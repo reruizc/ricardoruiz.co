@@ -38,6 +38,9 @@ FALLOS = REPO / 'Bases de datos' / 'leyes-senado' / 'actas' / 'gacetas-fallos.js
 LOG = REPO / 'Bases de datos' / 'leyes-senado' / 'actas' / 'harvest-gacetas.log'
 STATUS = REPO / 'Bases de datos' / 'leyes-senado' / 'actas' / 'harvest-gacetas-status.json'
 BUCKET = 'caudal-legislativo'
+TIMEOUT = 300   # curl timeout por request (s) — subido de 180: las gacetas
+                # recientes son enormes (verificado hasta 109 MB) y 180s las cortaba,
+                # ése fue el grueso de los 2.5k "fallos" transitorios del barrido inicial.
 
 _lock = Lock()
 _counts = {'ok': 0, 'skip': 0, 'fail_download': 0, 'fail_extract': 0, 'fail_empty': 0, 'fail_upload': 0}
@@ -62,13 +65,39 @@ def existing_keys():
     return keys
 
 
+DIST = REPO / 'Bases de datos' / 'leyes-senado' / 'dist'
+MAX_COMPARTIDA = 4   # idéntico a build_texto_index: una gaceta referenciada por
+                     # >4 proyectos es un boletín de radicación masiva (contamina
+                     # el índice) → se excluye allá, así que bajarla es doble
+                     # desperdicio (además son los PDFs gigantes que hacen timeout).
+
+
+def indexable_keys():
+    """Set de gaceta_key 'NNN-AAAA' que el índice SÍ va a usar: referenciadas por
+    ≤MAX_COMPARTIDA proyectos y NO como exposición de motivos. Mismo criterio que
+    build_texto_index.build_gaceta_to_proyectos, para no cosechar lo que se descarta."""
+    from collections import defaultdict
+    mp = defaultdict(int)
+    for fn in ('proyectos.jsonl', 'actos-legis.jsonl'):
+        p = DIST / fn
+        if not p.exists():
+            continue
+        for line in open(p, encoding='utf-8'):
+            r = json.loads(line)
+            for g in r.get('gacetas', []):
+                gk = g.get('gaceta')
+                if gk and g.get('tipo') != 'exposicion_motivos':
+                    mp[gk.replace('/', '-')] += 1
+    return {k for k, n in mp.items() if n <= MAX_COMPARTIDA}
+
+
 def _curl(args, cookie, out=None):
     cmd = ['/usr/bin/curl', '-s', '-A', UA, '-b', cookie, '-c', cookie] + args
     if out:
         cmd += ['-o', out]
-        subprocess.run(cmd, timeout=180)
+        subprocess.run(cmd, timeout=TIMEOUT)
         return None
-    return subprocess.run(cmd, capture_output=True, timeout=180).stdout
+    return subprocess.run(cmd, capture_output=True, timeout=TIMEOUT).stdout
 
 
 def descargar_ts(ent, fec, num):
@@ -163,13 +192,28 @@ def write_status(total, done):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--workers', type=int, default=8)
+    ap.add_argument('--workers', type=int, default=3,
+                    help='paralelo (bajado de 8: 8 workers + PDFs enormes saturaban → timeouts)')
     ap.add_argument('--desde', default='2020-01-01')
+    ap.add_argument('--timeout', type=int, default=0, help='override del curl timeout (s)')
+    ap.add_argument('--indexables', action='store_true',
+                    help='solo gacetas que el índice usará (≤4 proyectos, sin expo-motivos) — '
+                         'salta boletines gigantes, ~mitad del trabajo')
     ap.add_argument('--limit', type=int, default=0, help='solo para pruebas')
     args = ap.parse_args()
 
+    global TIMEOUT
+    if args.timeout:
+        TIMEOUT = args.timeout
+
     entries = [json.loads(l) for l in open(IDX, encoding='utf-8')]
     entries = [e for e in entries if e['fecha'] >= args.desde]
+    if args.indexables:
+        idxset = indexable_keys()
+        antes = len(entries)
+        entries = [e for e in entries if f"{e['num']}-{e['anio']}" in idxset]
+        _log(f'--indexables: {len(entries)} de {antes} enumeradas son indexables '
+             f'(≤{MAX_COMPARTIDA} proyectos, sin expo-motivos)')
     # más recientes PRIMERO: son las que más importan para "profundizar" temas
     # calientes (Lambda action tema?profundo=true) — que se puedan usar cuanto
     # antes, no al final de un barrido de 4+ horas.
