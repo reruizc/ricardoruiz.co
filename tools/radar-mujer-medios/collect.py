@@ -146,6 +146,18 @@ _KW_WORDS = set(norm(k) for k in KEYWORDS if " " not in k)
 _WORD_RE = re.compile(r"[a-zñ]+")
 
 _EXCLUIR = [norm(t) for t in CFG.get("excluir", {}).get("terminos", [])]
+# Medios que se descartan SIEMPRE (extranjeros, agregadores, redes) — el match
+# es por substring sobre el nombre normalizado del medio, así que "el sol de
+# mexico" y "cimacnoticias.com.mx" se pueden apagar con su propio nombre o con
+# un fragmento ('.com.mx').
+_EXCLUIR_MEDIOS = [norm(m) for m in CFG.get("excluir", {}).get("medios", []) if norm(m)]
+
+def medio_excluido(medio: str) -> bool:
+    """True si el medio está en la lista negra de excluir.medios."""
+    if not _EXCLUIR_MEDIOS:
+        return False
+    m = norm(medio or "")
+    return any(x in m for x in _EXCLUIR_MEDIOS)
 
 def match_keywords(title: str, summary: str):
     """Devuelve lista de términos del léxico que aparecen en title+summary."""
@@ -294,6 +306,8 @@ def fetch_google_news(query, gn, run_iso):
         return events
     for it in items:
         titulo, medio = split_gn_title(it["title"], it["source"])
+        if medio_excluido(medio):
+            continue
         matched = match_keywords(titulo, strip_tags(it["desc"]))
         if es_ruido(titulo, matched):
             continue

@@ -398,7 +398,8 @@ body.day-mode::before {
   /* botones/chips CUADRADOS con recuadro, patrón index.html (no pills) */
   .btn-back,.private-chip,.module-chip,.theme-btn,.module-status,.lens-toggle,.lens-btn,
   .tema-card h3 .cnt,.dl-btn,.pill,.chip,.f-btn,.seg-btn,.tab-btn,.toggle-btn,.mini-btn,
-  .cohort-btn,.metric-btn,.layer-btn,.filter-pill,.leg-chip {
+  .cohort-btn,.metric-btn,.layer-btn,.filter-pill,.leg-chip,
+  .mode-pill,.ip,.fc-selector select {
     border-radius:0 !important;
   }
   .btn-back,.private-chip,.module-chip,.lens-btn { border-width:1.5px !important; }
@@ -765,7 +766,7 @@ body.day-mode::before {
 
   <!-- DISCLAIMER -->
   <section class="disclaimer">
-    <strong>Sobre los datos.</strong> <a href="https://www.dane.gov.co/index.php/estadisticas-por-tema/mercado-laboral/segun-sexo">DANE GEIH Mercado Laboral según Sexo</a>, anexo trimestral mensual. Series de trimestres móviles solapados desde enero-marzo 2007. Cobertura del módulo: nacional + 23 ciudades y áreas metropolitanas. El boletín se publica entre el día 12 y el 15 de cada mes con el TM del mes anterior. Las cifras no llegan a departamental ni municipal — para esa lectura territorial usar el Censo 2018 (próxima versión de este módulo) o cruzar con SISBEN IV. La <strong>brecha estructural</strong> que medimos es la diferencia de tasas entre hombres y mujeres en cada indicador, no un indicador compuesto.
+    <strong>Sobre los datos.</strong> <a href="https://www.dane.gov.co/index.php/estadisticas-por-tema/mercado-laboral/segun-sexo">DANE GEIH Mercado Laboral según Sexo</a>, anexo trimestral mensual. Series de trimestres móviles solapados desde enero-marzo 2007. Cobertura del módulo: nacional + 23 ciudades y áreas metropolitanas. El boletín se publica hacia mediados de mes con el trimestre móvil que cierra <strong>dos meses antes</strong> (el TM marzo–mayo 2026 salió el 10 de julio de 2026); por eso el dato más reciente disponible siempre va con ese rezago. Las cifras no llegan a departamental ni municipal — para esa lectura territorial usar el Censo 2018 (próxima versión de este módulo) o cruzar con SISBEN IV. La <strong>brecha estructural</strong> que medimos es la diferencia de tasas entre hombres y mujeres en cada indicador, no un indicador compuesto.
   </section>
 
   <footer class="footer">
@@ -856,6 +857,18 @@ body.day-mode::before {
     const [y, m] = tm.split('-');
     return `${meses[parseInt(m,10)]} ${y}`;
   };
+  // Rango del trimestre móvil que cierra en tm ('2026-05' -> 'marzo–mayo 2026').
+  const fmtTMrango = tm => {
+    if (!tm) return '—';
+    const meses = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const [y, m] = tm.split('-');
+    const fin = parseInt(m, 10);
+    let ini = fin - 2, yIni = parseInt(y, 10);
+    if (ini < 1) { ini += 12; yIni -= 1; }
+    return yIni === parseInt(y, 10)
+      ? `${meses[ini]}–${meses[fin]} ${y}`
+      : `${meses[ini]} ${yIni}–${meses[fin]} ${y}`;
+  };
 
   // ─── KPIs ─────────────────────────────────────────────────────────
   function lastNonNull(arr) {
@@ -865,7 +878,8 @@ body.day-mode::before {
   }
   function renderKPIs() {
     if (!DATA) return;
-    document.getElementById('actualizado-a').textContent = `actualizado a ${fmtTM(DATA.actualizado_a)}`;
+    document.getElementById('actualizado-a').textContent =
+      `último dato disponible · trimestre móvil ${fmtTMrango(DATA.actualizado_a)}`;
     const m = DATA.nacional.mujeres, h = DATA.nacional.hombres;
     const tgpM = lastNonNull(m.tgp), tgpH = lastNonNull(h.tgp);
     const tdM  = lastNonNull(m.td),  tdH  = lastNonNull(h.td);
