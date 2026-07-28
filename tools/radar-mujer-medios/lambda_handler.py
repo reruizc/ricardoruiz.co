@@ -59,11 +59,23 @@ def _persist_raw(events, now, run_id):
                           ContentType="application/x-ndjson")
 
 
-def build_tablero(agg, n_total, digest, ventana_dias, now):
+def _digest_dias():
+    """Ventana de la LECTURA IA. Es más corta que la del tablero a propósito:
+    los volúmenes y la nube quieren una semana para tener masa, pero la lectura
+    del analista tiene que hablar de la coyuntura de estos días, no del promedio
+    de la semana."""
+    try:
+        return max(1, int(os.environ.get("RADAR_DIGEST_DIAS", "2")))
+    except ValueError:
+        return 2
+
+
+def build_tablero(agg, n_total, digest, ventana_dias, now, digest_dias=None):
     TL = report.TEMA_LABEL
     return {
         "generado_en": now.isoformat(),
         "ventana_dias": ventana_dias,
+        "digest_dias": digest_dias or _digest_dias(),
         "n_titulares": n_total,
         "n_medios": len(agg["por_medio"]),
         "n_temas": len(agg["por_tema"]),
@@ -93,7 +105,11 @@ def _add_redes(tablero, now):
             print(f"[redes raw] {e}")
     events = report.filter_window(events, ventana)
     agg = report.aggregate_social(events)
-    prompt = report.build_digest_prompt_social(agg, len(events), ventana)
+    # La lectura IA mira solo la coyuntura; los volúmenes/nube siguen a 7 d.
+    dd = _digest_dias()
+    ev_dig = report.filter_window(events, dd)
+    agg_dig = report.aggregate_social(ev_dig) if ev_dig else agg
+    prompt = report.build_digest_prompt_social(agg_dig, len(ev_dig) or len(events), dd, now)
     digest = report.call_deepseek(prompt)
     sent_redes = None
     try:
@@ -103,6 +119,8 @@ def _add_redes(tablero, now):
     RL = report.RED_LABEL
     tablero["redes"] = {
         "n_posts": len(events),
+        "digest_dias": dd,
+        "n_posts_digest": len(ev_dig),
         "digest": digest,
         "sentimiento": sent_redes,
         "por_red": [{"red": r, "label": RL.get(r, r), "n": n} for r, n in agg["por_red"].most_common()],
@@ -138,12 +156,18 @@ def handler(event, context):
     agg = report.aggregate(events)          # incluye cap por medio
     n_total = agg["n"]
 
-    prompt = report.build_digest_prompt(agg, n_total, ventana)
+    # Lectura IA sobre la COYUNTURA (2 d por defecto), no sobre toda la ventana.
+    dd = _digest_dias()
+    ev_dig = report.filter_window(events, dd)
+    agg_dig = report.aggregate(ev_dig) if ev_dig else agg
+    n_dig = agg_dig["n"] if ev_dig else n_total
+    prompt = report.build_digest_prompt(agg_dig, n_dig, dd, now)
     digest = report.call_deepseek(prompt)  # usa DEEPSEEK_API_KEY del env
     if not digest:
         print("[digest] sin DeepSeek (¿falta DEEPSEEK_API_KEY?) → tablero sin lectura")
 
-    tablero = build_tablero(agg, n_total, digest, ventana, now)
+    tablero = build_tablero(agg, n_total, digest, ventana, now, dd)
+    tablero["n_titulares_digest"] = n_dig
 
     # ── Sentimiento prensa (24h + 7d) ──
     try:
@@ -182,9 +206,26 @@ def handler(event, context):
         Body=json.dumps(tablero, ensure_ascii=False).encode("utf-8"),
         ContentType="application/json", CacheControl="public, max-age=300")
 
+    # ── Módulo de INFORMES (ventana larga) ──
+    # Va DESPUÉS de escribir el tablero y en su propio try: lee el histórico ya
+    # persistido en S3, así que no vuelve a golpear Google News ni Apify, y si
+    # falla no puede dejar el tablero a medias. Se salta con RADAR_INFORME=0.
+    informe_ok = False
+    if os.environ.get("RADAR_INFORME", "1") == "1":
+        try:
+            import informe as informe_mod
+            data = informe_mod.generar(now)
+            informe_mod.escribir(data)
+            informe_ok = any(v.get("informe") or v.get("informe_texto")
+                             for v in data["ventanas"].values())
+        except Exception as e:
+            print(f"[informe] falló (sigo, el tablero ya quedó escrito): {type(e).__name__}: {e}")
+
     print(f"[radar-mujer {run_id}] titulares={n_total} temas={len(agg['por_tema'])} "
-          f"medios={len(agg['por_medio'])} digest={'ok' if digest else 'no'}")
-    return {"run_id": run_id, "n_titulares": n_total, "digest": bool(digest)}
+          f"medios={len(agg['por_medio'])} digest={'ok' if digest else 'no'} "
+          f"(lectura sobre {dd} d) informe={'ok' if informe_ok else 'no'}")
+    return {"run_id": run_id, "n_titulares": n_total, "digest": bool(digest),
+            "digest_dias": dd, "informe": informe_ok}
 
 
 if __name__ == "__main__":

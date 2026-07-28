@@ -105,6 +105,28 @@ def temas_of(ev):
 
 MAX_POR_MEDIO = 8  # cap editorial: ningún medio domina el volumen/nube
 
+_MESES = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio",
+          "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
+def rango_humano(dias, hoy=None):
+    """'26 al 28 de julio de 2026'. El prompt DEBE recibir la fecha: si no,
+    el modelo escribe literalmente 'Semana del [fecha]' como marcador."""
+    hoy = hoy or datetime.now(timezone.utc)
+    ini = hoy - timedelta(days=max(0, dias - 1))
+    if ini.month == hoy.month and ini.year == hoy.year:
+        return f"{ini.day} al {hoy.day} de {_MESES[hoy.month]} de {hoy.year}"
+    if ini.year == hoy.year:
+        return f"{ini.day} de {_MESES[ini.month]} al {hoy.day} de {_MESES[hoy.month]} de {hoy.year}"
+    return (f"{ini.day} de {_MESES[ini.month]} de {ini.year} al "
+            f"{hoy.day} de {_MESES[hoy.month]} de {hoy.year}")
+
+# Regla que va en TODOS los prompts: el modelo rellena huecos con marcadores
+# si el dato no está en el contexto, y eso llega crudo al tablero.
+SIN_PLACEHOLDERS = ("No uses marcadores de posición de ningún tipo: nada de [fecha], "
+                    "[ciudad], [nombre] ni corchetes vacíos. La fecha del período está "
+                    "arriba; úsala tal cual. Si un dato no está en el contexto, omite la "
+                    "frase completa en vez de dejar un espacio por llenar.")
+
 def filter_window(events, dias):
     """Solo eventos con fecha_pub (o capturada) dentro de la ventana."""
     from datetime import datetime, timezone, timedelta
@@ -154,14 +176,16 @@ def aggregate(events):
     }
 
 
-def build_digest_prompt(agg, n_total, ventana_dias):
+def build_digest_prompt(agg, n_total, ventana_dias, hoy=None):
+    rango = rango_humano(ventana_dias, hoy)
     lines = []
     lines.append(f"Eres analista de medios de Mujeres por la Democracia (MxD), una organización "
                  f"que promueve la participación política de las mujeres en Colombia. Redacta un "
                  f"informe breve de escucha de medios (tuteo neutro, sobrio, sin adjetivos de más) "
-                 f"sobre la conversación de prensa de los últimos {ventana_dias} días en torno a las "
-                 f"mujeres y su rol político y social. Se monitorearon {n_total} titulares de medios "
-                 f"nacionales.\n")
+                 f"sobre la conversación de prensa en torno a las mujeres y su rol político y "
+                 f"social.\n")
+    lines.append(f"PERÍODO ANALIZADO: {rango} (últimos {ventana_dias} días).")
+    lines.append(f"Se monitorearon {n_total} titulares de medios nacionales.\n")
     lines.append("VOLUMEN POR TEMA (número de titulares):")
     for t, n in agg["por_tema"].most_common():
         lines.append(f"  - {TEMA_LABEL.get(t, t)}: {n}")
@@ -177,8 +201,10 @@ def build_digest_prompt(agg, n_total, ventana_dias):
     lines.append("1. UN PÁRRAFO de panorama: qué dominó la conversación y por qué importa para las mujeres.")
     lines.append("2. LOS 3 TEMAS MÁS CALIENTES con una frase cada uno (qué está pasando).")
     lines.append("3. UNA ALERTA: si hay un tema que se está encendiendo y MxD debería vigilar o pronunciarse.")
-    lines.append("4. UNA RECOMENDACIÓN de vocería (sobre qué hablar esta semana y con qué encuadre).")
+    lines.append("4. UNA RECOMENDACIÓN de vocería (sobre qué hablar en estos días y con qué encuadre).")
     lines.append("No inventes datos que no estén arriba. No cites cifras que no vengan de esta lista.")
+    lines.append(SIN_PLACEHOLDERS)
+    lines.append(f"Si encabezas el informe con el período, escribe exactamente: {rango}.")
     return "\n".join(lines)
 
 
@@ -267,12 +293,14 @@ def aggregate_social(events):
     top_posts = sorted(events, key=lambda e: _metrica_num(e.get("metrica")), reverse=True)[:12]
     return {"por_red": por_red, "palabras": palabras, "por_cuenta": por_cuenta, "top_posts": top_posts}
 
-def build_digest_prompt_social(agg, n_total, ventana_dias):
+def build_digest_prompt_social(agg, n_total, ventana_dias, hoy=None):
+    rango = rango_humano(ventana_dias, hoy)
     L = []
     L.append(f"Eres analista de redes sociales de Mujeres por la Democracia (MxD). Redacta un "
-             f"informe breve (tuteo neutro, sobrio) sobre la CONVERSACIÓN EN REDES de los últimos "
-             f"{ventana_dias} días en torno a las mujeres y su rol político/social en Colombia y la "
-             f"región. Se monitorearon {n_total} publicaciones (X, Instagram, TikTok).\n")
+             f"informe breve (tuteo neutro, sobrio) sobre la CONVERSACIÓN EN REDES en torno a las "
+             f"mujeres y su rol político/social en Colombia y la región.\n")
+    L.append(f"PERÍODO ANALIZADO: {rango} (últimos {ventana_dias} días).")
+    L.append(f"Se monitorearon {n_total} publicaciones (X, Instagram, TikTok).\n")
     L.append("VOLUMEN POR RED:")
     for r, n in agg["por_red"].most_common():
         L.append(f"  - {RED_LABEL.get(r, r)}: {n}")
@@ -286,8 +314,10 @@ def build_digest_prompt_social(agg, n_total, ventana_dias):
     L.append("1. UN PÁRRAFO: qué está moviendo la conversación en redes y qué tono tiene.")
     L.append("2. LOS 2-3 TEMAS o casos que más resuenan.")
     L.append("3. UNA ALERTA si algo se está viralizando y MxD debería mirar.")
-    L.append("4. UNA RECOMENDACIÓN de contenido/vocería para redes esta semana.")
+    L.append("4. UNA RECOMENDACIÓN de contenido/vocería para redes en estos días.")
     L.append("No inventes datos que no estén arriba.")
+    L.append(SIN_PLACEHOLDERS)
+    L.append(f"Si encabezas el informe con el período, escribe exactamente: {rango}.")
     return "\n".join(L)
 
 def call_deepseek(prompt, intentos=2, max_tokens=4000):
