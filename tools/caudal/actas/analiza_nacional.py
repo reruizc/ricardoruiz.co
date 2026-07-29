@@ -64,6 +64,10 @@ def main():
         idx = data['agendamientos']
         if not idx:
             continue
+        if com == 'plenaria' or data.get('ambito') == 'plenaria':
+            print('· plenaria excluida de este agregado (no es comisión; '
+                  'su cola es la de segundo debate — ver bloqueo.json)')
+            continue
         b, med = stats_com(idx)
         for lab in nat:
             nat[lab][0] += b[lab][0]; nat[lab][1] += b[lab][1]

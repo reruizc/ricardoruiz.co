@@ -726,12 +726,24 @@
     const el=document.getElementById('bloq-box'); if(el&&BLOQ) el.innerHTML=posChart(BLOQ); return BLOQ; }
   function posChart(s){
     if(!s||!s.p_tratado_por_posicion) return '<div class="cob-note">Sin datos.</div>';
-    const P=s.p_tratado_por_posicion, labs=['1º','2º-3º','4º-6º','7º-10º','11º-15º'];
-    const max=Math.max(...labs.map(l=>(P[l]||{}).pct||0),1);
-    const bars=labs.map(l=>{const v=(P[l]||{}).pct||0;
-      return `<div class="cx-row"><span class="cx-lab">${l} del día</span><span class="cx-bar"><span style="width:${Math.round(100*v/max)}%;background:linear-gradient(90deg,var(--amber),#e8b96a)"></span></span><span class="cx-n">${v}%</span></div>`;}).join('');
-    const t=s.totales||{};
-    return `<div class="cob-note" style="margin-bottom:.7rem">Probabilidad de que un proyecto se trate según su <b>posición</b> en el orden del día · ${t.proyectos||0} proyectos, ${t.comisiones||0} comisiones de Cámara.</div>${bars}<div class="cob-note" style="margin-top:.7rem">Ser el 1º del día ≈ ${(P['1º']||{}).pct||0}%; del 4º en adelante cae a ~20%. <b>El orden de la agenda decide.</b></div>`;
+    const labs=['1º','2º-3º','4º-6º','7º-10º','11º-15º'];
+    const barras=(P,grad)=>{
+      const max=Math.max(...labs.map(l=>(P[l]||{}).pct||0),1);
+      return labs.map(l=>{const v=(P[l]||{}).pct||0;
+        return `<div class="cx-row"><span class="cx-lab">${l} del día</span><span class="cx-bar"><span style="width:${Math.round(100*v/max)}%;background:${grad}"></span></span><span class="cx-n">${v}%</span></div>`;}).join('');
+    };
+    const P=s.p_tratado_por_posicion, t=s.totales||{};
+    let html=`<div class="cob-note" style="margin-bottom:.7rem">Probabilidad de que un proyecto se trate según su <b>posición</b> en el orden del día · ${t.proyectos||0} proyectos, ${t.comisiones||0} comisiones de Cámara.</div>${barras(P,'linear-gradient(90deg,var(--amber),#e8b96a)')}<div class="cob-note" style="margin-top:.7rem">Ser el 1º del día ≈ ${(P['1º']||{}).pct||0}%; del 4º en adelante cae a ${(P['4º-6º']||{}).pct||0}% o menos. <b>El orden de la agenda decide.</b></div>`;
+    // la plenaria es la SEGUNDA cola (segundo debate): mismo cálculo, aparte
+    const pl=s.plenaria;
+    if(pl&&pl.p_tratado_por_posicion){
+      const PP=pl.p_tratado_por_posicion, pt=pl.totales||{};
+      html+=`<div style="margin-top:1.1rem;padding-top:.9rem;border-top:1px solid rgba(255,255,255,.07)">
+        <div class="ga-tag" style="color:var(--teal)">◈ La otra cola · plenaria de Cámara (segundo debate)</div>
+        <div class="cob-note" style="margin:.35rem 0 .7rem">${pt.proyectos||0} proyectos en ${pt.sesiones||0} órdenes del día de plenaria · mediana de <b>${pt.mediana_agend||0}</b> agendamientos por proyecto.</div>
+        ${barras(PP,'linear-gradient(90deg,var(--teal),#5fd4c4)')}</div>`;
+    }
+    return html;
   }
 
   // --- chart builders (CSS puro, sin librerías) ---
@@ -1646,12 +1658,18 @@
     if(f.jala_presupuesto_regional) chips.push(`<span class="emp-badge" style="color:var(--amber);background:rgba(224,160,64,.08);border:1px solid rgba(224,160,64,.35)">Jala presupuesto regional</span>`);
     // historial de re-radicación
     const hist=(f.historial_reradicacion||[]).filter(h=>h.anio);
-    const bl=f.bloqueo;
-    const bloqHTML=bl?`<div class="bloq-card">
-      <div class="ga-tag" style="color:var(--amber)">◈ Bloqueo en comisión · órdenes del día</div>
-      <div class="bloq-big"><b>${bl.n}×</b> agendado en Comisión ${(bl.com||[]).map(c=>COM_NAME[c]||c).join(', ')}</div>
-      <div class="ga-t">Posición promedio en la agenda del día: <b>${bl.pos_prom}</b> · entre ${mesAno(bl.primera)} y ${mesAno(bl.ultima)}</div>
-      <div class="cob-note">Veces que se puso en el orden del día de la comisión. Muchos agendamientos sin avanzar = lo dejaban esperando en la cola (bloqueo).</div>
+    // órdenes del día: dos colas distintas — comisión (primer debate) y plenaria
+    // (segundo debate). Un proyecto puede estar solo en una de las dos.
+    const bl=f.bloqueo, plen=bl&&bl.plen;
+    const bloqLineas=[];
+    if(bl&&bl.n)bloqLineas.push(`<div class="bloq-big"><b>${bl.n}×</b> agendado en Comisión ${(bl.com||[]).map(c=>COM_NAME[c]||c).join(', ')}</div>
+      <div class="ga-t">Posición promedio en la agenda del día: <b>${bl.pos_prom}</b> · entre ${mesAno(bl.primera)} y ${mesAno(bl.ultima)}</div>`);
+    if(plen)bloqLineas.push(`<div class="bloq-big" style="margin-top:${bl&&bl.n?'.55rem':'0'}"><b>${plen.n}×</b> agendado en <b>plenaria</b> de Cámara</div>
+      <div class="ga-t">Posición promedio en la agenda del día: <b>${plen.pos_prom}</b> · entre ${mesAno(plen.primera)} y ${mesAno(plen.ultima)}</div>`);
+    const bloqHTML=bloqLineas.length?`<div class="bloq-card">
+      <div class="ga-tag" style="color:var(--amber)">◈ Bloqueo en la cola · órdenes del día</div>
+      ${bloqLineas.join('')}
+      <div class="cob-note">Veces que se puso en el orden del día${bl&&bl.n&&plen?' de la comisión y de la plenaria':(plen?' de la plenaria':' de la comisión')}. Muchos agendamientos sin avanzar = lo dejaban esperando en la cola (bloqueo).</div>
     </div>`:'';
     const vt=f.votaciones;
     const VTC={aplazamiento:'var(--amber)',archivo:'var(--red)',aprobado:'var(--green)',negado:'var(--red)',otro:'var(--gray)'};

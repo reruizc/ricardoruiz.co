@@ -5291,10 +5291,34 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
   Responde el foso que ni Dapper ni Sonar tienen: **agendado N× vs debatido/aplazado/votado**.
   - **Agendamientos** (`harvest_ordenes.py`): Cámara **wp-json** `/wp/v2/evento?comision_evento=<id>&evento_tipo=185`
     (órdenes del día, PDF de descarga directa, sin JSF). Barrió las **14 comisiones** (term ids en
-    `COMISIONES`, Primera=183; `harvest_ordenes.py todas`). PDFs digitales → texto → nº de proyecto
-    agendado por sesión (regex bloque "Proyecto de Ley No. N de AAAA Cámara «título»"). Corta en
-    "Anuncio de proyectos" para que la POSICIÓN sea la de la cola de debate. Cache en
-    `Bases de datos/leyes-senado/actas/ordenes/{com}/` (gitignored, ~1.1GB solo texto+pdf).
+    `COMISIONES`, Primera=183) **+ la PLENARIA** (`PLENARIA`/`TARGETS`, ver abajo).
+    `harvest_ordenes.py todas` = 14 + plenaria · `comisiones` = solo las 14 · `--offline` re-parsea el
+    caché sin tocar la red (regresión). PDFs digitales → texto → nº de proyecto
+    agendado por sesión (regex bloque "Proyecto de Ley No. N de AAAA Cámara «título»"). Cache en
+    `Bases de datos/leyes-senado/actas/ordenes/{com}/` (gitignored, ~1.4GB texto+pdf) + los eventos
+    de la API en `{com}/_eventos.json`.
+  - **PLENARIA de Cámara** (jul-2026 · la SEGUNDA cola, la de segundo debate): publica su orden del
+    día bajo la taxonomía **"Secretaría General" (id 253)** — no existe un término "Plenaria". **654
+    órdenes del día · 511 con agenda · 1.488 proyectos** (más que cualquier comisión), 96% casan con
+    un `numero_camara` del dataset. Va SIEMPRE agregada aparte (`ambito:'plenaria'` en su JSON, y
+    `sistema.plenaria` en bloqueo.json): no es una comisión y mezclarla contaminaría el
+    P(tratado|posición) nacional y el ranking de comisiones. Su curva tiene la misma forma pero más
+    alta — **1º del día 71% vs 53% en comisión**, 4º-6º 48% — la plenaria mueve su agenda más rápido,
+    y el efecto posición igual manda. Ejemplos de cola larga: 354/23 agendado **25×** (terminó en ley,
+    o sea agendar mucho = esperar mucho, no siempre morir) y 68/16 **21×** → ARCHIVADO_TIEMPO.
+  - **3 fixes del parseo que vinieron con la plenaria** (rehacen `agendamientos-*.json`):
+    (a) **corte del "Anuncio de proyectos"** — se cortaba en la PRIMERA aparición, pero en la plenaria
+    ese es el título de la sección III del índice, ARRIBA de los proyectos → truncaba todo. `cut_anuncio`
+    ahora corta en la primera aparición que quede DESPUÉS del primer proyecto citado. En comisión el
+    encabezado va al final, así que no hay regresión y de paso **recuperó sesiones que se estaban
+    perdiendo** (Séptima 139→224 sesiones con agenda, 221→376 proyectos; Primera 414→449).
+    (b) **fecha de SESIÓN, no de publicación** (`fecha_sesion`): la agenda se publica días antes. El
+    título la trae — plenaria "(17/06/2026)" casi siempre, comisión "Junio 17/2026" solo ~8% (formato
+    nuevo 2026) — y solo se acepta si cae en la ventana [-1, +14] días respecto de la publicación,
+    porque la Cámara reusa títulos con el año viejo (visto: publicado 2026-03-13, título "Marzo 18/2025").
+    (c) **una sesión = un agendamiento**: la Cámara republica el orden del día corregido para el mismo
+    día (`…-2.pdf`) → se colapsa por fecha de sesión con la mejor posición (antes inflaba el conteo).
+    Tras los 3: comisiones 2.311 → **2.475** proyectos, y el sistema casi no se mueve (1º 53,4%→52,6%).
   - **Análisis** (`analiza_bloqueo.py` por comisión · `analiza_nacional.py` agrega): proxy "tratado"=
     no reaparece la sesión siguiente (gap≤45d). Hallazgos: **P(tratado|posición) 1º≈53% → 4º-6º≈21%**
     (el orden de la agenda decide); mediana 5 agendamientos; **hazard de parar más alto al inicio**
@@ -5307,10 +5331,23 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
     (relato con quién propuso archivo + tally). → `votaciones.json` (1.627 proyectos, 260 aplazamientos).
     El voto nominal por congresista está en el detalle `/votaciones/{id}/` (pendiente, bajo demanda).
   - **Datos a S3** (`build_bloqueo_s3.py` → `metadata/bloqueo.json` sistema+lookup · `votaciones.json`).
+    `bloqueo.json` (663 KB · **2.739 proyectos**: 1.077 en las dos colas, 411 solo plenaria) trae
+    `sistema` (comisiones) + `sistema.plenaria` + `por_proyecto[tok]` con el bloque de comisión
+    (`n`, `pos_prom`, `com`) y `plen` cuando además estuvo en la cola de plenaria (un proyecto de
+    solo-plenaria viene con `n:0` y `com:[]` — el frontend debe soportarlo).
     Lambda: acciones `bloqueo` (sistema para el landing) + enriquece `proyecto` con `bloqueo` (match
-    nº Cámara) y `votaciones` (match Senado/Cámara). Frontend: panel ámbar "Bloqueo en comisión"
-    (agendado N×, posición) + panel azul "Trámite · debates y votaciones" (aplazamientos + tally) +
-    gráfica P(tratado|posición) en el landing.
+    nº Cámara, `plen` viaja dentro sin cambios en la Lambda) y `votaciones` (match Senado/Cámara).
+    Frontend: panel ámbar "Bloqueo en la cola" (comisión y/o plenaria, agendado N× + posición) +
+    panel azul "Trámite · debates y votaciones" (aplazamientos + tally) + gráfica P(tratado|posición)
+    en el landing con un segundo bloque teal "La otra cola · plenaria".
+  - **Refresco DIARIO automático (jul-2026):** las órdenes del día entraron al `run_diario.sh` que
+    dispara launchd 2×/día (última etapa, después de `leyes_en_vivo`): `harvest_ordenes.py todas` →
+    `build_bloqueo_s3.py` → `aws s3 cp bloqueo.json`. Es incremental (PDF/TXT cacheados por evento):
+    **~26 s cuando no hay sesiones nuevas**, y otro host (`camara.gov.co/wp-json`, sin el WAF de
+    leyes.senado) así que no interfiere con el rastreo de radicados. El `rc` de cada etapa sale en la
+    línea de cierre del log (`ordenes=… bloqueo=… bloqueo_up=…`); la subida se salta sola si el build
+    falló. Antes esto era corrida manual y el dato estaba congelado en **16-jun-2026** (la legislatura
+    instalada el 20-jul-2026 no aparecía).
   - **Descarga de gacetas por CURL — RESUELTO (jul-2026, `descargar_gaceta.py`).** La nota vieja
     ("NO bulk automatizable, clic a clic") **quedó obsoleta**: el portal de la Imprenta SÍ se
     automatiza. El deep-link `index2.xhtml?ent=Senado|Camara&fec=D-M-YYYY&num=NNN` (que sale del
@@ -5352,8 +5389,12 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
   a diferencia de Cámara) · voto MANUAL de Cámara ago-2021/sep-2022 (columna "X" sin texto,
   necesita extracción por coordenadas tipo pdfplumber) · OCR de actas/gacetas escaneadas
   pre-nov-2020 · voto nominal por congresista del detalle de Congreso Visible (Senado
-  pre-2022) · refinar títulos de agendamientos (71%→100%). NADA bloquea el pitch — el
-  módulo se demuestra completo. Ver `[[reference_actas_bloqueo_fuentes]]` en memoria.
+  pre-2022) · refinar títulos de agendamientos (comisión ~71%, plenaria 60% — el título
+  sale del propio PDF; lo que falta se puede rellenar del dataset por número, no hace falta
+  más parseo) · **órdenes del día de SENADO** (el equivalente al wp-json de Cámara no
+  existe: Senado es Joomla; sin eso el índice de bloqueo es solo de Cámara — es el hueco
+  grande que queda). NADA bloquea el pitch — el módulo se demuestra completo.
+  Ver `[[reference_actas_bloqueo_fuentes]]` en memoria.
 
 **Fase 3 · voto nominal de Cámara — RESUELTO (jul-2026 · `tools/caudal/actas/`).** Cierra
 el hueco de "voto nominal cuatrienio actual" que había quedado on-demand: se encontró que

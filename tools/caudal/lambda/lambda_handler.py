@@ -1322,7 +1322,8 @@ def handler(event, context):
         ficha = caudal.proyecto(pid, body.get('tb', 'pdly'))
         if not ficha:
             return _resp(404, {'error': f'proyecto {pid} no encontrado'})
-        # bloqueo por número Cámara (órdenes del día de comisión)
+        # bloqueo por número Cámara (órdenes del día de comisión + plenaria:
+        # la entrada trae `plen` cuando también estuvo en la cola de plenaria)
         tok_c = _num_token(ficha.get('numero_camara'))
         if tok_c:
             bl = _bloqueo().get('por_proyecto', {}).get(tok_c)

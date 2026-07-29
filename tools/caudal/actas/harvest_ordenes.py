@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-Caudal · Fase 3 (piloto) — harvester de ÓRDENES DEL DÍA por comisión (agendamientos).
+Caudal · Fase 3 — harvester de ÓRDENES DEL DÍA de Cámara (agendamientos).
 
 Fuente: API REST WordPress de la Cámara (curl con UA de navegador, sin el portal
 JSF de la Imprenta). Cada evento tipo "Orden del día" trae un PDF digital de
 descarga directa; dentro van los números de los proyectos agendados esa sesión.
+
+Cubre 15 ámbitos: las 14 comisiones + la PLENARIA (taxonomía "Secretaría
+General", id 253 — ahí publica la plenaria su orden del día).
 
 Señal de bloqueo = cuántas veces se AGENDÓ un proyecto (aparece en el orden del
 día) contra cuántos DEBATES EFECTIVOS tuvo (ya lo sabemos del dataset). Agendado
@@ -13,8 +16,15 @@ muchas veces + pocos/ningún debate = lo estaban dejando caer / bloqueando.
 Uso:
   python3 tools/caudal/actas/harvest_ordenes.py primera --limit 150
   python3 tools/caudal/actas/harvest_ordenes.py primera            # todo (600)
+  python3 tools/caudal/actas/harvest_ordenes.py plenaria           # solo plenaria
+  python3 tools/caudal/actas/harvest_ordenes.py comisiones         # las 14
+  python3 tools/caudal/actas/harvest_ordenes.py todas              # 14 + plenaria
+  python3 tools/caudal/actas/harvest_ordenes.py todas --offline    # re-parsea el
+                                                    # caché, sin tocar la red
+Es incremental y resumible: los PDF/TXT se cachean por id de evento, así que una
+corrida diaria solo baja las sesiones nuevas (por eso entra al run_diario.sh).
 """
-import subprocess, json, re, os, sys
+import subprocess, json, re, os, sys, datetime
 from pathlib import Path
 from collections import defaultdict
 
@@ -33,6 +43,13 @@ COMISIONES = {
     'afro': 272, 'ordenamiento': 260, 'ddhh': 271, 'cuentas': 257,
     'etica': 258, 'mujer': 266, 'electoral': 269,
 }
+# La PLENARIA de Cámara publica su orden del día bajo la taxonomía "Secretaría
+# General" (id 253) — no hay término "Plenaria" en comision_evento. Son ~654
+# órdenes del día, otra cola de espera: proyectos que YA pasaron comisión y
+# esperan segundo debate. Se cosecha igual pero se agrega aparte (no es una
+# comisión y no debe entrar al ranking/estadística de comisiones).
+PLENARIA = {'plenaria': 253}
+TARGETS = {**COMISIONES, **PLENARIA}
 PROJ_RE = re.compile(r'\b(\d{1,4})\s*/\s*(?:20)?(\d{2})\b')
 PDF_RE = re.compile(r'(?:href|src)="([^"]+\.pdf)"', re.I)
 # bloque del proyecto en el orden del día: número + año + título (entre comillas).
@@ -54,6 +71,70 @@ PROJ_BLOCK_RE = re.compile(
 GACETA_REF_RE = re.compile(
     r'Proyecto de (?:Ley|Acto Legislativo)\s*:\s*Gaceta\s*(?:del\s+Congreso|No\.?)?'
     r'\s*(\d{1,4})\s*de\s*(20\d{2})', re.I)
+ANUNCIO_RE = re.compile(r'anuncio\s+de\s+proyecto\w*', re.I)
+# fecha de la SESIÓN (la agenda es para un día distinto al de publicación del
+# evento): plenaria la pone entre paréntesis "(17/06/2026)", las comisiones en
+# texto "Orden del día – Junio 17/2026 – …".
+FECHA_SLASH_RE = re.compile(r'\((\d{1,2})/(\d{1,2})/(20\d{2})\)')
+MESES = {'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
+         'julio': 7, 'agosto': 8, 'septiembre': 9, 'setiembre': 9, 'octubre': 10,
+         'noviembre': 11, 'diciembre': 12}
+FECHA_MES_RE = re.compile(r'(' + '|'.join(MESES) + r')\s*(\d{1,2})\s*/\s*(20\d{2})', re.I)
+
+
+def cut_anuncio(txt):
+    """Recorta el 'Anuncio de proyectos' (los que se anuncian para la PRÓXIMA
+    sesión) para que la posición medida sea la de la cola de debate de HOY.
+
+    En las comisiones ese encabezado va al final, después de la agenda; en la
+    plenaria es la sección III del índice, ARRIBA de las secciones que traen los
+    proyectos (informes de conciliación, segundo debate). Por eso no se corta en
+    la primera aparición: se corta en la primera que quede DESPUÉS del primer
+    proyecto citado. Si el encabezado va antes de todo proyecto, no recorta nada.
+    """
+    prim = None
+    for rx in (PROJ_BLOCK_RE, GACETA_REF_RE):
+        m = rx.search(txt)
+        if m and (prim is None or m.start() < prim):
+            prim = m.start()
+    for m in ANUNCIO_RE.finditer(txt):
+        if prim is None or m.start() > prim:
+            return txt[:m.start()]
+    return txt
+
+
+def fecha_sesion(titulo, pub):
+    """Fecha de la SESIÓN desde el título del evento; cae a la de publicación.
+
+    La agenda se publica días antes de la sesión (plenaria: casi siempre 1 día;
+    comisión: hasta una semana), así que la fecha del título es la buena. Solo
+    ~8% de los títulos de comisión la traen (formato nuevo, 2026) contra casi
+    todos los de plenaria; el resto se queda con la de publicación.
+    Se acepta únicamente si cae en una ventana sana alrededor de la publicación
+    — la Cámara reusa títulos con el año viejo (visto: publicado 2026-03-13 con
+    título "Marzo 18/2025"), y ese ruido movería la sesión un año entero.
+    """
+    t = re.sub(r'<[^>]+>', ' ', titulo or '')
+    cand = None
+    m = FECHA_SLASH_RE.search(t)
+    if m:
+        d, mo, y = int(m.group(1)), int(m.group(2)), m.group(3)
+        if 1 <= d <= 31 and 1 <= mo <= 12:
+            cand = f'{y}-{mo:02d}-{d:02d}'
+    if cand is None:
+        m = FECHA_MES_RE.search(t)
+        if m:
+            mo, d, y = MESES[m.group(1).lower()], int(m.group(2)), m.group(3)
+            if 1 <= d <= 31:
+                cand = f'{y}-{mo:02d}-{d:02d}'
+    if cand and pub:
+        try:
+            dif = (datetime.date.fromisoformat(cand) - datetime.date.fromisoformat(pub)).days
+        except ValueError:
+            return pub, False
+        if -1 <= dif <= 14:
+            return cand, True
+    return pub, False
 
 
 def curl(url, out=None):
@@ -80,6 +161,25 @@ def fetch_eventos(com_id, tipo=TIPO_ORDEN):
             break
         page += 1
     return out
+
+
+def eventos_de(name, offline=False):
+    """Eventos del ámbito, cacheados en ordenes/{name}/_eventos.json. Con
+    --offline se lee solo el caché (re-parseo sin red, para regresión)."""
+    cf = CACHE / 'ordenes' / name / '_eventos.json'
+    if offline:
+        if not cf.exists():
+            print(f'  ! sin caché de eventos para {name} (corre online una vez)')
+            return []
+        return json.load(open(cf, encoding='utf-8'))
+    evs = fetch_eventos(TARGETS[name])
+    if evs:                              # solo pisa el caché si la red respondió
+        cf.parent.mkdir(parents=True, exist_ok=True)
+        json.dump(evs, open(cf, 'w', encoding='utf-8'), ensure_ascii=False)
+    elif cf.exists():
+        print(f'  ! la API no respondió; sigo con el caché de {name}')
+        return json.load(open(cf, encoding='utf-8'))
+    return evs
 
 
 def pdf_url(ev):
@@ -137,30 +237,46 @@ def load_gaceta_map():
     return mp
 
 
-def run(com, limit=None):
-    com_id = COMISIONES[com]
+_GMAP = None
+
+
+def gaceta_map_cached():
+    """proyectos.jsonl son 28 MB: se lee una vez por corrida, no una por ámbito."""
+    global _GMAP
+    if _GMAP is None:
+        _GMAP = load_gaceta_map()
+    return _GMAP
+
+
+def run(com, limit=None, offline=False):
+    com_id = TARGETS[com]
     outdir = CACHE / 'ordenes' / com
     outdir.mkdir(parents=True, exist_ok=True)
 
-    print(f'· órdenes del día de Comisión {com.title()} (id {com_id})…')
-    eventos = fetch_eventos(com_id)
+    rot = 'Plenaria (Secretaría General)' if com == 'plenaria' else f'Comisión {com.title()}'
+    print(f'· órdenes del día de {rot} (id {com_id}){" · offline" if offline else ""}…')
+    eventos = eventos_de(com, offline=offline)
     if limit:
         eventos = eventos[:limit]
     print(f'  {len(eventos)} sesiones')
-    gaceta_map = load_gaceta_map()
+    gaceta_map = gaceta_map_cached()
 
     agend = defaultdict(list)          # token → [{fecha, pos, n_dia}]
     titulos = {}                       # token → título (del propio orden del día)
-    n_pdf, n_ok = 0, 0
+    n_pdf, n_ok, n_fs = 0, 0, 0
     for i, ev in enumerate(eventos):
         url = pdf_url(ev)
         if not url:
             continue
-        fecha = (ev.get('date') or '')[:10]
+        pub = (ev.get('date') or '')[:10]
+        fecha, es_sesion = fecha_sesion((ev.get('title') or {}).get('rendered', ''), pub)
+        n_fs += es_sesion
         fn = outdir / f"{ev['id']}.pdf"
         tf = outdir / f"{ev['id']}.txt"
         if tf.exists():
             txt = tf.read_text(encoding='utf-8')
+        elif offline:
+            continue                   # sin caché de texto y sin red: se salta
         else:
             if not fn.exists() or fn.stat().st_size < 500:
                 curl(url, str(fn))
@@ -170,10 +286,11 @@ def run(com, limit=None):
             txt = extract_text(str(fn))
             tf.write_text(txt, encoding='utf-8')
             n_pdf += 1
-        # el orden del día trae 2 listas: la AGENDA de debate (arriba) y el
-        # "Anuncio de proyectos" (abajo, para la próxima sesión). Para la posición
-        # real en la cola de debate, cortamos en el anuncio.
-        body = re.split(r'anuncio\s+de\s+proyecto', txt, maxsplit=1, flags=re.I)[0]
+        # el orden del día trae 2 listas: la AGENDA de debate y el "Anuncio de
+        # proyectos" (los de la próxima sesión). Para que la posición sea la de la
+        # cola de debate, se recorta el anuncio (ver cut_anuncio: en comisión va al
+        # final, en plenaria es la sección III del índice).
+        body = cut_anuncio(txt)
         # lista ordenada de proyectos únicos (por 1ª aparición) → posición
         orden, seen = [], set()
         for m in PROJ_BLOCK_RE.finditer(body):
@@ -203,10 +320,17 @@ def run(com, limit=None):
         if (i + 1) % 50 == 0:
             print(f'  …{i + 1}/{len(eventos)}')
 
-    # índice de agendamientos por proyecto
+    # índice de agendamientos por proyecto. Una SESIÓN = un agendamiento: la
+    # Cámara republica el orden del día corregido para el mismo día (…-2.pdf),
+    # así que se colapsa por fecha de sesión y se guarda la mejor posición.
     index = {}
     for tok, evs in agend.items():
-        evs.sort(key=lambda e: e['fecha'])
+        por_fecha = {}
+        for e in evs:
+            prev = por_fecha.get(e['fecha'])
+            if prev is None or e['pos'] < prev['pos']:
+                por_fecha[e['fecha']] = e
+        evs = sorted(por_fecha.values(), key=lambda e: e['fecha'])
         index[tok] = {
             'titulo': titulos.get(tok, ''), 'n': len(evs),
             'primera': evs[0]['fecha'], 'ultima': evs[-1]['fecha'],
@@ -215,8 +339,9 @@ def run(com, limit=None):
         }
     rows = sorted(index.items(), key=lambda kv: -kv[1]['n'])
 
-    out = {'comision': com, 'com_id': com_id, 'n_sesiones': len(eventos),
-           'n_sesiones_con_proyectos': n_ok,
+    out = {'comision': com, 'com_id': com_id, 'ambito': 'plenaria' if com == 'plenaria' else 'comision',
+           'n_sesiones': len(eventos), 'n_sesiones_con_proyectos': n_ok,
+           'n_con_fecha_sesion': n_fs,
            'n_proyectos_agendados': len(index), 'agendamientos': index}
     outf = CACHE / f'agendamientos-{com}.json'
     json.dump(out, open(outf, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
@@ -231,7 +356,17 @@ def run(com, limit=None):
 
 if __name__ == '__main__':
     limit = int(sys.argv[sys.argv.index('--limit') + 1]) if '--limit' in sys.argv else None
+    offline = '--offline' in sys.argv
     arg = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('-') else 'primera'
-    coms = list(COMISIONES) if arg == 'todas' else [arg]
+    if arg == 'todas':
+        coms = list(TARGETS)
+    elif arg == 'comisiones':
+        coms = list(COMISIONES)
+    else:
+        coms = [arg]
+    desconocidas = [c for c in coms if c not in TARGETS]
+    if desconocidas:
+        sys.exit(f'ámbito desconocido: {", ".join(desconocidas)}\n'
+                 f'válidos: {", ".join(TARGETS)} · todas · comisiones')
     for c in coms:
-        run(c, limit)
+        run(c, limit, offline=offline)
