@@ -224,19 +224,50 @@ def _votaciones_nominal():
 
 _VOTAC_CONG = None
 _VOTAC_CONG_IDX = None
+_VOTAC_SEN_NOM = None
+_VOTAC_SEN_CONG = None
+
+
+def _votaciones_senado_nominal():
+    """Voto NOMINAL de la plenaria de SENADO por proyecto (API pública
+    app.senado.gov.co, 2017-2026). Gemelo de _votaciones_nominal (Cámara).
+    Cache warm."""
+    global _VOTAC_SEN_NOM
+    if _VOTAC_SEN_NOM is None:
+        try:
+            _VOTAC_SEN_NOM = _get_json('metadata/votaciones-senado-nominal.json')
+        except Exception:
+            _VOTAC_SEN_NOM = {'por_proyecto': {}}
+    return _VOTAC_SEN_NOM
+
+
+def _senadores():
+    """Récord de voto POR SENADOR. Mismo shape que _congresistas (Cámara)."""
+    global _VOTAC_SEN_CONG
+    if _VOTAC_SEN_CONG is None:
+        try:
+            _VOTAC_SEN_CONG = _get_json('metadata/votaciones-senado-congresista.json')
+        except Exception:
+            _VOTAC_SEN_CONG = {'por_congresista': {}}
+    return _VOTAC_SEN_CONG
 
 
 def _congresistas():
-    """Récord de voto POR CONGRESISTA (keyed por roster_key). Cache warm."""
+    """Récord de voto POR CONGRESISTA (keyed por roster_key), Cámara + Senado.
+    El índice de nombres cubre las dos cámaras para que un nombre tecleado
+    resuelva sin importar dónde votó la persona. Cache warm."""
     global _VOTAC_CONG, _VOTAC_CONG_IDX
     if _VOTAC_CONG is None:
         try:
             _VOTAC_CONG = _get_json('metadata/votaciones-camara-congresista.json')
         except Exception:
             _VOTAC_CONG = {'por_congresista': {}}
-        # índice token → keys (para resolver un nombre tecleado/clickeado)
+        # índice token → keys (para resolver un nombre tecleado/clickeado);
+        # incluye las keys de Senado para que también sean resolubles.
         _VOTAC_CONG_IDX = {}
-        for k in _VOTAC_CONG.get('por_congresista', {}):
+        keys = set(_VOTAC_CONG.get('por_congresista', {}))
+        keys |= set(_senadores().get('por_congresista', {}))
+        for k in keys:
             for t in k.split():
                 _VOTAC_CONG_IDX.setdefault(t, set()).add(k)
     return _VOTAC_CONG
@@ -248,10 +279,25 @@ def _canon_tokens(s):
     return frozenset(t for t in _re.split(r'[^A-Z0-9]+', s) if len(t) > 1)
 
 
+def _rec_congresista(key):
+    """Récord de una persona fusionando las dos cámaras. Devuelve el registro de
+    donde más votó como base y anexa el de la otra en `otra_camara` (hay quien fue
+    representante y luego senador). None si no está en ninguna."""
+    c = _congresistas().get('por_congresista', {}).get(key)
+    s = _senadores().get('por_congresista', {}).get(key)
+    if c and not c.get('camara'):
+        c = dict(c, camara='Cámara')
+    if c and s:
+        base, otra = (c, s) if c.get('n_votos', 0) >= s.get('n_votos', 0) else (s, c)
+        return dict(base, otra_camara=otra)
+    return c or s
+
+
 def _resolver_congresista(q):
-    """Devuelve (key exacto|None, [candidatos]) resolviendo q por subconjunto de tokens."""
-    pc = _congresistas().get('por_congresista', {})
-    if q in pc:
+    """Devuelve (key exacto|None, [candidatos]) resolviendo q por subconjunto de
+    tokens sobre las dos cámaras."""
+    _congresistas()   # asegura el índice construido (Cámara + Senado)
+    if _rec_congresista(q):
         return q, []
     atoks = _canon_tokens(q)
     if not atoks:
@@ -262,7 +308,7 @@ def _resolver_congresista(q):
         cand = s if cand is None else (cand & s)
         if not cand:
             break
-    keys = sorted(cand or [], key=lambda k: -pc[k].get('n_votos', 0))
+    keys = sorted(cand or [], key=lambda k: -((_rec_congresista(k) or {}).get('n_votos', 0)))
     if len(keys) == 1:
         return keys[0], []
     return None, keys[:12]
@@ -1275,6 +1321,13 @@ def handler(event, context):
             vn = _votaciones_nominal().get('por_proyecto', {}).get(tok_c)
             if vn:
                 ficha['voto_nominal'] = vn
+        # voto NOMINAL de plenaria SENADO (aditivo · API app.senado.gov.co):
+        # match por número Senado. Un proyecto puede traer los dos.
+        tok_s = _num_token(ficha.get('numero_senado'))
+        if tok_s:
+            vs = _votaciones_senado_nominal().get('por_proyecto', {}).get(tok_s)
+            if vs:
+                ficha['voto_nominal_senado'] = vs
         return _resp(200, ficha)
 
     if action == 'congresista':
@@ -1283,14 +1336,18 @@ def handler(event, context):
         q = (body.get('key') or body.get('q') or body.get('nombre') or '').strip()
         if not q:
             return _resp(400, {'error': 'falta key/q/nombre del congresista'})
-        pc = _congresistas().get('por_congresista', {})
         key, cands = _resolver_congresista(q)
         if key:
-            return _resp(200, dict(pc[key], key=key, encontrado=True))
+            rec = _rec_congresista(key) or {}
+            return _resp(200, dict(rec, key=key, encontrado=True))
         if cands:   # ambiguo: devolver candidatos para desambiguar
-            return _resp(200, {'encontrado': False, 'candidatos': [
-                {'key': k, 'nombre': pc[k]['nombre'], 'bancada': pc[k].get('bancada'),
-                 'n_votos': pc[k].get('n_votos')} for k in cands]})
+            out = []
+            for k in cands:
+                r = _rec_congresista(k) or {}
+                out.append({'key': k, 'nombre': r.get('nombre', k.title()),
+                            'bancada': r.get('bancada'), 'camara': r.get('camara'),
+                            'n_votos': r.get('n_votos')})
+            return _resp(200, {'encontrado': False, 'candidatos': out})
         return _resp(404, {'encontrado': False, 'error': f'sin récord de voto para «{q}»'})
 
     if action == 'radicados':

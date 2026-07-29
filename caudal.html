@@ -1662,28 +1662,40 @@
       <div class="cob-note">Congreso Visible · 2006–2022. Tally por proyecto. El voto nominal por congresista (abajo) sale de las actas de plenaria de Cámara.</div>
     </div>`:'';
     // voto NOMINAL de plenaria de Cámara (por congresista) — de las actas
-    const vn=f.voto_nominal;
+    const vn=f.voto_nominal, vsen=f.voto_nominal_senado;
     const RCOL={Si:'var(--green)',No:'var(--red)',Abstencion:'var(--amber)'};
     const RTXT={Si:'Sí',No:'No',Abstencion:'Abst'};
-    _vnData=(vn&&vn.votaciones)?vn.votaciones.slice().reverse():[];
-    const hasOcrVn=_vnData.some(x=>x.fuente==='ocr');
+    // _vnData es UNA sola lista (Cámara y luego Senado) porque el handler del
+    // detalle indexa por posición; cada bloque se pinta con su offset.
+    const camL=(vn&&vn.votaciones)?vn.votaciones.slice().reverse():[];
+    const senL=(vsen&&vsen.votaciones)?vsen.votaciones.slice().reverse():[];
+    _vnData=camL.concat(senL);
+    const hasOcrVn=camL.some(x=>x.fuente==='ocr');
     const bancStrip=pb=>Object.entries(pb||{})
       .sort((a,b)=>Object.values(b[1]).reduce((x,y)=>x+y,0)-Object.values(a[1]).reduce((x,y)=>x+y,0))
       .filter(([b])=>b!=='Sin bancada'&&b!=='Otro')
       .map(([banc,c])=>`<span class="vn-banc"><b>${esc(banc)}</b> ${Object.entries(c).map(([r,n])=>`<span style="color:${RCOL[r]||'var(--gray)'}">${n}${RTXT[r]||r}</span>`).join(' ')}</span>`).join('');
+    const vnRows=(list,off)=>list.map((x,j)=>{
+      const i=off+j;
+      const su=x.resumen||{}; const tally=`<b style="color:var(--green)">${su.Si||0} Sí</b> · <b style="color:var(--red)">${su.No||0} No</b>${su.Abstencion?` · <b style="color:var(--amber)">${su.Abstencion} abst</b>`:''}`;
+      return `<div class="vn-item"><div class="vn-head" data-vni="${i}">
+        <span class="vt-y">${(x.fecha||'').slice(0,7)}</span>
+        <span class="vn-name">${esc((x.nombre||'').replace(/^PL\.?\s*\d+\/\d+[A-Z]?\s*[-–]?\s*/i,'').slice(0,60))}</span>
+        <span class="vn-tally">${tally}</span>${x.fuente==='ocr'?'<span class="vn-ocr" title="Voto recuperado por OCR de acta escaneada DCN-SW (2014–2017). Confianza '+(x.confianza||'media')+'.">OCR</span>':''}<span class="vn-caret">▸</span></div>
+        <div class="vn-banks">${bancStrip(x.por_bancada)}</div>
+        <div class="vn-detail" id="vnd-${i}"></div></div>`;
+    }).join('');
     const nominalHTML=vn?`<div class="bloq-card" style="border-color:rgba(74,222,128,.3);background:linear-gradient(180deg,rgba(74,222,128,.06),transparent)">
       <div class="ga-tag" style="color:var(--green)">◈ Voto nominal · plenaria de Cámara · por congresista</div>
       <div class="bloq-big" style="font-size:.92rem"><b style="color:var(--green);font-size:1.35rem">${vn.n_votaciones}</b> votaciones nominales · click en una para ver quién votó qué</div>
-      <div class="vn-list">${_vnData.map((x,i)=>{
-        const su=x.resumen||{}; const tally=`<b style="color:var(--green)">${su.Si||0} Sí</b> · <b style="color:var(--red)">${su.No||0} No</b>${su.Abstencion?` · <b style="color:var(--amber)">${su.Abstencion} abst</b>`:''}`;
-        return `<div class="vn-item"><div class="vn-head" data-vni="${i}">
-          <span class="vt-y">${(x.fecha||'').slice(0,7)}</span>
-          <span class="vn-name">${esc((x.nombre||'').replace(/^PL\.?\s*\d+\/\d+[A-Z]?\s*[-–]?\s*/i,'').slice(0,60))}</span>
-          <span class="vn-tally">${tally}</span>${x.fuente==='ocr'?'<span class="vn-ocr" title="Voto recuperado por OCR de acta escaneada DCN-SW (2014–2017). Confianza '+(x.confianza||'media')+'.">OCR</span>':''}<span class="vn-caret">▸</span></div>
-          <div class="vn-banks">${bancStrip(x.por_bancada)}</div>
-          <div class="vn-detail" id="vnd-${i}"></div></div>`;
-      }).join('')}</div>
+      <div class="vn-list">${vnRows(camL,0)}</div>
       <div class="cob-note">Actas de plenaria de Cámara · voto nominal electrónico. ~90% cruzado con partido. Solo votos de fondo ligados a este proyecto.${hasOcrVn?' Las votaciones marcadas <b style="color:var(--amber)">OCR</b> se recuperaron por reconocimiento óptico de actas escaneadas (2014–2017) y pueden traer ruido menor en nombres o en el conteo.':''}</div>
+    </div>`:'';
+    const nominalSenHTML=vsen?`<div class="bloq-card" style="border-color:rgba(0,71,255,.32);background:linear-gradient(180deg,rgba(0,71,255,.07),transparent)">
+      <div class="ga-tag" style="color:var(--blue)">◈ Voto nominal · plenaria de Senado · por senador</div>
+      <div class="bloq-big" style="font-size:.92rem"><b style="color:var(--blue);font-size:1.35rem">${vsen.n_votaciones}</b> votaciones nominales · click en una para ver quién votó qué</div>
+      <div class="vn-list">${vnRows(senL,camL.length)}</div>
+      <div class="cob-note">API pública del Senado (2017–2026). La fuente solo registra <b>Sí/No</b> (no hay abstención ni «no votó») y agrupa en una misma entrada las votaciones del mismo día sobre este proyecto.</div>
     </div>`:'';
     const reradic=hist.length>1?`
       <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.5rem">Re-radicaciones · misma iniciativa en ${f.veces_presentado} términos</h3>
@@ -1716,6 +1728,7 @@
       ${bloqHTML}
       ${votacHTML}
       ${nominalHTML}
+      ${nominalSenHTML}
       ${reradic}
       <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin:1.1rem 0 .7rem">Documentos · gacetas del Congreso · click para analizar la ponencia</h3>
       <div class="gac-list">${gacs}</div>
@@ -1756,7 +1769,7 @@
       return;
     }
     if(!d || !d.encontrado){
-      modalCard.innerHTML='<button class="modal-close">✕</button><div class="cob-note" style="padding:1rem">Sin récord de voto nominal para esta persona. El voto nominal cubre la plenaria de Cámara 2020–2026; senadores y quienes no votaron en ese periodo no aparecen.</div>';
+      modalCard.innerHTML='<button class="modal-close">✕</button><div class="cob-note" style="padding:1rem">Sin récord de voto nominal para esta persona. Cubrimos la plenaria de Cámara (2014–2026) y la de Senado (2017–2026); quien no votó en esos periodos no aparece.</div>';
       modalCard.querySelector('.modal-close').onclick=cerrar; return;
     }
     const su=d.resumen||{}; const tot=d.n_votos||0;
@@ -1765,18 +1778,23 @@
       const bar=`<span class="cf-bar"><span style="width:${100*si/n}%;background:var(--green)"></span><span style="width:${100*no/n}%;background:var(--red)"></span><span style="width:${100*ab/n}%;background:var(--amber)"></span></span>`;
       const cnt=`${si?`<b style="color:var(--green)">${si}</b>`:''}${no?` <b style="color:var(--red)">${no}</b>`:''}${ab?` <b style="color:var(--amber)">${ab}</b>`:''}`;
       return `<div class="cf-p${p.id?' cf-p-clk':''}"${p.id?` data-id="${p.id}"`:''}>
-        <div class="cf-p-t"><span class="cf-p-num">${esc(p.numero_camara||p.tk)}</span> ${esc(p.titulo||'')}</div>
+        <div class="cf-p-t"><span class="cf-p-num">${esc(p.numero_camara||p.numero_senado||p.tk)}</span> ${esc(p.titulo||'')}</div>
         <div class="cf-p-r">${bar}<span class="cf-p-c">${cnt}</span></div></div>`;
     }).join('');
     const alin=d.alineacion_gob;
+    // la persona puede venir de Cámara o de Senado (o de ambas: otra_camara)
+    const esSen=(d.camara==='Senado');
+    const orig=esSen?'plenaria de Senado 2017–2026':'plenaria de Cámara 2020–2026';
+    const oc=d.otra_camara;
     modalCard.innerHTML=`<button class="modal-close">✕</button>
       <h2>${esc(d.nombre)}</h2>
-      <div class="cf-sub">${d.bancada?`<span class="p" style="border-color:${pcolor(d.bancada)}55;color:${pcolor(d.bancada)}">${esc(d.bancada)}</span>`:''}<span class="cf-meta">${tot} votos nominales · ${d.n_proyectos} proyectos · plenaria de Cámara 2020–2026</span></div>
+      <div class="cf-sub">${d.bancada?`<span class="p" style="border-color:${pcolor(d.bancada)}55;color:${pcolor(d.bancada)}">${esc(d.bancada)}</span>`:''}<span class="cf-meta">${tot} votos nominales · ${d.n_proyectos} proyectos · ${orig}</span></div>
+      ${oc?`<div class="cob-note" style="margin-bottom:.8rem">También tiene récord en <b>${esc(oc.camara||'la otra cámara')}</b>: ${oc.n_votos} votos en ${oc.n_proyectos} proyectos${oc.alineacion_gob!=null?` · alineación ${oc.alineacion_gob}%`:''}.</div>`:''}
       ${alin!=null?`<div class="cf-align"><div class="cf-align-n">${alin}%</div><div class="cf-align-t">votó con la bancada de gobierno (Pacto)<br><span>en ${d.n_contestadas} votaciones contestadas · las unánimes se excluyen</span></div></div>`:''}
       <div class="cf-tot"><b style="color:var(--green)">${su.Si||0} Sí</b> · <b style="color:var(--red)">${su.No||0} No</b>${su.Abstencion?` · <b style="color:var(--amber)">${su.Abstencion} abst</b>`:''} <span style="color:var(--ink3)">en total</span></div>
-      <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin:1.1rem 0 .6rem">Cómo votó por proyecto · click para abrir la ficha</h3>
+      <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin:1.1rem 0 .6rem">Cómo votó por proyecto${esSen?'':' · click para abrir la ficha'}</h3>
       <div class="cf-list">${proys}</div>
-      <div class="cob-note">Actas de plenaria de Cámara · voto nominal electrónico. Solo votos de fondo ligados a un proyecto.</div>`;
+      <div class="cob-note">${esSen?'API pública del Senado (2017–2026). Solo registra Sí/No — sin abstención ni «no votó» — y agrupa las votaciones del mismo día sobre un proyecto.':'Actas de plenaria de Cámara · voto nominal electrónico. Solo votos de fondo ligados a un proyecto.'}</div>`;
     modalCard.querySelector('.modal-close').onclick=cerrar;
     modalCard.querySelectorAll('.cf-p-clk').forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,'pdly'));
     modalCard.scrollTop=0;
