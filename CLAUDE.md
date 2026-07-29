@@ -21,7 +21,8 @@
 - `lab-indicadores.js` — **Sprint E (Fase A)** · helper de indicadores municipales oficiales con panel temporal 2018-2024. 8 indicadores × 1.108 municipios desde datos.gov.co (Policía Nacional + MEN). API lookupMun/getSerie/searchMun/matchIndicadorByKeyword. Cargado por analisis-estructural, problema-publico, ain y evaluacion.
 - `prospect-escenarios.html` — **Sprint F + F v2** · séptimo módulo del lab. Escenarios prospectivos por método de los ejes de incertidumbre (Schwartz · GBN), prospectiva estratégica francesa (Godet · Mojica · LIPSOR) y Robust Decision Making (Lempert · RAND). 4 mecánicas: incertidumbres críticas (auto-suggest desde MicMac) · narrativa de 4 cuadrantes · cross-impact con variables/actores/alternativas (Gordon 1968) · decisiones no-regret + señales tempranas. Cloud-save + 2 acciones IA copiloto (sugerir-ejes Pro · narrar-escenarios Premium) + 3 exports (memo .md + matriz .csv + ficha .pdf jsPDF). Integrado al informe combinado del lab (sección 8). LISTO (Sprint F + F v2).
 - `comunicar.html` — **Sprint H · v1** · **octavo módulo del lab**. Plan de comunicación de la política pública. 8 mecánicas: contexto + alcance · audiencias (mín 2 / máx 6) · mensaje clave (primario ≤15 palabras + 3 secundarios + valores) · narrativa pública Ganz (Story of Self/Us/Now) · framing Lakoff + Shenker-Osorio (valor central, palabras propias vs adversario) · matriz audiencia × canal con heurística BIT EAST · vocería principal + multiplicadores · cronograma 4 fases + medición OCDE 9-dim. STATE en `localStorage['comunicar-current-v1']`. 3 exports: plan .md, matriz .csv (audiencia×canal + KPIs), guía de mensajes .md para vocería. Auto-import desde PP/Ev/Alt/AIN. Marco metodológico: OCDE Public Communication Report 2021 · CLAD Carta Iberoamericana de Gobierno Abierto 2016 · MIPG · Función Pública (Decreto 1499/2017, Manual v6 dic 2024) · Ley 1712 de 2014 · Ganz · Lakoff 2024 · Anat Shenker-Osorio · BIT EAST 2024 · Stone · Omar Rincón. **Cloud-save + colaboración + 3 acciones IA copiloto** (sugerir-audiencias Pro+ · validar-mensaje Premium+ · narrativa-ganz Premium+) operativos vía worker `/comunicar/*`. PDFs de metodología en S3. LISTO (Sprint H v1 + **v2**).
-- `pricing.html` — planes (Básico / Pro 39.900 COP · Premium 99.900 COP · Personalizado)
+- `pricing.html` — planes (Básico / Pro 79.900 COP·mes · Premium 219.000 COP·mes · anual 59.900/179.000 · Personalizado)
+- `brujula-2027.html` — **herramienta demo B2B para candidatos 2027** (borrador v1, ver sección dedicada)
 - `lang.js` — i18n (co/us/cn); `CLAUDE.md` vive en la raíz del repo
 
 ## Tareas pendientes — `previa-1v.html`
@@ -558,6 +559,46 @@ Bogotá y Medellín actualizados. Datos limpios en S3. Mobile OK. PDF Premium
 operativo. Cuota de descargas server-side: `/dl/status` + `/dl/consume`
 desplegados en `rr-auth` (binding KV `RR_DL`) — el frontend ya consume
 estos endpoints; si el worker falla cae a localStorage como fallback.
+
+## Brújula 2027 — `brujula-2027.html` (borrador v1 · demo comercial para candidatos)
+
+Landing-muestra para vender la plataforma mensual a candidatos de las
+territoriales oct-2027. **Todo corre con datos reales ya existentes** (cero
+datos inventados); single-file, sistema visual v2, en producción desde jul-2026.
+
+- **Switch de perfil**: "Ya me lancé antes" vs "Soy candidato nuevo".
+- **Modo veterano**: buscador sobre `cand-index.js` (Congreso 2014-2026 +
+  Asamblea 2023 en el arranque; Concejo/JAL 2023 lazy al primer foco) → ficha
+  con count-up (votos · municipios · puestos · plaza fuerte) + mapa Leaflet
+  choropleth (nacional por deptos o departamental por `mun_elec` según la
+  carrera; sin tiles, `animate:false`) + top 10 territorios (puestos para
+  Concejo/JAL, municipios para el resto). El nombre elegido se pre-llena en
+  el buscador de medios. Normalizador `depKey()` casa nombres RNEC↔GeoJSON
+  (BOGOTA / VALLE / SAN ANDRES / NORTE+SAN→NSANTANDER).
+- **Modo nuevo**: bloque (izq→`ic` · centro→`sf` · der→`ae`) + ciudad (27 de
+  `huella-territorial.json`) → top barrios afines (índice de afinidad, click
+  despliega hechos p22/c25p/c26/s26) + **brecha generacional** (cifras
+  nacionales del ei-report embebidas: 5 bandas × 3 bloques) + **duelo
+  Cepeda-Abelardo por ciudad** (6 con EI propia) **o depto** (33, fallback
+  vía `dep` del barrio + `depKey`).
+  - Dato en S3: `congreso-2026/output/edad-1v/edad-geo.json` (2,2 KB), generado
+    desde `Bases de datos/output_edad_1v/ei-{ciudades,deptos}.csv` (snippet
+    python inline en el historial; regenerar y `aws s3 cp` si cambia la EI).
+- **Escucha de medios**: POST a la Lambda `caudal-analiza` (acción `medios`,
+  CORS abierto) → KPIs + 15 titulares con badge regional.
+- **Datos fríos**: `lab-indicadores.js` (8 indicadores, sparklines 2018-2024,
+  delta coloreado según si subir es bueno/malo por `GOOD_UP`).
+- **Teaser arquetipos** (sección 04): 5 chips con los colores del módulo 05 de
+  proyecto-dc + CTA al test presidencial.
+- **Gate**: `plan-gate.js` — `ficha` free con `requireOrSample` (3 muestras
+  anónimas, key `brujula-ficha`), `barrios`/`alertas` Pro (top 5 visibles +
+  blur), `mesas` Premium. Los precios del modal del gate se actualizaron a los
+  vigentes (79.900/219.000 + nota anual) — ojo: ese archivo es compartido con
+  los 3 tableros territoriales 2023, veleta y oportunidad.
+- **Pendientes/ideas v2**: renombrar si se quiere otra marca; conectar
+  arquetipos por territorio (hoy es teaser con candado); captura de leads
+  (correo/WhatsApp del candidato) antes del modal de plan; versión con datos
+  2023 de SU municipio al elegir territorio en modo nuevo.
 
 ## Ponderador propio
 
