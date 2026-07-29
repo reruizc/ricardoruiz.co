@@ -66,10 +66,12 @@ LEG_DEFAULT = '2026-2027'
 RE_NONCE = re.compile(r'PL_CFG\s*=\s*\{[^}]*?PL_NONCE\s*:\s*"([a-f0-9]+)"', re.S)
 RE_GACETA = re.compile(r'Gaceta\s*N[o°.]*\s*\.?\s*(\d+)\s*del?\s*(\d{4})', re.I)
 
-# los campos "pack" vienen como "id||nombre||url" (o varios, separados por ;;)
+# los campos "pack" vienen como "id||nombre||url" (o varios, separados por ::)
+# ⚠ el separador es '::', NO ';;' — con ';;' un pack de varios autores no se
+# partía y solo salía el PRIMERO (los coautores se perdían en silencio).
 def _unpack(s):
     out = []
-    for chunk in (s or '').split(';;'):
+    for chunk in (s or '').split('::'):
         parts = chunk.split('||')
         if len(parts) >= 2 and parts[1].strip():
             out.append({'id': parts[0], 'nombre': parts[1].strip(),

@@ -633,6 +633,9 @@ class Caudal:
             'titulos_alt': r.get('titulos_alt', []),
             'numero_senado': r.get('numero_senado', ''), 'numero_camara': r.get('numero_camara', ''),
             'legislatura': r.get('legislatura', ''), 'comision': r.get('comision', ''),
+            # 'camara' = solo está en el registro de Cámara (nunca cruzó al Senado):
+            # sin fechas de debate y sin causa de archivo. El frontend debe decirlo.
+            'origen_registro': r.get('origen_registro', 'senado'),
             'autores': autores,
             # --- F1: autoría real ---
             'autor_principal': principal,

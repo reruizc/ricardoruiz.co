@@ -5007,6 +5007,98 @@ solo tiene GetObject ahí (read-only para presignar) → no reusable tal cual.
 19:30 subió el manifiesto (19:43-19:44), y la acción `radicados` devuelve
 **76 Senado + 14 Cámara** en vivo (53/76 con PDF presignado).
 
+### Registro de CÁMARA integrado (jul-2026) — el dataset ya NO es solo Senado
+
+Hasta jul-2026 el histórico salía **solo de leyes.senado.gov.co**, y eso dejaba
+por fuera los proyectos que nacen en Cámara y mueren ahí sin cruzar: **el 45% del
+universo real**. El cuatrienio 2022-2026 daba 1.496 proyectos de ley cuando el
+universo deduplicado es **2.828**.
+
+**La aritmética (donde se equivocan los competidores):** un proyecto que cruza de
+cámara tiene DOS números de radicado (p.ej. 425/2023C y 195/2022S) y una ficha en
+CADA registro. Sumar los dos registros lo cuenta dos veces.
+
+| 2022-2026 | PL | PL + AL |
+|---|---|---|
+| Solo registro del Senado (lo que Caudal tenía) | 1.496 | 1.606 |
+| **Unión deduplicada (lo correcto)** | **2.828** | **3.056** |
+| Suma bruta de los dos registros | 3.447 | 3.710 |
+
+Contraste externo: **Dapper publica 3.478** ≈ la suma bruta de PL (3.447, +0,9%)
+→ está doble contando los que cruzan. **Orza publica 3.011** ≈ la unión PL+AL
+(3.056, −1,5%) → cuenta bien y suma proyectos de ley + actos legislativos.
+
+**Pipeline (orden de corrida):**
+```bash
+python3 tools/leyes-senado/harvest_camara_historico.py   # → camara/camara.jsonl
+python3 tools/leyes-senado/build_dataset.py              # une Senado + Cámara → dist/
+```
+- `harvest_camara_historico.py` — hermano histórico de `harvest_camara.py` (que es
+  el rastreador diario). Mismo AJAX (`admin-ajax.php`, `get_proyectos_ley_page`),
+  loop sobre `LEG_ID` (2008-2026), caché por legislatura en `camara/raw/{leg}.json`
+  (resumible), consolidado en `camara/camara.jsonl`. **6.340 registros, 2010-2026**
+  (2008-2010 el portal los tiene casi vacíos). ⚠ `per_page` está **capado a 100**
+  del lado del servidor: pedir 200 devuelve 100 igual → paginar por `total`.
+- `camara_merge.py` — dedup + mapeo al shape crudo que espera `enrich_pdly`/`pal`,
+  así todo el pipeline (canon de autores, clusters de re-radicación, tipología) los
+  ve. Solo entran los de Cámara **que no estén ya en el registro del Senado**.
+
+**⚠⚠ EL NÚMERO DE RADICADO NO ES IDENTIFICADOR ÚNICO** (el hallazgo que casi
+arruina el merge). Ambas cámaras reinician la numeración cada legislatura pero el
+número lleva el AÑO CALENDARIO → `511/2025C` existe DOS veces (leg 2024-2025,
+radicado ene-jun 2025, y leg 2025-2026, radicado jul-dic 2025) y son proyectos
+distintos. Medido: **387 números de Cámara se repiten** en su propio registro y
+**276 valores de `numero_camara` se repiten** dentro del registro del Senado
+(C179-05 aparece 11 veces). Deduplicar por número solo produjo **238 cruces
+errados**, y 190 de ellos **borraban proyectos reales**. Por eso `_ya_en_senado()`
+cruza por número **Y exige que los títulos se parezcan** (`_SIM_MIN = 0.45`; los
+del mismo proyecto pasan de 0.6 en el 86% de los casos, así que el umbral no es
+delicado). Residuo conocido tras el fix: **53 grupos** con título+legislatura
+idénticos entre registros y sin número cruzado (11 en 2022-2026, 0,4%) — o son el
+mismo proyecto sin número registrado, o proyectos espejo radicados en las dos
+cámaras a la vez; no se puede distinguir sin abrir la ficha.
+
+**El campo `origen` no es de fiar en ninguno de los dos registros** (se midieron
+etiquetas erradas en ambos lados). Da igual: la dedup decide por número+título, no
+por la etiqueta.
+
+**Lo que el listado de Cámara NO trae** (y cómo queda marcado en el dato):
+- Sin fecha de radicación ni de debates → `fecha_presentacion: null`, sin
+  `dias_a_primer_debate`, y la etapa se **infiere del estado textual**
+  (`_ETAPA_POR_ESTADO`). Están en la ficha individual (`GET /{link_web}`), ~1.250
+  requests por cuatrienio — **pendiente**.
+- Cámara **no dice la causa del archivo** → sus archivados caen en
+  `ARCHIVADO_OTRO`, nunca en `ARCHIVADO_TIEMPO`. **No confundir con "no murió por
+  tiempo": es "la fuente no lo informa".** `stats.json` lo expone en
+  `archivado_causa_no_informada`.
+- Por eso `embudo` y `dias_a_primer_debate` de `stats.json` se calculan **solo
+  sobre el registro del Senado** (`embudo_alcance: 'registro_senado'`), que es
+  donde hay fechas reales. El volumen de Cámara sí entra a resultados, por_anio,
+  por_comision y tipología.
+
+**Campos nuevos:** `origen_registro` ∈ {senado, camara} en `proyectos.jsonl` y
+`actos-legis.jsonl`; en `indice.json` va comprimido como `'oc': 1` (solo cuando es
+de Cámara, para no engordar el índice que se carga entero en memoria). Los ids de
+Cámara arrancan en **900.000** (`ID_BASE`) para no chocar con los del Senado
+(`caudal_core.proyecto()` hace `int(pid)`, así que deben ser enteros).
+
+**Verificado:** los 9.919 registros del Senado quedan **idénticos** campo por campo
+(regresión limpia). Lo que sí cambia a propósito: `veces_presentado` en 442
+registros y los autores canónicos en 827, porque los clusters de re-radicación y el
+registro de autores ahora ven también a Cámara. Total del dataset: **13.660 PL +
+1.084 AL**.
+
+**Cifras del cuatrienio con el dataset unido** (PL únicos · 2022-2026 vs 2018-2022):
+ley 274 (9,7%) vs 352 (13,0%) · aprobados sin sancionar 76 vs 1 · en trámite 292
+vs 186 · archivados 2.033 (71,9%) vs 1.883 (69,5%) · retirados 153 vs 287. **Vivos
+que pasan a la 2026-2027: 241** (los radicados en 2025-2026 aún en trámite; los de
+legislaturas vencidas con estado "en trámite" son estados que ningún registro
+cerró). Por legislatura: **2025-2026 = 839 PL + 39 AL = 878**.
+
+**Bug colateral corregido:** `harvest_camara.py::_unpack` partía los campos "pack"
+por `;;` cuando el separador real es `::` → se comía todos los coautores menos el
+primero. Afectaba al rastreador diario.
+
 ### Cobertura final (2026-07-10) + columnas
 ```
 Bases de datos/leyes-senado/{pdly,lys,pal,actos}.{jsonl,csv}   (gitignored)

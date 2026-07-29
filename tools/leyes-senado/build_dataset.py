@@ -34,8 +34,14 @@ SRC = REPO / 'Bases de datos' / 'leyes-senado'
 DIST = SRC / 'dist'
 
 sys.path.insert(0, str(REPO / 'tools' / 'caudal'))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import normalize_autores as na  # noqa: E402
 import clasificar as cl  # noqa: E402
+import camara_merge as cam  # noqa: E402
+
+# registro de Cámara (harvest_camara_historico.py). Si no existe, el dataset sale
+# solo con el Senado — que es como vivió Caudal hasta jul-2026.
+CAMARA_JSONL = SRC / 'camara' / 'camara.jsonl'
 
 # registro global de autores (clave→display); se llena en main() antes de enrich
 AUTOR_REG = {}
@@ -151,6 +157,9 @@ def enrich_pdly(rec):
             etapa_max = idx
     if res == 'LEY':
         etapa_max = 5
+    # los del registro de Cámara no traen fechas de debate: la etapa se infiere
+    # del estado textual (ver camara_merge._ETAPA_POR_ESTADO)
+    etapa_max = max(etapa_max, rec.get('_etapa_hint', 0))
     leg = rec.get('legislatura', '')
     anio = int(leg[:4]) if leg[:4].isdigit() else (fpres.year if fpres else None)
     canon = _autores_canon(rec.get('autor', ''))
@@ -165,6 +174,7 @@ def enrich_pdly(rec):
         'cuatrienio': rec.get('cuatrenio', ''),
         'anio': anio,
         'origen': rec.get('origen', ''),
+        'origen_registro': rec.get('_origen_registro', 'senado'),
         'tipo_de_ley': rec.get('tipo_de_ley', ''),
         'comision': rec.get('comision', ''),
         'autor_raw': rec.get('autor', ''),
@@ -200,6 +210,7 @@ def enrich_pal(rec):
     n_debates = sum(1 for k, v in rec.items()
                     if k.startswith('fecha_de_aprobacion') and pdate(v))
     etapa_max = 5 if res == 'LEY' else min(n_debates, 5)
+    etapa_max = max(etapa_max, rec.get('_etapa_hint', 0))  # ver enrich_pdly
     canon = _autores_canon(rec.get('autor', ''))
     titulo = rec.get('titulo', '')
     return {
@@ -209,6 +220,7 @@ def enrich_pal(rec):
         'numero_camara': rec.get('numero_camara', ''),
         'legislatura': leg, 'cuatrienio': rec.get('cuatrenio', ''), 'anio': anio,
         'origen': rec.get('origen', ''),
+        'origen_registro': rec.get('_origen_registro', 'senado'),
         'comision': rec.get('comision', ''),
         'autor_raw': rec.get('autor', ''),
         **canon,
@@ -281,6 +293,22 @@ def main():
     DIST.mkdir(parents=True, exist_ok=True)
     raw_pdly, raw_pal = load('pdly'), load('pal')
 
+    # 0) une el registro de CÁMARA (los que nunca cruzaron al Senado). Va ANTES
+    #    del registro de autores y de los clusters para que todo el pipeline
+    #    (canon de autores, re-radicación, tipología) los vea. Ver camara_merge.
+    cam_info = None
+    if CAMARA_JSONL.exists():
+        cam_rows = [json.loads(l) for l in open(CAMARA_JSONL, encoding='utf-8') if l.strip()]
+        ex_pdly, ex_pal, cam_info = cam.merge(raw_pdly, raw_pal, cam_rows)
+        raw_pdly += ex_pdly
+        raw_pal += ex_pal
+        print(f"· Cámara: +{cam_info['n_agregados_pdly']} PL  +{cam_info['n_agregados_pal']} AL"
+              f"   (descartados: {cam_info['ya_en_senado']} ya en el Senado, "
+              f"{cam_info['origen_senado']} de origen Senado)")
+    else:
+        print('· Cámara: sin camara.jsonl → dataset SOLO Senado '
+              '(corre harvest_camara_historico.py)')
+
     # 1) registro global de autores (dedup por clave canónica) ANTES de enrich
     global AUTOR_REG
     AUTOR_REG = na.construir_registro(raw_pdly + raw_pal)
@@ -339,6 +367,10 @@ def main():
             'tip': r['tipologia'], 'cf': r['crea_fondo'], 'jp': r['jala_presupuesto_regional'],
             'emp': r['empuje'], 'vs': r['vitrina_score'], 'vp': r['veces_presentado'],
             'ap': r.get('autor_principal'),
+            # 'oc':1 = viene del registro de Cámara (nunca cruzó al Senado) →
+            # sin fechas de debate ni causa de archivo. Se omite si es del Senado
+            # para no engordar el índice, que se carga entero en memoria.
+            **({'oc': 1} if r.get('origen_registro') == 'camara' else {}),
         }
     indice = [_ix(r, 'pdly') for r in pdly] + [_ix(r, 'pal') for r in pal]
     json.dump({'v': '2026-07-11', 'n': len(indice), 'proyectos': indice},
@@ -355,12 +387,21 @@ def main():
         c = (r['comision'] or 'SIN COMISIÓN').upper().strip()
         por_comision[c]['total'] += 1
         por_comision[c]['ley'] += r['es_ley']
-    # embudo
-    embudo = {name: sum(1 for r in pdly if r['etapa_max'] >= idx)
+    # embudo y días: SOLO sobre el registro del Senado, que es donde hay fechas
+    # de debate reales. Los de Cámara traen la etapa inferida del estado y sin
+    # fecha de radicación → meterlos aquí falsearía el embudo. Su volumen sí
+    # entra a resultados/por_anio/por_comision/tipología, que no dependen de eso.
+    pdly_sen = [r for r in pdly if r.get('origen_registro') == 'senado']
+    embudo = {name: sum(1 for r in pdly_sen if r['etapa_max'] >= idx)
               for idx, (name, _) in enumerate(ETAPAS)}
-    embudo['ley'] = sum(1 for r in pdly if r['es_ley'])
-    # días a primer debate
-    dias = sorted(r['dias_a_primer_debate'] for r in pdly if r['dias_a_primer_debate'] is not None)
+    embudo['ley'] = sum(1 for r in pdly_sen if r['es_ley'])
+    dias = sorted(r['dias_a_primer_debate'] for r in pdly_sen
+                  if r['dias_a_primer_debate'] is not None)
+    # Cámara no informa la CAUSA del archivo → sus archivados caen en
+    # ARCHIVADO_OTRO y nunca en ARCHIVADO_TIEMPO. No es "no murió por tiempo":
+    # es "la fuente no lo dice". Se expone aparte para no leer mal la mortandad.
+    n_causa_nd = sum(1 for r in pdly if r.get('origen_registro') == 'camara'
+                     and r['resultado'] == 'ARCHIVADO_OTRO')
 
     # --- F1: tipología, empuje, mortandad por año dentro del cuatrienio ---
     tip_count = Counter(r['tipologia'] for r in pdly)
@@ -388,8 +429,15 @@ def main():
                  for k, v in sorted(mort.items())}
 
     stats = {
-        'v': '2026-07-10', 'n_proyectos': len(pdly), 'n_actos': len(pal),
+        'v': '2026-07-29', 'n_proyectos': len(pdly), 'n_actos': len(pal),
         'n_leyes': len(lys),
+        # de qué registro salió cada cosa (jul-2026: se unió Cámara al Senado)
+        'por_registro': {
+            'proyectos': dict(Counter(r.get('origen_registro', 'senado') for r in pdly)),
+            'actos': dict(Counter(r.get('origen_registro', 'senado') for r in pal)),
+        },
+        'archivado_causa_no_informada': n_causa_nd,
+        'embudo_alcance': 'registro_senado',
         'resultados': dict(res_count),
         'embudo': embudo,
         'dias_a_primer_debate': {
