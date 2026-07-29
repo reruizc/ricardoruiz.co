@@ -132,6 +132,17 @@
 
     /* ── acuerdo de presidencia (borrador sin confirmar) ─────────── */
     .draft-badge{display:inline-block;font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:#060810;background:var(--amber);padding:.22rem .6rem;margin-left:.65rem;vertical-align:middle;font-weight:700}
+    .pres-badge{display:inline-block;font-size:.56rem;letter-spacing:.07em;text-transform:uppercase;color:#060810;background:var(--gold);padding:.2rem .55rem;margin-left:.5rem;vertical-align:middle;font-weight:700}
+    .mem-pres{display:flex;align-items:center;gap:.75rem;background:rgba(232,185,59,.09);border:1px solid rgba(232,185,59,.35);border-left:3px solid var(--gold);padding:.7rem .95rem;margin:0 0 1.15rem}
+    .mem-pres .mp-ic{font-size:1.15rem;line-height:1}
+    .mem-pres .mp-txt{font-size:.86rem;color:var(--white);line-height:1.35}
+    .mem-pres .mp-txt b{color:var(--gold);font-weight:700}
+    .mem-pres .mp-sub{display:block;font-size:.7rem;color:rgba(255,255,255,.5);letter-spacing:.01em;margin-top:.1rem}
+    .mem-pres+.mem-pres{margin-top:-.7rem}
+    /* presidencia todavía no votada: mismo bloque en ámbar, no en dorado */
+    .mem-pres.draft{background:rgba(232,185,59,.05);border-color:rgba(232,185,59,.22);border-left-color:var(--amber)}
+    .mem-pres.draft .mp-txt b{color:var(--amber)}
+    .pres-badge.draft{background:transparent;color:var(--amber);border:1px solid rgba(232,185,59,.5)}
     .ap-years{display:grid;grid-template-columns:repeat(4,1fr);gap:.7rem;margin:1.2rem 0 .3rem}
     .ap-y{background:var(--card-bg);border:1px solid var(--card-border);padding:.9rem .7rem;text-align:center}
     .ap-lab{display:block;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);margin-bottom:.55rem}
@@ -308,6 +319,7 @@
     <div class="sec-tag">Integrantes</div>
     <h2 class="sec-title">Quién está en la comisión</h2>
     <p class="sec-sub" id="mem-sub">Haz clic en cada persona para ver su información. Las plenarias eligen los integrantes tras la instalación del 20 de julio de 2026 — mientras tanto, cada cupo aparece marcado como pendiente.</p>
+    <div id="mem-presidente" style="display:none"></div>
     <div class="mem-wrap">
       <div class="mem-col" id="mem-groups"></div>
       <div class="panel-side" id="panel-side">
@@ -474,6 +486,43 @@
   const COM_ID=new URLSearchParams(location.search).get('id');
   const COM=COMISIONES.find(c=>c.key===COM_ID);
   let MIEMBROS={senado:[],camara:[]};
+  /* presidencias de la comisión — una por cámara. Cada entrada:
+     {nombre, corp:'senado'|'camara', partido, vigencia, confirmado:bool, fuente}
+     `confirmado:false` = acuerdo que circula pero que la comisión aún no vota. */
+  let PRESIDENTES=[];
+  /* el JSON admite `presidente` (objeto, formato viejo) o `presidentes` (array) */
+  function setPresidentes(m){
+    const raw=(m&&m.presidentes)||(m&&m.presidente)||[];
+    PRESIDENTES=(Array.isArray(raw)?raw:[raw]).filter(p=>p&&p.nombre);
+  }
+  /* ¿este nombre preside la comisión? exacto por nombre normalizado,
+     con respaldo por subconjunto de tokens (mismo criterio que matchElectos).
+     Devuelve la entrada para poder distinguir confirmado de borrador. */
+  function esPresidente(nombre){
+    const a=norm(nombre), ta=a.split(/\s+/).filter(t=>t.length>2);
+    return PRESIDENTES.find(p=>{
+      const b=norm(p.nombre);
+      if(a===b) return true;
+      const tb=new Set(b.split(/\s+/));
+      return ta.length>=3 && ta.every(t=>tb.has(t));
+    })||null;
+  }
+  function renderPresidente(){
+    const el=document.getElementById('mem-presidente'); if(!el) return;
+    if(!PRESIDENTES.length){ el.style.display='none'; el.innerHTML=''; return; }
+    el.style.display='block';
+    el.innerHTML=PRESIDENTES.map(p=>{
+      const corp=p.corp==='senado'?'Senado':'Cámara de Representantes';
+      const vig=p.vigencia?` · legislatura ${esc(p.vigencia)}`:'';
+      const ok=p.confirmado!==false;
+      const sub=ok?`Presidente de la mesa directiva${vig}`
+                 :`Acuerdo que circula para la legislatura ${esc(p.vigencia||'2026-2027')} — la comisión aún no lo vota${p.fuente?' · '+esc(p.fuente):''}`;
+      return `<div class="mem-pres${ok?'':' draft'}" data-pres="1"><span class="mp-ic">${ok?'★':'☆'}</span><span class="mp-txt">`
+        +`${ok?'Preside':'Presidiría'} la comisión (${corp}): <b>${esc(p.nombre)}</b>${p.partido?' · '+esc(p.partido):''}`
+        +`${ok?'':'<span class="draft-badge">Borrador · sin confirmar</span>'}`
+        +`<span class="mp-sub">${sub}</span></span></div>`;
+    }).join('');
+  }
 
   function initPage(){
     if(!COM){
@@ -632,10 +681,13 @@
       if(!r.ok) return;
       const j=await r.json();
       const m=j&&j.comisiones&&j.comisiones[COM.key];
+      setPresidentes(m);
+      renderPresidente();
       if(m&&((m.senado&&m.senado.length)||(m.camara&&m.camara.length))){
         MIEMBROS={senado:m.senado||[],camara:m.camara||[]};
         renderGroups();
-        document.getElementById('mem-sub').textContent='Haz clic en cada persona para ver su información.';
+        document.getElementById('mem-sub').textContent='Conformación aprobada por las plenarias el 28 de julio de 2026. Haz clic en cada persona para ver su información.'
+          +(PRESIDENTES.some(p=>p.confirmado!==false)?'':' Las presidencias de la comisión aún no se han votado.');
       }
     }catch(e){ /* aún no publicado — quedan las bolitas de cupos pendientes */ }
   }
@@ -654,11 +706,14 @@
     const partido=m.partido||(e&&e.partido)||'';
     const b=bancadaForMember(m);
     const dep=e&&e.dep?depNice(e.dep):null;
+    const pres=esPresidente(m.nombre);
     document.getElementById('panel-side').innerHTML=`
       <div class="ps-head">
         <div class="ps-photo" id="ps-photo" style="background:${b.color}"><span>${esc(initials(m.nombre))}</span></div>
         <div class="ps-head-txt">
-          <div class="ps-name">${esc(m.nombre)}</div>
+          <div class="ps-name">${esc(m.nombre)}${pres?(pres.confirmado!==false
+            ?'<span class="pres-badge">★ Presidente</span>'
+            :'<span class="pres-badge draft" title="Acuerdo que circula; la comisión aún no vota su mesa directiva">☆ Presidencia en acuerdo</span>'):''}</div>
           <span class="ps-chip" style="color:${lift(b.color)};background:${b.color}1a;border-color:${b.color}55">${esc(partido||b.name)}</span>
           <div class="ps-meta">${corp}${dep?' · '+esc(dep):''}</div>
         </div>
@@ -678,7 +733,9 @@
   /* ── registro compartido de candidaturas (cand-index.js): puntaje + foto +
         historial electoral, mismos datos de analisis-candidato.html ── */
   const S3_PHOTOS='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/fotos-candidatos';
-  const SRC_YEAR={endoso:2026,asamblea:2023,con2018:2018};
+  /* mismo mapa que analisis-candidato.html — si falta una fuente, su fila del
+     historial sale sin año y se va al fondo del orden cronológico */
+  const SRC_YEAR={endoso:2026,asamblea:2023,con2022:2022,con2018:2018,con2014:2014};
   let _regPromise=null;
   function getVotosCongreso(){
     if(!_regPromise){
@@ -741,10 +798,56 @@
     _terrCache[dataUrl]=p;
     return p;
   }
+  /* ── candidaturas PRESIDENCIALES ─────────────────────────────────
+     No están en cand-index.js (ese registro es de Congreso/Asamblea), así que
+     se leen aparte: 1ª vuelta 2010-2022 de los resúmenes de históricos y 2026
+     del índice presidencial. Sirve para senadores que fueron candidatos
+     presidenciales — Enrique Gómez (2022) o Iván Cepeda (2026, que está en la
+     Primera justamente por el Estatuto de Oposición). */
+  const S3_OUT='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const PRES_HIST=[2010,2014,2018,2022];   // solo 1ª vuelta: la 2ª no está publicada
+  let _presPromise=null;
+  function getPresidenciales(){
+    if(_presPromise) return _presPromise;
+    _presPromise=(async()=>{
+      const filas=[];
+      await Promise.all([
+        ...PRES_HIST.map(async anio=>{
+          try{
+            const r=await fetch(`${S3_OUT}/historicos/pres-${anio}-v1/resumen.json`);
+            if(!r.ok) return;
+            const c=((await r.json()).nacional||{}).candidatos||{};
+            for(const v of Object.values(c))
+              filas.push({n:norm(v.nombre),anio,votos:v.votos||0,label:`Presidencia ${anio} · 1ª vuelta`});
+          }catch(e){}
+        }),
+        (async()=>{
+          try{
+            const r=await fetch(`${S3_OUT}/presidencial/index-presidencial.json`);
+            if(!r.ok) return;
+            for(const p of Object.values((await r.json()).personas||{}))
+              for(const e of (p.elecciones||[]))
+                filas.push({n:norm(p.nombre),anio:2026,votos:e.votos||0,
+                            label:e.label||`Presidencia 2026 · ${e.ronda||''}`.trim()});
+          }catch(e){}
+        })()
+      ]);
+      return filas;
+    })();
+    return _presPromise;
+  }
+  /* match ESTRICTO por nombre completo: con subconjunto de tokens un "Luis
+     Pérez" cualquiera heredaría la candidatura presidencial de otro. */
+  async function presMatches(nombre){
+    const n=norm(nombre);
+    return (await getPresidenciales()).filter(f=>f.n===n)
+      .sort((a,b)=>b.anio-a.anio||b.votos-a.votos);
+  }
   async function loadFicha(nombre){
     const all=await getVotosCongreso();
     const hits=regMatches(nombre,all)
       .sort((a,b)=>(SRC_YEAR[b.source]||0)-(SRC_YEAR[a.source]||0)||(b.votos||0)-(a.votos||0));
+    const pres=await presMatches(nombre);
     // puntaje (solo candidaturas 2026 con voto preferente)
     const box=document.getElementById('ps-score');
     if(box&&box.isConnected){
@@ -765,15 +868,23 @@
     }
     // historial electoral (2018 · 2023 · 2026 — mismo registro de analisis-candidato)
     const hist=document.getElementById('ps-hist');
-    if(hist&&hist.isConnected&&hits.length){
+    if(hist&&hist.isConnected&&(hits.length||pres.length)){
       hist.style.display='block';
-      hist.innerHTML=`<div class="ps-hist-title">Historial electoral</div>`+hits.map((c,idx)=>
-        `<div class="ps-hist-row"><span class="y">${SRC_YEAR[c.source]||''}</span><span class="c">${esc(corpNice(c))}</span><span class="v">${fmt(c.votos)} votos</span></div>
-         <div class="ps-hist-terr" id="ps-hist-terr-${idx}"></div>`).join('');
+      /* una sola línea de tiempo: candidaturas al Congreso/Asamblea + presidenciales */
+      const filas=[
+        ...hits.map(c=>({anio:SRC_YEAR[c.source]||0,corp:corpNice(c),votos:c.votos,reg:c})),
+        ...pres.map(p=>({anio:p.anio,corp:p.label,votos:p.votos,pres:true}))
+      ].sort((a,b)=>b.anio-a.anio||(b.votos||0)-(a.votos||0));
+      hist.innerHTML=`<div class="ps-hist-title">Historial electoral</div>`+filas.map(f=>
+        `<div class="ps-hist-row"><span class="y">${f.anio||''}</span><span class="c">${esc(f.corp)}</span><span class="v">${fmt(f.votos)} votos</span></div>`
+        /* el detalle territorial solo cuelga de la candidatura más reciente del
+           registro (la única con dataUrl mesa a mesa) */
+        +(f.reg&&f.reg===hits[0]?`<div class="ps-hist-terr" id="ps-hist-terr-0"></div>`:'')).join('');
+      if(!hits.length) hist.innerHTML+=`<div class="note" style="margin-top:.5rem">Sin candidatura al Congreso en el registro 2014–2026.</div>`;
       // depto/municipio más votado — solo la candidatura más reciente (evita
       // varios fetches pesados de mesa-a-mesa por click; el resto queda en
       // "Ver ficha completa" que ya trae el drill territorial completo)
-      loadTerritorialTop(hits[0].dataUrl).then(top=>{
+      if(hits.length) loadTerritorialTop(hits[0].dataUrl).then(top=>{
         const box=document.getElementById('ps-hist-terr-0');
         if(!box||!box.isConnected) return;
         box.innerHTML=top
@@ -793,14 +904,22 @@
     try{ d=await call({action:'congresista', q:nombre}); }catch(err){ d=null; }
     if(!box.isConnected) return;
     if(!d||d.candidatos||!d.encontrado){
-      box.innerHTML=`<div class="note" style="margin-top:0">Sin historial de voto nominal disponible. Ese dato cubre solo a quienes votaron en la plenaria de Cámara 2020–2026.</div>`;
+      box.innerHTML=`<div class="note" style="margin-top:0">Sin historial de voto nominal disponible. Ese dato cubre a quienes votaron en plenaria de Cámara (2014–2026) o de Senado (2017–2026).</div>`;
       return;
     }
     const su=d.resumen||{}, tot=d.n_votos||0, alin=d.alineacion_gob;
+    /* la Lambda dice de qué cámara sale el récord ('Cámara' | 'Senado'); cada
+       fuente tiene su propio rango y su propia letra menuda. */
+    const esSen=/senado/i.test(d.camara||'');
+    const donde=esSen?'plenaria de Senado':'plenaria de Cámara';
+    const rango=esSen?'2017–2026':'2014–2026';
+    const nota=esSen
+      ? `Voto nominal de plenaria de Senado ${rango} · fuente: API pública del Senado, que solo registra Sí/No (sin abstención ni no-votó).`
+      : `Voto nominal de plenaria de Cámara ${rango} · solo aplica si fue representante en ese periodo.`;
     box.innerHTML=`
-      ${alin!=null?`<div class="ps-align"><span class="n">${alin}%</span><span class="t">votó con la bancada de gobierno (Pacto) en ${d.n_contestadas||0} votaciones contestadas del periodo 2020–2026</span></div>`:''}
-      <div class="ps-tot"><b style="color:var(--green)">${su.Si||0} Sí</b> · <b style="color:var(--red)">${su.No||0} No</b>${su.Abstencion?` · <b style="color:var(--amber)">${su.Abstencion} abst</b>`:''} de ${tot} votos nominales</div>
-      <div class="note" style="margin-top:.5rem">Voto nominal de plenaria de Cámara 2020–2026 · solo aplica si fue representante en el periodo anterior.</div>`;
+      ${alin!=null?`<div class="ps-align"><span class="n">${alin}%</span><span class="t">votó con la bancada de gobierno (Pacto) en ${d.n_contestadas||0} votaciones contestadas de ${donde}</span></div>`:''}
+      <div class="ps-tot"><b style="color:var(--green)">${su.Si||0} Sí</b> · <b style="color:var(--red)">${su.No||0} No</b>${su.Abstencion?` · <b style="color:var(--amber)">${su.Abstencion} abst</b>`:''} de ${tot} votos nominales${d.n_proyectos?` en ${d.n_proyectos} proyectos`:''}</div>
+      <div class="note" style="margin-top:.5rem">${nota}</div>`;
   }
 
   /* ── últimos proyectos de la comisión ────────────────────────── */

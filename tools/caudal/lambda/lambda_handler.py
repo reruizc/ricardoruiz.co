@@ -279,6 +279,18 @@ def _canon_tokens(s):
     return frozenset(t for t in _re.split(r'[^A-Z0-9]+', s) if len(t) > 1)
 
 
+# Erratas de la fuente que rompen el match por tokens. Se listan una por una,
+# con el nombre COMPLETO como llave (frozenset de tokens), nunca por apellido:
+# aflojar el emparejador general le atribuiría el récord de Karina Espinosa
+# Oliver a Héctor Olimpo Espinosa Oliver, o el de Eduardo Enrique Pulgar Daza a
+# Yessid Enrique Pulgar Daza — personas distintas que comparten apellidos.
+_ALIAS_CONGRESISTA = {
+    # la API del Senado escribe "SCAF"; censo electoral y prensa, "SCAFF"
+    'Nadya Georgette Blel Scaff': 'BLEL SCAF NADYA GEORGETTE',
+}
+_ALIAS_TOKENS = None
+
+
 def _rec_congresista(key):
     """Récord de una persona fusionando las dos cámaras. Devuelve el registro de
     donde más votó como base y anexa el de la otra en `otra_camara` (hay quien fue
@@ -302,6 +314,12 @@ def _resolver_congresista(q):
     atoks = _canon_tokens(q)
     if not atoks:
         return None, []
+    global _ALIAS_TOKENS
+    if _ALIAS_TOKENS is None:
+        _ALIAS_TOKENS = {_canon_tokens(k): v for k, v in _ALIAS_CONGRESISTA.items()}
+    ali = _ALIAS_TOKENS.get(atoks)
+    if ali and _rec_congresista(ali):
+        return ali, []
     cand = None
     for t in atoks:
         s = _VOTAC_CONG_IDX.get(t, set())
