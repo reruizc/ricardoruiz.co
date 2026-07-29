@@ -843,11 +843,19 @@
     return (await getPresidenciales()).filter(f=>f.n===n)
       .sort((a,b)=>b.anio-a.anio||b.votos-a.votos);
   }
+  /* cada clic invalida la ficha anterior. El panel se reconstruye con los MISMOS
+     ids (ps-score, ps-hist, ps-hist-terr-0…), así que un fetch lento —el mesa a
+     mesa pesa 1-4 MB— resolvía DESPUÉS de abrir a otro integrante y escribía sus
+     datos en la ficha nueva (Briceño mostrando el territorio de Orjuela). */
+  let _fichaSeq=0;
   async function loadFicha(nombre){
+    const my=++_fichaSeq;
     const all=await getVotosCongreso();
+    if(my!==_fichaSeq) return;
     const hits=regMatches(nombre,all)
       .sort((a,b)=>(SRC_YEAR[b.source]||0)-(SRC_YEAR[a.source]||0)||(b.votos||0)-(a.votos||0));
     const pres=await presMatches(nombre);
+    if(my!==_fichaSeq) return;
     // puntaje (solo candidaturas 2026 con voto preferente)
     const box=document.getElementById('ps-score');
     if(box&&box.isConnected){
@@ -884,10 +892,10 @@
       // depto/municipio más votado — solo la candidatura más reciente (evita
       // varios fetches pesados de mesa-a-mesa por click; el resto queda en
       // "Ver ficha completa" que ya trae el drill territorial completo)
-      if(hits.length) loadTerritorialTop(hits[0].dataUrl).then(top=>{
-        const box=document.getElementById('ps-hist-terr-0');
-        if(!box||!box.isConnected) return;
-        box.innerHTML=top
+      const terrBox=hist.querySelector('#ps-hist-terr-0');   // el de ESTA ficha, no el id global
+      if(hits.length&&terrBox) loadTerritorialTop(hits[0].dataUrl).then(top=>{
+        if(my!==_fichaSeq||!terrBox.isConnected) return;
+        terrBox.innerHTML=top
           ?`Departamento más votado: <b>${esc(top.dep)}</b> (${fmt(top.depVotos)} votos)${top.mun?` · Municipio más votado: <b>${esc(top.mun)}</b> (${fmt(top.munVotos)} votos)`:''}`
           :'';
       });
