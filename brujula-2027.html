@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brújula 2027 · Inteligencia electoral para candidatos</title>
+  <meta name="description" content="Muestra gratuita: histórico electoral barrio a barrio, electorado por edad, escucha de medios y datos fríos del territorio para candidatos 2027." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    /* ── Helvetica Neue embebida (sistema visual v2) ── */
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:swap; }
+
+    :root {
+      --black:#0a0a0a; --white:#f4f3ef;
+      --blue:#0047FF; --blue-light:#3d6fff; --blue-soft:#6f9bff;
+      --green:#4ade80; --orange:#f97316; --gold:#f0c552;
+      --red:#ff6b6b;
+      --card-bg:rgba(10,10,16,.75); --card-border:rgba(255,255,255,.07);
+      --hn:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:#060810;color:var(--white);font-family:var(--hn);cursor:none;overflow-x:hidden}
+    ::selection{background:rgba(0,71,255,.4)}
+
+    /* fondo con gradientes radiales azules */
+    .bg-glow{position:fixed;inset:0;z-index:0;pointer-events:none;
+      background:
+        radial-gradient(ellipse 60% 40% at 85% -5%, rgba(0,71,255,.16), transparent 60%),
+        radial-gradient(ellipse 50% 35% at 10% 40%, rgba(0,71,255,.08), transparent 60%),
+        radial-gradient(ellipse 55% 45% at 90% 95%, rgba(0,71,255,.10), transparent 65%);}
+    .bg-glow::after{content:'';position:absolute;inset:0;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.35}
+
+    /* ── cursor custom ── */
+    .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:99999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
+    .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:99998;transform:translate(-50%,-50%);opacity:.4}
+    @media (pointer:coarse){ body{cursor:auto} .cursor,.cursor-ring{display:none} a,button,select,input{cursor:auto!important} }
+
+    /* ── NAV v2 ── */
+    .electoral-nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px)}
+    .e-nav-left{display:flex;align-items:center;gap:1rem;min-width:0}
+    .e-nav-right{display:flex;align-items:center;gap:1.2rem;flex-shrink:0}
+    .e-btn-back{font-family:var(--hn);font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.55);padding:.35rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0;white-space:nowrap;cursor:none}
+    .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
+    .demo-badge{font-family:var(--hn);font-weight:600;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);border:1px solid rgba(240,197,82,.45);background:rgba(240,197,82,.08);padding:.3rem .65rem;white-space:nowrap}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s;flex-shrink:0;cursor:none}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white);line-height:1}
+    .logo-text span{color:var(--blue)}
+
+    main{position:relative;z-index:2;max-width:1180px;margin:0 auto;padding:0 2rem 4rem}
+
+    /* ── HERO ── */
+    .hero{padding:3.6rem 0 2.4rem;text-align:center}
+    .hero-eyebrow{font-weight:600;font-size:.72rem;letter-spacing:.24em;text-transform:uppercase;color:var(--blue-soft);margin-bottom:1rem}
+    .hero h1{font-weight:800;font-size:clamp(2rem,5vw,3.6rem);letter-spacing:-.04em;line-height:1.06;text-shadow:0 2px 24px rgba(0,71,255,.35)}
+    .hero h1 span{color:var(--blue-light)}
+    .hero-sub{max-width:680px;margin:1.2rem auto 0;font-weight:300;font-size:clamp(.98rem,1.6vw,1.12rem);line-height:1.6;color:rgba(255,255,255,.68)}
+    .hero-sub b{color:var(--white);font-weight:600}
+
+    /* ── SWITCH ── */
+    .switch-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:840px;margin:2.2rem auto 0}
+    .switch-card{position:relative;text-align:left;font-family:var(--hn);color:var(--white);background:var(--card-bg);border:1px solid var(--card-border);padding:1.4rem 1.5rem 1.3rem;transition:border-color .25s,transform .2s,background .25s;backdrop-filter:blur(6px);cursor:none}
+    .switch-card:hover{border-color:rgba(0,71,255,.55);transform:translateY(-2px)}
+    .switch-card.active{border-color:var(--blue);background:rgba(0,71,255,.10)}
+    .switch-card.active::after{content:'';position:absolute;left:0;right:0;bottom:-2px;height:2.5px;background:var(--blue)}
+    .sw-kicker{font-weight:600;font-size:.64rem;letter-spacing:.2em;text-transform:uppercase;color:var(--blue-soft);margin-bottom:.5rem}
+    .sw-title{font-weight:800;font-size:clamp(1.05rem,2vw,1.35rem);letter-spacing:-.02em;margin-bottom:.4rem}
+    .sw-desc{font-weight:300;font-size:.85rem;line-height:1.5;color:rgba(255,255,255,.55)}
+    .switch-card.active .sw-desc{color:rgba(255,255,255,.75)}
+
+    /* ── SECCIONES ── */
+    section{margin-top:3.2rem}
+    .sec-eyebrow{font-weight:600;font-size:.68rem;letter-spacing:.22em;text-transform:uppercase;color:var(--blue-soft);margin-bottom:.55rem}
+    .sec-title{font-weight:800;font-size:clamp(1.35rem,2.8vw,2rem);letter-spacing:-.03em;margin-bottom:.5rem}
+    .sec-sub{font-weight:300;font-size:.95rem;line-height:1.6;color:rgba(255,255,255,.6);max-width:720px}
+    .panel-mode{display:none}
+    .panel-mode.active{display:block;animation:fadeup .45s ease}
+    @keyframes fadeup{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+    .card{background:var(--card-bg);border:1px solid var(--card-border);backdrop-filter:blur(6px);padding:1.35rem 1.5rem}
+    .rv{opacity:0;transform:translateY(18px);transition:opacity .55s ease,transform .55s ease}
+    .rv.rv-in{opacity:1;transform:none}
+
+    /* ── buscador (modo veterano) ── */
+    .search-wrap{position:relative;max-width:640px;margin-top:1.4rem}
+    .search-input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.16);color:var(--white);font-family:var(--hn);font-size:1.02rem;padding:.85rem 1.1rem;outline:none;transition:border-color .2s}
+    .search-input:focus{border-color:var(--blue)}
+    .search-input::placeholder{color:rgba(255,255,255,.3)}
+    .search-hint{font-size:.74rem;color:rgba(255,255,255,.38);margin-top:.5rem;letter-spacing:.03em}
+    .ac-list{position:absolute;top:calc(100% + 6px);left:0;right:0;background:#0c101e;border:1px solid rgba(255,255,255,.14);z-index:60;max-height:380px;overflow-y:auto;display:none;box-shadow:0 14px 40px rgba(0,0,0,.55)}
+    .ac-list.open{display:block}
+    .ac-item{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.65rem 1rem;border-bottom:1px solid rgba(255,255,255,.06);transition:background .15s;cursor:none}
+    .ac-item:hover{background:rgba(0,71,255,.14)}
+    .ac-nom{font-weight:600;font-size:.9rem}
+    .ac-meta{font-size:.7rem;letter-spacing:.05em;color:rgba(255,255,255,.45);text-transform:uppercase;margin-top:.15rem}
+    .ac-votes{font-weight:700;font-size:.86rem;color:var(--blue-soft);white-space:nowrap}
+    .ac-year{font-size:.64rem;color:rgba(255,255,255,.35)}
+    .ac-empty{padding:.9rem 1rem;font-size:.85rem;color:rgba(255,255,255,.45)}
+
+    /* ── ficha candidato ── */
+    #vet-ficha{display:none;margin-top:1.8rem}
+    #vet-ficha.show{display:block;animation:fadeup .4s ease}
+    .ficha-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:14px}
+    .ficha-head{display:flex;align-items:center;gap:1.1rem;margin-bottom:1.1rem}
+    .ficha-avatar{width:74px;height:74px;border-radius:50%;flex-shrink:0;background:rgba(0,71,255,.18);border:1.5px solid rgba(0,71,255,.5);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.4rem;color:var(--blue-soft);overflow:hidden}
+    .ficha-avatar img{width:100%;height:100%;object-fit:cover}
+    .ficha-nom{font-weight:800;font-size:clamp(1.15rem,2.4vw,1.6rem);letter-spacing:-.02em;line-height:1.15}
+    .ficha-chips{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.45rem}
+    .chip{font-size:.64rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:.22rem .55rem;border:1px solid rgba(255,255,255,.18);color:rgba(255,255,255,.6)}
+    .chip.b{border-color:rgba(0,71,255,.5);color:var(--blue-soft);background:rgba(0,71,255,.1)}
+    .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.2rem}
+    .stat{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);padding:.75rem .8rem}
+    .stat-v{font-weight:800;font-size:clamp(1.05rem,2vw,1.5rem);letter-spacing:-.02em;color:var(--white)}
+    .stat-k{font-size:.62rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.42);margin-top:.3rem}
+    .stat.hl .stat-v{color:var(--blue-light)}
+    .top-list{display:flex;flex-direction:column;gap:.5rem;margin-top:.4rem}
+    .top-row{display:grid;grid-template-columns:18px 1fr auto;gap:.7rem;align-items:center;font-size:.86rem}
+    .top-rank{font-weight:700;font-size:.72rem;color:rgba(255,255,255,.35)}
+    .top-name{min-width:0}
+    .top-name b{font-weight:600}
+    .top-name small{display:block;font-size:.68rem;color:rgba(255,255,255,.4);letter-spacing:.04em;margin-top:.1rem}
+    .top-bar{height:5px;background:rgba(255,255,255,.06);margin-top:.3rem;overflow:hidden}
+    .top-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--blue-light));width:0;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+    .top-v{font-weight:700;font-size:.85rem;color:var(--blue-soft);white-space:nowrap}
+    #vet-map{height:430px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07)}
+    .leaflet-container{background:transparent!important;font-family:var(--hn)!important;cursor:none}
+    .leaflet-tooltip{font-family:var(--hn)!important;font-weight:400!important;font-size:.82rem!important;background:rgba(6,8,16,.97)!important;border:1px solid rgba(0,71,255,.4)!important;color:var(--white)!important;border-radius:0!important;padding:.4rem .6rem!important}
+    .leaflet-tooltip:before{display:none!important}
+    .map-note{font-size:.7rem;color:rgba(255,255,255,.38);margin-top:.5rem;letter-spacing:.03em}
+
+    /* candados / teasers */
+    .locks-row{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1.2rem}
+    .lock-btn{font-family:var(--hn);font-weight:600;font-size:.74rem;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.62);background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.25);padding:.5rem .85rem;cursor:none;transition:border-color .2s,color .2s}
+    .lock-btn:hover{border-color:var(--blue);color:var(--white)}
+    .lock-btn .tier{color:var(--gold);margin-left:.35rem}
+
+    /* ── modo nuevo ── */
+    .pills{display:flex;gap:.55rem;flex-wrap:wrap;margin-top:1rem}
+    .pill{font-family:var(--hn);font-weight:600;font-size:.8rem;letter-spacing:.06em;color:rgba(255,255,255,.6);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.16);padding:.5rem 1rem;cursor:none;transition:all .18s;text-transform:uppercase}
+    .pill:hover{border-color:rgba(0,71,255,.6);color:var(--white)}
+    .pill.active{background:rgba(0,71,255,.16);border-color:var(--blue);color:var(--white)}
+    .sel{background:#0c101e;border:1px solid rgba(255,255,255,.16);color:var(--white);font-family:var(--hn);font-size:.9rem;padding:.6rem .8rem;outline:none;cursor:none;min-width:220px}
+    .sel:focus{border-color:var(--blue)}
+    .nuevo-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:14px;margin-top:1.6rem}
+    .barrio-row{display:grid;grid-template-columns:18px 1fr auto;gap:.7rem;align-items:center;padding:.5rem .4rem;border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s;cursor:none}
+    .barrio-row:hover{background:rgba(0,71,255,.08)}
+    .barrio-idx{font-weight:700;font-size:.72rem;color:rgba(255,255,255,.35)}
+    .barrio-nom b{font-weight:600;font-size:.88rem}
+    .barrio-nom small{display:block;font-size:.66rem;color:rgba(255,255,255,.4);letter-spacing:.05em;margin-top:.12rem;text-transform:uppercase}
+    .barrio-aff{font-weight:800;font-size:.9rem;white-space:nowrap}
+    .aff-hi{color:var(--green)} .aff-mid{color:var(--gold)} .aff-lo{color:rgba(255,255,255,.5)}
+    .barrio-detail{display:none;grid-column:1/-1;background:rgba(0,71,255,.06);border:1px solid rgba(0,71,255,.25);padding:.7rem .9rem;font-size:.78rem;line-height:1.6;color:rgba(255,255,255,.7);margin:.3rem 0 .5rem}
+    .barrio-detail.show{display:block}
+    .barrio-detail b{color:var(--white)}
+    .blurred-zone{position:relative;margin-top:.4rem}
+    .blurred-zone .blur-rows{filter:blur(5px);pointer-events:none;user-select:none}
+    .blur-cta{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+
+    /* duelo por ciudad/depto */
+    #duel-wrap{display:none;margin-bottom:1.4rem;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:1.1rem}
+    .duel-title{font-weight:700;font-size:.9rem;letter-spacing:-.01em;margin-bottom:.2rem}
+    .duel-sub{font-size:.68rem;color:rgba(255,255,255,.42);margin-bottom:.8rem}
+    .duel-band{display:grid;grid-template-columns:64px 1fr;gap:.6rem;align-items:center;margin-bottom:.55rem}
+    .duel-lbl{font-size:.7rem;font-weight:600;letter-spacing:.06em;color:rgba(255,255,255,.6);text-align:right}
+    .duel-split{display:flex;height:22px;background:rgba(255,255,255,.05);overflow:hidden}
+    .duel-l{background:#c0392b;display:flex;align-items:center;padding-left:.45rem;font-size:.66rem;font-weight:700;color:#fff;white-space:nowrap;min-width:0;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+    .duel-r{background:#1f47cc;display:flex;align-items:center;justify-content:flex-end;padding-right:.45rem;font-size:.66rem;font-weight:700;color:#fff;white-space:nowrap;flex:1}
+    .duel-nac{grid-column:2;font-size:.6rem;color:rgba(255,255,255,.35);margin-top:.1rem}
+    .duel-leg{display:flex;gap:1rem;font-size:.64rem;color:rgba(255,255,255,.5);margin-bottom:.7rem}
+    .duel-leg i{display:inline-block;width:9px;height:9px;margin-right:.3rem}
+
+    /* teaser arquetipos */
+    .arq-row{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1.3rem}
+    .arq-chip{font-size:.74rem;font-weight:600;letter-spacing:.04em;padding:.45rem .85rem;border:1px solid;background:rgba(255,255,255,.03)}
+    .mensaje-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-top:1.5rem}
+
+    /* chart generacional */
+    .gen-chart{margin-top:1rem}
+    .gen-band{margin-bottom:1rem}
+    .gen-band-label{display:flex;justify-content:space-between;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-bottom:.35rem}
+    .gen-band-label b{color:var(--white)}
+    .gen-bars{display:flex;flex-direction:column;gap:4px}
+    .gen-bar{display:grid;grid-template-columns:86px 1fr 44px;gap:.6rem;align-items:center;font-size:.7rem}
+    .gen-bar .lbl{color:rgba(255,255,255,.5);letter-spacing:.04em;text-align:right}
+    .gen-bar .trk{height:9px;background:rgba(255,255,255,.05);overflow:hidden}
+    .gen-bar .trk i{display:block;height:100%;width:0;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+    .gen-bar .pct{font-weight:700;color:rgba(255,255,255,.75)}
+    .gen-bar.dim{opacity:.35}
+    .gen-bar.hl .pct{color:var(--white)}
+    .method-note{font-size:.7rem;line-height:1.55;color:rgba(255,255,255,.38);margin-top:1rem;border-top:1px solid rgba(255,255,255,.07);padding-top:.7rem}
+
+    /* ── medios ── */
+    .medios-form{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1.3rem;max-width:760px}
+    .medios-form .search-input{flex:1;min-width:240px}
+    .btn-blue{font-family:var(--hn);font-weight:700;font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:var(--blue);border:1.5px solid var(--blue);padding:.6rem 1.4rem;cursor:none;transition:background .2s}
+    .btn-blue:hover{background:#0035cc}
+    .btn-blue:disabled{opacity:.45}
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:1.4rem}
+    .headline{display:block;text-decoration:none;color:inherit;padding:.75rem .4rem;border-bottom:1px solid rgba(255,255,255,.06);transition:background .15s;cursor:none}
+    .headline:hover{background:rgba(0,71,255,.08)}
+    .headline-t{font-size:.92rem;line-height:1.45;font-weight:400}
+    .headline:hover .headline-t{color:var(--blue-soft)}
+    .headline-m{display:flex;gap:.6rem;align-items:center;margin-top:.3rem;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.42)}
+    .badge-reg{color:var(--gold);border:1px solid rgba(240,197,82,.4);padding:.08rem .4rem;font-size:.6rem}
+    .loading{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--blue-light);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .mod-msg{margin-top:1.2rem;font-size:.85rem;color:rgba(255,255,255,.5)}
+
+    /* ── datos fríos ── */
+    .frios-controls{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1.3rem}
+    .frios-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:1.5rem}
+    .ind-card{background:var(--card-bg);border:1px solid var(--card-border);padding:1rem 1.05rem;transition:border-color .2s}
+    .ind-card:hover{border-color:rgba(0,71,255,.5)}
+    .ind-cat{font-size:.58rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;margin-bottom:.5rem}
+    .ind-cat.seguridad{color:var(--red)} .ind-cat.educacion{color:var(--green)}
+    .ind-nom{font-weight:600;font-size:.82rem;line-height:1.3;min-height:2.2em}
+    .ind-val{font-weight:800;font-size:1.5rem;letter-spacing:-.02em;margin-top:.4rem}
+    .ind-unit{font-size:.64rem;color:rgba(255,255,255,.42);letter-spacing:.04em}
+    .ind-delta{font-size:.7rem;font-weight:700;margin-top:.25rem}
+    .d-up{color:var(--red)} .d-down{color:var(--green)} .d-up.good{color:var(--green)} .d-down.bad{color:var(--red)}
+    .ind-spark{margin-top:.6rem}
+    .ind-spark polyline{fill:none;stroke:var(--blue-light);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .ind-spark .area{fill:rgba(0,71,255,.12);stroke:none}
+    .ind-src{font-size:.6rem;color:rgba(255,255,255,.32);margin-top:.55rem;line-height:1.4}
+    .proxy-tag{font-size:.56rem;color:var(--gold);letter-spacing:.06em}
+
+    /* ── CTA final ── */
+    .cta-band{margin-top:4rem;border:1px solid rgba(0,71,255,.4);background:linear-gradient(135deg,rgba(0,71,255,.14),rgba(0,71,255,.03));padding:2.4rem 2.2rem;text-align:center}
+    .cta-band h2{font-weight:800;font-size:clamp(1.4rem,3vw,2.1rem);letter-spacing:-.03em}
+    .cta-band p{max-width:640px;margin:.8rem auto 0;font-weight:300;font-size:.95rem;line-height:1.6;color:rgba(255,255,255,.68)}
+    .cta-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:840px;margin:1.8rem auto 0;text-align:left}
+    .cta-col{background:rgba(6,8,16,.6);border:1px solid rgba(255,255,255,.08);padding:1rem 1.1rem}
+    .cta-col b{display:block;font-size:.86rem;margin-bottom:.35rem;color:var(--blue-soft)}
+    .cta-col span{font-size:.78rem;line-height:1.5;color:rgba(255,255,255,.55);font-weight:300}
+    .cta-price{margin-top:1.6rem;font-size:.85rem;color:rgba(255,255,255,.6)}
+    .cta-price b{color:var(--white);font-size:1.05rem}
+    .cta-actions{margin-top:1.4rem;display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap}
+    .btn-ghost{font-family:var(--hn);font-weight:600;font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.7);background:none;border:1.5px solid rgba(255,255,255,.25);padding:.6rem 1.4rem;text-decoration:none;cursor:none;transition:border-color .2s,color .2s}
+    .btn-ghost:hover{border-color:var(--white);color:var(--white)}
+
+    footer{position:relative;z-index:2;max-width:1180px;margin:0 auto;padding:2rem;border-top:1px solid rgba(255,255,255,.06);font-size:.7rem;line-height:1.7;color:rgba(255,255,255,.35)}
+
+    .warn-box{margin-top:1.2rem;border:1px solid rgba(240,197,82,.4);background:rgba(240,197,82,.06);color:rgba(255,255,255,.7);font-size:.8rem;line-height:1.55;padding:.8rem 1rem}
+
+    /* ── responsive ── */
+    @media (max-width:900px){
+      main{padding:0 1.1rem 3rem}
+      .electoral-nav{padding:.7rem 1.1rem}
+      .switch-wrap{grid-template-columns:1fr}
+      .ficha-grid,.nuevo-grid{grid-template-columns:1fr}
+      .stats-grid,.kpis{grid-template-columns:repeat(2,1fr)}
+      .frios-grid{grid-template-columns:repeat(2,1fr)}
+      .cta-cols{grid-template-columns:1fr}
+      #vet-map{height:340px}
+    }
+    @media (max-width:480px){ .frios-grid{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <div class="bg-glow"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="index.html" class="e-btn-back">← Volver</a>
+      <span class="demo-badge">Muestra gratuita · borrador</span>
+    </div>
+    <div class="e-nav-right">
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <main>
+    <!-- ═══════════ HERO ═══════════ -->
+    <div class="hero">
+      <div class="hero-eyebrow">Brújula 2027 · Inteligencia electoral para candidatos</div>
+      <h1>¿Vas a lanzarte en 2027?<br /><span>Mira lo que ya sabemos de tu territorio.</span></h1>
+      <p class="hero-sub">En octubre de 2027 se eligen <b>alcaldías, gobernaciones, asambleas, concejos y JAL</b>.
+      Esta es una muestra con <b>datos reales</b>: tu histórico electoral hasta el puesto de votación,
+      dónde vive tu electorado barrio a barrio, qué dice la prensa y los datos fríos de tu municipio.</p>
+
+      <div class="switch-wrap">
+        <button class="switch-card active" id="sw-vet" onclick="setMode('vet')">
+          <div class="sw-kicker">Ya me lancé antes</div>
+          <div class="sw-title">Busca tu histórico electoral</div>
+          <div class="sw-desc">Si fuiste candidato a Concejo, JAL, Asamblea o Congreso desde 2014, tu votación real está aquí — hasta el puesto de votación.</div>
+        </button>
+        <button class="switch-card" id="sw-new" onclick="setMode('new')">
+          <div class="sw-kicker">Soy candidato nuevo</div>
+          <div class="sw-title">Descubre dónde está tu electorado</div>
+          <div class="sw-desc">Elige tu bloque y tu ciudad: te mostramos los barrios donde tu electorado sobre-indexa y cómo vota cada generación.</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══════════ MODO A · VETERANO ═══════════ -->
+    <section id="panel-vet" class="panel-mode active">
+      <div class="sec-eyebrow">01 · Tu histórico electoral</div>
+      <div class="sec-title">Busca tu nombre. Sí, el tuyo.</div>
+      <p class="sec-sub">Más de <b style="color:var(--white)">120.000 candidaturas reales</b> procesadas mesa a mesa:
+      Concejo y JAL 2023, Asamblea 2023 y Congreso 2014, 2018, 2022 y 2026 (Registraduría).</p>
+
+      <div class="search-wrap">
+        <input type="text" id="cand-search" class="search-input" placeholder="Escribe un nombre — p. ej. tu apellido…" autocomplete="off" />
+        <div class="ac-list" id="ac-list"></div>
+        <div class="search-hint" id="search-hint">Cargando índice de candidaturas…</div>
+      </div>
+
+      <div id="vet-ficha">
+        <div class="card" style="margin-bottom:14px">
+          <div class="ficha-head">
+            <div class="ficha-avatar" id="ficha-avatar">?</div>
+            <div>
+              <div class="ficha-nom" id="ficha-nom">—</div>
+              <div class="ficha-chips" id="ficha-chips"></div>
+            </div>
+          </div>
+          <div class="stats-grid" id="ficha-stats"></div>
+          <div class="locks-row">
+            <button class="lock-btn" onclick="PlanGate.require('mesas')">🔒 Ver mesa a mesa <span class="tier">Premium</span></button>
+            <button class="lock-btn" onclick="PlanGate.require('barrios')">🔒 Comparar dos elecciones <span class="tier">Pro</span></button>
+            <button class="lock-btn" onclick="PlanGate.require('barrios')">🔒 Exportar Excel <span class="tier">Pro</span></button>
+          </div>
+        </div>
+        <div class="ficha-grid">
+          <div class="card">
+            <div class="sec-eyebrow" style="margin-bottom:.8rem">Mapa de tu fuerza territorial</div>
+            <div id="vet-map"></div>
+            <div class="map-note" id="map-note">Intensidad de color = concentración de tu votación.</div>
+          </div>
+          <div class="card">
+            <div class="sec-eyebrow" style="margin-bottom:.8rem" id="top-title">Tus territorios más fuertes</div>
+            <div class="top-list" id="top-list"></div>
+          </div>
+        </div>
+      </div>
+      <div id="vet-warn"></div>
+    </section>
+
+    <!-- ═══════════ MODO B · NUEVO ═══════════ -->
+    <section id="panel-new" class="panel-mode">
+      <div class="sec-eyebrow">01 · Tu electorado, antes de lanzarte</div>
+      <div class="sec-title">¿Con quién compites y dónde?</div>
+      <p class="sec-sub">Cruzamos 9 señales electorales (2010–2026) para estimar la afinidad de cada barrio con cada
+      bloque político, y la inferencia ecológica del voto por edad de la 1ª vuelta 2026.</p>
+
+      <div class="pills" id="bloque-pills">
+        <button class="pill active" data-bloque="izq" onclick="setBloque(this)">Izquierda / progresismo</button>
+        <button class="pill" data-bloque="centro" onclick="setBloque(this)">Centro</button>
+        <button class="pill" data-bloque="der" onclick="setBloque(this)">Derecha</button>
+      </div>
+      <div class="frios-controls">
+        <select class="sel" id="ciudad-sel" onchange="renderBarrios()"><option value="">Cargando ciudades…</option></select>
+      </div>
+
+      <div class="nuevo-grid">
+        <div class="card">
+          <div class="sec-eyebrow" style="margin-bottom:.3rem">Barrios donde tu electorado sobre-indexa</div>
+          <div style="font-size:.74rem;color:rgba(255,255,255,.42);margin-bottom:.6rem">Índice de afinidad territorial · 1.0 = promedio nacional del bloque · toca un barrio para ver sus hechos electorales</div>
+          <div id="barrios-list"><div class="mod-msg">Elige una ciudad para empezar.</div></div>
+        </div>
+        <div class="card">
+          <div class="sec-eyebrow" style="margin-bottom:.3rem">La brecha generacional del voto</div>
+          <div style="font-size:.74rem;color:rgba(255,255,255,.42);margin-bottom:1rem">% del voto dentro de cada grupo de edad · 1ª vuelta 2026 · inferencia ecológica sobre 9.346 puestos</div>
+          <div id="duel-wrap">
+            <div class="duel-title" id="duel-title">—</div>
+            <div class="duel-sub" id="duel-sub">Duelo izquierda–derecha (Cepeda vs Abelardo) · % del voto entre ambos</div>
+            <div class="duel-leg"><span><i style="background:#c0392b"></i>Izquierda</span><span><i style="background:#1f47cc"></i>Derecha</span></div>
+            <div id="duel-chart"></div>
+          </div>
+          <div class="gen-chart" id="gen-chart"></div>
+          <div class="method-note">Estimación por inferencia ecológica (IC 95 % típico ±3–6 pp). El grupo resaltado depende del bloque elegido.
+          La plataforma completa baja este análisis a tu ciudad y tu comuna.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ MÓDULO MEDIOS ═══════════ -->
+    <section id="modulo-medios" class="rv">
+      <div class="sec-eyebrow">02 · Escucha social y medios</div>
+      <div class="sec-title">¿Qué dice la prensa de ti — o de tu territorio?</div>
+      <p class="sec-sub">Rastreo en vivo sobre prensa nacional y regional. Escribe tu nombre, el de tu ciudad o un tema de campaña.</p>
+
+      <div class="medios-form">
+        <input type="text" id="medios-q" class="search-input" placeholder="p. ej. «elecciones Medellín» o tu nombre…" />
+        <select class="sel" id="medios-dias" style="min-width:130px">
+          <option value="7">7 días</option>
+          <option value="30" selected>30 días</option>
+          <option value="90">90 días</option>
+        </select>
+        <button class="btn-blue" id="medios-btn" onclick="buscarMedios()">Rastrear</button>
+      </div>
+
+      <div id="medios-out"></div>
+      <div class="locks-row">
+        <button class="lock-btn" onclick="PlanGate.require('alertas')">🔒 Alertas semanales a tu correo <span class="tier">Pro</span></button>
+        <button class="lock-btn" onclick="PlanGate.require('alertas')">🔒 Análisis de tono con IA <span class="tier">Pro</span></button>
+      </div>
+    </section>
+
+    <!-- ═══════════ MÓDULO DATOS FRÍOS ═══════════ -->
+    <section id="modulo-frios" class="rv">
+      <div class="sec-eyebrow">03 · Datos fríos del territorio</div>
+      <div class="sec-title">Tu municipio, en cifras oficiales.</div>
+      <p class="sec-sub">Seguridad (Policía Nacional) y educación (MEN) con serie 2018–2024 para 1.108 municipios.
+      La plataforma completa suma DANE (pobreza, población, servicios) con actualización periódica.</p>
+
+      <div class="frios-controls">
+        <select class="sel" id="frios-dep" onchange="onFriosDep()"><option value="">Cargando departamentos…</option></select>
+        <select class="sel" id="frios-mun" onchange="renderFrios()" disabled><option value="">Municipio…</option></select>
+      </div>
+      <div id="frios-out"></div>
+    </section>
+
+    <!-- ═══════════ MÓDULO MENSAJE (teaser arquetipos) ═══════════ -->
+    <section id="modulo-mensaje" class="rv">
+      <div class="sec-eyebrow">04 · El mensaje</div>
+      <div class="sec-title">Saber dónde está tu electorado no basta: ¿qué le dices?</div>
+      <p class="sec-sub">También leemos el electorado por su <b style="color:var(--white)">emoción dominante</b>:
+      cinco arquetipos que explican por qué un mismo mensaje conecta en un barrio y rebota en el de al lado.</p>
+      <div class="mensaje-grid">
+        <div class="card">
+          <div class="arq-row">
+            <span class="arq-chip" style="border-color:#2563eb;color:#7ba3f5">Protección y orden</span>
+            <span class="arq-chip" style="border-color:#16a34a;color:#5fc98a">Continuidad pragmática</span>
+            <span class="arq-chip" style="border-color:#b45309;color:#dd9959">Supervivencia económica</span>
+            <span class="arq-chip" style="border-color:#dc2626;color:#ef7b7b">Castigo y alternancia</span>
+            <span class="arq-chip" style="border-color:#a21caf;color:#cf7bd8">Pertenencia territorial</span>
+          </div>
+          <p style="font-size:.82rem;line-height:1.6;color:rgba(255,255,255,.55);margin-top:1rem">Cada territorio mezcla estos cinco resortes en proporciones distintas.
+          Conocer la mezcla de tus barrios fuertes te dice <b style="color:var(--white)">con qué tono hablarles</b>: seguridad, gestión, bolsillo, cambio o comunidad.</p>
+          <div class="locks-row">
+            <button class="lock-btn" onclick="PlanGate.require('mesas')">🔒 Arquetipos de tu territorio <span class="tier">Premium</span></button>
+          </div>
+        </div>
+        <div class="card">
+          <div style="font-weight:700;font-size:.95rem;margin-bottom:.5rem">Pruébalo tú mismo</div>
+          <p style="font-size:.82rem;line-height:1.6;color:rgba(255,255,255,.55)">Nuestro test de arquetipo emocional ya lo respondieron miles de votantes en 2026,
+          con lectura personalizada por IA y proyección de su barrio. Es la misma tecnología que la plataforma aplica a tu territorio.</p>
+          <div style="margin-top:1.1rem"><a class="btn-blue" style="text-decoration:none" href="test-presidencial-2026.html">Hacer el test →</a></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════ CTA ═══════════ -->
+    <div class="cta-band rv">
+      <h2>Esto es solo la muestra.</h2>
+      <p>La plataforma completa es tu sala de guerra: datos hasta la <b style="color:var(--white)">mesa de votación</b>,
+      alertas de medios cada semana, comparador de elecciones y datos fríos actualizados cada mes.</p>
+      <div class="cta-cols">
+        <div class="cta-col"><b>Territorio</b><span>Mesa a mesa, barrio a barrio. Comparte el mapa con tu equipo y prioriza dónde caminar.</span></div>
+        <div class="cta-col"><b>Escucha</b><span>Alertas semanales de prensa sobre tu nombre y tus temas, con análisis de tono por IA.</span></div>
+        <div class="cta-col"><b>Contexto</b><span>Seguridad, educación y datos DANE de tu municipio, siempre al día, listos para tu discurso.</span></div>
+      </div>
+      <div class="cta-price">Plan Pro <b>$79.900 COP/mes</b> · Plan Premium <b>$219.000 COP/mes</b></div>
+      <div class="cta-actions">
+        <a href="pricing.html" class="btn-blue" style="text-decoration:none">Ver planes</a>
+        <a href="https://wa.me/573243036767?text=Hola%2C%20quiero%20una%20demo%20de%20Br%C3%BAjula%202027" class="btn-ghost">Pedir demo guiada</a>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <b>Fuentes y método.</b> Resultados electorales: Registraduría Nacional (archivos GCS 2014–2026, preconteo 1V/2V 2026), procesados mesa a mesa.
+    Afinidad territorial: cruce de 9 señales electorales 2010–2026 por puesto de votación (índice de afinidad = afín local / afín nacional).
+    Voto por edad: inferencia ecológica sobre Edadygenero (RNEC) + proyecciones DANE; los valores son estimaciones con IC 95 %.
+    Medios: Google News (prensa nacional y regional). Datos fríos: Policía Nacional y MEN vía datos.gov.co.
+    Esta página es una muestra comercial en borrador; los análisis completos y sus límites metodológicos se documentan en la plataforma.
+    · ricardoruiz.co
+  </footer>
+
+  <!-- gate por plan (compartido del sitio) -->
+  <script>
+    window.GATE_FEATURES = {
+      plan: { ficha:'free', barrios:'pro', alertas:'pro', mesas:'premium' },
+      copy: {
+        ficha:   { title:'Ya usaste tus consultas de muestra', desc:'Crea una cuenta gratuita para seguir explorando candidaturas, o entra con tu correo si ya tienes una.' },
+        barrios: { title:'La lista completa es Pro', desc:'Con el plan Pro desbloqueas todos los barrios, el comparador de elecciones y la exportación a Excel.' },
+        alertas: { title:'Las alertas de medios son Pro', desc:'Con el plan Pro recibes cada semana en tu correo lo que la prensa dice de ti y de tus temas, con análisis de tono por IA.' },
+        mesas:   { title:'El mesa a mesa es Premium', desc:'Con Premium bajas hasta la mesa de votación: la unidad mínima real de tu campaña.' },
+      },
+    };
+  </script>
+  <script src="plan-gate.js"></script>
+  <script src="cand-index.js"></script>
+  <script src="lab-indicadores.js"></script>
+
+  <script>
+  'use strict';
+  /* ═══════════════ Brújula 2027 · borrador · muestra comercial ═══════════════ */
+
+  const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const S3_PHOTOS = S3 + '/fotos-candidatos';
+  const HUELLA_URL = S3 + '/huella/huella-territorial.json';
+  const EDAD_GEO_URL = S3 + '/edad-1v/edad-geo.json';
+  const GEO_DEPTOS = S3 + '/mapas-2026/DEPARTAMENTOS2.json';
+  const GEO_MUNS = c => S3 + '/mapas-2026/Departamentos-mps/' + String(c).padStart(2,'0') + '.json';
+  const CAUDAL_API = 'https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com';
+  const SRC_YEAR = { endoso:2026, asamblea:2023, con2014:2014, con2018:2018, con2022:2022, concejo:2023, jal:2023 };
+
+  const $ = s => document.querySelector(s);
+  const fmt = n => (n==null?'—':Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.'));
+  const norm = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const title = s => (s||'').toLowerCase().replace(/(^|\s|\.)([a-záéíóúñü])/g, (m,p,c)=>p+c.toUpperCase());
+  async function getJSON(url){ const r = await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }
+
+  /* ── cursor custom ── */
+  (function(){
+    const c=$('#cursor'), r=$('#cursorRing');
+    if(!c) return;
+    document.addEventListener('mousemove', e=>{
+      c.style.left=e.clientX+'px'; c.style.top=e.clientY+'px';
+      r.style.left=e.clientX+'px'; r.style.top=e.clientY+'px';
+    });
+    document.addEventListener('mouseover', e=>{
+      const it = e.target.closest('a,button,select,input,.ac-item,.barrio-row,.headline');
+      c.style.transform = 'translate(-50%,-50%) scale('+(it?2:1)+')';
+      r.style.opacity = it?0.15:0.4;
+    });
+  })();
+
+  /* ── reveal on scroll ── */
+  (function(){
+    const io = new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('rv-in'); io.unobserve(e.target); } }),{threshold:.08});
+    document.querySelectorAll('.rv').forEach(el=>io.observe(el));
+  })();
+
+  /* ── count-up ── */
+  function countUp(el, target){
+    const t0 = performance.now(), dur = 900;
+    function tick(t){
+      const p = Math.min(1,(t-t0)/dur), e = 1-Math.pow(1-p,3);
+      el.textContent = fmt(target*e);
+      if(p<1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  /* ═══════════ SWITCH de modo ═══════════ */
+  let MODE = 'vet';
+  function setMode(m){
+    MODE = m;
+    $('#sw-vet').classList.toggle('active', m==='vet');
+    $('#sw-new').classList.toggle('active', m==='new');
+    $('#panel-vet').classList.toggle('active', m==='vet');
+    $('#panel-new').classList.toggle('active', m==='new');
+    if(m==='new') initNuevo();
+  }
+
+  /* ═══════════ MODO A · buscador de histórico ═══════════ */
+  let CANDS = [], LOCAL_ASKED = false, REGISTRY_OK = false;
+
+  async function initRegistry(){
+    try{
+      CANDS = await CandRegistry.load({ includeParties:false });
+      REGISTRY_OK = CANDS.length > 0;
+      $('#search-hint').textContent = REGISTRY_OK
+        ? fmt(CANDS.length)+' candidaturas cargadas · Concejo y JAL se suman al escribir'
+        : 'No se pudo cargar el índice de candidaturas. Revisa tu conexión.';
+    }catch(e){
+      $('#search-hint').textContent = 'No se pudo cargar el índice de candidaturas. Revisa tu conexión.';
+    }
+  }
+  function askLocal(){
+    if(LOCAL_ASKED) return; LOCAL_ASKED = true;
+    CandRegistry.loadLocal({ includeParties:false }).then(loc=>{
+      if(loc.length){ CANDS = CANDS.concat(loc); if(REGISTRY_OK) $('#search-hint').textContent = fmt(CANDS.length)+' candidaturas cargadas (incluye Concejo y JAL 2023)'; }
+    }).catch(()=>{});
+  }
+
+  let _searchT = null;
+  const inp = $('#cand-search');
+  inp.addEventListener('focus', askLocal);
+  inp.addEventListener('input', ()=>{ clearTimeout(_searchT); _searchT = setTimeout(runSearch, 160); });
+  document.addEventListener('click', e=>{ if(!e.target.closest('.search-wrap')) $('#ac-list').classList.remove('open'); });
+
+  function runSearch(){
+    const q = inp.value.trim(), list = $('#ac-list');
+    if(q.length < 3){ list.classList.remove('open'); return; }
+    const hits = CANDS.filter(c=>CandRegistry.acMatch(q, c.nombre)).sort((a,b)=>b.votos-a.votos).slice(0,12);
+    if(!hits.length){
+      list.innerHTML = '<div class="ac-empty">'+(CANDS.length?'Sin resultados para «'+esc(q)+'». Prueba con apellido y nombre.':'El índice aún no carga — intenta de nuevo en unos segundos.')+'</div>';
+      list.classList.add('open'); return;
+    }
+    list.innerHTML = hits.map((c,i)=>
+      '<div class="ac-item" data-i="'+i+'">'+
+        '<div><div class="ac-nom">'+esc(title(c.nombre))+'</div>'+
+        '<div class="ac-meta">'+esc(c.corp||c.source)+' · '+esc(c.partido||'—')+'</div></div>'+
+        '<div style="text-align:right"><div class="ac-votes">'+fmt(c.votos)+'</div>'+
+        '<div class="ac-year">'+(SRC_YEAR[c.source]||'')+'</div></div>'+
+      '</div>').join('');
+    list.classList.add('open');
+    list.querySelectorAll('.ac-item').forEach(el=>el.addEventListener('click', ()=>selectCand(hits[+el.dataset.i])));
+  }
+
+  async function selectCand(c){
+    $('#ac-list').classList.remove('open');
+    if(!PlanGate.requireOrSample('ficha','brujula-ficha',3)) return;
+    inp.value = title(c.nombre);
+    const ficha = $('#vet-ficha'); ficha.classList.add('show');
+    $('#vet-warn').innerHTML = '';
+
+    // cabecera
+    $('#ficha-nom').textContent = title(c.nombre);
+    const av = $('#ficha-avatar');
+    const initials = norm(c.nombre).split(/\s+/).slice(0,2).map(w=>w[0]||'').join('');
+    av.innerHTML = esc(initials);
+    const img = new Image();
+    img.onload = ()=>{ av.innerHTML=''; av.appendChild(img); };
+    img.src = S3_PHOTOS + '/' + c.slug + '.jpg';
+    $('#ficha-chips').innerHTML =
+      '<span class="chip b">'+esc(c.corp||c.source)+'</span>'+
+      '<span class="chip">'+esc(c.partido||'Sin partido')+'</span>'+
+      '<span class="chip">'+(SRC_YEAR[c.source]||'')+'</span>';
+    $('#ficha-stats').innerHTML = '<div class="stat hl"><div class="stat-v"><span class="loading"></span></div><div class="stat-k">Cargando mesa a mesa…</div></div>';
+    $('#top-list').innerHTML = '';
+    ficha.scrollIntoView({behavior:'smooth', block:'start'});
+
+    // datos mesa a mesa
+    let data;
+    try{ data = await getJSON(CandRegistry.dataUrlFor(c.slug)); }
+    catch(e){
+      $('#ficha-stats').innerHTML = '';
+      $('#vet-warn').innerHTML = '<div class="warn-box">No se pudo descargar el detalle mesa a mesa de esta candidatura (conexión o archivo pesado). En producción este mapa carga en segundos.</div>';
+      return;
+    }
+    const agg = aggregate(data.mesas||[]);
+    renderFichaStats(c, agg);
+    renderTop(c, agg);
+    renderVetMap(c, agg);
+    // pre-llenar escucha de medios con el nombre
+    $('#medios-q').value = title(c.nombre);
+  }
+
+  function aggregate(mesas){
+    const deps={}, muns={}, pues={};
+    let total = 0;
+    mesas.forEach(m=>{
+      const v = m.v||0; total += v;
+      const dk = String(parseInt(m.dep,10)||0).padStart(2,'0');
+      (deps[dk] = deps[dk] || {nom:m.depNom||('Depto '+dk), v:0}).v += v;
+      const mk = dk+'-'+m.mun;
+      (muns[mk] = muns[mk] || {nom:m.munNom||('Mun '+m.mun), mun:m.mun, dep:dk, depNom:m.depNom||'', v:0}).v += v;
+      if(m.pue != null){
+        const pk = mk+'-'+(m.zon||'00')+'-'+m.pue;
+        (pues[pk] = pues[pk] || {nom:m.pueNom||('Puesto '+m.pue), munNom:m.munNom||'', v:0}).v += v;
+      }
+    });
+    return { total, deps, muns, pues, nMesas: mesas.length };
+  }
+
+  function renderFichaStats(c, agg){
+    const nDeps = Object.values(agg.deps).filter(d=>d.v>0).length;
+    const nMuns = Object.values(agg.muns).filter(m=>m.v>0).length;
+    const nPues = Object.values(agg.pues).filter(p=>p.v>0).length;
+    const topMun = Object.values(agg.muns).sort((a,b)=>b.v-a.v)[0];
+    $('#ficha-stats').innerHTML =
+      '<div class="stat hl"><div class="stat-v" id="st-votos">0</div><div class="stat-k">Votos</div></div>'+
+      '<div class="stat"><div class="stat-v" id="st-muns">0</div><div class="stat-k">Municipios con voto</div></div>'+
+      '<div class="stat"><div class="stat-v" id="st-pues">0</div><div class="stat-k">Puestos de votación</div></div>'+
+      '<div class="stat"><div class="stat-v" style="font-size:1rem;line-height:1.3">'+esc(title(topMun?topMun.nom:'—'))+'</div><div class="stat-k">Tu plaza fuerte</div></div>';
+    countUp($('#st-votos'), agg.total);
+    countUp($('#st-muns'), nMuns);
+    countUp($('#st-pues'), nPues || agg.nMesas);
+    void nDeps;
+  }
+
+  function renderTop(c, agg){
+    const local = (c.source==='concejo' || c.source==='jal');
+    const items = local
+      ? Object.values(agg.pues).sort((a,b)=>b.v-a.v).slice(0,10).map(p=>({nom:p.nom, sub:p.munNom, v:p.v}))
+      : Object.values(agg.muns).sort((a,b)=>b.v-a.v).slice(0,10).map(m=>({nom:m.nom, sub:m.depNom, v:m.v}));
+    $('#top-title').textContent = local ? 'Tus puestos de votación más fuertes' : 'Tus municipios más fuertes';
+    const max = items.length ? items[0].v : 1;
+    $('#top-list').innerHTML = items.map((it,i)=>
+      '<div class="top-row"><div class="top-rank">'+(i+1)+'</div>'+
+      '<div class="top-name"><b>'+esc(title(it.nom))+'</b><small>'+esc(title(it.sub||''))+'</small>'+
+      '<div class="top-bar"><i data-w="'+(100*it.v/max).toFixed(1)+'"></i></div></div>'+
+      '<div class="top-v">'+fmt(it.v)+'</div></div>').join('');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      $('#top-list').querySelectorAll('.top-bar i').forEach(b=>{ b.style.width = b.dataset.w+'%'; });
+    }));
+  }
+
+  /* ── mapa Leaflet (sin tiles, choropleth puro) ── */
+  let MAP=null, MAPLAYER=null;
+  function depKey(s){
+    s = norm(s);
+    if(s.indexOf('BOGOTA')>=0) return 'BOGOTA';
+    if(s.indexOf('VALLE')>=0) return 'VALLE';
+    if(s.indexOf('SAN ANDRES')>=0) return 'SANANDRES';
+    if(s.indexOf('NORTE')>=0 && s.indexOf('SAN')>=0) return 'NSANTANDER';
+    return s.replace(/[^A-Z]/g,'');
+  }
+  async function renderVetMap(c, agg){
+    if(!window.L){ $('#vet-map').style.display='none'; return; }
+    if(!MAP){
+      MAP = L.map('vet-map', {zoomControl:false, attributionControl:false, scrollWheelZoom:false});
+    }
+    if(MAPLAYER){ MAP.removeLayer(MAPLAYER); MAPLAYER=null; }
+    const depKeys = Object.keys(agg.deps).filter(k=>agg.deps[k].v>0);
+    try{
+      if(depKeys.length > 1){
+        // carrera nacional → mapa de deptos
+        const geo = await getJSON(GEO_DEPTOS);
+        const vals = {}; depKeys.forEach(k=>{ vals[depKey(agg.deps[k].nom)] = agg.deps[k].v; });
+        const max = Math.max.apply(null, Object.values(vals));
+        MAPLAYER = L.geoJSON(geo, {
+          style: f => {
+            const v = vals[depKey(f.properties.name||'')] || 0;
+            return { color:'rgba(255,255,255,.18)', weight:.7, fillColor:'#0047FF',
+                     fillOpacity: v ? .12 + .78*Math.sqrt(v/max) : .03 };
+          },
+          onEachFeature: (f, ly) => {
+            const v = vals[depKey(f.properties.name||'')] || 0;
+            ly.bindTooltip('<b>'+esc(f.properties.name||'')+'</b><br>'+fmt(v)+' votos', {sticky:true});
+          },
+        }).addTo(MAP);
+        $('#map-note').textContent = 'Intensidad de color = concentración de tu votación por departamento.';
+      } else {
+        // carrera departamental / municipal → municipios del depto
+        const dep = depKeys[0] || '01';
+        const geo = await getJSON(GEO_MUNS(dep));
+        const vals = {};
+        Object.values(agg.muns).forEach(m=>{ if(m.dep===dep) vals[String(parseInt(m.mun,10))] = m.v; });
+        const max = Math.max.apply(null, Object.values(vals).concat([1]));
+        MAPLAYER = L.geoJSON(geo, {
+          style: f => {
+            const v = vals[String(parseInt(f.properties.mun_elec,10))] || 0;
+            return { color:'rgba(255,255,255,.18)', weight:.6, fillColor:'#0047FF',
+                     fillOpacity: v ? .12 + .78*Math.sqrt(v/max) : .03 };
+          },
+          onEachFeature: (f, ly) => {
+            const v = vals[String(parseInt(f.properties.mun_elec,10))] || 0;
+            ly.bindTooltip('<b>'+esc(f.properties.name||f.properties.mun_nom||'Municipio')+'</b><br>'+fmt(v)+' votos', {sticky:true});
+          },
+        }).addTo(MAP);
+        $('#map-note').textContent = 'Intensidad de color = concentración de tu votación por municipio ('+esc(title((agg.deps[dep]||{}).nom||''))+').';
+      }
+      MAP.invalidateSize();
+      MAP.fitBounds(MAPLAYER.getBounds(), {animate:false, padding:[8,8]});
+    }catch(e){
+      $('#map-note').textContent = 'El mapa no cargó (conexión). Los datos de la ficha sí son reales.';
+    }
+  }
+
+  /* ═══════════ MODO B · candidato nuevo ═══════════ */
+  const BLOQUE_REF = { izq:'ic', centro:'sf', der:'ae' };
+  const BLOQUE_NOM = { izq:'izquierda', centro:'centro', der:'derecha' };
+  // Inferencia ecológica 1V-2026 (ei-report · 9.346 puestos): % del voto dentro de cada banda.
+  const EDAD = {
+    bandas: ['18-25','26-35','36-45','46-60','61+'],
+    peso:   [14.1, 20.6, 19.4, 25.4, 20.5],
+    series: [
+      { key:'izq',    lbl:'Izquierda',      color:'#ff6b6b', vals:[59.8,56.2,46.3,41.3,6.7] },
+      { key:'der',    lbl:'Derecha',        color:'#4d7cff', vals:[26.0,35.4,44.6,44.4,91.1] },
+      { key:'centro', lbl:'Centro',         color:'#f0c552', vals:[8.3,3.4,2.7,5.4,2.2] },
+    ],
+    nota: 'Izquierda = Cepeda · Derecha = Abelardo + Paloma · Centro = Fajardo (1V-2026).',
+  };
+  let HUELLA = null, HUELLA_ERR = false, BLOQUE = 'izq', NUEVO_READY = false;
+  let EDADGEO = null, CITY_DEP = '';
+
+  function initNuevo(){
+    renderGenChart();
+    if(NUEVO_READY || HUELLA_ERR) return;
+    NUEVO_READY = true;
+    getJSON(EDAD_GEO_URL).then(g=>{ EDADGEO = g; renderDuel(); }).catch(()=>{});
+    getJSON(HUELLA_URL).then(h=>{
+      HUELLA = h;
+      const ciudades = {};
+      Object.values(h.barrios||{}).forEach(b=>{ if(b.ciudad) ciudades[b.ciudad] = (ciudades[b.ciudad]||0)+1; });
+      const sel = $('#ciudad-sel');
+      sel.innerHTML = '<option value="">Elige tu ciudad…</option>' +
+        Object.keys(ciudades).sort().map(c=>'<option value="'+esc(c)+'">'+esc(c)+' · '+ciudades[c]+' barrios</option>').join('');
+    }).catch(()=>{
+      HUELLA_ERR = true;
+      $('#ciudad-sel').innerHTML = '<option value="">Sin conexión al índice de barrios</option>';
+      $('#barrios-list').innerHTML = '<div class="warn-box">No se pudo descargar el índice territorial (2.500 barrios). En producción carga en segundos.</div>';
+    });
+  }
+
+  function setBloque(el){
+    BLOQUE = el.dataset.bloque;
+    document.querySelectorAll('#bloque-pills .pill').forEach(p=>p.classList.toggle('active', p===el));
+    renderBarrios();
+    renderGenChart();
+    renderDuel();
+  }
+
+  function renderBarrios(){
+    if(!HUELLA) return;
+    const ciudad = $('#ciudad-sel').value, out = $('#barrios-list');
+    if(!ciudad){ out.innerHTML = '<div class="mod-msg">Elige una ciudad para empezar.</div>'; return; }
+    const ref = BLOQUE_REF[BLOQUE];
+    const rows = Object.values(HUELLA.barrios||{})
+      .filter(b=>b.ciudad===ciudad && b.b && b.b[ref]!=null && (b.puestos||0)>=1)
+      .sort((a,b)=>b.b[ref]-a.b[ref]);
+    if(!rows.length){ out.innerHTML = '<div class="mod-msg">Sin datos de barrio para esta ciudad.</div>'; return; }
+    CITY_DEP = rows[0].dep || '';
+    renderDuel();
+    const isPro = PlanGate.has('barrios');
+    const FREE = 5, TOTAL = Math.min(rows.length, 20);
+    const rowHtml = (b,i)=>{
+      const aff = b.b[ref], pct = Math.round((aff-1)*100);
+      const cls = aff>=1.3?'aff-hi':(aff>=1.05?'aff-mid':'aff-lo');
+      const sign = pct>0?'+':'';
+      return '<div class="barrio-row" data-i="'+i+'">'+
+        '<div class="barrio-idx">'+(i+1)+'</div>'+
+        '<div class="barrio-nom"><b>'+esc(title(b.n))+'</b><small>'+esc(title(b.subloc||''))+' · censo '+fmt(b.censo||0)+'</small></div>'+
+        '<div class="barrio-aff '+cls+'">'+sign+pct+'% <span style="font-weight:400;font-size:.62rem;color:rgba(255,255,255,.4)">vs país</span></div>'+
+        '<div class="barrio-detail" id="bd-'+i+'"></div></div>';
+    };
+    let html = rows.slice(0, isPro?TOTAL:FREE).map(rowHtml).join('');
+    if(!isPro && rows.length>FREE){
+      html += '<div class="blurred-zone"><div class="blur-rows">'+rows.slice(FREE, FREE+3).map(rowHtml).join('')+'</div>'+
+        '<div class="blur-cta"><button class="lock-btn" onclick="PlanGate.require(\'barrios\')">🔒 Ver los '+TOTAL+' barrios de '+esc(ciudad)+' <span class="tier">Pro</span></button></div></div>';
+    }
+    html += '<div style="font-size:.68rem;color:rgba(255,255,255,.38);margin-top:.7rem">Bloque: <b style="color:var(--white)">'+BLOQUE_NOM[BLOQUE]+'</b> · '+rows.length+' barrios con dato en '+esc(ciudad)+'.</div>';
+    out.innerHTML = html;
+    out.querySelectorAll('.barrio-row').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const i = +el.dataset.i, b = rows[i], d = $('#bd-'+i);
+        if(!d) return;
+        if(d.classList.contains('show')){ d.classList.remove('show'); return; }
+        const h = b.h||{};
+        d.innerHTML =
+          (h.p22?('Presidencial 2022: ganó <b>'+esc(title(h.p22.n))+'</b> ('+h.p22.pct+'%)<br>'):'')+
+          (h.c25p?('Consulta del Pacto 2025: <b>'+esc(title(h.c25p.n))+'</b> ('+h.c25p.pct+'%)<br>'):'')+
+          (h.c26?('Consulta 2026 más votada: <b>'+({gran:'La Gran Consulta (derecha)',frente:'Frente por la Vida (centro-izq)',soluciones:'Soluciones (centro)'}[h.c26]||esc(h.c26))+'</b><br>'):'')+
+          (h.s26?('Senado 2026: <b>'+esc(title(h.s26.n))+'</b> ('+h.s26.pct+'%)<br>'):'')+
+          (b.puestos?('Puestos de votación en el barrio: <b>'+b.puestos+'</b>'):'');
+        d.classList.add('show');
+      });
+    });
+  }
+
+  /* Duelo Cepeda vs Abelardo por ciudad (6 con EI propia) o por departamento (33). */
+  function renderDuel(){
+    const wrap = $('#duel-wrap');
+    if(!EDADGEO){ wrap.style.display='none'; return; }
+    const ciudad = $('#ciudad-sel').value;
+    if(!ciudad){ wrap.style.display='none'; return; }
+    let data = null, label = '', nivel = '';
+    const cKey = Object.keys(EDADGEO.ciudades||{}).find(k=>norm(k)===norm(ciudad));
+    if(cKey){ data = EDADGEO.ciudades[cKey]; label = cKey; nivel = 'ciudad'; }
+    else if(CITY_DEP){
+      const dKey = Object.keys(EDADGEO.deptos||{}).find(k=>depKey(k)===depKey(CITY_DEP));
+      if(dKey){ data = EDADGEO.deptos[dKey]; label = dKey; nivel = 'departamento'; }
+    }
+    if(!data){ wrap.style.display='none'; return; }
+    wrap.style.display = 'block';
+    $('#duel-title').textContent = 'El duelo por generaciones en ' + title(label);
+    $('#duel-sub').textContent = (nivel==='departamento' ? 'Estimación a nivel departamental · ' : '') +
+      'Duelo izquierda–derecha (Cepeda vs Abelardo · 1V-2026) · % del voto entre ambos' +
+      (BLOQUE==='centro' ? ' · tu bloque (centro) no está en el duelo: úsalo como mapa del terreno' : '');
+    const nac = (EDADGEO.nacional||{}).cep || [];
+    $('#duel-chart').innerHTML = (EDADGEO.bandas||[]).map((b,i)=>{
+      const cep = data.cep[i];
+      if(cep==null) return '';
+      return '<div class="duel-band"><div class="duel-lbl">'+esc(b)+'</div>'+
+        '<div><div class="duel-split">'+
+          '<div class="duel-l" data-w="'+cep+'">'+(cep>=14?cep.toFixed(0)+'%':'')+'</div>'+
+          '<div class="duel-r">'+((100-cep)>=14?(100-cep).toFixed(0)+'%':'')+'</div>'+
+        '</div>'+
+        (nac[i]!=null?'<div class="duel-nac">País: izquierda '+nac[i].toFixed(0)+'% · derecha '+(100-nac[i]).toFixed(0)+'%</div>':'')+
+        '</div></div>';
+    }).join('');
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      $('#duel-chart').querySelectorAll('.duel-l').forEach(el=>{ el.style.width = el.dataset.w+'%'; });
+    }));
+  }
+
+  function renderGenChart(){
+    const out = $('#gen-chart');
+    out.innerHTML = EDAD.bandas.map((banda,bi)=>{
+      const bars = EDAD.series.map(s=>{
+        const hl = s.key===BLOQUE;
+        return '<div class="gen-bar '+(hl?'hl':'dim')+'">'+
+          '<div class="lbl">'+s.lbl+'</div>'+
+          '<div class="trk"><i data-w="'+s.vals[bi]+'" style="background:'+s.color+'"></i></div>'+
+          '<div class="pct">'+s.vals[bi].toFixed(0)+'%</div></div>';
+      }).join('');
+      return '<div class="gen-band"><div class="gen-band-label"><b>'+banda+' años</b><span>'+EDAD.peso[bi]+'% del electorado</span></div><div class="gen-bars">'+bars+'</div></div>';
+    }).join('') + '<div style="font-size:.64rem;color:rgba(255,255,255,.35);margin-top:.4rem">'+EDAD.nota+'</div>';
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      out.querySelectorAll('.trk i').forEach(b=>{ b.style.width = Math.min(100,+b.dataset.w)+'%'; });
+    }));
+  }
+
+  /* ═══════════ MÓDULO MEDIOS ═══════════ */
+  async function buscarMedios(){
+    const q = $('#medios-q').value.trim();
+    const out = $('#medios-out'), btn = $('#medios-btn');
+    if(!q){ out.innerHTML = '<div class="mod-msg">Escribe un nombre, ciudad o tema.</div>'; return; }
+    btn.disabled = true;
+    out.innerHTML = '<div class="mod-msg"><span class="loading"></span>&nbsp; Rastreando prensa nacional y regional…</div>';
+    try{
+      const r = await fetch(CAUDAL_API, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'medios', query:q, dias:+($('#medios-dias').value||30) }),
+      });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const d = await r.json();
+      const alc = {}; (d.por_alcance||[]).forEach(a=>{ alc[a.alcance]=a.n; });
+      const res = (d.resultados||[]).slice(0,15);
+      out.innerHTML =
+        '<div class="kpis">'+
+          '<div class="stat hl"><div class="stat-v">'+fmt(d.n||0)+'</div><div class="stat-k">Titulares</div></div>'+
+          '<div class="stat"><div class="stat-v">'+fmt(d.n_medios||0)+'</div><div class="stat-k">Medios distintos</div></div>'+
+          '<div class="stat"><div class="stat-v">'+fmt(alc.nacional||0)+'</div><div class="stat-k">Prensa nacional</div></div>'+
+          '<div class="stat"><div class="stat-v">'+fmt(alc.regional||0)+'</div><div class="stat-k">Prensa regional</div></div>'+
+        '</div>'+
+        (res.length
+          ? '<div style="margin-top:1rem">'+res.map(e=>
+              '<a class="headline" href="'+esc(e.url||'#')+'" target="_blank" rel="noopener">'+
+                '<div class="headline-t">'+esc(e.titulo||'')+'</div>'+
+                '<div class="headline-m"><b style="color:rgba(255,255,255,.65)">'+esc(e.medio||'')+'</b>'+
+                (e.alcance==='regional'?'<span class="badge-reg">Regional</span>':'')+
+                '<span>'+esc((e.fecha||'').slice(0,10))+'</span></div>'+
+              '</a>').join('')+'</div>'
+          : '<div class="mod-msg">La prensa no ha hablado de «'+esc(q)+'» en este periodo. Eso también es un dato: tu reto es entrar en la conversación.</div>');
+    }catch(e){
+      out.innerHTML = '<div class="warn-box">No se pudo consultar el rastreador de medios (conexión). En producción responde en 2–4 segundos.</div>';
+    }
+    btn.disabled = false;
+  }
+  $('#medios-q').addEventListener('keydown', e=>{ if(e.key==='Enter') buscarMedios(); });
+
+  /* ═══════════ MÓDULO DATOS FRÍOS ═══════════ */
+  let FRIOS_OK = false;
+  async function initFrios(){
+    try{
+      await LabIndicadores.load();
+      FRIOS_OK = true;
+      const deps = LabIndicadores.getDeptosCatalog();
+      $('#frios-dep').innerHTML = '<option value="">Departamento…</option>' +
+        deps.map(d=>'<option value="'+esc(d.cod)+'">'+esc(d.nombre)+'</option>').join('');
+    }catch(e){
+      $('#frios-dep').innerHTML = '<option value="">Sin conexión a indicadores</option>';
+      $('#frios-out').innerHTML = '<div class="warn-box">No se pudo descargar el panel de indicadores municipales. En producción carga en segundos.</div>';
+    }
+  }
+  function onFriosDep(){
+    if(!FRIOS_OK) return;
+    const cod = $('#frios-dep').value, mun = $('#frios-mun');
+    if(!cod){ mun.disabled = true; mun.innerHTML = '<option value="">Municipio…</option>'; return; }
+    const muns = LabIndicadores.getMunsByDepto(cod);
+    mun.disabled = false;
+    mun.innerHTML = '<option value="">Municipio…</option>' +
+      muns.map(m=>'<option value="'+esc(m.divipola)+'">'+esc(m.nombre)+'</option>').join('');
+  }
+  // homicidios/hurtos/violencia: subir es malo (rojo). cobertura: subir es bueno.
+  const GOOD_UP = { cobertura_neta:true, matricula_5_16:true };
+  function renderFrios(){
+    const div = $('#frios-mun').value, out = $('#frios-out');
+    if(!div || !FRIOS_OK){ return; }
+    const munInfo = LabIndicadores.getMun(div);
+    const cat = LabIndicadores.getCatalog();
+    const cards = cat.map(ind=>{
+      const serie = LabIndicadores.getSerie(div, ind.id);
+      const values = serie && serie.values ? serie.values : {};
+      const years = Object.keys(values).map(Number).sort((a,b)=>a-b).filter(y=>values[y]!=null);
+      if(!years.length) return '';
+      const last = years[years.length-1], first = years[0];
+      const vLast = +values[last], vFirst = +values[first];
+      const delta = vFirst ? Math.round(100*(vLast-vFirst)/vFirst) : null;
+      const goodUp = !!GOOD_UP[ind.id];
+      let deltaHtml = '';
+      if(delta!=null && isFinite(delta)){
+        const up = delta>=0;
+        const good = up===goodUp;
+        deltaHtml = '<div class="ind-delta '+(up?'d-up':'d-down')+(good?' good':' bad')+'">'+(up?'▲':'▼')+' '+Math.abs(delta)+'% desde '+first+'</div>';
+      }
+      // sparkline
+      const W=170, H=36, pad=2;
+      const min = Math.min.apply(null, years.map(y=>+values[y]));
+      const max = Math.max.apply(null, years.map(y=>+values[y]));
+      const span = (max-min)||1;
+      const pts = years.map((y,i)=>{
+        const x = pad + (W-2*pad)*(years.length>1 ? i/(years.length-1) : .5);
+        const yy = H-pad - (H-2*pad)*((+values[y]-min)/span);
+        return x.toFixed(1)+','+yy.toFixed(1);
+      });
+      const area = pad+','+(H-pad)+' '+pts.join(' ')+' '+(pad+(W-2*pad)).toFixed(1)+','+(H-pad);
+      const isPct = /%|tasa/i.test(ind.unidad||'');
+      return '<div class="ind-card">'+
+        '<div class="ind-cat '+esc(ind.categoria)+'">'+esc(ind.categoria)+'</div>'+
+        '<div class="ind-nom">'+esc(ind.nombre)+'</div>'+
+        '<div class="ind-val">'+(isPct?vLast.toFixed(1)+'%':fmt(vLast))+'</div>'+
+        '<div class="ind-unit">'+esc(ind.unidad||'')+' · '+last+(serie.isProxy?' · <span class="proxy-tag">aprox. departamental</span>':'')+'</div>'+
+        deltaHtml+
+        '<svg class="ind-spark" viewBox="0 0 '+W+' '+H+'" width="100%" height="36"><polygon class="area" points="'+area+'"/><polyline points="'+pts.join(' ')+'"/></svg>'+
+        '<div class="ind-src">'+esc(ind.fuente||'')+'</div>'+
+      '</div>';
+    }).filter(Boolean).join('');
+    out.innerHTML =
+      '<div style="margin-top:1.3rem;font-size:.9rem;color:rgba(255,255,255,.65)">'+
+        '<b style="color:var(--white);font-size:1.05rem">'+esc(munInfo?munInfo.nombre:'')+'</b> · '+esc(munInfo?munInfo.depto:'')+
+      '</div>'+
+      '<div class="frios-grid">'+cards+'</div>'+
+      '<div class="method-note">Serie 2018–2024 · Policía Nacional (SIEDCO) y Ministerio de Educación vía datos.gov.co. '+
+      'En la plataforma completa: pobreza (DANE), población, servicios públicos y actualización automática — con lectura de campaña por IA.</div>';
+  }
+
+  /* ═══════════ INIT ═══════════ */
+  (async function init(){
+    try{ await PlanGate.init(); }catch(e){}
+    initRegistry();
+    initFrios();
+  })();
+  </script>
+</body>
+</html>

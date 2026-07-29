@@ -29,8 +29,8 @@
   var PLAN_LABEL = { anonymous: 'Anónimo', free: 'Básico', basico: 'Básico',
                      pro: 'Pro', premium: 'Premium', full: 'Full' };
   var PLAN_PRICE = {
-    pro:     { cop: '$39.900 COP', sub: 'al mes' },
-    premium: { cop: '$99.900 COP', sub: 'al mes' },
+    pro:     { cop: '$79.900 COP', sub: 'al mes · $59.900/mes pagando anual' },
+    premium: { cop: '$219.000 COP', sub: 'al mes · $179.000/mes pagando anual' },
   };
 
   var _plan = 'anonymous';
