@@ -1136,15 +1136,47 @@
     });
 
     // ── CURTAIN NAVIGATE ──
+    let _navigating = false;
     function navigate(e, url, label) {
       e && e.stopPropagation && e.stopPropagation();
       e && e.preventDefault && e.preventDefault();
+      if (_navigating) return;
+      _navigating = true;
       const c = document.getElementById('curtain');
       const sub = document.getElementById('curtain-sub');
       if (sub) sub.textContent = label || '';
+      c.classList.remove('opened', 'opening');
       c.classList.add('closing');
       setTimeout(() => { window.location.href = url; }, 1150);
     }
+
+    // Cualquier enlace interno a otra página del sitio pasa por el telón,
+    // así ninguna card/botón queda sin transición (la nav superior no).
+    document.addEventListener('click', (ev) => {
+      const a = ev.target.closest && ev.target.closest('a[href]');
+      if (!a || ev.defaultPrevented) return;
+      if (a.closest('.electoral-nav')) return;          // volver / logo / auth: instantáneos
+      if (a.hasAttribute('download') || a.target === '_blank') return;
+      const raw = a.getAttribute('href') || '';
+      if (!raw || raw.startsWith('#') || raw.startsWith('javascript:') ||
+          raw.startsWith('mailto:') || raw.startsWith('tel:')) return;
+      const url = new URL(a.href, location.href);
+      if (url.origin !== location.origin) return;       // externos, S3, etc.
+      if (!/\.html?$/i.test(url.pathname)) return;      // solo páginas del sitio
+      navigate(ev, a.getAttribute('href'), (a.textContent || '').trim());
+    });
+
+    // Al volver con "atrás", el navegador restaura la página desde bfcache con
+    // el telón cerrado encima → hay que reabrirlo o la página queda tapada.
+    window.addEventListener('pageshow', () => {
+      const c = document.getElementById('curtain');
+      _navigating = false;
+      if (!c || !c.classList.contains('closing')) return;
+      c.classList.remove('closing');
+      c.classList.add('opening');
+      void c.offsetWidth;   // fuerza el reflow (no dependemos de rAF: se congela si la pestaña está oculta)
+      setTimeout(() => { c.classList.remove('opening'); c.classList.add('opened'); }, 120);
+    });
 
     // ── DESCARGAS GATE ──
     function navigateDescargas(e) {

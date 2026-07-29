@@ -227,6 +227,70 @@
   </style>
 </head>
 <body>
+
+  <!-- ── TELÓN DE TRANSICIÓN (mismo de electoral.html) ── -->
+  <style>
+    .curtain{position:fixed;inset:0;z-index:99999;pointer-events:none}
+    .curtain-layer{position:absolute;inset:0;background:#04060e}
+    .curtain-layer:nth-child(1){clip-path:polygon(0 0,100% 0,100% 22%,0 28%);transform:translateX(-110%);transition:transform .58s cubic-bezier(.75,0,.25,1) 0s}
+    .curtain-layer:nth-child(2){clip-path:polygon(0 26%,100% 20%,100% 49%,0 55%);transform:translateX(110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .07s}
+    .curtain-layer:nth-child(3){clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%);transform:translateX(-110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .14s}
+    .curtain-layer:nth-child(4){clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%);transform:translateX(110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .21s}
+    .curtain-stage{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;pointer-events:none}
+    .curtain-tag{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:1.08rem;letter-spacing:.35em;text-transform:uppercase;color:rgba(0,71,255,.7);opacity:0;transform:translateY(-12px);transition:opacity .4s ease,transform .4s ease}
+    .curtain-sub{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.975rem;letter-spacing:.22em;color:rgba(255,255,255,.35);text-transform:uppercase;opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease}
+    .curtain-headline{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:800;font-size:clamp(2.6rem,6.5vw,5.85rem);letter-spacing:-.03em;line-height:1.05;text-shadow:0 0 50px rgba(0,71,255,.5);text-align:center}
+    .curtain-line{overflow:hidden;display:block}
+    .curtain-word{display:inline-block;opacity:0;transition:transform .52s cubic-bezier(.25,.46,.45,.94),opacity .45s ease}
+    .curtain-word.from-left{transform:translateX(-80px)}.curtain-word.from-right{transform:translateX(80px)}
+    .curtain-word.white{color:#f4f3ef}.curtain-word.blue{color:#0047FF}
+    .curtain.opening .curtain-layer{transform:translateX(0)!important;transition:none}
+    .curtain.opening .curtain-word{transform:translateX(0);opacity:1;transition:none}
+    .curtain.opening .curtain-tag,.curtain.opening .curtain-sub{opacity:1;transform:translateY(0);transition:none}
+    .curtain.opened .curtain-layer:nth-child(1){transform:translateX(-110%)}
+    .curtain.opened .curtain-layer:nth-child(2){transform:translateX(110%)}
+    .curtain.opened .curtain-layer:nth-child(3){transform:translateX(-110%)}
+    .curtain.opened .curtain-layer:nth-child(4){transform:translateX(110%)}
+    .curtain.opened .curtain-word{opacity:0}
+    .curtain.opened .curtain-tag,.curtain.opened .curtain-sub{opacity:0;transition:opacity .25s ease}
+    .curtain.opened{pointer-events:none}
+    .curtain.closing{pointer-events:all}
+    .curtain.closing .curtain-layer{transform:translateX(0)!important}
+    .curtain.closing .curtain-word.from-left,.curtain.closing .curtain-word.from-right{transform:translateX(0);opacity:1;transition-delay:.62s}
+    .curtain.closing .curtain-tag{opacity:1;transform:translateY(0);transition-delay:.68s}
+    .curtain.closing .curtain-sub{opacity:1;transform:translateY(0);transition-delay:.72s}
+  </style>
+  <div class="curtain" id="curtain">
+    <div class="curtain-layer"></div><div class="curtain-layer"></div>
+    <div class="curtain-layer"></div><div class="curtain-layer"></div>
+    <div class="curtain-stage">
+      <span class="curtain-tag">ricardoruiz.co</span>
+      <div class="curtain-headline">
+        <span class="curtain-line"><span class="curtain-word from-left white">Alcaldías</span></span>
+        <span class="curtain-line"><span class="curtain-word from-right blue">2023</span></span>
+      </div>
+      <span class="curtain-sub">Análisis territorial</span>
+    </div>
+  </div>
+  <script>
+    /* Se ejecuta durante el parseo: si falla, el telón nunca se cierra (no tapa nada). */
+    (function(){
+      var c = document.getElementById('curtain');
+      if (!c) return;
+      function abrir(hold){
+        c.classList.remove('closing');
+        c.classList.add('opening');
+        void c.offsetWidth;   /* fuerza el reflow: rAF se congela si la pestaña esta oculta */
+        setTimeout(function(){ c.classList.remove('opening'); c.classList.add('opened'); }, hold);
+      }
+      abrir(900);
+      /* bfcache: al volver con "atrás" el telón quedó cerrado encima -> reabrirlo. */
+      window.addEventListener('pageshow', function(){
+        if (c.classList.contains('closing')) abrir(120);
+      });
+    })();
+  </script>
+
   <div class="cursor" id="cursor"></div>
   <div class="cursor-ring" id="cursorRing"></div>
   <div class="bg-overlay"></div>
