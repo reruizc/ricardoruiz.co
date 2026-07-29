@@ -6371,8 +6371,17 @@ Reglas al convertir una página:
   pública Wompi, polling a `/auth/me`, refresca `rr-user` en caché). Configurar
   en cada link de Wompi: redirección `https://ricardoruiz.co/pago-confirmado.html`,
   pago único NO, SKU `plan-{pro|premium}-{mensual|anual}`.
-- Pendiente: Ricardo crea los 4 links nuevos → actualizar `WOMPI_LINKS` en
-  `pricing.html`. Pricing quedó mensual por defecto, sin promo y sin Plan Datos.
+- **Pendiente (jul-2026): solo los 2 links ANUALES.** Los mensuales ya están
+  rotados (`Ds08zS` Pro · `E1ZVCn` Premium); en `LINK_PLAN_MAP` del worker los
+  anuales `2Kdoxx`/`XWAdkz` siguen marcados `TODO: rotar`. Montos según
+  `pricing.html`: **Pro Anual $718.800 COP** (59.900 × 12) · **Premium Anual
+  $2.148.000 COP** (179.000 × 12), cobro único por 12 meses. Mensuales vigentes:
+  Pro $79.900 · Premium $219.000.
+- ⚠️ Al rotar un link hay que tocar **DOS** lugares: `WOMPI_LINKS` en
+  `pricing.html` **y** `LINK_PLAN_MAP` en `rr-auth/src/index.js` + redeploy del
+  worker. Si solo se cambia la web, el webhook responde `unknown_link_id` y NO
+  activa el plan.
+- Pricing quedó mensual por defecto, sin promo y sin Plan Datos.
 
 ## Cliente YCJF · consultoría IA operativa (STAND BY · jul-2026)
 
