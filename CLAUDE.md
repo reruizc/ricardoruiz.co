@@ -5356,7 +5356,27 @@ sin postback) al ZIP/PDF de esa sesión.
   5. **Disciplina de bancada** como vista propia (la alineación ya se mide por persona
      y por bancada; falta exponerla agregada). Coaliciones sigue PAUSADO por decisión.
 
-**Fase 3 · voto nominal de SENADO — investigación en curso, sin resolver (jul-2026).**
+> **✅ RESUELTO (jul-2026) — el voto nominal de Senado SÍ existe, vía API pública.**
+> Todo lo que sigue en este bloque (scraping de gacetas, DOCman, portal JSF) quedó
+> **superado**: `https://app.senado.gov.co/backend/api/public/v1/votes?format=csv`
+> entrega el **voto nominal por senador 2017-2026** en un CSV (16,7 MB), sin auth.
+> Cortesía de Pablo Bernal (La Silla Vacía). También hay `/senators?format=json`
+> con el **partido oficial** de los 103 actuales (sus `id` NO casan con el
+> `ID Senador` de los votos → join por nombre).
+> **En producción:** `tools/caudal/harvest_senado_api.py` → `build_votaciones_senado_s3.py`
+> → `metadata/votaciones-senado-{nominal,congresista}.json` → Lambda (`proyecto`
+> inyecta `voto_nominal_senado`; `congresista` resuelve senadores y fusiona con
+> Cámara vía `_rec_congresista`) → panel azul en la ficha de `caudal.html`.
+> **137.750 votos · 1.780 votaciones · 204 senadores · 287 proyectos · 96,2% con
+> partido · 97% linkean.** Memoria Lambda subida a **1536 MB**.
+> **Límites de la fuente** (se muestran en la UI): solo **Sí/No** (sin abstención
+> ni «no votó»); la llave (fecha, ID Proyecto) **agrupa las votaciones del mismo
+> día** sobre el mismo proyecto (se midió una con 231 votantes); arranca en 2017.
+> Regenerar: `harvest_senado_api.py && build_votaciones_senado_s3.py` + `aws s3 cp`
+> de los 2 JSON a `metadata/` + redeploy de la Lambda.
+> Lo de abajo se conserva solo como registro de la investigación previa.
+
+**Fase 3 · voto nominal de SENADO — investigación previa, sin resolver (jul-2026 · SUPERADA por la API, ver arriba).**
 Se buscó un equivalente al AJAX de Cámara. `senado.gov.co` es Joomla (no WordPress) — sin
 `admin-ajax.php`. Se encontró `secretariasenado.gov.co` (subsitio Joomla separado, también
 Secretaría General, con contenido spam SEO inyectado en el menú/footer — enlaces a sitios
