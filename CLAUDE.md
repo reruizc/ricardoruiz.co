@@ -1,12 +1,12 @@
 # ricardoruiz.co — Plataforma Electoral Colombia 2026
 
 ## Archivos principales
-- `electoral.html` — hub de navegación (senado, cámara, consultas). **6 pestañas de año
-  (jul-30-2026): 2015 · 2018 · 2019 · 2023 · 2025 · 2026** (paneles `p2015/p2018/p2019`
-  nuevos, espejo del chasis de p2023: card grande en vivo → `analisis-candidato.html` +
-  cards con cinta "próximamente" para los tableros por proceso, que aún no existen —
-  crear `resultados-{asamblea,concejo,jal}-{2015,2019}.html` etc. es el paso siguiente,
-  reusando el chasis CORP de los tableros 2023). i18n es/en/zh completo.
+- `electoral.html` — hub de navegación (senado, cámara, consultas). **10 pestañas de año
+  (jul-30-2026): 2010 · 2011 · 2014 · 2015 · 2018 · 2019 · 2022 · 2023 · 2025 · 2026** (los 7
+  paneles nuevos son espejo del chasis de p2023: card grande en vivo → `analisis-candidato.html`
+  + cards con cinta "próximamente" para los tableros por proceso, que aún no existen — crear
+  `resultados-{asamblea,concejo,jal}-{2011,2015,2019}.html` etc. es el paso siguiente, reusando
+  el chasis CORP de los tableros 2023). i18n es/en/zh completo.
 - `senado-2026.html` — escrutinio senado, todos los toggles y visualizaciones
 - `camara-2026.html` — **LISTO** · escrutinio Cámara 2026 espejo de senado. 4 circunscripciones (Territorial · Indígena · Afro · Resultados Generales con WHAT IF), drill territorial Dep → Mun → Zona → Puesto → Mesa, hemiciclo SVG de 165 curules, mapa Leaflet, listas cerradas por depto, race-fix `_rgIIFEToken`, BIG_CITIES toast custom (C.1).
 - `endoso-2026.html` — comparación mesa a mesa senado vs cámara
@@ -165,14 +165,28 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
   - **Mapa/radar**: `isDepartmentalRace` (y `isDeptRace` en comparar) ahora incluye Concejo/JAL
     (`isConcejoOJAL`) → auto-drill al depto y colorea municipios (Bogotá: localidades). Radar:
     Concejo → comunas/localidades, JAL → puestos.
-- **Territoriales 2015 + 2019 y Presidencial 2018** (jul-30-2026 · **LISTO · en producción**):
+- **Histórico completo 2010-2026 en analisis-candidato** (jul-30-2026 · **LISTO · en producción**)
+  — territoriales 2011·2015·2019, presidenciales 2010·2014·2018·2022 y consultas 2022:
   - `tools/analisis-candidato/build_territorial_candidatos.py <clave>` — builder ÚNICO parametrizado
-    (claves `asam2015 asam2019 conc2015 conc2019 jal2015 jal2019`), mismas llaves/gotchas que los
-    builders 2023 (asamblea=dep · concejo=mun · JAL=mun+nombre+hash, comuna por moda del georef).
-    ⚠ **Los códigos de corporación CAMBIAN por año**: 2015TER → 1=GOB 2=ASAM 3=ALC 4=CONCEJO
-    **5=JAL (la JAL 2015 viene DENTRO del TER)**; 2019TER → 4=GOB **5=ASAM** 6=ALC **7=CONCEJO**;
-    `GCS_2019JAL.csv` aparte (COR=5) y **con las columnas en otro orden** (geografía antes de COR
-    → layout `LAYOUT_JAL19` en el script). Streaming con sort temporal en scratchpad.
+    (claves `asam2011 asam2015 asam2019 · conc2011 conc2015 conc2019 · jal2011 jal2015 jal2019`),
+    mismas llaves/gotchas que los builders 2023 (asamblea=dep · concejo=mun · JAL=mun+nombre+hash,
+    comuna por moda del georef).
+    ⚠ **Los códigos de corporación CAMBIAN por año**: 2011TER → 4=GOB **5=ASAM** 6=ALC
+    **7=CONCEJO 8=JAL (adentro)**; 2015TER → 1=GOB 2=ASAM 3=ALC 4=CONCEJO **5=JAL (adentro)**;
+    2019TER → 4=GOB **5=ASAM** 6=ALC **7=CONCEJO**; `GCS_2019JAL.csv` aparte (COR=5) y **con las
+    columnas en otro orden** (geografía antes de COR → `LAYOUT_JAL19`).
+    ⚠⚠ **2011 es el más raro de todos: 17 columnas** (no 16) con un campo EXTRA `DES_MM` (nombre
+    del municipio) en la col 8 que corre toda la geografía, y sobre todo **NUM_VOT va ANTES de
+    partido y candidato** (col 12) — al revés que en cualquier otro año. Leerlo con `LAYOUT_TER`
+    devuelve basura en silencio (nombres de partido donde van los votos) → `LAYOUT_2011`. Por eso
+    cada layout lleva ahora `NCOL` (mínimo de columnas) en vez del `len(row) < 16` fijo, que con
+    17 columnas habría dejado pasar filas cortas hasta reventar en un índice inexistente.
+    Streaming con sort temporal en scratchpad.
+    ⚠ **JAL 2011: 4 candidatos (de 12.536) llegan SIN NOMBRE en la fuente** → caen al rótulo de
+    reserva `CANDIDATO {n}`. Verificado que NO es bug de llave: el `COD_CAN` se reinicia por
+    comuna (p.ej. `(16,1,par527,can89)` son 12 personas distintas, una por localidad de Bogotá,
+    y la llave las separa bien porque incluye el nombre); el sin-nombre de Bosa con 8.475 votos
+    es una candidatura real de UNA sola localidad, no una fusión.
   - `tools/analisis-candidato/build_pres_historico.py <clave|todas>` — **presidenciales 2010 · 2014 ·
     2018 · 2022 (1V+2V) + consultas interpartidistas 2022**, formato endoso, circunscripción
     NACIONAL (fuentes regulares de cand-index, NO el modelo por-persona de 2026). Slugs
@@ -200,28 +214,35 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
     **Validado contra el oficial**: 2010 1V Santos 6.802.043 / Mockus 3.134.222 · 2010 2V
     9.028.943 / 3.587.975 · 2014 2V Santos 7.839.342 / Zuluaga 6.917.001 · 2018 1V Duque
     7.616.857 / Petro 4.855.069 · 2022 2V Petro 11.292.758 / Hernández 10.604.656.
-  - **Volúmenes**: asam2015 3.230 cands (548 MB) · asam2019 3.232 (608 MB) · conc2015 84.586
-    (1,1 GB) · conc2019 89.250 (1,2 GB) · jal2015 13.203 (283 MB) · jal2019 12.186 (311 MB) ·
+  - **Volúmenes**: asam2011 3.085 cands (509 MB) · asam2015 3.230 (548 MB) · asam2019 3.232
+    (608 MB) · conc2011 77.008 (1,0 GB) · conc2015 84.586 (1,1 GB) · conc2019 89.250 (1,2 GB) ·
+    jal2011 12.536 (248 MB) · jal2015 13.203 (283 MB) · jal2019 12.186 (311 MB) ·
     pres2018 10 (127 MB) · pres2010 11 (111 MB) · pres2014 7 (104 MB) · pres2022 10 (126 MB) ·
     consu2022 15 (185 MB). Validados: Serpa/Flórez/Morris top Concejo BOG 2015 · Abisambra/Cancino
-    top 2019 · Garcés Rojas top asamblea Valle 2015 y 2019.
-  - **Cableado**: `SOURCES` += asam2019/asam2015/pres2010/pres2014/pres2018/pres2022/consu2022 ·
-    `LOCAL_SOURCES` += conc2019/jal2019/conc2015/jal2015 (lazy, índices 16-18 MB). `SRC_YEAR`
+    top 2019 · Garcés Rojas top asamblea Valle 2015 y 2019 · **De Roux top Concejo BOG 2011**
+    (concejal más votado ese año) · Aída Merlano top asamblea Atlántico 2011 (fue diputada allí
+    antes del Senado).
+  - **Cableado**: `SOURCES` += asam2019/asam2015/asam2011/pres2010/pres2014/pres2018/pres2022/
+    consu2022 · `LOCAL_SOURCES` += conc2019/jal2019/conc2015/jal2015/conc2011/jal2011 (lazy,
+    índices 15-18 MB). `SRC_YEAR`
     actualizado en analisis-candidato y brujula-2027. Flags pre-subida: `?terlocal=1` (asambleas +
     los 4 presidenciales + consultas 2022) y los `?conclocal=1`/`?jallocal=1` existentes ahora
     también apuntan los años nuevos al repo local.
-  - **`electoral.html` pasa a 9 pestañas**: 2010 · 2014 · 2015 · 2018 · 2019 · 2022 · 2023 · 2025 ·
-    2026 (todo año con dato tiene pestaña; 2014 y 2022 ya tenían Congreso en el buscador pero
-    ninguna pestaña). Con 9 el tab bar se apretó: padding de `1.6rem` → `1.05rem` + `flex-wrap`
-    como red de seguridad. `tabs[]` y `currentIdx` (=8, 2026) deben moverse juntos al agregar años.
+  - **`electoral.html` pasa a 10 pestañas**: 2010 · 2011 · 2014 · 2015 · 2018 · 2019 · 2022 ·
+    2023 · 2025 · 2026 (todo año con dato tiene pestaña; 2014 y 2022 ya tenían Congreso en el
+    buscador pero ninguna pestaña). El tab bar se apretó dos veces: padding `1.6rem` → `1.05rem`
+    (9 años) → **`.82rem`** (10 años), con `flex-wrap` como red de seguridad. Medido a 1440px:
+    740px de pestañas contra 880px disponibles. **A ~73px por pestaña el límite práctico son 10** —
+    si se agrega otro año, volver a medir. `tabs[]` y `currentIdx` (=9, que es 2026) deben moverse
+    JUNTOS al agregar años, si no la navegación con flechas queda desfasada.
   - ⚠ **Duplicado conocido por nombre legal**: `agruparPersonas` colapsa por nombre exacto y 2010
     usa el nombre legal completo → "GUSTAVO FRANCISCO PETRO URREGO" (2010) queda como entrada
     aparte de "GUSTAVO PETRO" (2018/2022/2026). Es el mismo límite ya documentado del registro
     (sin fuzzy-subset, conservador a propósito); el subset de tokens tampoco lo uniría porque
     "GUSTAVO PETRO" son 2 tokens y el umbral seguro es ≥3. Vargas Lleras sí encadena 2010→2018.
   - **S3 ✓ SUBIDO** (jul-30-2026, 1h 53m + 4 min de los presidenciales):
-    `congreso-2026/output/{asamblea-2015,asamblea-2019,concejo-2015,concejo-2019,jal-2015,
-    jal-2019,pres-2010,pres-2014,pres-2018,pres-2022,consu-2022}/` con
+    `congreso-2026/output/{asamblea-2011,asamblea-2015,asamblea-2019,concejo-2011,concejo-2015,
+    concejo-2019,jal-2011,jal-2015,jal-2019,pres-2010,pres-2014,pres-2018,pres-2022,consu-2022}/` con
     `aws s3 cp … --recursive --content-type "application/json" --cache-control "public, max-age=300"`.
     **205.704 objetos**, conteo local==S3 verificado prefijo por prefijo, los 7 índices dan HTTP 200
     anónimo (la bucket policy ya cubría `congreso-2026/output/*`, no hubo que tocarla). El buscador

@@ -8,6 +8,13 @@ comparar-candidatos.html y endoso-2026.html, + un índice por elección.
 Es la versión parametrizada de build_asamblea_2023.py / build_concejo_2023.py /
 build_jal_2023.py (mismas llaves, mismos gotchas), con dos diferencias de fuente:
 
+  · GCS_2011TER: 4=GOBERNACION · 5=ASAMBLEA · 6=ALCALDIA · 7=CONCEJO · 8=JAL
+      (JAL adentro). ⚠️ **17 columnas y el orden más raro de todos**: campo EXTRA
+      `DES_MM` (nombre de municipio) en la col 8, que corre toda la geografía, y
+      **NUM_VOT en la col 12, ANTES de partido y candidato** — al revés que en
+      cualquier otro año:
+      FUENTE;FEC_ELEC;COD_COR;DES_COR;COD_CIR;DES_CIR;COD_DDE;COD_MME;DES_MM;
+      COD_ZZ;COD_PP;DES_MS;NUM_VOT;COD_PAR;DES_PAR;COD_CAN;DES_CAN
   · GCS_2015TER trae las 5 corporaciones INTERCALADAS con códigos propios:
       1=GOBERNACION · 2=ASAMBLEA · 3=ALCALDIA · 4=CONCEJO · 5=JAL  (JAL adentro)
   · GCS_2019TER usa OTROS códigos: 4=GOBERNADOR · 5=ASAMBLEA · 6=ALCALDE · 7=CONCEJO
@@ -25,7 +32,8 @@ Memoria (8 GB): streaming — se extrae la corporación con awk, se ordena por
 Uso:
   python3 tools/analisis-candidato/build_territorial_candidatos.py asam2015
   python3 tools/analisis-candidato/build_territorial_candidatos.py conc2019
-  ... claves: asam2015 asam2019 conc2015 conc2019 jal2015 jal2019
+  ... claves: asam2011 asam2015 asam2019 · conc2011 conc2015 conc2019
+             jal2011 jal2015 jal2019
 
 Subida a S3 (manual, luz verde del usuario):
   aws s3 cp "Bases de datos/output_asamblea_2015/" \
@@ -39,13 +47,28 @@ BD   = os.path.join(ROOT, 'Bases de datos')
 GEOREF = os.path.join(BD, 'PUESTOS_GEOREF.csv')
 SCRATCH = os.environ.get('SCRATCH_DIR', '/tmp')
 
-# Layout de columnas (0-based tras split(';'))
+# Layout de columnas (0-based tras split(';')). NCOL = mínimo de columnas que
+# debe traer la fila para que todos los índices existan.
 LAYOUT_TER = dict(COR=2, DDE=6, MME=7, ZZ=8, PP=9, MS=10, PAR=11, DESPAR=12,
-                  CAN=13, DESCAN=14, VOT=15, SORT=('-k7,7', '-k8,8'))
+                  CAN=13, DESCAN=14, VOT=15, NCOL=16, SORT=('-k7,7', '-k8,8'))
 LAYOUT_JAL19 = dict(COR=7, DDE=2, MME=3, ZZ=4, PP=5, MS=6, PAR=11, DESPAR=12,
-                    CAN=13, DESCAN=14, VOT=15, SORT=('-k3,3', '-k4,4'))
+                    CAN=13, DESCAN=14, VOT=15, NCOL=16, SORT=('-k3,3', '-k4,4'))
+# ⚠️ 2011 es el más raro de todos: 17 columnas, un campo EXTRA `DES_MM` (nombre
+# del municipio) en la 8 que corre toda la geografía, y sobre todo **NUM_VOT va
+# ANTES de partido/candidato** (col 12) — al revés que en cualquier otro año.
+LAYOUT_2011 = dict(COR=2, DDE=6, MME=7, ZZ=9, PP=10, MS=11, PAR=13, DESPAR=14,
+                   CAN=15, DESCAN=16, VOT=12, NCOL=17, SORT=('-k7,7', '-k8,8'))
 
 CFG = {
+    'asam2011': dict(src='GCS_2011TER.csv', cor='5', layout=LAYOUT_2011, scope='dep',
+                     slug='ASAM2011', anio='2011', corp='ASAMBLEA',
+                     dir='asamblea-2011', eleccion='Asamblea Departamental 2011'),
+    'conc2011': dict(src='GCS_2011TER.csv', cor='7', layout=LAYOUT_2011, scope='mun',
+                     slug='CONC2011', anio='2011', corp='CONCEJO',
+                     dir='concejo-2011', eleccion='Concejo Municipal 2011'),
+    'jal2011':  dict(src='GCS_2011TER.csv', cor='8', layout=LAYOUT_2011, scope='jal',
+                     slug='JAL2011', anio='2011', corp='JAL',
+                     dir='jal-2011', eleccion='JAL (Ediles) 2011'),
     'asam2015': dict(src='GCS_2015TER.csv', cor='2', layout=LAYOUT_TER, scope='dep',
                      slug='ASAM2015', anio='2015', corp='ASAMBLEA',
                      dir='asamblea-2015', eleccion='Asamblea Departamental 2015'),
@@ -220,7 +243,7 @@ def main():
     n_rows = 0
     with open(sorted_path, encoding='utf-8', errors='replace', newline='') as f:
         for row in csv.reader(f, delimiter=';'):
-            if len(row) < 16:
+            if len(row) < L['NCOL']:
                 continue
             can = row[L['CAN']].strip()
             if can in SPECIAL_CAN:

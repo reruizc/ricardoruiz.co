@@ -28,6 +28,7 @@
     { name: 'asamblea', dir: 'asamblea-2023', indexFile: 'index-asamblea-2023.json',       list: d => d.candidatos || [] },
     { name: 'asam2019', dir: 'asamblea-2019', indexFile: 'index-asamblea-2019.json',       list: d => d.candidatos || [] },
     { name: 'asam2015', dir: 'asamblea-2015', indexFile: 'index-asamblea-2015.json',       list: d => d.candidatos || [] },
+    { name: 'asam2011', dir: 'asamblea-2011', indexFile: 'index-asamblea-2011.json',       list: d => d.candidatos || [] },
     { name: 'con2014',  dir: 'congreso-2014', indexFile: 'index-congreso-2014.json',       list: d => d.candidatos || [] },
     { name: 'con2018',  dir: 'congreso-2018', indexFile: 'index-congreso-2018.json',       list: d => d.candidatos || [] },
     { name: 'con2022',  dir: 'congreso-2022', indexFile: 'index-congreso-2022.json',       list: d => d.candidatos || [] },
@@ -50,6 +51,8 @@
     { name: 'jal2019',  dir: 'jal-2019',     indexFile: 'index-jal-2019.json',     list: d => d.candidatos || [] },
     { name: 'conc2015', dir: 'concejo-2015', indexFile: 'index-concejo-2015.json', list: d => d.candidatos || [] },
     { name: 'jal2015',  dir: 'jal-2015',     indexFile: 'index-jal-2015.json',     list: d => d.candidatos || [] },
+    { name: 'conc2011', dir: 'concejo-2011', indexFile: 'index-concejo-2011.json', list: d => d.candidatos || [] },
+    { name: 'jal2011',  dir: 'jal-2011',     indexFile: 'index-jal-2011.json',     list: d => d.candidatos || [] },
   ];
 
   const _bySlug = {};   // slug → entrada (para dataUrlFor)
