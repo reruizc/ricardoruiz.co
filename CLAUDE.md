@@ -165,7 +165,7 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
   - **Mapa/radar**: `isDepartmentalRace` (y `isDeptRace` en comparar) ahora incluye Concejo/JAL
     (`isConcejoOJAL`) → auto-drill al depto y colorea municipios (Bogotá: localidades). Radar:
     Concejo → comunas/localidades, JAL → puestos.
-- **Territoriales 2015 + 2019 y Presidencial 2018** (jul-30-2026 · pipelines corridos, ⚠ S3 pendiente):
+- **Territoriales 2015 + 2019 y Presidencial 2018** (jul-30-2026 · **LISTO · en producción**):
   - `tools/analisis-candidato/build_territorial_candidatos.py <clave>` — builder ÚNICO parametrizado
     (claves `asam2015 asam2019 conc2015 conc2019 jal2015 jal2019`), mismas llaves/gotchas que los
     builders 2023 (asamblea=dep · concejo=mun · JAL=mun+nombre+hash, comuna por moda del georef).
@@ -186,10 +186,17 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
     conc2015/jal2015 (lazy, índices 16-18 MB). `SRC_YEAR` actualizado en analisis-candidato y
     brujula-2027. Flags pre-subida: `?terlocal=1` (asambleas+pres2018) y los `?conclocal=1`/
     `?jallocal=1` existentes ahora también apuntan los años nuevos al repo local.
-  - **S3 (pendiente de luz verde)**: `congreso-2026/output/{asamblea-2015,asamblea-2019,
+  - **S3 ✓ SUBIDO** (jul-30-2026, 1h 53m): `congreso-2026/output/{asamblea-2015,asamblea-2019,
     concejo-2015,concejo-2019,jal-2015,jal-2019,pres-2018}/` con
     `aws s3 cp … --recursive --content-type "application/json" --cache-control "public, max-age=300"`.
-    cand-index tolera 404 → el frontend puede desplegarse antes de subir los datos.
+    **205.704 objetos**, conteo local==S3 verificado prefijo por prefijo, los 7 índices dan HTTP 200
+    anónimo (la bucket policy ya cubría `congreso-2026/output/*`, no hubo que tocarla). El buscador
+    de analisis-candidato pasa de 135k a **322.757 candidaturas** con las 15 fuentes.
+    ⚠ **Ritmo de subida medido: el cuello es la LATENCIA por petición, no el ancho de banda** —
+    archivos de ~21 KB suben a 31 arch/s (0,67 MB/s) mientras los de ~170 KB dan 12 arch/s
+    (2,1 MB/s). Para prefijos de decenas de miles de archivos chicos, contar ~45 min por cada 85k
+    con la concurrencia por defecto (10); subir `max_concurrent_requests` sí ayudaría ahí.
+    cand-index tolera 404 → el frontend se puede desplegar antes de que termine la subida.
 ### Tableros territoriales 2023 — JAL · Concejo · Asamblea (LISTO · jul-2026)
 
 **Tres tableros con la MISMA estructura y el mismo chasis de página**, enlazados desde
@@ -5848,7 +5855,8 @@ Caudal (paraguas)  ·  caudal.html = HOME multi-pilar (9 cards del mapa de fuent
 ├── Regulatorio   → view-regulatorio + Lambda action `sanciones` + tools/caudal/supers/  (LISTO · en prod)
 ├── Medios        → view-medios      + Lambda action `medios` (Google News RSS, gratis)  (LISTO · en prod)
 ├── Ejecutivo     → view-ejecutivo   + Lambda action `ejecutivo` + tools/caudal/ejecutivo/ (LISTO · en prod)
-└── Cortes / Datos abiertos / Territoriales / …   (cards "Próximamente" en el home)
+├── Contratación  → view-contratacion + Lambda action `contratacion` + tools/caudal/secop/ (LISTO · en prod)
+└── Cortes / Territoriales / Gacetas / Redes / …  (cards "Próximamente" en el home)
 
 ⊕ Vista Cliente   → view-cliente + Lambda action `cliente` — lente SIGA que CRUZA los
                     pilares por sector y triaja a acción (SKU A, NO es un pilar)  (LISTO · en prod)
@@ -6235,6 +6243,47 @@ Ejecutivo**: decretos, resoluciones, directivas, circulares y **agenda regulator
   pipeline de gacetas fase 3: pypdf + DeepSeek sobre el `url`) — hoy el pilar es el índice
   navegable con descripción + PDF. Cobertura 2015→hoy; pre-2015 tocaría SUIN-Juriscol (TLS roto
   para fetch auto) o el Diario Oficial.
+
+### Pilar Datos abiertos y contratación · SECOP II (`view-contratacion` · LISTO · en prod · jul-30-2026)
+
+Quinto pilar en vivo. **Fase 1** (datos) estaba desde el 28-jul; **Fase 2** (Lambda +
+frontend) se cableó el 30-jul. Fuente: **SECOP II · Contratos Electrónicos**
+(`jbjy-vk9h`, **5,87 M contratos, actualizado A DIARIO**). Doc completa en
+`tools/caudal/secop/README.md`.
+
+- **Arquitectura partida (a diferencia del resto de pilares):** SECOP no cabe en la
+  memoria de la Lambda → el **landing** sale de agregados precomputados
+  (`metadata/secop-stats.json`, 48 KB, que emite `harvest_secop.py` 1x/día) y la
+  **búsqueda va EN VIVO** contra Socrata (~1-3 s). Nada de dataset en RAM.
+- **Frontera dura: `$q` sí, `like` NO.** `$q` usa el índice full-text y admite agregar
+  (`count`/`sum`/`group by`) → la búsqueda devuelve el **total real** del universo, no
+  "una página". `like` escanea las 5,87 M filas: medido **31 s sin `$order` y >70 s con
+  él** — por encima del techo de **30 s de API Gateway**, así que no se usa. El toggle
+  "solo en el objeto" es **filtro post-`$q`** (se piden 4× filas y se filtra la frase en
+  Python): cuesta cobertura, no el conteo.
+- **Orden por defecto `fecha_de_firma DESC`** + `fecha_de_firma IS NOT NULL` **solo en las
+  filas mostradas**: 421 k contratos no traen fecha y encabezaban la lista con basura
+  ("No definido", valor 0). Los agregados NO llevan ese filtro → `total` sigue siendo el
+  universo real. Toggle "Más caros" (`orden:'valor'`).
+- **Las 2 mitigaciones del ruido de `$q`** (que matchea CUALQUIER columna, incluidas las
+  que no se muestran) vienen como DATOS en el stats y el frontend solo las consume:
+  **chips** (116 dimensiones cerradas → ofrece el filtro exacto: "transporte" →
+  *Sector: Transporte, 152.543*) y **badge "match: X"** (`columnas_match`, por prioridad
+  → explica por qué salió un contrato cuyo objeto no nombra el término).
+- **PII:** las 16 columnas de `columnas_pii_excluidas` (cédulas, domicilio del
+  representante legal, supervisor, cuenta bancaria) **no van en el `$select`** — `$q` las
+  matchea igual, pero mostrarlas es otra cosa (Ley 1581). Por eso la respuesta NO trae
+  `doc_proveedor` aunque el borrador del contrato lo listaba.
+- **Filtros exactos soportados** (`SECOP_FILTROS`): departamento · estado · modalidad ·
+  tipo · sector · orden_entidad · **entidad** · **nit**, + `anio`
+  (`date_extract_y(fecha_de_firma)`). Todos con escape de comilla simple.
+- **Cache** `analisis-cache/contratacion-{hash24}-{bucket 3h}` (mismo patrón del pilar
+  Medios: la key cambia con el tiempo, no hay TTL explícito). ⚠️ **No invalida al
+  redeployar** — al cambiar lógica, borrar a mano las keys `contratacion-*`.
+- **Pendiente:** `SOCRATA_APP_TOKEN` NO está seteada en la Lambda (corre con el rate
+  limit anónimo); refresco diario del `secop-stats.json` por launchd; mapeo UNSPSC
+  código→nombre; cruce con la Vista Cliente (`_secop_para_sector`, como
+  `_medios_para_sector`).
 
 ## Roadmap post-2V · Chats conversacionales (LLM + function calling)
 
