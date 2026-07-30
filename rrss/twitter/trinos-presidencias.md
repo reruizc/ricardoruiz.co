@@ -70,3 +70,35 @@ de que se muevan en el primer apretón fiscal.
   presupuesto, no al programa."
 - Si prefieres un tono más neutro en el trino 1, reemplazar el último párrafo
   por: "Ya sabemos quiénes son, en Senado y en Cámara."
+
+---
+
+## Trino 4 — Blel y Briceño  ·  (sin imagen · puede ir suelto o cerrando el hilo)
+
+Dato curioso del reparto de comisiones:
+
+Nadya Blel es la senadora más votada del país. 182.726 votos. No preside ninguna
+comisión.
+
+Daniel Briceño es el representante más votado: 264.838, casi el doble que el
+segundo. Tampoco preside.
+
+En la Primera de Cámara, donde se sienta Briceño, preside Uscátegui: 34.280
+votos, la misma circunscripción de Bogotá.
+
+Y la comisión de impuestos del Senado la preside Sara Castellanos, número 25 en
+votación.
+
+El poder en el Congreso no lo reparten las urnas. Lo reparten los partidos.
+
+### Por qué las comparaciones son válidas
+- Senado es circunscripción NACIONAL: comparar a Blel (1ª, 182.726) con
+  Castellanos (25ª, 103.796) es comparar peras con peras.
+- Briceño y Uscátegui fueron elegidos AMBOS por Bogotá D.C., así que sus
+  votaciones son comparables entre sí.
+- ⚠️ NO usar en esta comparación a Bermúdez (Guaviare, 6.737) ni a Jay-Pang
+  (San Andrés, 6.883): en circunscripciones chicas se llega con muchos menos
+  votos y la comparación sería tramposa.
+- ⚠️ Espinal y Forero aparecen con 0 votos personales porque el Centro
+  Democrático fue en lista CERRADA al Senado (el voto va al logo). No decir
+  nunca que "sacaron 0 votos".
