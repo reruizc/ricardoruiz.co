@@ -173,21 +173,55 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
     **5=JAL (la JAL 2015 viene DENTRO del TER)**; 2019TER → 4=GOB **5=ASAM** 6=ALC **7=CONCEJO**;
     `GCS_2019JAL.csv` aparte (COR=5) y **con las columnas en otro orden** (geografía antes de COR
     → layout `LAYOUT_JAL19` en el script). Streaming con sort temporal en scratchpad.
-  - `tools/analisis-candidato/build_pres_2018.py` — Presidencial 2018 1V+2V formato endoso, slugs
-    `PRES2018-{1V|2V}-{par}-{can}`, circunscripción NACIONAL (fuente regular de cand-index, NO el
-    modelo por-persona de 2026). ⚠ En los PRES los especiales son COD_CAN 96/97/98 con COD_PAR 996+
-    → se filtra por COD_PAR≥996. Validado exacto: Duque 1V 7.616.857 · Petro 1V 4.855.069 ·
-    2V 10.397.314/8.039.229.
+  - `tools/analisis-candidato/build_pres_historico.py <clave|todas>` — **presidenciales 2010 · 2014 ·
+    2018 · 2022 (1V+2V) + consultas interpartidistas 2022**, formato endoso, circunscripción
+    NACIONAL (fuentes regulares de cand-index, NO el modelo por-persona de 2026). Slugs
+    `PRES{año}-{1V|2V}-{par}-{can}` y `CONSU2022-{pacto|equipo|centro}-{par}-{can}`.
+    **Supersede a `build_pres_2018.py`** (borrado): `pres2018` reproduce su salida byte a byte
+    → los JSON de pres-2018 ya subidos a S3 siguen válidos (verificado con `diff -rq`).
+    ⚠⚠ **NO filtrar los especiales por COD_PAR — la convención cambia por año y en las dos
+    direcciones** (medido archivo por archivo): 2010 1V y 2014 1V/2V usan **COD_PAR=0** para
+    blanco/nulos (con `par>=996` se COLABAN como candidatos: la 2V de 2014 daba 5 en vez de 2);
+    **2010 2V usa COD_PAR=12399 para TODOS**, especiales y reales, así que el par no discrimina
+    nada; y en **2022 los partidos REALES pasan de 996** (Petro 1235 · Fico 1234 · Rodolfo 1076),
+    de modo que `par>=996` borraba a los punteros y dejaba la 2V en CERO. Lo único estable en los
+    8 archivos es **COD_CAN** (especiales ∈ {96,97,98,996,997,998,999}, reales = nº de tarjetón
+    1-9) → el filtro va por ahí (`SPECIAL_CAN`). ⚠ En 2018 hay una candidatura REAL "PROMOTORES
+    VOTO EN BLANCO" (par 28 · can 2 · 30.128 votos) que DEBE quedar dentro: filtrar por el texto
+    del nombre la borraría.
+    ⚠ **`GCS_2010PRES*` trae otro orden de columnas** (geografía primero, `COD_DDE` en la col 2 en
+    vez de la 6); partido/candidato/votos sí caen en los mismos índices → solo se parametriza el
+    bloque geográfico (`LAYOUT_2010` vs `LAYOUT_STD`).
+    ⚠ **En `GCS_2022CONSU` el `COD_CIR` NO distingue las 3 consultas** (llega VACÍO en el Pacto y
+    `0` en Equipo por Colombia y Centro Esperanza) → separarlas por el TEXTO de `DES_CIR`; además
+    **`COD_CAN` se repite (1-5) entre consultas**, así que la llave y el slug deben incluir cuál es.
+    `DES_PAR` trae campos entrecomillados (partido ASI) → leer con csv.reader, nunca partiendo
+    por ';' (awk parte mal esas filas).
+    **Validado contra el oficial**: 2010 1V Santos 6.802.043 / Mockus 3.134.222 · 2010 2V
+    9.028.943 / 3.587.975 · 2014 2V Santos 7.839.342 / Zuluaga 6.917.001 · 2018 1V Duque
+    7.616.857 / Petro 4.855.069 · 2022 2V Petro 11.292.758 / Hernández 10.604.656.
   - **Volúmenes**: asam2015 3.230 cands (548 MB) · asam2019 3.232 (608 MB) · conc2015 84.586
     (1,1 GB) · conc2019 89.250 (1,2 GB) · jal2015 13.203 (283 MB) · jal2019 12.186 (311 MB) ·
-    pres2018 10 (127 MB). Validados: Serpa/Flórez/Morris top Concejo BOG 2015 · Abisambra/Cancino
+    pres2018 10 (127 MB) · pres2010 11 (111 MB) · pres2014 7 (104 MB) · pres2022 10 (126 MB) ·
+    consu2022 15 (185 MB). Validados: Serpa/Flórez/Morris top Concejo BOG 2015 · Abisambra/Cancino
     top 2019 · Garcés Rojas top asamblea Valle 2015 y 2019.
-  - **Cableado**: `SOURCES` += asam2019/asam2015/pres2018 · `LOCAL_SOURCES` += conc2019/jal2019/
-    conc2015/jal2015 (lazy, índices 16-18 MB). `SRC_YEAR` actualizado en analisis-candidato y
-    brujula-2027. Flags pre-subida: `?terlocal=1` (asambleas+pres2018) y los `?conclocal=1`/
-    `?jallocal=1` existentes ahora también apuntan los años nuevos al repo local.
-  - **S3 ✓ SUBIDO** (jul-30-2026, 1h 53m): `congreso-2026/output/{asamblea-2015,asamblea-2019,
-    concejo-2015,concejo-2019,jal-2015,jal-2019,pres-2018}/` con
+  - **Cableado**: `SOURCES` += asam2019/asam2015/pres2010/pres2014/pres2018/pres2022/consu2022 ·
+    `LOCAL_SOURCES` += conc2019/jal2019/conc2015/jal2015 (lazy, índices 16-18 MB). `SRC_YEAR`
+    actualizado en analisis-candidato y brujula-2027. Flags pre-subida: `?terlocal=1` (asambleas +
+    los 4 presidenciales + consultas 2022) y los `?conclocal=1`/`?jallocal=1` existentes ahora
+    también apuntan los años nuevos al repo local.
+  - **`electoral.html` pasa a 9 pestañas**: 2010 · 2014 · 2015 · 2018 · 2019 · 2022 · 2023 · 2025 ·
+    2026 (todo año con dato tiene pestaña; 2014 y 2022 ya tenían Congreso en el buscador pero
+    ninguna pestaña). Con 9 el tab bar se apretó: padding de `1.6rem` → `1.05rem` + `flex-wrap`
+    como red de seguridad. `tabs[]` y `currentIdx` (=8, 2026) deben moverse juntos al agregar años.
+  - ⚠ **Duplicado conocido por nombre legal**: `agruparPersonas` colapsa por nombre exacto y 2010
+    usa el nombre legal completo → "GUSTAVO FRANCISCO PETRO URREGO" (2010) queda como entrada
+    aparte de "GUSTAVO PETRO" (2018/2022/2026). Es el mismo límite ya documentado del registro
+    (sin fuzzy-subset, conservador a propósito); el subset de tokens tampoco lo uniría porque
+    "GUSTAVO PETRO" son 2 tokens y el umbral seguro es ≥3. Vargas Lleras sí encadena 2010→2018.
+  - **S3 ✓ SUBIDO** (jul-30-2026, 1h 53m + 4 min de los presidenciales):
+    `congreso-2026/output/{asamblea-2015,asamblea-2019,concejo-2015,concejo-2019,jal-2015,
+    jal-2019,pres-2010,pres-2014,pres-2018,pres-2022,consu-2022}/` con
     `aws s3 cp … --recursive --content-type "application/json" --cache-control "public, max-age=300"`.
     **205.704 objetos**, conteo local==S3 verificado prefijo por prefijo, los 7 índices dan HTTP 200
     anónimo (la bucket policy ya cubría `congreso-2026/output/*`, no hubo que tocarla). El buscador

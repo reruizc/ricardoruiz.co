@@ -31,7 +31,11 @@
     { name: 'con2014',  dir: 'congreso-2014', indexFile: 'index-congreso-2014.json',       list: d => d.candidatos || [] },
     { name: 'con2018',  dir: 'congreso-2018', indexFile: 'index-congreso-2018.json',       list: d => d.candidatos || [] },
     { name: 'con2022',  dir: 'congreso-2022', indexFile: 'index-congreso-2022.json',       list: d => d.candidatos || [] },
+    { name: 'pres2010', dir: 'pres-2010',     indexFile: 'index-pres-2010.json',           list: d => d.candidatos || [] },
+    { name: 'pres2014', dir: 'pres-2014',     indexFile: 'index-pres-2014.json',           list: d => d.candidatos || [] },
     { name: 'pres2018', dir: 'pres-2018',     indexFile: 'index-pres-2018.json',           list: d => d.candidatos || [] },
+    { name: 'pres2022', dir: 'pres-2022',     indexFile: 'index-pres-2022.json',           list: d => d.candidatos || [] },
+    { name: 'consu2022',dir: 'consu-2022',    indexFile: 'index-consu-2022.json',          list: d => d.candidatos || [] },
   ];
 
   // Fuentes LOCALES (Concejo · JAL 2023): índices GRANDES (~94k + ~14k candidatos).
