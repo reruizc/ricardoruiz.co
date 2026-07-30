@@ -289,16 +289,67 @@ def fetch_sic():
     return hits
 
 
+# --- Clasificador propio de Supersalud (NO usar es_sancion genérico) --------
+# El repositorio de Comunicados es una SALA DE PRENSA: de ~100 PDFs que mencionan
+# multa/sanción, solo ~16 son sanciones INDIVIDUALES efectivamente impuestas (con
+# monto y entidad). El resto son investigaciones, medidas cautelares,
+# liquidaciones y balances agregados. El es_sancion() genérico (pensado para
+# titulares de prensa de SIC/Supertransporte) tumbaba las de título=nombre de
+# archivo ("Comunicado056_Sancion Coomeva") y dejaba pasar pocas → 12. Este par
+# POS/NEG sube a 16 y, sobre todo, filtra el ruido con precisión.
+#
+# OJO (semántica): esto NO es el registro de sanciones de Supersalud, es lo que
+# la entidad decidió publicitar. El REGISTRO REAL (~600-800 resoluciones
+# sancionatorias) vive en las bibliotecas SharePoint
+# PortalWeb/Notificaciones/{Por Aviso,NotificacionesPorAviso} y
+# PortalWeb/Juridica/Resoluciones — títulos opacos (números de resolución),
+# hay que leer el PDF → cosecha vía 3 (PDF→DeepSeek), mismo patrón que
+# Supersociedades. Ver nota en fuentes.json.
+SNS_POS = re.compile(
+    r'(sanciona\s+a\b|sancion[oó]\s+a\b|sancionad[oa]s?\b'
+    r'|impone\s+(?:una\s+)?(?:multa|sanci[oó]n)|impuso\s+(?:una\s+)?(?:multa|sanci[oó]n)'
+    r'|multa\s+(?:de|con|a|al|por)\b|con\s+multa\s+de'
+    r'|deja\s+en\s+firme\s+(?:la\s+|una\s+)?(?:multa|sanci[oó]n|sanciones|multas)'
+    r'|confirma\s+(?:la\s+)?(?:multa|sanci[oó]n)'
+    r'|_sancion|_multa|\bsancion_|impone\s+multas)', re.I)
+# NEG gana sobre POS. "liquida" a secas NO: dispararía con el adjetivo ("la
+# liquidada EPS Medimás", que SÍ es una sanción) — solo los ACTOS de liquidación.
+SNS_NEG = re.compile(
+    r'(balance|prioriz[oó]|récord|record\b|en\s+total'
+    r'|medida\s+cautelar|abre\s+(?:investigaci|proceso|averigua)|inicia\s+investigaci'
+    r'|averiguaci|indagaci|anuncia\s+investigaci|abre\s+proceso'
+    r'|ordena\s+liquidaci|toma\s+posesi|liquidaci[oó]n\s+(?:de\s+la|voluntaria)'
+    r'|autoriz|designa|interviene'
+    r'|\burge\b|insta\b|requiere|reglamenta|rechaza|facilit[oó]|imparte\s+órdenes'
+    r'|lamenta|activa\s+plan|pone\s+en\s+marcha|fortalece|avanza\s+en'
+    r'|order[óo]|órdenes\s+de\s+cumplimiento|acuerdos\s+por)', re.I)
+
+
+def es_sancion_sns(titulo, path):
+    """Sanción individual impuesta por Supersalud (título O nombre de archivo)."""
+    fn = path.rsplit('/', 1)[-1]
+    hay = f'{titulo} {fn}'
+    if SNS_NEG.search(hay):
+        return False
+    return bool(SNS_POS.search(hay))
+
+
 def fetch_supersalud():
-    """SharePoint Search API anónima, filtrada al repositorio de comunicados."""
+    """SharePoint Search API anónima, filtrada al repositorio de comunicados.
+
+    Keyword amplia (todas las variantes de multa/sanción) para no perder las de
+    título=nombre de archivo; el corte fino lo hace es_sancion_sns sobre título
+    + filename (NO el es_sancion genérico)."""
+    from urllib.parse import quote
     path = 'https://docs.supersalud.gov.co/PortalWeb/Comunicaciones/Comunicados'
-    qt = f'(multa OR sancion OR sanciona) path:"{path}"'
+    qt = ('(multa OR multas OR sancion OR sanciona OR sancionó OR sancionatorio '
+          'OR sancionada OR sancionados OR sancionar OR sancionado) '
+          f'path:"{path}"')
     rows, seen, start = [], set(), 0
     while True:
-        from urllib.parse import quote
         url = ('https://www.supersalud.gov.co/es-co/_api/search/query'
                f"?querytext='{quote(qt)}'&rowlimit=500&startrow={start}"
-               f"&selectproperties='Title,Path,Write'")
+               f"&selectproperties='Title,Path,Write'&trimduplicates=false")
         raw = _curl(url, headers={'Accept': 'application/json;odata=nometadata'})
         if raw is None:
             print('  ! supersalud: search no responde', file=sys.stderr)
@@ -312,7 +363,8 @@ def fetch_supersalud():
         for r in table:
             c = {x['Key']: x['Value'] for x in r['Cells']}
             titulo, url_doc = c.get('Title') or '', c.get('Path') or ''
-            if not titulo or url_doc in seen or not es_sancion(titulo):
+            if (not titulo or not url_doc.lower().endswith('.pdf')
+                    or url_doc in seen or not es_sancion_sns(titulo, url_doc)):
                 continue
             seen.add(url_doc)
             rec = parse_titulo(titulo)
@@ -322,7 +374,7 @@ def fetch_supersalud():
             rows.append(rec)
         total = rr.get('TotalRows', 0)
         start += len(table)
-        print(f'  supersalud: {len(rows)} hits de {total} resultados')
+        print(f'  supersalud: {len(rows)} sanciones de {total} candidatos revisados')
         if not table or start >= total:
             break
         time.sleep(0.3)

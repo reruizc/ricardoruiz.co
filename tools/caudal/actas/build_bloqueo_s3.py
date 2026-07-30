@@ -66,9 +66,17 @@ def p_tratado(idx):
     return b
 
 
-def bloque_sistema(b, tot_k, para_k, dist):
+def bloque_sistema(b, tot_k, para_k, dist, aportantes=None):
+    """`aportantes` = cuántos ámbitos distintos alimentan cada bucket. Sirve
+    para no leer como propiedad del sistema lo que es composición de UNA sola
+    fuente: en Senado, p.ej., el bucket 16º+ sale ÍNTEGRO de la Comisión Sexta
+    (la única con agendas largas: máx. 38 ítems, vs 15 en Quinta y 3 en
+    Cuarta), así que su porcentaje describe a Sexta, no al Senado. El
+    frontend puede atenuar o anotar los buckets con un solo aportante."""
     return {
-        'p_tratado_por_posicion': {lab: {'pct': pct(b[lab][0], b[lab][1]), 'n': b[lab][1]}
+        'p_tratado_por_posicion': {lab: {'pct': pct(b[lab][0], b[lab][1]), 'n': b[lab][1],
+                                         **({'ambitos': len(aportantes.get(lab, ()))}
+                                            if aportantes is not None else {})}
                                    for _, _, lab in BUCKETS},
         'hazard_agendamiento': [{'k': k, 'sigue_pct': round(100 * (1 - para_k[k] / tot_k[k]), 1),
                                  'n': tot_k[k]} for k in range(1, 13) if tot_k[k]],
@@ -84,13 +92,24 @@ def acumular(idx, tot_k, para_k, dist):
             tot_k[k] += 1
 
 
-def main():
+def agregar(files):
+    """Agrega los agendamientos de UNA cámara → (sistema, por_proyecto).
+
+    Se factorizó para poder correr lo mismo sobre Cámara y sobre Senado sin
+    duplicar la lógica. CLAVE: cada cámara produce su PROPIO `por_proyecto`
+    y nunca se fusionan — el token es 'NNN/YY' y ese número se REINICIA en
+    cada cámara, así que '259/24' es un proyecto en Cámara y otro distinto
+    en Senado. Mezclarlos sumaría agendamientos de proyectos que no tienen
+    nada que ver (mismo bug de identidad que ya nos mordió al deduplicar el
+    histórico por número, ver CLAUDE.md 'EL NÚMERO DE RADICADO NO ES
+    IDENTIFICADOR ÚNICO')."""
     nat = {lab: [0, 0] for _, _, lab in BUCKETS}
+    aportantes = defaultdict(set)      # bucket → comisiones que lo alimentan
     tot_k, para_k, dist = defaultdict(int), defaultdict(int), defaultdict(int)
     per_com, por_proy = [], {}
     plen_meta = None
 
-    for f in sorted(CACHE.glob('agendamientos-*.json')):
+    for f in files:
         com = f.stem.replace('agendamientos-', '')
         data = json.load(open(f, encoding='utf-8'))
         idx = data['agendamientos']
@@ -126,6 +145,8 @@ def main():
         for _, _, lab in BUCKETS:
             nat[lab][0] += b[lab][0]
             nat[lab][1] += b[lab][1]
+            if b[lab][1]:
+                aportantes[lab].add(com)
         for tok, info in idx.items():
             entry = {'n': info['n'],
                      'pos_prom': round(sum(info['posiciones']) / len(info['posiciones']), 1),
@@ -149,12 +170,17 @@ def main():
         per_com.append({'com': com, 'proyectos': len(idx),
                         'sesiones': data.get('n_sesiones_con_proyectos', 0),
                         'mediana_agend': _mediana(idx),
+                        # nº total de observaciones de la curva: con muestras
+                        # chicas (p.ej. Cuarta del Senado: 40 obs, 4 de 6
+                        # buckets vacíos) el porcentaje por posición es ruido y
+                        # no debe graficarse como curva.
+                        'n_obs': sum(b[lab][1] for _, _, lab in BUCKETS),
                         'pct_1o_tratado': pct(b['1º'][0], b['1º'][1]),
                         'p_tratado_por_posicion': {lab: {'pct': pct(b[lab][0], b[lab][1]),
                                                          'n': b[lab][1]} for _, _, lab in BUCKETS}})
 
     sistema = {
-        **bloque_sistema(nat, tot_k, para_k, dist),
+        **bloque_sistema(nat, tot_k, para_k, dist, aportantes),
         'comisiones': sorted(per_com, key=lambda x: -x['mediana_agend']),
         'totales': {'proyectos': sum(c['proyectos'] for c in per_com),
                     'sesiones': sum(c['sesiones'] for c in per_com),
@@ -162,18 +188,50 @@ def main():
     }
     if plen_meta:
         sistema['plenaria'] = plen_meta
+    return sistema, por_proy
+
+
+def main():
+    sistema, por_proy = agregar(sorted(CACHE.glob('agendamientos-*.json')))
     out = {'v': datetime.date.today().isoformat(),
            'fuente': 'Cámara · órdenes del día de comisión y plenaria (wp-json)',
            'sistema': sistema, 'por_proyecto': por_proy}
+
+    # SENADO — bloque namespaceado aparte (nunca fusionado con el de Cámara,
+    # ver docstring de agregar()). Alcance declarado: solo 3 de las 7
+    # comisiones constitucionales tienen serie usable en el DOCman del Senado
+    # (Cuarta/Quinta/Sexta); Primera/Segunda/Tercera/Séptima son un hueco
+    # conocido y la Gaceta no es vía viable para llenarlo (rezago de 11-16
+    # meses, medido — ver harvest_ordenes_senado.py). La PLENARIA sí está
+    # completa 2018-2026 y sale de OTRO sitio (secretariasenado.gov.co).
+    sen_files = sorted((CACHE / 'ordenes-senado').glob('agendamientos-*.json'))
+    sistema_sen, por_proy_sen = agregar(sen_files) if sen_files else (None, {})
+    if sistema_sen:
+        out['senado'] = {
+            'fuente': 'Senado · órdenes del día de comisión (DOCman senado.gov.co) '
+                      'y plenaria (DOCman secretariasenado.gov.co)',
+            'alcance': 'comisiones constitucionales Cuarta/Quinta/Sexta + plenaria; '
+                       'Primera/Segunda/Tercera/Séptima sin serie publicada',
+            'sistema': sistema_sen, 'por_proyecto': por_proy_sen,
+        }
+
     json.dump(out, open(OUT, 'w', encoding='utf-8'), ensure_ascii=False)
     kb = OUT.stat().st_size / 1024
     n_plen = sum(1 for v in por_proy.values() if v.get('plen'))
-    print(f'bloqueo.json · {len(por_proy)} proyectos ({n_plen} con plenaria) · '
-          f'{len(per_com)} comisiones · {kb:.0f} KB')
-    if plen_meta:
-        t = plen_meta['totales']
-        print(f'  plenaria: {t["proyectos"]} proyectos en {t["sesiones"]} sesiones '
+    print(f'bloqueo.json · CÁMARA {len(por_proy)} proyectos ({n_plen} con plenaria) · '
+          f'{sistema["totales"]["comisiones"]} comisiones · {kb:.0f} KB')
+    if sistema.get('plenaria'):
+        t = sistema['plenaria']['totales']
+        print(f'  plenaria Cámara: {t["proyectos"]} proyectos en {t["sesiones"]} sesiones '
               f'con agenda (de {t["sesiones_publicadas"]} publicadas)')
+    if sistema_sen:
+        n_ps = sum(1 for v in por_proy_sen.values() if v.get('plen'))
+        print(f'  SENADO {len(por_proy_sen)} proyectos ({n_ps} con plenaria) · '
+              f'{sistema_sen["totales"]["comisiones"]} comisiones')
+        if sistema_sen.get('plenaria'):
+            t = sistema_sen['plenaria']['totales']
+            print(f'  plenaria Senado: {t["proyectos"]} proyectos en {t["sesiones"]} sesiones '
+                  f'con agenda (de {t["sesiones_publicadas"]} publicadas)')
     print(f'→ {OUT.relative_to(REPO)}')
     print('subir: aws s3 cp "%s" s3://caudal-legislativo/metadata/bloqueo.json' % OUT)
 

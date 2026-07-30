@@ -22,7 +22,12 @@ Mecánica:
      procesados) — no discriminan y solo inflan el índice.
   5. Escribe dist/texto-index.json ({palabra: [tb:id, ...]}).
 
-Uso: python3 tools/caudal/build_texto_index.py [--workers 8] [--max-docfreq 0.12]
+Uso:
+  python3 tools/caudal/build_texto_index.py [--workers 8] [--max-docfreq 0.05]
+  # tras cosechar gacetas nuevas (reusa el caché, solo baja lo que falta):
+  python3 tools/caudal/build_texto_index.py --incremental
+  # solo re-filtrar sin tocar la red:
+  python3 tools/caudal/build_texto_index.py --from-cache
 """
 import argparse
 import json
@@ -140,6 +145,10 @@ def main():
     ap.add_argument('--from-cache', action='store_true',
                     help='reusa las palabras ya extraídas por gaceta (sin volver a bajar de S3) — '
                          'para iterar el filtro de frecuencia sin repetir ~15 min de red')
+    ap.add_argument('--incremental', action='store_true',
+                    help='como --from-cache pero SÍ baja las gacetas que falten en el caché '
+                         '(el modo normal tras una cosecha nueva: reusa lo ya extraído y '
+                         'solo paga la red por lo nuevo)')
     args = ap.parse_args()
 
     print('· cruzando proyectos con sus gacetas referenciadas…')
@@ -149,14 +158,23 @@ def main():
         keys = keys[:args.limit]
     print(f'  {len(keys)} gacetas distintas referenciadas por algún proyecto')
 
-    if args.from_cache and CACHE.exists():
+    doc_words = {}
+    if (args.from_cache or args.incremental) and CACHE.exists():
         print(f'  · reusando caché de palabras por gaceta ({CACHE.name})')
         cache = json.load(open(CACHE, encoding='utf-8'))
-        doc_words = {k: set(v) for k, v in cache.items()}
-        n_ok, n_sinTexto = len(doc_words), 0
+        # solo lo que sigue siendo relevante para ESTE set de keys
+        wanted = set(keys)
+        doc_words = {k: set(v) for k, v in cache.items() if k in wanted}
+        print(f'    {len(doc_words)} gacetas vienen del caché')
+
+    if args.from_cache:
+        pendientes = []          # --from-cache: no se toca la red
     else:
-        doc_words = {}
-        n_ok = n_sinTexto = 0
+        pendientes = [k for k in keys if k not in doc_words]
+
+    n_ok, n_sinTexto = len(doc_words), 0
+    if pendientes:
+        print(f'  · bajando {len(pendientes)} gacetas que faltan…')
 
         def _procesar(key):
             txt = fetch_texto(key)
@@ -165,7 +183,7 @@ def main():
             return key, significant_words(txt)
 
         with ThreadPoolExecutor(max_workers=args.workers) as ex:
-            futs = {ex.submit(_procesar, k): k for k in keys}
+            futs = {ex.submit(_procesar, k): k for k in pendientes}
             done = 0
             for fut in as_completed(futs):
                 key = futs[fut]
@@ -180,10 +198,20 @@ def main():
                     n_ok += 1
                     doc_words[key] = words
                 if done % 200 == 0:
-                    print(f'  …{done}/{len(keys)} · con texto={n_ok} sin texto={n_sinTexto}')
+                    print(f'  …{done}/{len(pendientes)} · con texto={n_ok} sin texto={n_sinTexto}')
 
-        json.dump({k: sorted(v) for k, v in doc_words.items()}, open(CACHE, 'w', encoding='utf-8'), ensure_ascii=False)
-        print(f'  · caché de palabras guardado en {CACHE.name} (para re-filtrar sin red: --from-cache)')
+        # el caché se MERGEA (no se pisa): conserva gacetas de corridas anteriores
+        # que hoy no estén en `keys` — si un proyecto cambia de gacetas, no hay
+        # que volver a bajarlas.
+        prev = {}
+        if CACHE.exists():
+            try:
+                prev = json.load(open(CACHE, encoding='utf-8'))
+            except Exception:
+                prev = {}
+        prev.update({k: sorted(v) for k, v in doc_words.items()})
+        json.dump(prev, open(CACHE, 'w', encoding='utf-8'), ensure_ascii=False)
+        print(f'  · caché actualizado ({len(prev)} gacetas) → --incremental la próxima vez')
 
     print(f'\n{n_ok} gacetas con texto procesadas · {n_sinTexto} sin texto en S3 (aún no cosechadas)')
 

@@ -9,8 +9,19 @@ harvest_actas_plenaria_senado.py) SIN filtro de Entidad ni Documento, ordenado
 por fecha DESC, y para hasta cruzar la fecha de corte (--desde). Escribe
 {num, entidad, fecha_iso} por fila a un JSONL resumible.
 
+MERGE-SAFE (jul-2026): ya NO clobbea el índice. Al escribir, fusiona con las
+filas que ya estaban en OUT (dedup por (num, fecha)). Así una corrida truncada
+—p.ej. el WAF de la Imprenta banea ~10 min a mitad del barrido de 300 páginas
+que hace falta para llegar a pre-2006— nunca pierde lo ya enumerado. Checkpointea
+cada CHECKPOINT_PAGES páginas. Para reanudar tras un corte, `--first N` arranca
+la paginación en la fila N (la portada del listado es date-DESC, así que un N
+alto = más viejo).
+
 Uso:
   python3 tools/caudal/actas/enumerar_gacetas.py --desde 2020-01-01
+  # extender a pre-2006 (baja hasta el piso real del portal, ~2001):
+  python3 tools/caudal/actas/enumerar_gacetas.py --desde 1990-01-01
+  python3 tools/caudal/actas/enumerar_gacetas.py --desde 1990-01-01 --first 24000  # reanudar
 """
 import argparse
 import json
@@ -28,6 +39,7 @@ BASE = 'http://svrpubindc.imprenta.gov.co/senado'
 DT = 'formResumen:dataTableResumen'
 CK = '/tmp/_caudal_enum_ck.txt'
 ROWS = 100
+CHECKPOINT_PAGES = 20   # cada cuántas páginas se vuelca el índice a disco
 
 ROW_RE = re.compile(
     r'<label[^>]*>(\d+)</label></td><td[^>]*><label[^>]*>([^<]*)'
@@ -72,60 +84,118 @@ def to_iso(dmy):
     return f'{y}-{m}-{d}'
 
 
+def load_existing():
+    """Filas ya enumeradas, keyeadas por (num, fecha) — base del merge."""
+    out = {}
+    if OUT.exists():
+        for line in open(OUT, encoding='utf-8'):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                r = json.loads(line)
+            except json.JSONDecodeError:
+                continue          # línea truncada por un corte a mitad de write
+            out[(r['num'], r['fecha'])] = r
+    return out
+
+
+def flush(acc):
+    """Vuelca el acumulado (dict (num,fecha)->fila) ordenado. Escritura atómica:
+    a un .tmp y luego replace — si el proceso muere a mitad, el índice viejo
+    sobrevive intacto en vez de quedar truncado."""
+    rows = sorted(acc.values(), key=lambda r: (r['fecha'], r['num']))
+    tmp = OUT.with_suffix('.jsonl.tmp')
+    with open(tmp, 'w', encoding='utf-8') as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + '\n')
+    tmp.replace(OUT)
+    return len(rows)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--desde', default='2020-01-01')
     ap.add_argument('--sleep', type=float, default=0.3)
+    ap.add_argument('--first', type=int, default=0,
+                    help='fila inicial de la paginación (para reanudar tras un corte; '
+                         'el listado es fecha-DESC → N alto = más viejo)')
+    ap.add_argument('--max-empty', type=int, default=3,
+                    help='páginas vacías seguidas antes de rendirse (el portal devuelve '
+                         'vacío transitorio bajo WAF, no siempre es el fondo del listado)')
     args = ap.parse_args()
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
+    acc = load_existing()
+    if acc:
+        print(f'· {len(acc)} filas ya en el índice (se fusionan, no se pisan)')
+    n_antes = len(acc)
+
     vs = fresh_vs()
     if not vs:
         print('no pude leer ViewState (¿portal caído?)', file=sys.stderr)
         sys.exit(1)
     post(vs, [(f'{DT}_filtering', 'true'), (f'{DT}_encodeFeature', 'true')])
 
-    seen, rows_out, first = set(), [], 0
-    por_anio = {}
+    first = args.first
     under_cutoff_streak = 0
-    while True:
-        html = post(vs, [(f'{DT}_pagination', 'true'), (f'{DT}_first', str(first)),
-                         (f'{DT}_rows', str(ROWS)), (f'{DT}_encodeFeature', 'true')])
-        rows = ROW_RE.findall(html)
-        if not rows:
-            break
-        page_min_iso = None
-        for num, entidad, dmy in rows:
-            iso = to_iso(dmy)
-            page_min_iso = iso if page_min_iso is None or iso < page_min_iso else page_min_iso
-            key = (num, iso)
-            if key in seen:
+    empty_streak = 0
+    pages = 0
+    try:
+        while True:
+            html = post(vs, [(f'{DT}_pagination', 'true'), (f'{DT}_first', str(first)),
+                             (f'{DT}_rows', str(ROWS)), (f'{DT}_encodeFeature', 'true')])
+            rows = ROW_RE.findall(html)
+            if not rows:
+                # una página vacía puede ser el fondo real O un hipo del portal
+                # (WAF / ViewState expirado). Reintentar con ViewState fresco
+                # antes de declarar terminado.
+                empty_streak += 1
+                if empty_streak >= args.max_empty:
+                    print(f'\n· {empty_streak} páginas vacías seguidas en first={first} → fin')
+                    break
+                print(f'\n· página vacía en first={first} ({empty_streak}/{args.max_empty}), '
+                      'renovando sesión y reintentando…')
+                time.sleep(5)
+                nvs = fresh_vs()
+                if nvs:
+                    vs = nvs
+                    post(vs, [(f'{DT}_filtering', 'true'), (f'{DT}_encodeFeature', 'true')])
                 continue
-            seen.add(key)
-            rows_out.append({'num': int(num), 'entidad': entidad.strip(),
-                             'fecha': iso, 'anio': int(iso[:4])})
-            por_anio[iso[:4]] = por_anio.get(iso[:4], 0) + 1
-        first += ROWS
-        print(f'  …{len(rows_out)} filas · página hasta {page_min_iso}', end='\r')
-        if page_min_iso and page_min_iso < args.desde:
-            under_cutoff_streak += 1
-            if under_cutoff_streak >= 2:   # 2 páginas seguidas bajo el corte → paramos
-                break
-        else:
-            under_cutoff_streak = 0
-        time.sleep(args.sleep)
+            empty_streak = 0
+            page_min_iso = None
+            for num, entidad, dmy in rows:
+                iso = to_iso(dmy)
+                page_min_iso = iso if page_min_iso is None or iso < page_min_iso else page_min_iso
+                acc[(int(num), iso)] = {'num': int(num), 'entidad': entidad.strip(),
+                                        'fecha': iso, 'anio': int(iso[:4])}
+            first += ROWS
+            pages += 1
+            print(f'  …{len(acc)} filas · first={first} · página hasta {page_min_iso}', end='\r')
+            if pages % CHECKPOINT_PAGES == 0:
+                flush(acc)
+            if page_min_iso and page_min_iso < args.desde:
+                under_cutoff_streak += 1
+                if under_cutoff_streak >= 2:   # 2 páginas seguidas bajo el corte → paramos
+                    break
+            else:
+                under_cutoff_streak = 0
+            time.sleep(args.sleep)
+    except KeyboardInterrupt:
+        print('\n· interrumpido — volcando lo enumerado hasta aquí')
 
-    rows_out.sort(key=lambda r: (r['fecha'], r['num']))
-    with open(OUT, 'w', encoding='utf-8') as f:
-        for r in rows_out:
-            f.write(json.dumps(r, ensure_ascii=False) + '\n')
+    total = flush(acc)
+    por_anio = {}
+    for r in acc.values():
+        por_anio[r['fecha'][:4]] = por_anio.get(r['fecha'][:4], 0) + 1
 
     print()
-    print(f'\n{len(rows_out)} gacetas enumeradas → {OUT.relative_to(REPO)}')
+    print(f'\n{total} gacetas en el índice ({total - n_antes} nuevas) → {OUT.relative_to(REPO)}')
     for a in sorted(por_anio):
         print(f'  {a}: {por_anio[a]}')
-    n_desde = sum(1 for r in rows_out if r['fecha'] >= args.desde)
+    n_desde = sum(1 for r in acc.values() if r['fecha'] >= args.desde)
     print(f'\n{n_desde} gacetas desde {args.desde}')
+    print(f'última página: first={first} (para reanudar: --first {first})')
 
 
 if __name__ == '__main__':

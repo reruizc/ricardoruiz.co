@@ -8,10 +8,10 @@ un dataset JSON con API directa. Este script las baja, las normaliza a un
 esquema común de sanción y consolida a JSONL + CSV, listo para que la Lambda
 las indexe por tema/sector y el analista de Cauce las lea.
 
-Las fuentes vía 2 (API interna del portal, ej. Superfinanciera) y vía 3
-(normograma/PDF, ej. Supersalud) quedan registradas en fuentes.json con su
-endpoint; se implementan en harvesters hermanos (harvest_sfc.py, etc.) reusando
-el mismo esquema y este consolidador.
+Las fuentes vía 2 (API interna del portal, ej. Superfinanciera vía harvest_sfc.py;
+Supersalud/SIC/Supertransporte vía harvest_comunicados.py) y vía 3 (normograma/PDF,
+ej. Supersociedades) quedan registradas en fuentes.json con su endpoint; se
+implementan en harvesters hermanos reusando el mismo esquema y este consolidador.
 
 Todo stdlib. curl por subprocess (mismo patrón que scrape_cne.py / harvest.py:
 esquiva el TLS de python 3.14). Resumible: los raw ya bajados no se re-piden.

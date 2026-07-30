@@ -613,6 +613,26 @@
       <div id="eje-results"></div>
     </div>
 
+    <!-- ===== PILAR · Datos abiertos y contratación (SECOP II) ===== -->
+    <div id="view-contratacion" hidden>
+      <button class="pill-back" id="conBack">← Volver a Caudal</button>
+      <div class="hero">
+        <h1>La plata del Estado, <em>rastreada</em>.</h1>
+        <p>Todos los contratos electrónicos del Estado colombiano (SECOP II),
+           consultados en vivo. Busca una entidad, un proveedor o un objeto: cada
+           contrato enlaza su proceso en SECOP. 5,87 M de contratos · se actualiza
+           a diario.</p>
+        <div class="search">
+          <input id="cq" type="text" placeholder="busca una entidad, un proveedor, un objeto…" autocomplete="off" />
+          <button id="cgo">Buscar</button>
+        </div>
+        <div class="chips" id="cchips"></div>
+      </div>
+
+      <div id="con-landing"></div>
+      <div id="con-results"></div>
+    </div>
+
     <!-- ===== VISTA CLIENTE · Radar (SKU A) ===== -->
     <div id="view-cliente" hidden>
       <button class="pill-back" id="cliBack">← Volver a Caudal</button>
@@ -743,6 +763,26 @@
         <div class="cob-note" style="margin:.35rem 0 .7rem">${pt.proyectos||0} proyectos en ${pt.sesiones||0} órdenes del día de plenaria · mediana de <b>${pt.mediana_agend||0}</b> agendamientos por proyecto.</div>
         ${barras(PP,'linear-gradient(90deg,var(--teal),#5fd4c4)')}</div>`;
     }
+    // SENADO — bloque aparte (no se fusiona: la numeración de proyectos se
+    // repite entre cámaras, son colas distintas). Su plenaria es la serie
+    // fuerte (2018-2026); de las 7 comisiones constitucionales solo 3 publican
+    // órdenes del día, y eso se declara en pantalla en vez de disimularlo.
+    const sen=s.senado&&s.senado.sistema;
+    if(sen){
+      const spl=sen.plenaria, st=(spl&&spl.totales)||{};
+      // color propio (violeta): el ámbar ya es "comisiones de Cámara" y el teal
+      // "plenaria de Cámara"; con un tercer tono se lee de una que es OTRA cámara.
+      html+=`<div style="margin-top:1.1rem;padding-top:.9rem;border-top:1px solid rgba(255,255,255,.07)">
+        <div class="ga-tag" style="color:#a98bff">◈ Senado · plenaria (segundo debate)</div>`;
+      if(spl&&spl.p_tratado_por_posicion){
+        html+=`<div class="cob-note" style="margin:.35rem 0 .7rem">${st.proyectos||0} proyectos en ${st.sesiones||0} órdenes del día · mediana de <b>${st.mediana_agend||0}</b> agendamientos por proyecto.</div>
+        ${barras(spl.p_tratado_por_posicion,'linear-gradient(90deg,#7c5cff,#b9a3ff)')}`;
+      }
+      // comisiones de Senado con muestra suficiente (n_obs<100 = la curva es ruido)
+      const cs=(sen.comisiones||[]).filter(c=>(c.n_obs||0)>=100).map(c=>c.com);
+      const chicas=(sen.comisiones||[]).filter(c=>(c.n_obs||0)<100).map(c=>c.com);
+      html+=`<div class="cob-note" style="margin-top:.7rem">En Senado solo 3 de las 7 comisiones constitucionales publican orden del día; con serie usable quedan <b>${cs.join(' · ')||'—'}</b>${chicas.length?` (${chicas.join(' · ')}, muestra insuficiente)`:''}.</div></div>`;
+    }
     return html;
   }
 
@@ -857,7 +897,7 @@
     {id:'congreso',    name:'Congreso y órgano legislativo',    status:'live', n:'13.172', unit:'registros · 1990–2026', desc:'Proyectos de ley, actos legislativos y leyes. Cuántas veces se intentó, por qué se cae, quién lo empuja.'},
     {id:'regulatorio', name:'Superintendencias y comisiones',   status:'live', n:'7.015',  unit:'sanciones · 9 fuentes', desc:'Sanciones de INVIMA, SECOP, Superfinanciera, Supersalud, Supertransporte, SIC, Contraloría y más. Cada una cita su resolución o comunicado.'},
     {id:'medios',      name:'Medios nacionales y regionales',   status:'live', n:'en vivo', unit:'prensa por tema',      desc:'Titulares de prensa nacional y regional, rastreados por tema — sin mantener un conector por medio.'},
-    {id:'datos',       name:'Datos abiertos y contratación',    status:'soon', desc:'datos.gov.co, SECOP, presupuesto y metas de gobierno.'},
+    {id:'datos',       name:'Datos abiertos y contratación',    status:'live', n:'5,87 M', unit:'contratos · SECOP II', desc:'Todos los contratos electrónicos del Estado, consultados en vivo y actualizados a diario. Cada uno enlaza su proceso en SECOP.'},
     {id:'control',     name:'Órganos de control y altas cortes',status:'soon', desc:'Procuraduría, Consejo de Estado, Corte Constitucional.'},
     {id:'ejecutivo',   name:'Ejecutivo nacional · Presidencia',   status:'live', n:'10.193', unit:'decretos · desde 2015', desc:'Decretos, resoluciones, directivas, circulares y agenda regulatoria de la Presidencia. Cada norma enlaza su texto oficial.'},
     {id:'gacetas',     name:'Diarios y gacetas oficiales',      status:'soon', desc:'Diario Oficial y Gaceta del Congreso: el texto completo del trámite.'},
@@ -882,12 +922,13 @@
       else if(id==='regulatorio') showView('regulatorio');
       else if(id==='medios') showView('medios');
       else if(id==='ejecutivo') showView('ejecutivo');
+      else if(id==='datos') showView('contratacion');
     });
   }
   let _view='home';
   function showView(v){
     _view=v;
-    ['home','buscar','congreso','regulatorio','ejecutivo','cliente','medios','radicados'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
+    ['home','buscar','congreso','regulatorio','ejecutivo','contratacion','cliente','medios','radicados'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
     window.scrollTo(0,0);
     // ← Volver de arriba: desde un pilar vuelve a la portada de Caudal; solo desde
     // la portada sale al dashboard (el puente pilar↔portada↔sitio).
@@ -896,6 +937,7 @@
     if(v==='congreso') requestAnimationFrame(()=>document.querySelectorAll('#view-congreso .mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
     if(v==='regulatorio') regLoadStats();
     if(v==='ejecutivo') ejeLoadStats();
+    if(v==='contratacion') conLoadStats();
     if(v==='medios') medLoadLanding();
     if(v==='radicados') radLoad();
   }
@@ -1055,6 +1097,132 @@
     const cont=document.getElementById('etipos');
     if(cont) EJE_TIPOS.forEach(([tp,t])=>{ const c=document.createElement('span'); c.className='chip'+(tp===''?' on':''); c.dataset.tipo=tp; c.textContent=t; c.onclick=()=>{ EJE.tipo=tp; ejeSyncTipos(); if(!EJE.q&&!EJE.tipo) ejeShowLanding(); else ejeBuscar(); }; cont.appendChild(c); });
     const eb=document.getElementById('ejeBack'); if(eb) eb.onclick=()=>showView('home');
+  }
+  /* ---------- pilar Datos abiertos y contratación · SECOP II ---------- */
+  const CON={q:'', filtros:{}, solo:false, orden:'reciente'};
+  const CON_EJEMPLOS=['interventoría vías','dotación hospitalaria','alimentación escolar','carrotanques','comando conjunto caribe'];
+  let CON_STATS=null, _conInited=false, _conSeq=0;
+  function conCard(r){
+    const fin=r.fecha_fin&&r.fecha_fin!==r.fecha?` · termina ${esc(r.fecha_fin)}`:'';
+    const name=r.url
+      ?`<a class="sanc-name" href="${esc(r.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(r.entidad||'—')}</a>`
+      :`<span class="sanc-name">${esc(r.entidad||'—')}</span>`;
+    // el badge "matchea por" explica el ruido de $q: SECOP indexa TODAS las
+    // columnas, así que un contrato puede salir por su sector o su tipo de
+    // documento aunque el objeto no nombre el término buscado.
+    const match=r.match&&r.match!=='Objeto'?`<span class="doc-badge">match: ${esc(r.match)}</span>`:'';
+    const dond=[r.ciudad,r.departamento].filter(Boolean).join(', ');
+    return `<div class="sanc">
+      <div class="sanc-top">${name}<span class="sanc-fecha">${esc(r.fecha||'sin fecha')}</span></div>
+      ${r.objeto?`<div class="sanc-motivo">${esc(r.objeto.slice(0,300))}${r.objeto.length>300?'…':''}</div>`:''}
+      <div class="sanc-tags">
+        ${r.valor?`<span class="sanc-monto">${fmtCOP(r.valor)}</span> · `:''}${esc(r.proveedor||'—')}
+        ${dond?` · ${esc(dond)}`:''}${fin}
+        ${r.modalidad?` · <span class="doc-badge pal">${esc(r.modalidad)}</span>`:''}${match}
+        ${r.url?` · <a href="${esc(r.url)}" target="_blank" rel="noopener" style="color:var(--ink3)">proceso en SECOP ↗</a>`:''}
+      </div>
+    </div>`;
+  }
+  function conRenderLanding(s){
+    const el=document.getElementById('con-landing'); if(!el||!s) return;
+    const t=s.total||{};
+    const anios=(s.por_anio||[]).filter(x=>/^\d{4}$/.test(x.anio)).slice(0,8);
+    const frec=(s.fuente||{}).frecuencia||'—';
+    el.innerHTML=`
+      <div class="land-h">La contratación pública en números · SECOP II</div>
+      <div class="kpis">
+        <div class="kpi"><div class="n">${fmt(t.contratos||0)}</div><div class="l">Contratos</div></div>
+        <div class="kpi"><div class="n" style="color:var(--amber)">${fmtCOP(t.valor_cop)||'—'}</div><div class="l">Valor reportado</div></div>
+        <div class="kpi"><div class="n">${(s.por_departamento||[]).length}</div><div class="l">Departamentos</div></div>
+        <div class="kpi"><div class="n" style="color:var(--teal)">${esc(frec)}</div><div class="l">Actualización</div></div>
+      </div>
+      <div class="panel wide"><h3>Contratos por año de firma</h3>
+        <div class="reg-sectors-grid">${anios.map(x=>`<div class="sec-card" data-anio="${esc(x.anio)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(x.anio)}</div></div>`).join('')}</div>
+      </div>
+      <div class="panel wide"><h3>Por sector</h3>
+        <div class="reg-sectors-grid">${(s.por_sector||[]).slice(0,10).map(x=>`<div class="sec-card" data-sector="${esc(x.sector)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(x.sector)}</div></div>`).join('')}</div>
+      </div>
+      <div class="panel wide"><h3>Entidades que más contratan (por valor)</h3>
+        <div class="reg-sectors-grid">${(s.top_entidades_valor||[]).slice(0,8).map(x=>`<div class="sec-card" data-entidad="${esc(x.entidad)}"><div class="n">${fmtCOP(x.valor)}</div><div class="l">${esc(x.entidad)}</div></div>`).join('')}</div>
+      </div>
+      ${s.nota?`<div class="cob-note">${esc(s.nota)}</div>`:''}`;
+    el.querySelectorAll('.sec-card').forEach(c=>c.onclick=()=>{
+      const d=c.dataset;
+      CON.filtros={};
+      if(d.anio) CON.filtros.anio=d.anio;
+      if(d.sector) CON.filtros.sector=d.sector;
+      if(d.entidad) CON.filtros.entidad=d.entidad;
+      conBuscar();
+    });
+  }
+  function conRenderResults(d){
+    const el=document.getElementById('con-results'); if(!el) return;
+    el.style.display='block';
+    const f=d.filtros||{};
+    const scope=[d.query?`«${esc(d.query)}»`:'', f.entidad?esc(f.entidad):'', f.sector?esc(f.sector):'',
+                 f.departamento?esc(f.departamento):'', f.anio?esc(String(f.anio)):''].filter(Boolean).join(' · ');
+    const tot=d.total;
+    const titular=tot?`${fmt(tot.contratos)} ${tot.contratos===1?'contrato':'contratos'}`:`${fmt(d.n)} contratos`;
+    const valor=tot&&tot.valor_cop?` · <b>${fmtCOP(tot.valor_cop)}</b> en total`:'';
+    const chips=(d.chips||[]).length?`<div class="cob-note" style="margin-bottom:1rem">
+        ¿Buscabas el filtro exacto? ${(d.chips||[]).map(c=>`<a href="#" class="con-chip" data-campo="${esc(c.campo)}" data-valor="${esc(c.valor)}" style="color:var(--teal)">${esc(c.etiqueta)}: ${esc(c.valor)} (${fmt(c.n)})</a>`).join(' · ')}
+        — filtra sin el ruido del texto libre.</div>`:'';
+    const solo=d.solo_objeto?`<div class="cob-note" style="margin-bottom:1rem">Precisión activa: de los ${fmt(d.revisadas||0)} contratos más recientes de esta búsqueda, ${fmt(d.n)} nombran la frase en el <b>objeto</b>. El total de arriba es el universo completo.</div>`:'';
+    el.innerHTML=`
+      <div class="r-titular" style="font-size:1.4rem">${titular}</div>
+      <div class="r-sub" style="margin-bottom:1rem">${scope||'toda la contratación'}${valor}</div>
+      ${chips}${solo}
+      <div class="chips" style="margin-bottom:1rem">
+        <span class="chip${CON.orden==='reciente'?' on':''}" data-orden="reciente">Más recientes</span>
+        <span class="chip${CON.orden==='valor'?' on':''}" data-orden="valor">Más caros</span>
+        ${d.query?`<span class="chip${CON.solo?' on':''}" data-solo="1">Solo en el objeto</span>`:''}
+        ${Object.keys(f).length?'<span class="chip" data-clear="1">✕ Quitar filtros</span>':''}
+      </div>
+      ${(d.por_departamento||[]).length>1?`<div class="cob-note" style="margin-bottom:1rem">Dónde está: ${(d.por_departamento||[]).slice(0,6).map(x=>`${esc(x.departamento)} (${fmt(x.n)})`).join(' · ')}</div>`:''}
+      <div class="sanc-list">${(d.resultados||[]).map(conCard).join('')||`<div class="err">Sin coincidencias.${Object.keys(f).length?' Hay filtros activos ('+esc(Object.values(f).join(' · '))+'): quítalos arriba y vuelve a buscar.':' Prueba otro término — recuerda que varias palabras se combinan con Y.'}</div>`}</div>
+      ${tot&&tot.contratos>d.n?`<div class="cob-note" style="margin-top:1rem">Mostrando ${fmt(d.n)} de ${fmt(tot.contratos)}. Afina con un filtro para ver menos.</div>`:''}`;
+    el.querySelectorAll('.chip[data-orden]').forEach(c=>c.onclick=()=>{ CON.orden=c.dataset.orden; conBuscar(); });
+    el.querySelectorAll('.chip[data-solo]').forEach(c=>c.onclick=()=>{ CON.solo=!CON.solo; conBuscar(); });
+    el.querySelectorAll('.chip[data-clear]').forEach(c=>c.onclick=()=>{ CON.filtros={}; conBuscar(); });
+    el.querySelectorAll('.con-chip').forEach(a=>a.onclick=(e)=>{
+      e.preventDefault();
+      const campo=a.dataset.campo, valor=a.dataset.valor;
+      const MAP={departamento:'departamento', estado_contrato:'estado', modalidad_de_contratacion:'modalidad',
+                 tipo_de_contrato:'tipo', sector:'sector', orden:'orden_entidad'};
+      if(MAP[campo]){ CON.filtros={[MAP[campo]]:valor}; CON.q=''; const i=document.getElementById('cq'); if(i) i.value=''; conBuscar(); }
+    });
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  async function conBuscar(){
+    const mine=++_conSeq;
+    const el=document.getElementById('con-results'), landing=document.getElementById('con-landing');
+    if(landing) landing.style.display='none';
+    if(el){ el.style.display='block'; el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Consultando SECOP en vivo <span class="dots"><span></span><span></span><span></span></span></div>'; }
+    let d; try{ d=await call(Object.assign({action:'contratacion', query:CON.q, limit:50,
+                                            orden:CON.orden, solo_objeto:CON.solo}, CON.filtros)); }
+    catch(e){ if(mine===_conSeq&&el) el.innerHTML='<div class="err">No se pudo consultar SECOP. Reintenta.</div>'; return; }
+    if(mine!==_conSeq) return;
+    if(d&&d.error){ if(el) el.innerHTML=`<div class="err">${esc(d.error)}</div>`; return; }
+    conRenderResults(d);
+  }
+  async function conLoadStats(){
+    if(CON_STATS){ conRenderLanding(CON_STATS); return; }
+    const el=document.getElementById('con-landing');
+    if(el) el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Cargando el pilar de contratación <span class="dots"><span></span><span></span><span></span></span></div>';
+    try{ CON_STATS=await call({action:'contratacion'}); }catch(e){ CON_STATS=null; }
+    if(CON_STATS) conRenderLanding(CON_STATS);
+    else if(el) el.innerHTML='<div class="err">No se pudo cargar la contratación. Reintenta.</div>';
+  }
+  function conShowLanding(){ const r=document.getElementById('con-results'); if(r) r.style.display='none'; const l=document.getElementById('con-landing'); if(l) l.style.display='block'; }
+  function conInit(){
+    if(_conInited) return; _conInited=true;
+    const cq=document.getElementById('cq'), cgo=document.getElementById('cgo');
+    const go=()=>{ CON.q=(cq&&cq.value||'').trim(); if(!CON.q&&!Object.keys(CON.filtros).length) conShowLanding(); else conBuscar(); };
+    if(cgo) cgo.onclick=go;
+    if(cq) cq.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
+    const cont=document.getElementById('cchips');
+    if(cont) CON_EJEMPLOS.forEach(t=>{ const c=document.createElement('span'); c.className='chip'; c.textContent=t; c.onclick=()=>{ if(cq) cq.value=t; CON.q=t; CON.filtros={}; conBuscar(); }; cont.appendChild(c); });
+    const cb=document.getElementById('conBack'); if(cb) cb.onclick=()=>showView('home');
   }
   /* ---------- pilar Medios · prensa nacional y regional ---------- */
   const MED={q:''};
@@ -1268,6 +1436,7 @@
     renderPillars();
     regInit();
     ejeInit();
+    conInit();
     medInit();
     cliInit();
     const rc=document.getElementById('radar-cta'); if(rc) rc.onclick=()=>showView('cliente');
@@ -1666,10 +1835,22 @@
       <div class="ga-t">Posición promedio en la agenda del día: <b>${bl.pos_prom}</b> · entre ${mesAno(bl.primera)} y ${mesAno(bl.ultima)}</div>`);
     if(plen)bloqLineas.push(`<div class="bloq-big" style="margin-top:${bl&&bl.n?'.55rem':'0'}"><b>${plen.n}×</b> agendado en <b>plenaria</b> de Cámara</div>
       <div class="ga-t">Posición promedio en la agenda del día: <b>${plen.pos_prom}</b> · entre ${mesAno(plen.primera)} y ${mesAno(plen.ultima)}</div>`);
+    if(bloqLineas.length)bloqLineas.unshift('<div class="ga-t" style="opacity:.75;margin-bottom:.3rem">Cámara de Representantes</div>');
+    // SENADO: mismo proyecto, su propia cola. Se busca por el número de Senado
+    // contra el índice de Senado (nunca contra el de Cámara: el mismo token
+    // existe en ambas cámaras para proyectos distintos).
+    const bs=f.bloqueo_senado, bsPlen=bs&&bs.plen;
+    if(bs&&(bs.n||bsPlen)){
+      bloqLineas.push(`<div class="ga-t" style="opacity:.75;margin:.75rem 0 .3rem">Senado de la República</div>`);
+      if(bs.n)bloqLineas.push(`<div class="bloq-big"><b>${bs.n}×</b> agendado en Comisión ${(bs.com||[]).map(c=>COM_NAME[c]||c).join(', ')}</div>
+        <div class="ga-t">Posición promedio en la agenda del día: <b>${bs.pos_prom}</b> · entre ${mesAno(bs.primera)} y ${mesAno(bs.ultima)}</div>`);
+      if(bsPlen)bloqLineas.push(`<div class="bloq-big" style="margin-top:${bs.n?'.55rem':'0'}"><b>${bsPlen.n}×</b> agendado en <b>plenaria</b> de Senado</div>
+        <div class="ga-t">Posición promedio en la agenda del día: <b>${bsPlen.pos_prom}</b> · entre ${mesAno(bsPlen.primera)} y ${mesAno(bsPlen.ultima)}</div>`);
+    }
     const bloqHTML=bloqLineas.length?`<div class="bloq-card">
       <div class="ga-tag" style="color:var(--amber)">◈ Bloqueo en la cola · órdenes del día</div>
       ${bloqLineas.join('')}
-      <div class="cob-note">Veces que se puso en el orden del día${bl&&bl.n&&plen?' de la comisión y de la plenaria':(plen?' de la plenaria':' de la comisión')}. Muchos agendamientos sin avanzar = lo dejaban esperando en la cola (bloqueo).</div>
+      <div class="cob-note">Veces que se puso en el orden del día sin que avanzara: quedarse en la cola es la forma más común de morir. En Senado solo publican orden del día las comisiones Cuarta, Quinta y Sexta.</div>
     </div>`:'';
     const vt=f.votaciones;
     const VTC={aplazamiento:'var(--amber)',archivo:'var(--red)',aprobado:'var(--green)',negado:'var(--red)',otro:'var(--gray)'};

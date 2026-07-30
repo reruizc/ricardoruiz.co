@@ -17,6 +17,10 @@ Acciones (POST JSON):
   {"action":"medios","query":"reforma pensional","dias":30}
       → pilar Medios: titulares de prensa nacional y regional vía Google News RSS
         (gratis, sin key). Sin `query` → landing con el pulso político nacional.
+  {"action":"contratacion","query":"comando conjunto caribe","departamento":"Atlántico"}
+      → pilar Datos abiertos y contratación: búsqueda EN VIVO sobre SECOP II
+        (5,87 M contratos, Socrata $q) + total real + desglose. Sin query ni
+        filtros → landing con los agregados precomputados de secop-stats.json.
 
 MODELO POR PASO (el switch a Claude es cambiar env vars, sin tocar código):
   CAUDAL_SINTESIS_PROVIDER  deepseek | anthropic     (default deepseek)
@@ -34,6 +38,7 @@ import hashlib
 import time as _time
 import urllib.request
 import urllib.error
+import urllib.parse
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 
@@ -390,6 +395,236 @@ def _ejecutivo():
         except Exception:
             _EJEC = []
     return _EJEC
+
+
+# --- pilar Datos abiertos y contratación (SECOP II · búsqueda en vivo) ------
+# Este pilar NO carga su dataset en memoria como los otros: SECOP II son 5,87 M
+# filas. El landing sale de agregados precomputados (metadata/secop-stats.json,
+# que emite tools/caudal/secop/harvest_secop.py 1x/día) y la búsqueda va EN VIVO
+# contra Socrata. Frontera medida (ver tools/caudal/secop/README.md):
+#   $q   → índice full-text: admite agregar (count/sum/group)   ~1-3 s
+#   like → escaneo de las 5,87 M filas: NUNCA con agregados     >65 s (timeout)
+SECOP_RESOURCE = os.environ.get('SECOP_RESOURCE', 'jbjy-vk9h')
+SECOP_URL = f'https://www.datos.gov.co/resource/{SECOP_RESOURCE}.json'
+SECOP_TIMEOUT = 25
+SECOP_STATS_KEY = 'metadata/secop-stats.json'
+
+# filtros exactos → columna. Solo dimensiones CERRADAS (las mismas de los chips)
+# más entidad/nit, que son los filtros que de verdad se piden. Nada de texto libre.
+SECOP_FILTROS = {
+    'departamento': 'departamento',
+    'estado': 'estado_contrato',
+    'modalidad': 'modalidad_de_contratacion',
+    'tipo': 'tipo_de_contrato',
+    'sector': 'sector',
+    'orden_entidad': 'orden',
+    'entidad': 'nombre_entidad',
+    'nit': 'nit_entidad',
+}
+# Columnas de display + probe del badge "matchea por". Las columnas PII del
+# dataset (cédulas, domicilio del representante legal, supervisor, cuenta
+# bancaria — ver `columnas_pii_excluidas` del stats) NO van acá: $q las matchea
+# igual, pero mostrarlas es otra cosa (mismo criterio del slim de supers).
+SECOP_SELECT = [
+    'id_contrato', 'nombre_entidad', 'nit_entidad', 'proveedor_adjudicado',
+    'objeto_del_contrato', 'descripcion_del_proceso', 'valor_del_contrato',
+    'departamento', 'ciudad', 'estado_contrato', 'modalidad_de_contratacion',
+    'tipo_de_contrato', 'sector', 'rama', 'orden', 'descripcion_documentos_tipo',
+    'referencia_del_contrato', 'codigo_de_categoria_principal',
+    'fecha_de_firma', 'fecha_de_fin_del_contrato', 'urlproceso',
+]
+SECOP_ORDENES = {'reciente': 'fecha_de_firma DESC', 'valor': 'valor_del_contrato DESC'}
+SECOP_MATCH_FALLBACK = [
+    {'campo': 'objeto_del_contrato', 'etiqueta': 'Objeto'},
+    {'campo': 'nombre_entidad', 'etiqueta': 'Entidad'},
+    {'campo': 'proveedor_adjudicado', 'etiqueta': 'Proveedor'},
+]
+
+_SECOP_STATS = None
+
+
+def _secop_stats():
+    """Agregados del pilar (landing + chips + columnas_match). Cache warm."""
+    global _SECOP_STATS
+    if _SECOP_STATS is None:
+        try:
+            _SECOP_STATS = _get_json(SECOP_STATS_KEY)
+        except Exception:
+            _SECOP_STATS = {'total': {}, 'por_anio': [], 'por_departamento': [],
+                            'por_sector': [], 'por_modalidad': [], 'por_tipo': [],
+                            'por_estado': [], 'chips': [], 'columnas_match': [],
+                            'top_entidades_valor': [], 'top_entidades_n': [],
+                            'top_categorias': [], 'fuente': {}}
+    return _SECOP_STATS
+
+
+def _secop_get(params, timeout=SECOP_TIMEOUT):
+    url = SECOP_URL + '?' + urllib.parse.urlencode(params)
+    headers = {'Accept': 'application/json'}
+    tok = os.environ.get('SOCRATA_APP_TOKEN', '')
+    if tok:
+        headers['X-App-Token'] = tok       # sube el rate limit (evita throttling)
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read())
+
+
+def _secop_norm(s):
+    s = (s or '').lower()
+    for a, b in (('á', 'a'), ('é', 'e'), ('í', 'i'), ('ó', 'o'), ('ú', 'u'), ('ñ', 'n')):
+        s = s.replace(a, b)
+    return ' '.join(s.split())
+
+
+def _secop_lit(v):
+    return str(v).replace("'", "''")           # escape SoQL
+
+
+def _secop_where(filtros):
+    conds = []
+    for k, col in SECOP_FILTROS.items():
+        v = (filtros.get(k) or '').strip()
+        if v:
+            conds.append(f"{col}='{_secop_lit(v)}'")
+    anio = str(filtros.get('anio') or '').strip()
+    if anio.isdigit():
+        conds.append(f'date_extract_y(fecha_de_firma)={int(anio)}')
+    return ' AND '.join(conds)
+
+
+def _secop_row(r, terms, cols):
+    url = r.get('urlproceso')
+    if isinstance(url, dict):
+        url = url.get('url')
+    try:
+        valor = round(float(r.get('valor_del_contrato') or 0))
+    except Exception:
+        valor = 0
+    # badge "matchea por": la PRIMERA columna de columnas_match (orden de
+    # prioridad) cuya celda contiene el término. Explica por qué $q trajo esta
+    # fila aunque el objeto no diga nada del término buscado.
+    match = None
+    if terms:
+        for c in cols:
+            cell = _secop_norm(r.get(c['campo']))
+            if cell and all(t in cell for t in terms):
+                match = c['etiqueta']
+                break
+    return {
+        'id': r.get('id_contrato'),
+        'entidad': r.get('nombre_entidad'), 'nit': r.get('nit_entidad'),
+        'proveedor': r.get('proveedor_adjudicado'),
+        'objeto': ' '.join((r.get('objeto_del_contrato') or '').split()),
+        'valor': valor,
+        'departamento': r.get('departamento'), 'ciudad': r.get('ciudad'),
+        'estado': r.get('estado_contrato'), 'modalidad': r.get('modalidad_de_contratacion'),
+        'tipo': r.get('tipo_de_contrato'), 'sector': r.get('sector'),
+        'categoria': r.get('codigo_de_categoria_principal'),
+        'fecha': (r.get('fecha_de_firma') or '')[:10],
+        'fecha_fin': (r.get('fecha_de_fin_del_contrato') or '')[:10],
+        'url': url, 'match': match,
+    }
+
+
+def _secop_chips(query, k=3):
+    """Chips de dimensión que matchean lo que el usuario escribió: ofrecen el
+    filtro EXACTO (sin ruido) antes de mandar todo a $q. Sin queries extra."""
+    q = _secop_norm(query)
+    if not q or len(q) < 3:
+        return []
+    hits = [c for c in (_secop_stats().get('chips') or [])
+            if q in c.get('norm', '') or c.get('norm', '') in q]
+    hits.sort(key=lambda c: c.get('n', 0), reverse=True)
+    return hits[:k]
+
+
+def _contratacion(body):
+    """Modo A (sin query ni filtros) → agregados del landing. Modo B → búsqueda
+    en vivo contra Socrata: filas + total real + desglose por departamento."""
+    query = (body.get('query') or '').strip()
+    filtros = {k: body.get(k) for k in list(SECOP_FILTROS) + ['anio']}
+    solo_objeto = bool(body.get('solo_objeto')) and bool(query)
+    where = _secop_where(filtros)
+    if not query and not where:
+        return dict(_secop_stats(), mode='stats')
+
+    limit = max(1, min(int(body.get('limit') or 50), 200))
+    orden = SECOP_ORDENES.get(body.get('orden') or 'reciente', SECOP_ORDENES['reciente'])
+    ck = ('contratacion-' + _hash24(json.dumps(
+        [query, where, limit, orden, solo_objeto], ensure_ascii=False, sort_keys=True))
+        + f'-{_medios_cache_bucket(3)}')
+    cached = _cache_get(ck)
+    if cached:
+        return cached
+
+    base = {}
+    if query:
+        base['$q'] = query                  # indexado (nunca `like`, ver abajo)
+    if where:
+        base['$where'] = where
+    # "solo en el objeto" NO se hace con `like`: medido jul-2026, un
+    # `like` sobre objeto_del_contrato tarda 31 s sin `$order` y >70 s con él —
+    # por encima del techo de 30 s de API Gateway. Se resuelve trayendo más filas
+    # por $q (indexado, ~1-3 s) y filtrando la frase acá. Cuesta cobertura (solo
+    # filtra lo traído), no el conteo: el total del universo $q se conserva.
+    n_pedir = min(200, limit * 4) if solo_objeto else limit
+    p_filas = dict(base, **{'$select': ','.join(SECOP_SELECT),
+                            '$order': orden, '$limit': n_pedir})
+    if orden.startswith('fecha_de_firma'):
+        # 421k contratos del dataset vienen SIN fecha de firma y con `$order`
+        # por fecha encabezan la lista (filas "No definido", valor 0). Se
+        # excluyen SOLO de las filas mostradas, no de los agregados: el `total`
+        # debe seguir siendo el universo real de la búsqueda.
+        p_filas['$where'] = ((where + ' AND ') if where else '') + 'fecha_de_firma IS NOT NULL'
+    p_total = dict(base, **{'$select': 'count(1) as n,sum(valor_del_contrato) as v'})
+    p_dep = dict(base, **{'$select': 'departamento,count(1) as n',
+                          '$group': 'departamento', '$order': 'n DESC', '$limit': 12})
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_filas = pool.submit(_secop_get, p_filas)
+        f_total = pool.submit(_secop_get, p_total)
+        f_dep = pool.submit(_secop_get, p_dep)
+        filas = f_filas.result()            # si esto falla, la búsqueda falla
+        total = dep = None
+        for fut, name in ((f_total, 'total'), (f_dep, 'dep')):
+            try:
+                r = fut.result()
+            except Exception as e:
+                print(f'[secop] agregado {name} FAIL: {type(e).__name__}: {e}')
+                continue
+            if name == 'total':
+                total = r
+            else:
+                dep = r
+
+    cols = _secop_stats().get('columnas_match') or SECOP_MATCH_FALLBACK
+    terms = [t for t in _secop_norm(query).split() if t]
+    n_traidas = len(filas)
+    if solo_objeto:
+        frase = _secop_norm(query)
+        filas = [r for r in filas if frase in _secop_norm(r.get('objeto_del_contrato'))][:limit]
+    tot = None
+    if total:
+        try:
+            tot = {'contratos': int(total[0].get('n') or 0),
+                   'valor_cop': round(float(total[0].get('v') or 0))}
+        except Exception:
+            tot = None
+    out = {
+        'mode': 'search', 'query': query, 'solo_objeto': solo_objeto,
+        'revisadas': n_traidas if solo_objeto else None,
+        'filtros': {k: v for k, v in filtros.items() if v},
+        'orden': body.get('orden') or 'reciente',
+        'n': len(filas), 'total': tot,
+        'por_departamento': [{'departamento': d.get('departamento') or '—',
+                              'n': int(d.get('n') or 0)} for d in (dep or [])],
+        'chips': _secop_chips(query),
+        'resultados': [_secop_row(r, terms, cols) for r in filas],
+        'fuente': _secop_stats().get('fuente', {}),
+        'nota': _secop_stats().get('nota', ''),
+    }
+    _cache_put(ck, out)
+    return out
 
 
 # --- LLM (ruteo por paso) ---------------------------------------------------
@@ -1314,7 +1549,17 @@ def handler(event, context):
             return _resp(500, {'error': f'no se pudo leer stats: {str(e)[:120]}'})
 
     if action == 'bloqueo':        # sistema de bloqueo (posición, hazard, comisiones)
-        return _resp(200, _bloqueo().get('sistema', {}))
+        _bl = _bloqueo()
+        out = dict(_bl.get('sistema', {}))
+        # Bloque de SENADO (aditivo): va anidado, NO fusionado con el de Cámara.
+        # Son dos colas distintas y su numeración de proyectos se repite entre
+        # cámaras, así que mezclarlas sumaría proyectos que no tienen relación.
+        sen = _bl.get('senado')
+        if sen:
+            out['senado'] = {'sistema': sen.get('sistema', {}),
+                             'fuente': sen.get('fuente', ''),
+                             'alcance': sen.get('alcance', '')}
+        return _resp(200, out)
 
     if action == 'proyecto':
         pid = body.get('id')
@@ -1329,6 +1574,15 @@ def handler(event, context):
             bl = _bloqueo().get('por_proyecto', {}).get(tok_c)
             if bl:
                 ficha['bloqueo'] = bl
+        # bloqueo en SENADO (aditivo, campo aparte): se busca por el número de
+        # SENADO contra el índice de Senado. Nunca contra `por_proyecto` de
+        # Cámara: el mismo token existe en ambas cámaras para proyectos
+        # distintos (1.012 casos medidos), así que cruzarlos daría un dato falso.
+        tok_sen = _num_token(ficha.get('numero_senado'))
+        if tok_sen:
+            bls = (_bloqueo().get('senado', {}).get('por_proyecto', {}) or {}).get(tok_sen)
+            if bls:
+                ficha['bloqueo_senado'] = bls
         # outcome (Congreso Visible): match por número Senado o Cámara
         vp = _votaciones().get('por_proyecto', {})
         for tk in (_num_token(ficha.get('numero_senado')), tok_c):
@@ -1482,6 +1736,15 @@ def handler(event, context):
             'por_tipo': [{'tipo': t, 'n': n} for t, n in tic.most_common()],
             'resultados': out,
         })
+
+    if action == 'contratacion':   # pilar Datos abiertos y contratación · SECOP II en vivo
+        try:
+            return _resp(200, _contratacion(body))
+        except urllib.error.HTTPError as e:
+            return _resp(502, {'error': f'SECOP respondió {e.code}', 'detalle': str(e)})
+        except Exception as e:
+            return _resp(502, {'error': 'no se pudo consultar SECOP',
+                               'detalle': f'{type(e).__name__}: {e}'})
 
     if action == 'medios':      # pilar Medios · prensa nacional y regional (Google News RSS)
         q = (body.get('query') or '').strip()

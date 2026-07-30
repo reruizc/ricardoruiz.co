@@ -12,6 +12,9 @@ secuencia de órdenes del día (sin actas):
      siguiente (se resolvió/salió de la agenda); si reaparece, no se alcanzó.
 
 Uso: python3 tools/caudal/actas/analiza_bloqueo.py primera
+     python3 tools/caudal/actas/analiza_bloqueo.py cuarta --dir ordenes-senado
+     (--dir apunta a una subcarpeta de CACHE, p.ej. la de harvest_ordenes_senado.py
+     — así se valida Senado sin tocar el pipeline/dataset de Cámara)
 """
 import json, sys, datetime
 from pathlib import Path
@@ -27,8 +30,12 @@ def d(s):
 
 
 def main():
-    com = sys.argv[1] if len(sys.argv) > 1 else 'primera'
-    data = json.load(open(CACHE / f'agendamientos-{com}.json', encoding='utf-8'))
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    com = args[0] if args else 'primera'
+    base = CACHE
+    if '--dir' in sys.argv:
+        base = CACHE / sys.argv[sys.argv.index('--dir') + 1]
+    data = json.load(open(base / f'agendamientos-{com}.json', encoding='utf-8'))
     idx = data['agendamientos']
 
     # reconstruye sesiones: fecha → [(pos, tok)]
@@ -103,7 +110,7 @@ def main():
                                             'n': stat[lab][1]} for _, _, lab in buckets},
            'mediana_veces_agendado': mediana,
            'bloqueados': rows[:60]}
-    outf = CACHE / f'bloqueo-{com}.json'
+    outf = base / f'bloqueo-{com}.json'
     json.dump(out, open(outf, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     print(f"\n→ {outf.relative_to(REPO)}")
 
