@@ -2679,7 +2679,7 @@
     // persona aparece varias veces (Senado 2018, Senado 2026, Asamblea 2023…).
     // Se colapsa a UNA entrada de buscador (la candidatura más reciente) y el
     // resto queda accesible en la barra de histórico.
-    const SRC_YEAR = { endoso: 2026, asamblea: 2023, con2022: 2022, con2018: 2018, con2014: 2014 };
+    const SRC_YEAR = { endoso: 2026, asamblea: 2023, asam2019: 2019, asam2015: 2015, con2022: 2022, con2018: 2018, pres2018: 2018, con2014: 2014 };
     const congHistBySlug = {};   // slug → [entradas de esa persona]
 
     function normPersona(s) {
@@ -2846,8 +2846,14 @@
         // Base compartida (cand-index.js): endoso (Congreso + Consultas) + Asamblea 2023
         // + futuras candidaturas. `?asamlocal=1` apunta la base de asamblea al repo local.
         loadEdades();   // fecha de nacimiento (best-effort, no bloquea el índice)
-        const _bases = ASAM_BASE.startsWith('http') ? undefined : { asamblea: ASAM_BASE };
-        candIndex = await CandRegistry.load({ includeParties: false, bases: _bases });
+        const _bases = ASAM_BASE.startsWith('http') ? {} : { asamblea: ASAM_BASE };
+        // ?terlocal=1 → asambleas 2015/2019 + presidencial 2018 desde el repo local (pre-subida).
+        if (new URLSearchParams(location.search).has('terlocal')) {
+          _bases.asam2019 = 'Bases de datos/output_asamblea_2019';
+          _bases.asam2015 = 'Bases de datos/output_asamblea_2015';
+          _bases.pres2018 = 'Bases de datos/output_pres_2018';
+        }
+        candIndex = await CandRegistry.load({ includeParties: false, bases: Object.keys(_bases).length ? _bases : undefined });
         if (!candIndex.length) throw new Error('índice de candidatos vacío');
         // Una entrada por PERSONA: el registro trae una por candidatura (2018,
         // asamblea 2023, 2026). Si el nombre coincide es la misma persona → se
@@ -2898,8 +2904,16 @@
       if (_localReq) return _localReq;
       const sp = new URLSearchParams(location.search);
       const bases = {};
-      if (sp.has('conclocal')) bases.concejo = 'Bases de datos/output_concejo_2023';
-      if (sp.has('jallocal'))  bases.jal     = 'Bases de datos/output_jal_2023';
+      if (sp.has('conclocal')) {
+        bases.concejo  = 'Bases de datos/output_concejo_2023';
+        bases.conc2019 = 'Bases de datos/output_concejo_2019';
+        bases.conc2015 = 'Bases de datos/output_concejo_2015';
+      }
+      if (sp.has('jallocal')) {
+        bases.jal     = 'Bases de datos/output_jal_2023';
+        bases.jal2019 = 'Bases de datos/output_jal_2019';
+        bases.jal2015 = 'Bases de datos/output_jal_2015';
+      }
       _localReq = CandRegistry.loadLocal({
         includeParties: false,
         bases: Object.keys(bases).length ? bases : undefined,

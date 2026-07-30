@@ -26,9 +26,12 @@
   const SOURCES = [
     { name: 'endoso',   dir: 'endoso',        indexFile: 'index.json',                    list: d => Array.isArray(d) ? d : (d.candidatos || []) },
     { name: 'asamblea', dir: 'asamblea-2023', indexFile: 'index-asamblea-2023.json',       list: d => d.candidatos || [] },
+    { name: 'asam2019', dir: 'asamblea-2019', indexFile: 'index-asamblea-2019.json',       list: d => d.candidatos || [] },
+    { name: 'asam2015', dir: 'asamblea-2015', indexFile: 'index-asamblea-2015.json',       list: d => d.candidatos || [] },
     { name: 'con2014',  dir: 'congreso-2014', indexFile: 'index-congreso-2014.json',       list: d => d.candidatos || [] },
     { name: 'con2018',  dir: 'congreso-2018', indexFile: 'index-congreso-2018.json',       list: d => d.candidatos || [] },
     { name: 'con2022',  dir: 'congreso-2022', indexFile: 'index-congreso-2022.json',       list: d => d.candidatos || [] },
+    { name: 'pres2018', dir: 'pres-2018',     indexFile: 'index-pres-2018.json',           list: d => d.candidatos || [] },
   ];
 
   // Fuentes LOCALES (Concejo · JAL 2023): índices GRANDES (~94k + ~14k candidatos).
@@ -37,8 +40,12 @@
   // A diferencia del resto, estas NO se agrupan por persona (nombres comunes se
   // repiten entre municipios → colapsarlas por nombre fusionaría personas distintas).
   const LOCAL_SOURCES = [
-    { name: 'concejo', dir: 'concejo-2023', indexFile: 'index-concejo-2023.json', list: d => d.candidatos || [] },
-    { name: 'jal',     dir: 'jal-2023',     indexFile: 'index-jal-2023.json',     list: d => d.candidatos || [] },
+    { name: 'concejo',  dir: 'concejo-2023', indexFile: 'index-concejo-2023.json', list: d => d.candidatos || [] },
+    { name: 'jal',      dir: 'jal-2023',     indexFile: 'index-jal-2023.json',     list: d => d.candidatos || [] },
+    { name: 'conc2019', dir: 'concejo-2019', indexFile: 'index-concejo-2019.json', list: d => d.candidatos || [] },
+    { name: 'jal2019',  dir: 'jal-2019',     indexFile: 'index-jal-2019.json',     list: d => d.candidatos || [] },
+    { name: 'conc2015', dir: 'concejo-2015', indexFile: 'index-concejo-2015.json', list: d => d.candidatos || [] },
+    { name: 'jal2015',  dir: 'jal-2015',     indexFile: 'index-jal-2015.json',     list: d => d.candidatos || [] },
   ];
 
   const _bySlug = {};   // slug → entrada (para dataUrlFor)

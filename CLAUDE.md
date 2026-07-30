@@ -1,7 +1,12 @@
 # ricardoruiz.co — Plataforma Electoral Colombia 2026
 
 ## Archivos principales
-- `electoral.html` — hub de navegación (senado, cámara, consultas)
+- `electoral.html` — hub de navegación (senado, cámara, consultas). **6 pestañas de año
+  (jul-30-2026): 2015 · 2018 · 2019 · 2023 · 2025 · 2026** (paneles `p2015/p2018/p2019`
+  nuevos, espejo del chasis de p2023: card grande en vivo → `analisis-candidato.html` +
+  cards con cinta "próximamente" para los tableros por proceso, que aún no existen —
+  crear `resultados-{asamblea,concejo,jal}-{2015,2019}.html` etc. es el paso siguiente,
+  reusando el chasis CORP de los tableros 2023). i18n es/en/zh completo.
 - `senado-2026.html` — escrutinio senado, todos los toggles y visualizaciones
 - `camara-2026.html` — **LISTO** · escrutinio Cámara 2026 espejo de senado. 4 circunscripciones (Territorial · Indígena · Afro · Resultados Generales con WHAT IF), drill territorial Dep → Mun → Zona → Puesto → Mesa, hemiciclo SVG de 165 curules, mapa Leaflet, listas cerradas por depto, race-fix `_rgIIFEToken`, BIG_CITIES toast custom (C.1).
 - `endoso-2026.html` — comparación mesa a mesa senado vs cámara
@@ -160,6 +165,31 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
   - **Mapa/radar**: `isDepartmentalRace` (y `isDeptRace` en comparar) ahora incluye Concejo/JAL
     (`isConcejoOJAL`) → auto-drill al depto y colorea municipios (Bogotá: localidades). Radar:
     Concejo → comunas/localidades, JAL → puestos.
+- **Territoriales 2015 + 2019 y Presidencial 2018** (jul-30-2026 · pipelines corridos, ⚠ S3 pendiente):
+  - `tools/analisis-candidato/build_territorial_candidatos.py <clave>` — builder ÚNICO parametrizado
+    (claves `asam2015 asam2019 conc2015 conc2019 jal2015 jal2019`), mismas llaves/gotchas que los
+    builders 2023 (asamblea=dep · concejo=mun · JAL=mun+nombre+hash, comuna por moda del georef).
+    ⚠ **Los códigos de corporación CAMBIAN por año**: 2015TER → 1=GOB 2=ASAM 3=ALC 4=CONCEJO
+    **5=JAL (la JAL 2015 viene DENTRO del TER)**; 2019TER → 4=GOB **5=ASAM** 6=ALC **7=CONCEJO**;
+    `GCS_2019JAL.csv` aparte (COR=5) y **con las columnas en otro orden** (geografía antes de COR
+    → layout `LAYOUT_JAL19` en el script). Streaming con sort temporal en scratchpad.
+  - `tools/analisis-candidato/build_pres_2018.py` — Presidencial 2018 1V+2V formato endoso, slugs
+    `PRES2018-{1V|2V}-{par}-{can}`, circunscripción NACIONAL (fuente regular de cand-index, NO el
+    modelo por-persona de 2026). ⚠ En los PRES los especiales son COD_CAN 96/97/98 con COD_PAR 996+
+    → se filtra por COD_PAR≥996. Validado exacto: Duque 1V 7.616.857 · Petro 1V 4.855.069 ·
+    2V 10.397.314/8.039.229.
+  - **Volúmenes**: asam2015 3.230 cands (548 MB) · asam2019 3.232 (608 MB) · conc2015 84.586
+    (1,1 GB) · conc2019 89.250 (1,2 GB) · jal2015 13.203 (283 MB) · jal2019 12.186 (311 MB) ·
+    pres2018 10 (127 MB). Validados: Serpa/Flórez/Morris top Concejo BOG 2015 · Abisambra/Cancino
+    top 2019 · Garcés Rojas top asamblea Valle 2015 y 2019.
+  - **Cableado**: `SOURCES` += asam2019/asam2015/pres2018 · `LOCAL_SOURCES` += conc2019/jal2019/
+    conc2015/jal2015 (lazy, índices 16-18 MB). `SRC_YEAR` actualizado en analisis-candidato y
+    brujula-2027. Flags pre-subida: `?terlocal=1` (asambleas+pres2018) y los `?conclocal=1`/
+    `?jallocal=1` existentes ahora también apuntan los años nuevos al repo local.
+  - **S3 (pendiente de luz verde)**: `congreso-2026/output/{asamblea-2015,asamblea-2019,
+    concejo-2015,concejo-2019,jal-2015,jal-2019,pres-2018}/` con
+    `aws s3 cp … --recursive --content-type "application/json" --cache-control "public, max-age=300"`.
+    cand-index tolera 404 → el frontend puede desplegarse antes de subir los datos.
 ### Tableros territoriales 2023 — JAL · Concejo · Asamblea (LISTO · jul-2026)
 
 **Tres tableros con la MISMA estructura y el mismo chasis de página**, enlazados desde
