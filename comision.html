@@ -393,6 +393,11 @@
     {key:'QUINTA', nombre:'Comisión Quinta', sen:13, cam:19, temas:'Agro y régimen de tierras, ambiente y recursos naturales, minas y energía, mares.'},
     {key:'SEXTA', nombre:'Comisión Sexta', sen:13, cam:28, temas:'Transporte, comunicaciones, educación, cultura, ciencia y tecnología, servicios públicos, turismo.'},
     {key:'SEPTIMA', nombre:'Comisión Séptima', sen:14, cam:21, temas:'Salud, trabajo y seguridad social, vivienda, mujer y familia, deporte, economía solidaria.'},
+    /* Comisión LEGAL, no constitucional: es solo de Cámara y no tramita
+       proyectos de ley, así que se le ocultan el acuerdo de presidencia, los
+       proyectos y el histórico de trámite. `legal:true` dispara ese modo. */
+    {key:'ACUSACIONES', nombre:'Comisión de Investigación y Acusación', sen:0, cam:17, legal:true,
+     temas:'Investiga y acusa ante el Senado al Presidente de la República, a los magistrados de las altas cortes y al Fiscal General de la Nación (Constitución, art. 178).'},
   ];
   let COM_HIST={PRIMERA:{t:2371,l:438},SEGUNDA:{t:1814,l:876},TERCERA:{t:838,l:298},CUARTA:{t:449,l:168},QUINTA:{t:796,l:136},SEXTA:{t:1631,l:255},SEPTIMA:{t:1837,l:277}};
   const COMISIONES_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/comisiones-2026.json';
@@ -551,19 +556,36 @@
     document.getElementById('com-title').textContent=COM.nombre;
     document.getElementById('com-sub').textContent=COM.temas;
     paintKpis();
-    renderAcuerdo();
     renderGroups();
     loadMiembros();
+    getVotosCongreso(); // precarga en paralelo — listo para cuando hagan click en alguien
+    if(COM.legal){
+      /* una comisión legal no tramita proyectos de ley: mostrar el embudo o el
+         acuerdo de presidencia por partido sería inventarle un trámite que no
+         tiene. Se ocultan esas tres secciones. */
+      ['acuerdo','proyectos','historico'].forEach(id=>{
+        const s=document.getElementById(id); if(s) s.style.display='none';
+      });
+      return;
+    }
+    renderAcuerdo();
     loadProyectos();
     loadRadicados();
-    getVotosCongreso(); // precarga en paralelo — listo para cuando hagan click en alguien
     loadHistoricoComision();
     document.getElementById('hist-sub').innerHTML=`Desde 1991, esta comisión ha tramitado <b style="color:var(--white)">${fmt((COM_HIST[COM.key]||{}).t)}</b> proyectos de ley, de los cuales <b style="color:var(--green)">${(COM_HIST[COM.key]||{}).l||0}</b> terminaron sancionados como ley (${(COM_HIST[COM.key]||{}).t?Math.round(100*(COM_HIST[COM.key]||{}).l/(COM_HIST[COM.key]||{}).t):0}%). Fuente: Secretaría del Senado · análisis propio 1990–2026.`;
   }
   function paintKpis(){
+    const box=document.getElementById('com-kpis');
+    if(COM.legal){
+      box.innerHTML=`
+        <div class="kpi"><div class="n">${COM.cam}</div><div class="l">Integrantes · solo Cámara</div></div>
+        <div class="kpi"><div class="n">178</div><div class="l">Artículo de la Constitución que la crea</div></div>
+        <div class="kpi hl"><div class="n">3</div><div class="l">A quiénes puede investigar: Presidente, altas cortes y Fiscal General</div></div>`;
+      return;
+    }
     const h=COM_HIST[COM.key]||{t:0,l:0};
     const pct=h.t?Math.round(100*h.l/h.t):0;
-    document.getElementById('com-kpis').innerHTML=`
+    box.innerHTML=`
       <div class="kpi"><div class="n">${COM.sen}</div><div class="l">Cupos Senado</div></div>
       <div class="kpi"><div class="n">${COM.cam}</div><div class="l">Cupos Cámara</div></div>
       <div class="kpi"><div class="n">${fmt(h.t)}</div><div class="l">Proyectos desde 1991</div></div>
@@ -674,11 +696,14 @@
     const camBody=camList.length
       ? `<svg id="hemi-camara" class="hemi-svg"></svg><div class="hemi-legend" id="leg-camara"></div>`
       : `<div class="bub-grid" id="bub-camara">${bubPlaceholders(COM.cam,'Cámara')}</div>`;
-    document.getElementById('mem-groups').innerHTML=`
+    /* las comisiones legales son de una sola cámara: sin cupos de Senado no se
+       pinta ese bloque, que si no queda como un hemiciclo vacío */
+    const senGroup=COM.sen>0?`
       <div class="mem-group">
         <div class="mem-group-title"><b>Senado</b> · ${COM.sen} cupos${senList.length?` · ${senList.length} confirmados`:''}</div>
         ${senBody}
-      </div>
+      </div>`:'';
+    document.getElementById('mem-groups').innerHTML=`${senGroup}
       <div class="mem-group">
         <div class="mem-group-title"><b>Cámara de Representantes</b> · ${COM.cam} cupos${camList.length?` · ${camList.length} confirmados`:''}</div>
         ${camBody}
