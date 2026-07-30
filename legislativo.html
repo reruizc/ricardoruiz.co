@@ -155,6 +155,17 @@
     .com-hist .hx{flex:1;height:7px;background:var(--card-bg2);overflow:hidden}
     .com-hist .hx > span{display:block;height:100%;background:linear-gradient(90deg,var(--green),#7fe6a4);width:0;transition:width .8s cubic-bezier(.2,.8,.2,1)}
     .com-hist .ht{font-size:.66rem;color:var(--gray);white-space:nowrap}
+    /* mesa directiva de la comisión dentro de la tarjeta */
+    .com-mesa{border-top:1px solid var(--border);padding-top:.75rem;display:flex;
+      flex-direction:column;gap:.3rem}
+    .cm-row{display:flex;align-items:baseline;gap:.45rem;font-size:.72rem;line-height:1.3}
+    .cm-ic{color:var(--amber);font-size:.8rem;flex:0 0 auto}
+    .cm-lab{color:var(--gray);letter-spacing:.02em;flex:0 0 auto;min-width:6.2rem}
+    .cm-nom{color:var(--white);font-weight:600}
+    .cm-row.vice .cm-ic{color:rgba(224,160,58,.55)}
+    .cm-row.vice .cm-nom{font-weight:400;color:rgba(244,243,239,.82)}
+    .cm-row.draft .cm-ic,.cm-row.draft .cm-nom{color:var(--amber);font-style:italic}
+    @media(max-width:520px){ .cm-lab{min-width:0} .cm-row{flex-wrap:wrap} }
     .com-int{border-top:1px solid var(--border);padding-top:.8rem}
     .com-int .ci-note{font-size:.72rem;color:rgba(255,255,255,.4);line-height:1.6;font-style:italic}
     .com-int .ci-list{display:flex;flex-wrap:wrap;gap:.35rem}
@@ -644,6 +655,17 @@
       const h=COM_HIST[c.key]||{t:0,l:0};
       const pct=h.t?Math.round(100*h.l/h.t):0;
       const m=COM_MIEMBROS&&COM_MIEMBROS[c.key];
+      /* mesa directiva: presidencia y vicepresidencia de cada cámara. Va antes
+         que los integrantes porque es lo que define quién maneja la agenda. */
+      const mesa=(m&&m.mesa)||[];
+      const mesaHtml=mesa.length?`<div class="com-mesa">${mesa.map(p=>{
+          const vice=p.cargo==='vicepresidencia';
+          const draft=p.confirmado===false;
+          return `<span class="cm-row${vice?' vice':''}${draft?' draft':''}">`
+            +`<span class="cm-ic">${draft||vice?'☆':'★'}</span>`
+            +`<span class="cm-lab">${vice?'Vice':'Preside'} · ${p.corp==='senado'?'Senado':'Cámara'}</span>`
+            +`<span class="cm-nom">${esc(p.nombre)}</span></span>`;
+        }).join('')}</div>`:'';
       let intHtml;
       if(m&&((m.senado&&m.senado.length)||(m.camara&&m.camara.length))){
         const chips=[...(m.senado||[]).map(x=>({...x,tag:'S'})),...(m.camara||[]).map(x=>({...x,tag:'C'}))];
@@ -657,6 +679,7 @@
         <div class="com-top"><span class="com-name">${c.nombre}</span><span class="com-cupos">${c.sen} Senado · ${c.cam} Cámara</span></div>
         <div class="com-temas">${c.temas}</div>
         <div class="com-hist"><span class="ht">${fmt(h.t)} proyectos desde 1991</span><span class="hx"><span data-w="${pct}"></span></span><span class="ht"><b style="color:var(--green)">${pct}%</b> terminó en ley</span></div>
+        ${mesaHtml}
         <div class="com-int">${intHtml}</div>
         <div class="com-cta">Ver comisión completa · integrantes y proyectos →</div>
       </div>`;

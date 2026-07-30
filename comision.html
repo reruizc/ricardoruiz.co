@@ -143,6 +143,13 @@
     .mem-pres.draft{background:rgba(232,185,59,.05);border-color:rgba(232,185,59,.22);border-left-color:var(--amber)}
     .mem-pres.draft .mp-txt b{color:var(--amber)}
     .pres-badge.draft{background:transparent;color:var(--amber);border:1px solid rgba(232,185,59,.5)}
+    /* vicepresidencia: mismo bloque, un escalón por debajo del dorado */
+    .mem-pres.vice{background:rgba(255,255,255,.025);border-color:rgba(255,255,255,.09);
+      border-left-color:rgba(232,185,59,.45);padding:.55rem .95rem}
+    .mem-pres.vice .mp-ic{font-size:.95rem;color:rgba(232,185,59,.6)}
+    .mem-pres.vice .mp-txt{font-size:.8rem}
+    .mem-pres.vice .mp-txt b{color:var(--white)}
+    .pres-badge.vice{background:transparent;color:rgba(232,185,59,.85);border:1px solid rgba(232,185,59,.4)}
     .ap-years{display:grid;grid-template-columns:repeat(4,1fr);gap:.7rem;margin:1.2rem 0 .3rem}
     .ap-y{background:var(--card-bg);border:1px solid var(--card-border);padding:.9rem .7rem;text-align:center}
     .ap-lab{display:block;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);margin-bottom:.55rem}
@@ -486,21 +493,25 @@
   const COM_ID=new URLSearchParams(location.search).get('id');
   const COM=COMISIONES.find(c=>c.key===COM_ID);
   let MIEMBROS={senado:[],camara:[]};
-  /* presidencias de la comisión — una por cámara. Cada entrada:
-     {nombre, corp:'senado'|'camara', partido, vigencia, confirmado:bool, fuente}
+  /* mesa directiva de la comisión — presidencia y vicepresidencia de cada
+     cámara. Cada entrada: {cargo:'presidencia'|'vicepresidencia', nombre,
+     corp:'senado'|'camara', partido, vigencia, confirmado:bool, fuente}
      `confirmado:false` = acuerdo que circula pero que la comisión aún no vota. */
-  let PRESIDENTES=[];
-  /* el JSON admite `presidente` (objeto, formato viejo) o `presidentes` (array) */
+  let MESA=[];
+  /* el JSON admite `mesa` (array, actual), `presidentes` (array) o `presidente`
+     (objeto) — los dos últimos son formatos anteriores, solo presidencias */
   function setPresidentes(m){
-    const raw=(m&&m.presidentes)||(m&&m.presidente)||[];
-    PRESIDENTES=(Array.isArray(raw)?raw:[raw]).filter(p=>p&&p.nombre);
+    const raw=(m&&m.mesa)||(m&&m.presidentes)||(m&&m.presidente)||[];
+    MESA=(Array.isArray(raw)?raw:[raw]).filter(p=>p&&p.nombre)
+      .map(p=>({cargo:'presidencia',...p}))
+      .sort((a,b)=>(a.corp===b.corp)?(a.cargo>b.cargo?1:-1):(a.corp<b.corp?1:-1));
   }
-  /* ¿este nombre preside la comisión? exacto por nombre normalizado,
+  /* ¿este nombre está en la mesa directiva? exacto por nombre normalizado,
      con respaldo por subconjunto de tokens (mismo criterio que matchElectos).
-     Devuelve la entrada para poder distinguir confirmado de borrador. */
+     Devuelve la entrada para distinguir cargo y confirmado de borrador. */
   function esPresidente(nombre){
     const a=norm(nombre), ta=a.split(/\s+/).filter(t=>t.length>2);
-    return PRESIDENTES.find(p=>{
+    return MESA.find(p=>{
       const b=norm(p.nombre);
       if(a===b) return true;
       const tb=new Set(b.split(/\s+/));
@@ -509,16 +520,17 @@
   }
   function renderPresidente(){
     const el=document.getElementById('mem-presidente'); if(!el) return;
-    if(!PRESIDENTES.length){ el.style.display='none'; el.innerHTML=''; return; }
+    if(!MESA.length){ el.style.display='none'; el.innerHTML=''; return; }
     el.style.display='block';
-    el.innerHTML=PRESIDENTES.map(p=>{
+    el.innerHTML=MESA.map(p=>{
       const corp=p.corp==='senado'?'Senado':'Cámara de Representantes';
       const vig=p.vigencia?` · legislatura ${esc(p.vigencia)}`:'';
-      const ok=p.confirmado!==false;
-      const sub=ok?`Presidente de la mesa directiva${vig}`
+      const ok=p.confirmado!==false, vice=p.cargo==='vicepresidencia';
+      const verbo=vice?(ok?'Vicepreside':'Vicepresidiría'):(ok?'Preside':'Presidiría');
+      const sub=ok?`${vice?'Vicepresidencia':'Presidencia'} de la mesa directiva${vig}`
                  :`Acuerdo que circula para la legislatura ${esc(p.vigencia||'2026-2027')} — la comisión aún no lo vota${p.fuente?' · '+esc(p.fuente):''}`;
-      return `<div class="mem-pres${ok?'':' draft'}" data-pres="1"><span class="mp-ic">${ok?'★':'☆'}</span><span class="mp-txt">`
-        +`${ok?'Preside':'Presidiría'} la comisión (${corp}): <b>${esc(p.nombre)}</b>${p.partido?' · '+esc(p.partido):''}`
+      return `<div class="mem-pres${ok?'':' draft'}${vice?' vice':''}" data-pres="1"><span class="mp-ic">${ok&&!vice?'★':'☆'}</span><span class="mp-txt">`
+        +`${verbo} la comisión (${corp}): <b>${esc(p.nombre)}</b>${p.partido?' · '+esc(p.partido):''}`
         +`${ok?'':'<span class="draft-badge">Borrador · sin confirmar</span>'}`
         +`<span class="mp-sub">${sub}</span></span></div>`;
     }).join('');
@@ -687,7 +699,7 @@
         MIEMBROS={senado:m.senado||[],camara:m.camara||[]};
         renderGroups();
         document.getElementById('mem-sub').textContent='Conformación aprobada por las plenarias el 28 de julio de 2026. Haz clic en cada persona para ver su información.'
-          +(PRESIDENTES.some(p=>p.confirmado!==false)?'':' Las presidencias de la comisión aún no se han votado.');
+          +(MESA.some(p=>p.confirmado!==false&&p.cargo==='presidencia')?'':' La mesa directiva de la comisión aún no se ha votado.');
       }
     }catch(e){ /* aún no publicado — quedan las bolitas de cupos pendientes */ }
   }
@@ -711,9 +723,11 @@
       <div class="ps-head">
         <div class="ps-photo" id="ps-photo" style="background:${b.color}"><span>${esc(initials(m.nombre))}</span></div>
         <div class="ps-head-txt">
-          <div class="ps-name">${esc(m.nombre)}${pres?(pres.confirmado!==false
-            ?'<span class="pres-badge">★ Presidente</span>'
-            :'<span class="pres-badge draft" title="Acuerdo que circula; la comisión aún no vota su mesa directiva">☆ Presidencia en acuerdo</span>'):''}</div>
+          <div class="ps-name">${esc(m.nombre)}${pres?(pres.confirmado===false
+            ?'<span class="pres-badge draft" title="Acuerdo que circula; la comisión aún no vota su mesa directiva">☆ En acuerdo</span>'
+            :(pres.cargo==='vicepresidencia'
+              ?'<span class="pres-badge vice">☆ Vicepresidente</span>'
+              :'<span class="pres-badge">★ Presidente</span>')):''}</div>
           <span class="ps-chip" style="color:${lift(b.color)};background:${b.color}1a;border-color:${b.color}55">${esc(partido||b.name)}</span>
           <div class="ps-meta">${corp}${dep?' · '+esc(dep):''}</div>
         </div>
