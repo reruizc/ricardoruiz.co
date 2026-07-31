@@ -11,11 +11,13 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 CORE = HERE.parent / 'caudal_core.py'          # fuente única de verdad
+EMPRESAS = HERE.parent / 'empresas.py'         # diccionario marca → tema (④)
 HANDLER = HERE / 'lambda_handler.py'
 OUT = HERE / 'caudal-analiza.zip'
 
 with zipfile.ZipFile(OUT, 'w', zipfile.ZIP_DEFLATED) as z:
     z.write(HANDLER, 'lambda_handler.py')
     z.write(CORE, 'caudal_core.py')
+    z.write(EMPRESAS, 'empresas.py')
 print(f'{OUT.name} · {OUT.stat().st_size/1024:.1f} KB '
-      f'(lambda_handler.py + caudal_core.py)')
+      f'(lambda_handler.py + caudal_core.py + empresas.py)')

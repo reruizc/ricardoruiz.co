@@ -18,6 +18,9 @@ import sys
 import unicodedata
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import empresas                       # noqa: E402 · diccionario marca → tema
+
 DIST = Path(__file__).resolve().parents[2] / 'Bases de datos' / 'leyes-senado' / 'dist'
 
 ETAPA_LABEL = ['presentado', '1er debate Senado', '2º debate Senado',
@@ -150,6 +153,57 @@ SINONIMOS = [
         'bebidas alcoholicas', 'licores', 'tabaco', 'cigarrillo', 'productos de tabaco']},
     {'k': 'propiedad intelectual', 'terms': [
         'propiedad intelectual', 'derechos de autor', 'patentes', 'marcas registradas']},
+    # --- ④ tópicos que faltaban para que el diccionario de EMPRESAS tenga a dónde
+    # mapear cada sector (empresas.py referencia estas llaves). Todos medidos
+    # contra los títulos reales; se descartaron los que colisionan por
+    # substring/stem: 'seguros'→'segur'≈seguridad social (580 hits, casi todos
+    # ajenos) y 'puertos'→'puert'≈AEROPUERTO — por eso van como frase.
+    {'k': 'salud / EPS e IPS', 'terms': [
+        'sistema de salud', 'reforma a la salud', 'entidades promotoras de salud',
+        'prestadores de servicios de salud', 'seguridad social en salud',
+        'aseguramiento en salud']},
+    {'k': 'pensiones y cesantias', 'terms': [
+        'regimen pensional', 'sistema pensional', 'reforma pensional', 'cesantias',
+        'fondos de pensiones', 'pension de vejez']},
+    {'k': 'seguros', 'terms': [
+        'contrato de seguro', 'sector asegurador', 'companias de seguros',
+        'seguro obligatorio', 'actividad aseguradora']},
+    {'k': 'competencia y consumidor', 'terms': [
+        'proteccion al consumidor', 'estatuto del consumidor', 'libre competencia',
+        'practicas restrictivas de la competencia', 'publicidad enganosa']},
+    {'k': 'aviacion / transporte aereo', 'terms': [
+        'transporte aereo', 'aerolineas', 'aeronautica civil', 'pasajeros aereos']},
+    {'k': 'vivienda y construccion', 'terms': [
+        'vivienda de interes social', 'politica de vivienda', 'licencia de construccion',
+        'subsidio de vivienda', 'propiedad horizontal']},
+    {'k': 'comercio y retail', 'terms': [
+        'establecimientos de comercio', 'comercio electronico', 'grandes superficies',
+        'codigo de comercio']},
+    {'k': 'turismo y hoteleria', 'terms': [
+        'turismo', 'prestadores de servicios turisticos', 'actividad turistica']},
+    {'k': 'puertos y logistica', 'terms': [
+        'puertos maritimos', 'sociedades portuarias', 'actividad portuaria',
+        'transporte de carga', 'infraestructura de transporte']},
+    {'k': 'agua y saneamiento', 'terms': [
+        'acueducto y alcantarillado', 'agua potable', 'servicio publico de aseo',
+        'saneamiento basico']},
+    {'k': 'tributario', 'terms': [
+        'estatuto tributario', 'reforma tributaria', 'regimen tributario',
+        'impuesto al consumo', 'beneficios tributarios']},
+    {'k': 'juegos de suerte y azar', 'terms': [
+        'juegos de suerte y azar', 'monopolio rentistico', 'apuestas']},
+    {'k': 'educacion superior', 'terms': [
+        'educacion superior', 'instituciones de educacion superior',
+        'creditos educativos', 'financiacion de la educacion']},
+    {'k': 'tecnologia digital / IA', 'terms': [
+        'inteligencia artificial', 'criptoactivos', 'transformacion digital',
+        'redes sociales', 'entornos digitales']},
+    {'k': 'laboral', 'terms': [
+        'reforma laboral', 'salario minimo', 'contrato de trabajo',
+        'tercerizacion laboral', 'jornada laboral']},
+    {'k': 'seguridad privada', 'terms': ['seguridad privada', 'vigilancia privada']},
+    {'k': 'comercio exterior y aduanas', 'terms': [
+        'comercio exterior', 'aranceles', 'regimen aduanero', 'zonas francas']},
 ]
 
 
@@ -167,6 +221,23 @@ def _topicos(query):
     if not qn:
         return []
     return [t for t in SINONIMOS if any(_phrase_match(term, qn) for term in t['terms'])]
+
+
+# --- ④ puente marca → tema (diccionario de EMPRESAS) ------------------------
+# El Congreso no legisla sobre marcas, legisla sobre actividades: 'Uber' da 0
+# títulos y 'plataformas tecnológicas' da ~20. empresas.py traduce lo uno en lo
+# otro. Se resuelve como una capa ENCIMA del tesauro (reusa sus tópicos) para
+# que un cambio de vocabulario se herede en las ~230 entradas.
+def _empresas_topicos(query, ampliar=False):
+    """(empresas nombradas en la consulta, tópicos del tesauro que activan).
+    Por defecto solo el NÚCLEO de cada una: 'Uber' → 'transporte por
+    plataformas' (35 proyectos), no + 'laboral' (que suma 89 de reforma laboral
+    genérica). `ampliar=True` mete el contexto — es el clic del usuario."""
+    emps = empresas.empresas_en(query)
+    if not emps:
+        return [], []
+    idx = {t['k']: t for t in SINONIMOS}
+    return emps, [idx[k] for k in empresas.topicos_de(emps, ampliar) if k in idx]
 
 
 # --- Radar del cliente (Vista Cliente · lente SIGA sobre los pilares) --------
@@ -278,7 +349,7 @@ class Caudal:
     # -------- búsqueda ------------------------------------------------
     def buscar(self, query, anio_min=None, anio_max=None, comision=None,
                resultado=None, tipologia=None, empuje=None, limit=None, expandir=True,
-               extra_terms=None, relajar=False, with_meta=False):
+               extra_terms=None, relajar=False, with_meta=False, ampliar_empresa=False):
         """Match por keyword(s) en el título O en el texto de sus gacetas.
         Filtros F1: tipologia (honores/fondos/…) y empuje (vitrina/empujado/…).
         `expandir`: si la consulta cae en un tópico del tesauro, matchea por OR
@@ -301,6 +372,18 @@ class Caudal:
         `with_meta`: si True devuelve (lista, {'relajado': ...}) para que la UI
         muestre el aviso de búsqueda flexible."""
         topicos = _topicos(query) if (query and expandir) else []
+        # ¿el tópico se activó por las palabras DEL USUARIO o solo por el puente
+        # de empresa? Cambia si su palabra sigue contando como término de título
+        # (ver el bloque del ancla más abajo).
+        hay_tesauro = bool(topicos)
+        if query and expandir:
+            # ④ si la consulta nombra una empresa/gremio, sus tópicos entran al
+            # MISMO OR. Los alias NO entran como término de título a propósito:
+            # 'claro' casaría dentro de "declaró" (substring). El nombre literal
+            # sí se busca en el texto de gaceta, vía el ancla de más abajo.
+            for t in _empresas_topicos(query, ampliar_empresa)[1]:
+                if t not in topicos:
+                    topicos.append(t)
         or_terms = [term for t in topicos for term in t['terms']]
         if query and extra_terms:
             seen = set(or_terms)
@@ -323,6 +406,17 @@ class Caudal:
             dfw = {w: sum(1 for (_i, t, _x) in titn if _term_match(w, t)) for w in base}
             min_df = min(dfw.values())
             anchor = [w for w in base if dfw[w] == min_df]
+        # Un tópico del TESAURO no puede ENCOGER la búsqueda: antes de que
+        # existiera, 'reforma laboral' anclaba en 'laboral' y traía 215; al crear
+        # el tópico 'laboral' el OR de sus frases lo bajaba a 70. El ancla del
+        # usuario entra como una opción más del OR y eso queda cubierto.
+        # NO aplica cuando el tópico vino SOLO del puente de empresa: ahí la
+        # palabra del usuario es una marca, no vocabulario legislativo, y como
+        # _term_match va por substring 'uber' casaría dentro de "gubernamental".
+        if or_terms and hay_tesauro and anchor:
+            for w in anchor:
+                if w not in or_terms:
+                    or_terms.append(w)
         if or_terms:
             def _match(titulo):
                 return 1 if any(_phrase_match(term, titulo) for term in or_terms) else 0
@@ -454,6 +548,10 @@ class Caudal:
         st = self._theme_stats(tit)                  # default: solo título (los reales)
         st_todos = self._theme_stats(hits)           # título + contenido (para el switch)
         topicos = _topicos(query)
+        emps, tops_emp = _empresas_topicos(query, filtros.get('ampliar_empresa', False))
+        for t in tops_emp:
+            if t not in topicos:
+                topicos.append(t)
         # ③ búsqueda flexible: si la consulta multi-palabra se relajó (ancló al
         # término más específico en vez de exigir todas), el aviso explica por qué
         # salieron más resultados que las coincidencias exactas.
@@ -470,6 +568,14 @@ class Caudal:
                     if term not in incluye:
                         incluye.append(term)
             sinonimos = {'topicos': [t['k'] for t in topicos], 'incluye': incluye}
+        # ④ traducción marca → tema: la UI DEBE mostrarla. Si el usuario buscó
+        # 'Uber' y le salen proyectos que dicen 'plataformas tecnológicas', tiene
+        # que ver por qué (mismo principio que el aviso de sinónimos y el de
+        # búsqueda flexible: nada de resultados que aparecen por magia).
+        emp_out = [{'k': e['k'], 'nombre': e['nombre'], 'tipo': e['tipo'],
+                    'sector': e['sector'], 'nucleo': e['nucleo'],
+                    'contexto': e['contexto'],
+                    'identidad': e['entidad']} for e in emps] or None
         # expansión IA: se reporta aparte para que la UI pueda decir con qué
         # vocabulario se buscó (el usuario debe ver por qué salió un título que
         # no contiene su palabra).
@@ -481,6 +587,7 @@ class Caudal:
             'stats_todos': st_todos,  # ④ switch: título + contenido
             'flexible': flexible,
             'sinonimos': sinonimos,
+            'empresas': emp_out,
             'expansion': expansion,
             # timeline en orden cronológico (buscar puede devolver por ranking cuando
             # relaja); 'mc'/'nw' = palabras coincididas / total, para el toggle

@@ -1370,10 +1370,11 @@
     const uq=document.getElementById('uq'); if(uq) uq.value=query;
     const box=document.getElementById('uni-results');
     box.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Buscando en los 4 pilares <span class="dots"><span></span><span></span><span></span></span></div>';
+    const amp=_ampliarEmp;
     const [cong,reg,eje,med]=await Promise.allSettled([
-      call({action:'tema', query, lectura:false}),
+      call({action:'tema', query, lectura:false, ampliar_empresa:amp}),
       call({action:'sanciones', query}),
-      call({action:'ejecutivo', query}),
+      call({action:'ejecutivo', query, ampliar_empresa:amp}),
       call({action:'medios', query}),
     ]);
     if(mine!==_uniSeq) return;
@@ -1386,10 +1387,15 @@
     };
     _uniData={congreso:cD, regulatorio:rD, ejecutivo:eD, medios:mD, query, counts};
     const first=(UNI_TABS.find(([k])=>counts[k]>0)||UNI_TABS[0])[0];
+    // ④ la traducción marca → tema se muestra ARRIBA de las pestañas: aplica a
+    // los 4 pilares a la vez, no a uno. La reporta cualquiera que la resuelva.
+    const emps=(cR&&cR.empresas)||(rD&&rD.empresas)||(eD&&eD.empresas)||null;
     box.innerHTML=`
       <div class="r-sub">Resultados para <b>${esc(query)}</b> en los pilares activos</div>
+      ${empresaHint(emps,'uni-emp-hint')}
       <div class="uni-tabs">${UNI_TABS.map(([k,n])=>`<button class="uni-tab" data-k="${k}">${n} <b>${fmt(counts[k])}</b></button>`).join('')}</div>
       <div id="uni-tab-body"></div>`;
+    wireEmpresaHint('uni-emp-hint', ()=>uniSearch(query));
     const tabs=[...box.querySelectorAll('.uni-tab')];
     const show=k=>{ tabs.forEach(t=>t.classList.toggle('on',t.dataset.k===k)); document.getElementById('uni-tab-body').innerHTML=uniTabBody(k); wireUniTab(k); };
     tabs.forEach(t=>t.onclick=()=>show(t.dataset.k));
@@ -1571,6 +1577,27 @@
   let _seq=0;
   // ④ estado del tema actual (para el switch de estadísticas sin re-consultar)
   let _statMode='titulo', _temaR=null, _temaQ=''; let _lecturaData=null; const _snipCache={};
+  /* ④ Traductor marca → tema. El usuario buscó «Uber» y le salen proyectos que
+     dicen "plataformas tecnológicas": tiene que ver POR QUÉ. Mismo principio que
+     el aviso de sinónimos y el de búsqueda flexible — nada aparece por magia.
+     `ampliado` alterna núcleo (preciso, por defecto) ↔ núcleo + contexto. */
+  let _ampliarEmp=false;
+  function empresaHint(emps, id){
+    if(!emps||!emps.length) return '';
+    const e=emps[0], esGremio=e.tipo==='gremio';
+    const nuc=(e.nucleo||[]).map(esc).join(' · ');
+    const ctx=(e.contexto||[]);
+    const mas=ctx.length
+      ? ` <span class="bd-link" id="${id}-mas">${_ampliarEmp?'volver a lo esencial':'ampliar a: '+ctx.map(esc).join(' · ')} →</span>`
+      : '';
+    return `<div class="broaden" id="${id}"><b>${esc(e.nombre)}</b> ${esGremio?'es un gremio':'es una empresa'} del diccionario de Caudal.
+      El Estado no legisla marcas, legisla actividades — así que se buscó por: <b>${nuc}</b>${_ampliarEmp&&ctx.length?' · '+ctx.map(esc).join(' · '):''}.${mas}</div>`;
+  }
+  function wireEmpresaHint(id, rerun){
+    const el=document.getElementById(id+'-mas'); if(!el) return;
+    el.onclick=()=>{ _ampliarEmp=!_ampliarEmp; rerun(); };
+  }
+
   async function buscar(){
     const query=q.value.trim(); if(!query) return;
     const mine=++_seq;
@@ -1580,7 +1607,7 @@
     results.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Consultando el histórico <span class="dots"><span></span><span></span><span></span></span></div>';
     results.scrollIntoView({behavior:'smooth',block:'start'});
     let data;
-    try{ data=await call({action:'tema',query,lectura:false}); }
+    try{ data=await call({action:'tema',query,lectura:false,ampliar_empresa:_ampliarEmp}); }
     catch(e){ if(mine===_seq) results.innerHTML='<div class="err">No se pudo consultar. Reintenta.</div>'; return; }
     if(mine!==_seq) return;
     const r=data.resumen;
@@ -1690,6 +1717,7 @@
       <div class="r-titular" id="r-titular">${S.n_intentos} ${S.n_intentos===1?'proyecto':'proyectos'} · ${S.n_leyes} ${S.n_leyes===1?'ley':'leyes'} · ${S.pct_exito}% de éxito</div>
       ${swSwitch}
       ${r.flexible?`<div class="broaden" id="flex-hint"><b>Búsqueda flexible</b> · pocas coincidencias con todas tus palabras (<b>${r.flexible.n_estricto}</b>). Mostrando los <b>${r.flexible.n_total}</b> del término más específico: «<b>${esc((r.flexible.anchor||[]).join(', '))}</b>». <span class="bd-link" id="flex-toggle" data-mode="all">ver solo las exactas →</span></div>`:''}
+      ${empresaHint(r.empresas,'emp-hint')}
       ${r.sinonimos?`<div class="broaden" id="syn-hint"><b>Búsqueda por tema</b> · el Congreso titula esto de varias formas, así que se incluyen: ${r.sinonimos.incluye.map(esc).join(' · ')}.</div>`:''}
       ${(r.expansion&&r.expansion.terminos&&r.expansion.terminos.length)?`<div class="broaden" id="exp-hint"><b>Búsqueda ampliada</b> · los títulos del Congreso rara vez usan tus palabras, así que también se buscó por: ${r.expansion.terminos.map(esc).join(' · ')}.</div>`:''}
 
@@ -1767,6 +1795,9 @@
       });
       if(tlHead) tlHead.textContent=`${shown} intento(s)${f==='all'?'':' filtrados'} · click para la ficha`;
     });
+    // ④ ampliar/reducir el vocabulario de la empresa re-consulta (el núcleo y el
+    // contexto son consultas distintas al motor, no un filtro del cliente).
+    wireEmpresaHint('emp-hint', buscar);
     // ③ toggle búsqueda flexible: alterna entre TODAS (relajado) y solo las que
     // coinciden con todas las palabras (mc===nw), filtrando el timeline in situ.
     const flexTgl=document.getElementById('flex-toggle');

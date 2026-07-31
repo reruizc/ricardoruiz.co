@@ -44,6 +44,36 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as
 
 import boto3
 import caudal_core
+import empresas                        # ④ diccionario marca → tema/identidad
+
+
+def _empresas_payload(emps):
+    """Traducción marca → tema que la UI muestra. El usuario TIENE que ver por
+    qué le salió un proyecto que no dice 'Uber' — mismo principio del aviso de
+    sinónimos: nada de resultados que aparecen por magia."""
+    if not emps:
+        return None
+    return [{'k': e['k'], 'nombre': e['nombre'], 'tipo': e['tipo'],
+             'sector': e['sector'], 'nucleo': e['nucleo'],
+             'contexto': e['contexto'], 'identidad': e['entidad']} for e in emps]
+
+
+def _vocab_empresa(emps, ampliar=False):
+    """Términos del tesauro del núcleo de estas empresas, para los pilares que
+    filtran por substring sobre su blob `q`.
+    OJO: el blob `q` de sanciones/normativa viene en minúsculas pero CON tildes
+    ("minería"), y los términos del tesauro van sin ellas ("mineria") → hay que
+    comparar los dos lados plegados con empresas._n, o no casa nunca."""
+    if not emps:
+        return []
+    idx = {t['k']: t for t in caudal_core.SINONIMOS}
+    out = []
+    for k in empresas.topicos_de(emps, ampliar):
+        for term in idx.get(k, {}).get('terms', []):
+            t = empresas._n(term)
+            if t and t not in out:
+                out.append(t)
+    return out
 
 BUCKET = os.environ.get('CAUDAL_BUCKET', 'caudal-legislativo')
 PROMPT_VERSION = 'v8'            # bumpear para invalidar cache de síntesis
@@ -1700,9 +1730,17 @@ def handler(event, context):
         if not q and not sector:               # landing: agregados precalculados (rápido)
             return _resp(200, dict(_sanciones_stats(), mode='stats'))
         recs = _sanciones()
+        # ④ si la consulta nombra una empresa, el match NO puede ser el substring
+        # sobre el blob `q`: 'uber' así trae "UBERNETH URANGO" y "YUBER CALIXTO",
+        # 'claro' trae "PESQUERA RIO CLARO". Se matchea la IDENTIDAD (razón social
+        # + alias) por palabra completa y SOLO contra el campo `sancionado`, que
+        # es donde vive la entidad (el blob incluye el motivo y mete ruido).
+        emps = empresas.empresas_en(body.get('query') or '')
         hits = [r for r in recs
                 if (not sector or r.get('sector') == sector)
-                and (not q or q in r.get('q', ''))]
+                and (not q
+                     or (empresas.casa_registro_any(emps, r.get('sancionado', ''))
+                         if emps else q in r.get('q', '')))]
         secc = Counter(r.get('sector', '') for r in hits)
         fuc = Counter(r.get('fuente_nombre', '') for r in hits)
         montos = [r['monto'] for r in hits if r.get('monto')]
@@ -1715,6 +1753,7 @@ def handler(event, context):
             'por_fuente': [{'fuente': f, 'n': n} for f, n in fuc.most_common()],
             'monto_total_cop': round(sum(montos)) if montos else 0,
             'con_monto': len(montos),
+            'empresas': _empresas_payload(emps),
             'resultados': out,
         })
 
@@ -1724,9 +1763,16 @@ def handler(event, context):
         if not q and not tipo:                 # landing: agregados precalculados (rápido)
             return _resp(200, dict(_ejecutivo_stats(), mode='stats'))
         recs = _ejecutivo()
+        # ④ el Ejecutivo tampoco nombra marcas: regula la actividad. Si la
+        # consulta es una empresa, se busca su vocabulario de núcleo (OR) además
+        # del nombre literal — que igual puede aparecer en un decreto puntual.
+        emps = empresas.empresas_en(body.get('query') or '')
+        vocab = _vocab_empresa(emps, bool(body.get('ampliar_empresa')))
         hits = [r for r in recs
                 if (not tipo or (r.get('tipo') or '').upper() == tipo)
-                and (not q or q in r.get('q', ''))]
+                and (not q
+                     or q in r.get('q', '')
+                     or (vocab and any(v in empresas._n(r.get('q', '')) for v in vocab)))]
         tic = Counter((r.get('tipo') or '—') for r in hits)
         hits_sorted = sorted(hits, key=lambda r: r.get('fecha', ''), reverse=True)
         out = [{k: v for k, v in r.items() if k != 'q'} for r in hits_sorted[:120]]
@@ -1734,6 +1780,7 @@ def handler(event, context):
             'mode': 'search', 'query': body.get('query', ''), 'tipo': tipo,
             'n': len(hits), 'mostrados': len(out),
             'por_tipo': [{'tipo': t, 'n': n} for t, n in tic.most_common()],
+            'empresas': _empresas_payload(emps),
             'resultados': out,
         })
 
@@ -1813,10 +1860,16 @@ def handler(event, context):
             return _resp(400, {'error': 'falta query'})
         # expansión de consulta con IA (ON por defecto): cubre el desajuste de
         # vocabulario usuario↔título formal. `expandir_ia:false` la apaga.
-        extra = _expandir_query(q) if body.get('expandir_ia', True) else []
+        # ④ si la consulta es una EMPRESA del diccionario, se salta: la
+        # traducción curada ya cubre el desajuste, es determinista (misma
+        # consulta, misma respuesta), no cuesta una llamada al modelo y no le
+        # mete al OR términos que el modelo se invente.
+        emps = empresas.empresas_en(q)
+        extra = [] if emps else (_expandir_query(q) if body.get('expandir_ia', True) else [])
         resumen = caudal.resumen_tema(
             q, anio_min=body.get('anio_min'), anio_max=body.get('anio_max'),
-            comision=body.get('comision'), extra_terms=extra)
+            comision=body.get('comision'), extra_terms=extra,
+            ampliar_empresa=bool(body.get('ampliar_empresa')))
         out = {'query': q, 'resumen': resumen,
                'model_info': {'sintesis': STEP_MODELS['sintesis']}}
         if body.get('lectura', True) and resumen['n_intentos'] > 0:
