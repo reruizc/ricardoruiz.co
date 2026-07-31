@@ -186,9 +186,12 @@ FECHA_LARGA_RE = re.compile(r'(\d{1,2})\s+de\s+(' + '|'.join(MESES) + r')\s+de\s
 #      cámara) sin asumir orden, y se toma el que esté explícitamente
 #      etiquetado "Senado" — el que NO lo esté (soltero o solo "Cámara") se
 #      descarta en vez de adivinar.
-# Cubre ambos estilos de año: "087 de 2023" (verboso) y "311/25" (corto, el
-# mismo formato de numero_senado). Límites conocidos y ACEPTADOS (no vale la
-# pena perseguirlos, son ruido de PDF, no de lógica):
+# Cubre TRES estilos de año: "087 de 2023" (verboso), "311/25" (corto, el
+# mismo formato de numero_senado) y "218/2024" (barra + año de 4 dígitos —
+# jul-31: encontrado en Comisión Séptima, que citaba TODO así y por eso daba
+# 0 proyectos agendados; el "(?:20)?" opcional antes de "(\d{2})" en la rama
+# "/" normaliza los dos casos al mismo grupo de 2 dígitos). Límites conocidos
+# y ACEPTADOS (no vale la pena perseguirlos, son ruido de PDF, no de lógica):
 #   - números con el separador "/" o la palabra "de" comidos por la extracción
 #     del PDF ("311125" en vez de "311/25", "594 2021" sin "de") → no matchea,
 #     se pierde ESE agendamiento puntual (el proyecto igual se captura en las
@@ -205,7 +208,7 @@ CITA_RE = re.compile(
     r'["“”](?P<titulo>.+?)(?:["”]|(?=\n\s*(?:•|Ponencia|Autores|Coordinadores|Ponentes|Presidente\s*:))|\Z)',
     re.I | re.S)
 NUM_LABELED_RE = re.compile(
-    r'(\d{1,4})\s*(?:de\s*(?:20)?\s?\d?\s?(\d{2})|/\s*(\d{2}))\s*(C[aá]mara|Senado)', re.I)
+    r'(\d{1,4})\s*(?:de\s*(?:20)?\s?\d?\s?(\d{2})|/\s*(?:20)?(\d{2}))\s*(C[aá]mara|Senado)', re.I)
 
 
 def resolver_num_senado(header):

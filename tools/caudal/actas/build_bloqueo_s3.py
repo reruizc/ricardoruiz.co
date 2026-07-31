@@ -198,20 +198,24 @@ def main():
            'sistema': sistema, 'por_proyecto': por_proy}
 
     # SENADO — bloque namespaceado aparte (nunca fusionado con el de Cámara,
-    # ver docstring de agregar()). Alcance declarado: solo 3 de las 7
-    # comisiones constitucionales tienen serie usable en el DOCman del Senado
-    # (Cuarta/Quinta/Sexta); Primera/Segunda/Tercera/Séptima son un hueco
-    # conocido y la Gaceta no es vía viable para llenarlo (rezago de 11-16
-    # meses, medido — ver harvest_ordenes_senado.py). La PLENARIA sí está
-    # completa 2018-2026 y sale de OTRO sitio (secretariasenado.gov.co).
+    # ver docstring de agregar()). Alcance (jul-31, tras cosechar las 4
+    # débiles + fix de NUM_LABELED_RE que no admitía año de 4 dígitos tras
+    # "/"): las 7 comisiones constitucionales tienen serie + la PLENARIA
+    # (secretariasenado.gov.co). Cuarta/Quinta/Sexta tienen cobertura casi
+    # continua 2018-2026 (n_obs alto); Primera/Segunda/Tercera/Séptima son
+    # series MÁS CORTAS/parciales por año (menos documentos publicados en el
+    # DOCman de esas 4 — ver docstring de harvest_ordenes_senado.py), así que
+    # sus curvas de posición tienen n_obs bajo y hay que leerlas con cautela
+    # (el frontend ya suprime por n_obs<100).
     sen_files = sorted((CACHE / 'ordenes-senado').glob('agendamientos-*.json'))
     sistema_sen, por_proy_sen = agregar(sen_files) if sen_files else (None, {})
     if sistema_sen:
         out['senado'] = {
             'fuente': 'Senado · órdenes del día de comisión (DOCman senado.gov.co) '
                       'y plenaria (DOCman secretariasenado.gov.co)',
-            'alcance': 'comisiones constitucionales Cuarta/Quinta/Sexta + plenaria; '
-                       'Primera/Segunda/Tercera/Séptima sin serie publicada',
+            'alcance': 'las 7 comisiones constitucionales + plenaria; '
+                       'Cuarta/Quinta/Sexta con serie más completa (2018-2026), '
+                       'Primera/Segunda/Tercera/Séptima con series más cortas/parciales',
             'sistema': sistema_sen, 'por_proyecto': por_proy_sen,
         }
 
