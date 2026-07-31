@@ -244,13 +244,53 @@ def ambito_de(doc):
     return None
 
 
-def fetch_plenaria_docman(force=False):
+def fetch_plenaria_docman(force=False, incremental=False):
     """Índice de órdenes del día de PLENARIA (secretariasenado.gov.co).
     Dos cuidados propios de ese servidor: pagina SIEMPRE de a 20 (ignora
     `limit`, y avanzar de a 100 pierde el 78% en silencio) y es lento e
-    intermitente (timeouts que devuelven cuerpo vacío) → reintentos."""
-    if IDX_CACHE_PLEN.exists() and not force:
-        return json.load(open(IDX_CACHE_PLEN, encoding='utf-8'))
+    intermitente (timeouts que devuelven cuerpo vacío) → reintentos.
+
+    `incremental=True` (el modo del cron diario): este listado viene ESTRICTO
+    de más nuevo a más viejo (verificado: 832 de 832 pares en orden DESC), así
+    que basta pedir páginas hasta topar con una donde ya conocíamos todos los
+    ids y fusionar lo nuevo al caché. Sin esto, el caché haría que la corrida
+    diaria nunca viera una sesión nueva; con esto son 1-2 páginas en vez de 42
+    contra un servidor lento."""
+    previo = json.load(open(IDX_CACHE_PLEN, encoding='utf-8')) if IDX_CACHE_PLEN.exists() else []
+    if previo and not force and not incremental:
+        return previo
+    if incremental and previo:
+        conocidos = {d.get('id') for d in previo}
+        print('· actualizando índice de PLENARIA (incremental, más nuevo primero)…')
+        nuevos, off = [], 0
+        while True:
+            d = None
+            for intento in range(3):
+                raw = curl(f'{PLENARIA_URL}?format=json&limit={PLENARIA_PAGE}&offset={off}')
+                try:
+                    d = json.loads(raw)
+                    break
+                except Exception:
+                    time.sleep(2 * (intento + 1))
+            if d is None:
+                print(f'  ! sin respuesta en offset {off}; me quedo con lo que haya')
+                break
+            lk = (d.get('linked') or {}).get('documents') or []
+            if not lk:
+                break
+            frescos = [x for x in lk if x.get('id') not in conocidos]
+            nuevos += frescos
+            if len(frescos) < len(lk):      # la página ya trae conocidos → alcanzamos lo viejo
+                break
+            off += PLENARIA_PAGE
+            time.sleep(0.4)
+        if nuevos:
+            docs = nuevos + previo
+            json.dump(docs, open(IDX_CACHE_PLEN, 'w', encoding='utf-8'), ensure_ascii=False)
+            print(f'  + {len(nuevos)} órdenes del día nuevas (total {len(docs)})')
+            return docs
+        print('  sin novedades')
+        return previo
     print('· descargando índice DOCman de PLENARIA (paginado de a 20)…')
     docs, off = [], 0
     while True:
@@ -634,10 +674,20 @@ def run(ambito, limit=None, offline=False, workers=1):
 
 
 if __name__ == '__main__':
-    if '--refrescar-indice' in sys.argv:
+    if '--refrescar-indice' in sys.argv:      # completo (primera vez / reparación)
         fetch_all_docman(force=True)
         fetch_plenaria_docman(force=True)
         sys.argv.remove('--refrescar-indice')
+        if len(sys.argv) == 1:
+            sys.exit(0)
+    if '--actualizar-indice' in sys.argv:     # el del cron: barato e incremental
+        # comisiones: el listado NO viene ordenado por fecha (los documentos
+        # nuevos no quedan al principio), así que no hay parada temprana posible
+        # y se re-baja entero — son ~73 páginas rápidas contra senado.gov.co.
+        fetch_all_docman(force=True)
+        # plenaria: sí viene DESC → solo las páginas nuevas.
+        fetch_plenaria_docman(incremental=True)
+        sys.argv.remove('--actualizar-indice')
         if len(sys.argv) == 1:
             sys.exit(0)
     limit = int(sys.argv[sys.argv.index('--limit') + 1]) if '--limit' in sys.argv else None

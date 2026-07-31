@@ -4,7 +4,9 @@
 #
 #   harvest_diario.py       lista → detalle → PDF → texto → diff → novedades
 #   build_diario_s3.py --upload   manifiesto + PDF + texto al bucket privado
-#   harvest_ordenes.py todas      órdenes del día (14 comisiones + plenaria) →
+#   harvest_ordenes.py todas      órdenes del día de CÁMARA (14 com + plenaria)
+#   harvest_ordenes_senado.py     órdenes del día de SENADO (Cuarta/Quinta/Sexta
+#                                 + plenaria, esta desde secretariasenado.gov.co)
 #   build_bloqueo_s3.py           bloqueo.json → S3 (índice de agendamientos)
 #
 # launchd corre con un entorno mínimo → fijamos PATH (aws y python3 viven en
@@ -47,6 +49,21 @@ cd "$REPO" || { echo "no pude cd a $REPO" >&2; exit 1; }
   python3 tools/caudal/actas/harvest_ordenes.py todas \
     | grep -E "órdenes del día de|PDFs nuevos|^  !"
   rc_od=${PIPESTATUS[0]}
+  # Órdenes del día del SENADO. Otros dos hosts (senado.gov.co y
+  # secretariasenado.gov.co para la plenaria), ninguno con el WAF de
+  # leyes.senado, así que no interfiere con el rastreo de radicados.
+  # --actualizar-indice es obligatorio: sin él, el índice cacheado haría que la
+  # corrida diaria NUNCA viera una sesión nueva (comisiones se re-baja entero,
+  # plenaria para temprano porque viene DESC). Los PDF/DOCX/TXT sí se cachean
+  # por documento → una corrida normal solo baja lo nuevo.
+  echo "--- harvest_ordenes_senado (Cuarta/Quinta/Sexta + plenaria) ---"
+  python3 tools/caudal/actas/harvest_ordenes_senado.py --actualizar-indice \
+    && python3 tools/caudal/actas/harvest_ordenes_senado.py buenas --workers 4 \
+      | grep -E "órdenes del día de|descargas nuevas|^  !"
+  rc_ods=${PIPESTATUS[0]}
+  python3 tools/caudal/actas/harvest_ordenes_senado.py plenaria --workers 4 \
+    | grep -E "órdenes del día de|descargas nuevas|^  !"
+  rc_odp=${PIPESTATUS[0]}
   echo "--- build_bloqueo_s3 + subida de bloqueo.json ---"
   python3 tools/caudal/actas/build_bloqueo_s3.py
   rc_bl=$?
@@ -58,5 +75,5 @@ cd "$REPO" || { echo "no pude cd a $REPO" >&2; exit 1; }
   else
     rc_bu=skip
   fi
-  echo "═════════ fin $(date '+%H:%M:%S') · senado=$rc_h upload=$rc_u camara=$rc_c camara_up=$rc_cu envivo=$rc_ev ordenes=$rc_od bloqueo=$rc_bl bloqueo_up=$rc_bu ═════════"
+  echo "═════════ fin $(date '+%H:%M:%S') · senado=$rc_h upload=$rc_u camara=$rc_c camara_up=$rc_cu envivo=$rc_ev ordenes=$rc_od ordenes_sen=$rc_ods ordenes_sen_plen=$rc_odp bloqueo=$rc_bl bloqueo_up=$rc_bu ═════════"
 } >> "$LOG" 2>&1

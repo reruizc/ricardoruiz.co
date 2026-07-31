@@ -5353,7 +5353,8 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
 - ✅ **Lambda `caudal-analiza`** desplegada (`POST https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com`),
   model-agnostic (DeepSeek V4 default, switch a Claude por env var), `DEEPSEEK_API_KEY` seteada.
   Acciones: `tema` (embudo+bancadas+intención+lectura LLM) · `buscar` (filtros tipologia/empuje) ·
-  `proyecto` (ficha + bloqueo + votaciones) · `stats` · `bloqueo` (sistema P(tratado|posición)) ·
+  `proyecto` (ficha + bloqueo Cámara + `bloqueo_senado` + votaciones) · `stats` · `bloqueo`
+  (sistema P(tratado|posición) de Cámara + bloque `senado` anidado) ·
   `gaceta` (acta/ponencia · aplazamiento+voto nominal) · `contexto` (rastreo de medios · Serper+DeepSeek).
 - ✅ **Frontend `caudal.html`** (sistema visual v2: Helvetica, azul #060810) con búsqueda,
   embudo, bancadas, lectura del analista y ficha con análisis de ponencia por IA.
@@ -5434,12 +5435,67 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
     en el landing con un segundo bloque teal "La otra cola · plenaria".
   - **Refresco DIARIO automático (jul-2026):** las órdenes del día entraron al `run_diario.sh` que
     dispara launchd 2×/día (última etapa, después de `leyes_en_vivo`): `harvest_ordenes.py todas` →
+    **`harvest_ordenes_senado.py --actualizar-indice` + `buenas` + `plenaria` (--workers 4)** →
     `build_bloqueo_s3.py` → `aws s3 cp bloqueo.json`. Es incremental (PDF/TXT cacheados por evento):
     **~26 s cuando no hay sesiones nuevas**, y otro host (`camara.gov.co/wp-json`, sin el WAF de
     leyes.senado) así que no interfiere con el rastreo de radicados. El `rc` de cada etapa sale en la
     línea de cierre del log (`ordenes=… bloqueo=… bloqueo_up=…`); la subida se salta sola si el build
     falló. Antes esto era corrida manual y el dato estaba congelado en **16-jun-2026** (la legislatura
     instalada el 20-jul-2026 no aparecía).
+  - **SENADO — el hueco grande, RESUELTO (jul-30-2026 · `harvest_ordenes_senado.py`).** El índice de
+    bloqueo ya no es solo de Cámara. **Fuente: DOCman (Joomla), API JSON sin auth ni JSF** —
+    `senado.gov.co/index.php/documentos?format=json&view=documents&limit=100&offset=N` (7.251 docs;
+    `links.file.href` es descarga DIRECTA y su breadcrumb da el ámbito, no hay que resolver
+    categorías). ⚠️ La **PLENARIA no está ahí**: vive en el SITIO HERMANO
+    `secretariasenado.gov.co/index.php/orden-del-dia-senado?format=json` (**833 órdenes del día,
+    2018-2026, vigente**), que **IGNORA `limit`** y siempre pagina de a **20** (paginar de a 100
+    pierde el 78% EN SILENCIO) y es lento/intermitente → reintentos con backoff.
+    **Cosecha: 1.329 proyectos en 428 sesiones de plenaria + Quinta 246 · Sexta 255 · Cuarta 24.**
+    - **Cobertura declarada, no disimulada:** de las 7 comisiones constitucionales solo publican
+      serie **Cuarta/Quinta/Sexta**; Primera (corta 2023) · Tercera (2022) · Séptima (2024) ·
+      Segunda (1 doc) son **hueco conocido**. Va en el JSON como campo `alcance` y en la UI.
+    - **La Gaceta NO sirve para llenarlo (medido, no supuesto):** rezago de publicación de **11 a 16
+      meses** (Gaceta 847/2026 publicada el 17-jul transcribe la sesión del 6-ago-**2025**; la
+      186/2026 una de nov-**2024**, 499 días) → la legislatura en curso no existe ahí; además las
+      actas son minoría no aislable por filtro (5 de 6 gacetas muestreadas al azar NO eran actas) y
+      pesan mucho (~35 MB en 6 archivos). Sí transcriben el orden del día completo, así que la vía
+      queda **targeted** (proyecto+fecha conocidos), nunca barrido masivo.
+    - **Gotchas del parseo** (todos resueltos en el código, no repetir la investigación): el número
+      se resuelve en **2 pasos** —aislar el bloque de cita y tomar el que esté etiquetado "Senado"—
+      porque ~22% de las sesiones de Cuarta son CONJUNTAS con Cámara y **el orden de los dos números
+      varía** (`"550 de 2026 Cámara, 369 de 2026 Senado"` ¡Cámara primero!); asumir "el primero es el
+      bueno" mal-atribuiría un número de Cámara. Convive el formato corto `311/25` (2024-2026) con el
+      verboso `087 de 2023`. ~70% de las comisiones son **.docx** (se leen con `zipfile` de stdlib,
+      mejor que PDF). La fecha de sesión **NO** se valida contra ventana relativa a la publicación
+      (a diferencia de Cámara): el Senado hace **backfill legítimo** de hasta un año. ~12,6% de los
+      hrefs son **link roto del propio DOCman** (su ficha individual da el mismo href malo; probadas
+      todas las bases de almacenamiento alternativas → 404; se cuentan y se saltan).
+    - **Validación:** 98-100% de los números extraídos casan con proyectos reales de
+      `proyectos.jsonl`; sin fechas futuras; fines de semana <2,5%.
+    - **Resultado (el dato publicable):** plenaria de Senado **69,6% → 52,4% → 33,6% → 24,4% →
+      21,4% → 19,9%** (n≈15.800, caída monótona). Contra la plenaria de Cámara (71% → 48% en 4º-6º):
+      **la cola del Senado se degrada mucho más rápido.** Mediana de **7** agendamientos (Cámara 5);
+      hay un proyecto agendado **80 veces**.
+    - **`build_bloqueo_s3.py`**: la agregación se factorizó en `agregar(files)` y corre por cámara.
+      ⚠️⚠️ **Los dos `por_proyecto` NUNCA se fusionan**: el token es `NNN/YY` y ese número se
+      REINICIA por cámara → **1.012 tokens existen en ambas para proyectos DISTINTOS** (medido; es
+      el mismo problema de identidad de `[[EL NÚMERO DE RADICADO NO ES IDENTIFICADOR ÚNICO]]`).
+      Senado va en `out['senado'] = {sistema, por_proyecto, fuente, alcance}`. Campos nuevos:
+      `ambitos` por bucket (el 16º+ del Senado sale ÍNTEGRO de la Sexta, única con agendas largas:
+      máx 38 vs 15 en Quinta y 3 en Cuarta → es artefacto de composición) y `n_obs` por comisión
+      (**Cuarta tiene 40 observaciones y 4 de 6 buckets vacíos: su curva es ruido**, la UI la
+      suprime con el umbral n_obs≥100). Regresión de Cámara verificada byte a byte.
+    - **Lambda**: `bloqueo` devuelve el bloque `senado` anidado; la ficha gana **`bloqueo_senado`**,
+      buscado por número de SENADO contra el índice de Senado (jamás contra el de Cámara).
+      **Frontend**: tercera curva **violeta** (el ámbar ya es comisiones de Cámara y el teal su
+      plenaria) + nota de alcance.
+    - **Refresco diario**: entró al `run_diario.sh` (ver abajo). ⚠️ **`--actualizar-indice` es
+      obligatorio en el cron**: el índice se cachea, así que sin él la corrida diaria NUNCA vería una
+      sesión nueva. Comisiones se re-baja entero (su listado **no viene ordenado por fecha**, no hay
+      parada temprana posible); plenaria para temprano (viene DESC estricto, 832/832 pares).
+    - Correr a mano: `harvest_ordenes_senado.py buenas|plenaria|todas [--workers N] [--offline]`
+      (`--workers` = prefetch concurrente: ~6 h → ~35 min, idempotente y resumible;
+      `--offline` re-parsea el texto cacheado sin tocar la red).
   - **Descarga de gacetas por CURL — RESUELTO (jul-2026, `descargar_gaceta.py`).** La nota vieja
     ("NO bulk automatizable, clic a clic") **quedó obsoleta**: el portal de la Imprenta SÍ se
     automatiza. El deep-link `index2.xhtml?ent=Senado|Camara&fec=D-M-YYYY&num=NNN` (que sale del
@@ -5480,13 +5536,14 @@ Cauce = el cuerpo de datos legislativos). Vive en `tools/caudal/`.
 - 🔜 **Pendiente (Fase 3):** targeting de actas de **Senado** (sin fuente limpia todavía,
   a diferencia de Cámara) · voto MANUAL de Cámara ago-2021/sep-2022 (columna "X" sin texto,
   necesita extracción por coordenadas tipo pdfplumber) · OCR de actas/gacetas escaneadas
-  pre-nov-2020 · voto nominal por congresista del detalle de Congreso Visible (Senado
-  pre-2022) · refinar títulos de agendamientos (comisión ~71%, plenaria 60% — el título
-  sale del propio PDF; lo que falta se puede rellenar del dataset por número, no hace falta
-  más parseo) · **órdenes del día de SENADO** (el equivalente al wp-json de Cámara no
-  existe: Senado es Joomla; sin eso el índice de bloqueo es solo de Cámara — es el hueco
-  grande que queda). NADA bloquea el pitch — el módulo se demuestra completo.
+  pre-nov-2020 (incluye el **47% de las órdenes del día de la Comisión Sexta del Senado**,
+  que son PDF escaneado sin capa de texto) · voto nominal por congresista del detalle de
+  Congreso Visible (Senado pre-2022) · refinar títulos de agendamientos de **Cámara**
+  (comisión ~71%, plenaria 60%; en Senado ya se rellenan del dataset y quedan al 99%).
+  NADA bloquea el pitch — el módulo se demuestra completo.
   Ver `[[reference_actas_bloqueo_fuentes]]` en memoria.
+  ✅ **Ya NO es pendiente:** las órdenes del día de SENADO (resueltas jul-30-2026 vía DOCman,
+  ver arriba) — el índice de bloqueo cubre las dos cámaras.
 
 **Fase 3 · voto nominal de Cámara — RESUELTO (jul-2026 · `tools/caudal/actas/`).** Cierra
 el hueco de "voto nominal cuatrienio actual" que había quedado on-demand: se encontró que
@@ -5896,6 +5953,70 @@ queda `expandir=False`** (AND literal de sus frases curadas) para no perder
 precisión. `_titulos_norm()` cachea los títulos normalizados (el Radar llama a
 `buscar` ~24×/request). Para casos no cubiertos, sigue disponible el stemmer
 Snowball español completo como upgrade.
+
+**④ Diccionario de EMPRESAS y GREMIOS — el traductor de la BÚSQUEDA GENERAL**
+(`tools/caudal/empresas.py` · **230 entradas: 189 empresas + 41 gremios** · jul-2026).
+El cliente busca con el nombre de la empresa, pero el Estado casi nunca la nombra así.
+Medido antes del fix: **«Uber» daba 0 títulos en Congreso** (el Congreso dice
+"plataformas tecnológicas": ~35 proyectos) y en Regulatorio traía **1 sanción real
++ 3 falsos por substring** (`UBERNETH URANGO`, `YUBER CALIXTO`, `UBER DARIO`; ídem
+`claro`→`PESQUERA RIO CLARO`, `CLAROS MURCIA`). **No es un problema, son dos**, y
+cada entrada del diccionario lleva las dos caras:
+- **IDENTIDAD** (`alias` + `entidad` + `excluir`) → pilares Regulatorio y
+  Contratación, donde la empresa SÍ aparece con nombre propio (campo `sancionado`,
+  proveedor de SECOP). Match por **palabra completa** (`_re_frase`, con
+  `(?<![a-z0-9])…(?![a-z0-9])`) y **solo contra el campo de la entidad, NO contra el
+  blob `q`** (que incluye el motivo y mete ruido). `excluir` son falsos positivos
+  MEDIDOS, no hipótesis — incluye casos que el límite de palabra no puede resolver
+  (`de claro`, porque en "CARVAJAL DE CLARO GLADYS" el apellido sí es palabra
+  completa). Resultado: uber 8→1 real · claro 11→8 reales · didi 3→0.
+- **TEMA** (`topicos`) → pilares Congreso y Ejecutivo, que legislan la ACTIVIDAD.
+  Se expresa como **llaves del tesauro SINONIMOS**, no como términos propios: si el
+  vocabulario de un tópico cambia, las 230 entradas lo heredan.
+
+**NÚCLEO vs CONTEXTO (la decisión de diseño que da la precisión):** el primer tópico
+es el núcleo (la actividad que ES la empresa) y es el único que se busca por defecto;
+los demás son contexto y entran solo si el usuario amplía. Medido: «Uber» núcleo=35
+vs todo=124, y los 89 extra son 'reforma laboral' genérica — o sea ruido vendido como
+señal. Una empresa con dos actividades de verdad centrales marca la segunda con `*`
+(Rappi `*laboral`, EPM `*agua y saneamiento`, Google `*datos personales`; 14 casos).
+El frontend muestra el aviso «X es una empresa del diccionario · se buscó por: …»
+con el enlace **ampliar/volver a lo esencial** (`empresaHint`/`wireEmpresaHint` en
+`caudal.html`), mismo principio que los avisos de sinónimos y búsqueda flexible:
+**nada de resultados que aparecen por magia**.
+
+- **Cableado**: `caudal_core._empresas_topicos(query, ampliar)` mete los tópicos al
+  MISMO OR del tesauro; `buscar(ampliar_empresa=…)`; `resumen_tema` reporta
+  `empresas:[{nombre,tipo,sector,nucleo,contexto,identidad}]`. Lambda: helpers
+  `_empresas_payload` / `_vocab_empresa` + las acciones `tema`, `sanciones` y
+  `ejecutivo` (aditivo, no toca ninguna otra ruta). `build_zip.py` **ya empaqueta
+  `empresas.py`** — es la 3ª pieza del ZIP.
+- **La expansión IA se SALTA cuando la consulta es una empresa** (`tema`): la
+  traducción curada ya cubre el desajuste, es determinista, no cuesta una llamada al
+  modelo y no le mete al OR términos inventados.
+- ⚠ **Los alias NO entran como término de título** a propósito: `_phrase_match` va
+  por substring/raíz y 'claro' casaría dentro de "de**claró**". El nombre literal sí
+  se busca en el TEXTO de gaceta, vía el ancla de `buscar`. Efecto colateral bueno:
+  «uber» dejó de traer 7 falsos por "g**uber**namental".
+- ⚠ **El blob `q` de sanciones/normativa viene en minúsculas pero CON tildes**
+  ("minería") y los términos del tesauro van sin ellas → comparar los dos lados
+  plegados con `empresas._n`, o no casa nunca.
+- **Verificado** (`python3 tools/caudal/empresas.py verificar`): 0 llaves de tópico
+  inválidas, 0 llaves duplicadas; 3 choques de alias que son ambigüedades REALES del
+  mercado (Colpatria banco/seguros, Falabella retail/banco, Suramericana seguros/EPS)
+  y resuelven bien. Control de falsos disparos: 1 de 28 consultas temáticas normales
+  ("claro que sí"). Cobertura contra el dato real: **230/230 (100%) devuelven
+  proyectos en Congreso** y **71/230 (31%) tienen sanción propia** en Regulatorio —
+  el 31% es la tasa real del mundo, no todas las empresas han sido sancionadas.
+- **Para agregar empresas**: una tupla de 7 en `_RAW` (o `_RAW_GREMIOS`) +
+  `verificar`. Nunca poner una palabra común suelta en `alias` (usar 'grupo exito',
+  'meta platforms', 'tiendas ara'). También faltan **17 tópicos nuevos** que se
+  agregaron a SINONIMOS para que las empresas tuvieran a dónde mapear (salud/EPS,
+  pensiones, seguros, competencia y consumidor, aviación, vivienda, retail, turismo,
+  puertos, agua, tributario, juegos de azar, educación superior, tecnología/IA,
+  laboral, seguridad privada, aduanas) — todos medidos contra títulos reales; se
+  descartaron los que colisionan por stem: `seguros`→`segur`≈seguridad social (580
+  hits casi todos ajenos) y `puertos`→`puert`≈AEROPUERTO, que van como frase.
 
 ### Arquitectura Caudal · paraguas vs pilares (aclaración conceptual jul-2026)
 
