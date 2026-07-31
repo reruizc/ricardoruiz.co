@@ -722,6 +722,111 @@ def casa_registro_any(emps, texto):
     return any(casa_registro(e, texto) for e in emps)
 
 
+# --- razón social · el gate que pide SECOP ----------------------------------
+# `casa_registro` (palabra completa + excluir) alcanza para el pilar Regulatorio,
+# donde `sancionado` son decenas de nombres de empresa. En CONTRATACIÓN no: el
+# proveedor de SECOP II son 5,87 M filas dominadas por PERSONAS NATURALES, y las
+# marcas de este diccionario son nombres y apellidos corrientes en Colombia.
+# Medido jul-2026 sobre el dataset real: de las filas que `casa_registro` deja
+# pasar, 42/42 en «uber» ("JOSE UBER ESCOBAR", "UBER DANIEL CHARA CERON") y
+# 34/34 en «claro» ("Álvaro José Claro Ríos") son personas, no la empresa.
+# La lista `excluir` no puede cubrirlo: se curó contra decenas de sanciones, y
+# acá el universo son millones de cédulas.
+#
+# El discriminador que sí funciona es la FORMA del nombre: una razón social es
+# la marca más decoración societaria ("COMCEL S.A.", "Rappi S.A.S.",
+# "BANCOLOMBIA"); una persona lleva la marca entre otros nombres propios. Se
+# quita la decoración y se exige que lo que queda SEA la marca.
+_DECOR = {
+    'sas', 'sa', 's', 'a', 'as', 'ltda', 'limitada', 'esp', 'e', 'p', 'eice',
+    'eu', 'sca', 'spa', 'inc', 'llc', 'ltd', 'plc', 'corp', 'cia', 'compania',
+    'y', 'de', 'del', 'la', 'el', 'los', 'las', 'en', 'c', 'bic', 'zomac',
+    'sucursal', 'colombia', 'colombiana', 'sucursales', 'nit', 'sociedad',
+    'anonima', 'simplificada', 'sucursal colombia',
+}
+# Palabras de LÍNEA DE NEGOCIO: pueden acompañar a la marca sin dejar de ser la
+# empresa ("Fiduciaria Bancolombia"). NO entran acá los marcadores de "otra
+# entidad que solo menciona la marca" —cooperativa, consorcio, union, temporal,
+# fundacion, asociacion, junta—, que son justo los falsos positivos medidos
+# ("COOPERATIVA DE TRABADORES DE AVIANCA", "CONSORCIO CLARO HITSS").
+_LINEA = {
+    'telecomunicaciones', 'telefonia', 'movil', 'moviles', 'celular', 'soluciones',
+    'servicios', 'energia', 'gas', 'seguros', 'seguros generales', 'vida',
+    'fiduciaria', 'fiducia', 'banco', 'bancario', 'comisionista', 'bolsa',
+    'eps', 'ips', 'salud', 'medicina', 'prepagada', 'alimentos', 'bebidas',
+    'comercial', 'industrial', 'logistica', 'transporte', 'carga', 'aereo',
+    'holding', 'group', 'international', 'andina', 'americas', 'sucursal',
+    'pay', 'tecnologias', 'technologies', 'sistemas', 'digital',
+}
+
+
+def _tokens_marca(nombre):
+    """Nombre sin decoración societaria → los tokens que de verdad identifican."""
+    return [t for t in _n(nombre).split() if t not in _DECOR]
+
+
+def es_razon_social(nombre, emp):
+    """¿Este nombre ES la empresa, o solo la contiene? Verificado contra SECOP:
+    ✓ 'COMCEL S.A.' · 'Rappi S.A.S.' · 'BANCOLOMBIA' · 'Fiduciaria Bancolombia'
+    ✗ 'JOSE UBER ESCOBAR' · 'Álvaro José Claro Ríos' (personas naturales)
+    ✗ 'COOPERATIVA DE TRABADORES DE AVIANCA' · 'CONSORCIO CLARO HITSS'
+      (otras entidades legales que nombran la marca)
+    Precisión antes que cobertura: una razón social larga que el diccionario no
+    registre queda fuera, y el sitio correcto de arreglarlo es su campo
+    `entidad`, no aflojar esta regla."""
+    toks = _tokens_marca(nombre)
+    if not toks:
+        return False
+    tn = _n(nombre)
+    if any(_casa(x, tn) for x in emp['excluir']):
+        return False
+    for ident in emp['entidad']:
+        it = _tokens_marca(ident)
+        if not it:
+            continue
+        if toks == it:
+            return True
+        # la marca completa + palabras de línea de negocio ("Fiduciaria X")
+        resto = list(toks)
+        for t in it:
+            if t not in resto:
+                break
+            resto.remove(t)
+        else:
+            if resto and all(t in _LINEA for t in resto):
+                return True
+    return False
+
+
+def razon_social_any(emps, nombre):
+    return any(es_razon_social(nombre, e) for e in emps)
+
+
+def empieza_por_marca(nombre, emp):
+    """Regla laxa para nombres de ENTIDAD PÚBLICA, donde no hay personas
+    naturales y la marca encabeza la dependencia: 'SENA REGIONAL VALLE Grupo de
+    Apoyo Administrativo Mixto' es el SENA comprando. Medido: sobre
+    `nombre_entidad` no añade un solo falso en claro/uber/ecopetrol, y le suma
+    al SENA los ~323 k contratos en que es la entidad contratante.
+    NO usar sobre el proveedor: ahí 'UBER DANIEL CHARA CERON' también empieza
+    por la marca."""
+    tk = _tokens_marca(nombre)
+    if not tk:
+        return False
+    tn = _n(nombre)
+    if any(_casa(x, tn) for x in emp['excluir']):
+        return False
+    for ident in emp['entidad']:
+        it = _tokens_marca(ident)
+        if it and tk[:len(it)] == it:
+            return True
+    return False
+
+
+def marca_lidera_any(emps, nombre):
+    return any(empieza_por_marca(nombre, e) for e in emps)
+
+
 def filtrar_registros(emps, registros, campos):
     """Registros que pertenecen a alguna de las empresas. `campos` es la lista de
     llaves donde vive el nombre de la entidad (p. ej. ['sancionado'] en el pilar

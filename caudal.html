@@ -540,6 +540,11 @@
         <span class="rad-cta-txt"><b>Lo último radicado</b> · proyectos de ley de la legislatura viva, con su texto descargable el mismo día →</span>
       </a>
 
+      <a class="rad-cta" id="bancCta">
+        <span class="rad-cta-tag">Nuevo</span>
+        <span class="rad-cta-txt"><b>Disciplina de bancada</b> · qué tan en bloque vota cada partido, con quién se alinea y quién se le sale →</span>
+      </a>
+
       <div id="landing"></div>
       <div id="results"></div>
     </div>
@@ -554,6 +559,19 @@
            cruzado contra 36 años de histórico: cuántas veces se intentó antes.</p>
       </div>
       <div id="rad-body"></div>
+    </div>
+
+    <!-- ===== Disciplina de bancada (agregado del voto nominal) ===== -->
+    <div id="view-bancadas" hidden>
+      <button class="pill-back" id="bancBack">← Volver a Congreso</button>
+      <div class="hero">
+        <h1>Disciplina de <em>bancada</em>.</h1>
+        <p>El voto nominal, agregado por partido: qué tan en bloque vota cada
+           bancada, con quién coincide y quién se le sale. Cada cámara va por
+           separado — cubren periodos distintos y no registran lo mismo.</p>
+        <div class="chips" id="banc-cam"></div>
+      </div>
+      <div id="banc-body"></div>
     </div>
 
     <!-- ===== PILAR · Regulatorio (sanciones) ===== -->
@@ -878,7 +896,7 @@
     [/liberal/i,'#c0392b'],
     [/cambio radical/i,'#e0533a'],
     [/verde|alianza verde|alianza por colombia/i,'#4bb96a'],
-    [/de la u|unidad nacional/i,'#e0a03a'],
+    [/^la u$|de la u|unidad nacional/i,'#e0a03a'],
     [/mira/i,'#7c5cd0'],
     [/gobierno/i,'#6b7b87'],
   ];
@@ -928,7 +946,7 @@
   let _view='home';
   function showView(v){
     _view=v;
-    ['home','buscar','congreso','regulatorio','ejecutivo','contratacion','cliente','medios','radicados'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
+    ['home','buscar','congreso','regulatorio','ejecutivo','contratacion','cliente','medios','radicados','bancadas'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
     window.scrollTo(0,0);
     // ← Volver de arriba: desde un pilar vuelve a la portada de Caudal; solo desde
     // la portada sale al dashboard (el puente pilar↔portada↔sitio).
@@ -940,6 +958,7 @@
     if(v==='contratacion') conLoadStats();
     if(v==='medios') medLoadLanding();
     if(v==='radicados') radLoad();
+    if(v==='bancadas') bancLoad();
   }
   /* ---------- pilar Regulatorio · sanciones ---------- */
   const REG={sector:'', q:''};
@@ -1168,19 +1187,31 @@
         ¿Buscabas el filtro exacto? ${(d.chips||[]).map(c=>`<a href="#" class="con-chip" data-campo="${esc(c.campo)}" data-valor="${esc(c.valor)}" style="color:var(--teal)">${esc(c.etiqueta)}: ${esc(c.valor)} (${fmt(c.n)})</a>`).join(' · ')}
         — filtra sin el ruido del texto libre.</div>`:'';
     const solo=d.solo_objeto?`<div class="cob-note" style="margin-bottom:1rem">Precisión activa: de los ${fmt(d.revisadas||0)} contratos más recientes de esta búsqueda, ${fmt(d.n)} nombran la frase en el <b>objeto</b>. El total de arriba es el universo completo.</div>`:'';
+    // ④ con qué nombres exactos se contó: el usuario tiene que poder auditar
+    // que "los contratos de Claro" son de COMCEL S.A. y no de un homónimo.
+    const nomb=[...(d.proveedores||[]).map(x=>[x,'proveedor']),...(d.entidades||[]).map(x=>[x,'entidad contratante'])];
+    const ident=d.identidad_empresa&&nomb.length?`<div class="cob-note" style="margin-bottom:1rem">
+        Razones sociales incluidas: ${nomb.slice(0,6).map(([x,rol])=>`<b>${esc(x.nombre)}</b> <span style="color:var(--ink3)">(${fmt(x.n)} · ${rol})</span>`).join(' · ')}${nomb.length>6?` <span style="color:var(--ink3)">y ${nomb.length-6} más</span>`:''}${d.n_descartados?` — se descartaron ${fmt(d.n_descartados)} nombres que solo <i>contienen</i> la marca (${(d.descartados||[]).slice(0,2).map(x=>esc(x.nombre)).join(', ')}…).`:'.'}
+        ${d.truncado?' <b>Nota:</b> hay más razones sociales de las que caben en una consulta; el total puede quedarse corto.':''}</div>`:'';
     el.innerHTML=`
       <div class="r-titular" style="font-size:1.4rem">${titular}</div>
       <div class="r-sub" style="margin-bottom:1rem">${scope||'toda la contratación'}${valor}</div>
-      ${chips}${solo}
+      ${empresaHint(d.empresas,'con-emp-hint','contratacion')}
+      ${ident}${chips}${solo}
       <div class="chips" style="margin-bottom:1rem">
         <span class="chip${CON.orden==='reciente'?' on':''}" data-orden="reciente">Más recientes</span>
         <span class="chip${CON.orden==='valor'?' on':''}" data-orden="valor">Más caros</span>
-        ${d.query?`<span class="chip${CON.solo?' on':''}" data-solo="1">Solo en el objeto</span>`:''}
+        ${d.query&&!d.identidad_empresa?`<span class="chip${CON.solo?' on':''}" data-solo="1">Solo en el objeto</span>`:''}
         ${Object.keys(f).length?'<span class="chip" data-clear="1">✕ Quitar filtros</span>':''}
       </div>
       ${(d.por_departamento||[]).length>1?`<div class="cob-note" style="margin-bottom:1rem">Dónde está: ${(d.por_departamento||[]).slice(0,6).map(x=>`${esc(x.departamento)} (${fmt(x.n)})`).join(' · ')}</div>`:''}
-      <div class="sanc-list">${(d.resultados||[]).map(conCard).join('')||`<div class="err">Sin coincidencias.${Object.keys(f).length?' Hay filtros activos ('+esc(Object.values(f).join(' · '))+'): quítalos arriba y vuelve a buscar.':' Prueba otro término — recuerda que varias palabras se combinan con Y.'}</div>`}</div>
+      <div class="sanc-list">${(d.resultados||[]).map(conCard).join('')||`<div class="err">${
+        d.sin_contratos
+          ? `<b>${esc((d.empresas&&d.empresas[0]&&d.empresas[0].nombre)||d.query)}</b> no le vende al Estado por SECOP II: no hay ninguna razón social suya entre los proveedores.${d.n_descartados?` Sí aparecen ${fmt(d.n_descartados)} nombres que <i>contienen</i> la marca (${(d.descartados||[]).slice(0,3).map(x=>esc(x.nombre)).join(', ')}…), pero son homónimos, no la empresa.`:''} Usa el enlace de arriba si quieres verlos igual.`
+          : `Sin coincidencias.${Object.keys(f).length?' Hay filtros activos ('+esc(Object.values(f).join(' · '))+'): quítalos arriba y vuelve a buscar.':' Prueba otro término — recuerda que varias palabras se combinan con Y.'}`
+      }</div>`}</div>
       ${tot&&tot.contratos>d.n?`<div class="cob-note" style="margin-top:1rem">Mostrando ${fmt(d.n)} de ${fmt(tot.contratos)}. Afina con un filtro para ver menos.</div>`:''}`;
+    wireEmpresaHint('con-emp-hint', conBuscar);
     el.querySelectorAll('.chip[data-orden]').forEach(c=>c.onclick=()=>{ CON.orden=c.dataset.orden; conBuscar(); });
     el.querySelectorAll('.chip[data-solo]').forEach(c=>c.onclick=()=>{ CON.solo=!CON.solo; conBuscar(); });
     el.querySelectorAll('.chip[data-clear]').forEach(c=>c.onclick=()=>{ CON.filtros={}; conBuscar(); });
@@ -1199,7 +1230,8 @@
     if(landing) landing.style.display='none';
     if(el){ el.style.display='block'; el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Consultando SECOP en vivo <span class="dots"><span></span><span></span><span></span></span></div>'; }
     let d; try{ d=await call(Object.assign({action:'contratacion', query:CON.q, limit:50,
-                                            orden:CON.orden, solo_objeto:CON.solo}, CON.filtros)); }
+                                            orden:CON.orden, solo_objeto:CON.solo,
+                                            ampliar_empresa:_ampliarEmp}, CON.filtros)); }
     catch(e){ if(mine===_conSeq&&el) el.innerHTML='<div class="err">No se pudo consultar SECOP. Reintenta.</div>'; return; }
     if(mine!==_conSeq) return;
     if(d&&d.error){ if(el) el.innerHTML=`<div class="err">${esc(d.error)}</div>`; return; }
@@ -1360,8 +1392,118 @@
     RAD_DATA=d; radRender(d);
   }
 
+  /* ---------- disciplina de bancada · agregado del voto nominal ----------
+     Las dos cámaras NUNCA se mezclan: Cámara 2014-2026 con Sí/No/Abstención,
+     Senado desde 2017 y solo Sí/No, con un orden de magnitud menos votaciones
+     contestadas. El alcance de cada una se imprime arriba de sus cifras. */
+  let BANC_DATA=null, BANC_CAM='camara', _bancInited=false;
+  const bancPct=v=>(v==null?'—':v+'%');
+  function bancBar(frac,color,alto){
+    const w=Math.max(0,Math.min(100,100*frac));
+    return `<span class="cx-bar" style="height:${alto||8}px"><span style="width:${w}%;background:${color};transition:none"></span></span>`;
+  }
+  // serie de cohesión: SVG inline (sin CSS nuevo), una línea por bancada
+  function bancSerie(d){
+    const s=d.serie||[];
+    if(!s.length) return `<div class="panel wide"><h3>Evolución de la cohesión</h3>
+      <div class="cob-note" style="margin-top:0">${esc(d.nota_serie||'Sin serie: no hay suficientes votaciones contestadas para medir evolución.')}</div></div>`;
+    const bs=(d.bancadas||[]).map(b=>b.bancada);
+    const W=760,H=210,P={t:14,r:12,b:26,l:34};
+    const x=i=>P.l+(s.length<2?0:i*(W-P.l-P.r)/(s.length-1));
+    const y=v=>P.t+(1-v)*(H-P.t-P.b);
+    const grid=[0,.25,.5,.75,1].map(v=>`<line x1="${P.l}" y1="${y(v).toFixed(1)}" x2="${W-P.r}" y2="${y(v).toFixed(1)}" stroke="rgba(255,255,255,.07)"/>`
+      +`<text x="${P.l-6}" y="${(y(v)+3).toFixed(1)}" text-anchor="end" fill="#6b7b87" font-size="9">${v.toFixed(2)}</text>`).join('');
+    const ejeX=s.map((p,i)=>`<text x="${x(i).toFixed(1)}" y="${H-8}" text-anchor="middle" fill="#6b7b87" font-size="9">${esc(p.periodo)}</text>`).join('');
+    const lineas=bs.map(b=>{
+      const pts=s.map((p,i)=>({i,v:p.rice[b]})).filter(p=>p.v!=null);
+      if(pts.length<2) return '';
+      const c=pcolor(b);
+      const path=pts.map((p,k)=>`${k?'L':'M'}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+      return `<path d="${path}" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"/>`
+        + pts.map(p=>`<circle cx="${x(p.i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="2.4" fill="${c}"></circle>`).join('');
+    }).join('');
+    const leg=bs.map(b=>`<span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.62rem;color:var(--ink2)"><span style="width:.55rem;height:.55rem;border-radius:50%;background:${pcolor(b)}"></span>${esc(b)}</span>`).join('');
+    return `<div class="panel wide"><h3>Evolución de la cohesión · índice de Rice por ${d.serie_tipo==='era'?'era':'año'}</h3>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${grid}${lineas}${ejeX}</svg>
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem .9rem;margin-top:.7rem">${leg}</div>
+      <div class="cob-note">Solo periodos con al menos 25 votaciones contestadas, y solo bancadas con 8 o más votaciones en ese periodo. Faltan 2012, 2018 y 2019: sus actas quedaron parseadas a medias (mediana de 2 a 12 votantes por votación) y no son plenarias completas.</div></div>`;
+  }
+  function bancRender(){
+    const el=document.getElementById('banc-body'); if(!el||!BANC_DATA) return;
+    const d=BANC_DATA[BANC_CAM]||{}, c=d.cobertura||{}, bs=d.bancadas||[];
+    if(!bs.length){ el.innerHTML='<div class="err">Sin datos de bancada para esta cámara.</div>'; return; }
+    const maxRice=Math.max(...bs.map(b=>b.rice));
+    const coh=bs.map(b=>`<div class="cx-row">
+        <span class="cx-lab" style="width:120px;color:${pcolor(b.bancada)}">${esc(b.bancada)}</span>
+        ${bancBar(b.rice/Math.max(.001,maxRice),pcolor(b.bancada))}
+        <span class="cx-n" style="width:112px">${b.rice.toFixed(2)} · bloque ${b.bloque_pct}%</span>
+      </div>`).join('');
+    // alineación: el Pacto se mide contra sí mismo, así que se marca aparte
+    const ali=bs.slice().sort((a,b)=>(b.alineacion_petro||0)-(a.alineacion_petro||0)).map(b=>{
+      const v=b.alineacion_petro;
+      return `<div class="cx-row">
+        <span class="cx-lab" style="width:120px;color:${pcolor(b.bancada)}">${esc(b.bancada)}</span>
+        ${bancBar((v||0)/100,pcolor(b.bancada))}
+        <span class="cx-n" style="width:112px">${bancPct(v)}${b.es_gobierno?' · es gobierno':''}</span>
+      </div>`;}).join('');
+    const dm=d.disidentes_meta||{};
+    const dis=(d.disidentes||[]).map(x=>`<div class="tl-item banc-dis" data-k="${esc(x.key)}">
+        <span style="width:52px;flex-shrink:0;font-weight:700;color:var(--amber)">${x.pct}%</span>
+        <span style="flex:1;min-width:0"><span style="color:var(--ink)">${esc(x.nombre)}</span>
+          <span style="color:${pcolor(x.bancada)};font-size:.66rem"> · ${esc(x.bancada)}</span></span>
+        <span style="flex-shrink:0;font-size:.66rem;color:var(--ink3)">${x.d} de ${x.n} votaciones</span>
+      </div>`).join('');
+    const cob=bs.map(b=>`<span style="font-size:.62rem;color:var(--ink3)">${esc(b.bancada)} <b style="color:var(--ink2)">${b.n_miembros}</b> personas · ${fmt(b.n_votos)} votos</span>`).join(' &nbsp;·&nbsp; ');
+    el.innerHTML=`
+      <div class="cob-note" style="margin:0 0 1rem;font-size:.72rem;color:var(--ink2);line-height:1.5">
+        <b style="color:var(--ink)">${esc(d.nombre||'')}</b> · ${esc(c.desde||'')} a ${esc(c.hasta||'')}. ${esc(d.alcance||'')}</div>
+      <div class="kpis">
+        <div class="kpi"><div class="n">${fmt(c.n_contestadas)}</div><div class="l">Votaciones contestadas</div></div>
+        <div class="kpi"><div class="n">${fmt(c.n_analizadas)}</div><div class="l">Votaciones analizadas</div></div>
+        <div class="kpi"><div class="n">${bs.length}</div><div class="l">Bancadas medidas</div></div>
+        <div class="kpi"><div class="n">${(100-(c.pct_sin_partido||0)).toFixed(1)}%</div><div class="l">Votos con partido</div></div>
+      </div>
+      <div class="grid2">
+        <div class="panel"><h3>Cohesión · qué tan en bloque vota</h3>${coh}
+          <div class="cob-note">Índice de Rice: |Sí−No| dividido por (Sí+No) dentro de la bancada, promediado sobre las votaciones contestadas. <b>1,00</b> = votó en bloque perfecto; <b>0</b> = partida por la mitad. «Bloque» es el porcentaje de votaciones donde al menos el 90% votó del mismo lado.</div></div>
+        <div class="panel"><h3>Alineación con el gobierno · desde ago-2022</h3>${ali}
+          <div class="cob-note">Porcentaje de votos que coincidieron con la posición del Pacto (su mayoría, ≥60%), restringido al gobierno Petro. <b>El Pacto coincide consigo mismo por definición</b>: su cifra no dice nada sobre él. Solo votaciones contestadas.</div></div>
+      </div>
+      ${bancSerie(d)}
+      <div class="panel wide" style="margin-top:1.2rem"><h3>Quién se sale de su propia bancada</h3>
+        ${dis||'<div class="cob-note" style="margin-top:0">Sin nadie por encima del mínimo de votaciones evaluables.</div>'}
+        <div class="cob-note">Porcentaje de votaciones contestadas en que la persona votó contra la mayoría de su propia bancada. Entran quienes tengan al menos ${dm.min_votos||0} votaciones evaluables: ${fmt(dm.n_evaluables||0)} personas lo cumplen y su disidencia mediana es ${dm.mediana_pct==null?'—':dm.mediana_pct+'%'}. Click para ver su récord completo.${BANC_CAM==='senado'?' <b>En Senado descansa en muy pocas votaciones</b> — mira la n de cada fila antes de sacar conclusiones.':''}</div></div>
+      <div class="panel wide" style="margin-top:1.2rem"><h3>Cobertura · lo que queda por fuera</h3>
+        <div style="font-size:.74rem;color:var(--ink2);line-height:1.6">
+          De ${fmt(c.n_votaciones)} votaciones registradas se analizan <b>${fmt(c.n_analizadas)}</b>:
+          se descartan ${fmt(c.n_descartadas_repetido)} donde alguien aparece votando dos veces${c.n_descartadas_sin_quorum?`, ${fmt(c.n_descartadas_sin_quorum)} con menos de ${c.min_votantes} votantes (actas parseadas a medias, no plenarias)`:''}${c.n_descartadas_duplicado?` y ${fmt(c.n_descartadas_duplicado)} que la fuente republica con la misma lista exacta de votos en otras fechas`:''}.
+          De esas, <b>${fmt(c.n_contestadas)}</b> (${c.pct_contestadas}%) están contestadas: las unánimes se excluyen porque ahí todas las bancadas dan cohesión perfecta y el número deja de medir disciplina.
+          <br><br>El <b>${c.pct_sin_partido}%</b> de los votos llega sin partido en la fuente y otro tanto pertenece a partidos que no forman bancada propia —organizaciones CITREP de un solo representante, coaliciones, movimientos pequeños—: entre unos y otros, el <b>${c.pct_no_asignado}%</b> de los votos queda fuera de estas cifras. No se les inventa una bancada ni se reparten entre las existentes.
+        </div>
+        <div style="margin-top:.8rem;line-height:2">${cob}</div>
+        <div class="cob-note">Fuente: ${esc(d.fuente||'')}.</div></div>`;
+    el.querySelectorAll('.banc-dis').forEach(x=>x.onclick=()=>abrirCongresista(x.dataset.k));
+  }
+  function bancSync(){ document.querySelectorAll('#banc-cam .chip').forEach(c=>c.classList.toggle('on',c.dataset.cam===BANC_CAM)); }
+  async function bancLoad(){
+    const el=document.getElementById('banc-body'); if(!el) return;
+    if(!_bancInited){
+      _bancInited=true;
+      const cont=document.getElementById('banc-cam');
+      if(cont) [['camara','Cámara de Representantes'],['senado','Senado']].forEach(([k,t])=>{
+        const c=document.createElement('span'); c.className='chip'; c.dataset.cam=k; c.textContent=t;
+        c.onclick=()=>{ BANC_CAM=k; bancSync(); bancRender(); }; cont.appendChild(c); });
+      bancSync();
+    }
+    if(BANC_DATA){ bancRender(); return; }
+    el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Cargando disciplina de bancada <span class="dots"><span></span><span></span><span></span></span></div>';
+    let d; try{ d=await call({action:'bancadas'}); }catch(e){ el.innerHTML='<div class="err">No se pudo cargar. Reintenta.</div>'; return; }
+    BANC_DATA=d; bancRender();
+  }
+
   /* ---------- Búsqueda universal · 4 pilares (Punto 2) ---------- */
-  const UNI_TABS=[['congreso','Congreso'],['regulatorio','Regulatorio'],['ejecutivo','Ejecutivo'],['medios','Medios']];
+  const UNI_TABS=[['congreso','Congreso'],['regulatorio','Regulatorio'],['ejecutivo','Ejecutivo'],
+                  ['contratacion','Contratación'],['medios','Medios']];
   let _uniSeq=0, _uniData={};
   async function uniSearch(query){
     query=(query||'').trim(); if(!query) return;
@@ -1371,25 +1513,30 @@
     const box=document.getElementById('uni-results');
     box.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Buscando en los 4 pilares <span class="dots"><span></span><span></span><span></span></span></div>';
     const amp=_ampliarEmp;
-    const [cong,reg,eje,med]=await Promise.allSettled([
+    const [cong,reg,eje,con,med]=await Promise.allSettled([
       call({action:'tema', query, lectura:false, ampliar_empresa:amp}),
       call({action:'sanciones', query}),
       call({action:'ejecutivo', query, ampliar_empresa:amp}),
+      call({action:'contratacion', query, limit:40, ampliar_empresa:amp}),
       call({action:'medios', query}),
     ]);
     if(mine!==_uniSeq) return;
     const V=x=>x&&x.status==='fulfilled'?x.value:null;
-    const cD=V(cong), rD=V(reg), eD=V(eje), mD=V(med);
+    const cD=V(cong), rD=V(reg), eD=V(eje), oD=V(con), mD=V(med);
     const cR=cD&&cD.resumen;
     const counts={
       congreso: cR?((cR.intentos||[]).filter(i=>!i.match_texto).length):0,
       regulatorio: rD?(rD.n||0):0, ejecutivo: eD?(eD.n||0):0, medios: mD?(mD.n||0):0,
+      // el total de SECOP es el universo de la búsqueda; con filtro de empresa
+      // el universo YA es el de la empresa, así que en los dos casos manda
+      // `total` y solo se cae a las filas traídas si el agregado falló.
+      contratacion: oD?((oD.total&&oD.total.contratos)||oD.n||0):0,
     };
-    _uniData={congreso:cD, regulatorio:rD, ejecutivo:eD, medios:mD, query, counts};
+    _uniData={congreso:cD, regulatorio:rD, ejecutivo:eD, contratacion:oD, medios:mD, query, counts};
     const first=(UNI_TABS.find(([k])=>counts[k]>0)||UNI_TABS[0])[0];
     // ④ la traducción marca → tema se muestra ARRIBA de las pestañas: aplica a
     // los 4 pilares a la vez, no a uno. La reporta cualquiera que la resuelva.
-    const emps=(cR&&cR.empresas)||(rD&&rD.empresas)||(eD&&eD.empresas)||null;
+    const emps=(cR&&cR.empresas)||(rD&&rD.empresas)||(eD&&eD.empresas)||(oD&&oD.empresas)||null;
     box.innerHTML=`
       <div class="r-sub">Resultados para <b>${esc(query)}</b> en los pilares activos</div>
       ${empresaHint(emps,'uni-emp-hint')}
@@ -1416,12 +1563,18 @@
       const rows=tit.slice(0,25).map(uniMiniRow).join('')||'<div class="cob-note">Ninguno lo lleva en el título.</div>';
       return `<div class="cob-note" style="margin-bottom:.8rem"><b>${tit.length}</b> con «${esc(query)}» en el título · <b>${txt.length}</b> lo mencionan en el texto. <a class="bd-link" id="uni-cong-full">Ver el análisis completo (embudo, éxito, bancadas) →</a></div><div class="tl tl-scroll">${rows}</div>`;
     }
-    const card={regulatorio:sancCard, ejecutivo:ejeCard, medios:medHeadCard}[k];
+    const card={regulatorio:sancCard, ejecutivo:ejeCard, contratacion:conCard, medios:medHeadCard}[k];
     const l=(d&&d.resultados)||[];
-    const noun={regulatorio:['sanción','sanciones'], ejecutivo:['norma','normas'], medios:['titular','titulares']}[k];
-    const empty={regulatorio:'Sin sanciones para este término.', ejecutivo:'Sin normas del Ejecutivo para este término.', medios:'Sin cobertura de prensa reciente para este tema.'}[k];
+    const noun={regulatorio:['sanción','sanciones'], ejecutivo:['norma','normas'], contratacion:['contrato','contratos'], medios:['titular','titulares']}[k];
+    const empty={regulatorio:'Sin sanciones para este término.', ejecutivo:'Sin normas del Ejecutivo para este término.', contratacion:'Sin contratos en SECOP para este término.', medios:'Sin cobertura de prensa reciente para este tema.'}[k];
+    if(k==='contratacion'&&d&&d.sin_contratos)
+      return `<div class="err"><b>${esc((d.empresas&&d.empresas[0]&&d.empresas[0].nombre)||query)}</b> no le vende al Estado por SECOP II. <a class="bd-link" id="uni-contratacion-full">abrir el pilar →</a></div>`;
     if(!l.length) return `<div class="err">${empty}</div>`;
-    return `<div class="cob-note" style="margin-bottom:.8rem">${fmt(d.n)} ${d.n===1?noun[0]:noun[1]} · <a class="bd-link" id="uni-${k}-full">abrir en el pilar →</a></div><div class="sanc-list">${l.slice(0,40).map(card).join('')}</div>`;
+    const tot=(d.total&&d.total.contratos)||d.n;
+    const cab=k==='contratacion'
+      ? `${fmt(tot)} ${tot===1?'contrato':'contratos'}${d.identidad_empresa?' <b>de la empresa</b>':''}${d.total&&d.total.valor_cop?` · ${fmtCOP(d.total.valor_cop)}`:''}${tot>l.length?` · mostrando ${fmt(l.length)}`:''}`
+      : `${fmt(d.n)} ${d.n===1?noun[0]:noun[1]}`;
+    return `<div class="cob-note" style="margin-bottom:.8rem">${cab} · <a class="bd-link" id="uni-${k}-full">abrir en el pilar →</a></div><div class="sanc-list">${l.slice(0,40).map(card).join('')}</div>`;
   }
   function wireUniTab(k){
     const query=_uniData.query;
@@ -1434,6 +1587,7 @@
     f.onclick=()=>{
       if(k==='regulatorio'){ showView('regulatorio'); const e=document.getElementById('rq'); if(e)e.value=query; REG.q=query; regBuscar(); }
       if(k==='ejecutivo'){ showView('ejecutivo'); const e=document.getElementById('eq'); if(e)e.value=query; EJE.q=query; ejeBuscar(); }
+      if(k==='contratacion'){ showView('contratacion'); const e=document.getElementById('cq'); if(e)e.value=query; CON.q=query; CON.filtros={}; conBuscar(); }
       if(k==='medios'){ showView('medios'); const e=document.getElementById('mq'); if(e)e.value=query; MED.q=query; medBuscar(); }
     };
   }
@@ -1463,6 +1617,8 @@
     const cb=document.getElementById('congresoBack'); if(cb) cb.onclick=()=>showView('home');
     const rcta=document.getElementById('radCta'); if(rcta) rcta.onclick=()=>showView('radicados');
     const rbk=document.getElementById('radBack'); if(rbk) rbk.onclick=()=>showView('congreso');
+    const bcta=document.getElementById('bancCta'); if(bcta) bcta.onclick=()=>showView('bancadas');
+    const bbk=document.getElementById('bancBack'); if(bbk) bbk.onclick=()=>showView('congreso');
   }
 
   /* ---------- Vista Cliente · Radar (SKU A) ---------- */
@@ -1499,6 +1655,17 @@
         <div class="sig-title"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.titulo)}</a></div>
         <div class="sig-tags">${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
+    if(x.tipo==='contratacion'){
+      const tags=[x.proveedor?esc(x.proveedor):'', x.departamento?esc(x.departamento):'', x.fecha?esc(x.fecha):'',
+                  x.valor?fmtCOP(x.valor):''].filter(Boolean).join(' · ');
+      const tit=x.url
+        ?`<a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.entidad||'—')}</a>`
+        :esc(x.entidad||'—');
+      return `<div class="sig ${x.nivel}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title">${tit}</div>
+        ${x.objeto?`<div class="sig-tags" style="opacity:.85">${esc(x.objeto)}</div>`:''}
+        <div class="sig-tags">${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
+    }
     const monto=x.monto?' · '+fmtCOP(x.monto):'';
     return `<div class="sig ${x.nivel}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
       <div class="sig-title">${esc(x.sancionado||'—')}</div>
@@ -1507,18 +1674,19 @@
   }
   let _CLI_LAST=null;
   function cliDetalleHTML(pilar,d){
-    const cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[], medios=d.medios||[];
+    const cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[], medios=d.medios||[], con=d.contratacion||[];
     if(pilar==='congreso') return congreso.length?`<div class="sig-list">${congreso.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin proyectos accionables ahora.</div>';
     if(pilar==='regulatorio') return cl.sector_sanciones
       ? (reg.length?`<div class="sig-list">${reg.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin sanciones recientes en esta fuente.</div>')
       : '<div class="cli-reg-none">Este sector aún no tiene fuente de sanciones conectada — Superfinanciera y otras superintendencias entran por etapas.</div>';
+    if(pilar==='contratacion') return con.length?`<div class="sig-list">${con.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin contratación reciente para los temas de este sector.</div>';
     if(pilar==='medios') return medios.length?`<div class="sig-list">${medios.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin cobertura de prensa reciente para este sector.</div>';
     return '';
   }
   function cliRender(d){
     const body=document.getElementById('cli-body'); if(!body) return;
     _CLI_LAST=d;
-    const k=d.kpis, cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[], medios=d.medios||[];
+    const k=d.kpis, cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[], medios=d.medios||[], con=d.contratacion||[];
     const sancTxt=cl.sector_sanciones ? `<b>${reg.length}</b> sanción(es) reciente(s)` : `sanciones sin fuente conectada`;
     body.innerHTML=`
       <div class="kpis">
@@ -1527,7 +1695,7 @@
         <div class="kpi ley"><div class="n">${k.en_tramite}</div><div class="l">En trámite · ventana</div></div>
         <div class="kpi"><div class="n">${k.n_medios_sector?fmt(k.n_medios_sector):'—'}</div><div class="l">Prensa reciente</div></div>
       </div>
-      <div class="cli-note"><b>Activo ahora en ${esc(cl.nombre)}:</b> <b>${k.en_tramite}</b> proyecto(s) de ley en trámite · ${sancTxt} · <b>${fmt(k.n_medios_sector||0)}</b> titular(es) de prensa reciente.</div>
+      <div class="cli-note"><b>Activo ahora en ${esc(cl.nombre)}:</b> <b>${k.en_tramite}</b> proyecto(s) de ley en trámite · ${sancTxt} · <b>${fmt(k.n_medios_sector||0)}</b> titular(es) de prensa reciente · <b>${fmt(k.n_contratos_sector||0)}</b> contrato(s) reciente(s) en SECOP.</div>
       <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt(k.n_sanciones_sector)}</b> sanciones`:''} en el sector, el radar prioriza por accionabilidad — precisión sobre volumen.</div>
       <div class="lectura">
         <div class="tag">◈ Lectura del analista · briefing de hoy para ${esc(cl.nombre)}</div>
@@ -1537,6 +1705,7 @@
       <div class="chips" id="cli-toggle" style="justify-content:flex-start;margin-top:.3rem">
         <span class="chip" data-p="congreso">Legislativo <b>${congreso.length}</b></span>
         <span class="chip" data-p="regulatorio">Regulatorio <b>${reg.length}</b></span>
+        <span class="chip" data-p="contratacion">Contratación <b>${con.length}</b></span>
         <span class="chip" data-p="medios">Prensa <b>${medios.length}</b></span>
       </div>
       <div id="cli-detalle" style="margin-top:1rem"></div>`;
@@ -1582,9 +1751,20 @@
      el aviso de sinónimos y el de búsqueda flexible — nada aparece por magia.
      `ampliado` alterna núcleo (preciso, por defecto) ↔ núcleo + contexto. */
   let _ampliarEmp=false;
-  function empresaHint(emps, id){
+  function empresaHint(emps, id, modo){
     if(!emps||!emps.length) return '';
     const e=emps[0], esGremio=e.tipo==='gremio';
+    // En CONTRATACIÓN el diccionario juega su otra cara: acá la empresa sí
+    // aparece con nombre propio (es el proveedor), así que no se traduce a
+    // tema — se filtra por identidad. Ampliar = ver todo lo que menciona la
+    // marca, con los homónimos que eso arrastra.
+    if(modo==='contratacion'){
+      const mas=` <span class="bd-link" id="${id}-mas">${_ampliarEmp?'volver a solo sus contratos':'ampliar: ver todo lo que menciona «'+esc(e.nombre)+'»'} →</span>`;
+      return `<div class="broaden" id="${id}"><b>${esc(e.nombre)}</b> ${esGremio?'es un gremio':'es una empresa'} del diccionario de Caudal.
+        ${_ampliarEmp
+          ? 'Estás viendo <b>todo lo que menciona su nombre</b> en SECOP — incluye homónimos (en Colombia hay personas que se apellidan así).'
+          : 'Se filtró por <b>identidad del proveedor</b>: son los contratos que <b>son de la empresa</b>, no los que nombran la marca.'}${mas}</div>`;
+    }
     const nuc=(e.nucleo||[]).map(esc).join(' · ');
     const ctx=(e.contexto||[]);
     const mas=ctx.length

@@ -64,6 +64,24 @@ cd "$REPO" || { echo "no pude cd a $REPO" >&2; exit 1; }
   python3 tools/caudal/actas/harvest_ordenes_senado.py plenaria --workers 4 \
     | grep -E "órdenes del día de|descargas nuevas|^  !"
   rc_odp=${PIPESTATUS[0]}
+  # SECOP II · agregados del pilar de contratación. La fuente se actualiza a
+  # DIARIO, así que el landing tiene que seguirle el paso. `fetch` sin --force
+  # se salta los agregados que ya bajó hoy → la segunda corrida del día no le
+  # vuelve a pegar a Socrata (solo la primera hace trabajo real, ~2-4 min).
+  # Otro host (datos.gov.co), nada que ver con el WAF de leyes.senado.
+  echo "--- harvest_secop fetch+build (agregados de SECOP II) ---"
+  python3 tools/caudal/secop/harvest_secop.py fetch
+  rc_sf=$?
+  python3 tools/caudal/secop/harvest_secop.py build
+  rc_sb=$?
+  if [ $rc_sb -eq 0 ]; then
+    aws s3 cp "$REPO/Bases de datos/leyes-senado/secop/dist/s3/secop-stats.json" \
+      "s3://caudal-legislativo/metadata/secop-stats.json" \
+      --content-type "application/json" --cache-control "private, max-age=300"
+    rc_su=$?
+  else
+    rc_su=skip
+  fi
   echo "--- build_bloqueo_s3 + subida de bloqueo.json ---"
   python3 tools/caudal/actas/build_bloqueo_s3.py
   rc_bl=$?
@@ -75,5 +93,5 @@ cd "$REPO" || { echo "no pude cd a $REPO" >&2; exit 1; }
   else
     rc_bu=skip
   fi
-  echo "═════════ fin $(date '+%H:%M:%S') · senado=$rc_h upload=$rc_u camara=$rc_c camara_up=$rc_cu envivo=$rc_ev ordenes=$rc_od ordenes_sen=$rc_ods ordenes_sen_plen=$rc_odp bloqueo=$rc_bl bloqueo_up=$rc_bu ═════════"
+  echo "═════════ fin $(date '+%H:%M:%S') · senado=$rc_h upload=$rc_u camara=$rc_c camara_up=$rc_cu envivo=$rc_ev ordenes=$rc_od ordenes_sen=$rc_ods ordenes_sen_plen=$rc_odp secop=$rc_sf/$rc_sb secop_up=$rc_su bloqueo=$rc_bl bloqueo_up=$rc_bu ═════════"
 } >> "$LOG" 2>&1

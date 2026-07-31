@@ -6132,25 +6132,72 @@ memoria — donde diga "verificado" es porque se llamó la API o se miró el rep
 - **Refresco diario**: ambas cámaras entran al `run_diario.sh` que dispara
   launchd 2×/día.
 
+**✅ RESUELTO jul-31 · OCR de órdenes del día del Senado + títulos de Cámara**
+(reemplaza los ítems 1 y 3 de la lista vieja — ver hallazgo abajo, es importante):
+
+- **El "47% de la Sexta / ~19% de la Cuarta escaneados" era un bug de
+  conteo, no un problema de OCR.** El cuerpo HTTP del 404 de DOCman a veces
+  trae un `\n` suelto ANTES de `<!doctype html>` — el check viejo
+  `head[:1]==b'<'` no lo detectaba, así que el 404 (guardado con extensión
+  `.pdf`, 1.515 bytes, siempre el mismo stub) caía en pypdf, que tira
+  `Stream has ended unexpectedly` (38 chars) → se contaba como `n_escaneado`
+  cuando en realidad es `n_link_roto` (ya documentado como irrecuperable, sin
+  atajo de URL alterna). Fix: `es_error_html()` en
+  `harvest_ordenes_senado.py` busca `<!doctype html`/`<html` en cualquier
+  posición de los primeros 300 bytes, y se re-valida el caché ya escrito
+  (self-heal, sin re-descargar) además del flujo de descarga nueva.
+  **Tras el fix: Comisión Sexta → 0 escaneados reales** (los 168 eran 100%
+  404). **Comisión Cuarta → 26 escaneados REALES** (PDFs de 68-486 KB, header
+  `%PDF` válido, extracción nativa da solo espacios en blanco — scans
+  genuinos). Quinta 1 · Plenaria 4.
+- **OCR de los 31 genuinos** — `tools/caudal/actas/ocr_ordenes_senado.py`
+  (nuevo, mismo patrón que `ocr_pilot.py`/`parse_dcnsw_camara.py`: pymupdf
+  300dpi + tesseract spa; a diferencia del parser de voto nominal, acá basta
+  el texto corrido porque se re-alimenta al MISMO `CITA_RE`/`GACETA_REF_RE`
+  que ya usa el harvester — no se duplicó lógica de extracción). Los 31
+  dieron texto usable (0 en blanco, 0 error). `harvest_ordenes_senado.py`
+  ahora recoge `{id}.ocr.txt` cuando el nativo es corto, marca cada evento
+  con `fuente:'ocr'` + `confianza` (`alta` si la fecha se leyó del
+  documento, `media` si cayó al fallback de publicación), y **exige que el
+  número resuelto exista en `proyectos.jsonl` antes de contarlo** — los sin
+  match se descartan (`n_ocr_sin_match`) y NUNCA entran al índice, así que
+  no hace falta filtrar 'baja' río abajo: nunca se escriben. **Resultado
+  real: 0 `n_ocr_sin_match` en los 31** (100% de las citas OCR-eadas casan
+  con proyectos reales). Impacto en el índice: solo 2 proyectos de Cuarta
+  ganaron un evento (`245/24` y `262/25`, nuevo) — la mayoría de los 26 PDFs
+  o no citan proyecto en formato reconocible (sesiones conjuntas viejas,
+  2019) o su fecha ya estaba cubierta por otro documento nativo. **Cuarta
+  n_obs pasó de 40 a 41** — sigue MUY por debajo del umbral `n_obs≥100` que
+  la UI usa para suprimir la curva como ruido (`analiza_bloqueo.py`/
+  `build_bloqueo_s3.py`), así que **no cruza el umbral y la curva de Cuarta
+  sigue oculta**, sin cambio de comportamiento del frontend. Sexta quedó
+  IDÉNTICA antes/después (1.146 n_obs) — coherente con que ahí no había nada
+  que OCRear. Re-correr sobre `todas` (débiles + refrescar índice) si se
+  quiere ampliar el universo cosechado más allá de lo ya cacheado.
+- **Títulos de Cámara portados** — `harvest_ordenes.py` ya tenía
+  `load_numero_camara_map()` sin usar; ahora al final de `run()` rellena
+  `index[tok]['titulo']` desde `proyectos.jsonl` igual que hace
+  `harvest_ordenes_senado.py` (solo lo que falta, nunca pisa el título leído
+  del PDF). **Cobertura total Cámara: 3.907/3.963 = 98,6%** (antes: solo lo
+  que el PDF traía inline — primera pasó de 357/772=46% a 737/772=95,5%;
+  plenaria de ~21% a 1.474/1.488=99,1%), a la par de Senado (~99%).
+- `bloqueo.json` regenerado y subido a
+  `s3://caudal-legislativo/metadata/bloqueo.json` (1,3 MB). No hizo falta
+  redeploy de la Lambda (recarga el JSON de S3 en cold start).
+
 **🟡 PENDIENTE — en orden de valor:**
-1. **OCR de órdenes del día escaneadas.** El **47% de las de la Comisión Sexta
-   del Senado** (168 de 360) son PDF sin capa de texto y hoy se pierden; ídem
-   19% de la Cuarta. Tesseract ya está montado y probado en el repo
-   (`parse_dcnsw_camara.py`, `ocr_pilot.py`), así que es aplicar lo que existe.
-   Mismo lote que el OCR pendiente de gacetas pre-2006 y actas de Cámara
-   2010-2013.
-2. **Las 4 comisiones del Senado sin serie** (Primera · Segunda · Tercera ·
+1. **Las 4 comisiones del Senado sin serie** (Primera · Segunda · Tercera ·
    Séptima). **NO intentar por Gaceta**: medido, rezago de 11-16 meses y actas
    no aislables por filtro (ver la sección de arriba). Si algún día importa, la
    vía es targeted por proyecto+fecha. Hoy es hueco DECLARADO en el JSON
    (`alcance`) y en la UI — es una limitación honesta, no una deuda urgente.
-3. **Órdenes del día de comisión de Cámara: títulos al ~71%** (plenaria 60%).
-   En Senado ya se rellenan desde `proyectos.jsonl` y quedan al 99% — falta
-   portar ese mismo relleno a `harvest_ordenes.py`. Es barato.
-4. **Voto nominal de Senado pre-2017** (la API pública arranca en 2017) y el
+   Si se corren con `harvest_ordenes_senado.py todas`/`ocr_ordenes_senado.py
+   todas`, podrían sumar más candidatos genuinos de OCR además de los 31 ya
+   procesados (no verificado — esos 4 ámbitos no se han cosechado localmente).
+2. **Voto nominal de Senado pre-2017** (la API pública arranca en 2017) y el
    **voto MANUAL de Cámara ago-2021/sep-2022** (columna "X" posicional, pide
    pdfplumber). Ambos son cola larga.
-5. **Disciplina de bancada como vista propia** — el dato ya se mide por persona
+3. **Disciplina de bancada como vista propia** — el dato ya se mide por persona
    y por bancada, falta exponerlo agregado. Coaliciones sigue PAUSADO por
    decisión.
 
@@ -6600,10 +6647,62 @@ frontend) se cableó el 30-jul. Fuente: **SECOP II · Contratos Electrónicos**
 - **Cache** `analisis-cache/contratacion-{hash24}-{bucket 3h}` (mismo patrón del pilar
   Medios: la key cambia con el tiempo, no hay TTL explícito). ⚠️ **No invalida al
   redeployar** — al cambiar lógica, borrar a mano las keys `contratacion-*`.
-- **Pendiente:** `SOCRATA_APP_TOKEN` NO está seteada en la Lambda (corre con el rate
-  limit anónimo); refresco diario del `secop-stats.json` por launchd; mapeo UNSPSC
-  código→nombre; cruce con la Vista Cliente (`_secop_para_sector`, como
-  `_medios_para_sector`).
+- **④ Diccionario de empresas cableado (jul-31-2026) · la cara de IDENTIDAD.** En
+  Congreso y Ejecutivo el diccionario traduce marca → TEMA; acá la empresa SÍ aparece
+  con nombre propio (es el proveedor), así que se filtra por identidad.
+  ⚠️⚠️ **`empresas.filtrar_registros` a secas NO SIRVE en SECOP** (medido, no supuesto):
+  el proveedor son 5,87 M filas dominadas por PERSONAS NATURALES y las marcas son
+  nombres y apellidos corrientes — de las filas que `casa_registro` deja pasar,
+  **42/42 en «uber»** ("JOSE UBER ESCOBAR") y **34/34 en «claro»** ("Álvaro José Claro
+  Ríos") son personas. `excluir` no puede taparlo: se curó contra decenas de sanciones
+  y acá el universo son millones de cédulas.
+  El discriminador que sí funciona es la FORMA del nombre → **`empresas.es_razon_social`**
+  (quita decoración societaria `_DECOR` y exige que lo que queda SEA la marca; admite
+  palabras de línea de negocio `_LINEA`, "Fiduciaria Bancolombia") y
+  **`empresas.empieza_por_marca`** (regla laxa por PREFIJO, **solo para `nombre_entidad`**:
+  ahí no hay cédulas y "SENA REGIONAL VALLE…" es el SENA comprando; sobre el proveedor
+  filtraría "UBER DANIEL CHARA CERON", que también empieza por la marca).
+  - **El camino, en 2 pasos y sin `like` en ninguno** (`_secop_descubrir` +
+    `_contratacion_empresa`): (1) **descubrir nombres** con group-by sobre `$q`
+    (indexado, ~1 s) por proveedor y por entidad, para la consulta **y sus alias** —
+    `$q=comcel` encuentra la razón social que `$q=claro` hunde entre 1.859 apellidos;
+    (2) **filtrar por igualdad** con `$where … in (…)`, que además da el **TOTAL REAL de
+    la empresa**, no el universo ruidoso de `$q`. Latencia 0,9-8 s (peor caso SENA).
+  - **Medido en producción:** claro 5.298 → **236** (todas COMCEL S.A.) · rappi 22 → **1** ·
+    uber 715 → **0** · sena → **242.658** (vía entidad contratante) · epm 1.766 → **250** ·
+    sura → **313** (rechaza "SURAMERICANA DE GUANTES SAS", otra empresa). **Cero falsos
+    positivos de nombre en las 6.** Consulta que no es empresa: comportamiento idéntico
+    al anterior (0 regresiones).
+  - **Cuando la empresa no le vende al Estado NO se cae a `$q` en silencio** (eso
+    devolvería homónimos): responde `sin_contratos:true` y lo dice. Verificado: Uber y
+    Ecopetrol no tienen contratos propios en SECOP II.
+  - `ampliar_empresa` (el mismo toggle global de los otros pilares) apaga el filtro y
+    devuelve el `$q` crudo. La respuesta trae `proveedores`/`entidades` (las razones
+    sociales con las que se contó) y `descartados` → el frontend las muestra para que se
+    pueda auditar, y son el insumo para curar el campo `entidad` del diccionario.
+  - **Precisión antes que cobertura:** una razón social larga que el diccionario no
+    registre queda fuera (p. ej. "COMUNICACIÓN CELULAR S.A. COMCEL S.A.", 7 contratos).
+    El sitio de arreglarlo es el campo `entidad` de esa fila, **no aflojar el gate**.
+- **`view-contratacion` es la 4ª pestaña de la búsqueda universal** (`UNI_TABS`).
+- **Cruce con la Vista Cliente / Radar SIGA** (`_secop_para_sector`, espejo de
+  `_medios_para_sector`): bloque "Contratación" en la acción `cliente` + KPI
+  `n_contratos_sector`. ⚠️ Ordena **por VALOR dentro de los últimos 180 días**, no por
+  fecha: con `$order=fecha DESC` lo que sale son las últimas prestaciones de servicios
+  profesionales firmadas ese día (ruido); con valor salen los contratos que mueven la
+  aguja (INVIAS $650 mil millones en el sector contratación, MINSALUD $79 mil millones
+  en salud). Dedup por contrato Y por (entidad, objeto, valor) — una misma contratación
+  se publica repetida cuando son varios contratistas con el mismo objeto.
+- **Refresco diario ✅** en `tools/leyes-senado/run_diario.sh` (launchd 2×/día):
+  `harvest_secop.py fetch` (sin `--force` → la 2ª corrida del día se salta lo ya bajado)
+  → `build` → `aws s3 cp` de `secop-stats.json`.
+- **Pendiente:** `SOCRATA_APP_TOKEN` NO está seteada en la Lambda ni en el entorno del
+  Mac (corre con el rate limit anónimo de Socrata). Conseguirla exige una cuenta en
+  datos.gov.co (la crea Ricardo, no el agente) → `datos.gov.co/profile/app_tokens`, y
+  luego: `aws lambda update-function-configuration --function-name caudal-analiza
+  --environment "Variables={DEEPSEEK_API_KEY=…,SERPER_API_KEY=…,SOCRATA_APP_TOKEN=…}"`
+  (⚠️ el flag REEMPLAZA todo el bloque: hay que repetir las otras dos) + `export
+  SOCRATA_APP_TOKEN=…` en `run_diario.sh` para el harvester. También queda el mapeo
+  UNSPSC código→nombre.
 
 ## Roadmap post-2V · Chats conversacionales (LLM + function calling)
 

@@ -14,6 +14,10 @@ Acciones (POST JSON):
       → ficha del proyecto + punteros de gaceta (para la fase DeepSeek de texto).
   {"action":"buscar","query":"agua","limit":25,"anio_min":2010}
       → lista cruda de coincidencias del índice.
+  {"action":"bancadas"}  ·  {"action":"bancadas","camara":"senado"}
+      → disciplina de bancada: cohesión (índice de Rice), % de votaciones en
+        bloque, alineación con el gobierno y mayores disidentes, POR CÁMARA.
+        Las dos cámaras nunca se promedian (ver `meta.no_comparable`).
   {"action":"medios","query":"reforma pensional","dias":30}
       → pilar Medios: titulares de prensa nacional y regional vía Google News RSS
         (gratis, sin key). Sin `query` → landing con el pulso político nacional.
@@ -218,6 +222,21 @@ def _bloqueo():
         except Exception:
             _BLOQUEO = {'sistema': {}, 'por_proyecto': {}}
     return _BLOQUEO
+
+
+_BANCADAS = None
+
+
+def _bancadas():
+    """Disciplina de bancada: cohesión (Rice), alineación, disidentes y serie,
+    por cámara. Chico (~14 KB), se carga entero. Cache warm."""
+    global _BANCADAS
+    if _BANCADAS is None:
+        try:
+            _BANCADAS = _get_json('metadata/bancadas.json')
+        except Exception:
+            _BANCADAS = {'meta': {}, 'camara': {}, 'senado': {}}
+    return _BANCADAS
 
 
 def _num_token(num):
@@ -568,6 +587,125 @@ def _secop_chips(query, k=3):
     return hits[:k]
 
 
+# ④ identidad de empresa en SECOP · el puente del diccionario a este pilar.
+# En Congreso y Ejecutivo el diccionario traduce marca → TEMA (el Estado legisla
+# actividades). En Contratación aplica la otra cara: acá la empresa SÍ aparece
+# con nombre propio, como PROVEEDOR. Pero `$q=uber` trae 210 contratos de gente
+# que se llama Uber, y filtrar las filas con `casa_registro` no arregla nada
+# (medido: 42/42 falsos). Ver la nota larga de `es_razon_social` en empresas.py.
+#
+# El camino, en dos pasos y SIN `like` en ninguno (restricción dura del pilar):
+#   1. DESCUBRIR nombres: group-by sobre $q (indexado, ~1 s) por proveedor y por
+#      entidad, para la consulta y sus alias — '$q=comcel' encuentra la razón
+#      social de Claro que '$q=claro' hunde entre 1.859 apellidos.
+#   2. FILTRAR por igualdad: $where con `in (…)` sobre los nombres que pasaron
+#      el gate. Es un filtro exacto sobre columna indexada → rápido, y da el
+#      TOTAL REAL de la empresa (no el universo ruidoso de $q).
+SECOP_DESC_LIMIT = 2000        # nombres distintos que revisa el descubrimiento
+SECOP_DESC_TERMS = 3           # consulta + 2 alias (cada término = 2 queries)
+SECOP_IN_MAX = 40              # nombres por lado en el `in (…)` (tope de URL)
+
+
+def _secop_descubrir(query, emps):
+    """Nombres de proveedor/entidad del universo $q que SON la empresa."""
+    terms = [query]
+    for e in emps:
+        for a in e['alias'] + e['entidad']:
+            if a not in terms and len(terms) < SECOP_DESC_TERMS:
+                terms.append(a)
+    cols = ('proveedor_adjudicado', 'nombre_entidad')
+    vistos = {c: {} for c in cols}
+    jobs = [(t, c) for t in terms for c in cols]
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        futs = {pool.submit(_secop_get, {'$q': t, '$select': f'{c},count(1) as n',
+                                         '$group': c, '$order': 'n DESC',
+                                         '$limit': SECOP_DESC_LIMIT}): c
+                for t, c in jobs}
+        for fut in as_completed(futs):
+            c = futs[fut]
+            try:
+                filas = fut.result()
+            except Exception as e:
+                print(f'[secop] descubrimiento {c} FAIL: {type(e).__name__}: {e}')
+                continue
+            for r in filas:
+                nm = (r.get(c) or '').strip()
+                if nm:
+                    vistos[c][nm] = max(vistos[c].get(nm, 0), int(r.get('n') or 0))
+    # proveedor: gate ESTRICTO (acá viven las personas naturales).
+    # entidad: gate por prefijo (entidades públicas; 'SENA REGIONAL VALLE …' es
+    # el SENA comprando, y sobre esta columna no hay cédulas que se cuelen).
+    prov = sorted(((n, c) for n, c in vistos['proveedor_adjudicado'].items()
+                   if empresas.razon_social_any(emps, n)), key=lambda x: -x[1])
+    ent = sorted(((n, c) for n, c in vistos['nombre_entidad'].items()
+                  if empresas.marca_lidera_any(emps, n)), key=lambda x: -x[1])
+    # lo que el gate tumbó, para que se pueda auditar sin adivinar
+    desc = sorted(((n, c) for n, c in vistos['proveedor_adjudicado'].items()
+                   if empresas.casa_registro_any(emps, n)
+                   and not empresas.razon_social_any(emps, n)), key=lambda x: -x[1])
+    return prov, ent, desc
+
+
+def _secop_in(col, nombres):
+    lit = ','.join("'" + _secop_lit(n) + "'" for n, _ in nombres[:SECOP_IN_MAX])
+    return f'{col} in ({lit})'
+
+
+def _contratacion_empresa(body, query, emps, filtros, where_base):
+    """Búsqueda por IDENTIDAD de empresa: los contratos que son DE la empresa,
+    no los que mencionan su nombre. Devuelve None si el diccionario no encuentra
+    ninguna razón social → el caller cae a la búsqueda normal por $q."""
+    prov, ent, descartados = _secop_descubrir(query, emps)
+    if not prov and not ent:
+        return {'sin_contratos': True, 'descartados': descartados,
+                'empresas': _empresas_payload(emps)}
+    conds = []
+    if prov:
+        conds.append(_secop_in('proveedor_adjudicado', prov))
+    if ent:
+        conds.append(_secop_in('nombre_entidad', ent))
+    w = '(' + ' OR '.join(conds) + ')'
+    if where_base:
+        w += ' AND ' + where_base
+    limit = max(1, min(int(body.get('limit') or 50), 200))
+    orden = SECOP_ORDENES.get(body.get('orden') or 'reciente', SECOP_ORDENES['reciente'])
+    p_filas = {'$select': ','.join(SECOP_SELECT), '$order': orden, '$limit': limit,
+               '$where': w + (' AND fecha_de_firma IS NOT NULL'
+                              if orden.startswith('fecha_de_firma') else '')}
+    p_total = {'$select': 'count(1) as n,sum(valor_del_contrato) as v', '$where': w}
+    p_dep = {'$where': w, '$select': 'departamento,count(1) as n',
+             '$group': 'departamento', '$order': 'n DESC', '$limit': 12}
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_filas, f_total, f_dep = (pool.submit(_secop_get, p)
+                                   for p in (p_filas, p_total, p_dep))
+        filas = f_filas.result()
+        total = dep = None
+        for fut, name in ((f_total, 'total'), (f_dep, 'dep')):
+            try:
+                r = fut.result()
+            except Exception as e:
+                print(f'[secop] empresa/{name} FAIL: {type(e).__name__}: {e}')
+                continue
+            total, dep = (r, dep) if name == 'total' else (total, r)
+    tot = None
+    if total:
+        try:
+            tot = {'contratos': int(total[0].get('n') or 0),
+                   'valor_cop': round(float(total[0].get('v') or 0))}
+        except Exception:
+            tot = None
+    cols = _secop_stats().get('columnas_match') or SECOP_MATCH_FALLBACK
+    return {
+        'proveedores': [{'nombre': n, 'n': c} for n, c in prov[:SECOP_IN_MAX]],
+        'entidades': [{'nombre': n, 'n': c} for n, c in ent[:SECOP_IN_MAX]],
+        'descartados': [{'nombre': n, 'n': c} for n, c in descartados[:12]],
+        'n_descartados': len(descartados),
+        'truncado': len(prov) > SECOP_IN_MAX or len(ent) > SECOP_IN_MAX,
+        'empresas': _empresas_payload(emps),
+        'total': tot, 'filas': filas, 'dep': dep, 'cols': cols,
+    }
+
+
 def _contratacion(body):
     """Modo A (sin query ni filtros) → agregados del landing. Modo B → búsqueda
     en vivo contra Socrata: filas + total real + desglose por departamento."""
@@ -580,12 +718,57 @@ def _contratacion(body):
 
     limit = max(1, min(int(body.get('limit') or 50), 200))
     orden = SECOP_ORDENES.get(body.get('orden') or 'reciente', SECOP_ORDENES['reciente'])
+    # ④ ¿la consulta nombra una empresa del diccionario? Entonces el usuario no
+    # quiere "contratos que dicen Uber", quiere "los contratos de Uber".
+    # `ampliar_empresa` (el mismo toggle de los otros pilares) apaga el filtro y
+    # devuelve el universo $q crudo — ampliar es perder precisión, acá también.
+    emps = empresas.empresas_en(query) if query else []
+    por_identidad = bool(emps) and not body.get('ampliar_empresa')
     ck = ('contratacion-' + _hash24(json.dumps(
-        [query, where, limit, orden, solo_objeto], ensure_ascii=False, sort_keys=True))
+        [query, where, limit, orden, solo_objeto, por_identidad],
+        ensure_ascii=False, sort_keys=True))
         + f'-{_medios_cache_bucket(3)}')
     cached = _cache_get(ck)
     if cached:
         return cached
+
+    if por_identidad:
+        emp = _contratacion_empresa(body, query, emps, filtros, where)
+        if emp.get('sin_contratos'):
+            # honesto: la empresa existe en el diccionario pero no le vende al
+            # Estado (verificado: Uber y Ecopetrol no tienen contratos en SECOP
+            # II). No se cae a $q en silencio — eso devolvería homónimos.
+            out = {'mode': 'search', 'query': query, 'identidad_empresa': True,
+                   'sin_contratos': True, 'n': 0, 'total': {'contratos': 0, 'valor_cop': 0},
+                   'filtros': {k: v for k, v in filtros.items() if v},
+                   'orden': body.get('orden') or 'reciente',
+                   'empresas': emp['empresas'], 'resultados': [], 'por_departamento': [],
+                   'descartados': [{'nombre': n, 'n': c} for n, c in emp['descartados'][:12]],
+                   'n_descartados': len(emp['descartados']),
+                   'chips': _secop_chips(query),
+                   'fuente': _secop_stats().get('fuente', {}),
+                   'nota': _secop_stats().get('nota', '')}
+            _cache_put(ck, out)
+            return out
+        out = {
+            'mode': 'search', 'query': query, 'identidad_empresa': True,
+            'solo_objeto': False, 'revisadas': None,
+            'filtros': {k: v for k, v in filtros.items() if v},
+            'orden': body.get('orden') or 'reciente',
+            'n': len(emp['filas']), 'total': emp['total'],
+            'por_departamento': [{'departamento': d.get('departamento') or '—',
+                                  'n': int(d.get('n') or 0)} for d in (emp['dep'] or [])],
+            'chips': _secop_chips(query),
+            'empresas': emp['empresas'],
+            'proveedores': emp['proveedores'], 'entidades': emp['entidades'],
+            'descartados': emp['descartados'], 'n_descartados': emp['n_descartados'],
+            'truncado': emp['truncado'],
+            'resultados': [_secop_row(r, [], emp['cols']) for r in emp['filas']],
+            'fuente': _secop_stats().get('fuente', {}),
+            'nota': _secop_stats().get('nota', ''),
+        }
+        _cache_put(ck, out)
+        return out
 
     base = {}
     if query:
@@ -642,6 +825,10 @@ def _contratacion(body):
             tot = None
     out = {
         'mode': 'search', 'query': query, 'solo_objeto': solo_objeto,
+        # `empresas` viaja también acá: es el caso "ampliar" (el usuario pidió
+        # ver todo lo que menciona la marca) y el aviso tiene que seguir visible
+        # para poder volver a lo preciso.
+        'empresas': _empresas_payload(emps), 'identidad_empresa': False,
         'revisadas': n_traidas if solo_objeto else None,
         'filtros': {k: v for k, v in filtros.items() if v},
         'orden': body.get('orden') or 'reciente',
@@ -1491,6 +1678,58 @@ def _medios_para_sector(temas, dias=14, cap=6):
     return out
 
 
+SECOP_SECTOR_DIAS = 180
+
+
+def _secop_para_sector(temas, cap=5):
+    """Contratación del sector para el Radar del cliente (Vista Cliente · SKU A),
+    espejo de `_medios_para_sector`: una búsqueda $q por tema, en paralelo.
+    Solo filas (sin los agregados de total/departamento): acá interesa "qué se
+    está contratando", no el universo.
+
+    Ordena por VALOR dentro de una ventana reciente, no por fecha. Medido: con
+    `$order=fecha DESC` lo que sale son las últimas prestaciones de servicios
+    profesionales firmadas ese día — ruido para un cliente; con valor dentro de
+    los últimos 180 días salen los contratos que mueven la aguja (p. ej. en
+    salud, suministros de medicamentos de decenas de miles de millones).
+    Cache de 3h por combinación de temas."""
+    if not temas:
+        return {'n': 0, 'resultados': []}
+    temas = temas[:4]
+    desde = _time.strftime('%Y-%m-%d',
+                           _time.gmtime(_time.time() - SECOP_SECTOR_DIAS * 86400))
+    ck = (f'secop-sector-{_hash24("|".join(sorted(temas)))}-{cap}'
+          f'-{SECOP_SECTOR_DIAS}-{_medios_cache_bucket()}')
+    cached = _cache_get(ck)
+    if cached:
+        return cached
+    filas = []
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futs = {pool.submit(_secop_get, {
+            '$q': t, '$select': ','.join(SECOP_SELECT),
+            '$where': f"fecha_de_firma > '{desde}'",
+            '$order': 'valor_del_contrato DESC', '$limit': 5}, 14): t for t in temas}
+        for fut in as_completed(futs):
+            try:
+                filas.extend(fut.result())
+            except Exception as e:
+                print(f'[secop] sector/{futs[fut]} FAIL: {type(e).__name__}: {e}')
+    # dedup por contrato Y por (entidad, objeto, valor): una misma contratación
+    # se publica repetida cuando son varios contratistas con el mismo objeto.
+    vistos, out = set(), []
+    for r in sorted(filas, key=lambda r: -float(r.get('valor_del_contrato') or 0)):
+        k = (r.get('id_contrato'), r.get('nombre_entidad'),
+             _secop_norm(r.get('objeto_del_contrato'))[:90], r.get('valor_del_contrato'))
+        if k[0] in vistos or k[1:] in vistos:
+            continue
+        vistos.add(k[0])
+        vistos.add(k[1:])
+        out.append(_secop_row(r, [], SECOP_MATCH_FALLBACK))
+    res = {'n': len(out), 'resultados': out[:cap], 'dias': SECOP_SECTOR_DIAS}
+    _cache_put(ck, res)
+    return res
+
+
 # --- handler ----------------------------------------------------------------
 CORS = {'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
@@ -1590,6 +1829,16 @@ def handler(event, context):
                              'fuente': sen.get('fuente', ''),
                              'alcance': sen.get('alcance', '')}
         return _resp(200, out)
+
+    if action == 'bancadas':       # disciplina de bancada (cohesión · alineación · disidentes)
+        # Las dos cámaras van SEPARADAS a propósito: cubren periodos distintos,
+        # el Senado no registra abstención y su volumen de votaciones
+        # contestadas es un orden de magnitud menor. Promediarlas mentiría.
+        d = _bancadas()
+        cam = body.get('camara')
+        if cam in ('camara', 'senado'):
+            return _resp(200, {'meta': d.get('meta', {}), cam: d.get(cam, {})})
+        return _resp(200, d)
 
     if action == 'proyecto':
         pid = body.get('id')
@@ -1839,17 +2088,40 @@ def handler(event, context):
                         'accion': ('Cobertura reciente — revisar si necesita respuesta o vocería'
                                    if reciente else
                                    'Tema en el radar de prensa — monitoreo pasivo')})
-        senales = rc['senales'] + reg + med
+        # Contratación · qué está comprando el Estado en el sector. Un contrato
+        # no es una "alerta" como una sanción: es plata ya comprometida, así que
+        # el nivel lo da la frescura de la firma (90 días ≈ el ciclo en que
+        # todavía se puede incidir en la ejecución o competir por el siguiente).
+        con, n_con = [], 0
+        try:
+            con_agg = _secop_para_sector(s.get('temas', []))
+        except Exception as e:
+            print(f'[cliente] secop FAIL: {type(e).__name__}: {e}')
+            con_agg = {'n': 0, 'resultados': []}
+        n_con = con_agg['n']
+        corte_con = _time.strftime('%Y-%m-%d', _time.gmtime(_time.time() - 90 * 86400))
+        for r in con_agg['resultados']:
+            reciente = (r.get('fecha') or '') >= corte_con
+            con.append({'tipo': 'contratacion', 'entidad': r.get('entidad'),
+                        'proveedor': r.get('proveedor'), 'objeto': (r.get('objeto') or '')[:170],
+                        'valor': r.get('valor'), 'departamento': r.get('departamento'),
+                        'fecha': r.get('fecha'), 'url': r.get('url'),
+                        'nivel': 'alto' if reciente else 'medio',
+                        'accion': ('Contrato reciente en tu sector — revisar quién ganó y con qué '
+                                   'objeto antes del próximo proceso') if reciente else
+                                  'Antecedente de contratación — referencia de precios y proveedores'})
+        senales = rc['senales'] + reg + med + con
         kpis = {'n_radar': len(senales),
                 'alto': sum(1 for x in senales if x['nivel'] == 'alto'),
                 'medio': sum(1 for x in senales if x['nivel'] == 'medio'),
                 'bajo': sum(1 for x in senales if x['nivel'] == 'bajo'),
                 'en_tramite': sum(1 for x in rc['senales'] if x['resultado'] == 'EN_TRAMITE'),
                 'n_proyectos_sector': rc['n_tocados'], 'n_sanciones_sector': n_sanc,
-                'n_medios_sector': n_med}
+                'n_medios_sector': n_med, 'n_contratos_sector': n_con}
         out = {'cliente': {'sector': sk, 'nombre': s['nombre'], 'comision': s['comision'],
                            'sector_sanciones': s.get('sector_sanciones', ''), 'temas': s.get('temas', [])},
-               'congreso': rc['senales'], 'regulatorio': reg, 'medios': med, 'kpis': kpis, 'sectores': sectores}
+               'congreso': rc['senales'], 'regulatorio': reg, 'medios': med,
+               'contratacion': con, 'kpis': kpis, 'sectores': sectores}
         if body.get('lectura', False):
             out['lectura'] = _lectura_cliente(s, senales, kpis)
         return _resp(200, out)
