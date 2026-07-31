@@ -5909,11 +5909,24 @@ sin expo-motivos, tokeniza, filtra palabras >5% docfreq → `dist/texto-index.js
   ⚠ **Memoria Lambda subida a 1024 MB** (era 512): parsear el JSON de 23 MB a dict de 255k
   palabras se comía los 512. El `update-function-configuration --memory-size` además recicla
   los contenedores warm (sirve de "redeploy" para que tomen el índice nuevo).
-- **PENDIENTE — pre-2006 (~1.393 gacetas indexables, ESCANEADAS):** `harvest_gacetas_texto`
-  las marca `fail_empty` (pypdf no saca texto). Requieren **OCR** (Tesseract, ya usado en
-  `parse_dcnsw_camara.py`/`ocr_pilot.py`). Es la Fase 2 para llegar a ~100% de cobertura;
-  más lenta y de menor relevancia para clientes de hoy. Residuo aparte: ~34 `fail_download`
-  de número muy bajo (num 1-9 de enero, primeras del año legislativo, casos borde genuinos).
+- **PENDIENTE — pre-2006, PERO NO ES UN PROBLEMA DE OCR (re-investigado jul-31-2026):**
+  se corrió `harvest_gacetas_texto.py --ocr --indexables --desde 1990-01-01 --hasta 2006-01-01
+  --workers 3` sobre los 171 pendientes de esa ventana → **100% `fail_download`, 0 OCR-eadas**.
+  El toolchain de OCR (pymupdf+tesseract) nunca llegó a correr porque **la descarga misma
+  falla para TODO el rango pre-2006**, no solo los ~34 casos borde documentados antes.
+  Verificado a mano (no es un bug del script, es del portal): el mismo mecanismo de 2 pasos
+  (`descargar_ts`) que baja gacetas de 2026 al instante (probado: 857/2026, 858/2026, 859/2026,
+  ~10-30 MB c/u, OK) devuelve, para 2001-2005 (probado con 5 combos num+fecha+entidad
+  distintos, Senado Y Cámara), la MISMA página de aterrizaje en vez del PDF — el JS de la
+  página (`if(consec==null){click pdfIr}else{click resumeIr}`) sugiere una rama alterna
+  `resumeIr`, pero seguirla (con `-L`) redirige a `gacetaPublica.xhtml`, que es el **buscador
+  genérico**, no el documento. Conclusión: el esquema de direccionamiento `ent+fec+num` de
+  este deep-link **no resuelve gacetas pre-2006** en este backend — probablemente catalogadas
+  con otro identificador interno en esa época, no un problema de imagen/escaneo per se.
+  **No re-intentar `--ocr` sobre este rango esperando que sea solo cuestión de Tesseract** —
+  el 100% de los "escaneados" pre-2006 nunca llegan a descargarse. Si se retoma: la vía
+  sería usar el BUSCADOR del portal (no el deep-link) para encontrar el identificador real de
+  cada gaceta vieja, targeted, no barrido masivo — investigación nueva, no aplicar lo ya hecho.
 
 **Ficha del frontend wireada (LISTO):** en el modal de proyecto, los documentos de
 ponencia/plenaria/conciliación son clicables → llaman la acción `gaceta` de la
