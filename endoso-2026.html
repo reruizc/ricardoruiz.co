@@ -743,7 +743,31 @@
       return words.every(w => targetWords.some(tw => tw.startsWith(w)));
     }
 
+    // ─── FUENTES LOCALES (Concejo · JAL 2011/2015/2019/2023) · carga diferida ──
+    // ~250k candidaturas: no entran al índice del arranque. Se piden al primer
+    // foco/tecla del buscador, igual que en analisis-candidato.html, y se apilan
+    // SIN agrupar por persona (esta página compara candidaturas, no personas).
+    let _localReq = null, _localDone = false;
+    function ensureLocal() {
+      if (_localDone || _localReq) return _localReq;
+      _localReq = CandRegistry.loadLocal().then(list => {
+        _localDone = true;
+        const have = new Set(candIndex.map(c => c.slug));
+        candIndex = candIndex.concat(list.filter(c => !have.has(c.slug)));
+        const el = document.getElementById('meta-cands');
+        if (el) el.textContent = candIndex.length.toLocaleString('es-CO');
+        // Repintar si el usuario ya estaba escribiendo.
+        ['A','B','C','D','E1','E2'].forEach(k => {
+          const i = document.getElementById(`ac-input-${k}`);
+          if (i && i.value.trim().length >= 2 && !acSelected[k]) acSearch(k);
+        });
+        return list;
+      }).catch(e => { console.warn('[local] no disponible:', e && e.message); _localDone = true; });
+      return _localReq;
+    }
+
     function acSearch(k) {
+      ensureLocal();
       const input = document.getElementById(`ac-input-${k}`);
       const drop  = document.getElementById(`ac-drop-${k}`);
       const q = input.value.trim();
@@ -768,6 +792,7 @@
     }
 
     function acOpen(k) {
+      ensureLocal();
       const input = document.getElementById(`ac-input-${k}`);
       if (input.value.trim().length >= 2) acSearch(k);
     }

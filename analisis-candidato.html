@@ -2682,8 +2682,15 @@
     const SRC_YEAR = { endoso: 2026, asamblea: 2023, asam2019: 2019, asam2015: 2015, asam2011: 2011,
                        con2022: 2022, pres2022: 2022, consu2022: 2022,
                        con2018: 2018, pres2018: 2018,
-                       con2014: 2014, pres2014: 2014, pres2010: 2010 };
+                       con2014: 2014, pres2014: 2014, pres2010: 2010,
+                       gob2023: 2023, gob2019: 2019, gob2015: 2015, gob2011: 2011,
+                       alc2023: 2023, alc2019: 2019, alc2015: 2015, alc2011: 2011 };
     const congHistBySlug = {};   // slug → [entradas de esa persona]
+
+    // Llave de PERSONA (aplica los alias curados de cand-index.js: la RNEC
+    // inscribe a la misma persona con nombre corto o legal según la elección).
+    const personaKey = n => (window.CandRegistry && CandRegistry.personaKey)
+      ? CandRegistry.personaKey(n) : normPersona(n);
 
     function normPersona(s) {
       return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -2825,13 +2832,13 @@
       const by = {};
       list.forEach(c => {
         if (c.tipo === 'presidencial') return;
-        const k = normPersona(c.nombre);
+        const k = personaKey(c.nombre);
         if (k) (by[k] = by[k] || []).push(c);
       });
       const out = [], seen = new Set();
       list.forEach(c => {
         if (c.tipo === 'presidencial') { out.push(c); return; }
-        const k = normPersona(c.nombre);
+        const k = personaKey(c.nombre);
         if (!k || seen.has(k)) return;
         seen.add(k);
         // más reciente primero; a igual año, la más votada
@@ -2860,6 +2867,10 @@
           _bases.pres2018  = 'Bases de datos/output_pres_2018';
           _bases.pres2022  = 'Bases de datos/output_pres_2022';
           _bases.consu2022 = 'Bases de datos/output_consu_2022';
+          for (const a of ['2011', '2015', '2019', '2023']) {
+            _bases['gob' + a] = 'Bases de datos/output_gobernacion_' + a;
+            _bases['alc' + a] = 'Bases de datos/output_alcaldia_' + a;
+          }
         }
         candIndex = await CandRegistry.load({ includeParties: false, bases: Object.keys(_bases).length ? _bases : undefined });
         if (!candIndex.length) throw new Error('índice de candidatos vacío');

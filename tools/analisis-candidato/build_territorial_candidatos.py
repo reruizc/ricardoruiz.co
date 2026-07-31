@@ -60,6 +60,30 @@ LAYOUT_2011 = dict(COR=2, DDE=6, MME=7, ZZ=9, PP=10, MS=11, PAR=13, DESPAR=14,
                    CAN=15, DESCAN=16, VOT=12, NCOL=17, SORT=('-k7,7', '-k8,8'))
 
 CFG = {
+    'gob2011':  dict(src='GCS_2011TER.csv', cor='4', layout=LAYOUT_2011, scope='dep',
+                     slug='GOB2011', anio='2011', corp='GOBERNACIÓN',
+                     dir='gobernacion-2011', eleccion='Gobernación 2011'),
+    'alc2011':  dict(src='GCS_2011TER.csv', cor='6', layout=LAYOUT_2011, scope='mun',
+                     slug='ALC2011', anio='2011', corp='ALCALDÍA',
+                     dir='alcaldia-2011', eleccion='Alcaldía 2011'),
+    'gob2015':  dict(src='GCS_2015TER.csv', cor='1', layout=LAYOUT_TER, scope='dep',
+                     slug='GOB2015', anio='2015', corp='GOBERNACIÓN',
+                     dir='gobernacion-2015', eleccion='Gobernación 2015'),
+    'alc2015':  dict(src='GCS_2015TER.csv', cor='3', layout=LAYOUT_TER, scope='mun',
+                     slug='ALC2015', anio='2015', corp='ALCALDÍA',
+                     dir='alcaldia-2015', eleccion='Alcaldía 2015'),
+    'gob2019':  dict(src='GCS_2019TER.csv', cor='4', layout=LAYOUT_TER, scope='dep',
+                     slug='GOB2019', anio='2019', corp='GOBERNACIÓN',
+                     dir='gobernacion-2019', eleccion='Gobernación 2019'),
+    'alc2019':  dict(src='GCS_2019TER.csv', cor='6', layout=LAYOUT_TER, scope='mun',
+                     slug='ALC2019', anio='2019', corp='ALCALDÍA',
+                     dir='alcaldia-2019', eleccion='Alcaldía 2019'),
+    'gob2023':  dict(src='GCS_2023TER.csv', cor='1', layout=LAYOUT_TER, scope='dep',
+                     slug='GOB2023', anio='2023', corp='GOBERNACIÓN',
+                     dir='gobernacion-2023', eleccion='Gobernación 2023'),
+    'alc2023':  dict(src='GCS_2023TER.csv', cor='3', layout=LAYOUT_TER, scope='mun',
+                     slug='ALC2023', anio='2023', corp='ALCALDÍA',
+                     dir='alcaldia-2023', eleccion='Alcaldía 2023'),
     'asam2011': dict(src='GCS_2011TER.csv', cor='5', layout=LAYOUT_2011, scope='dep',
                      slug='ASAM2011', anio='2011', corp='ASAMBLEA',
                      dir='asamblea-2011', eleccion='Asamblea Departamental 2011'),
@@ -174,17 +198,17 @@ def flush_group(cfg, cands, by9, munNames, index, out_dir):
 
         if scope == 'dep':
             slug = f"{cfg['slug']}-{dde}-{par}-{can}"
-            corp = f'ASAMBLEA · {depNom}'
+            corp = f"{cfg['corp']} · {depNom}"
             circ = depNom
-            corpIdx = f'ASAMBLEA · {depNom} · {anio}'
+            corpIdx = f"{cfg['corp']} · {depNom} · {anio}"
         else:
             mm = mme.zfill(3)
             munNom = 'BOGOTÁ D.C.' if dd == '16' else munNames.get(f'{dd}{mm}', c['munNom'] or f'MUN {mm}')
             if scope == 'mun':
                 slug = f"{cfg['slug']}-{dde}-{mme}-{par}-{can}"
-                corp = f'CONCEJO · {munNom}'
+                corp = f"{cfg['corp']} · {munNom}"
                 circ = munNom if munNom == depNom else f'{munNom} ({depNom})'
-                corpIdx = f'CONCEJO · {munNom} · {anio}'
+                corpIdx = f"{cfg['corp']} · {munNom} · {anio}"
             else:
                 comNom = 'LOCAL'
                 if c['comVotes']:

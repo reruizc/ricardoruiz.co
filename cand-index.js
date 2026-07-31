@@ -29,6 +29,17 @@
     { name: 'asam2019', dir: 'asamblea-2019', indexFile: 'index-asamblea-2019.json',       list: d => d.candidatos || [] },
     { name: 'asam2015', dir: 'asamblea-2015', indexFile: 'index-asamblea-2015.json',       list: d => d.candidatos || [] },
     { name: 'asam2011', dir: 'asamblea-2011', indexFile: 'index-asamblea-2011.json',       list: d => d.candidatos || [] },
+    // Uninominales: gobernaciones (índices de 24-41 KB) y alcaldías (~1 MB c/u).
+    // Van al arranque porque son las candidaturas más buscadas del histórico
+    // (Petro alcalde 2011, Fico en Medellín, Claudia López, Galán…).
+    { name: 'gob2023',  dir: 'gobernacion-2023', indexFile: 'index-gobernacion-2023.json', list: d => d.candidatos || [] },
+    { name: 'gob2019',  dir: 'gobernacion-2019', indexFile: 'index-gobernacion-2019.json', list: d => d.candidatos || [] },
+    { name: 'gob2015',  dir: 'gobernacion-2015', indexFile: 'index-gobernacion-2015.json', list: d => d.candidatos || [] },
+    { name: 'gob2011',  dir: 'gobernacion-2011', indexFile: 'index-gobernacion-2011.json', list: d => d.candidatos || [] },
+    { name: 'alc2023',  dir: 'alcaldia-2023',    indexFile: 'index-alcaldia-2023.json',    list: d => d.candidatos || [] },
+    { name: 'alc2019',  dir: 'alcaldia-2019',    indexFile: 'index-alcaldia-2019.json',    list: d => d.candidatos || [] },
+    { name: 'alc2015',  dir: 'alcaldia-2015',    indexFile: 'index-alcaldia-2015.json',    list: d => d.candidatos || [] },
+    { name: 'alc2011',  dir: 'alcaldia-2011',    indexFile: 'index-alcaldia-2011.json',    list: d => d.candidatos || [] },
     { name: 'con2014',  dir: 'congreso-2014', indexFile: 'index-congreso-2014.json',       list: d => d.candidatos || [] },
     { name: 'con2018',  dir: 'congreso-2018', indexFile: 'index-congreso-2018.json',       list: d => d.candidatos || [] },
     { name: 'con2022',  dir: 'congreso-2022', indexFile: 'index-congreso-2022.json',       list: d => d.candidatos || [] },
@@ -56,6 +67,51 @@
   ];
 
   const _bySlug = {};   // slug → entrada (para dataUrlFor)
+
+  /* ── ALIAS DE PERSONA ────────────────────────────────────────────────────
+     La RNEC inscribe a la misma persona con nombres distintos según la
+     elección: la forma corta (1er nombre + 1er apellido) en presidenciales y
+     consultas, el nombre legal completo en las territoriales. Sin esto,
+     `agruparPersonas` los deja como dos fichas: Petro aparece dos veces y su
+     Alcaldía de Bogotá 2011 no sale en la ficha del presidente.
+
+     Lista CURADA a mano (jul-2026) sobre la revisión de
+     `tools/analisis-candidato/dedup_revision.py`. Solo entran los casos
+     inequívocos: la carrera es continua y no hay dos candidaturas al mismo
+     cargo el mismo año. NO se infiere automáticamente — el mismo apellido
+     puede ser el SEGUNDO de otra persona ("GUSTAVO MIGUEL OSORIO PETRO" no es
+     Petro) y fusionar por regla generaba errores graves.
+
+     Para ampliar: correr `dedup_revision.py --xlsx`, revisar las filas de
+     confianza MEDIA y agregar aquí las confirmadas.                          */
+  const ALIAS_PERSONA = {
+    'GUSTAVO PETRO':               'GUSTAVO FRANCISCO PETRO URREGO',
+    'SERGIO FAJARDO':              'SERGIO FAJARDO VALDERRAMA',
+    'ENRIQUE PENALOSA':            'ENRIQUE PENALOSA LONDONO',
+    'DAVID BARGUIL':               'DAVID ALEJANDRO BARGUIL ASSIS',
+    'JUAN MANUEL GALAN':           'JUAN MANUEL GALAN PACHON',
+    'FRANCIA MARQUEZ':             'FRANCIA ELENA MARQUEZ MINA',
+    'JORGE ENRIQUE ROBLEDO':       'JORGE ENRIQUE ROBLEDO CASTILLO',
+    'HUMBERTO DE LA CALLE':        'HUMBERTO DE LA CALLE LOMBANA',
+    'FEDERICO RESTREPO':           'FEDERICO JOSE RESTREPO POSADA',
+    'DAVID LUNA':                  'DAVID ANDRES LUNA SANCHEZ',
+    'AYDEE LIZARAZO':              'AYDEE LIZARAZO CUBILLOS',
+    'JAIME AMIN':                  'JAIME ALEJANDRO AMIN HERNANDEZ',
+    'ALAN JARA':                   'ALAN JESUS EDMUNDO JARA URZOLA',
+    'VIVIANE MORALES':             'VIVIANE ALEYDA MORALES HOYOS',
+    'ARELIS URIANA':               'ARELIS MARIA URIANA GUARIYU',
+  };
+
+  function normPersona(s) {
+    return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toUpperCase().replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  // Llave de PERSONA: nombres distintos de la misma persona caen en la misma.
+  function personaKey(nombre) {
+    const n = normPersona(nombre);
+    return ALIAS_PERSONA[n] || n;
+  }
 
   function isPartyEntry(c) {
     if (!c || !c.nombre) return false;
@@ -156,5 +212,6 @@
     return (_bySlug[slug] && _bySlug[slug].dataUrl) || `${S3}/endoso/${slug}.json`;
   }
 
-  global.CandRegistry = { S3, SOURCES, LOCAL_SOURCES, isPartyEntry, acMatch, load, loadLocal, dataUrlFor };
+  global.CandRegistry = { S3, SOURCES, LOCAL_SOURCES, isPartyEntry, acMatch, load, loadLocal,
+                          dataUrlFor, normPersona, personaKey, ALIAS_PERSONA };
 })(typeof window !== 'undefined' ? window : this);

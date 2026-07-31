@@ -235,11 +235,47 @@ sin breadcrumb), **Helvetica Neue embebida** (Syne solo en el logo), y suma los
     740px de pestañas contra 880px disponibles. **A ~73px por pestaña el límite práctico son 10** —
     si se agrega otro año, volver a medir. `tabs[]` y `currentIdx` (=9, que es 2026) deben moverse
     JUNTOS al agregar años, si no la navegación con flechas queda desfasada.
-  - ⚠ **Duplicado conocido por nombre legal**: `agruparPersonas` colapsa por nombre exacto y 2010
-    usa el nombre legal completo → "GUSTAVO FRANCISCO PETRO URREGO" (2010) queda como entrada
-    aparte de "GUSTAVO PETRO" (2018/2022/2026). Es el mismo límite ya documentado del registro
-    (sin fuzzy-subset, conservador a propósito); el subset de tokens tampoco lo uniría porque
-    "GUSTAVO PETRO" son 2 tokens y el umbral seguro es ≥3. Vargas Lleras sí encadena 2010→2018.
+  - **Alcaldías y gobernaciones 2011·2015·2019·2023** (jul-31-2026): faltaban en TODOS los años —
+    eran el hueco más grande del histórico, porque son las candidaturas más buscadas. Mismo
+    builder parametrizado (`gob{año}` scope=dep · `alc{año}` scope=mun); `flush_group` dejó de
+    hardcodear ASAMBLEA/CONCEJO y ahora usa `cfg['corp']`. Códigos: 2011 → 4=GOB 6=ALC ·
+    2015 → 1=GOB 3=ALC · 2019 → 4=GOB 6=ALC · 2023 → 1=GOB 3=ALC. **20.257 candidatos, 725 MB.**
+    Validado exacto: Petro alcalde de Bogotá 2011 con 723.157 · Peñalosa 2015 con 906.058 ·
+    Claudia López 2019 con 1.109.362 · Galán 2023 con 1.499.734 · Fico en Medellín 2023 con
+    697.910 (cuadra al voto con la cifra que ya estaba en este archivo). Van en `SOURCES`
+    (carga al arranque): gobernación pesa 24-41 KB por índice y alcaldía ~1 MB.
+  - **Fusión de personas con dos nombres** (`ALIAS_PERSONA` en `cand-index.js` · jul-31-2026):
+    la RNEC inscribe a la misma persona con la forma corta (1er nombre + 1er apellido) en
+    presidenciales y consultas, y con el nombre legal completo en territoriales. `agruparPersonas`
+    colapsaba por nombre EXACTO → Petro salía dos veces y su Alcaldía 2011 no aparecía en la
+    ficha del presidente. Ahora la llave es `CandRegistry.personaKey()`, que aplica una tabla
+    **curada a mano de 15 alias**. Resultado: la ficha de Petro encadena 7 elecciones (2V y 1V
+    2022 · consulta Pacto · 2V y 1V 2018 · **Alcaldía Bogotá 2011** · 1V 2010).
+    ⚠⚠ **NO inferir esto con una regla automática.** Medido sobre 335k nombres: "el corto es
+    subsecuencia del largo" une `GUSTAVO PETRO` con `GUSTAVO MIGUEL OSORIO PETRO` (concejal de
+    253 votos), porque el apellido del corto puede ser el SEGUNDO del largo. Herramienta de
+    medición en `tools/analisis-candidato/dedup_revision.py` (no modifica nada, emite Excel de
+    revisión). Las 3 señales que sirven, en orden de potencia:
+      1. **Departamento** (regla de Ricardo): las carreras son departamentales — nadie es
+         diputado del Magdalena y luego concejal en Nariño. Descartó **12.091 pares falsos**.
+         No aplica cuando un lado es nacional (Senado · Presidencia · consultas).
+      2. **Año + cargo**: si compiten por lo MISMO el mismo año son personas distintas. Bajó
+         186 pares que el departamento había aprobado (p.ej. dos `MARIA EUGENIA LOPERA` al
+         Concejo de Antioquia en 2015).
+      3. **Tamaño**: la RNEC no abrevia el nombre de un concejal de 40 votos — las formas
+         cortas existen porque la figura se inscribió así. "Local diminuto vs nacional" es
+         casi siempre otra persona.
+    Quedan 26 pares de confianza MEDIA; se aplicaron los 15 inequívocos. Para ampliar: correr
+    el script, revisar los MEDIA y agregar a `ALIAS_PERSONA`.
+  - ⚠ **Deuda: 2 presidenciales 2026 quedan con ficha doble** (Cepeda y Fajardo): el modelo
+    por-persona de `index-presidencial.json` va por fuera de `agruparPersonas`, así que su
+    candidatura histórica aparece como entrada aparte. Es la otra cara de la deuda ya conocida
+    ("Paloma/Roy tienen su Senado 2018 tapado por la precedencia presidencial"). Arreglarlo bien
+    implica que `renderHistorial` funda las dos historias, no solo dé precedencia a una.
+  - **`endoso-2026.html` recibe TODO** (jul-31-2026): ya heredaba `SOURCES` por `CandRegistry.load()`,
+    y ahora suma `ensureLocal()` (concejos y JAL de los 4 años) en `acSearch`/`acOpen`. Pasó de
+    2.822 candidaturas a **419.258**. NO agrupa por persona a propósito: esta página compara
+    candidaturas mesa a mesa, no personas.
   - **S3 ✓ SUBIDO** (jul-30-2026, 1h 53m + 4 min de los presidenciales):
     `congreso-2026/output/{asamblea-2011,asamblea-2015,asamblea-2019,concejo-2011,concejo-2015,
     concejo-2019,jal-2011,jal-2015,jal-2019,pres-2010,pres-2014,pres-2018,pres-2022,consu-2022}/` con
