@@ -6005,9 +6005,9 @@ con el enlace **ampliar/volver a lo esencial** (`empresaHint`/`wireEmpresaHint` 
   inválidas, 0 llaves duplicadas; 3 choques de alias que son ambigüedades REALES del
   mercado (Colpatria banco/seguros, Falabella retail/banco, Suramericana seguros/EPS)
   y resuelven bien. Control de falsos disparos: 1 de 28 consultas temáticas normales
-  ("claro que sí"). Cobertura contra el dato real: **230/230 (100%) devuelven
-  proyectos en Congreso** y **71/230 (31%) tienen sanción propia** en Regulatorio —
-  el 31% es la tasa real del mundo, no todas las empresas han sido sancionadas.
+  ("sena de la mujer"). Cobertura contra el dato real: **388/388 (100%) devuelven
+  proyectos en Congreso** y **98/388 (25%) tienen sanción propia** en Regulatorio —
+  ese 25% es la tasa real del mundo, no un hueco: no toda empresa ha sido sancionada.
 - ⚠ **Un tópico del TESAURO no puede ENCOGER la búsqueda** (fix del mismo sprint):
   al crear los 17 tópicos, 'reforma laboral' cayó de 215 a 70 porque el OR de las
   frases del tópico reemplazaba el anclaje previo a la palabra más específica. Ahora
