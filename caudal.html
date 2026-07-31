@@ -578,15 +578,17 @@
     <div id="view-regulatorio" hidden>
       <button class="pill-back" id="regBack">← Volver a Caudal</button>
       <div class="hero">
-        <h1>Las sanciones del Estado, <em>leídas</em>.</h1>
-        <p>Sanciones ejecutoriadas y anunciadas de las superintendencias y entidades
-           de control, bajo un esquema común. Filtra por sector o busca una entidad;
-           cada sanción cita su resolución o comunicado. 7.015 sanciones · 9 fuentes.</p>
+        <h1>Los actos del Estado, <em>leídos</em>.</h1>
+        <p>Sanciones, investigaciones y demás actos de las superintendencias y
+           entidades de control, bajo un esquema común. Filtra por sector o busca una
+           entidad; cada acto cita su resolución o comunicado. Arranca en sanciones —
+           el toggle abre el resto de la actividad regulatoria.</p>
         <div class="search">
           <input id="rq" type="text" placeholder="busca una entidad, un producto, un motivo…" autocomplete="off" />
           <button id="rgo">Buscar</button>
         </div>
         <div class="chips" id="rsectors"></div>
+        <div class="chips" id="rtipos" style="margin-top:.5rem"></div>
       </div>
 
       <div id="reg-landing"></div>
@@ -961,58 +963,96 @@
     if(v==='bancadas') bancLoad();
   }
   /* ---------- pilar Regulatorio · sanciones ---------- */
-  const REG={sector:'', q:''};
+  const REG={sector:'', q:'', tipoActo:'sancion'};
   const REG_SECS=[['','Todos'],['salud','Salud'],['contratacion','Contratación'],['financiero','Financiero'],['transporte','Transporte'],['consumo','Consumo'],['juridico','Jurídico'],['control','Control fiscal']];
+  /* tipo de acto (reencuadre jul-2026). El default es 'sancion' a propósito:
+     abrir el pilar en "todo" diluiría la vista que hoy usa el cliente. */
+  const REG_TIPOS=[['sancion','Sanciones'],['todo','Toda la actividad regulatoria'],
+    ['apertura_investigacion','Investigaciones'],['archivo','Archivos'],
+    ['contribucion_especial','Contribución especial'],['resolucion','Resoluciones'],['circular','Circulares']];
+  /* [singular, plural] — explícito: la pluralización del español no se infiere
+     con una regla de sufijo ("apertura de investigación" → "aperturas de…"). */
+  const TIPO_ACTO_TXT={
+    sancion:['sanción','sanciones'],
+    apertura_investigacion:['apertura de investigación','aperturas de investigación'],
+    archivo:['archivo','archivos y exoneraciones'],
+    contribucion_especial:['acto de contribución especial','actos de contribución especial'],
+    resolucion:['resolución','resoluciones'], circular:['circular','circulares'],
+    otro:['acto administrativo','actos administrativos'],
+    todo:['acto regulatorio','actos regulatorios']};
+  /* rótulo del contador: solo dice "sanciones" cuando lo son de verdad. */
+  function regNoun(n, tipo){
+    const t=TIPO_ACTO_TXT[tipo]||TIPO_ACTO_TXT.otro;
+    return n===1?t[0]:t[1];
+  }
   let REG_STATS=null, _regInited=false, _regSeq=0;
   function fmtCOP(n){ if(!n||n<=0) return ''; if(n>=1e12) return '$'+(n/1e12).toFixed(1).replace('.',',')+' B'; if(n>=1e6) return '$'+fmt(Math.round(n/1e6))+' M'; return '$'+fmt(Math.round(n)); }
   function sancCard(r){
     const mot=(r.motivo||'').replace(/\s+/g,' ').replace(/^[IVX]+\.\s*/,'').trim();
     const monto=r.monto?`<span class="sanc-monto">${fmtCOP(r.monto)}</span> · `:'';
     const tipo=r.tipo?`<span class="doc-badge">${esc(r.tipo)}</span>`:'';
+    /* cuando el acto NO es sanción hay que decirlo en la card: si no, una
+       contribución especial se lee como una multa. */
+    const ta=r.tipo_acto||'sancion';
+    const taBadge=ta==='sancion'?'':`<span class="doc-badge pal">${esc((TIPO_ACTO_TXT[ta]||TIPO_ACTO_TXT.otro)[0])}</span>`;
     const name=r.url
       ?`<a class="sanc-name" href="${esc(r.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(r.sancionado)}</a>`
       :`<span class="sanc-name">${esc(r.sancionado)}</span>`;
     return `<div class="sanc">
       <div class="sanc-top">${name}<span class="sanc-fecha">${esc(r.fecha||'')}</span></div>
       ${mot?`<div class="sanc-motivo">${esc(mot)}</div>`:''}
-      <div class="sanc-tags"><span class="doc-badge pal">${esc(r.fuente_nombre||r.fuente)}</span>${tipo}${monto}${r.resolucion?'Res. '+esc(r.resolucion):''}${r.url?` · <a href="${esc(r.url)}" target="_blank" rel="noopener" style="color:var(--ink3)">comunicado ↗</a>`:''}</div>
+      <div class="sanc-tags">${taBadge}<span class="doc-badge pal">${esc(r.fuente_nombre||r.fuente)}</span>${tipo}${monto}${r.resolucion?'Res. '+esc(r.resolucion):''}${r.url?` · <a href="${esc(r.url)}" target="_blank" rel="noopener" style="color:var(--ink3)">comunicado ↗</a>`:''}</div>
     </div>`;
   }
   function regRenderLanding(s){
     const el=document.getElementById('reg-landing'); if(!el||!s) return;
     const monto=(s.monto||{}).total_cop;
     const rango=s.rango_fechas&&s.rango_fechas[0]?`${s.rango_fechas[0].slice(0,4)}–${s.rango_fechas[1].slice(0,4)}`:'—';
+    /* los KPI son de SANCIONES (lo que el pilar muestra por defecto). El
+       universo de actos va como nota aparte, no mezclado en el total. */
+    const otros=(s.total_actos||0)-(s.total||0);
     el.innerHTML=`
-      <div class="land-h">Las sanciones del Estado en números · esquema común</div>
+      <div class="land-h">Los actos del Estado en números · esquema común</div>
       <div class="kpis">
         <div class="kpi"><div class="n">${fmt(s.total)}</div><div class="l">Sanciones</div></div>
         <div class="kpi"><div class="n">${(s.por_fuente||[]).length}</div><div class="l">Fuentes</div></div>
         <div class="kpi"><div class="n" style="color:var(--amber)">${fmtCOP(monto)||'—'}</div><div class="l">Monto reportado</div></div>
         <div class="kpi"><div class="n">${rango}</div><div class="l">Periodo</div></div>
       </div>
+      ${otros>0?`<div class="cob-note" style="margin:.2rem 0 1rem">Además de las sanciones, el pilar registra ${fmt(otros)} ${otros===1?'acto regulatorio':'actos regulatorios'} (investigaciones, archivos, contribuciones, resoluciones). <a href="#" id="reg-landing-todo" style="color:var(--teal)">Ver toda la actividad regulatoria →</a></div>`:''}
       <div class="reg-sectors-grid">
         ${(s.por_sector||[]).map(x=>`<div class="sec-card" data-sec="${esc(x.sector)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(x.sector_txt||x.sector)}</div></div>`).join('')}
       </div>
       <div class="panel wide"><h3>Sanciones más recientes</h3><div class="sanc-list">${(s.recientes||[]).map(sancCard).join('')}</div></div>`;
     el.querySelectorAll('.sec-card').forEach(c=>c.onclick=()=>{ REG.sector=c.dataset.sec; regSyncSectors(); regBuscar(); });
+    const lt=document.getElementById('reg-landing-todo');
+    if(lt) lt.onclick=e=>{ e.preventDefault(); REG.tipoActo='todo'; regSyncTipos(); regBuscar(); };
   }
   function regRenderResults(d){
     const el=document.getElementById('reg-results'); if(!el) return;
     el.style.display='block';
     const scope=[d.sector?esc((REG_SECS.find(s=>s[0]===d.sector)||[])[1]||d.sector):'', d.query?`«${esc(d.query)}»`:''].filter(Boolean).join(' · ');
+    const ta=d.tipo_acto||'sancion';
+    /* si el filtro por defecto dejó actos fuera, se dice cuántos y se ofrece
+       el toggle — nunca "resultados que aparecen por magia". */
+    const otros=(ta==='sancion'&&d.otros_actos>0)
+      ? `<div class="cob-note" style="margin-bottom:1rem">Hay ${fmt(d.otros_actos)} ${d.otros_actos===1?'acto regulatorio más':'actos regulatorios más'} en este alcance (investigaciones, archivos, contribuciones). <a href="#" id="reg-ver-todo" style="color:var(--teal)">Ver toda la actividad regulatoria →</a></div>` : '';
     el.innerHTML=`
-      <div class="r-titular" style="font-size:1.4rem">${d.n} ${d.n===1?'sanción':'sanciones'}</div>
+      <div class="r-titular" style="font-size:1.4rem">${fmt(d.n)} ${regNoun(d.n, ta)}</div>
       <div class="r-sub" style="margin-bottom:1rem">${scope||'todas las fuentes'}${d.con_monto?` · ${d.con_monto} con monto · <b>${fmtCOP(d.monto_total_cop)}</b> en total`:''}</div>
-      ${d.mostrados<d.n?`<div class="cob-note" style="margin-bottom:1rem">Mostrando las ${d.mostrados} más recientes de ${d.n}. Afina la búsqueda para ver menos.</div>`:''}
+      ${otros}
+      ${d.mostrados<d.n?`<div class="cob-note" style="margin-bottom:1rem">Mostrando ${d.mostrados} de ${fmt(d.n)}, los más recientes. Afina la búsqueda para ver menos.</div>`:''}
       <div class="sanc-list">${(d.resultados||[]).map(sancCard).join('')||'<div class="err">Sin coincidencias. Prueba otra entidad o sector.</div>'}</div>`;
+    const vt=document.getElementById('reg-ver-todo');
+    if(vt) vt.onclick=e=>{ e.preventDefault(); REG.tipoActo='todo'; regSyncTipos(); regBuscar(); };
     el.scrollIntoView({behavior:'smooth',block:'start'});
   }
   async function regBuscar(){
     const mine=++_regSeq;
     const el=document.getElementById('reg-results'), landing=document.getElementById('reg-landing');
     if(landing) landing.style.display='none';
-    if(el){ el.style.display='block'; el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Buscando sanciones <span class="dots"><span></span><span></span><span></span></span></div>'; }
-    let d; try{ d=await call({action:'sanciones', query:REG.q, sector:REG.sector}); }
+    if(el){ el.style.display='block'; el.innerHTML=`<div class="llm-load" style="padding:2rem;justify-content:center">Buscando ${regNoun(2, REG.tipoActo)} <span class="dots"><span></span><span></span><span></span></span></div>`; }
+    let d; try{ d=await call({action:'sanciones', query:REG.q, sector:REG.sector, tipo_acto:REG.tipoActo}); }
     catch(e){ if(mine===_regSeq&&el) el.innerHTML='<div class="err">No se pudo consultar. Reintenta.</div>'; return; }
     if(mine!==_regSeq) return;
     regRenderResults(d);
@@ -1027,14 +1067,23 @@
   }
   function regShowLanding(){ const r=document.getElementById('reg-results'); if(r) r.style.display='none'; const l=document.getElementById('reg-landing'); if(l) l.style.display='block'; }
   function regSyncSectors(){ document.querySelectorAll('#rsectors .chip').forEach(c=>c.classList.toggle('on',(c.dataset.sec||'')===REG.sector)); }
+  function regSyncTipos(){ document.querySelectorAll('#rtipos .chip').forEach(c=>c.classList.toggle('on',(c.dataset.ta||'')===REG.tipoActo)); }
+  /* el landing solo aplica al default (sanciones): con cualquier otro tipo hay
+     que consultar, porque los agregados precalculados son de sanciones. */
+  function regRefrescar(){
+    if(!REG.q && !REG.sector && REG.tipoActo==='sancion') regShowLanding();
+    else regBuscar();
+  }
   function regInit(){
     if(_regInited) return; _regInited=true;
     const rq=document.getElementById('rq'), rgo=document.getElementById('rgo');
-    const go=()=>{ REG.q=(rq&&rq.value||'').trim(); if(!REG.q&&!REG.sector) regShowLanding(); else regBuscar(); };
+    const go=()=>{ REG.q=(rq&&rq.value||'').trim(); regRefrescar(); };
     if(rgo) rgo.onclick=go;
     if(rq) rq.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
     const cont=document.getElementById('rsectors');
-    if(cont) REG_SECS.forEach(([sec,t])=>{ const c=document.createElement('span'); c.className='chip'+(sec===''?' on':''); c.dataset.sec=sec; c.textContent=t; c.onclick=()=>{ REG.sector=sec; regSyncSectors(); if(!REG.q&&!REG.sector) regShowLanding(); else regBuscar(); }; cont.appendChild(c); });
+    if(cont) REG_SECS.forEach(([sec,t])=>{ const c=document.createElement('span'); c.className='chip'+(sec===''?' on':''); c.dataset.sec=sec; c.textContent=t; c.onclick=()=>{ REG.sector=sec; regSyncSectors(); regRefrescar(); }; cont.appendChild(c); });
+    const tc=document.getElementById('rtipos');
+    if(tc) REG_TIPOS.forEach(([ta,t])=>{ const c=document.createElement('span'); c.className='chip'+(ta===REG.tipoActo?' on':''); c.dataset.ta=ta; c.textContent=t; c.onclick=()=>{ REG.tipoActo=ta; regSyncTipos(); regRefrescar(); }; tc.appendChild(c); });
     const rb=document.getElementById('regBack'); if(rb) rb.onclick=()=>showView('home');
   }
   /* ---------- pilar Ejecutivo Nacional · decretos y normativa ---------- */
@@ -1472,7 +1521,7 @@
       ${bancSerie(d)}
       <div class="panel wide" style="margin-top:1.2rem"><h3>Quién se sale de su propia bancada</h3>
         ${dis||'<div class="cob-note" style="margin-top:0">Sin nadie por encima del mínimo de votaciones evaluables.</div>'}
-        <div class="cob-note">Porcentaje de votaciones contestadas en que la persona votó contra la mayoría de su propia bancada. Entran quienes tengan al menos ${dm.min_votos||0} votaciones evaluables: ${fmt(dm.n_evaluables||0)} personas lo cumplen y su disidencia mediana es ${dm.mediana_pct==null?'—':dm.mediana_pct+'%'}. Click para ver su récord completo.${BANC_CAM==='senado'?' <b>En Senado descansa en muy pocas votaciones</b> — mira la n de cada fila antes de sacar conclusiones.':''}</div></div>
+        <div class="cob-note">Porcentaje de votaciones contestadas en que la persona votó contra la mayoría de su propia bancada. Entran quienes tengan al menos ${dm.min_votos||0} votaciones evaluables: ${fmt(dm.n_evaluables||0)} personas lo cumplen y su disidencia mediana es ${dm.mediana_pct==null?'—':dm.mediana_pct+'%'}. Click para ver su récord completo.${BANC_CAM==='senado'?' <b>En Senado descansa en muy pocas votaciones</b> — mira la n de cada fila antes de sacar conclusiones. Su ficha personal muestra totales más altos porque cuenta las votaciones tal como las publica la fuente, sin descartar las que republica en varias fechas.':''}</div></div>
       <div class="panel wide" style="margin-top:1.2rem"><h3>Cobertura · lo que queda por fuera</h3>
         <div style="font-size:.74rem;color:var(--ink2);line-height:1.6">
           De ${fmt(c.n_votaciones)} votaciones registradas se analizan <b>${fmt(c.n_analizadas)}</b>:

@@ -1973,12 +1973,20 @@ def handler(event, context):
             return _resp(400, {'error': 'falta titulo del proyecto'})
         return _resp(200, _contexto_medios(body))
 
-    if action == 'sanciones':      # pilar Regulatorio · sanciones de superintendencias
+    if action == 'sanciones':      # pilar Regulatorio · actos de superintendencias
         q = (body.get('query') or '').strip().lower()
         sector = body.get('sector') or ''
-        if not q and not sector:               # landing: agregados precalculados (rápido)
+        # reencuadre jul-2026: el pilar cubre TODOS los actos regulatorios, pero
+        # la vista por defecto sigue siendo solo sanciones — meter aperturas y
+        # contribuciones sin pedirlo diluiría lo que hoy ve el cliente.
+        # tipo_acto: '' → sanciones · 'todo' → universo · un tipo concreto → ese.
+        tipo_acto = (body.get('tipo_acto') or '').strip().lower() or 'sancion'
+        if not q and not sector and tipo_acto == 'sancion':
             return _resp(200, dict(_sanciones_stats(), mode='stats'))
         recs = _sanciones()
+        if tipo_acto != 'todo':
+            # los registros viejos (pre-reencuadre) no traen tipo_acto → sanción
+            recs = [r for r in recs if (r.get('tipo_acto') or 'sancion') == tipo_acto]
         # ④ si la consulta nombra una empresa, el match NO puede ser el substring
         # sobre el blob `q`: 'uber' así trae "UBERNETH URANGO" y "YUBER CALIXTO",
         # 'claro' trae "PESQUERA RIO CLARO". Se matchea la IDENTIDAD (razón social
@@ -1992,14 +2000,28 @@ def handler(event, context):
                          if emps else q in r.get('q', '')))]
         secc = Counter(r.get('sector', '') for r in hits)
         fuc = Counter(r.get('fuente_nombre', '') for r in hits)
+        tac = Counter((r.get('tipo_acto') or 'sancion') for r in hits)
         montos = [r['monto'] for r in hits if r.get('monto')]
         hits_sorted = sorted(hits, key=lambda r: r.get('fecha', ''), reverse=True)
         out = [{k: v for k, v in r.items() if k != 'q'} for r in hits_sorted[:120]]
+        # cuántos actos NO-sanción quedaron fuera con el filtro por defecto: el
+        # frontend lo usa para ofrecer el toggle sin mentir sobre el universo.
+        otros = 0
+        if tipo_acto == 'sancion':
+            otros = sum(1 for r in _sanciones()
+                        if (r.get('tipo_acto') or 'sancion') != 'sancion'
+                        and (not sector or r.get('sector') == sector)
+                        and (not q
+                             or (empresas.casa_registro_any(emps, r.get('sancionado', ''))
+                                 if emps else q in r.get('q', ''))))
         return _resp(200, {
             'mode': 'search', 'query': body.get('query', ''), 'sector': sector,
+            'tipo_acto': tipo_acto,
             'n': len(hits), 'mostrados': len(out),
+            'otros_actos': otros,
             'por_sector': [{'sector': s, 'n': n} for s, n in secc.most_common()],
             'por_fuente': [{'fuente': f, 'n': n} for f, n in fuc.most_common()],
+            'por_tipo_acto': [{'tipo_acto': t, 'n': n} for t, n in tac.most_common()],
             'monto_total_cop': round(sum(montos)) if montos else 0,
             'con_monto': len(montos),
             'empresas': _empresas_payload(emps),
@@ -2061,10 +2083,14 @@ def handler(event, context):
         if not s:
             return _resp(400, {'error': f'sector desconocido: {sk}', 'sectores': sectores})
         rc = caudal.radar_congreso(sector_key=sk)
-        reg, n_sanc = [], 0
+        reg, n_sanc, n_otros = [], 0, 0
         if s.get('sector_sanciones'):
-            sanc = [r for r in _sanciones() if r.get('sector') == s['sector_sanciones']]
-            n_sanc = len(sanc)
+            dels = [r for r in _sanciones() if r.get('sector') == s['sector_sanciones']]
+            # el radar prioriza SANCIONES: son las que mueven la aguja del
+            # cliente. Los demás actos regulatorios del sector se cuentan
+            # (n_otros_actos_sector) pero no compiten por los 6 cupos.
+            sanc = [r for r in dels if (r.get('tipo_acto') or 'sancion') == 'sancion']
+            n_sanc, n_otros = len(sanc), len(dels) - len(sanc)
             sanc.sort(key=lambda r: r.get('fecha', ''), reverse=True)
             for r in sanc[:6]:
                 yr = (r.get('fecha') or '')[:4]
@@ -2117,6 +2143,7 @@ def handler(event, context):
                 'bajo': sum(1 for x in senales if x['nivel'] == 'bajo'),
                 'en_tramite': sum(1 for x in rc['senales'] if x['resultado'] == 'EN_TRAMITE'),
                 'n_proyectos_sector': rc['n_tocados'], 'n_sanciones_sector': n_sanc,
+                'n_otros_actos_sector': n_otros,
                 'n_medios_sector': n_med, 'n_contratos_sector': n_con}
         out = {'cliente': {'sector': sk, 'nombre': s['nombre'], 'comision': s['comision'],
                            'sector_sanciones': s.get('sector_sanciones', ''), 'temas': s.get('temas', [])},
