@@ -6061,6 +6061,56 @@ con el enlace **ampliar/volver a lo esencial** (`empresaHint`/`wireEmpresaHint` 
   descartaron los que colisionan por stem: `seguros`→`segur`≈seguridad social (580
   hits casi todos ajenos) y `puertos`→`puert`≈AEROPUERTO, que van como frase.
 
+> **📌 ESTADO del diccionario de empresas (jul-30-2026) — qué está VIVO y qué NO**
+>
+> Se trabajó en DOS conversaciones en paralelo; esto es lo que quedó, para no
+> tener que reconstruirlo de memoria.
+>
+> **✅ EN PRODUCCIÓN (desplegado y verificado, commit `a5eb9e4`):**
+> - `tools/caudal/empresas.py` con **388 entradas** + los 17 tópicos nuevos en
+>   `SINONIMOS` + el fix del ancla en `buscar`.
+> - **Lambda `caudal-analiza` redeployada** (`LastUpdateStatus: Successful`) con
+>   `empresas.py` dentro del ZIP. Probado con llamadas reales a la API:
+>   `uber` → Congreso 35 · Regulatorio 1 (UBER Colombia S.A.S) · Ejecutivo 4 ·
+>   `rappi` → 100 / 2 / 19 · `claro` → 119 / 8 (todas SIC contra la telco) / 20.
+>   El toggle `ampliar_empresa` responde (uber 35 → 124).
+> - **`caudal.html` en `main`** (GitHub Pages) con el aviso de traducción y el
+>   enlace ampliar/volver.
+> - ⚠ **La UI no se pudo ver en el navegador** (la página es gated y la sesión de
+>   trabajo no tenía cómo autenticarse). Se verificó la función `empresaHint`
+>   extraída del HTML y alimentada con el payload REAL de producción: los 3
+>   estados correctos (núcleo · ampliado · vacío sin empresa). **Sanity check
+>   pendiente de 10 s: entrar con cuenta, buscar `uber` en el home y confirmar
+>   que las 4 pestañas traen algo.**
+>
+> **🔜 PENDIENTE — 1. Pilar Contratación (SECOP II) · lo toma Ricardo en OTRA
+> conversación.** Es donde el diccionario rinde más obvio: en SECOP el **proveedor
+> ES la empresa**, así que aplica la cara de IDENTIDAD, no la de tema. La pieza ya
+> está construida y sin usar: **`empresas.filtrar_registros(emps, registros,
+> campos)`** — recibe la lista de campos donde vive el nombre del proveedor y
+> aplica el mismo match por palabra completa con vetos. Ojo con la arquitectura
+> partida de ese pilar: SECOP **no carga el dataset en memoria** (5,87 M filas), la
+> búsqueda va EN VIVO contra Socrata con `$q` y `like` está prohibido (>30 s,
+> techo de API Gateway) → el filtro por identidad tendría que ser **post-`$q`**
+> (traer más filas y filtrar en Python, como ya hace el toggle "solo en el
+> objeto"), NO un `where` nuevo. `view-contratacion` tampoco es una de las 4
+> pestañas de la búsqueda universal: si se quiere ahí, hay que sumarla a
+> `UNI_TABS` en `caudal.html`.
+>
+> **🔜 PENDIENTE — 2. Falso disparo residual (menor).** `"sena de la mujer"`
+> activa el SENA (1 de 28 consultas de control). Inofensivo —solo amplía a
+> educación superior— pero si molesta en uso real se corrige con una entrada en
+> el campo `excluir` de esa fila. Mismo patrón si aparecen otros: el campo
+> `excluir` es para falsos positivos MEDIDOS, no hipótesis.
+>
+> **🔜 PENDIENTE — 3. Crecer el diccionario más allá de 388 (opcional).** La vía
+> honesta NO es inventar más nombres: es **derivarlos del dato** (los `sancionado`
+> más frecuentes de las supers y los proveedores top de SECOP ya son nombres
+> reales con razón social). Eso da la cara de IDENTIDAD gratis; lo que hay que
+> curar a mano es el TEMA. El barrido ya hecho mostró que la densidad está en
+> comisionistas de bolsa, EPS/IPS y operadores de SITP — esas categorías ya
+> quedaron cubiertas.
+
 ### Arquitectura Caudal · paraguas vs pilares (aclaración conceptual jul-2026)
 
 **Caudal = la plataforma-paraguas** (el "mini-Dapper interno" de Cauce que
