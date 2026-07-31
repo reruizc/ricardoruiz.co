@@ -5955,7 +5955,7 @@ precisión. `_titulos_norm()` cachea los títulos normalizados (el Radar llama a
 Snowball español completo como upgrade.
 
 **④ Diccionario de EMPRESAS y GREMIOS — el traductor de la BÚSQUEDA GENERAL**
-(`tools/caudal/empresas.py` · **230 entradas: 189 empresas + 41 gremios** · jul-2026).
+(`tools/caudal/empresas.py` · **388 entradas: 320 empresas + 68 gremios** · jul-2026).
 El cliente busca con el nombre de la empresa, pero el Estado casi nunca la nombra así.
 Medido antes del fix: **«Uber» daba 0 títulos en Congreso** (el Congreso dice
 "plataformas tecnológicas": ~35 proyectos) y en Regulatorio traía **1 sanción real
@@ -5972,14 +5972,14 @@ cada entrada del diccionario lleva las dos caras:
   completa). Resultado: uber 8→1 real · claro 11→8 reales · didi 3→0.
 - **TEMA** (`topicos`) → pilares Congreso y Ejecutivo, que legislan la ACTIVIDAD.
   Se expresa como **llaves del tesauro SINONIMOS**, no como términos propios: si el
-  vocabulario de un tópico cambia, las 230 entradas lo heredan.
+  vocabulario de un tópico cambia, las 388 entradas lo heredan.
 
 **NÚCLEO vs CONTEXTO (la decisión de diseño que da la precisión):** el primer tópico
 es el núcleo (la actividad que ES la empresa) y es el único que se busca por defecto;
 los demás son contexto y entran solo si el usuario amplía. Medido: «Uber» núcleo=35
 vs todo=124, y los 89 extra son 'reforma laboral' genérica — o sea ruido vendido como
 señal. Una empresa con dos actividades de verdad centrales marca la segunda con `*`
-(Rappi `*laboral`, EPM `*agua y saneamiento`, Google `*datos personales`; 14 casos).
+(Rappi `*laboral`, EPM `*agua y saneamiento`, Google `*datos personales`; ~30 casos).
 El frontend muestra el aviso «X es una empresa del diccionario · se buscó por: …»
 con el enlace **ampliar/volver a lo esencial** (`empresaHint`/`wireEmpresaHint` en
 `caudal.html`), mismo principio que los avisos de sinónimos y búsqueda flexible:
@@ -6008,6 +6008,13 @@ con el enlace **ampliar/volver a lo esencial** (`empresaHint`/`wireEmpresaHint` 
   ("claro que sí"). Cobertura contra el dato real: **230/230 (100%) devuelven
   proyectos en Congreso** y **71/230 (31%) tienen sanción propia** en Regulatorio —
   el 31% es la tasa real del mundo, no todas las empresas han sido sancionadas.
+- ⚠ **Un tópico del TESAURO no puede ENCOGER la búsqueda** (fix del mismo sprint):
+  al crear los 17 tópicos, 'reforma laboral' cayó de 215 a 70 porque el OR de las
+  frases del tópico reemplazaba el anclaje previo a la palabra más específica. Ahora
+  el **ancla del usuario entra como una opción más del OR** cuando el tópico se
+  activó por SUS palabras (`hay_tesauro` en `buscar`) → 257. NO aplica cuando el
+  tópico vino solo del puente de empresa: ahí la palabra es una marca, no vocabulario
+  legislativo. Medido tras el fix: 0 regresiones en 21 consultas, 11 ganan alcance.
 - **Para agregar empresas**: una tupla de 7 en `_RAW` (o `_RAW_GREMIOS`) +
   `verificar`. Nunca poner una palabra común suelta en `alias` (usar 'grupo exito',
   'meta platforms', 'tiendas ara'). También faltan **17 tópicos nuevos** que se
