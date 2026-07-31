@@ -6111,6 +6111,57 @@ con el enlace **ampliar/volver a lo esencial** (`empresaHint`/`wireEmpresaHint` 
 > comisionistas de bolsa, EPS/IPS y operadores de SITP — esas categorías ya
 > quedaron cubiertas.
 
+### 📌 ESTADO CONSOLIDADO DE CAUDAL (jul-31-2026) — qué está vivo y qué falta
+
+Escrito para cerrar la confusión de haber trabajado en **dos conversaciones en
+paralelo** (una hizo el diccionario de empresas ④, la otra el índice de bloqueo
+del Senado). **Todo lo de abajo está VERIFICADO contra producción**, no de
+memoria — donde diga "verificado" es porque se llamó la API o se miró el repo.
+
+**✅ EN PRODUCCIÓN (los dos frentes están desplegados y probados):**
+- **Diccionario de empresas ④** — `tools/caudal/empresas.py` (388 entradas) en
+  el ZIP de la Lambda. Verificado jul-31 llamando la API: `uber` devuelve
+  `resumen.empresas=['Uber']` con 35 intentos, y el toggle `ampliar_empresa`
+  sube a 124. ⚠️ **El bloque `empresas` viene DENTRO de `resumen`, no en la
+  raíz** — mirarlo en la raíz hace creer que la Lambda está atrasada (pasó).
+- **Índice de bloqueo del SENADO** — `bloqueo.json` (1,2 MB) en S3 con el bloque
+  `senado`; Lambda sirviendo `bloqueo.senado` + `bloqueo_senado` en la ficha;
+  `caudal.html` con la tercera curva. 1.329 proyectos de plenaria + 525 de
+  Cuarta/Quinta/Sexta. Detalle completo en la sección "SENADO — el hueco
+  grande, RESUELTO" más arriba.
+- **Refresco diario**: ambas cámaras entran al `run_diario.sh` que dispara
+  launchd 2×/día.
+
+**🟡 PENDIENTE — en orden de valor:**
+1. **OCR de órdenes del día escaneadas.** El **47% de las de la Comisión Sexta
+   del Senado** (168 de 360) son PDF sin capa de texto y hoy se pierden; ídem
+   19% de la Cuarta. Tesseract ya está montado y probado en el repo
+   (`parse_dcnsw_camara.py`, `ocr_pilot.py`), así que es aplicar lo que existe.
+   Mismo lote que el OCR pendiente de gacetas pre-2006 y actas de Cámara
+   2010-2013.
+2. **Las 4 comisiones del Senado sin serie** (Primera · Segunda · Tercera ·
+   Séptima). **NO intentar por Gaceta**: medido, rezago de 11-16 meses y actas
+   no aislables por filtro (ver la sección de arriba). Si algún día importa, la
+   vía es targeted por proyecto+fecha. Hoy es hueco DECLARADO en el JSON
+   (`alcance`) y en la UI — es una limitación honesta, no una deuda urgente.
+3. **Órdenes del día de comisión de Cámara: títulos al ~71%** (plenaria 60%).
+   En Senado ya se rellenan desde `proyectos.jsonl` y quedan al 99% — falta
+   portar ese mismo relleno a `harvest_ordenes.py`. Es barato.
+4. **Voto nominal de Senado pre-2017** (la API pública arranca en 2017) y el
+   **voto MANUAL de Cámara ago-2021/sep-2022** (columna "X" posicional, pide
+   pdfplumber). Ambos son cola larga.
+5. **Disciplina de bancada como vista propia** — el dato ya se mide por persona
+   y por bancada, falta exponerlo agregado. Coaliciones sigue PAUSADO por
+   decisión.
+
+**⚠️ Trabajo SIN COMITEAR en el repo (jul-31), ajeno a Caudal:** hay bastante
+en el working tree de otros frentes —`analisis-candidato.html`, `cand-index.js`,
+`endoso-2026.html`, `electoral.html`, `brujula-2027.html`, `previa-1v.html`,
+`tools/analisis-candidato/build_territorial_candidatos.py`, las imágenes de
+`rrss/instagram/conflicto-png/`, ponderador, test-presidencial—. **No se tocó
+desde las sesiones de Caudal a propósito.** Antes de comitear cualquier cosa en
+esos archivos, revisar qué hay: son de otra línea de trabajo.
+
 ### Arquitectura Caudal · paraguas vs pilares (aclaración conceptual jul-2026)
 
 **Caudal = la plataforma-paraguas** (el "mini-Dapper interno" de Cauce que
