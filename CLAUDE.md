@@ -6274,9 +6274,30 @@ NO un pilar (vive encima de los pilares).
   Superfinanciera/otras superintendencias, los sectores financiero/energía ganan
   Regulatorio real.
 
-### Pilar Regulatorio · sanciones de superintendencias (`tools/caudal/supers/` · piloto vía 1 LISTO)
+### Pilar Regulatorio · actos de superintendencias (`tools/caudal/supers/` · LISTO)
 
-Extractor de sanciones/actos de superintendencias y entidades reguladoras.
+> **⚠️ REENCUADRE jul-2026 — el pilar es "actos regulatorios", NO solo "sanciones".**
+> Cada registro lleva **`tipo_acto`** ∈ `sancion · apertura_investigacion · archivo ·
+> contribucion_especial · resolucion · circular · otro`. Antes los actos procesales se
+> DESCARTABAN; ahora se conservan (el cliente quiere toda la actividad del Estado sobre
+> su sector, no solo las multas).
+> - **La vista de sanciones NO se diluyó:** el default de la acción `sanciones` y del
+>   frontend es `tipo_acto='sancion'` → 7.019 registros idénticos a antes (regresión
+>   verificada campo por campo). `tipo_acto:'todo'` abre el universo; un tipo concreto
+>   filtra a ese. La respuesta trae `otros_actos` (cuántos quedaron fuera) para ofrecer
+>   el toggle sin esconder el universo — mismo principio que los avisos de sinónimos y
+>   búsqueda flexible: **nada de resultados que aparecen por magia**.
+> - **Vista Cliente (SIGA) sigue priorizando SOLO sanciones** como señal; los demás
+>   actos del sector se cuentan en `kpis.n_otros_actos_sector` sin competir por los
+>   6 cupos del radar.
+> - `_schema_normalizado` gana `tipo_acto`; las fuentes mono-clase lo declaran en
+>   `tipo_acto_default` ("sancion" en las 10 existentes), y solo `supersalud-registro`
+>   lo trae POR FILA (lo clasifica el modelo leyendo el PDF).
+> - ⚠️ El campo `sancionado` **conserva el nombre** por compatibilidad (Lambda +
+>   frontend + build), pero su semántica pasó a "entidad DESTINATARIA del acto":
+>   sancionada, investigada, o contribuyente. No renombrarlo sin tocar los 3.
+
+Extractor de actos de superintendencias y entidades reguladoras.
 Cumple una promesa que YA está en el documento de Cauce
 (`Propuestas/Cauce-Estado-de-Cosas-Inteligencia-Legislativa.pdf`): las
 superintendencias son 1 de las 9 categorías del "mapa inicial de fuentes" (18 en
@@ -6336,15 +6357,31 @@ monto · resolucion · fecha_firmeza · estado · descripcion · _id · _raw`
   (`/es-co/_api/search/query`) filtrada al repo de Comunicados. `sancionado`/
   `monto`/`tipo` se sacan del titular por regex (sin LLM); `fecha` = la del
   comunicado, no la firmeza. Ver la nota extensa de Supersalud abajo.
-- **Vía 3 · normograma/PDF** (registrada, PENDIENTE): reusa el **pipeline de
-  gacetas de Caudal fase 3** (pypdf + DeepSeek). Candidata: **Supersociedades**
-  (Liferay). ⚠️ OJO (verificado jul-2026): la sección `/normativa` de
-  Supersociedades (478 resoluciones + 198 circulares externas) es **NORMATIVA
-  GENERAL, NO sanciones** — una "Circular Externa 100-000021" es una instrucción
-  a vigilados, igual que el normograma de Supersalud. Las sanciones REALES de
-  Supersociedades se notifican como "avisos" bajo landings Liferay DINÁMICOS
-  (`/web/supervision-societaria/avisos-y-otros`), que exigen crackear el scraping
-  JS primero. Ver "Investigación Supersalud + Supersociedades (jul-2026)" abajo.
+- **Vía 3 · PDF → DeepSeek** (IMPLEMENTADA jul-2026 ·
+  `harvest_supersalud_registro.py`): reusa el **pipeline de gacetas de Caudal
+  fase 3** (pypdf + DeepSeek). SharePoint Search enumera → PDF → texto → el
+  modelo estructura el acto y lo tipa con `tipo_acto`.
+  ⚠️ **Gotcha de `max_tokens` (medido):** con 2000, V4 gasta el presupuesto en
+  *reasoning* y devuelve `content` VACÍO con `finish_reason=length` en **7 de
+  20** docs — el mismo gotcha ya documentado para la síntesis de la Lambda. El
+  harvester usa **6000** y `_extraer_doc()` **reintenta con 12000** cuando aun
+  así se trunca (~10%). Subir el techo no encarece: solo se cobran los tokens
+  generados. La caché por doc guarda `_pv` = `PROMPT_VERSION`; al cambiar
+  `SNS_REG_SYSTEM` hay que subirla y las extracciones viejas se re-piden solas.
+  ❌ **Supersociedades DESCARTADA (jul-2026).** El bloqueo que este archivo
+  declaraba ("landings Liferay DINÁMICOS que exigen crackear el scraping JS")
+  era **FALSO**: el AssetPublisher de `/web/supervision-societaria/avisos`
+  (INSTANCE_zyly) es **server-rendered**, sin JS, con los PDFs en
+  `href=/documents/80303/160010/*`. El problema real es otro y es definitivo:
+  **su contenido no son sanciones** sino avisos de notificación de **oficios de
+  respuesta a derechos de petición** (art. 69 CPACA) — verificado leyendo 2
+  PDFs, texto literal "no fue posible la notificación de la contestación a su
+  solicitud". Los otros 3 landings de avisos traen 0-1 documentos (y ese 1 es
+  litigio mercantil entre privados); el buscador del sitio
+  (`resultados_busqueda?..._SearchBarPortlet_keywords=`) da 0 para
+  "sancionatorio"/"multa"; Socrata tiene 7 datasets, todos NIIF. `/normativa`
+  sigue siendo normativa general (ese premise ya estaba corregido). Retomar solo
+  si empiezan a publicar sus resoluciones sancionatorias.
 
 **Gotcha de `build_s3.py` encontrado con los datos de Superfinanciera (jul-2026):**
 algunos textos largos (`observacion`) traen mojibake de control chars —
@@ -6399,13 +6436,17 @@ Descubrir: `catalog/v1?domains=www.datos.gov.co&q=sanciones+<entidad>` →
 **Siguiente sprint:** (1) ✅ HECHO — `harvest_sfc.py` (Superfinanciera vía 2).
 (2) ✅ HECHO — `sanciones.jsonl` enganchado a la Lambda + frontend
 `view-regulatorio` + cruzado con el Radar del cliente (SIGA). (3) ✅ HECHO —
-Supertransporte + SIC + Supersalud (vía 2 comunicados). (4) 🟡 PENDIENTE —
-extraer TODO el acto regulatorio de las supers (ver dirección nueva abajo);
-Supersociedades vía 3 (avisos dinámicos).
+Supertransporte + SIC + Supersalud (vía 2 comunicados). (4) ✅ HECHO —
+**reencuadre a actos regulatorios** (`tipo_acto` end-to-end + registro de
+Supersalud vía 3). (5) ❌ DESCARTADA — Supersociedades (no publica sanciones).
+(6) 🟡 PENDIENTE — OCR de los PDFs escaneados del registro de Supersalud;
+extender `tipo_acto` no-sanción a SIC / Supertransporte / Superfinanciera
+(publican circulares y resoluciones que caben en el mismo esquema).
 
-**Estado:** **10 fuentes · 7.019 sanciones en producción** (S3
-`caudal-legislativo/metadata/` + Lambda `caudal-analiza`). Última subida:
-jul-2026 (Supersalud 12→16 tras recalibrar el filtro, ver abajo).
+**Estado:** **11 fuentes · 7.019 sanciones + 30 actos no-sancionatorios en
+producción** (S3 `caudal-legislativo/metadata/` + Lambda `caudal-analiza`).
+Última subida: jul-2026 (reencuadre `tipo_acto`; los 30 actos son el arranque
+del registro de Supersalud vía 3 — el harvest completo son 771 candidatos).
 
 ### Investigación Supersalud + Supersociedades (jul-2026) · el registro real vs la prensa
 

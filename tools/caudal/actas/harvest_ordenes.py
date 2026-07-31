@@ -238,6 +238,7 @@ def load_gaceta_map():
 
 
 _GMAP = None
+_NMAP = None
 
 
 def gaceta_map_cached():
@@ -246,6 +247,13 @@ def gaceta_map_cached():
     if _GMAP is None:
         _GMAP = load_gaceta_map()
     return _GMAP
+
+
+def num_map_cached():
+    global _NMAP
+    if _NMAP is None:
+        _NMAP = load_numero_camara_map()
+    return _NMAP
 
 
 def run(com, limit=None, offline=False):
@@ -339,15 +347,33 @@ def run(com, limit=None, offline=False):
         }
     rows = sorted(index.items(), key=lambda kv: -kv[1]['n'])
 
+    # Relleno de títulos desde el propio dataset — mismo patrón que
+    # harvest_ordenes_senado.py: ~29%/40% de las citas en el orden del día no
+    # traen título usable en el PDF (número solo, o título sin comillas y solo
+    # el apodo entre comillas). Como ya tenemos numero_camara→titulo en
+    # proyectos.jsonl, se completa de ahí en vez de dejar la fila en blanco en
+    # la UI. Solo rellena lo que falta; NO pisa el título leído del documento.
+    nmap = num_map_cached()
+    n_titulo_dataset = 0
+    for tok in index:
+        if not (index[tok].get('titulo') or '').strip():
+            r = nmap.get(tok)
+            t = (r.get('titulo') or '').strip() if r else ''
+            if t:
+                index[tok]['titulo'] = t
+                n_titulo_dataset += 1
+
     out = {'comision': com, 'com_id': com_id, 'ambito': 'plenaria' if com == 'plenaria' else 'comision',
            'n_sesiones': len(eventos), 'n_sesiones_con_proyectos': n_ok,
-           'n_con_fecha_sesion': n_fs,
+           'n_con_fecha_sesion': n_fs, 'n_titulo_desde_dataset': n_titulo_dataset,
            'n_proyectos_agendados': len(index), 'agendamientos': index}
     outf = CACHE / f'agendamientos-{com}.json'
     json.dump(out, open(outf, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 
+    n_con_titulo = sum(1 for i in index.values() if (i.get('titulo') or '').strip())
     print(f'\n  {n_pdf} PDFs nuevos · {n_ok} sesiones con proyectos · '
-          f'{len(index)} proyectos distintos · {len(titulos)} con título')
+          f'{len(index)} proyectos distintos · {n_con_titulo} con título '
+          f'(+{n_titulo_dataset} rellenados desde el dataset)')
     print(f'  → {outf.relative_to(REPO)}')
     print('\n  Proyectos más AGENDADOS (nº veces en orden del día):')
     for tok, info in rows[:15]:

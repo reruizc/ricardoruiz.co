@@ -225,6 +225,26 @@ def norm_txt(s):
     return ''.join(c for c in s if unicodedata.category(c) != 'Mn').lower()
 
 
+def es_error_html(fn):
+    """Detecta la página 404 de DOCman guardada con extensión .pdf/.docx.
+
+    BUG encontrado jul-31: el cuerpo HTTP a veces trae un byte de más (un
+    '\\n' suelto) ANTES de '<!doctype html>' — el check ingenuo
+    `head[:1] == b'<'` no lo ve, así que ~174 documentos (168 en Sexta, 6 en
+    Cuarta, medido) quedaban mal contados como `n_escaneado` (pypdf tira
+    'Stream has ended unexpectedly' sobre el HTML, texto <50 chars) cuando en
+    realidad son 404 GENUINOS de DOCman, ya documentados como irrecuperables
+    (ver docstring del módulo: probadas rutas alternativas, todas 404). No
+    hay nada que OCRear ahí — un 404 no tiene imagen. Este check mira los
+    primeros 300 bytes buscando '<!doctype html' o '<html' en cualquier
+    posición, no solo en el byte 0."""
+    try:
+        head = fn.read_bytes()[:300].lower()
+    except Exception:
+        return False
+    return b'<!doctype html' in head or b'<html' in head
+
+
 def es_candidato(doc):
     return bool(ORDEN_RE.search(norm_txt(doc.get('category_slug')) + ' ' + norm_txt(doc.get('title'))))
 
@@ -540,6 +560,7 @@ def run(ambito, limit=None, offline=False, workers=1):
     agend = defaultdict(list)
     titulos = {}
     n_nuevos, n_ok, n_fs, n_link_roto, n_escaneado, n_otro_formato = 0, 0, 0, 0, 0, 0
+    n_ocr_ok, n_ocr_sin_match = 0, 0
 
     for i, doc in enumerate(cand):
         ext = (doc.get('storage_path') or '').rsplit('.', 1)[-1].lower()
@@ -552,31 +573,49 @@ def run(ambito, limit=None, offline=False, workers=1):
         pub = (doc.get('publish_date') or '')[:10]
         fn = outdir / f"{doc['id']}.{ext}"
         tf = outdir / f"{doc['id']}.txt"
+        of = outdir / f"{doc['id']}.ocr.txt"
         if tf.exists():
             txt = tf.read_text(encoding='utf-8')
+            # re-validación (self-heal): texto corto cacheado ANTES del fix de
+            # es_error_html() podía ser en realidad un 404 mal contado como
+            # 'escaneado' — se corrige sin red, releyendo el archivo ya en disco.
+            if 0 < len(txt.strip()) < 50 and fn.exists() and es_error_html(fn):
+                txt = ''
+                tf.write_text('', encoding='utf-8')
         elif offline:
             continue
         else:
             if not fn.exists() or fn.stat().st_size < 300:
                 curl(href, str(fn))
                 n_nuevos += 1
-            head = open(fn, 'rb').read(5) if fn.exists() else b''
-            if head[:1] == b'<':          # 404/redirect (o link roto de DOCman) → HTML, no el archivo real
+            if fn.exists() and es_error_html(fn):   # 404/redirect (o link roto de DOCman)
                 n_link_roto += 1
                 tf.write_text('', encoding='utf-8')
                 continue
             txt = extract_text_docx(str(fn)) if ext == 'docx' else extract_text_pdf(str(fn))
             tf.write_text(txt, encoding='utf-8')
+        fuente_txt = 'nativo'
         if len(txt.strip()) < 50:
             # .txt vacío = el archivo nunca llegó (link roto de DOCman, se cacheó
-            # como ''); .txt corto pero no vacío = PDF escaneado sin capa de texto.
-            # Distinguirlos importa para que el diagnóstico de una corrida
-            # --offline no repita 'escaneado' donde en realidad hubo 404.
+            # como ''); .txt corto pero no vacío = PDF genuinamente escaneado sin
+            # capa de texto nativa (ya descartado que sea un 404 mal detectado,
+            # arriba). Antes de descartarlo, ver si ya hay OCR cacheado
+            # (ocr_ordenes_senado.py lo deja en {id}.ocr.txt) y usarlo.
             if txt == '':
                 n_link_roto += 1
+                continue
+            if of.exists():
+                ocr_txt = of.read_text(encoding='utf-8')
+                if len(ocr_txt.strip()) >= 50:
+                    txt = ocr_txt
+                    fuente_txt = 'ocr'
+                    n_ocr_ok += 1
+                else:
+                    n_escaneado += 1
+                    continue
             else:
                 n_escaneado += 1
-            continue
+                continue
         fecha, es_sesion = fecha_sesion_senado(doc.get('title'), txt, pub, titulo_flex=es_plen)
         n_fs += es_sesion
 
@@ -588,6 +627,7 @@ def run(ambito, limit=None, offline=False, workers=1):
         # cita verbosa que ancla bien. Revisar de nuevo si aparece en Quinta/Sexta.
         body = cut_anuncio(txt)
         orden, seen = [], set()
+        es_ocr = fuente_txt == 'ocr'
         for m in CITA_RE.finditer(body):
             hit = resolver_num_senado(m.group('header'))
             if not hit:
@@ -596,6 +636,16 @@ def run(ambito, limit=None, offline=False, workers=1):
             if int(num) == 0:   # "Proyecto de Ley No. 0 de …" no existe: artefacto de extracción
                 continue
             tok = norm(num, anio2)
+            # texto OCR: el dígito puede venir garabateado por el escáner. En vez
+            # de confiar en la cita tal cual (como con texto nativo), se exige que
+            # el número resuelto EXISTA en el dataset (proyectos.jsonl) — si no,
+            # se descarta en vez de contaminar el conteo con un número inventado
+            # por el OCR. Esto es justo lo que se valida al hacer QA de la
+            # cobertura ("98-100% de los números casan con proyectos reales"),
+            # aquí convertido en filtro duro para lo recuperado por OCR.
+            if es_ocr and tok not in num_map_cached():
+                n_ocr_sin_match += 1
+                continue
             t = re.sub(r'\s+', ' ', m.group('titulo')).strip(' "“”«»')
             if 12 <= len(t) <= 180 and tok not in titulos:
                 titulos[tok] = t
@@ -614,8 +664,18 @@ def run(ambito, limit=None, offline=False, workers=1):
         if orden:
             n_ok += 1
         n_dia = len(orden)
+        # confianza del OCR (solo se marca cuando fuente_txt=='ocr'; ver docstring
+        # del módulo/CLAUDE.md, mismo criterio de 3 niveles que parse_dcnsw_camara.py):
+        # 'alta' si además la fecha de sesión se leyó del documento (es_sesion),
+        # 'media' si la fecha cayó al fallback de publicación. Los 'baja' (número
+        # sin match en el dataset) YA fueron descartados arriba — nunca llegan a
+        # `orden`, así que nunca entran a los agregados.
+        conf_ocr = ('alta' if es_sesion else 'media') if es_ocr else None
         for pos, tok in enumerate(orden, 1):
-            agend[tok].append({'fecha': fecha, 'pos': pos, 'n_dia': n_dia})
+            ev = {'fecha': fecha, 'pos': pos, 'n_dia': n_dia, 'fuente': fuente_txt}
+            if conf_ocr:
+                ev['confianza'] = conf_ocr
+            agend[tok].append(ev)
         if (i + 1) % 50 == 0:
             print(f'  …{i + 1}/{len(cand)}')
 
@@ -643,11 +703,14 @@ def run(ambito, limit=None, offline=False, workers=1):
             if prev is None or e['pos'] < prev['pos']:
                 por_fecha[e['fecha']] = e
         evs = sorted(por_fecha.values(), key=lambda e: e['fecha'])
+        fuentes = [e.get('fuente', 'nativo') for e in evs]
         index[tok] = {
             'titulo': titulos.get(tok, ''), 'n': len(evs),
             'primera': evs[0]['fecha'], 'ultima': evs[-1]['fecha'],
             'fechas': [e['fecha'] for e in evs],
             'posiciones': [e['pos'] for e in evs],
+            'fuentes': fuentes,
+            'n_ocr': sum(1 for f in fuentes if f == 'ocr'),
         }
     rows = sorted(index.items(), key=lambda kv: -kv[1]['n'])
 
@@ -659,6 +722,7 @@ def run(ambito, limit=None, offline=False, workers=1):
            'n_escaneado': n_escaneado, 'n_otro_formato': n_otro_formato,
            'n_comunicado_descartado': n_comunicado,
            'n_titulo_desde_dataset': n_titulo_dataset,
+           'n_ocr_ok': n_ocr_ok, 'n_ocr_sin_match': n_ocr_sin_match,
            'n_proyectos_agendados': len(index), 'agendamientos': index}
     outf = BASE / f'agendamientos-{ambito}.json'
     json.dump(out, open(outf, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
@@ -666,7 +730,7 @@ def run(ambito, limit=None, offline=False, workers=1):
     print(f'\n  {n_nuevos} descargas nuevas · {n_ok} sesiones con proyectos · '
           f'{len(index)} proyectos distintos · {len(titulos)} con título')
     print(f'  n_link_roto={n_link_roto} · n_escaneado={n_escaneado} · n_otro_formato={n_otro_formato} '
-          f'· n_con_fecha_sesion={n_fs}')
+          f'· n_con_fecha_sesion={n_fs} · n_ocr_ok={n_ocr_ok} · n_ocr_sin_match={n_ocr_sin_match}')
     print(f'  → {outf.relative_to(REPO)}')
     print('\n  Proyectos más AGENDADOS (nº veces en orden del día):')
     for tok, info in rows[:15]:
