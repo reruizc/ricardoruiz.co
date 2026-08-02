@@ -142,6 +142,24 @@ def clasificar_motivo(texto):
     return [k for k, c in CAUSAS.items() if c["rx"].search(texto)]
 
 
+# ── Sección ANTECEDENTES ──────────────────────────────────────────────────────
+# Es el bloque donde la sentencia narra el caso y qué hizo el juez de instancia.
+# Está en el 96,7% de las sentencias del corpus (medido), mientras que los
+# encabezados específicos tipo "Sentencia de primera instancia" solo en ~46%.
+# Por eso la unidad del RAG es esta sección, no una frase suelta: le da al
+# modelo el caso completo en vez de un fragmento sin contexto.
+RE_ANTECEDENTES = re.compile(
+    r"\bANTECEDENTES\b(.*?)(?=\bCONSIDERACIONES\b|\bII\.\s|\bRESUELVE\b)", re.S)
+
+
+def extraer_antecedentes(txt, cap=14000):
+    m = RE_ANTECEDENTES.search(txt)
+    if not m:
+        return None
+    s = " ".join(m.group(1).split())
+    return s[:cap] if len(s) > 400 else None
+
+
 # Fórmulas de la propia Corte que el extractor confunde con el motivo del juez
 # de instancia (aparecen justo después de la frase de decisión, en el preámbulo
 # de competencia). No son razones de fracaso.
@@ -159,7 +177,7 @@ def main():
     rows = cargar()
     hits = Counter()
     citas = {k: [] for k in CAUSAS}
-    n_negadas = 0
+    n_negadas = n_con_motivo = n_clasificadas = 0
     sin_clasificar = []
 
     for r in rows:
@@ -173,12 +191,15 @@ def main():
             if mot and RE_BOILERPLATE.search(mot):
                 mot = ""  # es la fórmula de competencia de la Corte, no un motivo
             n_negadas += 1
+            if mot:
+                n_con_motivo += 1
             blob = dec + " " + mot
             cs = clasificar_motivo(blob)
             if not cs:
                 if mot:
                     sin_clasificar.append((r["sentencia"], mot[:160]))
                 continue
+            n_clasificadas += 1
             for c in cs:
                 hits[c] += 1
                 if len(citas[c]) < 40:
@@ -192,7 +213,22 @@ def main():
         "generado": __import__("time").strftime("%Y-%m-%d"),
         "fuente": "Corte Constitucional · sentencias T de salud (relatoría)",
         "universo": {"sentencias_salud": len(rows),
-                     "decisiones_de_instancia_desfavorables": n_negadas},
+                     "decisiones_de_instancia_desfavorables": n_negadas,
+                     "con_motivo_extraible": n_con_motivo,
+                     "clasificadas_en_la_taxonomia": n_clasificadas},
+        "cobertura": {
+            "pct_con_motivo": round(100 * n_con_motivo / n_negadas, 1) if n_negadas else None,
+            "pct_clasificadas_sobre_con_motivo":
+                round(100 * n_clasificadas / n_con_motivo, 1) if n_con_motivo else None,
+            "advertencia": (
+                "La taxonomía por patrones cubre el NÚCLEO de causas, no la cola. "
+                "En la mayoría de sentencias el juez no usa un verbo de motivación "
+                "cerca de la frase de decisión, y el razonamiento jurídico es "
+                "demasiado diverso para agotarlo con reglas. Por eso la taxonomía "
+                "es la capa de navegación y priors, y la lectura fina la hace el "
+                "LLM sobre los pasajes de `rag-pasajes.jsonl.gz` (sección "
+                "ANTECEDENTES completa), nunca de memoria."),
+        },
         "nota": ("Frecuencia dentro de las sentencias que la Corte SELECCIONÓ para "
                  "revisión — no es la distribución poblacional de las tutelas del "
                  "país. Sirve para explicar POR QUÉ se cae una tutela y citar la "
@@ -210,17 +246,28 @@ def main():
     salida["causas"].sort(key=lambda x: -x["n_casos"])
     (OUT / "causas-fracaso.json").write_text(json.dumps(salida, ensure_ascii=False, indent=1))
 
-    # Corpus de pasajes para el RAG: cada pasaje con su sentencia (citable)
+    # Corpus de pasajes para el RAG. Unidad = sección ANTECEDENTES (el caso
+    # narrado completo), más los pares decisión/motivo ya destilados. Así el
+    # modelo puede citar la sentencia Y tener el contexto para no malinterpretarla.
+    n_rag = n_ant = 0
     with gzip.open(OUT / "rag-pasajes.jsonl.gz", "wt", encoding="utf-8") as fh:
         for r in rows:
-            for p in r.get("instancia") or []:
-                if p.get("motivo"):
-                    fh.write(json.dumps({
-                        "sentencia": r["sentencia"], "fecha": r["fecha"], "url": r["url"],
-                        "casos": r["casos"], "temas": r["temas"][:300],
-                        "decision": p["decision"], "motivo": p["motivo"],
-                        "causas": clasificar_motivo(p["decision"] + " " + p["motivo"]),
-                    }, ensure_ascii=False) + "\n")
+            ant = extraer_antecedentes(r["texto"])
+            if ant:
+                n_ant += 1
+            inst = [{"decision": p["decision"], "motivo": p.get("motivo"),
+                     "causas": clasificar_motivo(p["decision"] + " " + (p.get("motivo") or ""))}
+                    for p in (r.get("instancia") or [])]
+            fh.write(json.dumps({
+                "sentencia": r["sentencia"], "fecha": r["fecha"], "ano": r["ano"],
+                "url": r["url"], "casos": r["casos"], "temas": r["temas"][:300],
+                "antecedentes": ant,
+                "instancia": inst,
+                "resuelve": r.get("resuelve"),
+            }, ensure_ascii=False) + "\n")
+            n_rag += 1
+    salida["rag"] = {"documentos": n_rag, "con_antecedentes": n_ant}
+    (OUT / "causas-fracaso.json").write_text(json.dumps(salida, ensure_ascii=False, indent=1))
 
     if ver_causa:
         c = next(x for x in salida["causas"] if x["id"] == ver_causa)
@@ -230,15 +277,19 @@ def main():
         return
 
     print(f"Corpus: {len(rows)} sentencias de salud")
-    print(f"Decisiones de instancia DESFAVORABLES analizadas: {n_negadas}\n")
+    print(f"Decisiones de instancia DESFAVORABLES: {n_negadas}"
+          f" · con motivo extraíble: {n_con_motivo}"
+          f" · clasificadas: {n_clasificadas}\n")
     print("CAUSAS DE FRACASO (frecuencia en el corpus de revisión):")
     for c in salida["causas"]:
         print(f"  {c['n_casos']:4d}  {c['titulo']}")
         if c["sentencias"]:
             print(f"        p.ej. {', '.join(c['sentencias'][:4])}")
-    print(f"\nSin clasificar: {len(sin_clasificar)} motivos")
-    for s, m in sin_clasificar[:6]:
-        print(f"  [{s}] {m}")
+    print(f"\nRAG: {salida['rag']['documentos']} documentos"
+          f" · {salida['rag']['con_antecedentes']} con sección ANTECEDENTES"
+          f" ({100*salida['rag']['con_antecedentes']/salida['rag']['documentos']:.0f}%)")
+    print(f"Sin clasificar por reglas: {len(sin_clasificar)} motivos"
+          f" → los lee el LLM sobre los pasajes, no se descartan")
     print(f"\n→ {OUT/'causas-fracaso.json'}")
     print(f"→ {OUT/'rag-pasajes.jsonl.gz'}")
 
