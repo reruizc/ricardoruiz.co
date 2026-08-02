@@ -28,6 +28,25 @@ Uso:
   python3 tools/tutela-analiza/probe_rama_docs.py --por-ano 40   # muestra por año
 Salida:
   Bases de datos/tutelas-salud/probe-rama/probe-report.json  (+ resumen en consola)
+
+══════════ CONCLUSIÓN (corrido 2026-08-01, NO repetir sin razón nueva) ══════════
+48 tutelas muestreadas (2023-2026, 10 despachos civiles/laborales de 6 ciudades),
+44 con actuación "Sentencia tutela primera Instancia" → **CERO con documento
+adjunto** (conDocumentos=false en el 100%, y /DocumentosActuacion devuelve []
+aunque se consulte igual). Tampoco hay documentos en NINGUNA actuación de ningún
+expediente, ni en procesos ordinarios de control (35 actuaciones de un Declarativo:
+0 docs). Es decir: **esta API es metadata-only en la práctica** — los juzgados
+notifican el fallo por correo a las partes y NO suben el PDF a la consulta pública.
+→ El corpus masivo de fallos de instancia NO es cosechable por esta vía. El motor
+del analizador se arma con: (1) causales taxativas del D.2591 (checklist
+determinista), (2) relatoría de la Corte ~29k sentencias con texto completo (RAG,
+y las T narran por qué los jueces de instancia negaron), (3) microdato de 2M
+outcomes (tasas empíricas, ya en S3).
+Hallazgos operativos: WAF Azure App Gateway banea ráfagas (~10 min); ban se
+esquiva con ritmo secuencial ~1s + backoff 120s. tipoProceso viene como "Acción
+de Tutela" O "CONSTITUCIONAL" según la conexión del juzgado. La búsqueda por
+NombreRazonSocial devuelve 0 sin codificacionDespacho. El idProceso NO es
+enumerable en la práctica (espacio fragmentado por idConexion, bandas vacías).
 """
 import json
 import random
@@ -121,7 +140,10 @@ def clasificar(hit):
     if not d:
         return None
     hit["tipoProceso"] = d.get("tipoProceso") or ""
-    hit["esTutela"] = "tutela" in hit["tipoProceso"].lower()
+    # Algunas conexiones etiquetan la tutela como "CONSTITUCIONAL" en vez de
+    # "Acción de Tutela" (medido: 48 de cada tipo en la corrida 2026-08-01).
+    hit["esTutela"] = ("tutela" in hit["tipoProceso"].lower()
+                       or hit["tipoProceso"].strip().upper() == "CONSTITUCIONAL")
     hit["esEPS"] = bool(EPS_RE.search(hit["sujetos"]))
     return hit
 
