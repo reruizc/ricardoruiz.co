@@ -4985,6 +4985,34 @@ nacional (embudo, mortandad, bloqueo, acuerdo de presidencias); `comision.html`
 (`?id=PRIMERA..SEPTIMA`) es la ficha por comisión constitucional, con el mismo
 bloque de análisis replicado 100% a nivel de esa comisión.
 
+**Feed "En vivo" + resumen ciudadano** (ago-2026): `tools/leyes-senado/leyes_en_vivo.py`
+emite los **3** últimos radicados por cámara (era 5) y ahora cada item lleva **`explica`**
+= resumen en lenguaje llano (titular · qué cambia en la práctica · a quién le aplica · ojo),
+que el frontend abre en un **modal** al hacer clic. Lo genera
+`tools/leyes-senado/explica_en_vivo.py` (DeepSeek V4 Flash) en el builder, NO en el
+navegador: son ~6 proyectos, se cachea por número (`en-vivo/explica-cache.json`) y así el
+visitante no paga latencia ni se expone la API key en una página pública. La key sale del
+entorno o, si no está, de la config de la Lambda `caudal-analiza` vía AWS CLI (por eso el
+cron funciona sin `.env`). Cada resumen declara su **`base`** —`texto` (radicado completo de
+`diario/{leg}/textos-txt/`) · `pdf` · `objeto` (columna del XLSX de Cámara) · `titulo`— y la
+UI lo dice explícito; el prompt prohíbe inventar y, con solo el título, obliga a quedarse ahí.
+- ⚠️ **El .txt del rastreo diario es SOLO de Senado y el número de radicado se repite entre
+  cámaras** → buscarlo para un item de Cámara devuelve otro proyecto (medido: el 077 de
+  Cámara, registro de SIM, salía resumido como el 077 de Senado, cadena perpetua).
+  `fuente_texto()` filtra por cámara.
+- ⚠️ **Dos sitios escriben el mismo `en-vivo.json`**: el cron del Mac (con los .txt y pypdf)
+  y la Lambda `leyes-en-vivo` (sin ninguno de los dos). La guarda `RANK` reusa el resumen ya
+  publicado cuando venía de mejor fuente, y `build()` además arrastra el `explica` previo si
+  el explicador no está disponible — sin eso una corrida de la Lambda dejaría sin resumen a
+  proyectos que ya lo tenían.
+- **Autores**: `autoresDe()` en el HTML. El campo no tiene convención estable — Senado manda
+  el prefijo de cámara **sin coma** delante (`…CAICEDOCARABALI H.R. DANIEL…`) y Cámara pone
+  el **cargo separado por coma** (`Ministro de Hacienda…, German Avila Plazas`), así que
+  partir por coma a ciegas pega dos personas o inventa un firmante. Se muestran 3 + "y otros N".
+- ⚠️ **Modales en esta página**: la regla `body > *:not(.bg-layer):not(.cursor):not(.cursor-ring)`
+  impone `position:relative;z-index:1` y **gana en especificidad** a `.md-box{position:fixed}`
+  → el modal se iba al final del documento. Hay que excluirlo en esa lista, igual que el cursor.
+
 **Composición de integrantes** (`comisiones-2026.json` en
 `s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/`):
 consumida por `comision.html` (fetch directo, `COMISIONES_URL`) para pintar
@@ -6492,43 +6520,46 @@ el registro de notificaciones NO es un registro de sanciones limpio.**
   impuesta (`"resuelve sancionar"`, `"se impone una multa"`) casi no se indexan
   (0-2 en todo el dominio) porque los saltos de línea del PDF las parten. Un
   harvest completo de ~771 candidatos rescataría solo **~30-80 multas reales**
-  obscuras en ~2h de DeepSeek. **Decisión (Ricardo, jul-2026): quedarse con las
-  16 de prensa; el registro queda PENDIENTE.**
+  obscuras. **Esa lectura quedó SUPERADA por el reencuadre** (abajo): los actos
+  procesales ya no son ruido a descartar, son el producto — el registro entró
+  como fuente `supersalud-registro`.
 
-**Supersociedades — `/normativa` ≠ sanciones (premise del fuentes.json
-corregido):** las "478 resoluciones + 198 circulares externas" de
-`/web/nuestra-entidad/normativa` (secciones `?id=876701` Resoluciones,
-`?id=1256465` Circulares Externas) son **normativa general**, no multas — igual
-que el normograma. Supersociedades NO tiene dataset de sanciones en datos.gov.co
-(sus 7 datasets son estados financieros NIIF). Sus sanciones reales se notifican
-como "avisos" bajo landings Liferay **dinámicos** (`/notificaciones` →
-`/web/supervision-societaria/avisos-y-otros`, JS-heavy). **PENDIENTE:** crackear
-ese scraping antes de vía-3.
+**Supersociedades — ❌ DESCARTADA (jul-2026, tras auditar el portal entero).**
+Ni `/normativa` (normativa general: "Circular Externa 100-000021" es instrucción
+a vigilados) ni los avisos. **Corrección a lo que decía esta sección:** los
+avisos NO están detrás de landings "JS-heavy" — el AssetPublisher de
+`/web/supervision-societaria/avisos` (INSTANCE_zyly) es **server-rendered** y se
+scrapea con un curl, 29 PDFs en `href=/documents/80303/160010/*`. Lo que pasa es
+que **no son sanciones**: son avisos de notificación de **oficios de respuesta a
+derechos de petición** (art. 69 CPACA), verificado leyendo los PDFs ("no fue
+posible la notificación de la contestación a su solicitud"). Los otros landings
+(`/notificaciones`, intervención, insolvencia) traen 0 documentos; procedimientos
+mercantiles trae 1 y es litigio entre privados; el buscador del sitio da 0 para
+"sancionatorio"/"multa"; Socrata tiene 7 datasets, todos NIIF. **Supersociedades
+simplemente no publica un registro sancionatorio.** Retomar solo si eso cambia.
 
-**Pipeline vía-3 CONSTRUIDO (`harvest_supersalud_registro.py`, listo por si se
-retoma):** `enumerate` (Search API → manifest dedup por nº de resolución) ·
+**Pipeline vía-3 (`harvest_supersalud_registro.py`) — EN PRODUCCIÓN:**
+`enumerate` (Search API → manifest dedup por nº de resolución, 771 candidatos) ·
 `download` (curl con **URL-encode del path** — los Path de SharePoint traen
 espacios/acentos literales que curl rechaza; sin `quote(path, safe=':/%')` el
 PDF llega en 0 bytes) · `extract` (pypdf → DeepSeek `deepseek-v4-flash`, prompt
-`SNS_REG_SYSTEM` que clasifica `es_sancion` + saca sancionado/monto/motivo).
-Resumible, caché por doc. Necesita `DEEPSEEK_API_KEY` en env (leerla de la
-Lambda: `aws lambda get-function-configuration --function-name caudal-analiza
---query 'Environment.Variables.DEEPSEEK_API_KEY' --output text`). Los PDFs
-2016-2026 son **digitales** (pypdf limpio, 0 escaneados en la muestra).
+`SNS_REG_SYSTEM` que tipa `tipo_acto` + saca entidad/monto/motivo).
+Resumible, caché por doc con `_pv` = `PROMPT_VERSION`. Necesita
+`DEEPSEEK_API_KEY` en env (leerla de la Lambda: `aws lambda
+get-function-configuration --function-name caudal-analiza --query
+'Environment.Variables.DEEPSEEK_API_KEY' --output text`). Los PDFs 2016-2026 son
+**digitales** (pypdf limpio, 0 escaneados en la muestra de 30).
+⚠️ **`max_tokens` 6000 + reintento a 12000** — ver el gotcha en la vía 3 arriba.
 
-**🟡 DIRECCIÓN NUEVA (Ricardo, jul-2026) — el pilar NO es solo "sanciones":**
-"necesitamos igual extraer todo lo de las super así no sean sanciones". Los
-actos procesales que hoy descartamos (contribuciones, aperturas, archivos,
-resoluciones, circulares) **SÍ son inteligencia regulatoria** — el cliente
-quiere ver TODA la actividad del Estado sobre su sector, no solo las multas.
-Reencuadra el pilar de "sanciones de superintendencias" a "**actos regulatorios
-de superintendencias**". Trabajo pendiente: (a) generalizar
-`harvest_supersalud_registro.py` para conservar TODOS los actos (quitar el
-filtro `es_sancion` de `_consolidar`, tipar por `tipo_acto`); (b) correr el
-harvest completo de Supersalud (~771 + las carpetas no-sancionatorias); (c)
-extender a las demás supers (Supersociedades avisos, etc.); (d) el frontend/
-Lambda deberá distinguir "sanción" vs "otro acto" para no diluir la vista de
-sanciones. Es un sprint aparte, no bloquea nada de lo desplegado.
+**✅ REENCUADRE HECHO (jul-2026) — el pilar es "actos regulatorios".** Lo que
+Ricardo pidió ("necesitamos igual extraer todo lo de las super así no sean
+sanciones") quedó implementado end-to-end: `tipo_acto` en el esquema →
+`harvest_supers.py normalize` → `build_s3.py` → `metadata/sanciones.jsonl` →
+Lambda (filtro con default `sancion` + `otros_actos`) → frontend (chips de tipo
++ toggle + badge por acto). Verificado en vivo contra la API. **Costo medido de
+la extracción: ~USD 0,0024 por documento** (V4 Flash, ~5k tokens in / ~1,5k out).
+Pendientes: OCR de los escaneados y extender `tipo_acto` no-sanción a SIC /
+Supertransporte / Superfinanciera.
 
 ### Pilar Medios · prensa nacional y regional (`view-medios` en `caudal.html` · LISTO vía Google News RSS)
 

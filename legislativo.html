@@ -35,7 +35,9 @@
         radial-gradient(1100px 600px at 78% -8%, rgba(0,71,255,0.16), transparent 60%),
         radial-gradient(900px 500px at 12% 108%, rgba(0,71,255,0.09), transparent 60%),
         #060810;}
-    body > *:not(.bg-layer):not(.cursor):not(.cursor-ring){position:relative;z-index:1}
+    /* el modal va excluido junto al cursor: esta regla le impone position:relative
+       (gana en especificidad) y lo sacaría del viewport, además de aplastar su z-index */
+    body > *:not(.bg-layer):not(.cursor):not(.cursor-ring):not(.md-back):not(.md-box){position:relative;z-index:1}
     .cursor{position:fixed;width:12px;height:12px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
     .cursor-ring{position:fixed;width:36px;height:36px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.35;transition:left .08s,top .08s}
 
@@ -138,15 +140,8 @@
     .com-cta{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue-light);text-align:right;margin-top:-.15rem}
 
     /* acuerdo de presidencia (borrador sin confirmar) */
-    .draft-badge{display:inline-block;font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:#060810;background:var(--amber);padding:.22rem .6rem;margin-left:.65rem;vertical-align:middle;font-weight:700}
     .ap-chip-mini{display:inline-block;font-size:.72rem;font-weight:600;padding:.22rem .5rem;border:1px solid transparent;margin:.12rem 0}
     .ap-or{display:block;font-size:.58rem;color:var(--gray);margin:.15rem 0}
-    .mesa-table{display:flex;flex-direction:column;gap:.5rem;margin-top:.8rem;overflow-x:auto}
-    .mesa-row{display:grid;grid-template-columns:180px repeat(4,1fr);gap:.6rem;align-items:center;min-width:640px}
-    .mesa-row.mesa-head{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray)}
-    .mesa-head span{text-align:center}
-    .mesa-cargo{font-size:.78rem;color:var(--white);font-weight:600}
-    .mesa-cell{text-align:center}
     .com-top{display:flex;align-items:baseline;justify-content:space-between;gap:1rem}
     .com-name{font-family:var(--hn);font-weight:700;font-size:1.05rem;letter-spacing:-.01em;color:var(--white)}
     .com-cupos{font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);white-space:nowrap}
@@ -185,6 +180,7 @@
     .chip:hover{color:var(--white);border-color:var(--white)}
     .chip.on{color:#fff;background:var(--blue);border-color:var(--blue)}
     .roster{display:grid;grid-template-columns:1fr 1fr;gap:.55rem}
+    .roster.bancadas{display:block}
     .r-row{display:flex;align-items:center;gap:.7rem;background:var(--card-bg);border:1px solid var(--card-border);padding:.6rem .8rem;min-width:0}
     .r-dot{width:9px;height:9px;flex-shrink:0}
     .r-body{flex:1;min-width:0}
@@ -256,6 +252,61 @@
     .ev-nopdf{font-size:.62rem;color:rgba(255,255,255,.3);align-self:center}
     .ev-empty{background:var(--card-bg);border:1px dashed var(--gray-light);padding:1.3rem 1.1rem;font-size:.76rem;color:var(--gray);line-height:1.6}
     @media(max-width:760px){ .ev-wrap{grid-template-columns:1fr} }
+
+    /* ── modal compartido (proyecto de ley · ficha de congresista) ──
+       z-index POR DEBAJO del cursor custom (9998/9999): si lo supera, el
+       puntero desaparece mientras el modal está abierto. Al cerrar hay que
+       resetear el estilo del cursor — el elemento sobre el que se hizo clic
+       se va del DOM sin disparar mouseout y deja el cursor "fantasma". */
+    .md-back{position:fixed;inset:0;background:rgba(2,3,10,.82);backdrop-filter:blur(3px);z-index:9990;display:none}
+    .md-back.on{display:block}
+    .md-box{position:fixed;z-index:9991;top:50%;left:50%;transform:translate(-50%,-50%);width:min(700px,calc(100vw - 2rem));max-height:86vh;overflow-y:auto;background:#0b0d18;border:1px solid rgba(255,255,255,.12);padding:1.8rem 1.9rem 1.6rem;display:none}
+    .md-box.on{display:block}
+    .md-x{position:absolute;top:.7rem;right:.85rem;font-family:var(--hn);font-size:1rem;line-height:1;color:rgba(255,255,255,.4);background:none;border:none;padding:.3rem .4rem;cursor:none;transition:color .15s}
+    .md-x:hover{color:var(--white)}
+    .md-tag{font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--blue-light);margin-bottom:.5rem}
+    .md-num{font-family:var(--hn);font-weight:700;font-size:.74rem;color:var(--white);background:rgba(255,255,255,.07);padding:.18rem .5rem;margin-right:.5rem}
+    .md-h{font-family:var(--hn);font-weight:700;font-size:1.25rem;line-height:1.35;color:var(--white);margin:.7rem 0 .5rem;letter-spacing:-.01em}
+    .md-legal{font-size:.72rem;color:rgba(255,255,255,.38);line-height:1.6;margin-bottom:1.1rem}
+    .md-sec{font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gray);margin:1.2rem 0 .55rem}
+    .md-li{display:flex;gap:.6rem;font-size:.86rem;color:var(--white);line-height:1.6;margin-bottom:.5rem}
+    .md-li i{color:var(--blue-light);font-style:normal;flex-shrink:0}
+    .md-afecta{font-size:.82rem;color:var(--gray);line-height:1.6}
+    .md-afecta b{color:var(--white);font-weight:500}
+    .md-ojo{font-size:.75rem;color:var(--amber);background:rgba(224,160,58,.08);border-left:2px solid var(--amber);padding:.6rem .8rem;line-height:1.6;margin-top:1rem}
+    .md-src{font-size:.66rem;color:rgba(255,255,255,.3);line-height:1.6;margin-top:1.1rem;border-top:1px solid var(--border);padding-top:.8rem}
+    .md-meta{display:flex;flex-wrap:wrap;gap:.35rem .8rem;margin-bottom:.2rem}
+    .md-meta .m{font-size:.68rem;color:var(--gray)}
+    .md-auts{font-size:.75rem;color:var(--gray);line-height:1.7;margin-top:.5rem}
+    .md-auts b{color:var(--white);font-weight:500}
+    .md-actions{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.2rem}
+
+    /* ── bancadas: cuadrícula de partidos (vista por defecto del roster) ── */
+    .pt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:.8rem}
+    .pt-card{background:var(--card-bg);border:1px solid var(--card-border);border-left:3px solid var(--blue);padding:.95rem 1.05rem;cursor:none;transition:border-color .15s,background .15s;text-align:left}
+    .pt-card:hover{background:var(--card-bg2);border-color:var(--gray-light)}
+    .pt-n{font-family:var(--hn);font-weight:800;font-size:1.55rem;color:var(--white);line-height:1;letter-spacing:-.02em}
+    .pt-name{font-size:.8rem;color:var(--white);line-height:1.4;margin-top:.35rem}
+    .pt-split{font-size:.64rem;color:var(--gray);margin-top:.3rem}
+    .pt-hint{font-size:.72rem;color:rgba(255,255,255,.35);margin-top:1rem;line-height:1.6}
+
+    /* ── ficha de congresista dentro del modal ── */
+    .fc-head{display:flex;gap:1rem;align-items:flex-start}
+    .fc-photo{width:74px;height:98px;border-radius:5px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.18)}
+    .fc-photo span{font-family:var(--hn);font-weight:800;font-size:1.25rem;color:#fff}
+    .fc-photo img{width:100%;height:100%;object-fit:cover;display:block}
+    .fc-name{font-family:var(--hn);font-weight:700;font-size:1.15rem;color:var(--white);line-height:1.3;margin-bottom:.5rem}
+    .fc-chip{display:inline-block;font-size:.64rem;letter-spacing:.05em;padding:.2rem .55rem;border:1px solid transparent;margin-bottom:.5rem}
+    .fc-meta{font-size:.78rem;color:var(--gray);line-height:1.6}
+    .fc-row{display:flex;gap:.6rem;font-size:.82rem;color:var(--gray);padding:.22rem 0;align-items:baseline}
+    .fc-row .y{font-family:var(--hn);font-weight:700;color:var(--white);width:38px;flex-shrink:0}
+    .fc-row .c{flex:1;min-width:0}
+    .fc-row .v{color:var(--white);white-space:nowrap}
+    .fc-terr{font-size:.75rem;color:rgba(255,255,255,.5);line-height:1.65;margin-top:.5rem}
+    .fc-terr b{color:var(--white);font-weight:500}
+    .fc-load{font-size:.75rem;color:var(--gray)}
+    .ps-cta{display:inline-block;margin-top:1.2rem;font-family:var(--hn);font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--blue-light);border:1.5px solid rgba(0,71,255,.45);padding:.5rem .9rem;text-decoration:none;transition:background .2s,color .2s,border-color .2s;cursor:none}
+    .ps-cta:hover{background:var(--blue);border-color:var(--blue);color:#fff}
     .dots span{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--blue-light);margin:0 1px;animation:blink 1.2s infinite}
     .dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
     @keyframes blink{0%,60%,100%{opacity:.25}30%{opacity:1}}
@@ -385,7 +436,7 @@
   <section id="en-vivo">
     <div class="sec-tag">En vivo · Legislatura 2026–2027</div>
     <h2 class="sec-title">Últimos proyectos de ley radicados</h2>
-    <p class="sec-sub">Lo más reciente que llega al Congreso, extraído a diario de <strong>Senado</strong> (leyes.senado.gov.co) y <strong>Cámara</strong> (camara.gov.co). Haz clic en cada proyecto para ver su objeto y descargar el texto radicado.</p>
+    <p class="sec-sub">Lo más reciente que llega al Congreso, extraído a diario de <strong>Senado</strong> (leyes.senado.gov.co) y <strong>Cámara</strong> (camara.gov.co). Haz clic en cada proyecto para ver, en lenguaje llano, qué cambiaría si se aprueba — y para descargar el texto radicado.</p>
     <div class="ev-bar">
       <div class="ev-updated" id="ev-updated"></div>
       <button class="ev-refresh" id="ev-refresh" type="button" title="Buscar radicaciones nuevas">
@@ -403,7 +454,7 @@
         <div class="ev-list" id="ev-camara"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div>
       </div>
     </div>
-    <div class="note" style="margin-top:1.2rem">Se muestran los cinco más recientes de cada cámara. El histórico completo (más de 10.600 proyectos desde 1990) es buscable en <a href="#proyectos" style="color:var(--blue-light)">Radar legislativo</a>. Fuentes: Secretaría del Senado · Cámara de Representantes.</div>
+    <div class="note" style="margin-top:1.2rem">Se muestran los tres más recientes de cada cámara. El histórico completo (más de 10.600 proyectos desde 1990) es buscable en <a href="#proyectos" style="color:var(--blue-light)">Radar legislativo</a>. Fuentes: Secretaría del Senado · Cámara de Representantes.</div>
   </section>
 
   <!-- ══ EL NUEVO CONGRESO ══════════════════════════════════════ -->
@@ -416,13 +467,13 @@
       <div class="kpi hl2"><div class="n">103</div><div class="l">Senadores</div></div>
       <div class="kpi hl"><div class="n">183</div><div class="l">Representantes</div></div>
       <div class="kpi hasinfo" id="kpi-mujeres">
-        <div class="n">29,7%</div><div class="l">Mujeres (85 curules) <span class="kpi-ihint">i</span></div>
+        <div class="n">29,5%</div><div class="l">Mujeres (84 curules) <span class="kpi-ihint">i</span></div>
         <div class="kpi-pop">
           <div class="kp-title">Mujeres electas al Congreso · serie histórica</div>
           <div class="cx-row"><span class="cx-lab">2018</span><span class="cx-bar"><span style="width:66%;background:linear-gradient(90deg,#a24a78,#e08fb8)"></span></span><span class="cx-n">19,7%</span></div>
           <div class="cx-row"><span class="cx-lab">2022</span><span class="cx-bar"><span style="width:98%;background:linear-gradient(90deg,#a24a78,#e08fb8)"></span></span><span class="cx-n">29%</span></div>
-          <div class="cx-row"><span class="cx-lab">2026</span><span class="cx-bar"><span style="width:100%;background:linear-gradient(90deg,#a24a78,#e08fb8)"></span></span><span class="cx-n">29,7%</span></div>
-          <div class="kp-note">En 1998 las mujeres no llegaban al 12% del Senado. Entre 2022 y 2026 la curva <b>se detuvo</b> pese a un récord de candidaturas: el 40,9% de quienes se lanzaron al Congreso 2026 fueron mujeres. Fuente: comunicado de prensa · Mujeres por la Democracia (MxD), 20 jul 2026.</div>
+          <div class="cx-row"><span class="cx-lab">2026</span><span class="cx-bar"><span style="width:100%;background:linear-gradient(90deg,#a24a78,#e08fb8)"></span></span><span class="cx-n">29,5%</span></div>
+          <div class="kp-note">En 1998 las mujeres no llegaban al 12% del Senado. Entre 2022 y 2026 la curva <b>se detuvo</b> pese a un récord de candidaturas: el 40,9% de quienes se lanzaron al Congreso 2026 fueron mujeres. Cuenta propia sobre el listado nominal de electos 2026-2030 (<b>84 de 285</b>: 32 de 103 en Senado y 52 de 182 en Cámara), reconstruido con el escrutinio de la Registraduría, las listas cerradas y las curules CITREP.</div>
         </div>
       </div>
       <div class="kpi"><div class="n">16</div><div class="l">Curules de paz (CITREP)</div></div>
@@ -438,23 +489,16 @@
   <section id="comisiones">
     <div class="sec-tag">02 · Comisiones constitucionales</div>
     <h2 class="sec-title">Las siete mesas donde se decide todo</h2>
-    <p class="sec-sub">Cada proyecto de ley vive o muere primero en una de las <strong>siete comisiones constitucionales permanentes</strong> (Ley 3ª de 1992). El <strong>28 de julio de 2026</strong> las plenarias de Senado y Cámara aprobaron la conformación: los <strong>103 senadores</strong> y los representantes ya tienen comisión asignada, y cada tarjeta los muestra junto a lo que tramita esa comisión y cómo le ha ido en el histórico 1990-2026. <strong>Faltan las presidencias</strong> de cada comisión, que se votan en los próximos días — esta sección se actualiza apenas queden elegidas.</p>
+    <p class="sec-sub">Cada proyecto de ley vive o muere primero en una de las <strong>siete comisiones constitucionales permanentes</strong> (Ley 3ª de 1992). El <strong>28 de julio de 2026</strong> las plenarias de Senado y Cámara aprobaron la conformación: los <strong>103 senadores</strong> y los representantes ya tienen comisión asignada. El <strong>29 de julio</strong> las comisiones eligieron sus <strong>mesas directivas</strong>, y cada tarjeta muestra quién preside junto a lo que tramita la comisión y cómo le ha ido en el histórico 1990-2026. Quedan por votar la presidencia de la <strong>Comisión Segunda de Senado</strong> y la de la <strong>Sexta de Cámara</strong>.</p>
     <div class="com-grid" id="com-grid"></div>
     <div class="note" style="margin-top:1.1rem">Además de las siete constitucionales operan las <b>comisiones legales</b> (Ética, <a href="comision.html?id=ACUSACIONES" style="color:var(--white);text-decoration:underline;text-underline-offset:3px">Investigación y Acusación</a> —la única que ya tiene ficha, con sus 17 integrantes y su mesa directiva—, Derechos Humanos, Cuentas y la Comisión Legal para la Equidad de la Mujer) y las <b>económicas conjuntas</b> (Tercera y Cuarta de ambas cámaras, que tramitan juntas el Presupuesto General y el Plan Nacional de Desarrollo). Los cupos por cámara son los de referencia de la Ley 3ª de 1992; se ajustan con las curules especiales.</div>
-
-    <div class="panel" style="margin-top:1.6rem">
-      <h3>Mesa directiva de la Plenaria de Cámara<span class="draft-badge">Borrador · sin confirmar</span></h3>
-      <p class="note" style="margin:0 0 1rem">Circula entre compromisarios un acuerdo político de repartición de la mesa directiva de la Plenaria de Cámara, un partido distinto por cada año del cuatrienio (2026–2030). No incluye nombres de personas — solo aplica a Cámara, click en cada comisión para ver su propio acuerdo de presidencia.</p>
-      <div class="mesa-table" id="mesa-table"></div>
-      <div class="note">Esto es un <b>borrador sin confirmar</b>, no una designación oficial de la Secretaría de Cámara.</div>
-    </div>
   </section>
 
   <!-- ══ CONGRESISTAS ═══════════════════════════════════════════ -->
   <section id="congresistas">
     <div class="sec-tag">03 · Quién es quién</div>
     <h2 class="sec-title">Los 285 congresistas electos</h2>
-    <p class="sec-sub">Busca por nombre, filtra por cámara, bancada o departamento. Cuando las comisiones queden integradas, cada congresista mostrará también su comisión.</p>
+    <p class="sec-sub">Empieza por la bancada o busca a alguien por nombre. Al tocar a un congresista se abre su ficha: cuánto sacó, dónde está su fuerza territorial y el enlace a su análisis completo.</p>
     <div class="filters">
       <input class="f-input" id="r-q" type="text" placeholder="Buscar congresista…" oninput="rosterRender()" />
       <button class="chip on" data-corp="" onclick="rosterCorp(this)">Todos</button>
@@ -462,6 +506,7 @@
       <button class="chip" data-corp="CAMARA" onclick="rosterCorp(this)">Cámara</button>
       <select class="f-input" id="r-banc" onchange="rosterRender()"><option value="">Todas las bancadas</option></select>
       <select class="f-input" id="r-dep" onchange="rosterRender()"><option value="">Todos los departamentos</option></select>
+      <button class="chip" id="r-reset" onclick="rosterReset()" style="display:none">← Todas las bancadas</button>
     </div>
     <div class="roster" id="roster"></div>
     <div class="roster-foot">
@@ -515,6 +560,13 @@
     <div class="note" style="margin-top:1.2rem">Fuentes: Secretaría del Senado (leyes.senado.gov.co) · Gaceta del Congreso · órdenes del día de las comisiones de Cámara · Registraduría Nacional. Procesamiento y análisis propios. Corte del histórico: julio de 2026.</div>
   </section>
 
+  <!-- ══ MODAL COMPARTIDO (proyecto de ley · ficha de congresista) ═══ -->
+  <div class="md-back" id="md-back" onclick="closeModal()"></div>
+  <div class="md-box" id="md-box" role="dialog" aria-modal="true" aria-labelledby="md-body">
+    <button class="md-x" type="button" onclick="closeModal()" aria-label="Cerrar">✕</button>
+    <div id="md-body"></div>
+  </div>
+
   <footer>
     <span class="footer-brand">ricardoruiz.co · Legislativo · Congreso 2026–2030</span>
     <a href="index.html" class="e-btn-back" style="font-size:.62rem">← Inicio</a>
@@ -528,12 +580,75 @@
   document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px';});
   (function loop(){rx+=(mx-rx)*.1;ry+=(my-ry)*.1;ri.style.left=rx+'px';ri.style.top=ry+'px';requestAnimationFrame(loop);})();
   document.addEventListener('mouseover',e=>{
-    if(e.target.closest('a,button,select,input,.com-card,.kpi.hasinfo')){cur.style.transform='translate(-50%,-50%) scale(2)';cur.style.background='transparent';cur.style.border='1.5px solid var(--blue)';ri.style.opacity='0';}
+    if(e.target.closest('a,button,select,input,.com-card,.kpi.hasinfo,.r-row,.ev-row,.pt-card')){cur.style.transform='translate(-50%,-50%) scale(2)';cur.style.background='transparent';cur.style.border='1.5px solid var(--blue)';ri.style.opacity='0';}
     else{cur.style.transform='translate(-50%,-50%) scale(1)';cur.style.background='var(--blue)';cur.style.border='none';ri.style.opacity='.35';}
   });
 
   const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const fmt=n=>String(n==null?'—':n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+
+  /* ── modal compartido ────────────────────────────────────────── */
+  function openModal(html){
+    document.getElementById('md-body').innerHTML=html;
+    document.getElementById('md-back').classList.add('on');
+    document.getElementById('md-box').classList.add('on');
+    document.getElementById('md-box').scrollTop=0;
+    document.body.style.overflow='hidden';
+  }
+  function closeModal(){
+    document.getElementById('md-back').classList.remove('on');
+    document.getElementById('md-box').classList.remove('on');
+    document.body.style.overflow='';
+    /* reset del cursor custom: el elemento sobre el que se hizo clic se va del
+       DOM sin disparar mouseout y deja el puntero con los estilos de hover */
+    const c=document.getElementById('cursor'), r=document.getElementById('cursorRing');
+    if(c){ c.style.transform='translate(-50%,-50%) scale(1)'; c.style.background='var(--blue)'; c.style.border='none'; }
+    if(r){ r.style.opacity='.35'; }
+  }
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+  /* ── autores de un proyecto ──────────────────────────────────────
+     El campo `autor` no trae una convención estable y hay que tratarlo con
+     cuidado en ambas cámaras:
+       · Senado manda los nombres en MAYÚSCULAS separados por coma, pero el
+         prefijo de cámara a veces llega SIN coma delante ("…CAICEDOCARABALI
+         H.R. DANIEL MONROY…"), así que partir solo por coma pega dos personas.
+       · Cámara puede anteponer el cargo separado por coma ("Ministro de
+         Hacienda y Crédito Público, German Avila Plazas"): ahí la coma NO
+         separa autores, y partirla a ciegas inventa un firmante. */
+  const SOLO_CARGO=/^(?:ministr|viceministr|director|superintendent|defensor|procurador|fiscal|contralor|registrador|presidenta?\b|gobernador|alcald)/i;
+  const tCase=s=>String(s||'').toLowerCase().replace(/(^|[ .\-'])(\p{L})/gu,(m,sep,ch)=>sep+ch.toUpperCase());
+  function autoresDe(txt){
+    let s=String(txt||'').replace(/\s+/g,' ').trim();
+    if(!s) return [];
+    s=s.replace(/\s(H\.?\s?[SR]\.?)\s/gi,', $1 ');          // prefijo sin coma
+    const partes=s.split(',').map(x=>x.trim()).filter(Boolean);
+    const out=[];
+    for(const p of partes){
+      const limpio=p.replace(/^H\.?\s?[SR]\.?\s*/i,'').trim();
+      if(!limpio) continue;
+      // un fragmento que es solo un cargo pertenece a la persona que sigue
+      if(SOLO_CARGO.test(limpio)){ out.push({cargo:limpio,nombre:''}); continue; }
+      const prev=out[out.length-1];
+      if(prev&&prev.cargo&&!prev.nombre){ prev.nombre=limpio; continue; }
+      out.push({cargo:'',nombre:limpio});
+    }
+    // MAYÚSCULA SOSTENIDA (Senado) → capitalizada; Cámara ya viene bien
+    return out.map(a=>{
+      const n=a.nombre||a.cargo;
+      const txt=(n===n.toUpperCase()?tCase(n):n);
+      return a.nombre&&a.cargo?`${txt} (${a.cargo})`:txt;
+    }).filter(Boolean);
+  }
+  /* "A, B y C · y otros 17" — la lista completa vive en el modal */
+  function autoresCorto(txt,n){
+    const a=autoresDe(txt); n=n||3;
+    if(!a.length) return '';
+    if(a.length===n+1) n=a.length;                 // esconder uno solo no ahorra nada
+    const top=a.slice(0,n), resto=a.length-top.length;
+    const unidos=top.length>1?top.slice(0,-1).join(', ')+' y '+top[top.length-1]:top[0];
+    return unidos+(resto>0?` <span style="opacity:.6">y otros ${resto}</span>`:'');
+  }
   const API='https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com';
   async function call(payload){
     const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
@@ -571,33 +686,6 @@
     const up=v=>Math.round(v+(255-v)*0.5).toString(16).padStart(2,'0');
     return '#'+up(r)+up(g)+up(b);
   }
-  /* una celda puede traer 2 partidos separados por "/" (p.ej. "Cambio Radical / CITREP") */
-  function partyChips(text){
-    return String(text||'').split('/').map(p=>p.trim()).filter(Boolean).map((p,i,arr)=>{
-      const b=bancadaOf(p);
-      const chip=`<span class="ap-chip-mini" style="color:${lift(b.color)};background:${b.color}1a;border-color:${b.color}55">${esc(p)}</span>`;
-      return i<arr.length-1?chip+'<span class="ap-or">o</span>':chip;
-    }).join('');
-  }
-
-  /* ── mesa directiva de la Plenaria de Cámara (BORRADOR SIN CONFIRMAR) ──
-     Fuente: documento "Acuerdos para las presidencias" de Axis
-     Consultoría Pública, citado por Laura Villa (@LauraV_Villa) el
-     19 de julio de 2026 como "borrador que está circulando" entre
-     compromisarios. Solo cubre Cámara — no trae nombres de personas. */
-  const MESA_CAMARA=[
-    {cargo:'Presidencia', anios:['Partido Conservador','Partido Liberal','Centro Democrático','Centro Democrático']},
-    {cargo:'1ª vicepresidencia', anios:['CITREP','Centro Democrático (por resolver)','Partido Liberal (por resolver)','CITREP']},
-    {cargo:'2ª vicepresidencia', anios:['Partido Liberal','Partido Liberal','Partido Liberal','Partido Liberal']},
-    {cargo:'Subsecretaría', anios:['Centro Democrático','Centro Democrático','Centro Democrático','Centro Democrático']},
-    {cargo:'Dirección administrativa', anios:['Partido de la U','Partido de la U','Partido de la U','Partido de la U']},
-  ];
-  function renderMesaCamara(){
-    const box=document.getElementById('mesa-table'); if(!box) return;
-    box.innerHTML=`<div class="mesa-row mesa-head"><span></span><span>Año 1</span><span>Año 2</span><span>Año 3</span><span>Año 4</span></div>`+
-      MESA_CAMARA.map(r=>`<div class="mesa-row"><span class="mesa-cargo">${esc(r.cargo)}</span>${r.anios.map(a=>`<span class="mesa-cell">${partyChips(a)}</span>`).join('')}</div>`).join('');
-  }
-
   /* composición por bancada (barras segmentadas) */
   function renderComp(){
     const box=document.getElementById('comp-box');
@@ -697,7 +785,7 @@
 
   /* ── roster de congresistas ─────────────────────────────────── */
   let R_CORP='', R_SHOWN=40;
-  const depNice=s=>s==='BOGOTA D.C.'?'Bogotá D.C.':s==='NACIONAL'?'Nacional':s.charAt(0)+s.slice(1).toLowerCase().replace(/ (\w)/g,(m,c)=>' '+c.toUpperCase());
+  const depNice=s=>s==='BOGOTA D.C.'?'Bogotá D.C.':s==='NACIONAL'?'Nacional':s.charAt(0)+s.slice(1).toLowerCase().replace(/([ .])(\w)/g,(m,sep,c)=>sep+c.toUpperCase());
   function rosterInit(){
     const bancs=[...new Set(ELECTOS.map(e=>bancadaOf(e.partido).name))].sort();
     document.getElementById('r-banc').innerHTML='<option value="">Todas las bancadas</option>'+bancs.map(b=>`<option>${esc(b)}</option>`).join('');
@@ -718,19 +806,65 @@
       return true;
     });
   }
+  /* ¿hay algún filtro puesto? Sin filtros la lista de 285 nombres ocupa toda
+     la página sin decir nada; en ese estado se muestran las bancadas y la
+     lista aparece cuando alguien busca o filtra. */
+  function rosterHayFiltro(){
+    return !!(document.getElementById('r-q').value.trim()
+      || document.getElementById('r-banc').value
+      || document.getElementById('r-dep').value
+      || R_CORP);
+  }
+  /* vista por defecto: una tarjeta por bancada (clic → filtra a esa bancada) */
+  function rosterBancadas(){
+    const porB={};
+    ELECTOS.forEach(e=>{
+      const b=bancadaOf(e.partido);
+      const r=porB[b.name]||(porB[b.name]={name:b.name,color:b.color,n:0,sen:0,cam:0});
+      r.n++; e.corp==='SENADO'?r.sen++:r.cam++;
+    });
+    const list=Object.values(porB).sort((a,b)=>b.n-a.n);
+    document.getElementById('roster').classList.add('bancadas');
+    document.getElementById('roster').innerHTML=
+      `<div class="pt-grid">`+list.map(b=>`
+        <button class="pt-card" type="button" style="border-left-color:${b.color}" data-banc="${esc(b.name)}">
+          <span class="pt-n" style="color:${lift(b.color)}">${b.n}</span>
+          <div class="pt-name">${esc(b.name)}</div>
+          <div class="pt-split">${b.sen} Senado · ${b.cam} Cámara</div>
+        </button>`).join('')+`</div>`
+      +`<div class="pt-hint">${list.length} bancadas · ${ELECTOS.length} congresistas. Toca una bancada para ver sus nombres, o busca a alguien por nombre arriba.</div>`;
+    document.getElementById('roster').querySelectorAll('.pt-card').forEach(c=>{
+      c.addEventListener('click',()=>{
+        document.getElementById('r-banc').value=c.dataset.banc;
+        rosterRender();
+        document.getElementById('roster').scrollIntoView({behavior:'smooth',block:'start'});
+      });
+    });
+    document.getElementById('r-count').textContent=`${ELECTOS.length} congresistas · ${list.length} bancadas`;
+    document.getElementById('r-more').style.display='none';
+  }
   function rosterRender(reset){
     if(reset!==false) R_SHOWN=40;
+    const hay=rosterHayFiltro();
+    const rb=document.getElementById('r-reset'); if(rb) rb.style.display=hay?'':'none';
+    if(!hay){ rosterBancadas(); return; }
+    document.getElementById('roster').classList.remove('bancadas');
     const all=rosterFiltered();
     const shown=all.slice(0,R_SHOWN);
-    document.getElementById('roster').innerHTML=shown.map(e=>{
+    document.getElementById('roster').innerHTML=shown.map((e,i)=>{
       const b=bancadaOf(e.partido);
       const paz=/CITREP/i.test(e.partido)?'<span class="r-badge paz">Paz</span>':'';
-      return `<div class="r-row">
+      return `<div class="r-row" data-i="${i}" tabindex="0" role="button">
         <span class="r-dot" style="background:${b.color}"></span>
         <span class="r-body"><span class="r-name">${esc(e.nombre)}</span><span class="r-meta">${esc(e.partido)} · ${esc(depNice(e.dep))}</span></span>
         ${paz}<span class="r-badge ${e.corp==='SENADO'?'sen':'cam'}">${e.corp==='SENADO'?'Senado':'Cámara'}</span>
       </div>`;
     }).join('')||'<div class="note">Ningún congresista coincide con la búsqueda.</div>';
+    document.getElementById('roster').querySelectorAll('.r-row').forEach(r=>{
+      const abrir=()=>abrirFicha(shown[+r.dataset.i]);
+      r.addEventListener('click',abrir);
+      r.addEventListener('keydown',ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); abrir(); } });
+    });
     document.getElementById('r-count').textContent=`${shown.length} de ${all.length} congresistas`;
     document.getElementById('r-more').style.display=all.length>R_SHOWN?'':'none';
   }
@@ -739,12 +873,108 @@
     btn.classList.add('on'); R_CORP=btn.dataset.corp; rosterRender();
   }
   function rosterMore(){ R_SHOWN+=40; rosterRender(false); }
+  function rosterReset(){
+    document.getElementById('r-q').value='';
+    document.getElementById('r-banc').value='';
+    document.getElementById('r-dep').value='';
+    R_CORP='';
+    document.querySelectorAll('.chip[data-corp]').forEach(b=>b.classList.toggle('on',!b.dataset.corp));
+    rosterRender();
+  }
+
+  /* ── ficha corta de un congresista (modal) ───────────────────────
+     Reusa el registro compartido cand-index.js — el mismo que alimenta
+     analisis-candidato.html — para el histórico de votación y el enlace a la
+     ficha completa. El territorio se pide aparte porque el JSON mesa a mesa
+     pesa 1-4 MB: se carga solo al abrir a alguien. */
+  const S3_PHOTOS='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/fotos-candidatos';
+  const SRC_YEAR={endoso:2026,asamblea:2023,con2022:2022,con2018:2018,con2014:2014};
+  const initials=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+  const _terrCache={};
+  function corpNice(c){
+    if(c.source==='endoso'){ const m={CAMARA:'Cámara',SENADO:'Senado',CONSULTAS:'Consulta presidencial'}; return m[c.corp]||c.corp||''; }
+    return String(c.corp||'').replace(/\s*·\s*20\d\d\s*$/,'').toLowerCase()
+      .replace(/(^|[ ·(.])(\p{L})/gu,(mm,a,ch)=>a+ch.toUpperCase());
+  }
+  async function loadTerritorialTop(dataUrl){
+    if(!dataUrl) return null;
+    if(_terrCache[dataUrl]) return _terrCache[dataUrl];
+    _terrCache[dataUrl]=(async()=>{
+      try{
+        const r=await fetch(dataUrl); if(!r.ok) return null;
+        const d=await r.json(); const byDep={}, byMun={};
+        (d.mesas||[]).forEach(row=>{
+          const dep=row.depNom||''; if(dep) byDep[dep]=(byDep[dep]||0)+(row.v||0);
+          const mun=row.munNom||''; if(mun){ const k=mun+' · '+dep; byMun[k]=(byMun[k]||0)+(row.v||0); }
+        });
+        const tD=Object.entries(byDep).sort((a,b)=>b[1]-a[1])[0];
+        const tM=Object.entries(byMun).sort((a,b)=>b[1]-a[1])[0];
+        if(!tD) return null;
+        return {dep:depNice(tD[0]),depVotos:tD[1],
+                mun:tM?tCase(tM[0].split(' · ')[0]):null,munVotos:tM?tM[1]:0};
+      }catch(e){ return null; }
+    })();
+    return _terrCache[dataUrl];
+  }
+  /* cada clic invalida la ficha anterior: el mesa a mesa es lento y sin esto
+     una respuesta vieja escribe el territorio de otra persona en la ficha nueva */
+  let _fichaSeq=0;
+  function abrirFicha(e){
+    if(!e) return;
+    const my=++_fichaSeq;
+    const b=bancadaOf(e.partido);
+    openModal(`
+      <div class="md-tag">Congresista electo · 2026–2030</div>
+      <div class="fc-head">
+        <div class="fc-photo" id="fc-photo" style="background:${b.color}"><span>${esc(initials(e.nombre))}</span></div>
+        <div style="min-width:0;flex:1">
+          <div class="fc-name">${esc(e.nombre)}</div>
+          <span class="fc-chip" style="color:${lift(b.color)};background:${b.color}1a;border-color:${b.color}55">${esc(e.partido)}</span>
+          <div class="fc-meta">${e.corp==='SENADO'?'Senado':'Cámara de Representantes'} · ${esc(depNice(e.dep))}</div>
+        </div>
+      </div>
+      <div class="md-sec">Su votación</div>
+      <div id="fc-hist"><div class="fc-load">Buscando su historial electoral <span class="dots"><span></span><span></span><span></span></span></div></div>
+      <div id="fc-cta"></div>`);
+    llenarFicha(e,my);
+  }
+  async function llenarFicha(e,my){
+    let hits=[];
+    try{
+      const all=await CandRegistry.load({includeParties:false});
+      const n=norm(e.nombre);
+      hits=all.filter(c=>c.tipo!=='partido'&&norm(c.nombre)===n);
+      if(!hits.length){
+        const toks=n.split(/\s+/).filter(t=>t.length>2);
+        if(toks.length) hits=all.filter(c=>c.tipo!=='partido'&&(()=>{const ct=norm(c.nombre).split(/\s+/);return toks.every(t=>ct.includes(t));})());
+      }
+      hits.sort((a,b)=>(SRC_YEAR[b.source]||0)-(SRC_YEAR[a.source]||0)||(b.votos||0)-(a.votos||0));
+    }catch(err){ hits=[]; }
+    if(my!==_fichaSeq) return;
+    const hist=document.getElementById('fc-hist');
+    if(!hist||!hist.isConnected) return;
+    if(!hits.length){
+      hist.innerHTML=`<div class="fc-terr">No aparece con voto personal en el registro 2014–2026. Suele pasar con quienes van en lista cerrada: el voto va al logo del partido, no al nombre.</div>`;
+      return;
+    }
+    hist.innerHTML=hits.map(c=>`<div class="fc-row"><span class="y">${SRC_YEAR[c.source]||''}</span><span class="c">${esc(corpNice(c))}</span><span class="v">${fmt(c.votos)} votos</span></div>`).join('')
+      +`<div class="fc-terr" id="fc-terr">Cargando dónde sacó sus votos…</div>`;
+    const cta=document.getElementById('fc-cta');
+    if(cta) cta.innerHTML=`<a class="ps-cta" href="analisis-candidato.html?cand=${encodeURIComponent(hits[0].slug)}">Ver ficha completa · mapa y drill territorial →</a>`;
+    const terr=document.getElementById('fc-terr');
+    loadTerritorialTop(hits[0].dataUrl).then(top=>{
+      if(my!==_fichaSeq||!terr||!terr.isConnected) return;
+      terr.innerHTML=top
+        ?`Su mayor votación fue en <b>${esc(top.dep)}</b> (${fmt(top.depVotos)} votos)${top.mun?`, y dentro de ese territorio en <b>${esc(top.mun)}</b> (${fmt(top.munVotos)} votos)`:''}.`
+        :'';
+    });
+  }
 
   /* ── proyectos de ley (radar) ───────────────────────────────── */
   const TITLE_PREF=/^\s*por\s+(?:medio\s+de\s+)?(?:el\s+medio\s+de\s+)?(?:la|el|los|las)?\s*cual(?:es)?\s+se\s+/i;
   function shortTitle(t){ let s=String(t||'').replace(TITLE_PREF,'').replace(/\s+/g,' ').trim(); if(s.length<6) s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
   const RES_TXT={EN_TRAMITE:['En trámite','res-tramite'],LEY:['Ley','res-ley'],ARCHIVADO_TIEMPO:['Archivado por tiempo','res-tiempo'],ARCHIVADO_OTRO:['Archivado','res-otro'],RETIRADO:['Retirado','res-otro'],SIN_DATO:['Sin dato','res-otro'],OTRO:['Otro','res-otro']};
-  let P_ALL=[], P_FILTER='', P_SHOWN=15, P_MODE='recientes';
+  let P_ALL=[], P_FILTER='', P_SHOWN=5, P_MODE='recientes';
   /* ── recién radicados (legislatura viva 2026-2027) ───────────────
      El histórico de `buscar` (proyectos.jsonl) se corta el 2026-07-10,
      antes de la instalación del Congreso el 20 de julio — los proyectos
@@ -797,7 +1027,7 @@
       const radHit=rad.filter(x=>norm(x.t+' '+x.ap).includes(nq));
       P_ALL=[...radHit,...(r.resultados||[])].sort((a,b)=>(b.a-a.a)||(b.id-a.id));
       P_MODE='busqueda';
-      P_SHOWN=15;
+      P_SHOWN=5;
       proysRender();
     }catch(e){
       document.getElementById('p-list').innerHTML='<div class="note">La búsqueda falló. Intenta de nuevo.</div>';
@@ -805,7 +1035,7 @@
   }
   function proysFilter(btn){
     document.querySelectorAll('.chip[data-f]').forEach(b=>b.classList.remove('on'));
-    btn.classList.add('on'); P_FILTER=btn.dataset.f; P_SHOWN=15; proysRender();
+    btn.classList.add('on'); P_FILTER=btn.dataset.f; P_SHOWN=5; proysRender();
   }
   function proysRender(){
     const all=P_ALL.filter(p=>!P_FILTER||p.res===P_FILTER);
@@ -832,7 +1062,7 @@
     document.getElementById('p-count').textContent=all.length?`${shown.length} de ${fmt(all.length)} proyectos${P_MODE==='recientes'?' · los más recientes del histórico':''}`:'';
     document.getElementById('p-more').style.display=all.length>P_SHOWN?'':'none';
   }
-  function proysMore(){ P_SHOWN+=15; proysRender(); }
+  function proysMore(){ P_SHOWN+=10; proysRender(); }
 
   /* ── histórico en cifras (Caudal) ───────────────────────────── */
   /* snapshot embebido (corte jul-2026) — la API lo refresca si responde */
@@ -951,34 +1181,72 @@
     return `${+m[3]} ${meses[+m[2]-1]||''} ${m[1]}`;
   }
   function evTitulo(t){ const s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
-  function evRow(it,camara,basePdf){
-    const pdf=it.pdf?(/^https?:/i.test(it.pdf)?it.pdf:basePdf+it.pdf):null;
-    const meta=[it.comision?`Comisión ${esc(it.comision)}`:'',it.autor?esc(it.autor):'',evFmtFecha(it.fecha),it.estado?esc(it.estado):'']
+  function evRow(it,camara,i){
+    const meta=[it.comision?`Comisión ${esc(it.comision)}`:'',evFmtFecha(it.fecha),it.estado?esc(it.estado):'']
       .filter(Boolean).map(m=>`<span class="m">${m}</span>`).join('');
-    const resumen=it.resumen&&it.resumen.trim()&&norm(it.resumen)!==norm(it.titulo)
-      ? `<div class="ev-obj"><b>Objeto:</b> ${esc(it.resumen)}</div>` : '';
-    const acciones=`<div class="ev-actions">`
-      +(pdf?`<a class="ev-dl" href="${esc(pdf)}" target="_blank" rel="noopener">↓ Descargar texto radicado</a>`
-            :`<span class="ev-nopdf">Texto radicado aún no publicado</span>`)
-      +(it.fuente?`<a class="ev-src" href="${esc(it.fuente)}" target="_blank" rel="noopener">Ver en ${camara==='sen'?'Senado':'Cámara'} ↗</a>`:'')
-      +`</div>`;
-    return `<div class="ev-row ${camara}">
+    const auts=autoresCorto(it.autor);
+    return `<div class="ev-row ${camara}" data-i="${i}" tabindex="0" role="button">
       <div class="ev-row-top">
         <span class="ev-num">${esc(it.numero||'—')}</span>
         <span class="ev-title">${esc(evTitulo(it.titulo))}</span>
-        <span class="ev-hint">Ver detalle</span>
+        <span class="ev-hint">Ver resumen</span>
       </div>
       <div class="ev-meta">${meta}</div>
-      <div class="ev-detail">${resumen}${acciones}</div>
+      ${auts?`<div class="ev-meta"><span class="m">${auts}</span></div>`:''}
     </div>`;
+  }
+  /* de dónde salió el resumen — se dice explícito para que se pueda contrastar
+     con el PDF oficial y para no vender como lectura del articulado algo que
+     salió solo del título */
+  const EV_BASE_TXT={
+    texto:'del texto completo del proyecto radicado',
+    pdf:'del PDF del proyecto radicado',
+    objeto:'del objeto declarado por el autor en la ficha oficial',
+    titulo:'únicamente del título radicado — el articulado todavía no se publica',
+  };
+  function evModal(it,camara,basePdf){
+    const pdf=it.pdf?(/^https?:/i.test(it.pdf)?it.pdf:basePdf+it.pdf):null;
+    const ex=it.explica;
+    const auts=autoresDe(it.autor);
+    const meta=[it.comision?`Comisión ${esc(it.comision)}`:'',evFmtFecha(it.fecha),
+                it.estado?esc(it.estado):'',it.tipo?esc(it.tipo):'']
+      .filter(Boolean).map(m=>`<span class="m">${m}</span>`).join('');
+    let cuerpo;
+    if(ex){
+      cuerpo=`<div class="md-h">${esc(ex.titular)}</div>`
+        +(ex.cambia&&ex.cambia.length
+          ?`<div class="md-sec">Qué cambiaría en la práctica</div>`
+           +ex.cambia.map(c=>`<div class="md-li"><i>▸</i><span>${esc(c)}</span></div>`).join('')
+          :'')
+        +(ex.afecta?`<div class="md-sec">A quién le aplica</div><div class="md-afecta">${esc(ex.afecta)}</div>`:'')
+        +(ex.ojo?`<div class="md-ojo">${esc(ex.ojo)}</div>`:'');
+    }else if(it.resumen&&it.resumen.trim()){
+      cuerpo=`<div class="md-sec">Objeto declarado</div><div class="md-afecta">${esc(it.resumen)}</div>`;
+    }else{
+      cuerpo=`<div class="md-ojo">Todavía no hay un resumen de este proyecto: la Secretaría publicó el título pero aún no el texto radicado. Aparecerá aquí en cuanto salga.</div>`;
+    }
+    return `<div class="md-tag">Proyecto de ley · ${camara==='sen'?'Senado':'Cámara de Representantes'} · Legislatura 2026–2027</div>
+      <div><span class="md-num">${esc(it.numero||'—')}</span></div>
+      ${cuerpo}
+      <div class="md-sec">Título radicado</div>
+      <div class="md-legal">${esc(evTitulo(it.titulo))}</div>
+      <div class="md-meta">${meta}</div>
+      ${auts.length?`<div class="md-auts"><b>${auts.length===1?'Autor':'Autores'} (${auts.length}):</b> ${esc(auts.join(' · '))}</div>`:''}
+      <div class="md-actions">
+        ${pdf?`<a class="ev-dl" href="${esc(pdf)}" target="_blank" rel="noopener">↓ Descargar texto radicado</a>`
+             :`<span class="ev-nopdf">Texto radicado aún no publicado</span>`}
+        ${it.fuente?`<a class="ev-src" href="${esc(it.fuente)}" target="_blank" rel="noopener">Ver en ${camara==='sen'?'Senado':'Cámara'} ↗</a>`:''}
+      </div>
+      ${ex?`<div class="md-src">Resumen en lenguaje llano redactado automáticamente a partir ${EV_BASE_TXT[ex.base]||'de la ficha oficial'}. Es una lectura de apoyo, no el texto legal: lo que obliga es el documento radicado.</div>`:''}`;
   }
   function evPaint(box,list,camara,basePdf){
     if(!list||!list.length){ box.innerHTML=`<div class="ev-empty">Aún no hay proyectos radicados en la legislatura 2026–2027 por esta cámara. Aparecerán aquí apenas la Secretaría los publique.</div>`; return; }
-    box.innerHTML=list.map(it=>evRow(it,camara,basePdf)).join('');
-    box.querySelectorAll('.ev-row').forEach(r=>r.addEventListener('click',e=>{
-      if(e.target.closest('a')) return;   // no cerrar al clicar descarga/fuente
-      r.classList.toggle('open');
-    }));
+    box.innerHTML=list.map((it,i)=>evRow(it,camara,i)).join('');
+    box.querySelectorAll('.ev-row').forEach(r=>{
+      const abrir=()=>openModal(evModal(list[+r.dataset.i],camara,basePdf));
+      r.addEventListener('click',abrir);
+      r.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); abrir(); } });
+    });
   }
   let EV_SEEN=null;   // Set de 'sen:NUM'/'cam:NUM' ya vistos (para detectar novedades)
   function evFlash(txt,none){
@@ -998,7 +1266,7 @@
       if(!r.ok) throw new Error('HTTP '+r.status);
       const j=await r.json();
       const base=j.base_pdf||'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/';
-      const sen=(j.senado||[]).slice(0,5), cam=(j.camara||[]).slice(0,5);
+      const sen=(j.senado||[]).slice(0,3), cam=(j.camara||[]).slice(0,3);
       // detectar radicaciones nuevas respecto a lo ya visto
       const ahora=new Set([...sen.map(x=>'sen:'+x.numero),...cam.map(x=>'cam:'+x.numero)]);
       if(EV_SEEN && opts.refresh){
@@ -1032,7 +1300,6 @@
   (function(){ const b=document.getElementById('ev-refresh'); if(b) b.addEventListener('click',()=>loadEnVivo({refresh:true})); })();
   renderComp();
   renderComisiones();
-  renderMesaCamara();
   loadComisionMiembros();
   loadVotosCongreso();
   rosterInit();

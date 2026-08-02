@@ -2,7 +2,7 @@
 """
 Feed "Proyectos de ley en vivo" para legislativo.html.
 
-Produce un JSON compacto con los ÚLTIMOS 5 proyectos de ley radicados en cada
+Produce un JSON compacto con los ÚLTIMOS 3 proyectos de ley radicados en cada
 cámara de la legislatura viva (2026-2027) y sube a S3 tanto el JSON como el PDF
 del texto radicado de cada uno. El frontend (sección "En vivo" de
 legislativo.html) lo lee directo de S3.
@@ -23,7 +23,7 @@ primer JSON y depurar.
 
 Notas de campo:
   · Senado tiene un WAF que banea a curl por fingerprint TLS ante RÁFAGAS
-    (~30 req seguidas). Este feed hace poco volumen (1 lista + 5 detalles +
+    (~30 req seguidas). Este feed hace poco volumen (1 lista + 3 detalles +
     los PDFs que falten) con pausas, y ADEMÁS es idempotente: si el PDF ya
     está en S3 no lo vuelve a bajar. En régimen, casi no toca la red de Senado.
   · Cámara es WordPress limpio (admin-ajax), sin WAF agresivo. El "nonce" de
@@ -60,7 +60,7 @@ CAM_PL_PAGE = 'https://www.camara.gov.co/secretaria/proyectos-de-ley'
 
 LEG_SEN = '2026-2027'
 LEG_CAM = '20'            # id interno de la legislatura 2026-2027 en camara.gov.co
-N = 5                     # cuántos mostrar por cámara
+N = 3                     # cuántos mostrar por cámara
 
 # S3 (mismo prefijo público donde vive comisiones-2026.json)
 S3_BUCKET = 'elecciones-2026'
@@ -381,6 +381,41 @@ def build(only=None, upload=False):
             result['camara'] = rehost_pdfs(cam, 'camara', s3)
         except Exception as e:                     # noqa: BLE001
             print(f'  ! cámara falló, conservo lo previo: {e}', file=sys.stderr)
+
+    # Resumen ciudadano (DeepSeek) de cada proyecto → campo `explica`. Es
+    # best-effort a propósito: si no hay API key o el modelo falla, los items
+    # se quedan sin `explica` y el frontend cae al objeto/título. Nunca se
+    # pierde el feed por esto. Cacheado por número: solo paga lo nuevo.
+    try:
+        from explica_en_vivo import explicar
+    except ImportError:                            # ejecutado fuera de su carpeta
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        try:
+            from explica_en_vivo import explicar
+        except Exception:                          # noqa: BLE001
+            explicar = None
+    if explicar:
+        for cam in ('senado', 'camara'):
+            try:
+                prev_map = {str(x.get('numero')): x['explica']
+                            for x in (previo.get(cam) or []) if x.get('explica')}
+                n, c = explicar(result[cam], cam, PUBLIC_BASE, previos=prev_map)
+                if n or c:
+                    print(f'  · explica {cam}: {n} nuevos · {c} reusados')
+            except Exception as e:                 # noqa: BLE001
+                print(f'  ! explicador falló en {cam}: {e}', file=sys.stderr)
+
+    # Red de seguridad: conservar el resumen ya publicado de un proyecto que
+    # sigue en el feed. Este builder corre en dos sitios (cron del Mac y
+    # Lambda) y solo el primero tiene el texto de los radicados y pypdf; sin
+    # esto, una corrida sin explicador reescribiría el JSON dejando sin
+    # resumen a proyectos que ya lo tenían.
+    for cam in ('senado', 'camara'):
+        prev_map = {str(x.get('numero')): x['explica']
+                    for x in (previo.get(cam) or []) if x.get('explica')}
+        for it in result[cam]:
+            if not it.get('explica') and prev_map.get(str(it.get('numero'))):
+                it['explica'] = prev_map[str(it['numero'])]
 
     payload = json.dumps(result, ensure_ascii=False, indent=1)
     result['_destino'] = 'staging'          # solo para el print/return; NO va al JSON
