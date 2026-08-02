@@ -88,10 +88,46 @@
     .instala-chip i{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
+    /* ── HUB DE FICHAS (mismo lenguaje visual que electoral.html) ──────
+       La página traía las 6 secciones apiladas en un scroll larguísimo. Ahora
+       la portada es una cuadrícula de tarjetas y solo se muestra la sección
+       que se abre; el resto queda oculto (`.sec-off`). */
+    .lg-hub{max-width:1080px;margin:2.4rem auto 0;padding:0 2rem}
+    .lg-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:14px;height:clamp(430px,calc(100vh - 330px),620px)}
+    .card{position:relative;background:var(--card-bg);border:1px solid var(--card-border);overflow:hidden;cursor:none;
+      transition:border-color .25s,transform .2s;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+      display:flex;flex-direction:column;justify-content:flex-end;min-height:0;text-align:left;padding:0;font:inherit}
+    .card:hover{border-color:rgba(0,71,255,.6);transform:scale(1.013);z-index:3}
+    .card:hover .card-glow{opacity:1}
+    .card:hover .card-name{color:var(--blue-light)}
+    .card-glow{position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,71,255,.15) 0%,transparent 60%);opacity:0;transition:opacity .3s;pointer-events:none}
+    /* tarjeta con imagen de fondo — se activa poniéndole background-image inline */
+    .card-img{background-size:cover;background-position:center}
+    .card-img::before{content:'';position:absolute;inset:0;background:rgba(4,6,16,.55);z-index:0}
+    .card-label{position:relative;z-index:1;padding:.7rem .85rem .75rem;background:linear-gradient(to top,rgba(0,0,0,.9) 0%,rgba(0,0,0,.3) 100%)}
+    .card-name{font-family:var(--hn);font-weight:400;font-size:clamp(.66rem,1.35vw,1.05rem);letter-spacing:.03em;text-transform:uppercase;color:var(--white);line-height:1.2;transition:color .2s}
+    .card-sub{font-family:var(--hn);font-weight:300;font-size:.72rem;letter-spacing:.02em;color:var(--gray);line-height:1.5;margin-top:.35rem}
+    .card-kpi{position:absolute;top:.75rem;left:.85rem;z-index:1;font-family:var(--hn);font-weight:800;font-size:2rem;letter-spacing:-.03em;color:var(--white);line-height:1;text-shadow:0 2px 18px rgba(0,0,0,.7)}
+    .card-kpi small{display:block;font-size:.58rem;font-weight:400;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.55);margin-top:.3rem}
+    .card-live{border-color:rgba(0,71,255,.3)}
+    .card-live .card-label{background:linear-gradient(to top,rgba(0,10,30,.92) 0%,rgba(0,10,30,.35) 100%)}
+    .card-live:hover{border-color:rgba(0,120,255,.8)}
+    .card-live::after{content:'● EN VIVO';position:absolute;top:.55rem;right:.6rem;font-family:var(--hn);font-size:.5rem;letter-spacing:.15em;color:#4ade80;background:rgba(0,0,0,.5);padding:.2rem .45rem;z-index:2}
+    @media(max-width:1100px){ .lg-grid{grid-template-columns:1fr 1fr 1fr;grid-template-rows:none;height:auto;grid-auto-rows:minmax(150px,auto)} }
+    @media(max-width:900px){ .lg-grid{grid-template-columns:1fr 1fr} .card-span2{grid-row:auto !important} }
+    @media(max-width:560px){ .lg-grid{grid-template-columns:1fr} }
+
+    /* barra de regreso al hub, dentro de cada sección */
+    .sec-bar{max-width:1080px;margin:1.6rem auto .4rem;padding:0 2rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+    .sec-back{font-family:var(--hn);font-size:.68rem;letter-spacing:.09em;text-transform:uppercase;color:#4ade80;background:none;border:1.5px solid rgba(74,222,128,.4);padding:.4rem .8rem;cursor:none;transition:.2s}
+    .sec-back:hover{background:rgba(74,222,128,.1);border-color:#4ade80}
+    .sec-off{display:none !important}
+
     /* sub-nav de anclas */
     .anchor-nav{display:flex;flex-wrap:wrap;gap:.55rem;max-width:1080px;margin:2.2rem auto 0;padding:0 2rem}
     .anchor-nav a{font-family:var(--hn);font-weight:500;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);text-decoration:none;border:1px solid var(--gray-light);padding:.42rem .85rem;transition:color .2s,border-color .2s}
     .anchor-nav a:hover{color:var(--white);border-color:var(--white)}
+    .anchor-nav a.on{color:#fff;border-color:var(--blue);background:rgba(0,71,255,.18)}
 
     /* secciones */
     section{max-width:1080px;margin:0 auto;padding:4rem 2rem 0}
@@ -423,13 +459,83 @@
     <div class="instala-chip"><i></i><span id="instala-txt">Instalación · 20 de julio de 2026</span></div>
   </div>
 
-  <div class="anchor-nav">
-    <a href="#en-vivo">Proyectos en vivo</a>
-    <a href="#congreso">El nuevo Congreso</a>
-    <a href="#comisiones">Comisiones</a>
-    <a href="#congresistas">Congresistas</a>
-    <a href="#proyectos">Proyectos de ley</a>
-    <a href="#historico">El histórico en cifras</a>
+  <!-- ══ HUB · una ficha por sección ══════════════════════════════
+       Para agregar una imagen a una tarjeta basta con ponerle la clase
+       card-img y su background-image inline, igual que en electoral.html:
+         class="card card-img …" style="background-image:url('imagenes/xxx.jpg')"
+       Sin imagen la tarjeta se ve bien igual (queda el fondo oscuro). -->
+  <div class="lg-hub" id="lg-hub">
+    <div class="lg-grid">
+      <button class="card card-img card-live card-span2" style="grid-row:span 2;background-image:url('imagenes/legislativo-en-vivo.jpg')" onclick="showSec('en-vivo')">
+        <div class="card-glow"></div>
+        <div class="card-kpi" id="hub-kpi-vivo">—<small>radicados esta semana</small></div>
+        <div class="card-label">
+          <div class="card-name">Proyectos en vivo</div>
+          <div class="card-sub">Lo último que llega al Congreso, con un resumen en lenguaje llano de qué cambiaría si se aprueba.</div>
+        </div>
+      </button>
+      <button class="card card-img" style="background-image:url('imagenes/legislativo-congreso.jpg')" onclick="showSec('congreso')">
+        <div class="card-glow"></div>
+        <div class="card-kpi">285<small>congresistas</small></div>
+        <div class="card-label">
+          <div class="card-name">El nuevo Congreso</div>
+          <div class="card-sub">Cómo quedó repartido el poder por bancadas.</div>
+        </div>
+      </button>
+      <button class="card card-img" style="background-image:url('imagenes/legislativo-comisiones.jpg')" onclick="showSec('comisiones')">
+        <div class="card-glow"></div>
+        <div class="card-kpi">7<small>comisiones</small></div>
+        <div class="card-label">
+          <div class="card-name">Comisiones</div>
+          <div class="card-sub">Las siete mesas donde cada proyecto vive o muere.</div>
+        </div>
+      </button>
+      <button class="card card-img" style="background-image:url('imagenes/legislativo-congresistas.jpg')" onclick="showSec('congresistas')">
+        <div class="card-glow"></div>
+        <div class="card-kpi">15<small>bancadas</small></div>
+        <div class="card-label">
+          <div class="card-name">Quién es quién</div>
+          <div class="card-sub">Busca a cualquier congresista y mira dónde está su fuerza.</div>
+        </div>
+      </button>
+      <button class="card card-img" style="background-image:url('imagenes/legislativo-proyectos.jpg')" onclick="showSec('proyectos')">
+        <div class="card-glow"></div>
+        <div class="card-kpi">10.664<small>proyectos desde 1990</small></div>
+        <div class="card-label">
+          <div class="card-name">Radar legislativo</div>
+          <div class="card-sub">Busca cualquier tema en el archivo completo del Congreso.</div>
+        </div>
+      </button>
+      <button class="card card-img" style="background-image:url('imagenes/legislativo-historico.jpg')" onclick="showSec('historico')">
+        <div class="card-glow"></div>
+        <div class="card-kpi">1 de 4<small>termina en ley</small></div>
+        <div class="card-label">
+          <div class="card-name">El histórico en cifras</div>
+          <div class="card-sub">Dónde se cae el trámite y por qué, en 36 legislaturas.</div>
+        </div>
+      </button>
+      <button class="card card-img" style="background-image:url('imagenes/legislativo-acusaciones.jpg')" onclick="location.href='comision.html?id=ACUSACIONES'">
+        <div class="card-glow"></div>
+        <div class="card-kpi">17<small>integrantes</small></div>
+        <div class="card-label">
+          <div class="card-name">Investigación y Acusación</div>
+          <div class="card-sub">La comisión que investiga al presidente y a los magistrados.</div>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- barra de regreso: solo visible dentro de una sección -->
+  <div class="sec-bar sec-off" id="sec-bar">
+    <button class="sec-back" type="button" onclick="showHub()">← Todas las secciones</button>
+    <div class="anchor-nav" style="margin:0;padding:0;flex:1">
+      <a href="#en-vivo" data-sec="en-vivo">Proyectos en vivo</a>
+      <a href="#congreso" data-sec="congreso">El nuevo Congreso</a>
+      <a href="#comisiones" data-sec="comisiones">Comisiones</a>
+      <a href="#congresistas" data-sec="congresistas">Quién es quién</a>
+      <a href="#proyectos" data-sec="proyectos">Radar</a>
+      <a href="#historico" data-sec="historico">El histórico</a>
+    </div>
   </div>
 
   <!-- ══ PROYECTOS DE LEY EN VIVO ═══════════════════════════════ -->
@@ -586,6 +692,34 @@
 
   const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const fmt=n=>String(n==null?'—':n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+
+  /* ── router del hub ──────────────────────────────────────────────
+     Las 6 secciones existen siempre en el DOM (sus datos se cargan una vez al
+     arrancar); lo único que cambia es cuál se muestra. Las anclas viejas
+     (#comisiones, #proyectos…) siguen funcionando: entran por hashchange y
+     abren su sección, así que los enlaces internos y los que ya estén
+     compartidos por fuera no se rompen. */
+  const LG_SECS=['en-vivo','congreso','comisiones','congresistas','proyectos','historico'];
+  function showSec(id){
+    if(LG_SECS.indexOf(id)<0){ showHub(); return; }
+    document.getElementById('lg-hub').classList.add('sec-off');
+    document.getElementById('sec-bar').classList.remove('sec-off');
+    LG_SECS.forEach(s=>{ const el=document.getElementById(s); if(el) el.classList.toggle('sec-off',s!==id); });
+    document.querySelectorAll('#sec-bar .anchor-nav a').forEach(a=>a.classList.toggle('on',a.dataset.sec===id));
+    if(location.hash.slice(1)!==id) history.replaceState(null,'','#'+id);
+    window.scrollTo(0,0);
+  }
+  function showHub(){
+    document.getElementById('lg-hub').classList.remove('sec-off');
+    document.getElementById('sec-bar').classList.add('sec-off');
+    LG_SECS.forEach(s=>{ const el=document.getElementById(s); if(el) el.classList.add('sec-off'); });
+    if(location.hash) history.replaceState(null,'',location.pathname+location.search);
+    window.scrollTo(0,0);
+  }
+  window.addEventListener('hashchange',()=>{
+    const h=decodeURIComponent(location.hash.slice(1));
+    h?showSec(h):showHub();
+  });
 
   /* ── modal compartido ────────────────────────────────────────── */
   function openModal(html){
@@ -1276,6 +1410,12 @@
       }
       EV_SEEN=ahora;
       evPaint(sB,sen,'sen',base); evPaint(cB,cam,'cam',base);
+      const k=document.getElementById('hub-kpi-vivo');
+      if(k){
+        const fechas=[...sen,...cam].map(x=>String(x.fecha||'').replace(/\//g,'-')).filter(Boolean).sort();
+        const ult=fechas[fechas.length-1];
+        k.innerHTML=(ult?evFmtFecha(ult).replace(/ (\d{4})$/,''):'—')+'<small>último radicado</small>';
+      }
       document.getElementById('ev-sen-count').textContent=sen.length?`· ${sen.length} recientes`:'';
       document.getElementById('ev-cam-count').textContent=cam.length?`· ${cam.length} recientes`:'';
       const up=document.getElementById('ev-updated');
@@ -1296,6 +1436,7 @@
 
   /* ── init ───────────────────────────────────────────────────── */
   updateNavAuth();
+  (function(){ const h=decodeURIComponent(location.hash.slice(1)); h?showSec(h):showHub(); })();
   loadEnVivo();
   (function(){ const b=document.getElementById('ev-refresh'); if(b) b.addEventListener('click',()=>loadEnVivo({refresh:true})); })();
   renderComp();

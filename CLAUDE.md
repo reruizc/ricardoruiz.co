@@ -4985,6 +4985,18 @@ nacional (embudo, mortandad, bloqueo, acuerdo de presidencias); `comision.html`
 (`?id=PRIMERA..SEPTIMA`) es la ficha por comisión constitucional, con el mismo
 bloque de análisis replicado 100% a nivel de esa comisión.
 
+**Estructura de hub (ago-2026)**: la página traía las 6 secciones apiladas en un scroll
+larguísimo ("muy complejo para el usuario"). Ahora la portada es una **cuadrícula de 7 fichas**
+con el mismo lenguaje visual de `electoral.html` (`.card` · `.card-img` · `.card-glow` ·
+`.card-label` · `.card-live`), 4 columnas × 2 filas con la de *Proyectos en vivo* a doble alto,
+y solo se muestra la sección que se abre (`showSec(id)` / `showHub()`, el resto queda
+`.sec-off`). **Las anclas viejas siguen sirviendo**: `#comisiones`, `#proyectos`… entran por
+`hashchange` y abren su sección, así que los enlaces internos y los ya compartidos por fuera
+no se rompen. Las 7ª ficha lleva a `comision.html?id=ACUSACIONES` (antes solo se llegaba por
+una nota al pie). Cada tarjeta ya apunta a `imagenes/legislativo-{slug}.jpg`
+(en-vivo · congreso · comisiones · congresistas · proyectos · historico · acusaciones):
+**basta con dejar el archivo ahí**, y si falta la tarjeta se ve igual, solo sin foto.
+
 **Feed "En vivo" + resumen ciudadano** (ago-2026): `tools/leyes-senado/leyes_en_vivo.py`
 emite los **3** últimos radicados por cámara (era 5) y ahora cada item lleva **`explica`**
 = resumen en lenguaje llano (titular · qué cambia en la práctica · a quién le aplica · ojo),
