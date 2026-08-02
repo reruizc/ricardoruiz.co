@@ -5008,8 +5008,10 @@ legislativo-electos.js         ELECTOS_RAW (285) + BANCADAS + bancadaOf (solo qu
 - La 7ª ficha lleva a `comision.html?id=ACUSACIONES`; el backlink de `comision.html` apunta a
   `legislativo-comisiones.html`. Ya no hay anclas `#seccion` — el split las reemplazó por
   páginas (los pocos enlaces internos se reescribieron).
-- Cada página de sección: hero propio (page-header con el sec-sub RICO promovido de la vieja
-  sección — no duplicar título hero + sec-title, ese fue el reclamo original), barra
+- Cada página de sección: **hero propio y COMPACTO** (`.page-header.compacta`, título a
+  1.6-2.3rem contra los 2-3.2rem del hub) con el sec-sub rico promovido de la vieja sección.
+  El hero grande es SOLO del hub: repetirlo en cada módulo hacía sentir que cada página
+  volvía a empezar la publicación — fue el reclamo que originó el split. Debajo, barra
   `sec-bar` con "← Todas las secciones" + conmutador de 6, modal compartido, footer.
 - El refresco de `COM_HIST` con `stats` vive en **legislativo-comisiones.html** (en el
   monolito lo hacía `loadHistorico`; al partir, esa referencia cruzada reventaba y el catch
@@ -5018,8 +5020,26 @@ legislativo-electos.js         ELECTOS_RAW (285) + BANCADAS + bancadaOf (solo qu
   `imagenes/legislativo-{en-vivo,congreso,comisiones,congresistas,proyectos,historico,acusaciones}.jpg`
   — basta con dejar el archivo ahí; si falta, la tarjeta se ve igual, solo sin foto.
 
+**Bancadas transversales** (`legislativo-congreso.html` · ago-2026): además del reparto por
+partido, la página muestra los bloques que CRUZAN partidos, separados por **cómo se prueba
+cada cifra** — la distinción es el punto, no un adorno:
+- **Las que se cuentan** (`renderBancadasTematicas`, derivadas de `ELECTOS`): Bogotá 18 ·
+  mujeres 84 · Caribe 34 · Amazonía/Orinoquía 21 · CITREP 16 · étnicas 9 · Estatuto de
+  Oposición 2. Salen del escrutinio, se pueden verificar nombre por nombre.
+- **Las que se declaran**: bloques temáticos SIN registro oficial de miembros. Solo va lo
+  documentado en prensa, citado. Hoy: **Bancada Provida** (24 en 2020 → 52 en 2022-2026 →
+  «más de 30» electos para este periodo según su balance del 16-jun-2026; PAL del 28-jul-2026
+  sobre el art. 11 CP, de David Cote y Sara Castellanos — ambos verificados contra el roster).
+  ⚠️ **La cifra de «54 provida» que circula es del Congreso 2022-2026** (El Colombiano,
+  sep-2022), NO de este — no reciclarla. Para agregar otra bancada temática: exigir fuente;
+  sin ella no entra.
+Senado y Cámara van en **paneles separados** (`.comp-2`) y la leyenda subió de .66rem a
+.82rem: con 14-15 bancadas era ilegible.
+
 **Feed "En vivo" + resumen ciudadano** (ago-2026): `tools/leyes-senado/leyes_en_vivo.py`
-emite los **3** últimos radicados por cámara (era 5) y ahora cada item lleva **`explica`**
+emite los **15** últimos radicados por cámara (el frontend pagina de a 3/5/10 con
+`evPintaPagina`/`evGo`/`evSetPer`; sin peticiones extra al cambiar de página) y cada item
+lleva **`explica`**
 = resumen en lenguaje llano (titular · qué cambia en la práctica · a quién le aplica · ojo),
 que el frontend abre en un **modal** al hacer clic. Lo genera
 `tools/leyes-senado/explica_en_vivo.py` (DeepSeek V4 Flash) en el builder, NO en el

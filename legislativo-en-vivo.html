@@ -48,9 +48,9 @@
     </div>
   </nav>
 
-  <div class="page-header">
+  <div class="page-header compacta">
     <div class="page-tag">En vivo · Legislatura 2026–2027</div>
-    <h1 class="page-title">Lo último que llega al Congreso</h1>
+    <h1 class="page-title">Últimos proyectos de ley radicados</h1>
     <p class="page-sub">Lo más reciente que llega al Congreso, extraído a diario de <strong>Senado</strong> (leyes.senado.gov.co) y <strong>Cámara</strong> (camara.gov.co). Haz clic en cada proyecto para ver, en lenguaje llano, qué cambiaría si se aprueba — y para descargar el texto radicado.</p>
   </div>
 
@@ -69,22 +69,31 @@
   <section id="en-vivo">
     <div class="ev-bar">
       <div class="ev-updated" id="ev-updated"></div>
-      <button class="ev-refresh" id="ev-refresh" type="button" title="Buscar radicaciones nuevas">
-        <span class="ev-refresh-ic">↻</span><span class="ev-refresh-tx">Actualizar</span>
-      </button>
+      <div class="ev-tools">
+        <label class="ev-per">Ver
+          <select id="ev-per" onchange="evSetPer(this.value)">
+            <option value="3">3</option><option value="5" selected>5</option><option value="10">10</option>
+          </select>
+          por página</label>
+        <button class="ev-refresh" id="ev-refresh" type="button" title="Buscar radicaciones nuevas">
+          <span class="ev-refresh-ic">↻</span><span class="ev-refresh-tx">Actualizar</span>
+        </button>
+      </div>
     </div>
     <div class="ev-flash" id="ev-flash"></div>
     <div class="ev-wrap">
       <div class="ev-col">
         <div class="ev-col-head"><b>Senado</b> <span class="c" id="ev-sen-count"></span></div>
         <div class="ev-list" id="ev-senado"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div>
+        <div class="ev-pager" id="ev-pager-sen"></div>
       </div>
       <div class="ev-col">
         <div class="ev-col-head"><b>Cámara de Representantes</b> <span class="c" id="ev-cam-count"></span></div>
         <div class="ev-list" id="ev-camara"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div>
+        <div class="ev-pager" id="ev-pager-cam"></div>
       </div>
     </div>
-    <div class="note" style="margin-top:1.2rem">Se muestran los tres más recientes de cada cámara. El histórico completo (más de 10.600 proyectos desde 1990) es buscable en <a href="legislativo-proyectos.html" style="color:var(--blue-light)">Radar legislativo</a>. Fuentes: Secretaría del Senado · Cámara de Representantes.</div>
+    <div class="note" style="margin-top:1.2rem">Se guardan los <b>15 radicados más recientes</b> de cada cámara, del más nuevo al más viejo. El histórico completo (más de 10.600 proyectos desde 1990) es buscable en <a href="legislativo-proyectos.html" style="color:var(--blue-light)">Radar legislativo</a>. Fuentes: Secretaría del Senado · Cámara de Representantes.</div>
   </section>
 
   <!-- ══ MODAL COMPARTIDO (proyecto de ley · ficha de congresista) ═══ -->
@@ -222,6 +231,37 @@
       r.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); abrir(); } });
     });
   }
+
+  /* ── paginación ──────────────────────────────────────────────────
+     El feed guarda los 15 más recientes por cámara (del más nuevo al más
+     viejo, que es como los devuelve la secretaría). Aquí solo se corta esa
+     lista: no hay más peticiones al cambiar de página. */
+  const EV_DATA={sen:{list:[],base:''},cam:{list:[],base:''}};
+  const EV_PAGE={sen:1,cam:1};
+  let EV_PER=5;
+  const EV_BOX={sen:'ev-senado',cam:'ev-camara'};
+  function evPintaPagina(camara){
+    const d=EV_DATA[camara], box=document.getElementById(EV_BOX[camara]);
+    const pager=document.getElementById('ev-pager-'+camara);
+    if(!box) return;
+    const total=d.list.length, paginas=Math.max(1,Math.ceil(total/EV_PER));
+    if(EV_PAGE[camara]>paginas) EV_PAGE[camara]=paginas;
+    const pg=EV_PAGE[camara], ini=(pg-1)*EV_PER;
+    evPaint(box,d.list.slice(ini,ini+EV_PER),camara,d.base);
+    if(!pager) return;
+    if(total<=EV_PER){ pager.innerHTML=''; return; }
+    let h=`<button class="ev-pg" ${pg===1?'disabled':''} onclick="evGo('${camara}',${pg-1})" aria-label="Anterior">‹</button>`;
+    for(let i=1;i<=paginas;i++)
+      h+=`<button class="ev-pg${i===pg?' on':''}" onclick="evGo('${camara}',${i})">${i}</button>`;
+    h+=`<button class="ev-pg" ${pg===paginas?'disabled':''} onclick="evGo('${camara}',${pg+1})" aria-label="Siguiente">›</button>`
+      +`<span class="ev-pg-info">${ini+1}–${Math.min(ini+EV_PER,total)} de ${total}</span>`;
+    pager.innerHTML=h;
+  }
+  function evGo(camara,pg){ EV_PAGE[camara]=pg; evPintaPagina(camara); }
+  function evSetPer(v){
+    EV_PER=+v||5; EV_PAGE.sen=1; EV_PAGE.cam=1;
+    evPintaPagina('sen'); evPintaPagina('cam');
+  }
   let EV_SEEN=null;   // Set de 'sen:NUM'/'cam:NUM' ya vistos (para detectar novedades)
   function evFlash(txt,none){
     const f=document.getElementById('ev-flash'); if(!f) return;
@@ -240,7 +280,7 @@
       if(!r.ok) throw new Error('HTTP '+r.status);
       const j=await r.json();
       const base=j.base_pdf||'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/';
-      const sen=(j.senado||[]).slice(0,3), cam=(j.camara||[]).slice(0,3);
+      const sen=(j.senado||[]), cam=(j.camara||[]);   // el feed ya viene acotado (15/cámara)
       // detectar radicaciones nuevas respecto a lo ya visto
       const ahora=new Set([...sen.map(x=>'sen:'+x.numero),...cam.map(x=>'cam:'+x.numero)]);
       if(EV_SEEN && opts.refresh){
@@ -249,15 +289,10 @@
                       :'Sin radicaciones nuevas por ahora — el feed se refresca varias veces al día', !nuevos);
       }
       EV_SEEN=ahora;
-      evPaint(sB,sen,'sen',base); evPaint(cB,cam,'cam',base);
-      const k=document.getElementById('hub-kpi-vivo');
-      if(k){
-        const fechas=[...sen,...cam].map(x=>String(x.fecha||'').replace(/\//g,'-')).filter(Boolean).sort();
-        const ult=fechas[fechas.length-1];
-        k.innerHTML=(ult?evFmtFecha(ult).replace(/ (\d{4})$/,''):'—')+'<small>último radicado</small>';
-      }
-      document.getElementById('ev-sen-count').textContent=sen.length?`· ${sen.length} recientes`:'';
-      document.getElementById('ev-cam-count').textContent=cam.length?`· ${cam.length} recientes`:'';
+      EV_DATA.sen={list:sen,base}; EV_DATA.cam={list:cam,base};
+      evPintaPagina('sen'); evPintaPagina('cam');
+      document.getElementById('ev-sen-count').textContent=sen.length?`· ${sen.length} radicados`:'';
+      document.getElementById('ev-cam-count').textContent=cam.length?`· ${cam.length} radicados`:'';
       const up=document.getElementById('ev-updated');
       if(j.actualizado){
         const d=new Date(j.actualizado);

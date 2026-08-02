@@ -48,9 +48,9 @@
     </div>
   </nav>
 
-  <div class="page-header">
+  <div class="page-header compacta">
     <div class="page-tag">Composición · Congreso 2026–2030</div>
-    <h1 class="page-title">Cómo quedó repartido el poder</h1>
+    <h1 class="page-title">El Congreso que se instala</h1>
     <p class="page-sub">285 congresistas elegidos el 8 de marzo de 2026 toman posesión el 20 de julio. Así queda repartido el poder legislativo por bancadas.</p>
   </div>
 
@@ -83,10 +83,27 @@
       </div>
       <div class="kpi"><div class="n">16</div><div class="l">Curules de paz (CITREP)</div></div>
     </div>
-    <div class="panel">
-      <h3>Composición por bancada</h3>
-      <div id="comp-box"></div>
-      <div class="note">Las coaliciones departamentales de Cámara se agrupan en la bancada del aval principal; el detalle partido por partido está en la sección <a href="legislativo-congresistas.html" style="color:var(--blue-light)">Congresistas</a>. Fuente: escrutinio Registraduría · elecciones legislativas del 8 de marzo de 2026.</div>
+    <div class="comp-2">
+      <div class="panel"><div id="comp-sen"></div></div>
+      <div class="panel"><div id="comp-cam"></div></div>
+    </div>
+    <div class="note" style="margin-top:1rem">Las coaliciones departamentales de Cámara se agrupan en la bancada del aval principal; el detalle partido por partido está en <a href="legislativo-congresistas.html" style="color:var(--blue-light)">Quién es quién</a>. Fuente: escrutinio Registraduría · elecciones legislativas del 8 de marzo de 2026.</div>
+
+    <div class="panel" style="margin-top:1.8rem">
+      <h3>Las otras bancadas: las que cruzan los partidos</h3>
+      <p class="note" style="margin:0 0 1.1rem">El reparto por partido no explica cómo se vota realmente. Sobre él se montan bloques transversales que juntan a congresistas de bancadas rivales: por territorio, por curul especial o por afinidad temática. Estos <b>se pueden contar uno por uno</b> en el listado de electos.</p>
+      <div class="bt-grid" id="bt-datos"></div>
+
+      <h3 style="margin-top:2rem">Las que se declaran</h3>
+      <p class="note" style="margin:0 0 1.1rem">Las bancadas temáticas no tienen registro oficial de miembros: se arman por adhesión y se conocen por lo que sus voceros anuncian. Por eso aquí va lo que está <b>documentado en prensa</b>, no un conteo nuestro.</p>
+      <div class="bt-grid">
+        <div class="bt declarada" style="grid-column:1/-1">
+          <div class="bt-name" style="font-size:1rem;margin-top:0"><b>Bancada Provida</b></div>
+          <div class="bt-d" style="font-size:.8rem">Bloque interpartidista por «la vida, la familia y la libertad religiosa», activo desde 2020. Arrancó con <b>24 congresistas</b>, llegó a <b>52</b> en el periodo 2022-2026 y, según el balance que presentó el 16 de junio de 2026, <b>más de 30</b> de los candidatos que respaldó fueron elegidos para este Congreso — la cifra final de adherentes no se ha publicado.<br /><br />El <b>28 de julio de 2026</b> radicó un proyecto de acto legislativo para modificar el artículo 11 de la Constitución y proteger la vida <i>desde la fecundación</i>, presentado por el representante <b>David Cote</b> (Centro Democrático, Bogotá) y la senadora <b>Sara Castellanos</b> (Salvación Nacional). Ese proyecto se puede seguir en <a href="legislativo-en-vivo.html" style="color:var(--blue-light)">Últimos proyectos radicados</a>.</div>
+          <div class="bt-split">Fuentes: ACI Prensa (16 jun 2026) · Infobae y Reporteros Asociados (28-29 jul 2026). Cifra de 54 integrantes que circula en prensa corresponde al Congreso 2022-2026, no a este.</div>
+        </div>
+      </div>
+      <div class="note" style="margin-top:1.1rem">¿Falta una bancada temática que ya se haya anunciado? Se agregan a medida que sus voceros las hagan públicas y haya con qué citarlas: sin fuente, no entran.</div>
     </div>
   </section>
 
@@ -106,23 +123,73 @@
   <script src="legislativo-electos.js"></script>
   <script>
   /* composición por bancada (barras segmentadas) */
+  /* Senado y Cámara van en paneles SEPARADOS: son dos cuerpos con reglas y
+     tamaños distintos, y apilarlos en una sola barra los hacía ver como si
+     fueran la misma repartición. */
+  function compBloque(corp){
+    const by={};
+    ELECTOS.filter(e=>e.corp===corp).forEach(e=>{
+      const b=bancadaOf(e.partido);
+      if(!by[b.name]) by[b.name]={n:0,color:b.color};
+      by[b.name].n++;
+    });
+    const en=Object.entries(by).sort((a,b)=>b[1].n-a[1].n);
+    const tot=en.reduce((a,b)=>a+b[1].n,0)||1;
+    return `<div class="comp-h">${corp==='SENADO'?'Senado':'Cámara de Representantes'}
+        <small>${tot} curules · ${en.length} bancadas</small></div>
+      <div class="segbar">${en.map(([k,v])=>`<div class="seg" style="width:${100*v.n/tot}%;background:${v.color}" title="${esc(k)}: ${v.n}"></div>`).join('')}</div>
+      <div class="seg-leg">${en.map(([k,v])=>`<span class="sl"><i style="background:${v.color}"></i>${esc(k)} <b>${v.n}</b></span>`).join('')}</div>`;
+  }
   function renderComp(){
-    const box=document.getElementById('comp-box');
-    let html='';
-    for(const corp of ['SENADO','CAMARA']){
-      const by={};
-      ELECTOS.filter(e=>e.corp===corp).forEach(e=>{const b=bancadaOf(e.partido); if(!by[b.name])by[b.name]={n:0,color:b.color}; by[b.name].n++;});
-      const en=Object.entries(by).sort((a,b)=>b[1].n-a[1].n);
-      const tot=en.reduce((a,b)=>a+b[1].n,0)||1;
-      html+=`<div class="seg-sub">${corp==='SENADO'?'Senado · '+tot+' curules':'Cámara de Representantes · '+tot+' curules'}</div>
-        <div class="segbar">${en.map(([k,v])=>`<div class="seg" style="width:${100*v.n/tot}%;background:${v.color}" title="${esc(k)}: ${v.n}"></div>`).join('')}</div>
-        <div class="seg-leg">${en.map(([k,v])=>`<span class="sl"><i style="background:${v.color}"></i>${esc(k)} ${v.n}</span>`).join('')}</div>`;
-    }
-    box.innerHTML=html;
+    document.getElementById('comp-sen').innerHTML=compBloque('SENADO');
+    document.getElementById('comp-cam').innerHTML=compBloque('CAMARA');
+  }
+
+  /* ── bancadas transversales ──────────────────────────────────────
+     Grupos que NO coinciden con el reparto por partido. Se separan en dos
+     clases según de dónde sale la cifra, porque no se prueban igual:
+       · las que se CUENTAN en el escrutinio (territorio, género, curules
+         especiales) salen de nuestro propio listado de electos;
+       · las que se DECLARAN (afinidad temática) no tienen registro oficial
+         de miembros — solo se puede citar lo que la prensa documenta, y se
+         rotula así en vez de inventar una lista. */
+  const CARIBE=new Set(['ATLANTICO','BOLIVAR','CESAR','CORDOBA','LA GUAJIRA','MAGDALENA','SUCRE','SAN ANDRES']);
+  const AMAZ=new Set(['AMAZONAS','VAUPES','VICHADA','GUAINIA','GUAVIARE','PUTUMAYO','CAQUETA','ARAUCA','CASANARE','META']);
+  function cuenta(f){
+    const s=ELECTOS.filter(f);
+    return {n:s.length, sen:s.filter(e=>e.corp==='SENADO').length, cam:s.filter(e=>e.corp==='CAMARA').length};
+  }
+  function renderBancadasTematicas(){
+    const G=[
+      {nom:'Bancada de Bogotá', d:'Los representantes que responden a la capital: es la circunscripción más grande de Cámara.',
+       f:e=>e.dep==='BOGOTA D.C.'},
+      {nom:'Bancada de mujeres', d:'Base de la Comisión Legal para la Equidad de la Mujer, que reúne a las congresistas de todos los partidos.',
+       f:e=>e.gen==='F'},
+      {nom:'Bancada Caribe', d:'Atlántico, Bolívar, Cesar, Córdoba, La Guajira, Magdalena, Sucre y San Andrés votan en bloque temas de región.',
+       f:e=>CARIBE.has(e.dep)},
+      {nom:'Bancada de la Amazonía y la Orinoquía', d:'Los departamentos de frontera y selva, con dos o tres curules cada uno.',
+       f:e=>AMAZ.has(e.dep)},
+      {nom:'Curules de paz (CITREP)', d:'Las 16 circunscripciones transitorias del Acuerdo de Paz, elegidas por víctimas del conflicto.',
+       f:e=>/CITREP/i.test(e.partido)},
+      {nom:'Circunscripciones étnicas', d:'Curules indígenas y afro en ambas cámaras, por fuera del reparto de partidos.',
+       f:e=>/ind[íi]gena|afro|raizal|comunitario|mais|aico/i.test(e.partido)||/INDIGENA|AFRO/.test(e.dep)},
+      {nom:'Estatuto de Oposición', d:'Las curules que la ley da a quien quedó segundo en la presidencial: Iván Cepeda y Aída Quilcué.',
+       f:e=>/ESTATUTO/i.test(e.partido)},
+    ];
+    document.getElementById('bt-datos').innerHTML=G.map(g=>{
+      const c=cuenta(g.f);
+      return `<div class="bt">
+        <div class="bt-n">${c.n}</div>
+        <div class="bt-name">${esc(g.nom)}</div>
+        <div class="bt-d">${esc(g.d)}</div>
+        <div class="bt-split">${c.sen} Senado · ${c.cam} Cámara</div>
+      </div>`;
+    }).join('');
   }
 
   /* ── init ── */
   renderComp();
+  renderBancadasTematicas();
   </script>
   <script src="lang.js"></script>
 </body>

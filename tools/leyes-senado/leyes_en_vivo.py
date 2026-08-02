@@ -2,7 +2,7 @@
 """
 Feed "Proyectos de ley en vivo" para legislativo.html.
 
-Produce un JSON compacto con los ÚLTIMOS 3 proyectos de ley radicados en cada
+Produce un JSON compacto con los ÚLTIMOS 15 proyectos de ley radicados en cada
 cámara de la legislatura viva (2026-2027) y sube a S3 tanto el JSON como el PDF
 del texto radicado de cada uno. El frontend (sección "En vivo" de
 legislativo.html) lo lee directo de S3.
@@ -23,7 +23,7 @@ primer JSON y depurar.
 
 Notas de campo:
   · Senado tiene un WAF que banea a curl por fingerprint TLS ante RÁFAGAS
-    (~30 req seguidas). Este feed hace poco volumen (1 lista + 3 detalles +
+    (~30 req seguidas). Este feed hace poco volumen (1 lista + 15 detalles +
     los PDFs que falten) con pausas, y ADEMÁS es idempotente: si el PDF ya
     está en S3 no lo vuelve a bajar. En régimen, casi no toca la red de Senado.
   · Cámara es WordPress limpio (admin-ajax), sin WAF agresivo. El "nonce" de
@@ -60,7 +60,9 @@ CAM_PL_PAGE = 'https://www.camara.gov.co/secretaria/proyectos-de-ley'
 
 LEG_SEN = '2026-2027'
 LEG_CAM = '20'            # id interno de la legislatura 2026-2027 en camara.gov.co
-N = 3                     # cuántos mostrar por cámara
+N = 15                    # cuántos guarda el feed por cámara
+                          # (el frontend pagina de a 3/5/10; con 15 hay 5
+                          #  páginas de 3, que es lo que muestra la paginación)
 
 # S3 (mismo prefijo público donde vive comisiones-2026.json)
 S3_BUCKET = 'elecciones-2026'
