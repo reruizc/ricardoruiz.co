@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Radar legislativo · Congreso 2026-2030 · Ricardo Ruiz</title>
+  <meta name="description" content="El nuevo Congreso de Colombia en datos: comisiones, congresistas electos 2026-2030, proyectos de ley radicados y el histórico legislativo desde 1990." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css" />
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="index.html" class="e-btn-back" id="nav-back-btn">← Inicio</a>
+      <span class="nav-page-tag">Legislativo</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <div class="country-selector-wrap">
+        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+          <span id="countryBtnLabel">Colombia</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="country-dropdown" id="countryDropdown">
+          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          <div class="country-option" data-value="br" onclick="selectCountry(this)"><span class="country-check">✓</span> Brasil</div>
+          <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+        </div>
+      </div>
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="page-header">
+    <div class="page-tag">Radar legislativo · 1990–2026</div>
+    <h1 class="page-title">Busca cualquier tema en el Congreso</h1>
+    <p class="page-sub">Los proyectos más recientes del Congreso, con su estado real de trámite. Busca cualquier tema — pensional, salud, seguridad, mujer — sobre el histórico completo de <strong>más de 10.600 proyectos desde 1990</strong>. Los que se radiquen en la legislatura 2026-2027 entran aquí a medida que avance el nuevo Congreso.</p>
+  </div>
+
+  <div class="sec-bar">
+    <a class="sec-back" href="legislativo.html">← Todas las secciones</a>
+    <div class="anchor-nav" style="margin:0;padding:0;flex:1">
+      <a href="legislativo-en-vivo.html">Proyectos en vivo</a>
+      <a href="legislativo-congreso.html">El nuevo Congreso</a>
+      <a href="legislativo-comisiones.html">Comisiones</a>
+      <a href="legislativo-congresistas.html">Quién es quién</a>
+      <a href="legislativo-proyectos.html" class="on">Radar</a>
+      <a href="legislativo-historico.html">El histórico</a>
+    </div>
+  </div>
+
+  <section id="proyectos">
+    <div class="filters">
+      <input class="f-input" id="p-q" type="text" placeholder="Buscar tema (ej. reforma pensional, salud, mujer)…" onkeydown="if(event.key==='Enter')proysSearch()" />
+      <button class="chip" onclick="proysSearch()" style="color:#fff;background:var(--blue);border-color:var(--blue)">Buscar</button>
+      <button class="chip on" data-f="" onclick="proysFilter(this)">Recientes</button>
+      <button class="chip" data-f="EN_TRAMITE" onclick="proysFilter(this)">En trámite</button>
+      <button class="chip" data-f="LEY" onclick="proysFilter(this)">Hechos ley</button>
+    </div>
+    <div class="p-list" id="p-list"><div class="loading">Cargando proyectos <span class="dots"><span></span><span></span><span></span></span></div></div>
+    <div class="roster-foot">
+      <span class="r-count" id="p-count"></span>
+      <button class="btn-more" id="p-more" onclick="proysMore()" style="display:none">Mostrar más</button>
+    </div>
+    <div class="note">Estado según ficha oficial de leyes.senado.gov.co: <b style="color:var(--amber)">en trámite</b> · <b style="color:var(--green)">ley</b> · <b style="color:var(--red)">archivado por tiempo</b> (vencimiento de términos, Art. 190 Ley 5ª) · archivado / retirado.</div>
+  </section>
+
+  <!-- ══ MODAL COMPARTIDO (proyecto de ley · ficha de congresista) ═══ -->
+  <div class="md-back" id="md-back" onclick="closeModal()"></div>
+  <div class="md-box" id="md-box" role="dialog" aria-modal="true" aria-labelledby="md-body">
+    <button class="md-x" type="button" onclick="closeModal()" aria-label="Cerrar">✕</button>
+    <div id="md-body"></div>
+  </div>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Legislativo · Congreso 2026–2030</span>
+    <a href="index.html" class="e-btn-back" style="font-size:.62rem">← Inicio</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script>
+  /* ── proyectos de ley (radar) ───────────────────────────────── */
+  const TITLE_PREF=/^\s*por\s+(?:medio\s+de\s+)?(?:el\s+medio\s+de\s+)?(?:la|el|los|las)?\s*cual(?:es)?\s+se\s+/i;
+  function shortTitle(t){ let s=String(t||'').replace(TITLE_PREF,'').replace(/\s+/g,' ').trim(); if(s.length<6) s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
+  const RES_TXT={EN_TRAMITE:['En trámite','res-tramite'],LEY:['Ley','res-ley'],ARCHIVADO_TIEMPO:['Archivado por tiempo','res-tiempo'],ARCHIVADO_OTRO:['Archivado','res-otro'],RETIRADO:['Retirado','res-otro'],SIN_DATO:['Sin dato','res-otro'],OTRO:['Otro','res-otro']};
+  let P_ALL=[], P_FILTER='', P_SHOWN=5, P_MODE='recientes';
+  /* ── recién radicados (legislatura viva 2026-2027) ───────────────
+     El histórico de `buscar` (proyectos.jsonl) se corta el 2026-07-10,
+     antes de la instalación del Congreso el 20 de julio — los proyectos
+     radicados desde entonces no salían en el Radar. `action:'radicados'`
+     lee el rastreo diario (Senado + Cámara) y sí los tiene al día; se
+     convierten a la misma forma que usa proysRender() y se mezclan. */
+  let _radConvPromise=null;
+  function getRadicadosConverted(){
+    if(!_radConvPromise){
+      _radConvPromise=(async()=>{
+        try{
+          const r=await call({action:'radicados'});
+          const sen=(r.radicados||[]).map((x,i)=>({
+            a:2026, id:'RAD-S-'+i, t:x.titulo, res:'EN_TRAMITE', tb:'pdly',
+            ap:(x.autor||'').split(',')[0].trim(), ng:(x.autor||'').split(',').filter(Boolean).length,
+            com:x.comision?titleCase(x.comision):'', _nuevo:true, _corp:'Senado', _fuente:x.fuente_url||'',
+          }));
+          const cam=(r.radicados_camara||[]).map((x,i)=>({
+            a:2026, id:'RAD-C-'+i, t:x.titulo, res:'EN_TRAMITE', tb:'pdly',
+            ap:(x.autor||'').split(',')[0].trim(), ng:(x.autor||'').split(',').filter(Boolean).length,
+            com:x.comision?titleCase(x.comision):'', _nuevo:true, _corp:'Cámara', _fuente:x.fuente_url||'',
+          }));
+          return [...sen,...cam];
+        }catch(e){ return []; }
+      })();
+    }
+    return _radConvPromise;
+  }
+  const titleCase=s=>String(s||'').toLowerCase().replace(/(^|\s)(\p{L})/gu,(m,sp,ch)=>sp+ch.toUpperCase());
+  async function proysInit(){
+    try{
+      const [r,rad]=await Promise.all([call({action:'buscar',query:'',anio_min:2024,limit:2000}),getRadicadosConverted()]);
+      P_ALL=[...rad,...(r.resultados||[])].sort((a,b)=>(b.a-a.a)||(b.id-a.id));
+      P_MODE='recientes';
+      proysRender();
+    }catch(e){
+      document.getElementById('p-list').innerHTML='<div class="note">No se pudo cargar el radar de proyectos. Intenta de nuevo en unos minutos.</div>';
+    }
+  }
+  async function proysSearch(){
+    const q=document.getElementById('p-q').value.trim();
+    if(!q){ proysInit(); return; }
+    document.getElementById('p-list').innerHTML='<div class="loading">Buscando <span class="dots"><span></span><span></span><span></span></span></div>';
+    try{
+      // el backend ordena ASCENDENTE por año y trunca al límite pedido — hay que
+      // pedir un límite alto para no quedarnos con los resultados más VIEJOS
+      // de un tema con muchos intentos, en vez de los más recientes.
+      const nq=norm(q);
+      const [r,rad]=await Promise.all([call({action:'buscar',query:q,limit:20000}),getRadicadosConverted()]);
+      const radHit=rad.filter(x=>norm(x.t+' '+x.ap).includes(nq));
+      P_ALL=[...radHit,...(r.resultados||[])].sort((a,b)=>(b.a-a.a)||(b.id-a.id));
+      P_MODE='busqueda';
+      P_SHOWN=5;
+      proysRender();
+    }catch(e){
+      document.getElementById('p-list').innerHTML='<div class="note">La búsqueda falló. Intenta de nuevo.</div>';
+    }
+  }
+  function proysFilter(btn){
+    document.querySelectorAll('.chip[data-f]').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on'); P_FILTER=btn.dataset.f; P_SHOWN=5; proysRender();
+  }
+  function proysRender(){
+    const all=P_ALL.filter(p=>!P_FILTER||p.res===P_FILTER);
+    const shown=all.slice(0,P_SHOWN);
+    const list=document.getElementById('p-list');
+    if(!shown.length){ list.innerHTML='<div class="note">Sin resultados'+(P_FILTER?' con este filtro':'')+'.</div>'; }
+    else list.innerHTML=shown.map(p=>{
+      const res=RES_TXT[p.res]||[p.res||'—','res-otro'];
+      const aut=(p.ap||((p.aut||[])[0])||'').trim();
+      return `<div class="p-row">
+        <span class="p-year">${p.a||'—'}</span>
+        <span class="p-body">
+          <span class="p-title">${esc(shortTitle(p.t).slice(0,160))}</span>
+          <span class="p-meta">
+            <span class="p-tipo">${p.tb==='pal'?'Acto legislativo':'Proyecto de ley'}</span>
+            ${p._nuevo?`<span class="p-res res-tramite">Nuevo · ${esc(p._corp||'')}</span>`:`<span class="p-res ${res[1]}">${res[0]}</span>`}
+            ${aut?`<span class="p-aut">${esc(aut)}${p.ng>1?' +'+(p.ng-1):''}</span>`:''}
+            ${p.com?`<span class="p-aut">Comisión ${esc(p.com)}</span>`:''}
+            ${p._nuevo&&p._fuente?`<a href="${esc(p._fuente)}" target="_blank" rel="noopener" style="font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);text-decoration:none;margin-left:auto">Ver fuente ↗</a>`:''}
+          </span>
+        </span>
+      </div>`;
+    }).join('');
+    document.getElementById('p-count').textContent=all.length?`${shown.length} de ${fmt(all.length)} proyectos${P_MODE==='recientes'?' · los más recientes del histórico':''}`:'';
+    document.getElementById('p-more').style.display=all.length>P_SHOWN?'':'none';
+  }
+  function proysMore(){ P_SHOWN+=10; proysRender(); }
+
+  /* ── init ── */
+  proysInit();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>

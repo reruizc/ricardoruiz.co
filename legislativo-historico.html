@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>El histórico legislativo en cifras · Congreso 2026-2030 · Ricardo Ruiz</title>
+  <meta name="description" content="El nuevo Congreso de Colombia en datos: comisiones, congresistas electos 2026-2030, proyectos de ley radicados y el histórico legislativo desde 1990." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css" />
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="index.html" class="e-btn-back" id="nav-back-btn">← Inicio</a>
+      <span class="nav-page-tag">Legislativo</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <div class="country-selector-wrap">
+        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+          <span id="countryBtnLabel">Colombia</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="country-dropdown" id="countryDropdown">
+          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          <div class="country-option" data-value="br" onclick="selectCountry(this)"><span class="country-check">✓</span> Brasil</div>
+          <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+        </div>
+      </div>
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="page-header">
+    <div class="page-tag">Análisis · 36 legislaturas</div>
+    <h1 class="page-title">Dónde se cae el trámite, y por qué</h1>
+    <p class="page-sub">36 legislaturas leídas con datos: qué tanto sobrevive un proyecto de ley en Colombia, dónde se cae y por qué. Análisis propio sobre el archivo completo del Congreso <strong>1990–2026</strong>.</p>
+  </div>
+
+  <div class="sec-bar">
+    <a class="sec-back" href="legislativo.html">← Todas las secciones</a>
+    <div class="anchor-nav" style="margin:0;padding:0;flex:1">
+      <a href="legislativo-en-vivo.html">Proyectos en vivo</a>
+      <a href="legislativo-congreso.html">El nuevo Congreso</a>
+      <a href="legislativo-comisiones.html">Comisiones</a>
+      <a href="legislativo-congresistas.html">Quién es quién</a>
+      <a href="legislativo-proyectos.html">Radar</a>
+      <a href="legislativo-historico.html" class="on">El histórico</a>
+    </div>
+  </div>
+
+  <section id="historico">
+    <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi"><div class="n" id="h-proy">9.919</div><div class="l">Proyectos de ley</div></div>
+      <div class="kpi"><div class="n" id="h-actos">745</div><div class="l">Proyectos de acto legislativo</div></div>
+      <div class="kpi hl"><div class="n" id="h-leyes">2.475</div><div class="l">Leyes sancionadas</div></div>
+      <div class="kpi"><div class="n">181</div><div class="l">Días (mediana) al primer debate</div></div>
+    </div>
+    <div class="charts">
+      <div class="panel"><h3>El embudo del trámite · 1990–2026</h3><div id="embudo-box"></div><div class="note">Cada fila es una fase del trámite; el ↓% dice cuántos sobreviven de una fase a la siguiente.</div></div>
+      <div class="panel"><h3>Mortandad por año del cuatrienio</h3><div id="mort-box"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+      <div class="panel wide"><h3>Bloqueo en comisión · el orden del día decide</h3><div id="bloq-box"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+    </div>
+    <div class="find-grid">
+      <div class="find"><div class="fn">1 de 4</div><div class="ft">termina en ley</div><div class="fd">De 9.919 proyectos de ley radicados desde 1990, solo 2.509 (25%) completaron el trámite.</div></div>
+      <div class="find"><div class="fn">2.804</div><div class="ft">muertos por el reloj</div><div class="fd">El archivo por vencimiento de términos (Art. 190) mata más proyectos que cualquier votación en contra.</div></div>
+      <div class="find"><div class="fn">53% → 21%</div><div class="ft">el orden del día decide</div><div class="fd">Ser el primero de la agenda en comisión duplica la probabilidad de ser debatido frente a ir de cuarto en adelante.</div></div>
+      <div class="find"><div class="fn">Año 4</div><div class="ft">el más letal</div><div class="fd">En el último año del cuatrienio la muerte por términos sube a ~35%: lo que no arranca temprano, rara vez llega.</div></div>
+    </div>
+    <div class="note" style="margin-top:1.2rem">Fuentes: Secretaría del Senado (leyes.senado.gov.co) · Gaceta del Congreso · órdenes del día de las comisiones de Cámara · Registraduría Nacional. Procesamiento y análisis propios. Corte del histórico: julio de 2026.</div>
+  </section>
+
+  <!-- ══ MODAL COMPARTIDO (proyecto de ley · ficha de congresista) ═══ -->
+  <div class="md-back" id="md-back" onclick="closeModal()"></div>
+  <div class="md-box" id="md-box" role="dialog" aria-modal="true" aria-labelledby="md-body">
+    <button class="md-x" type="button" onclick="closeModal()" aria-label="Cerrar">✕</button>
+    <div id="md-body"></div>
+  </div>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Legislativo · Congreso 2026–2030</span>
+    <a href="index.html" class="e-btn-back" style="font-size:.62rem">← Inicio</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script>
+  /* ── histórico en cifras (Caudal) ───────────────────────────── */
+  /* snapshot embebido (corte jul-2026) — la API lo refresca si responde */
+  const STATS_FALLBACK={n_proyectos:9919,n_actos:745,n_leyes:2475,
+    embudo:{'Presentado':9919,'1er debate · Senado':4876,'2º debate · Senado':4165,'1er debate · Cámara':3727,'2º debate · Cámara':3464,'Ley':2509}};
+  const EMB_KEYS={presentado:'Presentado','1er_debate_senado':'1er debate · Senado','2do_debate_senado':'2º debate · Senado','1er_debate_camara':'1er debate · Cámara','2do_debate_camara':'2º debate · Cámara',ley:'Ley'};
+  function funnel(embudo){
+    const ks=Object.keys(embudo||{}); if(!ks.length) return '';
+    const max=embudo[ks[0]]||1; let prev=null;
+    return `<div class="funnel2">${ks.map(k=>{const v=embudo[k];const w=Math.max(8,Math.round(100*v/max));const pct=(prev!=null&&prev>0)?Math.round(100*v/prev):null;prev=v;
+      return `<div class="f2-row"><div class="f2-lab">${esc(k)}</div><div class="f2-track"><div class="f2-bar" data-w="${w}">${fmt(v)}</div></div><div class="f2-pct">${pct!=null?'↓ '+pct+'%':''}</div></div>`;}).join('')}</div>`;
+  }
+  function mortandadChart(mort){
+    if(!mort) return '<div class="note">Sin datos de mortandad por ahora.</div>';
+    const rows=Object.entries(mort); const max=Math.max(...rows.map(([,v])=>v.pct_muerte_tiempo||0),1);
+    const hot=rows.reduce((m,r)=>(r[1].pct_muerte_tiempo||0)>(m[1].pct_muerte_tiempo||0)?r:m,rows[0]);
+    return `<div class="mort">${rows.map(([k,v])=>`<div class="mort-col${k===hot[0]?' hot':''}"><div class="mort-wrap"><div class="mort-bar" data-h="${Math.round(100*(v.pct_muerte_tiempo||0)/max)}"><span>${v.pct_muerte_tiempo}%</span></div></div><div class="mort-lab">Año ${k}</div></div>`).join('')}</div><div class="note">% de proyectos que muere por vencimiento de términos (Art. 190) según el año del cuatrienio en que se radicó.</div>`;
+  }
+  function posChart(s){
+    if(!s||!s.p_tratado_por_posicion) return '<div class="note">Sin datos de bloqueo por ahora.</div>';
+    const P=s.p_tratado_por_posicion, labs=['1º','2º-3º','4º-6º','7º-10º','11º-15º'];
+    const max=Math.max(...labs.map(l=>(P[l]||{}).pct||0),1);
+    const bars=labs.map(l=>{const v=(P[l]||{}).pct||0;
+      return `<div class="cx-row"><span class="cx-lab">${l} del día</span><span class="cx-bar"><span data-w="${Math.round(100*v/max)}"></span></span><span class="cx-n">${v}%</span></div>`;}).join('');
+    const t=s.totales||{};
+    return `<div class="note" style="margin:0 0 .8rem">Probabilidad de que un proyecto se <b>debata</b> según su posición en el orden del día — medida sobre ${fmt(t.proyectos||0)} proyectos en ${t.comisiones||0} comisiones de Cámara.</div>${bars}<div class="note">Ser el 1º del día ≈ ${(P['1º']||{}).pct||0}% de probabilidad de ser tratado; del 4º en adelante cae a ~20%. <b>El orden de la agenda decide.</b></div>`;
+  }
+  function paintEmbudo(embudo){
+    const box=document.getElementById('embudo-box');
+    box.innerHTML=funnel(embudo);
+    requestAnimationFrame(()=>box.querySelectorAll('.f2-bar').forEach(b=>b.style.width=b.dataset.w+'%'));
+  }
+  async function loadHistorico(){
+    paintEmbudo(STATS_FALLBACK.embudo);
+    try{
+      const s=await call({action:'stats'});
+      if(s&&s.n_proyectos){
+        document.getElementById('h-proy').textContent=fmt(s.n_proyectos);
+        document.getElementById('h-actos').textContent=fmt(s.n_actos);
+        document.getElementById('h-leyes').textContent=fmt(s.n_leyes);
+        if(s.embudo){ const e={}; Object.entries(s.embudo).forEach(([k,v])=>{e[EMB_KEYS[k]||k]=v;}); paintEmbudo(e); }
+        if(s.mortandad_por_anio_cuatrienio){
+          const mb=document.getElementById('mort-box');
+          mb.innerHTML=mortandadChart(s.mortandad_por_anio_cuatrienio);
+          requestAnimationFrame(()=>mb.querySelectorAll('.mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
+        }else document.getElementById('mort-box').innerHTML='<div class="note">Sin datos de mortandad por ahora.</div>';
+        /* (el refresco de las tarjetas por comisión vive ahora en
+           legislativo-comisiones.html — aquí COM_HIST no existe) */
+      }else{ document.getElementById('mort-box').innerHTML='<div class="note">Sin datos de mortandad por ahora.</div>'; }
+    }catch(e){ document.getElementById('mort-box').innerHTML='<div class="note">Sin datos de mortandad por ahora.</div>'; }
+    try{
+      const b=await call({action:'bloqueo'});
+      const el=document.getElementById('bloq-box');
+      el.innerHTML=posChart(b);
+      requestAnimationFrame(()=>el.querySelectorAll('.cx-bar > span').forEach(x=>x.style.width=x.dataset.w+'%'));
+    }catch(e){ document.getElementById('bloq-box').innerHTML='<div class="note">Sin datos de bloqueo por ahora.</div>'; }
+  }
+
+  /* ── init ── */
+  loadHistorico();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>

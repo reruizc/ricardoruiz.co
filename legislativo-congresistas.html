@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quién es quién en el Congreso · Congreso 2026-2030 · Ricardo Ruiz</title>
+  <meta name="description" content="El nuevo Congreso de Colombia en datos: comisiones, congresistas electos 2026-2030, proyectos de ley radicados y el histórico legislativo desde 1990." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css" />
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="index.html" class="e-btn-back" id="nav-back-btn">← Inicio</a>
+      <span class="nav-page-tag">Legislativo</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <div class="country-selector-wrap">
+        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+          <span id="countryBtnLabel">Colombia</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="country-dropdown" id="countryDropdown">
+          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          <div class="country-option" data-value="br" onclick="selectCountry(this)"><span class="country-check">✓</span> Brasil</div>
+          <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+        </div>
+      </div>
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="page-header">
+    <div class="page-tag">Quién es quién · 2026–2030</div>
+    <h1 class="page-title">Los 285 congresistas electos</h1>
+    <p class="page-sub">Empieza por la bancada o busca a alguien por nombre. Al tocar a un congresista se abre su ficha: cuánto sacó, dónde está su fuerza territorial y el enlace a su análisis completo.</p>
+  </div>
+
+  <div class="sec-bar">
+    <a class="sec-back" href="legislativo.html">← Todas las secciones</a>
+    <div class="anchor-nav" style="margin:0;padding:0;flex:1">
+      <a href="legislativo-en-vivo.html">Proyectos en vivo</a>
+      <a href="legislativo-congreso.html">El nuevo Congreso</a>
+      <a href="legislativo-comisiones.html">Comisiones</a>
+      <a href="legislativo-congresistas.html" class="on">Quién es quién</a>
+      <a href="legislativo-proyectos.html">Radar</a>
+      <a href="legislativo-historico.html">El histórico</a>
+    </div>
+  </div>
+
+  <section id="congresistas">
+    <div class="filters">
+      <input class="f-input" id="r-q" type="text" placeholder="Buscar congresista…" oninput="rosterRender()" />
+      <button class="chip on" data-corp="" onclick="rosterCorp(this)">Todos</button>
+      <button class="chip" data-corp="SENADO" onclick="rosterCorp(this)">Senado</button>
+      <button class="chip" data-corp="CAMARA" onclick="rosterCorp(this)">Cámara</button>
+      <select class="f-input" id="r-banc" onchange="rosterRender()"><option value="">Todas las bancadas</option></select>
+      <select class="f-input" id="r-dep" onchange="rosterRender()"><option value="">Todos los departamentos</option></select>
+      <button class="chip" id="r-reset" onclick="rosterReset()" style="display:none">← Todas las bancadas</button>
+    </div>
+    <div class="roster" id="roster"></div>
+    <div class="roster-foot">
+      <span class="r-count" id="r-count"></span>
+      <button class="btn-more" id="r-more" onclick="rosterMore()">Mostrar más</button>
+    </div>
+  </section>
+
+  <!-- ══ MODAL COMPARTIDO (proyecto de ley · ficha de congresista) ═══ -->
+  <div class="md-back" id="md-back" onclick="closeModal()"></div>
+  <div class="md-box" id="md-box" role="dialog" aria-modal="true" aria-labelledby="md-body">
+    <button class="md-x" type="button" onclick="closeModal()" aria-label="Cerrar">✕</button>
+    <div id="md-body"></div>
+  </div>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Legislativo · Congreso 2026–2030</span>
+    <a href="index.html" class="e-btn-back" style="font-size:.62rem">← Inicio</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script src="cand-index.js"></script>
+  <script src="legislativo-electos.js"></script>
+  <script>
+  /* ── roster de congresistas ─────────────────────────────────── */
+  let R_CORP='', R_SHOWN=40;
+  function rosterInit(){
+    const bancs=[...new Set(ELECTOS.map(e=>bancadaOf(e.partido).name))].sort();
+    document.getElementById('r-banc').innerHTML='<option value="">Todas las bancadas</option>'+bancs.map(b=>`<option>${esc(b)}</option>`).join('');
+    const deps=[...new Set(ELECTOS.map(e=>e.dep))].sort();
+    document.getElementById('r-dep').innerHTML='<option value="">Todos los departamentos</option>'+deps.map(d=>`<option value="${esc(d)}">${esc(depNice(d))}</option>`).join('');
+    rosterRender();
+  }
+  function rosterFiltered(){
+    const q=norm(document.getElementById('r-q').value.trim());
+    const banc=document.getElementById('r-banc').value;
+    const dep=document.getElementById('r-dep').value;
+    return ELECTOS.filter(e=>{
+      if(R_CORP&&e.corp!==R_CORP) return false;
+      if(banc&&bancadaOf(e.partido).name!==banc) return false;
+      if(dep&&e.dep!==dep) return false;
+      if(q&&!norm(e.nombre+' '+e.partido).includes(q)) return false;
+      return true;
+    });
+  }
+  /* ¿hay algún filtro puesto? Sin filtros la lista de 285 nombres ocupa toda
+     la página sin decir nada; en ese estado se muestran las bancadas y la
+     lista aparece cuando alguien busca o filtra. */
+  function rosterHayFiltro(){
+    return !!(document.getElementById('r-q').value.trim()
+      || document.getElementById('r-banc').value
+      || document.getElementById('r-dep').value
+      || R_CORP);
+  }
+  /* vista por defecto: una tarjeta por bancada (clic → filtra a esa bancada) */
+  function rosterBancadas(){
+    const porB={};
+    ELECTOS.forEach(e=>{
+      const b=bancadaOf(e.partido);
+      const r=porB[b.name]||(porB[b.name]={name:b.name,color:b.color,n:0,sen:0,cam:0});
+      r.n++; e.corp==='SENADO'?r.sen++:r.cam++;
+    });
+    const list=Object.values(porB).sort((a,b)=>b.n-a.n);
+    document.getElementById('roster').classList.add('bancadas');
+    document.getElementById('roster').innerHTML=
+      `<div class="pt-grid">`+list.map(b=>`
+        <button class="pt-card" type="button" style="border-left-color:${b.color}" data-banc="${esc(b.name)}">
+          <span class="pt-n" style="color:${lift(b.color)}">${b.n}</span>
+          <div class="pt-name">${esc(b.name)}</div>
+          <div class="pt-split">${b.sen} Senado · ${b.cam} Cámara</div>
+        </button>`).join('')+`</div>`
+      +`<div class="pt-hint">${list.length} bancadas · ${ELECTOS.length} congresistas. Toca una bancada para ver sus nombres, o busca a alguien por nombre arriba.</div>`;
+    document.getElementById('roster').querySelectorAll('.pt-card').forEach(c=>{
+      c.addEventListener('click',()=>{
+        document.getElementById('r-banc').value=c.dataset.banc;
+        rosterRender();
+        document.getElementById('roster').scrollIntoView({behavior:'smooth',block:'start'});
+      });
+    });
+    document.getElementById('r-count').textContent=`${ELECTOS.length} congresistas · ${list.length} bancadas`;
+    document.getElementById('r-more').style.display='none';
+  }
+  function rosterRender(reset){
+    if(reset!==false) R_SHOWN=40;
+    const hay=rosterHayFiltro();
+    const rb=document.getElementById('r-reset'); if(rb) rb.style.display=hay?'':'none';
+    if(!hay){ rosterBancadas(); return; }
+    document.getElementById('roster').classList.remove('bancadas');
+    const all=rosterFiltered();
+    const shown=all.slice(0,R_SHOWN);
+    document.getElementById('roster').innerHTML=shown.map((e,i)=>{
+      const b=bancadaOf(e.partido);
+      const paz=/CITREP/i.test(e.partido)?'<span class="r-badge paz">Paz</span>':'';
+      return `<div class="r-row" data-i="${i}" tabindex="0" role="button">
+        <span class="r-dot" style="background:${b.color}"></span>
+        <span class="r-body"><span class="r-name">${esc(e.nombre)}</span><span class="r-meta">${esc(e.partido)} · ${esc(depNice(e.dep))}</span></span>
+        ${paz}<span class="r-badge ${e.corp==='SENADO'?'sen':'cam'}">${e.corp==='SENADO'?'Senado':'Cámara'}</span>
+      </div>`;
+    }).join('')||'<div class="note">Ningún congresista coincide con la búsqueda.</div>';
+    document.getElementById('roster').querySelectorAll('.r-row').forEach(r=>{
+      const abrir=()=>abrirFicha(shown[+r.dataset.i]);
+      r.addEventListener('click',abrir);
+      r.addEventListener('keydown',ev=>{ if(ev.key==='Enter'||ev.key===' '){ ev.preventDefault(); abrir(); } });
+    });
+    document.getElementById('r-count').textContent=`${shown.length} de ${all.length} congresistas`;
+    document.getElementById('r-more').style.display=all.length>R_SHOWN?'':'none';
+  }
+  function rosterCorp(btn){
+    document.querySelectorAll('.chip[data-corp]').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on'); R_CORP=btn.dataset.corp; rosterRender();
+  }
+  function rosterMore(){ R_SHOWN+=40; rosterRender(false); }
+  function rosterReset(){
+    document.getElementById('r-q').value='';
+    document.getElementById('r-banc').value='';
+    document.getElementById('r-dep').value='';
+    R_CORP='';
+    document.querySelectorAll('.chip[data-corp]').forEach(b=>b.classList.toggle('on',!b.dataset.corp));
+    rosterRender();
+  }
+
+  /* ── ficha corta de un congresista (modal) ───────────────────────
+     Reusa el registro compartido cand-index.js — el mismo que alimenta
+     analisis-candidato.html — para el histórico de votación y el enlace a la
+     ficha completa. El territorio se pide aparte porque el JSON mesa a mesa
+     pesa 1-4 MB: se carga solo al abrir a alguien. */
+  const S3_PHOTOS='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/fotos-candidatos';
+  const SRC_YEAR={endoso:2026,asamblea:2023,con2022:2022,con2018:2018,con2014:2014};
+  const initials=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+  const _terrCache={};
+  function corpNice(c){
+    if(c.source==='endoso'){ const m={CAMARA:'Cámara',SENADO:'Senado',CONSULTAS:'Consulta presidencial'}; return m[c.corp]||c.corp||''; }
+    return String(c.corp||'').replace(/\s*·\s*20\d\d\s*$/,'').toLowerCase()
+      .replace(/(^|[ ·(.])(\p{L})/gu,(mm,a,ch)=>a+ch.toUpperCase());
+  }
+  async function loadTerritorialTop(dataUrl){
+    if(!dataUrl) return null;
+    if(_terrCache[dataUrl]) return _terrCache[dataUrl];
+    _terrCache[dataUrl]=(async()=>{
+      try{
+        const r=await fetch(dataUrl); if(!r.ok) return null;
+        const d=await r.json(); const byDep={}, byMun={};
+        (d.mesas||[]).forEach(row=>{
+          const dep=row.depNom||''; if(dep) byDep[dep]=(byDep[dep]||0)+(row.v||0);
+          const mun=row.munNom||''; if(mun){ const k=mun+' · '+dep; byMun[k]=(byMun[k]||0)+(row.v||0); }
+        });
+        const tD=Object.entries(byDep).sort((a,b)=>b[1]-a[1])[0];
+        const tM=Object.entries(byMun).sort((a,b)=>b[1]-a[1])[0];
+        if(!tD) return null;
+        return {dep:depNice(tD[0]),depVotos:tD[1],
+                mun:tM?tCase(tM[0].split(' · ')[0]):null,munVotos:tM?tM[1]:0};
+      }catch(e){ return null; }
+    })();
+    return _terrCache[dataUrl];
+  }
+  /* cada clic invalida la ficha anterior: el mesa a mesa es lento y sin esto
+     una respuesta vieja escribe el territorio de otra persona en la ficha nueva */
+  let _fichaSeq=0;
+  function abrirFicha(e){
+    if(!e) return;
+    const my=++_fichaSeq;
+    const b=bancadaOf(e.partido);
+    openModal(`
+      <div class="md-tag">Congresista electo · 2026–2030</div>
+      <div class="fc-head">
+        <div class="fc-photo" id="fc-photo" style="background:${b.color}"><span>${esc(initials(e.nombre))}</span></div>
+        <div style="min-width:0;flex:1">
+          <div class="fc-name">${esc(e.nombre)}</div>
+          <span class="fc-chip" style="color:${lift(b.color)};background:${b.color}1a;border-color:${b.color}55">${esc(e.partido)}</span>
+          <div class="fc-meta">${e.corp==='SENADO'?'Senado':'Cámara de Representantes'} · ${esc(depNice(e.dep))}</div>
+        </div>
+      </div>
+      <div class="md-sec">Su votación</div>
+      <div id="fc-hist"><div class="fc-load">Buscando su historial electoral <span class="dots"><span></span><span></span><span></span></span></div></div>
+      <div id="fc-cta"></div>`);
+    llenarFicha(e,my);
+  }
+  async function llenarFicha(e,my){
+    let hits=[];
+    try{
+      const all=await CandRegistry.load({includeParties:false});
+      const n=norm(e.nombre);
+      hits=all.filter(c=>c.tipo!=='partido'&&norm(c.nombre)===n);
+      if(!hits.length){
+        const toks=n.split(/\s+/).filter(t=>t.length>2);
+        if(toks.length) hits=all.filter(c=>c.tipo!=='partido'&&(()=>{const ct=norm(c.nombre).split(/\s+/);return toks.every(t=>ct.includes(t));})());
+      }
+      hits.sort((a,b)=>(SRC_YEAR[b.source]||0)-(SRC_YEAR[a.source]||0)||(b.votos||0)-(a.votos||0));
+    }catch(err){ hits=[]; }
+    if(my!==_fichaSeq) return;
+    const hist=document.getElementById('fc-hist');
+    if(!hist||!hist.isConnected) return;
+    if(!hits.length){
+      hist.innerHTML=`<div class="fc-terr">No aparece con voto personal en el registro 2014–2026. Suele pasar con quienes van en lista cerrada: el voto va al logo del partido, no al nombre.</div>`;
+      return;
+    }
+    hist.innerHTML=hits.map(c=>`<div class="fc-row"><span class="y">${SRC_YEAR[c.source]||''}</span><span class="c">${esc(corpNice(c))}</span><span class="v">${fmt(c.votos)} votos</span></div>`).join('')
+      +`<div class="fc-terr" id="fc-terr">Cargando dónde sacó sus votos…</div>`;
+    const cta=document.getElementById('fc-cta');
+    if(cta) cta.innerHTML=`<a class="ps-cta" href="analisis-candidato.html?cand=${encodeURIComponent(hits[0].slug)}">Ver ficha completa · mapa y drill territorial →</a>`;
+    const terr=document.getElementById('fc-terr');
+    loadTerritorialTop(hits[0].dataUrl).then(top=>{
+      if(my!==_fichaSeq||!terr||!terr.isConnected) return;
+      terr.innerHTML=top
+        ?`Su mayor votación fue en <b>${esc(top.dep)}</b> (${fmt(top.depVotos)} votos)${top.mun?`, y dentro de ese territorio en <b>${esc(top.mun)}</b> (${fmt(top.munVotos)} votos)`:''}.`
+        :'';
+    });
+  }
+
+  /* ── init ── */
+  rosterInit();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>

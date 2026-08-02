@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Proyectos de ley en vivo · Congreso 2026-2030 · Ricardo Ruiz</title>
+  <meta name="description" content="El nuevo Congreso de Colombia en datos: comisiones, congresistas electos 2026-2030, proyectos de ley radicados y el histórico legislativo desde 1990." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css" />
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="index.html" class="e-btn-back" id="nav-back-btn">← Inicio</a>
+      <span class="nav-page-tag">Legislativo</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <div class="country-selector-wrap">
+        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+          <span id="countryBtnLabel">Colombia</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="country-dropdown" id="countryDropdown">
+          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          <div class="country-option" data-value="br" onclick="selectCountry(this)"><span class="country-check">✓</span> Brasil</div>
+          <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+        </div>
+      </div>
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="page-header">
+    <div class="page-tag">En vivo · Legislatura 2026–2027</div>
+    <h1 class="page-title">Lo último que llega al Congreso</h1>
+    <p class="page-sub">Lo más reciente que llega al Congreso, extraído a diario de <strong>Senado</strong> (leyes.senado.gov.co) y <strong>Cámara</strong> (camara.gov.co). Haz clic en cada proyecto para ver, en lenguaje llano, qué cambiaría si se aprueba — y para descargar el texto radicado.</p>
+  </div>
+
+  <div class="sec-bar">
+    <a class="sec-back" href="legislativo.html">← Todas las secciones</a>
+    <div class="anchor-nav" style="margin:0;padding:0;flex:1">
+      <a href="legislativo-en-vivo.html" class="on">Proyectos en vivo</a>
+      <a href="legislativo-congreso.html">El nuevo Congreso</a>
+      <a href="legislativo-comisiones.html">Comisiones</a>
+      <a href="legislativo-congresistas.html">Quién es quién</a>
+      <a href="legislativo-proyectos.html">Radar</a>
+      <a href="legislativo-historico.html">El histórico</a>
+    </div>
+  </div>
+
+  <section id="en-vivo">
+    <div class="ev-bar">
+      <div class="ev-updated" id="ev-updated"></div>
+      <button class="ev-refresh" id="ev-refresh" type="button" title="Buscar radicaciones nuevas">
+        <span class="ev-refresh-ic">↻</span><span class="ev-refresh-tx">Actualizar</span>
+      </button>
+    </div>
+    <div class="ev-flash" id="ev-flash"></div>
+    <div class="ev-wrap">
+      <div class="ev-col">
+        <div class="ev-col-head"><b>Senado</b> <span class="c" id="ev-sen-count"></span></div>
+        <div class="ev-list" id="ev-senado"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div>
+      </div>
+      <div class="ev-col">
+        <div class="ev-col-head"><b>Cámara de Representantes</b> <span class="c" id="ev-cam-count"></span></div>
+        <div class="ev-list" id="ev-camara"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:1.2rem">Se muestran los tres más recientes de cada cámara. El histórico completo (más de 10.600 proyectos desde 1990) es buscable en <a href="legislativo-proyectos.html" style="color:var(--blue-light)">Radar legislativo</a>. Fuentes: Secretaría del Senado · Cámara de Representantes.</div>
+  </section>
+
+  <!-- ══ MODAL COMPARTIDO (proyecto de ley · ficha de congresista) ═══ -->
+  <div class="md-back" id="md-back" onclick="closeModal()"></div>
+  <div class="md-box" id="md-box" role="dialog" aria-modal="true" aria-labelledby="md-body">
+    <button class="md-x" type="button" onclick="closeModal()" aria-label="Cerrar">✕</button>
+    <div id="md-body"></div>
+  </div>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Legislativo · Congreso 2026–2030</span>
+    <a href="index.html" class="e-btn-back" style="font-size:.62rem">← Inicio</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script>
+  /* ── autores de un proyecto ──────────────────────────────────────
+     El campo `autor` no trae una convención estable y hay que tratarlo con
+     cuidado en ambas cámaras:
+       · Senado manda los nombres en MAYÚSCULAS separados por coma, pero el
+         prefijo de cámara a veces llega SIN coma delante ("…CAICEDOCARABALI
+         H.R. DANIEL MONROY…"), así que partir solo por coma pega dos personas.
+       · Cámara puede anteponer el cargo separado por coma ("Ministro de
+         Hacienda y Crédito Público, German Avila Plazas"): ahí la coma NO
+         separa autores, y partirla a ciegas inventa un firmante. */
+  const SOLO_CARGO=/^(?:ministr|viceministr|director|superintendent|defensor|procurador|fiscal|contralor|registrador|presidenta?\b|gobernador|alcald)/i;
+  function autoresDe(txt){
+    let s=String(txt||'').replace(/\s+/g,' ').trim();
+    if(!s) return [];
+    s=s.replace(/\s(H\.?\s?[SR]\.?)\s/gi,', $1 ');          // prefijo sin coma
+    const partes=s.split(',').map(x=>x.trim()).filter(Boolean);
+    const out=[];
+    for(const p of partes){
+      const limpio=p.replace(/^H\.?\s?[SR]\.?\s*/i,'').trim();
+      if(!limpio) continue;
+      // un fragmento que es solo un cargo pertenece a la persona que sigue
+      if(SOLO_CARGO.test(limpio)){ out.push({cargo:limpio,nombre:''}); continue; }
+      const prev=out[out.length-1];
+      if(prev&&prev.cargo&&!prev.nombre){ prev.nombre=limpio; continue; }
+      out.push({cargo:'',nombre:limpio});
+    }
+    // MAYÚSCULA SOSTENIDA (Senado) → capitalizada; Cámara ya viene bien
+    return out.map(a=>{
+      const n=a.nombre||a.cargo;
+      const txt=(n===n.toUpperCase()?tCase(n):n);
+      return a.nombre&&a.cargo?`${txt} (${a.cargo})`:txt;
+    }).filter(Boolean);
+  }
+  /* "A, B y C · y otros 17" — la lista completa vive en el modal */
+  function autoresCorto(txt,n){
+    const a=autoresDe(txt); n=n||3;
+    if(!a.length) return '';
+    if(a.length===n+1) n=a.length;                 // esconder uno solo no ahorra nada
+    const top=a.slice(0,n), resto=a.length-top.length;
+    const unidos=top.length>1?top.slice(0,-1).join(', ')+' y '+top[top.length-1]:top[0];
+    return unidos+(resto>0?` <span style="opacity:.6">y otros ${resto}</span>`:'');
+  }
+  /* ── EN VIVO · últimos proyectos de ley (Senado + Cámara) ─────
+     Lee el JSON compacto que produce el harvester (Lambda 3×/día) en S3.
+     Shape: { actualizado, base_pdf, senado:[…], camara:[…] }
+     item: { numero, titulo, resumen, autor, comision, fecha, estado, tipo, pdf, fuente } */
+  const EN_VIVO_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/en-vivo.json';
+  function evFmtFecha(f){
+    if(!f) return '';
+    const m=String(f).match(/(\d{4})[-/](\d{2})[-/](\d{2})/);
+    if(!m) return esc(f);
+    const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return `${+m[3]} ${meses[+m[2]-1]||''} ${m[1]}`;
+  }
+  function evTitulo(t){ const s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
+  function evRow(it,camara,i){
+    const meta=[it.comision?`Comisión ${esc(it.comision)}`:'',evFmtFecha(it.fecha),it.estado?esc(it.estado):'']
+      .filter(Boolean).map(m=>`<span class="m">${m}</span>`).join('');
+    const auts=autoresCorto(it.autor);
+    return `<div class="ev-row ${camara}" data-i="${i}" tabindex="0" role="button">
+      <div class="ev-row-top">
+        <span class="ev-num">${esc(it.numero||'—')}</span>
+        <span class="ev-title">${esc(evTitulo(it.titulo))}</span>
+        <span class="ev-hint">Ver resumen</span>
+      </div>
+      <div class="ev-meta">${meta}</div>
+      ${auts?`<div class="ev-meta"><span class="m">${auts}</span></div>`:''}
+    </div>`;
+  }
+  /* de dónde salió el resumen — se dice explícito para que se pueda contrastar
+     con el PDF oficial y para no vender como lectura del articulado algo que
+     salió solo del título */
+  const EV_BASE_TXT={
+    texto:'del texto completo del proyecto radicado',
+    pdf:'del PDF del proyecto radicado',
+    objeto:'del objeto declarado por el autor en la ficha oficial',
+    titulo:'únicamente del título radicado — el articulado todavía no se publica',
+  };
+  function evModal(it,camara,basePdf){
+    const pdf=it.pdf?(/^https?:/i.test(it.pdf)?it.pdf:basePdf+it.pdf):null;
+    const ex=it.explica;
+    const auts=autoresDe(it.autor);
+    const meta=[it.comision?`Comisión ${esc(it.comision)}`:'',evFmtFecha(it.fecha),
+                it.estado?esc(it.estado):'',it.tipo?esc(it.tipo):'']
+      .filter(Boolean).map(m=>`<span class="m">${m}</span>`).join('');
+    let cuerpo;
+    if(ex){
+      cuerpo=`<div class="md-h">${esc(ex.titular)}</div>`
+        +(ex.cambia&&ex.cambia.length
+          ?`<div class="md-sec">Qué cambiaría en la práctica</div>`
+           +ex.cambia.map(c=>`<div class="md-li"><i>▸</i><span>${esc(c)}</span></div>`).join('')
+          :'')
+        +(ex.afecta?`<div class="md-sec">A quién le aplica</div><div class="md-afecta">${esc(ex.afecta)}</div>`:'')
+        +(ex.ojo?`<div class="md-ojo">${esc(ex.ojo)}</div>`:'');
+    }else if(it.resumen&&it.resumen.trim()){
+      cuerpo=`<div class="md-sec">Objeto declarado</div><div class="md-afecta">${esc(it.resumen)}</div>`;
+    }else{
+      cuerpo=`<div class="md-ojo">Todavía no hay un resumen de este proyecto: la Secretaría publicó el título pero aún no el texto radicado. Aparecerá aquí en cuanto salga.</div>`;
+    }
+    return `<div class="md-tag">Proyecto de ley · ${camara==='sen'?'Senado':'Cámara de Representantes'} · Legislatura 2026–2027</div>
+      <div><span class="md-num">${esc(it.numero||'—')}</span></div>
+      ${cuerpo}
+      <div class="md-sec">Título radicado</div>
+      <div class="md-legal">${esc(evTitulo(it.titulo))}</div>
+      <div class="md-meta">${meta}</div>
+      ${auts.length?`<div class="md-auts"><b>${auts.length===1?'Autor':'Autores'} (${auts.length}):</b> ${esc(auts.join(' · '))}</div>`:''}
+      <div class="md-actions">
+        ${pdf?`<a class="ev-dl" href="${esc(pdf)}" target="_blank" rel="noopener">↓ Descargar texto radicado</a>`
+             :`<span class="ev-nopdf">Texto radicado aún no publicado</span>`}
+        ${it.fuente?`<a class="ev-src" href="${esc(it.fuente)}" target="_blank" rel="noopener">Ver en ${camara==='sen'?'Senado':'Cámara'} ↗</a>`:''}
+      </div>
+      ${ex?`<div class="md-src">Resumen en lenguaje llano redactado automáticamente a partir ${EV_BASE_TXT[ex.base]||'de la ficha oficial'}. Es una lectura de apoyo, no el texto legal: lo que obliga es el documento radicado.</div>`:''}`;
+  }
+  function evPaint(box,list,camara,basePdf){
+    if(!list||!list.length){ box.innerHTML=`<div class="ev-empty">Aún no hay proyectos radicados en la legislatura 2026–2027 por esta cámara. Aparecerán aquí apenas la Secretaría los publique.</div>`; return; }
+    box.innerHTML=list.map((it,i)=>evRow(it,camara,i)).join('');
+    box.querySelectorAll('.ev-row').forEach(r=>{
+      const abrir=()=>openModal(evModal(list[+r.dataset.i],camara,basePdf));
+      r.addEventListener('click',abrir);
+      r.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); abrir(); } });
+    });
+  }
+  let EV_SEEN=null;   // Set de 'sen:NUM'/'cam:NUM' ya vistos (para detectar novedades)
+  function evFlash(txt,none){
+    const f=document.getElementById('ev-flash'); if(!f) return;
+    f.textContent=txt; f.className='ev-flash show'+(none?' none':'');
+    clearTimeout(evFlash._t); evFlash._t=setTimeout(()=>{ f.className='ev-flash'; },6000);
+  }
+  async function loadEnVivo(opts){
+    opts=opts||{};
+    const sB=document.getElementById('ev-senado'), cB=document.getElementById('ev-camara');
+    const btn=document.getElementById('ev-refresh');
+    if(opts.refresh && btn){ btn.disabled=true; btn.classList.add('spin'); }
+    try{
+      // en refresh: cache-buster fino (por minuto) para traer el último feed publicado
+      const v=opts.refresh?Date.now():Math.floor(Date.now()/3600000);
+      const r=await fetch(EN_VIVO_URL+'?v='+v,{cache:opts.refresh?'no-store':'default'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const j=await r.json();
+      const base=j.base_pdf||'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/';
+      const sen=(j.senado||[]).slice(0,3), cam=(j.camara||[]).slice(0,3);
+      // detectar radicaciones nuevas respecto a lo ya visto
+      const ahora=new Set([...sen.map(x=>'sen:'+x.numero),...cam.map(x=>'cam:'+x.numero)]);
+      if(EV_SEEN && opts.refresh){
+        const nuevos=[...ahora].filter(k=>!EV_SEEN.has(k)).length;
+        evFlash(nuevos?`✦ ${nuevos} radicación${nuevos>1?'es':''} nueva${nuevos>1?'s':''} desde tu última consulta`
+                      :'Sin radicaciones nuevas por ahora — el feed se refresca varias veces al día', !nuevos);
+      }
+      EV_SEEN=ahora;
+      evPaint(sB,sen,'sen',base); evPaint(cB,cam,'cam',base);
+      const k=document.getElementById('hub-kpi-vivo');
+      if(k){
+        const fechas=[...sen,...cam].map(x=>String(x.fecha||'').replace(/\//g,'-')).filter(Boolean).sort();
+        const ult=fechas[fechas.length-1];
+        k.innerHTML=(ult?evFmtFecha(ult).replace(/ (\d{4})$/,''):'—')+'<small>último radicado</small>';
+      }
+      document.getElementById('ev-sen-count').textContent=sen.length?`· ${sen.length} recientes`:'';
+      document.getElementById('ev-cam-count').textContent=cam.length?`· ${cam.length} recientes`:'';
+      const up=document.getElementById('ev-updated');
+      if(j.actualizado){
+        const d=new Date(j.actualizado);
+        up.innerHTML=`<span class="ev-dot"></span>Actualizado ${isNaN(d)?esc(j.actualizado):d.toLocaleString('es-CO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}`;
+      }
+    }catch(e){
+      if(opts.refresh) evFlash('No se pudo actualizar ahora. Reintenta en un momento.',true);
+      else{
+        const msg=`<div class="ev-empty">No se pudo cargar el feed en vivo por ahora. Consulta el <a href="legislativo-proyectos.html" style="color:var(--blue-light)">Radar legislativo</a> con el histórico completo.</div>`;
+        sB.innerHTML=msg; cB.innerHTML='';
+      }
+    }finally{
+      if(btn){ btn.disabled=false; btn.classList.remove('spin'); }
+    }
+  }
+
+  /* ── init ── */
+  loadEnVivo();
+  (function(){ const b=document.getElementById('ev-refresh'); if(b) b.addEventListener('click',()=>loadEnVivo({refresh:true})); })();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>

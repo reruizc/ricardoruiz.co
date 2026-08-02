@@ -4985,17 +4985,38 @@ nacional (embudo, mortandad, bloqueo, acuerdo de presidencias); `comision.html`
 (`?id=PRIMERA..SEPTIMA`) es la ficha por comisión constitucional, con el mismo
 bloque de análisis replicado 100% a nivel de esa comisión.
 
-**Estructura de hub (ago-2026)**: la página traía las 6 secciones apiladas en un scroll
-larguísimo ("muy complejo para el usuario"). Ahora la portada es una **cuadrícula de 7 fichas**
-con el mismo lenguaje visual de `electoral.html` (`.card` · `.card-img` · `.card-glow` ·
-`.card-label` · `.card-live`), 4 columnas × 2 filas con la de *Proyectos en vivo* a doble alto,
-y solo se muestra la sección que se abre (`showSec(id)` / `showHub()`, el resto queda
-`.sec-off`). **Las anclas viejas siguen sirviendo**: `#comisiones`, `#proyectos`… entran por
-`hashchange` y abren su sección, así que los enlaces internos y los ya compartidos por fuera
-no se rompen. Las 7ª ficha lleva a `comision.html?id=ACUSACIONES` (antes solo se llegaba por
-una nota al pie). Cada tarjeta ya apunta a `imagenes/legislativo-{slug}.jpg`
-(en-vivo · congreso · comisiones · congresistas · proyectos · historico · acusaciones):
-**basta con dejar el archivo ahí**, y si falta la tarjeta se ve igual, solo sin foto.
+**Arquitectura multi-página (ago-2026)**: el monolito de 6 secciones apiladas se partió.
+`legislativo.html` es ahora el **HUB puro** — cuadrícula de 7 fichas con el lenguaje visual de
+`electoral.html` (`.card`/`.card-img`/`.card-glow`/`.card-label`/`.card-live`, 4 col × 2 filas,
+*Proyectos en vivo* a doble alto con "● EN VIVO") — y **cada sección tiene su propio HTML**:
+```
+legislativo.html               hub (7 fichas; solo pinta la fecha del último radicado)
+legislativo-en-vivo.html       feed en vivo + modal resumen ciudadano
+legislativo-congreso.html      composición por bancada
+legislativo-comisiones.html    7 comisiones + mesas directivas + refresco COM_HIST vía stats
+legislativo-congresistas.html  bancadas → roster filtrable → ficha modal (cand-index)
+legislativo-proyectos.html     radar (Lambda caudal-analiza: buscar + radicados)
+legislativo-historico.html     embudo + mortandad + bloqueo (stats + bloqueo)
+legislativo-base.css           TODO el CSS compartido (extraído del <style> del monolito)
+legislativo-base.js            cursor + esc/fmt/norm/tCase/depNice/lift + call + modal + auth
+legislativo-electos.js         ELECTOS_RAW (285) + BANCADAS + bancadaOf (solo quien lo necesita)
+```
+- **`legislativo-base.js` es un IIFE que expone por `Object.assign(window,{…})`** lo que los
+  onclick y scripts inline llaman. ⚠️ **Todo lo que corra dentro del IIFE debe tener guarda de
+  elemento faltante**: el chip `instala-txt` solo existe en el hub, y sin el `if(!el) return`
+  su bloque tumbaba TODO base.js en las páginas de sección (esc undefined → nada pintaba).
+- La 7ª ficha lleva a `comision.html?id=ACUSACIONES`; el backlink de `comision.html` apunta a
+  `legislativo-comisiones.html`. Ya no hay anclas `#seccion` — el split las reemplazó por
+  páginas (los pocos enlaces internos se reescribieron).
+- Cada página de sección: hero propio (page-header con el sec-sub RICO promovido de la vieja
+  sección — no duplicar título hero + sec-title, ese fue el reclamo original), barra
+  `sec-bar` con "← Todas las secciones" + conmutador de 6, modal compartido, footer.
+- El refresco de `COM_HIST` con `stats` vive en **legislativo-comisiones.html** (en el
+  monolito lo hacía `loadHistorico`; al partir, esa referencia cruzada reventaba y el catch
+  pisaba la gráfica de mortandad).
+- **Imágenes de las fichas del hub**: cada tarjeta ya apunta a
+  `imagenes/legislativo-{en-vivo,congreso,comisiones,congresistas,proyectos,historico,acusaciones}.jpg`
+  — basta con dejar el archivo ahí; si falta, la tarjeta se ve igual, solo sin foto.
 
 **Feed "En vivo" + resumen ciudadano** (ago-2026): `tools/leyes-senado/leyes_en_vivo.py`
 emite los **3** últimos radicados por cámara (era 5) y ahora cada item lleva **`explica`**
