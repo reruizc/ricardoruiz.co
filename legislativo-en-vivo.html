@@ -239,7 +239,11 @@
       if(!r.ok) throw new Error('HTTP '+r.status);
       const j=await r.json();
       const base=j.base_pdf||'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/';
-      const sen=(j.senado||[]), cam=(j.camara||[]);   // el feed ya viene acotado (15/cámara)
+      /* dedup por número: el builder ya lo hace, pero un feed publicado antes
+         de ese fix (o una re-radicación con la misma numeración) duplicaría
+         filas en la paginación */
+      const dedup=l=>{const v=new Set();return (l||[]).filter(x=>{const k=String(x.numero||'').trim().toUpperCase();if(v.has(k))return false;v.add(k);return true;});};
+      const sen=dedup(j.senado), cam=dedup(j.camara);   // el feed ya viene acotado (15/cámara)
       // detectar radicaciones nuevas respecto a lo ya visto
       const ahora=new Set([...sen.map(x=>'sen:'+x.numero),...cam.map(x=>'cam:'+x.numero)]);
       if(EV_SEEN && opts.refresh){

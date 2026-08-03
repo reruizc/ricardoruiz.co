@@ -5020,6 +5020,21 @@ legislativo-electos.js         ELECTOS_RAW (285) + BANCADAS + bancadaOf (solo qu
   `imagenes/legislativo-{en-vivo,congreso,comisiones,congresistas,proyectos,historico,acusaciones}.jpg`
   — basta con dejar el archivo ahí; si falta, la tarjeta se ve igual, solo sin foto.
 
+**Monitor de ritmo** (al lado del título del hub · `tools/leyes-senado/build_ritmo.py` →
+`ritmo-legislaturas.json`, ~2 KB, en el cron 2×/día): proyectos de ley radicados por día,
+**2026 vs 2022 vs 2018**. Medido ago-2026: 135 · 106 · 91 (la legislatura nueva radica 27%
+más que la anterior a la misma altura).
+- ⚠️ **Las tres series son SOLO del registro del Senado.** El listado de Cámara no publica
+  fecha de radicación, así que sumarlo le daría a 2026 un dato que 2018 y 2022 no tienen y la
+  comparación mentiría a favor del año nuevo. Verificado: los radicados jul-ago de 2018 (161)
+  y 2022 (189) del dataset son 100% registro Senado.
+- **Ventana RODANTE** (últimas 2 semanas hasta hoy, mapeadas a las mismas fechas calendario
+  de hace 4 y 8 años), no fija en el arranque: si no, en octubre seguiría mostrando julio.
+  Piso duro en el 20-jul-2026 (antes no hay legislatura viva que medir).
+- Si la Lambda no responde, `build` **aborta sin reescribir el JSON** (un Counter vacío
+  pintaría un desplome falso); el frontend sigue mostrando la última corrida buena.
+- El hub NO llama `{action:'radicados'}` directo: esa respuesta pesa 540 KB.
+
 **Bancadas transversales** (`legislativo-congreso.html` · ago-2026): además del reparto por
 partido, la página muestra los bloques que CRUZAN partidos, separados por **cómo se prueba
 cada cifra** — la distinción es el punto, no un adorno:
@@ -5046,7 +5061,9 @@ Senado y Cámara van en **paneles separados** (`.comp-2`) y la leyenda subió de
 **Feed "En vivo" + resumen ciudadano** (ago-2026): `tools/leyes-senado/leyes_en_vivo.py`
 emite los **15** últimos radicados por cámara (el frontend pagina de a 3/5/10 con
 `evPintaPagina`/`evGo`/`evSetPer`; sin peticiones extra al cambiar de página) y cada item
-lleva **`explica`**
+lleva **`explica`**. **Dedup por número en las dos capas** (`dedup_por_numero` en el builder +
+`dedup()` en el frontend): el registro republica fichas y una re-radicación repite numeración
+— sin eso la paginación mostraría el mismo proyecto dos veces
 = resumen en lenguaje llano (titular · qué cambia en la práctica · a quién le aplica · ojo),
 que el frontend abre en un **modal** al hacer clic. Lo genera
 `tools/leyes-senado/explica_en_vivo.py` (DeepSeek V4 Flash) en el builder, NO en el

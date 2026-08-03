@@ -309,6 +309,21 @@ def _aws_cli_upload():
     return ok
 
 
+def dedup_por_numero(items):
+    """El registro a veces trae la misma radicación repetida (re-publicación de
+    la ficha, o el mismo numero con dos ids). Se queda la PRIMERA aparición,
+    que en ambas fuentes es la más reciente — sin esto la paginación del
+    frontend mostraría el mismo proyecto dos veces."""
+    vistos, out = set(), []
+    for it in items:
+        k = str(it.get('numero') or '').strip().upper()
+        if k and k in vistos:
+            continue
+        vistos.add(k)
+        out.append(it)
+    return out
+
+
 def rehost_pdfs(items, camara, s3):
     """Descarga el PDF de origen y lo re-aloja en S3 (idempotente: si ya está, lo reusa).
     Devuelve la ruta relativa (respecto de PUBLIC_BASE) para el JSON, o None."""
@@ -369,14 +384,14 @@ def build(only=None, upload=False):
 
     if only in (None, 'senado'):
         try:
-            sen = fetch_senado()
+            sen = dedup_por_numero(fetch_senado())
             if sen:
                 result['senado'] = rehost_pdfs(sen, 'senado', s3)
         except Exception as e:                     # noqa: BLE001
             print(f'  ! senado falló, conservo lo previo: {e}', file=sys.stderr)
     if only in (None, 'camara'):
         try:
-            cam = fetch_camara()
+            cam = dedup_por_numero(fetch_camara())
             # cám puede venir vacía legítimamente (aún sin radicados en 2026-2027):
             # solo se conserva lo previo si la petición REVENTÓ (excepción), no si
             # devolvió [] limpio.

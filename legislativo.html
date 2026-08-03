@@ -49,10 +49,23 @@
   </nav>
 
   <div class="page-header">
-    <div class="page-tag">Congreso de la República · Periodo 2026–2030</div>
-    <h1 class="page-title">El nuevo Congreso, en datos</h1>
-    <p class="page-sub">El <strong>20 de julio de 2026</strong> se instala el Congreso elegido el 8 de marzo: <strong>103 senadores y 182 representantes</strong> (de 183 curules: la raizal del Archipiélago sigue sin implementarse), incluidas las 16 curules de paz, las circunscripciones étnicas y las curules del Estatuto de Oposición. Aquí puedes seguir <strong>quiénes integran cada comisión</strong>, los <strong>proyectos de ley que se radiquen</strong> en la legislatura 2026-2027 y el análisis del trámite legislativo con el histórico completo desde 1990.</p>
-    <div class="instala-chip"><i></i><span id="instala-txt">Instalación · 20 de julio de 2026</span></div>
+    <div class="hdr-2">
+      <div class="hdr-txt">
+        <div class="page-tag">Congreso de la República · Periodo 2026–2030</div>
+        <h1 class="page-title">El nuevo Congreso, en datos</h1>
+        <p class="page-sub">El <strong>20 de julio de 2026</strong> se instala el Congreso elegido el 8 de marzo: <strong>103 senadores y 182 representantes</strong> (de 183 curules: la raizal del Archipiélago sigue sin implementarse), incluidas las 16 curules de paz, las circunscripciones étnicas y las curules del Estatuto de Oposición. Aquí puedes seguir <strong>quiénes integran cada comisión</strong>, los <strong>proyectos de ley que se radiquen</strong> en la legislatura 2026-2027 y el análisis del trámite legislativo con el histórico completo desde 1990.</p>
+        <div class="instala-chip"><i></i><span id="instala-txt">Instalación · 20 de julio de 2026</span></div>
+      </div>
+      <!-- monitor de ritmo: se llena desde ritmo-legislaturas.json; si el
+           fetch falla, el JS lo oculta y el header queda como antes -->
+      <div class="ritmo" id="ritmo" style="display:none">
+        <div class="ritmo-t">El arranque, legislatura contra legislatura</div>
+        <div class="ritmo-s" id="ritmo-sub">Proyectos de ley radicados por día en el Senado.</div>
+        <div id="ritmo-rows"></div>
+        <div class="ritmo-cmp" id="ritmo-cmp"></div>
+        <div class="ritmo-foot">Registro del Senado en las tres series: el listado de Cámara no publica fecha de radicación, así que incluirlo haría incomparables los periodos.</div>
+      </div>
+    </div>
   </div>
 
   <!-- ══ HUB · una ficha por sección ══════════════════════════════
@@ -143,6 +156,49 @@
       const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
       k.innerHTML=(m?`${+m[3]} ${M[+m[2]-1]}`:'—')+'<small>último radicado</small>';
     }catch(e){ k.innerHTML='<small>último radicado</small>'; }
+  })();
+
+  /* ── monitor de ritmo: 2026 vs 2022 vs 2018 ─────────────────────
+     Lee el JSON precalculado (~2 KB) que emite build_ritmo.py. Best-effort:
+     si no está o falla, el monitor simplemente no aparece. */
+  (async()=>{
+    const box=document.getElementById('ritmo'); if(!box) return;
+    try{
+      const URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/ritmo-legislaturas.json';
+      const r=await fetch(URL+'?v='+Math.floor(Date.now()/3600000));
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const j=await r.json();
+      const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+      const dia=d=>{const[m,x]=String(d||'').split('-');const n=+x;return isNaN(n)?'':`${n} ${MES[+m-1]||''}`;};
+      const v0=dia((j.ventana||{}).desde), v1=dia((j.ventana||{}).hasta);
+      if(v0&&v1) document.getElementById('ritmo-sub').innerHTML=
+        `Proyectos de ley radicados por día en el Senado, del <b>${v0}</b> al <b>${v1}</b>, contra los mismos días de las dos legislaturas anteriores.`;
+      const anios=Object.keys(j.series||{}).sort((a,b)=>b-a);
+      if(!anios.length) return;
+      const vivo=anios[0];
+      /* mismo eje en las 3 filas: el pico más alto de cualquier serie */
+      const max=Math.max(1,...anios.flatMap(a=>j.series[a].dias.map(x=>x.n)));
+      document.getElementById('ritmo-rows').innerHTML=anios.map(a=>{
+        const s=j.series[a];
+        return `<div class="ritmo-row${a===vivo?' now':''}" title="${a}: ${s.total} proyectos en ${s.n_dias} día${s.n_dias===1?'':'s'}">
+          <span class="ritmo-y">${a}</span>
+          <span class="ritmo-bars">${s.dias.map(x=>`<span class="ritmo-b" style="height:${Math.max(6,Math.round(100*x.n/max))}%" title="${a}-${x.d}: ${x.n}"></span>`).join('')}</span>
+          <span class="ritmo-n">${s.total}</span>
+        </div>`;
+      }).join('');
+      /* la comparación honesta es a DÍAS IGUALES: la legislatura viva lleva
+         menos días que la ventana completa de las viejas */
+      const nd=j.series[vivo].n_dias;
+      const acum=a=>j.series[a].dias.slice(0,nd).reduce((t,x)=>t+x.n,0);
+      const v=acum(vivo), prev=anios.slice(1).map(a=>({a,n:acum(a)}));
+      const cmp=prev.map(p=>{
+        const d=v-p.n, pct=p.n?Math.round(100*d/p.n):null;
+        return `${d>=0?'<b>':'<b class="dn">'}${d>=0?'+':''}${d}${pct!=null?` (${d>=0?'+':''}${pct}%)`:''}</b> vs ${p.a}`;
+      }).join(' · ');
+      document.getElementById('ritmo-cmp').innerHTML=
+        `<b style="color:var(--white)">${v}</b> proyecto${v===1?'':'s'} en estos ${nd} día${nd===1?'':'s'} — ${cmp} en las mismas fechas.`;
+      box.style.display='';
+    }catch(e){ /* sin dato, sin monitor */ }
   })();
   </script>
   <script src="lang.js"></script>

@@ -41,6 +41,12 @@ cd "$REPO" || { echo "no pude cd a $REPO" >&2; exit 1; }
   echo "--- leyes_en_vivo --upload (feed 'En vivo' de legislativo.html) ---"
   python3 tools/leyes-senado/leyes_en_vivo.py --upload
   rc_ev=$?
+  # Monitor de ritmo del hub (2026 vs 2022 vs 2018). Lee la acción `radicados`
+  # de la Lambda + el histórico local → JSON de ~2 KB. Va después del feed para
+  # que la corrida ya haya refrescado el manifiesto de radicados del día.
+  echo "--- build_ritmo --upload (monitor de ritmo de radicación) ---"
+  python3 tools/leyes-senado/build_ritmo.py --upload
+  rc_rt=$?
   # Órdenes del día de Cámara (agenda de comisiones + plenaria) → índice de
   # bloqueo. Otro host (camara.gov.co/wp-json, sin WAF) y es incremental: los
   # PDF/TXT se cachean por evento, así que una corrida normal solo baja las
@@ -93,5 +99,5 @@ cd "$REPO" || { echo "no pude cd a $REPO" >&2; exit 1; }
   else
     rc_bu=skip
   fi
-  echo "═════════ fin $(date '+%H:%M:%S') · senado=$rc_h upload=$rc_u camara=$rc_c camara_up=$rc_cu envivo=$rc_ev ordenes=$rc_od ordenes_sen=$rc_ods ordenes_sen_plen=$rc_odp secop=$rc_sf/$rc_sb secop_up=$rc_su bloqueo=$rc_bl bloqueo_up=$rc_bu ═════════"
+  echo "═════════ fin $(date '+%H:%M:%S') · senado=$rc_h upload=$rc_u camara=$rc_c camara_up=$rc_cu envivo=$rc_ev ritmo=$rc_rt ordenes=$rc_od ordenes_sen=$rc_ods ordenes_sen_plen=$rc_odp secop=$rc_sf/$rc_sb secop_up=$rc_su bloqueo=$rc_bl bloqueo_up=$rc_bu ═════════"
 } >> "$LOG" 2>&1
