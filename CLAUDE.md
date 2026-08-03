@@ -842,7 +842,9 @@ participación → candidatos (2 slides de 3) → voto blanco → mapa
   - `POST /pron/save` — sin auth. Valida campos + suma de pcts ≈ 100.
     Guarda en `RR_STORE` bajo `pron:${correo}`. Conserva `createdAt`
     del primer envío, refresca `updatedAt`. Reescribe si reenvía.
-  - `GET /pron/me?correo=` — devuelve el registro de ese correo.
+  - ~~`GET /pron/me?correo=`~~ — **RETIRADA** (verificado ago-2026): exponía
+    datos personales (nombre, WhatsApp) a cualquiera que supiera un correo.
+    El dump completo vive solo en `/pron/admin/all` tras `adminGuard`.
   - `GET /pron/admin/all` — `adminGuard` (sesión admin). Dump paginado
     (hasta 5k) para calcular el ganador.
 - **Dashboard admin:** `admin-pronosticos.html` (card en `PRIVATE_TOOLS`,
@@ -6244,12 +6246,41 @@ con el enlace **ampliar/volver a lo esencial** (`empresaHint`/`wireEmpresaHint` 
 > comisionistas de bolsa, EPS/IPS y operadores de SITP — esas categorías ya
 > quedaron cubiertas.
 
-### 📌 ESTADO CONSOLIDADO DE CAUDAL (jul-31-2026) — qué está vivo y qué falta
+### 📌 ESTADO CONSOLIDADO DE CAUDAL (ago-2026) — qué está vivo y qué falta
 
-Escrito para cerrar la confusión de haber trabajado en **dos conversaciones en
-paralelo** (una hizo el diccionario de empresas ④, la otra el índice de bloqueo
-del Senado). **Todo lo de abajo está VERIFICADO contra producción**, no de
-memoria — donde diga "verificado" es porque se llamó la API o se miró el repo.
+**Todo lo de abajo está VERIFICADO contra producción**, no de memoria — donde
+diga "verificado" es porque se llamó la API o se miró el repo.
+
+**Tanda de ago-2026 · cinco frentes en paralelo, todos en producción.** Se
+trabajaron en conversaciones separadas con **propiedad exclusiva de archivos**
+(ningún archivo en dos listas) y una sola consolidando y commiteando. El patrón
+funcionó: cero conflictos de merge. Los tres monolitos peligrosos —`caudal.html`,
+`lambda_handler.py`, `caudal_core.py`— se le dieron a UNA sola conversación por
+vez; el módulo de alertas corre con su propio launchd justamente para no tocar
+`run_diario.sh`, que era el choque más probable.
+
+| Frente | Commit | Qué entró |
+|---|---|---|
+| Confiabilidad | `6d17137` | chequeo de salud, `estado.json`, cron endurecido |
+| Perfil de cliente | `5ed940f` | el radar deja de ser 6 sectores hardcoded |
+| Motor de alertas | `26f8a19` | el push: diff diario, digest, silencio |
+| Latencia | `e3015cc` | la lectura del analista se separa del radar |
+| Alertas por perfil | `1a60f1e` | endpoint de servicio + opt-in + buzones |
+
+**Lo que esto movió, medido:** producto por cliente 25%→70% · entrega proactiva
+0%→~55% · operación 40%→65%. Como producto vendible (SKU A) el conjunto pasó de
+**~55% a ~72%**.
+
+⚠️ **El bloqueador #1 dejó de ser las alertas y pasó a ser el ACCESO COMERCIAL.**
+El gate de `caudal.html` sigue siendo **tres correos escritos a mano en el HTML**
+más tokens de invitado en el KV: un gremio que quiera pagar literalmente no puede
+entrar. `rr-auth` ya tiene planes y Wompi ya cobra para el resto del sitio, pero
+**nada de eso está cableado a Caudal**. Ese cableado es lo que convierte 72% en
+algo vendible, y no lo tocó ninguno de los cinco frentes.
+
+**Lo que depende de Ricardo, no de código:** `RESEND_API_KEY` y
+`CAUDAL_ALERTAS_TOKEN` ✅ ya puestas (ago-2026) · `SOCRATA_APP_TOKEN` sigue
+faltando (SECOP corre con el rate limit anónimo; exige cuenta en datos.gov.co).
 
 **✅ EN PRODUCCIÓN (los dos frentes están desplegados y probados):**
 - **Diccionario de empresas ④** — `tools/caudal/empresas.py` (388 entradas) en
@@ -6394,18 +6425,222 @@ NO un pilar (vive encima de los pilares).
   accionabilidad (EN_TRAMITE > caído reciente > ley reciente > antecedente) →
   nivel + acción. **Cero invención de cifras** (todo sale del dato). La acción cita
   la comisión REAL del proyecto. Regulatorio: sanción reciente del sector = alto.
-- **Lambda acción `cliente`** (`{action:'cliente', sector, lectura}`): ensambla
-  `radar_congreso` (Congreso) + `_sanciones()` filtrado por sector (Regulatorio) +
-  KPIs; con `lectura:true` agrega `_lectura_cliente` (DeepSeek, cache hash24 por
-  sector+conteos, mismo patrón que `_sintesis_tema`). Aditiva — no toca las otras rutas.
-- **Frontend** (`view-cliente`): pills de sector → `cliLoad()` pinta KPIs + nota
-  "de N proyectos que tocaron el sector, el radar prioriza M" + lectura (pre-fetch
-  como en tema) + 2 secciones de señales (Legislativo · Regulatorio) con dot de
-  nivel y acción. `CLI_SECS` hardcoded (espejo de `SECTORES_CLIENTE`).
-- **Pendiente / v2:** perfil de cliente guardado (temas propios + storage), triaje
-  LLM por-señal (hoy es determinista + 1 lectura global), y cuando entren
-  Superfinanciera/otras superintendencias, los sectores financiero/energía ganan
-  Regulatorio real.
+- **Lambda acción `cliente`** (`{action:'cliente', sector|perfil, lectura}`):
+  ensambla `radar_congreso` (Congreso) + `_sanciones()` por sector (Regulatorio)
+  + prensa + contratación + KPIs. Aditiva — no toca las otras rutas.
+  ⚠️ **`lectura:true` NO significa "espérame la síntesis" sino "prepárala"**
+  (cambió ago-2026, ver "Latencia" abajo): deja el prompt en caché y devuelve
+  `lectura_key`. **`_lectura_cliente` ya no existe.**
+- **Frontend** (`view-cliente`): pills de sector + editor de perfil → `cliLoad()`
+  pinta KPIs + nota "de N proyectos que tocaron el sector, el radar prioriza M"
+  + lectura (sondeo) + 4 secciones de señales con dot de nivel y acción.
+- **Pendiente / v2:** triaje LLM por-señal (hoy es determinista + 1 lectura
+  global), y cuando entren Superfinanciera/otras superintendencias, los sectores
+  financiero/energía ganan Regulatorio real.
+
+#### Perfil de cliente (ago-2026 · el radar deja de ser solo demo)
+
+Los 6 sectores servían para demostrar, no para vender. Ahora el radar corre
+sobre un **perfil guardado por cuenta** en el KV del worker
+(`caudal:perfil:proj:<id>` + `caudal:perfil:owner:<email>:<id>`, tope por plan
+1/5/25/50, rutas `/caudal/perfil/{list,save,load,delete}`). **Los 6 presets NO
+se borraron**: son el fallback y las plantillas de arranque del editor.
+
+Un perfil = `{nombre, descripcion, temas[≤12], empresas[≤15], sector_sanciones,
+comision}`. `caudal_core.normalizar_perfil()` lo sanea y **nunca lanza**: lo que
+no valida se descarta y se reporta en `descartes` y `avisos`.
+
+**Las dos caras del diccionario de empresas, una por pilar** — es lo que da la
+precisión, y es el mismo principio de la búsqueda general:
+
+| Pilar | Cara | Cómo |
+|---|---|---|
+| Congreso | **TEMA** | `temas_de_empresas()` traduce la marca a su vocabulario legislativo vía el tesauro. Nadie legisla «Uber», legisla «plataformas tecnológicas». |
+| Regulatorio · Prensa · Contratación | **IDENTIDAD** | Ahí la empresa aparece con nombre propio → razón social estricta con vetos. |
+
+⚠️ **`temas_de_empresas` resuelve desde la ENTRADA del diccionario, no
+re-matcheando el nombre**: 29 de las 388 tienen `nombre` distinto de su alias
+(WOM, ISA, XM, Caracol, RCN, Semana) → buscarlas por nombre las perdería en
+silencio.
+⚠️ **El nombre de la marca NUNCA entra como término de título en Congreso**:
+`_phrase_match` va por substring y `claro` casaría dentro de "de**claró**".
+
+Las señales de identidad van en **cupos propios y primero dentro de su pilar**,
+descontadas del bloque de sector para no salir dos veces. `_regulatorio_para_
+empresas` hace **round-robin entre vigiladas** (una con 40 sanciones no puede
+acaparar el panel). Prensa usa ventana de 21 días y dedup por título — la misma
+nota replicada por 4 medios es UNA señal para el cliente, no cuatro.
+
+⚠️ **Deuda conocida: `pfEditar()` está definida y NUNCA se llama.** Un perfil
+guardado no se puede editar — solo crear y borrar. Con el opt-in de alertas
+encima ya no es cosmético: equivocarse en un tema obliga a rehacer el perfil.
+
+#### Latencia · la lectura del analista se separa del radar (ago-2026)
+
+Un perfil nuevo daba **HTTP 503 a los 30,5 s** —el techo del API Gateway— y lo
+hacía **dos veces** antes de servir la respuesta cacheada. Medido contra
+producción: radar solo 0,7-3,8 s; invocación con lectura **51,3 s**. Y el mismo
+prompt, con el mismo input dos veces seguidas, dio **20,0 s y 42,4 s** (1.314 vs
+3.672 tokens de razonamiento). **La varianza es del modelo, no del prompt** → no
+existe recorte de señales ni de `max_tokens` que meta esto bajo 30 s de forma
+confiable. Subir el timeout tampoco era la solución.
+
+Patrón de `test-presidencial-2026.html` (pintar primero, traer la lectura
+después), adaptado a que acá la generación se pasa del gateway:
+
+1. `{action:'cliente', …, lectura:true}` → **radar en ~1,4 s** + `lectura_key`.
+   Si ese radar ya se leyó antes, la lectura viene en la misma respuesta.
+2. `{action:'cliente-lectura', key}` → **disparo**. Suele morir en el gateway y
+   **el navegador lo ignora a propósito** (`.catch(()=>{})`): la Lambda igual
+   termina y deja la lectura en caché.
+3. `{action:'cliente-lectura', key, solo_cache:true}` → **sondeo** cada 3,5 s
+   (0,13-0,43 s por sondeo), tope 90 s y después el texto de reserva.
+
+**Candado** `cliente-lock-{key}` TTL 70 s: un segundo disparo responde
+`generando` sin arrancar otra generación. Eso mata el desperdicio del esquema
+viejo, donde cada reintento pagaba otra llamada de 50 s en paralelo.
+
+⚠️ **Backlog:** el disparo-que-muere-en-el-gateway funciona pero es un contrato
+frágil. Lo limpio es auto-invocación asíncrona, que exige darle
+`lambda:InvokeFunction` sobre sí mismo al rol `lambda-caudal-analiza`.
+
+**`normalizar_perfil` gana `avisos`** (hermano de `descartes`) y cubre tres
+silencios medidos: campo con nombre equivocado (`empresas_keys` en vez de
+`empresas`, con sugerencia); `temas`/`empresas` como texto suelto en vez de
+lista (se iteraba carácter por carácter y los descartaba todos por medir menos
+de 3 chars); y `empresas` como objetos — **que es la forma que devuelve la
+propia función**, así que reinyectar un perfil normalizado las perdía todas.
+
+### Motor de alertas · el push de Caudal (`tools/caudal/alertas/` · LISTO ago-2026)
+
+Caudal era 100% **pull**: había que entrar a preguntar. Esto construye lo que el
+pitch de Cauce promete — *"llega una alerta de precisión sobre una circular de
+Supersalud"*. Compara el estado de hoy contra el de ayer sobre las fuentes YA
+publicadas, clasifica lo nuevo por nivel y arma un digest por destino.
+
+```
+reglas.py   criterio editorial: sectores, vocabulario, niveles, salud operativa
+fuentes.py  lectores de las fuentes → eventos con forma común
+motor.py    orquestador: diff, clasificación, armado, silencio, buzones
+render.py   HTML de correo + texto plano
+sender.py   Resend, con cola cuando falta la key
+run_alertas.sh + co.ricardoruiz.caudal-alertas.plist   agente launchd PROPIO
+```
+
+**Agente launchd propio, 08:45 y 20:15** (~45 min después del rastreo diario).
+**No toca `run_diario.sh` ni su plist** a propósito: son dos ciclos distintos.
+Consume la Lambda **solo en lectura** (acciones `cliente` y `medios`).
+
+**Las tres reglas de diseño, cada una medida** (no las rompas al iterar):
+
+1. **La prensa NO dispara: corrobora.** Se cuelga del acto del Estado que la
+   respalda ("esto ya lo reportaron 4 medios") y le sube el nivel. Dispara sola
+   solo si nombra una empresa vigilada, describe un hecho accionable y no hay
+   acto detrás. Los dos filtros hicieron falta: solo "nombra empresa" daba **26
+   altas en un día** en financiero. Medido: 135 titulares → 4 colgados, 4
+   sueltos, **127 descartados**. La contratación salió de las anclas de prensa:
+   un contrato no es algo que la prensa cubra, y cruzarlo emparejaba vigilancia
+   en Bogotá con prensa de México, España e Indonesia.
+2. **Los contratos disparan por QUIÉN y por NOVEDAD, no por valor.** La API ya
+   devuelve el top por valor, así que un umbral de pesos no discrimina nada.
+   Proveedor contra el diccionario con razón social estricta — el match por
+   alias daba **42 de 42 falsos** (gente que se llama «Uber»). Sin histórico no
+   se afirma novedad: *"nunca lo había visto"* y *"nunca había mirado"* no son
+   lo mismo, y el digest lo dice.
+3. **Silencio.** Sin señales no se manda correo, `rc=0`. Un digest vacío semanal
+   mata el canal.
+
+**Alertas por PERFIL de cliente** (la unión con la Vista Cliente): el motor corre
+fuera del navegador, así que no tiene sesión — las 4 rutas `/caudal/perfil/*`
+exigen usuario y el único guard no-usuario era `adminGuard`. Se agregó
+`GET /caudal/alertas/inventario`, **auth de servicio** con `CAUDAL_ALERTAS_TOKEN`
++ cabecera `X-Caudal-Service`. Seis capas, porque devuelve correos de clientes y
+qué vigila cada uno: se resuelve antes del enrutador y su respuesta no lleva
+CORS; la cabecera no está en `Allow-Headers`, así que el preflight la rechaza; se
+descarta toda petición con huella de navegador (`Origin`, `Sec-Fetch-*`,
+`Cookie`), así que una sesión válida tampoco la abre; **sin el secreto responde
+byte a byte como una ruta inexistente** (verificado en producción, idéntico a una
+ruta inventada); comparación de tiempo constante; y solo viajan los perfiles
+encendidos. Con `esperado.length < 24` la ruta no existe → **desplegar sin el
+secreto es seguro**, el motor cae a sectores.
+
+⚠️ **El detalle que importa: el estado del motor es GLOBAL.** Una señal marcada
+vista no reaparece. Un cliente semanal que se saltara doce corridas perdería doce
+días de señales sin que nadie se enterara. Por eso lo que no toca enviar **no se
+descarta: se acumula en su buzón** y sale completo el día que le toca. **La
+cadencia cambia cuándo llega el correo, nunca qué trae.**
+
+**Opt-in con default APAGADO y una sola puerta** (`POST /caudal/perfil/alertas`):
+un `/save` con `alertas` en el cuerpo no enciende nada, y los perfiles que ya
+existían quedan apagados → desplegar no dispara correos.
+
+**Configuración (fuera del repo, que es público):** `~/.config/caudal/alertas.env`
+con `RESEND_API_KEY` y `CAUDAL_ALERTAS_TOKEN` (chmod 600). ⚠️ **NO confundir con
+`~/.caudal.env`**, que es del pipeline diario y lleva `SOCRATA_APP_TOKEN`: son
+dos archivos distintos, uno por módulo. Si falta Resend el motor no se cae —
+encola en disco— pero **el estado avanza igual**, así que la cola se vacía a mano
+con `sender.py --pendientes`, no se reenvía sola.
+
+**Baseline de regresión** (reproducible con `--fecha`, no hay que esperar día
+hábil): `--baseline --fecha 2026-07-28 --sin-api` y luego `--fecha 2026-07-29
+--sin-api --dry-run` → **53 eventos nuevos → 18 señales, 9 altas, 5 destinos**
+(salud 6/4 · contratación 3/1 · energía 3/1 · educación 2/1 · trabajo 4/2).
+Contra la primera versión, mismos datos: 440 señales → 35 y 52 "altas" → 5.
+
+**Pendiente:** el click-through del interruptor en un navegador real (`caudal.html`
+es gated y el preview no puede autenticarse) y `destinatarios.json`, que hoy está
+vacío. Los `datos/` quedaron bajo `tools/` contra la convención del proyecto; se
+mueven con `CAUDAL_ALERTAS_DIR`.
+
+### Confiabilidad del pipeline diario (`tools/caudal/salud/` · LISTO ago-2026)
+
+El cron corría en el Mac y si fallaba nadie se enteraba. Ahora hay chequeo de
+salud, estado publicado y un cron que no se arrastra a sí mismo.
+
+- **`catalogo.py`** — los 24 archivos de S3 con su umbral y el porqué al lado.
+  **Cuatro clases, no un umbral global:** `diario` avisa a 26 h y da error a 50 h
+  (la ventana nocturna real entre corridas es de 12,5 h, así que 26 h significa
+  que ya se saltó una); `mensual` (normativa del Ejecutivo) a 45 días; `manual`
+  (supers) a 120; y los **14 del histórico van SIN umbral de edad** — de esos
+  solo se verifica que existan y no lleguen truncados (`min_bytes`). No alertes
+  "hace 3 meses que no cambia `proyectos.jsonl`": está bien así.
+  ⚠️ Donde el archivo trae fecha por dentro (`secop-stats.generado`,
+  `en-vivo.actualizado`, `ritmo.v`) se compara **también contra esa**: un
+  `aws s3 cp` de contenido viejo se ve fresco por `LastModified`.
+- **`check.py`** — frescura + **12 pings a la Lambda que validan FORMA, no solo
+  HTTP 200**: un 200 con `{"error":...}` adentro es el modo de falla que el
+  frontend pinta como "sin resultados". Ninguno cuesta plata (`tema` va con
+  `lectura:false`). Los dos que dependen de terceros en vivo (Socrata, Google
+  News) **degradan a aviso, no a error**: el que se cayó es el tercero.
+  Verificado en producción: **24/24 archivos y 12/12 acciones en 9,6 s**.
+- **`estado.json`** (en `Bases de datos/leyes-senado/diario/`, fuera de git,
+  escrito atómicamente) con `corrida` / `frescura` / `lambda`, un `estado` global
+  y un array `problemas` con líneas ya redactadas para mandar en una alerta.
+  ⚠️ Tres avisos para quien lo consuma: **`corrida` puede estar AUSENTE** (si
+  nunca corrió el cron con el script nuevo) y **`corrida.arrastrada:true`
+  significa que esa corrida NO es de ahora**; los `warn` de fuentes externas no
+  son culpa nuestra y no deben despertar a nadie; y los archivos `estatico`
+  nunca envejecen.
+- **`etapa.py`** — corre una etapa con timeout y la registra. Existe porque
+  **este Mac no trae `timeout`**.
+- **`run_diario.sh` endurecido**: candado (launchd puede disparar la corrida
+  perdida encima de la programada, y dos contra leyes.senado son un ban),
+  timeout por etapa, tope global de 4 h, rotación de log, y **dependencias
+  explícitas en vez de cascadas** (si el índice de Senado cae se omiten las
+  comisiones pero la plenaria corre igual, que es otro host; si un build falla se
+  omite solo su upload). El resumen final nombra qué falló, con motivo y última
+  línea, y lo hace **sin red** por si el chequeo no pudo correr.
+- **`PLAN-salir-del-mac.md`** — documento, sin implementar. Recomienda **EC2
+  chico + cron (~$8-15/mes), no Fargate**: el estado se mueve con un `rsync` y no
+  hay que cambiar código, mientras que Fargate convierte cada edición de dos
+  líneas en un build+push. Con dos condiciones: **piloto de la IP primero** (el
+  WAF tolera una IP residencial colombiana; una de `us-east-1` es otra historia y
+  eso puede tumbar la migración entera), y una **fase 1 que mueva solo lo que no
+  tiene WAF** —Cámara, órdenes del día, SECOP— dejando en el Mac únicamente la
+  etapa del Senado. Eso ya baja el punto único de falla de "todo" a "una etapa".
+- ⚠️ **El 20-jul-2027 el chequeo va a reportar `pl-radicados-2027-2028.jsonl`
+  como faltante**, porque los harvesters traen la legislatura hardcodeada. Es el
+  aviso que hace falta, no un bug.
 
 ### Pilar Regulatorio · actos de superintendencias (`tools/caudal/supers/` · LISTO)
 
