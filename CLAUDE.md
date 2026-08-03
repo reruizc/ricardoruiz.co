@@ -7252,7 +7252,14 @@ Reglas al convertir una página:
   activa el plan.
 - Pricing quedó mensual por defecto, sin promo y sin Plan Datos.
 
-## Cliente YCJF · consultoría IA operativa (STAND BY · jul-2026)
+## Cliente YCJF · consultoría IA operativa (❄️ LEAD FRÍO · ago-2026)
+
+> **NO es un pendiente.** Se le insistió a Tatiana y no volvió a responder.
+> No dar seguimiento activo ni listarlo en pendientes. Todo lo de abajo queda
+> como registro por si el lead revive (o si sirve de plantilla para otra
+> consultoría de IA operativa: el modelo LEGO y la respuesta de "IA sobria"
+> son reusables). Lo ÚNICO que sigue vivo de este frente es la derivada
+> estratégica del final (servicio AI builder en `index.html`).
 
 **Youth Climate Justice Fund** (`ycjf.org`) — fondo filantrópico de justicia
 climática juvenil (partner ClimateWorks): 115 grants en 51 países, $8.1M
@@ -7286,7 +7293,8 @@ wins empaquetables con la base) + retainer mensual + bloque de expansión
 futuro (triaje IA de aplicaciones Submittable en 7 idiomas — donde más horas
 se queman, pero no es el área de Tatiana). Precios en USD.
 
-**Estado: BORRADOR v1 EN REVISIÓN INTERNA** (jul-2026). PDF armado en
+**Estado: CERRADO SIN RESPUESTA** (ago-2026). El PDF quedó en borrador v1 y
+nunca se envió en firme; tras insistir, Tatiana no volvió a contestar. PDF en
 `Propuestas/Propuesta-YCJF-IA-Operativa.pdf` (4 págs, **sistema visual v2**:
 fondo #060810 + Helvetica woff2 del repo + Syne solo wordmark + logo 4 barras
 — esta es LA PLANTILLA para propuestas nuevas, decisión jul-2026) vía
