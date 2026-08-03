@@ -5022,7 +5022,7 @@ legislativo-electos.js         ELECTOS_RAW (285) + BANCADAS + bancadaOf (solo qu
 
 **Monitor de ritmo** (al lado del título del hub · `tools/leyes-senado/build_ritmo.py` →
 `ritmo-legislaturas.json`, ~2 KB, en el cron 2×/día): **gráfico de líneas** (naranja 2026 ·
-verde 2022 · rojo 2018) con los proyectos de ley radicados por día,
+verde 2022 · cian 2018) con los proyectos de ley radicados por día,
 **2026 vs 2022 vs 2018**. Medido ago-2026: 135 · 106 · 91 (la legislatura nueva radica 27%
 más que la anterior a la misma altura).
 - ⚠️ **Las tres series son SOLO del registro del Senado.** El listado de Cámara no publica
@@ -5032,6 +5032,12 @@ más que la anterior a la misma altura).
 - **Ventana RODANTE** (últimas 2 semanas hasta hoy, mapeadas a las mismas fechas calendario
   de hace 4 y 8 años), no fija en el arranque: si no, en octubre seguiría mostrando julio.
   Piso duro en el 20-jul-2026 (antes no hay legislatura viva que medir).
+- **Solo días hábiles.** Sáb/dom no hay radicación: sus ceros hundían la línea al piso cada
+  cinco puntos sin significar nada. Un tramo de 14 días corridos trae SIEMPRE 10 hábiles, así
+  que las tres series quedan del mismo largo y alinean por posición aunque cada año arranque
+  en distinto día de semana (2026 lun · 2022 mié · 2018 vie). ⚠️ El filtro va sobre el
+  calendario DE CADA AÑO, no sobre el de 2026: el equivalente de un lunes de 2026 puede caer
+  sábado en 2018. NO se descuentan festivos (exigiría el calendario oficial de cada año).
 - Si la Lambda no responde, `build` **aborta sin reescribir el JSON** (un Counter vacío
   pintaría un desplome falso); el frontend sigue mostrando la última corrida buena.
 - El hub NO llama `{action:'radicados'}` directo: esa respuesta pesa 540 KB.

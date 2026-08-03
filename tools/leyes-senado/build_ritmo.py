@@ -15,7 +15,7 @@ POR QUÉ SOLO EL REGISTRO DEL SENADO
   nuevo. Medido en el dataset: los radicados de jul-ago de 2018 (161) y 2022
   (189) son 100% del registro del Senado.
 
-VENTANA — RODANTE, no fija
+VENTANA — RODANTE, no fija, y SOLO DÍAS HÁBILES
   Las ÚLTIMAS dos semanas hasta hoy, mapeadas a las mismas fechas calendario
   de hace 4 y 8 años (el calendario legislativo se repite: instalación el 20
   de julio, mismas legislaturas, mismos recesos). Una ventana fija en el
@@ -23,6 +23,15 @@ VENTANA — RODANTE, no fija
   legislatura todo el año. La serie de la legislatura viva solo existe desde
   el 20-jul-2026 (el rastreo diario empieza ahí), así que días anteriores a
   esa fecha se recortan de las TRES series para no comparar chueco.
+
+  Se descartan sábados y domingos: en el Congreso no se radica los fines de
+  semana, así que sus ceros no son actividad baja sino ausencia de calendario
+  — dejarlos hundía la línea al piso cada cinco puntos y ensuciaba la lectura.
+  Un tramo de 14 días corridos trae SIEMPRE 10 hábiles, así que las tres
+  series quedan del mismo largo y alinean por posición (hábil 1..10) aunque
+  cada año arranque en un día distinto de la semana (2026 lunes, 2022
+  miércoles, 2018 viernes). NO se descuentan festivos: eso exigiría el
+  calendario oficial de cada año y la ganancia es marginal.
 
 Fuentes:
   · 2018 y 2022 → Bases de datos/leyes-senado/dist/proyectos.jsonl (histórico Caudal)
@@ -56,12 +65,16 @@ DIAS = 14                        # las últimas dos semanas
 INSTALACION = dt.date(2026, 7, 20)
 
 
+def habiles(dias):
+    return [d for d in dias if d.weekday() < 5]        # 5=sáb, 6=dom
+
+
 def ventana_hoy():
-    """Últimos DIAS días hasta hoy, sin bajar del 20-jul-2026 (antes de la
-    instalación no hay legislatura que medir)."""
+    """Últimos DIAS días corridos hasta hoy (sin bajar del 20-jul-2026), ya
+    filtrados a días hábiles."""
     hoy = dt.date.today()
     dias = [hoy - dt.timedelta(days=i) for i in range(DIAS - 1, -1, -1)]
-    return [d for d in dias if d >= INSTALACION]
+    return habiles([d for d in dias if d >= INSTALACION])
 
 
 def equivalente(fecha, anio):
@@ -74,11 +87,12 @@ def equivalente(fecha, anio):
 
 
 def serie_historica(anio, dias):
-    """Cuenta por día en el histórico, solo registro del Senado."""
+    """Cuenta por día en el histórico, solo registro del Senado.
+    `dias` ya viene en el calendario de `anio`."""
     if not DIST.exists():
         print(f'  ! falta {DIST}', file=sys.stderr)
         return {}
-    fechas = {equivalente(d, anio).isoformat() for d in dias}
+    fechas = {d.isoformat() for d in dias}
     c = collections.Counter()
     with DIST.open(encoding='utf-8') as fh:
         for line in fh:
@@ -137,8 +151,13 @@ def build(upload=False):
         if a == max(ANIOS):
             c, ds = viva, dias
         else:
-            c = serie_historica(a, dias)
-            ds = [equivalente(d, a) for d in dias]
+            # se mapea la ventana CORRIDA (no la hábil) y se vuelve a filtrar:
+            # el equivalente de un lunes de 2026 puede caer en sábado de 2018
+            corrida = [dias[0] - dt.timedelta(days=k) for k in range(DIAS)][::-1]
+            corrida = [d for d in corrida if d >= dias[0] - dt.timedelta(days=DIAS)]
+            ds = habiles([equivalente(d, a) for d in
+                          [dias[0] + dt.timedelta(days=k) for k in range(DIAS)]])
+            c = serie_historica(a, ds)
         series[str(a)] = {
             'dias': [{'d': d.strftime('%m-%d'), 'n': c.get(d.isoformat(), 0)} for d in ds],
             'total': sum(c.get(d.isoformat(), 0) for d in ds),
@@ -147,11 +166,12 @@ def build(upload=False):
     out = {
         'v': hoy.isoformat(),
         'ventana': {'desde': dias[0].strftime('%m-%d'), 'hasta': dias[-1].strftime('%m-%d'),
-                    'dias': len(dias)},
+                    'dias': len(dias), 'solo_habiles': True},
         'series': series,
         'fuente': ('Registro de proyectos de ley del Senado (leyes.senado.gov.co). '
                    'Solo esa fuente: el listado de Cámara no publica fecha de radicación, '
-                   'así que incluirla haría incomparables los tres periodos.'),
+                   'así que incluirla haría incomparables los tres periodos. '
+                   'Solo días hábiles: los fines de semana no hay radicación.'),
     }
     STAGE.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')
