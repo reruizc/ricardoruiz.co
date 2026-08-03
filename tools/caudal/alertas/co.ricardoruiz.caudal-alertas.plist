@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Caudal · Alertas — agente de launchd.
+
+  Es un agente APARTE del de leyes-diario a propósito: el rastreo y las alertas
+  son dos procesos con dueños distintos, y encadenarlos haría que un cambio en
+  uno pudiera romper el otro.
+
+  Horario: 08:45 y 20:15, ~45 min después de cada corrida del rastreo (08:00 y
+  19:30). Ese margen es lo que da tiempo a que el rastreo termine de subir a S3;
+  medido, la corrida completa del rastreo tarda ~20 min en el peor caso.
+
+  Si el Mac estaba dormido a esa hora, launchd dispara la corrida perdida al
+  despertar (una sola vez, no una por cada hora perdida). El estado del motor
+  evita que eso reenvíe nada ya enviado.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>co.ricardoruiz.caudal-alertas</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/ricardoruiz/ricardoruiz.co/tools/caudal/alertas/run_alertas.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/ricardoruiz/ricardoruiz.co</string>
+
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict>
+      <key>Hour</key><integer>8</integer>
+      <key>Minute</key><integer>45</integer>
+    </dict>
+    <dict>
+      <key>Hour</key><integer>20</integer>
+      <key>Minute</key><integer>15</integer>
+    </dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/Users/ricardoruiz/ricardoruiz.co/tools/caudal/alertas/datos/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ricardoruiz/ricardoruiz.co/tools/caudal/alertas/datos/launchd.err.log</string>
+
+  <!-- launchd arranca con un PATH mínimo; el .sh lo fija igual, esto es cinturón
+       y tirantes para cuando alguien invoque el motor directo desde el plist. -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <!-- No relanzar si falla: una corrida fallida se reintenta en el siguiente
+       disparo, no en bucle. Un bucle contra la Lambda cuesta plata y, si el
+       fallo es un tercero caído, no arregla nada. -->
+  <key>KeepAlive</key>
+  <false/>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>
