@@ -7,8 +7,52 @@ pitch de Cauce promete lo contrario: *"llega una alerta de precisión sobre una
 circular de Supersalud"*. Esto es esa pieza.
 
 Corre después del rastreo diario, compara el estado de hoy contra el de ayer
-sobre las fuentes ya publicadas, clasifica lo nuevo por sector y nivel, y manda
-un digest por sector — **solo si hay algo que decir**.
+sobre las fuentes ya publicadas, clasifica lo nuevo por destino y nivel, y manda
+un digest por destino — **solo si hay algo que decir**.
+
+---
+
+## El destino: cliente primero, sector como red
+
+Un **destino** es a quién se le manda el correo. Hay dos clases y comparten la
+misma forma, así que todo el motor las procesa igual:
+
+| | Cliente | Sector |
+|---|---|---|
+| De dónde sale | perfil guardado en una cuenta (worker `rr-auth`) | los 6 presets de `SECTORES_CLIENTE` |
+| Vocabulario | SUS temas + los tópicos de SUS empresas vigiladas | curado por sector |
+| Empresas | solo las suyas | las 388 del diccionario |
+| Correo | el del dueño del perfil | `destinatarios.json` |
+| Cadencia | según su plan | en cada corrida |
+| Para qué sirve | **es el producto** | fallback y demostración |
+
+Los sectores no se borraron y no se van a borrar: son lo que corre si el worker
+no responde, si nadie ha encendido alertas todavía, o si se quiere el panorama
+general. Un motor que se queda mudo cuando falla una petición no es un motor.
+
+**Un perfil no manda correos hasta que alguien lo prenda.** El opt-in vive en el
+perfil (`alertas.activo`), arranca apagado y se cambia desde el interruptor de
+la Vista Cliente. Un perfil apagado no aparece siquiera en la respuesta del
+worker: el motor no puede mandarle correo por error porque ni ve su dirección.
+
+### La cadencia cambia cuándo llega el correo, nunca qué trae
+
+| Plan | Cadencia | |
+|---|---|---|
+| Premium · Full | `cada-corrida` | las dos del día (08:45 y 20:15) |
+| Pro | `diaria` | solo la de la mañana |
+| Básico (free) | `semanal` | los lunes en la mañana |
+
+La cadencia **se deriva del plan en cada lectura**, no se guarda: un cambio de
+plan (o su vencimiento) surte efecto solo.
+
+⚠️ Lo que no toca enviar **no se descarta: se acumula**. El estado del motor es
+global —en cuanto una señal se marca vista, no vuelve a aparecer mañana—, así
+que un cliente semanal que simplemente se saltara doce corridas perdería doce
+días de señales sin que nadie se enterara. Por eso existe el **buzón**
+(`estado['buzon']`): guarda lo suyo y lo suelta completo el día que le toca.
+Tope de 60 señales por pilar y 45 días, y lo que se recorta **se dice** en el
+digest.
 
 ---
 
@@ -19,10 +63,16 @@ python3 tools/caudal/alertas/motor.py                    # corrida normal de hoy
 python3 tools/caudal/alertas/motor.py --dry-run          # calcula y escribe, no envía ni guarda estado
 python3 tools/caudal/alertas/motor.py --fecha 2026-07-29 # reproducir un día concreto
 python3 tools/caudal/alertas/motor.py --sin-api          # sin prensa ni contratación (offline)
-python3 tools/caudal/alertas/motor.py --sectores salud,trabajo
+python3 tools/caudal/alertas/motor.py --sin-perfiles     # ignora los clientes: solo sectores
+python3 tools/caudal/alertas/motor.py --solo-perfiles    # solo clientes, sin el fallback
+python3 tools/caudal/alertas/motor.py --sectores salud,cli-a1b2c3
+python3 tools/caudal/alertas/motor.py --momento manana   # cuál de las dos corridas es
 python3 tools/caudal/alertas/motor.py --baseline         # sella el estado sin enviar nada
-python3 tools/caudal/alertas/motor.py --estado           # qué sabe el motor hasta ahora
+python3 tools/caudal/alertas/motor.py --estado           # qué sabe el motor (incluye buzones)
 ```
+
+Para ensayar un perfil sin tocar producción ni tener red, `CAUDAL_PERFILES_FIXTURE`
+apunta a un archivo con la misma forma que devuelve el worker.
 
 **La primera corrida es siempre baseline y no manda nada.** Sin estado previo
 las 18.526 llaves del universo (7.019 actos regulatorios + 11.500 normas)
@@ -45,6 +95,27 @@ es del rastreo diario).
 | Contratación | acción `cliente` de la Lambda (SOLO LECTURA) | ídem |
 | Prensa | acción `medios` de la Lambda (SOLO LECTURA) | ídem |
 | Operación | `diario/estado.json` del chequeo de salud | se evalúa entero cada corrida |
+| *Perfiles* | `GET /caudal/alertas/inventario` del worker `rr-auth` | no es una fuente de señales: dice a quién se le arma digest |
+
+### Las dos caras del diccionario de empresas, una por pilar
+
+Es lo mismo que ya hace el radar de la Vista Cliente, y es lo que da la
+precisión. Cada empresa vigilada se usa distinto según el pilar:
+
+- **Congreso → TEMA.** La marca se traduce a sus tópicos del tesauro. Nadie
+  legisla «Uber», legisla «plataformas tecnológicas». ⚠️ El alias **nunca**
+  entra como término de vocabulario: el match va por raíz de palabra y `claro`
+  casaría dentro de «de**claró**».
+- **Regulatorio · Contratación · Prensa → IDENTIDAD.** Ahí el registro sí la
+  nombra, así que se busca por su nombre propio. Una sanción a una vigilada
+  entra **siempre y en alto**, aunque el vocabulario no haya casado: no llega
+  porque el texto mencione su sector, llega porque lo nombra a él.
+
+⚠️ Si un perfil trae una llave de empresa que el diccionario no tiene (la llave
+real de Nueva EPS es `nuevaeps`, no `nueva eps`), el motor **lo dice** en los
+avisos del digest. Sin eso, el perfil se quedaría sin vigiladas en silencio y su
+dueño creería que Caudal las está mirando. Nada aparece por magia — y nada
+desaparece por magia.
 
 Los S3 solo se re-bajan si cambió el ETag: 5 MB que no cambiaron no se
 descargan dos veces.
@@ -164,15 +235,22 @@ Es un agente de launchd **propio**. No toca `run_diario.sh` ni su plist: el
 rastreo y las alertas son dos procesos con dueños distintos.
 
 ```bash
-# 1. destinatarios (el archivo real está gitignored)
+# 1. destinatarios de los SECTORES (el archivo real está gitignored).
+#    Los clientes no van aquí: cada perfil trae el correo de su dueño.
 cp tools/caudal/alertas/destinatarios.ejemplo.json \
    tools/caudal/alertas/destinatarios.json
 $EDITOR tools/caudal/alertas/destinatarios.json
 
-# 2. la key de Resend, FUERA del repo
+# 2. los dos secretos, FUERA del repo (que es público)
 mkdir -p ~/.config/caudal
-printf 'RESEND_API_KEY=re_xxxxxxxxxxxx\n' > ~/.config/caudal/alertas.env
+cat > ~/.config/caudal/alertas.env <<'EOF'
+RESEND_API_KEY=re_xxxxxxxxxxxx
+CAUDAL_ALERTAS_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+EOF
 chmod 600 ~/.config/caudal/alertas.env
+
+#    el MISMO valor de CAUDAL_ALERTAS_TOKEN va al worker:
+#    cd /Users/ricardoruiz/rr-auth && npx wrangler secret put CAUDAL_ALERTAS_TOKEN
 
 # 3. sellar el estado (esto NO manda nada)
 python3 tools/caudal/alertas/motor.py --baseline

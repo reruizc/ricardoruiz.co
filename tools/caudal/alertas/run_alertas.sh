@@ -39,18 +39,28 @@ fi
 echo $$ > "$LOCK/pid"
 trap 'rm -rf "$LOCK"' EXIT
 
-# --- la key de Resend ------------------------------------------------------
-# NO vive en el repo. Se busca, en orden:
-#   1. el entorno (si alguien exportó RESEND_API_KEY antes de llamar)
+# --- los dos secretos ------------------------------------------------------
+# NINGUNO vive en el repo (que es público). Se buscan, en orden:
+#   1. el entorno (si alguien los exportó antes de llamar)
 #   2. ~/.config/caudal/alertas.env  (chmod 600, fuera del repo)
-# Si no aparece, el motor NO falla: escribe los digests y los deja encolados.
-if [ -z "${RESEND_API_KEY:-}" ] && [ -f "$HOME/.config/caudal/alertas.env" ]; then
+#
+#   RESEND_API_KEY        manda los correos. Sin ella el motor NO falla:
+#                         escribe los digests y los deja encolados.
+#   CAUDAL_ALERTAS_TOKEN  lee los perfiles de cliente del worker rr-auth
+#                         (mismo valor que `npx wrangler secret put
+#                         CAUDAL_ALERTAS_TOKEN`). Sin él la corrida no se cae:
+#                         se queda con los sectores, que es el fallback.
+if [ -f "$HOME/.config/caudal/alertas.env" ] &&
+   { [ -z "${RESEND_API_KEY:-}" ] || [ -z "${CAUDAL_ALERTAS_TOKEN:-}" ]; }; then
   # shellcheck disable=SC1091
   set -a; . "$HOME/.config/caudal/alertas.env"; set +a
 fi
 
 if [ -z "${RESEND_API_KEY:-}" ]; then
   log "RESEND_API_KEY ausente · los digests quedarán en disco y encolados"
+fi
+if [ -z "${CAUDAL_ALERTAS_TOKEN:-}" ]; then
+  log "CAUDAL_ALERTAS_TOKEN ausente · sin perfiles de cliente, corrida por sectores"
 fi
 
 # --- corrida ---------------------------------------------------------------

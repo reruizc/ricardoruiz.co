@@ -29,6 +29,9 @@ BASE_DATOS = os.path.join(REPO, 'Bases de datos', 'leyes-senado')
 
 BUCKET = 'caudal-legislativo'
 API = 'https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com'
+# Worker rr-auth: de ahí salen los perfiles de cliente (endpoint de servicio).
+WORKER = os.environ.get('CAUDAL_WORKER_URL', 'https://rr-auth.reruizc.workers.dev')
+RUTA_INVENTARIO = '/caudal/alertas/inventario'
 
 TIMEOUT_API = 45
 
@@ -277,8 +280,79 @@ def api_seguro(payload, timeout=TIMEOUT_API):
         return None, f'{type(e).__name__}: {str(e)[:160]}'
 
 
+def perfiles_alertas(timeout=25):
+    """Perfiles de cliente con alertas ENCENDIDAS → (lista|None, error|None).
+
+    Habla con el worker `rr-auth` por su endpoint de servicio. No es una sesión
+    de usuario ni de admin: presenta un secreto en una cabecera propia. El
+    secreto vive FUERA del repo, junto a la key de Resend:
+
+        ~/.config/caudal/alertas.env   →  CAUDAL_ALERTAS_TOKEN=...
+
+    Sin secreto no se inventa nada ni se falla: devuelve (None, motivo) y el
+    motor sigue con los sectores, que es el fallback de siempre.
+
+    Ojo con el guarda del otro lado: rechaza peticiones con huella de navegador
+    (Origin, Sec-Fetch-*, Cookie). urllib no manda ninguna de esas, así que
+    esto pasa; un fetch() desde una página, no.
+    """
+    # Escotilla de pruebas: un archivo con la MISMA forma que devuelve el
+    # worker. Sirve para ensayar un perfil sin tocar producción y para correr
+    # sin red. Nunca se usa en el cron (la variable no existe allá).
+    fixture = (os.environ.get('CAUDAL_PERFILES_FIXTURE') or '').strip()
+    if fixture:
+        try:
+            d = json.load(open(fixture, encoding='utf-8'))
+        except (ValueError, OSError) as e:
+            return None, f'fixture ilegible ({fixture}): {str(e)[:120]}'
+        d.setdefault('ok', True)
+        d['_fixture'] = fixture
+        return d, None
+
+    token = (os.environ.get('CAUDAL_ALERTAS_TOKEN') or '').strip()
+    if not token:
+        return None, ('falta CAUDAL_ALERTAS_TOKEN (ver ~/.config/caudal/alertas.env): '
+                      'la corrida usa los sectores')
+    url = WORKER.rstrip('/') + RUTA_INVENTARIO
+    req = urllib.request.Request(
+        url, method='GET',
+        headers={'X-Caudal-Service': token,
+                 'Accept': 'application/json',
+                 'User-Agent': 'caudal-alertas/1.0 (+ricardoruiz.co)'})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            d = json.loads(r.read().decode('utf-8') or '{}')
+    except urllib.error.HTTPError as e:
+        # 404 acá casi siempre es "el secreto no coincide": el worker responde
+        # como si la ruta no existiera, a propósito.
+        pista = ' (¿el token del worker y el local son el mismo?)' if e.code == 404 else ''
+        return None, f'HTTP {e.code}{pista}'
+    except (urllib.error.URLError, ValueError, OSError, TimeoutError) as e:
+        return None, f'{type(e).__name__}: {str(e)[:160]}'
+    if not d.get('ok'):
+        return None, str(d.get('error') or 'respuesta sin ok')
+    return d, None
+
+
+def perfil_a_destino(p):
+    """Perfil del worker → destino con la forma que espera reglas.py."""
+    return {
+        'k': 'cli-' + str(p.get('perfilId') or ''),
+        'perfilId': p.get('perfilId') or '',
+        'nombre': p.get('nombre') or 'Cliente sin nombre',
+        'comision': p.get('comision') or '',
+        'sector_sanciones': p.get('sector_sanciones') or '',
+        'temas': list(p.get('temas') or []),
+        'empresas': list(p.get('empresas') or []),
+        'correo': (p.get('correo') or '').strip().lower(),
+        'plan': p.get('plan') or 'free',
+        'cadencia': p.get('cadencia') or 'semanal',
+        'tipo': 'cliente',
+    }
+
+
 def medios_sector(sector_k, temas, dias=2):
-    """Titulares recientes del sector → (eventos, errores).
+    """Titulares recientes del destino → (eventos, errores).
 
     Se consulta por cada tema del sector (igual que hace la Lambda en su Radar)
     y se dedupea por titular: una sola query genérica trae ruido de otro país,
@@ -311,9 +385,26 @@ def medios_sector(sector_k, temas, dias=2):
     return eventos, errores
 
 
-def contratos_sector(sector_k):
-    """Contratación del sector, vía la acción `cliente` → (eventos, error)."""
-    d, err = api_seguro({'action': 'cliente', 'sector': sector_k})
+def contratos_destino(dest):
+    """Contratación del destino, vía la acción `cliente` → (eventos, error, kpis).
+
+    Para un sector va `{'sector': k}` (idéntico a antes); para un cliente va su
+    perfil, y entonces la Lambda devuelve además los contratos DE SUS VIGILADAS
+    marcados con `vigilada`. Se pide sin `lectura`: la síntesis del modelo es
+    para la pantalla, no para el correo — acá se pagaría latencia por nada.
+    """
+    sector_k = dest['k']
+    if dest.get('tipo') == 'cliente':
+        payload = {'action': 'cliente', 'perfil': {
+            'nombre': dest.get('nombre') or '',
+            'temas': dest.get('temas') or [],
+            'empresas': dest.get('empresas') or [],
+            'sector_sanciones': dest.get('sector_sanciones') or '',
+            'comision': dest.get('comision') or '',
+        }}
+    else:
+        payload = {'action': 'cliente', 'sector': sector_k}
+    d, err = api_seguro(payload)
     if err:
         return [], err, {}
     eventos = []
@@ -333,9 +424,17 @@ def contratos_sector(sector_k):
             'meta': {'entidad': entidad, 'proveedor': r.get('proveedor') or '',
                      'valor': r.get('valor'), 'sector': sector_k,
                      'objeto': objeto,
+                     # la Lambda ya sabe si el contrato es de una vigilada del
+                     # perfil; se conserva su veredicto en vez de re-deducirlo.
+                     'vigilada': r.get('vigilada') or '',
                      'departamento': r.get('departamento') or ''},
         })
     return eventos, None, (d or {}).get('kpis', {})
+
+
+def contratos_sector(sector_k):
+    """Compatibilidad: contratación de un sector por su llave."""
+    return contratos_destino({'k': sector_k, 'tipo': 'sector'})
 
 
 # ---------------------------------------------------------------------------

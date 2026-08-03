@@ -197,26 +197,125 @@ TERMINOS_EXTRA = {
 _VOCAB_CACHE = {}
 
 
-def sectores():
-    """[{k, nombre, comision, sector_sanciones, temas}] — orden estable."""
-    return SECTORES_BASE
+# ---------------------------------------------------------------------------
+# 2.b) DESTINOS · el sector es el fallback, el cliente es el producto
+# ---------------------------------------------------------------------------
+# Un "destino" es a quién se le arma un digest. Hay dos clases y comparten
+# exactamente la misma forma, por eso todo el motor las trata igual:
+#
+#   tipo 'sector'  — los 6 presets. Vocabulario curado, sin dueño, sin correo
+#                    propio. Es lo que corre cuando no hay ningún cliente.
+#   tipo 'cliente' — un perfil guardado por cuenta (worker rr-auth). Trae SUS
+#                    temas, SUS empresas vigiladas y el correo de su dueño.
+#
+# El vocabulario de un cliente sale de dos fuentes, igual que en el radar de la
+# Vista Cliente: sus `temas` tal cual, y los TÓPICOS del tesauro que activan sus
+# empresas vigiladas (la cara TEMA del diccionario). Nadie legisla «Uber»,
+# legisla «plataformas tecnológicas».
+#
+# ⚠ El ALIAS de la empresa nunca entra como término de vocabulario: el match va
+# por raíz de palabra y «claro» casaría dentro de «declaró». Para el Congreso la
+# empresa vale por su tópico; su nombre propio solo se usa en Regulatorio,
+# Contratación y Prensa, donde el registro sí la nombra.
+
+def destino_desde_sector(s):
+    return {'k': s['k'], 'nombre': s.get('nombre', s['k']),
+            'comision': s.get('comision', ''),
+            'sector_sanciones': s.get('sector_sanciones', ''),
+            'temas': list(s.get('temas', [])), 'empresas': [],
+            'tipo': 'sector', 'correo': '', 'plan': '', 'cadencia': 'cada-corrida'}
 
 
-def sector(k):
-    for s in SECTORES_BASE:
-        if s['k'] == k:
-            return s
+_DESTINOS = [destino_desde_sector(s) for s in SECTORES_BASE]
+
+
+def registrar_destinos(lista):
+    """Reemplaza los destinos activos. Vaciar la lista vuelve a los 6 sectores."""
+    global _DESTINOS
+    _DESTINOS = list(lista) if lista else [destino_desde_sector(s) for s in SECTORES_BASE]
+    _VOCAB_CACHE.clear()
+    _EMPRESAS_CACHE.clear()
+    return _DESTINOS
+
+
+def destinos():
+    """[{k, nombre, comision, sector_sanciones, temas, empresas, tipo…}]."""
+    return _DESTINOS
+
+
+def destino(k):
+    for d in _DESTINOS:
+        if d['k'] == k:
+            return d
     return None
 
 
+# Nombres viejos: el resto del motor y las pruebas los siguen usando y a un
+# sector-destino le da igual cómo lo llamen.
+sectores = destinos
+sector = destino
+
+
+_EMPRESAS_CACHE = {}
+_EMP_POR_K = {e['k']: e for e in EMPRESAS}
+
+
+def empresas_de(k):
+    """Entradas del diccionario que vigila este destino, o None = todas.
+
+    None y [] NO son lo mismo, y la diferencia importa:
+      · None (sector) → se mira contra las 388 del diccionario, que es el
+        comportamiento histórico: «el proveedor es una empresa conocida».
+      · lista (cliente con vigiladas) → solo las suyas.
+      · [] (cliente sin vigiladas) → ninguna, y entonces la identidad no
+        dispara nada. Un cliente que no declaró vigiladas no quiere alertas
+        sobre empresas ajenas: quiere sus temas.
+    """
+    if k in _EMPRESAS_CACHE:
+        return _EMPRESAS_CACHE[k]
+    d = destino(k) or {}
+    if d.get('tipo') != 'cliente':
+        _EMPRESAS_CACHE[k] = None
+        return None
+    out = [_EMP_POR_K[x] for x in (d.get('empresas') or []) if x in _EMP_POR_K]
+    _EMPRESAS_CACHE[k] = out
+    return out
+
+
+def claves_desconocidas(claves):
+    """Llaves de empresa que el diccionario NO tiene.
+
+    El worker valida la FORMA de la llave, no que exista: quien vive con el
+    diccionario es este lado. Sin esto, un perfil con «nueva eps» (la llave real
+    es `nuevaeps`) se quedaría sin vigiladas EN SILENCIO y su dueño creería que
+    Caudal la está mirando. Nada aparece por magia — y nada desaparece por magia.
+    """
+    return [x for x in (claves or []) if x not in _EMP_POR_K]
+
+
+def topicos_de_empresas(claves):
+    """Llaves del tesauro que activan estas empresas (solo su núcleo)."""
+    if not _EMP_OK or not claves:
+        return []
+    emps = [_EMP_POR_K[x] for x in claves if x in _EMP_POR_K]
+    try:
+        return _EMP.topicos_de(emps)
+    except Exception:                                         # pragma: no cover
+        return []
+
+
 def vocabulario(k):
-    """Términos del sector, ya con higiene aplicada. Cacheado."""
+    """Términos del destino, ya con higiene aplicada. Cacheado."""
     if k in _VOCAB_CACHE:
         return _VOCAB_CACHE[k]
-    s = sector(k) or {}
+    s = destino(k) or {}
     idx = {t['k']: t for t in SINONIMOS}
     terms = list(s.get('temas', []))
     for tk in TOPICOS_POR_SECTOR.get(k, []):
+        if tk in idx:
+            terms += idx[tk]['terms']
+    # cliente: los tópicos de SUS vigiladas entran al vocabulario del Congreso
+    for tk in topicos_de_empresas(s.get('empresas')):
         if tk in idx:
             terms += idx[tk]['terms']
     terms += TERMINOS_EXTRA.get(k, [])
@@ -253,22 +352,25 @@ def hits_distintos(hits):
     return sorted([t for t, _w in out], key=lambda t: orden.get(t, 0))
 
 
-def sectores_de(texto, minimo=1):
-    """Sectores que toca un texto → [(k, [términos que casaron])].
+def destinos_de(texto, minimo=1):
+    """Destinos que toca un texto → [(k, [términos que casaron])].
 
-    `minimo` = cuántos términos distintos exige para contar el sector. El motor
+    `minimo` = cuántos términos distintos exige para contar el destino. El motor
     usa 1 para decidir pertenencia y ≥2 como señal de fuerza (ver nivel).
     """
     tn = norm(texto or '')
     if not tn:
         return []
     out = []
-    for s in SECTORES_BASE:
+    for s in _DESTINOS:
         k = s['k']
         hits = hits_distintos([t for t in vocabulario(k) if casa_termino(t, tn)])
         if len(hits) >= minimo:
             out.append((k, hits))
     return out
+
+
+sectores_de = destinos_de
 
 
 # ---------------------------------------------------------------------------
@@ -377,8 +479,13 @@ UMBRAL_MULTA = 100_000_000           # COP
 
 # --- empresas vigiladas -----------------------------------------------------
 
-def empresa_en_texto(texto):
-    """Empresa/gremio del diccionario nombrada en un texto libre (titulares).
+# El argumento `empresas` de las tres funciones de abajo es el universo contra
+# el que se busca: None = las 388 del diccionario (comportamiento de sector),
+# una lista = solo las que vigila ese cliente. Es lo que convierte «alguien
+# conocido apareció» en «apareció TU empresa», que es la alerta que se vende.
+
+def empresa_en_texto(texto, empresas=None):
+    """Empresa/gremio nombrada en un texto libre (titulares).
 
     Match por alias como palabra completa — 'claro' no casa dentro de
     'CLAROS MURCIA'. Devuelve la primera o None.
@@ -386,10 +493,32 @@ def empresa_en_texto(texto):
     if not _EMP_OK or not texto:
         return None
     encontradas = _EMP.empresas_en(texto)
+    if empresas is not None:
+        permitidas = {e['k'] for e in empresas}
+        encontradas = [e for e in encontradas if e['k'] in permitidas]
     return encontradas[0] if encontradas else None
 
 
-def proveedor_vigilado(nombre):
+def sancionado_vigilado(nombre, empresas=None):
+    """¿La entidad destinataria de un acto regulatorio es una vigilada?
+
+    Acá sí sirve `casa_registro` (palabra completa + vetos): el campo
+    `sancionado` son decenas de nombres de empresa, no millones de cédulas
+    como el proveedor de SECOP. Solo aplica con lista explícita: preguntarlo
+    contra las 388 devolvería «es una empresa conocida», que no es noticia.
+    """
+    if not _EMP_OK or not nombre or not empresas:
+        return None
+    for e in empresas:
+        try:
+            if _EMP.casa_registro(e, nombre):
+                return e
+        except Exception:                                     # pragma: no cover
+            continue
+    return None
+
+
+def proveedor_vigilado(nombre, empresas=None):
     """¿El proveedor de un contrato ES una empresa del diccionario?
 
     Usa `es_razon_social`, la regla ESTRICTA, no el match por alias. En SECOP el
@@ -400,19 +529,19 @@ def proveedor_vigilado(nombre):
     """
     if not _EMP_OK or not nombre:
         return None
-    for e in EMPRESAS:
+    for e in (EMPRESAS if empresas is None else empresas):
         if _EMP.es_razon_social(nombre, e):
             return e
     return None
 
 
-def entidad_vigilada(nombre):
+def entidad_vigilada(nombre, empresas=None):
     """Igual pero para la ENTIDAD contratante, donde la regla puede ser laxa:
     ahí no hay personas naturales y la marca encabeza la dependencia
     ('SENA REGIONAL VALLE …' es el SENA comprando)."""
     if not _EMP_OK or not nombre:
         return None
-    for e in EMPRESAS:
+    for e in (EMPRESAS if empresas is None else empresas):
         if _EMP.empieza_por_marca(nombre, e):
             return e
     return None
@@ -511,7 +640,7 @@ def nivel_normativa(row):
     return 'bajo', 'normativa general'
 
 
-def nivel_contrato(row, historico_entidad=None):
+def nivel_contrato(row, historico_entidad=None, empresas=None, propias=False):
     """Nivel de un contrato: por QUIÉN y por NOVEDAD, nunca por monto.
 
     El monto no discrimina: la Lambda ya devuelve el top del sector ordenado por
@@ -533,17 +662,17 @@ def nivel_contrato(row, historico_entidad=None):
     entidad = row.get('entidad') or ''
     cat = categoria_contrato(row.get('objeto') or row.get('_objeto') or '')
 
-    emp = proveedor_vigilado(proveedor)
-    if emp:
-        return ('alto',
-                f'el proveedor es {emp["nombre"]}, del registro de empresas vigiladas',
-                cat)
+    # `propias` cambia solo la REDACCIÓN, no el criterio: con perfil de cliente
+    # la frase tiene que decirle que es SU empresa, no «una empresa conocida».
+    de_quien = 'que este perfil vigila' if propias else 'del registro de empresas vigiladas'
 
-    emp_ent = entidad_vigilada(entidad)
+    emp = proveedor_vigilado(proveedor, empresas)
+    if emp:
+        return ('alto', f'el proveedor es {emp["nombre"]}, {de_quien}', cat)
+
+    emp_ent = entidad_vigilada(entidad, empresas)
     if emp_ent:
-        return ('medio',
-                f'contrata {emp_ent["nombre"]}, del registro de empresas vigiladas',
-                cat)
+        return ('medio', f'contrata {emp_ent["nombre"]}, {de_quien}', cat)
 
     if historico_entidad:
         if cat not in historico_entidad:
@@ -577,7 +706,7 @@ def prensa_accionable(titulo):
     return bool(_PRENSA_ACCIONABLE.search(norm(titulo)))
 
 
-def nivel_titular_empresa(titulo, emp):
+def nivel_titular_empresa(titulo, emp, propias=False):
     """Prensa que dispara SOLA: nombra una empresa vigilada, describe un hecho
     accionable, y no hay acto del Estado que le corresponda.
 
@@ -586,8 +715,9 @@ def nivel_titular_empresa(titulo, emp):
     actuado pero la prensa ya reporta una investigación o una orden, esperar al
     registro es llegar tarde.
     """
+    quien = f'{emp["nombre"]}, que este perfil vigila' if propias else emp['nombre']
     return ('alto',
-            f'la prensa reporta un hecho sobre {emp["nombre"]} que todavía no '
+            f'la prensa reporta un hecho sobre {quien} que todavía no '
             f'tiene acto del Estado en el registro — puede ir por delante')
 
 

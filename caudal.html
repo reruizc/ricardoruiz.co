@@ -238,6 +238,18 @@
   .btn-g.danger:hover{border-color:var(--red); color:var(--red)}
   .pf-msg{font-size:.72rem; color:var(--amber); margin-left:.3rem}
   .pf-msg.okmsg{color:var(--teal)}
+  /* --- interruptor de alertas por correo del perfil --- */
+  .pf-al{display:flex; align-items:center; gap:.55rem; flex-wrap:wrap;
+    margin-top:.9rem; padding-top:.9rem; border-top:1px solid var(--border)}
+  .pf-al .sw{width:34px; height:19px; border-radius:19px; background:var(--card2);
+    border:1px solid var(--border2); position:relative; flex:none; cursor:none; transition:.15s}
+  .pf-al .sw::after{content:''; position:absolute; top:2px; left:2px; width:13px; height:13px;
+    border-radius:50%; background:var(--ink3); transition:.15s}
+  .pf-al.on .sw{background:var(--teal-soft); border-color:var(--teal)}
+  .pf-al.on .sw::after{left:16px; background:var(--teal)}
+  .pf-al.busy{opacity:.55}
+  .pf-al .t{font-size:.76rem; color:var(--ink)}
+  .pf-al .s{font-size:.66rem; color:var(--ink3)}
   .lectura .acc{font-size:.82rem; line-height:1.5; color:var(--ink); margin:.28rem 0 .28rem 1rem; position:relative}
   .lectura .acc::before{content:'→'; position:absolute; left:-1rem; color:var(--teal)}
 
@@ -1726,7 +1738,7 @@
   const AUTH_API='https://rr-auth.reruizc.workers.dev';
   let _cliInited=false, _cliSeq=0;
   // estado del gestor de perfiles
-  let PF_LIST=[], PF_META=null, PF_ACTIVE=null, PF_DRAFT=null, PF_LIMIT=null;
+  let PF_LIST=[], PF_META=null, PF_ACTIVE=null, PF_DRAFT=null, PF_LIMIT=null, PF_CADENCIA=null;
 
   async function wcall(path, opts){
     const t=localStorage.getItem('rr-token');
@@ -1770,6 +1782,7 @@
       if(rt&&PF_DRAFT){ PF_DRAFT.temas.splice(+rt.dataset.rmtema,1); pfRenderTags(); return; }
       const re=t.closest('[data-rmemp]');
       if(re&&PF_DRAFT){ PF_DRAFT.empresas.splice(+re.dataset.rmemp,1); pfRenderTags(); return; }
+      if(t.closest('#pf-alertas')){ pfToggleAlertas(); return; }
       if(t.closest('#pf-save')){ pfGuardar(); return; }
       if(t.closest('#pf-cancel')){ pfCerrarEdit(); return; }
       if(t.closest('#pf-del')){ pfBorrar(); return; }
@@ -1812,7 +1825,7 @@
   }
   /* ---------- perfiles de cliente · CRUD contra el worker ---------- */
   async function pfLoadList(){
-    try{ const d=await wcall('/caudal/perfil/list'); PF_LIST=d.perfiles||[]; PF_LIMIT={usados:d.count,tope:d.ownedLimit,plan:d.plan}; }
+    try{ const d=await wcall('/caudal/perfil/list'); PF_LIST=d.perfiles||[]; PF_LIMIT={usados:d.count,tope:d.ownedLimit,plan:d.plan}; PF_CADENCIA=d.cadencia||null; }
     catch(e){ PF_LIST=[]; PF_LIMIT=null; }
     pfRenderBar();
   }
@@ -1827,6 +1840,8 @@
     if(!PF_LIST.length) h+='<span class="cob-note" style="margin:0">Todavía no tienes ninguno.</span>';
     h+='<span class="chip add" data-pfnew="1">+ Nuevo perfil</span>';
     if(PF_LIMIT) h+=`<span class="cob-note" style="margin:0">${PF_LIMIT.usados}/${PF_LIMIT.tope} · plan ${esc(PF_LIMIT.plan)}</span>`;
+    // El interruptor sale para el perfil abierto: es de ese perfil, no global.
+    if(PF_ACTIVE&&PF_ACTIVE.perfilId) h+=pfAlertasHTML(PF_ACTIVE);
     bar.innerHTML=h;
   }
   // Draft del editor. `desdePreset` copia un sector como punto de partida —
@@ -1841,7 +1856,8 @@
   function pfEditar(p){
     PF_DRAFT={perfilId:p.perfilId,nombre:p.nombre||'',descripcion:p.descripcion||'',
               temas:(p.temas||[]).slice(),empresas:(p.empresas||[]).slice(),
-              sector_sanciones:p.sector_sanciones||'',comision:p.comision||''};
+              sector_sanciones:p.sector_sanciones||'',comision:p.comision||'',
+              alertas:p.alertas||{activo:false}};
     pfRenderEdit();
   }
   function pfCerrarEdit(){ PF_DRAFT=null; const e=document.getElementById('pf-edit'); if(e){ e.hidden=true; e.innerHTML=''; } }
@@ -1884,6 +1900,45 @@
       </div>`;
     pfRenderTags();
     const ni=document.getElementById('pf-nombre'); if(ni&&!d.nombre) ni.focus();
+  }
+  /* ---------- alertas por correo del perfil ----------
+     Un interruptor y su estado, nada más. El motor de alertas
+     (tools/caudal/alertas/) solo ve los perfiles que estén encendidos, y el
+     default es apagado: un perfil no manda correos hasta que alguien lo diga. */
+  const PF_CAD_TXT={'cada-corrida':'dos veces al día','diaria':'una vez al día','semanal':'los lunes'};
+  // Estado de alertas del perfil abierto. Se prefiere lo que trae el propio
+  // perfil; si viene de la barra (resumen), se cae al de la lista.
+  function pfAlertasDe(p){
+    if(p&&p.alertas) return p.alertas;
+    const l=PF_LIST.find(x=>p&&x.perfilId===p.perfilId);
+    return (l&&l.alertas)||{activo:false};
+  }
+  function pfAlertasHTML(p){
+    const a=pfAlertasDe(p), on=a.activo===true;
+    const cad=a.cadencia||PF_CADENCIA||'semanal';
+    return `<div class="pf-al${on?' on':''}" id="pf-alertas" data-on="${on?1:0}"
+                 title="Prende o apaga el correo de alertas de «${esc(p.nombre||'')}»">
+      <span class="sw"></span>
+      <span class="t">Alertas por correo</span>
+      <span class="s">${on
+        ?'encendidas · '+esc(PF_CAD_TXT[cad]||cad)+', con los temas y las empresas de este perfil'
+        :'apagadas · este perfil no manda correos'}</span></div>`;
+  }
+  async function pfToggleAlertas(){
+    const el=document.getElementById('pf-alertas'), p=PF_ACTIVE;
+    if(!el||!p||!p.perfilId||el.classList.contains('busy')) return;
+    const nuevo=el.dataset.on!=='1';
+    el.classList.add('busy');
+    try{
+      const r=await wcall('/caudal/perfil/alertas',{method:'POST',
+        body:JSON.stringify({perfilId:p.perfilId,activo:nuevo})});
+      p.alertas=r.alertas||{activo:nuevo};
+      await pfLoadList();                    // repinta la barra con el estado nuevo
+    }catch(err){
+      el.classList.remove('busy');
+      const s=el.querySelector('.s');
+      if(s) s.textContent='no se pudo cambiar: '+(err.message||'error');
+    }
   }
   function pfRenderTags(){
     const d=PF_DRAFT; if(!d) return;
