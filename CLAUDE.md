@@ -5026,13 +5026,20 @@ cada cifra** — la distinción es el punto, no un adorno:
 - **Las que se cuentan** (`renderBancadasTematicas`, derivadas de `ELECTOS`): Bogotá 18 ·
   mujeres 84 · Caribe 34 · Amazonía/Orinoquía 21 · CITREP 16 · étnicas 9 · Estatuto de
   Oposición 2. Salen del escrutinio, se pueden verificar nombre por nombre.
-- **Las que se declaran**: bloques temáticos SIN registro oficial de miembros. Solo va lo
-  documentado en prensa, citado. Hoy: **Bancada Provida** (24 en 2020 → 52 en 2022-2026 →
-  «más de 30» electos para este periodo según su balance del 16-jun-2026; PAL del 28-jul-2026
-  sobre el art. 11 CP, de David Cote y Sara Castellanos — ambos verificados contra el roster).
-  ⚠️ **La cifra de «54 provida» que circula es del Congreso 2022-2026** (El Colombiano,
-  sep-2022), NO de este — no reciclarla. Para agregar otra bancada temática: exigir fuente;
-  sin ella no entra.
+- **Las que se declaran**: bloques temáticos SIN registro oficial de miembros. Hoy solo la
+  **Bancada Provida** (24 en 2020 → 52 en 2022-2026 → «más de 30» electos para este periodo
+  según su balance del 16-jun-2026). ⚠️ **La cifra de «54 provida» que circula es del Congreso
+  2022-2026** (El Colombiano, sep-2022), NO de este — no reciclarla.
+  ⚠️⚠️ **NO existe lista pública de sus integrantes 2026-2030 y no hay que inventarla.** En vez
+  de eso, `renderProvida()` muestra lo VERIFICABLE: los proyectos de esa agenda ya radicados
+  y sus firmantes reales, filtrando `{action:'radicados'}` de la Lambda con `PROVIDA_RE`. Se
+  actualiza solo con cada radicación. Medido (ago-2026): en el registro de la legislatura hay
+  **1 proyecto (PL 053/2026C, firma sola de David Cote)**; el **PAL del 28-jul sobre el art. 11
+  CP** (Cote + Sara Castellanos, vía Infobae) **aún no aparece** — `search_pal.php` de Senado
+  solo devuelve 5 actos y el XLSX de Cámara no incluye actos legislativos.
+  ⚠️ El filtro NO puede incluir «familia» a secas: trae subsidio familiar, familias cabeza de
+  hogar y el sistema de cuidado, que no son de esa agenda (medido).
+  Para agregar otra bancada temática: exigir fuente; sin ella no entra.
 Senado y Cámara van en **paneles separados** (`.comp-2`) y la leyenda subió de .66rem a
 .82rem: con 14-15 bancadas era ilegible.
 

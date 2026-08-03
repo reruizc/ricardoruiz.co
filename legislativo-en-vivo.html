@@ -110,47 +110,6 @@
 
   <script src="legislativo-base.js"></script>
   <script>
-  /* ── autores de un proyecto ──────────────────────────────────────
-     El campo `autor` no trae una convención estable y hay que tratarlo con
-     cuidado en ambas cámaras:
-       · Senado manda los nombres en MAYÚSCULAS separados por coma, pero el
-         prefijo de cámara a veces llega SIN coma delante ("…CAICEDOCARABALI
-         H.R. DANIEL MONROY…"), así que partir solo por coma pega dos personas.
-       · Cámara puede anteponer el cargo separado por coma ("Ministro de
-         Hacienda y Crédito Público, German Avila Plazas"): ahí la coma NO
-         separa autores, y partirla a ciegas inventa un firmante. */
-  const SOLO_CARGO=/^(?:ministr|viceministr|director|superintendent|defensor|procurador|fiscal|contralor|registrador|presidenta?\b|gobernador|alcald)/i;
-  function autoresDe(txt){
-    let s=String(txt||'').replace(/\s+/g,' ').trim();
-    if(!s) return [];
-    s=s.replace(/\s(H\.?\s?[SR]\.?)\s/gi,', $1 ');          // prefijo sin coma
-    const partes=s.split(',').map(x=>x.trim()).filter(Boolean);
-    const out=[];
-    for(const p of partes){
-      const limpio=p.replace(/^H\.?\s?[SR]\.?\s*/i,'').trim();
-      if(!limpio) continue;
-      // un fragmento que es solo un cargo pertenece a la persona que sigue
-      if(SOLO_CARGO.test(limpio)){ out.push({cargo:limpio,nombre:''}); continue; }
-      const prev=out[out.length-1];
-      if(prev&&prev.cargo&&!prev.nombre){ prev.nombre=limpio; continue; }
-      out.push({cargo:'',nombre:limpio});
-    }
-    // MAYÚSCULA SOSTENIDA (Senado) → capitalizada; Cámara ya viene bien
-    return out.map(a=>{
-      const n=a.nombre||a.cargo;
-      const txt=(n===n.toUpperCase()?tCase(n):n);
-      return a.nombre&&a.cargo?`${txt} (${a.cargo})`:txt;
-    }).filter(Boolean);
-  }
-  /* "A, B y C · y otros 17" — la lista completa vive en el modal */
-  function autoresCorto(txt,n){
-    const a=autoresDe(txt); n=n||3;
-    if(!a.length) return '';
-    if(a.length===n+1) n=a.length;                 // esconder uno solo no ahorra nada
-    const top=a.slice(0,n), resto=a.length-top.length;
-    const unidos=top.length>1?top.slice(0,-1).join(', ')+' y '+top[top.length-1]:top[0];
-    return unidos+(resto>0?` <span style="opacity:.6">y otros ${resto}</span>`:'');
-  }
   /* ── EN VIVO · últimos proyectos de ley (Senado + Cámara) ─────
      Lee el JSON compacto que produce el harvester (Lambda 3×/día) en S3.
      Shape: { actualizado, base_pdf, senado:[…], camara:[…] }
