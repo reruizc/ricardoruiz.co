@@ -5270,13 +5270,32 @@ CADA registro. Sumar los dos registros lo cuenta dos veces.
 
 | 2022-2026 | PL | PL + AL |
 |---|---|---|
-| Solo registro del Senado (lo que Caudal tenía) | 1.496 | 1.606 |
-| **Unión deduplicada (lo correcto)** | **2.828** | **3.056** |
-| Suma bruta de los dos registros | 3.447 | 3.710 |
+| Solo registro del Senado (lo que Caudal tenía) | 1.496 | 1.605 |
+| **Unión deduplicada (lo correcto)** | **2.826** | **3.053** |
+| Suma bruta de los dos registros | 3.447 | 3.709 |
 
-Contraste externo: **Dapper publica 3.478** ≈ la suma bruta de PL (3.447, +0,9%)
-→ está doble contando los que cruzan. **Orza publica 3.011** ≈ la unión PL+AL
-(3.056, −1,5%) → cuenta bien y suma proyectos de ley + actos legislativos.
+Contraste externo (re-verificado ago-2026 contra las fuentes): **Dapper publica
+3.478** ≈ la suma bruta de PL (3.447, +0,9%) → está doble contando los que
+cruzan; refuerza la lectura que dicen contar hasta el **20 de junio** de 2026,
+una ventana MÁS CORTA que el cuatrienio, y aun así les da 650 proyectos más.
+**Orza publica 3.011** (644+665+907+795 por legislatura, sumado de su informe) ≈
+la unión PL+AL (3.053, −1,4%) → cuenta bien y suma proyectos de ley + actos
+legislativos.
+
+**Auditoría de la deduplicación** (hecha porque un cliente preguntó por la
+discrepancia; el riesgo real era estar borrando proyectos de verdad). De los
+**621 registros de Cámara removidos** en el cuatrienio 2022-2026:
+**580 (93%) declaran explícitamente su propio número de Senado** — lo dice la
+fuente, no se infiere; **41 se quitan solo por parecido de título** (muestreados
+tres, los tres con contraparte real: el de "financiamiento del Presupuesto" es la
+tributaria, Senado 262/25); y **9 que sí declaran número de Senado se colaron** y
+siguen contados dos veces. O sea que el verdadero está entre **2.817 y 2.867**:
+nuestros 2.826 caen adentro con ±1,5%. **No estamos borrando proyectos reales.**
+
+Esto se publicó en `legislativo-historico.html` como apartado propio con las
+cuatro formas de contar (deduplicada, PL+AL, y las dos brutas), **sin nombrar a
+los competidores**: el argumento se sostiene describiendo el método y así no
+envejece si alguno corrige su cifra.
 
 **Pipeline (orden de corrida):**
 ```bash
@@ -5313,18 +5332,37 @@ etiquetas erradas en ambos lados). Da igual: la dedup decide por número+título
 por la etiqueta.
 
 **Lo que el listado de Cámara NO trae** (y cómo queda marcado en el dato):
-- Sin fecha de radicación ni de debates → `fecha_presentacion: null`, sin
-  `dias_a_primer_debate`, y la etapa se **infiere del estado textual**
-  (`_ETAPA_POR_ESTADO`). Están en la ficha individual (`GET /{link_web}`), ~1.250
-  requests por cuatrienio — **pendiente**.
-- Cámara **no dice la causa del archivo** → sus archivados caen en
-  `ARCHIVADO_OTRO`, nunca en `ARCHIVADO_TIEMPO`. **No confundir con "no murió por
-  tiempo": es "la fuente no lo informa".** `stats.json` lo expone en
-  `archivado_causa_no_informada`.
-- Por eso `embudo` y `dias_a_primer_debate` de `stats.json` se calculan **solo
-  sobre el registro del Senado** (`embudo_alcance: 'registro_senado'`), que es
-  donde hay fechas reales. El volumen de Cámara sí entra a resultados, por_anio,
-  por_comision y tipología.
+- ✅ **RESUELTO (ago-2026) · las fechas.** Estaban en la ficha individual y
+  `tools/leyes-senado/harvest_camara_fichas.py` las cosecha una a una: **4.113
+  fichas, cero fallos**, y los proyectos de Cámara con fecha de radicación pasan
+  de **0 a 3.738 (99,1%)**. Con eso el embudo deja de ser del Senado y se calcula
+  sobre **13.387 de 13.831 proyectos (96,8%)**.
+- ❌ **NO resuelto y no lo va a estar: la causa del archivo.** Se buscó
+  explícitamente en fichas archivadas de cuatro épocas distintas y **no está en
+  ninguna** (solo ruido del menú). Sus archivados siguen en `ARCHIVADO_OTRO`,
+  nunca en `ARCHIVADO_TIEMPO`. **No confundir con "no murió por tiempo": es "la
+  fuente no lo informa"**, y `stats.json` lo declara en
+  `archivado_causa_no_informada` (2.479). No lo estimes.
+- `embudo` (el viejo) se conserva **intacto** con `embudo_alcance:
+  'registro_senado'`; el nuevo va aparte en **`embudo_universo`** +
+  `embudo_universo_alcance`, que declara cobertura, faltantes por registro y de
+  dónde salió cada fecha (`fecha_fuente`).
+
+⚠️⚠️ **El "74% mueren antes del primer debate" que circuló NO es comparable con
+el número nuevo.** Salía de contar *el índice del último campo con fecha*, no los
+debates aprobados, así que un proyecto con un solo debate en Cámara contaba como
+etapa 3. Sobre el universo completo la cifra correcta es **63,5% mueren antes del
+primer debate** (Senado 58,9% · Cámara 75,2%) y **18,4% terminan en ley**. Si el
+74% está en material que ya circuló, corrígelo.
+
+⚠️ **Casi se publica un número falso, y la lección es reusable:** la primera
+versión del cálculo exigía la **fecha del acta** para dar un debate por aprobado
+y arrojaba **98,3% de mortandad en Cámara** contra 58,9% del Senado. Era el
+parser, no el Congreso. Se separó el **hito** de la **fecha**, con tres respaldos
+posibles, y cada debate guarda cuál lo sostiene: `fecha_acta` 71 ·
+`texto_aprobado` 542 · `ponencia_siguiente` 429. El tercero es **inferencia
+procedimental** y va etiquetado para poder filtrarlo. Regla: cuando una fuente
+rinde mucho peor que su hermana, sospecha del parser antes que del mundo.
 
 **Campos nuevos:** `origen_registro` ∈ {senado, camara} en `proyectos.jsonl` y
 `actos-legis.jsonl`; en `indice.json` va comprimido como `'oc': 1` (solo cuando es
@@ -5411,9 +5449,18 @@ Lambda leyes-analiza (patrón test-presidencial-explica):
 Los metadatos solos (sin gaceta) permiten **análisis de supervivencia** del
 trámite — el foso que ni Dapper ni Sonar tienen. Hallazgos ya calculados
 (sobre pdly, no recalcular a menos que cambien los datos):
-- **74% de los proyectos mueren SIN llegar a primer debate** (96% presentados
-  → 26% debatidos). El cementerio es el **orden del día**, no la votación.
-- Solo **~28% terminan en ley**. Los que cruzan 1er debate: volado **50/50**.
+- ⚠️ **CIFRAS CORREGIDAS ago-2026 · las de abajo eran solo del registro del
+  Senado y con una métrica distinta.** Sobre el universo completo (Senado +
+  Cámara, 96,8% con fecha): **63,5% mueren antes del primer debate** (Senado
+  58,9% · Cámara 75,2%) y **18,4% terminan en ley**. El cementerio sigue siendo
+  el **orden del día**, no la votación — eso no cambió. Ver el bloque de Cámara
+  más arriba para por qué el "74%" viejo no es comparable.
+- El **18,4% es más honesto que el ~25% del Senado solo**, y la razón es
+  estructural: un proyecto que cruza de cámara y se vuelve ley queda deduplicado
+  bajo el registro del Senado, así que los ~3.700 de origen Cámara que entran al
+  denominador son, casi por definición, **los que NO cruzaron**. Contar leyes
+  solo donde aterrizan las leyes infla el porcentaje.
+- *(histórico, no recalcular: con el alcance viejo daba 74% / ~28%.)*
 - **Mortalidad por brecha entre debates** (confirma "después de X se cae"): de
   los que aprueban 1er debate en Senado, mueren el **34%** si el 2º debate
   llega ≤90 días, **60%** a 181-365 días, **85%** si tarda >1 año o nunca
@@ -6026,11 +6073,42 @@ sin expo-motivos, tokeniza, filtra palabras >5% docfreq → `dist/texto-index.js
   escaneadas** — 2006+ es todo digital, pypdf limpio, 42 min a ~59/min) → índice pasó de
   **~1.996 → ~4.572 proyectos con texto** (~19% → **~43%** de los 10.664). `texto-index.json`
   23 MB · 255.901 palabras.
+- ✅ **Cobertura ago-2026: 4.846 → 7.594 proyectos (32,9% → 50,9%)**, Cámara de
+  **0% a 45,1%**, y 2024/2025 de 45%/31% a **87%/82%**. `texto-index.json` pasó a
+  **40 MB**.
+  ⚠️⚠️ **El cuello NO era cosechar** — de las gacetas indexables de 2006+ solo
+  faltaban **25** en S3. Era que `build_texto_index` **excluía siempre la
+  exposición de motivos**, y de esas 2.930 gacetas **1.433 pertenecen a un solo
+  proyecto**: ahí no es un boletín, es el texto radicado, y era **la única fuente
+  de texto de los que mueren antes del primer debate** (justo los que importan
+  para el análisis de supervivencia). Se le puso umbral propio y más estricto.
+  Moraleja: antes de mandar a cosechar, medir qué se está descartando.
+- **Legislatura viva:** `pdly.jsonl` se cortaba en el **id 9923** con **cero**
+  proyectos de 2026-2027, así que indexar su texto no habría servido — no había a
+  qué colgarlo. Como el manifiesto diario ya trae el shape crudo de
+  `parse_detalle`, `build_dataset` lo absorbe **sin volver a leyes.senado**. Hoy
+  hay **207 proyectos** de la legislatura en curso y **133 responden a búsqueda
+  por articulado** (el radicado 001/26 aporta 1.140 términos que no están en su
+  título).
+- **Refresco:** `camara_fichas`, `dataset_build`, `texto_index` y la subida entran
+  al **cron existente**, no a un disparo propio, porque dependen del rastreo del
+  día y cuestan poco (`build_dataset` tarda 10 s). Si el dataset falla, el índice
+  y la subida se omiten.
 - **Deploy del índice:** `aws s3 cp dist/texto-index.json s3://caudal-legislativo/metadata/
   texto-index.json` → la Lambda lo recarga en cold start (`_get_json('metadata/texto-index.json')`).
-  ⚠ **Memoria Lambda subida a 1024 MB** (era 512): parsear el JSON de 23 MB a dict de 255k
-  palabras se comía los 512. El `update-function-configuration --memory-size` además recicla
-  los contenedores warm (sirve de "redeploy" para que tomen el índice nuevo).
+  ⚠ **Memoria Lambda: 512 → 1024 → 1536 → 3008 MB** (ago-2026). El
+  `update-function-configuration --memory-size` además recicla los contenedores warm
+  (sirve de "redeploy" para que tomen el índice nuevo) y, a diferencia de
+  `--environment`, **no toca las variables de entorno**.
+  ⚠️ **Sobre el "arranque en frío de 16-26 s" que se reportó: NO se reproduce.**
+  Medido: `Init Duration` real **0,58 s** y llamadas en frío end-to-end de **4-6 s**
+  (`tema`, `snippets`, `buscar`, `stats`), muy lejos del corte de 30 s del gateway.
+  La p95 de 15,7 s y el máximo de 23,6 s que se ven en CloudWatch los producen
+  **3 invocaciones**, que son generaciones de DeepSeek de la Vista Cliente — el
+  camino que ya está resuelto con sondeo. **Al leer duraciones en CloudWatch,
+  separar las que llaman al modelo: contaminan cualquier percentil.** El salto a
+  3008 MB se dejó como colchón (solo 588 MB usados; la memoria extra es CPU para
+  parsear el índice, que creció de 23 a 40 MB en un día), no como rescate.
 - **PENDIENTE — pre-2006, PERO NO ES UN PROBLEMA DE OCR (re-investigado jul-31-2026):**
   se corrió `harvest_gacetas_texto.py --ocr --indexables --desde 1990-01-01 --hasta 2006-01-01
   --workers 3` sobre los 171 pendientes de esa ventana → **100% `fail_download`, 0 OCR-eadas**.
@@ -6266,10 +6344,16 @@ vez; el módulo de alertas corre con su propio launchd justamente para no tocar
 | Motor de alertas | `26f8a19` | el push: diff diario, digest, silencio |
 | Latencia | `e3015cc` | la lectura del analista se separa del radar |
 | Alertas por perfil | `1a60f1e` | endpoint de servicio + opt-in + buzones |
+| Dato legislativo | `8f728d7` | Cámara con fechas · articulado buscable · legislatura viva |
 
 **Lo que esto movió, medido:** producto por cliente 25%→70% · entrega proactiva
-0%→~55% · operación 40%→65%. Como producto vendible (SKU A) el conjunto pasó de
-**~55% a ~72%**.
+0%→~55% · operación 40%→65% · foso de datos 85%→90%. Como producto vendible
+(SKU A) el conjunto pasó de **~55% a ~74%**.
+
+**La vía más grande que queda para subir cobertura de texto:** el **PDF del
+radicado de Cámara**, uno por proyecto, ~4.000, en un host **sin WAF**. Es lo que
+llevaría el articulado de 50,9% a bastante más, y no tiene el problema de ritmo
+que sí tiene leyes.senado.
 
 ⚠️ **El bloqueador #1 dejó de ser las alertas y pasó a ser el ACCESO COMERCIAL.**
 El gate de `caudal.html` sigue siendo **tres correos escritos a mano en el HTML**
