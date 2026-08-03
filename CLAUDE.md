@@ -6449,6 +6449,55 @@ faltando (SECOP corre con el rate limit anónimo; exige cuenta en datos.gov.co).
    y por bancada, falta exponerlo agregado. Coaliciones sigue PAUSADO por
    decisión.
 
+> **📌 HANDOFF · dónde retomar Caudal (ago-3-2026)**
+>
+> **Todo lo de la tanda está commiteado y pusheado.** Últimos: `1834056` (el
+> histórico sobre las dos cámaras) · `60aafab` (apartado de precisión del
+> conteo) · `8f728d7` + `60a854c` (frente legislativo) · `9ba2ef1` (editor de
+> perfil). La Lambda está en **3008 MB / 60 s** y sirve el dataset nuevo.
+>
+> **Configurado y verificado end-to-end:** el motor de alertas habla con el
+> worker (`CAUDAL_ALERTAS_TOKEN` puesto en los dos lados, 43 chars) y
+> `RESEND_API_KEY` está en `~/.config/caudal/alertas.env`. Una corrida en seco
+> reporta *«0 perfiles con alertas encendidas de 0 guardados»*, que es la
+> respuesta correcta del endpoint: cae a los 6 sectores porque todavía no hay
+> ningún perfil creado.
+>
+> **Lo que falta para estrenar el piloto, en orden:**
+> 1. **El click-through en navegador** — crear un perfil, prender el
+>    interruptor, correr su radar, editarlo, borrarlo. NADIE lo ha hecho:
+>    `caudal.html` es gated y el preview no puede autenticarse. Es un minuto
+>    con Chrome, donde la sesión ya está iniciada.
+> 2. **`destinatarios.json`** — hoy vacío; las corridas reportan
+>    `sin_destinatarios`. Sin esto el motor calcula y encola, pero no le llega
+>    a nadie.
+> 3. **`SOCRATA_APP_TOKEN`** — SECOP corre con el rate limit anónimo. Exige
+>    cuenta en datos.gov.co, la crea Ricardo.
+>
+> **Los dos frentes siguientes, que NO chocan entre sí** (se pueden lanzar en
+> paralelo, propiedad exclusiva de archivos):
+> - **G · análisis del articulado.** Extraer con DeepSeek qué cambia cada
+>   proyecto (qué norma modifica, qué artículos, qué obligaciones crea, a quién
+>   aplica, qué sanciones) sobre los 7.594 textos que ya están en S3. Es lo que
+>   convierte índice en análisis, y donde el "a quién aplica" se cruza con las
+>   vigiladas del perfil. Archivos: `tools/caudal/analisis/**` (nuevo) ·
+>   `lambda_handler.py` · `caudal_core.py` · `caudal.html`. Empezar por la
+>   legislatura viva (207) y **medir el costo real** antes de escalar
+>   (referencia del proyecto: ~USD 0,0024/doc con V4 Flash). Ojo con el gotcha
+>   ya medido: `max_tokens` 6000 con reintento a 12000, porque con 2000 V4 gasta
+>   el presupuesto en razonamiento y devuelve `content` vacío.
+> - **H · PDF del radicado de Cámara.** ~4.000 archivos, uno por proyecto, en un
+>   host **sin WAF**. Es la vía más grande que queda para subir el articulado
+>   por encima del 50,9%. Archivos: `tools/leyes-senado/**` ·
+>   `tools/caudal/build_texto_index.py`.
+>
+> **El bloqueador #1 sigue siendo el acceso comercial**, y ninguno de los dos
+> frentes de arriba lo toca: el gate de `caudal.html` son tres correos escritos
+> a mano más tokens de invitado en el KV. Un gremio que quiera pagar no puede
+> entrar. `rr-auth` ya tiene planes y Wompi ya cobra para el resto del sitio;
+> falta cablearlo. Eso es lo que convierte el ~72% de producto vendible en algo
+> que se factura.
+
 **⚠️ Trabajo SIN COMITEAR en el repo (jul-31), ajeno a Caudal:** hay bastante
 en el working tree de otros frentes —`analisis-candidato.html`, `cand-index.js`,
 `endoso-2026.html`, `electoral.html`, `brujula-2027.html`, `previa-1v.html`,
@@ -6555,9 +6604,16 @@ empresas` hace **round-robin entre vigiladas** (una con 40 sanciones no puede
 acaparar el panel). Prensa usa ventana de 21 días y dedup por título — la misma
 nota replicada por 4 medios es UNA señal para el cliente, no cuatro.
 
-⚠️ **Deuda conocida: `pfEditar()` está definida y NUNCA se llama.** Un perfil
-guardado no se puede editar — solo crear y borrar. Con el opt-in de alertas
-encima ya no es cosmético: equivocarse en un tema obliga a rehacer el perfil.
+✅ **RESUELTO (`9ba2ef1`, ago-2026): `pfEditar()` estaba definida y nunca se
+llamaba.** Y era peor de lo que se creía: `pfBorrar` exige `PF_DRAFT.perfilId`,
+que solo existe cuando el editor abre uno EXISTENTE, así que un perfil guardado
+no se podía **ni corregir ni borrar** desde la interfaz. Ahora hay un chip
+`✎ Editar` en la barra, visible solo con un perfil abierto, que carga
+`PF_ACTIVE` al draft. Va por delegación como el resto del editor (su DOM se
+recrea entero en cada render) y su caso se evalúa **antes** que `[data-pf]`,
+para que un anidamiento futuro no lo haga caer en `pfAbrir`. Guardar una
+edición no toca el interruptor de alertas: el opt-in tiene una sola puerta en
+`/caudal/perfil/alertas` y `/save` ignora ese bloque del cuerpo.
 
 #### Latencia · la lectura del analista se separa del radar (ago-2026)
 
