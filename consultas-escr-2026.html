@@ -6,13 +6,23 @@
   <title>Consultas Presidenciales 2026 · Escrutinio · Ricardo Ruiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
+    /* HelveticaNeue embebida (familia completa). El logo va aparte en Syne. */
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-thin.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:swap; }
+    [onclick*="toggleTheme"] { display: none !important; }  /* sistema visual v2: sin toggle de modo dia */
     :root{--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--card-border:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.08);--bar-bg:rgba(255,255,255,0.1);--td-hover:rgba(255,255,255,0.04)}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html{scroll-behavior:smooth}
-    body{background:#060810;color:var(--white);font-family:'Syne',sans-serif;cursor:none;min-height:100vh;overflow-x:hidden}
+    body{background:#060810;color:var(--white);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;cursor:none;min-height:100vh;overflow-x:hidden}
     .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
     .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.4}
     .bg-layer{position:fixed;inset:0;z-index:0;background:url('foto-fondo.webp') center right/cover no-repeat}
@@ -20,13 +30,13 @@
     .shell{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column}
     .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
     .electoral-nav-auth{display:flex;align-items:center;gap:.75rem}
-    .e-btn-login{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);text-decoration:none;border:1.5px solid transparent;padding:.35rem .8rem;transition:color .2s,border-color .2s}
+    .e-btn-login{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);text-decoration:none;border:1.5px solid transparent;padding:.35rem .8rem;transition:color .2s,border-color .2s}
     .e-btn-login:hover{color:var(--white);border-color:rgba(255,255,255,.2)}
-    .e-btn-register{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.35rem .8rem}
-    .e-user-name{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7)}
-    .e-user-plan{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.2rem .6rem}
-    .e-btn-logout{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0}
-    .e-btn-back{font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0}
+    .e-btn-register{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.35rem .8rem}
+    .e-user-name{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+    .e-user-plan{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.2rem .6rem}
+    .e-btn-logout{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0}
+    .e-btn-back{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0}
     .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
     .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.8;transition:opacity .2s}
     .logo-link:hover{opacity:1}
@@ -36,81 +46,104 @@
     .logo-text span{color:var(--blue)}
     @media(max-width:900px){.electoral-nav{display:none}}
     .top-bar{display:flex;align-items:flex-start;justify-content:space-between;padding:1.1rem 2.5rem 0;flex-shrink:0}
-    .page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
+    .page-title{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
     .page-title span{color:var(--blue)}
-    .breadcrumb{padding:.6rem 2.5rem 0;font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);border-bottom:1px solid var(--border);padding-bottom:.7rem;flex-shrink:0}
+    .breadcrumb{padding:.6rem 2.5rem 0;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);border-bottom:1px solid var(--border);padding-bottom:.7rem;flex-shrink:0}
     .breadcrumb a{color:rgba(0,71,255,.7);text-decoration:none}
     .breadcrumb a:hover{color:var(--blue)}
-    .meta-bar{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;padding:.5rem 2.5rem;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.08em;color:rgba(255,255,255,.35);flex-shrink:0}
+    .meta-bar{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;padding:.5rem 2.5rem;border-bottom:1px solid var(--border);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.62rem;letter-spacing:.08em;color:rgba(255,255,255,.35);flex-shrink:0}
     .meta-item b{color:rgba(74,222,128,.85);font-weight:700}
-    .source-badge{margin-left:auto;font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:.3rem .8rem}
+    .source-badge{margin-left:auto;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:.3rem .8rem}
     .source-badge b{color:var(--blue)}
-    .content-area{flex:1;padding:1.8rem 2.5rem 1.5rem}
+    .content-area{flex:1;padding:1.4rem 2.5rem 1.5rem}
     .loader-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;min-height:300px}
     .loader-ring{width:40px;height:40px;border:2px solid rgba(0,71,255,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .loader-label{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3)}
-    .sub-selector{display:flex;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border);padding-bottom:1rem}
-    .sub-label{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-right:.25rem}
-    .dep-select{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.45rem 2rem .45rem .8rem;cursor:pointer;outline:none;transition:border-color .2s;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .75rem center}
-    .dep-select:hover,.dep-select:focus{border-color:var(--blue)}
-    .dep-select option{background:#0e1220;color:var(--white)}
-    .search-input{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.06em;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.45rem .8rem;outline:none;width:200px;transition:border-color .2s}
-    .search-input:focus{border-color:var(--blue)}
-    .search-input::placeholder{color:rgba(255,255,255,.25)}
-    .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
-    .kpi-card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.1rem 1.3rem;backdrop-filter:blur(4px)}
-    .kpi-label{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
-    .kpi-val{font-family:'Syne',sans-serif;font-weight:800;font-size:1.7rem;letter-spacing:-.04em;line-height:1;color:var(--blue)}
-    .kpi-val.wh{color:var(--white)}.kpi-val.gr{color:var(--green)}.kpi-val.sm{font-size:.95rem;line-height:1.3}
-    .kpi-delta{font-family:'DM Mono',monospace;font-size:.6rem;color:rgba(255,255,255,.28);margin-top:.3rem}
-    .results-grid{display:grid;grid-template-columns:1fr 300px;gap:1.2rem}
-    .card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.3rem;overflow:hidden;backdrop-filter:blur(4px)}
-    .card-label{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:1rem}
-    .drill-nav{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap}
-    .drill-crumb{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);cursor:pointer;padding:.3rem .7rem;border:1px solid transparent;transition:color .15s}
+    .loader-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+    .sub-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4)}
+    .selector-row{display:flex;gap:1.2rem;align-items:flex-start;margin-bottom:1.2rem;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:1rem}
+    .selector-block{display:flex;flex-direction:column;gap:.5rem;min-width:0;flex:1}
+    .chips{display:flex;gap:.5rem;flex-wrap:wrap}
+    .chip{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.04);color:rgba(255,255,255,.6);border:1.5px solid var(--card-border);padding:.45rem .85rem;cursor:pointer;transition:all .18s;position:relative}
+    .chip:hover{background:rgba(255,255,255,.08);color:var(--white)}
+    .chip.active{background:var(--cons-color,var(--blue));color:#fff;border-color:var(--cons-color,var(--blue))}
+    .chip.cand-chip.active{background:var(--cand-color,var(--blue));color:#fff;border-color:var(--cand-color,var(--blue))}
+    .chip-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dot,var(--blue));margin-right:.45rem;vertical-align:middle}
+    .chip.active .chip-dot{background:rgba(255,255,255,.95)}
+    .chip-sub{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.55rem;color:rgba(255,255,255,.35);margin-left:.45rem;font-weight:400}
+    .chip.active .chip-sub{color:rgba(255,255,255,.85)}
+    .chip-count{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.55rem;background:rgba(0,0,0,.25);padding:.08rem .35rem;margin-left:.45rem;border-radius:2px}
+    .chip.active .chip-count{background:rgba(255,255,255,.25)}
+    .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.2rem}
+    .kpi-card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1rem 1.2rem;backdrop-filter:blur(4px)}
+    .kpi-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
+    .kpi-val{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:1.55rem;letter-spacing:-.04em;line-height:1;color:var(--blue)}
+    .kpi-val.wh{color:var(--white)}.kpi-val.gr{color:var(--green)}.kpi-val.sm{font-size:.92rem;line-height:1.3}
+    .kpi-delta{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.58rem;color:rgba(255,255,255,.28);margin-top:.3rem}
+    .results-grid{display:grid;grid-template-columns:1fr 360px;gap:1.2rem}
+    .card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.2rem;overflow:hidden;backdrop-filter:blur(4px)}
+    .card-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:.8rem}
+    .drill-nav{display:flex;align-items:center;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap}
+    .drill-crumb{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);cursor:pointer;padding:.25rem .6rem;border:1px solid transparent;transition:color .15s}
     .drill-crumb.active{color:var(--white);border-color:var(--card-border);background:rgba(255,255,255,.04)}
-    .drill-crumb.clickable{color:rgba(0,71,255,.7)}
+    .drill-crumb.clickable{color:rgba(0,71,255,.75)}
     .drill-crumb.clickable:hover{color:var(--blue)}
-    .drill-sep{color:rgba(255,255,255,.2);font-size:.6rem}
-    .level-badge{font-family:'DM Mono',monospace;font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;padding:.2rem .55rem;border:1px solid}
-    .level-badge.dep{color:rgba(167,139,250,.7);border-color:rgba(167,139,250,.25);background:rgba(167,139,250,.06)}
-    .level-badge.mun{color:rgba(0,71,255,.8);border-color:rgba(0,71,255,.3);background:rgba(0,71,255,.06)}
-    .level-badge.pues{color:rgba(74,222,128,.7);border-color:rgba(74,222,128,.25);background:rgba(74,222,128,.06)}
+    .drill-sep{color:rgba(255,255,255,.2);font-size:.55rem}
+    .level-badge{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;padding:.18rem .55rem;border:1px solid;margin-left:auto}
+    .level-badge.nac{color:rgba(167,139,250,.8);border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.06)}
+    .level-badge.dep{color:rgba(0,71,255,.85);border-color:rgba(0,71,255,.3);background:rgba(0,71,255,.06)}
+    .level-badge.mun{color:rgba(74,222,128,.8);border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.06)}
+    .level-badge.com{color:rgba(245,158,11,.85);border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.06)}
+    .map-wrap{position:relative}
+    #cons-map{width:100%;height:520px;background:#060810}
+    .map-back-btn{position:absolute;top:.55rem;right:.55rem;z-index:500;background:rgba(0,71,255,.92);color:#fff;border:none;padding:.4rem .8rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border-radius:2px;transition:background .18s}
+    .map-back-btn:hover{background:rgba(0,71,255,1)}
+    .map-hint{position:absolute;bottom:.6rem;left:.6rem;z-index:500;background:rgba(6,8,16,.78);padding:.35rem .65rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.08);pointer-events:none}
+    .leaflet-container{background:#060810 !important}
+    .leaflet-tile-pane{display:none}
+    .leaflet-control-attribution{background:rgba(6,8,16,.75)!important;color:rgba(255,255,255,.2)!important;font-size:.4rem!important}
+    .leaflet-control-attribution a{color:rgba(0,71,255,.5)!important}
+    #cons-map .leaflet-interactive{cursor:pointer !important}
+    .leaflet-tooltip{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif!important;font-weight:400!important;font-size:.85rem!important;background:rgba(6,8,16,0.97)!important;border:1px solid rgba(0,71,255,0.4)!important;color:#f4f3ef!important;box-shadow:none!important;padding:.45rem .65rem!important;border-radius:0!important;width:240px!important;white-space:normal!important;line-height:1.45!important;overflow-wrap:break-word!important;word-break:normal!important}
+    .leaflet-tooltip:before{display:none!important}
     .results-table{width:100%;border-collapse:collapse}
-    .results-table th{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.25);text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--border);white-space:nowrap}
+    .results-table th{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);text-align:left;padding:.45rem .55rem;border-bottom:1px solid var(--border);white-space:nowrap}
     .results-table th.r{text-align:right}
-    .results-table td{padding:.65rem .6rem;border-bottom:1px solid rgba(255,255,255,.05);font-family:'DM Mono',monospace;font-size:.74rem;color:rgba(255,255,255,.75);vertical-align:middle}
+    .results-table td{padding:.55rem .55rem;border-bottom:1px solid rgba(255,255,255,.05);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:400;font-size:.86rem;color:rgba(255,255,255,.78);vertical-align:middle}
     .results-table td.r{text-align:right}
-    .results-table tr:hover td{background:var(--td-hover)}
-    .bar-wrap{width:72px;height:4px;background:var(--bar-bg);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle}
-    .bar-fill{height:100%;background:var(--blue);border-radius:2px;transition:width 1s ease}
-    .pct-val{font-family:'Syne',sans-serif;font-weight:700;font-size:.8rem;color:var(--white);display:inline-block;width:46px;text-align:right;margin-left:6px}
-    .cbadge{display:inline-flex;align-items:center;justify-content:center;background:rgba(0,71,255,.15);color:var(--blue);font-family:'Syne',sans-serif;font-weight:800;font-size:.85rem;min-width:28px;height:24px;padding:0 6px;border:1px solid rgba(0,71,255,.3)}
-    .cbadge.sub{background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border-color:rgba(255,255,255,.08)}
-    .drill-btn{background:none;border:none;color:var(--blue);font-family:'DM Mono',monospace;font-size:.74rem;cursor:pointer;text-align:left;padding:0;display:inline-flex;align-items:center;gap:.4rem;transition:color .15s}
-    .drill-btn:hover{color:#7ab3ff}
-    .expand-btn{background:none;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.06em;color:rgba(0,71,255,.9);display:flex;align-items:center;gap:.4rem;padding:.25rem 0;transition:color .15s;font-weight:500}
-    .expand-btn:hover{color:var(--blue);text-decoration:underline}
-    .cands-inner{background:rgba(0,0,0,.2);border-top:1px solid var(--border);border-bottom:2px solid rgba(0,71,255,.2);padding:.5rem 1rem .75rem 2.5rem;display:none}
-    .cands-inner.open{display:block}
-    .cands-table{width:100%;border-collapse:collapse;font-size:.94rem}
-    .cands-table thead th{font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.25);padding:.4rem .5rem;border-bottom:1px solid var(--border);font-weight:400}
-    .cands-table tbody tr{border-bottom:1px solid rgba(255,255,255,.05)}
-    .cands-table tbody tr:last-child{border-bottom:none}
-    .cands-table tbody td{padding:.35rem .5rem;vertical-align:middle}
-    .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
-    .donut-cw{position:relative;width:150px;height:150px}
-    .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
-    .donut-pct{font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.04em;color:var(--white);line-height:1}
-    .donut-sub{font-family:'DM Mono',monospace;font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-top:2px}
-    .donut-legend{width:100%;display:flex;flex-direction:column;gap:.55rem}
-    .li{display:flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.75rem;color:rgba(255,255,255,.5)}
-    .ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-    .lv{margin-left:auto;color:var(--white);font-weight:700;font-family:'Syne',sans-serif}
+    .results-table tbody tr{cursor:pointer;transition:background .15s}
+    .results-table tbody tr:hover td{background:var(--td-hover)}
+    .results-table tbody tr.active td{background:rgba(0,71,255,.08)}
+    .bar-wrap{width:60px;height:4px;background:var(--bar-bg);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle}
+    .bar-fill{height:100%;background:var(--blue);border-radius:2px;transition:width .8s ease}
+    .pct-val{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:700;font-size:.78rem;color:var(--white);display:inline-block;width:46px;text-align:right;margin-left:6px}
+    .winner-row td{background:color-mix(in srgb,var(--w-color,#0047FF) 14%,transparent)!important}
+    .winner-row td:first-child{border-left:3px solid var(--w-color,#fff)}
+    .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem;margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border)}
+    .donut-cw{position:relative;width:140px;height:140px}
+    .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
+    .donut-pct{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:1.4rem;letter-spacing:-.04em;color:var(--white);line-height:1}
+    .donut-sub{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.5rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.32);margin-top:3px}
+    .donut-legend{width:100%;display:flex;flex-direction:column;gap:.45rem}
+    .li{display:flex;align-items:center;gap:.55rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:400;font-size:.74rem;color:rgba(255,255,255,.6)}
+    .ld{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+    .lv{margin-left:auto;color:var(--white);font-weight:500;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif}
     .full-footer{flex-shrink:0;width:100%;border-top:1px solid var(--border);padding:.5rem 2.5rem;display:flex;align-items:center;justify-content:space-between}
-    .footer-brand{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.09em;color:rgba(255,255,255,.2)}
+    .footer-brand{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.62rem;letter-spacing:.09em;color:rgba(255,255,255,.2)}
     .footer-brand a{color:rgba(255,255,255,.25);text-decoration:none}
+    .endoso-cta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;background:rgba(0,71,255,.07);border:1px solid rgba(0,71,255,.2);padding:.85rem 1.4rem;margin-bottom:1.2rem;backdrop-filter:blur(4px)}
+    .endoso-cta-text{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.06em;color:rgba(255,255,255,.7);line-height:1.6}
+    .endoso-cta-text b{color:var(--white)}
+    .endoso-btn{display:inline-flex;align-items:center;gap:.6rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);background:var(--blue);border:none;padding:.55rem 1.3rem;cursor:pointer;text-decoration:none;transition:background .2s;white-space:nowrap;flex-shrink:0}
+    .endoso-btn:hover{background:#0035cc}
+    .excel-btn{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;padding:.3rem .85rem;border:none;cursor:pointer;transition:background .2s;margin-left:auto}
+    .excel-btn-active{background:#16a34a;color:#fff}
+    .excel-btn-active:hover{background:#15803d}
+    .excel-btn-locked{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.35);cursor:pointer}
+    .theme-btn{display:none !important;display:flex;align-items:center;gap:.4rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:pointer;transition:all .2s;flex-shrink:0}
+    .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
+    .copy-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(24px);background:rgba(10,10,20,.97);border:1.5px solid rgba(255,100,100,.5);color:rgba(255,180,180,.9);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.88rem;letter-spacing:.08em;padding:1rem 2rem;z-index:99998;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center}
+    .copy-toast.show{opacity:1;transform:translate(-50%,-50%);pointer-events:auto}
     .curtain{position:fixed;inset:0;z-index:99999;pointer-events:none}
     .curtain-layer{position:absolute;inset:0;background:#04060e}
     .curtain-layer:nth-child(1){clip-path:polygon(0 0,100% 0,100% 22%,0 28%);transform:translateX(-110%);transition:transform .58s cubic-bezier(.75,0,.25,1) 0s}
@@ -118,9 +151,9 @@
     .curtain-layer:nth-child(3){clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%);transform:translateX(-110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .14s}
     .curtain-layer:nth-child(4){clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%);transform:translateX(110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .21s}
     .curtain-stage{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;pointer-events:none}
-    .curtain-tag{font-family:'DM Mono',monospace;font-size:1.08rem;letter-spacing:.35em;text-transform:uppercase;color:rgba(0,71,255,.7);opacity:0;transform:translateY(-12px);transition:opacity .4s ease,transform .4s ease}
-    .curtain-sub{font-family:'DM Mono',monospace;font-size:.975rem;letter-spacing:.22em;color:rgba(255,255,255,.35);text-transform:uppercase;opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease}
-    .curtain-headline{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(2.6rem,6.5vw,5.85rem);letter-spacing:-.03em;line-height:1.05;text-shadow:0 0 50px rgba(0,71,255,.5);text-align:center}
+    .curtain-tag{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:1.08rem;letter-spacing:.35em;text-transform:uppercase;color:rgba(0,71,255,.7);opacity:0;transform:translateY(-12px);transition:opacity .4s ease,transform .4s ease}
+    .curtain-sub{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.975rem;letter-spacing:.22em;color:rgba(255,255,255,.35);text-transform:uppercase;opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease}
+    .curtain-headline{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:clamp(2.6rem,6.5vw,5.85rem);letter-spacing:-.03em;line-height:1.05;text-shadow:0 0 50px rgba(0,71,255,.5);text-align:center}
     .curtain-line{overflow:hidden;display:block}
     .curtain-word{display:inline-block;opacity:0;transition:transform .52s cubic-bezier(.25,.46,.45,.94),opacity .45s ease}
     .curtain-word.from-left{transform:translateX(-80px)}.curtain-word.from-right{transform:translateX(80px)}
@@ -140,98 +173,55 @@
     .curtain.closing .curtain-word.from-left,.curtain.closing .curtain-word.from-right{transform:translateX(0);opacity:1;transition-delay:.62s}
     .curtain.closing .curtain-tag{opacity:1;transform:translateY(0);transition-delay:.68s}
     .curtain.closing .curtain-sub{opacity:1;transform:translateY(0);transition-delay:.72s}
-    @media(max-width:1000px){.results-grid{grid-template-columns:1fr}}
-    @media(max-width:900px){body{cursor:auto}.cursor,.cursor-ring{display:none}.top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer{padding-left:1.2rem;padding-right:1.2rem}.bg-overlay{background:rgba(4,6,16,.93)}.kpi-row{grid-template-columns:1fr 1fr;gap:.75rem}}
-    @media(max-width:600px){.kpi-row{grid-template-columns:1fr}.sub-selector{flex-direction:column;align-items:flex-start}.search-input{width:100%}}
+    @media(max-width:1080px){.results-grid{grid-template-columns:1fr} #cons-map{height:400px}}
+    @media(max-width:900px){body{cursor:auto}.cursor,.cursor-ring{display:none}.top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer{padding-left:1.2rem;padding-right:1.2rem}.bg-overlay{background:rgba(4,6,16,.93)}.kpi-row{grid-template-columns:1fr 1fr;gap:.6rem} #cons-map{height:340px}}
+    @media(max-width:600px){.kpi-row{grid-template-columns:1fr}}
     .hidden{display:none!important}
-    .copy-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(24px);background:rgba(10,10,20,.97);border:1.5px solid rgba(255,100,100,.5);color:rgba(255,180,180,.9);font-family:'DM Mono',monospace;font-size:.88rem;letter-spacing:.08em;padding:1rem 2rem;z-index:99998;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center}
-    .copy-toast.show{opacity:1;transform:translate(-50%,-50%);pointer-events:auto}
-    .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:pointer;transition:all .2s;flex-shrink:0}
-    .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
-    body.day-mode .theme-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25);color:var(--blue)}
+    /* Day mode */
     body.day-mode{--white:#1a1a2e;--card-border:rgba(0,0,0,.12);--border:rgba(0,0,0,.08);--bar-bg:rgba(0,0,0,.1);--td-hover:rgba(0,71,255,.04);background:#e6ded3;color:#1a1a2e}
     body.day-mode .bg-layer{opacity:.04}
     body.day-mode .bg-overlay{background:linear-gradient(to right,rgba(240,235,228,.99) 0%,rgba(240,235,228,.97) 55%,rgba(240,235,228,.85) 72%,rgba(240,235,228,.6) 88%,rgba(240,235,228,.25) 100%)}
-    body.day-mode .shell{color:#0d1120}
     body.day-mode .electoral-nav{background:rgba(240,235,228,.92);border-bottom-color:rgba(0,0,0,.1)}
     body.day-mode .logo-text{color:#0d1120}
-    body.day-mode .e-btn-login{color:rgba(0,0,0,.6)}
-    body.day-mode .e-user-name{color:rgba(0,0,0,.7)}
-    body.day-mode .e-btn-logout{color:rgba(0,0,0,.35)}
     body.day-mode .page-title{color:#0d1120;text-shadow:none}
-    body.day-mode .page-title span{color:var(--blue)}
     body.day-mode .breadcrumb{color:rgba(0,0,0,.45);border-bottom-color:rgba(0,0,0,.1)}
     body.day-mode .meta-bar{color:rgba(0,0,0,.55);border-bottom-color:rgba(0,0,0,.1)}
     body.day-mode .meta-item b{color:#0a7a3e}
     body.day-mode .source-badge{color:rgba(0,0,0,.4);background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.1)}
-    body.day-mode .content-area{background:transparent}
     body.day-mode .kpi-card{background:#f7f8fc;border:1px solid rgba(0,0,0,.09)}
     body.day-mode .kpi-label{color:rgba(0,0,0,.5)}
     body.day-mode .kpi-delta{color:rgba(0,0,0,.4)}
-    body.day-mode .sub-selector{border-bottom-color:rgba(0,0,0,.1)}
-    body.day-mode .search-input{background:#fff;border-color:rgba(0,0,0,.2);color:#0d1120}
-    body.day-mode .search-input::placeholder{color:rgba(0,0,0,.3)}
-    body.day-mode .results-table th{color:rgba(0,0,0,.4);border-bottom-color:rgba(0,0,0,.1)}
-    body.day-mode .results-table td{color:rgba(0,0,0,.8);border-bottom-color:rgba(0,0,0,.06)}
-    body.day-mode .results-table tr:hover td{background:rgba(0,71,255,.04)}
-    body.day-mode .full-footer{border-top-color:rgba(0,0,0,.1)}
-    body.day-mode .footer-brand{color:rgba(0,0,0,.35)}
-    body.day-mode .e-btn-register,body.day-mode .endoso-btn{color:#f4f3ef}
+    body.day-mode .selector-row{border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .sub-label{color:rgba(0,0,0,.5)}
+    body.day-mode .chip{background:rgba(255,255,255,.7);color:rgba(0,0,0,.7);border-color:rgba(0,0,0,.12)}
+    body.day-mode .chip:hover{background:#fff;color:#0d1120}
     body.day-mode .card{background:#f0f2f8;border-color:rgba(0,0,0,.1)}
-    body.day-mode .dep-select{background:#fff;border-color:rgba(0,0,0,.2);color:#1a1a2e}
-    body.day-mode .dep-select option{background:#fff;color:#1a1a2e}
-    body.day-mode .cands-inner{background:rgba(0,0,0,.03);border-top-color:rgba(0,0,0,.08);border-bottom-color:rgba(0,71,255,.2)}
-    body.day-mode .cands-table thead th{color:rgba(0,0,0,.4);border-bottom-color:rgba(0,0,0,.1)}
-    body.day-mode .cands-table tbody tr{border-bottom-color:rgba(0,0,0,.06)}
+    body.day-mode .card-label{color:rgba(0,0,0,.5)}
+    body.day-mode .results-table th{color:rgba(0,0,0,.4);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .results-table td{color:rgba(0,0,0,.78);border-bottom-color:rgba(0,0,0,.06)}
     body.day-mode .bar-wrap{background:rgba(0,0,0,.1)}
-    body.day-mode .cbadge{background:rgba(0,71,255,.1);color:var(--blue);border-color:rgba(0,71,255,.25)}
-    body.day-mode .cbadge.sub{background:rgba(0,0,0,.05);color:rgba(0,0,0,.35);border-color:rgba(0,0,0,.1)}
-    body.day-mode .level-badge.dep{color:rgba(120,80,200,.9);border-color:rgba(120,80,200,.35);background:rgba(120,80,200,.08)}
-    body.day-mode .level-badge.mun{color:rgba(0,71,255,.9);border-color:rgba(0,71,255,.35);background:rgba(0,71,255,.08)}
-    body.day-mode .level-badge.pues{color:#0a7a3e;border-color:rgba(10,122,62,.35);background:rgba(10,122,62,.08)}
-    body.day-mode .results-table td{color:rgba(0,0,0,.75)!important}
-    body.day-mode .donut-wrap{background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.08)}
     body.day-mode .drill-crumb{color:rgba(0,0,0,.5)}
     body.day-mode .drill-crumb.active{color:#1a1a2e;background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.12)}
-    body.day-mode .card-label{color:rgba(0,0,0,.4)}
-    body.day-mode .umbral-bar{background:rgba(0,0,0,.07)}
-    body.day-mode .back-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.3);color:var(--blue)}
-    body.day-mode .expand-btn{color:rgba(0,71,255,.8)}
+    body.day-mode .donut-pct{color:#0d1120}
+    body.day-mode .li{color:rgba(0,0,0,.7)}
+    body.day-mode .lv{color:#0d1120}
+    body.day-mode .full-footer{border-top-color:rgba(0,0,0,.1)}
+    body.day-mode .footer-brand{color:rgba(0,0,0,.35)}
+    body.day-mode .theme-btn{display:none !important;background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25);color:var(--blue)}
+    body.day-mode .e-btn-register,body.day-mode .endoso-btn{color:#f4f3ef}
     body.day-mode .endoso-cta{background:rgba(0,71,255,.06);border-color:rgba(0,71,255,.15)}
     body.day-mode .endoso-cta-text{color:rgba(0,0,0,.7)}
-    body.day-mode .sub-label{color:rgba(0,0,0,.45)}
+    body.day-mode .map-hint{background:rgba(255,255,255,.85);color:rgba(0,0,0,.55);border-color:rgba(0,0,0,.08)}
+    body.day-mode #cons-map{background:#fff}
+    body.day-mode .leaflet-container{background:#fff !important}
+    /* Orient overlay */
     .orient-overlay{display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:1.5rem}
     .orient-overlay.show{display:flex}
     .orient-box{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2rem 1.8rem;max-width:320px;text-align:center}
     .orient-icon{font-size:2.2rem;margin-bottom:1rem;display:block}
-    .orient-msg{font-family:'DM Mono',monospace;font-size:.78rem;letter-spacing:.06em;line-height:1.9;color:rgba(255,255,255,.75);margin-bottom:1.5rem}
-    .orient-btn{font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;background:#4ade80;color:#060810;border:none;padding:.55rem 2rem;cursor:pointer;transition:background .2s}
+    .orient-msg{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.06em;line-height:1.9;color:rgba(255,255,255,.75);margin-bottom:1.5rem}
+    .orient-btn{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;background:#4ade80;color:#060810;border:none;padding:.55rem 2rem;cursor:pointer;transition:background .2s}
     .orient-btn:hover{background:#22c55e}
-    body.day-mode .li{color:rgba(0,0,0,.6)}
-    body.day-mode .lv{color:#0d1120}
-    body.day-mode .donut-pct{color:#0d1120}
-    .endoso-cta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;background:rgba(0,71,255,.07);border:1px solid rgba(0,71,255,.2);padding:1rem 1.5rem;margin-bottom:1.5rem;backdrop-filter:blur(4px)}
-    .endoso-cta-text{font-family:'DM Mono',monospace;font-size:.82rem;letter-spacing:.08em;color:rgba(255,255,255,.7);line-height:1.6}
-    .endoso-cta-text b{color:var(--white)}
-    .endoso-btn{display:inline-flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);background:var(--blue);border:none;padding:.6rem 1.4rem;cursor:pointer;text-decoration:none;transition:background .2s;white-space:nowrap;flex-shrink:0}
-    .endoso-btn:hover{background:#0035cc}
-    .endoso-btn.endoso-locked{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.45);cursor:not-allowed}
-    .endoso-btn.endoso-locked:hover{background:rgba(255,255,255,.07)}
-    .excel-btn{font-family:'DM Mono',monospace;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;padding:.3rem .85rem;border:none;cursor:pointer;transition:background .2s;margin-left:auto}
-    .excel-btn-active{background:#16a34a;color:#fff}
-    .excel-btn-active:hover{background:#15803d}
-    .excel-btn-locked{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.35);cursor:pointer}
-    body.day-mode .excel-btn-locked{background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.18);color:rgba(0,0,0,.35)}
-    body.day-mode .endoso-btn.endoso-locked{background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.18);color:rgba(0,0,0,.45)}
-    .cands-table thead th{font-size:.94rem!important}
-    .cands-table tbody td{font-size:.88rem!important}
-    .cands-table tbody td:nth-child(3){font-size:.95rem!important;font-weight:600!important}
-    .cands-table tbody td.r{font-size:.85rem!important}
-    .winner-row{background:color-mix(in srgb,var(--w-color,#0047FF) 12%,transparent)}
-    .winner-row>td:first-child{border-left:3px solid var(--w-color,#fff)}
-    .winner-cand{background:rgba(255,255,255,.07)}
-    .winner-cand>td:first-child{border-left:2px solid var(--wc-color,#fff)}
-    body.day-mode .winner-cand{background:rgba(0,0,0,.04)}
   </style>
 </head>
 <body>
@@ -239,8 +229,8 @@
   <div class="cursor-ring" id="cursorRing"></div>
   <div class="bg-layer"></div>
   <div class="bg-overlay"></div>
-  <div class="copy-toast" id="copy-toast"><a href="register.html" style="color:inherit;font-weight:700;text-decoration:underline">Regístrate</a> para copiar este contenido</div>
-  <div class="copy-toast" id="register-toast" style="border-color:rgba(0,71,255,.5);color:rgba(180,210,255,.9);max-width:320px;line-height:1.7">¿Quieres ver puestos y mesas?<br/><a href="register.html" style="color:#7ab3ff;font-weight:700;text-decoration:underline">Regístrate gratis</a> para acceder</div>
+  <div class="copy-toast" id="copy-toast"><a href="elige-plan.html" style="color:inherit;font-weight:700;text-decoration:underline">Regístrate</a> para copiar este contenido</div>
+  <div class="copy-toast" id="pro-toast" style="border-color:rgba(74,222,128,.4);color:rgba(180,255,200,.9)">Sólo disponible en plan Pro o superior · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
   <div class="orient-overlay" id="orient-overlay">
     <div class="orient-box">
       <span class="orient-icon">📱↔</span>
@@ -248,9 +238,6 @@
       <button class="orient-btn" onclick="dismissOrient()">Ok</button>
     </div>
   </div>
-  <div class="copy-toast" id="premium-toast" style="border-color:rgba(74,222,128,.4);color:rgba(180,255,200,.9)">Las mesas requieren plan Premium · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
-  <div class="copy-toast" id="invite-toast" style="border-color:rgba(0,71,255,.4);color:rgba(180,210,255,.9);max-width:340px;line-height:1.7">¿Te gusta este nivel de detalle? <a href="register.html" style="color:#7ab3ff;font-weight:700;text-decoration:underline">Regístrate gratis</a> para más funciones</div>
-  <div class="copy-toast" id="pro-toast" style="border-color:rgba(74,222,128,.4);color:rgba(180,255,200,.9)">Sólo disponible en plan Pro o superior · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
   <div class="curtain" id="curtain">
     <div class="curtain-layer"></div><div class="curtain-layer"></div>
     <div class="curtain-layer"></div><div class="curtain-layer"></div>
@@ -286,9 +273,9 @@
       &nbsp;/&nbsp; Consultas Presidenciales · Escrutinio 2026
     </div>
     <div class="meta-bar">
-      <span class="meta-item">Elección: <b>Consultas · 16 Mar 2026</b></span>
-      <span class="meta-item">Votos válidos: <b id="meta-votval">—</b></span>
-      <div class="source-badge">Fuente: <b>Registraduría · Escrutinio</b></div>
+      <span class="meta-item">Elección: <b>Consultas · 13 Mar 2026</b></span>
+      <span class="meta-item">Total votos: <b id="meta-votval">—</b></span>
+      <div class="source-badge">Fuente: <b>Registraduría · Escrutinio Definitivo</b></div>
       <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
     </div>
 
@@ -298,70 +285,52 @@
         <div class="loader-label">Cargando escrutinio…</div>
       </div>
       <div id="main-content" class="hidden">
-        <div class="sub-selector">
-          <div style="display:flex;align-items:center;gap:.5rem">
-            <span class="sub-label">Departamento:</span>
-            <select class="dep-select" id="dep-select" onchange="onDepChange(this.value)">
-              <option value="">NACIONAL – TODOS</option>
-            </select>
+        <div class="selector-row">
+          <div class="selector-block" style="flex:1.1">
+            <span class="sub-label">Consulta presidencial</span>
+            <div class="chips" id="cons-chips"></div>
           </div>
-          <div id="mun-filter-container" style="display:none;align-items:center;gap:.5rem">
-            <span class="sub-label">Municipio:</span>
-            <select class="dep-select" id="mun-select" onchange="onMunChange(this.value)">
-              <option value="">TODOS</option>
-            </select>
+          <div class="selector-block" style="flex:2.4">
+            <span class="sub-label">Candidato/a en el mapa</span>
+            <div class="chips" id="cand-chips"></div>
           </div>
-          <div id="zona-filter-container" style="display:none;align-items:center;gap:.5rem">
-            <span class="sub-label">Zona:</span>
-            <select class="dep-select" id="zona-select" onchange="onZonaChange(this.value)">
-              <option value="">TODAS</option>
-            </select>
-          </div>
-          <div id="pue-filter-container" style="display:none;align-items:center;gap:.5rem">
-            <span class="sub-label">Puesto:</span>
-            <select class="dep-select" id="pue-select" onchange="onPueChange(this.value)">
-              <option value="">TODOS</option>
-            </select>
-          </div>
-          <div id="mesa-filter-container" style="display:none;align-items:center;gap:.5rem">
-            <span class="sub-label">Mesa:</span>
-            <select class="dep-select" id="mesa-select" onchange="onMesaChange(this.value)">
-              <option value="">TODAS</option>
-            </select>
-          </div>
-          <span class="sub-label" style="margin-left:1rem">Buscar candidato/a:</span>
-          <input id="cons-search" type="search" class="search-input" placeholder="Nombre o apellido…"
-            oninput="buscarCandidato(this.value)"
-            onfocus="this.style.borderColor='var(--blue)'"
-            onblur="this.style.borderColor='var(--card-border)'" />
         </div>
-        <div id="cons-search-results" style="display:none;margin-bottom:1.5rem"></div>
+
         <div class="endoso-cta">
           <div class="endoso-cta-text"><b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato presidencial con uno al Congreso mesa por mesa.</div>
           <a href="endoso-2026.html" class="endoso-btn" id="endoso-cta-btn">Calcular endoso →</a>
         </div>
+
         <div class="kpi-row" id="kpi-row"></div>
+
         <div class="results-grid" id="cons-main-grid">
           <div class="card">
-            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
-              <div class="card-label" style="margin-bottom:0" id="lbl-tabla">Consultas Presidenciales · Nacional</div>
-              <span class="level-badge dep" id="drill-badge">Nacional</span>
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem;flex-wrap:wrap">
+              <div class="card-label" style="margin-bottom:0" id="map-label">Mapa nacional</div>
+              <span class="level-badge nac" id="level-badge">Nacional</span>
               <button id="excel-download-btn" class="excel-btn excel-btn-locked" onclick="downloadExcelCurrentView()">⬇ Descarga Excel</button>
             </div>
             <div class="drill-nav" id="drill-nav"></div>
-            <table class="results-table">
-              <thead id="drill-thead"></thead>
-              <tbody id="tbody-cons"></tbody>
-            </table>
+            <div class="map-wrap">
+              <div id="cons-map"></div>
+              <button id="cons-map-back" class="map-back-btn" style="display:none" onclick="mapBack()">← Volver</button>
+              <div class="map-hint" id="map-hint">Click en un departamento para entrar</div>
+            </div>
           </div>
           <div class="card">
-            <div class="card-label">Distribución de votos</div>
+            <div class="card-label" id="rank-label">Top candidatos · Nacional</div>
+            <table class="results-table">
+              <thead>
+                <tr><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r" style="min-width:90px">%</th></tr>
+              </thead>
+              <tbody id="tbody-rank"></tbody>
+            </table>
             <div class="donut-wrap">
               <div class="donut-cw">
                 <canvas id="donut-cons"></canvas>
                 <div class="donut-center">
                   <div class="donut-pct" id="pct-cons">—</div>
-                  <div class="donut-sub">válidos</div>
+                  <div class="donut-sub" id="sub-cons">consulta</div>
                 </div>
               </div>
               <div class="donut-legend" id="leg-cons"></div>
@@ -378,364 +347,835 @@
   </div>
 
   <script>
+    // ─── CONFIG ───────────────────────────────────────────────────
     const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
-    const fmt = n => Number(n).toLocaleString('es-CO');
+    const DEPTO_GEOJSON   = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+    const DEPTOS_MPS_URL  = `${S3}/mapas-2026/Departamentos-mps/`;
+    const BOGOTA_LOC_URL  = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`;
+    const MEDELLIN_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
+    const CALI_COM_URL     = `${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`;
+    const BARRANQUILLA_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/BARRANQUILLAX.json`;
+    const IBAGUE_COM_URL       = `${S3}/mapas-2026/Ciudades-COM-LOC/IBAGUEX.json`;
+    const MANIZALES_COM_URL    = `${S3}/mapas-2026/Ciudades-COM-LOC/MANIZALESX.json`;
+    const PEREIRA_COM_URL      = `${S3}/mapas-2026/Ciudades-COM-LOC/PEREIRAX.json`;
+    // Tabla zona electoral → comuna/localidad política (derivada de PUESTOS_GEOREF).
+    // Los datos vienen por zona y los polígonos son de comuna; en varias ciudades
+    // NO es 1:1 (Medellín: 32 zonas → 16 comunas), así que un join por número
+    // atribuye los votos a la comuna equivocada.
+    const ZONA_COMUNA_URL = `${S3}/mapas-2026/zona-comuna.json`;
+
+    // ─── HELPERS ──────────────────────────────────────────────────
+    const fmt = n => Number(n||0).toLocaleString('es-CO');
     const pct = (n,t) => t ? ((n/t)*100).toFixed(2) : '0.00';
-    const CP = {'Pacto Histórico':'#6B2D8B','Centro Democrático':'#0088BB','Partido Liberal Colombiano':'#C8102E','Partido de la U':'#F7941D','Cambio Radical':'#E91E8C','Partido Conservador Colombiano':'#003580','Alianza Verde':'#4CAF50','MIRA':'#1A3FC4','Comunes':'#007755','Nuevo Liberalismo':'#E53935'};
-    function shortName(n){n=n.trim().replace(/\s+/g,' ');if(/gran\s+consulta|consulta.*gran/i.test(n))return'La Gran Consulta';if(/soluciones/i.test(n))return'Consulta de Soluciones';if(/frente/i.test(n))return'Frente por la Vida';return n;}
-    function getColor(n){if(CP[n])return CP[n];if(/pacto hist/i.test(n))return'#6B2D8B';if(/centro dem/i.test(n))return'#0088BB';if(/liberal/i.test(n))return'#C8102E';if(/conservador/i.test(n))return'#003580';if(/cambio radical/i.test(n))return'#E91E8C';if(/partido de la u/i.test(n))return'#F7941D';if(/alianza (verde|por col)/i.test(n))return'#4CAF50';if(/\bMIRA\b/i.test(n))return'#1A3FC4';if(/comunes/i.test(n))return'#007755';if(/nuevo liberalismo/i.test(n))return'#E53935';return'#555';}
+    const _normC = c => String(Number(c));
+    const _normN = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+    const _to2   = v => v!=null && v!=='' ? String(parseInt(v,10)||0).padStart(2,'0') : '';
+    const titleCase = s => String(s||'').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()).replace(/\bD\.c\./g,'D.C.');
+    function shortLast(nombre){
+      // Toma las últimas 2 palabras del nombre completo: "Roy Leonardo Barreras Montealegre" → "Barreras Montealegre"
+      const parts = String(nombre||'').trim().split(/\s+/);
+      if(parts.length<=2) return titleCase(nombre);
+      return titleCase(parts.slice(-2).join(' '));
+    }
+    function lighten(hex, pct){ // pct 0..1
+      const h = hex.replace('#',''); const n = parseInt(h,16);
+      let r=(n>>16)&255, g=(n>>8)&255, b=n&255;
+      r=Math.round(r+(255-r)*pct); g=Math.round(g+(255-g)*pct); b=Math.round(b+(255-b)*pct);
+      return `rgb(${r},${g},${b})`;
+    }
+    function withAlpha(hex, a){
+      const h = hex.replace('#',''); const n = parseInt(h,16);
+      return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+    }
 
-    const cache = {};
-    function buildPartidos(cands){
-      const m={};
-      cands.forEach(c=>{
-        if(!m[c.partido])m[c.partido]={partido:c.partido,votos:0,candidatos:[]};
-        m[c.partido].votos+=c.votos;
-        m[c.partido].candidatos.push({nombre:c.nombre,codigo:c.codigo,votos:c.votos});
+    // ─── CONSULTA + CANDIDATO COLORS ─────────────────────────────
+    // Color del chip principal de cada consulta (visual del filtro).
+    const CONS_COLOR = {
+      gran:       '#1866DF',
+      frente:     '#3d8b3d',
+      soluciones: '#d9db24',
+    };
+    const CONS_SHORT = {
+      gran:       'La Gran Consulta',
+      frente:     'Frente por la Vida',
+      soluciones: 'Consulta de Soluciones',
+    };
+    // Color por candidato, derivado de su código dentro de la consulta.
+    // El ganador (rank 1) hereda el color principal; los demás vienen de una paleta.
+    const CONS_PALETTE = {
+      gran: ['#1866DF','#06b6d4','#E53935','#003580','#7c3aed','#0067B1','#C8102E','#F7941D','#0d9488'],
+      frente: ['#3d8b3d','#22c55e','#65a30d','#15803d','#4d7c0f'],
+      soluciones: ['#d9db24','#eab308','#facc15'],
+    };
+    // candKey: `${consulta}__${codigo}` → color
+    let CAND_COLOR = {};
+    function buildCandColors(){
+      Object.entries(STATE.consultas).forEach(([clave, c])=>{
+        const pal = CONS_PALETTE[clave] || ['#0047FF','#666'];
+        // sort cands by votos (desc) and assign palette in order
+        const sorted = [...c.candidatos].sort((a,b)=>b.votos-a.votos);
+        sorted.forEach((cand, i)=>{
+          CAND_COLOR[`${clave}__${cand.codigo||cand.nombre}`] = pal[i % pal.length];
+          CAND_COLOR[`${clave}__N::${_normN(cand.nombre)}`] = pal[i % pal.length];
+        });
       });
-      return Object.values(m).sort((a,b)=>b.votos-a.votos);
     }
-    function geoAggr(row){
-      const mp={};
-      Object.entries(row.candidatos||{}).forEach(([nombre,votos])=>{
-        if(!votos)return;
-        const p=resumenData._c2p[nombre];
-        if(!p)return;
-        mp[p]=(mp[p]||0)+votos;
-      });
-      return mp;
-    }
-    async function getJSON(nivel){
-      if(cache[nivel]) return cache[nivel];
-      const r = await fetch(`${S3}/consultas/${nivel}.json`);
-      if(!r.ok) throw new Error(`No se pudo cargar ${nivel}.json (${r.status})`);
-      cache[nivel] = await r.json();
-      return cache[nivel];
+    function candColor(clave, codigoOrNombre){
+      const k1 = `${clave}__${codigoOrNombre}`;
+      if(CAND_COLOR[k1]) return CAND_COLOR[k1];
+      const k2 = `${clave}__N::${_normN(codigoOrNombre)}`;
+      return CAND_COLOR[k2] || '#777';
     }
 
-    let resumenData = null, donutChart = null, ctxCandVotos = null, lastGeoPartidos = null;
+    // ─── STATE ────────────────────────────────────────────────────
+    const STATE = {
+      resumen: null,           // resumen.json raw
+      deps: null,              // deps.json raw
+      depData: {},             // depCod → dep-{cod}.json
+      consultas: {},           // clave → {clave,nombre,votos,candidatos:[{nombre,codigo,votos}]}
+      activeCons: 'gran',
+      activeCand: null,        // codigo (string) o null = "Ganador"
+      level: 'nac',            // nac | dep | mun | com
+      depCod: null,
+      munCod: null,
+      zonCod: null,
+      // map state
+      map: null,
+      currentLayer: null,
+      _deptoGeoRaw: null,
+      _depGeoCache: {},
+      _cityGeoCache: {},
+    };
 
+    // ─── DATA LOADING ─────────────────────────────────────────────
+    const _fetchCache = {};
+    async function getJSON(path){
+      if(_fetchCache[path]) return _fetchCache[path];
+      const r = await fetch(`${S3}/consultas/${path}.json`);
+      if(!r.ok) throw new Error(`No se pudo cargar ${path}.json (HTTP ${r.status})`);
+      _fetchCache[path] = await r.json();
+      return _fetchCache[path];
+    }
+    async function getDepData(depCod){
+      if(STATE.depData[depCod]) return STATE.depData[depCod];
+      const code = _to2(depCod);
+      const r = await fetch(`${S3}/consultas/dep-${code}.json`);
+      if(!r.ok) throw new Error(`No se pudo cargar dep-${code}.json (HTTP ${r.status})`);
+      STATE.depData[depCod] = await r.json();
+      return STATE.depData[depCod];
+    }
+
+    // ─── INIT ─────────────────────────────────────────────────────
     async function init(){
       try{
-        resumenData = await getJSON('resumen');
-        resumenData.partidos = buildPartidos(resumenData.candidatos);
-        resumenData._c2p = Object.fromEntries(resumenData.candidatos.map(c=>[c.nombre,c.partido]));
-        const _PAL=['#0047FF','#4ade80','#f97316','#e879f9','#38bdf8','#facc15','#fb7185','#a78bfa'];
-        resumenData.partidos.forEach((p,i)=>{if(!CP[p.partido])CP[p.partido]=_PAL[i%_PAL.length];});
-        document.getElementById('meta-votval').textContent = fmt(resumenData.votval);
+        const [resumen, deps] = await Promise.all([getJSON('resumen'), getJSON('deps')]);
+        STATE.resumen = resumen;
+        STATE.deps = deps;
+        // index resumen.consultas[] by clave for quick lookups
+        resumen.consultas.forEach(c => { STATE.consultas[c.clave] = c; });
+        buildCandColors();
+        const totalVotos = resumen.consultas.reduce((s,c)=>s+(c.votos||0), 0);
+        document.getElementById('meta-votval').textContent = fmt(totalVotos);
         document.getElementById('load-state').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
-        renderKPI();
-        renderDonut();
-        renderNacional();
-        const deps=await getJSON('departamentos');
-        const depSel=document.getElementById('dep-select');
-        deps.forEach(d=>{const o=document.createElement('option');o.value=d.cod;o.textContent=d.nombre;depSel.appendChild(o);});
+        renderConsChips();
+        renderCandChips();
+        renderAll();
+        initMap();
+        // Best-effort: si no llega, el mapa de comunas cae al join por número.
+        fetch(ZONA_COMUNA_URL)
+          .then(r=>r.ok?r.json():null)
+          .then(j=>{ if(j&&j.muns){ STATE.zonaComuna=j; if(STATE.level==='mun'||STATE.level==='com') renderMap(getScope()); } })
+          .catch(()=>{});
       }catch(e){
-        document.getElementById('load-state').innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">Error al cargar datos.<br/><span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span></div>`;
+        console.error('[Consultas] init error:', e);
+        document.getElementById('load-state').innerHTML =
+          `<div style="font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">Error al cargar datos.<br/><span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span></div>`;
       }
     }
 
-    function renderKPI(){
-      const r = resumenData;
-      const topP = r.partidos.filter(p=>!/blanco/i.test(p.partido))[0];
-      document.getElementById('kpi-row').innerHTML=`
-        <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(r.votval)}</div><div class="kpi-delta">${pct(r.votval,r.votant)}% de los votantes</div></div>
-        <div class="kpi-card"><div class="kpi-label">Votantes</div><div class="kpi-val wh">${fmt(r.votant)}</div><div class="kpi-delta">Votos emitidos</div></div>
-        <div class="kpi-card"><div class="kpi-label">Consultas</div><div class="kpi-val">${r.partidos.length}</div><div class="kpi-delta">en competencia</div></div>
-        <div class="kpi-card"><div class="kpi-label">Consulta puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div>`;
+    // ─── CHIP RENDERS ─────────────────────────────────────────────
+    function renderConsChips(){
+      const el = document.getElementById('cons-chips');
+      el.innerHTML = STATE.resumen.consultas.map(c=>{
+        const col = CONS_COLOR[c.clave] || '#555';
+        const isActive = c.clave===STATE.activeCons;
+        return `<button class="chip ${isActive?'active':''}" style="--cons-color:${col};--dot:${col}" data-cons="${c.clave}" onclick="setConsulta('${c.clave}')">
+          <span class="chip-dot"></span>${CONS_SHORT[c.clave]||c.nombre}
+          <span class="chip-sub">${fmt(c.votos)}</span>
+        </button>`;
+      }).join('');
     }
-
-    function renderDonut(){
-      const r = resumenData;
-      document.getElementById('pct-cons').textContent = pct(r.votval,r.votant)+'%';
-      if(donutChart) donutChart.destroy();
-      donutChart = new Chart(document.getElementById('donut-cons').getContext('2d'),{
-        type:'doughnut',
-        data:{labels:['Votos válidos','Nulos','No marcados','En blanco'],datasets:[{data:[r.votval,r.votnul||0,r.votnma||0,r.votblan||0],backgroundColor:['#0047FF','#cc2233','#f0a500','#555'],borderWidth:0,hoverOffset:6}]},
-        options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
+    function renderCandChips(){
+      const c = STATE.consultas[STATE.activeCons];
+      if(!c){ document.getElementById('cand-chips').innerHTML=''; return; }
+      const winnerCol = CONS_COLOR[STATE.activeCons]||'#555';
+      const cands = [...c.candidatos].sort((a,b)=>b.votos-a.votos);
+      const chips = [];
+      // chip "Ganador" (vista por defecto: cada territorio se pinta con el color del candidato que ganó allí)
+      chips.push(`<button class="chip cand-chip ${STATE.activeCand===null?'active':''}" style="--cand-color:${winnerCol};--dot:${winnerCol}" onclick="setCandidato(null)">
+        <span class="chip-dot"></span>Ganador por territorio
+      </button>`);
+      cands.forEach(cand=>{
+        const col = candColor(STATE.activeCons, cand.codigo);
+        const isAct = STATE.activeCand===cand.codigo;
+        chips.push(`<button class="chip cand-chip ${isAct?'active':''}" style="--cand-color:${col};--dot:${col}" onclick="setCandidato('${cand.codigo}')" title="${cand.nombre}">
+          <span class="chip-dot"></span>${shortLast(cand.nombre)}
+          <span class="chip-sub">${fmt(cand.votos)}</span>
+        </button>`);
       });
-      document.getElementById('leg-cons').innerHTML=[['Votos válidos',r.votval,'#0047FF'],['Nulos',r.votnul||0,'#cc2233'],['No marcados',r.votnma||0,'#f0a500'],['En blanco',r.votblan||0,'#555']].map(([l,v,c])=>`<div class="li"><span class="ld" style="background:${c}"></span><span>${l}</span><span class="lv">${fmt(v)}</span></div>`).join('');
+      document.getElementById('cand-chips').innerHTML = chips.join('');
     }
 
-    async function renderGeoPartidos(nivel, depCod, munCod, pueCod){
-      let geoData, labelText, badgeText;
-      if(nivel==='dep'){
-        const deps=await getJSON('departamentos');
-        const d=deps.find(x=>x.cod===depCod); if(!d) return;
-        geoData=d; labelText=`Consultas · ${d.nombre}`; badgeText=d.nombre;
-      } else if(nivel==='mun'){
-        const muns=await getJSON('municipios');
-        const d=muns.find(x=>x.dep_cod===depCod&&x.cod===munCod); if(!d) return;
-        geoData=d; labelText=`Consultas · ${d.nombre}`; badgeText=d.nombre;
+    // ─── SETTERS ──────────────────────────────────────────────────
+    function setConsulta(clave){
+      if(clave===STATE.activeCons) return;
+      STATE.activeCons = clave;
+      STATE.activeCand = null; // reset candidato cuando cambia la consulta
+      renderConsChips();
+      renderCandChips();
+      renderAll();
+    }
+    function setCandidato(codigo){
+      if(codigo===STATE.activeCand) return;
+      STATE.activeCand = codigo;
+      renderCandChips();
+      renderAll();
+    }
+
+    // ─── SCOPE-AWARE DATA ─────────────────────────────────────────
+    // Retorna { nombre, consulta:{votos,cands[]}, children:[{cod,nombre,consulta:{votos,cands}}] }
+    // donde `consulta` es el bucket activo, y `children` son los territorios siguientes (deptos, muns, zonas).
+    function getScope(){
+      const clave = STATE.activeCons;
+      // Nivel nacional
+      if(STATE.level==='nac'){
+        const c = STATE.consultas[clave];
+        const children = (STATE.deps||[]).map(d => ({
+          cod: d.cod, nombre: titleCase(d.nombre),
+          consulta: d[clave] || {votos:0, candidatos:[]}
+        }));
+        return {
+          nombre: 'Nacional',
+          consulta: { votos: c.votos, cands: c.candidatos.map(x=>({nombre:x.nombre,codigo:x.codigo,votos:x.votos})) },
+          children,
+        };
+      }
+      const dep = STATE.depData[STATE.depCod];
+      if(!dep) return null;
+      // Nivel depto
+      if(STATE.level==='dep'){
+        const b = dep[clave]||{votos:0,cands:[]};
+        const children = (dep.municipios||[]).map(m=>({
+          cod: m.cod, nombre: titleCase(m.nombre),
+          consulta: m[clave] || {votos:0, cands:[]}
+        }));
+        return {
+          nombre: titleCase(dep.nombre),
+          consulta: { votos: b.votos, cands: b.cands.map(x=>({nombre:x.nombre,codigo:codigoFor(clave, x.nombre),votos:x.votos})) },
+          children,
+        };
+      }
+      const mun = (dep.municipios||[]).find(m=>m.cod===STATE.munCod);
+      if(!mun) return null;
+      // Nivel municipio
+      if(STATE.level==='mun'){
+        const b = mun[clave]||{votos:0,cands:[]};
+        const children = (mun.zonas||[]).map(z=>({
+          cod: z.cod, nombre: titleCase(z.nombre),
+          consulta: z[clave] || {votos:0, cands:[]}
+        }));
+        return {
+          nombre: titleCase(mun.nombre),
+          consulta: { votos: b.votos, cands: b.cands.map(x=>({nombre:x.nombre,codigo:codigoFor(clave, x.nombre),votos:x.votos})) },
+          children,
+        };
+      }
+      // Nivel zona/comuna/localidad
+      const zon = (mun.zonas||[]).find(z=>z.cod===STATE.zonCod);
+      if(!zon) return null;
+      const b = zon[clave]||{votos:0,cands:[]};
+      return {
+        nombre: titleCase(zon.nombre),
+        consulta: { votos: b.votos, cands: b.cands.map(x=>({nombre:x.nombre,codigo:codigoFor(clave, x.nombre),votos:x.votos})) },
+        children: [],
+      };
+    }
+
+    // Lookup helper: `dep-{cod}` no incluye `codigo` en sus cands, así que matchea por nombre normalizado contra resumen.
+    const _codByNameByCons = {};
+    function codigoFor(clave, nombre){
+      if(!_codByNameByCons[clave]){
+        _codByNameByCons[clave] = {};
+        (STATE.consultas[clave]?.candidatos||[]).forEach(c=>{
+          _codByNameByCons[clave][_normN(c.nombre)] = c.codigo;
+        });
+      }
+      return _codByNameByCons[clave][_normN(nombre)] || null;
+    }
+
+    // ─── RENDER ALL ───────────────────────────────────────────────
+    function renderAll(){
+      const scope = getScope();
+      if(!scope){ console.warn('No scope'); return; }
+      renderDrillNav();
+      renderLevelBadge();
+      renderMapLabels(scope);
+      renderKPIs(scope);
+      renderRankTable(scope);
+      renderDonut(scope);
+      renderMap(scope);
+    }
+
+    function renderDrillNav(){
+      const nav = document.getElementById('drill-nav');
+      const items = [];
+      items.push({label:'Nacional', click:'mapBackTo(\'nac\')', active:STATE.level==='nac'});
+      if(STATE.depCod){
+        const dep = STATE.depData[STATE.depCod] || STATE.deps.find(d=>d.cod===STATE.depCod);
+        items.push({label:titleCase(dep?.nombre||STATE.depCod), click:'mapBackTo(\'dep\')', active:STATE.level==='dep'});
+      }
+      if(STATE.munCod){
+        const dep = STATE.depData[STATE.depCod];
+        const mun = dep?.municipios?.find(m=>m.cod===STATE.munCod);
+        items.push({label:titleCase(mun?.nombre||STATE.munCod), click:'mapBackTo(\'mun\')', active:STATE.level==='mun'});
+      }
+      if(STATE.zonCod){
+        const dep = STATE.depData[STATE.depCod];
+        const mun = dep?.municipios?.find(m=>m.cod===STATE.munCod);
+        const zon = mun?.zonas?.find(z=>z.cod===STATE.zonCod);
+        items.push({label:titleCase(zon?.nombre||STATE.zonCod), click:'', active:true});
+      }
+      nav.innerHTML = items.map((it,i)=>{
+        const cls = it.active ? 'drill-crumb active' : (it.click?'drill-crumb clickable':'drill-crumb');
+        const handler = it.click && !it.active ? `onclick="${it.click}"` : '';
+        const sep = i<items.length-1?'<span class="drill-sep">›</span>':'';
+        return `<span class="${cls}" ${handler}>${it.label}</span>${sep}`;
+      }).join('');
+    }
+
+    function renderLevelBadge(){
+      const badge = document.getElementById('level-badge');
+      const map = {nac:['Nacional','nac'], dep:['Departamento','dep'], mun:['Municipio','mun'], com:['Comuna/Localidad','com']};
+      const [label, cls] = map[STATE.level]||['—','nac'];
+      badge.textContent = label;
+      badge.className = 'level-badge '+cls;
+    }
+
+    function renderMapLabels(scope){
+      const consNom = CONS_SHORT[STATE.activeCons]||STATE.activeCons;
+      document.getElementById('map-label').textContent = `${consNom} · ${scope.nombre}`;
+      const candLabel = STATE.activeCand ?
+        ` · ${shortLast(findCandName(STATE.activeCons, STATE.activeCand))}` : ' · Ganador por territorio';
+      document.getElementById('rank-label').textContent = `Candidatos en ${scope.nombre}`;
+      // map hint changes by level
+      const hint = document.getElementById('map-hint');
+      if(STATE.level==='nac') hint.textContent = 'Click en un departamento para entrar';
+      else if(STATE.level==='dep') hint.textContent = 'Click en un municipio para entrar';
+      else if(STATE.level==='mun') hint.textContent = 'Click en una comuna/localidad';
+      else hint.textContent = '';
+    }
+    function findCandName(clave, codigo){
+      const c = STATE.consultas[clave];
+      if(!c) return '';
+      const f = c.candidatos.find(x=>x.codigo===codigo);
+      return f?.nombre || '';
+    }
+
+    // ─── KPIs ─────────────────────────────────────────────────────
+    function renderKPIs(scope){
+      const cons = scope.consulta;
+      const sorted = [...cons.cands].sort((a,b)=>b.votos-a.votos);
+      const winner = sorted[0];
+      const second = sorted[1];
+      const margen = (winner && second) ? winner.votos - second.votos : 0;
+      const candFiltro = STATE.activeCand ? cons.cands.find(c=>c.codigo===STATE.activeCand) : null;
+
+      let card4;
+      if(candFiltro){
+        card4 = `<div class="kpi-card"><div class="kpi-label">${shortLast(candFiltro.nombre)}</div><div class="kpi-val sm" style="color:${candColor(STATE.activeCons,STATE.activeCand)}">${fmt(candFiltro.votos)}</div><div class="kpi-delta">${pct(candFiltro.votos, cons.votos)}% de la consulta</div></div>`;
       } else {
-        const pues=await getJSON('puestos');
-        const zonaCod=document.getElementById('zona-select').value;
-        const d=pues.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&(zonaCod?x.zon_cod===zonaCod:true)&&x.cod===pueCod); if(!d) return;
-        geoData=d; labelText=`Consultas · ${d.nombre}`; badgeText=d.nombre;
+        card4 = `<div class="kpi-card"><div class="kpi-label">Margen 1° – 2°</div><div class="kpi-val sm gr">${fmt(margen)}</div><div class="kpi-delta">${pct(margen, cons.votos)} pp</div></div>`;
       }
-      const geoVotos=geoAggr(geoData);
-      const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
-      const _gCtx=geoData.candidatos||null;
-      const geoPartidos=resumenData.partidos
-        .filter(p=>geoVotos[p.partido]>0)
-        .map(p=>({...p, votos:geoVotos[p.partido]||0, candidatos:p.candidatos.map(c=>({...c,votos:_gCtx?(_gCtx[c.nombre]||0):c.votos})).filter(c=>c.votos>0)}))
-        .sort((a,b)=>b.votos-a.votos);
-      lastGeoPartidos=geoPartidos; ctxCandVotos=_gCtx;
-
-      document.getElementById('lbl-tabla').textContent=labelText;
-      document.getElementById('drill-badge').textContent=badgeText;
-      document.getElementById('drill-badge').className='level-badge dep';
-      document.getElementById('drill-nav').innerHTML='';
-      document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Consulta / Candidato</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">Candidatos</th></tr>`;
-      const tbody=document.getElementById('tbody-cons');
-      tbody.innerHTML='';
-      const maxV=geoPartidos[0]?.votos||1;
-      geoPartidos.forEach((p,i)=>{
-        const color=getColor(p.partido), pctV=pct(p.votos,totalVotos), bw=((p.votos/maxV)*100).toFixed(1);
-        const hasCands=p.candidatos&&p.candidatos.length>0;
-        const tr=document.createElement('tr');
-        if(i===0){tr.classList.add('winner-row');tr.style.setProperty('--w-color',color);}
-        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>
-          ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button></div>`:''}
-          </td>
-          <td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
-          <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
-          <td class="r"><span class="cbadge sub">${p.candidatos?.length||'—'}</span></td>`;
-        tbody.appendChild(tr);
-        if(hasCands){const trC=document.createElement('tr');trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}"><table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead><tbody>${[...p.candidatos].sort((a,b)=>b.votos-a.votos).map((c,j)=>{const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';return `<tr${j===0?' class="winner-cand" style="--wc-color:'+color+'"':''}><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody></table></div></td>`;tbody.appendChild(trC);}
-      });
-      setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
-      const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
-      document.getElementById('kpi-row').innerHTML=`
-        <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(totalVotos)}</div><div class="kpi-delta">${badgeText}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Consultas</div><div class="kpi-val wh">${geoPartidos.length}</div><div class="kpi-delta">con votación</div></div>
-        <div class="kpi-card"><div class="kpi-label">Consulta puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div>
-        <div class="kpi-card"><div class="kpi-label">% puntero</div><div class="kpi-val">${topP?pct(topP.votos,totalVotos)+'%':'—'}</div><div class="kpi-delta">de votos</div></div>`;
-      document.getElementById('pct-cons').textContent=topP?pct(topP.votos,totalVotos)+'%':'—';
-      if(donutChart) donutChart.destroy();
-      const top5=geoPartidos.slice(0,5),otros=geoPartidos.slice(5).reduce((s,p)=>s+p.votos,0);
-      const dL=top5.map(p=>shortName(p.partido)),dD=top5.map(p=>p.votos),dC=top5.map(p=>getColor(p.partido));
-      if(otros>0){dL.push('Otros');dD.push(otros);dC.push('#444');}
-      donutChart=new Chart(document.getElementById('donut-cons').getContext('2d'),{
-        type:'doughnut',data:{labels:dL,datasets:[{data:dD,backgroundColor:dC,borderWidth:0,hoverOffset:6}]},
-        options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
-      });
-      document.getElementById('leg-cons').innerHTML=top5.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.partido)}"></span><span>${shortName(p.partido)}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
+      document.getElementById('kpi-row').innerHTML = `
+        <div class="kpi-card"><div class="kpi-label">Votos en la consulta</div><div class="kpi-val wh">${fmt(cons.votos)}</div><div class="kpi-delta">${scope.nombre}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Candidatos/as</div><div class="kpi-val">${cons.cands.length}</div><div class="kpi-delta">con votación</div></div>
+        <div class="kpi-card"><div class="kpi-label">Puntero</div><div class="kpi-val sm" style="color:${winner?candColor(STATE.activeCons, winner.codigo||winner.nombre):'#fff'}">${winner?shortLast(winner.nombre):'—'}</div><div class="kpi-delta">${winner?fmt(winner.votos)+' votos · '+pct(winner.votos,cons.votos)+'%':''}</div></div>
+        ${card4}`;
     }
 
-    function showRegisterToast(){const t=document.getElementById('register-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
-
-    async function onDepChange(cod){
-      document.getElementById('mun-select').innerHTML='<option value="">TODOS</option>';
-      document.getElementById('zona-select').innerHTML='<option value="">TODAS</option>';
-      document.getElementById('pue-select').innerHTML='<option value="">TODOS</option>';
-      document.getElementById('mesa-select').innerHTML='<option value="">TODAS</option>';
-      document.getElementById('mun-filter-container').style.display='none';
-      document.getElementById('zona-filter-container').style.display='none';
-      document.getElementById('pue-filter-container').style.display='none';
-      document.getElementById('mesa-filter-container').style.display='none';
-      if(!cod){renderNacional();renderKPI();renderDonut();return;}
-      await renderGeoPartidos('dep',cod,null,null);
-      const muns=await getJSON('municipios');
-      const sel=document.getElementById('mun-select');
-      sel.innerHTML='<option value="">TODOS</option>';
-      muns.filter(m=>m.dep_cod===cod).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(m=>{const o=document.createElement('option');o.value=m.cod;o.textContent=m.nombre;sel.appendChild(o);});
-      document.getElementById('mun-filter-container').style.display='flex';
-    }
-
-    async function onMunChange(cod){
-      const depCod=document.getElementById('dep-select').value;
-      document.getElementById('zona-select').innerHTML='<option value="">TODAS</option>';
-      document.getElementById('pue-select').innerHTML='<option value="">TODOS</option>';
-      document.getElementById('mesa-select').innerHTML='<option value="">TODAS</option>';
-      document.getElementById('zona-filter-container').style.display='none';
-      document.getElementById('pue-filter-container').style.display='none';
-      document.getElementById('mesa-filter-container').style.display='none';
-      if(!cod){await renderGeoPartidos('dep',depCod,null,null);return;}
-      await renderGeoPartidos('mun',depCod,cod,null);
-      const zonas=await getJSON('zonas');
-      const sel=document.getElementById('zona-select');
-      sel.innerHTML='<option value="">TODAS</option>';
-      zonas.filter(z=>z.dep_cod===depCod&&z.mun_cod===cod).sort((a,b)=>a.cod.localeCompare(b.cod)).forEach(z=>{const o=document.createElement('option');o.value=z.cod;o.textContent=z.nombre||`Zona ${z.cod}`;sel.appendChild(o);});
-      document.getElementById('zona-filter-container').style.display='flex';
-    }
-
-    async function onZonaChange(cod){
-      const depCod=document.getElementById('dep-select').value;
-      const munCod=document.getElementById('mun-select').value;
-      document.getElementById('pue-select').innerHTML='<option value="">TODOS</option>';
-      document.getElementById('mesa-select').innerHTML='<option value="">TODAS</option>';
-      document.getElementById('pue-filter-container').style.display='none';
-      document.getElementById('mesa-filter-container').style.display='none';
-      if(!cod){await renderGeoPartidos('mun',depCod,munCod,null);return;}
-      const zonas=await getJSON('zonas');
-      const z=zonas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.cod===cod);
-      if(!z)return;
-      const geoVotos=geoAggr(z);
-      const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
-      const _zCtx=z.candidatos||null;
-      const geoPartidos=resumenData.partidos.filter(p=>geoVotos[p.partido]>0).map(p=>({...p,votos:geoVotos[p.partido]||0,candidatos:p.candidatos.map(c=>({...c,votos:_zCtx?(_zCtx[c.nombre]||0):c.votos})).filter(c=>c.votos>0)})).sort((a,b)=>b.votos-a.votos);
-      lastGeoPartidos=geoPartidos; ctxCandVotos=_zCtx;
-      const label=z.nombre||`Zona ${cod}`;
-      document.getElementById('lbl-tabla').textContent=`Consultas · ${label}`;
-      document.getElementById('drill-badge').textContent=label;
-      document.getElementById('drill-badge').className='level-badge pues';
-      document.getElementById('drill-nav').innerHTML='';
-      document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Consulta / Candidato</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th></tr>`;
-      const tbody=document.getElementById('tbody-cons');
-      tbody.innerHTML='';
-      const maxV=geoPartidos[0]?.votos||1;
-      geoPartidos.forEach((p,i)=>{
-        const color=getColor(p.partido),pctV=pct(p.votos,totalVotos),bw=((p.votos/maxV)*100).toFixed(1);
-        const hasCands=p.candidatos&&p.candidatos.length>0;
-        const tr=document.createElement('tr');
-        if(i===0){tr.classList.add('winner-row');tr.style.setProperty('--w-color',color);}
-        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button></div>`:''}</td><td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
-        tbody.appendChild(tr);
-        if(hasCands){const trC=document.createElement('tr');trC.innerHTML=`<td colspan="4" style="padding:0"><div class="cands-inner" id="cands-inner-${i}"><table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead><tbody>${[...p.candidatos].sort((a,b)=>b.votos-a.votos).map((c,j)=>{const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';return `<tr${j===0?' class="winner-cand" style="--wc-color:'+color+'"':''}><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody></table></div></td>`;tbody.appendChild(trC);}
-      });
-      setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
-      if(donutChart)donutChart.destroy();
-      const _dTop5z=geoPartidos.slice(0,5),_dOtrosZ=geoPartidos.slice(5).reduce((s,p)=>s+p.votos,0);
-      const _dLz=_dTop5z.map(p=>shortName(p.partido)),_dDz=_dTop5z.map(p=>p.votos),_dCz=_dTop5z.map(p=>getColor(p.partido));
-      if(_dOtrosZ>0){_dLz.push('Otros');_dDz.push(_dOtrosZ);_dCz.push('#444');}
-      donutChart=new Chart(document.getElementById('donut-cons').getContext('2d'),{type:'doughnut',data:{labels:_dLz,datasets:[{data:_dDz,backgroundColor:_dCz,borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}});
-      document.getElementById('leg-cons').innerHTML=_dTop5z.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.partido)}"></span><span>${shortName(p.partido)}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
-      const topP=geoPartidos.filter(p=>!/blanco/i.test(p.partido))[0];
-      document.getElementById('kpi-row').innerHTML=`<div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(totalVotos)}</div><div class="kpi-delta">${label}</div></div><div class="kpi-card"><div class="kpi-label">Consultas</div><div class="kpi-val wh">${geoPartidos.length}</div><div class="kpi-delta">con votación</div></div><div class="kpi-card"><div class="kpi-label">Consulta puntero</div><div class="kpi-val sm">${topP?topP.partido.split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?fmt(topP.votos)+' votos':''}</div></div><div class="kpi-card"><div class="kpi-label">% puntero</div><div class="kpi-val">${topP?pct(topP.votos,totalVotos)+'%':'—'}</div><div class="kpi-delta">de votos</div></div>`;
-      const pues=await getJSON('puestos');
-      const pSel=document.getElementById('pue-select');
-      pSel.innerHTML='<option value="">TODOS</option>';
-      pues.filter(p=>p.dep_cod===depCod&&p.mun_cod===munCod&&p.zon_cod===cod).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es')).forEach(p=>{const o=document.createElement('option');o.value=p.cod;o.textContent=p.nombre;pSel.appendChild(o);});
-      document.getElementById('pue-filter-container').style.display='flex';
-    }
-
-    async function onPueChange(cod){
-      const depCod=document.getElementById('dep-select').value;
-      const munCod=document.getElementById('mun-select').value;
-      const zonaCod=document.getElementById('zona-select').value;
-      document.getElementById('mesa-select').innerHTML='<option value="">TODAS</option>';
-      document.getElementById('mesa-filter-container').style.display='none';
-      if(!cod){
-        if(zonaCod)await onZonaChange(zonaCod);
-        else await renderGeoPartidos('mun',depCod,munCod,null);
+    // ─── RANK TABLE ───────────────────────────────────────────────
+    function renderRankTable(scope){
+      const cons = scope.consulta;
+      const sorted = [...cons.cands].sort((a,b)=>b.votos-a.votos);
+      const tbody = document.getElementById('tbody-rank');
+      if(!sorted.length){
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:rgba(255,255,255,.3);padding:1.5rem">Sin votación en este territorio</td></tr>`;
         return;
       }
-      if(!localStorage.getItem('rr-token')){showInviteToast();}
-      await renderGeoPartidos('pue',depCod,munCod,cod);
-      const mesas=await getJSON('mesas');
-      const sel=document.getElementById('mesa-select');
-      sel.innerHTML='<option value="">TODAS</option>';
-      const seen=new Set();
-      mesas.filter(m=>m.dep_cod===depCod&&m.mun_cod===munCod&&(zonaCod?m.zon_cod===zonaCod:true)&&m.pue_cod===cod).sort((a,b)=>+a.mesa-(+b.mesa)).forEach(m=>{if(seen.has(m.mesa))return;seen.add(m.mesa);const o=document.createElement('option');o.value=m.mesa;o.textContent=`Mesa ${m.mesa}`;sel.appendChild(o);});
-      document.getElementById('mesa-filter-container').style.display='flex';
+      const maxV = sorted[0].votos||1;
+      tbody.innerHTML = sorted.map((c,i)=>{
+        const col = candColor(STATE.activeCons, c.codigo||c.nombre);
+        const isActiveCand = STATE.activeCand && c.codigo===STATE.activeCand;
+        const isWinner = i===0;
+        const pctV = pct(c.votos, cons.votos);
+        const bw = ((c.votos/maxV)*100).toFixed(1);
+        const trClass = isWinner ? `winner-row" style="--w-color:${col}"` : (isActiveCand?'class="active"':'class=""');
+        const trAttr = isWinner ? `class="${trClass}"` : trClass;
+        return `<tr ${trAttr} onclick="setCandidato('${c.codigo||''}')">
+          <td style="color:rgba(255,255,255,.35);width:1.8rem">${i+1}</td>
+          <td><div style="display:flex;align-items:center;gap:.5rem"><span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0"></span><span style="font-weight:500">${shortLast(c.nombre)}</span></div></td>
+          <td class="r" style="font-weight:500">${fmt(c.votos)}</td>
+          <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${col}" data-w="${bw}"></div></div></td>
+        </tr>`;
+      }).join('');
+      setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),60);
     }
 
-    async function onMesaChange(cod){
-      const user=JSON.parse(localStorage.getItem('rr-user')||'null');
-      if(!user||!['premium','full'].includes(user.plan)){showInviteToast();}
-      const depCod=document.getElementById('dep-select').value;
-      const munCod=document.getElementById('mun-select').value;
-      const pueCod=document.getElementById('pue-select').value;
-      if(!cod){if(pueCod)await renderGeoPartidos('pue',depCod,munCod,pueCod);return;}
-      const mesas=await getJSON('mesas');
-      const zonaCod=document.getElementById('zona-select').value;
-      const m=mesas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&(zonaCod?x.zon_cod===zonaCod:true)&&x.pue_cod===pueCod&&x.mesa===cod);
-      if(!m)return;
-      const geoVotos=geoAggr(m);
-      const totalVotos=Object.values(geoVotos).reduce((s,v)=>s+v,0);
-      const label=`Mesa ${cod}`;
-      const _mCtx=m.candidatos||null;
-      const geoPartidos=resumenData.partidos.filter(p=>geoVotos[p.partido]>0).map(p=>({...p,votos:geoVotos[p.partido]||0,candidatos:p.candidatos.map(c=>({...c,votos:_mCtx?(_mCtx[c.nombre]||0):c.votos})).filter(c=>c.votos>0)})).sort((a,b)=>b.votos-a.votos);
-      lastGeoPartidos=geoPartidos; ctxCandVotos=_mCtx;
-      document.getElementById('lbl-tabla').textContent=`Consultas · ${label}`;
-      document.getElementById('drill-badge').textContent=label;
-      document.getElementById('drill-badge').className='level-badge pues';
-      document.getElementById('drill-nav').innerHTML='';
-      document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Consulta / Candidato</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th></tr>`;
-      const tbody=document.getElementById('tbody-cons');
-      tbody.innerHTML='';
-      const maxV=geoPartidos[0]?.votos||1;
-      geoPartidos.forEach((p,i)=>{
-        const color=getColor(p.partido),pctV=pct(p.votos,totalVotos),bw=((p.votos/maxV)*100).toFixed(1);
-        const hasCands=p.candidatos&&p.candidatos.length>0;
-        const tr=document.createElement('tr');
-        if(i===0){tr.classList.add('winner-row');tr.style.setProperty('--w-color',color);}
-        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td><td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button></div>`:''}</td><td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td><td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>`;
-        tbody.appendChild(tr);
-        if(hasCands){const trC=document.createElement('tr');trC.innerHTML=`<td colspan="4" style="padding:0"><div class="cands-inner" id="cands-inner-${i}"><table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead><tbody>${[...p.candidatos].sort((a,b)=>b.votos-a.votos).map((c,j)=>{const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';return `<tr${j===0?' class="winner-cand" style="--wc-color:'+color+'"':''}><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;}).join('')}</tbody></table></div></td>`;tbody.appendChild(trC);}
+    // ─── DONUT ────────────────────────────────────────────────────
+    let donutChart = null;
+    function renderDonut(scope){
+      const cons = scope.consulta;
+      const sorted = [...cons.cands].sort((a,b)=>b.votos-a.votos);
+      if(donutChart) donutChart.destroy();
+      const top = sorted.slice(0,5);
+      const otros = sorted.slice(5).reduce((s,c)=>s+c.votos,0);
+      const lbls = top.map(c=>shortLast(c.nombre));
+      const data = top.map(c=>c.votos);
+      const cols = top.map(c=>candColor(STATE.activeCons, c.codigo||c.nombre));
+      if(otros>0){ lbls.push('Otros'); data.push(otros); cols.push('#444'); }
+      donutChart = new Chart(document.getElementById('donut-cons').getContext('2d'),{
+        type:'doughnut',
+        data:{labels:lbls, datasets:[{data, backgroundColor:cols, borderWidth:0, hoverOffset:6}]},
+        options:{responsive:true,maintainAspectRatio:true,cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
       });
-      setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
-      if(donutChart)donutChart.destroy();
-      const _dTop5m=geoPartidos.slice(0,5),_dOtrosM=geoPartidos.slice(5).reduce((s,p)=>s+p.votos,0);
-      const _dLm=_dTop5m.map(p=>shortName(p.partido)),_dDm=_dTop5m.map(p=>p.votos),_dCm=_dTop5m.map(p=>getColor(p.partido));
-      if(_dOtrosM>0){_dLm.push('Otros');_dDm.push(_dOtrosM);_dCm.push('#444');}
-      donutChart=new Chart(document.getElementById('donut-cons').getContext('2d'),{type:'doughnut',data:{labels:_dLm,datasets:[{data:_dDm,backgroundColor:_dCm,borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:true,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}});
-      document.getElementById('leg-cons').innerHTML=_dTop5m.map(p=>`<div class="li"><span class="ld" style="background:${getColor(p.partido)}"></span><span>${shortName(p.partido)}</span><span class="lv">${fmt(p.votos)}</span></div>`).join('');
+      const focus = STATE.activeCand
+        ? cons.cands.find(c=>c.codigo===STATE.activeCand)
+        : sorted[0];
+      document.getElementById('pct-cons').textContent = focus ? pct(focus.votos, cons.votos)+'%' : '—';
+      document.getElementById('sub-cons').textContent = focus ? shortLast(focus.nombre) : 'consulta';
+      document.getElementById('leg-cons').innerHTML = top.map((c,i)=>{
+        const col = candColor(STATE.activeCons, c.codigo||c.nombre);
+        return `<div class="li"><span class="ld" style="background:${col}"></span><span>${shortLast(c.nombre)}</span><span class="lv">${pct(c.votos,cons.votos)}%</span></div>`;
+      }).join('');
     }
 
-    function renderNacional(){
-      document.getElementById('lbl-tabla').textContent='Consultas Presidenciales · Nacional';
-      document.getElementById('drill-badge').textContent='Nacional';
-      document.getElementById('drill-badge').className='level-badge dep';
-      document.getElementById('drill-nav').innerHTML='';
-      document.getElementById('drill-thead').innerHTML=`<tr><th>#</th><th>Consulta / Candidato</th><th class="r">Votos</th><th class="r" style="min-width:130px">%</th><th class="r">Candidatos</th></tr>`;
-      const tbody=document.getElementById('tbody-cons');
-      tbody.innerHTML='';
-      const partidos=resumenData.partidos, maxV=partidos[0]?.votos||1;
-      lastGeoPartidos=partidos; ctxCandVotos=null;
-      partidos.forEach((p,i)=>{
-        const pctV=pct(p.votos,resumenData.votval), bw=((p.votos/maxV)*100).toFixed(1), color=getColor(p.partido);
-        const tr=document.createElement('tr');
-        const hasCands=p.candidatos&&p.candidatos.length>0;
-        if(i===0){tr.classList.add('winner-row');tr.style.setProperty('--w-color',color);}
-        tr.innerHTML=`<td style="color:rgba(255,255,255,.3)">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.6rem"><span style="width:10px;height:10px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span><span style="font-family:'Syne',sans-serif;font-weight:700;font-size:1.15rem">${p.partido}</span></div>
-          ${hasCands?`<div style="margin-top:.35rem"><button class="expand-btn" onclick="toggleCands(${i})" id="expand-${i}"><span id="expand-icon-${i}">▸</span> ${p.candidatos.length} candidatos</button></div>`:''}
-          </td>
-          <td class="r" style="font-size:1.15rem;font-weight:700;font-family:'Syne',sans-serif">${fmt(p.votos)}</td>
-          <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${color}" data-w="${bw}"></div></div></td>
-          <td class="r"><span class="cbadge sub">${p.candidatos?.length||'—'}</span></td>`;
-        tbody.appendChild(tr);
-        if(hasCands){
-          const trC=document.createElement('tr');
-          trC.innerHTML=`<td colspan="5" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">
-            <table class="cands-table"><thead><tr><th>Cód.</th><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r">% consulta</th></tr></thead>
-            <tbody>${[...p.candidatos].sort((a,b)=>b.votos-a.votos).map((c,j)=>{
-              const codStr=c.codigo!=null?String(c.codigo).padStart(3,'0'):'—';
-              return `<tr${j===0?' class="winner-cand" style="--wc-color:'+color+'"':''}><td style="color:rgba(0,71,255,.8);font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;width:2.5rem;letter-spacing:.04em">${codStr}</td><td style="color:rgba(255,255,255,.25);width:2rem">${String(j+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${c.nombre}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(c.votos)}</td><td class="r" style="color:rgba(255,255,255,.4)">${p.votos?((c.votos/p.votos)*100).toFixed(1):'0.0'}%</td></tr>`;
-            }).join('')}</tbody>
-            </table></div></td>`;
-          tbody.appendChild(trC);
+    // ─── MAP ──────────────────────────────────────────────────────
+    function initMap(){
+      if(STATE.map) return;
+      const el = document.getElementById('cons-map');
+      STATE.map = L.map(el, {
+        center:[4.5,-74.0], zoom:5,
+        zoomControl:false, attributionControl:true,
+        scrollWheelZoom:false, doubleClickZoom:false,
+        touchZoom:false, boxZoom:false, keyboard:false,
+        dragging:false, tap:false,
+      });
+      // El contenedor puede tener tamaño 0 mientras la cortina cubre la página.
+      // Si Leaflet añade una capa con viewport 0×0, los paths SVG quedan con
+      // geometría vacía. Cuando el tamaño cambia a ≠0 forzamos un re-render
+      // completo (remueve la capa actual y vuelve a llamar a renderMap).
+      let lastW = 0, lastH = 0;
+      const ro = new ResizeObserver(entries=>{
+        for(const e of entries){
+          const w = e.contentRect.width, h = e.contentRect.height;
+          if(w>0 && h>0 && (Math.abs(w-lastW)>1 || Math.abs(h-lastH)>1)){
+            const wasZero = (lastW===0 || lastH===0);
+            lastW=w; lastH=h;
+            try{ STATE.map.invalidateSize(); }catch(_){}
+            // Si el zoom quedó nulo (porque fitBounds corrió con 0×0), restaurar
+            // un zoom base antes de re-encuadrar.
+            if(STATE.map.getZoom()==null) STATE.map.setView([4.5,-74.0], 5);
+            if(wasZero){
+              // El primer render se hizo con 0×0; remover la capa y re-render limpio.
+              if(STATE.currentLayer){ try{STATE.map.removeLayer(STATE.currentLayer);}catch(_){} STATE.currentLayer=null; }
+              renderMap(getScope());
+            } else if(STATE.currentLayer){
+              try{ STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[6,6]}); }catch(_){}
+            }
+          }
         }
       });
-      setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
+      ro.observe(el);
+      window.addEventListener('resize', ()=>{ try{STATE.map.invalidateSize();}catch(_){} });
+      // Si la página se cargó en pestaña en background (timers throttled),
+      // al volver visible re-rendereamos para asegurar geometría válida del SVG.
+      document.addEventListener('visibilitychange', ()=>{
+        if(document.visibilityState==='visible'){
+          try{
+            STATE.map.invalidateSize();
+            if(STATE.map.getZoom()==null) STATE.map.setView([4.5,-74.0], 5);
+            if(STATE.currentLayer){
+              const valid=[...el.querySelectorAll('svg path')].some(p=>(p.getAttribute('d')||'').length>20);
+              if(!valid){
+                try{STATE.map.removeLayer(STATE.currentLayer);}catch(_){} STATE.currentLayer=null;
+                renderMap(getScope());
+              } else {
+                try{STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[6,6]});}catch(_){}
+              }
+            }
+          }catch(_){}
+        }
+      });
+      // Red de seguridad para entornos donde ResizeObserver no dispara confiable
+      // (e.g. tab en background al cargar): reintenta varias veces.
+      [400, 1000, 1600, 2400].forEach(ms=>setTimeout(()=>{
+        try{
+          STATE.map.invalidateSize();
+          if(STATE.map.getZoom()==null) STATE.map.setView([4.5,-74.0], 5);
+          if(STATE.currentLayer){
+            const valid=[...el.querySelectorAll('svg path')].some(p=>(p.getAttribute('d')||'').length>20);
+            if(!valid){
+              try{STATE.map.removeLayer(STATE.currentLayer);}catch(_){} STATE.currentLayer=null;
+              renderMap(getScope());
+            } else {
+              try{STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[6,6]});}catch(_){}
+            }
+          }
+        }catch(_){}
+      }, ms));
+      // Precarga del GeoJSON nacional
+      fetch(DEPTO_GEOJSON).then(r=>r.ok?r.json():null).then(g=>{
+        if(g){ STATE._deptoGeoRaw = g; renderMap(getScope()); }
+      }).catch(e=>console.warn('[Map] depto geo:', e));
     }
 
-    function toggleCands(i){const inner=document.getElementById(`cands-inner-${i}`),icon=document.getElementById(`expand-icon-${i}`),open=inner.classList.toggle('open');icon.textContent=open?'▾':'▸';}
-
-    function buscarCandidato(q){
-      const box=document.getElementById('cons-search-results'),grid=document.getElementById('cons-main-grid'),kpi=document.getElementById('kpi-row');
-      q=q.trim();
-      if(!q){box.style.display='none';box.innerHTML='';grid.style.display='';kpi.style.display='';return;}
-      grid.style.display='none';kpi.style.display='none';box.style.display='block';
-      const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(), qn=norm(q), res=[];
-      const src=lastGeoPartidos||resumenData?.partidos||[];
-      src.forEach(p=>p.candidatos.forEach((c,idx)=>{
-        if(!norm(c.nombre).includes(qn))return;
-        const v=ctxCandVotos?(ctxCandVotos[c.nombre]||0):c.votos;
-        if(ctxCandVotos&&v===0)return;
-        res.push({nombre:c.nombre,partido:p.partido,votos:v,pos:idx+1});
+    // Build "lookup": para cada territorio del scope.children, calcular el ganador
+    // dentro de la consulta activa, o (si hay candidato) el voto/porcentaje del candidato.
+    // Los datos submunicipales vienen por ZONA ELECTORAL, pero los polígonos de
+    // ciudad son COMUNAS/LOCALIDADES políticas y la relación no siempre es 1:1
+    // (Medellín: zonas 30,31,32 → comuna 16 Belén). Suma las zonas de cada comuna
+    // antes de pintar. Si el municipio no está en la tabla la relación es la
+    // identidad (Bogotá: zona = localidad) y el scope pasa intacto.
+    function scopeComunas(scope){
+      const key = `${_to2(STATE.depCod)}-${String(STATE.munCod||'').padStart(3,'0')}`;
+      const map = STATE.zonaComuna?.muns?.[key];
+      if(!map || !scope?.children?.length) return scope;
+      const agg = {};
+      scope.children.forEach(ch=>{
+        const cod = map.z[String(ch.cod).padStart(2,'0')];
+        if(!cod) return;   // zonas 90/98 (puesto censo, cárceles): sin comuna
+        const a = agg[cod] || (agg[cod] = { votos:0, byName:{} });
+        a.votos += ch.consulta?.votos || 0;
+        ((ch.consulta?.cands)||[]).forEach(c=>{ a.byName[c.nombre] = (a.byName[c.nombre]||0) + (c.votos||0); });
+      });
+      if(!Object.keys(agg).length) return scope;
+      const children = Object.keys(agg).sort().map(cod=>({
+        cod,
+        nombre: titleCase(map.c[cod] || `Comuna ${Number(cod)}`),
+        consulta: {
+          votos: agg[cod].votos,
+          cands: Object.entries(agg[cod].byName)
+            .map(([nombre,votos])=>({ nombre, votos, codigo: codigoFor(STATE.activeCons, nombre) }))
+            .sort((a,b)=>b.votos-a.votos),
+        },
       }));
-      res.sort((a,b)=>b.votos-a.votos);
-      box.innerHTML=!res.length?`<div style="padding:2rem;font-family:'DM Mono',monospace;font-size:.72rem;color:rgba(255,255,255,.3);text-align:center">No se encontraron candidatos con "<b>${q}</b>" en el nivel actual</div>`
-        :`<div style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.1em;color:rgba(255,255,255,.3);text-transform:uppercase;padding:.75rem 0 .5rem">${res.length} resultado${res.length!==1?'s':''} para "${q}"</div>
-        <table class="results-table"><thead><tr><th>#</th><th>Candidato/a</th><th>Consulta</th><th class="r">Pos.</th><th class="r">Votos</th></tr></thead>
-        <tbody>${res.map((r,i)=>`<tr><td style="color:rgba(255,255,255,.25)">${String(i+1).padStart(2,'0')}</td><td style="font-family:'Syne',sans-serif">${r.nombre}</td><td style="color:rgba(255,255,255,.45);font-family:'Syne',sans-serif">${r.partido}</td><td class="r" style="color:rgba(255,255,255,.3)">#${r.pos}</td><td class="r" style="font-family:'Syne',sans-serif">${fmt(r.votos)}</td></tr>`).join('')}</tbody></table>`;
+      return {...scope, children};
+    }
+    function buildTerritoryLookup(scope){
+      const out = {};        // cod (normalizado) → { winner:{nombre,codigo,votos}, vCand, vTotal, byName }
+      const byName = {};     // nombre normalizado → mismo registro
+      (scope.children||[]).forEach(ch=>{
+        const cands = (ch.consulta?.cands||ch.consulta?.candidatos)||[];
+        if(!cands.length){ return; }
+        const sorted = [...cands].sort((a,b)=>b.votos-a.votos);
+        const winner = sorted[0];
+        let vCand = 0;
+        if(STATE.activeCand){
+          const cName = findCandName(STATE.activeCons, STATE.activeCand);
+          const f = cands.find(c=>(c.codigo&&c.codigo===STATE.activeCand) || _normN(c.nombre)===_normN(cName));
+          vCand = f?.votos||0;
+        }
+        const rec = {
+          winner: { nombre: winner.nombre, codigo: winner.codigo||codigoFor(STATE.activeCons, winner.nombre), votos: winner.votos },
+          vCand,
+          vTotal: ch.consulta?.votos || cands.reduce((s,c)=>s+c.votos,0),
+          nombre: ch.nombre,
+        };
+        out[_normC(ch.cod)] = rec;
+        byName[_normN(ch.nombre)] = rec;
+      });
+      out.__byName = byName;
+      return out;
     }
 
+    // Decide el fill color para un territorio según el modo activo.
+    function fillForRec(rec){
+      if(!rec) return '#333';
+      if(STATE.activeCand){
+        // Gradiente sobre el candidato seleccionado
+        if(!rec.vTotal) return '#333';
+        const share = rec.vCand / rec.vTotal;
+        // Gradient: 0..0.05 → muy claro / 0.5+ → color completo
+        const col = candColor(STATE.activeCons, STATE.activeCand);
+        // Mezcla del color con #1a1f2e según share
+        const t = Math.min(1, share*1.6 + 0.1);  // suaviza
+        return lighten(col, 1-t);
+      }
+      // Ganador
+      const w = rec.winner;
+      if(!w) return '#333';
+      return candColor(STATE.activeCons, w.codigo || w.nombre);
+    }
+    function fillOpacityForRec(rec){
+      if(!rec) return 0.18;
+      if(STATE.activeCand){
+        if(!rec.vTotal) return 0.18;
+        const share = rec.vCand/rec.vTotal;
+        return 0.32 + Math.min(0.55, share*1.1);
+      }
+      return 0.78;
+    }
+
+    // City detection (Bogotá, Medellín, Cali, Barranquilla, Ibagué, Manizales, Pereira).
+    function detectCity(depCod, munCod, munName){
+      if(_normC(depCod)==='16') return CITY_MAPS.bogota;
+      if(!munName) return null;
+      const n = _normN(munName);
+      if(/MEDELL/.test(n)) return CITY_MAPS.medellin;
+      if(/^CALI$|SANTIAGO DE CALI/.test(n)) return CITY_MAPS.cali;
+      if(/BARRANQUILLA/.test(n)) return CITY_MAPS.barranquilla;
+      if(/IBAGU/.test(n)) return CITY_MAPS.ibague;
+      if(/MANIZALES/.test(n)) return CITY_MAPS.manizales;
+      if(/PEREIRA/.test(n)) return CITY_MAPS.pereira;
+      return null;
+    }
+    const CITY_MAPS = {
+      bogota:       { key:'bogota',       url:BOGOTA_LOC_URL,      rotate:true,
+                      code:p=>_to2(p.LocCodigo),                  name:p=>p.LocNombre||p.nombre||'Localidad' },
+      medellin:     { key:'medellin',     url:MEDELLIN_COM_URL,    rotate:false,
+                      code:p=>_to2(p.CODIGO),                     name:p=>p.NOMBRE||p.IDENTIFICACION||'Comuna' },
+      cali:         { key:'cali',         url:CALI_COM_URL,        rotate:false,
+                      code:p=>_to2(p.comuna),                     name:p=>p.nombre||`Comuna ${p.comuna}` },
+      barranquilla: { key:'barranquilla', url:BARRANQUILLA_COM_URL,rotate:false,
+                      code:p=>_to2(p.id),                         name:p=>p.nombre||'Localidad' },
+      ibague:       { key:'ibague',       url:IBAGUE_COM_URL,      rotate:false,
+                      code:p=>{const m=String(p.COMUNAS||'').match(/(\d+)/); return m?_to2(m[1]):'';},
+                      name:p=>p.COMUNAS||'Comuna' },
+      manizales:    { key:'manizales',    url:MANIZALES_COM_URL,   rotate:false,
+                      code:p=>_to2(p.ID_COMUNA),                  name:p=>p.NOMBRES_CO||'Comuna' },
+      pereira:      { key:'pereira',      url:PEREIRA_COM_URL,     rotate:false,
+                      code:_=>'', name:p=>p.Comuna||'Comuna' },
+    };
+    function rotateGeoJSON90Left(geoData){
+      const cx=-74.08, cy=4.65;
+      const rc=([lon,lat])=>[cx-(lat-cy), cy+(lon-cx)];
+      const rg=geom=>{
+        if(!geom) return geom;
+        if(geom.type==='Polygon') return {...geom, coordinates: geom.coordinates.map(r=>r.map(rc))};
+        if(geom.type==='MultiPolygon') return {...geom, coordinates: geom.coordinates.map(p=>p.map(r=>r.map(rc)))};
+        return geom;
+      };
+      return {...geoData, features: geoData.features.map(f=>({...f, geometry: rg(f.geometry)}))};
+    }
+    // Build per-feature tooltip HTML.
+    function tooltipHTML(name, rec){
+      if(!rec) return `<div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700">${name.toUpperCase()}</span><br/><span style="color:rgba(255,255,255,.4)">Sin datos</span></div>`;
+      if(STATE.activeCand){
+        const cName = findCandName(STATE.activeCons, STATE.activeCand);
+        const col = candColor(STATE.activeCons, STATE.activeCand);
+        const pctV = rec.vTotal ? ((rec.vCand/rec.vTotal)*100).toFixed(1) : '0.0';
+        return `<div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700">${name.toUpperCase()}</span><br/>
+          <span style="color:${col};font-weight:600">${shortLast(cName)}</span><br/>
+          ${fmt(rec.vCand)} votos · ${pctV}% de la consulta<br/>
+          <span style="color:rgba(255,255,255,.45);font-size:.75rem">Ganador local: ${shortLast(rec.winner.nombre)}</span>
+        </div>`;
+      }
+      const w = rec.winner;
+      const col = candColor(STATE.activeCons, w.codigo||w.nombre);
+      const pctV = rec.vTotal ? ((w.votos/rec.vTotal)*100).toFixed(1) : '0.0';
+      return `<div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700">${name.toUpperCase()}</span><br/>
+        <span style="color:${col};font-weight:700">${shortLast(w.nombre)}</span><br/>
+        ${fmt(w.votos)} votos · ${pctV}%
+      </div>`;
+    }
+
+    async function renderMap(scope){
+      if(!STATE.map) return;
+      // Asegura el tamaño correcto del contenedor (la cortina puede haberlo dejado en 0×0).
+      try{ STATE.map.invalidateSize(); }catch(_){}
+      // Remueve capa actual
+      if(STATE.currentLayer){ STATE.map.removeLayer(STATE.currentLayer); STATE.currentLayer=null; }
+      // Botón volver
+      const backBtn = document.getElementById('cons-map-back');
+      backBtn.style.display = STATE.level==='nac' ? 'none' : '';
+
+      if(STATE.level==='nac'){
+        if(!STATE._deptoGeoRaw) return;
+        const lookup = buildTerritoryLookup(scope);
+        const style = feat=>{
+          const code = _depCodeFromProps(feat.properties);
+          const rec = lookup[_normC(code)] || (lookup.__byName||{})[_normN(feat.properties.name||feat.properties.NOMBRE||'')];
+          return {
+            fillColor: fillForRec(rec),
+            fillOpacity: fillOpacityForRec(rec),
+            color:'rgba(255,255,255,0.35)', weight:1,
+          };
+        };
+        STATE.currentLayer = L.geoJSON(STATE._deptoGeoRaw, {
+          style,
+          onEachFeature:(feat, layer)=>{
+            const code = _depCodeFromProps(feat.properties);
+            const rec = lookup[_normC(code)] || (lookup.__byName||{})[_normN(feat.properties.name||feat.properties.NOMBRE||'')];
+            const name = rec?.nombre || feat.properties.name || feat.properties.NOMBRE || 'Depto';
+            layer.on({
+              mouseover(e){
+                layer.setStyle({weight:2, color:'#fff', fillOpacity:Math.min(1, fillOpacityForRec(rec)+0.18)});
+                layer.bindTooltip(tooltipHTML(name, rec),{sticky:true,opacity:1}).openTooltip(e.latlng);
+              },
+              mouseout(){ layer.setStyle(style(feat)); layer.closeTooltip(); },
+              click(){ if(code) drillToDep(_to2(code)); }
+            });
+          }
+        }).addTo(STATE.map);
+        try{ STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[6,6]}); }catch(_){}
+        return;
+      }
+      if(STATE.level==='dep'){
+        const lookup = buildTerritoryLookup(scope);
+        try{
+          let geo = STATE._depGeoCache[STATE.depCod];
+          if(!geo){
+            const r = await fetch(`${DEPTOS_MPS_URL}${_to2(STATE.depCod)}.json`);
+            if(!r.ok) throw new Error(`HTTP ${r.status}`);
+            geo = await r.json();
+            STATE._depGeoCache[STATE.depCod] = geo;
+          }
+          const style = feat=>{
+            const p = feat.properties;
+            const code = p.mun_elec!=null ? _normC(p.mun_elec) : null;
+            const rec = code ? lookup[code] : (lookup.__byName||{})[_normN(p.mpio_cnmbr||p.NOMBRE||'')];
+            return {
+              fillColor: fillForRec(rec),
+              fillOpacity: fillOpacityForRec(rec),
+              color:'rgba(255,255,255,0.35)', weight:1,
+            };
+          };
+          STATE.currentLayer = L.geoJSON(geo, {
+            style,
+            onEachFeature:(feat, layer)=>{
+              const p = feat.properties;
+              const code = p.mun_elec!=null ? _normC(p.mun_elec) : null;
+              const rec = code ? lookup[code] : (lookup.__byName||{})[_normN(p.mpio_cnmbr||p.NOMBRE||'')];
+              const name = rec?.nombre || p.mpio_cnmbr || p.NOMBRE || p.nombre || 'Mun';
+              layer.on({
+                mouseover(e){
+                  layer.setStyle({weight:2, color:'#fff', fillOpacity:Math.min(1, fillOpacityForRec(rec)+0.18)});
+                  layer.bindTooltip(tooltipHTML(name, rec),{sticky:true,opacity:1}).openTooltip(e.latlng);
+                },
+                mouseout(){ layer.setStyle(style(feat)); layer.closeTooltip(); },
+                click(){ if(p.mun_elec!=null) drillToMun(_to2(p.mun_elec).padStart(3,'0').slice(-3)); }
+              });
+            }
+          }).addTo(STATE.map);
+          try{ STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[10,10]}); }catch(_){}
+        }catch(e){ console.warn('[Map] depto:', e); }
+        return;
+      }
+      if(STATE.level==='mun' || STATE.level==='com'){
+        const dep = STATE.depData[STATE.depCod];
+        const mun = dep?.municipios?.find(m=>m.cod===STATE.munCod);
+        const city = detectCity(STATE.depCod, STATE.munCod, mun?.nombre);
+        if(!city){
+          // No tenemos GeoJSON de comunas/localidades para este municipio:
+          // mantenemos visible la capa del departamento ya que no hay drill cartográfico posible.
+          document.getElementById('map-hint').textContent = 'Sin desagregación geográfica';
+          // Renderiza fallback como capa del depto sin highlight extra
+          await (async()=>{ STATE.level='dep'; await renderMap(getScope()); STATE.level='mun'; })();
+          return;
+        }
+        const lookup = buildTerritoryLookup(scopeComunas(scope));
+        try{
+          let geo = STATE._cityGeoCache[city.key];
+          if(!geo){
+            const r = await fetch(city.url); if(!r.ok) throw new Error(`HTTP ${r.status}`);
+            const raw = await r.json();
+            geo = city.rotate ? rotateGeoJSON90Left(raw) : raw;
+            STATE._cityGeoCache[city.key] = geo;
+          }
+          const resolve = p=>{
+            const c = city.code(p);
+            if(c && lookup[_normC(c)]) return lookup[_normC(c)];
+            return (lookup.__byName||{})[_normN(city.name(p))]||null;
+          };
+          const style = feat=>{
+            const rec = resolve(feat.properties);
+            return {
+              fillColor: fillForRec(rec),
+              fillOpacity: fillOpacityForRec(rec),
+              color:'rgba(255,255,255,0.35)', weight:1,
+            };
+          };
+          STATE.currentLayer = L.geoJSON(geo, {
+            style,
+            onEachFeature:(feat, layer)=>{
+              const p = feat.properties;
+              const rec = resolve(p);
+              const name = rec?.nombre || city.name(p) || 'Comuna';
+              layer.on({
+                mouseover(e){
+                  layer.setStyle({weight:2, color:'#fff', fillOpacity:Math.min(1, fillOpacityForRec(rec)+0.18)});
+                  layer.bindTooltip(tooltipHTML(name, rec),{sticky:true,opacity:1}).openTooltip(e.latlng);
+                },
+                mouseout(){ layer.setStyle(style(feat)); layer.closeTooltip(); },
+              });
+            }
+          }).addTo(STATE.map);
+          try{ STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[10,10]}); }catch(_){}
+        }catch(e){ console.warn('[Map] city:', e); }
+      }
+    }
+    function _depCodeFromProps(props){
+      if(props.electoral_id!=null && props.electoral_id!=='') return _normC(props.electoral_id);
+      // Fallback: lookup por nombre en STATE.deps
+      const nom = props.name||props.NOMBRE||props.nombre||'';
+      const norm = _normN(nom);
+      const found = (STATE.deps||[]).find(d=>{
+        const dn = _normN(d.nombre);
+        return dn===norm
+          || (norm.includes('BOGOTA') && dn.includes('BOGOTA'))
+          || (norm.includes('NORTE') && norm.includes('SAN') && dn.includes('NORTE'))
+          || (norm.includes('VALLE') && dn.includes('VALLE'))
+          || (norm.includes('SAN ANDRES') && dn.includes('SAN ANDRES'));
+      });
+      return found ? _normC(found.cod) : null;
+    }
+
+    // ─── DRILL ────────────────────────────────────────────────────
+    async function drillToDep(depCod){
+      try{
+        STATE.depCod = depCod;
+        STATE.munCod = null; STATE.zonCod = null;
+        STATE.level = 'dep';
+        await getDepData(depCod);
+        renderAll();
+        // Bogotá: salta directo a localidades (un solo mun = 001)
+        const dep = STATE.depData[depCod];
+        if(_normC(depCod)==='16' && dep?.municipios?.length===1){
+          await drillToMun(dep.municipios[0].cod);
+        }
+      }catch(e){ console.warn('[Drill dep]', e); }
+    }
+    async function drillToMun(munCod){
+      STATE.munCod = munCod;
+      STATE.zonCod = null;
+      STATE.level = 'mun';
+      renderAll();
+    }
+    function mapBack(){
+      if(STATE.level==='com'){ STATE.zonCod=null; STATE.level='mun'; }
+      else if(STATE.level==='mun'){ STATE.munCod=null; STATE.level='dep'; }
+      else if(STATE.level==='dep'){ STATE.depCod=null; STATE.level='nac'; }
+      renderAll();
+    }
+    function mapBackTo(level){
+      if(level==='nac'){ STATE.depCod=null; STATE.munCod=null; STATE.zonCod=null; STATE.level='nac'; }
+      else if(level==='dep'){ STATE.munCod=null; STATE.zonCod=null; STATE.level='dep'; }
+      else if(level==='mun'){ STATE.zonCod=null; STATE.level='mun'; }
+      renderAll();
+    }
+
+    // ─── BOILERPLATE: nav, theme, curtain, cursor, toasts ────────
     const curtain=document.getElementById('curtain');
     curtain.classList.add('opening');
     requestAnimationFrame(()=>requestAnimationFrame(()=>{setTimeout(()=>{curtain.classList.remove('opening');curtain.classList.add('opened');},900);}));
@@ -747,24 +1187,35 @@
     (function loop(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ri.style.left=rx+'px';ri.style.top=ry+'px';requestAnimationFrame(loop);})();
     document.addEventListener('mouseover',e=>{if(e.target.closest('a,button,select,input')){cur2.style.transform='translate(-50%,-50%) scale(2.5)';cur2.style.background='transparent';cur2.style.border='1.5px solid var(--blue)';ri.style.opacity='0';}else{cur2.style.transform='translate(-50%,-50%) scale(1)';cur2.style.background='var(--blue)';cur2.style.border='none';ri.style.opacity='.4';}});
 
-    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Free',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'DM Mono',monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="register.html" class="e-btn-register">Registrarse</a>`;}}
-    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateEndosoCta();updateExcelDownloadBtn();}
-    function updateEndosoCta(){}
+    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Free',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="elige-plan.html" class="e-btn-register">Registrarse</a>`;}}
+    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateExcelDownloadBtn();}
     function updateExcelDownloadBtn(){const token=localStorage.getItem('rr-token');const user=JSON.parse(localStorage.getItem('rr-user')||'null');const btn=document.getElementById('excel-download-btn');if(!btn)return;const ok=token&&user&&['pro','premium','full'].includes(user.plan);btn.className='excel-btn '+(ok?'excel-btn-active':'excel-btn-locked');}
     function downloadExcelCurrentView(){const token=localStorage.getItem('rr-token');const user=JSON.parse(localStorage.getItem('rr-user')||'null');const ok=token&&user&&['pro','premium','full'].includes(user.plan);if(!ok){showProToast();return;}console.log('TODO excel export');}
-    function showInviteToast(){const t=document.getElementById('invite-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
     function showProToast(){const t=document.getElementById('pro-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
-    updateElectoralNav();updateEndosoCta();updateExcelDownloadBtn();
-
     function showCopyToast(){const now=Date.now();if(showCopyToast._last&&now-showCopyToast._last<60000)return;showCopyToast._last=now;const t=document.getElementById('copy-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),3000);}
-    function showPremiumToast(){const t=document.getElementById('premium-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
     document.addEventListener('copy',e=>{if(!localStorage.getItem('rr-token')){e.preventDefault();showCopyToast();}});
-    document.addEventListener('selectstart',e=>{if(!localStorage.getItem('rr-token')&&!e.target.closest('select,input')){e.preventDefault();showCopyToast();}});
-    init();
+    updateElectoralNav();updateExcelDownloadBtn();
+
     function dismissOrient(){sessionStorage.setItem("orient-ok","1");document.getElementById("orient-overlay").classList.remove("show");}
     if(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)&&!sessionStorage.getItem("orient-ok")){document.getElementById("orient-overlay").classList.add("show");}
+
     // Tema día/noche: lógica compartida en theme.js (incluido al final del archivo).
+    init();
   </script>
   <script src="theme.js"></script>
+<script>/* sistema visual v2: modo dia retirado -- se mantiene siempre oscuro */
+(function(){var b=document.body;var strip=function(){if(b&&b.classList.contains('day-mode'))b.classList.remove('day-mode');};strip();try{new MutationObserver(strip).observe(b,{attributes:true,attributeFilter:['class']});}catch(e){}})();</script>
+  <script>
+    /* bfcache: al volver con "atras" el telon quedo cerrado encima -> reabrirlo,
+       si no la pagina restaurada queda tapada por las bandas. */
+    window.addEventListener('pageshow', function () {
+      var c = document.getElementById('curtain');
+      if (!c || !c.classList.contains('closing')) return;
+      c.classList.remove('closing');
+      c.classList.add('opening');
+      void c.offsetWidth;   /* fuerza el reflow: rAF se congela si la pestaña esta oculta */
+      setTimeout(function () { c.classList.remove('opening'); c.classList.add('opened'); }, 120);
+    });
+  </script>
 </body>
 </html>
