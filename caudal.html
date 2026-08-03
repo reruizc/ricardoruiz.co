@@ -1765,6 +1765,10 @@
     // cada pfRenderEdit(), así que los onclick directos morirían con él.
     vc.addEventListener('click', e=>{
       const t=e.target;
+      // va ANTES de [data-pf] a propósito: el chip de editar vive en la misma
+      // barra que los chips de perfil y no queremos que un anidamiento futuro
+      // lo haga caer en pfAbrir.
+      if(t.closest('[data-pfedit]')){ if(PF_ACTIVE&&PF_ACTIVE.perfilId) pfEditar(PF_ACTIVE); return; }
       const pf=t.closest('[data-pf]');
       if(pf){ pfAbrir(pf.dataset.pf); return; }
       if(t.closest('[data-pfnew]')){ pfNuevo(); return; }
@@ -1840,6 +1844,11 @@
     if(!PF_LIST.length) h+='<span class="cob-note" style="margin:0">Todavía no tienes ninguno.</span>';
     h+='<span class="chip add" data-pfnew="1">+ Nuevo perfil</span>';
     if(PF_LIMIT) h+=`<span class="cob-note" style="margin:0">${PF_LIMIT.usados}/${PF_LIMIT.tope} · plan ${esc(PF_LIMIT.plan)}</span>`;
+    // Puerta al editor del perfil abierto. Sin esto `pfEditar` quedaba huérfana
+    // y un perfil guardado no se podía ni corregir ni borrar: `pfBorrar` exige
+    // `PF_DRAFT.perfilId`, que solo existe cuando el editor abre uno existente.
+    if(PF_ACTIVE&&PF_ACTIVE.perfilId)
+      h+=`<span class="chip add" data-pfedit="1" title="Corregir los temas, las empresas o el nombre de «${esc(PF_ACTIVE.nombre||'')}»">✎ Editar</span>`;
     // El interruptor sale para el perfil abierto: es de ese perfil, no global.
     if(PF_ACTIVE&&PF_ACTIVE.perfilId) h+=pfAlertasHTML(PF_ACTIVE);
     bar.innerHTML=h;
