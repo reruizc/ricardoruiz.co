@@ -189,20 +189,61 @@
       const lineas=anios.map((a,k)=>{
         const s=j.series[a], n=s.dias.length, col=COLOR[k]||'var(--gray)';
         const pts=s.dias.map((x,i)=>`${px(i,n).toFixed(1)},${py(x.n).toFixed(1)}`).join(' ');
-        const dots=s.dias.map((x,i)=>`<circle cx="${px(i,n).toFixed(1)}" cy="${py(x.n).toFixed(1)}" r="${a===vivo?2:1.6}" fill="${col}"><title>${a}-${x.d}: ${x.n} proyecto${x.n===1?'':'s'}</title></circle>`).join('');
+        const dots=s.dias.map((x,i)=>`<circle cx="${px(i,n).toFixed(1)}" cy="${py(x.n).toFixed(1)}" r="${a===vivo?2:1.6}" fill="${col}"/>`).join('');
         return `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="${a===vivo?2:1.4}"
                   stroke-linejoin="round" stroke-linecap="round" opacity="${a===vivo?1:.85}"/>${dots}`;
       }).join('');
+      const nPts=Math.max(...anios.map(a=>j.series[a].dias.length));
       document.getElementById('ritmo-rows').innerHTML=
-        `<div class="ritmo-chart">
+        `<div class="ritmo-chart" id="ritmo-chart">
           <svg viewBox="0 -2 ${W} ${H+4}" role="img" aria-label="Proyectos radicados por día, tres legislaturas">
             <line x1="0" y1="${py(0)}" x2="${W}" y2="${py(0)}" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
+            <line id="ritmo-guia" x1="0" y1="0" x2="0" y2="${H}" stroke="rgba(255,255,255,.28)" stroke-width="1" opacity="0"/>
             ${lineas}
           </svg>
+          <div class="ritmo-tip" id="ritmo-tip"></div>
           <div class="ritmo-ejex"><span>${v0||''}</span><span>${v1||''}</span></div>
           <div class="ritmo-leg">${anios.map((a,k)=>
             `<span class="ritmo-li"><i style="background:${COLOR[k]||'var(--gray)'}"></i>${a} <b>${j.series[a].total}</b></span>`).join('')}</div>
         </div>`;
+
+      /* ── hover: cuántos proyectos entraron ese día, en las tres ──────
+         Se engancha al CONTENEDOR, no a cada punto: con 30 círculos de 2px
+         acertarle a uno es imposible. Se toma el día más cercano en X, así
+         que basta pasar el mouse por encima del gráfico. */
+      (function(){
+        const wrap=document.getElementById('ritmo-chart');
+        const tip=document.getElementById('ritmo-tip');
+        const guia=document.getElementById('ritmo-guia');
+        if(!wrap||!tip) return;
+        const MESES={'01':'ene','02':'feb','03':'mar','04':'abr','05':'may','06':'jun',
+                     '07':'jul','08':'ago','09':'sep','10':'oct','11':'nov','12':'dic'};
+        const fechaLarga=d=>{const[m,x]=String(d||'').split('-');return `${+x} ${MESES[m]||''}`;};
+        function mover(ev){
+          const r=wrap.getBoundingClientRect();
+          const rel=Math.min(1,Math.max(0,(ev.clientX-r.left)/r.width));
+          const i=Math.round(rel*(nPts-1));
+          /* la fecha del rótulo es la de la legislatura viva; las otras dos
+             caen en el día equivalente de su propio calendario */
+          const dv=(j.series[vivo].dias[i]||{}).d;
+          tip.innerHTML=`<div class="d">${fechaLarga(dv)}</div>`+anios.map((a,k)=>{
+            const x=j.series[a].dias[i];
+            return `<div class="r"><i style="background:${COLOR[k]||'var(--gray)'}"></i>${a}<b>${x?x.n:'—'}</b></div>`;
+          }).join('');
+          tip.classList.add('on');
+          /* se acota a la caja: centrado en el día, pero sin desbordar por
+             ningún lado (los días 1 y 10 quedan pegados al borde) */
+          const tw=tip.offsetWidth||130;
+          const cx=r.width*(i/(nPts-1));
+          tip.style.left=Math.round(Math.min(r.width-tw/2, Math.max(tw/2, cx)))+'px';
+          tip.style.transform='translate(-50%,0)';
+          tip.style.top=(wrap.querySelector('svg').getBoundingClientRect().height+6)+'px';
+          guia.setAttribute('x1',px(i,nPts)); guia.setAttribute('x2',px(i,nPts));
+          guia.setAttribute('opacity','1');
+        }
+        wrap.addEventListener('mousemove',mover);
+        wrap.addEventListener('mouseleave',()=>{ tip.classList.remove('on'); guia.setAttribute('opacity','0'); });
+      })();
       /* la comparación honesta es a DÍAS IGUALES: la legislatura viva lleva
          menos días que la ventana completa de las viejas */
       const nd=j.series[vivo].n_dias;

@@ -5041,6 +5041,14 @@ más que la anterior a la misma altura).
 - Si la Lambda no responde, `build` **aborta sin reescribir el JSON** (un Counter vacío
   pintaría un desplome falso); el frontend sigue mostrando la última corrida buena.
 - El hub NO llama `{action:'radicados'}` directo: esa respuesta pesa 540 KB.
+- **Hover**: el listener va en el CONTENEDOR y toma el día más cercano en X, no en cada
+  `<circle>` — con 30 puntos de 2px acertarle a uno es imposible. Pinta guía vertical +
+  tooltip con los tres años del mismo día. El tooltip va DEBAJO del gráfico y acotado a la
+  caja: arriba tapaba el título y encima de las líneas estorbaba.
+- **Imágenes de las tarjetas**: se exportan PNG (NanoBanana/GPT) pero **lo que se despliega
+  es el JPG** — el PNG de en-vivo pesaba 1,8 MB contra 249 KB del JPG. `imagenes/*.png` está
+  en .gitignore; convertir con
+  `sips -s format jpeg -s formatOptions 82 X.png --out X.jpg`.
 
 **Bancadas transversales** (`legislativo-congreso.html` · ago-2026): además del reparto por
 partido, la página muestra los bloques que CRUZAN partidos, separados por **cómo se prueba
