@@ -138,14 +138,19 @@ MAX_COMPARTIDA = 4   # idéntico a build_texto_index: una gaceta referenciada po
                      # >4 proyectos es un boletín de radicación masiva (contamina
                      # el índice) → se excluye allá, así que bajarla es doble
                      # desperdicio (además son los PDFs gigantes que hacen timeout).
+MAX_COMPARTIDA_EXPO = 2   # umbral propio de la exposición de motivos: ver la
+                          # nota larga en build_texto_index. Los dos valores
+                          # tienen que moverse JUNTOS o el harvester bajaría un
+                          # set distinto del que el índice consume.
 
 
 def indexable_keys():
-    """Set de gaceta_key 'NNN-AAAA' que el índice SÍ va a usar: referenciadas por
-    ≤MAX_COMPARTIDA proyectos y NO como exposición de motivos. Mismo criterio que
-    build_texto_index.build_gaceta_to_proyectos, para no cosechar lo que se descarta."""
+    """Set de gaceta_key 'NNN-AAAA' que el índice SÍ va a usar. Mismo criterio
+    que build_texto_index.build_gaceta_to_proyectos, para no cosechar lo que allá
+    se descarta ni dejar sin cosechar lo que allá se usa."""
     from collections import defaultdict
     mp = defaultdict(int)
+    solo_expo = {}
     for fn in ('proyectos.jsonl', 'actos-legis.jsonl'):
         p = DIST / fn
         if not p.exists():
@@ -154,9 +159,13 @@ def indexable_keys():
             r = json.loads(line)
             for g in r.get('gacetas', []):
                 gk = g.get('gaceta')
-                if gk and g.get('tipo') != 'exposicion_motivos':
-                    mp[gk.replace('/', '-')] += 1
-    return {k for k, n in mp.items() if n <= MAX_COMPARTIDA}
+                if not gk:
+                    continue
+                k = gk.replace('/', '-')
+                mp[k] += 1
+                solo_expo[k] = solo_expo.get(k, True) and g.get('tipo') == 'exposicion_motivos'
+    return {k for k, n in mp.items()
+            if n <= (MAX_COMPARTIDA_EXPO if solo_expo[k] else MAX_COMPARTIDA)}
 
 
 def _curl(args, cookie, out=None):
@@ -301,8 +310,8 @@ def main():
                          '300dpi + Tesseract spa en vez de reportar fail_empty')
     ap.add_argument('--timeout', type=int, default=0, help='override del curl timeout (s)')
     ap.add_argument('--indexables', action='store_true',
-                    help='solo gacetas que el índice usará (≤4 proyectos, sin expo-motivos) — '
-                         'salta boletines gigantes, ~mitad del trabajo')
+                    help='solo gacetas que el índice usará (≤4 proyectos, o ≤2 si son '
+                         'solo exposición de motivos) — salta boletines gigantes')
     ap.add_argument('--limit', type=int, default=0, help='solo para pruebas')
     args = ap.parse_args()
 
@@ -327,7 +336,8 @@ def main():
         antes = len(entries)
         entries = [e for e in entries if f"{e['num']}-{e['anio']}" in idxset]
         _log(f'--indexables: {len(entries)} de {antes} enumeradas son indexables '
-             f'(≤{MAX_COMPARTIDA} proyectos, sin expo-motivos)')
+             f'(≤{MAX_COMPARTIDA} proyectos, o ≤{MAX_COMPARTIDA_EXPO} si solo son '
+             f'exposición de motivos)')
     # más recientes PRIMERO: son las que más importan para "profundizar" temas
     # calientes (Lambda action tema?profundo=true) — que se puedan usar cuanto
     # antes, no al final de un barrido de 4+ horas.

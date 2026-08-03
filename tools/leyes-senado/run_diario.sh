@@ -17,6 +17,10 @@
 #   ordenes_senado_plenaria     ídem `plenaria`           secretariasenado.gov.co
 #   secop_fetch/build/upload  harvest_secop.py            agregados de SECOP II
 #   bloqueo_build/upload      build_bloqueo_s3.py         índice de agendamientos
+#   camara_fichas             harvest_camara_fichas.py    fechas de radicación y debate
+#   dataset_build             build_dataset.py            histórico + legislatura viva
+#   texto_index               build_texto_index.py        articulado buscable (incl. lo vivo)
+#   dataset_upload_*          aws s3 cp                   dist/ → metadata/
 #   salud                     tools/caudal/salud/check.py frescura en S3 + ping a la Lambda
 #
 # Tres cosas que este script garantiza y que antes no:
@@ -193,6 +197,47 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
              --content-type "application/json" --cache-control "private, max-age=300"
   else
     etapa --nombre bloqueo_upload --omitida "el build falló (rc=$rc_bloq): no hay archivo nuevo que subir"
+  fi
+
+  # ── fichas individuales de Cámara (la fecha de radicación) ──
+  # Incremental de verdad: cachea por proyecto, así que en una corrida normal
+  # baja solo los radicados del día. Es el único sitio donde Cámara publica la
+  # fecha — sin esto sus proyectos entran al dataset sin fecha y quedan fuera
+  # del embudo (ver harvest_camara_fichas.py).
+  etapa --nombre camara_fichas --timeout 2400 \
+        --desc "fichas individuales de Cámara (fechas de radicación y debate)" \
+        --filtro "objetivo|descarga|fecha de radicación|^  !" \
+        -- python3 tools/leyes-senado/harvest_camara_fichas.py --workers 6
+
+  # ── dataset + índice de texto (la legislatura viva entra al producto) ──
+  # Sin estas dos etapas el rastreo diario llegaba a S3 como manifiesto suelto
+  # pero NO al dataset: medido el 2026-08-02, pdly.jsonl se cortaba en el id 9923
+  # con cero proyectos de 2026-2027 mientras el cron ya tenía 139 de Senado y 71
+  # de Cámara. O sea: lo que se está debatiendo hoy no se podía buscar. Ahora
+  # build_dataset los absorbe (lee diario/ y diario-camara/, sin volver a la red)
+  # y build_texto_index indexa su articulado desde el .txt que ya está en disco.
+  etapa --nombre dataset_build --timeout 1200 \
+        --desc "dataset (histórico + legislatura viva)" \
+        -- python3 tools/leyes-senado/build_dataset.py
+  rc_ds=$?
+
+  if [ $rc_ds -eq 0 ]; then
+    # --incremental reusa las palabras ya extraídas por gaceta (el caché) y solo
+    # paga red por lo nuevo; los radicados se releen siempre (son locales y
+    # cambian mientras el proyecto se mueve).
+    etapa --nombre texto_index --timeout 1800 \
+          --desc "índice de texto (gacetas + radicados vivos)" \
+          -- python3 tools/caudal/build_texto_index.py --incremental
+
+    for f in proyectos.jsonl actos-legis.jsonl indice.json stats.json texto-index.json; do
+      etapa --nombre "dataset_upload_${f%%.*}" --timeout 900 --desc "$f → S3" \
+            -- aws s3 cp "$REPO/Bases de datos/leyes-senado/dist/$f" \
+               "s3://caudal-legislativo/metadata/$f" \
+               --cache-control "private, max-age=300"
+    done
+  else
+    etapa --nombre texto_index --omitida "el dataset falló (rc=$rc_ds): indexar sobre un dataset roto sería peor que no indexar"
+    etapa --nombre dataset_upload --omitida "el dataset falló (rc=$rc_ds): no hay archivo nuevo que subir"
   fi
 
   # ── chequeo de salud ──

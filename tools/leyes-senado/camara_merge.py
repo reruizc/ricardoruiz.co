@@ -28,18 +28,30 @@ ninguna ley se sanciona sin pasar por el Senado. O sea: el histórico de leyes
 nunca estuvo incompleto; lo que faltaba era el cementerio de Cámara, que es
 justo donde vive el análisis de mortandad y de bloqueo.
 
-LO QUE EL LISTADO DE CÁMARA NO TRAE
------------------------------------
-Ni fecha de radicación ni fechas de debate (viven en la ficha individual, un GET
-por proyecto). Consecuencias, asumidas y marcadas en el dato:
-  · fecha_presentacion = None  → sin dias_a_primer_debate
-  · la etapa se INFIERE del estado textual (_ETAPA_POR_ESTADO), no de fechas
-  · Cámara no dice la CAUSA del archivo → 'Archivado' cae en ARCHIVADO_OTRO y
-    nunca en ARCHIVADO_TIEMPO (art. 190). No confundir eso con "no murió por
-    tiempo": es "la fuente no lo informa". stats.json lo separa por registro.
+LO QUE EL LISTADO DE CÁMARA NO TRAE — y de dónde sale ahora
+-----------------------------------------------------------
+El listado AJAX no trae fecha de radicación ni fechas de debate. Eso hacía que
+los 4.080 proyectos de Cámara entraran al dataset con fecha_presentacion=None, y
+por eso el embudo se calculaba solo sobre el Senado.
+
+Desde jul-2026 esas fechas SÍ entran: harvest_camara_fichas.py cosecha la ficha
+individual (GET /{link_web}) y deja fichas.jsonl, que este módulo lee y vuelca
+sobre el registro crudo — fecha de radicación, fechas de aprobación por debate,
+comisión y las gacetas del trámite. Ver `cargar_fichas` y `_aplicar_ficha`.
+
+Lo que sigue SIN venir de ninguna fuente, y por tanto NO se inventa:
+  · la CAUSA del archivo. Se buscó en fichas archivadas de 2015, 2019, 2023 y
+    2025: la ficha dice "Archivado" y nada más. Así que sus archivados caen en
+    ARCHIVADO_OTRO y nunca en ARCHIVADO_TIEMPO (art. 190). Eso no es "no murió
+    por tiempo": es "la fuente no lo informa", y stats.json lo expone aparte
+    (archivado_causa_no_informada). Derivarlo de las fechas sería estimarlo.
+  · la fecha de los proyectos cuya ficha no responde o no la trae — quedan en
+    None y se cuentan aparte, nunca se rellenan.
 """
+import json
 import re
 import unicodedata
+from pathlib import Path
 
 # ---------------------------------------------------------------- llave de cruce
 _NUM = re.compile(r'\s*(\d{1,4})\s*[/-]\s*(\d{2,4})')
@@ -197,15 +209,193 @@ def _cuatrienio(leg):
     return f'{ini}-{ini + 4}'
 
 
+# ------------------------------------------------- ficha individual (fechas)
+FICHAS_JSONL = (Path(__file__).resolve().parents[2] /
+                'Bases de datos' / 'leyes-senado' / 'camara' / 'fichas.jsonl')
+
+
+def cargar_fichas(path=None):
+    """link_web → ficha parseada (harvest_camara_fichas.py). {} si no se ha
+    cosechado: el dataset sale como antes, sin fechas de Cámara."""
+    p = Path(path) if path else FICHAS_JSONL
+    if not p.exists():
+        return {}
+    out = {}
+    for line in p.open(encoding='utf-8'):
+        if line.strip():
+            r = json.loads(line)
+            out[r['link_web']] = r
+    return out
+
+
+# El nombre del acordeón de la ficha → el campo de fecha del shape crudo del
+# Senado. Ojo: "Primer Debate X" es el de COMISIÓN y "Segundo Debate X" el de
+# PLENARIA de esa misma cámara; el orden real del trámite depende del origen
+# (un proyecto de Cámara debate primero allá), y por eso etapa_max se calcula
+# contando debates y no por la posición del campo. Ver build_dataset.
+_DEBATE_A_CAMPO = {
+    'primer debate camara': 'fecha_de_aprobacion_primer_debate_camara',
+    'segundo debate camara': 'fecha_de_aprobacion_segundo_debate_camara',
+    'primer debate senado': 'fecha_de_aprobacion_primer_debate',
+    'segundo debate senado': 'fecha_de_aprobacion_segundo_debate',
+}
+# orden real del trámite de un proyecto de origen Cámara: comisión y plenaria de
+# Cámara primero, luego Senado. Lo usa _evidencia_aprobacion para saber cuál es
+# "el debate siguiente".
+_ORDEN_DEBATE = {'primer debate camara': 0, 'segundo debate camara': 1,
+                 'primer debate senado': 2, 'segundo debate senado': 3}
+
+_DEBATE_A_PONENTE = {
+    'primer debate camara': 'ponente_primer_debate_camara',
+    'segundo debate camara': 'ponente_segundo_debate_camara',
+    'primer debate senado': 'ponente_primer_debate',
+    'segundo debate senado': 'ponente_segundo_debate',
+}
+# la publicación de la ponencia de ese debate → campo de gaceta que lee
+# build_dataset.extract_gacetas
+_DEBATE_A_GACETA = {
+    'primer debate camara': 'primera_ponencia',
+    'primer debate senado': 'primera_ponencia',
+    'segundo debate camara': 'segunda_ponencia',
+    'segundo debate senado': 'segunda_ponencia',
+}
+
+
+def _fecha_aprobacion(pubs):
+    """Fecha de APROBACIÓN del debate, solo si la ficha la declara como tal.
+
+    Distingue cosas que conviven en la misma lista y que es fácil confundir:
+      · "Acta y Fecha de aprobación Comisión Acta 20 del 4 de junio de 2014" ✓
+      · "ACTA DE PLENARIA 66 DEL 10 DE JUNIO DE 2015"                        ✓
+      · "ACTA DE COMISIÓN 013 DEL 10 DE JUNIO DE 2015"                       ✓
+      · "...(anuncio)..." y "Ponencia Primer Debate Mayo 20 2014"            ✗
+    El anuncio es la sesión PREVIA (art. 8 del acto legislativo 01/2003) y la
+    ponencia es el documento, no la votación. Contar cualquiera de esos dos como
+    aprobación inflaría el embudo justo en el escalón que más importa."""
+    for p in pubs:
+        txt = _sin_tildes(p.get('texto') or '').lower()
+        if not p.get('fecha') or 'anuncio' in txt:
+            continue
+        if ('aprobacion' in txt or 'acta de plenaria' in txt
+                or 'acta de comision' in txt):
+            return p['fecha']
+    return None
+
+
+def _evidencia_aprobacion(debates):
+    """¿Qué debates aprobó el proyecto, y con qué respaldo?
+
+    La fecha del acta es el respaldo ideal, pero la ficha la publica en pocos
+    casos: de 4.080 fichas, solo 85 debates traen fecha de aprobación fechada,
+    mientras 589 traen el texto aprobado y 471 más tienen ponencia del debate
+    SIGUIENTE. Quedarse solo con la fecha daba 98,3% de muertes antes del primer
+    debate en Cámara — implausible al lado del 58,9% del Senado, y falso: era el
+    parser, no el Congreso.
+
+    Así que el HITO (¿aprobó?) y la FECHA (¿cuándo?) se separan. El hito admite
+    tres respaldos, y cada debate guarda cuál lo sostiene para que nadie tenga
+    que confiar a ciegas:
+      · fecha_acta          el acta de aprobación, con su fecha        (el mejor)
+      · texto_aprobado      "Texto Definitivo/Aprobado en Comisión"    (documental)
+      · ponencia_siguiente  hay ponencia del debate siguiente          (inferencia)
+    La tercera es inferencia procedimental, no dato: no existe ponencia para
+    segundo debate sin que el primero se haya aprobado. Es sólida, pero por eso
+    va etiquetada y se reporta aparte en stats.json.
+
+    Devuelve {nombre_debate: evidencia}."""
+    ev, presentes = {}, []
+    for db in debates or []:
+        nombre = _sin_tildes(db.get('nombre') or '').lower().strip()
+        if nombre not in _DEBATE_A_CAMPO:
+            continue
+        presentes.append(nombre)
+        marca = None
+        for p in db.get('publicaciones') or []:
+            txt = _sin_tildes(p.get('texto') or '').lower()
+            if 'anuncio' in txt:
+                continue
+            if p.get('fecha') and ('aprobacion' in txt or 'acta de plenaria' in txt
+                                   or 'acta de comision' in txt):
+                marca = 'fecha_acta'
+                break
+            if ('texto definitivo' in txt or 'texto aprobado' in txt
+                    or 'aprobado en comision' in txt):
+                marca = marca or 'texto_aprobado'
+        ev[nombre] = marca
+
+    # ponencia del debate siguiente ⇒ el anterior se aprobó
+    tiene_ponencia = {
+        _sin_tildes(db.get('nombre') or '').lower().strip():
+            any('ponencia' in _sin_tildes(p.get('texto') or '').lower()
+                for p in db.get('publicaciones') or [])
+        for db in debates or []}
+    orden = sorted(presentes, key=lambda n: _ORDEN_DEBATE[n])
+    for i, n in enumerate(orden[:-1]):
+        if ev.get(n) is None and tiene_ponencia.get(orden[i + 1]):
+            ev[n] = 'ponencia_siguiente'
+    return {n: e for n, e in ev.items() if e}
+
+
+def _aplicar_ficha(rec, ficha):
+    """Vuelca sobre el registro crudo lo que la ficha aporta. No pisa nada que
+    ya venga con valor: el listado y la ficha coinciden, pero si difirieran, lo
+    que ya estaba manda."""
+    if not ficha:
+        return rec
+    rec['_ficha_ok'] = True
+    if ficha.get('fecha_radicacion_camara'):
+        rec['fecha_de_presentacion'] = ficha['fecha_radicacion_camara']
+    if ficha.get('fecha_radicacion_senado'):
+        rec['_fecha_radicacion_senado'] = ficha['fecha_radicacion_senado']
+    if ficha.get('comision') and not rec.get('comision'):
+        rec['comision'] = ficha['comision']
+    if ficha.get('pdf_url'):
+        # texto del radicado, un PDF por proyecto (no un boletín). Sin cosechar
+        # todavía — anotado para el harvest de texto de Cámara.
+        rec['_pdf_radicado_url'] = ficha['pdf_url']
+    if ficha.get('gaceta_radicacion'):
+        rec['exposicion_de_motivos'] = f"Gaceta {ficha['gaceta_radicacion']}"
+    if ficha.get('gaceta_radicacion_deep'):
+        rec['_gaceta_radicacion_deep'] = ficha['gaceta_radicacion_deep']
+
+    n_fechas = 0
+    for db in ficha.get('debates') or []:
+        nombre = _sin_tildes(db.get('nombre') or '').lower().strip()
+        campo = _DEBATE_A_CAMPO.get(nombre)
+        if not campo:
+            continue
+        f = _fecha_aprobacion(db.get('publicaciones') or [])
+        if f:
+            rec[campo] = f
+            n_fechas += 1
+        if db.get('ponentes'):
+            rec[_DEBATE_A_PONENTE[nombre]] = ', '.join(db['ponentes'])
+        gac = next((p['gaceta'] for p in db.get('publicaciones') or []
+                    if p.get('gaceta') and 'ponencia' in _sin_tildes(p.get('texto') or '').lower()),
+                   None)
+        if gac:
+            rec[_DEBATE_A_GACETA[nombre]] = f'Gaceta {gac}'
+
+    # HITO vs FECHA (ver _evidencia_aprobacion): el embudo cuenta debates
+    # aprobados con cualquiera de los tres respaldos; los días al primer debate
+    # solo pueden usar los que además traen fecha.
+    ev = _evidencia_aprobacion(ficha.get('debates'))
+    rec['_debates_evidencia'] = ev
+    rec['_n_debates_ficha'] = len(ev)
+    rec['_n_debates_fechados'] = n_fechas
+    return rec
+
+
 # ------------------------------------------------------------------ merge
 ID_BASE = 900000  # los ids del Senado llegan a ~10.100 (pdly) y ~820 (pal)
 
 
-def _a_raw(it, nid):
-    """Item del listado de Cámara → el shape crudo que espera enrich_pdly/pal."""
+def _a_raw(it, nid, ficha=None):
+    """Item del listado de Cámara → el shape crudo que espera enrich_pdly/pal,
+    enriquecido con la ficha individual si se cosechó."""
     estado_txt, etapa = _ETAPA_POR_ESTADO.get(it.get('estado') or '', ('', 0))
     leg = it.get('legislatura', '')
-    return {
+    rec = {
         'id': nid,
         'titulo': it.get('titulo') or '',
         'numero_senado': (it.get('nro_senado') or '').replace('S', '').strip(),
@@ -220,17 +410,27 @@ def _a_raw(it, nid):
         '_origen_registro': 'camara',
         '_etapa_hint': etapa,
         '_link_web': it.get('link_web') or '',
+        '_ficha_ok': False,
     }
+    # llave del texto del radicado, cuando el cron diario ya lo bajó
+    for k in ('_texto_s3', '_texto_local'):
+        if it.get(k):
+            rec[k] = it[k]
+    return _aplicar_ficha(rec, ficha)
 
 
-def merge(raw_pdly, raw_pal, camara_rows):
+def merge(raw_pdly, raw_pal, camara_rows, fichas=None):
     """Devuelve (extra_pdly, extra_pal, info) con los de Cámara que faltaban.
 
     Solo entran los de ORIGEN Cámara que no estén ya en el registro del Senado.
     Los de origen Senado del listado de Cámara se descartan siempre: son los
     mismos que el Senado ya reporta (y son justo los que producen el doble
     conteo si uno suma los dos registros a lo bobo).
+
+    `fichas` es el dict de cargar_fichas() — con él los registros salen con
+    fecha de radicación y fechas de debate; sin él, como antes de jul-2026.
     """
+    fichas = fichas or {}
     por_s, por_c = _indice_senado(raw_pdly, raw_pal)
     extra_pdly, extra_pal = [], []
     desc = {'origen_senado': 0, 'ya_en_senado': 0, 'sin_numero': 0}
@@ -249,10 +449,15 @@ def merge(raw_pdly, raw_pal, camara_rows):
             desc['ya_en_senado'] += 1
             continue
         destino = extra_pal if (it.get('tipo') == 'Acto Legislativo') else extra_pdly
-        destino.append(_a_raw(it, ID_BASE + len(destino)))
+        destino.append(_a_raw(it, ID_BASE + len(destino),
+                              fichas.get(it.get('link_web') or '')))
 
+    todos = extra_pdly + extra_pal
     info = {'n_camara_leidos': len(camara_rows),
             'n_agregados_pdly': len(extra_pdly),
             'n_agregados_pal': len(extra_pal),
+            'n_con_ficha': sum(1 for r in todos if r.get('_ficha_ok')),
+            'n_con_fecha': sum(1 for r in todos if r.get('fecha_de_presentacion')),
+            'n_sin_fecha': sum(1 for r in todos if not r.get('fecha_de_presentacion')),
             **desc}
     return extra_pdly, extra_pal, info

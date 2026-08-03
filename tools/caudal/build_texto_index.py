@@ -8,17 +8,30 @@ ponencia/acta — este índice cierra ese hueco: palabra → [proyectos cuyas
 gacetas mencionan esa palabra], construido sobre los ~12.5k textos ya
 cosechados en s3://caudal-legislativo/gacetas-texto/ (harvest_gacetas_texto.py).
 
+DOS FUENTES DE TEXTO (jul-2026 en adelante)
+-------------------------------------------
+  a) GACETAS del trámite (gacetas-texto/) — el histórico.
+  b) TEXTO DEL RADICADO de la legislatura EN CURSO (radicados-texto/ y
+     radicados-camara-texto/), que el cron diario baja 2x/día.
+
+(b) se agregó porque el índice se construía solo con (a) y la legislatura viva
+no se podía buscar por articulado: los proyectos que se están debatiendo HOY
+—justo los que le importan a un cliente que paga— eran invisibles al texto. Los
+radicados son un documento POR proyecto (no un boletín), así que no les aplica
+el filtro MAX_COMPARTIDA, y se leen del disco local del cron cuando está
+disponible (gratis) antes que de S3.
+
 Mecánica:
   1. Carga proyectos.jsonl + actos-legis.jsonl (dist/) → para cada uno, sus
-     gacetas referenciadas (campo 'gaceta': 'NNN/AAAA').
-  2. Invierte a gaceta_key → [proyectos] (una gaceta puede ser común a varios
-     si comparten radicación/conciliación bicameral).
-  3. Para cada gaceta_key con texto en S3 (streaming vía `aws s3 cp - `, SIN
-     tocar disco — el corpus completo son ~3GB, no vale la pena bajarlo
-     entero dado lo ajustado que ha andado el disco hoy), extrae palabras
-     significativas (≥5 chars, sin stopwords, stem) y las asigna a TODOS los
-     proyectos que referencian esa gaceta.
-  4. Filtra palabras demasiado comunes (aparecen en >12% de los proyectos
+     gacetas referenciadas (campo 'gaceta': 'NNN/AAAA') y su texto de radicado
+     (campo 'texto_s3', que pone build_dataset).
+  2. Invierte a documento → [proyectos] (una gaceta puede ser común a varios
+     si comparten radicación/conciliación bicameral; un radicado nunca).
+  3. Para cada documento con texto, extrae palabras significativas (≥5 chars,
+     sin stopwords, stem) y las asigna a los proyectos que lo referencian. Las
+     gacetas se traen de S3 por streaming (`aws s3 cp -`, SIN tocar disco: el
+     corpus completo son ~3GB); los radicados salen del disco local del cron.
+  4. Filtra palabras demasiado comunes (aparecen en >5% de los proyectos
      procesados) — no discriminan y solo inflan el índice.
   5. Escribe dist/texto-index.json ({palabra: [tb:id, ...]}).
 
@@ -107,28 +120,92 @@ MAX_COMPARTIDA = 4   # una gaceta referenciada por más de N proyectos es casi
                      # lo hace, con LLM, la acción `gaceta`/`profundizar` — este
                      # índice es de presencia gruesa, no de atribución exacta).
 
+MAX_COMPARTIDA_EXPO = 2
+# La exposición de motivos estaba excluida SIEMPRE, con el argumento de que es
+# la más propensa a venir en boletines. Medido (ago-2026), el argumento tapaba
+# el caso bueno: de las 2.930 gacetas de expo-motivos que los proyectos
+# referencian, 1.433 pertenecen a UN SOLO proyecto — ahí la gaceta no es un
+# boletín, es literalmente el texto radicado de ese proyecto, y excluirla era
+# botar la única fuente de texto que tienen los proyectos que mueren antes del
+# primer debate (o sea, el 74% del universo: los que nunca generan ponencia).
+# Por eso ahora entra con umbral PROPIO y más estricto que el general: 1 o 2
+# proyectos. El riesgo de contaminación a 2 es simétrico y acotado, el mismo que
+# ya se acepta para las ponencias compartidas. Medido: +441 proyectos con texto
+# sin bajar un solo archivo nuevo (ya estaban en S3), +974 más al cosechar.
+# ⚠️ Este criterio debe seguir siendo IDÉNTICO al de
+# harvest_gacetas_texto.indexable_keys(), o el harvester bajaría un set distinto
+# del que el índice consume.
+
 
 def build_gaceta_to_proyectos():
     """gaceta_key 'NNN-AAAA' -> [tokens 'tb:id'] de los proyectos que la
-    referencian — EXCLUYE exposición de motivos (siempre es la radicación,
-    la más propensa a venir en boletines de decenas de proyectos juntos) y
-    cualquier gaceta compartida por más de MAX_COMPARTIDA proyectos."""
+    referencian. Descarta las compartidas por demasiados proyectos, con umbral
+    más estricto para la exposición de motivos (ver MAX_COMPARTIDA_EXPO)."""
     mp = defaultdict(list)
+    solo_expo = defaultdict(bool)
     for fn, tb in [('proyectos.jsonl', 'pdly'), ('actos-legis.jsonl', 'pal')]:
         for r in load(fn):
             tok = f"{tb}:{r['id']}"
             for g in r.get('gacetas', []):
                 gk = g.get('gaceta')
-                if gk and g.get('tipo') != 'exposicion_motivos':
-                    mp[gk.replace('/', '-')].append(tok)
-    return {k: v for k, v in mp.items() if len(v) <= MAX_COMPARTIDA}
+                if not gk:
+                    continue
+                k = gk.replace('/', '-')
+                mp[k].append(tok)
+                # una gaceta puede ser expo-motivos de un proyecto y ponencia de
+                # otro; el umbral estricto solo aplica si SIEMPRE es expo.
+                solo_expo[k] = solo_expo.get(k, True) and g.get('tipo') == 'exposicion_motivos'
+    return {k: v for k, v in mp.items()
+            if len(v) <= (MAX_COMPARTIDA_EXPO if solo_expo[k] else MAX_COMPARTIDA)}
 
 
-def fetch_texto(key):
-    """Trae el texto de una gaceta SIN tocar disco (stdout de aws s3 cp -)."""
-    r = subprocess.run(
-        ['aws', 's3', 'cp', f's3://{BUCKET}/gacetas-texto/{key}.txt', '-'],
-        capture_output=True, timeout=60)
+RAD_PREFIX = 'rad::'      # separa las llaves de radicado de las de gaceta en el
+                          # mismo caché, sin invalidar lo ya extraído
+
+
+# el cron deja el mismo .txt en disco antes de subirlo; la ruta es derivable de
+# la key, así que no hace falta ensuciar el dataset (que va a S3) con rutas de
+# esta máquina. Si el local no está, se cae a S3 sin ruido.
+_DIARIO = {'radicados-texto': REPO / 'Bases de datos' / 'leyes-senado' / 'diario',
+           'radicados-camara-texto': REPO / 'Bases de datos' / 'leyes-senado' / 'diario-camara'}
+
+
+def _local_de(key):
+    partes = key.split('/')
+    if len(partes) != 3 or partes[0] not in _DIARIO:
+        return None
+    _, leg, nombre = partes
+    return _DIARIO[partes[0]] / leg / 'textos-txt' / nombre
+
+
+def build_radicado_to_proyectos():
+    """rad::{tb:id} -> ([token], ruta_local|None, key_s3) para el texto del
+    radicado de la legislatura en curso. Un radicado es de UN solo proyecto."""
+    mp = {}
+    for fn, tb in [('proyectos.jsonl', 'pdly'), ('actos-legis.jsonl', 'pal')]:
+        for r in load(fn):
+            key = r.get('texto_s3')
+            if not key:
+                continue
+            tok = f"{tb}:{r['id']}"
+            mp[f'{RAD_PREFIX}{tok}'] = ([tok], _local_de(key), key)
+    return mp
+
+
+def fetch_texto(key, radicados=None):
+    """Texto de un documento. Las gacetas se traen de S3 por streaming; los
+    radicados salen del disco local del cron si está, y si no de S3."""
+    if key.startswith(RAD_PREFIX):
+        _, local, s3key = (radicados or {}).get(key, (None, None, None))
+        if local and Path(local).exists():
+            return Path(local).read_text(encoding='utf-8', errors='replace')
+        if not s3key:
+            return None
+        s3path = f's3://{BUCKET}/{s3key}'
+    else:
+        s3path = f's3://{BUCKET}/gacetas-texto/{key}.txt'
+    r = subprocess.run(['aws', 's3', 'cp', s3path, '-'],
+                       capture_output=True, timeout=60)
     if r.returncode != 0:
         return None
     return r.stdout.decode('utf-8', errors='replace')
@@ -153,10 +230,16 @@ def main():
 
     print('· cruzando proyectos con sus gacetas referenciadas…')
     gac2proy = build_gaceta_to_proyectos()
-    keys = list(gac2proy.keys())
+    rad2proy = build_radicado_to_proyectos()
+    doc2proy = dict(gac2proy)
+    doc2proy.update({k: v[0] for k, v in rad2proy.items()})
+    keys = list(doc2proy.keys())
     if args.limit:
         keys = keys[:args.limit]
-    print(f'  {len(keys)} gacetas distintas referenciadas por algún proyecto')
+    n_rad_local = sum(1 for _, loc, _ in rad2proy.values() if loc and loc.exists())
+    print(f'  {len(gac2proy)} gacetas distintas referenciadas por algún proyecto')
+    print(f'  {len(rad2proy)} textos de radicado de la legislatura viva '
+          f'({n_rad_local} en disco local, el resto de S3)')
 
     doc_words = {}
     if (args.from_cache or args.incremental) and CACHE.exists():
@@ -171,13 +254,18 @@ def main():
         pendientes = []          # --from-cache: no se toca la red
     else:
         pendientes = [k for k in keys if k not in doc_words]
+    # los radicados cambian mientras la legislatura corre (el cron re-baja el
+    # PDF cuando el proyecto se mueve) → se re-leen siempre. Son ~200 archivos
+    # locales, cuesta segundos.
+    frescos = [k for k in keys if k.startswith(RAD_PREFIX)]
+    pendientes = list(dict.fromkeys(pendientes + frescos))
 
     n_ok, n_sinTexto = len(doc_words), 0
     if pendientes:
         print(f'  · bajando {len(pendientes)} gacetas que faltan…')
 
         def _procesar(key):
-            txt = fetch_texto(key)
+            txt = fetch_texto(key, rad2proy)
             if not txt:
                 return key, None
             return key, significant_words(txt)
@@ -213,11 +301,14 @@ def main():
         json.dump(prev, open(CACHE, 'w', encoding='utf-8'), ensure_ascii=False)
         print(f'  · caché actualizado ({len(prev)} gacetas) → --incremental la próxima vez')
 
-    print(f'\n{n_ok} gacetas con texto procesadas · {n_sinTexto} sin texto en S3 (aún no cosechadas)')
+    n_rad_ok = sum(1 for k in doc_words if k.startswith(RAD_PREFIX))
+    print(f'\n{n_ok} documentos con texto procesados '
+          f'({n_rad_ok} radicados de la legislatura viva) · '
+          f'{n_sinTexto} sin texto (aún no cosechados)')
 
     inv = defaultdict(set)          # palabra -> set(tokens)
     for key, words in doc_words.items():
-        for tok in gac2proy.get(key, []):
+        for tok in doc2proy.get(key, []):
             for w in words:
                 inv[w].add(tok)
     print(f'{len(inv)} palabras distintas antes del filtro de frecuencia máxima')
@@ -240,7 +331,8 @@ def main():
     id_pos = {tok: i for i, tok in enumerate(todos_ids)}
     filtrado_int = {w: sorted(id_pos[t] for t in toks) for w, toks in filtrado.items()}
 
-    out = {'v': '2026-07-22', 'n_gacetas_procesadas': n_ok, 'n_proyectos_cubiertos': n_proy,
+    out = {'v': '2026-08-02', 'n_gacetas_procesadas': n_ok, 'n_proyectos_cubiertos': n_proy,
+           'n_radicados_procesados': n_rad_ok,
            'n_palabras': len(filtrado_int), 'ids': todos_ids, 'index': filtrado_int}
     outp = DIST / 'texto-index.json'
     json.dump(out, open(outp, 'w', encoding='utf-8'), ensure_ascii=False)
