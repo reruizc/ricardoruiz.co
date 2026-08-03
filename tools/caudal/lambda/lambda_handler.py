@@ -248,6 +248,126 @@ def _bancadas():
     return _BANCADAS
 
 
+_ARTICULADO = None
+
+
+def _articulado():
+    """QUÉ DICE el articulado: extracción estructurada del texto del proyecto
+    (tools/caudal/analisis/extraer_articulado.py). Cache warm.
+
+    El índice de texto contesta "qué proyectos mencionan X"; esto contesta "qué
+    cambia este proyecto": norma que modifica, obligaciones nuevas y sobre quién,
+    a quién le aplica, sanciones, quién vigila y desde cuándo rige. Cada entrada
+    declara su `base` (de qué documento salió) — sin eso, el dato no se muestra.
+    """
+    global _ARTICULADO
+    if _ARTICULADO is None:
+        try:
+            _ARTICULADO = _get_json('metadata/articulado.json')
+        except Exception:
+            _ARTICULADO = {'n': 0, 'por_proyecto': {}, 'por_sector': {}, 'stats': {}}
+    return _ARTICULADO
+
+
+def _articulado_de(tb, pid):
+    """Extracción de un proyecto, o None. La llave es la misma de _full()."""
+    try:
+        return _articulado().get('por_proyecto', {}).get(f'{tb}:{int(pid)}')
+    except (TypeError, ValueError):
+        return None
+
+
+def _articulado_compacto(art):
+    """Lo que el Radar necesita de una extracción: suficiente para decidir si
+    hay que actuar, sin arrastrar la ficha entera a cada señal."""
+    if not art:
+        return None
+    ap = art.get('aplica_a') or {}
+    obl, sanc = art.get('obligaciones') or [], art.get('sanciones') or []
+    vg = art.get('vigencia') or {}
+    return {
+        'resumen': art.get('resumen'), 'base': art.get('base'),
+        'base_txt': art.get('base_txt'), 'confianza': art.get('confianza'),
+        'n_obligaciones': len(obl), 'obligaciones': obl[:2],
+        'n_sanciones': len(sanc), 'sanciones': sanc[:1],
+        'sectores': ap.get('sectores') or [], 'sujetos': (ap.get('sujetos') or [])[:2],
+        'modifica': (art.get('modifica') or [])[:2],
+        'vigilancia': (art.get('vigilancia') or [])[:2],
+        'rige_desde': vg.get('rige_desde'),
+    }
+
+
+# El preset de sector del cliente y el vocabulario de `aplica_a.sectores` no son
+# la misma lista (uno es comercial, el otro descriptivo del articulado) → puente
+# explícito. Solo se mapea lo que de verdad se solapa; lo que no está aquí
+# simplemente no cruza (mejor no cruzar que cruzar mal).
+_SECTOR_CLIENTE_A_ARTICULADO = {
+    'salud': ['salud', 'farma'],
+    'contratacion': ['contratacion'],
+    'financiero': ['financiero', 'seguros', 'pensiones'],
+    'energia': ['energia', 'ambiental', 'mineria', 'agua'],
+    'educacion': ['educacion'],
+    'trabajo': ['laboral', 'pensiones'],
+    'consumo': ['consumo', 'retail', 'comercio'],
+    'transporte': ['transporte', 'aviacion', 'logistica'],
+}
+
+
+def _sectores_del_cliente(s, emps_vig):
+    """Sectores de articulado que le importan a ESTE cliente: los de sus
+    empresas vigiladas (empresas.py usa las mismas llaves) más el puente desde
+    su sector comercial. Devuelve (set_sectores, {sector: [nombres vigiladas]})."""
+    sect, quien = set(), {}
+    for e in emps_vig or []:
+        for k in _SECTOR_CLIENTE_A_ARTICULADO.get(e.get('sector'), [e.get('sector')]):
+            if k:
+                sect.add(k)
+                quien.setdefault(k, [])
+                if e['nombre'] not in quien[k]:
+                    quien[k].append(e['nombre'])
+    for base in (s.get('k'), s.get('sector_sanciones')):
+        for k in _SECTOR_CLIENTE_A_ARTICULADO.get(base, []):
+            sect.add(k)
+    return sect, quien
+
+
+def _enriquecer_senales_congreso(senales, sect_cliente, quien_vigila):
+    """Le pega a cada señal del Congreso lo que dice su articulado, y marca las
+    que le APLICAN al cliente (cruce sector del articulado × vigiladas/sector
+    del perfil). Ahí está el valor: no en la ficha suelta, sino en el cruce."""
+    n_art = n_aplica = 0
+    for sg in senales:
+        art = _articulado_de(sg.get('tb', 'pdly'), sg.get('id'))
+        if not art:
+            continue
+        comp = _articulado_compacto(art)
+        sg['articulado'] = comp
+        n_art += 1
+        inter = sorted(set(comp['sectores']) & sect_cliente)
+        if not inter:
+            continue
+        n_aplica += 1
+        vig = sorted({n for k in inter for n in quien_vigila.get(k, [])})
+        sg['te_aplica'] = {'sectores': inter, 'vigiladas': vig}
+        # la acción se re-redacta SOLO con lo que el articulado dice de verdad
+        # (conteos y sujeto textual). Nada de inferir alcance.
+        piezas = []
+        if comp['n_obligaciones']:
+            sujeto = (comp['obligaciones'][0].get('sobre_quien') or '').strip()
+            piezas.append(f"crea {comp['n_obligaciones']} obligación(es) nueva(s)"
+                          + (f' sobre {sujeto}' if sujeto else ''))
+        if comp['n_sanciones']:
+            piezas.append(f"establece {comp['n_sanciones']} sanción(es)")
+        if piezas:
+            det = ' y '.join(piezas)
+            if sg.get('resultado') == 'EN_TRAMITE':
+                sg['accion'] = (f'Te aplica y está vivo: {det}. '
+                                + (sg.get('accion') or ''))[:300]
+            else:
+                sg['accion'] = f'Te aplica: {det}. ' + (sg.get('accion') or '')
+    return n_art, n_aplica
+
+
 def _num_token(num):
     """'397/2024' | '022/91' → '397/24' (llave del índice de bloqueo)."""
     import re as _re
@@ -2024,6 +2144,22 @@ def handler(event, context):
         except Exception as e:
             return _resp(500, {'error': f'no se pudo leer stats: {str(e)[:120]}'})
 
+    if action == 'articulado':
+        # QUÉ DICE el articulado. Sin `id` devuelve la cobertura (cuántos
+        # proyectos tienen el texto leído, de qué base salió y qué campos
+        # rindieron) — el dato honesto de hasta dónde llega la extracción.
+        pid = body.get('id')
+        if pid is not None:
+            art = _articulado_de(body.get('tb', 'pdly'), pid)
+            if not art:
+                return _resp(404, {'error': 'sin extracción para este proyecto',
+                                   'extraido': False})
+            return _resp(200, dict(art, extraido=True))
+        d = _articulado()
+        return _resp(200, {'v': d.get('v'), 'pv': d.get('pv'), 'model': d.get('model'),
+                           'n': d.get('n', 0), 'stats': d.get('stats', {}),
+                           'por_sector': {k: len(v) for k, v in (d.get('por_sector') or {}).items()}})
+
     if action == 'bloqueo':        # sistema de bloqueo (posición, hazard, comisiones)
         _bl = _bloqueo()
         out = dict(_bl.get('sistema', {}))
@@ -2087,6 +2223,12 @@ def handler(event, context):
             vs = _votaciones_senado_nominal().get('por_proyecto', {}).get(tok_s)
             if vs:
                 ficha['voto_nominal_senado'] = vs
+        # QUÉ CAMBIA esta ley (aditivo): extracción del articulado. Si el
+        # proyecto todavía no está extraído, el campo no viaja y la ficha lo
+        # dice — nunca se rellena con inferencia del título.
+        art = _articulado_de(ficha.get('tabla', 'pdly'), ficha['id'])
+        if art:
+            ficha['articulado'] = art
         return _resp(200, ficha)
 
     if action == 'congresista':
@@ -2325,6 +2467,15 @@ def handler(event, context):
         rc = caudal.radar_congreso(temas=s.get('temas', []),
                                    comision_lbl=s.get('comision', ''),
                                    empresas_keys=s.get('empresas_keys'))
+        # --- qué DICE cada proyecto, y si le aplica a este cliente ----------
+        # El radar sin esto dice "hay un proyecto sobre tu tema". Con esto dice
+        # "crea N obligaciones sobre tus vigiladas y está vivo".
+        _sect_cli, _quien_vig = _sectores_del_cliente(s, emps_vig)
+        try:
+            n_art, n_aplica = _enriquecer_senales_congreso(rc['senales'], _sect_cli, _quien_vig)
+        except Exception as e:
+            print(f'[cliente] articulado FAIL: {type(e).__name__}: {e}')
+            n_art = n_aplica = 0
         # --- vigiladas · identidad (perfil) --------------------------------
         # Se resuelven ANTES que el sector para poder descontar duplicados: una
         # sanción a Bancolombia es a la vez "del sector financiero" y "de tu
@@ -2457,7 +2608,10 @@ def handler(event, context):
                 'n_otros_actos_sector': n_otros,
                 'n_medios_sector': n_med, 'n_contratos_sector': n_con,
                 'n_vigiladas': len(emps_vig), 'n_senales_vigiladas': n_vig,
-                'n_contratos_vigiladas': n_con_vig}
+                'n_contratos_vigiladas': n_con_vig,
+                # articulado: cuántas señales del Congreso traen "qué cambia" y
+                # cuántas de ésas le aplican al sector/vigiladas del cliente
+                'n_con_articulado': n_art, 'n_te_aplica': n_aplica}
         out = {'cliente': {'sector': sk, 'nombre': s['nombre'], 'comision': s.get('comision', ''),
                            'sector_sanciones': s.get('sector_sanciones', ''),
                            'temas': s.get('temas', []),

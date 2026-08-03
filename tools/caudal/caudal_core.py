@@ -705,7 +705,9 @@ class Caudal:
             # acción 'buscar'. El timeline del tema re-ordena por año en resumen_tema.
             out.sort(key=lambda x: (-(x.get('_mc') or 0), -(x['a'] or 0)))
         else:
-            out.sort(key=lambda x: (x['a'] or 0))
+            # más reciente primero (decisión ago-2026: al que busca no le sirve
+            # arrancar en 2006; el proyecto sin año va al final).
+            out.sort(key=lambda x: -(x['a'] or 0))
         result = out[:limit] if limit else out
         return (result, {'relajado': relajado}) if with_meta else result
 
@@ -808,9 +810,9 @@ class Caudal:
             'sinonimos': sinonimos,
             'empresas': emp_out,
             'expansion': expansion,
-            # timeline en orden cronológico (buscar puede devolver por ranking cuando
-            # relaja); 'mc'/'nw' = palabras coincididas / total, para el toggle
-            # cliente-side "solo exactas".
+            # timeline cronológico DESCENDENTE (lo más reciente primero — buscar
+            # puede devolver por ranking cuando relaja); 'mc'/'nw' = palabras
+            # coincididas / total, para el toggle cliente-side "solo exactas".
             'intentos': [{
                 'id': h['id'], 'tb': h.get('tb', 'pdly'), 'anio': h['a'], 'leg': h['leg'],
                 'titulo': h['t'], 'resultado': h['res'],
@@ -824,7 +826,7 @@ class Caudal:
                 'etapa_max': h.get('et', 0),
                 'mc': h.get('_mc'), 'nw': h.get('_nw'),
                 'match_texto': h.get('mt', False),   # matcheó por el texto de su gaceta, no por título
-            } for h in sorted(hits, key=lambda h: (h.get('a') or 0))],
+            } for h in sorted(hits, key=lambda h: -(h.get('a') or 0))],
         }
 
     # -------- candidatos para profundizar un tema con texto de gaceta --
