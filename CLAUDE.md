@@ -5021,7 +5021,8 @@ legislativo-electos.js         ELECTOS_RAW (285) + BANCADAS + bancadaOf (solo qu
   — basta con dejar el archivo ahí; si falta, la tarjeta se ve igual, solo sin foto.
 
 **Monitor de ritmo** (al lado del título del hub · `tools/leyes-senado/build_ritmo.py` →
-`ritmo-legislaturas.json`, ~2 KB, en el cron 2×/día): proyectos de ley radicados por día,
+`ritmo-legislaturas.json`, ~2 KB, en el cron 2×/día): **gráfico de líneas** (naranja 2026 ·
+verde 2022 · rojo 2018) con los proyectos de ley radicados por día,
 **2026 vs 2022 vs 2018**. Medido ago-2026: 135 · 106 · 91 (la legislatura nueva radica 27%
 más que la anterior a la misma altura).
 - ⚠️ **Las tres series son SOLO del registro del Senado.** El listado de Cámara no publica

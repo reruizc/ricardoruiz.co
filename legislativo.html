@@ -178,14 +178,31 @@
       const vivo=anios[0];
       /* mismo eje en las 3 filas: el pico más alto de cualquier serie */
       const max=Math.max(1,...anios.flatMap(a=>j.series[a].dias.map(x=>x.n)));
-      document.getElementById('ritmo-rows').innerHTML=anios.map(a=>{
-        const s=j.series[a];
-        return `<div class="ritmo-row${a===vivo?' now':''}" title="${a}: ${s.total} proyectos en ${s.n_dias} día${s.n_dias===1?'':'s'}">
-          <span class="ritmo-y">${a}</span>
-          <span class="ritmo-bars">${s.dias.map(x=>`<span class="ritmo-b" style="height:${Math.max(6,Math.round(100*x.n/max))}%" title="${a}-${x.d}: ${x.n}"></span>`).join('')}</span>
-          <span class="ritmo-n">${s.total}</span>
-        </div>`;
+      /* Una línea por legislatura sobre el MISMO eje: así se compara el perfil
+         del día a día, no solo el total. Los ceros son reales (fines de semana
+         y días sin sesión), por eso la línea baja hasta el piso en vez de
+         interpolar por encima. */
+      const COLOR={0:'var(--orange)',1:'var(--green)',2:'var(--red)'};
+      const W=300,H=76,PX=2,PY=6;                     // viewBox del gráfico
+      const px=(i,n)=>PX+(i*(W-2*PX))/Math.max(1,n-1);
+      const py=v=>PY+(H-2*PY)*(1-v/max);
+      const lineas=anios.map((a,k)=>{
+        const s=j.series[a], n=s.dias.length, col=COLOR[k]||'var(--gray)';
+        const pts=s.dias.map((x,i)=>`${px(i,n).toFixed(1)},${py(x.n).toFixed(1)}`).join(' ');
+        const dots=s.dias.map((x,i)=>`<circle cx="${px(i,n).toFixed(1)}" cy="${py(x.n).toFixed(1)}" r="${a===vivo?2:1.6}" fill="${col}"><title>${a}-${x.d}: ${x.n} proyecto${x.n===1?'':'s'}</title></circle>`).join('');
+        return `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="${a===vivo?2:1.4}"
+                  stroke-linejoin="round" stroke-linecap="round" opacity="${a===vivo?1:.85}"/>${dots}`;
       }).join('');
+      document.getElementById('ritmo-rows').innerHTML=
+        `<div class="ritmo-chart">
+          <svg viewBox="0 -2 ${W} ${H+4}" role="img" aria-label="Proyectos radicados por día, tres legislaturas">
+            <line x1="0" y1="${py(0)}" x2="${W}" y2="${py(0)}" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
+            ${lineas}
+          </svg>
+          <div class="ritmo-ejex"><span>${v0||''}</span><span>${v1||''}</span></div>
+          <div class="ritmo-leg">${anios.map((a,k)=>
+            `<span class="ritmo-li"><i style="background:${COLOR[k]||'var(--gray)'}"></i>${a} <b>${j.series[a].total}</b></span>`).join('')}</div>
+        </div>`;
       /* la comparación honesta es a DÍAS IGUALES: la legislatura viva lleva
          menos días que la ventana completa de las viejas */
       const nd=j.series[vivo].n_dias;
