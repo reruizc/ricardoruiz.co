@@ -606,13 +606,20 @@ SECOP_DESC_TERMS = 3           # consulta + 2 alias (cada término = 2 queries)
 SECOP_IN_MAX = 40              # nombres por lado en el `in (…)` (tope de URL)
 
 
-def _secop_descubrir(query, emps):
-    """Nombres de proveedor/entidad del universo $q que SON la empresa."""
-    terms = [query]
-    for e in emps:
-        for a in e['alias'] + e['entidad']:
-            if a not in terms and len(terms) < SECOP_DESC_TERMS:
-                terms.append(a)
+def _secop_descubrir(query, emps, terms=None):
+    """Nombres de proveedor/entidad del universo $q que SON la empresa.
+
+    `terms` explícito lo usa el Radar del perfil de cliente, que descubre las
+    razones sociales de VARIAS vigiladas en una sola ronda (un alias por
+    empresa) en vez de una ronda por empresa — el gate (`razon_social_any`) ya
+    recibe la lista completa, así que la precisión no cambia.
+    """
+    if terms is None:
+        terms = [query]
+        for e in emps:
+            for a in e['alias'] + e['entidad']:
+                if a not in terms and len(terms) < SECOP_DESC_TERMS:
+                    terms.append(a)
     cols = ('proveedor_adjudicado', 'nombre_entidad')
     vistos = {c: {} for c in cols}
     jobs = [(t, c) for t in terms for c in cols]
@@ -1131,9 +1138,11 @@ def _profundizar_tema(caudal, resumen, k_objetivo=2, k_candidatos=6, presupuesto
 CLIENTE_SYSTEM = (
     "Eres analista de asuntos públicos de Cauce. Escribes en español, tuteo "
     "neutro de Bogotá (sin voseo, sin regionalismos). Te doy el RADAR DE HOY de "
-    "un cliente de un sector: los proyectos de ley activos en el Congreso, las "
-    "sanciones recientes de las superintendencias y la prensa reciente que "
-    "tocan su sector, ya filtradas y con su nivel de prioridad. Esto es un "
+    "un cliente: los proyectos de ley activos en el Congreso, las sanciones "
+    "recientes de las superintendencias, la contratación del Estado y la prensa "
+    "reciente que tocan sus temas, ya filtradas y con su nivel de prioridad. "
+    "Algunas señales van marcadas VIGILADA DEL CLIENTE: son sobre una empresa "
+    "que él sigue de cerca — priorízalas y nómbralas explícitamente. Esto es un "
     "BRIEFING de seguimiento, NO un archivo histórico — escribe como si le "
     "contaras a tu cliente qué pasó y qué viene, no como quien resume un "
     "expediente de 36 años. Precisión sobre volumen. REGLA DURA: usa SOLO las "
@@ -1149,30 +1158,61 @@ CLIENTE_SYSTEM = (
     "señales que te di).")
 
 
+# cuántas señales entran al briefing. Es un tope de LATENCIA, no de cobertura:
+# el radar completo se le muestra al usuario en pantalla; esto es lo que el
+# modelo alcanza a sintetizar sin pasarse de los 30 s del API Gateway.
+LECTURA_MAX_SENALES = 26
+
+
 def _lectura_cliente(s, senales, kpis):
-    key = _hash24(PROMPT_VERSION + '|cliente|' + s['k'] + '|' + str(kpis['n_radar'])
+    # la firma incluye temas y vigiladas: con un perfil por cliente, `s['k']`
+    # es siempre 'perfil' y dos gremios distintos compartirían la lectura.
+    firma = '|'.join([s.get('k', ''), s.get('nombre', ''),
+                      ','.join(sorted(s.get('temas', []))),
+                      ','.join(sorted(s.get('empresas_keys', []))),
+                      s.get('sector_sanciones', '')])
+    key = _hash24(PROMPT_VERSION + '|cliente|' + firma + '|' + str(kpis['n_radar'])
                   + '|' + str(kpis['alto']) + '|' + str(kpis['en_tramite']))
     cached = _cache_get('cliente-' + key)
     if cached:
         return cached
     lines = []
-    # senales ya viene acotado por pilar (congreso≤10 + regulatorio≤6 +
-    # medios≤5 = 21 máx) — el slice debe cubrir el total, si no, medios
-    # (el último en concatenarse) queda afuera aunque el bug de arriba esté
-    # arreglado. Ver hallazgo jul-2026: con [:14] nunca llegaba prensa al LLM.
-    for x in senales[:21]:
+    # El slice tiene que cubrir todos los pilares: si se corta por el final, el
+    # último en concatenarse (contratación) nunca llega al modelo. Ver hallazgo
+    # jul-2026: con [:14] nunca llegaba prensa. Pero con perfil de cliente los
+    # pilares suman hasta 42 (cada uno con sus cupos de vigiladas) y mandarlas
+    # todas empuja la generación por encima del techo de 30 s del API Gateway.
+    # Así que se PRIORIZA en vez de truncar: primero todo lo que es sobre una
+    # vigilada, después lo de alta prioridad, después el resto.
+    orden = {'alto': 0, 'medio': 1, 'bajo': 2}
+    top = sorted(senales, key=lambda x: (0 if x.get('vigilada') else 1,
+                                         orden.get(x.get('nivel'), 3)))[:LECTURA_MAX_SENALES]
+    for x in top:
+        vig = f" · VIGILADA DEL CLIENTE: {x['vigilada']}" if x.get('vigilada') else ''
         if x['tipo'] == 'congreso':
             lines.append(f"- [LEGISLATIVO · prioridad {x['nivel']}] ({x['anio']}, "
                          f"{x.get('resultado_txt', x.get('resultado'))}) {x['titulo'][:95]}")
         elif x['tipo'] == 'medios':
-            lines.append(f"- [PRENSA · prioridad {x['nivel']}] {x.get('fecha', '')} "
+            lines.append(f"- [PRENSA · prioridad {x['nivel']}{vig}] {x.get('fecha', '')} "
                          f"{x.get('medio', '')}: {x['titulo'][:90]}")
+        elif x['tipo'] == 'contratacion':
+            lines.append(f"- [CONTRATACIÓN · prioridad {x['nivel']}{vig}] {x.get('fecha', '')} "
+                         f"{x.get('entidad', '')} → {x.get('proveedor', '')}: "
+                         f"{(x.get('objeto') or '')[:80]}")
         else:
-            lines.append(f"- [REGULATORIO · prioridad {x['nivel']}] {x.get('fecha', '')} "
+            lines.append(f"- [REGULATORIO · prioridad {x['nivel']}{vig}] {x.get('fecha', '')} "
                          f"{x.get('fuente', '')}: {x.get('sancionado', '')} — {x.get('motivo', '')[:75]}")
-    user = (f"Cliente: sector {s['nombre']} (sus proyectos suelen ir a la Comisión "
-            f"{s['comision']}).\n"
-            f"Radar de hoy: {kpis['n_radar']} señales priorizadas ({kpis['alto']} alta · "
+    vigiladas = ', '.join(e['nombre'] for e in s.get('empresas', []))
+    quien = (f"Cliente: {s['nombre']}" if s.get('k') == 'perfil'
+             else f"Cliente: sector {s['nombre']}")
+    user = (quien
+            + (f" (sus proyectos suelen ir a la Comisión {s['comision']})" if s.get('comision') else '')
+            + ".\n"
+            + (f"Temas que vigila: {', '.join(s.get('temas', []))}.\n" if s.get('temas') else '')
+            + (f"Empresas que vigila: {vigiladas}. Las señales marcadas VIGILADA DEL "
+               f"CLIENTE son sobre ellas — son las más importantes del briefing.\n"
+               if vigiladas else '')
+            + f"Radar de hoy: {kpis['n_radar']} señales priorizadas ({kpis['alto']} alta · "
             f"{kpis.get('medio', 0)} media prioridad) · {kpis['en_tramite']} proyectos de "
             f"ley EN TRÁMITE ACTIVO"
             + (f" · {kpis['n_sanciones_sector']} sanciones registradas del sector"
@@ -1730,6 +1770,129 @@ def _secop_para_sector(temas, cap=5):
     return res
 
 
+# --- Perfil de cliente · la cara de IDENTIDAD sobre las empresas vigiladas ----
+# El sector responde "qué se mueve alrededor de mi cliente"; las vigiladas
+# responden "qué le está pasando a mi cliente (o a su competencia directa)".
+# Son la señal más cara del radar, así que van en cupos propios y no compiten
+# con las del sector.
+PERFIL_EMP_SECOP   = 6     # empresas cuya razón social se descubre en SECOP
+PERFIL_EMP_MEDIOS  = 5     # empresas que se buscan por nombre en prensa
+PERFIL_MEDIOS_DIAS = 21    # prensa de vigiladas: ventana más larga que la del sector
+
+
+def _regulatorio_para_empresas(emps, cap=6):
+    """Sanciones cuyo destinatario ES una de las vigiladas (identidad, no tema).
+    Filtro por palabra completa + vetos del diccionario — el mismo gate que usa
+    el pilar Regulatorio, así que hereda su precisión medida."""
+    if not emps:
+        return []
+    por_emp = {}
+    for r in _sanciones():
+        nombre = r.get('sancionado') or ''
+        if not nombre:
+            continue
+        for e in emps:
+            if empresas.casa_registro(e, nombre):
+                por_emp.setdefault(e['nombre'], []).append(r)
+                break
+    for v in por_emp.values():
+        v.sort(key=lambda r: r.get('fecha', '') or '', reverse=True)
+    # round-robin: una vigilada con 40 sanciones no puede acaparar el panel y
+    # dejar sin ver a las otras. Se muestra la más reciente de cada una, luego
+    # la segunda de cada una, y así.
+    out, i = [], 0
+    while len(out) < cap and any(len(v) > i for v in por_emp.values()):
+        for quien, v in por_emp.items():
+            if i < len(v) and len(out) < cap:
+                out.append((quien, v[i]))
+        i += 1
+    return out
+
+
+def _medios_para_empresas(emps, cap=5):
+    """Prensa que nombra a las vigiladas. Ventana más larga que la del sector:
+    que salga tu empresa en un titular es raro y sigue siendo noticia a 3
+    semanas. Devuelve [(nombre_vigilada, evento)]."""
+    emps = emps[:PERFIL_EMP_MEDIOS]
+    if not emps:
+        return []
+    nombres = [e['nombre'] for e in emps]
+    agg = _medios_para_sector(nombres, dias=PERFIL_MEDIOS_DIAS, cap=cap * 4)
+    out, vistos = [], set()
+    for r in agg.get('resultados', []):
+        titulo = r.get('titulo') or ''
+        hit = next((e['nombre'] for e in emps if empresas.casa_registro(e, titulo)), None)
+        # sin hit el titular salió por la búsqueda pero no nombra a la vigilada
+        # como palabra completa → es homónimo o ruido; no se cuela como "tu empresa".
+        if not hit:
+            continue
+        # el dedup del pilar Medios es por (título, medio) — a propósito, ahí
+        # interesa cuántos medios lo cubren. Acá no: la misma nota replicada por
+        # 4 outlets es UNA señal para el cliente, no cuatro.
+        k = _medios_norm(titulo)[:90]
+        if k in vistos:
+            continue
+        vistos.add(k)
+        out.append((hit, r))
+        if len(out) >= cap:
+            break
+    return out
+
+
+def _secop_para_empresas(emps, cap=5):
+    """Contratos que SON de las vigiladas (proveedor o entidad), por identidad.
+
+    Una sola ronda de descubrimiento para todas (un alias por empresa) y un
+    único `in (…)` — hacer una ronda por empresa serían ~6 llamadas a Socrata
+    cada una y no cabe en el techo de 30 s de API Gateway.
+    """
+    emps = emps[:PERFIL_EMP_SECOP]
+    if not emps:
+        return {'n': 0, 'resultados': []}
+    terms = []
+    for e in emps:
+        a = min(e['alias'], key=len) if e['alias'] else e['k']
+        if a not in terms:
+            terms.append(a)
+    ck = (f'secop-vigiladas-{_hash24("|".join(sorted(terms)))}-{cap}'
+          f'-{_medios_cache_bucket()}')
+    cached = _cache_get(ck)
+    if cached:
+        return cached
+    prov, ent, _desc = _secop_descubrir('', emps, terms=terms)
+    if not prov and not ent:
+        # honesto: las vigiladas existen en el diccionario pero no le venden al
+        # Estado. No se cae a $q en silencio — eso devolvería homónimos.
+        res = {'n': 0, 'resultados': [], 'sin_contratos': True}
+        _cache_put(ck, res)
+        return res
+    conds = []
+    if prov:
+        conds.append(_secop_in('proveedor_adjudicado', prov))
+    if ent:
+        conds.append(_secop_in('nombre_entidad', ent))
+    w = '(' + ' OR '.join(conds) + ')'
+    filas = _secop_get({'$select': ','.join(SECOP_SELECT),
+                        '$where': w + ' AND fecha_de_firma IS NOT NULL',
+                        '$order': 'fecha_de_firma DESC', '$limit': cap}, 14)
+    tot = 0
+    try:
+        t = _secop_get({'$select': 'count(1) as n', '$where': w}, 14)
+        tot = int((t[0] if t else {}).get('n') or 0)
+    except Exception as e:
+        print(f'[secop] vigiladas/total FAIL: {type(e).__name__}: {e}')
+    out = []
+    for r in filas:
+        row = _secop_row(r, [], SECOP_MATCH_FALLBACK)
+        quien = next((e['nombre'] for e in emps
+                      if empresas.casa_registro(e, row.get('proveedor') or '')
+                      or empresas.casa_registro(e, row.get('entidad') or '')), None)
+        out.append((quien, row))
+    res = {'n': tot or len(out), 'resultados': out}
+    _cache_put(ck, res)
+    return res
+
+
 # --- handler ----------------------------------------------------------------
 CORS = {'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
@@ -2074,15 +2237,68 @@ def handler(event, context):
             dias = None
         return _resp(200, _medios_buscar(q, dias))
 
+    if action == 'perfil_meta':
+        # catálogo para el editor de perfil: plantillas de arranque (los presets),
+        # sectores de sanciones CON su conteo real (para no ofrecer un sector que
+        # está vacío como si tuviera datos) y comisiones de referencia.
+        por_sector = {}
+        for r in _sanciones():
+            if (r.get('tipo_acto') or 'sancion') == 'sancion':
+                por_sector[r.get('sector', '')] = por_sector.get(r.get('sector', ''), 0) + 1
+        return _resp(200, {
+            'plantillas': [caudal_core.perfil_desde_sector(x['k'])
+                           for x in caudal_core.SECTORES_CLIENTE],
+            'sectores_sanciones': [{'k': k, 'nombre': n, 'n': por_sector.get(k, 0)}
+                                   for k, n in caudal_core.SANCION_SECTORES],
+            'comisiones': caudal_core.COMISIONES_REF,
+            'limites': {'temas': caudal_core.PERFIL_MAX_TEMAS,
+                        'empresas': caudal_core.PERFIL_MAX_EMPRESAS}})
+
+    if action == 'empresas':
+        # autocompletado del diccionario (④) para elegir empresas vigiladas
+        return _resp(200, {'empresas': caudal_core.buscar_empresas(body.get('query', ''))})
+
     if action == 'cliente':        # Vista Cliente · radar SIGA sobre los pilares
+        # Dos entradas: `perfil` (los temas y las vigiladas DEL cliente, que el
+        # frontend trae del KV del worker) o `sector` (uno de los 6 presets, que
+        # se quedan como demo y como plantilla de arranque).
         sk = body.get('sector')
-        s = caudal_core.sector_cliente(sk)
+        perfil_in = body.get('perfil')
         sectores = [{'k': x['k'], 'nombre': x['nombre'],
                      'regulatorio': bool(x.get('sector_sanciones'))}
                     for x in caudal_core.SECTORES_CLIENTE]
-        if not s:
-            return _resp(400, {'error': f'sector desconocido: {sk}', 'sectores': sectores})
-        rc = caudal.radar_congreso(sector_key=sk)
+        if isinstance(perfil_in, dict):
+            s = caudal_core.normalizar_perfil(perfil_in)
+            if not s['temas'] and not s['empresas_keys']:
+                return _resp(400, {'error': 'el perfil necesita al menos un tema '
+                                            'o una empresa vigilada',
+                                   'perfil': s, 'sectores': sectores})
+        else:
+            s = caudal_core.sector_cliente(sk)
+            if not s:
+                return _resp(400, {'error': f'sector desconocido: {sk}', 'sectores': sectores})
+        emps_vig = [e for e in empresas.EMPRESAS if e['k'] in set(s.get('empresas_keys') or [])]
+        rc = caudal.radar_congreso(temas=s.get('temas', []),
+                                   comision_lbl=s.get('comision', ''),
+                                   empresas_keys=s.get('empresas_keys'))
+        # --- vigiladas · identidad (perfil) --------------------------------
+        # Se resuelven ANTES que el sector para poder descontar duplicados: una
+        # sanción a Bancolombia es a la vez "del sector financiero" y "de tu
+        # vigilada", y mostrarla dos veces infla el radar.
+        reg_vig, vig_keys = [], set()
+        for quien, r in _regulatorio_para_empresas(emps_vig):
+            yr = (r.get('fecha') or '')[:4]
+            reciente = yr.isdigit() and int(yr) >= caudal_core.REF_YEAR - 1
+            vig_keys.add((r.get('sancionado'), r.get('fecha'), r.get('resolucion'),
+                          r.get('fuente')))
+            reg_vig.append({'tipo': 'regulatorio', 'vigilada': quien,
+                            'sancionado': r.get('sancionado'),
+                            'fuente': r.get('fuente_nombre'), 'tipo_sancion': r.get('tipo'),
+                            'motivo': (r.get('motivo') or '')[:170], 'fecha': r.get('fecha'),
+                            'monto': r.get('monto'), 'nivel': 'alto' if reciente else 'medio',
+                            'accion': (f'Sanción a {quien}, empresa que vigilas — '
+                                       'documentar el caso y su exposición') if reciente else
+                                      f'Antecedente sancionatorio de {quien}'})
         reg, n_sanc, n_otros = [], 0, 0
         if s.get('sector_sanciones'):
             dels = [r for r in _sanciones() if r.get('sector') == s['sector_sanciones']]
@@ -2092,6 +2308,9 @@ def handler(event, context):
             sanc = [r for r in dels if (r.get('tipo_acto') or 'sancion') == 'sancion']
             n_sanc, n_otros = len(sanc), len(dels) - len(sanc)
             sanc.sort(key=lambda r: r.get('fecha', ''), reverse=True)
+            sanc = [r for r in sanc
+                    if (r.get('sancionado'), r.get('fecha'), r.get('resolucion'),
+                        r.get('fuente')) not in vig_keys]
             for r in sanc[:6]:
                 yr = (r.get('fecha') or '')[:4]
                 reciente = yr.isdigit() and int(yr) >= caudal_core.REF_YEAR - 1
@@ -2103,10 +2322,31 @@ def handler(event, context):
                                        'cumplimiento') if reciente else
                                       'Antecedente sancionatorio — referencia de riesgo del sector'})
         med, n_med = [], 0
-        med_agg = _medios_para_sector(s.get('temas', []))
-        n_med = med_agg['n']
         cutoff = _time.strftime('%Y-%m-%d', _time.gmtime(_time.time() - 5 * 86400))
-        for r in med_agg['resultados'][:5]:
+        med_vig, vig_urls = [], set()
+        try:
+            for quien, r in _medios_para_empresas(emps_vig):
+                vig_urls.add(r.get('url'))
+                reciente = (r.get('fecha') or '') >= cutoff
+                med_vig.append({'tipo': 'medios', 'vigilada': quien, 'medio': r.get('medio'),
+                                'titulo': r.get('titulo'), 'url': r.get('url'),
+                                'fecha': r.get('fecha'), 'alcance': r.get('alcance'),
+                                'nivel': 'alto' if reciente else 'medio',
+                                'accion': (f'{quien} en prensa — evaluar respuesta o vocería'
+                                           if reciente else
+                                           f'Cobertura de {quien} — seguimiento')})
+        except Exception as e:
+            print(f'[cliente] medios vigiladas FAIL: {type(e).__name__}: {e}')
+        # el sector se busca aunque el perfil no tenga temas propios (puede ser
+        # un perfil de puras vigiladas): ahí el bloque de sector queda vacío y
+        # el radar vive de la identidad, que es lo correcto.
+        med_agg = _medios_para_sector(s.get('temas', [])[:4])
+        n_med = med_agg['n']
+        for r in med_agg['resultados']:
+            if len(med) >= 5:
+                break
+            if r.get('url') in vig_urls:
+                continue
             reciente = (r.get('fecha') or '') >= cutoff
             med.append({'tipo': 'medios', 'medio': r.get('medio'), 'titulo': r.get('titulo'),
                         'url': r.get('url'), 'fecha': r.get('fecha'), 'alcance': r.get('alcance'),
@@ -2119,14 +2359,36 @@ def handler(event, context):
         # el nivel lo da la frescura de la firma (90 días ≈ el ciclo en que
         # todavía se puede incidir en la ejecución o competir por el siguiente).
         con, n_con = [], 0
+        corte_con = _time.strftime('%Y-%m-%d', _time.gmtime(_time.time() - 90 * 86400))
+        # vigiladas: contratos que SON de la empresa (identidad), no los que la
+        # mencionan. Es la pregunta directa "¿mi vigilada le vende al Estado?".
+        con_vig, vig_cids, n_con_vig, con_vig_vacio = [], set(), 0, False
+        try:
+            cv = _secop_para_empresas(emps_vig)
+            n_con_vig = cv.get('n', 0)
+            con_vig_vacio = bool(cv.get('sin_contratos'))
+            for quien, r in cv.get('resultados', []):
+                vig_cids.add(r.get('id'))
+                reciente = (r.get('fecha') or '') >= corte_con
+                con_vig.append({'tipo': 'contratacion', 'vigilada': quien,
+                                'entidad': r.get('entidad'), 'proveedor': r.get('proveedor'),
+                                'objeto': (r.get('objeto') or '')[:170], 'valor': r.get('valor'),
+                                'departamento': r.get('departamento'), 'fecha': r.get('fecha'),
+                                'url': r.get('url'), 'nivel': 'alto' if reciente else 'medio',
+                                'accion': (f'Contrato reciente de {quien} — revisar objeto, '
+                                           'entidad y ejecución') if reciente else
+                                          f'Antecedente de contratación de {quien}'})
+        except Exception as e:
+            print(f'[cliente] secop vigiladas FAIL: {type(e).__name__}: {e}')
         try:
             con_agg = _secop_para_sector(s.get('temas', []))
         except Exception as e:
             print(f'[cliente] secop FAIL: {type(e).__name__}: {e}')
             con_agg = {'n': 0, 'resultados': []}
         n_con = con_agg['n']
-        corte_con = _time.strftime('%Y-%m-%d', _time.gmtime(_time.time() - 90 * 86400))
         for r in con_agg['resultados']:
+            if r.get('id') in vig_cids:
+                continue
             reciente = (r.get('fecha') or '') >= corte_con
             con.append({'tipo': 'contratacion', 'entidad': r.get('entidad'),
                         'proveedor': r.get('proveedor'), 'objeto': (r.get('objeto') or '')[:170],
@@ -2136,7 +2398,12 @@ def handler(event, context):
                         'accion': ('Contrato reciente en tu sector — revisar quién ganó y con qué '
                                    'objeto antes del próximo proceso') if reciente else
                                   'Antecedente de contratación — referencia de precios y proveedores'})
+        # las de identidad van primero DENTRO de su pilar: en la lista del
+        # cliente, "sancionaron a tu vigilada" tiene que leerse antes que
+        # "sancionaron a alguien de tu sector".
+        reg, med, con = reg_vig + reg, med_vig + med, con_vig + con
         senales = rc['senales'] + reg + med + con
+        n_vig = sum(1 for x in senales if x.get('vigilada'))
         kpis = {'n_radar': len(senales),
                 'alto': sum(1 for x in senales if x['nivel'] == 'alto'),
                 'medio': sum(1 for x in senales if x['nivel'] == 'medio'),
@@ -2144,9 +2411,20 @@ def handler(event, context):
                 'en_tramite': sum(1 for x in rc['senales'] if x['resultado'] == 'EN_TRAMITE'),
                 'n_proyectos_sector': rc['n_tocados'], 'n_sanciones_sector': n_sanc,
                 'n_otros_actos_sector': n_otros,
-                'n_medios_sector': n_med, 'n_contratos_sector': n_con}
-        out = {'cliente': {'sector': sk, 'nombre': s['nombre'], 'comision': s['comision'],
-                           'sector_sanciones': s.get('sector_sanciones', ''), 'temas': s.get('temas', [])},
+                'n_medios_sector': n_med, 'n_contratos_sector': n_con,
+                'n_vigiladas': len(emps_vig), 'n_senales_vigiladas': n_vig,
+                'n_contratos_vigiladas': n_con_vig}
+        out = {'cliente': {'sector': sk, 'nombre': s['nombre'], 'comision': s.get('comision', ''),
+                           'sector_sanciones': s.get('sector_sanciones', ''),
+                           'temas': s.get('temas', []),
+                           'es_perfil': s.get('k') == 'perfil',
+                           'descripcion': s.get('descripcion', ''),
+                           'empresas': s.get('empresas', []),
+                           'temas_usados': rc.get('temas_usados', []),
+                           # honesto: las vigiladas están en el diccionario pero
+                           # no le venden al Estado (verificado con Uber/Ecopetrol)
+                           'vigiladas_sin_contratos': con_vig_vacio,
+                           'descartes': s.get('descartes', [])},
                'congreso': rc['senales'], 'regulatorio': reg, 'medios': med,
                'contratacion': con, 'kpis': kpis, 'sectores': sectores}
         if body.get('lectura', False):

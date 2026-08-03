@@ -273,6 +273,170 @@ def sector_cliente(k):
     return None
 
 
+# --- Perfil de cliente (el Radar sobre SUS temas, no sobre un preset) --------
+# Los 6 SECTORES_CLIENTE de arriba sirven para demostrar; un gremio real necesita
+# sus propios temas y sus propias empresas vigiladas. El perfil es esa misma
+# estructura, pero editable y guardada por cuenta (KV del worker). Los presets
+# se quedan como fallback y como PLANTILLA de arranque — `perfil_desde_sector`.
+PERFIL_MAX_TEMAS    = 12
+PERFIL_MAX_EMPRESAS = 15
+PERFIL_MAX_TEMA_LEN = 80
+
+# sectores del pilar Regulatorio (los que trae `fuentes.json` de las supers).
+# Los 4 primeros son los que hoy tienen volumen real; el resto existe pero es
+# de cola larga — se ofrecen igual, con el conteo real a la vista en la UI.
+SANCION_SECTORES = [
+    ('salud',        'Salud'),
+    ('contratacion', 'Contratación'),
+    ('financiero',   'Financiero'),
+    ('consumo',      'Consumo y competencia'),
+    ('transporte',   'Transporte'),
+    ('juridico',     'Jurídico'),
+    ('control',      'Control fiscal'),
+    ('laboral',      'Laboral'),
+    ('societario',   'Societario'),
+]
+_SANCION_SECTOR_KEYS = {k for k, _ in SANCION_SECTORES}
+
+COMISIONES_REF = ['Primera', 'Segunda', 'Tercera', 'Cuarta', 'Quinta', 'Sexta', 'Séptima']
+
+
+def _empresas_por_llave():
+    """k → entrada, y también alias → entrada, para tolerar que el cliente mande
+    'bancolombia' o 'Bancolombia' indistintamente."""
+    idx = {}
+    for e in empresas.EMPRESAS:
+        idx[e['k']] = e
+        for a in e['alias']:
+            idx.setdefault(a, e)
+    return idx
+
+
+def buscar_empresas(q, limit=20):
+    """Autocompletado del diccionario para el editor de perfil: devuelve las
+    empresas/gremios cuyo nombre o alias contiene la consulta."""
+    qn = _norm(q or '').strip()
+    if not qn:
+        return []
+    out = []
+    for e in empresas.EMPRESAS:
+        if qn in _norm(e['nombre']) or any(qn in a for a in e['alias']):
+            out.append({'k': e['k'], 'nombre': e['nombre'], 'tipo': e['tipo'],
+                        'sector': e['sector'], 'nucleo': e['nucleo']})
+        if len(out) >= limit:
+            break
+    return out
+
+
+def normalizar_perfil(p):
+    """Perfil de cliente saneado y listo para el Radar.
+
+    Entrada libre (viene del KV o del body del request) → dict con la MISMA
+    forma que un preset de SECTORES_CLIENTE (`nombre`, `temas`, `comision`,
+    `sector_sanciones`) más `empresas` (entradas del diccionario ya resueltas).
+    Nunca lanza: lo que no valida se descarta y se reporta en `descartes`,
+    para que la UI pueda decirlo en vez de fingir que lo guardó.
+    """
+    p = p if isinstance(p, dict) else {}
+    descartes = []
+
+    temas, vistos = [], set()
+    for t in (p.get('temas') or [])[:PERFIL_MAX_TEMAS * 2]:
+        t = re.sub(r'\s+', ' ', str(t or '')).strip()[:PERFIL_MAX_TEMA_LEN]
+        # <3 chars no discrimina nada (matchea medio dataset por substring)
+        if len(t) < 3:
+            continue
+        tn = _norm(t)
+        if tn in vistos:
+            continue
+        vistos.add(tn)
+        temas.append(t)
+        if len(temas) >= PERFIL_MAX_TEMAS:
+            break
+
+    idx = _empresas_por_llave()
+    emps, vistas = [], set()
+    for raw in (p.get('empresas') or [])[:PERFIL_MAX_EMPRESAS * 2]:
+        key = _norm(str(raw or '')).strip()
+        e = idx.get(key)
+        if not e:
+            if key:
+                descartes.append(str(raw))
+            continue
+        if e['k'] in vistas:
+            continue
+        vistas.add(e['k'])
+        emps.append(e)
+        if len(emps) >= PERFIL_MAX_EMPRESAS:
+            break
+
+    ss = str(p.get('sector_sanciones') or '').strip().lower()
+    if ss and ss not in _SANCION_SECTOR_KEYS:
+        descartes.append(f'sector de sanciones «{ss}»')
+        ss = ''
+    com = str(p.get('comision') or '').strip()
+    if com and com not in COMISIONES_REF:
+        com = ''
+
+    return {
+        'k': 'perfil',
+        'nombre': (str(p.get('nombre') or '').strip() or 'Perfil sin nombre')[:80],
+        'descripcion': str(p.get('descripcion') or '').strip()[:400],
+        'temas': temas,
+        'empresas': [{'k': e['k'], 'nombre': e['nombre'], 'tipo': e['tipo'],
+                      'sector': e['sector'], 'nucleo': e['nucleo']} for e in emps],
+        'empresas_keys': [e['k'] for e in emps],
+        'sector_sanciones': ss,
+        'comision': com,
+        'descartes': descartes,
+    }
+
+
+def perfil_desde_sector(k):
+    """Un preset convertido en perfil editable — la plantilla de arranque."""
+    s = sector_cliente(k)
+    if not s:
+        return None
+    p = normalizar_perfil({'nombre': s['nombre'], 'temas': list(s['temas']),
+                           'sector_sanciones': s.get('sector_sanciones', ''),
+                           'comision': s.get('comision', '')})
+    p['k'] = k
+    p['desde_preset'] = k
+    return p
+
+
+def temas_de_empresas(emp_keys, cap=18):
+    """Frases del tesauro que cubren el NÚCLEO de estas empresas — la cara de
+    TEMA del diccionario (④). Se resuelven desde la entrada del diccionario, no
+    re-matcheando el nombre: 29 de las 388 tienen `nombre` distinto de su alias
+    (WOM, ISA, XM…) y buscarlas por nombre las perdería en silencio.
+
+    Van como temas sueltos (frases curadas, AND literal) y NO el nombre de la
+    marca: `_phrase_match` va por substring y 'claro' casaría dentro de
+    "declaró". La identidad de la empresa se cruza en Regulatorio/Contratación,
+    que sí traen su nombre propio.
+    """
+    keys = set(emp_keys or [])
+    if not keys:
+        return []
+    emps = [e for e in empresas.EMPRESAS if e['k'] in keys]
+    idx = {t['k']: t for t in SINONIMOS}
+    out, vistos = [], set()
+    for tk in empresas.topicos_de(emps):
+        t = idx.get(tk)
+        if not t:
+            continue
+        for term in t['terms']:
+            tn = _norm(term)
+            if tn in vistos:
+                continue
+            vistos.add(tn)
+            out.append(term)
+            if len(out) >= cap:
+                return out
+    return out
+
+
 class Caudal:
     def __init__(self, indice=None, proyectos=None, autor_partido=None,
                  texto_index=None, texto_ids=None):
@@ -670,13 +834,25 @@ class Caudal:
                 'match': match}
 
     # -------- Radar del cliente · señales legislativas -----------------
-    def radar_congreso(self, sector_key=None, temas=None, comision_lbl='', cap=10):
+    def radar_congreso(self, sector_key=None, temas=None, comision_lbl='', cap=10,
+                       empresas_keys=None):
         """Proyectos que tocan los temas del cliente, priorizados por
-        accionabilidad (en trámite > caído reciente > ley > antecedente)."""
+        accionabilidad (en trámite > caído reciente > ley > antecedente).
+
+        `empresas_keys` (perfil de cliente): suma el vocabulario legislativo de
+        las empresas vigiladas — el Congreso no legisla «Uber», legisla
+        «plataformas tecnológicas», y el diccionario hace esa traducción.
+        """
         if temas is None:
             s = sector_cliente(sector_key) or {}
             temas = s.get('temas', [])
             comision_lbl = comision_lbl or s.get('comision', '')
+        temas = list(temas or [])
+        vistos = {_norm(t) for t in temas}
+        for t in temas_de_empresas(empresas_keys):
+            if _norm(t) not in vistos:
+                vistos.add(_norm(t))
+                temas.append(t)
         seen = {}
         for t in temas:
             # expandir=False + relajar=False: los temas del Radar son frases curadas
@@ -702,7 +878,8 @@ class Caudal:
 
         hits.sort(key=_score, reverse=True)
         senales = [self._senal_congreso(h, comision_lbl) for h in hits[:cap]]
-        return {'n_tocados': len(hits), 'n_mostrados': len(senales), 'senales': senales}
+        return {'n_tocados': len(hits), 'n_mostrados': len(senales), 'senales': senales,
+                'temas_usados': temas}
 
     def _senal_congreso(self, h, comision_lbl):
         res, a = h.get('res'), (h.get('a') or 0)

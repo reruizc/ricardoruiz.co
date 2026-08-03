@@ -198,6 +198,46 @@
   .sig-action{font-size:.73rem; color:var(--teal); margin-top:.42rem; line-height:1.4}
   .cli-empty{text-align:center; color:var(--ink2); font-size:.85rem; padding:3rem 1rem}
   .cli-reg-none{font-size:.76rem; color:var(--ink3); border:1px dashed var(--border2); border-radius:8px; padding:.9rem 1rem}
+  /* estrella de "empresa vigilada": la señal es sobre el cliente, no sobre su sector */
+  .sig.vig{background:linear-gradient(90deg,var(--teal-soft),transparent 60%)}
+  .vig-tag{font-size:.55rem; letter-spacing:.08em; text-transform:uppercase; font-weight:800;
+    color:var(--teal); background:var(--teal-soft); border:1px solid var(--teal-dim);
+    padding:.1rem .38rem; border-radius:3px; margin-right:.4rem; white-space:nowrap}
+  /* --- editor de perfil de cliente --- */
+  .pf-bar{display:flex; flex-wrap:wrap; gap:.45rem; align-items:center; margin-top:.4rem}
+  .pf-lbl{font-size:.6rem; letter-spacing:.15em; text-transform:uppercase; color:var(--ink3); margin-right:.25rem}
+  .chip.add{border-style:dashed; color:var(--teal); border-color:var(--teal-dim)}
+  .chip .x{margin-left:.4rem; color:var(--ink3); font-weight:700}
+  .chip .x:hover{color:var(--red)}
+  .pf-edit{border:1px solid var(--border2); border-radius:12px; background:var(--card);
+    padding:1.1rem 1.2rem; margin:1rem 0 .4rem; text-align:left}
+  .pf-grid{display:grid; grid-template-columns:1fr 1fr; gap:.9rem 1.1rem}
+  @media(max-width:700px){ .pf-grid{grid-template-columns:1fr} }
+  .pf-f{display:flex; flex-direction:column; gap:.3rem}
+  .pf-f.full{grid-column:1/-1}
+  .pf-f label{font-size:.6rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ink3)}
+  .pf-f .hint{font-size:.63rem; color:var(--ink3); line-height:1.45}
+  .pf-f input, .pf-f select{background:var(--card2); border:1px solid var(--border2); color:var(--ink);
+    font-family:inherit; font-size:.82rem; padding:.55rem .7rem; border-radius:6px; outline:none; width:100%}
+  .pf-f input:focus, .pf-f select:focus{border-color:var(--teal)}
+  .pf-tags{display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.2rem; min-height:1.2rem}
+  .pf-ac{position:relative}
+  .pf-sug{position:absolute; z-index:40; left:0; right:0; top:calc(100% + 3px); max-height:230px; overflow:auto;
+    background:var(--card2); border:1px solid var(--border2); border-radius:8px; box-shadow:0 12px 30px rgba(0,0,0,.5)}
+  .pf-sug div{padding:.5rem .7rem; font-size:.78rem; color:var(--ink); cursor:none; border-bottom:1px solid var(--border)}
+  .pf-sug div:last-child{border-bottom:none}
+  .pf-sug div:hover{background:var(--teal-soft)}
+  .pf-sug .s{color:var(--ink3); font-size:.66rem; margin-left:.4rem}
+  .pf-acts{display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1rem; align-items:center}
+  .btn-t{background:var(--teal); border:none; color:#061014; font-family:inherit; font-weight:700;
+    font-size:.76rem; padding:.55rem 1.1rem; border-radius:6px; cursor:none}
+  .btn-t:hover{filter:brightness(1.1)}
+  .btn-g{background:none; border:1px solid var(--border2); color:var(--ink2); font-family:inherit;
+    font-size:.76rem; padding:.55rem 1rem; border-radius:6px; cursor:none}
+  .btn-g:hover{border-color:var(--teal); color:var(--ink)}
+  .btn-g.danger:hover{border-color:var(--red); color:var(--red)}
+  .pf-msg{font-size:.72rem; color:var(--amber); margin-left:.3rem}
+  .pf-msg.okmsg{color:var(--teal)}
   .lectura .acc{font-size:.82rem; line-height:1.5; color:var(--ink); margin:.28rem 0 .28rem 1rem; position:relative}
   .lectura .acc::before{content:'→'; position:absolute; left:-1rem; color:var(--teal)}
 
@@ -658,13 +698,18 @@
       <button class="pill-back" id="cliBack">← Volver a Caudal</button>
       <div class="hero">
         <h1>Radar del <em>cliente</em>.</h1>
-        <p>Elige el sector de un cliente: Caudal cruza el Congreso y las
-           superintendencias, descarta el ruido y te deja las señales que mueven su
-           aguja — cada una con su estado real y una acción sugerida. La lente de
-           precisión, con datos reales.</p>
-        <div class="chips" id="cli-sectors"></div>
+        <p>Arma el perfil de tu cliente — sus temas y las empresas que vigila — y
+           Caudal cruza el Congreso, las superintendencias, la contratación del
+           Estado y la prensa, descarta el ruido y te deja las señales que mueven
+           su aguja, cada una con su estado real y una acción sugerida.</p>
+        <div class="pf-bar" id="cli-perfiles"></div>
+        <div class="pf-bar" id="cli-presets-bar">
+          <span class="pf-lbl">o prueba un sector</span>
+          <span class="chips" id="cli-sectors" style="display:contents"></span>
+        </div>
+        <div class="pf-edit" id="pf-edit" hidden></div>
       </div>
-      <div id="cli-body"><div class="cli-empty">Elige un sector arriba para ver su radar.</div></div>
+      <div id="cli-body"><div class="cli-empty">Crea el perfil de un cliente — o abre un sector de muestra — para ver su radar.</div></div>
     </div>
 
     <div class="foot">
@@ -684,7 +729,7 @@
   /* ---------- cursor ---------- */
   const cur=document.getElementById('cur'), ring=document.getElementById('curRing');
   addEventListener('mousemove',e=>{cur.style.left=ring.style.left=e.clientX+'px'; cur.style.top=ring.style.top=e.clientY+'px';});
-  addEventListener('mouseover',e=>{const h=e.target.closest('button,a,.chip,.tl-item,input,.modal-close,.info-i,.pcard.live,.pcard.data,.pill-back,.sec-card'); ring.style.opacity=h?'1':'.5'; ring.style.transform=`translate(-50%,-50%) scale(${h?1.4:1})`;});
+  addEventListener('mouseover',e=>{const h=e.target.closest('button,a,.chip,.tl-item,input,select,.modal-close,.info-i,.pcard.live,.pcard.data,.pill-back,.sec-card,.pf-sug div,.chip .x'); ring.style.opacity=h?'1':'.5'; ring.style.transform=`translate(-50%,-50%) scale(${h?1.4:1})`;});
   // tooltips ⓘ: toggle al click; cierra al clickear afuera
   addEventListener('click',e=>{
     const i=e.target.closest('.info-i');
@@ -727,7 +772,10 @@
       reveal();
     }catch(e){ reveal(); }
   })();
-  function reveal(guest){ document.getElementById('gate').remove(); document.getElementById('topNav').hidden=false; document.getElementById('app').hidden=false;
+  // el invitado por link no tiene cuenta → no puede guardar perfiles de cliente
+  // (el worker exige sesión). Se le deja el radar sobre los presets.
+  let IS_GUEST=false;
+  function reveal(guest){ IS_GUEST=!!guest; document.getElementById('gate').remove(); document.getElementById('topNav').hidden=false; document.getElementById('app').hidden=false;
     if(guest){
       const nl=document.querySelector('.e-nav-left'); if(nl) nl.innerHTML='<span class="priv-badge">Vista de invitado</span>';
     } else {
@@ -1671,18 +1719,63 @@
   }
 
   /* ---------- Vista Cliente · Radar (SKU A) ---------- */
+  // Los 6 presets se quedan como DEMO y como plantilla de arranque; el radar de
+  // verdad corre sobre un perfil guardado (temas propios + empresas vigiladas),
+  // que vive en el KV del worker bajo `caudal:perfil:*`.
   const CLI_SECS=[['salud','Salud'],['contratacion','Contratación e infraestructura'],['financiero','Financiero'],['energia','Energía y ambiente'],['educacion','Educación'],['trabajo','Trabajo y pensiones']];
+  const AUTH_API='https://rr-auth.reruizc.workers.dev';
   let _cliInited=false, _cliSeq=0;
+  // estado del gestor de perfiles
+  let PF_LIST=[], PF_META=null, PF_ACTIVE=null, PF_DRAFT=null, PF_LIMIT=null;
+
+  async function wcall(path, opts){
+    const t=localStorage.getItem('rr-token');
+    if(!t) throw new Error('sin sesión');
+    const r=await fetch(AUTH_API+path, Object.assign({headers:Object.assign(
+      {'Authorization':'Bearer '+t}, (opts&&opts.body)?{'Content-Type':'application/json'}:{})}, opts||{}));
+    const d=await r.json().catch(()=>({ok:false,error:'respuesta inválida'}));
+    if(!d.ok) throw new Error(d.error||('HTTP '+r.status));
+    return d;
+  }
+
   function cliInit(){
     if(_cliInited) return; _cliInited=true;
     const cont=document.getElementById('cli-sectors');
-    if(cont) CLI_SECS.forEach(([k,t])=>{ const c=document.createElement('span'); c.className='chip'; c.dataset.sec=k; c.textContent=t; c.onclick=()=>cliLoad(k); cont.appendChild(c); });
+    if(cont) CLI_SECS.forEach(([k,t])=>{ const c=document.createElement('span'); c.className='chip'; c.dataset.sec=k; c.textContent=t; c.onclick=()=>cliLoad({sector:k}); cont.appendChild(c); });
     const b=document.getElementById('cliBack'); if(b) b.onclick=()=>showView('home');
+    pfRenderBar();
+    if(!IS_GUEST){ pfLoadList(); call({action:'perfil_meta'}).then(m=>{PF_META=m;}).catch(()=>{}); }
     // toggle Legislativo/Regulatorio/Prensa — delegado porque #cli-toggle se
     // recrea en cada cliRender(); click de nuevo en el mismo chip lo colapsa.
     const vc=document.getElementById('view-cliente');
-    if(vc) vc.addEventListener('click', e=>{
-      const chip=e.target.closest('#cli-toggle .chip'); if(!chip) return;
+    if(!vc) return;
+    // TODO el editor de perfil va por delegación: su DOM se recrea entero en
+    // cada pfRenderEdit(), así que los onclick directos morirían con él.
+    vc.addEventListener('click', e=>{
+      const t=e.target;
+      const pf=t.closest('[data-pf]');
+      if(pf){ pfAbrir(pf.dataset.pf); return; }
+      if(t.closest('[data-pfnew]')){ pfNuevo(); return; }
+      const tpl=t.closest('[data-pftpl]');
+      if(tpl){ const n=PF_DRAFT?PF_DRAFT.nombre:''; pfNuevo(tpl.dataset.pftpl);
+               if(n&&PF_DRAFT){ PF_DRAFT.nombre=n; pfRenderEdit(); } return; }
+      const sug=t.closest('[data-pfemp]');
+      if(sug){
+        if(PF_DRAFT&&!PF_DRAFT.empresas.includes(sug.dataset.pfemp)) PF_DRAFT.empresas.push(sug.dataset.pfemp);
+        const box=document.getElementById('pf-sug'); if(box){ box.hidden=true; box.innerHTML=''; }
+        const inp=document.getElementById('pf-emp-in'); if(inp){ inp.value=''; inp.focus(); }
+        pfRenderTags(); return;
+      }
+      const rt=t.closest('[data-rmtema]');
+      if(rt&&PF_DRAFT){ PF_DRAFT.temas.splice(+rt.dataset.rmtema,1); pfRenderTags(); return; }
+      const re=t.closest('[data-rmemp]');
+      if(re&&PF_DRAFT){ PF_DRAFT.empresas.splice(+re.dataset.rmemp,1); pfRenderTags(); return; }
+      if(t.closest('#pf-save')){ pfGuardar(); return; }
+      if(t.closest('#pf-cancel')){ pfCerrarEdit(); return; }
+      if(t.closest('#pf-del')){ pfBorrar(); return; }
+      // toggle Legislativo/Regulatorio/Prensa — delegado porque #cli-toggle se
+      // recrea en cada cliRender(); click de nuevo en el mismo chip lo colapsa.
+      const chip=t.closest('#cli-toggle .chip'); if(!chip) return;
       const det=document.getElementById('cli-detalle'); if(!det) return;
       const already=chip.classList.contains('on');
       vc.querySelectorAll('#cli-toggle .chip').forEach(c=>c.classList.remove('on'));
@@ -1690,18 +1783,180 @@
       chip.classList.add('on');
       det.innerHTML=_CLI_LAST?cliDetalleHTML(chip.dataset.p,_CLI_LAST):'';
     });
+    vc.addEventListener('keydown', e=>{
+      if(e.key!=='Enter') return;
+      const inp=e.target;
+      if(inp.id==='pf-tema-in'){
+        e.preventDefault();
+        const v=(inp.value||'').replace(/\s+/g,' ').trim();
+        const lim=(PF_META&&PF_META.limites&&PF_META.limites.temas)||12;
+        if(!PF_DRAFT) return;
+        if(v.length<3) return pfMsg('Un tema de menos de 3 letras trae ruido, no señal.');
+        if(PF_DRAFT.temas.length>=lim) return pfMsg('Máximo '+lim+' temas.');
+        if(!PF_DRAFT.temas.some(x=>x.toLowerCase()===v.toLowerCase())) PF_DRAFT.temas.push(v);
+        inp.value=''; pfMsg(''); pfRenderTags();
+      } else if(inp.id==='pf-emp-in'){
+        e.preventDefault();
+        // Enter sobre el buscador toma la primera sugerencia (si hay)
+        const first=document.querySelector('#pf-sug [data-pfemp]'); if(first) first.click();
+      } else if(inp.id==='pf-nombre'||inp.id==='pf-desc'){
+        e.preventDefault(); pfGuardar();
+      }
+    });
+    let _pfT=null;
+    vc.addEventListener('input', e=>{
+      if(e.target.id!=='pf-emp-in') return;
+      clearTimeout(_pfT); const v=e.target.value;
+      _pfT=setTimeout(()=>pfSugerir(v), 220);
+    });
   }
+  /* ---------- perfiles de cliente · CRUD contra el worker ---------- */
+  async function pfLoadList(){
+    try{ const d=await wcall('/caudal/perfil/list'); PF_LIST=d.perfiles||[]; PF_LIMIT={usados:d.count,tope:d.ownedLimit,plan:d.plan}; }
+    catch(e){ PF_LIST=[]; PF_LIMIT=null; }
+    pfRenderBar();
+  }
+  function pfRenderBar(){
+    const bar=document.getElementById('cli-perfiles'); if(!bar) return;
+    if(IS_GUEST){
+      bar.innerHTML='<span class="pf-lbl">Perfiles de cliente</span><span class="cob-note" style="margin:0">Entra con tu cuenta para guardar los temas y las empresas de un cliente.</span>';
+      return;
+    }
+    let h='<span class="pf-lbl">Perfiles de cliente</span>';
+    h+=PF_LIST.map(p=>`<span class="chip${PF_ACTIVE&&PF_ACTIVE.perfilId===p.perfilId?' on':''}" data-pf="${esc(p.perfilId)}" title="${esc(p.n_temas)} tema(s) · ${esc(p.n_empresas)} empresa(s) vigilada(s)">${esc(p.nombre)}</span>`).join('');
+    if(!PF_LIST.length) h+='<span class="cob-note" style="margin:0">Todavía no tienes ninguno.</span>';
+    h+='<span class="chip add" data-pfnew="1">+ Nuevo perfil</span>';
+    if(PF_LIMIT) h+=`<span class="cob-note" style="margin:0">${PF_LIMIT.usados}/${PF_LIMIT.tope} · plan ${esc(PF_LIMIT.plan)}</span>`;
+    bar.innerHTML=h;
+  }
+  // Draft del editor. `desdePreset` copia un sector como punto de partida —
+  // por eso los presets no se borraron: son las plantillas.
+  function pfNuevo(desdePreset){
+    const pl=desdePreset&&PF_META&&(PF_META.plantillas||[]).find(x=>x.k===desdePreset);
+    PF_DRAFT=pl?{perfilId:null,nombre:pl.nombre,descripcion:'',temas:pl.temas.slice(),
+                 empresas:[],sector_sanciones:pl.sector_sanciones||'',comision:pl.comision||''}
+               :{perfilId:null,nombre:'',descripcion:'',temas:[],empresas:[],sector_sanciones:'',comision:''};
+    pfRenderEdit();
+  }
+  function pfEditar(p){
+    PF_DRAFT={perfilId:p.perfilId,nombre:p.nombre||'',descripcion:p.descripcion||'',
+              temas:(p.temas||[]).slice(),empresas:(p.empresas||[]).slice(),
+              sector_sanciones:p.sector_sanciones||'',comision:p.comision||''};
+    pfRenderEdit();
+  }
+  function pfCerrarEdit(){ PF_DRAFT=null; const e=document.getElementById('pf-edit'); if(e){ e.hidden=true; e.innerHTML=''; } }
+  function pfRenderEdit(){
+    const el=document.getElementById('pf-edit'); if(!el||!PF_DRAFT) return;
+    const d=PF_DRAFT;
+    const lim=(PF_META&&PF_META.limites)||{temas:12,empresas:15};
+    const secs=(PF_META&&PF_META.sectores_sanciones)||[];
+    const coms=(PF_META&&PF_META.comisiones)||[];
+    const plans=(PF_META&&PF_META.plantillas)||[];
+    el.hidden=false;
+    el.innerHTML=`
+      <div class="pf-grid">
+        <div class="pf-f"><label>Nombre del cliente</label>
+          <input id="pf-nombre" type="text" maxlength="80" placeholder="Asobancaria, Fenalco, EPM…" value="${esc(d.nombre)}" /></div>
+        <div class="pf-f"><label>Nota interna (opcional)</label>
+          <input id="pf-desc" type="text" maxlength="200" placeholder="quién es y qué le preocupa" value="${esc(d.descripcion)}" /></div>
+        <div class="pf-f full"><label>Temas que vigila · máx ${lim.temas}</label>
+          <input id="pf-tema-in" type="text" maxlength="80" placeholder="escribe un tema y Enter — p. ej. «tasas de usura»" />
+          <div class="hint">Frases exactas, como las diría una ley. Entre más específica, menos ruido: «reforma pensional» rinde mejor que «pensión».</div>
+          <div class="pf-tags" id="pf-temas"></div></div>
+        <div class="pf-f full pf-ac"><label>Empresas vigiladas · máx ${lim.empresas}</label>
+          <input id="pf-emp-in" type="text" maxlength="60" placeholder="busca en el diccionario — p. ej. «bancolombia»" autocomplete="off" />
+          <div class="hint">Del diccionario de Caudal: en el Congreso se traducen a su tema (nadie legisla «Uber», legisla «plataformas»); en sanciones, contratación y prensa se buscan por su nombre propio.</div>
+          <div class="pf-sug" id="pf-sug" hidden></div>
+          <div class="pf-tags" id="pf-emps"></div></div>
+        <div class="pf-f"><label>Sector de sanciones</label>
+          <select id="pf-sec"><option value="">— ninguno —</option>${secs.map(s=>`<option value="${esc(s.k)}"${s.k===d.sector_sanciones?' selected':''}>${esc(s.nombre)} (${fmt(s.n)})</option>`).join('')}</select>
+          <div class="hint">De qué superintendencias se le muestran sanciones del sector, además de las de sus vigiladas.</div></div>
+        <div class="pf-f"><label>Comisión de referencia</label>
+          <select id="pf-com"><option value="">— ninguna —</option>${coms.map(c=>`<option value="${esc(c)}"${c===d.comision?' selected':''}>Comisión ${esc(c)}</option>`).join('')}</select>
+          <div class="hint">Solo para redactar la acción sugerida cuando un proyecto no trae comisión propia.</div></div>
+      </div>
+      <div class="pf-acts">
+        <button class="btn-t" id="pf-save">${d.perfilId?'Guardar cambios':'Crear perfil'}</button>
+        <button class="btn-g" id="pf-cancel">Cancelar</button>
+        ${d.perfilId?'<button class="btn-g danger" id="pf-del">Borrar</button>':''}
+        ${(!d.perfilId&&plans.length)?`<span class="pf-lbl" style="margin-left:.5rem">plantilla</span>`+plans.map(p=>`<span class="chip" data-pftpl="${esc(p.k)}">${esc(p.nombre)}</span>`).join(''):''}
+        <span class="pf-msg" id="pf-msg"></span>
+      </div>`;
+    pfRenderTags();
+    const ni=document.getElementById('pf-nombre'); if(ni&&!d.nombre) ni.focus();
+  }
+  function pfRenderTags(){
+    const d=PF_DRAFT; if(!d) return;
+    const t=document.getElementById('pf-temas'), e=document.getElementById('pf-emps');
+    if(t) t.innerHTML=d.temas.length?d.temas.map((x,i)=>`<span class="chip on">${esc(x)}<span class="x" data-rmtema="${i}">×</span></span>`).join(''):'<span class="cob-note" style="margin:0">Sin temas.</span>';
+    if(e) e.innerHTML=d.empresas.length?d.empresas.map((x,i)=>`<span class="chip on">${esc(x)}<span class="x" data-rmemp="${i}">×</span></span>`).join(''):'<span class="cob-note" style="margin:0">Sin empresas vigiladas.</span>';
+  }
+  function pfMsg(txt,okc){ const m=document.getElementById('pf-msg'); if(m){ m.className='pf-msg'+(okc?' okmsg':''); m.textContent=txt||''; } }
+  function pfLeerForm(){
+    const d=PF_DRAFT; if(!d) return;
+    const g=id=>{const el=document.getElementById(id); return el?el.value:'';};
+    d.nombre=g('pf-nombre').trim(); d.descripcion=g('pf-desc').trim();
+    d.sector_sanciones=g('pf-sec'); d.comision=g('pf-com');
+  }
+  async function pfGuardar(){
+    pfLeerForm(); const d=PF_DRAFT; if(!d) return;
+    if(!d.nombre) return pfMsg('Ponle un nombre al perfil.');
+    if(!d.temas.length&&!d.empresas.length) return pfMsg('Agrega al menos un tema o una empresa vigilada.');
+    pfMsg('Guardando…');
+    try{
+      const r=await wcall('/caudal/perfil/save',{method:'POST',body:JSON.stringify(d)});
+      PF_ACTIVE=r.perfil; pfCerrarEdit(); await pfLoadList();
+      document.querySelectorAll('#cli-sectors .chip').forEach(c=>c.classList.remove('on'));
+      cliLoad({perfil:PF_ACTIVE});
+    }catch(err){ pfMsg(err.message||'No se pudo guardar.'); }
+  }
+  async function pfBorrar(){
+    const d=PF_DRAFT; if(!d||!d.perfilId) return;
+    if(!confirm('¿Borrar el perfil «'+d.nombre+'»? Los datos de Caudal no se tocan, solo se borra el perfil.')) return;
+    pfMsg('Borrando…');
+    try{
+      await wcall('/caudal/perfil/delete?perfilId='+encodeURIComponent(d.perfilId),{method:'DELETE'});
+      if(PF_ACTIVE&&PF_ACTIVE.perfilId===d.perfilId){ PF_ACTIVE=null; const b=document.getElementById('cli-body'); if(b) b.innerHTML='<div class="cli-empty">Elige un perfil o un sector arriba para ver su radar.</div>'; }
+      pfCerrarEdit(); await pfLoadList();
+    }catch(err){ pfMsg(err.message||'No se pudo borrar.'); }
+  }
+  async function pfAbrir(perfilId){
+    try{
+      const d=await wcall('/caudal/perfil/load?perfilId='+encodeURIComponent(perfilId));
+      PF_ACTIVE=d.perfil; pfCerrarEdit(); pfRenderBar();
+      document.querySelectorAll('#cli-sectors .chip').forEach(c=>c.classList.remove('on'));
+      cliLoad({perfil:PF_ACTIVE});
+    }catch(err){ const b=document.getElementById('cli-body'); if(b) b.innerHTML='<div class="err">No se pudo abrir el perfil: '+esc(err.message)+'</div>'; }
+  }
+  // autocompletado de empresas contra el diccionario (④), vía la Lambda
+  let _pfSugSeq=0;
+  async function pfSugerir(q){
+    const box=document.getElementById('pf-sug'); if(!box) return;
+    if(!q||q.trim().length<2){ box.hidden=true; box.innerHTML=''; return; }
+    const mine=++_pfSugSeq;
+    let d; try{ d=await call({action:'empresas',query:q}); }catch(e){ return; }
+    if(mine!==_pfSugSeq) return;
+    const box2=document.getElementById('pf-sug'); if(!box2) return;
+    const list=(d.empresas||[]).filter(e=>!(PF_DRAFT&&PF_DRAFT.empresas.includes(e.k)));
+    if(!list.length){ box2.hidden=false; box2.innerHTML='<div style="color:var(--ink3)">Nada en el diccionario para «'+esc(q)+'».</div>'; return; }
+    box2.hidden=false;
+    box2.innerHTML=list.map(e=>`<div data-pfemp="${esc(e.k)}">${esc(e.nombre)}<span class="s">${esc(e.tipo==='gremio'?'gremio':e.sector)}${e.nucleo&&e.nucleo.length?' · '+esc(e.nucleo[0]):''}</span></div>`).join('');
+  }
+
   function cliSigCard(x){
+    // ★ vigilada: la señal es sobre una empresa del perfil, no sobre su sector.
+    const cls=`sig ${x.nivel}${x.vigilada?' vig':''}`;
+    const vt=x.vigilada?`<span class="vig-tag">★ ${esc(x.vigilada)}</span>`:'';
     if(x.tipo==='congreso'){
       const tags=[x.comision?esc(x.comision):'', x.anio||'', RES_TXT[x.resultado]||''].filter(Boolean).join(' · ');
-      return `<div class="sig ${x.nivel}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
-        <div class="sig-title">${esc(shortTitle(x.titulo).slice(0,120))}</div>
+      return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title">${vt}${esc(shortTitle(x.titulo).slice(0,120))}</div>
         <div class="sig-tags">${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
     if(x.tipo==='medios'){
       const tags=[x.medio?esc(x.medio):'', x.alcance==='regional'?'Regional':'Nacional', x.fecha?esc(x.fecha):''].filter(Boolean).join(' · ');
-      return `<div class="sig ${x.nivel}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
-        <div class="sig-title"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.titulo)}</a></div>
+      return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title">${vt}<a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.titulo)}</a></div>
         <div class="sig-tags">${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
     if(x.tipo==='contratacion'){
@@ -1710,14 +1965,14 @@
       const tit=x.url
         ?`<a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.entidad||'—')}</a>`
         :esc(x.entidad||'—');
-      return `<div class="sig ${x.nivel}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
-        <div class="sig-title">${tit}</div>
+      return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title">${vt}${tit}</div>
         ${x.objeto?`<div class="sig-tags" style="opacity:.85">${esc(x.objeto)}</div>`:''}
         <div class="sig-tags">${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
     const monto=x.monto?' · '+fmtCOP(x.monto):'';
-    return `<div class="sig ${x.nivel}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
-      <div class="sig-title">${esc(x.sancionado||'—')}</div>
+    return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+      <div class="sig-title">${vt}${esc(x.sancionado||'—')}</div>
       <div class="sig-tags">${esc(x.fuente||'')}${x.tipo_sancion?' · '+esc(x.tipo_sancion):''}${x.fecha?' · '+esc(x.fecha):''}${monto}</div>
       <div class="sig-action">${esc(x.accion)}</div></div></div>`;
   }
@@ -1737,15 +1992,23 @@
     _CLI_LAST=d;
     const k=d.kpis, cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[], medios=d.medios||[], con=d.contratacion||[];
     const sancTxt=cl.sector_sanciones ? `<b>${reg.length}</b> sanción(es) reciente(s)` : `sanciones sin fuente conectada`;
+    const vigN=k.n_vigiladas||0;
+    const vigNoms=(cl.empresas||[]).map(e=>e.nombre).join(' · ');
+    // lo que el diccionario no reconoció: se dice, no se esconde
+    const desc=(cl.descartes&&cl.descartes.length)
+      ? `<div class="cli-reg-none" style="margin-bottom:1rem">No están en el diccionario de Caudal y quedaron fuera del radar: <b>${esc(cl.descartes.join(', '))}</b>. Búscalas otra vez en el editor: si no aparecen, todavía no las cubrimos.</div>` : '';
+    const vigNote=vigN
+      ? `<div class="cli-note"><b>Vigiladas (${vigN}):</b> ${esc(vigNoms)} · <b>${k.n_senales_vigiladas||0}</b> señal(es) del radar son sobre ellas${k.n_contratos_vigiladas?` · <b>${fmt(k.n_contratos_vigiladas)}</b> contrato(s) suyos en SECOP`:(cl.vigiladas_sin_contratos?' · no le venden al Estado en SECOP II':'')}.</div>` : '';
     body.innerHTML=`
       <div class="kpis">
         <div class="kpi"><div class="n">${k.n_radar}</div><div class="l">Señales en el radar</div></div>
         <div class="kpi vit"><div class="n">${k.alto}</div><div class="l">Alta prioridad</div></div>
         <div class="kpi ley"><div class="n">${k.en_tramite}</div><div class="l">En trámite · ventana</div></div>
-        <div class="kpi"><div class="n">${k.n_medios_sector?fmt(k.n_medios_sector):'—'}</div><div class="l">Prensa reciente</div></div>
+        <div class="kpi"><div class="n">${vigN?(k.n_senales_vigiladas||0):(k.n_medios_sector?fmt(k.n_medios_sector):'—')}</div><div class="l">${vigN?'Sobre tus vigiladas':'Prensa reciente'}</div></div>
       </div>
+      ${desc}${vigNote}
       <div class="cli-note"><b>Activo ahora en ${esc(cl.nombre)}:</b> <b>${k.en_tramite}</b> proyecto(s) de ley en trámite · ${sancTxt} · <b>${fmt(k.n_medios_sector||0)}</b> titular(es) de prensa reciente · <b>${fmt(k.n_contratos_sector||0)}</b> contrato(s) reciente(s) en SECOP.</div>
-      <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt(k.n_sanciones_sector)}</b> sanciones`:''} en el sector, el radar prioriza por accionabilidad — precisión sobre volumen.</div>
+      <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt(k.n_sanciones_sector)}</b> sanciones`:''} que tocan estos temas, el radar prioriza por accionabilidad — precisión sobre volumen.${(cl.temas_usados&&cl.temas_usados.length)?` Se buscó por: <b>${esc(cl.temas_usados.join(' · '))}</b>.`:''}</div>
       <div class="lectura">
         <div class="tag">◈ Lectura del analista · briefing de hoy para ${esc(cl.nombre)}</div>
         <div id="cli-lectura-body"><div class="llm-load">Generando lectura <span class="dots"><span></span><span></span><span></span></span></div></div>
@@ -1767,17 +2030,46 @@
       + blk('Lo que mueve la aguja', l.lo_que_importa) + acc + blk('En el horizonte', l.horizonte)
       || '<div class="cob-note">Sin lectura disponible.</div>';
   }
-  async function cliLoad(sector){
+  // `arg` = {sector:'salud'} (preset/demo) o {perfil:{…}} (el perfil del cliente).
+  // El resto del flujo es idéntico: los presets siguen siendo el fallback.
+  async function cliLoad(arg){
     const mine=++_cliSeq;
-    document.querySelectorAll('#cli-sectors .chip').forEach(c=>c.classList.toggle('on',c.dataset.sec===sector));
+    const esPerfil=!!(arg&&arg.perfil);
+    if(esPerfil){ PF_ACTIVE=arg.perfil; document.querySelectorAll('#cli-sectors .chip').forEach(c=>c.classList.remove('on')); }
+    else { PF_ACTIVE=null; document.querySelectorAll('#cli-sectors .chip').forEach(c=>c.classList.toggle('on',c.dataset.sec===arg.sector)); }
+    pfRenderBar();
+    const p=esPerfil?arg.perfil:null;
+    const req=esPerfil
+      ? {action:'cliente',perfil:{nombre:p.nombre,descripcion:p.descripcion||'',temas:p.temas||[],
+                                  empresas:p.empresas||[],sector_sanciones:p.sector_sanciones||'',
+                                  comision:p.comision||''}}
+      : {action:'cliente',sector:arg.sector};
     const body=document.getElementById('cli-body');
-    if(body) body.innerHTML='<div class="llm-load" style="padding:2.5rem;justify-content:center">Armando el radar del sector <span class="dots"><span></span><span></span><span></span></span></div>';
-    let d; try{ d=await call({action:'cliente',sector,lectura:false}); }
+    const quien=esPerfil?('de '+esc(p.nombre||'tu cliente')):'del sector';
+    if(body) body.innerHTML='<div class="llm-load" style="padding:2.5rem;justify-content:center">Armando el radar '+quien+' <span class="dots"><span></span><span></span><span></span></span></div>';
+    let d; try{ d=await call(Object.assign({lectura:false},req)); }
     catch(e){ if(mine===_cliSeq&&body) body.innerHTML='<div class="err">No se pudo cargar el radar. Reintenta.</div>'; return; }
     if(mine!==_cliSeq) return;
+    if(d&&d.error){ if(body) body.innerHTML='<div class="err">'+esc(d.error)+'</div>'; return; }
     cliRender(d);
-    call({action:'cliente',sector,lectura:true}).then(d2=>{ if(mine===_cliSeq && d2.lectura) cliRenderLectura(d2.lectura); })
-      .catch(()=>{ const el=document.getElementById('cli-lectura-body'); if(el) el.innerHTML='<div class="cob-note">No se pudo generar la lectura.</div>'; });
+    cliPedirLectura(req, mine);
+  }
+  // La lectura de un perfil nuevo se genera desde cero y puede pasarse de los
+  // 30 s que aguanta el API Gateway: el gateway corta pero la Lambda (60 s)
+  // termina y deja la lectura en su caché. Por eso se reintenta una vez —
+  // el segundo intento la encuentra hecha y responde al instante.
+  function cliPedirLectura(req, mine, reintento){
+    call(Object.assign({lectura:true},req)).then(d2=>{
+      if(mine!==_cliSeq) return;
+      if(d2 && d2.lectura && !d2.lectura.error) return cliRenderLectura(d2.lectura);
+      throw new Error('sin lectura');
+    }).catch(()=>{
+      if(mine!==_cliSeq) return;
+      const el=document.getElementById('cli-lectura-body'); if(!el) return;
+      if(reintento){ el.innerHTML='<div class="cob-note">No se pudo generar la lectura. El radar de arriba está completo.</div>'; return; }
+      el.innerHTML='<div class="llm-load">La primera lectura de un perfil tarda un poco más <span class="dots"><span></span><span></span><span></span></span></div>';
+      setTimeout(()=>cliPedirLectura(req, mine, true), 9000);
+    });
   }
 
   /* ---------- búsqueda ---------- */
