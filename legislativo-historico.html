@@ -10,6 +10,36 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="legislativo-base.css" />
+  <style>
+    /* tablas por cuatrienio — sólo se usan en esta página */
+    .ctab{width:100%;border-collapse:collapse;font-size:.72rem}
+    .ctab th{text-align:right;font-weight:400;color:var(--gray);padding:.45rem .5rem;
+      border-bottom:1px solid var(--card-border);white-space:nowrap;font-size:.62rem;
+      letter-spacing:.04em;text-transform:uppercase}
+    .ctab th:first-child,.ctab td:first-child{text-align:left}
+    .ctab td{text-align:right;padding:.5rem .5rem;border-bottom:1px solid rgba(255,255,255,.045);
+      font-variant-numeric:tabular-nums}
+    .ctab tr:last-child td{border-bottom:none}
+    .ctab tbody tr:hover{background:rgba(255,255,255,.03)}
+    .ctab .cu{font-weight:700;letter-spacing:.01em}
+    .ctab .ley{color:var(--green)}
+    .ctab .arch{color:var(--red)}
+    .ctab .tram{color:var(--amber)}
+    .ctab .muted{color:var(--gray)}
+    .ctab tr.curso td{opacity:.62}
+    /* barrita de % que llega a ley */
+    .pbar{display:inline-flex;align-items:center;gap:.4rem;justify-content:flex-end;width:100%}
+    .pbar i{display:block;height:5px;background:var(--green);opacity:.75;min-width:2px}
+    .pbar b{font-weight:700;font-size:.7rem;min-width:38px;text-align:right}
+    .tnote{font-size:.62rem;color:var(--gray);line-height:1.55;margin-top:.7rem}
+    .scrollx{overflow-x:auto}
+    /* fila de resultado final, separada del embudo */
+    .f2-final{display:flex;align-items:center;gap:.7rem;margin-top:.9rem;padding-top:.8rem;
+      border-top:1px dashed rgba(255,255,255,.12)}
+    .f2-final .lab{font-size:.66rem;color:var(--gray);text-transform:uppercase;letter-spacing:.05em}
+    .f2-final .val{font-size:1.15rem;font-weight:800;color:var(--green)}
+    .f2-final .pct{font-size:.72rem;color:var(--gray)}
+  </style>
 </head>
 <body>
   <div class="bg-layer"></div>
@@ -67,24 +97,32 @@
   </div>
 
   <section id="historico">
-    <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi"><div class="n" id="h-proy">9.919</div><div class="l">Proyectos de ley</div></div>
-      <div class="kpi"><div class="n" id="h-actos">745</div><div class="l">Proyectos de acto legislativo</div></div>
+    <div class="kpis">
+      <div class="kpi"><div class="n" id="h-proy">13.831</div><div class="l">Proyectos de ley</div></div>
+      <div class="kpi"><div class="n" id="h-actos">1.085</div><div class="l">Proyectos de acto legislativo</div></div>
       <div class="kpi hl"><div class="n" id="h-leyes">2.475</div><div class="l">Leyes sancionadas</div></div>
-      <div class="kpi"><div class="n">181</div><div class="l">Días (mediana) al primer debate</div></div>
+      <div class="kpi"><div class="n" id="h-pct">18,5%</div><div class="l">De lo radicado llega a ley</div></div>
+      <div class="kpi"><div class="n" id="h-dias">181</div><div class="l">Días (mediana) al primer debate</div></div>
     </div>
     <div class="charts">
-      <div class="panel"><h3>El embudo del trámite · 1990–2026</h3><div id="embudo-box"></div><div class="note">Cada fila es una fase del trámite; el ↓% dice cuántos sobreviven de una fase a la siguiente.</div></div>
+      <div class="panel"><h3>El embudo del trámite · 1990–2026</h3><div id="embudo-box"></div><div class="note" id="emb-note">Cada fila es una fase del trámite; el ↓% dice cuántos sobreviven de una fase a la siguiente.</div></div>
       <div class="panel"><h3>Mortandad por año del cuatrienio</h3><div id="mort-box"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+      <div class="panel wide"><h3>Proyectos de ley por cuatrienio de gobierno</h3><div class="scrollx" id="cuat-pl"></div>
+        <div class="tnote">Cada fila es el periodo presidencial en que se radicó el proyecto, sin importar cuándo terminó su trámite. «Otros» reúne los que el registro dejó sin estado. Los dos últimos cuatrienios todavía tienen proyectos vivos, así que su porcentaje de aprobación va a subir un poco.</div>
+      </div>
+      <div class="panel wide"><h3>Proyectos de acto legislativo por cuatrienio</h3><div class="scrollx" id="cuat-al"></div>
+        <div class="tnote"><b>Sin columna de aprobados, a propósito.</b> El registro publica por aparte 33 actos legislativos sancionados entre 1993 y 2025, pero <b>no los enlaza con el proyecto que les dio origen</b>, así que la tasa de éxito no se puede calcular con esta fuente sin inventarla. Lo que sí se puede medir es el volumen y la mortandad, y ahí la reforma constitucional se cuadruplicó: de 62 intentos en 1992-1994 a 237 en 2018-2022.</div>
+      </div>
       <div class="panel wide"><h3>Bloqueo en comisión · el orden del día decide</h3><div id="bloq-box"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
     </div>
     <div class="find-grid">
-      <div class="find"><div class="fn">1 de 4</div><div class="ft">termina en ley</div><div class="fd">De 9.919 proyectos de ley radicados desde 1990, solo 2.509 (25%) completaron el trámite.</div></div>
-      <div class="find"><div class="fn">2.804</div><div class="ft">muertos por el reloj</div><div class="fd">El archivo por vencimiento de términos (Art. 190) mata más proyectos que cualquier votación en contra.</div></div>
+      <div class="find"><div class="fn">1 de 5</div><div class="ft">termina en ley</div><div class="fd">De 13.353 proyectos de ley con fecha de radicación desde 1990, solo 2.467 (18,5%) completaron el trámite.</div></div>
+      <div class="find"><div class="fn">31% → 10%</div><div class="ft">cada vez pasa menos</div><div class="fd">La tasa de aprobación cayó sostenidamente de un cuatrienio al siguiente, mientras el volumen radicado se quintuplicó.</div></div>
       <div class="find"><div class="fn">53% → 21%</div><div class="ft">el orden del día decide</div><div class="fd">Ser el primero de la agenda en comisión duplica la probabilidad de ser debatido frente a ir de cuarto en adelante.</div></div>
-      <div class="find"><div class="fn">Año 4</div><div class="ft">el más letal</div><div class="fd">En el último año del cuatrienio la muerte por términos sube a ~35%: lo que no arranca temprano, rara vez llega.</div></div>
+      <div class="find"><div class="fn">2.250</div><div class="ft">de vitrina</div><div class="fd">Proyectos re-radicados en dos o más periodos que nunca pasaron del primer debate: se presentan para mostrar, no para aprobar.</div></div>
     </div>
-    <div class="note" style="margin-top:1.2rem">Fuentes: Secretaría del Senado (leyes.senado.gov.co) · Gaceta del Congreso · órdenes del día de las comisiones de Cámara · Registraduría Nacional. Procesamiento y análisis propios. Corte del histórico: julio de 2026.</div>
+    <div class="note" style="margin-top:1.2rem"><b>Alcance.</b> El embudo se calcula sobre los 13.353 proyectos con fecha de radicación, el <b>96,5%</b> del archivo. Incluye por primera vez el registro de la Cámara, que hasta ahora quedaba fuera porque su listado no publica fechas: se cosecharon una a una sus 3.704 fichas. La Cámara <b>tampoco informa la causa del archivo</b> en 2.479 proyectos, así que el desglose de «muerto por vencimiento de términos» sigue siendo sólo del registro del Senado y no se extrapola.</div>
+    <div class="note" style="margin-top:.5rem">Fuentes: Secretaría del Senado (leyes.senado.gov.co) · Cámara de Representantes · Gaceta del Congreso · órdenes del día de las comisiones de Cámara y Senado. Procesamiento y análisis propios. Corte del histórico: agosto de 2026.</div>
   </section>
 
   <!-- ══ MODAL COMPARTIDO (proyecto de ley · ficha de congresista) ═══ -->
@@ -102,15 +140,56 @@
   <script src="legislativo-base.js"></script>
   <script>
   /* ── histórico en cifras (Caudal) ───────────────────────────── */
-  /* snapshot embebido (corte jul-2026) — la API lo refresca si responde */
-  const STATS_FALLBACK={n_proyectos:9919,n_actos:745,n_leyes:2475,
-    embudo:{'Presentado':9919,'1er debate · Senado':4876,'2º debate · Senado':4165,'1er debate · Cámara':3727,'2º debate · Cámara':3464,'Ley':2509}};
-  const EMB_KEYS={presentado:'Presentado','1er_debate_senado':'1er debate · Senado','2do_debate_senado':'2º debate · Senado','1er_debate_camara':'1er debate · Cámara','2do_debate_camara':'2º debate · Cámara',ley:'Ley'};
+  /* snapshot embebido (corte ago-2026) — la API lo refresca si responde */
+  const STATS_FALLBACK={n_proyectos:13831,n_actos:1085,n_leyes:2475,
+    embudo_universo:{radicado:13353,'1er_debate':4886,'2do_debate':3301,'3er_debate':2261,'4to_debate':1742,ley:2467},
+    dias_a_primer_debate:{mediana:181}};
+
+  /* Por cuatrienio de gobierno. Embebido porque el agregado todavía no viaja en
+     `stats`; si algún día la API lo trae (`por_cuatrienio` / `actos_por_cuatrienio`),
+     la página lo prefiere sin tocar nada más. Columnas:
+       PL → [cuatrienio, radicados, ley, archivados, retirados, en trámite, otros]
+       AL → [cuatrienio, radicados, archivados, retirados, en trámite, otros]      */
+  const CUAT_PL=[["1990-1994",533,148,362,1,0,22],["1994-1998",1031,324,695,9,0,3],["1998-2002",1018,310,641,17,10,40],["2002-2006",1107,239,691,63,2,112],["2006-2010",1190,325,762,91,4,8],["2010-2014",1538,333,866,188,113,38],["2014-2018",1574,229,968,183,165,29],["2018-2022",2709,352,1859,287,184,27],["2022-2026",2826,274,2004,154,340,54],["2026-2030",205,0,0,0,204,1]];
+  const CUAT_AL=[["1992-1994",62,58,0,0,1],["1994-1998",86,78,0,0,4],["1998-2002",77,67,0,0,5],["2002-2006",55,49,1,0,5],["2006-2010",82,62,0,0,20],["2010-2014",105,57,24,5,18],["2014-2018",146,95,22,7,22],["2018-2022",237,192,20,8,17],["2022-2026",227,182,16,18,11],["2026-2030",3,0,0,3,0]];
+
+  const EMB_KEYS={radicado:'Radicado','1er_debate':'1er debate','2do_debate':'2º debate','3er_debate':'3er debate','4to_debate':'4º debate'};
+  /* El embudo se pinta hasta el 4º debate y la ley va aparte: «ley» sale del
+     resultado final del proyecto, mientras que los debates salen de la evidencia
+     de fechas, que el registro no siempre publica. Por eso hay más leyes que
+     cuartos debates registrados — meterlo como última barra dibujaría un embudo
+     que se ensancha al final, y eso sería mentir con un gráfico. */
   function funnel(embudo){
-    const ks=Object.keys(embudo||{}); if(!ks.length) return '';
+    const orden=['radicado','1er_debate','2do_debate','3er_debate','4to_debate'];
+    const ks=orden.filter(k=>embudo&&embudo[k]!=null); if(!ks.length) return '';
     const max=embudo[ks[0]]||1; let prev=null;
-    return `<div class="funnel2">${ks.map(k=>{const v=embudo[k];const w=Math.max(8,Math.round(100*v/max));const pct=(prev!=null&&prev>0)?Math.round(100*v/prev):null;prev=v;
-      return `<div class="f2-row"><div class="f2-lab">${esc(k)}</div><div class="f2-track"><div class="f2-bar" data-w="${w}">${fmt(v)}</div></div><div class="f2-pct">${pct!=null?'↓ '+pct+'%':''}</div></div>`;}).join('')}</div>`;
+    const filas=ks.map(k=>{const v=embudo[k];const w=Math.max(8,Math.round(100*v/max));
+      const pct=(prev!=null&&prev>0)?Math.round(100*v/prev):null;prev=v;
+      return `<div class="f2-row"><div class="f2-lab">${esc(EMB_KEYS[k]||k)}</div><div class="f2-track"><div class="f2-bar" data-w="${w}">${fmt(v)}</div></div><div class="f2-pct">${pct!=null?'↓ '+pct+'%':''}</div></div>`;}).join('');
+    const base=embudo.radicado||0, ley=embudo.ley||0;
+    const final=base>0?`<div class="f2-final"><span class="lab">Terminó en ley</span><span class="val">${fmt(ley)}</span><span class="pct">${(100*ley/base).toFixed(1).replace('.',',')}% de lo radicado</span></div>`:'';
+    return `<div class="funnel2">${filas}</div>${final}`;
+  }
+
+  function tablaCuat(rows,tipo){
+    const esPL=tipo==='pl';
+    const maxPct=esPL?Math.max(...rows.map(r=>r[1]?100*r[2]/r[1]:0),1):1;
+    const cols=esPL
+      ? ['Cuatrienio','Radicados','Ley','Archivados','Retirados','En trámite','Otros','% que llega a ley']
+      : ['Cuatrienio','Radicados','Archivados','Retirados','En trámite','Otros'];
+    const body=rows.map(r=>{
+      const enCurso=r[0]==='2026-2030';
+      if(esPL){
+        const [c,t,ley,arch,ret,tr,otr]=r;
+        const pct=t?100*ley/t:0;
+        const barra=enCurso?'<span class="muted">en curso</span>'
+          :`<span class="pbar"><i style="width:${Math.round(60*pct/maxPct)}px"></i><b>${pct.toFixed(1).replace('.',',')}%</b></span>`;
+        return `<tr class="${enCurso?'curso':''}"><td class="cu">${esc(c)}</td><td>${fmt(t)}</td><td class="ley">${fmt(ley)}</td><td class="arch">${fmt(arch)}</td><td>${fmt(ret)}</td><td class="tram">${fmt(tr)}</td><td class="muted">${fmt(otr)}</td><td>${barra}</td></tr>`;
+      }
+      const [c,t,arch,ret,tr,otr]=r;
+      return `<tr class="${enCurso?'curso':''}"><td class="cu">${esc(c)}</td><td>${fmt(t)}</td><td class="arch">${fmt(arch)}</td><td>${fmt(ret)}</td><td class="tram">${fmt(tr)}</td><td class="muted">${fmt(otr)}</td></tr>`;
+    }).join('');
+    return `<table class="ctab"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`;
   }
   function mortandadChart(mort){
     if(!mort) return '<div class="note">Sin datos de mortandad por ahora.</div>';
@@ -132,15 +211,33 @@
     box.innerHTML=funnel(embudo);
     requestAnimationFrame(()=>box.querySelectorAll('.f2-bar').forEach(b=>b.style.width=b.dataset.w+'%'));
   }
+  function pintaTablas(s){
+    const pl=(s&&Array.isArray(s.por_cuatrienio)&&s.por_cuatrienio.length)?s.por_cuatrienio:CUAT_PL;
+    const al=(s&&Array.isArray(s.actos_por_cuatrienio)&&s.actos_por_cuatrienio.length)?s.actos_por_cuatrienio:CUAT_AL;
+    const a=document.getElementById('cuat-pl'), b=document.getElementById('cuat-al');
+    if(a) a.innerHTML=tablaCuat(pl,'pl');
+    if(b) b.innerHTML=tablaCuat(al,'al');
+  }
   async function loadHistorico(){
-    paintEmbudo(STATS_FALLBACK.embudo);
+    paintEmbudo(STATS_FALLBACK.embudo_universo);
+    pintaTablas(null);
     try{
       const s=await call({action:'stats'});
       if(s&&s.n_proyectos){
         document.getElementById('h-proy').textContent=fmt(s.n_proyectos);
         document.getElementById('h-actos').textContent=fmt(s.n_actos);
         document.getElementById('h-leyes').textContent=fmt(s.n_leyes);
-        if(s.embudo){ const e={}; Object.entries(s.embudo).forEach(([k,v])=>{e[EMB_KEYS[k]||k]=v;}); paintEmbudo(e); }
+        const eu=s.embudo_universo||STATS_FALLBACK.embudo_universo;
+        if(eu){
+          paintEmbudo(eu);
+          if(eu.radicado) document.getElementById('h-pct').textContent=
+            (100*(eu.ley||0)/eu.radicado).toFixed(1).replace('.',',')+'%';
+        }
+        const dd=s.dias_a_primer_debate;
+        if(dd&&dd.mediana) document.getElementById('h-dias').textContent=fmt(dd.mediana);
+        const al=s.embudo_universo_alcance, nota=document.getElementById('emb-note');
+        if(al&&nota) nota.innerHTML='Cada fila es una fase del trámite; el ↓% dice cuántos sobreviven de una fase a la siguiente. Medido sobre <b>'+fmt(al.n_con_fecha||0)+'</b> proyectos con fecha de radicación, el <b>'+String(al.pct_cubierto||0).replace('.',',')+'%</b> del archivo (Senado y Cámara).';
+        pintaTablas(s);
         if(s.mortandad_por_anio_cuatrienio){
           const mb=document.getElementById('mort-box');
           mb.innerHTML=mortandadChart(s.mortandad_por_anio_cuatrienio);
