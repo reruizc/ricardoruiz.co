@@ -1997,6 +1997,10 @@
     // lo que el diccionario no reconoció: se dice, no se esconde
     const desc=(cl.descartes&&cl.descartes.length)
       ? `<div class="cli-reg-none" style="margin-bottom:1rem">No están en el diccionario de Caudal y quedaron fuera del radar: <b>${esc(cl.descartes.join(', '))}</b>. Búscalas otra vez en el editor: si no aparecen, todavía no las cubrimos.</div>` : '';
+    // el perfil llegó mal formado (campo con otro nombre, lista que era texto):
+    // se dice en vez de devolver un radar vacío en silencio
+    const avi=(cl.avisos&&cl.avisos.length)
+      ? `<div class="cli-reg-none" style="margin-bottom:1rem">El perfil llegó con algo que Caudal no entendió: <b>${esc(cl.avisos.join(' · '))}</b>. El radar de abajo se armó sin eso.</div>` : '';
     const vigNote=vigN
       ? `<div class="cli-note"><b>Vigiladas (${vigN}):</b> ${esc(vigNoms)} · <b>${k.n_senales_vigiladas||0}</b> señal(es) del radar son sobre ellas${k.n_contratos_vigiladas?` · <b>${fmt(k.n_contratos_vigiladas)}</b> contrato(s) suyos en SECOP`:(cl.vigiladas_sin_contratos?' · no le venden al Estado en SECOP II':'')}.</div>` : '';
     body.innerHTML=`
@@ -2006,7 +2010,7 @@
         <div class="kpi ley"><div class="n">${k.en_tramite}</div><div class="l">En trámite · ventana</div></div>
         <div class="kpi"><div class="n">${vigN?(k.n_senales_vigiladas||0):(k.n_medios_sector?fmt(k.n_medios_sector):'—')}</div><div class="l">${vigN?'Sobre tus vigiladas':'Prensa reciente'}</div></div>
       </div>
-      ${desc}${vigNote}
+      ${avi}${desc}${vigNote}
       <div class="cli-note"><b>Activo ahora en ${esc(cl.nombre)}:</b> <b>${k.en_tramite}</b> proyecto(s) de ley en trámite · ${sancTxt} · <b>${fmt(k.n_medios_sector||0)}</b> titular(es) de prensa reciente · <b>${fmt(k.n_contratos_sector||0)}</b> contrato(s) reciente(s) en SECOP.</div>
       <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt(k.n_sanciones_sector)}</b> sanciones`:''} que tocan estos temas, el radar prioriza por accionabilidad — precisión sobre volumen.${(cl.temas_usados&&cl.temas_usados.length)?` Se buscó por: <b>${esc(cl.temas_usados.join(' · '))}</b>.`:''}</div>
       <div class="lectura">
@@ -2034,42 +2038,74 @@
   // El resto del flujo es idéntico: los presets siguen siendo el fallback.
   async function cliLoad(arg){
     const mine=++_cliSeq;
+    cliLecturaStop();
     const esPerfil=!!(arg&&arg.perfil);
     if(esPerfil){ PF_ACTIVE=arg.perfil; document.querySelectorAll('#cli-sectors .chip').forEach(c=>c.classList.remove('on')); }
     else { PF_ACTIVE=null; document.querySelectorAll('#cli-sectors .chip').forEach(c=>c.classList.toggle('on',c.dataset.sec===arg.sector)); }
     pfRenderBar();
     const p=esPerfil?arg.perfil:null;
+    // `lectura:true` = "prepárala", no "espérala": la respuesta trae el radar
+    // y una `lectura_key` para recogerla aparte (ver cliPedirLectura).
     const req=esPerfil
-      ? {action:'cliente',perfil:{nombre:p.nombre,descripcion:p.descripcion||'',temas:p.temas||[],
-                                  empresas:p.empresas||[],sector_sanciones:p.sector_sanciones||'',
-                                  comision:p.comision||''}}
-      : {action:'cliente',sector:arg.sector};
+      ? {action:'cliente',lectura:true,
+         perfil:{nombre:p.nombre,descripcion:p.descripcion||'',temas:p.temas||[],
+                 empresas:p.empresas||[],sector_sanciones:p.sector_sanciones||'',
+                 comision:p.comision||''}}
+      : {action:'cliente',lectura:true,sector:arg.sector};
     const body=document.getElementById('cli-body');
     const quien=esPerfil?('de '+esc(p.nombre||'tu cliente')):'del sector';
     if(body) body.innerHTML='<div class="llm-load" style="padding:2.5rem;justify-content:center">Armando el radar '+quien+' <span class="dots"><span></span><span></span><span></span></span></div>';
-    let d; try{ d=await call(Object.assign({lectura:false},req)); }
+    let d; try{ d=await call(req); }
     catch(e){ if(mine===_cliSeq&&body) body.innerHTML='<div class="err">No se pudo cargar el radar. Reintenta.</div>'; return; }
     if(mine!==_cliSeq) return;
     if(d&&d.error){ if(body) body.innerHTML='<div class="err">'+esc(d.error)+'</div>'; return; }
     cliRender(d);
-    cliPedirLectura(req, mine);
+    // el radar ya está en pantalla; la lectura llega después (o ya venía hecha)
+    if(d.lectura && !d.lectura.error) cliRenderLectura(d.lectura);
+    else if(d.lectura_key) cliPedirLectura(d.lectura_key, mine);
+    else cliLecturaFallback();
   }
-  // La lectura de un perfil nuevo se genera desde cero y puede pasarse de los
-  // 30 s que aguanta el API Gateway: el gateway corta pero la Lambda (60 s)
-  // termina y deja la lectura en su caché. Por eso se reintenta una vez —
-  // el segundo intento la encuentra hecha y responde al instante.
-  function cliPedirLectura(req, mine, reintento){
-    call(Object.assign({lectura:true},req)).then(d2=>{
-      if(mine!==_cliSeq) return;
-      if(d2 && d2.lectura && !d2.lectura.error) return cliRenderLectura(d2.lectura);
-      throw new Error('sin lectura');
-    }).catch(()=>{
-      if(mine!==_cliSeq) return;
-      const el=document.getElementById('cli-lectura-body'); if(!el) return;
-      if(reintento){ el.innerHTML='<div class="cob-note">No se pudo generar la lectura. El radar de arriba está completo.</div>'; return; }
-      el.innerHTML='<div class="llm-load">La primera lectura de un perfil tarda un poco más <span class="dots"><span></span><span></span><span></span></span></div>';
-      setTimeout(()=>cliPedirLectura(req, mine, true), 9000);
-    });
+  function cliLecturaFallback(msg){
+    const el=document.getElementById('cli-lectura-body'); if(!el) return;
+    el.innerHTML='<div class="cob-note">'+esc(msg||'No se pudo generar la lectura. El radar de arriba está completo.')+'</div>';
+  }
+  // La lectura se genera aparte del radar: medida contra producción tarda entre
+  // 20 s y 51 s (la varianza es del modelo), o sea que se pasa del techo de
+  // 30 s del API Gateway sin que haya forma de predecirlo. Así que se dispara
+  // una vez y se recoge SONDEANDO el caché — un GET a S3, ~0,3 s. Si el modelo
+  // alcanza a contestar dentro del gateway, el disparo la trae de una y el
+  // sondeo se apaga; si lo cortan, la Lambda igual termina y el sondeo la pesca.
+  const CLI_LECT_POLL=3500, CLI_LECT_MAX=90000;
+  let _cliLectTimer=null;
+  function cliLecturaStop(){ if(_cliLectTimer){ clearTimeout(_cliLectTimer); _cliLectTimer=null; } }
+  function cliPedirLectura(key, mine){
+    cliLecturaStop();
+    const t0=Date.now();
+    const listo=d=>{
+      if(mine!==_cliSeq || !d || d.estado!=='lista' || !d.lectura || d.lectura.error) return false;
+      cliLecturaStop(); cliRenderLectura(d.lectura); return true;
+    };
+    // 1 · disparo: arranca la generación. Puede morir en el gateway a los 30 s
+    //     (503) y no pasa nada — la Lambda termina y deja la lectura hecha.
+    call({action:'cliente-lectura',key}).then(d=>{
+      if(mine!==_cliSeq || listo(d)) return;
+      if(d && d.estado==='sin_radar'){ cliLecturaStop(); return cliLecturaFallback('La lectura caducó. Vuelve a abrir el radar para regenerarla.'); }
+      // el modelo respondió pero mal: no se cachea, así que sondear no sirve
+      if(d && d.estado==='lista'){ cliLecturaStop(); cliLecturaFallback(); }
+    }).catch(()=>{});
+    // 2 · sondeo del caché en paralelo
+    const tick=()=>{
+      if(mine!==_cliSeq) return cliLecturaStop();
+      if(Date.now()-t0>CLI_LECT_MAX){ cliLecturaStop(); return cliLecturaFallback(); }
+      if(Date.now()-t0>12000){
+        const el=document.getElementById('cli-lectura-body');
+        if(el && !el.dataset.slow){ el.dataset.slow='1'; el.innerHTML='<div class="llm-load">La primera lectura de un perfil tarda un poco más <span class="dots"><span></span><span></span><span></span></span></div>'; }
+      }
+      call({action:'cliente-lectura',key,solo_cache:true})
+        .then(d=>{ if(!listo(d)) _cliLectTimer=setTimeout(tick,CLI_LECT_POLL); })
+        .catch(()=>{ if(mine===_cliSeq) _cliLectTimer=setTimeout(tick,CLI_LECT_POLL); });
+    };
+    _cliLectTimer=setTimeout(tick,CLI_LECT_POLL);
   }
 
   /* ---------- búsqueda ---------- */

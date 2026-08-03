@@ -328,20 +328,66 @@ def buscar_empresas(q, limit=20):
     return out
 
 
+# Campos que el perfil entiende. Todo lo demás que llegue en el dict se
+# reporta en `avisos`: un perfil que trae `empresas_keys` en vez de `empresas`
+# respondía 200 con el radar vacío de vigiladas y sin decir una palabra —
+# el mismo silencio que `descartes` ya evita cuando la empresa no existe.
+CAMPOS_PERFIL = {'nombre', 'descripcion', 'temas', 'empresas',
+                 'sector_sanciones', 'comision'}
+# nombres equivocados que hemos visto (o que son un typo obvio) → el campo real
+_ALIAS_CAMPO = {
+    'empresas_keys': 'empresas', 'empresa': 'empresas', 'vigiladas': 'empresas',
+    'empresas_vigiladas': 'empresas', 'tema': 'temas', 'temas_usados': 'temas',
+    'sector': 'sector_sanciones', 'comisión': 'comision', 'name': 'nombre',
+}
+# los que el propio perfil guardado arrastra: no son un error del cliente, son
+# metadatos del KV o la salida ya normalizada. No se avisan.
+_CAMPOS_IGNORADOS = {'k', 'perfilId', 'perfil_id', 'creado', 'actualizado',
+                     'owner', 'email', 'descartes', 'avisos', 'desde_preset'}
+
+
+def _lista_de(valor, campo, avisos):
+    """Una lista, cueste lo que cueste — avisando cuando no lo era.
+
+    `temas` como string suelto es el otro silencio de esta función: iterar
+    "energia" da caracteres de un char, todos por debajo del mínimo de 3, y el
+    perfil salía sin temas sin explicar por qué.
+    """
+    if valor is None or valor == '':
+        return []
+    if isinstance(valor, str):
+        avisos.append(f'«{campo}» llegó como texto y no como lista; '
+                      f'se tomó como un solo elemento')
+        return [valor]
+    if isinstance(valor, (list, tuple)):
+        return list(valor)
+    avisos.append(f'«{campo}» tiene que ser una lista y llegó como '
+                  f'{type(valor).__name__}; se ignoró')
+    return []
+
+
 def normalizar_perfil(p):
     """Perfil de cliente saneado y listo para el Radar.
 
     Entrada libre (viene del KV o del body del request) → dict con la MISMA
     forma que un preset de SECTORES_CLIENTE (`nombre`, `temas`, `comision`,
     `sector_sanciones`) más `empresas` (entradas del diccionario ya resueltas).
-    Nunca lanza: lo que no valida se descarta y se reporta en `descartes`,
-    para que la UI pueda decirlo en vez de fingir que lo guardó.
+    Nunca lanza: lo que no valida se descarta y se reporta en `descartes`
+    (valores que no existen) o en `avisos` (la forma del perfil está mal), para
+    que la UI pueda decirlo en vez de fingir que lo guardó.
     """
     p = p if isinstance(p, dict) else {}
-    descartes = []
+    descartes, avisos = [], []
+
+    for campo in p:
+        if campo in CAMPOS_PERFIL or campo in _CAMPOS_IGNORADOS:
+            continue
+        sug = _ALIAS_CAMPO.get(str(campo).strip().lower())
+        avisos.append(f'«{campo}» no es un campo del perfil y se ignoró'
+                      + (f' (¿querías «{sug}»?)' if sug else ''))
 
     temas, vistos = [], set()
-    for t in (p.get('temas') or [])[:PERFIL_MAX_TEMAS * 2]:
+    for t in _lista_de(p.get('temas'), 'temas', avisos)[:PERFIL_MAX_TEMAS * 2]:
         t = re.sub(r'\s+', ' ', str(t or '')).strip()[:PERFIL_MAX_TEMA_LEN]
         # <3 chars no discrimina nada (matchea medio dataset por substring)
         if len(t) < 3:
@@ -356,7 +402,13 @@ def normalizar_perfil(p):
 
     idx = _empresas_por_llave()
     emps, vistas = [], set()
-    for raw in (p.get('empresas') or [])[:PERFIL_MAX_EMPRESAS * 2]:
+    for raw in _lista_de(p.get('empresas'), 'empresas',
+                         avisos)[:PERFIL_MAX_EMPRESAS * 2]:
+        # el editor manda llaves ('epm'), pero la salida de esta misma función
+        # las devuelve como objetos {k, nombre, …}: si alguien reinyecta el
+        # perfil normalizado, str(dict) no casa con nada y las perdería todas.
+        if isinstance(raw, dict):
+            raw = raw.get('k') or raw.get('nombre') or ''
         key = _norm(str(raw or '')).strip()
         e = idx.get(key)
         if not e:
@@ -376,6 +428,8 @@ def normalizar_perfil(p):
         ss = ''
     com = str(p.get('comision') or '').strip()
     if com and com not in COMISIONES_REF:
+        if com:
+            avisos.append(f'la comisión «{com}» no existe; se ignoró')
         com = ''
 
     return {
@@ -389,6 +443,7 @@ def normalizar_perfil(p):
         'sector_sanciones': ss,
         'comision': com,
         'descartes': descartes,
+        'avisos': avisos,
     }
 
 

@@ -21,6 +21,15 @@ Acciones (POST JSON):
   {"action":"medios","query":"reforma pensional","dias":30}
       → pilar Medios: titulares de prensa nacional y regional vía Google News RSS
         (gratis, sin key). Sin `query` → landing con el pulso político nacional.
+  {"action":"cliente","perfil":{…},"lectura":true}  ·  {"action":"cliente","sector":"salud"}
+      → Vista Cliente (SKU A): radar SIGA cruzando los pilares. SIEMPRE rápido:
+        nunca espera al modelo. `lectura:true` ya no significa "espérame la
+        síntesis" sino "prepárala": devuelve `lectura_key` para recogerla
+        aparte, y ya la `lectura` si ese mismo radar se leyó antes.
+  {"action":"cliente-lectura","key":"<lectura_key>"[,"solo_cache":true]}
+      → el briefing del analista sobre ese radar. Sin `solo_cache` arranca la
+        generación (20-51 s, se pasa del gateway a propósito); con `solo_cache`
+        es un sondeo barato que responde 'lista' o 'pendiente'.
   {"action":"contratacion","query":"comando conjunto caribe","departamento":"Atlántico"}
       → pilar Datos abiertos y contratación: búsqueda EN VIVO sobre SECOP II
         (5,87 M contratos, Socrata $q) + total real + desglose. Sin query ni
@@ -1158,32 +1167,44 @@ CLIENTE_SYSTEM = (
     "señales que te di).")
 
 
-# cuántas señales entran al briefing. Es un tope de LATENCIA, no de cobertura:
-# el radar completo se le muestra al usuario en pantalla; esto es lo que el
-# modelo alcanza a sintetizar sin pasarse de los 30 s del API Gateway.
+# cuántas señales entran al briefing. Es un tope de COSTO y de foco, no de
+# cobertura: el radar completo se le muestra al usuario en pantalla.
 LECTURA_MAX_SENALES = 26
+# vida del candado que evita dos generaciones simultáneas de la misma lectura.
+# Un poco más que el timeout de la Lambda: si la que tenía el candado murió,
+# la siguiente petición puede volver a intentarlo.
+LECTURA_LOCK_TTL = 70
 
 
-def _lectura_cliente(s, senales, kpis):
-    # la firma incluye temas y vigiladas: con un perfil por cliente, `s['k']`
-    # es siempre 'perfil' y dos gremios distintos compartirían la lectura.
+def _lectura_cliente_key(s, kpis):
+    """Firma de la lectura: mismo perfil + mismo radar = misma lectura.
+
+    Incluye temas y vigiladas porque con un perfil por cliente `s['k']` es
+    siempre 'perfil' y dos gremios distintos compartirían el briefing.
+    """
     firma = '|'.join([s.get('k', ''), s.get('nombre', ''),
                       ','.join(sorted(s.get('temas', []))),
                       ','.join(sorted(s.get('empresas_keys', []))),
                       s.get('sector_sanciones', '')])
-    key = _hash24(PROMPT_VERSION + '|cliente|' + firma + '|' + str(kpis['n_radar'])
-                  + '|' + str(kpis['alto']) + '|' + str(kpis['en_tramite']))
-    cached = _cache_get('cliente-' + key)
-    if cached:
-        return cached
+    return _hash24(PROMPT_VERSION + '|cliente|' + firma + '|' + str(kpis['n_radar'])
+                   + '|' + str(kpis['alto']) + '|' + str(kpis['en_tramite']))
+
+
+def _lectura_cliente_prompt(s, senales, kpis):
+    """El mensaje de usuario del briefing, ya armado.
+
+    Se separa del envío para poder GUARDARLO: la lectura se genera en una
+    petición aparte y no puede volver a calcular el radar (es lo que hacía que
+    cada reintento pagara de nuevo los pilares y otra llamada al modelo).
+    """
     lines = []
     # El slice tiene que cubrir todos los pilares: si se corta por el final, el
     # último en concatenarse (contratación) nunca llega al modelo. Ver hallazgo
     # jul-2026: con [:14] nunca llegaba prensa. Pero con perfil de cliente los
     # pilares suman hasta 42 (cada uno con sus cupos de vigiladas) y mandarlas
-    # todas empuja la generación por encima del techo de 30 s del API Gateway.
-    # Así que se PRIORIZA en vez de truncar: primero todo lo que es sobre una
-    # vigilada, después lo de alta prioridad, después el resto.
+    # todas encarece la generación sin agregar foco. Así que se PRIORIZA en vez
+    # de truncar: primero todo lo que es sobre una vigilada, después lo de alta
+    # prioridad, después el resto.
     orden = {'alto': 0, 'medio': 1, 'bajo': 2}
     top = sorted(senales, key=lambda x: (0 if x.get('vigilada') else 1,
                                          orden.get(x.get('nivel'), 3)))[:LECTURA_MAX_SENALES]
@@ -1221,8 +1242,31 @@ def _lectura_cliente(s, senales, kpis):
                if kpis.get('n_medios_sector') else '') + ".\n\n"
             f"SEÑALES DEL RADAR (las priorizadas, no el histórico completo):\n"
             + '\n'.join(lines) + "\n\nEscribe el briefing en JSON.")
+    return user
+
+
+def _lectura_cliente_generar(key):
+    """Genera la lectura de un radar ya calculado y la deja en el caché.
+
+    Es lo ÚNICO lento del flujo del cliente: medido contra producción, la
+    generación tarda entre 20 s y 51 s — la varianza es del modelo (1.3k vs
+    3.7k tokens de razonamiento con el mismo prompt), así que no hay recorte de
+    prompt que la meta bajo los 30 s del API Gateway de forma confiable. Por
+    eso vive fuera de la acción `cliente` y se recoge por caché.
+    """
+    prompt = _cache_get('cliente-in-' + key)
+    if not prompt or not prompt.get('user'):
+        # el radar que la originó ya no está en caché (otra versión de prompt,
+        # o el objeto se borró): que el frontend vuelva a pedir el radar.
+        return {'estado': 'sin_radar'}
+    lock = _cache_get('cliente-lock-' + key)
+    if lock and _time.time() - float(lock.get('t') or 0) < LECTURA_LOCK_TTL:
+        # ya hay una generación en vuelo. Sin este candado, cada reintento del
+        # navegador arrancaba otra llamada de 50 s al modelo en paralelo.
+        return {'estado': 'generando'}
+    _cache_put('cliente-lock-' + key, {'t': _time.time()})
     try:
-        raw = _call_llm('sintesis', CLIENTE_SYSTEM, user, max_tokens=6000).strip()
+        raw = _call_llm('sintesis', CLIENTE_SYSTEM, prompt['user'], max_tokens=6000).strip()
         if raw.startswith('```'):
             raw = raw.split('```')[1].lstrip('json').strip()
         data = json.loads(raw)
@@ -1232,7 +1276,7 @@ def _lectura_cliente(s, senales, kpis):
     data['_model'] = STEP_MODELS['sintesis']['model']
     if 'error' not in data:
         _cache_put('cliente-' + key, data)
-    return data
+    return {'estado': 'lista', 'lectura': data}
 
 
 # --- fase 3 · extracción del texto de una gaceta ----------------------------
@@ -2427,9 +2471,43 @@ def handler(event, context):
                            'descartes': s.get('descartes', [])},
                'congreso': rc['senales'], 'regulatorio': reg, 'medios': med,
                'contratacion': con, 'kpis': kpis, 'sectores': sectores}
+        out['cliente']['avisos'] = s.get('avisos', [])
+        # `lectura:true` YA NO significa "espérame la síntesis": significa
+        # "prepárala". El radar tiene que salir siempre rápido (medido:
+        # 0,7-3,8 s) y la síntesis tarda 20-51 s — pedirlas en la misma
+        # respuesta era lo que hacía que un perfil nuevo diera 503 a los 30,5 s.
+        # Acá solo se deja el prompt listo en el caché; el frontend recoge la
+        # lectura por `cliente-lectura`, igual que test-presidencial-2026 pinta
+        # el resultado primero y trae la lectura del modelo después.
         if body.get('lectura', False):
-            out['lectura'] = _lectura_cliente(s, senales, kpis)
+            lkey = _lectura_cliente_key(s, kpis)
+            out['lectura_key'] = lkey
+            lista = _cache_get('cliente-' + lkey)
+            if lista:
+                out['lectura'] = lista       # radar ya visto antes: sale de una
+            else:
+                _cache_put('cliente-in-' + lkey,
+                           {'user': _lectura_cliente_prompt(s, senales, kpis)})
         return _resp(200, out)
+
+    if action == 'cliente-lectura':
+        # el briefing del radar, aparte. Dos modos:
+        #   solo_cache:true  → sondeo barato (un GET a S3): lista o pendiente.
+        #   sin solo_cache   → arranca la generación. Esta petición SE PASA de
+        #                      los 30 s del gateway a menudo; el navegador la
+        #                      abandona y recoge el resultado sondeando, pero
+        #                      la Lambda (60 s) termina y deja la lectura hecha.
+        key = str(body.get('key') or '').strip()
+        if not key or not key.isalnum():
+            return _resp(400, {'error': 'falta la llave de la lectura (lectura_key)'})
+        lista = _cache_get('cliente-' + key)
+        if lista:
+            return _resp(200, {'estado': 'lista', 'lectura': lista, 'key': key})
+        if body.get('solo_cache'):
+            return _resp(200, {'estado': 'pendiente', 'key': key})
+        r = _lectura_cliente_generar(key)
+        r['key'] = key
+        return _resp(200, r)
 
     if action == 'tema':
         q = body.get('query', '')
