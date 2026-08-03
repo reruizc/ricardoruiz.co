@@ -6592,6 +6592,26 @@ es gated y el preview no puede autenticarse) y `destinatarios.json`, que hoy est
 vacío. Los `datos/` quedaron bajo `tools/` contra la convención del proyecto; se
 mueven con `CAUDAL_ALERTAS_DIR`.
 
+**IDEA · resumen ejecutivo diario por WhatsApp (backlog, ago-2026).** El motor ya
+produce el digest en texto y HTML; **el canal sería lo único nuevo**, no el
+contenido. Pero WhatsApp NO es correo y eso cambia el diseño:
+
+- Fuera de la ventana de 24 h de atención al cliente, un mensaje iniciado por el
+  negocio **solo puede ser una plantilla pre-aprobada por Meta**, con variables
+  limitadas. **No se puede pegar un digest de 6 señales dentro.** La forma
+  realista es una plantilla corta —"Hoy: N señales, M altas en <sector>"— **+ un
+  enlace de vuelta a Caudal**, no el análisis completo en el chat.
+- Eso empuja el valor al enlace → **depende del acceso comercial**, que es el
+  bloqueador #1: hoy el cliente no puede abrir Caudal porque el gate son tres
+  correos hardcoded. Montar WhatsApp antes de resolver eso deja un aviso que
+  lleva a una puerta cerrada.
+- Requiere un BSP (Meta Cloud API directa, 360dialog, Twilio), costo por
+  conversación, y **opt-in explícito** — el campo de opt-in ya existe en el
+  perfil, pero el consentimiento de WhatsApp es distinto del de correo y hay que
+  pedirlo aparte (Ley 1581 + política de Meta).
+- Sugerencia de orden: correo primero (ya está listo, solo falta destinatario
+  real), medir qué abren, y recién ahí decidir si WhatsApp aporta o solo duplica.
+
 ### Confiabilidad del pipeline diario (`tools/caudal/salud/` · LISTO ago-2026)
 
 El cron corría en el Mac y si fallaba nadie se enteraba. Ahora hay chequeo de
