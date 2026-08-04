@@ -40,6 +40,7 @@ import sys
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
 
+import articulado as ART                                       # noqa: E402
 import fuentes as F                                            # noqa: E402
 import reglas as R                                             # noqa: E402
 import render                                                  # noqa: E402
@@ -177,6 +178,43 @@ def cargar_destinos(usar_perfiles=True, con_sectores=True, avisos=None):
     return clientes + base
 
 
+def cargar_articulado(avisos):
+    """Baja (si cambió) el articulado y arma su índice. No es una fuente de
+    señales: es de dónde sale el «por qué» de las señales del Congreso."""
+    global ARTICULADO
+    destino = os.path.join(DIR_CACHE, 'articulado.json')
+    key = ART.CLAVE_S3
+    try:
+        etag = F.s3_etag(key)
+        if not os.path.exists(destino) or not etag or etag != ESTADO_ETAGS.get(key):
+            F.s3_bajar(key, destino)
+            ESTADO_ETAGS[key] = etag
+    except (RuntimeError, OSError, ValueError) as e:
+        if not os.path.exists(destino):
+            avisos.append({'tipo': 'fuente_error', 'pilar': 'congreso',
+                           'texto': f'No se pudo leer {key} ({str(e)[:120]}): las señales '
+                                    f'del Congreso van sin la lectura de su articulado.'})
+            ARTICULADO = ART.VACIO
+            return ARTICULADO
+        avisos.append({'tipo': 'fuente_error', 'pilar': 'congreso',
+                       'texto': f'No se pudo refrescar {key} ({str(e)[:120]}): se usa la '
+                                f'copia local, que puede estar desactualizada.'})
+    ARTICULADO = ART.cargar(destino)
+    if not len(ARTICULADO):
+        avisos.append({'tipo': 'fuente_error', 'pilar': 'congreso',
+                       'texto': 'El articulado quedó vacío: las señales del Congreso van '
+                                'sin la lectura de su texto.'})
+    return ARTICULADO
+
+
+def articulado_de(ev):
+    """El articulado de un evento del Congreso, o None si no se ha leído."""
+    m = ev.get('meta') or {}
+    return ARTICULADO.buscar(pid=m.get('pid'), tab=m.get('tab'),
+                             numero=m.get('numero'), camara=m.get('camara'),
+                             titulo=ev.get('titulo'))
+
+
 def recolectar(fecha, destinos_activos, usar_api=True, avisos=None):
     """Todos los eventos crudos del día, de las 5 fuentes."""
     avisos = avisos if avisos is not None else []
@@ -213,6 +251,9 @@ def recolectar(fecha, destinos_activos, usar_api=True, avisos=None):
             avisos.append({'tipo': 'fuente_error', 'pilar': pilar,
                            'texto': f'No se pudo leer {key}: {str(e)[:200]}'})
 
+    # --- 2.b El articulado leído (no es una fuente de señales: es el «por qué»)
+    cargar_articulado(avisos)
+
     # --- 3. API: prensa y contratación por destino --------------------------
     if usar_api:
         for d in destinos_activos:
@@ -241,6 +282,11 @@ ESTADO_ETAGS = {}
 # permite decir "categoría nueva para esta entidad" sin inventarlo: arranca
 # vacía y se llena con cada corrida.
 HISTORICO_ENTIDAD = {}
+
+# El articulado leído del texto radicado. Se carga una vez por corrida; si no se
+# puede bajar, queda vacío y el motor lo DICE en los avisos en vez de volver
+# calladamente al «por qué» genérico.
+ARTICULADO = ART.VACIO
 
 
 # ---------------------------------------------------------------------------
@@ -309,14 +355,31 @@ def clasificar(ev):
     return []
 
 
+def _extra_congreso(art, k):
+    """Lo que la señal lleva encima del «por qué» para que el correo lo muestre.
+
+    `obligacion_clave` es POR DESTINO: la obligación que toca a este cliente no
+    tiene por qué ser la que toca al de al lado, y mandarle siempre la primera
+    del texto es volver a hablar en general.
+    """
+    if not art:
+        return {'articulado': None}
+    o, clase = R.obligacion_pertinente(art, k)
+    return {'articulado': art, 'obligacion_clave': o, 'obligacion_clase': clase}
+
+
 def _clasificar_congreso(ev):
+    art = articulado_de(ev)
+
     if ev['tipo'] == 'radicado_nuevo':
         out = []
         for k, hits in R.sectores_de(ev['titulo']):
             nivel, porque, tipologia = R.nivel_radicado(
-                ev['titulo'], ev['meta'].get('comision', ''), k, hits)
+                ev['titulo'], ev['meta'].get('comision', ''), k, hits, art=art)
             ev['meta']['tipologia'] = tipologia
-            out.append((k, nivel, porque))
+            extra = _extra_congreso(art, k)
+            extra['hits'] = hits
+            out.append((k, nivel, porque, extra))
         return out
 
     # trámite: primero se limpia el ruido del registro, después se mira sector
@@ -328,11 +391,28 @@ def _clasificar_congreso(ev):
                                                ev['meta'].get('camara', ''))
     if titulo and not ev['titulo']:
         ev['titulo'] = titulo
+        art = art or articulado_de(ev)          # el título recuperado abre la 3ª llave
     if not titulo:
         return []
     nivel = R.peor_nivel([d['nivel'] for d in deltas])
     etiquetas = ' · '.join(dict.fromkeys(d['etiqueta'] for d in deltas))
-    return [(k, nivel, etiquetas) for k, _h in R.sectores_de(titulo)]
+
+    out = []
+    for k, hits in R.sectores_de(titulo):
+        # El trámite dice QUÉ pasó hoy (aprobado en primer debate); el articulado
+        # dice qué es lo que se aprobó. Las dos mitades hacen la razón completa:
+        # sin la segunda, «APROBADO en primer debate» tampoco explica por qué
+        # hay que hacer algo al respecto.
+        if art:
+            _clase, lectura = R.razon_articulado(art, k)
+            porque = f'{etiquetas} — y el texto {lectura}'
+        else:
+            porque = (f'{etiquetas} · todavía no hemos leído su texto, así que esto '
+                      f'es el movimiento del trámite, no lo que dice el articulado')
+        extra = _extra_congreso(art, k)
+        extra['hits'] = hits
+        out.append((k, nivel, porque, extra))
+    return out
 
 
 def colgar_cobertura(pilares, titulares, empresas=None, propias=False):
@@ -568,13 +648,21 @@ def construir(fecha, destinos_activos, usar_api=True, baseline=False, momento=No
             if k in prensa:
                 prensa[k].append(dict(ev))
             continue
-        for k, nivel, porque in clasificar(ev):
+        # El Congreso devuelve un cuarto elemento (el articulado y la obligación
+        # que toca a ESE destino); los demás pilares no lo usan.
+        for k, nivel, porque, *resto in clasificar(ev):
             if k not in por_sector:
                 continue
             item = dict(ev)
             item.pop('_row', None)
             item['nivel'] = nivel
             item['porque'] = porque
+            extra = resto[0] if resto else None
+            if extra:
+                # meta se copia por destino: la obligación pertinente es de este
+                # cliente, no del que sigue.
+                item['meta'] = dict(ev.get('meta') or {})
+                item['meta'].update(extra)
             por_sector[k].setdefault(ev['pilar'], []).append(item)
 
     prensa_stats = {}
@@ -625,7 +713,9 @@ def construir(fecha, destinos_activos, usar_api=True, baseline=False, momento=No
             altos += sum(1 for e in visibles if e['nivel'] == 'alto')
             if len(visibles) > TOPE_POR_PILAR:
                 omitidos[pilar] = len(visibles) - TOPE_POR_PILAR
-            pilares[pilar] = visibles[:TOPE_POR_PILAR]
+            # Dos señales que dicen lo mismo se leen como una plantilla rota,
+            # aunque cada frase sea cierta: se les baja a lo que las separa.
+            pilares[pilar] = R.distinguir(visibles[:TOPE_POR_PILAR])
         if total:
             salida[k] = {'k': k, 'nombre': d.get('nombre', k),
                          'comision': d.get('comision', ''),
@@ -675,6 +765,9 @@ def construir(fecha, destinos_activos, usar_api=True, baseline=False, momento=No
 
     digest = {'fecha': fecha, 'baseline': False, 'momento': momento,
               'generado': dt.datetime.now().isoformat(timespec='seconds'),
+              'articulado': {'v': ARTICULADO.v, 'total': ARTICULADO.total,
+                             'utilizables': ARTICULADO.utilizables,
+                             'descartes': ARTICULADO.descartes},
               'avisos': avisos, 'sectores': salida, 'operacion': operacion,
               'en_espera': en_espera,
               'clientes': sum(1 for d in destinos_activos if d.get('tipo') == 'cliente'),

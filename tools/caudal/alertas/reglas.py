@@ -64,6 +64,11 @@ except Exception:                                             # pragma: no cover
         return {'tipologia': 'ordinaria', 'crea_fondo': False,
                 'jala_presupuesto_regional': False}
 
+# El articulado ya leído del texto radicado. Es lo que convierte el «por qué» de
+# «radicado en la Comisión Séptima» (un dato del registro) en «le crea esta
+# obligación, sobre este sujeto, con esta multa detrás» (una razón para actuar).
+import articulado as _ART                                    # noqa: E402
+
 # Diccionario de empresas y gremios (388 entradas), en modo LECTURA. Es lo que
 # convierte "un contrato grande" en "un contrato de una empresa que le importa
 # a este cliente".
@@ -576,30 +581,331 @@ def categoria_contrato(objeto):
     return 'otros'
 
 
-def nivel_radicado(titulo, comision, sector_k, hits):
+# ---------------------------------------------------------------------------
+# 3.b) EL «POR QUÉ» DE UN PROYECTO · lo que dice su articulado
+# ---------------------------------------------------------------------------
+# El defecto que esto cierra: la razón de casi toda señal alta del Congreso era
+# «radicado en la Comisión Séptima». Eso explica por qué el motor la marcó, no
+# por qué le importa a quien la lee — un gremio no actúa porque un proyecto haya
+# caído en una comisión u otra, actúa porque le aparece una obligación nueva,
+# con un plazo, sobre alguien, y a veces con una multa detrás.
+#
+# Esa lectura ya existe (`articulado.py`), así que la razón sale de ahí siempre
+# que el texto se haya leído. Y cuando NO se ha leído se dice, que es
+# información honesta: «todavía no hemos leído su texto» le dice al lector
+# exactamente cuánto vale lo que está viendo. El genérico disfrazado de razón,
+# no.
+
+def _limpio(s, n=None):
+    """Espacios colapsados y sin punto final. Sin tocar mayúsculas: bajarle la
+    inicial convertía «EPS, IPS y gestores» en «ePS, IPS y gestores». Los
+    sujetos van entre comillas, así que no necesitan encajar en la frase."""
+    t = re.sub(r'\s+', ' ', str(s or '')).strip().rstrip('.').strip()
+    return recorte_palabra(t, n) if n else t
+
+
+def recorte_palabra(s, n):
+    """Corta en frontera de palabra. Un `[:70]` pelado dejaba «…de pacientes c»,
+    que no se lee como texto acortado sino como dato roto."""
+    s = (s or '').strip()
+    if len(s) <= n:
+        return s
+    corte = s[:n]
+    esp = corte.rfind(' ')
+    return (corte[:esp] if esp > n * 0.6 else corte).rstrip(' ,;:·') + '…'
+
+
+# Quién es el obligado cambia por completo qué tiene que hacer el cliente. Si la
+# obligación recae en un ministerio, el gremio no tiene nada que cumplir: tiene
+# algo que vigilar (la reglamentación). Confundir las dos cosas es prometer
+# puntería que no se tiene — medido: en el PL 101/26 las seis obligaciones son
+# del Ministerio de Salud, y llamar a la primera «la que lo toca» le diría a una
+# EPS que le crearon un deber que no le crearon.
+_ES_ESTADO = re.compile(
+    r'ministerio|gobierno nacional|presidencia|superintendenc|congreso|'
+    r'entidad(es)? estatal|entidades territoriales|departamento administrativo|'
+    r'agencia nacional|instituto nacional|unidad administrativa|comision de regulacion|'
+    r'alcaldia|gobernacion|defensoria|procuradur|contralor|fiscalia|registradur|'
+    r'\bdian\b|\badres\b|\binvima\b|consejo nacional|rama judicial')
+
+
+def es_obligado_estatal(quien):
+    return bool(_ES_ESTADO.search(norm(quien or '')))
+
+
+def obligacion_pertinente(art, k=None):
+    """(obligación, clase) — la que más le toca a ESTE destino, y de quién es.
+
+    Un proyecto puede crear ocho obligaciones y que solo una recaiga sobre el
+    cliente. Mandarle la primera del texto es volver a hablar en general. Se
+    puntúa `sobre_quien` contra el vocabulario del destino y contra el nombre de
+    sus vigiladas, penalizando fuerte al obligado estatal.
+
+    clase ∈ 'propia'  (casó con este destino y el obligado es un particular)
+            'estado'  (el obligado es el Estado: hay qué vigilar, no qué cumplir)
+            'primera' (nada casó: es la primera del texto y se dice así)
+    """
+    obs = _ART.obligaciones(art)
+    if not obs:
+        return None, 'ninguna'
+
+    # El deber que recae sobre un particular SIEMPRE gana al que recae sobre el
+    # Estado, aunque el vocabulario del cliente case mejor con el segundo. Es lo
+    # que se le vende: qué le toca HACER. Medido en el proyecto que modifica la
+    # Ley 80 — el vocabulario de contratación casaba con «Entidad estatal
+    # contratante» y no con «Entidad contratista», así que sin esta regla el
+    # correo le mostraba al contratista un deber de la entidad que lo contrata.
+    privadas = [o for o in obs if not es_obligado_estatal(o.get('sobre_quien'))]
+    universo = privadas or obs
+
+    if k:
+        vocab = vocabulario(k)
+        nombres = [norm(e.get('nombre', '')) for e in (empresas_de(k) or [])]
+        mejor, mejor_p = None, 0
+        for o in universo:
+            qn = norm(o.get('sobre_quien') or '')
+            if not qn:
+                continue
+            p = sum(1 for t in vocab if casa_termino(t, qn))
+            p += 2 * sum(1 for n in nombres if n and n in qn)
+            if p > mejor_p:
+                mejor, mejor_p = o, p
+        if mejor is not None:
+            return mejor, ('propia' if privadas else 'estado')
+
+    o = universo[0]
+    # Sin match de vocabulario no se reclama puntería: es la primera del texto.
+    return o, ('primera' if privadas else 'estado')
+
+
+def razon_articulado(art, k=None):
+    """(nivel_sugerido, porque) leídos del articulado. `art` ya viene filtrado.
+
+    El orden no es estético: primero lo que obliga a hacer algo (y a quién),
+    después lo que castiga no hacerlo, y de último lo que cambia en el
+    ordenamiento. Es el orden en que un jefe jurídico lee un proyecto.
+    """
+    obs = _ART.obligaciones(art)
+    sanc = _ART.sanciones(art)
+    mods = _ART.modifica(art)
+
+    def _castigo():
+        """Cómo se nombra el castigo. Que exista un régimen sancionatorio ya es
+        la señal, aunque el texto no cuantifique la multa."""
+        det = _ART.sancion_legible(sanc[0])
+        if det:
+            return f'régimen sancionatorio ({_limpio(det, 70)})'
+        return 'un régimen sancionatorio que el texto no cuantifica'
+
+    if obs:
+        o, clase = obligacion_pertinente(art, k)
+        quien = _limpio(o.get('sobre_quien'), 90)
+        texto = _limpio(o.get('obligacion'), 150)
+        n = len(obs)
+        cuantas = ('crea una obligación nueva' if n == 1
+                   else f'crea {n} obligaciones nuevas')
+        # Qué se dice de la obligación elegida depende de a quién obliga: es la
+        # diferencia entre «prepárese a cumplir» y «vigile la reglamentación».
+        cual = {'propia': 'la que lo toca', 'estado': 'la principal',
+                'primera': 'la primera'}.get(clase, 'la primera')
+        sobre = f' recae en «{quien}» y' if quien else ''
+        frase = f'{cuantas}; {cual}{sobre} dice: «{texto}»'
+        if sanc:
+            frase += f', con {_castigo()}'
+        if clase == 'estado':
+            # Un obligado estatal NO es menos importante: es otra jugada. El
+            # gremio no tiene qué cumplir, tiene qué incidir antes de que se
+            # reglamente. Va de último para que cierre la frase, no la parta.
+            frase += (' — ojo: en este texto los obligados son entidades del Estado, '
+                      'no el sector; lo que hay es reglamentación por vigilar')
+        if sanc:
+            return 'alto', frase
+        return ('estado' if clase == 'estado' else 'obliga'), frase
+
+    if sanc:
+        conducta = _limpio(sanc[0].get('conducta'), 110)
+        frase = f'no crea obligaciones nuevas, pero sí {_castigo()}'
+        return 'alto', frase + (f' · castiga: «{conducta}»' if conducta else '')
+
+    if mods:
+        cual = ' · '.join(_ART.norma_legible(m) for m in mods[:2])
+        return 'modifica', (f'no crea obligaciones nuevas, pero cambia norma vigente: '
+                            f'{_limpio(cual, 160)}')
+
+    return 'vacio', ('leímos su texto y no crea obligaciones, ni sanciones, ni toca '
+                     'una norma vigente')
+
+
+def razon_sin_articulado(hits, comision, sector_k):
+    """Lo honesto cuando no se leyó el texto: decir de dónde sale lo que se dice.
+
+    Nunca «radicado en la Comisión Séptima» a secas. La comisión entra como dato
+    de contexto, después de haber advertido que esto sale del título.
+    """
+    s = sector(sector_k) or {}
+    partes = ['todavía no hemos leído su texto: esto sale del título']
+    if hits:
+        cuales = ' · '.join(f'«{h}»' for h in hits[:3])
+        partes.append(f'que toca {cuales}')
+    com = str(comision or '').strip()
+    if com:
+        # Senado manda «SEPTIMA» y Cámara «Comisión Primera Constitucional
+        # Permanente»: anteponer «Comisión» a ciegas producía «va a la Comisión
+        # Comisión Primera…».
+        etiqueta = com.title() if norm(com).startswith('comision') else f'Comisión {com.title()}'
+        propia = norm(s.get('comision', ''))
+        if propia and propia in norm(com):
+            partes.append(f'va a la {etiqueta}, la del sector')
+        else:
+            partes.append(f'va a la {etiqueta}')
+    return ', '.join(partes)
+
+
+def nivel_radicado(titulo, comision, sector_k, hits, art=None):
     """Nivel de un proyecto recién radicado que toca el sector.
 
     Un radicado nuevo es la ventana de incidencia clásica: llegar antes de la
     ponencia. Pero no todo radicado es igual — el Congreso produce mucho honor
     y mucho día nacional, y eso no mueve la aguja de ningún gremio.
+
+    Con articulado leído el nivel deja de depender del envase (comisión,
+    tipología) y pasa a depender del contenido: obligación + sanción es lo más
+    alto que hay, porque es lo único que obliga a alguien a hacer algo distinto
+    mañana. Sin articulado el criterio es EXACTAMENTE el de antes — no se toca
+    lo que se ve, solo se deja de llamar «razón» a un dato del registro.
     """
     tip = _clasificar_titulo(titulo or {})
     tipologia = tip.get('tipologia', 'ordinaria')
     s = sector(sector_k) or {}
     com_sector = norm(s.get('comision', ''))
     com = norm(comision or '')
+    en_comision = bool(com_sector and com_sector in com)
 
     if tipologia == 'honores':
         return 'bajo', 'proyecto de honores o conmemorativo — sin efecto regulatorio', tipologia
+
+    if art:
+        clase, porque = razon_articulado(art, sector_k)
+        if clase == 'alto':                       # obligación + sanción, o sanción
+            nivel = 'alto'
+        elif clase == 'obliga':
+            nivel = 'alto' if (tipologia == 'reforma' or en_comision or len(hits) >= 2) else 'medio'
+        elif clase == 'estado':
+            # Obliga solo al Estado y sin sanciones: hay qué vigilar, no qué
+            # cumplir. Alto se reserva para lo que el cliente tiene que hacer.
+            nivel = 'alto' if tipologia == 'reforma' else 'medio'
+        elif clase == 'modifica':
+            nivel = 'alto' if tipologia == 'reforma' else 'medio'
+        else:                                      # se leyó y no hay nada que cumplir
+            nivel = 'medio'
+        return nivel, porque, tipologia
+
+    porque = razon_sin_articulado(hits, comision, sector_k)
     if tipologia == 'reforma':
-        return 'alto', 'reforma estructural que toca el sector', tipologia
-    if com_sector and com_sector in com:
-        return ('alto',
-                f'radicado en la Comisión {s.get("comision", "")}, la del sector', tipologia)
-    if len(hits) >= 2:
-        return ('alto',
-                'toca el sector en varios frentes: ' + ' · '.join(hits[:3]), tipologia)
-    return 'medio', f'menciona «{hits[0]}»' if hits else 'toca el sector', tipologia
+        return 'alto', 'reforma estructural que toca el sector · ' + porque, tipologia
+    if en_comision or len(hits) >= 2:
+        return 'alto', porque, tipologia
+    return 'medio', porque, tipologia
+
+
+# ---------------------------------------------------------------------------
+# 3.c) DOS SEÑALES CON LA MISMA RAZÓN NO SON DOS RAZONES
+# ---------------------------------------------------------------------------
+# Mismo criterio que `hits_distintos` aplicado un nivel más arriba: ahí se
+# quitaban los términos que no agregaban evidencia nueva, acá se agrega lo que
+# hace falta para que dos señales dejen de leerse como la misma.
+#
+# Un digest donde cinco proyectos dicen «todavía no hemos leído su texto» se lee
+# como un error de plantilla, aunque cada frase sea cierta. La salida no es
+# inventar diferencias: es bajar al primer hecho que de verdad los separe.
+
+def _facetas(ev):
+    """Hechos que pueden distinguir una señal de otra, del más concreto al menos.
+
+    El orden importa: sobre quién recae una obligación distingue mucho más que
+    el nombre del autor, y por eso va primero.
+    """
+    art = (ev.get('meta') or {}).get('articulado') or {}
+    out = []
+
+    o = (ev.get('meta') or {}).get('obligacion_clave') or {}
+    quien = _limpio(o.get('sobre_quien'))
+    if quien:
+        out.append((f'recae en «{quien}»', 90))
+
+    mods = _ART.modifica(art)
+    if mods:
+        out.append(('toca ' + _ART.norma_legible(mods[0]), 120))
+
+    ents = _ART.entidades_vigilantes(art)
+    if ents:
+        out.append(('lo vigila ' + ents[0], 90))
+
+    sanc = _ART.sanciones(art)
+    if sanc:
+        castigo = _ART.sancion_legible(sanc[0])
+        if castigo:
+            out.append(('sanción: ' + castigo, 90))
+
+    hits = (ev.get('meta') or {}).get('hits') or []
+    if hits:
+        out.append(('toca ' + ' · '.join(f'«{h}»' for h in hits[:2]), 80))
+
+    autor = re.sub(r'\s+', ' ', str((ev.get('meta') or {}).get('autor') or '')).strip()
+    if autor:
+        out.append(('lo firma ' + autor.rstrip('. ').title()[:60], 70))
+
+    com = str((ev.get('meta') or {}).get('comision') or '').strip()
+    if com:
+        out.append(('Comisión ' + com.title(), 40))
+
+    estado = _limpio((ev.get('meta') or {}).get('estado'))
+    if estado:
+        out.append((estado.lower(), 60))
+    return out
+
+
+def distinguir(items):
+    """Añade a cada señal lo mínimo que la separa de las que dicen lo mismo.
+
+    Solo actúa sobre grupos que comparten razón, y solo agrega una faceta si
+    ESA faceta tiene valores distintos dentro del grupo: repetir «lo vigila la
+    Supersalud» en cinco señales no distingue nada y alarga el correo.
+    """
+    grupos = {}
+    for ev in items:
+        grupos.setdefault(norm(ev.get('porque') or '')[:160], []).append(ev)
+
+    for grupo in grupos.values():
+        if len(grupo) < 2:
+            continue
+        facetas = [_facetas(ev) for ev in grupo]
+        # cuántas señales del grupo comparten cada faceta: la que las comparte
+        # TODAS no separa a nadie y solo alargaría el correo.
+        veces = {}
+        for f in facetas:
+            for texto, _tope in f:
+                veces[texto] = veces.get(texto, 0) + 1
+        for ev, f in zip(grupo, facetas):
+            for texto, tope in f:
+                if veces.get(texto, 0) < len(grupo):
+                    ev['porque'] = ev['porque'].rstrip(' ·') + f' · {texto[:tope]}'
+                    break
+
+        # Lo que quede idéntico después de eso es que de verdad está ahí por lo
+        # mismo (dos radicados de Cámara el mismo día, sin comisión asignada, sin
+        # autor y sin texto leído: no hay un solo dato que los separe). Inventar
+        # una diferencia sería peor que repetir; lo que se hace es no repetir la
+        # frase larga tres veces, que es lo que se lee como plantilla rota.
+        vistas = {}
+        for ev in grupo:
+            clave = norm(ev.get('porque') or '')
+            if clave in vistas:
+                ev['porque'] = ('mismo caso que otra señal de este bloque: '
+                                + recorte_palabra(vistas[clave], 70))
+            else:
+                vistas[clave] = ev.get('porque') or ''
+    return items
 
 
 def nivel_acto_regulatorio(row):

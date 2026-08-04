@@ -212,6 +212,97 @@ handoff de esa pieza, puestas para **no despertar a nadie en falso**:
 
 ---
 
+## El «por qué» del Congreso sale del articulado, no del registro
+
+Durante un tiempo la razón de casi toda señal alta del Congreso fue la misma:
+*«radicado en la Comisión Séptima, la del sector»*. Eso explica por qué el motor
+la marcó, **no por qué le importa a quien la lee**. Ningún gremio actúa porque un
+proyecto haya caído en una comisión u otra; actúa porque le aparece una
+obligación nueva, sobre alguien, con un plazo, y a veces con una multa detrás.
+
+Eso ya está leído del texto radicado completo y publicado en
+`metadata/articulado.json`. `articulado.py` lo lee y `reglas.razon_articulado()`
+redacta con ello. El cambio, sobre el mismo día:
+
+> **antes** · por qué: radicado en la Comisión Séptima, la del sector
+> **ahora** · por qué: crea 8 obligaciones nuevas; la que lo toca recae en
+> «proveedores y prestadores de servicios de salud» y dice: «Radicar las facturas
+> de los servicios prestados en un plazo máximo de tres meses siguientes a la
+> finalización del servicio», con régimen sancionatorio (penal)
+
+Y debajo, un bloque **QUÉ CAMBIA** con la obligación tal como está redactada,
+sobre quién recae, con qué plazo, la sanción, la norma que toca, quién vigila y
+**de qué documento se leyó**. Una lectura sin procedencia es una opinión.
+
+### Tres reglas que sostienen esto
+
+**1. Si no se leyó el texto, se dice.** «Todavía no hemos leído su texto: esto
+sale del título, que toca «salud»» es información honesta — le dice al lector
+cuánto vale lo que está viendo. El genérico disfrazado de razón, no. La comisión
+sigue apareciendo, pero como contexto y después de la advertencia, nunca como
+la razón.
+
+**2. Quién es el obligado cambia la jugada.** Si la obligación recae en un
+ministerio, el cliente no tiene nada que cumplir: tiene algo que **vigilar** (la
+reglamentación). Por eso el deber que cae sobre un particular siempre gana al que
+cae sobre el Estado al elegir cuál mostrar, y cuando todos son del Estado el
+correo lo dice y la señal **baja a medio** si no hay sanciones — «alto» se
+reserva para lo que el cliente tiene que hacer.
+⚠️ Medido: en el PL 101/26 las seis obligaciones son del Ministerio de Salud;
+llamar a la primera «la que lo toca» le diría a una EPS que le crearon un deber
+que no le crearon. Y en el proyecto que modifica la Ley 80, el vocabulario de
+contratación casaba con «Entidad estatal contratante» y **no** con «Entidad
+contratista» — sin la regla, al contratista se le mostraba el deber de quien lo
+contrata.
+
+**3. Dos señales con la misma razón no son dos razones.** `reglas.distinguir()`
+es `hits_distintos` un nivel más arriba: si dos señales comparten el `porque`,
+se les agrega el primer hecho que de verdad las separe (sobre quién recae, qué
+norma tocan, quién las vigila, qué sanción traen, qué términos casaron, quién
+firma, en qué comisión, en qué estado) — y **solo** si esa faceta tiene valores
+distintos dentro del grupo: repetir «lo vigila la Supersalud» cinco veces no
+distingue nada. Lo que después de eso siga siendo idéntico está ahí de verdad
+por lo mismo (dos radicados de Cámara el mismo día, sin comisión, sin autor y sin
+texto leído): no se inventa una diferencia, se deja de repetir la frase larga.
+
+### El filtro de confianza (lo más importante)
+
+**El 24% del articulado publicado está pegado al proyecto equivocado.** Medido
+sobre la publicación del 2026-08-03: 55 de 231 registros son proyectos de Cámara
+cuyo texto se extrajo de un archivo del Senado. Es el trap que el proyecto ya
+tiene documentado — *el número de radicado no es identificador único*: se
+reinicia en cada cámara, así que el 077/26 de Cámara y el de Senado son
+proyectos distintos.
+
+Verificable a mano: `pdly:900009` se titula «…GESTORES COMUNITARIOS DEL AGUA Y
+SANEAMIENTO BÁSICO…» y su resumen habla de **turismo rural**; `pdly:900010`
+regula la **inteligencia artificial** y su resumen habla de **rutas de transporte
+turísticas**. El solape de vocabulario entre el título y su propio resumen es
+**0,03 en ese grupo contra 0,50 en el resto**, y el campo `confianza` de la
+fuente **no los detecta**: esos dos vienen marcados «media» y «alta».
+
+Un correo que le dice a un gremio de acueductos que su proyecto le crea
+obligaciones de registro turístico es **peor** que el genérico que se quería
+arreglar: es confiadamente falso. Así que `articulado.evaluar()` descarta:
+
+| descarte | cuántos | criterio |
+|---|---|---|
+| texto de la otra cámara | 55 | la cámara que implica el id (≥900.000 = Cámara) no coincide con la del archivo |
+| solo se leyó el título | 22 | `base: 'titulo'` — sus «obligaciones» serían inferidas, no leídas |
+| extracción vacía | 7 | sin resumen, ni obligaciones, ni normas |
+
+Quedan **147 utilizables**, y son los que se pueden defender uno por uno.
+
+⚠️ Se probó también un filtro por solape de palabras entre título y resumen, y
+**se descartó**: produce falsos rechazos. Un resumen fiel de «cárceles
+productivas» habla de «redención de pena por trabajo» y no comparte casi ninguna
+palabra con su título. El filtro que sirve es estructural, no lexical.
+
+⚠️ El índice por número está **scoped por cámara** y descarta cualquier número
+ambiguo en vez de adivinar, por la misma razón.
+
+---
+
 ## Niveles
 
 Cada señal viaja con un campo `porque` que explica en una línea qué la disparó.
@@ -221,11 +312,18 @@ modelo.
 
 | | Congreso | Regulatorio | Ejecutivo | Contratación |
 |---|---|---|---|---|
-| **alto** | aprobación en debate · conciliación · reforma estructural · radicado en la comisión del sector | circular o resolución (cambia la regla para todos los vigilados) · multa ≥ $100M | decreto o ley sancionada | proveedor vigilado · categoría nueva para la entidad |
-| **medio** | ponente designado · asignación de comisión · toca el sector de refilón | sanción del sector · apertura de investigación | resolución · circular · directiva | resto |
+| **alto** | aprobación en debate · conciliación · **obligación nueva con régimen sancionatorio** · obligación sobre un particular en la comisión del sector · reforma estructural | circular o resolución (cambia la regla para todos los vigilados) · multa ≥ $100M | decreto o ley sancionada | proveedor vigilado · categoría nueva para la entidad |
+| **medio** | ponente designado · asignación de comisión · **solo obliga al Estado y sin sanciones** · texto leído que no obliga ni sanciona ni toca norma vigente · toca el sector de refilón | sanción del sector · apertura de investigación | resolución · circular · directiva | resto |
 | **bajo** *(no se envía)* | honores y conmemorativos | actos procesales y de recaudo | normativa general | — |
 
 Las señales de nivel bajo **no entran al digest pero se cuentan** en el pie.
+
+⚠️ **Sin articulado el nivel es exactamente el de antes.** Lo que se ve no se
+reordenó por detrás: en la regresión documentada (28-jul → 29-jul), con el
+articulado vacío salen las mismas 18 señales y 9 altas de siempre; con
+articulado salen **las mismas 18 señales** y cambian de nivel 4, todas
+explicables una por una (2 suben por crear obligaciones con sanción, 2 bajan
+porque solo obligan al Estado).
 
 ---
 
@@ -356,6 +454,7 @@ cuenta — así que un `--probar` que falla no siempre significa key mala).
 
 ```
 reglas.py       sectores, vocabulario, niveles, salud operativa — TODO el criterio editorial
+articulado.py   el texto leído de cada proyecto + el filtro de confianza que decide de cuál fiarse
 fuentes.py      lectores de las 6 fuentes → eventos con forma común
 motor.py        orquestador: diff contra estado, clasificación, armado, silencio
 render.py       HTML de correo (tablas + estilos inline, sin fuentes web ni JS) + texto plano
@@ -380,3 +479,7 @@ degrada pero no se cae.
   que un cambio allá se herede solo, igual que hace `empresas.py`.
 - `clasificar.py` → `clasificar_titulo`, que detecta honores y reformas.
 - `empresas.py` → las 388 empresas y gremios, y las reglas de match por nombre.
+- `metadata/articulado.json` (S3) → el texto de cada proyecto ya leído, que lo
+  produce otro frente. Se baja con ETag como las demás fuentes de S3; si no
+  responde, el motor **lo dice en los avisos** y las señales del Congreso van sin
+  la lectura de su articulado, en vez de volver calladamente al genérico.

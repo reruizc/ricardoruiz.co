@@ -102,7 +102,13 @@ def novedades(fecha, camaras=None):
                 'titulo': titulo,
                 'detalle': '',
                 'url': p.get('texto_radicado_url') or '',
+                # `pid`/`tab` son la llave con la que se busca su articulado. El
+                # Senado los trae; Cámara no, y ahí se cae al número (por eso el
+                # índice del articulado está scoped por cámara: el número se
+                # repite entre las dos y cruzarlo a ciegas pega el texto de otro
+                # proyecto).
                 'meta': {'camara': camara, 'numero': num,
+                         'pid': p.get('id'), 'tab': p.get('type') or '',
                          'comision': _comision_de(p),
                          'autor': (p.get('autor') or p.get('otros_autores') or ''),
                          'estado': p.get('estado', '')},
@@ -119,6 +125,7 @@ def novedades(fecha, camaras=None):
                 'detalle': '',
                 'url': '',
                 'meta': {'camara': camara, 'numero': num,
+                         'pid': c.get('id'), 'tab': c.get('type') or '',
                          'deltas': c.get('deltas') or {}},
             })
     return eventos, faltantes

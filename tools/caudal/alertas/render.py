@@ -20,6 +20,7 @@ import sys
 import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import articulado as ART                                       # noqa: E402
 from reglas import pesos                                       # noqa: E402
 
 # --- paleta v2 (valores sólidos: rgba no es confiable en clientes de correo) --
@@ -236,6 +237,115 @@ def _meta_linea(ev):
     return ' · '.join(partes)
 
 
+# --- qué cambia · el articulado leído ---------------------------------------
+# El «por qué» de la señal ya lo dice en una frase; este bloque es el respaldo:
+# la obligación tal como está redactada, sobre quién recae, con qué plazo, qué
+# multa hay detrás y qué norma vigente se toca. Es lo que un jurídico necesita
+# para decidir si esto va a comité o no, y es lo que hasta ahora el correo no
+# traía. Va SIEMPRE con la fuente de la que se leyó: una lectura sin procedencia
+# es una opinión.
+
+def _minuscula_inicial(s):
+    """«por Solicitar autorización previa» → «por solicitar autorización previa».
+
+    Solo la primera palabra y solo si no es una sigla: bajarle la inicial a todo
+    convertía «EPS, IPS y gestores» en «ePS, IPS y gestores».
+    """
+    s = (s or '').strip()
+    primera = s.split(' ', 1)[0].rstrip(',.;:')
+    if len(primera) > 3 and primera[:1].isupper() and not primera.isupper():
+        return s[:1].lower() + s[1:]
+    return s
+
+
+def _filas_articulado(ev):
+    m = ev.get('meta') or {}
+    art = m.get('articulado')
+    if not art:
+        return []
+    filas = []
+
+    o = m.get('obligacion_clave') or {}
+    if o.get('obligacion'):
+        # La etiqueta dice de quién es el deber. «Obligación que lo toca» sobre
+        # algo que obliga a un ministerio sería prometerle al cliente un trabajo
+        # de cumplimiento que no le corresponde.
+        etiqueta = {'propia': 'Obligación que lo toca',
+                    'estado': 'Obligación (recae en el Estado)',
+                    }.get(m.get('obligacion_clase'), 'Obligación')
+        valor = recortar(str(o['obligacion']).strip(), 240)
+        pie = []
+        if o.get('sobre_quien'):
+            pie.append(f'recae en {str(o["sobre_quien"]).strip()}')
+        if o.get('plazo'):
+            pie.append(f'plazo: {str(o["plazo"]).strip()}')
+        n_obs = len(ART.obligaciones(art))
+        if n_obs > 1:
+            pie.append(f'{n_obs - 1} obligación(es) más en el texto')
+        filas.append((etiqueta, valor, ' · '.join(pie)))
+
+    sanc = ART.sanciones(art)
+    if sanc:
+        s = sanc[0]
+        # El valor es el CASTIGO; la conducta va al pie precedida de «por». Antes
+        # el castigo caía a la conducta cuando el texto no cuantificaba, y la
+        # línea quedaba «Régimen sancionatorio: Solicitar autorización previa…»,
+        # que se lee como si el proyecto sancionara justo al revés.
+        valor = ART.sancion_legible(s) or 'la trae, pero el texto no la cuantifica'
+        pie = []
+        if s.get('conducta'):
+            pie.append('por ' + _minuscula_inicial(recortar(str(s['conducta']).strip(), 150)))
+        if s.get('quien_sanciona'):
+            pie.append(f'la impone {s["quien_sanciona"]}')
+        if len(sanc) > 1:
+            pie.append(f'{len(sanc) - 1} sanción(es) más')
+        filas.append(('Régimen sancionatorio', recortar(valor, 160), ' · '.join(pie)))
+
+    mods = ART.modifica(art)
+    if mods:
+        valor = ' · '.join(ART.norma_legible(x) for x in mods[:3])
+        pie = f'{len(mods) - 3} norma(s) más' if len(mods) > 3 else ''
+        filas.append(('Modifica', recortar(valor, 220), pie))
+
+    ents = ART.entidades_vigilantes(art)
+    if ents:
+        filas.append(('Vigila / reglamenta', recortar(' · '.join(ents[:3]), 160), ''))
+
+    suj = ART.sujetos(art)
+    if suj and not o.get('sobre_quien'):
+        filas.append(('Aplica a', recortar(' · '.join(str(s) for s in suj[:4]), 200), ''))
+    return filas
+
+
+def _procedencia(art):
+    base = (art or {}).get('fuente_txt') or (art or {}).get('base_txt') or 'el texto radicado'
+    conf = (art or {}).get('confianza') or ''
+    extra = f' · confianza {conf} de la extracción' if conf else ''
+    return f'leído del {base}{extra}'
+
+
+def _articulado_html(ev):
+    filas = _filas_articulado(ev)
+    if not filas:
+        return ''
+    cuerpo = ''
+    for etiqueta, valor, pie in filas:
+        sub = (f'<div style="font-size:11px;color:{TENUE};padding-top:2px;">{e(pie)}</div>'
+               if pie else '')
+        cuerpo += (
+            f'<div style="padding-top:7px;">'
+            f'<div style="font-size:10px;letter-spacing:.08em;color:{TENUE};'
+            f'font-weight:700;text-transform:uppercase;">{e(etiqueta)}</div>'
+            f'<div style="font-size:12.5px;color:{TEXTO};line-height:1.45;'
+            f'padding-top:2px;">{e(valor)}</div>{sub}</div>')
+    return (f'<div style="margin-top:9px;padding:9px 11px;background:#0a0d16;'
+            f'border-left:2px solid {AZUL};border-radius:3px;">'
+            f'<div style="font-size:10px;letter-spacing:.1em;color:{AZUL};'
+            f'font-weight:700;">QUÉ CAMBIA</div>{cuerpo}'
+            f'<div style="font-size:10px;color:{TENUE};padding-top:7px;">'
+            f'{e(_procedencia((ev.get("meta") or {}).get("articulado")))}</div></div>')
+
+
 def _senal_html(ev):
     n = NIVEL.get(ev['nivel'], NIVEL['bajo'])
     # 260 y no 190: el título de un proyecto es boilerplate al principio («Por
@@ -296,6 +406,7 @@ def _senal_html(ev):
             {deltas}
             <div style="font-size:11px;color:{n["color"]};padding-top:8px;
                         font-style:italic;">por qué: {e(ev.get('porque', ''))}</div>
+            {_articulado_html(ev)}
             {cobertura}
           </td></tr>
         </table>
@@ -324,6 +435,33 @@ def notas_cobertura(digest, sector):
             f'{pr.get("sueltos", 0)} dispararon solos por nombrar una empresa vigilada '
             f'sin acto del Estado detrás{extra} · {pr.get("descartados", 0)} se '
             f'descartaron por ser eco sin hecho nuevo.')
+    # Cuántas señales del Congreso van con el texto leído y cuántas no. Sin esta
+    # línea, un digest en el que la mitad dice «todavía no hemos leído su texto»
+    # se lee como una falla del producto en vez de como lo que es: el estado real
+    # de la cobertura, dicho de frente.
+    congreso = (sector.get('pilares') or {}).get('congreso') or []
+    if congreso:
+        con_texto = sum(1 for x in congreso if (x.get('meta') or {}).get('articulado'))
+        sin_texto = len(congreso) - con_texto
+        if sin_texto:
+            out.append(
+                f'Congreso: {con_texto} de {len(congreso)} señales traen el análisis de su '
+                f'articulado (obligaciones, sanciones y normas que toca, leídos del texto '
+                f'radicado). De las otras {sin_texto} todavía no tenemos el texto leído, y '
+                f'lo que se dice de ellas sale del título — está marcado en cada una.')
+        else:
+            out.append(f'Congreso: las {con_texto} señales traen el análisis de su '
+                       f'articulado, leído del texto radicado.')
+    art = digest.get('articulado') or {}
+    if art.get('total') and art.get('utilizables') is not None:
+        # Los motivos se enumeran uno por uno en vez de resumirlos: no todos los
+        # descartes son lo mismo, y decir «84 por control de calidad» le
+        # atribuiría a un solo chequeo lo que hicieron tres.
+        motivos = sorted((art.get('descartes') or {}).items(), key=lambda x: -x[1])
+        detalle = ('; '.join(f'{n} porque {m}' for m, n in motivos)) if motivos else ''
+        linea = (f'Articulado disponible: {art["utilizables"]} de {art["total"]} proyectos de '
+                 f'la legislatura traen su texto leído y verificado')
+        out.append(f'{linea} ({detalle}).' if detalle else linea + '.')
     if sector.get('bajos'):
         out.append(f'Se omitieron {sector["bajos"]} señales de nivel bajo '
                    f'(honores, conmemorativos, actos procesales y de recaudo).')
@@ -451,6 +589,14 @@ def digest_texto(digest, sector):
             if ev.get('detalle'):
                 L.append(f'       {recortar(ev["detalle"], 220)}')
             L.append(f'       por qué: {ev.get("porque", "")}')
+            filas = _filas_articulado(ev)
+            if filas:
+                L.append('       QUÉ CAMBIA:')
+                for etiqueta, valor, pie in filas:
+                    L.append(f'         · {etiqueta}: {valor}')
+                    if pie:
+                        L.append(f'           ({pie})')
+                L.append(f'         {_procedencia((ev.get("meta") or {}).get("articulado"))}')
             if ev.get('cobertura'):
                 medios = ev.get('cobertura_medios') or len(
                     {c.get('medio') for c in ev['cobertura'] if c.get('medio')})
