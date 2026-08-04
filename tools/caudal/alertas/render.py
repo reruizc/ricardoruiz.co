@@ -17,6 +17,7 @@ import html as _html
 import re
 import os
 import sys
+import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from reglas import pesos                                       # noqa: E402
@@ -51,6 +52,68 @@ MESES = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
 
 def e(s):
     return _html.escape(str(s or ''), quote=True)
+
+
+def recortar(s, n):
+    """Corta en frontera de palabra y marca el corte con «…».
+
+    Un `[:190]` pelado partía los títulos a mitad de palabra —«para prevenir el
+    desabastecimient», «en beneficio de los pac»— y eso no se lee como un texto
+    acortado sino como un dato roto: el cliente no sabe si le llegó incompleto
+    el título o incompleto el sistema. El «…» es la diferencia entre las dos
+    lecturas, y cuesta un carácter.
+    """
+    s = (s or '').strip()
+    if len(s) <= n:
+        return s
+    corte = s[:n]
+    espacio = corte.rfind(' ')
+    # Si la última palabra se comió casi todo el margen (título sin espacios,
+    # una URL), se corta duro: mejor duro que devolver dos palabras.
+    if espacio > n * 0.6:
+        corte = corte[:espacio]
+    return corte.rstrip(' ,;:.-·') + '…'
+
+
+def url_segura(u):
+    """Percent-encode del path. Los PDF del Senado traen espacios en el nombre.
+
+    `…/PL 098-2026 SEGURIDAD SOCIAL.pdf` con espacios literales en el href es
+    una apuesta: el navegador lo perdona, pero los reescritores de enlaces de
+    correo corporativo (que es donde vive el cliente de un gremio) lo cortan en
+    el primer espacio y el enlace llega muerto. Encodear es gratis.
+    """
+    u = (u or '').strip()
+    if not u:
+        return ''
+    try:
+        p = urllib.parse.urlsplit(u)
+    except ValueError:
+        return u
+    if not p.scheme:
+        return u
+    return urllib.parse.urlunsplit((
+        p.scheme, p.netloc,
+        urllib.parse.quote(p.path, safe="/%:@!$&'()*+,;=~-._"),
+        urllib.parse.quote(p.query, safe="/%:@!$&'()*+,;=~-._?"),
+        p.fragment))
+
+
+def autores(s, tope=3):
+    """«A, B, C, D, E» → «A, B, C y otros 2». Nunca parte un nombre por la mitad.
+
+    El `[:80]` dejaba «…, NORMA HURT», que parece un apellido y no lo es. Con
+    una lista de firmantes, cortar en la coma y contar el resto dice lo mismo
+    sin inventar a nadie. Mismo criterio que `autoresDe()` en legislativo.html.
+    """
+    s = (s or '').strip()
+    if not s:
+        return ''
+    partes = [p.strip() for p in s.split(',') if p.strip()]
+    if len(partes) <= tope:
+        return ', '.join(partes) if partes else recortar(s, 80)
+    resto = len(partes) - tope
+    return f'{", ".join(partes[:tope])} y {resto} más'
 
 
 # Siglas que deben sobrevivir al paso a minúsculas. La lista es corta y curada:
@@ -147,7 +210,7 @@ def _meta_linea(ev):
             c = str(m['comision']).strip()
             partes.append(c if c.lower().startswith('comisi') else f'Comisión {c}')
         if m.get('autor'):
-            partes.append(str(m['autor'])[:80])
+            partes.append(autores(m['autor']))
     elif p == 'regulatorio':
         if m.get('fuente'):
             partes.append(str(m['fuente']))
@@ -175,20 +238,25 @@ def _meta_linea(ev):
 
 def _senal_html(ev):
     n = NIVEL.get(ev['nivel'], NIVEL['bajo'])
-    titulo = e(titulo_legible(ev['titulo'])[:190])
+    # 260 y no 190: el título de un proyecto es boilerplate al principio («Por
+    # medio de la cual se…») y sustancia al final. Cortar temprano se lleva justo
+    # la parte que dice de qué se trata — «…ajuste de la unidad de pago por» se
+    # comía el «capitación (UPC)», que ES la señal para una EPS. La mediana cabe
+    # entera; lo que se pasa, se marca.
+    titulo = e(recortar(titulo_legible(ev['titulo']), 260))
     if ev.get('url'):
-        titulo = (f'<a href="{e(ev["url"])}" style="color:{TEXTO};text-decoration:none;'
-                  f'border-bottom:1px solid {BORDE};">{titulo}</a>')
+        titulo = (f'<a href="{e(url_segura(ev["url"]))}" style="color:{TEXTO};'
+                  f'text-decoration:none;border-bottom:1px solid {BORDE};">{titulo}</a>')
     deltas = ''
     for d in (ev.get('meta') or {}).get('deltas_utiles', [])[:4]:
-        valor = e(d['ahora'][:90])
+        valor = e(recortar(d['ahora'], 90))
         deltas += (f'<div style="font-size:12px;color:{TENUE};padding-top:3px;">'
                    f'<span style="color:{n["color"]};">▸</span> '
                    f'{e(d["etiqueta"])}: <span style="color:{TEXTO};">{valor}</span></div>')
     detalle = ''
     if ev.get('detalle'):
         detalle = (f'<div style="font-size:12px;color:{TENUE};padding-top:4px;'
-                   f'line-height:1.45;">{e(ev["detalle"][:220])}</div>')
+                   f'line-height:1.45;">{e(recortar(ev["detalle"], 220))}</div>')
 
     # cobertura: la prensa NO es una señal aparte, es el eco de ésta.
     cobertura = ''
@@ -197,9 +265,9 @@ def _senal_html(ev):
             {c.get('medio') for c in ev['cobertura'] if c.get('medio')})
         filas = ''
         for c in ev['cobertura']:
-            t = e(c['titulo'][:110])
+            t = e(recortar(c['titulo'], 110))
             if c.get('url'):
-                t = (f'<a href="{e(c["url"])}" style="color:{TENUE};'
+                t = (f'<a href="{e(url_segura(c["url"]))}" style="color:{TENUE};'
                      f'text-decoration:underline;">{t}</a>')
             filas += (f'<div style="font-size:11px;color:{TENUE};padding-top:3px;">'
                       f'<b style="color:{TEXTO};">{e(c.get("medio") or "—")}</b> · {t}</div>')
@@ -374,26 +442,28 @@ def digest_texto(digest, sector):
         L.append(f'{PILAR.get(pilar, pilar).upper()} ({len(items) + omitidos})')
         L.append('-' * 62)
         for ev in items:
-            L.append(f'[{ev["nivel"].upper()}] {titulo_legible(ev["titulo"])[:150]}')
+            L.append(f'[{ev["nivel"].upper()}] {recortar(titulo_legible(ev["titulo"]), 260)}')
             meta = _meta_linea(ev)
             if meta:
                 L.append(f'       {meta}')
             for d in (ev.get('meta') or {}).get('deltas_utiles', [])[:4]:
-                L.append(f'       > {d["etiqueta"]}: {d["ahora"][:80]}')
+                L.append(f'       > {d["etiqueta"]}: {recortar(d["ahora"], 80)}')
             if ev.get('detalle'):
-                L.append(f'       {ev["detalle"][:160]}')
+                L.append(f'       {recortar(ev["detalle"], 220)}')
             L.append(f'       por qué: {ev.get("porque", "")}')
             if ev.get('cobertura'):
                 medios = ev.get('cobertura_medios') or len(
                     {c.get('medio') for c in ev['cobertura'] if c.get('medio')})
                 L.append(f'       esto ya lo reportaron {medios} medios:')
                 for c in ev['cobertura']:
-                    L.append(f'         - {c.get("medio", "—")}: {c["titulo"][:90]}')
+                    L.append(f'         - {c.get("medio", "—")}: {recortar(c["titulo"], 90)}')
                 resto = ev.get('cobertura_total', 0) - len(ev['cobertura'])
                 if resto > 0:
                     L.append(f'         - (+ {resto} más)')
             if ev.get('url'):
-                L.append(f'       {ev["url"][:110]}')
+                # La URL va ENTERA. Un `[:110]` la dejaba clickeable-pero-rota,
+                # que es el peor de los dos mundos: parece un enlace y da 404.
+                L.append(f'       {url_segura(ev["url"])}')
             L.append('')
         if omitidos:
             L.append(f'       (+ {omitidos} más en este pilar, ver digest.json)')
@@ -438,7 +508,7 @@ def operacion_html(digest):
               <div style="font-size:14px;color:{TEXTO};padding-top:7px;font-weight:500;">
                 {e(p['titulo'])}</div>
               <div style="font-size:12px;color:{TENUE};padding-top:4px;">
-                {e(p.get('detalle', '')[:240])}</div>
+                {e(recortar(p.get('detalle', ''), 240))}</div>
               <div style="font-size:11px;color:{n["color"]};padding-top:8px;
                           font-style:italic;">por qué: {e(p.get('porque', ''))}</div>
             </td></tr>
@@ -505,7 +575,7 @@ def operacion_texto(digest):
                     key=lambda x: 0 if x['nivel'] == 'alto' else 1):
         L.append(f'[{p["nivel"].upper()}] ({p.get("origen")}) {p["titulo"]}')
         if p.get('detalle'):
-            L.append(f'       {p["detalle"][:200]}')
+            L.append(f'       {recortar(p["detalle"], 200)}')
         L.append(f'       por qué: {p.get("porque", "")}')
         L.append('')
     if op.get('contexto'):

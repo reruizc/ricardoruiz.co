@@ -229,6 +229,39 @@ Las señales de nivel bajo **no entran al digest pero se cuentan** en el pie.
 
 ---
 
+## Render: cómo se acorta el texto (y por qué así)
+
+Todo recorte pasa por `render.recortar(s, n)`, que corta en frontera de palabra
+y marca con «…». Ninguna cadena visible se corta con un `[:n]` pelado. Suena
+cosmético y no lo es: la primera versión mostraba «para prevenir el
+desabastecimient» y «en beneficio de los pac», y un texto partido a mitad de
+palabra **no se lee como un texto acortado sino como un dato roto** — el cliente
+no sabe si le llegó incompleto el título o incompleto el sistema.
+
+Tres reglas que salieron de mirar el correo, no el código:
+
+- **Los títulos se cortan a 260, no a 190.** Un título de proyecto es
+  boilerplate al principio («Por medio de la cual se…») y sustancia al final.
+  Cortar temprano se lleva justo la parte que importa: a 190, el PL 098/26
+  terminaba en «…ajuste de la unidad de pago por» y se comía el «capitación
+  (UPC)», que ES la señal para una EPS.
+- **Las URL van enteras y percent-encoded** (`render.url_segura`). Truncarlas
+  dejaba enlaces clickeables-pero-rotos, el peor de los dos mundos. Y los PDF
+  del Senado traen espacios en el nombre (`PL 098-2026 SEGURIDAD SOCIAL.pdf`):
+  el navegador los perdona, pero los reescritores de enlaces de correo
+  corporativo —que es donde vive el cliente de un gremio— cortan en el primer
+  espacio.
+- **Las listas de firmantes se cortan por coma, nunca por carácter**
+  (`render.autores`): «…, NORMA HURTADO SÁNCHEZ y 15 más», no «…, NORMA HURT»,
+  que parece un apellido y no lo es.
+
+En el canal de operación, `reglas.cola_legible` se queda con la línea de
+excepción del stderr y tira el andamiaje del traceback. Antes el detalle era
+«— <30 espacios> output=stdout, stderr=stderr) · subprocess.CalledProcess…»:
+lo legible era el andamiaje y lo cortado, el error.
+
+---
+
 ## Cómo se monta el cron
 
 Es un agente de launchd **propio**. No toca `run_diario.sh` ni su plist: el
@@ -277,7 +310,7 @@ despertar; el estado del motor evita que eso reenvíe nada.
 
 ## Envío
 
-Por Resend, desde `contacto@ricardoruiz.co` (el dominio ya está verificado).
+Por Resend, desde `contacto@ricardoruiz.co`.
 
 **Sin `RESEND_API_KEY` el motor no falla y no se calla:** escribe los digests en
 disco y deja una cola en `pendientes.json`. Cuando la key exista:
@@ -288,9 +321,34 @@ RESEND_API_KEY=... python3 tools/caudal/alertas/sender.py \
 ```
 
 Eso importa porque **el estado del motor ya avanzó**: si un correo se pierde por
-falta de key, esas señales no vuelven a aparecer mañana.
+falta de key, esas señales no vuelven a aparecer mañana. La cola es conservadora:
+solo borra de `pendientes.json` lo que Resend confirmó; si el reintento vuelve a
+fallar, los cinco digests siguen ahí (verificado).
+
+### ⚠ Tener key no es tener envío: la key tiene que ser de la cuenta correcta
+
+Medido ago-2026, y costó un rato: la key configurada era **válida** —Resend la
+aceptaba— pero era de **otra cuenta de Resend**, donde `ricardoruiz.co` no está
+verificado. La API contesta:
+
+```
+HTTP 403 · The ricardoruiz.co domain is not verified.
+```
+
+…que se lee como *«hay que verificar el dominio»* cuando lo que pasaba era
+*«esta key es de otra cuenta»*. Son dos arreglos distintos y el mensaje no los
+distingue. Antes de pelear con DNS:
+
+```bash
+python3 tools/caudal/alertas/sender.py --diagnostico
+```
+
+Lista los dominios que la cuenta de ESA key tiene verificados y dice si el
+dominio del remitente está entre ellos. `rc=0` si puede enviar, `1` si no.
 
 Prueba de cableado: `RESEND_API_KEY=... python3 sender.py --probar tu@correo.com`
+(ojo: sin dominio verificado, Resend solo deja mandar a la dirección dueña de la
+cuenta — así que un `--probar` que falla no siempre significa key mala).
 
 ---
 
@@ -301,7 +359,7 @@ reglas.py       sectores, vocabulario, niveles, salud operativa — TODO el crit
 fuentes.py      lectores de las 6 fuentes → eventos con forma común
 motor.py        orquestador: diff contra estado, clasificación, armado, silencio
 render.py       HTML de correo (tablas + estilos inline, sin fuentes web ni JS) + texto plano
-sender.py       Resend, con cola cuando falta la key
+sender.py       Resend, con cola cuando falta la key · --diagnostico para la cuenta/dominio
 run_alertas.sh  runner del cron (candado, timeout, log rotado)
 co.ricardoruiz.caudal-alertas.plist   agente de launchd
 destinatarios.ejemplo.json            plantilla; el real va gitignored

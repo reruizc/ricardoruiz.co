@@ -824,6 +824,42 @@ def corrobora(titular, eventos_ancla, minimo_comun=2):
 
 HORAS_CORRIDA_VIEJA = 30
 
+# Andamiaje de traceback: ubica el error en el código, no lo explica. En un
+# correo de operación ocupa el espacio de lo único que importa —la excepción—,
+# que además queda cortada por el tope de caracteres.
+_RUIDO_TRACEBACK = re.compile(
+    r'^\s*(Traceback \(most recent call last\)|File ".*", line \d+|raise |'
+    r'\.\.\.|\^+\s*$)')
+# La línea de excepción de Python: `modulo.NombreError: mensaje`. Cuando
+# aparece, es LA explicación y todo lo anterior es andamiaje.
+_LINEA_EXCEPCION = re.compile(
+    r'^[A-Za-z_][\w.]*(Error|Exception|Interrupt|Exit|Timeout)\b.*?:')
+
+
+def cola_legible(lineas, n=2):
+    """Últimas líneas de una etapa caída, en forma de frase.
+
+    `salida_cola` trae el final del stderr crudo: sangría de traceback, la línea
+    de código que lanzó, y solo al final la excepción. Pegarlo tal cual daba
+    «— <30 espacios> output=stdout, stderr=stderr) · subprocess.CalledProcess…»,
+    donde lo legible es el andamiaje y lo cortado es el error.
+
+    Dos pasadas: se tira el andamiaje evidente y se colapsa el blanco; y si
+    queda una línea de excepción, se devuelve SOLO ella — el fragmento de
+    código que la lanzó no le dice nada a quien lee el correo, y quitarlo es lo
+    que hace que el mensaje del error entre completo en el tope de caracteres.
+    """
+    utiles = []
+    for ln in (lineas or []):
+        ln = ' '.join(str(ln).split())          # colapsa sangría y tabs
+        if not ln or _RUIDO_TRACEBACK.match(ln):
+            continue
+        utiles.append(ln)
+    for ln in reversed(utiles):
+        if _LINEA_EXCEPCION.match(ln):
+            return ln
+    return ' · '.join(utiles[-n:])
+
 
 def problemas_operacion(estado, ahora=None):
     """estado.json → (problemas accionables, contexto no accionable).
@@ -861,7 +897,7 @@ def problemas_operacion(estado, ahora=None):
         else:
             for et in corrida.get('etapas', []):
                 if et.get('estado') == 'error':
-                    cola = ' · '.join((et.get('salida_cola') or [])[-2:])
+                    cola = cola_legible(et.get('salida_cola'))
                     problemas.append({
                         'nivel': 'alto', 'origen': 'corrida',
                         'titulo': f'Etapa «{et.get("nombre")}» falló (rc={et.get("rc")})',

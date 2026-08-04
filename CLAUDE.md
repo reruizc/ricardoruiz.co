@@ -6362,9 +6362,12 @@ entrar. `rr-auth` ya tiene planes y Wompi ya cobra para el resto del sitio, pero
 **nada de eso está cableado a Caudal**. Ese cableado es lo que convierte 72% en
 algo vendible, y no lo tocó ninguno de los cinco frentes.
 
-**Lo que depende de Ricardo, no de código:** `RESEND_API_KEY` y
-`CAUDAL_ALERTAS_TOKEN` ✅ ya puestas (ago-2026) · `SOCRATA_APP_TOKEN` sigue
-faltando (SECOP corre con el rate limit anónimo; exige cuenta en datos.gov.co).
+**Lo que depende de Ricardo, no de código:** `CAUDAL_ALERTAS_TOKEN` ✅ puesta y
+funcionando · **`RESEND_API_KEY` está puesta pero es de la cuenta de Resend
+equivocada** (solo tiene verificado `hilvana.com.co`) → los envíos dan 403 y se
+encolan; ver el bloqueador en la sección del motor de alertas ·
+`SOCRATA_APP_TOKEN` sigue faltando (SECOP corre con el rate limit anónimo; exige
+cuenta en datos.gov.co).
 
 **✅ EN PRODUCCIÓN (los dos frentes están desplegados y probados):**
 - **Diccionario de empresas ④** — `tools/caudal/empresas.py` (388 entradas) en
@@ -6456,21 +6459,25 @@ faltando (SECOP corre con el rate limit anónimo; exige cuenta en datos.gov.co).
 > conteo) · `8f728d7` + `60a854c` (frente legislativo) · `9ba2ef1` (editor de
 > perfil). La Lambda está en **3008 MB / 60 s** y sirve el dataset nuevo.
 >
-> **Configurado y verificado end-to-end:** el motor de alertas habla con el
-> worker (`CAUDAL_ALERTAS_TOKEN` puesto en los dos lados, 43 chars) y
-> `RESEND_API_KEY` está en `~/.config/caudal/alertas.env`. Una corrida en seco
-> reporta *«0 perfiles con alertas encendidas de 0 guardados»*, que es la
-> respuesta correcta del endpoint: cae a los 6 sectores porque todavía no hay
-> ningún perfil creado.
+> **Configurado y verificado end-to-end salvo la última milla:** el motor habla
+> con el worker (`CAUDAL_ALERTAS_TOKEN` puesto en los dos lados, 43 chars),
+> `destinatarios.json` ya existe (todo a `reruizc@gmail.com`) y la corrida de
+> producción del 3-ago selló el baseline (19.134 llaves) y armó su digest. Ya
+> reporta *«0 con alertas encendidas de 1 guardados»* — el editor de perfil de
+> `9ba2ef1` funciona y el opt-in nace apagado, como se diseñó.
 >
 > **Lo que falta para estrenar el piloto, en orden:**
-> 1. **El click-through en navegador** — crear un perfil, prender el
+> 1. **La `RESEND_API_KEY` correcta** — es el bloqueador real del push. La que
+>    está es válida pero de **otra cuenta de Resend** (solo tiene verificado
+>    `hilvana.com.co`), así que todo envío da `403 domain is not verified` y se
+>    encola. Pegar una key de la cuenta donde `ricardoruiz.co` sí está
+>    verificado y confirmar con `sender.py --diagnostico` (`rc=0` = puede
+>    enviar). Después, `sender.py --pendientes …/digests/2026-08-03` suelta el
+>    digest de operación que quedó en cola.
+> 2. **El click-through en navegador** — crear un perfil, prender el
 >    interruptor, correr su radar, editarlo, borrarlo. NADIE lo ha hecho:
 >    `caudal.html` es gated y el preview no puede autenticarse. Es un minuto
 >    con Chrome, donde la sesión ya está iniciada.
-> 2. **`destinatarios.json`** — hoy vacío; las corridas reportan
->    `sin_destinatarios`. Sin esto el motor calcula y encola, pero no le llega
->    a nadie.
 > 3. **`SOCRATA_APP_TOKEN`** — SECOP corre con el rate limit anónimo. Exige
 >    cuenta en datos.gov.co, la crea Ricardo.
 >
@@ -6727,10 +6734,41 @@ hábil): `--baseline --fecha 2026-07-28 --sin-api` y luego `--fecha 2026-07-29
 (salud 6/4 · contratación 3/1 · energía 3/1 · educación 2/1 · trabajo 4/2).
 Contra la primera versión, mismos datos: 440 señales → 35 y 52 "altas" → 5.
 
-**Pendiente:** el click-through del interruptor en un navegador real (`caudal.html`
-es gated y el preview no puede autenticarse) y `destinatarios.json`, que hoy está
-vacío. Los `datos/` quedaron bajo `tools/` contra la convención del proyecto; se
-mueven con `CAUDAL_ALERTAS_DIR`.
+**⚠️ BLOQUEADOR del envío (ago-3-2026): la `RESEND_API_KEY` es de la cuenta
+equivocada.** `destinatarios.json` ya existe (todo a `reruizc@gmail.com`,
+gitignored) y el motor corre en producción, pero **ningún correo ha salido
+todavía**: Resend responde `403 · The ricardoruiz.co domain is not verified`. La
+key es válida —Resend la acepta— pero pertenece a **otra cuenta de Resend**, en
+la que el único dominio verificado es `hilvana.com.co`. El mensaje de la API se
+lee como «verificá el dominio» cuando el arreglo real es «poné una key de la
+cuenta donde ricardoruiz.co ya está verificado»; son dos cosas distintas y la
+API no las distingue. **Lo resuelve Ricardo**, no el código: pegar la key buena
+en `~/.config/caudal/alertas.env` y confirmar con
+`python3 tools/caudal/alertas/sender.py --diagnostico` (lista los dominios de esa
+cuenta y devuelve `rc=0` solo si puede enviar). Hecho eso, el digest de operación
+del 3-ago ya está encolado y sale con
+`sender.py --pendientes tools/caudal/alertas/datos/digests/2026-08-03`.
+
+**Verificado end-to-end salvo la última milla** (ago-3): baseline sella 19.134
+llaves · la regresión documentada reproduce exacto (18 señales, 9 altas, 5
+destinos) · **silencio** correcto (sin señales y sin problemas de operación no
+manda nada, `rc=0`) · **cola** conservadora (sin key no envía ni vacía; con key
+mala reintenta, falla y conserva los 5 — nada se pierde en silencio).
+
+**Arreglos de render del mismo día** (ver README, sección «Render»): todo recorte
+pasa por `render.recortar` (frontera de palabra + «…»); los títulos van a 260 y
+no a 190 porque el título de un proyecto es boilerplate al principio y sustancia
+al final —a 190 el PL 098/26 se comía el «capitación (UPC)», que es LA señal para
+una EPS—; las URL van enteras y percent-encoded (`url_segura`, porque los PDF del
+Senado traen espacios y los reescritores de enlaces de correo corporativo cortan
+ahí); los firmantes se cortan por coma (`autores` → «y 15 más», no «NORMA HURT»);
+y `reglas.cola_legible` deja la línea de excepción del stderr en vez del
+andamiaje del traceback.
+
+**Pendiente:** el click-through del interruptor en un navegador real
+(`caudal.html` es gated y el preview no puede autenticarse). Los `datos/`
+quedaron bajo `tools/` contra la convención del proyecto; se mueven con
+`CAUDAL_ALERTAS_DIR`.
 
 **IDEA · resumen ejecutivo diario por WhatsApp (backlog, ago-2026).** El motor ya
 produce el digest en texto y HTML; **el canal sería lo único nuevo**, no el
