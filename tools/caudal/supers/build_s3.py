@@ -87,6 +87,22 @@ def parse_monto(v):
         return None
 
 
+# reencuadre jul-2026: el pilar cubre ACTOS regulatorios, no solo sanciones.
+# La vista por defecto sigue siendo 'sancion' (no diluir lo que ve el cliente);
+# los demás tipos entran con el toggle "toda la actividad regulatoria".
+TIPOS_ACTO = ('sancion', 'apertura_investigacion', 'archivo',
+              'contribucion_especial', 'resolucion', 'circular', 'otro')
+TIPO_ACTO_TXT = {
+    'sancion': 'Sanciones',
+    'apertura_investigacion': 'Aperturas de investigación',
+    'archivo': 'Archivos y exoneraciones',
+    'contribucion_especial': 'Contribución especial',
+    'resolucion': 'Resoluciones',
+    'circular': 'Circulares',
+    'otro': 'Otros actos',
+}
+
+
 def slim(rec):
     fecha = parse_fecha(rec.get('fecha_firmeza'))
     monto = parse_monto(rec.get('monto'))
@@ -94,11 +110,14 @@ def slim(rec):
     mot = _clean_text(rec.get('motivo') or '')
     desc = _clean_text(rec.get('descripcion') or '')
     blob = ' '.join(x for x in (sanc, mot, desc, rec.get('fuente_nombre', '')) if x).lower()
+    ta = (rec.get('tipo_acto') or '').strip()
     return {
         'sancionado': sanc or '—',
         'fuente': rec.get('fuente', ''),
         'fuente_nombre': rec.get('fuente_nombre', ''),
         'sector': rec.get('sector', ''),
+        # tipo_acto = qué CLASE de acto es (filtro); tipo = su rótulo legible
+        'tipo_acto': ta if ta in TIPOS_ACTO else 'sancion',
         'tipo': (rec.get('tipo_sancion') or '').strip(),
         'motivo': mot[:280],
         'descripcion': desc[:120],
@@ -121,37 +140,49 @@ def main():
         for r in recs:
             fh.write(json.dumps(r, ensure_ascii=False) + '\n')
 
-    por_sector = Counter(r['sector'] for r in recs)
-    por_fuente = Counter(r['fuente_nombre'] for r in recs)
-    por_tipo = Counter((r['tipo'] or '—') for r in recs)
-    con_monto = [r['monto'] for r in recs if r['monto']]
-    fechas = sorted(r['fecha'] for r in recs if r['fecha'])
-    recientes = sorted([r for r in recs if r['fecha']],
+    # el landing por defecto muestra SANCIONES: sus agregados se calculan sobre
+    # ese subconjunto, no sobre el universo (si no, el cliente vería un "total"
+    # inflado con contribuciones y aperturas). Los del universo van aparte.
+    sanc = [r for r in recs if r['tipo_acto'] == 'sancion']
+    por_tipo_acto = Counter(r['tipo_acto'] for r in recs)
+    por_sector = Counter(r['sector'] for r in sanc)
+    por_fuente = Counter(r['fuente_nombre'] for r in sanc)
+    por_tipo = Counter((r['tipo'] or '—') for r in sanc)
+    con_monto = [r['monto'] for r in sanc if r['monto']]
+    fechas = sorted(r['fecha'] for r in sanc if r['fecha'])
+    recientes = sorted([r for r in sanc if r['fecha']],
                        key=lambda r: r['fecha'], reverse=True)[:15]
     for r in recientes:            # la muestra no necesita el blob de búsqueda
         r.pop('q', None)
+    todo_por_sector = Counter(r['sector'] for r in recs)
 
     stats = {
-        'total': len(recs),
+        'total': len(sanc),                 # sanciones (lo que ve el cliente por defecto)
+        'total_actos': len(recs),           # universo completo del pilar
+        'por_tipo_acto': [{'tipo_acto': t, 'tipo_acto_txt': TIPO_ACTO_TXT.get(t, t), 'n': n}
+                          for t, n in por_tipo_acto.most_common()],
         'por_sector': [{'sector': s, 'sector_txt': SECTOR_TXT.get(s, s.title()), 'n': n}
                        for s, n in por_sector.most_common()],
+        'por_sector_todo': [{'sector': s, 'sector_txt': SECTOR_TXT.get(s, s.title()), 'n': n}
+                            for s, n in todo_por_sector.most_common()],
         'por_fuente': [{'fuente': f, 'n': n} for f, n in por_fuente.most_common()],
         'por_tipo': [{'tipo': t, 'n': n} for t, n in por_tipo.most_common(8)],
         'monto': {
-            'con_monto': len(con_monto), 'sin_monto': len(recs) - len(con_monto),
+            'con_monto': len(con_monto), 'sin_monto': len(sanc) - len(con_monto),
             'total_cop': round(sum(con_monto)), 'max_cop': round(max(con_monto)) if con_monto else 0,
         },
         'rango_fechas': [fechas[0], fechas[-1]] if fechas else ['', ''],
         'recientes': recientes,
-        'fuentes': ['INVIMA', 'SECOP I', 'SECOP II', 'Contraloría (resp. fiscal)',
-                    'Junta Central de Contadores', 'Superfinanciera',
-                    'Supertransporte', 'SIC', 'Supersalud'],
+        'fuentes': sorted({r['fuente_nombre'] for r in recs if r['fuente_nombre']}),
     }
     (OUT / 'sanciones-stats.json').write_text(
         json.dumps(stats, ensure_ascii=False, indent=1), encoding='utf-8')
 
-    print(f"slim: {len(recs)} sanciones -> {(OUT/'sanciones.jsonl').relative_to(REPO)}")
-    print(f"sectores: {dict(por_sector)}")
+    print(f"slim: {len(recs)} actos ({len(sanc)} sanciones) -> "
+          f"{(OUT/'sanciones.jsonl').relative_to(REPO)}")
+    for t, n in por_tipo_acto.most_common():
+        print(f"  {t:24s} {n:>6d}")
+    print(f"sectores (sanciones): {dict(por_sector)}")
     print(f"con monto: {len(con_monto)} · total COP {stats['monto']['total_cop']:,}")
     print(f"rango: {stats['rango_fechas']}")
 

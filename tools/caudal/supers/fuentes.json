@@ -1,11 +1,21 @@
 {
-  "_doc": "Registro de fuentes de sanciones/actos de superintendencias y entidades reguladoras para Caudal (Cauce). 'via' 1=Socrata datos.gov.co (JSON directo), 2=API interna no documentada del portal, 3=normograma/PDF (pipeline gaceta+DeepSeek). 'granularidad' entidad=sancionado individual (sirve para alerta), agregado=solo conteos (contexto). El harvester actual (harvest_supers.py) implementa via 1; via 2 y 3 quedan registradas con su endpoint para el siguiente sprint.",
+  "_doc": "Registro de fuentes de ACTOS REGULATORIOS (sanciones y demás actuaciones) de superintendencias y entidades reguladoras para Caudal (Cauce). 'via' 1=Socrata datos.gov.co (JSON directo), 2=API interna no documentada del portal, 3=normograma/PDF (pipeline gaceta+DeepSeek). 'granularidad' entidad=destinatario individual (sirve para alerta), agregado=solo conteos (contexto). REENCUADRE jul-2026: el pilar deja de ser 'sanciones' y pasa a 'actos regulatorios' — cada registro lleva 'tipo_acto' (sancion|apertura_investigacion|archivo|contribucion_especial|resolucion|circular|otro). La vista de sanciones del cliente filtra tipo_acto='sancion'; el resto es actividad regulatoria del sector, que también es inteligencia. 'tipo_acto_default' fija el tipo de las fuentes cuyo dataset entero es de una sola clase (todas las de sanciones); solo supersalud-registro lo trae por fila, extraído del PDF.",
+  "_tipos_acto": [
+    "sancion",
+    "apertura_investigacion",
+    "archivo",
+    "contribucion_especial",
+    "resolucion",
+    "circular",
+    "otro"
+  ],
   "_schema_normalizado": [
     "fuente",
     "fuente_nombre",
     "sector",
     "sancionado",
     "identificacion",
+    "tipo_acto",
     "tipo_sancion",
     "motivo",
     "monto",
@@ -39,7 +49,8 @@
         "fecha_firmeza": "fecha_firmeza",
         "descripcion": "producto",
         "_id": "numero_proceso"
-      }
+      },
+      "tipo_acto_default": "sancion"
     },
     {
       "slug": "contraloria-fiscal",
@@ -63,7 +74,8 @@
         "fecha_firmeza": "fecha_de_firmeza_de_la_decisi",
         "estado": "informaci_n_de_recursos",
         "descripcion": "descripci_n_o_detalle_resumen"
-      }
+      },
+      "tipo_acto_default": "sancion"
     },
     {
       "slug": "secop1-multas",
@@ -86,7 +98,8 @@
         "resolucion": "numero_de_resolucion",
         "fecha_firmeza": "fecha_de_firmeza",
         "descripcion": "nombre_entidad"
-      }
+      },
+      "tipo_acto_default": "sancion"
     },
     {
       "slug": "secop2-multas",
@@ -110,7 +123,8 @@
         "fecha_firmeza": "fecha_evento",
         "estado": "estado",
         "descripcion": "nombre_entidad_creadora"
-      }
+      },
+      "tipo_acto_default": "sancion"
     },
     {
       "slug": "junta-contadores",
@@ -132,7 +146,8 @@
         "resolucion": "resoluci_n",
         "fecha_firmeza": "fecha_ejecutoria",
         "descripcion": "meses"
-      }
+      },
+      "tipo_acto_default": "sancion"
     },
     {
       "slug": "mintrabajo-territorial",
@@ -147,7 +162,8 @@
       "fecha_col": null,
       "count_aprox": 37,
       "nota": "Agregado por territorial (solo conteos y valores). Contexto, no alerta por entidad.",
-      "map": {}
+      "map": {},
+      "tipo_acto_default": "sancion"
     },
     {
       "slug": "sfc-mercado-valores",
@@ -171,7 +187,8 @@
         "fecha_firmeza": "fechaFirmeza",
         "estado": "estadoSancion",
         "descripcion": "observacion"
-      }
+      },
+      "tipo_acto_default": "sancion"
     },
     {
       "slug": "supertransporte",
@@ -192,7 +209,8 @@
         "estado": "estado",
         "url": "url",
         "_id": "id"
-      }
+      },
+      "tipo_acto_default": "sancion"
     },
     {
       "slug": "sic",
@@ -213,7 +231,8 @@
         "estado": "estado",
         "url": "url",
         "_id": "id"
-      }
+      },
+      "tipo_acto_default": "sancion"
     },
     {
       "slug": "supersalud",
@@ -235,6 +254,33 @@
         "estado": "estado",
         "url": "url",
         "_id": "id"
+      },
+      "tipo_acto_default": "sancion"
+    },
+    {
+      "slug": "supersalud-registro",
+      "nombre": "Superintendencia Nacional de Salud (registro de actos)",
+      "sector": "salud",
+      "via": 3,
+      "granularidad": "entidad",
+      "dificultad": "alta",
+      "tipo_acto_default": "otro",
+      "endpoint": "https://www.supersalud.gov.co/es-co/_api/search/query",
+      "metodo": "GET",
+      "nota": "IMPLEMENTADA jul-2026 via harvest_supersalud_registro.py (vía 3: SharePoint Search enumera → PDF → pypdf → DeepSeek estructura el acto). Es el REGISTRO REAL, distinto de la fuente 'supersalud' (sala de prensa, 16 sanciones publicitadas). Bibliotecas: Notificaciones/Por Aviso + Notificaciones/NotificacionesPorAviso + Juridica/Resoluciones, body-match 'sancionatorio', dedup por nº de resolución. OJO: está DOMINADO por actos procesales, no por multas — por eso el pilar se reencuadró a 'actos regulatorios' y aquí `tipo_acto` viene POR FILA (lo clasifica el modelo), no del default. `sancionado` guarda la entidad DESTINATARIA del acto (sancionada, investigada o contribuyente). fecha_firmeza = fecha del acto, o el Write del PDF si el acto no la trae.",
+      "map": {
+        "sancionado": "sancionado",
+        "identificacion": "identificacion",
+        "tipo_acto": "tipo_acto",
+        "tipo_sancion": "tipo_sancion",
+        "motivo": "motivo",
+        "monto": "monto",
+        "resolucion": "resolucion",
+        "fecha_firmeza": "fecha_firmeza",
+        "estado": "estado",
+        "descripcion": "descripcion",
+        "url": "url",
+        "_id": "_id"
       }
     },
     {
@@ -244,8 +290,9 @@
       "via": 3,
       "granularidad": "entidad",
       "dificultad": "alta",
-      "endpoint": "https://www.supersociedades.gov.co/web/nuestra-entidad/normativa",
-      "nota": "Liferay. 478 resoluciones + 198 circulares externas como PDF. Pipeline gaceta+DeepSeek.",
+      "estado": "descartada",
+      "endpoint": "https://www.supersociedades.gov.co/web/supervision-societaria/avisos",
+      "nota": "DESCARTADA jul-2026 tras auditar el portal — no es problema de scraping, es que NO HAY registro de sanciones publicado. (a) /web/nuestra-entidad/normativa es NORMATIVA GENERAL (resoluciones + circulares externas a vigilados), no sanciones — premise corregido antes. (b) /web/supervision-societaria/avisos SÍ es scrapeable (AssetPublisher Liferay INSTANCE_zyly, server-rendered, 29 PDFs en href=/documents/80303/160010/*, sin JS) — el bloqueo declarado como 'landing dinámico' era FALSO — pero su contenido son AVISOS DE NOTIFICACIÓN DE OFICIOS DE RESPUESTA A DERECHOS DE PETICIÓN (art. 69 CPACA): verificado leyendo 2 PDFs, texto literal 'no fue posible la notificación de la contestación a su solicitud'. Cero valor regulatorio. (c) /notificaciones, /web/intervencion-y-asuntos-financieros-especiales/avisos y /web/procedimientos-de-insolvencia/avisos-landing traen 0 documentos; /web/procedimientos-mercantiles/avisos-de-procesos-especiales trae 1, y es litigio mercantil entre privados. (d) La búsqueda del sitio (resultados_busqueda?_com_liferay_portal_search_web_search_bar_portlet_SearchBarPortlet_keywords=) devuelve 0 documentos para 'sancionatorio'/'multa'. (e) Socrata: 7 datasets, todos estados financieros NIIF + sujetos obligados. Retomar solo si Supersociedades empieza a publicar sus resoluciones sancionatorias.",
       "map": {}
     }
   ]

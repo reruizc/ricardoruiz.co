@@ -30,6 +30,7 @@ import json
 import subprocess
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -44,6 +45,7 @@ UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
 PAGE = 50000  # tope SoQL por request
 
 NORM_FIELDS = FUENTES['_schema_normalizado']
+TIPOS_ACTO = set(FUENTES['_tipos_acto'])
 
 
 def curl_json(url, timeout=60):
@@ -113,6 +115,11 @@ def normalize_row(f, row):
             continue
         src = m.get(nf)
         rec[nf] = row.get(src) if src else None
+    # tipo_acto (reencuadre jul-2026): las fuentes cuyo dataset entero es de una
+    # sola clase lo declaran en tipo_acto_default; supersalud-registro lo trae
+    # POR FILA (lo clasifica el modelo leyendo el PDF) y ese gana.
+    t = rec.get('tipo_acto')
+    rec['tipo_acto'] = t if t in TIPOS_ACTO else f.get('tipo_acto_default', 'sancion')
     rec['_raw'] = row
     return rec
 
@@ -132,7 +139,9 @@ def normalize_all():
             continue
         recs = [normalize_row(f, r) for r in rows]
         all_recs.extend(recs)
-        per_fuente[f['slug']] = {'filas': len(recs), 'granularidad': 'entidad'}
+        tp = Counter(r.get('tipo_acto') or 'otro' for r in recs)
+        per_fuente[f['slug']] = {'filas': len(recs), 'granularidad': 'entidad',
+                                 'por_tipo_acto': dict(tp.most_common())}
 
     jsonl = DIST / 'sanciones.jsonl'
     with jsonl.open('w', encoding='utf-8') as fh:
@@ -146,16 +155,22 @@ def normalize_all():
         for r in all_recs:
             w.writerow({k: r.get(k) for k in csv_cols})
 
+    por_tipo = Counter(r.get('tipo_acto') or 'otro' for r in all_recs)
     stats = {
-        'total_sanciones_entidad': len(all_recs),
+        'total_actos_entidad': len(all_recs),
+        'total_sanciones_entidad': por_tipo.get('sancion', 0),
+        'por_tipo_acto': dict(por_tipo.most_common()),
         'por_fuente': per_fuente,
         'campos': csv_cols,
     }
     (DIST / 'stats.json').write_text(
         json.dumps(stats, ensure_ascii=False, indent=2), encoding='utf-8')
-    print(f"\nconsolidado: {len(all_recs)} sanciones (nivel entidad) -> {jsonl.relative_to(REPO)}")
+    print(f"\nconsolidado: {len(all_recs)} actos (nivel entidad) -> {jsonl.relative_to(REPO)}")
     for slug, s in per_fuente.items():
         print(f"  {slug:22s} {s['filas']:>6d}  {s.get('granularidad','')}")
+    print('\npor tipo de acto:')
+    for t, n in por_tipo.most_common():
+        print(f"  {t:24s} {n:>6d}")
 
 
 def cmd_list():

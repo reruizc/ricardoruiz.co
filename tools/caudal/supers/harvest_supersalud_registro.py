@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
 """
-Caudal · pilar Regulatorio — REGISTRO REAL de sanciones de Supersalud (vía 3).
+Caudal · pilar Regulatorio — REGISTRO REAL de ACTOS de Supersalud (vía 3).
 
 El fetch_supersalud() de harvest_comunicados.py cosecha la SALA DE PRENSA
 (Comunicaciones/Comunicados, ~16 sanciones publicitadas). Este script cosecha el
-REGISTRO REAL: las resoluciones sancionatorias que Supersalud publica para
+REGISTRO REAL: los actos administrativos que Supersalud publica para
 notificación en sus bibliotecas SharePoint. Son cientos, con títulos OPACOS
 (número de resolución) → hay que LEER el PDF = pipeline PDF→DeepSeek, mismo
 patrón que la fase 3 de gacetas del pilar Congreso (extraer_gaceta + acción
 `gaceta` de la Lambda), pero corrido OFFLINE (como los demás harvesters de
 supers) para producir el dataset y subir solo el resultado.
+
+REENCUADRE jul-2026 — el pilar es "actos regulatorios", no solo "sanciones".
+Medido sobre una muestra de 12: CERO sanciones reales; todo eran actos
+procesales (archivo, apertura de investigación, contribución especial). Antes
+esos se DESCARTABAN; ahora se conservan TODOS y se tipan con `tipo_acto`:
+
+    sancion · apertura_investigacion · archivo · contribucion_especial ·
+    resolucion · circular · otro
+
+El cliente quiere ver toda la actividad del Estado sobre su sector, no solo las
+multas. La vista de sanciones se preserva filtrando `tipo_acto == 'sancion'`.
 
 Bibliotecas fuente (body-match 'sancionatorio' en la SharePoint Search API):
   PortalWeb/Notificaciones/Por Aviso                (~544)  2016-2026
@@ -37,6 +48,7 @@ import re
 import subprocess
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from urllib.parse import quote
 
@@ -61,6 +73,16 @@ FOLDERS = [
 SEARCH = 'https://www.supersalud.gov.co/es-co/_api/search/query'
 DEEPSEEK_MODEL = 'deepseek-v4-flash'
 DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
+
+# Sube PROMPT_VERSION al cambiar SNS_REG_SYSTEM: las extracciones cacheadas con
+# versión vieja se re-piden solas (mismo criterio que el PROMPT_VERSION de la
+# Lambda). v1 = prompt "solo sanciones"; v2 = prompt de actos regulatorios.
+PROMPT_VERSION = 'v2'
+
+# Taxonomía canónica del pilar. El modelo devuelve un vocabulario más granular
+# (y el prompt v1 usaba otro) → _norm_tipo_acto() colapsa ambos a estos 7.
+TIPOS_ACTO = ('sancion', 'apertura_investigacion', 'archivo',
+              'contribucion_especial', 'resolucion', 'circular', 'otro')
 
 
 # ------------------------------------------------------------------ util
@@ -232,33 +254,77 @@ def cmd_download(limit=None):
 
 # --------------------------------------------------------------- extract
 SNS_REG_SYSTEM = (
-    "Eres analista del pilar regulatorio de Cauce. Te doy el TEXTO de un documento "
-    "de la Superintendencia Nacional de Salud de Colombia (una resolución "
-    "sancionatoria o su notificación/citación por aviso). Tu tarea: extraer la "
-    "sanción de forma estructurada. REGLA DURA: usa SOLO lo que dice el texto; si "
-    "un dato no aparece, ponlo en null. NO inventes montos, nombres ni NIT.\n"
+    "Eres analista del pilar regulatorio de Cauce. Te doy el TEXTO de un acto "
+    "administrativo de la Superintendencia Nacional de Salud de Colombia (una "
+    "resolución, o su notificación/citación por aviso). Tu tarea: extraer el acto "
+    "de forma estructurada, SEA O NO una sanción — nos interesa toda la actividad "
+    "regulatoria sobre los vigilados, no solo las multas. REGLA DURA: usa SOLO lo "
+    "que dice el texto; si un dato no aparece, ponlo en null. NO inventes montos, "
+    "nombres ni NIT.\n"
     "Devuelves SIEMPRE un JSON válido con estas claves:\n"
-    "- es_sancion: true si el acto IMPONE o CONFIRMA una sanción (multa, "
-    "amonestación, etc.) a una entidad o persona vigilada; false si es apertura de "
-    "investigación / formulación de pliego de cargos / archivo / exoneración / "
-    "revocatoria / acto no sancionatorio.\n"
-    "- tipo_acto: 'sancion_impuesta' | 'apertura_investigacion' | 'archivo' | "
-    "'confirma_sancion' | 'revoca' | 'otro'.\n"
-    "- sancionado: razón social o nombre de la entidad/persona sancionada (o "
-    "investigada), null si no aparece.\n"
+    "- tipo_acto: clasifica el acto en UNA de estas categorías:\n"
+    "    'sancion' — IMPONE o CONFIRMA una sanción (multa, amonestación) a un "
+    "vigilado.\n"
+    "    'apertura_investigacion' — abre investigación o formula pliego de cargos.\n"
+    "    'archivo' — archiva la actuación, exonera, revoca o desiste.\n"
+    "    'contribucion_especial' — liquida, cobra o ajusta la contribución especial "
+    "a favor de la Supersalud (es un TRIBUTO de los vigilados, NUNCA una multa).\n"
+    "    'resolucion' — otra resolución administrativa de contenido general o "
+    "particular que no cae en las anteriores (habilitaciones, medidas especiales, "
+    "liquidaciones de entidades, nombramientos).\n"
+    "    'circular' — circular externa o instrucción a los vigilados.\n"
+    "    'otro' — no se puede determinar.\n"
+    "- es_sancion: true SOLO si tipo_acto es 'sancion'. Sirve de verificación.\n"
+    "- entidad: razón social o nombre de la entidad/persona DESTINATARIA del acto "
+    "(sancionada, investigada, o a quien se le liquida la contribución). Ponla "
+    "SIEMPRE que aparezca, sea o no una sanción. null si no aparece.\n"
     "- identificacion: NIT o cédula si aparece, si no null.\n"
-    "- tipo_sancion: 'Multa' | 'Amonestación escrita' | 'Otra' | null.\n"
-    "- monto_cop: valor de la multa en pesos colombianos como NÚMERO entero sin "
-    "puntos ni símbolos (ej 250000000), null si no hay multa o no se indica.\n"
-    "- motivo: por qué se sanciona/investiga, en una frase breve, null si no está.\n"
+    "- tipo_sancion: 'Multa' | 'Amonestación escrita' | 'Otra' | null. Solo si "
+    "tipo_acto es 'sancion'; en cualquier otro caso null.\n"
+    "- monto_cop: valor en pesos colombianos como NÚMERO entero sin puntos ni "
+    "símbolos (ej 250000000). Solo el monto de una MULTA o de la contribución "
+    "liquidada; null si el acto no fija un valor.\n"
+    "- motivo: por qué se sanciona / investiga / se expide el acto, en una frase "
+    "breve, null si no está.\n"
     "- resolucion: número y año de la resolución (ej '005720 de 2017'), null si no.\n"
     "- fecha: fecha del acto en formato YYYY-MM-DD, null si no se puede.\n"
     "- estado: 'en firme' | 'notificada' | 'recurrible' | 'ejecutoriada' | null.\n"
     "- resumen: 1 frase describiendo el acto."
 )
 
+# El modelo (y el prompt v1) usan vocabularios más granulares → se colapsan a
+# TIPOS_ACTO. Todo lo que no matchee cae a 'otro' (nunca se inventa un tipo).
+_TIPO_ALIAS = {
+    # v1 (prompt viejo, para que las extracciones cacheadas sigan sirviendo)
+    'sancion_impuesta': 'sancion', 'confirma_sancion': 'sancion',
+    'revoca': 'archivo',
+    # variantes que el modelo produce con el prompt v2
+    'sanción': 'sancion', 'multa': 'sancion',
+    'apertura_de_investigacion': 'apertura_investigacion',
+    'pliego_de_cargos': 'apertura_investigacion',
+    'investigacion': 'apertura_investigacion',
+    'archivo_actuacion': 'archivo', 'exoneracion': 'archivo',
+    'contribucion': 'contribucion_especial',
+    'contribución_especial': 'contribucion_especial',
+    'circular_externa': 'circular',
+}
 
-def _deepseek(system, user, max_tokens=2000, timeout=90):
+
+def _norm_tipo_acto(v, es_sancion=None):
+    """Vocabulario del modelo → uno de TIPOS_ACTO. Nunca inventa: cae a 'otro'."""
+    t = (v or '').strip().lower().replace(' ', '_').replace('-', '_')
+    t = _TIPO_ALIAS.get(t, t)
+    if t in TIPOS_ACTO:
+        return t
+    # sin tipo utilizable, el booleano de verificación es el último recurso
+    return 'sancion' if es_sancion else 'otro'
+
+
+# max_tokens 6000, NO 2000: V4 gasta el presupuesto en reasoning y con 2000
+# devolvía `content` vacío con finish_reason=length en 7 de 20 docs (medido —
+# es el mismo gotcha que la síntesis de la Lambda). El costo no sube por el
+# techo: solo se cobran los tokens realmente generados.
+def _deepseek(system, user, max_tokens=6000, timeout=120):
     key = os.environ.get('DEEPSEEK_API_KEY')
     if not key:
         raise RuntimeError(
@@ -278,7 +344,40 @@ def _deepseek(system, user, max_tokens=2000, timeout=90):
         headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         d = json.loads(r.read())
-    return d['choices'][0]['message']['content']
+    ch = d['choices'][0]
+    # el usage sirve para reportar costo real de la corrida (no estimarlo)
+    return ch['message']['content'], (d.get('usage') or {}), ch.get('finish_reason')
+
+
+def _extraer_doc(user):
+    """Una extracción, con reintento de presupuesto si el modelo se trunca.
+
+    Aun con 6000 el reasoning agota el budget en ~10% de los docs y deja el
+    JSON a medias (`finish_reason='length'`) — se reintenta con el doble antes
+    de darlo por perdido. Devuelve (dict, usage_acumulado).
+    """
+    tot = {'prompt_tokens': 0, 'completion_tokens': 0}
+    for max_tok in (6000, 12000):
+        raw, usage, fin = _deepseek(SNS_REG_SYSTEM, user, max_tokens=max_tok)
+        tot['prompt_tokens'] += usage.get('prompt_tokens', 0)
+        tot['completion_tokens'] += usage.get('completion_tokens', 0)
+        raw = (raw or '').strip()
+        if raw.startswith('```'):
+            raw = raw.split('```')[1].lstrip('json').strip()
+        if fin == 'length' and not raw.endswith('}'):
+            continue                        # truncado: se reintenta más ancho
+        return json.loads(raw), tot
+    raise ValueError(f'truncado dos veces (finish_reason=length, {max_tok} tokens)')
+
+
+# rótulo legible del acto cuando NO es sanción (el campo `tipo_sancion` del
+# esquema normalizado pasa a ser "qué es este acto" — lo pinta el frontend).
+_TIPO_TXT = {
+    'apertura_investigacion': 'Apertura de investigación',
+    'archivo': 'Archivo / exoneración',
+    'contribucion_especial': 'Contribución especial',
+    'resolucion': 'Resolución', 'circular': 'Circular', 'otro': 'Acto administrativo',
+}
 
 
 def _to_normalized(ex, e):
@@ -287,10 +386,18 @@ def _to_normalized(ex, e):
     if isinstance(monto, str):
         monto = re.sub(r'[^\d]', '', monto) or None
         monto = float(monto) if monto else None
+    tipo_acto = _norm_tipo_acto(ex.get('tipo_acto'), ex.get('es_sancion'))
+    if tipo_acto == 'sancion':
+        tipo_txt = ex.get('tipo_sancion') or ('Multa' if monto else 'Sanción')
+    else:
+        tipo_txt = _TIPO_TXT.get(tipo_acto, 'Acto administrativo')
     return {
-        'sancionado': ex.get('sancionado'),
+        # `sancionado` conserva el nombre del esquema (no romper Lambda/frontend),
+        # pero su semántica es "entidad destinataria del acto".
+        'sancionado': ex.get('entidad') or ex.get('sancionado'),
         'identificacion': ex.get('identificacion'),
-        'tipo_sancion': ex.get('tipo_sancion') or ('Multa' if monto else 'Sanción'),
+        'tipo_acto': tipo_acto,
+        'tipo_sancion': tipo_txt,
         'motivo': ex.get('motivo'),
         'monto': monto,
         'resolucion': ex.get('resolucion') or (e.get('resolucion') or ''),
@@ -308,7 +415,9 @@ def cmd_extract(limit=None):
     manifest = {e['id']: e for e in json.loads(MANIFEST.read_text(encoding='utf-8'))}
     EXDIR.mkdir(parents=True, exist_ok=True)
     txts = sorted(TXTDIR.glob('*.txt'))
-    done = kept = drop = err = 0
+    done = err = 0
+    tipos = Counter()
+    tok_in = tok_out = 0
     for tp in txts:
         doc_id = tp.stem
         e = manifest.get(doc_id)
@@ -316,7 +425,14 @@ def cmd_extract(limit=None):
             continue
         cache = EXDIR / f'{doc_id}.json'
         if cache.exists():
-            continue                       # resumible
+            # resumible, pero solo si la extracción es de este prompt: al subir
+            # PROMPT_VERSION las viejas se re-piden solas.
+            try:
+                prev = json.loads(cache.read_text(encoding='utf-8'))
+            except json.JSONDecodeError:
+                prev = {}
+            if prev.get('_pv') == PROMPT_VERSION:
+                continue
         if limit and done >= limit:
             break
         txt = tp.read_text(encoding='utf-8')
@@ -326,32 +442,41 @@ def cmd_extract(limit=None):
         user = (f"Documento (resolución {e.get('resolucion') or '?'}, "
                 f"{e['folder']}):\n\n{txt[:30000]}")
         try:
-            raw = _deepseek(SNS_REG_SYSTEM, user).strip()
-            if raw.startswith('```'):
-                raw = raw.split('```')[1].lstrip('json').strip()
-            ex = json.loads(raw)
+            ex, usage = _extraer_doc(user)
         except Exception as exn:
             print(f'  ! {doc_id}: extracción falló ({str(exn)[:100]})'); err += 1
             time.sleep(1); continue
+        tok_in += usage.get('prompt_tokens', 0)
+        tok_out += usage.get('completion_tokens', 0)
+        ex['_pv'] = PROMPT_VERSION
         cache.write_text(json.dumps(ex, ensure_ascii=False), encoding='utf-8')
-        if ex.get('es_sancion'):
-            kept += 1
-        else:
-            drop += 1
+        tipos[_norm_tipo_acto(ex.get('tipo_acto'), ex.get('es_sancion'))] += 1
         if done % 25 == 0:
-            print(f'  ... {done} extraídos (sanciones {kept} · no-sanción {drop} · err {err})')
+            print(f'  ... {done} extraídos · {dict(tipos)} · err {err}')
         time.sleep(0.4)
     _consolidar(manifest)
-    print(f'\n  extraídos esta corrida: {done} · sanciones {kept} · '
-          f'no-sanción {drop} · err {err}')
+    print(f'\n  extraídos esta corrida: {done} · err {err}')
+    for t, n in tipos.most_common():
+        print(f'    {t:24s} {n:>4d}')
+    if tok_in or tok_out:
+        # tarifa DeepSeek V4 Flash (USD por 1M tokens) — si cambia, ajustar.
+        usd = tok_in / 1e6 * 0.28 + tok_out / 1e6 * 0.42
+        print(f'  tokens: {tok_in:,} in · {tok_out:,} out  ≈ USD {usd:.4f} '
+              f'({usd / max(done, 1):.5f}/doc)')
 
 
 def _consolidar(manifest):
-    """Junta todas las extracciones cacheadas que SON sanción → raw JSON."""
+    """Junta TODAS las extracciones cacheadas (sanción o no) → raw JSON.
+
+    Antes filtraba por es_sancion y tiraba el 95% del material. Con el
+    reencuadre a "actos regulatorios" se conserva todo, tipado con tipo_acto;
+    la vista de sanciones filtra río abajo (Lambda), no aquí.
+    """
     rows = []
     for cache in sorted(EXDIR.glob('*.json')):
-        ex = json.loads(cache.read_text(encoding='utf-8'))
-        if not ex.get('es_sancion'):
+        try:
+            ex = json.loads(cache.read_text(encoding='utf-8'))
+        except json.JSONDecodeError:
             continue
         e = manifest.get(cache.stem)
         if e is None:
@@ -359,9 +484,10 @@ def _consolidar(manifest):
         rows.append(_to_normalized(ex, e))
     (RAW / 'supersalud-registro.json').write_text(
         json.dumps(rows, ensure_ascii=False), encoding='utf-8')
+    tipos = Counter(r['tipo_acto'] for r in rows)
     con_m = sum(1 for r in rows if r['monto'])
-    print(f'  consolidado: {len(rows)} sanciones ({con_m} con monto) → '
-          f'{(RAW / "supersalud-registro.json").relative_to(REPO)}')
+    print(f'  consolidado: {len(rows)} actos ({tipos.get("sancion", 0)} sanciones · '
+          f'{con_m} con monto) → {(RAW / "supersalud-registro.json").relative_to(REPO)}')
 
 
 def cmd_stats():
@@ -374,7 +500,9 @@ def cmd_stats():
     if reg.exists():
         rows = json.loads(reg.read_text(encoding='utf-8'))
         con_m = sum(1 for r in rows if r['monto'])
-        print(f'consolidado (sanciones): {len(rows)} · con monto {con_m}')
+        print(f'consolidado (actos): {len(rows)} · con monto {con_m}')
+        for t, n in Counter(r.get('tipo_acto', 'otro') for r in rows).most_common():
+            print(f'  {t:24s} {n:>4d}')
 
 
 def main():

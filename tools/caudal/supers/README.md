@@ -1,6 +1,21 @@
-# Caudal · sanciones de superintendencias (el "dapper interno")
+# Caudal · actos regulatorios de superintendencias (el "dapper interno")
 
-Extractor de sanciones/actos de superintendencias y entidades reguladoras para
+> **Reencuadre jul-2026 — el pilar dejó de ser "sanciones" y pasó a "actos
+> regulatorios".** El cliente quiere ver toda la actividad del Estado sobre su
+> sector, no solo las multas: una apertura de investigación o una liquidación de
+> contribución especial también son inteligencia. Cada registro lleva ahora
+> **`tipo_acto`** ∈ `sancion · apertura_investigacion · archivo ·
+> contribucion_especial · resolucion · circular · otro`.
+>
+> **La vista de sanciones no se diluyó:** el default de la acción `sanciones` de
+> la Lambda y del frontend sigue siendo `tipo_acto='sancion'` (7.019 registros,
+> idénticos a antes — regresión verificada). Lo demás entra con el toggle
+> *"ver toda la actividad regulatoria"*, y el conteo de lo que quedó fuera se
+> muestra explícitamente para no esconder el universo. La Vista Cliente (SIGA)
+> sigue priorizando **solo sanciones** como señal, con los otros actos contados
+> aparte en `kpis.n_otros_actos_sector`.
+
+Extractor de actos de superintendencias y entidades reguladoras para
 **Cauce**. Cumple una promesa que ya está escrita en el documento estratégico
 (`Propuestas/Cauce-Estado-de-Cosas-Inteligencia-Legislativa.pdf`): las
 superintendencias son una de las 9 categorías del "mapa inicial de fuentes"
@@ -33,11 +48,23 @@ Bases de datos/leyes-senado/supers/
 
 ## Esquema normalizado
 
-Toda sanción, venga de donde venga, se mapea a estos campos (definidos en
+Todo acto, venga de donde venga, se mapea a estos campos (definidos en
 `fuentes.json._schema_normalizado`):
 
-`fuente · fuente_nombre · sector · sancionado · identificacion · tipo_sancion ·
-motivo · monto · resolucion · fecha_firmeza · estado · descripcion · url · _id · _raw`
+`fuente · fuente_nombre · sector · sancionado · identificacion · **tipo_acto** ·
+tipo_sancion · motivo · monto · resolucion · fecha_firmeza · estado ·
+descripcion · url · _id · _raw`
+
+**`tipo_acto`** es el filtro (qué CLASE de acto es); **`tipo_sancion`** es su
+rótulo legible ("Multa", "Apertura de investigación", "Contribución especial").
+Las fuentes cuyo dataset entero es de una sola clase lo declaran en
+`tipo_acto_default` (todas las de sanciones lo tienen en `"sancion"`); solo
+`supersalud-registro` lo trae **por fila**, porque su registro mezcla clases y
+el tipo lo determina el modelo leyendo el PDF.
+
+⚠️ **`sancionado` conserva el nombre por compatibilidad** (Lambda + frontend +
+build lo usan), pero su semántica pasó a ser *"entidad destinataria del acto"*:
+la sancionada, la investigada, o el contribuyente al que se le liquida.
 
 `_raw` conserva la fila original (trazabilidad — cada alerta cita su fuente,
 regla dura del pitch). `url` (jul-2026) apunta a la fuente oficial del acto o
@@ -110,11 +137,37 @@ Mismo enfoque que la "API oculta" de `leyes.senado.gov.co`.
   python3 tools/caudal/supers/harvest_comunicados.py fetch   # las 3 fuentes
   ```
 
-### Vía 3 — normograma/PDF (registrada, pendiente)
-Reusa **el pipeline de gacetas de Caudal fase 3** (`extraer_gaceta.py` +
-Lambda acción `gaceta`): bajar PDF → pypdf → DeepSeek estructura el acto
-sancionatorio. Supersalud (SharePoint/normograma) y Supersociedades (Liferay,
-478 resoluciones + 198 circulares). PDFs viejos → OCR, como las gacetas 90-2005.
+### Vía 3 — PDF → DeepSeek
+
+- **Supersalud registro — IMPLEMENTADA (`harvest_supersalud_registro.py`,
+  jul-2026).** Reusa el pipeline de gacetas de Caudal fase 3: SharePoint Search
+  enumera → PDF → pypdf → DeepSeek estructura el acto. Es el REGISTRO REAL,
+  distinto de la fuente `supersalud` (sala de prensa, 16 sanciones publicitadas).
+  ```bash
+  python3 tools/caudal/supers/harvest_supersalud_registro.py enumerate   # manifest (771 candidatos)
+  python3 tools/caudal/supers/harvest_supersalud_registro.py download    # PDF -> texto (resumible)
+  export DEEPSEEK_API_KEY=$(aws lambda get-function-configuration \
+    --function-name caudal-analiza \
+    --query 'Environment.Variables.DEEPSEEK_API_KEY' --output text)
+  python3 tools/caudal/supers/harvest_supersalud_registro.py extract [--limit N]
+  ```
+  **Gotchas medidos:**
+  - **`max_tokens` 6000, no 2000.** V4 gasta el presupuesto en *reasoning* y con
+    2000 devolvía `content` vacío con `finish_reason=length` en **7 de 20** docs
+    (mismo gotcha que la síntesis de la Lambda). Aun con 6000 se trunca ~10% →
+    `_extraer_doc()` reintenta con 12000 antes de darlo por perdido. Subir el
+    techo no encarece: solo se cobran los tokens generados.
+  - **`PROMPT_VERSION`**: la caché por doc guarda `_pv`; al cambiar
+    `SNS_REG_SYSTEM` hay que subirla y las extracciones viejas se re-piden solas.
+  - Los `Path` de SharePoint traen espacios/acentos literales → `quote(path,
+    safe=':/%')` o el PDF llega en 0 bytes.
+- **Supersociedades — DESCARTADA** (ver la nota de su entrada en `fuentes.json`).
+  El bloqueo declarado ("landing Liferay dinámico") era falso: el AssetPublisher
+  de `/web/supervision-societaria/avisos` es server-rendered y perfectamente
+  scrapeable. El problema es otro y es definitivo: **su contenido no son
+  sanciones** sino avisos de notificación de oficios de respuesta a derechos de
+  petición (art. 69 CPACA), verificado leyendo los PDFs. Ni el portal, ni su
+  buscador, ni Socrata publican un registro sancionatorio.
 
 ## Cómo agregar una fuente
 
@@ -141,12 +194,16 @@ consolida si la fuente tiene `map` en el registro.
    anónima), Supertransporte (WP REST) y SIC (listado Drupal). El sector `salud`
    del Radar ahora trae las multas de Supersalud a EPS — el ejemplo del pitch
    con datos reales.
-4. Supersociedades (vía 3, Liferay): sigue pendiente — pipeline gaceta+DeepSeek.
-5. Supersalud vía profunda: leer el PDF del comunicado/acto con el pipeline
-   gaceta para sacar nº de resolución y motivo estructurado (hoy el registro
-   es el titular del comunicado).
-6. Stream normativo (circulares/resoluciones del normograma de Supersalud,
-   HTML limpio de Avance Jurídico) — es OTRO tipo de registro, no sanción;
-   pensarlo como capa "actos normativos" del pilar.
+4. ✅ HECHO (jul-2026) — **reencuadre a actos regulatorios**: `tipo_acto` en el
+   esquema, filtro en la Lambda con default `sancion` + toggle en el frontend,
+   y `harvest_supersalud_registro.py` conservando TODOS los actos.
+5. ❌ DESCARTADA — Supersociedades (no publica sanciones; ver arriba).
+6. **Pendiente · OCR del registro de Supersalud.** `download` marca los PDFs
+   escaneados (`len(txt) < 500`) y `extract` los salta. Reusar Tesseract como en
+   `parse_dcnsw_camara.py`.
+7. **Pendiente · extender el reencuadre a las demás supers**: hoy solo
+   Supersalud aporta actos no-sancionatorios. SIC, Supertransporte y
+   Superfinanciera publican circulares y resoluciones que caben en el mismo
+   esquema con `tipo_acto` 'circular'/'resolucion'.
 
 Ver el mapa completo de las 18+ fuentes y su estado en `fuentes.json`.
