@@ -207,9 +207,26 @@
   .vig-tag{font-size:.55rem; letter-spacing:.08em; text-transform:uppercase; font-weight:800;
     color:var(--teal); background:var(--teal-soft); border:1px solid var(--teal-dim);
     padding:.1rem .38rem; border-radius:3px; margin-right:.4rem; white-space:nowrap}
+  /* qué CLASE de acto regulatorio es (resolución, archivo, investigación): solo
+     aparece cuando NO es una sanción, que es el caso por defecto */
+  .acto-tag{font-size:.55rem; letter-spacing:.08em; text-transform:uppercase; font-weight:800;
+    color:var(--ink2); background:rgba(255,255,255,.05); border:1px solid var(--border2);
+    padding:.1rem .38rem; border-radius:3px; margin-right:.4rem; white-space:nowrap}
   /* --- editor de perfil de cliente --- */
   .pf-bar{display:flex; flex-wrap:wrap; gap:.45rem; align-items:center; margin-top:.4rem}
   .pf-lbl{font-size:.6rem; letter-spacing:.15em; text-transform:uppercase; color:var(--ink3); margin-right:.25rem}
+  /* la barra de presets pasó de 6 a 11 chips: centrada envuelve en filas
+     parejas en vez de dejar una fila huérfana pegada a la izquierda, y en
+     móvil se aprieta para no comerse la pantalla antes del radar. */
+  #cli-presets-bar{justify-content:center; row-gap:.4rem}
+  .sec-chip::before{content:'○'; font-size:.55rem; margin-right:.35rem; color:var(--ink3); vertical-align:.08em}
+  .sec-chip.con-reg::before{content:'●'; color:var(--teal)}
+  .sec-chip.on::before{color:var(--teal)}
+  @media(max-width:640px){
+    #cli-presets-bar{gap:.3rem; row-gap:.3rem}
+    #cli-presets-bar .chip{font-size:.65rem; padding:.28rem .55rem}
+    #cli-presets-bar .pf-lbl{flex-basis:100%; text-align:center; margin:0 0 .15rem}
+  }
   .chip.add{border-style:dashed; color:var(--teal); border-color:var(--teal-dim)}
   .chip .x{margin-left:.4rem; color:var(--ink3); font-weight:700}
   .chip .x:hover{color:var(--red)}
@@ -1790,7 +1807,17 @@
   // Los 6 presets se quedan como DEMO y como plantilla de arranque; el radar de
   // verdad corre sobre un perfil guardado (temas propios + empresas vigiladas),
   // que vive en el KV del worker bajo `caudal:perfil:*`.
-  const CLI_SECS=[['salud','Salud'],['contratacion','Contratación e infraestructura'],['financiero','Financiero'],['energia','Energía y ambiente'],['educacion','Educación'],['trabajo','Trabajo y pensiones']];
+  /* Espejo de SECTORES_CLIENTE en caudal_core.py — si allá cambia el orden,
+     acá también. El rótulo del chip va CORTO a propósito: con 11 presets los
+     nombres completos ocupaban seis filas en móvil (medido a 375px) y empujaban
+     el radar fuera de la pantalla; el nombre largo y qué cubre cada uno salen
+     igual arriba del radar al abrirlo. `reg` marca los que ya tienen fuente en
+     el pilar Regulatorio y el chip lo muestra con un punto lleno. */
+  const CLI_SECS=[
+    ['salud','Salud',1],['ambiente','Ambiente',1],['contratacion','Contratación',1],
+    ['financiero','Financiero',1],['transporte','Transporte',1],['energia','Energía',0],
+    ['agro','Agro',0],['tic','TIC',0],['pymes','Mipymes',0],['educacion','Educación',0],
+    ['trabajo','Trabajo',0]];
   const AUTH_API='https://rr-auth.reruizc.workers.dev';
   let _cliInited=false, _cliSeq=0;
   // estado del gestor de perfiles
@@ -1809,7 +1836,13 @@
   function cliInit(){
     if(_cliInited) return; _cliInited=true;
     const cont=document.getElementById('cli-sectors');
-    if(cont) CLI_SECS.forEach(([k,t])=>{ const c=document.createElement('span'); c.className='chip'; c.dataset.sec=k; c.textContent=t; c.onclick=()=>cliLoad({sector:k}); cont.appendChild(c); });
+    if(cont) CLI_SECS.forEach(([k,t,reg])=>{
+      const c=document.createElement('span');
+      c.className='chip sec-chip'+(reg?' con-reg':'');
+      c.dataset.sec=k; c.textContent=t;
+      c.title=reg?'Tiene fuente conectada en el pilar Regulatorio'
+                 :'Su regulador sectorial todavía no es fuente de Caudal';
+      c.onclick=()=>cliLoad({sector:k}); cont.appendChild(c); });
     const b=document.getElementById('cliBack'); if(b) b.onclick=()=>showView('home');
     pfRenderBar();
     if(!IS_GUEST){ pfLoadList(); call({action:'perfil_meta'}).then(m=>{PF_META=m;}).catch(()=>{}); }
@@ -1970,7 +2003,12 @@
           <div class="pf-sug" id="pf-sug" hidden></div>
           <div class="pf-tags" id="pf-emps"></div></div>
         <div class="pf-f"><label>Sector de sanciones</label>
-          <select id="pf-sec"><option value="">— ninguno —</option>${secs.map(s=>`<option value="${esc(s.k)}"${s.k===d.sector_sanciones?' selected':''}>${esc(s.nombre)} (${fmt(s.n)})</option>`).join('')}</select>
+          <select id="pf-sec"><option value="">— ninguno —</option>${secs.map(s=>{
+            /* el conteo de SANCIONES solo no describe la fuente: la ANLA tiene
+               210 sanciones y 54.105 actos, y con el primer número parecería
+               marginal siendo la más grande del pilar. */
+            const n=(s.n_actos&&s.n_actos!==s.n)?`${fmt(s.n_actos)} actos · ${fmt(s.n)} sanciones`:fmt(s.n);
+            return `<option value="${esc(s.k)}"${s.k===d.sector_sanciones?' selected':''}>${esc(s.nombre)} (${n})</option>`;}).join('')}</select>
           <div class="hint">De qué superintendencias se le muestran sanciones del sector, además de las de sus vigiladas.</div></div>
         <div class="pf-f"><label>Comisión de referencia</label>
           <select id="pf-com"><option value="">— ninguna —</option>${coms.map(c=>`<option value="${esc(c)}"${c===d.comision?' selected':''}>Comisión ${esc(c)}</option>`).join('')}</select>
@@ -2091,7 +2129,11 @@
   function cliSigCard(x){
     // ★ vigilada: la señal es sobre una empresa del perfil, no sobre su sector.
     const cls=`sig ${x.nivel}${x.vigilada?' vig':''}`;
-    const vt=x.vigilada?`<span class="vig-tag">★ ${esc(x.vigilada)}</span>`:'';
+    // el <wbr> no es decorativo: las etiquetas son `white-space:nowrap` y se
+    // concatenan SIN espacio, así que dos seguidas ("Investigación abierta" +
+    // "★ Cerrejón") forman una tira que el navegador no puede partir y se sale
+    // de la tarjeta en móvil. Medido a 375px: 302px de contenido en 230 de caja.
+    const vt=x.vigilada?`<span class="vig-tag">★ ${esc(x.vigilada)}</span><wbr>`:'';
     if(x.tipo==='congreso'){
       const tags=[x.comision?esc(x.comision):'', x.anio||'', RES_TXT[x.resultado]||''].filter(Boolean).join(' · ');
       // qué CAMBIA el proyecto (extracción del articulado) + el cruce con el
@@ -2130,9 +2172,15 @@
         <div class="sig-tags">${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
     const monto=x.monto?' · '+fmtCOP(x.monto):'';
+    // el pilar Regulatorio ya no es solo sanciones: desde que entró la ANLA una
+    // señal puede ser una resolución de seguimiento, una investigación abierta o
+    // un archivo. Se dice cuál es en la tarjeta — llamarle "sanción" a un
+    // archivo sería el peor error posible acá.
+    const acto=(x.acto&&x.acto!=='sancion'&&x.acto_lbl)?`<span class="acto-tag">${esc(x.acto_lbl)}</span><wbr>`:'';
     return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
-      <div class="sig-title">${vt}${esc(x.sancionado||'—')}</div>
+      <div class="sig-title">${acto}${vt}${esc(x.sancionado||'—')}</div>
       <div class="sig-tags">${esc(x.fuente||'')}${x.tipo_sancion?' · '+esc(x.tipo_sancion):''}${x.fecha?' · '+esc(x.fecha):''}${monto}</div>
+      ${x.motivo?`<div class="sig-tags" style="opacity:.85">${esc(x.motivo)}</div>`:''}
       <div class="sig-action">${esc(x.accion)}</div></div></div>`;
   }
   let _CLI_LAST=null;
@@ -2140,8 +2188,8 @@
     const cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[], medios=d.medios||[], con=d.contratacion||[];
     if(pilar==='congreso') return congreso.length?`<div class="sig-list">${congreso.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin proyectos accionables ahora.</div>';
     if(pilar==='regulatorio') return cl.sector_sanciones
-      ? (reg.length?`<div class="sig-list">${reg.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin sanciones recientes en esta fuente.</div>')
-      : '<div class="cli-reg-none">Este sector aún no tiene fuente de sanciones conectada — Superfinanciera y otras superintendencias entran por etapas.</div>';
+      ? (reg.length?`<div class="sig-list">${reg.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin actos recientes del regulador en esta fuente.</div>')
+      : '<div class="cli-reg-none">El regulador de este sector todavía no es fuente de Caudal — las entidades entran por etapas. Si tu exposición es ambiental (licenciamiento, seguimiento, sanción), el sector <b>Ambiente</b> ya trae el expediente completo de la ANLA.</div>';
     if(pilar==='contratacion') return con.length?`<div class="sig-list">${con.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin contratación reciente para los temas de este sector.</div>';
     if(pilar==='medios') return medios.length?`<div class="sig-list">${medios.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin cobertura de prensa reciente para este sector.</div>';
     return '';
@@ -2150,9 +2198,22 @@
     const body=document.getElementById('cli-body'); if(!body) return;
     _CLI_LAST=d;
     const k=d.kpis, cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[], medios=d.medios||[], con=d.contratacion||[];
-    const sancTxt=cl.sector_sanciones ? `<b>${reg.length}</b> sanción(es) reciente(s)` : `sanciones sin fuente conectada`;
+    // el bloque regulatorio puede traer sanciones o —desde la ANLA— resoluciones,
+    // aperturas y archivos. Se nombra por lo que de verdad trae, no por lo que
+    // solía traer.
+    const soloSanc=reg.every(x=>!x.acto||x.acto==='sancion');
+    const sancTxt=cl.sector_sanciones
+      ? `<b>${reg.length}</b> ${soloSanc?'sanción(es) reciente(s)':'acto(s) reciente(s) del regulador'}`
+      : `regulador sectorial sin fuente conectada`;
     const vigN=k.n_vigiladas||0;
     const vigNoms=(cl.empresas||[]).map(e=>e.nombre).join(' · ');
+    // qué cubre y qué NO cubre el preset — importa sobre todo en Mipymes, que
+    // es un tamaño de empresa y no una actividad, y en Energía, cuyo expediente
+    // ambiental vive en otro sector.
+    // el chip va corto por espacio, así que el nombre completo del sector se
+    // dice acá, junto con lo que cubre y lo que NO.
+    const secDesc=cl.es_perfil ? ''
+      : `<div class="cob-note" style="margin-bottom:1rem"><b>${esc(cl.nombre)}.</b>${cl.descripcion?' '+esc(cl.descripcion):''}</div>`;
     // lo que el diccionario no reconoció: se dice, no se esconde
     const desc=(cl.descartes&&cl.descartes.length)
       ? `<div class="cli-reg-none" style="margin-bottom:1rem">No están en el diccionario de Caudal y quedaron fuera del radar: <b>${esc(cl.descartes.join(', '))}</b>. Búscalas otra vez en el editor: si no aparecen, todavía no las cubrimos.</div>` : '';
@@ -2169,10 +2230,10 @@
         <div class="kpi ley"><div class="n">${k.en_tramite}</div><div class="l">En trámite · ventana</div></div>
         <div class="kpi"><div class="n">${vigN?(k.n_senales_vigiladas||0):(k.n_medios_sector?fmt(k.n_medios_sector):'—')}</div><div class="l">${vigN?'Sobre tus vigiladas':'Prensa reciente'}</div></div>
       </div>
-      ${avi}${desc}${vigNote}
+      ${secDesc}${avi}${desc}${vigNote}
       <div class="cli-note"><b>Activo ahora en ${esc(cl.nombre)}:</b> <b>${k.en_tramite}</b> proyecto(s) de ley en trámite · ${sancTxt} · <b>${fmt(k.n_medios_sector||0)}</b> titular(es) de prensa reciente · <b>${fmt(k.n_contratos_sector||0)}</b> contrato(s) reciente(s) en SECOP.</div>
       ${k.n_con_articulado?`<div class="cli-note"><b>Qué cambian:</b> de las ${congreso.length} señales del Congreso, <b>${k.n_con_articulado}</b> ya tienen el articulado leído${k.n_te_aplica?` y <b>${k.n_te_aplica}</b> le aplican a tu sector o a tus vigiladas`:''}. El resto todavía no se ha extraído.</div>`:''}
-      <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt(k.n_sanciones_sector)}</b> sanciones`:''} que tocan estos temas, el radar prioriza por accionabilidad — precisión sobre volumen.${(cl.temas_usados&&cl.temas_usados.length)?` Se buscó por: <b>${esc(cl.temas_usados.join(' · '))}</b>.`:''}</div>
+      <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt((k.n_sanciones_sector||0)+(k.n_otros_actos_sector||0))}</b> actos del regulador (<b>${fmt(k.n_sanciones_sector)}</b> de ellos sanciones)`:''} que tocan estos temas, el radar prioriza por accionabilidad — precisión sobre volumen.${(cl.temas_usados&&cl.temas_usados.length)?` Se buscó por: <b>${esc(cl.temas_usados.join(' · '))}</b>.`:''}</div>
       <div class="lectura">
         <div class="tag">◈ Lectura del analista · briefing de hoy para ${esc(cl.nombre)}</div>
         <div id="cli-lectura-body"><div class="llm-load">Generando lectura <span class="dots"><span></span><span></span><span></span></span></div></div>

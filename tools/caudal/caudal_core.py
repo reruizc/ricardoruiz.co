@@ -281,6 +281,23 @@ REF_YEAR = 2026    # horizonte del dataset (para calcular "reciente")
 # temas curados para PRECISIÓN: palabra sola solo si es distintiva (salud,
 # educacion, energia); si el término corto colisiona por substring
 # (seguros→seguridad, credito, pension→suspension, banca), se usa frase (AND).
+#
+# ⚠️⚠️ Un tema del Radar tiene que tener MATCH DE TÍTULO. `buscar` cruza título Y
+# texto de gaceta, pero el índice de texto DESCARTA las palabras de alta
+# frecuencia (>5% docfreq, build_texto_index.py) — o sea que las únicas palabras
+# sueltas que sobreviven ahí son las RARAS, y una palabra rara la menciona de
+# pasada cualquier documento largo. Medido: «ciberseguridad» devuelve 153
+# proyectos con CERO match de título — el PND, una reforma del IVA, el código
+# electoral y la ley de trasplante de órganos, porque todos la nombran una vez
+# en su articulado. «microcredito» igual: 300 hits, 6 de título. Los dos quedaron
+# fuera. Antes de agregar un tema: mirar cuántos hits vienen del título, no solo
+# el total.
+#
+# La otra trampa es la de siempre (la raíz corta que vive dentro de otra
+# palabra), y en esta tanda se llevó a «movilidad»: su raíz 'movil' casa con
+# telefonía MÓVIL, MOVILIZAción y "movilidad entre regímenes pensionales" —
+# nada de transporte. Vale la regla del proyecto: medir el conteo no basta, hay
+# que leer los títulos.
 SECTORES_CLIENTE = [
     {'k': 'salud', 'nombre': 'Salud', 'comision': 'Séptima', 'sector_sanciones': 'salud',
      'temas': ['salud', 'medicamentos', 'aseguramiento en salud', 'habilitacion de ips']},
@@ -290,8 +307,77 @@ SECTORES_CLIENTE = [
     {'k': 'financiero', 'nombre': 'Financiero', 'comision': 'Tercera', 'sector_sanciones': 'financiero',
      'temas': ['sistema financiero', 'entidades financieras', 'mercado de valores',
                'establecimientos de credito']},
-    {'k': 'energia', 'nombre': 'Energía y ambiente', 'comision': 'Quinta', 'sector_sanciones': '',
-     'temas': ['energia', 'servicios publicos domiciliarios', 'transicion energetica', 'gas natural']},
+    # Energía y Ambiente iban juntos en un solo preset y eso escondía la fuente
+    # más grande de todo el pilar Regulatorio: los 54.105 actos de la ANLA
+    # (sector 'ambiental'). Separados, Energía declara honestamente que su
+    # regulador sectorial (CREG/Superservicios) todavía no es fuente de Caudal,
+    # y Ambiente abre el expediente ambiental completo — que es el que le sirve
+    # a minería, hidrocarburos, energía e infraestructura.
+    {'k': 'energia', 'nombre': 'Energía y servicios públicos', 'comision': 'Quinta',
+     'sector_sanciones': '',
+     'descripcion': 'Generación, transmisión, hidrocarburos y servicios públicos '
+                    'domiciliarios. El expediente ambiental de estos proyectos vive '
+                    'en el sector Ambiente.',
+     'temas': ['energia', 'servicios publicos domiciliarios', 'transicion energetica',
+               'gas natural', 'hidrocarburos']},
+    {'k': 'ambiente', 'nombre': 'Ambiente y licenciamiento', 'comision': 'Quinta',
+     'sector_sanciones': 'ambiental',
+     'descripcion': 'Licenciamiento, seguimiento y sanción ambiental (ANLA). Es el '
+                    'expediente que comparten minería, hidrocarburos, energía e '
+                    'infraestructura.',
+     # ⚠️ EL ORDEN DE `temas` NO ES COSMÉTICO: Congreso y SECOP usan la lista
+     # completa, pero el pilar Prensa solo manda los CUATRO PRIMEROS a Google
+     # News. Medido tema por tema en la ventana de 14 días: 'contaminacion'
+     # devuelve las Perseidas y un eclipse lunar (por «contaminación lumínica»)
+     # y 'licencia ambiental' devuelve fondos de capital y el dólar. Los dos
+     # quedan de últimos: siguen contando para el Congreso y no ensucian el
+     # pulso de prensa.
+     'temas': ['ambiental', 'gestion de residuos', 'areas protegidas',
+               'licencia ambiental', 'contaminacion']},
+    {'k': 'transporte', 'nombre': 'Transporte y logística', 'comision': 'Sexta',
+     'sector_sanciones': 'transporte',
+     'descripcion': 'Transporte público, carga, aéreo e infraestructura. Vigilado por '
+                    'la Superintendencia de Transporte.',
+     'temas': ['transporte publico', 'infraestructura de transporte', 'transporte de carga',
+               'seguridad vial', 'transporte aereo']},
+    {'k': 'agro', 'nombre': 'Agricultura y desarrollo rural', 'comision': 'Quinta',
+     'sector_sanciones': '',
+     'descripcion': 'Producción agropecuaria, tierras, crédito de fomento y seguridad '
+                    'alimentaria.',
+     'temas': ['agropecuario', 'desarrollo rural', 'reforma agraria', 'seguridad alimentaria',
+               'credito agropecuario']},
+    # TIC se puede leer de tres formas y el tesauro las tiene separadas
+    # (telecomunicaciones · datos personales · tecnología digital/IA). El NÚCLEO
+    # es telecomunicaciones porque es la única de las tres que nombra una
+    # INDUSTRIA BAJO RÉGIMEN —espectro, habilitación, obligaciones de servicio,
+    # un regulador propio—; datos personales e IA son materias transversales que
+    # le aplican igual a un banco, una EPS o un retailer, así que no pueden
+    # definir un sector. Entran igual como temas: es donde está viva la
+    # regulación y donde el operador tiene exposición real.
+    {'k': 'tic', 'nombre': 'TIC y economía digital', 'comision': 'Sexta',
+     'sector_sanciones': '',
+     'descripcion': 'Telecomunicaciones como núcleo (industria bajo régimen), más las '
+                    'dos materias transversales donde hoy se mueve la regulación: datos '
+                    'personales e inteligencia artificial.',
+     # el orden manda por lo mismo que en Ambiente (prensa = 4 primeros):
+     # 'telecomunicaciones' es el núcleo LEGISLATIVO pero como consulta de prensa
+     # trae ferias y notas de compañías eléctricas, así que va de último; los
+     # cuatro que sí rinden titulares del sector van adelante.
+     'temas': ['internet', 'servicios de comunicaciones', 'inteligencia artificial',
+               'datos personales', 'telecomunicaciones']},
+    # ⚠️ PyMES NO es un sector: es un TAMAÑO de empresa y atraviesa a todos los
+    # demás. No existe "la industria pyme" ni un regulador de pymes — su agenda
+    # legislativa propia es la de acceso: formalización, crédito, plazos de pago
+    # y cupos en compra estatal. Los temas son esos, no una actividad económica;
+    # para lo sectorial, el cliente combina este preset con el de su sector.
+    {'k': 'pymes', 'nombre': 'Mipymes y economía popular', 'comision': 'Tercera',
+     'sector_sanciones': '',
+     'descripcion': 'No es un sector sino un tamaño de empresa: atraviesa a todos los '
+                    'demás. Cubre su agenda propia —formalización, acceso a crédito, '
+                    'plazos de pago y cupos en compra estatal—; para lo sectorial, '
+                    'combínalo con el preset de tu actividad.',
+     'temas': ['mipymes', 'micro pequenas y medianas empresas', 'emprendimiento',
+               'formalizacion empresarial', 'economia popular']},
     {'k': 'educacion', 'nombre': 'Educación', 'comision': 'Sexta', 'sector_sanciones': '',
      'temas': ['educacion', 'universidades', 'instituciones educativas']},
     {'k': 'trabajo', 'nombre': 'Trabajo y pensiones', 'comision': 'Séptima', 'sector_sanciones': '',
@@ -316,14 +402,20 @@ PERFIL_MAX_EMPRESAS = 15
 PERFIL_MAX_TEMA_LEN = 80
 
 # sectores del pilar Regulatorio (los que trae `fuentes.json` de las supers).
-# Los 4 primeros son los que hoy tienen volumen real; el resto existe pero es
+# Los 5 primeros son los que hoy tienen volumen real; el resto existe pero es
 # de cola larga — se ofrecen igual, con el conteo real a la vista en la UI.
+# ⚠️ 'ambiental' (ANLA) FALTABA en esta lista aunque sus 54.105 actos llevaban
+# semanas en el dataset: `normalizar_perfil` valida contra estas llaves, así que
+# un cliente de minería, energía o infraestructura no podía elegir su propio
+# regulador ni por preset ni por perfil. Al agregar una fuente al pilar hay que
+# tocar TAMBIÉN esta lista, si no queda publicada pero inalcanzable.
 SANCION_SECTORES = [
     ('salud',        'Salud'),
+    ('ambiental',    'Ambiental · ANLA'),
     ('contratacion', 'Contratación'),
     ('financiero',   'Financiero'),
-    ('consumo',      'Consumo y competencia'),
     ('transporte',   'Transporte'),
+    ('consumo',      'Consumo y competencia'),
     ('juridico',     'Jurídico'),
     ('control',      'Control fiscal'),
     ('laboral',      'Laboral'),
@@ -486,6 +578,7 @@ def perfil_desde_sector(k):
     if not s:
         return None
     p = normalizar_perfil({'nombre': s['nombre'], 'temas': list(s['temas']),
+                           'descripcion': s.get('descripcion', ''),
                            'sector_sanciones': s.get('sector_sanciones', ''),
                            'comision': s.get('comision', '')})
     p['k'] = k

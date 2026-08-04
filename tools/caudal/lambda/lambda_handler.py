@@ -400,11 +400,20 @@ _SECTOR_CLIENTE_A_ARTICULADO = {
     'salud': ['salud', 'farma'],
     'contratacion': ['contratacion'],
     'financiero': ['financiero', 'seguros', 'pensiones'],
-    'energia': ['energia', 'ambiental', 'mineria', 'agua'],
+    # energía y ambiente dejaron de compartir preset: la energía se queda con su
+    # cadena (incluye hidrocarburos, que el articulado etiqueta 'mineria') y el
+    # expediente ambiental es su propio sector.
+    'energia': ['energia', 'mineria', 'agua'],
+    'ambiente': ['ambiental'],
     'educacion': ['educacion'],
     'trabajo': ['laboral', 'pensiones'],
     'consumo': ['consumo', 'retail', 'comercio'],
     'transporte': ['transporte', 'aviacion', 'logistica'],
+    'agro': ['agro', 'alimentos'],
+    'tic': ['tecnologia', 'telecom'],
+    # 'pymes' NO entra a propósito: es un tamaño de empresa, no una actividad.
+    # Puentearlo a algún sector del articulado haría que "te aplica" se
+    # encendiera en todo, que es justo lo contrario de lo que el cruce sirve.
 }
 
 
@@ -1977,6 +1986,80 @@ def _medios_para_sector(temas, dias=14, cap=6):
     return out
 
 
+# --- bloque Regulatorio del Radar ------------------------------------------
+# El pilar Regulatorio dejó de ser "sanciones" y pasó a ser "actos regulatorios"
+# (`tipo_acto`), pero el Radar seguía mirando solo las sanciones. Con las supers
+# clásicas eso daba igual —INVIMA, ANCP, Superfinanciera y Supertransporte casi
+# solo publican sanciones, con nombre y fecha fresca— y con la ANLA se rompe:
+# de sus 54.105 actos apenas 210 son 'sancion', SOLO 10 traen empresa (la última
+# de 2010) y las otras 200 son "POR LA CUAL SE IMPONE UNA SANCIÓN AMBIENTAL" sin
+# destinatario. La vida del expediente está en los otros 53.895: resoluciones,
+# aperturas y archivos de 2026 contra Cerro Matoso, Chevron, Prodeco, Biomax.
+# Llenar los 6 cupos solo con sanciones le habría mostrado al cliente minero
+# seis tarjetas tituladas «—».
+#
+# Regla: seis señales, las más recientes primero, y SIEMPRE con destinatario —
+# una tarjeta cuyo título entero es «—» no le dice nada a nadie. Las sanciones
+# de los últimos 3 años mandan; si no llenan, entran los demás actos del sector;
+# y solo al final las sanciones viejas. Para las 5 fuentes que ya funcionaban el
+# resultado es el mismo de antes (verificado): sus sanciones recientes con
+# nombre llenan los seis cupos y el resto de la cadena nunca se toca.
+_REG_ACTO_LBL = {
+    'sancion': 'Sanción', 'apertura_investigacion': 'Investigación abierta',
+    'archivo': 'Archivo', 'resolucion': 'Resolución',
+    'contribucion_especial': 'Contribución especial', 'otro': 'Acto administrativo',
+}
+_REG_ACCION = {
+    'apertura_investigacion': ('Investigación abierta en tu sector — revisar si el hecho '
+                               'imputado se parece a tu operación'),
+    'archivo': ('Archivo del expediente — sirve de precedente sobre qué defensa le '
+                'funcionó a otro en tu sector'),
+    'resolucion': ('Acto de trámite del regulador en tu sector — revisar qué le exigió '
+                   'y con qué plazo'),
+    'contribucion_especial': 'Liquidación de la contribución del sector — verificar tu base',
+    'otro': 'Actuación del regulador en tu sector — seguimiento',
+}
+
+
+def _reg_con_nombre(r):
+    return (r.get('sancionado') or '').strip() not in ('', '—', '-', 'N/A')
+
+
+def _bloque_regulatorio(dels, vig_keys, cap=6):
+    """Las `cap` señales regulatorias del sector, ya priorizadas y redactadas."""
+    corte = str(caudal_core.REF_YEAR - 3)
+    utiles = [r for r in dels
+              if _reg_con_nombre(r)
+              and (r.get('sancionado'), r.get('fecha'), r.get('resolucion'),
+                   r.get('fuente')) not in vig_keys]
+    utiles.sort(key=lambda r: r.get('fecha') or '', reverse=True)
+    es_sanc = lambda r: (r.get('tipo_acto') or 'sancion') == 'sancion'
+    sanc_rec = [r for r in utiles if es_sanc(r) and (r.get('fecha') or '')[:4] >= corte]
+    otros = [r for r in utiles if not es_sanc(r)]
+    sanc_old = [r for r in utiles if es_sanc(r) and (r.get('fecha') or '')[:4] < corte]
+    out = []
+    for r in (sanc_rec + otros + sanc_old)[:cap]:
+        acto = r.get('tipo_acto') or 'sancion'
+        yr = (r.get('fecha') or '')[:4]
+        reciente = yr.isdigit() and int(yr) >= caudal_core.REF_YEAR - 1
+        if acto == 'sancion':
+            accion = ('Sanción reciente en tu sector — revisar exposición y activar '
+                      'cumplimiento') if reciente else \
+                     'Antecedente sancionatorio — referencia de riesgo del sector'
+            # una sanción firme siempre pesa; los actos de trámite solo cuando
+            # están frescos (un archivo de 2019 es doctrina, no alerta).
+            nivel = 'alto' if reciente else 'medio'
+        else:
+            accion = _REG_ACCION.get(acto, _REG_ACCION['otro'])
+            nivel = 'alto' if (reciente and acto == 'apertura_investigacion') else 'medio'
+        out.append({'tipo': 'regulatorio', 'sancionado': r.get('sancionado'),
+                    'fuente': r.get('fuente_nombre'), 'tipo_sancion': r.get('tipo'),
+                    'acto': acto, 'acto_lbl': _REG_ACTO_LBL.get(acto, _REG_ACTO_LBL['otro']),
+                    'motivo': (r.get('motivo') or '')[:170], 'fecha': r.get('fecha'),
+                    'monto': r.get('monto'), 'nivel': nivel, 'accion': accion})
+    return out
+
+
 SECOP_SECTOR_DIAS = 180
 
 
@@ -2581,14 +2664,21 @@ def handler(event, context):
         # catálogo para el editor de perfil: plantillas de arranque (los presets),
         # sectores de sanciones CON su conteo real (para no ofrecer un sector que
         # está vacío como si tuviera datos) y comisiones de referencia.
-        por_sector = {}
+        # dos conteos, porque no dicen lo mismo: `n` son las sanciones y
+        # `n_actos` todo el expediente. En la ANLA la diferencia es el sector
+        # entero (210 vs 54.105) y enseñar solo el primero haría ver como
+        # marginal a la fuente más grande del pilar.
+        por_sector, actos_sector = {}, {}
         for r in _sanciones():
+            sec = r.get('sector', '')
+            actos_sector[sec] = actos_sector.get(sec, 0) + 1
             if (r.get('tipo_acto') or 'sancion') == 'sancion':
-                por_sector[r.get('sector', '')] = por_sector.get(r.get('sector', ''), 0) + 1
+                por_sector[sec] = por_sector.get(sec, 0) + 1
         return _resp(200, {
             'plantillas': [caudal_core.perfil_desde_sector(x['k'])
                            for x in caudal_core.SECTORES_CLIENTE],
-            'sectores_sanciones': [{'k': k, 'nombre': n, 'n': por_sector.get(k, 0)}
+            'sectores_sanciones': [{'k': k, 'nombre': n, 'n': por_sector.get(k, 0),
+                                    'n_actos': actos_sector.get(k, 0)}
                                    for k, n in caudal_core.SANCION_SECTORES],
             'comisiones': caudal_core.COMISIONES_REF,
             'limites': {'temas': caudal_core.PERFIL_MAX_TEMAS,
@@ -2640,36 +2730,33 @@ def handler(event, context):
             reciente = yr.isdigit() and int(yr) >= caudal_core.REF_YEAR - 1
             vig_keys.add((r.get('sancionado'), r.get('fecha'), r.get('resolucion'),
                           r.get('fuente')))
+            # el acto de la vigilada tampoco es siempre una sanción: desde que
+            # entró la ANLA, lo que aparece contra una minera suele ser una
+            # resolución de seguimiento o una investigación abierta. Se nombra
+            # por lo que es — llamarle "sanción" a un archivo es un error caro.
+            acto = r.get('tipo_acto') or 'sancion'
+            lbl = _REG_ACTO_LBL.get(acto, _REG_ACTO_LBL['otro'])
             reg_vig.append({'tipo': 'regulatorio', 'vigilada': quien,
                             'sancionado': r.get('sancionado'),
                             'fuente': r.get('fuente_nombre'), 'tipo_sancion': r.get('tipo'),
+                            'acto': acto, 'acto_lbl': lbl,
                             'motivo': (r.get('motivo') or '')[:170], 'fecha': r.get('fecha'),
-                            'monto': r.get('monto'), 'nivel': 'alto' if reciente else 'medio',
-                            'accion': (f'Sanción a {quien}, empresa que vigilas — '
+                            'monto': r.get('monto'),
+                            # acá el nivel NO depende de la clase de acto: que el
+                            # regulador se haya movido este año contra la empresa
+                            # que el cliente vigila es alta prioridad aunque sea
+                            # una resolución de trámite. En el bloque de SECTOR sí
+                            # se distingue, porque ahí el acto es de un tercero.
+                            'nivel': 'alto' if reciente else 'medio',
+                            'accion': (f'{lbl} contra {quien}, empresa que vigilas — '
                                        'documentar el caso y su exposición') if reciente else
-                                      f'Antecedente sancionatorio de {quien}'})
+                                      f'Antecedente regulatorio de {quien} ({lbl.lower()})'})
         reg, n_sanc, n_otros = [], 0, 0
         if s.get('sector_sanciones'):
             dels = [r for r in _sanciones() if r.get('sector') == s['sector_sanciones']]
-            # el radar prioriza SANCIONES: son las que mueven la aguja del
-            # cliente. Los demás actos regulatorios del sector se cuentan
-            # (n_otros_actos_sector) pero no compiten por los 6 cupos.
             sanc = [r for r in dels if (r.get('tipo_acto') or 'sancion') == 'sancion']
             n_sanc, n_otros = len(sanc), len(dels) - len(sanc)
-            sanc.sort(key=lambda r: r.get('fecha', ''), reverse=True)
-            sanc = [r for r in sanc
-                    if (r.get('sancionado'), r.get('fecha'), r.get('resolucion'),
-                        r.get('fuente')) not in vig_keys]
-            for r in sanc[:6]:
-                yr = (r.get('fecha') or '')[:4]
-                reciente = yr.isdigit() and int(yr) >= caudal_core.REF_YEAR - 1
-                reg.append({'tipo': 'regulatorio', 'sancionado': r.get('sancionado'),
-                            'fuente': r.get('fuente_nombre'), 'tipo_sancion': r.get('tipo'),
-                            'motivo': (r.get('motivo') or '')[:170], 'fecha': r.get('fecha'),
-                            'monto': r.get('monto'), 'nivel': 'alto' if reciente else 'medio',
-                            'accion': ('Sanción reciente en tu sector — revisar exposición y activar '
-                                       'cumplimiento') if reciente else
-                                      'Antecedente sancionatorio — referencia de riesgo del sector'})
+            reg = _bloque_regulatorio(dels, vig_keys)
         med, n_med = [], 0
         cutoff = _time.strftime('%Y-%m-%d', _time.gmtime(_time.time() - 5 * 86400))
         med_vig, vig_urls = [], set()
