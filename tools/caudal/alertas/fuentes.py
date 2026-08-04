@@ -214,18 +214,44 @@ def llave_normativa(r):
                   r.get('fecha'), (r.get('titulo') or '')[:80])
 
 
+# Marcadores de «aquí no hay entidad» que usa el pilar Regulatorio. El guion
+# largo es el que emite el build de ANLA, y es el caso mayoritario: 51.897 de
+# sus 54.097 actos no tienen destinatario porque no son sanciones (son
+# permisos, autos de trámite, licencias). Un `or` no los atrapa —un guion es
+# verdadero— así que el correo salía con 25 de 26 tarjetas tituladas «—», que
+# el cliente lee como un error de render.
+_SIN_ENTIDAD = {'', '-', '—', '–', 'n/a', 'na', 'null', 'none', 'no aplica'}
+
+
+def entidad_de(v):
+    """Razón social del destinatario del acto, o '' si no hay ninguna."""
+    s = str(v or '').strip()
+    return '' if s.lower() in _SIN_ENTIDAD else s
+
+
 def sanciones(ruta):
     """Actos regulatorios → eventos."""
     out = []
     for r in leer_jsonl(ruta):
-        titulo = (r.get('sancionado') or 'Entidad no identificada').strip()
+        # Cuando hay entidad, ELLA es el titular: al cliente le importa a quién
+        # se lo hicieron. Cuando no la hay, el titular es el acto mismo, y la
+        # descripción (el expediente) pasa a ser el detalle — así la tarjeta
+        # dice algo en vez de un guion, y no repite el motivo dos veces.
+        entidad = entidad_de(r.get('sancionado'))
+        motivo = (r.get('motivo') or '').strip()
+        descripcion = (r.get('descripcion') or '').strip()
+        if entidad:
+            titulo, detalle = entidad, (motivo or descripcion)
+        else:
+            titulo, detalle = (motivo or descripcion or 'Acto sin descripción'), \
+                              (descripcion if motivo else '')
         out.append({
             'id': llave_sancion(r),
             'pilar': 'regulatorio',
             'tipo': (r.get('tipo_acto') or 'sancion'),
             'fecha': r.get('fecha') or '',
             'titulo': titulo,
-            'detalle': (r.get('motivo') or r.get('descripcion') or '').strip(),
+            'detalle': detalle,
             'url': r.get('url') or '',
             'meta': {'fuente': r.get('fuente_nombre') or r.get('fuente'),
                      'sector_fuente': r.get('sector') or '',

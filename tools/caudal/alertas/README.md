@@ -408,26 +408,76 @@ despertar; el estado del motor evita que eso reenvíe nada.
 
 ## Envío
 
-Por Resend, desde `contacto@ricardoruiz.co`.
+Hay **dos caminos** hasta la bandeja, y el motor escoge solo:
 
-**Sin `RESEND_API_KEY` el motor no falla y no se calla:** escribe los digests en
-disco y deja una cola en `pendientes.json`. Cuando la key exista:
+| | quién habla con Resend | con qué credencial |
+|---|---|---|
+| **directo** | este proceso | `RESEND_API_KEY` del entorno |
+| **worker** | `rr-auth` (`POST /caudal/alertas/enviar`) | la key del worker, la que ya manda las verificaciones de cuenta y las invitaciones del Lab |
+
+El segundo existe por un problema real: la key local resultó ser de **otra
+cuenta de Resend**, donde `ricardoruiz.co` no está verificado, así que todo
+envío moría en 403 y el digest se encolaba. El worker lleva meses mandando
+correo verificado desde ese dominio — la casa ya tenía una llave buena y el
+motor no la estaba usando.
+
+**La elección no está escrita a mano: se decide por capacidad.** `transporte()`
+le pregunta a Resend (`/domains`) si la key local puede mandar desde el
+remitente; si puede, gana el camino directo, y si no, sale por el worker. El día
+que aparezca una key buena en el entorno, el motor vuelve solo al camino directo
+sin que nadie cambie configuración. Para ver cuál va a usar hoy:
 
 ```bash
-RESEND_API_KEY=... python3 tools/caudal/alertas/sender.py \
+python3 tools/caudal/alertas/sender.py --diagnostico
+```
+
+Imprime los dominios verificados de la cuenta de esa key, el veredicto y la
+línea `VA A USAR: DIRECTO|WORKER`. `rc=0` si hay por dónde mandar.
+
+`CAUDAL_ALERTAS_TRANSPORTE=directo|worker` fuerza uno, para depurar.
+
+**Si el camino elegido falla, se intenta el otro antes de encolar.** El objetivo
+es que el correo llegue, no defender un transporte; cuando hubo que cambiar, el
+reporte lo dice (`enviado via worker (tras fallar directo: …)`), porque un
+transporte que se cayó es información de operación.
+
+**Si no sirve ninguno, el motor no falla y no se calla:** escribe los digests en
+disco y deja una cola en `pendientes.json`:
+
+```bash
+python3 tools/caudal/alertas/sender.py \
   --pendientes tools/caudal/alertas/datos/digests/2026-08-02
 ```
 
-Eso importa porque **el estado del motor ya avanzó**: si un correo se pierde por
-falta de key, esas señales no vuelven a aparecer mañana. La cola es conservadora:
-solo borra de `pendientes.json` lo que Resend confirmó; si el reintento vuelve a
-fallar, los cinco digests siguen ahí (verificado).
+Eso importa porque **el estado del motor ya avanzó**: si un correo se pierde,
+esas señales no vuelven a aparecer mañana. La cola es conservadora: solo borra
+de `pendientes.json` lo que Resend confirmó; si el reintento vuelve a fallar,
+los digests siguen ahí (verificado).
+
+### Lo que el worker NO deja hacer, y por qué
+
+La ruta del worker recibe correo ya renderizado, así que el riesgo evidente es
+volverla un relay abierto. Además del guarda de servicio (el **mismo** de
+`/caudal/alertas/inventario`: sin CORS, rechaza huella de navegador y sin el
+secreto responde byte a byte como una ruta inexistente), el worker acota qué se
+manda y a quién:
+
+* el **remitente y el reply-to los fija el servidor** — quien llama no los elige;
+* el **asunto se fuerza a empezar por «Caudal ·»**, para que un token filtrado no
+  pueda disfrazar el correo de «Restablece tu contraseña»;
+* el **destinatario tiene que ser de la casa**: admin o cuenta con acceso a
+  Caudal (el mismo `_caudalAccesoDe` que abre `caudal.html`). A un tercero no se
+  le escribe ni con el token en la mano;
+* **tope de 80 correos/día** (una corrida manda ~7).
+
+Un destinatario rechazado **no pasa en silencio**: vuelve en `rechazados` con el
+motivo y el reporte lo imprime. Si a un cliente nuevo no le llega su digest, casi
+siempre es que le falta el acceso — se otorga con `tools/caudal/acceso/acceso.py`.
 
 ### ⚠ Tener key no es tener envío: la key tiene que ser de la cuenta correcta
 
 Medido ago-2026, y costó un rato: la key configurada era **válida** —Resend la
-aceptaba— pero era de **otra cuenta de Resend**, donde `ricardoruiz.co` no está
-verificado. La API contesta:
+aceptaba— pero era de otra cuenta. La API contesta:
 
 ```
 HTTP 403 · The ricardoruiz.co domain is not verified.
@@ -435,18 +485,22 @@ HTTP 403 · The ricardoruiz.co domain is not verified.
 
 …que se lee como *«hay que verificar el dominio»* cuando lo que pasaba era
 *«esta key es de otra cuenta»*. Son dos arreglos distintos y el mensaje no los
-distingue. Antes de pelear con DNS:
+distingue. Por eso `--diagnostico` pregunta por `/domains` en vez de adivinar.
 
-```bash
-python3 tools/caudal/alertas/sender.py --diagnostico
-```
+Prueba de cableado: `python3 sender.py --probar tu@correo.com` (ojo: por el
+camino directo y sin dominio verificado, Resend solo deja mandar a la dirección
+dueña de la cuenta — así que un `--probar` que falla no siempre significa key
+mala. Por el worker, el destino debe tener acceso a Caudal).
 
-Lista los dominios que la cuenta de ESA key tiene verificados y dice si el
-dominio del remitente está entre ellos. `rc=0` si puede enviar, `1` si no.
+### La key del worker es de solo envío
 
-Prueba de cableado: `RESEND_API_KEY=... python3 sender.py --probar tu@correo.com`
-(ojo: sin dominio verificado, Resend solo deja mandar a la dirección dueña de la
-cuenta — así que un `--probar` que falla no siempre significa key mala).
+Verificado: `GET /emails/{id}` responde `401 · This API key is restricted to
+only send emails`. O sea que **no se puede consultar por API si un correo se
+entregó o rebotó** — «Resend lo aceptó» (HTTP 200 + id) es lo más que se sabe
+desde acá. Es una buena propiedad de seguridad (un token filtrado no puede leer
+el correo de nadie) y a la vez el techo de lo que este módulo puede afirmar
+sobre la entrega. Para confirmar rebotes hay que mirar el panel de Resend, o
+darle a esa key permiso de lectura.
 
 ---
 

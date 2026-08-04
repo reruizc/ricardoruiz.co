@@ -6910,26 +6910,47 @@ hábil): `--baseline --fecha 2026-07-28 --sin-api` y luego `--fecha 2026-07-29
 (salud 6/4 · contratación 3/1 · energía 3/1 · educación 2/1 · trabajo 4/2).
 Contra la primera versión, mismos datos: 440 señales → 35 y 52 "altas" → 5.
 
-**⚠️ BLOQUEADOR del envío (ago-3-2026): la `RESEND_API_KEY` es de la cuenta
-equivocada.** `destinatarios.json` ya existe (todo a `reruizc@gmail.com`,
-gitignored) y el motor corre en producción, pero **ningún correo ha salido
-todavía**: Resend responde `403 · The ricardoruiz.co domain is not verified`. La
-key es válida —Resend la acepta— pero pertenece a **otra cuenta de Resend**, en
-la que el único dominio verificado es `hilvana.com.co`. El mensaje de la API se
-lee como «verificá el dominio» cuando el arreglo real es «poné una key de la
-cuenta donde ricardoruiz.co ya está verificado»; son dos cosas distintas y la
-API no las distingue. **Lo resuelve Ricardo**, no el código: pegar la key buena
-en `~/.config/caudal/alertas.env` y confirmar con
-`python3 tools/caudal/alertas/sender.py --diagnostico` (lista los dominios de esa
-cuenta y devuelve `rc=0` solo si puede enviar). Hecho eso, el digest de operación
-del 3-ago ya está encolado y sale con
-`sender.py --pendientes tools/caudal/alertas/datos/digests/2026-08-03`.
+**✅ RESUELTO (ago-4-2026): el correo sale, y sin key nueva.** La
+`RESEND_API_KEY` local sigue siendo de otra cuenta de Resend (la única con
+dominio verificado ahí es `hilvana.com.co`), pero eso dejó de bloquear: **el
+worker `rr-auth` ya mandaba correo verificado desde `ricardoruiz.co`** hace
+meses (verificaciones de cuenta, invitaciones del Lab), y el motor ahora puede
+pasarle el correo ya renderizado por **`POST /caudal/alertas/enviar`**, con el
+mismo secreto de servicio que ya usaba para leer los perfiles.
+- **El motor elige solo, por capacidad** (`sender.transporte()`): le pregunta a
+  Resend `/domains` si la key local puede mandar desde el remitente; si puede,
+  va directo, y si no, sale por el worker. **El día que aparezca una key buena
+  en el entorno, vuelve solo al camino directo** — no hay que cambiar nada.
+  `--diagnostico` imprime cuál va a usar. Si el elegido falla, intenta el otro
+  antes de encolar.
+- **El worker no es un relay abierto**: mismo guarda de 6 capas de
+  `/inventario`, remitente y reply-to fijos del lado del servidor, asunto
+  forzado a empezar por «Caudal ·», **destinatario obligado a tener acceso a
+  Caudal** (`_caudalAccesoDe`) y tope de 80 correos/día. Un destinatario
+  rechazado vuelve en `rechazados` con el motivo, no en silencio.
+- ⚠️ **La key del worker es de SOLO ENVÍO** (`GET /emails/{id}` → `401 · This
+  API key is restricted to only send emails`), así que **no se puede confirmar
+  la entrega por API**: lo máximo que este módulo puede afirmar es «Resend lo
+  aceptó» (HTTP 200 + id). Para rebotes, el panel de Resend.
+- Sigue siendo cierto que una key buena en `~/.config/caudal/alertas.env`
+  simplifica todo (y ahí `--diagnostico` lo dirá), pero ya **no es requisito
+  para que el cliente reciba su digest**.
 
-**Verificado end-to-end salvo la última milla** (ago-3): baseline sella 19.134
-llaves · la regresión documentada reproduce exacto (18 señales, 9 altas, 5
-destinos) · **silencio** correcto (sin señales y sin problemas de operación no
-manda nada, `rc=0`) · **cola** conservadora (sin key no envía ni vacía; con key
-mala reintenta, falla y conserva los 5 — nada se pierde en silencio).
+**Verificado end-to-end** (ago-4): la corrida real del 4-ago mandó **9 digests
+de sector** por el worker (Resend devolvió id en los 9) y **vació la cola** del
+3-ago · **silencio** correcto (sin señales y sin problemas de operación no manda
+nada, `rc=0`) · **cola** conservadora (solo borra lo que Resend confirmó).
+⚠️ **Falta el último centímetro: nadie ha ABIERTO la bandeja.** La sesión de
+Gmail del Chrome de trabajo está cerrada y la key del worker no permite
+consultar entregas, así que «Resend lo aceptó» es lo verificado; «llegó» lo
+confirma Ricardo mirando su correo.
+
+⚠️ **La regresión documentada ya no da 18/9/5 sino 19/10/6** (mismos 53 eventos).
+**No es una regresión de código**: se midió el mismo caso con el código anterior
+y con el nuevo, con el mismo cache, y los dos dan 19/10/6. La diferencia contra
+el número sellado el 3-ago es del DATO (el cache de regulatorio/ejecutivo creció
+con ANLA). Al comparar contra un baseline viejo, medir siempre las dos versiones
+del código con el mismo cache antes de culpar al cambio.
 
 **Arreglos de render del mismo día** (ver README, sección «Render»): todo recorte
 pasa por `render.recortar` (frontera de palabra + «…»); los títulos van a 260 y
@@ -6940,6 +6961,28 @@ Senado traen espacios y los reescritores de enlaces de correo corporativo cortan
 ahí); los firmantes se cortan por coma (`autores` → «y 15 más», no «NORMA HURT»);
 y `reglas.cola_legible` deja la línea de excepción del stderr en vez del
 andamiaje del traceback.
+
+**Tres defectos que solo se vieron leyendo el correo como cliente** (ago-4, al
+abrir el digest real que acababa de salir):
+- **25 de 26 tarjetas del bloque Regulatorio salían tituladas «—».** El slim de
+  S3 escribe `sancionado: "—"` literal para los 51.897 actos de ANLA que no
+  tienen destinatario (permisos, autos, licencias: no son sanciones), y el
+  `or 'Entidad no identificada'` de `fuentes.sanciones` **no lo atrapa porque un
+  guion es truthy**. Ahora, sin entidad, el titular es **el acto mismo** y el
+  expediente pasa al detalle. De regalo se ve por qué cada acto cayó en su
+  sector: el que llegó a Educación es de la **Universidad Icesi**, y con el
+  guion eso era invisible. `fuentes.entidad_de()` centraliza los marcadores de
+  ausencia (`— – - n/a null …`).
+- **«leído del el texto radicado»** en el pie del bloque «Qué cambia» — el
+  default de `_procedencia` ya traía el artículo y la frase pone el suyo. Salía
+  en el 100% de los casos, justo en la línea que sostiene la credibilidad de lo
+  que el bloque afirma arriba.
+- **«por No publicar el contrato…»**: `_minuscula_inicial` protegía siglas con
+  `len(primera) > 3`, que era redundante (`not primera.isupper()` ya lo hace) y
+  dejaba fuera las palabras cortas más frecuentes al inicio de una conducta
+  («No», «Se», «La»).
+Ninguno de los tres cambia qué señales entran ni a quién van: verificado
+corriendo la misma regresión antes y después (19/10/6 idéntico).
 
 **Pendiente:** el click-through del interruptor en un navegador real
 (`caudal.html` es gated y el preview no puede autenticarse). Los `datos/`

@@ -253,7 +253,12 @@ def _minuscula_inicial(s):
     """
     s = (s or '').strip()
     primera = s.split(' ', 1)[0].rstrip(',.;:')
-    if len(primera) > 3 and primera[:1].isupper() and not primera.isupper():
+    # Quien protege a las siglas es `not primera.isupper()` («EPS» queda igual).
+    # El filtro por longitud que había además era redundante y dejaba pasar las
+    # palabras cortas más frecuentes al inicio de una conducta —«No publicar»,
+    # «Se abstenga», «La entidad»—, que son justo las que se leían mal después
+    # de «por».
+    if primera[:1].isupper() and not primera.isupper():
         return s[:1].lower() + s[1:]
     return s
 
@@ -318,7 +323,12 @@ def _filas_articulado(ev):
 
 
 def _procedencia(art):
-    base = (art or {}).get('fuente_txt') or (art or {}).get('base_txt') or 'el texto radicado'
+    # El valor va SIN artículo porque la frase ya pone el suyo («del»). Con el
+    # default viejo («el texto radicado») salía «leído del el texto radicado»
+    # en el 100% de los casos, y es el pie que sostiene la credibilidad de todo
+    # lo que el bloque afirma arriba.
+    base = (art or {}).get('fuente_txt') or (art or {}).get('base_txt') or 'texto radicado'
+    base = re.sub(r'^(el|la|los|las)\s+', '', str(base).strip(), flags=re.I)
     conf = (art or {}).get('confianza') or ''
     extra = f' · confianza {conf} de la extracción' if conf else ''
     return f'leído del {base}{extra}'
