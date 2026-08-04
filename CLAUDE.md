@@ -5993,8 +5993,34 @@ universal y grilla de 9 pilares. Lo que sigue en esta ficha describe la **vista
 Congreso** (`view-congreso`), uno de los pilares. Página privada en la raíz,
 sistema visual v2 (Helvetica embebida, fondo `#060810`, acento teal, azul `#0047FF`,
 cursor custom, `noindex,nofollow`). Gate calcado de proyecto-dc: `rr-token`/`rr-user`
-+ whitelist **`['reruizc@gmail.com','nuevagemela@gmail.com']`** (Nury Gómez agregada
-jul-2026) + verificación contra `rr-auth /auth/me`. Card en `dashboard.html`
++ whitelist **`['reruizc@gmail.com','nuevagemela@gmail.com','diego@cauce.co']`**
++ verificación contra `rr-auth /auth/me`. Card en `dashboard.html`
+
+**Aprovisionamiento de clientes por CLI (`tools/caudal/acceso/` · ago-2026) —
+el backend YA está, el frontend NO.** El modelo comercial de Cauce es
+aprovisionamiento manual de cuentas ya habladas: Cauce trae al cliente y
+nosotros le habilitamos la plataforma. **No hay que cablear Wompi ni pasarela
+de pago acá** — esa lectura (que estuvo un tiempo en este archivo como
+"bloqueador #1") es la del resto del sitio, no la de Caudal.
+- Worker: 4 rutas aditivas `/caudal/acceso/{me,list,save,delete}` sobre llaves
+  `caudal:acceso:<correo>` en KV, con quién otorgó, cuándo y vencimiento
+  opcional. El vencimiento va en DOS capas —TTL de KV para que no queden
+  accesos zombis, y revalidación de la fecha al leer, porque el borrado de KV
+  es eventual—. Los **admins entran siempre** y no se pueden revocar desde ahí:
+  que Ricardo no se pueda dejar afuera es una propiedad, no un descuido.
+- CLI `acceso.py listar|otorgar|ver|revocar`. Credenciales por `RR_ADMIN_API_KEY`
+  en `~/.config/caudal/acceso.env` (chmod 600) o sesión de admin cacheada. ⚠ Es
+  un archivo DISTINTO de `~/.config/caudal/alertas.env`, que lleva
+  `RESEND_API_KEY` y `CAUDAL_ALERTAS_TOKEN` para el motor de alertas.
+- ⚠ **Autoriza un correo, no crea la cuenta**: el cliente igual se registra en
+  `register.html` con exactamente ese correo.
+- ✅ Los 2 correos no-admin del HTML (`diego@cauce.co`, `nuevagemela@gmail.com`)
+  ya están **sembrados en KV** — sin eso, el día que se cablee el frontend con
+  el KV vacío perderían el acceso. Verificado contra producción.
+- 🔜 **PENDIENTE**: `caudal.html` sigue con la lista escrita a mano, así que
+  otorgar por CLI **todavía no abre la puerta**. Falta cambiar ese chequeo por
+  `/caudal/acceso/me` con el bearer de la sesión y mandar a `dashboard.html`
+  cuando responda `acceso:false`, conservando el camino del token de invitado.
 
 **Acceso de invitado a Caudal (link/QR sin registro · jul-2026).** Para mostrarle
 Caudal a socios (Cauce) sin crearles cuenta: `?acceso=<token>` en la URL. El token
@@ -6621,6 +6647,29 @@ recrea entero en cada render) y su caso se evalúa **antes** que `[data-pf]`,
 para que un anidamiento futuro no lo haga caer en `pfAbrir`. Guardar una
 edición no toca el interruptor de alertas: el opt-in tiene una sola puerta en
 `/caudal/perfil/alertas` y `/save` ignora ese bloque del cuerpo.
+
+⚠️⚠️ **REGLA · el KV es de consistencia eventual: después de escribir, NO leas
+por listado.** Dos conversaciones distintas chocaron con esto el mismo día
+(ago-2026) sin saber la una de la otra, así que no es un bug, es la forma de la
+herramienta:
+- **`caudal.html`** (`7a1c8b2`): al crear el PRIMER perfil, la barra decía
+  *«Todavía no tienes ninguno · 0/25»* con el perfil ya guardado y su radar
+  cargando al lado — el `list()` que corre justo después del `put` todavía no lo
+  veía, y quedaba así hasta recargar. Es el peor sitio posible para ese error:
+  le dice al cliente que no guardó, justo en el estreno, y **solo aparece con la
+  cuenta en cero**, que es el estado que nadie prueba. Fix: lo que ya se sabe
+  del perfil abierto (`PF_ACTIVE`) le gana a una lista rezagada; `pfBorrar`
+  anula `PF_ACTIVE` antes de recargar para que un perfil borrado no reviva por
+  esa vía.
+- **CLI de acceso** (`7c4c16a`): `ver` consultaba el listado y respondía «no
+  está» a los segundos de haber otorgado — se lee como que el alta falló e
+  invita a repetirla. Fix: lectura directa por llave.
+
+El patrón general: **la lectura por llave ve el dato enseguida; el LISTADO va
+atrasado unos segundos.** Para confirmar una escritura, lee la llave o confía en
+el estado local; nunca preguntes por el índice. Al escribir UI nueva sobre KV,
+prueba siempre el caso de la cuenta vacía (0→1), que es donde la lista rezagada
+miente de la forma más costosa.
 
 #### Latencia · la lectura del analista se separa del radar (ago-2026)
 
