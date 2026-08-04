@@ -225,7 +225,14 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
     # --incremental reusa las palabras ya extraídas por gaceta (el caché) y solo
     # paga red por lo nuevo; los radicados se releen siempre (son locales y
     # cambian mientras el proyecto se mueve).
-    etapa --nombre texto_index --timeout 1800 \
+    #
+    # Timeout 2400 y no 1800: medido, la etapa tarda ~14 min y el grueso YA NO es
+    # red sino CPU (leer el caché de 123 MB, invertir 8.170 documentos, escribir
+    # 38 MB). Con 1800 se cortó en la primera corrida real (rc=124) porque además
+    # reintentaba las ~2.200 gacetas sin texto en S3; eso lo arregla el caché de
+    # negativos de build_texto_index. Si el corpus vuelve a crecer, medir antes
+    # de bajar este número.
+    etapa --nombre texto_index --timeout 2400 \
           --desc "índice de texto (gacetas + radicados vivos)" \
           -- python3 tools/caudal/build_texto_index.py --incremental
 
