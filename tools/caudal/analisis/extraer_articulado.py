@@ -661,8 +661,16 @@ def _cacheado(tok, base_plan=None):
     # título, adopta una reforma tributaria' con cero obligaciones. El texto
     # entra a diario por el cron, así que sin este chequeo el corpus envejece
     # justo en los proyectos que más importan — los que llegan con texto tarde.
+    #
+    # La comparación va contra la base que se INTENTÓ, no contra la que quedó.
+    # Un documento ilegible o de dos líneas se degrada a 'titulo' al procesarlo,
+    # y comparar contra el resultado haría que el plan pidiera para siempre un
+    # texto que ya se probó y no sirve — un bucle que además cuesta plata en
+    # cada corrida. Las entradas viejas no traen el campo: ahí se cae al
+    # comportamiento anterior, que es no reintentar.
+    intentada = (d.get('_meta') or {}).get('base_intentada') or d.get('base')
     if base_plan and (_CALIDAD_BASE.get(base_plan, 9)
-                      < _CALIDAD_BASE.get(d.get('base'), 9)):
+                      < _CALIDAD_BASE.get(intentada, 9)):
         return None
     return d
 
@@ -716,6 +724,12 @@ def _procesar(item, guardar_txt=False):
         ex['confianza'] = 'media'
     d = _norm_extraccion(ex, item, item['base'])
     d['_meta'] = {'pv': _pv(item['base']), 'model': DEEPSEEK_MODEL, 'modo': modo,
+                  # base que se INTENTÓ, que no siempre es la que quedó: un
+                  # documento ilegible o vacío se degrada a 'titulo'. Sin este
+                  # registro, el chequeo de calidad de `_cacheado` vería
+                  # "el plan ofrece texto y la caché dice título" y volvería a
+                  # pedirlo en cada corrida, para siempre.
+                  'base_intentada': item['base'],
                   'chars': chars,
                   'tok_in': usage['prompt_tokens'], 'tok_out': usage['completion_tokens'],
                   'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}

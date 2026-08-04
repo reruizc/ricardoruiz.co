@@ -250,9 +250,19 @@ que son las que llegan con el texto tarde.
    rastreo diario como respaldo — nunca pisando al dataset, solo cubriendo el
    hueco.
 
-Efecto conjunto sobre la legislatura viva: de **143 a 199** proyectos con base
-`texto_radicado`. La tributaria pasó de «según el título» a un articulado con
-obligaciones reales sobre IVA, patrimonio, renta y juegos de suerte y azar.
+Efecto conjunto sobre la legislatura viva: de **143 a 194** proyectos con base
+`texto_radicado` (de 216; los 22 que quedan en «solo título» son los que de
+verdad no tienen texto publicado todavía). La tributaria pasó de «según el
+título» a un articulado con obligaciones reales sobre IVA, patrimonio, renta y
+juegos de suerte y azar. Cobertura del lente de riesgo: **100%**, ningún
+proyecto queda fuera.
+
+Un tercer bug, este introducido al arreglar los dos anteriores y detectado
+antes de que costara: invalidar la caché comparando contra la base que QUEDÓ
+hacía que un documento ilegible —que se degrada a «título» al procesarlo— se
+volviera a pedir en cada corrida, para siempre y pagando cada vez. Ahora se
+compara contra la base que se **intentó** (`_meta.base_intentada`), y la cola
+efectivamente se vacía.
 
 ## Límites conocidos, medidos
 
