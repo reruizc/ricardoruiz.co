@@ -6365,6 +6365,26 @@ intentos + 109 normas del Ejecutivo**, con la traducción de marca a tema visibl
   de SECOP (`es_razon_social` / `empieza_por_marca`). Si una razón social larga no
   aparece, el sitio de arreglarlo es el campo `entidad` de esa fila.
 
+**⑦ ASINFAR + afinado de ACEMI y Asobares (ago-2026) · 589 entradas.** Se pidieron tres
+gremios y **dos ya estaban** (Asobares y ACEMI) — conviene consultar `empresas_en()` antes
+de agregar, que el diccionario ya pasa de 500 nombres.
+- **ASINFAR** entra con presencia verificada (10 documentos en el articulado). Es la
+  **contraparte de AFIDRO** en el mismo debate —industria nacional de genéricos frente a
+  multinacionales innovadoras— y mapea al mismo vocabulario **a propósito**: el
+  diccionario traduce temas, no toma partido. La diferencia es que para ASINFAR la
+  patente es la pelea definitoria, así que `propiedad intelectual` va como segunda
+  actividad central y no como contexto.
+- **ACEMI no tenía ningún contexto** y **Asobares tenía dos**. Se les sumó el vocabulario
+  que de verdad los toca (ACEMI: medicamentos, laboral, tributario · Asobares: tributario
+  y ordenamiento territorial, que es de donde salen los pleitos de horarios y licencias de
+  funcionamiento) **como CONTEXTO, no como núcleo** → lo que devuelven por defecto no
+  cambia (ACEMI sigue en 159, Asobares en 64) y solo crece al ampliar (437 y 288).
+- ⚠️ **`build_zip.py` empaqueta lo que encuentre en el árbol, incluido trabajo sin
+  commitear de otra conversación.** En esta tanda el ZIP pasó de 80 a 98 KB porque
+  recogió un módulo `tools/caudal/importancia/` que no era de este frente. No rompió nada
+  (se verificaron `tema`, `stats` y `bloqueo` en producción), pero **antes de desplegar
+  hay que mirar la línea que imprime el build**: dice exactamente qué está subiendo.
+
 **⑥ Palma y construcción (ago-2026) · 529 → 588 entradas (+59).** Los dos sectores
 tenían problemas distintos y cada uno pidió lo suyo:
 - **Palma eran 4 entradas colgadas de `sector agropecuario`**, que es el corpus de TODO

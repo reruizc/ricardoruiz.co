@@ -1007,9 +1007,19 @@ _RAW_GREMIOS = [
      'sector financiero,tributario', '', ''),
     ('fasecolda', 'Fasecolda', 'seguros', 'fasecolda', 'seguros,sector financiero', '', ''),
     ('asofondos', 'Asofondos', 'pensiones', 'asofondos', 'pensiones y cesantias', '', ''),
-    ('acemi', 'ACEMI', 'salud', 'acemi', 'salud / EPS e IPS', '', ''),
+    ('acemi', 'ACEMI', 'salud', 'acemi',
+     'salud / EPS e IPS,farmaceutico / medicamentos,laboral,tributario', '', ''),
     ('afidro', 'AFIDRO', 'farma', 'afidro',
      'farmaceutico / medicamentos,propiedad intelectual', '', ''),
+    # ASINFAR es la CONTRAPARTE de AFIDRO en el mismo debate: la industria
+    # nacional de genéricos frente a las multinacionales innovadoras. Mapea al
+    # mismo vocabulario a propósito —el diccionario traduce temas, no toma
+    # partido—, pero la patente es su pelea definitoria, no un contexto, así
+    # que 'propiedad intelectual' va como segunda actividad central.
+    ('asinfar', 'ASINFAR', 'farma', 'asinfar',
+     'farmaceutico / medicamentos,*propiedad intelectual,'
+     'salud / EPS e IPS,comercio exterior y aduanas',
+     'asociacion de industrias farmaceuticas en colombia', ''),           # texto=10
     ('asocoldro', 'Asocoldro', 'farma', 'asocoldro', 'farmaceutico / medicamentos', '', ''),
     ('camacol', 'Camacol', 'construccion', 'camacol', 'vivienda y construccion', '', ''),
     ('cci', 'Cámara Colombiana de la Infraestructura', 'construccion',
@@ -1055,7 +1065,9 @@ _RAW_GREMIOS = [
     ('ascun', 'ASCUN', 'educacion', 'ascun', 'educacion superior', '', ''),
     ('acodres', 'Acodres', 'comercio', 'acodres',
      'comercio y retail,alimentos / etiquetado,turismo y hoteleria', '', ''),
-    ('asobares', 'Asobares', 'comercio', 'asobares', 'licores y tabaco,comercio y retail', '', ''),
+    ('asobares', 'Asobares', 'comercio', 'asobares',
+     'licores y tabaco,comercio y retail,tributario,'
+     'ordenamiento territorial y urbanismo', '', ''),
     ('fedeseguridad', 'Fedeseguridad', 'seguridad', 'fedeseguridad', 'seguridad privada', '', ''),
     ('anif', 'ANIF', 'financiero', 'anif', 'sector financiero,tributario', '', ''),
     ('acm', 'ACM · Asoc. Colombiana de Minería', 'mineria',
