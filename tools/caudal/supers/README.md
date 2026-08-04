@@ -136,6 +136,47 @@ Mismo enfoque que la "API oculta" de `leyes.senado.gov.co`.
   python3 tools/caudal/supers/harvest_comunicados.py test    # parseo de titulares
   python3 tools/caudal/supers/harvest_comunicados.py fetch   # las 3 fuentes
   ```
+- **ANLA · Gaceta Ambiental — IMPLEMENTADA (`harvest_anla.py`, ago-2026).**
+  Motivación comercial directa: para una minera/petrolera la ANLA ES el
+  regulador, y Caudal no tenía nada ambiental. El buscador público de la Gaceta
+  (`gaceta.anla.gov.co:8443/Consultar-gaceta/consultar`) es un GET sin auth ni
+  token que devuelve fragmentos HTML de a 20 (fijo — ignora `por_pagina`/
+  `limit`): **el registro COMPLETO de actos administrativos de la ANLA**
+  (~57.800: 28,3k autos · 28,5k resoluciones · 955 certificados · 118
+  permisos), con descripción completa ("Por la cual se impone una sanción…
+  Declara responsable a la empresa ANGLOGOLD ASHANTI COLOMBIA S.A…") y PDF de
+  descarga directa (`descargar?q=ID`, sin postback).
+  - Harvest **por slices de fecha de publicación** (pre-2016 + año a año):
+    caché resumible por slice, y el refresco re-baja solo el año en curso
+    (~185 páginas, 1-2 min). Dedup global por id. ~42 registros sin fecha de
+    publicación no caen en ningún slice — hueco declarado.
+  - `tipo_acto` POR FILA por regex sobre la descripción (whitelist dura, nunca
+    inventa): sanción→`sancion` · inicio de sancionatorio/pliego→
+    `apertura_investigacion` · archivo/cesación/exoneración/revocatoria→
+    `archivo` · **medida preventiva→`otro`** (rótulo "Medida preventiva" — la
+    whitelist no tiene ese valor y el frontend tiene chips fijos) ·
+    RESOLUCIÓN/PERMISO restantes→`resolucion` (rótulo fino: licencia
+    otorgada/negada/modificada · plan de manejo · permiso) · AUTO/CERTIFICADO
+    restantes→`otro`.
+  - `sancionado` = razón social extraída de la descripción (run de MAYÚSCULAS
+    terminado en sufijo societario S.A./S.A.S./LTDA/LIMITED/LLC/E.S.P…).
+    Conservadora: sin match queda null — la búsqueda funciona igual porque la
+    descripción completa entra al blob `q`.
+  - Título del acto con variantes reales: `1481 DEL 30 DE JULIO DE 2010` ·
+    `NO. 003141 DEL 25 DE NOVIEMBRE DE 2025` · `003661 DEL 05 MAYO DE 2026`
+    (sin el DE) → el regex de fecha los cubre los tres.
+  - **Sector nuevo `ambiental`**: el chip del frontend queda para después; la
+    búsqueda por texto y los stats lo sirven desde ya.
+  - Descartadas como fuente primaria: **Socrata** (todo lo de ANLA son capas
+    geográficas `federated_href`, sin registro de actos) y **RUIA/VITAL**
+    (`ConsultarSancion.aspx`, ASP.NET WebForms con ViewState — cubre todas las
+    autoridades ambientales pero es notoriamente incompleto; registrable como
+    fuente aparte si algún día se quiere el universo de las CARs).
+  ```bash
+  python3 tools/caudal/supers/harvest_anla.py test     # 1 página + clasificación
+  python3 tools/caudal/supers/harvest_anla.py fetch    # slices faltantes + año en curso
+  python3 tools/caudal/supers/harvest_anla.py build    # caché -> raw/anla-gaceta.json
+  ```
 
 ### Vía 3 — PDF → DeepSeek
 

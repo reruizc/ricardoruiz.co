@@ -7185,10 +7185,55 @@ Supersalud vía 3). (5) ❌ DESCARTADA — Supersociedades (no publica sanciones
 extender `tipo_acto` no-sanción a SIC / Supertransporte / Superfinanciera
 (publican circulares y resoluciones que caben en el mismo esquema).
 
-**Estado:** **11 fuentes · 7.019 sanciones + 30 actos no-sancionatorios en
-producción** (S3 `caudal-legislativo/metadata/` + Lambda `caudal-analiza`).
-Última subida: jul-2026 (reencuadre `tipo_acto`; los 30 actos son el arranque
-del registro de Supersalud vía 3 — el harvest completo son 771 candidatos).
+**Estado:** **12 fuentes · 61.146 actos (7.229 sanciones) en producción**
+(S3 `caudal-legislativo/metadata/` + Lambda `caudal-analiza`). Última subida:
+ago-2026 (**entra la ANLA**, ver bloque siguiente). Antes: jul-2026
+(reencuadre `tipo_acto`; los 30 actos del registro de Supersalud vía 3 —
+el harvest completo son 771 candidatos).
+
+### Fuente ANLA · Gaceta Ambiental (`harvest_anla.py` · LISTO · ago-2026)
+
+Motivada por el prospecto minero (AngloGold vía Cauce): para una minera la ANLA
+ES el regulador y Caudal no tenía nada ambiental. **Vía 2**: el buscador público
+de la Gaceta (`gaceta.anla.gov.co:8443/Consultar-gaceta/consultar`) es un GET
+sin auth que devuelve fragmentos HTML de a 20 (fijo) con descripción completa
+del acto (nombra la razón social) y PDF de descarga directa (`descargar?q=ID`).
+**54.097 actos únicos** (el contador del server dice 57.778 pero 3.639 ids están
+publicados DOS veces — medido: 57.736 cards = suma exacta por año, cero pérdida),
+fechas del acto 2000→hoy. Socrata solo tiene capas geográficas federadas de ANLA
+(descartada) y el RUIA de VITAL es ASP.NET+ViewState y notoriamente incompleto
+(descartado como primaria; registrable aparte si se quiere el universo CARs).
+- **Sector nuevo `ambiental`** (210 sanciones · 54.097 actos): el chip del
+  frontend queda para después — búsqueda y stats lo sirven desde ya.
+- `tipo_acto` POR FILA por regex sobre la descripción (whitelist dura):
+  sanción 210 · apertura 2.762 (incluye "ordena el INICIO de un procedimiento
+  sancionatorio" y vinculaciones) · archivo 5.949 · resolución 25.336 (con
+  rótulo fino: licencia otorgada/negada/modificada · plan de manejo ·
+  **"Decisión de sancionatorio"** para "define la responsabilidad", que sin
+  leer el PDF no se sabe si sanciona o exonera — NO se marca sanción) · otro
+  19.840 (autos de trámite · **medida preventiva va aquí con su rótulo**, la
+  whitelist no tiene ese valor).
+- **`sancionado` en dos capas**: (1) razón social en MAYÚSCULAS+sufijo
+  societario extraída de la descripción; (2) fallback con el **diccionario de
+  empresas** (`empresas.casa_registro`, import de solo lectura) cuando el
+  texto+proyecto casa con EXACTAMENTE UNA empresa → nombre curado. Vetos
+  locales MEDIDOS en el harvester (no toca empresas.py): `Porvenir` (50/50
+  falsos, topónimo de oleoductos Cusiana–El Porvenir), `Compensar` (3/3, "área
+  a compensar"), `Seguros SURA` (sancionatorio de Suramericana de Baterías),
+  `Cerro Matoso`+contexto "transmision" (11/30 eran la SUBESTACIÓN homónima),
+  `Claro`+contexto "pozo" (el pozo petrolero Claro Sur del Bloque La Miel).
+- **Verificado en producción** (`tipo_acto:'todo'`): anglogold 1 (la sanción de
+  2010 a ANGLOGOLD ASHANTI COLOMBIA S.A) · ecopetrol 14 (1 sanción 2007) ·
+  drummond 37 · cerrejon 30 (25 resoluciones + 5 aperturas). Regresión limpia:
+  uber 1 · claro 8 SIC (+1 sanción ANLA nueva a COMCEL 2010, real) · landing
+  7.229/61.146.
+- **Refresco**: `fetch` re-baja solo el año en curso (~185 págs, 1-2 min) y los
+  slices cerrados quedan con marker `_done`. NO está en el cron todavía
+  (`run_diario.sh` es de otro frente) — correr a mano
+  `fetch && build && normalize && build_s3.py && aws s3 cp …` o sumarlo al cron
+  cuando se toque ese archivo. El slim `sanciones.jsonl` pasó de 3,5 MB a
+  **42,5 MB** (el blob `q` de 54k descripciones); la Lambda a 3008 MB lo carga
+  bien en frío.
 
 ### Investigación Supersalud + Supersociedades (jul-2026) · el registro real vs la prensa
 

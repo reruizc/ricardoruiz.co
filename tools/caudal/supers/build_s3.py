@@ -31,6 +31,7 @@ SECTOR_TXT = {
     'control': 'Control fiscal', 'juridico': 'Jurídico / contable',
     'financiero': 'Financiero', 'transporte': 'Transporte',
     'consumo': 'Consumo', 'laboral': 'Laboral', 'societario': 'Societario',
+    'ambiental': 'Ambiental',
 }
 
 
