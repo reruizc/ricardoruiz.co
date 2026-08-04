@@ -30,6 +30,12 @@ python3 tools/caudal/acceso/acceso.py revocar diego@cauce.co
 - `revocar` es idempotente: si no estaba, lo dice en vez de fingir que hizo algo.
 - `ver` sale con código 1 si el correo no tiene acceso (sirve para scripts).
 
+⚠️ **`listar` va atrasado unos segundos; `ver` no.** El *listado* de KV es más
+eventual que la lectura por llave: justo después de `otorgar`, `listar` puede
+no mostrar todavía a la persona. `ver` lee la llave directa y la ve enseguida
+—por eso es el comando para confirmar un alta—. Si `listar` no cuadra, espera
+unos segundos y repítelo; no vuelvas a otorgar.
+
 ⚠️ **Esto autoriza un correo, no crea la cuenta.** El cliente necesita
 registrarse en `ricardoruiz.co/register.html`; el correo con el que se registre
 tiene que ser exactamente el autorizado.
@@ -73,7 +79,7 @@ Cuatro rutas en `rr-auth` (`/Users/ricardoruiz/rr-auth/src/index.js`, bloque
 | Ruta | Guard | Para qué |
 |---|---|---|
 | `GET /caudal/acceso/me` | sesión de usuario | Lo consulta el **frontend**: ¿esta cuenta puede abrir Caudal? |
-| `GET /caudal/acceso/list` | admin | `listar` |
+| `GET /caudal/acceso/list` | admin | `listar`; con `?email=` es lectura directa por llave (`ver`) |
 | `POST /caudal/acceso/save` | admin | `otorgar` |
 | `DELETE /caudal/acceso/delete?email=` | admin | `revocar` |
 
@@ -94,10 +100,15 @@ Los tres caminos de acceso a Caudal quedan separados a propósito:
 ## Pendiente: cablear el frontend
 
 `caudal.html` **todavía usa su lista `ALLOWED` hardcodeada** — el cambio del
-frontend se hizo aparte, a propósito. Mientras no se cablee, otorgar acceso por
-CLI **no abre la puerta todavía**. Lo que falta ahí es reemplazar el chequeo
-local por una llamada a `/caudal/acceso/me` con el bearer de la sesión, y mandar
-a `dashboard.html` cuando responda `acceso:false`.
+frontend va aparte, a propósito. Mientras no se cablee, otorgar acceso por CLI
+**no abre la puerta todavía**. Lo que falta ahí es reemplazar el chequeo local
+por una llamada a `/caudal/acceso/me` con el bearer de la sesión, y mandar a
+`dashboard.html` cuando responda `acceso:false`.
+
+Los dos correos no-admin que estaban en esa lista (`diego@cauce.co` y
+`nuevagemela@gmail.com`) **ya quedaron sembrados en KV**, para que el día del
+corte nadie pierda el acceso que ya tenía. No hubo alta nueva: es la misma
+gente que hoy entra por el HTML.
 
 ## Desplegar el worker
 

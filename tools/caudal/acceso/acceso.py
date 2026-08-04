@@ -180,10 +180,13 @@ def _fecha(iso):
 def _vence(reg):
     if not reg.get("expiraEn"):
         return "sin vencimiento"
-    dias = (datetime.fromisoformat(reg["expiraEn"].replace("Z", "+00:00"))
-            - datetime.now(timezone.utc)).days
-    if dias < 0:
+    resta = (datetime.fromisoformat(reg["expiraEn"].replace("Z", "+00:00"))
+             - datetime.now(timezone.utc))
+    if resta.total_seconds() <= 0:
         return f"VENCIDO ({_fecha(reg['expiraEn'])})"
+    # Hacia arriba: con --dias 1 quedan ~23,9 h y truncar mostraba "0d", que se
+    # lee como vencido justo después de otorgar.
+    dias = -(-int(resta.total_seconds()) // 86400)
     return f"vence {_fecha(reg['expiraEn'])} ({dias}d)"
 
 
@@ -242,19 +245,23 @@ def cmd_revocar(auth, args):
 
 def cmd_ver(auth, args):
     correo = args.email.strip().lower()
-    data = auth.call("GET", "/caudal/acceso/list")
-    if correo in {a.lower() for a in data.get("admins", [])}:
+    # Lectura directa por llave (no `list`): el listado de KV tarda en reflejar
+    # un otorgamiento recién hecho y respondería "no está" a los pocos segundos
+    # de abrirle la puerta a alguien.
+    from urllib.parse import quote
+    data = auth.call("GET", f"/caudal/acceso/list?email={quote(correo)}")
+    if data.get("esAdmin"):
         print(f"{correo}: ACCESO (admin, permanente)")
         return 0
-    for a in data.get("accesos", []):
-        if a["email"].lower() == correo:
-            estado = "ACCESO" if a.get("vigente") else "SIN ACCESO (vencido)"
-            print(f"{correo}: {estado} · {_vence(a)}")
-            print(f"  nota: {a.get('nota') or '—'}")
-            print(f"  otorgado {_fecha(a.get('otorgadoEn'))} por {a.get('otorgadoPor') or '—'}")
-            return 0
-    print(f"{correo}: SIN ACCESO (no está en la lista)")
-    return 1
+    a = data.get("acceso")
+    if not a:
+        print(f"{correo}: SIN ACCESO (no está en la lista)")
+        return 1
+    estado = "ACCESO" if a.get("vigente") else "SIN ACCESO (vencido)"
+    print(f"{correo}: {estado} · {_vence(a)}")
+    print(f"  nota: {a.get('nota') or '—'}")
+    print(f"  otorgado {_fecha(a.get('otorgadoEn'))} por {a.get('otorgadoPor') or '—'}")
+    return 0 if a.get("vigente") else 1
 
 
 def main():
