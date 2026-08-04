@@ -6017,10 +6017,20 @@ de pago acá** — esa lectura (que estuvo un tiempo en este archivo como
 - ✅ Los 2 correos no-admin del HTML (`diego@cauce.co`, `nuevagemela@gmail.com`)
   ya están **sembrados en KV** — sin eso, el día que se cablee el frontend con
   el KV vacío perderían el acceso. Verificado contra producción.
-- 🔜 **PENDIENTE**: `caudal.html` sigue con la lista escrita a mano, así que
-  otorgar por CLI **todavía no abre la puerta**. Falta cambiar ese chequeo por
-  `/caudal/acceso/me` con el bearer de la sesión y mandar a `dashboard.html`
-  cuando responda `acceso:false`, conservando el camino del token de invitado.
+- ✅ **CABLEADO (`1a73e9c`, ago-2026): el gate ya obedece al worker.**
+  `caudal.html` consulta `/caudal/acceso/me` con el bearer de la sesión y manda
+  a `dashboard.html` con `acceso:false` — otorgar por CLI abre la puerta de
+  inmediato y revocar la cierra. Las dos llamadas (`/auth/me` para refrescar el
+  usuario cacheado y `/caudal/acceso/me` para autorizar) van **en paralelo**, así
+  que autorizar no le suma latencia al arranque.
+  ⚠️ La lista del HTML **sigue existiendo pero cambió de papel**: dejó de ser la
+  whitelist y es `EMERGENCIA`, que solo se usa si el worker NO responde. Sin ella
+  una caída del worker dejaría a Ricardo y a los socios por fuera de su propia
+  plataforma; con ella, nadie nuevo entra mientras dure la caída. **Agregar un
+  correo ahí ya no da acceso** — hay que otorgarlo por CLI.
+  Verificado en producción con la sesión real: el worker responde
+  `acceso:true · fuente:"admin"` (los admin no necesitan llave en KV), y el
+  camino del token de invitado sigue intacto y se evalúa ANTES que la sesión.
 
 **Acceso de invitado a Caudal (link/QR sin registro · jul-2026).** Para mostrarle
 Caudal a socios (Cauce) sin crearles cuenta: `?acceso=<token>` en la URL. El token
