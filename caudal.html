@@ -1861,9 +1861,29 @@
     });
   }
   /* ---------- perfiles de cliente · CRUD contra el worker ---------- */
+  // El índice de perfiles del KV es de consistencia EVENTUAL: el `list()` que
+  // corre justo después de crear uno puede todavía no verlo. Medido en
+  // producción al crear el primer perfil de una cuenta: el perfil quedó bien
+  // guardado y su radar cargando, y la barra decía «Todavía no tienes ninguno ·
+  // 0/25» hasta recargar la página. O sea que la interfaz le dice al cliente
+  // que no guardó justo en el momento en que estrena el producto.
+  // Regla: lo que sabemos del perfil abierto le gana a una lista rezagada.
+  function pfMergeActivo(){
+    const p=PF_ACTIVE; if(!p||!p.perfilId) return;
+    if(PF_LIST.some(x=>x.perfilId===p.perfilId)) return;
+    PF_LIST.unshift({perfilId:p.perfilId, nombre:p.nombre||'Perfil sin nombre',
+      descripcion:p.descripcion||'', n_temas:(p.temas||[]).length,
+      n_empresas:(p.empresas||[]).length, sector_sanciones:p.sector_sanciones||'',
+      comision:p.comision||'', alertas:p.alertas||{activo:false}});
+    // el contador tiene que contar lo mismo que se ve, no lo que trajo el list
+    if(PF_LIMIT) PF_LIMIT.usados=PF_LIST.length;
+  }
   async function pfLoadList(){
     try{ const d=await wcall('/caudal/perfil/list'); PF_LIST=d.perfiles||[]; PF_LIMIT={usados:d.count,tope:d.ownedLimit,plan:d.plan}; PF_CADENCIA=d.cadencia||null; }
     catch(e){ PF_LIST=[]; PF_LIMIT=null; }
+    // `pfBorrar` pone PF_ACTIVE en null ANTES de recargar, así que un perfil
+    // recién borrado no puede revivir por aquí.
+    pfMergeActivo();
     pfRenderBar();
   }
   function pfRenderBar(){
@@ -1987,6 +2007,11 @@
     const t=document.getElementById('pf-temas'), e=document.getElementById('pf-emps');
     if(t) t.innerHTML=d.temas.length?d.temas.map((x,i)=>`<span class="chip on">${esc(x)}<span class="x" data-rmtema="${i}">×</span></span>`).join(''):'<span class="cob-note" style="margin:0">Sin temas.</span>';
     if(e) e.innerHTML=d.empresas.length?d.empresas.map((x,i)=>`<span class="chip on">${esc(x)}<span class="x" data-rmemp="${i}">×</span></span>`).join(''):'<span class="cob-note" style="margin:0">Sin empresas vigiladas.</span>';
+    // Un aviso de validación («tema de menos de 3 letras», «máximo N temas»)
+    // se quedaba en pantalla después de que el usuario ya había corregido, y
+    // hace leer como error un formulario que está sano. Cualquier cambio en
+    // los tags lo retira.
+    pfMsg('');
   }
   function pfMsg(txt,okc){ const m=document.getElementById('pf-msg'); if(m){ m.className='pf-msg'+(okc?' okmsg':''); m.textContent=txt||''; } }
   function pfLeerForm(){
