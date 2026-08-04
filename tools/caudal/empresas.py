@@ -549,6 +549,292 @@ _RAW = [
     # ---- seguridad privada -------------------------------------------------
     ('brinks', "Brink's", 'seguridad', 'brinks', 'seguridad privada', '', ''),
     ('atlas', 'Seguridad Atlas', 'seguridad', 'seguridad atlas', 'seguridad privada', '', ''),
+
+    # =====================================================================
+    # ⑤ AMPLIACIÓN (ago-2026) · 388 -> ~525 entradas.
+    # Derivada del DATO, no de memoria. Cada nombre se probó contra las tres
+    # fuentes que ya tenemos antes de entrar (arnés en la nota de CLAUDE.md):
+    #   · texto-index.json  → el articulado de las gacetas lo nombra
+    #   · sanciones.jsonl   → tiene acto regulatorio propio (razón social real)
+    #   · normativa.jsonl   → el Ejecutivo lo nombra
+    # Los números al lado de cada bloque son esa medición, no una estimación.
+    # Lo que NO se deriva y va curado a mano es el TEMA (a qué tópicos mapea,
+    # cuál es núcleo y cuál contexto).
+    # =====================================================================
+
+    # ---- minería · el sector más flaco frente a su peso real -------------
+    # Era 8 entradas para el sector que hace >50% de las exportaciones. La
+    # regulación que de verdad los mueve no es solo 'minería': es la licencia
+    # ambiental y la consulta previa, por eso van como segunda actividad
+    # central ('*') y no como contexto.
+    ('anglogold', 'AngloGold Ashanti', 'mineria', 'anglogold|anglogold ashanti',
+     'mineria e hidrocarburos,*ambiental / medio ambiente,'
+     'consulta previa / comunidades etnicas,laboral',
+     'anglogold ashanti colombia', ''),          # texto=24
+    ('cerromatoso', 'Cerro Matoso (South32)', 'mineria', 'cerro matoso|cerromatoso|south32',
+     'mineria e hidrocarburos,*ambiental / medio ambiente,'
+     'consulta previa / comunidades etnicas', '', ''),                    # texto=17
+    ('continentalgold', 'Continental Gold (Zijin)', 'mineria', 'continental gold|zijin',
+     'mineria e hidrocarburos,ambiental / medio ambiente', '', ''),
+    ('minesa', 'Minesa', 'mineria', 'minesa|sociedad minera de santander',
+     'mineria e hidrocarburos,*ambiental / medio ambiente', '', ''),      # texto=7
+    ('redeagle', 'Red Eagle Mining', 'mineria', 'red eagle',
+     'mineria e hidrocarburos,ambiental / medio ambiente', '', ''),       # texto=16
+    ('carboandes', 'Carboandes', 'mineria', 'carboandes', 'mineria e hidrocarburos', '', ''),
+    ('norcarbon', 'Norcarbón', 'mineria', 'norcarbon', 'mineria e hidrocarburos', '', ''),
+    ('fenoco', 'Fenoco', 'mineria', 'fenoco',
+     'mineria e hidrocarburos,*puertos y logistica,ambiental / medio ambiente', '', ''),
+
+    # ---- hidrocarburos · operadoras, transporte y refinación -------------
+    ('sierracol', 'SierraCol Energy', 'energia', 'sierracol', 'mineria e hidrocarburos', '', ''),
+    ('oxy', 'Occidental de Colombia', 'energia', 'occidental de colombia|oxy colombia',
+     'mineria e hidrocarburos', '', ''),
+    ('hocol', 'Hocol', 'energia', 'hocol', 'mineria e hidrocarburos', '', ''),      # texto=6
+    ('equion', 'Equión Energía', 'energia', 'equion', 'mineria e hidrocarburos', '', ''),
+    ('mansarovar', 'Mansarovar Energy', 'energia', 'mansarovar',
+     'mineria e hidrocarburos', '', ''),                                            # texto=10
+    ('emeraldenergy', 'Emerald Energy', 'energia', 'emerald energy',
+     'mineria e hidrocarburos', '', ''),
+    ('tecpetrol', 'Tecpetrol', 'energia', 'tecpetrol', 'mineria e hidrocarburos', '', ''),
+    ('lewisenergy', 'Lewis Energy', 'energia', 'lewis energy', 'mineria e hidrocarburos', '', ''),
+    ('hupecol', 'Hupecol', 'energia', 'hupecol', 'mineria e hidrocarburos', '', ''),
+    ('vetra', 'Vetra Energía', 'energia', 'vetra', 'mineria e hidrocarburos', '', ''),
+    ('petrobras', 'Petrobras', 'energia', 'petrobras', 'mineria e hidrocarburos', '', ''),
+    ('repsol', 'Repsol', 'energia', 'repsol', 'mineria e hidrocarburos', '', ''),
+    ('exxonmobil', 'ExxonMobil', 'energia', 'exxonmobil|exxon mobil',
+     'mineria e hidrocarburos', '', ''),                                            # texto=15
+    ('chevron', 'Chevron', 'energia', 'chevron', 'mineria e hidrocarburos', '', ''),
+    ('shellco', 'Shell Colombia', 'energia', 'shell colombia',
+     'mineria e hidrocarburos', '', ''),
+    ('cenit', 'Cenit Transporte y Logística', 'energia', 'cenit',
+     'mineria e hidrocarburos,*puertos y logistica', 'cenit transporte', ''),       # texto=31
+    ('ocensa', 'Ocensa', 'energia', 'ocensa',
+     'mineria e hidrocarburos,puertos y logistica', '', ''),
+    ('tgi', 'TGI · Transportadora de Gas Internacional', 'energia',
+     'transportadora de gas internacional|tgi sa', 'energia y servicios publicos', '', ''),
+    ('reficar', 'Refinería de Cartagena', 'energia', 'reficar|refineria de cartagena',
+     'mineria e hidrocarburos,*ambiental / medio ambiente', '', ''),                # texto=21
+    ('esenttia', 'Esenttia (Propilco)', 'industria', 'esenttia|propilco',
+     'mineria e hidrocarburos,ambiental / medio ambiente', '', ''),
+    ('monomeros', 'Monómeros', 'industria', 'monomeros',
+     'sector agropecuario,*comercio exterior y aduanas', '', ''),                   # texto=26
+    ('schlumberger', 'SLB (Schlumberger)', 'energia', 'schlumberger',
+     'mineria e hidrocarburos', 'schlumberger surenco', ''),
+    ('halliburton', 'Halliburton', 'energia', 'halliburton', 'mineria e hidrocarburos', '', ''),
+    ('bakerhughes', 'Baker Hughes', 'energia', 'baker hughes', 'mineria e hidrocarburos', '', ''),
+
+    # ---- generación y servicios públicos regionales ----------------------
+    ('gecelca', 'Gecelca', 'energia', 'gecelca', 'energia y servicios publicos', '', ''),
+    ('termocandelaria', 'Termocandelaria', 'energia', 'termocandelaria',
+     'energia y servicios publicos', '', ''),
+    ('tebsa', 'Tebsa', 'energia', 'tebsa|termobarranquilla',
+     'energia y servicios publicos', '', ''),
+    ('geb', 'Grupo Energía Bogotá', 'energia', 'grupo energia de bogota|grupo energia bogota',
+     'energia y servicios publicos,*mineria e hidrocarburos', '', ''),
+    ('ruitoque', 'Ruitoque ESP', 'energia', 'ruitoque', 'energia y servicios publicos', '', ''),
+    ('enerca', 'Enerca', 'energia', 'enerca', 'energia y servicios publicos', '', ''),
+
+    # ---- agua y aseo · el sector tenía 4 entradas ------------------------
+    ('interaseo', 'Interaseo', 'agua', 'interaseo',
+     'agua y saneamiento,*ambiental / medio ambiente', '', ''),                     # sanc=3
+    ('cgrdonajuana', 'CGR Doña Juana', 'agua', 'cgr dona juana',
+     'agua y saneamiento,*ambiental / medio ambiente', '', ''),                     # sanc=4
+    ('promoambiental', 'Promoambiental', 'agua', 'promoambiental',
+     'agua y saneamiento,ambiental / medio ambiente', '', ''),
+    ('aguascartagena', 'Aguas de Cartagena', 'agua', 'aguas de cartagena|acuacar',
+     'agua y saneamiento', '', ''),
+    ('emvarias', 'Emvarias', 'agua', 'emvarias',
+     'agua y saneamiento,ambiental / medio ambiente', '', ''),
+    ('aguasmanizales', 'Aguas de Manizales', 'agua', 'aguas de manizales',
+     'agua y saneamiento', '', ''),
+
+    # ---- fiduciarias y comisionistas · el bloque más denso de sanciones ---
+    # Todas salen del campo `sancionado` de sanciones.jsonl (Superfinanciera).
+    # ⚠ El alias corto evita anidar con una entrada existente: 'fiduciaria la
+    # previsora' contendría el alias 'la previsora' y dispararía un choque —
+    # la razón social larga vive en `entidad`, que no participa del choque.
+    ('fiduprevisora', 'Fiduprevisora', 'financiero', 'fiduprevisora',
+     'sector financiero', 'fiduciaria la previsora', ''),                           # sanc=5
+    ('fiduagraria', 'Fiduagraria', 'financiero', 'fiduagraria',
+     'sector financiero,*sector agropecuario',
+     'fiduciaria de desarrollo agropecuario', ''),                                  # sanc=4
+    ('fidubogota', 'Fiduciaria Bogotá', 'financiero', 'fidubogota|fiduciaria bogota',
+     'sector financiero', '', ''),                                                  # sanc=5
+    ('fidupopular', 'Fiduciaria Popular', 'financiero', 'fiduciaria popular|fidupopular',
+     'sector financiero', '', ''),                                                  # sanc=5
+    ('fiduoccidente', 'Fiduciaria de Occidente', 'financiero',
+     'fiduoccidente|fiduciaria de occidente', 'sector financiero', '', ''),         # sanc=7
+    ('fidupetrolera', 'Fiduciaria Petrolera', 'financiero', 'fiduciaria petrolera|fidupetrol',
+     'sector financiero', '', ''),                                                  # sanc=5
+    ('fiducentral', 'Fiduciaria Central', 'financiero', 'fiduciaria central',
+     'sector financiero', '', ''),
+    ('proyectarvalores', 'Proyectar Valores', 'financiero', 'proyectar valores',
+     'sector financiero', '', ''),                                                  # sanc=12
+    ('valoralta', 'Valoralta', 'financiero', 'valoralta', 'sector financiero', '', ''),
+    ('progresionbolsa', 'Progresión Comisionista', 'financiero',
+     'progresion sociedad comisionista', 'sector financiero',
+     'progresion sociedad comisionista de bolsa', ''),                              # sanc=7
+    ('profesionalesbolsa', 'Cía. de Profesionales de Bolsa', 'financiero',
+     'profesionales de bolsa', 'sector financiero',
+     'compania de profesionales de bolsa', ''),                                     # sanc=8
+    ('mercanciasvalores', 'Mercancías y Valores', 'financiero', 'mercancias y valores',
+     'sector financiero', '', ''),
+    ('ualet', 'Ualet', 'financiero', 'ualet', 'sector financiero,tecnologia digital / IA', '', ''),
+    ('alianzavalores', 'Alianza Valores', 'financiero', 'alianza valores',
+     'sector financiero', '', ''),
+    ('cfagropecuarios', 'Comisionistas Financieros Agropecuarios', 'financiero',
+     'comisionistas financieros agropecuarios',
+     'sector financiero,*sector agropecuario', '', ''),                             # sanc=6
+
+    # ---- banca y sector solidario ----------------------------------------
+    ('bancoserfinanza', 'Banco Serfinanza', 'financiero', 'banco serfinanza|serfinanza',
+     'sector financiero', '', ''),
+    ('bancomundomujer', 'Banco Mundo Mujer', 'financiero', 'banco mundo mujer|mundo mujer',
+     'sector financiero', '', ''),
+    ('confiar', 'Confiar Cooperativa', 'financiero', 'confiar cooperativa',
+     'economia solidaria / cooperativas,*sector financiero', '', ''),
+    ('cfantioquia', 'Cooperativa Financiera de Antioquia', 'financiero',
+     'cooperativa financiera de antioquia',
+     'economia solidaria / cooperativas,*sector financiero', '', ''),
+    ('coopcentral', 'Banco Cooperativo Coopcentral', 'financiero',
+     'coopcentral|banco cooperativo coopcentral',
+     'economia solidaria / cooperativas,*sector financiero', '', ''),
+    ('juriscoop', 'Juriscoop', 'financiero', 'juriscoop',
+     'economia solidaria / cooperativas,sector financiero', '', ''),
+
+    # ---- seguros · aseguradoras del Estado y generales -------------------
+    # ⚠ 'positiva' NO puede ir suelta como alias: es un adjetivo corriente
+    # ("acción positiva", "discriminación positiva") y dispararía la empresa
+    # en consultas que no la nombran.
+    ('segurosestado', 'Seguros del Estado', 'seguros', 'seguros del estado',
+     'seguros', '', ''),
+    ('positivaseg', 'Positiva Compañía de Seguros', 'seguros',
+     'positiva compania de seguros|positiva seguros',
+     'seguros,*laboral', '', ''),                                                   # norm=11
+    ('segurosmundial', 'Seguros Mundial', 'seguros',
+     'seguros mundial|compania mundial de seguros', 'seguros', '', ''),
+    ('solidariaseg', 'Aseguradora Solidaria', 'seguros', 'aseguradora solidaria',
+     'seguros,economia solidaria / cooperativas', '', ''),
+    ('segurexpo', 'Segurexpo', 'seguros', 'segurexpo',
+     'seguros,*comercio exterior y aduanas', '', ''),
+
+    # ---- transporte masivo y concesiones viales --------------------------
+    ('metrocinco', 'Metrocinco Plus', 'transporte', 'metrocinco',
+     'puertos y logistica', 'metrocinco plus', ''),                                 # sanc=25
+    ('movilizamos', 'Movilizamos', 'transporte', 'movilizamos', 'puertos y logistica', '', ''),
+    ('egobus', 'Egobus', 'transporte', 'egobus', 'puertos y logistica', '', ''),
+    ('coobus', 'Coobus', 'transporte', 'coobus', 'puertos y logistica', '', ''),
+    ('ferrocarrilpacifico', 'Ferrocarril del Pacífico', 'transporte',
+     'ferrocarril del pacifico', 'puertos y logistica', '', ''),                    # sanc=9
+    ('coviandes', 'Coviandes', 'construccion', 'coviandes|concesionaria vial de los andes',
+     'puertos y logistica', '', ''),
+    ('coviandina', 'Coviandina', 'construccion', 'coviandina|concesionaria vial andina',
+     'puertos y logistica', '', ''),
+    ('devimed', 'Devimed', 'construccion', 'devimed', 'puertos y logistica', '', ''),
+    ('spperinsula', 'Sociedad Portuaria de la Península', 'logistica',
+     'sociedad portuaria de la peninsula', 'puertos y logistica', '', ''),
+
+    # ---- empresas del Estado y certificación -----------------------------
+    ('indumil', 'Indumil', 'industria', 'indumil|industria militar colombiana',
+     'seguridad privada,*comercio exterior y aduanas', '', ''),                     # texto=76
+    ('imprentanacional', 'Imprenta Nacional', 'industria', 'imprenta nacional',
+     'comercio y retail', '', ''),
+    ('servipostales', 'Servicios Postales Nacionales (4-72)', 'logistica',
+     'servicios postales nacionales', 'puertos y logistica', '', ''),
+    ('icontec', 'Icontec', 'servicios', 'icontec',
+     'competencia y consumidor,comercio exterior y aduanas', '', ''),               # texto=216
+    ('certicamara', 'Certicámara', 'tecnologia', 'certicamara',
+     'tecnologia digital / IA,*datos personales / habeas data', '', ''),
+    ('artesaniascol', 'Artesanías de Colombia', 'industria', 'artesanias de colombia',
+     'comercio y retail,*turismo y hoteleria', '', ''),
+    ('rtvc', 'RTVC', 'medios', 'rtvc|radio television nacional de colombia',
+     'telecomunicaciones', '', ''),
+
+    # ---- medios ----------------------------------------------------------
+    ('elespectador', 'El Espectador', 'medios', 'el espectador',
+     'telecomunicaciones', 'comunican sa', ''),
+    ('bluradio', 'Blu Radio', 'medios', 'blu radio', 'telecomunicaciones', '', ''),
+    ('teleantioquia', 'Teleantioquia', 'medios', 'teleantioquia', 'telecomunicaciones', '', ''),
+    ('telecafe', 'Telecafé', 'medios', 'telecafe', 'telecomunicaciones', '', ''),
+
+    # ---- infraestructura de telecom y TI ---------------------------------
+    ('huawei', 'Huawei', 'tecnologia', 'huawei',
+     'telecomunicaciones,*tecnologia digital / IA,comercio exterior y aduanas', '', ''),
+    ('ericsson', 'Ericsson', 'tecnologia', 'ericsson', 'telecomunicaciones', '', ''),
+    ('nokia', 'Nokia', 'tecnologia', 'nokia', 'telecomunicaciones', '', ''),
+    ('digitalware', 'Digital Ware', 'tecnologia', 'digital ware',
+     'tecnologia digital / IA', '', ''),
+
+    # ---- salud · clínicas, IPS y EPS (3ª tanda) --------------------------
+    ('medilaser', 'Clínica Medilaser', 'salud', 'medilaser|clinica medilaser',
+     'salud / EPS e IPS', '', ''),
+    ('dumian', 'Dumian Medical', 'salud', 'dumian medical|dumian',
+     'salud / EPS e IPS', '', ''),                                                  # sanc=15
+    ('oncologosocc', 'Oncólogos del Occidente', 'salud',
+     'oncologos del occidente|oncologos de occidente', 'salud / EPS e IPS', '', ''),
+    ('coltrasplantes', 'Colombiana de Trasplantes', 'salud', 'colombiana de trasplantes',
+     'salud / EPS e IPS', '', ''),
+    ('saludbolivar', 'Salud Bolívar EPS', 'salud', 'salud bolivar eps',
+     'salud / EPS e IPS', '', ''),
+    ('cruzblanca', 'Cruz Blanca EPS', 'salud', 'cruz blanca eps', 'salud / EPS e IPS', '', ''),
+    ('colsaludcia', 'Compañía Colombiana de Salud', 'salud', 'colsalud',
+     'salud / EPS e IPS', 'compania colombiana de salud colsalud', ''),
+
+    # ---- cajas de compensación -------------------------------------------
+    ('cajacopi', 'Cajacopi', 'salud', 'cajacopi', 'salud / EPS e IPS,*laboral', '', ''),
+    ('comfacor', 'Comfacor', 'salud', 'comfacor', 'salud / EPS e IPS,*laboral', '', ''),
+    ('comfaoriente', 'Comfaoriente', 'salud', 'comfaoriente',
+     'salud / EPS e IPS,*laboral', '', ''),
+
+    # ---- droguerías y distribución farmacéutica --------------------------
+    ('pasteur', 'Droguerías Pasteur', 'farma', 'droguerias pasteur|distribuidora pasteur',
+     'farmaceutico / medicamentos,comercio y retail', '', ''),
+    ('copservir', 'Copservir', 'farma', 'copservir',
+     'farmaceutico / medicamentos,*economia solidaria / cooperativas', '', ''),
+    ('locatel', 'Locatel', 'farma', 'locatel',
+     'farmaceutico / medicamentos,comercio y retail', '', ''),
+
+    # ---- retail y consumo (3ª tanda) -------------------------------------
+    ('la14', 'Almacenes La 14', 'retail', 'almacenes la 14', 'comercio y retail', '', ''),
+    ('surtimax', 'Surtimax', 'retail', 'surtimax', 'comercio y retail', '', ''),
+    ('cooratiendas', 'Cooratiendas', 'retail', 'cooratiendas',
+     'comercio y retail,*economia solidaria / cooperativas', '', ''),
+    ('merqueo', 'Merqueo', 'retail', 'merqueo',
+     'comercio y retail,tecnologia digital / IA', '', ''),
+    ('inditex', 'Inditex (Zara)', 'textil', 'inditex',
+     'comercio y retail,*comercio exterior y aduanas', '', ''),
+
+    # ---- motos y automotriz · el parque real del país ---------------------
+    ('auteco', 'Auteco', 'automotriz', 'auteco',
+     'comercio exterior y aduanas,*puertos y logistica', '', ''),
+    ('incolmotos', 'Incolmotos Yamaha', 'automotriz', 'incolmotos|yamaha',
+     'comercio exterior y aduanas', '', ''),
+    ('fanalca', 'Fanalca', 'automotriz', 'fanalca',
+     'comercio exterior y aduanas,*puertos y logistica', '', ''),
+    ('aktmotos', 'AKT Motos', 'automotriz', 'akt motos', 'comercio exterior y aduanas', '', ''),
+
+    # ---- alimentos y agro (3ª tanda) -------------------------------------
+    ('macpollo', 'Avidesa Mac Pollo', 'agro', 'mac pollo|avidesa',
+     'sector agropecuario,*alimentos / etiquetado', '', ''),
+    ('florhuila', 'Flor Huila', 'agro', 'florhuila', 'sector agropecuario', '', ''),
+    ('levapan', 'Levapan', 'alimentos', 'levapan', 'alimentos / etiquetado', '', ''),
+    ('harineravalle', 'Harinera del Valle', 'alimentos', 'harinera del valle',
+     'alimentos / etiquetado,*sector agropecuario', '', ''),
+    ('arrozdiana', 'Arroz Diana', 'agro', 'arroz diana|diana corporacion',
+     'sector agropecuario,alimentos / etiquetado', '', ''),
+    ('superalimentos', 'Super de Alimentos', 'alimentos', 'super de alimentos',
+     'alimentos / etiquetado', '', ''),
+
+    # ---- licoreras departamentales · monopolio rentístico ----------------
+    ('fla', 'Fábrica de Licores de Antioquia', 'alimentos',
+     'fabrica de licores de antioquia|licorera de antioquia',
+     'licores y tabaco,*tributario', '', ''),
+    ('ilc', 'Industria Licorera de Caldas', 'alimentos',
+     'industria licorera de caldas|licorera de caldas',
+     'licores y tabaco,*tributario', '', ''),
+    ('elc', 'Empresa de Licores de Cundinamarca', 'alimentos',
+     'empresa de licores de cundinamarca|licorera de cundinamarca',
+     'licores y tabaco,*tributario', '', ''),
 ]
 
 # Gremios y asociaciones: no son empresas, pero SON quienes contratan a Cauce y
@@ -574,8 +860,10 @@ _RAW_GREMIOS = [
      'energia y servicios publicos,*agua y saneamiento,telecomunicaciones', '', ''),
     ('acolgen', 'Acolgen', 'energia', 'acolgen', 'energia y servicios publicos', '', ''),
     ('naturgas', 'Naturgas', 'energia', 'naturgas', 'energia y servicios publicos', '', ''),
+    # Campetrol salió de este alias en ago-2026: es un gremio distinto (bienes
+    # y servicios petroleros, no las operadoras) y ahora tiene entrada propia.
     ('acp', 'ACP · Asoc. Colombiana del Petróleo', 'energia',
-     'asociacion colombiana del petroleo|campetrol', 'mineria e hidrocarburos', '', ''),
+     'asociacion colombiana del petroleo', 'mineria e hidrocarburos', '', ''),
     ('asomineros', 'Asomineros', 'mineria', 'asomineros', 'mineria e hidrocarburos', '', ''),
     ('fenalcarbon', 'Fenalcarbón', 'mineria', 'fenalcarbon', 'mineria e hidrocarburos', '', ''),
     ('asomovil', 'Asomóvil', 'telecom', 'asomovil', 'telecomunicaciones', '', ''),
@@ -641,6 +929,43 @@ _RAW_GREMIOS = [
     ('defencarga', 'Defencarga', 'logistica', 'defencarga', 'puertos y logistica', '', ''),
     ('asojuegos', 'Asojuegos', 'juegos', 'asojuegos|fecoljuegos',
      'juegos de suerte y azar', '', ''),
+
+    # ---- ⑤ ampliación ago-2026 · gremios que faltaban --------------------
+    # El hueco más caro era el de minería e hidrocarburos: el gremio es quien
+    # contrata, y el diccionario solo tenía 4 para todo el sector.
+    ('campetrol', 'Campetrol', 'energia',
+     'campetrol|camara colombiana de bienes y servicios petroleros',
+     'mineria e hidrocarburos', '', ''),                                  # texto=15
+    ('acipet', 'ACIPET · Ingenieros de Petróleos', 'energia', 'acipet',
+     'mineria e hidrocarburos', '', ''),
+    ('asoenergia', 'Asoenergía', 'energia', 'asoenergia',
+     'energia y servicios publicos,*mineria e hidrocarburos', '', ''),
+    ('asogravas', 'Asogravas', 'mineria', 'asogravas',
+     'mineria e hidrocarburos,vivienda y construccion', '', ''),
+    ('fedebiocombustibles', 'Fedebiocombustibles', 'energia', 'fedebiocombustibles',
+     'energia y servicios publicos,*sector agropecuario', '', ''),
+    ('asocolcanna', 'Asocolcanna', 'farma', 'asocolcanna',
+     'cannabis,*farmaceutico / medicamentos', '', ''),                    # texto=6
+    ('confecoop', 'Confecoop', 'multisectorial', 'confecoop',
+     'economia solidaria / cooperativas,*sector financiero', '', ''),
+    ('analfe', 'Analfe · Fondos de Empleados', 'multisectorial', 'analfe',
+     'economia solidaria / cooperativas,*laboral', '', ''),
+    ('asocajas', 'Asocajas', 'salud', 'asocajas',
+     'laboral,*salud / EPS e IPS', '', ''),
+    ('fedelonjas', 'Fedelonjas', 'construccion', 'fedelonjas',
+     'vivienda y construccion', '', ''),
+    ('asoportuaria', 'Asoportuaria', 'logistica', 'asoportuaria',
+     'puertos y logistica,comercio exterior y aduanas', '', ''),
+    ('fitac', 'FITAC · Agentes de Aduana', 'logistica', 'fitac',
+     'comercio exterior y aduanas,*puertos y logistica', '', ''),
+    ('asoleche', 'Asoleche', 'agro', 'asoleche',
+     'sector agropecuario,alimentos / etiquetado', '', ''),
+    ('ccmedellin', 'Cámara de Comercio de Medellín', 'multisectorial',
+     'camara de comercio de medellin', 'comercio y retail,*tributario', '', ''),
+    ('asocapitales', 'Asocapitales', 'multisectorial', 'asocapitales',
+     'tributario,agua y saneamiento,puertos y logistica', '', ''),
+    ('fedemunicipios', 'Federación Colombiana de Municipios', 'multisectorial',
+     'federacion colombiana de municipios', 'tributario,agua y saneamiento', '', ''),
 ]
 
 

@@ -6230,7 +6230,8 @@ precisión. `_titulos_norm()` cachea los títulos normalizados (el Radar llama a
 Snowball español completo como upgrade.
 
 **④ Diccionario de EMPRESAS y GREMIOS — el traductor de la BÚSQUEDA GENERAL**
-(`tools/caudal/empresas.py` · **388 entradas: 320 empresas + 68 gremios** · jul-2026).
+(`tools/caudal/empresas.py` · **529 entradas: 445 empresas + 84 gremios** · jul-2026,
+ampliado ago-2026 — ver "⑤ Ampliación" al final de este bloque).
 El cliente busca con el nombre de la empresa, pero el Estado casi nunca la nombra así.
 Medido antes del fix: **«Uber» daba 0 títulos en Congreso** (el Congreso dice
 "plataformas tecnológicas": ~35 proyectos) y en Regulatorio traía **1 sanción real
@@ -6292,13 +6293,67 @@ con el enlace **ampliar/volver a lo esencial** (`empresaHint`/`wireEmpresaHint` 
   legislativo. Medido tras el fix: 0 regresiones en 21 consultas, 11 ganan alcance.
 - **Para agregar empresas**: una tupla de 7 en `_RAW` (o `_RAW_GREMIOS`) +
   `verificar`. Nunca poner una palabra común suelta en `alias` (usar 'grupo exito',
-  'meta platforms', 'tiendas ara'). También faltan **17 tópicos nuevos** que se
+  'meta platforms', 'tiendas ara').
+- ⚠ **Un alias nuevo no puede CONTENER a un alias existente como frase completa**:
+  `verificar` lo reporta como choque. La razón social larga va en `entidad`, que NO
+  participa del test — así "Fiduprevisora" entra sin chocar con "la previsora"
+  (alias 'fiduprevisora', entidad 'fiduciaria la previsora'). También faltan **17 tópicos nuevos** que se
   agregaron a SINONIMOS para que las empresas tuvieran a dónde mapear (salud/EPS,
   pensiones, seguros, competencia y consumidor, aviación, vivienda, retail, turismo,
   puertos, agua, tributario, juegos de azar, educación superior, tecnología/IA,
   laboral, seguridad privada, aduanas) — todos medidos contra títulos reales; se
   descartaron los que colisionan por stem: `seguros`→`segur`≈seguridad social (580
   hits casi todos ajenos) y `puertos`→`puert`≈AEROPUERTO, que van como frase.
+
+**⑤ Ampliación a 529 entradas (ago-2026) · derivada del dato, no de memoria.**
+La disparó un prospecto real de minería (AngloGold Ashanti, vía los socios de Cauce):
+se verificó que **no estaba**, y buscarla no devolvía ni proyectos ni normas. Medido
+antes/después contra producción: **`anglogold` pasó de 0 intentos y 0 empresas a 230
+intentos + 109 normas del Ejecutivo**, con la traducción de marca a tema visible en la UI.
+
+- **El método fue medir primero.** El sector minería tenía **8 entradas** para lo que
+  hace >50% de las exportaciones del país; hoy tiene 17, y energía/hidrocarburos pasó
+  de 36 a 68. La derivación salió de cruzar tres fuentes que ya teníamos, no de
+  recordar nombres: **`texto-index.json`** (el articulado de las gacetas: AngloGold 24
+  documentos, Cerrejón 117, Drummond 46, Minesa 7), **`sanciones.jsonl`** (el campo
+  `sancionado` son razones sociales verdaderas → de ahí salieron las 9 fiduciarias, los
+  7 comisionistas de bolsa y los operadores del SITP) y **SECOP II** por group-by sobre
+  `$q` (aseguradoras del Estado, certificadoras). Arnés reusable en el scratchpad de la
+  sesión; el patrón es `en_texto` / `en_sanciones` / `en_normativa` sobre una lista de
+  candidatos, y solo entra lo que devuelve algo.
+- **Lo que NO se deriva es el TEMA** y va curado a mano: a qué tópicos mapea cada
+  entrada, cuál es núcleo y cuál contexto. Para minería el núcleo es 'minería e
+  hidrocarburos', pero lo que de verdad las mueve —licencia ambiental y consulta
+  previa— va como **segunda actividad central (`*`)**, no como contexto: si no, el
+  cliente no las ve sin ampliar.
+- **2 tópicos nuevos** en `SINONIMOS`, medidos contra títulos reales antes de crearlos:
+  `consulta previa / comunidades etnicas` (consulta previa 5 · comunidades negras 35 ·
+  pueblos indígenas 20 · grupos étnicos 15) y `economia solidaria / cooperativas`
+  (economía solidaria 29 · cooperativas 39 · sector solidario 10).
+  ⚠ **`paramos` quedó FUERA pese a sus 74 hits**: su raíz `param` colisiona con
+  PARAMÉDICO y PARÁMETROS — el mismo modo de falla que ya había botado `seguros` y
+  `puertos`. El vocabulario de páramo que sí discrimina va como frase.
+- **Reparto de las 141 nuevas:** energía/hidrocarburos +32 · financiero +21 (fiduciarias
+  y comisionistas, todas de sanciones) · salud +11 · minería +9 · agua y aseo +6 ·
+  alimentos +6 · industria/tecnología/medios/transporte/multisectorial +5 c/u ·
+  seguros +5 · agro/farma/retail/construcción/logística/automotriz +4 c/u.
+  **16 gremios nuevos**, encabezados por los que faltaban en el sector del prospecto:
+  Campetrol, ACIPET, Asoenergía, Asogravas, Fedebiocombustibles.
+- ⚠ **Campetrol dejó de ser un alias de la ACP** y tiene entrada propia: es el gremio de
+  bienes y servicios petroleros, no el de las operadoras. Son interlocutores distintos.
+- **Verificación (toda corrida, no estimada):** `verificar` limpio — 0 llaves de tópico
+  inválidas, 0 duplicadas y **0 choques nuevos** (los 6 que salen son exactamente los
+  preexistentes: Bancolombia, Davivienda, Colpatria, Sura ×2, Falabella). **Falsos
+  disparos 1 de 42** consultas temáticas de control, y ese 1 es el «sena de la mujer»
+  que ya estaba documentado — ninguna entrada nueva dispara de más. **Cobertura: 141/141
+  (100%) devuelven proyectos en Congreso** y **44/141 (31%) tienen acto regulatorio
+  propio**, por encima del 25% que trae el resto del diccionario. **Cero regresiones**
+  contra producción: uber 35, claro 119, rappi 102/22, sena 255, epm 154, ecopetrol 277
+  quedaron idénticos antes y después del despliegue, y en Regulatorio claro sigue en 8
+  sanciones y uber en 1.
+- **Precisión antes que cobertura, sin excepción:** no se tocó el gate de razón social
+  de SECOP (`es_razon_social` / `empieza_por_marca`). Si una razón social larga no
+  aparece, el sitio de arreglarlo es el campo `entidad` de esa fila.
 
 > **📌 ESTADO del diccionario de empresas (jul-30-2026) — qué está VIVO y qué NO**
 >

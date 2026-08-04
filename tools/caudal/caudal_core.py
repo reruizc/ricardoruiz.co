@@ -204,6 +204,19 @@ SINONIMOS = [
     {'k': 'seguridad privada', 'terms': ['seguridad privada', 'vigilancia privada']},
     {'k': 'comercio exterior y aduanas', 'terms': [
         'comercio exterior', 'aranceles', 'regimen aduanero', 'zonas francas']},
+    # --- ⑤ tópicos de la ampliación del diccionario de empresas (~520 entradas).
+    # Medidos contra los títulos reales antes de crearlos: 'consulta previa' 5 +
+    # 'comunidades negras' 35 + 'pueblos indigenas' 20 + 'grupos etnicos' 15;
+    # 'economia solidaria' 29 + 'cooperativas' 39 + 'sector solidario' 10.
+    # ⚠ NO entra 'paramos' pese a sus 74 hits: su raíz ('param') colisiona con
+    # PARAMÉDICO y PARÁMETROS — el mismo modo de falla que ya botó 'seguros' y
+    # 'puertos'. El vocabulario de páramo que sí discrimina va como frase.
+    {'k': 'consulta previa / comunidades etnicas', 'terms': [
+        'consulta previa', 'comunidades negras', 'pueblos indigenas',
+        'grupos etnicos', 'comunidades etnicas']},
+    {'k': 'economia solidaria / cooperativas', 'terms': [
+        'economia solidaria', 'sector solidario', 'organizaciones solidarias',
+        'cooperativas', 'fondos de empleados']},
 ]
 
 
