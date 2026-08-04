@@ -21,6 +21,11 @@
 #   dataset_build             build_dataset.py            histórico + legislatura viva
 #   texto_index               build_texto_index.py        articulado buscable (incl. lo vivo)
 #   dataset_upload_*          aws s3 cp                   dist/ → metadata/
+#   anla_fetch/build          harvest_anla.py             Gaceta Ambiental (pilar Regulatorio)
+#   supers_consolida          harvest_supers.py normalize las 12 fuentes del pilar en un dataset
+#   supers_build_s3           build_s3.py                 el slim que lee la Lambda
+#   supers_verifica           verificar_consolidado.py    piso por fuente ANTES de publicar
+#   supers_upload_*           aws s3 cp                   dist/s3/ → metadata/
 #   salud                     tools/caudal/salud/check.py frescura en S3 + ping a la Lambda
 #
 # Tres cosas que este script garantiza y que antes no:
@@ -245,6 +250,78 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
   else
     etapa --nombre texto_index --omitida "el dataset falló (rc=$rc_ds): indexar sobre un dataset roto sería peor que no indexar"
     etapa --nombre dataset_upload --omitida "el dataset falló (rc=$rc_ds): no hay archivo nuevo que subir"
+  fi
+
+  # ── pilar Regulatorio · Gaceta Ambiental de la ANLA ──
+  # Va al final: es otro host (gaceta.anla.gov.co) y no compite con nada de lo
+  # de arriba. `fetch` sin argumentos re-baja SOLO el año en curso (~185 páginas,
+  # medido 38-46s con 4 workers); los slices cerrados llevan marker `_done`.
+  etapa --nombre anla_fetch --timeout 900 \
+        --desc "Gaceta Ambiental de la ANLA (año en curso)" \
+        -- python3 tools/caudal/supers/harvest_anla.py fetch --workers 4
+
+  # `build` corre aunque `fetch` falle: reconstruye desde las páginas cacheadas,
+  # que es mejor que dejar el pilar sin refrescar. Medido ~4s con el memo del
+  # cruce contra el diccionario de empresas caliente; ~350s la primera vez
+  # después de que ese diccionario cambie (es de otro frente y crece seguido).
+  etapa --nombre anla_build --timeout 1200 \
+        --desc "anla-gaceta.json desde las páginas cacheadas" \
+        -- python3 tools/caudal/supers/harvest_anla.py build
+  rc_anla_b=$?
+
+  # ⚠ `normalize` y `build_s3` consolidan las DOCE fuentes del pilar, no solo
+  # ANLA: leen todos los `raw/*.json` que haya en disco. Eso es lo correcto (el
+  # pilar es un solo dataset y la Lambda lee un solo archivo), pero significa
+  # que una corrida desatendida puede publicar un consolidado al que le falte
+  # una fuente si su raw se borró o quedó a medias — `normalize` la salta en
+  # silencio. Por eso NO se sube nada sin pasar antes por
+  # `verificar_consolidado.py`, que exige piso por fuente y coherencia con los
+  # raw en disco. Si falla, en S3 se queda el archivo bueno del día anterior.
+  if [ $rc_anla_b -eq 0 ]; then
+    etapa --nombre supers_consolida --timeout 900 \
+          --desc "consolidado de las 12 fuentes del pilar Regulatorio" \
+          -- python3 tools/caudal/supers/harvest_supers.py normalize
+    rc_norm=$?
+  else
+    etapa --nombre supers_consolida \
+          --omitida "el build de ANLA falló (rc=$rc_anla_b): consolidar sobre un raw a medias arriesga publicar un pilar mutilado"
+    rc_norm=1
+  fi
+
+  if [ $rc_norm -eq 0 ]; then
+    etapa --nombre supers_build_s3 --timeout 600 \
+          --desc "sanciones.jsonl + stats para la Lambda" \
+          -- python3 tools/caudal/supers/build_s3.py
+    rc_bs3=$?
+  else
+    etapa --nombre supers_build_s3 --omitida "la consolidación falló (rc=$rc_norm): no hay qué empaquetar"
+    rc_bs3=1
+  fi
+
+  if [ $rc_bs3 -eq 0 ]; then
+    etapa --nombre supers_verifica --timeout 300 \
+          --desc "¿el consolidado está completo? (piso por fuente)" \
+          -- python3 tools/caudal/supers/verificar_consolidado.py
+    rc_ver=$?
+  else
+    etapa --nombre supers_verifica --omitida "no se construyó el consolidado (rc=$rc_bs3)"
+    rc_ver=1
+  fi
+
+  if [ $rc_ver -eq 0 ]; then
+    S3SUP="$REPO/Bases de datos/leyes-senado/supers/dist/s3"
+    etapa --nombre supers_upload_sanciones --timeout 900 --desc "sanciones.jsonl → S3 (42 MB, medido 21s)" \
+          -- aws s3 cp "$S3SUP/sanciones.jsonl" \
+             "s3://caudal-legislativo/metadata/sanciones.jsonl" \
+             --content-type "application/json" --cache-control "private, max-age=300"
+    etapa --nombre supers_upload_stats --timeout 300 --desc "sanciones-stats.json → S3" \
+          -- aws s3 cp "$S3SUP/sanciones-stats.json" \
+             "s3://caudal-legislativo/metadata/sanciones-stats.json" \
+             --content-type "application/json" --cache-control "private, max-age=300"
+  else
+    etapa --nombre supers_upload_sanciones \
+          --omitida "el consolidado no pasó la verificación (rc=$rc_ver): en S3 se queda el bueno de ayer"
+    etapa --nombre supers_upload_stats --omitida "ídem: no se sube un pilar a medias"
   fi
 
   # ── chequeo de salud ──

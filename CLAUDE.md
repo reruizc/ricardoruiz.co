@@ -7227,13 +7227,30 @@ fechas del acto 2000→hoy. Socrata solo tiene capas geográficas federadas de A
   drummond 37 · cerrejon 30 (25 resoluciones + 5 aperturas). Regresión limpia:
   uber 1 · claro 8 SIC (+1 sanción ANLA nueva a COMCEL 2010, real) · landing
   7.229/61.146.
-- **Refresco**: `fetch` re-baja solo el año en curso (~185 págs, 1-2 min) y los
-  slices cerrados quedan con marker `_done`. NO está en el cron todavía
-  (`run_diario.sh` es de otro frente) — correr a mano
-  `fetch && build && normalize && build_s3.py && aws s3 cp …` o sumarlo al cron
-  cuando se toque ese archivo. El slim `sanciones.jsonl` pasó de 3,5 MB a
-  **42,5 MB** (el blob `q` de 54k descripciones); la Lambda a 3008 MB lo carga
-  bien en frío.
+- **Refresco ✅ AUTOMATIZADO** (ago-2026): ANLA entró a `run_diario.sh` (launchd
+  2x/día) como `anla_fetch` → `anla_build` → `supers_consolida` →
+  `supers_build_s3` → `supers_verifica` → `supers_upload_*`. **~76s end-to-end**
+  sobre una corrida de ~43 min con tope de 4 h. `fetch` re-baja solo el año en
+  curso (medido 46s) y los slices cerrados llevan marker `_done`.
+  - **`build` bajó de 369s a ~4s** con un memo del cruce contra el diccionario
+    de empresas (`raw/anla-dict-memo.json`, gitignored): eran ~26M de regex
+    diarias sobre documentos inmutables. La huella del memo cubre solo lo que
+    `casa_registro` mira (`entidad`/`excluir`), así que el diccionario —que es
+    de otro frente y crece seguido— lo invalida cuando cambia de verdad.
+    Verificado byte a byte contra un build en frío.
+  - ⚠️ **`normalize`/`build_s3` consolidan las DOCE fuentes del pilar y saltan
+    en silencio la fuente cuyo raw falte.** Desatendido eso publicaría un
+    `sanciones.jsonl` mutilado, así que **nada se sube sin pasar
+    `verificar_consolidado.py`** (piso por fuente + coherencia con los raw en
+    disco); si falla, la subida se omite y en S3 queda el bueno de ayer.
+    Probado borrando `raw/invima.json` → rc=1. El piso del TOTAL solo NO lo
+    habría atrapado: lo salvó el piso por fuente.
+  - **Catálogo de salud**: los dos archivos del pilar pasaron de clase `manual`
+    (120 días) a `diario` (26h/50h) y `sanciones.jsonl` de `min_bytes` 2 MB a
+    18 MB — el valor viejo era del pilar PRE-ANLA y con 54k actos se volvió
+    inservible (un consolidado sin ANLA pesa ~2,5 MB y lo habría pasado).
+  El slim `sanciones.jsonl` pasó de 3,5 MB a **42,5 MB** (el blob `q` de 54k
+  descripciones); la Lambda a 3008 MB lo carga bien en frío.
 
 ### Investigación Supersalud + Supersociedades (jul-2026) · el registro real vs la prensa
 

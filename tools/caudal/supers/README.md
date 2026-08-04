@@ -177,6 +177,53 @@ Mismo enfoque que la "API oculta" de `leyes.senado.gov.co`.
   python3 tools/caudal/supers/harvest_anla.py fetch    # slices faltantes + año en curso
   python3 tools/caudal/supers/harvest_anla.py build    # caché -> raw/anla-gaceta.json
   ```
+  - **Memo del cruce contra el diccionario de empresas** (`raw/anla-dict-memo.json`,
+    gitignored). Cruzar los ~52k actos sin razón social contra las 500 empresas
+    del diccionario son ~26 millones de regex: medido, **283s de los 369s** que
+    tardaba `build`, todos los días, sobre documentos que ya no cambian. El
+    resultado se memoiza por id de documento y `build` bajó a **~4s**
+    (346s → 3,3s, verificado byte a byte contra un build en frío).
+    La llave del memo es una **huella de lo que `casa_registro` realmente mira**
+    (`entidad` y `excluir` de cada empresa, más los vetos locales `NO_DICT` y
+    `VETO_CONTEXTO`): el diccionario es de otro frente y crece seguido
+    (388 → 500 → 529 → 589 en un mes), así que un cambio real invalida el memo
+    entero y se recalcula, mientras que una edición de docstring o de tópicos
+    —que no puede cambiar un match— no cuesta nada. Cada entrada guarda además
+    el hash del texto, por si la ANLA reescribiera un acto ya publicado.
+
+### El pilar se refresca solo (ago-2026)
+
+ANLA entró al **cron diario** (`tools/leyes-senado/run_diario.sh`, launchd 2x/día).
+Etapas nuevas al final de la corrida: `anla_fetch` → `anla_build` →
+`supers_consolida` → `supers_build_s3` → `supers_verifica` → `supers_upload_*`.
+Medido end-to-end: **~76s** (46s de red contra la ANLA + 4s de build + 5s de
+consolidación + 23s de subida), sobre una corrida de ~43 min con tope de 4 h.
+
+⚠️ **`normalize` y `build_s3` consolidan las DOCE fuentes, no solo ANLA** — leen
+todos los `raw/*.json` que haya en disco. Eso es lo correcto (el pilar es un solo
+dataset y la Lambda lee un solo archivo), pero **`normalize` salta en silencio la
+fuente cuyo raw falte**. Con el pilar regenerándose a mano eso era inofensivo
+porque alguien miraba la salida; desatendido, un `raw/invima.json` borrado o a
+medio escribir publicaría un `sanciones.jsonl` sin INVIMA y nadie se enteraría
+hasta que un cliente buscara y no encontrara.
+
+Por eso **nada se sube sin pasar `verificar_consolidado.py`**, que corre entre
+`build_s3` y el `aws s3 cp`: integridad del JSONL, piso por fuente, pisos
+globales y coherencia con los raw en disco. Si falla, la subida se omite y en S3
+se queda el archivo bueno del día anterior — perder un refresco es barato,
+publicar un pilar mutilado no.
+
+```bash
+python3 tools/caudal/supers/verificar_consolidado.py --verboso
+```
+
+Los pisos viven en el propio script (no en un archivo de estado): así están en
+git, se revisan en un diff y sobreviven a un disco nuevo. Están al ~90% de lo
+medido. **Probado borrando `raw/invima.json`**: el guardarraíl lo detecta y
+devuelve rc=1 — y vale notar que el piso del TOTAL por sí solo no lo habría
+atrapado (57.462 actos seguían por encima de 55.000); lo salvaron el piso por
+fuente y el de sanciones. Si un piso hay que bajarlo, primero mirar el raw de esa
+fuente y si `normalize` la listó.
 
 ### Vía 3 — PDF → DeepSeek
 

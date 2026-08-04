@@ -49,6 +49,7 @@ Comandos:
   python3 tools/caudal/supers/harvest_anla.py build                 # caché -> raw/anla-gaceta.json (normalizado)
   python3 tools/caudal/supers/harvest_anla.py stats
 """
+import hashlib
 import html
 import json
 import re
@@ -429,6 +430,62 @@ def _empresas_dict():
         return [], None
 
 
+# --- memo del fallback de diccionario -------------------------------------
+# Medido ago-2026: cruzar 52.276 actos sin razón social contra las 500 empresas
+# del diccionario son ~26 millones de regex y se llevaba 283s de los 369s del
+# build — todos los días, sobre documentos que ya no cambian. Como el resultado
+# es función pura de (texto del acto, identidad del diccionario), se memoiza.
+#
+# La huella cubre EXACTAMENTE lo que mira `casa_registro` (`entidad` y
+# `excluir`) más los vetos locales de acá. Así un cambio real del diccionario
+# —que crece seguido: 388 → 500 → 529 → 589 en un mes, y es de otro frente—
+# invalida el memo entero y se recalcula; una edición de docstring o de los
+# tópicos, que no puede cambiar un match, no cuesta nada.
+#
+# Cada entrada guarda además el hash del texto: si la ANLA reescribiera la
+# descripción de un acto ya publicado, la fila se recalcula sola en vez de
+# quedarse pegada a la respuesta vieja.
+DICT_MEMO = RAW / 'anla-dict-memo.json'
+_FALTA = object()
+
+
+def _huella_dict(emps):
+    payload = [[e['nombre'], sorted(e['entidad']), sorted(e['excluir'])]
+               for e in sorted(emps, key=lambda x: x['nombre'])]
+    payload.append(sorted(NO_DICT))
+    payload.append(sorted((k, sorted(v)) for k, v in VETO_CONTEXTO.items()))
+    crudo = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode('utf-8')
+    return hashlib.blake2s(crudo, digest_size=8).hexdigest()
+
+
+def _htexto(t):
+    return hashlib.blake2s(t.encode('utf-8'), digest_size=6).hexdigest()
+
+
+def _cargar_memo(huella):
+    """{id: [hash_texto, nombre|None]} si la huella coincide; {} si no."""
+    try:
+        d = json.loads(DICT_MEMO.read_text(encoding='utf-8'))
+    except Exception:
+        return {}
+    if d.get('huella') != huella:
+        print('  (el diccionario de empresas cambió → recalculo el cruce completo)')
+        return {}
+    return d.get('m') or {}
+
+
+def _casar_dict(emps, casa, desc, proy):
+    """El cruce caro, aislado para poder memoizarlo. → nombre curado o None."""
+    txt = f'{desc} {proy}'
+    m = [e for e in emps if casa(e, txt)]
+    if len(m) != 1 or m[0]['nombre'] in NO_DICT:
+        return None
+    txt_f = _fold(txt)
+    if any(v in txt_f for v in VETO_CONTEXTO.get(m[0]['nombre'], ())):
+        return None
+    return m[0]['nombre']
+
+
 # ------------------------------------------------------------------ build
 def cmd_build():
     vistos = {}
@@ -441,7 +498,10 @@ def cmd_build():
             for row in parse_cards(pf.read_text(encoding='utf-8')):
                 vistos.setdefault(row['id'], row)   # dedup global por id
     emps, casa = _empresas_dict()
-    n_dict = 0
+    huella = _huella_dict(emps) if emps else ''
+    memo = _cargar_memo(huella) if emps else {}
+    memo_new = {}
+    n_dict = n_calc = 0
     rows = []
     for r in vistos.values():
         desc = r['descripcion']
@@ -451,13 +511,16 @@ def cmd_build():
         extra = ' · '.join(x for x in (proy, ubi) if x)
         sanc = extraer_empresa(desc)
         if not sanc and casa:
-            m = [e for e in emps if casa(e, f'{desc} {proy}')]
-            if len(m) == 1 and m[0]['nombre'] not in NO_DICT:
-                vetos = VETO_CONTEXTO.get(m[0]['nombre'], ())
-                txt_f = _fold(f'{desc} {proy}')
-                if not any(v in txt_f for v in vetos):
-                    sanc = m[0]['nombre']
-                    n_dict += 1
+            ht = _htexto(f'{desc} {proy}')
+            prev = memo.get(r['id'])
+            hit = prev[1] if (prev and prev[0] == ht) else _FALTA
+            if hit is _FALTA:
+                hit = _casar_dict(emps, casa, desc, proy)
+                n_calc += 1
+            memo_new[r['id']] = [ht, hit]   # se reescribe entero → se auto-poda
+            if hit:
+                sanc = hit
+                n_dict += 1
         rows.append({
             'sancionado': sanc,
             'identificacion': None,
@@ -475,6 +538,10 @@ def cmd_build():
     rows.sort(key=lambda x: x['fecha_firmeza'] or '', reverse=True)
     out = RAW / 'anla-gaceta.json'
     out.write_text(json.dumps(rows, ensure_ascii=False), encoding='utf-8')
+    if emps:
+        DICT_MEMO.write_text(
+            json.dumps({'huella': huella, 'm': memo_new}, ensure_ascii=False),
+            encoding='utf-8')
     tipos = Counter(x['tipo_acto'] for x in rows)
     con_emp = sum(1 for x in rows if x['sancionado'])
     fechas = sorted(x['fecha_firmeza'] for x in rows if x['fecha_firmeza'])
@@ -482,7 +549,8 @@ def cmd_build():
     for t, n in tipos.most_common():
         print(f'  {t:24s} {n:>6d}')
     print(f'  con destinatario: {con_emp} ({con_emp * 100 // max(len(rows), 1)}%) '
-          f'· {n_dict} vía diccionario de empresas')
+          f'· {n_dict} vía diccionario de empresas ({n_calc} cruces calculados, '
+          f'{len(memo_new) - n_calc} del memo)')
     if fechas:
         print(f'  rango fecha del acto: {fechas[0]} → {fechas[-1]}')
 

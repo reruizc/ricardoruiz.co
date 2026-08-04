@@ -110,13 +110,25 @@ def archivos(leg=None):
              min_bytes=3_000, campo_fecha=None,
              productor='harvest_decretos.py build (manual)',
              consumidor='acción `ejecutivo` (landing)'),
-        dict(bucket=BUCKET_PRIV, key='metadata/sanciones.jsonl', clase='manual',
-             min_bytes=2_000_000,
-             productor='harvest_supers.py normalize + build_s3.py (manual)',
-             consumidor='acción `sanciones` · pilar Regulatorio · radar del cliente'),
-        dict(bucket=BUCKET_PRIV, key='metadata/sanciones-stats.json', clase='manual',
-             min_bytes=4_000, campo_fecha=None,
-             productor='build_s3.py (manual)',
+        # El pilar Regulatorio dejó de ser manual: desde ago-2026 el cron refresca
+        # la Gaceta Ambiental de la ANLA 2x/día y vuelve a consolidar las 12
+        # fuentes, así que estos dos se re-suben en cada corrida. Con clase
+        # `manual` (120 días) una caída de cinco días habría pasado inadvertida.
+        # Las otras 11 fuentes se siguen cosechando a mano — lo que el reloj
+        # vigila es que la corrida diaria llegue a publicar, no que cada fuente
+        # traiga novedades.
+        dict(bucket=BUCKET_PRIV, key='metadata/sanciones.jsonl', clase='diario',
+             min_bytes=18_000_000,
+             productor='run_diario.sh · harvest_anla.py + harvest_supers.py normalize + build_s3.py',
+             consumidor='acción `sanciones` · pilar Regulatorio · radar del cliente',
+             nota='min_bytes 18 MB sobre 42,5 MB reales. El valor viejo (2 MB) era del pilar '
+                  'PRE-ANLA y se volvió inservible al entrar 54k actos: un consolidado sin '
+                  'ANLA pesa ~2,5 MB y habría pasado el chequeo. La red fina del contenido la '
+                  'pone verificar_consolidado.py (piso por fuente) antes de subir; esto es el '
+                  'guardarraíl contra la subida truncada.'),
+        dict(bucket=BUCKET_PRIV, key='metadata/sanciones-stats.json', clase='diario',
+             min_bytes=5_000, campo_fecha=None,
+             productor='run_diario.sh · build_s3.py',
              consumidor='acción `sanciones` (landing)'),
 
         # ─────────── histórico cerrado · sin umbral de edad ───────────
