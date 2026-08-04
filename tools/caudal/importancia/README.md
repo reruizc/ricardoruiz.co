@@ -120,8 +120,53 @@ cerrando filas»*; en la tributaria, 73,7%; en el fracking, 100% sobre los 17
 firmantes con partido conocido. Es la distinción que pidió Pablo entre bandera de
 identidad y proyecto que toca mercados, calculada y no supuesta.
 
-**El eje 1 se puede validar y por eso se validó. Este no, y por eso se firma como
-criterio y no se disfraza de medición.**
+**El eje 1 se puede validar contra un desenlace. Este no** — pero sí se puede
+contrastar contra un período que ya pasó, y ese contraste destapó un fallo (ver
+abajo).
+
+### Validación retrospectiva: correrlo sobre un Congreso que ya terminó
+
+No existe registro de qué fue bandera de quién, pero sí existe algo: **la
+memoria de quien vivió ese Congreso.** Se corre el eje sobre los 3.053 proyectos
+del cuatrienio 2022-2026 y se mira dónde deja las reformas que cualquiera que
+siguió ese período nombra de memoria. La lista de referencia va curada a mano y
+declarada como tal (`BANDERAS_2226` en `tabla_cauce.py`): no sale del dato, sale
+de saber qué pasó.
+
+| Bandera del período | Puesto de 3.053 | Antes del arreglo |
+|---|---|---|
+| Acto legislativo · salud como derecho (art. 49) | **#1** | #2 |
+| Acto legislativo · educación como derecho (art. 67) | **#2** | #126 |
+| Reforma tributaria 2022 (Ley 2277) | **#11** | — |
+| Reforma laboral (Ley 2466 de 2025) | **#50** | #982 |
+| Reforma pensional (Ley 2381 de 2024) | #166 | **#1.629** |
+| Jurisdicción agraria | #169 | — |
+| Reforma a la salud (hundida en Séptima) | #233 | #134 |
+
+Las siete quedan en el 8% superior.
+
+### El fallo que destapó: el sistema le daba cero respaldo al Gobierno
+
+`autoria()` deja `n_firmantes` en **0** cuando quien radica es una entidad. El
+componente que más pesa —28 de 100— valía cero justo para el actor que por
+definición tiene más peso político. **La reforma pensional, bandera del
+cuatrienio y además aprobada, quedaba en el puesto 1.629 de 3.053.**
+
+Mirando solo la legislatura actual esto no se veía. Se necesitaba un período con
+desenlace conocido para que saltara.
+
+El arreglo no es un matiz de criterio: radicar como Gobierno **es** el acto de
+bloque más grande que existe, así que cuenta como respaldo máximo. El componente
+se renombró de `firma_colectiva` a `respaldo_de_bloque`, que es lo que mide —
+la misma señal expresada de dos formas según quién radique. De paso hubo que
+restar las **leyes aprobatorias de tratado**: el Ejecutivo radica decenas al año
+y son trámite, no bandera; sin esa resta el top se llenaba de convenios de la OIT.
+
+**Y eso reinterpreta el hallazgo de «los 10 son del Pacto».** El top de la
+legislatura actual pasó de 10/10 del Pacto a **7 del Pacto y 3 del Gobierno**,
+con el presupuesto, la ley minera y las competencias territoriales entrando al
+cuadro. Parte de aquella concentración era el fallo, no el Congreso. Lo que
+queda sigue siendo pregunta abierta para la reunión.
 
 ### Un defecto del clustering que salía justo en el caso de Diego
 

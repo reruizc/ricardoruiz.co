@@ -38,32 +38,15 @@ ordena por: impacto × probabilidad de que pase (valor esperado)
        − lo firma alguien que radica mucho (y por eso le aprueban una fracción menor)
        + el firmante tiene cuatro o más leyes aprobadas
      ↳ comparte razones con 4 del ranking · se separa porque no trae régimen sancionatorio y los otros sí (0 contra 3)
- 6. [   135/26] POR LA CUAL SE MODIFICA LA LEY 1328 DE 2009, SE PROHÍBEN LAS PRÁCTICAS COMER
-     avance MEDIO      impacto  81.2   político   3.2 · iniciativa_sectorial   [orden 22.73]
-       + está en Tercera (hacienda), de alta tasa de aprobación
-       − lo firma alguien que radica mucho (y por eso le aprueban una fracción menor)
-       − al firmante nunca le han aprobado cuatro leyes
-     ↳ comparte razones con 4 del ranking · se separa porque carga menos peso político (3 contra 19)
- 7. [   063/26] POR MEDIO DE LA CUAL SE DECLARA EL 15 DE MARZO COMO EL DÍA NACIONAL DE LA ED
-     avance MEDIO      impacto  60.0   político  12.4 · tramite_menor   [orden 22.69]
-       + es honores o conmemoración, de trámite liviano
-       + un intento anterior pasó del segundo debate
-       − ya se había radicado tres veces o más
- 8. [   107/26] POR LA CUAL SE PROMUEVE EL FORTALECIMIENTO DE LA INCLUSIÓN CREDITICIA PARA L
-     avance ALTO       impacto  53.8   político  33.3 · iniciativa_sectorial   [orden 22.44]
-       + está en Tercera (hacienda), de alta tasa de aprobación
-       − lo firma alguien que radica mucho (y por eso le aprueban una fracción menor)
-       + lo firman diez o más
-     ↳ comparte razones con 1 del ranking · va arriba porque crea más vigilancia (2 contra 0)
 
   ── Pendientes de leer el articulado (34) — fuera del ranking a propósito: de estos solo tenemos el título,
      así que su impacto sería un piso y no una medida. Van aparte, ordenados por avance y peso político.
-   1. [   136/26] POR MEDIO DEL CUAL SE CREA LA POLÍTICA DE AUSTERIDAD PÚBLICA, SE ESTABLECE L
+   1. [   119/26] POR LA CUAL SE DICTAN NORMAS ORGÁNICAS EN MATERIA DE COMPETENCIAS Y RECURSOS
+     avance ALTO       impacto   1.5   político  77.9 · agenda_de_gobierno   [orden 0.62]
+   2. [   080/26] POR MEDIO DE LA CUAL SE EXPIDE LA “LEY MINERA PARA LA TRANSICIÓN ENERGÉTICA 
+     avance ALTO       impacto   1.5   político  66.8 · agenda_de_gobierno   [orden 0.66]
+   3. [   136/26] POR MEDIO DEL CUAL SE CREA LA POLÍTICA DE AUSTERIDAD PÚBLICA, SE ESTABLECE L
      avance ALTO       impacto   1.5   político  51.0 · bandera_sostenida   [orden 0.7]
-   2. [   119/26] POR LA CUAL SE DICTAN NORMAS ORGÁNICAS EN MATERIA DE COMPETENCIAS Y RECURSOS
-     avance ALTO       impacto   1.5   político  43.8 · agenda_de_gobierno   [orden 0.62]
-   3. [   080/26] POR MEDIO DE LA CUAL SE EXPIDE LA “LEY MINERA PARA LA TRANSICIÓN ENERGÉTICA 
-     avance ALTO       impacto   1.5   político  32.7 · agenda_de_gobierno   [orden 0.66]
    4. [   096/26] POR MEDIO DE LA CUAL SE CREA EL SISTEMA SIMPLIIFCADO DE PROTECCIÓN LABORAL, 
      avance BAJO       impacto   3.0   político  38.6 · bandera_de_bloque   [orden 0.46]
    5. [ 063/2026] Por medio de la cual se declara el día nacional del árbol y se dictan otras 
@@ -76,20 +59,14 @@ ordena por: carga política, IGNORANDO la probabilidad de avance
 
  1. [ 017/2026] Por medio del cual se modifica el artículo 49 de la Constitución Política de
      avance CASI NULO  impacto  65.8   político  80.7 · bandera_sostenida   [orden 80.7]
- 2. [ 022/2026] Por medio del cual se modifican los artículos 107, 108, 109, 134 y 262 de la
+ 2. [   119/26] POR LA CUAL SE DICTAN NORMAS ORGÁNICAS EN MATERIA DE COMPETENCIAS Y RECURSOS
+     avance ALTO       impacto   1.5   político  77.9 · agenda_de_gobierno   [orden 77.9]
+ 3. [ 022/2026] Por medio del cual se modifican los artículos 107, 108, 109, 134 y 262 de la
      avance CASI NULO  impacto  71.8   político  71.6 · bandera_sostenida   [orden 71.6]
- 3. [ 030/2026] POR MEDIO DE LA CUAL SE DESARROLLA EL ARTÍCULO 53 DE LA CONSTITUCIÓN POLÍTIC
-     avance BAJO       impacto  52.7   político  62.9 · bandera_sostenida   [orden 62.9]
- 4. [   011/26] POR MEDIO DE LA CUAL SE PROHÍBE EN EL TERRITORIO NACIONAL LA EXPLORACIÓN Y P
-     avance BAJO       impacto  48.7   político  62.1 · bandera_sostenida   [orden 62.1]
- 5. [ 004/2026] Por medio de la cual se adopta una reforma tributaria y se dictan otras disp
-     avance BAJO       impacto  73.0   político  61.2 · bandera_sostenida   [orden 61.2]
- 6. [ 025/2026] POR MEDIO DE LA CUAL SE REGULA LA INTELIGENCIA ARTIFICIAL EN COLOMBIA PARA G
-     avance BAJO       impacto  78.0   político  56.8 · bandera_sostenida   [orden 56.8]
- 7. [ 015/2026] Por medio de la cual se garantiza la plena protección de los derechos labora
-     avance BAJO       impacto  75.3   político  54.0 · bandera_sostenida   [orden 54.0]
- 8. [ 020/2026] Por medio del cual se reconocen, garantizan y protegen los derechos menstrua
-     avance BAJO       impacto  49.5   político  53.8 · bandera_sostenida   [orden 53.8]
+ 4. [   111/26] POR LA CUAL SE DECRETA EL PRESUPUESTO DE RENTAS Y RECURSOS DE CAPITAL Y LEY 
+     avance ALTO       impacto   5.1   político  69.8 · agenda_de_gobierno   [orden 69.8]
+ 5. [   080/26] POR MEDIO DE LA CUAL SE EXPIDE LA “LEY MINERA PARA LA TRANSICIÓN ENERGÉTICA 
+     avance ALTO       impacto   1.5   político  66.8 · agenda_de_gobierno   [orden 66.8]
 
 
 ──────────────────────────────────────────────────────────────────────────────
@@ -97,19 +74,13 @@ LENTE «Lo que se va a mover» — quien planea la agenda de las próximas seman
 ordena por: probabilidad de avance
 
  1. [   111/26] POR LA CUAL SE DECRETA EL PRESUPUESTO DE RENTAS Y RECURSOS DE CAPITAL Y LEY 
-     avance ALTO       impacto   5.1   político  35.6 · agenda_de_gobierno   [orden 92.2]
+     avance ALTO       impacto   5.1   político  69.8 · agenda_de_gobierno   [orden 92.2]
  2. [   081/26] POR MEDIO DE LA CUAL SE APRUEBA EL «CONVENIO SOBRE EL MARCO PROMOCIONAL PARA
-     avance ALTO       impacto   8.3   político  19.5 · agenda_de_gobierno   [orden 85.9]
+     avance ALTO       impacto   8.3   político  18.8 · tramite_menor   [orden 85.9]
  3. [   082/26] POR MEDIO DE LA CUAL SE APRUEBA EL «CONVENIO SOBRE EL TRABAJO MARÍTIMO, 2006
-     avance ALTO       impacto   4.8   político  19.5 · agenda_de_gobierno   [orden 85.3]
+     avance ALTO       impacto   4.8   político  18.8 · tramite_menor   [orden 85.3]
  4. [   035/26] POR MEDIO DE LA CUAL LA NACIÓN SE VINCULA A LA CELEBRACIÓN DE LOS CINCUENTA 
      avance ALTO       impacto  13.4   político   1.1 · tramite_menor   [orden 54.4]
  5. [   084/26] POR MEDIO DE LA CUAL SE ESTABLECE EL RÉGIMEN DE MEDIDAS PREVENTIVAS O DE SAL
-     avance ALTO       impacto  38.4   político  19.5 · agenda_de_gobierno   [orden 52.9]
- 6. [   136/26] POR MEDIO DEL CUAL SE CREA LA POLÍTICA DE AUSTERIDAD PÚBLICA, SE ESTABLECE L
-     avance ALTO       impacto   1.5   político  51.0 · bandera_sostenida   [orden 46.9]
- 7. [   080/26] POR MEDIO DE LA CUAL SE EXPIDE LA “LEY MINERA PARA LA TRANSICIÓN ENERGÉTICA 
-     avance ALTO       impacto   1.5   político  32.7 · agenda_de_gobierno   [orden 43.7]
- 8. [   107/26] POR LA CUAL SE PROMUEVE EL FORTALECIMIENTO DE LA INCLUSIÓN CREDITICIA PARA L
-     avance ALTO       impacto  53.8   político  33.3 · iniciativa_sectorial   [orden 41.7]
+     avance ALTO       impacto  38.4   político  53.7 · agenda_de_gobierno   [orden 52.9]
 ```

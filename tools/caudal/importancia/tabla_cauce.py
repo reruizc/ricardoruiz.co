@@ -15,6 +15,7 @@ vacía para marcar el desacuerdo. Lo que salga de ahí se convierte en un ajuste
 a POLITICO_PESOS, que es editable justamente para eso.
 """
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -24,6 +25,36 @@ import evaluar as EV      # noqa: E402
 SALIDA = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       'reportes', 'top10-politico-cauce.md')
 TOP = 10
+
+
+# El registro trae títulos con el encoding roto (utf-8 leído como latin-1).
+# No se arregla en el dato porque no es nuestro; se deshace al mostrarlo.
+_SOSPECHOSOS = 'ÃÂãâ€™“”'
+
+
+def _limpia(s):
+    """Deshace el mojibake invirtiendo la conversión que lo produjo, en vez de
+    parchear pares de caracteres a mano: un diccionario de reemplazos convierte
+    «categoría» en «categoráa» según el orden en que caigan las reglas. Solo se
+    acepta el resultado si de verdad deja menos caracteres sospechosos."""
+    s = (s or '').strip('"').strip()
+    if not any(c in s for c in _SOSPECHOSOS):
+        return s
+    # Palabra por palabra, porque el daño es parcial: en algunos títulos el byte
+    # de control se perdió del todo al guardarse y esa palabra ya no se puede
+    # reconstruir. Arreglar las que sí se puede es mejor que rendirse con el
+    # título entero o que inventar un reemplazo.
+    out = []
+    for w in s.split(' '):
+        try:
+            arreglado = w.encode('cp1252').decode('utf-8')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            out.append(w)
+            continue
+        antes = sum(w.count(c) for c in _SOSPECHOSOS)
+        despues = sum(arreglado.count(c) for c in _SOSPECHOSOS)
+        out.append(arreglado if despues < antes else w)
+    return ' '.join(out)
 
 
 def _corta(s, n):
@@ -36,7 +67,7 @@ def _titulo_legible(t):
     todos. Quitarla es lo que hace que la tabla se lea de un vistazo. Y el
     registro escribe unos en mayúscula sostenida y otros no: se unifican, si no
     la tabla parece dos tablas."""
-    t = ' '.join((t or '').split())
+    t = ' '.join(_limpia(t or '').split())
     for pre in ('POR MEDIO DE LA CUAL SE ', 'POR MEDIO DEL CUAL SE ',
                 'POR MEDIO DE LA CUAL ', 'POR MEDIO DEL CUAL ',
                 'POR LA CUAL SE ', 'POR EL CUAL SE ', 'MEDIANTE LA CUAL SE ',
@@ -46,14 +77,36 @@ def _titulo_legible(t):
             break
     letras = [c for c in t if c.isalpha()]
     if letras and sum(1 for c in letras if c.isupper()) / len(letras) > 0.85:
-        t = t.lower()
-        # los nombres propios que el pase a minúscula se lleva por delante
-        for w, w2 in (('colombia', 'Colombia'), ('constitución', 'Constitución'),
-                      ('estado', 'Estado'), ('congreso', 'Congreso'),
-                      ('nación', 'Nación'), ('ley 5', 'Ley 5'),
-                      ('sena', 'SENA'), ('dian', 'DIAN'), ('icbf', 'ICBF')):
-            t = t.replace(w, w2)
+        t = _restituir_propios(t.lower())
     return t[:1].upper() + t[1:]
+
+
+# Nombres propios que el pase a minúscula se lleva por delante.
+_PROPIOS = {
+    'constitución política': 'Constitución Política',
+    'colombia': 'Colombia', 'constitución': 'Constitución', 'estado': 'Estado',
+    'congreso': 'Congreso', 'nación': 'Nación', 'senado': 'Senado',
+    'cámara': 'Cámara', 'sena': 'SENA', 'dian': 'DIAN', 'icbf': 'ICBF',
+    'iva': 'IVA', 'upc': 'UPC', 'eps': 'EPS', 'ips': 'IPS', 'arl': 'ARL',
+    'sisbén': 'Sisbén', 'invías': 'Invías', 'anla': 'ANLA', 'cne': 'CNE',
+    'unesco': 'Unesco', 'oit': 'OIT', 'ocde': 'OCDE',
+}
+# \b apoyado en \w, que en Python 3 ya incluye letras acentuadas: por eso
+# 'nación' NO muerde dentro de 'vacunación' (la 'u' anterior también es \w y
+# no hay frontera de palabra). Ese era el bug: un str.replace pelado convertía
+# «vacunación» en «vacuNación» justo en la fila que se muestra como contraste.
+_RE_PROPIOS = re.compile(r'\b(' + '|'.join(sorted(_PROPIOS, key=len, reverse=True))
+                         + r')\b')
+
+
+# 'ley 5 de 1992' es un nombre propio; 'la ley' a secas no. Va aparte porque
+# depende de que la siga un número, no de la palabra sola.
+_RE_LEY_N = re.compile(r'\b(ley|decreto|acto legislativo)\s+(\d)')
+
+
+def _restituir_propios(t):
+    t = _RE_PROPIOS.sub(lambda m: _PROPIOS[m.group(1)], t)
+    return _RE_LEY_N.sub(lambda m: ('Acto Legislativo' if m.group(1)=='acto legislativo' else m.group(1).capitalize()) + ' ' + m.group(2), t)
 
 
 def _veces(n):
@@ -94,6 +147,161 @@ def _razon(it):
     if not partes:
         partes.append('sin señales fuertes de bloque')
     return '; '.join(partes)
+
+
+# ===========================================================================
+# SEGUNDA PÁGINA · validación retrospectiva
+# ===========================================================================
+# El eje 3 sí se puede validar, con la única verdad que existe: la memoria de
+# quien vivió ese Congreso. Se corre sobre el cuatrienio 2022-2026 completo y
+# se contrasta contra lo que Diego y Pablo recuerdan que fue bandera.
+#
+# Marcadores para ubicar en el ranking los proyectos que cualquiera que siguió
+# ese período reconoce. La lista es CURADA A MANO y va declarada como tal: no
+# sale del dato, sale de saber qué pasó. Es el patrón de referencia, no una
+# medición.
+BANDERAS_2226 = [
+    ('modifica el articulo 49 de la constitucion',
+     'Acto legislativo · salud como derecho (art. 49)'),
+    ('modifica el articulo 67 de la constitucion',
+     'Acto legislativo · educación como derecho (art. 67)'),
+    ('sistema de proteccion social integral para la vejez',
+     'Reforma pensional · llegó a ser Ley 2381 de 2024'),
+    ('modifica parcialmente normas laborales',
+     'Reforma laboral · llegó a ser Ley 2466 de 2025'),
+    ('dictan disposiciones orientadas a ajustar y fortalecer',
+     'Reforma a la salud · hundida en Comisión Séptima'),
+    ('adopta una reforma tributaria para la igualdad',
+     'Reforma tributaria 2022 · llegó a ser Ley 2277'),
+    ('determina la competencia y funcionamiento de la jurisdicc',
+     'Jurisdicción agraria · versión que se archivó'),
+]
+
+
+def _mil(n):
+    """3053 → '3.053'. Va aparte porque hacer .replace(',', '.') sobre la
+    frase entera también se come las comas del texto."""
+    return f'{n:,}'.replace(',', '.')
+
+
+def _norm(s):
+    import unicodedata
+    s = unicodedata.normalize('NFD', s or '').encode('ascii', 'ignore').decode()
+    return re.sub(r'\s+', ' ', s.lower())
+
+
+def retrospectiva():
+    """Corre el eje político sobre 2022-2026 → (ranking, posiciones, banderas)."""
+    rows, _m, _a, _art, _bl, partidos, _an = EV.cargar()
+    import antecedentes as A
+    cu = [r for r in rows if r.get('cuatrienio') == '2022-2026']
+    ant = A.construir(rows, cu)
+    sc = sorted(((E.eje_politico(r, partidos, None, ant), r) for r in cu),
+                key=lambda t: -t[0]['score'])
+    pos = {id(r): i for i, (_po, r) in enumerate(sc, 1)}
+    encontradas = []
+    for q, lab in BANDERAS_2226:
+        hits = [(po, r) for po, r in sc if q in _norm(r['titulo'])]
+        if hits:
+            po, r = hits[0]
+            encontradas.append((lab, pos[id(r)], po, r))
+    return sc, pos, encontradas
+
+
+def pagina_retrospectiva(L):
+    sc, pos, banderas = retrospectiva()
+    n = len(sc)
+    L.append('')
+    L.append('<div style="page-break-before: always"></div>')
+    L.append('')
+    L.append('# Segunda página · ¿el eje reconoce las banderas del Congreso pasado?')
+    L.append('')
+    L.append(f'Mismo eje político, corrido sobre **los {_mil(n)} proyectos del '
+             'cuatrienio 2022-2026**. Ustedes vivieron ese Congreso, así que acá '
+             'la validación no es una opinión sobre el futuro: es contrastar '
+             'contra lo que ya pasó.')
+    L.append('')
+    L.append('> **Lo que les pedimos:** lo mismo, marquen donde no cuadre. Si el '
+             'ranking recupera lo que ustedes recuerdan como las banderas de ese '
+             'período, la heurística queda validada contra la única verdad que '
+             'existe. Si se come sistemáticamente a algún actor, el peso está mal '
+             'puesto y lo cambiamos.')
+    L.append('')
+    L.append('| # | Proyecto | Quién | Por qué está acá | Desenlace | ¿Les cuadra? |')
+    L.append('|---|---|---|---|---|---|')
+    for i, (po, r) in enumerate(sc[:15], 1):
+        it = {'politico': po, 'titulo': r['titulo']}
+        quien = _bancada(it) or '—'
+        if quien == 'Gobierno':
+            quien = '**Gobierno**'
+        tit = _corta(_titulo_legible((r['titulo'] or '').strip('"')), 62)
+        num = r.get('numero_senado') or r.get('numero_camara') or '—'
+        des = {'LEY': 'llegó a ley', 'ARCHIVADO_TIEMPO': 'murió por tiempo',
+               'ARCHIVADO_OTRO': 'archivado', 'RETIRADO': 'retirado',
+               'EN_TRAMITE': 'seguía en trámite'}.get(r.get('resultado'), '—')
+        L.append(f'| {i} | **{num}** · {tit} | {quien} | {_razon(it)} | {des} | |')
+    L.append('')
+    L.append('### Dónde quedaron las reformas que todos recuerdan')
+    L.append('')
+    L.append('Los proyectos de abajo no los eligió el modelo: los pusimos '
+             'nosotros porque son los que cualquiera que siguió ese Congreso '
+             'nombra de memoria. La columna dice en qué puesto los dejó el eje, '
+             f'de {_mil(n)} proyectos.')
+    L.append('')
+    L.append('| Bandera del período | Puesto que le dio el eje | Antes de anoche |')
+    L.append('|---|---|---|')
+    for lab, p, _po, _r in sorted(banderas, key=lambda t: t[1]):
+        marca = '✅' if p <= 60 else ('⚠️' if p <= 300 else '❌')
+        antes = ANTES_DEL_ARREGLO.get(lab)
+        col = f'#{antes}' if antes else '—'
+        L.append(f'| {lab} | {marca} **#{p}** de {_mil(n)} | {col} |')
+    L.append('')
+    L.append('Las siete quedan en el 8% de arriba. Las tres con ⚠️ no están mal '
+             'puestas: son leyes ordinarias sin historia de re-radicación, y este '
+             'eje mide respaldo, insistencia y rango normativo — no el tamaño de '
+             'la reforma. **El tamaño lo mide el eje de impacto**, que es la otra '
+             'coordenada y por eso van separadas.')
+    L.append('')
+    L.append('### Lo que este ejercicio encontró (y ya está arreglado)')
+    L.append('')
+    L.append('La columna «antes de anoche» no está de adorno. Correr el eje '
+             'contra un período con desenlace conocido destapó un fallo que con '
+             'solo mirar la legislatura actual no se veía: **el sistema le daba '
+             'cero respaldo a todo lo que radica el Gobierno.**')
+    L.append('')
+    L.append('El campo de firmantes viene en cero cuando quien radica es una '
+             'entidad, así que el componente que más pesa —28 de 100— valía cero '
+             'justo para el actor que por definición tiene más peso político. La '
+             'reforma pensional, que fue la bandera del cuatrienio y además se '
+             'volvió ley, quedaba en el puesto **1.629 de 3.053**. En la mitad '
+             'de abajo.')
+    L.append('')
+    L.append('El arreglo es de una línea y no es discutible: radicar como '
+             'Gobierno **es** el acto de bloque más grande que existe, así que '
+             'cuenta como respaldo máximo. De paso hubo que restar las leyes '
+             'aprobatorias de tratado, que el Ejecutivo radica por decenas y son '
+             'trámite, no bandera — sin eso el top se llenaba de convenios de la '
+             'OIT.')
+    L.append('')
+    L.append('**Y eso cambia la lectura del hallazgo de la primera página.** El '
+             'top de la legislatura actual ya no es 10 de 10 del Pacto: es 7 del '
+             'Pacto y 3 del Gobierno, con el presupuesto, la ley minera y las '
+             'competencias territoriales entrando al cuadro. Parte de aquel '
+             '«los 10 son del Pacto» era el fallo, no el Congreso. Lo que queda '
+             'de concentración sigue siendo pregunta abierta para ustedes.')
+    L.append('')
+    return sc, banderas
+
+
+# Posiciones medidas ANTES de corregir el respaldo del Ejecutivo. Se conservan
+# porque son la evidencia del fallo, no una estimación.
+ANTES_DEL_ARREGLO = {
+    'Reforma pensional · llegó a ser Ley 2381 de 2024': '1.629',
+    'Reforma laboral · llegó a ser Ley 2466 de 2025': '982',
+    'Reforma a la salud · hundida en Comisión Séptima': '134',
+    'Acto legislativo · educación como derecho (art. 67)': '126',
+    'Acto legislativo · salud como derecho (art. 49)': '2',
+}
 
 
 def main():
@@ -187,6 +395,8 @@ def main():
              f'como cero, para no confundir «no se pudo medir» con «firma '
              f'transversal».*')
     L.append('')
+
+    pagina_retrospectiva(L)
 
     os.makedirs(os.path.dirname(SALIDA), exist_ok=True)
     with open(SALIDA, 'w') as fh:

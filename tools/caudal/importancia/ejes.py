@@ -22,6 +22,7 @@ editable, y viajan en la respuesta. No son "el modelo": son un criterio
 editorial explícito que se puede discutir renglón por renglón.
 """
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -237,13 +238,14 @@ def _impacto_para_perfil(art, perfil, score):
 # El eje 1 se puede validar y por eso se validó. Este no, y por eso se firma
 # como criterio y no se disfraza de medición.
 POLITICO_PESOS = {
-    'firma_colectiva': 28,   # 60 firmas no son 60 autores: son un acto de bloque
-    'cohesion_bancada': 18,  # ¿la firma es de un bloque o es transversal?
-    'persistencia': 24,      # re-radicado sin pasar = lo sostienen por lo que dice
-    'agenda_ejecutivo': 16,  # lo radica el Gobierno: es programa, no iniciativa suelta
-    'rango_normativo': 14,   # cambiar las reglas del juego, no una regla
+    'respaldo_de_bloque': 28,  # ¿cuánta maquinaria hay detrás de la radicación?
+    'cohesion_bancada': 18,    # ¿la firma es de un bloque o es transversal?
+    'persistencia': 24,        # re-radicado sin pasar = lo sostienen por lo que dice
+    'agenda_ejecutivo': 16,    # lo radica el Gobierno: es programa, no iniciativa suelta
+    'rango_normativo': 14,     # cambiar las reglas del juego, no una regla
 }
-# los honores y conmemoraciones no son política de bloque aunque los firmen 20
+# Honores, conmemoraciones y leyes aprobatorias de tratado no son política de
+# bloque aunque las firmen veinte o las radique un ministro: son trámite.
 PENALIZACION_TRAMITE_MENOR = 0.35
 
 
@@ -273,8 +275,24 @@ def eje_politico(rec, partidos=None, art=None, antec=None):
     tip = rec.get('tipologia') or 'ordinaria'
 
     c = {}
-    # 1 firma = 0 · 10 = 0,5 · 30+ = 1
-    c['firma_colectiva'] = 0.0 if nf <= 1 else min(1.0, (nf - 1) / 29.0 * 0.55 + min(nf, 12) / 12.0 * 0.45)
+    # Cuánta maquinaria hay detrás de la radicación. Se expresa de dos formas
+    # distintas según quién radique, y las dos son la MISMA señal:
+    #   · un congresista → cuántos colegas firmaron (1 firma = 0 · 10 = 0,5 · 30+ = 1)
+    #   · el Ejecutivo   → máximo, porque radicar como Gobierno ES el acto de
+    #                      bloque más grande que existe.
+    #
+    # Esto se corrigió con el test retrospectivo sobre 2022-2026 y era un fallo,
+    # no un matiz: `autoria()` deja n_firmantes en 0 para autor institucional, así
+    # que las reformas del Gobierno sacaban CERO en el componente que más pesa. La
+    # reforma pensional —la bandera del cuatrienio, y además aprobada— quedaba en
+    # el puesto 1.629 de 3.053. Con el arreglo sube al 169, y la laboral que se
+    # volvió ley pasa del 982 al 52.
+    if inst:
+        c['respaldo_de_bloque'] = 1.0
+    else:
+        c['respaldo_de_bloque'] = (0.0 if nf <= 1 else
+                                   min(1.0, (nf - 1) / 29.0 * 0.55
+                                       + min(nf, 12) / 12.0 * 0.45))
 
     coh = _cohesion(rec, partidos)
     # Si no es calculable, el componente NO aporta cero disimulado: se saca del
@@ -310,7 +328,11 @@ def eje_politico(rec, partidos=None, art=None, antec=None):
     score = sum(POLITICO_PESOS[k] * v for k, v in c.items())
     if disponible < 100:            # renormaliza sobre lo que sí se pudo medir
         score = score * 100.0 / disponible
-    if tip == 'honores':
+    # Sin esta línea, dar respaldo máximo al Gobierno llenaba el top de leyes
+    # aprobatorias de tratado: el Ejecutivo radica decenas al año y son trámite,
+    # no bandera. Se midió en el test retrospectivo antes de dejarlo así.
+    es_tramite = tip == 'honores' or _es_tratado(rec)
+    if es_tramite:
         score *= PENALIZACION_TRAMITE_MENOR
 
     return {
@@ -323,9 +345,23 @@ def eje_politico(rec, partidos=None, art=None, antec=None):
         'componentes_medidos': sorted(c),
         'componentes_no_medidos': ([] if calc else ['cohesion_bancada']),
         'base_del_score': round(disponible, 1),
-        'etiqueta': _etiqueta(c, coh if calc else None, inst, tip, ant),
+        'etiqueta': ('tramite_menor' if es_tramite
+                     else _etiqueta(c, coh if calc else None, inst, tip, ant)),
         'metodo': 'heuristica declarada — no validada contra desenlace (ver README)',
     }
+
+
+_TRATADO_EXTRA = re.compile(
+    r'\b(se aprueba|aprobatoria)\b.{0,90}'
+    r'\b(acuerdo|convenio|tratado|protocolo|estatuto|memorando|enmienda|carta)\b')
+
+
+def _es_tratado(rec):
+    """Ley aprobatoria de instrumento internacional. Se usa el detector de
+    features y además una forma más laxa: el registro escribe «se aprueba el
+    "Estatuto de la Conferencia..."» y esa variante se colaba al top."""
+    t = F._n(rec.get('titulo'))
+    return bool(F._TRATADO.search(t) or _TRATADO_EXTRA.search(t))
 
 
 MIN_FIRMAS_COHESION = 3
@@ -380,16 +416,16 @@ def _cohesion(rec, partidos):
 
 
 def _etiqueta(c, coh, inst, tip, ant):
-    c = {'firma_colectiva': 0.0, 'persistencia': 0.0, **c}
+    c = {'respaldo_de_bloque': 0.0, 'persistencia': 0.0, **c}
     if tip == 'honores':
         return 'tramite_menor'
     if inst:
         return 'agenda_de_gobierno'
-    if c['persistencia'] >= 0.45 and c['firma_colectiva'] >= 0.35:
+    if c['persistencia'] >= 0.45 and c['respaldo_de_bloque'] >= 0.35:
         return 'bandera_sostenida'
-    if c['firma_colectiva'] >= 0.6 and coh and coh['valor'] >= 0.6:
+    if c['respaldo_de_bloque'] >= 0.6 and coh and coh['valor'] >= 0.6:
         return 'bandera_de_bloque'
-    if c['firma_colectiva'] >= 0.5 and coh and coh['valor'] < 0.45:
+    if c['respaldo_de_bloque'] >= 0.5 and coh and coh['valor'] < 0.45:
         return 'acuerdo_transversal'
     if c['persistencia'] >= 0.45:
         return 'insistencia_individual'
