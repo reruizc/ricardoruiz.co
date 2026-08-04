@@ -31,12 +31,47 @@ import features as F   # noqa: E402
 # ===========================================================================
 # EJE 1 · AVANCE
 # ===========================================================================
-def eje_avance(rec, modelo, autores_idx=None, bloqueo=None, ref=None):
-    """→ {p_ley, score, factores, bloqueo}
+# BANDAS, NO PORCENTAJES.
+#
+# El modelo ORDENA bien y EXAGERA el nivel: en la validación out-of-time el
+# decil superior predice 0,69 y observa 0,57. Se probó recalibración isotónica
+# ajustada en 2015-2019 y medida en 2020-2024: arregla el decil alto (0,65/0,56
+# → 0,52/0,55) pero invierte los bajos (el primer decil pasa de 0,021/0,009 a
+# 0,006/0,023) y el Brier no se mueve (0,1455 → 0,1454). O sea que no endereza
+# el nivel: mueve el error de sitio. Así que no se publica un porcentaje que no
+# se sostiene.
+#
+# Lo que SÍ se sostiene son las bandas. Medidas sobre los 3.653 proyectos del
+# test out-of-time, con la tasa real de cada una:
+#
+#     alto       n=  511   llegaron a ley  51,9%
+#     medio      n=  868                   28,6%
+#     bajo       n= 1495                   15,2%
+#     casi nulo  n=  779                    5,6%
+#
+# Monótonas, bien separadas y con n grande en las cuatro. El porcentaje sigue
+# viajando en `p_ley` para quien quiera el detalle técnico, pero la cifra que
+# se muestra es la banda.
+BANDAS = [(0.40, 'alto', 51.9), (0.20, 'medio', 28.6),
+          (0.08, 'bajo', 15.2), (0.0, 'casi nulo', 5.6)]
 
-    `score` es la probabilidad en porcentaje, no un índice inventado: 12
-    significa "12% de probabilidad de llegar a ley", que es lo que el modelo
-    fue calibrado para decir.
+
+def banda_de(p):
+    for corte, nombre, observado in BANDAS:
+        if p >= corte:
+            return {'banda': nombre, 'corte_inferior': corte,
+                    'observado_historico': observado,
+                    'dice': f'de los proyectos que el modelo puso en «{nombre}» '
+                            f'entre 2015 y 2024, llegó a ley el {observado:.1f}%'}
+    return {'banda': 'casi nulo', 'corte_inferior': 0.0,
+            'observado_historico': 5.6, 'dice': ''}
+
+
+def eje_avance(rec, modelo, autores_idx=None, bloqueo=None, ref=None):
+    """→ {banda, p_ley, factores, bloqueo}
+
+    La salida pública es `banda`. `p_ley` va como detalle técnico y `score`
+    se conserva para poder ordenar, no para mostrarse como cifra.
     """
     p = modelo.prob(F.vector(rec, autores_idx))
     out = {
@@ -51,6 +86,9 @@ def eje_avance(rec, modelo, autores_idx=None, bloqueo=None, ref=None):
             out['p_ley_ajustada'] = round(min(0.97, max(0.005, p * aj['factor'])), 4)
             out['score'] = round(100 * out['p_ley_ajustada'], 1)
             out['ajuste_bloqueo'] = aj
+    out['banda'] = banda_de(out['score'] / 100.0)
+    out['aviso_nivel'] = ('el modelo ordena mejor de lo que calibra: use la '
+                          'banda, no el porcentaje')
     return out
 
 
@@ -239,7 +277,13 @@ def eje_politico(rec, partidos=None, art=None, antec=None):
     c['firma_colectiva'] = 0.0 if nf <= 1 else min(1.0, (nf - 1) / 29.0 * 0.55 + min(nf, 12) / 12.0 * 0.45)
 
     coh = _cohesion(rec, partidos)
-    c['cohesion_bancada'] = coh['valor'] if coh else 0.0
+    # Si no es calculable, el componente NO aporta cero disimulado: se saca del
+    # score y el total se renormaliza sobre los componentes que sí se midieron.
+    # Contarlo como cero castigaría a los proyectos por un hueco del registro
+    # autor→partido, no por lo que hicieron.
+    calc = bool(coh and coh.get('calculable'))
+    if calc:
+        c['cohesion_bancada'] = coh['valor']
 
     # sostener una iniciativa que nunca pasa es la señal más limpia de que lo
     # que importa es lo que dice, no lo que logra
@@ -262,7 +306,10 @@ def eje_politico(rec, partidos=None, art=None, antec=None):
                 rango = 1.0
     c['rango_normativo'] = rango
 
+    disponible = sum(POLITICO_PESOS[k] for k in c)
     score = sum(POLITICO_PESOS[k] * v for k, v in c.items())
+    if disponible < 100:            # renormaliza sobre lo que sí se pudo medir
+        score = score * 100.0 / disponible
     if tip == 'honores':
         score *= PENALIZACION_TRAMITE_MENOR
 
@@ -273,9 +320,15 @@ def eje_politico(rec, partidos=None, art=None, antec=None):
         'antecedentes_via': via,
         'antecedentes': ant.get('ejemplos') or [],
         'cohesion': coh,
-        'etiqueta': _etiqueta(c, coh, inst, tip, ant),
+        'componentes_medidos': sorted(c),
+        'componentes_no_medidos': ([] if calc else ['cohesion_bancada']),
+        'base_del_score': round(disponible, 1),
+        'etiqueta': _etiqueta(c, coh if calc else None, inst, tip, ant),
         'metodo': 'heuristica declarada — no validada contra desenlace (ver README)',
     }
+
+
+MIN_FIRMAS_COHESION = 3
 
 
 def _cohesion(rec, partidos):
@@ -283,25 +336,51 @@ def _cohesion(rec, partidos):
 
     Alta con muchas firmas = bloque cerrando filas. Baja = coalición amplia, que
     en Colombia suele leerse como consenso o como reparto, no como bandera.
+
+    NUNCA devuelve None en silencio. «No se pudo calcular» y «la firma es
+    transversal» son cosas distintas y confundirlas es un error caro: hoy solo
+    77 de 214 proyectos vivos tienen partido conocido para al menos tres
+    firmantes, así que si el componente aportara cero sin decirlo, 137
+    proyectos parecerían medidos como transversales cuando en realidad no se
+    midieron. Se devuelve siempre un dict con `calculable`, y el que no lo es
+    trae el motivo.
     """
-    if not partidos:
-        return None
     ks = rec.get('autores_keys') or []
+    if not partidos:
+        return {'calculable': False, 'motivo': 'sin_registro_de_partidos',
+                'dice': 'no se pudo calcular: falta el registro autor→partido',
+                'n_firmantes': len(ks)}
+    if rec.get('autor_tipo') == 'institucional':
+        return {'calculable': False, 'motivo': 'autor_institucional',
+                'dice': 'no aplica: lo radica una entidad, no una bancada',
+                'n_firmantes': 0}
+    if len(ks) < MIN_FIRMAS_COHESION:
+        return {'calculable': False, 'motivo': 'pocos_firmantes',
+                'dice': f'no aplica: {len(ks)} firmante(s), se necesitan '
+                        f'{MIN_FIRMAS_COHESION}',
+                'n_firmantes': len(ks)}
     ps = [partidos[k].get('partido') for k in ks
           if k in partidos and partidos[k].get('partido')]
-    if len(ps) < 3:
-        return None
+    if len(ps) < MIN_FIRMAS_COHESION:
+        return {'calculable': False, 'motivo': 'partido_desconocido',
+                'dice': f'no se pudo calcular: de {len(ks)} firmantes solo se '
+                        f'conoce el partido de {len(ps)}',
+                'n_firmantes': len(ks), 'n_con_partido': len(ps)}
     top = max(set(ps), key=ps.count)
     frac = ps.count(top) / len(ps)
-    return {'valor': round(frac, 3), 'partido_dominante': top,
+    return {'calculable': True, 'valor': round(frac, 3), 'partido_dominante': top,
             'n_con_partido': len(ps), 'n_firmantes': len(ks),
             'partidos_distintos': len(set(ps)),
+            'cobertura': round(len(ps) / len(ks), 2),
             'lectura': ('bancada cerrando filas' if frac >= 0.7 else
                         'coalición estrecha' if frac >= 0.45 else
-                        'firma transversal entre partidos')}
+                        'firma transversal entre partidos'),
+            'dice': (f'{ps.count(top)} de los {len(ps)} firmantes con partido '
+                     f'conocido son de {top}')}
 
 
 def _etiqueta(c, coh, inst, tip, ant):
+    c = {'firma_colectiva': 0.0, 'persistencia': 0.0, **c}
     if tip == 'honores':
         return 'tramite_menor'
     if inst:
@@ -373,6 +452,106 @@ def _p_efectiva(it):
     return a.get('p_ley_ajustada', a['p_ley'])
 
 
+def _firma_razones(it):
+    return tuple(sorted(f['factor'] for f in it['avance']['factores']))
+
+
+def _desempatar(rank, k=4):
+    """Cuando dos vecinos del ranking traen EXACTAMENTE las mismas razones, la
+    explicación deja de explicar: es el defecto que criticamos del motor de
+    alertas, reproducido acá. Pasaba con los tres primeros del lente de riesgo,
+    que decían palabra por palabra 'está en Tercera… lo firma alguien que
+    radica mucho'.
+
+    El arreglo es bajar a lo que sí los distingue. Cuando un grupo comparte
+    razones, se busca la diferencia real —impacto, obligaciones, sanciones,
+    peso político, agendamientos— y se dice cuál es, incluyendo el caso honesto
+    de que la diferencia sea mínima.
+    """
+    grupos = {}
+    for it in rank:
+        grupos.setdefault(_firma_razones(it), []).append(it)
+
+    for firma, grupo in grupos.items():
+        if len(grupo) < 2:
+            continue
+        for i, it in enumerate(grupo):
+            otros = [o for o in grupo if o is not it]
+            it['razones_compartidas_con'] = len(otros)
+            it['distingue'] = _distingue(it, otros, grupo, i)
+
+
+def _cmp_campos(it):
+    im = it.get('impacto') or {}
+    po = it.get('politico') or {}
+    return {
+        'impacto': im.get('score'),
+        'obligaciones': im.get('n_obligaciones'),
+        'sanciones': im.get('n_sanciones'),
+        'vigilancia': im.get('n_vigilancia'),
+        'politico': po.get('score'),
+        'firmantes': po.get('n_firmantes'),
+        'radicaciones_previas': po.get('radicaciones_previas'),
+        'agendamientos': (it['avance'].get('bloqueo') or {}).get('n'),
+    }
+
+
+# Cada campo con sus DOS lecturas: la diferencia puede ir en cualquier
+# dirección, y una frase que solo sirva para arriba produce sinsentidos del
+# tipo "trae régimen sancionatorio y el otro no (0 contra 3)".
+_COMO_SE_DICE = {
+    'impacto': ('su articulado pesa más ({a} contra {b})',
+                'su articulado pesa menos ({a} contra {b})'),
+    'obligaciones': ('crea más obligaciones nuevas ({a} contra {b})',
+                     'crea menos obligaciones nuevas ({a} contra {b})'),
+    'sanciones': ('trae régimen sancionatorio y los otros casi no ({a} contra {b})',
+                  'no trae régimen sancionatorio y los otros sí ({a} contra {b})'),
+    'vigilancia': ('crea más vigilancia ({a} contra {b})',
+                   'crea menos vigilancia ({a} contra {b})'),
+    'politico': ('carga más peso político ({a} contra {b})',
+                 'carga menos peso político ({a} contra {b})'),
+    'firmantes': ('lo firman más congresistas ({a} contra {b})',
+                  'lo firman menos congresistas ({a} contra {b})'),
+    'radicaciones_previas': ('lo han vuelto a radicar más veces ({a} contra {b})',
+                             'no lo habían radicado antes y a los otros sí ({a} contra {b})'),
+    'agendamientos': ('ya lo agendaron más veces ({a} contra {b})',
+                      'lo han agendado menos veces ({a} contra {b})'),
+}
+
+
+def _distingue(it, otros, grupo, pos):
+    """La diferencia más grande entre este proyecto y sus empatados."""
+    mio = _cmp_campos(it)
+    mejor = None
+    for campo in _COMO_SE_DICE:
+        v = mio.get(campo)
+        if v is None:
+            continue
+        vecinos = [_cmp_campos(o).get(campo) for o in otros]
+        vecinos = [x for x in vecinos if x is not None]
+        if not vecinos:
+            continue
+        ref = sum(vecinos) / len(vecinos)
+        if ref == v:
+            continue
+        # magnitud relativa, para comparar campos de escalas distintas
+        rel = abs(v - ref) / max(abs(v), abs(ref), 1.0)
+        if mejor is None or rel > mejor[0]:
+            mejor = (rel, campo, v, ref)
+    if mejor is None or mejor[0] < 0.12:
+        return {'hay_diferencia': False,
+                'dice': ('casi empatados: comparten las razones y ninguna otra '
+                         'medida los separa de forma apreciable; el orden entre '
+                         'ellos no es informativo')}
+    _rel, campo, v, ref = mejor
+    fmt = (lambda x: f'{x:.0f}' if isinstance(x, float) else str(x))
+    arriba, abajo = _COMO_SE_DICE[campo]
+    frase = (arriba if v > ref else abajo).format(a=fmt(v), b=fmt(ref))
+    return {'hay_diferencia': True, 'campo': campo, 'mayor': v > ref,
+            'dice': ('va arriba porque ' if pos == 0 and v > ref
+                     else 'se separa porque ') + frase}
+
+
 def ordenar(items, lente='riesgo'):
     """Ordena por el lente pedido → {ranking, pendientes, fuera}.
 
@@ -416,6 +595,7 @@ def ordenar(items, lente='riesgo'):
             rank.append(it)
 
     rank.sort(key=lambda it: -it['orden'])
+    _desempatar(rank)
     # los pendientes se ordenan por lo único que sí sabemos de ellos: qué tan
     # probable es que avancen y qué tanto peso político cargan
     pend.sort(key=lambda it: -(_p_efectiva(it) * 100 + it['politico']['score']))

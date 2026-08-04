@@ -98,14 +98,17 @@ def _linea(i, it, mostrar='todo'):
     ims = f"{im['score']:5.1f}" if im else '  n/d'
     tit = (it['titulo'] or '')[:76].replace('\n', ' ')
     L = [f"{i:2d}. [{it['numero'] or '—':>9}] {tit}",
-         f"     avance {a['score']:5.1f}%   impacto {ims}   político {po['score']:5.1f}"
-         f"   · {po['etiqueta']}"]
+         f"     avance {a['banda']['banda'].upper():<10} impacto {ims}   "
+         f"político {po['score']:5.1f} · {po['etiqueta']}"]
     if it.get('orden') is not None:
         L[1] += f"   [orden {it['orden']}]"
     if mostrar == 'todo':
         for f in a['factores'][:3]:
             sig = '+' if f['sentido'] == 'a favor' else '−'
             L.append(f"       {sig} {f['dice']}")
+        if it.get('distingue'):
+            L.append(f"     ↳ comparte razones con {it['razones_compartidas_con']}"
+                     f" del ranking · {it['distingue']['dice']}")
         if im and im.get('aviso'):
             L.append(f"     ⚠ {im['aviso']}")
         if a.get('ajuste_bloqueo'):

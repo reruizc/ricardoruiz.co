@@ -184,12 +184,82 @@ desaparecer proyectos en silencio**.
 
 ---
 
+## Bandas, no porcentajes
+
+El modelo **ordena bien y exagera el nivel**: el decil superior predice 0,69 y
+observa 0,57. Se probó recalibración isotónica ajustada en 2015-2019 y medida en
+2020-2024 — arregla el decil alto (0,65/0,56 → 0,52/0,55) pero **invierte los
+bajos** (el primer decil pasa de 0,021/0,009 a 0,006/0,023) y el Brier no se
+mueve (0,1455 → 0,1454). No endereza el nivel: mueve el error de sitio.
+
+Así que la salida pública es la **banda**, que sí se sostiene. Medida sobre los
+3.653 proyectos del test out-of-time:
+
+| banda | n | llegaron a ley |
+|---|---|---|
+| alto | 511 | **51,9%** |
+| medio | 868 | **28,6%** |
+| bajo | 1.495 | **15,2%** |
+| casi nulo | 779 | **5,6%** |
+
+Monótonas, bien separadas y con n grande en las cuatro. El porcentaje sigue
+viajando en `p_ley` como detalle técnico; la cifra que se muestra es la banda.
+
+## «No calculable» no es «transversal»
+
+`_cohesion` **nunca devuelve None en silencio**. Solo en 77 de 214 proyectos
+vivos se conoce el partido de al menos tres firmantes; si el componente aportara
+cero sin decirlo, los otros 137 parecerían medidos como firma transversal cuando
+en realidad no se midieron. Ahora devuelve siempre un dict con `calculable` y,
+cuando no lo es, el motivo (`pocos_firmantes` · `partido_desconocido` ·
+`autor_institucional` · `sin_registro_de_partidos`).
+
+Y cuando no es calculable **el componente se saca del score y el total se
+renormaliza sobre lo que sí se midió** (`base_del_score` dice sobre cuánto).
+Contarlo como cero castigaría a un proyecto por un hueco de nuestro registro
+autor→partido, no por lo que hizo.
+
+## Cuando dos proyectos tienen las mismas razones
+
+Los tres primeros del lente de riesgo decían palabra por palabra *«está en
+Tercera… lo firma alguien que radica mucho»* — el mismo defecto que criticamos
+del motor de alertas, reproducido acá. `_desempatar` agrupa a los que comparten
+firma de razones y baja a lo que sí los distingue (impacto, obligaciones,
+sanciones, peso político, agendamientos), con las dos direcciones de cada frase.
+Cuando la diferencia es menor al 12% dice lo honesto: *«casi empatados; el orden
+entre ellos no es informativo»*.
+
+## Dos bugs del extractor de articulado que salieron persiguiendo la tributaria
+
+El caso de Diego —«lo que importaba, la tributaria, no estaba»— resultó no ser
+un problema de cobertura sino dos bugs en `tools/caudal/analisis/extraer_articulado.py`.
+Los dos hacían lo mismo: **congelar en «solo el título» a proyectos cuyo texto
+ya estaba en S3**, y los dos golpeaban con más fuerza a las reformas grandes,
+que son las que llegan con el texto tarde.
+
+1. **La caché no se invalidaba cuando aparecía un documento mejor.** `_cacheado`
+   comparaba la versión del prompt pero no la calidad de la base. El radicado de
+   la reforma tributaria (282 KB) llegó a S3 después de que la extracción se
+   hiciera solo con el título, y la caché la dejaba congelada en *«según el
+   título, adopta una reforma tributaria»* con cero obligaciones. Ahora
+   `_CALIDAD_BASE` invalida la entrada si el plan trae una base mejor.
+2. **El plan solo miraba `texto_s3` del dataset.** El texto entra a S3 varias
+   veces al día por el cron, y `proyectos.jsonl` se reconstruye con menos
+   frecuencia: 56 proyectos de la legislatura viva tenían el radicado completo en
+   S3 y el dataset todavía no lo sabía. Ahora el plan usa los manifiestos del
+   rastreo diario como respaldo — nunca pisando al dataset, solo cubriendo el
+   hueco.
+
+Efecto conjunto sobre la legislatura viva: de **143 a 199** proyectos con base
+`texto_radicado`. La tributaria pasó de «según el título» a un articulado con
+obligaciones reales sobre IVA, patrimonio, renta y juegos de suerte y azar.
+
 ## Límites conocidos, medidos
 
-- **Sobre-confianza en el decil alto.** El decil superior predice 0,69 y observa
-  0,57. Ordena bien y exagera el nivel arriba. El intercepto se corrige por deriva
-  de época (el Congreso aprueba menos que antes: 27,1% antes de 2015, 21,5%
-  después), pero eso mueve el nivel, no la pendiente.
+- **Sobre-confianza en el decil alto**, ya descrita arriba. Por eso la salida
+  pública son bandas. El intercepto se corrige además por deriva de época (el
+  Congreso aprueba menos que antes: 27,1% antes de 2015, 21,5% después), pero eso
+  mueve el nivel, no la pendiente.
 - **La dispersión dentro de la legislatura viva es estrecha**: mediana 0,19 con
   cuartiles en 0,14 y 0,21. Todos los proyectos son del año 1, ninguno tiene
   historia de trámite todavía, así que el eje 1 discrimina mucho mejor en agregado
@@ -197,14 +267,14 @@ desaparecer proyectos en silencio**.
 - **La capa de bloqueo casi no aporta hoy**: 3 de 214 proyectos tienen
   agendamientos observados, porque la legislatura arrancó hace semanas. La curva
   P(tratado|posición) que usa está medida, pero su efecto se verá en meses.
-- **La cohesión de bancada solo se calcula en 77 de 214** (los que tienen al
-  menos tres firmantes con partido conocido). En el resto, ese componente aporta
-  cero, que no es lo mismo que «firma transversal».
-- **74 de 207 articulados salen solo del título.** Su impacto es un piso, no una
-  medida, y el sesgo no es aleatorio: las reformas grandes llegan con el texto
-  tarde. Por eso van en un bloque `pendientes` aparte y **nunca mezclados en el
-  ranking** — es lo que evita que la reforma tributaria quede al fondo por no
-  haberla leído todavía.
+- **La cohesión de bancada solo se calcula en 77 de 214.** Ya no se confunde con
+  firma transversal (ver arriba), pero el hueco sigue: se cierra ampliando el
+  registro autor→partido, que hoy solo cubre 2014 en adelante.
+- **Los que salen solo del título** llevan su impacto como piso, no como medida,
+  y el sesgo no es aleatorio: las reformas grandes llegan con el texto tarde. Van
+  en un bloque `pendientes` aparte y **nunca mezclados en el ranking**. La bolsa
+  bajó mucho al arreglar dos cosas del extractor (ver abajo), pero no llega a
+  cero: quedan los que de verdad no tienen texto publicado todavía.
 - **Aplicar el modelo a un proyecto que solo existe en el registro de Cámara es
   una extrapolación**: se entrenó sobre el registro del Senado por la fuga
   estructural descrita arriba.

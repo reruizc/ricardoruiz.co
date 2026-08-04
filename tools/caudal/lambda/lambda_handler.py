@@ -31,6 +31,12 @@ Acciones (POST JSON):
         generación (20-51 s, se pasa del gateway a propósito); con `solo_cache`
         es un sondeo barato que responde 'lista' o 'pendiente'.
   {"action":"contratacion","query":"comando conjunto caribe","departamento":"Atlántico"}
+
+POR QUÉ IMPORTA · tres coordenadas (avance · impacto · político), un lente por
+cliente. El eje 1 va en BANDAS, no en porcentaje: ordena mejor de lo que calibra.
+  {"action":"importancia"}                                  → modelo, lentes, bandas
+  {"action":"importancia","id":9934,"tb":"pdly"}             → coordenadas de uno
+  {"action":"importancia","lente":"riesgo","perfil":{…}}     → ranking
       → pilar Datos abiertos y contratación: búsqueda EN VIVO sobre SECOP II
         (5,87 M contratos, Socrata $q) + total real + desglose. Sin query ni
         filtros → landing con los agregados precomputados de secop-stats.json.
@@ -2273,11 +2279,21 @@ def handler(event, context):
 
         lente = str(body.get('lente') or '').strip()
         if not lente:
-            return _resp(200, {'modelo': imp['modelo'].meta, 'lentes': lentes,
-                               'pesos_impacto': _ejes.IMPACTO_PESOS,
-                               'pesos_politico': _ejes.POLITICO_PESOS,
-                               'legislatura': IMPORTANCIA_LEG,
-                               'n_evaluables': len(_viva_recs())})
+            return _resp(200, {
+                'modelo': imp['modelo'].meta, 'lentes': lentes,
+                'pesos_impacto': _ejes.IMPACTO_PESOS,
+                'pesos_politico': _ejes.POLITICO_PESOS,
+                'legislatura': IMPORTANCIA_LEG,
+                'n_evaluables': len(_viva_recs()),
+                # La salida pública del eje 1 es la BANDA. El modelo ordena
+                # mejor de lo que calibra (decil alto: predice 0,69 y observa
+                # 0,57) y la isotónica no lo endereza, solo mueve el error de
+                # sitio. Cada banda viaja con la tasa REAL que tuvo en el test
+                # out-of-time, que es lo que sí se sostiene.
+                'bandas': [{'banda': n, 'desde': c, 'llegaron_a_ley_pct': o}
+                           for c, n, o in _ejes.BANDAS],
+                'nota_bandas': ('use la banda, no el porcentaje: los porcentajes '
+                                'de cada banda son la tasa observada 2015-2024')})
         if lente not in lentes:
             return _resp(400, {'error': f'lente desconocido: {lente}',
                                'lentes': sorted(lentes)})

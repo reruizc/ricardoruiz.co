@@ -286,11 +286,50 @@ _RANK_BASE = {0: 'exposicion_motivos', 1: 'ponencia', 2: 'otro_documento',
               3: 'otro_documento', 4: 'otro_documento'}
 
 
+def _texto_por_manifiesto():
+    """{token de radicado → key del texto en S3}, leído de los manifiestos del
+    rastreo diario.
+
+    `proyectos.jsonl` se regenera en el cron y trae `texto_s3`, pero el texto de
+    los radicados entra a S3 varias veces al día: entre una reconstrucción del
+    dataset y la siguiente hay proyectos cuyo texto YA está y el dataset todavía
+    no lo sabe. Medido: 56 proyectos de la legislatura viva quedaban extraídos
+    solo del título teniendo el radicado completo en S3. El manifiesto es la
+    fuente más fresca, así que se usa como respaldo — nunca pisa al dataset.
+    """
+    out = {}
+    for nombre in ('pl-radicados-2026-2027.jsonl',
+                   'pl-radicados-camara-2026-2027.jsonl'):
+        p = DIST / 's3' / nombre
+        if not p.exists():
+            continue
+        for ln in p.read_text(encoding='utf-8').splitlines():
+            if not ln.strip():
+                continue
+            try:
+                d = json.loads(ln)
+            except Exception:
+                continue
+            if not d.get('s3_txt'):
+                continue
+            for k in ('numero_senado', 'numero_camara', 'proyecto'):
+                t = _num_token(d.get(k))
+                if t:
+                    out.setdefault(t, d['s3_txt'])
+    return out
+
+
+def _num_token(num):
+    m = re.search(r'(\d{1,4})\s*/\s*(?:20)?(\d{2})', str(num or ''))
+    return f'{int(m.group(1))}/{m.group(2)}' if m else None
+
+
 def construir_plan(refresh_s3=False):
     """[{tok, tb, id, base, fuente, ...}] — de dónde sale el texto de cada
     proyecto. Un solo documento por proyecto: el de mejor base disponible."""
     proyectos = [(r, 'pdly') for r in _load('proyectos.jsonl')]
     proyectos += [(r, 'pal') for r in _load('actos-legis.jsonl')]
+    manif = _texto_por_manifiesto()
 
     # cuántos proyectos referencian cada gaceta (para el umbral de "compartida")
     share, solo_expo = Counter(), {}
@@ -313,8 +352,14 @@ def construir_plan(refresh_s3=False):
                 'cuatrienio': r.get('cuatrienio', ''),
                 'anio': r.get('anio'), 'resultado': r.get('resultado'),
                 'comision': r.get('comision', '')}
-        if r.get('texto_s3'):
-            item.update(base='texto_radicado', fuente=r['texto_s3'],
+        txt = r.get('texto_s3')
+        if not txt:      # respaldo: el manifiesto va más fresco que el dataset
+            for k in ('numero_senado', 'numero_camara'):
+                txt = manif.get(_num_token(r.get(k)))
+                if txt:
+                    break
+        if txt:
+            item.update(base='texto_radicado', fuente=txt,
                         fuente_txt='texto radicado')
             plan.append(item)
             continue
@@ -589,7 +634,13 @@ def _cache_path(tok):
     return EXDIR / (tok.replace(':', '-') + '.json')
 
 
-def _cacheado(tok):
+# Calidad de la base, de mejor a peor. Sirve para saber si vale la pena volver
+# a pedir una extracción que ya está en caché.
+_CALIDAD_BASE = {'texto_radicado': 0, 'exposicion_motivos': 1, 'ponencia': 2,
+                 'otro_documento': 3, 'titulo': 4}
+
+
+def _cacheado(tok, base_plan=None):
     p = _cache_path(tok)
     if not p.exists():
         return None
@@ -602,6 +653,16 @@ def _cacheado(tok):
     # versión de la base que QUEDÓ registrada, no la planeada: un documento sin
     # texto legible se degrada a 'titulo' y su versión válida es la del título.
     if (d.get('_meta') or {}).get('pv') != _pv(d.get('base')):
+        return None
+    # Y si desde la última corrida APARECIÓ un documento mejor, la extracción
+    # vieja deja de servir. Pasaba de verdad y con el peor caso posible: el
+    # radicado de la reforma tributaria llegó a S3 después de que la extracción
+    # se hiciera solo con el título, y la caché la dejaba congelada en 'según el
+    # título, adopta una reforma tributaria' con cero obligaciones. El texto
+    # entra a diario por el cron, así que sin este chequeo el corpus envejece
+    # justo en los proyectos que más importan — los que llegan con texto tarde.
+    if base_plan and (_CALIDAD_BASE.get(base_plan, 9)
+                      < _CALIDAD_BASE.get(d.get('base'), 9)):
         return None
     return d
 
@@ -678,12 +739,12 @@ def cmd_extract(args):
     if args.sin_titulo:
         sel = [p for p in sel if p['base'] != 'titulo']
     # los que ya están en caché con el prompt vigente no se vuelven a pedir
-    pend = [p for p in sel if not _cacheado(p['tok'])]
+    pend = [p for p in sel if not _cacheado(p['tok'], p['base'])]
     # documento primero, título después: el orden en que aporta valor
     pend.sort(key=lambda p: (p['base'] == 'titulo', -(p.get('anio') or 0)))
     if args.limit:
         pend = pend[:args.limit]
-    print(f'· universo {len(sel)} · ya en caché {len(sel) - len([p for p in sel if not _cacheado(p["tok"])])}'
+    print(f'· universo {len(sel)} · ya en caché {len(sel) - len(pend)}'
           f' · a procesar ahora {len(pend)}')
     if args.dry_run:
         for p in pend[:20]:
