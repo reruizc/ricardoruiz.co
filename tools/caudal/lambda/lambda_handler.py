@@ -47,6 +47,7 @@ Bucket:
 """
 import json
 import os
+import sys
 import hashlib
 import time as _time
 import urllib.request
@@ -275,6 +276,94 @@ def _articulado_de(tb, pid):
         return _articulado().get('por_proyecto', {}).get(f'{tb}:{int(pid)}')
     except (TypeError, ValueError):
         return None
+
+
+# --- POR QUÉ IMPORTA · las tres coordenadas --------------------------------
+# El módulo vive en tools/caudal/importancia y viaja completo en el ZIP. Los
+# submódulos usan imports planos, así que el directorio entra al path igual que
+# lo hacen ellos entre sí.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                'importancia'))
+try:
+    import ejes as _ejes                      # noqa: E402
+    import features as _feat                  # noqa: E402
+    from modelo import Logistica as _Logistica  # noqa: E402
+except Exception:                             # pragma: no cover
+    _ejes = _feat = _Logistica = None
+
+IMPORTANCIA_LEG = '2026-2027'
+_IMP = None
+_VIVA = None
+
+
+def _importancia():
+    """Modelo del eje 1 + trayectoria de firmantes + partidos. Cache warm."""
+    global _IMP
+    if _IMP is None:
+        if _ejes is None:
+            return None
+        m = _Logistica.de_dict(_get_json('metadata/importancia-modelo.json'))
+        try:
+            aut = _get_json('metadata/importancia-autores.json')
+        except Exception:
+            aut = None
+        try:
+            part = _get_json('metadata/autor-partido.json').get('autor_partido', {})
+        except Exception:
+            part = {}
+        try:
+            # antecedentes por parecido de título: el cluster exacto no agrupa
+            # los títulos genéricos, que son los de las reformas grandes
+            antec = _get_json('metadata/importancia-antecedentes.json').get('por_proyecto', {})
+        except Exception:
+            antec = {}
+        _IMP = {'modelo': m, 'autores': aut, 'partidos': part,
+                'antec': antec, 'ref': None}
+    return _IMP
+
+
+def _viva_recs():
+    """Los proyectos de la legislatura en curso, desde el dataset completo."""
+    global _VIVA
+    if _VIVA is None:
+        _VIVA = [r for r in _full().values()
+                 if r.get('legislatura') == IMPORTANCIA_LEG]
+    return _VIVA
+
+
+def _imp_ref(imp):
+    """Media de features de la legislatura viva: la explicación compara contra
+    los pares, no contra 36 años de histórico (si no, el 'por qué' de cada
+    señal termina siendo siempre el mismo)."""
+    if imp.get('ref') is None:
+        imp['ref'] = _feat.referencia(_viva_recs(), imp['autores'])
+    return imp['ref']
+
+
+def _imp_bloqueo(rec):
+    """Agendamientos del proyecto. Cámara contra el índice de Cámara y Senado
+    contra el de Senado: el número se reinicia por cámara y hay más de mil
+    tokens que existen en los dos para proyectos distintos."""
+    bl = _bloqueo()
+    t = _num_token(rec.get('numero_camara'))
+    if t:
+        b = (bl.get('por_proyecto') or {}).get(t)
+        if b:
+            return b
+    t = _num_token(rec.get('numero_senado'))
+    if t:
+        b = ((bl.get('senado') or {}).get('por_proyecto') or {}).get(t)
+        if b:
+            return b
+    return None
+
+
+def _coords_de(rec, imp, perfil=None):
+    tok = f"{rec.get('tabla', 'pdly')}:{rec.get('id')}"
+    return _ejes.coordenadas(rec, imp['modelo'], imp['autores'],
+                             _articulado().get('por_proyecto', {}).get(tok),
+                             imp['partidos'], _imp_bloqueo(rec), perfil,
+                             _imp_ref(imp), imp['antec'])
 
 
 def _articulado_compacto(art):
@@ -2159,6 +2248,55 @@ def handler(event, context):
         return _resp(200, {'v': d.get('v'), 'pv': d.get('pv'), 'model': d.get('model'),
                            'n': d.get('n', 0), 'stats': d.get('stats', {}),
                            'por_sector': {k: len(v) for k, v in (d.get('por_sector') or {}).items()}})
+
+    if action == 'importancia':
+        # POR QUÉ IMPORTA — tres coordenadas, no un score. Ver
+        # tools/caudal/importancia/README.md.
+        #   {action:'importancia'}                       → metadatos del modelo
+        #   {action:'importancia', id:9934, tb:'pdly'}   → coordenadas de uno
+        #   {action:'importancia', lente:'riesgo', perfil:{…}} → ranking
+        try:
+            imp = _importancia()
+        except Exception as e:
+            return _resp(503, {'error': f'modelo de importancia no disponible: {str(e)[:120]}'})
+        if imp is None:
+            return _resp(503, {'error': 'modelo de importancia no cargado'})
+
+        lentes = {k: dict(v) for k, v in _ejes.LENTES.items()}
+        pid = body.get('id')
+        if pid is not None:
+            rec = _full().get(f"{body.get('tb', 'pdly')}:{int(pid)}")
+            if not rec:
+                return _resp(404, {'error': 'proyecto no encontrado'})
+            return _resp(200, {'coordenadas': _coords_de(rec, imp, body.get('perfil')),
+                               'modelo': imp['modelo'].meta, 'lentes': lentes})
+
+        lente = str(body.get('lente') or '').strip()
+        if not lente:
+            return _resp(200, {'modelo': imp['modelo'].meta, 'lentes': lentes,
+                               'pesos_impacto': _ejes.IMPACTO_PESOS,
+                               'pesos_politico': _ejes.POLITICO_PESOS,
+                               'legislatura': IMPORTANCIA_LEG,
+                               'n_evaluables': len(_viva_recs())})
+        if lente not in lentes:
+            return _resp(400, {'error': f'lente desconocido: {lente}',
+                               'lentes': sorted(lentes)})
+        perfil = body.get('perfil') or None
+        items = [_coords_de(r, imp, perfil) for r in _viva_recs()]
+        res = _ejes.ordenar(items, lente)
+        lim = max(1, min(int(body.get('limit') or 20), 100))
+        return _resp(200, {
+            'lente': lente, 'meta': lentes[lente],
+            'legislatura': IMPORTANCIA_LEG,
+            'ranking': res['ranking'][:lim],
+            # los tres bloques viajan siempre: un lente no puede desaparecer
+            # proyectos en silencio, y "no lo hemos leído" no es "no te toca"
+            'pendientes': res['pendientes'][:lim],
+            'n_pendientes': len(res['pendientes']),
+            'n_fuera': len(res['fuera']),
+            'nota_pendientes': ('de estos solo tenemos el título: su impacto sería '
+                                'un piso, no una medida, así que van aparte'),
+            'modelo': imp['modelo'].meta})
 
     if action == 'bloqueo':        # sistema de bloqueo (posición, hazard, comisiones)
         _bl = _bloqueo()
