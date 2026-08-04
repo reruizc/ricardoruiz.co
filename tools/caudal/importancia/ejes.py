@@ -339,6 +339,11 @@ def eje_politico(rec, partidos=None, art=None, antec=None):
         'score': round(min(100.0, score), 1),
         'componentes': {k: round(POLITICO_PESOS[k] * v, 1) for k, v in c.items()},
         'n_firmantes': nf, 'radicaciones_previas': ant['n_previos'],
+        # ⚠ Un antecedente que SÍ llegó a ley cambia el sentido de la frase: el
+        # presupuesto se radica cada año y pasa cada año — decir "se radicó 33
+        # veces y no pasó" es falso y lo detecta cualquiera que conozca el
+        # Congreso. Viaja para que la redacción distinga insistencia de rutina.
+        'algun_antecedente_fue_ley': bool(ant.get('previo_fue_ley')),
         'antecedentes_via': via,
         'antecedentes': ant.get('ejemplos') or [],
         'cohesion': coh,

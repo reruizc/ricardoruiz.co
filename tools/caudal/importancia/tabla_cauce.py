@@ -141,7 +141,16 @@ def _razon(it):
             partes.append(f'{nf} firmas')
     prev = po.get('radicaciones_previas') or 0
     if prev:
-        partes.append(f'ya se radicó {_veces(prev)} y no pasó')
+        # "y no pasó" solo cuando de verdad no pasó. El presupuesto se radica
+        # cada año y se aprueba cada año: decirle "se radicó 33 veces y no pasó"
+        # es falso, y en la fila de la tributaria de 2022 contradecía a la
+        # columna de al lado, que dice "llegó a ley". Cuando algún antecedente
+        # sí fue ley, la señal es recurrencia, no insistencia fallida.
+        if po.get('algun_antecedente_fue_ley'):
+            partes.append(f'vuelve cada tanto: ya se radicó {_veces(prev)}, '
+                          f'con antecedentes que sí llegaron a ley')
+        else:
+            partes.append(f'ya se radicó {_veces(prev)} y no pasó')
     if comp.get('rango_normativo', 0) >= 10:
         partes.append('toca la Constitución')
     if not partes:
@@ -318,9 +327,12 @@ def main():
              'es justamente la lectura que interesa acá.')
     L.append('')
     L.append('> **Lo que les pedimos:** marquen la última columna donde no les '
-             'cuadre. El eje político es una heurística declarada — no hay forma '
-             'de validarla contra un desenlace, porque no existe registro de qué '
-             'fue bandera de quién. Su desacuerdo es la validación, y se traduce '
+             'cuadre. El eje político es una heurística: no existe un registro '
+             'oficial de qué fue bandera de quién, así que se contrasta contra '
+             'la memoria de quien vivió el Congreso. La segunda página hace ese '
+             'ejercicio con el cuatrienio pasado —y ya destapó un fallo grande—; '
+             'esta primera necesita el criterio de ustedes, porque es sobre un '
+             'período que todavía no tiene desenlace. Su desacuerdo se traduce '
              'directo en un ajuste de los pesos.')
     L.append('')
     L.append('| # | Proyecto | Por qué está acá | ¿Pasa? | ¿Les cuadra? |')

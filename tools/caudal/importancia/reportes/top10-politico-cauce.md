@@ -2,14 +2,14 @@
 
 **Top 10 por carga política, legislatura 2026-2027.** Este lente ordena por lo que un proyecto SIGNIFICA, no por lo que va a pasar: un proyecto puede ser central y no tener ninguna posibilidad, y esa es justamente la lectura que interesa acá.
 
-> **Lo que les pedimos:** marquen la última columna donde no les cuadre. El eje político es una heurística declarada — no hay forma de validarla contra un desenlace, porque no existe registro de qué fue bandera de quién. Su desacuerdo es la validación, y se traduce directo en un ajuste de los pesos.
+> **Lo que les pedimos:** marquen la última columna donde no les cuadre. El eje político es una heurística: no existe un registro oficial de qué fue bandera de quién, así que se contrasta contra la memoria de quien vivió el Congreso. La segunda página hace ese ejercicio con el cuatrienio pasado —y ya destapó un fallo grande—; esta primera necesita el criterio de ustedes, porque es sobre un período que todavía no tiene desenlace. Su desacuerdo se traduce directo en un ajuste de los pesos.
 
 | # | Proyecto | Por qué está acá | ¿Pasa? | ¿Les cuadra? |
 |---|---|---|---|---|
 | 1 | **017/2026** · Modifica el artículo 49 de la Constitución Política de Colombia, se regulariz… | 35 firmas y Pacto Histórico cierra filas; ya se radicó 7 veces y no pasó; toca la Constitución | casi nulo | |
 | 2 | **119/26** · Dictan normas orgánicas en materia de competencias y recursos del sistema gen… | lo radica el Gobierno; ya se radicó una vez y no pasó | alto | |
 | 3 | **022/2026** · Modifican los artículos 107, 108, 109, 134 y 262 de la Constitución Política… | 36 firmas y Pacto Histórico cierra filas; ya se radicó 2 veces y no pasó; toca la Constitución | casi nulo | |
-| 4 | **111/26** · Decreta el presupuesto de rentas y recursos de capital y ley de apropiaciones… | lo radica el Gobierno; ya se radicó 33 veces y no pasó | alto | |
+| 4 | **111/26** · Decreta el presupuesto de rentas y recursos de capital y ley de apropiaciones… | lo radica el Gobierno; vuelve cada tanto: ya se radicó 33 veces, con antecedentes que sí llegaron a ley | alto | |
 | 5 | **080/26** · Expide la “ley minera para la transición energética justa, la reindustrializa… | lo radica el Gobierno; ya se radicó una vez y no pasó | alto | |
 | 6 | **030/2026** · Desarrolla el artículo 53 de la Constitución Política, se expide el estatuto… | 52 firmas y Pacto Histórico cierra filas; ya se radicó 5 veces y no pasó | bajo | |
 | 7 | **011/26** · Prohíbe en el territorio nacional la exploración y producción de yacimientos… | 55 firmas y Pacto Histórico cierra filas; ya se radicó 2 veces y no pasó | bajo | |
@@ -27,7 +27,7 @@
 
 **Las dos columnas son independientes a propósito.** El fracking está alto en política y bajo en probabilidad, y las dos cosas son ciertas al tiempo: es basura para un gremio que gestiona riesgo regulatorio y es de lo más informativo que hay para leer al bloque que lo sostiene.
 
-*Cobertura: de los 214 proyectos de la legislatura, en 77 se pudo calcular la cohesión de bancada. En los otros 137 no se conoce el partido de suficientes firmantes; ese componente se excluye del cálculo en vez de contar como cero, para no confundir «no se pudo medir» con «firma transversal».*
+*Cobertura: de los 220 proyectos de la legislatura, en 77 se pudo calcular la cohesión de bancada. En los otros 143 no se conoce el partido de suficientes firmantes; ese componente se excluye del cálculo en vez de contar como cero, para no confundir «no se pudo medir» con «firma transversal».*
 
 
 <div style="page-break-before: always"></div>
@@ -50,7 +50,7 @@ Mismo eje político, corrido sobre **los 3.053 proyectos del cuatrienio 2022-202
 | 8 | **566/2025** · Modifica el artículo 49 de la Constitución Política de Colomb… | PACTO HISTÓRICO | 57 firmas, 18 partidos; ya se radicó 5 veces y no pasó; toca la Constitución | archivado | |
 | 9 | **013/2024** · Modifica el artículo 49 de la Constitución Política de Colomb… | PACTO HISTÓRICO | 47 firmas, 17 partidos; ya se radicó 5 veces y no pasó; toca la Constitución | archivado | |
 | 10 | **187/2024** · Modifica el artículo 65 de la Constitución Política de Colomb… | PARTIDO CAMBIO RADICAL | 16 firmas y Partido Cambio Radical cierra filas; ya se radicó 12 veces y no pasó; toca la Constitución | archivado | |
-| 11 | **131/22** · Adopta una reforma tributaria para la igualdad y la justicia… | **Gobierno** | lo radica el Gobierno; ya se radicó una vez y no pasó | llegó a ley | |
+| 11 | **131/22** · Adopta una reforma tributaria para la igualdad y la justicia… | **Gobierno** | lo radica el Gobierno; vuelve cada tanto: ya se radicó una vez, con antecedentes que sí llegaron a ley | llegó a ley | |
 | 12 | **020/2023** · Reforma la justicia | PARTIDO CAMBIO RADICAL | 23 firmas, 5 partidos; ya se radicó 3 veces y no pasó; toca la Constitución | archivado | |
 | 13 | **015/23** · Amplia el periodo a 5 añosde los cargos de elección popular,… | **Gobierno** | lo radica el Gobierno; toca la Constitución | murió por tiempo | |
 | 14 | **006/24 - Acum PAL 05/24** · Modifica el artículo 262 de la Constitución política de Colo… | **Gobierno** | lo radica el Gobierno; toca la Constitución | archivado | |
