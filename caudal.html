@@ -764,7 +764,13 @@
 (function(){
   'use strict';
   const API = 'https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com';
-  const ALLOWED = ['reruizc@gmail.com', 'nuevagemela@gmail.com', 'diego@cauce.co'];
+  /* Lista de EMERGENCIA, no la whitelist. Quién entra a Caudal lo decide el
+     worker (`/caudal/acceso/me`, llaves `caudal:acceso:<correo>` en KV), que se
+     otorga y revoca con tools/caudal/acceso/ sin tocar código. Esta lista solo
+     se usa si el worker NO responde: sin ella, una caída dejaría a Ricardo y a
+     los socios por fuera de su propia plataforma; con ella, nadie nuevo entra
+     durante la caída. Agregar gente ACÁ ya no sirve — hay que otorgar por CLI. */
+  const EMERGENCIA = ['reruizc@gmail.com', 'nuevagemela@gmail.com', 'diego@cauce.co'];
 
   /* ---------- cursor ---------- */
   const cur=document.getElementById('cur'), ring=document.getElementById('curRing');
@@ -796,21 +802,38 @@
   /* ---------- gate ---------- */
   const token=localStorage.getItem('rr-token'); const uRaw=localStorage.getItem('rr-user');
   const user=uRaw?JSON.parse(uRaw):null;
-  const ok=em=>em&&ALLOWED.includes(String(em).toLowerCase().trim());
+  const enEmergencia=em=>!!em&&EMERGENCIA.includes(String(em).toLowerCase().trim());
   const toLogin=()=>{localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');location.replace('login.html');};
   const toDash=()=>location.replace('dashboard.html');
+  // Quién entra lo decide el worker. Las dos llamadas van EN PARALELO (`/auth/me`
+  // refresca el usuario cacheado —plan, nombre—; `/caudal/acceso/me` autoriza),
+  // así cablear la autorización no le suma latencia al arranque.
   (async()=>{
     if(await checkShareAccess()) return reveal(true);
     if(!token||!user) return toLogin();
-    if(!ok(user.email)) return toDash();
+    const H={Authorization:`Bearer ${token}`};
+    const B='https://rr-auth.reruizc.workers.dev';
+    let meRes, acRes;
     try{
-      const res=await fetch('https://rr-auth.reruizc.workers.dev/auth/me',{headers:{Authorization:`Bearer ${token}`}});
-      if(res.status===401) return toLogin();
-      const data=await res.json();
-      if(!data.ok||!ok(data.user&&data.user.email)) return toDash();
-      localStorage.setItem('rr-user',JSON.stringify(Object.assign({},user,data.user)));
-      reveal();
-    }catch(e){ reveal(); }
+      [meRes, acRes]=await Promise.all([
+        fetch(`${B}/auth/me`,{headers:H}),
+        fetch(`${B}/caudal/acceso/me`,{headers:H}),
+      ]);
+    }catch(e){
+      // worker inalcanzable: se cae a la lista de emergencia en vez de dejar
+      // a todo el mundo por fuera.
+      return enEmergencia(user.email)?reveal():toDash();
+    }
+    if(meRes.status===401||acRes.status===401) return toLogin();
+    try{
+      const d=await meRes.json();
+      if(d&&d.ok&&d.user) localStorage.setItem('rr-user',JSON.stringify(Object.assign({},user,d.user)));
+    }catch(e){ /* el refresco del perfil no decide el acceso */ }
+    let ac=null;
+    try{ ac=await acRes.json(); }catch(e){ /* cae a emergencia abajo */ }
+    // El worker manda: si dice que sí entra, y si dice que no va al dashboard.
+    if(ac&&ac.ok&&typeof ac.acceso==='boolean') return ac.acceso?reveal():toDash();
+    return enEmergencia(user.email)?reveal():toDash();
   })();
   // el invitado por link no tiene cuenta → no puede guardar perfiles de cliente
   // (el worker exige sesión). Se le deja el radar sobre los presets.
