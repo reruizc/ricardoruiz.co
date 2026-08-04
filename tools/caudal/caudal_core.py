@@ -217,6 +217,26 @@ SINONIMOS = [
     {'k': 'economia solidaria / cooperativas', 'terms': [
         'economia solidaria', 'sector solidario', 'organizaciones solidarias',
         'cooperativas', 'fondos de empleados']},
+    # --- ⑥ palma y construcción (ago-2026). Mismo criterio: cada término se
+    # miró contra los títulos que devuelve, no solo contra su conteo.
+    # ⚠ Tres candidatos se CAYERON en esa revisión, y valen como advertencia:
+    #   · 'licitacion' (34 hits) cae dentro de "pub-LICITA-cion" y "so-LICITA"
+    #   · 'anticipos' (14) dentro de "ANTICIPAda": los hits eran voluntad
+    #     anticipada y pago anticipado, nada de contratación
+    #   · 'uso del suelo' (18) se reduce a la palabra 'suelo', que vive dentro
+    #     de "con-SUELO"
+    # Es el mismo modo de falla de 'seguros'/'puertos'/'paramos': la raíz corta
+    # se esconde adentro de otra palabra. Medir el conteo no basta; hay que
+    # leer los títulos.
+    {'k': 'palma y biocombustibles', 'terms': [
+        'palma de aceite', 'aceite de palma', 'palmicultores', 'biocombustibles',
+        'biodiesel', 'alcohol carburante', 'agroindustria de la palma']},
+    {'k': 'obra publica y contratacion estatal', 'terms': [
+        'obras publicas', 'contratacion estatal', 'asociaciones publico privadas',
+        'pliegos tipo', 'interventoria']},
+    {'k': 'ordenamiento territorial y urbanismo', 'terms': [
+        'ordenamiento territorial', 'licencias urbanisticas', 'curadurias urbanas',
+        'espacio publico', 'valorizacion']},
 ]
 
 

@@ -6240,8 +6240,8 @@ precisión. `_titulos_norm()` cachea los títulos normalizados (el Radar llama a
 Snowball español completo como upgrade.
 
 **④ Diccionario de EMPRESAS y GREMIOS — el traductor de la BÚSQUEDA GENERAL**
-(`tools/caudal/empresas.py` · **529 entradas: 445 empresas + 84 gremios** · jul-2026,
-ampliado ago-2026 — ver "⑤ Ampliación" al final de este bloque).
+(`tools/caudal/empresas.py` · **588 entradas: 500 empresas + 88 gremios** · jul-2026,
+ampliado ago-2026 — ver "⑤ Ampliación" y "⑥ Palma y construcción" al final del bloque).
 El cliente busca con el nombre de la empresa, pero el Estado casi nunca la nombra así.
 Medido antes del fix: **«Uber» daba 0 títulos en Congreso** (el Congreso dice
 "plataformas tecnológicas": ~35 proyectos) y en Regulatorio traía **1 sanción real
@@ -6364,6 +6364,48 @@ intentos + 109 normas del Ejecutivo**, con la traducción de marca a tema visibl
 - **Precisión antes que cobertura, sin excepción:** no se tocó el gate de razón social
   de SECOP (`es_razon_social` / `empieza_por_marca`). Si una razón social larga no
   aparece, el sitio de arreglarlo es el campo `entidad` de esa fila.
+
+**⑥ Palma y construcción (ago-2026) · 529 → 588 entradas (+59).** Los dos sectores
+tenían problemas distintos y cada uno pidió lo suyo:
+- **Palma eran 4 entradas colgadas de `sector agropecuario`**, que es el corpus de TODO
+  el agro: el cliente palmero se perdía entre café, arroz y ganadería. Ahora hay tópico
+  propio **`palma y biocombustibles`** y el agro queda como segunda actividad central
+  (`*`), así que la búsqueda por defecto trae las dos cosas y **nadie pierde alcance**
+  (verificado entrada por entrada: 0 preexistentes pierden un tópico central).
+  18 empresas nuevas (Indupalma, Poligrow, Oleoflores, Unipalma, Guaicaramo, Ecodiesel,
+  Bio D…) + Cenipalma y Asograsas.
+- **Construcción tenía 16 pero le faltaba la mitad del negocio:** quien construye
+  vivienda y quien hace obra pública son clientes distintos, con regulación distinta, y
+  estaban en el mismo saco. Se partió en dos núcleos —`vivienda y construccion` para las
+  constructoras, **`obra publica y contratacion estatal`** para los contratistas de vías—
+  más **`ordenamiento territorial y urbanismo`**. 37 entradas: cemento y acero (Holcim,
+  Titán, Alión, Gerdau Diaco, Acesco, Eternit, Pavco), constructoras (Coninsa, Cusezar,
+  Prodesa, Londoño Gómez), obra pública (El Cóndor, Mincivil, Gisaico, Valorcon, Estyma,
+  Grupo Solarte, MHC) y los **contratantes públicos** (Invías, ANI, Enterritorio), que no
+  son clientes pero sí la contraparte que el cliente rastrea.
+- ⚠️ **La evidencia salió distinta por sector, y eso es un hallazgo, no un defecto:**
+  palma vive en el **articulado** (`biocombustibles` 311 · `biodiesel` 140 ·
+  `palmicultor` 40) y **no en Regulatorio** — INVIMA, SIC y Superfinanciera no regulan
+  cultivadores; su regulador es la **ANLA, que todavía no es fuente de Caudal**.
+  Construcción vive en **SECOP**, donde es proveedor con nombre propio (verificado en
+  producción: Coninsa 11 contratos · Mincivil 8 · Acesco 6 · Holcim 2). Por eso la tanda
+  da **59/59 (100%) con proyectos en Congreso pero solo 2/59 con acto regulatorio
+  propio** — el 31% de la tanda anterior no es la vara acá.
+- ⚠️ **Los grandes de infraestructura licitan en CONSORCIO** y `es_razon_social` los
+  rechaza a propósito (por eso Conconcreto sale con pocos contratos). Es la precisión
+  funcionando; **no se aflojó el gate para "cubrir más"**.
+- ⚠️⚠️ **Tres términos se cayeron al revisar QUÉ títulos devolvían**, y valen como
+  advertencia permanente: **`licitacion`** (34 hits) cae dentro de "pub**licita**ción" y
+  "so**licita**"; **`anticipos`** (14) dentro de "voluntad **anticipa**da" y "pago
+  **anticipa**do" — nada de contratación; **`uso del suelo`** (18) se reduce a la palabra
+  `suelo`, que vive dentro de "con**suelo**". Es el mismo modo de falla de
+  `seguros`/`puertos`/`paramos`. **Medir el conteo no basta: hay que leer los títulos.**
+- **Verificación:** `verificar` limpio, **0 choques nuevos** (los mismos 6 de siempre);
+  **falsos disparos 1 de 51** consultas de control —incluidas trampas como "el cóndor
+  pasa", "la palma Cundinamarca" y "alfa y omega", que NO disparan porque los alias son
+  compuestos— y ese 1 sigue siendo el «sena de la mujer» ya conocido. **Cero regresiones
+  en producción**: uber 35, claro 119, rappi 102/22, sena 255, epm 154, ecopetrol 277 y
+  anglogold 230 idénticos antes y después.
 
 > **📌 ESTADO del diccionario de empresas (jul-30-2026) — qué está VIVO y qué NO**
 >

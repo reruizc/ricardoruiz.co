@@ -249,7 +249,8 @@ _RAW = [
      'licores y tabaco,tributario,competencia y consumidor', 'bavaria sa', ''),
     ('nestle', 'Nestlé', 'alimentos', 'nestle', 'alimentos / etiquetado', '', ''),
     ('bimbo', 'Bimbo', 'alimentos', 'bimbo', 'alimentos / etiquetado', '', ''),
-    ('teamfoods', 'Team Foods', 'alimentos', 'team foods', 'alimentos / etiquetado', '', ''),
+    ('teamfoods', 'Team Foods (Alianza Team)', 'alimentos', 'team foods|alianza team',
+     'alimentos / etiquetado,*palma y biocombustibles', 'sociedad industrial de grasas vegetales sigra', ''),
     ('colombina', 'Colombina', 'alimentos', 'colombina', 'alimentos / etiquetado', '', ''),
     ('quala', 'Quala', 'alimentos', 'quala', 'alimentos / etiquetado', '', ''),
     ('casaluker', 'Casa Luker', 'alimentos', 'casa luker|luker', 'alimentos / etiquetado', '', ''),
@@ -259,7 +260,8 @@ _RAW = [
      'licores y tabaco,tributario', '', ''),
     ('bat', 'British American Tobacco', 'alimentos', 'british american tobacco|protabaco',
      'licores y tabaco,tributario', '', ''),
-    ('manuelita', 'Manuelita', 'alimentos', 'manuelita', 'sector agropecuario,alimentos / etiquetado', '', ''),
+    ('manuelita', 'Manuelita', 'alimentos', 'manuelita',
+     'sector agropecuario,*palma y biocombustibles,alimentos / etiquetado', '', ''),
     ('riopaila', 'Riopaila Castilla', 'alimentos', 'riopaila', 'sector agropecuario', '', ''),
     ('incauca', 'Incauca', 'alimentos', 'incauca', 'sector agropecuario', '', ''),
     ('italcol', 'Italcol', 'alimentos', 'italcol', 'sector agropecuario', '', ''),
@@ -491,7 +493,11 @@ _RAW = [
     ('kikes', 'Huevos Kikes', 'agro', 'huevos kikes|incubadora santander',
      'sector agropecuario,*alimentos / etiquetado', '', ''),
     ('bucanero', 'Pollos Bucanero', 'agro', 'pollos bucanero', 'sector agropecuario', '', ''),
-    ('daabon', 'Grupo Daabon', 'agro', 'daabon', 'sector agropecuario,*ambiental / medio ambiente', '', ''),
+    # ⚠ 'ambiental' se mantiene CENTRAL: ya lo era, y bajarlo a contexto le
+    # habría quitado alcance por defecto a la entrada — el ángulo ambiental es
+    # justo el perfil de Daabon (palma orgánica certificada).
+    ('daabon', 'Grupo Daabon', 'agro', 'daabon',
+     'palma y biocombustibles,*ambiental / medio ambiente,*sector agropecuario', '', ''),
     ('mayaguez', 'Ingenio Mayagüez', 'agro', 'mayaguez', 'sector agropecuario', '', ''),
 
     # ---- transporte masivo y terrestre -------------------------------------
@@ -835,6 +841,158 @@ _RAW = [
     ('elc', 'Empresa de Licores de Cundinamarca', 'alimentos',
      'empresa de licores de cundinamarca|licorera de cundinamarca',
      'licores y tabaco,*tributario', '', ''),
+
+    # =====================================================================
+    # ⑥ PALMA Y CONSTRUCCIÓN (ago-2026) · 529 -> 583 entradas.
+    # Los dos sectores tenían un problema distinto y cada uno pidió lo suyo:
+    #
+    #  · PALMA existía como 4 entradas colgadas de 'sector agropecuario', que
+    #    es el corpus de TODO el agro: el cliente palmero se perdía entre café,
+    #    arroz y ganadería. Ahora tienen tópico propio y el agro queda como
+    #    segunda actividad central ('*'), así que la búsqueda por defecto trae
+    #    las dos cosas y no encoge.
+    #  · CONSTRUCCIÓN ya tenía 16, pero le faltaba la mitad del negocio: quien
+    #    construye vivienda y quien hace obra pública son clientes distintos,
+    #    con regulación distinta, y el diccionario los metía en el mismo saco.
+    #
+    # La evidencia también salió distinta, y conviene saberlo:
+    #  · palma vive en el ARTICULADO (texto-index: 'biocombustibles' 311,
+    #    'biodiesel' 140, 'palmicultor' 40) y NO en Regulatorio — INVIMA, SIC y
+    #    Superfinanciera no regulan cultivadores. Su regulador es la ANLA, que
+    #    todavía no es una fuente de Caudal.
+    #  · construcción vive en SECOP, donde es proveedor con nombre propio
+    #    (Coninsa 11 contratos · Mincivil 8 · Acesco 6 · Holcim 2). Ojo: los
+    #    grandes de infraestructura licitan en CONSORCIO, y `es_razon_social`
+    #    los rechaza a propósito — por eso Conconcreto sale con pocos. Es la
+    #    precisión funcionando, no un hueco que haya que tapar aflojándola.
+    # =====================================================================
+
+    # ---- palma · plantaciones, extractoras y biodiésel --------------------
+    ('indupalma', 'Indupalma', 'agro', 'indupalma',
+     'palma y biocombustibles,*sector agropecuario,laboral', '', ''),          # texto=6
+    ('poligrow', 'Poligrow', 'agro', 'poligrow',
+     'palma y biocombustibles,*sector agropecuario,'
+     'ambiental / medio ambiente,consulta previa / comunidades etnicas', '', ''),  # texto=16
+    ('guaicaramo', 'Guaicaramo', 'agro', 'guaicaramo',
+     'palma y biocombustibles,*sector agropecuario', '', ''),
+    ('gradesa', 'Gradesa', 'agro', 'gradesa',
+     'palma y biocombustibles,*alimentos / etiquetado', '', ''),               # texto=8
+    ('santandereanaceites', 'Santandereana de Aceites', 'agro',
+     'santandereana de aceites', 'palma y biocombustibles,*sector agropecuario', '', ''),
+    ('oleoflores', 'Oleoflores', 'agro', 'oleoflores',
+     'palma y biocombustibles,*sector agropecuario', '', ''),
+    ('palmascesar', 'Palmas del Cesar', 'agro', 'palmas del cesar',
+     'palma y biocombustibles,*sector agropecuario', '', ''),
+    ('palmerascosta', 'Palmeras de la Costa', 'agro', 'palmeras de la costa',
+     'palma y biocombustibles,*sector agropecuario', '', ''),
+    ('unipalma', 'Unipalma', 'agro', 'unipalma',
+     'palma y biocombustibles,*sector agropecuario', '', ''),
+    ('lacabana', 'Hacienda La Cabaña', 'agro', 'hacienda la cabana',
+     'palma y biocombustibles,*sector agropecuario', '', ''),
+    ('palmaroriente', 'Palmar del Oriente', 'agro', 'palmar del oriente',
+     'palma y biocombustibles,*sector agropecuario', '', ''),
+    ('murgas', 'Grupo Murgas', 'agro', 'grupo murgas',
+     'palma y biocombustibles,*sector agropecuario', '', ''),
+    # biodiésel · la salida industrial de la palma, y donde está el debate
+    # regulatorio de verdad (mezcla obligatoria, precio, exención tributaria)
+    ('ecodiesel', 'Ecodiesel Colombia', 'energia', 'ecodiesel',
+     'palma y biocombustibles,*energia y servicios publicos,tributario', '', ''),
+    ('biod', 'Bio D', 'energia', 'bio d sas|biodiesel bio d',
+     'palma y biocombustibles,*energia y servicios publicos', '', ''),
+    ('odinenergy', 'Odin Energy', 'energia', 'odin energy',
+     'palma y biocombustibles,energia y servicios publicos', '', ''),
+    ('acepalma', 'Acepalma', 'agro', 'acepalma',
+     'palma y biocombustibles,*comercio exterior y aduanas', '', ''),
+    ('cenipalma', 'Cenipalma', 'agro', 'cenipalma',
+     'palma y biocombustibles,*sector agropecuario', '', ''),                  # texto=28
+
+    # ---- cemento, acero y materiales -------------------------------------
+    ('holcim', 'Holcim Colombia', 'construccion', 'holcim',
+     'vivienda y construccion,*ambiental / medio ambiente,'
+     'competencia y consumidor', '', ''),                                      # texto=14 · SECOP
+    ('cementostequendama', 'Cementos Tequendama', 'construccion',
+     'cementos tequendama', 'vivienda y construccion', '', ''),
+    ('titancementos', 'Cementos Titán', 'construccion', 'titan cementos|cementos titan',
+     'vivienda y construccion', '', ''),
+    ('cementosalion', 'Cementos Alión', 'construccion', 'cementos alion',
+     'vivienda y construccion', '', ''),
+    ('cementossanmarcos', 'Cementos San Marcos', 'construccion', 'cementos san marcos',
+     'vivienda y construccion', '', ''),
+    ('diaco', 'Gerdau Diaco', 'industria', 'diaco|gerdau',
+     'vivienda y construccion,*comercio exterior y aduanas', '', ''),
+    ('acesco', 'Acesco', 'industria', 'acesco',
+     'vivienda y construccion,*comercio exterior y aduanas', '', ''),
+    ('corpacero', 'Corpacero', 'industria', 'corpacero',
+     'vivienda y construccion,comercio exterior y aduanas', '', ''),
+    ('ladrillerasantafe', 'Ladrillera Santafé', 'construccion', 'ladrillera santafe',
+     'vivienda y construccion,*ordenamiento territorial y urbanismo', '', ''),
+    ('eternit', 'Eternit', 'construccion', 'eternit',
+     'vivienda y construccion,*asbesto', '', ''),                              # texto=13
+    ('pavco', 'Pavco Wavin', 'construccion', 'pavco|mexichem',
+     'vivienda y construccion,*agua y saneamiento', '', ''),
+    ('alfaceramica', 'Alfa', 'construccion', 'alfa ceramica|ceramica italia',
+     'vivienda y construccion', '', ''),
+
+    # ---- constructoras de vivienda ---------------------------------------
+    ('coninsa', 'Coninsa Ramón H.', 'construccion', 'coninsa|coninsa ramon h',
+     'vivienda y construccion,*obra publica y contratacion estatal', '', ''),   # SECOP=11
+    ('cusezar', 'Cusezar', 'construccion', 'cusezar', 'vivienda y construccion', '', ''),
+    ('prodesa', 'Prodesa', 'construccion', 'prodesa', 'vivienda y construccion', '', ''),
+    ('arqconcreto', 'Arquitectura y Concreto', 'construccion', 'arquitectura y concreto',
+     'vivienda y construccion', '', ''),
+    ('londonogomez', 'Londoño Gómez', 'construccion', 'londono gomez',
+     'vivienda y construccion', '', ''),
+    ('constructoracapital', 'Constructora Capital', 'construccion', 'constructora capital',
+     'vivienda y construccion', '', ''),
+    ('oikos', 'Oikos', 'construccion', 'oikos', 'vivienda y construccion', '', ''),
+    ('ospinas', 'Ospinas & Cía.', 'construccion', 'ospinas',
+     'vivienda y construccion,*ordenamiento territorial y urbanismo', '', ''),
+    ('apiros', 'Apiros', 'construccion', 'apiros', 'vivienda y construccion', '', ''),
+
+    # ---- obra pública, vías y concesiones --------------------------------
+    # Núcleo distinto al de vivienda a propósito: a este cliente lo mueven los
+    # pliegos y la contratación estatal, no la política de vivienda.
+    ('elcondor', 'Construcciones El Cóndor', 'construccion',
+     'construcciones el condor', 'obra publica y contratacion estatal,*puertos y logistica',
+     'construcciones el condor', ''),
+    ('mincivil', 'Mincivil', 'construccion', 'mincivil',
+     'obra publica y contratacion estatal,*puertos y logistica', '', ''),       # SECOP=8
+    ('pavimentoscol', 'Pavimentos Colombia', 'construccion', 'pavimentos colombia',
+     'obra publica y contratacion estatal,puertos y logistica', '', ''),
+    ('gisaico', 'Gisaico', 'construccion', 'gisaico',
+     'obra publica y contratacion estatal', '', ''),
+    ('valorcon', 'Valorcon', 'construccion', 'valorcon',
+     'obra publica y contratacion estatal', '', ''),
+    ('icein', 'Grupo ICEIN', 'construccion', 'grupo icein',
+     'obra publica y contratacion estatal', '', ''),
+    ('estyma', 'Estyma', 'construccion', 'estyma',
+     'obra publica y contratacion estatal', '', ''),
+    ('hbestructuras', 'HB Estructuras Metálicas', 'construccion', 'hb estructuras',
+     'obra publica y contratacion estatal,vivienda y construccion', '', ''),
+    ('solarte', 'Grupo Solarte', 'construccion', 'grupo solarte|solarte y solarte',
+     'obra publica y contratacion estatal,*puertos y logistica', '', ''),
+    ('mhc', 'Mario Huertas Cotes', 'construccion', 'mario huertas cotes|mhc ingenieria',
+     'obra publica y contratacion estatal,*puertos y logistica', '', ''),
+    ('via40express', 'Vía 40 Express', 'construccion', 'via 40 express',
+     'puertos y logistica,*obra publica y contratacion estatal', '', ''),       # texto=43
+    ('autopistasnordeste', 'Autopistas del Nordeste', 'construccion',
+     'autopistas del nordeste', 'puertos y logistica', '', ''),
+    ('covioriente', 'Covioriente', 'construccion', 'covioriente',
+     'puertos y logistica', '', ''),
+    ('metrobogota', 'Metro de Bogotá', 'transporte', 'metro de bogota|empresa metro de bogota',
+     'puertos y logistica,*obra publica y contratacion estatal', '', ''),
+
+    # ---- contratantes públicos de obra ------------------------------------
+    # No son clientes, pero SÍ son la contraparte que el cliente rastrea: el
+    # pliego, la adjudicación y la interventoría salen de acá.
+    ('invias', 'Invías', 'construccion', 'invias|instituto nacional de vias',
+     'obra publica y contratacion estatal,*puertos y logistica', '', ''),       # norm=7
+    ('ani', 'ANI · Agencia Nacional de Infraestructura', 'construccion',
+     'agencia nacional de infraestructura',
+     'obra publica y contratacion estatal,*puertos y logistica', '', ''),       # norm=7
+    ('enterritorio', 'Enterritorio', 'construccion', 'enterritorio',
+     'obra publica y contratacion estatal,*vivienda y construccion',
+     'empresa nacional promotora del desarrollo territorial', ''),              # texto=16
 ]
 
 # Gremios y asociaciones: no son empresas, pero SON quienes contratan a Cauce y
@@ -879,8 +1037,11 @@ _RAW_GREMIOS = [
     ('fedecafe', 'Federación Nacional de Cafeteros', 'agro',
      'federacion nacional de cafeteros|fedecafe', 'sector agropecuario', '', ''),
     ('fedearroz', 'Fedearroz', 'agro', 'fedearroz', 'sector agropecuario', '', ''),
+    # ⑥ el núcleo pasa a ser palma: colgada solo de 'sector agropecuario', se
+    # perdía en el corpus de todo el agro (café, arroz, ganadería). El agro
+    # queda como segunda actividad central, así que no pierde alcance.
     ('fedepalma', 'Fedepalma', 'agro', 'fedepalma',
-     'sector agropecuario,ambiental / medio ambiente', '', ''),
+     'palma y biocombustibles,*sector agropecuario,ambiental / medio ambiente', '', ''),
     ('asocana', 'Asocaña', 'agro', 'asocana', 'sector agropecuario', '', ''),
     ('augura', 'Augura', 'agro', 'augura', 'sector agropecuario', '', ''),
     ('fenavi', 'Fenavi', 'agro', 'fenavi', 'sector agropecuario,alimentos / etiquetado', '', ''),
@@ -966,6 +1127,18 @@ _RAW_GREMIOS = [
      'tributario,agua y saneamiento,puertos y logistica', '', ''),
     ('fedemunicipios', 'Federación Colombiana de Municipios', 'multisectorial',
      'federacion colombiana de municipios', 'tributario,agua y saneamiento', '', ''),
+
+    # ---- ⑥ gremios de palma y construcción -------------------------------
+    ('asograsas', 'Asograsas', 'agro', 'asograsas',
+     'palma y biocombustibles,*alimentos / etiquetado', '', ''),               # texto=13
+    ('asocreto', 'Asocreto', 'construccion', 'asocreto',
+     'vivienda y construccion,*obra publica y contratacion estatal', '', ''),
+    ('sci', 'Sociedad Colombiana de Ingenieros', 'construccion',
+     'sociedad colombiana de ingenieros',
+     'obra publica y contratacion estatal,*vivienda y construccion', '', ''),
+    ('scarq', 'Sociedad Colombiana de Arquitectos', 'construccion',
+     'sociedad colombiana de arquitectos',
+     'ordenamiento territorial y urbanismo,*vivienda y construccion', '', ''),
 ]
 
 
