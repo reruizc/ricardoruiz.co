@@ -1515,6 +1515,7 @@
   }
 
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var NOMBRE_RE = /^[a-záéíóúñü][a-záéíóúñü .'\-]*$/i;
   var ERR_DEFAULT = 'Completa los campos obligatorios marcados en rojo.';
 
   // Falla por formato: marca el campo, pone un mensaje específico y hace scroll.
@@ -1529,6 +1530,46 @@
     scrollToFirst(bad); return false;
   }
 
+  /* ── Anti-relleno: detecta basura obvia sin bloquear datos legítimos ── */
+  function nDistintos(s){
+    var t = String(s || '').replace(/\s/g, '').toLowerCase(), set = {}, i;
+    for (i = 0; i < t.length; i++) set[t[i]] = 1;
+    return Object.keys(set).length;
+  }
+  function tieneLetras(s, n){
+    var m = String(s || '').match(/[a-záéíóúñü]/gi);
+    return !!m && m.length >= (n || 2);
+  }
+  function nPalabras(s){
+    return String(s || '').trim().split(/\s+/).filter(function(w){ return w.length >= 2; }).length;
+  }
+  var JUNK = ['asdf','asdfasdf','asdf','qwerty','qwe','zxcv','test','testing','prueba','ejemplo',
+    'xxx','xxxx','aaa','sss','ddd','abc','abcd','nada','ninguno','ninguna','na','nn','no se','nose'];
+  function esRelleno(s){
+    var t = String(s || '').trim().toLowerCase();
+    var comp = t.replace(/\s+/g, '');
+    if (!comp) return false;
+    if (comp.length >= 3 && nDistintos(comp) <= 1) return true;   // aaaa, 1111, ....
+    if (JUNK.indexOf(t) >= 0) return true;                        // basura conocida (match exacto)
+    if (/^(asdf|qwer|zxcv|1234|abcd|0000)/.test(comp)) return true; // teclado corrido al inicio
+    return false;
+  }
+  // ¿el texto de un campo narrativo parece relleno? (corto, sin letras, o basura)
+  function textoMalo(id, min){
+    var v = val(id);
+    return v.length < (min || 3) || !tieneLetras(v) || esRelleno(v);
+  }
+  // Número de documento válido según el tipo elegido.
+  function docValido(idNum, idTipo){
+    var doc = val(idNum).replace(/[.\s-]/g, '');
+    var tipo = val(idTipo);
+    if (!/^[a-z0-9]{4,16}$/i.test(doc)) return false;   // largo y clase razonables
+    if (/^(.)\1+$/.test(doc)) return false;             // 1111111 / aaaaaa
+    if (/ciudadan/i.test(tipo)) return /^\d{6,10}$/.test(doc);  // CC: 6-10 dígitos
+    if (/tarjeta/i.test(tipo)) return /^\d{5,11}$/.test(doc);   // TI: numérica
+    return true;  // pasaporte, extranjería, PPT, registro civil: alfanumérico
+  }
+
   function validate(step){
     document.querySelectorAll('.errmsg').forEach(function(e){ e.classList.remove('on'); });
     var bad = [];
@@ -1541,12 +1582,31 @@
       if (S.rol !== 'propio') bad = bad.concat(mark(['t_nombre','t_doc','t_rel']));
       if (S.rol === 'agente') bad = bad.concat(mark(['t_motivo']));
       if (bad.length) return faltan('err2', bad);
+      // Nombre del accionante: nombres + apellidos, solo letras, sin relleno.
+      if (nPalabras(val('a_nombre')) < 2 || !NOMBRE_RE.test(val('a_nombre')) || esRelleno(val('a_nombre')))
+        return fmtFail('a_nombre', 'err2', 'Escribe el nombre completo (nombres y apellidos), solo con letras.');
+      if (!docValido('a_doc', 'a_tipodoc'))
+        return fmtFail('a_doc', 'err2', 'Revisa el número de documento: sin puntos, del tipo que elegiste (la cédula de ciudadanía va entre 6 y 10 dígitos).');
+      if (val('a_dir').trim().length < 6 || !tieneLetras(val('a_dir')) || esRelleno(val('a_dir')))
+        return fmtFail('a_dir', 'err2', 'Escribe una dirección de notificación real (calle/carrera, número, barrio).');
       if (!EMAIL_RE.test(val('a_mail')))
         return fmtFail('a_mail', 'err2', 'Revisa el correo: debe tener el formato nombre@dominio.com. Ahí te llega la confirmación del juzgado.');
-      if (val('a_tel').replace(/\D/g, '').length < 7)
-        return fmtFail('a_tel', 'err2', 'Revisa el teléfono: debe tener al menos 7 dígitos.');
+      var tel = val('a_tel').replace(/\D/g, '');
+      if (tel.length < 7 || tel.length > 12 || /^(\d)\1+$/.test(tel))
+        return fmtFail('a_tel', 'err2', 'Revisa el teléfono: escribe un número de contacto real (7 a 10 dígitos).');
+      // Persona afectada distinta al accionante
+      if (S.rol !== 'propio'){
+        if (nPalabras(val('t_nombre')) < 2 || !NOMBRE_RE.test(val('t_nombre')) || esRelleno(val('t_nombre')))
+          return fmtFail('t_nombre', 'err2', 'Escribe el nombre completo de la persona afectada, solo con letras.');
+        if (!docValido('t_doc', 't_tipodoc'))
+          return fmtFail('t_doc', 'err2', 'Revisa el número de documento de la persona afectada.');
+        if (textoMalo('t_rel', 3))
+          return fmtFail('t_rel', 'err2', 'Describe el parentesco o la relación (por ejemplo: mi madre, mi hijo).');
+      }
+      if (S.rol === 'agente' && (val('t_motivo').trim().length < 15 || esRelleno(val('t_motivo')) || !tieneLetras(val('t_motivo'))))
+        return fmtFail('t_motivo', 'err2', 'Explica con claridad por qué esa persona no puede presentar la tutela por sí misma (la agencia oficiosa lo exige).');
       var ed = parseInt(val('af_edad'), 10);
-      if (isNaN(ed) || ed < 0 || ed > 120)
+      if (isNaN(ed) || ed < 0 || ed > 120 || !/^\d{1,3}$/.test(val('af_edad').trim()))
         return fmtFail('af_edad', 'err2', 'Revisa la edad: escribe un número entre 0 y 120.');
       if (!S.zona) { $('err2').textContent = 'Indica si la persona afectada vive en zona urbana o rural.'; $('err2').classList.add('on'); scrollToFirst(['zona-row']); return false; }
       if (S.zona === 'urbano' && !val('af_estrato'))
@@ -1558,6 +1618,8 @@
     if (step === 3) {
       bad = mark(['e_eps','e_depto_hechos','e_ciudad_hechos']);
       if (bad.length) return faltan('err3', bad);
+      if (textoMalo('e_eps', 3))
+        return fmtFail('e_eps', 'err3', 'Escribe el nombre de tu EPS.');
       if (val('e_eps_correo') && !EMAIL_RE.test(val('e_eps_correo')))
         return fmtFail('e_eps_correo', 'err3', 'El correo de notificación de la EPS no tiene un formato válido. Verifícalo o déjalo en blanco.');
       if (S.prepagada === 'si' && !val('e_prepagada_ent'))
@@ -1572,11 +1634,28 @@
       if (S.urg === 'si') req.push('h_urgdet');
       bad = mark(req);
       if (bad.length) return faltan('err4', bad);
+      // Diagnóstico y objeto de la tutela: texto real, no relleno.
+      if (textoMalo('h_diag', 3))
+        return fmtFail('h_diag', 'err4', 'Escribe el diagnóstico o la condición de salud tal como aparece en la orden o la historia clínica.');
+      if ($('c_item') && textoMalo('c_item', 3))
+        return fmtFail('c_item', 'err4', 'Describe con claridad lo que te ordenaron y no te han entregado o autorizado.');
+      if (textoMalo('h_afecta', 5))
+        return fmtFail('h_afecta', 'err4', 'Cuenta brevemente cómo te ha afectado la demora (por ejemplo: el dolor aumentó, faltaste al trabajo).');
+      if (S.urg === 'si' && (val('h_urgdet').trim().length < 12 || esRelleno(val('h_urgdet')) || !tieneLetras(val('h_urgdet'))))
+        return fmtFail('h_urgdet', 'err4', 'Explica por qué es urgente (qué riesgo concreto corres si esperas al fallo).');
       var f = val('c_fecha');
       if (f){
         var hoy = new Date(); hoy.setHours(0,0,0,0);
-        if (new Date(f + 'T00:00:00') > hoy)
+        var fd = new Date(f + 'T00:00:00');
+        if (fd > hoy)
           return fmtFail('c_fecha', 'err4', 'La fecha de la orden médica no puede estar en el futuro. Revísala.');
+        if (parseInt(f.slice(0, 4), 10) < 2000)
+          return fmtFail('c_fecha', 'err4', 'Revisa la fecha de la orden médica: parece demasiado antigua.');
+      }
+      if ($('c_veces')){
+        var veces = parseInt(val('c_veces'), 10);
+        if (val('c_veces') && (isNaN(veces) || veces < 1 || veces > 200))
+          return fmtFail('c_veces', 'err4', 'Revisa el número de veces: escribe un número entre 1 y 200.');
       }
       return true;
     }
