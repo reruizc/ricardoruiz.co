@@ -233,6 +233,8 @@
     #panel-viabilidad summary::-webkit-details-marker{display:none}
     #panel-viabilidad summary::after{content:' +';color:var(--blue-light)}
     #panel-viabilidad details[open] summary::after{content:' –'}
+    .via-loading{animation:viaPulse 1.3s ease-in-out infinite}
+    @keyframes viaPulse{0%,100%{opacity:.45}50%{opacity:1}}
     .via-met{font-size:.78rem;color:var(--muted);line-height:1.6;margin-top:.55rem;max-width:76ch}
     .via-met b{color:var(--white);font-weight:600}
 
@@ -513,12 +515,12 @@
           <div class="box-hint">Vas a escribir información sensible sobre tu salud. Queremos ser explícitos sobre qué pasa con ella.</div>
 
           <div class="notice green">
-            <b>Esta herramienta no recolecta tus datos.</b> Todo lo que escribas se procesa únicamente en tu navegador:
+            <b>Tu identidad nunca sale de tu navegador.</b> El documento se arma únicamente en tu dispositivo:
             <ul>
-              <li>No se envía a ningún servidor ni se almacena en ricardoruiz.co.</li>
+              <li>Tu nombre, documento, dirección, teléfono y correo <b>no se envían a ningún servidor</b>: solo existen en tu navegador y en el archivo que descargues.</li>
               <li>No hay cuenta, registro ni cookies de seguimiento en esta página.</li>
-              <li>Al cerrar la pestaña sin descargar, la información desaparece.</li>
               <li>Solo se guarda un borrador en <i>este</i> dispositivo si presionas el botón de guardar, y puedes borrarlo cuando quieras.</li>
+              <li>Para mejorar la herramienta guardamos una <b>estadística anónima</b> de cada tutela generada: tipo de caso, departamento y municipio, EPS, condiciones de protección marcadas y el servicio que se pide. <b>Nunca incluye tu identidad ni tus datos de contacto</b>, y no hay forma de vincularla contigo.</li>
             </ul>
           </div>
 
@@ -867,7 +869,7 @@
           <div class="box-title">¿Te la pueden rechazar?</div>
           <div class="box-hint">
             Antes del fondo, el juez revisa unos requisitos de procedibilidad. Esta revisión automática usa reglas
-            fijas sobre lo que respondiste en el formulario: nada sale de tu dispositivo.
+            fijas sobre lo que respondiste en el formulario y se calcula en tu dispositivo.
           </div>
           <div class="adm-global" id="adm-global"></div>
           <div id="adm-list"></div>
@@ -883,8 +885,25 @@
 
         <div class="box no-print">
           <div class="box-title">Anexos que debes adjuntar</div>
-          <div class="box-hint">Sin soportes la tutela se debilita. Toma foto o escanea cada documento y súbelo junto al escrito.</div>
+          <div class="box-hint">Sin soportes la tutela se debilita. Toma foto o escanea cada documento y súbelo junto al escrito — o adjúntalo aquí abajo para que quede unido al PDF.</div>
           <ul class="anexos" id="anexos-list"></ul>
+        </div>
+
+        <div class="box no-print">
+          <div class="box-title">Adjunta aquí tus soportes (opcional)</div>
+          <div class="box-hint">
+            Agrega tus anexos en PDF o foto (JPG/PNG) y los unimos <b>al final del PDF de la tutela</b>, para que
+            radiques un solo archivo. Tus documentos no salen de tu dispositivo: se unen dentro de tu navegador.
+          </div>
+          <div class="dl-row">
+            <button class="btn btn-ghost btn-sm" id="btn-anexos">＋ Agregar documentos</button>
+            <input type="file" id="anx-input" accept="application/pdf,image/jpeg,image/png" multiple style="display:none">
+          </div>
+          <ul class="anexos" id="anx-list" style="margin-top:.7rem"></ul>
+          <p class="help" id="anx-msg" style="margin-top:.5rem">
+            Solo se unen al PDF (el Word sale sin anexos). Procura que el archivo final no pase de unos 25 MB:
+            las plataformas de radicación limitan el tamaño.
+          </p>
         </div>
 
         <div class="box no-print">
@@ -1520,6 +1539,8 @@
     if (!validate(S.step)) return;
     if (S.step === MAXSTEP - 1) { buildDoc(); }
     S.step++; paint(); window.scrollTo({ top:0, behavior:'smooth' });
+    // pre-calienta el JSON de tasas un paso antes de necesitarlo (pesa ~510 KB)
+    if (S.step === MAXSTEP - 1) cargarTasas().catch(function(){});
   });
 
   /* ── toggles de rol / pqr / urgencia ── */
@@ -2073,10 +2094,20 @@
   };
   function renderViabilidad(){
     var panel = $('panel-viabilidad'); if (!panel) return;
-    panel.style.display = 'none'; panel.innerHTML = '';
     var caso = S.caso;
+    if (_tasas) {
+      panel.style.display = 'none'; panel.innerHTML = '';
+    } else {
+      // el JSON pesa ~510 KB: mientras baja, que el panel no aparezca "de la nada"
+      panel.innerHTML =
+        '<div class="box-title">Cómo le ha ido a casos como el tuyo</div>' +
+        '<p class="via-txt via-loading">Calculando con los datos abiertos de la Corte Constitucional: cómo se resolvieron miles de tutelas con características como las de tu caso…</p>';
+      panel.style.display = '';
+    }
     cargarTasas().then(function(data){
       if (S.caso !== caso) return; // el usuario cambió de caso mientras cargaba
+      // a partir de aquí, cualquier salida temprana debe esconder el placeholder
+      panel.style.display = 'none';
       var pret = data.casos_herramienta && data.casos_herramienta[caso];
       if (!pret) return;
       var depto = val('e_depto_hechos');
@@ -2095,6 +2126,7 @@
         cell = data.nacional; nivel = 'nacional';
       }
       if (!cell || !cell.n || typeof cell.p !== 'number') return;
+      _viaReg = { p: cell.p, n: cell.n, nivel: nivel };
 
       var anio = ((data.metodologia && data.metodologia.ventana_score) || []).join(' y ') || '2025';
       var pct = Math.round(cell.p * 100);
@@ -2151,7 +2183,10 @@
         '</details>' +
         '<p class="via-src">Fuente: Corte Constitucional — datos abiertos (<a href="' + esc(fuenteUrl) + '" target="_blank" rel="noopener">datos.gov.co · g3ma-7zce</a>). Licencia CC BY-SA 4.0.</p>';
       panel.style.display = '';
-    }).catch(function(){ /* sin datos no hay panel; el documento no se afecta */ });
+    }).catch(function(){
+      // sin datos no hay panel (y se retira el placeholder); el documento no se afecta
+      panel.style.display = 'none'; panel.innerHTML = '';
+    });
   }
 
   var LAST = { sec:null, d:null };
@@ -2166,6 +2201,7 @@
     }).join('');
     renderViabilidad();
     renderAdmisibilidad();
+    registro('genera');
   }
 
   /* ══════════════════ ADMISIBILIDAD (reglas fijas · sin IA · sin red) ══════════════════
@@ -2283,6 +2319,160 @@
     panel.style.display = '';
   }
 
+  /* ══════════════════ ANEXOS ADJUNTOS (se unen al PDF, sin salir del navegador) ══
+     El usuario agrega sus soportes (PDF/JPG/PNG) y al descargar el PDF se fusionan
+     al final del escrito con pdf-lib (CDN bajo demanda). Los archivos viven solo en
+     memoria del navegador: nunca se suben a ningún servidor. */
+  var ANEXOS = [];
+  var ANX_MAX = 25 * 1024 * 1024;
+
+  function anxTipoOk(f){
+    return f.type === 'application/pdf' || f.type === 'image/jpeg' || f.type === 'image/png' ||
+      /\.(pdf|jpe?g|png)$/i.test(f.name);
+  }
+
+  function anxRender(){
+    var ul = $('anx-list'); if (!ul) return;
+    ul.innerHTML = ANEXOS.map(function(f, i){
+      var tam = f.size > 900000 ? (f.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(f.size / 1024)) + ' KB';
+      return '<li><span>📎</span><span>' + esc(f.name) + ' <span style="color:var(--muted)">(' + tam + ')</span> ' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-anx="' + i + '" style="margin-left:.45rem;padding:.1rem .55rem">Quitar</button></span></li>';
+    }).join('');
+    var msg = $('anx-msg'); if (!msg) return;
+    var total = ANEXOS.reduce(function(a, f){ return a + f.size; }, 0);
+    if (total > ANX_MAX) {
+      msg.innerHTML = '<b style="color:var(--amber)">Ojo:</b> tus anexos suman ' + (total / 1048576).toFixed(1) +
+        ' MB y el PDF final puede quedar muy pesado para la plataforma de radicación. Considera quitar alguno o comprimir las fotos.';
+    } else {
+      msg.textContent = 'Solo se unen al PDF (el Word sale sin anexos). Procura que el archivo final no pase de unos 25 MB: las plataformas de radicación limitan el tamaño.';
+    }
+  }
+
+  var _anxBtn = $('btn-anexos');
+  if (_anxBtn) {
+    _anxBtn.addEventListener('click', function(){ $('anx-input').click(); });
+    $('anx-input').addEventListener('change', function(){
+      var rechazados = [];
+      Array.prototype.forEach.call(this.files || [], function(f){
+        if (anxTipoOk(f)) ANEXOS.push(f);
+        else rechazados.push(f.name);
+      });
+      this.value = '';
+      anxRender();
+      if (rechazados.length) alert('Estos archivos no se pueden unir (solo PDF, JPG o PNG):\n\n' + rechazados.join('\n'));
+    });
+    $('anx-list').addEventListener('click', function(e){
+      var b = e.target.closest('[data-anx]'); if (!b) return;
+      ANEXOS.splice(Number(b.dataset.anx), 1);
+      anxRender();
+    });
+  }
+
+  function loadPdfLib(){
+    return new Promise(function(res, rej){
+      if (window.PDFLib) return res(window.PDFLib);
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+      s.onload = function(){ window.PDFLib ? res(window.PDFLib) : rej(new Error('pdf-lib no disponible')); };
+      s.onerror = function(){ rej(new Error('No se pudo cargar la librería de anexos')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  // Une el escrito (jsPDF) + los ANEXOS en un solo PDF y lo descarga.
+  function mergeAnexosYDescargar(doc){
+    return loadPdfLib().then(function(PDFLib){
+      return PDFLib.PDFDocument.load(doc.output('arraybuffer')).then(function(base){
+        var fallos = [];
+        var chain = Promise.resolve();
+        ANEXOS.forEach(function(f){
+          chain = chain.then(function(){
+            return f.arrayBuffer().then(function(bytes){
+              if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+                return PDFLib.PDFDocument.load(bytes, { ignoreEncryption:true }).then(function(src){
+                  return base.copyPages(src, src.getPageIndices()).then(function(pages){
+                    pages.forEach(function(p){ base.addPage(p); });
+                  });
+                });
+              }
+              var esPng = f.type === 'image/png' || /\.png$/i.test(f.name);
+              return (esPng ? base.embedPng(bytes) : base.embedJpg(bytes)).then(function(img){
+                var PW = 612, PH = 792, M = 36; // carta, en puntos
+                var page = base.addPage([PW, PH]);
+                var k = Math.min((PW - M * 2) / img.width, (PH - M * 2) / img.height, 1);
+                var w = img.width * k, h = img.height * k;
+                page.drawImage(img, { x:(PW - w) / 2, y:(PH - h) / 2, width:w, height:h });
+              });
+            }).catch(function(){ fallos.push(f.name); });
+          });
+        });
+        return chain.then(function(){ return base.save(); }).then(function(out){
+          download(new Blob([out], { type:'application/pdf' }), nombreArchivo('pdf'));
+          if (fallos.length) {
+            alert('Tu tutela se descargó, pero no pudimos unir estos anexos (¿archivo dañado o protegido con clave?):\n\n' +
+              fallos.join('\n') + '\n\nAdjúntalos como archivos aparte al radicar.');
+          }
+        });
+      });
+    });
+  }
+
+  /* ══════════════════ REGISTRO ESTADÍSTICO ANÓNIMO ══════════════════
+     Un evento por hito (genera / pdf / word / copy / print / save) hacia la Lambda
+     tutela-registro, que guarda SOLO campos estructurados del caso en S3 privado.
+     JAMÁS viajan nombre, documento, dirección, teléfono, correo, nombre del médico
+     ni textos libres distintos del diagnóstico y el servicio pedido. La Lambda
+     impone su propia whitelist (defensa en profundidad) y no guarda IP ni headers.
+     Declarado en el aviso del paso 1. El registro nunca puede romper la herramienta. */
+  var REG_URL = 'https://8jzog5bhe8.execute-api.us-east-1.amazonaws.com';
+  var REG_SID = (function(){
+    try {
+      var a = new Uint8Array(12); crypto.getRandomValues(a);
+      return Array.prototype.map.call(a, function(b){ return ('0' + b.toString(16)).slice(-2); }).join('');
+    } catch(e){ return 'f' + Date.now().toString(16) + Math.floor(Math.random() * 1e9).toString(16); }
+  })();
+  var _viaReg = null; // celda de viabilidad mostrada (la llena renderViabilidad)
+
+  function registroPayload(evento){
+    var p = {
+      sid: REG_SID, evento: evento, v: 'v1', ts: new Date().toISOString(),
+      caso: S.caso, rol: S.rol, zona: S.zona || '',
+      estrato: val('af_estrato'), regimen: val('e_regimen'), calidad: val('e_calidad'),
+      eps: val('e_eps'), ips: val('e_ips'),
+      depto: val('e_depto_hechos'), ciudad: val('e_ciudad_hechos'),
+      prepagada: S.prepagada === 'si', poliza: S.poliza === 'si',
+      urgente: S.urg === 'si', pqr: S.pqr === 'si',
+      // true = reclamó Y la EPS le respondió algo (el select trae default 'ninguna')
+      pqr_resp: S.pqr === 'si' && val('p_resp') !== 'ninguna',
+      ninguna: !!S.ninguna,
+      sujetos: SUJETOS.filter(function(s){ return S.sujetos[s.id]; }).map(function(s){ return s.id; }),
+      diag: val('h_diag').slice(0, 300),
+      c_item: val('c_item').slice(0, 300), c_dosis: val('c_dosis').slice(0, 200),
+      c_respuesta: val('c_respuesta'), c_estado: val('c_estado'),
+      c_fecha: val('c_fecha'), c_fechadada: val('c_fechadada'), c_veces: val('c_veces'),
+      anexos_n: ANEXOS.length,
+      anexos_tipos: ANEXOS.map(function(f){ return (f.name.split('.').pop() || '').toLowerCase().slice(0, 8); })
+    };
+    var dias = diasDesde(val('c_fecha'));
+    if (typeof dias === 'number') p.dias = dias;
+    if (_viaReg) { p.via_p = _viaReg.p; p.via_n = _viaReg.n; p.via_nivel = _viaReg.nivel; }
+    var g = $('adm-global');
+    if (g && g.className) p.adm_global = g.className.replace('adm-global', '').trim();
+    return p;
+  }
+
+  function registro(evento){
+    try {
+      var body = JSON.stringify(registroPayload(evento));
+      // text/plain evita el preflight CORS; la Lambda parsea el JSON igual
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(REG_URL, new Blob([body], { type:'text/plain' }));
+      } else if (window.fetch) {
+        fetch(REG_URL, { method:'POST', body: body, keepalive:true, mode:'no-cors' }).catch(function(){});
+      }
+    } catch(e){ /* nunca romper la herramienta por el registro */ }
+  }
+
   /* ══════════════════ DESCARGAS ══════════════════ */
   function nombreArchivo(ext){
     var n = (LAST.d && LAST.d.a_nombre ? LAST.d.a_nombre : 'accionante')
@@ -2300,6 +2490,7 @@
 
   $('btn-word').addEventListener('click', function(){
     if (!LAST.sec) return;
+    registro('word');
     var body = secToHTML(LAST.sec)
       .split('<span class="blank">').join('<span style="background:#ffe9a8">');
     var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
@@ -2315,6 +2506,7 @@
 
   $('btn-copy').addEventListener('click', function(){
     if (!LAST.sec) return;
+    registro('copy');
     var txt = secToText(LAST.sec);
     var btn = this;
     var ok = function(){ btn.textContent = 'Copiado ✓'; setTimeout(function(){ btn.textContent = 'Copiar texto'; }, 2000); };
@@ -2331,7 +2523,7 @@
     ta.remove();
   }
 
-  $('btn-print').addEventListener('click', function(){ window.print(); });
+  $('btn-print').addEventListener('click', function(){ registro('print'); window.print(); });
 
   /* ── PDF con jsPDF cargado bajo demanda ── */
   function loadJsPDF(){
@@ -2350,10 +2542,12 @@
 
   $('btn-pdf').addEventListener('click', function(){
     if (!LAST.sec) return;
+    registro('pdf');
     var btn = this, original = btn.textContent;
     btn.textContent = 'Generando…'; btn.disabled = true;
     loadJsPDF().then(function(jsPDF){
-      makePDF(jsPDF);
+      return makePDF(jsPDF); // devuelve una promesa cuando hay anexos que unir
+    }).then(function(){
       btn.textContent = original; btn.disabled = false;
     }).catch(function(){
       btn.textContent = original; btn.disabled = false;
@@ -2425,7 +2619,12 @@
       doc.text('Página ' + p + ' de ' + total, W / 2, H - 12, { align:'center' });
       doc.setTextColor(0);
     }
-    doc.save(nombreArchivo('pdf'));
+    if (!ANEXOS.length) { doc.save(nombreArchivo('pdf')); return Promise.resolve(); }
+    // hay anexos: unirlos al final; si la unión falla, entregar el escrito solo
+    return mergeAnexosYDescargar(doc).catch(function(){
+      doc.save(nombreArchivo('pdf'));
+      alert('No pudimos unir los anexos al PDF (posiblemente no hay conexión).\n\nSe descargó el escrito solo: adjunta tus soportes como archivos aparte al radicar.');
+    });
   }
 
   /* ══════════════════ BORRADOR LOCAL (opt-in) ══════════════════ */
@@ -2433,6 +2632,7 @@
 
   $('btn-save').addEventListener('click', function(){
     var msg = $('save-msg');
+    registro('save');
     try {
       var payload = { caso:S.caso, rol:S.rol, pqr:S.pqr, urg:S.urg, prepagada:S.prepagada, poliza:S.poliza, zona:S.zona, ninguna:S.ninguna, sujetos:S.sujetos, campos:{} };
       ['a_nombre','a_tipodoc','a_doc','a_estado_civil','a_ciudad','a_depto','a_dir','a_tel','a_mail','af_edad','af_estrato',
