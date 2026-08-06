@@ -47,7 +47,8 @@ STR = {
 BOOL = {'prepagada', 'poliza', 'urgente', 'pqr', 'pqr_resp', 'ninguna'}
 INT = {'dias', 'anexos_n', 'via_n'}
 FLOAT = {'via_p'}
-LISTS = {'sujetos': 14, 'anexos_tipos': 20, 'adm': 12}
+ACCESORIAS = {'transporte', 'acompanante', 'cuidador', 'integral', 'insumos'}
+LISTS = {'sujetos': 14, 'anexos_tipos': 20, 'adm': 12, 'accesorias': 6}
 
 
 def _sanitize(data):
@@ -77,6 +78,8 @@ def _sanitize(data):
             vals = [str(x)[:60] for x in v[:cap] if isinstance(x, (str, int, float))]
             if k == 'sujetos':
                 vals = [x for x in vals if x in SUJETOS]
+            if k == 'accesorias':
+                vals = [x for x in vals if x in ACCESORIAS]
             if vals:
                 out[k] = vals
     if out.get('caso') not in CASOS:

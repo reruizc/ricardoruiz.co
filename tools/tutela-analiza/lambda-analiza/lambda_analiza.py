@@ -44,10 +44,11 @@ BUCKET = 'elecciones-2026'
 PREFIX = 'ricardoruiz.co/tutelas-privado/'
 RATIO_KEY = PREFIX + 'ratio-decidendi.json'
 CAUSAS_KEY = PREFIX + 'causas-fracaso.json'
+TEST_KEY = PREFIX + 'test-{caso}.json'   # el test judicial por etapas (build_estructura)
 CACHE_PREFIX = PREFIX + 'cache-lectura/'
 CAP_PREFIX = PREFIX + 'cap/'
 
-PROMPT_VERSION = 'l1-2026-08-05'
+PROMPT_VERSION = 'l2-2026-08-06-pretensiones'
 CACHE_TTL_DIAS = 14
 
 DEEPSEEK_URL = os.environ.get('DEEPSEEK_URL', 'https://api.deepseek.com/chat/completions')
@@ -62,6 +63,17 @@ _warm = {}
 CASOS = {'medicamentos', 'citas', 'procedimientos'}
 SUJETOS = {'menor', 'mayor', 'discap', 'gestante', 'cronica', 'catastrofica',
            'huerfana', 'victima', 'indigena', 'afro', 'vulnerable', 'rural'}
+ACCESORIAS = {'transporte', 'acompanante', 'cuidador', 'integral', 'insumos'}
+
+# Cómo se llama cada pretensión accesoria para el usuario, y con qué palabras
+# aparece nombrada en el test extraído de la relatoría.
+ACC_INFO = {
+    'transporte':  ('Transporte', ('transporte',)),
+    'acompanante': ('Acompañante', ('acompañante', 'acompanante')),
+    'cuidador':    ('Cuidador o enfermería', ('cuidador', 'enfermer')),
+    'integral':    ('Tratamiento integral', ('tratamiento integral', 'integral')),
+    'insumos':     ('Insumos o pañales', ('insumo', 'pañal', 'panal')),
+}
 
 DISCLAIMER = ('Esta lectura describe cómo han fallado los jueces en casos con características '
               'similares, según sentencias públicas de la Corte Constitucional. No es asesoría '
@@ -83,7 +95,7 @@ Devuelve JSON estricto:
  "riesgos": [ { "causa": "<id tal cual te lo di>", "texto": "1-2 frases aterrizadas a ESTE caso: por qué ese riesgo aplica aquí y qué lo neutraliza" } ]
 }
 
-Párrafo 1: qué caracteriza los casos como este (pretensión, situación) y qué muestra el contexto empírico si se entregó. Párrafo 2: por qué se caen casos como este ante los jueces de instancia (ancla en las causas del MATERIAL) y la idea general de que el expediente bien soportado es lo que evita esas caídas.
+Párrafo 1: qué caracteriza los casos como este (pretensión, situación) y qué muestra el contexto empírico si se entregó. Párrafo 2: si el caso incluye PRETENSIONES ADICIONALES (transporte, cuidador, tratamiento integral, insumos, medida provisional), el párrafo debe advertir que el servicio principal suele concederse pero esas peticiones son las que más se niegan, porque cada una tiene requisitos propios; si no las hay, explica por qué se caen casos como este ante los jueces de instancia. En ambos casos cierra con la idea de que el expediente bien soportado es lo que evita esas caídas.
 
 Reglas duras:
 1. NO prometas resultados, NO digas que la tutela "va a ganar", "será concedida" ni nada equivalente. Todo descriptivo: "casos como el tuyo", "los jueces han negado cuando…".
@@ -131,7 +143,112 @@ def _sanitize(data):
         out['sujetos'] = sorted({str(x) for x in suj[:14] if str(x) in SUJETOS})
     else:
         out['sujetos'] = []
+    acc = data.get('accesorias')
+    if isinstance(acc, list):
+        out['accesorias'] = sorted({str(x) for x in acc[:6] if str(x) in ACCESORIAS})
+    else:
+        out['accesorias'] = []
     return out
+
+
+# ── el test judicial por pretensión ──
+def _bloques_test(inp):
+    """Arma los bloques de requisitos que aplican a ESTE caso, en el orden en que
+    los mira un juez: procedibilidad → servicio principal → cada pretensión
+    accesoria pedida → medida provisional si se declaró urgencia.
+
+    El servicio principal casi siempre se concede; lo que trae requisitos propios
+    (y lo que más se niega) son las accesorias. Por eso van en bloques separados:
+    mezclarlas haría creer que un requisito de transporte aplica al medicamento.
+    """
+    try:
+        test = _get_json(TEST_KEY.format(caso=inp['caso']))
+    except Exception as e:
+        print(f'[s3] test {inp["caso"]}: {e}')
+        return []
+
+    etapas = test.get('etapas') or []
+    def etapa(pred):
+        for et in etapas:
+            if pred(et.get('etapa', '').lower()):
+                return et.get('elementos') or []
+        return []
+
+    def top(elems, n):
+        return sorted(elems, key=lambda e: -e.get('n_sentencias', 0))[:n]
+
+    def limpio(e):
+        return {'nombre': e.get('nombre', ''), 'exige': e.get('exige', ''),
+                'prueba': e.get('prueba', ''), 'si_falla': e.get('si_falla', ''),
+                'n_sentencias': e.get('n_sentencias', 0),
+                'citas': (e.get('citas') or [])[:1]}
+
+    bloques = []
+    proc = etapa(lambda t: 'procedibilidad' in t)
+    if proc:
+        bloques.append({'id': 'procedibilidad', 'titulo': 'Antes del fondo: que te la admitan',
+                        'porque': 'El juez revisa esto primero; si algo falla aquí no llega a estudiar tu caso.',
+                        'requisitos': [limpio(e) for e in top(proc, 4)]})
+    fondo = etapa(lambda t: 'fondo' in t or 'servicio' in t)
+    if fondo:
+        bloques.append({'id': 'servicio', 'titulo': 'El servicio que reclamas',
+                        'porque': 'Es lo que el juez concede casi siempre cuando está bien soportado.',
+                        'requisitos': [limpio(e) for e in top(fondo, 4)]})
+
+    acc = etapa(lambda t: 'accesoria' in t)
+    if not acc and inp['caso'] != 'medicamentos':
+        # El test de transporte, cuidador o tratamiento integral es el MISMO sea cual
+        # sea el servicio principal: la Corte no lo hace depender de si lo que se pide
+        # es un medicamento o una cita. Los casos con pocas sentencias (citas: 23) no
+        # alcanzan a enunciarlo, así que se toma del catálogo de medicamentos (177),
+        # que sí lo trae. No es una analogía nuestra: es la misma línea jurisprudencial.
+        try:
+            med = _get_json(TEST_KEY.format(caso='medicamentos'))
+            for et in med.get('etapas') or []:
+                if 'accesoria' in et.get('etapa', '').lower():
+                    acc = et.get('elementos') or []
+                    break
+        except Exception as e:
+            print(f'[s3] fallback accesorias: {e}')
+    for aid in inp.get('accesorias', []):
+        titulo, claves = ACC_INFO[aid]
+        reqs = [e for e in acc
+                if any(k in (e.get('nombre', '') + ' ' + e.get('exige', '')).lower() for k in claves)]
+        if not reqs:
+            continue
+        bloques.append({'id': aid, 'titulo': titulo, 'accesoria': True,
+                        'porque': 'Tiene requisitos propios, distintos de los del servicio principal. '
+                                  'Es de lo que más se niega.',
+                        'requisitos': [limpio(e) for e in top(reqs, 4)]})
+
+    # Medida provisional (art. 7 D.2591) — la "cautelar" de la tutela.
+    # NO sale del test extraído: en el corpus se menciona en el 44% de las
+    # sentencias pero solo 4 veces con enunciación estructurada, así que no hay
+    # base para destilar un test. Lo que sí está medido son las razones de
+    # negativa observadas (382 frases: 53 niegan, 169 conceden ≈ 24% de negativa,
+    # muy por encima del 5-8% de la tutela misma). El bloque se arma de la ley y
+    # de esas razones, no del modelo.
+    if inp.get('urgente'):
+        bloques.append({
+            'id': 'provisional', 'titulo': 'La medida provisional que pides', 'accesoria': True,
+            'porque': 'Es lo que le pides al juez para YA, antes del fallo. Se niega mucho más '
+                      'que la tutela: en las sentencias revisadas, cerca de una de cada cuatro '
+                      'decisiones sobre medidas provisionales fue negativa.',
+            'requisitos': [
+                {'nombre': 'Urgencia actual, no pasada',
+                 'exige': 'El riesgo debe existir HOY. Si para cuando el juez decide el episodio '
+                          'crítico ya pasó, se niega por falta de urgencia.',
+                 'prueba': 'Historia clínica o concepto médico reciente que describa el riesgo vigente.',
+                 'si_falla': 'El juez niega la medida provisional, aunque después conceda la tutela.',
+                 'n_sentencias': 0, 'citas': []},
+                {'nombre': 'Riesgo concreto, no genérico',
+                 'exige': 'Hay que decir qué daño específico ocurre si se espera: no basta afirmar '
+                          'que la salud está en riesgo.',
+                 'prueba': 'Concepto médico que nombre la consecuencia concreta de la espera.',
+                 'si_falla': 'Se niega por no acreditar los presupuestos del artículo 7 del Decreto 2591 de 1991.',
+                 'n_sentencias': 0, 'citas': []},
+            ]})
+    return bloques
 
 
 # ── motor de riesgos (determinista) ──
@@ -208,6 +325,7 @@ def _cache_key(inp):
         'pqr_resp': inp.get('pqr_resp'), 'rol': inp.get('rol', ''),
         'resp': inp.get('c_respuesta', ''), 'estado': inp.get('c_estado', ''),
         'via_nivel': inp.get('via_nivel', ''),
+        'acc': inp.get('accesorias', []),   # cambian el análisis → cambian la celda
     }
     h = hashlib.sha256(json.dumps(celda, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:24]
     return CACHE_PREFIX + h + '.json'
@@ -322,7 +440,7 @@ def _post_verifica(texto, permitidas, pct_ok):
     return ' '.join(keep).strip()
 
 
-def _lectura_llm(inp, causas, citas, causas_info):
+def _lectura_llm(inp, causas, citas, causas_info, bloques=None):
     caso_txt = CASO_TXT.get(inp['caso'], '')
     lineas = [f"CASO (anónimo, estructurado):",
               f"- Tipo: {inp['caso']} ({caso_txt})",
@@ -339,6 +457,11 @@ def _lectura_llm(inp, causas, citas, causas_info):
         lineas.append(f"- Respuesta que recibe de la entidad: {inp['c_respuesta']}")
     if inp.get('c_estado'):
         lineas.append(f"- Estado del trámite: {inp['c_estado']}")
+    if inp.get('accesorias'):
+        pide = ', '.join(ACC_INFO[a][0] for a in inp['accesorias'])
+        lineas.append(f"- ADEMÁS del servicio principal, va a pedir: {pide}")
+    if inp.get('urgente'):
+        lineas.append('- Va a pedir MEDIDA PROVISIONAL (art. 7 D.2591)')
 
     pct_ok = None
     if isinstance(inp.get('via_p'), float) and inp.get('via_n'):
@@ -352,6 +475,11 @@ def _lectura_llm(inp, causas, citas, causas_info):
         info = causas_info.get(cid, {})
         lineas.append(f"- id={cid} · {info.get('titulo', cid)}: {info.get('explica', '')} "
                       f"Cómo se evita: {info.get('como_se_arregla', '')}")
+    if bloques:
+        acc_t = [b['titulo'] for b in bloques if b.get('accesoria')]
+        if acc_t:
+            lineas.append('\nPRETENSIONES CON REQUISITOS PROPIOS que este caso incluye: '
+                          + ', '.join(acc_t) + '. Menciónalas en el párrafo 2 como lo que más se niega.')
     lineas.append('\nMATERIAL (sentencias reales; las únicas que puedes mencionar):')
     for c in citas:
         lineas.append(f"- {c['sentencia']} ({c['ano']}) · causa={c['causa']} · el juez de instancia negó porque: {c['razon']}")
@@ -439,10 +567,12 @@ def handler(event, context):
         cached['fuente'] = 'cache'
         return _resp(200, cached)
 
+    bloques = _bloques_test(inp)
+
     resp = None
     if DEEPSEEK_API_KEY and citas and _cap_ok():
         try:
-            core, usage = _lectura_llm(inp, causas, citas, causas_info)
+            core, usage = _lectura_llm(inp, causas, citas, causas_info, bloques)
             resp = {'ok': True, 'fuente': 'llm', 'usage': usage}
             resp.update(core)
         except Exception as e:
@@ -455,6 +585,8 @@ def handler(event, context):
     resp['citas'] = [{'sentencia': c['sentencia'], 'ano': c['ano'], 'url': c['url'],
                       'causa': c['causa'], 'razon': c['razon'], 'cita': c['cita']}
                      for c in citas]
+    # el test por pretensión: determinista, no lo redacta el modelo
+    resp['bloques'] = bloques
     resp['disclaimer'] = DISCLAIMER
     resp['pv'] = PROMPT_VERSION
     if resp['fuente'] == 'llm':
