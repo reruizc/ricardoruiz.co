@@ -17,6 +17,7 @@
 #   ordenes_senado_plenaria     ídem `plenaria`           secretariasenado.gov.co
 #   secop_fetch/build/upload  harvest_secop.py            agregados de SECOP II
 #   bloqueo_build/upload      build_bloqueo_s3.py         índice de agendamientos
+#   citaciones_extrae/build/upload  harvest_citaciones.py  control político por congresista
 #   camara_fichas             harvest_camara_fichas.py    fechas de radicación y debate
 #   dataset_build             build_dataset.py            histórico + legislatura viva
 #   texto_index               build_texto_index.py        articulado buscable (incl. lo vivo)
@@ -202,6 +203,33 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
              --content-type "application/json" --cache-control "private, max-age=300"
   else
     etapa --nombre bloqueo_upload --omitida "el build falló (rc=$rc_bloq): no hay archivo nuevo que subir"
+  fi
+
+  # ── citaciones de control político (mismo caché de órdenes del día) ──
+  # Va DESPUÉS de las etapas de órdenes porque lee su caché; no toca la red, así
+  # que es barato y no pelea con el WAF de leyes.senado.
+  etapa --nombre citaciones_extrae --timeout 900 \
+        --desc "citaciones de control político desde las órdenes del día" \
+        -- python3 tools/caudal/actas/harvest_citaciones.py todas
+  rc_cit=$?
+
+  if [ $rc_cit -eq 0 ]; then
+    etapa --nombre citaciones_build --timeout 600 \
+          --desc "citaciones.json (por congresista)" \
+          -- python3 tools/caudal/build_citaciones_s3.py
+    rc_citb=$?
+  else
+    etapa --nombre citaciones_build --omitida "la extracción falló (rc=$rc_cit): no hay qué empaquetar"
+    rc_citb=1
+  fi
+
+  if [ $rc_citb -eq 0 ]; then
+    etapa --nombre citaciones_upload --timeout 600 --desc "citaciones.json → S3" \
+          -- aws s3 cp "$REPO/Bases de datos/leyes-senado/dist/s3/citaciones.json" \
+             "s3://caudal-legislativo/metadata/citaciones.json" \
+             --content-type "application/json" --cache-control "private, max-age=300"
+  else
+    etapa --nombre citaciones_upload --omitida "el build falló (rc=$rc_citb): no hay archivo nuevo que subir"
   fi
 
   # ── fichas individuales de Cámara (la fecha de radicación) ──

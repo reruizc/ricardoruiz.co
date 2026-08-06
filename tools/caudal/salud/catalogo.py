@@ -71,6 +71,12 @@ def archivos(leg=None):
              productor='run_diario.sh · build_bloqueo_s3.py + aws s3 cp',
              consumidor='acción `bloqueo` + panel de la ficha de proyecto',
              nota='1,4 MB: no se baja para leer su campo `v`; basta LastModified.'),
+        dict(bucket=BUCKET_PRIV, key='metadata/citaciones.json', clase='diario',
+             min_bytes=300_000, campo_fecha=None,
+             productor='run_diario.sh · harvest_citaciones.py + build_citaciones_s3.py + aws s3 cp',
+             consumidor='acción `citaciones` + panel de control político en la ficha del congresista',
+             nota='Sale del MISMO caché de órdenes del día que bloqueo.json: si aquel '
+                  'envejece, este también — mirar primero las etapas ordenes_*.'),
         dict(bucket=BUCKET_PRIV, key=f'metadata/pl-radicados-{leg}.jsonl', clase='diario',
              min_bytes=2_000, campo_fecha=None,
              productor='run_diario.sh · harvest_diario.py + build_diario_s3.py --upload',

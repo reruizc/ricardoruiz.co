@@ -513,6 +513,7 @@ _VOTAC_CONG = None
 _VOTAC_CONG_IDX = None
 _VOTAC_SEN_NOM = None
 _VOTAC_SEN_CONG = None
+_CITAC = None
 
 
 def _votaciones_senado_nominal():
@@ -539,6 +540,18 @@ def _senadores():
     return _VOTAC_SEN_CONG
 
 
+def _citaciones():
+    """CITACIONES DE CONTROL POLÍTICO por congresista (misma roster_key que el
+    récord de voto). Fuente: órdenes del día. Cache warm."""
+    global _CITAC
+    if _CITAC is None:
+        try:
+            _CITAC = _get_json('metadata/citaciones.json')
+        except Exception:
+            _CITAC = {'por_congresista': {}, 'por_citado': {}, 'sistema': {}, 'meta': {}}
+    return _CITAC
+
+
 def _congresistas():
     """Récord de voto POR CONGRESISTA (keyed por roster_key), Cámara + Senado.
     El índice de nombres cubre las dos cámaras para que un nombre tecleado
@@ -554,6 +567,10 @@ def _congresistas():
         _VOTAC_CONG_IDX = {}
         keys = set(_VOTAC_CONG.get('por_congresista', {}))
         keys |= set(_senadores().get('por_congresista', {}))
+        # …y las de citaciones: hay quien ejerce control político sin récord de
+        # voto en nuestro rango (el nominal de Senado arranca en 2017). Sin esto
+        # su nombre no resolvería y la ficha diría "sin datos" teniéndolos.
+        keys |= set(_citaciones().get('por_congresista', {}))
         for k in keys:
             for t in k.split():
                 _VOTAC_CONG_IDX.setdefault(t, set()).add(k)
@@ -588,8 +605,16 @@ def _rec_congresista(key):
         c = dict(c, camara='Cámara')
     if c and s:
         base, otra = (c, s) if c.get('n_votos', 0) >= s.get('n_votos', 0) else (s, c)
-        return dict(base, otra_camara=otra)
-    return c or s
+        rec = dict(base, otra_camara=otra)
+    else:
+        rec = c or s
+    # control político: aditivo. Puede existir sin récord de voto, así que
+    # también sirve de base cuando no hay ninguno de los dos.
+    cit = _citaciones().get('por_congresista', {}).get(key)
+    if cit:
+        rec = dict(rec or {'nombre': cit.get('nombre'), 'bancada': cit.get('bancada')},
+                   citaciones=cit)
+    return rec
 
 
 def _resolver_congresista(q):
@@ -2487,6 +2512,42 @@ def handler(event, context):
                             'n_votos': r.get('n_votos')})
             return _resp(200, {'encontrado': False, 'candidatos': out})
         return _resp(404, {'encontrado': False, 'error': f'sin récord de voto para «{q}»'})
+
+    if action == 'citaciones':
+        # control político: quién cita, a quién y sobre qué. Sin `q` devuelve el
+        # panorama (cobertura declarada + rankings); con `q` filtra por citado o
+        # por tema. La cobertura viaja siempre: hay comisiones que no publican
+        # control político en su agenda y "0" no puede leerse como "no citó".
+        d = _citaciones()
+        sis = d.get('sistema', {})
+        q = (body.get('q') or '').strip()
+        if not q:
+            return _resp(200, {'meta': d.get('meta', {}), 'sistema': sis})
+        ql = _secop_norm(q)
+        hits, vistos = [], set()
+        for rk, p in d.get('por_congresista', {}).items():
+            for c in p.get('citaciones', []):
+                if c['k'] in vistos:
+                    continue
+                blob = _secop_norm(' '.join(
+                    [c.get('tema') or ''] +
+                    [(x.get('nombre') or '') + ' ' + (x.get('cargo') or '')
+                     for x in c.get('citados', [])]))
+                if ql in blob:
+                    vistos.add(c['k'])
+                    hits.append(dict(c, citantes=[]))
+        por_k = {}
+        for rk, p in d.get('por_congresista', {}).items():
+            for c in p.get('citaciones', []):
+                if c['k'] in vistos:
+                    por_k.setdefault(c['k'], []).append(
+                        {'rk': rk, 'nombre': p.get('nombre'), 'bancada': p.get('bancada')})
+        for h in hits:
+            h['citantes'] = por_k.get(h['k'], [])
+        hits.sort(key=lambda h: (h.get('primera') or ''), reverse=True)
+        return _resp(200, {'meta': d.get('meta', {}), 'q': q,
+                           'n': len(hits), 'citaciones': hits[:80],
+                           'cobertura': sis.get('cobertura', [])})
 
     if action == 'radicados':
         # proyectos recién radicados de la legislatura viva + descarga (PDF/texto).

@@ -506,6 +506,20 @@
   .cf-pk{cursor:pointer; padding:.6rem .8rem; border:1px solid var(--border2); border-radius:8px; display:flex; flex-direction:column; gap:.15rem}
   .cf-pk:hover{border-color:var(--teal)}
   .cf-pk b{font-size:.82rem} .cf-pk span{font-size:.66rem; color:var(--ink3)}
+  /* control político (citaciones) — ámbar, para no confundirlo con el voto */
+  .cp-head{display:flex; align-items:center; gap:.9rem; background:linear-gradient(180deg,rgba(207,125,42,.09),transparent); border:1px solid rgba(207,125,42,.28); border-radius:10px; padding:.9rem 1.1rem; margin:.2rem 0 1rem}
+  .cp-n{font-size:2rem; font-weight:700; color:var(--amber); line-height:1}
+  .cp-t{font-size:.74rem; color:var(--ink2); line-height:1.35}
+  .cp-t span{font-size:.62rem; color:var(--ink3)}
+  .cp-list{display:flex; flex-direction:column; gap:.1rem; max-height:420px; overflow-y:auto}
+  .cp-i{padding:.55rem 0; border-top:1px solid rgba(255,255,255,.05)}
+  .cp-i-h{display:flex; align-items:baseline; gap:.5rem; flex-wrap:wrap}
+  .cp-a{font-size:.76rem; color:var(--ink); font-weight:500}
+  .cp-c{font-size:.66rem; color:var(--ink3)}
+  .cp-tema{font-size:.7rem; color:var(--ink2); line-height:1.35; margin-top:.22rem}
+  .cp-meta{font-size:.62rem; color:var(--ink3); margin-top:.24rem}
+  .cp-veces{color:var(--amber); font-weight:700}
+  .cf-h3{font-size:.6rem; letter-spacing:.14em; text-transform:uppercase; color:var(--ink3); margin:1.1rem 0 .6rem}
 
   /* modal proyecto */
   .modal{position:fixed; inset:0; z-index:800; background:rgba(4,7,11,.72); backdrop-filter:blur(4px); display:none; align-items:flex-start; justify-content:center; padding:4vh 1rem; overflow-y:auto}
@@ -2826,10 +2840,11 @@
       return;
     }
     if(!d || !d.encontrado){
-      modalCard.innerHTML='<button class="modal-close">✕</button><div class="cob-note" style="padding:1rem">Sin récord de voto nominal para esta persona. Cubrimos la plenaria de Cámara (2014–2026) y la de Senado (2017–2026); quien no votó en esos periodos no aparece.</div>';
+      modalCard.innerHTML='<button class="modal-close">✕</button><div class="cob-note" style="padding:1rem">Sin récord de voto nominal ni citaciones de control político para esta persona. Cubrimos la plenaria de Cámara (2014–2026), la de Senado (2017–2026) y las órdenes del día de comisiones; quien no aparece ahí no figura.</div>';
       modalCard.querySelector('.modal-close').onclick=cerrar; return;
     }
     const su=d.resumen||{}; const tot=d.n_votos||0;
+    const hayVoto=tot>0;
     const proys=(d.por_proyecto||[]).map(p=>{
       const si=p.r.Si||0, no=p.r.No||0, ab=p.r.Abstencion||0, n=si+no+ab||1;
       const bar=`<span class="cf-bar"><span style="width:${100*si/n}%;background:var(--green)"></span><span style="width:${100*no/n}%;background:var(--red)"></span><span style="width:${100*ab/n}%;background:var(--amber)"></span></span>`;
@@ -2839,19 +2854,41 @@
         <div class="cf-p-r">${bar}<span class="cf-p-c">${cnt}</span></div></div>`;
     }).join('');
     const alin=d.alineacion_gob;
+    // CONTROL POLÍTICO — a quién citó. Es la citación AGENDADA en el orden del
+    // día, no el debate realizado: por eso se muestra «agendada N veces», que es
+    // justamente la señal (una citación re-agendada y nunca realizada dice algo).
+    const cp=d.citaciones;
+    const cpHTML=!cp?'':`
+      <h3 class="cf-h3" style="color:var(--amber)">Control político · a quién citó</h3>
+      <div class="cp-head">
+        <div class="cp-n">${cp.n_citaciones}</div>
+        <div class="cp-t">citaciones de control político que firmó<br>
+          <span>${cp.n_agendamientos} veces agendadas en total${cp.citados_top&&cp.citados_top.length?` · más citado: <b>${esc(cp.citados_top[0].nombre)}</b> (${cp.citados_top[0].n})`:''}</span></div>
+      </div>
+      <div class="cp-list">${(cp.citaciones||[]).map(c=>{
+        const q=(c.citados||[]).filter(x=>x.nombre||x.cargo);
+        const a=q.length?q.map(x=>x.nombre?`<span class="cp-a">${esc(x.nombre)}</span>${x.cargo?` <span class="cp-c">${esc(x.cargo)}</span>`:''}`:`<span class="cp-a">${esc(x.cargo)}</span>`).join(' · '):'<span class="cp-c">citado no identificado en la agenda</span>';
+        return `<div class="cp-i"><div class="cp-i-h">${a}</div>
+          ${c.tema?`<div class="cp-tema">${esc(c.tema)}</div>`:''}
+          <div class="cp-meta">${esc(c.primera||'')}${c.n>1?` · <span class="cp-veces">agendada ${c.n} veces</span> hasta ${esc(c.ultima||'')}`:''} · ${esc(c.camara)}/${esc(c.ambito)}${c.proposicion?` · proposición ${esc(String(c.proposicion))}`:''}</div></div>`;
+      }).join('')}</div>
+      <div class="cob-note">Órdenes del día de comisiones y plenarias. Es la citación <b>agendada</b>, no el debate realizado.</div>`;
     // la persona puede venir de Cámara o de Senado (o de ambas: otra_camara)
     const esSen=(d.camara==='Senado');
     const orig=esSen?'plenaria de Senado 2017–2026':'plenaria de Cámara 2020–2026';
     const oc=d.otra_camara;
     modalCard.innerHTML=`<button class="modal-close">✕</button>
       <h2>${esc(d.nombre)}</h2>
-      <div class="cf-sub">${d.bancada?`<span class="p" style="border-color:${pcolor(d.bancada)}55;color:${pcolor(d.bancada)}">${esc(d.bancada)}</span>`:''}<span class="cf-meta">${tot} votos nominales · ${d.n_proyectos} proyectos · ${orig}</span></div>
+      <div class="cf-sub">${d.bancada?`<span class="p" style="border-color:${pcolor(d.bancada)}55;color:${pcolor(d.bancada)}">${esc(d.bancada)}</span>`:''}<span class="cf-meta">${hayVoto?`${tot} votos nominales · ${d.n_proyectos} proyectos · ${orig}`:''}${hayVoto&&cp?' · ':''}${cp?`${cp.n_citaciones} citaciones de control político`:''}</span></div>
       ${oc?`<div class="cob-note" style="margin-bottom:.8rem">También tiene récord en <b>${esc(oc.camara||'la otra cámara')}</b>: ${oc.n_votos} votos en ${oc.n_proyectos} proyectos${oc.alineacion_gob!=null?` · alineación ${oc.alineacion_gob}%`:''}.</div>`:''}
+      ${hayVoto?`
       ${alin!=null?`<div class="cf-align"><div class="cf-align-n">${alin}%</div><div class="cf-align-t">votó con la bancada de gobierno (Pacto)<br><span>en ${d.n_contestadas} votaciones contestadas · las unánimes se excluyen</span></div></div>`:''}
       <div class="cf-tot"><b style="color:var(--green)">${su.Si||0} Sí</b> · <b style="color:var(--red)">${su.No||0} No</b>${su.Abstencion?` · <b style="color:var(--amber)">${su.Abstencion} abst</b>`:''} <span style="color:var(--ink3)">en total</span></div>
-      <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin:1.1rem 0 .6rem">Cómo votó por proyecto${esSen?'':' · click para abrir la ficha'}</h3>
+      <h3 class="cf-h3">Cómo votó por proyecto${esSen?'':' · click para abrir la ficha'}</h3>
       <div class="cf-list">${proys}</div>
-      <div class="cob-note">${esSen?'API pública del Senado (2017–2026). Solo registra Sí/No — sin abstención ni «no votó» — y agrupa las votaciones del mismo día sobre un proyecto.':'Actas de plenaria de Cámara · voto nominal electrónico. Solo votos de fondo ligados a un proyecto.'}</div>`;
+      <div class="cob-note">${esSen?'API pública del Senado (2017–2026). Solo registra Sí/No — sin abstención ni «no votó» — y agrupa las votaciones del mismo día sobre un proyecto.':'Actas de plenaria de Cámara · voto nominal electrónico. Solo votos de fondo ligados a un proyecto.'}</div>`
+      :'<div class="cob-note" style="margin-bottom:1rem">Sin récord de voto nominal en nuestro rango (plenaria de Cámara 2014–2026 · Senado 2017–2026).</div>'}
+      ${cpHTML}`;
     modalCard.querySelector('.modal-close').onclick=cerrar;
     modalCard.querySelectorAll('.cf-p-clk').forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,'pdly'));
     modalCard.scrollTop=0;
