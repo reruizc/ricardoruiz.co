@@ -168,11 +168,17 @@ def _bloques_test(inp):
         return []
 
     etapas = test.get('etapas') or []
+
     def etapa(pred):
+        """Acumula TODAS las etapas que casen, no solo la primera: la consolidación
+        a veces parte las accesorias en varias etapas (procedimientos trae
+        'Pretensiones accesorias' y 'Pretensiones accesorias: tratamiento integral')
+        y quedarse con la primera perdería requisitos reales."""
+        out = []
         for et in etapas:
             if pred(et.get('etapa', '').lower()):
-                return et.get('elementos') or []
-        return []
+                out.extend(et.get('elementos') or [])
+        return out
 
     def top(elems, n):
         return sorted(elems, key=lambda e: -e.get('n_sentencias', 0))[:n]
@@ -196,25 +202,51 @@ def _bloques_test(inp):
                         'requisitos': [limpio(e) for e in top(fondo, 4)]})
 
     acc = etapa(lambda t: 'accesoria' in t)
-    if not acc and inp['caso'] != 'medicamentos':
-        # El test de transporte, cuidador o tratamiento integral es el MISMO sea cual
-        # sea el servicio principal: la Corte no lo hace depender de si lo que se pide
-        # es un medicamento o una cita. Los casos con pocas sentencias (citas: 23) no
-        # alcanzan a enunciarlo, así que se toma del catálogo de medicamentos (177),
-        # que sí lo trae. No es una analogía nuestra: es la misma línea jurisprudencial.
-        try:
-            med = _get_json(TEST_KEY.format(caso='medicamentos'))
-            for et in med.get('etapas') or []:
-                if 'accesoria' in et.get('etapa', '').lower():
-                    acc = et.get('elementos') or []
-                    break
-        except Exception as e:
-            print(f'[s3] fallback accesorias: {e}')
+
+    # El test de transporte, cuidador o tratamiento integral es el MISMO sea cual sea
+    # el servicio principal: la Corte no lo hace depender de si lo que se reclama es un
+    # medicamento o una cita. Los casos con menos sentencias no alcanzan a enunciar
+    # todas las accesorias (citas tiene 23 sentencias; medicamentos, 177), así que lo
+    # que falte se toma del catálogo de medicamentos. El respaldo va POR PRETENSIÓN y
+    # no por ausencia de la etapa entera: procedimientos SÍ trae accesorias, pero no
+    # las de insumos, y sin esto ese bloque desaparecía en silencio.
+    _acc_med = [None]
+
+    def acc_medicamentos():
+        if _acc_med[0] is None:
+            out = []
+            if inp['caso'] != 'medicamentos':
+                try:
+                    med = _get_json(TEST_KEY.format(caso='medicamentos'))
+                    for et in med.get('etapas') or []:
+                        if 'accesoria' in et.get('etapa', '').lower():
+                            out.extend(et.get('elementos') or [])
+                except Exception as e:
+                    print(f'[s3] respaldo accesorias: {e}')
+            _acc_med[0] = out
+        return _acc_med[0]
+
+    def buscar(fuente, claves):
+        return [e for e in fuente
+                if any(k in (e.get('nombre', '') + ' ' + e.get('exige', '')).lower() for k in claves)]
+
     for aid in inp.get('accesorias', []):
         titulo, claves = ACC_INFO[aid]
-        reqs = [e for e in acc
-                if any(k in (e.get('nombre', '') + ' ' + e.get('exige', '')).lower() for k in claves)]
+        reqs = buscar(acc, claves) or buscar(acc_medicamentos(), claves)
         if not reqs:
+            # Insumos y pañales NO tienen test propio, y eso es un hallazgo, no un
+            # hueco: en el corpus se analizan con el MISMO test del servicio (orden
+            # médica, no sustituto en el PBS, incapacidad económica, amenaza a la
+            # salud) — la línea de los tres escenarios PBS/UPC. Decirlo es más útil
+            # que callar el bloque, y más honesto que inventarle requisitos.
+            if aid == 'insumos':
+                bloques.append({
+                    'id': aid, 'titulo': titulo, 'accesoria': True, 'sin_test_propio': True,
+                    'porque': 'No tiene requisitos aparte: los jueces los analizan con el mismo '
+                              'test del servicio que reclamas, aquí arriba. Lo que decide es que '
+                              'estén prescritos y que no haya en el plan de beneficios algo que '
+                              'los sustituya.',
+                    'requisitos': []})
             continue
         bloques.append({'id': aid, 'titulo': titulo, 'accesoria': True,
                         'porque': 'Tiene requisitos propios, distintos de los del servicio principal. '

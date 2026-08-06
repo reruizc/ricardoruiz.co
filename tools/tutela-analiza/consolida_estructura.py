@@ -138,6 +138,10 @@ def main():
                 'agrupa': [idx[k]['elemento'] for k in keys],
                 'citas': uniq[:4],
             })
+        # Poda: al test publicable solo entra lo que tiene respaldo. Sin esto queda
+        # una cola larga de "elementos" que no son requisitos verificables sino
+        # temas doctrinales ("principios del SGSSS", "obligaciones del Estado").
+        elems = [e for e in elems if e['n_sentencias'] >= 3 or e['citas']]
         if elems:
             elems.sort(key=lambda e: -e['n_sentencias'])
             etapas.append({'etapa': str(et.get('etapa') or '')[:80],
@@ -153,7 +157,8 @@ def main():
         'universo': doc['universo'],
         'consolidacion': {'elementos_entrada': len(els),
                           'elementos_consolidados': sum(len(e['elementos']) for e in etapas),
-                          'descartados': len(huerfanas)},
+                          'descartados': len(huerfanas),
+                          'poda': 'solo entran elementos con >=3 sentencias o >=1 cita normativa'},
         'etapas': etapas,
     }
     out_p = BASE / f'test-{args.caso}.json'
