@@ -238,6 +238,19 @@
     .via-met{font-size:.78rem;color:var(--muted);line-height:1.6;margin-top:.55rem;max-width:76ch}
     .via-met b{color:var(--white);font-weight:600}
 
+    /* ── LO QUE DICEN LOS JUECES (Lambda tutela-analiza · citas verificadas) ── */
+    #panel-jueces{border-left:3px solid var(--amber)}
+    .jz-txt{font-size:.92rem;color:var(--muted);line-height:1.55;margin-top:.7rem;max-width:72ch}
+    .jz-riesgo{margin-top:.85rem;padding:.7rem .85rem;background:rgba(26,29,36,.04);border-left:2px solid var(--amber)}
+    .jz-riesgo b{display:block;font-size:.83rem;color:var(--white);margin-bottom:.25rem}
+    .jz-riesgo p{font-size:.83rem;color:var(--muted);line-height:1.5;margin:0}
+    .jz-cita{margin-top:.7rem;padding:.65rem .85rem;border:1px solid var(--card-border)}
+    .jz-cita .jz-sent{font-size:.78rem;font-weight:700;color:var(--blue-light)}
+    .jz-cita .jz-sent a{color:var(--blue-light);text-decoration:none;border-bottom:1px solid rgba(61,111,255,.4)}
+    .jz-cita p{font-size:.8rem;color:var(--muted);line-height:1.5;margin-top:.3rem}
+    .jz-cita p em{font-style:italic;color:rgba(26,29,36,.8)}
+    .jz-src{font-size:.72rem;color:var(--muted-2);margin-top:.95rem;line-height:1.5}
+
     /* ── CHECKLIST ANEXOS ── */
     .anexos{list-style:none;margin-top:.7rem}
     .anexos li{display:flex;gap:.6rem;align-items:flex-start;font-size:.87rem;color:rgba(26,29,36,.72);padding:.42rem 0;border-bottom:1px solid rgba(26,29,36,.05);line-height:1.45}
@@ -878,6 +891,9 @@
             judicial ni predice el resultado de tu caso.
           </p>
         </div>
+
+        <!-- LO QUE DICEN LOS JUECES · lectura con citas verificadas (Lambda tutela-analiza) -->
+        <div class="box no-print" id="panel-jueces" style="display:none"></div>
 
         <div class="box" style="padding:0;background:none;border:none">
           <div class="doc" id="doc-preview"></div>
@@ -2186,7 +2202,75 @@
     }).catch(function(){
       // sin datos no hay panel (y se retira el placeholder); el documento no se afecta
       panel.style.display = 'none'; panel.innerHTML = '';
+    }).then(function(){
+      // la lectura de jueces va DESPUÉS de resolver viabilidad (con o sin dato):
+      // así el payload lleva la celda empírica como contexto cuando existe
+      renderLectura();
     });
+  }
+
+  /* ══════════════════ LO QUE DICEN LOS JUECES (Lambda tutela-analiza) ══════════════════
+     Lectura narrativa con citas VERIFICADAS de sentencias reales de la Corte.
+     Solo viajan campos estructurados (nunca nombre, documento, contacto ni
+     texto libre). Si falla la red, el panel no aparece y nada se rompe. */
+  var ANALIZA_URL = 'https://flqjezr1ld.execute-api.us-east-1.amazonaws.com';
+  var _lecturaCache = {}; // por payload estructurado: no re-pide al re-generar
+
+  function lecturaPayload(){
+    var p = {
+      action:'lectura', caso:S.caso, rol:S.rol || '',
+      depto: val('e_depto_hechos'),
+      urgente: S.urg === 'si', pqr: S.pqr === 'si',
+      pqr_resp: S.pqr === 'si' && val('p_resp') !== 'ninguna',
+      c_respuesta: val('c_respuesta'), c_estado: val('c_estado'),
+      sujetos: SUJETOS.filter(function(s){ return S.sujetos[s.id]; }).map(function(s){ return s.id; }),
+      anexos_n: ANEXOS.length
+    };
+    var dias = diasDesde(val('c_fecha'));
+    if (typeof dias === 'number') p.dias = dias;
+    if (_viaReg){ p.via_p = _viaReg.p; p.via_n = _viaReg.n; p.via_nivel = _viaReg.nivel; }
+    return p;
+  }
+
+  function renderLectura(){
+    var panel = $('panel-jueces'); if (!panel) return;
+    var payload, key;
+    try { payload = lecturaPayload(); key = JSON.stringify(payload); } catch(e){ return; }
+    if (_lecturaCache[key]){ pintarLectura(panel, _lecturaCache[key]); return; }
+    panel.innerHTML =
+      '<div class="box-title">Lo que dicen los jueces de casos como el tuyo</div>' +
+      '<p class="jz-txt via-loading">Leyendo sentencias reales de la Corte Constitucional sobre casos con características como las del tuyo…</p>';
+    panel.style.display = '';
+    // text/plain evita el preflight CORS; la Lambda parsea el JSON igual
+    fetch(ANALIZA_URL, { method:'POST', body:key, headers:{ 'Content-Type':'text/plain' } })
+      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(j){
+        if (!j || !j.ok || !j.lectura || !j.lectura.length) throw new Error('sin lectura');
+        _lecturaCache[key] = j;
+        // si el usuario cambió respuestas mientras cargaba, no pintar encima
+        if (JSON.stringify(lecturaPayload()) !== key) return;
+        pintarLectura(panel, j);
+      })
+      .catch(function(){ panel.style.display = 'none'; panel.innerHTML = ''; });
+  }
+
+  function pintarLectura(panel, j){
+    var h = '<div class="box-title">Lo que dicen los jueces de casos como el tuyo</div>';
+    (j.lectura || []).forEach(function(p){ h += '<p class="jz-txt">' + esc(p) + '</p>'; });
+    (j.riesgos || []).forEach(function(r){
+      h += '<div class="jz-riesgo"><b>' + esc(r.titulo || '') + '</b><p>' + esc(r.texto || '') + '</p></div>';
+    });
+    (j.citas || []).slice(0, 4).forEach(function(c){
+      var frase = c.cita || c.razon || '';
+      if (!frase) return;
+      h += '<div class="jz-cita"><span class="jz-sent">' +
+        (c.url ? '<a href="' + esc(c.url) + '" target="_blank" rel="noopener">Sentencia ' + esc(c.sentencia) + ' ↗</a>'
+               : 'Sentencia ' + esc(c.sentencia)) +
+        '</span><p>' + (c.cita ? '<em>«' + esc(frase) + '»</em>' : esc(frase)) + '</p></div>';
+    });
+    h += '<p class="jz-src">' + esc(j.disclaimer || 'Esta lectura describe casos similares; no es asesoría jurídica ni una predicción sobre tu caso.') +
+         ' Fuente: relatoría de la Corte Constitucional (sentencias enlazadas).</p>';
+    panel.innerHTML = h; panel.style.display = '';
   }
 
   var LAST = { sec:null, d:null };
