@@ -237,6 +237,22 @@
     @keyframes viaPulse{0%,100%{opacity:.45}50%{opacity:1}}
     .via-met{font-size:.78rem;color:var(--muted);line-height:1.6;margin-top:.55rem;max-width:76ch}
     .via-met b{color:var(--white);font-weight:600}
+    /* tasa por cada pretensión pedida */
+    .via-extras{margin-top:1.15rem;border-top:1px solid var(--card-border);padding-top:.85rem}
+    .via-et{font-size:.86rem;font-weight:700;color:var(--white)}
+    .via-ep{font-size:.79rem;color:var(--muted);line-height:1.5;margin-top:.25rem;max-width:72ch}
+    .via-row{display:grid;grid-template-columns:1fr auto auto;gap:.5rem 1rem;align-items:baseline;
+      padding:.5rem 0;border-bottom:1px solid rgba(26,29,36,.06);font-size:.84rem}
+    .via-row:last-child{border-bottom:none}
+    .via-row span{color:var(--white)}
+    .via-row span em{font-style:normal;color:var(--muted-2);font-size:.76rem}
+    .via-row b{font-weight:700;font-size:1.02rem;color:var(--green-light);text-align:right}
+    .via-row i{font-style:normal;font-size:.74rem;color:var(--muted-2);text-align:right;min-width:14ch}
+    .via-row u{text-decoration:none}
+    .via-row .via-peor{color:#a4522a;font-weight:600}
+    .via-row .via-mejor{color:#1c7a3e;font-weight:600}
+    .via-row-h{margin-top:.5rem;border-bottom:1px solid var(--card-border)}
+    @media(max-width:560px){.via-row{grid-template-columns:1fr auto}.via-row i{grid-column:1/-1;text-align:left;min-width:0}}
 
     /* ── LO QUE DICEN LOS JUECES (Lambda tutela-analiza · citas verificadas) ── */
     #panel-jueces{border-left:3px solid var(--amber)}
@@ -870,10 +886,10 @@
               <label>¿Vas a pedirle al juez algo más, además de <span id="acc-servicio">el servicio</span>?</label>
               <div class="checks" id="acc-grid"></div>
               <span class="help">
-                Márcalo solo si de verdad lo necesitas. Esto importa: en las tutelas de salud el
-                servicio principal casi siempre se concede, pero <b>estas peticiones adicionales son
-                las que más se niegan</b>, porque cada una tiene requisitos propios. Si marcas
-                alguna, te decimos qué exige el juez para concederla.
+                Márcalo solo si de verdad lo necesitas. Esto importa: <b>cada petición se decide
+                por separado y tiene requisitos propios</b>, así que a unas les va mejor que a
+                otras. Si marcas alguna, te mostramos con qué frecuencia se ha concedido y qué
+                exige el juez para darla.
               </span>
             </div>
           </div>
@@ -1335,13 +1351,18 @@
     { id:'transporte',  txt:'Transporte hasta la cita o el tratamiento' },
     { id:'acompanante', txt:'Que autoricen un acompañante' },
     { id:'cuidador',    txt:'Cuidador o servicio de enfermería en casa' },
-    { id:'integral',    txt:'Tratamiento integral (todo lo que necesite en adelante)' },
+    // Premarcado: el escrito SIEMPRE lo pedía antes de que existiera esta pregunta.
+    // Dejarlo por defecto evita empeorar a quien no repare en la casilla, y quien no
+    // lo quiera puede quitarlo — que es lo que la pregunta vino a permitir.
+    { id:'integral',    txt:'Tratamiento integral (todo lo que necesite en adelante)', def:true },
     { id:'insumos',     txt:'Insumos, pañales o suplementos' }
   ];
   (function renderAccesorias(){
     var g = $('acc-grid'); if (!g) return;
     g.innerHTML = ACCESORIAS.map(function(a){
-      return '<label class="chk" data-acc="' + a.id + '"><input type="checkbox" data-aid="' + a.id + '"><span>' + a.txt + '</span></label>';
+      if (a.def) S.accesorias[a.id] = true;
+      return '<label class="chk' + (a.def ? ' on' : '') + '" data-acc="' + a.id + '">' +
+        '<input type="checkbox" data-aid="' + a.id + '"' + (a.def ? ' checked' : '') + '><span>' + a.txt + '</span></label>';
     }).join('');
     g.addEventListener('change', function(e){
       var inp = e.target, aid = inp.dataset.aid; if (!aid) return;
@@ -2044,9 +2065,42 @@
       (d.propio ? 'del suscrito accionante' : 'de ' + (d.t_nombre || BLANK)) + '.');
     pre.push(c.pretension(d));
     c.pretensiones_extra(d).forEach(function(p){ pre.push(p); });
-    pre.push('ORDENAR a ' + d.eps + ' que garantice el TRATAMIENTO INTEGRAL de la patología diagnosticada (' + d.diag +
-      '), incluyendo todos los servicios, medicamentos, procedimientos, insumos, exámenes, valoraciones especializadas, terapias, controles y transporte que el médico tratante llegue a ordenar con ocasión de esa condición, sin que ' +
-      (d.propio ? 'el accionante' : (d.t_nombre || BLANK)) + ' deba interponer una nueva acción de tutela por cada servicio requerido.');
+    /* Cada pretensión accesoria se redacta SOLO si la persona la pidió, y con los
+       elementos que el juez verifica para concederla (test destilado de la relatoría
+       de la Corte). Pedirlas "por si acaso", sin sustentar sus requisitos, es una de
+       las razones por las que se caen: los jueces han rechazado ordenar servicios
+       "de manera anticipada e indeterminada". */
+    var quien = d.propio ? 'el accionante' : (d.t_nombre || BLANK);
+    // "de " + "el accionante" da "de el accionante": hace falta la forma contraída
+    var deQuien = d.propio ? 'del accionante' : 'de ' + (d.t_nombre || BLANK);
+    if (S.accesorias.integral) {
+      pre.push('ORDENAR a ' + d.eps + ' que garantice el TRATAMIENTO INTEGRAL de la patología diagnosticada (' + d.diag +
+        '), incluyendo todos los servicios, medicamentos, procedimientos, insumos, exámenes, valoraciones especializadas, terapias, controles y transporte que el médico tratante llegue a ordenar con ocasión de esa condición, sin que ' +
+        quien + ' deba interponer una nueva acción de tutela por cada servicio requerido. Esta solicitud se funda en el principio de integralidad del artículo 8 de la Ley 1751 de 2015 y en la conducta de la entidad accionada descrita en los hechos, que ha obligado a acudir de forma reiterada para obtener un servicio ya ordenado.');
+    }
+    if (S.accesorias.transporte) {
+      pre.push('ORDENAR a ' + d.eps + ' que autorice y cubra el SERVICIO DE TRANSPORTE ' + deQuien +
+        ' desde su lugar de residencia hasta la institución donde deba recibir la atención, y su regreso, por cuanto ' +
+        'el traslado es indispensable para acceder al servicio ordenado por el médico tratante, ' +
+        (S.sujetos.rural ? 'la residencia se ubica en zona rural o dispersa, ' : '') +
+        'ni ' + quien + ' ni su núcleo familiar cuentan con los recursos económicos para sufragarlo, y la imposibilidad de desplazarse pone en riesgo su salud e integridad. ' +
+        'Lo anterior conforme a la jurisprudencia constitucional sobre cobertura del transporte cuando concurren estos supuestos.');
+    }
+    if (S.accesorias.acompanante) {
+      pre.push('ORDENAR a ' + d.eps + ' que autorice y cubra el desplazamiento de un ACOMPAÑANTE, en razón de que ' +
+        quien + ' requiere asistencia continua de un tercero para garantizar su integridad física durante el traslado y la atención.');
+    }
+    if (S.accesorias.cuidador) {
+      pre.push('ORDENAR a ' + d.eps + ' que garantice el SERVICIO DE CUIDADOR O DE ENFERMERÍA EN CASA que el médico tratante determine, ' +
+        'por cuanto ' + quien + ' requiere atención permanente para preservar su vida e integridad, sin que la familia pueda asumir ese cuidado de manera continua. ' +
+        'La entidad no puede trasladar a la familia una obligación que corresponde al sistema cuando la necesidad está médicamente acreditada.');
+    }
+    if (S.accesorias.insumos) {
+      pre.push('ORDENAR a ' + d.eps + ' la entrega oportuna y sin interrupciones de los INSUMOS, pañales, suplementos y elementos ' +
+        'que el médico tratante haya prescrito o llegue a prescribir con ocasión del diagnóstico (' + d.diag + '), ' +
+        'sin que su eventual exclusión del plan de beneficios sea razón para negarlos cuando no existe dentro de este una alternativa que los sustituya con igual efectividad y ' +
+        quien + ' carece de capacidad económica para adquirirlos.');
+    }
     if (S.sujetos.vulnerable) {
       pre.push('EXONERAR ' + (d.propio ? 'al suscrito accionante' : 'a ' + (d.t_nombre || BLANK)) +
         ' del pago de copagos, cuotas moderadoras y cuotas de recuperación asociados a estos servicios, en atención a su situación económica, o subsidiariamente ordenar que la entidad accionada asuma dichos valores y los recobre por los canales que corresponda, sin que la falta de pago sea obstáculo para la prestación del servicio.');
@@ -2154,6 +2208,35 @@
     return _tasasReq;
   }
   var SEP_IDS = ['menor','mayor','discap','gestante','cronica','catastrofica','huerfana','victima','indigena','afro','vulnerable','rural'];
+
+  /* Cada pretensión accesoria tiene su PROPIA tasa en el microdato de la Corte: son
+     categorías distintas del expediente, no sub-partes de una sola. Por eso el panel
+     muestra un número por cada cosa que la persona pide, y no un único porcentaje del
+     "caso": a quien pide medicamento + cuidador le va distinto en cada uno (95,4% vs
+     84,5% nacional). 'acompanante' no tiene categoría propia en el microdato — va
+     dentro de transporte — así que no se le inventa una tasa. */
+  var ACC_PRETENSION = {
+    transporte: 'Transporte y viáticos para recibir atención en salud',
+    cuidador:   'Atención domiciliaria',
+    integral:   'Tratamiento integral',
+    insumos:    'Medicamentos, insumos o servicios incluidos en el PBS / POS'
+  };
+
+  /* Resuelve la celda del microdato para una pretensión, con la misma cascada del
+     build: pretensión+depto+SEP → por pretensión → nacional. */
+  function celdaDe(data, pret, depto, sep){
+    var sepKey = sep ? 'Es SEP' : 'No es SEP', cell = null, nivel = '';
+    if (data.celdas && depto && data.celdas[pret + '||' + depto + '||' + sepKey]) {
+      cell = data.celdas[pret + '||' + depto + '||' + sepKey];
+      nivel = cell.nivel || 'pretension+depto+sep';
+    } else if (data.por_pretension && data.por_pretension[pret]) {
+      cell = data.por_pretension[pret]; nivel = 'pretension';
+    } else if (data.nacional) {
+      cell = data.nacional; nivel = 'nacional';
+    }
+    if (!cell || !cell.n || typeof cell.p !== 'number') return null;
+    return { p: cell.p, n: cell.n, lo: cell.lo, hi: cell.hi, desglose: cell.desglose || {}, nivel: nivel };
+  }
   var VIA_CASO = {
     medicamentos:  'entrega de medicamentos o insumos',
     citas:         'asignación de citas médicas',
@@ -2179,21 +2262,23 @@
       if (!pret) return;
       var depto = val('e_depto_hechos');
       var sep = SEP_IDS.some(function(k){ return !!(S.sujetos && S.sujetos[k]); });
-      var sepKey = sep ? 'Es SEP' : 'No es SEP';
-      /* cascada de respaldo: celda exacta → tasa por pretensión → nacional.
-         Ojo: la celda exacta puede traer nivel más grueso (el build ya aplicó
-         su propia cascada cuando la combinación fina tenía pocos casos). */
-      var cell = null, nivel = '';
-      if (data.celdas && depto && data.celdas[pret + '||' + depto + '||' + sepKey]) {
-        cell = data.celdas[pret + '||' + depto + '||' + sepKey];
-        nivel = cell.nivel || 'pretension+depto+sep';
-      } else if (data.por_pretension && data.por_pretension[pret]) {
-        cell = data.por_pretension[pret]; nivel = 'pretension';
-      } else if (data.nacional) {
-        cell = data.nacional; nivel = 'nacional';
-      }
-      if (!cell || !cell.n || typeof cell.p !== 'number') return;
+      /* La tasa se resuelve POR PRETENSIÓN, no por "caso": en el microdato cada
+         petición es una categoría propia y les va distinto. Al que pide medicamento
+         y además cuidador, un solo número le escondería que la segunda va 11 puntos
+         por debajo. */
+      var cell = celdaDe(data, pret, depto, sep);
+      if (!cell) return;
+      var nivel = cell.nivel;
       _viaReg = { p: cell.p, n: cell.n, nivel: nivel };
+
+      // una fila por cada pretensión accesoria marcada que tenga categoría en el microdato
+      var extras = [];
+      ACCESORIAS.forEach(function(a){
+        if (!S.accesorias[a.id]) return;
+        var pa = ACC_PRETENSION[a.id]; if (!pa) return;
+        var c2 = celdaDe(data, pa, depto, sep); if (!c2) return;
+        extras.push({ id:a.id, txt:a.txt, pret:pa, cell:c2, delta:(c2.p - cell.p) * 100 });
+      });
 
       var anio = ((data.metodologia && data.metodologia.ventana_score) || []).join(' y ') || '2025';
       var pct = Math.round(cell.p * 100);
@@ -2242,6 +2327,23 @@
         (exacto ? '' : '<p class="via-fallback">No hay suficientes casos registrados con tu combinación exacta de caso, departamento y protección especial, así que te mostramos el grupo más cercano con datos suficientes.</p>') +
         '<div class="via-bar">' + barH + '</div>' +
         '<div class="via-leg">' + legH + '</div>' +
+        (extras.length
+          ? '<div class="via-extras">' +
+            '<div class="via-et">Y a cada cosa que pides le va distinto</div>' +
+            '<p class="via-ep">En el registro de la Corte cada petición es una categoría aparte, ' +
+              'con su propia suerte. Estas son las que marcaste, medidas por separado:</p>' +
+            '<div class="via-row via-row-h"><span>' + esc(VIA_CASO[caso] || pret) + ' <em>(lo principal)</em></span>' +
+              '<b>' + pct + '%</b><i>' + fmtN(cell.n) + ' casos</i></div>' +
+            extras.map(function(x){
+              var p2 = Math.round(x.cell.p * 100);
+              var dTxt = x.delta <= -3
+                ? '<u class="via-peor">' + Math.abs(Math.round(x.delta)) + ' puntos menos</u>'
+                : (x.delta >= 3 ? '<u class="via-mejor">' + Math.round(x.delta) + ' puntos más</u>' : '<u>parecido</u>');
+              return '<div class="via-row"><span>' + esc(x.txt) + '</span><b>' + p2 + '%</b>' +
+                     '<i>' + fmtN(x.cell.n) + ' casos · ' + dTxt + '</i></div>';
+            }).join('') +
+            '</div>'
+          : '') +
         '<details><summary>Cómo se calcula este número</summary>' +
           '<p class="via-met"><b>“A favor”</b> suma tres decisiones: <b>concede</b> (el juez ordena lo pedido), <b>concede parcial</b> (ordena una parte) y <b>hecho superado</b> (la EPS cumplió antes del fallo, que es el resultado que buscaba quien tuteló). ' +
           'La tasa sale del universo de tutelas remitidas a la Corte Constitucional para eventual revisión, con la decisión reportada en el expediente (' + esc(anio) + '). ' +
@@ -2318,7 +2420,7 @@
     (j.bloques || []).forEach(function(b){
       h += '<div class="jz-bloque' + (b.accesoria ? ' jz-acc' : '') + '">' +
            '<div class="jz-bt">' + esc(b.titulo || '') +
-           (b.accesoria && !b.sin_test_propio ? '<span class="jz-tag">se niega más</span>' : '') + '</div>' +
+           (b.accesoria && !b.sin_test_propio ? '<span class="jz-tag">requisitos propios</span>' : '') + '</div>' +
            '<p class="jz-bp">' + esc(b.porque || '') + '</p>';
       (b.requisitos || []).forEach(function(r){
         h += '<div class="jz-req"><b>' + esc(r.nombre || '') + '</b>' +
@@ -2359,7 +2461,15 @@
     var sec = buildSecciones(d);
     LAST.sec = sec; LAST.d = d;
     $('doc-preview').innerHTML = secToHTML(sec);
-    $('anexos-list').innerHTML = CASOS[S.caso].anexos.map(function(a){
+    /* Cada pretensión accesoria se prueba con documentos propios: sin ellos el juez
+       la niega aunque conceda el servicio principal. El checklist los suma para que
+       la persona no descubra el faltante después de radicar. */
+    var anexos = CASOS[S.caso].anexos.slice();
+    if (S.accesorias.transporte) anexos.push('Prueba de que no puedes costear el transporte (Sisbén, certificación de ingresos o declaración juramentada) y constancia de la distancia o de la remisión fuera de tu municipio');
+    if (S.accesorias.acompanante) anexos.push('Concepto médico que indique que necesitas acompañante permanente');
+    if (S.accesorias.cuidador) anexos.push('Concepto médico que describa por qué necesitas cuidado permanente y por qué tu familia no puede asumirlo de forma continua');
+    if (S.accesorias.insumos) anexos.push('Fórmula o prescripción de los insumos, pañales o suplementos que reclamas');
+    $('anexos-list').innerHTML = anexos.map(function(a){
       return '<li><span>▢</span><span>' + esc(a) + '</span></li>';
     }).join('');
     renderViabilidad();

@@ -248,9 +248,17 @@ def _bloques_test(inp):
                               'los sustituya.',
                     'requisitos': []})
             continue
+        # ⚠️ NO afirmar aquí "es lo que más se niega". El microdato de la Corte
+        # (462k tutelas) lo desmiente para la mayoría: como pretensión principal,
+        # transporte va en 93,5% y tratamiento integral en 95,2%, por encima o cerca
+        # del promedio nacional (92,5%); la única claramente peor es atención
+        # domiciliaria (84,5%). Lo que sí es cierto y basta decir es que traen
+        # requisitos PROPIOS. El número comparado lo pone el panel de viabilidad,
+        # que tiene la tasa de cada pretensión.
         bloques.append({'id': aid, 'titulo': titulo, 'accesoria': True,
-                        'porque': 'Tiene requisitos propios, distintos de los del servicio principal. '
-                                  'Es de lo que más se niega.',
+                        'porque': 'No basta con probar que necesitas el servicio principal: '
+                                  'esta petición tiene sus propios requisitos y el juez los '
+                                  'revisa aparte.',
                         'requisitos': [limpio(e) for e in top(reqs, 4)]})
 
     # Medida provisional (art. 7 D.2591) — la "cautelar" de la tutela.
