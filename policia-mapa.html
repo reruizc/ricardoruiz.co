@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>El mapa del delito · Policía 2015-2024 · Ricardo Ruiz</title>
+  <meta name="description" content="Dónde se denuncia cada delito en Colombia: del mapa nacional a los 1.111 municipios, con los 21 delitos de la Policía Nacional entre 2015 y 2024." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    .nav-page-tag{background:var(--amber);border-color:var(--amber)}
+    .mp-wrap{max-width:1080px;margin:0 auto 3rem;padding:0 2rem}
+    /* barra de filtros */
+    .flt{display:flex;flex-wrap:wrap;gap:.9rem;align-items:flex-end;margin:1.4rem 0 1.1rem;
+      padding:1rem 1.1rem;background:var(--card-bg2);border:1px solid var(--card-border)}
+    .flt-g{display:flex;flex-direction:column;gap:.35rem;min-width:0}
+    .flt-l{font-size:.58rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gray)}
+    .flt select{font-family:var(--hn);font-size:.8rem;background:#0e1220;color:var(--white);
+      border:1px solid rgba(255,255,255,.16);padding:.45rem .6rem;cursor:none;min-width:190px}
+    .flt select:focus{outline:none;border-color:var(--amber)}
+    .flt-sp{flex:1}
+    .yrs{display:flex;gap:2px;flex-wrap:wrap}
+    .yr{font-family:var(--hn);font-size:.68rem;padding:.4rem .5rem;background:none;
+      border:1px solid rgba(255,255,255,.14);color:var(--gray);cursor:none;font-variant-numeric:tabular-nums}
+    .yr.on{background:var(--amber);border-color:var(--amber);color:#1a1206;font-weight:700}
+    .yr:hover:not(.on){border-color:rgba(255,255,255,.4);color:var(--white)}
+    /* mapa + panel */
+    .mp-2{display:grid;grid-template-columns:1fr 320px;gap:14px;align-items:start}
+    #map{height:560px;background:#080b14;border:1px solid var(--card-border)}
+    .mp-side{display:flex;flex-direction:column;gap:12px}
+    .box{background:var(--card-bg);border:1px solid var(--card-border);padding:1rem}
+    .box-t{font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gray);margin-bottom:.7rem}
+    .big{font-family:var(--hn);font-weight:800;font-size:2rem;letter-spacing:-.03em;
+      line-height:1;font-variant-numeric:tabular-nums}
+    .big small{display:block;font-size:.6rem;font-weight:400;letter-spacing:.11em;
+      text-transform:uppercase;color:var(--gray);margin-top:.35rem}
+    .rk{display:flex;flex-direction:column;gap:.35rem;max-height:330px;overflow-y:auto}
+    .rk-i{display:grid;grid-template-columns:18px 1fr auto;gap:.5rem;align-items:center;
+      font-size:.74rem;padding:.2rem 0;cursor:none;border:none;background:none;color:inherit;
+      text-align:left;font-family:var(--hn);width:100%}
+    .rk-i:hover .rk-n{color:var(--amber)}
+    .rk-p{font-size:.6rem;color:var(--gray);font-variant-numeric:tabular-nums}
+    .rk-n{color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .rk-v{font-variant-numeric:tabular-nums;color:var(--gray);font-size:.7rem}
+    .rk-b{grid-column:2/4;height:3px;background:var(--amber);opacity:.45;margin-top:-2px}
+    /* leyenda */
+    .lg{display:flex;align-items:center;gap:.4rem;font-size:.6rem;color:var(--gray);margin-top:.6rem}
+    .lg i{display:block;width:22px;height:9px}
+    /* avisos de calidad */
+    .warn{border-left:2px solid var(--amber);padding:.5rem .75rem;background:rgba(224,160,58,.07);
+      font-size:.68rem;color:rgba(255,255,255,.75);line-height:1.6;margin-top:.9rem}
+    .warn b{color:var(--amber)}
+    .bcrumb{display:flex;align-items:center;gap:.5rem;font-size:.72rem;color:var(--gray);margin-bottom:.5rem}
+    .bcrumb button{font-family:var(--hn);font-size:.72rem;background:none;border:none;color:var(--amber);cursor:none;padding:0}
+    .bcrumb button:hover{text-decoration:underline}
+    .leaflet-tooltip{font-family:var(--hn)!important;font-size:.75rem!important;
+      background:rgba(6,8,16,.97)!important;border:1px solid rgba(224,160,58,.45)!important;
+      color:#f4f3ef!important;border-radius:0!important;padding:.4rem .6rem!important;box-shadow:none!important}
+    .leaflet-tooltip:before{display:none!important}
+    #map .leaflet-interactive{cursor:pointer}
+    @media(max-width:900px){ .mp-2{grid-template-columns:1fr} #map{height:400px} }
+  </style>
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="index.html" class="e-btn-back" id="nav-back-btn">← Inicio</a>
+      <span class="nav-page-tag">Policía</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <div class="country-selector-wrap">
+        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+          <span id="countryBtnLabel">Colombia</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="country-dropdown" id="countryDropdown">
+          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          <div class="country-option" data-value="br" onclick="selectCountry(this)"><span class="country-check">✓</span> Brasil</div>
+          <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+        </div>
+      </div>
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">Policía Nacional · 2015–2024</div>
+    <h1 class="page-title">El mapa del delito</h1>
+    <p class="page-sub">Escoge un delito y un año y mira dónde se denuncia. Haz clic en un departamento para bajar a sus municipios. Los conteos son <strong>denuncias</strong>, no víctimas totales, y no están ajustados por población: un municipio grande casi siempre va a mostrar más hechos que uno pequeño.</p>
+  </div>
+
+  <div class="sec-bar">
+    <a href="policia.html" class="sec-back">← Todas las secciones</a>
+    <a href="policia-historico.html" class="sec-back">El histórico en cifras</a>
+  </div>
+
+  <div class="mp-wrap">
+    <div class="flt">
+      <div class="flt-g">
+        <label class="flt-l" for="f-delito">Delito</label>
+        <select id="f-delito"></select>
+      </div>
+      <div class="flt-g">
+        <label class="flt-l">Año</label>
+        <div class="yrs" id="f-anios"></div>
+      </div>
+    </div>
+
+    <div class="mp-2">
+      <div>
+        <div class="bcrumb" id="bcrumb"></div>
+        <div id="map"></div>
+        <div class="lg" id="leyenda"></div>
+        <div class="warn" id="warn" style="display:none"></div>
+      </div>
+      <div class="mp-side">
+        <div class="box">
+          <div class="box-t" id="kpi-t">Total nacional</div>
+          <div class="big" id="kpi-v">—<small id="kpi-s">hechos denunciados</small></div>
+        </div>
+        <div class="box">
+          <div class="box-t" id="rk-t">Dónde más se denuncia</div>
+          <div class="rk" id="rk"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Policía · El mapa del delito</span>
+    <a href="policia.html" class="e-btn-back" style="font-size:.62rem">← Policía</a>
+  </footer>
+
+  <div class="md-back" id="md-back" onclick="closeModal()"></div>
+  <div class="md-box" id="md-box"><div id="md-body"></div></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="legislativo-base.js"></script>
+  <script src="ponal-base.js"></script>
+  <script>
+  const ST={delito:'homicidios',anio:'todos',dep:null,meta:null,deps:null,muns:null};
+  let map,capa;
+
+  function totalDe(o,delito,anio){
+    const d=(o.d||{})[delito];
+    if(!d) return 0;
+    if(anio==='todos') return d.t;
+    const i=ST.meta.anios.indexOf(+anio);
+    return i<0?0:(d.y[i]||0);
+  }
+
+  /* ── filtros ────────────────────────────────────────────────── */
+  function pintarFiltros(){
+    const sel=document.getElementById('f-delito');
+    sel.innerHTML=ST.meta.delitos.map(d=>
+      `<option value="${d.id}">${esc(d.label)}${d.solo_2024?' · solo 2024':''}</option>`).join('');
+    sel.value=ST.delito;
+    sel.onchange=()=>{ ST.delito=sel.value; sincronizarAnios(); pintar(); };
+    pintarAnios();
+  }
+  function pintarAnios(){
+    const d=ST.meta.delitos.find(x=>x.id===ST.delito)||{};
+    const anios=d.solo_2024?[2024]:ST.meta.anios;
+    document.getElementById('f-anios').innerHTML=
+      `<button class="yr${ST.anio==='todos'?' on':''}" data-y="todos">Todos</button>`+
+      anios.map(a=>`<button class="yr${String(ST.anio)===String(a)?' on':''}" data-y="${a}">${a}</button>`).join('');
+    document.querySelectorAll('#f-anios .yr').forEach(b=>b.onclick=()=>{
+      ST.anio=b.dataset.y; pintarAnios(); pintar();
+    });
+  }
+  /* un delito que solo existe en 2024 no puede quedarse en un año que no tiene */
+  function sincronizarAnios(){
+    const d=ST.meta.delitos.find(x=>x.id===ST.delito)||{};
+    if(d.solo_2024 && ST.anio!=='todos' && String(ST.anio)!=='2024') ST.anio='2024';
+    pintarAnios();
+  }
+
+  /* ── mapa ───────────────────────────────────────────────────── */
+  function initMapa(){
+    map=L.map('map',{zoomControl:true,attributionControl:false,
+      scrollWheelZoom:false,zoomSnap:.25}).setView([4.6,-74.1],5);
+  }
+  /* Encuadre. Leaflet cachea el tamaño del contenedor y aquí el `#map` vive en
+     un grid que todavía no se ha resuelto cuando se pinta la capa: medido, el
+     contenedor reportaba 113 px de ancho y el fitBounds dejaba el país en zoom
+     3.25 en vez de 5.25 — Colombia del tamaño de una moneda. No se arregla
+     midiendo una vez: hay que invalidar el tamaño DESPUÉS de que el layout se
+     asiente y volver a encuadrar si el contenedor cambia de tamaño (abrir el
+     panel, rotar el móvil, redimensionar).
+     `animate:false` porque un fitBounds animado se queda a medio camino cuando
+     la pestaña no está visible y requestAnimationFrame está congelado. */
+  let _bounds=null, _ro=null;
+  function reencuadrar(){
+    if(!map||!_bounds) return;
+    map.invalidateSize(false);
+    map.fitBounds(_bounds,{padding:[12,12],animate:false});
+  }
+  function fit(g){
+    _bounds=L.geoJSON(g).getBounds();
+    setTimeout(reencuadrar,0);          // tras el layout, no rAF (se congela oculto)
+    if(!_ro && window.ResizeObserver){
+      let w=0;
+      _ro=new ResizeObserver(es=>{
+        const nw=Math.round(es[0].contentRect.width);
+        if(nw && nw!==w){ w=nw; reencuadrar(); }
+      });
+      _ro.observe(document.getElementById('map'));
+    }
+  }
+
+  async function pintar(){
+    const esNac=!ST.dep;
+    const filas=esNac?filasNac():filasDep(ST.dep);
+    const max=Math.max(0,...filas.map(f=>f.v));
+    const geo=esNac?await PONAL.geoDeptos():await PONAL.geoMuns(ST.dep);
+    const byKey={}; filas.forEach(f=>byKey[f.k]=f);
+
+    if(capa) map.removeLayer(capa);
+    capa=L.geoJSON(geo,{
+      style:f=>{
+        const k=claveDe(f.properties,esNac);
+        return {fillColor:PONAL.color((byKey[k]||{}).v||0,max),fillOpacity:.85,
+                color:'rgba(255,255,255,.18)',weight:.7};
+      },
+      onEachFeature:(f,l)=>{
+        const k=claveDe(f.properties,esNac), r=byKey[k];
+        const nom=r?r.n:(f.properties.name||f.properties.mpio_cnmbr||'—');
+        l.bindTooltip(`<b>${esc(nom)}</b><br>${r?fmt(r.v):'sin dato'} ${r&&r.v===1?'hecho':'hechos'}`,{sticky:true});
+        if(esNac&&k) l.on('click',()=>abrirDep(k));
+      }
+    }).addTo(map);
+    if(esNac) PONAL.avisarSinMatch(geo.features.map(f=>f.properties.name),n=>claveDe({name:n},true));
+    fit(geo);
+    pintarPanel(filas,esNac);
+    pintarLeyenda(max);
+    pintarAvisos();
+  }
+  /* nacional: el GeoJSON solo trae `name` → se casa por nombre normalizado.
+     municipal: trae `mpio_cdpmp`, que ES el DANE de 5 dígitos de PONAL. */
+  function claveDe(p,esNac){
+    if(!esNac) return p.mpio_cdpmp||'';
+    const n=PONAL.norm(p.name);
+    if(PONAL.ALIAS[n]) return PONAL.ALIAS[n];
+    for(const [c,o] of Object.entries(ST.deps)) if(PONAL.norm(o.n)===n) return c;
+    return '';
+  }
+  function filasNac(){
+    return Object.entries(ST.deps).map(([c,o])=>({k:c,n:o.n,v:totalDe(o,ST.delito,ST.anio)}))
+      .filter(f=>f.v>0).sort((a,b)=>b.v-a.v);
+  }
+  function filasDep(dep){
+    return Object.entries(ST.muns).filter(([,o])=>o.dp===dep)
+      .map(([c,o])=>({k:c,n:o.n,v:totalDe(o,ST.delito,ST.anio)}))
+      .filter(f=>f.v>0).sort((a,b)=>b.v-a.v);
+  }
+
+  function abrirDep(c){ ST.dep=c; pintar(); }
+  function volver(){ ST.dep=null; pintar(); }
+
+  /* ── panel ──────────────────────────────────────────────────── */
+  function pintarPanel(filas,esNac){
+    const tot=filas.reduce((s,f)=>s+f.v,0);
+    const lab=(ST.meta.delitos.find(d=>d.id===ST.delito)||{}).label||'';
+    const per=ST.anio==='todos'?'2015–2024':ST.anio;
+    document.getElementById('kpi-t').textContent=
+      (esNac?'Total nacional':ST.deps[ST.dep].n)+' · '+per;
+    document.getElementById('kpi-v').innerHTML=
+      fmt(tot)+`<small>${esc(lab.toLowerCase())}</small>`;
+    document.getElementById('rk-t').textContent=
+      esNac?'Departamentos con más denuncias':'Municipios con más denuncias';
+    const max=Math.max(1,...filas.map(f=>f.v));
+    document.getElementById('rk').innerHTML=filas.slice(0,25).map((f,i)=>
+      `<button class="rk-i" ${esNac?`data-dep="${f.k}"`:''}>
+         <span class="rk-p">${i+1}</span>
+         <span class="rk-n">${esc(f.n)}</span>
+         <span class="rk-v">${fmt(f.v)}</span>
+         <span class="rk-b" style="width:${Math.max(2,100*f.v/max)}%"></span>
+       </button>`).join('')||'<div style="font-size:.72rem;color:var(--gray)">Sin denuncias registradas.</div>';
+    document.querySelectorAll('#rk .rk-i[data-dep]').forEach(b=>
+      b.onclick=()=>abrirDep(b.dataset.dep));
+    document.getElementById('bcrumb').innerHTML=esNac
+      ? '<span>Colombia · 33 departamentos</span>'
+      : `<button onclick="volver()">← Colombia</button><span>·</span><span>${esc(ST.deps[ST.dep].n)}</span>`;
+  }
+  function pintarLeyenda(max){
+    document.getElementById('leyenda').innerHTML=
+      '<span>menos</span>'+PONAL.RAMPA.map(c=>`<i style="background:${c}"></i>`).join('')+
+      `<span>más — hasta ${fmt(max)}</span>`;
+  }
+  /* Los avisos no son decorativos: sin ellos el mapa afirma cosas que el dato
+     no sostiene (un delito sin año, o uno que solo existe en 2024). */
+  function pintarAvisos(){
+    const d=ST.meta.delitos.find(x=>x.id===ST.delito)||{};
+    const av=[];
+    if(d.solo_2024) av.push(`<b>Solo 2024.</b> La Policía empezó a entregar este delito en ese lote, así que no tiene historia previa: no se puede leer como tendencia.`);
+    if(d.sin_anio>0){
+      const p=(100*d.sin_anio/d.total).toFixed(0);
+      av.push(`<b>${p}% de estos hechos llegó sin año.</b> Traen mes y día de la semana, pero no el año. Cuentan en «Todos» y quedan fuera de cada año por separado — por eso la suma de los años da menos que el total.`);
+    }
+    const w=document.getElementById('warn');
+    w.innerHTML=av.join('<br><br>'); w.style.display=av.length?'':'none';
+  }
+
+  /* ── arranque ───────────────────────────────────────────────── */
+  (async()=>{
+    try{
+      const [m,dp,mu]=await Promise.all([PONAL.meta(),PONAL.deptos(),PONAL.municipios()]);
+      ST.meta=m; ST.deps=dp.deptos; ST.muns=mu.muns;
+      pintarFiltros(); initMapa(); await pintar();
+    }catch(e){
+      document.getElementById('map').innerHTML=
+        `<div style="padding:2rem;font-size:.8rem;color:var(--gray)">No pude cargar los datos: ${esc(e.message)}</div>`;
+    }
+  })();
+  window.volver=volver;
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>

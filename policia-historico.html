@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>El histórico en cifras · Policía 2015-2024 · Ricardo Ruiz</title>
+  <meta name="description" content="Qué subió y qué bajó en diez años de denuncias a la Policía Nacional: tendencia por delito, hora del día, día de la semana y perfil de la víctima." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css" />
+  <style>
+    .nav-page-tag{background:var(--amber);border-color:var(--amber)}
+    .hs{max-width:1080px;margin:0 auto 3rem;padding:0 2rem}
+    .sec{background:var(--card-bg);border:1px solid var(--card-border);padding:1.4rem 1.5rem;margin-bottom:14px}
+    .sec-t{font-family:var(--hn);font-weight:800;font-size:1.05rem;letter-spacing:-.02em;
+      color:var(--white);margin-bottom:.3rem}
+    .sec-s{font-size:.76rem;color:var(--gray);line-height:1.65;margin-bottom:1.1rem;max-width:74ch}
+    .sec-s b{color:var(--white);font-weight:600}
+    /* tabla de tendencia */
+    .tt{width:100%;border-collapse:collapse;font-size:.74rem}
+    .tt th{text-align:right;font-weight:400;color:var(--gray);padding:.4rem .5rem;font-size:.58rem;
+      letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid var(--card-border)}
+    .tt th:first-child,.tt td:first-child{text-align:left}
+    .tt td{text-align:right;padding:.5rem;border-bottom:1px solid rgba(255,255,255,.045);
+      font-variant-numeric:tabular-nums}
+    .tt tr:last-child td{border-bottom:none}
+    .tt tbody tr:hover{background:rgba(255,255,255,.03)}
+    .up{color:var(--red)} .dn{color:var(--green)}
+    /* cambio calculado sobre datos incompletos: gris + interrogante, para que
+       no se lea con la misma autoridad que los que sí tienen serie completa */
+    .parc{color:#8a8f9c}
+    .parc .q{display:inline-block;margin-left:.22rem;font-size:.62rem;font-weight:700;
+      color:var(--amber);vertical-align:super}
+    .tt tr.pf td{background:rgba(224,160,58,.045)}
+    .badge.gris{background:rgba(255,255,255,.14);color:rgba(255,255,255,.72)}
+    .spark{display:block}
+    .badge{display:inline-block;margin-left:.4rem;padding:.08rem .34rem;font-size:.52rem;
+      letter-spacing:.06em;text-transform:uppercase;background:var(--amber);color:#1a1206;font-weight:700}
+    /* selector de delito */
+    .pill{font-family:var(--hn);font-size:.68rem;padding:.32rem .6rem;background:none;
+      border:1px solid rgba(255,255,255,.14);color:var(--gray);cursor:none;margin:0 3px 5px 0}
+    .pill.on{background:var(--amber);border-color:var(--amber);color:#1a1206;font-weight:700}
+    .pill:hover:not(.on){border-color:rgba(255,255,255,.4);color:var(--white)}
+    /* barras genéricas */
+    .bars{display:flex;flex-direction:column;gap:.4rem}
+    .bar-i{display:grid;grid-template-columns:130px 1fr 62px;gap:.6rem;align-items:center;font-size:.74rem}
+    .bar-i .l{color:var(--gray);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .bar-i .t{height:12px;background:var(--amber);opacity:.75;min-width:2px}
+    .bar-i .v{text-align:right;font-variant-numeric:tabular-nums;color:var(--white)}
+    .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+    .mini-t{font-size:.6rem;letter-spacing:.13em;text-transform:uppercase;color:var(--gray);margin-bottom:.7rem}
+    .warn{border-left:2px solid var(--amber);padding:.55rem .8rem;background:rgba(224,160,58,.07);
+      font-size:.7rem;color:rgba(255,255,255,.75);line-height:1.6;margin-top:1rem}
+    .warn b{color:var(--amber)}
+    .scrollx{overflow-x:auto}
+    @media(max-width:820px){ .g2,.g3{grid-template-columns:1fr} .bar-i{grid-template-columns:96px 1fr 54px} }
+  </style>
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="index.html" class="e-btn-back" id="nav-back-btn">← Inicio</a>
+      <span class="nav-page-tag">Policía</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <div class="country-selector-wrap">
+        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+          <span id="countryBtnLabel">Colombia</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="country-dropdown" id="countryDropdown">
+          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          <div class="country-option" data-value="br" onclick="selectCountry(this)"><span class="country-check">✓</span> Brasil</div>
+          <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+        </div>
+      </div>
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">Policía Nacional · 2015–2024</div>
+    <h1 class="page-title">El histórico en cifras</h1>
+    <p class="page-sub">Diez años de denuncias, delito por delito. Qué creció y qué cayó, en qué mes y a qué hora ocurre, y a quién le pasa. Todo es <strong>denuncia registrada</strong>: si un delito sube, puede ser que ocurra más o que se denuncie más — y en varios casos es lo segundo.</p>
+  </div>
+
+  <div class="sec-bar">
+    <a href="policia.html" class="sec-back">← Todas las secciones</a>
+    <a href="policia-mapa.html" class="sec-back">El mapa del delito</a>
+  </div>
+
+  <div class="hs">
+    <div class="sec">
+      <div class="sec-t">Qué subió y qué bajó, 2015 a 2024</div>
+      <div class="sec-s">Cada fila es un delito con su curva de diez años y el cambio entre las puntas. Los delitos que la Policía solo empezó a entregar en 2024 van al final, sin tendencia: <b>no tienen con qué compararse</b>.</div>
+      <div class="scrollx"><table class="tt" id="tt"></table></div>
+      <div class="warn" id="w-tend"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-t">El perfil de cada delito</div>
+      <div class="sec-s">Escoge uno y mira cuándo ocurre y a quién le ocurre. La hora y el día de la semana están en <b>casi todos</b> los registros, incluso en los que no traen año.</div>
+      <div id="pills" style="margin-bottom:1.2rem"></div>
+      <div class="g2">
+        <div><div class="mini-t" id="t-hora">A qué hora</div><div id="c-hora"></div></div>
+        <div><div class="mini-t">Qué día de la semana</div><div id="c-dia"></div></div>
+      </div>
+      <div class="g2" style="margin-top:1.2rem">
+        <div><div class="mini-t">En qué mes</div><div id="c-mes"></div></div>
+        <div><div class="mini-t">Urbano o rural</div><div id="c-zona"></div></div>
+      </div>
+      <div class="g3" style="margin-top:1.2rem">
+        <div><div class="mini-t">Género de la víctima</div><div id="c-gen"></div></div>
+        <div><div class="mini-t">Edad de la víctima</div><div id="c-edad"></div></div>
+        <div><div class="mini-t">Arma empleada</div><div id="c-arma"></div></div>
+      </div>
+      <div style="margin-top:1.2rem"><div class="mini-t">Dónde ocurre</div><div id="c-sitio"></div></div>
+      <div class="warn" id="w-perfil"></div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-t">Lo que este archivo no puede decir</div>
+      <div class="sec-s" id="calidad"></div>
+    </div>
+  </div>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Policía · El histórico en cifras</span>
+    <a href="policia.html" class="e-btn-back" style="font-size:.62rem">← Policía</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script src="ponal-base.js"></script>
+  <script>
+  const ST={meta:null,nac:null,sel:'homicidios'};
+
+  /* sparkline de 10 años; el color lo decide el sentido del cambio */
+  function spark(v,col){
+    const W=104,H=22,P=2,max=Math.max(...v,1);
+    const x=i=>P+i*(W-2*P)/Math.max(1,v.length-1);
+    const y=n=>P+(H-2*P)*(1-n/max);
+    const pts=v.map((n,i)=>`${x(i).toFixed(1)},${y(n).toFixed(1)}`).join(' ');
+    return `<svg class="spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">
+      <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5"
+        stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>
+      <circle cx="${x(v.length-1)}" cy="${y(v[v.length-1])}" r="2" fill="${col}"/></svg>`;
+  }
+
+  /* Un delito con muchos registros sin año tiene la curva construida sobre una
+     fracción del dato, y no sabemos si lo que falta se reparte parejo entre los
+     años. Amenazas (53% sin año) daba «+266%» calculado sobre el 38% de sus
+     registros: publicar eso como tendencia sería inventar. Por encima de este
+     umbral el cambio se muestra marcado, no como una cifra firme. */
+  const UMBRAL_PARCIAL=0.15;
+
+  function tabla(){
+    const A=ST.meta.anios, P=ST.nac.por_anio;
+    const filas=ST.meta.delitos.map(d=>{
+      const v=P[d.id]||[];
+      const ini=v[0]||0, fin=v[v.length-1]||0;
+      const parcial=d.total?(d.sin_anio/d.total)>=UMBRAL_PARCIAL:false;
+      const pct=(!d.solo_2024&&ini)?Math.round(100*(fin-ini)/ini):null;
+      const cob=d.total?Math.round(100*(1-d.sin_anio/d.total)):100;
+      return {...d,v,ini,fin,pct,parcial,cob};
+    });
+    /* con tendencia primero, ordenados por volumen; los de 2024 al final */
+    filas.sort((a,b)=>(a.solo_2024-b.solo_2024)||(b.total-a.total));
+    document.getElementById('tt').innerHTML=
+      `<thead><tr><th>Delito</th><th>Total 2015–2024</th><th>${A[0]}</th><th>${A[A.length-1]}</th>
+        <th>Cambio</th><th>Curva</th></tr></thead><tbody>`+
+      filas.map(f=>{
+        const col=f.pct==null?'var(--gray)':(f.parcial?'#8a8f9c':(f.pct>0?'#d1584e':'#4ade80'));
+        let cam;
+        if(f.pct==null) cam='<span style="color:var(--gray)">—</span>';
+        else if(f.parcial) cam=`<span class="parc" title="Calculado sobre el ${f.cob}% de los registros de este delito: al resto la fuente no le puso año.">${f.pct>0?'+':''}${f.pct}%<span class="q">?</span></span>`;
+        else cam=`<span class="${f.pct>0?'up':'dn'}">${f.pct>0?'+':''}${f.pct}%</span>`;
+        return `<tr${f.parcial?' class="pf"':''}>
+          <td>${esc(f.label)}${f.solo_2024?'<span class="badge">solo 2024</span>':''}${f.parcial?`<span class="badge gris">${f.cob}% con año</span>`:''}</td>
+          <td>${fmt(f.total)}</td>
+          <td>${f.solo_2024?'—':fmt(f.ini)}</td>
+          <td>${fmt(f.fin)}</td>
+          <td>${cam}</td>
+          <td style="text-align:right">${f.v.length?spark(f.v,col):''}</td></tr>`;
+      }).join('')+'</tbody>';
+
+    const par=filas.filter(f=>f.parcial);
+    document.getElementById('w-tend').innerHTML=
+      `<b>Tres delitos no tienen tendencia confiable.</b> ${par.map(f=>
+        `<i>${esc(f.label.toLowerCase())}</i> (solo ${f.cob}% con año)`).join(', ')}:
+       a más de la mitad de esos registros la fuente no les puso año, así que su curva
+       está construida sobre una fracción del dato y no sabemos si lo que falta se
+       reparte parejo entre los años. El cambio va en gris y con <b>?</b> a propósito —
+       <b>no lo leas como que el delito se multiplicó</b>. El total de la primera columna
+       sí es firme: ahí entran todos los registros.
+       <br><br><b>Por eso las columnas de año no suman el total:</b>
+       ${fmt(ST.meta.calidad.sin_anio_total)} hechos
+       (${String(ST.meta.calidad.sin_anio_pct).replace('.',',')}% del archivo) quedan fuera de
+       cualquier año concreto.`;
+  }
+
+  /* ── perfil por delito ──────────────────────────────────────── */
+  function pills(){
+    document.getElementById('pills').innerHTML=ST.meta.delitos.map(d=>
+      `<button class="pill${d.id===ST.sel?' on':''}" data-d="${d.id}">${esc(d.label)}</button>`).join('');
+    document.querySelectorAll('#pills .pill').forEach(b=>b.onclick=()=>{
+      ST.sel=b.dataset.d; pills(); perfil();
+    });
+  }
+  function barras(el,labels,vals,fmtL){
+    const max=Math.max(1,...vals);
+    const tot=vals.reduce((a,b)=>a+b,0);
+    document.getElementById(el).innerHTML=vals.every(v=>!v)
+      ? '<div style="font-size:.72rem;color:var(--gray)">La fuente no registra este dato para el delito escogido.</div>'
+      : labels.map((l,i)=>`<div class="bar-i">
+          <span class="l">${esc(fmtL?fmtL(l):l)}</span>
+          <span class="t" style="width:${Math.max(1,100*vals[i]/max)}%"></span>
+          <span class="v">${tot?(100*vals[i]/tot).toFixed(1).replace('.',',')+'%':'—'}</span>
+        </div>`).join('');
+  }
+  function topbars(el,obj){
+    const o=(obj||{})[ST.sel];
+    if(!o||!o.top||!o.top.length){
+      document.getElementById(el).innerHTML='<div style="font-size:.72rem;color:var(--gray)">Sin dato.</div>';
+      return;
+    }
+    const tot=o.top.reduce((s,[,v])=>s+v,0)+(o.otros||0);
+    const max=Math.max(...o.top.map(([,v])=>v));
+    document.getElementById(el).innerHTML=o.top.slice(0,8).map(([c,v])=>
+      `<div class="bar-i"><span class="l" title="${esc(c)}">${esc(tCase(c))}</span>
+        <span class="t" style="width:${Math.max(1,100*v/max)}%"></span>
+        <span class="v">${(100*v/tot).toFixed(1).replace('.',',')}%</span></div>`).join('');
+  }
+  function perfil(){
+    const N=ST.nac, s=ST.sel;
+    const d=ST.meta.delitos.find(x=>x.id===s)||{};
+    const H=(N.por_hora[s]||new Array(24).fill(0));
+    /* la hora se lee mejor en bloques de 3: 24 barras es ruido */
+    const bloques=[0,3,6,9,12,15,18,21].map(h=>H.slice(h,h+3).reduce((a,b)=>a+b,0));
+    barras('c-hora',['0–3','3–6','6–9','9–12','12–15','15–18','18–21','21–24'],bloques);
+    document.getElementById('t-hora').textContent='A qué hora · '+d.label;
+    barras('c-dia',N.dias,N.por_dia[s]||new Array(7).fill(0));
+    barras('c-mes',N.meses,N.por_mes[s]||new Array(12).fill(0));
+    barras('c-zona',['Urbana','Rural'],N.por_zona[s]||[0,0]);
+    barras('c-gen',['Hombres','Mujeres'],N.por_genero[s]||[0,0]);
+    barras('c-edad',N.edad_labels,N.por_edad[s]||new Array(N.edad_labels.length).fill(0));
+    topbars('c-arma',N.por_arma);
+    topbars('c-sitio',N.por_sitio);
+
+    const av=[];
+    if(d.solo_2024) av.push('<b>Este delito solo existe en el lote de 2024</b>, así que su perfil describe ese año, no la década.');
+    if(d.sin_anio>0) av.push(`<b>${Math.round(100*d.sin_anio/d.total)}% de estos hechos llegó sin año</b>, pero sí con hora y día de la semana: el perfil de arriba los incluye.`);
+    const w=document.getElementById('w-perfil');
+    w.innerHTML=av.join('<br><br>'); w.style.display=av.length?'':'none';
+  }
+
+  function calidad(){
+    const c=ST.meta.calidad, fr=Object.entries(c.fuera_de_rango||{});
+    document.getElementById('calidad').innerHTML=`
+      <p style="margin-bottom:.7rem"><b>Son denuncias, no delitos.</b> Un municipio donde la gente confía en la
+      Policía denuncia más y aparece más oscuro en el mapa. La comparación entre territorios mide
+      denuncia y tamaño de población a la vez, no solo criminalidad.</p>
+      <p style="margin-bottom:.7rem"><b>${fmt(c.sin_anio_total)} hechos sin año</b>
+      (${String(c.sin_anio_pct).replace('.',',')}%). ${esc(c.nota_sin_anio)}</p>
+      <p style="margin-bottom:.7rem"><b>El lote de 2024 venía con otros nombres de delito.</b>
+      ${esc(c.nota_2024)} Sin unificarlos, 2024 habría dado cero en cada serie.</p>
+      <p style="margin-bottom:.7rem"><b>Bogotá venía dentro de Cundinamarca.</b> ${esc(c.nota_bogota)}</p>
+      <p style="margin-bottom:.7rem"><b>No hay tasas por habitante todavía.</b> Sin población por municipio
+      y año, las cifras son volumen absoluto: Bogotá encabeza casi todo simplemente por tamaño.</p>
+      ${fr.length?`<p><b>Fechas fuera de rango:</b> ${fr.map(([a,n])=>`${fmt(n)} hechos fechados en ${a}`).join(', ')}
+      — quedan fuera de las series.</p>`:''}
+      ${c.sin_dane?`<p><b>Sin municipio identificable:</b> ${fmt(c.sin_dane)} hechos (${(100*c.sin_dane/ST.meta.hechos).toFixed(3).replace('.',',')}%), fuera del mapa.</p>`:''}`;
+  }
+
+  (async()=>{
+    try{
+      const [m,n]=await Promise.all([PONAL.meta(),PONAL.nacional()]);
+      ST.meta=m; ST.nac=n;
+      tabla(); pills(); perfil(); calidad();
+    }catch(e){
+      document.querySelector('.hs').innerHTML=
+        `<div class="sec"><div class="sec-t">No pude cargar los datos</div>
+         <div class="sec-s">${esc(e.message)}</div></div>`;
+    }
+  })();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>
