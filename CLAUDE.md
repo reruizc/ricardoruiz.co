@@ -5139,6 +5139,112 @@ las bolitas de Senado/Cámara — sin dato, cada cupo queda como placeholder "?"
   también se sientan en una constitucional (normal: es comisión legal, no
   exclusiva) — confirmado cruzando contra las hojas del xlsx.
 
+## Hub de Policía — `policia.html` + delitos PONAL 2015-2024 (v1 · 2 fichas · ago-2026)
+
+Cara pública del histórico de delitos de la Policía Nacional, con el **mismo
+chasis de `legislativo.html`** (reusa `legislativo-base.css` y
+`legislativo-base.js` tal cual — son genéricos y una sola copia evita que los
+dos hubs se desincronicen). Arrancó con **2 fichas** por decisión de Ricardo:
+validar chasis y datos antes de invertir en las otras cuatro.
+
+```
+policia.html             hub (hero con franja de cobertura + 2 fichas)
+policia-mapa.html        drill nacional → depto → municipio, 21 delitos × 10 años
+policia-historico.html   tendencia por delito + perfil (hora/día/mes/zona/edad/arma/sitio)
+ponal-base.js            capa de datos: URLs de S3, cruce de códigos, rampa de color
+tools/ponal/build_ponal.py   el agregador (una pasada sobre los 8,4 GB, ~5 min)
+```
+
+### La fuente y sus cuatro trampas
+`Bases de datos/PONAL/BD-PONAL-15-24.csv` — **8,4 GB · `;` · UTF-8 con BOM · 36
+columnas · 8.564.219 filas · 8.853.912 hechos**. ⚠️ `Cantidad` no siempre es 1
+→ **sumarla, nunca contar filas**. **El 72,8% del peso es basura:** las 4
+columnas `Table Names*` repiten la lista completa de archivos fuente en cada
+fila (útil ~2,3 GB).
+
+⚠️⚠️ **① El lote de 2024 usa OTRA convención de nombres de delito.** 2015-2023
+trae `hurto personas`; 2024 trae el nombre de la hoja de Excel,
+`HURTO A PERSONAS dic/Sheet1`. Son **37 etiquetas para 21 delitos**. Sin el mapa
+`DELITOS` del builder, 2024 **no falla: da CERO** en toda serie, en silencio.
+Por eso una etiqueta desconocida **aborta el build a propósito**, en vez de irse
+a una bolsa de "otros". **5 delitos existen SOLO en 2024** (bicicletas, ganado,
+piratería, entidades financieras, lesiones en acc. de tránsito) → marcados
+`solo_2024`, van sin tendencia.
+
+⚠️ **② Bogotá viene dentro de Cundinamarca** en la columna `Departamento` (por
+eso ese departamento pesa 35% del archivo). El departamento se deriva de los 2
+primeros dígitos del **código DANE**, no de esa columna, y quedan separados.
+
+⚠️ **③ Nombres de municipio con mayúsculas mezcladas** — `BOGOTÁ D.C. (CT)` y
+`Bogotá D.C. (CT)` son filas distintas → **2.209 municipios falsos donde hay
+1.111**. La llave es `Hechos.CODIGO_DANE` (7-8 díg → quitar los 3 ceros finales
+y `zfill(5)`); un solo conflicto real, CHIBOLO/CHIVOLO. El nombre sale por moda.
+
+⚠️ **④ 716.509 hechos (8,1%) sin año, y NO es aleatorio:** amenazas 53%, hurto a
+comercios 55%, delitos sexuales 52%. Traen mes y día de la semana pero **no
+año** → entran a totales y perfil, y quedan fuera de toda serie temporal.
+**Consecuencia publicable:** el % de cambio de esos tres delitos **no es una
+tendencia** — amenazas daba «+266%» calculado sobre el 47% de sus registros. En
+la página van en gris con `?`, badge de cobertura y fila tintada
+(`UMBRAL_PARCIAL = 0.15`). Es la diferencia entre informar y inventar.
+
+**Otras columnas:** `Hora` usa la época de Excel (`30/12/1899 6:00:00`) — la
+fecha es basura, la hora sirve. **Inservibles:** `Grupo de Edad` (97% vacío),
+`Calend.MES` (39% vacío + 2 convenciones → derivar el mes de `Fecha`), `LINEA`
+(mal nombrada: es la línea del vehículo hurtado), `COMUNAS_ZONAS_DESCRIPCION`
+(86,5% vacío y corrupto: `UPZ No. 14 USAQUEN ENO REPORTADO1`, un reemplazo de
+texto que se comió el nombre). **Ricas:** edad (79%), género (80%), arma, clase
+de sitio, zona urbano/rural (93/7). 8.103 hechos fechados en **2010** (hurto de
+autos), fuera de rango declarado.
+
+**Validado contra la cifra oficial:** homicidios **12.783 (2015)** · caída de
+2020 · pico **14.160 (2021)** · **13.355 (2024)**. Perfil de homicidio: 92%
+hombres · 74,6% arma de fuego · domingo 21,2% · 39% entre 6 p.m. y medianoche ·
+rural 33,7% (contra 7% del promedio general). **2024 está completo** (12 meses
+con volumen normal) → sí es comparable con 2023.
+
+### Salida y S3
+```
+Bases de datos/output_ponal/{meta,nacional,deptos,municipios}.json   (~1 MB, gitignored)
+→ s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/ponal/
+```
+Cuelga de `congreso-2026/output` porque la política del bucket ya lo cubre como
+público; un prefijo nuevo de primer nivel exigiría tocar la policy. Regenerar:
+`python3 tools/ponal/build_ponal.py` + `aws s3 cp` de los 4 JSON.
+
+### Mapas — el DANE casa directo
+El GeoJSON municipal `mapas-2026/Departamentos-mps/{NN}.json` trae
+**`mpio_cdpmp`, que ES el DANE de 5 dígitos** de PONAL → match directo (125 de
+125 en Antioquia, cero huérfanos en ambas direcciones). El **nombre del archivo**
+sí es código ELECTORAL: la tabla DANE→electoral autoritativa está en
+`split_municipios.py` (el script que generó esos archivos), copiada a
+`ponal-base.js`.
+⚠️ En el GeoJSON nacional Bogotá se llama **`Distrito Capital de Bogotá`** — sin
+ese alias la jurisdicción más grande del país se pinta como «sin dato» y **no
+protesta nadie**. Por eso `PONAL.avisarSinMatch()` deja un `console.warn` con los
+departamentos que no casan; NO adivina por parecido (`Santander` y `Norte de
+Santander` se confundirían).
+⚠️ **Leaflet en grid:** cachea el tamaño del contenedor al crearse y aquí medía
+**113 px de ancho**, dejando el `fitBounds` en zoom 3.25 en vez de 5.25 (Colombia
+del tamaño de una moneda). No basta un `invalidateSize`: hay que reencuadrar
+**después** del layout (`setTimeout 0`, **no** rAF, que se congela con la
+pestaña oculta) y registrar un `ResizeObserver`.
+
+### Pendiente
+1. **Tasas por 100.000 habitantes** (decisión tomada: Ricardo consigue la
+   población). Hoy todo es volumen absoluto y Bogotá encabeza casi todo por
+   tamaño. Necesita proyecciones DANE por municipio 2015-2024 — **es la misma
+   descarga manual del Sprint E Fase B del Lab** (TerriData). El enganche está
+   listo en la página y el aviso ya lo declara.
+2. Las otras 4 fichas: cuándo ocurre · a quién le pasa · cómo (arma/sitio) ·
+   ciudades a comuna/barrio. Ojo: `COMUNAS_ZONAS_DESCRIPCION` está 86,5% vacío,
+   así que el drill a comuna exige cruzar por otra vía (PUESTOS_GEOREF o
+   georreferenciación propia), no por esa columna.
+3. Imágenes de las tarjetas: `imagenes/policia-{mapa,historico}.jpg` (el hub se
+   ve bien sin ellas). Convertir con
+   `sips -s format jpeg -s formatOptions 82 X.png --out X.jpg`.
+4. Enlazar desde `index.html` / `noticias.html` cuando se despliegue.
+
 ## Histórico legislativo — `tools/leyes-senado/` (harvester LISTO · foso de Cauce)
 
 Cosecha completa del histórico de **proyectos de ley, leyes sancionadas,
