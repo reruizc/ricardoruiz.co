@@ -28,10 +28,10 @@ Este módulo es DATO + funciones puras: no importa caudal_core (sería ciclo —
 caudal_core importa este). La validación de que cada llave de `topicos` existe
 en SINONIMOS corre en `verificar()`, que sí importa caudal_core en caliente.
 
-Formato de cada fila (tupla de 7, compacta a propósito para que 200 entradas
-sigan siendo legibles y editables):
+Formato de cada fila (tupla de 7 —u 8 con banderas—, compacta a propósito para
+que 200 entradas sigan siendo legibles y editables):
 
-  (k, nombre, sector, alias, topicos, entidad, excluir)
+  (k, nombre, sector, alias, topicos, entidad, excluir[, flags])
 
   k        · llave estable (no cambiarla: viaja al frontend y al cache)
   nombre   · como se le muestra al usuario
@@ -53,6 +53,31 @@ sigan siendo legibles y editables):
              registros, no dispara desde la consulta)
   excluir  · '|' · substrings que VETAN un registro. Son los falsos positivos
              medidos, no hipótesis.
+  flags    · ',' · opcional. Hoy solo 'extranjera' (ver abajo).
+
+--- 'extranjera': la empresa que solo tiene una de las dos caras -------------
+
+El modelo de arriba asume que la empresa existe jurídicamente en Colombia. Una
+que NO —una exchange de cripto, una plataforma que le vende al usuario desde
+afuera— usa la cara de TEMA con normalidad, pero la de IDENTIDAD solo a medias:
+sale en PRENSA con su nombre propio, y NO puede salir en SECOP (no es
+proveedor del Estado) ni tener acto de una super (no la vigila ninguna).
+
+Sin marcarla, `es_razon_social` la trataría como local: el gate no encontraría
+razón social, el pilar Contratación gastaría sus 6 consultas a Socrata para
+nada y —peor— cualquier homónimo que el gate dejara pasar entraría como si
+fuera ella. La bandera lo vuelve explícito: búscala en prensa, no la busques en
+SECOP. `es_razon_social` y `empieza_por_marca` devuelven False de entrada, así
+que el pilar responde `sin_contratos` (que es la verdad) en vez de un vacío sin
+explicación. `casa_registro` NO se toca: prensa y Regulatorio siguen igual, y
+el día que una super la sancione el acto aparece solo.
+
+⚠ 'extranjera' NO es 'multinacional'. Pfizer, Bayer, Huawei y Holcim tienen
+casa matriz afuera y filial acá: le venden al Estado y las sancionan las supers
+—van SIN bandera, y marcarlas las sacaría de SECOP sin razón—. La bandera es
+"no está inscrita en Colombia", no "es de afuera". Ante la duda, sin bandera:
+el costo de no marcar una es unas consultas de más; el de marcar mal es
+esconderle al cliente contratos que sí existen.
 
 CLI:
   python3 tools/caudal/empresas.py verificar        # llaves de tópico + choques
@@ -993,6 +1018,80 @@ _RAW = [
     ('enterritorio', 'Enterritorio', 'construccion', 'enterritorio',
      'obra publica y contratacion estatal,*vivienda y construccion',
      'empresa nacional promotora del desarrollo territorial', ''),              # texto=16
+
+    # =====================================================================
+    # ⑦ CRIPTOACTIVOS (ago-2026) · el primer sector que el diccionario no podía
+    # representar, porque casi todo él es EXTRANJERO (ver la bandera arriba).
+    #
+    # El síntoma medido: «Binance» no estaba → no se podía poner de vigilada en
+    # un perfil → el perfil quedaba sin identidad → la prensa nunca disparaba, y
+    # eso con la acción `medios` devolviendo 15 titulares suyos en 7 días. El
+    # cliente no recibía nada de una empresa que la prensa cubre a diario.
+    #
+    # Las tres fuentes, medidas una por una sobre el dataset local (ago-2026):
+    #   · sanciones.jsonl (62.538) → 0 para las 15. Ninguna la vigila una super.
+    #   · normativa.jsonl (11.611) → 0. El Ejecutivo no las nombra.
+    #   · títulos del Congreso     → 0 por marca; el debate es por ACTIVIDAD
+    #     (el tópico nuevo del tesauro), que es justo lo que el diccionario
+    #     traduce.
+    # Esos ceros no son un hueco del dato: son el retrato de una industria sin
+    # presencia jurídica local. Por eso van con bandera y su pilar es prensa.
+    #
+    # ⚠ Ningún alias de una palabra corriente: 'buda' (Buda) y 'panda' (medido:
+    # 1 acto de la ANLA para un producto que se llama así) van COMPUESTOS.
+    # Gemini y Circle quedaron FUERA del todo: 'gemini' choca de frente con el
+    # modelo de Google, que es justo lo que domina la prensa de tecnología, y
+    # 'circle' es una palabra inglesa suelta. Entran el día que valgan un alias
+    # compuesto que alguien de verdad escriba, no con la marca pelada.
+    # =====================================================================
+    ('binance', 'Binance', 'cripto', 'binance',
+     'criptoactivos y activos virtuales,sector financiero,tributario,'
+     'competencia y consumidor',
+     'binance holdings', '', 'extranjera'),
+    ('coinbase', 'Coinbase', 'cripto', 'coinbase',
+     'criptoactivos y activos virtuales,sector financiero,tributario', '', '', 'extranjera'),
+    ('kraken', 'Kraken', 'cripto', 'kraken',
+     'criptoactivos y activos virtuales,sector financiero', '', '', 'extranjera'),
+    ('bybit', 'Bybit', 'cripto', 'bybit',
+     'criptoactivos y activos virtuales,sector financiero', '', '', 'extranjera'),
+    ('okx', 'OKX', 'cripto', 'okx',
+     'criptoactivos y activos virtuales,sector financiero', '', '', 'extranjera'),
+    ('kucoin', 'KuCoin', 'cripto', 'kucoin',
+     'criptoactivos y activos virtuales,sector financiero', '', '', 'extranjera'),
+    ('cryptocom', 'Crypto.com', 'cripto', 'crypto com',
+     'criptoactivos y activos virtuales,sector financiero', '', '', 'extranjera'),
+    ('bitfinex', 'Bitfinex', 'cripto', 'bitfinex',
+     'criptoactivos y activos virtuales,sector financiero', '', '', 'extranjera'),
+    # las de la región · son las que de verdad operan sobre el peso colombiano
+    ('bitso', 'Bitso', 'cripto', 'bitso',
+     'criptoactivos y activos virtuales,sector financiero,tecnologia digital / IA',
+     '', '', 'extranjera'),
+    ('buda', 'Buda.com', 'cripto', 'buda com',
+     'criptoactivos y activos virtuales,sector financiero', '', '', 'extranjera'),
+    # ⚠ RIPIO (exchange argentino) quedó FUERA, y no por poco peso: «ripio» es
+    # una palabra corriente —el material de afirmado de una vía— y el control
+    # de trampas la disparó con «ripio de construcción». En un país cuyo
+    # Congreso legisla sobre vías, eso le mete una exchange al cliente de
+    # infraestructura. Es la regla de siempre (ningún alias puede ser palabra
+    # común suelta), y acá no hay compuesto que sirva: nadie escribe «ripio
+    # exchange». Entra el día que la nombren distinto, no antes.
+    ('lemoncash', 'Lemon Cash', 'cripto', 'lemon cash',
+     'criptoactivos y activos virtuales,sector financiero', '', '', 'extranjera'),
+    ('banexcoin', 'Banexcoin', 'cripto', 'banexcoin',
+     'criptoactivos y activos virtuales,sector financiero', '', '', 'extranjera'),
+    ('bitpoint', 'Bitpoint', 'cripto', 'bitpoint',
+     'criptoactivos y activos virtuales,sector financiero', '', '', 'extranjera'),
+    # emisores de stablecoin · no son exchange, pero son la contraparte de todo
+    # el debate de medios de pago y de la exposición cambiaria
+    ('tether', 'Tether (USDT)', 'cripto', 'tether|usdt',
+     'criptoactivos y activos virtuales,sector financiero,tributario', '', '', 'extranjera'),
+    ('ripple', 'Ripple (XRP)', 'cripto', 'ripple|xrp',
+     'criptoactivos y activos virtuales,sector financiero', '', '', 'extranjera'),
+    # ⚠ Panda va SIN bandera: es colombiana (Medellín), así que sí puede
+    # aparecer como proveedora o vigilada. Es el contraejemplo que muestra que
+    # la bandera es por presencia jurídica y no por sector.
+    ('pandaexchange', 'Panda Exchange', 'cripto', 'panda exchange',
+     'criptoactivos y activos virtuales,sector financiero,tecnologia digital / IA', '', ''),
 ]
 
 # Gremios y asociaciones: no son empresas, pero SON quienes contratan a Cauce y
@@ -1151,11 +1250,30 @@ _RAW_GREMIOS = [
     ('scarq', 'Sociedad Colombiana de Arquitectos', 'construccion',
      'sociedad colombiana de arquitectos',
      'ordenamiento territorial y urbanismo,*vivienda y construccion', '', ''),
+
+    # ---- ⑦ el interlocutor local de un sector extranjero -------------------
+    # Las 15 exchanges no tienen presencia jurídica acá, pero el proyecto de ley
+    # de PSAV sí tiene quién lo negocie: Colombia Fintech es el gremio que se
+    # sienta en esa mesa, y es colombiano (sin bandera: sí puede tener contrato
+    # y sí lo puede sancionar una super). Su agenda no es SOLO cripto —crédito
+    # digital, pagos, finanzas abiertas— así que el núcleo es doble: lo
+    # financiero y lo cripto. Con cripto de contexto, el cliente que lo consulta
+    # no vería por defecto el proyecto que está negociando.
+    ('colombiafintech', 'Colombia Fintech', 'financiero', 'colombia fintech',
+     'sector financiero,*criptoactivos y activos virtuales,'
+     'tecnologia digital / IA,tributario,datos personales / habeas data',
+     'asociacion colombiana de empresas de tecnologia e innovacion financiera', ''),
 ]
 
 
+FLAGS_VALIDAS = {'extranjera'}
+
+
 def _fila(t, tipo):
-    k, nombre, sector, alias, top, ent, exc = t
+    # la 8ª posición (banderas) es opcional: las ~590 filas que no la traen
+    # siguen siendo tuplas de 7 y no hay que tocarlas.
+    k, nombre, sector, alias, top, ent, exc = t[:7]
+    flags = {f.strip() for f in (t[7] if len(t) > 7 else '').split(',') if f.strip()}
     al = [_n(a) for a in alias.split('|') if a.strip()]
     tops = [x.strip() for x in top.split(',') if x.strip()]
     nucleo, contexto = [], []
@@ -1164,6 +1282,9 @@ def _fila(t, tipo):
         (nucleo if (i == 0 or x.startswith('*')) else contexto).append(x.lstrip('*'))
     return {
         'k': k, 'nombre': nombre, 'sector': sector, 'tipo': tipo,
+        'flags': sorted(flags),
+        # sin presencia jurídica local → prensa sí, SECOP/supers no
+        'extranjera': 'extranjera' in flags,
         'alias': al,
         'topicos': [x.lstrip('*') for x in tops],
         'nucleo': nucleo, 'contexto': contexto,
@@ -1284,6 +1405,10 @@ def es_razon_social(nombre, emp):
     Precisión antes que cobertura: una razón social larga que el diccionario no
     registre queda fuera, y el sitio correcto de arreglarlo es su campo
     `entidad`, no aflojar esta regla."""
+    # una empresa sin presencia jurídica local no tiene razón social colombiana
+    # que encontrar: lo que el gate deje pasar sería un homónimo, no ella.
+    if emp.get('extranjera'):
+        return False
     toks = _tokens_marca(nombre)
     if not toks:
         return False
@@ -1320,6 +1445,8 @@ def empieza_por_marca(nombre, emp):
     al SENA los ~323 k contratos en que es la entidad contratante.
     NO usar sobre el proveedor: ahí 'UBER DANIEL CHARA CERON' también empieza
     por la marca."""
+    if emp.get('extranjera'):     # tampoco es una entidad pública colombiana
+        return False
     tk = _tokens_marca(nombre)
     if not tk:
         return False
@@ -1335,6 +1462,24 @@ def empieza_por_marca(nombre, emp):
 
 def marca_lidera_any(emps, nombre):
     return any(empieza_por_marca(nombre, e) for e in emps)
+
+
+def sin_presencia_local(emps):
+    """Las de la lista que no pueden aparecer en SECOP ni en actos de una super.
+
+    Los dos gates de arriba ya las rechazan solos, así que nadie NECESITA llamar
+    esto para que el filtro sea correcto. Sirve para otras dos cosas: decirle al
+    usuario POR QUÉ su vigilada no tiene contratos (es un hecho de la empresa,
+    no un hueco del dato) y ahorrarse el descubrimiento en Socrata cuando todas
+    las de la consulta son extranjeras —hoy son 6 consultas que, por
+    construcción, no pueden devolver nada—."""
+    return [e['nombre'] for e in emps if e.get('extranjera')]
+
+
+def solo_extranjeras(emps):
+    """¿Ninguna de las nombradas tiene presencia jurídica local? (lista vacía →
+    False: 'no hay empresas' no es 'todas son extranjeras')."""
+    return bool(emps) and all(e.get('extranjera') for e in emps)
 
 
 def filtrar_registros(emps, registros, campos):
@@ -1356,7 +1501,8 @@ def _cli():
     if cmd == 'buscar':
         q = ' '.join(sys.argv[2:])
         for e in empresas_en(q):
-            print(f"{e['nombre']}  [{e['tipo']} · {e['sector']}]")
+            marca = ' · SIN PRESENCIA LOCAL (prensa sí, SECOP no)' if e['extranjera'] else ''
+            print(f"{e['nombre']}  [{e['tipo']} · {e['sector']}{marca}]")
             print('   tópicos:', ', '.join(e['topicos']))
             print('   identidad:', ' | '.join(e['entidad']))
         return
@@ -1366,9 +1512,15 @@ def _cli():
     malas = [(e['k'], t) for e in EMPRESAS for t in e['topicos'] if t not in validas]
     print(f'{len(EMPRESAS)} entradas '
           f"({sum(1 for e in EMPRESAS if e['tipo']=='empresa')} empresas, "
-          f"{sum(1 for e in EMPRESAS if e['tipo']=='gremio')} gremios) · "
+          f"{sum(1 for e in EMPRESAS if e['tipo']=='gremio')} gremios · "
+          f"{sum(1 for e in EMPRESAS if e['extranjera'])} sin presencia local) · "
           f'{len(validas)} tópicos en el tesauro')
     print('llaves de tópico inválidas:', malas or 'ninguna')
+    # una bandera mal escrita no puede pasar en silencio: 'extrangera' dejaría a
+    # la empresa tratada como local y de vuelta al problema que ⑦ resolvió.
+    flags_malas = [(e['k'], f) for e in EMPRESAS for f in e['flags']
+                   if f not in FLAGS_VALIDAS]
+    print('banderas desconocidas:', flags_malas or 'ninguna')
     ks = [e['k'] for e in EMPRESAS]
     print('llaves duplicadas:', [k for k in set(ks) if ks.count(k) > 1] or 'ninguna')
     choques = []

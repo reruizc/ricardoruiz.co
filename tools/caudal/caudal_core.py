@@ -195,8 +195,14 @@ SINONIMOS = [
     {'k': 'educacion superior', 'terms': [
         'educacion superior', 'instituciones de educacion superior',
         'creditos educativos', 'financiacion de la educacion']},
+    # ⚠ 'criptoactivos' SALIÓ de acá y se fue al tópico propio de ⑦: un término
+    # no puede vivir en dos tópicos, porque entonces la consulta los activa a
+    # los dos y el OR se come la precisión de ambos — buscar «criptoactivos»
+    # arrastraba los proyectos de IA y de redes sociales. Cuesta 4 títulos a las
+    # ~25 entradas colgadas de este tópico (Google, Meta, OpenAI…), y son 4 que
+    # no les competen: la ley de exchanges no es su agenda.
     {'k': 'tecnologia digital / IA', 'terms': [
-        'inteligencia artificial', 'criptoactivos', 'transformacion digital',
+        'inteligencia artificial', 'transformacion digital',
         'redes sociales', 'entornos digitales']},
     {'k': 'laboral', 'terms': [
         'reforma laboral', 'salario minimo', 'contrato de trabajo',
@@ -237,6 +243,34 @@ SINONIMOS = [
     {'k': 'ordenamiento territorial y urbanismo', 'terms': [
         'ordenamiento territorial', 'licencias urbanisticas', 'curadurias urbanas',
         'espacio publico', 'valorizacion']},
+    # --- ⑦ criptoactivos (ago-2026). Estaba escondido como UN término dentro de
+    # 'tecnologia digital / IA', mezclado con IA y redes sociales; de ahí salió.
+    #
+    # Medido sobre los títulos reales (los `terms` se cruzan contra el TÍTULO —
+    # el texto de gaceta va por el ancla de la consulta, no por el tesauro):
+    #   'criptoactivos' 4 · 'plataformas de intercambio' 4 · 'criptomonedas' 1 ·
+    #   'monedas virtuales' 1 · 'activos virtuales' 1 (el proyecto de PSAV) ·
+    #   'psav' 1. Unión: 5 proyectos distintos. Es un tópico chico y así es el
+    #   sector: el Congreso lo ha intentado poco y casi siempre lo mismo.
+    #
+    # ⚠⚠ 'cripto' a secas se CAYÓ, y es el ejemplo más limpio de por qué hay que
+    # leer los títulos y no contarlos: devuelve 20, y 15 son impres-CRIPT-ibilidad
+    # de los crímenes de guerra y sus-CRIPT-ores de servicios públicos. Su raíz
+    # ('cript') vive dentro de otras palabras — el mismo modo de falla de
+    # 'seguros', 'puertos', 'paramos', 'licitacion' y 'anticipos'.
+    # ⚠⚠ 'defi' es peor todavía: 134 títulos, todos DEFInir, DEFEnsoría e
+    # inmunoDEFIciencia. Ni con la mejor intención.
+    #
+    # 'bitcoin' y 'blockchain' van con 0 títulos A PROPÓSITO: no aportan un solo
+    # match, aportan el DISPARO. Son las dos palabras con las que el cliente
+    # escribe, y el Congreso no usa ninguna — sin ellas la consulta «bitcoin» no
+    # activa el tópico y el usuario nunca ve la ley que le aplica. Son cadenas
+    # que no existen dentro de ninguna palabra en español, así que disparar es
+    # todo lo que hacen. 'fintech' NO entra: es más ancho que cripto (Nequi y
+    # Nubank son fintech y no tocan esta ley) y dispararía de más.
+    {'k': 'criptoactivos y activos virtuales', 'terms': [
+        'criptoactivos', 'criptomonedas', 'monedas virtuales', 'activos virtuales',
+        'plataformas de intercambio', 'psav', 'bitcoin', 'blockchain']},
 ]
 
 
@@ -447,7 +481,10 @@ def buscar_empresas(q, limit=20):
     for e in empresas.EMPRESAS:
         if qn in _norm(e['nombre']) or any(qn in a for a in e['alias']):
             out.append({'k': e['k'], 'nombre': e['nombre'], 'tipo': e['tipo'],
-                        'sector': e['sector'], 'nucleo': e['nucleo']})
+                        'sector': e['sector'], 'nucleo': e['nucleo'],
+                        # sin presencia jurídica local: la UI puede advertir que
+                        # esta vigilada se sigue por prensa, no por SECOP
+                        'extranjera': e.get('extranjera', False)})
         if len(out) >= limit:
             break
     return out
@@ -563,7 +600,8 @@ def normalizar_perfil(p):
         'descripcion': str(p.get('descripcion') or '').strip()[:400],
         'temas': temas,
         'empresas': [{'k': e['k'], 'nombre': e['nombre'], 'tipo': e['tipo'],
-                      'sector': e['sector'], 'nucleo': e['nucleo']} for e in emps],
+                      'sector': e['sector'], 'nucleo': e['nucleo'],
+                      'extranjera': e.get('extranjera', False)} for e in emps],
         'empresas_keys': [e['k'] for e in emps],
         'sector_sanciones': ss,
         'comision': com,
