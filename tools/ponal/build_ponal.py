@@ -234,6 +234,13 @@ def main():
     nac_sitio = defaultdict(int)     # (delito, sitio)
     nac_mag = defaultdict(int)       # (delito, móvil del agresor)
     nac_mvi = defaultdict(int)       # (delito, móvil de la víctima)
+    nac_civil = defaultdict(int)     # (delito, estado civil)
+    nac_educ = defaultdict(int)      # (delito, grado de instrucción)
+    nac_emp = defaultdict(int)       # (delito, clase de empleado)
+    nac_pais = defaultdict(int)      # (delito, país de nacimiento)
+    nac_cond = defaultdict(int)      # (delito, artículo del Código Penal)
+    nac_bien = defaultdict(int)      # (delito, clase de bien hurtado)
+    gen_anio = defaultdict(int)      # (delito, género, anio) — la brecha en el tiempo
     # ciudades: comuna × delito × año, y barrio × delito (sin año, por tamaño)
     ciu_com = defaultdict(int)       # (dane, comuna, delito, anio)
     ciu_com_t = defaultdict(int)     # (dane, comuna, delito)
@@ -324,6 +331,8 @@ def main():
         g = limpio(row[ix["Person.GENERO"]]).upper()
         if g in ("MASCULINO", "FEMENINO"):
             nac_gen[(did, g)] += q
+            if anio is not None:
+                gen_anio[(did, g, anio)] += q
         b = banda_edad(limpio(row[ix["Person.EDAD"]]))
         if b is not None:
             nac_edad[(did, b)] += q
@@ -339,6 +348,33 @@ def main():
         vi = limpio(row[ix["Móvil Victima"]])
         if vi:
             nac_mvi[(did, vi.upper())] += q
+        # ── perfil social de la víctima ─────────────────────────────
+        ec = limpio(row[ix["Estado Civil"]])
+        if ec:
+            nac_civil[(did, ec.upper())] += q
+        ed = limpio(row[ix["Person.GRADO_INSTRUCCION_PERSONA"]])
+        if ed:
+            nac_educ[(did, ed.upper())] += q
+        # ⚠️ `Clase de empleado` trae 858 valores (está sucia) pero su cabeza es
+        # limpia y dice mucho: empleado, independiente, estudiante, ama de casa,
+        # desempleado. Entra recortada al top, con el resto agrupado.
+        em = limpio(row[ix["Clase de empleado"]])
+        if em and em.upper() != "NO REPORTADA":
+            nac_emp[(did, em.upper())] += q
+        pa = limpio(row[ix["País de nacimiento"]])
+        if pa:
+            # la fuente escribe el mismo país de dos formas
+            u = pa.upper().replace("ESTADOS UNIDOS DE AMERICA", "ESTADOS UNIDOS")
+            nac_pais[(did, u)] += q
+        # el artículo del Código Penal: es lo que revela la MODALIDAD dentro de
+        # un mismo delito (p.ej. dentro de «delitos sexuales» separa actos con
+        # menor de 14 años de acceso carnal violento)
+        cd = limpio(row[ix["ListaC.DESCRIPCION_CONDUCTA"]])
+        if cd:
+            nac_cond[(did, cd.upper())] += q
+        bn = limpio(row[ix["Bienes.CLASE_BIEN"]])
+        if bn:
+            nac_bien[(did, bn.upper())] += q
 
         # ── ciudades: comuna (por sufijo del barrio) y barrio ────────
         if dane and (dane in CIUDADES or dane in CIUDADES_SOLO_BARRIO):
@@ -454,6 +490,23 @@ def main():
         # completos (k alto), no recortados como arma y sitio
         "por_movil_agresor": topcat(nac_mag, 18),
         "por_movil_victima": topcat(nac_mvi, 18),
+        "por_estado_civil": porcat(nac_civil, ["SOLTERO", "UNION LIBRE", "CASADO",
+                                               "SEPARADO", "DIVORCIADO", "VIUDO"]),
+        "civil_labels": ["Soltero", "Unión libre", "Casado", "Separado", "Divorciado", "Viudo"],
+        "por_educacion": porcat(nac_educ, ["ANALFABETA", "PRIMARIA", "SECUNDARIA",
+                                           "TECNICO", "TECNOLOGO", "SUPERIOR"]),
+        "educ_labels": ["Analfabeta", "Primaria", "Secundaria", "Técnico", "Tecnólogo", "Superior"],
+        "por_ocupacion": topcat(nac_emp, 10),
+        "por_pais": topcat(nac_pais, 10),
+        "por_modalidad": topcat(nac_cond, 10),
+        "por_bien": topcat(nac_bien, 10),
+        # la brecha de género año a año: solo tiene sentido donde hay serie
+        "genero_anio": {
+            did: {"M": [gen_anio.get((did, "MASCULINO", a), 0) for a in ANIOS],
+                  "F": [gen_anio.get((did, "FEMENINO", a), 0) for a in ANIOS]}
+            for did, _l, _r in DELITOS
+            if any(gen_anio.get((did, g, a), 0) for g in ("MASCULINO", "FEMENINO") for a in ANIOS)
+        },
     }
 
     deps = {}
@@ -547,7 +600,8 @@ def main():
         if d in indice:
             f2 = OUT / "ciudades" / f"{d}.json"
             print(f"    {indice[d]['n']:14} {f2.stat().st_size/1024:>8,.0f} KB · "
-                  f"{indice[d].get('comunas',0)} {CIUDADES[d]['tipo']}es · "
+                  f"{indice[d].get('comunas',0)} "
+                  f"{ {'comuna':'comunas','localidad':'localidades'}[CIUDADES[d]['tipo']] } · "
                   f"{indice[d]['barrios']:,} barrios · "
                   f"{100*indice[d]['sin_comuna']/max(1,ciu_tot[d]):.1f}% sin comuna")
 

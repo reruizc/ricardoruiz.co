@@ -5263,6 +5263,49 @@ absoluto es Valle · Antioquia · Bogotá, y en tasa pasa a ser **Arauca 129,5 �
 Putumayo 59,8 · Cauca 55,3 · Chocó 50,7** — la periferia del conflicto. Nacional
 26,2 por 100.000, que cuadra con la cifra oficial.
 
+### ⚠️⚠️ La medianoche es un NULO disfrazado
+`Hora` escribe **00:00 cuando la fuente no conoce la hora**, así que la hora 0
+queda inflada. **Medido contra el promedio de las otras 23 horas del mismo
+delito:** homicidios **1,0×** (dato real) · hurto de celulares 1,2× · hurto a
+personas 1,5× · **amenazas 5,0×** · **violencia intrafamiliar 6,8×** ·
+**delitos sexuales 9,1×**.
+
+Sin tratarlo, la página afirmaba que **el 31,6% de los delitos sexuales ocurre
+entre medianoche y las 3 a.m.** — falso. Con la hora 0 apartada (umbral
+`ratio ≥ 2`, calculado en el frontend contra el propio delito), el pico real
+queda en **9-12 a.m. (21,3%) y 3-6 p.m. (18,9%)**, que es lo coherente con que
+la mayoría sea contra menores en entornos conocidos. Homicidios no se toca y
+conserva su pico nocturno real de 18-24 h.
+
+El umbral se aplica **por delito, no global**: es la única forma de apartar el
+nulo sin borrar las medianoches verdaderas.
+
+### Perfil social de la víctima (variables añadidas)
+⚠️ **Todo el bloque `Person.*` describe a la VÍCTIMA**, no al agresor; del
+agresor la fuente solo registra cómo se movía. Está declarado en la página.
+
+| Variable | Vacío | Notas |
+|---|---|---|
+| `Person.GENERO` | 20,8% | ~48% femenino global y estable; lo que habla es **por delito** |
+| `Estado Civil` | 21,5% | 6 valores limpios |
+| `Person.GRADO_INSTRUCCION_PERSONA` | 32,7% | 6 niveles, analfabeta→superior |
+| `Clase de empleado` | 36,8% | 858 valores (sucia) pero su cabeza sirve → entra al top |
+| `País de nacimiento` | 33,6% | Venezuela 56.183; se declara en **cifra absoluta**, no en % (el 99% es Colombia y el resto quedaría en «0,x%») |
+| `ListaC.DESCRIPCION_CONDUCTA` | 36,6% | el artículo del Código Penal: revela la **modalidad** dentro del delito |
+| `Bienes.CLASE_BIEN` | 83,1% | ese vacío es correcto: solo aplica a hurtos de bien identificable |
+
+**Descartadas:** `Profesión` (51,8% vacío + 2.388 valores + «NO REPORTADA» es el
+31% — `Clase de empleado` cubre lo mismo mejor) · `Bienes.COLOR_BIEN` (95,8%
+vacío) · `MARCA`/`Modelo` (nicho).
+
+**La brecha de género en el tiempo** (`genero_anio` en nacional.json) es lo que
+el agregado nacional esconde: violencia intrafamiliar **83,6% → 75,0%** de
+víctimas mujeres entre 2015 y 2024 · delitos sexuales 85,7% → 82,4% ·
+homicidios estable en ~8% · hurto a personas 40,0% → 42,2%.
+
+**Hallazgo de modalidad:** dentro de delitos sexuales, los artículos 209 y 208
+(**contra menores de 14 años**) suman **168.911 de ~300.000** — la mayoría.
+
 ### Móvil del agresor y de la víctima
 `Conduc.MOVIL_AGRESOR` y `Móvil Victima`: ~16 valores cerrados, **solo 2,5%
 vacío**, entran completos (no recortados como arma y sitio). Es el dato que

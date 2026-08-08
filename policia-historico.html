@@ -56,7 +56,30 @@
       font-size:.7rem;color:rgba(255,255,255,.75);line-height:1.6;margin-top:1rem}
     .warn b{color:var(--amber)}
     .scrollx{overflow-x:auto}
+    .sub-n{font-size:.64rem;color:var(--gray);line-height:1.55;margin-top:.6rem}
+    .gen-2{display:grid;grid-template-columns:340px 1fr;gap:1.2rem;align-items:center}
+    .gen-ejex{display:flex;justify-content:space-between;font-size:.58rem;color:var(--gray);margin-top:.2rem}
+    .gen-txt{font-size:.78rem;color:rgba(255,255,255,.72);line-height:1.7}
+    .gen-txt b{color:var(--white)}
+    @media(max-width:820px){ .gen-2{grid-template-columns:1fr} }
     @media(max-width:820px){ .g2,.g3{grid-template-columns:1fr} .bar-i{grid-template-columns:96px 1fr 54px} }
+    /* En móvil la tabla mide 448px contra 375 de pantalla y lo que se sale son
+       justo las dos columnas que importan: el cambio y la curva. Scrollear de
+       lado no se ve, así que en vez de eso se ocultan las columnas de los años
+       sueltos —el dato que MENOS aporta, porque la curva ya muestra la forma—
+       y quedan delito · total · cambio · curva. */
+    @media(max-width:640px){
+      .tt th:nth-child(3),.tt td:nth-child(3),
+      .tt th:nth-child(4),.tt td:nth-child(4){display:none}
+      .tt{font-size:.7rem}
+      .tt th{font-size:.55rem}
+      /* medido a 375px: con padding .35rem y spark de 74 la tabla daba 277
+         contra 261 de caja y la curva quedaba cortada por 16px */
+      .tt td{padding:.5rem .25rem}
+      .tt th{padding:.45rem .25rem}
+      .spark{width:60px}
+      .badge{display:inline-block;margin:.25rem 0 0;font-size:.5rem}
+    }
   </style>
 </head>
 <body>
@@ -117,10 +140,10 @@
 
     <div class="sec">
       <div class="sec-t">El perfil de cada delito</div>
-      <div class="sec-s">Escoge uno y mira cuándo ocurre y a quién le ocurre. La hora y el día de la semana están en <b>casi todos</b> los registros, incluso en los que no traen año.</div>
+      <div class="sec-s">Escoge uno y mira cuándo ocurre y a quién le ocurre. La hora y el día de la semana están en <b>casi todos</b> los registros, incluso en los que no traen año. El perfil de la persona —género, edad, estudios, ocupación, nacionalidad— es el de <b>la víctima</b>, no el del agresor; la fuente solo describe al agresor por cómo se movía.</div>
       <div id="pills" style="margin-bottom:1.2rem"></div>
       <div class="g2">
-        <div><div class="mini-t" id="t-hora">A qué hora</div><div id="c-hora"></div></div>
+        <div><div class="mini-t" id="t-hora">A qué hora</div><div id="c-hora"></div><div class="sub-n" id="n-hora"></div></div>
         <div><div class="mini-t">Qué día de la semana</div><div id="c-dia"></div></div>
       </div>
       <div class="g2" style="margin-top:1.2rem">
@@ -136,7 +159,26 @@
         <div><div class="mini-t">Cómo se movía el agresor</div><div id="c-mag"></div></div>
         <div><div class="mini-t">Cómo se movía la víctima</div><div id="c-mvi"></div></div>
       </div>
-      <div style="margin-top:1.2rem"><div class="mini-t">Dónde ocurre</div><div id="c-sitio"></div></div>
+      <div class="g2" style="margin-top:1.2rem">
+        <div><div class="mini-t">Dónde ocurre</div><div id="c-sitio"></div></div>
+        <div><div class="mini-t" id="t-mod">Bajo qué artículo se registra</div><div id="c-mod"></div></div>
+      </div>
+      <div class="g3" style="margin-top:1.2rem">
+        <div><div class="mini-t">Estado civil de la víctima</div><div id="c-civil"></div></div>
+        <div><div class="mini-t">Hasta dónde estudió</div><div id="c-educ"></div></div>
+        <div><div class="mini-t">De qué vive</div><div id="c-ocup"></div></div>
+      </div>
+      <div class="g2" style="margin-top:1.2rem">
+        <div><div class="mini-t" id="t-bien">Qué se llevaron</div><div id="c-bien"></div></div>
+        <div><div class="mini-t">Dónde nació la víctima</div><div id="c-pais"></div><div class="sub-n" id="n-pais"></div></div>
+      </div>
+      <div id="gen-wrap" style="display:none;margin-top:1.4rem;padding-top:1.2rem;border-top:1px solid var(--card-border)">
+        <div class="mini-t">La brecha de género, año a año</div>
+        <div class="gen-2">
+          <div id="gen-chart"></div>
+          <div class="gen-txt" id="gen-txt"></div>
+        </div>
+      </div>
       <div class="warn" id="w-perfil"></div>
     </div>
 
@@ -255,11 +297,27 @@
   function perfil(){
     const N=ST.nac, s=ST.sel;
     const d=ST.meta.delitos.find(x=>x.id===s)||{};
+    /* ── la hora, con la medianoche desactivada cuando es un nulo ──────
+       La fuente escribe 00:00 cuando NO conoce la hora, así que la medianoche
+       queda inflada. Medido: en homicidios la hora 0 es 1,0× el promedio de
+       las demás (dato real), pero en delitos sexuales es 9,1×, en violencia
+       intrafamiliar 6,8× y en amenazas 5,0×. Sin esto la página afirmaría que
+       el 31,6% de los delitos sexuales ocurre entre medianoche y las 3 a.m.,
+       que es falso. Se compara cada delito contra sí mismo y solo se aparta la
+       hora 0 donde el pico delata el nulo. */
     const H=(N.por_hora[s]||new Array(24).fill(0));
-    /* la hora se lee mejor en bloques de 3: 24 barras es ruido */
-    const bloques=[0,3,6,9,12,15,18,21].map(h=>H.slice(h,h+3).reduce((a,b)=>a+b,0));
-    barras('c-hora',['0–3','3–6','6–9','9–12','12–15','15–18','18–21','21–24'],bloques);
+    const medResto=H.slice(1).reduce((a,b)=>a+b,0)/23;
+    const ratio=medResto?H[0]/medResto:0;
+    const sucia=ratio>=2;
+    const HH=sucia?[0].concat(H.slice(1)):H;      // hora 0 a cero si está sucia
+    const bloques=[0,3,6,9,12,15,18,21].map(h=>HH.slice(h,h+3).reduce((a,b)=>a+b,0));
+    barras('c-hora',[sucia?'1–3':'0–3','3–6','6–9','9–12','12–15','15–18','18–21','21–24'],bloques);
     document.getElementById('t-hora').textContent='A qué hora · '+d.label;
+    document.getElementById('n-hora').innerHTML=sucia
+      ? `Se apartaron <b>${fmt(H[0])}</b> registros marcados a las 00:00. La fuente usa esa hora
+         cuando no la conoce, y en este delito aparece ${ratio.toFixed(1).replace('.',',')} veces
+         más de lo que cabría esperar — contarlos diría que ocurren de madrugada, que no es cierto.`
+      : '';
     barras('c-dia',N.dias,N.por_dia[s]||new Array(7).fill(0));
     barras('c-mes',N.meses,N.por_mes[s]||new Array(12).fill(0));
     barras('c-zona',['Urbana','Rural'],N.por_zona[s]||[0,0]);
@@ -272,12 +330,72 @@
        la moto pesa muchísimo más */
     topbars('c-mag',N.por_movil_agresor);
     topbars('c-mvi',N.por_movil_victima);
+    barras('c-civil',N.civil_labels,N.por_estado_civil[s]||new Array(6).fill(0));
+    barras('c-educ',N.educ_labels,N.por_educacion[s]||new Array(6).fill(0));
+    topbars('c-ocup',N.por_ocupacion);
+    topbars('c-mod',N.por_modalidad);
+    topbars('c-bien',N.por_bien);
+    topbars('c-pais',N.por_pais);
+    /* La nacionalidad se declara en cifras absolutas, no solo en porcentaje: el
+       99% de las víctimas es colombiana, así que un porcentaje deja al resto
+       en «0,x%» y no se puede leer. El número crudo sí. */
+    const P=(N.por_pais||{})[s];
+    if(P&&P.top&&P.top.length){
+      const tot=P.top.reduce((a,[,v])=>a+v,0)+(P.otros||0);
+      const col=(P.top.find(([c])=>c==='COLOMBIA')||[,0])[1];
+      const ext=tot-col;
+      document.getElementById('n-pais').innerHTML=
+        `${fmt(ext)} de ${fmt(tot)} víctimas con nacionalidad registrada nacieron fuera de Colombia `+
+        `(${(100*ext/Math.max(1,tot)).toFixed(1).replace('.',',')}%).`;
+    } else document.getElementById('n-pais').textContent='';
+    /* rótulos que cambian según el delito, para no prometer lo que no hay */
+    document.getElementById('t-bien').textContent=
+      (N.por_bien||{})[s] ? 'Qué se llevaron' : 'Qué se llevaron · no aplica a este delito';
+    /* la brecha de género en el tiempo va aparte, con su propio gráfico */
+    lineaGenero(s,d);
 
     const av=[];
     if(d.solo_2024) av.push('<b>Este delito solo existe en el lote de 2024</b>, así que su perfil describe ese año, no la década.');
     if(d.sin_anio>0) av.push(`<b>${Math.round(100*d.sin_anio/d.total)}% de estos hechos llegó sin año</b>, pero sí con hora y día de la semana: el perfil de arriba los incluye.`);
     const w=document.getElementById('w-perfil');
     w.innerHTML=av.join('<br><br>'); w.style.display=av.length?'':'none';
+  }
+
+  /* ── la brecha de género, año a año ──────────────────────────────
+     El porcentaje de víctimas mujeres del total nacional es ~48% y se mueve
+     poco, así que a nivel agregado no dice nada. Lo que habla es POR DELITO:
+     violencia intrafamiliar y delitos sexuales están arriba del 75% femenino,
+     y homicidio abajo del 10%. Por eso se dibuja una línea por delito, no una
+     sola cifra nacional. */
+  function lineaGenero(s,d){
+    const G=(ST.nac.genero_anio||{})[s], box=document.getElementById('gen-wrap');
+    if(!G||d.solo_2024){ box.style.display='none'; return; }
+    const A=ST.meta.anios;
+    const pct=A.map((_,i)=>{const m=G.M[i]||0,f=G.F[i]||0;return (m+f)?100*f/(m+f):null;});
+    if(pct.every(v=>v==null)){ box.style.display='none'; return; }
+    box.style.display='';
+    const W=320,H=90,P=8;
+    const x=i=>P+i*(W-2*P)/Math.max(1,A.length-1);
+    const y=v=>P+(H-2*P)*(1-v/100);
+    const pts=pct.map((v,i)=>v==null?null:`${x(i).toFixed(1)},${y(v).toFixed(1)}`).filter(Boolean).join(' ');
+    const dots=pct.map((v,i)=>v==null?'':`<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="2.2" fill="#e0679a"/>`).join('');
+    const prim=pct.find(v=>v!=null), ult=[...pct].reverse().find(v=>v!=null);
+    document.getElementById('gen-chart').innerHTML=
+      `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Porcentaje de víctimas mujeres por año">
+         <line x1="0" y1="${y(50)}" x2="${W}" y2="${y(50)}" stroke="rgba(255,255,255,.16)" stroke-dasharray="3 3"/>
+         <text x="2" y="${y(50)-4}" fill="rgba(255,255,255,.35)" font-size="7">50% · paridad</text>
+         <polyline points="${pts}" fill="none" stroke="#e0679a" stroke-width="2" stroke-linejoin="round"/>
+         ${dots}
+       </svg>
+       <div class="gen-ejex"><span>${A[0]}</span><span>${A[A.length-1]}</span></div>`;
+    const dif=(ult-prim);
+    document.getElementById('gen-txt').innerHTML=
+      `En <b>${esc(d.label.toLowerCase())}</b> las mujeres pasaron de ser el `+
+      `<b>${prim.toFixed(1).replace('.',',')}%</b> de las víctimas en ${A[0]} al `+
+      `<b>${ult.toFixed(1).replace('.',',')}%</b> en ${A[A.length-1]}`+
+      (Math.abs(dif)<1?' — prácticamente sin cambio.':
+        ` (${dif>0?'+':''}${dif.toFixed(1).replace('.',',')} puntos).`)+
+      (d.sin_anio>0?' <span style="opacity:.6">Ojo: a este delito le falta el año en buena parte de sus registros, así que la línea se apoya en menos datos de los que parece.</span>':'');
   }
 
   function calidad(){
@@ -291,8 +409,17 @@
       <p style="margin-bottom:.7rem"><b>El lote de 2024 venía con otros nombres de delito.</b>
       ${esc(c.nota_2024)} Sin unificarlos, 2024 habría dado cero en cada serie.</p>
       <p style="margin-bottom:.7rem"><b>Bogotá venía dentro de Cundinamarca.</b> ${esc(c.nota_bogota)}</p>
-      <p style="margin-bottom:.7rem"><b>No hay tasas por habitante todavía.</b> Sin población por municipio
-      y año, las cifras son volumen absoluto: Bogotá encabeza casi todo simplemente por tamaño.</p>
+      <p style="margin-bottom:.7rem"><b>La medianoche es, muchas veces, «no sé a qué hora».</b> La fuente
+      escribe 00:00 cuando no conoce la hora del hecho. En homicidios ese valor es tan frecuente como
+      cualquier otro —o sea, es real—, pero en delitos sexuales aparece 9 veces de más, en violencia
+      intrafamiliar 7 y en amenazas 5. Donde el pico delata el nulo, esos registros se apartan del
+      gráfico de horas y se dice cuántos son.</p>
+      <p style="margin-bottom:.7rem"><b>El perfil es el de la víctima.</b> Género, edad, estudios,
+      ocupación y nacionalidad describen a quien denuncia, no a quien agrede. Del agresor la fuente
+      solo registra cómo se movía.</p>
+      <p style="margin-bottom:.7rem"><b>Las tasas por habitante llegan hasta 2018.</b> La proyección
+      municipal del DANE es post-censo y arranca ese año; 2015, 2016 y 2017 van en volumen absoluto.
+      Dentro de las ciudades no hay tasa: el DANE no publica población por comuna.</p>
       ${fr.length?`<p><b>Fechas fuera de rango:</b> ${fr.map(([a,n])=>`${fmt(n)} hechos fechados en ${a}`).join(', ')}
       — quedan fuera de las series.</p>`:''}
       ${c.sin_dane?`<p><b>Sin municipio identificable:</b> ${fmt(c.sin_dane)} hechos (${(100*c.sin_dane/ST.meta.hechos).toFixed(3).replace('.',',')}%), fuera del mapa.</p>`:''}`;
