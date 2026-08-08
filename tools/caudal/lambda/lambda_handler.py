@@ -58,6 +58,7 @@ Bucket:
   CAUDAL_BUCKET      default 'caudal-legislativo'
 """
 import json
+import unicodedata as _unicodedata
 import os
 import sys
 import hashlib
@@ -2203,17 +2204,34 @@ def _reg_con_nombre(r):
 def _bloque_regulatorio(dels, vig_keys, cap=6):
     """Las `cap` señales regulatorias del sector, ya priorizadas y redactadas."""
     corte = str(caudal_core.REF_YEAR - 3)
+    es_sanc = lambda r: (r.get('tipo_acto') or 'sancion') == 'sancion'
+    # El filtro de nombre aplica SOLO a las sanciones: una sanción sin
+    # sancionado no sirve para nada. Un acto NORMATIVO —una circular, una
+    # resolución de la UIAF— no tiene destinatario individual por definición, y
+    # exigirle uno lo borraba del radar. Medido ago-2026: con las seis fuentes
+    # normativas adentro, el perfil de Binance sumaba 798 actos al conteo y
+    # mostraba CERO, porque todos traen `sancionado='—'`. El guion es el
+    # marcador de ausencia de la fuente, no un nombre — y es truthy, así que un
+    # `or` no lo atrapa (mismo tropiezo que ya había costado caro en alertas).
     utiles = [r for r in dels
-              if _reg_con_nombre(r)
+              if (_reg_con_nombre(r) or not es_sanc(r))
               and (r.get('sancionado'), r.get('fecha'), r.get('resolucion'),
                    r.get('fuente')) not in vig_keys]
     utiles.sort(key=lambda r: r.get('fecha') or '', reverse=True)
-    es_sanc = lambda r: (r.get('tipo_acto') or 'sancion') == 'sancion'
     sanc_rec = [r for r in utiles if es_sanc(r) and (r.get('fecha') or '')[:4] >= corte]
     otros = [r for r in utiles if not es_sanc(r)]
     sanc_old = [r for r in utiles if es_sanc(r) and (r.get('fecha') or '')[:4] < corte]
+    # Reparto: hasta la mitad del cupo para sanciones recientes y el resto para
+    # la norma. Sin esto las sanciones —que son muchas y frescas— se comen el
+    # bloque entero y la circular que le CREA la obligación al cliente no cabe.
+    # Para un cliente vale más la norma que le habla a él que la multa que le
+    # pusieron a un tercero de su sector.
+    mitad = max(1, cap // 2)
+    orden = sanc_rec[:mitad] + otros[:cap - mitad]
+    orden += [r for r in (sanc_rec[mitad:] + otros[cap - mitad:] + sanc_old)
+              if r not in orden]
     out = []
-    for r in (sanc_rec + otros + sanc_old)[:cap]:
+    for r in orden[:cap]:
         acto = r.get('tipo_acto') or 'sancion'
         yr = (r.get('fecha') or '')[:4]
         reciente = yr.isdigit() and int(yr) >= caudal_core.REF_YEAR - 1
@@ -2227,7 +2245,11 @@ def _bloque_regulatorio(dels, vig_keys, cap=6):
         else:
             accion = _REG_ACCION.get(acto, _REG_ACCION['otro'])
             nivel = 'alto' if (reciente and acto == 'apertura_investigacion') else 'medio'
-        out.append({'tipo': 'regulatorio', 'sancionado': r.get('sancionado'),
+        # Sin destinatario real, el titular es el ACTO. Devolver un guion deja
+        # una tarjeta en blanco en la pantalla del cliente, que es peor que no
+        # mostrarla: parece un error nuestro.
+        quien = r.get('sancionado') if _reg_con_nombre(r) else None
+        out.append({'tipo': 'regulatorio', 'sancionado': quien,
                     'fuente': r.get('fuente_nombre'), 'tipo_sancion': r.get('tipo'),
                     'acto': acto, 'acto_lbl': _REG_ACTO_LBL.get(acto, _REG_ACTO_LBL['otro']),
                     'motivo': (r.get('motivo') or '')[:170], 'fecha': r.get('fecha'),
@@ -2416,6 +2438,18 @@ CORS = {'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
         'Content-Type': 'application/json'}
 
+
+
+def _fold_q(s):
+    """Minúsculas y sin tildes — la MISMA regla con la que build_s3 y los
+    harvesters construyen el blob `q`. Si las dos mitades no coinciden, la
+    búsqueda miente: medido ago-2026, «régimen cambiario» devolvía 3.764 actos
+    y «regimen cambiario» devolvía cero, y el cliente escribe sin tildes.
+
+    Se pliega la CONSULTA (una cadena) y no los blobs (81k): plegar los blobs en
+    caliente cuesta 2,87 s por petición."""
+    return ''.join(c for c in _unicodedata.normalize('NFD', (s or '').strip().lower())
+                   if _unicodedata.category(c) != 'Mn')
 
 def _resp(code, payload):
     return {'statusCode': code, 'headers': CORS,
@@ -2771,7 +2805,7 @@ def handler(event, context):
         return _resp(200, _contexto_medios(body))
 
     if action == 'sanciones':      # pilar Regulatorio · actos de superintendencias
-        q = (body.get('query') or '').strip().lower()
+        q = _fold_q(body.get('query'))   # misma regla que el blob: sin tildes
         sector = body.get('sector') or ''
         # reencuadre jul-2026: el pilar cubre TODOS los actos regulatorios, pero
         # la vista por defecto sigue siendo solo sanciones — meter aperturas y
@@ -2826,7 +2860,7 @@ def handler(event, context):
         })
 
     if action == 'ejecutivo':      # pilar Ejecutivo Nacional · decretos y normativa de Presidencia
-        q = (body.get('query') or '').strip().lower()
+        q = _fold_q(body.get('query'))   # misma regla que el blob: sin tildes
         tipo = (body.get('tipo') or '').strip().upper()
         if not q and not tipo:                 # landing: agregados precalculados (rápido)
             return _resp(200, dict(_ejecutivo_stats(), mode='stats'))
@@ -2853,7 +2887,7 @@ def handler(event, context):
         })
 
     if action == 'sucop':          # pilar SUCOP · borradores de norma en consulta pública
-        q = (body.get('query') or '').strip().lower()
+        q = _fold_q(body.get('query'))   # misma regla que el blob: sin tildes
         estado = (body.get('estado') or '').strip().lower()
         entidad = (body.get('entidad') or '').strip().lower()
         sector = (body.get('sector') or '').strip().lower()
@@ -3047,8 +3081,35 @@ def handler(event, context):
                                        'documentar el caso y su exposición') if reciente else
                                       f'Antecedente regulatorio de {quien} ({lbl.lower()})'})
         reg, n_sanc, n_otros = [], 0, 0
+        # El sector del perfil es UNO solo, y desde ago-2026 eso se quedó corto:
+        # a un exchange de criptoactivos le pega la UIAF (financiero), la
+        # Supersociedades (societario) y la DIAN (tributario) a la vez, y el
+        # campo solo admite un sector. Verificado con el perfil de Binance: con
+        # `sector_sanciones='consumo'` su obligación de reporte ante la UIAF
+        # —que es su frontera de cumplimiento más cara— no aparecía nunca.
+        #
+        # Por eso el pilar se mira por DOS vías y se unen sin repetir:
+        #   · por SECTOR, como siempre (lo que le pasa a otros de su gremio);
+        #   · por TEMA, contra el blob de búsqueda (la norma que le habla a él,
+        #     la emita quien la emita).
+        # La vía temática es la que trae la norma, que para un cliente vale más
+        # que la multa que le pusieron a un tercero.
+        dels, vistos = [], set()
         if s.get('sector_sanciones'):
-            dels = [r for r in _sanciones() if r.get('sector') == s['sector_sanciones']]
+            for r in _sanciones():
+                if r.get('sector') == s['sector_sanciones']:
+                    dels.append(r)
+                    vistos.add(id(r))
+        temas_reg = [_fold_q(t) for t in (s.get('temas') or []) if len(_fold_q(t)) >= 4]
+        if temas_reg:
+            for r in _sanciones():
+                if id(r) in vistos:
+                    continue
+                blob = r.get('q') or ''
+                if any(t in blob for t in temas_reg):
+                    dels.append(r)
+                    vistos.add(id(r))
+        if dels:
             sanc = [r for r in dels if (r.get('tipo_acto') or 'sancion') == 'sancion']
             n_sanc, n_otros = len(sanc), len(dels) - len(sanc)
             reg = _bloque_regulatorio(dels, vig_keys)
@@ -3117,7 +3178,19 @@ def handler(event, context):
             print(f'[cliente] secop FAIL: {type(e).__name__}: {e}')
             con_agg = {'n': 0, 'resultados': []}
         n_con = con_agg['n']
-        for r in con_agg['resultados']:
+        # La contratación GENÉRICA del sector se calla para un perfil de cliente.
+        # Medido con Binance: sin vender un peso al Estado, su radar traía cinco
+        # contratos de servicios profesionales de la Secretaría de Integración
+        # Social — ruido con apariencia de señal, y encima marcado 'alto'. Para
+        # un cliente temático SECOP no aporta: no existe la contratación pública
+        # de criptoactivos. Lo que SÍ se conserva es la contratación de sus
+        # VIGILADAS (con_vig, que va por identidad y arriba en el bloque) y el
+        # conteo `n_contratos_sector`, para que el dato no desaparezca: se deja
+        # de mostrar, no se esconde.
+        # Los 6 presets de sector siguen igual — son demo y ahí el sector ES el
+        # cliente.
+        con_generica_muda = s.get('k') == 'perfil'
+        for r in ([] if con_generica_muda else con_agg['resultados']):
             if r.get('id') in vig_cids:
                 continue
             reciente = (r.get('fecha') or '') >= corte_con
@@ -3158,6 +3231,9 @@ def handler(event, context):
                            # honesto: las vigiladas están en el diccionario pero
                            # no le venden al Estado (verificado con Uber/Ecopetrol)
                            'vigiladas_sin_contratos': con_vig_vacio,
+                           # por qué el bloque de contratación puede venir vacío
+                           # aunque `n_contratos_sector` no sea cero
+                           'contratacion_generica_omitida': con_generica_muda,
                            'descartes': s.get('descartes', [])},
                'congreso': rc['senales'], 'regulatorio': reg, 'medios': med,
                'contratacion': con, 'kpis': kpis, 'sectores': sectores}

@@ -27,6 +27,7 @@ Uso:
 import argparse
 import datetime
 import json
+import unicodedata
 import re
 import subprocess
 import sys
@@ -123,7 +124,12 @@ def slim(row):
     tipo = (row.get('tipo') or '').strip()
     numero = parse_numero(titulo)
     url = (row.get('url') or '').strip()
-    blob = ' '.join(x for x in (titulo, desc) if x).lower()
+    # Sin tildes: el 70% de los blobs las traía y «declaracion» no encontraba
+    # «declaración». Se pliega acá y no en la consulta porque plegar en caliente
+    # cuesta segundos por petición (medido en el pilar Regulatorio).
+    blob = ''.join(c for c in unicodedata.normalize(
+        'NFD', ' '.join(x for x in (titulo, desc) if x).lower())
+        if unicodedata.category(c) != 'Mn')
     return {
         'tipo': tipo,
         'numero': numero,

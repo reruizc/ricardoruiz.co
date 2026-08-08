@@ -17,6 +17,7 @@ Todo stdlib. No sube nada: el `aws s3 cp` va aparte (ver README).
 import datetime
 import json
 import re
+import unicodedata
 from collections import Counter
 from pathlib import Path
 
@@ -104,13 +105,33 @@ TIPO_ACTO_TXT = {
 }
 
 
+def _fold(s):
+    """Minúsculas y SIN tildes, para el blob de búsqueda.
+
+    Medido ago-2026, y era un agujero grande: el 87% de los blobs traía tildes,
+    así que «régimen cambiario» devolvía 3.764 actos y «regimen cambiario»
+    devolvía CERO. El cliente escribe sin tildes.
+
+    Va acá y no en la Lambda a propósito: plegar los 81k blobs en caliente
+    cuesta 2,87 s POR CONSULTA (medido). Plegado una vez al construir, la
+    búsqueda no paga nada. La otra mitad del arreglo está en la Lambda, que
+    pliega la consulta con la misma regla.
+
+    NFD + descartar las marcas combinantes, no un reemplazo literal de á→a: hay
+    fuentes que mandan la tilde descompuesta (la 'a' y el acento como dos
+    caracteres) y ahí el reemplazo literal no ve nada y falla en silencio.
+    """
+    return ''.join(c for c in unicodedata.normalize('NFD', (s or '').lower())
+                   if unicodedata.category(c) != 'Mn')
+
+
 def slim(rec):
     fecha = parse_fecha(rec.get('fecha_firmeza'))
     monto = parse_monto(rec.get('monto'))
     sanc = _clean_text(rec.get('sancionado') or '')
     mot = _clean_text(rec.get('motivo') or '')
     desc = _clean_text(rec.get('descripcion') or '')
-    blob = ' '.join(x for x in (sanc, mot, desc, rec.get('fuente_nombre', '')) if x).lower()
+    blob = _fold(' '.join(x for x in (sanc, mot, desc, rec.get('fuente_nombre', '')) if x))
     ta = (rec.get('tipo_acto') or '').strip()
     return {
         'sancionado': sanc or '—',

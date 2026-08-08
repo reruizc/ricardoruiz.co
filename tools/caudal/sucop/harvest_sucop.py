@@ -56,6 +56,7 @@ import argparse
 import datetime
 import json
 import re
+import unicodedata
 import subprocess
 import sys
 import time
@@ -118,9 +119,11 @@ _FECHA_MAX = (datetime.date.today() + datetime.timedelta(days=400)).isoformat()
 
 
 def _norm(s):
-    s = (s or '').lower()
-    for a, b in (('á', 'a'), ('é', 'e'), ('í', 'i'), ('ó', 'o'), ('ú', 'u'), ('ñ', 'n')):
-        s = s.replace(a, b)
+    # NFD y fuera las marcas combinantes, en vez del reemplazo literal á→a: hay
+    # fuentes que mandan la tilde DESCOMPUESTA (la 'a' y el acento como dos
+    # caracteres) y ahí el reemplazo no ve nada. Medido: 23 blobs se escapaban.
+    s = unicodedata.normalize('NFD', (s or '').lower())
+    s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
     return re.sub(r'\s+', ' ', s).strip()
 
 
