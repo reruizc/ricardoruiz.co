@@ -324,6 +324,8 @@ button { font:inherit; color:inherit; background:none; border:none; cursor:none;
 
   <!-- ═══ VISTA REDES ═══ -->
   <div id="view-redes" hidden>
+    <div id="redes-pausa" hidden></div>
+    <div id="redes-cuerpo">
     <div class="kpis" id="kpis-redes"></div>
 
     <div class="section-head"><h2><span class="num">— 01</span> Lectura del analista</h2><span class="meta" id="meta-digest-redes">Redes · IA</span></div>
@@ -349,6 +351,7 @@ button { font:inherit; color:inherit; background:none; border:none; cursor:none;
 
     <div class="section-head"><h2><span class="num">— 04</span> Publicaciones que más resuenan</h2><span class="meta">Por engagement</span></div>
     <div class="temas-grid" id="posts-grid"></div>
+    </div>
   </div>
 
   <footer class="footer">
@@ -418,7 +421,10 @@ button { font:inherit; color:inherit; background:none; border:none; cursor:none;
     window._D = D;
     renderKPIs(D); renderDigest(D); renderTemas(D); renderCloud(D); renderMedios(D); renderTitulares(D);
     renderSentimiento(D.sentimiento, 'sent-prensa', 'sent-head');
-    if (D.redes && D.redes.n_posts) {
+    // La pestaña también se muestra cuando la captura está pausada y no queda
+    // dato: si se ocultara, una función que el cliente conoce desaparecería sin
+    // explicación y parecería rota. Con el aviso, se lee como pausa.
+    if (D.redes && (D.redes.n_posts || D.redes.pausado)) {
       document.getElementById('lens-toggle').hidden = false;
       renderRedes(D.redes);
       renderSentimiento(D.redes.sentimiento, 'sent-redes', 'sent-head-redes');
@@ -438,6 +444,43 @@ button { font:inherit; color:inherit; background:none; border:none; cursor:none;
   }
 
   function renderRedes(R){
+    // Aviso de captura congelada. Sin esto, una sección conservada de hace
+    // semanas se lee igual que una recién scrapeada — y la vista de redes es
+    // justo la que se mira para saber "qué está pasando ahora".
+    const pz = document.getElementById('redes-pausa');
+    if (pz) {
+      const dias = R.capturado
+        ? Math.floor((Date.now() - new Date(R.capturado).getTime()) / 86400000) : null;
+      // el ciclo normal salta unas horas: solo se avisa si de verdad se nota
+      const avisar = R.pausado && (R.pausado !== 'ciclo' || (dias !== null && dias >= 2));
+      if (avisar) {
+        const f = R.capturado
+          ? new Date(R.capturado).toLocaleDateString('es-CO', { day:'numeric', month:'long', year:'numeric' })
+          : null;
+        // dos casos distintos: hay una captura vieja abajo, o no hay nada
+        const cola = R.n_posts
+          ? `Lo que se muestra abajo es la última lectura${f ? `, del <strong style="color:var(--ink)">${esc(f)}</strong>` : ''}${
+              dias !== null && dias > 0 ? ` — hace ${dias} día${dias === 1 ? '' : 's'}` : ''}.
+             <strong style="color:var(--ink)">No refleja la conversación de hoy.</strong>`
+          : `<strong style="color:var(--ink)">Por ahora no hay datos de redes que mostrar.</strong>`;
+        pz.innerHTML =
+          `<div style="border:1.5px solid var(--gold);background:#EEBCFF10;padding:1rem 1.15rem;margin-bottom:1.25rem">
+             <div style="font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.18em;
+                         text-transform:uppercase;color:var(--gold);margin-bottom:.5rem">
+               Captura pausada</div>
+             <p style="font-size:14px;color:var(--ink-2);line-height:1.6">
+               ${esc(R.pausado_nota || 'La captura de redes está pausada.')} ${cola}
+               El monitoreo de <strong style="color:var(--ink)">prensa sigue actualizándose</strong> con normalidad.
+             </p>
+           </div>`;
+        pz.hidden = false;
+      } else { pz.hidden = true; pz.innerHTML = ''; }
+    }
+    // Pausada y sin captura previa: solo el aviso. Todo lo de abajo (KPIs,
+    // nube, cuentas, posts) leería de arrays que no existen.
+    const cuerpo = document.getElementById('redes-cuerpo');
+    if (!R.n_posts) { if (cuerpo) cuerpo.hidden = true; return; }
+    if (cuerpo) cuerpo.hidden = false;
     const top = (R.por_red && R.por_red[0]) ? R.por_red[0].label : '—';
     const kp = [
       { v:R.n_posts, l:'Publicaciones' },

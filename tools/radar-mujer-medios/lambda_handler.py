@@ -94,10 +94,19 @@ def build_tablero(agg, n_total, digest, ventana_dias, now, digest_dias=None):
 
 
 def _add_redes(tablero, now):
+    """Escribe tablero['redes'] con una captura nueva. Devuelve True si lo logró.
+
+    ⚠️ El valor de retorno importa: si sale con False, el llamador tiene que
+    conservar la sección de la corrida anterior. Sin eso, un día de 0 eventos
+    BORRA las redes del tablero para siempre — y como el ciclo siguiente ya no
+    encuentra nada que conservar, la pestaña entera desaparece sin avisar. Fue
+    exactamente lo que pasó del 3 al 8 de agosto de 2026.
+    """
     ventana = int(os.environ.get("RADAR_VENTANA_DIAS", "7"))
     events = collect_social.collect_social_events(now.isoformat())
     if not events:
-        print("[redes] 0 eventos"); return
+        print("[redes] 0 eventos → conservo la captura anterior")
+        return False
     if os.environ.get("RADAR_PERSIST_RAW", "1") == "1":
         try:
             _persist_raw(events, now, now.strftime("%Y%m%dT%H%M%SZ"))
@@ -118,6 +127,10 @@ def _add_redes(tablero, now):
         print(f"[sentimiento redes] falló: {e}")
     RL = report.RED_LABEL
     tablero["redes"] = {
+        # Sella CUÁNDO se scrapeó de verdad. Las redes no corren en todos los
+        # ciclos (cuestan por resultado), así que sin esta marca la sección
+        # conservada de una corrida anterior se lee como si fuera de hoy.
+        "capturado": now.isoformat(),
         "n_posts": len(events),
         "digest_dias": dd,
         "n_posts_digest": len(ev_dig),
@@ -135,6 +148,7 @@ def _add_redes(tablero, now):
         ],
     }
     print(f"[redes] posts={len(events)} por_red={dict(agg['por_red'])} digest={'ok' if digest else 'no'}")
+    return True
 
 
 def handler(event, context):
@@ -187,19 +201,45 @@ def handler(event, context):
     if hrs:
         allowed = {int(h) for h in hrs.split(",") if h.strip().isdigit()}
         run_social = now.hour in allowed
-    if collect_social is not None and os.environ.get("APIFY_TOKEN") and run_social:
+    hay_token = bool(os.environ.get("APIFY_TOKEN"))
+    scraped = False
+    if collect_social is not None and hay_token and run_social:
         try:
-            _add_redes(tablero, now)
+            scraped = bool(_add_redes(tablero, now))
         except Exception as e:
             print(f"[redes] falló (sigo solo con prensa): {e}")
-    else:
+
+    if not scraped:
+        # Por qué no hay captura nueva. Se distingue el ciclo normal (hora fuera
+        # de RADAR_SOCIAL_HOURS, varias veces al día) de la desconexión
+        # deliberada, porque el tablero las muestra distinto: en la primera el
+        # dato es de esta madrugada, en la segunda puede ser de hace semanas.
+        if collect_social is None:
+            motivo, corte = "modulo", "El módulo de redes no cargó en el Lambda."
+        elif not hay_token:
+            motivo, corte = "desconectado", ("La conexión con la fuente de redes está "
+                                             "pausada. Vuelve a conectarse pronto.")
+        elif not run_social:
+            motivo, corte = "ciclo", f"Ciclo sin scraping (hora {now.hour} UTC)."
+        else:
+            motivo, corte = "sin_datos", ("La última consulta a la fuente de redes no "
+                                          "devolvió publicaciones.")
         try:
             prev = json.loads(_s3c().get_object(Bucket=S3_BUCKET, Key=TABLERO_KEY)["Body"].read())
-            if prev.get("redes"):
-                tablero["redes"] = prev["redes"]
-                print(f"[redes] ciclo sin scraping (hora {now.hour} UTC) → conservo redes de {prev.get('redes',{}).get('n_posts')} posts")
+            r = dict(prev.get("redes") or {})
+            if r:
+                # Si venía de antes de que existiera `capturado`, se cae al sello
+                # de la corrida anterior: la fecha queda bien aunque la hora no.
+                # NUNCA se re-sella con `now`: sería decir que el dato es de ahora.
+                r.setdefault("capturado", prev.get("generado_en"))
+            r["pausado"] = motivo      # ciclo | desconectado | sin_datos | modulo
+            r["pausado_nota"] = corte
+            r.setdefault("n_posts", 0)
+            tablero["redes"] = r
+            print(f"[redes] {motivo} → {r.get('n_posts')} posts, capturados {r.get('capturado')}")
         except Exception as e:
             print(f"[redes] no pude conservar sección previa: {e}")
+            tablero["redes"] = {"pausado": motivo, "pausado_nota": corte, "n_posts": 0}
 
     _s3c().put_object(
         Bucket=S3_BUCKET, Key=TABLERO_KEY,
