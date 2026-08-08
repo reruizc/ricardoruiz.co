@@ -468,7 +468,7 @@
   <div class="wrap">
 
     <!-- ══════════ INICIO ══════════ -->
-    <div class="panel active" id="panel-inicio">
+    <div class="panel" id="panel-inicio">
       <div class="eyebrow">Herramienta ciudadana gratuita</div>
       <h1>Tu EPS no te entrega lo que ya te <em>autorizaron</em>.<br>Aquí armas la tutela.</h1>
       <p class="lede">
@@ -654,29 +654,14 @@
 
     <!-- ══════════ WIZARD ══════════ -->
     <!-- SECUENCIA DEL CASO · va entre elegirlo y "Ten esto a mano" -->
+    <!-- APERTURA · la orden médica que no se cumple, y el papel que la hace exigible -->
+    <div class="panel active" id="panel-intro">
+      <section class="sy" id="sy-gen"></section>
+    </div>
+
+    <!-- SECUENCIA DEL CASO · va entre elegirlo y "Ten esto a mano" -->
     <div class="panel" id="panel-secuencia">
-      <section class="sy" id="sy">
-        <div class="sy-track">
-          <div class="sy-stage">
-            <div class="sy-art" id="sy-art">
-              <div class="sy-over" id="sy-over"></div>
-            </div>
-            <div class="sy-bar"><i id="sy-bar"></i></div>
-            <div class="sy-copy">
-              <div class="sy-lines" id="sy-lines"></div>
-              <div class="sy-cta" id="sy-cta">
-                <button type="button" class="btn btn-primary" id="sy-empezar">Empezar</button>
-              </div>
-            </div>
-            <button type="button" class="sy-skip" id="sy-skip" aria-label="Seguir bajando">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M12 5v14M5 12l7 7 7-7"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </section>
+      <section class="sy" id="sy-med"></section>
     </div>
 
     <!-- CASO ELEGIDO · de qué se trata y qué hay que tener a mano -->
@@ -1452,6 +1437,8 @@
   var STEP_NAMES = ['Tus datos','Quién','Contra quién','Qué pasó','Tu tutela'];
 
   var $ = function(id){ return document.getElementById(id); };
+  // la página abre EN la secuencia: el fondo y la barra reducida aplican de entrada
+  document.body.classList.add('en-secuencia');
   var val = function(id){ var e = $(id); return e ? String(e.value || '').trim() : ''; };
 
   /* ══════════════════ SECUENCIA DEL CASO ══════════════════
@@ -1471,59 +1458,115 @@
      ⚠️ Hoy solo MEDICAMENTOS tiene frames. `SY_CASOS` es la llave: un caso sin
      frames se salta la secuencia y va derecho a "Ten esto a mano", en vez de
      mostrar la hoja con pastillas a quien reclama una cita. */
-  var SY_CASOS = { medicamentos:true };
-  var SY = [
-    { f:1,  k:'Lo que pasa',   t:'Te formularon algo y <em>no te lo entregan</em>.',
-      d:'Vuelves a la farmacia, te dicen que no ha llegado, que vuelvas la otra semana.' },
-    { f:3,  k:'No eres el único', t:'274.510 tutelas por salud en un año.',
-      d:'Fue lo que se radicó en Colombia durante 2025: un 15,7% más que el año anterior.' },
-    { f:5,  k:'Y lo más absurdo', t:'Casi todas reclaman algo <em>ya cubierto</em>.',
-      d:'El 64,85% pide servicios que ya están en el plan de beneficios y ya están pagados con tu UPC. El problema no es la cobertura: es que no llegan a tiempo.' },
-    { f:7,  k:'Lo que hacemos', t:'Tú respondes, <em>nosotros lo armamos</em>.',
-      d:'Los hechos, los derechos que se están vulnerando y las órdenes concretas al juez. Listo para firmar y radicar.' },
-    { f:8,  k:'Con datos', t:'Y cómo le ha ido a <em>casos como el tuyo</em>.',
-      d:'Con el registro público de la Corte Constitucional, por tipo de petición y por departamento. Y qué exige el juez para concederla.' },
-    { f:10, k:'Y es tuyo', t:'Gratis y <em>sin que tus datos salgan</em>.',
-      d:'El documento se arma en tu propio navegador. Tu nombre y tu cédula no viajan a ningún servidor.' }
-  ];
-  var SY_N = 10;
+  /* ══════════════════ SECUENCIAS ══════════════════
+     Frames encadenados al scroll, con el título SOBRE la imagen y el cuerpo debajo.
+     Hay DOS y comparten motor:
 
-  (function apertura(){
-    var art = $('sy-art'), lines = $('sy-lines'), sec = $('sy');
-    if (!art || !lines) return;
+     · general (15 frames) — abre la página. Una orden médica que nadie cumple y el
+       papel que la hace exigible. Sirve para todo el sector salud, no para un caso.
+     · medicamentos (10 frames) — va dentro de ese caso, entre elegirlo y "Ten esto
+       a mano".
+
+     Decisiones que valen la pena recordar:
+     · No hay scroll-jacking. La escena va en `sticky` sobre una pista alta, así que
+       el dedo manda: se puede bajar rápido, devolverse o salir cuando se quiera.
+     · Movimiento reducido → la pista se colapsa por CSS y el motor ni se engancha.
+     · Los frames se piden por lotes de dos, no todos de golpe: en un celular con
+       datos contados, bajar todo antes de ver nada es una barrera.
+     · La flecha que late invita a bajar y además salta al final, para quien no
+       quiere el recorrido: esta es una herramienta para gente enferma, no una campaña.
+
+     ⚠️ Un caso sin frames propios se salta su secuencia (`SY_CASOS`) en vez de
+     mostrar la hoja con pastillas a quien reclama una cita. */
+  var SY_CASOS = { medicamentos:true };
+
+  var SECUENCIAS = {
+    general: { dir:'wg', pre:'g', n:15, salida:'irAOpciones', textos:[
+      { f:1,  k:'Cómo empieza', t:'Un médico te ordenó <em>algo que necesitas</em>.',
+        d:'Eso es una promesa: un servicio que está cubierto, autorizado y ya pagado con tu UPC.' },
+      { f:3,  k:'Y entonces', t:'Empieza la espera.',
+        d:'Vuelves, preguntas, te dicen que no ha llegado, que vuelvas la otra semana. Y otra vez.' },
+      { f:6,  k:'Lo más absurdo', t:'Casi nadie pelea por <em>cobertura</em>.',
+        d:'El 64,85% de las tutelas de salud reclama algo que ya está incluido y ya está pagado. El problema no es que no lo cubran: es que no llega a tiempo.' },
+      { f:9,  k:'No eres el único', t:'274.510 tutelas por salud en un año.',
+        d:'Fue lo que se radicó en Colombia durante 2025: un 15,7% más que el año anterior.' },
+      { f:11, k:'Lo que hacemos', t:'Tú respondes, <em>nosotros lo armamos</em>.',
+        d:'Los hechos, los derechos que se están vulnerando y las órdenes concretas al juez. Listo para firmar y radicar.' },
+      { f:13, k:'Con datos', t:'Y cómo le ha ido a <em>casos como el tuyo</em>.',
+        d:'Con el registro público de la Corte Constitucional, por tipo de petición y por departamento. Y qué exige el juez para concederla.' },
+      { f:15, k:'Y es tuyo', t:'Gratis y <em>sin que tus datos salgan</em>.',
+        d:'El documento se arma en tu propio navegador. Tu nombre y tu cédula no viajan a ningún servidor.' }
+    ]},
+    medicamentos: { dir:'w', pre:'f', n:10, salida:'salirSecuencia', textos:[
+      { f:1,  k:'Lo que pasa',   t:'Te formularon algo y <em>no te lo entregan</em>.',
+        d:'Vuelves a la farmacia, te dicen que no ha llegado, que vuelvas la otra semana.' },
+      { f:3,  k:'No eres el único', t:'274.510 tutelas por salud en un año.',
+        d:'Fue lo que se radicó en Colombia durante 2025: un 15,7% más que el año anterior.' },
+      { f:5,  k:'Y lo más absurdo', t:'Casi todas reclaman algo <em>ya cubierto</em>.',
+        d:'El 64,85% pide servicios que ya están en el plan de beneficios y ya están pagados con tu UPC. El problema no es la cobertura: es que no llegan a tiempo.' },
+      { f:7,  k:'Lo que hacemos', t:'Tú respondes, <em>nosotros lo armamos</em>.',
+        d:'Los hechos, los derechos que se están vulnerando y las órdenes concretas al juez. Listo para firmar y radicar.' },
+      { f:8,  k:'Con datos', t:'Y cómo le ha ido a <em>casos como el tuyo</em>.',
+        d:'Con el registro público de la Corte Constitucional, por tipo de petición y por departamento. Y qué exige el juez para concederla.' },
+      { f:10, k:'Y es tuyo', t:'Gratis y <em>sin que tus datos salgan</em>.',
+        d:'El documento se arma en tu propio navegador. Tu nombre y tu cédula no viajan a ningún servidor.' }
+    ]}
+  };
+
+  function montarSecuencia(secId, cfg){
+    var sec = $(secId); if (!sec) return;
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
     var ancho = (window.innerWidth > 900 ? 'lg' : 'sm');
+    var T = cfg.textos;
+
+    sec.innerHTML =
+      '<div class="sy-track"><div class="sy-stage">' +
+        '<div class="sy-art"><div class="sy-over"></div></div>' +
+        '<div class="sy-bar"><i></i></div>' +
+        '<div class="sy-copy"><div class="sy-lines"></div>' +
+          '<div class="sy-cta"><button type="button" class="btn btn-primary">Empezar</button></div>' +
+        '</div>' +
+        '<button type="button" class="sy-skip" aria-label="Seguir bajando">' +
+          '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+          'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<path d="M12 5v14M5 12l7 7 7-7"/></svg></button>' +
+      '</div></div>';
+
+    var art = sec.querySelector('.sy-art'), over = sec.querySelector('.sy-over'),
+        lines = sec.querySelector('.sy-lines'), barra = sec.querySelector('.sy-bar i'),
+        cta = sec.querySelector('.sy-cta'), skip = sec.querySelector('.sy-skip');
 
     var imgs = [];
-    for (var i = 1; i <= SY_N; i++) {
+    for (var i = 1; i <= cfg.n; i++) {
       var im = document.createElement('img');
-      im.alt = ''; im.setAttribute('aria-hidden', 'true');
-      im.decoding = 'async';
-      // el primero entra de inmediato; el resto se piden por lotes al avanzar
-      if (i <= 2) im.src = 'tutelas-salud/w/f' + i + '-' + ancho + '.webp';
-      else im.dataset.src = 'tutelas-salud/w/f' + i + '-' + ancho + '.webp';
+      im.alt = ''; im.setAttribute('aria-hidden', 'true'); im.decoding = 'async';
+      var ruta = 'tutelas-salud/' + cfg.dir + '/' + cfg.pre + i + '-' + ancho + '.webp';
+      if (i <= 2) im.src = ruta; else im.dataset.src = ruta;
       if (i === 1) im.className = 'on';
       art.appendChild(im); imgs.push(im);
     }
-    // el título va SOBRE la imagen y el cuerpo debajo: son dos pilas separadas que
-    // se encienden juntas
-    var over = $('sy-over');
-    over.innerHTML = SY.map(function(s, n){
+    // el título va SOBRE la imagen y el cuerpo debajo: dos pilas que se encienden juntas
+    over.innerHTML = T.map(function(s, n){
       return '<div class="sy-line' + (n === 0 ? ' on' : '') + '">' +
-             '<div class="sy-k">' + s.k + '</div>' +
-             '<div class="sy-t">' + s.t + '</div></div>';
+             '<div class="sy-k">' + s.k + '</div><div class="sy-t">' + s.t + '</div></div>';
     }).join('');
-    lines.innerHTML = SY.map(function(s, n){
+    lines.innerHTML = T.map(function(s, n){
       return '<div class="sy-line' + (n === 0 ? ' on' : '') + '">' +
              '<div class="sy-d">' + s.d + '</div></div>';
     }).join('');
-    var lineEls = lines.querySelectorAll('.sy-line');
-    var overEls = over.querySelectorAll('.sy-line');
+    var lineEls = lines.querySelectorAll('.sy-line'), overEls = over.querySelectorAll('.sy-line');
 
-    if (reduce) { $('sy-cta').classList.add('on'); return; }
+    cta.querySelector('button').addEventListener('click', function(){ window[cfg.salida](); });
+    skip.addEventListener('click', function(){
+      // el tope se mide contra el DOCUMENTO: `offsetTop` es relativo al padre posicionado
+      var arriba = sec.getBoundingClientRect().top + window.pageYOffset;
+      window.scrollTo({ top: arriba + sec.offsetHeight - window.innerHeight, behavior:'smooth' });
+    });
+
+    if (reduce) { cta.classList.add('on'); return; }
 
     function cargarHasta(n){
-      for (var i = 0; i < Math.min(n + 2, SY_N); i++) {
+      for (var i = 0; i < Math.min(n + 2, cfg.n); i++) {
         var im = imgs[i];
         if (im && im.dataset.src) { im.src = im.dataset.src; delete im.dataset.src; }
       }
@@ -1531,32 +1574,43 @@
     var ultimo = -1, pend = false;
     function pintar(){
       pend = false;
+      if (!sec.offsetParent) return;            // la secuencia está oculta
       var r = sec.getBoundingClientRect();
       var total = sec.offsetHeight - window.innerHeight;
       var p = total > 0 ? Math.min(Math.max(-r.top / total, 0), 1) : 0;
-      var idx = Math.min(Math.floor(p * SY_N), SY_N - 1);
+      var idx = Math.min(Math.floor(p * cfg.n), cfg.n - 1);
       if (idx !== ultimo) {
         ultimo = idx;
         cargarHasta(idx);
         imgs.forEach(function(im, i){ im.classList.toggle('on', i === idx); });
-        // la frase activa es la última cuyo frame de anclaje ya se alcanzó
         var act = 0;
-        for (var j = 0; j < SY.length; j++) if (idx + 1 >= SY[j].f) act = j;
+        for (var j = 0; j < T.length; j++) if (idx + 1 >= T[j].f) act = j;
         for (var k = 0; k < lineEls.length; k++) {
           lineEls[k].classList.toggle('on', k === act);
           overEls[k].classList.toggle('on', k === act);
         }
       }
-      $('sy-bar').style.width = (p * 100).toFixed(1) + '%';
-      $('sy-cta').classList.toggle('on', p > 0.9);
-      // la flecha estorba cuando ya se llegó: ahí manda el botón
-      $('sy-skip').classList.toggle('oculto', p > 0.86);
+      barra.style.width = (p * 100).toFixed(1) + '%';
+      cta.classList.toggle('on', p > 0.9);
+      skip.classList.toggle('oculto', p > 0.86);   // al llegar manda el botón
     }
     function onScroll(){ if (!pend) { pend = true; requestAnimationFrame(pintar); } }
     window.addEventListener('scroll', onScroll, { passive:true });
     window.addEventListener('resize', onScroll, { passive:true });
     pintar();
-  })();
+  }
+
+  montarSecuencia('sy-gen', SECUENCIAS.general);
+  montarSecuencia('sy-med', SECUENCIAS.medicamentos);
+
+  // la apertura desemboca en las opciones
+  function irAOpciones(){
+    document.body.classList.remove('en-secuencia');
+    $('panel-intro').classList.remove('active');
+    $('panel-inicio').classList.add('active');
+    window.scrollTo({ top:0, behavior:'auto' });
+  }
+  window.irAOpciones = irAOpciones;
 
   // la secuencia desemboca en "Ten esto a mano", no en el formulario
   function salirSecuencia(){
@@ -1565,17 +1619,7 @@
     $('panel-caso').classList.add('active');
     window.scrollTo({ top:0, behavior:'auto' });
   }
-  if ($('sy-empezar')) $('sy-empezar').addEventListener('click', salirSecuencia);
-  // la flecha invita a bajar, pero al tocarla lleva al final: sigue siendo la salida
-  // para quien no quiere el recorrido
-  if ($('sy-skip')) $('sy-skip').addEventListener('click', function(){
-    var sec = $('sy'); if (!sec) return salirSecuencia();
-    // el tope se mide contra el DOCUMENTO: `offsetTop` es relativo al padre
-    // posicionado y aquí apuntaba más allá del final de la secuencia
-    var arriba = sec.getBoundingClientRect().top + window.pageYOffset;
-    window.scrollTo({ top: arriba + sec.offsetHeight - window.innerHeight,
-                      behavior:'smooth' });
-  });
+  window.salirSecuencia = salirSecuencia;
   if ($('caso-empezar')) $('caso-empezar').addEventListener('click', function(){ abrirFormulario(); });
   if ($('caso-volver')) $('caso-volver').addEventListener('click', function(){
     $('panel-caso').classList.remove('active');
