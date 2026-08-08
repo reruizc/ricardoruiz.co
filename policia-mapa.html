@@ -23,6 +23,10 @@
       border:1px solid rgba(255,255,255,.16);padding:.45rem .6rem;cursor:none;min-width:190px}
     .flt select:focus{outline:none;border-color:var(--amber)}
     .flt-sp{flex:1}
+    .yr:disabled{opacity:.32;cursor:none}
+    .tasa-nota{font-size:.66rem;color:var(--gray);line-height:1.5;margin:-.5rem 0 1rem;max-width:78ch}
+    .bar-n{font-size:.62rem;color:var(--gray);line-height:1.5;margin-top:.7rem;
+      padding-top:.6rem;border-top:1px solid var(--card-border)}
     .yrs{display:flex;gap:2px;flex-wrap:wrap}
     .yr{font-family:var(--hn);font-size:.68rem;padding:.4rem .5rem;background:none;
       border:1px solid rgba(255,255,255,.14);color:var(--gray);cursor:none;font-variant-numeric:tabular-nums}
@@ -105,7 +109,7 @@
   <div class="page-header compacta">
     <div class="page-tag">Policía Nacional · 2015–2024</div>
     <h1 class="page-title">El mapa del delito</h1>
-    <p class="page-sub">Escoge un delito y un año y mira dónde se denuncia. Haz clic en un departamento para bajar a sus municipios. Los conteos son <strong>denuncias</strong>, no víctimas totales, y no están ajustados por población: un municipio grande casi siempre va a mostrar más hechos que uno pequeño.</p>
+    <p class="page-sub">Escoge un delito y un año y mira dónde se denuncia. Haz clic en un departamento para bajar a sus municipios, y en <strong>Bogotá, Medellín o Cali</strong> para llegar a la comuna y al barrio. Los conteos son <strong>denuncias</strong>, no víctimas totales. Con un año de 2018 en adelante puedes pasar a <strong>tasa por 100.000 habitantes</strong>, que es lo que permite comparar territorios de distinto tamaño.</p>
   </div>
 
   <div class="sec-bar">
@@ -123,7 +127,12 @@
         <label class="flt-l">Año</label>
         <div class="yrs" id="f-anios"></div>
       </div>
+      <div class="flt-g">
+        <label class="flt-l">Medida</label>
+        <button class="yr" id="btn-tasa">Ver tasa por 100.000 hab.</button>
+      </div>
     </div>
+    <div class="tasa-nota" id="tasa-nota"></div>
 
     <div class="mp-2">
       <div>
@@ -141,6 +150,11 @@
           <div class="box-t" id="rk-t">Dónde más se denuncia</div>
           <div class="rk" id="rk"></div>
         </div>
+        <div class="box" id="bar-box" style="display:none">
+          <div class="box-t" id="bar-t">Barrios</div>
+          <div class="rk" id="bar"></div>
+          <div class="bar-n" id="bar-n"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -157,7 +171,8 @@
   <script src="legislativo-base.js"></script>
   <script src="ponal-base.js"></script>
   <script>
-  const ST={delito:'homicidios',anio:'todos',dep:null,meta:null,deps:null,muns:null};
+  const ST={delito:'homicidios',anio:'todos',dep:null,mun:null,tasa:false,
+            meta:null,deps:null,muns:null,pob:null,ciuIdx:null,ciu:null};
   let map,capa;
 
   function totalDe(o,delito,anio){
@@ -167,6 +182,29 @@
     const i=ST.meta.anios.indexOf(+anio);
     return i<0?0:(d.y[i]||0);
   }
+  /* ── tasas ──────────────────────────────────────────────────────
+     La población municipal del DANE arranca en 2018 (es post-censo), así que
+     la tasa solo existe para un año concreto de 2018 en adelante. Con «Todos»
+     no hay tasa posible: sumar diez años de hechos sobre la población de un
+     año daría una cifra sin sentido. */
+  const ANIO_POB_MIN=2018;
+  function hayTasa(){ return ST.anio!=='todos' && +ST.anio>=ANIO_POB_MIN; }
+  function poblacionDe(clave,esNac){
+    if(!ST.pob||!hayTasa()) return 0;
+    const i=ST.pob.anios.indexOf(+ST.anio); if(i<0) return 0;
+    const o=(esNac?ST.pob.deptos:ST.pob.muns)[clave];
+    return o?(o.p[i]||0):0;
+  }
+  /* valor que se pinta y se rankea: hechos, o hechos por 100.000 habitantes */
+  function valorDe(o,clave,esNac){
+    const v=totalDe(o,ST.delito,ST.anio);
+    if(!ST.tasa||!hayTasa()) return v;
+    const p=poblacionDe(clave,esNac);
+    return p?(v*1e5/p):0;
+  }
+  const fmtV=v=>ST.tasa&&hayTasa()
+    ? v.toLocaleString('es-CO',{minimumFractionDigits:1,maximumFractionDigits:1})
+    : fmt(Math.round(v));
 
   /* ── filtros ────────────────────────────────────────────────── */
   function pintarFiltros(){
@@ -227,79 +265,216 @@
     }
   }
 
+  /* nivel actual: 'nac' → 'dep' → 'ciu' (solo Bogotá, Medellín y Cali) */
+  function nivel(){ return ST.mun?'ciu':(ST.dep?'dep':'nac'); }
+
   async function pintar(){
-    const esNac=!ST.dep;
-    const filas=esNac?filasNac():filasDep(ST.dep);
+    const nv=nivel();
+    const filas=nv==='nac'?filasNac():nv==='dep'?filasDep(ST.dep):filasCiu();
     const max=Math.max(0,...filas.map(f=>f.v));
-    const geo=esNac?await PONAL.geoDeptos():await PONAL.geoMuns(ST.dep);
+    let geo;
+    if(nv==='nac')      geo=await PONAL.geoDeptos();
+    else if(nv==='dep') geo=await PONAL.geoMuns(ST.dep);
+    else{
+      const cfg=ST.ciuIdx[ST.mun];
+      geo=await PONAL.geoCiudad(cfg.geo);
+      if(cfg.rot) geo=PONAL.rotar90(geo);       // Bogotá va rotada 90° izq
+    }
     const byKey={}; filas.forEach(f=>byKey[f.k]=f);
 
     if(capa) map.removeLayer(capa);
     capa=L.geoJSON(geo,{
       style:f=>{
-        const k=claveDe(f.properties,esNac);
+        const k=claveDe(f.properties,nv);
         return {fillColor:PONAL.color((byKey[k]||{}).v||0,max),fillOpacity:.85,
                 color:'rgba(255,255,255,.18)',weight:.7};
       },
       onEachFeature:(f,l)=>{
-        const k=claveDe(f.properties,esNac), r=byKey[k];
-        const nom=r?r.n:(f.properties.name||f.properties.mpio_cnmbr||'—');
-        l.bindTooltip(`<b>${esc(nom)}</b><br>${r?fmt(r.v):'sin dato'} ${r&&r.v===1?'hecho':'hechos'}`,{sticky:true});
-        if(esNac&&k) l.on('click',()=>abrirDep(k));
+        const k=claveDe(f.properties,nv), r=byKey[k];
+        const nom=r?r.n:nombreGeo(f.properties,nv);
+        const und=ST.tasa&&hayTasa()?' por 100.000 hab.':'';
+        l.bindTooltip(`<b>${esc(nom)}</b><br>${r?fmtV(r.v)+und:'sin dato'}`,{sticky:true});
+        if(nv==='nac'&&k) l.on('click',()=>abrirDep(k));
+        if(nv==='dep'&&k&&ST.ciuIdx[k]&&ST.ciuIdx[k].mapa) l.on('click',()=>abrirCiudad(k));
       }
     }).addTo(map);
-    if(esNac) PONAL.avisarSinMatch(geo.features.map(f=>f.properties.name),n=>claveDe({name:n},true));
+    if(nv==='nac') PONAL.avisarSinMatch(geo.features.map(f=>f.properties.name),x=>claveDe({name:x},'nac'));
     fit(geo);
-    pintarPanel(filas,esNac);
+    pintarPanel(filas,nv);
     pintarLeyenda(max);
     pintarAvisos();
   }
-  /* nacional: el GeoJSON solo trae `name` → se casa por nombre normalizado.
-     municipal: trae `mpio_cdpmp`, que ES el DANE de 5 dígitos de PONAL. */
-  function claveDe(p,esNac){
-    if(!esNac) return p.mpio_cdpmp||'';
+
+  /* Cada nivel casa por una llave distinta:
+       nac → el GeoJSON solo trae `name`, se casa por nombre normalizado
+       dep → trae `mpio_cdpmp`, que ES el DANE de 5 dígitos de PONAL
+       ciu → el número de comuna/localidad, que es lo único estable entre las
+             tres ciudades (cada GeoJSON lo guarda en un campo distinto) */
+  function claveDe(p,nv){
+    if(nv==='dep') return p.mpio_cdpmp||'';
+    if(nv==='ciu'){
+      const raw=p[ST.ciuIdx[ST.mun].prop];
+      const m=String(raw==null?'':raw).match(/\d+/);
+      return m?String(+m[0]):'';
+    }
     const n=PONAL.norm(p.name);
     if(PONAL.ALIAS[n]) return PONAL.ALIAS[n];
     for(const [c,o] of Object.entries(ST.deps)) if(PONAL.norm(o.n)===n) return c;
     return '';
   }
+  function nombreGeo(p,nv){
+    if(nv==='ciu') return p.LocNombre||p.NOMBRE||p.nombre||p.NOMBRES_CO||'—';
+    return p.name||p.mpio_cnmbr||'—';
+  }
   function filasNac(){
-    return Object.entries(ST.deps).map(([c,o])=>({k:c,n:o.n,v:totalDe(o,ST.delito,ST.anio)}))
+    return Object.entries(ST.deps).map(([c,o])=>({k:c,n:o.n,v:valorDe(o,c,true)}))
       .filter(f=>f.v>0).sort((a,b)=>b.v-a.v);
   }
   function filasDep(dep){
     return Object.entries(ST.muns).filter(([,o])=>o.dp===dep)
-      .map(([c,o])=>({k:c,n:o.n,v:totalDe(o,ST.delito,ST.anio)}))
+      .map(([c,o])=>({k:c,n:o.n,v:valorDe(o,c,false)}))
       .filter(f=>f.v>0).sort((a,b)=>b.v-a.v);
   }
+  /* dentro de la ciudad NO hay tasa: el DANE no publica población por comuna */
+  function filasCiu(){
+    const c=ST.ciu||{};
+    return Object.entries(c.comunas||{})
+      /* los nombres salen del GeoJSON y vienen en mayúscula sostenida en unas
+         ciudades y capitalizados en otras: se normalizan para que el ranking
+         no mezcle «CIUDAD BOLIVAR» con «El Poblado» */
+      .map(([k,o])=>({k:String(+k),n:tCase(nomComuna(k)),v:totalDe(o,ST.delito,ST.anio)}))
+      .filter(f=>f.v>0).sort((a,b)=>b.v-a.v);
+  }
+  let _nomCom={};
+  function nomComuna(k){ return _nomCom[String(+k)]||`${ST.ciuIdx[ST.mun].tipo} ${+k}`; }
+  /* 'localidad' → 'localidades', no 'localidads' */
+  const PLURAL={localidad:'localidades',comuna:'comunas'};
+  function plural(t){ return PLURAL[t]||t+'s'; }
+  /* ¿el departamento y la ciudad son la misma jurisdicción? («Bogotá D.C.» vs
+     «Bogotá»): se compara por prefijo, no por igualdad, porque el sufijo D.C.
+     solo lo trae uno de los dos lados */
+  function mismoQueDepto(){
+    if(!ST.dep||!ST.mun) return false;
+    const a=PONAL.norm(ST.deps[ST.dep].n), b=PONAL.norm(ST.ciuIdx[ST.mun].n);
+    return a.startsWith(b)||b.startsWith(a);
+  }
 
-  function abrirDep(c){ ST.dep=c; pintar(); }
-  function volver(){ ST.dep=null; pintar(); }
+  function abrirDep(c){ ST.dep=c; ST.mun=null; ST.ciu=null; pintar(); }
+  async function abrirCiudad(d){
+    const cfg=ST.ciuIdx[d]; if(!cfg||!cfg.mapa) return;
+    /* el departamento se deduce del propio código DANE: así entrar directo a
+       una ciudad (enlace, prueba, futuro deep-link) no deja `ST.dep` en null,
+       que rompía la miga de pan y con ella el resto del panel */
+    ST.dep=d.slice(0,2);
+    ST.mun=d; ST.ciu=await PONAL.ciudad(d);
+    /* los nombres de comuna salen del propio GeoJSON, no se duplican en el JSON
+       de datos (cada ciudad los guarda en un campo distinto) */
+    _nomCom={};
+    const g=await PONAL.geoCiudad(cfg.geo);
+    g.features.forEach(f=>{
+      const m=String(f.properties[cfg.prop]==null?'':f.properties[cfg.prop]).match(/\d+/);
+      if(m) _nomCom[String(+m[0])]=nombreGeo(f.properties,'ciu');
+    });
+    pintar();
+  }
+  function volver(){
+    if(ST.mun){
+      const solo=Object.values(ST.muns).filter(o=>o.dp===ST.dep).length<=1;
+      ST.mun=null; ST.ciu=null;
+      /* Bogotá es su propio departamento con un solo municipio: volver a ese
+         nivel intermedio muestra un mapa de una sola pieza y no sirve de nada,
+         así que se sale directo a la vista nacional. */
+      if(solo) ST.dep=null;
+    }
+    else ST.dep=null;
+    pintar();
+  }
 
   /* ── panel ──────────────────────────────────────────────────── */
-  function pintarPanel(filas,esNac){
-    const tot=filas.reduce((s,f)=>s+f.v,0);
+  function pintarPanel(filas,nv){
     const lab=(ST.meta.delitos.find(d=>d.id===ST.delito)||{}).label||'';
     const per=ST.anio==='todos'?'2015–2024':ST.anio;
-    document.getElementById('kpi-t').textContent=
-      (esNac?'Total nacional':ST.deps[ST.dep].n)+' · '+per;
-    document.getElementById('kpi-v').innerHTML=
-      fmt(tot)+`<small>${esc(lab.toLowerCase())}</small>`;
+    const esTasa=ST.tasa&&hayTasa()&&nv!=='ciu';
+    let titulo, total;
+    if(nv==='nac'){ titulo='Total nacional'; total=filas.reduce((s,f)=>s+totalDe(ST.deps[f.k],ST.delito,ST.anio),0); }
+    else if(nv==='dep'){ titulo=ST.deps[ST.dep].n; total=totalDe(ST.deps[ST.dep],ST.delito,ST.anio); }
+    else { titulo=ST.ciuIdx[ST.mun].n; total=filas.reduce((s,f)=>s+f.v,0); }
+    document.getElementById('kpi-t').textContent=titulo+' · '+per;
+    if(esTasa){
+      const pob=nv==='nac'
+        ? Object.keys(ST.deps).reduce((s,c)=>s+poblacionDe(c,true),0)
+        : poblacionDe(ST.dep,true);
+      const t=pob?(total*1e5/pob):0;
+      document.getElementById('kpi-v').innerHTML=
+        fmtV(t)+`<small>${esc(lab.toLowerCase())} por 100.000 hab.</small>`;
+    }else{
+      document.getElementById('kpi-v').innerHTML=fmt(total)+`<small>${esc(lab.toLowerCase())}</small>`;
+    }
     document.getElementById('rk-t').textContent=
-      esNac?'Departamentos con más denuncias':'Municipios con más denuncias';
-    const max=Math.max(1,...filas.map(f=>f.v));
-    document.getElementById('rk').innerHTML=filas.slice(0,25).map((f,i)=>
-      `<button class="rk-i" ${esNac?`data-dep="${f.k}"`:''}>
+      nv==='nac'?'Departamentos':nv==='dep'?'Municipios':tCase(plural(ST.ciuIdx[ST.mun].tipo));
+    const max=Math.max(1e-9,...filas.map(f=>f.v));
+    document.getElementById('rk').innerHTML=filas.slice(0,30).map((f,i)=>{
+      const drill=nv==='nac'?`data-dep="${f.k}"`
+                : (nv==='dep'&&ST.ciuIdx[f.k]&&ST.ciuIdx[f.k].mapa)?`data-ciu="${f.k}"`:'';
+      return `<button class="rk-i" ${drill}>
          <span class="rk-p">${i+1}</span>
-         <span class="rk-n">${esc(f.n)}</span>
-         <span class="rk-v">${fmt(f.v)}</span>
+         <span class="rk-n">${esc(f.n)}${drill&&nv==='dep'?' <span style="opacity:.5">↳</span>':''}</span>
+         <span class="rk-v">${fmtV(f.v)}</span>
          <span class="rk-b" style="width:${Math.max(2,100*f.v/max)}%"></span>
-       </button>`).join('')||'<div style="font-size:.72rem;color:var(--gray)">Sin denuncias registradas.</div>';
-    document.querySelectorAll('#rk .rk-i[data-dep]').forEach(b=>
-      b.onclick=()=>abrirDep(b.dataset.dep));
-    document.getElementById('bcrumb').innerHTML=esNac
-      ? '<span>Colombia · 33 departamentos</span>'
-      : `<button onclick="volver()">← Colombia</button><span>·</span><span>${esc(ST.deps[ST.dep].n)}</span>`;
+       </button>`;}).join('')||'<div style="font-size:.72rem;color:var(--gray)">Sin denuncias registradas.</div>';
+    document.querySelectorAll('#rk .rk-i[data-dep]').forEach(b=>b.onclick=()=>abrirDep(b.dataset.dep));
+    document.querySelectorAll('#rk .rk-i[data-ciu]').forEach(b=>b.onclick=()=>abrirCiudad(b.dataset.ciu));
+
+    document.getElementById('bcrumb').innerHTML=
+      nv==='nac' ? '<span>Colombia · 33 departamentos</span>'
+    : nv==='dep' ? `<button onclick="volver()">← Colombia</button><span>·</span><span>${esc(ST.deps[ST.dep].n)}</span>`
+    /* en Bogotá el departamento y la ciudad son lo mismo; repetirlo
+       («Bogotá D.C. · Bogotá») se lee como un error */
+    /* en Bogotá el departamento ES la ciudad («Bogotá D.C.» / «Bogotá»);
+       repetirlo en la miga se lee como un error, así que se sale a Colombia */
+    : `<button onclick="volver()">← ${esc(mismoQueDepto()?'Colombia':ST.deps[ST.dep].n)}</button><span>·</span><span>${esc(ST.ciuIdx[ST.mun].n)} · ${esc(plural(ST.ciuIdx[ST.mun].tipo))}</span>`;
+    pintarBarrios(nv);
+    pintarTasaBtn(nv);
+  }
+
+  /* Ranking de barrios. Va como LISTA y no como mapa a propósito: el nombre de
+     barrio de la Policía solo casa con el polígono catastral en el 64% de los
+     hechos en Bogotá (los fallos son sub-barrios: «PATIO BONITO I», «LA AURORA
+     I SECTOR»). Un mapa así botaría un tercio del delito sin decirlo; la lista
+     no pierde un solo hecho. */
+  function pintarBarrios(nv){
+    const box=document.getElementById('bar-box');
+    if(nv!=='ciu'||!ST.ciu){ box.style.display='none'; return; }
+    box.style.display='';
+    const bs=(ST.ciu.barrios||[]).map(b=>({n:b.n,c:b.c,v:(b.d||{})[ST.delito]||0}))
+      .filter(b=>b.v>0).sort((a,b)=>b.v-a.v).slice(0,30);
+    const max=Math.max(1,...bs.map(b=>b.v));
+    document.getElementById('bar-t').textContent=
+      `Barrios de ${ST.ciuIdx[ST.mun].n} · 2015–2024`;
+    document.getElementById('bar').innerHTML=bs.length?bs.map((b,i)=>
+      `<div class="rk-i" style="cursor:default">
+         <span class="rk-p">${i+1}</span>
+         <span class="rk-n">${esc(tCase(b.n))}${b.c?` <span style="opacity:.45">· ${esc(tCase(nomComuna(b.c)))}</span>`:''}</span>
+         <span class="rk-v">${fmt(b.v)}</span>
+         <span class="rk-b" style="width:${Math.max(2,100*b.v/max)}%"></span>
+       </div>`).join('')
+      :'<div style="font-size:.72rem;color:var(--gray)">Sin denuncias de este delito.</div>';
+    document.getElementById('bar-n').textContent=
+      `El total por barrio es de los diez años juntos, no del año escogido arriba.`;
+  }
+
+  /* El botón de tasa se apaga solo donde la tasa no existe, y dice por qué en
+     vez de quedarse gris y mudo. */
+  function pintarTasaBtn(nv){
+    const b=document.getElementById('btn-tasa'), n=document.getElementById('tasa-nota');
+    const puede=hayTasa()&&nv!=='ciu';
+    b.disabled=!puede;
+    b.classList.toggle('on',ST.tasa&&puede);
+    b.textContent=ST.tasa&&puede?'Tasa por 100.000 hab.':'Ver tasa por 100.000 hab.';
+    n.textContent=puede?''
+      : nv==='ciu' ? 'El DANE no publica población por comuna: dentro de la ciudad solo hay conteo.'
+      : ST.anio==='todos' ? 'Escoge un año para ver la tasa: sumar diez años de hechos sobre la población de uno solo no significa nada.'
+      : `La proyección municipal del DANE arranca en ${ANIO_POB_MIN}; ${ST.anio} va en conteo.`;
   }
   function pintarLeyenda(max){
     document.getElementById('leyenda').innerHTML=
@@ -323,8 +498,11 @@
   /* ── arranque ───────────────────────────────────────────────── */
   (async()=>{
     try{
-      const [m,dp,mu]=await Promise.all([PONAL.meta(),PONAL.deptos(),PONAL.municipios()]);
-      ST.meta=m; ST.deps=dp.deptos; ST.muns=mu.muns;
+      const [m,dp,mu,ci]=await Promise.all([PONAL.meta(),PONAL.deptos(),PONAL.municipios(),PONAL.ciudades()]);
+      ST.meta=m; ST.deps=dp.deptos; ST.muns=mu.muns; ST.ciuIdx=ci.ciudades;
+      /* la población es best-effort: si no está, la página funciona en conteo */
+      try{ ST.pob=await PONAL.poblacion(); }catch(e){ console.warn('[PONAL] sin población, solo conteo'); }
+      document.getElementById('btn-tasa').onclick=()=>{ ST.tasa=!ST.tasa; pintar(); };
       pintarFiltros(); initMapa(); await pintar();
     }catch(e){
       document.getElementById('map').innerHTML=

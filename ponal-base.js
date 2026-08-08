@@ -22,6 +22,10 @@
     return (_c[key]=await r.json());
   }
   const meta       =()=>j(BASE+'/meta.json'+V(),'meta');
+  const poblacion  =()=>j(BASE+'/poblacion.json'+V(),'pob');
+  const ciudades   =()=>j(BASE+'/ciudades.json'+V(),'ciu');
+  const ciudad     =d=>j(BASE+'/ciudades/'+d+'.json'+V(),'ciu-'+d);
+  const geoCiudad  =f=>j(MAPAS+'/Ciudades-COM-LOC/'+f,'geo-ciu-'+f);
   const nacional   =()=>j(BASE+'/nacional.json'+V(),'nacional');
   const deptos     =()=>j(BASE+'/deptos.json'+V(),'deptos');
   const municipios =()=>j(BASE+'/municipios.json'+V(),'muns');
@@ -81,6 +85,17 @@
      ese lote. Cualquier vista temporal debe excluirlos o marcarlos. */
   const conSerie=m=>(m.delitos||[]).filter(d=>!d.solo_2024);
 
-  window.PONAL={meta,nacional,deptos,municipios,geoDeptos,geoMuns,
+  /* Bogotá se dibuja rotada 90° a la izquierda — es la convención con la que
+     se ve la ciudad en todo el proyecto (misma transformación que usan senado,
+     cámara y los mapas del Pacto). */
+  function rotar90(geo){
+    const cx=-74.08, cy=4.65;
+    const f=c=>Array.isArray(c[0])?c.map(f):[cx-(c[1]-cy), cy+(c[0]-cx)];
+    return {...geo, features:geo.features.map(x=>({...x,
+      geometry:{...x.geometry, coordinates:f(x.geometry.coordinates)}}))};
+  }
+
+  window.PONAL={meta,nacional,deptos,municipios,poblacion,ciudades,ciudad,
+    geoDeptos,geoMuns,geoCiudad,rotar90,
     DANE_A_ELECTORAL,ALIAS,norm,color,RAMPA,conSerie,avisarSinMatch,BASE};
 })();

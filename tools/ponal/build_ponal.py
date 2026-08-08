@@ -118,6 +118,41 @@ DEPTOS = {
     "94": "Guainía", "95": "Guaviare", "97": "Vaupés", "99": "Vichada",
 }
 
+# ── ciudades ───────────────────────────────────────────────────────────
+# `Hechos.COMUNAS_ZONAS_DESCRIPCION` está 87% VACÍA y lo poco que trae viene
+# corrupto, así que no sirve. Pero `Hechos.BARRIOS_HECHO` está llena al 100% en
+# las ciudades grandes y **en tres de ellas el nombre trae la comuna pegada
+# como sufijo**: `EL POBLADO C-14` · `BOSA E-7` · `LILI E17`. De ahí sale el
+# mapa por comuna, sin depender de la columna rota.
+#
+# ⚠️ MEDIDO: ese sufijo SOLO existe en Bogotá (89,6%), Medellín (83,1%) y Cali
+# (96,7%). En Bucaramanga, Cúcuta, Ibagué, Manizales, Montería, Neiva, Popayán
+# y Villavicencio la cobertura es 0,0% — sus barrios no traen código de comuna.
+# Por eso el mapa por comuna es de tres ciudades y el resto va con ranking de
+# barrios. Inventarles la comuna a las otras ocho sería inventar el mapa.
+#
+# `geo`/`prop` es el polígono y el campo con el número de comuna; el frontend
+# casa por NÚMERO, que es lo único estable entre fuentes.
+CIUDADES = {
+    "11001": {"n": "Bogotá",   "geo": "BOG-LOCALIDADX.json", "prop": "LocCodigo", "tipo": "localidad",
+              "suf": r"\s+E-?\s?(\d{1,2})$", "rot": True},
+    "05001": {"n": "Medellín", "geo": "MEDELLINX.json",      "prop": "CODIGO",    "tipo": "comuna",
+              "suf": r"\s+C-?\s?(\d{1,2})$", "rot": False},
+    "76001": {"n": "Cali",     "geo": "CALIX.json",          "prop": "comuna",    "tipo": "comuna",
+              "suf": r"\s+E-?\s?(\d{1,2})$", "rot": False},
+}
+# Ciudades sin mapa de comuna pero con ranking de barrios (el dato está, lo que
+# falta es el código de comuna en el nombre).
+CIUDADES_SOLO_BARRIO = {
+    "08001": "Barranquilla", "13001": "Cartagena", "68001": "Bucaramanga",
+    "54001": "Cúcuta", "73001": "Ibagué", "17001": "Manizales", "23001": "Montería",
+    "41001": "Neiva", "19001": "Popayán", "50001": "Villavicencio", "66001": "Pereira",
+    "52001": "Pasto", "47001": "Santa Marta", "63001": "Armenia", "20001": "Valledupar",
+    "08758": "Soledad", "25754": "Soacha",
+}
+# marcador de nulo de la fuente: no es un barrio
+BARRIO_NULO = "PENDIENTE POR ASIGNAR"
+
 ANIOS = list(range(2015, 2025))
 AIX = {a: i for i, a in enumerate(ANIOS)}
 NA = len(ANIOS)
@@ -197,6 +232,16 @@ def main():
     nac_edad = defaultdict(int)      # (delito, banda)
     nac_arma = defaultdict(int)      # (delito, arma)
     nac_sitio = defaultdict(int)     # (delito, sitio)
+    nac_mag = defaultdict(int)       # (delito, móvil del agresor)
+    nac_mvi = defaultdict(int)       # (delito, móvil de la víctima)
+    # ciudades: comuna × delito × año, y barrio × delito (sin año, por tamaño)
+    ciu_com = defaultdict(int)       # (dane, comuna, delito, anio)
+    ciu_com_t = defaultdict(int)     # (dane, comuna, delito)
+    ciu_bar = defaultdict(int)       # (dane, barrio, delito)
+    ciu_bar_com = {}                 # (dane, barrio) -> comuna
+    ciu_tot = defaultdict(int)       # dane -> hechos
+    ciu_sin_com = defaultdict(int)   # dane -> hechos sin comuna derivable
+    SUF = {d: re.compile(c["suf"]) for d, c in CIUDADES.items()}
     dep_anio = defaultdict(int)      # (dep, delito, anio)
     dep_tot = defaultdict(int)       # (dep, delito)  incluye filas sin año
     mun_anio = defaultdict(int)      # (dane, delito, anio)
@@ -288,6 +333,32 @@ def main():
         s = limpio(row[ix["Clase de sitio"]])
         if s:
             nac_sitio[(did, s.upper())] += q
+        ag = limpio(row[ix["Conduc.MOVIL_AGRESOR"]])
+        if ag:
+            nac_mag[(did, ag.upper())] += q
+        vi = limpio(row[ix["Móvil Victima"]])
+        if vi:
+            nac_mvi[(did, vi.upper())] += q
+
+        # ── ciudades: comuna (por sufijo del barrio) y barrio ────────
+        if dane and (dane in CIUDADES or dane in CIUDADES_SOLO_BARRIO):
+            ciu_tot[dane] += q
+            b = row[ix["Hechos.BARRIOS_HECHO"]].strip()
+            if b and BARRIO_NULO not in b.upper():
+                rx = SUF.get(dane)
+                m = rx.search(b) if rx else None
+                com = int(m.group(1)) if m else None
+                # el nombre del barrio se guarda SIN el sufijo de comuna
+                nom = (b[:m.start()] if m else b).strip()
+                ciu_bar[(dane, nom, did)] += q
+                if com is not None:
+                    ciu_bar_com[(dane, nom)] = com
+                    ciu_com[(dane, com, did, anio)] += q if anio is not None else 0
+                    ciu_com_t[(dane, com, did)] += q
+                elif dane in CIUDADES:
+                    ciu_sin_com[dane] += q
+            else:
+                ciu_sin_com[dane] += q
 
         if n % 1000000 == 0:
             print(f"  ... {n:,}", file=sys.stderr, flush=True)
@@ -379,6 +450,10 @@ def main():
         "dias": DIAS,
         "por_arma": topcat(nac_arma),
         "por_sitio": topcat(nac_sitio),
+        # los dos móviles traen ~16 valores cerrados y solo 2,5% vacío: entran
+        # completos (k alto), no recortados como arma y sitio
+        "por_movil_agresor": topcat(nac_mag, 18),
+        "por_movil_victima": topcat(nac_mvi, 18),
     }
 
     deps = {}
@@ -407,6 +482,74 @@ def main():
             "d": v,
         }
     municipios = {"anios": ANIOS, "muns": muns}
+
+    # ── ciudades: un índice liviano + un archivo por ciudad (carga diferida) ──
+    (OUT / "ciudades").mkdir(parents=True, exist_ok=True)
+    indice = {}
+    for dane in list(CIUDADES) + list(CIUDADES_SOLO_BARRIO):
+        if not ciu_tot.get(dane):
+            continue
+        cfg = CIUDADES.get(dane)
+        # comunas (solo las 3 ciudades con sufijo)
+        comunas = {}
+        if cfg:
+            vistas = {c for (d, c, _x) in ciu_com_t if d == dane}
+            for c in sorted(vistas):
+                dd = {}
+                for did, _l, _r in DELITOS:
+                    t = ciu_com_t.get((dane, c, did), 0)
+                    if not t:
+                        continue
+                    dd[did] = {"t": t, "y": [ciu_com.get((dane, c, did, a), 0) for a in ANIOS]}
+                if dd:
+                    comunas[str(c)] = {"d": dd}
+        # barrios: total por delito, sin año (el cruce barrio×delito×año son
+        # ~1,5 M celdas solo en Bogotá y no cabe en una carga de navegador)
+        # ⚠️ `nb`, no `n`: `n` es el contador de filas del bucle principal y
+        # reusarlo aquí lo convertía en un str y reventaba el resumen final.
+        nombres = {nb for (d, nb, _x) in ciu_bar if d == dane}
+        barrios = []
+        for nb in nombres:
+            dd = {}
+            for did, _l, _r in DELITOS:
+                t = ciu_bar.get((dane, nb, did), 0)
+                if t:
+                    dd[did] = t
+            if dd:
+                b = {"n": nb, "t": sum(dd.values()), "d": dd}
+                c = ciu_bar_com.get((dane, nb))
+                if c is not None:
+                    b["c"] = c
+                barrios.append(b)
+        barrios.sort(key=lambda x: -x["t"])
+        p = OUT / "ciudades" / f"{dane}.json"
+        p.write_text(json.dumps({"anios": ANIOS, "comunas": comunas, "barrios": barrios},
+                                ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        indice[dane] = {
+            "n": cfg["n"] if cfg else CIUDADES_SOLO_BARRIO[dane],
+            "hechos": ciu_tot[dane],
+            "barrios": len(barrios),
+            "mapa": bool(cfg),
+            "sin_comuna": ciu_sin_com.get(dane, 0),
+            **({"geo": cfg["geo"], "prop": cfg["prop"], "tipo": cfg["tipo"],
+                "rot": cfg["rot"], "comunas": len(comunas)} if cfg else {}),
+        }
+    (OUT / "ciudades.json").write_text(
+        json.dumps({"anios": ANIOS, "ciudades": indice,
+                    "nota": ("El mapa por comuna existe donde el nombre del barrio trae el "
+                             "código de comuna pegado (Bogotá, Medellín y Cali). En las demás "
+                             "ciudades la fuente no lo trae, así que va el ranking de barrios "
+                             "y no un mapa.")},
+                   ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"  {'ciudades.json':18} {(OUT/'ciudades.json').stat().st_size/1024:>9,.0f} KB "
+          f"({len(indice)} ciudades, {sum(1 for v in indice.values() if v['mapa'])} con mapa)")
+    for d in CIUDADES:
+        if d in indice:
+            f2 = OUT / "ciudades" / f"{d}.json"
+            print(f"    {indice[d]['n']:14} {f2.stat().st_size/1024:>8,.0f} KB · "
+                  f"{indice[d].get('comunas',0)} {CIUDADES[d]['tipo']}es · "
+                  f"{indice[d]['barrios']:,} barrios · "
+                  f"{100*indice[d]['sin_comuna']/max(1,ciu_tot[d]):.1f}% sin comuna")
 
     for nombre, obj in [("meta.json", meta), ("nacional.json", nacional),
                         ("deptos.json", deptos), ("municipios.json", municipios)]:

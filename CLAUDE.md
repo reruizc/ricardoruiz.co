@@ -5203,11 +5203,84 @@ hombres · 74,6% arma de fuego · domingo 21,2% · 39% entre 6 p.m. y medianoche
 rural 33,7% (contra 7% del promedio general). **2024 está completo** (12 meses
 con volumen normal) → sí es comparable con 2023.
 
+### Ciudades — el mapa por comuna sale del NOMBRE del barrio
+`Hechos.COMUNAS_ZONAS_DESCRIPCION` está 87% vacía y corrupta, pero
+**`Hechos.BARRIOS_HECHO` está llena al 100% en las 20 ciudades grandes** y en
+tres de ellas **el nombre trae la comuna pegada como sufijo**: `EL POBLADO C-14`
+· `BOSA E-7` · `LILI E17`. De ahí sale el mapa por comuna, sin depender de la
+columna rota.
+
+⚠️⚠️ **MEDIDO: ese sufijo SOLO existe en Bogotá (89,6%), Medellín (83,1%) y Cali
+(96,7%).** En Bucaramanga, Cúcuta, Ibagué, Manizales, Montería, Neiva, Popayán y
+Villavicencio la cobertura es **0,0%** — sus barrios no traen código de comuna.
+Por eso el mapa por comuna es de **3 ciudades** (que son el 41% de los hechos) y
+las otras 17 quedan con ranking de barrios. Inventarles la comuna sería
+inventar el mapa.
+
+⚠️ **El barrio va como LISTA, no como polígono, a propósito.** Medido: el nombre
+de barrio de la Policía casa con el polígono catastral en **64% de los hechos en
+Bogotá** y 81% en Cali; los fallos son sub-barrios (`PATIO BONITO I`, `LA AURORA
+I SECTOR`, `HAYUELOS I ETAPA`). Un mapa así botaría un tercio del delito sin
+decirlo. La lista rankeada no pierde un solo hecho. Si algún día se quiere el
+polígono, hay que reconciliar nombres con la cascada de 3 niveles de
+`build_puesto_to_barrio` (ver la sección de oportunidad.html).
+
+⚠️ `BARRIO PENDIENTE POR ASIGNAR` es el marcador de nulo de la fuente (3-11% por
+ciudad), no un barrio. Va a `sin_comuna`, nunca al ranking.
+
+Los polígonos de comuna existen para 16 ciudades en `Ciudades-COM-LOC/`, pero
+**Cartagena y Santa Marta traen BARRIOS** (213 y 285 features) y **Sincelejo trae
+basura de export CAD** — no son comunas. Cada ciudad guarda el número en un campo
+distinto (`LocCodigo` · `CODIGO` · `comuna`), así que el frontend casa por
+**número**, extraído con `String(raw).match(/\d+/)`, que es lo único estable.
+Bogotá se pinta **rotada 90° a la izquierda** (`PONAL.rotar90`), convención del
+proyecto.
+
+### Tasas por 100.000 habitantes
+`tools/ponal/build_poblacion.py` → `poblacion.json` (82 KB), leyendo
+`output_observatorio_mujer/PPED-AreaSexoEdadMun-2018-2042_VP.xlsx` (126 MB, el
+anexo municipal del DANE). Se lee **solo la fila `ÁREA GEOGRÁFICA == 'Total'`**:
+el archivo trae además Cabecera y Centros Poblados, y sumar las tres cuenta cada
+municipio por partida doble. Se parsea el XML del sheet en streaming (openpyxl
+tarda muchísimo con 84k filas × 312 columnas cuando solo hacen falta 7).
+Validado: nacional 2018 = 48.258.494 (cuadra con el archivo nacional del DANE) ·
+Bogotá 7.391.056 → 7.918.660 · Medellín 2.427.133.
+
+⚠️ **Cobertura 2018-2024, NO 2015-2017.** El anexo municipal es post-censo y
+arranca en 2018. La página muestra tasa solo con un año ≥2018 escogido; con
+«Todos» el botón se apaga y explica por qué (sumar diez años de hechos sobre la
+población de uno solo no significa nada). **No se extrapola hacia atrás.** Para
+completar 2015-2017 hace falta la *retroproyección municipal 1985-2017* del DANE.
+
+⚠️ **Los `PPED-AreaNac-*.xlsx` que están en la carpeta PONAL son NACIONALES**
+(solo `Total Nacional` × año × Cabecera/Rural) — sirven de control, no para el
+mapa municipal.
+
+⚠️ **Dentro de la ciudad no hay tasa:** el DANE no publica población por comuna.
+
+**El valor de la tasa se ve al primer clic:** en homicidios 2022 el ranking
+absoluto es Valle · Antioquia · Bogotá, y en tasa pasa a ser **Arauca 129,5 ·
+Putumayo 59,8 · Cauca 55,3 · Chocó 50,7** — la periferia del conflicto. Nacional
+26,2 por 100.000, que cuadra con la cifra oficial.
+
+### Móvil del agresor y de la víctima
+`Conduc.MOVIL_AGRESOR` y `Móvil Victima`: ~16 valores cerrados, **solo 2,5%
+vacío**, entran completos (no recortados como arma y sitio). Es el dato que
+separa el atraco a pie del fleteo en moto: 84% de agresores va a pie en general,
+pero en **homicidios el 15% llega en moto** (sicariato) y en **hurto de motos el
+27,7% de las víctimas iba conduciendo la suya**.
+
 ### Salida y S3
 ```
-Bases de datos/output_ponal/{meta,nacional,deptos,municipios}.json   (~1 MB, gitignored)
+Bases de datos/output_ponal/
+  {meta,nacional,deptos,municipios,poblacion,ciudades}.json
+  ciudades/{11001,05001,76001,…}.json    (uno por ciudad, carga diferida)
 → s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/ponal/
 ```
+Bogotá pesa 1,1 MB (6.577 barrios) → por eso va en archivo aparte y se pide solo
+al entrar a la ciudad. El barrio guarda **total por delito sin año**: el cruce
+barrio × delito × año son ~1,5 M celdas solo en Bogotá y no cabe en una carga
+de navegador.
 Cuelga de `congreso-2026/output` porque la política del bucket ya lo cubre como
 público; un prefijo nuevo de primer nivel exigiría tocar la policy. Regenerar:
 `python3 tools/ponal/build_ponal.py` + `aws s3 cp` de los 4 JSON.
@@ -5231,19 +5304,19 @@ del tamaño de una moneda). No basta un `invalidateSize`: hay que reencuadrar
 pestaña oculta) y registrar un `ResizeObserver`.
 
 ### Pendiente
-1. **Tasas por 100.000 habitantes** (decisión tomada: Ricardo consigue la
-   población). Hoy todo es volumen absoluto y Bogotá encabeza casi todo por
-   tamaño. Necesita proyecciones DANE por municipio 2015-2024 — **es la misma
-   descarga manual del Sprint E Fase B del Lab** (TerriData). El enganche está
-   listo en la página y el aviso ya lo declara.
-2. Las otras 4 fichas: cuándo ocurre · a quién le pasa · cómo (arma/sitio) ·
-   ciudades a comuna/barrio. Ojo: `COMUNAS_ZONAS_DESCRIPCION` está 86,5% vacío,
-   así que el drill a comuna exige cruzar por otra vía (PUESTOS_GEOREF o
-   georreferenciación propia), no por esa columna.
-3. Imágenes de las tarjetas: `imagenes/policia-{mapa,historico}.jpg` (el hub se
+1. **Retroproyección municipal 1985-2017 del DANE** para completar la tasa en
+   2015-2017 (hoy esos tres años van en conteo, declarado en la página).
+2. Comuna para las otras 8 ciudades: su barrio no trae el código, así que
+   tocaría cruzar nombre de barrio → comuna por otra vía (PUESTOS_GEOREF tiene
+   `BARRIO` y `CÓDIGO COMUNA`, que es como se armó el mapeo de Medellín).
+3. Polígono de barrio en Bogotá/Medellín/Cali: exige reconciliar nombres (hoy
+   64% en Bogotá). Ver el aviso de arriba antes de intentarlo.
+4. Las otras fichas del hub: cuándo ocurre · a quién le pasa · cómo (arma/sitio).
+   El dato ya está en `nacional.json`, falta la página.
+5. Imágenes de las tarjetas: `imagenes/policia-{mapa,historico}.jpg` (el hub se
    ve bien sin ellas). Convertir con
    `sips -s format jpeg -s formatOptions 82 X.png --out X.jpg`.
-4. Enlazar desde `index.html` / `noticias.html` cuando se despliegue.
+6. Enlazar desde `index.html` / `noticias.html`.
 
 ## Histórico legislativo — `tools/leyes-senado/` (harvester LISTO · foso de Cauce)
 
