@@ -78,9 +78,15 @@ TOPE_POR_PILAR = 6
 # Cuántos titulares de corroboración se cuelgan de una señal antes de resumir.
 TOPE_COBERTURA = 4
 
-# Tope de alertas de prensa-sobre-empresa por sector. Es la única prensa que
-# dispara sola, así que conviene que no pueda dominar el digest ni en un día raro.
+# Tope de alertas de prensa-sobre-empresa por sector. Es prensa que dispara
+# sola, así que conviene que no pueda dominar el digest ni en un día raro.
 TOPE_EMPRESA_SUELTA = 5
+
+# Tope de la otra puerta: prensa que dispara por TEMA (una autoridad movió algo
+# en el terreno vigilado). Más bajo que el de identidad a propósito: la nota que
+# habla de TU empresa manda sobre la que habla de tu terreno, y si un día el
+# sector amanece lleno de resoluciones, lo que sobra se cuenta y se dice.
+TOPE_TEMA_SUELTA = 3
 
 # Un digest solo sale si tiene al menos una señal de este nivel. Ver
 # `hay_algo_que_decir`: el silencio es una salida legítima del motor.
@@ -426,9 +432,14 @@ def colgar_cobertura(pilares, titulares, empresas=None, propias=False):
         regulador o en el Ejecutivo, se cuelga de esa señal como cobertura
         («esto ya lo reportaron N medios»). Eso le sube el nivel a la señal:
         un proyecto que además tiene prensa encima se mueve distinto.
-      · Excepción, y es la única que dispara sola: un titular que nombra una
-        EMPRESA VIGILADA y no tiene acto del Estado que le corresponda. Ahí la
-        prensa va por delante del registro, y esperar al acto es llegar tarde.
+      · Dispara sola por IDENTIDAD: un titular que nombra una EMPRESA VIGILADA
+        y no tiene acto del Estado que le corresponda. Ahí la prensa va por
+        delante del registro, y esperar al acto es llegar tarde.
+      · Dispara sola por TEMA: un titular que reporta una norma o una decisión
+        de una autoridad reguladora sobre el terreno vigilado. Sin esta puerta
+        el pilar queda APAGADO para un cliente sin vigiladas — medido el
+        7-ago-2026, el perfil «Binance» revisó 51 titulares y descartó los 51,
+        incluida la Resolución 000240 de la DIAN llegando a prensa.
       · Todo lo demás se descarta y se cuenta.
 
     Devuelve las cifras de lo que entró y lo que se descartó, para que el digest
@@ -496,10 +507,54 @@ def colgar_cobertura(pilares, titulares, empresas=None, propias=False):
     if sueltos:
         pilares.setdefault('medios', []).extend(sueltos[:TOPE_EMPRESA_SUELTA])
 
+    # Segunda puerta: prensa que dispara por TEMA. Solo norma o decisión de una
+    # autoridad reguladora; la crónica roja y la noticia política mueren en
+    # `R.prensa_normativa`, que es donde vive el criterio y donde está medido.
+    tema_sueltos, por_causa = [], {}
+    for t in titulares:
+        if id(t) in usados:
+            continue
+        ok, causa, autoridad = R.prensa_normativa(t['titulo'])
+        if not ok:
+            por_causa[causa] = por_causa.get(causa, 0) + 1
+            continue
+        t['autoridad'] = autoridad
+        tema_sueltos.append(t)
+
+    # Cuántos medios traen el MISMO acto. Es el criterio de corroboración que ya
+    # usa el resto del motor, aplicado entre titulares en vez de contra una
+    # señal: una resolución que la prensa del sector persigue en bloque pesa
+    # distinto que una nota suelta.
+    for t in tema_sueltos:
+        medios_ac = {(t.get('meta') or {}).get('medio', '')}
+        for o in tema_sueltos:
+            if o is t:
+                continue
+            ok2, _a, _c = R.corrobora(t['titulo'], [o])
+            if ok2:
+                medios_ac.add((o.get('meta') or {}).get('medio', ''))
+        nivel, porque = R.nivel_titular_tema(
+            t.get('autoridad', ''), (t.get('meta') or {}).get('tema', 'tus temas'),
+            n_medios=len([m for m in medios_ac if m]) or 1, propias=propias)
+        t['nivel'] = nivel
+        t['porque'] = porque
+        usados.add(id(t))
+
+    tema_sueltos.sort(key=lambda e: (-R.orden_nivel(e['nivel']), e.get('fecha') or ''))
+    if tema_sueltos:
+        pilares.setdefault('medios', []).extend(tema_sueltos[:TOPE_TEMA_SUELTA])
+
     return {'total': len(titulares), 'cobertura': n_cobertura,
             'sueltos': len(sueltos[:TOPE_EMPRESA_SUELTA]),
             'sueltos_omitidos': max(0, len(sueltos) - TOPE_EMPRESA_SUELTA),
             'empresa_sin_hecho': descartados_empresa,
+            'tema': len(tema_sueltos[:TOPE_TEMA_SUELTA]),
+            'tema_omitidos': max(0, len(tema_sueltos) - TOPE_TEMA_SUELTA),
+            'tema_sin_autoridad': por_causa.get('sin-autoridad', 0),
+            'tema_sin_acto': por_causa.get('sin-acto', 0),
+            'tema_diagnostico': por_causa.get('diagnostico', 0),
+            'tema_penal': por_causa.get('penal', 0),
+            'tema_politica': por_causa.get('politica', 0),
             'descartados': len(titulares) - len(usados)}
 
 
@@ -908,7 +963,8 @@ def main():
             fh.write(txt)
         pr = s.get('prensa') or {}
         extra = (f" · prensa: {pr.get('cobertura', 0)} como cobertura, "
-                 f"{pr.get('sueltos', 0)} sueltas, {pr.get('descartados', 0)} descartadas"
+                 f"{pr.get('sueltos', 0)} por empresa, {pr.get('tema', 0)} por tema, "
+                 f"{pr.get('descartados', 0)} descartadas"
                  if pr.get('total') else '')
         quien = f" → {s['correo']}" if s.get('tipo') == 'cliente' else ''
         print(f"  · {s['nombre']:<32} {s['total']:>3} señales ({s['altos']} altas)"

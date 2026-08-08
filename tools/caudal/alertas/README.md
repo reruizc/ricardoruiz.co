@@ -111,6 +111,10 @@ precisión. Cada empresa vigilada se usa distinto según el pilar:
   entra **siempre y en alto**, aunque el vocabulario no haya casado: no llega
   porque el texto mencione su sector, llega porque lo nombra a él.
 
+⚠️ La prensa usa **las dos caras**, no solo la identidad: sin vigiladas el pilar
+quedaba apagado para un cliente puramente temático. Ver *«Por qué existe la
+puerta del TEMA»* abajo.
+
 ⚠️ Si un perfil trae una llave de empresa que el diccionario no tiene (la llave
 real de Nueva EPS es `nuevaeps`, no `nueva eps`), el motor **lo dice** en los
 avisos del digest. Sin eso, el perfil se quedaría sin vigiladas en silencio y su
@@ -139,16 +143,86 @@ Un titular no es un hecho nuevo del Estado — es el eco de uno. Entonces:
   regulador o en el Ejecutivo, se **cuelga de esa señal** como cobertura
   (*"esto ya lo reportaron 4 medios"*), y le sube el nivel: un proyecto que
   además tiene prensa encima se mueve distinto.
-- **Única excepción que dispara sola:** un titular que nombra una empresa
-  vigilada **y** describe un hecho accionable (sanción, investigación, orden
-  judicial, intervención…) **y** no tiene acto del Estado que le corresponda.
-  Ahí la prensa va por delante del registro y esperar al acto es llegar tarde.
+- **Dispara sola por IDENTIDAD:** un titular que nombra una empresa vigilada
+  **y** describe un hecho accionable (sanción, investigación, orden judicial,
+  intervención…) **y** no tiene acto del Estado que le corresponda. Ahí la
+  prensa va por delante del registro y esperar al acto es llegar tarde.
+- **Dispara sola por TEMA:** un titular que reporta una **norma o una decisión
+  de una autoridad reguladora** sobre el terreno vigilado.
 - Todo lo demás se descarta **y se cuenta** en el pie del digest.
 
-Los dos filtros de la excepción son necesarios. Solo *"nombra empresa"* daba 26
-alertas altas en un día en financiero, casi todas noticia comercial rutinaria.
-Solo *"hecho accionable"* deja pasar la crisis genérica del sector, que no es de
-nadie en particular.
+Los dos filtros de la primera puerta son necesarios. Solo *"nombra empresa"*
+daba 26 alertas altas en un día en financiero, casi todas noticia comercial
+rutinaria. Solo *"hecho accionable"* deja pasar la crisis genérica del sector,
+que no es de nadie en particular.
+
+#### Por qué existe la puerta del TEMA
+
+La identidad no le sirve a todo el mundo. Un cliente cuyo negocio no tiene razón
+social colombiana en el diccionario se queda con `empresas_de` = `[]` y entonces
+**ningún** titular puede dispararle: el pilar queda apagado. Medido el
+7-ago-2026, el perfil «Binance» (seis temas, cero vigiladas) revisó **51
+titulares y descartó los 51**, y entre los descartados iba la Resolución 000240
+de la DIAN aterrizando en prensa — justo la norma que ese cliente tiene
+clasificada como adversaria.
+
+Abrirla **no** puede ser bajar la barra: el corpus temático es peor que el de
+identidad. De esos 51, **40 son de «lavado de activos»** y hablan de Milei, del
+caso Lili Pink, de extradiciones y de la posesión presidencial. El término del
+cliente aparece en la *consulta*, no en el hecho.
+
+El discriminador que sí separa es la **naturaleza del hecho**:
+
+| | ¿entra? | por qué |
+|---|---|---|
+| Norma o decisión de una autoridad reguladora | **sí** | aplica a una clase entera de actores: eso **es** su frontera regulatoria |
+| Caso penal contra un tercero con nombre propio | **no** | si el tercero fuera su empresa, la puerta de la **identidad** ya lo alerta, y esa sí acepta lo penal |
+| Estudio, informe o balance del regulador | **no** | un diagnóstico no cambia ninguna obligación |
+| Nombramientos, posesiones, agenda, «paso a paso» | **no** | no es un hecho de Estado |
+
+De ahí las cinco piezas de `reglas.prensa_normativa`, todas medidas sobre los
+**1.161 titulares reales** de los 12 destinos del 8-ago-2026 (pasan 24, el
+**2,1%**):
+
+1. **La autoridad**, en dos listas. La división no es cosmética: el corpus trae
+   prensa de media región. «Corte Suprema» o «Ministerio» a secas disparaban con
+   una nota **argentina** sobre pensiones; «DIAN» o «Minsalud» no existen fuera
+   de Colombia y se bastan solas. Las genéricas exigen que el titular ancle el
+   país.
+2. **Qué hizo** esa autoridad. Sin esto entra el ruido de nombramientos, que en
+   el corpus es enorme (*«Fabio Arjona Hincapié — Ministerio de Ambiente»*,
+   *«sería designado como el nuevo presidente de la ANLA»*). Nombrar a alguien no
+   cambia ninguna obligación.
+3. **Diagnóstico ≠ decisión.** *«Estudio de la Superservicios revela que la
+   integración vertical no reduce las tarifas»* entraba por la palabra «tarifa»,
+   y ese mismo informe venía replicado por 4 medios — o sea que la corroboración
+   lo habría subido a alto **por ser eco**, que es justo lo que este pilar existe
+   para no hacer.
+4. **Crónica roja** fuera. Es el grueso del ruido temático.
+5. **Política y servicio al lector** fuera.
+
+**Nivel.** Arranca en `medio`, no en `alto`, y la diferencia es honesta: en la
+puerta de la identidad la nota habla de **tu empresa**; acá habla de **tu
+terreno**. Sube a `alto` cuando ≥2 medios reportan el mismo acto — el mismo
+criterio de corroboración que ya usa el resto del motor.
+
+**El «por qué» nombra a la autoridad y el término vigilado**: *«Minsalud movió
+algo en «salud»…»*. Lo primero porque «una autoridad movió algo» no es noticia y
+«Minsalud movió algo» sí. Lo segundo porque la consulta de prensa es por término
+y a veces devuelve algo de un sector vecino: verlo escrito (*«el Invima movió
+algo en «internet»»*) deja que el lector lo descarte de una ojeada en vez de
+preguntarse por qué le llegó. Esa fuga es de Google News, no del filtro, y se
+midió en **3 de 16** señales nuevas — todas a destinos-sector, ninguna a un
+cliente. Se deja y se cuenta: exigir que el titular case el vocabulario del
+destino la mata, pero mata también Santurbán, los decretos de taxis y la nota de
+la DIAN, cuyos títulos no nombran el tema.
+
+**Impacto medido** (mismo corpus congelado, antes/después, la única variable es
+el código): 7 → 23 señales de prensa; **+7 altas en total y nunca más de +3 en un
+mismo sector**; tres destinos que no recibían nada (Binance, Energía, Trabajo)
+pasan a recibir. Tope propio de **3 por destino** (`TOPE_TEMA_SUELTA`), más bajo
+que el de identidad: la nota sobre tu empresa manda sobre la que habla de tu
+terreno, y lo que sobra se cuenta y se dice.
 
 La contratación **no ancla cobertura**: un contrato no es algo que la prensa
 cubra, y cruzarlo con titulares producía coincidencias de vocabulario

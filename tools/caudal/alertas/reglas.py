@@ -1027,6 +1027,213 @@ def nivel_titular_empresa(titulo, emp, propias=False):
             f'tiene acto del Estado en el registro — puede ir por delante')
 
 
+# --- la otra puerta: prensa que dispara por TEMA ----------------------------
+#
+# La identidad no le sirve a todo el mundo. Un cliente cuyo negocio no tiene
+# razón social colombiana en el diccionario (Binance) se queda con `empresas_de`
+# = [] y entonces NINGÚN titular puede dispararle: medido el 7-ago-2026, su
+# corrida revisó 51 titulares y descartó los 51, y entre los descartados iba la
+# Resolución 000240 de la DIAN aterrizando en prensa — justo la norma que ese
+# cliente tiene clasificada como adversaria. El pilar entero estaba apagado para
+# quien solo tiene temas.
+#
+# Abrirlo por tema NO puede ser bajar la barra: la barra existe porque «prensa
+# que nombra una empresa vigilada» ya daba 26 altas en un día en financiero, y
+# el corpus temático es peor todavía. Medido sobre los 51 de ese perfil: 40 son
+# de «lavado de activos» y hablan de Milei, del caso Lili Pink, de extradiciones
+# y de la posesión presidencial — el término del cliente aparece en la consulta,
+# no en el hecho.
+#
+# El discriminador que sí separa es cuál es la NATURALEZA del hecho:
+#
+#   · una norma o una decisión de una autoridad reguladora, que aplica a una
+#     clase entera de actores  → eso ES la frontera regulatoria del cliente;
+#   · un caso penal contra un tercero con nombre propio (captura, extradición,
+#     imputación) → eso NO es su frontera. Si el tercero fuera su empresa, la
+#     puerta de la IDENTIDAD ya lo alerta, y esa puerta sí acepta lo penal.
+#
+# De ahí las cinco piezas de abajo. Medidas sobre los 1.161 titulares reales de
+# los 12 destinos del 8-ago-2026: pasan 23 (2,0%), y las 40 notas de crónica
+# roja del perfil de Binance mueren en la primera.
+
+# 1) La autoridad. Dos listas, y la división NO es cosmética: el corpus trae
+#    prensa de media región (el 7-ago entraron notas de Argentina, Uruguay,
+#    Panamá, Honduras, México e Indonesia). «Corte Suprema» o «Ministerio» sin
+#    más disparaban con una nota argentina sobre pensiones; «DIAN» o «Minsalud»
+#    no existen fuera de Colombia y se bastan solas.
+_AUTORIDAD_CO = re.compile(
+    r'\bdian\b|supersalud|superfinanc|supertransp|superservicios|supersociedades|'
+    r'superindustria|superintendencia de (industria|salud|servicios|sociedades|transporte|puertos)|'
+    r'superintendencia (nacional de salud|financiera)|'
+    r'\bsic\b|invima|\banla\b|\bcreg\b|\bupme\b|\bani\b|\bica\b|\badres\b|\buiaf\b|'
+    r'\bdnp\b|\bcnsc\b|\bsena\b|\bicbf\b|\bdane\b|aerocivil|aeronautica civil|'
+    r'minsalud|minhacienda|mintrabajo|mintic|minenergia|minambiente|minagricultura|'
+    r'mineducacion|minjusticia|mincomercio|mintransporte|minminas|mindefensa|'
+    r'ministerio de (salud|hacienda|trabajo|minas|ambiente|agricultura|educacion|'
+    r'justicia|comercio|transporte|vivienda|igualdad|tecnologias|las tic)|'
+    r'ministerio tic|banco de la republica|procuradur|contralor|'
+    r'corte constitucional|consejo de estado|comision de regulacion')
+
+# Existen en toda la región: solo cuentan si el titular ancla el país.
+_AUTORIDAD_GENERICA = re.compile(
+    r'superintendenc|ministerio|corte suprema|agencia nacional|instituto nacional|'
+    r'gobierno nacional')
+
+_ANCLA_COLOMBIA = re.compile(
+    r'\bcolombia|colombian|\bbogota\b|\bmedellin\b|\bcali\b|\bbarranquilla\b|'
+    r'\bcartagena\b|\bpetro\b|espriella')
+
+# 2) Qué HIZO la autoridad. Sin esto entra el ruido de nombramientos, que en el
+#    corpus es enorme: «Fabio Arjona Hincapié — Ministerio de Ambiente», «sería
+#    designado como el nuevo presidente de la ANLA», «completa la cúpula del
+#    Ministerio de Minas». Nombrar a alguien no cambia ninguna obligación.
+#    Ojo: esta lista es generosa a propósito y el corte fino lo hace la pieza
+#    2.b — hay verbos ('tarifa', 'ordena') que aparecen igual en una decisión y
+#    en un informe sobre el sector.
+_ACTO_REGULATORIO = re.compile(
+    r'resolucion|decreto|circular|reglamenta|normativ|expide|expidio|emitio|'
+    r'entra en vigencia|rige a partir|nueva[s]? regla|cambi[ao] las reglas|'
+    r'cambian las reglas|sancion|multa|obliga|obligator|exige|prohibe|prohibicion|'
+    r'autoriza|luz verde|deja en firme|otorga|adjudica|declara desierta|'
+    r'niega (la |el )?(licencia|permiso|registro|solicitud)|'
+    r'formula cargos|imputa cargos|abre investigacion|investiga a|'
+    r'requisito|licencia|permiso|habilitacion|tarifa|topes? |plazo|'
+    r'suspende|revoca|deroga|modifica|aprueba|adopta|ordena|\bfallo\b|sentencia|'
+    r'actualiza|incorpora|establece|fija ')
+
+# 2.b) …y lo que solo PARECE un acto. Un diagnóstico del regulador no cambia
+#    ninguna obligación: es información sobre el sector, no una decisión sobre
+#    él. Sin este corte se colaba «Estudio de la Superservicios revela que la
+#    integración vertical no reduce las tarifas» —entró por la palabra 'tarifa'—
+#    y en el corpus ese mismo informe venía replicado por 4 medios, o sea que la
+#    corroboración lo habría subido a alto por ser eco, que es exactamente lo que
+#    este pilar existe para no hacer.
+_DIAGNOSTICO = re.compile(
+    r'\bestudio\b|\binforme\b|\bbalance\b|revela|estima que|\bencuesta\b|'
+    r'segun (el|la) (estudio|informe|reporte)')
+
+# 3) Crónica roja. Es el grueso del ruido temático y NO se pierde nada al
+#    sacarlo: si el capturado fuera una vigilada del cliente, la puerta de la
+#    identidad lo alerta igual (`_PRENSA_ACCIONABLE` sí acepta lo penal).
+_CASO_PENAL = re.compile(
+    r'captur|extradit|judicializ|arrest|detenid|detien|allanamiento|incaut|'
+    # 'banda' va calificada a propósito: 'banda ancha' es vocabulario de TIC, y
+    # a secas mataba las resoluciones del MinTIC sobre conectividad.
+    r'\balias\b|bandas? (criminal|delincuencial|narco)|'
+    r'narcotrafic|homicid|masacre|secuestr|sicari|atentado|'
+    r'declara culpable|condena a \d+|\bcarcel\b|prision|red(es)? de trata|contraband')
+
+# 4) Política, agenda y servicio al lector. No son hechos de Estado: son quién
+#    llegó al cargo, quién se reunió con quién, y el «paso a paso» de siempre.
+_RUIDO_POLITICO = re.compile(
+    r'gabinete|posesion|se posesiona|nombramiento|nombra a|designa|designacion|'
+    r'sera el nuevo|asumira|viceminist|cupula|renuncia|escandalo|encuesta|'
+    r'entrevista|columna de opinion|\btop \d|paso a paso|conozca |asi funciona|'
+    r'asi va |esto es lo que|\bvideo\b|en vivo|se reunio|se encontro|gira |'
+    r'ganan influencia|altos cargos|— ministerio|- ministerio')
+
+
+# Cómo se escribe cada autoridad en el correo. `norm` ya bajó todo a minúscula
+# y sin tildes, así que la forma original del titular no se puede recuperar por
+# posición (al normalizar se caen las comillas tipográficas y las rayas, y los
+# índices dejan de cuadrar). Una tabla corta es más barata y no se equivoca.
+_AUTORIDAD_NOMBRE = {
+    'dian': 'la DIAN', 'sic': 'la SIC', 'anla': 'la ANLA', 'creg': 'la CREG',
+    'upme': 'la UPME', 'ani': 'la ANI', 'ica': 'el ICA', 'adres': 'la ADRES',
+    'uiaf': 'la UIAF', 'dnp': 'el DNP', 'cnsc': 'la CNSC', 'sena': 'el SENA',
+    'icbf': 'el ICBF', 'dane': 'el DANE', 'aerocivil': 'la Aerocivil',
+    'aeronautica civil': 'la Aeronáutica Civil',
+    # Ojo: la llave es lo que devuelve `group(0)`, o sea el TROZO que casó. Varias
+    # alternativas del patrón son raíces cortadas ('superfinanc', 'supertransp')
+    # justamente para tolerar «Superfinanciera»/«Superintendencia Financiera», así
+    # que la raíz también tiene que estar acá o el correo diría «la Superfinanc».
+    'supersalud': 'la Supersalud', 'superfinanc': 'la Superfinanciera',
+    'superfinanciera': 'la Superfinanciera', 'supertransp': 'la Supertransporte',
+    'supertransporte': 'la Supertransporte', 'superservicios': 'la Superservicios',
+    'comision de regulacion': 'la Comisión de Regulación',
+    'supersociedades': 'la Supersociedades', 'superindustria': 'la Superindustria',
+    'invima': 'el Invima', 'minsalud': 'Minsalud', 'minhacienda': 'Minhacienda',
+    'mintrabajo': 'MinTrabajo', 'mintic': 'MinTIC', 'minenergia': 'MinEnergía',
+    'minambiente': 'Minambiente', 'minagricultura': 'Minagricultura',
+    'mineducacion': 'Mineducación', 'minjusticia': 'Minjusticia',
+    'mincomercio': 'Mincomercio', 'mintransporte': 'MinTransporte',
+    'minminas': 'MinMinas', 'mindefensa': 'MinDefensa',
+    'ministerio tic': 'el Ministerio TIC',
+    'banco de la republica': 'el Banco de la República',
+    'corte constitucional': 'la Corte Constitucional',
+    'corte suprema': 'la Corte Suprema', 'consejo de estado': 'el Consejo de Estado',
+    'gobierno nacional': 'el Gobierno Nacional',
+}
+
+
+def _nombre_autoridad(bruto):
+    """Texto crudo del match → cómo se nombra en el correo."""
+    b = (bruto or '').strip()
+    if b in _AUTORIDAD_NOMBRE:
+        return _AUTORIDAD_NOMBRE[b]
+    if b.startswith('procuradur'):
+        return 'la Procuraduría'
+    if b.startswith('contralor'):
+        return 'la Contraloría'
+    if b.startswith('superintendencia'):
+        return 'la ' + b.capitalize()
+    if b.startswith('ministerio'):
+        return 'el ' + b.capitalize()
+    return 'una autoridad' if not b else 'la ' + b.capitalize()
+
+
+def prensa_normativa(titulo):
+    """¿El titular reporta una NORMA o una decisión regulatoria?
+
+    → (bool, motivo, autoridad). `motivo` dice por qué NO pasó cuando no pasa,
+    para poder contar el descarte por causa en vez de dejarlo opaco:
+    'sin-autoridad' · 'sin-acto' · 'diagnostico' · 'penal' · 'politica'. Cuando
+    pasa, `motivo` es 'ok' y `autoridad` es cómo se nombra a quien actuó.
+    """
+    tn = norm(titulo)
+    if not tn:
+        return False, 'sin-autoridad', ''
+    m = _AUTORIDAD_CO.search(tn)
+    if not m:
+        # Autoridad genérica: solo si el titular dice de qué país habla.
+        m = _AUTORIDAD_GENERICA.search(tn)
+        if not (m and _ANCLA_COLOMBIA.search(tn)):
+            return False, 'sin-autoridad', ''
+    if not _ACTO_REGULATORIO.search(tn):
+        return False, 'sin-acto', ''
+    if _DIAGNOSTICO.search(tn):
+        return False, 'diagnostico', ''
+    if _CASO_PENAL.search(tn):
+        return False, 'penal', ''
+    if _RUIDO_POLITICO.search(tn):
+        return False, 'politica', ''
+    return True, 'ok', _nombre_autoridad(m.group(0))
+
+
+def nivel_titular_tema(autoridad, tema, n_medios=1, propias=False):
+    """Prensa que dispara por TEMA: una autoridad movió algo en el terreno que
+    este destino vigila, y no hay acto en el registro que le corresponda.
+
+    Arranca en `medio`, no en `alto`, y la diferencia es honesta: en la puerta
+    de la identidad la nota habla de TU empresa; acá habla de tu terreno. Sube a
+    `alto` cuando varios medios reportan el mismo acto, que es el mismo criterio
+    de corroboración que ya usa el resto del motor: un acto que la prensa del
+    sector persigue en bloque pesa distinto que una nota suelta.
+
+    Se nombra a la autoridad y el término vigilado que trajo la nota. Lo primero
+    porque «Minsalud movió algo» es la noticia y «una autoridad movió algo» no
+    es nada; lo segundo porque la consulta de prensa es por término y a veces
+    devuelve algo de un sector vecino — verlo escrito deja que el lector lo
+    descarte de una ojeada en vez de preguntarse por qué le llegó.
+    """
+    de_quien = 'que este perfil vigila' if propias else 'de este sector'
+    base = (f'{autoridad or "una autoridad"} movió algo en «{tema}», {de_quien}, '
+            f'y todavía no tiene acto del Estado en el registro')
+    if n_medios >= 2:
+        return 'alto', f'{base} — y lo reportaron {n_medios} medios'
+    return 'medio', base
+
+
 def _pesos(v):
     try:
         v = float(v)

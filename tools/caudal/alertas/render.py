@@ -439,12 +439,32 @@ def notas_cobertura(digest, sector):
         if pr.get('empresa_sin_hecho'):
             extra += (f' · {pr["empresa_sin_hecho"]} nombraban una empresa vigilada pero '
                       f'sin hecho accionable detrás (noticia comercial rutinaria)')
+        n_om = pr.get('tema_omitidos', 0)
+        if n_om:
+            extra += (f' · {n_om} norma{"s" if n_om != 1 else ""} más '
+                      f'{"quedaron" if n_om != 1 else "quedó"} por encima del tope de '
+                      f'prensa por tema (ver digest.json)')
+        # Por qué se cayó lo demás. Un solo número («N descartados») se lee como
+        # una caja negra; separar la crónica roja del diagnóstico y de la noticia
+        # política deja ver que el filtro descarta por criterio y no por volumen.
+        partes = []
+        if pr.get('tema_penal'):
+            partes.append(f'{pr["tema_penal"]} eran casos penales contra terceros')
+        if pr.get('tema_diagnostico'):
+            partes.append(f'{pr["tema_diagnostico"]} eran estudios o informes, '
+                          f'no decisiones')
+        if pr.get('tema_politica'):
+            partes.append(f'{pr["tema_politica"]} eran noticia política o de agenda')
+        if partes:
+            extra += (' · de los descartados, ' + ' · '.join(partes) +
+                      ' (nombran una autoridad, pero no una norma)')
         out.append(
             f'Prensa: se revisaron {pr["total"]} titulares del sector · '
             f'{pr.get("cobertura", 0)} quedaron colgados de una señal como cobertura · '
             f'{pr.get("sueltos", 0)} dispararon solos por nombrar una empresa vigilada '
-            f'sin acto del Estado detrás{extra} · {pr.get("descartados", 0)} se '
-            f'descartaron por ser eco sin hecho nuevo.')
+            f'sin acto del Estado detrás · {pr.get("tema", 0)} por reportar una norma o '
+            f'decisión de una autoridad sobre el terreno vigilado{extra} · '
+            f'{pr.get("descartados", 0)} se descartaron por ser eco sin hecho nuevo.')
     # Cuántas señales del Congreso van con el texto leído y cuántas no. Sin esta
     # línea, un digest en el que la mitad dice «todavía no hemos leído su texto»
     # se lee como una falla del producto en vez de como lo que es: el estado real
