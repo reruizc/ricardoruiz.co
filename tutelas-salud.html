@@ -26,7 +26,10 @@
       --muted:rgba(26,29,36,.62); --muted-2:rgba(26,29,36,.46);
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html,body{min-height:100%;overflow-x:hidden}
+    /* `overflow-x:hidden` convertía al body en contenedor de scroll y eso rompe
+       `position:sticky` — la escena de apertura se iba con el scroll en vez de
+       quedarse fija. `clip` recorta igual pero no crea contexto de scroll. */
+    html,body{min-height:100%;overflow-x:clip}
     body{
       background:var(--paper);color:var(--white);
       font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
@@ -73,6 +76,70 @@
     h2{font-weight:700;font-size:1.32rem;letter-spacing:-.01em;margin-bottom:.35rem}
     h3{font-weight:600;font-size:1rem;letter-spacing:.01em}
     .section{margin-top:2.6rem}
+
+    /* ══ SECUENCIA DE APERTURA ══
+       La hoja se arma mientras se baja: 10 frames apilados en el mismo sitio, y el
+       scroll decide cuál se ve. Se usa una pista alta con la escena en `sticky`
+       —no scroll-jacking— para que el dedo mande y se pueda salir cuando se quiera.
+       La imagen es cuadrada: en celular ocupa el ancho, en escritorio va al lado del
+       texto. Todo el movimiento se apaga con `prefers-reduced-motion`. */
+    .sy{position:relative}
+    .sy-track{height:520vh}                     /* lo que hay que bajar para ver los 10 */
+    .sy-stage{position:sticky;top:0;height:100svh;height:100vh;display:grid;
+      grid-template-columns:1fr;align-content:center;gap:1.2rem;overflow:hidden}
+    .sy-art{position:relative;width:min(90vw,52svh);aspect-ratio:1;margin:0 auto;flex:none;
+      /* Las imágenes traen su propio fondo gris y sin esto se ve el cuadrado recortado
+         contra el degradado de la página. La máscara difumina los bordes para que la
+         hoja parezca apoyada sobre la página y no pegada encima. */
+      -webkit-mask-image:radial-gradient(ellipse 74% 74% at 50% 50%,#000 58%,transparent 100%);
+      mask-image:radial-gradient(ellipse 74% 74% at 50% 50%,#000 58%,transparent 100%)}
+    .sy-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+      opacity:0;transition:opacity .45s ease}
+    .sy-art img.on{opacity:1}
+    .sy-copy{text-align:center;padding:0 1.2rem}
+    /* Las frases se apilan en el mismo punto (son `absolute`), así que su contenedor
+       colapsaría a cero y el botón se les montaría encima. La altura reservada lo
+       mantiene debajo. */
+    .sy-lines{position:relative;min-height:11.5rem}
+    /* La saliente se va rápido y la entrante llega con retardo: si se cruzan a media
+       opacidad los dos textos se leen encima uno del otro y no se entiende ninguno. */
+    .sy-line{position:absolute;left:0;right:0;padding:0 1.2rem;opacity:0;
+      transform:translateY(10px);transition:opacity .18s ease,transform .18s ease;pointer-events:none}
+    .sy-line.on{opacity:1;transform:none;pointer-events:auto;
+      transition:opacity .34s ease .16s,transform .34s ease .16s}
+    .sy-k{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--blue-light);
+      font-weight:600;margin-bottom:.5rem}
+    .sy-t{font-weight:700;font-size:clamp(1.25rem,3.4vw,2rem);letter-spacing:-.02em;line-height:1.15}
+    .sy-t em{font-style:normal;color:var(--blue-light)}
+    .sy-d{font-size:clamp(.86rem,1.4vw,1rem);color:var(--muted);margin-top:.5rem;
+      line-height:1.5;max-width:46ch;margin-left:auto;margin-right:auto}
+    .sy-cta{margin-top:1.1rem;opacity:0;transform:translateY(10px);
+      transition:opacity .5s ease,transform .5s ease;pointer-events:none}
+    .sy-cta.on{opacity:1;transform:none;pointer-events:auto}
+    /* progreso: una barra fina, para que se sepa cuánto falta */
+    .sy-bar{position:absolute;left:0;bottom:0;height:2px;background:var(--blue);width:0;
+      transition:width .2s linear}
+    .sy-skip{position:absolute;top:1rem;right:1rem;font-size:.76rem;color:var(--muted);
+      background:none;border:none;cursor:none;padding:.4rem .6rem;z-index:3}
+    .sy-skip:hover{color:var(--white)}
+    @media(min-width:900px){
+      .sy-stage{grid-template-columns:1fr 1fr;align-items:center;gap:3rem;
+        max-width:1100px;margin:0 auto;padding:0 2rem}
+      .sy-art{width:min(42vw,70svh);margin:0}
+      .sy-copy{text-align:left}
+      .sy-lines{min-height:13rem}
+      .sy-line{padding:0}
+      .sy-d{margin-left:0}
+    }
+    @media(prefers-reduced-motion:reduce){
+      /* sin movimiento: la pista se colapsa y todo queda visible de una */
+      .sy-track{height:auto}
+      .sy-stage{position:static;height:auto;padding:2rem 0}
+      .sy-art img{transition:none}
+      .sy-line{position:static;opacity:1;transform:none;margin-bottom:1.6rem;pointer-events:auto}
+      .sy-cta{opacity:1;transform:none;pointer-events:auto}
+      .sy-copy{min-height:0}
+    }
 
     /* ── STATS ── */
     .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1px;background:var(--card-border);border:1px solid var(--card-border);margin-top:2rem}
@@ -361,7 +428,27 @@
   <div class="wrap">
 
     <!-- ══════════ INICIO ══════════ -->
-    <div class="panel active" id="panel-inicio">
+    <!-- APERTURA · la hoja se arma mientras se baja -->
+    <div class="panel active" id="panel-intro">
+      <section class="sy" id="sy">
+        <div class="sy-track">
+          <div class="sy-stage">
+            <button type="button" class="sy-skip" id="sy-skip">Saltar →</button>
+            <div class="sy-art" id="sy-art"></div>
+            <div class="sy-copy">
+              <div class="sy-lines" id="sy-lines"></div>
+              <div class="sy-cta" id="sy-cta">
+                <button type="button" class="btn btn-primary" id="sy-empezar">Empezar</button>
+                <div class="sy-d" style="margin-top:.6rem">Gratis, sin registro y sin cuenta.</div>
+              </div>
+            </div>
+            <div class="sy-bar" id="sy-bar"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="panel" id="panel-inicio">
       <div class="eyebrow">Herramienta ciudadana gratuita</div>
       <h1>Tu EPS no te entrega lo que ya te <em>autorizaron</em>.<br>Aquí armas la tutela.</h1>
       <p class="lede">
@@ -546,6 +633,33 @@
     </div>
 
     <!-- ══════════ WIZARD ══════════ -->
+    <!-- CASO ELEGIDO · de qué se trata y qué hay que tener a mano -->
+    <div class="panel" id="panel-caso">
+      <button type="button" class="btn btn-ghost" id="caso-volver" style="margin-bottom:1.4rem">← Elegir otro caso</button>
+      <div class="eyebrow" id="caso-eyebrow">—</div>
+      <h1 style="font-size:clamp(1.5rem,3vw,2.2rem)" id="caso-title">—</h1>
+      <p class="lede" id="caso-desc">—</p>
+      <div class="box" style="margin-top:1.8rem">
+        <div class="box-title">Ten esto a mano antes de empezar</div>
+        <div class="box-hint">
+          No necesitas tenerlo todo para armar el escrito, pero sí para radicarlo. Si te falta
+          alguno, puedes seguir y conseguirlo después: al final te dejamos la lista para revisar.
+        </div>
+        <ul class="anexos" id="caso-anexos"></ul>
+      </div>
+      <div class="box" style="margin-top:1rem">
+        <div class="box-hint" style="margin:0">
+          <b id="caso-num">—</b> se radicaron en 2025 por esta misma razón. Responder las preguntas
+          toma unos <b>10 minutos</b> y el documento queda listo para firmar, con los hechos, las
+          normas y las órdenes al juez.
+        </div>
+      </div>
+      <div style="margin-top:1.8rem;display:flex;gap:.7rem;flex-wrap:wrap;align-items:center">
+        <button type="button" class="btn btn-primary" id="caso-empezar">Empezar</button>
+        <span class="help" style="margin:0">Gratis · sin registro · tus datos no salen de tu navegador</span>
+      </div>
+    </div>
+
     <div class="panel" id="panel-wizard">
       <div class="eyebrow" id="wiz-eyebrow">Caso seleccionado</div>
       <h1 style="font-size:clamp(1.5rem,3vw,2.2rem)" id="wiz-title">—</h1>
@@ -1294,6 +1408,106 @@
   var $ = function(id){ return document.getElementById(id); };
   var val = function(id){ var e = $(id); return e ? String(e.value || '').trim() : ''; };
 
+  /* ══════════════════ SECUENCIA DE APERTURA ══════════════════
+     Diez frames de la hoja armándose, encadenados al scroll. El texto va por
+     bloques: cada uno se sostiene varios frames para que se alcance a leer.
+
+     Decisiones que valen la pena recordar:
+     · No hay scroll-jacking. La escena va en `sticky` sobre una pista alta, así que
+       el dedo manda: se puede bajar rápido, devolverse o salir cuando se quiera.
+     · Movimiento reducido → la pista se colapsa por CSS y esto ni se ejecuta.
+     · Los frames se precargan por lotes, no los diez de golpe: en un celular con
+       datos contados, bajar 75 KB antes de ver nada es una barrera.
+     · Quien ya sabe a qué viene tiene "Saltar" desde el primer momento: esta es una
+       herramienta para gente enferma, no una campaña. */
+  var SY = [
+    { f:1,  k:'Lo que pasa',   t:'Te formularon algo y <em>no te lo entregan</em>.',
+      d:'Vuelves a la farmacia, te dicen que no ha llegado, que vuelvas la otra semana.' },
+    { f:3,  k:'No eres el único', t:'274.510 tutelas por salud en un año.',
+      d:'Fue lo que se radicó en Colombia durante 2025: un 15,7% más que el año anterior.' },
+    { f:5,  k:'Y lo más absurdo', t:'Casi todas reclaman algo <em>ya cubierto</em>.',
+      d:'El 64,85% pide servicios que ya están en el plan de beneficios y ya están pagados con tu UPC. El problema no es la cobertura: es que no llegan a tiempo.' },
+    { f:7,  k:'Lo que hacemos', t:'Respondes unas preguntas y armamos el escrito.',
+      d:'Los hechos, los derechos que se están vulnerando y las órdenes concretas al juez. Listo para firmar y radicar.' },
+    { f:8,  k:'Con datos', t:'Te decimos cómo le ha ido a casos como el tuyo.',
+      d:'Con el registro público de la Corte Constitucional, por tipo de petición y por departamento. Y qué exige el juez para concederla.' },
+    { f:10, k:'Y es tuyo', t:'Gratis, sin registro y <em>sin que tus datos salgan</em>.',
+      d:'El documento se arma en tu propio navegador. Tu nombre y tu cédula no viajan a ningún servidor.' }
+  ];
+  var SY_N = 10;
+
+  (function apertura(){
+    var art = $('sy-art'), lines = $('sy-lines'), sec = $('sy');
+    if (!art || !lines) return;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    var ancho = (window.innerWidth > 900 ? 'lg' : 'sm');
+
+    var imgs = [];
+    for (var i = 1; i <= SY_N; i++) {
+      var im = document.createElement('img');
+      im.alt = ''; im.setAttribute('aria-hidden', 'true');
+      im.decoding = 'async';
+      // el primero entra de inmediato; el resto se piden por lotes al avanzar
+      if (i <= 2) im.src = 'tutelas-salud/w/f' + i + '-' + ancho + '.webp';
+      else im.dataset.src = 'tutelas-salud/w/f' + i + '-' + ancho + '.webp';
+      if (i === 1) im.className = 'on';
+      art.appendChild(im); imgs.push(im);
+    }
+    lines.innerHTML = SY.map(function(s, n){
+      return '<div class="sy-line' + (n === 0 ? ' on' : '') + '" data-n="' + n + '">' +
+             '<div class="sy-k">' + s.k + '</div>' +
+             '<div class="sy-t">' + s.t + '</div>' +
+             '<div class="sy-d">' + s.d + '</div></div>';
+    }).join('');
+    var lineEls = lines.querySelectorAll('.sy-line');
+
+    if (reduce) { $('sy-cta').classList.add('on'); return; }
+
+    function cargarHasta(n){
+      for (var i = 0; i < Math.min(n + 2, SY_N); i++) {
+        var im = imgs[i];
+        if (im && im.dataset.src) { im.src = im.dataset.src; delete im.dataset.src; }
+      }
+    }
+    var ultimo = -1, pend = false;
+    function pintar(){
+      pend = false;
+      var r = sec.getBoundingClientRect();
+      var total = sec.offsetHeight - window.innerHeight;
+      var p = total > 0 ? Math.min(Math.max(-r.top / total, 0), 1) : 0;
+      var idx = Math.min(Math.floor(p * SY_N), SY_N - 1);
+      if (idx !== ultimo) {
+        ultimo = idx;
+        cargarHasta(idx);
+        imgs.forEach(function(im, i){ im.classList.toggle('on', i === idx); });
+        // la frase activa es la última cuyo frame de anclaje ya se alcanzó
+        var act = 0;
+        for (var j = 0; j < SY.length; j++) if (idx + 1 >= SY[j].f) act = j;
+        for (var k = 0; k < lineEls.length; k++) lineEls[k].classList.toggle('on', k === act);
+      }
+      $('sy-bar').style.width = (p * 100).toFixed(1) + '%';
+      $('sy-cta').classList.toggle('on', p > 0.9);
+    }
+    function onScroll(){ if (!pend) { pend = true; requestAnimationFrame(pintar); } }
+    window.addEventListener('scroll', onScroll, { passive:true });
+    window.addEventListener('resize', onScroll, { passive:true });
+    pintar();
+  })();
+
+  function irAOpciones(){
+    $('panel-intro').classList.remove('active');
+    $('panel-inicio').classList.add('active');
+    window.scrollTo({ top:0, behavior:'auto' });
+  }
+  if ($('sy-empezar')) $('sy-empezar').addEventListener('click', irAOpciones);
+  if ($('sy-skip')) $('sy-skip').addEventListener('click', irAOpciones);
+  if ($('caso-empezar')) $('caso-empezar').addEventListener('click', function(){ abrirFormulario(); });
+  if ($('caso-volver')) $('caso-volver').addEventListener('click', function(){
+    $('panel-caso').classList.remove('active');
+    $('panel-inicio').classList.add('active');
+    window.scrollTo({ top:0, behavior:'auto' });
+  });
+
   /* ══════════════════ RENDER INICIAL ══════════════════ */
   (function renderCases(){
     var html = '';
@@ -1564,17 +1778,35 @@
   });
 
   /* ══════════════════ NAVEGACIÓN ══════════════════ */
+  /* Antes de las preguntas se muestra de qué se trata el caso y, sobre todo, QUÉ HAY
+     QUE TENER A MANO. Enterarse a mitad del formulario de que falta la fórmula
+     médica es la forma más segura de que alguien lo abandone. */
   function startCaso(k){
     S.caso = k; S.step = 1;
     var c = CASOS[k];
+    $('caso-eyebrow').textContent = c.rank + ' · ' + String(c.pct).replace('.', ',') + '% de las peticiones';
+    $('caso-title').textContent = c.nombre;
+    $('caso-desc').textContent = c.desc;
+    $('caso-num').textContent = c.num;
+    $('caso-anexos').innerHTML = c.anexos.map(function(a){
+      return '<li><span>▢</span><span>' + a + '</span></li>';
+    }).join('');
+    $('panel-inicio').classList.remove('active');
+    $('panel-intro').classList.remove('active');
+    $('panel-caso').classList.add('active');
+    window.scrollTo({ top:0, behavior:'auto' });
+  }
+
+  function abrirFormulario(){
+    var c = CASOS[S.caso]; if (!c) return;
     $('wiz-title').textContent = c.nombre;
     $('wiz-eyebrow').textContent = c.rank + ' · ' + String(c.pct).replace('.', ',') + '% de las peticiones';
     var accSrv = $('acc-servicio'); if (accSrv) accSrv.textContent = c.objeto || 'el servicio';
     renderCamposCaso(c);
-    $('panel-inicio').classList.remove('active');
+    $('panel-caso').classList.remove('active');
     $('panel-wizard').classList.add('active');
     paint();
-    window.scrollTo({ top:0, behavior:'smooth' });
+    window.scrollTo({ top:0, behavior:'auto' });
   }
 
   function renderCamposCaso(c){
