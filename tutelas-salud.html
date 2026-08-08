@@ -80,8 +80,16 @@
     /* Durante la secuencia la barra se retira y queda solo el logo, centrado y más
        chico: la escena se lee de un tirón y "Volver / Gratis · sin registro" competía
        con ella. La barra vuelve sola al salir. */
+    /* La barra sale del FLUJO durante la secuencia. Ocupando sitio, empujaba la escena
+       74 px hacia abajo, y esos 74 px eran scroll muerto: la página se desplazaba antes
+       de que la escena se fijara y solo entonces empezaban a cambiar imagen y texto.
+       Fuera del flujo, la escena arranca pegada y lo único que se mueve es la secuencia. */
     body.en-secuencia .electoral-nav{border-bottom:none;background:none;backdrop-filter:none;
-      justify-content:center;padding:1rem 1rem .2rem}
+      justify-content:center;padding:1rem 1rem .2rem;
+      position:absolute;top:0;left:0;right:0;pointer-events:none}
+    body.en-secuencia .electoral-nav a{pointer-events:auto}
+    /* y el padding del contenedor, que dejaba otros 34 px de scroll muerto */
+    body.en-secuencia .wrap{padding-top:0}
     body.en-secuencia .e-nav-left{display:none}
     body.en-secuencia .e-nav-right{justify-content:center}
     body.en-secuencia .logo-text{font-size:.98rem}
@@ -195,6 +203,14 @@
       .sy-lines{min-height:0}
       .sy-over{position:static;background:none;padding:0 0 1rem}
     }
+
+    /* Sub-pasos: una pregunta a la vez. Entran con un desplazamiento corto para que
+       se note que se avanzó, sin hacer esperar a nadie. */
+    .sub{animation:subEntra .26s ease}
+    @keyframes subEntra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    @media(prefers-reduced-motion:reduce){.sub{animation:none}}
+    /* dentro de un sub-paso el par de campos va lado a lado y en celular se apila */
+    .sub .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.95rem}
 
     /* ── STATS ── */
     .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1px;background:var(--card-border);border:1px solid var(--card-border);margin-top:2rem}
@@ -1974,34 +1990,202 @@
     $('campos-caso').innerHTML = html;
   }
 
+
+  /* ══════════════════ SUB-PASOS · una pregunta a la vez ══════════════════
+     El paso 2 tenía 16 campos en una sola pantalla y eso abruma: quien llega aquí
+     está enfermo y con afán, no llenando un formulario de trabajo. Ahora cada paso
+     se recorre de a una pregunta (dos cuando van juntas de forma natural, como
+     departamento y ciudad, o tipo y número de documento).
+
+     El HTML no se reescribe: los campos se MUEVEN a contenedores nuevos, así que
+     conservan sus ids y todos los listeners que ya tenían enganchados. Reconstruirlos
+     habría roto la validación, el autocompletado de EPS e IPS y el generador.
+
+     Los sub-pasos cuyos campos están ocultos —el motivo de la agencia oficiosa, el
+     estrato si eligió zona rural, el detalle de urgencia— se saltan solos al navegar,
+     en vez de aparecer en blanco. */
+  var PAREJAS = [
+    ['a_tipodoc','a_doc'], ['a_depto','a_ciudad'], ['a_tel','a_mail'],
+    ['t_tipodoc','t_doc'], ['af_edad','af_estrato'],
+    ['e_regimen','e_calidad'], ['e_depto_hechos','e_ciudad_hechos'],
+    ['c_medico','c_fecha'], ['c_item','c_dosis']
+  ];
+  var SUBS = {};          // paso → [nodos de sub-paso]
+  var subActual = 0;
+
+  function campoDe(el){
+    var c = el.querySelector('input,select,textarea');
+    return c ? c.id : '';
+  }
+  function parejaDe(id){
+    for (var i = 0; i < PAREJAS.length; i++) if (PAREJAS[i][0] === id) return PAREJAS[i][1];
+    return null;
+  }
+
+  function armarSubpasos(paso){
+    var step = document.querySelector('.wstep[data-step="' + paso + '"]');
+    if (!step || step.dataset.subs) return;
+    var cont = document.createElement('div');
+    var grupos = [];
+
+    // cada caja del paso aporta su título; sus campos se reparten de a uno o dos
+    [].forEach.call(step.children, function(box){
+      if (!box.classList || !box.classList.contains('box')) { grupos.push({ suelto:box }); return; }
+      var titulo = box.querySelector('.box-title');
+      var hint = box.querySelector('.box-hint');
+      var piezas = [];
+      [].forEach.call(box.children, function(n){
+        if (n === titulo || n === hint) return;
+        if (n.classList && (n.classList.contains('grid2') || n.classList.contains('grid3'))) {
+          [].forEach.call(n.children, function(f){ piezas.push(f); });
+        } else piezas.push(n);
+      });
+      // Solo las PREGUNTAS abren pantalla. Los textos de contexto —avisos, notas,
+      // el aviso de la Ley 1581— se acumulan y viajan con la pregunta que sigue: si
+      // cada uno abriera la suya, el paso 1 (que es un aviso y una casilla) se
+      // repartía en cuatro pantallas vacías.
+      var i = 0, primero = true, contexto = [];
+      while (i < piezas.length) {
+        var pieza = piezas[i];
+        var interactiva = pieza.querySelector &&
+          pieza.querySelector('input,select,textarea,.radio-opt,.chk');
+        if (!interactiva) { contexto.push(pieza); i++; continue; }
+        var lote = contexto.concat([pieza]);
+        contexto = [];
+        var id = campoDe(pieza), par = id ? parejaDe(id) : null;
+        if (par && piezas[i + 1] && campoDe(piezas[i + 1]) === par) { lote.push(piezas[i + 1]); i++; }
+        grupos.push({ titulo:titulo, hint:primero ? hint : null, piezas:lote });
+        primero = false; i++;
+      }
+      // lo que quede sin pregunta detrás se pega al último grupo de esta caja
+      if (contexto.length && grupos.length) {
+        grupos[grupos.length - 1].piezas = grupos[grupos.length - 1].piezas.concat(contexto);
+      } else if (contexto.length) {
+        grupos.push({ titulo:titulo, hint:hint, piezas:contexto });
+      }
+    });
+
+    grupos.forEach(function(g){
+      var sub = document.createElement('div');
+      sub.className = 'sub';
+      if (g.suelto) { sub.appendChild(g.suelto); cont.appendChild(sub); return; }
+      var caja = document.createElement('div');
+      caja.className = 'box';
+      if (g.titulo) caja.appendChild(g.titulo.cloneNode(true));
+      if (g.hint) caja.appendChild(g.hint);
+      // los campos van en rejilla; el texto de contexto va suelto, antes
+      var campos = g.piezas.filter(function(pz){
+        return pz.querySelector && pz.querySelector('input,select,textarea,.radio-opt,.chk');
+      });
+      var textos = g.piezas.filter(function(pz){ return campos.indexOf(pz) === -1; });
+      textos.forEach(function(pz){ caja.appendChild(pz); });
+      if (campos.length) {
+        var fila = document.createElement('div');
+        fila.className = campos.length > 1 ? 'grid2' : '';
+        campos.forEach(function(pz){ fila.appendChild(pz); });
+        caja.appendChild(fila);
+      }
+      sub.appendChild(caja);
+      cont.appendChild(sub);
+    });
+
+    step.innerHTML = '';
+    step.appendChild(cont);
+    // el aviso de error del paso vive fuera de los sub-pasos
+    var err = document.createElement('div');
+    err.className = 'errmsg'; err.id = 'err' + paso;
+    err.textContent = 'Completa los campos obligatorios marcados en rojo.';
+    step.appendChild(err);
+    step.dataset.subs = '1';
+    SUBS[paso] = [].slice.call(cont.querySelectorAll('.sub'));
+  }
+
+  function subVisible(sub){
+    // un sub-paso sin nada que mostrar (campos condicionales apagados) se salta
+    var vis = [].filter.call(sub.querySelectorAll('.field,.radio-row,.checks,.chk'), function(e){
+      return e.offsetParent !== null || getComputedStyle(e).display !== 'none';
+    });
+    return vis.length > 0;
+  }
+
+  function pintarSubs(){
+    var subs = SUBS[S.step] || [];
+    subs.forEach(function(sub, i){ sub.style.display = (i === subActual) ? '' : 'none'; });
+  }
+
+  function saltarOcultos(dir){
+    var subs = SUBS[S.step] || [];
+    while (subs[subActual] && !subVisible(subs[subActual])) {
+      subActual += dir;
+      if (subActual < 0 || subActual >= subs.length) break;
+      pintarSubs();
+    }
+  }
+
+  function haySiguienteSub(){
+    var subs = SUBS[S.step] || [];
+    return subActual < subs.length - 1;
+  }
+
   function paint(){
     $('steps').innerHTML = STEP_NAMES.map(function(n, i){
       var idx = i + 1;
       var cls = 'stepchip' + (idx === S.step ? ' on' : (idx < S.step ? ' done' : ''));
-      return '<div class="' + cls + '">' + (idx < S.step ? '✓ ' : idx + '. ') + n + '</div>';
+      // dentro del paso activo, cuántas preguntas van: sin esto el avance de cada
+      // pregunta no se ve por ningún lado y el paso se siente eterno
+      var extra = '';
+      if (idx === S.step && (SUBS[idx] || []).length > 1) {
+        extra = ' <b>' + (subActual + 1) + '/' + SUBS[idx].length + '</b>';
+      }
+      return '<div class="' + cls + '">' + (idx < S.step ? '✓ ' : idx + '. ') + n + extra + '</div>';
     }).join('');
     document.querySelectorAll('.wstep').forEach(function(el){
       el.style.display = (Number(el.dataset.step) === S.step) ? '' : 'none';
     });
-    $('btn-prev').textContent = S.step === 1 ? '← Cambiar de caso' : '← Atrás';
+    // el último paso es el resultado: no se trocea en preguntas
+    if (S.step < MAXSTEP) { armarSubpasos(S.step); pintarSubs(); }
+    $('btn-prev').textContent = (S.step === 1 && subActual === 0) ? '← Cambiar de caso' : '← Atrás';
     $('btn-next').style.display = S.step === MAXSTEP ? 'none' : '';
-    $('btn-next').textContent = S.step === MAXSTEP - 1 ? 'Generar mi tutela →' : 'Continuar →';
+    // el rótulo avisa cuándo el botón cierra el paso y cuándo genera el documento
+    $('btn-next').textContent = (S.step === MAXSTEP - 1 && !haySiguienteSub())
+      ? 'Generar mi tutela →' : 'Continuar →';
   }
 
   $('btn-prev').addEventListener('click', function(){
+    if (subActual > 0) {                       // dentro del paso, una pregunta atrás
+      subActual--; pintarSubs(); saltarOcultos(-1);
+      if (subActual < 0) subActual = 0;
+      pintarSubs(); paint(); window.scrollTo({ top:0, behavior:'smooth' });
+      return;
+    }
     if (S.step === 1) {
       $('panel-wizard').classList.remove('active');
       $('panel-inicio').classList.add('active');
       window.scrollTo({ top:0, behavior:'smooth' });
       return;
     }
-    S.step--; paint(); window.scrollTo({ top:0, behavior:'smooth' });
+    S.step--;
+    armarSubpasos(S.step);
+    subActual = Math.max((SUBS[S.step] || []).length - 1, 0);
+    pintarSubs(); saltarOcultos(-1);
+    paint(); window.scrollTo({ top:0, behavior:'smooth' });
   });
 
   $('btn-next').addEventListener('click', function(){
+    if (haySiguienteSub()) {
+      // se valida SOLO lo que está en pantalla: exigir el paso entero delataría
+      // errores de preguntas que la persona todavía no ha visto
+      if (!validate(S.step, SUBS[S.step][subActual])) return;
+      subActual++; pintarSubs(); saltarOcultos(1);
+      if (subActual >= SUBS[S.step].length) subActual = SUBS[S.step].length - 1;
+      pintarSubs(); paint(); window.scrollTo({ top:0, behavior:'smooth' });
+      return;
+    }
     if (!validate(S.step)) return;
     if (S.step === MAXSTEP - 1) { buildDoc(); }
-    S.step++; paint(); window.scrollTo({ top:0, behavior:'smooth' });
+    S.step++; subActual = 0;
+    paint(); saltarOcultos(1); pintarSubs();
+    window.scrollTo({ top:0, behavior:'smooth' });
     // pre-calienta el JSON de tasas un paso antes de necesitarlo (pesa ~510 KB)
     if (S.step === MAXSTEP - 1) cargarTasas().catch(function(){});
   });
@@ -2120,7 +2304,19 @@
     return true;  // pasaporte, extranjería, PPT, registro civil: alfanumérico
   }
 
-  function validate(step){
+  /* `ambito` = el sub-paso que está en pantalla. La validación del paso corre
+     completa igual, pero solo BLOQUEA si el campo que falló está a la vista: exigirle
+     a alguien un dato de una pregunta que todavía no ha visto no tiene sentido, y
+     marcar en rojo algo que no puede ver es peor. Al cerrar el paso se llama sin
+     ámbito y ahí sí se exige todo. */
+  function validate(step, ambito){
+    var ok = validarPaso(step);
+    if (ok || !ambito) return ok;
+    var fallo = document.querySelector('.err');
+    return fallo ? !ambito.contains(fallo) : true;
+  }
+
+  function validarPaso(step){
     document.querySelectorAll('.errmsg').forEach(function(e){ e.classList.remove('on'); });
     var bad = [];
     if (step === 1) {
