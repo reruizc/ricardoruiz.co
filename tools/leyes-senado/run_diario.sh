@@ -16,6 +16,7 @@
 #   ordenes_senado_comisiones   ídem `buenas`             Cuarta/Quinta/Sexta
 #   ordenes_senado_plenaria     ídem `plenaria`           secretariasenado.gov.co
 #   secop_fetch/build/upload  harvest_secop.py            agregados de SECOP II
+#   sucop_fetch/build/upload_*  harvest_sucop.py          consulta pública de normas (el dato que VENCE)
 #   bloqueo_build/upload      build_bloqueo_s3.py         índice de agendamientos
 #   citaciones_extrae/build/upload  harvest_citaciones.py  control político por congresista
 #   camara_fichas             harvest_camara_fichas.py    fechas de radicación y debate
@@ -188,6 +189,43 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
              --content-type "application/json" --cache-control "private, max-age=300"
   else
     etapa --nombre secop_upload --omitida "el build falló (rc=$rc_secop): no hay archivo nuevo que subir"
+  fi
+
+  # ── SUCOP (sucop.gov.co · consulta pública de normas) ──
+  # La etapa MÁS importante de las baratas: es el único pilar cuyo dato vence.
+  # Un `sucop.jsonl` de hace una semana no es "un poco viejo", es falso — las
+  # consultas que decía abiertas ya cerraron. ~8 requests, ~100 s, host propio
+  # (SharePoint del DNP) que no comparte WAF con leyes.senado.
+  # `fetch` va SIN --reuse a propósito: --reuse salta las páginas que ya están en
+  # disco, así que en una corrida diaria nunca vería un proceso nuevo.
+  etapa --nombre sucop_fetch --timeout 900 \
+        --desc "procesos de consulta pública (SharePoint DNP)" \
+        -- python3 tools/caudal/sucop/harvest_sucop.py fetch
+  rc_suc_f=$?
+
+  etapa --nombre sucop_build --timeout 600 \
+        --desc "sucop.jsonl + stats desde el raw" \
+        -- python3 tools/caudal/sucop/harvest_sucop.py build
+  rc_suc_b=$?
+
+  # Se sube solo si la cosecha Y el build salieron bien. Si la fuente no
+  # respondió, en S3 se queda el archivo de ayer y su antigüedad la delata en el
+  # chequeo de salud; subir un rebuild del raw viejo lo dejaría pasando por
+  # fresco, que en este pilar es peor que no subir nada.
+  if [ $rc_suc_f -eq 0 ] && [ $rc_suc_b -eq 0 ]; then
+    S3SUC="$REPO/Bases de datos/leyes-senado/sucop/dist"
+    etapa --nombre sucop_upload_jsonl --timeout 600 --desc "sucop.jsonl → S3" \
+          -- aws s3 cp "$S3SUC/sucop.jsonl" \
+             "s3://caudal-legislativo/metadata/sucop.jsonl" \
+             --content-type "application/json" --cache-control "private, max-age=300"
+    etapa --nombre sucop_upload_stats --timeout 300 --desc "sucop-stats.json → S3" \
+          -- aws s3 cp "$S3SUC/stats.json" \
+             "s3://caudal-legislativo/metadata/sucop-stats.json" \
+             --content-type "application/json" --cache-control "private, max-age=300"
+  else
+    etapa --nombre sucop_upload_jsonl \
+          --omitida "cosecha rc=$rc_suc_f · build rc=$rc_suc_b: en S3 se queda el de ayer, y su antigüedad la reporta el chequeo de salud"
+    etapa --nombre sucop_upload_stats --omitida "ídem"
   fi
 
   # ── índice de bloqueo (agendamientos de las dos cámaras) ──

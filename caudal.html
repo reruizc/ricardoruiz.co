@@ -400,6 +400,13 @@
   /* tipo documental + intento list */
   .doc-badge{font-size:.55rem; letter-spacing:.05em; text-transform:uppercase; padding:.13rem .42rem; border-radius:4px; font-weight:700; white-space:nowrap; border:1px solid var(--border2); color:var(--ink2)}
   .doc-badge.pal{color:var(--amber); border-color:rgba(224,160,58,.4)}
+  /* SUCOP · la cuenta regresiva. Es el único dato de Caudal que vence, así que
+     se le da color propio: rojo cuando quedan días, verde mientras haya margen,
+     gris apagado cuando ya cerró (archivo, no alerta). */
+  .doc-badge.urge{color:var(--red); border-color:rgba(209,88,78,.45); background:rgba(209,88,78,.10)}
+  .doc-badge.viva{color:var(--green); border-color:rgba(74,222,128,.35); background:rgba(74,222,128,.07)}
+  .doc-badge.venc{color:var(--ink3); border-color:var(--border2)}
+  .suc-urg{border-left:2px solid var(--red)}
   .tl-scroll{max-height:440px; overflow-y:auto; padding-right:.3rem}
   .tl-tags{display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.45rem; align-items:center}
 
@@ -744,6 +751,27 @@
       <div id="eje-results"></div>
     </div>
 
+    <!-- ===== PILAR · SUCOP (borradores en consulta pública) ===== -->
+    <div id="view-sucop" hidden>
+      <button class="pill-back" id="sucBack">← Volver a Caudal</button>
+      <div class="hero">
+        <h1>El borrador, <em>antes</em> de que sea norma.</h1>
+        <p>Los proyectos de decreto, resolución y circular que las entidades
+           publican para comentarios <b>antes</b> de expedirlos (SUCOP · DNP). Es la
+           señal más temprana de Caudal: cuando una norma aparece en el pilar
+           Ejecutivo ya está firmada; acá todavía se puede incidir — pero solo
+           mientras la ventana siga abierta.</p>
+        <div class="search">
+          <input id="sq" type="text" placeholder="busca un tema, una entidad, una empresa…" autocomplete="off" />
+          <button id="sgo">Buscar</button>
+        </div>
+        <div class="chips" id="sestados"></div>
+      </div>
+
+      <div id="suc-landing"></div>
+      <div id="suc-results"></div>
+    </div>
+
     <!-- ===== PILAR · Datos abiertos y contratación (SECOP II) ===== -->
     <div id="view-contratacion" hidden>
       <button class="pill-back" id="conBack">← Volver a Caudal</button>
@@ -1056,12 +1084,13 @@
   // Mapa de fuentes de Cauce como pilares navegables. Los 3 vivos van primero
   // (Congreso · Regulatorio · Medios); el resto se enciende por etapas.
   const PILLARS=[
-    {id:'congreso',    name:'Congreso y órgano legislativo',    status:'live', n:'13.172', unit:'registros · 1990–2026', desc:'Proyectos de ley, actos legislativos y leyes. Cuántas veces se intentó, por qué se cae, quién lo empuja.'},
-    {id:'regulatorio', name:'Superintendencias y comisiones',   status:'live', n:'7.015',  unit:'sanciones · 9 fuentes', desc:'Sanciones de INVIMA, SECOP, Superfinanciera, Supersalud, Supertransporte, SIC, Contraloría y más. Cada una cita su resolución o comunicado.'},
+    {id:'congreso',    name:'Congreso y órgano legislativo',    status:'live', n:'14.964', unit:'registros · 1990–2026', desc:'Proyectos de ley, actos legislativos y leyes. Cuántas veces se intentó, por qué se cae, quién lo empuja.'},
+    {id:'regulatorio', name:'Superintendencias y comisiones',   status:'live', n:'63.004', unit:'actos · 10 fuentes', desc:'Actos de la ANLA, INVIMA, SECOP, Superfinanciera, Supersalud, Supertransporte, SIC, Contraloría y más — 7.229 de ellos sanciones. Cada uno cita su resolución o comunicado.'},
     {id:'medios',      name:'Medios nacionales y regionales',   status:'live', n:'en vivo', unit:'prensa por tema',      desc:'Titulares de prensa nacional y regional, rastreados por tema — sin mantener un conector por medio.'},
     {id:'datos',       name:'Datos abiertos y contratación',    status:'live', n:'5,87 M', unit:'contratos · SECOP II', desc:'Todos los contratos electrónicos del Estado, consultados en vivo y actualizados a diario. Cada uno enlaza su proceso en SECOP.'},
     {id:'control',     name:'Órganos de control y altas cortes',status:'soon', desc:'Procuraduría, Consejo de Estado, Corte Constitucional.'},
     {id:'ejecutivo',   name:'Ejecutivo nacional · Presidencia',   status:'live', n:'10.193', unit:'decretos · desde 2015', desc:'Decretos, resoluciones, directivas, circulares y agenda regulatoria de la Presidencia. Cada norma enlaza su texto oficial.'},
+    {id:'sucop',       name:'Consulta pública de normas · SUCOP',status:'live', n:'3.899', unit:'borradores · desde 2020', desc:'Proyectos de decreto y resolución abiertos a comentarios ANTES de expedirse. La señal más temprana de Caudal: acá la norma todavía se puede pelear.'},
     {id:'gacetas',     name:'Diarios y gacetas oficiales',      status:'soon', desc:'Diario Oficial y Gaceta del Congreso: el texto completo del trámite.'},
     {id:'territorial', name:'Entidades territoriales',          status:'soon', desc:'Concejos, asambleas y gobiernos locales.'},
     {id:'redes',       name:'Redes sociales oficiales y voceros',status:'wired', desc:'Cuentas oficiales de entidades y voceros clave. Fuente conectada; el primer corte se publica con la salida al público.'},
@@ -1087,13 +1116,14 @@
       else if(id==='regulatorio') showView('regulatorio');
       else if(id==='medios') showView('medios');
       else if(id==='ejecutivo') showView('ejecutivo');
+      else if(id==='sucop') showView('sucop');
       else if(id==='datos') showView('contratacion');
     });
   }
   let _view='home';
   function showView(v){
     _view=v;
-    ['home','buscar','congreso','regulatorio','ejecutivo','contratacion','cliente','medios','radicados','bancadas'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
+    ['home','buscar','congreso','regulatorio','ejecutivo','sucop','contratacion','cliente','medios','radicados','bancadas'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
     window.scrollTo(0,0);
     // ← Volver de arriba: desde un pilar vuelve a la portada de Caudal; solo desde
     // la portada sale al dashboard (el puente pilar↔portada↔sitio).
@@ -1102,6 +1132,9 @@
     if(v==='congreso') requestAnimationFrame(()=>document.querySelectorAll('#view-congreso .mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
     if(v==='regulatorio') regLoadStats();
     if(v==='ejecutivo') ejeLoadStats();
+    // SUCOP se recarga en CADA entrada, no solo la primera: su landing es una
+    // cuenta regresiva y un caché de sesión la dejaría mintiendo.
+    if(v==='sucop') sucLoadStats();
     if(v==='contratacion') conLoadStats();
     if(v==='medios') medLoadLanding();
     if(v==='radicados') radLoad();
@@ -1310,6 +1343,145 @@
     const cont=document.getElementById('etipos');
     if(cont) EJE_TIPOS.forEach(([tp,t])=>{ const c=document.createElement('span'); c.className='chip'+(tp===''?' on':''); c.dataset.tipo=tp; c.textContent=t; c.onclick=()=>{ EJE.tipo=tp; ejeSyncTipos(); if(!EJE.q&&!EJE.tipo) ejeShowLanding(); else ejeBuscar(); }; cont.appendChild(c); });
     const eb=document.getElementById('ejeBack'); if(eb) eb.onclick=()=>showView('home');
+  }
+  /* ---------- pilar SUCOP · borradores en consulta pública ----------
+     Lo que separa a este pilar de los otros seis: su dato VENCE. Toda la UI de
+     acá abajo existe para que el cliente no confunda las dos cosas — lo que
+     todavía puede comentar (y cuánto le queda) contra lo que ya es archivo. */
+  const SUC={estado:'abiertas', q:''};
+  const SUC_ESTADOS=[['abiertas','Se puede comentar'],['cierra_pronto','Cierran en ≤7 días'],
+                     ['cerrada','Ya cerradas'],['planeacion','Anunciadas, sin fecha'],['','Todas']];
+  const SUC_EJEMPLOS=['minería','salud','datos personales','transporte','educación'];
+  let SUC_STATS=null, _sucInited=false, _sucSeq=0;
+  /* La cuenta regresiva en palabras. Es el corazón del pilar: "cierra hoy" y
+     "cerró hace 3 meses" no pueden verse igual. */
+  function sucPlazo(r){
+    const d=r.dias_restantes, ec=r.estado_consulta;
+    if(ec==='cierra_pronto'||ec==='abierta'){
+      if(d===0) return ['urge','Cierra hoy'];
+      if(d===1) return ['urge','Cierra mañana'];
+      return [ec==='cierra_pronto'?'urge':'viva', `Quedan ${d} días`];
+    }
+    if(ec==='por_abrir') return ['viva', 'Aún no abre'];
+    if(ec==='cerrada'){
+      const dd=(d==null)?null:Math.abs(d);
+      return ['venc', dd==null?'Cerrada':(dd===0?'Cerró hoy':`Cerró hace ${dd} ${dd===1?'día':'días'}`)];
+    }
+    if(ec==='planeacion') return ['venc','Anunciada, sin fecha'];
+    if(ec==='cancelada')  return ['venc','Cancelada'];
+    return ['venc','Sin ventana publicada'];
+  }
+  function sucCard(r){
+    const [cls,txt]=sucPlazo(r);
+    const viva=(r.estado_consulta==='cierra_pronto'||r.estado_consulta==='abierta');
+    // shortTitle quita el «Por medio de la cual se…» — sin eso, un título legal
+    // completo ocupa dos líneas subrayadas y entierra de qué trata el borrador,
+    // que es lo único que el cliente está leyendo en esta lista.
+    const tit=shortTitle((r.titulo||'—').replace(/^["“]|["”]$/g,''))||'—';
+    const obj=(r.objeto||'').replace(/\s+/g,' ').trim();
+    const href=r.url?encodeURI(r.url):'';
+    const name=href
+      ?`<a class="sanc-name" href="${esc(href)}" target="_blank" rel="noopener" style="color:inherit">${esc(tit)}</a>`
+      :`<span class="sanc-name">${esc(tit)}</span>`;
+    // la ventana en crudo, para que el plazo sea auditable y no una afirmación
+    const vent=(r.fecha_inicio||r.fecha_fin)?`${esc(r.fecha_inicio||'—')} → ${esc(r.fecha_fin||'—')}`:'';
+    return `<div class="sanc${cls==='urge'?' suc-urg':''}">
+      <div class="sanc-top">${name}<span class="doc-badge ${cls}">${esc(txt)}</span></div>
+      ${obj?`<div class="sanc-motivo">${esc(obj.length>320?obj.slice(0,317)+'…':obj)}</div>`:''}
+      <div class="sanc-tags">
+        <span class="doc-badge${viva?' pal':''}">${esc(r.entidad||'—')}</span>
+        ${r.tipo_norma&&r.tipo_norma!=='No especificado'?`<span class="doc-badge">${esc(r.tipo_norma)}</span>`:''}
+        ${r.tipo==='agenda'?'<span class="doc-badge">Agenda regulatoria</span>':''}
+        ${vent?`<span class="sanc-fecha">${vent}</span>`:''}
+        ${r.comentarios?` · ${fmt(r.comentarios)} comentario${r.comentarios===1?'':'s'}`:''}
+        ${href?` · <a href="${esc(href)}" target="_blank" rel="noopener" style="color:var(--ink3)">ficha oficial ↗</a>`:''}
+      </div>
+    </div>`;
+  }
+  function sucRenderLanding(s){
+    const el=document.getElementById('suc-landing'); if(!el||!s) return;
+    const v=s.ventana||{};
+    const rango=s.rango_fechas&&s.rango_fechas[0]?`${s.rango_fechas[0].slice(0,4)}–${s.rango_fechas[1].slice(0,4)}`:'—';
+    const ab=(s.abiertos||[]);
+    const urg=ab.filter(r=>r.estado_consulta==='cierra_pronto');
+    el.innerHTML=`
+      <div class="land-h">Lo que todavía se puede comentar · consultado hoy, ${esc(s.hoy||'')}</div>
+      <div class="kpis">
+        <div class="kpi"><div class="n" style="color:var(--green)">${fmt(v.abiertas||0)}</div><div class="l">Abiertas ahora</div></div>
+        <div class="kpi"><div class="n" style="color:var(--red)">${fmt(v.cierran_en_7_dias||0)}</div><div class="l">Cierran en ≤7 días</div></div>
+        <div class="kpi"><div class="n">${fmt(s.total||0)}</div><div class="l">Procesos en total</div></div>
+        <div class="kpi"><div class="n">${rango}</div><div class="l">Periodo</div></div>
+      </div>
+      <div class="cob-note" style="margin-bottom:1.4rem">
+        El plazo se calcula contra la fecha de <b>hoy</b>, no contra la de la
+        cosecha: ${esc(v.cerradas!=null?fmt(v.cerradas):'—')} procesos ya vencieron y
+        ${fmt(v.en_planeacion||0)} están anunciados sin fecha. Último barrido de la
+        fuente: ${esc(s.cosechado_a||'—')}.
+      </div>
+      ${ab.length?`<div class="panel wide"><h3>Ventana abierta${urg.length?` · ${urg.length} cierra${urg.length===1?'':'n'} esta semana`:''}</h3>
+        <div class="sanc-list">${ab.map(sucCard).join('')}</div></div>`:
+        `<div class="panel wide"><h3>Ventana abierta</h3><div class="cob-note">Hoy no hay ninguna consulta pública abierta. Vuelve mañana: la fuente se mueve todos los días hábiles.</div></div>`}
+      <div class="reg-sectors-grid">
+        ${(s.por_entidad||[]).slice(0,12).map(x=>`<div class="sec-card" data-ent="${esc(x.entidad)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(x.entidad)}</div></div>`).join('')}
+      </div>
+      <div class="panel wide"><h3>Lo último publicado</h3><div class="sanc-list">${(s.recientes||[]).map(sucCard).join('')}</div></div>`;
+    el.querySelectorAll('.sec-card').forEach(c=>c.onclick=()=>{
+      SUC.estado=''; SUC.q=''; const i=document.getElementById('sq'); if(i) i.value='';
+      sucSyncEstados(); sucBuscar({entidad:c.dataset.ent});
+    });
+  }
+  function sucRenderResults(d){
+    const el=document.getElementById('suc-results'); if(!el) return;
+    el.style.display='block';
+    const et=(SUC_ESTADOS.find(([k])=>k===(d.estado||''))||['','Todas'])[1];
+    const scope=[d.entidad?esc(d.entidad):'', d.query?`«${esc(d.query)}»`:'', esc(et)].filter(Boolean).join(' · ');
+    const v=d.ventana||{};
+    const emp=(d.empresas||[]).length?`<div class="cob-note" style="margin-bottom:1rem">
+        <b>${esc(d.empresas.map(e=>e.nombre).join(', '))}</b> es una empresa del diccionario: el
+        Estado no regula marcas sino actividades, así que se buscó por su tema —
+        ${esc(d.empresas.flatMap(e=>e.nucleo||[]).join(' · ')||'—')} — además del nombre literal.
+      </div>`:'';
+    el.innerHTML=`
+      <div class="r-titular" style="font-size:1.4rem">${fmt(d.n)} ${d.n===1?'proceso':'procesos'}</div>
+      <div class="r-sub" style="margin-bottom:1rem">${scope||'todos los procesos'}${
+        v.abiertas?` · <b style="color:var(--green)">${fmt(v.abiertas)} todavía se puede${v.abiertas===1?'':'n'} comentar</b>`:
+        ' · ninguno con la ventana abierta'}</div>
+      ${emp}
+      ${d.mostrados<d.n?`<div class="cob-note" style="margin-bottom:1rem">Mostrando ${d.mostrados} de ${fmt(d.n)} — primero lo que cierra antes. Afina la búsqueda para ver menos.</div>`:''}
+      <div class="sanc-list">${(d.resultados||[]).map(sucCard).join('')||'<div class="err">Sin coincidencias. Prueba otro término o cambia el estado.</div>'}</div>`;
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  async function sucBuscar(extra){
+    const mine=++_sucSeq;
+    const el=document.getElementById('suc-results'), landing=document.getElementById('suc-landing');
+    if(landing) landing.style.display='none';
+    if(el){ el.style.display='block'; el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Buscando borradores <span class="dots"><span></span><span></span><span></span></span></div>'; }
+    let d; try{ d=await call(Object.assign({action:'sucop', query:SUC.q, estado:SUC.estado}, extra||{})); }
+    catch(e){ if(mine===_sucSeq&&el) el.innerHTML='<div class="err">No se pudo consultar. Reintenta.</div>'; return; }
+    if(mine!==_sucSeq) return;
+    sucRenderResults(d);
+  }
+  async function sucLoadStats(){
+    // el landing NO se cachea entre visitas como los otros pilares: su número
+    // principal es una cuenta regresiva, y servirla de memoria la envejecería
+    // dentro de la misma sesión.
+    const el=document.getElementById('suc-landing');
+    if(el&&!SUC_STATS) el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Cargando las consultas abiertas <span class="dots"><span></span><span></span><span></span></span></div>';
+    try{ SUC_STATS=await call({action:'sucop'}); }catch(e){ /* deja lo anterior */ }
+    if(SUC_STATS) sucRenderLanding(SUC_STATS);
+    else if(el) el.innerHTML='<div class="err">No se pudieron cargar las consultas. Reintenta.</div>';
+  }
+  function sucShowLanding(){ const r=document.getElementById('suc-results'); if(r) r.style.display='none'; const l=document.getElementById('suc-landing'); if(l) l.style.display='block'; }
+  function sucSyncEstados(){ document.querySelectorAll('#sestados .chip').forEach(c=>c.classList.toggle('on',(c.dataset.est||'')===SUC.estado)); }
+  function sucInit(){
+    if(_sucInited) return; _sucInited=true;
+    const sq=document.getElementById('sq'), sgo=document.getElementById('sgo');
+    const go=()=>{ SUC.q=(sq&&sq.value||'').trim(); if(!SUC.q&&SUC.estado==='abiertas') sucShowLanding(); else sucBuscar(); };
+    if(sgo) sgo.onclick=go;
+    if(sq) sq.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
+    const cont=document.getElementById('sestados');
+    if(cont) SUC_ESTADOS.forEach(([k,t])=>{ const c=document.createElement('span'); c.className='chip'+(k===SUC.estado?' on':''); c.dataset.est=k; c.textContent=t; c.onclick=()=>{ SUC.estado=k; sucSyncEstados(); if(!SUC.q&&k==='abiertas') sucShowLanding(); else sucBuscar(); }; cont.appendChild(c); });
+    const sb=document.getElementById('sucBack'); if(sb) sb.onclick=()=>showView('home');
   }
   /* ---------- pilar Datos abiertos y contratación · SECOP II ---------- */
   const CON={q:'', filtros:{}, solo:false, orden:'reciente'};
@@ -1696,8 +1868,11 @@
   }
 
   /* ---------- Búsqueda universal · 4 pilares (Punto 2) ---------- */
-  const UNI_TABS=[['congreso','Congreso'],['regulatorio','Regulatorio'],['ejecutivo','Ejecutivo'],
-                  ['contratacion','Contratación'],['medios','Medios']];
+  // SUCOP va ANTES de Ejecutivo a propósito: es el mismo documento en dos
+  // momentos — primero el borrador que todavía se puede comentar, después la
+  // norma ya firmada.
+  const UNI_TABS=[['congreso','Congreso'],['regulatorio','Regulatorio'],['sucop','Consulta pública'],
+                  ['ejecutivo','Ejecutivo'],['contratacion','Contratación'],['medios','Medios']];
   let _uniSeq=0, _uniData={};
   async function uniSearch(query){
     query=(query||'').trim(); if(!query) return;
@@ -1705,32 +1880,34 @@
     showView('buscar');
     const uq=document.getElementById('uq'); if(uq) uq.value=query;
     const box=document.getElementById('uni-results');
-    box.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Buscando en los 4 pilares <span class="dots"><span></span><span></span><span></span></span></div>';
+    box.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Buscando en los pilares activos <span class="dots"><span></span><span></span><span></span></span></div>';
     const amp=_ampliarEmp;
-    const [cong,reg,eje,con,med]=await Promise.allSettled([
+    const [cong,reg,eje,con,med,suc]=await Promise.allSettled([
       call({action:'tema', query, lectura:false, ampliar_empresa:amp}),
       call({action:'sanciones', query}),
       call({action:'ejecutivo', query, ampliar_empresa:amp}),
       call({action:'contratacion', query, limit:40, ampliar_empresa:amp}),
       call({action:'medios', query}),
+      call({action:'sucop', query, ampliar_empresa:amp}),
     ]);
     if(mine!==_uniSeq) return;
     const V=x=>x&&x.status==='fulfilled'?x.value:null;
-    const cD=V(cong), rD=V(reg), eD=V(eje), oD=V(con), mD=V(med);
+    const cD=V(cong), rD=V(reg), eD=V(eje), oD=V(con), mD=V(med), sD=V(suc);
     const cR=cD&&cD.resumen;
     const counts={
       congreso: cR?((cR.intentos||[]).filter(i=>!i.match_texto).length):0,
       regulatorio: rD?(rD.n||0):0, ejecutivo: eD?(eD.n||0):0, medios: mD?(mD.n||0):0,
+      sucop: sD?(sD.n||0):0,
       // el total de SECOP es el universo de la búsqueda; con filtro de empresa
       // el universo YA es el de la empresa, así que en los dos casos manda
       // `total` y solo se cae a las filas traídas si el agregado falló.
       contratacion: oD?((oD.total&&oD.total.contratos)||oD.n||0):0,
     };
-    _uniData={congreso:cD, regulatorio:rD, ejecutivo:eD, contratacion:oD, medios:mD, query, counts};
+    _uniData={congreso:cD, regulatorio:rD, ejecutivo:eD, contratacion:oD, medios:mD, sucop:sD, query, counts};
     const first=(UNI_TABS.find(([k])=>counts[k]>0)||UNI_TABS[0])[0];
     // ④ la traducción marca → tema se muestra ARRIBA de las pestañas: aplica a
-    // los 4 pilares a la vez, no a uno. La reporta cualquiera que la resuelva.
-    const emps=(cR&&cR.empresas)||(rD&&rD.empresas)||(eD&&eD.empresas)||(oD&&oD.empresas)||null;
+    // todos los pilares a la vez, no a uno. La reporta cualquiera que la resuelva.
+    const emps=(cR&&cR.empresas)||(rD&&rD.empresas)||(eD&&eD.empresas)||(oD&&oD.empresas)||(sD&&sD.empresas)||null;
     box.innerHTML=`
       <div class="r-sub">Resultados para <b>${esc(query)}</b> en los pilares activos</div>
       <div class="uni-what">Esto es una <b>consulta al archivo</b>: todo lo que el Estado y la prensa han producido sobre «${esc(query)}», de lo más reciente hacia atrás. Si lo que necesitas es vigilancia permanente de tu sector —señales nuevas, filtradas y con acción sugerida—, eso es el <a id="uni-radar-link">Radar del cliente →</a></div>
@@ -1759,16 +1936,21 @@
       const rows=tit.slice(0,25).map(uniMiniRow).join('')||'<div class="cob-note">Ninguno lo lleva en el título.</div>';
       return `<div class="cob-note" style="margin-bottom:.8rem"><b>${tit.length}</b> con «${esc(query)}» en el título · <b>${txt.length}</b> lo mencionan en el texto. <a class="bd-link" id="uni-cong-full">Ver el análisis completo (embudo, éxito, bancadas) →</a></div><div class="tl tl-scroll">${rows}</div>`;
     }
-    const card={regulatorio:sancCard, ejecutivo:ejeCard, contratacion:conCard, medios:medHeadCard}[k];
+    const card={regulatorio:sancCard, ejecutivo:ejeCard, contratacion:conCard, medios:medHeadCard, sucop:sucCard}[k];
     const l=(d&&d.resultados)||[];
-    const noun={regulatorio:['sanción','sanciones'], ejecutivo:['norma','normas'], contratacion:['contrato','contratos'], medios:['titular','titulares']}[k];
-    const empty={regulatorio:'Sin sanciones para este término.', ejecutivo:'Sin normas del Ejecutivo para este término.', contratacion:'Sin contratos en SECOP para este término.', medios:'Sin cobertura de prensa reciente para este tema.'}[k];
+    const noun={regulatorio:['sanción','sanciones'], ejecutivo:['norma','normas'], contratacion:['contrato','contratos'], medios:['titular','titulares'], sucop:['borrador','borradores']}[k];
+    const empty={regulatorio:'Sin sanciones para este término.', ejecutivo:'Sin normas del Ejecutivo para este término.', contratacion:'Sin contratos en SECOP para este término.', medios:'Sin cobertura de prensa reciente para este tema.', sucop:'Ningún borrador en consulta pública sobre este tema.'}[k];
     if(k==='contratacion'&&d&&d.sin_contratos)
       return `<div class="err"><b>${esc((d.empresas&&d.empresas[0]&&d.empresas[0].nombre)||query)}</b> no le vende al Estado por SECOP II. <a class="bd-link" id="uni-contratacion-full">abrir el pilar →</a></div>`;
     if(!l.length) return `<div class="err">${empty}</div>`;
     const tot=(d.total&&d.total.contratos)||d.n;
+    // en SUCOP el conteo bruto no es la noticia: lo que importa es cuántos de
+    // esos todavía admiten comentarios. Un 40 con 0 abiertos es archivo.
+    const ab=k==='sucop'?((d.ventana&&d.ventana.abiertas)||0):0;
     const cab=k==='contratacion'
       ? `${fmt(tot)} ${tot===1?'contrato':'contratos'}${d.identidad_empresa?' <b>de la empresa</b>':''}${d.total&&d.total.valor_cop?` · ${fmtCOP(d.total.valor_cop)}`:''}${tot>l.length?` · mostrando ${fmt(l.length)}`:''}`
+      : k==='sucop'
+      ? `${fmt(d.n)} ${d.n===1?noun[0]:noun[1]} · ${ab?`<b style="color:var(--green)">${fmt(ab)} todavía se puede${ab===1?'':'n'} comentar</b>`:'<b>ninguno abierto hoy</b>'}`
       : `${fmt(d.n)} ${d.n===1?noun[0]:noun[1]}`;
     return `<div class="cob-note" style="margin-bottom:.8rem">${cab} · <a class="bd-link" id="uni-${k}-full">abrir en el pilar →</a></div><div class="sanc-list">${l.slice(0,40).map(card).join('')}</div>`;
   }
@@ -1785,6 +1967,9 @@
       if(k==='ejecutivo'){ showView('ejecutivo'); const e=document.getElementById('eq'); if(e)e.value=query; EJE.q=query; ejeBuscar(); }
       if(k==='contratacion'){ showView('contratacion'); const e=document.getElementById('cq'); if(e)e.value=query; CON.q=query; CON.filtros={}; conBuscar(); }
       if(k==='medios'){ showView('medios'); const e=document.getElementById('mq'); if(e)e.value=query; MED.q=query; medBuscar(); }
+      // en SUCOP se abre sin filtro de estado: el usuario venía viendo el
+      // universo del tema, no solo lo abierto, y cambiárselo al saltar confunde.
+      if(k==='sucop'){ showView('sucop'); const e=document.getElementById('sq'); if(e)e.value=query; SUC.q=query; SUC.estado=''; sucSyncEstados(); sucBuscar(); }
     };
   }
 
@@ -1792,6 +1977,7 @@
     renderPillars();
     regInit();
     ejeInit();
+    sucInit();
     conInit();
     medInit();
     cliInit();
@@ -2042,7 +2228,10 @@
      Un interruptor y su estado, nada más. El motor de alertas
      (tools/caudal/alertas/) solo ve los perfiles que estén encendidos, y el
      default es apagado: un perfil no manda correos hasta que alguien lo diga. */
-  const PF_CAD_TXT={'cada-corrida':'dos veces al día','diaria':'una vez al día','semanal':'los lunes'};
+  // El horario lo fija el agente de launchd (co.ricardoruiz.caudal-alertas), no
+  // esta página: hoy dispara lunes 07:00 y viernes 12:00. Si allá se cambia el
+  // plist, este texto hay que moverlo con él — es la única copia que el cliente ve.
+  const PF_CAD_TXT={'cada-corrida':'lunes y viernes','diaria':'una vez al día','semanal':'los lunes'};
   // Estado de alertas del perfil abierto. Se prefiere lo que trae el propio
   // perfil; si viene de la barra (resumen), se cae al de la lista.
   function pfAlertasDe(p){

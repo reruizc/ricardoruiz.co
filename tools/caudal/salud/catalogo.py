@@ -91,6 +91,21 @@ def archivos(leg=None):
              productor='run_diario.sh · harvest_secop.py fetch+build + aws s3 cp',
              consumidor='acción `contratacion` (landing del pilar SECOP)',
              nota='`generado` es la hora de CÓMPUTO: delata una subida fresca de contenido viejo.'),
+        # SUCOP es el archivo que MENOS puede envejecer de todo el catálogo: sus
+        # consultas públicas vencen. Uno de hace una semana no está "un poco
+        # viejo" — declara abiertas ventanas que ya cerraron. `calculado_a` es la
+        # fecha contra la que el harvester midió los plazos; que S3 diga fresco no
+        # basta, porque un rebuild del raw viejo también actualiza LastModified.
+        dict(bucket=BUCKET_PRIV, key='metadata/sucop.jsonl', clase='diario',
+             min_bytes=3_000_000, campo_fecha=None,
+             productor='run_diario.sh · harvest_sucop.py fetch+build + aws s3 cp',
+             consumidor='acción `sucop` (pilar de consulta pública)',
+             nota='min_bytes 3 MB sobre 4,6 MB reales (3.895 procesos).'),
+        dict(bucket=BUCKET_PRIV, key='metadata/sucop-stats.json', clase='diario',
+             min_bytes=20_000, campo_fecha='calculado_a',
+             productor='run_diario.sh · harvest_sucop.py build + aws s3 cp',
+             consumidor='acción `sucop` (agregados del landing)',
+             nota='`calculado_a` es solo fecha (YYYY-MM-DD): la edad interna se mide contra su medianoche.'),
 
         # ─────────── feeds públicos que también salen del cron ───────────
         # No están en metadata/ pero los produce la misma corrida y los consume
@@ -190,6 +205,13 @@ def archivos(leg=None):
 # (Socrata para SECOP, Google News para medios). Si fallan, es aviso y no error:
 # el pipeline nuestro puede estar perfecto y el tercero caído.
 
+def _hoy_bogota():
+    """La fecha con la que la Lambda mide los plazos de SUCOP. Offset fijo: en
+    Colombia no hay horario de verano, y comparar contra la fecha UTC daría un
+    falso fallo cada madrugada."""
+    return _dt.datetime.now(_dt.timezone(_dt.timedelta(hours=-5))).date().isoformat()
+
+
 def _n(d, *ks):
     for k in ks:
         if not isinstance(d, dict) or k not in d:
@@ -237,6 +259,16 @@ def pings(leg=None):
              desc='pilar Ejecutivo (landing)',
              forma=lambda d: '' if _n(d, 'mode') == 'stats' and _n(d, 'total')
              else 'no devolvió mode=stats con total'),
+
+        # SUCOP: además de que responda, se comprueba que la ventana venga
+        # recalculada a HOY. Ese `hoy` es el pilar entero — si volviera la fecha
+        # de la cosecha, el landing estaría publicando plazos vencidos.
+        dict(accion='sucop', body={'action': 'sucop'}, externa=False,
+             desc='pilar SUCOP (landing · consulta pública)',
+             forma=lambda d: '' if (_n(d, 'mode') == 'stats' and _n(d, 'total')
+                                    and _n(d, 'hoy') == _hoy_bogota()
+                                    and isinstance(_n(d, 'ventana', 'abiertas'), int))
+             else 'no devolvió mode=stats con total y la ventana recalculada a hoy'),
 
         dict(accion='bancadas', body={'action': 'bancadas'}, externa=False,
              desc='disciplina de bancada',

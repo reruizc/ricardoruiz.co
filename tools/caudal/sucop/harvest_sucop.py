@@ -442,8 +442,12 @@ def main():
     sub.add_parser('test')
     a = ap.parse_args()
     if a.cmd == 'fetch':
-        if fetch(reuse=a.reuse) is not None:
-            print("\nlisto. corre 'build' para consolidar.")
+        # rc distinto de 0 cuando la cosecha se cae: el cron decide con esto si
+        # sube o no. Antes salía 0 siempre y una cosecha rota se habría publicado
+        # como si fuera buena.
+        if fetch(reuse=a.reuse) is None:
+            sys.exit(1)
+        print("\nlisto. corre 'build' para consolidar.")
     elif a.cmd == 'build':
         build()
     elif a.cmd == 'test':

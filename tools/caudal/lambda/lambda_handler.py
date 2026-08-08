@@ -30,6 +30,12 @@ Acciones (POST JSON):
       → el briefing del analista sobre ese radar. Sin `solo_cache` arranca la
         generación (20-51 s, se pasa del gateway a propósito); con `solo_cache`
         es un sondeo barato que responde 'lista' o 'pendiente'.
+  {"action":"sucop","query":"minería","estado":"abiertas"}
+      → pilar SUCOP: borradores de norma en consulta pública (DNP). El único
+        pilar cuyo dato caduca: `estado_consulta` y `dias_restantes` se
+        recalculan contra HOY en cada request, nunca se sirven los del JSONL.
+        Sin filtros → landing con la ventana en vivo + los agregados
+        estructurales precalculados.
   {"action":"contratacion","query":"comando conjunto caribe","departamento":"Atlántico"}
 
 POR QUÉ IMPORTA · tres coordenadas (avance · impacto · político), un lente por
@@ -702,6 +708,150 @@ def _ejecutivo():
         except Exception:
             _EJEC = []
     return _EJEC
+
+
+# --- pilar SUCOP (borradores de norma en consulta pública · DNP) ------------
+# El único pilar de Caudal cuyo dato CADUCA. Todo lo demás acá es histórico y no
+# envejece; un borrador cuya ventana de comentarios cerró es arqueología, y uno
+# que cierra en cinco días es lo más urgente que Caudal produce.
+#
+# De ahí las dos decisiones de este bloque, que lo apartan del patrón de los
+# otros pilares:
+#   · `estado_consulta` y `dias_restantes` se RECALCULAN en cada request contra
+#     la fecha de hoy. Los del JSONL son del día en que corrió el harvester y
+#     mienten por definición al día siguiente. `fecha_inicio`/`fecha_fin` viajan
+#     crudas justamente para que esto sea posible (ver sucop/README.md).
+#   · el landing NO sale entero de stats.json. Los agregados estructurales
+#     (por_tipo, por_entidad, por_sector, por_anio) no envejecen y se sirven
+#     precalculados; pero la VENTANA — cuántas abiertas, cuántas cierran ya — se
+#     recuenta en vivo sobre el JSONL. Servir ahí un `abiertos_ahora` de hace una
+#     semana sería publicar el bug en la portada del pilar.
+import datetime
+
+SUCOP_DIAS_CIERRA_PRONTO = 7          # mismo umbral del harvester
+# Colombia no tiene horario de verano, así que un offset fijo es exacto y no
+# depende de que la imagen de Lambda traiga tzdata. En UTC puro, entre las 00:00
+# y las 05:00 el pilar adelantaría el vencimiento de una consulta medio día.
+SUCOP_TZ = datetime.timezone(datetime.timedelta(hours=-5))
+# Lo que el usuario puede pedir. 'abiertas' es un atajo (abierta + cierra_pronto)
+# porque "lo que todavía puedo comentar" es la pregunta real del cliente.
+SUCOP_ESTADOS = ('abierta', 'cierra_pronto', 'cerrada', 'por_abrir',
+                 'planeacion', 'cancelada', 'sin_fechas')
+
+_SUCOP = None
+_SUCOP_STATS = None
+
+
+def _sucop_hoy():
+    return datetime.datetime.now(SUCOP_TZ).date()
+
+
+def _sucop_estado_consulta(ini, fin, estado, hoy):
+    """¿Todavía se puede comentar? Puerto literal de `estado_consulta_de` de
+    tools/caudal/sucop/harvest_sucop.py — si cambia allá, cambia acá.
+
+    Decide por la FECHA (que es el hecho); el estado que declara la fuente solo
+    desempata cuando no hay ventana publicada. Devuelve (estado, dias_restantes).
+    """
+    if (estado or '').strip().lower() == 'cancelada':      # desistida: no abre
+        return 'cancelada', None
+    if fin:
+        try:
+            dias = (datetime.date.fromisoformat(fin) - hoy).days
+        except ValueError:
+            return 'sin_fechas', None
+        if dias < 0:
+            return 'cerrada', dias
+        try:
+            arranca = bool(ini) and datetime.date.fromisoformat(ini) > hoy
+        except ValueError:
+            arranca = False
+        if arranca:
+            return 'por_abrir', dias
+        return ('cierra_pronto' if dias <= SUCOP_DIAS_CIERRA_PRONTO else 'abierta'), dias
+    if estado in ('Planeación de la consulta', 'Aprobación de la consulta pública'):
+        return 'planeacion', None
+    return 'sin_fechas', None
+
+
+def _sucop_stats():
+    """Agregados estructurales del pilar (los que NO caducan). Cache warm."""
+    global _SUCOP_STATS
+    if _SUCOP_STATS is None:
+        try:
+            _SUCOP_STATS = _get_json('metadata/sucop-stats.json')
+        except Exception:
+            _SUCOP_STATS = {'total': 0, 'por_tipo': {}, 'por_tipo_norma': [],
+                            'por_sector': [], 'por_entidad': [], 'por_anio': {},
+                            'rango_fechas': ['', ''], 'fuente': {}}
+    return _SUCOP_STATS
+
+
+def _sucop():
+    """Procesos de SUCOP, con la ventana ya recalculada a HOY. Cache warm.
+
+    El recálculo va acá y no en cada acción para que ninguna ruta pueda leer por
+    descuido el `estado_consulta` viejo del JSONL. El caché se invalida solo al
+    cambiar de día: un contenedor warm que sobreviva a la medianoche serviría un
+    'cierra_pronto' vencido, que es exactamente el error que este pilar no puede
+    cometer.
+    """
+    global _SUCOP
+    hoy = _sucop_hoy()
+    if _SUCOP is not None and _SUCOP[0] == hoy:
+        return _SUCOP[1]
+    try:
+        obj = _s3.get_object(Bucket=BUCKET, Key='metadata/sucop.jsonl')
+        recs = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
+    except Exception:
+        recs = []
+    for r in recs:
+        ec, dias = _sucop_estado_consulta(r.get('fecha_inicio'), r.get('fecha_fin'),
+                                          r.get('estado'), hoy)
+        r['estado_consulta'] = ec
+        r['dias_restantes'] = dias
+    _SUCOP = (hoy, recs)
+    return recs
+
+
+def _sucop_dias_desde_epoca(f):
+    """'2026-08-19' -> entero comparable. 0 si no hay fecha."""
+    try:
+        return datetime.date.fromisoformat(f).toordinal()
+    except (TypeError, ValueError):
+        return 0
+
+
+def _sucop_orden(r):
+    """Lo urgente primero: lo que sigue abierto, ordenado por lo que menos tiempo
+    le queda. Después lo que aún no abre, y de último lo cerrado por recencia —
+    una consulta vencida es archivo, no una alerta."""
+    ec = r.get('estado_consulta')
+    dias = r.get('dias_restantes')
+    if ec in ('cierra_pronto', 'abierta'):
+        return (0, dias if dias is not None else 9999)
+    if ec == 'por_abrir':
+        return (1, dias if dias is not None else 9999)
+    # el resto (cerrada, planeación, sin fechas): lo más nuevo arriba
+    return (2, -_sucop_dias_desde_epoca(r.get('fecha_fin') or r.get('creado')))
+
+
+def _sucop_ventana(recs):
+    """El recuento que caduca, contado en vivo."""
+    c = Counter(r.get('estado_consulta') for r in recs)
+    return {
+        'abiertas': c.get('abierta', 0) + c.get('cierra_pronto', 0),
+        'cierran_en_7_dias': c.get('cierra_pronto', 0),
+        'por_abrir': c.get('por_abrir', 0),
+        'cerradas': c.get('cerrada', 0),
+        'en_planeacion': c.get('planeacion', 0),
+        'por_estado': {k: c.get(k, 0) for k in SUCOP_ESTADOS if c.get(k, 0)},
+    }
+
+
+def _sucop_card(r):
+    """Registro para la UI, sin el blob de búsqueda."""
+    return {k: v for k, v in r.items() if k != 'q'}
 
 
 # --- pilar Datos abiertos y contratación (SECOP II · búsqueda en vivo) ------
@@ -2698,6 +2848,90 @@ def handler(event, context):
             'mode': 'search', 'query': body.get('query', ''), 'tipo': tipo,
             'n': len(hits), 'mostrados': len(out),
             'por_tipo': [{'tipo': t, 'n': n} for t, n in tic.most_common()],
+            'empresas': _empresas_payload(emps),
+            'resultados': out,
+        })
+
+    if action == 'sucop':          # pilar SUCOP · borradores de norma en consulta pública
+        q = (body.get('query') or '').strip().lower()
+        estado = (body.get('estado') or '').strip().lower()
+        entidad = (body.get('entidad') or '').strip().lower()
+        sector = (body.get('sector') or '').strip().lower()
+        tipo = (body.get('tipo') or '').strip().lower()      # norma | agenda
+        if estado and estado not in SUCOP_ESTADOS and estado != 'abiertas':
+            return _resp(400, {'error': f'estado no válido: {estado}',
+                               'validos': list(SUCOP_ESTADOS) + ['abiertas']})
+
+        recs = _sucop()                       # ventana ya recalculada a hoy
+        hoy = _sucop_hoy().isoformat()
+        stats = _sucop_stats()
+        ventana = _sucop_ventana(recs)
+
+        if not (q or estado or entidad or sector or tipo):
+            # Landing. Los agregados estructurales salen precalculados (no
+            # caducan); la ventana se recuenta en vivo (sí caduca) y se declara
+            # de cuándo es cada cosa, para que nadie lea un dato viejo como nuevo.
+            urgentes = sorted([r for r in recs
+                               if r.get('estado_consulta') in ('cierra_pronto', 'abierta')],
+                              key=_sucop_orden)
+            nuevos = sorted(recs, key=lambda r: r.get('creado') or '', reverse=True)[:12]
+            return _resp(200, {
+                'mode': 'stats', 'hoy': hoy,
+                'total': stats.get('total', len(recs)),
+                'ventana': ventana,
+                'por_tipo': stats.get('por_tipo', {}),
+                'por_tipo_norma': stats.get('por_tipo_norma', []),
+                'por_sector': stats.get('por_sector', []),
+                'por_entidad': stats.get('por_entidad', []),
+                'por_anio': stats.get('por_anio', {}),
+                'por_topico': stats.get('por_topico', []),
+                'rango_fechas': stats.get('rango_fechas', ['', '']),
+                'fuente': stats.get('fuente', {}),
+                'cosechado_a': stats.get('calculado_a') or stats.get('generado', ''),
+                'abiertos': [_sucop_card(r) for r in urgentes[:40]],
+                'recientes': [_sucop_card(r) for r in nuevos],
+            })
+
+        # ④ el borrador tampoco nombra marcas: regula la ACTIVIDAD. Acá el puente
+        # marca→tema no re-matchea texto: el harvester ya etiquetó cada proceso
+        # con las llaves del tesauro que toca (`topicos`), así que basta cruzar
+        # llaves. El nombre literal se sigue buscando en `q` por si un borrador
+        # puntual sí lo menciona.
+        emps = empresas.empresas_en(body.get('query') or '')
+        tops = set(empresas.topicos_de(emps, bool(body.get('ampliar_empresa')))) if emps else set()
+
+        def _pasa(r):
+            if tipo and (r.get('tipo') or '') != tipo:
+                return False
+            ec = r.get('estado_consulta')
+            if estado == 'abiertas':
+                if ec not in ('abierta', 'cierra_pronto'):
+                    return False
+            elif estado and ec != estado:
+                return False
+            if entidad and entidad not in (r.get('entidad') or '').lower():
+                return False
+            if sector and sector not in (r.get('sector') or '').lower():
+                return False
+            if not q:
+                return True
+            return (q in (r.get('q') or '')
+                    or (tops and tops.intersection(r.get('topicos') or [])))
+
+        hits = [r for r in recs if _pasa(r)]
+        hits_sorted = sorted(hits, key=_sucop_orden)
+        out = [_sucop_card(r) for r in hits_sorted[:120]]
+        # el desglose del subconjunto: cuántas de ESTAS todavía se pueden comentar
+        return _resp(200, {
+            'mode': 'search', 'hoy': hoy,
+            'query': body.get('query', ''), 'estado': estado,
+            'entidad': body.get('entidad', ''), 'sector': body.get('sector', ''),
+            'tipo': tipo,
+            'n': len(hits), 'mostrados': len(out),
+            'ventana': _sucop_ventana(hits),
+            'ventana_global': ventana,
+            'por_entidad': [{'entidad': e, 'n': n} for e, n in
+                            Counter((r.get('entidad') or '—') for r in hits).most_common(12)],
             'empresas': _empresas_payload(emps),
             'resultados': out,
         })
