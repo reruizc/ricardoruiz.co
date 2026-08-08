@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
-"""build_frames.py — deja los frames de la secuencia en peso servible.
+"""build_frames.py — deja los frames de las secuencias en peso servible.
 
-Los PNG que salen del generador de imágenes pesan ~1,6 MB cada uno: los 10 suman
-16 MB, siete veces el resto de la página junta. Nadie con datos móviles espera eso,
-y el público de esta herramienta es justo el que paga los datos por megabyte.
+Los PNG que salen del generador pesan 1,3-1,9 MB cada uno: 16 MB los diez de
+medicamentos, 22 MB los quince de la secuencia general. Nadie con datos móviles
+espera eso, y el público de esta herramienta es justo el que paga los datos por
+megabyte.
 
-Qué hace: recorta el margen sobrante, genera dos anchos (móvil y escritorio) y
-convierte a WebP. No hay transparencia que preservar —el generador entregó fondo
-opaco— y eso juega a favor: el fondo gris de las imágenes es casi idéntico al
---paper de la página, así que se funden sin recortar la silueta.
+Dos sets, con tratamientos distintos porque llegaron distintos:
+
+· MEDICAMENTOS (10 frames, fondo gris opaco, hoja quieta). Se ALINEA: el generador
+  no reprodujo la hoja en el mismo sitio en cada corrida, y encadenados con fundido
+  eso se ve como un micro-zoom. También se empareja el brillo del fondo.
+
+· GENERAL (15 frames, fondo TRANSPARENTE, la hoja rota medio grado por frame a
+  propósito). NO se alinea: la rotación es intencional y el alineador la
+  malinterpretaría —un papel rotado tiene un recuadro más ancho, así que creería
+  que creció y lo encogería para "corregirlo"—. Tampoco se empareja el brillo:
+  no hay fondo que emparejar. El alfa se preserva.
 
 Uso:
-  python3 tools/tutela-analiza/build_frames.py            # convierte
-  python3 tools/tutela-analiza/build_frames.py --check    # solo mide, no escribe
+  python3 tools/tutela-analiza/build_frames.py general
+  python3 tools/tutela-analiza/build_frames.py medicamentos --check
 """
 import argparse
 import shutil
@@ -24,13 +32,24 @@ from PIL import Image, ImageEnhance
 
 RAIZ = Path(__file__).resolve().parents[2]
 SRC = RAIZ / 'tutelas-salud'
-OUT = RAIZ / 'tutelas-salud' / 'w'
 
-# Dos anchos: el chico cubre móviles hasta ~430 CSS px a densidad 2x; el grande
-# cubre el contenedor de escritorio, que nunca pasa de ~560 px de lado.
+# Dos anchos: el chico cubre móviles hasta ~516 CSS px a densidad 2x; el grande
+# cubre el contenedor de escritorio, que no pasa de ~564 px de lado.
 ANCHOS = [(760, 'sm'), (1120, 'lg')]
 CALIDAD = 80          # medido: por debajo de 78 se ve banding en el degradado del fondo
-N_FRAMES = 10
+
+SETS = {
+    'medicamentos': {'patron': 'frame{}.png', 'n': 10, 'salida': 'w', 'pre': 'f',
+                     'alinear': True, 'anchos': [(760, 'sm'), (1120, 'lg')],
+                     'q': 80, 'alpha_q': None},
+    # Con transparencia la compresión cuesta mucho más: a los ajustes del set opaco
+    # los 15 frames pesaban 1.137 KB en celular, quince veces lo del otro set. El
+    # canal alfa es lo caro, y baja en escalón: medido sobre el frame 13, alpha_q 85
+    # da 109 KB y alpha_q 70 da 34 KB, con la imagen indistinguible a simple vista.
+    'general':      {'patron': 'frame{:03d}.png', 'n': 15, 'salida': 'wg', 'pre': 'g',
+                     'alinear': False, 'anchos': [(700, 'sm'), (1024, 'lg')],
+                     'q': 72, 'alpha_q': 70},
+}
 
 
 def bbox_papel(im):
@@ -131,22 +150,48 @@ def kb(p):
     return p.stat().st_size / 1024
 
 
+def bbox_alpha(im):
+    """Recuadro del objeto cuando el fondo es transparente: donde hay píxeles.
+
+    Más fiable que medir contraste. El umbral alto ignora la sombra —que llega
+    semitransparente— para que el ancla sea el canto del papel y no su halo.
+    """
+    a = im.convert('RGBA').getchannel('A')
+    w, h = a.size
+    px = a.load()
+    xs, ys = range(0, w, 4), range(0, h, 4)
+    op = 210
+    izq = next((x for x in range(w) if any(px[x, y] > op for y in ys)), 0)
+    der = next((x for x in range(w - 1, -1, -1) if any(px[x, y] > op for y in ys)), w - 1)
+    arr = next((y for y in range(h) if any(px[x, y] > op for x in xs)), 0)
+    aba = next((y for y in range(h - 1, -1, -1) if any(px[x, y] > op for x in xs)), h - 1)
+    return izq, arr, der, aba, None
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument('set', choices=list(SETS), nargs='?', default='medicamentos')
     ap.add_argument('--check', action='store_true', help='solo medir el estado actual')
-    ap.add_argument('--calidad', type=int, default=CALIDAD)
     args = ap.parse_args()
+    cfg = SETS[args.set]
+    OUT = SRC / cfg['salida']
+    pre = cfg['pre']
 
-    fuentes = [SRC / f'frame{i}.png' for i in range(1, N_FRAMES + 1)]
+    fuentes = [SRC / cfg['patron'].format(i) for i in range(1, cfg['n'] + 1)]
     faltan = [f.name for f in fuentes if not f.exists()]
     if faltan:
         sys.exit(f'Faltan frames: {", ".join(faltan)}')
 
     orig = sum(kb(f) for f in fuentes)
-    print(f'origen: {len(fuentes)} PNG · {orig/1024:.1f} MB')
+    con_alpha = any(Image.open(f).mode in ('RGBA', 'LA') and
+                    Image.open(f).convert('RGBA').getchannel('A').getextrema()[0] < 250
+                    for f in fuentes[:1])
+    print(f"{args.set}: {len(fuentes)} PNG · {orig/1024:.1f} MB · "
+          f"{'con transparencia' if con_alpha else 'fondo opaco'} · "
+          f"{'se alinea' if cfg['alinear'] else 'sin alinear (la rotación es intencional)'}")
     if args.check:
         for f in fuentes:
-            print(f'  {f.name:12s} {kb(f):7.0f} KB')
+            print(f'  {f.name:16s} {kb(f):7.0f} KB')
         return
 
     if falta_cwebp():
@@ -156,36 +201,43 @@ def main():
 
     ref = None
     total = 0
-    for f in fuentes:
-        n = f.stem.replace('frame', '')
-        im = Image.open(f).convert('RGB')
-        bb = bbox_papel(im)
+    for i, f in enumerate(fuentes, 1):
+        im = Image.open(f)
+        # el alfa se preserva; sin él, RGB basta
+        im = im.convert('RGBA') if con_alpha else im.convert('RGB')
+        bb = bbox_alpha(im) if con_alpha else bbox_papel(im)
+        nota = ''
         if ref is None:
-            ref = bb                      # el frame 1 fija dónde va la hoja
-            dx = dy = 0
-        else:
+            ref = bb
+            nota = '  [referencia]'
+        elif cfg['alinear']:
             dx, dy = bb[0] - ref[0], bb[1] - ref[1]
             im = alinear(im, bb, ref, ref[4])
+            nota = f'  [alineado {dx:+d},{dy:+d} px]'
+        else:
+            nota = f'  [desvío {bb[0]-ref[0]:+d},{bb[1]-ref[1]:+d} px]'
         im.save(tmp)
-        for ancho, suf in ANCHOS:
-            dst = OUT / f'f{n}-{suf}.webp'
+        for ancho, suf in cfg['anchos']:
+            dst = OUT / f'{pre}{i}-{suf}.webp'
             # -resize con alto 0 mantiene la proporción; -m 6 es el esfuerzo máximo
-            # de compresión (más lento al construir, nada al servir)
-            r = subprocess.run(
-                ['cwebp', '-q', str(args.calidad), '-m', '6', '-resize', str(ancho), '0',
-                 '-quiet', str(tmp), '-o', str(dst)],
-                capture_output=True, text=True)
+            # de compresión (más lento al construir, nada al servir).
+            # -exact preserva el color de los píxeles transparentes: sin él cwebp los
+            # reescribe y la sombra semitransparente puede ensuciarse.
+            cmd = ['cwebp', '-q', str(cfg['q']), '-m', '6',
+                   '-resize', str(ancho), '0', '-quiet', str(tmp), '-o', str(dst)]
+            if cfg['alpha_q'] is not None:
+                cmd[1:1] = ['-alpha_q', str(cfg['alpha_q'])]
+            r = subprocess.run(cmd, capture_output=True, text=True)
             if r.returncode != 0:
                 sys.exit(f'cwebp falló en {f.name}: {r.stderr[:200]}')
             total += kb(dst)
-        ajuste = f'  [alineado {dx:+d},{dy:+d} px]' if (dx or dy) else '  [referencia]'
-        print(f'  frame{n:>2s}: {kb(f):6.0f} KB → '
-              + ' + '.join(f'{kb(OUT / f"f{n}-{s}.webp"):5.0f} KB ({s})' for _, s in ANCHOS)
-              + ajuste)
+        print(f'  {f.name:16s} {kb(f):6.0f} KB → '
+              + ' + '.join(f'{kb(OUT / f"{pre}{i}-{s}.webp"):5.0f} KB ({s})' for _, s in cfg['anchos'])
+              + nota)
     tmp.unlink(missing_ok=True)
 
     print(f'\ntotal: {orig/1024:.1f} MB → {total/1024:.2f} MB  ({total/orig*100:.0f}% del origen)')
-    solo_sm = sum(kb(OUT / f'f{i}-sm.webp') for i in range(1, N_FRAMES + 1))
+    solo_sm = sum(kb(OUT / f'{pre}{i}-sm.webp') for i in range(1, cfg['n'] + 1))
     print(f'lo que baja un celular (solo -sm): {solo_sm:.0f} KB')
 
 
