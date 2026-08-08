@@ -5360,6 +5360,99 @@ pestaña oculta) y registrar un `ResizeObserver`.
    ve bien sin ellas). Convertir con
    `sips -s format jpeg -s formatOptions 82 X.png --out X.jpg`.
 6. Enlazar desde `index.html` / `noticias.html`.
+7. **Portar los VERTEDEROS de `build_mujer.py`** (ver abajo): el mapa por comuna
+   de Bogotá y Medellín del hub está mal por dos barrios que son valor por
+   defecto del registro. Es la deuda más urgente de esta sección.
+
+### Derivada MxD · `tools/ponal/build_mujer.py` (víctimas mujeres · ago-2026)
+
+Segunda pasada sobre el MISMO CSV para el **módulo 07 del observatorio de MxD**
+(`observatorio-mujer/violencia-mujer.html`). Existe aparte porque `build_ponal.py`
+agrega el género **solo a nivel nacional**: sus JSON territoriales traen
+`delito × año` y nada de sexo, así que el mapa de víctimas mujeres no se puede
+derivar de ellos. Importa las constantes de `build_ponal` (mapa canónico de
+delitos, DEPTOS, CIUDADES, `limpio`, `banda_edad`) para que la trampa ① se
+arregle en un solo sitio. Corre en ~95 s. Salida en
+`Bases de datos/output_observatorio_mujer/violencia-{meta,nacional,deptos,municipios,ciudades}.json`
+(~700 KB en total, el grueso es municipios).
+
+**Lo medido que cambia el diagnóstico de la fuente:**
+- ⚠️ **El «80% de llenado de género» es engañoso.** Por delito: homicidios,
+  lesiones, hurto a personas y secuestro **100%**; amenazas y violencia
+  intrafamiliar 99,8%; delitos sexuales 99,5%. El 78,2% global lo hunden los
+  delitos SIN víctima-persona, que van en **0,0%** (terrorismo, hurto a
+  comercios, hurto de celulares). **Para un análisis de mujeres no hay problema
+  de cobertura.** Municipios con dato de víctimas mujeres: VIF 1.102 (945 con
+  ≥30), delitos sexuales 1.108, amenazas 1.104, lesiones 1.102, homicidios 850.
+- ⚠️⚠️ **`DESCRIPCION_CONDUCTA` no viene pareja por año, y de ahí sale
+  FEMINICIDIO.** Llenado global: 2015-2021 ~58-66% · 2022 100% · 2023 80,7% ·
+  **2024 16,3%**. Por delito es peor: homicidios 100% hasta 2023 y **0% en
+  2024**; VIF 100% hasta 2022 y **0% en 2023-2024**. → **la serie de feminicidio
+  es 2015-2023**; el 2024 se emite como `null`, nunca como 0.
+- ⚠️ **Feminicidio: 1.336 hechos** (1.326 F + 10 M mal codificadas), ≈148/año,
+  muy por debajo de Medicina Legal/Fiscalía. Es «homicidios que la Policía
+  tipificó como feminicidio», no «feminicidios». La curva 27 (2015) → 219 (2021)
+  es la **adopción del tipo penal** (Ley 1761 de jul-2015), no un aumento ×8.
+- ⚠️ **No existe la relación víctima-agresor.** `MOVIL_AGRESOR` es cómo se movía
+  (a pie, moto). Con PONAL **no se puede decir «el X% fue la pareja»** — eso es
+  Forensis. Va declarado en la página.
+- ⚠️ **`Clase de sitio` no dice dónde pasó.** «VIAS PUBLICAS» es el valor
+  mayoritario en los OCHO delitos (45%-76%), incluida la violencia
+  intrafamiliar (68,8% vías públicas contra 25,6% vivienda), que por definición
+  es doméstica. Es valor por defecto, no lugar del hecho.
+- **Serie publicable por delito** (`meta.delitos[].serie`, umbral 15% igual que
+  el hub): delitos sexuales 52,2% sin año y amenazas 53,6% → **`false`**, la
+  página les bloquea el selector de año. Sin ese corte, delitos sexuales «sube»
+  de 8.047 (2023) a 25.021 (2024), que es solo el lote de 2024 trayendo fecha.
+
+**⚠️⚠️ VERTEDEROS de registro (hallazgo nuevo · afecta también al hub público).**
+Dos barrios concentran una masa que no es suya porque el sistema los usó como
+valor por defecto durante unos años:
+`BELLA SUIZA` (Bogotá, localidad 1) **214.316 hechos = 14,3% de la ciudad**,
+serie 2.063 → 47.075 (2019) → 291 (2023); y `PARQUE NORTE` (Medellín, comuna 4)
+**23.434 = 7,3%**, serie 5.871 → 8.201 (2016) → 90 (2023). Sin sacarlos, Usaquén
+sale como la localidad más violenta de Bogotá (116.944 contra 16.011 de Kennedy)
+e **invierte la lectura de clase del mapa**. Con el fix el orden queda Kennedy ·
+Bosa · Suba · Ciudad Bolívar, que es lo esperable.
+⚠️ **La regla NO es «el barrio más grande»:** `LA CANDELARIA` (Medellín) también
+pesa 9,1% y **sí es real** (centro de la ciudad, serie plana). Lo que distingue
+al vertedero es que **aparece y desaparece**: pico/último **131× y 91×** contra
+**2,1×** de La Candelaria y 2,6× de El Poblado. Cali está limpia.
+Se excluyen por lista medida (`VERTEDEROS`) y sus casos van a `sin_comuna`, no
+se borran. Hay un **detector** (`VERT_PESO 3%` + `VERT_CAIDA 20×`) que solo
+AVISA por consola si un lote futuro trae uno nuevo — no excluye por su cuenta.
+**El hub de Policía tiene el mismo bug y todavía no está arreglado** (pendiente 7).
+
+**Denominador:** `build_poblacion.py` ahora emite también `f` (mujeres) por
+municipio/depto/nacional, leyendo la **columna I** del anexo DANE (verificado:
+Medellín 2018 = 1.141.343 H + 1.285.790 M = 2.427.133). Es aditivo: el hub de
+Policía sigue usando `p`. Nacional 2024: **26.836.155 mujeres (51,0%)**. Cubre
+**2018-2024**, así que la tasa por 100.000 mujeres no existe para 2015-2017 y la
+página apaga esos años cuando la lectura es «tasa» (con «casos» vuelven).
+
+**Regenerar y subir:**
+```bash
+python3 tools/ponal/build_poblacion.py    # solo si cambia el anexo DANE
+python3 tools/ponal/build_mujer.py        # ~95 s sobre los 7,8 GB
+aws s3 cp "Bases de datos/output_observatorio_mujer/" \
+  "s3://elecciones-2026/ricardoruiz.co/bases de datos/output_observatorio_mujer/" \
+  --recursive --exclude "*" --include "violencia-*.json" \
+  --content-type "application/json" --cache-control "public, max-age=300"
+aws s3 cp "Bases de datos/output_ponal/poblacion.json" \
+  "s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/ponal/poblacion.json" \
+  --content-type "application/json" --cache-control "public, max-age=300"
+```
+Bumpear `DATA_V` en `violencia-mujer.html` al regenerar. `?local=1` lee los JSON
+del repo para verificar antes de subir.
+
+**Gotchas del frontend** (ya resueltos, no re-introducir): el mapa nace dentro de
+`<main hidden>` → sin `invalidateSize()` + refit en `setTimeout 0` Leaflet mide
+mal y **pinta los polígonos encima del recuadro**, con el mapa aparentemente en
+blanco (`rAF` no sirve: se congela con la pestaña oculta). `PONAL.avisarSinMatch`
+entrega **nombres**, no el objeto de propiedades. Y **San Andrés y Providencia
+viene SIN geometría** en `DEPARTAMENTOS2.json`, así que no se puede dibujar en
+ninguna página del sitio; acá importa porque es 3º por tasa, y se declara bajo el
+mapa en vez de dejarlo pasar por ausente.
 
 ## Histórico legislativo — `tools/leyes-senado/` (harvester LISTO · foso de Cauce)
 

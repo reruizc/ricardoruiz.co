@@ -153,6 +153,69 @@ CIUDADES_SOLO_BARRIO = {
 # marcador de nulo de la fuente: no es un barrio
 BARRIO_NULO = "PENDIENTE POR ASIGNAR"
 
+# ── vertederos de registro ─────────────────────────────────────────────
+# ⚠️⚠️ Dos barrios concentran una masa de casos que NO es suya: son el valor
+# por defecto que usó el sistema de registro durante unos años. Medido sobre
+# el total de la base:
+#
+#   BELLA SUIZA (Bogotá, localidad 1)  214.316 hechos = 14,3% de la ciudad
+#       serie 2.063 → 47.075 (2019) → 291 (2023) → 568 (2024)
+#   PARQUE NORTE (Medellín, comuna 4)   23.434 hechos =  7,3% de la ciudad
+#       serie 5.871 → 8.201 (2016) → 90 (2023)
+#
+# Bella Suiza es un barrio pequeño y acomodado de Usaquén; Parque Norte es un
+# parque de diversiones. Ninguno de los dos produce decenas de miles de casos
+# y luego para en seco. Sin sacarlos, Usaquén sale como la localidad más
+# violenta de Bogotá (137.085 casos de violencia intrafamiliar contra 16.011
+# de Kennedy), que es falso y además invierte la lectura de clase del mapa.
+#
+# ⚠️ La regla NO puede ser «el barrio más grande»: LA CANDELARIA (Medellín)
+# también pesa 9,1% y SÍ es real — es el centro de la ciudad y su serie es
+# plana (pico/último 2,1×). Lo que distingue al vertedero es que aparece y
+# desaparece: pico/último ≥20× en los dos casos.
+#
+# Los casos excluidos no se borran: van a `sin_comuna`, igual que los del
+# marcador `PENDIENTE POR ASIGNAR`, y el JSON los declara para que la página
+# pueda decir el hueco.
+VERTEDEROS = {("11001", "BELLA SUIZA"), ("05001", "PARQUE NORTE")}
+# Umbrales del detector que avisa si el próximo lote trae un vertedero nuevo.
+VERT_PESO, VERT_CAIDA = 0.03, 20
+
+
+def detectar_vertederos(bar, bar_anio, anios=None):
+    """Avisa si un barrio nuevo se comporta como vertedero de registro.
+
+    No adivina ni excluye por su cuenta: solo AVISA. Si el lote del año que
+    viene mete otro barrio-vertedero, esto lo delata en la corrida en vez de
+    dejarlo pintando una comuna entera durante meses.
+
+    `bar` es {(dane, barrio): hechos} y `bar_anio` {(dane, barrio, anio): hechos},
+    con el barrio en MAYÚSCULAS y sin el sufijo de comuna. Devuelve la lista de
+    barrios vigilados (los que pesan ≥VERT_PESO de su ciudad), marcando cuáles
+    ya están excluidos.
+    """
+    anios = anios or ANIOS
+    sospechosos = []
+    for dane in CIUDADES:
+        tot_c = sum(v for k, v in bar.items() if k[0] == dane) or 1
+        for (dd, nom), n in bar.items():
+            if dd != dane or n / tot_c < VERT_PESO:
+                continue
+            serie = [bar_anio.get((dane, nom, a), 0) for a in anios]
+            pico = max(serie) or 1
+            ult = next((x for x in reversed(serie) if x), 0) or 1
+            caida = pico / ult
+            marca = (dane, nom) in VERTEDEROS
+            sospechosos.append({"ciudad": CIUDADES[dane]["n"], "barrio": nom,
+                                "hechos": n, "pct": round(100 * n / tot_c, 1),
+                                "pico_sobre_ultimo": round(caida, 1),
+                                "excluido": marca})
+            if caida >= VERT_CAIDA and not marca:
+                print(f"  ⚠️ POSIBLE VERTEDERO NUEVO · {CIUDADES[dane]['n']} · {nom}: "
+                      f"{n:,} hechos ({100*n/tot_c:.1f}% de la ciudad), "
+                      f"pico/último {caida:.0f}×. Revisar y agregar a VERTEDEROS.")
+    return sospechosos
+
 ANIOS = list(range(2015, 2025))
 AIX = {a: i for i, a in enumerate(ANIOS)}
 NA = len(ANIOS)
@@ -248,6 +311,11 @@ def main():
     ciu_bar_com = {}                 # (dane, barrio) -> comuna
     ciu_tot = defaultdict(int)       # dane -> hechos
     ciu_sin_com = defaultdict(int)   # dane -> hechos sin comuna derivable
+    # acumuladores APARTE, solo para el detector de vertederos: miden todos los
+    # barrios (incluidos los ya excluidos) para que el próximo lote delate al
+    # que siga. No entran a ninguna salida de producción.
+    vert_bar = defaultdict(int)       # (dane, barrio) -> hechos
+    vert_bar_anio = defaultdict(int)  # (dane, barrio, anio) -> hechos
     SUF = {d: re.compile(c["suf"]) for d, c in CIUDADES.items()}
     dep_anio = defaultdict(int)      # (dep, delito, anio)
     dep_tot = defaultdict(int)       # (dep, delito)  incluye filas sin año
@@ -386,13 +454,24 @@ def main():
                 com = int(m.group(1)) if m else None
                 # el nombre del barrio se guarda SIN el sufijo de comuna
                 nom = (b[:m.start()] if m else b).strip()
-                ciu_bar[(dane, nom, did)] += q
-                if com is not None:
-                    ciu_bar_com[(dane, nom)] = com
-                    ciu_com[(dane, com, did, anio)] += q if anio is not None else 0
-                    ciu_com_t[(dane, com, did)] += q
-                elif dane in CIUDADES:
+                # vigilancia del vertedero: se mide SIEMPRE, se excluye solo a
+                # los confirmados (así el próximo lote delata al que siga)
+                vert_bar[(dane, nom.upper())] += q
+                if anio is not None:
+                    vert_bar_anio[(dane, nom.upper(), anio)] += q
+                if (dane, nom.upper()) in VERTEDEROS:
+                    # no es un barrio: es el valor por defecto del registro.
+                    # Se cuenta como «sin comuna», igual que BARRIO_NULO, y no
+                    # entra ni al mapa ni al ranking de barrios.
                     ciu_sin_com[dane] += q
+                else:
+                    ciu_bar[(dane, nom, did)] += q
+                    if com is not None:
+                        ciu_bar_com[(dane, nom)] = com
+                        ciu_com[(dane, com, did, anio)] += q if anio is not None else 0
+                        ciu_com_t[(dane, com, did)] += q
+                    elif dane in CIUDADES:
+                        ciu_sin_com[dane] += q
             else:
                 ciu_sin_com[dane] += q
 
@@ -409,6 +488,8 @@ def main():
         for k, v in etiquetas_nuevas.most_common(20):
             print(f"     {k!r}  ({v:,} filas)", file=sys.stderr)
         sys.exit(1)
+
+    vigilados = detectar_vertederos(vert_bar, vert_bar_anio)
 
     # ── serialización ──────────────────────────────────────────────
     def serie(dd):
@@ -467,7 +548,16 @@ def main():
             "nota_bogota": (
                 "Bogotá viene dentro de Cundinamarca en la fuente. El departamento "
                 "se deriva del código DANE, así que van separados."),
+            "nota_vertederos": (
+                "Dos barrios quedaron fuera del mapa de comunas y del ranking de "
+                "barrios porque el sistema de registro los usó como valor por "
+                "defecto durante unos años: Bella Suiza (Bogotá) y Parque Norte "
+                "(Medellín). Sus casos no se borran —se cuentan como «sin "
+                "comuna»— pero dejarlos adentro hacía de Usaquén la localidad "
+                "más violenta de Bogotá, que es falso."),
         },
+        "vertederos": {"excluidos": sorted(f"{c}·{b}" for c, b in VERTEDEROS),
+                       "vigilados": sorted(vigilados, key=lambda x: -x["hechos"])},
         "municipios": len(mun_nom),
         "departamentos": len({d for d, _x in dep_tot}),
     }
