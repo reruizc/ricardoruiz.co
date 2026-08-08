@@ -213,6 +213,29 @@ def fetch_texto(key, radicados=None):
 
 CACHE = DIST / '_texto_words_cache.json'
 
+# Caché NEGATIVO: gacetas que el índice quiere pero que no tienen texto en S3.
+# Son ~2.200 (casi todas de los años 90, que el portal de la Imprenta no sirve).
+# El caché normal solo guarda las que SÍ tienen texto, así que sin esto el índice
+# las reintenta en cada corrida: 2.200 descargas condenadas a fallar, dos veces
+# al día. Medido: la etapa del cron pasaba de segundos a >26 min por esto.
+# Se reintentan igual cada REINTENTO_DIAS, porque el corpus crece y una gaceta
+# que hoy no está puede cosecharse mañana.
+NEG_CACHE = DIST / '_texto_sin_texto.json'
+REINTENTO_DIAS = 7
+
+
+def _cargar_negativos(reintentar_todo=False):
+    """{key: 'YYYY-MM-DD'} de lo que no tuvo texto, filtrado a lo reciente."""
+    if reintentar_todo or not NEG_CACHE.exists():
+        return {}
+    try:
+        prev = json.load(open(NEG_CACHE, encoding='utf-8'))
+    except Exception:
+        return {}
+    import datetime
+    corte = (datetime.date.today() - datetime.timedelta(days=REINTENTO_DIAS)).isoformat()
+    return {k: v for k, v in prev.items() if v >= corte}
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -222,6 +245,9 @@ def main():
     ap.add_argument('--from-cache', action='store_true',
                     help='reusa las palabras ya extraídas por gaceta (sin volver a bajar de S3) — '
                          'para iterar el filtro de frecuencia sin repetir ~15 min de red')
+    ap.add_argument('--reintentar-faltantes', action='store_true',
+                    help='ignora el caché de negativos y vuelve a pedir TODAS las gacetas '
+                         'sin texto (útil justo después de una cosecha grande)')
     ap.add_argument('--incremental', action='store_true',
                     help='como --from-cache pero SÍ baja las gacetas que falten en el caché '
                          '(el modo normal tras una cosecha nueva: reusa lo ya extraído y '
@@ -250,10 +276,14 @@ def main():
         doc_words = {k: set(v) for k, v in cache.items() if k in wanted}
         print(f'    {len(doc_words)} gacetas vienen del caché')
 
+    negativos = _cargar_negativos(args.reintentar_faltantes)
     if args.from_cache:
         pendientes = []          # --from-cache: no se toca la red
     else:
-        pendientes = [k for k in keys if k not in doc_words]
+        pendientes = [k for k in keys if k not in doc_words and k not in negativos]
+        if negativos:
+            print(f'  · {len(negativos)} gacetas se saltan: no tenían texto en S3 y se '
+                  f'reintentan cada {REINTENTO_DIAS} días (--reintentar-faltantes fuerza)')
     # los radicados cambian mientras la legislatura corre (el cron re-baja el
     # PDF cuando el proyecto se mueve) → se re-leen siempre. Son ~200 archivos
     # locales, cuesta segundos.
@@ -261,6 +291,7 @@ def main():
     pendientes = list(dict.fromkeys(pendientes + frescos))
 
     n_ok, n_sinTexto = len(doc_words), 0
+    sin_texto_keys = []
     if pendientes:
         print(f'  · bajando {len(pendientes)} gacetas que faltan…')
 
@@ -282,6 +313,7 @@ def main():
                 done += 1
                 if words is None:
                     n_sinTexto += 1
+                    sin_texto_keys.append(key)
                 else:
                     n_ok += 1
                     doc_words[key] = words
@@ -300,6 +332,15 @@ def main():
         prev.update({k: sorted(v) for k, v in doc_words.items()})
         json.dump(prev, open(CACHE, 'w', encoding='utf-8'), ensure_ascii=False)
         print(f'  · caché actualizado ({len(prev)} gacetas) → --incremental la próxima vez')
+
+        # los "no tiene texto" también se recuerdan, con la fecha del intento
+        if sin_texto_keys:
+            import datetime
+            hoy = datetime.date.today().isoformat()
+            negativos.update({k: hoy for k in sin_texto_keys})
+            json.dump(negativos, open(NEG_CACHE, 'w', encoding='utf-8'), ensure_ascii=False)
+            print(f'  · {len(sin_texto_keys)} sin texto anotadas → no se reintentan '
+                  f'hasta dentro de {REINTENTO_DIAS} días')
 
     n_rad_ok = sum(1 for k in doc_words if k.startswith(RAD_PREFIX))
     print(f'\n{n_ok} documentos con texto procesados '
