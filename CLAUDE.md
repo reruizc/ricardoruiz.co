@@ -5023,25 +5023,67 @@ legislativo-electos.js         ELECTOS_RAW (285) + BANCADAS + bancadaOf (solo qu
   — basta con dejar el archivo ahí; si falta, la tarjeta se ve igual, solo sin foto.
 
 **Monitor de ritmo** (al lado del título del hub · `tools/leyes-senado/build_ritmo.py` →
-`ritmo-legislaturas.json`, ~2 KB, en el cron 2×/día): **gráfico de líneas** (naranja 2026 ·
+`ritmo-legislaturas.json`, ~3 KB, en el cron 2×/día): **gráfico de líneas** (naranja 2026 ·
 verde 2022 · cian 2018) con los proyectos de ley radicados por día,
-**2026 vs 2022 vs 2018**. Medido ago-2026: 135 · 106 · 91 (la legislatura nueva radica 27%
-más que la anterior a la misma altura).
-- ⚠️ **Las tres series son SOLO del registro del Senado.** El listado de Cámara no publica
-  fecha de radicación, así que sumarlo le daría a 2026 un dato que 2018 y 2022 no tienen y la
-  comparación mentiría a favor del año nuevo. Verificado: los radicados jul-ago de 2018 (161)
-  y 2022 (189) del dataset son 100% registro Senado.
-- **Ventana RODANTE** (últimas 2 semanas hasta hoy, mapeadas a las mismas fechas calendario
-  de hace 4 y 8 años), no fija en el arranque: si no, en octubre seguiría mostrando julio.
-  Piso duro en el 20-jul-2026 (antes no hay legislatura viva que medir).
+**2026 vs 2022 vs 2018**.
+- ✅ **LAS DOS CÁMARAS desde ago-2026** (antes era solo Senado). La razón vieja —«el listado
+  de Cámara no publica fecha»— quedó obsoleta con `harvest_camara_fichas.py`: el LISTADO no
+  la trae, pero la FICHA sí, y hoy la tienen **4.106 de 4.146 (99,0%)**, con 95-100% en TODAS
+  las legislaturas. El monitor viejo publicaba **~2/3 del universo**. Medido en la ventana
+  20→28 jul — 2018: 73 Senado + 34 Cámara = 107 · 2022: 87 + 59 = 146 · 2026: 120 + 100 =
+  **220** → 2026 vs 2022 pasa de **+38% (solo Senado) a +51% (completo)**: la conclusión no
+  solo sobrevive, se refuerza. **No hay doble conteo** (el set `origen_registro:'camara'`
+  excluye por construcción lo que ya está en Senado); el subconteo por proyectos que cruzan
+  ya existía antes y se reduce, no se introduce.
+- ⚠️⚠️ **Por eso la ventana es CONSOLIDADA, no llega hasta hoy: el listado de Cámara publica
+  con rezago, y es IRREGULAR.** Medido sobre los 60 proyectos de la legislatura viva con
+  primera-aparición registrada: **min 0 · p50 7 · p90 12 · máx 13 días**. No es una tubería de
+  N días sino publicación a golpes — el 29-jul salió uno el MISMO día que se radicó, y ese
+  mismo día salieron otros radicados 8 días antes. Con la ventana pegada a hoy, la cola de
+  2026 saldría con la Cámara a medias y treparía retroactivamente cada día: sesgo CONTRA el
+  año nuevo, invisible, y peor que el que la nota vieja temía.
+  ⚠️ **El rezago NO es un problema de fecha sino de EXISTENCIA**: la ficha sí trae "Fecha de
+  Radicación" (verificado en el navegador ago-2026, es la que cosechamos); lo que pasa es que
+  el proyecto todavía no está en el listado, así que no hay fila que leer. Ningún campo de
+  fecha lo arregla. Verificado también que **el listado NO tiene columna de fecha** —9
+  columnas: No. Cámara · No. Senado · Proyecto · Tipo · Autores · Estado · Origen · Comisión ·
+  Legislatura— y que el item crudo del AJAX tampoco (12 llaves, ninguna fecha), así que
+  `norm_item` no está descartando nada.
+- **El lag NO es una constante a ojo: `lag_observado()` lo mide en cada corrida**, cruzando
+  cuándo vio el rastreo cada proyecto por primera vez (`diario-camara/novedades/*.json`)
+  contra la fecha de radicación de su ficha. Usa **máx + 1** (no la mediana: la ventana
+  promete estar consolidada), acotado a `[LAG_MIN 3, LAG_MAX 21]`. Así, si el rezago de
+  jul-2026 era cola del arranque y Cámara se pone al día, **la ventana se acerca sola a hoy**;
+  si se atrasa, se aleja sola. Sin historial cae a LAG_MAX (lado seguro). Probado: real→14 ·
+  sin novedades→21 · Cámara al día→3 (piso) · outlier de 247 días→21 (cota). Un cron caído
+  infla el lag observado, así que el error empuja a la ventana conservadora, nunca a publicar
+  de más. El JSON expone `ventana.lag_dias` + `ventana.lag{n,max,p50,p90}` y **el pie del hub
+  lo lee de ahí** en vez de traer un número escrito a mano que envejece.
+  ⚠️ `_visto` del manifiesto de Cámara es **última** vez visto (se reescribe cada corrida), NO
+  la primera — usarlo para medir el lag da «hoy − radicación», que es la edad del proyecto, no
+  el rezago. La primera aparición solo está en los archivos de novedades.
+- **Fuente única: `dist/proyectos.jsonl`** (ya no la Lambda). Desde el fix de `pdate` el
+  dataset trae la legislatura viva de las dos cámaras, así que las tres series se construyen
+  igual — un modo de falla menos. **Por eso `ritmo` bajó en el cron a después de
+  `dataset_build`** y se omite si ese falló. Cuenta solo proyectos de ley; los actos
+  legislativos van aparte (otro trámite, otro reloj).
+- **Ventana RODANTE** dentro de eso (14 días corridos que terminan en la frontera, mapeados a
+  las mismas fechas calendario de hace 4 y 8 años), no fija en el arranque: si no, en octubre
+  seguiría mostrando julio. Piso duro en el 20-jul-2026 (antes no hay legislatura viva).
 - **Solo días hábiles.** Sáb/dom no hay radicación: sus ceros hundían la línea al piso cada
   cinco puntos sin significar nada. Un tramo de 14 días corridos trae SIEMPRE 10 hábiles, así
   que las tres series quedan del mismo largo y alinean por posición aunque cada año arranque
   en distinto día de semana (2026 lun · 2022 mié · 2018 vie). ⚠️ El filtro va sobre el
   calendario DE CADA AÑO, no sobre el de 2026: el equivalente de un lunes de 2026 puede caer
   sábado en 2018. NO se descuentan festivos (exigiría el calendario oficial de cada año).
-- Si la Lambda no responde, `build` **aborta sin reescribir el JSON** (un Counter vacío
-  pintaría un desplome falso); el frontend sigue mostrando la última corrida buena.
+  ⚠️ Mientras el piso del 20-jul recorta la ventana a menos de 14 días, ese «siempre 10
+  hábiles» NO se cumple y los tres años quedan de largo distinto (hoy 5·4·4) → `build` las
+  **trunca por la cola al largo de la más corta**, si no compararía totales de 5 días contra
+  4. Se normaliza solo cuando la ventana llega a 14 días completos.
+- **Dos guardas que abortan sin reescribir el JSON** (el frontend sigue con la última corrida
+  buena): si la serie viva queda en **cero** (pintaría un desplome falso) o si la serie viva
+  **no trae Cámara mientras las históricas sí** (es justo el sesgo invisible que la ventana
+  consolidada existe para evitar → señal de que `camara_fichas` se quedó atrás).
 - El hub NO llama `{action:'radicados'}` directo: esa respuesta pesa 540 KB.
 - **Hover**: el listener va en el CONTENEDOR y toma el día más cercano en X, no en cada
   `<circle>` — con 30 puntos de 2px acertarle a uno es imposible. Pinta guía vertical +
@@ -5652,6 +5694,17 @@ por la etiqueta.
   fichas, cero fallos**, y los proyectos de Cámara con fecha de radicación pasan
   de **0 a 3.738 (99,1%)**. Con eso el embudo deja de ser del Senado y se calcula
   sobre **13.387 de 13.831 proyectos (96,8%)**.
+- ⚠️⚠️ **Y el hermano de ese bug, del lado SENADO: `pdate` se comía la fecha de toda la
+  legislatura viva** (ago-2026). El histórico escribe el día primero (`1/11/1991`) pero el
+  manifiesto del rastreo diario escribe **el año primero** (`2026/07/20`), y la lista de
+  formatos de `build_dataset.pdate` no tenía `%Y/%m/%d` → **154 de 154 radicados del Senado
+  vivo quedaban SIN fecha, en silencio** (`strptime` falla y el bucle devuelve `None`). No
+  reventaba nada: simplemente el embudo y cualquier serie temporal ignoraban la legislatura
+  en curso. Arreglado agregando el formato **al FINAL** de la lista, para que `%d/%m/%Y` siga
+  ganando en lo ambiguo y el nuevo solo recoja lo que los otros tres rechazan. Medido sobre
+  83.740 campos de fecha del histórico: **+162 ganadas, 0 regresiones**. Lección: cuando dos
+  fuentes alimentan el mismo parser, comparar el FORMATO de ambas — acá el que fallaba era el
+  más nuevo y el fallo era mudo.
 - ❌ **NO resuelto y no lo va a estar: la causa del archivo.** Se buscó
   explícitamente en fichas archivadas de cuatro épocas distintas y **no está en
   ninguna** (solo ruido del menú). Sus archivados siguen en `ARCHIVADO_OTRO`,
@@ -8342,6 +8395,110 @@ antes de enviar. Sigue pendiente el ejemplo del correo de grant de Tatiana
 "construcción de flujos de trabajo con IA" (tipo AI builder — nombre tomado
 por Microsoft) más allá de lo electoral. Pendiente: sumar ese servicio como
 el principal en la sección Servicios de `index.html`.
+
+## Videos de datos — HyperFrames (`rrss/video/`) · ago-2026
+
+Pipeline para videos verticales 1080×1920 que explican cambios en legislativo,
+policía o electoral. **Video como artefacto de build**: se escribe HTML+CSS+GSAP
+y se renderiza a MP4 — el mismo stack del resto del sitio, versionable y
+regenerable, sin editor de video de por medio.
+
+Motor: **[hyperframes](https://github.com/heygen-com/hyperframes)**, repo
+**Apache 2.0** de HeyGen. **Todo corre local y gratis**: el CLI renderiza con
+Chrome headless + ffmpeg y no toca la cuenta ni los créditos de HeyGen.
+⚠️ **No confundir con el MCP / los avatares de HeyGen, que SÍ se cobran** por
+minuto renderizado ($0,10–0,30/min según resolución). Los TikToks que circulan
+promocionando esto venden el producto de pago, no el repo.
+
+Prerequisitos (ya instalados en el Mac): **Node 22+** y **ffmpeg**.
+
+### Los dos formatos
+
+**A · Motion graphics de datos** (sin cámara, con voz sintética). Es el de
+`rrss/video/congreso-2026-2027-60s.mp4`: escenas encadenadas con cifras que
+cuentan, barras que crecen y narración. 60 s renderizan en **1 min 45 s**.
+
+**B · Talking-head recut** (Ricardo se graba selfie y encima van los gráficos).
+`hyperframes init recut --video <mp4> --language es --model small` monta el
+clip como capa base y **transcribe con whisper.cpp LOCAL** (`~/.cache/hyperframes/
+whisper/models/ggml-small.bin`, 481 MB, se baja una vez). Verificado en español:
+transcribe bien y **convierte los números hablados a dígitos** ("doscientos
+cincuenta y cuatro" → `254`), lo que permite anclar cada gráfico a la frase donde
+se menciona el dato. Los segmentos de `transcript.json` traen `offsets.from/to`
+en ms. ⚠️ Con `--model small` los segmentos son de ~7 s: alcanza para anclar
+overlays, pero no da precisión palabra por palabra.
+Sobre el video base van: lower-third, callouts de dato, paneles con gráficos y
+subtítulos. El clip corre intacto debajo.
+⚠️ El `<video>` base necesita **`data-has-audio="true"`** (o `muted`), si no el
+check falla y la voz no entra al MP4.
+
+### Estructura de un proyecto
+
+```
+rrss/video/fuente-<nombre>/
+  index.html          la composición (HTML + CSS + GSAP)
+  package.json        scripts con la versión del CLI pineada
+  hyperframes.json
+  fonts/*.woff2       Helvetica Neue del repo
+  assets/*.mp3        narración por escena
+```
+
+Cada elemento visible es un `.clip` con `data-start` / `data-duration` /
+`data-track-index`; la animación va en una timeline GSAP **pausada** registrada
+en `window.__timelines["main"]` (el renderer hace *seek* a cada frame, así que
+todo debe ser determinista — nada de `setInterval`).
+
+```bash
+cd rrss/video/fuente-congreso-60s
+npx --yes hyperframes@0.7.101 check    # lint + layout + motion + contraste WCAG AA
+npx --yes hyperframes@0.7.101 render   # → renders/*.mp4
+```
+
+`--batch filas.json` renderiza **un MP4 por fila del JSON** (medido: 3 videos en
+26 s) → un video por departamento, por delito o por proyecto desde los JSON que
+ya generamos.
+
+### Narración (gratis, local)
+
+```bash
+say -v Paulina -r 168 -o e1.aiff "texto de la escena"
+ffmpeg -y -i e1.aiff -filter:a atempo=1.10 -ar 44100 -b:a 160k e1.mp3
+```
+
+**Paulina** (es_MX) es la más neutra para Colombia; Mónica es peninsular (zeta).
+`atempo` acelera **sin subir el tono** — subirle el `-r` a `say` atropella las
+sílabas. Ritmo medido: ~168 wpm × 1,10 ≈ **2,8 palabras/segundo**. El mp3 entra
+como `<audio class="clip">` y HyperFrames lo mezcla nativo (no hace falta ffmpeg
+al final). Migrar a ElevenLabs no cambia el pipeline: cualquier TTS que dé mp3 sirve.
+
+⚠️⚠️ **El orden importa: primero la voz, se mide cada mp3, y con esas duraciones
+se arma la animación.** Al revés no calza. `check` avisa si el `data-duration`
+no coincide con la duración real del audio.
+
+### Dos reglas de guion (decisión de Ricardo)
+
+1. **La voz NO lee lo que está en pantalla.** La pantalla lleva las cifras; la
+   voz, el contexto y la advertencia metodológica. Repetirlas se siente obvio.
+2. **Silencios de 1 a 4 s por escena.** El video respira y no suena a teleprónter.
+
+### Gotchas medidos
+
+- **Nombrar `Helvetica Neue` en el CSS NO sirve**: el renderer aliasa las fuentes
+  de sistema a Inter. Hay que cargar los `fonts/*.woff2` del repo con `@font-face`.
+- **Telemetría anónima activada por defecto** → `hyperframes telemetry disable`.
+- `init` es interactivo; para agentes va `--non-interactive` (+ `--example`,
+  `--resolution portrait`). `HYPERFRAMES_SKIP_SKILLS=1` evita que baje los skills.
+- Contenedores con **altura automática** hacen que los hijos absolutos "escapen" y
+  el check lo marca como error: fijarles `height`. Para pegar algo al borde
+  derecho, usar `right`, no `left` calculado.
+- El `check` es estricto a propósito (detecta solapes de texto y desbordes que a
+  simple vista no se ven en el render). **Correrlo siempre antes de renderizar.**
+
+### Dónde viven los archivos
+
+Los MP4 finales y su proyecto fuente van a **`rrss/video/`** (junto a
+`rrss/twitter/`, `rrss/instagram/`, `rrss/linkedin/`), con un `LEEME.md` que
+documenta de dónde sale cada cifra. **NO** en el scratchpad, que es efímero.
 
 ## Convenciones de commit
 ```

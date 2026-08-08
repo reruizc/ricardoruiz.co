@@ -63,7 +63,13 @@ def pdate(s):
     if not s:
         return None
     s = s.strip()
-    for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y'):
+    # ⚠️ '%Y/%m/%d' va al FINAL y no es decorativo: el histórico escribe el día
+    # primero ('1/11/1991') pero el manifiesto del rastreo diario escribe el año
+    # primero ('2026/07/20'), y sin ese formato los radicados de la legislatura
+    # viva perdían la fecha EN SILENCIO (154 de 154 en ago-2026). Va de último
+    # porque '%d/%m/%Y' debe seguir ganando en lo ambiguo; solo recoge lo que los
+    # otros tres rechazan. Medido: +162 fechas en el histórico, 0 regresiones.
+    for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%Y/%m/%d'):
         try:
             d = datetime.datetime.strptime(s[:10], fmt).date()
             if 1985 <= d.year <= 2027:

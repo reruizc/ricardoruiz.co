@@ -60,10 +60,10 @@
            fetch falla, el JS lo oculta y el header queda como antes -->
       <div class="ritmo" id="ritmo" style="display:none">
         <div class="ritmo-t">El arranque, legislatura contra legislatura</div>
-        <div class="ritmo-s" id="ritmo-sub">Proyectos de ley radicados por día en el Senado.</div>
+        <div class="ritmo-s" id="ritmo-sub">Proyectos de ley radicados por día en Senado y Cámara.</div>
         <div id="ritmo-rows"></div>
         <div class="ritmo-cmp" id="ritmo-cmp"></div>
-        <div class="ritmo-foot">Solo días hábiles: los fines de semana no hay radicación. Registro del Senado en las tres series — el listado de Cámara no publica fecha, así que incluirlo haría incomparables los periodos.</div>
+        <div class="ritmo-foot" id="ritmo-foot">Las dos cámaras, deduplicadas: un proyecto que cruza de cámara se cuenta una sola vez. La fecha de radicación de Cámara sale de la ficha de cada proyecto, no del listado. La ventana no llega hasta hoy porque el listado de Cámara publica con rezago; se cierra donde el dato ya está completo. Solo días hábiles: los fines de semana no hay radicación.</div>
       </div>
     </div>
   </div>
@@ -177,7 +177,17 @@
       const dia=d=>{const[m,x]=String(d||'').split('-');const n=+x;return isNaN(n)?'':`${n} ${MES[+m-1]||''}`;};
       const v0=dia((j.ventana||{}).desde), v1=dia((j.ventana||{}).hasta);
       if(v0&&v1) document.getElementById('ritmo-sub').innerHTML=
-        `Proyectos de ley radicados por día en el Senado, del <b>${v0}</b> al <b>${v1}</b>, contra los mismos días hábiles de las dos legislaturas anteriores.`;
+        `Proyectos de ley radicados por día en <b>Senado y Cámara</b>, del <b>${v0}</b> al <b>${v1}</b>, contra los mismos días hábiles de las dos legislaturas anteriores.`;
+      /* el margen de cierre no es fijo: build_ritmo lo recalcula con el rezago
+         que hemos medido, así que el pie dice el de HOY en vez de un número
+         escrito a mano que envejece */
+      const lag=((j.ventana||{}).lag_dias)|0, pie=document.getElementById('ritmo-foot');
+      if(lag&&pie) pie.innerHTML=
+        `Las dos cámaras, deduplicadas: un proyecto que cruza de cámara se cuenta una sola vez. `+
+        `La fecha de radicación de Cámara sale de la ficha de cada proyecto, no del listado. `+
+        `La ventana cierra <b>${lag} días</b> antes de hoy: el listado de Cámara publica con rezago `+
+        `y ese margen se recalcula con el rezago medido, así que hasta ahí el dato está completo. `+
+        `Solo días hábiles: los fines de semana no hay radicación.`;
       const anios=Object.keys(j.series||{}).sort((a,b)=>b-a);
       if(!anios.length) return;
       const vivo=anios[0];
@@ -252,14 +262,18 @@
       /* la comparación honesta es a DÍAS IGUALES: la legislatura viva lleva
          menos días que la ventana completa de las viejas */
       const nd=j.series[vivo].n_dias;
-      const acum=a=>j.series[a].dias.slice(0,nd).reduce((t,x)=>t+x.n,0);
+      const acum=(a,k='n')=>j.series[a].dias.slice(0,nd).reduce((t,x)=>t+(x[k]||0),0);
       const v=acum(vivo), prev=anios.slice(1).map(a=>({a,n:acum(a)}));
+      /* de dónde salen: el JSON trae el desglose por registro desde ago-2026;
+         si viniera uno viejo (sin s/c) los dos dan 0 y la nota no se pinta */
+      const vS=acum(vivo,'s'), vC=acum(vivo,'c');
+      const comp=(vS+vC)?` <span class="ritmo-comp">${vS} en Senado · ${vC} en Cámara</span>`:'';
       const cmp=prev.map(p=>{
         const d=v-p.n, pct=p.n?Math.round(100*d/p.n):null;
         return `${d>=0?'<b>':'<b class="dn">'}${d>=0?'+':''}${d}${pct!=null?` (${d>=0?'+':''}${pct}%)`:''}</b> vs ${p.a}`;
       }).join(' · ');
       document.getElementById('ritmo-cmp').innerHTML=
-        `<b style="color:var(--white)">${v}</b> proyecto${v===1?'':'s'} en ${nd} día${nd===1?'':'s'} hábil${nd===1?'':'es'} — ${cmp} en las mismas fechas.`;
+        `<b style="color:var(--white)">${v}</b> proyecto${v===1?'':'s'} en ${nd} día${nd===1?'':'s'} hábil${nd===1?'':'es'} — ${cmp} en las mismas fechas.${comp}`;
       box.style.display='';
     }catch(e){ /* sin dato, sin monitor */ }
   })();
