@@ -1,0 +1,157 @@
+{
+ "_doc": "ENTRADA PROPUESTA para fuentes.json — NO la agregué yo porque fuentes.json es archivo compartido del pilar y su dueño es otra conversación. Pégala en el array `fuentes` cuando quieras consolidar. El harvester ya corrió y dejó el raw en su sitio; NO toqué harvest_supers.py, build_s3.py, verificar_consolidado.py, run_diario.sh ni salud/catalogo.py.",
+ "_generado": "2026-08-08",
+ "_veredicto": "REABIERTA Y VIVA. La fuente se había cerrado como DESCARTADA en jul-2026 buscando SANCIONES, y esa conclusión sigue en pie: Supersociedades NO publica registro sancionatorio. Pero sí publica —server-rendered, sin auth, sin JS— sus 199 circulares externas, el linaje completo de su Circular Básica Jurídica, 480 resoluciones y, lo más valioso, 49 PROYECTOS de normativa con su ventana de comentarios. 734 actos cosechados, CERO sanciones, y está bien: el pilar dejó de ser solo sanciones.",
+ "_como_correr": [
+  "python3 tools/caudal/supers/harvest_supersociedades.py probe    # mapea el portal y mide, no escribe",
+  "python3 tools/caudal/supers/harvest_supersociedades.py fetch    # cosecha las dos colas (resumible)",
+  "python3 tools/caudal/supers/harvest_supersociedades.py fetch --solo proyectos   # solo la cola de borradores",
+  "python3 tools/caudal/supers/harvest_supersociedades.py test     # valida CBJ + el proyecto del cliente + dedup",
+  "→ luego, su dueño: harvest_supers.py normalize && verificar_consolidado.py && build_s3.py"
+ ],
+
+ "fuente_propuesta": {
+  "slug": "supersociedades",
+  "nombre": "Superintendencia de Sociedades",
+  "sector": "societario",
+  "via": 2,
+  "granularidad": "entidad",
+  "dificultad": "media",
+  "endpoint": "https://www.supersociedades.gov.co/es/web/nuestra-entidad/normativa?id=<catId>&start=N&end=N+20  +  /web/nuestra-entidad/proyectos-de-normatividad?p_p_id=<AssetPublisher INSTANCE_gllg>&_..._cur=N",
+  "metodo": "GET",
+  "nota": "IMPLEMENTADA ago-2026 vía harvest_supersociedades.py (vía 2: dos portlets server-rendered de Liferay, sin auth ni token). Cola B = buscador interno propio (`gov.co.supersociedades.buscador.interno`): pese al onclick=findByCategory() NO es AJAX, la función solo hace window.location=?id=<catId> y la página vuelve renderizada con los PDF en href directo. Cola A = AssetPublisher de proyectos de normativa, cuyo NODO trae tipo de norma, ventana de comentarios, correo para observaciones, dependencia líder, responsable técnico y —en 10 de 49— la matriz de comentarios recibidos. NO trae sanciones: esta entidad no publica registro sancionatorio (auditado jul-2026 y confirmado ago-2026).",
+  "map": {
+   "sancionado": null,
+   "identificacion": null,
+   "tipo_acto": "tipo_acto",
+   "tipo_sancion": "tipo_norma",
+   "motivo": "descripcion",
+   "monto": null,
+   "resolucion": "titulo",
+   "fecha_firmeza": "fecha",
+   "estado": null,
+   "descripcion": null,
+   "url": "url",
+   "_id": "_id"
+  },
+  "tipo_acto_default": "circular"
+ },
+
+ "cosecha_medida_2026_08_08": {
+  "actos": 734,
+  "por_tipo_acto": {"resolucion": 481, "circular": 204, "otro": 49},
+  "por_cola": {"normativa": 685, "proyectos": 49},
+  "sanciones": 0,
+  "rango_fechas": "2010-02-01 .. 2026-07-24",
+  "sin_fecha_iso": 413,
+  "sin_pdf": 2,
+  "_ids_unicos": "734 de 734",
+  "linaje_cbj": 34,
+  "titulo_irregular": 13,
+  "completitud": "Cada categoría cuadra con el `totalArticulos` que declara el propio portal: Circulares Externas 199/199 · Circular Básica Jurídica 18/18 · Resoluciones 480/480 · Estructura 10/10 · Otra Normativa 4/4 · proyectos 49/49.",
+  "dry_run_normalize": "Corrí los 734 actos por el `normalize_row` REAL del pilar (importando harvest_supers.py) con el map propuesto: 481 resolucion + 204 circular + 49 otro, 0 con tipo_acto fuera de la whitelist de fuentes.json, 0 sin motivo, 2 sin url.",
+  "prueba_de_fuego": "PASA · `test` verifica los dos objetivos del encargo: (a) la Circular Básica Jurídica 100-000008 de 12-jul-2022 con su PDF, y (b) el proyecto en consulta del 30-mar al 08-abr-2026. Además 0 colisiones contra sic-circulares, sic, supersalud-registro y dian-normas."
+ },
+
+ "los_dos_objetivos_del_encargo": {
+  "circular_basica_juridica": "ESTÁ, y no como un documento suelto sino como LINAJE: 34 actos la tocan. La vigente hasta hace un mes era la Circular 100-000008 del 12-jul-2022; el 2-jul-2026 la Circular Externa 100-000020 la modificó integralmente. Entre medio están las que le agregaron capítulos (la 100-000010 de 2023 → Cap. XV sostenibilidad; la 100-000001 de 2024 → Cap. XVI ESAL extranjeras) y las que tocaron directamente SAGRILAFT/PTEE (la 100-300000 de dic-2024 modifica los numerales 4.4 y 4.5 de los Capítulos X y XIII). El campo `es_cbj` permite filtrar exactamente eso.",
+  "proyecto_de_circular_sagr": "ESTÁ, con la fecha exacta que trae la matriz del cliente — pero con OTRO NOMBRE. Ver `correccion_al_rotulo_del_cliente`.",
+  "capitulo_x_es_el_sagrilaft": "El SAGR del cliente es el SAGRILAFT, y no es una circular aparte: vive DENTRO de la CBJ, en el Capítulo X ('Autocontrol y gestión del riesgo integral LA/FT/FPADM y reporte de operaciones sospechosas a la UIAF'). El PTEE es el Capítulo XIII. Por eso 'un proyecto de circular sobre SAGR' se materializa como 'un proyecto de nueva Circular Básica Jurídica'."
+ },
+
+ "correccion_al_rotulo_del_cliente": {
+  "lo_que_dice_la_matriz": "Fila 1.6 — 'Proyecto de Circular Externa sobre SAGR (Sistema de Autocontrol y Gestión del Riesgo)', Supersociedades, consulta hasta el 08-abr-2026, clasificado adversarial/costosa.",
+  "lo_que_dice_la_fuente": "'Proyecto de nueva Circular Básica Jurídica de la Superintendencia de Sociedades' — 'Por la cual se emite la Circular Básica Jurídica de la entidad y se deroga la Circular Básica Jurídica 100-000008 de 2022'. Publicación por SEGUNDA vez, incorporando los comentarios de la primera. Ventana: del 30-mar-2026 al 08-abr-2026. Oficina Asesora Jurídica · Andrés Mauricio Cervantes Díaz (Jefe). Dos documentos: el proyecto y el informe de observaciones de la ronda anterior.",
+  "la_fecha_del_cliente_es_exacta": "08-abr-2026 coincide al día. El rótulo no.",
+  "el_dato_que_su_matriz_no_puede_tener": "⚠️ YA NO ES UN BORRADOR. El proyecto se expidió como CIRCULAR EXTERNA 100-000020 DEL 2 DE JULIO DE 2026, 'por medio de la cual se modifica integralmente la Circular Básica Jurídica'. Una matriz que siga listándolo como proyecto en consulta está desactualizada por casi cinco semanas — y esto es justamente lo que un cliente compra: enterarse de que la obligación dejó de ser hipotética.",
+  "hubo_una_primera_ronda": "El mismo proyecto ya había estado en consulta del 19-dic-2025 al 04-ene-2026. Son DOS eventos distintos y los dos quedan en la cosecha (por eso los proyectos se deduplican por ficha y no por título)."
+ },
+
+ "que_le_sirve_a_un_cliente_de_lavado_de_activos": {
+  "por_que_esta_entidad_y_no_la_superfinanciera": "Supersociedades supervisa el SAGRILAFT del SECTOR REAL. Los exchanges de criptoactivos no son vigilados de la Superfinanciera —de ahí el proyecto de ley de PSAV—, así que hoy su obligación de LA/FT cuelga del Capítulo X de esta CBJ, no de una circular de la SFC.",
+  "busqueda_simulada_sobre_el_blob_q": {
+   "insolvencia": 36,
+   "cámaras de comercio": 32,
+   "riesgo": 12,
+   "ptee": 5,
+   "sagrilaft": 4,
+   "uiaf": 4,
+   "autocontrol": 4,
+   "lavado": 2,
+   "sostenibilidad": 2,
+   "esal": 1,
+   "criptoactivo": 0,
+   "activos virtuales": 0
+  },
+  "⚠_el_cero_de_cripto_es_importante_y_no_es_un_fallo": "Ninguna circular ni resolución NOMBRA criptoactivos en su título o descripción. No significa que no les aplique: significa que la obligación les llega por el ÁMBITO DE APLICACIÓN del Capítulo X (topes de ingresos/activos y actividades sujetas), que vive en el ARTICULADO del PDF, no en el 'por medio de la cual…'. Si el cliente quiere la respuesta a '¿a mí me aplica?', esa pregunta se responde con el frente de análisis del articulado sobre estos PDF, no con este índice. Prometer lo contrario sería vender humo.",
+  "las_tildes_importan": "El blob se compara en minúsculas pero CON tildes (mismo comportamiento medido en la DIAN): 'cámaras de comercio' da 32 y 'camaras de comercio' daría 0."
+ },
+
+ "la_cola_de_proyectos_es_lo_que_no_tiene_nadie": {
+  "por_que": "Es la única fuente del pilar que avisa ANTES de que la norma exista. 49 borradores con ventana de comentarios, correo de destino y responsable con nombre y cargo — o sea, no solo 'va a haber una norma' sino 'a quién se le escribe y hasta cuándo'.",
+  "cobertura": "49 proyectos · ventanas del 21-jul-2015 al 14-abr-2026 · 49 con plazo · 49 con dependencia · 47 con responsable técnico · 47 con al menos un documento · 10 con MATRIZ DE COMENTARIOS de la ronda anterior.",
+  "por_tipo": {"Proyecto de Circular Externa": 22, "Proyecto de Resolución Externa": 11, "Proyecto de Resolución Interna": 7, "Proyecto de Decreto": 6, "Proyecto de Circular Interna": 3},
+  "los_proyectos_de_decreto": "6 son 'Proyecto de Decreto'. Se emiten igual: es normativa del sector que ESTA entidad lidera y somete a consulta, así que es su tubería regulatoria. No choca con el pilar Ejecutivo, que trae decretos YA EXPEDIDOS por Presidencia — aquí son borradores y viven en otra URL.",
+  "campos_extra_que_no_caben_en_el_esquema": "plazo_inicio · plazo_fin · plazo_texto · correos · dependencia · responsable · cargo_responsable · docs[] · url_ficha · numero_referenciado. El esquema común del pilar no los tiene; van en el raw y quedan disponibles en `_raw` después de normalize. Si algún día el pilar quiere 'consultas abiertas' como vista propia, `plazo_fin` es el campo."
+ },
+
+ "interaccion_sancionado_guion": "OJO al consolidar, mismo aviso que dejó la DIAN: `sancionado` va en null (estos son actos de carácter general, no tienen destinatario individual) y `build_s3.py` hace `sanc or '—'`, así que los 734 quedan con guion. Eso ya está resuelto río abajo —`fuentes.entidad_de()` del motor de alertas trata el guion como ausencia y titula con el acto—, pero si alguien lee `sanciones.jsonl` en crudo va a ver 734 filas con '—' en esa columna. Es correcto, no es un dato perdido.",
+
+ "vias_probadas_y_descartadas": [
+  {
+   "via": 1,
+   "que": "Socrata datos.gov.co",
+   "resultado": "DESCARTADA",
+   "detalle": "catalog/v1?q=Supersociedades da 7 datasets y todos son NIIF (estados financieros de vigiladas). Ninguno normativo."
+  },
+  {
+   "via": 1,
+   "que": "SUIN-Juriscol (fiev-nid6, de MinJusticia)",
+   "resultado": "SOLO COMO CONTROL CRUZADO",
+   "detalle": "439 normas de la entidad: 324 bajo 'SUPERINTENDENCIA DE SOCIEDADES' + 115 bajo 'Superintendencia de Sociedades' — el mismo emisor escrito de dos formas, así que agrupar por ese campo sin normalizar lo parte en dos y uno se convence de que hay la mitad. Por tipo: 301 RESOLUCION + 135 CIRCULAR EXTERNA + 3 CIRCULAR CONJUNTA. Trae tipo/número/año/vigencia y NADA MÁS: sin título, sin fecha, sin descripción y sin PDF. Es un índice, no la norma; no sirve para decirle a un cliente qué tiene que hacer. Idéntico al hallazgo del harvester de circulares de la SIC."
+  },
+  {
+   "via": 2,
+   "que": "AssetPublisher de /web/supervision-societaria/avisos (los 'avisos' que motivaron el descarte de jul-2026)",
+   "resultado": "CONFIRMADO QUE NO SIRVE — y el premise viejo era falso",
+   "detalle": "Se comprobó otra vez lo que ya decía CLAUDE.md: el AssetPublisher es server-rendered y se lee con un curl (la nota vieja de que era 'JS-heavy' estaba equivocada). Lo que no sirve es el CONTENIDO: son avisos de notificación de oficios de respuesta a derechos de petición (art. 69 CPACA), no sanciones. El descarte de jul-2026 fue por la razón correcta."
+  },
+  {
+   "via": 3,
+   "que": "PDF + LLM sobre el articulado",
+   "resultado": "INNECESARIA PARA EL ACTO, PENDIENTE PARA EL CONTENIDO",
+   "detalle": "El 'por medio de la cual…' ya viene en texto en el listado, así que extraer el PDF para saber DE QUÉ TRATA sería pagar por algo que la fuente regala. Lo que sí exige el PDF es el ámbito de aplicación (ver el cero de 'criptoactivo' arriba). Eso es trabajo del frente de análisis del articulado, y estos 732 PDF quedan referenciados en `url` listos para él."
+  },
+  {
+   "via": 2,
+   "que": "Buscador por palabra del propio portal (?keyword=)",
+   "resultado": "INSERVIBLE",
+   "detalle": "Devuelve 0 para sagrilaft, cripto, virtuales, autocontrol… y también para 'circular', 'Circular Externa', 'Resoluci' y hasta para el número exacto de un acto que sí existe ('100-000020'), mientras '2026' devuelve 64. Sea lo que sea que indexa, no es el título como substring ni la descripción. Por eso se cosecha por CATEGORÍA: una cosecha por keyword se vería limpia y traería la nada."
+  }
+ ],
+
+ "trampas_medidas": {
+  "_doc": "Las doce están explicadas con su medición en el docstring de harvest_supersociedades.py. Resumen para quien consolide:",
+  "①_la_categoria_no_dice_quien_expide": "73% de los 2.632 actos del portal NO son de Supersociedades (decretos, leyes, DURS, constitución, y 1.407 actas de conciliación que ni siquiera son normativa). Y el nombre de la categoría engaña: 'Otra Normativa' son 4 Directivas Presidenciales, 'Escala Salarial' son 13 decretos de Función Pública, y 'Estructura' es MIXTA. Por eso el emisor se decide POR FILA. Emitir lo ajeno duplicaría los pilares Ejecutivo y Congreso.",
+  "⑧_el_mismo_titulo_puede_ser_un_acto_o_dos": "Deduplicar por título borra 9 actos reales (la fuente reusa títulos cortos entre años); no deduplicar cuenta 2 veces los que están a la vez en Circulares Externas y en CBJ. Lo decide si el título trae fecha.",
+  "⑩_el_numero_se_reinicia_cada_ano": "38 números repetidos entre 134 actos; '100-000001' existe diez veces. 'Circular 100-000008' es ambiguo: el de 2022 es la Circular Básica Jurídica, el de 2023 es una circular de plazos. La identidad es (número, año). Misma trampa que el número de radicado en el histórico legislativo.",
+  "⑪_una_pagina_que_falla_trunca_en_silencio": "Una corrida devolvió 180 de 480 resoluciones con un resumen de aspecto normal. Hay reintento por página, reintento de categoría y comparación contra el total que declara el portal. Si el raw trae `_categorias_incompletas`, NO consolides esa corrida.",
+  "⑫_413_actos_sin_fecha_no_es_un_bug": "Los actos viejos se titulan solo con su número y su PDF tampoco trae fecha (el último tramo de la URL es un UUID). Verificado: 0 recuperables del nombre del archivo. Van con fecha=null y año cuando el título lo trae."
+ },
+
+ "si_se_quiere_meter_al_cron": {
+  "_doc": "NO lo metí: run_diario.sh y salud/catalogo.py son de otro dueño. Si se decide, esto es lo que hay que saber.",
+  "costo": "~40 peticiones para la cola de normativa (26 páginas + reintentos) y ~52 para proyectos (3 de listado + 49 nodos, que quedan en caché y no se vuelven a pedir). Con PAUSA=0.35s son ~2-3 minutos en frío y unos segundos en caliente.",
+  "incremental": "Los nodos de proyecto se cachean por URL en `raw/supersociedades-nodos.json`, así que una corrida diaria solo abre los proyectos nuevos. La cola de normativa sí se recorre entera cada vez (el buscador no expone orden por fecha).",
+  "frecuencia_sugerida": "Semanal basta para la normativa. La cola de PROYECTOS sí querría ser diaria: sus ventanas de comentarios duran entre 4 y 15 días, así que un rastreo semanal puede enterarse cuando ya cerró — que es exactamente el fallo que el producto promete evitar.",
+  "catalogo_de_salud": "Si entra al cron, `raw/supersociedades.json` querría clase `diario` o `mensual` con min_bytes ~500 KB (la corrida de ago-2026 pesa ~1,1 MB)."
+ },
+
+ "lo_que_NO_hice": [
+  "No toqué fuentes.json (archivo compartido del pilar).",
+  "No toqué harvest_supers.py, build_s3.py ni verificar_consolidado.py.",
+  "No toqué run_diario.sh ni salud/catalogo.py.",
+  "No subí nada a S3 ni corrí normalize/build_s3: eso lo hace su dueño cuando decida consolidar.",
+  "No extraje el articulado de los PDF: es otro frente."
+ ]
+}

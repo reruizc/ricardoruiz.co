@@ -1,0 +1,180 @@
+{
+  "_doc": "ENTRADA PROPUESTA para fuentes.json — NO la agregué yo porque fuentes.json es archivo compartido del pilar y hay tres conversaciones más trabajando otras fuentes en paralelo. Quien consolide: pegar el objeto `fuente_propuesta` dentro de `fuentes.fuentes` y borrar este archivo. El harvester (harvest_uiaf.py) y su raw (raw/uiaf-reportantes.json + raw/uiaf-cache/) ya están y son míos, exclusivos.",
+  "_generado": "2026-08-08",
+  "_como_correr": [
+    "python3 tools/caudal/supers/harvest_uiaf.py test    # valida los 3 bloques + prueba de fuego Res 314 PSAV",
+    "python3 tools/caudal/supers/harvest_uiaf.py fetch   # 22 peticiones, ~30 s, resumible",
+    "python3 tools/caudal/supers/harvest_uiaf.py build",
+    "python3 tools/caudal/supers/harvest_supers.py normalize && python3 tools/caudal/supers/build_s3.py"
+  ],
+  "fuente_propuesta": {
+    "slug": "uiaf-reportantes",
+    "nombre": "UIAF · Obligaciones de reporte ALA/CFT",
+    "sector": "financiero",
+    "via": 2,
+    "granularidad": "entidad",
+    "dificultad": "media",
+    "endpoint": "https://www.uiaf.gov.co/sector/{slug} (20 sectores reportantes) + /index.php/normativa-2 + /index.php/documentos-de-interes/otros-documentos-de-interes",
+    "metodo": "GET",
+    "nota": "IMPLEMENTADA ago-2026 vía harvest_uiaf.py. La UIAF define QUÉ hay que reportar y CUÁNDO: para un exchange, una fintech o una remesadora es la frontera de cumplimiento más cara que tienen. ⚠️ LA UIAF NO SANCIONA (es unidad de inteligencia financiera adscrita a MinHacienda; quien multa por incumplir es el supervisor de cada sector) → `tipo_acto` ∈ {resolucion, circular, otro}, NUNCA 'sancion', y `sancionado` va NULL a propósito: una norma general no tiene destinatario individual (ver `interaccion_sancionado_guion`). El NÚCLEO son las 20 páginas de sector reportante, que traen por sector la Resolución que impone la obligación, los ANEXOS TÉCNICOS de cada reporte (Anexo 1 - ROS · Anexo 2 - Reporte de Transacciones en Efectivo · clientes exonerados · operaciones cambiarias) y el CALENDARIO de reporte del año en curso; el listado se declara vivo ('cifras actualizadas al 5 de agosto de 2026'). El campo `descripcion` lleva a qué sector(es) aplica cada documento, que es el 'a quién le aplica' del cliente. `estado` lleva una NOTA LEGIBLE de dónde salió la fecha (ver `fechas_como_se_derivan`) porque es una advertencia que tiene que viajar con el dato, no quedarse en este archivo. Descartadas: Socrata (los 2 datasets de la UIAF en datos.gov.co son landings SIN columnas) y JSON:API (Drupal 10 lo tiene ABIERTO pero no sirve: no hay content type de norma y los nodos por norma son STUBS VACÍOS cuya única fecha es la migración del CMS en jun-2024 — usarlos fecharía en 2024 una resolución de 2021).",
+    "map": {
+      "sancionado": null,
+      "identificacion": null,
+      "tipo_acto": "tipo_acto",
+      "tipo_sancion": "rotulo",
+      "motivo": "motivo",
+      "monto": null,
+      "resolucion": "resolucion",
+      "fecha_firmeza": "fecha",
+      "estado": "nota_fecha",
+      "descripcion": "sectores_txt",
+      "url": "url",
+      "_id": "_id"
+    },
+    "tipo_acto_default": "resolucion"
+  },
+  "cosecha_medida_2026_08_08": {
+    "actos": 240,
+    "por_bloque": {
+      "sector-reportante": 200,
+      "compilacion-alacft": 32,
+      "tipologias": 8
+    },
+    "tipo_acto": {
+      "otro": 165,
+      "resolucion": 38,
+      "circular": 37
+    },
+    "rotulos": {
+      "Anexo técnico de reporte": 68,
+      "Utilidad de generación de reporte": 51,
+      "Resolución": 36,
+      "Circular": 35,
+      "Calendario de reporte": 22,
+      "Documento de tipologías": 8,
+      "Guía / manual": 4,
+      "Documento": 4,
+      "Ley": 3,
+      "Decreto": 3,
+      "Acuerdo": 2,
+      "Instrucción administrativa": 2,
+      "Norma técnica": 2
+    },
+    "sectores_reportantes": 19,
+    "documentos_por_sector": {
+      "Superintendencia Financiera de Colombia": 36,
+      "Superintendencia de Economía Solidaria": 34,
+      "Superintendencia de Sociedades": 20,
+      "DIAN": 16,
+      "Activos virtuales": 14,
+      "Ministerio del Deporte": 13,
+      "Superintendencia de Transporte": 11,
+      "Ministerio de Tecnologías de la Información y las Comunicaciones": 10,
+      "Superintendencia Nacional de Salud": 9,
+      "Real importadoras y exportadoras de Oro": 8,
+      "Coljuegos": 7,
+      "Superintendencia de Notariado y Registro": 5,
+      "Consejo Nacional de Juegos de Suerte y Azar": 4,
+      "Ministerio de Cultura": 4,
+      "Ley 2195 de 2022": 3,
+      "Superintendencia de Vigilancia y Seguridad Privada": 3,
+      "Consejo Nacional Electoral": 1,
+      "Alcaldia De Bogota": 1,
+      "Decreto 1497 de 2002": 1
+    },
+    "rango_fecha_real": "2002-01-01 .. 2026-01-01",
+    "sin_url": 0,
+    "_ids_unicos": "240 de 240",
+    "prueba_de_fuego": "PASA · Resolución 314 de 2021 (PSAV) presente, con su 'Por la cual se impone la obligación de reporte a la UIAF a las empresas y personas naturales que provean servicios de activos virtuales en Colombia' + los 3 anexos técnicos + calendarios de reporte 2024/2025/2026. También presentes la Resolución No. 010 de 2025 (SFC, fecha exacta 2025-01-13) y el 'Anexo 2 - Reporte de Transacciones en Efectivo', que son literalmente los dos reportes que pide el encargo.",
+    "dry_run_normalize": "Corrí los 240 actos por el normalize_row REAL del pilar (importando harvest_supers.py sin modificarlo) con el map propuesto: 100% de tipo_acto dentro de la whitelist, esquema idéntico a _schema_normalizado, 0 con `sancionado` no nulo, 0 sin `resolucion`, 0 sin `motivo`.",
+    "busqueda_simulada_sobre_blob_q": {
+      "activos virtuales": 15,
+      "transacciones en efectivo": 7,
+      "ros": 37,
+      "calendario": 22,
+      "notariado": 5,
+      "psav": 1,
+      "oro": 9,
+      "_nota_tildes": "mismo comportamiento ya documentado del pilar (el blob q va en minúsculas pero CON tildes); no lo introduce esta fuente."
+    },
+    "reparto_por_anio_fecha_real": {
+      "2002": 2,
+      "2003": 1,
+      "2006": 1,
+      "2007": 2,
+      "2008": 2,
+      "2009": 3,
+      "2011": 3,
+      "2012": 1,
+      "2013": 4,
+      "2015": 3,
+      "2016": 17,
+      "2017": 6,
+      "2018": 5,
+      "2019": 3,
+      "2020": 7,
+      "2021": 11,
+      "2022": 6,
+      "2024": 4,
+      "2025": 14,
+      "2026": 15
+    }
+  },
+  "fechas_como_se_derivan": {
+    "_por_que": "Ni las páginas de sector ni la compilación publican la fecha de expedición. Se deriva en cascada y CADA REGISTRO DECLARA su procedencia en `fecha_precision` (y en texto legible en `nota_fecha`, mapeado a `estado`).",
+    "dia": 10,
+    "anio": 100,
+    "carga": 83,
+    "sin_fecha": 47,
+    "ojo_carga": "'carga' es la carpeta de subida de Drupal en la ruta del archivo (/sites/default/files/2024-10/…). NO ES LA FECHA DE LA NORMA: sirve solo para poder ordenar los anexos técnicos, que no llevan fecha en ninguna parte. Si alguien hace una serie temporal sin filtrar por `fecha_precision`, verá un pico falso de 77 actos en 2024 que es la MIGRACIÓN DEL CMS de la UIAF, no actividad normativa. Por eso `stats` imprime los dos histogramas separados.",
+    "bug_corregido": "La primera versión miraba nombre y descripción a la vez y la descripción ganaba: fechaba la 'Resolución 212 de 2009' en 2007 (su descripción cita otra norma de 2007) y las circulares con radicado largo ('Circular 20180000000045') en 2011. Ahora el NOMBRE manda y hay una regla para el radicado largo (los 4 primeros dígitos son el año)."
+  },
+  "solapamiento_con_otras_fuentes_del_pilar": {
+    "_por_que_importa": "El bloque `compilacion-alacft` (/normativa-2) es una compilación del sistema ALA/CFT ENTERO, no actos de la UIAF: de las 83 normas que publica, solo 7 las expide la UIAF.",
+    "ya_excluidas_por_defecto": {
+      "Ley": 26,
+      "Decreto": 21,
+      "Conpes": 1,
+      "Sentencia": 1,
+      "Constitución": 1,
+      "_motivo": "viven en los pilares Congreso y Ejecutivo de Caudal, que las tienen con mejor metadato. `--con-leyes` las incluye si alguna vez se quiere el compendio completo."
+    },
+    "duplicado_real_medido": {
+      "acto": "Resolución 029 de 2020 (DIAN)",
+      "_id_uiaf": "uiaf-comp-…",
+      "prueba": "Está en raw/dian-normas.json como 'Resolución 000029 de 2020', fecha 2020-03-26. Es el ÚNICO duplicado exacto con una fuente ya implementada del pilar (verificado contra los 4.739 actos del raw de la DIAN).",
+      "sugerencia": "Al consolidar, dejar la de la DIAN (trae fecha exacta y PDF oficial) y descartar la copia de la UIAF, o dejar las dos si se prefiere no tocar nada: es 1 acto sobre 240."
+    },
+    "de_otras_entidades_sin_fuente_propia": [
+      "Coljuegos",
+      "Consejo Nacional de Juegos de Suerte y Azar",
+      "DIAN",
+      "MinTIC",
+      "Ministerio del Deporte (Coldeportes)",
+      "Superintendencia Nacional de Salud",
+      "Superintendencia de Economía Solidaria",
+      "Superintendencia de Notariado y Registro",
+      "Superintendencia de Sociedades",
+      "Superintendencia de Transporte",
+      "Superintendencia de Vigilancia y Seguridad Privada"
+    ],
+    "_nota": "Estas 14 no duplican nada HOY porque ninguna de esas entidades tiene fuente normativa en el pilar (supertransporte/supersalud/sic están como fuentes de SANCIONES, no de normatividad; supersociedades quedó descartada). Si algún día se agrega la normatividad de alguna, revisar el campo `emisor` de este bloque. El emisor se detecta del NOMBRE DEL ARCHIVO, que es la señal fuerte ('resolucion 2679 de 2016 mintic.pdf'), no del título: casi todos los textos mencionan a la UIAF porque es a quien se le reporta."
+  },
+  "interaccion_sancionado_guion": "OJO al consolidar: build_s3.py hace `sanc or '—'`, así que con sancionado NULL los 240 actos quedan con sancionado='—'. Es CORRECTO aquí (una norma general no tiene destinatario) y ya está manejado río abajo: el fix de ago-2026 en el motor de alertas (fuentes.entidad_de) trata '—' como marcador de ausencia y titula con el acto mismo. Misma situación de los 51.897 actos de ANLA y de los 4.739 de la DIAN. NO 'arreglarlo' inventando un sancionado — y ojo con el `or`: un guion es truthy, así que `sancionado or 'sin identificar'` NO lo atrapa.",
+  "tipologias_limite_declarado": {
+    "que_hay": "8 documentos públicos de tipologías y amenazas que la UIAF republica (recopilación de tipologías regionales GAFILAT 2010-2016, tipologías GAFI 2004-2005, red flag indicators de activos virtuales, informes de amenazas regionales, informes de seguimiento y recalificación de Colombia).",
+    "que_NO_hay": "El buscador de tipologías PROPIO de la UIAF está detrás de login (https://hub.uiaf.gov.co/login) y no es cosechable sin credenciales. Lo traído son las recopilaciones internacionales que la UIAF publica, no su catálogo propio. Se etiquetan `tipo_acto='otro'` con rótulo 'Documento de tipologías' y no se presentan como algo más de lo que son.",
+    "si_se_quiere_el_catalogo_propio": "Habría que pedirle a la UIAF una cuenta del hub (es gratuita para sujetos obligados) y validar si sus términos permiten indexar el contenido. Decisión de producto, no técnica."
+  },
+  "refresco": {
+    "costo": "22 peticiones (19 sectores + índice + compilación + tipologías), ~30 s. El índice de sectores, la compilación y las tipologías se re-bajan SIEMPRE; los sectores salen del caché salvo con --refetch.",
+    "cadencia_sugerida": "semanal, no 2x/día: la UIAF publica el calendario de reporte una vez al año y las resoluciones son escasas (10-15 por año). Meterlo al cron diario gastaría 22 peticiones para no encontrar nada casi nunca.",
+    "ojo": "El calendario de reporte del año siguiente aparece en diciembre (el de 2026 se cargó en 2025-12). Si se deja semanal, se coge solo."
+  },
+  "vias_probadas_y_descartadas": {
+    "via_1_socrata": "La UIAF tiene 2 datasets en datos.gov.co y los DOS son landings informativas con 0 columnas ('Conozca qué es la UIAF' · 'Conjuntos de Datos Obligatorios'). Cero normatividad.",
+    "jsonapi_drupal": "ABIERTO (https://www.uiaf.gov.co/jsonapi devuelve el índice de recursos) pero inútil para esto: los content types son genéricos (node--page, node--article) sin campos de norma, y los nodos por norma (/resolucion-314-de-2021, /circular-170-de-2002) son STUBS: solo el título y la fecha de migración del CMS (jun/jul-2024). Documentado por si alguien lo intenta creyendo que es la vía fácil.",
+    "2_1_3_normativa": "El ítem de Ley 1712 ('2.1.3 Normativa') trae 4 documentos administrativos (decretos de estructura y planta de personal). No es el registro sustantivo.",
+    "sitemap": "1.463 URLs; sirvió para descubrir /sector/* y /normativa-2, pero no es fuente por sí mismo."
+  }
+}

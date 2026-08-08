@@ -1,0 +1,152 @@
+{
+  "_doc": "ENTRADA PROPUESTA para fuentes.json — NO la agregué yo porque fuentes.json es archivo compartido del pilar y hay otras conversaciones trabajando fuentes en paralelo. Quien consolide: pegar el objeto `fuente_propuesta` dentro de `fuentes.fuentes` y borrar este archivo. El harvester (harvest_dian.py) y su raw (raw/dian-normas.json + raw/dian-cache/) ya están y son míos, exclusivos.",
+  "_generado": "2026-08-08",
+  "_como_correr": [
+    "python3 tools/caudal/supers/harvest_dian.py test      # valida API + prueba de fuego 000240/2025",
+    "python3 tools/caudal/supers/harvest_dian.py fetch     # ~75 peticiones, resumible, ~3 min",
+    "python3 tools/caudal/supers/harvest_dian.py stats     # actos por año y tipo",
+    "python3 tools/caudal/supers/harvest_supers.py normalize && python3 tools/caudal/supers/build_s3.py"
+  ],
+
+  "fuente_propuesta": {
+    "slug": "dian-normas",
+    "nombre": "DIAN · Resoluciones y Circulares",
+    "sector": "tributario",
+    "via": 2,
+    "granularidad": "entidad",
+    "dificultad": "media",
+    "endpoint": "https://www.dian.gov.co/normatividad/scripts/HNormativity?type=Norms&filter={listName,normType,includeAnnex,year}",
+    "metodo": "GET",
+    "nota": "IMPLEMENTADA ago-2026 via harvest_dian.py (vía 2: capa /scripts/ del portal SharePoint, GET sin auth ni token ni ViewState). Es el REGISTRO COMPLETO de resoluciones y circulares que expide la DIAN, el regulador fiscal de todo cliente con operación en Colombia. ⚠️ NO confundir con el pilar Ejecutivo: normativa.jsonl (Presidencia) tiene ~195 normas que MENCIONAN a la DIAN, pero son decretos de Presidencia, no los actos que la DIAN expide. `tipo_acto` viene POR FILA (resolucion | circular) porque la lista mezcla ambos. `sancionado` va NULL a propósito: una norma general no tiene destinatario individual — el titular útil es el acto mismo, que ya viaja en `resolucion`; ver la nota `interaccion_sancionado_guion` de este archivo. `motivo` lleva el 'Por la cual se...' (es lo que hace buscable el acto: la 000240 de 2025 se encuentra por 'criptoactivos'). `url` = PDF oficial. Cosecha por año contra /scripts/, no contra _api, por dos razones medidas: el campo Anio de la lista es Calculated (no filtrable) y la lista tiene 5.684 ítems (encima del list view threshold de 5.000). Resumible: un JSON por (tipo, año) en raw/dian-cache/; el año en curso se re-baja siempre, los cerrados salen del caché. Descartadas: Socrata (ningún dataset de normatividad — los 23 resultados de DIAN son estadísticos: importaciones/exportaciones, RUT, actividades económicas) y normograma.dian.gov.co (es COMPILACIÓN CURADA, ~22-40 resoluciones/año contra ~200 reales, y NO trae la 000240 de 2025). CONCEPTOS/doctrina NO están en esta fuente: viven en otro backend (type=Doctrine), ver `doctrina_pendiente`.",
+    "map": {
+      "sancionado": null,
+      "identificacion": null,
+      "tipo_acto": "tipo_acto",
+      "tipo_sancion": "tipo_norma",
+      "motivo": "descripcion",
+      "monto": null,
+      "resolucion": "titulo",
+      "fecha_firmeza": "fecha",
+      "estado": null,
+      "descripcion": null,
+      "url": "url",
+      "_id": "_id"
+    },
+    "tipo_acto_default": "resolucion"
+  },
+
+  "cosecha_medida_2026_08_08": {
+    "actos": 4739,
+    "resoluciones": 3343,
+    "circulares": 1396,
+    "rango_fechas": "1991-06-12 .. 2026-08-06",
+    "sin_fecha": 0,
+    "sin_pdf": 0,
+    "_ids_unicos": "4739 de 4739",
+    "prueba_de_fuego": "PASA · Resolución 000240 de 2025 · fecha 2025-12-24 · tipo resolucion · _id dian-resolucion-5997 · PDF https://www.dian.gov.co/normatividad/Normatividad/Resoluci%C3%B3n%20000240%20de%2024-12-2025.pdf · motivo 'Por la cual se adiciona el Capitulo 11 \"Intercambio de Información de Proveedores de Servicios Criptoactivos\"...' — que es exactamente el acto que aparece como ADVERSARIAL en la matriz regulatoria de Binance.",
+    "dry_run_normalize": "Corrí los 4.739 actos por el normalize_row REAL del pilar con el map propuesto: 3.343 resolucion + 1.396 circular, 0 sin fecha_firmeza, 0 sin url, 0 sin motivo.",
+    "busqueda_simulada_sobre_blob_q": {
+      "criptoactivos": 1,
+      "información exógena": 9,
+      "facturación electrónica": 2,
+      "grandes contribuyentes": 29,
+      "precios de transferencia": 21,
+      "_nota_tildes": "'exogena' sin tilde da 0 y 'información exógena' da 9: el blob q se construye en minúsculas pero CON tildes. NO es algo que introduzca esta fuente — es el comportamiento ya documentado del pilar (misma nota que ANLA en CLAUDE.md: comparar los dos lados plegados con empresas._n). Lo dejo anotado por si al cablear el diccionario de empresas alguien busca por término sin tilde."
+    },
+    "reparto_por_anio": "Las resoluciones se disparan desde 2016 (114 → ~200-400/año; máximos 2019 con 395 y 2024 con 324) mientras las circulares caen (80/año a comienzos de los 2000 → ~30 hoy). 2026 va en 100 resoluciones al 6 de agosto. Los años 1991-2000 traen poquísimo (1-14/año): el registro digital arranca de verdad en 2001."
+  },
+
+  "interaccion_sancionado_guion": "OJO al consolidar: build_s3.py hace `sanc or '—'`, así que con sancionado NULL todos los actos de la DIAN quedan con sancionado='—'. Eso es CORRECTO aquí (una resolución general no tiene destinatario) y ya está manejado río abajo: el fix de ago-2026 en el motor de alertas (fuentes.entidad_de) trata '—' como marcador de ausencia y titula con el acto mismo. Es la misma situación de los 51.897 actos de ANLA sin destinatario. No 'arreglarlo' inventando un sancionado.",
+
+  "fuente_propuesta_doctrina": {
+    "slug": "dian-doctrina",
+    "nombre": "DIAN · Conceptos y Oficios (doctrina)",
+    "sector": "tributario",
+    "via": 2,
+    "granularidad": "entidad",
+    "dificultad": "media",
+    "endpoint": "https://www.dian.gov.co/normatividad/scripts/HNormativity?type=Doctrine&<JSON crudo url-encoded>",
+    "metodo": "GET",
+    "nota": "IMPLEMENTADA ago-2026 via `harvest_dian.py doctrina` (vía 2). Es la DOCTRINA de la DIAN: conceptos y oficios. En materia tributaria el concepto es lo que fija la interpretación oficial, así que para un cliente pesa tanto como la resolución. ⚠️⚠️ COBERTURA 1993-2019 Y SE ACABA AHÍ — la doctrina posterior a 2019 NO está en este endpoint (medido, ver `rango_medido`). Es archivo histórico de interpretación, NO doctrina vigente: no venderlo como 'la doctrina al día'. `tipo_acto` va a 'otro' porque el pilar no tiene clase 'concepto' (ver `mejora_tipo_acto_concepto`); el rótulo real ('Concepto' u 'Oficio') viaja en tipo_sancion. NO hay PDF: el campo `link` viene vacío en todas las filas y el documento ES la ficha HTML DetalleDoctrina.aspx?DianId={id}, que además trae banco y descriptores (que el buscador devuelve en null). `motivo` lleva la interpretación jurídica recortada a 3.000 chars para que el raw no crezca a cientos de MB; el texto íntegro queda siempre a un clic en `url`.",
+    "map": {
+      "sancionado": null,
+      "identificacion": null,
+      "tipo_acto": "tipo_acto",
+      "tipo_sancion": "tipo_norma",
+      "motivo": "descripcion",
+      "monto": null,
+      "resolucion": "titulo",
+      "fecha_firmeza": "fecha",
+      "estado": null,
+      "descripcion": "fuentes_formales",
+      "url": "url",
+      "_id": "_id"
+    },
+    "tipo_acto_default": "otro"
+  },
+
+  "doctrina_como_se_resolvio": {
+    "contrato": "⚠️ El JSON va PEGADO como fragmento de query string, NO como filter=... (normativity.executeSearch en dian.min.js hace `i+\"&\"+JSON.stringify(n)`). Forma: {\"descriptor\":\"\",\"conceptNumber\":\"\",\"textInside\":\"\"} + dateRangeStart/dateRangeEnd opcionales.",
+    "estrategia": "Barrido de `conceptNumber` de 2 dígitos ('00'..'99'), dedup por id. Es un conjunto CUBRIDOR porque conceptNumber es CONTAINS (no prefijo): '241' trae 016241, 022410, 024107, 84241 — así que todo número de >=2 dígitos cae en algún par. Los prefijos que se caen se rescatan partiendo por año (2001-2019).",
+    "medido": [
+      "NO hay tope de resultados: conceptNumber='77' devuelve 287 filas / 1,96 MB sin recorte. El costo es el payload (~6,8 KB por fila por la interpretación), no un TOP N.",
+      "`descriptor` DEBE ir como STRING PELADO. El bundle manda un array (es un multi-select) y el servidor revienta con array en 6 de 6 pruebas. No es volumen: descriptores de 1 sola fila fallan igual y en el mismo tiempo. Con string funciona y es match exacto por id (probado 1, 5, 1778, 2475, 3535).",
+      "Algunos prefijos ('24', '9') devuelven HTML de error en menos de 1 s — demasiado rápido para ser timeout; parece una fila que rompe la serialización, no un límite. Se rescatan por año: '24' cae, pero '24'+2001 devuelve 32 filas.",
+      "type=Descriptors: la firma es `?type=Descriptors&[\"1\",\"2\",...]` (array de ids de banco como fragmento crudo). Los 42 bancos de una vez devuelven 3.836 descriptores en 1,5 s.",
+      "type=DataBanks devuelve 42 bancos, no ~30 como creí al principio.",
+      "/usr/bin/curl NECESITA `-g` (--globoff) con estas URLs: los corchetes del JSON lo hacen abortar con 'bad range specification' antes de salir a la red."
+    ],
+    "rango_medido": "1993-2019 sobre el barrido COMPLETO de 8.249 conceptos. ⚠️ CORRECCIÓN IMPORTANTE: el muestreo previo decía 2001-2019 y era FALSO — hay 17 documentos entre 1993 y 2000 (el más viejo, OFICIO 031761 del 7-dic-1993) que solo aparecen al barrer todo. Lección: no fijar el rango de una fuente por muestreo de prefijos; el muestreo subestimó la cola. El techo de 2019 sí se confirmó por las dos vías (prefijos independientes y rangos de fecha hacia afuera). El grueso está en 2001-2019, con pico en 2001 (1.067) y 2015 (747), y un valle real en 2009-2010.",
+    "el_piso_del_rango_no_es_cosmetico": "DOC_ANIO_MIN se usa para partir por año los prefijos que se caen. Con el piso mal puesto en 2001, los 8 prefijos que necesitaron partición (45,47,48,54,73,76,81,91) se habrían cosechado solo desde 2001 y cualquier concepto pre-2001 suyo se habría perdido EN SILENCIO. Detectado y corregido: piso a 1993 y esos 8 prefijos re-cosechados.",
+    "campo_year_no_es_de_fiar": "MEDIDO: en 21 de 8.249 filas el campo `year` de la fuente contradice su propio issueDate, incluida una con year=1029 (typo real, fecha buena 2019-07-11). El harvester deriva `anio` de la fecha validada y solo cae a `year` si no hay fecha. Mismo patrón que el año 3022 de la Superfinanciera: estos portales traen typos de año y hay que descartarlos, no propagarlos.",
+    "post_2019_no_hay": "Busqué dónde vive la doctrina reciente: /normatividad/Publicaciones-Juridicas/Paginas/{DoctriFlash,Boletin-Actualidad-Juridica-DIAN}.aspx responden 200 pero son páginas estáticas de acordeón (publicaciones), sin normFilter ni listName ni endpoint consultable. No hay API limpia para 2020-2026. Queda como hueco declarado.",
+    "descriptores_como_complemento": "Los 3.836 descriptores permitirían etiquetar cada concepto con banco+descriptor (1 petición por descriptor, ~2,1 h a 2 s, 1-5 filas cada una). NO lo implementé: no es necesario para cosechar el corpus y el barrido ya lo cubre. Sirve si algún día se quiere clasificación temática. Ojo: no está medido cuántos documentos quedan SIN descriptor asignado, así que enumerar por descriptor como vía primaria tendría un hueco que no se puede cerrar."
+  },
+
+  "cosecha_doctrina_medida_2026_08_08": {
+    "conceptos": 8250,
+    "reparto": "Concepto 4.254 · Oficio 3.996",
+    "rango_fechas": "1993-12-07 .. 2019-09-06",
+    "pre_2001": 18,
+    "sin_fecha": 0,
+    "sin_url": 0,
+    "sin_motivo": 5,
+    "_ids_unicos": "8250 de 8250",
+    "anios_incoherentes_tras_fix": 0,
+    "html_residual": 0,
+    "barrido": "100/100 prefijos, CERO perdidos. 8 prefijos (45,47,48,54,73,76,81,91) se cayeron y se rescataron partiendo por año, 27/27 años cada uno. Duración ~48 min a 2 s por petición.",
+    "dry_run_normalize": "Los 8.250 pasan por el normalize_row REAL del pilar con el map propuesto: 0 sin fecha_firmeza, 0 sin url, 5 sin motivo.",
+    "busqueda_simulada": {"zona franca": 280, "criptoactivos": 4, "precios de transferencia": 61, "retención en la fuente": 1195, "establecimiento permanente": 44},
+    "nota_criptoactivos": "'criptoactivos' devuelve 1 resolución (la 000240 de 2025) Y 4 conceptos. Es la demostración de por qué la doctrina hace falta al lado de la norma: el cliente ve la regla y además cómo la DIAN la venía interpretando."
+  },
+
+  "doctrina_decisiones_de_texto": {
+    "html_de_sharepoint": "MEDIDO: el 28% de las filas trae HTML crudo pegado en legalInterpretation ('<div class=\"ExternalClass...\">'). Sin limpiarlo se le muestra marcado al cliente y ensucia el blob de búsqueda. `_limpiar_html` quita tags y desescapa entidades; se aplica en fila_doc Y retroactivamente en consolidar_doctrina, para no tener que re-barrer las ~100 peticiones cuando se detectó. Es idempotente.",
+    "recorte_3000_chars": "La interpretación se recorta a DOC_INTERP_MAX=3.000 chars (75% de los conceptos la superan). Razón: build_s3 mete el `motivo` COMPLETO al blob de búsqueda `q` y solo trunca a 280 para mostrar — o sea que el texto íntegro engordaría sanciones.jsonl en decenas de MB (hoy pesa 71 MB con 61k actos). Se eligió 3.000 porque el ENCABEZADO del concepto es lo que sirve para buscar: arranca con 'Tema:' y 'Descriptor:', que son la clasificación; la cola es razonamiento y citas. El texto íntegro queda siempre a un clic en `url`. Si algún día se quiere recall total, subir la constante y medir el peso resultante del consolidado."
+  },
+
+  "mejora_tipo_acto_concepto": "Los conceptos entran como tipo_acto='otro' porque los _tipos_acto viven en fuentes.json y la whitelist en build_s3.py (~línea 95), ambos compartidos y fuera de mi alcance en esta tanda. Si se quiere que el cliente pueda filtrar 'solo doctrina', agregar 'concepto' a las dos listas y cambiar tipo_acto_default de la fuente dian-doctrina. Es un cambio de 3 líneas pero toca archivos de otros frentes: dejarlo para quien consolide.",
+
+  "otros_registros_disponibles": {
+    "_doc": "Listas SharePoint del subsitio /normatividad, legibles anónimas con _api (ItemCount medido ago-2026). No las cosecho: quedan registradas para quien quiera ampliar el pilar.",
+    "Resoluciones de Clasificación Arancelaria": 9990,
+    "Proyectos de normas": 972,
+    "Autos": 1128,
+    "TIM": 205,
+    "Decretos": 16,
+    "_comentario": "'Proyectos de normas' (972) es el más goloso para inteligencia regulatoria: son normas EN BORRADOR, o sea alerta temprana antes de que el acto exista. 'Resoluciones de Clasificación Arancelaria' (9.990) es enorme pero muy técnico (clasificación por producto), útil para importadores/exportadores. Fuera del alcance de esta tanda a propósito, para no diluir la fuente principal.",
+    "listas_root_dian": {
+      "_doc": "En la web RAÍZ (www.dian.gov.co/_api) hay además dos registros sancionatorios propios de la DIAN, que sí encajarían como tipo_acto='sancion' y con `sancionado` real:",
+      "Contadores Sancionados DIAN": 135,
+      "Proveedores Ficticios": 125
+    }
+  },
+
+  "vias_probadas_y_descartadas": [
+    {"via": 1, "que": "Socrata datos.gov.co", "resultado": "DESCARTADA", "detalle": "catalog/v1?q=DIAN da 23 datasets, TODOS estadísticos (importaciones/exportaciones federadas, RUT/régimen especial, actividades económicas, matriculados). Búsquedas 'resoluciones DIAN', 'conceptos DIAN', 'normatividad tributaria' no devuelven ningún registro de normatividad. La DIAN no publica sus actos en Socrata."},
+    {"via": 2, "que": "SharePoint _api/search/query (patrón Supersalud)", "resultado": "ROTO del lado del servidor", "detalle": "/_api/web/title responde 200 anónimo, pero /_api/search/query da 500: 'La propiedad SafeQueryPropertiesTemplateUrl no es una dirección URL válida'. Es una mala configuración de su tenant, no nuestra. No perder tiempo ahí."},
+    {"via": 2, "que": "SharePoint _api/web/lists (lista Normas)", "resultado": "SIRVE PERO PEOR", "detalle": "Legible anónima y con campos limpios (Title, NumeroNorma, FechaDeEmision, Descripcion, TipoDeNorma). Dos problemas: el campo Anio es Calculated y no se puede filtrar (SPException), y la lista tiene 5.684 ítems, encima del list view threshold de 5.000. Además NO trae el enlace al PDF (no hay columna Attachments). El endpoint /scripts/ ya viene partido por año y sí trae el link: por eso se eligió ese."},
+    {"via": 2, "que": "normograma.dian.gov.co (Compilación Jurídica DIAN)", "resultado": "DESCARTADA como primaria", "detalle": "Fácil de cosechar (árbol de partes estáticas: openClosePanelArbolOpcion carga {pagina}_parte_{NN}.html; t_1_normativa_tributaria_parte_07.html lista 648 resoluciones 1996-2026 con links docs/resolucion_dian_{num}_{anio}.htm). Pero es una COMPILACIÓN CURADA: ~22-40 resoluciones por año contra las ~200 reales, y su 2025 salta de la 0227 sin incluir la 000240. Sirve como fuente de TEXTO en HTML (no PDF escaneado) si algún día se quiere articulado, pero no como registro."},
+    {"via": 3, "que": "PDF + DeepSeek", "resultado": "NO HIZO FALTA", "detalle": "La vía 2 ya entrega metadata estructurada y rica (título + fecha + 'Por la cual se...' completo + PDF). El LLM solo haría falta para el ARTICULADO, y ahí hay un obstáculo medido: los PDF son MIXTOS — muestreados 4 de 2025, uno de 21 páginas (la 000240) y otro de 4 salieron ESCANEADOS con 0 caracteres extraíbles, mientras que otros dos dieron 4.064 y 5.529 caracteres nativos. Igual que las actas de Cámara: detectar por CONTENIDO documento a documento, nunca por año."}
+  ]
+}

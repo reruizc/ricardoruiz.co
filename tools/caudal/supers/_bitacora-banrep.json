@@ -1,0 +1,151 @@
+{
+  "_doc": "ENTRADA PROPUESTA para fuentes.json — NO la agregué yo porque fuentes.json es archivo compartido del pilar y hay tres conversaciones más trabajando otras fuentes en paralelo. Quien consolide: pegar el objeto `fuente_propuesta` dentro de `fuentes.fuentes` y borrar este archivo. El harvester (harvest_banrep.py) y su raw (raw/banrep-normatividad.json + raw/banrep-pages/ + raw/banrep-compendio*.html) ya están y son míos, exclusivos.",
+  "_generado": "2026-08-08",
+  "_como_correr": [
+    "python3 tools/caudal/supers/harvest_banrep.py test           # WAF + parseo + prueba de fuego DCIP-83",
+    "python3 tools/caudal/supers/harvest_banrep.py fetch          # incremental, ~1 min, 5 peticiones",
+    "python3 tools/caudal/supers/harvest_banrep.py fetch --full   # 606 páginas, ~55 min con 3 obreros",
+    "python3 tools/caudal/supers/harvest_banrep.py build",
+    "python3 tools/caudal/supers/harvest_supers.py normalize && python3 tools/caudal/supers/build_s3.py"
+  ],
+  "fuente_propuesta": {
+    "slug": "banrep-normatividad",
+    "nombre": "Banco de la República · Junta Directiva y régimen cambiario",
+    "sector": "financiero",
+    "via": 2,
+    "granularidad": "entidad",
+    "dificultad": "media",
+    "endpoint": "https://www.banrep.gov.co/es/normatividad?page=N (vista Drupal paginada, 606 páginas) + /es/regulacion-operaciones-cambiarias-dcip-83 (compendio vigente) + /es/normatividad/regulacion-operaciones-cambiarias/compendios-dcin-83-dcip-83",
+    "metodo": "GET",
+    "nota": "IMPLEMENTADA ago-2026 vía harvest_banrep.py. Es la otra cara de la UIAF para cualquier cliente que mueva plata: la UIAF define qué hay que reportar, el BanRep define qué se puede HACER con divisas. ⚠️ EL BANREP NO SANCIONA (no es superintendencia; su acto es normativo) → `tipo_acto` ∈ {resolucion, circular, otro}, NUNCA 'sancion', y `sancionado` va NULL a propósito (ver `interaccion_sancionado_guion`). La vista de novedades es una TABLA con columnas limpias (tipo · número · asunto · <time datetime> · PDF) → cero heurística de fechas: 0 registros sin fecha y 0 sin PDF sobre 3.666. ⚠️⚠️ El bloque cambiario NO sale de esa vista: ahí solo están los boletines que MODIFICAN el régimen, no el texto consolidado; el compendio vigente se trae aparte (ver `dcin83_vs_dcip83`, que es el hallazgo que más importa de esta fuente). WAF: el sitio está detrás de Radware/ShieldSquare y exige el juego COMPLETO de headers de navegador — con User-Agent solo, no pasa.",
+    "map": {
+      "sancionado": null,
+      "identificacion": null,
+      "tipo_acto": "tipo_acto",
+      "tipo_sancion": "rotulo",
+      "motivo": "motivo",
+      "monto": null,
+      "resolucion": "resolucion",
+      "fecha_firmeza": "fecha",
+      "estado": null,
+      "descripcion": null,
+      "url": "url",
+      "_id": "_id"
+    },
+    "tipo_acto_default": "resolucion"
+  },
+  "dcin83_vs_dcip83": {
+    "_titular": "LA DCIN-83 YA NO ES LA CIRCULAR VIGENTE DEL RÉGIMEN DE CAMBIOS. La vigente es la Circular Reglamentaria DCIP-83 (2023).",
+    "por_que_importa": "La DCIN-83 es la referencia que todo el mundo cita de memoria (y la que pedía el encargo). Entregarle esa a un cliente de comercio exterior o a una remesadora sería entregarle el régimen derogado.",
+    "prueba": "La propia página de compendios del banco lista TRES compendios como históricos —DCIN-83 vigente hasta el 24-may-2018 · DCIN-83 vigente hasta el 31-ago-2021 · DCIP-83 vigente hasta el 31-oct-2023— y enlaza aparte el 'Compendio actualizado', que redirige a /es/regulacion-operaciones-cambiarias-dcip-83, titulado 'Compendio actualizado de la Circular Reglamentaria DCIP-83 (2023)'. La página vieja /es/circular-reglamentaria-externa-dcin-83 sigue en línea y su título es 'Boletín 18 del 25 de abril de 2019': quien llegue ahí por buscador se lleva la versión de 2019.",
+    "como_queda_en_el_dato": "28 registros con bloque='cambiario-vigente' y vigente=True (el compendio DCIP-83 despiezado) + 3 con bloque='cambiario-historico' y vigente=False (los compendios derogados, que se conservan porque sirven para saber qué regía en una fecha pasada).",
+    "las_28_piezas": "El compendio no se publica como un PDF único sino despiezado: 12 capítulos (declaraciones de cambio · operaciones con el BanRep · importaciones · exportaciones · endeudamiento externo · avales y garantías · inversiones internacionales · cuentas de compensación · zonas francas · generalidades del mercado cambiario · hidrocarburos y minería · formularios) + 12 formularios y reportes periódicos (Ipext · DSIF · préstamos de IMC a no residentes · avales · proveedores de servicios de pago agregadores · pagos de exportación de servicios · remesas de trabajadores mensual y trimestral · concesionarios de correos …) + 4 anexos (numerales cambiarios · transmisión electrónica · Sistema de Información Cambiaria · fechas de registro). Se emiten como 28 registros y no como uno: el cliente busca 'cuentas de compensación', no 'DCIP-83'.",
+    "fecha_asignada": "2023-11-01 para las 28 piezas del vigente, porque el compendio anterior estuvo vigente hasta el 31-oct-2023. Es la fecha de entrada en vigor del compendio, no la de cada capítulo (que el banco no publica por separado)."
+  },
+  "cosecha_medida_2026_08_08": {
+    "actos": 3666,
+    "por_bloque": {
+      "novedades": 3635,
+      "cambiario-vigente": 28,
+      "cambiario-historico": 3
+    },
+    "tipo_acto": {
+      "circular": 2320,
+      "resolucion": 1242,
+      "otro": 104
+    },
+    "rotulos": {
+      "Circular Reglamentaria Externa": 1276,
+      "Circular Externa": 713,
+      "Resolución": 712,
+      "Resolución Externa": 530,
+      "Carta Circular Externa": 300,
+      "Proyecto de regulación": 103,
+      "Circular Reglamentaria DCIP-83 (régimen cambiario vigente)": 28,
+      "Compendio cambiario derogado": 3,
+      "Derogación": 1
+    },
+    "rango_fechas": "1986-12-31 .. 2026-08-06",
+    "sin_fecha": 0,
+    "sin_pdf": 0,
+    "_ids_unicos": "3666 de 3666",
+    "prueba_de_fuego": "PASA · el compendio VIGENTE es DCIP-83 y trae sus 28 piezas; los 3 compendios DCIN-83/DCIP-83 derogados quedan marcados vigente=False con su fecha de corte.",
+    "dry_run_normalize": "Corrí los 3666 actos por el normalize_row REAL del pilar (importando harvest_supers.py sin modificarlo) con el map propuesto: 100% dentro de la whitelist de tipo_acto, esquema idéntico a _schema_normalizado, 0 con tipo_acto='sancion', 0 con `sancionado` no nulo, 0 sin fecha, 0 sin url, 0 sin `resolucion`.",
+    "busqueda_simulada_sobre_blob_q": {
+      "dcip-83": 52,
+      "dcin-83": 118,
+      "endeudamiento externo": 29,
+      "declaraciones de cambio": 7,
+      "encaje": 55,
+      "resolución externa": 531,
+      "cuentas de compensación": 1,
+      "zonas francas": 1,
+      "_nota": "'cuentas de compensación' y 'zonas francas' dan 1 porque el capítulo del compendio es el único documento que se llama así; los boletines que los modifican usan la sigla de la circular en el asunto, no el nombre del tema. Es esperado, no un fallo del parseo."
+    },
+    "reparto_por_anio": {
+      "1986": 1,
+      "1987": 1,
+      "1988": 1,
+      "1989": 1,
+      "1990": 1,
+      "1991": 15,
+      "1992": 36,
+      "1993": 26,
+      "1994": 39,
+      "1995": 34,
+      "1996": 45,
+      "1997": 36,
+      "1998": 45,
+      "1999": 54,
+      "2000": 45,
+      "2001": 46,
+      "2002": 51,
+      "2003": 61,
+      "2004": 53,
+      "2005": 63,
+      "2006": 66,
+      "2007": 120,
+      "2008": 151,
+      "2009": 120,
+      "2010": 120,
+      "2011": 150,
+      "2012": 120,
+      "2013": 124,
+      "2014": 153,
+      "2015": 208,
+      "2016": 164,
+      "2017": 198,
+      "2018": 143,
+      "2019": 155,
+      "2020": 269,
+      "2021": 149,
+      "2022": 131,
+      "2023": 151,
+      "2024": 108,
+      "2025": 139,
+      "2026": 73
+    }
+  },
+  "ojo_1986_1990": "Los años 1986-1990 traen UN registro por año ('Resoluciones de la Junta Monetaria de 1988'): son compilaciones anuales de la Junta Monetaria (el órgano anterior a la Junta Directiva del BanRep, creada por la Constitución de 1991), no actos sueltos. NO leer ese tramo como 'casi no hubo actividad regulatoria'. El registro acto por acto arranca en 1991 (15 actos) y se estabiliza sobre 40-60/año en los 90 y 120-200/año desde 2007.",
+  "interaccion_sancionado_guion": "OJO al consolidar: build_s3.py hace `sanc or '—'`, así que con sancionado NULL los 3.666 actos quedan con sancionado='—'. Es CORRECTO aquí y ya está manejado río abajo: el fix de ago-2026 en el motor de alertas (fuentes.entidad_de) trata '—' como marcador de ausencia y titula con el acto mismo. Misma situación de los 51.897 actos de ANLA y los 4.739 de la DIAN. NO inventar un destinatario: hay Cartas Circulares que NOMBRAN una entidad en el asunto ('Nuevo Participante CENIT – TUYA S.A'), pero esa entidad no es la destinataria del acto sino su objeto, y meterla en `sancionado` la haría aparecer como sancionada. Y ojo con el `or`: un guion es truthy, así que `sancionado or 'sin identificar'` NO lo atrapa.",
+  "waf": {
+    "que_es": "Radware Bot Manager / ShieldSquare (dominio validate.perfdrive.com).",
+    "sintoma": "curl —incluso con User-Agent de Chrome— recibe un 302 a validate.perfdrive.com con un cuerpo de ~16 KB. NO es un bloqueo por volumen: pasa desde la primera petición.",
+    "solucion": "El juego COMPLETO de headers de navegador (Accept · Accept-Language · sec-ch-ua · sec-ch-ua-mobile · sec-ch-ua-platform · Sec-Fetch-Dest/Mode/Site/User · Upgrade-Insecure-Requests). Está en la constante HEADERS del harvester; recortarla lo rompe. `curl()` detecta el bloqueo explícitamente y reintenta con backoff en vez de guardar la página del WAF como si fuera dato.",
+    "ritmo_medido": "606 páginas con 3 obreros = ~55 min (≈11 páginas/min) sin un solo bloqueo. No subir los obreros sin volver a medir."
+  },
+  "refresco": {
+    "incremental": "`fetch` sin --full: 1 min, 5 peticiones. La vista va en orden DESC, así que recorre desde la página 0 y PARA en la primera página cuyos items YA estén todos conocidos (si una página entera es conocida, lo que sigue también). Medido: con el caché al día para en la página 1 y reporta 0 actos nuevos. El bloque cambiario se re-baja siempre (son 2 peticiones).",
+    "cadencia_sugerida": "diaria. El banco publica ~6 actos por semana y el incremental cuesta 1 minuto; encaja en run_diario.sh sin discusión. Ojo: es OTRO host que leyes.senado, así que no compite con el rastreo de radicados.",
+    "cuando_re_bajar_todo": "solo si cambia el marcado de la tabla (el `test` lo detecta: falla si no parsea filas)."
+  },
+  "vias_probadas_y_descartadas": {
+    "via_1_socrata": "El BanRep publica 5 datasets en datos.gov.co y son TODOS indicadores estadísticos (DTF · UVR · IBR · IPVU) más una landing de 'Conjuntos de Datos Obligatorios'. Cero normatividad. Buscar 'régimen cambiario' en el catálogo de datos.gov.co da 0 resultados. Ojo: los datasets 'Encaje' e 'Inversiones Obligatorias' MENCIONAN resoluciones externas del BanRep en su descripción pero los publica la Superfinanciera y son series de cifras, no normas.",
+    "buscador_de_la_vista": "El campo `modal_search_term` del formulario es un modal decorativo: pasado como parámetro GET se IGNORA y devuelve siempre la primera página. Medido con 'DCIN-83' y con 'DCIN' (respuestas idénticas a ?page=0). Por eso la cosecha pagina en vez de buscar.",
+    "jsonapi_y_sitemap": "/jsonapi y /sitemap.xml dan 404 (a diferencia de la UIAF, que sí expone JSON:API abierto)."
+  },
+  "pendientes_menores": [
+    "2 de las 28 piezas del compendio DCIP-83 no exponen PDF directo en la página índice (son las que ofrecen 'Reporte para diligenciar' + 'Instructivo' como dos enlaces separados); para esas el campo `url` cae al nodo de su capítulo, que sí lleva a los dos archivos. No hay pérdida de información, pero si se quiere el PDF directo habría que abrir esos 2 nodos.",
+    "El régimen cambiario de fondo son las RESOLUCIONES EXTERNAS de la Junta Directiva (la Resolución Externa 1 de 2018 es la marco); están dentro del bloque 'novedades' con rótulo 'Resolución Externa' (530 registros), pero el banco no publica un COMPENDIO consolidado de esas resoluciones como sí lo hace con la circular reglamentaria. Si se quisiera el texto vigente consolidado de la RE 1/2018, habría que reconstruirlo de sus modificaciones o buscarlo en SUIN-Juriscol."
+  ]
+}

@@ -133,6 +133,22 @@ def normalize_all():
         if not raw.exists():
             continue
         rows = json.loads(raw.read_text(encoding='utf-8'))
+        # Un raw puede venir como lista plana o como sobre con metadatos
+        # (`{_fuente, _generado, registros:[...]}`, que es lo que emite
+        # supersociedades). Sin esto el consolidado revienta con un
+        # AttributeError opaco —'str' object has no attribute 'get'— al iterar
+        # las CLAVES del dict en vez de sus filas. Se acepta cualquiera de los
+        # dos envoltorios y se falla claro si no hay ninguno.
+        if isinstance(rows, dict):
+            for k in ('registros', 'items', 'rows', 'data'):
+                if isinstance(rows.get(k), list):
+                    rows = rows[k]
+                    break
+            else:
+                raise SystemExit(
+                    f"{f['slug']}: raw es un dict sin lista de filas reconocible "
+                    f"(claves: {list(rows)[:8]}). Emite una lista o una clave "
+                    f"'registros'.")
         if f.get('granularidad') == 'agregado' or not f.get('map'):
             per_fuente[f['slug']] = {'filas': len(rows), 'granularidad': f.get('granularidad'),
                                      'nota': 'agregado / sin mapeo — no entra al consolidado por entidad'}

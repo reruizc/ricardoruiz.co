@@ -139,12 +139,14 @@ def archivos(leg=None):
         # vigila es que la corrida diaria llegue a publicar, no que cada fuente
         # traiga novedades.
         dict(bucket=BUCKET_PRIV, key='metadata/sanciones.jsonl', clase='diario',
-             min_bytes=18_000_000,
-             productor='run_diario.sh · harvest_anla.py + harvest_supers.py normalize + build_s3.py',
+             min_bytes=60_000_000,
+             productor='run_diario.sh · harvest_{anla,banrep,dian,uiaf,supersociedades}.py + harvest_supers.py normalize + build_s3.py',
              consumidor='acción `sanciones` · pilar Regulatorio · radar del cliente',
-             nota='min_bytes 18 MB sobre 42,5 MB reales. El valor viejo (2 MB) era del pilar '
-                  'PRE-ANLA y se volvió inservible al entrar 54k actos: un consolidado sin '
-                  'ANLA pesa ~2,5 MB y habría pasado el chequeo. La red fina del contenido la '
+             nota='min_bytes 60 MB sobre 83,2 MB reales (ago-2026, con las 6 fuentes '
+                  'normativas: DIAN normas y doctrina, SIC circulares, Supersociedades, '
+                  'UIAF y BanRep). Antes eran 18 MB sobre 42,5 MB, y antes 2 MB del pilar '
+                  'PRE-ANLA — este umbral hay que subirlo CADA VEZ que entra una fuente '
+                  'grande, si no deja de discriminar. La red fina del contenido la '
                   'pone verificar_consolidado.py (piso por fuente) antes de subir; esto es el '
                   'guardarraíl contra la subida truncada.'),
         dict(bucket=BUCKET_PRIV, key='metadata/sanciones-stats.json', clase='diario',

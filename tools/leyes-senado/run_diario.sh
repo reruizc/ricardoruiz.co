@@ -10,7 +10,6 @@
 #   camara_radicados          harvest_camara.py           lo mismo del lado Cámara
 #   camara_upload             build_diario_camara_s3.py   resuelve y baja gacetas nuevas
 #   en_vivo                   leyes_en_vivo.py            feed "En vivo" de legislativo.html
-#   ritmo                     build_ritmo.py              monitor de ritmo de radicación
 #   ordenes_camara            harvest_ordenes.py          órdenes del día: 14 comisiones + plenaria
 #   ordenes_senado_indice     harvest_ordenes_senado.py   refresca el índice DOCman + plenaria
 #   ordenes_senado_comisiones   ídem `buenas`             Cuarta/Quinta/Sexta
@@ -23,6 +22,7 @@
 #   dataset_build             build_dataset.py            histórico + legislatura viva
 #   texto_index               build_texto_index.py        articulado buscable (incl. lo vivo)
 #   dataset_upload_*          aws s3 cp                   dist/ → metadata/
+#   ritmo                     build_ritmo.py              monitor de ritmo (lee dist, va tras el dataset)
 #   anla_fetch/build          harvest_anla.py             Gaceta Ambiental (pilar Regulatorio)
 #   supers_consolida          harvest_supers.py normalize las 12 fuentes del pilar en un dataset
 #   supers_build_s3           build_s3.py                 el slim que lee la Lambda
@@ -129,11 +129,8 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
         --desc "feed 'En vivo' de legislativo.html" \
         -- python3 tools/leyes-senado/leyes_en_vivo.py --upload
 
-  # ── monitor de ritmo (2026 vs 2022 vs 2018) ──
-  # Después del feed: así ya se refrescó el manifiesto de radicados del día.
-  etapa --nombre ritmo --timeout 1200 \
-        --desc "monitor de ritmo de radicación" \
-        -- python3 tools/leyes-senado/build_ritmo.py --upload
+  # (el monitor de ritmo bajó a después de dataset_build: desde ago-2026 lee el
+  #  dataset, no la Lambda, así que necesita el dist del día — ver allá abajo)
 
   # ── órdenes del día · Cámara (wp-json, incremental) ──
   etapa --nombre ordenes_camara --timeout 3000 \
@@ -313,9 +310,21 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
                "s3://caudal-legislativo/metadata/$f" \
                --cache-control "private, max-age=300"
     done
+
+    # ── monitor de ritmo (2026 vs 2022 vs 2018) ──
+    # Va AQUÍ, y no arriba con el feed, porque desde ago-2026 las tres series
+    # salen de dist/proyectos.jsonl (que ya incluye la legislatura viva de las
+    # dos cámaras) en vez de la Lambda. Con un dist viejo publicaría una ventana
+    # sin la Cámara del día; build_ritmo lo detecta y aborta, pero mejor no
+    # llegar ahí. Su ventana cierra dos semanas atrás, así que no le urge la
+    # frescura: le urge que el dataset esté bien construido.
+    etapa --nombre ritmo --timeout 1200 \
+          --desc "monitor de ritmo de radicación" \
+          -- python3 tools/leyes-senado/build_ritmo.py --upload
   else
     etapa --nombre texto_index --omitida "el dataset falló (rc=$rc_ds): indexar sobre un dataset roto sería peor que no indexar"
     etapa --nombre dataset_upload --omitida "el dataset falló (rc=$rc_ds): no hay archivo nuevo que subir"
+    etapa --nombre ritmo --omitida "el dataset falló (rc=$rc_ds): el monitor lee dist/proyectos.jsonl; con uno roto publicaría una comparación falsa"
   fi
 
   # ── pilar Regulatorio · Gaceta Ambiental de la ANLA ──
@@ -334,6 +343,43 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
         --desc "anla-gaceta.json desde las páginas cacheadas" \
         -- python3 tools/caudal/supers/harvest_anla.py build
   rc_anla_b=$?
+
+  # ── pilar Regulatorio · las cuatro fuentes NORMATIVAS (ago-2026) ──
+  # No son sancionatorias: traen la norma que le crea obligaciones al cliente,
+  # que para un gremio vale más que la multa que le pusieron a otro. Entran acá,
+  # antes del consolidado, y cada una es OTRO host: ninguna compite con
+  # leyes.senado ni entre sí.
+  #
+  # Las cuatro son incrementales y baratas; los ritmos están medidos:
+  #   banrep  ~1 min  · la vista va DESC y para en la primera página ya vista
+  #   dian    ~2 min  · resoluciones y circulares del año en curso
+  #   uiaf    ~30 s   · 22 peticiones, el resto sale de caché
+  #   supersoc ~90 pet· los nodos de proyecto quedan cacheados por URL
+  #
+  # Ninguna es crítica: si una cae, el consolidado sigue con su raw de ayer y el
+  # piso de `verificar_consolidado.py` la respalda. Por eso no se guarda su rc.
+  #
+  # ⚠ La SIC (harvest_sic_circulares.py) queda FUERA a propósito: son ~800
+  # peticiones (~21 min) para un registro que se mueve ~13 actos al año. Se
+  # corre a mano cuando haga falta; meterla acá sería gastar 42 min diarios.
+  etapa --nombre banrep_fetch --timeout 600 \
+        --desc "BanRep · Junta Directiva y régimen cambiario (incremental)" \
+        -- python3 tools/caudal/supers/harvest_banrep.py fetch
+
+  etapa --nombre dian_fetch --timeout 900 \
+        --desc "DIAN · resoluciones y circulares (incremental)" \
+        -- python3 tools/caudal/supers/harvest_dian.py fetch
+
+  etapa --nombre uiaf_fetch --timeout 600 \
+        --desc "UIAF · obligaciones de reporte ALA/CFT" \
+        -- python3 tools/caudal/supers/harvest_uiaf.py fetch
+
+  # Supersociedades tiene dos colas y la que importa refrescar a diario es la de
+  # PROYECTOS: sus ventanas de comentarios duran entre 4 y 15 días, así que un
+  # rastreo semanal se perdería la mitad.
+  etapa --nombre supersociedades_fetch --timeout 900 \
+        --desc "Supersociedades · normativa y proyectos en consulta" \
+        -- python3 tools/caudal/supers/harvest_supersociedades.py fetch
 
   # ⚠ `normalize` y `build_s3` consolidan las DOCE fuentes del pilar, no solo
   # ANLA: leen todos los `raw/*.json` que haya en disco. Eso es lo correcto (el

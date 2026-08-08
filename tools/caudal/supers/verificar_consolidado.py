@@ -59,12 +59,23 @@ PISOS = {
     'supertransporte':         32,   # 36
     'supersalud-registro':     27,   # 30
     'supersalud':              14,   # 16
+    # --- ago-2026 · las seis fuentes normativas (no sancionatorias) ---------
+    # Los pisos van a ~90% de lo medido el 8-ago-2026, igual que los de arriba.
+    # Ojo con dian-doctrina: su cosecha es un barrido de prefijos y una corrida
+    # a medias devuelve un subconjunto de aspecto perfectamente normal, así que
+    # el piso es lo único que la atrapa.
+    'dian-doctrina':        7_400,   # 8.250 · conceptos y oficios
+    'dian-normas':          4_200,   # 4.739 · resoluciones + circulares
+    'banrep-normatividad':  3_300,   # 3.666 · Junta Directiva y régimen cambiario
+    'supersociedades':        660,   # 734  · circulares, CBJ y proyectos
+    'sic-circulares':         647,   # 719  · normativa (no las 76 sanciones)
+    'uiaf-reportantes':       215,   # 240  · obligaciones de reporte ALA/CFT
 }
 # `mintrabajo-territorial` queda fuera adrede: su dataset es AGREGADO (conteos
 # por territorial, no por entidad) y `normalize` no lo mete al consolidado.
 FUERA = {'mintrabajo-territorial'}
 
-PISO_TOTAL = 55_000          # 61.146 medidos
+PISO_TOTAL = 73_000          # 81.352 medidos (ago-2026, con las 6 fuentes normativas)
 PISO_SANCIONES = 6_500       # 7.229 medidas (es lo que ve el cliente por defecto)
 
 
@@ -113,8 +124,12 @@ def main():
     # 4 · todo raw en disco tiene que haber llegado al consolidado
     for f in sorted(RAW.glob('*.json')):
         slug = f.stem
-        if slug in FUERA or slug.endswith('-memo'):
-            continue        # -memo es caché interno de harvest_anla, no una fuente
+        if slug in FUERA or slug.endswith(('-memo', '-nodos', '-cache')):
+            continue        # cachés internos de los harvesters, no fuentes:
+            # -memo  → harvest_anla (cruce contra el diccionario de empresas)
+            # -nodos → harvest_sic_circulares y harvest_supersociedades guardan
+            #          acá el detalle ya abierto de cada nodo para no volver a
+            #          pedirlo; el de la SIC pesa 43 MB y no es una fuente.
         if slug not in por_fuente:
             quejas.append(f'{slug}: hay raw en disco pero NO salió en el consolidado')
 

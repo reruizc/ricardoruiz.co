@@ -1,0 +1,82 @@
+{
+  "_doc": "Entrada PROPUESTA para el array `fuentes` de fuentes.json. La deja aquí harvest_sic_circulares.py porque fuentes.json lo tocan otras conversaciones en paralelo. Para activarla: pegar el objeto `entrada` dentro de `fuentes`, y correr `harvest_supers.py normalize` + `build_s3.py` + `verificar_consolidado.py` antes de subir a S3. El mapeo ya se probó de punta a punta importando el `normalize_row` y el `slim` reales: 719 filas entran sin campos vacíos ni colisiones.",
+
+  "entrada": {
+    "slug": "sic-circulares",
+    "nombre": "Superintendencia de Industria y Comercio (normativa)",
+    "sector": "consumo",
+    "via": 2,
+    "granularidad": "entidad",
+    "dificultad": "media",
+    "endpoint": "https://sedeelectronica.sic.gov.co/transparencia/normativa/busqueda-de-normas/entidad",
+    "metodo": "GET",
+    "nota": "IMPLEMENTADA ago-2026 via harvest_sic_circulares.py (vía 2: view Drupal server-rendered de la SEDE ELECTRÓNICA, sin auth ni token). Trae las CIRCULARES de la SIC y sus RESOLUCIONES DE CARÁCTER GENERAL — el complemento de la fuente `sic`, que solo tiene las 76 sanciones anunciadas en la sala de prensa: una sanción cuenta lo que otro hizo mal, una circular externa cambia lo que la empresa vigilada tiene que hacer. El view expone tres filtros que dan los ejes exactos: field_clasificacion2_target_id (179=Circulares, 177=Resoluciones), field_clasificacion5_target_id (delegatura: 398 Consumidor, 399 Datos Personales, 397 Competencia +5) y field_tipo_acto_target_id (6704=Carácter General) — o sea que 'de carácter general' NO se infiere, lo marca la propia SIC, y recorta las resoluciones de ~2.020 a 467 dejando fuera nombramientos y actos de trámite. `tipo_acto` viene POR FILA (circular|resolucion). `sancionado` recibe `titular` = la CITA del acto ('Circular Externa 001 de 2025'), no un destinatario: es corta, uniforme y evita que build_s3 ponga '—' (el modo de falla que ya se documentó con ANLA, 25 de 26 tarjetas tituladas con un guion). El destinatario real del acto, cuando el cuerpo lo declara ('Para Sujetos vigilados…', 145 de 719), va en su campo y se anexa a `descripcion`, igual que la delegatura, para que sean buscables: el blob `q` de build_s3 solo mira sancionado+motivo+descripcion+fuente_nombre. DESCARTADAS: vía 1 Socrata (los 19 datasets de la SIC en datos.gov.co no incluyen normativa; el índice SUIN `fiev-nid6` sí lista 652 normas de la SIC pero sin título, fecha, descripción ni PDF — sirve solo de control cruzado) y el repositorio viejo www.sic.gov.co/repositorio-de-normatividad, que está CONGELADO (circulares hasta dic-2022, ningún tipo pasa de feb-2024) y habría dado una cosecha aparentemente completa y sin nada de 2023-2026, ni las dos circulares de validación. Ver el docstring del harvester para las trampas medidas ①-⑤.",
+    "map": {
+      "sancionado": "titular",
+      "tipo_acto": "tipo_acto",
+      "tipo_sancion": "subtipo",
+      "motivo": "titulo",
+      "resolucion": "referencia",
+      "fecha_firmeza": "fecha",
+      "descripcion": "descripcion",
+      "url": "url",
+      "_id": "id"
+    },
+    "tipo_acto_default": "circular"
+  },
+
+  "_al_activar": {
+    "piso_sugerido_verificar_consolidado": 647,
+    "nota_piso": "≈90% de las 719 cosechadas. Sin piso propio para este slug, verificar_consolidado.py no cubre la fuente y una corrida mutilada podría publicarse (el piso del TOTAL solo no lo atraparía: 719 sobre ~61.000 actos del pilar es ruido).",
+    "catalogo_salud": "Es fuente MANUAL: no entra a run_diario.sh. La cosecha son ~800 peticiones (~21 min) y el registro se mueve poco — ~13 actos en lo que va de 2026. Si algún día se automatiza, clase 'mensual' en salud/catalogo.py.",
+    "sector": "Va como 'consumo' para quedar junto a la fuente `sic` en el frontend. Si algún día se quiere Datos Personales como sector propio, el campo `delegatura` de cada fila ya lo permite sin recosechar.",
+    "ojo_fechas_pre_2000": "build_s3.parse_fecha descarta fechas anteriores a 2000-01-01, así que los 2 actos de 1998-1999 llegan al slim SIN fecha (el registro sí entra). Es política de build_s3, no de esta fuente; se anota para que no se lea como pérdida de datos."
+  },
+
+  "_validacion": {
+    "criterio": "Las dos circulares externas de 2025 que le aplican al cliente de referencia (Binance) deben estar, y no puede haber colisión con las 76 sanciones de raw/sic.json.",
+    "comando": "python3 tools/caudal/supers/harvest_sic_circulares.py test",
+    "resultado": "TEST OK (ago-2026). Circular Externa 001 de 2025 → fecha 2025-09-18, delegatura Protección de Datos Personales, con PDF. Circular Externa 002 de 2025 → fecha 2025-10-07, misma delegatura, con PDF. Las dos fechas coinciden al día con las que declara el cliente. Dedup contra raw/sic.json: 0 colisiones por URL y 0 por título normalizado (viven en dominios distintos: las sanciones en www.sic.gov.co/{slider,noticias}, estas en sedeelectronica.sic.gov.co/transparencia/normativa)."
+  },
+
+  "resumen": {
+    "total": 719,
+    "por_tipo_acto": {"resolucion": 467, "circular": 252},
+    "por_subtipo": {
+      "Resolución de carácter general": 467,
+      "Circular": 195,
+      "Circular Externa": 53,
+      "Circular Única": 2,
+      "Circular Interna": 1,
+      "Circular Externa Conjunta": 1
+    },
+    "por_caracter": {"Carácter General": 625, "No aplica": 92, "Carácter Particular": 2},
+    "por_delegatura": {
+      "(sin dato)": 648,
+      "Asuntos Jurisdiccionales": 23,
+      "Propiedad Industrial": 14,
+      "Reglamentos Técnicos y Metrología Legal": 12,
+      "Protección al Consumidor": 10,
+      "Protección de Datos Personales": 7,
+      "Despacho de la Superintendencia": 4,
+      "Protección a la Competencia": 1
+    },
+    "delegaturas_clave_del_encargo": 18,
+    "rango_fechas": ["1998-10-01", "2026-07-06"],
+    "con_pdf": 719,
+    "con_destinatario_declarado": 145,
+    "fecha_no_confiable": 35,
+    "descartados_emisor_ajeno": 23
+  },
+
+  "_lo_que_no_se_puede_afirmar": [
+    "195 de las 252 circulares no declaran si son externas o internas: su título es solo 'Circular 06' y el nombre del PDF tampoco lo dice (medido: 0 de 196 lo declaran ahí). Se quedan como 'Circular' a secas en vez de asumir que son externas. Contexto para leer ese residuo: en toda la cosecha hay UNA sola circular explícitamente interna, así que casi todo lo que este registro publica es de destinatario externo — pero afirmarlo acto por acto sería inventar. Resolverlo exige leer la primera página de cada PDF (vía 3) y no valía el costo para el encargo.",
+    "648 de 719 actos no traen delegatura: el campo existe en el view pero la SIC lo dejó sin llenar en la mayoría. Las tres delegaturas que pidió el encargo suman 18 actos etiquetados (Consumidor 10, Datos Personales 7, Competencia 1). No es un fallo de la cosecha: es lo que la fuente etiquetó. Ojo con leer el 1 de Competencia como escasez — Competencia tiene ~200 actos en el view, pero son resoluciones de carácter PARTICULAR (decisiones de casos), que quedan fuera del alcance pedido.",
+    "35 actos tienen fecha marcada no confiable (`fecha_confiable:false`): el título declara un año y el nodo trae otro, porque en el bucket 'Normativa aplicable' la fecha del nodo es la de CARGA a la sede, no la de expedición. La fecha se conserva y se marca; no se inventa una.",
+    "El conteo del pager del view NO es el total: solo muestra una ventana de números. Cualquier medición que se apoye en él subestima (la primera pasada dio ~140 circulares donde hay 252). Paginar hasta página vacía."
+  ],
+
+  "_control_cruzado_completitud": "El índice SUIN-Juriscol (Socrata `fiev-nid6`, de MinJusticia) lista 652 normas de la SIC: 221 CIRCULAR EXTERNA + 2 CIRCULAR + 428 RESOLUCION + 1 DECRETO, con años hasta 2026. Esta cosecha trae 252 circulares y 467 resoluciones de carácter general — o sea MÁS resoluciones que las que SUIN tiene en total, y más circulares que sus 223. Los dos registros se confirman en las dos circulares de validación (SUIN las tipa distinto entre sí: la 001 de 2025 como 'CIRCULAR EXTERNA' y la 002 como 'CIRCULAR'). Lectura: la sede electrónica es más completa que SUIN para la SIC, y SUIN sirve como control de existencia, no como fuente.",
+
+  "_hallazgo_fuera_de_alcance": "Buscando en Socrata apareció `73dx-n59j` 'Sanciones impuestas en firme por la SIC' (datos.gov.co, publicado por la propia SIC): un registro ESTRUCTURADO de sanciones que podría superar —o al menos auditar— las 76 que hoy salen de comunicados en la fuente `sic`. No se tocó: es otra fuente, otro alcance y otro dueño. Queda anotado para quien lleve el pilar."
+}
