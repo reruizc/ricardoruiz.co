@@ -77,6 +77,21 @@
     h3{font-weight:600;font-size:1rem;letter-spacing:.01em}
     .section{margin-top:2.6rem}
 
+    /* Durante la secuencia la barra se retira y queda solo el logo, centrado y más
+       chico: la escena se lee de un tirón y "Volver / Gratis · sin registro" competía
+       con ella. La barra vuelve sola al salir. */
+    body.en-secuencia .electoral-nav{border-bottom:none;background:none;backdrop-filter:none;
+      justify-content:center;padding:1rem 1rem .2rem}
+    body.en-secuencia .e-nav-left{display:none}
+    body.en-secuencia .e-nav-right{justify-content:center}
+    body.en-secuencia .logo-text{font-size:.98rem}
+    body.en-secuencia .logo-bars{transform:scale(.82);transform-origin:center}
+    /* el fondo de la página se iguala al de los frames: si no, el cuadro del módulo
+       se recorta contra el degradado azulado del resto del sitio */
+    body.en-secuencia .bg-layer{opacity:0}
+    /* el gris medio del fondo de los frames (medido sobre los diez) */
+    body.en-secuencia{background:#e5e5e7}
+
     /* ══ SECUENCIA DEL CASO ══
        La hoja se arma mientras se baja: 10 frames apilados en el mismo sitio y el
        scroll decide cuál se ve. Va DENTRO del caso elegido (no como apertura de la
@@ -91,10 +106,18 @@
     .sy-stage{position:sticky;top:0;min-height:100svh;min-height:100vh;
       display:flex;flex-direction:column;align-items:center;justify-content:center;
       gap:1.1rem;padding:1.2rem 0}
-    /* el módulo: cuadrado, contenido, con el fondo de las imágenes */
-    .sy-art{position:relative;width:min(92vw,min(430px,46svh));aspect-ratio:1;flex:none;
-      background:#e4e4e6;border-radius:14px;overflow:hidden;
-      box-shadow:0 1px 3px rgba(26,29,36,.07),0 12px 34px -18px rgba(26,29,36,.3)}
+    /* El módulo va SIN caja: sin fondo propio, sin sombra y sin borde. Con caja se
+       veía un cuadro gris pegado sobre el resto del sitio.
+       Los bordes se difuminan porque el render trae viñeteo —medido: 232 arriba y 221
+       abajo— y contra un fondo plano el canto inferior se nota. Con el desvanecido la
+       transición es imperceptible sin tener que acertarle a un color imposible. */
+    .sy-art{position:relative;width:min(94vw,min(516px,55svh));aspect-ratio:1;flex:none;
+      background:transparent;
+      /* UNA sola máscara. Con dos capas y `mask-composite:intersect` la imagen
+         desaparecía: la primera capa se compone contra nada y el resultado queda
+         vacío. La elipse difumina los cuatro cantos de una. */
+      -webkit-mask-image:radial-gradient(ellipse 82% 82% at 50% 50%,#000 62%,transparent 99%);
+      mask-image:radial-gradient(ellipse 82% 82% at 50% 50%,#000 62%,transparent 99%)}
     /* La imagen va A SANGRE: es cuadrada y el módulo también, así que encaja exacta
        sin recortar nada. Cualquier margen deja ver el canto del cuadro de la imagen
        contra el fondo del módulo —el fondo del render tiene un degradado y no casa
@@ -106,7 +129,7 @@
        cortarlo con un borde duro. */
     .sy-over{position:absolute;left:0;right:0;top:0;padding:1.35rem 1.6rem 2.6rem;
       text-align:center;z-index:2;pointer-events:none;
-      background:linear-gradient(to bottom,rgba(231,231,233,.98) 0%,rgba(231,231,233,.92) 52%,rgba(231,231,233,0) 100%)}
+      background:linear-gradient(to bottom,rgba(229,229,231,.99) 0%,rgba(229,229,231,.94) 56%,rgba(229,229,231,0) 100%)}
     .sy-k{font-size:.68rem;letter-spacing:.13em;text-transform:uppercase;color:var(--blue-light);
       font-weight:700;margin-bottom:.4rem}
     .sy-t{font-weight:700;font-size:clamp(1rem,2.9vw,1.5rem);letter-spacing:-.02em;
@@ -126,15 +149,26 @@
     .sy-cta{opacity:0;transform:translateY(8px);pointer-events:none;
       transition:opacity .5s ease,transform .5s ease;text-align:center}
     .sy-cta.on{opacity:1;transform:none;pointer-events:auto}
-    .sy-bar{width:min(92vw,430px);height:2px;background:rgba(26,29,36,.1);position:relative}
+    .sy-bar{width:min(94vw,516px);height:2px;background:rgba(26,29,36,.1);position:relative}
     .sy-bar i{position:absolute;inset:0 auto 0 0;background:var(--blue);width:0;
       transition:width .2s linear}
-    .sy-skip{background:none;border:none;cursor:none;font-size:.76rem;color:var(--muted);
-      padding:.35rem .5rem}
-    .sy-skip:hover{color:var(--white)}
+    /* Una flecha que late invita a seguir bajando mejor que un rótulo. Y sigue siendo
+       la vía de escape: al tocarla salta al final de la secuencia, para quien no
+       quiere el recorrido. Se desvanece cuando ya no hace falta. */
+    .sy-skip{background:none;border:none;cursor:none;padding:.5rem;line-height:0;
+      color:var(--blue);opacity:.85;transition:opacity .4s ease}
+    .sy-skip svg{display:block;animation:syLat 1.9s ease-in-out infinite}
+    .sy-skip:hover{opacity:1}
+    .sy-skip.oculto{opacity:0;pointer-events:none}
+    @keyframes syLat{
+      0%,100%{transform:translateY(0);opacity:.55}
+      50%{transform:translateY(6px);opacity:1}
+    }
     @media(min-width:900px){
-      .sy-art{width:min(46vw,470px)}
-      .sy-bar{width:470px}
+      /* la cota por alto de pantalla es obligatoria: sin ella, en un portátil de 800 px
+         la imagen ampliada empuja el resto fuera de la ventana y la escena se recorta */
+      .sy-art{width:min(52vw,min(564px,54svh))}
+      .sy-bar{width:min(52vw,min(564px,54svh))}
     }
     @media(prefers-reduced-motion:reduce){
       /* sin movimiento: la pista se colapsa y todo queda visible de una */
@@ -634,7 +668,12 @@
                 <button type="button" class="btn btn-primary" id="sy-empezar">Empezar</button>
               </div>
             </div>
-            <button type="button" class="sy-skip" id="sy-skip">Saltar esta parte →</button>
+            <button type="button" class="sy-skip" id="sy-skip" aria-label="Seguir bajando">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v14M5 12l7 7 7-7"/>
+              </svg>
+            </button>
           </div>
         </div>
       </section>
@@ -1510,6 +1549,8 @@
       }
       $('sy-bar').style.width = (p * 100).toFixed(1) + '%';
       $('sy-cta').classList.toggle('on', p > 0.9);
+      // la flecha estorba cuando ya se llegó: ahí manda el botón
+      $('sy-skip').classList.toggle('oculto', p > 0.86);
     }
     function onScroll(){ if (!pend) { pend = true; requestAnimationFrame(pintar); } }
     window.addEventListener('scroll', onScroll, { passive:true });
@@ -1519,12 +1560,22 @@
 
   // la secuencia desemboca en "Ten esto a mano", no en el formulario
   function salirSecuencia(){
+    document.body.classList.remove('en-secuencia');
     $('panel-secuencia').classList.remove('active');
     $('panel-caso').classList.add('active');
     window.scrollTo({ top:0, behavior:'auto' });
   }
   if ($('sy-empezar')) $('sy-empezar').addEventListener('click', salirSecuencia);
-  if ($('sy-skip')) $('sy-skip').addEventListener('click', salirSecuencia);
+  // la flecha invita a bajar, pero al tocarla lleva al final: sigue siendo la salida
+  // para quien no quiere el recorrido
+  if ($('sy-skip')) $('sy-skip').addEventListener('click', function(){
+    var sec = $('sy'); if (!sec) return salirSecuencia();
+    // el tope se mide contra el DOCUMENTO: `offsetTop` es relativo al padre
+    // posicionado y aquí apuntaba más allá del final de la secuencia
+    var arriba = sec.getBoundingClientRect().top + window.pageYOffset;
+    window.scrollTo({ top: arriba + sec.offsetHeight - window.innerHeight,
+                      behavior:'smooth' });
+  });
   if ($('caso-empezar')) $('caso-empezar').addEventListener('click', function(){ abrirFormulario(); });
   if ($('caso-volver')) $('caso-volver').addEventListener('click', function(){
     $('panel-caso').classList.remove('active');
@@ -1818,8 +1869,12 @@
     $('panel-inicio').classList.remove('active');
     // los casos sin frames propios se saltan la secuencia: mostrarle la hoja con
     // pastillas a quien reclama una cita sería contarle otra historia
-    if (SY_CASOS[k]) $('panel-secuencia').classList.add('active');
-    else $('panel-caso').classList.add('active');
+    if (SY_CASOS[k]) {
+      $('panel-secuencia').classList.add('active');
+      document.body.classList.add('en-secuencia');
+    } else {
+      $('panel-caso').classList.add('active');
+    }
     window.scrollTo({ top:0, behavior:'auto' });
   }
 
