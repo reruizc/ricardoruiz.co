@@ -111,20 +111,33 @@
        Los bordes se difuminan porque el render trae viñeteo —medido: 232 arriba y 221
        abajo— y contra un fondo plano el canto inferior se nota. Con el desvanecido la
        transición es imperceptible sin tener que acertarle a un color imposible. */
-    .sy-art{position:relative;width:min(94vw,min(516px,55svh));aspect-ratio:1;flex:none;
-      background:transparent;
-      /* UNA sola máscara. Con dos capas y `mask-composite:intersect` la imagen
-         desaparecía: la primera capa se compone contra nada y el resultado queda
-         vacío. La elipse difumina los cuatro cantos de una. */
+    .sy-art{position:relative;width:min(96vw,min(560px,60svh));aspect-ratio:1;flex:none;
+      background:transparent;overflow:hidden}
+    /* La máscara es SOLO para los frames de fondo opaco: difumina el canto del cuadro
+       para que no se recorte contra la página. Los frames con transparencia no la
+       necesitan —no hay fondo que ocultar— y con ellos hace daño: al ampliar el
+       contenido, la elipse empieza a cortar el papel por los lados.
+       Con dos capas y `mask-composite:intersect` la imagen desaparecía (la primera se
+       compone contra nada), así que va una sola elipse. */
+    .sy[data-opaco] .sy-art{
       -webkit-mask-image:radial-gradient(ellipse 82% 82% at 50% 50%,#000 62%,transparent 99%);
       mask-image:radial-gradient(ellipse 82% 82% at 50% 50%,#000 62%,transparent 99%)}
     /* La imagen va A SANGRE: es cuadrada y el módulo también, así que encaja exacta
        sin recortar nada. Cualquier margen deja ver el canto del cuadro de la imagen
        contra el fondo del módulo —el fondo del render tiene un degradado y no casa
        con un color plano—, que fue justo lo que se quiso evitar. */
+    /* El contenido se escala dentro del cuadro. En celular la imagen ya ocupa el 94%
+       del ancho, así que el módulo no puede crecer más: lo que sí sobra es el aire
+       del cuadro —los documentos son apaisados dentro de un lienzo 1:1— y ampliarlo
+       hace que el papel se lea más grande sin mover el layout.
+       El tope es 1.19 y está MEDIDO, no elegido: el frame 8 es el que más ancho ocupa
+       —el 84% del cuadro— y por encima de ahí se le empieza a cortar el papel. */
     .sy-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+      transform:scale(1.19);transform-origin:center;
       opacity:0;transition:opacity .45s ease}
     .sy-art img.on{opacity:1}
+    /* los frames de fondo opaco ya venían encuadrados: ampliarlos les recortaría la hoja */
+    .sy[data-opaco] .sy-art img{transform:none}
     /* El título va CENTRADO SOBRE la imagen. El degradado lo despega del papel sin
        cortarlo con un borde duro. */
     .sy-over{position:absolute;left:0;right:0;top:0;padding:1.35rem 1.6rem 2.6rem;
@@ -167,8 +180,10 @@
     @media(min-width:900px){
       /* la cota por alto de pantalla es obligatoria: sin ella, en un portátil de 800 px
          la imagen ampliada empuja el resto fuera de la ventana y la escena se recorta */
-      .sy-art{width:min(52vw,min(564px,54svh))}
-      .sy-bar{width:min(52vw,min(564px,54svh))}
+      /* en escritorio sobra alto: el contenedor crece hasta donde el resto de la
+         escena siga cabiendo en la ventana */
+      .sy-art{width:min(56vw,min(660px,63svh))}
+      .sy-bar{width:min(56vw,min(660px,63svh))}
     }
     @media(prefers-reduced-motion:reduce){
       /* sin movimiento: la pista se colapsa y todo queda visible de una */
@@ -1481,7 +1496,7 @@
   var SY_CASOS = { medicamentos:true };
 
   var SECUENCIAS = {
-    general: { dir:'wg', pre:'g', n:15, salida:'irAOpciones', textos:[
+    general: { dir:'wg', pre:'g', n:15, salida:'irAOpciones', opaco:false, textos:[
       { f:1,  k:'Cómo empieza', t:'Un médico te ordenó <em>algo que necesitas</em>.',
         d:'Eso es una promesa: un servicio que está cubierto, autorizado y ya pagado con tu UPC.' },
       { f:3,  k:'Y entonces', t:'Empieza la espera.',
@@ -1497,7 +1512,7 @@
       { f:15, k:'Y es tuyo', t:'Gratis y <em>sin que tus datos salgan</em>.',
         d:'El documento se arma en tu propio navegador. Tu nombre y tu cédula no viajan a ningún servidor.' }
     ]},
-    medicamentos: { dir:'w', pre:'f', n:10, salida:'salirSecuencia', textos:[
+    medicamentos: { dir:'w', pre:'f', n:10, salida:'salirSecuencia', opaco:true, textos:[
       { f:1,  k:'Lo que pasa',   t:'Te formularon algo y <em>no te lo entregan</em>.',
         d:'Vuelves a la farmacia, te dicen que no ha llegado, que vuelvas la otra semana.' },
       { f:3,  k:'No eres el único', t:'274.510 tutelas por salud en un año.',
@@ -1518,6 +1533,9 @@
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion:reduce)').matches;
     var ancho = (window.innerWidth > 900 ? 'lg' : 'sm');
     var T = cfg.textos;
+    // los frames de fondo opaco necesitan la máscara que difumina el canto del cuadro;
+    // los transparentes no, y con ellos recortaría el papel al ampliarlo
+    if (cfg.opaco) sec.setAttribute('data-opaco', '');
 
     sec.innerHTML =
       '<div class="sy-track"><div class="sy-stage">' +
