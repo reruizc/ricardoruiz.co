@@ -46,58 +46,88 @@ CSS = f"""
 @font-face {{ font-family:'HN'; src:url('file://{F_HN_L}'); font-weight:300; }}
 @font-face {{ font-family:'HN'; src:url('file://{F_HN_I}'); font-style:italic; }}
 
-@page {{ size:A4; margin:12mm 12mm 13mm 12mm; background:#ffffff; }}
+@page {{ size:A4; margin:12mm 12mm 13mm 12mm;
+         /* Papel con textura en vez de blanco puro: hairlines diagonales cada
+            5px sobre un blanco cálido. El contraste entre la línea y el fondo
+            es de 2 puntos de luminancia — se percibe como grano, no como
+            rayado, y no compite con el texto ni se ensucia al imprimir. */
+         background-color:#fbfaf8;
+         background-image:repeating-linear-gradient(45deg,
+             #f7f5f1 0, #f7f5f1 0.45px, rgba(0,0,0,0) 0.45px, rgba(0,0,0,0) 9px); }}
 * {{ box-sizing:border-box; }}
-body {{ font-family:'HN',sans-serif; color:#15171c; background:#fff;
-        font-size:8.9pt; line-height:1.44; margin:0; }}
+body {{ font-family:'HN',sans-serif; color:#15171c; background:transparent;
+        font-size:9.8pt; line-height:1.5; margin:0; }}
 
 .top {{ display:flex; justify-content:space-between; align-items:flex-end;
         border-bottom:1.5px solid #15171c; padding-bottom:7px; margin-bottom:15px; }}
 .top img {{ height:12.5mm; }}
-.top .meta {{ font-size:7.2pt; color:#5a6070; text-align:right; letter-spacing:.4px;
+.top .meta {{ font-size:7.8pt; color:#5a6070; text-align:right; letter-spacing:.4px;
               text-transform:uppercase; line-height:1.6; }}
 
-h1 {{ font-size:17.5pt; font-weight:700; line-height:1.14; margin:0 0 7px;
+h1 {{ font-size:19.3pt; font-weight:700; line-height:1.14; margin:0 0 7px;
       letter-spacing:-.5px; color:#0b0d11; }}
 h1 .hl {{ color:#0047FF; }}
-.lead {{ font-size:9.2pt; color:#3d434f; font-weight:300; margin:0 0 4px; max-width:168mm; }}
+.lead {{ font-size:10.1pt; color:#3d434f; font-weight:300; margin:0 0 4px; max-width:168mm; }}
 .window {{ font-size:7.4pt; color:#5a6070; text-transform:uppercase; letter-spacing:.6px;
-           margin:9px 0 12px; padding-top:7px; border-top:1px solid #dfe2e8; }}
+           margin:9px 0 0; padding-top:7px; border-top:1px solid #dfe2e8; }}
+
+/* El texto nunca va directo sobre la textura del papel: a ciertos zooms las
+   diagonales entran en moiré con los trazos de la letra y el titular se
+   ensucia. Las tarjetas ya traen fondo propio; la cabecera necesitaba el suyo.
+   El patrón queda donde debe leerse: márgenes y aire entre bloques. */
+.hero {{ background:#fdfdfc; border:1px solid #eceef2; border-radius:2px;
+         padding:12px 15px 10px; margin:0 0 13px; page-break-inside:avoid; }}
 
 /* Las tarjetas: fondo gris muy claro + borde completo + franja de color a la
    izquierda. Antes eran solo una franja sobre fondo casi igual al papel y no se
    leían como bloques separados. */
-.item {{ margin:0 0 9px; padding:10px 13px; background:#f6f7f9;
+.item {{ margin:0 0 13px; padding:12px 15px; background:#fdfdfc;
          border:1px solid #e2e5ea; border-left:3px solid #0047FF;
-         border-radius:2px; page-break-inside:avoid; }}
+         border-radius:2px;
+         /* Las cajas FLUYEN entre páginas. Con `page-break-inside:avoid` una
+            caja alta que no cabía saltaba entera y dejaba un tercio de página
+            en blanco — pasaba en dos de las cuatro páginas. Lo que sí se
+            protege es que el título no quede huérfano al pie (`h2` y el rótulo
+            con `page-break-after:avoid`) y que los bloques de «por qué» no se
+            partan: son cortos y partidos no se entienden. */
+         orphans:3; widows:3; }}
 .item.urg {{ border-left-color:#d9480f; background:#fdf7f4; border-color:#f0dbd0; }}
 .item.ok  {{ border-left-color:#2b8a3e; background:#f5faf6; border-color:#d6e9da; }}
-.num {{ font-size:6.9pt; color:#6b7280; letter-spacing:1.2px; text-transform:uppercase;
-        margin-bottom:4px; font-weight:500; }}
-.item h2 {{ font-size:10.6pt; font-weight:700; margin:0 0 5px; line-height:1.28; color:#0b0d11; }}
-.item p {{ margin:0 0 5px; color:#2b303a; }}
+/* Resumen ejecutivo: violeta, el único de los cuatro que no está en uso (azul
+   = tema normal · café = urgente · verde = sin acción). Va con la franja más
+   gruesa porque abre el documento. */
+.item.resumen {{ border-left-width:5px; border-left-color:#5f3dc4;
+                 background:#f8f6fd; border-color:#e0d8f5; }}
+.item.resumen h2 {{ font-size:12.4pt; }}
+.item.resumen p {{ font-size:10.1pt; }}
+.num {{ font-size:7.4pt; color:#6b7280; letter-spacing:1.2px; text-transform:uppercase;
+        margin-bottom:4px; font-weight:500; page-break-after:avoid; }}
+.item h2 {{ font-size:11.7pt; font-weight:700; margin:0 0 5px; line-height:1.28; color:#0b0d11;
+            page-break-after:avoid; }}
+.item p {{ margin:0 0 6px; color:#2b303a; }}
 .item p:last-child {{ margin-bottom:0; }}
 b {{ color:#0b0d11; font-weight:700; }}
 
 /* «Por qué le importa» y «qué mirar»: son la razón de ser del brief, así que
    van marcados y no como un párrafo más. */
-.porque {{ margin-top:5px; padding:6px 9px; background:#fff; border:1px solid #e2e5ea;
-           border-radius:2px; font-size:8.5pt; color:#2b303a; }}
-.porque .et {{ display:block; font-size:6.7pt; letter-spacing:1.1px; text-transform:uppercase;
+.porque {{ page-break-inside:avoid; margin-top:6px; padding:7px 10px; background:#fff; border:1px solid #e2e5ea;
+           border-radius:2px; font-size:9.35pt; color:#2b303a; }}
+.porque .et {{ display:block; font-size:7.2pt; letter-spacing:1.1px; text-transform:uppercase;
                color:#0047FF; font-weight:700; margin-bottom:2px; }}
 .item.urg .porque .et {{ color:#d9480f; }}
 .item.ok  .porque .et {{ color:#2b8a3e; }}
+.item.resumen .porque .et {{ color:#5f3dc4; }}
 
-h3.sec {{ font-size:8pt; text-transform:uppercase; letter-spacing:1.1px; color:#5a6070;
+h3.sec {{ font-size:8.6pt; text-transform:uppercase; letter-spacing:1.1px; color:#5a6070;
           margin:13px 0 6px; padding-bottom:4px; border-bottom:1px solid #dfe2e8; }}
-table {{ width:100%; border-collapse:collapse; font-size:8.2pt; }}
+table {{ width:100%; border-collapse:collapse; font-size:9.0pt; }}
 td, th {{ text-align:left; padding:4px 8px 4px 0; vertical-align:top;
           border-bottom:1px solid #e6e9ee; }}
-th {{ color:#5a6070; font-weight:500; font-size:7.2pt; text-transform:uppercase;
+th {{ color:#5a6070; font-weight:500; font-size:7.8pt; text-transform:uppercase;
       letter-spacing:.5px; }}
 td.q {{ color:#3d434f; }}
-.foot {{ margin-top:13px; padding-top:8px; border-top:1px solid #d8dce3;
-         font-size:7.2pt; color:#6b7280; line-height:1.6; }}
+.foot {{ margin-top:16px; padding-top:9px; border-top:1px solid #d8dce3;
+         font-size:7.8pt; color:#6b7280; line-height:1.6; }}
 .foot b {{ color:#3d434f; }}
 """
 
@@ -112,11 +142,31 @@ HTML_DOC = f"""
 <html><head><meta charset="utf-8"><style>{CSS}</style></head><body>
 {TOP}
 
-<h1>Lo que se movió en Colombia y <span class="hl">cómo le pega a Binance</span>.</h1>
-<p class="lead">Barrido del jueves 6 al sábado 8 de agosto sobre el Congreso, las
-superintendencias, el Ejecutivo, la consulta pública de normas y la prensa. Cinco temas,
-ordenados por lo que exige atención primero.</p>
-<div class="window">Ventana 6–8 de agosto de 2026 · Colombia</div>
+<div class="hero">
+  <h1>Lo que se movió en Colombia y <span class="hl">cómo le pega a Binance</span>.</h1>
+  <p class="lead">Barrido del jueves 6 al sábado 8 de agosto sobre el Congreso, las
+  superintendencias, el Ejecutivo, la consulta pública de normas y la prensa. Cinco temas,
+  ordenados por lo que exige atención primero.</p>
+  <div class="window">Ventana 6–8 de agosto de 2026 · Colombia</div>
+</div>
+
+<div class="item resumen">
+  <div class="num">Resumen ejecutivo</div>
+  <h2>Lo que se movió no es lo que ocupa la conversación pública</h2>
+  <p>Mientras la discusión sigue puesta en si Colombia tendrá o no una ley de criptoactivos,
+  los tres frentes que se movieron esta semana <b>ya están vigentes y ya le aplican a Binance</b>:
+  la obligación de reporte ante la UIAF —con calendario 2026 corriendo y datos exigidos a nivel de
+  wallet—, la reescritura que hizo Supersociedades de las reglas de prevención de lavado el 2 de
+  julio, y la decisión de la DIAN de llevar los criptoactivos a la declaración de renta, que esta
+  semana saltó a prensa con anuncio de sanción.</p>
+  <p>En el Congreso <b>no hay ninguna ley de cripto en trámite</b> —la que había fue archivada, y es
+  el sexto intento fallido desde 2018—, pero cuatro proyectos fiscales y de consumidor financiero
+  alcanzan a Binance por otra vía. Y no hay ninguna ventana de comentarios abierta que le aplique,
+  así que esta semana no hay nada que responder.</p>
+  <div class="porque"><span class="et">Si solo hay tiempo para una cosa</span>
+  Confirmar el estado de reporte ante la UIAF. Es el único punto donde una omisión sería presente
+  y verificable, no una exposición futura.</div>
+</div>
 
 <div class="item urg">
   <div class="num">01 · Cumplimiento</div>
@@ -208,7 +258,8 @@ ordenados por lo que exige atención primero.</p>
   antes de que el texto quede en firme.</div>
 </div>
 
-<h3 class="sec">Un frente que conviene sumar al radar</h3>
+<div class="hero">
+<h3 class="sec" style="margin-top:0">Un frente que conviene sumar al radar</h3>
 <table>
   <tr><th style="width:26%">Régimen cambiario</th><td class="q">Para cualquier operación con divisas, la circular vigente del Banco de la República es la <b>DCIP-83</b>, expedida en 2023. La DCIN-83, que suele citarse de memoria y sigue circulando en documentos de referencia, está <b>derogada desde el 31 de octubre de 2023</b>. Trabajar sobre la circular equivocada es un riesgo silencioso.</td></tr>
 </table>
@@ -223,15 +274,15 @@ ordenados por lo que exige atención primero.</p>
 </table>
 
 <div class="foot">
-  <b>Fuentes.</b> Registro de proyectos de ley del Senado y la Cámara de Representantes; normativa
-  de la DIAN; normativa de la Superintendencia de Sociedades; obligaciones de reporte de la UIAF;
-  régimen cambiario del Banco de la República; sistema de consulta pública de proyectos de norma
-  del DNP; prensa nacional y regional. Cada afirmación es verificable contra el acto que la
-  respalda.<br>
+  <b>Fuentes.</b> Registro de proyectos de ley del Senado y la Cámara; normativa de la DIAN y de
+  Supersociedades; obligaciones de reporte de la UIAF; régimen cambiario del Banco de la República;
+  consulta pública de proyectos de norma del DNP; prensa nacional y regional. Cada afirmación es
+  verificable contra el acto que la respalda.<br>
   <b>Ventana.</b> 6 al 8 de agosto de 2026.<br>
   <b>Alcance.</b> Documento de monitoreo regulatorio; no constituye asesoría legal ni tributaria.
   Las decisiones de cumplimiento requieren el criterio del equipo jurídico de Binance.<br>
   Caudal · módulo de inteligencia regulatoria de Cauce.
+</div>
 </div>
 
 </body></html>
