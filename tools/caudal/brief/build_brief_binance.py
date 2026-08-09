@@ -46,20 +46,30 @@ CSS = f"""
 @font-face {{ font-family:'HN'; src:url('file://{F_HN_L}'); font-weight:300; }}
 @font-face {{ font-family:'HN'; src:url('file://{F_HN_I}'); font-style:italic; }}
 
-@page {{ size:A4; margin:12mm 12mm 13mm 12mm;
-         /* Papel con textura en vez de blanco puro: hairlines diagonales cada
-            5px sobre un blanco cálido. El contraste entre la línea y el fondo
-            es de 2 puntos de luminancia — se percibe como grano, no como
-            rayado, y no compite con el texto ni se ensucia al imprimir. */
+@page {{ size:A4; margin:27mm 12mm 13mm 12mm;
+         /* Papel con textura de cuadrícula fina, tipo dial guilloché
+            («grande tapisserie»): dos rejillas de hairlines cruzadas a 4,2mm
+            que forman cuadros pequeños, más una diagonal aún más tenue que
+            insinúa el relieve. El contraste con el fondo es de 3-4 puntos de
+            luminancia: se percibe como textura, no como rayado, y no se
+            ensucia al imprimir. */
          background-color:#fbfaf8;
-         background-image:repeating-linear-gradient(45deg,
-             #f7f5f1 0, #f7f5f1 0.45px, rgba(0,0,0,0) 0.45px, rgba(0,0,0,0) 9px); }}
+         background-image:
+             repeating-linear-gradient(0deg,
+                 #f8f6f1 0, #f8f6f1 0.3px, rgba(0,0,0,0) 0.3px, rgba(0,0,0,0) 4.6px),
+             repeating-linear-gradient(90deg,
+                 #f8f6f1 0, #f8f6f1 0.3px, rgba(0,0,0,0) 0.3px, rgba(0,0,0,0) 4.6px); }}
 * {{ box-sizing:border-box; }}
 body {{ font-family:'HN',sans-serif; color:#15171c; background:transparent;
         font-size:9.8pt; line-height:1.5; margin:0; }}
 
 .top {{ display:flex; justify-content:space-between; align-items:flex-end;
-        border-bottom:1.5px solid #15171c; padding-bottom:7px; margin-bottom:15px; }}
+        border-bottom:1.5px solid #15171c; padding:0 0 6px;
+        background:#fbfaf8;
+        /* `position:fixed` en WeasyPrint significa «repetir en cada página».
+           El encabezado deja de ser parte del flujo, así que el margen superior
+           de @page se ensancha para dejarle sitio y que no pise el contenido. */
+        position:fixed; top:-14mm; left:0; right:0; }}
 .top img {{ height:12.5mm; }}
 .top .meta {{ font-size:7.8pt; color:#5a6070; text-align:right; letter-spacing:.4px;
               text-transform:uppercase; line-height:1.6; }}
@@ -143,7 +153,7 @@ HTML_DOC = f"""
 {TOP}
 
 <div class="hero">
-  <h1>Lo que se movió en Colombia y <span class="hl">cómo le pega a Binance</span>.</h1>
+  <h1>Lo que se movió en Colombia y <span class="hl">cómo afecta a Binance</span>.</h1>
   <p class="lead">Barrido del jueves 6 al sábado 8 de agosto sobre el Congreso, las
   superintendencias, el Ejecutivo, la consulta pública de normas y la prensa. Cinco temas,
   ordenados por lo que exige atención primero.</p>
