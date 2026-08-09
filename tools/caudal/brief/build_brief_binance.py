@@ -38,6 +38,7 @@ F_HN_M = os.path.join(FDIR, "helveticaneue-medium.woff2")
 F_HN_L = os.path.join(FDIR, "helveticaneue-light.woff2")
 F_HN_I = os.path.join(FDIR, "helveticaneue-italic.woff2")
 LOGO = os.path.join(ROOT, "tools", "caudal", "brief", "assets", "caudalxcauce-tinta.png")
+TILE = os.path.join(ROOT, "tools", "caudal", "brief", "assets", "papel-guilloche.png")
 
 CSS = f"""
 @font-face {{ font-family:'HN'; src:url('file://{F_HN}'); font-weight:400; }}
@@ -54,11 +55,8 @@ CSS = f"""
             luminancia: se percibe como textura, no como rayado, y no se
             ensucia al imprimir. */
          background-color:#fbfaf8;
-         background-image:
-             repeating-linear-gradient(0deg,
-                 #f8f6f1 0, #f8f6f1 0.3px, rgba(0,0,0,0) 0.3px, rgba(0,0,0,0) 4.6px),
-             repeating-linear-gradient(90deg,
-                 #f8f6f1 0, #f8f6f1 0.3px, rgba(0,0,0,0) 0.3px, rgba(0,0,0,0) 4.6px); }}
+         background-image:url('file://{TILE}');
+         background-size:4.6px 4.6px; background-repeat:repeat; }}
 * {{ box-sizing:border-box; }}
 body {{ font-family:'HN',sans-serif; color:#15171c; background:transparent;
         font-size:9.8pt; line-height:1.5; margin:0; }}
