@@ -1116,6 +1116,10 @@ class Caudal:
         else:
             nivel, accion = 'bajo', 'Antecedente histórico — monitoreo pasivo'
         return {'tipo': 'congreso', 'id': h['id'], 'tb': h.get('tb', 'pdly'),
+                # El número de radicado es la única referencia que el cliente
+                # reconoce: el `id` es interno. Se prefiere el de Cámara cuando
+                # existe porque es el que traen las agendas del día.
+                'num': h.get('nc') or h.get('ns') or '',
                 'anio': a, 'titulo': h['t'], 'comision': h.get('com', ''),
                 'resultado': res, 'resultado_txt': RES_LABEL.get(res, res),
                 'empuje': h.get('emp'), 'nivel': nivel, 'accion': accion}

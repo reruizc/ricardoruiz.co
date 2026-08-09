@@ -3017,6 +3017,156 @@ def handler(event, context):
         # autocompletado del diccionario (④) para elegir empresas vigiladas
         return _resp(200, {'empresas': caudal_core.buscar_empresas(body.get('query', ''))})
 
+
+    if action == 'tablero':
+        # ── EL EXPEDIENTE DEL CLIENTE ──────────────────────────────────────
+        # El radar responde «¿qué se movió esta semana?». Esto responde la otra
+        # mitad, que es la que el cliente lleva a mano en un Excel: «¿cómo va
+        # CADA frente que me toca, se haya movido o no?».
+        #
+        # Por qué hace falta las dos cosas: un tablero de estado se desactualiza
+        # solo. En la matriz real de un cliente (ago-2026) el proyecto de
+        # circular de SAGRILAFT figuraba «en consulta» cuando ya se había
+        # expedido, y el proyecto de ley de PSAV «pendiente de segundo debate»
+        # cuando estaba archivado. Ninguna de las dos cosas es descuido: es que
+        # mantener siete frentes a mano no escala.
+        #
+        # Se agrupa por URGENCIA y no por fuente, que es lo que el Excel no
+        # puede hacer: primero lo que tiene plazo corriendo, al final lo cerrado.
+        sk = body.get('sector')
+        perfil_in = body.get('perfil')
+        if isinstance(perfil_in, dict):
+            s = caudal_core.normalizar_perfil(perfil_in)
+            if not s['temas'] and not s['empresas_keys']:
+                return _resp(400, {'error': 'el perfil necesita al menos un tema '
+                                            'o una empresa vigilada'})
+        else:
+            s = caudal_core.sector_cliente(sk)
+            if not s:
+                return _resp(400, {'error': f'sector desconocido: {sk}'})
+
+        temas = [_fold_q(t) for t in (s.get('temas') or []) if len(_fold_q(t)) >= 4]
+        for t in caudal_core.temas_de_empresas(s.get('empresas_keys')):
+            tf = _fold_q(t)
+            if len(tf) >= 4 and tf not in temas:
+                temas.append(tf)
+        casa = lambda blob: any(t in (blob or '') for t in temas)
+        hoy = _time.strftime('%Y-%m-%d', _time.gmtime())
+        corte = str(int(hoy[:4]) - 2)          # ventana de dos años para lo cerrado
+
+        consulta, tramite, vigente, cerrado = [], [], [], []
+        solo_texto = 0
+
+        # 1 · consulta pública — lo único con reloj corriendo
+        try:
+            for r in _sucop():
+                if r.get('estado_consulta') not in ('abierta', 'cierra_pronto'):
+                    continue
+                if not casa(r.get('q')):
+                    continue
+                consulta.append({
+                    'ref': r.get('codigo') or '—', 'titulo': (r.get('titulo') or '')[:200],
+                    'tipo': (r.get('tipo_norma') or 'Proyecto de norma'),
+                    'entidad': r.get('entidad') or '—', 'estado': 'En consulta',
+                    'cierra': r.get('fecha_fin') or '', 'fecha': r.get('fecha_inicio') or '',
+                    'fuente': 'Consulta pública', 'url': r.get('url') or ''})
+        except Exception as e:
+            print(f'[tablero] sucop FAIL: {type(e).__name__}: {e}')
+
+        # 2 · Congreso — vivo y cerrado, con su comisión
+        try:
+            rc = caudal.radar_congreso(temas=s.get('temas', []),
+                                       comision_lbl=s.get('comision', ''), cap=90,
+                                       empresas_keys=s.get('empresas_keys'))
+            # El tablero exige que el tema esté en el TÍTULO. `radar_congreso`
+            # también acepta la coincidencia dentro del articulado, que para
+            # descubrir es justo lo que se busca pero para un registro es ruido:
+            # medido con el perfil de Binance, 9 de 14 proyectos entraban solo
+            # por el texto — uno sobre el STUNT como disciplina deportiva que
+            # menciona «lavado de activos» de pasada, otro de honores a un
+            # centenario. Ninguno es un frente suyo.
+            #
+            # Y es autocorregible: lo que se cae queda contado en
+            # `solo_en_texto`, así que si un tema importa de verdad —la reforma
+            # tributaria, por ejemplo— se agrega al perfil y entra por título.
+            for x in rc.get('senales', []):
+                if not casa(_fold_q(x.get('titulo'))):
+                    solo_texto += 1
+                    continue
+                # el id del Congreso llega como entero; el frontend lo trata
+                # como texto igual que las demás referencias
+                fila = {'ref': x.get('num') or f"id {x.get('id')}",
+                        'titulo': (x.get('titulo') or '')[:200],
+                        'tipo': 'Proyecto de ley',
+                        'entidad': ('Congreso · Comisión ' + x['comision'].title())
+                                   if x.get('comision') else 'Congreso',
+                        'estado': x.get('resultado_txt') or '—', 'cierra': '',
+                        'fecha': str(x.get('anio') or ''), 'fuente': 'Congreso', 'url': ''}
+                (tramite if x.get('resultado') == 'EN_TRAMITE' else cerrado).append(fila)
+        except Exception as e:
+            print(f'[tablero] congreso FAIL: {type(e).__name__}: {e}')
+
+        # 3 · norma expedida — superintendencias y Ejecutivo
+        try:
+            for r in _sanciones():
+                if (r.get('tipo_acto') or '') not in ('circular', 'resolucion'):
+                    continue
+                if (r.get('fecha') or '')[:4] < corte or not casa(r.get('q')):
+                    continue
+                vigente.append({
+                    'ref': (r.get('resolucion') or '—')[:60],
+                    'titulo': (r.get('motivo') or r.get('descripcion') or '')[:200],
+                    'tipo': (r.get('tipo') or 'Acto administrativo'),
+                    'entidad': r.get('fuente_nombre') or '—', 'estado': 'Expedida',
+                    'cierra': '', 'fecha': r.get('fecha') or '',
+                    'fuente': 'Superintendencias', 'url': r.get('url') or ''})
+        except Exception as e:
+            print(f'[tablero] regulatorio FAIL: {type(e).__name__}: {e}')
+        try:
+            for r in _ejecutivo():
+                if (r.get('fecha') or '')[:4] < corte or not casa(r.get('q')):
+                    continue
+                vigente.append({
+                    'ref': (r.get('numero') or '—'), 'titulo': (r.get('titulo') or '')[:200],
+                    'tipo': (r.get('tipo') or 'Norma').title(), 'entidad': 'Presidencia',
+                    'estado': 'Expedida', 'cierra': '', 'fecha': r.get('fecha') or '',
+                    'fuente': 'Ejecutivo', 'url': r.get('url') or ''})
+        except Exception as e:
+            print(f'[tablero] ejecutivo FAIL: {type(e).__name__}: {e}')
+
+        _rec = lambda xs: sorted(xs, key=lambda r: (r.get('cierra') or r.get('fecha') or ''),
+                                 reverse=not bool(xs and xs[0].get('cierra')))
+        consulta.sort(key=lambda r: r.get('cierra') or '9999')      # el que cierra antes, primero
+        for g in (tramite, vigente, cerrado):
+            g.sort(key=lambda r: r.get('fecha') or '', reverse=True)
+
+        TOPE = 40
+        grupos = [
+            {'k': 'consulta', 'nombre': 'En consulta pública',
+             'nota': 'Tiene plazo corriendo: es lo único donde todavía se puede comentar.',
+             'n': len(consulta), 'items': consulta[:TOPE]},
+            {'k': 'tramite', 'nombre': 'En trámite en el Congreso',
+             'nota': 'Vivo. Puede moverse en cualquier sesión.',
+             'n': len(tramite), 'items': tramite[:TOPE]},
+            {'k': 'vigente', 'nombre': 'Norma expedida y vigente',
+             'nota': 'Ya obliga. Acá se mira cumplimiento, no incidencia.',
+             'n': len(vigente), 'items': vigente[:TOPE]},
+            {'k': 'cerrado', 'nombre': 'Cerrado o archivado',
+             'nota': 'Sin trámite. Queda como antecedente de lo que ya se intentó.',
+             'n': len(cerrado), 'items': cerrado[:TOPE]},
+        ]
+        return _resp(200, {
+            'cliente': {'nombre': s.get('nombre', ''), 'temas': s.get('temas', []),
+                        'empresas': s.get('empresas', [])},
+            'hoy': hoy, 'tope_por_grupo': TOPE,
+            # proyectos que casaban solo dentro del articulado y no en el
+            # título: es la pista de que al perfil le falta un tema
+            'solo_en_texto': solo_texto,
+            'kpis': {'total': len(consulta) + len(tramite) + len(vigente) + len(cerrado),
+                     'consulta': len(consulta), 'tramite': len(tramite),
+                     'vigente': len(vigente), 'cerrado': len(cerrado)},
+            'grupos': grupos})
+
     if action == 'cliente':        # Vista Cliente · radar SIGA sobre los pilares
         # Dos entradas: `perfil` (los temas y las vigiladas DEL cliente, que el
         # frontend trae del KV del worker) o `sector` (uno de los 6 presets, que

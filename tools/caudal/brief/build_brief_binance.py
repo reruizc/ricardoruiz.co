@@ -74,7 +74,7 @@ body {{ font-family:'HN',sans-serif; color:#15171c; background:transparent;
 
 h1 {{ font-size:19.3pt; font-weight:700; line-height:1.14; margin:0 0 7px;
       letter-spacing:-.5px; color:#0b0d11; }}
-h1 .hl {{ color:#0047FF; }}
+h1 .hl {{ color:#2b5672; }}   /* azul de cauce.co, no el #0047FF del sitio */
 .lead {{ font-size:10.1pt; color:#3d434f; font-weight:300; margin:0 0 4px; max-width:168mm; }}
 .window {{ font-size:7.4pt; color:#5a6070; text-transform:uppercase; letter-spacing:.6px;
            margin:9px 0 0; padding-top:7px; border-top:1px solid #dfe2e8; }}
@@ -90,7 +90,7 @@ h1 .hl {{ color:#0047FF; }}
    izquierda. Antes eran solo una franja sobre fondo casi igual al papel y no se
    leían como bloques separados. */
 .item {{ margin:0 0 13px; padding:12px 15px; background:#fdfdfc;
-         border:1px solid #e2e5ea; border-left:3px solid #0047FF;
+         border:1px solid #e2e5ea; border-left:3px solid #2b5672;
          border-radius:2px;
          /* Las cajas FLUYEN entre páginas. Con `page-break-inside:avoid` una
             caja alta que no cabía saltaba entera y dejaba un tercio de página
@@ -121,7 +121,7 @@ b {{ color:#0b0d11; font-weight:700; }}
 .porque {{ page-break-inside:avoid; margin-top:6px; padding:7px 10px; background:#fff; border:1px solid #e2e5ea;
            border-radius:2px; font-size:9.35pt; color:#2b303a; }}
 .porque .et {{ display:block; font-size:7.2pt; letter-spacing:1.1px; text-transform:uppercase;
-               color:#0047FF; font-weight:700; margin-bottom:2px; }}
+               color:#2b5672; font-weight:700; margin-bottom:2px; }}
 .item.urg .porque .et {{ color:#d9480f; }}
 .item.ok  .porque .et {{ color:#2b8a3e; }}
 .item.resumen .porque .et {{ color:#5f3dc4; }}

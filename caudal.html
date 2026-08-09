@@ -563,6 +563,38 @@
     .kpis{grid-template-columns:repeat(2,1fr)} .grid2{grid-template-columns:1fr}
     .funnel-row .lab{width:96px}
   }
+
+  /* ── Expediente del cliente (tablero de estado) ───────────────────────── */
+  .tb-intro{font-size:.86rem;color:#9aa0b0;max-width:62ch;margin:.15rem 0 .7rem;line-height:1.5}
+  .tb-btn{background:transparent;border:1px solid rgba(255,255,255,.22);color:#e8e9ee;
+          font:inherit;font-size:.85rem;padding:.5rem .9rem;border-radius:3px;cursor:pointer}
+  .tb-btn:hover{border-color:#3d6fff;color:#fff}
+  .tb-kpis{display:flex;flex-wrap:wrap;gap:1.1rem;font-size:.82rem;color:#9aa0b0;
+           padding:.6rem 0 .9rem;border-bottom:1px solid rgba(255,255,255,.08)}
+  .tb-kpis b{color:#fff;font-weight:700}
+  .tb-kpis .tb-hoy{margin-left:auto;font-size:.74rem;opacity:.7}
+  .tb-grupo{margin:1.1rem 0;border-left:2px solid rgba(255,255,255,.14);padding-left:.85rem}
+  .tb-grupo.urg{border-left-color:#f97316}
+  .tb-grupo.viv{border-left-color:#3d6fff}
+  .tb-grupo.vig{border-left-color:#4ade80}
+  .tb-grupo.cer{border-left-color:rgba(255,255,255,.2)}
+  .tb-gh{font-size:.92rem;color:#e8e9ee}
+  .tb-gh span{color:#8b90a0;font-size:.8rem;margin-left:.3rem}
+  .tb-gn{font-size:.76rem;color:#8b90a0;margin:.15rem 0 .5rem}
+  .tb-tab{width:100%;border-collapse:collapse;font-size:.8rem}
+  .tb-tab th{text-align:left;font-weight:500;font-size:.68rem;letter-spacing:.5px;
+             text-transform:uppercase;color:#8b90a0;padding:.3rem .6rem .3rem 0;
+             border-bottom:1px solid rgba(255,255,255,.09)}
+  .tb-tab td{padding:.45rem .6rem .45rem 0;vertical-align:top;
+             border-bottom:1px solid rgba(255,255,255,.05);color:#ccd0da}
+  .tb-tab a{color:#ccd0da;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.2)}
+  .tb-tab a:hover{color:#fff;border-color:#3d6fff}
+  .tb-ref{color:#fff;font-weight:700;white-space:nowrap}
+  .tb-q{color:#9aa0b0}
+  .tb-tipo{font-size:.7rem;color:#7d8290;margin-top:.1rem}
+  .tb-cierra{font-size:.7rem;color:#f97316;margin-top:.1rem}
+  .tb-nota{font-size:.76rem;color:#8b90a0;margin-top:.8rem;padding-top:.6rem;
+           border-top:1px solid rgba(255,255,255,.08);max-width:70ch;line-height:1.5}
 </style>
 </head>
 <body>
@@ -2448,7 +2480,60 @@
         <span class="chip" data-p="contratacion">Contratación <b>${con.length}</b></span>
         <span class="chip" data-p="medios">Prensa <b>${medios.length}</b></span>
       </div>
-      <div id="cli-detalle" style="margin-top:1rem"></div>`;
+      <div id="cli-detalle" style="margin-top:1rem"></div>
+
+      <div class="cli-sub" style="margin-top:1.6rem">El expediente de ${esc(cl.nombre)}</div>
+      <div class="tb-intro">El radar de arriba dice <b>qué se movió</b>. Esto dice
+        <b>cómo va cada frente</b>, se haya movido o no — el registro que un equipo
+        suele llevar a mano en un Excel y que se desactualiza solo.</div>
+      <div id="cli-tablero"><button class="tb-btn" id="tb-load">Abrir el expediente →</button></div>`;
+  }
+
+  // ── EXPEDIENTE DEL CLIENTE ───────────────────────────────────────────────
+  // Es la otra mitad del radar y se carga aparte, bajo demanda: recorre los
+  // cuatro pilares completos y no tiene por qué retrasar la primera pantalla.
+  const TB_CLS={consulta:'urg',tramite:'viv',vigente:'vig',cerrado:'cer'};
+  let TB_ARG=null;
+  function tbRender(d){
+    const box=document.getElementById('cli-tablero'); if(!box) return;
+    const k=d.kpis||{};
+    const grupos=(d.grupos||[]).filter(g=>g.n>0).map(g=>`
+      <div class="tb-grupo ${TB_CLS[g.k]||''}">
+        <div class="tb-gh"><b>${esc(g.nombre)}</b> <span>${g.n}</span></div>
+        <div class="tb-gn">${esc(g.nota||'')}</div>
+        <table class="tb-tab">
+          <tr><th style="width:16%">Referencia</th><th style="width:38%">Norma o proyecto</th>
+              <th style="width:24%">Entidad</th><th style="width:12%">Estado</th><th>Fecha</th></tr>
+          ${g.items.map(it=>`<tr>
+            <td class="tb-ref">${esc(it.ref||'—')}</td>
+            <td>${it.url?`<a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.titulo)}</a>`:esc(it.titulo)}
+                <div class="tb-tipo">${esc(it.tipo||'')}</div></td>
+            <td class="tb-q">${esc(it.entidad||'—')}</td>
+            <td class="tb-q">${esc(it.estado||'—')}${it.cierra?`<div class="tb-cierra">cierra ${esc(it.cierra)}</div>`:''}</td>
+            <td class="tb-q">${esc((it.fecha||'').slice(0,10))}</td></tr>`).join('')}
+        </table>
+        ${g.n>g.items.length?`<div class="tb-gn">Se muestran ${g.items.length} de ${g.n}.</div>`:''}
+      </div>`).join('');
+    // El descarte se dice, no se esconde: si un tema importa y solo aparece en
+    // el articulado, la salida es agregarlo al perfil.
+    const nota=d.solo_en_texto?`<div class="tb-nota">${d.solo_en_texto} proyecto(s) más
+      mencionan estos temas dentro de su articulado pero no en el título, así que no entran
+      al expediente. Si alguno debería estar, agrega ese tema al perfil.</div>`:'';
+    box.innerHTML=`<div class="tb-kpis">
+        <span><b>${k.total||0}</b> frentes</span><span><b>${k.consulta||0}</b> en consulta</span>
+        <span><b>${k.tramite||0}</b> en trámite</span><span><b>${k.vigente||0}</b> vigentes</span>
+        <span><b>${k.cerrado||0}</b> cerrados</span>
+        <span class="tb-hoy">al ${esc(d.hoy||'')}</span>
+      </div>${grupos||'<div class="cli-empty">Sin frentes registrados para este perfil.</div>'}${nota}`;
+  }
+  document.addEventListener('click',ev=>{
+    if(ev.target&&ev.target.id==='tb-load'&&TB_ARG) tbLoad(TB_ARG);
+  });
+  async function tbLoad(arg){
+    const box=document.getElementById('cli-tablero'); if(!box) return;
+    box.innerHTML='<div class="llm-load">Armando el expediente <span class="dots"><span></span><span></span><span></span></span></div>';
+    try{ tbRender(await call({action:'tablero',...arg})); }
+    catch(e){ box.innerHTML='<div class="cli-empty">No se pudo armar el expediente. Reintenta en un momento.</div>'; }
   }
   function cliRenderLectura(l){
     const body=document.getElementById('cli-lectura-body'); if(!body) return;
@@ -2483,6 +2568,9 @@
     catch(e){ if(mine===_cliSeq&&body) body.innerHTML='<div class="err">No se pudo cargar el radar. Reintenta.</div>'; return; }
     if(mine!==_cliSeq) return;
     if(d&&d.error){ if(body) body.innerHTML='<div class="err">'+esc(d.error)+'</div>'; return; }
+    // el expediente se pide con el mismo `arg` del radar, pero solo cuando el
+    // usuario lo abre: recorre los cuatro pilares enteros
+    TB_ARG = esPerfil ? {perfil:req.perfil} : {sector:arg.sector};
     cliRender(d);
     // el radar ya está en pantalla; la lectura llega después (o ya venía hecha)
     if(d.lectura && !d.lectura.error) cliRenderLectura(d.lectura);

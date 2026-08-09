@@ -525,6 +525,13 @@ def main():
             'tip': r['tipologia'], 'cf': r['crea_fondo'], 'jp': r['jala_presupuesto_regional'],
             'emp': r['empuje'], 'vs': r['vitrina_score'], 'vp': r['veces_presentado'],
             'ap': r.get('autor_principal'),
+            # Número de radicado. Va en el índice porque es la ÚNICA referencia
+            # que un cliente reconoce: el `id` es interno nuestro, y un tablero
+            # que diga «900003» en vez de «068/2026C» no se puede leer. Se
+            # guarda solo el que exista, para no engordar el índice —se carga
+            # entero en memoria— y con la clave corta como el resto.
+            **({'nc': r['numero_camara']} if r.get('numero_camara') else {}),
+            **({'ns': r['numero_senado']} if r.get('numero_senado') else {}),
             # 'oc':1 = viene del registro de Cámara (nunca cruzó al Senado) →
             # sin fechas de debate ni causa de archivo. Se omite si es del Senado
             # para no engordar el índice, que se carga entero en memoria.
