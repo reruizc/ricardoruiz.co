@@ -6337,10 +6337,18 @@ documento (`P-NNN-ART-NNN-...pdf`, `CT-NNN-...pdf`).
   `proyecto` (ficha + punteros de gaceta). `build_zip.py` empaqueta handler +
   `caudal_core.py` CANÓNICO (sin drift). Guía completa en `setup-lambda.md`.
 - **Desplegada:** función `caudal-analiza` (python3.13, rol `lambda-caudal-analiza`
-  con AWSLambdaBasicExecutionRole + inline `caudal-s3`). **API pública:**
-  `POST https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com` (HTTP API, CORS `*`).
+  con AWSLambdaBasicExecutionRole + inline `caudal-s3`). **Endpoint:**
+  `POST https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com` (HTTP API).
+  ⚠️ **Ya NO es la puerta pública: el frontend habla con el worker** (ver "La
+  puerta pública de la API" abajo). El endpoint sigue vivo para las herramientas
+  locales (alertas, chequeo de salud) y para el propio worker.
   Gotcha: `apigatewayv2 create-api --target` NO agrega el permiso de invocación →
   hay que `lambda add-permission` a mano (si no, 500 con el Lambda corriendo limpio).
+- **Throttle (ago-2026):** el stage `$default` estaba SIN límite. Ahora 25 req/s
+  con ráfaga de 50 y métricas detalladas activadas
+  (`apigatewayv2 update-stage --default-route-settings`). ⚠️ El throttle de API
+  Gateway es **global al stage**: acota la factura pero NO distingue un scraper de
+  un cliente — el límite por IP vive en el worker.
 - **Model-agnostic:** `STEP_MODELS` con provider/model por env var
   (`CAUDAL_SINTESIS_PROVIDER/MODEL`, default `deepseek`/`deepseek-v4-flash`). El
   switch a Claude para la síntesis es cambiar env vars a `anthropic`/`claude-sonnet-5`
@@ -6354,6 +6362,98 @@ documento (`P-NNN-ART-NNN-...pdf`, `CT-NNN-...pdf`).
   síntesis usa `max_tokens=6000`; NO bajarlo. El handler además limpia fences ```json.
 - Cache de síntesis en `analisis-cache/{hash24}.json`, TTL vía `PROMPT_VERSION`
   (va en `v2`). No cachea respuestas con error.
+
+### La puerta pública de la API — worker `/caudal/api` (ago-2026)
+
+Caudal se abre al público en **freemium** (ver `[[project_caudal_freemium_beta]]`):
+cualquiera entra y ve cifras reales; lo que se cobra es la lectura, no el dato
+público. Eso deja la API expuesta a internet, y **la API es el foso**.
+
+⚠️⚠️ **El agujero que había (medido, no teórico):** la Lambda **no validaba NADA**
+—CORS abierto, cualquier acción, sin token— y su URL estaba escrita en
+`caudal.html`, que vive en un **repo público de GitHub**. El gate de los tres
+correos nunca protegió la API: solo escondía la página. Peor, `tema` traía
+`lectura` en **True por defecto**, así que una sola petición anónima disparaba
+**dos** llamadas al modelo (síntesis + expansión de consulta). Llevaba meses así.
+
+**La frontera es por COSTO, no por "parece premium".** De las 23 acciones, **19
+solo leen índices de S3**: cuestan centavos y son lo que se regala (buscar,
+conteos, embudo, bloqueo, sectores, autocompletar). Las **4 caras** llaman al
+modelo o a Serper —que tiene cupo de **2.500 consultas gratis al mes**, el límite
+duro más cercano— y viven del lado del muro.
+
+- **`ACCIONES_CARAS`** en `lambda_handler.py` = `{gaceta, contexto,
+  cliente-lectura}` → **403 sin credencial**, y el rechazo va ANTES de `_caudal()`
+  (decir que no no debe costar cargar ~80 MB de índices).
+- **`tema` con lectura DEGRADA, no rechaza**: el visitante sin acceso recibe el
+  resumen real completo + `lectura_bloqueada:true` y el frontend pinta el muro
+  encima. Un blur sobre un resumen vacío se huele en cinco segundos; sobre cifras
+  reales, vende.
+- **`_expandir_query(q, solo_cache=True)`** para quien no tiene acceso: sirve lo ya
+  cacheado y nunca llama al modelo. No se le quita calidad a la búsqueda gratis
+  (las consultas reales se repiten y hereda lo que ya pagó alguien con acceso),
+  pero nadie abre el grifo con consultas inventadas.
+- **`_con_credencial(event)`** compara el header `X-Caudal-Origin` con
+  `CAUDAL_ORIGIN_SECRET` (comparación de tiempo constante). ⚠️ **Sin la variable en
+  el entorno devuelve True a propósito** (fail-open documentado): así el código
+  puede subir antes que el secreto sin dejar la Lambda muerta en el intermedio.
+  **Si nunca se siembra, esto no protege nada.**
+
+**Worker `rr-auth` · ruta `POST /caudal/api`** — la única puerta pública. Hace tres
+cosas que la Lambda sola no puede: (1) **límite por IP**, (2) **decide quién tiene
+acceso** (sesión + `_caudalAccesoDe`, o token de invitado) y se lo dice a la Lambda
+con el secreto, (3) **esconde** la URL de la Lambda.
+- Topes: **60 peticiones/min anónimo · 240 con acceso** (`CAUDAL_RL_ANON` /
+  `CAUDAL_RL_CLIENTE`). Responde **429 + `Retry-After`**.
+- ⚠️ El contador vive en **KV, que no tiene incremento atómico y limita a una
+  escritura por segundo y por llave**. Bajo ráfagas **SUBCUENTA**: el corte llega
+  más tarde, no deja de llegar (un scraper a 5 req/s se cuenta a ~1/s → salta a
+  los ~60 s en vez de a los ~12 s). Es un limitador suficiente contra scraping,
+  **NO un antifraude**. Exacto sería Durable Objects o la Rate Limiting API nativa.
+- ⚠️ El **token de invitado viaja en el CUERPO** (`_guest`), no en un header: una
+  cabecera propia dispararía preflight y `Access-Control-Allow-Headers` solo admite
+  `Content-Type, Authorization`. El worker lo quita antes de reenviar.
+- Devuelve `X-Caudal-Acceso: 0|1` (con `Access-Control-Expose-Headers`, si no el
+  navegador no puede leerlo).
+- `CAUDAL_ACCIONES_CARAS` se repite en el worker **a propósito**: allá ahorra la
+  invocación, y la de la Lambda es la defensa de verdad si alguien saltara el proxy.
+
+**`ALLOWED_ORIGINS` del worker ahora incluye `http://localhost:{8765,8766,8767}`.**
+Sin eso **ninguna página del sitio se puede probar en local contra el worker** (el
+navegador bloquea la respuesta y la página se va por el camino de "sin sesión") —
+esa era la razón de fondo por la que el click-through de `caudal.html` nunca se
+había podido hacer. No abre nada por sí solo: sigue haciendo falta un token de
+sesión válido, que no se obtiene por CORS.
+
+**Sembrar/rotar el secreto** (va en los DOS lados o no sirve):
+```bash
+S=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))")
+# ⚠️ --environment REEMPLAZA todo el bloque: leer las actuales y reescribir las tres
+V=$(aws lambda get-function-configuration --function-name caudal-analiza --query 'Environment.Variables' --output json)
+N=$(echo "$V" | SECRET="$S" python3 -c "import sys,json,os;v=json.load(sys.stdin);v['CAUDAL_ORIGIN_SECRET']=os.environ['SECRET'];print(json.dumps({'Variables':v}))")
+aws lambda update-function-configuration --function-name caudal-analiza --environment "$N"
+cd /Users/ricardoruiz/rr-auth && echo "$S" | npx wrangler secret put CAUDAL_ORIGIN_SECRET
+```
+⚠️ **Orden de despliegue** (si se rompe, los clientes pierden la lectura): código de
+la Lambda → worker → **HTML en producción** → y solo entonces el secreto. Sembrarlo
+antes de que `caudal.html` apunte al worker deja a los clientes con acceso sin
+lectura, porque su navegador sigue llamando a la Lambda sin credencial.
+
+**Verificado en producción (ago-2026):** Lambda directa sin credencial → 403 en las
+tres caras · con credencial → 200 · `tema` anónimo por el worker → resumen real (68
+intentos) + `lectura_bloqueada` en 1,7 s sin tocar el modelo · `tema` con acceso →
+lectura completa · chequeo de salud **13/13** · rutas del resto del sitio intactas.
+Ninguna herramienta local usa acciones caras (alertas usa `medios`/`cliente`; salud
+manda `lectura:false`), así que sembrar el secreto no las rompe.
+
+🔜 **PENDIENTE CALIENTE · `tema` con lectura se pasa del techo de 30 s del API
+Gateway.** Medido: **HTTP 503 a los 30,7 s** en la primera generación de una
+consulta nueva; la Lambda termina igual y deja la respuesta cacheada, así que el
+reintento la sirve en 1,6 s. **No es regresión del proxy** — la generación siempre
+fue síncrona ahí. Es el MISMO problema que ya se resolvió en la Vista Cliente con
+disparo + sondeo (`cliente-lectura` + `solo_cache`), patrón que **a `tema` nunca se
+le aplicó**. Con Caudal abierto importa más: el primero que busque un tema nuevo ve
+un error. Arreglo = portar el patrón de `cliente` a `tema`.
 
 **Frontend `caudal.html` (LISTO · gated · en producción)** — es el **HOME paraguas**
 (ver "Arquitectura Caudal · paraguas vs pilares"): hero "El Estado, leído", búsqueda
@@ -8555,14 +8655,59 @@ Google News vía la consulta por nombre.
 **Piezas de redes del mismo caso** (Contralor 2026): `tools/contralor-2026/build_img.py` →
 `rrss/instagram/contralor-png/` (imagen 1080×1080 + LEEME con las fuentes de cada cifra).
 
-## ¿Quién quiere ser juez? — `quien-quiere-ser-juez.html` (v1 · ago-2026 · captura de leads B2C)
+## ¿Quién quiere ser juez? — `quien-quiere-ser-juez.html` (v3 · ago-2026 · captura de leads B2C)
+
+> **📌 HANDOFF · estado al 11-ago-2026 — LISTO Y EN PRODUCCIÓN, ya con usuarios reales**
+>
+> **En vivo:** `ricardoruiz.co/quien-quiere-ser-juez.html` (público) ·
+> `ricardoruiz.co/admin-juez.html` (gated, solo `reruizc@gmail.com`, card RR-ADMIN-003
+> en el dashboard). Worker `rr-auth` con las rutas `/juez/*` desplegado.
+> **La base tiene registros reales** — el primero entró el 11-ago 15:48. **NO borrar el
+> KV `juez:reg:*` sin mirar antes quién es**: mis registros de prueba ya se limpiaron
+> todos, lo que quede de aquí en adelante es de usuarios.
+>
+> **Qué es:** simulador tipo millonario para aspirantes a juez/magistrado. El juego es
+> gratis y engancha; **el producto real es la base de datos** (nombre, WhatsApp o correo,
+> universidad) con autorización Ley 1581. Modelo B2C decidido por Ricardo: el upsell es
+> material y simulacros de preparación. Las firmas grandes se descartaron como comprador
+> del lead (el aspirante a juez no es su perfil de reclutamiento).
+>
+> **Lo construido:** 5 salas (civil · penal · laboral · administrativo · disciplinario) ·
+> **225 preguntas** con cita normativa · partidas de 25 con escalera a 1.000 y corte en
+> 800 · 3 comodines · registro de 3 campos · ranking global/sala/universidad ·
+> **diagnóstico del aspirante** post-registro · panel admin con export CSV.
+>
+> **⚠️ Los cuatro aprendizajes que NO se deben deshacer** (cada uno costó un bug o una
+> medición, y están detallados más abajo en su sección):
+> 1. **El 0 se guarda.** Quien cae en la Q1 saca 0; descartarlo hacía que el registro
+>    "no guardara nada" — el caso más probable en la primera partida.
+> 2. **Las opciones se barajan.** El banco tiene el 96% de las respuestas en A o B;
+>    sin barajar, marcar siempre B acierta el 59% sin saber derecho.
+> 3. **El comodín muestra la CITA, nunca la `pista`.** La pista explica la regla y por
+>    tanto regala la respuesta literal.
+> 4. **Ninguna lectura promete resultado en el concurso.** Ni el diagnóstico ni el
+>    puntaje ([[reference_legaltech_riesgo_score]]).
+>
+> **Pendientes, en orden de valor:**
+> 1. **Revisión de abogado** a las **219 preguntas propias** (6 son oficiales de los
+>    instructivos). Cada una trae su `cita` justamente para que la pasada sea rápida.
+>    Es lo único que separa esto de poder moverlo con fuerza.
+> 2. **Música** en `quien-quiere-ser-juez/audio/*.mp3` — los hooks ya existen y fallan
+>    en silencio. ⚠️ Propia o libre: NO la del programa original (derechos Sony), mismo
+>    criterio que obligó a renombrar `combate-electoral`.
+> 3. **Enlazarlo** desde `index.html` / `noticias.html` (hoy solo llega quien recibe el
+>    link) + OG image para que compartir el ranking se vea bien.
+> 4. **Sala de Familia** — la que falta para cubrir las 4 especialidades de Tribunal
+>    Superior. Ver el árbol completo pendiente más abajo.
+> 5. Al crecer el banco: `xlsx_to_json` para que Ricardo edite preguntas en Excel
+>    (patrón `tools/build-banco-preguntas`).
 
 Juego tipo "millonario" para aspirantes al **concurso de méritos de la Rama Judicial**
 (Convocatoria 28, Acuerdo PCSJA25-12348: inscripciones cerraron 1-dic-2025, listado de
 inscritos 13-ene-2026, pruebas escritas AÚN sin aplicar al ago-2026 → ventana comercial
 abierta). **Negocio decidido (ago-2026): B2C** — el juego gratis captura la base
-(nombre, correo, celular, universidad, año de grado, cargo objetivo, consentimiento
-Ley 1581) y el upsell es material/simulacros de preparación. Las firmas grandes quedaron
+(nombre, WhatsApp o correo, universidad, cargo opcional, consentimiento Ley 1581) y el
+upsell es material/simulacros de preparación. Las firmas grandes quedaron
 descartadas como comprador del lead (los aspirantes a juez no son su perfil de
 reclutamiento); academias/editoriales o patrocinio de firma son alternativas vivas.
 
@@ -8571,7 +8716,8 @@ reclutamiento); academias/editoriales o patrocinio de firma son alternativas viv
   Tipo 2 de combinaciones era de 2018 y ya no se usa). Aptitudes 50 (300 pts) +
   Conocimientos 80 (700 pts: 35 general + 45 específico) + Psicotécnica 70
   (clasificatoria). **APRUEBA: 800/1000** — la escalera del juego replica ese umbral
-  (Q13 = 800 = "zona de aprobación"; peldaños seguros Q5 y Q10).
+  (**Q20 = 800 = "zona de aprobación"**, que además es peldaño seguro; los otros seguros
+  van en Q5, Q10 y Q15).
 - **Componente general común**: Filosofía del Derecho · Hermenéutica · Constitucional ·
   Teoría General del Proceso · Teoría General de la Prueba · Ofimática.
 - **22 grupos de específico** (instructivo 2018, extraído completo en su momento):
@@ -8598,7 +8744,8 @@ reclutamiento); academias/editoriales o patrocinio de firma son alternativas viv
   componente general + **40 por cada una de las 5 salas** (civil · penal · laboral ·
   administrativo · disciplinario). Niveles n:1/2/3 (~13 por nivel por sala), cada una con `cita`
   (norma/sentencia) + `pista` (explicación completa; SOLO se usa al final, ver el aviso del comodín) + `f`
-  (oficial|propia). **10 preguntas son `oficial`** = ejemplos publicados con respuesta
+  (oficial|propia). **6 preguntas son `oficial`** (c13 · p06 · p13 · l11 · l12 · a22)
+  = ejemplos publicados con respuesta
   en los instructivos C22/C27 (2 de ellas laborales: art. 66 y art. 128 CST).
   ⚠️⚠️ **El banco tiene un sesgo posicional brutal que NO se corrige reescribiéndolo:**
   el 96% de las respuestas correctas están en A o B (medido: A 36% · B 59% · C 3% ·
