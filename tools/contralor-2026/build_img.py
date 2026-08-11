@@ -15,7 +15,17 @@ Fuentes de cada dato en LEEME.md. Sistema visual v2 (oscuro + Helvetica Neue).
 import os
 from PIL import Image, ImageDraw, ImageFont
 
-W = H = 1080
+# Se dibuja en coordenadas de 1080 y se renderiza a ESCALA×: 1080 es el mínimo
+# de Instagram y se veía suave. Todo pasa por u() y F(), así que subir ESCALA
+# no descuadra nada.
+ESCALA = 2
+BASE = 1080
+W = H = BASE * ESCALA
+
+
+def u(v):
+    """Coordenada/medida del diseño (en base 1080) al lienzo real."""
+    return int(round(v * ESCALA))
 BG        = (6, 8, 16)
 INK       = (244, 243, 239)
 MUTE      = (150, 158, 178)
@@ -31,8 +41,11 @@ LINE      = (38, 44, 64)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FDIR = os.path.join(ROOT, 'reforma-tributaria-2026', 'fonts')
 def F(name, size):
-    return ImageFont.truetype(os.path.join(FDIR, name), size)
+    return ImageFont.truetype(os.path.join(FDIR, name), max(1, u(size)))
 BOLD, MED, REG = 'helveticaneue-bold.ttf', 'helveticaneue-medium.ttf', 'helveticaneue.ttf'
+# El logo del sitio va en Syne 800; Helvetica no lo reemplaza.
+SYNE = os.path.join(os.path.dirname(ROOT), 'tools', 'build-cotizacion-campana',
+                    'fonts', 'Syne-ExtraBold.ttf')
 
 # --- datos: MISMA fuente de verdad que quien-queda.html --------------------
 # Se leen del estado que produce tools/pronosticos/motor.py, para que la imagen
@@ -44,13 +57,17 @@ ESTADO_LOCAL = os.path.join(os.path.dirname(ROOT), 'Bases de datos',
                             'pronosticos', 'contralor-2026.json')
 # Respaldos en una línea para la pieza (el motor guarda el score, no la frase).
 RESP_TXT = {
-    'laverde':  "Liberales (Lidio García, Simón Gaviria) · toma ventaja esta semana",
-    'castro':   "Procurador Eljach + sectores del Pacto · el otro contendor real",
-    'zuluaga':  "Se le desgranaron los votos que lo sostenían",
+    'laverde':  "Liberales (Lidio García, Simón Gaviria) · va adelante en el duelo final",
+    'castro':   "Procurador Eljach + sectores del Pacto · el otro finalista",
+    'zuluaga':  "Le quitaron 68 votos: quedó fuera de la pelea",
     'monsalvo': "El gobierno se apartó: no cogió vuelo entre las bancadas",
     'abadia':   "Ganó el concurso y sigue sin padrino político",
     'torres':   "Perfil técnico, sin padrino visible",
 }
+# Kicker y bajada de la pieza. Se editan aquí porque dependen del día.
+KICKER = "·  12 DE AGOSTO DE 2026  ·  VOTO SECRETO"
+BAJADA_FUERTE = "La carrera se redujo a dos. "
+BAJADA_SUAVE = "El Centro Democrático (48 curules) define hoy."
 
 
 def cargar_estado(local=False):
@@ -104,34 +121,34 @@ def build(out, CAND, ABADIA, est):
     for i in range(70, 0, -1):
         a = i / 70
         col = (int(6 + 20 * a * a), int(8 + 26 * a * a), int(16 + 74 * a * a))
-        gd.ellipse([W * .5 - 620 * a, -420 - 180 * a, W * .5 + 620 * a, 300 + 120 * a], fill=col)
+        gd.ellipse([W * .5 - u(620) * a, u(-420 - 180 * a),
+                    W * .5 + u(620) * a, u(300 + 120 * a)], fill=col)
     img = Image.blend(img, glow, .55)
     d = ImageDraw.Draw(img)
 
-    M = 64
-    y = 52
+    M = u(64)
+    y = u(52)
 
     # kicker
     d.text((M, y), "CONGRESO EN PLENO", font=F(BOLD, 20), fill=BLUE_SOFT)
     kw = d.textlength("CONGRESO EN PLENO", font=F(BOLD, 20))
-    d.text((M + kw + 13, y), "·  12 DE AGOSTO DE 2026  ·  VOTO SECRETO", font=F(MED, 20), fill=DIM)
-    y += 40
+    d.text((M + kw + u(13), y), KICKER, font=F(MED, 20), fill=DIM)
+    y += u(40)
 
     # título
-    d.text((M, y), "¿Quién será el próximo", font=F(BOLD, 55), fill=INK); y += 58
-    d.text((M, y), "Contralor General?", font=F(BOLD, 55), fill=INK); y += 72
+    d.text((M, y), "¿Quién será el próximo", font=F(BOLD, 55), fill=INK); y += u(58)
+    d.text((M, y), "Contralor General?", font=F(BOLD, 55), fill=INK); y += u(72)
 
-    sub1 = "El Centro Democrático (47 votos) define mañana. "
-    d.text((M, y), sub1, font=F(BOLD, 23), fill=INK)
-    d.text((M + d.textlength(sub1, font=F(BOLD, 23)), y), "Detrás se alinean las demás.",
+    d.text((M, y), BAJADA_FUERTE, font=F(BOLD, 23), fill=INK)
+    d.text((M + d.textlength(BAJADA_FUERTE, font=F(BOLD, 23)), y), BAJADA_SUAVE,
            font=F(MED, 23), fill=MUTE)
-    y += 46
+    y += u(46)
 
     # --- filas ---
-    BARX, BARW, BARH = M, 660, 14
+    BARX, BARW, BARH = M, u(660), u(14)
     for c in CAND:
         top = y
-        rr(d, [M - 20, top - 14, W - M + 20, top + 126], 20, fill=CARD)
+        rr(d, [M - u(20), top - u(14), W - M + u(20), top + u(126)], u(20), fill=CARD)
 
         d.text((BARX, top), c["ape"], font=F(BOLD, 34), fill=INK)
 
@@ -139,15 +156,15 @@ def build(out, CAND, ABADIA, est):
         num = f'{c["idx"]}%'
         nf = F(BOLD, 54)
         nw = d.textlength(num, font=nf)
-        d.text((W - M - nw - 32, top - 8), num, font=nf, fill=INK)
+        d.text((W - M - nw - u(32), top - u(8)), num, font=nf, fill=INK)
         if c["tend"] != 0:
             col = GREEN if c["tend"] > 0 else RED
-            tri(d, W - M - 13, top + 22, 10, c["tend"] > 0, col)
+            tri(d, W - M - u(13), top + u(22), u(10), c["tend"] > 0, col)
 
-        d.text((BARX, top + 42), c["cargo"], font=F(REG, 20), fill=MUTE)
+        d.text((BARX, top + u(42)), c["cargo"], font=F(REG, 20), fill=MUTE)
 
         # barra
-        by = top + 72
+        by = top + u(72)
         rr(d, [BARX, by, BARX + BARW, by + BARH], BARH // 2, fill=(24, 28, 44))
         wpx = int(BARW * c["idx"] / lider)
         grad = Image.new('RGB', (max(wpx, 1), BARH))
@@ -162,44 +179,61 @@ def build(out, CAND, ABADIA, est):
         img.paste(grad, (BARX, by), mask)
         d = ImageDraw.Draw(img)
 
-        d.text((BARX + BARW + 18, by - 4), f"concurso {c['pts']:.2f}".replace('.', ','),
+        d.text((BARX + BARW + u(18), by - u(4)), f"concurso {c['pts']:.2f}".replace('.', ','),
                font=F(MED, 18), fill=DIM)
 
         # respaldo, dentro de la misma tarjeta
         # (Helvetica no trae flechas/triángulos: se dibuja el bullet a mano)
-        cy = by + 36
-        d.polygon([(BARX + 1, cy - 6), (BARX + 1, cy + 6), (BARX + 10, cy)], fill=BLUE_SOFT)
-        d.text((BARX + 22, by + 26), c["resp"], font=F(REG, 19), fill=(178, 186, 206))
+        cy = by + u(36)
+        d.polygon([(BARX + u(1), cy - u(6)), (BARX + u(1), cy + u(6)),
+                   (BARX + u(10), cy)], fill=BLUE_SOFT)
+        d.text((BARX + u(22), by + u(26)), c["resp"], font=F(REG, 19), fill=(178, 186, 206))
 
-        y += 152
+        y += u(152)
 
     # --- contraste Abadía ---
-    y += 4
-    rr(d, [M - 20, y, W - M + 20, y + 86], 18, fill=(26, 18, 10), outline=(74, 52, 22), w=2)
-    d.text((M, y + 15), "EL QUE GANÓ EL CONCURSO NO TIENE VOTOS", font=F(BOLD, 19), fill=AMBER)
+    y += u(4)
+    rr(d, [M - u(20), y, W - M + u(20), y + u(86)], u(18),
+       fill=(26, 18, 10), outline=(74, 52, 22), w=u(2))
+    d.text((M, y + u(15)), "EL QUE GANÓ EL CONCURSO NO TIENE VOTOS", font=F(BOLD, 19), fill=AMBER)
     p1 = f"{ABADIA['nom']} sacó 86,74, el mejor de los diez. "
-    d.text((M, y + 45), p1, font=F(MED, 20), fill=INK)
-    d.text((M + d.textlength(p1, font=F(MED, 20)), y + 45),
+    d.text((M, y + u(45)), p1, font=F(MED, 20), fill=INK)
+    d.text((M + d.textlength(p1, font=F(MED, 20)), y + u(45)),
            f"Sigue sin padrino: {ABADIA['idx']}%.", font=F(REG, 20), fill=MUTE)
-    y += 104
+    y += u(104)
 
-    # --- footer ---
+    # --- footer: texto a la izquierda, logo a la derecha, sin pisarse ---
     ts = str(est.get('actualizado', ''))[:16].replace('T', ' ')
-    d.line([(M, y), (W - M, y)], fill=LINE, width=1); y += 15
-    d.text((M, y), "Índice propio, no es encuesta ni mercado de apuestas. Pesos: respaldo político declarado",
-           font=F(REG, 16), fill=DIM)
-    d.text((M, y + 20), f"en prensa 60% · presencia en el reporteo 25% · concurso 15%. "
-                        f"Se actualiza cada 6 h · {ts}",
-           font=F(REG, 16), fill=DIM)
+    d.line([(M, y), (W - M, y)], fill=LINE, width=u(1)); y += u(16)
 
-    # logo
-    lx, ly = W - M - 196, y + 4
-    for i, hgt in enumerate([26, 18, 30, 22]):
-        d.rectangle([lx + i * 11, ly + (30 - hgt), lx + i * 11 + 6, ly + 30], fill=BLUE_SOFT)
-    d.text((lx + 58, ly + 4), "ricardoruiz.co", font=F(BOLD, 22), fill=INK)
+    # el logo se mide primero para saber cuánto ancho le queda al texto
+    bw, gap, alturas = u(5), u(3), [u(20), u(15), u(9), u(4)]   # descendentes, como en la web
+    ftxt = ImageFont.truetype(SYNE, u(24))
+    tw = d.textlength("Ricardo.Ruiz", font=ftxt)
+    barras_w = len(alturas) * bw + (len(alturas) - 1) * gap
+    logo_w = barras_w + u(9) + int(tw)
+    lx = W - M - logo_w
 
-    img.save(out, quality=95)
-    print("→", out)
+    fpie = F(REG, 16)
+    l1 = "Índice propio, no es encuesta ni mercado de apuestas · ricardoruiz.co/quien-queda"
+    l2 = f"Respaldo 60% · reporteo 25% · concurso 15% · se actualiza cada 6 h · {ts}"
+    ancho_libre = lx - M - u(26)
+    for txt, dy in ((l1, 0), (l2, u(21))):
+        while d.textlength(txt, font=fpie) > ancho_libre and len(txt) > 20:
+            txt = txt[:-2]                      # nunca invade la zona del logo
+        d.text((M, y + dy), txt, font=fpie, fill=DIM)
+
+    base_y = y + u(34)                          # centrado contra las dos líneas
+    for i, hgt in enumerate(alturas):
+        x0 = lx + i * (bw + gap)
+        d.rounded_rectangle([x0, base_y - hgt, x0 + bw, base_y], radius=u(1), fill=BLUE)
+    tx, ty = lx + barras_w + u(9), base_y - u(21)
+    for parte, color in (("Ricardo", INK), (".", BLUE_SOFT), ("Ruiz", INK)):
+        d.text((tx, ty), parte, font=ftxt, fill=color)
+        tx += d.textlength(parte, font=ftxt)
+
+    img.save(out, quality=96)
+    print("→", out, f"({W}×{H})")
 
 
 if __name__ == '__main__':

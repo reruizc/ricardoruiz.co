@@ -1,6 +1,9 @@
 # Contralor General 2026-2030 · pieza IG "mercado de predicción"
 
-`contralor-mercado.png` (1080×1080) · genera `tools/contralor-2026/build_img.py`
+`contralor-mercado.png` (**2160×2160**) · genera `tools/contralor-2026/build_img.py`
+Se dibuja en coordenadas de 1080 y se renderiza a `ESCALA=2`: a 1080 (el mínimo de
+Instagram) se veía suave. Todo pasa por `u()` y `F()`, así que subir `ESCALA` no
+descuadra el layout. Las cifras las lee del estado del motor, nunca a mano.
 Corte de datos: **10 de agosto de 2026, 8:00 a. m.** (v2 · el corte anterior fue el 6-ago).
 
 ## Lo primero: la fecha es el 12, no el 13
