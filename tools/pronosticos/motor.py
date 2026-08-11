@@ -410,6 +410,9 @@ def calcular(mercado, respaldo, conv):
                + PESOS['puntaje'] * pn)
         filas.append({**{k: c[k] for k in
                          ('id', 'nombre', 'corto', 'cargo', 'pts')},
+                      'color': c.get('color', '#626a7e'),
+                      'apoyo': c.get('apoyo', ''),
+                      'foto': bool(c.get('foto')),
                       'respaldo': respaldo.get(c['id'], c['respaldo']),
                       'convergencia': conv.get(c['id'], 0),
                       'indice': round(idx)})

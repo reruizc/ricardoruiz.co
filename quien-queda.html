@@ -85,8 +85,16 @@ h1{font-size:clamp(2.4rem,7vw,3.9rem); font-weight:700; letter-spacing:-.035em; 
 .rows{margin-top:20px; display:flex; flex-direction:column; gap:3px}
 .row{display:grid; grid-template-columns:1fr auto; gap:4px 14px; padding:13px 0; border-top:1px solid rgba(255,255,255,.05)}
 .row:first-child{border-top:0}
+.rwho{display:flex; gap:13px; align-items:flex-start; min-width:0}
+.ava{position:relative; flex:0 0 auto; width:46px; height:46px; border-radius:50%;
+  overflow:hidden; background:#141a2c; border:2px solid var(--line);
+  display:flex; align-items:center; justify-content:center}
+.ava img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:top center}
+.ava b{font-size:.9rem; font-weight:700; letter-spacing:-.02em}
 .rname{font-weight:500; font-size:1.06rem; letter-spacing:-.01em}
 .rcargo{color:var(--dim); font-size:.81rem; margin-top:1px}
+.rapoyo{display:flex; align-items:center; gap:6px; margin-top:5px; font-size:.76rem; color:var(--mute)}
+.rapoyo i{width:8px;height:8px;border-radius:2px;display:block;flex:0 0 auto}
 .rnums{display:flex; align-items:baseline; gap:8px; justify-self:end}
 .rprob{font-size:1.62rem; font-weight:700; letter-spacing:-.03em; line-height:1; font-variant-numeric:tabular-nums}
 .delta{font-size:.8rem; font-weight:500; font-variant-numeric:tabular-nums}
@@ -126,6 +134,15 @@ h1{font-size:clamp(2.4rem,7vw,3.9rem); font-weight:700; letter-spacing:-.035em; 
 .chart-leg i{width:11px; height:11px; border-radius:3px; display:block; flex:0 0 auto}
 .chart-leg b{color:var(--ink); font-weight:500}
 #hemi{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 14px 8px}
+.toggle{display:inline-flex; gap:3px; background:#111629; border:1px solid var(--line);
+  border-radius:10px; padding:3px; margin:0 0 14px}
+.toggle button{background:none; border:0; color:var(--mute); font:inherit; font-size:.83rem;
+  padding:7px 13px; border-radius:7px; cursor:pointer; transition:background .18s,color .18s}
+.toggle button.on{background:var(--blue); color:#fff; font-weight:500}
+.toggle button:not(.on):hover{color:var(--ink)}
+.escwarn{background:rgba(249,158,52,.07); border:1px solid rgba(249,158,52,.3);
+  border-radius:10px; padding:11px 14px; margin-top:12px; font-size:.83rem; color:var(--mute)}
+.escwarn b{color:var(--amber); font-weight:700}
 .seat{transition:opacity .2s}
 .hemi-mid{font-size:.74rem; fill:var(--dim); text-anchor:middle}
 .hemi-big{font-size:1.5rem; font-weight:700; fill:var(--ink); text-anchor:middle}
@@ -217,9 +234,12 @@ footer a:hover{color:var(--blue2)}
 
 <section class="sec">
   <h2>Dónde están los votos</h2>
-  <p class="sub">Las 285 curules del Congreso, agrupadas por bancada. El color indica hacia
-    dónde se inclina cada bloque <em>según el reporteo</em>; el gris es lo que todavía no
-    está definido — que hoy es casi todo.</p>
+  <p class="sub">Las 285 curules del Congreso, agrupadas por bancada y pintadas con el color
+    del candidato hacia el que se inclinan.</p>
+  <div class="toggle" id="hemi-toggle">
+    <button data-v="conf" class="on">Lo confirmado</button>
+    <button data-v="esc">Escenario probable</button>
+  </div>
   <div id="hemi"></div>
   <div class="chart-leg" id="hemi-leg"></div>
   <p class="sub" id="hemi-nota" style="margin-top:14px"></p>
@@ -336,12 +356,17 @@ function pintarPulso(m){
 function fila(f,i,lider){
   const d=f.delta, cls=d==null||d===0?'flat':(d>0?'up':'down');
   const txt=d==null?'':(d===0?'=':(d>0?'▲ ':'▼ ')+Math.abs(d));
+  const c=colorDe[f.id]||'#626a7e';
   return '<div class="row '+(i===0?'lead':'')+(i>4?' tail':'')+'">'+
-    '<div><div class="rname">'+esc(f.nombre)+'</div>'+
-      '<div class="rcargo">'+esc(f.cargo)+'</div></div>'+
+    '<div class="rwho">'+avatar(f)+
+      '<div><div class="rname">'+esc(f.nombre)+'</div>'+
+      '<div class="rcargo">'+esc(f.cargo)+'</div>'+
+      (f.apoyo?'<div class="rapoyo"><i style="background:'+c+'"></i>'+esc(f.apoyo)+'</div>':'')+
+      '</div></div>'+
     '<div class="rnums"><span class="rprob">'+f.prob+'%</span>'+
       '<span class="delta '+cls+'">'+txt+'</span></div>'+
-    '<div class="bar"><i data-w="'+Math.round(100*f.prob/lider)+'"></i></div>'+
+    '<div class="bar"><i data-w="'+Math.round(100*f.prob/lider)+'" '+
+      'style="background:linear-gradient(90deg,'+c+'aa,'+c+')"></i></div>'+
   '</div>';
 }
 
@@ -381,10 +406,29 @@ function anima(root){
   root.querySelectorAll('.bar i').forEach(el=>{el.style.width=el.dataset.w+'%';});
 }
 
-/* ── colores por candidato (estables entre el gráfico y el hemiciclo) ── */
+/* ── color de cada candidato = la bancada que lo empuja ──
+   Ojo: es el color del bloque que lo respalda, NO su militancia. Ninguno de
+   los diez es militante de un partido; lo dice la etiqueta bajo cada nombre. */
 const COL=['#3d6fff','#4ade80','#f99e34','#c084fc','#22d3ee','#ef5b5b'];
 const colorDe={};
-function asignarColores(m){ (m.tabla||[]).forEach((f,i)=>{ colorDe[f.id]=COL[i]||'#626a7e'; }); }
+function asignarColores(m){
+  (m.tabla||[]).forEach((f,i)=>{ colorDe[f.id]=f.color||COL[i]||'#626a7e'; });
+}
+
+/* Avatar: foto si el mercado la declara, si no las iniciales sobre el color de
+   su bancada. Se pide sólo con el flag `foto` en mercados.json — sondear el
+   archivo a ciegas dejaba un 404 por candidato en la consola de una página
+   pública. Para activar una: poner la imagen en fotos-candidatos/<id>.jpg y
+   marcar "foto": true en ese candidato. */
+function avatar(f){
+  const ini=esc((f.nombre||'').split(/\s+/).filter(Boolean).slice(0,2)
+              .map(p=>p[0]).join('').toUpperCase());
+  const c=colorDe[f.id]||'#626a7e';
+  return '<span class="ava" style="border-color:'+c+'">'+
+    (f.foto?'<img src="fotos-candidatos/'+esc(f.id)+'.jpg" alt="" loading="lazy" '+
+      'onerror="this.remove()">':'')+
+    '<b style="color:'+c+'">'+ini+'</b></span>';
+}
 
 /* ── serie temporal ── */
 function pintarSerie(m){
@@ -429,17 +473,25 @@ function pintarSerie(m){
     H.length+' revisiones desde el '+fFecha(H[0].ts)+'.';
 }
 
-/* ── hemiciclo: 285 curules reales, coloreadas por inclinación reportada ── */
+/* ── hemiciclo: 285 curules reales ──
+   Dos vistas: 'conf' = sólo lo que la prensa reporta como respaldo declarado;
+   'esc' = reparto estimado por señales, rotulado como escenario. Nunca se
+   mezclan: el toggle obliga a decir cuál se está mirando. */
+let VISTA_HEMI='conf';
 function pintarHemiciclo(m){
   if(typeof ELECTOS==='undefined'||typeof bancadaOf==='undefined'){
     $('#hemi').innerHTML='<p class="sub">No se pudo cargar la composición del Congreso.</p>'; return;
   }
+  const esEsc=VISTA_HEMI==='esc';
   // curules reales por bancada, del escrutinio
   const porBanc={};
   ELECTOS.forEach(e=>{ const b=bancadaOf(e.partido); (porBanc[b.name]=porBanc[b.name]||{n:0}).n++; });
-  // inclinación declarada
+  // inclinación: declarada o estimada según la vista
   const incl={};
-  (m.bancadas||[]).forEach(b=>{ incl[b.match]={hacia:b.hacia,nota:b.nota,clave:b.clave,fuente:b.fuente}; });
+  (m.bancadas||[]).forEach(b=>{ incl[b.match]={
+    hacia: esEsc ? (b.escenario||null) : (b.hacia||null),
+    nota: esEsc ? (b.escenario_nota||b.nota) : b.nota,
+    clave:b.clave, fuente:b.fuente }; });
   // orden político aproximado, izquierda → derecha
   const ORDEN=['Pacto Histórico','Estatuto de Oposición','Alianza Verde','Alianza por Colombia',
     'Indígenas','Afro y raizal','Curules de paz (CITREP)','Otros y coaliciones','Partido Liberal',
@@ -489,7 +541,7 @@ function pintarHemiciclo(m){
   }
   const definidas=asientos.filter(s=>s.hacia).length;
   sv+=`<text class="hemi-big" x="${cx}" y="${cy-58}">${definidas} de ${N}</text>`+
-      `<text class="hemi-mid" x="${cx}" y="${cy-34}">curules con respaldo declarado</text>`+
+      `<text class="hemi-mid" x="${cx}" y="${cy-34}">curules ${esEsc?'con inclinación estimada':'con respaldo declarado'}</text>`+
       `<text class="hemi-mid" x="${cx}" y="${cy-14}" style="font-size:.8rem;fill:#f99e34">`+
       `se necesitan 144 para elegir</text>`;
   $('#hemi').innerHTML=`<svg viewBox="0 0 ${W} ${cy+18}" role="img"
@@ -510,11 +562,30 @@ function pintarHemiciclo(m){
 
   const clave=(m.bancadas||[]).find(b=>b.clave);
   const nb=clave?nombres.find(n=>n===clave.match):null;
-  $('#hemi-nota').innerHTML = clave
+  let pie = clave
     ? '<b style="color:var(--ink);font-weight:500">'+esc(clave.match)+
       (nb?' ('+porBanc[nb].n+' curules)':'')+':</b> '+esc(clave.nota)+
       ' <span style="color:var(--dim)">— '+esc(clave.fuente)+'</span>'
     : '';
+  if(esEsc){
+    pie+='<div class="escwarn"><b>Esto es un escenario, no un hecho.</b> '+
+      'Ninguna bancada ha publicado a quién vota y el voto es secreto. El reparto '+
+      'sale de las señales del reporteo — que el Conservador venía con Zuluaga por '+
+      'Efraín Cepeda, que sectores del Pacto se reunieron con Castro — y puede '+
+      'desmentirse el mismo miércoles. Lo único confirmado está en la otra vista.</div>';
+  }
+  $('#hemi-nota').innerHTML=pie;
+
+  const tg=$('#hemi-toggle');
+  if(tg && !tg.dataset.wired){
+    tg.dataset.wired='1';
+    tg.addEventListener('click',ev=>{
+      const b=ev.target.closest('button[data-v]'); if(!b) return;
+      VISTA_HEMI=b.dataset.v;
+      [...tg.querySelectorAll('button')].forEach(x=>x.classList.toggle('on',x===b));
+      pintarHemiciclo(m);
+    });
+  }
 }
 
 function pintarLog(m){
