@@ -11,11 +11,12 @@ y una sesión de estudio son 10-20 partidas.
 ## Storage KV (`RR_STORE`)
 
 ```
-juez:reg:<correo>        registro + mejores puntajes del jugador (JSON)
+juez:reg:<correoKey>     registro + mejores puntajes del jugador (JSON)
+juez:rank-cache:<tab>    ranking precomputado, TTL 300s (se borra en cada save)
 ```
 
 Una sola llave por jugador: el registro (nombre, apellido, correo, cel,
-universidad, grado, cargo, consent, ts) + `best` = `{civil, penal, administrativo}`.
+universidad, grado, cargo, consent, ts) + `best` = `{civil, penal, laboral, administrativo}`.
 Reenvíos actualizan `best` con `max()` por sala y conservan `createdAt`.
 
 ## Endpoints
@@ -26,10 +27,10 @@ Body: `{nombre, apellido, correo, cel, universidad, grado, cargo, consent, best:
 Validación:
 - `consent === true` obligatorio (Ley 1581 — sin autorización no se guarda).
 - correo con regex simple; cel `^3\d{9}$`; nombre/apellido/universidad no vacíos, ≤120 chars.
-- `best`: solo llaves en `{civil, penal, administrativo}`, valores enteros 0..1000.
+- `best`: solo llaves en `{civil, penal, laboral, administrativo}`, valores enteros 0..1000.
 - Merge: `best[sala] = Math.max(prev, nuevo)`; conservar `createdAt` del primer envío.
 
-### `GET /juez/ranking?tab=global|civil|penal|administrativo|uni` — sin auth, público
+### `GET /juez/ranking?tab=global|civil|penal|laboral|administrativo|uni` — sin auth, público
 Lista hasta 25 filas `{nombre, universidad, pts}`:
 - `global`: max de `best` por jugador, desc.
 - por sala: `best[sala]` desc.

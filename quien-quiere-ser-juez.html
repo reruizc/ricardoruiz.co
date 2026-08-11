@@ -6,7 +6,7 @@
 <title>¿Quién quiere ser juez? · Entrena para el concurso de la Rama Judicial</title>
 <meta name="description" content="Simulador tipo concurso de televisión para aspirantes a jueces y magistrados. Preguntas con cita normativa, escalera de 1.000 puntos como el examen real y ranking por especialidad y universidad.">
 <meta property="og:title" content="¿Quién quiere ser juez? · Entrena para el concurso">
-<meta property="og:description" content="15 preguntas, 3 comodines y la zona de aprobación en 800/1.000 — como el examen real. ¿Llegas a la silla?">
+<meta property="og:description" content="20 preguntas, 3 comodines y la zona de aprobación en 800/1.000 — como el examen real. ¿Llegas a la silla?">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -63,7 +63,10 @@ h1 em{font-style:normal;color:var(--blue2)}
 .fact{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 18px;min-width:130px}
 .fact b{display:block;font-size:1.4rem;color:var(--gold);font-weight:700}
 .fact span{font-size:.76rem;color:var(--dim)}
-.salas{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin:30px 0 8px}
+/* 4 en fila en desktop · 2x2 en tablet · 1 en móvil. Aguanta crecer a 8 salas sin dejar huérfanas. */
+.salas{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:30px 0 8px}
+@media(max-width:900px){.salas{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.salas{grid-template-columns:1fr}}
 .sala{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 20px;cursor:pointer;
   transition:transform .15s,border-color .15s;text-align:left;position:relative;overflow:hidden}
 .sala:hover{transform:translateY(-3px);border-color:var(--blue2)}
@@ -225,7 +228,7 @@ footer b{color:var(--mute)}
   <header>
     <div class="kicker">Entrena para la Convocatoria de la Rama Judicial</div>
     <h1>¿Quién quiere ser <em>juez</em>?</h1>
-    <p class="tagline">15 preguntas, 3 comodines y una escalera de 1.000 puntos con la zona de aprobación
+    <p class="tagline">20 preguntas, 3 comodines y una escalera de 1.000 puntos con la zona de aprobación
     en <b>800</b> — el mismo umbral del examen real. Cada respuesta te muestra la norma o la sentencia que la sustenta.</p>
   </header>
 
@@ -237,7 +240,7 @@ footer b{color:var(--mute)}
   </div>
 
   <div class="salas" id="salas-grid"></div>
-  <p class="soon-note">Próximamente: Laboral · Familia · Promiscuos · Disciplinario — el árbol completo de la convocatoria.</p>
+  <p class="soon-note">Próximamente: Familia · Promiscuos · Ejecución de Penas · Disciplinario — el árbol completo de la convocatoria.</p>
 
   <div class="home-rank">
     <h2>Los mejores del simulador</h2>
@@ -360,9 +363,10 @@ footer b{color:var(--mute)}
    ============================================================ */
 const API = 'https://rr-auth.reruizc.workers.dev';   // rutas /juez/* (fallback localStorage si 404)
 const B = window.BANCO_JUDICIAL;
-const LADDER = [25,50,90,140,200,270,340,410,480,550,650,750,800,900,1000];
-const SAFE = [4,9];          // Q5 y Q10 (índices)
-const ZONE = 12;             // Q13 = 800 = zona de aprobación
+const LADDER = [20,45,75,110,150,195,245,300,360,425,495,565,635,690,750,800,850,900,950,1000];
+const NQ = LADDER.length;    // 20 preguntas por partida
+const SAFE = [4,9,14];       // Q5, Q10 y Q15 (índices) — peldaños seguros
+const ZONE = 15;             // Q16 = 800 = zona de aprobación del examen real
 const T_LIMIT = 60;
 
 /* ---- audio hooks: Ricardo agrega los mp3 en quien-quiere-ser-juez/audio/ ----
@@ -398,7 +402,7 @@ function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;
 function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
 function seenKey(sala){ return 'jz-seen-'+sala; }
 function getSeen(sala){ try{return JSON.parse(localStorage.getItem(seenKey(sala))||'[]')}catch(e){return[]} }
-function addSeen(sala,ids){ const s=[...new Set([...getSeen(sala),...ids])].slice(-60); localStorage.setItem(seenKey(sala),JSON.stringify(s)); }
+function addSeen(sala,ids){ const s=[...new Set([...getSeen(sala),...ids])].slice(-80); localStorage.setItem(seenKey(sala),JSON.stringify(s)); }
 
 /* ---- vistas ---- */
 function showView(v){
@@ -409,18 +413,21 @@ function showView(v){
   if(v==='home'){ stopLoop(); renderHome(); }
 }
 
-/* ---- selección de preguntas: 5 fáciles · 5 medias · 5 difíciles ---- */
+/* ---- selección: 7 fáciles · 7 medias · 6 difíciles = 20 ----
+   Mezcla componente general (común a todos los cargos) con el específico
+   de la sala, igual que el examen real. ---- */
+const CUPOS = { 1:7, 2:7, 3:6 };
 function pickQuestions(sala){
   const seen = getSeen(sala);
   const pool = tier => {
-    const own = B[sala].filter(q=>q.n===tier);
-    const gen = B.general.filter(q=>q.n===tier);
-    // general entra a la mezcla, más presente en niveles bajos (como el componente general real)
-    const mix = tier===1 ? own.concat(gen) : tier===2 ? own.concat(gen) : own.concat(gen);
+    const mix = B[sala].filter(q=>q.n===tier).concat(B.general.filter(q=>q.n===tier));
     const fresh = mix.filter(q=>!seen.includes(q.id));
-    return shuffle(fresh.length>=5 ? fresh : mix.slice());
+    // si lo fresco no alcanza para el cupo, completa con las ya vistas
+    const base = fresh.length >= CUPOS[tier] ? fresh
+               : shuffle(fresh).concat(shuffle(mix.filter(q=>seen.includes(q.id))));
+    return shuffle(base.slice());
   };
-  const qs = [...pool(1).slice(0,5), ...pool(2).slice(0,5), ...pool(3).slice(0,5)];
+  const qs = [...pool(1).slice(0,CUPOS[1]), ...pool(2).slice(0,CUPOS[2]), ...pool(3).slice(0,CUPOS[3])];
   addSeen(sala, qs.map(q=>q.id));
   return qs;
 }
@@ -450,12 +457,12 @@ function renderLadder(){
 function renderQuestion(){
   const q = STATE.qs[STATE.idx];
   $('q-tema').textContent = q.t + (q.f==='oficial' ? ' · pregunta oficial de instructivo' : '');
-  $('q-num').textContent = 'Pregunta '+(STATE.idx+1)+' de 15 · por '+LADDER[STATE.idx]+' pts';
+  $('q-num').textContent = 'Pregunta '+(STATE.idx+1)+' de '+NQ+' · por '+LADDER[STATE.idx]+' pts';
   $('q-text').textContent = q.p;
   $('hint-box').classList.remove('on'); $('sala-poll').classList.remove('on');
   const L=['A','B','C','D'];
   $('q-opts').innerHTML = q.o.map((o,i)=>'<button class="opt" data-l="'+L[i]+'" data-i="'+i+'" onclick="answer('+i+')">'+esc(o)+'</button>').join('');
-  if(STATE.idx===10) playLoop('tension');
+  if(STATE.idx===ZONE-2) playLoop('tension');
   startTimer();
 }
 
@@ -484,7 +491,7 @@ function answer(i){
       STATE.score = LADDER[STATE.idx];
       STATE.idx++;
       renderLadder();
-      if(STATE.idx>=15){ endGame('win'); }
+      if(STATE.idx>=NQ){ endGame('win'); }
       else setTimeout(renderQuestion, 1100);
     } else {
       if(i>=0) opts[i].classList.add('bad');
@@ -612,7 +619,7 @@ async function pushToServer(){
 /* ---- ranking ---- */
 let curRankTab='global';
 function rankTabs(){
-  const tabs=[['global','Global'],['civil','Civil'],['penal','Penal'],['administrativo','Administrativo'],['uni','Por universidad']];
+  const tabs=[['global','Global'], ...Object.entries(B.salas).map(([k,s])=>[k,s.nombre]), ['uni','Por universidad']];
   $('rank-tabs').innerHTML = tabs.map(t=>'<button class="rt'+(t[0]===curRankTab?' on':'')+'" onclick="loadRanking(\''+t[0]+'\')">'+t[1]+'</button>').join('');
 }
 async function loadRanking(tab){

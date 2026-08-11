@@ -8592,20 +8592,33 @@ reclutamiento); academias/editoriales o patrocinio de firma son alternativas viv
 
 ### Arquitectura
 - **`banco-judicial.js`** — banco de preguntas (patrón cand-index: `<script src>` con
-  `window.BANCO_JUDICIAL`, sin fetch). v1: **86 preguntas** (14 general + 24 civil +
-  24 penal + 24 administrativo), niveles n:1/2/3, cada una con `cita` (norma/sentencia)
-  + `pista` (texto del comodín "consultar la doctrina") + `f` (oficial|propia).
+  `window.BANCO_JUDICIAL`, sin fetch). v2 (ago-2026): **140 preguntas** — 20 del
+  componente general + **30 por cada una de las 4 salas** (civil · penal · laboral ·
+  administrativo). Niveles n:1/2/3 (~10 por nivel por sala), cada una con `cita`
+  (norma/sentencia) + `pista` (texto del comodín "consultar la doctrina") + `f`
+  (oficial|propia). **10 preguntas son `oficial`** = ejemplos publicados con respuesta
+  en los instructivos C22/C27 (2 de ellas laborales: art. 66 y art. 128 CST).
   ⚠️ Las `propia` requieren **pasada de revisión de abogado** antes de escalar
   marketing. Regla dura: ninguna pregunta sin cita verificable.
+  ⚠️ **Evitar temas con norma en disputa**: no hay preguntas sobre requisitos de
+  pensión de vejez porque el estado de la reforma (Ley 2381 de 2024) es movedizo;
+  seguridad social se cubre con invalidez, sobrevivientes y riesgos, que son estables.
+  Sí entra la jornada de 42h de la Ley 2101 de 2021 (vigente desde jul-2026).
 - **`quien-quiere-ser-juez.html`** — single-file, sistema visual v2. Vistas: home
-  (salas + facts del examen real + mini-ranking) → juego (15 preguntas: 5 fáciles/5
-  medias/5 difíciles, mezcla general+específica; reloj 60s; escalera lateral) →
-  resultado (veredicto vs 800 + la pregunta fallada con norma y explicación) → modal
-  registro (post-primera-partida, NO antes — conversión) → ranking (tabs global/sala/
-  universidad). Comodines: **50:50**, **§ doctrina** (muestra la pista con cita),
+  (salas + facts del examen real + mini-ranking) → juego → resultado (veredicto vs 800
+  + la pregunta fallada con norma y explicación) → modal registro (post-primera-partida,
+  NO antes — conversión) → ranking (tabs global/sala/universidad).
+  **Partida de 20 preguntas** (`LADDER` de 20 peldaños; `NQ` se deriva de su longitud —
+  no hay 20 hardcodeado): 7 fáciles + 7 medias + 6 difíciles (`CUPOS`), mezclando
+  componente general y específico como el examen real. Peldaños seguros en **Q5 (150),
+  Q10 (425) y Q15 (750)**; **Q16 = 800 = zona de aprobación** marcada en la escalera.
+  Reloj 60s. Comodines: **50:50**, **§ doctrina** (muestra la pista con cita),
   **◧ sala** (distribución simulada seedeada por id, sesgo a la correcta decreciente
-  con dificultad — cuando el worker esté vivo puede volverse dato real).
-  Anti-repetición: `localStorage jz-seen-{sala}` (últimas 60).
+  con dificultad — cuando haya tráfico real puede volverse dato real).
+  Anti-repetición: `localStorage jz-seen-{sala}` (últimas 80); si lo fresco no alcanza
+  el cupo, completa con vistas en vez de fallar.
+  Grid de salas: 4 columnas en desktop · 2×2 en tablet · 1 en móvil (fijo, no auto-fit:
+  con 4 tarjetas el auto-fit dejaba una huérfana; aguanta crecer a 8 salas).
 - **Audio**: hooks en `AUDIO{}` → `quien-quiere-ser-juez/audio/*.mp3` (intro, pregunta,
   tension, correcta, incorrecta, peldano, final, comodin). Fallan en silencio si no
   existen (patrón combate-electoral). ⚠️ **Ricardo pone la música: usar PROPIA o libre,
@@ -8626,11 +8639,12 @@ reclutamiento); academias/editoriales o patrocinio de firma son alternativas viv
   "probabilidad de pasar" ([[reference_legaltech_riesgo_score]] aplica igual acá).
 
 ### 🌳 PENDIENTE · árbol COMPLETO de salas (pedido explícito de Ricardo)
-v1 tiene 3 salas (Civil · Penal · Administrativo). Falta construir el árbol completo
-nivel × especialidad de la Convocatoria 28, reusando los ejes del instructivo 2018:
-1. **Laboral** (Individual · Colectivo · Procesal laboral · Seguridad social) — cohorte
-   grande, siguiente prioridad.
-2. **Familia** (CGP-Familia · C.C.-Familia · Infancia y Adolescencia).
+v2 tiene 4 salas (Civil · Penal · **Laboral** · Administrativo). Falta construir el
+árbol completo nivel × especialidad de la Convocatoria 28, reusando los ejes del
+instructivo 2018:
+1. ~~**Laboral**~~ ✅ HECHA en v2 (Individual · Colectivo · Procesal · Seguridad Social).
+2. **Familia** (CGP-Familia · C.C.-Familia · Infancia y Adolescencia) — siguiente
+   prioridad: es la que falta para cubrir las 4 especialidades de Tribunal Superior.
 3. **Penal especializado**: Ejecución de penas · Extinción de dominio (Ley 1708/2014 +
    1849/2017) · Responsabilidad penal adolescentes (Ley 1098).
 4. **Promiscuos I-VI** (mezclan pools de civil+penal+familia — casi gratis una vez
@@ -8640,7 +8654,7 @@ nivel × especialidad de la Convocatoria 28, reusando los ejes del instructivo 2
 6. Variantes por **nivel** (Municipal/Circuito/Magistrado): mismo pool con pesos de
    dificultad distintos + ejes extra de magistrado (p.ej. Civil-Mag suma Propiedad
    Intelectual y Víctimas/Restitución).
-7. Banco: crecer a ≥60/sala (hoy 24) + modo "simulacro 200 preguntas · 4h30" como
+7. Banco: crecer a ≥60/sala (hoy 30) + modo "simulacro 200 preguntas · 4h30" como
    producto pago.
 - Otros pendientes: rutas worker + `admin-juez.html` (clonar admin-pronosticos) +
   card en dashboard · enlazar desde index/noticias · música · OG image para compartir
