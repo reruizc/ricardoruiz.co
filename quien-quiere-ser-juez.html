@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>¿Quién quiere ser juez? · Entrena para el concurso de la Rama Judicial</title>
+<meta name="description" content="Simulador tipo concurso de televisión para aspirantes a jueces y magistrados. Preguntas con cita normativa, escalera de 1.000 puntos como el examen real y ranking por especialidad y universidad.">
+<meta property="og:title" content="¿Quién quiere ser juez? · Entrena para el concurso">
+<meta property="og:description" content="15 preguntas, 3 comodines y la zona de aprobación en 800/1.000 — como el examen real. ¿Llegas a la silla?">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+@font-face{font-family:'HN';src:url('fonts/helveticaneue.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'HN';src:url('fonts/helveticaneue-medium.woff2') format('woff2');font-weight:500;font-display:swap}
+@font-face{font-family:'HN';src:url('fonts/helveticaneue-bold.woff2') format('woff2');font-weight:700;font-display:swap}
+@font-face{font-family:'HN';src:url('fonts/helveticaneue-light.woff2') format('woff2');font-weight:300;font-display:swap}
+
+:root{
+  --bg:#060810; --ink:#f4f3ef; --mute:#969eb2; --dim:#626a7e;
+  --blue:#0047FF; --blue2:#3d6fff; --green:#4ade80; --red:#ef5b5b;
+  --amber:#f99e34; --gold:#e8c35a; --card:#0e1120; --line:#262c40;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'HN',-apple-system,'Helvetica Neue',Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;line-height:1.5;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(900px 500px at 50% -12%,rgba(0,71,255,.30),transparent 62%),
+             radial-gradient(700px 460px at 85% 100%,rgba(61,111,255,.10),transparent 60%)}
+.wrap{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:0 20px 80px}
+
+nav{display:flex;align-items:center;justify-content:space-between;padding:18px 0 6px;gap:12px;flex-wrap:wrap}
+.back{color:var(--green);text-decoration:none;font-size:.86rem;font-weight:500}
+.back:hover{text-decoration:underline}
+.logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s;flex-shrink:0}
+.logo-link:hover{opacity:1}
+.logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+.logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+.logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.4rem);letter-spacing:-.03em;color:var(--ink);line-height:1}
+.logo-text span{color:var(--blue)}
+.nav-r{display:flex;align-items:center;gap:12px}
+.chip-user{font-size:.8rem;color:var(--mute);background:var(--card);border:1px solid var(--line);
+  border-radius:20px;padding:5px 12px;cursor:pointer}
+.chip-user b{color:var(--gold)}
+#mute-btn{background:none;border:1px solid var(--line);color:var(--mute);border-radius:8px;
+  padding:5px 10px;cursor:pointer;font-size:.9rem}
+
+/* ===== vistas ===== */
+.view{display:none}
+.view.on{display:block}
+
+/* ===== HOME ===== */
+header{padding:34px 0 10px;text-align:center}
+.kicker{color:var(--gold);font-size:.8rem;letter-spacing:.22em;text-transform:uppercase;font-weight:500;margin-bottom:10px}
+h1{font-size:clamp(2.3rem,7vw,4rem);font-weight:700;letter-spacing:-.035em;margin:0 0 10px;line-height:1.02}
+h1 em{font-style:normal;color:var(--blue2)}
+.tagline{color:var(--mute);font-size:clamp(.98rem,2.3vw,1.14rem);max-width:640px;margin:0 auto}
+.exam-facts{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:26px 0 8px}
+.fact{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 18px;min-width:130px}
+.fact b{display:block;font-size:1.4rem;color:var(--gold);font-weight:700}
+.fact span{font-size:.76rem;color:var(--dim)}
+.salas{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin:30px 0 8px}
+.sala{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 20px;cursor:pointer;
+  transition:transform .15s,border-color .15s;text-align:left;position:relative;overflow:hidden}
+.sala:hover{transform:translateY(-3px);border-color:var(--blue2)}
+.sala::after{content:'';position:absolute;inset:0 0 auto 0;height:3px;background:var(--sc,#3d6fff)}
+.sala h3{margin:.2rem 0 .35rem;font-size:1.3rem;font-weight:700}
+.sala .cargos{color:var(--mute);font-size:.82rem;margin-bottom:8px}
+.sala .ejes{color:var(--dim);font-size:.75rem;line-height:1.45}
+.sala .best{margin-top:12px;font-size:.8rem;color:var(--gold)}
+.sala .cta{display:inline-block;margin-top:12px;background:var(--blue);color:#fff;border-radius:8px;
+  padding:8px 16px;font-weight:500;font-size:.86rem}
+.soon-note{color:var(--dim);font-size:.8rem;text-align:center;margin-top:14px}
+.home-rank{margin-top:38px}
+.home-rank h2{font-size:1.15rem;font-weight:700;margin-bottom:4px}
+.home-rank .sub{color:var(--dim);font-size:.82rem;margin-bottom:12px}
+
+/* ===== JUEGO ===== */
+.game-grid{display:grid;grid-template-columns:1fr 190px;gap:22px;margin-top:16px}
+@media(max-width:760px){.game-grid{grid-template-columns:1fr}}
+.g-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.g-sala{font-size:.8rem;color:var(--mute)}
+.g-sala b{color:var(--ink)}
+.timer{position:relative;width:58px;height:58px}
+.timer svg{transform:rotate(-90deg)}
+.timer .tnum{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:1.05rem}
+.q-card{background:linear-gradient(180deg,#101427,#0b0e1c);border:1px solid var(--line);border-radius:16px;
+  padding:22px;min-height:120px}
+.q-meta{display:flex;justify-content:space-between;color:var(--dim);font-size:.74rem;margin-bottom:10px;gap:8px;flex-wrap:wrap}
+.q-meta .qt{color:var(--blue2)}
+.q-text{font-size:clamp(1rem,2.4vw,1.18rem);font-weight:500;line-height:1.5}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+@media(max-width:640px){.opts{grid-template-columns:1fr}}
+.opt{position:relative;background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:14px 14px 14px 44px;cursor:pointer;font-size:.92rem;line-height:1.4;text-align:left;color:var(--ink);
+  transition:border-color .12s,background .12s;font-family:inherit;width:100%}
+.opt:hover:not(:disabled){border-color:var(--blue2);background:#131730}
+.opt::before{content:attr(data-l);position:absolute;left:14px;top:13px;color:var(--gold);font-weight:700}
+.opt:disabled{cursor:default}
+.opt.sel{border-color:var(--amber);background:#221a10}
+.opt.ok{border-color:var(--green);background:#0e2216;animation:pulseok .6s 2}
+.opt.bad{border-color:var(--red);background:#2a1113}
+.opt.gone{opacity:.18;pointer-events:none}
+@keyframes pulseok{50%{background:#164a2b}}
+.lifelines{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.ll{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:9px 16px;cursor:pointer;
+  color:var(--ink);font-size:.84rem;font-family:inherit;transition:border-color .12s}
+.ll:hover:not(:disabled){border-color:var(--gold)}
+.ll:disabled{opacity:.3;cursor:default}
+.ll b{color:var(--gold)}
+.hint-box{margin-top:14px;background:#141020;border:1px solid #3d2f63;border-radius:12px;padding:14px 16px;
+  font-size:.86rem;color:#cfc6e8;display:none}
+.hint-box.on{display:block}
+.hint-box .ht{color:var(--gold);font-weight:700;font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;display:block;margin-bottom:6px}
+.sala-poll{display:none;margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.sala-poll.on{display:block}
+.sp-row{display:flex;align-items:center;gap:10px;margin:5px 0;font-size:.8rem}
+.sp-row b{width:18px;color:var(--gold)}
+.sp-bar{flex:1;height:14px;background:#1a1f33;border-radius:7px;overflow:hidden}
+.sp-bar i{display:block;height:100%;background:var(--blue2);border-radius:7px;transition:width .8s}
+.sp-row span{width:38px;text-align:right;color:var(--mute)}
+
+/* escalera */
+.ladder{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 12px;align-self:start}
+.ladder .lt{font-size:.68rem;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;text-align:center;margin-bottom:8px}
+.rung{display:flex;justify-content:space-between;gap:8px;padding:3.5px 10px;border-radius:7px;font-size:.8rem;color:var(--dim)}
+.rung b{font-weight:500}
+.rung.safe .rp::after{content:' ●';color:var(--amber);font-size:.6rem;vertical-align:middle}
+.rung.zone{border-top:1px dashed var(--gold)}
+.rung.zone .z{color:var(--gold);font-size:.62rem;letter-spacing:.08em}
+.rung.cur{background:var(--blue);color:#fff}
+.rung.cur b{color:#fff}
+.rung.won{color:var(--green)}
+@media(max-width:760px){
+  .ladder{display:flex;flex-wrap:wrap;gap:4px;padding:10px}
+  .ladder .lt{display:none}
+  .rung{padding:3px 8px;font-size:.72rem;border-radius:14px;border:1px solid var(--line)}
+  .rung .rn,.rung .z{display:none}
+  .rung.zone{border-top:1px solid var(--gold)}
+}
+
+/* ===== RESULTADO ===== */
+.res-hero{text-align:center;padding:36px 0 8px}
+.res-hero .verdict{font-size:.8rem;letter-spacing:.2em;text-transform:uppercase;font-weight:500;margin-bottom:8px}
+.res-hero .verdict.ok{color:var(--green)} .res-hero .verdict.no{color:var(--red)}
+.res-score{font-size:clamp(3.4rem,11vw,5.6rem);font-weight:700;letter-spacing:-.04em;line-height:1}
+.res-score span{font-size:1.4rem;color:var(--dim);font-weight:300}
+.res-sub{color:var(--mute);margin-top:8px;font-size:.95rem}
+.res-fail{max-width:620px;margin:26px auto 0;background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:18px 20px;text-align:left;font-size:.88rem}
+.res-fail .rf-t{color:var(--red);font-weight:700;font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px}
+.res-fail .rf-ok{color:var(--green);margin-top:8px}
+.res-fail .rf-cita{color:var(--gold);font-size:.8rem;margin-top:8px}
+.res-acts{display:flex;gap:12px;justify-content:center;margin-top:26px;flex-wrap:wrap}
+.btn{border:none;border-radius:10px;padding:13px 24px;font-weight:500;font-size:.95rem;cursor:pointer;font-family:inherit}
+.btn-p{background:var(--blue);color:#fff}
+.btn-g{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.btn-o{background:var(--amber);color:#111}
+
+/* ===== MODAL REGISTRO ===== */
+.modal{display:none;position:fixed;inset:0;z-index:900;background:rgba(4,6,12,.82);backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;padding:18px;overflow:auto}
+.modal.on{display:flex}
+.m-box{background:#0d1020;border:1px solid var(--line);border-radius:18px;max-width:480px;width:100%;padding:26px}
+.m-box h3{margin:0 0 4px;font-size:1.3rem}
+.m-box .m-sub{color:var(--mute);font-size:.86rem;margin-bottom:18px}
+.f-row{margin-bottom:12px}
+.f-row label{display:block;font-size:.76rem;color:var(--dim);margin-bottom:4px}
+.f-row input,.f-row select{width:100%;background:#131728;border:1px solid var(--line);border-radius:9px;
+  color:var(--ink);padding:11px 12px;font-size:.92rem;font-family:inherit}
+.f-row input:focus,.f-row select:focus{outline:none;border-color:var(--blue2)}
+.f-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.consent{display:flex;gap:10px;align-items:flex-start;font-size:.74rem;color:var(--mute);margin:14px 0;line-height:1.5}
+.consent input{margin-top:3px;flex:none}
+.m-err{color:var(--red);font-size:.8rem;min-height:1.2em;margin-bottom:6px}
+.m-skip{display:block;text-align:center;color:var(--dim);font-size:.8rem;margin-top:12px;background:none;border:none;
+  cursor:pointer;width:100%;font-family:inherit;text-decoration:underline}
+
+/* ===== RANKING ===== */
+.rank-tabs{display:flex;gap:8px;margin:18px 0 14px;flex-wrap:wrap}
+.rt{background:var(--card);border:1px solid var(--line);color:var(--mute);border-radius:20px;padding:7px 16px;
+  cursor:pointer;font-size:.84rem;font-family:inherit}
+.rt.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.rank-list{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.rk-row{display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid var(--line);font-size:.9rem}
+.rk-row:last-child{border-bottom:none}
+.rk-pos{width:30px;color:var(--gold);font-weight:700}
+.rk-name{flex:1}
+.rk-name small{display:block;color:var(--dim);font-size:.72rem}
+.rk-pts{font-weight:700}
+.rk-row.me{background:#101c3a}
+.rk-empty{padding:26px;text-align:center;color:var(--dim);font-size:.88rem}
+
+footer{margin-top:60px;border-top:1px solid var(--line);padding-top:18px;color:var(--dim);font-size:.74rem;line-height:1.6}
+footer b{color:var(--mute)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav>
+  <a class="back" href="index.html">← Volver</a>
+  <div class="nav-r">
+    <button id="mute-btn" title="Silenciar">🔊</button>
+    <div class="chip-user" id="chip-user" onclick="showView('ranking')">Ranking</div>
+    <a class="logo-link" href="index.html">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<!-- ============ HOME ============ -->
+<div class="view on" id="v-home">
+  <header>
+    <div class="kicker">Entrena para la Convocatoria de la Rama Judicial</div>
+    <h1>¿Quién quiere ser <em>juez</em>?</h1>
+    <p class="tagline">15 preguntas, 3 comodines y una escalera de 1.000 puntos con la zona de aprobación
+    en <b>800</b> — el mismo umbral del examen real. Cada respuesta te muestra la norma o la sentencia que la sustenta.</p>
+  </header>
+
+  <div class="exam-facts">
+    <div class="fact"><b>200</b><span>preguntas tiene el examen real</span></div>
+    <div class="fact"><b>4h 30m</b><span>dura la prueba escrita</span></div>
+    <div class="fact"><b>800/1000</b><span>puntaje mínimo para aprobar</span></div>
+    <div class="fact"><b id="f-jug">0</b><span>partidas jugadas aquí</span></div>
+  </div>
+
+  <div class="salas" id="salas-grid"></div>
+  <p class="soon-note">Próximamente: Laboral · Familia · Promiscuos · Disciplinario — el árbol completo de la convocatoria.</p>
+
+  <div class="home-rank">
+    <h2>Los mejores del simulador</h2>
+    <div class="sub">Mejor puntaje por jugador. Regístrate al terminar tu primera partida para entrar.</div>
+    <div class="rank-list" id="home-rank-list"><div class="rk-empty">Sé el primero en la tabla: juega una partida.</div></div>
+  </div>
+</div>
+
+<!-- ============ JUEGO ============ -->
+<div class="view" id="v-game">
+  <div class="g-top">
+    <div class="g-sala" id="g-sala"></div>
+    <div class="timer">
+      <svg width="58" height="58"><circle cx="29" cy="29" r="25" fill="none" stroke="#1a1f33" stroke-width="5"/>
+      <circle id="t-ring" cx="29" cy="29" r="25" fill="none" stroke="#3d6fff" stroke-width="5" stroke-linecap="round" stroke-dasharray="157" stroke-dashoffset="0"/></svg>
+      <div class="tnum" id="t-num">60</div>
+    </div>
+  </div>
+  <div class="game-grid">
+    <div>
+      <div class="q-card">
+        <div class="q-meta"><span class="qt" id="q-tema"></span><span id="q-num"></span></div>
+        <div class="q-text" id="q-text"></div>
+        <div class="opts" id="q-opts"></div>
+      </div>
+      <div class="lifelines">
+        <button class="ll" id="ll-50" onclick="useFifty()"><b>50:50</b> quita dos opciones</button>
+        <button class="ll" id="ll-doc" onclick="useDoctrina()"><b>§</b> Consultar la doctrina</button>
+        <button class="ll" id="ll-sala" onclick="useSala()"><b>◧</b> Preguntar a la sala</button>
+        <button class="ll" id="ll-quit" onclick="retirarse()">Retirarse con lo acumulado</button>
+      </div>
+      <div class="hint-box" id="hint-box"><span class="ht">La doctrina dice</span><span id="hint-text"></span></div>
+      <div class="sala-poll" id="sala-poll"></div>
+    </div>
+    <div class="ladder" id="ladder"></div>
+  </div>
+</div>
+
+<!-- ============ RESULTADO ============ -->
+<div class="view" id="v-result">
+  <div class="res-hero">
+    <div class="verdict" id="res-verdict"></div>
+    <div class="res-score"><span id="res-pts">0</span><span> / 1000</span></div>
+    <div class="res-sub" id="res-sub"></div>
+  </div>
+  <div class="res-fail" id="res-fail" style="display:none"></div>
+  <div class="res-acts">
+    <button class="btn btn-p" onclick="startGame(STATE.sala)">Jugar de nuevo</button>
+    <button class="btn btn-g" onclick="showView('home')">Cambiar de sala</button>
+    <button class="btn btn-o" id="btn-rank" onclick="showView('ranking')">Ver ranking</button>
+  </div>
+</div>
+
+<!-- ============ RANKING ============ -->
+<div class="view" id="v-ranking">
+  <header style="text-align:left;padding-top:26px">
+    <div class="kicker">Ranking del simulador</div>
+    <h1 style="font-size:clamp(1.8rem,5vw,2.6rem)">La lista de <em>elegibles</em></h1>
+    <p class="tagline" style="margin:0;max-width:none">Mejor puntaje de cada jugador. Como en el concurso real: el orden lo da el mérito.</p>
+  </header>
+  <div class="rank-tabs" id="rank-tabs"></div>
+  <div class="rank-list" id="rank-list"><div class="rk-empty">Cargando…</div></div>
+  <div class="res-acts" style="justify-content:flex-start"><button class="btn btn-g" onclick="showView('home')">← Volver al inicio</button></div>
+</div>
+
+<!-- ============ MODAL REGISTRO ============ -->
+<div class="modal" id="modal-reg">
+  <div class="m-box">
+    <h3>Guarda tu puntaje</h3>
+    <div class="m-sub">Entra al ranking, compite por especialidad y contra tu universidad, y recibe material de preparación para la convocatoria.</div>
+    <div class="f-2">
+      <div class="f-row"><label>Nombre</label><input id="r-nombre" autocomplete="given-name"></div>
+      <div class="f-row"><label>Apellido</label><input id="r-apellido" autocomplete="family-name"></div>
+    </div>
+    <div class="f-row"><label>Correo</label><input id="r-correo" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
+    <div class="f-row"><label>Celular (WhatsApp)</label><input id="r-cel" type="tel" autocomplete="tel" placeholder="3xx xxx xxxx"></div>
+    <div class="f-row"><label>Universidad donde estudiaste Derecho</label>
+      <input id="r-uni" list="unis" placeholder="Escribe o elige">
+      <datalist id="unis">
+        <option>Universidad Externado de Colombia</option><option>Universidad Nacional de Colombia</option>
+        <option>Universidad de los Andes</option><option>Pontificia Universidad Javeriana</option>
+        <option>Universidad del Rosario</option><option>Universidad Libre</option>
+        <option>Universidad de Antioquia</option><option>Universidad Santo Tomás</option>
+        <option>Universidad de Caldas</option><option>Universidad del Cauca</option>
+        <option>Universidad de Cartagena</option><option>Universidad del Norte</option>
+        <option>Universidad Autónoma de Bucaramanga</option><option>Universidad Industrial de Santander</option>
+        <option>Universidad Sergio Arboleda</option><option>Universidad La Gran Colombia</option>
+        <option>Universidad Cooperativa de Colombia</option><option>Universidad Simón Bolívar</option>
+      </datalist>
+    </div>
+    <div class="f-2">
+      <div class="f-row"><label>Año de grado</label><input id="r-grado" type="number" min="1970" max="2026" placeholder="2018"></div>
+      <div class="f-row"><label>Cargo al que aspiras</label>
+        <select id="r-cargo"><option value="">Elige…</option><option>Juez Municipal</option><option>Juez de Circuito</option><option>Magistrado de Tribunal</option><option>Aún no decido</option></select>
+      </div>
+    </div>
+    <label class="consent"><input type="checkbox" id="r-consent">
+      <span>Autorizo el tratamiento de mis datos personales conforme a la <b>Ley 1581 de 2012</b> para: guardar mi puntaje, mostrarme en el ranking y enviarme información de preparación para el concurso de la Rama Judicial. Podré consultar, actualizar o suprimir mis datos escribiendo a contacto@ricardoruiz.co.</span></label>
+    <div class="m-err" id="r-err"></div>
+    <button class="btn btn-p" style="width:100%" onclick="submitReg()">Entrar al ranking</button>
+    <button class="m-skip" onclick="closeReg()">Seguir sin registrarme (no guarda puntaje)</button>
+  </div>
+</div>
+
+<footer>
+  <b>Simulador independiente con fines de entrenamiento.</b> No tiene vínculo con la Rama Judicial, el Consejo Superior
+  de la Judicatura ni la universidad operadora del concurso, y su puntaje no predice el resultado de ninguna prueba oficial.
+  Las cifras del examen real (200 preguntas · 4h30 · aprueba 800/1000) provienen del instructivo oficial de pruebas
+  escritas de la Convocatoria 27 (Consejo Superior de la Judicatura · Universidad Nacional, 2022); los ejes temáticos por
+  especialidad, de los instructivos oficiales publicados. Cada pregunta cita la norma o jurisprudencia en que se apoya.
+  Preguntas marcadas como oficiales = ejemplos publicados por la organización del concurso en sus instructivos.
+  · Datos personales: Ley 1581 de 2012 · contacto@ricardoruiz.co
+</footer>
+</div>
+
+<script src="banco-judicial.js"></script>
+<script>
+/* ============================================================
+   ¿QUIÉN QUIERE SER JUEZ? · motor del juego
+   ============================================================ */
+const API = 'https://rr-auth.reruizc.workers.dev';   // rutas /juez/* (fallback localStorage si 404)
+const B = window.BANCO_JUDICIAL;
+const LADDER = [25,50,90,140,200,270,340,410,480,550,650,750,800,900,1000];
+const SAFE = [4,9];          // Q5 y Q10 (índices)
+const ZONE = 12;             // Q13 = 800 = zona de aprobación
+const T_LIMIT = 60;
+
+/* ---- audio hooks: Ricardo agrega los mp3 en quien-quiere-ser-juez/audio/ ----
+   ⚠️ usar música PROPIA o libre — no la del programa original (derechos de Sony). */
+const AUDIO = {
+  intro:'quien-quiere-ser-juez/audio/intro.mp3',
+  pregunta:'quien-quiere-ser-juez/audio/pregunta.mp3',       // loop de tensión
+  tension:'quien-quiere-ser-juez/audio/tension.mp3',         // loop preguntas altas (11+)
+  correcta:'quien-quiere-ser-juez/audio/correcta.mp3',
+  incorrecta:'quien-quiere-ser-juez/audio/incorrecta.mp3',
+  peldano:'quien-quiere-ser-juez/audio/peldano.mp3',         // peldaño seguro
+  final:'quien-quiere-ser-juez/audio/final.mp3',             // llegó a 1000
+  comodin:'quien-quiere-ser-juez/audio/comodin.mp3'
+};
+let muted = localStorage.getItem('jz-muted')==='1';
+let curLoop = null;
+function playSfx(k){ if(muted||!AUDIO[k])return; try{ const a=new Audio(AUDIO[k]); a.volume=.7; a.play().catch(()=>{});}catch(e){} }
+function playLoop(k){ if(muted)return; stopLoop(); try{ curLoop=new Audio(AUDIO[k]); curLoop.loop=true; curLoop.volume=.35; curLoop.play().catch(()=>{});}catch(e){} }
+function stopLoop(){ if(curLoop){ try{curLoop.pause()}catch(e){} curLoop=null; } }
+document.getElementById('mute-btn').onclick = function(){
+  muted=!muted; localStorage.setItem('jz-muted',muted?'1':'0');
+  this.textContent = muted?'🔇':'🔊'; if(muted) stopLoop();
+};
+if(muted) document.getElementById('mute-btn').textContent='🔇';
+
+/* ---- estado ---- */
+const STATE = { sala:null, qs:[], idx:0, score:0, over:false,
+  used:{fifty:false,doc:false,sala:false}, timer:null, tleft:T_LIMIT };
+
+/* ---- utilidades ---- */
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function seenKey(sala){ return 'jz-seen-'+sala; }
+function getSeen(sala){ try{return JSON.parse(localStorage.getItem(seenKey(sala))||'[]')}catch(e){return[]} }
+function addSeen(sala,ids){ const s=[...new Set([...getSeen(sala),...ids])].slice(-60); localStorage.setItem(seenKey(sala),JSON.stringify(s)); }
+
+/* ---- vistas ---- */
+function showView(v){
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
+  $('v-'+v).classList.add('on');
+  window.scrollTo(0,0);
+  if(v==='ranking') loadRanking(curRankTab);
+  if(v==='home'){ stopLoop(); renderHome(); }
+}
+
+/* ---- selección de preguntas: 5 fáciles · 5 medias · 5 difíciles ---- */
+function pickQuestions(sala){
+  const seen = getSeen(sala);
+  const pool = tier => {
+    const own = B[sala].filter(q=>q.n===tier);
+    const gen = B.general.filter(q=>q.n===tier);
+    // general entra a la mezcla, más presente en niveles bajos (como el componente general real)
+    const mix = tier===1 ? own.concat(gen) : tier===2 ? own.concat(gen) : own.concat(gen);
+    const fresh = mix.filter(q=>!seen.includes(q.id));
+    return shuffle(fresh.length>=5 ? fresh : mix.slice());
+  };
+  const qs = [...pool(1).slice(0,5), ...pool(2).slice(0,5), ...pool(3).slice(0,5)];
+  addSeen(sala, qs.map(q=>q.id));
+  return qs;
+}
+
+/* ---- juego ---- */
+function startGame(sala){
+  Object.assign(STATE,{ sala, qs:pickQuestions(sala), idx:0, score:0, over:false,
+    used:{fifty:false,doc:false,sala:false} });
+  $('ll-50').disabled = $('ll-doc').disabled = $('ll-sala').disabled = false;
+  $('g-sala').innerHTML = 'Sala <b>'+esc(B.salas[sala].nombre)+'</b> · '+esc(B.salas[sala].cargos);
+  showView('game');
+  playSfx('intro'); playLoop('pregunta');
+  renderLadder(); renderQuestion();
+  localStorage.setItem('jz-plays', (parseInt(localStorage.getItem('jz-plays')||'0',10)+1));
+}
+
+function renderLadder(){
+  let h = '<div class="lt">Escalera</div>';
+  for(let i=LADDER.length-1;i>=0;i--){
+    const cls = ['rung', i===STATE.idx?'cur':'', i<STATE.idx?'won':'',
+                 SAFE.includes(i)?'safe':'', i===ZONE?'zone':''].join(' ');
+    h += '<div class="'+cls+'" style="order:'+i+'"><b class="rn">'+(i+1)+'</b>'+(i===ZONE?'<span class="z">APRUEBAS →</span>':'')+'<b class="rp">'+LADDER[i]+'</b></div>';
+  }
+  $('ladder').innerHTML = h;
+}
+
+function renderQuestion(){
+  const q = STATE.qs[STATE.idx];
+  $('q-tema').textContent = q.t + (q.f==='oficial' ? ' · pregunta oficial de instructivo' : '');
+  $('q-num').textContent = 'Pregunta '+(STATE.idx+1)+' de 15 · por '+LADDER[STATE.idx]+' pts';
+  $('q-text').textContent = q.p;
+  $('hint-box').classList.remove('on'); $('sala-poll').classList.remove('on');
+  const L=['A','B','C','D'];
+  $('q-opts').innerHTML = q.o.map((o,i)=>'<button class="opt" data-l="'+L[i]+'" data-i="'+i+'" onclick="answer('+i+')">'+esc(o)+'</button>').join('');
+  if(STATE.idx===10) playLoop('tension');
+  startTimer();
+}
+
+function startTimer(){
+  clearInterval(STATE.timer); STATE.tleft=T_LIMIT; tickTimer();
+  STATE.timer=setInterval(()=>{ STATE.tleft--; tickTimer();
+    if(STATE.tleft<=0){ clearInterval(STATE.timer); answer(-1); } },1000);
+}
+function tickTimer(){
+  $('t-num').textContent=STATE.tleft;
+  const r=$('t-ring'); r.style.strokeDashoffset = 157*(1-STATE.tleft/T_LIMIT);
+  r.style.stroke = STATE.tleft<=10 ? 'var(--red)' : STATE.tleft<=25 ? 'var(--amber)' : 'var(--blue2)';
+}
+
+function answer(i){
+  if(STATE.over) return;
+  clearInterval(STATE.timer);
+  const q = STATE.qs[STATE.idx];
+  const opts = [...document.querySelectorAll('#q-opts .opt')];
+  opts.forEach(o=>o.disabled=true);
+  if(i>=0) opts[i].classList.add('sel');
+  setTimeout(()=>{
+    opts[q.r].classList.add('ok');
+    if(i===q.r){
+      playSfx(SAFE.includes(STATE.idx)?'peldano':'correcta');
+      STATE.score = LADDER[STATE.idx];
+      STATE.idx++;
+      renderLadder();
+      if(STATE.idx>=15){ endGame('win'); }
+      else setTimeout(renderQuestion, 1100);
+    } else {
+      if(i>=0) opts[i].classList.add('bad');
+      playSfx('incorrecta');
+      // cae al último peldaño seguro superado
+      let safePts=0; SAFE.forEach(s=>{ if(STATE.idx>s) safePts=LADDER[s]; });
+      STATE.score = safePts;
+      setTimeout(()=>endGame('lose', q, i), 1400);
+    }
+  }, 700);
+}
+
+function retirarse(){
+  if(STATE.over||STATE.idx===0) return;
+  clearInterval(STATE.timer);
+  STATE.score = LADDER[STATE.idx-1];
+  endGame('retire');
+}
+
+function endGame(mode, failedQ, given){
+  STATE.over=true; stopLoop();
+  if(mode==='win') playSfx('final');
+  const pts=STATE.score, aprueba = pts>=B.examen.aprueba;
+  $('res-pts').textContent = pts;
+  const v=$('res-verdict');
+  if(mode==='win'){ v.textContent='¡Silla de juez! Escalera completa'; v.className='verdict ok'; }
+  else if(aprueba){ v.textContent='Zona de aprobación superada'; v.className='verdict ok'; }
+  else { v.textContent = mode==='retire' ? 'Te retiraste a tiempo' : 'Fuera del concurso'; v.className='verdict no'; }
+  $('res-sub').textContent = aprueba
+    ? 'En el examen real, con 800/1000 sigues en concurso. Puesto '+(mode==='win'?'perfecto':'firme')+' en la sala '+B.salas[STATE.sala].nombre+'.'
+    : 'En el examen real necesitas 800/1000 para seguir. La escalera premia llegar lejos sin caer: los peldaños seguros son la pregunta 5 y la 10.';
+  const rf=$('res-fail');
+  if(failedQ){
+    rf.style.display='block';
+    rf.innerHTML = '<div class="rf-t">La que te sacó</div>'
+      + '<div>'+esc(failedQ.p)+'</div>'
+      + (given>=0 ? '<div style="color:var(--red);margin-top:8px">Tu respuesta: '+esc(failedQ.o[given])+'</div>' : '<div style="color:var(--red);margin-top:8px">Se agotó el tiempo.</div>')
+      + '<div class="rf-ok">Correcta: '+esc(failedQ.o[failedQ.r])+'</div>'
+      + '<div class="rf-cita">§ '+esc(failedQ.cita)+'</div>'
+      + '<div style="color:var(--mute);margin-top:8px;font-size:.83rem">'+esc(failedQ.pista)+'</div>';
+  } else rf.style.display='none';
+  showView('result');
+  saveScore(pts);
+  // registro tras la primera partida
+  if(!getReg() && !localStorage.getItem('jz-reg-skip')) setTimeout(openReg, 900);
+}
+
+/* ---- comodines ---- */
+function useFifty(){
+  if(STATE.used.fifty||STATE.over) return;
+  STATE.used.fifty=true; $('ll-50').disabled=true; playSfx('comodin');
+  const q=STATE.qs[STATE.idx];
+  const wrong = [0,1,2,3].filter(i=>i!==q.r);
+  shuffle(wrong).slice(0,2).forEach(i=>document.querySelector('#q-opts .opt[data-i="'+i+'"]').classList.add('gone'));
+}
+function useDoctrina(){
+  if(STATE.used.doc||STATE.over) return;
+  STATE.used.doc=true; $('ll-doc').disabled=true; playSfx('comodin');
+  const q=STATE.qs[STATE.idx];
+  $('hint-text').textContent = q.pista;
+  $('hint-box').classList.add('on');
+}
+function useSala(){
+  if(STATE.used.sala||STATE.over) return;
+  STATE.used.sala=true; $('ll-sala').disabled=true; playSfx('comodin');
+  const q=STATE.qs[STATE.idx];
+  // distribución simulada de la sala: sesgo a la correcta que decrece con la dificultad
+  let seed=0; for(const c of q.id) seed=(seed*31+c.charCodeAt(0))%997;
+  const base = q.n===1?62 : q.n===2?48 : 38;
+  const okPct = base + (seed%15);
+  let rest=100-okPct; const parts=[];
+  for(let k=0;k<3;k++){ const p = k===2?rest:Math.floor(rest*((seed>>k)%40+15)/100); parts.push(Math.max(2,p)); rest-=p; }
+  const pct=[0,0,0,0]; pct[q.r]=okPct;
+  let pi=0; [0,1,2,3].filter(i=>i!==q.r).forEach(i=>pct[i]=parts[pi++]);
+  const L=['A','B','C','D'];
+  $('sala-poll').innerHTML = '<div style="font-size:.72rem;color:var(--dim);letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px">Así respondió la sala</div>'
+    + pct.map((p,i)=>'<div class="sp-row"><b>'+L[i]+'</b><div class="sp-bar"><i style="width:0"></i></div><span>'+p+'%</span></div>').join('');
+  $('sala-poll').classList.add('on');
+  setTimeout(()=>{ document.querySelectorAll('#sala-poll .sp-bar i').forEach((el,i)=>el.style.width=pct[i]+'%'); },60);
+}
+
+/* ---- registro + puntajes ---- */
+function getReg(){ try{return JSON.parse(localStorage.getItem('jz-reg')||'null')}catch(e){return null} }
+function openReg(){ $('modal-reg').classList.add('on'); }
+function closeReg(){ $('modal-reg').classList.remove('on'); localStorage.setItem('jz-reg-skip','1'); }
+function submitReg(){
+  const d = {
+    nombre:$('r-nombre').value.trim(), apellido:$('r-apellido').value.trim(),
+    correo:$('r-correo').value.trim().toLowerCase(), cel:$('r-cel').value.trim(),
+    universidad:$('r-uni').value.trim(), grado:$('r-grado').value.trim(),
+    cargo:$('r-cargo').value, consent:$('r-consent').checked
+  };
+  const err=$('r-err');
+  if(!d.nombre||!d.apellido) return err.textContent='Nombre y apellido son obligatorios.';
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.correo)) return err.textContent='Revisa el correo.';
+  if(!/^3\d{9}$/.test(d.cel.replace(/\D/g,''))) return err.textContent='El celular debe ser un número colombiano de 10 dígitos.';
+  if(!d.universidad) return err.textContent='Cuéntanos tu universidad: el ranking por universidad es la gracia.';
+  if(!d.consent) return err.textContent='Necesitamos tu autorización de datos para guardar el puntaje.';
+  err.textContent='';
+  d.cel = d.cel.replace(/\D/g,'');
+  localStorage.setItem('jz-reg', JSON.stringify(d));
+  localStorage.removeItem('jz-reg-skip');
+  $('modal-reg').classList.remove('on');
+  // sube registro + mejores puntajes acumulados
+  pushToServer();
+  renderChip(); renderHome();
+}
+function bestKey(){ return 'jz-best'; }
+function getBest(){ try{return JSON.parse(localStorage.getItem(bestKey())||'{}')}catch(e){return{}} }
+function saveScore(pts){
+  const b=getBest();
+  if(!b[STATE.sala]||pts>b[STATE.sala]) b[STATE.sala]=pts;
+  localStorage.setItem(bestKey(), JSON.stringify(b));
+  pushToServer();
+}
+async function pushToServer(){
+  const reg=getReg(); if(!reg) return;
+  const b=getBest();
+  try{
+    await fetch(API+'/juez/save',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({...reg, best:b, ts:Date.now()})});
+  }catch(e){ /* offline o endpoint aún no desplegado: el dato queda local y se reintenta al próximo juego */ }
+}
+
+/* ---- ranking ---- */
+let curRankTab='global';
+function rankTabs(){
+  const tabs=[['global','Global'],['civil','Civil'],['penal','Penal'],['administrativo','Administrativo'],['uni','Por universidad']];
+  $('rank-tabs').innerHTML = tabs.map(t=>'<button class="rt'+(t[0]===curRankTab?' on':'')+'" onclick="loadRanking(\''+t[0]+'\')">'+t[1]+'</button>').join('');
+}
+async function loadRanking(tab){
+  curRankTab=tab||'global'; rankTabs();
+  const box=$('rank-list');
+  let rows=null;
+  try{
+    const r=await fetch(API+'/juez/ranking?tab='+curRankTab);
+    if(r.ok){ const j=await r.json(); rows=j.rows||null; }
+  }catch(e){}
+  if(!rows){ rows=localRank(curRankTab); box.dataset.local='1'; }
+  renderRankRows(box, rows, curRankTab);
+}
+function localRank(tab){
+  const reg=getReg(), b=getBest(); if(!reg) return [];
+  const me = n => [{nombre:reg.nombre+' '+reg.apellido, universidad:reg.universidad, pts:n, me:true}];
+  if(tab==='global'){ const t=Math.max(0,...Object.values(b),0); return t?me(t):[]; }
+  if(tab==='uni'){ const t=Math.max(0,...Object.values(b),0); return t?[{nombre:reg.universidad,universidad:'1 jugador',pts:t,me:true}]:[]; }
+  return b[tab]?me(b[tab]):[];
+}
+function renderRankRows(box,rows,tab){
+  if(!rows||!rows.length){ box.innerHTML='<div class="rk-empty">Todavía no hay puntajes'+(box.dataset.local?' (el ranking global se activa al conectar el servidor; por ahora ves solo el tuyo)':'')+'. Juega y regístrate.</div>'; return; }
+  box.innerHTML = rows.slice(0,25).map((r,i)=>
+    '<div class="rk-row'+(r.me?' me':'')+'"><span class="rk-pos">'+(i+1)+'</span>'
+    +'<span class="rk-name">'+esc(r.nombre)+'<small>'+esc(r.universidad||'')+'</small></span>'
+    +'<span class="rk-pts">'+r.pts+'</span></div>').join('');
+}
+
+/* ---- home ---- */
+function renderHome(){
+  const b=getBest();
+  $('salas-grid').innerHTML = Object.entries(B.salas).map(([k,s])=>
+    '<div class="sala" style="--sc:'+s.color+'" onclick="startGame(\''+k+'\')">'
+    +'<div style="font-size:1.5rem">'+s.icono+'</div><h3>'+esc(s.nombre)+'</h3>'
+    +'<div class="cargos">'+esc(s.cargos)+'</div><div class="ejes">Ejes del examen: '+esc(s.ejes)+'</div>'
+    +(b[k]?'<div class="best">Tu mejor: '+b[k]+' / 1000'+(b[k]>=800?' · aprobado ✓':'')+'</div>':'')
+    +'<span class="cta">Jugar →</span></div>').join('');
+  $('f-jug').textContent = localStorage.getItem('jz-plays')||'0';
+  // mini-ranking del home
+  loadHomeRank();
+}
+async function loadHomeRank(){
+  let rows=null;
+  try{ const r=await fetch(API+'/juez/ranking?tab=global'); if(r.ok){ rows=(await r.json()).rows; } }catch(e){}
+  if(!rows) rows=localRank('global');
+  renderRankRows($('home-rank-list'), rows.slice(0,5), 'global');
+}
+function renderChip(){
+  const reg=getReg();
+  $('chip-user').innerHTML = reg ? 'Ranking · <b>'+esc(reg.nombre)+'</b>' : 'Ranking';
+}
+
+renderChip(); renderHome(); rankTabs();
+</script>
+</body>
+</html>
