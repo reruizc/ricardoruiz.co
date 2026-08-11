@@ -1686,7 +1686,7 @@
       <div class="land-h">La contratación pública en números · SECOP II</div>
       <div class="kpis">
         <div class="kpi"><div class="n">${fmt(t.contratos||0)}</div><div class="l">Contratos</div></div>
-        <div class="kpi"><div class="n" style="color:var(--amber)">${fmtCOP(t.valor_cop)||'—'}</div><div class="l">Valor reportado</div></div>
+        <div class="kpi"><div class="n" style="color:var(--amber)">${fmtCOP(s.mediana_cop)||'—'}</div><div class="l">Contrato mediano</div></div>
         <div class="kpi"><div class="n">${(s.por_departamento||[]).length}</div><div class="l">Departamentos</div></div>
         <div class="kpi"><div class="n" style="color:var(--teal)">${esc(frec)}</div><div class="l">Actualización</div></div>
       </div>
@@ -1696,8 +1696,9 @@
       <div class="panel wide"><h3>Por sector</h3>
         <div class="reg-sectors-grid">${(s.por_sector||[]).slice(0,10).map(x=>`<div class="sec-card" data-sector="${esc(x.sector)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(x.sector)}</div></div>`).join('')}</div>
       </div>
-      <div class="panel wide"><h3>Entidades que más contratan (por valor)</h3>
-        <div class="reg-sectors-grid">${(s.top_entidades_valor||[]).slice(0,8).map(x=>`<div class="sec-card" data-entidad="${esc(x.entidad)}"><div class="n">${fmtCOP(x.valor)}</div><div class="l">${esc(x.entidad)}</div></div>`).join('')}</div>
+      <div class="panel wide"><h3>Entidades que más contratan (por número de contratos)</h3>
+        <div class="cob-note" style="margin-bottom:.7rem">Se cuentan contratos, no pesos: la columna de valor de SECOP trae errores de digitación que ponían a una universidad técnica encabezando la contratación del país con una cifra mayor que el PIB mundial.</div>
+        <div class="reg-sectors-grid">${(s.top_entidades_n||[]).slice(0,8).map(x=>`<div class="sec-card" data-entidad="${esc(x.entidad)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(x.entidad)}</div></div>`).join('')}</div>
       </div>
       ${s.nota?`<div class="cob-note">${esc(s.nota)}</div>`:''}`;
     el.querySelectorAll('.sec-card').forEach(c=>c.onclick=()=>{
@@ -1717,7 +1718,13 @@
                  f.departamento?esc(f.departamento):'', f.anio?esc(String(f.anio)):''].filter(Boolean).join(' · ');
     const tot=d.total;
     const titular=tot?`${fmt(tot.contratos)} ${tot.contratos===1?'contrato':'contratos'}`:`${fmt(d.n)} contratos`;
-    const valor=tot&&tot.valor_cop?` · <b>${fmtCOP(tot.valor_cop)}</b> en total`:'';
+    // ⚠️ NO se publica la suma de `valor_del_contrato`. Medido ago-2026: esa
+    // columna de SECOP trae errores de digitación de hasta 12 órdenes de
+    // magnitud —un contrato del CNE figura con 6,86e18 pesos y él solo era el
+    // 99,2% del total de su búsqueda— y no hay umbral limpio donde cortar (a 1
+    // billón todavía aparece un centro de salud rural con 9,9 billones). Sumar
+    // una columna rota no se arregla con un tope. El conteo sí es fiable.
+    const valor='';
     const chips=(d.chips||[]).length?`<div class="cob-note" style="margin-bottom:1rem">
         ¿Buscabas el filtro exacto? ${(d.chips||[]).map(c=>`<a href="#" class="con-chip" data-campo="${esc(c.campo)}" data-valor="${esc(c.valor)}" style="color:var(--teal)">${esc(c.etiqueta)}: ${esc(c.valor)} (${fmt(c.n)})</a>`).join(' · ')}
         — filtra sin el ruido del texto libre.</div>`:'';

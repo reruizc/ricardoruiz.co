@@ -236,11 +236,59 @@ def fetch(force=False):
         print(f"  ok {name:24s} {len(data):>4d} filas · {time.time()-t0:4.1f}s")
         ok += 1
         time.sleep(0.3)
+    if not fetch_mediana(force):
+        fail += 1
     print(f"\nfetch: {ok} bajadas · {skip} frescas · {fail} fallidas")
     if fail:
         print("  (rerun para reintentar las fallidas; las frescas no se repiten)",
               file=sys.stderr)
     return fail == 0
+
+
+def fetch_mediana(force=False):
+    """Mediana del valor del contrato, tomando el elemento del medio.
+
+    ⚠️⚠️ La SUMA de `valor_del_contrato` NO es publicable y por eso existe esto.
+    Medido ago-2026: la columna trae errores de digitación de hasta 12 órdenes de
+    magnitud. Un contrato del Consejo Nacional Electoral figura con
+    6.861.565.321.708.050.432 pesos y él solo era el 99,2% del total de su
+    búsqueda; el agregado nacional daba 5,09e21, o sea cinco mil millones de
+    billones. Y NO hay umbral limpio donde cortar: por debajo de 1 billón todavía
+    aparece el centro de salud de Nimaima —un municipio de ~6.000 habitantes— con
+    un contrato de 9,9 billones, que es un 9.922.500 al que le sobran seis ceros.
+    Sumar una columna rota no se arregla con un tope; la mediana es inmune a la
+    cola y sí describe el contrato típico.
+
+    SoQL no tiene median(), así que va por desplazamiento: cuántos traen valor, y
+    cuál está justo en la mitad. Dos consultas, y solo en el cron."""
+    name = 'mediana'
+    if not force and _is_fresh(name):
+        print(f"  = {name:24s} (fresco de hoy, se salta)")
+        return True
+    w = f'{VALOR} IS NOT NULL'
+    t0 = time.time()
+    d1, err = curl_json(f"{BASE}?{_encode(f'$select=count(1) as n&$where={w}')}")
+    if err or not d1:
+        print(f"  ! {name:24s} {err or 'sin filas'}", file=sys.stderr)
+        return False
+    n = _i(d1[0].get('n'))
+    if n <= 0:
+        print(f"  ! {name:24s} ningún contrato con valor", file=sys.stderr)
+        return False
+    soql = f'$select={VALOR}&$where={w}&$order={VALOR} ASC&$offset={n // 2}&$limit=1'
+    d2, err = curl_json(f"{BASE}?{_encode(soql)}")
+    if err or not d2:
+        print(f"  ! {name:24s} {err or 'sin fila en el medio'}", file=sys.stderr)
+        return False
+    med = _i(d2[0].get(VALOR))
+    _raw_path(name).write_text(json.dumps(
+        {'generado_dia': _today(),
+         'generado': datetime.datetime.now(datetime.timezone.utc)
+                     .replace(microsecond=0).isoformat(),
+         'soql': soql, 'rows': [{'n_con_valor': n, 'mediana': med}]},
+        ensure_ascii=False), encoding='utf-8')
+    print(f"  ok {name:24s} ${med:,} sobre {n:,} con valor · {time.time()-t0:4.1f}s")
+    return True
 
 
 def _rows(name):
@@ -287,6 +335,10 @@ def build():
     for r in _rows('por_anio'):
         y = (r.get('y') or '')[:4]
         por_anio.append({'anio': y or 'sin fecha', 'n': _i(r.get('n')), 'valor': _i(r.get('v'))})
+
+    med_rows = _rows('mediana')
+    mediana = _i(med_rows[0].get('mediana')) if med_rows else 0
+    n_con_valor = _i(med_rows[0].get('n_con_valor')) if med_rows else 0
 
     def top_entidades(name):
         out = []
@@ -346,9 +398,17 @@ def build():
         'top_entidades_valor': top_entidades('top_entidades_valor'),
         'top_entidades_n': top_entidades('top_entidades_n'),
         'top_categorias': top_categorias,
+        # Lo que el frontend PUBLICA de dinero. La suma sigue viajando en
+        # `total.valor_cop` para no romper a nadie, pero no se muestra: ver el
+        # docstring de fetch_mediana() para las cifras que lo justifican.
+        'mediana_cop': mediana,
+        'n_con_valor': n_con_valor,
         'nota': ('Agregados precomputados 1x/día. La búsqueda de contratos es en '
-                 'vivo (Socrata $q). Los valores COP son crudos del dataset (SECOP '
-                 'trae outliers de digitación en valor_del_contrato — no depurados).'),
+                 'vivo (Socrata $q). ⚠️ `valor_del_contrato` trae errores de '
+                 'digitación de hasta 12 órdenes de magnitud (un contrato del CNE '
+                 'figura con 6,86e18 pesos), así que NO se publica ninguna suma ni '
+                 'ranking por valor: se usa `mediana_cop` y los rankings van por '
+                 'número de contratos.'),
     }
     out = DIST_S3 / 'secop-stats.json'
     out.write_text(json.dumps(stats, ensure_ascii=False, indent=1), encoding='utf-8')
