@@ -1364,12 +1364,20 @@ Responde SOLO JSON: {"terminos": ["...", "..."]}"""
 QEXP_VERSION = 'v2'   # versión propia: cambiarla invalida SOLO el cache de expansión
 
 
-def _expandir_query(query):
+def _expandir_query(query, solo_cache=False):
     """Vocabulario legislativo equivalente a la consulta del usuario (expansión
     de consulta con IA). Resuelve el desajuste de vocabulario: el usuario busca
     'etiquetado' y el título dice 'entornos alimentarios saludables'. Cacheado
     por consulta normalizada; best-effort (si falla, [] y la búsqueda sigue
-    como antes — nunca rompe la ruta)."""
+    como antes — nunca rompe la ruta).
+
+    `solo_cache=True` sirve lo ya calculado y NUNCA llama al modelo. Es el modo
+    del visitante sin acceso: la expansión es justo lo que hace buena la
+    búsqueda gratis, así que no se le quita — pero generarla a demanda sería un
+    grifo abierto (una consulta nueva por petición, y el atacante las inventa
+    infinitas). Como las consultas reales se repiten mucho, el visitante acaba
+    recibiendo casi siempre la expansión que ya pagó alguien con acceso, y la
+    cobertura mejora sola con el uso."""
     q = (query or '').strip()
     if len(q) < 3:
         return []
@@ -1377,6 +1385,8 @@ def _expandir_query(query):
     cached = _cache_get(ck)
     if cached is not None:
         return cached.get('terminos', [])
+    if solo_cache:
+        return []
     try:
         raw = _call_llm('sintesis', QEXP_SYSTEM,
                         f'Tema buscado por el usuario: "{q}"\n\nJSON:',
@@ -2456,6 +2466,48 @@ def _resp(code, payload):
             'body': json.dumps(payload, ensure_ascii=False)}
 
 
+# ── La puerta de las acciones que cuestan plata ───────────────────────────────
+# De las 23 acciones, 19 solo leen índices de S3: cuestan centavos y son la parte
+# que Caudal REGALA (buscar, conteos, embudo, bloqueo, sectores, autocompletar).
+# Las otras cuatro llaman al modelo —síntesis del tema, lectura del radar,
+# lectura de gaceta— o a Serper —rastreo de medios, con cupo de 2.500 consultas
+# gratis al mes—. Esas viven del lado del muro.
+#
+# ⚠️ Hasta ago-2026 esta Lambda no validaba NADA y su URL está escrita en
+# caudal.html, que vive en un repo público: cualquiera podía quemar DeepSeek y
+# Serper. Peor, `tema` traía `lectura` en True por defecto, así que una sola
+# petición anónima disparaba dos llamadas al modelo. El gate de caudal.html
+# nunca protegió la API — solo escondía la página.
+#
+# La credencial la pone el worker de Cloudflare (ruta `/caudal/api`), que es
+# quien sabe si el visitante tiene acceso. Un navegador NO puede falsificarla:
+# un header propio dispara preflight y CORS aquí solo admite Content-Type.
+# Contra un cliente que no sea navegador, lo que protege es el secreto.
+ORIGEN_HEADER  = 'x-caudal-origin'
+ACCIONES_CARAS = frozenset({'gaceta', 'contexto', 'cliente-lectura'})
+
+
+def _con_credencial(event):
+    """True si la petición trae el secreto compartido con el worker.
+
+    ⚠️ Sin `CAUDAL_ORIGIN_SECRET` en el entorno devuelve True a propósito: así
+    desplegar el código y sembrar el secreto pueden ir en corridas distintas sin
+    dejar la Lambda muerta en el intermedio. La puerta se cierra sola al sembrar
+    el secreto — si nunca se siembra, esto no protege nada."""
+    esperado = os.environ.get('CAUDAL_ORIGIN_SECRET', '')
+    if not esperado:
+        return True
+    # API Gateway entrega los headers en minúsculas, pero no depender de eso
+    # sale gratis.
+    dado = ''
+    for k, v in (event.get('headers') or {}).items():
+        if str(k).lower() == ORIGEN_HEADER:
+            dado = str(v or '')
+            break
+    from hmac import compare_digest
+    return bool(dado) and compare_digest(dado, esperado)
+
+
 def handler(event, context):
     if (event.get('requestContext', {}).get('http', {}).get('method')
             or event.get('httpMethod')) == 'OPTIONS':
@@ -2466,13 +2518,20 @@ def handler(event, context):
         return _resp(400, {'error': 'body no es JSON'})
 
     action = body.get('action', 'tema')
+    # El rechazo va ANTES de _caudal(): decir que no no debe costar cargar los
+    # ~80 MB de índices en un arranque en frío.
+    autorizado = _con_credencial(event)
+    if action in ACCIONES_CARAS and not autorizado:
+        return _resp(403, {'error': 'accion_restringida', 'accion': action,
+                           'detalle': 'Esta lectura pertenece a la versión con acceso.'})
     caudal = _caudal()
 
     if action == 'buscar':
         q = body.get('query', '')
         # expansión IA opt-in aquí (la vista de lista se usa también para
         # filtros internos, donde el literal es lo que se espera).
-        extra = _expandir_query(q) if body.get('expandir_ia') else []
+        extra = (_expandir_query(q, solo_cache=not autorizado)
+                 if body.get('expandir_ia') else [])
         # relajar=True (③): consultas de varias palabras no colapsan por AND; anclan
         # al término más específico y rankean por nº de coincidencias.
         hits, meta = caudal.buscar(q, anio_min=body.get('anio_min'),
@@ -3436,7 +3495,8 @@ def handler(event, context):
         # consulta, misma respuesta), no cuesta una llamada al modelo y no le
         # mete al OR términos que el modelo se invente.
         emps = empresas.empresas_en(q)
-        extra = [] if emps else (_expandir_query(q) if body.get('expandir_ia', True) else [])
+        extra = [] if emps else (_expandir_query(q, solo_cache=not autorizado)
+                                 if body.get('expandir_ia', True) else [])
         resumen = caudal.resumen_tema(
             q, anio_min=body.get('anio_min'), anio_max=body.get('anio_max'),
             comision=body.get('comision'), extra_terms=extra,
@@ -3444,10 +3504,18 @@ def handler(event, context):
         out = {'query': q, 'resumen': resumen,
                'model_info': {'sintesis': STEP_MODELS['sintesis']}}
         if body.get('lectura', True) and resumen['n_intentos'] > 0:
-            casos = None
-            if body.get('profundo'):    # opt-in: más lento/costoso, lee gacetas de verdad
-                casos = _profundizar_tema(caudal, resumen)
-            out['lectura'] = _sintesis_tema(resumen, casos=casos)
+            if not autorizado:
+                # Degrada, no rechaza. El visitante sin acceso se lleva el
+                # resumen COMPLETO —que es real, y es lo que convence— y el
+                # frontend pinta el muro encima de la lectura. Cero llamadas al
+                # modelo. Un blur sobre un resumen vacío se huele en cinco
+                # segundos; sobre cifras reales, vende.
+                out['lectura_bloqueada'] = True
+            else:
+                casos = None
+                if body.get('profundo'):    # opt-in: más lento/costoso, lee gacetas de verdad
+                    casos = _profundizar_tema(caudal, resumen)
+                out['lectura'] = _sintesis_tema(resumen, casos=casos)
         return _resp(200, out)
 
     return _resp(400, {'error': f'action desconocida: {action}'})

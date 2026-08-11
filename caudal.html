@@ -854,7 +854,12 @@
 <script>
 (function(){
   'use strict';
-  const API = 'https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com';
+  /* La API se consume por el worker, no contra la Lambda directamente. El worker
+     limita por IP (el throttle de API Gateway es global al stage y no distingue
+     un scraper de un cliente), decide quién tiene acceso y se lo dice a la
+     Lambda con un secreto compartido, y de paso deja de publicar la URL de la
+     Lambda en un repo abierto. Ver rr-auth · ruta /caudal/api. */
+  const API = 'https://rr-auth.reruizc.workers.dev/caudal/api';
   /* Lista de EMERGENCIA, no la whitelist. Quién entra a Caudal lo decide el
      worker (`/caudal/acceso/me`, llaves `caudal:acceso:<correo>` en KV), que se
      otorga y revoca con tools/caudal/acceso/ sin tocar código. Esta lista solo
@@ -880,13 +885,18 @@
   // no expone ningún secreto y el acceso se revoca borrando la llave del KV
   // (o dejando que expire su TTL) — sin tocar ni redesplegar esta página.
   // Sembrar/revocar: ver CLAUDE.md · sección "acceso de invitado a Caudal".
+  // Se guarda para que `call()` lo reenvíe: el worker necesita reconocer al
+  // invitado en CADA petición, no solo al abrir la página.
+  let GUEST_TOKEN='';
   async function checkShareAccess(){
     const p=(new URLSearchParams(location.search).get('acceso')||'').trim();
     if(!p) return false;
     try{
       const r=await fetch(`https://rr-auth.reruizc.workers.dev/caudal/guest?token=${encodeURIComponent(p)}`);
       const d=await r.json();
-      return !!(d && d.ok && d.valid);
+      const val=!!(d && d.ok && d.valid);
+      if(val) GUEST_TOKEN=p;
+      return val;
     }catch(e){ return false; }
   }
 
@@ -1108,7 +1118,16 @@
   const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
   async function call(payload){
-    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    // La sesión va en cada petición: es lo que el worker usa para saber si quien
+    // llama tiene acceso y, con eso, si le pone la credencial a la Lambda. Sin
+    // ella la consulta igual responde — con el resumen real y sin la lectura.
+    const h={'Content-Type':'application/json'};
+    const t=localStorage.getItem('rr-token');
+    if(t) h.Authorization=`Bearer ${t}`;
+    // El invitado por link no tiene sesión; su token viaja en el cuerpo porque
+    // una cabecera propia dispararía preflight (ver la ruta en el worker).
+    const body=GUEST_TOKEN?Object.assign({},payload,{_guest:GUEST_TOKEN}):payload;
+    const r=await fetch(API,{method:'POST',headers:h,body:JSON.stringify(body)});
     return r.json();
   }
 
