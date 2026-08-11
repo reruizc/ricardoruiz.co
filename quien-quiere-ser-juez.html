@@ -243,7 +243,7 @@ footer b{color:var(--mute)}
 <div class="wrap">
 
 <nav>
-  <a class="back" href="index.html">← Volver</a>
+  <a class="back" id="btn-back" href="index.html">← Volver</a>
   <div class="nav-r">
     <button id="mute-btn" title="Silenciar">🔊</button>
     <div class="chip-user" id="chip-user" onclick="showView('ranking')">Ranking</div>
@@ -459,9 +459,27 @@ function addSeen(sala,ids){
 }
 
 /* ---- vistas ---- */
+/* El botón "Volver" es contextual: desde el inicio del juego sale al sitio,
+   pero desde una sala, el resultado o el ranking devuelve al inicio del juego. */
+function setBack(v){
+  const b=$('btn-back'); if(!b) return;
+  if(v==='home'){ b.href='index.html'; b.onclick=null; b.textContent='← Volver'; }
+  else{
+    b.href='#'; b.textContent = v==='game' ? '← Salir de la sala' : '← Volver';
+    b.onclick = e => {
+      e.preventDefault();
+      if(v==='game' && !STATE.over && STATE.idx>0 &&
+         !confirm('Si sales ahora pierdes lo que llevas de esta partida. ¿Salir?')) return;
+      if(v==='game'){ clearInterval(STATE.timer); STATE.over=true; stopLoop(); }
+      showView('home');
+    };
+  }
+}
+
 function showView(v){
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
   $('v-'+v).classList.add('on');
+  setBack(v);
   window.scrollTo(0,0);
   if(v==='ranking') loadRanking(curRankTab);
   if(v==='home'){ stopLoop(); renderHome(); }
@@ -526,6 +544,8 @@ function renderLadder(){
 function renderQuestion(){
   const q = STATE.qs[STATE.idx];
   STATE.qStart = Date.now();
+  // en la primera pregunta no hay nada acumulado que retirar
+  $('ll-quit').style.display = STATE.idx===0 ? 'none' : '';
   $('q-tema').textContent = q.t + (q.f==='oficial' ? ' · pregunta oficial de instructivo' : '');
   $('q-num').textContent = 'Pregunta '+(STATE.idx+1)+' de '+NQ+' · por '+LADDER[STATE.idx]+' pts';
   $('q-text').textContent = q.p;

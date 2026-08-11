@@ -8712,8 +8712,22 @@ instructivo 2018:
    Intelectual y Víctimas/Restitución).
 7. Banco: crecer a ≥60/sala (hoy 40) + modo "simulacro 200 preguntas · 4h30" como
    producto pago.
-- Otros pendientes: rutas worker + `admin-juez.html` (clonar admin-pronosticos) +
-  card en dashboard · enlazar desde index/noticias · música · OG image para compartir
+- **`admin-juez.html` ✅ HECHO** (ago-2026): panel de leads con el chasis de
+  `admin-pronosticos.html` (gate triple: localStorage + `/auth/me` + whitelist
+  `reruizc@gmail.com`). Lee `/juez/admin/all`. KPIs (aspirantes · últimas 24 h · con
+  WhatsApp · superan 800) + barras por **universidad**, por **sala jugada** (con puntaje
+  promedio: dice qué sala ampliar primero) y por **cargo objetivo** + tabla ordenable
+  con filtros y export CSV de 15 columnas. El contacto es link directo a `wa.me` o
+  `mailto` según el tipo. Card `RR-ADMIN-003` en `PRIVATE_TOOLS` de dashboard.
+  ⚠️ Lleva un aviso fijo de que la autorización recibida **no cubre ceder ni vender**
+  la base a un tercero: para eso hace falta autorización nueva que identifique al
+  destinatario (Ley 1581 de 2012). Es el reparo comercial del arranque, ahora a la vista
+  de quien opere el panel.
+- **Botón Volver contextual** (`setBack`): desde el inicio sale a `index.html`; desde una
+  sala, el resultado o el ranking devuelve al inicio del juego, y salir a mitad de
+  partida pide confirmación. **«Retirarse con lo acumulado» se oculta en la Q1**, donde
+  no hay nada acumulado.
+- Otros pendientes: enlazar desde index/noticias · música · OG image para compartir
   ranking ("mi universidad le gana a la tuya").
 
 ## Convenciones de commit
