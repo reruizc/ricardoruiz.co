@@ -8594,10 +8594,10 @@ reclutamiento); academias/editoriales o patrocinio de firma son alternativas viv
 - **Correo de contacto del proyecto: `hola@ricardoruiz.co`** (NO contacto@ — corregido
   ago-2026). Es el que va en los avisos de habeas data y el footer.
 - **`banco-judicial.js`** — banco de preguntas (patrón cand-index: `<script src>` con
-  `window.BANCO_JUDICIAL`, sin fetch). v3 (ago-2026): **185 preguntas** — 25 del
-  componente general + **40 por cada una de las 4 salas** (civil · penal · laboral ·
-  administrativo). Niveles n:1/2/3 (~13 por nivel por sala), cada una con `cita`
-  (norma/sentencia) + `pista` (texto del comodín "consultar la doctrina") + `f`
+  `window.BANCO_JUDICIAL`, sin fetch). v3 (ago-2026): **225 preguntas** — 25 del
+  componente general + **40 por cada una de las 5 salas** (civil · penal · laboral ·
+  administrativo · disciplinario). Niveles n:1/2/3 (~13 por nivel por sala), cada una con `cita`
+  (norma/sentencia) + `pista` (explicación completa; SOLO se usa al final, ver el aviso del comodín) + `f`
   (oficial|propia). **10 preguntas son `oficial`** = ejemplos publicados con respuesta
   en los instructivos C22/C27 (2 de ellas laborales: art. 66 y art. 128 CST).
   ⚠️⚠️ **El banco tiene un sesgo posicional brutal que NO se corrige reescribiéndolo:**
@@ -8623,11 +8623,16 @@ reclutamiento); academias/editoriales o patrocinio de firma son alternativas viv
   componente general y específico como el examen real. Peldaños seguros en **Q5 (125),
   Q10 (375), Q15 (675) y Q20 (800)**; **Q20 = 800 = zona de aprobación**, que coincide
   con un peldaño seguro: aprobar y asegurar son el mismo momento. Reloj 60s. Comodines:
-  **50:50**, **§ doctrina** (muestra la pista con cita), **◧ sala** (distribución
-  simulada seedeada por id, sesgo a la correcta decreciente con dificultad — cuando
-  haya tráfico real puede volverse dato real).
+  **50:50**, **§ ver la norma aplicable** y **◧ sala** (distribución simulada seedeada
+  por id, sesgo a la correcta decreciente con dificultad — cuando haya tráfico real
+  puede volverse dato real).
+  ⚠️ **El comodín de norma muestra SOLO la `cita`, nunca la `pista`**: la pista explica
+  la regla y por tanto regala la respuesta literal (medido: "Art. 762 C.C.: posesión =
+  tenencia + animus domini" ES la opción correcta). Saber que el asunto lo resuelve el
+  art. 762 orienta a quien estudió sin resolverle el examen a quien no. La `pista`
+  completa se reserva para la explicación final, donde ya enseña sin costo.
   ⚠️ **Anti-repetición en DOS claves**: `jz-seen-{sala}` (tope 40) para las específicas
-  y **`jz-seen-_gen` (tope 15) para el componente general**, que es común a las 4 salas
+  y **`jz-seen-_gen` (tope 15) para el componente general**, que es común a las 5 salas
   — con una sola clave por sala, cambiar de sala repetía las mismas generales. Los topes
   van por debajo del pool para que siempre queden frescas. Si aun así no alcanza el
   cupo, completa con vistas en vez de fallar.
@@ -8670,11 +8675,30 @@ reclutamiento); academias/editoriales o patrocinio de firma son alternativas viv
   (guardar puntaje + ranking + envío de material por WhatsApp). NUNCA prometer
   "probabilidad de pasar" ([[reference_legaltech_riesgo_score]] aplica igual acá).
 
+### 📊 Diagnóstico del aspirante (`renderAnalisis` · ago-2026)
+Panel post-partida que convierte el registro en un intercambio de valor real: das tus
+datos, recibes un análisis de tu desempeño. **Bloqueado tras registro** (blur + CTA,
+patrón plan-gate); el contenido se ve difuminado para que se note que hay algo detrás.
+- `STATE.log` registra por pregunta `{id, t, n, cita, ok, seg, gen, sala}`. Se acumula
+  en `localStorage['jz-hist']` (tope 400 ≈ 16 partidas) y **nunca sale del navegador**:
+  el diagnóstico es 100% cliente.
+- `analizar()` produce: ejes flojos (≤50%, mín. 2 intentos) y firmes (≥75%) · desempeño
+  por nivel de dificultad · **componente general vs específico** (el general son 35 de
+  las 80 preguntas de conocimientos y el específico 45 — la comparación dice dónde
+  invertir el estudio) · ritmo contra los **81 s/pregunta** del examen real (4h30 ÷ 200)
+  · y **normas para repasar** derivadas de las `cita` de lo que falló, por frecuencia.
+- Las lecturas (`lecturaNivel`, `lecturaComponente`, `lecturaRitmo`) son deterministas
+  por umbrales: describen lo que muestran los números. ⚠️ **Ninguna promete resultado en
+  el concurso** — misma regla del disclaimer y de [[reference_legaltech_riesgo_score]].
+
 ### 🌳 PENDIENTE · árbol COMPLETO de salas (pedido explícito de Ricardo)
-v2 tiene 4 salas (Civil · Penal · **Laboral** · Administrativo). Falta construir el
-árbol completo nivel × especialidad de la Convocatoria 28, reusando los ejes del
+v3 tiene 5 salas (Civil · Penal · Laboral · Administrativo · **Disciplinario**). Falta
+el árbol completo nivel × especialidad de la Convocatoria 28, con los ejes del
 instructivo 2018:
-1. ~~**Laboral**~~ ✅ HECHA en v2 (Individual · Colectivo · Procesal · Seguridad Social).
+1. ~~**Laboral**~~ ✅ · ~~**Disciplinario**~~ ✅ (CGD Ley 1952/2019 + Ley 2094/2021;
+   ⚠️ se evitan preguntas sobre el alcance de las funciones jurisdiccionales de la
+   Procuraduría frente a elegidos por voto popular — materia en disputa tras C-030 de
+   2023 y el caso Petro ante la Corte IDH).
 2. **Familia** (CGP-Familia · C.C.-Familia · Infancia y Adolescencia) — siguiente
    prioridad: es la que falta para cubrir las 4 especialidades de Tribunal Superior.
 3. **Penal especializado**: Ejecución de penas · Extinción de dominio (Ley 1708/2014 +
