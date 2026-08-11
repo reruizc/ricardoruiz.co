@@ -8500,6 +8500,61 @@ Los MP4 finales y su proyecto fuente van a **`rrss/video/`** (junto a
 `rrss/twitter/`, `rrss/instagram/`, `rrss/linkedin/`), con un `LEEME.md` que
 documenta de dónde sale cada cifra. **NO** en el scratchpad, que es efímero.
 
+## ¿Quién queda? — pronósticos de elecciones de segundo grado (`quien-queda.html` · ago-2026)
+
+Índice de opción, actualizado **cada 6 horas**, para las elecciones que NO decide el voto
+popular (Contralor, CNE, Defensor, Procurador). Página pública con la metodología a la vista;
+título "¿Quién queda?", bajada "las apuestas que no son apuestas".
+⚠️ **No confundir con `pronostico-1v.html`** (el concurso de $100.000) ni con
+`admin-pronosticos.html`. Por esa colisión el archivo NO se llama `pronostico*.html`.
+
+- **Motor**: `tools/pronosticos/{motor.py, mercados.json, run_pronosticos.sh, LEEME.md}`.
+  `índice = 0,60·respaldo + 0,25·convergencia + 0,15·puntaje_norm`; la probabilidad es el
+  índice normalizado a 100 entre todos los elegibles. **Agregar un mercado nuevo es una
+  entrada en `mercados.json`, sin tocar código.**
+- **El 60% de respaldo lo mueve DeepSeek** en automático, con **revisión humana diaria** de
+  Ricardo (así se declara en la página). Acotado por: tope de 12 puntos por corrida ·
+  obligación de citar un titular que exista LITERALMENTE en el corpus (si lo inventa, se
+  descarta) · **`peso_medio()`** que pondera por solidez de la fuente (referencia ×1,0 ·
+  secundario ×0,6 · desconocido ×0,35) ANTES del tope · falla cerrado si el JSON no valida ·
+  todo cambio queda en `log` con fuente, peso y pedido-vs-aplicado, y se publica.
+  ⚠️ La ponderación existe porque el caso ocurrió: el modelo subió a Castro 6 puntos por un
+  titular especulativo de un diario regional. Con peso, ese ajuste ya no se aplica.
+- **La imagen de redes lee el MISMO JSON** (`tools/contralor-2026/build_img.py` con `--local`
+  o desde S3): la pieza y la página no pueden decir números distintos.
+- **Datos**: local gitignored en `Bases de datos/pronosticos/`; público en
+  `congreso-2026/output/pronosticos/{index,<mercado>}.json` (prefijo ya cubierto por la
+  bucket policy). Frontend lee de ahí con cache-buster.
+- **Cron**: `launchd` (`co.ricardoruiz.pronosticos`, 00:10 · 06:10 · 12:10 · 18:10), con
+  candado anti-solape y subida a S3 sólo si el motor salió bien.
+  🔜 **Pendiente: mover a Lambda + EventBridge.** `ricardo-mac-cli` NO tiene permisos de
+  EventBridge (`events:ListRules` denegado); con `events:PutRule/PutTargets/ListRules/
+  DescribeRule` otorgados, los comandos exactos están en el LEEME del módulo.
+
+**⚠️⚠️ Tres cosas medidas que definieron el diseño (no deshacerlas):**
+1. **Buscar sólo por tema deja ciego al motor ante la noticia que mueve a UNA persona.** Con
+   consultas temáticas el corpus traía **un solo titular de Zuluaga, del 3-ago y favorable**,
+   el mismo día en que Cambio publicaba que perdía los votos. `queries_de()` añade **una
+   consulta por candidato vivo**; con eso entró la nota y el modelo lo bajó de 40 a 30
+   citándola.
+2. **El share of voice proporcional ordena por RUIDO**: el corpus de una ventana son decenas
+   de titulares (una corrida dio **9 menciones en total**), así que 6 menciones contra 2 no
+   significan el triple de opción. La convergencia es **escalonada** (ausente 25 · presente 65
+   · fuerte 85 · líder 100) + Laplace + media móvil; mide *presencia*, no volumen.
+3. **"Cambió" es un hecho, no un temblor de redondeo.** El suavizado movía ±1 punto por
+   corrida y la página habría dicho "se acaba de mover" 4 veces al día sin que pasara nada.
+   Sólo cuenta un ajuste del modelo o un movimiento ≥2 pp, y la UI muestra **la fecha del
+   último cambio REAL** junto a la de la última revisión.
+
+⚠️ **Gotcha DeepSeek** (el mismo del resto del proyecto): V4 devuelve `content` VACÍO con
+`finish_reason=length` si el prompt es largo — medido, con techo 8.000 gastó 8.000 tokens en
+razonamiento y no devolvió nada. El motor arranca en **16.000** y reintenta con 24.000.
+⚠️ **Cambio Colombia y La Silla Vacía dan 403** a fetch directo, y Cambio sólo aparece en
+Google News vía la consulta por nombre.
+
+**Piezas de redes del mismo caso** (Contralor 2026): `tools/contralor-2026/build_img.py` →
+`rrss/instagram/contralor-png/` (imagen 1080×1080 + LEEME con las fuentes de cada cifra).
+
 ## Convenciones de commit
 ```
 git commit -m "scope: descripción concisa\n\nDetalle si es necesario\n\nCo-Authored-By: Ricardo y Claudio <noreply@anthropic.com>"

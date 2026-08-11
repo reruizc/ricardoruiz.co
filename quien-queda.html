@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>¿Quién queda? · Pronósticos del Estado · Ricardo Ruiz</title>
+<meta name="description" content="Índice de opción para las elecciones que no elige el voto popular: Contralor, CNE, Defensor. Se revisa cada seis horas y muestra qué se movió y por qué.">
+<meta property="og:title" content="¿Quién queda? · Pronósticos del Estado">
+<meta property="og:description" content="Las apuestas que no son apuestas. Índice de opción para las elecciones de segundo grado, con la metodología a la vista.">
+<meta property="og:type" content="website">
+<style>
+@font-face{font-family:'HN';src:url('fonts/helveticaneue.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'HN';src:url('fonts/helveticaneue-medium.woff2') format('woff2');font-weight:500;font-display:swap}
+@font-face{font-family:'HN';src:url('fonts/helveticaneue-bold.woff2') format('woff2');font-weight:700;font-display:swap}
+@font-face{font-family:'HN';src:url('fonts/helveticaneue-light.woff2') format('woff2');font-weight:300;font-display:swap}
+
+:root{
+  --bg:#060810; --ink:#f4f3ef; --mute:#969eb2; --dim:#626a7e;
+  --blue:#0047FF; --blue2:#3d6fff; --green:#4ade80; --red:#ef5b5b;
+  --amber:#f99e34; --card:#0e1120; --line:#262c40;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:'HN',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  font-weight:400; -webkit-font-smoothing:antialiased; line-height:1.5;
+  min-height:100vh;
+}
+body::before{
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(900px 480px at 50% -12%, rgba(0,71,255,.28), transparent 62%),
+    radial-gradient(600px 420px at 88% 8%, rgba(61,111,255,.12), transparent 60%);
+}
+.wrap{position:relative; z-index:1; max-width:940px; margin:0 auto; padding:0 22px 90px}
+
+/* nav */
+nav{display:flex; align-items:center; justify-content:space-between; padding:20px 0 6px; gap:14px; flex-wrap:wrap}
+.back{color:var(--green); text-decoration:none; font-size:.86rem; font-weight:500; letter-spacing:.01em}
+.back:hover{text-decoration:underline}
+.logo{display:flex; align-items:center; gap:9px; text-decoration:none; color:var(--ink)}
+.bars{display:flex; align-items:flex-end; gap:2.5px; height:20px}
+.bars i{width:4px; background:var(--blue2); display:block; border-radius:1px}
+.logo span{font-family:'Syne','HN',sans-serif; font-weight:800; font-size:1.02rem; letter-spacing:-.01em}
+.logo span b{color:var(--blue2)}
+
+/* hero */
+header{padding:26px 0 8px}
+h1{font-size:clamp(2.4rem,7vw,3.9rem); font-weight:700; letter-spacing:-.035em; margin:0 0 6px; line-height:1}
+.tagline{color:var(--mute); font-size:clamp(1rem,2.4vw,1.16rem); margin:0 0 4px; font-weight:400}
+.tagline em{color:var(--blue2); font-style:normal; font-weight:500}
+.lede{color:var(--dim); font-size:.95rem; max-width:640px; margin:14px 0 0}
+
+/* estado */
+.pulse{display:flex; align-items:center; gap:9px; margin:26px 0 4px; flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);
+     box-shadow:0 0 0 0 rgba(74,222,128,.6); animation:p 2.6s infinite}
+@keyframes p{0%{box-shadow:0 0 0 0 rgba(74,222,128,.5)}70%{box-shadow:0 0 0 10px rgba(74,222,128,0)}100%{box-shadow:0 0 0 0 rgba(74,222,128,0)}}
+.pulse .big{font-weight:500; font-size:.94rem}
+.pulse .small{color:var(--dim); font-size:.82rem}
+
+/* mercado */
+.market{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:22px; margin:16px 0 0}
+.mhead{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:6px}
+.mtitle{font-size:1.32rem; font-weight:700; letter-spacing:-.02em; margin:0}
+.mmeta{color:var(--dim); font-size:.85rem; margin:5px 0 0}
+.countdown{text-align:right; flex-shrink:0}
+.cd-num{font-size:1.5rem; font-weight:700; letter-spacing:-.02em; line-height:1}
+.cd-lab{color:var(--dim); font-size:.72rem; text-transform:uppercase; letter-spacing:.09em; margin-top:3px}
+
+/* filas */
+.rows{margin-top:20px; display:flex; flex-direction:column; gap:3px}
+.row{display:grid; grid-template-columns:1fr auto; gap:4px 14px; padding:13px 0; border-top:1px solid rgba(255,255,255,.05)}
+.row:first-child{border-top:0}
+.rname{font-weight:500; font-size:1.06rem; letter-spacing:-.01em}
+.rcargo{color:var(--dim); font-size:.81rem; margin-top:1px}
+.rnums{display:flex; align-items:baseline; gap:8px; justify-self:end}
+.rprob{font-size:1.62rem; font-weight:700; letter-spacing:-.03em; line-height:1; font-variant-numeric:tabular-nums}
+.delta{font-size:.8rem; font-weight:500; font-variant-numeric:tabular-nums}
+.up{color:var(--green)} .down{color:var(--red)} .flat{color:var(--dim)}
+.bar{grid-column:1/-1; height:8px; border-radius:4px; background:rgba(255,255,255,.06); overflow:hidden; margin-top:7px}
+.bar i{display:block; height:100%; border-radius:4px; background:linear-gradient(90deg,var(--blue),var(--blue2)); width:0; transition:width .9s cubic-bezier(.2,.7,.3,1)}
+.row.lead .rprob{color:#fff}
+.row.tail{opacity:.62}
+.rwhy{grid-column:1/-1; color:var(--mute); font-size:.83rem; margin-top:6px; display:flex; gap:8px; align-items:flex-start}
+.rwhy::before{content:''; flex:0 0 auto; width:0;height:0; margin-top:6px;
+  border-left:6px solid var(--blue2); border-top:4px solid transparent; border-bottom:4px solid transparent}
+
+.more{margin-top:16px; background:none; border:1px solid var(--line); color:var(--mute);
+  border-radius:10px; padding:9px 15px; font:inherit; font-size:.85rem; cursor:pointer}
+.more:hover{border-color:var(--blue2); color:var(--ink)}
+
+/* log */
+.sec{margin-top:44px}
+.sec h2{font-size:1.16rem; font-weight:700; letter-spacing:-.02em; margin:0 0 4px}
+.sec p.sub{color:var(--dim); font-size:.87rem; margin:0 0 16px}
+.mv{border-left:2px solid var(--line); padding:0 0 0 16px; margin:0 0 18px}
+.mv .when{color:var(--dim); font-size:.76rem; text-transform:uppercase; letter-spacing:.07em}
+.mv .what{font-weight:500; margin:3px 0 4px; font-size:.98rem}
+.mv .what .arrow{color:var(--dim); font-weight:400}
+.mv .src{font-size:.86rem; color:var(--mute)}
+.mv .src a{color:var(--blue2); text-decoration:none}
+.mv .src a:hover{text-decoration:underline}
+.mv .medio{color:var(--dim)}
+.mv.gain{border-left-color:var(--green)} .mv.loss{border-left-color:var(--red)}
+
+/* metodología */
+details{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-top:14px}
+details summary{cursor:pointer; font-weight:500; font-size:.96rem; list-style:none}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:' +'; color:var(--blue2)}
+details[open] summary::after{content:' −'}
+details .body{color:var(--mute); font-size:.89rem; margin-top:13px}
+details .body p{margin:0 0 10px}
+details .body strong{color:var(--ink); font-weight:500}
+.wts{display:flex; gap:8px; flex-wrap:wrap; margin:12px 0}
+.wt{background:rgba(0,71,255,.1); border:1px solid rgba(61,111,255,.28); border-radius:8px;
+    padding:7px 11px; font-size:.82rem}
+.wt b{color:var(--blue2); font-weight:700}
+
+.warn{background:rgba(249,158,52,.07); border:1px solid rgba(249,158,52,.3);
+  border-radius:12px; padding:15px 17px; margin-top:20px; font-size:.88rem; color:var(--mute)}
+.warn b{color:var(--amber); font-weight:700; display:block; margin-bottom:5px;
+  font-size:.76rem; text-transform:uppercase; letter-spacing:.09em}
+
+footer{margin-top:54px; padding-top:20px; border-top:1px solid var(--line);
+  color:var(--dim); font-size:.8rem; display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap}
+footer a{color:var(--mute); text-decoration:none}
+footer a:hover{color:var(--blue2)}
+.loading{color:var(--dim); padding:50px 0; text-align:center; font-size:.92rem}
+
+@media(max-width:560px){
+  .wrap{padding:0 16px 70px}
+  .mhead{flex-direction:column} .countdown{text-align:left}
+  .rprob{font-size:1.42rem}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav>
+  <a class="back" href="index.html">← Volver</a>
+  <a class="logo" href="index.html">
+    <span class="bars"><i style="height:13px"></i><i style="height:9px"></i><i style="height:19px"></i><i style="height:11px"></i></span>
+    <span>Ricardo<b>.</b>Ruiz</span>
+  </a>
+</nav>
+
+<header>
+  <h1>¿Quién queda?</h1>
+  <p class="tagline">Las apuestas que <em>no son apuestas</em>.</p>
+  <p class="lede">Un índice de opción para las elecciones que no decide el voto popular:
+    las que se ganan adentro del Congreso y las altas cortes. Se revisa cada seis horas,
+    y cuando algo se mueve decimos qué titular lo movió.</p>
+</header>
+
+<div class="pulse" id="pulse"></div>
+<main id="app"><div class="loading">Cargando el tablero…</div></main>
+
+<section class="sec">
+  <h2>Qué se movió</h2>
+  <p class="sub">Cada cambio del índice, con la noticia que lo produjo. Si no hay nada, es que no se ha movido.</p>
+  <div id="log"></div>
+</section>
+
+<section class="sec">
+  <h2>Cómo se calcula</h2>
+  <p class="sub">La metodología completa, incluida la parte que es juicio y no medición.</p>
+
+  <div class="wts">
+    <div class="wt"><b>60%</b> respaldo político</div>
+    <div class="wt"><b>25%</b> presencia en el reporteo</div>
+    <div class="wt"><b>15%</b> puntaje del concurso</div>
+  </div>
+
+  <details>
+    <summary>Los tres componentes</summary>
+    <div class="body">
+      <p><strong>Respaldo político (60%).</strong> Cuántos votos reales tiene detrás:
+        qué bancadas lo respaldan, quién lo veta, quién se le desprendió. Es el que
+        decide una elección de Congreso y es <strong>el componente de juicio</strong>:
+        lo mueve un modelo de lenguaje que lee los titulares nuevos cada seis horas,
+        y <strong>Ricardo revisa el tablero todos los días</strong> y corrige lo que el
+        modelo haya leído mal. El modelo no puede mover a nadie más de 12 puntos por
+        revisión y está obligado a citar el titular que sustenta el cambio; si lo
+        inventa, el ajuste se descarta.</p>
+      <p><strong>Y no todo titular pesa igual.</strong> Un movimiento sustentado en un
+        medio de referencia entra completo; uno que sale en un portal pequeño entra a un
+        tercio, hasta que otro medio lo confirme. Sin eso, una nota especulativa movía a
+        un candidato lo mismo que una investigación — pasó, y por eso existe la regla.</p>
+      <p><strong>Presencia en el reporteo (25%).</strong> Si la prensa lo cuenta o no
+        entre los que tienen opción. Es escalonado y no proporcional a propósito: con
+        corpus de decenas de titulares, el volumen de menciones ordena por ruido — que
+        alguien tenga seis notas y otro dos no significa el triple de opción.</p>
+      <p><strong>Puntaje del concurso (15%).</strong> El resultado oficial de la
+        convocatoria de méritos. Pesa poco porque, empíricamente, no ordena nada:
+        en esta elección quien ganó el concurso es de los que menos opciones tiene.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Qué NO es esto</summary>
+    <div class="body">
+      <p>No es una encuesta: nadie le preguntó nada a ningún congresista.
+        No es un mercado de predicción: no hay dinero, ni apuestas, ni contraparte.
+        No es un pronóstico calibrado: con un puñado de elecciones al año no hay
+        forma de medir si el modelo acierta más que el azar.</p>
+      <p>Es una <strong>lectura ordenada del reporteo político</strong>, con los pesos
+        a la vista para que cualquiera discuta el resultado sabiendo de dónde sale
+        cada número. Si te parece que un candidato está mal puesto, casi siempre vas a
+        estar discutiendo el 60% de respaldo — y ahí probablemente tengas razón.</p>
+    </div>
+  </details>
+
+  <div class="warn">
+    <b>Lo que puede salir mal</b>
+    El tablero se actualiza solo cada seis horas, pero <b style="display:inline;font-size:inherit;
+    letter-spacing:0;text-transform:none">no queda a la deriva</b>: hay revisión humana diaria.
+    El ajuste automático está acotado (tope de movimiento, obligación de citar fuente, las fuentes
+    pesan distinto, se conserva el valor anterior si algo falla) y aun así puede leer mal un
+    titular. Por eso todo cambio queda registrado arriba con su fuente y su enlace: para que
+    cualquiera lo audite y, si está mal, se vea.
+  </div>
+</section>
+
+<footer>
+  <span>Datos y método · <a href="https://ricardoruiz.co">ricardoruiz.co</a></span>
+  <span id="stamp"></span>
+</footer>
+</div>
+
+<script>
+const S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/pronosticos';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function haceCuanto(iso){
+  if(!iso) return '—';
+  const d=(Date.now()-new Date(iso).getTime())/1000;
+  if(d<90) return 'hace un momento';
+  if(d<5400) return 'hace '+Math.round(d/60)+' min';
+  if(d<172800) return 'hace '+Math.round(d/3600)+' h';
+  return 'hace '+Math.round(d/86400)+' días';
+}
+function faltan(iso){
+  const ms=new Date(iso).getTime()-Date.now();
+  if(ms<=0) return {n:'—',l:'ya se decidió'};
+  const h=ms/3.6e6;
+  if(h<48) return {n:Math.round(h)+' h',l:'para la votación'};
+  return {n:Math.round(h/24)+' días',l:'para la votación'};
+}
+const fFecha=iso=>{
+  try{return new Date(iso).toLocaleDateString('es-CO',{day:'numeric',month:'long'});}
+  catch(e){return iso?String(iso).slice(0,10):'';}
+};
+
+function pintarPulso(m){
+  const movio=m.ultimo_cambio, rev=m.actualizado;
+  const mismo=movio && rev && Math.abs(new Date(rev)-new Date(movio))<60000;
+  $('#pulse').innerHTML=
+    '<span class="dot"></span>'+
+    '<span class="big">'+(mismo?'Se acaba de mover':'Sin movimiento '+esc(haceCuanto(movio)))+'</span>'+
+    '<span class="small">· revisado '+esc(haceCuanto(rev))+', cada 6 horas</span>';
+  $('#stamp').textContent='Última revisión: '+haceCuanto(rev);
+}
+
+function fila(f,i,lider){
+  const d=f.delta, cls=d==null||d===0?'flat':(d>0?'up':'down');
+  const txt=d==null?'':(d===0?'=':(d>0?'▲ ':'▼ ')+Math.abs(d));
+  return '<div class="row '+(i===0?'lead':'')+(i>4?' tail':'')+'">'+
+    '<div><div class="rname">'+esc(f.nombre)+'</div>'+
+      '<div class="rcargo">'+esc(f.cargo)+'</div></div>'+
+    '<div class="rnums"><span class="rprob">'+f.prob+'%</span>'+
+      '<span class="delta '+cls+'">'+txt+'</span></div>'+
+    '<div class="bar"><i data-w="'+Math.round(100*f.prob/lider)+'"></i></div>'+
+  '</div>';
+}
+
+function pintar(m){
+  pintarPulso(m);
+  const t=m.tabla||[], lider=Math.max(...t.map(f=>f.prob),1);
+  const cd=faltan(m.meta.cierra);
+  const top=t.slice(0,5), resto=t.slice(5);
+  $('#app').innerHTML='<div class="market">'+
+    '<div class="mhead"><div>'+
+      '<h2 class="mtitle">'+esc(m.meta.titulo)+'</h2>'+
+      '<p class="mmeta">'+esc(m.meta.cuerpo)+' · '+esc(m.meta.umbral)+
+        ' · '+esc(fFecha(m.meta.cierra))+'</p></div>'+
+      '<div class="countdown"><div class="cd-num">'+esc(cd.n)+'</div>'+
+        '<div class="cd-lab">'+esc(cd.l)+'</div></div></div>'+
+    (m.resumen?'<div class="rwhy" style="margin-top:12px">'+esc(m.resumen)+'</div>':'')+
+    '<div class="rows" id="rows">'+top.map((f,i)=>fila(f,i,lider)).join('')+
+      '<div id="resto" hidden>'+resto.map((f,i)=>fila(f,i+5,lider)).join('')+'</div>'+
+    '</div>'+
+    (resto.length?'<button class="more" id="btnMore">Ver los otros '+resto.length+' elegibles</button>':'')+
+  '</div>';
+
+  const btn=$('#btnMore');
+  if(btn) btn.addEventListener('click',()=>{
+    const r=$('#resto'); r.hidden=!r.hidden;
+    btn.textContent=r.hidden?'Ver los otros '+resto.length+' elegibles':'Ocultar';
+    if(!r.hidden) anima(r);
+  });
+  requestAnimationFrame(()=>anima(document));
+  pintarLog(m);
+}
+
+function anima(root){
+  root.querySelectorAll('.bar i').forEach(el=>{el.style.width=el.dataset.w+'%';});
+}
+
+function pintarLog(m){
+  const L=(m.log||[]).slice(0,10);
+  if(!L.length){ $('#log').innerHTML='<p class="sub">Todavía no se ha movido nada.</p>'; return; }
+  const nom={}; (m.tabla||[]).forEach(f=>nom[f.id]=f.nombre);
+  $('#log').innerHTML=L.map(l=>{
+    const sube=l.a>l.de;
+    return '<div class="mv '+(sube?'gain':'loss')+'">'+
+      '<div class="when">'+esc(fFecha(l.ts))+'</div>'+
+      '<div class="what">'+esc(nom[l.id]||l.id)+': respaldo '+
+        '<span class="arrow">'+l.de+' → </span>'+l.a+
+        (l.recortado?' <span class="arrow">(recortado por el tope)</span>':'')+'</div>'+
+      '<div class="src">'+(l.url?'<a href="'+esc(l.url)+'" target="_blank" rel="noopener">'+esc(l.titular)+'</a>':esc(l.titular))+
+        ' <span class="medio">— '+esc(l.medio||'')+'</span></div>'+
+    '</div>';
+  }).join('');
+}
+
+(async function(){
+  try{
+    const idx=await (await fetch(S3+'/index.json?v='+Date.now())).json();
+    const abiertos=(idx.mercados||[]).filter(m=>m.estado==='abierto');
+    if(!abiertos.length){ $('#app').innerHTML='<div class="loading">No hay mercados abiertos.</div>'; return; }
+    const m=await (await fetch(S3+'/'+abiertos[0].id+'.json?v='+Date.now())).json();
+    pintar(m);
+  }catch(e){
+    $('#app').innerHTML='<div class="loading">No se pudo cargar el tablero. Reintenta en un momento.</div>';
+    console.error(e);
+  }
+})();
+</script>
+</body>
+</html>
