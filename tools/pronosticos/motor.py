@@ -480,10 +480,13 @@ def correr(mercado, dry=False, sin_llm=False):
         f['prob_prev'] = prev.get(f['id'])
         f['delta'] = None if f['prob_prev'] is None else f['prob'] - f['prob_prev']
 
-    # "Cambió" es un hecho, no un temblor de redondeo: un ajuste del modelo, o
-    # un movimiento de al menos 2 puntos. Si no, el reloj de la página diría
-    # "se acaba de mover" cuatro veces al día sin que pase nada.
-    cambio = bool(aplicados) or any(abs(f['delta'] or 0) >= 2 for f in filas)
+    # "Cambió" = pasó algo en la política, que es lo que lee quien entra.
+    # Manda el ajuste del modelo (que siempre viene con una fuente detrás); la
+    # convergencia se reacomoda sola en cada corrida y sus ±1-2 puntos NO son
+    # noticia — sin este filtro la página decía "se acaba de mover" mientras el
+    # propio modelo reportaba "sin movimientos". Sólo un corrimiento grande de
+    # presencia (≥5) cuenta por sí solo.
+    cambio = bool(aplicados) or any(abs(f['delta'] or 0) >= 5 for f in filas)
     ts = iso()
     if cambio:
         estado['ultimo_cambio'] = ts

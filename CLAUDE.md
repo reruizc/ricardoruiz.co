@@ -8555,6 +8555,93 @@ Google News vía la consulta por nombre.
 **Piezas de redes del mismo caso** (Contralor 2026): `tools/contralor-2026/build_img.py` →
 `rrss/instagram/contralor-png/` (imagen 1080×1080 + LEEME con las fuentes de cada cifra).
 
+## ¿Quién quiere ser juez? — `quien-quiere-ser-juez.html` (v1 · ago-2026 · captura de leads B2C)
+
+Juego tipo "millonario" para aspirantes al **concurso de méritos de la Rama Judicial**
+(Convocatoria 28, Acuerdo PCSJA25-12348: inscripciones cerraron 1-dic-2025, listado de
+inscritos 13-ene-2026, pruebas escritas AÚN sin aplicar al ago-2026 → ventana comercial
+abierta). **Negocio decidido (ago-2026): B2C** — el juego gratis captura la base
+(nombre, correo, celular, universidad, año de grado, cargo objetivo, consentimiento
+Ley 1581) y el upsell es material/simulacros de preparación. Las firmas grandes quedaron
+descartadas como comprador del lead (los aspirantes a juez no son su perfil de
+reclutamiento); academias/editoriales o patrocinio de firma son alternativas vivas.
+
+### El examen real (fuente: instructivos oficiales UNal · Conv. 27)
+- **200 preguntas · 4h30 · selección múltiple única respuesta A-D** (formato 2022; el
+  Tipo 2 de combinaciones era de 2018 y ya no se usa). Aptitudes 50 (300 pts) +
+  Conocimientos 80 (700 pts: 35 general + 45 específico) + Psicotécnica 70
+  (clasificatoria). **APRUEBA: 800/1000** — la escalera del juego replica ese umbral
+  (Q13 = 800 = "zona de aprobación"; peldaños seguros Q5 y Q10).
+- **Componente general común**: Filosofía del Derecho · Hermenéutica · Constitucional ·
+  Teoría General del Proceso · Teoría General de la Prueba · Ofimática.
+- **22 grupos de específico** (instructivo 2018, extraído completo en su momento):
+  Civil (Mag/Circuito/Municipal-pequeñas causas) · Penal (Mag/Circuito-Municipal/
+  Ejecución de penas/Extinción de dominio/Adolescentes) · Laboral (Mag/Juez) · Familia
+  (Mag/Juez) · Promiscuos I-VI · Administrativo (Mag/Juez) · Disciplinario ·
+  Área Administrativa (Consejero Seccional).
+- ⚠️ **Los cuadernillos completos NO son públicos**: reserva legal — la exhibición solo
+  aplica a quien reclamó, bajo confidencialidad (Protocolo Exhibición Conv. 27). NO
+  republicar reconstrucciones filtradas. Lo legalmente limpio: los **ejemplos oficiales
+  con respuesta publicados en los instructivos** (C22-2013: ~6 · C27-2018: 2 · C27-2022: 2)
+  — ya integrados al banco marcados `f:'oficial'`. La Conv. 27 tuvo 2 exámenes anulados
+  (2019 y 2021) antes del definitivo de jul-2022; los aspirantes los vieron, pero no hay
+  fuente pública reutilizable.
+- Instructivos PDF descargados y extraídos a texto (scratchpad de la sesión ago-2026);
+  las URLs oficiales están en ramajudicial.gov.co (`Instructivo+Presentacion+Pruebas+
+  Escritas+Convocatoria+27` y `C22-Instructivo`).
+
+### Arquitectura
+- **`banco-judicial.js`** — banco de preguntas (patrón cand-index: `<script src>` con
+  `window.BANCO_JUDICIAL`, sin fetch). v1: **86 preguntas** (14 general + 24 civil +
+  24 penal + 24 administrativo), niveles n:1/2/3, cada una con `cita` (norma/sentencia)
+  + `pista` (texto del comodín "consultar la doctrina") + `f` (oficial|propia).
+  ⚠️ Las `propia` requieren **pasada de revisión de abogado** antes de escalar
+  marketing. Regla dura: ninguna pregunta sin cita verificable.
+- **`quien-quiere-ser-juez.html`** — single-file, sistema visual v2. Vistas: home
+  (salas + facts del examen real + mini-ranking) → juego (15 preguntas: 5 fáciles/5
+  medias/5 difíciles, mezcla general+específica; reloj 60s; escalera lateral) →
+  resultado (veredicto vs 800 + la pregunta fallada con norma y explicación) → modal
+  registro (post-primera-partida, NO antes — conversión) → ranking (tabs global/sala/
+  universidad). Comodines: **50:50**, **§ doctrina** (muestra la pista con cita),
+  **◧ sala** (distribución simulada seedeada por id, sesgo a la correcta decreciente
+  con dificultad — cuando el worker esté vivo puede volverse dato real).
+  Anti-repetición: `localStorage jz-seen-{sala}` (últimas 60).
+- **Audio**: hooks en `AUDIO{}` → `quien-quiere-ser-juez/audio/*.mp3` (intro, pregunta,
+  tension, correcta, incorrecta, peldano, final, comodin). Fallan en silencio si no
+  existen (patrón combate-electoral). ⚠️ **Ricardo pone la música: usar PROPIA o libre,
+  NO la del programa original** (derechos Sony) — mismo criterio del renombre de
+  combate-electoral.
+- **Backend**: endpoints `POST /juez/save` + `GET /juez/ranking` + `GET /juez/admin/all`
+  en rr-auth — **snippet listo en `tools/quien-quiere-ser-juez/rr-auth-juez-routes.md`,
+  AÚN NO desplegado**. El frontend cae a localStorage si 404 (patrón cuota /dl), así que
+  la página funciona sola. Al deployar: pedir luz verde (worker compartido). Ranking
+  público solo expone nombre + inicial + universidad (lección de `/pron/me` retirada).
+- **Legal**: footer con disclaimer (independiente, sin vínculo con Rama Judicial/CSJ/
+  UNal, puntaje no predictivo) + consentimiento Ley 1581 explícito en el registro
+  (guardar puntaje + ranking + envío de material de preparación). NUNCA prometer
+  "probabilidad de pasar" ([[reference_legaltech_riesgo_score]] aplica igual acá).
+
+### 🌳 PENDIENTE · árbol COMPLETO de salas (pedido explícito de Ricardo)
+v1 tiene 3 salas (Civil · Penal · Administrativo). Falta construir el árbol completo
+nivel × especialidad de la Convocatoria 28, reusando los ejes del instructivo 2018:
+1. **Laboral** (Individual · Colectivo · Procesal laboral · Seguridad social) — cohorte
+   grande, siguiente prioridad.
+2. **Familia** (CGP-Familia · C.C.-Familia · Infancia y Adolescencia).
+3. **Penal especializado**: Ejecución de penas · Extinción de dominio (Ley 1708/2014 +
+   1849/2017) · Responsabilidad penal adolescentes (Ley 1098).
+4. **Promiscuos I-VI** (mezclan pools de civil+penal+familia — casi gratis una vez
+   existan esas salas: son combinaciones de bancos).
+5. **Disciplinario** (Ley 1952/2019 CGD) y **Consejero Seccional** (CPACA · gerencia
+   pública · contratación · SIGCMA).
+6. Variantes por **nivel** (Municipal/Circuito/Magistrado): mismo pool con pesos de
+   dificultad distintos + ejes extra de magistrado (p.ej. Civil-Mag suma Propiedad
+   Intelectual y Víctimas/Restitución).
+7. Banco: crecer a ≥60/sala (hoy 24) + modo "simulacro 200 preguntas · 4h30" como
+   producto pago.
+- Otros pendientes: rutas worker + `admin-juez.html` (clonar admin-pronosticos) +
+  card en dashboard · enlazar desde index/noticias · música · OG image para compartir
+  ranking ("mi universidad le gana a la tuya").
+
 ## Convenciones de commit
 ```
 git commit -m "scope: descripción concisa\n\nDetalle si es necesario\n\nCo-Authored-By: Ricardo y Claudio <noreply@anthropic.com>"
