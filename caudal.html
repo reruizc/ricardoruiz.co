@@ -24,6 +24,29 @@
     --teal:#3d6fff; --teal-dim:rgba(61,111,255,.16); --teal-soft:rgba(61,111,255,.07);
     --blue:#0047FF; --amber:#e0a03a; --red:#d1584e; --green:#4ade80; --gray:#6b7b87;
   }
+  /* ── muro del freemium ──────────────────────────────────────────────────
+     Lo bloqueado se VE, no se esconde (mismo principio que plan-gate.js): el
+     contenido real se pinta y se difumina, con el conteo y el CTA encima. Es un
+     muro de producto, no de seguridad — el JSON ya viajó completo al navegador,
+     igual que en el resto del sitio. */
+  .muro{position:relative; margin-top:.4rem}
+  .muro-tapa{filter:blur(5px); pointer-events:none; user-select:none; max-height:200px; overflow:hidden; opacity:.7}
+  .muro-cta{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:.5rem; text-align:center; padding:1rem .9rem;
+            background:linear-gradient(180deg, rgba(6,8,16,.25) 0%, rgba(6,8,16,.92) 62%, var(--bg) 100%)}
+  .muro-n{font-size:1rem; font-weight:600; color:var(--ink); letter-spacing:.01em}
+  .muro-t{font-size:.78rem; line-height:1.5; color:var(--ink2); max-width:440px}
+  .muro-btn{display:inline-block; margin-top:.15rem; padding:.5rem 1.1rem; border-radius:7px;
+            background:var(--blue); color:#fff; font-size:.8rem; font-weight:500; text-decoration:none;
+            border:1px solid var(--blue); transition:.15s}
+  .muro-btn:hover{background:transparent; color:var(--ink)}
+  /* Muro de bloque entero (la lectura del analista): sin contenido que difuminar,
+     porque la Lambda no la genera para quien no tiene acceso — no hay nada que
+     tapar, y decirlo así es más honesto que fingir un texto borroso. */
+  .muro-blk{border:1px dashed var(--border2); border-radius:10px; padding:1.3rem 1.4rem; margin-bottom:1.2rem;
+            background:linear-gradient(180deg,var(--teal-soft),transparent)}
+  .muro-blk .tag{font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color:var(--teal); margin-bottom:.6rem}
+  .muro-blk .t{font-size:.85rem; line-height:1.55; color:var(--ink2); margin-bottom:.8rem}
   *{box-sizing:border-box; margin:0; padding:0}
   html,body{background:var(--bg); color:var(--ink); font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif}
   body{background:radial-gradient(1100px 700px at 78% -8%, rgba(0,71,255,.12), transparent 60%), radial-gradient(900px 600px at 10% 110%, rgba(61,111,255,.08), transparent 55%), #060810; background-attachment:fixed}
@@ -900,18 +923,32 @@
     }catch(e){ return false; }
   }
 
-  /* ---------- gate ---------- */
+  /* ---------- acceso (esto YA NO es un gate: la página es pública) ---------- */
+  // Caudal se abre al público. El acceso dejó de decidir SI entras y ahora decide
+  // QUÉ ves: el dato es de todos, lo que se cobra es la lectura. Por eso la página
+  // revela DE UNA y la autorización se resuelve en segundo plano — dejar al
+  // visitante frente a una pantalla de "verificando" mientras responde el worker
+  // es la versión educada del "contáctenos" de la competencia.
   const token=localStorage.getItem('rr-token'); const uRaw=localStorage.getItem('rr-user');
   const user=uRaw?JSON.parse(uRaw):null;
   const enEmergencia=em=>!!em&&EMERGENCIA.includes(String(em).toLowerCase().trim());
   const toLogin=()=>{localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');location.replace('login.html');};
-  const toDash=()=>location.replace('dashboard.html');
-  // Quién entra lo decide el worker. Las dos llamadas van EN PARALELO (`/auth/me`
-  // refresca el usuario cacheado —plan, nombre—; `/caudal/acceso/me` autoriza),
-  // así cablear la autorización no le suma latencia al arranque.
+  // ACCESO decide el muro · IS_GUEST es invitado por link (sin cuenta → no puede
+  // guardar perfiles, el worker exige sesión) · HAS_SESSION es "hay cuenta".
+  let ACCESO=false, IS_GUEST=false, HAS_SESSION=!!(token&&user);
+
+  // La página no espera a nadie, pero SÍ tiene que esperar a que el script
+  // termine de evaluarse: `reveal()` → `initHome()` → `renderPillars()` toca
+  // PILLARS, EJEMPLOS y compañía, que son `const` declarados más abajo. Llamarlo
+  // aquí en seco revienta con "Cannot access 'PILLARS' before initialization"
+  // (zona muerta temporal) — un error de ejecución que la validación con
+  // `new Function` NO ve, porque la sintaxis es válida. queueMicrotask lo corre
+  // apenas termina el script, sin retraso perceptible.
+  queueMicrotask(reveal);
+
   (async()=>{
-    if(await checkShareAccess()) return reveal(true);
-    if(!token||!user) return toLogin();
+    if(await checkShareAccess()) return setAcceso(true,{guest:true});
+    if(!HAS_SESSION) return;          // visitante: se queda con la versión abierta
     const H={Authorization:`Bearer ${token}`};
     const B='https://rr-auth.reruizc.workers.dev';
     let meRes, acRes;
@@ -921,32 +958,65 @@
         fetch(`${B}/caudal/acceso/me`,{headers:H}),
       ]);
     }catch(e){
-      // worker inalcanzable: se cae a la lista de emergencia en vez de dejar
-      // a todo el mundo por fuera.
-      return enEmergencia(user.email)?reveal():toDash();
+      // worker inalcanzable: la lista de emergencia evita que una caída deje a
+      // Ricardo y a los socios en la versión gratis de su propia plataforma.
+      return setAcceso(enEmergencia(user.email));
     }
-    if(meRes.status===401||acRes.status===401) return toLogin();
+    if(meRes.status===401||acRes.status===401){
+      // sesión vencida: se limpia para que la nav ofrezca entrar de nuevo, pero
+      // NO se le echa de la página — se queda viendo la versión abierta.
+      localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+      HAS_SESSION=false; return setAcceso(false);
+    }
     try{
       const d=await meRes.json();
       if(d&&d.ok&&d.user) localStorage.setItem('rr-user',JSON.stringify(Object.assign({},user,d.user)));
     }catch(e){ /* el refresco del perfil no decide el acceso */ }
     let ac=null;
     try{ ac=await acRes.json(); }catch(e){ /* cae a emergencia abajo */ }
-    // El worker manda: si dice que sí entra, y si dice que no va al dashboard.
-    if(ac&&ac.ok&&typeof ac.acceso==='boolean') return ac.acceso?reveal():toDash();
-    return enEmergencia(user.email)?reveal():toDash();
+    if(ac&&ac.ok&&typeof ac.acceso==='boolean') return setAcceso(ac.acceso);
+    return setAcceso(enEmergencia(user.email));
   })();
-  // el invitado por link no tiene cuenta → no puede guardar perfiles de cliente
-  // (el worker exige sesión). Se le deja el radar sobre los presets.
-  let IS_GUEST=false;
-  function reveal(guest){ IS_GUEST=!!guest; document.getElementById('gate').remove(); document.getElementById('topNav').hidden=false; document.getElementById('app').hidden=false;
-    if(guest){
-      const nl=document.querySelector('.e-nav-left'); if(nl) nl.innerHTML='<span class="priv-badge">Vista de invitado</span>';
-    } else {
-      const lo=document.getElementById('navLogout'); if(lo) lo.onclick=()=>{ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); location.replace('login.html'); };
-    }
+
+  function reveal(){
+    const g=document.getElementById('gate'); if(g) g.remove();
+    // Siempre presente: el muro (CSS y render) se cuelga de este atributo, y el
+    // visitante sin sesión no pasa por setAcceso(). Sin esto quedaría en
+    // `undefined` y el blur no sabría a qué lado está.
+    document.body.dataset.acceso='0';
+    document.getElementById('topNav').hidden=false;
+    document.getElementById('app').hidden=false;
+    pintarNav();
     initHome();
     loadStats();
+  }
+
+  // Llega ~medio segundo después de revelar. Repinta lo que depende del acceso;
+  // los resultados consultan ACCESO al pintarse, y para entonces ya está resuelto
+  // (el visitante todavía no ha alcanzado a buscar nada).
+  function setAcceso(v,opt){
+    ACCESO=!!v; IS_GUEST=!!(opt&&opt.guest);
+    document.body.dataset.acceso=ACCESO?'1':'0';
+    pintarNav();
+    if(ACCESO && !IS_GUEST && HAS_SESSION){
+      pfLoadList(); call({action:'perfil_meta'}).then(m=>{PF_META=m;}).catch(()=>{});
+    }
+  }
+
+  function pintarNav(){
+    const nl=document.querySelector('.e-nav-left'); if(!nl) return;
+    if(IS_GUEST){ nl.innerHTML='<span class="priv-badge">Vista de invitado</span>'; return; }
+    if(!HAS_SESSION){
+      // El visitante no viene del dashboard, así que "← Volver" no significa nada
+      // para él: se le ofrece entrar, que es lo que queremos que haga.
+      nl.innerHTML='<a href="index.html" class="e-btn-back">← ricardoruiz.co</a>'
+                 + '<a href="login.html" class="e-btn-logout" style="text-decoration:none">Iniciar sesión</a>';
+      return;
+    }
+    nl.innerHTML='<a href="dashboard.html" class="e-btn-back" id="navBack">← Volver</a>'
+               + (ACCESO?'<span class="priv-badge">Cliente</span>':'')
+               + '<button class="e-btn-logout" id="navLogout" type="button">Salir</button>';
+    const lo=document.getElementById('navLogout'); if(lo) lo.onclick=toLogin;
   }
 
   /* ---------- helpers ---------- */
@@ -962,6 +1032,45 @@
   const mesAno=s=>{const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];const p=String(s||'').split('-');return p.length>=2?M[+p[1]-1]+' '+p[0]:s;};
   const TITLE_PREF=/^\s*por\s+(?:medio\s+de\s+)?(?:el\s+medio\s+de\s+)?(?:la|el|los|las)?\s*cual(?:es)?\s+se\s+/i;
   function shortTitle(t){ let s=String(t||'').replace(TITLE_PREF,'').replace(/\s+/g,' ').trim(); if(s.length<6) s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
+
+  /* ---------- muro del freemium ---------- */
+  // El corte va DESPUÉS de ejecutar la consulta, no antes. Buscar no cuesta casi
+  // nada (19 de las 23 acciones solo leen índices), así que el visitante ve
+  // títulos y cifras REALES y choca con el muro justo donde empieza el trabajo:
+  // la lectura del analista. Bloquear antes de buscar ahorraría cero y regalaría
+  // el argumento — un blur sobre nada se huele en cinco segundos.
+  const CONTACTO_MAIL='hola@ricardoruiz.co';
+  const CORTE_LIBRE=10;
+  function mailtoHref(asunto){
+    const cuerpo='Hola,\n\nVi Caudal y quiero acceso.\n\nOrganización:\nSector que me interesa:\nQué necesito seguir:\n\n';
+    return `mailto:${CONTACTO_MAIL}?subject=${encodeURIComponent('Caudal · '+asunto)}&body=${encodeURIComponent(cuerpo)}`;
+  }
+  // Devuelve {ver, fuera}: lo que se pinta entero y lo que va detrás del muro.
+  function cortar(arr){
+    const a=arr||[];
+    if(ACCESO) return {ver:a, fuera:[]};
+    return {ver:a.slice(0,CORTE_LIBRE), fuera:a.slice(CORTE_LIBRE)};
+  }
+  // `fuera` son los items que sobraron; `render` es la misma función con la que
+  // se pintan los visibles, para que lo difuminado sea el contenido de verdad.
+  function muroLista(fuera, render, sing, plu, asunto){
+    if(!fuera||!fuera.length) return '';
+    const n=fuera.length;
+    return `<div class="muro">
+      <div class="muro-tapa">${fuera.slice(0,4).map(render).join('')}</div>
+      <div class="muro-cta">
+        <div class="muro-n">y ${fmt(n)} ${n===1?sing:plu} más</div>
+        <div class="muro-t">El archivo completo, la lectura del analista y las alertas por sector van con acceso.</div>
+        <a class="muro-btn" href="${mailtoHref(asunto)}">Escríbenos · ${CONTACTO_MAIL}</a>
+      </div></div>`;
+  }
+  function muroLectura(asunto){
+    return `<div class="muro-blk">
+      <div class="tag">◈ Lectura del analista</div>
+      <div class="t">Acá va la lectura: qué patrón siguen estos intentos, por qué se caen y qué predice eso del que está en trámite. Se escribe sobre los mismos datos que acabas de ver, y va con acceso.</div>
+      <a class="muro-btn" href="${mailtoHref(asunto)}">Escríbenos · ${CONTACTO_MAIL}</a>
+    </div>`;
+  }
 
   // stats globales (mortandad por año de cuatrienio) — 1 fetch cacheado
   let STATS=null;
@@ -1984,7 +2093,12 @@
     if(k==='congreso'){
       const r=d&&d.resumen; if(!r||!(r.intentos||[]).length) return '<div class="err">Sin proyectos de ley para este tema.</div>';
       const tit=(r.intentos||[]).filter(i=>!i.match_texto), txt=(r.intentos||[]).filter(i=>i.match_texto);
-      const rows=tit.slice(0,25).map(uniMiniRow).join('')||'<div class="cob-note">Ninguno lo lleva en el título.</div>';
+      // Con acceso, el tope de siempre (25). Sin acceso, 10 completos y el resto
+      // detrás del muro — pero el conteo del muro es el REAL, no el del tope.
+      const cC=cortar(tit);
+      const vistosC=ACCESO?cC.ver.slice(0,25):cC.ver;
+      const rows=(vistosC.map(uniMiniRow).join('')||'<div class="cob-note">Ninguno lo lleva en el título.</div>')
+        + muroLista(cC.fuera, uniMiniRow, 'proyecto', 'proyectos', `acceso · ${query}`);
       return `<div class="cob-note" style="margin-bottom:.8rem"><b>${tit.length}</b> con «${esc(query)}» en el título · <b>${txt.length}</b> lo mencionan en el texto. <a class="bd-link" id="uni-cong-full">Ver el análisis completo (embudo, éxito, bancadas) →</a></div><div class="tl tl-scroll">${rows}</div>`;
     }
     const card={regulatorio:sancCard, ejecutivo:ejeCard, contratacion:conCard, medios:medHeadCard, sucop:sucCard}[k];
@@ -2003,7 +2117,11 @@
       : k==='sucop'
       ? `${fmt(d.n)} ${d.n===1?noun[0]:noun[1]} · ${ab?`<b style="color:var(--green)">${fmt(ab)} todavía se puede${ab===1?'':'n'} comentar</b>`:'<b>ninguno abierto hoy</b>'}`
       : `${fmt(d.n)} ${d.n===1?noun[0]:noun[1]}`;
-    return `<div class="cob-note" style="margin-bottom:.8rem">${cab} · <a class="bd-link" id="uni-${k}-full">abrir en el pilar →</a></div><div class="sanc-list">${l.slice(0,40).map(card).join('')}</div>`;
+    const cP=cortar(l);
+    const vistosP=ACCESO?cP.ver.slice(0,40):cP.ver;
+    return `<div class="cob-note" style="margin-bottom:.8rem">${cab} · <a class="bd-link" id="uni-${k}-full">abrir en el pilar →</a></div>`
+      + `<div class="sanc-list">${vistosP.map(card).join('')}</div>`
+      + muroLista(cP.fuera, card, noun[0], noun[1], `acceso · ${query}`);
   }
   function wireUniTab(k){
     const query=_uniData.query;
@@ -2096,7 +2214,9 @@
       c.onclick=()=>cliLoad({sector:k}); cont.appendChild(c); });
     const b=document.getElementById('cliBack'); if(b) b.onclick=()=>showView('home');
     pfRenderBar();
-    if(!IS_GUEST){ pfLoadList(); call({action:'perfil_meta'}).then(m=>{PF_META=m;}).catch(()=>{}); }
+    // Los perfiles piden cuenta CON acceso (el worker exige sesión). El invitado
+    // por link y el visitante sin acceso se quedan con el radar sobre los presets.
+    if(ACCESO && !IS_GUEST && HAS_SESSION){ pfLoadList(); call({action:'perfil_meta'}).then(m=>{PF_META=m;}).catch(()=>{}); }
     // toggle Legislativo/Regulatorio/Prensa — delegado porque #cli-toggle se
     // recrea en cada cliRender(); click de nuevo en el mismo chip lo colapsa.
     const vc=document.getElementById('view-cliente');
@@ -2702,9 +2822,14 @@
     if(!r||!(r.intentos||[]).length){ results.innerHTML=`<div class="err">Sin resultados para «${esc(query)}». Prueba otra palabra (feminicidio, paridad, pensional…).</div>`; return; }
     _temaR=r; _temaQ=query;
     renderResumen(query,r);
-    // lectura LLM en background (pre-fetch); se cachea para que el switch no la re-pida
-    call({action:'tema',query,lectura:true}).then(d2=>{ if(mine===_seq && d2.lectura){ _lecturaData=d2.lectura; renderLectura(d2.lectura); } })
-      .catch(()=>{ const el=document.getElementById('lectura-body'); if(el) el.innerHTML='<div class="err" style="padding:.5rem;text-align:left">No se pudo generar la lectura.</div>'; });
+    // lectura LLM en background (pre-fetch); se cachea para que el switch no la re-pida.
+    // Sin acceso ni se pide: la Lambda la degradaría igual (devuelve
+    // `lectura_bloqueada` sin llamar al modelo), pero en su lugar va el muro y no
+    // tiene sentido gastar la petición.
+    if(ACCESO){
+      call({action:'tema',query,lectura:true}).then(d2=>{ if(mine===_seq && d2.lectura){ _lecturaData=d2.lectura; renderLectura(d2.lectura); } })
+        .catch(()=>{ const el=document.getElementById('lectura-body'); if(el) el.innerHTML='<div class="err" style="padding:.5rem;text-align:left">No se pudo generar la lectura.</div>'; });
+    }
   }
 
   async function profundizar(query,mine){
@@ -2824,12 +2949,12 @@
         ${S.pct_vitrina?`<span class="ichip" style="border:none;color:var(--ink3)">· ${S.pct_vitrina}% de vitrina</span>`:''}
       </div>
 
-      <div class="lectura">
+      ${ACCESO?`<div class="lectura">
         <div class="tag">◈ Lectura del analista · IA sobre datos oficiales</div>
         <div id="lectura-body"><div class="llm-load">Generando lectura <span class="dots"><span></span><span></span><span></span></span></div></div>
         <button id="btn-profundizar" class="btn-medios" style="margin-top:.6rem">◈ Profundizar con evidencia de gacetas (lee ponencias/actas reales · más lento)</button>
         <div id="lectura-casos"></div>
-      </div>
+      </div>`:muroLectura(`acceso · ${query}`)}
 
       <div class="panel wide" style="margin-bottom:1.2rem"><h3>Embudo del trámite · cómo cae en cada fase ${infoIcon(EMBUDO_INFO)}</h3>${funnel(emb)}</div>
 
