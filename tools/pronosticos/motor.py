@@ -16,7 +16,8 @@ Cada corrida:
 `respaldo` es el componente de juicio; lo mueve el modelo. `convergencia` se
 mide sola (share of voice normalizado al líder). `puntaje_norm` es estático.
 
-SALVAGUARDAS (el modelo corre sin revisión humana, así que el código lo acota):
+El ajuste es automático; la revisión, humana y diaria (ver --ajuste al final).
+SALVAGUARDAS (el modelo corre solo entre revisiones, así que el código lo acota):
   · clamp: nadie se mueve más de MAX_DELTA puntos de respaldo por corrida
   · todo ajuste debe citar un titular que exista LITERALMENTE en el corpus;
     si el modelo lo inventa, el ajuste se descarta y queda registrado
@@ -29,6 +30,9 @@ Uso:
     python3 motor.py contralor-2026  # uno solo
     python3 motor.py --dry-run       # no escribe ni sube
     python3 motor.py --sin-llm       # sólo la parte medible (sin DeepSeek)
+    python3 motor.py contralor-2026 --ajuste laverde=90,castro=86 --motivo "..."
+                                     # revisión humana: fija el respaldo a mano
+                                     # y lo registra en el log como tal
 """
 import json, os, re, sys, time, hashlib, urllib.request, urllib.parse
 import unicodedata, datetime as dt
@@ -41,6 +45,7 @@ OUT_DIR = os.path.join(REPO, 'Bases de datos', 'pronosticos')
 S3_PREFIX = 's3://elecciones-2026/ricardoruiz.co/congreso-2026/output/pronosticos'
 
 PESOS = {'respaldo': .60, 'convergencia': .25, 'puntaje': .15}
+CONCENTRACION = 2.5     # exponente índice→probabilidad (elección winner-take-all)
 MAX_DELTA = 12          # tope de movimiento del respaldo por corrida
 MIN_MENCIONES = 6       # muestra mínima para mover convergencia
 VENTANA_DIAS = 14       # ventana de la convergencia
@@ -416,9 +421,14 @@ def calcular(mercado, respaldo, conv):
                       'respaldo': respaldo.get(c['id'], c['respaldo']),
                       'convergencia': conv.get(c['id'], 0),
                       'indice': round(idx)})
-    tot = sum(f['indice'] for f in filas) or 1
+    # La probabilidad NO es proporcional al índice: gana uno solo. Repartir
+    # linealmente daba 25%/23% a los dos punteros y 52% al resto justo cuando
+    # el reporteo decía que sólo quedaban dos con opción. Se concentra elevando
+    # a CONCENTRACION (medido: 2,5 deja a los punteros en ~82% conjunto, que es
+    # lo que describe la prensa, sin cerrarle la puerta a una sorpresa).
+    tot = sum(f['indice'] ** CONCENTRACION for f in filas) or 1
     for f in filas:
-        f['prob'] = round(100 * f['indice'] / tot)
+        f['prob'] = round(100 * (f['indice'] ** CONCENTRACION) / tot)
     # cuadrar a 100 tras redondear
     dif = 100 - sum(f['prob'] for f in filas)
     if dif and filas:
@@ -525,10 +535,62 @@ def correr(mercado, dry=False, sin_llm=False):
     return estado, cambio
 
 
+def ajuste_manual(mercado, pares, motivo):
+    """Revisión humana: fija el respaldo a mano y lo deja registrado.
+
+    Existe porque el modelo es conservador por diseño y a veces se queda corto
+    ante un hecho que la prensa da por sentado (p. ej. 'la carrera se redujo a
+    dos' publicado por cinco medios sin que ningún titular nuevo lo dijera con
+    todas las letras). El ajuste va al MISMO log que los automáticos, marcado
+    como revisión humana, para que se distinga en la página.
+    """
+    estado = cargar_estado(mercado)
+    ids = {c['id'] for c in mercado['candidatos']}
+    ts = iso()
+    hechos = []
+    for cid, val in pares:
+        if cid not in ids:
+            log(f'  ! id desconocido: {cid}'); continue
+        viejo = estado['respaldo'].get(cid, 50)
+        nuevo = max(0, min(100, int(val)))
+        if nuevo == viejo:
+            continue
+        estado['respaldo'][cid] = nuevo
+        hechos.append({'id': cid, 'de': viejo, 'a': nuevo, 'ts': ts,
+                       'motivo': motivo, 'titular': motivo,
+                       'medio': 'Revisión humana', 'url': '', 'fecha': ts[:10],
+                       'peso': 1.0, 'pedido': nuevo - viejo,
+                       'recortado': False, 'humano': True})
+        log(f'  ✎ {cid}: {viejo} → {nuevo}')
+    if hechos:
+        estado['log'] = (hechos + estado.get('log', []))[:60]
+        estado['ultimo_cambio'] = ts
+        with open(path_estado(mercado['id']), 'w', encoding='utf-8') as fh:
+            json.dump(estado, fh, ensure_ascii=False, indent=1)
+    return len(hechos)
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     dry = '--dry-run' in sys.argv
     sin_llm = '--sin-llm' in sys.argv
+
+    # revisión humana:  motor.py <mercado> --ajuste zuluaga=12,laverde=90 --motivo "..."
+    if '--ajuste' in sys.argv:
+        cfg = json.load(open(os.path.join(ROOT, 'mercados.json'), encoding='utf-8'))
+        m = next((x for x in cfg['mercados'] if not args or x['id'] in args), None)
+        if not m:
+            log('mercado no encontrado'); return 1
+        spec = sys.argv[sys.argv.index('--ajuste') + 1]
+        motivo = (sys.argv[sys.argv.index('--motivo') + 1]
+                  if '--motivo' in sys.argv else 'Revisión humana del tablero')
+        pares = [(p.split('=')[0].strip(), float(p.split('=')[1]))
+                 for p in spec.split(',') if '=' in p]
+        log(f'— revisión humana sobre {m["id"]}')
+        n = ajuste_manual(m, pares, motivo)
+        log(f'  {n} ajustes aplicados; corre el motor para recalcular')
+        return 0
+
     cfg = json.load(open(os.path.join(ROOT, 'mercados.json'), encoding='utf-8'))
     ms = [m for m in cfg['mercados']
           if (not args or m['id'] in args) and m.get('estado') == 'abierto']
