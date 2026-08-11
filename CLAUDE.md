@@ -8611,11 +8611,15 @@ reclutamiento); academias/editoriales o patrocinio de firma son alternativas viv
   existen (patrón combate-electoral). ⚠️ **Ricardo pone la música: usar PROPIA o libre,
   NO la del programa original** (derechos Sony) — mismo criterio del renombre de
   combate-electoral.
-- **Backend**: endpoints `POST /juez/save` + `GET /juez/ranking` + `GET /juez/admin/all`
-  en rr-auth — **snippet listo en `tools/quien-quiere-ser-juez/rr-auth-juez-routes.md`,
-  AÚN NO desplegado**. El frontend cae a localStorage si 404 (patrón cuota /dl), así que
-  la página funciona sola. Al deployar: pedir luz verde (worker compartido). Ranking
-  público solo expone nombre + inicial + universidad (lección de `/pron/me` retirada).
+- **Backend ✅ DESPLEGADO (ago-2026)**: `POST /juez/save` + `GET /juez/ranking?tab=` +
+  `GET /juez/admin/all` (adminGuard) en rr-auth. KV: `juez:reg:<correoKey>` (registro +
+  best por sala, merge max(), conserva createdAt) + `juez:rank-cache:{tab}` TTL 300
+  (se invalida en cada save). Honeypot + rate limit propio `_juezRateLimit` (40/h —
+  el de pron era 8/h y una sesión de estudio son 10-20 partidas). Reusa
+  `_pronCleanStr/_pronValidEmail/_pronCanonEmail`. Ranking público solo expone
+  nombre + inicial + universidad (lección de `/pron/me` retirada); tab `uni` = promedio
+  de mejores por universidad. Doc en `tools/quien-quiere-ser-juez/rr-auth-juez-routes.md`.
+  El frontend igual cae a localStorage si el worker falla.
 - **Legal**: footer con disclaimer (independiente, sin vínculo con Rama Judicial/CSJ/
   UNal, puntaje no predictivo) + consentimiento Ley 1581 explícito en el registro
   (guardar puntaje + ranking + envío de material de preparación). NUNCA prometer

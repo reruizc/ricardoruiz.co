@@ -1,11 +1,12 @@
-# Rutas `/juez/*` para el worker rr-auth · ¿Quién quiere ser juez?
+# Rutas `/juez/*` del worker rr-auth · ¿Quién quiere ser juez?
 
-Snippet listo para pegar en `/Users/ricardoruiz/rr-auth/src/index.js` (mismo patrón
-de `/pron/save`). El frontend (`quien-quiere-ser-juez.html`) ya llama estos
-endpoints y cae a localStorage si responden 404 — se puede desplegar el worker
-después sin romper nada.
+**✅ DESPLEGADAS en producción (ago-2026)** en `/Users/ricardoruiz/rr-auth/src/index.js`
+(buscar "QUIÉN QUIERE SER JUEZ"). Este doc queda como referencia del contrato.
+Verificado en vivo: ranking vacío OK, honeypot OK, validaciones de consent/cel OK.
 
-⚠️ El worker es compartido con todo el sitio: pedir luz verde antes de deployar.
+Diferencia clave vs el sketch original: rate limit propio `_juezRateLimit` (40/h por IP)
+en vez de reusar `_pronRateLimit` (8/h) — el frontend guarda al final de cada partida
+y una sesión de estudio son 10-20 partidas.
 
 ## Storage KV (`RR_STORE`)
 
