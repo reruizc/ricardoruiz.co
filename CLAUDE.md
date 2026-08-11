@@ -8591,13 +8591,23 @@ reclutamiento); academias/editoriales o patrocinio de firma son alternativas viv
   Escritas+Convocatoria+27` y `C22-Instructivo`).
 
 ### Arquitectura
+- **Correo de contacto del proyecto: `hola@ricardoruiz.co`** (NO contacto@ — corregido
+  ago-2026). Es el que va en los avisos de habeas data y el footer.
 - **`banco-judicial.js`** — banco de preguntas (patrón cand-index: `<script src>` con
-  `window.BANCO_JUDICIAL`, sin fetch). v2 (ago-2026): **140 preguntas** — 20 del
-  componente general + **30 por cada una de las 4 salas** (civil · penal · laboral ·
-  administrativo). Niveles n:1/2/3 (~10 por nivel por sala), cada una con `cita`
+  `window.BANCO_JUDICIAL`, sin fetch). v3 (ago-2026): **185 preguntas** — 25 del
+  componente general + **40 por cada una de las 4 salas** (civil · penal · laboral ·
+  administrativo). Niveles n:1/2/3 (~13 por nivel por sala), cada una con `cita`
   (norma/sentencia) + `pista` (texto del comodín "consultar la doctrina") + `f`
   (oficial|propia). **10 preguntas son `oficial`** = ejemplos publicados con respuesta
   en los instructivos C22/C27 (2 de ellas laborales: art. 66 y art. 128 CST).
+  ⚠️⚠️ **El banco tiene un sesgo posicional brutal que NO se corrige reescribiéndolo:**
+  el 96% de las respuestas correctas están en A o B (medido: A 36% · B 59% · C 3% ·
+  D 1%; chi²=131 contra un crítico de 7,81). Marcando siempre B se acertaría el 59%
+  sin saber derecho. Por eso el juego **baraja las 4 opciones en cada partida**
+  (`barajarOpciones`, Fisher-Yates, recalcula `r`) — verificado uniforme en 10 corridas
+  de 40.000 (0/10 sobre el crítico). Si algún día se agregan preguntas donde el ORDEN
+  de las opciones importe (p. ej. "todas las anteriores"), habría que marcarlas para
+  excluirlas del barajado; hoy no hay ninguna.
   ⚠️ Las `propia` requieren **pasada de revisión de abogado** antes de escalar
   marketing. Regla dura: ninguna pregunta sin cita verificable.
   ⚠️ **Evitar temas con norma en disputa**: no hay preguntas sobre requisitos de
@@ -8608,15 +8618,19 @@ reclutamiento); academias/editoriales o patrocinio de firma son alternativas viv
   (salas + facts del examen real + mini-ranking) → juego → resultado (veredicto vs 800
   + la pregunta fallada con norma y explicación) → modal registro (post-primera-partida,
   NO antes — conversión) → ranking (tabs global/sala/universidad).
-  **Partida de 20 preguntas** (`LADDER` de 20 peldaños; `NQ` se deriva de su longitud —
-  no hay 20 hardcodeado): 7 fáciles + 7 medias + 6 difíciles (`CUPOS`), mezclando
-  componente general y específico como el examen real. Peldaños seguros en **Q5 (150),
-  Q10 (425) y Q15 (750)**; **Q16 = 800 = zona de aprobación** marcada en la escalera.
-  Reloj 60s. Comodines: **50:50**, **§ doctrina** (muestra la pista con cita),
-  **◧ sala** (distribución simulada seedeada por id, sesgo a la correcta decreciente
-  con dificultad — cuando haya tráfico real puede volverse dato real).
-  Anti-repetición: `localStorage jz-seen-{sala}` (últimas 80); si lo fresco no alcanza
-  el cupo, completa con vistas en vez de fallar.
+  **Partida de 25 preguntas** (`LADDER` de 25 peldaños; `NQ` se deriva de su longitud —
+  no hay número hardcodeado): 9 fáciles + 8 medias + 8 difíciles (`CUPOS`), mezclando
+  componente general y específico como el examen real. Peldaños seguros en **Q5 (125),
+  Q10 (375), Q15 (675) y Q20 (800)**; **Q20 = 800 = zona de aprobación**, que coincide
+  con un peldaño seguro: aprobar y asegurar son el mismo momento. Reloj 60s. Comodines:
+  **50:50**, **§ doctrina** (muestra la pista con cita), **◧ sala** (distribución
+  simulada seedeada por id, sesgo a la correcta decreciente con dificultad — cuando
+  haya tráfico real puede volverse dato real).
+  ⚠️ **Anti-repetición en DOS claves**: `jz-seen-{sala}` (tope 40) para las específicas
+  y **`jz-seen-_gen` (tope 15) para el componente general**, que es común a las 4 salas
+  — con una sola clave por sala, cambiar de sala repetía las mismas generales. Los topes
+  van por debajo del pool para que siempre queden frescas. Si aun así no alcanza el
+  cupo, completa con vistas en vez de fallar.
   Grid de salas: 4 columnas en desktop · 2×2 en tablet · 1 en móvil (fijo, no auto-fit:
   con 4 tarjetas el auto-fit dejaba una huérfana; aguanta crecer a 8 salas).
 - **Audio**: hooks en `AUDIO{}` → `quien-quiere-ser-juez/audio/*.mp3` (intro, pregunta,
@@ -8625,17 +8639,35 @@ reclutamiento); academias/editoriales o patrocinio de firma son alternativas viv
   NO la del programa original** (derechos Sony) — mismo criterio del renombre de
   combate-electoral.
 - **Backend ✅ DESPLEGADO (ago-2026)**: `POST /juez/save` + `GET /juez/ranking?tab=` +
-  `GET /juez/admin/all` (adminGuard) en rr-auth. KV: `juez:reg:<correoKey>` (registro +
+  `GET /juez/admin/all` (adminGuard) en rr-auth. KV: **`juez:reg:<celular>`** (registro +
   best por sala, merge max(), conserva createdAt) + `juez:rank-cache:{tab}` TTL 300
   (se invalida en cada save). Honeypot + rate limit propio `_juezRateLimit` (40/h —
-  el de pron era 8/h y una sesión de estudio son 10-20 partidas). Reusa
-  `_pronCleanStr/_pronValidEmail/_pronCanonEmail`. Ranking público solo expone
-  nombre + inicial + universidad (lección de `/pron/me` retirada); tab `uni` = promedio
-  de mejores por universidad. Doc en `tools/quien-quiere-ser-juez/rr-auth-juez-routes.md`.
-  El frontend igual cae a localStorage si el worker falla.
+  el de pron era 8/h y una sesión de estudio son 10-20 partidas). Ranking público solo
+  expone nombre de pila + inicial del apellido + universidad (lección de `/pron/me`
+  retirada); tab `uni` = promedio de mejores por universidad. Doc en
+  `tools/quien-quiere-ser-juez/rr-auth-juez-routes.md`.
+- ⚠️⚠️ **BUG CORREGIDO (ago-2026) · "no almacena el resultado"**: quien fallaba antes
+  del primer peldaño seguro sacaba **0**, y tanto el worker (`if n > 0`) como el ranking
+  (`if pts > 0`) descartaban los ceros — el jugador se registraba y su resultado no
+  aparecía en ninguna parte. Ahora **el 0 se guarda y se muestra**. Dos lecciones que
+  aplican a cualquier captura de leads: (a) el caso del usuario que va MAL es el más
+  probable en la primera partida y es justo donde el producto tiene que demostrar que
+  funciona; (b) no había **ninguna confirmación visual** de guardado — se agregó
+  `renderSaveState()` ("✓ Guardado como X · ya estás en el ranking") y `pushToServer`
+  dejó de tragarse los errores en silencio: devuelve `{ok,msg}` y el formulario los pinta.
+- **Formulario reducido a 3 campos** (ago-2026, por fricción): **nombre y apellido**
+  (validado: ≥2 palabras de 2+ letras, solo letras) + **WhatsApp o correo** (UN solo
+  campo: `parseContacto()` decide por la presencia de `@` — correo si lo trae, si no
+  celular `^3\d{9}$`; ambos lados **normalizan el `+57`** con
+  `replace(/^57(?=3\d{9}$)/,'')`, que no se traga números que solo empiezan por 57) +
+  **universidad** (alimenta el ranking por universidad, el gancho viral). Cargo objetivo
+  quedó opcional. **Se quitaron el año de grado y el correo como campo separado.**
+  La llave del KV pasó de `correoKey` a `contactoKey` = celular tal cual, o
+  `_pronCanonEmail(correo)`; un celular de 10 dígitos nunca colisiona con un correo, así
+  que no hace falta prefijo. El worker acepta `body.cel` por compatibilidad.
 - **Legal**: footer con disclaimer (independiente, sin vínculo con Rama Judicial/CSJ/
   UNal, puntaje no predictivo) + consentimiento Ley 1581 explícito en el registro
-  (guardar puntaje + ranking + envío de material de preparación). NUNCA prometer
+  (guardar puntaje + ranking + envío de material por WhatsApp). NUNCA prometer
   "probabilidad de pasar" ([[reference_legaltech_riesgo_score]] aplica igual acá).
 
 ### 🌳 PENDIENTE · árbol COMPLETO de salas (pedido explícito de Ricardo)
@@ -8654,7 +8686,7 @@ instructivo 2018:
 6. Variantes por **nivel** (Municipal/Circuito/Magistrado): mismo pool con pesos de
    dificultad distintos + ejes extra de magistrado (p.ej. Civil-Mag suma Propiedad
    Intelectual y Víctimas/Restitución).
-7. Banco: crecer a ≥60/sala (hoy 30) + modo "simulacro 200 preguntas · 4h30" como
+7. Banco: crecer a ≥60/sala (hoy 40) + modo "simulacro 200 preguntas · 4h30" como
    producto pago.
 - Otros pendientes: rutas worker + `admin-juez.html` (clonar admin-pronosticos) +
   card en dashboard · enlazar desde index/noticias · música · OG image para compartir
