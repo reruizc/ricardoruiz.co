@@ -117,6 +117,21 @@ h1{font-size:clamp(2.4rem,7vw,3.9rem); font-weight:700; letter-spacing:-.035em; 
 .mv .medio{color:var(--dim)}
 .mv.gain{border-left-color:var(--green)} .mv.loss{border-left-color:var(--red)}
 
+/* gráfico de serie + hemiciclo */
+.chart-wrap{background:var(--card); border:1px solid var(--line); border-radius:14px;
+  padding:16px 14px 10px; overflow-x:auto}
+.chart-wrap svg, #hemi svg{display:block; max-width:100%; height:auto}
+.chart-leg{display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; font-size:.83rem; color:var(--mute)}
+.chart-leg span{display:flex; align-items:center; gap:6px}
+.chart-leg i{width:11px; height:11px; border-radius:3px; display:block; flex:0 0 auto}
+.chart-leg b{color:var(--ink); font-weight:500}
+#hemi{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 14px 8px}
+.seat{transition:opacity .2s}
+.hemi-mid{font-size:.74rem; fill:var(--dim); text-anchor:middle}
+.hemi-big{font-size:1.5rem; font-weight:700; fill:var(--ink); text-anchor:middle}
+.gline{stroke:rgba(255,255,255,.06)}
+.glab{font-size:10px; fill:var(--dim)}
+
 /* metodología */
 details{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-top:14px}
 details summary{cursor:pointer; font-weight:500; font-size:.96rem; list-style:none}
@@ -194,6 +209,23 @@ footer a:hover{color:var(--blue2)}
 <main id="app"><div class="loading">Cargando el tablero…</div></main>
 
 <section class="sec">
+  <h2>Cómo se ha movido</h2>
+  <p class="sub" id="serie-sub">Cada punto es una revisión. La serie arranca cuando arrancó el tablero.</p>
+  <div class="chart-wrap"><div id="serie"></div></div>
+  <div class="chart-leg" id="serie-leg"></div>
+</section>
+
+<section class="sec">
+  <h2>Dónde están los votos</h2>
+  <p class="sub">Las 285 curules del Congreso, agrupadas por bancada. El color indica hacia
+    dónde se inclina cada bloque <em>según el reporteo</em>; el gris es lo que todavía no
+    está definido — que hoy es casi todo.</p>
+  <div id="hemi"></div>
+  <div class="chart-leg" id="hemi-leg"></div>
+  <p class="sub" id="hemi-nota" style="margin-top:14px"></p>
+</section>
+
+<section class="sec">
   <h2>Qué se movió</h2>
   <p class="sub">Cada cambio del índice, con la noticia que lo produjo. Si no hay nada, es que no se ha movido.</p>
   <div id="log"></div>
@@ -265,6 +297,7 @@ footer a:hover{color:var(--blue2)}
 </footer>
 </div>
 
+<script src="legislativo-electos.js"></script>
 <script>
 const S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/pronosticos';
 const $=s=>document.querySelector(s);
@@ -313,6 +346,7 @@ function fila(f,i,lider){
 }
 
 function pintar(m){
+  asignarColores(m);
   pintarPulso(m);
   const t=m.tabla||[], lider=Math.max(...t.map(f=>f.prob),1);
   const cd=faltan(m.meta.cierra);
@@ -338,11 +372,149 @@ function pintar(m){
     if(!r.hidden) anima(r);
   });
   requestAnimationFrame(()=>anima(document));
+  pintarSerie(m);
+  pintarHemiciclo(m);
   pintarLog(m);
 }
 
 function anima(root){
   root.querySelectorAll('.bar i').forEach(el=>{el.style.width=el.dataset.w+'%';});
+}
+
+/* ── colores por candidato (estables entre el gráfico y el hemiciclo) ── */
+const COL=['#3d6fff','#4ade80','#f99e34','#c084fc','#22d3ee','#ef5b5b'];
+const colorDe={};
+function asignarColores(m){ (m.tabla||[]).forEach((f,i)=>{ colorDe[f.id]=COL[i]||'#626a7e'; }); }
+
+/* ── serie temporal ── */
+function pintarSerie(m){
+  const H=(m.historia||[]), top=(m.tabla||[]).slice(0,4);
+  if(H.length<2){
+    $('#serie').innerHTML='<p class="sub" style="margin:6px 0 10px">Todavía no hay suficiente '+
+      'historia para dibujar la línea: hacen falta al menos dos revisiones. '+
+      'Vuelve en unas horas.</p>';
+    $('#serie-leg').innerHTML=''; return;
+  }
+  const W=880,Hh=260,P={t:14,r:16,b:26,l:32};
+  const xs=H.map(h=>new Date(h.ts).getTime());
+  const x0=Math.min(...xs), x1=Math.max(...xs)||x0+1;
+  const vals=H.flatMap(h=>top.map(f=>h.probs[f.id]||0));
+  const ymax=Math.max(10,Math.ceil((Math.max(...vals)+3)/5)*5);
+  const X=t=>P.l+(W-P.l-P.r)*((t-x0)/((x1-x0)||1));
+  const Y=v=>P.t+(Hh-P.t-P.b)*(1-v/ymax);
+  let g='';
+  for(let v=0; v<=ymax; v+=(ymax>40?10:5)){
+    g+=`<line class="gline" x1="${P.l}" y1="${Y(v)}" x2="${W-P.r}" y2="${Y(v)}"/>`+
+       `<text class="glab" x="${P.l-7}" y="${Y(v)+3}" text-anchor="end">${v}%</text>`;
+  }
+  let paths='';
+  top.forEach(f=>{
+    const pts=H.map(h=>[X(new Date(h.ts).getTime()),Y(h.probs[f.id]||0)]);
+    const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+    const c=colorDe[f.id]||'#626a7e';
+    paths+=`<path d="${d}" fill="none" stroke="${c}" stroke-width="2.4"
+      stroke-linejoin="round" stroke-linecap="round"/>`;
+    pts.forEach((p,i)=>{ if(i===pts.length-1)
+      paths+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4" fill="${c}"/>`; });
+  });
+  const fmt=t=>new Date(t).toLocaleString('es-CO',{day:'numeric',month:'short',hour:'numeric'});
+  const ejes=`<text class="glab" x="${P.l}" y="${Hh-6}">${esc(fmt(x0))}</text>`+
+    `<text class="glab" x="${W-P.r}" y="${Hh-6}" text-anchor="end">${esc(fmt(x1))}</text>`;
+  $('#serie').innerHTML=`<svg viewBox="0 0 ${W} ${Hh}" role="img"
+    aria-label="Evolución de la probabilidad de cada candidato">${g}${paths}${ejes}</svg>`;
+  $('#serie-leg').innerHTML=top.map(f=>
+    '<span><i style="background:'+(colorDe[f.id]||'#626a7e')+'"></i><b>'+esc(f.corto)+'</b> '+
+    f.prob+'%</span>').join('');
+  $('#serie-sub').textContent='Cada punto es una revisión, cada seis horas. '+
+    H.length+' revisiones desde el '+fFecha(H[0].ts)+'.';
+}
+
+/* ── hemiciclo: 285 curules reales, coloreadas por inclinación reportada ── */
+function pintarHemiciclo(m){
+  if(typeof ELECTOS==='undefined'||typeof bancadaOf==='undefined'){
+    $('#hemi').innerHTML='<p class="sub">No se pudo cargar la composición del Congreso.</p>'; return;
+  }
+  // curules reales por bancada, del escrutinio
+  const porBanc={};
+  ELECTOS.forEach(e=>{ const b=bancadaOf(e.partido); (porBanc[b.name]=porBanc[b.name]||{n:0}).n++; });
+  // inclinación declarada
+  const incl={};
+  (m.bancadas||[]).forEach(b=>{ incl[b.match]={hacia:b.hacia,nota:b.nota,clave:b.clave,fuente:b.fuente}; });
+  // orden político aproximado, izquierda → derecha
+  const ORDEN=['Pacto Histórico','Estatuto de Oposición','Alianza Verde','Alianza por Colombia',
+    'Indígenas','Afro y raizal','Curules de paz (CITREP)','Otros y coaliciones','Partido Liberal',
+    'Partido de la U','Ahora Colombia','Cambio Radical','Partido Conservador','Salvación Nacional',
+    'Centro Democrático'];
+  const nombres=Object.keys(porBanc).sort((a,b)=>{
+    const ia=ORDEN.indexOf(a), ib=ORDEN.indexOf(b);
+    return (ia<0?99:ia)-(ib<0?99:ib);
+  });
+  const asientos=[];
+  nombres.forEach(nb=>{
+    const inf=incl[nb]||{}, hacia=inf.hacia||null;
+    for(let i=0;i<porBanc[nb].n;i++)
+      asientos.push({banc:nb, hacia, clave:!!inf.clave});
+  });
+
+  // geometría del hemiciclo
+  const N=asientos.length, W=880, R=380, r0=150, cx=W/2, cy=R+22, FILAS=8;
+  const pesos=[]; let tot=0;
+  for(let f=0;f<FILAS;f++){ const w=r0+(R-r0)*f/(FILAS-1); pesos.push(w); tot+=w; }
+  const porFila=pesos.map(w=>Math.max(1,Math.round(N*w/tot)));
+  let dif=N-porFila.reduce((a,b)=>a+b,0); let k=FILAS-1;
+  while(dif!==0){ porFila[k]+=dif>0?1:-1; dif+=dif>0?-1:1; k=(k-1+FILAS)%FILAS; }
+
+  // Las posiciones se ordenan POR ÁNGULO (y luego por radio), no por fila: así
+  // cada bancada ocupa una cuña contigua como en un hemiciclo real. Llenando
+  // fila por fila, un partido quedaba repartido en los dos extremos del arco.
+  const pos=[];
+  for(let f=0;f<FILAS;f++){
+    const rad=r0+(R-r0)*f/(FILAS-1), n=porFila[f];
+    for(let j=0;j<n;j++) pos.push({ang:Math.PI*(j+.5)/n, rad});
+  }
+  pos.sort((a,b)=> a.ang-b.ang || a.rad-b.rad);
+
+  let sv='';
+  for(let i=0;i<N && i<pos.length;i++){
+    {
+      const a=pos[i].ang, rad=pos[i].rad;   // 180°, de derecha a izquierda
+      const x=cx-rad*Math.cos(a), y=cy-rad*Math.sin(a);
+      const s=asientos[i];
+      const col=s.hacia?(colorDe[s.hacia]||'#626a7e'):'#2b3247';
+      sv+=`<circle class="seat" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7.4"
+        fill="${col}" ${s.clave?'stroke="#f99e34" stroke-width="1.6"':''}>
+        <title>${esc(s.banc)}${s.hacia?' → '+esc((m.tabla.find(t=>t.id===s.hacia)||{}).nombre||''):' · sin definir'}</title>
+        </circle>`;
+    }
+  }
+  const definidas=asientos.filter(s=>s.hacia).length;
+  sv+=`<text class="hemi-big" x="${cx}" y="${cy-58}">${definidas} de ${N}</text>`+
+      `<text class="hemi-mid" x="${cx}" y="${cy-34}">curules con respaldo declarado</text>`+
+      `<text class="hemi-mid" x="${cx}" y="${cy-14}" style="font-size:.8rem;fill:#f99e34">`+
+      `se necesitan 144 para elegir</text>`;
+  $('#hemi').innerHTML=`<svg viewBox="0 0 ${W} ${cy+18}" role="img"
+    aria-label="Hemiciclo del Congreso por bancada">${sv}</svg>`;
+
+  // leyenda: sólo bancadas con inclinación + el bloque clave + el gris
+  const leg=[];
+  nombres.forEach(nb=>{
+    const inf=incl[nb]; if(!inf||!inf.hacia) return;
+    const cand=(m.tabla.find(t=>t.id===inf.hacia)||{}).corto||inf.hacia;
+    leg.push('<span><i style="background:'+(colorDe[inf.hacia]||'#626a7e')+'"></i><b>'+
+      esc(nb)+'</b> '+porBanc[nb].n+' → '+esc(cand)+'</span>');
+  });
+  leg.push('<span><i style="background:#2b3247"></i>Sin definir</span>');
+  leg.push('<span><i style="background:transparent;border:1.6px solid #f99e34"></i>'+
+    'El bloque que decide</span>');
+  $('#hemi-leg').innerHTML=leg.join('');
+
+  const clave=(m.bancadas||[]).find(b=>b.clave);
+  const nb=clave?nombres.find(n=>n===clave.match):null;
+  $('#hemi-nota').innerHTML = clave
+    ? '<b style="color:var(--ink);font-weight:500">'+esc(clave.match)+
+      (nb?' ('+porBanc[nb].n+' curules)':'')+':</b> '+esc(clave.nota)+
+      ' <span style="color:var(--dim)">— '+esc(clave.fuente)+'</span>'
+    : '';
 }
 
 function pintarLog(m){

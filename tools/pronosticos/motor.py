@@ -501,6 +501,7 @@ def correr(mercado, dry=False, sin_llm=False):
         'resumen': resumen or estado.get('resumen', ''),
         'n_titulares': len(titulares), 'n_nuevos': len(nuevos),
         'descartados_ultima': len(descartados),
+        'bancadas': mercado.get('bancadas', []),
         'meta': {'titulo': mercado['titulo'], 'cuerpo': mercado['cuerpo'],
                  'umbral': mercado['umbral'], 'cierra': mercado['cierra'],
                  'estado': mercado['estado'], 'pts_label': mercado['pts_label'],
