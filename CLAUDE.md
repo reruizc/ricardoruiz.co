@@ -8655,7 +8655,62 @@ Google News vía la consulta por nombre.
 **Piezas de redes del mismo caso** (Contralor 2026): `tools/contralor-2026/build_img.py` →
 `rrss/instagram/contralor-png/` (imagen 1080×1080 + LEEME con las fuentes de cada cifra).
 
-## ¿Quién quiere ser juez? — `quien-quiere-ser-juez.html` (v3 · ago-2026 · captura de leads B2C)
+## ¿Quién quiere ser juez? — `quien-quiere-ser-juez.html` (v4 · ago-2026 · captura de leads B2C)
+
+> **📌 v4 (ago-11-2026) · reescritura del modelo tras la revisión de abogados amigos de Ricardo.**
+> Diez pedidos, todos implementados. Lo que cambió y **por qué** (no deshacer sin leer esto):
+>
+> 1. **Se acabó la muerte súbita.** Se responden las **30** preguntas y el puntaje sale al final.
+>    Antes, caer en la Q3 cerraba la partida y el jugador se iba sin diagnóstico ni repaso, que
+>    es justo lo que el simulador tiene para dar. Adiós `LADDER`/`SAFE`/`ZONE`/`retirarse`.
+> 2. **Puntaje ponderado por dificultad** (`PESO` 1 / 1,5 / 2) sobre las 27 que puntúan →
+>    `round(1000 × obtenido/posible)`, corte en 800. Con el banco endurecido, una partida
+>    honesta cae en 650-800: eso es el diagnóstico, no un castigo.
+> 3. **Composición por bloques que replica el examen real** (`BLOQUES`): aptitudes 5 ·
+>    actualidad 2 · general 7 · específico de sala 13 · **comportamental 3**. Cuotas de
+>    dificultad duras: de las 27 que puntúan **solo 3 son de nivel básico** (antes 9 de 25).
+> 4. **El comportamental NO puntúa** — en el concurso la psicotécnica es clasificatoria. Se
+>    reporta aparte como «coincidencia con el criterio esperado». Afirmar que hay respuesta
+>    correcta a una prueba de personalidad sería inventar.
+> 5. **Selector de CARGO antes de la partida** (`modal-cargo`, `B.cargos`: empleado ·
+>    municipal · circuito · magistrado → `nivel` empleado/juez/magistrado). No es un trámite:
+>    5 comportamentales llevan **`rNivel`** porque el deber cambia con el alcance del cargo
+>    (quien dirige tiene deber de **gestión** donde el empleado tiene deber de **reporte**).
+>    ⚠️ `aplicarNivel()` corre **antes** de `barajarOpciones()`: el índice de `rNivel` apunta
+>    al orden original de las opciones.
+> 6. **El comodín § vuelve a mostrar qué dice la norma** (campo **`norma`**, nuevo, en las
+>    ~149 preguntas nuevas; cae a `pista` en las viejas). La razón vieja para ocultarlo
+>    —«regala una respuesta de la que depende seguir en juego»— **murió con la muerte
+>    súbita**: sin eliminación y con 30 preguntas, el comodín ya no decide la partida.
+>    `norma` enseña el precepto SIN nombrar la opción correcta; `pista` (que sí la desarrolla)
+>    se reserva para la retroalimentación del final.
+> 7. **Retroalimentación inmediata por pregunta** (`#fb`) + botón Siguiente (Enter/espacio).
+>    Es lo que convierte el simulador en estudio.
+> 8. **Timer 60 s → 81 s** = los 4h30 ÷ 200 preguntas del examen real.
+> 9. **Se guardan las partidas de quien NO se registra** (ver bloque dedicado abajo).
+> 10. **Sala nueva: Ejecución de Penas** (30 preguntas) → 6 salas, grid a 3 columnas
+>     (con 4 quedaban dos huérfanas en la segunda fila).
+>
+> **Banco: 225 → 374 preguntas.** Nuevas: `aptitudes` 22 (razonamiento lógico-matemático,
+> lógica formal, cómputo de términos, comprensión lectora) · `actualidad` 13 · `comportamental`
+> 16 · `ejecucion` 30 · +16 CGP en civil · +18 procesal laboral (CPTSS) · +12 general con un
+> eje de **líneas jurisprudenciales** · +8 penal · +8 administrativo · +6 disciplinario.
+>
+> **⚠️ Bug de CSS corregido de paso:** `.res-score span{font-size:1.4rem;color:var(--dim)}`
+> alcanzaba por descendencia a `#res-pts`, así que **el puntaje —el número protagonista de la
+> pantalla— salía en 1.4rem y en gris**. Al añadir un `<span>` hermano para el «/1000» se
+> arrastró desde la v1 sin que nadie lo notara.
+>
+> **🔴 PENDIENTE PARA QUE v4 QUEDE COMPLETO: desplegar el worker.**
+> `/Users/ricardoruiz/rr-auth/src/index.js` tiene los cambios (ruta `/juez/partida`, sala
+> `ejecucion` en `JUEZ_SALAS`, `/juez/admin/partidas`, campo `anon` en el registro) y pasa
+> `wrangler deploy --dry-run`, **pero NO se desplegó**: el worker es compartido con Caudal, el
+> Lab y el resto del sitio, y la regla del proyecto es pedir luz verde. Sin ese deploy las
+> partidas anónimas se encolan en `localStorage` (`jz-part-pend`, tope 20) y se reintentan
+> solas en la siguiente carga — no se pierde nada, pero el panel no las ve.
+> ```bash
+> cd /Users/ricardoruiz/rr-auth && npx wrangler deploy
+> ```
 
 > **📌 HANDOFF · estado al 11-ago-2026 — LISTO Y EN PRODUCCIÓN, ya con usuarios reales**
 >
@@ -8672,26 +8727,36 @@ Google News vía la consulta por nombre.
 > material y simulacros de preparación. Las firmas grandes se descartaron como comprador
 > del lead (el aspirante a juez no es su perfil de reclutamiento).
 >
-> **Lo construido:** 5 salas (civil · penal · laboral · administrativo · disciplinario) ·
-> **225 preguntas** con cita normativa · partidas de 25 con escalera a 1.000 y corte en
-> 800 · 3 comodines · registro de 3 campos · ranking global/sala/universidad ·
-> **diagnóstico del aspirante** post-registro · panel admin con export CSV.
+> **Lo construido (v4):** **6 salas** (civil · penal · laboral · administrativo ·
+> disciplinario · **ejecución de penas**) · **374 preguntas** con cita normativa ·
+> partidas de **30 sin eliminación** con puntaje ponderado sobre 1.000 y corte en 800 ·
+> **selector de cargo** previo · 3 comodines · registro de 3 campos ·
+> ranking global/sala/universidad · **diagnóstico del aspirante** post-registro ·
+> **partidas anónimas** de quien no se registra · panel admin con export CSV.
 >
-> **⚠️ Los cuatro aprendizajes que NO se deben deshacer** (cada uno costó un bug o una
+> **⚠️ Los aprendizajes que NO se deben deshacer** (cada uno costó un bug o una
 > medición, y están detallados más abajo en su sección):
-> 1. **El 0 se guarda.** Quien cae en la Q1 saca 0; descartarlo hacía que el registro
->    "no guardara nada" — el caso más probable en la primera partida.
+> 1. **El 0 se guarda.** Descartarlo hacía que el registro "no guardara nada" — el caso
+>    más probable en la primera partida.
 > 2. **Las opciones se barajan.** El banco tiene el 96% de las respuestas en A o B;
 >    sin barajar, marcar siempre B acierta el 59% sin saber derecho.
-> 3. **El comodín muestra la CITA, nunca la `pista`.** La pista explica la regla y por
->    tanto regala la respuesta literal.
+> 3. **El comodín § muestra `norma`, no `pista`.** `norma` enseña el precepto sin nombrar
+>    la opción correcta; `pista` sí la desarrolla y se guarda para el final. (En v1-v3 el
+>    comodín ocultaba todo porque con muerte súbita regalaba la partida; eso ya no aplica.)
 > 4. **Ninguna lectura promete resultado en el concurso.** Ni el diagnóstico ni el
 >    puntaje ([[reference_legaltech_riesgo_score]]).
+> 5. **El comportamental no puntúa y su criterio depende del cargo.** No inventar una
+>    clave psicológica: cada situación se ancla en un deber o prohibición normativo.
+> 6. **`aplicarNivel` antes de `barajarOpciones`**, o `rNivel` apunta a la opción errada.
 >
 > **Pendientes, en orden de valor:**
-> 1. **Revisión de abogado** a las **219 preguntas propias** (6 son oficiales de los
->    instructivos). Cada una trae su `cita` justamente para que la pasada sea rápida.
->    Es lo único que separa esto de poder moverlo con fuerza.
+> 0. **Desplegar el worker** (`cd /Users/ricardoruiz/rr-auth && npx wrangler deploy`) —
+>    sin eso no se guardan las partidas anónimas ni existe la sala `ejecucion` en el
+>    ranking. Ver el aviso rojo del bloque v4.
+> 1. **Revisión de abogado** a las **368 preguntas propias** (6 son oficiales de los
+>    instructivos). Cada una trae su `cita` y, las nuevas, además su `norma`, justamente
+>    para que la pasada sea rápida. Es lo único que separa esto de poder moverlo con fuerza.
+>    Prioridad dentro de la revisión: `actualidad` (caduca), `ejecucion` y `comportamental`.
 > 2. **Música** en `quien-quiere-ser-juez/audio/*.mp3` — los hooks ya existen y fallan
 >    en silencio. ⚠️ Propia o libre: NO la del programa original (derechos Sony), mismo
 >    criterio que obligó a renombrar `combate-electoral`.
@@ -8701,6 +8766,8 @@ Google News vía la consulta por nombre.
 >    Superior. Ver el árbol completo pendiente más abajo.
 > 5. Al crecer el banco: `xlsx_to_json` para que Ricardo edite preguntas en Excel
 >    (patrón `tools/build-banco-preguntas`).
+> 6. **Calibrar con el panel** una vez haya tráfico: la tarjeta «Preguntas más falladas»
+>    de `admin-juez.html` señala las mal redactadas y las que ya no discriminan.
 
 Juego tipo "millonario" para aspirantes al **concurso de méritos de la Rama Judicial**
 (Convocatoria 28, Acuerdo PCSJA25-12348: inscripciones cerraron 1-dic-2025, listado de
@@ -8822,6 +8889,32 @@ reclutamiento); academias/editoriales o patrocinio de firma son alternativas viv
   (guardar puntaje + ranking + envío de material por WhatsApp). NUNCA prometer
   "probabilidad de pasar" ([[reference_legaltech_riesgo_score]] aplica igual acá).
 
+### Partidas anónimas · el dato de quien NO se registra (v4 · ago-2026)
+
+La inmensa mayoría de quienes juegan no deja sus datos, y su desempeño es justo el que dice
+qué preguntas están mal calibradas, qué salas interesan y en qué punto se abandona. Antes se
+perdía entero.
+
+- **Frontend:** `pushPartida()` se llama SIEMPRE al cerrar la partida, con o sin registro.
+  Encola en `localStorage['jz-part-pend']` (tope 20) y `flushPartidas()` sube el lote; si el
+  servidor falla, queda en cola y se reintenta al cargar la página. Sin PII: solo
+  `anonId()` (id aleatorio del dispositivo, `jz-anon`), sala, cargo, puntaje y
+  `qs:[[id, acertó, segundos], …]`.
+- **Worker `POST /juez/partida`** (sin auth · honeypot · rate limit propio 60/h por IP,
+  distinto del de `/juez/save` que es 40/h). Dos capas: detalle por partida
+  `juez:part:<día>:<ts>:<anon>` con TTL 1 año, y **agregado diario**
+  `juez:part-dia:<YYYY-MM-DD>` (RMW best-effort, igual que analytics) con conteos por sala,
+  por cargo y **`q:{id:[vistas, aciertos]}`** hasta 600 preguntas distintas por día.
+  El agregado es lo que consulta el panel: listar miles de llaves sería inviable.
+- **`GET /juez/admin/partidas?dias=30`** (adminGuard) devuelve los agregados por día.
+- **`admin-juez.html`** suma dos tarjetas: KPIs de partidas (total, % de registrados,
+  puntaje promedio, % que supera 800) y **«Preguntas más falladas»**, que carga
+  `banco-judicial.js` para mostrar el enunciado junto al % de acierto. **Ese panel es la
+  herramienta de calibración del banco**: acierto cercano a 25 % ⇒ pregunta mal redactada o
+  con dos opciones defendibles; por encima de 90 % ⇒ ya no discrimina y hay que endurecerla.
+- El registro (`/juez/save`) guarda también el campo `anon`: es lo único que permite unir un
+  lead con las partidas que jugó ANTES de registrarse.
+
 ### 📊 Diagnóstico del aspirante (`renderAnalisis` · ago-2026)
 Panel post-partida que convierte el registro en un intercambio de valor real: das tus
 datos, recibes un análisis de tu desempeño. **Bloqueado tras registro** (blur + CTA,
@@ -8839,9 +8932,11 @@ patrón plan-gate); el contenido se ve difuminado para que se note que hay algo 
   el concurso** — misma regla del disclaimer y de [[reference_legaltech_riesgo_score]].
 
 ### 🌳 PENDIENTE · árbol COMPLETO de salas (pedido explícito de Ricardo)
-v3 tiene 5 salas (Civil · Penal · Laboral · Administrativo · **Disciplinario**). Falta
-el árbol completo nivel × especialidad de la Convocatoria 28, con los ejes del
-instructivo 2018:
+v4 tiene 6 salas (Civil · Penal · Laboral · Administrativo · Disciplinario ·
+**Ejecución de Penas**). Falta el árbol completo nivel × especialidad de la
+Convocatoria 28, con los ejes del instructivo 2018:
+0. ~~**Ejecución de Penas**~~ ✅ v4 (Ley 65/1993 + Ley 1709/2014 + arts. 38 y 459-480
+   Ley 906; subrogados, redención, permisos, ECI carcelario T-388/2013 y T-762/2015).
 1. ~~**Laboral**~~ ✅ · ~~**Disciplinario**~~ ✅ (CGD Ley 1952/2019 + Ley 2094/2021;
    ⚠️ se evitan preguntas sobre el alcance de las funciones jurisdiccionales de la
    Procuraduría frente a elegidos por voto popular — materia en disputa tras C-030 de

@@ -127,6 +127,28 @@
     </div>
 
     <div class="card">
+      <div class="card-h">Partidas jugadas · incluidas las de quienes NO se registran</div>
+      <div class="card-s">La inmensa mayoría de quienes juegan no deja sus datos, y su desempeño es el que dice
+        qué preguntas están mal calibradas y en qué punto se abandona. Se guarda sin ningún dato personal:
+        un id aleatorio del dispositivo, el cargo elegido y el acierto por pregunta.</div>
+      <div class="kpis" style="margin:0 0 14px">
+        <div class="kpi"><div class="kpi-n" id="p-total">—</div><div class="kpi-l">Partidas (30 días)</div></div>
+        <div class="kpi"><div class="kpi-n" id="p-reg">—</div><div class="kpi-l">De registrados</div></div>
+        <div class="kpi"><div class="kpi-n" id="p-prom">—</div><div class="kpi-l">Puntaje promedio</div></div>
+        <div class="kpi"><div class="kpi-n" id="p-apr">—</div><div class="kpi-l">Superan 800</div></div>
+      </div>
+      <div class="bars" id="bars-psala"><div class="empty">Cargando…</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Preguntas más falladas</div>
+      <div class="card-s">Porcentaje de acierto por pregunta, sobre todas las partidas. Una con acierto
+        cercano a 25 % suele estar mal redactada o tener dos opciones defendibles; una por encima de 90 %
+        ya no discrimina y conviene endurecerla. Se muestran las que tienen al menos 5 apariciones.</div>
+      <div class="bars" id="bars-preg"><div class="empty">Cargando…</div></div>
+    </div>
+
+    <div class="card">
       <div class="card-h">Universidades</div>
       <div class="card-s">De dónde vienen los aspirantes. Es el segmento más útil para pautar y para el ranking por universidad del juego.</div>
       <div class="bars" id="bars-uni"><div class="empty">Cargando…</div></div>
@@ -197,7 +219,8 @@
 
     /* ─── DATOS ─── */
     const SALAS = [['civil','Civil'],['penal','Penal'],['laboral','Laboral'],
-                   ['administrativo','Administrativo'],['disciplinario','Disciplinario']];
+                   ['administrativo','Administrativo'],['disciplinario','Disciplinario'],
+                   ['ejecucion','Ejecución de Penas']];
     const APRUEBA = 800;
     let ROWS = [];
     let sortKey = 'updatedAt', sortDir = -1;
@@ -221,6 +244,61 @@
       }catch(e){
         tb.innerHTML='<tr><td class="err" colspan="9">No se pudo conectar con el servidor.</td></tr>';
       }
+      cargarPartidas();
+    }
+
+    /* ─── PARTIDAS ANÓNIMAS ───
+       Agregado diario del worker. No trae PII: son conteos y estadística por
+       pregunta, así que se pinta al lado de los leads sin mezclarse con ellos. */
+    const BANCO_URL = 'banco-judicial.js';
+    let BANCO = null;
+    async function cargarBanco(){
+      if(BANCO) return BANCO;
+      try{
+        await new Promise((ok,no)=>{ const s=document.createElement('script');
+          s.src=BANCO_URL; s.onload=ok; s.onerror=no; document.head.appendChild(s); });
+        BANCO = window.BANCO_JUDICIAL || null;
+      }catch(e){ BANCO=null; }
+      return BANCO;
+    }
+    function textoPregunta(id){
+      if(!BANCO) return id;
+      for(const k of Object.keys(BANCO)){
+        const a = BANCO[k];
+        if(!Array.isArray(a)) continue;
+        const q = a.find(x=>x && x.id===id);
+        if(q) return q.p.length>78 ? q.p.slice(0,78)+'…' : q.p;
+      }
+      return id;
+    }
+    async function cargarPartidas(){
+      try{
+        const res = await fetch(`${API_BASE}/juez/admin/partidas?dias=30`, { headers:{ 'Authorization':`Bearer ${tok}` } });
+        const d = await res.json();
+        if(!d.ok) return;
+        const dias = Object.values(d.dias||{});
+        const tot = dias.reduce((s,x)=>s+(x.n||0),0);
+        const reg = dias.reduce((s,x)=>s+(x.registradas||0),0);
+        const sum = dias.reduce((s,x)=>s+(x.sumPts||0),0);
+        const apr = dias.reduce((s,x)=>s+(x.aprobadas||0),0);
+        document.getElementById('p-total').textContent = fmt(tot);
+        document.getElementById('p-reg').textContent   = tot? `${fmt(reg)} · ${Math.round(reg/tot*100)}%` : '0';
+        document.getElementById('p-prom').textContent  = tot? fmt(sum/tot) : '—';
+        document.getElementById('p-apr').textContent   = tot? `${fmt(apr)} · ${Math.round(apr/tot*100)}%` : '0';
+
+        const sala={}; dias.forEach(x=>Object.entries(x.sala||{}).forEach(([k,v])=>sala[k]=(sala[k]||0)+v));
+        barras('bars-psala', SALAS.filter(([k])=>sala[k]).map(([k,n])=>({n, v:sala[k], txt:fmt(sala[k])})), tot);
+
+        // acierto por pregunta: [vistas, aciertos]
+        const q={};
+        dias.forEach(x=>Object.entries(x.q||{}).forEach(([k,v])=>{
+          const c=q[k]||[0,0]; c[0]+=v[0]||0; c[1]+=v[1]||0; q[k]=c; }));
+        await cargarBanco();
+        const items = Object.entries(q).filter(([,c])=>c[0]>=5)
+          .map(([id,c])=>({id, n:textoPregunta(id), pct:Math.round(c[1]/c[0]*100), vistas:c[0]}))
+          .sort((a,b)=>a.pct-b.pct).slice(0,20);
+        barras('bars-preg', items.map(i=>({n:`${i.id} · ${i.n}`, v:i.pct, txt:`${i.pct}% · ${i.vistas} veces`})), 100);
+      }catch(e){ /* el panel de leads sigue sirviendo aunque esto falle */ }
     }
 
     function pintaTodo(){

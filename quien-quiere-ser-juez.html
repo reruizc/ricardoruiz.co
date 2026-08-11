@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>¿Quién quiere ser juez? · Entrena para el concurso de la Rama Judicial</title>
-<meta name="description" content="Simulador tipo concurso de televisión para aspirantes a jueces y magistrados. Preguntas con cita normativa, escalera de 1.000 puntos como el examen real y ranking por especialidad y universidad.">
+<meta name="description" content="Simulador del concurso de méritos de la Rama Judicial. 30 preguntas por partida con razonamiento lógico-matemático, actualidad, componente general, específico de la sala y preguntas de comportamiento. Cada respuesta cita la norma o la sentencia que la sustenta.">
 <meta property="og:title" content="¿Quién quiere ser juez? · Entrena para el concurso">
-<meta property="og:description" content="25 preguntas, 3 comodines y la zona de aprobación en 800/1.000 — como el examen real. ¿Llegas a la silla?">
+<meta property="og:description" content="30 preguntas como en el examen real: aptitudes, conocimientos y comportamiento. Respondes todas y al final sabes tu puntaje sobre 1.000, con el corte en 800.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -63,8 +63,9 @@ h1 em{font-style:normal;color:var(--blue2)}
 .fact{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 18px;min-width:130px}
 .fact b{display:block;font-size:1.4rem;color:var(--gold);font-weight:700}
 .fact span{font-size:.76rem;color:var(--dim)}
-/* 4 en fila en desktop · 2x2 en tablet · 1 en móvil. Aguanta crecer a 8 salas sin dejar huérfanas. */
-.salas{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:30px 0 8px}
+/* 3 en fila en desktop · 2 en tablet · 1 en móvil. Con 6 salas quedan 3+3;
+   4 columnas dejaba dos huérfanas en la segunda fila. */
+.salas{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:30px 0 8px}
 @media(max-width:900px){.salas{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:560px){.salas{grid-template-columns:1fr}}
 .sala{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 20px;cursor:pointer;
@@ -128,31 +129,66 @@ h1 em{font-style:normal;color:var(--blue2)}
 .sp-bar i{display:block;height:100%;background:var(--blue2);border-radius:7px;transition:width .8s}
 .sp-row span{width:38px;text-align:right;color:var(--mute)}
 
-/* escalera */
+/* etiqueta de bloque en el encabezado de la pregunta */
+.bl{display:inline-block;border-radius:5px;padding:1px 7px;font-size:.66rem;letter-spacing:.08em;
+  text-transform:uppercase;font-weight:500;margin-right:6px;color:#060810;background:var(--blue2)}
+.bl-aptitudes{background:#7aa2ff} .bl-actualidad{background:#5ed3b2}
+.bl-general{background:#c0b3ff}  .bl-sala{background:var(--gold)}
+.bl-comportamental{background:var(--amber)}
+
+/* retroalimentación inmediata (sustituye a la muerte súbita) */
+.fb{display:none;margin-top:16px;background:#0d1122;border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.fb.on{display:block}
+.fb-h{font-size:.76rem;letter-spacing:.14em;text-transform:uppercase;font-weight:500;margin-bottom:10px}
+.fb-ok{color:var(--green)} .fb-bad{color:var(--red)} .fb-crit{color:var(--amber)}
+.fb-r{font-size:.92rem;margin-bottom:8px}
+.fb-c{color:var(--gold);font-size:.82rem;margin-bottom:8px}
+.fb-p{color:var(--mute);font-size:.86rem;line-height:1.6;margin-bottom:16px}
+.fb .btn{width:100%}
+
+/* panel de avance (reemplaza a la escalera) */
 .ladder{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 12px;align-self:start}
-.ladder .lt{font-size:.68rem;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;text-align:center;margin-bottom:8px}
-.rung{display:flex;justify-content:space-between;gap:8px;padding:3.5px 10px;border-radius:7px;font-size:.8rem;color:var(--dim)}
-.rung b{font-weight:500}
-.rung.safe .rp::after{content:' ●';color:var(--amber);font-size:.6rem;vertical-align:middle}
-.rung.zone{border-top:1px dashed var(--gold)}
-.rung.zone .z{color:var(--gold);font-size:.62rem;letter-spacing:.08em}
-.rung.cur{background:var(--blue);color:#fff}
-.rung.cur b{color:#fff}
-.rung.won{color:var(--green)}
+.ladder .lt{font-size:.68rem;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;text-align:center;margin-bottom:10px}
+.pg-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.pg-cell{display:flex;align-items:center;justify-content:center;height:26px;border-radius:6px;
+  font-size:.7rem;color:var(--dim);background:#141930;border:1px solid transparent}
+.pg-cell.ok{background:#12331f;color:var(--green)}
+.pg-cell.bad{background:#2a1113;color:var(--red)}
+.pg-cell.crit{background:#2a2011;color:var(--amber)}
+.pg-cell.cur{border-color:var(--blue2);color:var(--ink)}
+.pg-foot{text-align:center;color:var(--dim);font-size:.7rem;margin-top:10px}
 @media(max-width:760px){
-  .ladder{display:flex;flex-wrap:wrap;gap:4px;padding:10px}
-  .ladder .lt{display:none}
-  .rung{padding:3px 8px;font-size:.72rem;border-radius:14px;border:1px solid var(--line)}
-  .rung .rn,.rung .z{display:none}
-  .rung.zone{border-top:1px solid var(--gold)}
+  .ladder{padding:10px}
+  .pg-grid{grid-template-columns:repeat(10,1fr)}
+  .pg-cell{height:22px;font-size:.62rem}
 }
+
+/* selector de cargo */
+.cargo-grid{display:grid;gap:9px}
+.cargo{text-align:left;background:#131728;border:1px solid var(--line);border-radius:11px;padding:13px 15px;
+  cursor:pointer;font-family:inherit;color:var(--ink);transition:border-color .12s,background .12s}
+.cargo:hover{border-color:var(--blue2);background:#171c33}
+.cargo.on{border-color:var(--gold)}
+.cargo b{display:block;font-size:.98rem;font-weight:500}
+.cargo span{display:block;color:var(--dim);font-size:.78rem;margin-top:2px}
+
+/* desglose por bloque en el resultado */
+.res-blocks{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:660px;margin:26px auto 0}
+.blk{position:relative;flex:1;min-width:118px;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;padding:12px 14px 14px;overflow:hidden}
+.blk b{display:block;font-size:1.25rem;font-weight:700}
+.blk span{display:block;font-size:.7rem;color:var(--dim);line-height:1.35}
+.blk i{position:absolute;left:0;bottom:0;height:3px;display:block}
 
 /* ===== RESULTADO ===== */
 .res-hero{text-align:center;padding:36px 0 8px}
 .res-hero .verdict{font-size:.8rem;letter-spacing:.2em;text-transform:uppercase;font-weight:500;margin-bottom:8px}
 .res-hero .verdict.ok{color:var(--green)} .res-hero .verdict.no{color:var(--red)}
 .res-score{font-size:clamp(3.4rem,11vw,5.6rem);font-weight:700;letter-spacing:-.04em;line-height:1}
+/* ⚠️ el selector de descendencia también alcanzaba a #res-pts y dejaba el
+   puntaje —el número protagonista de la pantalla— en 1.4rem y en gris. */
 .res-score span{font-size:1.4rem;color:var(--dim);font-weight:300}
+.res-score #res-pts{font-size:inherit;color:inherit;font-weight:inherit}
 .res-sub{color:var(--mute);margin-top:8px;font-size:.95rem}
 .res-saved{margin-top:16px;font-size:.85rem;color:var(--dim);min-height:1.4em}
 .res-saved.ok{color:var(--green)}
@@ -164,6 +200,11 @@ h1 em{font-style:normal;color:var(--blue2)}
 .res-fail .rf-t{color:var(--red);font-weight:700;font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px}
 .res-fail .rf-ok{color:var(--green);margin-top:8px}
 .res-fail .rf-cita{color:var(--gold);font-size:.8rem;margin-top:8px}
+.rv{border-top:1px solid var(--line);padding-top:16px;margin-top:16px}
+.rv:first-of-type{border-top:none;padding-top:0}
+.rv-q{font-weight:500;line-height:1.5}
+.rv-mine{color:var(--red);margin-top:8px}
+.rv-p{color:var(--mute);margin-top:8px;font-size:.83rem;line-height:1.6}
 /* ===== diagnóstico ===== */
 .panel-an{max-width:660px;margin:34px auto 0}
 .an-head h3{font-size:1.25rem;margin:0 0 6px}
@@ -264,8 +305,10 @@ footer b{color:var(--mute)}
   <header>
     <div class="kicker">Entrena para la Convocatoria de la Rama Judicial</div>
     <h1>¿Quién quiere ser <em>juez</em>?</h1>
-    <p class="tagline">25 preguntas, 3 comodines y una escalera de 1.000 puntos con la zona de aprobación
-    en <b>800</b> — el mismo umbral del examen real. Cada respuesta te muestra la norma o la sentencia que la sustenta.</p>
+    <p class="tagline">Respondes <b>30 preguntas</b> —razonamiento lógico-matemático, actualidad, componente
+    general, específico de tu sala y comportamiento— y al final sabes tu puntaje sobre 1.000, con el corte
+    en <b>800</b> como en el examen real. Nada de quedar eliminado en la tercera: cada respuesta te muestra
+    la norma o la sentencia que la sustenta.</p>
   </header>
 
   <div class="exam-facts">
@@ -276,7 +319,8 @@ footer b{color:var(--mute)}
   </div>
 
   <div class="salas" id="salas-grid"></div>
-  <p class="soon-note">Próximamente: Familia · Promiscuos · Ejecución de Penas · Disciplinario — el árbol completo de la convocatoria.</p>
+  <p class="soon-note">Próximamente: Familia · Promiscuos · Extinción de Dominio · Responsabilidad Penal
+  para Adolescentes — el árbol completo de la convocatoria.</p>
 
   <div class="home-rank">
     <h2>Los mejores del simulador</h2>
@@ -304,14 +348,14 @@ footer b{color:var(--mute)}
       </div>
       <div class="lifelines">
         <button class="ll" id="ll-50" onclick="useFifty()"><b>50:50</b> quita dos opciones</button>
-        <button class="ll" id="ll-doc" onclick="useDoctrina()"><b>§</b> Ver la norma aplicable</button>
+        <button class="ll" id="ll-doc" onclick="useDoctrina()"><b>§</b> Qué dice la norma</button>
         <button class="ll" id="ll-sala" onclick="useSala()"><b>◧</b> Preguntar a la sala</button>
-        <button class="ll" id="ll-quit" onclick="retirarse()">Retirarse con lo acumulado</button>
       </div>
-      <div class="hint-box" id="hint-box"><span class="ht">Fuente normativa</span><span id="hint-text"></span></div>
+      <div class="hint-box" id="hint-box"><span class="ht">La norma aplicable dice</span><span id="hint-text"></span></div>
       <div class="sala-poll" id="sala-poll"></div>
+      <div class="fb" id="fb"></div>
     </div>
-    <div class="ladder" id="ladder"></div>
+    <div class="ladder" id="progress"></div>
   </div>
 </div>
 
@@ -323,6 +367,7 @@ footer b{color:var(--mute)}
     <div class="res-sub" id="res-sub"></div>
     <div class="res-saved" id="res-saved"></div>
   </div>
+  <div class="res-blocks" id="res-blocks"></div>
   <div class="res-fail" id="res-fail" style="display:none"></div>
 
   <div class="panel-an" id="panel-analisis" style="display:none">
@@ -343,7 +388,7 @@ footer b{color:var(--mute)}
     </div>
   </div>
   <div class="res-acts">
-    <button class="btn btn-p" onclick="startGame(STATE.sala)">Jugar de nuevo</button>
+    <button class="btn btn-p" onclick="startGame(STATE.sala, STATE.cargo)">Jugar de nuevo</button>
     <button class="btn btn-g" onclick="showView('home')">Cambiar de sala</button>
     <button class="btn btn-o" id="btn-rank" onclick="showView('ranking')">Ver ranking</button>
   </div>
@@ -359,6 +404,23 @@ footer b{color:var(--mute)}
   <div class="rank-tabs" id="rank-tabs"></div>
   <div class="rank-list" id="rank-list"><div class="rk-empty">Cargando…</div></div>
   <div class="res-acts" style="justify-content:flex-start"><button class="btn btn-g" onclick="showView('home')">← Volver al inicio</button></div>
+</div>
+
+<!-- ============ MODAL CARGO ============
+     Va antes de la partida porque el criterio esperado de las preguntas
+     comportamentales cambia con el alcance del cargo. -->
+<div class="modal" id="modal-cargo">
+  <div class="m-box">
+    <h3>¿A qué cargo aspiras?</h3>
+    <div class="m-sub" id="cargo-sala"></div>
+    <p style="color:var(--mute);font-size:.84rem;line-height:1.55;margin:0 0 16px">
+      No es un trámite: en las preguntas de comportamiento la respuesta esperada
+      cambia con el cargo. Quien dirige un despacho tiene deber de <b>gestión</b>
+      donde el empleado tiene deber de <b>reporte</b>.
+    </p>
+    <div class="cargo-grid" id="cargo-grid"></div>
+    <button class="m-skip" onclick="closeCargo()">Cancelar</button>
+  </div>
 </div>
 
 <!-- ============ MODAL REGISTRO ============ -->
@@ -382,8 +444,10 @@ footer b{color:var(--mute)}
         <option>Universidad Cooperativa de Colombia</option><option>Universidad Simón Bolívar</option>
       </datalist>
     </div>
-    <div class="f-row"><label>Cargo al que aspiras <span style="color:var(--dim)">· opcional</span></label>
-      <select id="r-cargo"><option value="">Prefiero no decir</option><option>Juez Municipal</option><option>Juez de Circuito</option><option>Magistrado de Tribunal</option><option>Aún no decido</option></select>
+    <div class="f-row"><label>Cargo al que aspiras</label>
+      <!-- Se llena desde B.cargos para que coincida siempre con el selector
+           previo a la partida; si divergen, la preselección falla en silencio. -->
+      <select id="r-cargo"></select>
     </div>
     <label class="consent"><input type="checkbox" id="r-consent">
       <span>Autorizo el tratamiento de mis datos personales conforme a la <b>Ley 1581 de 2012</b> para: guardar mi puntaje, mostrarme en el ranking y enviarme información de preparación para el concurso de la Rama Judicial por el medio que dejé arriba. Podré consultar, actualizar o suprimir mis datos escribiendo a hola@ricardoruiz.co.</span></label>
@@ -400,7 +464,18 @@ footer b{color:var(--mute)}
   escritas de la Convocatoria 27 (Consejo Superior de la Judicatura · Universidad Nacional, 2022); los ejes temáticos por
   especialidad, de los instructivos oficiales publicados. Cada pregunta cita la norma o jurisprudencia en que se apoya.
   Preguntas marcadas como oficiales = ejemplos publicados por la organización del concurso en sus instructivos.
-  · Datos personales: Ley 1581 de 2012 · hola@ricardoruiz.co
+  <br><br>
+  <b>Sobre las preguntas de comportamiento:</b> no existe clave pública de la prueba psicotécnica oficial. Aquí no puntúan
+  —como en el concurso, donde son clasificatorias— y el criterio de cada situación se ancla en deberes y prohibiciones
+  normativos (Ley 270 de 1996, Ley 1952 de 2019, Ley 1010 de 2006) y en el Código Iberoamericano de Ética Judicial, no en
+  una respuesta psicológica supuesta. Por eso se pregunta el cargo antes de empezar: el deber cambia con el alcance del cargo.
+  <br><br>
+  <b>Bloque de actualidad:</b> caduca. Cada pregunta lleva la fecha en que se verificó y se revisa periódicamente; se evitan
+  materias todavía en disputa. Las preguntas de argumentación e interpretación se apoyan además en los módulos de
+  aprendizaje autodirigido de la <b>Escuela Judicial «Rodrigo Lara Bonilla»</b> (argumentación en procesos judiciales,
+  interpretación judicial y análisis de casos), de consulta pública en escuelajudicial.ramajudicial.gov.co.
+  <br><br>
+  Datos personales: Ley 1581 de 2012 · hola@ricardoruiz.co
 </footer>
 </div>
 
@@ -411,11 +486,31 @@ footer b{color:var(--mute)}
    ============================================================ */
 const API = 'https://rr-auth.reruizc.workers.dev';   // rutas /juez/* (fallback localStorage si 404)
 const B = window.BANCO_JUDICIAL;
-const LADDER = [15,35,60,90,125, 165,210,260,315,375, 435,495,555,615,675, 700,730,760,780,800, 850,890,930,965,1000];
-const NQ = LADDER.length;    // 25 preguntas por partida
-const SAFE = [4,9,14,19];    // Q5, Q10, Q15 y Q20 (índices) — peldaños seguros
-const ZONE = 19;             // Q20 = 800 = zona de aprobación del examen real (y peldaño seguro)
-const T_LIMIT = 60;
+
+/* ── MODELO DE PARTIDA (v3 · ago-2026) ──────────────────────────
+   Se acabó la muerte súbita: se responden las 30 preguntas y el
+   puntaje se calcula al final. Antes, caer en la Q3 cerraba la
+   partida y el jugador se iba sin diagnóstico ni repaso, que es
+   justo lo que el simulador tiene para dar.
+
+   La composición replica la arquitectura del examen real
+   (aptitudes + conocimientos + psicotécnica), y por eso el bloque
+   comportamental NO suma al puntaje: en el concurso también es
+   clasificatorio. Se reporta aparte como coincidencia de criterio.
+
+   Cuotas por dificultad deliberadamente duras: de las 27 preguntas
+   que puntúan solo 3 son de nivel introductorio. */
+const BLOQUES = [
+  { k:'aptitudes',      et:'Aptitudes',      n:5,  cuotas:{2:3, 3:2},        puntua:true  },
+  { k:'actualidad',     et:'Actualidad',     n:2,  cuotas:{2:1, 3:1},        puntua:true  },
+  { k:'general',        et:'General',        n:7,  cuotas:{1:1, 2:3, 3:3},   puntua:true  },
+  { k:'sala',           et:'Específico',     n:13, cuotas:{1:2, 2:5, 3:6},   puntua:true  },
+  { k:'comportamental', et:'Comportamental', n:3,  cuotas:{2:2, 3:1},        puntua:false }
+];
+const NQ = BLOQUES.reduce((s,b)=>s+b.n, 0);         // 30
+const PESO = {1:1, 2:1.5, 3:2};                     // la dificultad vale más
+const ESCALA = 1000, APRUEBA = 800;
+const T_LIMIT = 81;   // 4h30 / 200 preguntas = 81 s por pregunta en el examen real
 
 /* ---- audio hooks: Ricardo agrega los mp3 en quien-quiere-ser-juez/audio/ ----
    ⚠️ usar música PROPIA o libre — no la del programa original (derechos de Sony). */
@@ -441,21 +536,34 @@ document.getElementById('mute-btn').onclick = function(){
 if(muted) document.getElementById('mute-btn').textContent='🔇';
 
 /* ---- estado ---- */
-const STATE = { sala:null, qs:[], idx:0, score:0, over:false,
-  used:{fifty:false,doc:false,sala:false}, timer:null, tleft:T_LIMIT, log:[], qStart:0 };
+const STATE = { sala:null, cargo:null, nivel:null, qs:[], idx:0, over:false, answered:false,
+  used:{fifty:false,doc:false,sala:false}, timer:null, tleft:T_LIMIT, log:[], qStart:0, res:null };
+
+/* Identificador anónimo del dispositivo. NO es dato personal: es un
+   número aleatorio que solo sirve para no contar diez veces al mismo
+   jugador y para saber si una partida vino de alguien registrado. */
+function anonId(){
+  let a = localStorage.getItem('jz-anon');
+  if(!a){ a = 'a'+Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+          localStorage.setItem('jz-anon', a); }
+  return a;
+}
 
 /* ---- utilidades ---- */
 const $ = id => document.getElementById(id);
 function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
-function seenKey(sala){ return 'jz-seen-'+sala; }
-function getSeen(sala){ try{return JSON.parse(localStorage.getItem(seenKey(sala))||'[]')}catch(e){return[]} }
-/* Tope por debajo del pool para que siempre queden preguntas frescas:
-   40 en las salas (pool ~40 propias) y 15 en el general (pool 25). */
-function addSeen(sala,ids){
-  const cap = sala==='_gen' ? 15 : 40;
-  const s=[...new Set([...getSeen(sala),...ids])].slice(-cap);
-  localStorage.setItem(seenKey(sala),JSON.stringify(s));
+/* Anti-repetición: un historial por POOL, no por sala. Aptitudes,
+   actualidad, general y comportamental son comunes a las seis salas,
+   así que si su historial fuera por sala, cambiar de sala repetiría
+   siempre las mismas. El tope se calcula sobre el tamaño real del
+   pool para que nunca se agoten las preguntas frescas. */
+function seenKey(pool){ return 'jz-seen-'+pool; }
+function getSeen(pool){ try{return JSON.parse(localStorage.getItem(seenKey(pool))||'[]')}catch(e){return[]} }
+function addSeen(pool, ids, poolSize, need){
+  const cap = Math.max(0, poolSize - need);   // siempre quedan `need` sin ver
+  const s = [...new Set([...getSeen(pool),...ids])].slice(-cap);
+  localStorage.setItem(seenKey(pool), JSON.stringify(s));
 }
 
 /* ---- vistas ---- */
@@ -485,28 +593,41 @@ function showView(v){
   if(v==='home'){ stopLoop(); renderHome(); }
 }
 
-/* ---- selección: 9 fáciles · 8 medias · 8 difíciles = 25 ----
-   Mezcla componente general (común a todos los cargos) con el específico
-   de la sala, igual que el examen real. ---- */
-const CUPOS = { 1:9, 2:8, 3:8 };
-function pickQuestions(sala){
-  // El componente general es común a todas las salas, así que su historial
-  // va en una clave propia: si no, al cambiar de sala reaparecían las mismas.
-  const vistas = new Set([...getSeen(sala), ...getSeen('_gen')]);
-  const pool = tier => {
-    const mix = B[sala].filter(q=>q.n===tier).concat(B.general.filter(q=>q.n===tier));
-    const fresh = mix.filter(q=>!vistas.has(q.id));
-    // si lo fresco no alcanza para el cupo, completa con las ya vistas
-    const base = fresh.length >= CUPOS[tier] ? fresh
-               : shuffle(fresh).concat(shuffle(mix.filter(q=>vistas.has(q.id))));
-    return shuffle(base.slice());
+/* ---- selección: 30 preguntas repartidas por bloque y por dificultad ----
+   De las 27 que puntúan, solo 3 son de nivel introductorio. */
+function tomarDe(lista, cuotas, vistas, need){
+  const out = [];
+  const usados = new Set();
+  const tomar = (cands, cuantas) => {
+    const fresh  = shuffle(cands.filter(q=>!vistas.has(q.id) && !usados.has(q.id)));
+    const repite = shuffle(cands.filter(q=> vistas.has(q.id) && !usados.has(q.id)));
+    // lo fresco primero; si no alcanza, se completa con lo ya visto
+    [...fresh, ...repite].slice(0, cuantas).forEach(q=>{ usados.add(q.id); out.push(q); });
   };
-  const qs = [...pool(1).slice(0,CUPOS[1]), ...pool(2).slice(0,CUPOS[2]), ...pool(3).slice(0,CUPOS[3])]
-             .map(barajarOpciones);
-  const ids = qs.map(q=>q.id);
-  addSeen(sala, ids.filter(id=>id[0]!=='g'));
-  addSeen('_gen', ids.filter(id=>id[0]==='g'));
-  return qs;
+  for(const tier of Object.keys(cuotas)) tomar(lista.filter(q=>q.n===+tier), cuotas[tier]);
+  // si alguna cuota no se llenó (pool corto en ese nivel), se completa con cualquiera
+  if(out.length < need) tomar(lista, need - out.length);
+  return out.slice(0, need);
+}
+
+function pickQuestions(sala, nivel){
+  const qs = [];
+  for(const b of BLOQUES){
+    const pool  = b.k==='sala' ? sala : b.k;          // el pool de sala cambia; los demás son comunes
+    const lista = B[pool] || [];
+    const elegidas = tomarDe(lista, b.cuotas, new Set(getSeen(pool)), b.n);
+    addSeen(pool, elegidas.map(q=>q.id), lista.length, b.n);
+    elegidas.forEach(q=> qs.push({ ...aplicarNivel(q, nivel), _bl:b.k, _et:b.et, _puntua:b.puntua }));
+  }
+  return shuffle(qs).map(barajarOpciones);
+}
+
+/* El criterio esperado de una situacional cambia con el alcance del cargo:
+   quien dirige un despacho tiene deber de gestión donde el empleado tiene
+   deber de reporte. Se resuelve ANTES de barajar, para que el índice de
+   `rNivel` siga apuntando al orden original de las opciones. */
+function aplicarNivel(q, nivel){
+  return (q.rNivel && q.rNivel[nivel] !== undefined) ? { ...q, r:q.rNivel[nivel] } : q;
 }
 
 /* Baraja las 4 opciones y recalcula cuál es la correcta.
@@ -519,40 +640,69 @@ function barajarOpciones(q){
   return { ...q, o: idx.map(i=>q.o[i]), r: idx.indexOf(q.r) };
 }
 
+/* ---- selector de cargo ----
+   Va ANTES de la partida porque el criterio esperado de las preguntas
+   comportamentales cambia con el alcance del cargo, y porque para el
+   examen real el cargo define el grupo específico al que se presenta. */
+let _salaPend = null;
+function pickCargo(sala){
+  _salaPend = sala;
+  const prev = localStorage.getItem('jz-cargo');
+  const s = B.salas[sala];
+  $('cargo-sala').innerHTML = 'Sala <b>'+esc(s.nombre)+'</b> · '+esc(s.cargos);
+  $('cargo-grid').innerHTML = B.cargos.map(c=>
+    '<button class="cargo'+(c.id===prev?' on':'')+'" onclick="startGame(\''+_salaPend+'\',\''+c.id+'\')">'
+    +'<b>'+esc(c.nombre)+'</b><span>'+esc(c.detalle)+'</span></button>').join('');
+  $('modal-cargo').classList.add('on');
+}
+function closeCargo(){ $('modal-cargo').classList.remove('on'); }
+
 /* ---- juego ---- */
-function startGame(sala){
-  Object.assign(STATE,{ sala, qs:pickQuestions(sala), idx:0, score:0, over:false,
-    used:{fifty:false,doc:false,sala:false}, log:[], qStart:0 });
+function startGame(sala, cargoId){
+  const cargo = B.cargos.find(c=>c.id===cargoId) || B.cargos.find(c=>c.id===localStorage.getItem('jz-cargo')) || B.cargos[1];
+  localStorage.setItem('jz-cargo', cargo.id);
+  closeCargo();
+  Object.assign(STATE,{ sala, cargo:cargo.id, nivel:cargo.nivel,
+    qs:pickQuestions(sala, cargo.nivel), idx:0, over:false, answered:false,
+    used:{fifty:false,doc:false,sala:false}, log:[], qStart:0, res:null });
   $('ll-50').disabled = $('ll-doc').disabled = $('ll-sala').disabled = false;
-  $('g-sala').innerHTML = 'Sala <b>'+esc(B.salas[sala].nombre)+'</b> · '+esc(B.salas[sala].cargos);
+  $('g-sala').innerHTML = 'Sala <b>'+esc(B.salas[sala].nombre)+'</b> · aspirante a <b>'+esc(cargo.nombre)+'</b>';
   showView('game');
   playSfx('intro'); playLoop('pregunta');
-  renderLadder(); renderQuestion();
+  renderProgress(); renderQuestion();
   localStorage.setItem('jz-plays', (parseInt(localStorage.getItem('jz-plays')||'0',10)+1));
 }
 
-function renderLadder(){
-  let h = '<div class="lt">Escalera</div>';
-  for(let i=LADDER.length-1;i>=0;i--){
-    const cls = ['rung', i===STATE.idx?'cur':'', i<STATE.idx?'won':'',
-                 SAFE.includes(i)?'safe':'', i===ZONE?'zone':''].join(' ');
-    h += '<div class="'+cls+'" style="order:'+i+'"><b class="rn">'+(i+1)+'</b>'+(i===ZONE?'<span class="z">APRUEBAS →</span>':'')+'<b class="rp">'+LADDER[i]+'</b></div>';
+/* Panel de avance: 30 celdas. El comportamental va en ámbar porque no
+   puntúa — mostrarlo como acierto o error afirmaría que hay una
+   respuesta correcta a una prueba que en el concurso es clasificatoria. */
+function renderProgress(){
+  const hechas = STATE.log.length;
+  let h = '<div class="lt">Avance</div><div class="pg-grid">';
+  for(let i=0;i<NQ;i++){
+    const l = STATE.log[i];
+    const cls = ['pg-cell', i===STATE.idx?'cur':'',
+                 l ? (STATE.qs[i]._puntua ? (l.ok?'ok':'bad') : 'crit') : ''].join(' ');
+    h += '<span class="'+cls+'">'+(i+1)+'</span>';
   }
-  $('ladder').innerHTML = h;
+  h += '</div><div class="pg-foot">'+hechas+' de '+NQ+' respondidas</div>';
+  $('progress').innerHTML = h;
 }
 
 function renderQuestion(){
   const q = STATE.qs[STATE.idx];
-  STATE.qStart = Date.now();
-  // en la primera pregunta no hay nada acumulado que retirar
-  $('ll-quit').style.display = STATE.idx===0 ? 'none' : '';
-  $('q-tema').textContent = q.t + (q.f==='oficial' ? ' · pregunta oficial de instructivo' : '');
-  $('q-num').textContent = 'Pregunta '+(STATE.idx+1)+' de '+NQ+' · por '+LADDER[STATE.idx]+' pts';
+  STATE.qStart = Date.now(); STATE.answered = false;
+  const dif = {1:'básica', 2:'media', 3:'difícil'}[q.n];
+  $('q-tema').innerHTML = '<span class="bl bl-'+q._bl+'">'+esc(q._et)+'</span> '+esc(q.t)
+    + (q.f==='oficial' ? ' · <b style="color:var(--gold)">pregunta oficial</b>' : '');
+  $('q-num').textContent = 'Pregunta '+(STATE.idx+1)+' de '+NQ+' · '+dif
+    + (q._puntua ? '' : ' · no puntúa');
   $('q-text').textContent = q.p;
   $('hint-box').classList.remove('on'); $('sala-poll').classList.remove('on');
+  $('fb').classList.remove('on');
   const L=['A','B','C','D'];
   $('q-opts').innerHTML = q.o.map((o,i)=>'<button class="opt" data-l="'+L[i]+'" data-i="'+i+'" onclick="answer('+i+')">'+esc(o)+'</button>').join('');
-  if(STATE.idx===ZONE-2) playLoop('tension');
+  if(STATE.idx===NQ-3) playLoop('tension');
   startTimer();
 }
 
@@ -564,77 +714,116 @@ function startTimer(){
 function tickTimer(){
   $('t-num').textContent=STATE.tleft;
   const r=$('t-ring'); r.style.strokeDashoffset = 157*(1-STATE.tleft/T_LIMIT);
-  r.style.stroke = STATE.tleft<=10 ? 'var(--red)' : STATE.tleft<=25 ? 'var(--amber)' : 'var(--blue2)';
+  r.style.stroke = STATE.tleft<=15 ? 'var(--red)' : STATE.tleft<=35 ? 'var(--amber)' : 'var(--blue2)';
 }
 
 function answer(i){
-  if(STATE.over) return;
+  if(STATE.over || STATE.answered) return;
+  STATE.answered = true;
   clearInterval(STATE.timer);
-  const q = STATE.qs[STATE.idx];
+  const q = STATE.qs[STATE.idx], ok = (i===q.r);
   // bitácora para el diagnóstico: qué eje, qué nivel, si acertó y cuánto tardó
-  STATE.log.push({ id:q.id, t:q.t, n:q.n, cita:q.cita, ok:(i===q.r),
+  STATE.log.push({ id:q.id, t:q.t, n:q.n, cita:q.cita, ok, dada:i,
                    seg: Math.round((Date.now()-(STATE.qStart||Date.now()))/1000),
-                   gen: q.id[0]==='g', sala: STATE.sala });
+                   bl:q._bl, puntua:q._puntua, sala:STATE.sala });
   const opts = [...document.querySelectorAll('#q-opts .opt')];
   opts.forEach(o=>o.disabled=true);
-  if(i>=0) opts[i].classList.add('sel');
-  setTimeout(()=>{
-    opts[q.r].classList.add('ok');
-    if(i===q.r){
-      playSfx(SAFE.includes(STATE.idx)?'peldano':'correcta');
-      STATE.score = LADDER[STATE.idx];
-      STATE.idx++;
-      renderLadder();
-      if(STATE.idx>=NQ){ endGame('win'); }
-      else setTimeout(renderQuestion, 1100);
-    } else {
-      if(i>=0) opts[i].classList.add('bad');
-      playSfx('incorrecta');
-      // cae al último peldaño seguro superado
-      let safePts=0; SAFE.forEach(s=>{ if(STATE.idx>s) safePts=LADDER[s]; });
-      STATE.score = safePts;
-      setTimeout(()=>endGame('lose', q, i), 1400);
-    }
-  }, 700);
+  if(i>=0) opts[i].classList.add(ok?'ok':'bad');
+  opts[q.r].classList.add('ok');
+  playSfx(ok?'correcta':'incorrecta');
+  renderProgress();
+  // Retroalimentación inmediata: es lo que convierte el simulador en estudio.
+  const cabeza = !q._puntua
+      ? (ok ? '<span class="fb-ok">Coincide con el criterio esperado</span>'
+            : '<span class="fb-crit">Criterio distinto del esperado para este cargo</span>')
+      : (ok ? '<span class="fb-ok">Correcta</span>'
+            : '<span class="fb-bad">'+(i<0?'Se agotó el tiempo':'Incorrecta')+'</span>');
+  $('fb').innerHTML = '<div class="fb-h">'+cabeza+'</div>'
+    + (ok ? '' : '<div class="fb-r">'+(!q._puntua?'Se esperaba: ':'Respuesta correcta: ')+esc(q.o[q.r])+'</div>')
+    + '<div class="fb-c">§ '+esc(q.cita)+'</div>'
+    + '<div class="fb-p">'+esc(q.pista)+'</div>'
+    + '<button class="btn btn-p" id="btn-next" onclick="nextQuestion()">'
+    + (STATE.idx>=NQ-1 ? 'Ver mi resultado →' : 'Siguiente pregunta →')+'</button>';
+  $('fb').classList.add('on');
+  const nb=$('btn-next'); if(nb){ nb.focus(); nb.scrollIntoView({block:'nearest'}); }
 }
 
-function retirarse(){
-  if(STATE.over||STATE.idx===0) return;
-  clearInterval(STATE.timer);
-  STATE.score = LADDER[STATE.idx-1];
-  endGame('retire');
+function nextQuestion(){
+  if(STATE.over) return;
+  STATE.idx++;
+  if(STATE.idx>=NQ){ endGame(); return; }
+  renderProgress(); renderQuestion();
+}
+// Enter o barra espaciadora avanzan, para no obligar al mouse en 30 preguntas
+document.addEventListener('keydown', e=>{
+  if((e.key==='Enter'||e.key===' ') && STATE.answered && !STATE.over && $('btn-next')){
+    e.preventDefault(); nextQuestion();
+  }
+});
+
+/* ---- cierre: el puntaje se calcula al final, sobre las 27 que puntúan ---- */
+function calcular(){
+  const log = STATE.log;
+  let obt=0, pos=0, aciertos=0;
+  const porBloque = {};
+  log.forEach((l,idx)=>{
+    const b = BLOQUES.find(x=>x.k===l.bl);
+    const g = porBloque[l.bl] = porBloque[l.bl] || { et:b.et, n:0, ok:0, puntua:b.puntua };
+    g.n++; if(l.ok) g.ok++;
+    if(l.puntua){ pos += PESO[l.n]; if(l.ok){ obt += PESO[l.n]; aciertos++; } }
+  });
+  const pts = pos ? Math.round(ESCALA*obt/pos) : 0;
+  const scored = log.filter(l=>l.puntua).length;
+  return { pts, aciertos, scored, porBloque,
+           fallidas: log.map((l,i)=>({l, q:STATE.qs[i]})).filter(x=>!x.l.ok) };
 }
 
-function endGame(mode, failedQ, given){
+function endGame(){
   STATE.over=true; stopLoop();
-  if(mode==='win') playSfx('final');
-  const pts=STATE.score, aprueba = pts>=B.examen.aprueba;
-  $('res-pts').textContent = pts;
+  const R = STATE.res = calcular();
+  const aprueba = R.pts >= APRUEBA;
+  if(aprueba) playSfx('final');
+  $('res-pts').textContent = R.pts;
   const v=$('res-verdict');
-  if(mode==='win'){ v.textContent='¡Silla de juez! Escalera completa'; v.className='verdict ok'; }
+  if(R.pts>=950){ v.textContent='Puntaje sobresaliente'; v.className='verdict ok'; }
   else if(aprueba){ v.textContent='Zona de aprobación superada'; v.className='verdict ok'; }
-  else { v.textContent = mode==='retire' ? 'Te retiraste a tiempo' : 'Fuera del concurso'; v.className='verdict no'; }
-  $('res-sub').textContent = aprueba
-    ? 'En el examen real, con 800/1000 sigues en concurso. Puesto '+(mode==='win'?'perfecto':'firme')+' en la sala '+B.salas[STATE.sala].nombre+'.'
-    : 'En el examen real necesitas 800/1000 para seguir. La escalera premia llegar lejos sin caer: los peldaños seguros son las preguntas '
-      + SAFE.map(i=>i+1).join(', ').replace(/, (\d+)$/,' y $1') + '.';
+  else { v.textContent='Por debajo del corte'; v.className='verdict no'; }
+  $('res-sub').innerHTML = 'Acertaste <b>'+R.aciertos+' de '+R.scored+'</b> preguntas que puntúan · sala '
+    + esc(B.salas[STATE.sala].nombre) + ' · aspirante a ' + esc((B.cargos.find(c=>c.id===STATE.cargo)||{}).nombre||'')
+    + '<br><span style="color:var(--dim);font-size:.85rem">El puntaje pondera la dificultad: una pregunta difícil vale el doble que una básica. El corte del examen real está en '+APRUEBA+'/'+ESCALA+'.</span>';
+
+  // desglose por bloque
+  $('res-blocks').innerHTML = Object.values(R.porBloque).map(g=>{
+    const p = Math.round(g.ok/g.n*100);
+    const col = p>=70?'var(--green)':p>=45?'var(--amber)':'var(--red)';
+    return '<div class="blk"><b>'+g.ok+'/'+g.n+'</b><span>'+esc(g.et)+(g.puntua?'':' · no puntúa')+'</span>'
+      +'<i style="width:'+p+'%;background:'+col+'"></i></div>';
+  }).join('');
+
+  // repaso: TODAS las falladas, con su norma. Es el entregable real de la partida.
   const rf=$('res-fail');
-  if(failedQ){
+  if(R.fallidas.length){
     rf.style.display='block';
-    rf.innerHTML = '<div class="rf-t">La que te sacó</div>'
-      + '<div>'+esc(failedQ.p)+'</div>'
-      + (given>=0 ? '<div style="color:var(--red);margin-top:8px">Tu respuesta: '+esc(failedQ.o[given])+'</div>' : '<div style="color:var(--red);margin-top:8px">Se agotó el tiempo.</div>')
-      + '<div class="rf-ok">Correcta: '+esc(failedQ.o[failedQ.r])+'</div>'
-      + '<div class="rf-cita">§ '+esc(failedQ.cita)+'</div>'
-      + '<div style="color:var(--mute);margin-top:8px;font-size:.83rem">'+esc(failedQ.pista)+'</div>';
-  } else rf.style.display='none';
+    rf.innerHTML = '<div class="rf-t">Para repasar · '+R.fallidas.length+(R.fallidas.length===1?' pregunta':' preguntas')+'</div>'
+      + R.fallidas.map(({l,q})=>'<div class="rv">'
+        + '<div class="rv-q">'+esc(q.p)+'</div>'
+        + (l.dada>=0 ? '<div class="rv-mine">Marcaste: '+esc(q.o[l.dada])+'</div>' : '<div class="rv-mine">Se agotó el tiempo.</div>')
+        + '<div class="rf-ok">'+(q._puntua?'Correcta: ':'Criterio esperado: ')+esc(q.o[q.r])+'</div>'
+        + '<div class="rf-cita">§ '+esc(q.cita)+'</div>'
+        + '<div class="rv-p">'+esc(q.pista)+'</div></div>').join('');
+  } else {
+    rf.style.display='block';
+    rf.innerHTML = '<div class="rf-t">Sin errores</div><div>Respondiste las 30 sin fallar una sola. Cambia de sala y sube la exigencia.</div>';
+  }
+
   addHist(STATE.log);
   showView('result');
-  saveScore(pts);
+  saveScore(R.pts);
+  pushPartida(R);          // se guarda SIEMPRE, con o sin registro
   renderSaveState();
   renderAnalisis();
   // registro tras la primera partida
-  if(!getReg() && !localStorage.getItem('jz-reg-skip')) setTimeout(openReg, 900);
+  if(!getReg() && !localStorage.getItem('jz-reg-skip')) setTimeout(openReg, 1200);
 }
 
 /* ---- comodines ---- */
@@ -645,17 +834,20 @@ function useFifty(){
   const wrong = [0,1,2,3].filter(i=>i!==q.r);
   shuffle(wrong).slice(0,2).forEach(i=>document.querySelector('#q-opts .opt[data-i="'+i+'"]').classList.add('gone'));
 }
-/* Muestra SOLO la fuente normativa, no su desarrollo: la `pista` explica la
-   regla y por tanto regala la respuesta. Saber que el asunto lo resuelve el
-   art. 762 del C.C. orienta a quien estudió sin resolverle el examen a quien
-   no. El desarrollo completo se muestra al final, donde ya enseña. */
+/* Muestra la fuente Y lo que dice la norma.
+   Antes solo mostraba la cita: con el modelo de muerte súbita, revelar el
+   contenido de la regla equivalía a regalar una respuesta de la que dependía
+   seguir en juego. Sin eliminación y con 30 preguntas, el comodín ya no
+   decide la partida y el campo `norma` enseña el precepto sin nombrar la
+   opción correcta, que es lo que un aspirante necesita para razonarla.
+   En las preguntas antiguas que aún no tienen `norma` se cae a la `pista`. */
 function useDoctrina(){
   if(STATE.used.doc||STATE.over) return;
   STATE.used.doc=true; $('ll-doc').disabled=true; playSfx('comodin');
   const q=STATE.qs[STATE.idx];
   const fuente = q.cita.split(' · ').filter(s=>!/Instructivo|Ejemplo oficial/i.test(s)).join(' · ') || q.cita;
   $('hint-text').innerHTML = '<b style="color:var(--gold)">'+esc(fuente)+'</b>'
-    + '<br><span style="color:var(--dim)">Recuerda qué dice esa norma y descarta las opciones que la contradigan.</span>';
+    + '<div style="margin-top:8px">'+esc(q.norma || q.pista)+'</div>';
   $('hint-box').classList.add('on');
 }
 function useSala(){
@@ -679,7 +871,16 @@ function useSala(){
 
 /* ---- registro + puntajes ---- */
 function getReg(){ try{return JSON.parse(localStorage.getItem('jz-reg')||'null')}catch(e){return null} }
-function openReg(){ $('modal-reg').classList.add('on'); }
+function openReg(){
+  // el cargo ya lo eligió al entrar a la sala: se preselecciona, no se re-pregunta
+  const actual = STATE.cargo || localStorage.getItem('jz-cargo') || '';
+  const sel=$('r-cargo');
+  if(sel){
+    sel.innerHTML = B.cargos.map(c=>'<option value="'+c.id+'"'+(c.id===actual?' selected':'')+'>'
+      +esc(c.nombre)+'</option>').join('') + '<option value="">Prefiero no decir</option>';
+  }
+  $('modal-reg').classList.add('on');
+}
 function closeReg(){ $('modal-reg').classList.remove('on'); localStorage.setItem('jz-reg-skip','1'); }
 /* Un solo campo de contacto: si trae @ se valida como correo, si no como
    celular colombiano. El jugador elige por dónde quiere que lo busquen. */
@@ -704,8 +905,10 @@ async function submitReg(){
   const err=$('r-err');
   const ct = parseContacto($('r-contacto').value);
   const d = {
-    nombre, contacto:ct.contacto, tipo_contacto:ct.tipo,
-    universidad:$('r-uni').value.trim(), cargo:$('r-cargo').value, consent:$('r-consent').checked
+    nombre, contacto:ct.contacto, tipo_contacto:ct.tipo, anon:anonId(),
+    universidad:$('r-uni').value.trim(), consent:$('r-consent').checked,
+    // se guarda el rótulo legible: es lo que lee el panel de leads y el CSV
+    cargo: (B.cargos.find(c=>c.id===$('r-cargo').value)||{}).nombre || ''
   };
   // exige al menos dos palabras de 2+ letras: nombre y apellido
   const palabras = nombre.split(' ').filter(w=>w.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ']/g,'').length>=2);
@@ -733,6 +936,38 @@ function saveScore(pts){
   localStorage.setItem(bestKey(), JSON.stringify(b));
   pushToServer();
 }
+/* ---- partidas anónimas ----
+   La inmensa mayoría de quienes juegan NO se registra, y su desempeño es
+   justo el dato que dice qué preguntas están mal calibradas, qué salas
+   interesan y en qué punto se abandona. Se guarda SIEMPRE, con o sin
+   registro, y sin ningún dato personal: solo un id aleatorio del
+   dispositivo, el cargo elegido y el detalle de aciertos por pregunta.
+   Best-effort: si el servidor falla, la partida queda en el dispositivo
+   y se reintenta en la siguiente. */
+function partidasPend(){ try{return JSON.parse(localStorage.getItem('jz-part-pend')||'[]')}catch(e){return[]} }
+function pushPartida(R){
+  const reg = getReg();
+  const p = {
+    anon: anonId(), sala:STATE.sala, cargo:STATE.cargo, nivel:STATE.nivel,
+    pts:R.pts, aciertos:R.aciertos, scored:R.scored, total:STATE.log.length,
+    registrado: !!reg, ts: Date.now(), v: (B.v||''),
+    // por pregunta: id, si acertó y segundos. Sirve para calibrar el banco.
+    qs: STATE.log.map(l=>[l.id, l.ok?1:0, Math.min(999,l.seg||0)])
+  };
+  const cola = [...partidasPend(), p].slice(-20);
+  localStorage.setItem('jz-part-pend', JSON.stringify(cola));
+  flushPartidas();
+}
+async function flushPartidas(){
+  const cola = partidasPend();
+  if(!cola.length) return;
+  try{
+    const r = await fetch(API+'/juez/partida',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({partidas:cola})});
+    if(r.ok) localStorage.removeItem('jz-part-pend');
+  }catch(e){ /* queda en cola para el próximo intento */ }
+}
+
 /* Devuelve {ok, msg} para que el formulario pueda avisar si algo falló,
    en vez de cerrarse y dejar al jugador sin saber si quedó guardado. */
 async function pushToServer(){
@@ -782,17 +1017,21 @@ function analizar(){
   // por nivel de dificultad
   const niv = [1,2,3].map(n=>{ const a=h.filter(x=>x.n===n); return {n, total:a.length, pct:pct(a)}; });
 
-  // componente general vs específico (35 vs 45 preguntas en el examen real)
-  const gen = h.filter(x=>x.gen), esp = h.filter(x=>!x.gen);
+  // componente general vs específico (35 vs 45 preguntas en el examen real).
+  // Solo se comparan esos dos bloques: aptitudes y comportamental miden
+  // otra cosa y meterlas aquí distorsionaría la lectura.
+  const gen = h.filter(x=>x.bl==='general'), esp = h.filter(x=>x.bl==='sala');
 
   // ritmo
   const tiempos = h.filter(x=>x.seg>0 && x.seg<=T_LIMIT).map(x=>x.seg);
   const seg = tiempos.length ? Math.round(tiempos.reduce((a,b)=>a+b,0)/tiempos.length) : null;
 
-  // normas a repasar: las citas de lo que falló, más frecuentes primero
+  // normas a repasar: las citas de lo que falló, más frecuentes primero.
+  // Se excluyen aptitudes y comportamental: sus citas son marcos de
+  // razonamiento o deberes generales, no normas que se puedan "repasar".
   const normas = {};
-  h.filter(x=>!x.ok).forEach(x=>{
-    x.cita.split(' · ').filter(s=>!/Instructivo|Ejemplo oficial|jurisprudencia|doctrina/i.test(s))
+  h.filter(x=>!x.ok && x.bl!=='aptitudes' && x.bl!=='comportamental').forEach(x=>{
+    x.cita.split(' · ').filter(s=>!/Instructivo|Ejemplo oficial|jurisprudencia|doctrina|Razonamiento|Comprensión|Lógica|Falacia|terminología/i.test(s))
       .forEach(c=>{ normas[c]=(normas[c]||0)+1; });
   });
   const repasar = Object.entries(normas).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([c,n])=>({c,n}));
@@ -926,7 +1165,7 @@ function renderRankRows(box,rows,tab){
 function renderHome(){
   const b=getBest();
   $('salas-grid').innerHTML = Object.entries(B.salas).map(([k,s])=>
-    '<div class="sala" style="--sc:'+s.color+'" onclick="startGame(\''+k+'\')">'
+    '<div class="sala" style="--sc:'+s.color+'" onclick="pickCargo(\''+k+'\')">'
     +'<div style="font-size:1.5rem">'+s.icono+'</div><h3>'+esc(s.nombre)+'</h3>'
     +'<div class="cargos">'+esc(s.cargos)+'</div><div class="ejes">Ejes del examen: '+esc(s.ejes)+'</div>'
     +(b[k]?'<div class="best">Tu mejor: '+b[k]+' / 1000'+(b[k]>=800?' · aprobado ✓':'')+'</div>':'')
@@ -947,6 +1186,7 @@ function renderChip(){
 }
 
 renderChip(); renderHome(); rankTabs();
+flushPartidas();   // reintenta las partidas que quedaron sin subir
 </script>
 </body>
 </html>
