@@ -837,8 +837,8 @@
            contrato enlaza su proceso en SECOP. 5,87 M de contratos · se actualiza
            a diario.</p>
         <div class="search">
-          <input id="cq" type="text" placeholder="busca una entidad, un proveedor, un objeto…" autocomplete="off" />
-          <button id="cgo">Buscar</button>
+          <input id="conq" type="text" placeholder="busca una entidad, un proveedor, un objeto…" autocomplete="off" />
+          <button id="congo">Buscar</button>
         </div>
         <div class="chips" id="cchips"></div>
       </div>
@@ -1063,6 +1063,15 @@
         <div class="muro-t">El archivo completo, la lectura del analista y las alertas por sector van con acceso.</div>
         <a class="muro-btn" href="${mailtoHref(asunto)}">Escríbenos · ${CONTACTO_MAIL}</a>
       </div></div>`;
+  }
+  // Envoltorio para las listas de los pilares, que son todas de la misma forma
+  // (`d.resultados` + su tarjeta). Los LANDINGS ("lo último publicado") NO se
+  // cortan a propósito: son el escaparate, y recortarlos haría que la página se
+  // sienta mezquina antes de que el visitante busque nada.
+  function listaConMuro(items, card, sing, plu, asunto, vacio){
+    const c=cortar(items||[]);
+    const cuerpo=c.ver.map(card).join('')||`<div class="err">${vacio}</div>`;
+    return `<div class="sanc-list">${cuerpo}</div>`+muroLista(c.fuera, card, sing, plu, asunto);
   }
   function muroLectura(asunto){
     return `<div class="muro-blk">
@@ -1380,7 +1389,7 @@
       <div class="r-sub" style="margin-bottom:1rem">${scope||'todas las fuentes'}${d.con_monto?` · ${d.con_monto} con monto · <b>${fmtCOP(d.monto_total_cop)}</b> en total`:''}</div>
       ${otros}
       ${d.mostrados<d.n?`<div class="cob-note" style="margin-bottom:1rem">Mostrando ${d.mostrados} de ${fmt(d.n)}, los más recientes. Afina la búsqueda para ver menos.</div>`:''}
-      <div class="sanc-list">${(d.resultados||[]).map(sancCard).join('')||'<div class="err">Sin coincidencias. Prueba otra entidad o sector.</div>'}</div>`;
+      ${listaConMuro(d.resultados, sancCard, 'acto', 'actos', `acceso · ${d.query||d.sector||'regulatorio'}`, 'Sin coincidencias. Prueba otra entidad o sector.')}`;
     const vt=document.getElementById('reg-ver-todo');
     if(vt) vt.onclick=e=>{ e.preventDefault(); REG.tipoActo='todo'; regSyncTipos(); regBuscar(); };
     el.scrollIntoView({behavior:'smooth',block:'start'});
@@ -1471,7 +1480,7 @@
       <div class="r-titular" style="font-size:1.4rem">${fmt(d.n)} ${d.n===1?'norma':'normas'}</div>
       <div class="r-sub" style="margin-bottom:1rem">${scope||'toda la normativa'}</div>
       ${d.mostrados<d.n?`<div class="cob-note" style="margin-bottom:1rem">Mostrando las ${d.mostrados} más recientes de ${fmt(d.n)}. Afina la búsqueda para ver menos.</div>`:''}
-      <div class="sanc-list">${(d.resultados||[]).map(ejeCard).join('')||'<div class="err">Sin coincidencias. Prueba otro término o tipo.</div>'}</div>`;
+      ${listaConMuro(d.resultados, ejeCard, 'norma', 'normas', `acceso · ${d.query||d.tipo||'ejecutivo'}`, 'Sin coincidencias. Prueba otro término o tipo.')}`;
     el.scrollIntoView({behavior:'smooth',block:'start'});
   }
   async function ejeBuscar(){
@@ -1608,7 +1617,7 @@
         ' · ninguno con la ventana abierta'}</div>
       ${emp}
       ${d.mostrados<d.n?`<div class="cob-note" style="margin-bottom:1rem">Mostrando ${d.mostrados} de ${fmt(d.n)} — primero lo que cierra antes. Afina la búsqueda para ver menos.</div>`:''}
-      <div class="sanc-list">${(d.resultados||[]).map(sucCard).join('')||'<div class="err">Sin coincidencias. Prueba otro término o cambia el estado.</div>'}</div>`;
+      ${listaConMuro(d.resultados, sucCard, 'borrador', 'borradores', `acceso · ${d.query||'consulta pública'}`, 'Sin coincidencias. Prueba otro término o cambia el estado.')}`;
     el.scrollIntoView({behavior:'smooth',block:'start'});
   }
   async function sucBuscar(extra){
@@ -1731,11 +1740,10 @@
         ${Object.keys(f).length?'<span class="chip" data-clear="1">✕ Quitar filtros</span>':''}
       </div>
       ${(d.por_departamento||[]).length>1?`<div class="cob-note" style="margin-bottom:1rem">Dónde está: ${(d.por_departamento||[]).slice(0,6).map(x=>`${esc(x.departamento)} (${fmt(x.n)})`).join(' · ')}</div>`:''}
-      <div class="sanc-list">${(d.resultados||[]).map(conCard).join('')||`<div class="err">${
+      ${listaConMuro(d.resultados, conCard, 'contrato', 'contratos', `acceso · ${d.query||'contratación'}`,
         d.sin_contratos
           ? `<b>${esc((d.empresas&&d.empresas[0]&&d.empresas[0].nombre)||d.query)}</b> no le vende al Estado por SECOP II: no hay ninguna razón social suya entre los proveedores.${d.n_descartados?` Sí aparecen ${fmt(d.n_descartados)} nombres que <i>contienen</i> la marca (${(d.descartados||[]).slice(0,3).map(x=>esc(x.nombre)).join(', ')}…), pero son homónimos, no la empresa.`:''} Usa el enlace de arriba si quieres verlos igual.`
-          : `Sin coincidencias.${Object.keys(f).length?' Hay filtros activos ('+esc(Object.values(f).join(' · '))+'): quítalos arriba y vuelve a buscar.':' Prueba otro término — recuerda que varias palabras se combinan con Y.'}`
-      }</div>`}</div>
+          : `Sin coincidencias.${Object.keys(f).length?' Hay filtros activos ('+esc(Object.values(f).join(' · '))+'): quítalos arriba y vuelve a buscar.':' Prueba otro término — recuerda que varias palabras se combinan con Y.'}`)}
       ${tot&&tot.contratos>d.n?`<div class="cob-note" style="margin-top:1rem">Mostrando ${fmt(d.n)} de ${fmt(tot.contratos)}. Afina con un filtro para ver menos.</div>`:''}`;
     wireEmpresaHint('con-emp-hint', conBuscar);
     el.querySelectorAll('.chip[data-orden]').forEach(c=>c.onclick=()=>{ CON.orden=c.dataset.orden; conBuscar(); });
@@ -1746,7 +1754,7 @@
       const campo=a.dataset.campo, valor=a.dataset.valor;
       const MAP={departamento:'departamento', estado_contrato:'estado', modalidad_de_contratacion:'modalidad',
                  tipo_de_contrato:'tipo', sector:'sector', orden:'orden_entidad'};
-      if(MAP[campo]){ CON.filtros={[MAP[campo]]:valor}; CON.q=''; const i=document.getElementById('cq'); if(i) i.value=''; conBuscar(); }
+      if(MAP[campo]){ CON.filtros={[MAP[campo]]:valor}; CON.q=''; const i=document.getElementById('conq'); if(i) i.value=''; conBuscar(); }
     });
     el.scrollIntoView({behavior:'smooth',block:'start'});
   }
@@ -1774,7 +1782,10 @@
   function conShowLanding(){ const r=document.getElementById('con-results'); if(r) r.style.display='none'; const l=document.getElementById('con-landing'); if(l) l.style.display='block'; }
   function conInit(){
     if(_conInited) return; _conInited=true;
-    const cq=document.getElementById('cq'), cgo=document.getElementById('cgo');
+    // ⚠️ ids propios (`conq`/`congo`): este buscador y el de congresistas usaban
+    // los MISMOS `cq`/`cgo`, y como getElementById devuelve el primero del DOM,
+    // este pilar leía la caja de congresistas — escribías acá y no buscaba nada.
+    const cq=document.getElementById('conq'), cgo=document.getElementById('congo');
     const go=()=>{ CON.q=(cq&&cq.value||'').trim(); if(!CON.q&&!Object.keys(CON.filtros).length) conShowLanding(); else conBuscar(); };
     if(cgo) cgo.onclick=go;
     if(cq) cq.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
@@ -1814,7 +1825,7 @@
     el.innerHTML=`
       <div class="r-titular" style="font-size:1.4rem">${d.n} ${d.n===1?'titular':'titulares'}</div>
       <div class="r-sub" style="margin-bottom:1rem">«${esc(d.query)}» · últimos ${d.dias} días · ${alc.nacional||0} nacional · ${alc.regional||0} regional</div>
-      <div class="sanc-list">${(d.resultados||[]).map(medHeadCard).join('')||'<div class="err">Sin cobertura de prensa reciente para este tema.</div>'}</div>`;
+      ${listaConMuro(d.resultados, medHeadCard, 'titular', 'titulares', `acceso · ${d.query||'prensa'}`, 'Sin cobertura de prensa reciente para este tema.')}`;
     el.scrollIntoView({behavior:'smooth',block:'start'});
   }
   async function medBuscar(){
@@ -2134,7 +2145,7 @@
     f.onclick=()=>{
       if(k==='regulatorio'){ showView('regulatorio'); const e=document.getElementById('rq'); if(e)e.value=query; REG.q=query; regBuscar(); }
       if(k==='ejecutivo'){ showView('ejecutivo'); const e=document.getElementById('eq'); if(e)e.value=query; EJE.q=query; ejeBuscar(); }
-      if(k==='contratacion'){ showView('contratacion'); const e=document.getElementById('cq'); if(e)e.value=query; CON.q=query; CON.filtros={}; conBuscar(); }
+      if(k==='contratacion'){ showView('contratacion'); const e=document.getElementById('conq'); if(e)e.value=query; CON.q=query; CON.filtros={}; conBuscar(); }
       if(k==='medios'){ showView('medios'); const e=document.getElementById('mq'); if(e)e.value=query; MED.q=query; medBuscar(); }
       // en SUCOP se abre sin filtro de estado: el usuario venía viendo el
       // universo del tema, no solo lo abierto, y cambiárselo al saltar confunde.
@@ -2712,13 +2723,23 @@
     TB_ARG = esPerfil ? {perfil:req.perfil} : {sector:arg.sector};
     cliRender(d);
     // el radar ya está en pantalla; la lectura llega después (o ya venía hecha)
-    if(d.lectura && !d.lectura.error) cliRenderLectura(d.lectura);
+    // Sin acceso ni se pide: el worker devuelve 403 a `cliente-lectura`, y eso
+    // le pintaría un error al visitante donde debería ir una invitación.
+    if(!ACCESO) cliMuroLectura();
+    else if(d.lectura && !d.lectura.error) cliRenderLectura(d.lectura);
     else if(d.lectura_key) cliPedirLectura(d.lectura_key, mine);
     else cliLecturaFallback();
   }
   function cliLecturaFallback(msg){
     const el=document.getElementById('cli-lectura-body'); if(!el) return;
     el.innerHTML='<div class="cob-note">'+esc(msg||'No se pudo generar la lectura. El radar de arriba está completo.')+'</div>';
+  }
+  // El muro del radar: el briefing es justamente lo que se vende acá, así que en
+  // vez de un error va la invitación, en el mismo sitio donde iría la lectura.
+  function cliMuroLectura(){
+    const el=document.getElementById('cli-lectura-body'); if(!el) return;
+    el.innerHTML=`<div class="muro-t" style="margin-bottom:.7rem">Acá va el briefing del día: qué señales de las de arriba mueven la aguja, por qué, y qué hacer con cada una. Se escribe sobre este mismo radar, y va con acceso.</div>`
+      + `<a class="muro-btn" href="${mailtoHref('acceso · radar del cliente')}">Escríbenos · ${CONTACTO_MAIL}</a>`;
   }
   // La lectura se genera aparte del radar: medida contra producción tarda entre
   // 20 s y 51 s (la varianza es del modelo), o sea que se pasa del techo de
@@ -2913,8 +2934,13 @@
         </div>
       </div>`;
     };
-    const tl=titInt.map(it=>tlRow(it,false)).join('');
-    const txtList=txtInt.map(it=>tlRow(it,true)).join('');
+    // La línea de intentos es el corazón del pilar: 10 completos para el
+    // visitante y el resto detrás del muro, con el conteo real.
+    const cT=cortar(titInt), cX=cortar(txtInt);
+    const tl=cT.ver.map(it=>tlRow(it,false)).join('')
+      + muroLista(cT.fuera, it=>tlRow(it,false), 'proyecto', 'proyectos', `acceso · ${query}`);
+    const txtList=cX.ver.map(it=>tlRow(it,true)).join('')
+      + muroLista(cX.fuera, it=>tlRow(it,true), 'proyecto', 'proyectos', `acceso · ${query}`);
 
     // desglose de empuje para la tira de intención (orden fijo)
     const empD=S.empuje||{};
