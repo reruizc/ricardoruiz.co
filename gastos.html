@@ -151,6 +151,26 @@ textarea:focus{outline:none;border-color:var(--accent)}
 .ob-it .v.in{color:var(--green)} .ob-it .v.tr{color:var(--ink-3);font-weight:400}
 .link{background:none;border:none;color:var(--accent);font-family:var(--sans);font-size:.82rem;
   cursor:pointer;padding:.8rem 0;display:block;margin:0 auto;text-decoration:underline}
+.rep{background:linear-gradient(160deg,rgba(0,71,255,.14),var(--paper-2));
+  border:1px solid rgba(61,111,255,.3);border-radius:14px;padding:1rem 1.05rem;margin-bottom:.9rem}
+.rep h3{font-size:.95rem;font-weight:600;margin-bottom:.15rem}
+.rep .sub{font-size:.78rem;color:var(--ink-2);margin-bottom:.8rem}
+.rep-l{display:flex;justify-content:space-between;gap:.7rem;font-size:.86rem;padding:.35rem 0}
+.rep-l .n{color:var(--ink-2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rep-l .v{font-variant-numeric:tabular-nums;white-space:nowrap}
+.rep-tot{display:flex;justify-content:space-between;gap:.7rem;margin-top:.6rem;padding-top:.6rem;
+  border-top:1px solid var(--rule-strong);font-size:.95rem;font-weight:600}
+.rep-tot .v{font-variant-numeric:tabular-nums}
+.rep-tot .v.neg{color:var(--danger)}
+.venc{background:rgba(230,207,58,.1);border:1px solid rgba(230,207,58,.35);border-radius:10px;
+  padding:.65rem .8rem;margin-bottom:.6rem;font-size:.82rem;color:var(--gold);line-height:1.45}
+.deu{display:flex;align-items:center;gap:.7rem;padding:.55rem 0;border-bottom:1px solid var(--rule)}
+.deu .n{flex:1;min-width:0}
+.deu .n b{display:block;font-size:.88rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.deu .n span{font-size:.7rem;color:var(--ink-3)}
+.deu .v{font-size:.9rem;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.deu-tot{display:flex;justify-content:space-between;padding:.7rem 0 0;font-size:.95rem;font-weight:600}
+.deu-tot .v{font-variant-numeric:tabular-nums}
 .nota{font-size:.78rem;color:var(--ink-3);background:var(--paper-2);border:1px solid var(--rule);border-radius:10px;padding:.6rem .75rem;margin-bottom:.6rem;line-height:1.45}
 .empty{text-align:center;color:var(--ink-3);font-size:.88rem;padding:2rem 1rem;line-height:1.6}
 .gate{position:fixed;inset:0;background:var(--paper);display:grid;place-items:center;z-index:100;padding:2rem;text-align:center}
@@ -237,13 +257,19 @@ textarea:focus{outline:none;border-color:var(--accent)}
     <div class="kpi"><div class="n" id="k-mov">—</div><div class="l">Movs.</div></div>
   </div>
 
+  <div id="venc-aviso"></div>
   <div id="saldo-aviso"></div>
   <div id="fijo-aviso"></div>
   <div id="tras-aviso"></div>
   <div id="rev-aviso"></div>
 
+  <div id="reparto"></div>
+
   <h2>En qué se va</h2>
   <div id="cats"></div>
+
+  <h2 id="deudas-h" hidden>Lo que debes</h2>
+  <div id="deudas"></div>
 
   <h2 id="movs-h">Movimientos</h2>
   <div id="movs"></div>
@@ -308,6 +334,7 @@ async function arrancar(){
   $('gate').remove(); $('app').hidden = false; $('fab').hidden = false;
   MES = mesHoy();
   try { CFG = (await api('/gastos/config')).cfg || {}; } catch {}
+  await cargarDeudas();
   await cargar();
   if (cuentaVacia()) obPaso(0);
 }
@@ -353,6 +380,10 @@ function render(){
     ? `Llevas gastado el ${Math.round(pct)}% de lo que entró`
     : `${d.n_movimientos} movimientos este mes`;
   $('foot-r').textContent = '';
+  renderReparto(d);
+  renderVencimientos();
+  renderDeudas();
+
   $('saldo-aviso').innerHTML = d.saldo_ancla
     ? `<div class="nota">Partimos de ${cop(d.saldo_ancla)} el ${new Date(d.saldo_fecha - 5*3600000).toLocaleDateString('es-CO',{day:'numeric',month:'short'})}, más ${d.saldo_movs} ${d.saldo_movs===1?'movimiento':'movimientos'} desde entonces. Si no cuadra con tu banco, tócalo arriba y vuélvelo a fijar.</div>`
     : '';
@@ -514,6 +545,91 @@ $('fab').onclick = () => {
     } catch (e) { toast('No se anotó: ' + e.message); }
   };
 };
+
+// ── Deudas y reparto del ingreso ──────────────────────────────────────────
+// La idea que pidió Ricardo: el presupuesto no sirve de nada en abstracto;
+// sirve el día que entra la plata. Por eso el reparto solo aparece cuando el
+// mes registra un ingreso.
+//
+// La app NO decide en qué orden pagar: muestra lo comprometido, lo que queda y
+// las fechas. Sin las tasas de interés, un "paga esta primero" sería una
+// opinión disfrazada de cálculo.
+let DEUDAS = [];
+
+async function cargarDeudas() {
+  try { DEUDAS = (await api('/gastos/deudas')).deudas || []; } catch { DEUDAS = []; }
+}
+
+function diasHasta(dia) {
+  if (!dia) return null;
+  const h = new Date(Date.now() - 5*3600000);
+  let m = h.getUTCMonth(), a = h.getUTCFullYear();
+  if (dia < h.getUTCDate()) { m++; if (m > 11) { m = 0; a++; } }
+  return Math.round((Date.UTC(a, m, dia) - Date.UTC(a, h.getUTCMonth(), h.getUTCDate())) / 86400000);
+}
+
+function renderDeudas() {
+  const deudas   = DEUDAS.filter(d => d.tipo === 'deuda');
+  const mensual  = DEUDAS.filter(d => d.tipo === 'mensual');
+  $('deudas-h').hidden = !DEUDAS.length;
+  if (!DEUDAS.length) { $('deudas').innerHTML = ''; return; }
+
+  const total = deudas.reduce((a, d) => a + d.saldo, 0);
+  const fila = d => {
+    const dd = diasHasta(d.dia_pago);
+    const det = [
+      d.grupo,
+      dd != null ? (dd === 0 ? 'vence hoy' : dd === 1 ? 'vence mañana' : `en ${dd} días`) : null,
+      d.minimo ? `mínimo ${cop(d.minimo)}` : null,
+    ].filter(Boolean).join(' · ');
+    return `<div class="deu"><span class="n"><b>${esc(d.nombre)}</b><span>${esc(det)}</span></span>
+      <span class="v">${cop(d.tipo === 'mensual' ? d.minimo : d.saldo)}</span></div>`;
+  };
+
+  $('deudas').innerHTML =
+    deudas.sort((a,b) => b.saldo - a.saldo).map(fila).join('')
+    + `<div class="deu-tot"><span>Total</span><span class="v">${cop(total)}</span></div>`
+    + (mensual.length ? `<div class="nota" style="margin-top:.8rem">Cada mes, aparte: ${mensual.map(d => `${esc(d.nombre)} ${cop(d.minimo)}`).join(' · ')}.</div>` : '')
+    + `<div class="nota">Los saldos se actualizan a mano: tócalos cuando abones. La app no sabe cuánto bajó tu deuda con un pago porque el banco no lo dice en el mensaje.</div>`;
+}
+
+function renderVencimientos() {
+  const prox = DEUDAS
+    .map(d => ({ d, dd: diasHasta(d.dia_pago) }))
+    .filter(x => x.dd != null && x.dd <= 10)
+    .sort((a,b) => a.dd - b.dd);
+  $('venc-aviso').innerHTML = prox.map(({d, dd}) =>
+    `<div class="venc"><b>${esc(d.nombre)}</b> — ${dd === 0 ? 'vence hoy' : dd === 1 ? 'vence mañana' : `vence en ${dd} días`} (el ${d.dia_pago})${d.minimo ? `. Mínimo ${cop(d.minimo)}.` : '.'}</div>`
+  ).join('');
+}
+
+function renderReparto(d) {
+  const caja = $('reparto');
+  if (!d.total_ingreso) { caja.innerHTML = ''; return; }
+
+  const mensual = DEUDAS.filter(x => x.tipo === 'mensual');
+  const minimos = DEUDAS.filter(x => x.tipo === 'deuda' && x.minimo > 0);
+  const lineas = [
+    ...mensual.map(x => ({ n: x.nombre, v: x.minimo })),
+    ...minimos.map(x => ({ n: `${x.nombre} · mínimo`, v: x.minimo })),
+  ];
+  if (d.total_recurrente) lineas.push({ n: 'Gasto fijo (suscripciones)', v: d.total_recurrente });
+
+  const comprometido = lineas.reduce((a, x) => a + x.v, 0);
+  const yaGastado = d.total_gastado;
+  const libre = d.total_ingreso - comprometido - yaGastado;
+
+  caja.innerHTML = `
+    <div class="rep">
+      <h3>Entraron ${cop(d.total_ingreso)} este mes</h3>
+      <div class="sub">Esto es lo que ya tiene dueño.</div>
+      ${lineas.map(x => `<div class="rep-l"><span class="n">${esc(x.n)}</span><span class="v">− ${cop(x.v)}</span></div>`).join('')}
+      <div class="rep-l"><span class="n">Ya gastaste</span><span class="v">− ${cop(yaGastado)}</span></div>
+      <div class="rep-tot"><span>${libre >= 0 ? 'Te queda libre' : 'Te falta'}</span>
+        <span class="v ${libre < 0 ? 'neg' : ''}">${cop(Math.abs(libre))}</span></div>
+      <div class="nota" style="margin:.8rem 0 0">Los mínimos evitan la mora, no bajan la deuda. Lo que quede libre y a cuál abonarlo lo decides tú: la app no conoce tus tasas de interés.</div>
+    </div>`;
+}
 
 // ── Onboarding e importación ───────────────────────────────────────────────
 // El asistente aparece solo cuando la cuenta está vacía; después el mismo
