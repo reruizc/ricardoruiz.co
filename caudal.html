@@ -905,7 +905,7 @@
         </div>
         <div class="pf-edit" id="pf-edit" hidden></div>
       </div>
-      <div id="cli-body"><div class="cli-empty">Crea el perfil de un cliente — o abre un sector de muestra — para ver su radar.</div></div>
+      <div id="cli-body"><div class="cli-empty">Crea el perfil de un cliente — o abre un sector de muestra — para orientarlo.</div></div>
     </div>
 
     <div class="foot">
@@ -2616,7 +2616,7 @@
     pfMsg('Borrando…');
     try{
       await wcall('/caudal/perfil/delete?perfilId='+encodeURIComponent(d.perfilId),{method:'DELETE'});
-      if(PF_ACTIVE&&PF_ACTIVE.perfilId===d.perfilId){ PF_ACTIVE=null; const b=document.getElementById('cli-body'); if(b) b.innerHTML='<div class="cli-empty">Elige un perfil o un sector arriba para ver su radar.</div>'; }
+      if(PF_ACTIVE&&PF_ACTIVE.perfilId===d.perfilId){ PF_ACTIVE=null; const b=document.getElementById('cli-body'); if(b) b.innerHTML='<div class="cli-empty">Elige un perfil o un sector arriba para orientarlo.</div>'; }
       pfCerrarEdit(); await pfLoadList();
     }catch(err){ pfMsg(err.message||'No se pudo borrar.'); }
   }
@@ -2737,12 +2737,12 @@
     // el perfil llegó mal formado (campo con otro nombre, lista que era texto):
     // se dice en vez de devolver un radar vacío en silencio
     const avi=(cl.avisos&&cl.avisos.length)
-      ? `<div class="cli-reg-none" style="margin-bottom:1rem">El perfil llegó con algo que Caudal no entendió: <b>${esc(cl.avisos.join(' · '))}</b>. El radar de abajo se armó sin eso.</div>` : '';
+      ? `<div class="cli-reg-none" style="margin-bottom:1rem">El perfil llegó con algo que Caudal no entendió: <b>${esc(cl.avisos.join(' · '))}</b>. ${MARCA.nombre} se armó sin eso.</div>` : '';
     const vigNote=vigN
       ? `<div class="cli-note"><b>Vigiladas (${vigN}):</b> ${esc(vigNoms)} · <b>${k.n_senales_vigiladas||0}</b> señal(es) de ${MARCA.nombre} son sobre ellas${k.n_contratos_vigiladas?` · <b>${fmt(k.n_contratos_vigiladas)}</b> contrato(s) suyos en SECOP`:(cl.vigiladas_sin_contratos?' · no le venden al Estado en SECOP II':'')}.</div>` : '';
     body.innerHTML=`
       <div class="kpis">
-        <div class="kpi"><div class="n">${k.n_radar}</div><div class="l">Señales en ${MARCA.nombre}</div></div>
+        <div class="kpi"><div class="n">${k.n_radar}</div><div class="l">Señales en ${MARCA.articulo} ${MARCA.nombre}</div></div>
         <div class="kpi vit"><div class="n">${k.alto}</div><div class="l">Alta prioridad</div></div>
         <div class="kpi ley"><div class="n">${k.en_tramite}</div><div class="l">En trámite · ventana</div></div>
         <div class="kpi"><div class="n">${vigN?(k.n_senales_vigiladas||0):(k.n_medios_sector?fmt(k.n_medios_sector):'—')}</div><div class="l">${vigN?'Sobre tus vigiladas':'Prensa reciente'}</div></div>
@@ -2750,7 +2750,7 @@
       ${secDesc}${avi}${desc}${vigNote}
       <div class="cli-note"><b>Activo ahora en ${esc(cl.nombre)}:</b> <b>${k.en_tramite}</b> proyecto(s) de ley en trámite · ${sancTxt} · <b>${fmt(k.n_medios_sector||0)}</b> titular(es) de prensa reciente · <b>${fmt(k.n_contratos_sector||0)}</b> contrato(s) reciente(s) en SECOP.</div>
       ${k.n_con_articulado?`<div class="cli-note"><b>Qué cambian:</b> de las ${congreso.length} señales del Congreso, <b>${k.n_con_articulado}</b> ya tienen el articulado leído${k.n_te_aplica?` y <b>${k.n_te_aplica}</b> le aplican a tu sector o a tus vigiladas`:''}. El resto todavía no se ha extraído.</div>`:''}
-      <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt((k.n_sanciones_sector||0)+(k.n_otros_actos_sector||0))}</b> actos del regulador (<b>${fmt(k.n_sanciones_sector)}</b> de ellos sanciones)`:''} que tocan estos temas, el radar prioriza por accionabilidad — precisión sobre volumen.${(cl.temas_usados&&cl.temas_usados.length)?` Se buscó por: <b>${esc(cl.temas_usados.join(' · '))}</b>.`:''}</div>
+      <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt((k.n_sanciones_sector||0)+(k.n_otros_actos_sector||0))}</b> actos del regulador (<b>${fmt(k.n_sanciones_sector)}</b> de ellos sanciones)`:''} que tocan estos temas, ${MARCA.nombre} prioriza por accionabilidad — precisión sobre volumen.${(cl.temas_usados&&cl.temas_usados.length)?` Se buscó por: <b>${esc(cl.temas_usados.join(' · '))}</b>.`:''}</div>
       <div class="lectura">
         <div class="tag">◈ Lectura del analista · briefing de hoy para ${esc(cl.nombre)}</div>
         <div id="cli-lectura-body"><div class="llm-load">Generando lectura <span class="dots"><span></span><span></span><span></span></span></div></div>
@@ -2765,7 +2765,7 @@
       <div id="cli-detalle" style="margin-top:1rem"></div>
 
       <div class="cli-sub" style="margin-top:1.6rem">El expediente de ${esc(cl.nombre)}</div>
-      <div class="tb-intro">El radar de arriba dice <b>qué se movió</b>. Esto dice
+      <div class="tb-intro">${MARCA.nombre} dice <b>qué se movió</b>. Esto dice
         <b>cómo va cada frente</b>, se haya movido o no — el registro que un equipo
         suele llevar a mano en un Excel y que se desactualiza solo.</div>
       <div id="cli-tablero"><button class="tb-btn" id="tb-load">Abrir el expediente →</button></div>`;
@@ -2864,14 +2864,14 @@
   }
   function cliLecturaFallback(msg){
     const el=document.getElementById('cli-lectura-body'); if(!el) return;
-    el.innerHTML='<div class="cob-note">'+esc(msg||'No se pudo generar la lectura. El radar de arriba está completo.')+'</div>';
+    el.innerHTML='<div class="cob-note">'+esc(msg||'No se pudo generar la lectura. Lo de arriba está completo.')+'</div>';
   }
   // El muro del radar: el briefing es justamente lo que se vende acá, así que en
   // vez de un error va la invitación, en el mismo sitio donde iría la lectura.
   function cliMuroLectura(){
     const el=document.getElementById('cli-lectura-body'); if(!el) return;
-    el.innerHTML=`<div class="muro-t" style="margin-bottom:.7rem">Acá va el briefing del día: qué señales de las de arriba mueven la aguja, por qué, y qué hacer con cada una. Se escribe sobre este mismo radar, y va con acceso.</div>`
-      + `<a class="muro-btn" href="${mailtoHref('acceso · radar del cliente')}">Escríbenos · ${CONTACTO_MAIL}</a>`;
+    el.innerHTML=`<div class="muro-t" style="margin-bottom:.7rem">Acá va el briefing del día: qué señales de las de arriba mueven la aguja, por qué, y qué hacer con cada una. Se escribe sobre esto mismo, y va con acceso.</div>`
+      + `<a class="muro-btn" href="${mailtoHref('acceso · '+MARCA.nombre)}">Escríbenos · ${CONTACTO_MAIL}</a>`;
   }
   // La lectura se genera aparte del radar: medida contra producción tarda entre
   // 20 s y 51 s (la varianza es del modelo), o sea que se pasa del techo de
