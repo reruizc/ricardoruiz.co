@@ -8757,7 +8757,42 @@ Google News vía la consulta por nombre.
 > puntajes de esas dos salas se rechazan con 400 y no entran al ranking.** Ver el pendiente
 > de abajo: ahora el deploy sí bloquea funcionalidad visible.
 
-> **🔴 PENDIENTE PARA QUE v4 Y v5 QUEDEN COMPLETAS: desplegar el worker.**
+> **📌 v5.1 (ago-13-2026) · el delator de longitud, resuelto de verdad.**
+> El parche de v5 (coletillas jurídicas genéricas para emparejar longitudes) cambió un
+> delator por otro: medido, **el 86 % de las opciones con muletilla eran distractores**, así
+> que «evitar la muletilla y marcar la más larga» sacaba **838/1000**. Se revirtieron las 367
+> coletillas y se **reescribieron a mano ~500 opciones** con contenido jurídico real, en dos
+> movimientos: alargar el distractor cuando la correcta lo doblaba, y **extenderlo por encima
+> de la correcta** en una parte de los casos, para que la longitud deje de predecir.
+>
+> **Resultado medido:** correcta = única más larga **77 % → 27 %** (azar 25 %) · casos donde
+> la correcta más que dobla al distractor más largo: **137 → 0** · «marcar siempre la más
+> larga» rinde **295-477/1000** (antes ~1000) y «la más corta» 114-163.
+>
+> ⚠️ **Regla para quien amplíe el banco:** la correcta no puede ser sistemáticamente la más
+> desarrollada, y **el remedio no es rellenar con muletillas** —un distractor con relleno
+> legalista se huele—. Los distractores tienen que ser errores *creíbles* del mismo tamaño.
+> `medir_banco.py` falla si el delator supera el 40 %.
+>
+> **También en v5.1:** el formulario de registro **ya no pregunta el cargo** (se toma del
+> selector previo a la sala, que es donde el jugador ya lo eligió) y la **universidad pasó de
+> texto libre a desplegable** de 63 facultades + «Otra universidad…» con campo libre. El
+> texto libre estaba fragmentando el ranking por universidad en variantes de la misma
+> facultad («Externado», «U. Externado», «externado de colombia»).
+>
+> **✅ WORKER DESPLEGADO** (versión `c8881802`). Al desplegarlo apareció un fallo que NO era
+> del cambio: **`/juez/ranking` y `/juez/partida` devolvían 500 porque se agotó la cuota
+> diaria de escrituras del KV** (`KV put() limit exceeded for the day`). Una ruta de solo
+> lectura se caía por no poder escribir su propio caché. Corregido: **todo `put` accesorio
+> —caché del ranking, contadores de los dos limitadores de tasa, agregado de partidas— va en
+> `try/catch` y degrada**; el único `put` esencial (el registro del lead en `/juez/save`)
+> responde **503 con mensaje legible** en vez de excepción. Verificadas las 10 pestañas del
+> ranking en 200 y el resto del worker intacto (auth, pron, caudal, admin).
+> ⚠️ El límite del plan gratuito de KV son 1.000 escrituras/día y se comparte con Caudal, el
+> Lab y las alertas: si vuelven los 500 en rutas de escritura, revisar la cuota antes que el
+> código.
+
+> **🔴 PENDIENTE (ya resuelto para v4 y v5, se deja el comando a mano): desplegar el worker.**
 > `/Users/ricardoruiz/rr-auth/src/index.js` tiene los cambios (ruta `/juez/partida`, salas
 > `ejecucion`, `familia` y `promiscuo` en `JUEZ_SALAS`, `/juez/admin/partidas`, campo `anon`
 > en el registro) y pasa
