@@ -1408,13 +1408,14 @@ def _expandir_query(query, solo_cache=False):
 
 
 def _sintesis_tema(resumen, casos=None):
+    """Arma el prompt de la lectura de un tema. Devuelve (key, user) — NO genera.
+    La generación vive en _tema_lectura_generar (ver por qué en _tema_lectura_pedir)."""
     casos_hash = _hash24('|'.join(sorted(c['gaceta'] for c in (casos or []))))
     key = _hash24(PROMPT_VERSION + '|tema|' + resumen['query'] + '|' +
                   str(resumen['n_intentos']) + '|' + str(resumen['n_leyes']) +
                   '|' + str(resumen.get('n_vitrina', 0)) + '|' + casos_hash)
-    cached = _cache_get(key)
-    if cached:
-        return cached
+    # (el early-return del caché vive ahora en _tema_lectura_pedir: esta función
+    #  solo ARMA el prompt y devuelve (key, user) — no llama al modelo)
     intentos_txt = '\n'.join(
         f"- [{it['anio']}] {it['resultado_txt']} · {it.get('empuje_txt','')}: {it['titulo'][:85]}"
         for it in resumen['intentos'][:20])
@@ -1470,10 +1471,45 @@ def _sintesis_tema(resumen, casos=None):
         "— eso es lo que distingue este análisis de un conteo genérico. NO inventes "
         "nada que no esté en esa evidencia. Si no te di evidencia, trabaja solo con "
         "la metadata y no la menciones.")
+    return key, user
+
+
+def _tema_lectura_pedir(resumen, casos=None):
+    """Deja el prompt listo en caché y devuelve (key, lectura_hecha_o_None).
+
+    ⚠️ Por qué esto NO genera acá: la síntesis tarda entre 20 y 51 s —la varianza
+    es del modelo, no del prompt— y el API Gateway corta a los 30 s. Medido
+    ago-2026: `tema` con lectura devolvía HTTP 503 a los 30,7 s en la primera
+    consulta de un tema nuevo, aunque la Lambda terminara y dejara la respuesta
+    cacheada; el reintento la traía en 1,6 s. O sea, el primero que buscaba un
+    tema nuevo veía un error. Es el mismo problema que ya se resolvió en el radar
+    del cliente, y esto porta el mismo patrón: preparar → disparar → sondear."""
+    key, user = _sintesis_tema(resumen, casos)
+    hecha = _cache_get(key)
+    if hecha:
+        return key, hecha
+    _cache_put('tema-in-' + key, {'user': user, 'casos': casos or []})
+    return key, None
+
+
+def _tema_lectura_generar(key):
+    """Genera la lectura de un tema ya preparado y la deja en el caché."""
+    prompt = _cache_get('tema-in-' + key)
+    if not prompt or not prompt.get('user'):
+        # el resumen que la originó ya no está en caché (otra versión de prompt,
+        # o el objeto caducó): que el frontend vuelva a pedir el tema.
+        return {'estado': 'sin_tema'}
+    lock = _cache_get('tema-lock-' + key)
+    if lock and _time.time() - float(lock.get('t') or 0) < LECTURA_LOCK_TTL:
+        # ya hay una generación en vuelo. Sin el candado, cada reintento del
+        # navegador arrancaba otra llamada de 50 s al modelo en paralelo.
+        return {'estado': 'generando'}
+    _cache_put('tema-lock-' + key, {'t': _time.time()})
+    casos = prompt.get('casos') or []
     try:
         # max_tokens alto: DeepSeek V4 gasta tokens en reasoning y con presupuesto
         # bajo deja content vacío (finish_reason=length) — gotcha documentado.
-        raw = _call_llm('sintesis', SINT_SYSTEM, user, max_tokens=6000)
+        raw = _call_llm('sintesis', SINT_SYSTEM, prompt['user'], max_tokens=6000)
         raw = raw.strip()
         if raw.startswith('```'):                    # por si envuelve en fences
             raw = raw.split('```')[1].lstrip('json').strip()
@@ -1482,10 +1518,10 @@ def _sintesis_tema(resumen, casos=None):
         data = {'titular': '', 'hallazgo': '', 'por_que_caen': '',
                 'quien_propone': '', 'veredicto': '', 'error': str(e)[:200]}
     data['_model'] = STEP_MODELS['sintesis']['model']
-    data['casos_evidencia'] = casos or []   # trazabilidad: qué gacetas sustentan la lectura
+    data['casos_evidencia'] = casos   # trazabilidad: qué gacetas sustentan la lectura
     if 'error' not in data:          # no cachear fallos
         _cache_put(key, data)
-    return data
+    return {'estado': 'lista', 'lectura': data}
 
 
 def _gaceta_decisiva(full):
@@ -2484,7 +2520,7 @@ def _resp(code, payload):
 # un header propio dispara preflight y CORS aquí solo admite Content-Type.
 # Contra un cliente que no sea navegador, lo que protege es el secreto.
 ORIGEN_HEADER  = 'x-caudal-origin'
-ACCIONES_CARAS = frozenset({'gaceta', 'contexto', 'cliente-lectura'})
+ACCIONES_CARAS = frozenset({'gaceta', 'contexto', 'cliente-lectura', 'tema-lectura'})
 
 
 def _con_credencial(event):
@@ -3515,7 +3551,32 @@ def handler(event, context):
                 casos = None
                 if body.get('profundo'):    # opt-in: más lento/costoso, lee gacetas de verdad
                     casos = _profundizar_tema(caudal, resumen)
-                out['lectura'] = _sintesis_tema(resumen, casos=casos)
+                # NO se genera acá: se prepara y se devuelve la llave. Si ya
+                # estaba hecha viene en la misma respuesta y el frontend no
+                # sondea nada. Ver _tema_lectura_pedir para el porqué.
+                key, hecha = _tema_lectura_pedir(resumen, casos)
+                out['lectura_key'] = key
+                if hecha:
+                    out['lectura'] = hecha
         return _resp(200, out)
+
+    if action == 'tema-lectura':
+        # gemela de `cliente-lectura`. Dos modos:
+        #   solo_cache:true  → sondeo barato (un GET a S3): lista o pendiente.
+        #   sin solo_cache   → arranca la generación. Esta petición SE PASA de
+        #                      los 30 s del gateway a menudo; el navegador la
+        #                      abandona y recoge el resultado sondeando, pero
+        #                      la Lambda (60 s) termina y deja la lectura hecha.
+        key = str(body.get('key') or '').strip()
+        if not key or not key.isalnum():
+            return _resp(400, {'error': 'falta la llave de la lectura (lectura_key)'})
+        lista = _cache_get(key)
+        if lista:
+            return _resp(200, {'estado': 'lista', 'lectura': lista, 'key': key})
+        if body.get('solo_cache'):
+            return _resp(200, {'estado': 'pendiente', 'key': key})
+        r = _tema_lectura_generar(key)
+        r['key'] = key
+        return _resp(200, r)
 
     return _resp(400, {'error': f'action desconocida: {action}'})
