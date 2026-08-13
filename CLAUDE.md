@@ -837,7 +837,8 @@ participación → candidatos (2 slides de 3) → voto blanco → mapa
   apellido, depto, municipio (+ comuna/localidad si Bogotá/Medellín/
   Cali), correo y WhatsApp. El correo es el identificador único.
 - **Backend en worker `rr-auth`** (`/Users/ricardoruiz/rr-auth/src/index.js`,
-  no es repo git — deploy con `cd /Users/ricardoruiz/rr-auth && npx
+  **repo PRIVADO propio: `github.com/reruizc/rr-auth`** (creado ago-2026; antes
+  vivía solo en el disco) — deploy con `cd /Users/ricardoruiz/rr-auth && npx
   wrangler deploy`):
   - `POST /pron/save` — sin auth. Valida campos + suma de pcts ≈ 100.
     Guarda en `RR_STORE` bajo `pron:${correo}`. Conserva `createdAt`
@@ -9395,9 +9396,15 @@ del KV) y **nunca con el editor abierto** (borraría lo que se está escribiendo
 ### Desplegar
 ```bash
 cd /Users/ricardoruiz/rr-auth && npx wrangler deploy    # ⚠️ worker COMPARTIDO, pedir luz verde
+cd /Users/ricardoruiz/rr-auth && git push               # repo PRIVADO reruizc/rr-auth
 git push origin HEAD:main
 node tools/gastos/prueba-parser.mjs                     # 51 casos, sale con 1 si algo falla
 ```
+
+⚠️ **Son DOS repos y uno es público.** `ricardoruiz.co` (público) lleva el
+frontend; `reruizc/rr-auth` (privado) lleva el worker, con la lógica de negocio,
+los topes por plan y las guardas de acceso. No pegar código de uno en otro sin
+mirar cuál es cuál.
 
 ### Pendientes
 1. **Click-through real en el iPhone**: el Atajo lo arma Ricardo; nadie ha visto
