@@ -430,8 +430,48 @@ $('fab').onclick = () => {
   };
 };
 
+// ── Refresco automático ───────────────────────────────────────────────────
+// Los SMS ya entran solos (el Atajo los empuja); lo que hay que refrescar es
+// la PANTALLA. Dos disparadores:
+//   · al volver a la app  → es el que de verdad importa: abres y ya está al día
+//   · cada 90 s con la app abierta y a la vista
+// Nunca refresca con la pestaña oculta: gastaría cuota del KV sin que nadie
+// esté mirando.
+const REFRESCO_MS = 90000;
+let refrescoT = null;
+
+function puedeRefrescar() {
+  // No pisar al usuario mientras edita: un refresco le borraría lo que escribe.
+  if (ABIERTO) return false;
+  if ($('sheet').classList.contains('on')) return false;
+  return document.visibilityState === 'visible' && DATA;
+}
+
+async function refrescarSilencioso() {
+  if (!puedeRefrescar()) return;
+  try {
+    const d = await api('/gastos/resumen?mes=' + MES);
+    // Solo repinta si algo cambió, para no parpadear cada 90 segundos.
+    if (d.n_movimientos !== DATA.n_movimientos || d.total_gastado !== DATA.total_gastado) {
+      const nuevos = d.n_movimientos - DATA.n_movimientos;
+      DATA = d; render();
+      if (nuevos > 0) toast(nuevos === 1 ? 'Entró un movimiento' : `Entraron ${nuevos} movimientos`);
+    }
+  } catch {}   // sin señal se reintenta al siguiente ciclo; no molestamos al usuario
+}
+
+function arrancarRefresco() {
+  clearInterval(refrescoT);
+  refrescoT = setInterval(refrescarSilencioso, REFRESCO_MS);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { refrescarSilencioso(); arrancarRefresco(); }
+  else clearInterval(refrescoT);
+});
+
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('gastos-sw.js').catch(()=>{});
-arrancar();
+arrancar().then(arrancarRefresco);
 </script>
 </body>
 </html>

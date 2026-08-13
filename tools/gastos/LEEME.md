@@ -113,6 +113,41 @@ python3 tools/gastos/correos.py              # enviarlo de verdad
 Abre el buzón en **solo lectura**: no marca como leído nada tuyo. Para que corra
 solo, agrégalo como una etapa más del cron que ya existe en el Mac.
 
+## ¿Cada cuánto se actualiza?
+
+Hay que separar dos cosas que se confunden:
+
+| | Cómo funciona | Latencia |
+|---|---|---|
+| **SMS** | El Atajo EMPUJA en el instante en que llega el mensaje. No hay nada que "revisar". | inmediata |
+| **Correo** | Hay que ir a mirar el buzón, así que sí es una consulta periódica. | cada 2 h |
+| **La pantalla** | Se refresca al volver a la app y cada 90 s mientras esté abierta y a la vista. | inmediata al abrir |
+
+El refresco de pantalla **nunca corre con la app en segundo plano** (gastaría
+cuota del KV sin que nadie mire) y **nunca repinta mientras estás editando un
+movimiento** — eso borraría lo que estás escribiendo. Al cerrar el editor entra
+lo que haya llegado entre tanto.
+
+### Instalar la revisión de correo cada 2 horas
+
+Solo tiene sentido después de poner `GASTOS_IMAP_PASS` (PASO 4). Sin ella el
+script sale en silencio, así que instalarlo antes no rompe nada.
+
+```bash
+cp tools/gastos/co.ricardoruiz.gastos-correos.plist ~/Library/LaunchAgents/
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/co.ricardoruiz.gastos-correos.plist
+launchctl list | grep gastos-correos          # debe salir con exit 0
+```
+
+Va en su **propio** agente, no dentro de `run_diario.sh`: ese es el pipeline de
+Caudal, corre 2 veces al día y tiene su propio candado. Mezclarlos haría que un
+fallo de uno arrastre al otro.
+
+Para desinstalarlo:
+```bash
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/co.ricardoruiz.gastos-correos.plist
+```
+
 ## PASO 5 · Instalar la app en el iPhone
 
 Safari → `https://ricardoruiz.co/gastos.html` → Compartir → **Agregar a inicio**.
