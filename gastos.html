@@ -92,6 +92,7 @@ h2{font-size:.75rem;text-transform:uppercase;letter-spacing:.09em;color:var(--in
 .mov-com{flex:1;font-size:.92rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mov-monto{font-size:.95rem;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
 .mov-monto.in{color:var(--green)}
+.mov-monto.tr{color:var(--ink-3);font-weight:400}
 .mov-sub{display:flex;gap:.45rem;align-items:center;font-size:.72rem;color:var(--ink-3);margin-top:.2rem;flex-wrap:wrap}
 .tag{background:rgba(244,243,239,.07);border-radius:5px;padding:.08rem .38rem;font-size:.68rem}
 .tag.rev{background:rgba(230,207,58,.16);color:var(--gold)}
@@ -121,6 +122,7 @@ button.b.del{background:transparent;border:1px solid rgba(255,92,92,.4);color:va
   border:none;font-size:1.7rem;line-height:1;cursor:pointer;
   box-shadow:0 6px 24px rgba(0,71,255,.4);z-index:50;
 }
+.nota{font-size:.78rem;color:var(--ink-3);background:var(--paper-2);border:1px solid var(--rule);border-radius:10px;padding:.6rem .75rem;margin-bottom:.6rem;line-height:1.45}
 .empty{text-align:center;color:var(--ink-3);font-size:.88rem;padding:2rem 1rem;line-height:1.6}
 .gate{position:fixed;inset:0;background:var(--paper);display:grid;place-items:center;z-index:100;padding:2rem;text-align:center}
 .gate p{color:var(--ink-2);font-size:.95rem;margin-top:.6rem}
@@ -164,6 +166,7 @@ button.b.del{background:transparent;border:1px solid rgba(255,92,92,.4);color:va
     <div class="kpi"><div class="n" id="k-mov">—</div><div class="l">Movs.</div></div>
   </div>
 
+  <div id="tras-aviso"></div>
   <div id="rev-aviso"></div>
 
   <h2>En qué se va</h2>
@@ -186,9 +189,9 @@ button.b.del{background:transparent;border:1px solid rgba(255,92,92,.4);color:va
 const API = 'https://rr-auth.reruizc.workers.dev';
 const PERMITIDOS = ['reruizc@gmail.com'];
 const CATS = ['mercado','comida','transporte','suscripciones','servicios','salud','hogar','ropa',
-              'educacion','entretenimiento','transferencia','impuestos','financiero','sin categoría','otro'];
+              'educacion','entretenimiento','transferencia','impuestos','financiero','traslado','sin categoría','otro'];
 let TOKEN = localStorage.getItem('rr-token') || '';
-let MES = null, DATA = null, ABIERTO = null;
+let MES = null, DATA = null, ABIERTO = null, CFG = {};
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -230,6 +233,7 @@ async function arrancar(){
   if (!PERMITIDOS.includes(correo)) return negar('Esta herramienta es privada.', false);
   $('gate').remove(); $('app').hidden = false; $('fab').hidden = false;
   MES = mesHoy();
+  try { CFG = (await api('/gastos/config')).cfg || {}; } catch {}
   cargar();
 }
 function negar(msg, login){
@@ -267,6 +271,9 @@ function render(){
     : 'Define tu sueldo para ver cuánto te queda';
   $('foot-l').textContent = hayS ? Math.round(pct) + '% usado' : `${d.n_movimientos} movimientos`;
   $('foot-r').textContent = d.total_ingreso ? 'Ingresos ' + cop(d.total_ingreso) : '';
+  $('tras-aviso').innerHTML = d.n_traslados
+    ? `<div class="nota">⇄ ${d.n_traslados} ${d.n_traslados===1?'traslado':'traslados'} por ${cop(d.total_traslados)} — plata movida entre cuentas tuyas, no suma a los totales.</div>`
+    : '';
 
   $('k-dia').textContent   = corto(d.promedio_dia);
   $('k-queda').textContent = d.disponible_por_dia != null ? corto(d.disponible_por_dia) : '—';
@@ -302,7 +309,7 @@ function movHTML(m){
   <div class="mov ${dudoso?'rev':''}" data-id="${esc(m.id)}">
     <div class="mov-top">
       <span class="mov-com">${esc(m.comercio)}</span>
-      <span class="mov-monto ${m.tipo==='ingreso'?'in':''}">${m.tipo==='ingreso'?'+':''}${cop(m.monto)}</span>
+      <span class="mov-monto ${m.tipo==='ingreso'?'in':m.tipo==='traslado'?'tr':''}">${m.tipo==='ingreso'?'+':m.tipo==='traslado'?'⇄ ':''}${cop(m.monto)}</span>
     </div>
     <div class="mov-sub">
       <span>${fecha}</span><span class="tag">${esc(m.categoria)}</span>
@@ -321,6 +328,7 @@ function editorHTML(m){
       <div><label>Tipo</label><select data-f="tipo">
         <option value="gasto"${m.tipo==='gasto'?' selected':''}>Gasto</option>
         <option value="ingreso"${m.tipo==='ingreso'?' selected':''}>Ingreso</option>
+        <option value="traslado"${m.tipo==='traslado'?' selected':''}>Traslado (no cuenta)</option>
       </select></div>
     </div>
     <div><label>Comercio</label><input data-f="comercio" value="${esc(m.comercio)}"></div>
@@ -377,12 +385,17 @@ function abrirSueldo(){
   $('sheet-body').innerHTML = `
     <div><label style="font-size:.7rem;color:var(--ink-3)">Lo que te entra cada mes (DNP)</label>
     <input id="s-sueldo" type="number" inputmode="numeric" value="${DATA && DATA.sueldo ? DATA.sueldo : ''}" placeholder="8500000"></div>
+    <div><label style="font-size:.7rem;color:var(--ink-3)">Tu nombre como lo escribe el banco</label>
+    <input id="s-titular" value="${esc(CFG.titular||'')}" placeholder="Ricardo Esteban Ruiz Castro">
+    <div class="nota" style="margin:.4rem 0 0">Sirve para reconocer las transferencias que te haces a ti mismo y no contarlas como ingreso.</div></div>
     <div class="acts"><button class="b ghost" id="s-cancel">Cancelar</button><button class="b" id="s-ok">Guardar</button></div>`;
   $('sheet').classList.add('on');
   $('s-cancel').onclick = cerrarSheet;
   $('s-ok').onclick = async () => {
-    try { await api('/gastos/config', { method:'POST', body: JSON.stringify({ sueldo: Number($('s-sueldo').value)||0 }) });
-          cerrarSheet(); toast('Sueldo guardado'); cargar(); }
+    try { await api('/gastos/config', { method:'POST', body: JSON.stringify({
+            sueldo: Number($('s-sueldo').value)||0, titular: $('s-titular').value }) });
+          CFG.titular = $('s-titular').value;
+          cerrarSheet(); toast('Guardado'); cargar(); }
     catch (e) { toast('No se guardó: ' + e.message); }
   };
 }
@@ -392,7 +405,7 @@ $('fab').onclick = () => {
   $('sheet-body').innerHTML = `
     <div class="row">
       <div><label style="font-size:.7rem;color:var(--ink-3)">Monto</label><input id="m-monto" type="number" inputmode="decimal" placeholder="25000"></div>
-      <div><label style="font-size:.7rem;color:var(--ink-3)">Tipo</label><select id="m-tipo"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select></div>
+      <div><label style="font-size:.7rem;color:var(--ink-3)">Tipo</label><select id="m-tipo"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option><option value="traslado">Traslado</option></select></div>
     </div>
     <div><label style="font-size:.7rem;color:var(--ink-3)">En qué / de quién</label><input id="m-com" placeholder="Almuerzo"></div>
     <div><label style="font-size:.7rem;color:var(--ink-3)">Categoría</label><select id="m-cat">${CATS.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>

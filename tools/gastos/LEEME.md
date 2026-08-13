@@ -56,8 +56,14 @@ despliega sin luz verde.
 
 En la app **Atajos** → pestaña **Automatización** → **+** → **Mensaje**:
 
-1. **Remitente**: agrega los números cortos desde los que te escriben los
-   bancos (los ves en Mensajes: Bancolombia, Nequi, Lulo, Nu…).
+1. **Remitente**: los tres números cortos, en UNA sola automatización.
+
+   | Número | Qué llega |
+   |---|---|
+   | `85540` | Bancolombia · gastos **y** plata que entra (la nómina del DNP) |
+   | `85784` | Bancolombia · tarjeta de crédito |
+   | `890789` | Lulo Bank |
+
    *Alternativa:* dejar el remitente vacío y usar **Contiene: `$`**. Atrapa
    más, pero le manda al servidor cualquier mensaje con un signo de pesos,
    incluidos los personales. **Prefiere filtrar por remitente.**
