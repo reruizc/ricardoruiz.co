@@ -3,7 +3,11 @@
 // Regla única y deliberada: se cachea SOLO el cascarón (HTML, fuentes, íconos).
 // Los datos NUNCA — viven en otro origen (el worker rr-auth) y mostrar un saldo
 // viejo como si fuera el de hoy es peor que no mostrar nada.
-const CACHE = 'gastos-v1';
+// ⚠️ SUBIR ESTE NÚMERO en cada cambio del cascarón. Una app añadida a la
+// pantalla de inicio se queda con la versión vieja hasta que el caché cambie de
+// nombre — a Ricardo le pasó: siguió viendo la pregunta del sueldo que ya no
+// existía, y le respondió con su ingreso a un campo que pedía su saldo.
+const CACHE = 'gastos-v2';
 const SHELL = [
   '/gastos.html',
   '/gastos-manifest.json',
