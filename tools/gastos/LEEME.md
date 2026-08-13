@@ -1,0 +1,167 @@
+# Gastos · presupuesto alimentado por el banco
+
+App personal: define el sueldo del mes y los gastos se van descontando solos a
+medida que llegan las notificaciones de Bancolombia, Nequi, Lulo y Nubank.
+
+```
+gastos.html            la app (PWA instalable, sistema visual v2)
+gastos-manifest.json   manifiesto  ·  gastos-sw.js  service worker
+imagenes/gastos-icon-{180,192,512}.png
+rr-auth/src/gastos-parser.js   el parser (módulo puro, con pruebas)
+rr-auth/src/index.js           rutas /gastos/*
+tools/gastos/correos.py        lector de correos de banco (cron del Mac)
+```
+
+## Por qué no es una app nativa de iOS
+
+**iOS no deja que una app lea los SMS.** No hay API, no es un permiso que se
+pueda pedir: Apple simplemente no lo expone. Una app en Swift jamás vería los
+mensajes de Nequi. Lo que sí funciona es una **automatización de Atajos**, que
+es el puente que usa todo el mundo en Colombia para esto.
+
+Y como el frontend es una **PWA**, se instala en la pantalla de inicio, se ve
+como app y no cuesta los USD 99/año del programa de desarrollador ni pasa por
+revisión de Apple.
+
+---
+
+## PASO 1 · Secretos del worker  ← esto lo hace Ricardo
+
+```bash
+# Genera el secreto (guárdalo: lo vas a pegar en el Atajo del iPhone)
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+
+cd /Users/ricardoruiz/rr-auth
+npx wrangler secret put GASTOS_TOKEN      # pega el secreto de arriba
+```
+
+`GASTOS_EMAIL` es opcional: sin él, los movimientos se le anotan a
+`reruizc@gmail.com`, que es lo correcto para uso personal.
+
+> Sin `GASTOS_TOKEN` la ruta `/gastos/ingest` **no existe** (responde 404 igual
+> que cualquier ruta inventada). Es a propósito: desplegar el código antes de
+> sembrar el secreto no abre nada.
+
+## PASO 2 · Desplegar
+
+```bash
+cd /Users/ricardoruiz/rr-auth && npx wrangler deploy
+cd /Users/ricardoruiz/ricardoruiz.co && git push origin HEAD:main
+```
+
+⚠️ El worker es **compartido** con Caudal, el Lab y el resto del sitio. No se
+despliega sin luz verde.
+
+## PASO 3 · El Atajo del iPhone (SMS)
+
+En la app **Atajos** → pestaña **Automatización** → **+** → **Mensaje**:
+
+1. **Remitente**: agrega los números cortos desde los que te escriben los
+   bancos (los ves en Mensajes: Bancolombia, Nequi, Lulo, Nu…).
+   *Alternativa:* dejar el remitente vacío y usar **Contiene: `$`**. Atrapa
+   más, pero le manda al servidor cualquier mensaje con un signo de pesos,
+   incluidos los personales. **Prefiere filtrar por remitente.**
+2. Marca **Ejecutar inmediatamente** y desactiva **Avisar antes de ejecutar**.
+   Sin esto te pide confirmación en cada compra y el automatismo pierde sentido.
+3. Acción: **Obtener contenido de la URL**
+   - URL: `https://rr-auth.reruizc.workers.dev/gastos/ingest`
+   - Método: **POST**
+   - Encabezados:
+     - `X-Gastos-Token` → *el secreto del paso 1*
+     - `Content-Type` → `application/json`
+   - Cuerpo de la solicitud: **JSON**
+     - `texto`  → variable mágica **Contenido del mensaje**
+     - `metodo` → `sms`
+
+Listo. Cada SMS del banco entra solo.
+
+**Probar sin esperar una compra:** ejecuta el Atajo a mano poniéndole un texto
+fijo, o desde el Mac:
+
+```bash
+curl -s -X POST https://rr-auth.reruizc.workers.dev/gastos/ingest \
+  -H "X-Gastos-Token: TU_SECRETO" -H "Content-Type: application/json" \
+  -d '{"texto":"Bancolombia le informa Compra por $52.900 en RAPPI COLOMBIA 15:22","metodo":"sms"}'
+# → {"ok":true,"guardado":true,"monto":52900,"comercio":"RAPPI COLOMBIA",...}
+```
+
+## PASO 4 · Los correos (opcional, cubre lo que no llega por SMS)
+
+Necesita una **contraseña de aplicación** de Google (no la del correo):
+`myaccount.google.com` → Seguridad → Verificación en dos pasos → Contraseñas de
+aplicaciones.
+
+```bash
+mkdir -p ~/.config/gastos && chmod 700 ~/.config/gastos
+cat > ~/.config/gastos/gastos.env <<'EOF'
+GASTOS_TOKEN=...
+GASTOS_IMAP_USER=reruizc@gmail.com
+GASTOS_IMAP_PASS=xxxx xxxx xxxx xxxx
+EOF
+chmod 600 ~/.config/gastos/gastos.env
+
+python3 tools/gastos/correos.py --dry-run    # ver qué encontraría
+python3 tools/gastos/correos.py              # enviarlo de verdad
+```
+
+Abre el buzón en **solo lectura**: no marca como leído nada tuyo. Para que corra
+solo, agrégalo como una etapa más del cron que ya existe en el Mac.
+
+## PASO 5 · Instalar la app en el iPhone
+
+Safari → `https://ricardoruiz.co/gastos.html` → Compartir → **Agregar a inicio**.
+Queda con ícono propio y sin barra del navegador.
+
+---
+
+## Cómo lee los mensajes (y por qué se puede corregir)
+
+El parser vive en `rr-auth/src/gastos-parser.js` y es un **módulo puro**, así
+que se prueba entero con node sin desplegar nada.
+
+Decisiones que conviene no deshacer, cada una salió de un caso que falla:
+
+- **El monto es el PRIMERO que no sea saldo**, no el mayor.
+  `Nequi: Enviaste $50.000 a Juan. Te queda $120.000` → quedarse con el mayor
+  tomaría el saldo.
+- **Una compra que además informa el saldo SÍ es un gasto.** Por eso los
+  rechazos están partidos en duros (claves, compras rechazadas, avisos de
+  facturación) y blandos (saldo, cupo), y los blandos solo aplican si el
+  mensaje no trae un verbo de movimiento.
+- **"Pago mínimo" y "fecha de pago" son rechazo duro** aunque contengan el
+  verbo "pago": son avisos de facturación, no un movimiento que ocurrió.
+- **Las claves dinámicas no se guardan** ni siquiera como texto crudo.
+- **Ante la duda, gasto.** Subestimar el gasto es el error caro.
+- **Nunca se descarta el texto original**: si el parser se equivoca, el
+  movimiento igual queda con `crudo` y confianza baja, marcado en amarillo para
+  que lo corrijas de un toque. Corregirlo lo deja en confianza alta.
+
+Correr las pruebas (18 casos, sale con código 1 si alguno falla):
+
+```bash
+node tools/gastos/prueba-parser.mjs
+```
+
+Prueba el archivo que se despliega, no una copia. Cuando aparezca un formato de
+banco nuevo, el caso se agrega ahí **primero** y luego se toca el parser.
+
+### ⚠️ El parser está calibrado con mensajes VEROSÍMILES, no reales
+
+No tuve a la vista SMS de verdad tuyos. Los formatos que maneja se construyeron
+a partir de las plantillas típicas de cada banco y los 18 casos de prueba pasan,
+pero **el formato exacto de cada banco puede diferir**.
+
+Por eso todo lo que entra guarda el texto original y lo dudoso sale marcado en
+amarillo. **Cuando lleguen los primeros mensajes reales, pásame 3 o 4 de cada
+banco y ajusto las expresiones**: con eso la confianza sube de "media" a "alta"
+y dejas de tener que corregir a mano.
+
+## Privacidad
+
+- La app está en un repo público, pero **no hay datos en el HTML**: todo vive
+  en el KV del worker detrás de sesión, y solo la abre `reruizc@gmail.com`.
+- `/gastos/ingest` va **sin CORS** y rechaza cualquier petición con huella de
+  navegador: aunque alguien tuviera el secreto, no la puede llamar desde una
+  página web.
+- El service worker cachea **solo el cascarón**, nunca los datos: mostrar un
+  saldo viejo como si fuera el de hoy es peor que no mostrar nada.
