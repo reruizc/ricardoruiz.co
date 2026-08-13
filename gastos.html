@@ -181,12 +181,10 @@ textarea:focus{outline:none;border-color:var(--accent)}
   </div>
 
   <div class="ob-paso" id="ob-1" hidden>
-    <div class="ob-kicker">Paso 1 de 3 · tus números</div>
-    <div><label>Lo que te entra cada mes</label>
-      <input id="ob-sueldo" type="number" inputmode="numeric" placeholder="8500000"></div>
-    <div><label>Lo que tienes hoy <span class="opc">(opcional)</span></label>
+    <div class="ob-kicker">Paso 1 de 3 · de dónde partimos</div>
+    <div><label>¿Cuánto tienes hoy?</label>
       <input id="ob-saldo" type="number" inputmode="numeric" placeholder="1200000">
-      <div class="nota">Es una foto del momento, no un saldo en vivo: la app no ve todos tus movimientos (Nubank entra a mano). Lo puedes volver a fijar cuando quieras.</div></div>
+      <div class="nota">Súmalo de tus cuentas. Desde acá cada gasto lo baja y cada ingreso lo sube — incluida tu nómina, que la app reconoce sola cuando llega el mensaje. No hace falta que le digas cuánto ganas.</div></div>
     <div><label>Tu nombre como lo escribe el banco</label>
       <input id="ob-titular" placeholder="Ricardo Esteban Ruiz Castro">
       <div class="nota">Sirve para no contar como ingreso las transferencias que te haces a ti mismo.</div></div>
@@ -235,7 +233,7 @@ textarea:focus{outline:none;border-color:var(--accent)}
 
   <div class="kpis">
     <div class="kpi"><div class="n" id="k-dia">—</div><div class="l">Por día</div></div>
-    <div class="kpi"><div class="n" id="k-queda">—</div><div class="l">Al día</div></div>
+    <div class="kpi"><div class="n" id="k-queda">—</div><div class="l">Puedes al día</div></div>
     <div class="kpi"><div class="n" id="k-mov">—</div><div class="l">Movs.</div></div>
   </div>
 
@@ -329,37 +327,45 @@ async function cargar(){
 
 function render(){
   const d = DATA;
-  $('sueldo-lbl').textContent = d.sueldo ? 'sueldo ' + corto(d.sueldo) : 'sin sueldo · toca aquí';
+  $('sueldo-lbl').textContent = d.saldo_ancla
+    ? 'ajustar saldo'
+    : 'fijar tu saldo · toca aquí';
 
-  const hayS = d.sueldo > 0;
-  $('hero-lbl').textContent = hayS ? 'Disponible este mes' : 'Gastado este mes';
-  const val = hayS ? d.disponible : d.total_gastado;
+  const haySaldo = d.saldo_actual != null;
+  $('hero-lbl').textContent = haySaldo ? 'Tienes hoy' : 'Gastado este mes';
+  const val = haySaldo ? d.saldo_actual : d.total_gastado;
   const big = $('hero-big');
   big.textContent = cop(val);
-  big.classList.toggle('neg', hayS && val < 0);
+  big.classList.toggle('neg', haySaldo && val < 0);
 
-  const pct = hayS ? Math.min(100, (d.total_gastado / d.sueldo) * 100) : 0;
+  // La barra compara lo gastado con lo que ENTRÓ este mes. Sale del propio
+  // dato, así que no hay que preguntarle el sueldo a nadie.
+  const conIngreso = d.total_ingreso > 0;
+  const pct = conIngreso ? Math.min(100, (d.total_gastado / d.total_ingreso) * 100) : 0;
   const bar = $('hero-bar');
-  bar.style.width = (hayS ? pct : 0) + '%';
+  bar.style.width = pct + '%';
   bar.className = pct >= 100 ? 'over' : pct >= 80 ? 'warn' : '';
 
-  $('hero-sub').textContent = hayS
-    ? `Llevas ${cop(d.total_gastado)} de ${cop(d.sueldo)}`
-    : 'Define tu sueldo para ver cuánto te queda';
-  $('foot-l').textContent = hayS ? Math.round(pct) + '% usado' : `${d.n_movimientos} movimientos`;
-  $('foot-r').textContent = d.total_ingreso ? 'Ingresos ' + cop(d.total_ingreso) : '';
-  $('saldo-aviso').innerHTML = d.saldo
-    ? `<div class="nota">Tenías ${cop(d.saldo)} cuando lo registraste${d.saldo_fecha ? ' el ' + new Date(d.saldo_fecha - 5*3600000).toLocaleDateString('es-CO', {day:'numeric', month:'short'}) : ''}. Es una foto, no un saldo en vivo.</div>`
+  $('hero-sub').textContent = haySaldo
+    ? `Este mes gastaste ${cop(d.total_gastado)}${conIngreso ? ' y entraron ' + cop(d.total_ingreso) : ''}`
+    : `${d.n_movimientos} movimientos · toca arriba para fijar tu saldo`;
+  $('foot-l').textContent = conIngreso
+    ? `Llevas gastado el ${Math.round(pct)}% de lo que entró`
+    : `${d.n_movimientos} movimientos este mes`;
+  $('foot-r').textContent = '';
+  $('saldo-aviso').innerHTML = d.saldo_ancla
+    ? `<div class="nota">Partimos de ${cop(d.saldo_ancla)} el ${new Date(d.saldo_fecha - 5*3600000).toLocaleDateString('es-CO',{day:'numeric',month:'short'})}, más ${d.saldo_movs} ${d.saldo_movs===1?'movimiento':'movimientos'} desde entonces. Si no cuadra con tu banco, tócalo arriba y vuélvelo a fijar.</div>`
     : '';
   $('fijo-aviso').innerHTML = d.n_recurrentes
-    ? `<div class="nota">↻ ${cop(d.total_recurrente)} del mes es gasto fijo (${d.n_recurrentes} ${d.n_recurrentes===1?'cobro que se repite':'cobros que se repiten'} solos).</div>`
+    ? `<div class="nota">↻ ${cop(d.total_recurrente)} del mes es gasto fijo (${d.n_recurrentes} ${d.n_recurrentes===1?'cobro que se repite solo':'cobros que se repiten solos'}).</div>`
     : '';
   $('tras-aviso').innerHTML = d.n_traslados
     ? `<div class="nota">⇄ ${d.n_traslados} ${d.n_traslados===1?'traslado':'traslados'} por ${cop(d.total_traslados)} — plata movida entre cuentas tuyas, no suma a los totales.</div>`
     : '';
 
   $('k-dia').textContent   = corto(d.promedio_dia);
-  $('k-queda').textContent = d.disponible_por_dia != null ? corto(d.disponible_por_dia) : '—';
+  $('k-queda').textContent = (d.saldo_actual != null && d.dias_restantes)
+    ? corto(Math.max(0, d.saldo_actual / d.dias_restantes)) : '—';
   $('k-mov').textContent   = d.n_movimientos;
 
   $('rev-aviso').innerHTML = d.n_por_revisar
@@ -465,10 +471,11 @@ function cerrarSheet(){ $('sheet').classList.remove('on'); }
 $('sheet').addEventListener('click', e => { if (e.target === $('sheet')) cerrarSheet(); });
 
 function abrirSueldo(){
-  $('sheet-t').textContent = 'Tu sueldo mensual';
+  $('sheet-t').textContent = 'Ajustar tu saldo';
   $('sheet-body').innerHTML = `
-    <div><label style="font-size:.7rem;color:var(--ink-3)">Lo que te entra cada mes (DNP)</label>
-    <input id="s-sueldo" type="number" inputmode="numeric" value="${DATA && DATA.sueldo ? DATA.sueldo : ''}" placeholder="8500000"></div>
+    <div><label style="font-size:.7rem;color:var(--ink-3)">¿Cuánto tienes ahora?</label>
+    <input id="s-sueldo" type="number" inputmode="numeric" value="${DATA && DATA.saldo_actual != null ? Math.round(DATA.saldo_actual) : ''}" placeholder="1200000">
+    <div class="nota" style="margin:.4rem 0 0">Vuelve a fijarlo cuando se desvíe de tu banco: siempre habrá algo que la app no vio (efectivo, Nubank). Los movimientos anteriores no se tocan.</div></div>
     <div><label style="font-size:.7rem;color:var(--ink-3)">Tu nombre como lo escribe el banco</label>
     <input id="s-titular" value="${esc(CFG.titular||'')}" placeholder="Ricardo Esteban Ruiz Castro">
     <div class="nota" style="margin:.4rem 0 0">Sirve para reconocer las transferencias que te haces a ti mismo y no contarlas como ingreso.</div></div>
@@ -477,7 +484,7 @@ function abrirSueldo(){
   $('s-cancel').onclick = cerrarSheet;
   $('s-ok').onclick = async () => {
     try { await api('/gastos/config', { method:'POST', body: JSON.stringify({
-            sueldo: Number($('s-sueldo').value)||0, titular: $('s-titular').value }) });
+            saldo: Number($('s-sueldo').value)||0, titular: $('s-titular').value }) });
           CFG.titular = $('s-titular').value;
           cerrarSheet(); toast('Guardado'); cargar(); }
     catch (e) { toast('No se guardó: ' + e.message); }
@@ -513,7 +520,7 @@ $('fab').onclick = () => {
 // paso 2 queda disponible desde "Importar mensajes viejos".
 let OB_ITEMS = [], OB_SOLO_IMPORTAR = false;
 
-function cuentaVacia() { return DATA && !DATA.sueldo && DATA.n_movimientos === 0; }
+function cuentaVacia() { return DATA && !DATA.saldo_ancla && DATA.n_movimientos === 0; }
 
 function obPaso(n) {
   $('onboard').hidden = false;
@@ -537,12 +544,12 @@ function obSalir() {
 $('ob-start').onclick = () => obPaso(1);
 
 $('ob-a2').onclick = async () => {
-  const sueldo = Number($('ob-sueldo').value) || 0;
   const saldo  = Number($('ob-saldo').value) || 0;
   const titular = $('ob-titular').value.trim();
+  if (!(saldo > 0)) return toast('Dime cuánto tienes hoy');
   try {
-    await api('/gastos/config', { method:'POST', body: JSON.stringify({ sueldo, saldo, titular }) });
-    CFG.titular = titular; CFG.sueldo = sueldo;
+    await api('/gastos/config', { method:'POST', body: JSON.stringify({ saldo, titular }) });
+    CFG.titular = titular;
   } catch (e) { return toast('No se guardó: ' + e.message); }
   obPaso(2);
 };
