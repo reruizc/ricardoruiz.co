@@ -3577,8 +3577,23 @@ def handler(event, context):
                            'temas': s.get('temas', []),
                            'es_perfil': s.get('k') == 'perfil',
                            'descripcion': s.get('descripcion', ''),
-                           'empresas': s.get('empresas', []),
+                           # Un perfil guardado trae `empresas` ya resueltas; un
+                           # preset solo trae las llaves. Sin este fallback la
+                           # ficha decía «Competencia (6):» y no nombraba a
+                           # ninguna, que es peor que no mostrar el bloque.
+                           'empresas': s.get('empresas') or [
+                               {'k': e['k'], 'nombre': e['nombre'], 'tipo': e['tipo']}
+                               for e in emps_vig],
                            'temas_usados': rc.get('temas_usados', []),
+                           # empresa vs gremio: cambia qué se le pregunta y qué
+                           # significa "vigilada" (competencia vs afiliadas)
+                           'tipo': s.get('tipo', ''),
+                           # una empresa multi-negocio no tiene UNA comisión
+                           'lineas': s.get('lineas', []),
+                           'competencia': s.get('competencia', []),
+                           # países que el cliente sigue y Caudal NO cubre: se
+                           # declara en pantalla en vez de dejarlo asumir
+                           'fuera_de_alcance': s.get('fuera_de_alcance', []),
                            # honesto: las vigiladas están en el diccionario pero
                            # no le venden al Estado (verificado con Uber/Ecopetrol)
                            'vigiladas_sin_contratos': con_vig_vacio,

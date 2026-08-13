@@ -322,6 +322,18 @@
   .pf-f input, .pf-f select{background:var(--card2); border:1px solid var(--border2); color:var(--ink);
     font-family:inherit; font-size:.82rem; padding:.55rem .7rem; border-radius:6px; outline:none; width:100%}
   .pf-f input:focus, .pf-f select:focus{border-color:var(--teal)}
+  /* switch empresa/gremio: la pregunta correcta depende de cuál sea */
+  /* chip de cliente real: se distingue de los sectores genéricos */
+  .sec-chip.cli-real{border-color:var(--blue); color:var(--blue); font-weight:600}
+  .sec-chip.cli-real.on{background:var(--blue); color:#fff}
+  .ln-com{font-size:.58rem; letter-spacing:.08em; text-transform:uppercase; font-weight:800;
+          color:var(--teal); border:1px solid var(--teal-dim); padding:.06rem .3rem; border-radius:3px}
+  .cli-alcance{border-left:2px solid var(--amber); padding-left:.6rem}
+  .pf-tipo{display:flex; gap:.4rem; margin:.15rem 0 .1rem; flex-wrap:wrap}
+  .pf-tbtn{font-family:inherit; font-size:.76rem; padding:.42rem .85rem; border-radius:7px;
+           border:1px solid var(--border2); background:none; color:var(--ink2); cursor:none}
+  .pf-tbtn:hover{border-color:var(--teal); color:var(--ink)}
+  .pf-tbtn.on{background:var(--blue); border-color:var(--blue); color:#fff; font-weight:600}
   .pf-tags{display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.2rem; min-height:1.2rem}
   .pf-ac{position:relative}
   .pf-sug{position:absolute; z-index:40; left:0; right:0; top:calc(100% + 3px); max-height:230px; overflow:auto;
@@ -2310,6 +2322,10 @@
      el radar fuera de la pantalla; el nombre largo y qué cubre cada uno salen
      igual arriba del radar al abrirlo. `reg` marca los que ya tienen fuente en
      el pilar Regulatorio y el chip lo muestra con un punto lleno. */
+  // Los dos primeros son CLIENTES con nombre, no sectores: van aparte porque
+  // muestran lo que un preset genérico no puede — una empresa con varias líneas
+  // de negocio, cada una en su comisión, y con competencia real en el Sur.
+  const CLI_CLIENTES=[['didi','DiDi',1],['binance','Binance',1]];
   const CLI_SECS=[
     ['salud','Salud',1],['ambiente','Ambiente',1],['contratacion','Contratación',1],
     ['financiero','Financiero',1],['transporte','Transporte',1],['energia','Energía',0],
@@ -2363,13 +2379,22 @@
     if(_cliInited) return; _cliInited=true;
     marcaRender();
     const cont=document.getElementById('cli-sectors');
-    if(cont) CLI_SECS.forEach(([k,t,reg])=>{
-      const c=document.createElement('span');
-      c.className='chip sec-chip'+(reg?' con-reg':'');
-      c.dataset.sec=k; c.textContent=t;
-      c.title=reg?'Tiene fuente conectada en el pilar Regulatorio'
-                 :'Su regulador sectorial todavía no es fuente de Caudal';
-      c.onclick=()=>cliLoad({sector:k}); cont.appendChild(c); });
+    // primero los clientes con nombre, con un separador, después los sectores
+    if(cont){
+      const pinta=(lista,cls)=>lista.forEach(([k,t,reg])=>{
+        const c=document.createElement('span');
+        c.className='chip sec-chip'+(reg?' con-reg':'')+(cls?' '+cls:'');
+        c.dataset.sec=k; c.textContent=t;
+        c.title=cls?'Perfil de cliente real · varias líneas de negocio'
+                   :(reg?'Tiene fuente conectada en el pilar Regulatorio'
+                       :'Su regulador sectorial todavía no es fuente de Caudal');
+        c.onclick=()=>cliLoad({sector:k}); cont.appendChild(c); });
+      pinta(CLI_CLIENTES,'cli-real');
+      const sep=document.createElement('span');
+      sep.className='pf-lbl'; sep.style.margin='0 .1rem'; sep.textContent='· o un sector';
+      cont.appendChild(sep);
+      pinta(CLI_SECS,'');
+    }
     const b=document.getElementById('cliBack'); if(b) b.onclick=()=>showView('home');
     pfRenderBar();
     // Los perfiles piden cuenta CON acceso (el worker exige sesión). El invitado
@@ -2405,6 +2430,10 @@
       const re=t.closest('[data-rmemp]');
       if(re&&PF_DRAFT){ PF_DRAFT.empresas.splice(+re.dataset.rmemp,1); pfRenderTags(); return; }
       if(t.closest('#pf-alertas')){ pfToggleAlertas(); return; }
+      const tb=t.closest('[data-tipo]');
+      if(tb&&PF_DRAFT){ PF_DRAFT.tipo=tb.dataset.tipo; pfRenderEdit(); return; }
+      const rl=t.closest('[data-rmlinea]');
+      if(rl&&PF_DRAFT){ PF_DRAFT.lineas.splice(+rl.dataset.rmlinea,1); pfRenderTags(); return; }
       if(t.closest('#pf-save')){ pfGuardar(); return; }
       if(t.closest('#pf-cancel')){ pfCerrarEdit(); return; }
       if(t.closest('#pf-del')){ pfBorrar(); return; }
@@ -2421,7 +2450,16 @@
     vc.addEventListener('keydown', e=>{
       if(e.key!=='Enter') return;
       const inp=e.target;
-      if(inp.id==='pf-tema-in'){
+      if(inp.id==='pf-linea-in'){
+        e.preventDefault();
+        const v=(inp.value||'').replace(/\s+/g,' ').trim();
+        if(!PF_DRAFT) return;
+        if(v.length<3) return pfMsg('Ponle un nombre reconocible a la línea.');
+        if((PF_DRAFT.lineas||[]).length>=8) return pfMsg('Máximo 8 líneas de negocio.');
+        PF_DRAFT.lineas=PF_DRAFT.lineas||[];
+        if(!PF_DRAFT.lineas.some(x=>x.toLowerCase()===v.toLowerCase())) PF_DRAFT.lineas.push(v);
+        inp.value=''; pfMsg(''); pfRenderTags();
+      } else if(inp.id==='pf-tema-in'){
         e.preventDefault();
         const v=(inp.value||'').replace(/\s+/g,' ').trim();
         const lim=(PF_META&&PF_META.limites&&PF_META.limites.temas)||12;
@@ -2496,14 +2534,17 @@
   function pfNuevo(desdePreset){
     const pl=desdePreset&&PF_META&&(PF_META.plantillas||[]).find(x=>x.k===desdePreset);
     PF_DRAFT=pl?{perfilId:null,nombre:pl.nombre,descripcion:'',temas:pl.temas.slice(),
-                 empresas:[],sector_sanciones:pl.sector_sanciones||'',comision:pl.comision||''}
-               :{perfilId:null,nombre:'',descripcion:'',temas:[],empresas:[],sector_sanciones:'',comision:''};
+                 empresas:[],sector_sanciones:pl.sector_sanciones||'',comision:pl.comision||'',
+                 tipo:pl.tipo||'empresa',lineas:(pl.lineas||[]).map(l=>l.nombre||l)}
+               :{perfilId:null,nombre:'',descripcion:'',temas:[],empresas:[],sector_sanciones:'',comision:'',
+                 tipo:'empresa',lineas:[]};
     pfRenderEdit();
   }
   function pfEditar(p){
     PF_DRAFT={perfilId:p.perfilId,nombre:p.nombre||'',descripcion:p.descripcion||'',
               temas:(p.temas||[]).slice(),empresas:(p.empresas||[]).slice(),
               sector_sanciones:p.sector_sanciones||'',comision:p.comision||'',
+              tipo:p.tipo||'empresa',lineas:(p.lineas||[]).slice(),
               alertas:p.alertas||{activo:false}};
     pfRenderEdit();
   }
@@ -2515,6 +2556,9 @@
     const secs=(PF_META&&PF_META.sectores_sanciones)||[];
     const coms=(PF_META&&PF_META.comisiones)||[];
     const plans=(PF_META&&PF_META.plantillas)||[];
+    // Empresa por defecto: es el caso más común y evita que el primer campo que
+    // ve el usuario sea la pregunta equivocada («qué vigila» a una empresa).
+    const esEmp = (d.tipo||'empresa')==='empresa';
     el.hidden=false;
     el.innerHTML=`
       <div class="pf-grid">
@@ -2522,13 +2566,27 @@
           <input id="pf-nombre" type="text" maxlength="80" placeholder="Asobancaria, Fenalco, EPM…" value="${esc(d.nombre)}" /></div>
         <div class="pf-f"><label>Nota interna (opcional)</label>
           <input id="pf-desc" type="text" maxlength="200" placeholder="quién es y qué le preocupa" value="${esc(d.descripcion)}" /></div>
-        <div class="pf-f full"><label>Temas que vigila · máx ${lim.temas}</label>
+        <div class="pf-f full"><label>¿Qué es este cliente?</label>
+          <div class="pf-tipo">
+            <button type="button" class="pf-tbtn${esEmp?' on':''}" data-tipo="empresa">Una empresa</button>
+            <button type="button" class="pf-tbtn${d.tipo==='gremio'?' on':''}" data-tipo="gremio">Un gremio o asociación</button>
+          </div>
+          <div class="hint">${esEmp
+            ? 'Una empresa compite y opera en varias líneas de negocio; se le pregunta contra quién compite, no qué vigila.'
+            : 'Un gremio representa a otros: se le pregunta a quién agrupa y qué temas defiende por ellos.'}</div></div>
+        ${esEmp?`<div class="pf-f full"><label>Líneas de negocio (opcional)</label>
+          <input id="pf-linea-in" type="text" maxlength="60" placeholder="una línea y Enter — p. ej. «reparto de alimentos»" />
+          <div class="hint">Una empresa multi-negocio no tiene UNA comisión. DiDi cae en cuatro —Sexta, Primera, Tercera y Séptima— según si el proyecto es de movilidad, datos, impuestos o laboral. Cada línea que agregues se rastrea aparte.</div>
+          <div class="pf-tags" id="pf-lineas"></div></div>`:''}
+        <div class="pf-f full"><label>${esEmp?'Temas que le aplican':'Temas que vigila'} · máx ${lim.temas}</label>
           <input id="pf-tema-in" type="text" maxlength="80" placeholder="escribe un tema y Enter — p. ej. «tasas de usura»" />
           <div class="hint">Frases exactas, como las diría una ley. Entre más específica, menos ruido: «reforma pensional» rinde mejor que «pensión».</div>
           <div class="pf-tags" id="pf-temas"></div></div>
-        <div class="pf-f full pf-ac"><label>Empresas vigiladas · máx ${lim.empresas}</label>
-          <input id="pf-emp-in" type="text" maxlength="60" placeholder="busca en el diccionario — p. ej. «bancolombia»" autocomplete="off" />
-          <div class="hint">Del diccionario de Caudal: en el Congreso se traducen a su tema (nadie legisla «Uber», legisla «plataformas»); en sanciones, contratación y prensa se buscan por su nombre propio.</div>
+        <div class="pf-f full pf-ac"><label>${esEmp?'Competidores a seguir':'Empresas vigiladas'} · máx ${lim.empresas}</label>
+          <input id="pf-emp-in" type="text" maxlength="60" placeholder="${esEmp?'busca a tu competencia — p. ej. «uber»':'busca en el diccionario — p. ej. «bancolombia»'}" autocomplete="off" />
+          <div class="hint">${esEmp
+            ? 'A una empresa no se le pregunta qué <i>vigila</i>: se le pregunta contra quién compite. Lo que le pase a estos —sanciones, contratos, prensa— entra por el <b>Sur</b> del Sextante.'
+            : 'Las empresas del gremio, o las que sigue de cerca. Del diccionario de Caudal: en el Congreso se traducen a su tema (nadie legisla «Uber», legisla «plataformas»); en sanciones, contratación y prensa se buscan por su nombre propio.'}</div>
           <div class="pf-sug" id="pf-sug" hidden></div>
           <div class="pf-tags" id="pf-emps"></div></div>
         <div class="pf-f"><label>Sector de sanciones</label>
@@ -2599,6 +2657,8 @@
     const d=PF_DRAFT; if(!d) return;
     const t=document.getElementById('pf-temas'), e=document.getElementById('pf-emps');
     if(t) t.innerHTML=d.temas.length?d.temas.map((x,i)=>`<span class="chip on">${esc(x)}<span class="x" data-rmtema="${i}">×</span></span>`).join(''):'<span class="cob-note" style="margin:0">Sin temas.</span>';
+    const li=document.getElementById('pf-lineas');
+    if(li) li.innerHTML=(d.lineas||[]).length?d.lineas.map((x,i)=>`<span class="chip on">${esc(x)}<span class="x" data-rmlinea="${i}">×</span></span>`).join(''):'<span class="cob-note" style="margin:0">Sin líneas — se rastrea como un solo negocio.</span>';
     if(e) e.innerHTML=d.empresas.length?d.empresas.map((x,i)=>`<span class="chip on">${esc(x)}<span class="x" data-rmemp="${i}">×</span></span>`).join(''):'<span class="cob-note" style="margin:0">Sin empresas vigiladas.</span>';
     // Un aviso de validación («tema de menos de 3 letras», «máximo N temas»)
     // se quedaba en pantalla después de que el usuario ya había corregido, y
@@ -2616,7 +2676,10 @@
   async function pfGuardar(){
     pfLeerForm(); const d=PF_DRAFT; if(!d) return;
     if(!d.nombre) return pfMsg('Ponle un nombre al perfil.');
-    if(!d.temas.length&&!d.empresas.length) return pfMsg('Agrega al menos un tema o una empresa vigilada.');
+    if(!d.temas.length&&!d.empresas.length) return pfMsg(
+      (d.tipo||'empresa')==='empresa'
+        ? 'Agrega al menos un tema que le aplique, o un competidor a seguir.'
+        : 'Agrega al menos un tema o una empresa vigilada.');
     pfMsg('Guardando…');
     try{
       const r=await wcall('/caudal/perfil/save',{method:'POST',body:JSON.stringify(d)});
@@ -2753,16 +2816,26 @@
     // se dice en vez de devolver un radar vacío en silencio
     const avi=(cl.avisos&&cl.avisos.length)
       ? `<div class="cli-reg-none" style="margin-bottom:1rem">El perfil llegó con algo que Caudal no entendió: <b>${esc(cl.avisos.join(' · '))}</b>. ${MARCA.nombre} se armó sin eso.</div>` : '';
+    // Una empresa multi-negocio no tiene UNA comisión: se muestran sus líneas
+    // con la comisión de cada una, que es el argumento del perfil.
+    const lineasHTML=(cl.lineas&&cl.lineas.length)
+      ? `<div class="cli-note"><b>Líneas de negocio (${cl.lineas.length}):</b> `
+        + cl.lineas.map(l=>`${esc(l.nombre)} <span class="ln-com">${esc(l.comision)}</span>`).join(' · ')
+        + ` · <b>${[...new Set(cl.lineas.map(l=>l.comision))].length} comisiones</b> distintas — por eso no tiene una sola.</div>` : '';
+    // Alcance: si el cliente sigue países que Caudal no cubre, se dice. Dejar
+    // que lo asuma es el error caro.
+    const alcanceHTML=(cl.fuera_de_alcance&&cl.fuera_de_alcance.length)
+      ? `<div class="cli-note cli-alcance"><b>Alcance:</b> Caudal cubre hoy solo el tramo <b>colombiano</b>. Este cliente también sigue ${esc(cl.fuera_de_alcance.join(' · '))}, que no están cubiertos por ninguna fuente de Caudal.</div>` : '';
     const vigNote=vigN
-      ? `<div class="cli-note"><b>Vigiladas (${vigN}):</b> ${esc(vigNoms)} · <b>${k.n_senales_vigiladas||0}</b> señal(es) de ${MARCA.nombre} son sobre ellas${k.n_contratos_vigiladas?` · <b>${fmt(k.n_contratos_vigiladas)}</b> contrato(s) suyos en SECOP`:(cl.vigiladas_sin_contratos?' · no le venden al Estado en SECOP II':'')}.</div>` : '';
+      ? `<div class="cli-note"><b>${cl.tipo==='empresa'?'Competencia':'Vigiladas'} (${vigN}):</b> ${esc(vigNoms)} · <b>${k.n_senales_vigiladas||0}</b> señal(es) de ${MARCA.nombre} son sobre ellas${k.n_contratos_vigiladas?` · <b>${fmt(k.n_contratos_vigiladas)}</b> contrato(s) suyos en SECOP`:(cl.vigiladas_sin_contratos?' · no le venden al Estado en SECOP II':'')}.</div>` : '';
     body.innerHTML=`
       <div class="kpis">
         <div class="kpi"><div class="n">${k.n_radar}</div><div class="l">Señales en ${MARCA.articulo} ${MARCA.nombre}</div></div>
         <div class="kpi vit"><div class="n">${k.alto}</div><div class="l">Alta prioridad</div></div>
         <div class="kpi ley"><div class="n">${k.en_tramite}</div><div class="l">En trámite · ventana</div></div>
-        <div class="kpi"><div class="n">${vigN?(k.n_senales_vigiladas||0):(k.n_medios_sector?fmt(k.n_medios_sector):'—')}</div><div class="l">${vigN?'Sobre tus vigiladas':'Prensa reciente'}</div></div>
+        <div class="kpi"><div class="n">${vigN?(k.n_senales_vigiladas||0):(k.n_medios_sector?fmt(k.n_medios_sector):'—')}</div><div class="l">${vigN?(cl.tipo==='empresa'?'Sobre tu competencia':'Sobre tus vigiladas'):'Prensa reciente'}</div></div>
       </div>
-      ${secDesc}${avi}${desc}${vigNote}
+      ${secDesc}${avi}${desc}${lineasHTML}${alcanceHTML}${vigNote}
       <div class="cli-note"><b>Activo ahora en ${esc(cl.nombre)}:</b> <b>${k.en_tramite}</b> proyecto(s) de ley en trámite · ${sancTxt} · <b>${fmt(k.n_medios_sector||0)}</b> titular(es) de prensa reciente · <b>${fmt(k.n_contratos_sector||0)}</b> contrato(s) reciente(s) en SECOP.</div>
       ${k.n_con_articulado?`<div class="cli-note"><b>Qué cambian:</b> de las ${congreso.length} señales del Congreso, <b>${k.n_con_articulado}</b> ya tienen el articulado leído${k.n_te_aplica?` y <b>${k.n_te_aplica}</b> le aplican a tu sector o a tus vigiladas`:''}. El resto todavía no se ha extraído.</div>`:''}
       <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt((k.n_sanciones_sector||0)+(k.n_otros_actos_sector||0))}</b> actos del regulador (<b>${fmt(k.n_sanciones_sector)}</b> de ellos sanciones)`:''} que tocan estos temas, ${MARCA.nombre} prioriza por accionabilidad — precisión sobre volumen.${(cl.temas_usados&&cl.temas_usados.length)?` Se buscó por: <b>${esc(cl.temas_usados.join(' · '))}</b>.`:''}</div>

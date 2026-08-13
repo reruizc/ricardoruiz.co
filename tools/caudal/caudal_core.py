@@ -333,7 +333,68 @@ REF_YEAR = 2026    # horizonte del dataset (para calcular "reciente")
 # nada de transporte. Vale la regla del proyecto: medir el conteo no basta, hay
 # que leer los títulos.
 SECTORES_CLIENTE = [
-    {'k': 'salud', 'nombre': 'Salud', 'comision': 'Séptima', 'sector_sanciones': 'salud',
+    # ── perfiles de CLIENTE REAL ───────────────────────────────────────────
+    # Los de abajo son sectores genéricos (demo). Estos dos son clientes con
+    # nombre, derivados de las matrices de seguimiento que Cauce ya lleva a
+    # mano, y existen para mostrar lo que un sector genérico no puede: que una
+    # empresa NO vive en una sola comisión.
+    #
+    # DiDi · medido sobre «Monitoreo regulatorio - DiDi - CAUCE.xlsx» (58 filas
+    # de Congreso): sus proyectos caen en Sexta 13 · Primera 4 · Tercera 2 ·
+    # Séptima 1, y sus categorías propias son Movilidad, Tecnología, Impuestos,
+    # Laboral, Ride-hailing y CX. Por eso `lineas`: preguntarle a DiDi "¿cuál es
+    # tu comisión?" es la pregunta equivocada — tiene cuatro, una por negocio.
+    {'k': 'didi', 'nombre': 'DiDi', 'tipo': 'empresa', 'comision': 'Sexta',
+     'sector_sanciones': 'transporte',
+     'descripcion': 'Movilidad por plataforma, reparto y pagos. Su regulación no vive '
+                    'en una sola comisión: cada línea de negocio tiene la suya.',
+     'empresas_keys': ['didi'],
+     'competencia': ['uber', 'rappi', 'cabify'],
+     'lineas': [
+         {'nombre': 'Movilidad · ride-hailing', 'comision': 'Sexta',
+          'temas': ['transporte por plataformas', 'plataformas tecnologicas']},
+         {'nombre': 'Reparto y consumo', 'comision': 'Sexta',
+          'temas': ['proteccion al consumidor', 'alimentos / etiquetado']},
+         {'nombre': 'Repartidores y conductores', 'comision': 'Séptima',
+          'temas': ['laboral', 'seguridad social']},
+         {'nombre': 'Tributario', 'comision': 'Tercera', 'temas': ['tributario']},
+         {'nombre': 'Datos y tecnología', 'comision': 'Primera',
+          'temas': ['datos personales / habeas data']},
+     ],
+     'temas': ['transporte por plataformas', 'plataformas tecnologicas', 'laboral',
+               'tributario', 'datos personales / habeas data', 'proteccion al consumidor']},
+
+    # Binance · de «Matriz - Priorizacion LATAM - Binance.xlsx». ⚠️ La matriz
+    # cubre SEIS países (Colombia 8 normas · Bolivia 7 · Perú 4 · El Salvador 4 ·
+    # Rep. Dominicana 3 · Venezuela 2) y Caudal solo tiene fuentes COLOMBIANAS.
+    # `fuera_de_alcance` existe para declararlo en pantalla: es preferible decir
+    # "de los seis países cubro uno" que dejar que el cliente asuma que los seis
+    # están vigilados.
+    {'k': 'binance', 'nombre': 'Binance', 'tipo': 'empresa', 'comision': 'Tercera',
+     'sector_sanciones': 'financiero',
+     'descripcion': 'Exchange de criptoactivos. El seguimiento de Cauce es regional; '
+                    'Caudal cubre hoy el tramo colombiano.',
+     'empresas_keys': ['binance'],
+     'competencia': ['coinbase', 'bitso', 'buda', 'kraken', 'okx'],
+     'fuera_de_alcance': ['Venezuela', 'Perú', 'Bolivia', 'El Salvador',
+                          'República Dominicana'],
+     'lineas': [
+         {'nombre': 'Criptoactivos · marco PSAV', 'comision': 'Tercera',
+          'temas': ['criptoactivos y activos virtuales']},
+         {'nombre': 'Supervisión financiera', 'comision': 'Tercera',
+          'temas': ['sector financiero']},
+         {'nombre': 'Tributario · DIAN', 'comision': 'Tercera', 'temas': ['tributario']},
+         {'nombre': 'Consumidor y publicidad', 'comision': 'Sexta',
+          'temas': ['proteccion al consumidor']},
+         {'nombre': 'Datos personales', 'comision': 'Primera',
+          'temas': ['datos personales / habeas data']},
+     ],
+     'temas': ['criptoactivos y activos virtuales', 'sector financiero', 'tributario',
+               'proteccion al consumidor', 'datos personales / habeas data']},
+
+    # ── sectores genéricos (demo y plantilla de arranque) ──────────────────
+    {'k': 'salud', 'nombre': 'Salud', 'tipo': 'gremio', 'comision': 'Séptima',
+     'sector_sanciones': 'salud',
      'temas': ['salud', 'medicamentos', 'aseguramiento en salud', 'habilitacion de ips']},
     {'k': 'contratacion', 'nombre': 'Contratación e infraestructura', 'comision': 'Primera',
      'sector_sanciones': 'contratacion',
@@ -422,6 +483,14 @@ SECTORES_CLIENTE = [
 def sector_cliente(k):
     for s in SECTORES_CLIENTE:
         if s['k'] == k:
+            s = dict(s)
+            # La competencia entra al radar como vigilada: para una EMPRESA, lo
+            # que se vigila es a los otros del sector (Sur). Se fusiona acá y no
+            # en el preset para que `competencia` siga siendo legible como tal
+            # en la ficha — la lista sirve para dos cosas distintas.
+            if s.get('competencia'):
+                s['empresas_keys'] = list(dict.fromkeys(
+                    list(s.get('empresas_keys') or []) + list(s['competencia'])))
             return s
     return None
 
