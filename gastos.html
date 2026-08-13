@@ -179,6 +179,10 @@ textarea:focus{outline:none;border-color:var(--accent)}
 .venc{background:rgba(230,207,58,.1);border:1px solid rgba(230,207,58,.35);border-radius:10px;
   padding:.65rem .8rem;margin-bottom:.6rem;font-size:.82rem;color:var(--gold);line-height:1.45}
 .deu{display:flex;align-items:center;gap:.7rem;padding:.55rem 0;border-bottom:1px solid var(--rule);cursor:pointer}
+.deu .tick{flex:0 0 auto;width:20px;text-align:center;color:var(--ink-3);font-size:.95rem}
+.deu.listo .tick{color:var(--green)}
+.deu.listo .n b{color:var(--ink-3);text-decoration:line-through;text-decoration-color:var(--rule-strong)}
+.deu.listo .v{color:var(--ink-3);font-weight:400}
 .pag-det{font-size:.68rem;color:var(--ink-3);padding:0 0 .55rem;margin-top:-.25rem}
 .pag-lista{display:grid;gap:.2rem}
 .pag-l{display:flex;align-items:center;gap:.6rem;font-size:.82rem;padding:.3rem 0;border-bottom:1px solid var(--rule)}
@@ -302,7 +306,9 @@ textarea:focus{outline:none;border-color:var(--accent)}
   <div id="bancos"></div>
   </section>
 
-  <section class="vista" id="v-pagos" hidden>
+  <section class="vista" id="v-mensual" hidden>
+  <h2>Cada mes</h2>
+  <div id="mensuales"></div>
   <h2>Lo que has pagado</h2>
   <div id="pagos"></div>
   </section>
@@ -317,8 +323,8 @@ textarea:focus{outline:none;border-color:var(--accent)}
   <button data-v="hoy"      class="on"><span>◉</span>Hoy</button>
   <button data-v="movs"><span>≡</span>Movimientos</button>
   <button data-v="analisis"><span>◑</span>Análisis</button>
+  <button data-v="mensual"><span>◷</span>Cada mes</button>
   <button data-v="deudas"><span>▤</span>Deudas</button>
-  <button data-v="pagos"><span>◈</span>Pagos</button>
 </nav>
 
 <button class="fab" id="fab" hidden>+</button>
@@ -430,6 +436,7 @@ function render(){
   renderVencimientos();
   renderDeudas();
   renderPagos();
+  renderMensuales();
 
   // Un solo renglón: tres tarjetas apiladas volvían la pantalla un scroll eterno.
   const notas = [];
@@ -628,6 +635,58 @@ async function cargarPagos() {
 
 const nombreDeuda = id => (DEUDAS.find(d => d.id === id) || {}).nombre || 'deuda borrada';
 
+// ¿Ya se pagó este mes? Se mira contra los pagos registrados, no contra el
+// calendario: que sea 20 no significa que hayas pagado.
+function pagadoEsteMes(deudaId) {
+  const m = mesHoy();
+  return PAGOS.filter(p => p.deudaId === deudaId && mesDe(p.ts) === m)
+              .reduce((a, p) => a + p.monto, 0);
+}
+const mesDe = ts => { const d = new Date(ts - 5*3600000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`; };
+
+// Lo que hay que pagar TODOS los meses: arriendo, seguridad social, matrícula,
+// suscripciones grandes y las cuotas de deuda. Es la lista que de verdad manda
+// sobre el mes, y por eso va como pendientes con estado, no como una nota.
+function renderMensuales() {
+  const caja = $('mensuales');
+  if (!caja) return;
+  const items = DEUDAS
+    .filter(d => d.minimo > 0)
+    .map(d => ({ d, pagado: pagadoEsteMes(d.id) }))
+    .sort((a, b) => (a.pagado > 0) - (b.pagado > 0) || b.d.minimo - a.d.minimo);
+
+  if (!items.length) { caja.innerHTML = '<div class="empty">Nada registrado todavía.</div>'; return; }
+
+  const total  = items.reduce((a, x) => a + x.d.minimo, 0);
+  const cubier = items.reduce((a, x) => a + Math.min(x.pagado, x.d.minimo), 0);
+  const faltan = items.filter(x => x.pagado < x.d.minimo);
+
+  caja.innerHTML =
+    `<div class="rep" style="margin-bottom:.9rem">
+       <h3>${cop(total - cubier)} por pagar este mes</h3>
+       <div class="sub">${faltan.length
+          ? `${faltan.length} de ${items.length} pendientes · ya cubriste ${cop(cubier)}`
+          : 'todo cubierto este mes'}</div>
+     </div>`
+    + items.map(({ d, pagado }) => {
+        const listo = pagado >= d.minimo;
+        const dd = diasHasta(d.dia_pago);
+        const sub = [
+          listo ? `pagado ${cop(pagado)}` : (pagado ? `abonado ${cop(pagado)}` : 'sin registrar'),
+          dd != null ? (dd === 0 ? 'VENCE HOY' : dd === 1 ? 'VENCE MAÑANA' : `día ${d.dia_pago}`) : null,
+        ].filter(Boolean).join(' · ');
+        return `<div class="deu ${listo ? 'listo' : ''}" data-deuda="${esc(d.id)}">
+          <span class="tick">${listo ? '✓' : '○'}</span>
+          <span class="n"><b>${esc(d.nombre)}</b><span>${esc(sub)}</span></span>
+          <span class="v">${cop(d.minimo)}</span></div>`;
+      }).join('')
+    + `<div class="nota compacta">Se marca pagado con lo que registres en la deuda, no con el calendario: que sea día 20 no significa que ya lo hayas hecho.</div>`;
+
+  caja.querySelectorAll('[data-deuda]').forEach(el =>
+    el.onclick = () => abrirDeuda(el.dataset.deuda));
+}
+
 function renderPagos() {
   const caja = $('pagos');
   if (!caja) return;
@@ -690,14 +749,14 @@ function abrirDeuda(id) {
       PAGOS = r.pagos; PAGOS_MES = r.resumen;
       await cargarDeudas();
   await cargarPagos();
-      cerrarSheet(); toast('Pago registrado'); renderDeudas(); renderPagos();
+      cerrarSheet(); toast('Pago registrado'); renderDeudas(); renderPagos(); renderMensuales();
     } catch (e) { toast('No se registró: ' + e.message); }
   };
   $('sheet-body').querySelectorAll('[data-borrar]').forEach(b => b.onclick = async () => {
     try {
       const r = await api('/gastos/pagos', { method:'POST', body: JSON.stringify({ borrar: b.dataset.borrar }) });
       PAGOS = r.pagos; PAGOS_MES = r.resumen;
-      cerrarSheet(); toast('Pago borrado'); renderPagos(); abrirDeuda(id);
+      cerrarSheet(); toast('Pago borrado'); renderPagos(); renderMensuales(); abrirDeuda(id);
     } catch (e) { toast('No se borró: ' + e.message); }
   });
 }
@@ -708,7 +767,7 @@ function abrirDeuda(id) {
 let VISTA = 'hoy';
 function mostrarVista(v) {
   VISTA = v;
-  for (const id of ['hoy','movs','analisis','deudas','pagos'])
+  for (const id of ['hoy','movs','analisis','deudas','mensual'])
     $('v-' + id).hidden = id !== v;
   $('tabs').querySelectorAll('[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   $('fab').hidden = !(v === 'hoy' || v === 'movs');
@@ -786,7 +845,7 @@ function renderDeudas() {
     + `<div class="deu-tot"><span>Total</span><span class="v">${cop(total)}</span></div>`
     + (costoTotal ? `<div class="deu-tot" style="font-weight:400;font-size:.85rem;color:var(--ink-3);padding-top:.3rem">
         <span>Te cuesta al mes solo por existir</span><span class="v">${cop(costoTotal)}</span></div>` : '')
-    + (mensual.length ? `<div class="nota" style="margin-top:.8rem">Cada mes, aparte: ${mensual.map(d => `${esc(d.nombre)} ${cop(d.minimo)}`).join(' · ')}.</div>` : '')
+
     + `<div class="nota compacta">Ordenar por costo es aritmética, no una recomendación: sin plazos ni flujo la app no decide por ti. Los saldos se actualizan a mano — el banco no dice cuánto bajó la deuda al pagar.</div>`;
 
   $('deudas').querySelectorAll('[data-ord]').forEach(b =>
