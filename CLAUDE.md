@@ -8832,6 +8832,34 @@ Google News vía la consulta por nombre.
 > y las repetían; y se agregó `n19` (Ley 2126 de 2021, comisarías de familia) para la sala
 > Familia. **Banco: 524 preguntas.**
 
+> **📌 v5.3 (ago-13-2026) · QUIÉN se comió la cuota de KV: un bucle de pruebas.**
+> El correo de Cloudflare llegó a las 00:56 (Colombia), con el sitio sin tráfico, así que la
+> hipótesis de «muchos registros» no se sostenía. **Medido llave por llave en el KV:**
+> analytics 9 visitas ese día y 42 el anterior · `gastos:` 1 llave · `caudal:rl` 0 ·
+> **`juez:part:` 4.561 llaves, de las cuales 4.556 son del MISMO dispositivo y de UNA sola
+> hora** (05:00 UTC = medianoche Colombia). Eso es un bucle de simulación del juego corrido
+> desde el navegador de pruebas, no jugadores: cada partida simulada disparaba un POST real
+> que escribía 3 llaves.
+>
+> ⚠️⚠️ **Las simulaciones del juego escriben en producción.** Llamar `answer()`/`nextQuestion()`
+> en bucle termina en `endGame()` → `pushPartida()` → `POST /juez/partida`. Para medir el
+> sorteo o la dificultad hay que usar **`pickQuestions()` en seco**, que no toca el servidor.
+> **Guardián puesto en las dos capas:** el frontend no encola y el worker descarta
+> (`JUEZ_SEG_MIN = 25 s`) cualquier partida de ≥10 preguntas resuelta en menos de 25 segundos,
+> que es imposible para una persona. Verificado: 30 preguntas en 3 s → «Sin partidas válidas»;
+> las mismas 30 con tiempos humanos → aceptada.
+>
+> **Consecuencia para la decisión de plan:** con uso REAL el consumo es bajísimo (42 visitas
+> el día más movido, ~2 escrituras por registro tras el arreglo de v5.2). El plan Workers Paid
+> (5 USD/mes, 1 millón de escrituras/día) **es opcional para crecer, no un remedio a una fuga**:
+> la fuga eran las pruebas. Dashboard de planes:
+> `https://dash.cloudflare.com/fb68af0cc20ea27a0883c43bee9f39e8/workers/plans`
+>
+> ⚠️ Quedan **4.556 llaves basura** `juez:part:2026-08-13:*` (TTL 1 año) y el agregado
+> `juez:part-dia:2026-08-13` inflado con esas partidas: **el panel de admin de ese día no es
+> real**. Borrarlas cuesta 4.556 escrituras, así que conviene hacerlo con plan pago o dejarlas
+> expirar; el agregado del día sí se puede limpiar con una sola escritura.
+
 > **🔴 PENDIENTE (ya resuelto para v4 y v5, se deja el comando a mano): desplegar el worker.**
 > `/Users/ricardoruiz/rr-auth/src/index.js` tiene los cambios (ruta `/juez/partida`, salas
 > `ejecucion`, `familia` y `promiscuo` en `JUEZ_SALAS`, `/juez/admin/partidas`, campo `anon`

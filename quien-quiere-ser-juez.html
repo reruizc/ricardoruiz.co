@@ -477,7 +477,7 @@ footer b{color:var(--mute)}
 <!-- ⚠️ BUMPEAR ?v= al regenerar el banco. Sin él, quien ya visitó la página
      sigue jugando con el banco viejo servido desde su caché: las preguntas
      nuevas, las correcciones y el alcance por sala no le llegan. -->
-<script src="banco-judicial.js?v=20260813c"></script>
+<script src="banco-judicial.js?v=20260813d"></script>
 <script>
 /* ============================================================
    ¿QUIÉN QUIERE SER JUEZ? · motor del juego
@@ -1041,8 +1041,15 @@ function saveScore(pts){
    Best-effort: si el servidor falla, la partida queda en el dispositivo
    y se reintenta en la siguiente. */
 function partidasPend(){ try{return JSON.parse(localStorage.getItem('jz-part-pend')||'[]')}catch(e){return[]} }
+/* Segundos mínimos de una partida real de 30 preguntas. Un bucle de pruebas
+   del navegador llegó a mandar 4.556 partidas de un mismo dispositivo en una
+   hora y agotó la cuota diaria de escrituras del KV de toda la cuenta. El
+   servidor también lo descarta, pero conviene no gastar ni la petición. */
+const SEG_MIN_PARTIDA = 25;
 function pushPartida(R){
   const reg = getReg();
+  const segTotal = STATE.log.reduce((t,l)=>t+(l.seg||0), 0);
+  if(STATE.log.length >= 10 && segTotal < SEG_MIN_PARTIDA) return;   // simulación, no jugador
   const p = {
     anon: anonId(), sala:STATE.sala, cargo:STATE.cargo, nivel:STATE.nivel,
     pts:R.pts, aciertos:R.aciertos, scored:R.scored, total:STATE.log.length,
