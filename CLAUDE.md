@@ -8625,11 +8625,14 @@ título "¿Quién queda?", bajada "las apuestas que no son apuestas".
 - **Datos**: local gitignored en `Bases de datos/pronosticos/`; público en
   `congreso-2026/output/pronosticos/{index,<mercado>}.json` (prefijo ya cubierto por la
   bucket policy). Frontend lee de ahí con cache-buster.
-- **Cron**: `launchd` (`co.ricardoruiz.pronosticos`, 00:10 · 06:10 · 12:10 · 18:10), con
-  candado anti-solape y subida a S3 sólo si el motor salió bien.
-  🔜 **Pendiente: mover a Lambda + EventBridge.** `ricardo-mac-cli` NO tiene permisos de
-  EventBridge (`events:ListRules` denegado); con `events:PutRule/PutTargets/ListRules/
-  DescribeRule` otorgados, los comandos exactos están en el LEEME del módulo.
+- **Cron: ⏸ DETENIDO (ago-13-2026)** — el contralor ya se eligió (12-ago) y era el único
+  mercado abierto. `launchctl bootout` hecho y el plist quedó archivado en
+  `~/Library/LaunchAgents/desactivados/co.ricardoruiz.pronosticos.plist`; para revivirlo
+  con otro mercado (CNE · Defensor · Procurador): agregar la entrada a `mercados.json` y
+  `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/desactivados/co.ricardoruiz.pronosticos.plist`
+  (moverlo de vuelta a `~/Library/LaunchAgents/` primero). Corría 00:10 · 06:10 · 12:10 ·
+  18:10 con candado anti-solape y subida a S3 sólo si el motor salió bien.
+  (El pendiente viejo de moverlo a Lambda + EventBridge queda en pausa con el cron.)
 
 **⚠️⚠️ Tres cosas medidas que definieron el diseño (no deshacerlas):**
 1. **Buscar sólo por tema deja ciego al motor ante la noticia que mueve a UNA persona.** Con
@@ -8701,9 +8704,63 @@ Google News vía la consulta por nombre.
 > pantalla— salía en 1.4rem y en gris**. Al añadir un `<span>` hermano para el «/1000» se
 > arrastró desde la v1 sin que nadie lo notara.
 >
-> **🔴 PENDIENTE PARA QUE v4 QUEDE COMPLETO: desplegar el worker.**
-> `/Users/ricardoruiz/rr-auth/src/index.js` tiene los cambios (ruta `/juez/partida`, sala
-> `ejecucion` en `JUEZ_SALAS`, `/juez/admin/partidas`, campo `anon` en el registro) y pasa
+> **📌 v5 (ago-13-2026) · más difícil, banco más grande, Familia y Promiscuo.**
+> Los probadores sacaban **27-28 de 30**, y a uno le salió una pregunta repetida. Cinco cambios:
+>
+> 1. **Se eliminaron 3 preguntas DUPLICADAS del banco** (`l47`≈`l27` consulta laboral,
+>    `l48`≈`l26` casación laboral, `d43`≈`d05` destitución). Eso era lo que veía el probador:
+>    no un fallo del sorteo, sino dos redacciones del mismo contenido conviviendo en el pool.
+>    ⚠️ Al agregar preguntas, correr el chequeo de prefijo de 55 chars sobre `q.p` (el de 60
+>    chars no las detectaba) **y también entre pools distintos**: `f12` chocaba con `c37`, y
+>    en la sala Promiscuo civil y familia se mezclan, así que habrían salido juntas.
+> 2. **Banco 374 → 523 preguntas** (+149, casi todas nivel 3). El sorteo ya no repite: cada
+>    pool tiene 3-4× lo que consume una partida.
+> 3. **Cuotas endurecidas**: de las 27 que puntúan ahora **18 son difíciles, 8 medias y 1
+>    básica** (antes 12/11/4). Medido: se puede fallar **hasta 5 de 27** y pasar el corte de
+>    800; con 6 fallos ya no pasa.
+> 4. ⚠️⚠️ **EL DELATOR DE LONGITUD ERA EL VERDADERO PROBLEMA, no las cuotas.** Medido: la
+>    opción correcta era la **única más larga en el 77 %** del banco, y **marcar siempre la
+>    más larga sacaba ~1.000/1.000 en las salas viejas**. Los amigos no estaban ganándole al
+>    banco: estaban leyendo el formato. Arreglado alargando distractores con calificativos
+>    jurídicos neutros (*«conforme a la regla que la ley establece para estos casos»*) y
+>    camuflando algunas correctas. Resultado: delator **77 % → 28 %** (azar = 25 %) y la
+>    estrategia rinde **330-470/1000**. Se envenenó además el contra-exploit: si solo se
+>    camuflaran las correctas cortas, «evitar la muletilla y marcar la más larga» daba 838;
+>    poniendo coletilla también en algunas correctas largas bajó a ~700 y `p(correcta |
+>    coletilla)` quedó en **14 %**. Las 6 preguntas `f:'oficial'` NO se tocaron.
+>    **Al redactar preguntas nuevas: la correcta no puede ser sistemáticamente la más
+>    desarrollada.** Hay un medidor listo para reusar (ver el commit de esta versión).
+> 5. **Sala FAMILIA** (46 preguntas: Ley 1098, Ley 54/1990, **Ley 1996 de 2019** —capacidad
+>    legal y apoyos, que derogó la interdicción—, sucesiones, violencia intrafamiliar,
+>    restitución internacional La Haya 1980) y **sala PROMISCUO MUNICIPAL**, que es
+>    **COMPUESTA**: no tiene banco propio, lleva el campo `mezcla:['civil','penal','laboral',
+>    'familia']` en `B.salas` y `pickQuestions` une esos bancos para el bloque específico.
+>    Agregar otra sala mixta (promiscuo de familia, promiscuos I-VI) es una entrada más en
+>    `salas` con su `mezcla` — no hace falta tocar el motor. **8 salas**, grid 3+3+2.
+> 6. **Comodín nuevo `⟳ Cambiar la pregunta`** (uno por partida). La sustituta sale del
+>    **mismo bloque y del mismo nivel** y no puede estar ya en la partida: sirve para esquivar
+>    un tema que no se domina, nunca para ablandar el examen. Si el pool se agota no se gasta.
+> 7. **El diagnóstico subió**: en la pantalla de resultado va ahora ANTES del bloque
+>    «Para repasar» (puntaje → desglose por bloque → diagnóstico → repaso → acciones).
+>    Sin registro sigue difuminado con su CTA; con registro se destapa completo.
+> 8. **Auditor del banco** en `tools/quien-quiere-ser-juez/medir_banco.py`: duplicados
+>    dentro y entre pools, delator de longitud y reparto de dificultad. Sale con código 1
+>    si hay duplicados o si el delator supera el 40 %. **Correrlo antes de cada push que
+>    toque el banco.** Fue el que detectó que `d42` subsumía a `d03` y que `l46` abría con
+>    el mismo enunciado de `l18`.
+> 9. **Paleta caoba + dorados** (madera de juzgado): `--bg:#0c0705`, tarjetas `#171009`,
+>    líneas `#3a2b1c` y el azul del sitio reemplazado por dorado (`--blue:#b8862f`,
+>    `--blue2:#d9a94b`) **conservando los nombres de las variables** para no reescribir cada
+>    uso. Las barras del logo Ricardo.Ruiz quedan doradas aquí (solo en esta página).
+>
+> ⚠️ **`JUEZ_SALAS` del worker ya incluye `familia` y `promiscuo`, pero SIN DESPLEGAR los
+> puntajes de esas dos salas se rechazan con 400 y no entran al ranking.** Ver el pendiente
+> de abajo: ahora el deploy sí bloquea funcionalidad visible.
+
+> **🔴 PENDIENTE PARA QUE v4 Y v5 QUEDEN COMPLETAS: desplegar el worker.**
+> `/Users/ricardoruiz/rr-auth/src/index.js` tiene los cambios (ruta `/juez/partida`, salas
+> `ejecucion`, `familia` y `promiscuo` en `JUEZ_SALAS`, `/juez/admin/partidas`, campo `anon`
+> en el registro) y pasa
 > `wrangler deploy --dry-run`, **pero NO se desplegó**: el worker es compartido con Caudal, el
 > Lab y el resto del sitio, y la regla del proyecto es pedir luz verde. Sin ese deploy las
 > partidas anónimas se encolan en `localStorage` (`jz-part-pend`, tope 20) y se reintentan
@@ -8727,8 +8784,9 @@ Google News vía la consulta por nombre.
 > material y simulacros de preparación. Las firmas grandes se descartaron como comprador
 > del lead (el aspirante a juez no es su perfil de reclutamiento).
 >
-> **Lo construido (v4):** **6 salas** (civil · penal · laboral · administrativo ·
-> disciplinario · **ejecución de penas**) · **374 preguntas** con cita normativa ·
+> **Lo construido (v5):** **8 salas** (civil · penal · laboral · administrativo ·
+> disciplinario · ejecución de penas · **familia** · **promiscuo municipal**, esta última
+> compuesta) · **523 preguntas** con cita normativa ·
 > partidas de **30 sin eliminación** con puntaje ponderado sobre 1.000 y corte en 800 ·
 > **selector de cargo** previo · 3 comodines · registro de 3 campos ·
 > ranking global/sala/universidad · **diagnóstico del aspirante** post-registro ·
@@ -8753,7 +8811,7 @@ Google News vía la consulta por nombre.
 > 0. **Desplegar el worker** (`cd /Users/ricardoruiz/rr-auth && npx wrangler deploy`) —
 >    sin eso no se guardan las partidas anónimas ni existe la sala `ejecucion` en el
 >    ranking. Ver el aviso rojo del bloque v4.
-> 1. **Revisión de abogado** a las **368 preguntas propias** (6 son oficiales de los
+> 1. **Revisión de abogado** a las **517 preguntas propias** (6 son oficiales de los
 >    instructivos). Cada una trae su `cita` y, las nuevas, además su `norma`, justamente
 >    para que la pasada sea rápida. Es lo único que separa esto de poder moverlo con fuerza.
 >    Prioridad dentro de la revisión: `actualidad` (caduca), `ejecucion` y `comportamental`.
@@ -8932,21 +8990,21 @@ patrón plan-gate); el contenido se ve difuminado para que se note que hay algo 
   el concurso** — misma regla del disclaimer y de [[reference_legaltech_riesgo_score]].
 
 ### 🌳 PENDIENTE · árbol COMPLETO de salas (pedido explícito de Ricardo)
-v4 tiene 6 salas (Civil · Penal · Laboral · Administrativo · Disciplinario ·
-**Ejecución de Penas**). Falta el árbol completo nivel × especialidad de la
-Convocatoria 28, con los ejes del instructivo 2018:
+v5 tiene 8 salas (Civil · Penal · Laboral · Administrativo · Disciplinario ·
+Ejecución de Penas · **Familia** · **Promiscuo Municipal**). Falta el resto del
+árbol nivel × especialidad de la Convocatoria 28, con los ejes del instructivo 2018:
 0. ~~**Ejecución de Penas**~~ ✅ v4 (Ley 65/1993 + Ley 1709/2014 + arts. 38 y 459-480
    Ley 906; subrogados, redención, permisos, ECI carcelario T-388/2013 y T-762/2015).
 1. ~~**Laboral**~~ ✅ · ~~**Disciplinario**~~ ✅ (CGD Ley 1952/2019 + Ley 2094/2021;
    ⚠️ se evitan preguntas sobre el alcance de las funciones jurisdiccionales de la
    Procuraduría frente a elegidos por voto popular — materia en disputa tras C-030 de
    2023 y el caso Petro ante la Corte IDH).
-2. **Familia** (CGP-Familia · C.C.-Familia · Infancia y Adolescencia) — siguiente
-   prioridad: es la que falta para cubrir las 4 especialidades de Tribunal Superior.
+2. ~~**Familia**~~ ✅ v5 (46 preguntas · C.C.-Familia y sucesiones · Ley 1098 ·
+   Ley 54/1990 · Ley 1996/2019 · violencia intrafamiliar · La Haya 1980).
 3. **Penal especializado**: Ejecución de penas · Extinción de dominio (Ley 1708/2014 +
    1849/2017) · Responsabilidad penal adolescentes (Ley 1098).
-4. **Promiscuos I-VI** (mezclan pools de civil+penal+familia — casi gratis una vez
-   existan esas salas: son combinaciones de bancos).
+4. **Promiscuos I-VI** — el motor ya soporta salas compuestas (campo `mezcla` en
+   `B.salas`, ver v5). Agregar cada variante es una entrada más en `salas`.
 5. **Disciplinario** (Ley 1952/2019 CGD) y **Consejero Seccional** (CPACA · gerencia
    pública · contratación · SIGCMA).
 6. Variantes por **nivel** (Municipal/Circuito/Magistrado): mismo pool con pesos de
@@ -8971,6 +9029,129 @@ Convocatoria 28, con los ejes del instructivo 2018:
   no hay nada acumulado.
 - Otros pendientes: enlazar desde index/noticias · música · OG image para compartir
   ranking ("mi universidad le gana a la tuya").
+
+## Mapa de ayuda · sismo 10-ago-2026 — `ayuda-sismo/` (LISTO · sin desplegar)
+
+Mapa abierto donde la gente registra necesidades tras el sismo M 7.4 (epicentro
+San José del Palmar, Chocó). Doc operativa completa en `ayuda-sismo/LEEME.md`.
+
+**⚠️ NO es una matriz tipo × categoría — es un catálogo plano de 17
+SITUACIONES** agrupadas en `busco` / `necesito` / `ofrezco`. La matriz daba 18
+combinaciones y la mitad no significaba nada ("ofrezco + mascota" no distingue
+buscar a mi perro de haber encontrado uno). El catálogo vive DOS veces a
+propósito: `SIT` en el frontend (etiquetas, ejemplos, colores) y `SITUACIONES`
+en el Worker (qué es privado, qué admite foto) — el Worker **valida contra su
+propia copia** y deriva `tipo`/`cat`; no confía en lo que mande el formulario.
+Agregar una situación obliga a tocar las dos listas.
+
+**Drill-down en dos lugares**: el mapa tiene barra de zonas (los 5 deptos con
+daño) que enfoca y filtra; el formulario va **departamento → municipio →
+barrio**, sobre los **1.122 municipios** del país, no solo capitales — muchos
+municipios vecinos quedaron tan golpeados como las capitales.
+
+**⚠️ NO va en GitHub Pages.** `ricardoruiz.co` lo sirve GH Pages, con límite
+blando de ~100 GB/mes; con 1M de visitantes GitHub throttlea y se cae **todo**
+el sitio, no solo el mapa. Va a **Cloudflare Pages** (ancho de banda ilimitado)
+con `sismo.ricardoruiz.co` por CNAME desde **GoDaddy** (ahí está el DNS, no en
+Cloudflare — verificado: NS `domaincontrol.com`).
+
+**Worker aparte, NO `rr-auth`**: ese es compartido con Caudal y el Lab, y un
+deploy de emergencia no puede arriesgar producción. `ayuda-sismo` + D1 propia.
+
+**Costo con 1M de visitantes: $5-8/mes.** La clave es separar lectura de
+escritura — `/snapshot.json` se sirve del caché del edge (`s-maxage=60`), así
+que un millón de visitas son ~1 consulta a D1 por minuto y por PoP, no un
+millón. Se paga Workers Paid solo para quitar el techo de 100k req/día, que si
+algo se cachea mal tumba el sitio en plena emergencia. Aplicar a **Project
+Galileo** (protección enterprise gratis para proyectos humanitarios).
+
+### Las 3 reglas de privacidad (decisiones de Ricardo · no deshacerlas)
+1. **Desaparecidos: el contacto NUNCA se publica.** Se ve el caso completo,
+   pero quien tenga información escribe por el mapa y el mensaje le llega al
+   familiar (`/contacto` → tabla `mensajes` → enlace privado + correo opcional
+   vía Resend). Publicar el teléfono de una familia que busca a alguien es lo
+   que habilita la llamada extorsiva. El Worker lo fuerza: aunque el cliente
+   mande `contacto_pub:true`, en esa categoría guarda 0.
+2. **El texto libre se enmascara** (`enmascarar()`): correos y corridas de 7+
+   dígitos. Sin esto la regla 1 no vale nada — basta escribir el celular dentro
+   de la descripción. Verificado: sale `"llamar al [teléfono oculto]"`.
+3. **Ubicación pública desplazada ~100 m** (`difuminar()`). Se calcula **una vez
+   al insertar y se guarda** en `plat/plon`; recalcular por lectura dejaría
+   promediar capturas sucesivas y recuperar el punto real. La exacta queda en
+   `lat/lon` y solo la ven moderación y el reportante. Medido: 93,1 m y 69,0 m.
+4. **La foto se re-codifica en canvas ANTES de subirla.** No es (solo) por peso:
+   el EXIF de una foto de celular trae el **GPS exacto**, que echaría por tierra
+   la regla 3. Redibujarla descarta todos los metadatos. Verificado: 2400×1600 →
+   1280 px, 16 KB, sin bloque `Exif`. El servidor valida **bytes mágicos**, no el
+   `Content-Type` (probado con un script de shell etiquetado `image/jpeg`: se
+   descarta la foto y el reporte se publica igual). Las fotos viajan DENTRO del
+   POST del reporte, en base64 — un endpoint de subida suelto sería
+   almacenamiento abierto a internet. Ocultar por moderación **borra el objeto
+   de R2**. `ofr-persona` (encontré a alguien) NO admite foto: quien está
+   desorientada o herida no puede consentir.
+
+⚠️ **Marcar abuso NO oculta solo**: cuenta y manda a revisión, una marca por IP
+y reporte (llave primaria de `abuso_log`). Si unos clics tumbaran un reporte,
+una campaña coordinada borraría justo los casos reales.
+
+⚠️ Sin `TURNSTILE_SECRET` el formulario **sigue recibiendo**, marcando
+`sin_captcha=1` — tumbar la recepción en plena emergencia es peor que el spam.
+
+### Datos y verificación
+- `build_geo.py` → `geo.json` (44 KB): 33 deptos · **1.122 municipios** con
+  centro por **mediana** de los puestos de `PUESTOS_GEOREF` (el promedio se
+  corre km con un puesto rural mal georreferenciado). ⚠️ Los códigos son de la
+  **Registraduría, NO del DANE**: Caldas=09 · Chocó=17 · Quindío=26 ·
+  Risaralda=24 · Valle=31. Por eso `AFECTADOS` marca por nombre y **aborta el
+  build** si un nombre deja de casar. Nombres de municipio vienen **sin tildes**
+  y se dejan así (corregir 1.122 a mano = meter erratas); la búsqueda del sitio
+  normaliza tildes. Los 33 deptos sí se corrigen (`DEP_NOMBRES`): venían
+  truncados ("Norte De San", "Valle").
+- `build_barrios.py` → `barrios.json` (46 KB): Cali 339 · Pereira 472 ·
+  Manizales 114 · Quibdó 60. **Armenia no tiene capa** → el selector no aparece
+  y se marca el punto a mano, en vez de fingir una lista vacía.
+- `seed.py` → 18 puntos de prueba con prefijo `[PRUEBA]`. ⚠️ Manda una
+  `CF-Connecting-IP` distinta por caso para no chocar con el límite de 5/hora;
+  eso **solo sirve contra `wrangler dev`** porque en producción Cloudflare fija
+  esa cabecera en el edge.
+- Verificado end-to-end contra `wrangler dev` + D1 + R2 locales: escritura,
+  snapshot, enmascarado, supresión de contacto en las 2 situaciones `priv`,
+  rechazo fuera de Colombia, vista privada con y sin token, dedup de abuso,
+  foto (resize + sin EXIF + servida desde R2), rechazo de archivo falso, y el
+  formulario en navegador (desktop 1265px y móvil 375px).
+- ⚠️ **`wrangler d1 execute --local` no aplica nada si `wrangler dev` tiene la
+  base tomada** (falla en silencio y queda el esquema viejo). Para recrear:
+  parar dev → `rm -rf .wrangler/state` → aplicar `schema.sql` → arrancar dev.
+  Un `DROP TABLE` con varias sentencias en un solo `--command` tampoco se aplica.
+- Tipografía de sistema y sin webfonts a propósito: se abre en la calle, con
+  sol, mala señal y batería baja. Tema claro, no el sistema visual v2 oscuro.
+
+**Pendiente**: correr el despliegue (pasos en el LEEME) y decidir si se enlaza
+desde `index.html` / `noticias.html`.
+
+## Brief matutino personal — `tools/brief/` (v1 · ago-2026)
+
+Uso personal de Ricardo, NO producto. Cada mañana responde 3 preguntas leyendo lo
+que los crons existentes YA producen (cero fuentes nuevas, cero LLM en v1):
+1. **¿Algo roto?** → `Bases de datos/leyes-senado/diario/estado.json` (salud del pipeline).
+2. **¿Qué se movió?** → último digest de alertas de Caudal
+   (`tools/caudal/alertas/datos/digests/`) + radicados de `en-vivo.json`.
+3. **¿La tarea del día?** → criterio FIJO en la constante `PRIORIDADES` de `brief.py`:
+   DNP (único ingreso) → Caudal acceso comercial (bloqueador #1) → marketing acotado,
+   con la regla "¿factura en 90 días?". **Editar ahí cuando cambie la situación.**
+   Si hay problemas de operación, esos van primero.
+
+- Salida: `Bases de datos/brief/brief-YYYY-MM-DD.md` (gitignored) + correo a
+  reruizc@gmail.com reusando el transporte de alertas (`sender.enviar` — decide
+  Resend directo vs worker; ⚠ `para` es LISTA, un string se itera por caracteres).
+- Cron: `launchd` `co.ricardoruiz.brief`, **diario 07:15** (`run_brief.sh` carga
+  secretos de `~/.config/caudal/alertas.env`, mismo patrón que alertas).
+  Log en `Bases de datos/brief/brief.log`. Correr a mano:
+  `python3 tools/brief/brief.py [--sin-correo]`.
+- Verificado end-to-end (ago-13): correo aceptado por Resend vía worker.
+- Nota: la decisión de fondo fue NO construir un "monitor personal" nuevo
+  (medios+redes+Grok) — el brief reusa lo existente a propósito. v2 posible:
+  lectura LLM corta, pero solo si el uso real la pide.
 
 ## Convenciones de commit
 ```
