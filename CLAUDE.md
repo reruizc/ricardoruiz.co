@@ -8792,6 +8792,46 @@ Google News vía la consulta por nombre.
 > Lab y las alertas: si vuelven los 500 en rutas de escritura, revisar la cuota antes que el
 > código.
 
+> **📌 v5.2 (ago-13-2026) · la cuota de KV, el registro que mentía y el arbitraje en penal.**
+>
+> ⚠️⚠️ **EL REGISTRO ESTUVO CAÍDO Y LA CAUSA NO ERA EL CÓDIGO: se agotó la cuota diaria de
+> escrituras del KV** (plan free: **1.000/día para TODO el sitio**, reset a las 00:00 UTC =
+> 7 p.m. Colombia). Medido: **cada registro costaba 12 escrituras** —1 del limitador de tasa,
+> 1 del registro y **10 borrados del caché del ranking, uno por pestaña**, porque en KV un
+> `delete` también cuenta como escritura—. Agregar Familia y Promiscuo subió ese costo de 10
+> a 12 y con menos de un centenar de registros se agotaba el día para todo el sitio.
+> **Arreglado a 2 escrituras por registro:** se dejó de invalidar el caché borrando llaves (el
+> ranking expira solo, TTL 5→15 min), el detalle por partida anónima se **muestrea 1 de cada 4**
+> y el contador de tasa se actualiza **1 de cada 5** veces. Un registro ya no compite con la
+> analítica por la cuota.
+> **Si vuelve a pasar:** el síntoma es 503 en `/juez/save` y el mensaje `KV put() limit
+> exceeded for the day` en `wrangler tail`. La solución de fondo es el **plan Workers Paid
+> (5 USD/mes → 1 millón de escrituras/día)**; mientras tanto, la cuota se comparte con Caudal,
+> el Lab y las alertas.
+>
+> ⚠️ **Dos bugs del frontend que salieron con esto** (y que hacían perder leads en silencio):
+> 1. **`pushToServer` no se reintentaba nunca.** `flushPartidas()` sí corría al cargar, pero el
+>    registro —lo único con valor comercial— se perdía si el servidor lo rechazaba. Ahora hay
+>    `reintentarRegistro()` en el arranque.
+> 2. **La pantalla decía «✓ ya estás en el ranking» con solo tener los datos en localStorage**,
+>    aunque el servidor los hubiera rechazado. Ahora existe la marca `jz-reg-sync` y sin ella
+>    el mensaje es honesto: «quedaron en este dispositivo… se suben solos la próxima vez».
+>
+> ⚠️⚠️ **`banco-judicial.js` se cargaba SIN cache-buster**, así que al actualizar el banco los
+> navegadores que ya habían visitado seguían jugando con la versión vieja. Ahora es
+> `banco-judicial.js?v=YYYYMMDD` — **bumpearlo cada vez que se regenere el banco**, igual que
+> `CACHE_BUSTER` de `lab-indicadores.js`.
+>
+> **Alcance por sala en las preguntas comunes** (`salas:[...]`, campo opcional): a un penalista
+> le salían preguntas de **arbitraje**, de jornada laboral y de disciplinario, porque el bloque
+> de actualidad es común a las ocho salas. 11 de las 19 preguntas de actualidad quedaron
+> acotadas; las de cultura jurídica común (carrera judicial, TIC, Escazú, jurisdicción agraria)
+> siguen saliendo en todas. `pickQuestions` **cae a la lista completa si el filtro deja menos de
+> lo que exige la cuota**, así que acotar nunca rompe la partida. La cuota de actualidad pasó a
+> **1 media + 1 difícil** porque con solo nivel 3 algunas salas quedaban con cuatro preguntas
+> y las repetían; y se agregó `n19` (Ley 2126 de 2021, comisarías de familia) para la sala
+> Familia. **Banco: 524 preguntas.**
+
 > **🔴 PENDIENTE (ya resuelto para v4 y v5, se deja el comando a mano): desplegar el worker.**
 > `/Users/ricardoruiz/rr-auth/src/index.js` tiene los cambios (ruta `/juez/partida`, salas
 > `ejecucion`, `familia` y `promiscuo` en `JUEZ_SALAS`, `/juez/admin/partidas`, campo `anon`

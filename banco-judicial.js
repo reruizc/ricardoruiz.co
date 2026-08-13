@@ -782,6 +782,12 @@ window.BANCO_JUDICIAL = {
      Se evitan materias en disputa (p. ej. la vigencia de la reforma
      pensional) porque una respuesta cerrada envejecería mal.
      ══════════════════════════════════════════════════════════════ */
+  /* ⚠️ `salas:[...]` restringe en qué salas puede salir la pregunta. El bloque
+     de actualidad es común a todas, pero una pregunta de arbitraje en una
+     partida de penal se lee como error del simulador. Sin el campo, la
+     pregunta sirve para todas (carrera judicial, TIC, jurisdicción agraria…).
+     El sorteo cae a la lista completa si el filtro deja menos de lo que
+     exige la cuota, así que agregar un alcance nunca rompe la partida. */
   actualidad: [
     { id:'n01', n:1, t:'Actualidad · Carrera judicial', rev:'2026-08',
       p:'La convocatoria para proveer por concurso de méritos los cargos de funcionarios de la Rama Judicial es expedida por',
@@ -789,7 +795,7 @@ window.BANCO_JUDICIAL = {
       r:0, cita:'Arts. 156 y ss. Ley 270 de 1996 · Art. 256 C.P.',
       norma:'La Constitución y la Ley Estatutaria de Administración de Justicia asignan al Consejo Superior de la Judicatura la administración de la carrera judicial y la realización de los concursos de méritos para la Rama.',
       pista:'La Comisión Nacional del Servicio Civil administra la carrera administrativa general, pero NO la judicial: la Rama tiene régimen especial y su carrera la administra el Consejo Superior de la Judicatura, que suele contratar a una universidad para operar las pruebas.', f:'propia' },
-    { id:'n02', n:2, t:'Actualidad · Laboral', rev:'2026-08',
+    { id:'n02', n:2, t:'Actualidad · Laboral', salas:['laboral'], rev:'2026-08',
       p:'Culminada la reducción gradual dispuesta por la Ley 2101 de 2021, la jornada máxima legal de trabajo en Colombia a partir de julio de 2026 es de',
       o:['42 horas semanales.','44 horas semanales.','46 horas semanales.','48 horas semanales.'],
       r:0, cita:'Ley 2101 de 2021 · Art. 161 CST',
@@ -804,13 +810,13 @@ window.BANCO_JUDICIAL = {
       r:0, cita:'Ley 2213 de 2022',
       norma:'La Ley 2213 de 2022 convirtió en legislación permanente el Decreto 806 de 2020: uso de las TIC en las actuaciones judiciales, notificaciones por medios electrónicos, memoriales y audiencias virtuales.',
       pista:'No hay retorno automático a la presencialidad: la virtualidad quedó como regla permanente, y el juez decide el medio atendiendo a las garantías del debido proceso y al acceso efectivo de las partes.', f:'propia' },
-    { id:'n04', n:2, t:'Actualidad · Disciplinario', rev:'2026-08',
+    { id:'n04', n:2, t:'Actualidad · Disciplinario', salas:['disciplinario'], rev:'2026-08',
       p:'El Código General Disciplinario (Ley 1952 de 2019) empezó a regir, tras sucesivas prórrogas y la reforma de la Ley 2094 de 2021, el',
       o:['29 de marzo de 2022.','1 de enero de 2019.','1 de julio de 2021.','1 de enero de 2024.'],
       r:0, cita:'Ley 1952 de 2019 · Ley 2094 de 2021',
       norma:'La entrada en vigencia de la Ley 1952 se aplazó varias veces (Leyes 2094 de 2021 entre ellas) y quedó fijada el 29 de marzo de 2022, fecha desde la cual quedó derogada la Ley 734 de 2002.',
       pista:'La Ley 2094 de 2021 además introdujo la doble instancia y la doble conformidad en el proceso disciplinario y ajustó el trámite ante la Procuraduría.', f:'propia' },
-    { id:'n05', n:2, t:'Actualidad · Contencioso administrativo', rev:'2026-08',
+    { id:'n05', n:2, t:'Actualidad · Contencioso administrativo', salas:['administrativo'], rev:'2026-08',
       p:'La Ley 2080 de 2021',
       o:['reformó el CPACA (Ley 1437 de 2011) y dictó disposiciones para la descongestión de la jurisdicción de lo contencioso administrativo.',
          'expidió un nuevo Código Contencioso Administrativo que derogó íntegramente la Ley 1437 de 2011, junto con las normas sobre descongestión de la jurisdicción.',
@@ -819,19 +825,19 @@ window.BANCO_JUDICIAL = {
       r:0, cita:'Ley 2080 de 2021',
       norma:'La Ley 2080 de 2021 reformó la Ley 1437 de 2011 (CPACA): ajustó competencias, recursos, el uso de TIC y las reglas de extensión de la jurisprudencia, con fines de descongestión.',
       pista:'Es una reforma al CPACA, no un código nuevo: la Ley 1437 sigue siendo la norma base de la jurisdicción contencioso-administrativa.', f:'propia' },
-    { id:'n06', n:2, t:'Actualidad · MASC', rev:'2026-08',
+    { id:'n06', n:2, t:'Actualidad · MASC', salas:['civil','laboral','administrativo','familia'], rev:'2026-08',
       p:'La Ley 2220 de 2022 corresponde al',
       o:['Estatuto de Conciliación.','Estatuto del Consumidor.','Código Nacional de Seguridad y Convivencia.','Estatuto Anticorrupción.'],
       r:0, cita:'Ley 2220 de 2022',
       norma:'La Ley 2220 de 2022 expidió el Estatuto de Conciliación, que sistematiza y actualiza el régimen de la conciliación judicial y extrajudicial en derecho.',
       pista:'El Estatuto del Consumidor es la Ley 1480 de 2011; el Código de Seguridad y Convivencia, la Ley 1801 de 2016; el Estatuto Anticorrupción, la Ley 1474 de 2011.', f:'propia' },
-    { id:'n07', n:3, t:'Actualidad · Constitucional', rev:'2026-08',
+    { id:'n07', n:3, t:'Actualidad · Constitucional', salas:['penal'], rev:'2026-08',
       p:'Mediante la sentencia C-055 de 2022 la Corte Constitucional declaró que el delito de aborto consentido solo se configura cuando la conducta se realiza después de la semana',
       o:['veinticuatro (24) de gestación.','doce (12) de gestación.','dieciséis (16) de gestación.','veinte (20) de gestación.'],
       r:0, cita:'C-055 de 2022 · Art. 122 Ley 599 de 2000',
       norma:'La C-055 de 2022 condicionó la constitucionalidad del art. 122 del Código Penal: la conducta solo es punible cuando se practica después de la semana veinticuatro de gestación, y aun después subsisten las causales de la C-355 de 2006.',
       pista:'Después de la semana 24 siguen aplicando las tres causales de la C-355 de 2006 (riesgo para la vida o salud de la mujer, malformación incompatible con la vida y embarazo resultado de conducta punible), en las que no hay delito en ningún momento de la gestación.', f:'propia' },
-    { id:'n08', n:2, t:'Actualidad · Orden público', rev:'2026-08',
+    { id:'n08', n:2, t:'Actualidad · Orden público', salas:['penal','ejecucion'], rev:'2026-08',
       p:'La Ley 2272 de 2022',
       o:['modificó la Ley 418 de 1997 y definió la política de paz total como política de Estado.',
          'creó la Jurisdicción Especial para la Paz.',
@@ -840,7 +846,7 @@ window.BANCO_JUDICIAL = {
       r:0, cita:'Ley 2272 de 2022',
       norma:'La Ley 2272 de 2022 prorrogó y modificó la Ley 418 de 1997, definió la paz total como política de Estado y habilitó procesos de diálogo con grupos armados organizados al margen de la ley y con estructuras armadas de crimen de alto impacto.',
       pista:'La JEP nació del Acto Legislativo 01 de 2017 y se desarrolló con la Ley 1957 de 2019, no con la Ley 2272.', f:'propia' },
-    { id:'n09', n:2, t:'Actualidad · Penal', rev:'2026-08',
+    { id:'n09', n:2, t:'Actualidad · Penal', salas:['penal','ejecucion'], rev:'2026-08',
       p:'La Ley 2197 de 2022 se conoce como',
       o:['Ley de Seguridad Ciudadana.','Ley de Sometimiento a la Justicia.','Ley de Víctimas y Restitución de Tierras.','Ley de Infancia y Adolescencia.'],
       r:0, cita:'Ley 2197 de 2022',
@@ -855,7 +861,7 @@ window.BANCO_JUDICIAL = {
       r:0, cita:'Ley 2273 de 2022 · C-162 de 2023',
       norma:'El Acuerdo de Escazú consagra tres derechos de acceso en asuntos ambientales —información, participación y justicia— e impone al Estado el deber de proteger a las personas defensoras de derechos humanos en materia ambiental.',
       pista:'Es el primer tratado ambiental de América Latina y el Caribe con disposiciones específicas sobre defensores ambientales. La Corte Constitucional lo declaró exequible en la C-162 de 2023.', f:'propia' },
-    { id:'n11', n:2, t:'Actualidad · Anticorrupción', rev:'2026-08',
+    { id:'n11', n:2, t:'Actualidad · Anticorrupción', salas:['administrativo','disciplinario','penal'], rev:'2026-08',
       p:'La Ley 2195 de 2022 introdujo, entre otras medidas contra la corrupción,',
       o:['un régimen de responsabilidad administrativa sancionatoria de las personas jurídicas.',
          'la imprescriptibilidad de todos los delitos contra la administración pública.',
@@ -879,7 +885,7 @@ window.BANCO_JUDICIAL = {
       r:0, cita:'C-233 de 2021 · C-239 de 1997',
       norma:'La C-233 de 2021 amplió el ámbito del homicidio por piedad despenalizado: además del enfermo terminal, cobija a quien padece intenso sufrimiento físico o psíquico proveniente de lesión corporal o enfermedad grave e incurable, siempre que medie consentimiento libre, informado e inequívoco.',
       pista:'La exigencia de terminalidad venía de la C-239 de 1997; la C-233 de 2021 la sustituyó por el criterio del sufrimiento intenso ante enfermedad grave e incurable. El consentimiento del paciente sigue siendo indispensable y no se requiere autorización judicial.', f:'propia' },
-    { id:'n14', n:3, t:'Actualidad · Disciplinario', rev:'2026-08',
+    { id:'n14', n:3, t:'Actualidad · Disciplinario', salas:['disciplinario'], rev:'2026-08',
       p:'La Ley 2094 de 2021 reformó el Código General Disciplinario, entre otros aspectos, para',
       o:['garantizar la doble conformidad y separar las funciones de instrucción y juzgamiento en el proceso disciplinario.',
          'suprimir la potestad disciplinaria de la Procuraduría General de la Nación.',
@@ -897,7 +903,7 @@ window.BANCO_JUDICIAL = {
       r:0, cita:'Instructivo de pruebas escritas · Convocatorias 27 y 28 · Consejo Superior de la Judicatura',
       norma:'Las pruebas escritas del concurso comprenden conocimientos y aptitudes, calificadas sobre 1.000 puntos, siendo eliminatoria la que no alcance el puntaje mínimo aprobatorio de 800; la prueba psicotécnica tiene carácter clasificatorio.',
       pista:'La exigencia explica el diseño del examen: 200 preguntas en cuatro horas y media, con un umbral alto que deja por fuera a la mayoría de inscritos antes de la fase de entrevista y valoración de antecedentes.', f:'propia' },
-    { id:'n16', n:3, t:'Actualidad · Arbitraje', rev:'2026-08',
+    { id:'n16', n:3, t:'Actualidad · Arbitraje', salas:['civil','laboral','administrativo'], rev:'2026-08',
       p:'El Estatuto de Arbitraje Nacional e Internacional en Colombia corresponde a la',
       o:['Ley 1563 de 2012.','Ley 1285 de 2009.','Ley 2220 de 2022.','Ley 446 de 1998.'],
       r:0, cita:'Ley 1563 de 2012',
@@ -912,7 +918,7 @@ window.BANCO_JUDICIAL = {
       r:0, cita:'Acto Legislativo 03 de 2023 · Art. 116 C.P.',
       norma:'El Acto Legislativo 03 de 2023 modificó la Constitución para crear la jurisdicción agraria y rural, con el fin de resolver los conflictos sobre la tierra y facilitar el acceso a la justicia de la población campesina, y ordenó al legislador desarrollar su estructura y competencias.',
       pista:'Es la reforma que más incide en la oferta futura de cargos judiciales: la creación de despachos agrarios abre una especialidad nueva dentro de la Rama, distinta de la civil y de la contencioso administrativa.', f:'propia' },
-    { id:'n18', n:3, t:'Actualidad · Consumidor', rev:'2026-08',
+    { id:'n18', n:3, t:'Actualidad · Consumidor', salas:['civil'], rev:'2026-08',
       p:'La Ley 2300 de 2023 tuvo por objeto',
       o:['proteger a los consumidores frente a las prácticas abusivas de las entidades de cobranza y del sector financiero.',
          'crear un régimen especial de insolvencia para las personas naturales no comerciantes, tramitado ante los jueces civiles municipales.',
@@ -920,7 +926,16 @@ window.BANCO_JUDICIAL = {
          'establecer la gratuidad total de los servicios notariales.'],
       r:0, cita:'Ley 2300 de 2023',
       norma:'La Ley 2300 de 2023 establece medidas para proteger a los consumidores frente a las prácticas abusivas de cobranza, fijando límites de horario y frecuencia en los contactos de cobro y sanciones a cargo de las autoridades de inspección y vigilancia.',
-      pista:'El régimen de insolvencia de la persona natural no comerciante está en el Código General del Proceso, no en esta ley: es el distractor con el que suele confundirse.', f:'propia' }
+      pista:'El régimen de insolvencia de la persona natural no comerciante está en el Código General del Proceso, no en esta ley: es el distractor con el que suele confundirse.', f:'propia' },
+    { id:'n19', n:3, t:'Actualidad · Familia', salas:['familia'], rev:'2026-08',
+      p:'La Ley 2126 de 2021 tuvo por objeto',
+      o:['regular la creación, composición y funcionamiento de las comisarías de familia y fijar el órgano rector de la materia.',
+         'trasladar a los jueces de familia todas las funciones que hoy ejercen los comisarios de familia en el territorio.',
+         'suprimir las comisarías de familia y reemplazarlas por casas de justicia de carácter municipal.',
+         'crear una jurisdicción especializada en violencia intrafamiliar con jueces de dedicación exclusiva.'],
+      r:0, cita:'Ley 2126 de 2021 · Ley 575 de 2000',
+      norma:'La Ley 2126 de 2021 regula la creación, composición y funcionamiento de las comisarías de familia, define su naturaleza y competencias, fija los requisitos de sus equipos interdisciplinarios y asigna el rol de órgano rector en la materia.',
+      pista:'Las comisarías siguen conociendo de las medidas de protección por violencia intrafamiliar que les trasladó la Ley 575 de 2000; lo que hizo la Ley 2126 fue ordenar su estructura, su financiación y el perfil de quienes las integran.', f:'propia' }
   ],
 
   /* ══════════════════════════════════════════════════════════════

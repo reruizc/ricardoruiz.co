@@ -474,7 +474,10 @@ footer b{color:var(--mute)}
 </footer>
 </div>
 
-<script src="banco-judicial.js"></script>
+<!-- ⚠️ BUMPEAR ?v= al regenerar el banco. Sin él, quien ya visitó la página
+     sigue jugando con el banco viejo servido desde su caché: las preguntas
+     nuevas, las correcciones y el alcance por sala no le llegan. -->
+<script src="banco-judicial.js?v=20260813c"></script>
 <script>
 /* ============================================================
    ¿QUIÉN QUIERE SER JUEZ? · motor del juego
@@ -498,7 +501,10 @@ const B = window.BANCO_JUDICIAL;
    puntúan solo UNA es de nivel introductorio y 18 son difíciles. */
 const BLOQUES = [
   { k:'aptitudes',      et:'Aptitudes',      n:5,  cuotas:{2:2, 3:3},        puntua:true  },
-  { k:'actualidad',     et:'Actualidad',     n:2,  cuotas:{3:2},             puntua:true  },
+  // 1 media + 1 difícil, no 2 difíciles: el bloque de actualidad tiene alcance
+  // por sala y con solo las de nivel 3 algunas salas se quedaban con cuatro
+  // preguntas y las repetían cada dos partidas.
+  { k:'actualidad',     et:'Actualidad',     n:2,  cuotas:{2:1, 3:1},        puntua:true  },
   { k:'general',        et:'General',        n:7,  cuotas:{2:2, 3:5},        puntua:true  },
   { k:'sala',           et:'Específico',     n:13, cuotas:{1:1, 2:4, 3:8},   puntua:true  },
   { k:'comportamental', et:'Comportamental', n:3,  cuotas:{2:1, 3:2},        puntua:false }
@@ -606,14 +612,30 @@ function tomarDe(lista, cuotas, vistas, need){
   return out.slice(0, need);
 }
 
+/* Una pregunta con `salas:[...]` solo puede salir en esas salas. Los bloques
+   comunes (actualidad, general) se comparten entre las ocho salas, y sin este
+   filtro a un penalista le caían preguntas de arbitraje o de jornada laboral,
+   que se leen como error del simulador. En la sala compuesta cuentan también
+   las materias que mezcla. */
+function aplicaEnSala(q, sala){
+  if(!q.salas || !q.salas.length) return true;
+  const mez = (B.salas[sala]||{}).mezcla;
+  const activas = mez ? [sala, ...mez] : [sala];
+  return q.salas.some(x => activas.includes(x));
+}
+
 function pickQuestions(sala, nivel){
   const qs = [];
   const mezcla = (B.salas[sala]||{}).mezcla;   // sala COMPUESTA (promiscuo): sin banco propio
   for(const b of BLOQUES){
     const pool  = b.k==='sala' ? sala : b.k;          // el pool de sala cambia; los demás son comunes
-    const lista = b.k==='sala' && mezcla
+    const todas = b.k==='sala' && mezcla
       ? mezcla.flatMap(m=>B[m]||[])                   // promiscuo = unión de los bancos que mezcla
       : (B[pool] || []);
+    // el filtro por sala nunca puede dejar la cuota sin cubrir: si recorta de
+    // más, se vuelve a la lista completa antes que romper la partida
+    const acotada = todas.filter(q => aplicaEnSala(q, sala));
+    const lista = acotada.length >= b.n ? acotada : todas;
     const elegidas = tomarDe(lista, b.cuotas, new Set(getSeen(pool)), b.n);
     addSeen(pool, elegidas.map(q=>q.id), lista.length, b.n);
     elegidas.forEach(q=> qs.push({ ...aplicarNivel(q, nivel), _bl:b.k, _et:b.et, _puntua:b.puntua }));
@@ -1044,21 +1066,40 @@ async function flushPartidas(){
 
 /* Devuelve {ok, msg} para que el formulario pueda avisar si algo falló,
    en vez de cerrarse y dejar al jugador sin saber si quedó guardado. */
+/* `jz-reg-sync` = el registro llegó al servidor. Sin esta marca la página
+   daba por hecho que bastaba con tener los datos en el dispositivo y decía
+   "ya estás en el ranking" aunque el servidor los hubiera rechazado. */
+function regSincronizado(){ return localStorage.getItem('jz-reg-sync')==='1'; }
 async function pushToServer(){
   const reg=getReg(); if(!reg) return {ok:false, msg:'Sin registro'};
   try{
     const r = await fetch(API+'/juez/save',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({...reg, best:getBest(), ts:Date.now()})});
     const j = await r.json().catch(()=>({}));
-    if(!r.ok || j.ok===false) return {ok:false, msg:j.error||('Error '+r.status)};
+    if(!r.ok || j.ok===false){ localStorage.setItem('jz-reg-sync','0');
+      return {ok:false, msg:j.error||('Error '+r.status)}; }
+    localStorage.setItem('jz-reg-sync','1');
     return {ok:true};
-  }catch(e){ return {ok:false, msg:'Sin conexión con el servidor. Tu puntaje quedó en este dispositivo.'}; }
+  }catch(e){ localStorage.setItem('jz-reg-sync','0');
+    return {ok:false, msg:'Sin conexión con el servidor. Tu puntaje quedó en este dispositivo.'}; }
+}
+/* Reintento al cargar: si el registro quedó pendiente —por ejemplo porque el
+   servidor no pudo escribir ese día— se sube solo en la siguiente visita, sin
+   que el aspirante tenga que volver a llenar el formulario. */
+async function reintentarRegistro(){
+  if(!getReg() || regSincronizado()) return;
+  const r = await pushToServer();
+  if(r.ok) renderSaveState();
 }
 /* Estado de guardado visible en la pantalla de resultado. */
 function renderSaveState(){
   const el=$('res-saved'); if(!el) return;
   const reg=getReg();
-  if(reg){ el.className='res-saved ok'; el.innerHTML='✓ Guardado como <b>'+esc(reg.nombre)+'</b> · ya estás en el ranking'; }
+  if(reg && regSincronizado()){ el.className='res-saved ok';
+    el.innerHTML='✓ Guardado como <b>'+esc(reg.nombre)+'</b> · ya estás en el ranking'; }
+  else if(reg){ el.className='res-saved';
+    el.innerHTML='Tus datos quedaron en este dispositivo como <b>'+esc(reg.nombre)
+      +'</b>. El ranking no pudo recibirlos todavía: se suben solos la próxima vez que abras el juego.'; }
   else { el.className='res-saved'; el.innerHTML='<button class="lnk" onclick="openReg()">Guarda tu puntaje y entra al ranking →</button>'; }
 }
 
@@ -1260,7 +1301,8 @@ function renderChip(){
 }
 
 renderChip(); renderHome(); rankTabs();
-flushPartidas();   // reintenta las partidas que quedaron sin subir
+flushPartidas();       // reintenta las partidas que quedaron sin subir
+reintentarRegistro();  // …y el registro, si el servidor no pudo recibirlo
 </script>
 </body>
 </html>
