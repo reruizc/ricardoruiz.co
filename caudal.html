@@ -249,6 +249,21 @@
   .rosa-pie{font-size:.8rem; color:var(--ink2); line-height:1.55; margin-top:.2rem; text-align:left;
             border-left:2px solid var(--teal); padding-left:.7rem}
   @media(max-width:640px){ .rosa{grid-template-columns:1fr} }
+  /* ── la lectura, por dirección ───────────────────────────────────────────
+     El sello de la derecha es lo que hace legible la doble velocidad: azul si
+     esa dirección trajo algo en 72 h, gris si está quieta. Sin él, «sin
+     movimiento» y «cuatro noticias» se leen igual de lejos. */
+  .lc-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:.7rem; margin:.2rem 0 1.1rem}
+  .lc-card{padding:.9rem 1.05rem; background:var(--card); border:1px solid var(--border); border-radius:11px}
+  .lc-top{display:flex; align-items:center; gap:.5rem; margin-bottom:.45rem; flex-wrap:wrap}
+  .lc-let{font-weight:800; font-size:1rem; color:var(--teal); line-height:1}
+  .lc-nom{font-weight:700; font-size:.78rem; letter-spacing:-.01em}
+  .lc-mov{margin-left:auto; font-size:.56rem; letter-spacing:.1em; text-transform:uppercase;
+          font-weight:800; color:#fff; background:var(--blue); padding:.16rem .42rem; border-radius:3px; white-space:nowrap}
+  .lc-quieto{margin-left:auto; font-size:.56rem; letter-spacing:.1em; text-transform:uppercase;
+             color:var(--ink3); border:1px solid var(--border2); padding:.14rem .42rem; border-radius:3px; white-space:nowrap}
+  .lc-t{font-size:.79rem; color:var(--ink2); line-height:1.55}
+  @media(max-width:640px){ .lc-grid{grid-template-columns:1fr} .lc-mov,.lc-quieto{margin-left:0} }
   #cli-body{margin-top:1.2rem}
   .cli-note{font-size:.8rem; color:var(--ink2); background:var(--teal-soft); border:1px solid var(--teal-dim);
     border-radius:8px; padding:.7rem .95rem; margin:.2rem 0 1.2rem}
@@ -2817,12 +2832,33 @@
     try{ tbRender(await call({action:'tablero',...arg})); }
     catch(e){ box.innerHTML='<div class="cli-empty">No se pudo armar el expediente. Reintenta en un momento.</div>'; }
   }
+  /* La lectura ya no es un briefing plano: son las cuatro direcciones, cada una
+     con su resumen. El contador «N en 72 h» sale de kpis.cardinales y es lo que
+     separa lo que se movió de lo que solo está vigente — sin él, una dirección
+     quieta y una activa se ven igual. */
+  const CARD_ORD=[['norte','N','Norte · Oportunidad'],['este','E','Este · Conversación'],
+                  ['sur','S','Sur · Competencia'],['oeste','O','Oeste · Estado']];
   function cliRenderLectura(l){
     const body=document.getElementById('cli-lectura-body'); if(!body) return;
+    const _k=(_CLI_LAST&&_CLI_LAST.kpis)||{};
+    const cc=_k.cardinales||{}, md=_k.mov_dias||3;
+    const partes=CARD_ORD.map(([k,letra,nom])=>{
+      const t=(l[k]||'').trim(); if(!t) return '';
+      const c=cc[k]||{}, mov=c.mov||0, tot=c.total||0;
+      // el sello dice de un vistazo si esa dirección trajo noticia o está quieta
+      const sello=mov ? `<span class="lc-mov">${mov} en ${md*24} h</span>`
+                      : `<span class="lc-quieto">sin movimiento${tot?` · ${tot} vigente${tot>1?'s':''}`:''}</span>`;
+      return `<div class="lc-card"><div class="lc-top"><span class="lc-let">${letra}</span>`
+           + `<span class="lc-nom">${nom}</span>${sello}</div>`
+           + `<div class="lc-t">${esc(t)}</div></div>`;
+    }).join('');
     const blk=(h,t)=>t?`<div class="blk"><div class="h">${h}</div><div class="t">${esc(t)}</div></div>`:'';
     const acc=(l.acciones&&l.acciones.length)?`<div class="blk"><div class="h">Acciones</div>${l.acciones.map(a=>`<div class="acc">${esc(a)}</div>`).join('')}</div>`:'';
     body.innerHTML=(l.titular?`<div class="blk"><div class="t" style="font-weight:700;font-size:.95rem;color:var(--ink)">${esc(l.titular)}</div></div>`:'')
-      + blk('Lo que mueve la aguja', l.lo_que_importa) + acc + blk('En el horizonte', l.horizonte)
+      + (partes?`<div class="lc-grid">${partes}</div>`:'')
+      // compatibilidad: lecturas cacheadas de antes del cambio traen el campo viejo
+      + blk('Lo que mueve la aguja', l.lo_que_importa)
+      + acc + blk('En el horizonte', l.horizonte)
       || '<div class="cob-note">Sin lectura disponible.</div>';
   }
   // `arg` = {sector:'salud'} (preset/demo) o {perfil:{…}} (el perfil del cliente).

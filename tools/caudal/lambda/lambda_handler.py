@@ -103,7 +103,7 @@ def _vocab_empresa(emps, ampliar=False):
     return out
 
 BUCKET = os.environ.get('CAUDAL_BUCKET', 'caudal-legislativo')
-PROMPT_VERSION = 'v8'            # bumpear para invalidar cache de síntesis
+PROMPT_VERSION = 'v9'            # bumpear para invalidar cache de síntesis
 CACHE_PREFIX = 'analisis-cache/'
 HTTP_TIMEOUT = 55
 
@@ -1603,19 +1603,95 @@ CLIENTE_SYSTEM = (
     "expediente de 36 años. Precisión sobre volumen. REGLA DURA: usa SOLO las "
     "señales que te doy; NO inventes proyectos, cifras, entidades, sanciones "
     "ni titulares de prensa. Si algo no está, no lo menciones. Devuelves "
-    "SIEMPRE un JSON válido con: titular (una frase potente y precisa del "
-    "hallazgo principal de hoy), lo_que_importa (2-4 frases que sinteticen lo "
-    "legislativo + lo regulatorio + la prensa citando ítems concretos por "
-    "nombre, y por qué mueven la aguja de este sector — si un tipo de señal "
-    "no trajo nada relevante, no lo fuerces), acciones (lista de 2-4 acciones "
-    "concretas), horizonte (1-2 frases sobre qué ventana de incidencia, riesgo "
-    "u oportunidad se abre próximamente según el estado de trámite de las "
-    "señales que te di).")
+    "SIEMPRE un JSON válido.\n\n"
+    "El briefing se organiza en CUATRO DIRECCIONES, y cada una responde una "
+    "pregunta distinta. Las señales te llegan ya repartidas y marcadas "
+    "[MOVIMIENTO] (ocurrió en las últimas 72 horas: es noticia) o [ESTADO] "
+    "(situación vigente, no pasó hoy). Esa diferencia es la clave del briefing: "
+    "NUNCA presentes como novedad algo marcado ESTADO.\n"
+    "  · norte  — la OPORTUNIDAD. Qué se está abriendo para este cliente. Es la "
+    "única dirección donde INTERPRETAS en vez de reportar: cruza lo que ves en "
+    "las otras tres y di qué ventana se abre o se cierra. Si el trámite va bien "
+    "pero el ambiente está caldeado, dilo; si algo se ve muerto y hay ventana, "
+    "dilo. No inventes hechos: interpreta los que te di.\n"
+    "  · este   — la CONVERSACIÓN. Qué se está diciendo en la prensa, en qué "
+    "tono y quién lo dice.\n"
+    "  · sur    — la COMPETENCIA. Qué les está pasando a las empresas que el "
+    "cliente vigila. Nómbralas.\n"
+    "  · oeste  — el ESTADO. Qué está produciendo el Congreso y las "
+    "superintendencias sobre sus temas.\n\n"
+    "REGLA DE HONESTIDAD: si una dirección no trajo NADA en 72 horas, dilo "
+    "explícitamente («sin movimiento en 72 horas») y describe en una frase cómo "
+    "está el frente. NO rellenes, NO estires, NO presentes algo viejo como "
+    "nuevo. Un punto cardinal quieto es información, no un hueco.\n\n"
+    "Campos del JSON: titular (una frase potente y precisa de lo principal de "
+    "hoy), norte, este, sur, oeste (2-3 frases cada uno, citando ítems "
+    "concretos por nombre), acciones (lista de 2-4 acciones concretas) y "
+    "horizonte (1-2 frases sobre qué ventana se abre próximamente).")
 
 
 # cuántas señales entran al briefing. Es un tope de COSTO y de foco, no de
 # cobertura: el radar completo se le muestra al usuario en pantalla.
 LECTURA_MAX_SENALES = 26
+
+# ── los cuatro puntos ────────────────────────────────────────────────────────
+# El producto dejó de ser un listado por FUENTE y pasa a orientar en cuatro
+# direcciones. El mapeo no es cosmético: cambia qué pregunta responde cada
+# bloque.
+#   Norte  · qué se abre  → contratación (el Estado comprando) + la lectura de
+#                           contexto, que es lo único que no sale de un feed
+#   Este   · qué se dice  → prensa
+#   Sur    · la competencia → CUALQUIER señal sobre una vigilada, venga del
+#                           pilar que venga: si sancionan a tu competidor eso es
+#                           noticia de competencia, no "regulatorio" a secas
+#   Oeste  · el Estado    → Congreso y superintendencias sobre TU tema
+CARD_POR_TIPO = {'contratacion': 'norte', 'medios': 'este',
+                 'congreso': 'oeste', 'regulatorio': 'oeste'}
+CARD_LBL = {'norte': 'NORTE · oportunidad', 'este': 'ESTE · conversación',
+            'sur': 'SUR · competencia',    'oeste': 'OESTE · Estado'}
+
+# Ventana de "se movió". 72 h es lo que pidió el cliente y es la ventana correcta
+# para un brief diario, PERO medido contra producción (ago-2026) solo la prensa
+# tiene volumen diario: regulatorio y contratación traen 0 señales en ≤3 días la
+# mayoría de los días. Por eso el radar NO filtra por esta ventana — la usa para
+# SEPARAR: lo de ≤3 días es movimiento (noticia), lo demás es estado del frente
+# (situación vigente). Un filtro duro dejaría tres de los cuatro puntos vacíos y
+# convertiría el producto en un servicio de recortes de prensa.
+MOV_DIAS = 3
+
+
+def _es_movimiento(x):
+    """¿La señal cayó dentro de la ventana de movimiento?
+
+    ⚠️ Las señales del Congreso NO traen fecha: el índice guarda solo el año
+    (`a`), la fecha de radicación vive en proyectos.jsonl y no se sube al
+    índice. Así que un proyecto nunca cuenta como "movimiento" — y eso es
+    correcto de todas formas: un proyecto en trámite es una situación vigente,
+    no una noticia de hoy. Para poder decir "esto se radicó anteayer" habría que
+    llevar la fecha al índice (ver el pendiente en CLAUDE.md)."""
+    f = (x.get('fecha') or '')[:10]
+    if len(f) != 10:
+        return False
+    try:
+        d = datetime.date(int(f[:4]), int(f[5:7]), int(f[8:10]))
+    except (ValueError, TypeError):
+        return False
+    return 0 <= (datetime.date.today() - d).days <= MOV_DIAS
+
+
+def _anotar_cardinales(senales):
+    """Marca cada señal con su punto (`card`) y si es movimiento (`mov`).
+
+    La vigilada gana sobre el tipo: una sanción a un competidor es Sur, no
+    Oeste. Devuelve el conteo por punto para los KPI."""
+    cuenta = {c: {'total': 0, 'mov': 0} for c in ('norte', 'este', 'sur', 'oeste')}
+    for x in senales:
+        card = 'sur' if x.get('vigilada') else CARD_POR_TIPO.get(x.get('tipo'), 'oeste')
+        mov = _es_movimiento(x)
+        x['card'], x['mov'] = card, mov
+        cuenta[card]['total'] += 1
+        cuenta[card]['mov'] += 1 if mov else 0
+    return cuenta
 # vida del candado que evita dos generaciones simultáneas de la misma lectura.
 # Un poco más que el timeout de la Lambda: si la que tenía el candado murió,
 # la siguiente petición puede volver a intentarlo.
@@ -1652,9 +1728,21 @@ def _lectura_cliente_prompt(s, senales, kpis):
     # de truncar: primero todo lo que es sobre una vigilada, después lo de alta
     # prioridad, después el resto.
     orden = {'alto': 0, 'medio': 1, 'bajo': 2}
-    top = sorted(senales, key=lambda x: (0 if x.get('vigilada') else 1,
+    # Lo que se movió en 72 h entra ANTES que lo alto-y-viejo: el briefing es de
+    # hoy, y si el recorte deja fuera el único movimiento del día el modelo no
+    # puede escribir la dirección que importa.
+    top = sorted(senales, key=lambda x: (0 if x.get('mov') else 1,
+                                         0 if x.get('vigilada') else 1,
                                          orden.get(x.get('nivel'), 3)))[:LECTURA_MAX_SENALES]
+    # agrupadas por punto cardinal, que es como se va a escribir el briefing
+    top.sort(key=lambda x: (('norte', 'este', 'sur', 'oeste').index(x.get('card', 'oeste')),
+                            0 if x.get('mov') else 1))
+    _card_actual = [None]
     for x in top:
+        if x.get('card') != _card_actual[0]:
+            _card_actual[0] = x.get('card')
+            lines.append(f"\n### {CARD_LBL.get(_card_actual[0], _card_actual[0])}")
+        x = dict(x, nivel=('[MOVIMIENTO ≤72h] ' if x.get('mov') else '[ESTADO] ') + str(x.get('nivel')))
         vig = f" · VIGILADA DEL CLIENTE: {x['vigilada']}" if x.get('vigilada') else ''
         if x['tipo'] == 'congreso':
             lines.append(f"- [LEGISLATIVO · prioridad {x['nivel']}] ({x['anio']}, "
@@ -1686,6 +1774,18 @@ def _lectura_cliente_prompt(s, senales, kpis):
                if kpis.get('n_sanciones_sector') else '')
             + (f" · {kpis['n_medios_sector']} titulares de prensa recientes del sector"
                if kpis.get('n_medios_sector') else '') + ".\n\n"
+            # Sin este recuento el modelo no puede distinguir "esta dirección no
+            # trajo nada" de "no me la mandaste", y termina callándose el punto
+            # en vez de reportar la quietud, que es justo lo que hay que decir.
+            + "ESTADO DE LAS CUATRO DIRECCIONES (cuenta sobre TODO el radar, no "
+              "solo lo que te mando abajo):\n"
+            + '\n'.join(
+                f"  · {CARD_LBL[c]}: {sum(1 for x in senales if x.get('card') == c)} señales, "
+                f"{sum(1 for x in senales if x.get('card') == c and x.get('mov'))} de ellas "
+                f"con movimiento en las últimas {MOV_DIAS*24} horas"
+                + ("  ← SIN MOVIMIENTO: dilo explícito y describe cómo está el frente"
+                   if not any(x.get('card') == c and x.get('mov') for x in senales) else '')
+                for c in ('norte', 'este', 'sur', 'oeste')) + "\n\n"
             f"SEÑALES DEL RADAR (las priorizadas, no el histórico completo):\n"
             + '\n'.join(lines) + "\n\nEscribe el briefing en JSON.")
     return user
@@ -3466,6 +3566,12 @@ def handler(event, context):
                 # articulado: cuántas señales del Congreso traen "qué cambia" y
                 # cuántas de ésas le aplican al sector/vigiladas del cliente
                 'n_con_articulado': n_art, 'n_te_aplica': n_aplica}
+        # Cada señal sabe a qué punto pertenece y si se movió en 72 h. Va sobre
+        # `senales` (la lista unificada) y sobre los bloques por pilar, que son
+        # los mismos objetos: el frontend lee `card`/`mov` de cualquiera de las dos.
+        cards = _anotar_cardinales(senales)
+        kpis['cardinales'] = cards
+        kpis['mov_dias'] = MOV_DIAS
         out = {'cliente': {'sector': sk, 'nombre': s['nombre'], 'comision': s.get('comision', ''),
                            'sector_sanciones': s.get('sector_sanciones', ''),
                            'temas': s.get('temas', []),
