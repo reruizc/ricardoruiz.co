@@ -233,6 +233,22 @@
   .radar-cta .rc-d{color:var(--ink2); font-size:.8rem; margin-top:.22rem; line-height:1.5}
   .radar-cta .rc-go{margin-left:auto; color:var(--teal); font-weight:700; font-size:.82rem; white-space:nowrap; align-self:center}
   @media(max-width:640px){ .radar-cta{flex-wrap:wrap} .radar-cta .rc-go{margin-left:0; width:100%} }
+  /* ── los cuatro puntos, al abrir el instrumento ──────────────────────────
+     Cuadrícula 2×2 en vez de una rosa dibujada: proyectada en una sala, un
+     diagrama con las etiquetas en diagonal se vuelve ilegible, y una tarjeta
+     con la letra grande se lee desde el fondo. */
+  /* text-align:left explícito: la rosa vive dentro de .hero, que centra todo, y
+     un párrafo centrado dentro de una tarjeta se lee mal. */
+  .rosa{display:grid; grid-template-columns:repeat(2,1fr); gap:.75rem; margin:1.5rem 0 .3rem; text-align:left}
+  .rosa-p{display:flex; gap:.85rem; align-items:flex-start; padding:1rem 1.15rem;
+          background:var(--card); border:1px solid var(--border); border-radius:12px}
+  .rosa-c{font-weight:800; font-size:1.5rem; line-height:1; color:var(--teal); width:1.5rem;
+          flex-shrink:0; text-align:center; letter-spacing:-.02em}
+  .rosa-t{font-weight:700; font-size:.9rem; letter-spacing:-.01em; margin-bottom:.24rem}
+  .rosa-d{font-size:.78rem; color:var(--ink2); line-height:1.5}
+  .rosa-pie{font-size:.8rem; color:var(--ink2); line-height:1.55; margin-top:.2rem; text-align:left;
+            border-left:2px solid var(--teal); padding-left:.7rem}
+  @media(max-width:640px){ .rosa{grid-template-columns:1fr} }
   #cli-body{margin-top:1.2rem}
   .cli-note{font-size:.8rem; color:var(--ink2); background:var(--teal-soft); border:1px solid var(--teal-dim);
     border-radius:8px; padding:.7rem .95rem; margin:.2rem 0 1.2rem}
@@ -699,10 +715,10 @@
       <div class="radar-cta" id="radar-cta">
         <span class="rc-ic">◎</span>
         <div>
-          <div class="rc-t">Radar del cliente</div>
+          <div class="rc-t">&nbsp;</div>
           <div class="rc-d">Elige un sector y Caudal cruza Congreso, Regulatorio y prensa, filtra el ruido y te deja las señales que mueven tu aguja, ya leídas y con una acción sugerida.</div>
         </div>
-        <span class="rc-go">Abrir el radar →</span>
+        <span class="rc-go">Abrir →</span>
       </div>
       <div class="pillars" id="pillars"></div>
     </div>
@@ -878,11 +894,10 @@
     <div id="view-cliente" hidden>
       <button class="pill-back" id="cliBack">← Volver a Caudal</button>
       <div class="hero">
-        <h1>Radar del <em>cliente</em>.</h1>
-        <p>Arma el perfil de tu cliente — sus temas y las empresas que vigila — y
-           Caudal cruza el Congreso, las superintendencias, la contratación del
-           Estado y la prensa, descarta el ruido y te deja las señales que mueven
-           su aguja, cada una con su estado real y una acción sugerida.</p>
+        <h1 id="cli-h1"></h1>
+        <p id="cli-sub"></p>
+        <div class="rosa" id="cli-rosa"></div>
+        <div class="rosa-pie" id="cli-pie"></div>
         <div class="pf-bar" id="cli-perfiles"></div>
         <div class="pf-bar" id="cli-presets-bar">
           <span class="pf-lbl">o prueba un sector</span>
@@ -1284,6 +1299,24 @@
     const r=await fetch(API,{method:'POST',headers:h,body:JSON.stringify(body)});
     return r.json();
   }
+
+  /* ---------- marca del producto de acompañamiento ----------
+     Se llamaba «Radar», que es como se llama el de Orza. El nombre definitivo lo
+     deciden los socios entre Sextante y Rosa de los Vientos, así que vive en UNA
+     constante: cambiar `nombre` y `articulo` renombra la portada, la vista y
+     todos los textos. No se tocaron ni los id ni las clases CSS (`radar-cta`,
+     `cli-*`): renombrarlos rompería el cableado sin que el cliente gane nada. */
+  const MARCA={
+    nombre:'Sextante',
+    articulo:'el',            // «abrir EL Sextante» / «abrir LA Rosa de los Vientos»
+    // Los cuatro puntos. El orden es el de la rosa: N · E · S · O.
+    puntos:[
+      {c:'N', t:'Norte · Oportunidad',  d:'La lectura del contexto: qué se está abriendo y qué conviene mover ahora. No es el trámite — es si el ambiente lo aguanta.'},
+      {c:'E', t:'Este · Conversación',  d:'Prensa y redes sobre tu cliente y su sector: quién está hablando, en qué tono y desde cuándo.'},
+      {c:'S', t:'Sur · Competencia',    d:'Los otros de tu sector, con el mismo detalle que tú: qué los sancionaron, qué contratan, qué proyectos los tocan.'},
+      {c:'O', t:'Oeste · Estado',       d:'Lo que produce el Estado: proyectos en el Congreso, decretos del Ejecutivo y actos de las superintendencias.'}
+    ]
+  };
 
   /* ---------- home · paraguas + router de pilares ---------- */
   // Mapa de fuentes de Cauce como pilares navegables. Los 3 vivos van primero
@@ -2282,8 +2315,38 @@
     return d;
   }
 
+  /* La portada del instrumento: su nombre y sus cuatro puntos. Se pinta desde
+     MARCA para que renombrarlo no obligue a perseguir textos por el archivo. */
+  function marcaRender(){
+    const N=MARCA.nombre, A=MARCA.articulo;
+    const h1=document.getElementById('cli-h1');
+    if(h1) h1.innerHTML=`<em>${esc(N)}</em>.`;
+    const sub=document.getElementById('cli-sub');
+    if(sub) sub.textContent=`Arma el perfil de tu cliente —sus temas y las empresas que vigila— y `
+      +`${N} orienta en cuatro direcciones: lo que produce el Estado, lo que hace su competencia, `
+      +`lo que se está diciendo y lo que se está abriendo. Descarta el ruido y deja las señales que `
+      +`mueven su aguja, cada una con su estado real y una acción sugerida.`;
+    const r=document.getElementById('cli-rosa');
+    if(r) r.innerHTML=MARCA.puntos.map(p=>
+      `<div class="rosa-p"><div class="rosa-c">${esc(p.c)}</div>`
+      +`<div><div class="rosa-t">${esc(p.t)}</div><div class="rosa-d">${esc(p.d)}</div></div></div>`).join('');
+    const pie=document.getElementById('cli-pie');
+    if(pie) pie.innerHTML='Las cuatro direcciones las cruza Caudal; la lectura la firma un analista. '
+      +'<b>No es un tablero que se deja solo</b> — el acompañamiento es parte del servicio.';
+    // portada: la tarjeta que lleva acá
+    const t=document.querySelector('#radar-cta .rc-t'); if(t) t.textContent=N;
+    const d=document.querySelector('#radar-cta .rc-d');
+    if(d) d.textContent=`Elige un sector o arma el perfil de tu cliente y ${N} cruza el Estado, `
+      +`su competencia y la conversación pública, filtra el ruido y te deja las señales que mueven `
+      +`su aguja, ya leídas y con una acción sugerida.`;
+    const g=document.querySelector('#radar-cta .rc-go'); if(g) g.textContent=`Abrir ${A} ${N} →`;
+    const e=document.querySelector('#cli-body .cli-empty');
+    if(e) e.textContent=`Crea el perfil de un cliente —o abre un sector de muestra— para orientarlo.`;
+  }
+
   function cliInit(){
     if(_cliInited) return; _cliInited=true;
+    marcaRender();
     const cont=document.getElementById('cli-sectors');
     if(cont) CLI_SECS.forEach(([k,t,reg])=>{
       const c=document.createElement('span');
@@ -2670,16 +2733,16 @@
       : `<div class="cob-note" style="margin-bottom:1rem"><b>${esc(cl.nombre)}.</b>${cl.descripcion?' '+esc(cl.descripcion):''}</div>`;
     // lo que el diccionario no reconoció: se dice, no se esconde
     const desc=(cl.descartes&&cl.descartes.length)
-      ? `<div class="cli-reg-none" style="margin-bottom:1rem">No están en el diccionario de Caudal y quedaron fuera del radar: <b>${esc(cl.descartes.join(', '))}</b>. Búscalas otra vez en el editor: si no aparecen, todavía no las cubrimos.</div>` : '';
+      ? `<div class="cli-reg-none" style="margin-bottom:1rem">No están en el diccionario de Caudal y quedaron fuera de ${MARCA.nombre}: <b>${esc(cl.descartes.join(', '))}</b>. Búscalas otra vez en el editor: si no aparecen, todavía no las cubrimos.</div>` : '';
     // el perfil llegó mal formado (campo con otro nombre, lista que era texto):
     // se dice en vez de devolver un radar vacío en silencio
     const avi=(cl.avisos&&cl.avisos.length)
       ? `<div class="cli-reg-none" style="margin-bottom:1rem">El perfil llegó con algo que Caudal no entendió: <b>${esc(cl.avisos.join(' · '))}</b>. El radar de abajo se armó sin eso.</div>` : '';
     const vigNote=vigN
-      ? `<div class="cli-note"><b>Vigiladas (${vigN}):</b> ${esc(vigNoms)} · <b>${k.n_senales_vigiladas||0}</b> señal(es) del radar son sobre ellas${k.n_contratos_vigiladas?` · <b>${fmt(k.n_contratos_vigiladas)}</b> contrato(s) suyos en SECOP`:(cl.vigiladas_sin_contratos?' · no le venden al Estado en SECOP II':'')}.</div>` : '';
+      ? `<div class="cli-note"><b>Vigiladas (${vigN}):</b> ${esc(vigNoms)} · <b>${k.n_senales_vigiladas||0}</b> señal(es) de ${MARCA.nombre} son sobre ellas${k.n_contratos_vigiladas?` · <b>${fmt(k.n_contratos_vigiladas)}</b> contrato(s) suyos en SECOP`:(cl.vigiladas_sin_contratos?' · no le venden al Estado en SECOP II':'')}.</div>` : '';
     body.innerHTML=`
       <div class="kpis">
-        <div class="kpi"><div class="n">${k.n_radar}</div><div class="l">Señales en el radar</div></div>
+        <div class="kpi"><div class="n">${k.n_radar}</div><div class="l">Señales en ${MARCA.nombre}</div></div>
         <div class="kpi vit"><div class="n">${k.alto}</div><div class="l">Alta prioridad</div></div>
         <div class="kpi ley"><div class="n">${k.en_tramite}</div><div class="l">En trámite · ventana</div></div>
         <div class="kpi"><div class="n">${vigN?(k.n_senales_vigiladas||0):(k.n_medios_sector?fmt(k.n_medios_sector):'—')}</div><div class="l">${vigN?'Sobre tus vigiladas':'Prensa reciente'}</div></div>
@@ -2782,9 +2845,9 @@
       : {action:'cliente',lectura:true,sector:arg.sector};
     const body=document.getElementById('cli-body');
     const quien=esPerfil?('de '+esc(p.nombre||'tu cliente')):'del sector';
-    if(body) body.innerHTML='<div class="llm-load" style="padding:2.5rem;justify-content:center">Armando el radar '+quien+' <span class="dots"><span></span><span></span><span></span></span></div>';
+    if(body) body.innerHTML='<div class="llm-load" style="padding:2.5rem;justify-content:center">Armando '+MARCA.articulo+' '+MARCA.nombre+' '+quien+' <span class="dots"><span></span><span></span><span></span></span></div>';
     let d; try{ d=await call(req); }
-    catch(e){ if(mine===_cliSeq&&body) body.innerHTML='<div class="err">No se pudo cargar el radar. Reintenta.</div>'; return; }
+    catch(e){ if(mine===_cliSeq&&body) body.innerHTML='<div class="err">No se pudo cargar '+MARCA.articulo+' '+MARCA.nombre+'. Reintenta.</div>'; return; }
     if(mine!==_cliSeq) return;
     if(d&&d.error){ if(body) body.innerHTML='<div class="err">'+esc(d.error)+'</div>'; return; }
     // el expediente se pide con el mismo `arg` del radar, pero solo cuando el
@@ -2830,7 +2893,7 @@
     //     (503) y no pasa nada — la Lambda termina y deja la lectura hecha.
     call({action:'cliente-lectura',key}).then(d=>{
       if(mine!==_cliSeq || listo(d)) return;
-      if(d && d.estado==='sin_radar'){ cliLecturaStop(); return cliLecturaFallback('La lectura caducó. Vuelve a abrir el radar para regenerarla.'); }
+      if(d && d.estado==='sin_radar'){ cliLecturaStop(); return cliLecturaFallback('La lectura caducó. Vuelve a abrir '+MARCA.articulo+' '+MARCA.nombre+' para regenerarla.'); }
       // el modelo respondió pero mal: no se cachea, así que sondear no sirve
       if(d && d.estado==='lista'){ cliLecturaStop(); cliLecturaFallback(); }
     }).catch(()=>{});
