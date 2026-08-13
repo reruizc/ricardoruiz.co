@@ -178,7 +178,12 @@ textarea:focus{outline:none;border-color:var(--accent)}
 .rep-tot .v.neg{color:var(--danger)}
 .venc{background:rgba(230,207,58,.1);border:1px solid rgba(230,207,58,.35);border-radius:10px;
   padding:.65rem .8rem;margin-bottom:.6rem;font-size:.82rem;color:var(--gold);line-height:1.45}
-.deu{display:flex;align-items:center;gap:.7rem;padding:.55rem 0;border-bottom:1px solid var(--rule)}
+.deu{display:flex;align-items:center;gap:.7rem;padding:.55rem 0;border-bottom:1px solid var(--rule);cursor:pointer}
+.pag-det{font-size:.68rem;color:var(--ink-3);padding:0 0 .55rem;margin-top:-.25rem}
+.pag-lista{display:grid;gap:.2rem}
+.pag-l{display:flex;align-items:center;gap:.6rem;font-size:.82rem;padding:.3rem 0;border-bottom:1px solid var(--rule)}
+.pag-l span:first-child{flex:1;color:var(--ink-3);font-size:.75rem}
+.pag-x{background:none;border:none;color:var(--danger);font-size:1.1rem;cursor:pointer;padding:0 .3rem}
 .deu .n{flex:1;min-width:0}
 .deu .n b{display:block;font-size:.88rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .deu .n span{font-size:.7rem;color:var(--ink-3)}
@@ -297,6 +302,11 @@ textarea:focus{outline:none;border-color:var(--accent)}
   <div id="bancos"></div>
   </section>
 
+  <section class="vista" id="v-pagos" hidden>
+  <h2>Lo que has pagado</h2>
+  <div id="pagos"></div>
+  </section>
+
   <section class="vista" id="v-deudas" hidden>
   <h2 id="deudas-h" hidden>Lo que debes</h2>
   <div id="deudas"></div>
@@ -308,6 +318,7 @@ textarea:focus{outline:none;border-color:var(--accent)}
   <button data-v="movs"><span>≡</span>Movimientos</button>
   <button data-v="analisis"><span>◑</span>Análisis</button>
   <button data-v="deudas"><span>▤</span>Deudas</button>
+  <button data-v="pagos"><span>◈</span>Pagos</button>
 </nav>
 
 <button class="fab" id="fab" hidden>+</button>
@@ -369,6 +380,7 @@ async function arrancar(){
   MES = mesHoy();
   try { CFG = (await api('/gastos/config')).cfg || {}; } catch {}
   await cargarDeudas();
+  await cargarPagos();
   await cargar();
   if (cuentaVacia()) obPaso(0);
 }
@@ -417,6 +429,7 @@ function render(){
   renderReparto(d);
   renderVencimientos();
   renderDeudas();
+  renderPagos();
 
   // Un solo renglón: tres tarjetas apiladas volvían la pantalla un scroll eterno.
   const notas = [];
@@ -600,13 +613,102 @@ function abrirManual() {
   };
 };
 
+// ── Pagos a deudas ────────────────────────────────────────────────────────
+// Lo que se registra es el PAGO; el saldo nuevo lo dice el usuario mirando su
+// banco. No se deduce uno del otro: entre corte y corte corren intereses, y
+// restar el pago del saldo daría una cifra que el banco no reconoce.
+let PAGOS = [], PAGOS_MES = [];
+
+async function cargarPagos() {
+  try {
+    const r = await api('/gastos/pagos');
+    PAGOS = r.pagos || []; PAGOS_MES = r.resumen || [];
+  } catch { PAGOS = []; PAGOS_MES = []; }
+}
+
+const nombreDeuda = id => (DEUDAS.find(d => d.id === id) || {}).nombre || 'deuda borrada';
+
+function renderPagos() {
+  const caja = $('pagos');
+  if (!caja) return;
+  if (!PAGOS_MES.length) {
+    caja.innerHTML = `<div class="empty">Todavía no has registrado ningún pago.<br>
+      Tócale a una deuda para anotar el primero.</div>`;
+    return;
+  }
+  const max = Math.max(...PAGOS_MES.map(m => m.total));
+  const esteMes = PAGOS_MES.find(m => m.mes === mesHoy());
+  caja.innerHTML =
+    `<div class="rep" style="margin-bottom:.9rem">
+       <h3>${esteMes ? cop(esteMes.total) : '$0'} este mes</h3>
+       <div class="sub">${esteMes ? `${esteMes.n} ${esteMes.n===1?'pago':'pagos'} registrados` : 'sin pagos registrados todavía'}</div>
+     </div>`
+    + PAGOS_MES.map(m => `
+        <div class="cat">
+          <span class="cat-n">${esc(mesLbl(m.mes))}</span>
+          <span class="cat-bar"><i style="width:${Math.max(4,(m.total/max)*100)}%"></i></span>
+          <span class="cat-v">${cop(m.total)}</span>
+        </div>
+        <div class="pag-det">${Object.entries(m.por_deuda)
+            .sort((a,b)=>b[1]-a[1])
+            .map(([id,v]) => `${esc(nombreDeuda(id))} ${cop(v)}`).join(' &nbsp;·&nbsp; ')}</div>`).join('')
+    + `<div class="nota compacta">Solo cuenta lo que registres acá. Un pago no baja el saldo solo: cuando abones, aprovecha y actualiza también cuánto quedó debiendo según tu banco.</div>`;
+}
+
+// Tocar una deuda abre su ficha: registrar pago + lo que ya le has pagado.
+function abrirDeuda(id) {
+  const d = DEUDAS.find(x => x.id === id);
+  if (!d) return;
+  const suyos = PAGOS.filter(p => p.deudaId === id);
+  const total = suyos.reduce((a, p) => a + p.monto, 0);
+  const f = ts => new Date(ts - 5*3600000).toLocaleDateString('es-CO', { day:'numeric', month:'short' });
+
+  $('sheet-t').textContent = d.nombre;
+  $('sheet-body').innerHTML = `
+    <div class="nota compacta">Debes ${cop(d.saldo)}${d.tasa ? ` · ${d.tasa}% E.A.` : ''}${total ? ` · le has pagado ${cop(total)}` : ''}</div>
+    <div class="row">
+      <div><label style="font-size:.7rem;color:var(--ink-3)">¿Cuánto abonaste?</label>
+        <input id="p-monto" type="number" inputmode="decimal" placeholder="${d.minimo || 200000}"></div>
+      <div><label style="font-size:.7rem;color:var(--ink-3)">Saldo que quedó</label>
+        <input id="p-saldo" type="number" inputmode="decimal" placeholder="según tu banco"></div>
+    </div>
+    <div class="nota compacta">El saldo es opcional, pero es lo que mantiene la cifra honesta: el pago no lo baja completo porque corrieron intereses.</div>
+    ${suyos.length ? `<div><label style="font-size:.7rem;color:var(--ink-3)">Lo que le has pagado</label>
+      <div class="pag-lista">${suyos.slice(0,8).map(p => `<div class="pag-l"><span>${f(p.ts)}</span><span>${cop(p.monto)}</span>
+        <button class="pag-x" data-borrar="${esc(p.id)}">×</button></div>`).join('')}</div></div>` : ''}
+    <div class="acts"><button class="b ghost" id="p-cancel">Cerrar</button><button class="b" id="p-ok">Registrar pago</button></div>`;
+  $('sheet').classList.add('on');
+  $('p-cancel').onclick = cerrarSheet;
+  $('p-ok').onclick = async () => {
+    const monto = Number($('p-monto').value);
+    if (!(monto > 0)) return toast('¿Cuánto abonaste?');
+    const cuerpo = { deudaId: id, monto };
+    const ns = Number($('p-saldo').value);
+    if (ns >= 0 && $('p-saldo').value !== '') cuerpo.nuevo_saldo = ns;
+    try {
+      const r = await api('/gastos/pagos', { method:'POST', body: JSON.stringify(cuerpo) });
+      PAGOS = r.pagos; PAGOS_MES = r.resumen;
+      await cargarDeudas();
+  await cargarPagos();
+      cerrarSheet(); toast('Pago registrado'); renderDeudas(); renderPagos();
+    } catch (e) { toast('No se registró: ' + e.message); }
+  };
+  $('sheet-body').querySelectorAll('[data-borrar]').forEach(b => b.onclick = async () => {
+    try {
+      const r = await api('/gastos/pagos', { method:'POST', body: JSON.stringify({ borrar: b.dataset.borrar }) });
+      PAGOS = r.pagos; PAGOS_MES = r.resumen;
+      cerrarSheet(); toast('Pago borrado'); renderPagos(); abrirDeuda(id);
+    } catch (e) { toast('No se borró: ' + e.message); }
+  });
+}
+
 // ── Vistas ────────────────────────────────────────────────────────────────
 // Cuatro pantallas en vez de un scroll interminable. El + solo tiene sentido
 // donde se ven movimientos, así que se oculta en las otras dos.
 let VISTA = 'hoy';
 function mostrarVista(v) {
   VISTA = v;
-  for (const id of ['hoy','movs','analisis','deudas'])
+  for (const id of ['hoy','movs','analisis','deudas','pagos'])
     $('v-' + id).hidden = id !== v;
   $('tabs').querySelectorAll('[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
   $('fab').hidden = !(v === 'hoy' || v === 'movs');
@@ -667,7 +769,7 @@ function renderDeudas() {
       dd != null ? (dd === 0 ? 'VENCE HOY' : dd === 1 ? 'VENCE MAÑANA' : `en ${dd} días`) : null,
       d.minimo ? `cuota ${cop(d.minimo)}` : null,
     ].filter(Boolean).join(' · ');
-    return `<div class="deu"><span class="n"><b>${esc(d.nombre)}</b><span>${esc(det)}</span></span>
+    return `<div class="deu" data-deuda="${esc(d.id)}"><span class="n"><b>${esc(d.nombre)}</b><span>${esc(det)}</span></span>
       <span class="v">${cop(d.saldo)}</span></div>`;
   };
 
@@ -689,6 +791,8 @@ function renderDeudas() {
 
   $('deudas').querySelectorAll('[data-ord]').forEach(b =>
     b.onclick = () => { ORDEN_DEUDAS = b.dataset.ord; renderDeudas(); });
+  $('deudas').querySelectorAll('[data-deuda]').forEach(el =>
+    el.onclick = () => abrirDeuda(el.dataset.deuda));
 }
 
 function renderVencimientos() {
