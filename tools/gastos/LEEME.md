@@ -177,7 +177,7 @@ Decisiones que conviene no deshacer, cada una salió de un caso que falla:
   movimiento igual queda con `crudo` y confianza baja, marcado en amarillo para
   que lo corrijas de un toque. Corregirlo lo deja en confianza alta.
 
-Correr las pruebas (18 casos, sale con código 1 si alguno falla):
+Correr las pruebas (40 casos, sale con código 1 si alguno falla):
 
 ```bash
 node tools/gastos/prueba-parser.mjs
@@ -186,16 +186,26 @@ node tools/gastos/prueba-parser.mjs
 Prueba el archivo que se despliega, no una copia. Cuando aparezca un formato de
 banco nuevo, el caso se agrega ahí **primero** y luego se toca el parser.
 
-### ⚠️ El parser está calibrado con mensajes VEROSÍMILES, no reales
+### Calibrado con mensajes REALES
 
-No tuve a la vista SMS de verdad tuyos. Los formatos que maneja se construyeron
-a partir de las plantillas típicas de cada banco y los 18 casos de prueba pasan,
-pero **el formato exacto de cada banco puede diferir**.
+Once de los 40 casos son SMS textuales que llegaron al teléfono de Ricardo, de
+los tres remitentes (`85540` débito e ingresos · `85784` tarjeta de crédito ·
+`890789` Lulo). Son la vara: si uno de esos se rompe, el parser está mal.
 
-Por eso todo lo que entra guarda el texto original y lo dudoso sale marcado en
-amarillo. **Cuando lleguen los primeros mensajes reales, pásame 3 o 4 de cada
-banco y ajusto las expresiones**: con eso la confianza sube de "media" a "alta"
-y dejas de tener que corregir a mano.
+Lo que enseñaron, y que no se habría descubierto inventando mensajes:
+
+- **Bancolombia manda dos formatos de monto contradictorios** en la misma
+  cuenta: `COP12.533,00` (punto de miles) y `$13,693.98` (al revés). La regla
+  del último separador aguanta los dos.
+- **`tigo` casaba dentro de "Siempre con-tigo"**, la despedida que Bancolombia
+  pega en CADA mensaje: cualquier compra podía terminar en "servicios". Trece
+  términos del diccionario tenían el mismo defecto.
+- **El asterisco significa dos cosas opuestas** (ver el comentario en el
+  parser). `DNH*GODADDY#4088755116` se quedaba en "DNH".
+
+Sigue en pie el principio: lo dudoso queda marcado en amarillo y con su texto
+original. Cuando aparezca un banco o un formato nuevo, el caso se agrega al
+test primero.
 
 ## Privacidad
 
