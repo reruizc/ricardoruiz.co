@@ -120,9 +120,23 @@ button.b{
 button.b.ghost{background:transparent;border:1px solid var(--rule-strong);color:var(--ink-2)}
 button.b.del{background:transparent;border:1px solid rgba(255,92,92,.4);color:var(--danger);flex:0 0 auto;padding:.6rem .9rem}
 
+.tabs{
+  position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;
+  background:rgba(10,13,22,.92);backdrop-filter:blur(14px);
+  border-top:1px solid var(--rule);
+  padding:.45rem .3rem calc(.45rem + env(safe-area-inset-bottom));
+}
+.tabs button{
+  flex:1;background:none;border:none;color:var(--ink-3);font-family:var(--sans);
+  font-size:.66rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;
+  gap:.15rem;padding:.3rem 0;letter-spacing:.02em;
+}
+.tabs button span{font-size:1.05rem;line-height:1}
+.tabs button.on{color:var(--accent)}
+.wrap{padding-bottom:calc(5.5rem + env(safe-area-inset-bottom)) !important}
 .fab{
   position:fixed;right:max(1.1rem,env(safe-area-inset-right));
-  bottom:calc(1.1rem + env(safe-area-inset-bottom));
+  bottom:calc(4.6rem + env(safe-area-inset-bottom));   /* encima de la barra */
   width:56px;height:56px;border-radius:50%;background:var(--blue);color:#fff;
   border:none;font-size:1.7rem;line-height:1;cursor:pointer;
   box-shadow:0 6px 24px rgba(0,71,255,.4);z-index:50;
@@ -248,6 +262,7 @@ textarea:focus{outline:none;border-color:var(--accent)}
     </div>
   </div>
 
+  <section class="vista" id="v-hoy">
   <div class="hero">
     <div class="lbl" id="hero-lbl">Disponible</div>
     <div class="big" id="hero-big">—</div>
@@ -267,17 +282,33 @@ textarea:focus{outline:none;border-color:var(--accent)}
   <div id="rev-aviso"></div>
 
   <div id="reparto"></div>
+  </section>
 
-  <h2>En qué se va</h2>
-  <div id="cats"></div>
-
-  <h2 id="deudas-h" hidden>Lo que debes</h2>
-  <div id="deudas"></div>
-
+  <section class="vista" id="v-movs" hidden>
   <h2 id="movs-h">Movimientos</h2>
   <div id="movs"></div>
   <button class="link" id="btn-importar">Importar mensajes viejos</button>
+  </section>
+
+  <section class="vista" id="v-analisis" hidden>
+  <h2>En qué se va</h2>
+  <div id="cats"></div>
+  <h2>Con qué pagas</h2>
+  <div id="bancos"></div>
+  </section>
+
+  <section class="vista" id="v-deudas" hidden>
+  <h2 id="deudas-h" hidden>Lo que debes</h2>
+  <div id="deudas"></div>
+  </section>
 </div>
+
+<nav class="tabs" id="tabs" hidden>
+  <button data-v="hoy"      class="on"><span>◉</span>Hoy</button>
+  <button data-v="movs"><span>≡</span>Movimientos</button>
+  <button data-v="analisis"><span>◑</span>Análisis</button>
+  <button data-v="deudas"><span>▤</span>Deudas</button>
+</nav>
 
 <button class="fab" id="fab" hidden>+</button>
 
@@ -334,7 +365,7 @@ async function arrancar(){
   const correo = (u && u.email || '').toLowerCase();
   if (!correo) return negar('Tu sesión expiró.', true);
   if (!PERMITIDOS.includes(correo)) return negar('Esta herramienta es privada.', false);
-  $('gate').remove(); $('app').hidden = false; $('fab').hidden = false;
+  $('gate').remove(); $('app').hidden = false; $('fab').hidden = false; $('tabs').hidden = false;
   MES = mesHoy();
   try { CFG = (await api('/gastos/config')).cfg || {}; } catch {}
   await cargarDeudas();
@@ -414,6 +445,16 @@ function render(){
           <span class="cat-v">${cop(c.monto)}</span>
         </div>`).join('')
     : '<div class="empty">Todavía no hay gastos este mes.</div>';
+
+  const maxB = (d.por_banco && d.por_banco.length) ? d.por_banco[0].monto : 1;
+  $('bancos').innerHTML = (d.por_banco && d.por_banco.length)
+    ? d.por_banco.map(b => `
+        <div class="cat">
+          <span class="cat-n">${esc(b.banco)}</span>
+          <span class="cat-bar"><i style="width:${Math.max(4,(b.monto/maxB)*100)}%"></i></span>
+          <span class="cat-v">${cop(b.monto)}</span>
+        </div>`).join('')
+    : '<div class="empty">Sin gastos este mes.</div>';
 
   $('movs-h').textContent = `Movimientos · ${d.n_movimientos}`;
   $('movs').innerHTML = d.movimientos.length
@@ -559,6 +600,23 @@ function abrirManual() {
   };
 };
 
+// ── Vistas ────────────────────────────────────────────────────────────────
+// Cuatro pantallas en vez de un scroll interminable. El + solo tiene sentido
+// donde se ven movimientos, así que se oculta en las otras dos.
+let VISTA = 'hoy';
+function mostrarVista(v) {
+  VISTA = v;
+  for (const id of ['hoy','movs','analisis','deudas'])
+    $('v-' + id).hidden = id !== v;
+  $('tabs').querySelectorAll('[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  $('fab').hidden = !(v === 'hoy' || v === 'movs');
+  window.scrollTo(0, 0);
+}
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-v]');
+  if (b) mostrarVista(b.dataset.v);
+});
+
 // ── Deudas y reparto del ingreso ──────────────────────────────────────────
 // La idea que pidió Ricardo: el presupuesto no sirve de nada en abstracto;
 // sirve el día que entra la plata. Por eso el reparto solo aparece cuando el
@@ -594,7 +652,7 @@ let ORDEN_DEUDAS = 'saldo';   // 'saldo' | 'costo'
 function renderDeudas() {
   const deudas  = DEUDAS.filter(d => d.tipo === 'deuda');
   const mensual = DEUDAS.filter(d => d.tipo === 'mensual');
-  $('deudas-h').hidden = !DEUDAS.length;
+  $('deudas-h').hidden = false;
   if (!DEUDAS.length) { $('deudas').innerHTML = ''; return; }
 
   const total = deudas.reduce((a, d) => a + d.saldo, 0);
@@ -682,6 +740,7 @@ function obPaso(n) {
   $('onboard').hidden = false;
   $('app').hidden = true;
   $('fab').hidden = true;
+  $('tabs').hidden = true;
   document.querySelector('.ob-hero').hidden = n !== 0;
   $('ob-1').hidden = n !== 1;
   $('ob-2').hidden = n !== 2;
@@ -692,7 +751,8 @@ function obPaso(n) {
 function obSalir() {
   $('onboard').hidden = true;
   $('app').hidden = false;
-  $('fab').hidden = false;
+  $('tabs').hidden = false;
+  mostrarVista(VISTA);
   OB_SOLO_IMPORTAR = false;
   cargar();
 }

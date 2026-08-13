@@ -733,6 +733,31 @@
     }
 
     // ─── VALIDATION & SUBMIT ─────────────────────────────────────────────────
+
+    // ─── A dónde volver después de entrar ────────────────────────────────
+    // Acepta `redirect` Y `next`: el sitio usa los dos nombres (32 páginas
+    // mandan `next`, 3 mandan `redirect`) y antes solo se leía el segundo, así
+    // que casi todo el mundo terminaba en el dashboard en vez de volver a donde
+    // iba. Los módulos del Lab además mandan la ruta con barra inicial
+    // (`/mactor.html`), que la validación vieja rechazaba.
+    //
+    // ⚠️ Validar es obligatorio: sin esto sería un redirect abierto y cualquiera
+    // podría mandar a un usuario recién autenticado a un sitio ajeno con un link
+    // que se ve legítimo. Solo se admite un .html DE ESTE sitio.
+    function destinoTrasLogin() {
+      const q = new URLSearchParams(window.location.search);
+      const crudo = q.get('redirect') || q.get('next') || '';
+      let d = String(crudo).trim();
+      if (!d) return 'dashboard.html';
+      try { d = decodeURIComponent(d); } catch {}
+      if (/^[a-z][a-z0-9+.\-]*:/i.test(d)) return 'dashboard.html';  // http:, javascript:, data:
+      if (d.startsWith('//')) return 'dashboard.html';                // protocolo-relativa
+      d = d.replace(/^\/+/, '');                                      // ruta desde la raíz
+      if (!/^[\w.-]+\.html(\?[^#]*)?$/.test(d)) return 'dashboard.html';
+      if (d.includes('..')) return 'dashboard.html';
+      return d;
+    }
+
     document.getElementById('loginForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       const t = i18n[currentLang] || i18n.co;
@@ -786,8 +811,7 @@
               return;
             }
           }
-          const _redir = new URLSearchParams(window.location.search).get('redirect');
-          window.location.href = (_redir && /^[\w-]+\.html$/.test(_redir)) ? _redir : 'dashboard.html';
+          window.location.href = destinoTrasLogin();
         } else {
           // 403 = correo no verificado
           if (res.status === 403) {
