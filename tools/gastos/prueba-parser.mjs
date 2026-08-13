@@ -19,7 +19,7 @@ const FUENTE = path.resolve(import.meta.dirname, '../../../rr-auth/src/gastos-pa
 const tmp = path.join(os.tmpdir(), `gastos-parser-${process.pid}.mjs`);
 fs.copyFileSync(FUENTE, tmp);
 process.on('exit', () => { try { fs.unlinkSync(tmp); } catch {} });
-const { parsear } = await import('file://' + tmp);
+const { parsear, partirMensajes } = await import('file://' + tmp);
 
 const TITULAR = 'Ricardo Esteban Ruiz Castro';
 
@@ -98,6 +98,57 @@ function correrRecurrentes() {
   return mal;
 }
 
+
+// La fecha del mensaje manda sobre la de llegada. Sin esto, importar el
+// historial metería veinte mensajes viejos en el día de la importación.
+function correrFechas() {
+  console.log(`\n── fecha leída del mensaje ──`);
+  const fmt = ts => { const d = new Date(ts - 5*3600000);
+    return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`; };
+  const casos = [
+    [REALES[0][0],   "11/08/2026 21:14", "dd/mm/aaaa con 'a las'"],
+    [REALES_2[0][0], "02/08/2026 14:16", "dd/mm/aaaa sin 'a las'"],
+    [REALES[3][0],   "09/08/2026 22:06", "año de dos dígitos"],
+    [REALES_2[4][0], "29/07/2026 11:23", "'29 de julio de 2026' + a.m."],
+    [REALES_2[6][0], "14/05/2026 20:47", "p.m. → 24 h"],
+    ["Nequi: Pagaste $15.900 en NETFLIX. Saldo: $84.100", null, "sin fecha → hora de llegada"],
+  ];
+  let mal = 0;
+  for (const [msg, esp, que] of casos) {
+    const r = parsear(msg, { titular: TITULAR });
+    const leyo = r.ok && r.mov.fecha_fuente === "mensaje";
+    const got = leyo ? fmt(r.mov.ts) : null;
+    const bien = got === esp;
+    if (!bien) mal++;
+    console.log(`${bien ? "ok   " : "FALLA"} ${que.padEnd(30)} ${got || "(llegada)"}${bien ? "" : "  ← esperado " + (esp || "(llegada)")}`);
+  }
+  return mal;
+}
+
+// Un pegado con varios SMS se parte por el nombre del banco, no por salto de
+// línea: un solo mensaje ocupa varias líneas (Lulo pone la fecha aparte).
+function correrPartir() {
+  console.log(`\n── partir un pegado en mensajes ──`);
+  const pegado = [REALES[0][0], REALES[1][0], "", REALES_2[0][0],
+    "Lulo Bank: Realizaste una compra recurrente por $113,771.40 con tu tarjeta • 1603 en DNH*GODADDY#4088755116.\nFecha 14 de mayo de 2026. Hora 8:47 p.m.",
+    REALES[2][0], "Bancolombia: tu clave dinamica es 483920. No compartas este codigo."].join("\n");
+  const piezas = partirMensajes(pegado);
+  const movs = piezas.map(x => parsear(x, { titular: TITULAR })).filter(r => r.ok);
+  const pruebas = [
+    ["parte en 6 piezas", piezas.length === 6, piezas.length],
+    ["5 son movimientos", movs.length === 5, movs.length],
+    ["la clave se descarta", movs.every(r => !/clave/i.test(r.mov.crudo)), true],
+    ["Lulo de 2 líneas se une", movs.some(r => r.mov.comercio === "GODADDY"), true],
+    ["cada uno con su fecha", new Set(movs.map(r => new Date(r.mov.ts).toDateString())).size >= 3, true],
+  ];
+  let mal = 0;
+  for (const [que, ok, val] of pruebas) {
+    if (!ok) mal++;
+    console.log(`${ok ? "ok   " : "FALLA"} ${que.padEnd(30)} ${val}`);
+  }
+  return mal;
+}
+
 function correr(casos, etiqueta) {
   console.log(`\n── ${etiqueta} ──`);
   let mal = 0;
@@ -148,8 +199,10 @@ const mal = correr(SINTETICOS, "casos sintéticos")
           + correr(REALES, "mensajes REALES (85540 · débito e ingresos)")
           + correr(REALES_2, "mensajes REALES (85784 tarjeta · 890789 Lulo)")
           + correrSubstrings()
-          + correrRecurrentes();
+          + correrRecurrentes()
+          + correrFechas()
+          + correrPartir();
 
-const total = SINTETICOS.length + REALES.length + REALES_2.length + 4 + REALES_2.length;
+const total = SINTETICOS.length + REALES.length + REALES_2.length + 4 + REALES_2.length + 6 + 5;
 console.log(mal ? `\n${mal} de ${total} FALLAN` : `\nlos ${total} casos pasan`);
 process.exit(mal ? 1 : 0);
