@@ -61,6 +61,43 @@ const REALES = [
    true, 215000, "traslado", "bancolombia", "RICARDO ESTEBAN"],
 ];
 
+
+// REALES · 85784 (tarjeta de crédito Bancolombia) y 890789 (Lulo), ago-2026
+const REALES_2 = [
+  // Pagar la tarjeta NO es un gasto nuevo: cubre compras ya contadas.
+  ["Bancolombia: Pagaste $600,000 en la tarjeta de credito *1519 desde la cuenta *0583, el 02/08/2026 14:16. ¿Dudas? Llamanos al 018000912345. Estamos cerca.",
+   true, 600000, "traslado", "bancolombia", "Pago tarjeta *1519"],
+  ["Bancolombia: Pagaste $2,000,000 en la tarjeta de credito *1519 desde la cuenta *0583, el 01/08/2026 16:36. ¿Dudas? Llamanos al 018000912345. Estamos cerca.",
+   true, 2000000, "traslado", "bancolombia", "Pago tarjeta *1519"],
+  // procesador * COMERCIO → queda lo de después
+  ["Bancolombia: Compraste COP16.872,00 en PAYU*UBER con tu T.Cred *1519, el 19/06/2026 a las 14:00. Si tienes dudas, encuentranos aqui: 6045109095 o 018000931987. Estamos cerca.",
+   true, 16872, "gasto", "bancolombia", "UBER"],
+  ["Bancolombia: Compraste COP200.382,00 en EMILIA GRACE con tu T.Cred *1519, el 19/06/2026 a las 16:08. Si tienes dudas, encuentranos aqui: 6045109095 o 018000931987. Estamos cerca.",
+   true, 200382, "gasto", "bancolombia", "EMILIA GRACE"],
+  ["Lulo Bank: Realizaste una compra recurrente por $41,900.00 con tu tarjeta • 1603 en DLO*GOOGLE YouTubePrem. Fecha 29 de julio de 2026. Hora 11:23 a.m.",
+   true, 41900, "gasto", "lulo", "GOOGLE YouTubePrem"],
+  ["Lulo Bank: Realizaste una compra recurrente por $3,049.00 con tu tarjeta • 1603 en GOOGLE *Workspace_rica. Fecha 1 de agosto de 2026. Hora 8:17 a.m.",
+   true, 3049, "gasto", "lulo", "GOOGLE Workspace_rica"],
+  // El # de referencia no puede llevarse el nombre del comercio por delante.
+  ["Lulo Bank: Realizaste una compra recurrente por $113,771.40 con tu tarjeta • 1603 en DNH*GODADDY#4088755116. Fecha 14 de mayo de 2026. Hora 8:47 p.m.",
+   true, 113771.40, "gasto", "lulo", "GODADDY"],
+];
+
+// Las tres compras recurrentes de Lulo deben quedar marcadas como gasto fijo.
+function correrRecurrentes() {
+  console.log(`\n── marca de gasto recurrente ──`);
+  let mal = 0;
+  for (const [msg, , , , , com] of REALES_2) {
+    const esperado = /recurrente/i.test(msg);
+    const r = parsear(msg, { titular: TITULAR });
+    const tiene = !!(r.ok && r.mov.recurrente);
+    const bien = tiene === esperado;
+    if (!bien) mal++;
+    console.log(`${bien ? "ok   " : "FALLA"} ${String(com).padEnd(24)} recurrente=${tiene}${bien ? "" : `  ← esperado ${esperado}`}`);
+  }
+  return mal;
+}
+
 function correr(casos, etiqueta) {
   console.log(`\n── ${etiqueta} ──`);
   let mal = 0;
@@ -108,9 +145,11 @@ function correrSubstrings() {
 }
 
 const mal = correr(SINTETICOS, "casos sintéticos")
-          + correr(REALES, "mensajes REALES (85540)")
-          + correrSubstrings();
+          + correr(REALES, "mensajes REALES (85540 · débito e ingresos)")
+          + correr(REALES_2, "mensajes REALES (85784 tarjeta · 890789 Lulo)")
+          + correrSubstrings()
+          + correrRecurrentes();
 
-const total = SINTETICOS.length + REALES.length + 4;
+const total = SINTETICOS.length + REALES.length + REALES_2.length + 4 + REALES_2.length;
 console.log(mal ? `\n${mal} de ${total} FALLAN` : `\nlos ${total} casos pasan`);
 process.exit(mal ? 1 : 0);

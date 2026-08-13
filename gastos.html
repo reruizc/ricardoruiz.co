@@ -96,6 +96,7 @@ h2{font-size:.75rem;text-transform:uppercase;letter-spacing:.09em;color:var(--in
 .mov-sub{display:flex;gap:.45rem;align-items:center;font-size:.72rem;color:var(--ink-3);margin-top:.2rem;flex-wrap:wrap}
 .tag{background:rgba(244,243,239,.07);border-radius:5px;padding:.08rem .38rem;font-size:.68rem}
 .tag.rev{background:rgba(230,207,58,.16);color:var(--gold)}
+.tag.fijo{background:rgba(61,111,255,.16);color:var(--accent)}
 
 /* ── Editor ── */
 .edit{margin-top:.7rem;padding-top:.7rem;border-top:1px solid var(--rule);display:grid;gap:.5rem}
@@ -166,6 +167,7 @@ button.b.del{background:transparent;border:1px solid rgba(255,92,92,.4);color:va
     <div class="kpi"><div class="n" id="k-mov">—</div><div class="l">Movs.</div></div>
   </div>
 
+  <div id="fijo-aviso"></div>
   <div id="tras-aviso"></div>
   <div id="rev-aviso"></div>
 
@@ -271,6 +273,9 @@ function render(){
     : 'Define tu sueldo para ver cuánto te queda';
   $('foot-l').textContent = hayS ? Math.round(pct) + '% usado' : `${d.n_movimientos} movimientos`;
   $('foot-r').textContent = d.total_ingreso ? 'Ingresos ' + cop(d.total_ingreso) : '';
+  $('fijo-aviso').innerHTML = d.n_recurrentes
+    ? `<div class="nota">↻ ${cop(d.total_recurrente)} del mes es gasto fijo (${d.n_recurrentes} ${d.n_recurrentes===1?'cobro que se repite':'cobros que se repiten'} solos).</div>`
+    : '';
   $('tras-aviso').innerHTML = d.n_traslados
     ? `<div class="nota">⇄ ${d.n_traslados} ${d.n_traslados===1?'traslado':'traslados'} por ${cop(d.total_traslados)} — plata movida entre cuentas tuyas, no suma a los totales.</div>`
     : '';
@@ -314,6 +319,7 @@ function movHTML(m){
     <div class="mov-sub">
       <span>${fecha}</span><span class="tag">${esc(m.categoria)}</span>
       <span class="tag">${esc(m.banco)}</span>
+      ${m.recurrente ? '<span class="tag fijo">↻ fijo</span>' : ''}
       ${dudoso ? '<span class="tag rev">revisar</span>' : ''}
     </div>
     ${abierto ? editorHTML(m) : ''}
