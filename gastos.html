@@ -169,6 +169,10 @@ textarea:focus{outline:none;border-color:var(--accent)}
 .deu .n b{display:block;font-size:.88rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .deu .n span{font-size:.7rem;color:var(--ink-3)}
 .deu .v{font-size:.9rem;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ord{display:flex;gap:.4rem;margin-bottom:.5rem}
+.ord button{flex:1;background:var(--paper-2);border:1px solid var(--rule);color:var(--ink-3);
+  border-radius:8px;padding:.4rem;font-family:var(--sans);font-size:.75rem;cursor:pointer}
+.ord button.on{border-color:var(--accent);color:var(--ink);background:rgba(61,111,255,.12)}
 .deu-tot{display:flex;justify-content:space-between;padding:.7rem 0 0;font-size:.95rem;font-weight:600}
 .deu-tot .v{font-variant-numeric:tabular-nums}
 .nota{font-size:.78rem;color:var(--ink-3);background:var(--paper-2);border:1px solid var(--rule);border-radius:10px;padding:.6rem .75rem;margin-bottom:.6rem;line-height:1.45}
@@ -568,29 +572,57 @@ function diasHasta(dia) {
   return Math.round((Date.UTC(a, m, dia) - Date.UTC(a, h.getUTCMonth(), h.getUTCDate())) / 86400000);
 }
 
+// Lo que cuesta una deuda al mes solo por existir. Es la tasa efectiva anual
+// llevada a mensual equivalente — la misma cuenta que hace el banco, no una
+// aproximación de dividir entre doce.
+function costoMes(d) {
+  if (!d.tasa) return 0;
+  return d.saldo * (Math.pow(1 + d.tasa / 100, 1 / 12) - 1);
+}
+
+let ORDEN_DEUDAS = 'saldo';   // 'saldo' | 'costo'
+
 function renderDeudas() {
-  const deudas   = DEUDAS.filter(d => d.tipo === 'deuda');
-  const mensual  = DEUDAS.filter(d => d.tipo === 'mensual');
+  const deudas  = DEUDAS.filter(d => d.tipo === 'deuda');
+  const mensual = DEUDAS.filter(d => d.tipo === 'mensual');
   $('deudas-h').hidden = !DEUDAS.length;
   if (!DEUDAS.length) { $('deudas').innerHTML = ''; return; }
 
   const total = deudas.reduce((a, d) => a + d.saldo, 0);
+  const costoTotal = deudas.reduce((a, d) => a + costoMes(d), 0);
+
   const fila = d => {
     const dd = diasHasta(d.dia_pago);
+    const c = costoMes(d);
     const det = [
-      d.grupo,
-      dd != null ? (dd === 0 ? 'vence hoy' : dd === 1 ? 'vence mañana' : `en ${dd} días`) : null,
-      d.minimo ? `mínimo ${cop(d.minimo)}` : null,
+      d.tasa ? `${d.tasa}% E.A.` : (d.grupo === 'familia' ? 'sin interés' : 'tasa sin registrar'),
+      c ? `cuesta ${cop(c)}/mes` : null,
+      dd != null ? (dd === 0 ? 'VENCE HOY' : dd === 1 ? 'VENCE MAÑANA' : `en ${dd} días`) : null,
+      d.minimo ? `cuota ${cop(d.minimo)}` : null,
     ].filter(Boolean).join(' · ');
     return `<div class="deu"><span class="n"><b>${esc(d.nombre)}</b><span>${esc(det)}</span></span>
-      <span class="v">${cop(d.tipo === 'mensual' ? d.minimo : d.saldo)}</span></div>`;
+      <span class="v">${cop(d.saldo)}</span></div>`;
   };
 
+  const orden = ORDEN_DEUDAS === 'costo'
+    ? (a,b) => costoMes(b) - costoMes(a)
+    : (a,b) => b.saldo - a.saldo;
+
   $('deudas').innerHTML =
-    deudas.sort((a,b) => b.saldo - a.saldo).map(fila).join('')
+    `<div class="ord">
+       <button data-ord="saldo"${ORDEN_DEUDAS==='saldo'?' class="on"':''}>Por saldo</button>
+       <button data-ord="costo"${ORDEN_DEUDAS==='costo'?' class="on"':''}>Por lo que cuesta</button>
+     </div>`
+    + deudas.slice().sort(orden).map(fila).join('')
     + `<div class="deu-tot"><span>Total</span><span class="v">${cop(total)}</span></div>`
+    + (costoTotal ? `<div class="deu-tot" style="font-weight:400;font-size:.85rem;color:var(--ink-3);padding-top:.3rem">
+        <span>Te cuesta al mes solo por existir</span><span class="v">${cop(costoTotal)}</span></div>` : '')
     + (mensual.length ? `<div class="nota" style="margin-top:.8rem">Cada mes, aparte: ${mensual.map(d => `${esc(d.nombre)} ${cop(d.minimo)}`).join(' · ')}.</div>` : '')
-    + `<div class="nota">Los saldos se actualizan a mano: tócalos cuando abones. La app no sabe cuánto bajó tu deuda con un pago porque el banco no lo dice en el mensaje.</div>`;
+    + `<div class="nota">Ordenar por costo no es una recomendación de pago: es aritmética. Sin saber tus plazos y tu flujo, la app no tiene con qué decidir por ti — y las tasas que faltan hay que registrarlas para que la cuenta sirva.</div>`
+    + `<div class="nota">Los saldos se actualizan a mano: el banco no dice cuánto bajó la deuda en el mensaje de un pago.</div>`;
+
+  $('deudas').querySelectorAll('[data-ord]').forEach(b =>
+    b.onclick = () => { ORDEN_DEUDAS = b.dataset.ord; renderDeudas(); });
 }
 
 function renderVencimientos() {

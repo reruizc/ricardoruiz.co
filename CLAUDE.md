@@ -9256,6 +9256,157 @@ que los crons existentes YA producen (cero fuentes nuevas, cero LLM en v1):
   (medios+redes+Grok) — el brief reusa lo existente a propósito. v2 posible:
   lectura LLM corta, pero solo si el uso real la pide.
 
+## Gastos — presupuesto personal por notificaciones del banco (`gastos.html` · LISTO · ago-2026)
+
+App personal de Ricardo. Dice cuánto tiene hoy y de ahí cada gasto lo baja y cada
+ingreso lo sube, alimentada por los SMS del banco. **No pregunta cuánto gana**: la
+nómina llega por SMS y el parser la reconoce; pedir un dato que el banco va a
+informar es pedirlo dos veces.
+
+> ⚠️⚠️ **ESTE REPO ES PÚBLICO.** Los saldos, tasas, cédula, direcciones y números
+> de tarjeta de Ricardo **NO van acá ni en ningún archivo del repo**. Viven en el
+> KV privado del worker (`gastos:*`). El `GASTOS_TOKEN` tampoco: está en
+> `~/.config/gastos/gastos.env` (chmod 600) y como secreto de Cloudflare.
+
+```
+gastos.html                    la app (PWA instalable, sistema visual v2, mobile-first)
+gastos-manifest.json           manifiesto · gastos-sw.js service worker (cachea SOLO el cascarón)
+imagenes/gastos-icon-{180,192,512}.png
+rr-auth/src/gastos-parser.js   el parser · MÓDULO PURO, se prueba sin desplegar
+rr-auth/src/index.js           rutas /gastos/*
+tools/gastos/prueba-parser.mjs 51 casos · `node tools/gastos/prueba-parser.mjs`
+tools/gastos/correos.py        lector IMAP de correos de banco (opcional, ver abajo)
+tools/gastos/{run_correos.sh,co.ricardoruiz.gastos-correos.plist}  agente launchd cada 2 h
+tools/gastos/LEEME.md          runbook operativo (Atajo del iPhone, secretos, despliegue)
+```
+
+### Por qué NO es una app nativa de iOS
+**iOS no expone los SMS a las apps.** No hay API ni permiso que pedir: una app en
+Swift jamás vería los mensajes de Nequi. El puente es una **automatización de
+Atajos** (`Mensaje` → `Obtener contenido de la URL` → POST). Y como el frontend es
+una **PWA**, se instala en la pantalla de inicio sin los USD 99/año de Apple ni
+revisión de la App Store.
+
+### Dos puertas, a propósito distintas
+- **`POST /gastos/ingest`** — la usan el Atajo y el cron. **Sin sesión, sin CORS**,
+  autenticada por `X-Gastos-Token` con guarda propia (`_gastosServicioAutorizado`,
+  secreto SEPARADO del de Caudal). Va en la tabla `SERVICIO` del router, que ahora
+  admite `guarda` por ruta. **Sin el secreto la ruta responde 404 igual que una
+  inexistente.**
+- **`/gastos/{resumen,editar,manual,config,importar,deudas}`** — las usa la app.
+  Sesión + `_gastosPermitido` (hoy solo `ADMIN_EMAILS`).
+
+**KV:** `gastos:cfg:<email>` · `gastos:mov:<email>:<YYYY-MM>:<id>` ·
+`gastos:dedup:<email>:<hash>` (TTL 10 min) · `gastos:deudas:<email>`.
+El mes se calcula en **hora de Bogotá** (`_gastosMes` resta 5 h): con UTC, todo lo
+gastado después de las 7 p.m. del último día caería en el mes siguiente.
+
+### ⚠️ El parser · decisiones que NO hay que deshacer
+Cada una salió de un mensaje real que fallaba. Los 51 casos del test las cubren;
+**11 son SMS textuales de Ricardo** (85540 débito/ingresos · 85784 tarjeta ·
+890789 Lulo) y son la vara: si uno se rompe, el parser está mal.
+
+- **El monto es el PRIMERO que no sea saldo, no el mayor.**
+  `Nequi: Enviaste $50.000 a Juan. Te queda $120.000` → el mayor es el saldo.
+- **Dos formatos de monto contradictorios en el mismo banco:** `COP12.533,00`
+  (punto de miles) y `$13,693.98` (formato gringo). La regla que aguanta los dos:
+  manda el ÚLTIMO separador, y solo es decimal si deja 1 o 2 dígitos detrás.
+- **Rechazos partidos en tres.** DURO (claves —que no se guardan ni como texto
+  crudo— y compras rechazadas) · FACTURA ("pago mínimo", "fecha de pago": traen el
+  verbo "pago" y se colaban como gasto) · BLANDO (saldo, cupo), que solo descarta
+  si NO hay verbo de movimiento — una compra que además informa el saldo SÍ es un
+  gasto.
+- **En un INGRESO la contraparte va tras "de", no tras "en"** — el "en" apunta a
+  TU cuenta. Se corta contra palabras que siguen al nombre, no contra el punto,
+  porque las razones sociales traen puntos (`WOMPI S.A.S.`).
+- **⚠️ El asterisco de la red de tarjetas significa DOS cosas opuestas:**
+  `APIFY* INVÑ202608120` es COMERCIO*referencia, pero `PAYU*UBER` y
+  `DNH*GODADDY#4088755116` son procesador*COMERCIO. Se distinguen por el largo
+  (los procesadores son siglas de 2-4 letras); una lista cerrada de pasarelas
+  envejecería mal. Sin esto GoDaddy quedaba en "DNH".
+- **⚠️⚠️ TODO término del diccionario de categorías va entre `\b...\b`.** Sin eso
+  `tigo` casa dentro de "Siempre con-**tigo**" —la despedida que Bancolombia manda
+  en CADA mensaje, o sea que contaminaba todo— y `ara` dentro de "com-**pra**ra ti".
+  Trece términos tenían el defecto. Es la misma trampa del diccionario de empresas
+  de Caudal. `sinRelleno()` además recorta la cola publicitaria antes de analizar.
+- **TRASLADO** es un tipo propio, ni gasto ni ingreso: pago de la tarjeta de
+  crédito y transferencias de uno a sí mismo. Sin él, pagar la tarjeta contaría
+  DOS VECES la misma compra. Se detecta con el nombre del titular (`cfg.titular`),
+  exigiendo **dos apellidos en común** para no marcar a cualquier homónimo.
+- **La FECHA sale del mensaje, no de la llegada.** Sin esto, importar el historial
+  metía veinte mensajes viejos en el día de la importación. Lee `dd/mm/aaaa`, año
+  de dos dígitos y `14 de mayo de 2026` con a.m./p.m.; convierte de Bogotá a UTC y
+  descarta fechas del futuro o de hace más de 3 años (son lecturas erradas).
+- **`partirMensajes()`** parte un pegado por el nombre del banco, NO por salto de
+  línea: un solo mensaje ocupa varias (Lulo pone la fecha aparte).
+- **Ante la duda, gasto**, y **nunca se descarta el texto original**: lo dudoso
+  queda con `crudo`, confianza baja y marcado en amarillo para corregir de un toque.
+
+### El modelo de saldo · la regla del ancla
+`saldo_actual = saldo anclado + ingresos − gastos POSTERIORES al ancla`.
+
+⚠️ **Lo de "posteriores" no es un detalle:** si se fija el saldo hoy y se importa
+el historial de mayo, esos gastos YA están descontados de la cifra escrita;
+restarlos otra vez mostraría mucha menos plata de la que hay. **Los traslados
+nunca cuentan.** Re-anclar cuando se desvíe del banco es parte del uso normal
+(siempre hay algo que la app no vio: efectivo, Nubank) y no toca los movimientos.
+
+La barra del hero compara **lo gastado contra lo que ENTRÓ en el mes** — sale del
+propio dato, sin preguntar un sueldo.
+
+### Importar el historial (`/gastos/importar`)
+Dos pasos a propósito: primero muestra qué entendió, y solo guarda lo confirmado.
+Importar a ciegas veinte mensajes mal leídos envenenaría el presupuesto y
+limpiarlo después es peor. **Al confirmar se mandan los TEXTOS y el servidor los
+vuelve a leer**, así lo guardado es exactamente lo que se mostró. El id sale del
+hash del texto → reimportar la misma tanda sobrescribe en vez de duplicar.
+
+### Deudas y reparto del ingreso
+El presupuesto **no aparece en abstracto: aparece el día que entra plata** (fue
+pedido explícito de Ricardo). El panel de reparto solo se pinta si el mes registra
+un ingreso, y muestra qué ya tiene dueño (cuotas, mínimos, gasto fijo detectado,
+lo ya gastado) y cuánto queda libre.
+
+`gastos:deudas:<email>` guarda `{nombre, saldo, tipo, minimo, dia_pago, tasa,
+grupo}`. La lista muestra el **costo mensual** de cada deuda —la tasa E.A. llevada
+a mensual equivalente, no dividida entre doce— y se puede ordenar por saldo o por
+costo. Avisa los vencimientos a ≤10 días.
+
+> ⚠️ **La app NO decide en qué orden pagar y el texto lo dice explícito.** Ordenar
+> por costo es aritmética, no recomendación: sin plazos ni flujo de caja no hay con
+> qué decidir. Tampoco se dan consejos de producto financiero — si el tema aparece,
+> la respuesta correcta es hacer la cuenta y decir que uno no es asesor financiero.
+> Los saldos se actualizan a MANO y la app lo declara: el banco no dice cuánto bajó
+> la deuda en el mensaje de un pago, y fingir que se entera sería mentir.
+
+### Refresco
+SMS = **empuje**, inmediato. Correo = consulta cada 2 h (agente launchd propio,
+aparte de `run_diario.sh` para que un fallo no arrastre al otro). Pantalla = al
+volver a la app y cada 90 s con la app a la vista, **nunca oculta** (gastaría cuota
+del KV) y **nunca con el editor abierto** (borraría lo que se está escribiendo).
+
+### Cobertura por banco
+| Banco | Cómo entra |
+|---|---|
+| Bancolombia débito e ingresos (85540) · tarjeta (85784) · Lulo (890789) | SMS → Atajo, automático |
+| Nequi | **solo correo** (`notificaciones@nequi.com.co`) → necesita el camino IMAP |
+| Nubank | **solo notificación en su app** → no hay forma automática en iOS; se anota a mano con el botón `+` |
+
+### Desplegar
+```bash
+cd /Users/ricardoruiz/rr-auth && npx wrangler deploy    # ⚠️ worker COMPARTIDO, pedir luz verde
+git push origin HEAD:main
+node tools/gastos/prueba-parser.mjs                     # 51 casos, sale con 1 si algo falla
+```
+
+### Pendientes
+1. **Click-through real en el iPhone**: el Atajo lo arma Ricardo; nadie ha visto
+   entrar un SMS de verdad de punta a punta.
+2. Las **tasas que faltan** (tarjeta NU) para que el orden por costo sirva completo.
+3. Correo: falta la contraseña de aplicación de Google y `launchctl bootstrap`.
+4. Si aparece un formato de banco nuevo, el caso va **primero** al test y después
+   se toca el parser.
+
 ## Convenciones de commit
 ```
 git commit -m "scope: descripción concisa\n\nDetalle si es necesario\n\nCo-Authored-By: Ricardo y Claudio <noreply@anthropic.com>"
