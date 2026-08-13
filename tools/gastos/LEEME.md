@@ -1,7 +1,17 @@
 # Gastos · presupuesto alimentado por el banco
 
-App personal: define el sueldo del mes y los gastos se van descontando solos a
-medida que llegan las notificaciones de Bancolombia, Nequi, Lulo y Nubank.
+App personal: dices cuánto tienes hoy y de ahí en adelante cada gasto lo baja y
+cada ingreso lo sube, a medida que llegan las notificaciones del banco.
+
+**No pregunta cuánto ganas**, a propósito: la nómina llega por SMS y la app la
+reconoce sola. Pedir un dato que el banco va a informar es pedirlo dos veces.
+
+⚠️ El saldo solo cuenta los movimientos **posteriores al ancla**. Si fijas tu
+saldo hoy e importas el historial de mayo, esos gastos ya están descontados de
+la cifra que escribiste; restarlos otra vez mostraría mucha menos plata de la
+que hay. Los traslados tampoco cuentan: mover plata entre bolsillos propios no
+cambia cuánta hay. Reanclar el saldo cuando se desvíe del banco es parte del
+uso normal — siempre habrá algo que la app no vio (efectivo, Nubank).
 
 ```
 gastos.html            la app (PWA instalable, sistema visual v2)
