@@ -9134,104 +9134,197 @@ Ejecución de Penas · **Familia** · **Promiscuo Municipal**). Falta el resto d
 - Otros pendientes: enlazar desde index/noticias · música · OG image para compartir
   ranking ("mi universidad le gana a la tuya").
 
-## Mapa de ayuda · sismo 10-ago-2026 — `ayuda-sismo/` (LISTO · sin desplegar)
+## Mapa de ayuda · sismo 10-ago-2026 — `ayuda-sismo/` (EN PRODUCCIÓN)
 
 Mapa abierto donde la gente registra necesidades tras el sismo M 7.4 (epicentro
-San José del Palmar, Chocó). Doc operativa completa en `ayuda-sismo/LEEME.md`.
+San José del Palmar, Chocó), más una segunda página con el pulso de prensa.
+**Se va a entregar a organizaciones aliadas para que lo monten en el dominio que
+ellas compren.** Doc operativa en `ayuda-sismo/LEEME.md`.
 
-**⚠️ NO es una matriz tipo × categoría — es un catálogo plano de 17
-SITUACIONES** agrupadas en `busco` / `necesito` / `ofrezco`. La matriz daba 18
-combinaciones y la mitad no significaba nada ("ofrezco + mascota" no distingue
-buscar a mi perro de haber encontrado uno). El catálogo vive DOS veces a
-propósito: `SIT` en el frontend (etiquetas, ejemplos, colores) y `SITUACIONES`
-en el Worker (qué es privado, qué admite foto) — el Worker **valida contra su
-propia copia** y deriva `tipo`/`cat`; no confía en lo que mande el formulario.
-Agregar una situación obliga a tocar las dos listas.
-
-**Drill-down en dos lugares**: el mapa tiene barra de zonas (los 5 deptos con
-daño) que enfoca y filtra; el formulario va **departamento → municipio →
-barrio**, sobre los **1.122 municipios** del país, no solo capitales — muchos
-municipios vecinos quedaron tan golpeados como las capitales.
+```
+🟢 https://ayuda-sismo.pages.dev              el mapa
+🟢 https://ayuda-sismo.pages.dev/inteligencia el pulso de prensa
+🟢 https://ayuda-sismo.reruizc.workers.dev    el Worker
+   D1 `ayuda-sismo` · e7a0d228-d793-4728-94b4-da2c79d45f35
+   Secretos: ADMIN_TOKEN, IP_SALT · token en ~/.config/ayuda-sismo/admin.env (600)
+   Cron: 17 */3 * * *  (prensa + geocodificación de acopios)
+```
 
 **⚠️ NO va en GitHub Pages.** `ricardoruiz.co` lo sirve GH Pages, con límite
-blando de ~100 GB/mes; con 1M de visitantes GitHub throttlea y se cae **todo**
-el sitio, no solo el mapa. Va a **Cloudflare Pages** (ancho de banda ilimitado)
-con `sismo.ricardoruiz.co` por CNAME desde **GoDaddy** (ahí está el DNS, no en
-Cloudflare — verificado: NS `domaincontrol.com`).
+blando de ~100 GB/mes; con el tráfico esperado GitHub throttlea y se cae **todo**
+el sitio. Por eso Cloudflare Pages. **Worker aparte, NO `rr-auth`** (ese es
+compartido con Caudal y el Lab).
 
-**Worker aparte, NO `rr-auth`**: ese es compartido con Caudal y el Lab, y un
-deploy de emergencia no puede arriesgar producción. `ayuda-sismo` + D1 propia.
+**Costo: $5-8/mes.** Lecturas desde el caché del edge (`s-maxage`), escrituras a
+D1. Aplicar a **Project Galileo** (protección enterprise gratis para proyectos
+humanitarios).
 
-**Costo con 1M de visitantes: $5-8/mes.** La clave es separar lectura de
-escritura — `/snapshot.json` se sirve del caché del edge (`s-maxage=60`), así
-que un millón de visitas son ~1 consulta a D1 por minuto y por PoP, no un
-millón. Se paga Workers Paid solo para quitar el techo de 100k req/día, que si
-algo se cachea mal tumba el sitio en plena emergencia. Aplicar a **Project
-Galileo** (protección enterprise gratis para proyectos humanitarios).
+### Las 4 reglas de privacidad (decisiones de Ricardo · no deshacerlas)
+1. **Desaparecidos: el contacto NUNCA se publica.** Quien tenga información
+   escribe por el mapa y el mensaje le llega al familiar. El Worker lo fuerza
+   aunque el cliente mande `contacto_pub:true`.
+2. **El texto libre se enmascara** (correos y corridas de 7+ dígitos). Sin esto
+   la regla 1 no vale nada: basta escribir el celular en la descripción.
+3. **Ubicación desplazada ~100 m**, calculada **una vez al insertar** y
+   guardada. Recalcular por lectura dejaría promediar capturas y hallar el punto
+   real. Medido: 93,1 m y 69,0 m.
+4. **La foto se re-codifica en canvas antes de subirla**: el EXIF trae el GPS
+   exacto y anularía la regla 3. El servidor valida **bytes mágicos**, no el
+   `Content-Type`. `ofr-persona` NO admite foto (dignidad: quien está
+   desorientada no puede consentir).
 
-### Las 3 reglas de privacidad (decisiones de Ricardo · no deshacerlas)
-1. **Desaparecidos: el contacto NUNCA se publica.** Se ve el caso completo,
-   pero quien tenga información escribe por el mapa y el mensaje le llega al
-   familiar (`/contacto` → tabla `mensajes` → enlace privado + correo opcional
-   vía Resend). Publicar el teléfono de una familia que busca a alguien es lo
-   que habilita la llamada extorsiva. El Worker lo fuerza: aunque el cliente
-   mande `contacto_pub:true`, en esa categoría guarda 0.
-2. **El texto libre se enmascara** (`enmascarar()`): correos y corridas de 7+
-   dígitos. Sin esto la regla 1 no vale nada — basta escribir el celular dentro
-   de la descripción. Verificado: sale `"llamar al [teléfono oculto]"`.
-3. **Ubicación pública desplazada ~100 m** (`difuminar()`). Se calcula **una vez
-   al insertar y se guarda** en `plat/plon`; recalcular por lectura dejaría
-   promediar capturas sucesivas y recuperar el punto real. La exacta queda en
-   `lat/lon` y solo la ven moderación y el reportante. Medido: 93,1 m y 69,0 m.
-4. **La foto se re-codifica en canvas ANTES de subirla.** No es (solo) por peso:
-   el EXIF de una foto de celular trae el **GPS exacto**, que echaría por tierra
-   la regla 3. Redibujarla descarta todos los metadatos. Verificado: 2400×1600 →
-   1280 px, 16 KB, sin bloque `Exif`. El servidor valida **bytes mágicos**, no el
-   `Content-Type` (probado con un script de shell etiquetado `image/jpeg`: se
-   descarta la foto y el reporte se publica igual). Las fotos viajan DENTRO del
-   POST del reporte, en base64 — un endpoint de subida suelto sería
-   almacenamiento abierto a internet. Ocultar por moderación **borra el objeto
-   de R2**. `ofr-persona` (encontré a alguien) NO admite foto: quien está
-   desorientada o herida no puede consentir.
+### Taxonomía: catálogo de 17 situaciones, NO una matriz
+`tipo × categoría` daba 18 combinaciones y la mitad no significaba nada
+("ofrezco + mascota" no distingue buscar a mi perro de haber encontrado uno).
+El catálogo vive **dos veces a propósito**: `SIT` en el frontend (etiquetas,
+ejemplos, colores) y `SITUACIONES` en el Worker (qué es privado, qué admite
+foto). El Worker **valida contra su propia copia** y deriva `tipo`/`cat`.
 
-⚠️ **Marcar abuso NO oculta solo**: cuenta y manda a revisión, una marca por IP
-y reporte (llave primaria de `abuso_log`). Si unos clics tumbaran un reporte,
-una campaña coordinada borraría justo los casos reales.
+### Pulso de prensa (`inteligencia.js` + `inteligencia.html`)
+Google News RSS, 17 consultas (9 temas + 8 ciudades), cron cada 3 h. ~1.140
+titulares de ~250 medios. Clasificación **determinista** (diccionarios), sin
+modelo; el único texto de IA es el párrafo de resumen, marcado como tal.
 
-⚠️ Sin `TURNSTILE_SECRET` el formulario **sigue recibiendo**, marcando
-`sin_captcha=1` — tumbar la recepción en plena emergencia es peor que el spam.
+⚠️ **Mide COBERTURA, no realidad.** El hallazgo principal es el silencio: ~88 de
+101 municipios de la zona afectada **sin un solo titular**. Se publican también
+las propias cifras de cobertura (78% de titulares sin intención clasificable,
+46% sin municipio detectable) en vez de esconderlas.
+
+⚠️ `curl` necesita **`-L`** con Google News (responde 302); `urlopen` la sigue
+sola. Y `grep -c "<item>"` da 1 porque el XML viene en una sola línea.
+
+### Balance de víctimas: se extrae de la prensa, no hay feed
+**La UNGRD NO publica un feed en vivo.** Su conjunto en datos.gov.co
+(`wwkg-r6te`) tiene el esquema exacto —fallecidos, heridos, desaparecidos,
+viviendas— y **su último registro es del 31-dic-2022**. El otro sitio del sector
+también las captura a mano.
+
+Dos reglas del extractor, las dos salidas de verlo equivocarse feo:
+1. **El sustantivo va PEGADO al número.** Aceptándolo "cerca" (34 chars), en
+   "Van 287 muertos, 3.975 heridos y 378 desaparecidos" todos los números quedan
+   cerca de todos los sustantivos: reportó **975 desaparecidos**, de "3.975
+   heridos".
+2. **Manda la cifra más CORROBORADA, no la más reciente.** Con "más reciente"
+   publicó **10 fallecidos** —el conteo local de Buenaventura— mientras veinte
+   medios decían 287. Se exigen **2 medios distintos**; si ninguno llega, no se
+   publica. Un hueco es mejor que un balance de víctimas equivocado.
+
+⚠️ El extractor usa `normalizarNum`, no `normalizar`: esta última convierte todo
+signo en espacio y partía el separador de miles ("12.584 viviendas destruidas"
+habría salido como **584**).
+
+Resultado: 287 fallecidos (5 medios), 379 desaparecidos (11), 3.975 heridos (3).
+Se rotula "según prensa que cita el balance oficial", NO "cifra oficial".
+
+### Centros de acopio desde Google Sheets (editable en vivo)
+Hoja: `1dj1fNYuwGMW0zLit4I6w_5abJGxuGVZttwA1QMbvQts` → `ACOPIOS_CSV` en
+`wrangler.toml` (variable, no hardcodeada: es lo que permite que otra
+organización use la suya). **No hace falta "publicar en la web"**: basta
+"cualquiera con el enlace puede ver" y `export?format=csv`.
+
+13 columnas: `NOMBRE · CIUDAD O MUNICIPIO · DEPARTAMENTO · DIRECCION ·
+NECESIDAD · HORARIO ABRE · HORARIO CIERRE · TODOS LOS DIAS O LV · REQUIERE
+VOLUNTARIOS · CONTACTO · TELEFONO · ULTIMA REVISION · TIPO DE LUGAR`.
+
+- **`SIN DATO` es ausencia, no valor.** Sin filtrarlo las fichas decían "Horario:
+  SIN DATO a SIN DATO". `AUSENTE` cubre también N/A, ND y guiones.
+- **`ULTIMA REVISION` cambia el sello**: "sin revisar" (ámbar) → "revisado
+  {fecha}" (verde). Si algún día se escribe `YYYY-MM-DD` se puede marcar en rojo
+  lo que lleve >3 días.
+- **Última copia buena**: si la hoja falla o queda vacía, se sirve lo último
+  válido. Un borrado accidental no puede dejar el mapa sin acopios.
+- Parser de CSV propio con comillas: partir por comas rompe las direcciones.
+- ⚠️ La hoja es **pública**: `CONTACTO` y `TELEFONO` quedan a la vista.
+- CSV semilla listos para pegar: `acopios-semilla-prensa.csv` (16) y
+  `acopios-tanda-2.csv` (22, incluye los 7 de Pereira y los bancos de sangre de
+  Cali). Se regeneran con `tools/ayuda-sismo/rehacer_csv_acopios.py`.
+- ⚠️ `ULTIMA REVISION` va en `SIN DATO` en los CSV **a propósito**: salieron de
+  prensa y nadie los confirmó en terreno.
+
+### ⚠️⚠️ Geocodificación: por NOMBRE, nunca por dirección
+**Nominatim no interpreta el número de una dirección colombiana.** Medido:
+Carrera 15 **#12-05** → lat 4.6227 · **#82-81** → 4.7065 · **#180-20** → 4.5630.
+La #180 al SUR de la #12, cuando las calles suben hacia el norte. **El orden sale
+invertido**: engancha segmentos arbitrarios de la vía, errores de 5 a 19 km.
+Geocodificar así pone pines que PARECEN exactos — peor que el centro del
+municipio, porque el error es invisible.
+
+Por **nombre** sí resuelve el punto del lugar (hospital, universidad, coliseo).
+⚠️ Pero **Nominatim siempre devuelve algo**: sin validar, "Café Comuna del Café"
+resolvió a una **estación de policía** y "Café Consota" a una vía de servicio.
+Tres filtros: <30 km del centro del municipio · tipo OSM que no sea vía/barrio ·
+**una palabra DISTINTIVA del nombre debe aparecer en el resultado** ("comuna" no
+cuenta, es genérica en Colombia y fue la que dejó pasar la policía).
+
+**Rinde 7 de 39** (0 falsos positivos). Los nombres tipo "Cruz Roja - Samu Sur"
+no existen en OSM. Los 32 restantes conservan centro de municipio + advertencia
++ **"Cómo llegar"**, que abre el mapa del teléfono con la dirección literal y es
+lo que de verdad lleva a alguien hasta la puerta.
+
+Corre en el **cron** (no en la visita: ~1 s por consulta, política de Nominatim),
+cachea para siempre en `geocache` **incluidos los fallos**, y `/admin/acopios`
+la fuerza. La vía a precisión real: columnas **`LAT`/`LON`** en la hoja, que ya
+mandan sobre el centro del municipio.
+
+**Puntos apilados**: los acopios sin coordenada propia caían todos en el mismo
+pixel (14 en Bogotá, se veía uno). `separarApilados` los abre en círculo, en
+orden fijo. Es arreglo **visual**; la ficha sigue diciendo que es aproximado.
+
+### Anti-abuso: falta Turnstile
+🔴 **Turnstile NO está configurado.** Crear el widget exige el panel de
+Cloudflare: el token OAuth de wrangler **no tiene ese permiso** (probado, error
+10000; sus scopes son workers, d1, pages, zone). Pasos: dash.cloudflare.com →
+Turnstile → widget para el dominio → *site key* a `CONFIG.TURNSTILE` de
+`index.html` → `npx wrangler secret put TURNSTILE_SECRET`.
+
+Mientras tanto, defensa en profundidad ya desplegada:
+- **Honeypot** (campo invisible).
+- **Límite por IP**: 5 reportes/hora.
+- **Tiempo de diligenciamiento**: se rechaza lo enviado en <5 s. Verificado en
+  producción: `dt:120` atajado, `dt:42000` publicado. Responde `ok` como el
+  honeypot para no enseñar la regla. ⚠️ Frena al bot ingenuo, **no** a quien
+  falsee el campo.
+- Sin Turnstile, todo reporte queda marcado `sin_captcha=1` para moderación.
+
+⚠️ **`CF-Connecting-IP` no es spoofeable en producción**: Cloudflare responde
+`error code: 1000` si el cliente la manda. Solo sirve contra `wrangler dev`
+(por eso `seed.py` la usa para saltarse el límite al sembrar en local).
 
 ### Datos y verificación
-- `build_geo.py` → `geo.json` (44 KB): 33 deptos · **1.122 municipios** con
-  centro por **mediana** de los puestos de `PUESTOS_GEOREF` (el promedio se
-  corre km con un puesto rural mal georreferenciado). ⚠️ Los códigos son de la
-  **Registraduría, NO del DANE**: Caldas=09 · Chocó=17 · Quindío=26 ·
-  Risaralda=24 · Valle=31. Por eso `AFECTADOS` marca por nombre y **aborta el
-  build** si un nombre deja de casar. Nombres de municipio vienen **sin tildes**
-  y se dejan así (corregir 1.122 a mano = meter erratas); la búsqueda del sitio
-  normaliza tildes. Los 33 deptos sí se corrigen (`DEP_NOMBRES`): venían
-  truncados ("Norte De San", "Valle").
-- `build_barrios.py` → `barrios.json` (46 KB): Cali 339 · Pereira 472 ·
-  Manizales 114 · Quibdó 60. **Armenia no tiene capa** → el selector no aparece
-  y se marca el punto a mano, en vez de fingir una lista vacía.
-- `seed.py` → 18 puntos de prueba con prefijo `[PRUEBA]`. ⚠️ Manda una
-  `CF-Connecting-IP` distinta por caso para no chocar con el límite de 5/hora;
-  eso **solo sirve contra `wrangler dev`** porque en producción Cloudflare fija
-  esa cabecera en el edge.
-- Verificado end-to-end contra `wrangler dev` + D1 + R2 locales: escritura,
-  snapshot, enmascarado, supresión de contacto en las 2 situaciones `priv`,
-  rechazo fuera de Colombia, vista privada con y sin token, dedup de abuso,
-  foto (resize + sin EXIF + servida desde R2), rechazo de archivo falso, y el
-  formulario en navegador (desktop 1265px y móvil 375px).
+- `build_geo.py` → `geo.json` (44 KB): 33 deptos · 1.122 municipios, centro por
+  **mediana** de puestos. ⚠️ Códigos de **Registraduría, NO DANE**: Caldas=09 ·
+  Chocó=17 · Quindío=26 · Risaralda=24 · Valle=31.
+- `build_municipios_js.py` → `municipios.js`: 118 municipios detectables
+  `[clave, nombre, depto, en_zona_afectada, lat, lon]`, 24 excluidos por nombre
+  ambiguo (Sevilla=España, Florida=EE.UU., Bolívar=depto). ⚠️ `en_zona_afectada`
+  evita que Bogotá cuente como "municipio sin cobertura".
+- `build_barrios.py` → `barrios.json`: Cali 339 · Pereira 472 · Manizales 114 ·
+  Quibdó 60. **Armenia no tiene capa** y el formulario lo dice.
+- `seed.py` → 18 puntos de prueba con prefijo `[PRUEBA]`.
 - ⚠️ **`wrangler d1 execute --local` no aplica nada si `wrangler dev` tiene la
-  base tomada** (falla en silencio y queda el esquema viejo). Para recrear:
-  parar dev → `rm -rf .wrangler/state` → aplicar `schema.sql` → arrancar dev.
-  Un `DROP TABLE` con varias sentencias en un solo `--command` tampoco se aplica.
-- Tipografía de sistema y sin webfonts a propósito: se abre en la calle, con
-  sol, mala señal y batería baja. Tema claro, no el sistema visual v2 oscuro.
+  base tomada** (falla en silencio). Para recrear: parar dev → `rm -rf
+  .wrangler/state` → aplicar schema → arrancar.
+- ⚠️ **gviz ignora el parámetro `sheet`**: pedir una pestaña inexistente devuelve
+  200 con la PRIMERA. Para una segunda pestaña hace falta su `gid`.
 
-**Pendiente**: correr el despliegue (pasos en el LEEME) y decidir si se enlaza
-desde `index.html` / `noticias.html`.
+### 📌 HANDOFF · qué sigue (ago-14-2026)
+1. 🔴 **Turnstile** — lo único entre el formulario y el spam. Requiere el panel.
+2. 🟡 **R2 para fotos** — no está habilitado en la cuenta (API 10042). El binding
+   está comentado en `wrangler.toml`; el Worker publica `caps.fotos` en
+   `/snapshot.json` y el formulario **esconde el campo solo** para no pedir una
+   imagen que se descartaría.
+3. 🟡 **Portabilidad para las organizaciones aliadas** — dominio, URL del Worker,
+   correo y nombre del evento están regados entre el HTML y `wrangler.toml`.
+   Juntarlos en un bloque de configuración + un "cómo montarlo en tu dominio".
+4. 🟡 **Dominio propio** — sigue en `pages.dev`. DNS de ricardoruiz.co está en
+   **GoDaddy**: CNAME `sismo` → `ayuda-sismo.pages.dev` + agregar el dominio en
+   el panel de Pages.
+5. 🟡 **`DEEPSEEK_API_KEY`** — sin ella no sale el párrafo de lectura automática
+   (el resto de la página funciona).
+6. 🟡 **Cifras UNGRD editables a mano** — si se quiere sobreescribir lo extraído
+   de prensa, hace falta el **gid** de una segunda pestaña de la hoja.
+7. 🟢 Acopios de **Armenia, Manizales y Quibdó**: la prensa los menciona pero no
+   publica direcciones. Toca terreno.
 
 ## Brief matutino personal — `tools/brief/` (v1 · ago-2026)
 
