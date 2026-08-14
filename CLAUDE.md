@@ -9380,6 +9380,38 @@ costo. Avisa los vencimientos a ≤10 días.
 > Los saldos se actualizan a MANO y la app lo declara: el banco no dice cuánto bajó
 > la deuda en el mensaje de un pago, y fingir que se entera sería mentir.
 
+### Las cinco pestañas
+Barra inferior; cada vista cabe en una pantalla (antes era un scroll de 1.852 px).
+
+| Pestaña | Qué muestra |
+|---|---|
+| **Hoy** | saldo, vencimientos ≤10 días, y el reparto del ingreso |
+| **Movimientos** | la lista editable · el `+` ofrece *pegar un mensaje* (reusa el importador, resuelve Nubank y Nequi) o *anotar a mano* |
+| **Análisis** | por categoría y por banco |
+| **Deudas** | las 7, ordenables por saldo o por costo mensual · tocar una abre su ficha |
+| **Cada mes** | los compromisos fijos como pendientes con estado + el histórico de pagos |
+
+El `+` solo aparece en Hoy y Movimientos.
+
+### Pagos a deudas y compromisos mensuales
+`gastos:pagos:<email>` guarda `{id, deudaId, monto, ts, nota}`; el endpoint
+`/gastos/pagos` (GET/POST, `{borrar}` para eliminar) devuelve también el resumen
+por mes.
+
+⚠️ **El PAGO y el SALDO se registran por separado, nunca uno deducido del otro.**
+Si abona 390.831 y el saldo baja 300.000, la diferencia se la comieron los
+intereses: deducir "pagué lo que bajó el saldo" subestimaría el esfuerzo justo en
+las deudas caras. El saldo nuevo lo escribe el usuario mirando su banco (campo
+opcional en el formulario de pago) y la app lo dice explícito.
+
+⚠️ **"Pagado este mes" sale de los pagos registrados, NO del calendario**: que sea
+día 20 no significa que ya se hizo, y marcarlo por fecha volvería la lista un
+adorno.
+
+Un `tipo:'mensual'` es un compromiso que se repite y no baja (arriendo,
+seguridad social, matrícula, suscripciones grandes); un `tipo:'deuda'` es un
+saldo que baja. Los dos con `minimo` aparecen en *Cada mes*.
+
 ### Refresco
 SMS = **empuje**, inmediato. Correo = consulta cada 2 h (agente launchd propio,
 aparte de `run_diario.sh` para que un fallo no arrastre al otro). Pantalla = al
@@ -9392,6 +9424,13 @@ del KV) y **nunca con el editor abierto** (borraría lo que se está escribiendo
 | Bancolombia débito e ingresos (85540) · tarjeta (85784) · Lulo (890789) | SMS → Atajo, automático |
 | Nequi | **solo correo** (`notificaciones@nequi.com.co`) → necesita el camino IMAP |
 | Nubank | **solo notificación en su app** → no hay forma automática en iOS; se anota a mano con el botón `+` |
+
+### ⚠️ Al cambiar el cascarón, SUBIR `CACHE` en `gastos-sw.js`
+Una app añadida a la pantalla de inicio arranca del caché y **se queda con la
+versión vieja hasta que el caché cambie de nombre**, aunque el HTML vaya por red
+primero. Pasó de verdad: Ricardo siguió viendo la pregunta del sueldo que ya se
+había quitado y le respondió con su ingreso a un campo que pedía su saldo. Para
+forzar la actualización en el iPhone: borrar el ícono y volver a agregarlo.
 
 ### Desplegar
 ```bash
@@ -9413,6 +9452,21 @@ mirar cuál es cuál.
 3. Correo: falta la contraseña de aplicación de Google y `launchctl bootstrap`.
 4. Si aparece un formato de banco nuevo, el caso va **primero** al test y después
    se toca el parser.
+
+## Volver a donde ibas después de entrar (`login.html`)
+
+`destinoTrasLogin()` acepta **`?redirect=` y `?next=`** — el sitio usa los dos
+nombres (32 páginas mandan `next`, 3 mandan `redirect`) y antes solo se leía el
+segundo, así que casi todo el mundo terminaba en el dashboard en vez de volver a
+donde iba. Los módulos del Lab además mandan la ruta con barra inicial
+(`/mactor.html?proj=…`), que la validación vieja rechazaba; ahora se tolera y la
+query se conserva, así que el Lab vuelve al proyecto abierto.
+
+⚠️ **La validación es obligatoria y no se puede aflojar**: sin ella sería un
+**redirect abierto** y cualquiera podría mandar a un usuario recién autenticado a
+un sitio ajeno con un link que se ve legítimo. Solo se admite un `.html` de este
+sitio: se rechazan URL absolutas, `//`, `javascript:`, `data:` y `..`. Probado
+con 13 casos, 7 de ellos ataques.
 
 ## Convenciones de commit
 ```
