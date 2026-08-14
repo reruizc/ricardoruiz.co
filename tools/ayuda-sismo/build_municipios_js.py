@@ -182,18 +182,26 @@ def main():
                 if clave in vistos:
                     continue
                 vistos.add(clave)
-                entradas.append((clave, nombre_ui, d["n"], 1 if d["n"] in DEPTOS else 0))
+                entradas.append((clave, nombre_ui, d["n"],
+                                 1 if d["n"] in DEPTOS else 0, m[2], m[3]))
 
     # Los nombres largos primero: así "San José del Palmar" se detecta antes de
     # que un nombre más corto contenido en él se lo lleve.
     entradas.sort(key=lambda e: (-len(e[0]), e[0]))
 
     filas = ",\n".join(
-        f'  ["{c}", "{n}", "{dep}", {af}]' for c, n, dep, af in entradas)
+        f'  ["{c}", "{n}", "{dep}", {af},'
+        f' {"null" if la is None else la}, {"null" if lo is None else lo}]'
+        for c, n, dep, af, la, lo in entradas)
     js = f"""// GENERADO por tools/ayuda-sismo/build_municipios_js.py — no editar a mano.
 //
-// [clave sin tildes, nombre, departamento, en_zona_afectada]. Ordenado de más
+// [clave, nombre, departamento, en_zona_afectada, lat, lon]. Ordenado de más
 // largo a más corto para que "San Jose del Palmar" gane sobre un fragmento suyo.
+//
+// ⚠️ lat/lon es el CENTRO DEL MUNICIPIO, no el lugar del hecho. Sirve para
+// poner una noticia en el mapa a escala municipal y nada más fino: todas las
+// notas de un municipio caen exactamente en el mismo punto. La página lo dice
+// en vez de simular una precisión que no existe.
 //
 // ⚠️ en_zona_afectada = 0 son ciudades que se vigilan solo para poder
 // detectarlas en un titular (Bogotá, Medellín, Barranquilla…). NO deben entrar
