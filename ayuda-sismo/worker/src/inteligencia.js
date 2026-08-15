@@ -200,7 +200,7 @@ async function unIntento(c) {
 const pausa = (ms) => new Promise((s) => setTimeout(s, ms));
 
 /**
- * Una consulta a Google News, con un reintento.
+ * Una consulta a Google News, con un reintento SOLO si tiene sentido.
  *
  * ⚠️⚠️ Devuelve el DIAGNÓSTICO junto con los items, y nunca lanza. La versión
  * anterior era `traer(q).catch(() => [])`: una consulta que fallaba quedaba
@@ -211,12 +211,20 @@ const pausa = (ms) => new Promise((s) => setTimeout(s, ms));
  * lo que permitió identificarlo: 17 respuestas `503` con la página
  * "Sorry..." de Google, o sea bloqueo por consultas automatizadas.
  *
- * El reintento es UNO y con espera larga: contra un bloqueo por abuso,
- * insistir rápido es exactamente lo que lo prolonga.
+ * ⚠️⚠️ NO se reintenta un 503. Medido: contra el bloqueo por abuso el
+ * reintento falla igual, y lo único que consigue es DUPLICAR las peticiones
+ * —de 17 a 34— justo cuando Google nos está diciendo que somos demasiados.
+ * Insistir prolonga el bloqueo. Se reintenta solo lo que puede ser un tropiezo
+ * de red: timeout, corte de conexión, 5xx que no sea 503.
  */
+function vaLaPena(r) {
+  if (r.ok) return false;
+  return r.http === 0 || (r.http >= 500 && r.http !== 503);
+}
+
 async function traer(c) {
   const r = await unIntento(c);
-  if (r.ok) return { id: c.id, ...r };
+  if (r.ok || !vaLaPena(r)) return { id: c.id, ...r };
 
   await pausa(4000);
   const r2 = await unIntento(c);
@@ -228,24 +236,37 @@ async function traer(c) {
 }
 
 /**
- * Corre las consultas en tandas pequeñas y con pausa, no las 17 de golpe.
+ * Corre las consultas en tandas pequeñas, con pausa, y ABANDONA si nos
+ * bloquearon.
  *
- * ⚠️⚠️ ESTA ES LA CAUSA DEL FALLO, no una optimización. 17 peticiones
- * simultáneas al RSS desde una IP de datacenter tienen la forma exacta de una
- * ráfaga automatizada, y Google las corta: respondía `503` con su página
- * "Sorry..." a las 17, con latencias que subían de 6 a 25 segundos a medida
- * que estrangulaba la tanda. El bloqueo es por IP de salida, y por eso el cron
- * —que sale siempre por el mismo centro de datos— caía sistemáticamente
- * mientras la llamada manual, que sale por otro, respondía 1.146 notas.
+ * ⚠️⚠️ El corta-circuitos es la parte que importa. Google bloquea por IP de
+ * salida y con `503`; una vez que está bloqueando, las 17 consultas van a
+ * fallar igual. Seguir disparándolas —y peor, reintentarlas— es insistirle a
+ * quien ya dijo que no, y es lo que hace que el bloqueo dure más. Si la
+ * primera tanda vuelve entera con 503, se abandona: la corrida pasa de 34
+ * peticiones a 3, se anota el bloqueo y se conserva lo último bueno.
  *
- * Nadie está esperando esta corrida: es un cron cada 3 horas. Ir despacio no
- * cuesta nada y es la diferencia entre que Google conteste o no.
+ * Las tandas y la pausa siguen porque 17 peticiones simultáneas desde una IP
+ * de datacenter tienen la forma exacta de una ráfaga automatizada. Nadie está
+ * esperando esta corrida —es un cron cada 3 horas—, así que ir despacio no
+ * cuesta nada.
  */
 async function enTandas(items, tam, msEntre, fn) {
   const out = [];
   for (let i = 0; i < items.length; i += tam) {
     if (i) await pausa(msEntre);
-    out.push(...await Promise.all(items.slice(i, i + tam).map(fn)));
+    const tanda = await Promise.all(items.slice(i, i + tam).map(fn));
+    out.push(...tanda);
+
+    if (tanda.length && tanda.every((r) => r.http === 503)) {
+      // Se marcan las que no se llegaron a pedir, para que la bitácora no
+      // aparente que fallaron: no se intentaron a propósito.
+      for (const c of items.slice(i + tam)) {
+        out.push({ id: c.id, ok: false, http: null, n: 0, items: [],
+                   omitida: 'abandonado tras bloqueo 503' });
+      }
+      break;
+    }
   }
   return out;
 }
@@ -682,7 +703,12 @@ export async function recolectar(env, opciones = {}) {
   // se lee de un vistazo —"503" es el bloqueo por consultas automatizadas de
   // Google— sin tener que abrir el detalle consulta por consulta.
   const porCodigo = {};
-  for (const f of fallidas) porCodigo[f.http] = (porCodigo[f.http] || 0) + 1;
+  // Las omitidas por el corta-circuitos no se cuentan: no se intentaron, y
+  // meterlas acá diría "17× HTTP null" en vez de nombrar el bloqueo real.
+  for (const f of fallidas) {
+    if (f.omitida) continue;
+    porCodigo[f.http] = (porCodigo[f.http] || 0) + 1;
+  }
   const dominante = Object.entries(porCodigo).sort((a, b) => b[1] - a[1])[0];
   const pista = dominante
     ? ` · ${dominante[1]}× HTTP ${dominante[0]}${dominante[0] === '503' ? ' (Google bloquea consultas automatizadas)' : ''}`

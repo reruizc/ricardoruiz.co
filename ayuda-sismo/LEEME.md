@@ -441,28 +441,51 @@ Diagnosticado el 15-ago-2026. Durante días la corrida programada publicó
 `notas:0, medios:0` mientras el disparo manual por HTTP traía 1.146 notas en
 dos segundos. **Mismo código, mismo minuto, resultado opuesto.**
 
-**La causa:** las 17 consultas salían a la vez (`Promise.all`) y Google
-respondía **HTTP 503 a las 17**, con su página `<title>Sorry...</title>` de
-bloqueo por consultas automatizadas. Las latencias subían de 6 a 25 segundos
-mientras estrangulaba la tanda. **El bloqueo es por IP de salida**, y ahí está
-la asimetría: el cron sale siempre por el mismo centro de datos —así que una
-vez bloqueado, cae corrida tras corrida— mientras la llamada manual sale por
-otro y contesta normal. Diagnosticar esto desde afuera era imposible porque el
-código lo ocultaba (ver abajo).
+**La causa:** Google responde **HTTP 503** con su página
+`<title>Sorry...</title>` de bloqueo por consultas automatizadas. No es una
+excepción ni un timeout: es un rechazo bien formado que el código convertía en
+"no hay noticias".
 
-**Tres arreglos, y los tres hacen falta:**
+**El bloqueo es por IP de salida y VARÍA EN EL TIEMPO.** Al principio pegaba
+solo al cron —que sale siempre por el mismo centro de datos— mientras la
+llamada manual, que sale por otro, respondía 1.146 notas en el mismo minuto.
+Horas después, **las dos vías estaban bloqueadas**.
 
-1. **No salir en ráfaga.** Tandas de 3 con 900 ms entre tandas, un reintento
-   por consulta a los 4 s, y techo de 15 s por petición. La corrida pasó de
-   ~2 s a ~8 s: nadie la está esperando, es un cron cada 3 horas.
-2. **No publicar una corrida mala.** Una corrida con cero notas, o con más de
-   la mitad de las consultas fallidas, **se descarta y NO se escribe**: queda
-   publicada la última buena. Antes el agregado vacío se escribía encima del
-   bueno y la página quedaba muda sin que nadie se enterara.
-3. **Dejar rastro.** Tabla `corridas`: una fila por corrida, salga bien o mal,
+⚠️⚠️ **Y una parte de eso nos la hicimos nosotros.** Diagnosticar el problema
+costó ~10 recolecciones de prueba en dos horas y media; con reintentos, más de
+300 peticiones a Google News. Es muy probable que eso ampliara el bloqueo a la
+segunda IP. **Al depurar esto NO se prueba contra Google en bucle**: se mira la
+bitácora de `corridas`, que para eso existe, y se deja pasar el cron.
+
+**Cuatro arreglos:**
+
+1. **No salir en ráfaga.** Tandas de 3 con 900 ms entre tandas y techo de 15 s
+   por petición. Nadie está esperando: es un cron cada 3 horas.
+2. **Abandonar cuando nos bloquean** (corta-circuitos). Si la primera tanda
+   vuelve entera con 503, se abandona la corrida. Y **un 503 no se reintenta**:
+   contra un bloqueo por abuso el reintento falla igual y solo duplica las
+   peticiones, de 17 a 34, justo cuando nos están diciendo que somos
+   demasiados. Medido: una corrida bloqueada pasa de 34 peticiones a **3**.
+3. **No publicar una corrida mala.** Cero notas, o más de la mitad de las
+   consultas fallidas, **se descarta y NO se escribe**: queda publicada la
+   última buena. Antes el agregado vacío se escribía encima del bueno y la
+   página quedaba muda sin que nadie se enterara.
+4. **Dejar rastro.** Tabla `corridas`: una fila por corrida, salga bien o mal,
    con el detalle por consulta cuando falla (código HTTP, ms, y los primeros
    300 caracteres del cuerpo cuando no es RSS — que es lo que delató el
    "Sorry..."). Se retienen 30 días.
+
+⚠️ **Los arreglos 3 y 4 están verificados contra una corrida programada real**
+(06:17 UTC del 15-ago): falló entera, **no publicó**, y quedó anotada con las
+17 respuestas. El agregado bueno de 1.145 notas siguió en pie. Los arreglos 1
+y 2 reducen la probabilidad de que nos bloqueen, pero **no rescatan una IP ya
+bloqueada**: mientras dure, el pulso de prensa se queda con el último dato
+bueno y lo declara.
+
+**Si el bloqueo se vuelve permanente**, las salidas reales son cambiar de
+fuente —RSS directo de los medios, como hace `agenda-medios-rss` del proyecto
+DC, que no pasa por Google— o sacar la recolección de Cloudflare. Insistir con
+reintentos no es una salida.
 
 ⚠️ **El `.catch(() => [])` era el verdadero problema.** Convertía "Google me
 bloqueó" en "no hay noticias": indistinguibles. Con eso, 17 fallos producían un
