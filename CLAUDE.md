@@ -9270,8 +9270,51 @@ mandan sobre el centro del municipio.
 pixel (14 en Bogotá, se veía uno). `separarApilados` los abre en círculo, en
 orden fijo. Es arreglo **visual**; la ficha sigue diciendo que es aproximado.
 
-### Anti-abuso: falta Turnstile
-🔴 **Turnstile NO está configurado.** Crear el widget exige el panel de
+### Anti-abuso · Turnstile CONFIGURADO pero SIN VERIFICAR que entregue token
+🟡 **Widget creado y cableado; falta confirmar que funcione en un navegador.**
+Site key `0x4AAAAAAEQU0HH2L5Ccynh0` en `CONFIG.TURNSTILE`; `TURNSTILE_SECRET` ya
+cargado; hostnames `ayuda-sismo.pages.dev`, `sismo.ricardoruiz.co` y `localhost`.
+
+**Dos reportes de prueba hechos desde el navegador REAL de Ricardo salieron con
+`sin_captcha=1`** (ids 4e6594d6 y 761fd7d3, ya borrados). O sea: el token no
+llegó al servidor. Se corrigieron dos causas y ninguna se pudo confirmar:
+
+1. **El `onload` del `<script>` no sirve para montar el widget**: cuando dispara,
+   `window.turnstile` existe pero `render` **todavía no** ("render is not a
+   function"). Se pasó al callback explícito
+   (`?onload=onloadTurnstileCallback&render=explicit`) + intento de montaje al
+   elegir la situación, con guard contra el "Turnstile already has been loaded".
+2. **El token se raspaba del input `cf-turnstile-response` al enviar.** En modo
+   Gestionado el reto tarda 1-2 s: quien llena rápido enviaba con el campo
+   vacío. Ahora se usa `getResponse(tsId)` y **se espera hasta 8 s** con el
+   botón en "Verificando…".
+
+⚠️ **PRÓXIMO PASO: hay instrumentación esperando.** Cada reporte manda
+`tsdiag` y el Worker guarda el ÚLTIMO en `externos` id `diag-turnstile`. Basta
+un reporte de prueba (con **Cmd+Shift+R**, el HTML se cachea 120 s) y luego:
+
+```bash
+cd ayuda-sismo/worker && npx wrangler d1 execute ayuda-sismo --remote \
+  --command "SELECT datos FROM externos WHERE id='diag-turnstile'"
+```
+
+Cómo leerlo: `api=ausente` → un bloqueador tumbó el script · `api=vacia` → la
+API carga y no arranca (hostname/clave) · `montado=false` con `api=lista` → es
+nuestro código · `token=vacio` con `espera=8000ms` → el reto nunca resolvió.
+
+⚠️ **El captcha es FAIL-SOFT a propósito**: token ausente pasa marcado
+`sin_captcha=1`; token presente pero inválido se rechaza. Fue esa decisión la
+que dejó ver el fallo — con la versión estricta los reportes de prueba habrían
+sido rechazados con un error genérico. Los `error-codes` de siteverify se
+registran para distinguir clave secreta mala de token falso.
+
+⚠️ **La extensión de Chrome no estuvo disponible en toda la sesión** (4 intentos),
+y el navegador integrado **no inicializa Turnstile** (`window.turnstile` queda
+como objeto vacío antes de que la site key importe). Por eso no se pudo ver el
+widget renderizado; de ahí la instrumentación.
+
+### Anti-abuso · las otras tres capas
+🔴 **Antes de Turnstile no había nada.** Crear el widget exige el panel de
 Cloudflare: el token OAuth de wrangler **no tiene ese permiso** (probado, error
 10000; sus scopes son workers, d1, pages, zone). Pasos: dash.cloudflare.com →
 Turnstile → widget para el dominio → *site key* a `CONFIG.TURNSTILE` de
