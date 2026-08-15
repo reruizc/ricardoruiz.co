@@ -398,9 +398,9 @@ titulares. Un municipio sin periodistas se ve idéntico a uno sin problemas. Por
 eso el **hallazgo principal es el silencio**: cuántos municipios de la zona
 afectada no aparecen en una sola noticia. Medido: **88 de 101**.
 
-- **Fuente**: Google News RSS (`hl=es-419&gl=CO`), 17 consultas por tema y
-  ciudad. Gratis, sin API key. ⚠️ Devuelve **302**: hay que seguir la redirección
-  (`curl -L`; `fetch` con `redirect:'follow'`). Sin eso llegan cero resultados.
+- **Fuente**: el **RSS propio de 20 medios** (12 de la zona afectada, 8
+  nacionales), en `MEDIOS` dentro de `worker/src/inteligencia.js`. Ya NO se usa
+  Google News — ver "Google bloquea la ráfaga" más abajo.
 - **Clasificación determinista**, sin modelo de lenguaje: diccionarios de
   palabras y reglas. El único texto de IA es el párrafo azul del comienzo, va
   marcado y no produce ninguna cifra. Necesita `DEEPSEEK_API_KEY`; sin ella la
@@ -482,10 +482,51 @@ y 2 reducen la probabilidad de que nos bloqueen, pero **no rescatan una IP ya
 bloqueada**: mientras dure, el pulso de prensa se queda con el último dato
 bueno y lo declara.
 
-**Si el bloqueo se vuelve permanente**, las salidas reales son cambiar de
-fuente —RSS directo de los medios, como hace `agenda-medios-rss` del proyecto
-DC, que no pasa por Google— o sacar la recolección de Cloudflare. Insistir con
-reintentos no es una salida.
+### La salida: RSS propio de cada medio (15-ago-2026)
+
+Se cambió de fuente. Ahora se leen **20 feeds** que los propios periódicos
+publican para que los lean: sin buscador de por medio, sin antibot, sin una
+cuota secreta que un día se cierra. La lista vive en `MEDIOS`
+(`worker/src/inteligencia.js`) con `reg: 1` para los de la zona afectada.
+
+⚠️⚠️ **Cada URL fue PROBADA, no adivinada.** De 38 candidatos escritos de
+memoria solo acertaron 12; el resto daba 404 porque la ruta se inventó. Las que
+faltaban salieron leyendo el `<link rel="alternate" type="application/rss+xml">`
+del home de cada sitio — así aparecieron **El País de Cali (100 items)** y **El
+Diario de Pereira (99)**, los dos regionales más importantes de la zona. La
+prensa colombiana corre mayoritariamente sobre Arc XP, cuya ruta es
+`/arc/outboundfeeds/rss/?outputType=xml`. **Al agregar un medio, probarlo.**
+
+⚠️⚠️ **El filtro por tema es obligatorio y es LA diferencia con Google.** A
+Google se le pedía "terremoto Cali" y devolvía solo eso; el feed de un medio
+trae todo lo que publicó, incluido el fútbol. `esDelSismo()` exige una palabra
+del sismo (sismo, réplica, magnitud…) **o bien** una de emergencia
+(damnificados, albergue, acopio…) **junto con** un nombre de la zona. Esa
+segunda condición existe porque "ayuda humanitaria" a secas trae Gaza y
+"damnificados" trae una inundación en Barranquilla — los dos casos, probados.
+
+⚠️ **El User-Agent lleva token de navegador adelante.** Medido: El Diario de
+Pereira responde **403 al UA propio y 200 al híbrido**. Seguimos identificándonos
+y dejando URL de contacto; si un medio pide que paremos, se saca de `MEDIOS`.
+
+⚠️ **Infobae contesta 200 desde una IP residencial y 403 desde el Worker**: ahí
+el corte es por IP y ningún UA lo arregla. Queda en la lista porque la bitácora
+avisa si vuelve, y un caído de 20 no mueve nada.
+
+**Google News queda apagado detrás de `USAR_GOOGLE_NEWS=1`**, con su
+corta-circuitos. Si se enciende y falla, **no descarta la corrida**: lo que
+manda es el RSS directo.
+
+⚠️⚠️ **Las cifras de antes y de ahora NO son comparables.** Con Google la
+lectura daba ~1.145 titulares; con RSS directo da ~294. No es que se haya
+perdido cobertura: Google devolvía 17 búsquedas con mucho solapamiento y ruido
+de todo el país, y ahora se cuentan las notas del sismo de 20 medios concretos.
+El denominador cambió. El hallazgo principal —el silencio— se sostiene: **89 de
+101 municipios de la zona sin una sola nota**.
+
+Primera corrida real: **294 notas · 17 medios · 19 de 20 feeds vivos · 12 s**.
+Rinde así por medio (`del_feed` → `del sismo`): El País Cali 100→62, El Heraldo
+100→33, Semana 100→30, Caracol 100→29, Las2Orillas 150→27, Q'Hubo Cali 12→10.
 
 ⚠️ **El `.catch(() => [])` era el verdadero problema.** Convertía "Google me
 bloqueó" en "no hay noticias": indistinguibles. Con eso, 17 fallos producían un

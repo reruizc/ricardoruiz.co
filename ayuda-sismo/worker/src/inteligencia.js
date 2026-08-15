@@ -20,6 +20,118 @@ export const SISMO_TS = Date.UTC(2026, 7, 10, 12, 34, 0);
 const GNEWS = 'https://news.google.com/rss/search';
 const UA = 'Mozilla/5.0 (compatible; MapaDeAyuda/1.0; +https://sismo.ricardoruiz.co)';
 
+/**
+ * UA para los feeds de los medios.
+ *
+ * ⚠️ Lleva el token de navegador ADELANTE y nuestro identificador atrás. No es
+ * capricho: medido, El Diario de Pereira responde **403 al UA propio y 200 al
+ * híbrido** —su WAF corta por "esto no parece un navegador"—, y es un medio
+ * regional de la zona afectada con 99 notas, de los que más importan acá.
+ *
+ * Seguimos diciendo quiénes somos y dejando una URL de contacto, que es lo que
+ * permite que alguien nos pida parar. Si un medio lo pide, se saca de MEDIOS.
+ */
+const UA_FEED = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+  + '(KHTML, like Gecko) Chrome/128.0 Safari/537.36 '
+  + 'MapaDeAyuda/1.0 (+https://sismo.ricardoruiz.co)';
+
+/**
+ * MEDIOS · el RSS propio de cada periódico. Esta es la fuente.
+ *
+ * ⚠️⚠️ Se dejó de depender de Google News porque nos bloqueaba. Su endpoint
+ * `news.google.com/rss/search` NO es una API pública: Google cerró su News API
+ * en 2011 y ese RSS sobrevive sin documentación, sin llave y **sin cuota
+ * publicada**. O sea que no hay un límite al cual ajustarse; hay una heurística
+ * antibot que un día decide que somos un robot y contesta `503` con su página
+ * "Sorry...". Peor: bloquea por IP de salida, y las IP de Cloudflare las
+ * comparten miles de Workers, así que se hereda la mala reputación de terceros.
+ * No se arregla portándose bien.
+ *
+ * El RSS de cada medio es lo contrario: lo publica el propio periódico para
+ * que lo lean, sale de su hosting y no tiene antibot.
+ *
+ * ⚠️ Cada URL de esta lista fue PROBADA, no adivinada (15-ago-2026): responde
+ * un feed válido con items. Adivinar rutas da 404 en la mitad de los casos —de
+ * 38 candidatos, 12 acertaron a la primera— y varias solo aparecen leyendo el
+ * `<link rel="alternate">` del home. Al agregar un medio, probarlo antes.
+ *
+ * ⚠️ `reg` (regional) viene de acá y ya no de adivinar por el nombre del
+ * medio, que era una lista de subcadenas y fallaba en los dos sentidos.
+ *
+ * Fuera a propósito:
+ *  · El Espectador — su único feed vivo es el de "discover" y trae notas de
+ *    mayo; un feed viejo no aporta y ensucia la ventana.
+ *  · Blu Radio, El Colombiano, Pulzo, RCN, W Radio, Crónica del Quindío,
+ *    El Quindiano, Telecafé — no exponen RSS alcanzable (probado).
+ */
+export const MEDIOS = [
+  // ── zona afectada ──
+  { id: 'elpaiscali',   n: 'El País (Cali)',        reg: 1, url: 'https://www.elpais.com.co/arc/outboundfeeds/rss/?outputType=xml' },
+  { id: 'eldiario',     n: 'El Diario (Pereira)',   reg: 1, url: 'https://www.eldiario.com.co/feed/' },
+  { id: 'latarde',      n: 'La Tarde (Pereira)',    reg: 1, url: 'https://www.latarde.com/feed/' },
+  { id: 'lapatria',     n: 'La Patria (Manizales)', reg: 1, url: 'https://www.lapatria.com/rss.xml' },
+  { id: 'eje21',        n: 'Eje21',                 reg: 1, url: 'https://eje21.com.co/feed/' },
+  { id: 'risaraldahoy', n: 'Risaralda Hoy',         reg: 1, url: 'https://risaraldahoy.com/feed/' },
+  { id: 'quindionot',   n: 'Quindío Noticias',      reg: 1, url: 'https://quindionoticias.com/feed/' },
+  { id: 'occidente',    n: 'Diario Occidente',      reg: 1, url: 'https://occidente.co/feed/' },
+  { id: '90minutos',    n: '90 Minutos (Cali)',     reg: 1, url: 'https://90minutos.co/feed/' },
+  { id: 'qhubocali',    n: "Q'Hubo Cali",           reg: 1, url: 'https://qhubocali.com/feed/' },
+  { id: 'choco7dias',   n: 'Chocó 7 Días',          reg: 1, url: 'https://choco7dias.com/feed/' },
+  { id: 'eltiempocali', n: 'El Tiempo · Cali',      reg: 1, url: 'https://www.eltiempo.com/rss/colombia_cali.xml' },
+  // ── nacionales ──
+  { id: 'eltiempo',     n: 'El Tiempo',             reg: 0, url: 'https://www.eltiempo.com/rss/colombia.xml' },
+  { id: 'semana',       n: 'Semana',                reg: 0, url: 'https://www.semana.com/arc/outboundfeeds/rss/?outputType=xml' },
+  { id: 'caracolradio', n: 'Caracol Radio',         reg: 0, url: 'https://caracol.com.co/arc/outboundfeeds/rss/?outputType=xml' },
+  // ⚠️ Infobae contesta 200 desde una IP residencial y 403 desde el Worker:
+  // ahí el corte es por IP, no por UA, y no hay UA que lo arregle. Se deja en
+  // la lista porque cuesta una petición y la bitácora avisa si algún día
+  // vuelve; mientras tanto sale como caído y no afecta a los otros 19.
+  { id: 'infobaeco',    n: 'Infobae Colombia',      reg: 0, url: 'https://www.infobae.com/arc/outboundfeeds/rss/category/colombia/' },
+  { id: 'elheraldo',    n: 'El Heraldo',            reg: 0, url: 'https://www.elheraldo.co/arc/outboundfeeds/rss/?outputType=xml' },
+  { id: 'las2orillas',  n: 'Las2Orillas',           reg: 0, url: 'https://www.las2orillas.co/feed/' },
+  { id: 'elnuevosiglo', n: 'El Nuevo Siglo',        reg: 0, url: 'https://www.elnuevosiglo.com.co/rss.xml' },
+  { id: 'minuto30',     n: 'Minuto30',              reg: 0, url: 'https://www.minuto30.com/feed/' },
+];
+
+/**
+ * ⚠️⚠️ EL FILTRO ES OBLIGATORIO Y ES LA DIFERENCIA CON GOOGLE.
+ *
+ * A Google se le pedía "terremoto Cali" y devolvía solo eso. El feed de un
+ * medio trae TODO lo que publicó —fútbol, farándula, política— así que el
+ * recorte temático hay que hacerlo acá. Sin esto, el pulso del sismo contaría
+ * la programación del fin de semana.
+ */
+const SISMO_KW = [
+  'sismo', 'sismos', 'sismica', 'sismico', 'terremoto', 'temblor', 'temblores',
+  'replica', 'replicas', 'magnitud', 'epicentro', 'richter', 'movimiento telurico',
+];
+// Palabras de emergencia que solo cuentan si además se nombra la zona: "ayuda
+// humanitaria" a secas puede ser de Gaza, y "damnificados" de una inundación.
+const EMERGENCIA_KW = [
+  'damnificado', 'damnificados', 'albergue', 'albergues', 'escombros', 'derrumbe',
+  'colapso', 'rescatistas', 'socorristas', 'ungrd', 'calamidad', 'evacuados',
+  'ayuda humanitaria', 'donaciones', 'centro de acopio', 'centros de acopio',
+  'desaparecidos', 'remocion de escombros', 'viviendas afectadas', 'emergencia',
+];
+// Nombres de la zona golpeada, para calificar lo anterior.
+const ZONA_KW = [
+  'choco', 'valle del cauca', 'risaralda', 'caldas', 'quindio', 'cauca',
+  'cali', 'pereira', 'manizales', 'armenia', 'quibdo', 'dosquebradas',
+  'buenaventura', 'san jose del palmar', 'eje cafetero', 'pacifico',
+];
+
+const pegaAlguna = (norm, palabras, lista) =>
+  lista.some((t) => (t.includes(' ') ? norm.includes(t) : palabras.has(t)));
+
+/** ¿Esta nota habla del sismo? Determinista y auditable, como el resto. */
+export function esDelSismo(titulo) {
+  const norm = normalizar(titulo);
+  const palabras = new Set(norm.split(' '));
+  if (pegaAlguna(norm, palabras, SISMO_KW)) return true;
+  return pegaAlguna(norm, palabras, EMERGENCIA_KW)
+      && pegaAlguna(norm, palabras, ZONA_KW);
+}
+
 /** Temas, alineados a las situaciones del mapa y no a una taxonomía de prensa. */
 export const TEMAS = {
   ayuda:      { n: 'Ayuda y donaciones', q: 'ayudas donaciones damnificados',
@@ -144,6 +256,79 @@ function parsearRSS(xml) {
     });
   }
   return items;
+}
+
+/**
+ * Parseo del feed propio de un medio. Sirve RSS 2.0 y Atom.
+ *
+ * ⚠️ Dos diferencias con el RSS de Google, y las dos importan:
+ *  · El nombre del medio NO viene adentro (no hay `<source>`): lo pone la
+ *    ficha de MEDIOS. Sin esto todas las notas saldrían como "sin medio".
+ *  · Hay feeds Atom, que usan `<entry>` y `<link href="...">` en vez de
+ *    `<item>` y `<link>texto</link>`.
+ */
+function parsearFeed(xml, medio, regional) {
+  const items = [];
+  const bloques = xml.match(/<(?:item|entry)[\s>][\s\S]*?<\/(?:item|entry)>/g) || [];
+  for (const b of bloques) {
+    const g = (re) => { const m = b.match(re); return m ? m[1] : ''; };
+    const crudo = g(/<title[^>]*>([\s\S]*?)<\/title>/);
+    if (!crudo) continue;
+
+    // Atom pone la URL en un atributo; RSS, en el texto del nodo.
+    const link = desescapar(g(/<link[^>]*>([\s\S]*?)<\/link>/))
+      || g(/<link[^>]+href=["']([^"']+)["']/);
+
+    const fechaTxt = g(/<pubDate>([\s\S]*?)<\/pubDate>/)
+      || g(/<updated>([\s\S]*?)<\/updated>/)
+      || g(/<published>([\s\S]*?)<\/published>/)
+      || g(/<dc:date>([\s\S]*?)<\/dc:date>/);
+    const ts = Date.parse(desescapar(fechaTxt));
+
+    items.push({
+      titulo: desescapar(crudo).trim(),
+      medio,
+      regional: Boolean(regional),
+      url: link,
+      ts: Number.isFinite(ts) ? ts : null,
+    });
+  }
+  return items;
+}
+
+/** Baja el feed de un medio. Nunca lanza: devuelve su propio diagnóstico. */
+async function traerMedio(m) {
+  const t0 = Date.now();
+  try {
+    const r = await fetch(m.url, {
+      headers: {
+        'User-Agent': UA_FEED,
+        Accept: 'application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8',
+        'Accept-Language': 'es-CO,es;q=0.9',
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(15000),
+    });
+    const txt = await r.text();
+    const ok = r.ok && ES_FEED.test(txt);
+    const todos = ok ? parsearFeed(txt, m.n, m.reg) : [];
+    // El recorte temático se hace acá, no en el agregado: así el diagnóstico
+    // distingue "el medio publicó 100 notas y ninguna era del sismo" de "el
+    // medio no respondió", que son problemas distintos.
+    const items = todos.filter((it) => esDelSismo(it.titulo));
+    return {
+      id: m.id, ok, http: r.status, ms: Date.now() - t0,
+      n: items.length, del_feed: todos.length, bytes: txt.length,
+      muestra: ok ? undefined : txt.slice(0, 300),
+      items,
+    };
+  } catch (e) {
+    return {
+      id: m.id, ok: false, http: 0, ms: Date.now() - t0, n: 0, del_feed: 0,
+      err: `${(e && e.name) || 'Error'}: ${(e && e.message) || e}`,
+      items: [],
+    };
+  }
 }
 
 function desescapar(s) {
@@ -309,7 +494,10 @@ export function clasificar(items) {
       mun: detectarMunicipio(norm, palabras),
       temas: detectarPorDiccionario(norm, palabras, TEMAS),
       disc: detectarPorDiccionario(norm, palabras, DISCURSO),
-      regional: esRegional(it.medio),
+      // El alcance viene de la ficha del medio cuando la nota salió de su
+      // propio feed —ahí lo sabemos con certeza—; la heurística por nombre
+      // queda solo para lo que llegue por Google, donde el medio es un texto.
+      regional: it.regional !== undefined ? it.regional : esRegional(it.medio),
       dia: it.ts != null ? Math.floor((it.ts - SISMO_TS) / 86400000) : null,
     });
   }
@@ -423,8 +611,15 @@ export function agregar(notas) {
     ejemplos,
     metodo: {
       clasificacion: 'determinista',
-      fuente: 'Google News RSS (es-419 · Colombia)',
-      consultas: consultas().length,
+      // ⚠️ La página imprime `fuente` y `consultas` en una sola frase, así que
+      // el texto de acá tiene que quedar cierto ahí. Ya no se le pregunta a un
+      // buscador: se leen los feeds de los medios y el recorte del tema lo
+      // hacemos nosotros.
+      fuente: `RSS propio de ${MEDIOS.length} medios `
+            + `(${MEDIOS.filter((m) => m.reg).length} de la zona afectada, `
+            + `${MEDIOS.filter((m) => !m.reg).length} nacionales)`,
+      consultas: MEDIOS.length,
+      medios_leidos: MEDIOS.map((m) => m.n),
       municipios_excluidos: MUNICIPIOS_EXCLUIDOS.length,
       excluidos_ejemplo: MUNICIPIOS_EXCLUIDOS.slice(0, 10),
     },
@@ -670,17 +865,31 @@ export async function ultimaCorrida(env, tarea = 'prensa') {
 export async function recolectar(env, opciones = {}) {
   const origen = opciones.origen || 'desconocido';
   const t0 = Date.now();
-  const qs = consultas();
-  const res = await enTandas(qs, 3, 900, traer);
+
+  // ── fuente principal: el RSS propio de cada medio ───────────────────────
+  const res = await enTandas(MEDIOS, 5, 400, traerMedio);
+
+  // ── complemento opcional: Google News, APAGADO por defecto ──────────────
+  //
+  // ⚠️ Se enciende con la variable USAR_GOOGLE_NEWS=1. Está apagado porque nos
+  // bloquea (503 "Sorry...") y el bloqueo es por IP de salida compartida, o
+  // sea que no depende de portarse bien. Se conserva el camino —con su
+  // corta-circuitos— por si algún día vuelve a servir, pero su fallo NUNCA
+  // descarta la corrida: lo que manda es el RSS directo.
+  let resG = [];
+  if (env.USAR_GOOGLE_NEWS === '1') {
+    resG = await enTandas(consultas(), 3, 900, traer);
+  }
 
   const fallidas = res.filter((r) => !r.ok);
   const diag = res.map(({ items, ...d }) => d);
+  const diagG = resG.map(({ items, ...d }) => d);
 
-  // Dedup por (titular normalizado, medio): la misma nota llega por varias
-  // consultas, y contarla dos veces inflaría todos los agregados.
+  // Dedup por (titular normalizado, medio): una nota puede repetirse entre el
+  // feed y Google, y contarla dos veces inflaría todos los agregados.
   const vistos = new Set();
   const items = [];
-  for (const { items: lote } of res) {
+  for (const { items: lote } of [...res, ...resG]) {
     for (const it of lote) {
       const llave = `${normalizar(it.titulo).slice(0, 90)}::${normalizar(it.medio)}`;
       if (vistos.has(llave)) continue;
@@ -692,32 +901,31 @@ export async function recolectar(env, opciones = {}) {
   // ── el filtro: ¿esta corrida se puede publicar? ─────────────────────────
   //
   // Dos motivos para descartarla, los dos medidos contra el fallo real:
-  //  · CERO items. Con 17 consultas sobre un sismo de hace cinco días, cero
+  //  · CERO items. Con 20 medios leídos y un sismo de hace cinco días, cero
   //    no es "no hay noticias", es "no pudimos preguntar".
-  //  · MAYORÍA de consultas fallidas. Aunque entren algunas notas, el
-  //    agregado saldría sesgado hacia los temas de las consultas que sí
-  //    respondieron, y publicarlo sería peor que conservar el anterior.
+  //  · MAYORÍA de medios caídos. Aunque entren algunas notas, el agregado
+  //    saldría sesgado hacia los pocos medios que sí respondieron, y
+  //    publicarlo sería peor que conservar el anterior.
   const anterior = await leer(env);
 
-  // El código HTTP que más se repite entre las fallidas. Con esto el motivo
-  // se lee de un vistazo —"503" es el bloqueo por consultas automatizadas de
-  // Google— sin tener que abrir el detalle consulta por consulta.
+  // El código HTTP que más se repite entre los medios caídos. Con esto el
+  // motivo se lee de un vistazo, sin abrir el detalle medio por medio.
   const porCodigo = {};
   // Las omitidas por el corta-circuitos no se cuentan: no se intentaron, y
-  // meterlas acá diría "17× HTTP null" en vez de nombrar el bloqueo real.
+  // meterlas acá diría "N× HTTP null" en vez de nombrar el fallo real.
   for (const f of fallidas) {
     if (f.omitida) continue;
     porCodigo[f.http] = (porCodigo[f.http] || 0) + 1;
   }
   const dominante = Object.entries(porCodigo).sort((a, b) => b[1] - a[1])[0];
   const pista = dominante
-    ? ` · ${dominante[1]}× HTTP ${dominante[0]}${dominante[0] === '503' ? ' (Google bloquea consultas automatizadas)' : ''}`
+    ? ` · ${dominante[1]}× HTTP ${dominante[0]}${dominante[0] === '503' ? ' (bloqueo por consultas automatizadas)' : ''}`
     : '';
 
   const razon = items.length === 0
-    ? `ninguna consulta devolvió resultados${pista}`
-    : (fallidas.length > qs.length / 2
-      ? `${fallidas.length} de ${qs.length} consultas fallaron${pista}`
+    ? `ningún medio devolvió notas del sismo${pista}`
+    : (fallidas.length > MEDIOS.length / 2
+      ? `${fallidas.length} de ${MEDIOS.length} medios fallaron${pista}`
       : null);
 
   if (razon && anterior && anterior.totales?.notas > 0) {
@@ -726,7 +934,7 @@ export async function recolectar(env, opciones = {}) {
     await anotarCorrida(env, {
       tarea: 'prensa', origen, ok: false, publicado: false,
       ms: Date.now() - t0, notas: items.length, medios: 0,
-      detalle: { razon, consultas: diag },
+      detalle: { razon, medios: diag, google: diagG.length ? diagG : undefined },
     });
     const err = new Error(`corrida descartada: ${razon}`);
     err.descartada = true;
@@ -739,12 +947,16 @@ export async function recolectar(env, opciones = {}) {
   ag.cifras = extraerCifras(notas);
   ag.lectura = await lecturaAutomatica(env, ag);
   ag.lectura_automatica = true;
-  // Va DENTRO del agregado que consume la página: cuántas de las 17 consultas
-  // respondieron. Una corrida a medias tiene que poder verse desde afuera.
+  // Va DENTRO del agregado que consume la página: cuántos medios respondieron.
+  // Una corrida a medias tiene que poder verse desde afuera.
   ag.recoleccion = {
     origen,
-    consultas: qs.length,
-    fallidas: fallidas.length,
+    medios_leidos: MEDIOS.length,
+    fallidos: fallidas.length,
+    // Qué medios no contestaron, por nombre: sirve para saber a cuál hay que
+    // buscarle una URL nueva cuando un periódico cambia de plataforma.
+    caidos: fallidas.filter((f) => !f.omitida).map((f) => f.id),
+    google: env.USAR_GOOGLE_NEWS === '1' ? { consultas: diagG.length } : 'apagado',
     ms: Date.now() - t0,
     // Sin la primera corrida buena que sirva de piso no hay con qué comparar,
     // así que la primera vez esto entra aunque `razon` exista.
@@ -759,7 +971,7 @@ export async function recolectar(env, opciones = {}) {
   await anotarCorrida(env, {
     tarea: 'prensa', origen, ok: !razon, publicado: true,
     ms: Date.now() - t0, notas: ag.totales.notas, medios: ag.totales.medios,
-    detalle: fallidas.length ? { razon, consultas: diag } : null,
+    detalle: fallidas.length ? { razon, medios: diag } : null,
   });
 
   return ag;
