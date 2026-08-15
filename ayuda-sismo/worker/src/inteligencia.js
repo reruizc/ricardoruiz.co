@@ -155,19 +155,99 @@ function desescapar(s) {
     .replace(/<[^>]+>/g, '').trim();
 }
 
-async function traer(q) {
-  const url = `${GNEWS}?q=${encodeURIComponent(q)}&hl=es-419&gl=CO&ceid=CO:es`;
+// Un feed válido, aunque venga sin una sola nota, trae estas etiquetas. La
+// página "Sorry..." de Google no. Es el discriminador entre "no hay noticias
+// de este municipio" —que es un resultado legítimo— y "no pude preguntar".
+const ES_FEED = /<rss[\s>]|<feed[\s>]|<channel[\s>]/i;
+
+/** Un intento contra Google News. Nunca lanza: devuelve su propio diagnóstico. */
+async function unIntento(c) {
+  const url = `${GNEWS}?q=${encodeURIComponent(c.q)}&hl=es-419&gl=CO&ceid=CO:es`;
+  const t0 = Date.now();
   try {
-    const r = await fetch(url, { headers: { 'User-Agent': UA }, redirect: 'follow' });
+    const r = await fetch(url, {
+      headers: { 'User-Agent': UA },
+      redirect: 'follow',
+      // ⚠️ Sin techo, una consulta colgada se lleva por delante la corrida
+      // entera: `Promise.all` no resuelve nunca y la invocación muere sin
+      // dejar ni siquiera constancia de que corrió. Pasó, y por eso está.
+      signal: AbortSignal.timeout(15000),
+    });
     const txt = await r.text();
-    console.log('DIAG traer', q.slice(0, 24), 'http', r.status, 'bytes', txt.length,
-      'ct', r.headers.get('content-type'), 'cuerpo', JSON.stringify(txt.slice(0, 200)));
-    if (!r.ok) return [];
-    return parsearRSS(txt);
+    // ⚠️ "Fallida" es que la petición no sirvió, NO que no haya noticias. Una
+    // consulta por un municipio pequeño puede devolver un feed legítimo y
+    // vacío; tratarlo como fallo dispararía reintentos inútiles y podría
+    // descartar una corrida buena por el umbral de "la mayoría falló".
+    const ok = r.ok && ES_FEED.test(txt);
+    const items = ok ? parsearRSS(txt) : [];
+    return {
+      ok, http: r.status, ms: Date.now() - t0,
+      n: items.length, bytes: txt.length,
+      // Solo cuando algo salió mal: si el cuerpo no es RSS, los primeros
+      // caracteres suelen decir exactamente qué respondió el otro lado.
+      muestra: ok ? undefined : txt.slice(0, 300),
+      items,
+    };
   } catch (e) {
-    console.log('DIAG traer', q.slice(0, 24), 'THREW', e && e.name, e && e.message);
-    return [];
+    return {
+      ok: false, http: 0, ms: Date.now() - t0, n: 0,
+      err: `${(e && e.name) || 'Error'}: ${(e && e.message) || e}`,
+      items: [],
+    };
   }
+}
+
+const pausa = (ms) => new Promise((s) => setTimeout(s, ms));
+
+/**
+ * Una consulta a Google News, con un reintento.
+ *
+ * ⚠️⚠️ Devuelve el DIAGNÓSTICO junto con los items, y nunca lanza. La versión
+ * anterior era `traer(q).catch(() => [])`: una consulta que fallaba quedaba
+ * indistinguible de una consulta que no encontró nada, así que 17 fallos
+ * seguidos producían una corrida "exitosa" de cero notas que se publicaba
+ * encima de la buena. El motivo del fallo —código HTTP, excepción, cuerpo que
+ * no es RSS— es justo lo que hace falta para saber a quién reclamarle, y fue
+ * lo que permitió identificarlo: 17 respuestas `503` con la página
+ * "Sorry..." de Google, o sea bloqueo por consultas automatizadas.
+ *
+ * El reintento es UNO y con espera larga: contra un bloqueo por abuso,
+ * insistir rápido es exactamente lo que lo prolonga.
+ */
+async function traer(c) {
+  const r = await unIntento(c);
+  if (r.ok) return { id: c.id, ...r };
+
+  await pausa(4000);
+  const r2 = await unIntento(c);
+  return {
+    id: c.id, ...r2, reintento: true,
+    // Se conserva el diagnóstico del PRIMER fallo: es el que explica qué pasó.
+    primer_fallo: r.err || `http ${r.http}`,
+  };
+}
+
+/**
+ * Corre las consultas en tandas pequeñas y con pausa, no las 17 de golpe.
+ *
+ * ⚠️⚠️ ESTA ES LA CAUSA DEL FALLO, no una optimización. 17 peticiones
+ * simultáneas al RSS desde una IP de datacenter tienen la forma exacta de una
+ * ráfaga automatizada, y Google las corta: respondía `503` con su página
+ * "Sorry..." a las 17, con latencias que subían de 6 a 25 segundos a medida
+ * que estrangulaba la tanda. El bloqueo es por IP de salida, y por eso el cron
+ * —que sale siempre por el mismo centro de datos— caía sistemáticamente
+ * mientras la llamada manual, que sale por otro, respondía 1.146 notas.
+ *
+ * Nadie está esperando esta corrida: es un cron cada 3 horas. Ir despacio no
+ * cuesta nada y es la diferencia entre que Google conteste o no.
+ */
+async function enTandas(items, tam, msEntre, fn) {
+  const out = [];
+  for (let i = 0; i < items.length; i += tam) {
+    if (i) await pausa(msEntre);
+    out.push(...await Promise.all(items.slice(i, i + tam).map(fn)));
+  }
+  return out;
 }
 
 /* ─────────────────────────── clasificación ─────────────────────────── */
@@ -515,15 +595,71 @@ export async function lecturaAutomatica(env, ag) {
 
 /* ─────────────────────────── orquestación ─────────────────────────── */
 
-export async function recolectar(env) {
+/**
+ * Deja constancia de una corrida, salga bien o mal.
+ *
+ * ⚠️ Es la mitad del arreglo, no un adorno: sin esto una corrida en cero es
+ * indistinguible de una corrida buena y nadie se entera hasta que alguien
+ * abre la página y la ve vacía. Se guarda SIEMPRE, y el fallo se guarda con
+ * más detalle que el éxito.
+ *
+ * Nunca lanza: que no se pueda anotar el fallo no puede convertirse en un
+ * segundo fallo que tape al primero.
+ */
+export async function anotarCorrida(env, fila) {
+  try {
+    await env.DB.prepare(
+      `INSERT INTO corridas (ts, tarea, origen, ok, publicado, ms, notas, medios, detalle)
+       VALUES (?,?,?,?,?,?,?,?,?)`
+    ).bind(
+      Date.now(), fila.tarea, fila.origen || 'desconocido',
+      fila.ok ? 1 : 0, fila.publicado ? 1 : 0,
+      fila.ms ?? null, fila.notas ?? null, fila.medios ?? null,
+      fila.detalle ? JSON.stringify(fila.detalle).slice(0, 20000) : null
+    ).run();
+    // Se retienen ~30 días de corridas: es una bitácora de operación, no un
+    // archivo histórico, y la base es la misma que sirve el mapa.
+    await env.DB.prepare('DELETE FROM corridas WHERE ts < ?')
+      .bind(Date.now() - 30 * 86400000).run();
+  } catch (e) {
+    console.error('no se pudo anotar la corrida', e && e.message);
+  }
+}
+
+export async function ultimaCorrida(env, tarea = 'prensa') {
+  try {
+    const r = await env.DB.prepare(
+      `SELECT ts, ok, publicado, notas, medios, ms FROM corridas
+       WHERE tarea = ? ORDER BY ts DESC LIMIT 1`
+    ).bind(tarea).first();
+    return r || null;
+  } catch { return null; }
+}
+
+/**
+ * Recolecta el pulso de prensa y lo publica SOLO si la corrida sirve.
+ *
+ * ⚠️⚠️ El agregado nuevo no se publica a ciegas. Una recolección puede fallar
+ * entera —lo hizo: el cron devolvía cero mientras la misma llamada por HTTP
+ * traía 1.146 notas— y la versión anterior escribía ese cero encima del
+ * agregado bueno, dejando la página vacía sin un solo rastro de que algo
+ * había pasado. Ahora una corrida vacía o mayoritariamente fallida se anota y
+ * se descarta: queda publicado lo último bueno.
+ */
+export async function recolectar(env, opciones = {}) {
+  const origen = opciones.origen || 'desconocido';
+  const t0 = Date.now();
   const qs = consultas();
-  const lotes = await Promise.all(qs.map((c) => traer(c.q).catch(() => [])));
+  const res = await enTandas(qs, 3, 900, traer);
+
+  const fallidas = res.filter((r) => !r.ok);
+  const diag = res.map(({ items, ...d }) => d);
 
   // Dedup por (titular normalizado, medio): la misma nota llega por varias
   // consultas, y contarla dos veces inflaría todos los agregados.
   const vistos = new Set();
   const items = [];
-  for (const lote of lotes) {
+  for (const { items: lote } of res) {
     for (const it of lote) {
       const llave = `${normalizar(it.titulo).slice(0, 90)}::${normalizar(it.medio)}`;
       if (vistos.has(llave)) continue;
@@ -532,16 +668,73 @@ export async function recolectar(env) {
     }
   }
 
+  // ── el filtro: ¿esta corrida se puede publicar? ─────────────────────────
+  //
+  // Dos motivos para descartarla, los dos medidos contra el fallo real:
+  //  · CERO items. Con 17 consultas sobre un sismo de hace cinco días, cero
+  //    no es "no hay noticias", es "no pudimos preguntar".
+  //  · MAYORÍA de consultas fallidas. Aunque entren algunas notas, el
+  //    agregado saldría sesgado hacia los temas de las consultas que sí
+  //    respondieron, y publicarlo sería peor que conservar el anterior.
+  const anterior = await leer(env);
+
+  // El código HTTP que más se repite entre las fallidas. Con esto el motivo
+  // se lee de un vistazo —"503" es el bloqueo por consultas automatizadas de
+  // Google— sin tener que abrir el detalle consulta por consulta.
+  const porCodigo = {};
+  for (const f of fallidas) porCodigo[f.http] = (porCodigo[f.http] || 0) + 1;
+  const dominante = Object.entries(porCodigo).sort((a, b) => b[1] - a[1])[0];
+  const pista = dominante
+    ? ` · ${dominante[1]}× HTTP ${dominante[0]}${dominante[0] === '503' ? ' (Google bloquea consultas automatizadas)' : ''}`
+    : '';
+
+  const razon = items.length === 0
+    ? `ninguna consulta devolvió resultados${pista}`
+    : (fallidas.length > qs.length / 2
+      ? `${fallidas.length} de ${qs.length} consultas fallaron${pista}`
+      : null);
+
+  if (razon && anterior && anterior.totales?.notas > 0) {
+    console.error('prensa: corrida DESCARTADA ·', razon,
+      '· se conserva la del', new Date(anterior.generado).toISOString());
+    await anotarCorrida(env, {
+      tarea: 'prensa', origen, ok: false, publicado: false,
+      ms: Date.now() - t0, notas: items.length, medios: 0,
+      detalle: { razon, consultas: diag },
+    });
+    const err = new Error(`corrida descartada: ${razon}`);
+    err.descartada = true;
+    err.diag = diag;
+    throw err;
+  }
+
   const notas = clasificar(items);
   const ag = agregar(notas);
   ag.cifras = extraerCifras(notas);
   ag.lectura = await lecturaAutomatica(env, ag);
   ag.lectura_automatica = true;
+  // Va DENTRO del agregado que consume la página: cuántas de las 17 consultas
+  // respondieron. Una corrida a medias tiene que poder verse desde afuera.
+  ag.recoleccion = {
+    origen,
+    consultas: qs.length,
+    fallidas: fallidas.length,
+    ms: Date.now() - t0,
+    // Sin la primera corrida buena que sirva de piso no hay con qué comparar,
+    // así que la primera vez esto entra aunque `razon` exista.
+    degradada: Boolean(razon),
+  };
 
   await env.DB.prepare(
     `INSERT INTO inteligencia (id, ts, datos) VALUES ('actual', ?, ?)
      ON CONFLICT(id) DO UPDATE SET ts = excluded.ts, datos = excluded.datos`
   ).bind(ag.generado, JSON.stringify(ag)).run();
+
+  await anotarCorrida(env, {
+    tarea: 'prensa', origen, ok: !razon, publicado: true,
+    ms: Date.now() - t0, notas: ag.totales.notas, medios: ag.totales.medios,
+    detalle: fallidas.length ? { razon, consultas: diag } : null,
+  });
 
   return ag;
 }

@@ -435,6 +435,61 @@ Regenerar la lista tras cambiar `geo.json` o los diccionarios:
 python3 tools/ayuda-sismo/build_municipios_js.py
 ```
 
+### ⚠️⚠️ Google bloquea la ráfaga: por qué el cron devolvía CERO
+
+Diagnosticado el 15-ago-2026. Durante días la corrida programada publicó
+`notas:0, medios:0` mientras el disparo manual por HTTP traía 1.146 notas en
+dos segundos. **Mismo código, mismo minuto, resultado opuesto.**
+
+**La causa:** las 17 consultas salían a la vez (`Promise.all`) y Google
+respondía **HTTP 503 a las 17**, con su página `<title>Sorry...</title>` de
+bloqueo por consultas automatizadas. Las latencias subían de 6 a 25 segundos
+mientras estrangulaba la tanda. **El bloqueo es por IP de salida**, y ahí está
+la asimetría: el cron sale siempre por el mismo centro de datos —así que una
+vez bloqueado, cae corrida tras corrida— mientras la llamada manual sale por
+otro y contesta normal. Diagnosticar esto desde afuera era imposible porque el
+código lo ocultaba (ver abajo).
+
+**Tres arreglos, y los tres hacen falta:**
+
+1. **No salir en ráfaga.** Tandas de 3 con 900 ms entre tandas, un reintento
+   por consulta a los 4 s, y techo de 15 s por petición. La corrida pasó de
+   ~2 s a ~8 s: nadie la está esperando, es un cron cada 3 horas.
+2. **No publicar una corrida mala.** Una corrida con cero notas, o con más de
+   la mitad de las consultas fallidas, **se descarta y NO se escribe**: queda
+   publicada la última buena. Antes el agregado vacío se escribía encima del
+   bueno y la página quedaba muda sin que nadie se enterara.
+3. **Dejar rastro.** Tabla `corridas`: una fila por corrida, salga bien o mal,
+   con el detalle por consulta cuando falla (código HTTP, ms, y los primeros
+   300 caracteres del cuerpo cuando no es RSS — que es lo que delató el
+   "Sorry..."). Se retienen 30 días.
+
+⚠️ **El `.catch(() => [])` era el verdadero problema.** Convertía "Google me
+bloqueó" en "no hay noticias": indistinguibles. Con eso, 17 fallos producían un
+agregado de ceros perfectamente bien formado que se publicaba como si nada.
+**Al tocar esta recolección, no vuelvas a colapsar el error con el vacío.**
+
+**Ver qué pasó:**
+
+```bash
+curl -s .../inteligencia.json | jq .ultima_corrida     # público, en cada respuesta
+curl -s .../admin/corridas -H "X-Admin-Token: $ADMIN_TOKEN" | jq   # últimas 40, con detalle
+```
+
+`ultima_corrida` viaja en `/inteligencia.json` a propósito: sin él, un agregado
+de hace ocho horas se ve exactamente igual que uno recién hecho.
+
+⚠️ Si vuelve a aparecer `503 (Google bloquea consultas automatizadas)` de forma
+sostenida, el camino NO es reintentar más —eso alarga el bloqueo—: es espaciar
+más las tandas, o cambiar de fuente.
+
+### Acopios: una consulta a D1, no 205
+
+La hoja tiene 205 filas y **ninguna traía coordenada**, así que
+`geocodificarPendientes` hacía **un `SELECT` por fila** contra `geocache` —205
+consultas secuenciales por corrida, y también en cada visita que refrescara la
+copia—. Ahora la caché se lee entera de una sola vez y se resuelve en memoria.
+
 **Entrega 2, pendiente: zonas de silencio.** El cruce de esta cobertura contra
 los reportes ciudadanos del mapa — municipios con necesidad reportada y sin una
 sola nota. Es lo que un monitor de prensa no puede responder, y necesita volumen
