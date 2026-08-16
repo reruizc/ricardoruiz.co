@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Ficha territorial · Barrios Unidos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+@font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-thin.woff2') format('woff2');font-weight:200;font-display:swap}
+@font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-light.woff2') format('woff2');font-weight:300;font-display:swap}
+@font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-medium.woff2') format('woff2');font-weight:500;font-display:swap}
+@font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-bold.woff2') format('woff2');font-weight:700;font-display:swap}
+
+:root{
+  --bg:#060810; --bg2:#0a0c14;
+  --card:rgba(10,10,16,.75); --card2:rgba(16,17,26,.9);
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.14);
+  --tx:#f4f3ef; --tx2:#9a9aa6; --tx3:#5b5b68;
+  --blue:#0047FF; --blue2:#3d6fff;
+  --pur:#a78bfa; --pur-dim:rgba(167,139,250,.13);
+  --ok:#4ade80; --warn:#f0c040; --warn-dim:rgba(240,192,64,.10); --bad:#ff6b7a;
+  --orange:#f97316;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--tx);
+  font-family:'HelveticaNeue',-apple-system,'Helvetica Neue',Helvetica,Arial,sans-serif;
+  font-weight:300;min-height:100vh;overflow-x:hidden;line-height:1.5;
+  background-image:radial-gradient(ellipse 80% 50% at 15% -5%,rgba(0,71,255,.13),transparent 60%),
+                   radial-gradient(ellipse 60% 45% at 95% 0%,rgba(167,139,250,.10),transparent 60%);
+  background-attachment:fixed;
+}
+
+/* ── gate ── */
+.gate{position:fixed;inset:0;z-index:5000;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1rem}
+.gate-text{font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;color:var(--tx3)}
+.gate-bar{width:130px;height:1px;background:var(--line);position:relative;overflow:hidden}
+.gate-bar::after{content:'';position:absolute;inset:0;background:var(--pur);animation:gs 1.4s ease-in-out infinite}
+@keyframes gs{0%{transform:translateX(-100%)}50%{transform:translateX(0)}100%{transform:translateX(100%)}}
+
+/* ── nav ── */
+nav.top{position:sticky;top:0;z-index:400;display:flex;align-items:center;justify-content:space-between;
+  padding:.85rem 2rem;background:rgba(6,8,16,.88);border-bottom:1px solid var(--line);backdrop-filter:blur(14px)}
+.nav-l,.nav-r{display:flex;align-items:center;gap:.9rem}
+.btn-back{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ok);text-decoration:none;
+  border:1px solid rgba(74,222,128,.35);padding:.34rem .8rem;transition:.2s}
+.btn-back:hover{background:rgba(74,222,128,.1)}
+.badge-priv{font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--pur);background:var(--pur-dim);
+  padding:.32rem .7rem;border:1px solid rgba(167,139,250,.25)}
+.logo{display:flex;align-items:center;gap:.5rem;text-decoration:none;opacity:.9}
+.logo-bars{display:flex;align-items:flex-end;gap:3px;height:19px}
+.logo-bars i{width:5px;background:var(--blue);border-radius:1px 1px 0 0;display:block}
+.logo-tx{font-family:'Syne',sans-serif;font-weight:800;font-size:.9rem;letter-spacing:-.02em;color:var(--tx)}
+.btn-out{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);text-decoration:none}
+.btn-out:hover{color:var(--tx2)}
+
+/* ── layout ── */
+.wrap{max-width:1280px;margin:0 auto;padding:0 2rem 6rem}
+.hero{padding:3.2rem 0 2rem}
+.eyebrow{font-size:.68rem;letter-spacing:.24em;text-transform:uppercase;color:var(--pur);margin-bottom:.9rem}
+h1{font-weight:200;font-size:clamp(2rem,4.4vw,3.3rem);letter-spacing:-.03em;line-height:1.04}
+h1 b{font-weight:500}
+.sub{color:var(--tx2);font-size:1rem;max-width:62ch;margin-top:.9rem;font-weight:300}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:1px;background:var(--line);
+  border:1px solid var(--line);margin:2.2rem 0 0}
+.kpi{background:var(--bg2);padding:1.1rem 1.2rem}
+.kpi .n{font-size:1.85rem;font-weight:200;letter-spacing:-.03em;line-height:1}
+.kpi .n small{font-size:.9rem;color:var(--tx2);font-weight:300}
+.kpi .l{font-size:.66rem;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);margin-top:.5rem}
+
+/* ── tabs ── */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--line);margin:2.6rem 0 0;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--tx3);font-family:inherit;
+  font-size:.78rem;letter-spacing:.09em;text-transform:uppercase;padding:.85rem 1.15rem;cursor:pointer;
+  white-space:nowrap;transition:.2s;font-weight:400}
+.tab:hover{color:var(--tx2)}
+.tab.on{color:var(--tx);border-bottom-color:var(--pur)}
+.panel{display:none;padding-top:2.2rem}
+.panel.on{display:block}
+
+h2{font-weight:300;font-size:1.5rem;letter-spacing:-.02em;margin-bottom:.4rem}
+h3{font-weight:400;font-size:1rem;letter-spacing:-.01em;margin-bottom:.7rem}
+.note{font-size:.82rem;color:var(--tx2);max-width:78ch;margin-bottom:1.5rem}
+.sec{margin-bottom:3rem}
+
+.card{background:var(--card);border:1px solid var(--line);padding:1.4rem}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.2rem}
+
+/* ── avisos ── */
+.alert{border-left:2px solid var(--warn);background:var(--warn-dim);padding:.85rem 1.1rem;font-size:.8rem;
+  color:var(--tx2);margin-bottom:1.4rem}
+.alert b{color:var(--warn);font-weight:500}
+.alert.info{border-left-color:var(--blue2);background:rgba(61,111,255,.08)}
+.alert.info b{color:var(--blue2)}
+
+/* ── tablas ── */
+.tbl-tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin-bottom:.8rem}
+.inp{background:var(--bg2);border:1px solid var(--line2);color:var(--tx);font-family:inherit;font-size:.82rem;
+  padding:.5rem .8rem;min-width:230px;font-weight:300}
+.inp:focus{outline:none;border-color:var(--pur)}
+.chip{background:none;border:1px solid var(--line2);color:var(--tx3);font-family:inherit;font-size:.7rem;
+  letter-spacing:.06em;text-transform:uppercase;padding:.4rem .75rem;cursor:pointer;transition:.2s}
+.chip:hover{color:var(--tx2);border-color:var(--tx3)}
+.chip.on{color:var(--tx);border-color:var(--pur);background:var(--pur-dim)}
+.tbl-scroll{max-height:620px;overflow:auto;border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+thead th{position:sticky;top:0;background:var(--bg2);z-index:2;text-align:left;font-weight:400;font-size:.66rem;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--tx3);padding:.7rem .8rem;border-bottom:1px solid var(--line2);
+  cursor:pointer;user-select:none;white-space:nowrap}
+thead th:hover{color:var(--tx2)}
+thead th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr{border-bottom:1px solid var(--line)}
+tbody tr:hover{background:rgba(255,255,255,.028)}
+tbody tr.clickable{cursor:pointer}
+tbody tr.sel{background:var(--pur-dim)}
+td{padding:.62rem .8rem;color:var(--tx2);font-weight:300}
+td.strong{color:var(--tx);font-weight:400}
+td.zero{color:var(--tx3)}
+.rank{color:var(--tx3);font-size:.72rem;font-variant-numeric:tabular-nums}
+.bar-cell{position:relative}
+.bar-cell i{position:absolute;left:0;top:0;bottom:0;background:rgba(167,139,250,.16);display:block;z-index:0}
+.bar-cell span{position:relative;z-index:1}
+
+/* ── mapa ── */
+.map-layout{display:grid;grid-template-columns:1fr 380px;gap:1.2rem;align-items:start}
+#map{height:640px;background:var(--bg2);border:1px solid var(--line)}
+.map-side{border:1px solid var(--line);background:var(--card);max-height:640px;overflow:auto}
+.map-side-h{padding:1rem 1.1rem;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card2);
+  backdrop-filter:blur(8px);z-index:3}
+.map-side-h .t{font-size:.95rem;font-weight:400}
+.map-side-h .s{font-size:.72rem;color:var(--tx3);letter-spacing:.06em;text-transform:uppercase;margin-top:.25rem}
+.map-side-b{padding:.4rem 0}
+.crumb{display:flex;gap:.4rem;align-items:center;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--tx3);margin-bottom:.8rem;flex-wrap:wrap}
+.crumb button{background:none;border:none;color:var(--pur);font-family:inherit;font-size:inherit;letter-spacing:inherit;
+  text-transform:inherit;cursor:pointer;padding:0}
+.crumb button:hover{text-decoration:underline}
+.li{display:flex;justify-content:space-between;gap:.8rem;padding:.6rem 1.1rem;border-bottom:1px solid var(--line);
+  cursor:pointer;font-size:.82rem}
+.li:hover{background:rgba(255,255,255,.03)}
+.li .n{color:var(--tx2);font-weight:300}
+.li .v{color:var(--tx);font-variant-numeric:tabular-nums;font-weight:400;white-space:nowrap}
+.li .sub{font-size:.7rem;color:var(--tx3);margin-top:.15rem}
+.legend{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-top:.9rem;font-size:.72rem;color:var(--tx3)}
+.legend i{display:inline-block;width:13px;height:13px;margin-right:.35rem;vertical-align:-2px;border:1px solid rgba(255,255,255,.2)}
+.leaflet-tooltip{background:rgba(6,8,16,.97)!important;border:1px solid rgba(167,139,250,.4)!important;
+  color:var(--tx)!important;font-family:'HelveticaNeue',sans-serif!important;font-size:.78rem!important;
+  border-radius:0!important;padding:.45rem .65rem!important;box-shadow:none!important}
+.leaflet-tooltip::before{display:none!important}
+.leaflet-container{background:var(--bg2)}
+.leaflet-control-attribution{background:rgba(6,8,16,.7)!important;color:var(--tx3)!important;font-size:9px!important}
+.leaflet-control-attribution a{color:var(--tx3)!important}
+
+/* ── charts ── */
+.spark-row{display:flex;align-items:center;gap:.9rem;padding:.7rem 0;border-bottom:1px solid var(--line)}
+.spark-row .nm{flex:0 0 168px;font-size:.82rem;color:var(--tx2);font-weight:300}
+.spark-row .tt{flex:0 0 78px;text-align:right;font-variant-numeric:tabular-nums;font-size:.88rem;color:var(--tx)}
+.spark-row .sk{flex:1;min-width:120px}
+.spark-row .rk{flex:0 0 118px;text-align:right;font-size:.7rem;color:var(--tx3)}
+.gap-note{font-size:.68rem;color:var(--warn);letter-spacing:.04em}
+.bars .b{display:grid;grid-template-columns:170px 1fr 96px;gap:.8rem;align-items:center;padding:.5rem 0;font-size:.82rem}
+.bars .b .t{color:var(--tx2);font-weight:300}
+.bars .b .g{height:16px;background:rgba(255,255,255,.05);position:relative}
+.bars .b .g i{position:absolute;left:0;top:0;bottom:0;background:var(--pur);opacity:.75;display:block}
+.bars .b .g i.city{background:var(--tx3);opacity:.45}
+.bars .b .v{text-align:right;font-variant-numeric:tabular-nums;color:var(--tx)}
+
+/* ── prensa ── */
+.news{border:1px solid var(--line)}
+.news a{display:block;padding:.85rem 1.1rem;border-bottom:1px solid var(--line);text-decoration:none;transition:.2s}
+.news a:hover{background:rgba(255,255,255,.03)}
+.news .t{color:var(--tx);font-size:.88rem;font-weight:300;line-height:1.35}
+.news .m{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);margin-top:.35rem}
+.news .m b{color:var(--pur);font-weight:400}
+
+footer{border-top:1px solid var(--line);margin-top:4rem;padding:2rem 0;font-size:.74rem;color:var(--tx3);max-width:80ch}
+footer p{margin-bottom:.5rem}
+
+@media(max-width:1000px){
+  .map-layout{grid-template-columns:1fr}
+  #map{height:440px}
+  .map-side{max-height:none}
+  .grid2,.grid3{grid-template-columns:1fr}
+  .wrap{padding:0 1.1rem 4rem}
+  nav.top{padding:.75rem 1.1rem}
+  .spark-row{flex-wrap:wrap}
+  .spark-row .nm{flex:0 0 100%}
+  .bars .b{grid-template-columns:120px 1fr 70px}
+}
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <div class="gate-text">Verificando acceso</div>
+  <div class="gate-bar"></div>
+</div>
+
+<nav class="top" id="topNav" hidden>
+  <div class="nav-l">
+    <a href="dashboard.html" class="btn-back">← Volver</a>
+    <span class="badge-priv">Privado</span>
+  </div>
+  <div class="nav-r">
+    <a href="#" class="btn-out" id="btnOut">Salir</a>
+    <a href="index.html" class="logo">
+      <span class="logo-bars"><i style="height:8px"></i><i style="height:13px"></i><i style="height:19px"></i><i style="height:11px"></i></span>
+      <span class="logo-tx">Ricardo.Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<main id="main" hidden>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow" id="hEyebrow">Ficha territorial</div>
+    <h1 id="hTitle">—</h1>
+    <p class="sub" id="hSub">—</p>
+    <div class="kpis" id="kpis"></div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab on" data-p="electoral">Resultado electoral</button>
+    <button class="tab" data-p="mapa">Mapa</button>
+    <button class="tab" data-p="seguridad">Seguridad</button>
+    <button class="tab" data-p="mujer">Mujer</button>
+    <button class="tab" data-p="prensa">Prensa</button>
+  </div>
+
+  <!-- ══ ELECTORAL ══ -->
+  <section class="panel on" id="p-electoral">
+    <div class="sec">
+      <h2>Puesto por puesto</h2>
+      <p class="note" id="elecNotePuestos">—</p>
+      <div class="tbl-tools">
+        <input class="inp" id="qPuestos" placeholder="Buscar puesto o barrio…" oninput="renderPuestos()" />
+        <span style="font-size:.74rem;color:var(--tx3)" id="cntPuestos"></span>
+      </div>
+      <div class="tbl-scroll">
+        <table id="tPuestos">
+          <thead><tr>
+            <th data-k="rank">#</th>
+            <th data-k="nombre">Puesto</th>
+            <th data-k="barrio">Barrio</th>
+            <th class="num" data-k="v">Sus votos</th>
+            <th class="num" data-k="pct">% del puesto</th>
+            <th class="num" data-k="validos">Válidos</th>
+            <th class="num" data-k="nmesas">Mesas</th>
+            <th data-k="ganador">Más votado ahí</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>Mesa por mesa</h2>
+      <p class="note" id="elecNoteMesas">—</p>
+      <div class="tbl-tools">
+        <input class="inp" id="qMesas" placeholder="Buscar puesto, barrio o número de mesa…" oninput="renderMesas()" />
+        <button class="chip on" id="chipConVoto" onclick="toggleConVoto()">Solo mesas con voto</button>
+        <span style="font-size:.74rem;color:var(--tx3)" id="cntMesas"></span>
+      </div>
+      <div class="tbl-scroll">
+        <table id="tMesas">
+          <thead><tr>
+            <th data-k="rank">#</th>
+            <th data-k="mesa">Mesa</th>
+            <th data-k="puesto">Puesto</th>
+            <th data-k="barrio">Barrio</th>
+            <th class="num" data-k="v">Sus votos</th>
+            <th class="num" data-k="pct">% de la mesa</th>
+            <th class="num" data-k="validos">Válidos</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sec grid2">
+      <div>
+        <h3>Su lista</h3>
+        <p class="note" id="listaNote">—</p>
+        <div class="tbl-scroll" style="max-height:380px"><table id="tLista">
+          <thead><tr><th>#</th><th>Candidato</th><th class="num">Votos</th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
+      <div>
+        <h3>Los más votados de la localidad</h3>
+        <p class="note">Las 15 votaciones más altas entre los 70 candidatos a la JAL de Barrios Unidos.</p>
+        <div class="tbl-scroll" style="max-height:380px"><table id="tTop">
+          <thead><tr><th>#</th><th>Candidato</th><th>Partido</th><th class="num">Votos</th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ MAPA ══ -->
+  <section class="panel" id="p-mapa">
+    <h2>Dónde está su voto</h2>
+    <p class="note">
+      Tres niveles: la localidad completa por barrios, un barrio con sus puestos, y un puesto con sus mesas.
+      Toca un barrio del mapa para bajar; los círculos son los puestos de votación, con su tamaño proporcional
+      a los votos que sacó allí.
+    </p>
+    <div class="crumb" id="crumb"></div>
+    <div class="map-layout">
+      <div>
+        <div id="map"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <aside class="map-side">
+        <div class="map-side-h">
+          <div class="t" id="sideT">Barrios Unidos</div>
+          <div class="s" id="sideS">25 barrios con dato</div>
+        </div>
+        <div class="map-side-b" id="sideB"></div>
+      </aside>
+    </div>
+    <div class="alert" id="mapAviso" style="margin-top:1.4rem"></div>
+  </section>
+
+  <!-- ══ SEGURIDAD ══ -->
+  <section class="panel" id="p-seguridad">
+    <h2>Seguridad y convivencia en la localidad</h2>
+    <p class="note" id="segNote">—</p>
+    <div class="alert" id="segAviso"></div>
+    <div class="sec">
+      <h3>Serie 2015–2024</h3>
+      <p class="note">La línea es Barrios Unidos. A la derecha, su posición entre las 20 localidades por total del periodo.</p>
+      <div id="segSeries"></div>
+    </div>
+    <div class="sec grid2">
+      <div>
+        <h3>Barrios con más hechos</h3>
+        <p class="note" id="segBarriosNote">—</p>
+        <div class="tbl-scroll" style="max-height:420px"><table id="tSegBarrios">
+          <thead><tr><th>#</th><th>Barrio</th><th class="num">Hechos</th><th class="num">Hurto a personas</th><th class="num">Violencia intrafam.</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+      <div>
+        <h3>Las 20 localidades</h3>
+        <p class="note">Total de hechos registrados 2015–2024. Barrios Unidos va resaltada.</p>
+        <div class="tbl-scroll" style="max-height:420px"><table id="tSegLoc">
+          <thead><tr><th>#</th><th>Localidad</th><th class="num">Hechos</th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ MUJER ══ -->
+  <section class="panel" id="p-mujer">
+    <h2>Víctimas mujeres en la localidad</h2>
+    <p class="note" id="mujNote">—</p>
+    <div class="alert" id="mujAviso"></div>
+    <div class="sec">
+      <h3>Qué proporción de las víctimas son mujeres</h3>
+      <p class="note">Barra morada: Barrios Unidos. Barra gris: Bogotá, para comparar.</p>
+      <div class="bars" id="mujBars"></div>
+    </div>
+    <div class="sec grid2">
+      <div>
+        <h3>Víctimas por delito</h3>
+        <div class="tbl-scroll" style="max-height:400px"><table id="tMuj">
+          <thead><tr><th>Delito</th><th class="num">Mujeres</th><th class="num">Hombres</th><th class="num">% mujeres</th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
+      <div>
+        <h3>Violencia intrafamiliar por localidad</h3>
+        <p class="note">Víctimas mujeres registradas, 2015–2024.</p>
+        <div class="tbl-scroll" style="max-height:400px"><table id="tMujLoc">
+          <thead><tr><th>#</th><th>Localidad</th><th class="num">Mujeres</th></tr></thead><tbody></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ PRENSA ══ -->
+  <section class="panel" id="p-prensa">
+    <h2>Pulso de prensa</h2>
+    <p class="note" id="preNote">—</p>
+    <div class="alert info" id="preAviso"></div>
+    <div class="tbl-tools">
+      <button class="chip on" data-g="local" onclick="setGrupo('local')">Barrios Unidos</button>
+      <button class="chip" data-g="bogota" onclick="setGrupo('bogota')">Bogotá</button>
+      <button class="chip" data-g="nacional" onclick="setGrupo('nacional')">Nacional</button>
+      <span style="font-size:.74rem;color:var(--tx3)" id="preCnt"></span>
+    </div>
+    <div class="news" id="preList"></div>
+  </section>
+
+  <footer>
+    <p><b style="color:var(--tx2);font-weight:400">Fuentes.</b> Resultados: Registraduría Nacional del Estado Civil,
+      escrutinio de autoridades locales 2023, procesado mesa a mesa. Seguridad y víctimas: Policía Nacional,
+      base de delitos 2015–2024. Prensa: Google News, ventana móvil.</p>
+    <p>Los porcentajes electorales se calculan sobre votos válidos. Los barrios sin puesto de votación propio
+      no tienen dato y se muestran en gris: no suman a ningún total.</p>
+    <p>Documento de trabajo, de uso reservado. No es material oficial de campaña ni de la Registraduría.</p>
+  </footer>
+
+</div>
+</main>
+
+<script>
+/* ═══ GATE ═══ */
+(function(){
+  var ALLOWED = ['reruizc@gmail.com', 'nasopr81@gmail.com'];
+  var token = localStorage.getItem('rr-token');
+  var raw = localStorage.getItem('rr-user');
+  var user = null;
+  try { user = raw ? JSON.parse(raw) : null; } catch(e) { user = null; }
+  function ok(em){ return em && ALLOWED.indexOf(String(em).toLowerCase().trim()) >= 0; }
+  function toLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); location.replace('login.html'); }
+  function toDash(){ location.replace('dashboard.html'); }
+  if (!token || !user) { toLogin(); return; }
+  if (!ok(user.email)) { toDash(); return; }
+  fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(function(r){ if (r.status === 401) { toLogin(); return null; } return r.json(); })
+    .then(function(d){
+      if (!d) return;
+      if (!d.ok || !ok(d.user && d.user.email)) { toDash(); return; }
+      reveal();
+    })
+    .catch(function(){ reveal(); });   // sin red, la whitelist local ya validó
+  function reveal(){
+    var g = document.getElementById('gate');
+    if (g) g.remove();
+    document.getElementById('topNav').hidden = false;
+    document.getElementById('main').hidden = false;
+    init();
+  }
+})();
+
+document.getElementById('btnOut').addEventListener('click', function(e){
+  e.preventDefault();
+  localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user');
+  location.href = 'index.html';
+});
+
+/* ═══ ESTADO ═══ */
+var D = { elec:null, geo:null, seg:null, muj:null, med:null };
+var LOC_NOMBRES = {1:'Usaquén',2:'Chapinero',3:'Santa Fe',4:'San Cristóbal',5:'Usme',6:'Tunjuelito',
+  7:'Bosa',8:'Kennedy',9:'Fontibón',10:'Engativá',11:'Suba',12:'Barrios Unidos',13:'Teusaquillo',
+  14:'Los Mártires',15:'Antonio Nariño',16:'Puente Aranda',17:'La Candelaria',18:'Rafael Uribe Uribe',
+  19:'Ciudad Bolívar',20:'Sumapaz'};
+
+function num(n){ return (n === null || n === undefined) ? '—' : n.toLocaleString('es-CO'); }
+/* Los puestos suelen llamarse como su barrio ("JOSE JOAQUIN VARGAS" está en el
+   barrio "Jose Joaquin Vargas"): repetir la cadena en dos columnas es ruido.
+   Se compara sin tildes ni mayúsculas y, si coincide, la celda queda tenue. */
+function mismoNombre(a, b){
+  var n = function(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .toUpperCase().replace(/[^A-Z0-9]/g,''); };
+  return !!a && n(a) === n(b);
+}
+function celdaBarrio(barrio, puesto){
+  if (!barrio) return '<td class="zero">—</td>';
+  if (mismoNombre(barrio, puesto)) return '<td class="zero" title="El puesto lleva el nombre del barrio">idem</td>';
+  return '<td>' + esc(barrio) + '</td>';
+}
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function titulo(s){
+  return String(s||'').toLowerCase().replace(/(^|[\s\-\(\.])([a-záéíóúñ])/g, function(m,a,b){ return a + b.toUpperCase(); });
+}
+
+/* ═══ INIT ═══ */
+function init(){
+  var f = ['electoral','geo','seguridad','mujer','medios'];
+  Promise.all(f.map(function(n){
+    return fetch('natalia-parra/datos/nsp-' + n + '.json?v=20260816')
+      .then(function(r){ if (!r.ok) throw new Error(n + ' HTTP ' + r.status); return r.json(); })
+      .catch(function(e){ console.warn('[ficha] ' + n + ' no disponible:', e.message); return null; });
+  })).then(function(r){
+    D.elec = r[0]; D.geo = r[1]; D.seg = r[2]; D.muj = r[3]; D.med = r[4];
+    if (!D.elec) {
+      document.getElementById('hTitle').textContent = 'No se pudieron cargar los datos';
+      document.getElementById('hSub').textContent = 'Revisa la carpeta natalia-parra/datos/.';
+      return;
+    }
+    renderHero();
+    renderElectoral();
+    renderSeguridad();
+    renderMujer();
+    renderPrensa();
+    wireTabs();
+  });
+}
+
+function wireTabs(){
+  var tabs = document.querySelectorAll('.tab');
+  tabs.forEach(function(t){
+    t.addEventListener('click', function(){
+      tabs.forEach(function(x){ x.classList.remove('on'); });
+      document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('on'); });
+      t.classList.add('on');
+      var p = document.getElementById('p-' + t.dataset.p);
+      p.classList.add('on');
+      // Leaflet cachea el tamaño del contenedor al crearse: dentro de un panel
+      // oculto mide 0 y los polígonos se salen del marco. Se arma al mostrarlo
+      // y se reencuadra tras el layout (setTimeout, no rAF: se congela oculto).
+      if (t.dataset.p === 'mapa') { setTimeout(initMapa, 0); }
+    });
+  });
+}
+
+/* ═══ HERO ═══ */
+function renderHero(){
+  var m = D.elec.meta;
+  var loc = titulo(m.localidad);
+  document.getElementById('hEyebrow').textContent = 'Ficha territorial · JAL ' + loc + ' · ' + m.anio;
+  document.getElementById('hTitle').innerHTML = titulo(m.nombre).replace(/ (\S+)$/, ' <b>$1</b>');
+  document.getElementById('hSub').textContent =
+    titulo(m.partido) + '. Obtuvo ' + num(m.votos) + ' votos en la Junta Administradora Local de ' + loc +
+    ', el puesto ' + m.ranking + ' entre ' + m.n_candidatos + ' candidatos.';
+  var k = [
+    ['votos', num(m.votos), 'Votos'],
+    ['rank', m.ranking + '<small> de ' + m.n_candidatos + '</small>', 'Puesto en la localidad'],
+    ['pct', m.pct_localidad.toFixed(2) + '<small>%</small>', 'De los válidos'],
+    ['pue', m.n_puestos_con_voto + '<small> de ' + m.n_puestos + '</small>', 'Puestos con votos'],
+    ['mes', m.n_mesas_con_voto + '<small> de ' + m.n_mesas + '</small>', 'Mesas con votos'],
+    ['top', num(m.mejor_puesto_v), 'Su mejor puesto']
+  ];
+  document.getElementById('kpis').innerHTML = k.map(function(x){
+    return '<div class="kpi"><div class="n">' + x[1] + '</div><div class="l">' + esc(x[2]) + '</div></div>';
+  }).join('');
+}
+
+/* ═══ ELECTORAL ═══ */
+var sortPuestos = { k:'v', dir:-1 }, sortMesas = { k:'v', dir:-1 }, soloConVoto = true;
+
+function renderElectoral(){
+  var m = D.elec.meta;
+  document.getElementById('elecNotePuestos').textContent =
+    'Los ' + m.n_puestos + ' puestos de votación de la localidad, con los votos que sacó en cada uno. ' +
+    'El porcentaje es sobre los votos válidos de ese puesto. Toca una fila para ver sus mesas.';
+  document.getElementById('elecNoteMesas').textContent =
+    'Las ' + m.n_mesas + ' mesas de la localidad. Tuvo al menos un voto en ' + m.n_mesas_con_voto + '.';
+  document.getElementById('listaNote').textContent =
+    'Los candidatos de ' + m.partido + '. La lista sumó ' + num(m.partido_votos) + ' votos.';
+
+  ['tPuestos','tMesas'].forEach(function(id){
+    document.querySelectorAll('#' + id + ' thead th').forEach(function(th){
+      th.addEventListener('click', function(){
+        var s = id === 'tPuestos' ? sortPuestos : sortMesas;
+        if (s.k === th.dataset.k) { s.dir *= -1; } else { s.k = th.dataset.k; s.dir = -1; }
+        if (id === 'tPuestos') renderPuestos(); else renderMesas();
+      });
+    });
+  });
+
+  var lista = D.elec.lista.map(function(c, i){
+    return '<tr' + (c.yo ? ' class="sel"' : '') + '><td class="rank">' + (i+1) + '</td>' +
+      '<td class="' + (c.yo ? 'strong' : '') + '">' + esc(titulo(c.nombre)) + (c.yo ? ' ★' : '') + '</td>' +
+      '<td class="num">' + num(c.votos) + '</td></tr>';
+  }).join('');
+  document.querySelector('#tLista tbody').innerHTML = lista;
+
+  document.querySelector('#tTop tbody').innerHTML = D.elec.top_candidatos.map(function(c, i){
+    var yo = c.nombre === D.elec.meta.nombre;
+    return '<tr' + (yo ? ' class="sel"' : '') + '><td class="rank">' + (i+1) + '</td>' +
+      '<td class="' + (yo ? 'strong' : '') + '">' + esc(titulo(c.nombre)) + '</td>' +
+      '<td style="font-size:.74rem">' + esc(titulo(c.partido)) + '</td>' +
+      '<td class="num">' + num(c.votos) + '</td></tr>';
+  }).join('');
+
+  renderPuestos();
+  renderMesas();
+}
+
+function filaPuestos(){
+  var q = (document.getElementById('qPuestos').value || '').toLowerCase().trim();
+  var rows = D.elec.puestos.map(function(p, i){
+    return {
+      rank: i + 1, nombre: p.nombre, barrio: p.barrio, v: p.v, pct: p.pct,
+      validos: p.validos, nmesas: p.mesas.length, ganador: p.ganador,
+      ganador_v: p.ganador_v, code: p.code
+    };
+  });
+  if (q) rows = rows.filter(function(r){
+    return (r.nombre + ' ' + r.barrio).toLowerCase().indexOf(q) >= 0;
+  });
+  var s = sortPuestos;
+  rows.sort(function(a, b){
+    var x = a[s.k], y = b[s.k];
+    if (typeof x === 'string') return s.dir * x.localeCompare(y, 'es');
+    return s.dir * (x - y);
+  });
+  return rows;
+}
+
+function renderPuestos(){
+  var rows = filaPuestos();
+  var max = Math.max.apply(null, D.elec.puestos.map(function(p){ return p.v; })) || 1;
+  document.getElementById('cntPuestos').textContent = rows.length + ' de ' + D.elec.puestos.length + ' puestos';
+  document.querySelector('#tPuestos tbody').innerHTML = rows.map(function(r){
+    return '<tr class="clickable" onclick="verPuesto(\'' + r.code + '\')">' +
+      '<td class="rank">' + r.rank + '</td>' +
+      '<td class="strong">' + esc(titulo(r.nombre)) + '</td>' +
+      celdaBarrio(r.barrio, r.nombre) +
+      '<td class="num bar-cell"><i style="width:' + (100 * r.v / max) + '%"></i><span>' + num(r.v) + '</span></td>' +
+      '<td class="num">' + r.pct.toFixed(2) + '%</td>' +
+      '<td class="num">' + num(r.validos) + '</td>' +
+      '<td class="num">' + r.nmesas + '</td>' +
+      '<td style="font-size:.74rem">' + esc(titulo(r.ganador)) + ' <span class="rank">(' + num(r.ganador_v) + ')</span></td>' +
+      '</tr>';
+  }).join('');
+}
+
+function todasLasMesas(){
+  var out = [];
+  D.elec.puestos.forEach(function(p){
+    p.mesas.forEach(function(m){
+      out.push({ mesa: m.mesa, puesto: p.nombre, barrio: p.barrio, v: m.v,
+                 pct: m.pct, validos: m.validos, code: p.code });
+    });
+  });
+  out.sort(function(a, b){ return b.v - a.v; });
+  out.forEach(function(r, i){ r.rank = i + 1; });
+  return out;
+}
+
+function toggleConVoto(){
+  soloConVoto = !soloConVoto;
+  document.getElementById('chipConVoto').classList.toggle('on', soloConVoto);
+  renderMesas();
+}
+
+function renderMesas(){
+  var q = (document.getElementById('qMesas').value || '').toLowerCase().trim();
+  var all = todasLasMesas();
+  var rows = all;
+  if (soloConVoto) rows = rows.filter(function(r){ return r.v > 0; });
+  if (q) rows = rows.filter(function(r){
+    return (r.puesto + ' ' + r.barrio + ' ' + r.mesa).toLowerCase().indexOf(q) >= 0;
+  });
+  var s = sortMesas;
+  rows = rows.slice().sort(function(a, b){
+    var x = a[s.k], y = b[s.k];
+    if (typeof x === 'string') return s.dir * x.localeCompare(y, 'es');
+    return s.dir * (x - y);
+  });
+  document.getElementById('cntMesas').textContent = rows.length + ' de ' + all.length + ' mesas';
+  var max = Math.max.apply(null, all.map(function(r){ return r.v; })) || 1;
+  document.querySelector('#tMesas tbody').innerHTML = rows.slice(0, 600).map(function(r){
+    return '<tr><td class="rank">' + r.rank + '</td>' +
+      '<td class="strong">Mesa ' + esc(r.mesa) + '</td>' +
+      '<td>' + esc(titulo(r.puesto)) + '</td>' +
+      celdaBarrio(r.barrio, r.puesto) +
+      '<td class="num bar-cell' + (r.v ? '' : ' zero') + '"><i style="width:' + (100 * r.v / max) + '%"></i><span>' + r.v + '</span></td>' +
+      '<td class="num">' + r.pct.toFixed(2) + '%</td>' +
+      '<td class="num">' + num(r.validos) + '</td></tr>';
+  }).join('');
+}
+
+function verPuesto(code){
+  document.querySelector('.tab[data-p="mapa"]').click();
+  setTimeout(function(){ abrirPuesto(code, true); }, 60);
+}
+
+/* ═══ MAPA ═══ */
+var map = null, capaBarrios = null, capaPuestos = null, nivel = 'localidad',
+    barrioSel = null, puestoSel = null, ultimoBounds = null;
+
+/* Leaflet mide el contenedor UNA vez, al crearse. Si en ese momento el panel
+   todavía no tiene ancho (grid recién mostrado, pestaña que acaba de abrirse),
+   el fitBounds calcula un zoom absurdo y el mapa queda en un rincón. Medido en
+   verificación: con 41px de ancho salía zoom 19 en vez de 14. Se observa el
+   contenedor y se reencuadra cuando cambie de tamaño. */
+function reencuadrar(){
+  if (!map) return;
+  map.invalidateSize();
+  if (ultimoBounds) map.fitBounds(ultimoBounds, { padding: [18, 18], animate: false });
+}
+
+function colorBarrio(v, max){
+  if (!v) return 'rgba(255,255,255,.05)';
+  var t = Math.pow(v / max, 0.6);
+  // gris → morado: intensidad = votos suyos en ese barrio
+  var r = Math.round(90 + t * 77), g = Math.round(85 + t * 54), b = Math.round(110 + t * 140);
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
+function initMapa(){
+  if (map) { map.invalidateSize(); return; }
+  if (!D.geo || !D.geo.barrios) {
+    document.getElementById('map').innerHTML =
+      '<div style="padding:2rem;color:var(--tx3);font-size:.85rem">No se pudo cargar la geografía.</div>';
+    return;
+  }
+  map = L.map('map', { zoomControl: true, attributionControl: true, scrollWheelZoom: true });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 19, opacity: .55
+  }).addTo(map);
+
+  var porFeat = {};
+  D.elec.barrios.forEach(function(b){ porFeat[b.feat] = b; });
+  var fills = {};
+  D.elec.fills.forEach(function(f){ fills[f.feat] = f; });
+  var max = Math.max.apply(null, D.elec.barrios.map(function(b){ return b.v; })) || 1;
+
+  capaBarrios = L.geoJSON(D.geo.barrios, {
+    style: function(f){
+      var b = porFeat[f.properties.feat];
+      var esFill = !!fills[f.properties.feat];
+      return {
+        color: 'rgba(255,255,255,.28)', weight: 1,
+        fillColor: b ? colorBarrio(b.v, max) : 'rgba(255,255,255,.04)',
+        fillOpacity: b ? .78 : .25,
+        dashArray: (!b && esFill) ? '3,3' : null
+      };
+    },
+    onEachFeature: function(f, layer){
+      var b = porFeat[f.properties.feat];
+      var nm = f.properties.nombre || 'Sin nombre';
+      layer.bindTooltip(
+        '<b>' + esc(nm) + '</b><br>' +
+        (b ? (num(b.v) + ' votos · ' + b.pct.toFixed(2) + '% de los válidos del barrio')
+           : 'Sin puesto de votación propio: no tiene dato'),
+        { sticky: true });
+      layer.on('click', function(){ if (b) abrirBarrio(f.properties.feat); });
+    }
+  }).addTo(map);
+
+  capaPuestos = L.layerGroup().addTo(map);
+  dibujarPuestos(D.elec.puestos);
+  irALocalidad();
+
+  if (window.ResizeObserver) {
+    var ancho = 0;
+    new ResizeObserver(function(e){
+      var w = e[0].contentRect.width;
+      if (Math.abs(w - ancho) < 2) return;
+      ancho = w;
+      if (nivel === 'localidad') reencuadrar(); else map.invalidateSize();
+    }).observe(document.getElementById('map'));
+  }
+
+  document.getElementById('legend').innerHTML =
+    '<span><i style="background:' + colorBarrio(max, max) + '"></i>Más votos suyos</span>' +
+    '<span><i style="background:' + colorBarrio(max * 0.15, max) + '"></i>Menos</span>' +
+    '<span><i style="background:rgba(255,255,255,.05);border-style:dashed"></i>Barrio sin puesto propio</span>' +
+    '<span><i style="background:var(--pur);border-radius:50%"></i>Puesto de votación</span>';
+
+  document.getElementById('mapAviso').innerHTML =
+    '<b>Cómo leer el mapa.</b> El color de cada barrio son los votos que ella sacó en los puestos que están ' +
+    'dentro de él. Los ' + D.elec.fills.length + ' barrios en gris punteado no tienen puesto de votación propio: ' +
+    'no hay dato para ellos y no suman a ningún total. Los puestos están en su coordenada real, ' +
+    'no en el centro del barrio.';
+}
+
+function dibujarPuestos(lista){
+  capaPuestos.clearLayers();
+  var max = Math.max.apply(null, D.elec.puestos.map(function(p){ return p.v; })) || 1;
+  lista.forEach(function(p){
+    if (p.lat == null || p.lon == null) return;
+    var r = 5 + 13 * Math.sqrt(p.v / max);
+    var c = L.circleMarker([p.lat, p.lon], {
+      radius: r, color: '#fff', weight: 1.2, opacity: .85,
+      fillColor: p.code === puestoSel ? '#f97316' : '#a78bfa', fillOpacity: .82
+    });
+    c.bindTooltip('<b>' + esc(titulo(p.nombre)) + '</b><br>' + num(p.v) + ' votos · ' +
+      p.pct.toFixed(2) + '% del puesto<br>' + p.mesas.length + ' mesas', { sticky: true });
+    c.on('click', function(){ abrirPuesto(p.code); });
+    capaPuestos.addLayer(c);
+  });
+}
+
+function irALocalidad(){
+  nivel = 'localidad'; barrioSel = null; puestoSel = null;
+  dibujarPuestos(D.elec.puestos);
+  ultimoBounds = (D.geo.localidad && D.geo.localidad.features.length)
+    ? L.geoJSON(D.geo.localidad).getBounds()
+    : capaBarrios.getBounds();
+  map.invalidateSize();
+  map.fitBounds(ultimoBounds, { padding: [18, 18], animate: false });
+  capaBarrios.setStyle(function(f){ return { opacity: 1, fillOpacity: undefined }; });
+  capaBarrios.resetStyle();
+  var m = D.elec.meta;
+  panel('Barrios Unidos', D.elec.barrios.length + ' barrios con dato · ' + num(m.votos) + ' votos',
+    D.elec.barrios.map(function(b){
+      return { t: b.name, s: b.pct.toFixed(2) + '% de los válidos del barrio · ' +
+                 b.puestos.length + (b.puestos.length === 1 ? ' puesto' : ' puestos'),
+               v: num(b.v), fn: 'abrirBarrio(' + b.feat + ')' };
+    }));
+  crumb([{ t: 'Barrios Unidos' }]);
+}
+
+function abrirBarrio(feat){
+  nivel = 'barrio'; barrioSel = feat; puestoSel = null;
+  var b = D.elec.barrios.filter(function(x){ return x.feat === feat; })[0];
+  if (!b) return;
+  var lay = null;
+  capaBarrios.eachLayer(function(l){ if (l.feature.properties.feat === feat) lay = l; });
+  if (lay) { map.invalidateSize(); map.fitBounds(lay.getBounds(), { padding: [40, 40], maxZoom: 17, animate: false }); }
+  var puestos = D.elec.puestos.filter(function(p){ return b.puestos.indexOf(p.code) >= 0; });
+  dibujarPuestos(puestos.length ? puestos : D.elec.puestos);
+  panel(b.name, num(b.v) + ' votos · ' + b.pct.toFixed(2) + '% de los válidos del barrio',
+    puestos.map(function(p){
+      return { t: titulo(p.nombre), s: p.mesas.length + ' mesas · ' + p.pct.toFixed(2) + '% del puesto',
+               v: num(p.v), fn: 'abrirPuesto(\'' + p.code + '\')' };
+    }));
+  crumb([{ t: 'Barrios Unidos', fn: 'irALocalidad()' }, { t: b.name }]);
+}
+
+function abrirPuesto(code, encuadrar){
+  var p = D.elec.puestos.filter(function(x){ return x.code === code; })[0];
+  if (!p) return;
+  nivel = 'puesto'; puestoSel = code;
+  var b = D.elec.barrios.filter(function(x){ return x.puestos.indexOf(code) >= 0; })[0];
+  barrioSel = b ? b.feat : null;
+  dibujarPuestos(D.elec.puestos.filter(function(x){
+    return b ? b.puestos.indexOf(x.code) >= 0 : x.code === code;
+  }));
+  if (p.lat != null && (encuadrar || nivel === 'puesto')) map.setView([p.lat, p.lon], 18, { animate: false });
+  var mesas = p.mesas.slice().sort(function(a, c){ return c.v - a.v; });
+  panel(titulo(p.nombre), num(p.v) + ' votos · ' + mesas.length + ' mesas · ' + p.pct.toFixed(2) + '% del puesto',
+    mesas.map(function(m){
+      return { t: 'Mesa ' + m.mesa, s: m.pct.toFixed(2) + '% de la mesa · ' + num(m.validos) + ' válidos',
+               v: String(m.v), dim: m.v === 0 };
+    }));
+  var c = [{ t: 'Barrios Unidos', fn: 'irALocalidad()' }];
+  if (b) c.push({ t: b.name, fn: 'abrirBarrio(' + b.feat + ')' });
+  c.push({ t: titulo(p.nombre) });
+  crumb(c);
+}
+
+function panel(t, s, items){
+  document.getElementById('sideT').textContent = t;
+  document.getElementById('sideS').textContent = s;
+  document.getElementById('sideB').innerHTML = items.length ? items.map(function(i){
+    return '<div class="li"' + (i.fn ? ' onclick="' + i.fn + '"' : ' style="cursor:default"') + '>' +
+      '<div><div class="n"' + (i.dim ? ' style="color:var(--tx3)"' : '') + '>' + esc(i.t) + '</div>' +
+      '<div class="sub">' + esc(i.s) + '</div></div>' +
+      '<div class="v"' + (i.dim ? ' style="color:var(--tx3)"' : '') + '>' + i.v + '</div></div>';
+  }).join('') : '<div style="padding:1rem 1.1rem;color:var(--tx3);font-size:.82rem">Sin puestos de votación en este barrio.</div>';
+}
+
+function crumb(items){
+  document.getElementById('crumb').innerHTML = items.map(function(i, n){
+    var sep = n ? '<span style="color:var(--tx3)">›</span>' : '';
+    return sep + (i.fn ? '<button onclick="' + i.fn + '">' + esc(i.t) + '</button>'
+                       : '<span style="color:var(--tx2)">' + esc(i.t) + '</span>');
+  }).join(' ');
+}
+
+/* ═══ SPARKLINE ═══ */
+function sparkline(y, anios){
+  var w = 260, h = 34, pad = 2;
+  var vals = y.filter(function(v){ return v !== null; });
+  if (!vals.length) return '<span class="gap-note">sin dato</span>';
+  var mx = Math.max.apply(null, vals), mn = 0;
+  var pasos = [];
+  var seg = [], puntos = '';
+  y.forEach(function(v, i){
+    var x = pad + i * (w - 2 * pad) / (y.length - 1);
+    if (v === null) { if (seg.length) { pasos.push(seg); seg = []; } return; }
+    var yy = h - pad - (v - mn) / (mx - mn || 1) * (h - 2 * pad);
+    seg.push(x.toFixed(1) + ',' + yy.toFixed(1));
+    puntos += '<circle cx="' + x.toFixed(1) + '" cy="' + yy.toFixed(1) + '" r="1.7" fill="var(--pur)" opacity=".9"/>';
+  });
+  if (seg.length) pasos.push(seg);
+  // Los tramos se dibujan separados: un año sin dato NO se une con una línea
+  // recta, que insinuaría una caída que no ocurrió.
+  var lineas = pasos.map(function(s){
+    return '<polyline points="' + s.join(' ') + '" fill="none" stroke="var(--pur)" stroke-width="1.6" opacity=".85"/>';
+  }).join('');
+  return '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:' + h + 'px;overflow:visible">' +
+         lineas + puntos + '</svg>';
+}
+
+/* ═══ SEGURIDAD ═══ */
+function renderSeguridad(){
+  if (!D.seg) { document.getElementById('p-seguridad').innerHTML = '<p class="note">Datos de seguridad no disponibles.</p>'; return; }
+  var s = D.seg, L = s.localidad;
+  document.getElementById('segNote').textContent =
+    'Hechos registrados por la Policía Nacional en ' + L.nombre + ' entre ' + s.anios[0] + ' y ' +
+    s.anios[s.anios.length - 1] + ': ' + num(L.total) + ' en total, la localidad número ' + L.rank +
+    ' de ' + L.n_localidades + ' por volumen.';
+
+  var huecos = Object.keys(s.avisos.huecos || {});
+  document.getElementById('segAviso').innerHTML =
+    '<b>2023 no tiene dato por localidad.</b> ' + s.avisos.hueco_2023 +
+    ' Afecta a ' + huecos.length + ' de los delitos que se muestran, así que ese año se salta en las series ' +
+    'en vez de dibujarse como una caída a cero.' +
+    (s.avisos.solo_2024 && s.avisos.solo_2024.length
+      ? ' El hurto de bicicletas solo se empezó a registrar en 2024: se muestra el total, sin tendencia.' : '');
+
+  document.getElementById('segSeries').innerHTML = s.series.map(function(d){
+    var rk = d.rank_localidad ? ('#' + d.rank_localidad + ' de ' + d.n_localidades) : '';
+    return '<div class="spark-row">' +
+      '<div class="nm">' + esc(d.nombre) + (d.solo_2024 ? ' <span class="gap-note">solo 2024</span>' : '') + '</div>' +
+      '<div class="tt">' + num(d.total) + '</div>' +
+      '<div class="sk">' + (d.tendencia ? sparkline(d.y, s.anios) : '<span class="gap-note">sin serie comparable</span>') + '</div>' +
+      '<div class="rk">' + rk + '</div></div>';
+  }).join('');
+
+  document.getElementById('segBarriosNote').textContent =
+    'Los barrios de la localidad como los nombra la Policía. Son ' + s.n_barrios +
+    ' en total; el nombre no coincide con el barrio catastral del mapa, por eso va como lista y no como polígono.';
+  document.querySelector('#tSegBarrios tbody').innerHTML = s.barrios.slice(0, 30).map(function(b, i){
+    return '<tr><td class="rank">' + (i + 1) + '</td>' +
+      '<td class="strong">' + esc(titulo(b.n)) + '</td>' +
+      '<td class="num">' + num(b.t) + '</td>' +
+      '<td class="num">' + num(b.d.hurto_personas || 0) + '</td>' +
+      '<td class="num">' + num(b.d.violencia_intra || 0) + '</td></tr>';
+  }).join('');
+
+  document.querySelector('#tSegLoc tbody').innerHTML = s.ranking_localidades.map(function(l, i){
+    var yo = l.cod === s.localidad.codigo;
+    return '<tr' + (yo ? ' class="sel"' : '') + '><td class="rank">' + (i + 1) + '</td>' +
+      '<td class="' + (yo ? 'strong' : '') + '">' + esc(LOC_NOMBRES[+l.cod] || ('Localidad ' + l.cod)) + '</td>' +
+      '<td class="num">' + num(l.total) + '</td></tr>';
+  }).join('');
+}
+
+/* ═══ MUJER ═══ */
+function renderMujer(){
+  if (!D.muj) { document.getElementById('p-mujer').innerHTML = '<p class="note">Datos no disponibles.</p>'; return; }
+  var m = D.muj;
+  var vif = m.delitos.filter(function(d){ return d.id === 'violencia_intra'; })[0];
+  document.getElementById('mujNote').textContent =
+    'Víctimas mujeres registradas por la Policía en ' + m.localidad.nombre + '. ' +
+    (vif ? ('En violencia intrafamiliar, ' + vif.pct_mujeres + '% de las víctimas son mujeres (' +
+      num(vif.mujeres) + ' de ' + num(vif.total) + '), y la localidad es la número ' + m.rank_vif +
+      ' de ' + m.n_localidades + ' por número de víctimas mujeres.') : '');
+
+  document.getElementById('mujAviso').innerHTML =
+    '<b>Qué no dice este dato.</b> ' + m.avisos.victima_no_agresor + ' ' + m.avisos.serie +
+    ' Además, ' + num(m.avisos.sin_localidad) + ' hechos de la ciudad llegan sin localidad asignada y no ' +
+    'entran a ningún desglose por localidad.';
+
+  document.getElementById('mujBars').innerHTML = m.delitos.filter(function(d){
+    return d.pct_mujeres !== null && d.total >= 30;
+  }).map(function(d){
+    return '<div class="b"><div class="t">' + esc(d.nombre) + '</div>' +
+      '<div class="g"><i style="width:' + d.pct_mujeres + '%"></i></div>' +
+      '<div class="v">' + d.pct_mujeres + '%</div></div>' +
+      '<div class="b" style="padding-top:0;opacity:.6"><div class="t" style="font-size:.7rem;color:var(--tx3)">Bogotá</div>' +
+      '<div class="g" style="height:7px"><i class="city" style="width:' + d.ciudad_pct_mujeres + '%"></i></div>' +
+      '<div class="v" style="font-size:.72rem;color:var(--tx3)">' + d.ciudad_pct_mujeres + '%</div></div>';
+  }).join('');
+
+  document.querySelector('#tMuj tbody').innerHTML = m.delitos.map(function(d){
+    return '<tr><td class="strong">' + esc(d.nombre) + '</td>' +
+      '<td class="num">' + num(d.mujeres) + '</td>' +
+      '<td class="num">' + num(d.hombres) + '</td>' +
+      '<td class="num">' + (d.pct_mujeres === null ? '—' : d.pct_mujeres + '%') + '</td></tr>';
+  }).join('');
+
+  document.querySelector('#tMujLoc tbody').innerHTML = m.ranking_vif.map(function(l, i){
+    var yo = l.cod === m.localidad.codigo;
+    return '<tr' + (yo ? ' class="sel"' : '') + '><td class="rank">' + (i + 1) + '</td>' +
+      '<td class="' + (yo ? 'strong' : '') + '">' + esc(LOC_NOMBRES[+l.cod] || ('Localidad ' + l.cod)) + '</td>' +
+      '<td class="num">' + num(l.mujeres) + '</td></tr>';
+  }).join('');
+}
+
+/* ═══ PRENSA ═══ */
+var grupoAct = 'local';
+function setGrupo(g){
+  grupoAct = g;
+  document.querySelectorAll('[data-g]').forEach(function(b){ b.classList.toggle('on', b.dataset.g === g); });
+  renderPrensa();
+}
+function renderPrensa(){
+  if (!D.med) { document.getElementById('p-prensa').innerHTML = '<p class="note">Sin datos de prensa.</p>'; return; }
+  var m = D.med, g = m.grupos[grupoAct];
+  var f = m.v ? new Date(m.v) : null;
+  document.getElementById('preNote').textContent =
+    'Titulares de los últimos ' + m.ventana_dias + ' días: ' + num(m.total) + ' de ' + m.medios +
+    ' medios distintos' + (f ? ', al ' + f.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }) : '') + '.';
+  document.getElementById('preAviso').innerHTML = '<b>Mide cobertura, no realidad.</b> ' + m.aviso;
+  document.getElementById('preCnt').textContent = g.n + ' titulares · ' + g.medios + ' medios';
+  document.getElementById('preList').innerHTML = g.titulares.length ? g.titulares.map(function(t){
+    var d = t.fecha ? new Date(t.fecha) : null;
+    return '<a href="' + esc(t.url) + '" target="_blank" rel="noopener noreferrer">' +
+      '<div class="t">' + esc(t.titulo) + '</div>' +
+      '<div class="m"><b>' + esc(t.medio) + '</b>' +
+      (d ? ' · ' + d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : '') +
+      ' · ' + esc(t.q) + '</div></a>';
+  }).join('') : '<div style="padding:1.2rem;color:var(--tx3);font-size:.85rem">Sin titulares en la ventana.</div>';
+}
+</script>
+</body>
+</html>

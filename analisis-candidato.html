@@ -121,6 +121,7 @@
     .ac-item:hover, .ac-item.highlighted { background:rgba(0,71,255,.15); color:var(--white); }
     .ac-item .ac-corp { color:rgba(255,255,255,.3); font-size:.6rem; display:block; margin-top:2px; }
     .ac-item mark { background:transparent; color:var(--blue); font-weight:700; }
+    .ac-more { padding:.5rem .8rem; font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.6rem; color:rgba(255,255,255,.4); letter-spacing:.04em; background:rgba(255,255,255,.03); border-bottom:1px solid rgba(255,255,255,.05); }
     .search-hint { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:1.2rem; color:rgba(255,255,255,.35); }
 
     /* ─── MAIN LAYOUT ─── */
@@ -2980,15 +2981,30 @@
       const q = input.value.trim();
       acHighlight = -1;
       if (q.length < 2) { drop.classList.remove('open'); return; }
-      const results = candIndex.filter(c => acMatch(q, c.nombre)).slice(0, 20);
-      if (!results.length) { drop.classList.remove('open'); return; }
-      drop.innerHTML = results.map(c => {
+      // Ordena por relevancia + votación (CandRegistry.acRank) en vez de cortar
+      // en el orden de carga de las fuentes, que escondía a los candidatos de
+      // Concejo y JAL detrás de todo lo demás.
+      const rank = CandRegistry.acRank(q, candIndex, 20);
+      const results = rank.items;
+      const cargando = !_localDone;
+      if (!results.length && !cargando) { drop.classList.remove('open'); return; }
+      let html = results.map(c => {
         const hn = c.nombre.replace(new RegExp(`(${q.split(' ').filter(Boolean).join('|')})`, 'gi'), '<mark>$1</mark>');
+        const votos = c.votos ? ` · ${Number(c.votos).toLocaleString('es-CO')} votos` : '';
         return `<div class="ac-item" data-slug="${c.slug}" onclick="selectCand('${c.slug}')">
           ${hn}
-          <span class="ac-corp">${c.corp||''} · ${c.partido||''}</span>
+          <span class="ac-corp">${c.corp||''} · ${c.partido||''}${votos}</span>
         </div>`;
       }).join('');
+      // Con una palabra suelta hay cientos de homónimos: se dice cuántos
+      // quedaron fuera en vez de dejar creer que estos 20 son todos.
+      if (rank.total > results.length) {
+        html += `<div class="ac-more">${results.length} de ${rank.total.toLocaleString('es-CO')} coincidencias · agrega el apellido para afinar</div>`;
+      }
+      // Concejo y JAL entran por carga diferida (índices grandes): sin este
+      // aviso, escribir rápido mostraba "sin resultados" y parecía que faltaran.
+      if (cargando) html += `<div class="ac-more">Cargando Concejo y JAL…</div>`;
+      drop.innerHTML = html;
       drop.classList.add('open');
     }
 

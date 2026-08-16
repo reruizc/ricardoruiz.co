@@ -129,6 +129,47 @@
     return words.every(w => tw.some(t => t.startsWith(w)));
   }
 
+  /* ── RANKING DEL AUTOCOMPLETAR ──────────────────────────────────────────
+     El buscador cortaba a 20 en el ORDEN DE CARGA de las fuentes, no por
+     relevancia. Con 419k candidaturas y nombres que se repiten entre municipios
+     eso escondía a cualquiera que no fuera de las primeras fuentes: buscando
+     "parra" hay 866 personas y la edilesa de Barrios Unidos caía en la posición
+     766 — invisible, y parecía que faltaran los datos de JAL.
+
+     Ahora se ordena por relevancia y, a igual relevancia, por votación:
+       4 · el nombre completo empieza por lo que se escribió
+       2 · el primer nombre empieza por la primera palabra escrita
+       1 · la consulta trae más de una palabra (es específica)
+     Devuelve también el TOTAL, para poder decir cuántos quedaron fuera: con una
+     sola palabra el corte es inevitable y lo honesto es avisar, no fingir que
+     esos 20 son todo. */
+  function acRank(q, lista, limite) {
+    var norm = function (s) {
+      return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+    };
+    var qq = norm(q);
+    var palabras = qq.split(/\s+/).filter(Boolean);
+    if (!palabras.length) return { total: 0, items: [] };
+    var out = [];
+    for (var i = 0; i < lista.length; i++) {
+      var c = lista[i];
+      if (!acMatch(q, c.nombre)) continue;
+      var n = norm(c.nombre);
+      var s = 0;
+      if (n.indexOf(qq) === 0) s += 4;
+      else if (n.split(/\s+/)[0].indexOf(palabras[0]) === 0) s += 2;
+      if (palabras.length > 1) s += 1;
+      out.push({ c: c, s: s, v: c.votos || 0 });
+    }
+    out.sort(function (a, b) {
+      return (b.s - a.s) || (b.v - a.v) || a.c.nombre.localeCompare(b.c.nombre, 'es');
+    });
+    return {
+      total: out.length,
+      items: out.slice(0, limite || 20).map(function (x) { return x.c; }),
+    };
+  }
+
   // Carga y fusiona todas las fuentes. Tolerante a 404: una fuente caída no
   // rompe el resto (útil mientras se sube una candidatura nueva a S3).
   //   opts.bases   → { <name>: '<baseUrl>' } override del base por fuente
@@ -212,6 +253,6 @@
     return (_bySlug[slug] && _bySlug[slug].dataUrl) || `${S3}/endoso/${slug}.json`;
   }
 
-  global.CandRegistry = { S3, SOURCES, LOCAL_SOURCES, isPartyEntry, acMatch, load, loadLocal,
+  global.CandRegistry = { S3, SOURCES, LOCAL_SOURCES, isPartyEntry, acMatch, acRank, load, loadLocal,
                           dataUrlFor, normPersona, personaKey, ALIAS_PERSONA };
 })(typeof window !== 'undefined' ? window : this);
