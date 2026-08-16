@@ -23,6 +23,7 @@ Salida (gitignored) en `Bases de datos/natalia-parra/`:
 Correr:  python3 tools/natalia-parra/build_electoral.py
 """
 import json
+import math
 import os
 import sys
 import urllib.request
@@ -39,6 +40,70 @@ COMUNA_URL = f'{S3}/jal-2023/comuna/16-001-12.json'
 CANDIDATA = 'NATALIA SOPHIA PARRA ROJAS'
 LOC_COD = '12'          # Barrios Unidos
 LOC_NOMBRE = 'BARRIOS UNIDOS'
+
+
+def cat_features(geo_dir):
+    ruta = os.path.join(geo_dir, 'BOG-BARRIOS-CATASTRALES.json')
+    return json.load(open(ruta, encoding='utf-8'))['features']
+
+
+def _centroide(geom):
+    """Centroide aproximado: media de los vértices del anillo exterior.
+    Basta para decidir cuál es el barrio con dato más cercano."""
+    xs, ys = [], []
+
+    def rec(c, prof=0):
+        if not c:
+            return
+        if isinstance(c[0], (int, float)):
+            xs.append(c[0]); ys.append(c[1])
+            return
+        for x in c:
+            rec(x, prof + 1)
+    rec(geom.get('coordinates'))
+    if not xs:
+        return None
+    return (sum(xs) / len(xs), sum(ys) / len(ys))
+
+
+def _rellenar_vecinos(features, barrios, fills_origen, loc_cod):
+    """Cada barrio de la localidad SIN puesto propio hereda el dato del barrio
+    CON dato más cercano. Devuelve entradas marcadas `fill:true`, sin votos."""
+    con_dato = {}
+    for b in barrios:
+        c = _centroide(features[b['feat']]['geometry'])
+        if c:
+            con_dato[b['feat']] = (c, b)
+    heredado_previo = {f['feat']: f.get('from', '') for f in fills_origen}
+
+    salida = []
+    for i, f in enumerate(features):
+        if str(f['properties'].get('loc_codigo', '')).lstrip('0') != loc_cod.lstrip('0'):
+            continue
+        if i in con_dato:
+            continue
+        c = _centroide(f['geometry'])
+        if not c:
+            continue
+        mejor, dmin = None, None
+        for feat, (cc, b) in con_dato.items():
+            d = (c[0] - cc[0]) ** 2 + (c[1] - cc[1]) ** 2
+            if dmin is None or d < dmin:
+                dmin, mejor = d, b
+        if not mejor:
+            continue
+        salida.append({
+            'name': f['properties'].get('nombre', 'Sin nombre'),
+            'feat': i,
+            'fill': True,
+            'from': mejor['name'],
+            'from_feat': mejor['feat'],
+            'pct_heredado': mejor['pct'],
+            'dist_km': round(math.sqrt(dmin) * 111, 2),
+            'from_previo': heredado_previo.get(i, ''),
+        })
+    salida.sort(key=lambda x: -x['pct_heredado'])
+    return salida
 
 
 def baja(url, destino):
@@ -133,10 +198,13 @@ def main():
         })
     barrios.sort(key=lambda x: -x['v'])
 
-    # Barrios sin puesto propio: se listan aparte, NUNCA suman a totales
-    # (mismo criterio que los tableros territoriales 2023).
-    fills = [{'name': f['name'], 'feat': f['feat'], 'from': f.get('from', '')}
-             for f in com.get('fills', [])]
+    # ── BARRIOS SIN PUESTO PROPIO ──────────────────────────────────────
+    # Heredan la tendencia del barrio con dato más cercano por centroide
+    # (mismo criterio que `_fill_neighbors` de pacto-1v-2026 y el FILL de
+    # bogota-1v-barrios). ⚠️ Van en un array APARTE y SIN votos propios: si
+    # entraran a `barrios` sumarían al total y se contaría voto que no existe.
+    # El frontend los pinta translúcidos y lo advierte.
+    fills = _rellenar_vecinos(cat_features(GEO), barrios, com.get('fills', []), LOC_COD)
 
     electoral = {
         'v': '2026-08-16',
@@ -173,7 +241,7 @@ def main():
     }
 
     # ── GEO: barrios de la localidad + polígono de la localidad ────────
-    cat = json.load(open(os.path.join(GEO, 'BOG-BARRIOS-CATASTRALES.json'), encoding='utf-8'))
+    cat = {'features': cat_features(GEO)}
     locs = json.load(open(os.path.join(GEO, 'BOG-LOCALIDADX.json'), encoding='utf-8'))
 
     quiero = {b['feat'] for b in barrios} | {f['feat'] for f in fills}

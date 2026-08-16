@@ -93,6 +93,7 @@
     .ac-item { padding:.55rem .8rem; font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.7rem; color:rgba(255,255,255,.7); cursor:pointer; border-bottom:1px solid rgba(255,255,255,.05); transition:background .1s; line-height:1.4; }
     .ac-item:hover, .ac-item.highlighted { background:rgba(0,71,255,.15); color:var(--white); }
     .ac-item .ac-corp { color:rgba(255,255,255,.3); font-size:.6rem; display:block; margin-top:2px; }
+    .ac-more { padding:.5rem .8rem; font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.6rem; color:rgba(255,255,255,.4); letter-spacing:.04em; background:rgba(255,255,255,.03); border-bottom:1px solid rgba(255,255,255,.05); }
     .ac-item mark { background:transparent; color:var(--blue); font-weight:700; }
     .vs-label { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:800; font-size:1.3rem; color:rgba(255,255,255,.12); padding:0 .4rem; flex-shrink:0; padding-bottom:.5rem; }
     .search-hint { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.7rem; color:rgba(255,255,255,.2); white-space:nowrap; align-self:flex-end; padding-bottom:.55rem; }
@@ -583,17 +584,27 @@
       return words.every(w => tw.some(t => t.startsWith(w)));
     }
 
-    function acRenderDrop(results, dropId, selectFn, q) {
+    // Ordena por relevancia + votación (CandRegistry.acRank) en vez de cortar en
+    // el orden de carga de las fuentes, que escondía Concejo y JAL detrás de todo.
+    function acRenderDrop(rank, dropId, selectFn, q) {
       const drop = document.getElementById(dropId);
-      if (!results.length) { drop.classList.remove('open'); return; }
+      const results = rank.items;
+      const cargando = !_localDone;
+      if (!results.length && !cargando) { drop.classList.remove('open'); return; }
       const qWords = q.split(' ').filter(Boolean);
-      drop.innerHTML = results.map(c => {
+      let html = results.map(c => {
         let hn = c.nombre;
         qWords.forEach(w => { hn = hn.replace(new RegExp(`(${w})`, 'gi'), '<mark>$1</mark>'); });
+        const votos = c.votos ? ` · ${Number(c.votos).toLocaleString('es-CO')} votos` : '';
         return `<div class="ac-item" data-slug="${c.slug}" onclick="${selectFn}('${c.slug}')">
-          ${hn}<span class="ac-corp">${c.corp||''} · ${c.partido||''}</span>
+          ${hn}<span class="ac-corp">${c.corp||''} · ${c.partido||''}${votos}</span>
         </div>`;
       }).join('');
+      if (rank.total > results.length) {
+        html += `<div class="ac-more">${results.length} de ${rank.total.toLocaleString('es-CO')} coincidencias · agrega el apellido para afinar</div>`;
+      }
+      if (cargando) html += `<div class="ac-more">Cargando Concejo y JAL…</div>`;
+      drop.innerHTML = html;
       drop.classList.add('open');
     }
 
@@ -603,7 +614,7 @@
       const q = document.getElementById('ac-a').value.trim();
       const drop = document.getElementById('drop-a');
       if (q.length < 2) { drop.classList.remove('open'); return; }
-      acRenderDrop(candIndex.filter(c => acMatch(q, c.nombre)).slice(0,20), 'drop-a', 'selectA', q);
+      acRenderDrop(CandRegistry.acRank(q, candIndex, 20), 'drop-a', 'selectA', q);
     }
 
     function acSearchB() {
@@ -612,7 +623,7 @@
       const q = document.getElementById('ac-b').value.trim();
       const drop = document.getElementById('drop-b');
       if (q.length < 2) { drop.classList.remove('open'); return; }
-      acRenderDrop(candIndex.filter(c => acMatch(q, c.nombre)).slice(0,20), 'drop-b', 'selectB', q);
+      acRenderDrop(CandRegistry.acRank(q, candIndex, 20), 'drop-b', 'selectB', q);
     }
 
     function acKeyA(e) { acHlA = acKeyNav(e, 'drop-a', acHlA, 'selectA'); }

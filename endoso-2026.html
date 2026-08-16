@@ -124,6 +124,7 @@
     .ac-item{padding:.5rem .7rem;font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.926rem;color:rgba(255,255,255,.7);cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);transition:background .1s}
     .ac-item:hover,.ac-item.highlighted{background:rgba(0,71,255,.15);color:var(--white)}
     .ac-item .ac-corp{color:rgba(255,255,255,.3);font-size:.794rem;margin-left:.4rem}
+    .ac-more { padding:.5rem .8rem; font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.6rem; color:rgba(255,255,255,.4); letter-spacing:.04em; background:rgba(255,255,255,.03); border-bottom:1px solid rgba(255,255,255,.05); }
     .ac-item mark{background:transparent;color:var(--blue);font-weight:700}
     .selector-sep{display:flex;align-items:center;justify-content:center;padding-top:1.4rem;font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.992rem;color:rgba(255,255,255,.2)}
     .run-btn{margin-top:1.1rem;display:inline-flex;align-items:center;gap:.6rem;font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.952rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);background:var(--blue);border:none;padding:.55rem 1.4rem;cursor:pointer;transition:background .2s}
@@ -778,15 +779,26 @@
 
       if (q.length < 2) { drop.classList.remove('open'); drop.innerHTML=''; return; }
 
-      const results = candIndex.filter(c => acMatch(q, c.nombre)).slice(0, 30);
-      if (!results.length) { drop.classList.remove('open'); drop.innerHTML=''; return; }
+      // Ordena por relevancia + votación (CandRegistry.acRank) en vez de cortar
+      // en el orden de carga: con 419k candidaturas, ese corte escondía Concejo
+      // y JAL detrás de todas las demás fuentes.
+      const rank = CandRegistry.acRank(q, candIndex, 30);
+      const results = rank.items;
+      const cargando = !_localDone;
+      if (!results.length && !cargando) { drop.classList.remove('open'); drop.innerHTML=''; return; }
 
-      drop.innerHTML = results.map((c, i) => {
+      let html = results.map((c, i) => {
         const circ = c.circunscripcion || '';
         const corpLabel = circ && circ !== c.corp ? `${c.corp} · ${circ}` : c.corp;
+        const votos = c.votos ? ` · ${Number(c.votos).toLocaleString('es-CO')} votos` : '';
         return `<div class="ac-item" data-slug="${c.slug}" data-nombre="${c.nombre}" data-corp="${c.corp}" data-circ="${circ}" data-partido="${c.partido}"
-          onmousedown="acSelect('${k}', this)">${c.nombre}<span class="ac-corp">${corpLabel}</span></div>`;
+          onmousedown="acSelect('${k}', this)">${c.nombre}<span class="ac-corp">${corpLabel}${votos}</span></div>`;
       }).join('');
+      if (rank.total > results.length) {
+        html += `<div class="ac-more">${results.length} de ${rank.total.toLocaleString('es-CO')} coincidencias · agrega el apellido para afinar</div>`;
+      }
+      if (cargando) html += `<div class="ac-more">Cargando Concejo y JAL…</div>`;
+      drop.innerHTML = html;
       acHighlight[k] = -1;
       drop.classList.add('open');
     }
