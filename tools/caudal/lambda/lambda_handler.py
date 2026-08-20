@@ -62,6 +62,7 @@ import unicodedata as _unicodedata
 import os
 import sys
 import hashlib
+import re
 import time as _time
 import urllib.request
 import urllib.error
@@ -970,6 +971,9 @@ def _secop_row(r, terms, cols):
                 break
     return {
         'id': r.get('id_contrato'),
+        # ② el número que el cliente tecleó: si buscó por radicado tiene que
+        # poder confirmar que la fila que ve es la suya.
+        'referencia': r.get('referencia_del_contrato'),
         'entidad': r.get('nombre_entidad'), 'nit': r.get('nit_entidad'),
         'proveedor': r.get('proveedor_adjudicado'),
         'objeto': ' '.join((r.get('objeto_del_contrato') or '').split()),
@@ -1122,6 +1126,246 @@ def _contratacion_empresa(body, query, emps, filtros, where_base):
     }
 
 
+# --- ② búsqueda por IDENTIFICADOR · ③ el campo `adjudicado` ------------------
+# Aprendizaje del caso PAF-MENIES-O-134-2024 (ago-2026), todo medido contra
+# Socrata, no supuesto:
+#
+#  (a) Este pilar solo consulta CONTRATOS (jbjy-vk9h, 5,97 M filas). Los
+#      PROCESOS (p6dx-8zbt, 9,02 M) son la otra mitad del universo y llegan
+#      ANTES: en ese caso el proceso se publicó el 13-nov-2024 y el contrato se
+#      firmó el 24-ene-2025 — 72 días en los que todavía se podía incidir. Y hay
+#      contratos que NUNCA existen como contrato electrónico: los de régimen
+#      especial de patrimonios autónomos (Findeter, Fiduprevisora, Fiduagraria)
+#      viven solo como proceso. Régimen especial son 3,67 M procesos contra
+#      849 K contratos de esa modalidad. Corolario para la UI: un `$q` sin
+#      resultados NO significa "no existe", significa "no está en ESTE dataset".
+#
+#  (b) El cliente llega con un NÚMERO en la mano ("¿qué pasó con este
+#      contrato?") y hasta acá todo iba por `$q` full-text, que depende de cómo
+#      tokenice un identificador con guiones. Las sondas por igualdad son
+#      baratas (medido: 0,50-0,63 s cada una) y corren en paralelo, así que esto
+#      es ADITIVO: si no encuentra nada no cuesta nada ni toca la búsqueda
+#      normal, y por eso el detector puede ser permisivo sin riesgo.
+#
+# ⚠️⚠️ La llave de join proceso→contrato es `id_del_portafolio` (CO1.BDOS.*) →
+#      `proceso_de_compra`. NO es `id_del_proceso` (CO1.REQ.*): usar esa
+#      devuelve vacío SIEMPRE y hace creer que el contrato no existe.
+# ⚠️ `referencia_del_contrato` NO es única — medido: 'CPS-3548-2022' son dos
+#      contratos de entidades distintas. Por eso se devuelven todas las
+#      coincidencias con bandera `ambiguo`, nunca "el" contrato.
+SECOP_PROC_RESOURCE = os.environ.get('SECOP_PROC_RESOURCE', 'p6dx-8zbt')
+SECOP_PROC_URL = f'https://www.datos.gov.co/resource/{SECOP_PROC_RESOURCE}.json'
+SECOP_IDENT_TIMEOUT = 10
+SECOP_IDENT_MAX = 12               # filas por sonda (una referencia repetida)
+SECOP_ADJ_MAX = 3                  # procesos a los que se les resuelve el cruce
+
+SECOP_NOTICE_RE = re.compile(r'(CO1\.NTC\.\d+)', re.I)
+SECOP_ID_RE = re.compile(r'^CO1\.[A-Z]{2,8}\.?\s?\d+$', re.I)
+SECOP_REF_DE_RE = re.compile(r'^\d{1,6}\s+DE\s+\d{4}$', re.I)
+SECOP_NOTICE_BASE = ('https://community.secop.gov.co/Public/Tendering/'
+                     'OpportunityDetail/Index?noticeUID=')
+SECOP_NOTICE_SUF = '&isFromPublicArea=True&isModal=true&asPopupView=true'
+
+SECOP_PROC_SELECT = [
+    'id_del_proceso', 'id_del_portafolio', 'referencia_del_proceso', 'entidad',
+    'nit_entidad', 'nombre_del_procedimiento', 'descripci_n_del_procedimiento',
+    'precio_base', 'modalidad_de_contratacion', 'fase', 'estado_del_procedimiento',
+    'fecha_de_publicacion_del', 'departamento_entidad', 'ciudad_entidad',
+    'duracion', 'unidad_de_duracion', 'adjudicado', 'nombre_del_proveedor',
+    'valor_total_adjudicacion', 'tipo_de_contrato', 'urlproceso',
+]
+
+# ③ El texto que acompaña SIEMPRE a un proceso. No es un disclaimer decorativo:
+# es la diferencia entre informar y afirmar algo falso.
+SECOP_ADJ_NOTA = (
+    'El campo `adjudicado` del dataset de procesos no es confiable en régimen '
+    'especial. Medido ago-2026 sobre 200 procesos marcados «No» con más de un '
+    'año de publicados: el 38% SÍ tenía contrato firmado. Findeter reporta 0 '
+    'adjudicaciones en sus 5.089 procesos y Fiduprevisora 2,3%. Por eso acá el '
+    'estado se resuelve cruzando contra el dataset de contratos, y cuando ese '
+    'cruce no encuentra nada se dice «la fuente no lo informa», nunca «no '
+    'adjudicado».')
+
+SECOP_ADJ_ETIQUETA = {
+    'adjudicado': 'Adjudicado · hay contrato firmado',
+    'adjudicado_sin_contrato': 'Adjudicado según la fuente · sin contrato electrónico publicado',
+    'no_informa': 'La fuente no lo informa',
+}
+
+
+def _secop_get_res(resource, params, timeout=SECOP_TIMEOUT):
+    """`_secop_get` para cualquier dataset (contratos o procesos)."""
+    url = f'https://www.datos.gov.co/resource/{resource}.json?' + urllib.parse.urlencode(params)
+    headers = {'Accept': 'application/json'}
+    tok = os.environ.get('SOCRATA_APP_TOKEN', '')
+    if tok:
+        headers['X-App-Token'] = tok
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read())
+
+
+def _secop_es_identificador(q):
+    """¿La consulta parece un radicado y no una frase? Permisivo a propósito:
+    un falso positivo cuesta una sonda de 0,6 s que devuelve vacío."""
+    q = (q or '').strip()
+    if not (4 <= len(q) <= 120) or len(q.split()) > 6:
+        return False
+    if not any(c.isdigit() for c in q):
+        return False                       # 'reforma pensional' no es un radicado
+    if SECOP_NOTICE_RE.search(q) or SECOP_ID_RE.match(q) or SECOP_REF_DE_RE.match(q):
+        return True
+    # un radicado trae separador pegado: PAF-MENIES-O-134-2024 · CPS-3548-2022
+    return bool(re.search(r'\w[-/.]\w', q))
+
+
+def _secop_ident_sondas(q):
+    """(dataset, columna, valor) a probar por IGUALDAD. Máximo 4."""
+    q = (q or '').strip()
+    sondas = []
+
+    def add(res, col, val):
+        t = (res, col, val)
+        if val and t not in sondas:
+            sondas.append(t)
+
+    m = SECOP_NOTICE_RE.search(q)
+    if m:                                  # URL de SECOP pegada, o noticeUID suelto
+        base = SECOP_NOTICE_BASE + m.group(1).upper()
+        add(SECOP_PROC_RESOURCE, 'urlproceso.url', base)
+        add(SECOP_RESOURCE, 'urlproceso.url', base + SECOP_NOTICE_SUF)
+        return sondas
+    if SECOP_ID_RE.match(q):               # un CO1.* nunca es una referencia
+        u = q.upper()
+        add(SECOP_RESOURCE, 'id_contrato', u)
+        add(SECOP_RESOURCE, 'proceso_de_compra', u)
+        add(SECOP_PROC_RESOURCE, 'id_del_proceso', u)
+        add(SECOP_PROC_RESOURCE, 'id_del_portafolio', u)
+        return sondas
+    for v in (q, q.upper()):               # la referencia se escribe en mayúsculas
+        add(SECOP_RESOURCE, 'referencia_del_contrato', v)
+        add(SECOP_PROC_RESOURCE, 'referencia_del_proceso', v)
+    return sondas
+
+
+def _secop_proc_row(r):
+    url = r.get('urlproceso')
+    if isinstance(url, dict):
+        url = url.get('url')
+    try:
+        base = round(float(r.get('precio_base') or 0))
+    except Exception:
+        base = 0
+    dur = ' '.join(x for x in (str(r.get('duracion') or '').strip(),
+                               (r.get('unidad_de_duracion') or '').strip()) if x)
+    return {
+        'id': r.get('id_del_proceso'), 'portafolio': r.get('id_del_portafolio'),
+        'referencia': r.get('referencia_del_proceso'),
+        'entidad': r.get('entidad'), 'nit': r.get('nit_entidad'),
+        'objeto': ' '.join((r.get('nombre_del_procedimiento')
+                            or r.get('descripci_n_del_procedimiento') or '').split()),
+        'valor_base': base, 'modalidad': r.get('modalidad_de_contratacion'),
+        'fase': r.get('fase'), 'estado': r.get('estado_del_procedimiento'),
+        'fecha_publicacion': (r.get('fecha_de_publicacion_del') or '')[:10],
+        'departamento': r.get('departamento_entidad'), 'ciudad': r.get('ciudad_entidad'),
+        'duracion': dur or None, 'tipo': r.get('tipo_de_contrato'), 'url': url,
+        '_campo_adjudicado': r.get('adjudicado'),
+    }
+
+
+def _secop_adjudicacion(proc):
+    """③ Resuelve el estado real cruzando por `id_del_portafolio` →
+    `proceso_de_compra`. NUNCA repite el campo `adjudicado` como si fuera
+    verdad: si el cruce no encuentra contrato, el estado es 'no_informa'."""
+    campo = (proc.get('_campo_adjudicado') or '').strip() or None
+    out = {'campo_fuente': campo, 'contratos': [], 'n_contratos': 0,
+           'campo_desmentido': False, 'nota': SECOP_ADJ_NOTA}
+    port = proc.get('portafolio')
+    if not port:
+        out['estado'] = 'no_informa'
+        out['etiqueta'] = SECOP_ADJ_ETIQUETA['no_informa']
+        return out
+    try:
+        filas = _secop_get_res(SECOP_RESOURCE, {
+            '$select': ','.join(SECOP_SELECT),
+            '$where': f"proceso_de_compra='{_secop_lit(port)}'",
+            '$order': 'fecha_de_firma DESC', '$limit': SECOP_IDENT_MAX,
+        }, timeout=SECOP_IDENT_TIMEOUT)
+    except Exception as e:
+        print(f'[secop] cruce adjudicacion {port} FAIL: {type(e).__name__}: {e}')
+        out['estado'] = 'no_informa'
+        out['etiqueta'] = SECOP_ADJ_ETIQUETA['no_informa']
+        out['cruce_fallo'] = True
+        return out
+    if filas:
+        out['estado'] = 'adjudicado'
+        out['contratos'] = [_secop_row(r, [], []) for r in filas]
+        out['n_contratos'] = len(filas)
+        # el caso PAF-MENIES: la fuente dice 'No' y hay contrato firmado
+        out['campo_desmentido'] = (campo or '').lower().startswith('n')
+    elif (campo or '').lower().startswith('s'):
+        out['estado'] = 'adjudicado_sin_contrato'
+    else:
+        out['estado'] = 'no_informa'
+    out['etiqueta'] = SECOP_ADJ_ETIQUETA[out['estado']]
+    return out
+
+
+def _secop_identificador(query):
+    """② Camino explícito por radicado. Devuelve None si la consulta no parece
+    un identificador o si ninguna sonda encontró nada — nunca estorba."""
+    if not _secop_es_identificador(query):
+        return None
+    sondas = _secop_ident_sondas(query)
+    if not sondas:
+        return None
+    contratos, procesos, vistos_c, vistos_p = [], [], set(), set()
+    with ThreadPoolExecutor(max_workers=len(sondas)) as pool:
+        futs = {}
+        for res, col, val in sondas:
+            sel = SECOP_SELECT if res == SECOP_RESOURCE else SECOP_PROC_SELECT
+            p = {'$select': ','.join(sel), '$limit': SECOP_IDENT_MAX,
+                 '$where': f"{col}='{_secop_lit(val)}'"}
+            futs[pool.submit(_secop_get_res, res, p, SECOP_IDENT_TIMEOUT)] = (res, col)
+        for fut in as_completed(futs):
+            res, col = futs[fut]
+            try:
+                filas = fut.result()
+            except Exception as e:
+                print(f'[secop] sonda {res}.{col} FAIL: {type(e).__name__}: {e}')
+                continue
+            for r in filas:
+                if res == SECOP_RESOURCE:
+                    row = _secop_row(r, [], [])
+                    k = row.get('id') or json.dumps(row, sort_keys=True)
+                    if k not in vistos_c:
+                        vistos_c.add(k)
+                        contratos.append(row)
+                else:
+                    row = _secop_proc_row(r)
+                    k = row.get('id') or json.dumps(row, sort_keys=True)
+                    if k not in vistos_p:
+                        vistos_p.add(k)
+                        procesos.append(row)
+    if not contratos and not procesos:
+        return None
+    for p in procesos[:SECOP_ADJ_MAX]:     # ③ solo a los que se muestran arriba
+        p['adjudicacion'] = _secop_adjudicacion(p)
+    for p in procesos:
+        p.pop('_campo_adjudicado', None)
+    return {
+        'consulta': query,
+        'contratos': contratos, 'procesos': procesos,
+        'n_contratos': len(contratos), 'n_procesos': len(procesos),
+        'encontrado_en': ([['contratos'], []][not contratos]
+                          + [['procesos'], []][not procesos]),
+        # una referencia repetida en varias entidades no es "el" contrato
+        'ambiguo': (len(contratos) + len(procesos)) > 1,
+        'nota_adjudicado': SECOP_ADJ_NOTA if procesos else None,
+        'solo_proceso': bool(procesos) and not contratos,
+    }
+
+
 def _contratacion(body):
     """Modo A (sin query ni filtros) → agregados del landing. Modo B → búsqueda
     en vivo contra Socrata: filas + total real + desglose por departamento."""
@@ -1141,12 +1385,17 @@ def _contratacion(body):
     emps = empresas.empresas_en(query) if query else []
     por_identidad = bool(emps) and not body.get('ampliar_empresa')
     ck = ('contratacion-' + _hash24(json.dumps(
-        [query, where, limit, orden, solo_objeto, por_identidad],
+        ['v2-ident', query, where, limit, orden, solo_objeto, por_identidad],
         ensure_ascii=False, sort_keys=True))
         + f'-{_medios_cache_bucket(3)}')
     cached = _cache_get(ck)
     if cached:
         return cached
+
+    # ② El camino por radicado corre SIEMPRE que la consulta parezca un
+    # identificador, en paralelo con lo demás y sin condicionarlo: si no
+    # encuentra nada devuelve None y la respuesta queda igual que antes.
+    ident = _secop_identificador(query) if query else None
 
     if por_identidad:
         emp = _contratacion_empresa(body, query, emps, filtros, where)
@@ -1155,6 +1404,7 @@ def _contratacion(body):
             # Estado (verificado: Uber y Ecopetrol no tienen contratos en SECOP
             # II). No se cae a $q en silencio — eso devolvería homónimos.
             out = {'mode': 'search', 'query': query, 'identidad_empresa': True,
+                   'identificador': ident,
                    'sin_contratos': True, 'n': 0, 'total': {'contratos': 0, 'valor_cop': 0},
                    'filtros': {k: v for k, v in filtros.items() if v},
                    'orden': body.get('orden') or 'reciente',
@@ -1168,6 +1418,7 @@ def _contratacion(body):
             return out
         out = {
             'mode': 'search', 'query': query, 'identidad_empresa': True,
+            'identificador': ident,
             'solo_objeto': False, 'revisadas': None,
             'filtros': {k: v for k, v in filtros.items() if v},
             'orden': body.get('orden') or 'reciente',
@@ -1241,6 +1492,7 @@ def _contratacion(body):
             tot = None
     out = {
         'mode': 'search', 'query': query, 'solo_objeto': solo_objeto,
+        'identificador': ident,
         # `empresas` viaja también acá: es el caso "ampliar" (el usuario pidió
         # ver todo lo que menciona la marca) y el aviso tiene que seguir visible
         # para poder volver a lo preciso.

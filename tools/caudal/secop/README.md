@@ -365,3 +365,28 @@ archivo y `soql` = querystring SoQL cruda, dimensión CERRADA nunca texto libre)
 armar su sección en `build()`. Correr `fetch` (baja solo el nuevo si los demás son
 de hoy) → `build`. Antes de sumar uno de alta cardinalidad, medir su latencia (debe
 quedar <60 s); si se acerca, acotarlo con `$limit` o `$where` de rango.
+
+## ② Búsqueda por identificador · ③ el campo `adjudicado` (ago-2026)
+
+Del caso **PAF-MENIES-O-134-2024**. El detalle completo, con las cifras medidas,
+está en `CLAUDE.md` (sección del pilar). Resumen operativo:
+
+- El pilar consulta **contratos** (`jbjy-vk9h`, 5,97 M). Los **procesos**
+  (`p6dx-8zbt`, 9,02 M) son la otra mitad y hoy solo entran **por radicado**.
+- ⚠️⚠️ Join proceso→contrato: **`id_del_portafolio` (`CO1.BDOS.*`) →
+  `proceso_de_compra`**. NO `id_del_proceso` (`CO1.REQ.*`).
+- ⚠️⚠️ `adjudicado` de `p6dx-8zbt` es basura en régimen especial (38% de los
+  marcados «No» tienen contrato firmado; Findeter reporta 0 de 5.089). Se
+  resuelve por cruce; sin cruce se dice **«la fuente no lo informa»**.
+- ⚠️ `referencia_del_contrato` NO es única (`CPS-3548-2022` → 2 entidades).
+- El noticeUID **no es full-text searchable**: se busca por igualdad sobre
+  `urlproceso.url`, armando la URL canónica (contratos llevan
+  `&isFromPublicArea=True&isModal=true&asPopupView=true`; procesos no).
+
+Sondas por igualdad medidas (todas <1 s), útiles para depurar a mano:
+
+```bash
+curl -s -G "https://www.datos.gov.co/resource/p6dx-8zbt.json" \
+  --data-urlencode "\$where=referencia_del_proceso='PAF-MENIES-O-134-2024'" \
+  --data-urlencode '$limit=1' | python3 -m json.tool
+```

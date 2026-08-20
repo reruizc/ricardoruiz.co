@@ -1833,6 +1833,70 @@
       conBuscar();
     });
   }
+  // ② y ③ · bloque de coincidencia exacta por radicado.
+  // Nace del caso PAF-MENIES-O-134-2024 (ago-2026): el cliente llega con un
+  // número en la mano, la búsqueda por $q mira SOLO contratos, y ese contrato
+  // vive únicamente como proceso (régimen especial de patrimonio autónomo).
+  // Resultado viejo: "sin coincidencias", que se lee como "no existe".
+  const ADJ_TONO={adjudicado:'var(--teal)', adjudicado_sin_contrato:'#e0a33e', no_informa:'var(--ink3)'};
+  function identAdj(a){
+    if(!a) return '';
+    // ③ NUNCA se repite el campo `adjudicado` como si fuera verdad: el estado
+    // sale del cruce contra el dataset de contratos por id_del_portafolio.
+    const col=ADJ_TONO[a.estado]||'var(--ink3)';
+    const det=a.estado==='adjudicado'
+      ? `${a.n_contratos} ${a.n_contratos===1?'contrato firmado':'contratos firmados'} en el dataset de contratos.`
+      : a.estado==='adjudicado_sin_contrato'
+        ? 'La fuente lo da por adjudicado pero no hay contrato electrónico publicado — en régimen especial el contrato suele ir como documento adjunto al proceso.'
+        : 'El cruce contra el dataset de contratos no encontró contrato. Eso <b>no</b> quiere decir que no se adjudicó.';
+    const desm=a.campo_desmentido
+      ? `<div class="cob-note" style="margin:.45rem 0 0">⚠️ El campo <code>adjudicado</code> de la fuente dice <b>«${esc(a.campo_fuente||'—')}»</b> y sí hay contrato firmado. El campo está errado, no el cruce.</div>`
+      : '';
+    const cont=(a.contratos||[]).length
+      ? `<div style="margin-top:.6rem">${a.contratos.map(conCard).join('')}</div>` : '';
+    return `<div style="margin-top:.7rem;padding-left:.7rem;border-left:2px solid ${col}">
+        <div style="font-weight:600;color:${col}">${esc(a.etiqueta||'')}</div>
+        <div class="cob-note" style="margin:.25rem 0 0">${det}</div>
+        ${desm}
+        <details style="margin-top:.45rem"><summary style="cursor:pointer;color:var(--ink3);font-size:.86rem">Por qué no mostramos el campo tal cual</summary>
+          <div class="cob-note" style="margin-top:.4rem">${esc(a.nota||'')}</div></details>
+        ${cont}
+      </div>`;
+  }
+  function identProcCard(p){
+    const dond=[p.ciudad,p.departamento].filter(Boolean).join(', ');
+    const name=p.url
+      ?`<a class="sanc-name" href="${esc(p.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(p.entidad||'—')}</a>`
+      :`<span class="sanc-name">${esc(p.entidad||'—')}</span>`;
+    return `<div class="sanc">
+      <div class="sanc-top">${name}<span class="sanc-fecha">${esc(p.fecha_publicacion||'sin fecha')}</span></div>
+      ${p.objeto?`<div class="sanc-motivo">${esc(p.objeto.slice(0,300))}${p.objeto.length>300?'…':''}</div>`:''}
+      <div class="sanc-tags">
+        ${p.valor_base?`<span class="sanc-monto">${fmtCOP(p.valor_base)}</span> <span style="color:var(--ink3)">(precio base)</span> · `:''}${esc(p.referencia||'—')}
+        ${dond?` · ${esc(dond)}`:''}${p.duracion?` · ${esc(p.duracion)}`:''}
+        ${p.modalidad?` · <span class="doc-badge pal">${esc(p.modalidad)}</span>`:''}
+        ${p.url?` · <a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:var(--ink3)">proceso en SECOP ↗</a>`:''}
+      </div>
+      ${identAdj(p.adjudicacion)}
+    </div>`;
+  }
+  function identBlock(d){
+    const x=d&&d.identificador; if(!x) return '';
+    // el aviso que evita el falso "no existe": $q solo mira contratos.
+    const solo=x.solo_proceso
+      ? `<div class="cob-note" style="margin:.2rem 0 .9rem">Este radicado existe como <b>proceso</b> pero no tiene contrato electrónico publicado — es lo normal en el régimen especial de los patrimonios autónomos, donde el contrato va como documento adjunto. La búsqueda de abajo mira solo el dataset de contratos, por eso sale vacía: <b>«sin resultados» ahí significa «no está en ese dataset», no «no existe»</b>.</div>`
+      : '';
+    const amb=x.ambiguo
+      ? `<div class="cob-note" style="margin:.2rem 0 .9rem">⚠️ Ese número no es único en SECOP: cada entidad numera por su cuenta. Se muestran las ${fmt(x.n_contratos+x.n_procesos)} coincidencias — revisa la entidad para saber cuál es la tuya.</div>`
+      : '';
+    return `<div class="panel wide" style="border-color:var(--teal);margin-bottom:1.4rem">
+      <h3 style="margin-bottom:.3rem">Coincidencia exacta por radicado</h3>
+      <div class="cob-note" style="margin-bottom:.9rem">Búsqueda por igualdad de <code>${esc(x.consulta)}</code> sobre contratos y procesos, no por texto libre.</div>
+      ${solo}${amb}
+      ${x.n_contratos?`<div style="font-weight:600;margin:.4rem 0 .5rem">${fmt(x.n_contratos)} ${x.n_contratos===1?'contrato':'contratos'}</div>${x.contratos.map(conCard).join('')}`:''}
+      ${x.n_procesos?`<div style="font-weight:600;margin:1rem 0 .5rem">${fmt(x.n_procesos)} ${x.n_procesos===1?'proceso':'procesos'} <span style="color:var(--ink3);font-weight:400">· el proceso se publica antes que el contrato: es donde todavía se puede incidir</span></div>${x.procesos.map(identProcCard).join('')}`:''}
+    </div>`;
+  }
   function conRenderResults(d){
     const el=document.getElementById('con-results'); if(!el) return;
     el.style.display='block';
@@ -1862,6 +1926,7 @@
       <div class="r-titular" style="font-size:1.4rem">${titular}</div>
       <div class="r-sub" style="margin-bottom:1rem">${scope||'toda la contratación'}${valor}</div>
       ${empresaHint(d.empresas,'con-emp-hint','contratacion')}
+      ${identBlock(d)}
       ${ident}${chips}${solo}
       <div class="chips" style="margin-bottom:1rem">
         <span class="chip${CON.orden==='reciente'?' on':''}" data-orden="reciente">Más recientes</span>
@@ -1873,7 +1938,9 @@
       ${listaConMuro(d.resultados, conCard, 'contrato', 'contratos', `acceso · ${d.query||'contratación'}`,
         d.sin_contratos
           ? `<b>${esc((d.empresas&&d.empresas[0]&&d.empresas[0].nombre)||d.query)}</b> no le vende al Estado por SECOP II: no hay ninguna razón social suya entre los proveedores.${d.n_descartados?` Sí aparecen ${fmt(d.n_descartados)} nombres que <i>contienen</i> la marca (${(d.descartados||[]).slice(0,3).map(x=>esc(x.nombre)).join(', ')}…), pero son homónimos, no la empresa.`:''} Usa el enlace de arriba si quieres verlos igual.`
-          : `Sin coincidencias.${Object.keys(f).length?' Hay filtros activos ('+esc(Object.values(f).join(' · '))+'): quítalos arriba y vuelve a buscar.':' Prueba otro término — recuerda que varias palabras se combinan con Y.'}`)}
+          : (d.identificador
+             ? `Sin coincidencias <b>en el dataset de contratos</b> — pero el radicado sí existe: lo tienes arriba.`
+             : `Sin coincidencias.${Object.keys(f).length?' Hay filtros activos ('+esc(Object.values(f).join(' · '))+'): quítalos arriba y vuelve a buscar.':' Prueba otro término — recuerda que varias palabras se combinan con Y.'}`))}
       ${tot&&tot.contratos>d.n?`<div class="cob-note" style="margin-top:1rem">Mostrando ${fmt(d.n)} de ${fmt(tot.contratos)}. Afina con un filtro para ver menos.</div>`:''}`;
     wireEmpresaHint('con-emp-hint', conBuscar);
     el.querySelectorAll('.chip[data-orden]').forEach(c=>c.onclick=()=>{ CON.orden=c.dataset.orden; conBuscar(); });
