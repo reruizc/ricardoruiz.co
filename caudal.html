@@ -1904,7 +1904,16 @@
     const scope=[d.query?`«${esc(d.query)}»`:'', f.entidad?esc(f.entidad):'', f.sector?esc(f.sector):'',
                  f.departamento?esc(f.departamento):'', f.anio?esc(String(f.anio)):''].filter(Boolean).join(' · ');
     const tot=d.total;
-    const titular=tot?`${fmt(tot.contratos)} ${tot.contratos===1?'contrato':'contratos'}`:`${fmt(d.n)} contratos`;
+    // ② Si el radicado se encontró pero el universo $q está vacío (el caso
+    // PAF-MENIES: el contrato solo existe como proceso), el titular NO puede
+    // gritar «0 contratos» encima de un hallazgo real — es la misma lectura
+    // equivocada que este camino existe para evitar.
+    const _ix=d.identificador, _n=w=>fmt(w);
+    const identSolo=_ix&&(!tot||!tot.contratos);
+    const titular=identSolo
+      ? [_ix.n_contratos?`${_n(_ix.n_contratos)} ${_ix.n_contratos===1?'contrato':'contratos'}`:'',
+         _ix.n_procesos?`${_n(_ix.n_procesos)} ${_ix.n_procesos===1?'proceso':'procesos'}`:''].filter(Boolean).join(' · ')
+      : (tot?`${fmt(tot.contratos)} ${tot.contratos===1?'contrato':'contratos'}`:`${fmt(d.n)} contratos`);
     // ⚠️ NO se publica la suma de `valor_del_contrato`. Medido ago-2026: esa
     // columna de SECOP trae errores de digitación de hasta 12 órdenes de
     // magnitud —un contrato del CNE figura con 6,86e18 pesos y él solo era el
@@ -1924,7 +1933,7 @@
         ${d.truncado?' <b>Nota:</b> hay más razones sociales de las que caben en una consulta; el total puede quedarse corto.':''}</div>`:'';
     el.innerHTML=`
       <div class="r-titular" style="font-size:1.4rem">${titular}</div>
-      <div class="r-sub" style="margin-bottom:1rem">${scope||'toda la contratación'}${valor}</div>
+      <div class="r-sub" style="margin-bottom:1rem">${scope||'toda la contratación'}${valor}${identSolo?' · encontrado por radicado exacto':''}</div>
       ${empresaHint(d.empresas,'con-emp-hint','contratacion')}
       ${identBlock(d)}
       ${ident}${chips}${solo}
