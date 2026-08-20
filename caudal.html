@@ -1776,7 +1776,7 @@
     const sb=document.getElementById('sucBack'); if(sb) sb.onclick=()=>showView('home');
   }
   /* ---------- pilar Datos abiertos y contratación · SECOP II ---------- */
-  const CON={q:'', filtros:{}, solo:false, orden:'reciente'};
+  const CON={q:'', filtros:{}, solo:false, orden:'reciente', tab:'contratos', _last:null};
   const CON_EJEMPLOS=['interventoría vías','dotación hospitalaria','alimentación escolar','carrotanques','comando conjunto caribe'];
   let CON_STATS=null, _conInited=false, _conSeq=0;
   function conCard(r){
@@ -1897,9 +1897,66 @@
       ${x.n_procesos?`<div style="font-weight:600;margin:1rem 0 .5rem">${fmt(x.n_procesos)} ${x.n_procesos===1?'proceso':'procesos'} <span style="color:var(--ink3);font-weight:400">· el proceso se publica antes que el contrato: es donde todavía se puede incidir</span></div>${x.procesos.map(identProcCard).join('')}`:''}
     </div>`;
   }
+  // Procesos (p6dx-8zbt) en la lista. Van en PESTAÑA aparte, nunca fusionados
+  // con los contratos: un proceso y el contrato que sale de él son la MISMA
+  // contratación, así que sumarlos duplicaría, y sus campos no son comparables
+  // (precio base ≠ valor firmado, fecha de publicación ≠ fecha de firma).
+  function procCard(r){
+    const a=r.adjudicacion||{};
+    const col=ADJ_TONO[a.estado]||'var(--ink3)';
+    const name=r.url
+      ?`<a class="sanc-name" href="${esc(r.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(r.entidad||'—')}</a>`
+      :`<span class="sanc-name">${esc(r.entidad||'—')}</span>`;
+    const dond=[r.ciudad,r.departamento].filter(Boolean).join(', ');
+    // ③ el estado sale del cruce contra contratos, jamás del campo `adjudicado`
+    const est=a.etiqueta?`<span class="doc-badge" style="border-color:${col};color:${col}">${esc(a.etiqueta)}</span>`:'';
+    const desm=a.campo_desmentido?`<span class="doc-badge" style="border-color:#e0a33e;color:#e0a33e" title="El campo adjudicado de la fuente dice «${esc(a.campo_fuente||'')}» y sí hay contrato">campo errado</span>`:'';
+    return `<div class="sanc">
+      <div class="sanc-top">${name}<span class="sanc-fecha">${esc(r.fecha_publicacion||'sin fecha')}</span></div>
+      ${r.objeto?`<div class="sanc-motivo">${esc(r.objeto.slice(0,300))}${r.objeto.length>300?'…':''}</div>`:''}
+      <div class="sanc-tags">
+        ${r.valor_base?`<span class="sanc-monto">${fmtCOP(r.valor_base)}</span> <span style="color:var(--ink3)">precio base</span> · `:''}${esc(r.referencia||'—')}
+        ${r.proveedor?` · ${esc(r.proveedor)}`:''}${dond?` · ${esc(dond)}`:''}${r.duracion?` · ${esc(r.duracion)}`:''}
+        ${r.modalidad?` · <span class="doc-badge pal">${esc(r.modalidad)}</span>`:''}
+        ${est}${desm}
+        ${r.url?` · <a href="${esc(r.url)}" target="_blank" rel="noopener" style="color:var(--ink3)">ver en SECOP ↗</a>`:''}
+      </div>
+    </div>`;
+  }
+  function conTabs(d){
+    const p=d.procesos;
+    // sin procesos no hay pestaña que ofrecer: una pestaña vacía es ruido
+    if(!p&&!d.procesos_tarde) return '';
+    const nC=(d.total&&d.total.contratos)!=null?d.total.contratos:(d.n||0);
+    const nP=p?(p.total!=null?p.total:p.n):null;
+    if(d.procesos_tarde&&!p)
+      return `<div class="cob-note" style="margin-bottom:1rem">Los <b>procesos</b> de esta búsqueda no alcanzaron a cargar. Los contratos de abajo están completos; vuelve a buscar si quieres los procesos.</div>`;
+    return `<div class="chips" style="margin-bottom:1rem">
+      <span class="chip${CON.tab!=='procesos'?' on':''}" data-tab="contratos">Contratos <b>${fmt(nC)}</b></span>
+      <span class="chip${CON.tab==='procesos'?' on':''}" data-tab="procesos">Procesos <b>${fmt(nP)}</b></span>
+    </div>`;
+  }
+  function conProcBloque(d){
+    const p=d.procesos; if(!p) return '';
+    const ign=(p.filtros_ignorados||[]).length
+      ? `<div class="cob-note" style="margin-bottom:1rem">⚠️ ${(p.filtros_ignorados||[]).map(x=>`<b>${esc(x)}</b>`).join(' y ')} no ${p.filtros_ignorados.length>1?'existen':'existe'} en el registro de procesos: ese filtro <b>no</b> está aplicado acá. El conteo de arriba es sin él.</div>`
+      : '';
+    const idn=p.por_identidad&&(p.entidades||[]).length
+      ? `<div class="cob-note" style="margin-bottom:1rem">Entidades incluidas: ${p.entidades.slice(0,4).map(e=>`<b>${esc(e.nombre)}</b>`).join(' · ')}${/\.$/.test(p.entidades[0].nombre||'')?'':'.'}${p.nota_proveedor?` ${esc(p.nota_proveedor)}`:''}</div>`
+      : (p.nota_proveedor?`<div class="cob-note" style="margin-bottom:1rem">${esc(p.nota_proveedor)}</div>`:'');
+    return `
+      <div class="cob-note" style="margin-bottom:1rem">El proceso se publica <b>antes</b> que el contrato: acá la contratación todavía se puede pelear. ${esc(p.nota_adjudicado||'')}</div>
+      ${ign}${idn}
+      ${(p.por_departamento||[]).length>1?`<div class="cob-note" style="margin-bottom:1rem">Dónde está: ${(p.por_departamento||[]).slice(0,6).map(x=>`${esc(x.departamento)} (${fmt(x.n)})`).join(' · ')}</div>`:''}
+      ${listaConMuro(p.resultados, procCard, 'proceso', 'procesos', `acceso · ${d.query||'contratación'}`,
+        'Sin procesos para esta búsqueda.')}
+      ${p.total>p.n?`<div class="cob-note" style="margin-top:1rem">Mostrando ${fmt(p.n)} de ${fmt(p.total)}.</div>`:''}`;
+  }
   function conRenderResults(d){
     const el=document.getElementById('con-results'); if(!el) return;
     el.style.display='block';
+    CON._last=d;                       // cambiar de pestaña no repite la consulta
+    if(!d.procesos) CON.tab='contratos';   // sin procesos no hay dónde estar
     const f=d.filtros||{};
     const scope=[d.query?`«${esc(d.query)}»`:'', f.entidad?esc(f.entidad):'', f.sector?esc(f.sector):'',
                  f.departamento?esc(f.departamento):'', f.anio?esc(String(f.anio)):''].filter(Boolean).join(' · ');
@@ -1937,12 +1994,14 @@
       ${empresaHint(d.empresas,'con-emp-hint','contratacion')}
       ${identBlock(d)}
       ${ident}${chips}${solo}
+      ${conTabs(d)}
       <div class="chips" style="margin-bottom:1rem">
         <span class="chip${CON.orden==='reciente'?' on':''}" data-orden="reciente">Más recientes</span>
         <span class="chip${CON.orden==='valor'?' on':''}" data-orden="valor">Más caros</span>
-        ${d.query&&!d.identidad_empresa?`<span class="chip${CON.solo?' on':''}" data-solo="1">Solo en el objeto</span>`:''}
+        ${d.query&&!d.identidad_empresa&&CON.tab!=='procesos'?`<span class="chip${CON.solo?' on':''}" data-solo="1">Solo en el objeto</span>`:''}
         ${Object.keys(f).length?'<span class="chip" data-clear="1">✕ Quitar filtros</span>':''}
       </div>
+      ${CON.tab==='procesos'?conProcBloque(d):`
       ${(d.por_departamento||[]).length>1?`<div class="cob-note" style="margin-bottom:1rem">Dónde está: ${(d.por_departamento||[]).slice(0,6).map(x=>`${esc(x.departamento)} (${fmt(x.n)})`).join(' · ')}</div>`:''}
       ${listaConMuro(d.resultados, conCard, 'contrato', 'contratos', `acceso · ${d.query||'contratación'}`,
         d.sin_contratos
@@ -1950,8 +2009,10 @@
           : (d.identificador
              ? `Sin coincidencias <b>en el dataset de contratos</b> — pero el radicado sí existe: lo tienes arriba.`
              : `Sin coincidencias.${Object.keys(f).length?' Hay filtros activos ('+esc(Object.values(f).join(' · '))+'): quítalos arriba y vuelve a buscar.':' Prueba otro término — recuerda que varias palabras se combinan con Y.'}`))}
-      ${tot&&tot.contratos>d.n?`<div class="cob-note" style="margin-top:1rem">Mostrando ${fmt(d.n)} de ${fmt(tot.contratos)}. Afina con un filtro para ver menos.</div>`:''}`;
+      ${tot&&tot.contratos>d.n?`<div class="cob-note" style="margin-top:1rem">Mostrando ${fmt(d.n)} de ${fmt(tot.contratos)}. Afina con un filtro para ver menos.</div>`:''}`}`;
     wireEmpresaHint('con-emp-hint', conBuscar);
+    el.querySelectorAll('.chip[data-tab]').forEach(c=>c.onclick=()=>{
+      CON.tab=c.dataset.tab; if(CON._last) conRenderResults(CON._last); });
     el.querySelectorAll('.chip[data-orden]').forEach(c=>c.onclick=()=>{ CON.orden=c.dataset.orden; conBuscar(); });
     el.querySelectorAll('.chip[data-solo]').forEach(c=>c.onclick=()=>{ CON.solo=!CON.solo; conBuscar(); });
     el.querySelectorAll('.chip[data-clear]').forEach(c=>c.onclick=()=>{ CON.filtros={}; conBuscar(); });
@@ -1975,6 +2036,11 @@
     catch(e){ if(mine===_conSeq&&el) el.innerHTML='<div class="err">No se pudo consultar SECOP. Reintenta.</div>'; return; }
     if(mine!==_conSeq) return;
     if(d&&d.error){ if(el) el.innerHTML=`<div class="err">${esc(d.error)}</div>`; return; }
+    // si no hay contratos pero sí procesos, abrir en procesos: es el caso
+    // PAF-MENIES generalizado — mandar a una lista vacía cuando el hallazgo está
+    // en la otra pestaña es el mismo falso negativo que venimos corrigiendo.
+    const nP=d.procesos?(d.procesos.total!=null?d.procesos.total:d.procesos.n):0;
+    if(!(d.total&&d.total.contratos)&&!d.n&&nP) CON.tab='procesos';
     conRenderResults(d);
   }
   async function conLoadStats(){

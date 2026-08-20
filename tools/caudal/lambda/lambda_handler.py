@@ -63,6 +63,8 @@ import os
 import sys
 import hashlib
 import re
+import threading
+import socket
 import time as _time
 import urllib.request
 import urllib.error
@@ -1077,7 +1079,11 @@ def _contratacion_empresa(body, query, emps, filtros, where_base):
     ninguna razón social → el caller cae a la búsqueda normal por $q."""
     prov, ent, descartados = _secop_descubrir(query, emps)
     if not prov and not ent:
+        # ⚠️ Sin razón social del lado CONTRATO puede haber procesos igual: una
+        # entidad puede casi no contratar por SECOP II y sí publicar procesos
+        # (Findeter, 5.089). Por eso viajan las listas vacías, no un corte seco.
         return {'sin_contratos': True, 'descartados': descartados,
+                '_prov': prov, '_ent': ent,
                 'empresas': _empresas_payload(emps)}
     conds = []
     if prov:
@@ -1098,7 +1104,11 @@ def _contratacion_empresa(body, query, emps, filtros, where_base):
     with ThreadPoolExecutor(max_workers=3) as pool:
         f_filas, f_total, f_dep = (pool.submit(_secop_get, p)
                                    for p in (p_filas, p_total, p_dep))
-        filas = f_filas.result()
+        try:
+            filas = f_filas.result()
+        except Exception as e:
+            print(f'[secop] empresa/filas FAIL: {type(e).__name__}: {e}')
+            return {'error_transitorio': True}
         total = dep = None
         for fut, name in ((f_total, 'total'), (f_dep, 'dep')):
             try:
@@ -1123,6 +1133,7 @@ def _contratacion_empresa(body, query, emps, filtros, where_base):
         'truncado': len(prov) > SECOP_IN_MAX or len(ent) > SECOP_IN_MAX,
         'empresas': _empresas_payload(emps),
         'total': tot, 'filas': filas, 'dep': dep, 'cols': cols,
+        '_prov': prov, '_ent': ent,
     }
 
 
@@ -1193,16 +1204,45 @@ SECOP_ADJ_ETIQUETA = {
 }
 
 
+# ⚠️ Socrata ANÓNIMO castiga las ráfagas. Medido ago-2026 desde una sola IP:
+# 4, 8 y 16 consultas en paralelo devolvieron 100% de error, y la IP se
+# recupera sola al esperar ~20 s. Al sumar los procesos, una búsqueda por
+# empresa pasó de 9 a 16 consultas → el pilar entero se volvía frágil.
+# El tope no es una optimización: es lo que hace que la respuesta exista.
+# Con `SOCRATA_APP_TOKEN` seteada (pendiente, ver README) se puede subir.
+SECOP_MAX_PARALELO = int(os.environ.get('SECOP_MAX_PARALELO', '6'))
+_SECOP_SEM = threading.Semaphore(SECOP_MAX_PARALELO)
+SECOP_REINTENTO_ESPERA = 1.2
+
+
 def _secop_get_res(resource, params, timeout=SECOP_TIMEOUT):
-    """`_secop_get` para cualquier dataset (contratos o procesos)."""
+    """`_secop_get` para cualquier dataset (contratos o procesos).
+
+    El semáforo se toma SOLO durante la llamada HTTP, nunca mientras se espera
+    a otras tareas: por eso los pools anidados de este módulo no se traban."""
     url = f'https://www.datos.gov.co/resource/{resource}.json?' + urllib.parse.urlencode(params)
     headers = {'Accept': 'application/json'}
     tok = os.environ.get('SOCRATA_APP_TOKEN', '')
     if tok:
         headers['X-App-Token'] = tok
     req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read())
+    for intento in (0, 1):
+        try:
+            with _SECOP_SEM:
+                with urllib.request.urlopen(req, timeout=timeout) as r:
+                    return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            # Socrata presenta el throttle de varias formas — medido en
+            # CloudWatch ago-2026: 429, 403 y también 500/503 en ráfaga. Todos
+            # son transitorios y se reintentan UNA vez; el resto sube tal cual.
+            if intento == 0 and e.code in (429, 403, 500, 502, 503, 504):
+                _time.sleep(SECOP_REINTENTO_ESPERA)
+                continue
+            raise
+        except (TimeoutError, socket.timeout) as e:
+            if intento == 0:
+                continue                   # un timeout suelto también se reintenta
+            raise
 
 
 def _secop_es_identificador(q):
@@ -1269,6 +1309,11 @@ def _secop_proc_row(r):
         'fecha_publicacion': (r.get('fecha_de_publicacion_del') or '')[:10],
         'departamento': r.get('departamento_entidad'), 'ciudad': r.get('ciudad_entidad'),
         'duracion': dur or None, 'tipo': r.get('tipo_de_contrato'), 'url': url,
+        # el proveedor explica por qué salió la fila cuando la búsqueda es por
+        # empresa (la entidad es el comprador). 'No Definido' es el marcador de
+        # nulo de la fuente en el 88,9% de las filas → se omite, no se muestra.
+        'proveedor': (None if (r.get('nombre_del_proveedor') or '').strip() in
+                      ('', SECOP_PROC_PROV_NULO) else r.get('nombre_del_proveedor')),
         '_campo_adjudicado': r.get('adjudicado'),
     }
 
@@ -1366,9 +1411,269 @@ def _secop_identificador(query):
     }
 
 
+# --- procesos (p6dx-8zbt) en la búsqueda general -----------------------------
+# El pilar nació mirando solo CONTRATOS. Los PROCESOS son la otra mitad del
+# universo (9,02 M contra 5,97 M) y llegan ANTES: es donde el cliente todavía
+# puede incidir. Ver el bloque de arriba para las cifras medidas.
+#
+# ⚠️ NO se fusionan en una sola lista, a propósito: un proceso y el contrato que
+# sale de él son la MISMA contratación, así que sumarlos duplicaría el conteo, y
+# sus campos no son comparables (precio base ≠ valor firmado, fecha de
+# publicación ≠ fecha de firma). Van en dos pestañas con su propio total.
+SECOP_PROC_FILTROS = {
+    'departamento': 'departamento_entidad',
+    'entidad': 'entidad',
+    'nit': 'nit_entidad',
+    'modalidad': 'modalidad_de_contratacion',
+    'tipo': 'tipo_de_contrato',
+    'orden_entidad': 'ordenentidad',
+}
+# `estado` (estado_contrato) y `sector` no existen del lado proceso. NO se
+# aplican en silencio: se reportan en `filtros_ignorados` y la UI los muestra —
+# un filtro que el usuario cree activo y no lo está es peor que no ofrecerlo.
+SECOP_PROC_SIN_EQUIV = ('estado', 'sector')
+SECOP_PROC_ORDENES = {'reciente': 'fecha_de_publicacion_del DESC',
+                      'valor': 'precio_base DESC'}
+SECOP_PROC_IN_MAX = 40
+# ⚠️ Los procesos son ADITIVOS: si no alcanzan, la respuesta sale igual con los
+# contratos y un aviso. Sin este tope, una ráfaga throttleada llevó la búsqueda
+# de 'sena' (243k contratos · 193k procesos) a 50 s — el gateway corta a 30.
+SECOP_PROC_BUDGET = float(os.environ.get('SECOP_PROC_BUDGET', '9'))
+# ⚠️⚠️ Plazo GLOBAL de la acción. El presupuesto de arriba no basta: medido en
+# producción (CloudWatch, ago-2026), el descubrimiento del lado CONTRATO ya
+# estaba al borde para un término tan grande como 'sena' —
+# `descubrimiento nombre_entidad FAIL: TimeoutError` a los 25 s— y sumarle los
+# procesos llevó la invocación a 50 s. Si lo ya gastado no deja margen, los
+# procesos NO se piden: el gateway corta a 30 s y una respuesta con contratos
+# vale infinitamente más que un 503.
+SECOP_DEADLINE = float(os.environ.get('SECOP_DEADLINE', '22'))
+# timeout HTTP propio, más corto que el de contratos: un proceso abandonado por
+# presupuesto sigue ocupando su cupo del semáforo hasta que su socket muere.
+SECOP_PROC_HTTP_TIMEOUT = float(os.environ.get('SECOP_PROC_HTTP_TIMEOUT', '8'))
+
+
+def _secop_presupuesto(t0):
+    """Segundos que quedan para los procesos sin arriesgar el techo del gateway."""
+    return min(SECOP_PROC_BUDGET, SECOP_DEADLINE - (_time.time() - t0))
+
+# Medido ago-2026: `nombre_del_proveedor` viene 'No Definido' en 8.024.084 de
+# 9.023.386 filas (88,9%) — el dataset de procesos casi no publica a quién se le
+# adjudicó. Por eso, del lado empresa, los procesos se encuentran sobre todo por
+# ENTIDAD contratante, y la cobertura por proveedor es parcial y se declara.
+SECOP_PROC_PROV_NULO = 'No Definido'
+SECOP_PROC_NOTA_PROV = (
+    'En el dataset de procesos el proveedor viene sin definir en el 88,9% de '
+    'las filas: un proceso publica a quién CONTRATA mucho después de abrirse, '
+    'o nunca. Por eso los procesos de una empresa se encuentran sobre todo '
+    'cuando ella es la entidad contratante; como proveedora, la cobertura es '
+    'parcial.')
+SECOP_PROC_NOTA_ADJ = (
+    'El estado de cada proceso sale de cruzarlo contra el dataset de contratos '
+    'por `id_del_portafolio`, no del campo `adjudicado` de la fuente — que en '
+    'régimen especial no es confiable (38% de falsos «No» medidos).')
+
+
+def _secop_proc_where(filtros):
+    """(where, ignorados). Los filtros sin equivalente NO se aplican en silencio."""
+    conds, ign = [], []
+    for k, col in SECOP_PROC_FILTROS.items():
+        v = (filtros.get(k) or '').strip()
+        if v:
+            conds.append(f"{col}='{_secop_lit(v)}'")
+    for k in SECOP_PROC_SIN_EQUIV:
+        if (filtros.get(k) or '').strip():
+            ign.append(k)
+    anio = str(filtros.get('anio') or '').strip()
+    if anio.isdigit():
+        conds.append(f'date_extract_y(fecha_de_publicacion_del)={int(anio)}')
+    return ' AND '.join(conds), ign
+
+
+def _secop_adjudicado_bulk(portafolios):
+    """③ en lote: qué portafolios YA tienen contrato firmado. Una sola consulta
+    para toda la página (medido: 40 portafolios en 0,59 s), en vez de una por
+    fila. Sin esto habría que mostrar el campo `adjudicado` crudo, que miente."""
+    ids = [p for p in dict.fromkeys(portafolios) if p][:SECOP_PROC_IN_MAX]
+    if not ids:
+        return set()
+    inl = ','.join("'" + _secop_lit(x) + "'" for x in ids)
+    try:
+        filas = _secop_get_res(SECOP_RESOURCE, {
+            '$select': 'proceso_de_compra', '$group': 'proceso_de_compra',
+            '$where': f'proceso_de_compra in({inl})', '$limit': str(len(ids) * 2)},
+            timeout=SECOP_IDENT_TIMEOUT)
+        return {r.get('proceso_de_compra') for r in filas if r.get('proceso_de_compra')}
+    except Exception as e:
+        print(f'[secop] cruce adjudicacion lote FAIL: {type(e).__name__}: {e}')
+        return None                        # None = no se pudo, ≠ conjunto vacío
+
+
+def _secop_proc_lista(filas):
+    """Filas de proceso para la lista, con el estado resuelto por cruce."""
+    rows = [_secop_proc_row(r) for r in filas]
+    con = _secop_adjudicado_bulk([r.get('portafolio') for r in rows])
+    for r in rows:
+        campo = (r.pop('_campo_adjudicado', '') or '').strip() or None
+        if con is None:                    # el cruce falló: no se afirma nada
+            r['adjudicacion'] = {'estado': 'sin_verificar', 'campo_fuente': campo,
+                                 'etiqueta': 'Estado sin verificar', 'campo_desmentido': False}
+            continue
+        hay = r.get('portafolio') in con
+        r['adjudicacion'] = {
+            'estado': 'adjudicado' if hay else 'no_informa',
+            'etiqueta': (SECOP_ADJ_ETIQUETA['adjudicado'] if hay
+                         else SECOP_ADJ_ETIQUETA['no_informa']),
+            'campo_fuente': campo,
+            'campo_desmentido': bool(hay and (campo or '').lower().startswith('n')),
+        }
+    return rows
+
+
+def _contratacion_procesos(query, filtros, limit, orden_key, where_extra=None):
+    """Búsqueda en vivo sobre p6dx-8zbt. Misma frontera que contratos: `$q`
+    indexado y agregados sobre `$q`; nunca `like`."""
+    where, ign = _secop_proc_where(filtros)
+    if where_extra:
+        where = (where + ' AND ' if where else '') + where_extra
+    base = {}
+    if query:
+        base['$q'] = query
+    if where:
+        base['$where'] = where
+    if not base:
+        return None
+    orden = SECOP_PROC_ORDENES.get(orden_key or 'reciente', SECOP_PROC_ORDENES['reciente'])
+    p_filas = dict(base, **{'$select': ','.join(SECOP_PROC_SELECT),
+                            '$order': orden, '$limit': limit})
+    if orden.startswith('fecha_de_publicacion_del'):
+        # mismo defecto que del lado contrato: las filas SIN fecha encabezan la
+        # lista con $order DESC. Se excluyen SOLO de lo mostrado, jamás del
+        # total — el conteo debe seguir siendo el universo real.
+        p_filas['$where'] = ((where + ' AND ') if where else '') + \
+                            'fecha_de_publicacion_del IS NOT NULL'
+    p_total = dict(base, **{'$select': 'count(1) as n'})
+    p_dep = dict(base, **{'$select': 'departamento_entidad,count(1) as n',
+                          '$group': 'departamento_entidad', '$order': 'n DESC', '$limit': 12})
+    filas = total = dep = None
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futs = {pool.submit(_secop_get_res, SECOP_PROC_RESOURCE, p,
+                            SECOP_PROC_HTTP_TIMEOUT): k
+                for p, k in ((p_filas, 'filas'), (p_total, 'total'), (p_dep, 'dep'))}
+        for fut in as_completed(futs):
+            k = futs[fut]
+            try:
+                r = fut.result()
+            except Exception as e:
+                print(f'[secop] procesos/{k} FAIL: {type(e).__name__}: {e}')
+                continue
+            if k == 'filas':
+                filas = r
+            elif k == 'total':
+                total = r
+            else:
+                dep = r
+    if filas is None:
+        return None                        # sin filas no hay pestaña que pintar
+    n_tot = None
+    try:
+        n_tot = int(total[0].get('n') or 0)
+    except Exception:
+        pass
+    return {
+        'n': len(filas), 'total': n_tot,
+        'resultados': _secop_proc_lista(filas),
+        'por_departamento': [{'departamento': d.get('departamento_entidad') or '—',
+                              'n': int(d.get('n') or 0)} for d in (dep or [])],
+        'filtros_ignorados': ign,
+        'nota_adjudicado': SECOP_PROC_NOTA_ADJ,
+    }
+
+
+def _secop_descubrir_proc(emps, terms):
+    """Entidades del universo de PROCESOS que SON la empresa. Existe porque hay
+    entidades que casi no aparecen del lado contrato: Findeter tiene 5.089
+    procesos, y su razón social ('FINANCIERA DE DESARROLLO TERRITORIAL S.A.')
+    NO contiene la marca — el mismo problema de identidad de COMCEL/Claro."""
+    vistos = {}
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        # 1 término, no 3: cada consulta extra sale del presupuesto de ráfaga
+        # (ver SECOP_MAX_PARALELO) y los alias casi no aportan entidades que el
+        # término principal no traiga ya.
+        futs = [pool.submit(_secop_get_res, SECOP_PROC_RESOURCE,
+                            {'$q': t, '$select': 'entidad,count(1) as n',
+                             '$group': 'entidad', '$order': 'n DESC',
+                             '$limit': SECOP_DESC_LIMIT}, SECOP_PROC_HTTP_TIMEOUT)
+                for t in terms[:1]]
+        for fut in as_completed(futs):
+            try:
+                filas = fut.result()
+            except Exception as e:
+                print(f'[secop] descubrimiento proc FAIL: {type(e).__name__}: {e}')
+                continue
+            for r in filas:
+                nm = (r.get('entidad') or '').strip()
+                if nm:
+                    vistos[nm] = max(vistos.get(nm, 0), int(r.get('n') or 0))
+    return sorted(((n, c) for n, c in vistos.items()
+                   if empresas.marca_lidera_any(emps, n)), key=lambda x: -x[1])
+
+
+def _procesos_con_presupuesto(t0, fn, *args):
+    """Corre el bloque de procesos con tope de tiempo. Devuelve (dato, tarde).
+
+    ⚠️⚠️ El pool NO va en `with`: su `__exit__` hace `shutdown(wait=True)` y
+    espera igual al hilo que acabamos de abandonar, con lo que el tope de tiempo
+    no ahorra NADA (medido: una consulta de 1,5 s se fue a 30 s). Rendirse de
+    verdad es `shutdown(wait=False)`; el hilo huérfano muere solo con su timeout
+    HTTP corto."""
+    resto = _secop_presupuesto(t0)
+    if resto < 1.0:                        # sin margen: ni se piden
+        print('[secop] procesos: sin margen en el plazo global, se omiten')
+        return None, True
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        fut = pool.submit(fn, *args)
+        try:
+            return fut.result(timeout=resto), False
+        except FuturesTimeoutError:
+            print('[secop] procesos (empresa): fuera de presupuesto, se omiten')
+            return None, True
+        except Exception as e:
+            print(f'[secop] procesos (empresa) FAIL: {type(e).__name__}: {e}')
+            return None, False
+    finally:
+        pool.shutdown(wait=False)
+
+
+def _contratacion_procesos_empresa(emps, query, prov, ent, filtros, limit, orden_key):
+    """Procesos de UNA empresa: por identidad, igual que los contratos. Reusa
+    las razones sociales ya descubiertas del lado contrato (no cuesta consulta)
+    y suma las entidades que solo existen del lado proceso."""
+    ent_proc = _secop_descubrir_proc(emps, [query] + [a for e in emps for a in e['alias']])
+    ents = list(dict.fromkeys([n for n, _ in ent] + [n for n, _ in ent_proc]))
+    provs = [n for n, _ in prov if n != SECOP_PROC_PROV_NULO]
+    ors = []
+    if provs:
+        ors.append('nombre_del_proveedor in (' +
+                   ','.join("'" + _secop_lit(n) + "'" for n in provs[:SECOP_PROC_IN_MAX]) + ')')
+    if ents:
+        ors.append('entidad in (' +
+                   ','.join("'" + _secop_lit(n) + "'" for n in ents[:SECOP_PROC_IN_MAX]) + ')')
+    if not ors:
+        return None
+    out = _contratacion_procesos(None, filtros, limit, orden_key,
+                                 where_extra='(' + ' OR '.join(ors) + ')')
+    if out is not None:
+        out['por_identidad'] = True
+        out['entidades'] = [{'nombre': n, 'n': c} for n, c in ent_proc[:12]]
+        out['nota_proveedor'] = SECOP_PROC_NOTA_PROV
+    return out
+
+
 def _contratacion(body):
     """Modo A (sin query ni filtros) → agregados del landing. Modo B → búsqueda
     en vivo contra Socrata: filas + total real + desglose por departamento."""
+    t0 = _time.time()
     query = (body.get('query') or '').strip()
     filtros = {k: body.get(k) for k in list(SECOP_FILTROS) + ['anio']}
     solo_objeto = bool(body.get('solo_objeto')) and bool(query)
@@ -1385,7 +1690,7 @@ def _contratacion(body):
     emps = empresas.empresas_en(query) if query else []
     por_identidad = bool(emps) and not body.get('ampliar_empresa')
     ck = ('contratacion-' + _hash24(json.dumps(
-        ['v2-ident', query, where, limit, orden, solo_objeto, por_identidad],
+        ['v3-proc', query, where, limit, orden, solo_objeto, por_identidad],
         ensure_ascii=False, sort_keys=True))
         + f'-{_medios_cache_bucket(3)}')
     cached = _cache_get(ck)
@@ -1399,12 +1704,21 @@ def _contratacion(body):
 
     if por_identidad:
         emp = _contratacion_empresa(body, query, emps, filtros, where)
+        if emp.get('error_transitorio'):
+            return {'error': 'SECOP no respondió a tiempo. Es intermitente: '
+                             'vuelve a buscar en unos segundos.',
+                    'reintentable': True, 'mode': 'search', 'query': query}
         if emp.get('sin_contratos'):
             # honesto: la empresa existe en el diccionario pero no le vende al
             # Estado (verificado: Uber y Ecopetrol no tienen contratos en SECOP
             # II). No se cae a $q en silencio — eso devolvería homónimos.
+            procs, procs_tarde = _procesos_con_presupuesto(
+                t0, _contratacion_procesos_empresa, emps, query,
+                emp.get('_prov') or [], emp.get('_ent') or [],
+                filtros, limit, body.get('orden'))
             out = {'mode': 'search', 'query': query, 'identidad_empresa': True,
-                   'identificador': ident,
+                   'identificador': ident, 'procesos': procs,
+                   'procesos_tarde': procs_tarde,
                    'sin_contratos': True, 'n': 0, 'total': {'contratos': 0, 'valor_cop': 0},
                    'filtros': {k: v for k, v in filtros.items() if v},
                    'orden': body.get('orden') or 'reciente',
@@ -1416,9 +1730,14 @@ def _contratacion(body):
                    'nota': _secop_stats().get('nota', '')}
             _cache_put(ck, out)
             return out
+        procs, procs_tarde = _procesos_con_presupuesto(
+            t0, _contratacion_procesos_empresa, emps, query,
+            emp.get('_prov') or [], emp.get('_ent') or [],
+            filtros, limit, body.get('orden'))
         out = {
             'mode': 'search', 'query': query, 'identidad_empresa': True,
-            'identificador': ident,
+            'identificador': ident, 'procesos': procs,
+            'procesos_tarde': procs_tarde,
             'solo_objeto': False, 'revisadas': None,
             'filtros': {k: v for k, v in filtros.items() if v},
             'orden': body.get('orden') or 'reciente',
@@ -1460,11 +1779,25 @@ def _contratacion(body):
     p_dep = dict(base, **{'$select': 'departamento,count(1) as n',
                           '$group': 'departamento', '$order': 'n DESC', '$limit': 12})
 
+    # el pool de procesos va APARTE y sin `with`: si se pasa del presupuesto hay
+    # que poder soltarlo sin que nadie lo espere (ver _procesos_con_presupuesto).
+    proc_pool = ThreadPoolExecutor(max_workers=1)
+    f_proc = proc_pool.submit(_contratacion_procesos, query, filtros, limit,
+                              body.get('orden'))
+    proc_pool.shutdown(wait=False)
     with ThreadPoolExecutor(max_workers=3) as pool:
         f_filas = pool.submit(_secop_get, p_filas)
         f_total = pool.submit(_secop_get, p_total)
         f_dep = pool.submit(_secop_get, p_dep)
-        filas = f_filas.result()            # si esto falla, la búsqueda falla
+        try:
+            filas = f_filas.result()
+        except Exception as e:
+            # antes esto subía y el gateway devolvía 502. Un 503 de Socrata es
+            # transitorio: se dice con palabras y el cliente reintenta.
+            print(f'[secop] filas FAIL: {type(e).__name__}: {e}')
+            return {'error': 'SECOP no respondió a tiempo. Es intermitente: '
+                             'vuelve a buscar en unos segundos.',
+                    'reintentable': True, 'mode': 'search', 'query': query}
         total = dep = None
         for fut, name in ((f_total, 'total'), (f_dep, 'dep')):
             try:
@@ -1476,6 +1809,15 @@ def _contratacion(body):
                 total = r
             else:
                 dep = r
+
+    procs, procs_tarde = None, False
+    try:
+        procs = f_proc.result(timeout=max(0.5, _secop_presupuesto(t0)))
+    except FuturesTimeoutError:
+        procs_tarde = True                  # se declara, no se esconde
+        print('[secop] procesos: fuera de presupuesto, se omiten')
+    except Exception as e:
+        print(f'[secop] procesos FAIL: {type(e).__name__}: {e}')
 
     cols = _secop_stats().get('columnas_match') or SECOP_MATCH_FALLBACK
     terms = [t for t in _secop_norm(query).split() if t]
@@ -1497,6 +1839,7 @@ def _contratacion(body):
         # ver todo lo que menciona la marca) y el aviso tiene que seguir visible
         # para poder volver a lo preciso.
         'empresas': _empresas_payload(emps), 'identidad_empresa': False,
+        'procesos': procs, 'procesos_tarde': procs_tarde,
         'revisadas': n_traidas if solo_objeto else None,
         'filtros': {k: v for k, v in filtros.items() if v},
         'orden': body.get('orden') or 'reciente',

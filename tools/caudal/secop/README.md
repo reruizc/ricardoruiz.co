@@ -390,3 +390,64 @@ curl -s -G "https://www.datos.gov.co/resource/p6dx-8zbt.json" \
   --data-urlencode "\$where=referencia_del_proceso='PAF-MENIES-O-134-2024'" \
   --data-urlencode '$limit=1' | python3 -m json.tool
 ```
+
+## Procesos (`p6dx-8zbt`) en la búsqueda general (ago-2026)
+
+El pilar ya no mira solo contratos. Los procesos entran como **pestaña aparte**.
+
+⚠️⚠️ **NO se fusionan las dos listas.** Un proceso y el contrato que sale de él
+son la MISMA contratación: sumarlos duplica el conteo, y sus campos no son
+comparables (precio base ≠ valor firmado, fecha de publicación ≠ fecha de firma).
+
+**Lo medido que definió el diseño:**
+
+| | |
+|---|---|
+| `$q` sobre procesos | 0,52-0,66 s (igual de rápido que contratos) |
+| cruce en bloque de 40 portafolios | 0,59 s |
+| `nombre_del_proveedor` = `'No Definido'` | **8.024.084 de 9.023.386 (88,9%)** |
+| Socrata anónimo, 4/8/16 consultas en paralelo | **100% de error**, se recupera a los ~20 s |
+
+⚠️⚠️ **El tope de concurrencia (`SECOP_MAX_PARALELO`, 6) no es una optimización:
+es lo que hace que la respuesta exista.** Al sumar procesos, una búsqueda por
+empresa pasó de 9 a 16 consultas y Socrata tumbaba la ráfaga. Con semáforo +
+un reintento en 429/403, `claro` bajó de 25,8 s a 3,6 s. **Con
+`SOCRATA_APP_TOKEN` (pendiente) se puede subir el tope.**
+
+⚠️ **Presupuesto de tiempo (`SECOP_PROC_BUDGET`, 9 s).** Los procesos son valor
+añadido y no pueden hacer llegar tarde la respuesta principal: una ráfaga
+throttleada llevó `sena` (243k contratos · 193k procesos) a **50 s**, por encima
+del techo de 30 s del gateway. Si no alcanzan, la respuesta sale con los
+contratos y `procesos_tarde: true`, que la UI declara. Tras el arreglo: 7,5 s.
+
+⚠️ **`estado` y `sector` no existen del lado proceso** → van en
+`filtros_ignorados` y la UI dice que ese filtro NO está aplicado. Un filtro que
+el usuario cree activo y no lo está es peor que no ofrecerlo.
+
+⚠️ **La razón social no contiene la marca.** Findeter devolvía **cero** procesos
+porque su entrada del diccionario no tenía `financiera de desarrollo territorial`
+en el campo `entidad`. El arreglo va SIEMPRE ahí, nunca aflojando el gate. Con
+eso pasó de 0 a **5.156 procesos**. Se corrigió también Fiducoldex.
+
+### ⚠️⚠️ El bug del executor (ago-2026 · vale para todo el proyecto)
+
+`with ThreadPoolExecutor(...)` llama `shutdown(wait=True)` al salir del bloque.
+Eso significa que **rendirse con `future.result(timeout=…)` no ahorra nada**: el
+`with` se queda esperando igual al hilo que acabas de abandonar. Medido en
+producción: una búsqueda de 1,5 s se fue a **30 s** y el gateway devolvió 503.
+
+Para rendirse de verdad, el pool va **sin `with`**:
+
+```python
+pool = ThreadPoolExecutor(max_workers=1)
+try:
+    fut = pool.submit(fn, *args)
+    return fut.result(timeout=resto)
+except FuturesTimeoutError:
+    return None
+finally:
+    pool.shutdown(wait=False)      # el hilo huérfano muere con su timeout HTTP
+```
+
+Por eso el timeout HTTP de las consultas de proceso es corto (8 s): un hilo
+abandonado sigue ocupando su cupo del semáforo hasta que su socket muere.
