@@ -3047,6 +3047,9 @@
             candIndex = presEntries.concat(candIndex);
           } catch (e) { console.warn('[Pres] índice presidencial no disponible:', e.message); }
         }
+        // A partir de aquí candIndex ya no se reasigna: lo diferido puede apilar.
+        _baseListo = true;
+        if (_drenaLocal) _drenaLocal();
         ldStop();
         document.getElementById('load-state').style.display = 'none';
         document.getElementById('placeholder-state').style.display = 'block';
@@ -3058,6 +3061,10 @@
         // y Leaflet mediría el contenedor como 0×0 → NaN en coordenadas.
         // El mapa se inicializa en loadCandData() cuando el panel ya es visible.
       } catch(e) {
+        // Aunque el índice base falle, lo diferido debe poder entrar: quedarse
+        // esperando dejaría el buscador vacío incluso con Concejo y JAL ya abajo.
+        _baseListo = true;
+        if (_drenaLocal) _drenaLocal();
         ldStop();
         document.getElementById('load-state').innerHTML = `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8;padding:2rem">Error al cargar el índice.<br/><span style="font-size:.6rem;color:rgba(255,255,255,.3)">${e.message}</span></div>`;
       }
@@ -3067,7 +3074,18 @@
     // ~108k candidatos: no entran al índice del arranque. Se piden al primer
     // foco/tecla del buscador y se APILAN al índice sin agrupar por persona.
     // ?conclocal=1 / ?jallocal=1 → leen los JSON locales del repo (pre-subida).
+    /* ⚠️⚠️ CARRERA ENTRE LAS DOS CARGAS. `loadIndex` termina con dos
+       REASIGNACIONES de candIndex (agruparPersonas y el concat de los
+       presidenciales). Si para entonces la carga diferida ya había apilado
+       Concejo o JAL, esas reasignaciones se los llevan por delante y el buscador
+       se queda en 31.969 sin decir nada. Antes no se notaba porque lo diferido
+       tardaba minutos y el índice base segundos; al bajar lo diferido a segundos
+       —basta enfocar el buscador mientras carga— el choque es lo normal.
+       Por eso lo diferido se PIDE de una (no se pierde tiempo) pero se APILA
+       solo cuando el índice base ya quedó armado: lo que llegue antes espera
+       en `_localPend`. */
     let _localReq = null, _localDone = false, _acLocalHechas = 0;
+    let _baseListo = false, _localPend = [], _drenaLocal = null;
     function ensureLocal() {
       if (_localDone) return _localReq;
       if (_localReq) return _localReq;
@@ -3102,14 +3120,18 @@
         }
       };
       const _apila = (list) => {
-        if (list && list.length) {
+        if (list && list.length) _localPend.push(list);
+        if (!_baseListo) return;          // se apila al drenar, ver _drenaLocal
+        while (_localPend.length) {
+          const l = _localPend.shift();
           const have = new Set(candIndex.map(c => c.slug));
-          candIndex = candIndex.concat(list.filter(c => !have.has(c.slug)));
+          candIndex = candIndex.concat(l.filter(c => !have.has(c.slug)));
         }
         _pintaHint();
         const inp = document.getElementById('ac-input');
         if (inp && inp.value.trim().length >= 2) acSearch();
       };
+      _drenaLocal = () => _apila(null);   // loadIndex lo llama al terminar
       _localReq = CandRegistry.loadLocal({
         includeParties: false,
         bases: Object.keys(bases).length ? bases : undefined,
