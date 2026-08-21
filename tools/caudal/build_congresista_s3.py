@@ -18,8 +18,10 @@ Uso:
   python3 tools/caudal/build_congresista_s3.py
   # → Bases de datos/leyes-senado/dist/s3/votaciones-camara-congresista.json
 """
-import json, re, collections
+import json, re, collections, sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from votacion_tipo import clasificar, nombre_corto, posicion, FONDO
 
 REPO = Path(__file__).resolve().parents[2]
 DIST = REPO / 'Bases de datos' / 'leyes-senado' / 'dist'
@@ -69,6 +71,7 @@ def main():
 
     # 1) agrupar votos por votación (para calcular posición de gobierno + contestada)
     votac = collections.defaultdict(list)   # (acta,vnum) -> [(rk, resp, banc, pnc, nombre, fecha)]
+    vmeta = {}                              # (acta,vnum) -> (fecha, nombre corto, tipo, sentido)
     titulos = {}
     for r in _iter_rows():
         pnc = r.get('proyecto_numero_camara')
@@ -82,8 +85,10 @@ def main():
         vkey = r.get('votacion_numero')
         if vkey is None:
             vkey = r.get('archivo') or r.get('votacion_nombre')
+        tipo, sent = clasificar(r.get('votacion_nombre'), r.get('archivo'))
         votac[(r['acta_id'], vkey)].append(
             (rk, r['respuesta'], canon_bancada(r.get('partido')), tok, r.get('proyecto_titulo') or ''))
+        vmeta[(r['acta_id'], vkey)] = (r.get('fecha') or '', nombre_corto(r.get('votacion_nombre'), r.get('archivo')), tipo, sent)
         titulos.setdefault(tok, {'numero_camara': pnc, 'id': r.get('proyecto_id'),
                                  'titulo': _short_titulo(r.get('proyecto_titulo'))})
 
@@ -106,6 +111,7 @@ def main():
         'bancada': None, 'resumen': collections.Counter(),
         'aligned': 0, 'n_contest': 0,
         'por_proyecto': collections.defaultdict(lambda: collections.Counter()),
+        'detalle': collections.defaultdict(list),   # tok -> [(fecha, nom, tipo, sent, resp)]
     })
     for key, votos in votac.items():
         gp = gov.get(key)
@@ -118,6 +124,8 @@ def main():
                 p['bancada'] = banc
             p['resumen'][resp] += 1
             p['por_proyecto'][tok][resp] += 1
+            fe, nom, tipo, sent = vmeta[key]
+            p['detalle'][tok].append((fe, nom, tipo, sent, resp))
             if cont and gp:
                 p['n_contest'] += 1
                 if resp == gp:
@@ -131,10 +139,17 @@ def main():
         proys = []
         for tok, c in p['por_proyecto'].items():
             meta = titulos.get(tok, {})
+            det = sorted(p['detalle'][tok])
+            # QUÉ se votó y si el Sí empujaba o frenaba el proyecto: sin esto el
+            # contador Sí/No mezcla aplazamientos, impedimentos y ponencia.
+            pos = posicion((resp, tipo, sent) for (_, _, tipo, sent, resp) in det)
             proys.append({'tk': tok, 'numero_camara': meta.get('numero_camara', tok),
                           'id': meta.get('id'), 'titulo': meta.get('titulo', ''),
-                          'n': sum(c.values()), 'r': dict(c)})
+                          'n': sum(c.values()), 'r': dict(c), 'pos': pos,
+                          'v': [{'f': fe, 'nom': nom, 't': tipo, 's': sent, 'r': resp}
+                                for (fe, nom, tipo, sent, resp) in det]})
         proys.sort(key=lambda x: -x['n'])
+        posic = collections.Counter(x['pos']['pos'] for x in proys)
         por_congresista[rk] = {
             'nombre': roster.get(rk, {}).get('display', rk.title()),
             'bancada': p['bancada'],
@@ -142,15 +157,19 @@ def main():
             'resumen': dict(p['resumen']),
             'alineacion_gob': round(100 * p['aligned'] / p['n_contest']) if p['n_contest'] else None,
             'n_contestadas': p['n_contest'],
+            'posiciones': dict(posic),   # proyectos a_favor / en_contra / dividido / sin_fondo
             'por_proyecto': proys,
         }
 
     out = {
         'meta': {
-            'v': '2026-07-24', 'fuente': 'actas de plenaria de Cámara (voto nominal electrónico + OCR DCN-SW 2014-2017)',
+            'v': '2026-08-21', 'fuente': 'actas de plenaria de Cámara (voto nominal electrónico + OCR DCN-SW 2014-2017)',
             'rango': '2014-12 a 2026-06', 'n_congresistas': len(por_congresista),
             'alineacion': 'alineación con la bancada de gobierno (Pacto) en votaciones '
                           'CONTESTADAS (min lado ≥15%); las unánimes se excluyen',
+            'posicion': 'por proyecto: cada votación clasificada por su nombre (tipo + si el Sí '
+                        'empuja o frena el proyecto); la posición de fondo sale SOLO de ponencia · '
+                        'articulado · título · conciliación · aplazamiento · archivo (≥80% de un lado)',
         },
         'por_congresista': por_congresista,
     }

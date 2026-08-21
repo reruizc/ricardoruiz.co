@@ -602,6 +602,34 @@
   .cf-p-r{display:flex; align-items:center; gap:.6rem}
   .cf-bar{flex:1; height:.5rem; border-radius:3px; overflow:hidden; display:flex; background:var(--card2); max-width:260px}
   .cf-p-c{font-size:.68rem; white-space:nowrap}
+  /* posición por proyecto: qué se votó, no un contador ciego Sí/No */
+  .cf-pos{font-size:.62rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:.18rem .5rem; border-radius:999px; border:1px solid; white-space:nowrap}
+  .cf-pos.a_favor{color:var(--green); border-color:rgba(74,222,128,.45); background:rgba(74,222,128,.08)}
+  .cf-pos.en_contra{color:var(--red); border-color:rgba(239,68,68,.45); background:rgba(239,68,68,.08)}
+  .cf-pos.dividido{color:var(--amber); border-color:rgba(207,125,42,.5); background:rgba(207,125,42,.08)}
+  .cf-pos.sin_fondo{color:var(--ink3); border-color:var(--border2)}
+  .cf-p-det{font-size:.64rem; color:var(--ink3); white-space:nowrap}
+  .cf-p-x{font-size:.62rem; color:var(--teal); margin-left:auto; white-space:nowrap; padding:.1rem .4rem; border:1px solid rgba(61,111,255,.3); border-radius:5px}
+  .cf-p-x:hover{background:rgba(61,111,255,.12)}
+  .cf-vlist{display:none; margin-top:.45rem; border-left:2px solid var(--border2); padding-left:.6rem}
+  .cf-vlist.open{display:block}
+  .cf-v{display:grid; grid-template-columns:3.4rem 8.2rem 1fr auto; gap:.45rem; align-items:baseline; font-size:.66rem; padding:.16rem 0; border-top:1px dashed var(--border)}
+  .cf-v:first-child{border-top:none}
+  .cf-v .vt-y{font-size:.6rem}
+  .cf-v-t{font-size:.58rem; letter-spacing:.04em; text-transform:uppercase; color:var(--ink3)}
+  .cf-v-n{color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .cf-v-r{font-weight:700; white-space:nowrap}
+  .cf-v-r i{font-style:normal; font-weight:400; color:var(--ink3); font-size:.6rem; margin-left:.25rem}
+  .cf-possum{display:flex; gap:.9rem; flex-wrap:wrap; font-size:.7rem; margin:-.2rem 0 .8rem}
+  .cf-possum b{font-size:.95rem}
+  /* score electoral + enlace a la ficha de candidato */
+  .cf-elec{display:flex; align-items:center; gap:.9rem; border:1px solid rgba(0,71,255,.3); border-radius:10px; padding:.75rem 1rem; margin-bottom:1rem; background:linear-gradient(180deg,rgba(0,71,255,.07),transparent)}
+  .cf-elec-n{font-size:1.9rem; font-weight:700; line-height:1; color:var(--blue); min-width:2.6rem; text-align:center}
+  .cf-elec-n.na{font-size:1.2rem; color:var(--ink3)}
+  .cf-elec-t{font-size:.72rem; color:var(--ink2); line-height:1.35; flex:1}
+  .cf-elec-t span{font-size:.62rem; color:var(--ink3)}
+  .cf-elec a{font-size:.68rem; color:#fff; background:var(--blue); padding:.4rem .7rem; border-radius:6px; text-decoration:none; white-space:nowrap}
+  .cf-elec a:hover{filter:brightness(1.15)}
   .cf-pick{display:flex; flex-direction:column; gap:.4rem}
   .cf-pk{cursor:pointer; padding:.6rem .8rem; border:1px solid var(--border2); border-radius:8px; display:flex; flex-direction:column; gap:.15rem}
   .cf-pk:hover{border-color:var(--teal)}
@@ -3727,14 +3755,37 @@
     }
     const su=d.resumen||{}; const tot=d.n_votos||0;
     const hayVoto=tot>0;
-    const proys=(d.por_proyecto||[]).map(p=>{
+    // Por proyecto NO se pinta un contador ciego Sí/No: una plenaria vota sobre
+    // el mismo proyecto ponencia, articulado, aplazamientos, impedimentos y
+    // proposiciones no avaladas, y un Sí no significa lo mismo en cada una (un
+    // Sí al aplazamiento es frenarlo). El build clasifica cada votación (`v[]`,
+    // con tipo + sentido) y deriva la posición de FONDO (`pos`) solo de
+    // ponencia · articulado · título · conciliación · aplazamiento · archivo.
+    // Senado (API) no trae el nombre de la votación → cae a la barra vieja.
+    // ⚠️ va ANTES del map de proyectos: el render de cada fila lo consulta y
+    // declararlo abajo revienta en zona muerta temporal (que `new Function` no ve).
+    const esSen=(d.camara==='Senado');
+    const POS_TXT={a_favor:'A favor',en_contra:'En contra',dividido:'Dividido',sin_fondo:'Sin voto de fondo'};
+    const TIPO_TXT={ponencia:'Ponencia',articulado:'Articulado',titulo:'Título y pregunta',conciliacion:'Conciliación',aplazamiento:'Aplazamiento',archivo:'Archivo / pon. negativa',eliminacion:'Prop. eliminación',no_avalada:'Prop. NO avalada',sustitutiva:'Prop. sustitutiva',avalada:'Prop. avalada',impedimento:'Impedimento',orden:'Trámite',objeciones:'Objeciones',informe:'Informe (truncado)',proposicion:'Proposición',otro:'Otra'};
+    const FONDO=new Set(['ponencia','articulado','titulo','conciliacion','aplazamiento','archivo']);
+    const efecto=(r,s)=>{ if(!s) return ['no fija posición','var(--ink3)']; if(r==='Abstencion') return ['se abstuvo','var(--ink3)']; const apoya=(r==='Si')===(s>0); return apoya?['empuja el proyecto','var(--green)']:['lo frena','var(--red)']; };
+    _cfProys=d.por_proyecto||[];
+    const proys=_cfProys.map((p,i)=>{
       const si=p.r.Si||0, no=p.r.No||0, ab=p.r.Abstencion||0, n=si+no+ab||1;
-      const bar=`<span class="cf-bar"><span style="width:${100*si/n}%;background:var(--green)"></span><span style="width:${100*no/n}%;background:var(--red)"></span><span style="width:${100*ab/n}%;background:var(--amber)"></span></span>`;
-      const cnt=`${si?`<b style="color:var(--green)">${si}</b>`:''}${no?` <b style="color:var(--red)">${no}</b>`:''}${ab?` <b style="color:var(--amber)">${ab}</b>`:''}`;
-      return `<div class="cf-p${p.id?' cf-p-clk':''}"${p.id?` data-id="${p.id}"`:''}>
-        <div class="cf-p-t"><span class="cf-p-num">${esc(p.numero_camara||p.numero_senado||p.tk)}</span> ${esc(p.titulo||'')}</div>
-        <div class="cf-p-r">${bar}<span class="cf-p-c">${cnt}</span></div></div>`;
+      const head=`<div class="cf-p-t"><span class="cf-p-num">${esc(p.numero_camara||p.numero_senado||p.tk)}</span> ${esc(p.titulo||'')}</div>`;
+      const ficha=p.id&&!esSen?`<span class="cf-p-x" data-id="${p.id}">ficha ▸</span>`:'';
+      if(!p.pos){   // Senado: sin nombre de votación no hay cómo leer el sentido
+        const bar=`<span class="cf-bar"><span style="width:${100*si/n}%;background:var(--green)"></span><span style="width:${100*no/n}%;background:var(--red)"></span><span style="width:${100*ab/n}%;background:var(--amber)"></span></span>`;
+        const cnt=`${si?`<b style="color:var(--green)">${si}</b>`:''}${no?` <b style="color:var(--red)">${no}</b>`:''}${ab?` <b style="color:var(--amber)">${ab}</b>`:''}`;
+        return `<div class="cf-p">${head}<div class="cf-p-r">${bar}<span class="cf-p-c">${cnt}</span>${ficha}</div></div>`;
+      }
+      const q=p.pos; const nf=q.fondo_pro+q.fondo_contra;
+      const det=nf?`${q.fondo_pro} de fondo a favor · ${q.fondo_contra} en contra${q.proc?` · ${q.proc} de trámite`:''}`:`${q.proc} de trámite · ${q.pro+q.contra} sobre artículos`;
+      return `<div class="cf-p cf-p-clk" data-i="${i}">${head}
+        <div class="cf-p-r"><span class="cf-pos ${q.pos}">${POS_TXT[q.pos]}</span><span class="cf-p-det">${det} · ${p.n} votos ▸</span>${ficha}</div>
+        <div class="cf-vlist" id="cfv-${i}"></div></div>`;
     }).join('');
+    const posc=d.posiciones||null;
     const alin=d.alineacion_gob;
     // CONTROL POLÍTICO — a quién citó. Es la citación AGENDADA en el orden del
     // día, no el debate realizado: por eso se muestra «agendada N veces», que es
@@ -3756,24 +3807,91 @@
       }).join('')}</div>
       <div class="cob-note">Órdenes del día de comisiones y plenarias. Es la citación <b>agendada</b>, no el debate realizado.</div>`;
     // la persona puede venir de Cámara o de Senado (o de ambas: otra_camara)
-    const esSen=(d.camara==='Senado');
     const orig=esSen?'plenaria de Senado 2017–2026':'plenaria de Cámara 2020–2026';
     const oc=d.otra_camara;
     modalCard.innerHTML=`<button class="modal-close">✕</button>
       <h2>${esc(d.nombre)}</h2>
       <div class="cf-sub">${d.bancada?`<span class="p" style="border-color:${pcolor(d.bancada)}55;color:${pcolor(d.bancada)}">${esc(d.bancada)}</span>`:''}<span class="cf-meta">${hayVoto?`${tot} votos nominales · ${d.n_proyectos} proyectos · ${orig}`:''}${hayVoto&&cp?' · ':''}${cp?`${cp.n_citaciones} citaciones de control político`:''}</span></div>
       ${oc?`<div class="cob-note" style="margin-bottom:.8rem">También tiene récord en <b>${esc(oc.camara||'la otra cámara')}</b>: ${oc.n_votos} votos en ${oc.n_proyectos} proyectos${oc.alineacion_gob!=null?` · alineación ${oc.alineacion_gob}%`:''}.</div>`:''}
+      <div class="cf-elec" id="cf-elec"><div class="cf-elec-n na">…</div><div class="cf-elec-t">Buscando su candidatura en el registro electoral…</div></div>
       ${hayVoto?`
       ${alin!=null?`<div class="cf-align"><div class="cf-align-n">${alin}%</div><div class="cf-align-t">votó con la bancada de gobierno (Pacto)<br><span>en ${d.n_contestadas} votaciones contestadas · las unánimes se excluyen</span></div></div>`:''}
-      <div class="cf-tot"><b style="color:var(--green)">${su.Si||0} Sí</b> · <b style="color:var(--red)">${su.No||0} No</b>${su.Abstencion?` · <b style="color:var(--amber)">${su.Abstencion} abst</b>`:''} <span style="color:var(--ink3)">en total</span></div>
-      <h3 class="cf-h3">Cómo votó por proyecto${esSen?'':' · click para abrir la ficha'}</h3>
+      <div class="cf-tot"><b style="color:var(--green)">${su.Si||0} Sí</b> · <b style="color:var(--red)">${su.No||0} No</b>${su.Abstencion?` · <b style="color:var(--amber)">${su.Abstencion} abst</b>`:''} <span style="color:var(--ink3)">en total — la cifra cruda: mezcla ponencias, artículos, aplazamientos e impedimentos</span></div>
+      ${posc?`<div class="cf-possum"><span><b style="color:var(--green)">${posc.a_favor||0}</b> proyectos a favor</span><span><b style="color:var(--red)">${posc.en_contra||0}</b> en contra</span><span><b style="color:var(--amber)">${posc.dividido||0}</b> dividido</span><span style="color:var(--ink3)"><b>${posc.sin_fondo||0}</b> sin voto de fondo</span></div>`:''}
+      <h3 class="cf-h3">Cómo votó por proyecto${esSen?'':' · click para ver cada votación'}</h3>
       <div class="cf-list">${proys}</div>
-      <div class="cob-note">${esSen?'API pública del Senado (2017–2026). Solo registra Sí/No — sin abstención ni «no votó» — y agrupa las votaciones del mismo día sobre un proyecto.':'Actas de plenaria de Cámara · voto nominal electrónico. Solo votos de fondo ligados a un proyecto.'}</div>`
+      <div class="cob-note">${esSen?'API pública del Senado (2017–2026). Solo registra Sí/No — sin abstención ni «no votó» —, agrupa las votaciones del mismo día sobre un proyecto y no dice QUÉ se votó, así que aquí no se puede leer el sentido.':'Actas de plenaria de Cámara · voto nominal electrónico. La <b>posición</b> sale solo de las votaciones de fondo (ponencia · articulado · título · conciliación · aplazamiento · archivo), leyendo si el Sí empujaba o frenaba el proyecto; impedimentos y trámite no cuentan, y las proposiciones sobre artículos sueltos se muestran pero no deciden.'}</div>`
       :'<div class="cob-note" style="margin-bottom:1rem">Sin récord de voto nominal en nuestro rango (plenaria de Cámara 2014–2026 · Senado 2017–2026).</div>'}
       ${cpHTML}`;
     modalCard.querySelector('.modal-close').onclick=cerrar;
-    modalCard.querySelectorAll('.cf-p-clk').forEach(el=>el.onclick=()=>abrirProyecto(el.dataset.id,'pdly'));
+    modalCard.querySelectorAll('.cf-p-x').forEach(el=>el.onclick=ev=>{ev.stopPropagation(); abrirProyecto(el.dataset.id,'pdly');});
+    modalCard.querySelectorAll('.cf-p-clk[data-i]').forEach(el=>el.onclick=()=>{
+      const i=+el.dataset.i, box=document.getElementById('cfv-'+i); if(!box) return;
+      if(box.classList.contains('open')){ box.classList.remove('open'); return; }
+      if(!box.innerHTML){
+        const p=_cfProys[i]||{};
+        box.innerHTML=(p.v||[]).map(v=>{ const [ef,col]=efecto(v.r,v.s);
+          return `<div class="cf-v"><span class="vt-y">${esc((v.f||'').slice(0,7))}</span><span class="cf-v-t"${FONDO.has(v.t)?' style="color:var(--ink2);font-weight:700"':''}>${TIPO_TXT[v.t]||v.t}</span><span class="cf-v-n" title="${esc(v.nom||'')}">${esc(v.nom||'')}</span><span class="cf-v-r" style="color:${CFG[v.r]||'var(--ink3)'}">${v.r==='Abstencion'?'Abst':v.r==='Si'?'Sí':'No'}<i style="color:${col}">${ef}</i></span></div>`; }).join('');
+      }
+      box.classList.add('open');
+    });
     modalCard.scrollTop=0;
+    // score electoral + enlace a la ficha de candidato (aparte y best-effort:
+    // no frena el render del récord de voto si los índices tardan)
+    const eb=modalCard.querySelector('#cf-elec'); if(eb) pintarElectoral(eb,d.nombre);
+  }
+  let _cfProys=[];
+
+  // ── Score electoral del congresista (mismo que analisis-candidato.html) ──
+  // Busca a la persona en los índices de Congreso 2026 · 2022 · 2018 (los del
+  // registro compartido cand-index, pedidos aquí directo para no cargar las 22
+  // fuentes por un modal) y calcula el mismo puntaje: 100·log10(v+1)/log10(vmax+1),
+  // tope 99, con vmax = votos del presidente electo (index-presidencial.json).
+  // ⚠️ Quien entró por LISTA CERRADA (Pacto 2022, p. ej.) no tiene fila nominal
+  // en el índice: el voto fue al logo. Ahí no hay score y se dice.
+  const CAND_S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const CAND_SRC=[['endoso/index.json',2026],['congreso-2022/index-congreso-2022.json',2022],['congreso-2018/index-congreso-2018.json',2018]];
+  let _candIdx=null, _candLogMax=Math.log10(12950643);
+  function cargarCandIdx(){
+    if(_candIdx) return _candIdx;
+    _candIdx=Promise.all(CAND_SRC.map(async([f,anio])=>{
+      try{ const r=await fetch(`${CAND_S3}/${f}`); if(!r.ok) return []; const raw=await r.json();
+        return (Array.isArray(raw)?raw:(raw.candidatos||[])).filter(c=>c.tipo!=='partido'&&c.nombre!==c.partido).map(c=>({...c,anio}));
+      }catch(e){ return []; }
+    })).then(a=>a.flat());
+    fetch(`${CAND_S3}/presidencial/index-presidencial.json`).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.vmax) _candLogMax=Math.log10(j.vmax+1); }).catch(()=>{});
+    return _candIdx;
+  }
+  const _ntoks=s=>(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z ]/g,' ').split(/\s+/).filter(t=>t.length>1);
+  // Dos tokens son el mismo si uno prefija al otro con ≥4 letras: las actas y el
+  // censo escriben distinto el mismo apellido (BLEL SCAF / BLEL SCAFF). Exigir
+  // igualdad exacta pierde esos casos; aflojar más (contar 3 de 4 sueltos)
+  // fusionaría personas distintas — "Eduardo Enrique Pulgar Daza" y "Yessid
+  // Enrique Pulgar Daza" comparten tres tokens y no son la misma persona.
+  const _tokEq=(a,b)=>a===b||(a.length>=4&&b.length>=4&&(a.startsWith(b)||b.startsWith(a)));
+  async function pintarElectoral(box,nombre){
+    const lista=await cargarCandIdx(); const qt=_ntoks(nombre);
+    const url=`analisis-candidato.html?q=${encodeURIComponent(nombre||'')}`;
+    // subconjunto de tokens en cualquiera de las dos direcciones, mínimo 3 en
+    // común — el mismo criterio del join autor→partido de Caudal
+    const hits=lista.filter(c=>{
+      const ct=_ntoks(c.nombre);
+      const n=qt.filter(t=>ct.some(u=>_tokEq(t,u))).length;
+      // subconjunto en alguna de las dos direcciones (el censo usa el nombre
+      // legal completo y las actas a veces omiten un nombre de pila)
+      return n>=3 && (n===qt.length||n===ct.filter(u=>qt.some(t=>_tokEq(t,u))).length&&n===ct.length);
+    })
+      .sort((a,b)=>(b.anio-a.anio)||((b.votos||0)-(a.votos||0)));
+    const c=hits[0];
+    if(!c){
+      box.innerHTML=`<div class="cf-elec-n na">—</div><div class="cf-elec-t">Sin candidatura nominal en los índices de Congreso 2018 · 2022 · 2026.<br><span>Suele ser lista cerrada (el voto fue al logo del partido) o un nombre que el registro escribe distinto.</span></div><a href="${url}" target="_blank" rel="noopener">Buscar en Análisis de Candidato ↗</a>`;
+      return;
+    }
+    const score=Math.max(1,Math.min(99,Math.round(100*Math.log10((c.votos||0)+1)/_candLogMax)));
+    const corp=(c.corp||'').replace(/\s*·\s*\d{4}$/,'');
+    box.innerHTML=`<div class="cf-elec-n" title="Puntaje electoral: 100·log10(votos+1)/log10(vmax+1), vmax = votos del presidente electo. Misma escala de analisis-candidato.html">${score}</div>
+      <div class="cf-elec-t"><b>${Number(c.votos||0).toLocaleString('es-CO')} votos</b> · ${esc(corp)} ${c.anio}${c.circunscripcion?` · ${esc(c.circunscripcion)}`:''}<br><span>${esc(c.partido||'')} · candidatura con voto preferente más reciente${hits.length>1?` · también ${hits.slice(1,3).map(h=>`${(h.corp||'').replace(/\s*·\s*\d{4}$/,'').toLowerCase()} ${h.anio}`).join(', ')}`:''}</span></div>
+      <a href="analisis-candidato.html?cand=${encodeURIComponent(c.slug)}" target="_blank" rel="noopener">Ficha electoral · mapa y puestos ↗</a>`;
   }
 
   // rastreo de medios: busca prensa del proyecto → controversia/impopularidad
