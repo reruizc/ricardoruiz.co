@@ -908,123 +908,13 @@ def distinguir(items):
     return items
 
 
-# --- ¿el acto fija una regla, o resuelve un expediente? ----------------------
-# `tipo_acto` NO alcanza para saberlo, y creer que sí fue el defecto que inundó
-# los digests: la regla anterior marcaba ALTO toda «resolucion» con la frase
-# "cambia la regla para todos los vigilados del sector". Eso es cierto en una
-# superintendencia (una circular externa instruye a todos sus vigilados) y es
-# FALSO en la ANLA, cuya resolución es el instrumento con el que resuelve un
-# expediente individual. Medido sobre las 25.426 resoluciones de ANLA: 5 son
-# normas generales — el 0,02%. El otro 99,98% eran alertas ALTAS que afirmaban
-# algo falso en la línea que debía justificarlas.
-#
-# Lo que sí discrimina es el VERBO del acto, y vive al principio del texto.
-
-_ENCABEZADO = re.compile(
-    r'^por\s+(la\s+cual(es)?|medio\s+de\s+la\s+cual|el\s+cual|las\s+cuales)\s*')
-
-# Coletilla de cierre. Aparece al final de casi todo acto de ANLA y usa los
-# mismos verbos que una norma general, así que sin quitarla "se modifica una
-# licencia ambiental Y SE ADOPTAN otras determinaciones" —un acto sobre una sola
-# empresa— se clasifica como norma que obliga al sector entero. Medido: son 281
-# falsos «general» de ANLA, casi el doble de los generales verdaderos.
-_COLETILLA = re.compile(
-    r'\s*(,)?\s*y\s+se\s+(adoptan?|toman?|dictan?|dispone[n]?)\s+'
-    r'(otras|unas|las)?\s*(determinaciones|disposiciones|medidas).*$')
-
-# Resuelve un expediente concreto: le pasa a UN titular, no al sector.
-_ACTO_PARTICULAR = (
-    'se emite dictamen', 'se emite un dictamen', 'se otorga', 'se niega', 'se autoriza',
-    'se aprueba', 'se certifica', 'se acepta', 'se acoge', 'se acredita', 'se evalua',
-    'se decide una solicitud', 'se decide sobre', 'se resuelve un recurso',
-    'se resuelve el recurso', 'se resuelve una solicitud', 'se levanta', 'se desiste',
-    'se declara', 'se decide', 'se tiene en cuenta el cambio', 'se efectua', 'se efectuan',
-    'se realiza un ajuste', 'se realiza el ajuste', 'se realizan los ajustes',
-    'se ordena', 'se cede', 'se autoriza la cesion', 'se requiere', 'se impone',
-    'se formulan cargos', 'se inicia', 'se corrige', 'se aclara', 'se reconoce',
-    'se da por terminado', 'se define la responsabilidad', 'se mantiene vigente',
-    'se modifica un sistema', 'se modifica una licencia', 'se modifica un dictamen',
-    'se modifica un plan', 'se establece un plan de manejo', 'se actualiza un plan',
-    'se revoca la resolucion', 'se exceptua', 'se sanciona', 'se concede una prorroga',
-    'se decreta', 'desistimiento', 'se resuelven los recursos', 'se ajusta via seguimiento',
-    'inicia tramite', 'se inicia tramite', 'se avoca', 'se admite',
-    'se define competencia', 'se niegan', 'se otorgan', 'se autorizan', 'se deniega',
-)
-
-# Fija una regla nueva: obliga a todo el que esté en el supuesto.
-_NORMA_GENERAL = (
-    'se establece', 'se establecen', 'se adopta', 'se adoptan', 'se reglamenta',
-    'se reglamentan', 'se fija', 'se fijan', 'se dictan disposiciones', 'se actualiza',
-    'se actualizan', 'se senalan', 'se determinan los', 'se sustituye', 'se deroga',
-    'terminos de referencia', 'metodologia', 'manual', 'precios de referencia',
-    'gravamenes', 'derechos correctivos', 'circular reglamentaria', 'circular externa',
-    'carta circular', 'valores de la', 'precios del gramo', 'se expide el reglamento',
-    'se modifica el decreto', 'se modifica la circular', 'se modifica el reglamento',
-)
-
-# Administración interna de la entidad. No regula a nadie de afuera, así que no
-# es señal para ningún cliente por más que la fuente sea un regulador.
-_ACTO_INTERNO = (
-    'trabajo en casa', 'jornada laboral', 'horario de atencion', 'horario de trabajo',
-    'horario excepcional', 'se habilita la jornada', 'se habilita temporalmente',
-    'planta de personal', 'comision de servicios', 'se nombra', 'se encarga a',
-    'vacaciones', 'situacion administrativa', 'se conforma el comite', 'se designa',
-)
-
-# Desempatan los verbos ambiguos ("se modifica la…") por el objeto del acto.
-_OBJETO_PARTICULAR = (
-    'licencia', 'dictamen', 'permiso', 'plan de manejo', 'concesion', 'expediente',
-    'autorizacion', 'certificado', 'salvoconducto', 'zoocriadero', 'aprovechamiento forestal',
-)
-_OBJETO_GENERAL = (
-    'circular', 'reglamento', 'manual', 'metodologia', 'tarifa',
-    'resolucion externa', 'formulario', 'procedimiento general',
-)
-
-
-def alcance_acto(texto):
-    """'general' | 'particular' | 'interno' | 'indeterminado'.
-
-    Mira solo la CABEZA del texto (el verbo del acto). El resto es el expediente
-    y contamina: una licencia nombrada al final no vuelve particular a una norma.
-    Ante la duda devuelve 'indeterminado' — que río arriba pesa como medio, nunca
-    como alto: en un sistema de alertas, la duda no puede ser urgencia.
-    """
-    t = _COLETILLA.sub('', _ENCABEZADO.sub('', norm(texto)).strip()).strip()
-    cabeza = ' '.join(t.split()[:9])
-    if not cabeza:
-        return 'indeterminado'
-    if any(k in cabeza for k in _ACTO_INTERNO):
-        return 'interno'
-    part = next((k for k in _ACTO_PARTICULAR if k in cabeza), None)
-    gen = next((k for k in _NORMA_GENERAL if k in cabeza), None)
-    if part and not gen:
-        return 'particular'
-    if gen and not part:
-        return 'general'
-    if part and gen:                       # ambos verbos → manda el más específico
-        return 'particular' if len(part) >= len(gen) else 'general'
-    if any(o in cabeza for o in _OBJETO_PARTICULAR):
-        return 'particular'
-    if any(o in cabeza for o in _OBJETO_GENERAL):
-        return 'general'
-    return 'indeterminado'
-
-
 def nivel_acto_regulatorio(row):
-    """Nivel de un acto de un regulador.
+    """Nivel de un acto de superintendencia.
 
-    Un acto pesa por lo que OBLIGA, no por cómo se llama:
-      · fija una regla nueva            → alto  (obliga a todo el sector)
-      · sanción grande                  → alto  (marca el criterio del regulador)
-      · abre investigación              → medio
-      · resuelve un expediente ajeno    → bajo  (le pasó a un tercero)
-      · administración interna          → bajo
-
-    Ojo: que un acto particular caiga en BAJO no es que se pierda. Si recae sobre
-    una empresa que el perfil vigila, `motor.clasificar` lo sube a alto por
-    IDENTIDAD — que es la señal que de verdad justifica el producto: no llega
-    porque el texto mencione su sector, llega porque lo nombra a él.
+    Criterio de fondo: una CIRCULAR o RESOLUCIÓN cambia la regla para todos los
+    vigilados del sector; una multa afecta a una empresa. Para un digest
+    sectorial la norma pesa más que la sanción individual — que es exactamente
+    el ejemplo del pitch de Cauce (una circular de Supersalud).
     """
     tipo = (row.get('tipo_acto') or 'sancion').lower()
     monto = row.get('monto')
@@ -1033,38 +923,15 @@ def nivel_acto_regulatorio(row):
     except (TypeError, ValueError):
         monto = None
 
-    if monto and monto >= UMBRAL_MULTA:
-        return 'alto', f'sanción de {_pesos(monto)}'
-    if tipo in ('archivo', 'contribucion_especial'):
-        return 'bajo', 'acto procesal o de recaudo, sin efecto regulatorio nuevo'
+    if tipo in ('resolucion', 'circular'):
+        return 'alto', 'acto normativo: cambia la regla para todos los vigilados del sector'
     if tipo == 'apertura_investigacion':
         return 'medio', 'apertura de investigación'
-    # La doctrina (conceptos de la DIAN) no crea una obligación nueva: fija la
-    # interpretación oficial de una que ya existe. Importa —y mucho, a un gremio
-    # tributario— pero no es lo mismo que una norma nueva, y decir que lo es
-    # devuelve el producto al problema que este arreglo vino a resolver.
-    if (row.get('fuente') or '') == 'dian-doctrina':
-        return 'medio', 'doctrina oficial: fija interpretación, no crea obligación nueva'
-    if tipo == 'sancion':
-        # 'sancion' es también el valor por defecto de las fuentes que no tipan
-        # sus actos (INVIMA, multas de SECOP, SFC), y en todas ellas es correcto.
-        if monto:
-            return 'medio', f'sanción de {_pesos(monto)}'
-        return 'medio', 'sanción en el sector'
-
-    # Resoluciones, circulares y AUTOS. Los autos llegan tipados 'otro' y antes
-    # se escurrían hasta el final, saliendo rotulados "sanción en el sector" —
-    # un desistimiento tácito no sanciona a nadie. Es la misma afirmación falsa
-    # que el defecto grande, en pequeño: lo que no es una sanción se clasifica
-    # por lo que obliga, nunca por el cajón donde cayó.
-    alcance = alcance_acto(row.get('motivo') or row.get('descripcion') or '')
-    if alcance == 'general':
-        return 'alto', 'norma nueva: fija una regla para todo el sector'
-    if alcance == 'particular':
-        return 'bajo', 'resuelve un expediente puntual: no cambia la regla del sector'
-    if alcance == 'interno':
-        return 'bajo', 'administración interna de la entidad, sin efecto sobre vigilados'
-    return 'medio', 'acto del regulador, de alcance no declarado en el texto'
+    if tipo in ('archivo', 'contribucion_especial'):
+        return 'bajo', 'acto procesal o de recaudo, sin efecto regulatorio nuevo'
+    if monto and monto >= UMBRAL_MULTA:
+        return 'alto', f'sanción de {_pesos(monto)}'
+    return 'medio', 'sanción en el sector'
 
 
 def nivel_normativa(row):
