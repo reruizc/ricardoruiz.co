@@ -23,6 +23,11 @@ import subprocess
 import urllib.error
 import urllib.request
 
+try:
+    from . import titular as TIT          # como paquete
+except ImportError:
+    import titular as TIT                  # como script / sys.path
+
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                     '..', '..', '..'))
 BASE_DATOS = os.path.join(REPO, 'Bases de datos', 'leyes-senado')
@@ -245,6 +250,20 @@ def sanciones(ruta):
         else:
             titulo, detalle = (motivo or descripcion or 'Acto sin descripción'), \
                               (descripcion if motivo else '')
+        # Cuando el motivo es el ENCABEZADO del acto («Por la cual se…»), el
+        # titular pasa a decir el hecho —«Producto BULLET — Queda sin efecto la
+        # Resolución 1029 de 2013»— y el nombre formal baja al detalle. Para
+        # ANLA, que es el 70% del pilar y casi nunca trae destinatario, es la
+        # diferencia entre un correo que se entiende y uno que no. Si el motivo
+        # no es encabezado (INVIMA, SFC, SECOP: ahí va la conducta), `titular`
+        # devuelve None y la tarjeta queda como siempre. Ver titular.py.
+        armado = TIT.titular(r)
+        if armado:
+            titulo, detalle, _info = armado
+            if not entidad and descripcion and _info.get('sujeto') in (None, 'producto') \
+                    and not TIT._es_generico(descripcion.split(' · ')[0]):
+                # el expediente sigue siendo útil aunque no titule
+                detalle = f'{detalle} · {descripcion}' if detalle else descripcion
         out.append({
             'id': llave_sancion(r),
             'pilar': 'regulatorio',

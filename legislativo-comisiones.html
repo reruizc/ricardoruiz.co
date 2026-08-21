@@ -19,6 +19,7 @@
   <nav class="electoral-nav">
     <div class="e-nav-left">
       <a href="index.html" class="e-btn-back" id="nav-back-btn">← Inicio</a>
+      <a href="pricing.html" class="e-btn-planes" id="nav-planes">Planes &amp; Precios</a>
       <span class="nav-page-tag">Legislativo</span>
       <div class="electoral-nav-auth" id="nav-auth-area"></div>
     </div>
@@ -88,13 +89,13 @@
   <script>
   /* ── comisiones constitucionales ────────────────────────────── */
   const COMISIONES=[
-    {key:'PRIMERA', nombre:'Comisión Primera', sen:19, cam:35, temas:'Reformas constitucionales, leyes estatutarias, derechos fundamentales, organización territorial, paz, reglamentos.'},
-    {key:'SEGUNDA', nombre:'Comisión Segunda', sen:13, cam:19, temas:'Política internacional, defensa nacional, fuerza pública, comercio exterior, fronteras, honores públicos.'},
-    {key:'TERCERA', nombre:'Comisión Tercera', sen:15, cam:29, temas:'Hacienda y crédito público, impuestos, banca central, actividad financiera y bursátil.'},
-    {key:'CUARTA', nombre:'Comisión Cuarta', sen:15, cam:27, temas:'Presupuesto General de la Nación, control fiscal, contratación pública, patentes y marcas.'},
-    {key:'QUINTA', nombre:'Comisión Quinta', sen:13, cam:19, temas:'Agro y régimen de tierras, ambiente y recursos naturales, minas y energía, mares.'},
-    {key:'SEXTA', nombre:'Comisión Sexta', sen:13, cam:28, temas:'Transporte, comunicaciones, educación, cultura, ciencia y tecnología, servicios públicos, turismo.'},
-    {key:'SEPTIMA', nombre:'Comisión Séptima', sen:14, cam:21, temas:'Salud, trabajo y seguridad social, vivienda, mujer y familia, deporte, economía solidaria.'},
+    {key:'PRIMERA', nombre:'Comisión Primera', img:'imagenes/comision-primera.jpg', sen:19, cam:35, temas:'Reformas constitucionales, leyes estatutarias, derechos fundamentales, organización territorial, paz, reglamentos.'},
+    {key:'SEGUNDA', nombre:'Comisión Segunda', img:'imagenes/comision-segunda.jpg', sen:13, cam:19, temas:'Política internacional, defensa nacional, fuerza pública, comercio exterior, fronteras, honores públicos.'},
+    {key:'TERCERA', nombre:'Comisión Tercera', img:'imagenes/comision-tercera.jpg', sen:15, cam:29, temas:'Hacienda y crédito público, impuestos, banca central, actividad financiera y bursátil.'},
+    {key:'CUARTA', nombre:'Comisión Cuarta', img:'imagenes/comision-cuarta.jpg', sen:15, cam:27, temas:'Presupuesto General de la Nación, control fiscal, contratación pública, patentes y marcas.'},
+    {key:'QUINTA', nombre:'Comisión Quinta', img:'imagenes/comision-quinta.jpg', sen:13, cam:19, temas:'Agro y régimen de tierras, ambiente y recursos naturales, minas y energía, mares.'},
+    {key:'SEXTA', nombre:'Comisión Sexta', img:'imagenes/comision-sexta.jpg', sen:13, cam:28, temas:'Transporte, comunicaciones, educación, cultura, ciencia y tecnología, servicios públicos, turismo.'},
+    {key:'SEPTIMA', nombre:'Comisión Séptima', img:'imagenes/comision-septima.jpg', sen:14, cam:21, temas:'Salud, trabajo y seguridad social, vivienda, mujer y familia, deporte, economía solidaria.'},
   ];
   /* histórico por comisión (snapshot Caudal jul-2026; se refresca en vivo si la API responde) */
   let COM_HIST={PRIMERA:{t:2371,l:438},SEGUNDA:{t:1814,l:876},TERCERA:{t:838,l:298},CUARTA:{t:449,l:168},QUINTA:{t:796,l:136},SEXTA:{t:1631,l:255},SEPTIMA:{t:1837,l:277}};
@@ -121,14 +122,35 @@
     return hit?(hit.votos||0):0;
   }
 
+  const S3_PHOTOS='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/fotos-candidatos';
+  const initials=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+  function avHTML(nombre){
+    return `<span class="bt-av" data-nom="${esc(nombre)}">${esc(initials(nombre))}</span>`;
+  }
+  function hydratePhotos(root){
+    const pool=VOTOS_CONGRESO||[];
+    (root||document).querySelectorAll('.bt-av[data-nom]').forEach(el=>{
+      if(el.querySelector('img')) return;
+      const n=norm(el.dataset.nom);
+      let hit=pool.find(c=>norm(c.nombre)===n);
+      if(!hit){
+        const toks=n.split(/\s+/).filter(t=>t.length>2);
+        if(toks.length) hit=pool.find(c=>{ const ct=norm(c.nombre).split(/\s+/); return toks.every(t=>ct.includes(t)); });
+      }
+      if(!hit||!hit.slug) return;
+      const img=new Image();
+      img.alt=el.dataset.nom;
+      img.onload=()=>{ el.innerHTML=''; el.appendChild(img); };
+      img.src=`${S3_PHOTOS}/${encodeURIComponent(hit.slug)}.jpg`;
+    });
+  }
+
   function renderComisiones(){
     const grid=document.getElementById('com-grid');
     grid.innerHTML=COMISIONES.map(c=>{
       const h=COM_HIST[c.key]||{t:0,l:0};
       const pct=h.t?Math.round(100*h.l/h.t):0;
       const m=COM_MIEMBROS&&COM_MIEMBROS[c.key];
-      /* mesa directiva: presidencia y vicepresidencia de cada cámara. Va antes
-         que los integrantes porque es lo que define quién maneja la agenda. */
       const mesa=(m&&m.mesa)||[];
       const mesaHtml=mesa.length?`<div class="com-mesa">${mesa.map(p=>{
           const vice=p.cargo==='vicepresidencia';
@@ -138,25 +160,40 @@
             +`<span class="cm-lab">${vice?'Vice':'Preside'} · ${p.corp==='senado'?'Senado':'Cámara'}</span>`
             +`<span class="cm-nom">${esc(p.nombre)}</span></span>`;
         }).join('')}</div>`:'';
-      let intHtml;
-      if(m&&((m.senado&&m.senado.length)||(m.camara&&m.camara.length))){
-        const chips=[...(m.senado||[]).map(x=>({...x,tag:'S'})),...(m.camara||[]).map(x=>({...x,tag:'C'}))];
-        const ranked=chips.map(x=>({...x,votos:votosFor(x.nombre)})).sort((a,b)=>b.votos-a.votos);
-        const top=ranked.slice(0,5), restN=ranked.length-top.length;
-        intHtml=`<div class="ci-list">${top.map(x=>`<span class="ci-chip">${esc(x.nombre)} <small>· ${x.tag==='S'?'Senado':'Cámara'}</small></span>`).join('')}${restN>0?`<span class="ci-hint">+${restN} más · ${VOTOS_CONGRESO?'por votación personal 2026':'ver comisión completa'} →</span>`:''}</div>`;
-      }else{
-        intHtml=`<div class="ci-note">Integrantes en definición — las plenarias eligen las comisiones tras la instalación del 20 de julio. Esta tarjeta se actualiza apenas queden conformadas.</div>`;
-      }
-      return `<div class="com-card" onclick="location.href='comision.html?id=${c.key}'">
-        <div class="com-top"><span class="com-name">${c.nombre}</span><span class="com-cupos">${c.sen} Senado · ${c.cam} Cámara</span></div>
-        <div class="com-temas">${c.temas}</div>
-        <div class="com-hist"><span class="ht">${fmt(h.t)} proyectos desde 1991</span><span class="hx"><span data-w="${pct}"></span></span><span class="ht"><b style="color:var(--green)">${pct}%</b> terminó en ley</span></div>
-        ${mesaHtml}
-        <div class="com-int">${intHtml}</div>
-        <div class="com-cta">Ver comisión completa · integrantes y proyectos →</div>
+      const members=[
+        ...((m&&m.senado)||[]).map(x=>({...x,tag:'S',votos:votosFor(x.nombre)})),
+        ...((m&&m.camara)||[]).map(x=>({...x,tag:'C',votos:votosFor(x.nombre)}))
+      ].sort((a,b)=>b.votos-a.votos||a.nombre.localeCompare(b.nombre,'es'));
+      const faces=members.slice(0,8);
+      const intHtml=members.length
+        ? `<div class="bt-faces">${faces.map(x=>avHTML(x.nombre)).join('')}${members.length>8?`<span class="bt-av more">+${members.length-8}</span>`:''}</div>
+           <span class="bt-more">Ver integrantes →</span>
+           <div class="bt-names">${members.map(x=>`<div class="bt-li">${avHTML(x.nombre)}<span>${esc(tCase(x.nombre))}</span><small>${x.tag==='S'?'Senado':'Cámara'}</small></div>`).join('')}</div>`
+        : `<div class="ci-note">Integrantes en definición — las plenarias eligen las comisiones tras la instalación del 20 de julio. Esta tarjeta se actualiza apenas queden conformadas.</div>`;
+      return `<div class="com-card has-img" data-com="${c.key}">
+        <div class="com-cover" style="background-image:url('${c.img}')"><span class="com-name">${c.nombre}</span></div>
+        <div class="com-body">
+          <div class="com-top"><span class="com-cupos">${members.length?members.length+' integrantes · ':''}${c.sen} Senado · ${c.cam} Cámara</span></div>
+          <div class="com-temas">${c.temas}</div>
+          <div class="com-hist"><span class="ht">${fmt(h.t)} proyectos desde 1991</span><span class="hx"><span data-w="${pct}"></span></span><span class="ht"><b style="color:var(--green)">${pct}%</b> terminó en ley</span></div>
+          ${mesaHtml}
+          <div class="com-int">${intHtml}</div>
+          <a class="com-cta" href="comision.html?id=${c.key}">Ver comisión completa · integrantes y proyectos →</a>
+        </div>
       </div>`;
     }).join('');
     requestAnimationFrame(()=>grid.querySelectorAll('.hx > span').forEach(s=>s.style.width=s.dataset.w+'%'));
+    grid.querySelectorAll('.com-card.has-img').forEach(card=>{
+      card.addEventListener('click',ev=>{
+        if(ev.target.closest('a')) return;
+        const was=card.classList.contains('open');
+        grid.querySelectorAll('.com-card.has-img.open').forEach(c=>c.classList.remove('open'));
+        if(!was) card.classList.add('open');
+        const more=card.querySelector('.bt-more');
+        if(more) more.textContent=card.classList.contains('open')?'Cerrar lista ↑':'Ver integrantes →';
+      });
+    });
+    hydratePhotos(grid);
   }
   async function loadComisionMiembros(){
     try{

@@ -122,11 +122,12 @@
   }
 
   // Búsqueda tolerante: cada palabra del query debe prefijar alguna del nombre.
+  // Se conserva la firma (q, nombre) porque otras páginas la llaman con strings
+  // sueltos; acRank usa la versión rápida sobre `_n`.
   function acMatch(q, nombre) {
-    const norm = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
-    const words = norm(q).split(/\s+/).filter(Boolean);
-    const tw = norm(nombre).split(/\s+/);
-    return words.every(w => tw.some(t => t.startsWith(w)));
+    var n = padNombre(nombre);
+    var words = normNombre(q).split(/\s+/).filter(Boolean);
+    return words.every(function (w) { return n.indexOf(' ' + w) >= 0; });
   }
 
   /* ── RANKING DEL AUTOCOMPLETAR ──────────────────────────────────────────
@@ -142,24 +143,29 @@
        1 · la consulta trae más de una palabra (es específica)
      Devuelve también el TOTAL, para poder decir cuántos quedaron fuera: con una
      sola palabra el corte es inevitable y lo honesto es avisar, no fingir que
-     esos 20 son todo. */
+     esos 20 son todo.
+
+     ⚠️ Corre sobre `_n` (nombre normalizado, ver más abajo). Si la entrada no lo
+     trae —listas armadas fuera del registro— se calcula y se MEMOIZA en la
+     entrada, así solo la primera tecla paga el costo.                          */
   function acRank(q, lista, limite) {
-    var norm = function (s) {
-      return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
-    };
-    var qq = norm(q);
+    var qq = normNombre(q);
     var palabras = qq.split(/\s+/).filter(Boolean);
     if (!palabras.length) return { total: 0, items: [] };
+    // ' '+palabra encuentra "¿alguna palabra del nombre empieza por esto?" sin
+    // tener que partir el nombre en cada tecla.
+    var agujas = palabras.map(function (w) { return ' ' + w; });
+    var pre = ' ' + qq, a0 = agujas[0], na = agujas.length;
+    var extra = na > 1 ? 1 : 0;
     var out = [];
     for (var i = 0; i < lista.length; i++) {
       var c = lista[i];
-      if (!acMatch(q, c.nombre)) continue;
-      var n = norm(c.nombre);
-      var s = 0;
-      if (n.indexOf(qq) === 0) s += 4;
-      else if (n.split(/\s+/)[0].indexOf(palabras[0]) === 0) s += 2;
-      if (palabras.length > 1) s += 1;
-      out.push({ c: c, s: s, v: c.votos || 0 });
+      var n = c._n || (c._n = padNombre(c.nombre));
+      var ok = true;
+      for (var j = 0; j < na; j++) { if (n.indexOf(agujas[j]) < 0) { ok = false; break; } }
+      if (!ok) continue;
+      var sc = n.indexOf(pre) === 0 ? 4 : (n.indexOf(a0) === 0 ? 2 : 0);
+      out.push({ c: c, s: sc + extra, v: c.votos || 0 });
     }
     out.sort(function (a, b) {
       return (b.s - a.s) || (b.v - a.v) || a.c.nombre.localeCompare(b.c.nombre, 'es');
@@ -170,80 +176,99 @@
     };
   }
 
-  // Carga y fusiona todas las fuentes. Tolerante a 404: una fuente caída no
-  // rompe el resto (útil mientras se sube una candidatura nueva a S3).
+  /* ── NOMBRE NORMALIZADO PRECOMPUTADO ────────────────────────────────────
+     El autocompletar normalizaba (`normalize('NFD')` + regex) el nombre de CADA
+     candidatura en CADA tecla. Con 420k eso cuesta ~180 ms por pulsación en
+     Node y bastante más en un navegador: escribir "natalia parra" bloqueaba el
+     hilo principal varios segundos seguidos y el buscador se sentía trabado.
+
+     Ahora cada entrada guarda `_n` = ' ' + nombre normalizado + ' ' (medido:
+     91 ms una sola vez para 420k, y la búsqueda baja de 180 a 26 ms). Los
+     espacios que envuelven permiten preguntar "¿alguna palabra empieza por X?"
+     con un indexOf(' '+X), sin partir el nombre en cada tecla.                */
+  function normNombre(s) {
+    return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+  }
+  function padNombre(s) { return ' ' + normNombre(s) + ' '; }
+
+  function mapEntry(c, base, srcName) {
+    return {
+      nombre: c.nombre,
+      slug: c.slug,
+      corp: c.corp || '',
+      circunscripcion: c.circunscripcion || '',
+      partido: c.partido || '',
+      votos: c.votos || 0,
+      tipo: c.tipo || 'candidato',
+      source: srcName,
+      dataUrl: base + '/' + c.slug + '.json',
+      _n: padNombre(c.nombre),
+    };
+  }
+
+  // Baja UNA fuente y la devuelve mapeada. Tolerante a 404: una fuente caída
+  // devuelve [] con un warning y no rompe a las demás.
+  async function fetchSource(src, base) {
+    try {
+      const r = await fetch(`${base}/${src.indexFile}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const raw = await r.json();
+      return src.list(raw).map(c => mapEntry(c, base, src.name));
+    } catch (e) {
+      console.warn(`[CandRegistry] fuente "${src.name}" no disponible:`, e.message);
+      return [];
+    }
+  }
+
+  // Carga y fusiona todas las fuentes.
   //   opts.bases   → { <name>: '<baseUrl>' } override del base por fuente
   //                  (p.ej. rutas locales para verificación pre-subida).
   //   opts.includeParties=false → filtra entradas de partido.
+  //   opts.onSource(lista, src, i, total) → se llama en cuanto CADA fuente
+  //                  aterriza, para poder ir apilando y buscar antes de que
+  //                  terminen todas. Lo que devuelva se ignora.
   async function load(opts) {
     opts = opts || {};
     const bases = opts.bases || {};
+    const filtra = l => opts.includeParties === false ? l.filter(c => !isPartyEntry(c)) : l;
+    let listos = 0;
     const perSource = await Promise.all(SOURCES.map(async src => {
       const base = bases[src.name] || `${S3}/${src.dir}`;
-      try {
-        const r = await fetch(`${base}/${src.indexFile}`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const raw = await r.json();
-        return src.list(raw).map(c => ({
-          nombre: c.nombre,
-          slug: c.slug,
-          corp: c.corp || '',
-          circunscripcion: c.circunscripcion || '',
-          partido: c.partido || '',
-          votos: c.votos || 0,
-          tipo: c.tipo || 'candidato',
-          source: src.name,
-          dataUrl: `${base}/${c.slug}.json`,
-        }));
-      } catch (e) {
-        console.warn(`[CandRegistry] fuente "${src.name}" no disponible:`, e.message);
-        return [];
-      }
+      const list = await fetchSource(src, base);
+      list.forEach(c => { _bySlug[c.slug] = c; });
+      listos++;
+      if (opts.onSource) { try { opts.onSource(filtra(list), src, listos, SOURCES.length); } catch (e) {} }
+      return list;
     }));
-    let all = perSource.flat();
-    // Indexar TODO por slug (incluidos partidos) para resolver dataUrl siempre.
-    all.forEach(c => { _bySlug[c.slug] = c; });
-    if (opts.includeParties === false) all = all.filter(c => !isPartyEntry(c));
-    return all;
+    return filtra(perSource.flat());
   }
 
-  // Carga LAZY de las fuentes locales (Concejo · JAL 2023). Se cachea la promesa
-  // para no re-pedir. Devuelve la lista fusionada (cada candidatura es su propia
-  // entrada, SIN agrupar por persona). Tolerante a 404 igual que load().
-  //   opts.bases → { concejo:'<base>', jal:'<base>' } override (rutas locales).
+  // Carga LAZY de las fuentes locales (Concejo · JAL, los 4 años). Se cachea la
+  // promesa para no re-pedir. Cada candidatura es su propia entrada, SIN agrupar
+  // por persona (nombres comunes se repiten entre municipios → agruparlos
+  // fusionaría personas distintas).
+  //   opts.bases → { concejo:'<base>', … } override (rutas locales).
   //   opts.includeParties=false → filtra entradas de partido.
+  //   opts.onSource(lista, src, i, total) → igual que en load(). Son ~82 MB en
+  //     8 archivos: entregarlos a medida que llegan deja buscar en Concejo 2023
+  //     a los pocos segundos, en vez de esperar a que estén los ocho.
+  //   ⚠️ La promesa se cachea: si loadLocal() ya se llamó, la segunda llamada
+  //     recibe la lista completa al resolver pero NO los avisos de onSource.
   let _localPromise = null;
   function loadLocal(opts) {
     opts = opts || {};
     if (_localPromise) return _localPromise;
     const bases = opts.bases || {};
+    const filtra = l => opts.includeParties === false ? l.filter(c => !isPartyEntry(c)) : l;
+    let listos = 0;
     _localPromise = Promise.all(LOCAL_SOURCES.map(async src => {
       const base = bases[src.name] || `${S3}/${src.dir}`;
-      try {
-        const r = await fetch(`${base}/${src.indexFile}`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const raw = await r.json();
-        return src.list(raw).map(c => ({
-          nombre: c.nombre,
-          slug: c.slug,
-          corp: c.corp || '',
-          circunscripcion: c.circunscripcion || '',
-          partido: c.partido || '',
-          votos: c.votos || 0,
-          tipo: c.tipo || 'candidato',
-          source: src.name,
-          dataUrl: `${base}/${c.slug}.json`,
-        }));
-      } catch (e) {
-        console.warn(`[CandRegistry] fuente local "${src.name}" no disponible:`, e.message);
-        return [];
-      }
-    })).then(per => {
-      let all = per.flat();
-      all.forEach(c => { _bySlug[c.slug] = c; });
-      if (opts.includeParties === false) all = all.filter(c => !isPartyEntry(c));
-      return all;
-    });
+      const list = await fetchSource(src, base);
+      list.forEach(c => { _bySlug[c.slug] = c; });
+      listos++;
+      if (opts.onSource) { try { opts.onSource(filtra(list), src, listos, LOCAL_SOURCES.length); } catch (e) {} }
+      return list;
+    })).then(per => filtra(per.flat()));
     return _localPromise;
   }
 
@@ -254,5 +279,5 @@
   }
 
   global.CandRegistry = { S3, SOURCES, LOCAL_SOURCES, isPartyEntry, acMatch, acRank, load, loadLocal,
-                          dataUrlFor, normPersona, personaKey, ALIAS_PERSONA };
+                          dataUrlFor, normPersona, personaKey, normNombre, padNombre, ALIAS_PERSONA };
 })(typeof window !== 'undefined' ? window : this);

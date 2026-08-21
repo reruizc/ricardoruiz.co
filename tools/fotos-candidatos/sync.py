@@ -17,7 +17,7 @@ Comandos:
 
 Requiere: aws CLI configurado (ricardo-mac-cli) y sips (macOS).
 """
-import csv, json, os, shutil, subprocess, sys, urllib.request
+import csv, gzip, json, os, shutil, subprocess, sys, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 STAGING = os.path.join(ROOT, 'fotos-candidatos')
@@ -35,10 +35,24 @@ TARGET_W, TARGET_H = 1248, 864     # tamaño editorial fijo 3:2 (crop-to-fill ce
 EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.tiff', '.heic')
 
 
+def _get_json(url, timeout=60):
+    """Baja un JSON de S3 tolerando Content-Encoding: gzip.
+
+    Los índices grandes se sirven comprimidos (82 MB sin comprimir hacían que la
+    página tardara minutos). urllib NO descomprime solo: sin esto, json.load()
+    recibe los bytes del gzip y revienta.
+    """
+    req = urllib.request.Request(url, headers={'Accept-Encoding': 'gzip'})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        data = r.read()
+        if r.headers.get('Content-Encoding', '').lower() == 'gzip' or data[:2] == b'\x1f\x8b':
+            data = gzip.decompress(data)
+    return json.loads(data.decode('utf-8'))
+
+
 def load_candidates():
     """Índice completo: endoso (congreso+consultas) + presidenciales."""
-    with urllib.request.urlopen(ENDOSO_INDEX, timeout=60) as r:
-        endoso = json.load(r)
+    endoso = _get_json(ENDOSO_INDEX, timeout=60)
     cands = [
         {'slug': c['slug'], 'nombre': c['nombre'], 'corp': c.get('corp', ''),
          'partido': c.get('partido', ''), 'votos': c.get('votos', 0)}
@@ -49,8 +63,7 @@ def load_candidates():
         pres = json.load(open(PRES_INDEX_LOCAL, encoding='utf-8'))
     else:
         try:
-            with urllib.request.urlopen(PRES_INDEX_S3, timeout=30) as r:
-                pres = json.load(r)
+            pres = _get_json(PRES_INDEX_S3, timeout=30)
         except Exception:
             pass
     if pres:
@@ -70,8 +83,7 @@ def load_candidates():
         asam = json.load(open(ASAM_INDEX_LOCAL, encoding='utf-8'))
     else:
         try:
-            with urllib.request.urlopen(ASAM_INDEX_S3, timeout=60) as r:
-                asam = json.load(r)
+            asam = _get_json(ASAM_INDEX_S3, timeout=60)
         except Exception:
             pass
     if asam:

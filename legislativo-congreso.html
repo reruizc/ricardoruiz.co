@@ -19,6 +19,7 @@
   <nav class="electoral-nav">
     <div class="e-nav-left">
       <a href="index.html" class="e-btn-back" id="nav-back-btn">← Inicio</a>
+      <a href="pricing.html" class="e-btn-planes" id="nav-planes">Planes &amp; Precios</a>
       <span class="nav-page-tag">Legislativo</span>
       <div class="electoral-nav-auth" id="nav-auth-area"></div>
     </div>
@@ -51,7 +52,7 @@
   <div class="page-header compacta">
     <div class="page-tag">Composición · Congreso 2026–2030</div>
     <h1 class="page-title">El Congreso que se instala</h1>
-    <p class="page-sub">285 congresistas elegidos el 8 de marzo de 2026 toman posesión el 20 de julio. Así queda repartido el poder legislativo por bancadas.</p>
+    <p class="page-sub">285 congresistas elegidos el 8 de marzo de 2026 se posesionaron el 20 de julio. Así queda repartido el poder por bancadas, y quiénes las componen.</p>
   </div>
 
   <div class="sec-bar">
@@ -87,6 +88,7 @@
       <div class="panel"><div id="comp-sen"></div></div>
       <div class="panel"><div id="comp-cam"></div></div>
     </div>
+    <div id="banc-who" class="banc-who" style="display:none"></div>
     <div class="note" style="margin-top:1rem">Las coaliciones departamentales de Cámara se agrupan en la bancada del aval principal; el detalle partido por partido está en <a href="legislativo-congresistas.html" style="color:var(--blue-light)">Quién es quién</a>. Fuente: escrutinio Registraduría · elecciones legislativas del 8 de marzo de 2026.</div>
 
     <div class="panel" style="margin-top:1.8rem">
@@ -121,11 +123,44 @@
 
   <script src="legislativo-base.js"></script>
   <script src="legislativo-electos.js"></script>
+  <script src="cand-index.js"></script>
   <script>
   /* composición por bancada (barras segmentadas) */
   /* Senado y Cámara van en paneles SEPARADOS: son dos cuerpos con reglas y
      tamaños distintos, y apilarlos en una sola barra los hacía ver como si
      fueran la misma repartición. */
+  const S3_PHOTOS='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/fotos-candidatos';
+  const initials=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+  let _slugByNom=null;
+  async function slugMap(){
+    if(_slugByNom) return _slugByNom;
+    _slugByNom={};
+    try{
+      const all=await CandRegistry.load({includeParties:false});
+      all.forEach(c=>{
+        if(!c||c.tipo==='partido'||!c.slug) return;
+        const k=norm(c.nombre);
+        if(!k) return;
+        if(!_slugByNom[k]||c.source==='endoso') _slugByNom[k]=c.slug;
+      });
+    }catch(e){}
+    return _slugByNom;
+  }
+  function avHTML(nombre, color){
+    return `<span class="bt-av" data-nom="${esc(nombre)}" style="background:${color||'#1a2030'}">${esc(initials(nombre))}</span>`;
+  }
+  async function hydratePhotos(root){
+    const map=await slugMap();
+    (root||document).querySelectorAll('.bt-av[data-nom]').forEach(el=>{
+      const slug=map[norm(el.dataset.nom)];
+      if(!slug||el.querySelector('img')) return;
+      const img=new Image();
+      img.alt=el.dataset.nom;
+      img.onload=()=>{ el.innerHTML=''; el.appendChild(img); };
+      img.src=`${S3_PHOTOS}/${encodeURIComponent(slug)}.jpg`;
+    });
+  }
+
   function compBloque(corp){
     const by={};
     ELECTOS.filter(e=>e.corp===corp).forEach(e=>{
@@ -136,13 +171,27 @@
     const en=Object.entries(by).sort((a,b)=>b[1].n-a[1].n);
     const tot=en.reduce((a,b)=>a+b[1].n,0)||1;
     return `<div class="comp-h">${corp==='SENADO'?'Senado':'Cámara de Representantes'}
-        <small>${tot} curules · ${en.length} bancadas</small></div>
+        <small>${tot} curules · ${en.length} bancadas · toca una para ver quiénes la componen</small></div>
       <div class="segbar">${en.map(([k,v])=>`<div class="seg" style="width:${100*v.n/tot}%;background:${v.color}" title="${esc(k)}: ${v.n}"></div>`).join('')}</div>
-      <div class="seg-leg">${en.map(([k,v])=>`<span class="sl"><i style="background:${v.color}"></i>${esc(k)} <b>${v.n}</b></span>`).join('')}</div>`;
+      <div class="seg-leg">${en.map(([k,v])=>`<span class="sl" data-corp="${corp}" data-banc="${esc(k)}" data-color="${v.color}"><i style="background:${v.color}"></i>${esc(k)} <b>${v.n}</b></span>`).join('')}</div>`;
   }
   function renderComp(){
     document.getElementById('comp-sen').innerHTML=compBloque('SENADO');
     document.getElementById('comp-cam').innerHTML=compBloque('CAMARA');
+    document.querySelectorAll('.sl[data-banc]').forEach(sl=>{
+      sl.addEventListener('click',()=>showBancada(sl.dataset.corp, sl.dataset.banc, sl.dataset.color));
+    });
+  }
+  function showBancada(corp, name, color){
+    document.querySelectorAll('.sl[data-banc]').forEach(s=>s.classList.toggle('on', s.dataset.corp===corp&&s.dataset.banc===name));
+    const list=ELECTOS.filter(e=>e.corp===corp&&bancadaOf(e.partido).name===name)
+      .sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+    const box=document.getElementById('banc-who');
+    box.style.display='';
+    box.innerHTML=`<h4>${esc(name)} · ${corp==='SENADO'?'Senado':'Cámara'} · ${list.length} integrante${list.length===1?'':'s'}</h4>
+      <div class="banc-who-grid">${list.map(e=>`<div class="bt-li">${avHTML(e.nombre,color)}<span>${esc(tCase(e.nombre))}</span><small>${esc(depNice(e.dep))}</small></div>`).join('')}</div>`;
+    box.scrollIntoView({behavior:'smooth',block:'nearest'});
+    hydratePhotos(box);
   }
 
   /* ── bancadas transversales ──────────────────────────────────────
@@ -161,30 +210,62 @@
   }
   function renderBancadasTematicas(){
     const G=[
-      {nom:'Bancada de Bogotá', d:'Los representantes que responden a la capital: es la circunscripción más grande de Cámara.',
+      {nom:'Bancada de Bogotá', img:'imagenes/bancada-bogota.jpg',
+       d:'Los representantes que responden a la capital: es la circunscripción más grande de Cámara.',
        f:e=>e.dep==='BOGOTA D.C.'},
-      {nom:'Bancada de mujeres', d:'Base de la Comisión Legal para la Equidad de la Mujer, que reúne a las congresistas de todos los partidos.',
+      {nom:'Bancada de mujeres', img:'imagenes/bancada-mujeres.jpg',
+       d:'Base de la Comisión Legal para la Equidad de la Mujer, que reúne a las congresistas de todos los partidos.',
        f:e=>e.gen==='F'},
-      {nom:'Bancada Caribe', d:'Atlántico, Bolívar, Cesar, Córdoba, La Guajira, Magdalena, Sucre y San Andrés votan en bloque temas de región.',
+      {nom:'Bancada Caribe', img:'imagenes/bancada-caribe.jpg',
+       d:'Atlántico, Bolívar, Cesar, Córdoba, La Guajira, Magdalena, Sucre y San Andrés votan en bloque temas de región.',
        f:e=>CARIBE.has(e.dep)},
-      {nom:'Bancada de la Amazonía y la Orinoquía', d:'Los departamentos de frontera y selva, con dos o tres curules cada uno.',
+      {nom:'Bancada de la Amazonía y la Orinoquía', img:'imagenes/bancada-amazonia.jpg',
+       d:'Los departamentos de frontera y selva, con dos o tres curules cada uno.',
        f:e=>AMAZ.has(e.dep)},
-      {nom:'Curules de paz (CITREP)', d:'Las 16 circunscripciones transitorias del Acuerdo de Paz, elegidas por víctimas del conflicto.',
+      {nom:'Curules de paz (CITREP)', img:'imagenes/bancada-citrep.jpg',
+       d:'Las 16 circunscripciones transitorias del Acuerdo de Paz, elegidas por víctimas del conflicto.',
        f:e=>/CITREP/i.test(e.partido)},
-      {nom:'Circunscripciones étnicas', d:'Curules indígenas y afro en ambas cámaras, por fuera del reparto de partidos.',
+      {nom:'Circunscripciones étnicas', img:'imagenes/bancada-etnicas.jpg',
+       d:'Curules indígenas y afro en ambas cámaras, por fuera del reparto de partidos.',
        f:e=>/ind[íi]gena|afro|raizal|comunitario|mais|aico/i.test(e.partido)||/INDIGENA|AFRO/.test(e.dep)},
-      {nom:'Estatuto de Oposición', d:'Las curules que la ley da a quien quedó segundo en la presidencial: Iván Cepeda y Aída Quilcué.',
+      {nom:'Estatuto de Oposición', img:'imagenes/bancada-oposicion.jpg',
+       d:'Las curules que la ley da a quien quedó segundo en la presidencial: Iván Cepeda y Aída Quilcué.',
        f:e=>/ESTATUTO/i.test(e.partido)},
     ];
-    document.getElementById('bt-datos').innerHTML=G.map(g=>{
-      const c=cuenta(g.f);
-      return `<div class="bt">
-        <div class="bt-n">${c.n}</div>
-        <div class="bt-name">${esc(g.nom)}</div>
-        <div class="bt-d">${esc(g.d)}</div>
-        <div class="bt-split">${c.sen} Senado · ${c.cam} Cámara</div>
-      </div>`;
+    const colorFor=g=>{
+      if(/CITREP/i.test(g.nom)) return '#e0a03a';
+      if(/Oposición/i.test(g.nom)) return '#6b7b87';
+      if(/mujeres/i.test(g.nom)) return '#e08fb8';
+      return '#3d6fff';
+    };
+    document.getElementById('bt-datos').innerHTML=G.map((g,i)=>{
+      const members=ELECTOS.filter(g.f).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+      const sen=members.filter(e=>e.corp==='SENADO').length;
+      const cam=members.length-sen;
+      const col=colorFor(g);
+      const faces=members.slice(0,7);
+      return `<button type="button" class="bt has-img" data-bt="${i}" style="border-left-color:${col};text-align:left;width:100%">
+        <div class="bt-cover" style="background-image:url('${g.img}')"><div class="bt-n">${members.length}</div></div>
+        <div class="bt-body">
+          <div class="bt-name">${esc(g.nom)}</div>
+          <div class="bt-d">${esc(g.d)}</div>
+          <div class="bt-split">${sen} Senado · ${cam} Cámara</div>
+          <div class="bt-faces">${faces.map(e=>avHTML(e.nombre,col)).join('')}${members.length>7?`<span class="bt-av more">+${members.length-7}</span>`:''}</div>
+          <span class="bt-more">Ver integrantes →</span>
+          <div class="bt-names">${members.map(e=>`<div class="bt-li">${avHTML(e.nombre,col)}<span>${esc(tCase(e.nombre))}</span><small>${e.corp==='SENADO'?'Senado':'Cámara'}</small></div>`).join('')}</div>
+        </div>
+      </button>`;
     }).join('');
+    document.getElementById('bt-datos').querySelectorAll('.bt.has-img').forEach(card=>{
+      card.addEventListener('click',()=>{
+        const was=card.classList.contains('open');
+        document.querySelectorAll('.bt.has-img.open').forEach(c=>c.classList.remove('open'));
+        if(!was) card.classList.add('open');
+        const more=card.querySelector('.bt-more');
+        if(more) more.textContent=card.classList.contains('open')?'Cerrar lista ↑':'Ver integrantes →';
+      });
+    });
+    hydratePhotos(document.getElementById('bt-datos'));
   }
 
   /* ── agenda provida · quién la firma de verdad ───────────────────

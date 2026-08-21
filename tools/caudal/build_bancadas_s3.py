@@ -72,6 +72,21 @@ OJO 4 · SOLO VOTACIONES CONTESTADAS (min lado ≥15%, misma regla que la ficha)
   En una votación unánime el Rice de todos da 1,0 y el bloque 100%: no mide
   disciplina, la simula.
 
+OJO 6 · QUÉ SE VOTÓ · LA DISCIPLINA DE FONDO VA APARTE. Medido: **949 de las
+  1.560 votaciones contestadas de Cámara (61%) son IMPEDIMENTOS**, donde cada
+  quien decide sobre el conflicto de interés de un colega y la bancada se suelta
+  por rutina, no por indisciplina política. Promediarlo todo sub-reporta la
+  disciplina y **cambia el orden**: la cohesión de fondo sube en todas las
+  bancadas pero desigual (Liberal +0,111 · Pacto +0,104 · Cambio Radical +0,064
+  frente a Conservador +0,025), y Cambio Radical pasa de estar por debajo de
+  La U (0,693 vs 0,718) a estar por encima (0,757 vs 0,748).
+  Por eso cada bancada trae DOS cifras: la global (comparable con la ficha de
+  persona) y la de FONDO — solo ponencia · articulado · título · conciliación ·
+  aplazamiento · archivo, según `votacion_tipo.clasificar`. Lo mismo para los
+  disidentes: quien solo se sale en impedimentos no es un disidente político.
+  ⚠️ El Senado NO tiene esta dimensión: su API no dice QUÉ se votó, así que sus
+  campos de fondo van en None y el frontend lo declara — no se le inventa un tipo.
+
 OJO 5 · «Otro» Y «Sin bancada» NO SON BANCADAS. `Otro` es una bolsa de 54
   etiquetas sin relación entre sí (organizaciones CITREP de un solo
   representante, MIRA, Opción Ciudadana, coaliciones). Medir su cohesión, o
@@ -94,7 +109,10 @@ DIST = REPO / 'Bases de datos' / 'leyes-senado' / 'dist'
 OUT = DIST / 's3'
 
 # taxonomía compartida con los builds de voto nominal — no bifurcar (OJO 5)
+import sys                                                      # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_votaciones_senado_s3 import canon_bancada           # noqa: E402
+from votacion_tipo import clasificar, FONDO                    # noqa: E402
 
 NO_BANCADA = {'Otro', 'Sin bancada'}
 MIN_MIEMBROS = 5      # miembros votando Sí/No para calcular Rice de esa bancada
@@ -106,6 +124,10 @@ MIN_SERIE = 25        # votaciones contestadas para que un periodo entre a la se
 MIN_DISIDENTE = {'camara': 60, 'senado': 12}
 # piso de votantes para que una votación cuente como plenaria (OJO 3b)
 MIN_VOTANTES = {'camara': 40, 'senado': 30}
+# votaciones de FONDO mínimas para publicar la cohesión de fondo de una bancada
+MIN_FONDO = 20
+# votos de fondo evaluables para publicar la disidencia de fondo de una persona
+MIN_DISIDENTE_FONDO = {'camara': 25, 'senado': 0}
 BLOQUE = 0.90         # ≥90% del mismo lado = "votó en bloque"
 CONTESTADA = 0.15     # min(Sí,No) ≥ 15% del total Sí+No
 GOB_MAY = 0.60        # mayoría del Pacto que fija la posición de gobierno
@@ -147,12 +169,15 @@ def _persona_senado(r):
     return r.get('roster_key') or (r.get('congresista') or '').upper()
 
 
-def agrupar(rows, keyf, personaf, proyectof=None):
+def agrupar(rows, keyf, personaf, proyectof=None, tipar=False):
     """{votacion → [(persona, respuesta, bancada, fecha)]} + cobertura.
     `proyectof` marca el proyecto de cada votación; si viene, se usa para
-    deduplicar votaciones republicadas (OJO 1b)."""
+    deduplicar votaciones republicadas (OJO 1b).
+    `tipar` clasifica QUÉ se votó (OJO 6) — solo Cámara: el Senado no publica
+    el nombre de la votación y ahí no hay nada que clasificar."""
     V = collections.defaultdict(list)
     proy = {}
+    tipos = {}
     cob = {'n_votos': 0, 'sin_partido': 0, 'por_bancada': collections.Counter(),
            'personas': collections.defaultdict(set), 'fechas': []}
     nombres = {}
@@ -178,7 +203,9 @@ def agrupar(rows, keyf, personaf, proyectof=None):
         V[k].append((p, resp, b, f))
         if proyectof:
             proy[k] = proyectof(r)
-    return V, cob, nombres, proy
+        if tipar and k not in tipos:
+            tipos[k] = clasificar(r.get('votacion_nombre'), r.get('archivo'))[0]
+    return V, cob, nombres, proy, tipos
 
 
 def dedup(limpias, proy):
@@ -195,9 +222,13 @@ def dedup(limpias, proy):
 
 
 # ---------------------------------------------------------------- métricas
-def analizar(V, cob, nombres, roster, serie_de, min_disidente, min_votantes, proy=None):
+def analizar(V, cob, nombres, roster, serie_de, min_disidente, min_votantes,
+             proy=None, tipos=None, min_disidente_fondo=None):
     """serie_de(fecha) → etiqueta de periodo (año o era), o None para omitir.
-    `proy` no vacío activa la deduplicación de votaciones republicadas."""
+    `proy` no vacío activa la deduplicación de votaciones republicadas.
+    `tipos` (votacion → tipo) activa la dimensión de FONDO (OJO 6); sin él los
+    campos `*_fondo` van en None, que es lo correcto para el Senado."""
+    tipos = tipos or {}
     n_total = len(V)
     n_sucia = n_chica = 0
     limpias = {}
@@ -217,11 +248,14 @@ def analizar(V, cob, nombres, roster, serie_de, min_disidente, min_votantes, pro
 
     banc = collections.defaultdict(lambda: {
         'rice': [], 'bloque': 0, 'n': 0,
+        'rice_f': [], 'bloque_f': 0, 'n_f': 0,
         'ali_a': 0, 'ali_n': 0, 'ali_ap': 0, 'ali_np': 0})
     serie = collections.defaultdict(lambda: collections.defaultdict(list))
     serie_n = collections.Counter()
-    dis = collections.defaultdict(lambda: {'n': 0, 'd': 0, 'b': collections.Counter()})
+    dis = collections.defaultdict(lambda: {'n': 0, 'd': 0, 'nf': 0, 'df': 0,
+                                           'b': collections.Counter()})
     n_cont = 0
+    cont_tipo = collections.Counter()   # de qué es cada contestada (OJO 6)
 
     for k, vs in limpias.items():
         tally = collections.Counter(x[1] for x in vs)
@@ -229,6 +263,12 @@ def analizar(V, cob, nombres, roster, serie_de, min_disidente, min_votantes, pro
         if si + no == 0 or min(si, no) < CONTESTADA * (si + no):
             continue                                            # OJO 4
         n_cont += 1
+        tipo = tipos.get(k)
+        if tipo:
+            cont_tipo[tipo] += 1
+        # de FONDO = decide el proyecto (no impedimentos ni trámite). Sin `tipos`
+        # (Senado) queda None y ninguna métrica de fondo se acumula.
+        fondo = (tipo in FONDO) if tipo else None
         fecha = next((x[3] for x in vs if x[3]), '')
         per = serie_de(fecha)
         if per:
@@ -256,8 +296,14 @@ def analizar(V, cob, nombres, roster, serie_de, min_disidente, min_votantes, pro
             rice = abs(s - n) / (s + n)
             st['rice'].append(rice)
             st['n'] += 1
-            if max(s, n) >= BLOQUE * (s + n):
+            en_bloque = max(s, n) >= BLOQUE * (s + n)
+            if en_bloque:
                 st['bloque'] += 1
+            if fondo:
+                st['rice_f'].append(rice)
+                st['n_f'] += 1
+                if en_bloque:
+                    st['bloque_f'] += 1
             if per:
                 serie[per][b].append(rice)
             if s != n:      # empate exacto → sin mayoría contra la cual disentir
@@ -268,8 +314,13 @@ def analizar(V, cob, nombres, roster, serie_de, min_disidente, min_votantes, pro
                 d = dis[p]
                 d['n'] += 1
                 d['b'][b] += 1
-                if resp != mayoria[b]:
+                se_sale = resp != mayoria[b]
+                if se_sale:
                     d['d'] += 1
+                if fondo:
+                    d['nf'] += 1
+                    if se_sale:
+                        d['df'] += 1
             if gob and b not in NO_BANCADA:
                 st = banc[b]
                 st['ali_n'] += 1
@@ -284,11 +335,16 @@ def analizar(V, cob, nombres, roster, serie_de, min_disidente, min_votantes, pro
     for b, st in banc.items():
         if st['n'] < MIN_VOTACIONES:
             continue
+        nf = st['n_f']
         bancadas.append({
             'bancada': b,
             'n_votaciones': st['n'],
             'rice': round(sum(st['rice']) / st['n'], 3),
             'bloque_pct': round(100 * st['bloque'] / st['n'], 1),
+            # de FONDO (OJO 6): None cuando la fuente no dice qué se votó
+            'rice_fondo': round(sum(st['rice_f']) / nf, 3) if nf >= MIN_FONDO else None,
+            'bloque_pct_fondo': round(100 * st['bloque_f'] / nf, 1) if nf >= MIN_FONDO else None,
+            'n_fondo': nf,
             'alineacion': round(100 * st['ali_a'] / st['ali_n']) if st['ali_n'] else None,
             'n_alineacion': st['ali_n'],
             'alineacion_petro': round(100 * st['ali_ap'] / st['ali_np']) if st['ali_np'] else None,
@@ -297,7 +353,9 @@ def analizar(V, cob, nombres, roster, serie_de, min_disidente, min_votantes, pro
             'n_votos': cob['por_bancada'][b],
             'es_gobierno': b == 'Pacto/izq',
         })
-    bancadas.sort(key=lambda x: -x['rice'])
+    # ordena por la cohesión de FONDO cuando la hay: es la que responde si la
+    # bancada se cuadra donde se decide el proyecto. Cae a la global (Senado).
+    bancadas.sort(key=lambda x: -(x['rice_fondo'] if x['rice_fondo'] is not None else x['rice']))
 
     listadas = {x['bancada'] for x in bancadas}
     out_serie = []
@@ -311,21 +369,30 @@ def analizar(V, cob, nombres, roster, serie_de, min_disidente, min_votantes, pro
             out_serie.append({'periodo': per, 'n_contestadas': serie_n[per], 'rice': pts})
 
     disidentes = []
+    mdf = min_disidente_fondo or 0
     for p, d in dis.items():
         if d['n'] < min_disidente or not d['b']:
             continue
         b = d['b'].most_common(1)[0][0]
+        pf = round(100 * d['df'] / d['nf'], 1) if d['nf'] >= mdf and d['nf'] else None
         disidentes.append({
             'key': p,
             'nombre': (roster.get(p, {}) or {}).get('display') or nombres.get(p, p).title(),
             'bancada': b,
             'n': d['n'], 'd': d['d'],
             'pct': round(100 * d['d'] / d['n'], 1),
+            # se sale en lo que DECIDE el proyecto (OJO 6). Quien solo disiente
+            # en impedimentos no es un disidente político.
+            'n_fondo': d['nf'], 'd_fondo': d['df'], 'pct_fondo': pf,
         })
-    disidentes.sort(key=lambda x: -x['pct'])
+    # el ranking manda por la disidencia de FONDO cuando se puede medir
+    disidentes.sort(key=lambda x: (-(x['pct_fondo'] if x['pct_fondo'] is not None else -1),
+                                   -x['pct']))
     evaluables = len(disidentes)
+    con_fondo = [x['pct_fondo'] for x in disidentes if x['pct_fondo'] is not None]
     medianas = sorted(x['pct'] for x in disidentes)
     mediana = medianas[len(medianas) // 2] if medianas else None
+    mediana_f = sorted(con_fondo)[len(con_fondo) // 2] if con_fondo else None
 
     fechas = sorted(cob['fechas'])
     nv = cob['n_votos'] or 1
@@ -341,6 +408,11 @@ def analizar(V, cob, nombres, roster, serie_de, min_disidente, min_votantes, pro
             'n_analizadas': len(limpias),
             'n_contestadas': n_cont,
             'pct_contestadas': round(100 * n_cont / max(1, len(limpias)), 1),
+            # de qué son las contestadas (OJO 6): sin esto no se ve que la
+            # mayoría son impedimentos, y el número parece medir otra cosa
+            'n_contestadas_fondo': sum(cont_tipo[t] for t in FONDO),
+            'n_contestadas_impedimento': cont_tipo.get('impedimento', 0),
+            'contestadas_por_tipo': dict(cont_tipo.most_common()) or None,
             'sin_partido': cob['sin_partido'],
             'pct_sin_partido': round(100 * cob['sin_partido'] / nv, 1),
             'no_asignado': no_asig,
@@ -352,7 +424,10 @@ def analizar(V, cob, nombres, roster, serie_de, min_disidente, min_votantes, pro
         'serie': out_serie,
         'disidentes': disidentes[:20],
         'disidentes_meta': {'n_evaluables': evaluables, 'mediana_pct': mediana,
-                            'min_votos': MIN_DISIDENTE},
+                            'mediana_pct_fondo': mediana_f,
+                            'n_con_fondo': len(con_fondo),
+                            'min_votos': MIN_DISIDENTE,
+                            'min_votos_fondo': min_disidente_fondo},
     }
 
 
@@ -365,9 +440,11 @@ def main():
 
     # --- Cámara: serie por AÑO (~1.734 contestadas lo aguantan). Sin dedup: el
     # acta numera cada votación, así que sus firmas repetidas son votos reales.
-    Vc, cobc, nomc, _ = agrupar(_rows_camara(), _key_camara, _persona_camara)
+    Vc, cobc, nomc, _, tipc = agrupar(_rows_camara(), _key_camara, _persona_camara,
+                                      tipar=True)
     camara = analizar(Vc, cobc, nomc, roster, lambda f: f[:4] if f else None,
-                      MIN_DISIDENTE['camara'], MIN_VOTANTES['camara'])
+                      MIN_DISIDENTE['camara'], MIN_VOTANTES['camara'],
+                      tipos=tipc, min_disidente_fondo=MIN_DISIDENTE_FONDO['camara'])
     camara.update({
         'nombre': 'Cámara de Representantes',
         'fuente': 'actas de plenaria · voto nominal electrónico + OCR DCN-SW (2014-2017)',
@@ -383,8 +460,9 @@ def main():
             return None
         return 'Duque 2017-2022' if f < PETRO else 'Petro 2022-2026'
 
-    Vs, cobs, noms, proys = agrupar(_rows_senado(), lambda r: r['votacion_id'],
-                                    _persona_senado, lambda r: r.get('senado_proyecto_id'))
+    Vs, cobs, noms, proys, _ = agrupar(_rows_senado(), lambda r: r['votacion_id'],
+                                       _persona_senado,
+                                       lambda r: r.get('senado_proyecto_id'))
     senado = analizar(Vs, cobs, noms, roster, era, MIN_DISIDENTE['senado'],
                       MIN_VOTANTES['senado'], proy=proys)
     senado.update({
@@ -450,16 +528,23 @@ def main():
               f"− {c['n_descartadas_duplicado']} republicadas = {c['n_analizadas']} analizadas "
               f"· {c['n_contestadas']} contestadas ({c['pct_contestadas']}%)")
         print(f"  {c['n_votos']:,} votos · sin partido {c['pct_sin_partido']}% · fuera de bancada {c['pct_no_asignado']}%")
-        print(f"  {'bancada':20s} {'n':>5s} {'Rice':>6s} {'bloque':>8s} {'alin.Petro':>11s}")
+        if c.get('contestadas_por_tipo'):
+            print(f"  de las contestadas: {c['n_contestadas_fondo']} de fondo · "
+                  f"{c['n_contestadas_impedimento']} impedimentos "
+                  f"({round(100 * c['n_contestadas_impedimento'] / max(1, c['n_contestadas']))}%)")
+        print(f"  {'bancada':20s} {'n':>5s} {'Rice':>6s} {'RiceFondo':>10s} {'bloque':>8s} {'alin.Petro':>11s}")
         for b in d['bancadas']:
             ap = f"{b['alineacion_petro']}%" if b['alineacion_petro'] is not None else '—'
-            print(f"  {b['bancada']:20s} {b['n_votaciones']:5d} {b['rice']:6.3f} "
+            rf = f"{b['rice_fondo']:.3f}" if b['rice_fondo'] is not None else '—'
+            print(f"  {b['bancada']:20s} {b['n_votaciones']:5d} {b['rice']:6.3f} {rf:>10s} "
                   f"{b['bloque_pct']:7.1f}% {ap:>11s}{'  (es el gobierno)' if b['es_gobierno'] else ''}")
         print(f"  serie ({d['serie_tipo']}): {[s['periodo'] for s in d['serie']]}")
         dm = d['disidentes_meta']
-        print(f"  disidentes: {dm['n_evaluables']} evaluables · mediana {dm['mediana_pct']}%")
+        print(f"  disidentes: {dm['n_evaluables']} evaluables · mediana {dm['mediana_pct']}%"
+              + (f" · mediana de fondo {dm['mediana_pct_fondo']}%" if dm.get('mediana_pct_fondo') is not None else ''))
         for x in d['disidentes'][:5]:
-            print(f"    {x['pct']:5.1f}%  {x['d']:3d}/{x['n']:3d}  {x['bancada']:20s} {x['nombre'][:38]}")
+            pf = f"{x['pct_fondo']:5.1f}% ({x['d_fondo']}/{x['n_fondo']})" if x.get('pct_fondo') is not None else '—'
+            print(f"    fondo {pf:>16s} · global {x['pct']:5.1f}%  {x['bancada']:20s} {x['nombre'][:34]}")
 
 
 if __name__ == '__main__':

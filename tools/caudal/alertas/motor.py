@@ -57,9 +57,19 @@ DIR_CACHE = os.path.join(DIR_DATOS, 'cache')
 RUTA_ESTADO = os.path.join(DIR_ESTADO, 'estado.json')
 RUTA_DESTINATARIOS = os.path.join(AQUI, 'destinatarios.json')
 
-# Días hacia atrás que se releen de novedades. Si el motor no corrió ayer (Mac
-# dormido), la corrida de hoy recupera lo de ayer sola; el estado evita repetir.
-DIAS_NOVEDADES = 3
+# Días hacia atrás que se releen de novedades. El estado evita repetir, así que
+# el único costo de mirar lejos es leer unos JSON de más.
+#
+# ⚠️ Este número tiene que cubrir el HUECO ENTRE CORRIDAS, no "ayer". El motor
+# corre lunes y viernes, y el rastreo diario escribe las novedades del día a las
+# ~19:5x — o sea que la corrida de la mañana nunca ve el archivo del día en curso.
+# Con 3 días, el lunes leía dom/sáb y el viernes jue/mié: lunes, martes y viernes
+# no los miraba NADIE. Medido sobre agosto: se perdían 137 de 398 eventos de
+# Congreso (34,4%) — en un producto de inteligencia legislativa. Con 8, 100%.
+#
+# 8 cubre una semana completa con margen para un Mac apagado. Si cambia la
+# cadencia del plist, revisar este número: son dos mitades del mismo ajuste.
+DIAS_NOVEDADES = 8
 
 # Ventana de frescura por pilar. Protege contra el backfill: si un harvester
 # reconstruye su archivo y mete filas viejas, éstas son nuevas PARA EL ESTADO
@@ -228,18 +238,24 @@ def recolectar(fecha, destinos_activos, usar_api=True, avisos=None):
 
     # --- 1. Radicados (el diff ya lo hizo el rastreo diario) ---------------
     hoy = dt.date.fromisoformat(fecha)
-    faltantes_hoy = None
+    # Un día suelto sin archivo es normal (no todos los días hay radicaciones, y
+    # el del día en curso aún no está escrito a la hora de la corrida). Lo que sí
+    # es señal de rastreo caído es que una cámara no tenga NI UN archivo en toda
+    # la ventana. Avisar por el primer caso —como se hacía— era gritar en falso
+    # en cada corrida, y un aviso que siempre está encendido no avisa de nada:
+    # enmascara justo el día en que el rastreo se cae de verdad.
+    con_archivo = set()
     for i in range(DIAS_NOVEDADES):
         f = (hoy - dt.timedelta(days=i)).isoformat()
         ev, faltantes = F.novedades(f)
         eventos += ev
-        if i == 0:
-            faltantes_hoy = faltantes
-    if faltantes_hoy:
+        con_archivo |= {c for c, _r in F.RUTAS_NOVEDADES} - set(faltantes)
+    mudas = sorted({c for c, _r in F.RUTAS_NOVEDADES} - con_archivo)
+    if mudas:
         avisos.append({'tipo': 'fuente_sin_datos', 'pilar': 'congreso',
-                       'texto': 'Sin archivo de novedades hoy para: '
-                                + ', '.join(faltantes_hoy)
-                                + '. Puede ser un día sin sesión o el rastreo caído.'})
+                       'texto': 'Sin una sola novedad en '
+                                f'{DIAS_NOVEDADES} días para: ' + ', '.join(mudas)
+                                + '. A esa altura ya no es un receso: revisar el rastreo.'})
 
     # --- 2. S3: sanciones + normativa --------------------------------------
     for key, lector, pilar in (

@@ -176,6 +176,8 @@ def archivos(leg=None):
              consumidor='match ◈ "en el texto" de la búsqueda'),
         dict(bucket=BUCKET_PRIV, key='metadata/bancadas.json', clase='estatico',
              min_bytes=5_000, productor='build_bancadas_s3.py', consumidor='acción `bancadas`'),
+        dict(bucket=BUCKET_PRIV, key='metadata/coaliciones.json', clase='estatico',
+             min_bytes=4_000, productor='build_coaliciones_s3.py', consumidor='acción `coaliciones`'),
         dict(bucket=BUCKET_PRIV, key='metadata/votaciones.json', clase='estatico',
              min_bytes=5_000_000, productor='harvest_votaciones.py (Congreso Visible)',
              consumidor='aplazamientos y tally en la ficha'),
@@ -275,6 +277,11 @@ def pings(leg=None):
         dict(accion='bancadas', body={'action': 'bancadas'}, externa=False,
              desc='disciplina de bancada',
              forma=lambda d: '' if _n(d, 'camara') and _n(d, 'senado') else 'falta camara/senado'),
+
+        dict(accion='coaliciones', body={'action': 'coaliciones'}, externa=False,
+             desc='matriz de coincidencia entre bancadas',
+             forma=lambda d: '' if ((d.get('camara') or {}).get('periodos') or {}).get('petro', {}).get('matriz')
+             else 'falta camara.periodos.petro.matriz'),
 
         dict(accion='congresista', body={'action': 'congresista', 'q': 'barguil'}, externa=False,
              desc='récord de voto de una persona',
