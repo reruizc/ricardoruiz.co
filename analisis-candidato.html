@@ -1179,7 +1179,7 @@
         congress: 'Congreso 2026', page: 'Mapa Candidato',
         searchLabel: 'Buscar candidato', searchPlaceholder: 'Nombre del candidato…',
         loadingIndex: 'Cargando índice…', candidatesLoaded: n => `${n.toLocaleString('es-CO')} candidatos cargados`,
-        loadingLocal: n => `faltan ${n} índices de Concejo y JAL`, loadingLocalShort: n => `Cargando Concejo y JAL · faltan ${n} índices`,
+        loadingBoards: 'Cargando concejos y juntas locales…', loadingLocal: n => `faltan ${n} índices de Concejo y JAL`, loadingLocalShort: n => `Cargando Concejo y JAL · faltan ${n} índices`,
         dlBy: 'Descargar por', dlDep: '⬇ Depto.', dlMun: '⬇ Municipio', dlCom: '⬇ Com./Local.', dlPue: '⬇ Puesto', dlMesa: '⬇ Mesa',
         connecting: 'Conectando con S3…', placeholder: 'Busca un candidato para ver su perfil electoral',
         mapTitle: 'Mapa · Votación por departamento', mapLoading: 'Cargando mapa…',
@@ -1216,7 +1216,7 @@
         congress: 'Congress 2026', page: 'Candidate Map',
         searchLabel: 'Search candidate', searchPlaceholder: 'Candidate name…',
         loadingIndex: 'Loading index…', candidatesLoaded: n => `${n.toLocaleString('en-US')} candidates loaded`,
-        loadingLocal: n => `${n} council and local-board indexes to go`, loadingLocalShort: n => `Loading council and local boards · ${n} indexes to go`,
+        loadingBoards: 'Loading councils and local boards…', loadingLocal: n => `${n} council and local-board indexes to go`, loadingLocalShort: n => `Loading council and local boards · ${n} indexes to go`,
         dlBy: 'Download by', dlDep: '⬇ Dept.', dlMun: '⬇ Municipality', dlCom: '⬇ Com./Locality', dlPue: '⬇ Polling station', dlMesa: '⬇ Table',
         connecting: 'Connecting to S3…', placeholder: 'Search for a candidate to view their electoral profile',
         mapTitle: 'Map · Votes by department', mapLoading: 'Loading map…',
@@ -1253,7 +1253,7 @@
         congress: '2026年国会', page: '候选人地图',
         searchLabel: '搜索候选人', searchPlaceholder: '候选人姓名…',
         loadingIndex: '正在加载索引…', candidatesLoaded: n => `已加载 ${n.toLocaleString('zh-CN')} 名候选人`,
-        loadingLocal: n => `市议会与地方委员会索引还差 ${n} 个`, loadingLocalShort: n => `正在加载市议会与地方委员会 · 还差 ${n} 个索引`,
+        loadingBoards: '正在加载市议会与地方委员会…', loadingLocal: n => `市议会与地方委员会索引还差 ${n} 个`, loadingLocalShort: n => `正在加载市议会与地方委员会 · 还差 ${n} 个索引`,
         dlBy: '下载方式', dlDep: '⬇ 省份', dlMun: '⬇ 市', dlCom: '⬇ 社区', dlPue: '⬇ 投票站', dlMesa: '⬇ 投票台',
         connecting: '正在连接 S3…', placeholder: '搜索候选人以查看其选举档案',
         mapTitle: '地图 · 各省得票', mapLoading: '地图加载中…',
@@ -2950,6 +2950,65 @@
       ],
     };
 
+    /* ── CONTADOR PROGRESIVO (odómetro) ──────────────────────────────────
+       El contador saltaba de "Cargando índice…" a "31.969" de un tirón y ahí se
+       quedaba quieto los segundos que tardan los concejos. Un número que no se
+       mueve durante 15 s se lee como colgado, no como cargando.
+
+       Ahora sube frame a frame desde 1: el paso es un 6% de lo ya mostrado, así
+       que arranca 1, 2, 3, 4… y acelera solo. Se probó sumarle un empujón
+       proporcional a lo que FALTA y hay que no hacerlo: con 31.969 de target el
+       primer frame ya salta a 1.598 y el efecto de arranque se pierde entero.
+       Medido: 0 a 31.969 en 2,6 s y 0 a 428.795 en 3,4 s, por debajo de lo que
+       tarda la red, así que el contador nunca es el cuello.
+
+       ⚠️ NUNCA RETROCEDE mientras carga: `agruparPersonas` colapsa unos cientos
+       de homónimos al terminar el índice base, así que el target puede bajar un
+       ~1%; un contador que se devuelve se lee como error. Al terminar TODO se
+       fija el valor exacto con `hintFinal`, que sí manda — y para entonces es
+       mayor que cualquier intermedio, así que el número final siempre es real. */
+    let _hintShown = 0, _hintTarget = 0, _hintPend = 0, _hintRaf = null, _hintFijo = false;
+    function hintTexto() {
+      const t = candI18n[localStorage.getItem('rr-lang') || 'co'] || candI18n.co;
+      const el = document.getElementById('search-hint');
+      if (!el) return;
+      el.dataset.count = _hintShown;
+      el.textContent = t.candidatesLoaded(_hintShown)
+        + (_hintPend > 0 ? ` · ${t.loadingLocal(_hintPend)}` : '');
+    }
+    function hintTick() {
+      _hintRaf = null;
+      if (document.hidden) { _hintShown = _hintTarget; hintTexto(); return; }
+      if (_hintShown < _hintTarget) {
+        const paso = Math.max(1, Math.floor(_hintShown * 0.06));
+        _hintShown = Math.min(_hintTarget, _hintShown + paso);
+        hintTexto();
+        _hintRaf = requestAnimationFrame(hintTick);
+      } else { hintTexto(); }
+    }
+    // target = a cuánto debe llegar · pend = índices que aún faltan (0 = ninguno)
+    /* ⚠️ Con la pestaña en segundo plano el navegador CONGELA requestAnimationFrame.
+       Sin esto, quien abre la página en una pestaña de fondo —abrir varios enlaces
+       de golpe es lo normal— vuelve y encuentra "6 candidatos cargados" con las
+       428.795 ya en memoria. Oculto no hay animación que valga: se salta al número
+       real de una, y `visibilitychange` reengancha lo que quedara a medias. */
+    function hintKick() {
+      if (document.hidden) { _hintShown = _hintTarget; hintTexto(); return; }
+      if (!_hintRaf && _hintShown < _hintTarget) _hintRaf = requestAnimationFrame(hintTick);
+    }
+    document.addEventListener('visibilitychange', hintKick);
+    function hintSet(target, pend) {
+      if (_hintFijo) return;
+      if (target > _hintTarget) _hintTarget = target;
+      _hintPend = pend || 0;
+      hintKick();
+    }
+    // Cifra definitiva: se acabó la carga, aquí sí manda el número real.
+    function hintFinal(total) {
+      _hintTarget = total; _hintPend = 0; _hintFijo = true;
+      hintKick();
+    }
+
     let _ldTimer = null, _ldOrden = [], _ldI = 0;
     function ldFacts() {
       return LD_FACTS[localStorage.getItem('rr-lang') || 'co'] || LD_FACTS.co;
@@ -2985,6 +3044,25 @@
       _ldTimer = setInterval(ldPintaFact, 5200);
     }
     function ldStop() { if (_ldTimer) { clearInterval(_ldTimer); _ldTimer = null; } }
+    /* El loader ya no se va cuando termina el índice base: se queda mientras
+       bajan los concejos y las juntas, que son el 92,5% de las candidaturas.
+       Ese es el punto de los datos curiosos —hacer llevadera la espera— y antes
+       duraban menos de un segundo porque el base llega enseguida. El buscador
+       vive fuera del área de contenido, así que se puede buscar igual. */
+    let _ldCerrado = false;
+    function ldFin() {
+      if (_ldCerrado) return;
+      _ldCerrado = true;
+      ldStop();
+      const ls = document.getElementById('load-state');
+      if (ls) ls.style.display = 'none';
+      // Si ya hay una ficha abierta (deep-link ?cand=), no pisarla con el
+      // placeholder de "busca un candidato".
+      const pes = document.getElementById('pes-panel');
+      const abierta = pes && pes.style.display && pes.style.display !== 'none';
+      const ph = document.getElementById('placeholder-state');
+      if (ph && !abierta) ph.style.display = 'block';
+    }
     // La barra nunca retrocede: un avance que se devuelve se lee como error.
     let _ldPct = 0;
     function ldProgreso(hechas, total) {
@@ -3018,12 +3096,18 @@
             _bases['alc' + a] = 'Bases de datos/output_alcaldia_' + a;
           }
         }
-        // +1 paso por el índice presidencial, que se pide justo después.
-        const _pasos = CandRegistry.SOURCES.length + 1;
+        // La barra cubre TODA la carga: base + presidencial + los 8 locales.
+        // Si solo contara el base llegaría al 100% con el 7% de los candidatos.
+        const _pasos = CandRegistry.SOURCES.length + 1 + CandRegistry.LOCAL_SOURCES.length;
+        let _crudo = 0;   // acumulado en bruto, para que el contador suba desde ya
         candIndex = await CandRegistry.load({
           includeParties: false,
           bases: Object.keys(_bases).length ? _bases : undefined,
-          onSource: (_l, _src, i) => ldProgreso(i, _pasos),
+          onSource: (_l, _src, i) => {
+            ldProgreso(i, _pasos);
+            _crudo += _l.length;
+            hintSet(_crudo, CandRegistry.LOCAL_SOURCES.length);
+          },
         });
         if (!candIndex.length) throw new Error('índice de candidatos vacío');
         // Una entrada por PERSONA: el registro trae una por candidatura (2018,
@@ -3055,9 +3139,6 @@
         // A partir de aquí candIndex ya no se reasigna: lo diferido puede apilar.
         _baseListo = true;
         if (_drenaLocal) _drenaLocal();
-        ldStop();
-        document.getElementById('load-state').style.display = 'none';
-        document.getElementById('placeholder-state').style.display = 'block';
         const _lang = localStorage.getItem('rr-lang') || 'co';
         const _t = candI18n[_lang] || candI18n.co;
         const _hint = document.getElementById('search-hint');
@@ -3065,18 +3146,17 @@
            buscador, así que quien abría la página leía "31.969 candidatos
            cargados" —una afirmación falsa: son 428.795— y se iba creyendo que
            faltaban los datos locales.
-           Los 15 s de espera dejan pasar la pantalla de datos curiosos y la
-           ficha de un deep-link (?cand=) antes de sumarle 13 MB. No hay prisa:
-           quien toque el buscador antes dispara la carga de una (`ensureLocal`
-           desde `acSearch`), así que la espera solo aplica a la página quieta.
-           ⚠️ El aviso de que faltan se pinta YA, no al vencer el plazo: si no,
-           esos 15 s se leerían como que 31.969 es todo lo que hay. */
-        if (_hint) {
-          _hint.dataset.count = candIndex.length;
-          _hint.textContent = _t.candidatesLoaded(candIndex.length)
-            + ` · ${_t.loadingLocal(CandRegistry.LOCAL_SOURCES.length)}`;
-        }
-        setTimeout(ensureLocal, 15000);
+           Arrancan SIN plazo, en cuanto el base está armado: la pantalla de
+           datos curiosos existe justamente para hacer llevadera esta espera, y
+           dejarla para después la dejaba sin nada que amenizar. Quien toque el
+           buscador antes también la dispara (`ensureLocal` desde `acSearch`). */
+        const _lbl = document.getElementById('loader-label');
+        if (_lbl) _lbl.textContent = _t.loadingBoards;
+        hintSet(candIndex.length, CandRegistry.LOCAL_SOURCES.length);
+        ensureLocal();
+        /* Red de seguridad: si los concejos no llegan, el loader no se puede
+           quedar puesto para siempre tapando la página. */
+        setTimeout(ldFin, 45000);
         // No inicializar el mapa aquí: el panel aún está oculto (display:none)
         // y Leaflet mediría el contenedor como 0×0 → NaN en coordenadas.
         // El mapa se inicializa en loadCandData() cuando el panel ya es visible.
@@ -3085,7 +3165,8 @@
         // esperando dejaría el buscador vacío incluso con Concejo y JAL ya abajo.
         _baseListo = true;
         if (_drenaLocal) _drenaLocal();
-        setTimeout(ensureLocal, 15000);   // sin base, lo local es lo único que quedaría
+        ensureLocal();   // sin base, lo local es lo único que quedaría
+        _ldCerrado = true;   // el error ocupa el sitio del loader; ldFin no debe pisarlo
         ldStop();
         document.getElementById('load-state').innerHTML = `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8;padding:2rem">Error al cargar el índice.<br/><span style="font-size:.6rem;color:rgba(255,255,255,.3)">${e.message}</span></div>`;
       }
@@ -3131,15 +3212,7 @@
       // aterriza: a los pocos segundos ya se busca en Concejo 2023, que es el
       // más pedido, y el aviso dice cuántas fuentes faltan en vez de callar.
       let _lHechas = 0, _lTotal = CandRegistry.LOCAL_SOURCES.length;
-      const _pintaHint = () => {
-        const _hint = document.getElementById('search-hint');
-        if (_hint) {
-          const _t = candI18n[localStorage.getItem('rr-lang') || 'co'] || candI18n.co;
-          _hint.dataset.count = candIndex.length;
-          _hint.textContent = _t.candidatesLoaded(candIndex.length)
-            + (_lHechas < _lTotal ? ` · ${_t.loadingLocal(_lTotal - _lHechas)}` : '');
-        }
-      };
+      const _pintaHint = () => hintSet(candIndex.length, _lTotal - _lHechas);
       const _apila = (list) => {
         if (list && list.length) _localPend.push(list);
         if (!_baseListo) return;          // se apila al drenar, ver _drenaLocal
@@ -3157,15 +3230,25 @@
       // se repintaba dentro de _apila, o sea que durante los primeros segundos
       // el número se leía como definitivo cuando todavía faltaban 8 índices.
       if (_baseListo) _pintaHint();
+      const _nBase = CandRegistry.SOURCES.length + 1;   // ya cubiertos por la barra
       _localReq = CandRegistry.loadLocal({
         includeParties: false,
         bases: Object.keys(bases).length ? bases : undefined,
-        onSource: (list, _src, i) => { _lHechas = i; _acLocalHechas = i; _apila(list); },
+        onSource: (list, _src, i) => {
+          _lHechas = i; _acLocalHechas = i;
+          ldProgreso(_nBase + i, _nBase + _lTotal);
+          _apila(list);
+        },
       }).then(() => {
         _localDone = true;
         _lHechas = _lTotal;
-        _apila([]);   // repinta el aviso ya sin el "faltan N" y refresca resultados
-      }).catch(e => { console.warn('[local] no disponible:', e && e.message); _localDone = true; });
+        _apila([]);            // refresca los resultados con el índice completo
+        hintFinal(candIndex.length);   // la cifra exacta, sin sufijo
+        ldFin();
+      }).catch(e => {
+        console.warn('[local] no disponible:', e && e.message);
+        _localDone = true; hintFinal(candIndex.length); ldFin();
+      });
       return _localReq;
     }
 
@@ -3355,6 +3438,10 @@
 
     // ─── LOAD CANDIDATE DATA ──────────────────────────────────
     async function loadCandData(meta) {
+      // El loader ahora sigue puesto mientras bajan los concejos: si el usuario
+      // abre una ficha antes (deep-link o búsqueda temprana), hay que quitarlo o
+      // le taparía el perfil.
+      ldFin();
       document.getElementById('placeholder-state').style.display = 'none';
       document.getElementById('pes-panel').style.display = 'grid';
       document.getElementById('map-loading')?.classList.add('active');
