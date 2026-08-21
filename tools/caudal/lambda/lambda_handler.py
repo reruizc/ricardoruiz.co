@@ -265,6 +265,21 @@ def _bancadas():
     return _BANCADAS
 
 
+_COALICIONES = None
+
+
+def _coaliciones():
+    """Coaliciones: quién vota con quién entre bancadas y cómo cambió con el
+    gobierno. Chico (~7 KB), se carga entero. Cache warm."""
+    global _COALICIONES
+    if _COALICIONES is None:
+        try:
+            _COALICIONES = _get_json('metadata/coaliciones.json')
+        except Exception:
+            _COALICIONES = {'meta': {}, 'camara': {'medible': False}, 'senado': {'medible': False}}
+    return _COALICIONES
+
+
 _ARTICULADO = None
 
 
@@ -3418,6 +3433,12 @@ def handler(event, context):
         if cam in ('camara', 'senado'):
             return _resp(200, {'meta': d.get('meta', {}), cam: d.get(cam, {})})
         return _resp(200, d)
+
+    if action == 'coaliciones':    # quién vota con quién · matriz entre bancadas
+        # Aditiva: no toca `bancadas` ni ninguna otra ruta. El Senado viaja con
+        # `medible: false` y su motivo — no se le calcula una matriz sobre 23
+        # votaciones (ver OJO 4 del build).
+        return _resp(200, _coaliciones())
 
     if action == 'proyecto':
         pid = body.get('id')

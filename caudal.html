@@ -424,6 +424,28 @@
   .banc-n{width:22px; text-align:right; font-size:.7rem; color:var(--ink2)}
   .cob-note{font-size:.64rem; color:var(--ink3); margin-top:.7rem}
 
+  /* coaliciones · matriz de coincidencia entre bancadas */
+  .coa-wrap{overflow-x:auto}
+  .coa-m{border-collapse:separate; border-spacing:2px; font-size:.66rem; margin:.2rem auto 0}
+  .coa-m th{font-weight:500; color:var(--ink2); padding:.2rem .35rem; white-space:nowrap}
+  .coa-m th.c{writing-mode:vertical-rl; transform:rotate(180deg); text-align:right; height:104px; padding:.2rem 0}
+  .coa-m th.r{text-align:right; max-width:150px; overflow:hidden; text-overflow:ellipsis}
+  .coa-c{width:44px; height:30px; text-align:center; border-radius:4px; color:#fff; font-weight:600}
+  .coa-c.na{background:var(--card2); color:var(--ink3); font-weight:400}
+  .coa-c.self{background:transparent; color:var(--ink3)}
+  .coa-blk{display:flex; flex-wrap:wrap; gap:.5rem; margin:.9rem 0 .2rem}
+  .coa-b{border:1px solid var(--border2); border-radius:8px; padding:.5rem .7rem; font-size:.7rem}
+  .coa-b .h{font-size:.56rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink3); margin-bottom:.25rem}
+  .coa-b .m{display:flex; flex-wrap:wrap; gap:.3rem .5rem}
+  .coa-b .m span{white-space:nowrap}
+  .coa-r{display:flex; align-items:center; gap:.5rem; padding:.32rem 0; border-top:1px solid var(--border); font-size:.7rem}
+  .coa-r:first-child{border-top:none}
+  .coa-par{flex:1; min-width:0; color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .coa-ch{width:150px; height:9px; background:var(--card2); border-radius:3px; position:relative; flex-shrink:0}
+  .coa-ch i{position:absolute; top:0; height:100%; border-radius:3px}
+  .coa-ch u{position:absolute; top:-2px; bottom:-2px; left:50%; width:1px; background:var(--border2)}
+  .coa-d{width:136px; text-align:right; flex-shrink:0; font-size:.66rem; color:var(--ink3); white-space:nowrap}
+  .coa-d b{font-size:.72rem}
   /* lectura LLM */
   .lectura{background:linear-gradient(180deg,var(--teal-soft),transparent); border:1px solid var(--teal-dim); border-radius:10px; padding:1.4rem 1.5rem; margin-bottom:1.2rem}
   .lectura .tag{font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color:var(--teal); margin-bottom:.9rem; display:flex; align-items:center; gap:.5rem}
@@ -833,6 +855,18 @@
     </div>
 
     <!-- ===== Disciplina de bancada (agregado del voto nominal) ===== -->
+    <div id="view-coaliciones" hidden>
+      <button class="pill-back" id="coaBack">← Volver a Disciplina de bancada</button>
+      <div class="hero">
+        <h1>Quién vota <em>con quién</em>.</h1>
+        <p>Cuando una bancada decide, ¿quién decide igual? La coincidencia entre
+           las mayorías de cada par de bancadas, solo en las votaciones que deciden
+           el proyecto. El eje y los bloques no están escritos a mano: salen del voto.</p>
+        <div class="chips" id="coa-per"></div>
+      </div>
+      <div id="coa-body"></div>
+    </div>
+
     <div id="view-bancadas" hidden>
       <button class="pill-back" id="bancBack">← Volver a Congreso</button>
       <div class="hero">
@@ -843,6 +877,10 @@
         <div class="chips" id="banc-cam"></div>
       </div>
       <div id="banc-body"></div>
+      <a class="rad-cta" id="coaCta" style="margin-top:1.4rem">
+        <span class="rad-cta-tag">Nuevo</span>
+        <span class="rad-cta-txt"><b>Quién vota con quién</b> · la coincidencia entre bancadas, los bloques que forman y cuáles se rompieron al cambiar el gobierno →</span>
+      </a>
     </div>
 
     <!-- ===== PILAR · Regulatorio (sanciones) ===== -->
@@ -1446,7 +1484,7 @@
       if(_navStack.length>24) _navStack.shift();   // tope: es historial, no un log
     }
     _view=v;
-    ['home','buscar','congreso','regulatorio','ejecutivo','sucop','contratacion','cliente','medios','radicados','bancadas'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
+    ['home','buscar','congreso','regulatorio','ejecutivo','sucop','contratacion','cliente','medios','radicados','bancadas','coaliciones'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
     window.scrollTo(0,0);
     pintarBack();
     if(v==='congreso') requestAnimationFrame(()=>document.querySelectorAll('#view-congreso .mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
@@ -1459,6 +1497,7 @@
     if(v==='medios') medLoadLanding();
     if(v==='radicados') radLoad();
     if(v==='bancadas') bancLoad();
+    if(v==='coaliciones') coaLoad();
   }
   /* ---------- pilar Regulatorio · sanciones ---------- */
   const REG={sector:'', q:'', tipoActo:'sancion'};
@@ -2342,6 +2381,92 @@
     el.querySelectorAll('.banc-dis').forEach(x=>x.onclick=()=>abrirCongresista(x.dataset.k));
   }
   function bancSync(){ document.querySelectorAll('#banc-cam .chip').forEach(c=>c.classList.toggle('on',c.dataset.cam===BANC_CAM)); }
+  // ═══ COALICIONES · quién vota con quién ═══════════════════════════════
+  // Mide la coincidencia entre las MAYORÍAS de dos bancadas, solo en votaciones
+  // de fondo contestadas. El orden de las filas y los bloques NO están escritos
+  // a mano: los deriva el build agrupando por similitud, y van por periodo
+  // porque el realineamiento de 2022 mueve pares hasta 62 pp — promediar las dos
+  // eras fabrica un bloque que nunca existió.
+  let COA_DATA=null, COA_PER='petro', _coaInited=false;
+  // escala: rojo (discrepan) → gris (mitad y mitad) → azul (votan juntas)
+  function coaColor(p){
+    if(p==null) return null;
+    const t=Math.max(0,Math.min(1,(p-10)/80));
+    return t<.5 ? `rgba(239,68,68,${(.20+(.5-t)*1.5).toFixed(2)})`
+                : `rgba(61,111,255,${(.20+(t-.5)*1.5).toFixed(2)})`;
+  }
+  function coaCell(m,a,b){
+    const v=m[`${a}|${b}`]||m[`${b}|${a}`];
+    return v?{pct:v.pct,n:v.n}:null;
+  }
+  function coaRender(){
+    const el=document.getElementById('coa-body'); if(!el||!COA_DATA) return;
+    const c=COA_DATA.camara||{}, sen=COA_DATA.senado||{};
+    if(!c.medible){ el.innerHTML='<div class="err">Sin datos de coalición.</div>'; return; }
+    const p=(c.periodos||{})[COA_PER]||{}, orden=p.orden||[], m=p.matriz||{};
+    const cob=c.cobertura||{};
+    // matriz
+    const head=`<tr><th></th>${orden.map(b=>`<th class="c" style="color:${pcolor(b)}">${esc(b)}</th>`).join('')}</tr>`;
+    const filas=orden.map(a=>`<tr><th class="r" style="color:${pcolor(a)}">${esc(a)}</th>${orden.map(b=>{
+      if(a===b) return '<td class="coa-c self">—</td>';
+      const v=coaCell(m,a,b);
+      if(!v) return '<td class="coa-c na" title="Menos votaciones compartidas de las que exige la vista">·</td>';
+      return `<td class="coa-c" style="background:${coaColor(v.pct)}" title="${esc(a)} y ${esc(b)} votaron igual en ${v.pct}% de ${v.n} votaciones de fondo">${v.pct}</td>`;
+    }).join('')}</tr>`).join('');
+    // bloques
+    const blk=(p.bloques||[]).map(b=>`<div class="coa-b"><div class="h">${b.length>1?`Bloque · ${b.length} bancadas`:'Suelta'}</div>
+      <div class="m">${b.map(x=>`<span style="color:${pcolor(x)}">${esc(x)}</span>`).join('')}</div></div>`).join('');
+    // realineamiento: cambio entre las dos eras
+    const re=(c.realineamiento||[]).filter(r=>Math.abs(r.cambio)>=10);
+    const mx=Math.max(70,...re.map(r=>Math.abs(r.cambio)));
+    const reH=re.map(r=>{
+      const w=Math.abs(r.cambio)/mx*50, pos=r.cambio>=0;
+      return `<div class="coa-r">
+        <span class="coa-par"><span style="color:${pcolor(r.a)}">${esc(r.a)}</span> — <span style="color:${pcolor(r.b)}">${esc(r.b)}</span></span>
+        <span class="coa-ch"><u></u><i style="${pos?'left:50%':`right:50%`};width:${w}%;background:${pos?'var(--green)':'var(--red)'}"></i></span>
+        <span class="coa-d">${r.duque}% → <b style="color:${pos?'var(--green)':'var(--red)'}">${r.petro}%</b> (${r.cambio>0?'+':''}${r.cambio})</span>
+      </div>`;}).join('');
+    const exc=(c.excluidas||[]);
+    const faltan=exc.length?[...new Set(exc.map(x=>x.par.split('|')).reduce((a,b)=>a.filter(v=>b.includes(v)),exc[0].par.split('|')))]:[];
+    el.innerHTML=`
+      <div class="cob-note" style="margin:0 0 1rem;font-size:.72rem;color:var(--ink2);line-height:1.5">
+        <b style="color:var(--ink)">${esc(c.nombre||'')}</b> · ${esc(p.etiqueta||'')} · <b>${fmt(p.n_votaciones)}</b> votaciones de fondo contestadas.
+        Dos bancadas «coinciden» cuando la mayoría de una vota lo mismo que la mayoría de la otra.</div>
+      <div class="panel wide"><h3>Coincidencia entre bancadas · ${esc(p.etiqueta||'')}</h3>
+        <div class="coa-wrap"><table class="coa-m">${head}${filas}</table></div>
+        <div class="coa-blk">${blk}</div>
+        <div class="cob-note"><b>El orden de las filas no está escrito a mano</b>: las bancadas se agrupan por parecido en su voto y el recorrido de ese árbol las deja contiguas. Que salga un eje reconocible es un hallazgo del dato, no un supuesto de entrada. Un <b>bloque</b> exige que <b>todos</b> sus pares coincidan al menos ${Math.round((cob.corte_bloque||.6)*100)}% entre sí — con el promedio en vez del mínimo, el grupo encadena y mete bancadas que discrepan en la mitad de las votaciones. Las celdas «·» son pares con menos de ${cob.min_par||25} votaciones compartidas: no se publican.</div></div>
+      ${reH?`<div class="panel wide" style="margin-top:1.2rem"><h3>Qué se rompió y qué se juntó al cambiar el gobierno</h3>
+        ${reH}
+        <div class="cob-note">Coincidencia bajo Duque (hasta ago-2022) contra la de Petro, en los pares con al menos ${cob.min_par||25} votaciones compartidas <b>en cada era</b>. Solo se listan cambios de 10 puntos o más.${faltan.length?` <b>${faltan.map(esc).join(', ')} no aparece</b>: no era bancada propia antes de 2022 —eran Colombia Humana, Polo y MAIS, con muy pocos representantes— así que no hay periodo anterior contra el cual comparar. Su ausencia aquí no significa que no se moviera.`:''}</div></div>`:''}
+      <div class="panel wide" style="margin-top:1.2rem"><h3>Cobertura · qué entra y qué no</h3>
+        <div style="font-size:.74rem;color:var(--ink2);line-height:1.6">
+          Entran <b>${fmt(cob.n_votaciones_fondo)}</b> votaciones: las que <b>deciden el proyecto</b> —ponencia, articulado, título, conciliación, aplazamiento y archivo— y además están <b>contestadas</b>.
+          Se descartan ${fmt((cob.descartes||{}).no_fondo||0)} que no deciden el proyecto (sobre todo impedimentos, donde la bancada se suelta por rutina), ${fmt((cob.descartes||{}).unanime||0)} unánimes —si todos votan igual, dos bancadas cualesquiera coinciden sin ser aliadas—, ${fmt((cob.descartes||{}).sin_quorum||0)} sin quórum y ${fmt((cob.descartes||{}).repetido||0)} donde alguien aparece votando dos veces.
+          Una bancada partida por la mitad exacta no tiene mayoría que comparar y esa votación no entra a sus pares.
+          <br><br><b>El Senado no se puede medir aquí.</b> ${esc(sen.motivo||'')}
+        </div>
+        <div class="cob-note">Fuente: ${esc((COA_DATA.meta||{}).fuente||'')}.</div></div>`;
+  }
+  function coaSync(){ document.querySelectorAll('#coa-per .chip').forEach(c=>c.classList.toggle('on',c.dataset.per===COA_PER)); }
+  async function coaLoad(){
+    const el=document.getElementById('coa-body'); if(!el) return;
+    if(!_coaInited){
+      _coaInited=true;
+      const cont=document.getElementById('coa-per');
+      if(cont) [['petro','Gobierno Petro'],['duque','Gobierno Duque'],['todo','Todo el periodo']].forEach(([k,t])=>{
+        const b=document.createElement('span'); b.className='chip'; b.dataset.per=k; b.textContent=t;
+        b.onclick=()=>{ COA_PER=k; coaSync(); coaRender(); }; cont.appendChild(b);
+      });
+      coaSync();
+    }
+    if(COA_DATA) return coaRender();
+    el.innerHTML='<div class="llm-load" style="padding:1.4rem">Cargando coaliciones <span class="dots"><span></span><span></span><span></span></span></div>';
+    let d; try{ d=await call({action:'coaliciones'}); }catch(e){ el.innerHTML='<div class="err">No se pudo cargar. Reintenta.</div>'; return; }
+    COA_DATA=d; if(d&&d.camara&&d.camara.periodo_default) { COA_PER=d.camara.periodo_default; coaSync(); }
+    coaRender();
+  }
+
   async function bancLoad(){
     const el=document.getElementById('banc-body'); if(!el) return;
     if(!_bancInited){
@@ -2500,6 +2625,8 @@
     const rbk=document.getElementById('radBack'); if(rbk) rbk.onclick=()=>showView('congreso');
     const bcta=document.getElementById('bancCta'); if(bcta) bcta.onclick=()=>showView('bancadas');
     const bbk=document.getElementById('bancBack'); if(bbk) bbk.onclick=()=>showView('congreso');
+    const cct=document.getElementById('coaCta'); if(cct) cct.onclick=()=>showView('coaliciones');
+    const cbk=document.getElementById('coaBack'); if(cbk) cbk.onclick=()=>showView('bancadas');
   }
 
   /* ---------- Vista Cliente · Radar (SKU A) ---------- */
