@@ -129,7 +129,23 @@
     .content-area { flex:1; padding:0; }
 
     /* ─── LOADER ─── */
-    .loader-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; min-height:300px; }
+    .loader-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; min-height:300px; padding:2rem 1.5rem; }
+    /* Barra de progreso: la carga son ~90 MB de índices, así que el anillo
+       girando sin más dejaba al visitante sin saber si avanzaba o estaba roto. */
+    .ld-bar { width:min(460px,86vw); height:3px; background:rgba(255,255,255,.07); border-radius:2px; overflow:hidden; position:relative; }
+    .ld-bar i { display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--blue),#5b8bff); border-radius:2px; transition:width .5s ease; }
+    /* Latido: sin él, un tramo lento se lee como barra congelada. */
+    .ld-bar i::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent); animation:ldPulse 1.6s ease-in-out infinite; }
+    @keyframes ldPulse { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+    .ld-pct { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.12em; color:rgba(255,255,255,.35); }
+    .ld-fact { max-width:min(560px,88vw); text-align:center; font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
+               font-size:.92rem; line-height:1.7; color:rgba(255,255,255,.6); min-height:4.2em;
+               display:flex; align-items:center; justify-content:center; opacity:1; transition:opacity .45s ease; }
+    .ld-fact.fade { opacity:0; }
+    .ld-fact b { color:var(--blue); font-weight:500; }
+    .ld-fact .ld-kicker { display:block; font-family:'DM Mono',monospace; font-size:.55rem; letter-spacing:.18em;
+                          text-transform:uppercase; color:rgba(255,255,255,.25); margin-bottom:.6rem; }
+    @media (max-width:640px){ .ld-fact { font-size:.82rem; } }
     .loader-ring { width:40px; height:40px; border:2px solid rgba(0,71,255,.2); border-top-color:var(--blue); border-radius:50%; animation:spin .8s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
     .loader-label { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.65rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.3); }
@@ -883,7 +899,7 @@
       <span class="search-label" id="search-label">Buscar candidato</span>
       <div class="ac-wrap">
         <input class="ac-input" id="ac-input" type="text" placeholder="Nombre del candidato…" autocomplete="off"
-          oninput="acSearch()"
+          oninput="acSearchDebounced()"
           onkeydown="acKey(event)"
           onfocus="acSearch()" />
         <div class="ac-dropdown" id="ac-dropdown"></div>
@@ -917,6 +933,9 @@
       <div class="loader-wrap" id="load-state">
         <div class="loader-ring"></div>
         <div class="loader-label" id="loader-label">Conectando con S3…</div>
+        <div class="ld-bar"><i id="ld-bar-fill"></i></div>
+        <div class="ld-pct" id="ld-pct">0%</div>
+        <div class="ld-fact" id="ld-fact"></div>
       </div>
 
       <!-- Placeholder -->
@@ -1155,6 +1174,7 @@
         congress: 'Congreso 2026', page: 'Mapa Candidato',
         searchLabel: 'Buscar candidato', searchPlaceholder: 'Nombre del candidato…',
         loadingIndex: 'Cargando índice…', candidatesLoaded: n => `${n.toLocaleString('es-CO')} candidatos cargados`,
+        loadingLocal: n => `faltan ${n} índices de Concejo y JAL`, loadingLocalShort: n => `Cargando Concejo y JAL · faltan ${n} índices`,
         dlBy: 'Descargar por', dlDep: '⬇ Depto.', dlMun: '⬇ Municipio', dlCom: '⬇ Com./Local.', dlPue: '⬇ Puesto', dlMesa: '⬇ Mesa',
         connecting: 'Conectando con S3…', placeholder: 'Busca un candidato para ver su perfil electoral',
         mapTitle: 'Mapa · Votación por departamento', mapLoading: 'Cargando mapa…',
@@ -1191,6 +1211,7 @@
         congress: 'Congress 2026', page: 'Candidate Map',
         searchLabel: 'Search candidate', searchPlaceholder: 'Candidate name…',
         loadingIndex: 'Loading index…', candidatesLoaded: n => `${n.toLocaleString('en-US')} candidates loaded`,
+        loadingLocal: n => `${n} council and local-board indexes to go`, loadingLocalShort: n => `Loading council and local boards · ${n} indexes to go`,
         dlBy: 'Download by', dlDep: '⬇ Dept.', dlMun: '⬇ Municipality', dlCom: '⬇ Com./Locality', dlPue: '⬇ Polling station', dlMesa: '⬇ Table',
         connecting: 'Connecting to S3…', placeholder: 'Search for a candidate to view their electoral profile',
         mapTitle: 'Map · Votes by department', mapLoading: 'Loading map…',
@@ -1227,6 +1248,7 @@
         congress: '2026年国会', page: '候选人地图',
         searchLabel: '搜索候选人', searchPlaceholder: '候选人姓名…',
         loadingIndex: '正在加载索引…', candidatesLoaded: n => `已加载 ${n.toLocaleString('zh-CN')} 名候选人`,
+        loadingLocal: n => `市议会与地方委员会索引还差 ${n} 个`, loadingLocalShort: n => `正在加载市议会与地方委员会 · 还差 ${n} 个索引`,
         dlBy: '下载方式', dlDep: '⬇ 省份', dlMun: '⬇ 市', dlCom: '⬇ 社区', dlPue: '⬇ 投票站', dlMesa: '⬇ 投票台',
         connecting: '正在连接 S3…', placeholder: '搜索候选人以查看其选举档案',
         mapTitle: '地图 · 各省得票', mapLoading: '地图加载中…',
@@ -2851,11 +2873,129 @@
       return out;
     }
 
+    /* ─── PANTALLA DE CARGA: barra + datos curiosos ─────────────
+       El índice son ~90 MB repartidos en 29 archivos de S3 y el anillo girando
+       no decía nada: no se sabía si faltaban dos segundos o dos minutos, ni por
+       qué el contador saltaba de 31 mil a 400 mil un buen rato después. Ahora la
+       barra avanza por fuente que aterriza y, mientras tanto, se rota un banco
+       de datos del propio archivo.
+
+       Todas las cifras salen de los índices que esta página ya sirve; si alguna
+       se corrige en la fuente, hay que corregirla también aquí.                */
+    const LD_FACTS = {
+      co: [
+        ['El concejal más votado del país', '<b>Edison Julián Forero</b> sacó <b>70.032</b> votos al Concejo de Bogotá en 2023 — más que muchos senadores.'],
+        ['El edil más votado', 'En Suba, <b>Juan Camilo Ramírez</b> llegó a la JAL con <b>12.165</b> votos en 2023.'],
+        ['La votación nominal más alta del archivo', '<b>Álvaro Uribe</b> obtuvo <b>891.964</b> votos al Senado en 2018.'],
+        ['Senado 2022', '<b>Miguel Uribe Turbay</b> fue el senador más votado con <b>226.922</b>; <b>María Fernanda Cabal</b> lo siguió con 207.732.'],
+        ['Senado 2014', '<b>Jorge Enrique Robledo</b> fue el más votado con <b>194.523</b>, todos por voto preferente.'],
+        ['Antes de la Presidencia', '<b>Gustavo Petro</b> ganó la Alcaldía de Bogotá en 2011 con <b>723.157</b> votos.'],
+        ['Alcaldía de Bogotá', 'De las cuatro últimas, la más votada es la de <b>Carlos Fernando Galán</b> en 2023: <b>1.499.734</b>.'],
+        ['Medellín 2023', '<b>Federico Gutiérrez</b> volvió a la Alcaldía con <b>697.910</b> votos: el <b>79,1%</b>.'],
+        ['El efecto de la lista cerrada', 'El Pacto Histórico y el Centro Democrático aparecen con <b>cero</b> votos nominales al Senado: el voto fue al logo, no a la persona.'],
+        ['Bogotá, 2011', '<b>Francisco de Roux</b> fue el concejal más votado de la ciudad ese año.'],
+        ['Antes del Senado', '<b>Aída Merlano</b> fue la diputada más votada del Atlántico en 2011.'],
+        ['Senado 2018', '<b>Antanas Mockus</b> entró con <b>549.734</b> votos.'],
+        ['La segunda vuelta más apretada', 'En 2022 <b>Petro</b> sacó 11.292.758 y <b>Rodolfo Hernández</b> 10.604.656: <b>688 mil</b> votos de diferencia.'],
+        ['Primera vuelta de 2010', '<b>Juan Manuel Santos</b> 6.802.043 contra <b>Antanas Mockus</b> 3.134.222.'],
+        ['Primera vuelta de 2018', '<b>Iván Duque</b> 7.616.857 contra <b>Gustavo Petro</b> 4.855.069.'],
+        ['La misma persona, dos nombres', 'La Registraduría lo inscribe como «Gustavo Petro» en la presidencial y «Gustavo Francisco Petro Urrego» en la Alcaldía: aquí se unen en una sola ficha.'],
+        ['Las 16 curules de paz', 'En 2022 <b>Jorge Tovar</b> sumó 15.272 votos repartidos entre Cesar, Magdalena y La Guajira: su distrito CITREP cruza tres departamentos.'],
+        ['Bogotá no tiene asamblea', 'Es Distrito Capital: por eso el mapa de diputados se queda en 32 departamentos.'],
+      ],
+      us: [
+        ['Colombia’s most-voted city councillor', '<b>Edison Julián Forero</b> won <b>70,032</b> votes for Bogotá’s council in 2023 — more than many senators.'],
+        ['The most-voted local board member', 'In Suba, <b>Juan Camilo Ramírez</b> took his seat with <b>12,165</b> votes in 2023.'],
+        ['The highest personal vote on record', '<b>Álvaro Uribe</b> drew <b>891,964</b> Senate votes in 2018.'],
+        ['Senate, 2022', '<b>Miguel Uribe Turbay</b> led with <b>226,922</b>; <b>María Fernanda Cabal</b> followed with 207,732.'],
+        ['Senate, 2014', '<b>Jorge Enrique Robledo</b> led with <b>194,523</b>, all of them preferential votes.'],
+        ['Before the presidency', '<b>Gustavo Petro</b> won Bogotá’s mayoralty in 2011 with <b>723,157</b> votes.'],
+        ['Mayor of Bogotá', 'Of the last four races, the biggest win is <b>Carlos Fernando Galán</b>’s in 2023: <b>1,499,734</b>.'],
+        ['Medellín, 2023', '<b>Federico Gutiérrez</b> returned to the mayoralty with <b>697,910</b> votes — <b>79.1%</b>.'],
+        ['What a closed list does', 'Pacto Histórico and Centro Democrático show <b>zero</b> personal Senate votes: the ballot went to the logo, not the candidate.'],
+        ['Bogotá, 2011', '<b>Francisco de Roux</b> was the city’s most-voted councillor that year.'],
+        ['Before the Senate', '<b>Aída Merlano</b> was Atlántico’s most-voted deputy in 2011.'],
+        ['Senate, 2018', '<b>Antanas Mockus</b> was elected with <b>549,734</b> votes.'],
+        ['The closest runoff', 'In 2022 <b>Petro</b> got 11,292,758 and <b>Rodolfo Hernández</b> 10,604,656 — <b>688,000</b> apart.'],
+        ['First round, 2010', '<b>Juan Manuel Santos</b> 6,802,043 against <b>Antanas Mockus</b> 3,134,222.'],
+        ['First round, 2018', '<b>Iván Duque</b> 7,616,857 against <b>Gustavo Petro</b> 4,855,069.'],
+        ['One person, two names', 'The registry lists him as “Gustavo Petro” for president and “Gustavo Francisco Petro Urrego” for mayor — here both become one profile.'],
+        ['The 16 peace seats', 'In 2022 <b>Jorge Tovar</b> gathered 15,272 votes across Cesar, Magdalena and La Guajira: his CITREP district spans three departments.'],
+        ['Bogotá has no assembly', 'It is a Capital District — which is why the deputy map stops at 32 departments.'],
+      ],
+      cn: [
+        ['全国得票最高的市议员', '2023年，<b>Edison Julián Forero</b> 以 <b>70,032</b> 票当选波哥大市议员，超过不少参议员。'],
+        ['得票最高的地方委员', '在苏巴区，<b>Juan Camilo Ramírez</b> 于2023年以 <b>12,165</b> 票进入地方管理委员会。'],
+        ['档案中最高的个人得票', '2018年，<b>Álvaro Uribe</b> 获得 <b>891,964</b> 张参议院选票。'],
+        ['2022年参议院', '<b>Miguel Uribe Turbay</b> 以 <b>226,922</b> 票居首，<b>María Fernanda Cabal</b> 以 207,732 票紧随其后。'],
+        ['2014年参议院', '<b>Jorge Enrique Robledo</b> 以 <b>194,523</b> 票居首，全部来自优先投票。'],
+        ['当选总统之前', '2011年，<b>Gustavo Petro</b> 以 <b>723,157</b> 票当选波哥大市长。'],
+        ['波哥大市长', '最近四届中得票最高的是2023年的 <b>Carlos Fernando Galán</b>：<b>1,499,734</b> 票。'],
+        ['2023年麦德林', '<b>Federico Gutiérrez</b> 以 <b>697,910</b> 票重返市长职位，占 <b>79.1%</b>。'],
+        ['封闭名单的效应', '历史公约与民主中心的参议院个人得票为 <b>零</b>：选票投给了党徽，而不是候选人。'],
+        ['2011年波哥大', '那一年，<b>Francisco de Roux</b> 是全市得票最高的市议员。'],
+        ['进入参议院之前', '2011年，<b>Aída Merlano</b> 是大西洋省得票最高的省议员。'],
+        ['2018年参议院', '<b>Antanas Mockus</b> 以 <b>549,734</b> 票当选。'],
+        ['最接近的第二轮', '2022年 <b>Petro</b> 获11,292,758票，<b>Rodolfo Hernández</b> 获10,604,656票，相差 <b>68.8万</b>。'],
+        ['2010年第一轮', '<b>Juan Manuel Santos</b> 6,802,043 票对 <b>Antanas Mockus</b> 3,134,222 票。'],
+        ['2018年第一轮', '<b>Iván Duque</b> 7,616,857 票对 <b>Gustavo Petro</b> 4,855,069 票。'],
+        ['同一个人，两个名字', '选举登记处在总统选举中记作“Gustavo Petro”，在市长选举中记作“Gustavo Francisco Petro Urrego”——本页把两者合并为同一份档案。'],
+        ['16个和平席位', '2022年 <b>Jorge Tovar</b> 在塞萨尔、马格达莱纳和拉瓜希拉共得15,272票：他的CITREP选区横跨三个省。'],
+        ['波哥大没有省议会', '它是首都区——这也是省议员地图只有32个省的原因。'],
+      ],
+    };
+
+    let _ldTimer = null, _ldOrden = [], _ldI = 0;
+    function ldFacts() {
+      return LD_FACTS[localStorage.getItem('rr-lang') || 'co'] || LD_FACTS.co;
+    }
+    function ldPintaFact() {
+      const el = document.getElementById('ld-fact');
+      if (!el) return;
+      const f = ldFacts();
+      if (!_ldOrden.length) {
+        // Barajado (Fisher-Yates): si el orden fuera fijo, quien entra dos veces
+        // ve siempre los mismos dos primeros y el banco parece de dos datos.
+        _ldOrden = f.map((_, i) => i);
+        for (let i = _ldOrden.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [_ldOrden[i], _ldOrden[j]] = [_ldOrden[j], _ldOrden[i]];
+        }
+      }
+      const [k, txt] = f[_ldOrden[_ldI % _ldOrden.length]];
+      _ldI++;
+      el.classList.add('fade');
+      setTimeout(() => {
+        el.innerHTML = `<div><span class="ld-kicker">${k}</span>${txt}</div>`;
+        el.classList.remove('fade');
+      }, 300);
+    }
+    function ldStart() {
+      const el = document.getElementById('ld-fact');
+      if (!el || _ldTimer) return;
+      const f = ldFacts();
+      const [k, txt] = f[Math.floor(Math.random() * f.length)];
+      el.innerHTML = `<div><span class="ld-kicker">${k}</span>${txt}</div>`;
+      _ldI = 1; _ldOrden = [];
+      _ldTimer = setInterval(ldPintaFact, 5200);
+    }
+    function ldStop() { if (_ldTimer) { clearInterval(_ldTimer); _ldTimer = null; } }
+    // La barra nunca retrocede: un avance que se devuelve se lee como error.
+    let _ldPct = 0;
+    function ldProgreso(hechas, total) {
+      const pct = Math.max(_ldPct, Math.round((hechas / Math.max(total, 1)) * 100));
+      _ldPct = pct;
+      const b = document.getElementById('ld-bar-fill'), t = document.getElementById('ld-pct');
+      if (b) b.style.width = pct + '%';
+      if (t) t.textContent = pct + '%';
+    }
+
     // ─── LOAD INDEX ───────────────────────────────────────────
     async function loadIndex() {
       try {
         // Base compartida (cand-index.js): endoso (Congreso + Consultas) + Asamblea 2023
         // + futuras candidaturas. `?asamlocal=1` apunta la base de asamblea al repo local.
+        ldStart();      // datos curiosos mientras bajan los ~8,5 MB del arranque
         loadEdades();   // fecha de nacimiento (best-effort, no bloquea el índice)
         const _bases = ASAM_BASE.startsWith('http') ? {} : { asamblea: ASAM_BASE };
         // ?terlocal=1 → asambleas 2015/2019 + presidencial 2018 desde el repo local (pre-subida).
@@ -2873,7 +3013,13 @@
             _bases['alc' + a] = 'Bases de datos/output_alcaldia_' + a;
           }
         }
-        candIndex = await CandRegistry.load({ includeParties: false, bases: Object.keys(_bases).length ? _bases : undefined });
+        // +1 paso por el índice presidencial, que se pide justo después.
+        const _pasos = CandRegistry.SOURCES.length + 1;
+        candIndex = await CandRegistry.load({
+          includeParties: false,
+          bases: Object.keys(_bases).length ? _bases : undefined,
+          onSource: (_l, _src, i) => ldProgreso(i, _pasos),
+        });
         if (!candIndex.length) throw new Error('índice de candidatos vacío');
         // Una entrada por PERSONA: el registro trae una por candidatura (2018,
         // asamblea 2023, 2026). Si el nombre coincide es la misma persona → se
@@ -2882,6 +3028,7 @@
         candIndex = agruparPersonas(candIndex);
 
         const rp = await fetch(`${PRES_BASE}/index-presidencial.json`).catch(() => null);
+        ldProgreso(CandRegistry.SOURCES.length + 1, CandRegistry.SOURCES.length + 1);
         // Merge presidenciales (una entrada por persona; el histórico vive en meta.pres)
         if (rp && rp.ok) {
           try {
@@ -2900,6 +3047,7 @@
             candIndex = presEntries.concat(candIndex);
           } catch (e) { console.warn('[Pres] índice presidencial no disponible:', e.message); }
         }
+        ldStop();
         document.getElementById('load-state').style.display = 'none';
         document.getElementById('placeholder-state').style.display = 'block';
         const _lang = localStorage.getItem('rr-lang') || 'co';
@@ -2910,6 +3058,7 @@
         // y Leaflet mediría el contenedor como 0×0 → NaN en coordenadas.
         // El mapa se inicializa en loadCandData() cuando el panel ya es visible.
       } catch(e) {
+        ldStop();
         document.getElementById('load-state').innerHTML = `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8;padding:2rem">Error al cargar el índice.<br/><span style="font-size:.6rem;color:rgba(255,255,255,.3)">${e.message}</span></div>`;
       }
     }
@@ -2918,7 +3067,7 @@
     // ~108k candidatos: no entran al índice del arranque. Se piden al primer
     // foco/tecla del buscador y se APILAN al índice sin agrupar por persona.
     // ?conclocal=1 / ?jallocal=1 → leen los JSON locales del repo (pre-subida).
-    let _localReq = null, _localDone = false;
+    let _localReq = null, _localDone = false, _acLocalHechas = 0;
     function ensureLocal() {
       if (_localDone) return _localReq;
       if (_localReq) return _localReq;
@@ -2936,22 +3085,39 @@
         bases.jal2015 = 'Bases de datos/output_jal_2015';
         bases.jal2011 = 'Bases de datos/output_jal_2011';
       }
+      // Los 8 índices de Concejo y JAL pesan ~82 MB. Antes se esperaba a que
+      // llegaran los OCHO (Promise.all) y el contador saltaba de 31 mil a 400
+      // mil de golpe, varios minutos después; en el intermedio el buscador
+      // parecía no tener esos datos. Ahora cada índice se apila EN CUANTO
+      // aterriza: a los pocos segundos ya se busca en Concejo 2023, que es el
+      // más pedido, y el aviso dice cuántas fuentes faltan en vez de callar.
+      let _lHechas = 0, _lTotal = CandRegistry.LOCAL_SOURCES.length;
+      const _pintaHint = () => {
+        const _hint = document.getElementById('search-hint');
+        if (_hint) {
+          const _t = candI18n[localStorage.getItem('rr-lang') || 'co'] || candI18n.co;
+          _hint.dataset.count = candIndex.length;
+          _hint.textContent = _t.candidatesLoaded(candIndex.length)
+            + (_lHechas < _lTotal ? ` · ${_t.loadingLocal(_lTotal - _lHechas)}` : '');
+        }
+      };
+      const _apila = (list) => {
+        if (list && list.length) {
+          const have = new Set(candIndex.map(c => c.slug));
+          candIndex = candIndex.concat(list.filter(c => !have.has(c.slug)));
+        }
+        _pintaHint();
+        const inp = document.getElementById('ac-input');
+        if (inp && inp.value.trim().length >= 2) acSearch();
+      };
       _localReq = CandRegistry.loadLocal({
         includeParties: false,
         bases: Object.keys(bases).length ? bases : undefined,
-      }).then(list => {
+        onSource: (list, _src, i) => { _lHechas = i; _acLocalHechas = i; _apila(list); },
+      }).then(() => {
         _localDone = true;
-        const have = new Set(candIndex.map(c => c.slug));
-        candIndex = candIndex.concat(list.filter(c => !have.has(c.slug)));
-        const _hint = document.getElementById('search-hint');
-        if (_hint) {
-          const _t = candI18n[localStorage.getItem('rr-lang')] || candI18n.co;
-          _hint.dataset.count = candIndex.length;
-          _hint.textContent = _t.candidatesLoaded(candIndex.length);
-        }
-        const inp = document.getElementById('ac-input');
-        if (inp && inp.value.trim().length >= 2) acSearch();
-        return list;
+        _lHechas = _lTotal;
+        _apila([]);   // repinta el aviso ya sin el "faltan N" y refresca resultados
       }).catch(e => { console.warn('[local] no disponible:', e && e.message); _localDone = true; });
       return _localReq;
     }
@@ -2972,6 +3138,19 @@
       const words = norm(q).split(/\s+/).filter(Boolean);
       const tw = norm(nombre).split(/\s+/);
       return words.every(w => tw.some(t => t.startsWith(w)));
+    }
+
+    /* Con 420k candidaturas cada tecla recorría el índice entero. Aun con el
+       recorrido ya optimizado (ver acRank en cand-index.js), encadenar una
+       pasada por pulsación deja el hilo principal ocupado mientras se escribe.
+       El debounce corta las pasadas intermedias: solo se busca ~90 ms después
+       de la última tecla, imperceptible al escribir y una sola pasada por
+       palabra en vez de una por letra. */
+    let _acTimer = null;
+    function acSearchDebounced() {
+      ensureLocal();                       // dispara la carga diferida ya, no en 90 ms
+      clearTimeout(_acTimer);
+      _acTimer = setTimeout(acSearch, 90);
     }
 
     function acSearch() {
@@ -3003,7 +3182,10 @@
       }
       // Concejo y JAL entran por carga diferida (índices grandes): sin este
       // aviso, escribir rápido mostraba "sin resultados" y parecía que faltaran.
-      if (cargando) html += `<div class="ac-more">Cargando Concejo y JAL…</div>`;
+      if (cargando) {
+        const _t = candI18n[localStorage.getItem('rr-lang') || 'co'] || candI18n.co;
+        html += `<div class="ac-more">${_t.loadingLocalShort(Math.max(1, CandRegistry.LOCAL_SOURCES.length - _acLocalHechas))}</div>`;
+      }
       drop.innerHTML = html;
       drop.classList.add('open');
     }
