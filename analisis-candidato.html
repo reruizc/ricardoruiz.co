@@ -3061,7 +3061,22 @@
         const _lang = localStorage.getItem('rr-lang') || 'co';
         const _t = candI18n[_lang] || candI18n.co;
         const _hint = document.getElementById('search-hint');
-        if (_hint) { _hint.dataset.count = candIndex.length; _hint.textContent = _t.candidatesLoaded(candIndex.length); }
+        /* Concejo y JAL arrancan SOLOS. Antes solo se pedían al tocar el
+           buscador, así que quien abría la página leía "31.969 candidatos
+           cargados" —una afirmación falsa: son 428.795— y se iba creyendo que
+           faltaban los datos locales.
+           Los 15 s de espera dejan pasar la pantalla de datos curiosos y la
+           ficha de un deep-link (?cand=) antes de sumarle 13 MB. No hay prisa:
+           quien toque el buscador antes dispara la carga de una (`ensureLocal`
+           desde `acSearch`), así que la espera solo aplica a la página quieta.
+           ⚠️ El aviso de que faltan se pinta YA, no al vencer el plazo: si no,
+           esos 15 s se leerían como que 31.969 es todo lo que hay. */
+        if (_hint) {
+          _hint.dataset.count = candIndex.length;
+          _hint.textContent = _t.candidatesLoaded(candIndex.length)
+            + ` · ${_t.loadingLocal(CandRegistry.LOCAL_SOURCES.length)}`;
+        }
+        setTimeout(ensureLocal, 15000);
         // No inicializar el mapa aquí: el panel aún está oculto (display:none)
         // y Leaflet mediría el contenedor como 0×0 → NaN en coordenadas.
         // El mapa se inicializa en loadCandData() cuando el panel ya es visible.
@@ -3070,6 +3085,7 @@
         // esperando dejaría el buscador vacío incluso con Concejo y JAL ya abajo.
         _baseListo = true;
         if (_drenaLocal) _drenaLocal();
+        setTimeout(ensureLocal, 15000);   // sin base, lo local es lo único que quedaría
         ldStop();
         document.getElementById('load-state').innerHTML = `<div style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8;padding:2rem">Error al cargar el índice.<br/><span style="font-size:.6rem;color:rgba(255,255,255,.3)">${e.message}</span></div>`;
       }
@@ -3137,6 +3153,10 @@
         if (inp && inp.value.trim().length >= 2) acSearch();
       };
       _drenaLocal = () => _apila(null);   // loadIndex lo llama al terminar
+      // Avisar ANTES de que aterrice la primera fuente: hasta acá el hint solo
+      // se repintaba dentro de _apila, o sea que durante los primeros segundos
+      // el número se leía como definitivo cuando todavía faltaban 8 índices.
+      if (_baseListo) _pintaHint();
       _localReq = CandRegistry.loadLocal({
         includeParties: false,
         bases: Object.keys(bases).length ? bases : undefined,
