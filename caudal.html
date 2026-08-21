@@ -2260,21 +2260,36 @@
         + pts.map(p=>`<circle cx="${x(p.i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="2.4" fill="${c}"></circle>`).join('');
     }).join('');
     const leg=bs.map(b=>`<span style="display:inline-flex;align-items:center;gap:.3rem;font-size:.62rem;color:var(--ink2)"><span style="width:.55rem;height:.55rem;border-radius:50%;background:${pcolor(b)}"></span>${esc(b)}</span>`).join('');
-    return `<div class="panel wide"><h3>Evolución de la cohesión · índice de Rice por ${d.serie_tipo==='era'?'era':'año'}</h3>
+    // ⚠️ La serie va sobre TODAS las contestadas, no solo las de fondo: medido,
+    // separando por tipo se caen 2014, 2016, 2020 y 2026 bajo el umbral de 25
+    // votaciones y la línea quedaría cortada en 6 de 10 años. Se conserva
+    // completa y se ROTULA como global, para que no se lea como continuación
+    // del panel de cohesión de arriba, que sí es de fondo.
+    return `<div class="panel wide"><h3>Evolución de la cohesión · índice de Rice por ${d.serie_tipo==='era'?'era':'año'} <span style="color:var(--ink3);font-weight:400">· todas las votaciones</span></h3>
       <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${grid}${lineas}${ejeX}</svg>
       <div style="display:flex;flex-wrap:wrap;gap:.5rem .9rem;margin-top:.7rem">${leg}</div>
-      <div class="cob-note">Solo periodos con al menos 25 votaciones contestadas, y solo bancadas con 8 o más votaciones en ese periodo. Faltan 2012, 2018 y 2019: sus actas quedaron parseadas a medias (mediana de 2 a 12 votantes por votación) y no son plenarias completas.</div></div>`;
+      <div class="cob-note">Solo periodos con al menos 25 votaciones contestadas, y solo bancadas con 8 o más votaciones en ese periodo. Faltan 2012, 2018 y 2019: sus actas quedaron parseadas a medias (mediana de 2 a 12 votantes por votación) y no son plenarias completas. <b>Esta serie cuenta todas las votaciones contestadas, no solo las de fondo</b>, así que va más abajo que la cohesión del panel anterior: restringirla a las de fondo dejaría 2014, 2016, 2020 y 2026 sin suficientes votaciones y la línea quedaría cortada en 6 de 10 años.</div></div>`;
   }
   function bancRender(){
     const el=document.getElementById('banc-body'); if(!el||!BANC_DATA) return;
     const d=BANC_DATA[BANC_CAM]||{}, c=d.cobertura||{}, bs=d.bancadas||[];
     if(!bs.length){ el.innerHTML='<div class="err">Sin datos de bancada para esta cámara.</div>'; return; }
-    const maxRice=Math.max(...bs.map(b=>b.rice));
-    const coh=bs.map(b=>`<div class="cx-row">
+    // ⚠️ La barra mide la cohesión DE FONDO, no la global: el 33% de las
+    // votaciones contestadas de Cámara son impedimentos (decidir sobre el
+    // conflicto de interés de un colega), donde la bancada se suelta por rutina
+    // y no por indisciplina política. Medido, promediarlo todo sub-reporta la
+    // disciplina y cambia el orden. La global va al lado como referencia.
+    // Senado no trae `rice_fondo` (su API no dice qué se votó) → cae a la global.
+    const hayFondo=bs.some(b=>b.rice_fondo!=null);
+    const riceDe=b=>b.rice_fondo!=null?b.rice_fondo:b.rice;
+    const maxRice=Math.max(...bs.map(riceDe));
+    const coh=bs.map(b=>{
+      const r=riceDe(b), bl=b.bloque_pct_fondo!=null?b.bloque_pct_fondo:b.bloque_pct;
+      return `<div class="cx-row">
         <span class="cx-lab" style="width:120px;color:${pcolor(b.bancada)}">${esc(b.bancada)}</span>
-        ${bancBar(b.rice/Math.max(.001,maxRice),pcolor(b.bancada))}
-        <span class="cx-n" style="width:112px">${b.rice.toFixed(2)} · bloque ${b.bloque_pct}%</span>
-      </div>`).join('');
+        ${bancBar(r/Math.max(.001,maxRice),pcolor(b.bancada))}
+        <span class="cx-n" style="width:132px">${r.toFixed(2)} · bloque ${bl}%${b.rice_fondo!=null?`<span style="color:var(--ink3)"> · global ${b.rice.toFixed(2)}</span>`:''}</span>
+      </div>`;}).join('');
     // alineación: el Pacto se mide contra sí mismo, así que se marca aparte
     const ali=bs.slice().sort((a,b)=>(b.alineacion_petro||0)-(a.alineacion_petro||0)).map(b=>{
       const v=b.alineacion_petro;
@@ -2284,32 +2299,37 @@
         <span class="cx-n" style="width:112px">${bancPct(v)}${b.es_gobierno?' · es gobierno':''}</span>
       </div>`;}).join('');
     const dm=d.disidentes_meta||{};
-    const dis=(d.disidentes||[]).map(x=>`<div class="tl-item banc-dis" data-k="${esc(x.key)}">
-        <span style="width:52px;flex-shrink:0;font-weight:700;color:var(--amber)">${x.pct}%</span>
+    // el ranking manda por la disidencia DE FONDO: quien solo se sale en
+    // impedimentos no es un disidente político (medido: hay quien baja de 55,6%
+    // global a 44,4% de fondo, y quien sube de 69,7% a 79,7%).
+    const dis=(d.disidentes||[]).map(x=>{
+      const f=x.pct_fondo!=null;
+      return `<div class="tl-item banc-dis" data-k="${esc(x.key)}">
+        <span style="width:52px;flex-shrink:0;font-weight:700;color:var(--amber)">${f?x.pct_fondo:x.pct}%</span>
         <span style="flex:1;min-width:0"><span style="color:var(--ink)">${esc(x.nombre)}</span>
           <span style="color:${pcolor(x.bancada)};font-size:.66rem"> · ${esc(x.bancada)}</span></span>
-        <span style="flex-shrink:0;font-size:.66rem;color:var(--ink3)">${x.d} de ${x.n} votaciones</span>
-      </div>`).join('');
+        <span style="flex-shrink:0;font-size:.66rem;color:var(--ink3)">${f?`${x.d_fondo} de ${x.n_fondo} de fondo · ${x.pct}% en total`:`${x.d} de ${x.n} votaciones`}</span>
+      </div>`;}).join('');
     const cob=bs.map(b=>`<span style="font-size:.62rem;color:var(--ink3)">${esc(b.bancada)} <b style="color:var(--ink2)">${b.n_miembros}</b> personas · ${fmt(b.n_votos)} votos</span>`).join(' &nbsp;·&nbsp; ');
     el.innerHTML=`
       <div class="cob-note" style="margin:0 0 1rem;font-size:.72rem;color:var(--ink2);line-height:1.5">
         <b style="color:var(--ink)">${esc(d.nombre||'')}</b> · ${esc(c.desde||'')} a ${esc(c.hasta||'')}. ${esc(d.alcance||'')}</div>
       <div class="kpis">
         <div class="kpi"><div class="n">${fmt(c.n_contestadas)}</div><div class="l">Votaciones contestadas</div></div>
-        <div class="kpi"><div class="n">${fmt(c.n_analizadas)}</div><div class="l">Votaciones analizadas</div></div>
+        ${c.n_contestadas_fondo!=null&&c.contestadas_por_tipo?`<div class="kpi"><div class="n">${fmt(c.n_contestadas_fondo)}</div><div class="l">De fondo · deciden el proyecto</div></div>`:`<div class="kpi"><div class="n">${fmt(c.n_analizadas)}</div><div class="l">Votaciones analizadas</div></div>`}
         <div class="kpi"><div class="n">${bs.length}</div><div class="l">Bancadas medidas</div></div>
         <div class="kpi"><div class="n">${(100-(c.pct_sin_partido||0)).toFixed(1)}%</div><div class="l">Votos con partido</div></div>
       </div>
       <div class="grid2">
-        <div class="panel"><h3>Cohesión · qué tan en bloque vota</h3>${coh}
-          <div class="cob-note">Índice de Rice: |Sí−No| dividido por (Sí+No) dentro de la bancada, promediado sobre las votaciones contestadas. <b>1,00</b> = votó en bloque perfecto; <b>0</b> = partida por la mitad. «Bloque» es el porcentaje de votaciones donde al menos el 90% votó del mismo lado.</div></div>
+        <div class="panel"><h3>Cohesión · qué tan en bloque vota${hayFondo?' <span style="color:var(--ink3);font-weight:400">donde se decide el proyecto</span>':''}</h3>${coh}
+          <div class="cob-note">Índice de Rice: |Sí−No| dividido por (Sí+No) dentro de la bancada, promediado sobre las votaciones contestadas. <b>1,00</b> = votó en bloque perfecto; <b>0</b> = partida por la mitad. «Bloque» es el porcentaje de votaciones donde al menos el 90% votó del mismo lado.${hayFondo?` <b>La cifra grande cuenta solo las votaciones de fondo</b> —ponencia, articulado, título, conciliación, aplazamiento y archivo—, ${fmt(c.n_contestadas_fondo)} de las ${fmt(c.n_contestadas)} contestadas. Se separan porque <b>${fmt(c.n_contestadas_impedimento)}</b> (${Math.round(100*(c.n_contestadas_impedimento||0)/Math.max(1,c.n_contestadas))}%) son <b>impedimentos</b>: ahí cada quien decide sobre el conflicto de interés de un colega y la bancada se suelta por rutina, no por indisciplina política. Medirlo todo junto sub-reporta la disciplina de forma desigual y cambia el orden — Cambio Radical pasa de estar por debajo de La U a estar por encima. La cifra global va en gris al lado.`:' Esta cámara no permite separar por tipo de votación: su fuente no publica <b>qué</b> se votó, así que aquí entran también impedimentos y trámite.'}</div></div>
         <div class="panel"><h3>Alineación con el gobierno · desde ago-2022</h3>${ali}
           <div class="cob-note">Porcentaje de votos que coincidieron con la posición del Pacto (su mayoría, ≥60%), restringido al gobierno Petro. <b>El Pacto coincide consigo mismo por definición</b>: su cifra no dice nada sobre él. Solo votaciones contestadas.</div></div>
       </div>
       ${bancSerie(d)}
       <div class="panel wide" style="margin-top:1.2rem"><h3>Quién se sale de su propia bancada</h3>
         ${dis||'<div class="cob-note" style="margin-top:0">Sin nadie por encima del mínimo de votaciones evaluables.</div>'}
-        <div class="cob-note">Porcentaje de votaciones contestadas en que la persona votó contra la mayoría de su propia bancada. Entran quienes tengan al menos ${dm.min_votos||0} votaciones evaluables: ${fmt(dm.n_evaluables||0)} personas lo cumplen y su disidencia mediana es ${dm.mediana_pct==null?'—':dm.mediana_pct+'%'}. Click para ver su récord completo.${BANC_CAM==='senado'?' <b>En Senado descansa en muy pocas votaciones</b> — mira la n de cada fila antes de sacar conclusiones. Su ficha personal muestra totales más altos porque cuenta las votaciones tal como las publica la fuente, sin descartar las que republica en varias fechas.':''}</div></div>
+        <div class="cob-note">${dm.mediana_pct_fondo!=null?'Porcentaje de votaciones <b>de fondo</b> —las que deciden el proyecto— en que la persona votó contra la mayoría de su propia bancada; al lado, su cifra sobre todas las contestadas. Se ordena por la de fondo porque quien solo se sale en impedimentos no es un disidente político.':'Porcentaje de votaciones contestadas en que la persona votó contra la mayoría de su propia bancada.'} Entran quienes tengan al menos ${dm.min_votos||0} votaciones evaluables${dm.min_votos_fondo?` (y ${dm.min_votos_fondo} de fondo para publicar esa cifra)`:''}: ${fmt(dm.n_evaluables||0)} personas lo cumplen y su disidencia mediana es ${dm.mediana_pct==null?'—':dm.mediana_pct+'%'}${dm.mediana_pct_fondo!=null?` y la de fondo ${dm.mediana_pct_fondo}%`:''}. Click para ver su récord completo.${BANC_CAM==='senado'?' <b>En Senado descansa en muy pocas votaciones</b> — mira la n de cada fila antes de sacar conclusiones. Su ficha personal muestra totales más altos porque cuenta las votaciones tal como las publica la fuente, sin descartar las que republica en varias fechas.':''}</div></div>
       <div class="panel wide" style="margin-top:1.2rem"><h3>Cobertura · lo que queda por fuera</h3>
         <div style="font-size:.74rem;color:var(--ink2);line-height:1.6">
           De ${fmt(c.n_votaciones)} votaciones registradas se analizan <b>${fmt(c.n_analizadas)}</b>:
