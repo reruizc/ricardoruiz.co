@@ -138,5 +138,10 @@ def handler(event, context):
     except Exception:
         return _resp(500, {'ok': False, 'error': 'no se pudo generar el enlace de descarga'})
 
+    # `email` vuelve al navegador SOLO para prellenar el alta de cuenta en
+    # descarga-entrega.html. No amplía el riesgo ya asumido: quien tenga la URL
+    # con ?p=&id= ya podía re-descargar el archivo; ahora además ve el correo
+    # con que se pagó. Es el mismo secreto, no uno nuevo.
     return _resp(200, {'ok': True, 'url': url, 'titulo': info['titulo'],
-                       'archivo': info['file'], 'ttl': URL_TTL})
+                       'archivo': info['file'], 'ttl': URL_TTL,
+                       'email': (tx.get('customer_email') or '')})

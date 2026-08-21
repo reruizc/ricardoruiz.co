@@ -37,6 +37,23 @@
     .btns { display:flex; gap:.7rem; justify-content:center; flex-wrap:wrap; }
     .note { font-size:.72rem; color:var(--muted); margin-top:1.3rem; opacity:.8; }
     .hidden { display:none; }
+
+    /* Alta de cuenta posterior al pago (opción B): sin fricción antes de
+       comprar, y el correo sale de la transacción para que siempre cuadre
+       con el del pago. */
+    .acct { margin-top:1.6rem; padding-top:1.5rem; border-top:1px solid var(--rule); text-align:left; }
+    .acct h2 { font-family:'Syne',sans-serif; font-weight:700; font-size:.9rem; margin-bottom:.45rem; }
+    .acct p { font-size:.8rem; margin-bottom:1rem; }
+    .acct-row { display:flex; gap:.6rem; flex-wrap:wrap; }
+    .acct input { flex:1 1 210px; min-width:0; background:var(--paper); color:var(--ink);
+                  border:1px solid var(--rule); border-radius:5px; padding:.8rem .9rem;
+                  font-family:'DM Mono',monospace; font-size:.85rem; }
+    .acct input:focus { outline:none; border-color:var(--accent); }
+    .acct .btn { flex:0 0 auto; }
+    .acct-msg { font-size:.78rem; margin-top:.8rem; line-height:1.5; }
+    .acct-msg.good { color:var(--green); }
+    .acct-msg.bad { color:var(--accent); }
+    .acct-msg a { color:inherit; }
   </style>
 </head>
 <body>
@@ -59,6 +76,17 @@
         <a class="btn" id="ok-dl" href="#">↓ Descargar Excel</a>
         <a class="btn ghost" href="descargas.html">Volver a descargas</a>
       </div>
+
+      <div id="acct" class="acct hidden">
+        <h2>Guarda tu compra</h2>
+        <p>Crea tu cuenta y vuelve a descargar este archivo cuando lo necesites, sin buscar el correo del pago.</p>
+        <div class="acct-row">
+          <input type="email" id="acct-email" autocomplete="email" placeholder="tu@correo.com" />
+          <button class="btn" id="acct-btn" type="button">Crear mi cuenta</button>
+        </div>
+        <div id="acct-msg" class="acct-msg hidden"></div>
+      </div>
+
       <div class="note">Uso interno con atribución opcional · redistribución comercial bajo acuerdo aparte.</div>
     </div>
 
@@ -74,7 +102,8 @@
   </div>
 
   <script>
-    const API = 'https://ciupqm47ki.execute-api.us-east-1.amazonaws.com/entrega';
+    const API   = 'https://ciupqm47ki.execute-api.us-east-1.amazonaws.com/entrega';
+    const MAGIC = 'https://rr-auth.reruizc.workers.dev/auth/magic';
 
     // Une TODO lo que venga tras el primer '?' (Wompi puede anexar la tx con '?' o '&'
     // cuando la redirect ya trae ?p=...): así ?p=x?id=y y ?p=x&id=y se parsean igual.
@@ -105,12 +134,89 @@
         a.href = d.url;
         a.setAttribute('download', d.archivo || '');
         show('ok');
+        montarCuenta(d.email);
         // dispara la descarga automáticamente
         setTimeout(() => { window.location.href = d.url; }, 600);
       } catch (e) {
         fail('Error de conexión', 'No pudimos contactar el servidor. Reintenta en un momento.');
       }
     }
+
+    // ─── Alta de cuenta después del pago ──────────────────────────────────────
+    // Se ofrece SOLO cuando la descarga ya salió bien: cero fricción antes de
+    // pagar y el correo viene de la transacción, así que la cuenta siempre
+    // queda con el mismo correo con que se pagó.
+    const $acct = () => document.getElementById('acct');
+    const $email = () => document.getElementById('acct-email');
+    const $btn = () => document.getElementById('acct-btn');
+    const $msg = () => document.getElementById('acct-msg');
+
+    function acctMsg(tipo, html) {
+      const el = $msg();
+      el.className = 'acct-msg ' + tipo;
+      el.innerHTML = html;
+      el.classList.remove('hidden');
+    }
+
+    function montarCuenta(email) {
+      // Si ya hay sesión no le pedimos que se registre otra vez.
+      let tok = null;
+      try { tok = localStorage.getItem('rr-token'); } catch (_) {}
+      if (tok) {
+        $acct().classList.remove('hidden');
+        $acct().innerHTML =
+          '<h2>Compra guardada</h2>' +
+          '<p>Ya tienes sesión abierta. Este archivo queda disponible para volver a descargarlo durante 30 días.</p>' +
+          '<div class="acct-row"><a class="btn ghost" href="dashboard.html">Ir a mi cuenta</a></div>';
+        return;
+      }
+      if (email) $email().value = email;
+      $acct().classList.remove('hidden');
+      $btn().addEventListener('click', crearCuenta);
+      $email().addEventListener('keydown', e => { if (e.key === 'Enter') crearCuenta(); });
+    }
+
+    function alRegistro(email, error) {
+      const url = 'register.html?email=' + encodeURIComponent(email);
+      acctMsg('bad',
+        (error ? esc(error) + ' ' : '') +
+        'Puedes crear la cuenta desde <a href="' + url + '">el formulario de registro</a>.');
+      $btn().disabled = false;
+      $btn().textContent = 'Crear mi cuenta';
+    }
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, c =>
+        ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
+
+    async function crearCuenta() {
+      const email = ($email().value || '').trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return acctMsg('bad', 'Escribe un correo válido.');
+      }
+      $btn().disabled = true;
+      $btn().textContent = '…';
+      $msg().classList.add('hidden');
+      try {
+        const r = await fetch(MAGIC, { method:'POST', headers:{'Content-Type':'application/json'},
+                                       body: JSON.stringify({ email }) });
+        let d = {};
+        try { d = await r.json(); } catch (_) {}
+        // El worker puede no crear cuentas nuevas desde /auth/magic; si responde
+        // error, mandamos al registro completo con el correo ya puesto.
+        if (r.ok && d.ok !== false) {
+          document.querySelector('.acct-row').classList.add('hidden');
+          acctMsg('good', '✓ Listo. Te enviamos un enlace a <strong>' + esc(email) +
+                          '</strong> para entrar a tu cuenta.');
+        } else {
+          alRegistro(email, d.error);
+        }
+      } catch (_) {
+        alRegistro(email, 'No pudimos conectarnos.');
+      }
+    }
+
     verificar();
   </script>
 </body>
