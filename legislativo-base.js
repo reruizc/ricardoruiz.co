@@ -57,7 +57,7 @@
     if(dias>1) el.textContent=`Instalación · 20 de julio de 2026 · faltan ${dias} días`;
     else if(dias===1) el.textContent='Instalación · 20 de julio de 2026 · mañana';
     else if(dias===0) el.textContent='Instalación · hoy · 20 de julio de 2026';
-    else el.textContent='Congreso 2026-2030 · en funciones desde el 20 de julio';
+    else el.textContent='En funciones · legislatura 2026–2027 · desde el 20 de julio';
   })();
   /* ── SESSION NAV (chip de plan / login-registro) ────────────── */
   function updateNavAuth(){
