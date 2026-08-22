@@ -1135,7 +1135,7 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <script src="cand-index.js?v=20260715"></script>
+  <script src="cand-index.js?v=20260821"></script>
   <script>
     // ─── CONFIG ───────────────────────────────────────────────
     const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
@@ -1179,7 +1179,7 @@
         congress: 'Congreso 2026', page: 'Mapa Candidato',
         searchLabel: 'Buscar candidato', searchPlaceholder: 'Nombre del candidato…',
         loadingIndex: 'Cargando índice…', candidatesLoaded: n => `${n.toLocaleString('es-CO')} candidatos cargados`,
-        loadingBoards: 'Cargando concejos y juntas locales…', loadingLocal: n => `faltan ${n} índices de Concejo y JAL`, loadingLocalShort: n => `Cargando Concejo y JAL · faltan ${n} índices`,
+        loadingBoards: 'Cargando concejos y juntas locales…', loadingLocal: n => n === 1 ? 'falta 1 índice de Concejo y JAL' : `faltan ${n} índices de Concejo y JAL`, loadingLocalShort: n => n === 1 ? 'Cargando Concejo y JAL · falta 1 índice' : `Cargando Concejo y JAL · faltan ${n} índices`,
         dlBy: 'Descargar por', dlDep: '⬇ Depto.', dlMun: '⬇ Municipio', dlCom: '⬇ Com./Local.', dlPue: '⬇ Puesto', dlMesa: '⬇ Mesa',
         connecting: 'Conectando con S3…', placeholder: 'Busca un candidato para ver su perfil electoral',
         mapTitle: 'Mapa · Votación por departamento', mapLoading: 'Cargando mapa…',
@@ -1216,7 +1216,7 @@
         congress: 'Congress 2026', page: 'Candidate Map',
         searchLabel: 'Search candidate', searchPlaceholder: 'Candidate name…',
         loadingIndex: 'Loading index…', candidatesLoaded: n => `${n.toLocaleString('en-US')} candidates loaded`,
-        loadingBoards: 'Loading councils and local boards…', loadingLocal: n => `${n} council and local-board indexes to go`, loadingLocalShort: n => `Loading council and local boards · ${n} indexes to go`,
+        loadingBoards: 'Loading councils and local boards…', loadingLocal: n => n === 1 ? '1 council and local-board index to go' : `${n} council and local-board indexes to go`, loadingLocalShort: n => n === 1 ? 'Loading council and local boards · 1 index to go' : `Loading council and local boards · ${n} indexes to go`,
         dlBy: 'Download by', dlDep: '⬇ Dept.', dlMun: '⬇ Municipality', dlCom: '⬇ Com./Locality', dlPue: '⬇ Polling station', dlMesa: '⬇ Table',
         connecting: 'Connecting to S3…', placeholder: 'Search for a candidate to view their electoral profile',
         mapTitle: 'Map · Votes by department', mapLoading: 'Loading map…',
@@ -3117,7 +3117,7 @@
         candIndex = agruparPersonas(candIndex);
 
         const rp = await fetch(`${PRES_BASE}/index-presidencial.json`).catch(() => null);
-        ldProgreso(CandRegistry.SOURCES.length + 1, CandRegistry.SOURCES.length + 1);
+        ldProgreso(CandRegistry.SOURCES.length + 1, _pasos);   // 22 de 30, no 22 de 22
         // Merge presidenciales (una entrada por persona; el histórico vive en meta.pres)
         if (rp && rp.ok) {
           try {
@@ -3155,8 +3155,12 @@
         hintSet(candIndex.length, CandRegistry.LOCAL_SOURCES.length);
         ensureLocal();
         /* Red de seguridad: si los concejos no llegan, el loader no se puede
-           quedar puesto para siempre tapando la página. */
-        setTimeout(ldFin, 45000);
+           quedar puesto para siempre tapando la página. 45 s se quedaban cortos
+           —con caché fría son ~16 s desde una conexión buena, o sea que una lenta
+           se los come— y el loader se cerraba con los ocho índices aún en vuelo.
+           Detrás del cierre el contador sigue subiendo y el aviso sigue diciendo
+           cuántos faltan, así que cerrar tarde no engaña a nadie. */
+        setTimeout(ldFin, 90000);
         // No inicializar el mapa aquí: el panel aún está oculto (display:none)
         // y Leaflet mediría el contenedor como 0×0 → NaN en coordenadas.
         // El mapa se inicializa en loadCandData() cuando el panel ya es visible.

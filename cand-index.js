@@ -254,21 +254,38 @@
   //     a los pocos segundos, en vez de esperar a que estén los ocho.
   //   ⚠️ La promesa se cachea: si loadLocal() ya se llamó, la segunda llamada
   //     recibe la lista completa al resolver pero NO los avisos de onSource.
+  /* ⚠️⚠️ DE DOS EN DOS, NO LOS OCHO A LA VEZ. Son ~12 MB comprimidos por un solo
+     tubo: lanzados en paralelo se reparten el ancho de banda y **aterrizan todos
+     al final**, así que el contador no se mueve en absoluto hasta que termina todo
+     y la página parece colgada. Medido con caché fría: en paralelo el primer índice
+     grande llega a los 8,8 s y el último a los 13,8; de dos en dos el contador
+     arranca a 1,2 s y sube escalonado —13k, 108k, 209k, 307k, 396k— por 1,8 s más
+     de total. En una conexión lenta la diferencia es entre ver progreso y creer que
+     no carga nada.
+     El orden de LOCAL_SOURCES importa: 2023 primero, que es lo que más se busca. */
+  const LOCAL_CONCURRENCIA = 2;
   let _localPromise = null;
   function loadLocal(opts) {
     opts = opts || {};
     if (_localPromise) return _localPromise;
     const bases = opts.bases || {};
     const filtra = l => opts.includeParties === false ? l.filter(c => !isPartyEntry(c)) : l;
-    let listos = 0;
-    _localPromise = Promise.all(LOCAL_SOURCES.map(async src => {
-      const base = bases[src.name] || `${S3}/${src.dir}`;
-      const list = await fetchSource(src, base);
-      list.forEach(c => { _bySlug[c.slug] = c; });
-      listos++;
-      if (opts.onSource) { try { opts.onSource(filtra(list), src, listos, LOCAL_SOURCES.length); } catch (e) {} }
-      return list;
-    })).then(per => filtra(per.flat()));
+    let listos = 0, siguiente = 0;
+    const acum = [];
+    async function obrero() {
+      while (siguiente < LOCAL_SOURCES.length) {
+        const src = LOCAL_SOURCES[siguiente++];
+        const base = bases[src.name] || `${S3}/${src.dir}`;
+        const list = await fetchSource(src, base);
+        list.forEach(c => { _bySlug[c.slug] = c; });
+        acum.push(list);
+        listos++;
+        if (opts.onSource) { try { opts.onSource(filtra(list), src, listos, LOCAL_SOURCES.length); } catch (e) {} }
+      }
+    }
+    _localPromise = Promise.all(
+      Array.from({ length: Math.min(LOCAL_CONCURRENCIA, LOCAL_SOURCES.length) }, obrero)
+    ).then(() => filtra(acum.flat()));
     return _localPromise;
   }
 
