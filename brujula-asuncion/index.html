@@ -223,7 +223,7 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
       <div class="actions"><button class="btn btn-ghost" onclick="goTo('p-demo')">← Volver</button><button class="btn" id="btn-canal" disabled onclick="goTo('p-prio')">Seguir →</button></div>
     </div>
 
-    <div class="panel" id="p-prio"><div class="qhead"><span class="qnum">Antes de las preguntas</span><span class="qtag">Tus prioridades</span></div><p class="qtext">¿Cuáles son los dos temas más importantes para vos en Asunción?</p><p class="qhint">Vamos a hacerte 9 preguntas generales y 3 adicionales sobre los temas que elijas.</p><div class="chips" id="tema-chips"></div><div class="actions"><button class="btn btn-ghost" onclick="goTo('p-canal')">← Volver</button><button class="btn" id="btn-prio" disabled onclick="startQ()">Ir a las preguntas →</button></div></div>
+    <div class="panel" id="p-prio"><div class="qhead"><span class="qnum">Antes de las preguntas</span><span class="qtag">Tus prioridades</span></div><p class="qtext">¿Cuáles son los dos temas más importantes para vos en Asunción?</p><div class="chips" id="tema-chips"></div><div class="actions"><button class="btn btn-ghost" onclick="goTo('p-canal')">← Volver</button><button class="btn" id="btn-prio" disabled onclick="startQ()">Ir a las preguntas →</button></div></div>
 
     <!-- 3 · UBICACIÓN -->
     <div class="panel" id="p-ubi">
@@ -308,7 +308,7 @@ function avatar(c,extra){ return `<div class="avatar ${extra||''}" style="--cc:$
 function wording(q){ return STATE.lenguaje==='popular' && q.popular ? q.popular : q; }
 
 /* ── 0. lenguaje ── */
-function pickLang(id){ STATE.lenguaje=id; document.querySelectorAll('#lang-grid [data-lang]').forEach(b=>b.classList.toggle('sel',b.dataset.lang===id)); $('btn-lang').disabled=false; }
+function pickLang(id){ STATE.lenguaje=id; renderTemas(); document.querySelectorAll('#lang-grid [data-lang]').forEach(b=>b.classList.toggle('sel',b.dataset.lang===id)); $('btn-lang').disabled=false; }
 
 /* ── 1. candidato ── */
 (function(){
@@ -326,7 +326,12 @@ function pickCanal(id){ STATE.canal=id; document.querySelectorAll('#canal-opts .
 
 /* ── 3. temas prioritarios ── */
 const TEMAS = [...new Map(BANCO.map(q=>[q.tema.id,q.tema])).values()];
-$('tema-chips').innerHTML = TEMAS.map(t=>`<button class="chip" data-tema="${t.id}" onclick="pickTema(${t.id})">${esc(t.nombre)}</button>`).join('');
+const TEMAS_LABEL = {
+  informada:['Calles y mantenimiento','Basura y limpieza','Raudales y desagües','Cómo funciona la Muni','Deuda y presupuesto','Movilidad y transporte','Plazas y áreas verdes','Seguridad en los barrios','Edificios y vida barrial','Vivienda y títulos','Empleo y oportunidades','Dengue y prevención'],
+  popular:['Calles llenas de baches','Basura en el barrio','Raudales cuando llueve','La Muni y su gasto','Deuda y en qué se va la plata','Colectivo, tráfico y veredas','Plazas y lugares verdes','Sentirse seguro en el barrio','Edificios y negocios cerca de casa','Casas, terrenos y títulos','Laburo y oportunidades','Dengue y criaderos']
+};
+function renderTemas(){ const labels=TEMAS_LABEL[STATE.lenguaje]||TEMAS_LABEL.informada; $('tema-chips').innerHTML=TEMAS.map(t=>`<button class="chip ${STATE.temas.includes(t.id)?'sel':''}" data-tema="${t.id}" onclick="pickTema(${t.id})">${labels[t.id-1]}</button>`).join(''); }
+renderTemas();
 function pickTema(id){
   const index=STATE.temas.indexOf(id);
   if(index>=0) STATE.temas.splice(index,1); else if(STATE.temas.length<2) STATE.temas.push(id);
