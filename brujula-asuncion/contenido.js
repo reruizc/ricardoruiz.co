@@ -30,7 +30,7 @@ window.BRUJULA = {
       redes:{ ig:'@arleneaquinomorel', x:'@ArleneAquino', web:'Arlene es Asunción' } },
   ],
 
-  /* Ejes de la brújula, derivados de las MISMAS 10 preguntas (no del partido).
+  /* Ejes de la brújula, derivados de las preguntas estructurales (no del partido).
      inv:true = la escala de la pregunta va al revés del eje. */
   ejes: {
     estado: { nombre:'Estado municipal', polos:['Menos Municipalidad: competencia, ajuste y privados','Más Municipalidad: servicio directo y estructura'],
@@ -118,6 +118,18 @@ window.BRUJULA = {
             soledad:{pos:3,conf:'B',txt:'Su programa desarrolla catastro, gestión urbana y políticas territoriales, pero no hay una regla pública específica para el caso de familias en proceso de titulación enfrentadas a un proyecto inmobiliario concreto. No sería correcto adjudicarle 1 o 2 solo por su trayectoria anterior en vivienda.'},
             rodri:{pos:3,conf:'B',txt:'Su programa vincula catastro, claridad jurídica y “paz social”, pero no especifica qué prevalecería cuando la regularización de residentes entra en conflicto con un proyecto de inversión.'},
             arlene:{pos:1,conf:'A',txt:'Uno de sus posicionamientos más definidos: ha propuesto titulación masiva y la presenta como herramienta de seguridad jurídica, paz ciudadana y fortalecimiento de la recaudación municipal.'} } },
+    { n:11, tema:'EM', tag:'Empleo', texto:'¿Qué papel debería asumir la Municipalidad en la generación de oportunidades laborales?',
+      escala:['No es una función municipal relevante','Un papel limitado de facilitación','Apoyo complementario','Un rol activo de articulación y programas','Considerar empleo y oportunidades una prioridad municipal'],
+      pos:{ camilo:{pos:4,conf:'A',txt:'Su programa propone facilitar inversión, simplificar trámites y articular al sector privado para generar actividad económica y empleo.'},
+            soledad:{pos:5,conf:'A',txt:'Propone una Municipalidad activa en la articulación de oportunidades, formación y desarrollo económico local.'},
+            rodri:{pos:4,conf:'A',txt:'Plantea simplificación, competencia y condiciones para que el sector privado genere empleo, con un rol municipal de facilitación activa.'},
+            arlene:{pos:5,conf:'A',txt:'Su propuesta vincula oportunidades, formación, economía barrial y acompañamiento municipal directo.'} } },
+    { n:12, tema:'SP', tag:'Dengue y salud', texto:'¿Qué papel debería asumir la Municipalidad en la prevención del dengue y otras arbovirosis?',
+      escala:['Responsabilidad principalmente del sistema nacional de salud','Un papel municipal limitado','Coordinación regular con Salud y SENEPA','Intervención municipal activa','Prevención territorial permanente como responsabilidad municipal compartida'],
+      pos:{ camilo:{pos:3,conf:'B',txt:'La evidencia pública disponible no permite ubicar con certeza el alcance de su propuesta municipal específica frente al dengue.'},
+            soledad:{pos:4,conf:'M',txt:'Su enfoque de servicios, prevención y gestión territorial permite inferir una intervención municipal activa, coordinada con el sistema nacional.'},
+            rodri:{pos:4,conf:'A',txt:'Propone una Municipalidad activa en servicios y presencia territorial, incluyendo prevención y respuesta en los barrios.'},
+            arlene:{pos:5,conf:'A',txt:'Su propuesta prioriza una presencia territorial sostenida, servicios básicos y prevención cercana a los barrios.'} } },
   ],
 
   /* 5 arquetipos sociodigitales del modelo territorial (inferenciales) */
@@ -140,3 +152,20 @@ window.BRUJULA = {
     ],
   },
 };
+
+/* La versión de barrio conserva la escala y las posiciones; solo cambia la redacción. */
+const VERSION_BARRIO = {
+  1:{texto:'Cuando la calle está llena de baches, ¿qué tiene que hacer primero la Muni?',escala:['Arreglar rápido la mayor cantidad posible','Arreglar rápido en más lugares','Mezclar arreglos rápidos con obras de fondo','Hacer más arreglos completos','Arreglar de raíz las calles más críticas, aunque sean menos']},
+  2:{texto:'Con la basura, ¿quién tiene que hacerse cargo principalmente?',escala:['Empresas privadas, bien controladas por la Muni','Mayormente empresas privadas','Muni y empresas trabajando juntas','Mayormente la Muni','La Muni directamente de punta a punta']},
+  3:{texto:'Cuando vienen los raudales, ¿dónde hay que poner primero la plata para desagües?',escala:['Terminar las obras grandes que ya arrancaron','Dar más prioridad a las obras grandes','Mezclar obras grandes y soluciones de barrio','Meter más soluciones en los barrios','Repartir en muchas soluciones puntuales por los barrios']},
+  4:{texto:'Con la plata corta, ¿qué hacemos con el gasto de oficina de la Muni?',escala:['Recortar fuerte para que alcance para servicios y obras','Bajar bastante el gasto de oficina','Buscar un punto medio','Hacer ajustes moderados','Dejar casi igual y cambiar de a poco']},
+  5:{texto:'Si la plata de la Muni no alcanza para todo, ¿qué tendría que ir primero?',escala:['Bajar primero la deuda','Dar más prioridad a pagar la deuda','Equilibrar deuda, servicios y obras','Dar más prioridad a servicios y obras','Mantener servicios y obras aunque la deuda baje más lento']},
+  6:{texto:'Para movernos mejor por Asunción, ¿qué tiene que ir primero?',escala:['Colectivos, veredas y otras opciones al auto','Principalmente colectivo y peatón','Equilibrar todos los medios','Mejorar más la circulación de autos','Dar prioridad a autos, estacionamiento y calles']},
+  7:{texto:'Con las plazas y parques, ¿qué tendría que pesar más?',escala:['Cuidarlos como espacios verdes y de todos','Proteger más lo público y verde','Buscar equilibrio','Permitir algunos usos privados, con reglas','Permitir usos privados si ayudan a mantenerlos']},
+  8:{texto:'Para sentirnos más seguros en la calle y la plaza, ¿qué tendría que hacer primero la Muni?',escala:['Más cámaras, vigilancia y control','Más presencia de control','Mezclar vigilancia y prevención','Más iluminación y recuperar espacios','Iluminación, espacios cuidados y prevención con vecinos']},
+  9:{texto:'Cuando llegan edificios o negocios nuevos al barrio, ¿qué tendría que pesar más?',escala:['Poner reglas fuertes para cuidar el barrio','Proteger más al barrio','Buscar equilibrio','Dar más lugar a proyectos e inversión','Facilitar inversión y más edificios si cumplen las reglas']},
+  10:{texto:'Si una obra nueva afecta a familias que todavía esperan el título de su casa, ¿qué hay que hacer primero?',escala:['Resolver primero lo de las familias que ya viven ahí','Dar más prioridad a los vecinos','Resolver las dos cosas al mismo tiempo','Dar más prioridad a la obra nueva','Dejar avanzar la obra mientras se arreglan o compensan los casos']},
+  11:{texto:'¿La Muni pio tiene que ayudar a que haya más laburo en Asunción?',escala:['Eso no le toca mucho a la Muni','Que ayude poquito nomás','Que acompañe en algunas cosas','Que se mueva bastante con empresas y cursos','Sí, que se mueva para que haya laburo, no discurso nomás']},
+  12:{texto:'Con el dengue dando vueltas cada verano, ¿la Muni pio tiene que meterse fuerte o dejarle casi todo a Salud y SENEPA?',escala:['Eso es más de Salud y SENEPA','Que la Muni ayude poquito nomás','Que trabajen juntos seguido','Que la Muni se mueva fuerte nomás','Sí, barrio por barrio y todo el año; no aparecer solo cuando explota el dengue']},
+};
+window.BRUJULA.preguntas.forEach(q=>{ q.popular=VERSION_BARRIO[q.n]; });
