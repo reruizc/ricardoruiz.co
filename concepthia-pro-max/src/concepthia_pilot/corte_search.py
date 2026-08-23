@@ -5,12 +5,13 @@ from functools import lru_cache
 import gzip
 import hashlib
 import json
+import os
 from pathlib import Path
 
 from .retrieval import BM25Index, Chunk
 
 
-DEFAULT_INDEX = Path("data/jurisprudence/corte-chunks-pilot-500.jsonl.gz")
+DEFAULT_INDEX = Path("data/jurisprudence/corte-search-pilot-500.jsonl.gz")
 
 
 @lru_cache(maxsize=1)
@@ -22,18 +23,19 @@ def _index(path_text: str) -> BM25Index:
             row = json.loads(raw)
             sentence = str(row["sentencia"])
             chunks.append(Chunk(
-                chunk_id=str(row["chunk_id"]), concept_id=str(row["id"]), radicado=sentence,
+                chunk_id=str(row.get("chunk_id", row["id"])), concept_id=str(row["id"]), radicado=sentence,
                 anio=int(str(row["fecha"])[:4]), titulo=f"Corte Constitucional · Sentencia {sentence}",
-                tema=str(row.get("temas", "")), subtema=str(row.get("sala", "")), pagina=int(row["posicion"]),
-                posicion_en_pagina=int(row["posicion"]), texto=str(row["texto"]), palabras=int(row["palabras"]),
+                tema=str(row.get("temas", "")), subtema=str(row.get("sala", "")), pagina=int(row.get("posicion", 1)),
+                posicion_en_pagina=int(row.get("posicion", 1)), texto=str(row["texto"]), palabras=int(row.get("palabras", len(str(row["texto"]).split()))),
                 nombre_archivo_pdf=sentence, sha256_pdf=hashlib.sha256(sentence.encode()).hexdigest(),
                 url_ficha=str(row["url"]), url_pdf=str(row["url"]),
             ))
     return BM25Index(chunks)
 
 
-def search_corte_constitucional(question: str, path: Path = DEFAULT_INDEX, limit: int = 5) -> tuple[dict[str, str], ...]:
+def search_corte_constitucional(question: str, path: Path | None = None, limit: int = 5) -> tuple[dict[str, str], ...]:
     """Return distinct official decisions; an unavailable local pilot is non-fatal."""
+    path = path or Path(os.environ.get("CONCEPTHIA_CORTE_INDEX", str(DEFAULT_INDEX)))
     if not path.is_file():
         return ()
     results = _index(str(path)).search(question, limit=limit * 5)
