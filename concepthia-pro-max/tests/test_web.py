@@ -2,6 +2,7 @@ import io
 import json
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from concepthia_pilot import web
 
@@ -56,10 +57,16 @@ class WebTests(unittest.TestCase):
 
     def test_jurisprudence_review_returns_official_searches(self):
         payload = json.dumps({"question": "prima técnica", "review_jurisprudence": True}).encode()
-        status, _, body = request(type(self).app, "POST", "/api/answer", payload)
+        live = ({"court": "Consejo de Estado", "label": "Rad. 11001", "url": "https://samai.consejodeestado.gov.co/documento", "coverage": "1 de enero de 2026", "summary": "Providencia de prueba", "sala": "Sección Segunda"},)
+        corte = ({"court": "Corte Constitucional", "sentencia": "T-123/26", "label": "Sentencia T-123/26", "url": "https://corteconstitucional.gov.co/T-123-26.htm", "coverage": "2026", "summary": "Sentencia de prueba", "sala": "Sala Segunda"},)
+        with patch.object(web, "search_consejo_estado", return_value=live), patch.object(web, "search_corte_constitucional", return_value=corte):
+            status, _, body = request(type(self).app, "POST", "/api/answer", payload)
         data = json.loads(body)
         self.assertEqual(status, "200 OK")
-        self.assertEqual(len(data["jurisprudence"]), 2)
+        self.assertEqual(len(data["jurisprudence"]), 4)
+        self.assertEqual(data["jurisprudence"][0]["label"], "Sentencia T-123/26")
+        self.assertTrue(any(source["id"] == "CE Rad: 11001" for source in data["sources"]))
+        self.assertTrue(any(source["id"] == "CC T-123/26" for source in data["sources"]))
         self.assertTrue(all(link["url"].startswith("https://") for link in data["jurisprudence"]))
 
     def test_display_date_formats_iso_date_in_spanish(self):

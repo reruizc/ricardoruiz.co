@@ -54,6 +54,11 @@ Expón objetivamente la pregunta recibida, sin inventar hechos. Empieza con “S
 Desarrolla aquí la postura sustentada del DASCD. Para cada afirmación factual o jurídica relevante,
 cita exactamente el identificador del extracto entre corchetes. Prioriza citas como
 **[Nro. Rad: 2-2023-3150]**; usa [S#] solo cuando el documento no tenga radicado identificable.
+Cuando uses una providencia del Consejo de Estado, cita exactamente su identificador
+**[CE Rad: …]**. Preséntala como jurisprudencia de esa Corporación, nunca como un concepto
+emitido por el DASCD.
+Cuando uses una sentencia de la Corte Constitucional, cita exactamente **[CC …]** y preséntala
+como jurisprudencia constitucional, nunca como un concepto emitido por el DASCD.
 Si los extractos no permiten concluir algo, indícalo expresamente. Señala fuentes
 insuficientes, desactualizadas o potencialmente inaplicables.
 

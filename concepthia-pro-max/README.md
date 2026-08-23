@@ -61,3 +61,18 @@ Para usar DeepSeek, exporta `DEEPSEEK_API_KEY`; se selecciona automáticamente y
 ## Pruebas de la interfaz
 
 Las pruebas locales no consumen una clave ni hacen llamadas al proveedor: validan el formulario, el manejo de preguntas inválidas y que una respuesta incluya fuentes. Ejecútalas con `PYTHONPATH=src python -m unittest discover -s tests -v`.
+### Corpus de Corte Constitucional (S3)
+
+El índice Socrata oficial enumera las sentencias; el texto se extrae de la Relatoría oficial y se guarda comprimido para indexación posterior. Piloto de 500 providencias desde 2016 y subida directa a S3:
+
+```bash
+PYTHONPATH=src python3 -m concepthia_pilot.corte_index --from-year 2016 --limit 500 --workers 4 \
+  --s3-uri s3://elecciones-2026/ricardoruiz.co/concepthia-pro-max/jurisprudence/corte-documents.jsonl.gz
+```
+
+Para convertir el corpus descargado en pasajes BM25 citables:
+
+```bash
+PYTHONPATH=src python3 -m concepthia_pilot.corte_chunks \
+  --s3-uri s3://elecciones-2026/ricardoruiz.co/concepthia-pro-max/jurisprudence/corte-chunks-pilot-500.jsonl.gz
+```

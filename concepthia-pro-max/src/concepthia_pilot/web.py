@@ -13,6 +13,8 @@ from urllib.parse import quote_plus
 from wsgiref.simple_server import make_server
 
 from .answer import make_sources, provider_from_env, retrieve
+from .corte_search import as_evidence as corte_evidence, search_corte_constitucional
+from .jurisprudence import as_evidence, search_consejo_estado
 
 
 MAX_BODY_BYTES = 8_000
@@ -29,23 +31,25 @@ def display_date(value: str) -> str:
     return f"{parsed.day} de {MONTHS_ES[parsed.month - 1]} de {parsed.year}"
 
 
-def jurisprudence_links(question: str) -> list[dict[str, str]]:
-    """Prepare traceable searches in the official court repositories."""
+def jurisprudence_links(question: str, live_results: tuple[dict[str, str], ...] = (), corte_results: tuple[dict[str, str], ...] = ()) -> list[dict[str, str]]:
+    """Return official entry points, with live SAMAI decisions when available."""
     encoded = quote_plus(question)
-    return [
+    links = [*corte_results, *live_results]
+    links.extend([
         {
             "court": "Corte Constitucional",
-            "label": "Buscar providencias en la Relatoría",
-            "url": f"https://www.corteconstitucional.gov.co/relatoria/buscador-jurisprudencia?texto={encoded}",
-            "coverage": "Providencias publicadas desde 1992",
+            "label": "Continuar búsqueda en la Relatoría",
+            "url": f"https://www.corteconstitucional.gov.co/relatoria/buscador-jurisprudencia?q={encoded}",
+            "coverage": "Buscador oficial de la Relatoría",
         },
         {
             "court": "Consejo de Estado",
-            "label": "Buscar decisiones en Mi Relatoría",
+            "label": "Abrir Mi Relatoría y búsqueda histórica",
             "url": "https://consejodeestado.gov.co/buscador-de-jurisprudencia2/",
-            "coverage": "Decisiones tituladas desde el 1 de diciembre de 2021 y buscador histórico",
+            "coverage": "Acceso a decisiones tituladas y buscador histórico",
         },
-    ]
+    ])
+    return links
 
 
 def json_response(start_response: Callable, status: HTTPStatus, body: dict[str, object]) -> list[bytes]:
@@ -105,6 +109,10 @@ def app(data_dir: Path):
         if not results:
             return json_response(start_response, HTTPStatus.OK, {"answer": None, "sources": [], "message": "No encontré evidencia suficiente en el corpus local."})
         sources = make_sources(results)
+        live_jurisprudence = search_consejo_estado(question) if review_jurisprudence else ()
+        live_corte = search_corte_constitucional(question) if review_jurisprudence else ()
+        sources.extend(as_evidence(live_jurisprudence))
+        sources.extend(corte_evidence(live_corte))
         drafting_request = (
             f"Consulta sustantiva: {question}\nRadicado: {radicado}\nFecha: {fecha}\n"
             f"Destinatario: {destinatario}\nSubdirector Jurídico: {subdirector}"
@@ -121,7 +129,7 @@ def app(data_dir: Path):
             })
         return json_response(start_response, HTTPStatus.OK, {
             "answer": draft, "sources": sources,
-            "jurisprudence": jurisprudence_links(question) if review_jurisprudence else [],
+            "jurisprudence": jurisprudence_links(question, live_jurisprudence, live_corte) if review_jurisprudence else [],
             "warning": "Borrador informativo: requiere revisión humana; no constituye asesoría jurídica.",
         })
     return application
