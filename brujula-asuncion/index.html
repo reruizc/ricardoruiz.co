@@ -257,17 +257,22 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
         <p class="note" id="res-note"></p>
       </div>
       <div class="sec" id="res-mine-wrap"></div>
-      <div class="sec" id="ejes-sec"><div class="sec-eyebrow"><span>La brújula · ejes derivados de tus respuestas</span></div>
-        <div class="card compass-wrap"><svg class="compass" id="compass" viewBox="0 0 400 400"></svg><div id="axisbars"></div></div>
-      </div>
       <div class="sec" id="res-prio-wrap"></div>
       <div class="sec" id="res-arq-wrap"></div>
       <div class="sec" id="res-map-wrap" style="display:none"><div class="sec-eyebrow"><span>El mapa de Asunción, barrio por barrio</span><span id="map-src">INE · 68 barrios</span></div>
         <div class="card"><div class="map-ctl" id="map-ctl"></div><div class="map" id="map-res"></div><div class="map-leg" id="map-leg"></div><p class="note" id="map-note"></p></div></div>
       <div class="sec" id="res-zona-wrap"></div>
-      <div class="sec"><div class="sec-eyebrow"><span>Compartir</span></div><div class="share-row" id="share-row"></div></div>
       <p class="foot">La afinidad mide distancia entre tus respuestas y las posiciones públicas de cada candidatura (programas, entrevistas y declaraciones verificables, corte 14-ago-2026), con 12 preguntas de igual peso. Las posiciones marcadas como <b>pendientes</b> no cuentan ni a favor ni en contra. Los datos de tu zona son resultados oficiales del TSJE (municipales 2010, 2015 y 2021; presidenciales 2013, 2018 y 2023) y un modelo territorial inferencial; no son una predicción de 2026. Esto no es una encuesta.</p>
       <div class="actions"><button class="btn btn-ghost" onclick="restart()">Repetir</button><button class="btn btn-ghost" onclick="openModal()">Metodología</button></div>
+    </div>
+
+    <div class="panel" id="p-brujula">
+      <div class="qhead"><span class="qnum">Tu brújula</span><span class="qtag">Ejes</span></div>
+      <div class="sec" id="ejes-sec"><div class="sec-eyebrow"><span>La brújula · ejes derivados de tus respuestas</span></div>
+        <div class="card compass-wrap"><svg class="compass" id="compass" viewBox="0 0 400 400"></svg><div id="axisbars"></div></div>
+      </div>
+      <div class="sec"><div class="sec-eyebrow"><span>Compartir</span></div><div class="share-row" id="share-row"></div></div>
+      <div class="actions"><button class="btn btn-ghost" onclick="goTo('p-res')">← Volver al resultado</button></div>
     </div>
   </div>
   <div class="full-footer">Brújula Asunción 2026 · v1 · corte de posiciones 14-ago-2026</div>
@@ -421,7 +426,7 @@ function renderAll(){
   // ranking
   $('res-rank').innerHTML = res.map(r=>`<button class="rank-row ${mine&&mine.id===r.c.id?'mine':''} ${STATE.verCand===r.c.id?'sel':''}" style="--cc:${r.c.color};border:0;background:transparent;width:100%;text-align:left;cursor:pointer" onclick="pickResCand('${r.c.id}')">${avatar(r.c)}<div><div class="rank-meta"><span class="rank-nom">${r.c.nombre}</span>${r.pend.length?`<span class="rank-pend">${r.pend.length} pendiente${r.pend.length>1?'s':''}</span>`:''}</div><div class="rank-bar"><div class="rank-fill" style="width:${r.pct??0}%"></div></div></div><div class="rank-pct">${r.pct==null?'—':r.pct+'%'}</div></button>`).join('');
   const pendTot = res.reduce((a,r)=>a+r.pend.length,0);
-  $('res-note').innerHTML = (pendTot? `Algunas candidaturas no se han pronunciado en ciertos temas (<b>${pendTot}</b> posiciones pendientes en total). Esas preguntas no cuentan para ese candidato. ` : '') + (mine?'★ = el candidato que declaraste. ':'') + `<button class="link" onclick="document.getElementById('ejes-sec').scrollIntoView({behavior:'smooth',block:'start'})">Ver brújula</button>`;
+  $('res-note').innerHTML = (pendTot? `Algunas candidaturas no se han pronunciado en ciertos temas (<b>${pendTot}</b> posiciones pendientes en total). Esas preguntas no cuentan para ese candidato. ` : '') + (mine?'★ = el candidato que declaraste. ':'') + `<button class="link" onclick="goTo('p-brujula')">Ver brújula</button>`;
   // coincidencias con el declarado (o el top)
   const ref = CAND.find(c=>c.id===STATE.verCand) || mine || top.c;
   const rows = Q.filter(q=>STATE.ans[q.n]&&q.pos[ref.id].conf!=='B').map(q=>({q, d:Math.abs(STATE.ans[q.n]-q.pos[ref.id].pos)})).sort((a,b)=>a.d-b.d);
