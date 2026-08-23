@@ -729,6 +729,33 @@ def _ejecutivo():
     return _EJEC
 
 
+# --- pilar Órganos de control y altas cortes -------------------------------
+_CONTROL = None
+_CONTROL_STATS = None
+
+
+def _control_stats():
+    global _CONTROL_STATS
+    if _CONTROL_STATS is None:
+        try:
+            _CONTROL_STATS = _get_json('metadata/control-stats.json')
+        except Exception:
+            _CONTROL_STATS = {'total': 0, 'por_fuente': [], 'por_tipo': [],
+                              'rango_fechas': ['', ''], 'recientes': []}
+    return _CONTROL_STATS
+
+
+def _control():
+    global _CONTROL
+    if _CONTROL is None:
+        try:
+            obj = _s3.get_object(Bucket=BUCKET, Key='metadata/control.jsonl')
+            _CONTROL = [json.loads(line) for line in obj['Body'].read().decode('utf-8').split('\n') if line.strip()]
+        except Exception:
+            _CONTROL = []
+    return _CONTROL
+
+
 # --- pilar SUCOP (borradores de norma en consulta pública · DNP) ------------
 # El único pilar de Caudal cuyo dato CADUCA. Todo lo demás acá es histórico y no
 # envejece; un borrador cuya ventana de comentarios cerró es arqueología, y uno
@@ -3614,6 +3641,20 @@ def handler(event, context):
         if not body.get('titulo'):
             return _resp(400, {'error': 'falta titulo del proyecto'})
         return _resp(200, _contexto_medios(body))
+
+    if action == 'control':
+        q = _fold_q(body.get('query'))
+        fuente = (body.get('fuente') or '').strip()
+        if not q and not fuente:
+            return _resp(200, dict(_control_stats(), mode='stats'))
+        recs = [r for r in _control()
+                if (not fuente or r.get('fuente') == fuente)
+                and (not q or q in r.get('q', ''))]
+        out = [{k: v for k, v in r.items() if k != 'q'}
+               for r in sorted(recs, key=lambda r: r.get('fecha', ''), reverse=True)[:120]]
+        return _resp(200, {'mode': 'search', 'query': body.get('query', ''),
+                            'fuente': fuente, 'n': len(recs), 'mostrados': len(out),
+                            'resultados': out})
 
     if action == 'sanciones':      # pilar Regulatorio · actos de superintendencias
         q = _fold_q(body.get('query'))   # misma regla que el blob: sin tildes

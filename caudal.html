@@ -92,7 +92,7 @@
   /* nav v2 */
   nav{position:sticky; top:0; z-index:400; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:1rem; padding:1rem 1.8rem; border-bottom:1px solid var(--border); background:rgba(255,255,255,.86); backdrop-filter:blur(10px)}
   .e-nav-left{display:flex; align-items:center; gap:1rem; min-width:0; justify-self:start}
-  .e-nav-left:has(.nav-login){grid-column:1 / -1; width:100%; justify-content:space-between}
+  .nav-login{position:absolute; right:1.8rem; top:50%; transform:translateY(-50%)}
   .e-btn-back{font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-weight:500; font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--green); text-decoration:none; border:1.5px solid rgba(28,128,70,.4); padding:.35rem .8rem; transition:color .2s,border-color .2s,background .2s; flex-shrink:0; white-space:nowrap}
   .e-btn-back:hover{color:#fff; background:var(--green); border-color:var(--green)}
   .priv-badge{font-size:.56rem; letter-spacing:.16em; text-transform:uppercase; color:var(--teal); border:1px solid var(--teal-dim); padding:.22rem .5rem; border-radius:3px}
@@ -122,6 +122,7 @@
     .cobrand-cluster{order:-1; margin:.1rem auto; flex-wrap:wrap; justify-content:center}
     .cobrand{height:24px; max-width:74vw}
     .e-nav-left{justify-self:auto}
+    .nav-login{position:static; transform:none; margin-left:auto}
   }
 
   .wrap{max-width:1080px; margin:0 auto; padding:2.4rem 1.8rem 5rem}
@@ -1472,7 +1473,7 @@
     {id:'regulatorio', name:'Superintendencias y comisiones',   status:'live', n:'63.004', unit:'actos · 10 fuentes', desc:'Actos de la ANLA, INVIMA, SECOP, Superfinanciera, Supersalud, Supertransporte, SIC, Contraloría y más — 7.229 de ellos sanciones. Cada uno cita su resolución o comunicado.'},
     {id:'medios',      name:'Medios nacionales y regionales',   status:'live', n:'en vivo', unit:'prensa por tema',      desc:'Titulares de prensa nacional y regional, rastreados por tema — sin mantener un conector por medio.'},
     {id:'datos',       name:'Datos abiertos y contratación',    status:'live', n:'5,87 M', unit:'contratos · SECOP II', desc:'Todos los contratos electrónicos del Estado, consultados en vivo y actualizados a diario. Cada uno enlaza su proceso en SECOP.'},
-    {id:'control',     name:'Órganos de control y altas cortes',status:'live', n:'MVP', unit:'Consejo de Estado · Corte Constitucional', desc:'Providencias y decisiones que cambian la interpretación de la norma y afectan sectores, entidades y clientes.'},
+    {id:'control',     name:'Órganos de control y altas cortes',status:'live', n:'499', unit:'providencias · Corte Constitucional', desc:'Providencias y decisiones que cambian la interpretación de la norma y afectan sectores, entidades y clientes. Consejo de Estado se incorpora en el siguiente corte.'},
     {id:'ejecutivo',   name:'Ejecutivo nacional · Presidencia',   status:'live', n:'10.193', unit:'decretos · desde 2015', desc:'Decretos, resoluciones, directivas, circulares y agenda regulatoria de la Presidencia. Cada norma enlaza su texto oficial.'},
     {id:'sucop',       name:'Consulta pública de normas · SUCOP',status:'live', n:'3.899', unit:'borradores · desde 2020', desc:'Proyectos de decreto y resolución abiertos a comentarios ANTES de expedirse. La señal más temprana de Caudal: acá la norma todavía se puede pelear.'},
     {id:'gacetas',     name:'Diarios y gacetas oficiales',      status:'soon', desc:'Diario Oficial y Gaceta del Congreso: el texto completo del trámite.'},
@@ -1554,36 +1555,35 @@
     if(v==='sucop') sucLoadStats();
     if(v==='contratacion') conLoadStats();
     if(v==='medios') medLoadLanding();
-    if(v==='control') controlRender();
+    if(v==='control') controlLoad();
     if(v==='radicados') radLoad();
     if(v==='bancadas') bancLoad();
     if(v==='coaliciones') coaLoad();
   }
   /* ---------- pilar Regulatorio · sanciones ---------- */
-  /* ---------- pilar Órganos de control y altas cortes · MVP ----------
-     La interfaz ya usa el esquema final; estos dos registros son semillas de
-     producto mientras entran los harvesters oficiales. No se presentan como
-     cobertura completa: la etiqueta lo deja explícito. */
+  /* ---------- pilar Órganos de control y altas cortes ---------- */
   const CONTROL_EJEMPLOS=['salud','contratación','pensiones','ambiente','elecciones'];
-  const CONTROL_DATA=[
-    {fuente:'Consejo de Estado', tipo:'Providencia', fecha:'2026-08-20', tema:'Contratación estatal', titulo:'Decisiones de la jurisdicción contencioso-administrativa', resumen:'El Consejo de Estado fija criterios que pueden cambiar la lectura de contratos, actos administrativos y responsabilidad pública.', estado:'Fuente oficial conectada', url:'https://samai.consejodeestado.gov.co/TitulacionRelatoria/BuscadorProvidenciasTituladas.aspx'},
-    {fuente:'Corte Constitucional', tipo:'Sentencia', fecha:'2026-08-18', tema:'Derechos y política pública', titulo:'Decisiones de la Corte Constitucional', resumen:'La Corte delimita el alcance constitucional de normas y políticas que afectan entidades, sectores y ciudadanos.', estado:'Fuente oficial conectada', url:'https://www.corteconstitucional.gov.co/relatoria/tematico.php'}
-  ];
-  const CONTROL={q:''};
+  const CONTROL={q:'', fuente:''}; let CONTROL_STATS=null, _controlSeq=0;
   function controlCard(x){
-    const href=x.fuente==='Corte Constitucional' ? `https://www.corteconstitucional.gov.co/relatoria/tematico.php?campo=%2F&pg=0&sql=${encodeURIComponent(CONTROL.q||x.tema)}&todos=%25` : x.url;
-    return `<div class="sanc"><div class="sanc-top"><a class="sanc-name" href="${esc(href)}" target="_blank" rel="noopener">${esc(x.titulo)}</a><span class="sanc-fecha">${esc(x.fecha)}</span></div><div class="sanc-tags"><span class="doc-badge">${esc(x.fuente)}</span><span class="doc-badge">${esc(x.tipo)}</span><span class="doc-badge pal">${esc(x.estado)}</span></div><div class="sanc-motivo"><b>${esc(x.tema)}</b> · ${esc(x.resumen)}</div></div>`;
+    return `<div class="sanc"><div class="sanc-top"><a class="sanc-name" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.titulo||x.identificador)}</a><span class="sanc-fecha">${esc(x.fecha||'s. f.')}</span></div><div class="sanc-tags"><span class="doc-badge">${esc(x.fuente_nombre)}</span><span class="doc-badge">${esc(x.tipo)}</span></div><div class="sanc-motivo"><b>${esc(x.tema)}</b>${x.resumen?` · ${esc(x.resumen)}`:''}</div></div>`;
   }
-  function controlRender(){
+  function controlWire(){
+    const chips=document.getElementById('ctrlchips'), qel=document.getElementById('ctrlq'), go=document.getElementById('ctrlgo'), back=document.getElementById('controlBack');
+    if(chips&&!chips.childElementCount) CONTROL_EJEMPLOS.forEach(t=>{const c=document.createElement('span');c.className='chip';c.textContent=t;c.onclick=()=>{qel.value=t;CONTROL.q=t;controlLoad()};chips.appendChild(c)});
+    if(go&&!go.dataset.ready){go.dataset.ready='1';go.onclick=()=>{CONTROL.q=(qel.value||'').trim();controlLoad()};qel.addEventListener('keydown',e=>{if(e.key==='Enter')go.click()});back.onclick=()=>showView('home')}
+  }
+  function controlRender(d){
     const l=document.getElementById('control-landing'), r=document.getElementById('control-results'); if(!l||!r) return;
-    const q=CONTROL.q.toLowerCase();
-    const rows=CONTROL_DATA.filter(x=>!q||[x.fuente,x.tipo,x.tema,x.titulo,x.resumen].join(' ').toLowerCase().includes(q));
-    const chips=document.getElementById('ctrlchips');
-    if(chips&&!chips.childElementCount) CONTROL_EJEMPLOS.forEach(t=>{const c=document.createElement('span');c.className='chip';c.textContent=t;c.onclick=()=>{document.getElementById('ctrlq').value=t;CONTROL.q=t;controlRender()};chips.appendChild(c)});
-    l.innerHTML=`<div class="cli-note"><b>Primer corte activado.</b> ${CONTROL_DATA.length} fichas de entrada con acceso directo a las relatorías oficiales. La siguiente iteración reemplazará estas fichas por resultados cosechados y conservará el identificador de origen.</div>`;
-    r.innerHTML=rows.length?`<div class="rad-sec">Resultados · ${rows.length}</div>${rows.map(controlCard).join('')}`:`<div class="err">No encontramos decisiones para «${esc(CONTROL.q)}».</div>`;
-    const qel=document.getElementById('ctrlq'), go=document.getElementById('ctrlgo'), back=document.getElementById('controlBack');
-    if(go&&!go.dataset.ready){go.dataset.ready='1';go.onclick=()=>{CONTROL.q=(qel.value||'').trim();controlRender()};qel.addEventListener('keydown',e=>{if(e.key==='Enter')go.click()});back.onclick=()=>showView('home')}
+    controlWire();
+    const rows=d.resultados||d.recientes||[];
+    l.innerHTML=`<div class="cli-note"><b>Fuentes oficiales.</b> ${d.total||d.n||0} providencias indexadas · ${(d.por_fuente||[]).map(x=>`${esc(x.fuente)}: ${x.n}`).join(' · ')||'cargando cobertura'}.</div>`;
+    r.innerHTML=rows.length?`<div class="rad-sec">${d.mode==='search'?'Resultados':'Providencias recientes'} · ${d.n||rows.length}</div>${rows.map(controlCard).join('')}`:`<div class="err">No encontramos providencias para «${esc(CONTROL.q)}».</div>`;
+  }
+  async function controlLoad(){
+    const l=document.getElementById('control-landing'), r=document.getElementById('control-results'); if(!l||!r) return;
+    const seq=++_controlSeq; r.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Consultando jurisprudencia <span class="dots"><span></span><span></span><span></span></span></div>';
+    try{ const d=await call({action:'control',query:CONTROL.q,fuente:CONTROL.fuente}); if(seq!==_controlSeq)return; if(!CONTROL.q&&!CONTROL.fuente)CONTROL_STATS=d; controlRender(d); }
+    catch(e){if(seq===_controlSeq)r.innerHTML='<div class="err">No se pudo cargar la jurisprudencia. Reintenta.</div>';}
   }
   const REG={sector:'', q:'', tipoActo:'sancion'};
   const REG_SECS=[['','Todos'],['salud','Salud'],['contratacion','Contratación'],['financiero','Financiero'],['ambiental','Ambiental'],['transporte','Transporte'],['consumo','Consumo'],['juridico','Jurídico'],['control','Control fiscal']];
