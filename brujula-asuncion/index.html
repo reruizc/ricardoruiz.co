@@ -256,7 +256,7 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
         <p class="note" id="res-note"></p>
       </div>
       <div class="sec" id="res-mine-wrap"></div>
-      <div class="sec"><div class="sec-eyebrow"><span>La brújula · ejes derivados de tus respuestas</span></div>
+      <div class="sec" id="ejes-sec"><div class="sec-eyebrow"><span>La brújula · ejes derivados de tus respuestas</span></div>
         <div class="card compass-wrap"><svg class="compass" id="compass" viewBox="0 0 400 400"></svg><div id="axisbars"></div></div>
       </div>
       <div class="sec" id="res-prio-wrap"></div>
@@ -264,7 +264,6 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
       <div class="sec" id="res-map-wrap" style="display:none"><div class="sec-eyebrow"><span>El mapa de Asunción, barrio por barrio</span><span id="map-src">INE · 68 barrios</span></div>
         <div class="card"><div class="map-ctl" id="map-ctl"></div><div class="map" id="map-res"></div><div class="map-leg" id="map-leg"></div><p class="note" id="map-note"></p></div></div>
       <div class="sec" id="res-zona-wrap"></div>
-      <div class="sec"><div class="sec-eyebrow"><span>Pregunta por pregunta</span></div><div id="res-detalle"></div></div>
       <div class="sec"><div class="sec-eyebrow"><span>Compartir</span></div><div class="share-row" id="share-row"></div></div>
       <p class="foot">La afinidad mide distancia entre tus respuestas y las posiciones públicas de cada candidatura (programas, entrevistas y declaraciones verificables, corte 14-ago-2026), con 12 preguntas de igual peso. Las posiciones marcadas como <b>pendientes</b> no cuentan ni a favor ni en contra. Los datos de tu zona son resultados oficiales del TSJE (municipales 2010, 2015 y 2021; presidenciales 2013, 2018 y 2023) y un modelo territorial inferencial; no son una predicción de 2026. Esto no es una encuesta.</p>
       <div class="actions"><button class="btn btn-ghost" onclick="restart()">Repetir</button><button class="btn btn-ghost" onclick="openModal()">Metodología</button></div>
@@ -295,7 +294,7 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
 const B = window.BRUJULA, D = window.BRUJULA_DATOS || {zonas:[],puestos:[],barrios:[],meta:{}};
 const CAND = B.candidatos, BANCO = window.BRUJULA_BANCO;
 let Q = [];
-const STATE = { lenguaje:null, cand:null, edad:null, canal:null, zona:null, barrio:null, puesto:null, prio:[], temas:[], ans:{}, qi:0 };
+const STATE = { lenguaje:null, cand:null, verCand:null, edad:null, canal:null, zona:null, barrio:null, puesto:null, prio:[], temas:[], ans:{}, qi:0 };
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt = n => Math.round(n).toLocaleString('es-PY');
@@ -317,6 +316,7 @@ function pickLang(id){ STATE.lenguaje=id; renderTemas(); document.querySelectorA
     + `<button class="undecided" data-id="none" onclick="pickCand('none')">Todavía no me decido</button>`;
 })();
 function pickCand(id){ STATE.cand=id; document.querySelectorAll('#cand-grid [data-id]').forEach(b=>b.classList.toggle('sel',b.dataset.id===id)); $('btn-cand').disabled=false; }
+function pickResCand(id){ STATE.verCand=id; renderAll(); $('res-mine-wrap').scrollIntoView({behavior:'smooth',block:'center'}); }
 
 /* ── 2. demo ── */
 $('edad-chips').innerHTML = B.demo.edades.map(e=>`<button class="chip" data-id="${e.id}" onclick="pickEdad('${e.id}')">${e.l}</button>`).join('');
@@ -366,14 +366,15 @@ function renderQ(){
   const w = wording(q);
   $('q-num').textContent = `Pregunta ${q.n} de ${Q.length}`; $('q-tag').textContent = q.tag; $('q-text').textContent = w.texto;
   $('progressFill').style.width = (100*STATE.qi/Q.length)+'%';
-  $('q-opts').innerHTML = w.escala.map((t,i)=>`<button class="opt ${cur===i+1?'sel':''}" onclick="pickAns(${q.n},${i+1})"><span class="opt-num">${i+1}</span><span class="opt-text">${esc(t)}</span></button>`).join('')
+  const order = (q.orden ||= w.escala.map((_,i)=>i+1).sort(()=>Math.random()-.5));
+  $('q-opts').innerHTML = order.map(v=>`<button class="opt ${cur===v?'sel':''}" onclick="pickAns(${q.n},${v})"><span class="opt-num">${v}</span><span class="opt-text">${esc(w.escala[v-1])}</span></button>`).join('')
     + `<button class="opt skip ${cur===0?'sel':''}" onclick="pickAns(${q.n},0)"><span class="opt-dot" style="opacity:.25"></span><span class="opt-text">No tengo posición sobre esto · saltar</span></button>`;
   $('btn-next').disabled = cur===undefined; $('btn-prev').style.visibility = STATE.qi===0?'hidden':'visible';
   $('btn-next').textContent = STATE.qi===Q.length-1 ? 'Ver mi brújula →' : 'Siguiente →';
 }
-function pickAns(n,v){ STATE.ans[n]=v; document.querySelectorAll('#q-opts .opt').forEach((b,i)=>b.classList.toggle('sel', (i<5?i+1:0)===v)); $('btn-next').disabled=false; }
+function pickAns(n,v){ STATE.ans[n]=v; document.querySelectorAll('#q-opts .opt').forEach(b=>b.classList.toggle('sel', +b.getAttribute('onclick').match(/,([0-5])\)/)[1]===v)); $('btn-next').disabled=false; }
 function prevQ(){ if(STATE.qi>0){STATE.qi--; renderQ();} }
-function nextQ(){ if(STATE.qi<Q.length-1){ STATE.qi++; renderQ(); } else { $('progressFill').style.width='100%'; goTo('p-ubi'); } }
+function nextQ(){ if(STATE.qi<Q.length-1){ STATE.qi++; renderQ(); } else { $('progressFill').style.width='100%'; renderAll(); goTo('p-res'); } }
 
 /* prioridades: del barrio elegido (preocupaciones con intensidad 5) si lo hay */
 function inferPrio(){
@@ -414,16 +415,16 @@ function renderAll(){
   $('res-hero').innerHTML = top.pct==null ? `<div class="card">Respondiste muy pocas preguntas para calcular afinidad. <button class="link" onclick="restart()">Volvé a intentar</button>.</div>` :
     `<div class="hero" style="--cc:${top.c.color}"><div class="hero-top"><div><div class="h-eyebrow">${tie?'Empate en el primer lugar':'Con quien más coincidís'}</div><div class="h-name">${top.c.nombre}${tie?' y '+res[1].c.nombre:''}</div></div><div class="h-pct">${top.pct}%</div></div><div class="h-sub">${esc(top.c.partido)} · Lista ${top.c.lista}. ${esc(top.c.arquetipo)}. ${mine && mine.id!==top.c.id ? `Vos declaraste a <b>${mine.nombre}</b>: abajo te mostramos dónde coincidís y dónde no con cada uno.` : mine ? 'Coincide con el candidato que declaraste.' : 'Todavía no te definiste: esta es la lectura de tus respuestas, no una recomendación.'}</div></div>`;
   // ranking
-  $('res-rank').innerHTML = res.map(r=>`<div class="rank-row ${mine&&mine.id===r.c.id?'mine':''}" style="--cc:${r.c.color}">${avatar(r.c)}<div><div class="rank-meta"><span class="rank-nom">${r.c.nombre}</span>${r.pend.length?`<span class="rank-pend">${r.pend.length} pendiente${r.pend.length>1?'s':''}</span>`:''}</div><div class="rank-bar"><div class="rank-fill" style="width:${r.pct??0}%"></div></div></div><div class="rank-pct">${r.pct==null?'—':r.pct+'%'}</div></div>`).join('');
+  $('res-rank').innerHTML = res.map(r=>`<button class="rank-row ${mine&&mine.id===r.c.id?'mine':''} ${STATE.verCand===r.c.id?'sel':''}" style="--cc:${r.c.color};border:0;background:transparent;width:100%;text-align:left;cursor:pointer" onclick="pickResCand('${r.c.id}')">${avatar(r.c)}<div><div class="rank-meta"><span class="rank-nom">${r.c.nombre}</span>${r.pend.length?`<span class="rank-pend">${r.pend.length} pendiente${r.pend.length>1?'s':''}</span>`:''}</div><div class="rank-bar"><div class="rank-fill" style="width:${r.pct??0}%"></div></div></div><div class="rank-pct">${r.pct==null?'—':r.pct+'%'}</div></button>`).join('');
   const pendTot = res.reduce((a,r)=>a+r.pend.length,0);
-  $('res-note').innerHTML = (pendTot? `Algunas candidaturas no se han pronunciado en ciertos temas (<b>${pendTot}</b> posiciones pendientes en total, p. ej. desagües, densificación, titulación o dengue). Esas preguntas no cuentan para ese candidato: por eso los porcentajes no siempre salen de las mismas ${Q.length} preguntas. ` : '') + (mine?'★ = el candidato que declaraste.':'');
+  $('res-note').innerHTML = (pendTot? `Algunas candidaturas no se han pronunciado en ciertos temas (<b>${pendTot}</b> posiciones pendientes en total). Esas preguntas no cuentan para ese candidato. ` : '') + (mine?'★ = el candidato que declaraste. ':'') + `<button class="link" onclick="document.getElementById('ejes-sec').scrollIntoView({behavior:'smooth',block:'start'})">Ver ejes de la brújula ↓</button>`;
   // coincidencias con el declarado (o el top)
-  const ref = mine || top.c;
+  const ref = CAND.find(c=>c.id===STATE.verCand) || mine || top.c;
   const rows = Q.filter(q=>STATE.ans[q.n]&&q.pos[ref.id].conf!=='B').map(q=>({q, d:Math.abs(STATE.ans[q.n]-q.pos[ref.id].pos)})).sort((a,b)=>a.d-b.d);
   const coinc = rows.filter(r=>r.d<=1).slice(0,2), disc = rows.filter(r=>r.d>=2).sort((a,b)=>b.d-a.d).slice(0,2);
   const lbl = (q,v)=> { const w=wording(q); return `<small>Vos: “${esc(w.escala[v-1])}” · ${ref.nombre}: “${esc(w.escala[q.pos[ref.id].pos-1])}”</small>`; };
   $('res-mine-wrap').innerHTML = `<div class="sec-eyebrow"><span>${mine?'Tu candidato, tema por tema':'Con quien más coincidís, tema por tema'}</span></div><div class="card" style="border-left:4px solid ${ref.color}"><div class="two"><div><div class="mini-h ok">Donde más coincidís con ${ref.nombre}</div>${coinc.length?coinc.map(r=>`<div class="coin"><b>${r.q.tag}</b> · distancia ${r.d}${lbl(r.q,STATE.ans[r.q.n])}</div>`).join(''):'<div class="coin">Sin coincidencias claras.</div>'}</div><div><div class="mini-h no">Donde más discrepás</div>${disc.length?disc.map(r=>`<div class="coin"><b>${r.q.tag}</b> · distancia ${r.d}${lbl(r.q,STATE.ans[r.q.n])}</div>`).join(''):'<div class="coin">No hay discrepancias fuertes.</div>'}</div></div>${mine&&mine.id!==top.c.id?`<p class="note">Con <b>${mine.nombre}</b> tu afinidad es <b>${res.find(r=>r.c.id===mine.id).pct}%</b>; con <b>${top.c.nombre}</b>, <b>${top.pct}%</b>. Esto mide programas, no confianza, trayectoria ni simpatía — que también cuentan al votar.</p>`:''}</div>`;
-  renderCompass(); renderPrio(); renderArq(); renderMapRes(); renderZona(); renderDetalle(res); renderShare(res);
+  renderCompass(); renderPrio(); renderArq(); $('res-rank').parentElement.after($('res-arq-wrap')); renderMapRes(); renderZona(); renderShare(res);
 }
 
 function renderCompass(){
@@ -571,7 +572,7 @@ function renderShare(res){
   if(bc) bc.onclick = () => { if(navigator.clipboard) navigator.clipboard.writeText(txt).then(()=>{ bc.textContent='Copiado ✓'; }); };
 }
 
-function restart(){ Object.assign(STATE,{lenguaje:null,cand:null,edad:null,canal:null,zona:null,barrio:null,puesto:null,prio:[],temas:[],ans:{},qi:0}); document.querySelectorAll('.sel').forEach(e=>e.classList.remove('sel')); $('sel-zona').value=''; onZona(); $('btn-lang').disabled=$('btn-cand').disabled=$('btn-demo').disabled=$('btn-canal').disabled=$('btn-prio').disabled=true; $('toggle-pond').checked=false; goTo('p-welcome'); }
+function restart(){ Object.assign(STATE,{lenguaje:null,cand:null,verCand:null,edad:null,canal:null,zona:null,barrio:null,puesto:null,prio:[],temas:[],ans:{},qi:0}); document.querySelectorAll('.sel').forEach(e=>e.classList.remove('sel')); $('sel-zona').value=''; onZona(); $('btn-lang').disabled=$('btn-cand').disabled=$('btn-demo').disabled=$('btn-canal').disabled=$('btn-prio').disabled=true; $('toggle-pond').checked=false; goTo('p-welcome'); }
 window.STATE = STATE;
 </script>
 </body>
