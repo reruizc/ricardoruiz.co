@@ -90,6 +90,23 @@
   <script>
   /* ── roster de congresistas ─────────────────────────────────── */
   let R_CORP='', R_SHOWN=40;
+  const BANCADA_SIGLA={
+    'Pacto Histórico':'PH','Centro Democrático':'CD','Partido Liberal':'L',
+    'Partido Conservador':'C','Partido de la U':'U','Cambio Radical':'CR',
+    'Otros y coaliciones':'+','Curules de paz (CITREP)':'PAZ',
+    'Alianza por Colombia':'APC','Alianza Verde':'AV','Ahora Colombia':'AC',
+    'Salvación Nacional':'SN','Indígenas':'IND','Afro y raizal':'AFRO',
+    'Estatuto de Oposición':'EO'
+  };
+  function bancadaLogoInk(hex){
+    const h=String(hex||'#3d6fff').replace('#','');
+    const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+    return (.299*r+.587*g+.114*b)>155?'#060810':'#fff';
+  }
+  function bancadaLogo(b,extra){
+    const sigla=BANCADA_SIGLA[b.name]||b.sigla||b.name.slice(0,2).toUpperCase();
+    return `<span class="party-mark${extra?' '+extra:''}" style="--party:${b.color};color:${bancadaLogoInk(b.color)}" title="${esc(b.name)}" aria-label="${esc(b.name)}">${esc(sigla)}</span>`;
+  }
   function rosterInit(){
     const bancs=[...new Set(ELECTOS.map(e=>bancadaOf(e.partido).name))].sort();
     document.getElementById('r-banc').innerHTML='<option value="">Todas las bancadas</option>'+bancs.map(b=>`<option>${esc(b)}</option>`).join('');
@@ -131,7 +148,7 @@
     document.getElementById('roster').innerHTML=
       `<div class="pt-grid">`+list.map(b=>`
         <button class="pt-card" type="button" style="border-left-color:${b.color}" data-banc="${esc(b.name)}">
-          <span class="pt-n" style="color:${lift(b.color)}">${b.n}</span>
+          <div class="pt-head">${bancadaLogo(b,'large')}<span class="pt-n" style="color:${lift(b.color)}">${b.n}</span></div>
           <div class="pt-name">${esc(b.name)}</div>
           <div class="pt-split">${b.sen} Senado · ${b.cam} Cámara</div>
         </button>`).join('')+`</div>`
@@ -158,9 +175,9 @@
       const b=bancadaOf(e.partido);
       const paz=/CITREP/i.test(e.partido)?'<span class="r-badge paz">Paz</span>':'';
       return `<div class="r-row" data-i="${i}" tabindex="0" role="button">
-        <span class="r-dot" style="background:${b.color}"></span>
+        ${bancadaLogo(b)}
         <span class="r-body"><span class="r-name">${esc(e.nombre)}</span><span class="r-meta">${esc(e.partido)} · ${esc(depNice(e.dep))}</span></span>
-        ${paz}<span class="r-badge ${e.corp==='SENADO'?'sen':'cam'}">${e.corp==='SENADO'?'Senado':'Cámara'}</span>
+        <span class="r-actions">${paz}<span class="r-badge ${e.corp==='SENADO'?'sen':'cam'}">${e.corp==='SENADO'?'Senado':'Cámara'}</span></span>
       </div>`;
     }).join('')||'<div class="note">Ningún congresista coincide con la búsqueda.</div>';
     document.getElementById('roster').querySelectorAll('.r-row').forEach(r=>{
@@ -232,7 +249,7 @@
         <div class="fc-photo" id="fc-photo" style="background:${b.color}"><span>${esc(initials(e.nombre))}</span></div>
         <div style="min-width:0;flex:1">
           <div class="fc-name">${esc(e.nombre)}</div>
-          <span class="fc-chip" style="color:${lift(b.color)};background:${b.color}1a;border-color:${b.color}55">${esc(e.partido)}</span>
+          <div class="fc-party">${bancadaLogo(b)}<span class="fc-chip" style="color:${lift(b.color)};background:${b.color}1a;border-color:${b.color}55">${esc(e.partido)}</span></div>
           <div class="fc-meta">${e.corp==='SENADO'?'Senado':'Cámara de Representantes'} · ${esc(depNice(e.dep))}</div>
         </div>
       </div>
