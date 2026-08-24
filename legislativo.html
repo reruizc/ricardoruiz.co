@@ -212,7 +212,9 @@
     const k=document.getElementById('hub-kpi-vivo'); if(!k) return;
     const URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/en-vivo.json';
     try{
-      const r=await fetch(URL+'?v='+Math.floor(Date.now()/3600000));
+      /* El feed cambia durante el día: no retenemos una versión de la mañana
+         hasta la siguiente hora ni después de una corrección de datos. */
+      const r=await fetch(URL+'?v='+Math.floor(Date.now()/300000),{cache:'no-store'});
       if(!r.ok) throw new Error('HTTP '+r.status);
       const j=await r.json();
       const f=[...(j.senado||[]),...(j.camara||[])].map(x=>String(x.fecha||'').replace(/\//g,'-')).filter(Boolean).sort();

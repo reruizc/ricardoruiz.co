@@ -198,7 +198,7 @@
   }
   function renderBancadasTematicas(){
     const G=[
-      {nom:'Bancada de Bogotá', img:'imagenes/bancada-bogota.jpg',
+      {nom:'Bancada de Bogotá', img:'imagenes/bancada-bogota-v2.png',
        d:'Los representantes que responden a la capital: es la circunscripción más grande de Cámara.',
        f:e=>e.dep==='BOGOTA D.C.'},
       {nom:'Bancada de mujeres', img:'imagenes/bancada-mujeres.jpg',
@@ -226,6 +226,27 @@
       if(/mujeres/i.test(g.nom)) return '#e08fb8';
       return '#3d6fff';
     };
+    async function abrirBancada(g,members,col){
+      openModal(`<div class="md-tag">Bancada transversal · Congreso 2026–2030</div>
+        <div class="fc-name">${esc(g.nom)}</div>
+        <div class="fc-load">Cargando integrantes <span class="dots"><span></span><span></span><span></span></span></div>`);
+      const map=await slugMap();
+      const body=document.getElementById('md-body');
+      if(!body||!body.isConnected) return;
+      const sen=members.filter(e=>e.corp==='SENADO').length;
+      body.innerHTML=`<div class="md-tag">Bancada transversal · Congreso 2026–2030</div>
+        <div class="fc-name">${esc(g.nom)}</div>
+        <div class="md-afecta">${esc(g.d)}</div>
+        <div class="bt-split">${members.length} integrantes · ${sen} Senado · ${members.length-sen} Cámara</div>
+        <div class="md-sec">Integrantes</div>
+        <div class="bt-modal-list">${members.map(e=>{
+          const slug=map[norm(e.nombre)];
+          const href=slug?`analisis-candidato.html?cand=${encodeURIComponent(slug)}`
+            :`analisis-candidato.html?q=${encodeURIComponent(e.nombre)}`;
+          return `<div class="bt-modal-row">${avHTML(e.nombre,col)}<div class="bt-modal-name"><b>${esc(tCase(e.nombre))}</b><span>${e.corp==='SENADO'?'Senado':'Cámara'} · ${esc(depNice(e.dep))}</span></div><a href="${href}" class="bt-profile">Ver perfil →</a></div>`;
+        }).join('')}</div>`;
+      hydratePhotos(body);
+    }
     document.getElementById('bt-datos').innerHTML=G.map((g,i)=>{
       const members=ELECTOS.filter(g.f).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
       const sen=members.filter(e=>e.corp==='SENADO').length;
@@ -240,18 +261,12 @@
           <div class="bt-split">${sen} Senado · ${cam} Cámara</div>
           <div class="bt-faces">${faces.map(e=>avHTML(e.nombre,col)).join('')}${members.length>7?`<span class="bt-av more">+${members.length-7}</span>`:''}</div>
           <span class="bt-more">Ver integrantes →</span>
-          <div class="bt-names">${members.map(e=>`<div class="bt-li">${avHTML(e.nombre,col)}<span>${esc(tCase(e.nombre))}</span><small>${e.corp==='SENADO'?'Senado':'Cámara'}</small></div>`).join('')}</div>
         </div>
       </button>`;
     }).join('');
     document.getElementById('bt-datos').querySelectorAll('.bt.has-img').forEach(card=>{
-      card.addEventListener('click',()=>{
-        const was=card.classList.contains('open');
-        document.querySelectorAll('.bt.has-img.open').forEach(c=>c.classList.remove('open'));
-        if(!was) card.classList.add('open');
-        const more=card.querySelector('.bt-more');
-        if(more) more.textContent=card.classList.contains('open')?'Cerrar lista ↑':'Ver integrantes →';
-      });
+      const g=G[+card.dataset.bt], members=ELECTOS.filter(g.f).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+      card.addEventListener('click',()=>abrirBancada(g,members,colorFor(g)));
     });
     hydratePhotos(document.getElementById('bt-datos'));
   }

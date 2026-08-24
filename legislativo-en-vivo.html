@@ -67,6 +67,7 @@
         <button class="ev-refresh" id="ev-refresh" type="button" title="Buscar radicaciones nuevas">
           <span class="ev-refresh-ic">↻</span><span class="ev-refresh-tx">Actualizar</span>
         </button>
+        <label class="ev-search"><span>Buscar</span><input id="ev-search" type="search" placeholder="Número, tema o autor" autocomplete="off" /></label>
       </div>
     </div>
     <div class="ev-flash" id="ev-flash"></div>
@@ -123,7 +124,8 @@
         <span class="ev-hint">Ver resumen</span>
       </div>
       <div class="ev-meta">${meta}</div>
-      ${auts?`<div class="ev-meta"><span class="m">${auts}</span></div>`:''}
+      <div class="ev-meta">${auts?`<span class="m">${auts}</span>`:''}
+        <span class="${it.pdf?'ev-ready':'ev-pending'}">${it.pdf?'● Texto disponible':'○ Texto pendiente'}</span></div>
     </div>`;
   }
   /* de dónde salió el resumen — se dice explícito para que se pueda contrastar
@@ -187,15 +189,22 @@
   const EV_DATA={sen:{list:[],base:''},cam:{list:[],base:''}};
   const EV_PAGE={sen:1,cam:1};
   let EV_PER=5;
+  let EV_QUERY='';
   const EV_BOX={sen:'ev-senado',cam:'ev-camara'};
+  function evFiltra(list){
+    const q=norm(EV_QUERY).trim();
+    if(!q) return list;
+    return list.filter(it=>norm([it.numero,it.titulo,it.resumen,it.autor,it.comision].join(' ')).includes(q));
+  }
   function evPintaPagina(camara){
     const d=EV_DATA[camara], box=document.getElementById(EV_BOX[camara]);
     const pager=document.getElementById('ev-pager-'+camara);
     if(!box) return;
-    const total=d.list.length, paginas=Math.max(1,Math.ceil(total/EV_PER));
+    const list=evFiltra(d.list), total=list.length, paginas=Math.max(1,Math.ceil(total/EV_PER));
     if(EV_PAGE[camara]>paginas) EV_PAGE[camara]=paginas;
     const pg=EV_PAGE[camara], ini=(pg-1)*EV_PER;
-    evPaint(box,d.list.slice(ini,ini+EV_PER),camara,d.base);
+    if(!total&&EV_QUERY) box.innerHTML='<div class="ev-empty">No hay coincidencias en los últimos radicados de esta cámara.</div>';
+    else evPaint(box,list.slice(ini,ini+EV_PER),camara,d.base);
     if(!pager) return;
     if(total<=EV_PER){ pager.innerHTML=''; return; }
     let h=`<button class="ev-pg" ${pg===1?'disabled':''} onclick="evGo('${camara}',${pg-1})" aria-label="Anterior">‹</button>`;
@@ -208,6 +217,10 @@
   function evGo(camara,pg){ EV_PAGE[camara]=pg; evPintaPagina(camara); }
   function evSetPer(v){
     EV_PER=+v||5; EV_PAGE.sen=1; EV_PAGE.cam=1;
+    evPintaPagina('sen'); evPintaPagina('cam');
+  }
+  function evBuscar(v){
+    EV_QUERY=v||''; EV_PAGE.sen=1; EV_PAGE.cam=1;
     evPintaPagina('sen'); evPintaPagina('cam');
   }
   let EV_SEEN=null;   // Set de 'sen:NUM'/'cam:NUM' ya vistos (para detectar novedades)
@@ -243,8 +256,8 @@
       EV_SEEN=ahora;
       EV_DATA.sen={list:sen,base}; EV_DATA.cam={list:cam,base};
       evPintaPagina('sen'); evPintaPagina('cam');
-      document.getElementById('ev-sen-count').textContent=sen.length?`· ${sen.length} radicados`:'';
-      document.getElementById('ev-cam-count').textContent=cam.length?`· ${cam.length} radicados`:'';
+      document.getElementById('ev-sen-count').textContent=sen.length?`· ${sen.length} últimos`:'';
+      document.getElementById('ev-cam-count').textContent=cam.length?`· ${cam.length} últimos`:'';
       const up=document.getElementById('ev-updated');
       if(j.actualizado){
         const d=new Date(j.actualizado);
@@ -264,6 +277,7 @@
   /* ── init ── */
   loadEnVivo();
   (function(){ const b=document.getElementById('ev-refresh'); if(b) b.addEventListener('click',()=>loadEnVivo({refresh:true})); })();
+  (function(){ const s=document.getElementById('ev-search'); if(s) s.addEventListener('input',()=>evBuscar(s.value)); })();
   </script>
   <script src="lang.js"></script>
 </body>
