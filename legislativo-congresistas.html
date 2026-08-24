@@ -98,14 +98,14 @@
     'Salvación Nacional':'SN','Indígenas':'IND','Afro y raizal':'AFRO',
     'Estatuto de Oposición':'EO'
   };
-  function bancadaLogoInk(hex){
-    const h=String(hex||'#3d6fff').replace('#','');
-    const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
-    return (.299*r+.587*g+.114*b)>155?'#060810':'#fff';
+  function bancadaLogoSrc(b){
+    const sigla=BANCADA_SIGLA[b.name]||b.sigla||b.name.slice(0,2).toUpperCase();
+    const fs=sigla.length>3?42:sigla.length===3?52:64;
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 100"><path fill="${b.color}" fill-opacity=".18" d="M0 8h126l48 42-48 42H0z"/><path fill="${b.color}" d="M8 14h8v72H8z"/><text x="27" y="69" fill="${b.color}" font-family="Arial,Helvetica,sans-serif" font-size="${fs}" font-weight="900" letter-spacing="-2">${sigla}</text></svg>`;
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
   }
   function bancadaLogo(b,extra){
-    const sigla=BANCADA_SIGLA[b.name]||b.sigla||b.name.slice(0,2).toUpperCase();
-    return `<span class="party-mark${extra?' '+extra:''}" style="--party:${b.color};color:${bancadaLogoInk(b.color)}" title="${esc(b.name)}" aria-label="${esc(b.name)}">${esc(sigla)}</span>`;
+    return `<img class="party-mark${extra?' '+extra:''}" src="${bancadaLogoSrc(b)}" alt="${esc(b.name)}" title="${esc(b.name)}" />`;
   }
   function rosterInit(){
     const bancs=[...new Set(ELECTOS.map(e=>bancadaOf(e.partido).name))].sort();
@@ -148,7 +148,7 @@
     document.getElementById('roster').innerHTML=
       `<div class="pt-grid">`+list.map(b=>`
         <button class="pt-card" type="button" style="border-left-color:${b.color}" data-banc="${esc(b.name)}">
-          <div class="pt-head">${bancadaLogo(b,'large')}<span class="pt-n" style="color:${lift(b.color)}">${b.n}</span></div>
+          ${bancadaLogo(b,'card-art')}<div class="pt-head"><span class="pt-n" style="color:${lift(b.color)}">${b.n}</span></div>
           <div class="pt-name">${esc(b.name)}</div>
           <div class="pt-split">${b.sen} Senado · ${b.cam} Cámara</div>
         </button>`).join('')+`</div>`
