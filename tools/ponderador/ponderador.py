@@ -98,8 +98,14 @@ Q_FIRMA_OVERRIDE = {
     # con cifras idénticas: id 24-genesis-crea y 26-corporacion-miguel-maldonado).
     # Atenuamos a 0.45 cada una para evitar doble conteo (peso conjunto ~ una
     # encuesta calibrada con q ≈ 0.9 en lugar de dos con q ≈ 1.0).
-    "45-genesis-may11": 0.45,
-    "46-corp-mmm-may17": 0.45,
+    "44-fundacion-genesis-crea": 0.45,
+    "46-corporacion-miguel-maldonado": 0.45,
+    # Firmas nuevas sin historial CNE pre-8mar (no calibrables contra ground
+    # truth del 8-mar). Entran al promedio pero atenuadas, mismo criterio que
+    # Génesis/Corp MMM. Si después una de ellas adquiere historial verificable
+    # se sube el override o se elimina.
+    "51-tempo-may17": 0.45,
+    "52-cb-global-may20": 0.45,
 }
 
 

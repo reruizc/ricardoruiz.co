@@ -69,6 +69,25 @@
     </div>
   </div>
 
+  <a class="agenda-strip" id="agenda-strip"
+     href="https://www.camara.gov.co/secretaria-general/orden-del-dia-secretaria-general/"
+     target="_blank" rel="noopener" aria-live="polite">
+    <div class="agenda-strip-bg"></div>
+    <div class="agenda-strip-date">
+      <span id="agenda-dia">—</span>
+      <small id="agenda-mes">orden del día</small>
+    </div>
+    <div class="agenda-strip-copy">
+      <div class="agenda-strip-tag"><i></i><span id="agenda-tag">Agenda legislativa · actualizando</span></div>
+      <div class="agenda-strip-title" id="agenda-title">Revisando lo próximo en el orden del día</div>
+      <div class="agenda-strip-sub" id="agenda-sub">Cámara y Senado · fuente oficial</div>
+    </div>
+    <div class="agenda-strip-action">
+      <span id="agenda-pos">Agenda diaria</span>
+      <b>Ver documento oficial ↗</b>
+    </div>
+  </a>
+
   <!-- ══ HUB · una ficha por sección ══════════════════════════════
        Cada tarjeta ya apunta a su imagen; si el archivo no está, se ve igual
        de bien (queda el fondo oscuro). Los nombres que espera son:
@@ -148,6 +167,53 @@
 
   <script src="legislativo-base.js"></script>
   <script>
+  /* ── orden del día · franja superior ────────────────────────────
+     El pipeline diario cosecha las dos cámaras y publica un JSON pequeño.
+     La franja rota las próximas sesiones; cada estado enlaza al PDF oficial. */
+  (async()=>{
+    const box=document.getElementById('agenda-strip'); if(!box) return;
+    const URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/ordenes-vigentes.json';
+    const $=id=>document.getElementById(id);
+    const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const limpia=t=>String(t||'').replace(/\s+/g,' ').trim();
+    const frase=t=>{const s=limpia(t).toLowerCase();return s?s.charAt(0).toUpperCase()+s.slice(1):'';};
+    function pintar(r,i,n){
+      const d=new Date(r.fecha+'T12:00:00-05:00');
+      const ps=(r.proyectos||[]).filter(p=>p.titulo);
+      $('agenda-dia').textContent=isNaN(d)?'—':d.getDate();
+      $('agenda-mes').textContent=isNaN(d)?'orden del día':`${meses[d.getMonth()]} · ${d.getFullYear()}`;
+      $('agenda-tag').textContent=`${r.corporacion||'Congreso'} · ${r.ambito||'Orden del día'}`;
+      if(ps.length){
+        $('agenda-title').textContent=frase(ps[0].titulo);
+        $('agenda-sub').textContent=ps.length===1
+          ? `${ps[0].numero||'Proyecto'} · único proyecto listado para esta sesión`
+          : `${ps[0].numero||'Proyecto'} · y ${ps.length-1} proyecto${ps.length===2?'':'s'} más en la agenda`;
+      }else{
+        $('agenda-title').textContent=frase(r.titulo)||'Orden del día publicado';
+        $('agenda-sub').textContent='Sesión, elección o control político · consulta el documento oficial';
+      }
+      $('agenda-pos').textContent=n>1?`${i+1} de ${n} próximas`:'Próxima sesión';
+      box.href=r.url||box.href;
+      box.setAttribute('aria-label',`${$('agenda-tag').textContent}. ${$('agenda-title').textContent}. Ver documento oficial`);
+      box.classList.remove('agenda-flash'); void box.offsetWidth; box.classList.add('agenda-flash');
+    }
+    try{
+      const r=await fetch(URL+'?v='+Math.floor(Date.now()/300000));
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const j=await r.json(), rows=(j.ordenes||[]).filter(x=>x.fecha&&x.url);
+      if(!rows.length) throw new Error('sin próximas sesiones');
+      let i=0; pintar(rows[i],i,rows.length);
+      if(rows.length>1) setInterval(()=>{i=(i+1)%rows.length;pintar(rows[i],i,rows.length)},6500);
+    }catch(e){
+      $('agenda-dia').textContent='↻';
+      $('agenda-mes').textContent='agenda diaria';
+      $('agenda-tag').textContent='Orden del día · fuentes oficiales';
+      $('agenda-title').textContent='La próxima agenda todavía no está disponible';
+      $('agenda-sub').textContent='Abre el registro oficial de la Cámara mientras vuelve el feed';
+      $('agenda-pos').textContent='Consulta directa';
+    }
+  })();
+
   /* El hub solo necesita la fecha del último radicado, para la ficha de
      "Proyectos en vivo". Sale del mismo feed que consume esa página. */
   (async()=>{

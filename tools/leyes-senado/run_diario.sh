@@ -165,6 +165,24 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
         --filtro "órdenes del día de|descargas nuevas|^  !" \
         -- python3 tools/caudal/actas/harvest_ordenes_senado.py plenaria --workers 4
 
+  # Feed corto para la franja de agenda del hub Legislativo. Se construye
+  # después de ambas cosechas: nunca toca la red ni disfraza un caché viejo.
+  etapa --nombre ordenes_vigentes_build --timeout 300 \
+        --desc "próximas órdenes del día → feed del hub" \
+        -- python3 tools/caudal/actas/build_ordenes_vigentes.py
+  rc_ord_vig=$?
+
+  if [ $rc_ord_vig -eq 0 ]; then
+    etapa --nombre ordenes_vigentes_upload --timeout 300 \
+          --desc "ordenes-vigentes.json → S3" \
+          -- aws s3 cp "$REPO/Bases de datos/leyes-senado/actas/ordenes-vigentes.json" \
+             "s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/ordenes-vigentes.json" \
+             --content-type "application/json" --cache-control "public, max-age=300"
+  else
+    etapa --nombre ordenes_vigentes_upload \
+          --omitida "el build falló (rc=$rc_ord_vig): se conserva el feed anterior"
+  fi
+
   # ── SECOP II (datos.gov.co · fuente diaria) ──
   # `fetch` sin --force se salta lo que ya bajó hoy → la segunda corrida del día
   # no le vuelve a pegar a Socrata.

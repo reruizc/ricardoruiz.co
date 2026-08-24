@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "HelveticaNeue"; src: url("fonts/helveticaneue-light.woff2") format("woff2");  font-weight: 300; font-display: block; }
+      @font-face { font-family: "HelveticaNeue"; src: url("fonts/helveticaneue.woff2") format("woff2");        font-weight: 400; font-display: block; }
+      @font-face { font-family: "HelveticaNeue"; src: url("fonts/helveticaneue-medium.woff2") format("woff2"); font-weight: 500; font-display: block; }
+      @font-face { font-family: "HelveticaNeue"; src: url("fonts/helveticaneue-bold.woff2") format("woff2");   font-weight: 700; font-display: block; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #060810; }
+      body { font-family: "HelveticaNeue"; color: #f4f3ef; -webkit-font-smoothing: antialiased; }
+
+      #base { position: absolute; inset: 0; width: 1080px; height: 1920px; object-fit: cover; }
+      /* viñeta para que el texto respire sobre el video */
+      #vig { position: absolute; inset: 0; background:
+        linear-gradient(180deg, rgba(6,8,16,.72) 0%, rgba(6,8,16,0) 26%, rgba(6,8,16,0) 52%, rgba(6,8,16,.88) 82%); }
+
+      /* lower third */
+      #lt { position: absolute; left: 80px; top: 250px; }
+      #lt .bar { width: 6px; height: 96px; background: #f97316; position: absolute; left: 0; top: 0; transform-origin: 50% 0; }
+      #lt .nm { margin-left: 28px; font-size: 46px; font-weight: 700; letter-spacing: -.02em; }
+      #lt .rl { margin-left: 28px; margin-top: 8px; font-size: 27px; font-weight: 300; color: rgba(244,243,239,.70); }
+
+      /* callout de dato */
+      #co { position: absolute; left: 80px; top: 1180px; width: 620px;
+        background: rgba(10,10,16,.80); border: 1px solid rgba(255,255,255,.10);
+        border-left: 5px solid #0047FF; border-radius: 10px; padding: 30px 34px; }
+      #co .k { font-size: 23px; letter-spacing: .26em; text-transform: uppercase; color: #3d6fff; font-weight: 500; }
+      #co .v { margin-top: 10px; font-size: 96px; font-weight: 700; letter-spacing: -.045em; line-height: 1; }
+      #co .t { margin-top: 8px; font-size: 28px; font-weight: 300; color: rgba(244,243,239,.66); }
+
+      /* panel de dato al cierre */
+      #pn { position: absolute; left: 80px; top: 1080px; width: 920px; height: 480px;
+        background: rgba(10,10,16,.84); border: 1px solid rgba(255,255,255,.10);
+        border-radius: 12px; padding: 34px 38px; }
+      #pn .k { font-size: 23px; letter-spacing: .26em; text-transform: uppercase; color: #f97316; font-weight: 500; }
+      #pn .v { margin-top: 12px; font-size: 118px; font-weight: 700; color: #f97316; letter-spacing: -.05em; line-height: 1; }
+      #pn .t { margin-top: 10px; font-size: 30px; font-weight: 300; color: rgba(244,243,239,.72); }
+      .emb { position: absolute; height: 40px; border-radius: 5px; }
+      .embt { position: absolute; right: 38px; width: 200px; text-align: right;
+        font-size: 22px; font-weight: 500; color: rgba(244,243,239,.85); }
+
+      #cap { position: absolute; left: 80px; right: 80px; bottom: 210px; text-align: center;
+        font-size: 40px; font-weight: 500; line-height: 1.25; text-shadow: 0 2px 18px rgba(0,0,0,.65); }
+      .marca { position: absolute; right: 80px; bottom: 110px; font-size: 26px; font-weight: 500; color: #3d6fff; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="13.92"
+         data-width="1080" data-height="1920">
+
+      <video id="base" class="clip" src="selfie.mp4" data-start="0" data-duration="13.92"
+             data-track-index="0" data-volume="1" data-has-audio="true"></video>
+      <div id="vig" class="clip" data-start="0" data-duration="13.92" data-track-index="1"></div>
+
+      <!-- lower third: 0.6 – 5.5 -->
+      <div id="lt" class="clip" data-start="0.6" data-duration="4.9" data-track-index="2">
+        <div class="bar" id="lt-bar"></div>
+        <div class="nm" id="lt-nm">Ricardo Ruiz</div>
+        <div class="rl" id="lt-rl">Datos electorales y legislativos</div>
+      </div>
+
+      <!-- callout: entra cuando dice "254" (seg. 1: 0.00–6.84) -->
+      <div id="co" class="clip" data-start="3.4" data-duration="3.3" data-track-index="3">
+        <div class="k">Legislatura 2026–2027</div>
+        <div class="v" id="co-v">0</div>
+        <div class="t">proyectos de ley en 17 días</div>
+      </div>
+
+      <!-- panel: entra con el "18%" (seg. 2: 6.84–13.92) -->
+      <div id="pn" class="clip" data-start="8.6" data-duration="5.32" data-track-index="4">
+        <div class="k">Lo que dice la historia</div>
+        <div class="v" id="pn-v">0%</div>
+        <div class="t">de los radicados llega a ser ley</div>
+        <div class="emb" id="pb0" style="left:38px;  top:300px; width:844px; background:rgba(255,255,255,.12)"></div>
+        <div class="emb" id="pb1" style="left:38px;  top:348px; width:307px; background:rgba(0,71,255,.55)"></div>
+        <div class="emb" id="pb2" style="left:38px;  top:396px; width:155px; background:#f97316"></div>
+        <div class="embt" id="pt0" style="top:309px">13.420</div>
+        <div class="embt" id="pt1" style="top:357px">4.886</div>
+        <div class="embt" id="pt2" style="top:405px; color:#f97316">2.467</div>
+      </div>
+
+      <!-- subtítulo, anclado a los segmentos de la transcripción -->
+      <div id="cap1" class="clip" data-start="0.15" data-duration="6.69" data-track-index="5">
+        <div id="cap">Hola, soy Ricardo Ruiz. El Congreso radicó <b>254 proyectos de ley</b>…</div>
+      </div>
+      <div id="cap2" class="clip" data-start="6.84" data-duration="7.08" data-track-index="6">
+        <div id="cap">…y les tengo un dato incómodo: apenas el <b>18%</b> va a terminar en ley.</div>
+      </div>
+
+      <div class="marca clip" data-start="0" data-duration="13.92" data-track-index="7">ricardoruiz.co</div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      tl.from("#lt-bar", { scaleY: 0, duration: .45, ease: "power3.out" }, 0.6)
+        .from("#lt-nm",  { opacity: 0, x: -26, duration: .55, ease: "power2.out" }, 0.75)
+        .from("#lt-rl",  { opacity: 0, x: -20, duration: .55, ease: "power2.out" }, 0.9);
+
+      tl.from("#co", { opacity: 0, y: 30, duration: .5, ease: "power3.out" }, 3.4);
+      const c = { n: 0 };
+      tl.to(c, { n: 254, duration: 1.1, ease: "power2.out",
+        onUpdate: () => { document.getElementById("co-v").textContent = Math.round(c.n).toLocaleString("es-CO"); } }, 3.6);
+
+      tl.from("#pn", { opacity: 0, y: 34, duration: .5, ease: "power3.out" }, 8.6);
+      const p = { n: 0 };
+      tl.to(p, { n: 18.4, duration: 1.2, ease: "power2.out",
+        onUpdate: () => { document.getElementById("pn-v").textContent = p.n.toFixed(1).replace(".", ",") + "%"; } }, 8.8);
+      [0, 1, 2].forEach((i) => {
+        tl.from("#pb" + i, { scaleX: 0, duration: .55, ease: "power3.out", transformOrigin: "0% 50%" }, 9.5 + i * .28);
+        tl.from("#pt" + i, { opacity: 0, duration: .4 }, 9.7 + i * .28);
+      });
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

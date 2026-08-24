@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ConcepthIA 2.0 — Consulta documental</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand-row">
+        <div class="brand-mark">
+          <img class="dascd-logo" src="https://serviciocivil.gov.co/sites/default/files/logo-dascd.jpeg" alt="Departamento Administrativo del Servicio Civil Distrital">
+        </div>
+        <div class="header-search" aria-label="Búsqueda institucional"><span>Buscar en la sede electrónica</span><b>⌕</b></div>
+      </div>
+    </header>
+    <main id="consulta">
+      <p class="breadcrumbs">ConcepthIA 2.0</p>
+      <p class="eyebrow">Herramienta institucional · DASCD</p>
+      <h1>ConcepthIA 2.0</h1>
+      <p class="intro">Consulta conceptos jurídicos publicados y recibe un borrador sustentado en sus fuentes.</p>
+      <form id="question-form" aria-label="Consulta de conceptos jurídicos">
+        <label for="question">¿Qué necesitas consultar?</label>
+        <textarea id="question" name="question" minlength="3" maxlength="1500" required placeholder="Ej.: ¿Cómo aplica la prima técnica cuando hay experiencia profesional previa?"></textarea>
+        <div class="query-actions">
+          <button type="submit">Consultar fuentes</button>
+          <label class="jurisprudence-toggle">
+            <input id="review-jurisprudence" type="checkbox">
+            <span>Revisar jurisprudencia</span>
+          </label>
+        </div>
+        <p class="field-help">El refuerzo consulta Mi Relatoría del Consejo de Estado y permite complementar la revisión en la Relatoría de la Corte Constitucional.</p>
+      </form>
+      <p class="disclaimer">La respuesta es un borrador informativo y no reemplaza la revisión jurídica humana.</p>
+      <section id="loading" class="loading-card" aria-live="polite" hidden>
+        <div class="loading-heading"><span class="loading-mark" aria-hidden="true">⌛</span><strong id="loading-message">Preparando la consulta…</strong></div>
+        <div class="loading-track" aria-hidden="true"><span id="loading-progress"></span></div>
+        <p>Estamos reuniendo las fuentes que sustentan el borrador.</p>
+      </section>
+      <section id="status" aria-live="polite"></section>
+      <section id="result" hidden>
+        <p class="eyebrow">Borrador sustentado</p>
+        <div id="answer"></div>
+        <p id="warning" class="warning"></p>
+        <h2>Fuentes recuperadas</h2>
+        <ol id="sources"></ol>
+        <section id="jurisprudence-result" hidden>
+          <h2>Refuerzo jurisprudencial</h2>
+          <p class="field-help">Resultados y accesos oficiales. Verifica la pertinencia y vigencia de cada providencia antes de incorporarla al documento.</p>
+          <ul id="jurisprudence-links"></ul>
+        </section>
+        <button id="start-document" class="secondary-action" type="button">Empezar a construir documento</button>
+      </section>
+      <section id="document-builder" hidden>
+        <div class="document-header">
+          <div>
+            <p class="eyebrow">Mesa de redacción</p>
+            <h2>Construir documento</h2>
+          </div>
+          <label>Plantilla
+            <select id="document-template">
+              <option value="concepto">Concepto jurídico</option>
+              <option value="oficio">Respuesta a oficio</option>
+              <option value="memorando">Memorando</option>
+            </select>
+          </label>
+        </div>
+        <fieldset class="office-fields">
+          <legend>Datos del oficio</legend>
+          <label>Radicado
+            <input id="radicado" maxlength="80" placeholder="2026XXXXXX">
+          </label>
+          <label>Fecha
+            <input id="office-date" type="date">
+          </label>
+          <label class="wide-field">Destinatario
+            <input id="destinatario" maxlength="160" placeholder="Respetado Doctor Juan Pérez">
+          </label>
+          <label class="wide-field">Subdirector Jurídico
+            <input id="subdirector" maxlength="160" placeholder="Nombre completo">
+            <span class="saved-hint">Este nombre se guardará únicamente en este navegador.</span>
+          </label>
+        </fieldset>
+        <div class="editor-toolbar" aria-label="Herramientas de edición">
+          <button type="button" data-command="bold"><strong>N</strong></button>
+          <button type="button" data-command="italic"><em>K</em></button>
+          <button type="button" data-command="insertUnorderedList">Lista</button>
+          <button type="button" data-command="undo">Deshacer</button>
+        </div>
+        <article id="document-editor" contenteditable="true" spellcheck="true" aria-label="Documento editable"></article>
+        <div class="document-actions">
+          <button id="copy-document" type="button">Copiar texto</button>
+        <button id="download-document" class="secondary-action" type="button">Descargar .docx</button>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div><strong>Sede electrónica</strong><br>Departamento Administrativo del Servicio Civil Distrital</div>
+      <div>Cra. 30 No. 25-90 Piso 9 · Bogotá D.C.<br>Atención: lunes a viernes, 7:00 a.m. – 4:30 p.m.</div>
+      <div>contacto@serviciocivil.gov.co<br>+57 (601) 368 0038</div>
+    </footer>
+    <script>
+      const form = document.querySelector('#question-form');
+      const question = document.querySelector('#question');
+      const button = form.querySelector('button');
+      const status = document.querySelector('#status');
+      const loading = document.querySelector('#loading');
+      const loadingMessage = document.querySelector('#loading-message');
+      const loadingProgress = document.querySelector('#loading-progress');
+      const result = document.querySelector('#result');
+      const answer = document.querySelector('#answer');
+      const warning = document.querySelector('#warning');
+      const sources = document.querySelector('#sources');
+      const reviewJurisprudence = document.querySelector('#review-jurisprudence');
+      const radicado = document.querySelector('#radicado');
+      const officeDate = document.querySelector('#office-date');
+      const destinatario = document.querySelector('#destinatario');
+      const subdirector = document.querySelector('#subdirector');
+      const jurisprudenceResult = document.querySelector('#jurisprudence-result');
+      const jurisprudenceLinks = document.querySelector('#jurisprudence-links');
+      const documentBuilder = document.querySelector('#document-builder');
+      const documentEditor = document.querySelector('#document-editor');
+      const documentTemplate = document.querySelector('#document-template');
+      let latestDraft = '';
+      const loadingMessages = [
+        'Preguntándole al Subdirector Jurídico…',
+        'Revisando el historial de los conceptos del DASCD…',
+        'Subiendo el ascensor del CAD y consultando en las oficinas jurídicas…',
+        'Contrastando las fuentes y los radicados…',
+        'Ordenando las citas para el borrador…'
+      ];
+      const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+      const startLoading = () => {
+        const startedAt = Date.now(); let lastMessage = -1;
+        loading.hidden = false; loadingProgress.style.animation = 'loading-sweep 1.7s ease-in-out infinite';
+        const update = () => {
+          const elapsed = Date.now() - startedAt;
+          const messageIndex = Math.min(loadingMessages.length - 1, Math.floor(elapsed / 3200));
+          if (messageIndex !== lastMessage) { loadingMessage.textContent = loadingMessages[messageIndex]; lastMessage = messageIndex; }
+          if (elapsed >= 20000) loadingMessage.textContent = 'Terminando la revisión de las fuentes…';
+        };
+        update(); const interval = setInterval(update, 250);
+        return { startedAt, stop: () => { clearInterval(interval); loadingProgress.style.animation = 'none'; loading.hidden = true; } };
+      };
+      const today = new Date();
+      officeDate.value = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'), String(today.getDate()).padStart(2, '0')].join('-');
+      subdirector.value = localStorage.getItem('concepthia.subdirector') || '';
+      subdirector.addEventListener('input', () => localStorage.setItem('concepthia.subdirector', subdirector.value.trim()));
+      const escape = value => String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+      const inline = value => escape(value).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\[(Nro\. Rad: [^\]]+|CE Rad: [^\]]+|CC [^\]]+|S\d+)\]/g, '<span class="citation">[$1]</span>');
+      const renderDraft = value => {
+        const output = []; let listOpen = false;
+        const closeList = () => { if (listOpen) { output.push('</ul>'); listOpen = false; } };
+        for (const rawLine of String(value).split('\n')) {
+          const line = rawLine.trim();
+          if (!line) { closeList(); continue; }
+          if (line === '---') { closeList(); output.push('<hr>'); continue; }
+          const heading = line.match(/^(#{2,3})\s+(.+)$/);
+          if (heading) { closeList(); output.push(`<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>`); continue; }
+          if (line.startsWith('- ')) {
+            if (!listOpen) { output.push('<ul>'); listOpen = true; }
+            output.push(`<li>${inline(line.slice(2))}</li>`); continue;
+          }
+          closeList(); output.push(`<p>${inline(line)}</p>`);
+        }
+        closeList(); return output.join('');
+      };
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        button.disabled = true; result.hidden = true;
+        status.textContent = '';
+        const loader = startLoading();
+        try {
+          const apiBase = window.CONCEPTHIA_API_BASE || '';
+          const request = fetch(`${apiBase}/api/answer`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({
+            question: question.value,
+            review_jurisprudence: reviewJurisprudence.checked
+          })});
+          const [response] = await Promise.all([request, wait(Math.max(0, 10000 - (Date.now() - loader.startedAt)))]);
+          const data = await response.json();
+          if (!response.ok || data.error) throw new Error(data.error || 'No fue posible procesar la consulta.');
+          if (!data.answer) { status.textContent = data.message; return; }
+          latestDraft = data.answer; answer.innerHTML = renderDraft(data.answer);
+          warning.textContent = data.warning;
+          sources.innerHTML = data.sources.map(source => `<li><a href="${escape(source.url_ficha)}" target="_blank" rel="noreferrer">[${escape(source.id)}] ${escape(source.titulo)}</a><span> · página ${escape(source.pagina)}</span></li>`).join('');
+          const courtLinks = data.jurisprudence || [];
+          jurisprudenceLinks.innerHTML = courtLinks.map(item => `<li><a href="${escape(item.url)}" target="_blank" rel="noreferrer">${escape(item.court)} · ${escape(item.label)}</a><span> · ${escape(item.coverage)}</span>${item.sala ? `<span> · ${escape(item.sala)}</span>` : ''}${item.summary ? `<p class="jurisprudence-summary">${escape(item.summary)}</p>` : ''}</li>`).join('');
+          jurisprudenceResult.hidden = courtLinks.length === 0;
+          status.textContent = ''; result.hidden = false;
+        } catch (error) { status.textContent = error.message; }
+        finally { loader.stop(); button.disabled = false; }
+      });
+      const templateIntro = type => ({
+        concepto: '',
+        oficio: '',
+        memorando: '<h1>Memorando</h1><p><strong>Asunto:</strong> '+escape(question.value)+'</p><h2>Antecedentes</h2><h2>Análisis</h2>'
+      }[type]);
+      const formatOfficeDate = value => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value || 'FECHA';
+        const [year, month, day] = value.split('-').map(Number);
+        const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+        return `${day} de ${months[month - 1]} de ${year}`;
+      };
+      const personalizedDraft = () => latestDraft
+        .replaceAll('{{RADICADO}}', radicado.value.trim() || '2026XXXXXX')
+        .replaceAll('{{FECHA}}', formatOfficeDate(officeDate.value))
+        .replaceAll('{{DESTINATARIO}}', destinatario.value.trim() || 'Respetado Doctor')
+        .replaceAll('{{SUBDIRECTOR}}', subdirector.value.trim() || 'XXXXXXX');
+      const refreshDocument = () => {
+        localStorage.setItem('concepthia.subdirector', subdirector.value.trim());
+        documentEditor.innerHTML = templateIntro(documentTemplate.value) + renderDraft(personalizedDraft());
+      };
+      const buildDocument = () => {
+        refreshDocument(); documentBuilder.hidden = false;
+        documentBuilder.scrollIntoView({behavior:'smooth'});
+      };
+      document.querySelector('#start-document').addEventListener('click', buildDocument);
+      documentTemplate.addEventListener('change', buildDocument);
+      [radicado, officeDate, destinatario, subdirector].forEach(field => field.addEventListener('input', refreshDocument));
+      document.querySelectorAll('[data-command]').forEach(tool => tool.addEventListener('click', () => { documentEditor.focus(); document.execCommand(tool.dataset.command); }));
+      document.querySelector('#copy-document').addEventListener('click', async event => {
+        await navigator.clipboard.writeText(documentEditor.innerText); event.currentTarget.textContent = 'Copiado';
+        setTimeout(() => event.currentTarget.textContent = 'Copiar texto', 1400);
+      });
+      document.querySelector('#download-document').addEventListener('click', async event => {
+        const downloadButton = event.currentTarget;
+        downloadButton.disabled = true; downloadButton.textContent = 'Generando .docx…';
+        try {
+          const apiBase = window.CONCEPTHIA_API_BASE || '';
+          const response = await fetch(`${apiBase}/api/document`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({document:documentEditor.innerText})});
+          if (!response.ok) throw new Error('No fue posible generar el documento.');
+          const link = document.createElement('a'); link.href = URL.createObjectURL(await response.blob());
+          link.download = 'borrador-concepthia.docx'; link.click(); URL.revokeObjectURL(link.href);
+        } catch (error) { status.textContent = error.message; }
+        finally { downloadButton.disabled = false; downloadButton.textContent = 'Descargar .docx'; }
+      });
+    </script>
+  </body>
+</html>

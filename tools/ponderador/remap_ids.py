@@ -37,10 +37,12 @@ MAPPING: dict[str, str] = {
     "40-invamer": "38-invamer",
     "41-atlas-abr29": "42-atlas-intel",
     "42-gad3-abr": "39-gad-3",
+    "44-atlas-may14": "45-atlas-intel",
+    "45-genesis-may11": "44-fundacion-genesis-crea",
+    "46-corp-mmm-may17": "46-corporacion-miguel-maldonado",
 }
 # No remapeados a propósito:
 #   wiki-celag-abr  → CELAG es firma extranjera, no radica en CNE
-#   44-atlas-may14  → no radicada en CNE todavía
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 WORKTREE_GUESS = SCRIPT_DIR.parents[1]

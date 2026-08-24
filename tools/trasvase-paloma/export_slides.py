@@ -8,9 +8,12 @@ html=open(SRC,encoding='utf-8').read()
 head=re.search(r"<head>(.*?)</head>",html,re.S).group(1)
 sections=re.findall(r"(<section class=\"slide.*?</section>)",html,re.S)
 print(f"{len(sections)} slides → {OUTDIR}",file=sys.stderr)
+# base href apunta al directorio del SRC para que los src relativos (mapas, imgs) resuelvan en headless
+SRCDIR=os.path.dirname(os.path.abspath(SRC))
+base=f'<base href="file://{SRCDIR}/">'
 tmpd=tempfile.mkdtemp()
 for i,sec in enumerate(sections,1):
-    page=f"<!DOCTYPE html><html lang=es><head>{head}</head><body style='margin:0'>{sec}</body></html>"
+    page=f"<!DOCTYPE html><html lang=es><head>{base}{head}</head><body style='margin:0'>{sec}</body></html>"
     fp=os.path.join(tmpd,f"s{i}.html"); open(fp,'w',encoding='utf-8').write(page)
     out=os.path.abspath(os.path.join(OUTDIR,f"{PREFIX}-{i}.png"))
     subprocess.run([CHROME,"--headless=new","--disable-gpu","--hide-scrollbars","--force-device-scale-factor=1",

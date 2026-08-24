@@ -138,14 +138,22 @@
     .ld-bar i::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent); animation:ldPulse 1.6s ease-in-out infinite; }
     @keyframes ldPulse { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
     .ld-pct { font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.12em; color:rgba(255,255,255,.35); }
-    .ld-fact { max-width:min(560px,88vw); text-align:center; font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
-               font-size:.92rem; line-height:1.7; color:rgba(255,255,255,.6); min-height:4.2em;
-               display:flex; align-items:center; justify-content:center; opacity:1; transition:opacity .45s ease; }
+    /* ⚠️ La transición y el relevo del texto TIENEN que ir sincronizados. Estaban en
+       450 ms de fade y 300 ms de swap, así que el dato nuevo entraba cuando el viejo
+       aún se veía al ~35%: los dos textos quedaban encimados y parecía que el anterior
+       se hubiera quedado pegado al fondo. Ahora el fade dura .28s y el relevo espera
+       .3s — ver LD_SWAP en el script, que es el número que hay que mover si se toca. */
+    .ld-fact { max-width:min(640px,90vw); text-align:center; font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
+               font-size:1.06rem; line-height:1.72; color:rgba(255,255,255,.72); min-height:6.4em;
+               display:flex; align-items:center; justify-content:center; opacity:1; transition:opacity .28s ease; }
     .ld-fact.fade { opacity:0; }
     .ld-fact b { color:var(--blue); font-weight:500; }
-    .ld-fact .ld-kicker { display:block; font-family:'DM Mono',monospace; font-size:.55rem; letter-spacing:.18em;
-                          text-transform:uppercase; color:rgba(255,255,255,.25); margin-bottom:.6rem; }
-    @media (max-width:640px){ .ld-fact { font-size:.82rem; } }
+    .ld-fact .ld-kicker { display:block; font-family:'DM Mono',monospace; font-size:.62rem; letter-spacing:.18em;
+                          text-transform:uppercase; color:rgba(255,255,255,.34); margin-bottom:.7rem; }
+    /* La reserva de alto evita que el bloque salte al rotar el dato — un salto de
+       layout se lee como parpadeo. Medido sobre los 51 textos (17 × 3 idiomas): el
+       más alto pide 133 px a 375 px de ancho, así que 9.6em (≈146 px) los cubre. */
+    @media (max-width:640px){ .ld-fact { font-size:.95rem; min-height:9.6em; } }
     .loader-ring { width:40px; height:40px; border:2px solid rgba(0,71,255,.2); border-top-color:var(--blue); border-radius:50%; animation:spin .8s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
     .loader-label { font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif; font-size:.65rem; letter-spacing:.15em; text-transform:uppercase; color:rgba(255,255,255,.3); }
@@ -2889,67 +2897,63 @@
        se corrige en la fuente, hay que corregirla también aquí.                */
     const LD_FACTS = {
       co: [
-        ['El concejal más votado del país', '<b>Edison Julián Forero</b> sacó <b>70.032</b> votos al Concejo de Bogotá en 2023 — más que muchos senadores.'],
-        ['El edil más votado', 'En Suba, <b>Juan Camilo Ramírez</b> llegó a la JAL con <b>12.165</b> votos en 2023.'],
-        ['La votación nominal más alta del archivo', '<b>Álvaro Uribe</b> obtuvo <b>891.964</b> votos al Senado en 2018.'],
-        ['Senado 2022', '<b>Miguel Uribe Turbay</b> fue el senador más votado con <b>226.922</b>; <b>María Fernanda Cabal</b> lo siguió con 207.732.'],
-        ['Senado 2014', '<b>Jorge Enrique Robledo</b> fue el más votado con <b>194.523</b>, todos por voto preferente.'],
-        ['Antes de la Presidencia', '<b>Gustavo Petro</b> ganó la Alcaldía de Bogotá en 2011 con <b>723.157</b> votos.'],
-        ['Alcaldía de Bogotá', 'De las cuatro últimas, la más votada es la de <b>Carlos Fernando Galán</b> en 2023: <b>1.499.734</b>.'],
-        ['Medellín 2023', '<b>Federico Gutiérrez</b> volvió a la Alcaldía con <b>697.910</b> votos: el <b>79,1%</b>.'],
+        ['El votante mediano no existe', 'Un concejal <b>mediano</b> saca <b>69</b> votos. El más votado del país, <b>Edison Julián Forero</b>, sacó <b>70.032</b>: mil veces más.'],
+        ['La política se decide abajo', '<b>8 de cada 10</b> candidaturas de este archivo son al Concejo, y el <b>61%</b> de ellas no llegó a <b>100</b> votos.'],
+        ['Cuánto cuesta cada silla', 'Votación mediana por cargo: concejal <b>69</b> · edil <b>175</b> · diputado <b>1.126</b> · alcalde <b>1.250</b> · senador <b>1.491</b> · representante <b>2.157</b> · gobernador <b>22.429</b>.'],
+        ['Un gobernador vale 325 concejales', 'El gobernador mediano saca <b>22.429</b> votos; el concejal mediano, <b>69</b>. Esa es la distancia entre los dos extremos del voto colombiano.'],
+        ['La votación más alta de una mujer', '<b>Paloma Valencia</b>, con <b>3.248.589</b> en la consulta de 2022. En una elección propiamente dicha, <b>Martha Lucía Ramírez</b>: <b>1.997.980</b> en la primera vuelta de 2014.'],
+        ['Bogotá pesa más que el Senado', '<b>Carlos Fernando Galán</b> sacó <b>1.499.734</b> votos en la Alcaldía de 2023: más que el senador más votado de todo el archivo, <b>Álvaro Uribe</b> con <b>891.964</b>.'],
+        ['Un voto', '<b>4.286</b> candidaturas sacaron exactamente <b>un</b> voto. Otras <b>24.103</b> no pasaron de cinco.'],
+        ['El edil que le gana al alcalde', 'El más votado de una JAL, <b>Juan Camilo Ramírez</b> en Suba, sacó <b>12.165</b> votos: casi <b>diez veces</b> lo que saca un alcalde mediano.'],
+        ['Diez por silla', 'Al Concejo de Bogotá de 2023 se presentaron <b>435</b> candidatos para <b>45</b> curules.'],
+        ['El nombre de la política colombiana', '<b>José</b> encabeza <b>20.098</b> candidaturas y <b>María</b>, <b>13.854</b>. El apellido más frecuente es <b>Rodríguez</b>, con <b>7.978</b>.'],
+        ['Lo que no es una persona', 'Hay <b>537</b> candidaturas inscritas como «REVOCADO(A)» y <b>633</b> como retiradas: la Registraduría conserva el registro aunque quien se lanzó salga de la contienda.'],
+        ['Los dos extremos del archivo', 'La votación más alta es la de <b>Gustavo Petro</b> en la segunda vuelta de 2022: <b>11.292.758</b>. La más baja es un voto, y se repite <b>4.286</b> veces.'],
         ['El efecto de la lista cerrada', 'El Pacto Histórico y el Centro Democrático aparecen con <b>cero</b> votos nominales al Senado: el voto fue al logo, no a la persona.'],
-        ['Bogotá, 2011', '<b>Francisco de Roux</b> fue el concejal más votado de la ciudad ese año.'],
-        ['Antes del Senado', '<b>Aída Merlano</b> fue la diputada más votada del Atlántico en 2011.'],
-        ['Senado 2018', '<b>Antanas Mockus</b> entró con <b>549.734</b> votos.'],
-        ['La segunda vuelta más apretada', 'En 2022 <b>Petro</b> sacó 11.292.758 y <b>Rodolfo Hernández</b> 10.604.656: <b>688 mil</b> votos de diferencia.'],
-        ['Primera vuelta de 2010', '<b>Juan Manuel Santos</b> 6.802.043 contra <b>Antanas Mockus</b> 3.134.222.'],
-        ['Primera vuelta de 2018', '<b>Iván Duque</b> 7.616.857 contra <b>Gustavo Petro</b> 4.855.069.'],
         ['La misma persona, dos nombres', 'La Registraduría lo inscribe como «Gustavo Petro» en la presidencial y «Gustavo Francisco Petro Urrego» en la Alcaldía: aquí se unen en una sola ficha.'],
-        ['Las 16 curules de paz', 'En 2022 <b>Jorge Tovar</b> sumó 15.272 votos repartidos entre Cesar, Magdalena y La Guajira: su distrito CITREP cruza tres departamentos.'],
+        ['Antes de la Presidencia', '<b>Gustavo Petro</b> ganó la Alcaldía de Bogotá en 2011 con <b>723.157</b> votos, once años antes de llegar a la Casa de Nariño.'],
+        ['El país cabe en este archivo', 'Son <b>437.845</b> candidaturas reales, con los concejos de <b>1.020</b> municipios en cuatro elecciones.'],
         ['Bogotá no tiene asamblea', 'Es Distrito Capital: por eso el mapa de diputados se queda en 32 departamentos.'],
       ],
       us: [
-        ['Colombia’s most-voted city councillor', '<b>Edison Julián Forero</b> won <b>70,032</b> votes for Bogotá’s council in 2023 — more than many senators.'],
-        ['The most-voted local board member', 'In Suba, <b>Juan Camilo Ramírez</b> took his seat with <b>12,165</b> votes in 2023.'],
-        ['The highest personal vote on record', '<b>Álvaro Uribe</b> drew <b>891,964</b> Senate votes in 2018.'],
-        ['Senate, 2022', '<b>Miguel Uribe Turbay</b> led with <b>226,922</b>; <b>María Fernanda Cabal</b> followed with 207,732.'],
-        ['Senate, 2014', '<b>Jorge Enrique Robledo</b> led with <b>194,523</b>, all of them preferential votes.'],
-        ['Before the presidency', '<b>Gustavo Petro</b> won Bogotá’s mayoralty in 2011 with <b>723,157</b> votes.'],
-        ['Mayor of Bogotá', 'Of the last four races, the biggest win is <b>Carlos Fernando Galán</b>’s in 2023: <b>1,499,734</b>.'],
-        ['Medellín, 2023', '<b>Federico Gutiérrez</b> returned to the mayoralty with <b>697,910</b> votes — <b>79.1%</b>.'],
+        ['The median voter does not exist', 'A <b>median</b> city councillor draws <b>69</b> votes. The most-voted one in the country, <b>Edison Julián Forero</b>, drew <b>70,032</b> — a thousand times more.'],
+        ['Politics is decided at the bottom', '<b>8 out of 10</b> candidacies in this archive are for city council, and <b>61%</b> of them fell short of <b>100</b> votes.'],
+        ['What each seat costs', 'Median vote by office: councillor <b>69</b> · local board <b>175</b> · deputy <b>1,126</b> · mayor <b>1,250</b> · senator <b>1,491</b> · representative <b>2,157</b> · governor <b>22,429</b>.'],
+        ['One governor is worth 325 councillors', 'The median governor draws <b>22,429</b> votes; the median councillor, <b>69</b>. That is the distance between the two ends of the Colombian ballot.'],
+        ['The highest vote ever won by a woman', '<b>Paloma Valencia</b>, with <b>3,248,589</b> in the 2022 primary. In an election proper, <b>Martha Lucía Ramírez</b>: <b>1,997,980</b> in the first round of 2014.'],
+        ['Bogotá outweighs the Senate', '<b>Carlos Fernando Galán</b> drew <b>1,499,734</b> votes for mayor in 2023 — more than the most-voted senator on record, <b>Álvaro Uribe</b>, with <b>891,964</b>.'],
+        ['One vote', '<b>4,286</b> candidacies drew exactly <b>one</b> vote. Another <b>24,103</b> never got past five.'],
+        ['The local board member who beats the mayor', 'The most-voted local board member, <b>Juan Camilo Ramírez</b> in Suba, drew <b>12,165</b> votes — almost <b>ten times</b> what a median mayor gets.'],
+        ['Ten per seat', '<b>435</b> candidates ran for <b>45</b> seats on Bogotá’s city council in 2023.'],
+        ['The name of Colombian politics', '<b>José</b> heads <b>20,098</b> candidacies and <b>María</b>, <b>13,854</b>. The most frequent surname is <b>Rodríguez</b>, with <b>7,978</b>.'],
+        ['What is not a person', '<b>537</b> candidacies are filed as “REVOKED” and <b>633</b> as withdrawn: the registry keeps the record even when the candidate leaves the race.'],
+        ['The two ends of the archive', 'The highest vote is <b>Gustavo Petro</b>’s in the 2022 runoff: <b>11,292,758</b>. The lowest is one vote, and it repeats <b>4,286</b> times.'],
         ['What a closed list does', 'Pacto Histórico and Centro Democrático show <b>zero</b> personal Senate votes: the ballot went to the logo, not the candidate.'],
-        ['Bogotá, 2011', '<b>Francisco de Roux</b> was the city’s most-voted councillor that year.'],
-        ['Before the Senate', '<b>Aída Merlano</b> was Atlántico’s most-voted deputy in 2011.'],
-        ['Senate, 2018', '<b>Antanas Mockus</b> was elected with <b>549,734</b> votes.'],
-        ['The closest runoff', 'In 2022 <b>Petro</b> got 11,292,758 and <b>Rodolfo Hernández</b> 10,604,656 — <b>688,000</b> apart.'],
-        ['First round, 2010', '<b>Juan Manuel Santos</b> 6,802,043 against <b>Antanas Mockus</b> 3,134,222.'],
-        ['First round, 2018', '<b>Iván Duque</b> 7,616,857 against <b>Gustavo Petro</b> 4,855,069.'],
         ['One person, two names', 'The registry lists him as “Gustavo Petro” for president and “Gustavo Francisco Petro Urrego” for mayor — here both become one profile.'],
-        ['The 16 peace seats', 'In 2022 <b>Jorge Tovar</b> gathered 15,272 votes across Cesar, Magdalena and La Guajira: his CITREP district spans three departments.'],
+        ['Before the presidency', '<b>Gustavo Petro</b> won Bogotá’s mayoralty in 2011 with <b>723,157</b> votes, eleven years before reaching the presidency.'],
+        ['The whole country fits in here', '<b>437,845</b> real candidacies, covering the councils of <b>1,020</b> municipalities across four elections.'],
         ['Bogotá has no assembly', 'It is a Capital District — which is why the deputy map stops at 32 departments.'],
       ],
       cn: [
-        ['全国得票最高的市议员', '2023年，<b>Edison Julián Forero</b> 以 <b>70,032</b> 票当选波哥大市议员，超过不少参议员。'],
-        ['得票最高的地方委员', '在苏巴区，<b>Juan Camilo Ramírez</b> 于2023年以 <b>12,165</b> 票进入地方管理委员会。'],
-        ['档案中最高的个人得票', '2018年，<b>Álvaro Uribe</b> 获得 <b>891,964</b> 张参议院选票。'],
-        ['2022年参议院', '<b>Miguel Uribe Turbay</b> 以 <b>226,922</b> 票居首，<b>María Fernanda Cabal</b> 以 207,732 票紧随其后。'],
-        ['2014年参议院', '<b>Jorge Enrique Robledo</b> 以 <b>194,523</b> 票居首，全部来自优先投票。'],
-        ['当选总统之前', '2011年，<b>Gustavo Petro</b> 以 <b>723,157</b> 票当选波哥大市长。'],
-        ['波哥大市长', '最近四届中得票最高的是2023年的 <b>Carlos Fernando Galán</b>：<b>1,499,734</b> 票。'],
-        ['2023年麦德林', '<b>Federico Gutiérrez</b> 以 <b>697,910</b> 票重返市长职位，占 <b>79.1%</b>。'],
+        ['不存在“中位选民”', '一位<b>中位</b>市议员得票 <b>69</b> 张。全国得票最高的 <b>Edison Julián Forero</b> 得到 <b>70,032</b> 张，是前者的一千倍。'],
+        ['政治在基层决定', '本档案中 <b>十分之八</b> 的参选记录是市议会选举，其中 <b>61%</b> 得票不足 <b>100</b> 张。'],
+        ['每个席位的价码', '各职位中位得票：市议员 <b>69</b> · 地方委员 <b>175</b> · 省议员 <b>1,126</b> · 市长 <b>1,250</b> · 参议员 <b>1,491</b> · 众议员 <b>2,157</b> · 省长 <b>22,429</b>。'],
+        ['一位省长抵得上325位市议员', '中位省长得票 <b>22,429</b> 张，中位市议员只有 <b>69</b> 张——这就是哥伦比亚选票两端的距离。'],
+        ['女性候选人的最高得票', '<b>Paloma Valencia</b> 在2022年党内初选中获得 <b>3,248,589</b> 票。若只算正式选举，则是 <b>Martha Lucía Ramírez</b> 在2014年第一轮的 <b>1,997,980</b> 票。'],
+        ['波哥大比参议院更重', '<b>Carlos Fernando Galán</b> 在2023年市长选举中获得 <b>1,499,734</b> 票，超过档案中得票最高的参议员 <b>Álvaro Uribe</b> 的 <b>891,964</b> 票。'],
+        ['一张票', '<b>4,286</b> 份参选记录恰好只得到 <b>一</b> 张票，另有 <b>24,103</b> 份不超过五张。'],
+        ['赢过市长的地方委员', '得票最高的地方委员 <b>Juan Camilo Ramírez</b>（苏巴区）获得 <b>12,165</b> 票，几乎是中位市长的 <b>十倍</b>。'],
+        ['一个席位十个人', '2023年波哥大市议会 <b>45</b> 个席位共有 <b>435</b> 人参选。'],
+        ['哥伦比亚政治最常见的名字', '<b>José</b> 出现在 <b>20,098</b> 份参选记录中，<b>María</b> 为 <b>13,854</b> 份。最常见的姓氏是 <b>Rodríguez</b>，共 <b>7,978</b> 次。'],
+        ['哪些记录不是人', '有 <b>537</b> 份记录登记为“已撤销”，<b>633</b> 份为“已退选”：即使参选人退出，选举登记处仍保留记录。'],
+        ['档案的两端', '最高得票是 <b>Gustavo Petro</b> 在2022年第二轮的 <b>11,292,758</b> 票；最低是一票，且重复出现 <b>4,286</b> 次。'],
         ['封闭名单的效应', '历史公约与民主中心的参议院个人得票为 <b>零</b>：选票投给了党徽，而不是候选人。'],
-        ['2011年波哥大', '那一年，<b>Francisco de Roux</b> 是全市得票最高的市议员。'],
-        ['进入参议院之前', '2011年，<b>Aída Merlano</b> 是大西洋省得票最高的省议员。'],
-        ['2018年参议院', '<b>Antanas Mockus</b> 以 <b>549,734</b> 票当选。'],
-        ['最接近的第二轮', '2022年 <b>Petro</b> 获11,292,758票，<b>Rodolfo Hernández</b> 获10,604,656票，相差 <b>68.8万</b>。'],
-        ['2010年第一轮', '<b>Juan Manuel Santos</b> 6,802,043 票对 <b>Antanas Mockus</b> 3,134,222 票。'],
-        ['2018年第一轮', '<b>Iván Duque</b> 7,616,857 票对 <b>Gustavo Petro</b> 4,855,069 票。'],
         ['同一个人，两个名字', '选举登记处在总统选举中记作“Gustavo Petro”，在市长选举中记作“Gustavo Francisco Petro Urrego”——本页把两者合并为同一份档案。'],
-        ['16个和平席位', '2022年 <b>Jorge Tovar</b> 在塞萨尔、马格达莱纳和拉瓜希拉共得15,272票：他的CITREP选区横跨三个省。'],
+        ['当选总统之前', '2011年，<b>Gustavo Petro</b> 以 <b>723,157</b> 票当选波哥大市长，十一年后入主总统府。'],
+        ['整个国家都在这里', '共 <b>437,845</b> 份真实参选记录，涵盖四次选举中 <b>1,020</b> 个市镇的市议会。'],
         ['波哥大没有省议会', '它是首都区——这也是省议员地图只有32个省的原因。'],
       ],
     };
-
     /* ── CONTADOR PROGRESIVO (odómetro) ──────────────────────────────────
        El contador saltaba de "Cargando índice…" a "31.969" de un tirón y ahí se
        quedaba quieto los segundos que tardan los concejos. Un número que no se
@@ -3009,6 +3013,8 @@
       hintKick();
     }
 
+    // Debe ser >= la duración del fade de .ld-fact (.28s), o los dos textos se encabalgan.
+    const LD_SWAP = 300;
     let _ldTimer = null, _ldOrden = [], _ldI = 0;
     function ldFacts() {
       return LD_FACTS[localStorage.getItem('rr-lang') || 'co'] || LD_FACTS.co;
@@ -3032,7 +3038,7 @@
       setTimeout(() => {
         el.innerHTML = `<div><span class="ld-kicker">${k}</span>${txt}</div>`;
         el.classList.remove('fade');
-      }, 300);
+      }, LD_SWAP);
     }
     function ldStart() {
       const el = document.getElementById('ld-fact');

@@ -135,6 +135,50 @@
   }
   .copy-btn:hover { background: var(--elpais-blue-2); }
 
+  /* heatmap cand × arq */
+  table.heat {
+    border-collapse: separate; border-spacing: 3px;
+    width: 100%; font-family: 'Lato', system-ui, sans-serif;
+  }
+  table.heat th, table.heat td {
+    padding: .55rem .4rem; text-align: center; font-size: .82rem;
+  }
+  table.heat th {
+    font-size: .64rem; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--text-meta); font-weight: 700;
+  }
+  table.heat td.rowlbl {
+    text-align: left; font-weight: 700; white-space: nowrap;
+    padding-right: .8rem; color: var(--text);
+  }
+  table.heat td.cell {
+    border-radius: 2px; color: var(--text);
+    font-variant-numeric: tabular-nums; font-weight: 600;
+    min-width: 48px;
+  }
+  table.heat td.cell.hot { color: #fff; }
+  .heat-legend {
+    display: flex; align-items: center; gap: .6rem;
+    margin-top: .9rem; font-size: .75rem; color: var(--text-meta);
+  }
+  .heat-legend .scale {
+    display: flex; height: 10px; border-radius: 2px; overflow: hidden;
+    flex: 0 0 140px;
+  }
+  .heat-legend .scale span { flex: 1; }
+  .heat-empty {
+    text-align: center; padding: 1.6rem 1rem;
+    color: var(--text-meta); font-size: .88rem;
+  }
+  .heat-hint {
+    color: var(--text-soft); font-size: .88rem; margin: 0 0 1rem;
+  }
+  @media (max-width: 760px) {
+    table.heat th, table.heat td { padding: .42rem .25rem; font-size: .75rem; }
+    table.heat td.rowlbl { font-size: .8rem; }
+    table.heat td.cell { min-width: 36px; }
+  }
+
   .live-feed { max-height: 380px; overflow-y: auto; }
   .live-feed .feed-item {
     display: grid; grid-template-columns: 90px 1fr auto;
@@ -216,11 +260,12 @@
 
   <!-- ───────────── Cruce candidato × arquetipo ───────────── -->
   <div class="panel">
-    <h3>Cruce candidato × arquetipo (heatmap) <span class="badge todo">próximamente</span></h3>
-    <p style="color:var(--text-soft); font-size:.92rem; margin:0;">
+    <h3>Cruce candidato × arquetipo (heatmap) <span class="badge live">live</span></h3>
+    <p class="heat-hint">
       Matriz 6×5 con la frecuencia de cada combinación. Útil para ver qué
       arquetipo emocional gravita a cada candidato dentro del Valle.
     </p>
+    <div id="heat-wrap"></div>
   </div>
 
   <!-- ───────────── Feed en vivo ───────────── -->
@@ -336,6 +381,44 @@
     $('kpi-cross-delta').textContent = 'declaró candidato poco afín a su zona';
   }
 
+  function renderHeat(sc) {
+    const wrap = $('heat-wrap');
+    const cruce = sc.cruce || {};
+    const cands = (DATA && DATA.cands) || Object.keys(CAND);
+    const arqs  = (DATA && DATA.arqs)  || Object.keys(ARQ);
+    let maxv = 0;
+    cands.forEach(c => arqs.forEach(a => { maxv = Math.max(maxv, (cruce[c]||{})[a]||0); }));
+    if (maxv === 0) {
+      wrap.innerHTML = '<div class="heat-empty">Aún no hay datos suficientes para el cruce en este segmento.</div>';
+      return;
+    }
+    let h = '<table class="heat"><thead><tr><th></th>' +
+      arqs.map(a => {
+        const short = (ARQ[a]?.n || a).split(' ')[0];
+        return `<th title="${ARQ[a]?.n||a}">${short}</th>`;
+      }).join('') + '</tr></thead><tbody>';
+    cands.forEach(c => {
+      const rowTotal = arqs.reduce((s,a)=>s+((cruce[c]||{})[a]||0),0);
+      h += `<tr><td class="rowlbl">${CAND[c]?.n||c}</td>` + arqs.map(a => {
+        const v = (cruce[c]||{})[a]||0;
+        const ratio = v / maxv;
+        const alpha = v ? (0.10 + 0.85*ratio) : 0;
+        const hot = ratio >= 0.55 ? ' hot' : '';
+        const pctRow = rowTotal ? ((100*v/rowTotal).toFixed(0)+'%') : '0%';
+        const title = v
+          ? `${CAND[c]?.n||c} · ${ARQ[a]?.n||a}: ${v} (${pctRow} del candidato)`
+          : `${CAND[c]?.n||c} · ${ARQ[a]?.n||a}: sin respuestas`;
+        return `<td class="cell${hot}" title="${title}" style="background:rgba(0,103,177,${alpha.toFixed(3)})">${v||''}</td>`;
+      }).join('') + '</tr>';
+    });
+    h += '</tbody></table>' +
+      '<div class="heat-legend"><span>menos</span>' +
+      '<div class="scale">' +
+        [0.10,0.25,0.40,0.55,0.70,0.85,0.95].map(a=>`<span style="background:rgba(0,103,177,${a})"></span>`).join('') +
+      '</div><span>más</span><span style="margin-left:auto">Cada celda = nº de tests</span></div>';
+    wrap.innerHTML = h;
+  }
+
   function renderFeed() {
     const el = $('live-feed');
     // Stream filtrado a El País / Valle
@@ -371,6 +454,7 @@
     renderKPIs(sc);
     bars('bars-cand', sc.candidato_counts, CAND);
     bars('bars-arq',  sc.arquetipo_counts, ARQ);
+    renderHeat(sc);
     renderFeed();
   }
 

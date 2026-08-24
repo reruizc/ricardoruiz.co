@@ -84,6 +84,58 @@ PRIO_KEYWORDS = {
 CACHE_TTL_DIAS = int(os.environ.get("CACHE_TTL_DIAS", "14"))
 HTTP_TIMEOUT = 55
 
+# ---- Seguridad / anti-abuse ----
+# Tope duro al tamaño del body. El payload legítimo es ~3-5 KB; 50 KB deja
+# margen amplio sin permitir payload bombs que exhausten memoria/timeout.
+MAX_BODY_BYTES = int(os.environ.get("MAX_BODY_BYTES", "50000"))
+
+# Allowlist de origins permitidos para CORS. Cualquier Origin fuera de esta
+# lista recibe 403 (con STRICT_ORIGIN=true) y no se llama DeepSeek.
+# Para sumar embeds nuevos (Semana, Pulzo, etc.), agregar a ALLOWED_ORIGINS_EXTRA
+# en env vars de la Lambda, separados por coma. NO requiere redeploy de código.
+ALLOWED_ORIGINS = {
+    "https://ricardoruiz.co",
+    "https://www.ricardoruiz.co",
+    "https://elpais.com.co",
+    "https://www.elpais.com.co",
+}
+ALLOWED_ORIGINS |= {
+    o.strip() for o in os.environ.get("ALLOWED_ORIGINS_EXTRA", "").split(",")
+    if o.strip().startswith("https://")
+}
+# Default True: rechaza requests sin Origin válido. Para desactivar en una
+# emergencia (sin redeploy de código): `aws lambda update-function-configuration
+#   --function-name test-presidencial-explica --environment Variables={STRICT_ORIGIN=false,...}`
+STRICT_ORIGIN = os.environ.get("STRICT_ORIGIN", "true").lower() == "true"
+
+# Enums para validación estricta de input. Cualquier valor fuera de esta lista
+# es 400 inmediato — sin llamar DeepSeek.
+VALID_REGISTROS = {"popular", "digital", "analitico"}
+VALID_CAND_IDS = {"ic", "ae", "pv", "sf", "cl", "rb"}
+VALID_ARQ_IDS = {"proteccion", "estabilidad", "supervivencia", "castigo", "pertenencia"}
+# Espejo de las claves de PRIO_KEYWORDS (definido arriba) — duplicado a
+# propósito para que estas validaciones vivan en un solo bloque.
+VALID_PRIO = {"seguridad", "economia", "salud", "costo_vida", "anticorrupcion",
+              "exterior", "agraria", "instituciones", "educacion", "ambiente"}
+VALID_EDADES = {"18-25", "26-35", "36-50", "51-65", "66+"}
+VALID_IDENTIDADES = {"trabajo", "barrio", "familia", "ciudad", "gremio", "comunidad", "region"}
+# Espejo de TONO_REGIONAL (definido más abajo). Si agregás un tono nuevo
+# allá, sumarlo acá también.
+VALID_TONOS_REG = {"voseo_paisa", "voseo_caleño", "ustedeo_boyacense",
+                   "tuteo_costeño", "tuteo_neutro", None, ""}
+VALID_ORIGENES = {"declarado", "sugerido"}
+VALID_ALINEACIONES = {"alineado", "vientos_cruzados", "neutro"}
+
+# Sanitizador minimalista para strings que entran al prompt de DeepSeek.
+# Quita newlines/cuotes que rompen el system prompt y limita longitud.
+_PROMPT_BAD_CHARS = re.compile(r'[\r\n"\x00-\x1f]')
+
+def _safe_prompt_str(s, max_len=120):
+    if not s:
+        return ""
+    s = _PROMPT_BAD_CHARS.sub(" ", str(s))[:max_len]
+    return s.strip()
+
 # Nombre canonico de los 6 candidatos (para la huella)
 CAND_NOMBRES = {
     "ic": "Iván Cepeda",
@@ -116,12 +168,24 @@ LENTE_CAND = {
            "tono": "cerrar el ciclo de violencia, juntar a quienes quieren paz sin sectarismo, gobernar con todos."},
 }
 
-CORS_HEADERS = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Content-Type": "application/json; charset=utf-8",
-}
+def _cors(origin):
+    """Construye headers CORS reflejando el Origin sólo si está en la allowlist.
+    Si STRICT_ORIGIN=true y el origin no es válido, NO se incluye
+    Access-Control-Allow-Origin — el browser bloquea la respuesta en JS.
+    Cuando STRICT_ORIGIN=false (modo legacy), refleja todo origin presente
+    o cae a '*' para no romper integraciones existentes."""
+    base = {
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Origin",
+        "Access-Control-Max-Age": "86400",
+        "Vary": "Origin",
+        "Content-Type": "application/json; charset=utf-8",
+    }
+    if origin and origin in ALLOWED_ORIGINS:
+        base["Access-Control-Allow-Origin"] = origin
+    elif not STRICT_ORIGIN:
+        base["Access-Control-Allow-Origin"] = origin or "*"
+    return base
 
 # Tono por registro.
 TONO = {
@@ -487,16 +551,18 @@ def _cache_get(key):
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-def _save_optin(state):
+def _save_optin(state, origin=None):
     """Guarda un opt-in de contacto de campaña en un store SEPARADO.
     Datos personales (email/celular) — solo de quien autorizó. Nunca
     toca responses/ (anónimo)."""
-    email = (state.get("email") or "").strip()
+    email = (state.get("email") or "").strip().lower()
     cel = re.sub(r"\D", "", (state.get("celular") or ""))
-    if not _EMAIL_RE.match(email):
-        return _err(400, "bad_email", "Correo inválido")
-    if len(cel) < 7:
-        return _err(400, "bad_cel", "Celular inválido")
+    if not _EMAIL_RE.match(email) or len(email) > 254:
+        return _err(400, "bad_email", "Correo inválido", origin)
+    # Celular Colombia: 10 dígitos típicamente. Aceptamos 7-15 para cubrir
+    # fijos y formatos internacionales sin abrir la puerta a basura.
+    if not (7 <= len(cel) <= 15):
+        return _err(400, "bad_cel", "Celular inválido", origin)
     try:
         import uuid
         now = datetime.now(timezone.utc)
@@ -525,11 +591,14 @@ def _save_optin(state):
             Body=json.dumps(rec, ensure_ascii=False).encode("utf-8"),
             ContentType="application/json",
         )
-        print(f"[optin] guardado cand={rec['candidato']} dep={rec['dep_cod']} mun={rec['mun_cod']}")
-        return _ok({"ok": True})
+        # No logueamos el dict completo de candidato (puede incluir más
+        # campos del frontend); solo el id del candidato (no es PII).
+        cand_id = (rec.get("candidato") or {}).get("id") if isinstance(rec.get("candidato"), dict) else rec.get("candidato")
+        print(f"[optin] guardado cand={cand_id} dep={rec['dep_cod']} mun={rec['mun_cod']}")
+        return _ok({"ok": True}, origin)
     except Exception as e:
-        print(f"[optin] ERROR: {type(e).__name__}: {e}")
-        return _err(500, "optin_failed", "No se pudo guardar")
+        print(f"[optin] ERROR: {type(e).__name__}")
+        return _err(500, "optin_failed", "No se pudo guardar", origin)
 
 
 def _emit_event(state, alineacion):
@@ -710,35 +779,78 @@ def _call_deepseek(state):
 
 
 # ---- Handler ----
+def _get_origin(event):
+    """Extrae el Origin del request. API Gateway v2 lowercases headers; v1
+    los preserva. Cubrimos ambos."""
+    h = event.get("headers") or {}
+    return h.get("origin") or h.get("Origin") or ""
+
+
 def handler(event, context):
-    # Preflight CORS
+    origin = _get_origin(event)
+
     method = (event.get("requestContext", {}).get("http", {}).get("method")
               or event.get("httpMethod") or "POST").upper()
+
+    # Preflight CORS — siempre 204, pero los headers sólo reflejan Origin
+    # si está en la allowlist (cuando STRICT_ORIGIN=true). Si no, el browser
+    # rechaza el preflight y nunca dispara el POST → ahorramos DeepSeek.
     if method == "OPTIONS":
-        return {"statusCode": 204, "headers": CORS_HEADERS, "body": ""}
+        return {"statusCode": 204, "headers": _cors(origin), "body": ""}
 
     if method != "POST":
-        return _err(405, "method_not_allowed", "Solo POST")
+        return _err(405, "method_not_allowed", "Solo POST", origin)
 
-    # Body
-    body = event.get("body") or "{}"
+    # Allowlist de Origin — bloquea scraping casual con curl/python sin
+    # spoof de headers. Atacante decidido lo puede saltar; igual eleva el
+    # costo y los logs son más limpios para ver tráfico real anómalo.
+    if STRICT_ORIGIN and origin and origin not in ALLOWED_ORIGINS:
+        print(f"[security] origin rechazado: {origin!r}")
+        return _err(403, "origin_not_allowed", "Origin no permitido", origin)
+    # Si STRICT_ORIGIN está activo y NO viene Origin (curl, server-to-server),
+    # también rechazamos. Las llamadas legítimas del browser SIEMPRE traen Origin.
+    if STRICT_ORIGIN and not origin:
+        print("[security] request sin Origin rechazado")
+        return _err(403, "origin_missing", "Falta header Origin", origin)
+
+    # Body — chequear tamaño ANTES de parsear (defensa contra payload bomb)
+    raw_body = event.get("body") or "{}"
+    if len(raw_body) > MAX_BODY_BYTES:
+        print(f"[security] body demasiado grande: {len(raw_body)} bytes")
+        return _err(413, "payload_too_large",
+                    f"Body máximo permitido: {MAX_BODY_BYTES} bytes", origin)
+
     if event.get("isBase64Encoded"):
         import base64
-        body = base64.b64decode(body).decode("utf-8")
+        try:
+            raw_body = base64.b64decode(raw_body).decode("utf-8")
+        except Exception:
+            return _err(400, "bad_base64", "Body base64 inválido", origin)
+        if len(raw_body) > MAX_BODY_BYTES:
+            return _err(413, "payload_too_large",
+                        f"Body máximo permitido: {MAX_BODY_BYTES} bytes", origin)
+
     try:
-        state = json.loads(body) if isinstance(body, str) else body
+        state = json.loads(raw_body) if isinstance(raw_body, str) else raw_body
     except Exception as e:
-        return _err(400, "bad_json", f"Body no es JSON válido: {e}")
+        return _err(400, "bad_json", f"Body no es JSON válido: {e}", origin)
 
     # Rama opt-in (consentimiento de contacto de campaña). No usa DeepSeek.
     if state.get("accion") == "optin":
-        return _save_optin(state)
+        return _save_optin(state, origin)
 
-    # Validación mínima del state
+    # Validación mínima del state (campos requeridos)
     required = ["registro", "candidato", "arquetipo_dominante"]
     missing = [k for k in required if not state.get(k)]
     if missing:
-        return _err(400, "missing_fields", f"Faltan campos: {missing}")
+        return _err(400, "missing_fields", f"Faltan campos: {missing}", origin)
+
+    # Validación estricta — enums + tipos + longitudes. Bloquea inputs raros
+    # ANTES de tocar S3 o DeepSeek (que es lo caro).
+    ok, kind, msg = _validate_state(state)
+    if not ok:
+        print(f"[security] validación falló: {kind} — {msg}")
+        return _err(400, kind, msg, origin)
 
     # Cache check
     key = _cache_key(state)
@@ -746,18 +858,19 @@ def handler(event, context):
     if cached:
         cached["cache_hit"] = True
         _emit_event(state, cached.get("alineacion"))
-        return _ok(cached)
+        return _ok(cached, origin)
 
     # DeepSeek call
     try:
         parsed = _call_deepseek(state)
     except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")[:500]
-        print(f"[deepseek] HTTPError {e.code}: {body}")
-        return _err(502, "deepseek_http_error", f"DeepSeek devolvió {e.code}")
+        # No logueamos el body de error de DeepSeek (puede traer fragmentos
+        # del prompt con PII del usuario). Solo el código HTTP.
+        print(f"[deepseek] HTTPError {e.code}")
+        return _err(502, "deepseek_http_error", f"DeepSeek devolvió {e.code}", origin)
     except Exception as e:
-        print(f"[deepseek] FAIL: {type(e).__name__}: {e}")
-        return _err(500, "deepseek_failed", str(e))
+        print(f"[deepseek] FAIL: {type(e).__name__}")
+        return _err(500, "deepseek_failed", "Error procesando lectura", origin)
 
     out = {
         **parsed,
@@ -767,23 +880,121 @@ def handler(event, context):
     }
     _cache_put(key, out)
     _emit_event(state, out.get("alineacion"))
-    return _ok(out)
+    return _ok(out, origin)
 
 
-def _ok(payload):
+def _ok(payload, origin=None):
     return {
         "statusCode": 200,
-        "headers": CORS_HEADERS,
+        "headers": _cors(origin),
         "body": json.dumps(payload, ensure_ascii=False),
     }
 
 
-def _err(code, kind, msg):
+def _err(code, kind, msg, origin=None):
     return {
         "statusCode": code,
-        "headers": CORS_HEADERS,
+        "headers": _cors(origin),
         "body": json.dumps({"error": kind, "message": msg}, ensure_ascii=False),
     }
+
+
+def _validate_state(state):
+    """Valida tipos, enums y longitudes ANTES de tocar cache o DeepSeek.
+    Devuelve (ok: bool, kind: str|None, msg: str|None).
+    Mantenemos la regla del handler original: 'candidato' y
+    'arquetipo_dominante' son obligatorios; el resto es flexible para no
+    romper clientes viejos. Lo que sí endurecemos es: si el campo viene,
+    debe ser válido."""
+    if not isinstance(state, dict):
+        return False, "bad_shape", "state debe ser objeto JSON"
+
+    # Registro
+    reg = state.get("registro")
+    if reg is not None and reg not in VALID_REGISTROS:
+        return False, "bad_registro", f"registro debe ser uno de {sorted(VALID_REGISTROS)}"
+
+    # Candidato (obligatorio en el handler original)
+    cand = state.get("candidato")
+    if not isinstance(cand, dict):
+        return False, "bad_candidato", "candidato debe ser objeto"
+    cid = cand.get("id")
+    if cid not in VALID_CAND_IDS:
+        return False, "bad_candidato_id", f"candidato.id debe ser uno de {sorted(VALID_CAND_IDS)}"
+    # nombre y partido se sanitizan más tarde — no rechazamos por longitud aquí
+    if cand.get("nombre") and len(str(cand.get("nombre"))) > 80:
+        return False, "bad_candidato_nombre", "candidato.nombre demasiado largo"
+
+    # Origen del candidato (opcional)
+    org = state.get("candidato_origen")
+    if org is not None and org not in VALID_ORIGENES:
+        return False, "bad_candidato_origen", f"candidato_origen debe ser uno de {sorted(VALID_ORIGENES)}"
+
+    # Demografía
+    demo = state.get("demografia") or {}
+    if not isinstance(demo, dict):
+        return False, "bad_demografia", "demografia debe ser objeto"
+    edad = demo.get("edad")
+    if edad and edad not in VALID_EDADES:
+        return False, "bad_edad", f"demografia.edad debe ser uno de {sorted(VALID_EDADES)}"
+    ident = demo.get("identidad")
+    if ident and ident not in VALID_IDENTIDADES:
+        return False, "bad_identidad", f"demografia.identidad debe ser uno de {sorted(VALID_IDENTIDADES)}"
+
+    # Prio: lista de máx 5 valores, todos del enum
+    prio = state.get("prio") or []
+    if not isinstance(prio, list):
+        return False, "bad_prio", "prio debe ser lista"
+    if len(prio) > 5:
+        return False, "bad_prio_len", "prio acepta máx 5 elementos"
+    for p in prio:
+        if p not in VALID_PRIO:
+            return False, "bad_prio_value", f"prio: '{p}' no es válido"
+
+    # Ubicación
+    ubi = state.get("ubicacion") or {}
+    if not isinstance(ubi, dict):
+        return False, "bad_ubicacion", "ubicacion debe ser objeto"
+    barrio = ubi.get("barrio")
+    if barrio and len(str(barrio)) > 100:
+        return False, "bad_barrio_len", "ubicacion.barrio demasiado largo"
+    dep = ubi.get("dep_cod")
+    if dep is not None and not re.match(r"^\d{1,3}$", str(dep)):
+        return False, "bad_dep_cod", "ubicacion.dep_cod inválido"
+    mun = ubi.get("mun_cod")
+    if mun is not None and not re.match(r"^\d{1,5}$", str(mun)):
+        return False, "bad_mun_cod", "ubicacion.mun_cod inválido"
+    if ubi.get("tono_regional") not in VALID_TONOS_REG:
+        return False, "bad_tono_regional", "ubicacion.tono_regional inválido"
+
+    # Arquetipos
+    ad = state.get("arquetipo_dominante")
+    if not isinstance(ad, dict):
+        return False, "bad_arq_dominante", "arquetipo_dominante debe ser objeto"
+    if ad.get("id") not in VALID_ARQ_IDS:
+        return False, "bad_arq_dom_id", f"arquetipo_dominante.id debe ser uno de {sorted(VALID_ARQ_IDS)}"
+    aspct = ad.get("pct")
+    if aspct is not None and not (isinstance(aspct, (int, float)) and 0 <= aspct <= 100):
+        return False, "bad_arq_dom_pct", "arquetipo_dominante.pct fuera de rango"
+
+    asec = state.get("arquetipo_secundario")
+    if asec is not None:
+        if not isinstance(asec, dict):
+            return False, "bad_arq_secundario", "arquetipo_secundario debe ser objeto"
+        if asec.get("id") and asec.get("id") not in VALID_ARQ_IDS:
+            return False, "bad_arq_sec_id", "arquetipo_secundario.id inválido"
+
+    # arq_score (opcional pero si viene, valores numéricos sanos)
+    arq_score = state.get("arq_score") or {}
+    if not isinstance(arq_score, dict):
+        return False, "bad_arq_score", "arq_score debe ser objeto"
+    for k, v in arq_score.items():
+        if k not in VALID_ARQ_IDS:
+            return False, "bad_arq_score_key", f"arq_score: clave '{k}' no es arquetipo"
+        if not isinstance(v, (int, float)) or v < -100 or v > 1000:
+            return False, "bad_arq_score_val", f"arq_score['{k}'] fuera de rango"
+
+    return True, None, None
 
 
 # ---- CLI test ----
@@ -799,7 +1010,13 @@ if __name__ == "__main__":
         "arquetipo_secundario": {"id": "pertenencia", "nombre": "Pertenencia comunitaria y autonomía territorial", "pct": 24},
         "arq_score": {"proteccion": 2, "estabilidad": 4, "supervivencia": 2, "castigo": 14, "pertenencia": 8},
     }
-    event = {"httpMethod": "POST", "body": json.dumps(sample)}
+    # Origin fingido para pasar el gate de STRICT_ORIGIN durante tests
+    # locales. En producción el header lo pone el browser real.
+    event = {
+        "httpMethod": "POST",
+        "headers": {"origin": "https://ricardoruiz.co", "content-type": "application/json"},
+        "body": json.dumps(sample),
+    }
     result = handler(event, None)
     print(json.dumps(json.loads(result["body"]), indent=2, ensure_ascii=False))
     sys.exit(0 if result["statusCode"] == 200 else 1)

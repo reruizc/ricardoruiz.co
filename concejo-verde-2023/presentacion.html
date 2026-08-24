@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Primera vuelta 2026 leída hasta el barrio · El voto Verde en Bogotá</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Arima:wght@400;500;700&family=Syne:wght@600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!--
+  ANÁLISIS ELECTORAL · 1ª vuelta presidencial 2026 + Concejo de Bogotá 2023 (Verde)
+  Ricardo Ruiz · ricardoruiz.co
+  Controles: → / espacio avanzar · ← atrás · N notas · F pantalla completa · ? ayuda
+  Datos: tools/concejo-verde-2023/build.py → concejo-verde-2023/data.json + img/
+  Exportar PDF:
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+      --headless --disable-gpu --no-pdf-header-footer \
+      --print-to-pdf="presentacion.pdf" \
+      "file:///ABS/PATH/concejo-verde-2023/presentacion.html"
+-->
+<style>
+:root{
+  --paper:#f1eee4; --paper2:#e9e4d6; --ink:#1a1510; --ink2:#3a322a;
+  --ox:#8a1e16; --cep:#6a3d9a; --abe:#1f47cc; --verde:#1c6b39;
+  --muted:rgba(26,21,16,.60); --line:rgba(26,21,16,.16); --line2:rgba(26,21,16,.10);
+  --gold:#a8741a;
+  --f-title:'Arima',Georgia,'Times New Roman',serif;
+  --f-body:'Helvetica Neue',Helvetica,Arial,sans-serif;
+  --f-data:'Syne',sans-serif;
+  --f-mono:'DM Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:#cdc6b6; color:var(--ink); font-family:var(--f-body);
+  overflow:hidden; -webkit-font-smoothing:antialiased;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact;
+}
+#deck{
+  position:fixed; left:50%; top:50%; width:1280px; height:720px;
+  transform-origin:center center; transform:translate(-50%,-50%);
+  background:var(--paper); box-shadow:0 30px 90px rgba(0,0,0,.45); overflow:hidden;
+}
+.slide{
+  position:absolute; inset:0; display:none; padding:58px 70px 64px; flex-direction:column;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(106,61,154,.05), transparent 60%),
+    radial-gradient(900px 500px at -5% 110%, rgba(31,71,204,.05), transparent 60%),
+    var(--paper);
+}
+.slide.active{display:flex}
+.slide .notes{display:none}
+#deck::after{
+  content:""; position:absolute; inset:0; pointer-events:none; opacity:.5;
+  background-image:radial-gradient(rgba(26,21,16,.045) 1px, transparent 1px);
+  background-size:4px 4px; mix-blend-mode:multiply;
+}
+/* typography */
+.kicker{ font-family:var(--f-body); font-weight:700; font-size:13.5px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--ox); display:flex; align-items:center; gap:12px }
+.kicker::before{content:""; width:30px; height:3px; background:var(--ox); display:inline-block}
+.title{ font-family:var(--f-title); font-weight:700; color:var(--ink); line-height:1.04; letter-spacing:-.01em }
+.sub{ font-family:var(--f-title); font-weight:400; color:var(--ink2); line-height:1.18 }
+.body{ font-size:20px; line-height:1.48; color:var(--ink2); max-width:60ch }
+.body b,.body strong{ color:var(--ink); font-weight:700 }
+.lead{ font-size:24px; line-height:1.42; color:var(--ink2); max-width:54ch }
+.lead b{ color:var(--ink) }
+.small{ font-size:15.5px; color:var(--muted); line-height:1.45 }
+.em-cep{ color:var(--cep); font-weight:700 }
+.em-abe{ color:var(--abe); font-weight:700 }
+.em-vd{ color:var(--verde); font-weight:700 }
+.slide .title.t-xl{ font-size:74px } .slide .title.t-lg{ font-size:56px } .slide .title.t-md{ font-size:42px }
+.head{ margin-bottom:22px } .head .title{ margin-top:12px } .spacer{ flex:1 }
+/* cover */
+.cover{ justify-content:center; gap:0;
+  background:radial-gradient(1100px 700px at 80% 12%, rgba(106,61,154,.12), transparent 62%),
+    radial-gradient(900px 700px at 6% 96%, rgba(31,71,204,.10), transparent 60%), var(--paper) }
+.cover .eyebrow{ font-family:var(--f-mono); font-size:15px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--ox); margin-bottom:10px }
+.cover .title{ font-size:84px; line-height:.99; margin:6px 0 22px }
+.cover .sub{ font-size:28px; max-width:34ch }
+.cover .byline{ margin-top:42px; font-family:var(--f-mono); font-size:15px; color:var(--ink2);
+  border-top:1px solid var(--line); padding-top:16px; letter-spacing:.02em }
+.cover .byline b{ color:var(--ox) }
+/* layouts */
+.cols{ display:flex; gap:40px; flex:1; min-height:0; align-items:center } .col{ flex:1; min-width:0; min-height:0 }
+.col.narrow{ flex:.82 } .col.wide{ flex:1.3 }
+.col.fig{ display:flex; flex-direction:column }   /* contiene una figura → deja que la imagen se ajuste a lo alto */
+.figure{ flex:1; display:flex; align-items:center; justify-content:center; min-height:0 }
+.figure img{ max-width:100%; max-height:100%; object-fit:contain; border:1px solid var(--line);
+  border-radius:4px; background:#fff; box-shadow:0 10px 30px rgba(0,0,0,.12) }
+.figbox{ display:flex; flex-direction:column; min-height:0; flex:1 }
+.cap{ font-family:var(--f-mono); font-size:13px; color:var(--muted); margin-top:10px; text-align:center }
+/* stats */
+.statgrid{ display:flex; gap:14px; margin-top:6px; flex-wrap:wrap }
+.stat{ background:#fff; border:1px solid var(--line); border-radius:6px; padding:16px 18px; min-width:128px }
+.stat .n{ font-family:var(--f-data); font-weight:800; font-size:42px; line-height:1 }
+.stat .l{ font-size:13px; color:var(--muted); margin-top:7px; line-height:1.3 }
+/* mirror rows */
+.mirror{ display:flex; flex-direction:column; gap:14px; margin-top:4px }
+.mrow{ display:flex; align-items:center; gap:14px; background:#fff; border:1px solid var(--line);
+  border-radius:8px; padding:14px 20px }
+.mrow .who{ font-family:var(--f-title); font-weight:700; font-size:24px; width:110px }
+.mrow .who.c{ color:var(--cep) } .mrow .who.a{ color:var(--abe) }
+.mrow .pair{ display:flex; align-items:baseline; gap:8px }
+.mrow .age{ font-family:var(--f-mono); font-size:12.5px; color:var(--muted); width:48px }
+.mrow .v{ font-family:var(--f-data); font-weight:800; font-size:34px; line-height:1 }
+.mrow .arrow{ font-size:26px; margin:0 4px; opacity:.45 }
+.mrow .v.c{ color:var(--cep) } .mrow .v.a{ color:var(--abe) }
+/* split bar (Cepeda vs Abelardo) */
+.splitwrap{ margin-top:6px }
+.split{ display:flex; height:40px; border-radius:7px; overflow:hidden; border:1px solid var(--line) }
+.split .seg{ display:flex; align-items:center; justify-content:center; gap:7px;
+  font-family:var(--f-data); font-weight:800; font-size:17px; color:#fff }
+.split .ce{ background:var(--cep) } .split .ab{ background:var(--abe) }
+.splitlab{ display:flex; justify-content:space-between; margin-top:8px; font-family:var(--f-mono);
+  font-size:12.5px; color:var(--muted) }
+.splitlab b.c{ color:var(--cep) } .splitlab b.a{ color:var(--abe) }
+/* delta cards */
+.deltas{ display:flex; gap:12px; margin-top:16px }
+.delta{ flex:1; background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 16px }
+.delta .who{ font-family:var(--f-mono); font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted) }
+.delta .n{ font-family:var(--f-data); font-weight:800; font-size:30px; margin-top:4px }
+.delta .vs{ font-size:12.5px; color:var(--muted); margin-top:4px }
+.delta.up .n{ color:var(--abe) } .delta.down .n{ color:var(--cep) }
+/* barrio table */
+.btab{ width:100%; border-collapse:collapse; margin-top:8px; font-size:13.5px }
+.btab th{ font-family:var(--f-mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--muted); text-align:left; padding:5px 8px; border-bottom:1px solid var(--line) }
+.btab td{ padding:6px 8px; border-bottom:1px solid var(--line2); color:var(--ink2) }
+.btab td .bn{ color:var(--ink); font-weight:700 } .btab td.r{ text-align:right; font-family:var(--f-mono) }
+.tag{ font-family:var(--f-mono); font-size:10.5px; font-weight:500; padding:2px 7px; border-radius:999px; color:#fff }
+.tag.ce{ background:var(--cep) } .tag.ab{ background:var(--abe) }
+/* bullets + chips */
+.blist{ list-style:none; display:flex; flex-direction:column; gap:14px; margin-top:4px; max-width:64ch }
+.blist li{ font-size:19px; line-height:1.4; color:var(--ink2); padding-left:28px; position:relative }
+.blist li::before{ content:""; position:absolute; left:0; top:10px; width:10px; height:10px;
+  background:var(--ox); border-radius:2px; transform:rotate(45deg) }
+.blist li b{ color:var(--ink) }
+.note-line{ margin-top:auto; font-family:var(--f-title); font-size:23px; color:var(--ox); font-weight:500;
+  border-left:4px solid var(--ox); padding-left:18px; line-height:1.25 }
+.chips{ display:flex; flex-wrap:wrap; gap:9px; margin-top:14px }
+.chip{ font-family:var(--f-mono); font-size:12.5px; color:var(--ink2); background:#fff;
+  border:1px solid var(--line); border-radius:999px; padding:6px 13px }
+.chip b{ color:var(--ox) }
+/* divider + close */
+.divider{ justify-content:center; background:linear-gradient(135deg,#241a2e 0%, #2a1f38 55%, #1c2752 100%); color:#f1eee4 }
+.divider .kicker{ color:#cdb6e9 } .divider .kicker::before{ background:#cdb6e9 }
+.divider .title{ color:#fbf7ef; font-size:80px; line-height:1; margin:16px 0 16px }
+.divider .sub{ color:rgba(251,247,239,.80); font-size:27px; max-width:32ch }
+.close{ justify-content:center; background:linear-gradient(135deg,#241a2e,#1c2752); color:#f7f2ea }
+.close .kicker{ color:#cdb6e9 } .close .kicker::before{ background:#cdb6e9 }
+.close .title{ color:#fff; font-size:62px; line-height:1.04; margin:14px 0 18px }
+.close .sub{ color:rgba(247,242,234,.86); font-size:25px; max-width:42ch }
+.close .byline{ margin-top:34px; font-family:var(--f-mono); font-size:15px; color:rgba(247,242,234,.7);
+  border-top:1px solid rgba(255,255,255,.18); padding-top:16px }
+.close .byline b{ color:#cdb6e9 }
+/* chrome */
+#progress{ position:fixed; left:0; top:0; height:4px; width:100%; background:rgba(0,0,0,.15); z-index:50 }
+#bar{ height:100%; width:0; background:var(--ox); transition:width .3s ease }
+.ctrl{ position:fixed; z-index:50; font-family:var(--f-mono); color:#f1eee4; user-select:none }
+#counter{ right:18px; bottom:14px; font-size:13px; opacity:.8 }
+#brand{ left:18px; bottom:14px; font-size:13px; opacity:.8; letter-spacing:.04em } #brand b{ color:#cdb6e9 }
+#nav{ left:50%; bottom:10px; transform:translateX(-50%); display:flex; gap:8px; opacity:.55; transition:opacity .2s }
+#nav:hover{ opacity:1 }
+#nav button{ font-family:var(--f-mono); font-size:18px; line-height:1; background:rgba(0,0,0,.35);
+  color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:6px; padding:8px 14px; cursor:pointer }
+#nav button:hover{ background:rgba(0,0,0,.6) }
+#notes{ position:fixed; left:0; right:0; bottom:0; z-index:60; transform:translateY(102%);
+  transition:transform .25s ease; background:#16110c; color:#efe8dc; border-top:3px solid var(--ox);
+  max-height:42vh; overflow:auto; padding:20px 26px 26px; box-shadow:0 -20px 50px rgba(0,0,0,.5) }
+#notes.on{ transform:translateY(0) }
+#notes h4{ font-family:var(--f-mono); font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:#cdb6e9; margin-bottom:10px }
+#notes-body{ font-size:16px; line-height:1.55; max-width:90ch } #notes-body p{ margin-bottom:9px } #notes-body b{ color:#fff }
+#notes-body em.live{ color:#7fd1a0; font-style:normal; font-family:var(--f-mono); font-size:13px }
+#help{ position:fixed; inset:0; z-index:70; display:none; align-items:center; justify-content:center; background:rgba(8,6,4,.82); color:#f1eee4 }
+#help.on{ display:flex }
+#help .box{ background:#16110c; border:1px solid rgba(255,255,255,.2); border-radius:12px; padding:34px 40px; max-width:520px }
+#help h3{ font-family:var(--f-title); font-size:30px; margin-bottom:18px; color:#fff }
+#help dl{ display:grid; grid-template-columns:auto 1fr; gap:10px 18px; font-size:16px }
+#help dt{ font-family:var(--f-mono); color:#cdb6e9 } #help dd{ color:#d8cfc1 }
+#help .x{ margin-top:22px; font-size:13px; color:rgba(255,255,255,.5); font-family:var(--f-mono) }
+@page{ size:1280px 720px; margin:0 }
+@media print{
+  body{ background:#fff; overflow:visible }
+  #deck{ position:static; transform:none!important; width:1280px; height:auto; box-shadow:none }
+  #deck::after{ display:none }
+  .slide{ display:flex!important; position:static!important; inset:auto!important;
+    width:1280px; height:720px; page-break-after:always; break-after:page; overflow:hidden }
+  .slide:last-child{ page-break-after:auto }
+  #progress,.ctrl,#nav,#notes,#help{ display:none!important }
+}
+</style>
+</head>
+<body>
+<div id="progress"><div id="bar"></div></div>
+<div id="deck">
+
+  <!-- 1 · PORTADA -->
+  <section class="slide cover active">
+    <div class="eyebrow">Análisis electoral · 1ª vuelta presidencial 2026</div>
+    <h1 class="title">Primera vuelta 2026,<br>leída hasta el barrio</h1>
+    <p class="sub">Del resultado nacional al voto de dos concejales del <b>Partido Verde</b> en Bogotá — y a quién votó hoy su gente.</p>
+    <div class="byline">Ricardo Ruiz · <b>ricardoruiz.co</b> &nbsp;·&nbsp; escrutinio mesa a mesa · barrio catastral &nbsp;·&nbsp; 2026</div>
+    <aside class="notes">
+      <p>El arco de la charla: empezamos en el <b>resultado nacional</b> de la primera vuelta (2 láminas), bajamos a <b>Bogotá</b> (5 láminas) y aterrizamos en un cruce concreto: el voto de <b>Ronald Vargas</b> y <b>Julián Espinosa</b> —dos concejales del Verde elegidos en 2023— barrio por barrio, contra cómo votó hoy ese mismo territorio.</p>
+      <p>La pregunta final: la gente que los eligió al Concejo, ¿hoy se inclina por <b>Cepeda</b> o por <b>Abelardo</b>?</p>
+    </aside>
+  </section>
+
+  <!-- 2 · NACIONAL · EL RESULTADO -->
+  <section class="slide">
+    <div class="head">
+      <div class="kicker">Nacional · 1ª vuelta · 31 de mayo de 2026</div>
+      <h2 class="title t-lg">Ganó Abelardo. Cepeda quedó<br>a <span style="color:var(--cep)">2,8 puntos</span>.</h2>
+    </div>
+    <div class="cols" style="align-items:stretch">
+      <div class="col narrow">
+        <div class="statgrid">
+          <div class="stat"><div class="n" style="color:var(--abe)">43,7%</div><div class="l"><b>Abelardo</b> De La Espriella<br>10.346.010 votos</div></div>
+          <div class="stat"><div class="n" style="color:var(--cep)">40,9%</div><div class="l"><b>Cepeda</b> · Pacto Histórico<br>9.680.095 votos</div></div>
+        </div>
+        <p class="body" style="margin-top:16px; font-size:18px">Paloma <b>6,9%</b> · Fajardo <b>4,3%</b> · participación <b>58%</b>. Margen de ~<b>666 mil votos</b> (2,8 pp).</p>
+        <p class="small" style="margin-top:14px">Se van a 2ª vuelta el 21 de junio. La derecha llega favorita porque <b>se consolidó</b> en primera; la izquierda tiene que sumar el centro y movilizar.</p>
+      </div>
+      <div class="col wide fig">
+        <div class="figbox"><div class="figure"><img src="img/m_ganador_dep.png" alt="Quién ganó cada departamento"></div></div>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>El dato duro de la noche: Abelardo 43,7%, Cepeda 40,9%. Margen de ~<b>666 mil votos</b>, 2,8 puntos. Paloma tercera (6,9%), Fajardo cuarto.</p>
+      <p>El mapa por departamento ya muestra la <b>geografía del país</b>: Abelardo (azul) en el centro andino y los Llanos; Cepeda (morado) en la periferia —Pacífico, Caribe, sur, frontera—. Es el mapa que vamos a ver repetirse, en pequeño, dentro de Bogotá.</p>
+    </aside>
+  </section>
+
+  <!-- 3 · NACIONAL · LA FRACTURA -->
+  <section class="slide">
+    <div class="head">
+      <div class="kicker">Nacional · cómo se partió el voto</div>
+      <h2 class="title t-md">No fue solo izquierda y derecha:<br>fue <span style="color:var(--cep)">joven</span> contra <span style="color:var(--abe)">mayor</span>.</h2>
+    </div>
+    <div class="cols">
+      <div class="col wide">
+        <div class="mirror">
+          <div class="mrow">
+            <div class="who c">Cepeda</div>
+            <div class="pair"><span class="age">18–25</span><span class="v c">60%</span></div>
+            <span class="arrow">→</span>
+            <div class="pair"><span class="age">61+</span><span class="v c">7%</span></div>
+          </div>
+          <div class="mrow">
+            <div class="who a">Abelardo</div>
+            <div class="pair"><span class="age">18–25</span><span class="v a">23%</span></div>
+            <span class="arrow">→</span>
+            <div class="pair"><span class="age">61+</span><span class="v a">79%</span></div>
+          </div>
+        </div>
+        <p class="small" style="margin-top:16px">% del voto de cada grupo de edad · duelo de los dos punteros (estimación por puesto, con su intervalo). Cepeda puntea en casi todas las edades… menos entre los mayores de 60.</p>
+      </div>
+      <div class="col narrow fig">
+        <div class="figbox"><div class="figure"><img src="img/perfil_edad.png" alt="Perfil de voto por edad 2026"></div></div>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>El voto 2026 se ordenó por <b>generación</b> casi tanto como por ideología: Cepeda ~60% entre los más jóvenes y ~7% entre los mayores; Abelardo al revés, 23%→79%. Líneas en espejo.</p>
+      <p>Esto importa para lo que sigue: edad, estrato y territorio van de la mano, y en Bogotá esa fractura se dibuja sobre el mapa con una nitidez que vamos a usar para leer dos electorados concretos.</p>
+    </aside>
+  </section>
+
+  <!-- 4 · BOGOTÁ · LAS DOS BOGOTÁS -->
+  <section class="slide">
+    <div class="head">
+      <div class="kicker">Bogotá · 1ª vuelta · barrio a barrio</div>
+      <h2 class="title t-md">Cepeda ganó la ciudad, pero Bogotá<br>se partió en dos sobre el mapa.</h2>
+    </div>
+    <div class="cols">
+      <div class="col wide fig">
+        <div class="figbox"><div class="figure"><img src="img/m_bogota_barrio_winner.png" alt="Ganador por barrio en Bogotá 2026"></div></div>
+      </div>
+      <div class="col narrow">
+        <p class="body"><span class="em-cep">Cepeda</span> gana el <b>sur y el centro</b> popular: Usme, Bosa, Ciudad Bolívar, San Cristóbal, Kennedy.</p>
+        <p class="body" style="margin-top:12px"><span class="em-abe">Abelardo</span> gana el <b>norte y el occidente</b> acomodado: Usaquén, Chapinero, Suba, Teusaquillo.</p>
+        <div class="statgrid" style="margin-top:18px">
+          <div class="stat"><div class="n" style="color:var(--cep)">435</div><div class="l">barrios gana<br>Cepeda</div></div>
+          <div class="stat"><div class="n" style="color:var(--abe)">223</div><div class="l">barrios gana<br>Abelardo</div></div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>Cepeda gana Bogotá (~42,7% ciudad) y se lleva 435 barrios contra 223 de Abelardo. Pero el mapa <b>es</b> la estructura social: sur y centro popular morado; norte y occidente acomodado azul. Norte a la izquierda por la rotación de costumbre.</p>
+      <p>Este es el tablero. Ahora pongamos encima el voto de dos concejales del Verde y veamos sobre cuál de las dos Bogotás se para cada uno.</p>
+      <p><em class="live">EN VIVO opcional → bogota-1v-barrios.html</em></p>
+    </aside>
+  </section>
+
+  <!-- 5 · RONALD · EL MAPA -->
+  <section class="slide">
+    <div class="head">
+      <div class="kicker">Bogotá · Concejo 2023 · Partido Verde (Alianza Verde)</div>
+      <h2 class="title t-md">Ronald Vargas: <span style="color:var(--verde)">13.942 votos</span><br>al Concejo, repartidos así.</h2>
+    </div>
+    <div class="cols">
+      <div class="col wide fig">
+        <div class="figbox"><div class="figure"><img src="img/m_ronald_barrio.png" alt="Voto de Ronald Vargas por barrio 2023"></div></div>
+      </div>
+      <div class="col narrow">
+        <p class="lead">Su voto se concentra en el <b>centro-occidente y el norte</b> de clase media.</p>
+        <p class="small" style="margin-top:14px">Top localidades (voto 2023):</p>
+        <div class="chips">
+          <span class="chip"><b>Suba</b> 2.076</span>
+          <span class="chip"><b>Engativá</b> 2.048</span>
+          <span class="chip"><b>Kennedy</b> 1.701</span>
+          <span class="chip"><b>Teusaquillo</b> 1.507</span>
+          <span class="chip"><b>Fontibón</b> 969</span>
+          <span class="chip"><b>Usaquén</b> 916</span>
+        </div>
+        <p class="small" style="margin-top:16px">Dato real por mesa (Registraduría 2023), agregado a <b>589 barrios</b> catastrales por punto-en-polígono. Cobertura 99,5%.</p>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>Ronald Vargas, concejal de Alianza Verde elegido en 2023. Su voto verde se reparte sobre todo en el <b>arco centro-occidental</b>: Suba, Engativá, Teusaquillo, Fontibón, más Usaquén en el norte. Clase media urbana, no el sur popular.</p>
+      <p>Cada puesto se ubica por sus coordenadas y cae en su barrio; el verde más intenso son sus barrios fuertes (Teusaquillo, Hayuelos, Tíntala).</p>
+    </aside>
+  </section>
+
+  <!-- 6 · RONALD · EL CRUCE -->
+  <section class="slide">
+    <div class="head">
+      <div class="kicker">Bogotá · el cruce 2023 → 2026 · ¿su gente vota Cepeda o Abelardo?</div>
+      <h2 class="title t-md">Su electorado se inclina a <span style="color:var(--abe)">Abelardo</span><br>más que el resto de la ciudad.</h2>
+    </div>
+    <div class="cols">
+      <div class="col wide fig">
+        <div class="figbox"><div class="figure"><img src="img/m_ronald_cross.png" alt="Voto de Ronald coloreado por ganador 2026"></div></div>
+      </div>
+      <div class="col narrow">
+        <p class="small" style="margin-bottom:2px">De cada 100 votos suyos de 2023, hoy viven en barrios que ganó…</p>
+        <div class="splitwrap">
+          <div class="split">
+            <div class="seg ce" style="width:53%">53%</div>
+            <div class="seg ab" style="width:47%">47%</div>
+          </div>
+          <div class="splitlab"><b class="c">Cepeda</b><b class="a">Abelardo</b></div>
+        </div>
+        <p class="small" style="margin-top:16px">Intención 2026 ponderada por su voto, frente al promedio de Bogotá:</p>
+        <div class="deltas">
+          <div class="delta down"><div class="who">Cepeda</div><div class="n">−4,0</div><div class="vs">pp vs ciudad</div></div>
+          <div class="delta up"><div class="who">Abelardo</div><div class="n">+2,8</div><div class="vs">pp vs ciudad</div></div>
+        </div>
+        <p class="small" style="margin-top:14px">Su voto Verde es la <b>franja media del occidente</b> que en 2026 se corrió a la derecha (Hayuelos, Colsubsidio, Federman, Villa Alsacia).</p>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>Aquí está la respuesta para Ronald: 53% de su voto 2023 vive en barrios que ganó Cepeda, 47% en barrios que ganó Abelardo. Pero comparado con la ciudad, su electorado es <b>−4 pp en Cepeda y +2,8 pp en Abelardo</b>: se inclina a la derecha más que el promedio bogotano.</p>
+      <p>No es que su gente sea de derecha; es que su voto verde sale del <b>occidente de clase media</b> (Fontibón-Hayuelos, Engativá-Colsubsidio, Teusaquillo-Federman) que en esta presidencial se fue para Abelardo. Verde, sí, pero del lado azul del mapa.</p>
+    </aside>
+  </section>
+
+  <!-- 7 · JULIÁN · EL MAPA -->
+  <section class="slide">
+    <div class="head">
+      <div class="kicker">Bogotá · Concejo 2023 · Partido Verde (Alianza Verde)</div>
+      <h2 class="title t-md">Julián Espinosa: <span style="color:var(--verde)">19.565 votos</span>,<br>anclados en el sur popular.</h2>
+    </div>
+    <div class="cols">
+      <div class="col wide fig">
+        <div class="figbox"><div class="figure"><img src="img/m_julian_barrio.png" alt="Voto de Julián Espinosa por barrio 2023"></div></div>
+      </div>
+      <div class="col narrow">
+        <p class="lead">Otro Verde, otra ciudad: su voto baja al <b>sur y suroccidente</b>.</p>
+        <p class="small" style="margin-top:14px">Top localidades (voto 2023):</p>
+        <div class="chips">
+          <span class="chip"><b>Kennedy</b> 2.688</span>
+          <span class="chip"><b>Suba</b> 2.219</span>
+          <span class="chip"><b>Bosa</b> 1.775</span>
+          <span class="chip"><b>Engativá</b> 1.771</span>
+          <span class="chip"><b>Tunjuelito</b> 1.289</span>
+          <span class="chip"><b>Usme</b> 1.205</span>
+        </div>
+        <p class="small" style="margin-top:16px">Mismo método: por mesa (2023) a <b>602 barrios</b> catastrales. Más votos que Ronald y un mapa distinto.</p>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>Julián Espinosa Ortiz, también Alianza Verde, también elegido 2023, pero con casi 20 mil votos y un mapa <b>opuesto</b>: Kennedy, Bosa, Tunjuelito, Usme, San Cristóbal. El sur y suroccidente popular.</p>
+      <p>Misma marca, dos territorios. La pregunta es si esa diferencia de mapa se traduce en una diferencia de hacia dónde va su gente en la presidencial.</p>
+    </aside>
+  </section>
+
+  <!-- 8 · JULIÁN · EL CRUCE -->
+  <section class="slide">
+    <div class="head">
+      <div class="kicker">Bogotá · el cruce 2023 → 2026 · ¿su gente vota Cepeda o Abelardo?</div>
+      <h2 class="title t-md">Su electorado calca a la ciudad<br>y se inclina a <span style="color:var(--cep)">Cepeda</span>.</h2>
+    </div>
+    <div class="cols">
+      <div class="col wide fig">
+        <div class="figbox"><div class="figure"><img src="img/m_julian_cross.png" alt="Voto de Julián coloreado por ganador 2026"></div></div>
+      </div>
+      <div class="col narrow">
+        <p class="small" style="margin-bottom:2px">De cada 100 votos suyos de 2023, hoy viven en barrios que ganó…</p>
+        <div class="splitwrap">
+          <div class="split">
+            <div class="seg ce" style="width:63%">63%</div>
+            <div class="seg ab" style="width:37%">37%</div>
+          </div>
+          <div class="splitlab"><b class="c">Cepeda</b><b class="a">Abelardo</b></div>
+        </div>
+        <p class="small" style="margin-top:16px">Intención 2026 ponderada por su voto, frente al promedio de Bogotá:</p>
+        <div class="deltas">
+          <div class="delta down" style="opacity:.85"><div class="who">Cepeda</div><div class="n" style="color:var(--ink2)">−0,6</div><div class="vs">pp ≈ ciudad</div></div>
+          <div class="delta up" style="opacity:.85"><div class="who">Abelardo</div><div class="n" style="color:var(--ink2)">+0,6</div><div class="vs">pp ≈ ciudad</div></div>
+        </div>
+        <p class="small" style="margin-top:14px">Su voto es la <b>Bogotá mediana</b>: prácticamente el promedio de la ciudad, ladeado a Cepeda (Tunal, Kennedy, Guacamayas, Gustavo Restrepo).</p>
+      </div>
+    </div>
+    <aside class="notes">
+      <p>Julián es el contraste: 63% de su voto 2023 vive en barrios que ganó Cepeda, solo 37% en barrios de Abelardo. Y frente a la ciudad casi no se mueve (−0,6 / +0,6): su electorado <b>es</b> Bogotá promedio, con sesgo Cepeda.</p>
+      <p>Diez puntos de diferencia con Ronald en "barrios Cepeda" (63 vs 53). Mismo partido, lecturas territoriales opuestas.</p>
+    </aside>
+  </section>
+
+  <!-- 9 · CIERRE -->
+  <section class="slide close">
+    <div class="kicker">Cierre · lo que dice (y lo que no) el cruce</div>
+    <h2 class="title">Dos Verdes, dos Bogotás.</h2>
+    <p class="sub">El voto del Partido Verde <b style="color:#fff">no es un bloque</b>: se reparte a lado y lado de la fractura de 2026. <b style="color:#cdb6e9">Julián</b> (sur popular) ladea Cepeda; <b style="color:#9fb4ff">Ronald</b> (occidente medio) ladea Abelardo, +2,8 pp sobre la ciudad.</p>
+    <div class="byline">Inferencia ecológica: medimos cómo votó el <b>barrio</b>, no cada persona · Concejo 2023 y presidencial 2026 son elecciones distintas, con 3 años de por medio · dato real por mesa, cruce a barrio catastral · <b>ricardoruiz.co</b></div>
+    <aside class="notes">
+      <p>La conclusión útil: la etiqueta "Verde" esconde dos electorados que en 2026 caen en mitades distintas de la ciudad. Para quien hace estrategia, eso cambia el mensaje, el aliado natural y el riesgo de cada base.</p>
+      <p>La honestidad metodológica (clave frente a cualquiera que sepa): esto es <b>inferencia ecológica</b> —sé cómo votó el barrio donde vive su voto, no cómo votó cada uno de sus votantes—. Y son <b>dos elecciones distintas</b> separadas por tres años: leemos coincidencia territorial, no transferencia individual de votos. Aun así, el contraste entre los dos es nítido y se sostiene.</p>
+    </aside>
+  </section>
+
+</div><!-- /deck -->
+
+<div id="brand" class="ctrl">1ª VUELTA 2026 · EL VOTO VERDE EN BOGOTÁ · <b>ricardoruiz.co</b></div>
+<div id="counter" class="ctrl">1 / 9</div>
+<div id="nav" class="ctrl">
+  <button id="btn-prev" aria-label="Anterior">‹</button>
+  <button id="btn-next" aria-label="Siguiente">›</button>
+</div>
+<div id="notes"><h4>Notas del orador</h4><div id="notes-body"></div></div>
+<div id="help">
+  <div class="box">
+    <h3>Controles</h3>
+    <dl>
+      <dt>→ · espacio</dt><dd>Avanzar</dd>
+      <dt>←</dt><dd>Retroceder</dd>
+      <dt>N</dt><dd>Notas del orador</dd>
+      <dt>F</dt><dd>Pantalla completa</dd>
+      <dt>Inicio / Fin</dt><dd>Primera / última</dd>
+      <dt>?</dt><dd>Esta ayuda</dd>
+    </dl>
+    <div class="x">Esc para cerrar</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var deck=document.getElementById('deck');
+  var slides=Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var counter=document.getElementById('counter');
+  var bar=document.getElementById('bar');
+  var notes=document.getElementById('notes');
+  var notesBody=document.getElementById('notes-body');
+  var help=document.getElementById('help');
+  var cur=0, notesOn=false;
+  function fit(){
+    var s=Math.min(window.innerWidth/1280, window.innerHeight/720);
+    deck.style.transform='translate(-50%,-50%) scale('+s+')';
+  }
+  function renderNotes(){
+    var n=slides[cur].querySelector('.notes');
+    notesBody.innerHTML=n?n.innerHTML:'<em>—</em>';
+  }
+  function show(i){
+    cur=Math.max(0,Math.min(slides.length-1,i));
+    for(var k=0;k<slides.length;k++){ slides[k].classList.toggle('active',k===cur); }
+    counter.textContent=(cur+1)+' / '+slides.length;
+    bar.style.width=(cur/(slides.length-1)*100)+'%';
+    if(notesOn) renderNotes();
+    try{ history.replaceState(null,'','#s'+(cur+1)); }catch(e){ location.hash='s'+(cur+1); }
+  }
+  function next(){ show(cur+1); }
+  function prev(){ show(cur-1); }
+  function toggleNotes(){ notesOn=!notesOn; notes.classList.toggle('on',notesOn); if(notesOn) renderNotes(); }
+  function fs(){
+    if(!document.fullscreenElement){ (document.documentElement.requestFullscreen||function(){})(); }
+    else { (document.exitFullscreen||function(){})(); }
+  }
+  document.addEventListener('keydown',function(e){
+    var k=e.key;
+    if(k==='ArrowRight'||k===' '||k==='PageDown'||k==='Spacebar'){ e.preventDefault(); next(); }
+    else if(k==='ArrowLeft'||k==='PageUp'){ e.preventDefault(); prev(); }
+    else if(k==='Home'){ e.preventDefault(); show(0); }
+    else if(k==='End'){ e.preventDefault(); show(slides.length-1); }
+    else if(k==='n'||k==='N'){ toggleNotes(); }
+    else if(k==='f'||k==='F'){ fs(); }
+    else if(k==='?'||k==='/'){ help.classList.toggle('on'); }
+    else if(k==='Escape'){ help.classList.remove('on'); }
+  });
+  document.getElementById('btn-next').addEventListener('click',next);
+  document.getElementById('btn-prev').addEventListener('click',prev);
+  window.addEventListener('resize',fit);
+  var m=(location.hash.match(/s(\d+)/));
+  fit();
+  show(m?parseInt(m[1],10)-1:0);
+})();
+</script>
+</body>
+</html>

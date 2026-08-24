@@ -80,6 +80,8 @@ MESES = {'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6
          'julio': 7, 'agosto': 8, 'septiembre': 9, 'setiembre': 9, 'octubre': 10,
          'noviembre': 11, 'diciembre': 12}
 FECHA_MES_RE = re.compile(r'(' + '|'.join(MESES) + r')\s*(\d{1,2})\s*/\s*(20\d{2})', re.I)
+FECHA_MES_DE_RE = re.compile(r'(' + '|'.join(MESES) + r')\s*(\d{1,2})\s+de\s+(20\d{2})', re.I)
+FECHA_DIA_DE_RE = re.compile(r'(\d{1,2})\s+de\s+(' + '|'.join(MESES) + r')\s+de\s+(20\d{2})', re.I)
 
 
 def cut_anuncio(txt):
@@ -125,6 +127,18 @@ def fecha_sesion(titulo, pub):
         m = FECHA_MES_RE.search(t)
         if m:
             mo, d, y = MESES[m.group(1).lower()], int(m.group(2)), m.group(3)
+            if 1 <= d <= 31:
+                cand = f'{y}-{mo:02d}-{d:02d}'
+    if cand is None:
+        m = FECHA_MES_DE_RE.search(t)
+        if m:
+            mo, d, y = MESES[m.group(1).lower()], int(m.group(2)), m.group(3)
+            if 1 <= d <= 31:
+                cand = f'{y}-{mo:02d}-{d:02d}'
+    if cand is None:
+        m = FECHA_DIA_DE_RE.search(t)
+        if m:
+            d, mo, y = int(m.group(1)), MESES[m.group(2).lower()], m.group(3)
             if 1 <= d <= 31:
                 cand = f'{y}-{mo:02d}-{d:02d}'
     if cand and pub:

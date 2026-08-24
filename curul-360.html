@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Curul 360 · Herramienta para congresistas y candidatos · Ricardo Ruiz</title>
+  <meta name="description" content="Demo de Curul 360: inteligencia electoral, legislativa y de medios para congresistas en ejercicio y candidatos nuevos. Histórico electoral, voto nominal, escucha de medios, datos oficiales del territorio y simulador de proyecto de ley." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    /* Helvetica Neue embebida (sistema visual v2). Syne solo en el logo. */
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:swap; }
+    :root {
+      --black:#0a0a0a; --white:#f4f3ef;
+      --blue:#0047FF; --blue-light:#3d6fff;
+      --green:#4ade80; --amber:#e0a03a; --red:#d1584e; --orange:#f97316;
+      --gray:rgba(255,255,255,.5); --gray-light:rgba(255,255,255,.2);
+      --border:rgba(255,255,255,0.08);
+      --card-bg:rgba(10,10,16,0.75); --card-bg2:rgba(255,255,255,0.045);
+      --card-border:rgba(255,255,255,0.07);
+      --hn:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:#060810;color:var(--white);font-family:var(--hn);overflow-x:hidden;cursor:none;min-height:100vh}
+    a,button,select,input{cursor:none}
+    .bg-layer{position:fixed;inset:0;z-index:0;pointer-events:none;
+      background:
+        radial-gradient(1100px 600px at 78% -8%, rgba(0,71,255,0.16), transparent 60%),
+        radial-gradient(900px 500px at 12% 108%, rgba(0,71,255,0.09), transparent 60%),
+        #060810;}
+    body > *:not(.bg-layer):not(.cursor):not(.cursor-ring){position:relative;z-index:1}
+    .cursor{position:fixed;width:12px;height:12px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
+    .cursor-ring{position:fixed;width:36px;height:36px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.35;transition:left .08s,top .08s}
+
+    /* ── NAV v2 ─────────────────────────────────────────────────── */
+    .electoral-nav{position:sticky;top:0;z-index:1200;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px)}
+    .e-nav-left{display:flex;align-items:center;gap:1rem;min-width:0;flex-wrap:wrap;row-gap:.5rem}
+    .e-nav-right{display:flex;align-items:center;gap:1.2rem;flex-shrink:0}
+    .e-btn-back{font-family:var(--hn);font-size:.782rem;letter-spacing:.08em;text-transform:uppercase;color:#4ade80;text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.35rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0;white-space:nowrap}
+    .e-btn-back:hover{color:#060810;background:#4ade80;border-color:#4ade80}
+    .nav-page-tag{font-family:var(--hn);font-weight:500;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:#060810;background:var(--green);border:1.5px solid var(--green);padding:.35rem .85rem;white-space:nowrap}
+    .nav-demo-tag{font-family:var(--hn);font-weight:500;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);border:1px solid rgba(224,160,58,.4);padding:.3rem .7rem;white-space:nowrap}
+    .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.85;transition:opacity .2s;flex-shrink:0}
+    .logo-link:hover{opacity:1}
+    .logo-bars{display:flex;align-items:flex-end;gap:3px;height:20px}
+    .logo-bar{width:5px;background:var(--blue);border-radius:1px 1px 0 0;opacity:.85}
+    .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white);line-height:1}
+    .logo-text span{color:var(--blue)}
+
+    /* ── LAYOUT ────────────────────────────────────────────────── */
+    .page-header{max-width:1080px;margin:4rem auto 0;padding:0 2rem}
+    .page-tag{font-family:var(--hn);font-weight:500;font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--blue-light);margin-bottom:.8rem}
+    .page-title{font-family:var(--hn);font-weight:800;font-size:clamp(2rem,5vw,3.2rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);margin-bottom:.9rem;text-shadow:0 2px 24px rgba(0,71,255,0.35)}
+    .page-sub{font-family:var(--hn);font-weight:300;font-size:1rem;letter-spacing:.02em;color:var(--gray);line-height:1.75;max-width:780px}
+    .page-sub strong{color:var(--white);font-weight:600}
+    section{max-width:1080px;margin:0 auto;padding:3.6rem 2rem 0}
+    .sec-tag{font-family:var(--hn);font-weight:500;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;color:var(--blue-light);margin-bottom:.6rem}
+    .sec-title{font-family:var(--hn);font-weight:700;font-size:clamp(1.35rem,3vw,1.9rem);letter-spacing:-.03em;color:var(--white);margin-bottom:.7rem}
+    .sec-sub{font-family:var(--hn);font-weight:300;font-size:.95rem;color:var(--gray);line-height:1.7;max-width:780px;margin-bottom:1.6rem}
+    .sec-sub strong{color:var(--white);font-weight:600}
+    .panel{background:var(--card-bg);border:1px solid var(--card-border);padding:1.5rem}
+    .panel h3{font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--gray);margin-bottom:1.1rem;font-weight:500}
+    .note{font-size:.68rem;color:rgba(255,255,255,.35);line-height:1.6;margin-top:.8rem}
+    .note b{color:var(--gray)}
+    .err{font-size:.8rem;color:var(--red);padding:.8rem 0}
+
+    .anchor-nav{display:flex;flex-wrap:wrap;gap:.55rem;max-width:1080px;margin:2rem auto 0;padding:0 2rem}
+    .anchor-nav a{font-family:var(--hn);font-weight:500;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);text-decoration:none;border:1px solid var(--gray-light);padding:.4rem .8rem;transition:color .2s,border-color .2s}
+    .anchor-nav a:hover{color:var(--white);border-color:var(--white)}
+
+    /* ── SWITCH DE MODO ────────────────────────────────────────── */
+    .mode-switch{display:inline-flex;border:1px solid rgba(0,71,255,.5);margin-top:1.6rem;background:rgba(0,71,255,.06)}
+    .mode-btn{font-family:var(--hn);font-weight:600;font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--gray);background:none;border:none;padding:.85rem 1.5rem;transition:background .2s,color .2s}
+    .mode-btn.active{background:var(--blue);color:#fff}
+    .mode-hint{font-size:.72rem;color:rgba(255,255,255,.4);margin-top:.7rem;line-height:1.6;max-width:640px}
+
+    /* ── PANEL PERSONA / TERRITORIO ────────────────────────────── */
+    .setup-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:1.2rem;margin-top:1.8rem}
+    .search-wrap{position:relative}
+    .search-input,.wiz-input,.med-input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:var(--white);font-family:var(--hn);font-size:.95rem;padding:.8rem 1rem;outline:none;transition:border-color .2s}
+    .search-input:focus,.wiz-input:focus,.med-input:focus{border-color:var(--blue-light)}
+    .search-dd{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#0e1220;border:1px solid rgba(255,255,255,.14);max-height:320px;overflow-y:auto;z-index:400;display:none;box-shadow:0 14px 34px rgba(0,0,0,.55)}
+    .search-dd.open{display:block}
+    .sd-item{padding:.65rem .9rem;border-bottom:1px solid rgba(255,255,255,.06);transition:background .15s}
+    .sd-item:hover{background:rgba(0,71,255,.14)}
+    .sd-n{font-size:.85rem;font-weight:600;color:var(--white)}
+    .sd-m{font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--gray);margin-top:.2rem}
+    .chips{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.8rem}
+    .chip{font-family:var(--hn);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--blue-light);border:1px solid rgba(61,111,255,.4);padding:.35rem .75rem;transition:background .2s,color .2s;user-select:none}
+    .chip:hover{background:var(--blue);color:#fff}
+    select.sel{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:var(--white);font-family:var(--hn);font-size:.88rem;padding:.7rem .8rem;outline:none;appearance:none;-webkit-appearance:none}
+    select.sel option{background:#0e1220;color:var(--white)}
+    .sel-label{font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gray);margin:.9rem 0 .4rem}
+    .sel-label:first-child{margin-top:0}
+
+    /* perfil de la persona elegida */
+    .profile{display:none;grid-template-columns:auto 1fr;gap:1.4rem;align-items:center;margin-top:1.6rem;background:var(--card-bg);border:1px solid var(--card-border);padding:1.3rem 1.5rem}
+    .profile.on{display:grid}
+    .pf-photo{width:86px;height:86px;border-radius:50%;object-fit:cover;border:2px solid rgba(61,111,255,.5);background:#0e1220}
+    .pf-initials{width:86px;height:86px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.6rem;color:var(--blue-light);background:rgba(0,71,255,.12);border:2px solid rgba(61,111,255,.5)}
+    .pf-name{font-weight:800;font-size:1.35rem;letter-spacing:-.02em;line-height:1.15}
+    .pf-meta{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);margin-top:.35rem}
+    .pf-hist{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.8rem}
+    .pf-hist .hchip{font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;padding:.3rem .65rem;border:1px solid var(--gray-light);color:var(--gray);transition:all .2s;user-select:none}
+    .pf-hist .hchip:hover{border-color:var(--blue-light);color:var(--white)}
+    .pf-hist .hchip.cur{background:var(--blue);border-color:var(--blue);color:#fff}
+
+    /* ── KPIs ──────────────────────────────────────────────────── */
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.2rem}
+    .kpi{background:var(--card-bg);border:1px solid var(--card-border);padding:1.1rem 1rem}
+    .kpi .n{font-weight:800;font-size:clamp(1.3rem,2.6vw,1.9rem);letter-spacing:-.03em;line-height:1.1}
+    .kpi .l{font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);margin-top:.4rem;line-height:1.45}
+    .kpi.hl .n{color:var(--green)} .kpi.hl2 .n{color:var(--blue-light)} .kpi.hl3 .n{color:var(--amber)}
+
+    /* ── MAPA + TOP MUNICIPIOS ─────────────────────────────────── */
+    .radio-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:1.2rem}
+    #map-electoral{height:430px;background:transparent}
+    .leaflet-container{background:transparent !important;font-family:var(--hn) !important;cursor:none}
+    .leaflet-tooltip{font-family:var(--hn) !important;font-weight:400 !important;font-size:.8rem !important;background:rgba(6,8,16,0.97) !important;border:1px solid rgba(0,71,255,0.4) !important;color:#f4f3ef !important;border-radius:0 !important;padding:.45rem .65rem !important;white-space:normal !important;width:200px !important;overflow-wrap:break-word !important}
+    .leaflet-tooltip:before{display:none !important}
+    .bars{display:flex;flex-direction:column;gap:.55rem}
+    .bar-row{display:grid;grid-template-columns:150px 1fr 62px;gap:.6rem;align-items:center}
+    .bar-name{font-size:.72rem;letter-spacing:.03em;color:var(--gray);text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .bar-track{height:14px;background:var(--card-bg2);overflow:hidden}
+    .bar-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--blue-light));width:0;transition:width .8s}
+    .bar-val{font-size:.74rem;font-weight:700;color:var(--white);text-align:right}
+    .placeholder-msg{padding:2.2rem 1rem;text-align:center;color:rgba(255,255,255,.35);font-size:.85rem;line-height:1.7}
+
+    /* ── VOTO EN EL CONGRESO ───────────────────────────────────── */
+    .vc-head{display:flex;align-items:center;gap:1.1rem;margin-bottom:1rem}
+    .vc-align-n{font-weight:800;font-size:2.4rem;letter-spacing:-.04em;color:var(--blue-light)}
+    .vc-align-t{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--gray);line-height:1.5}
+    .vc-align-t span{color:rgba(255,255,255,.32);text-transform:none;letter-spacing:0}
+    .vc-banc{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:.7rem}
+    .vc-tot{font-size:.85rem;margin-bottom:1rem}
+    .vc-tot span{color:var(--gray);font-size:.72rem}
+    .vc-list{max-height:330px;overflow-y:auto;display:flex;flex-direction:column;gap:.7rem;padding-right:.4rem}
+    .vc-p{border-bottom:1px solid rgba(255,255,255,.05);padding-bottom:.6rem}
+    .vc-p-t{font-size:.76rem;color:rgba(255,255,255,.75);line-height:1.45}
+    .vc-p-num{font-size:.62rem;letter-spacing:.06em;color:var(--blue-light);margin-right:.4rem}
+    .vc-p-r{display:flex;align-items:center;gap:.6rem;margin-top:.35rem}
+    .vc-bar{display:flex;height:8px;flex:1;background:var(--card-bg2);overflow:hidden}
+    .vc-bar span{height:100%}
+    .vc-p-c{font-size:.68rem;white-space:nowrap}
+
+    /* ── ETARIO ────────────────────────────────────────────────── */
+    .et-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem}
+    .et-band{margin-bottom:.9rem;user-select:none}
+    .et-band-h{display:flex;justify-content:space-between;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--gray);margin-bottom:.35rem}
+    .et-track{display:flex;height:20px;background:var(--card-bg2);overflow:hidden;border:1px solid transparent;transition:border-color .2s}
+    .et-band:hover .et-track,.et-band.sel .et-track{border-color:var(--blue-light)}
+    .et-l{background:#c0392b;height:100%;transition:width .7s}
+    .et-r{background:#1f47cc;height:100%;transition:width .7s}
+    .et-detail{background:var(--card-bg2);padding:1.1rem 1.2rem;font-size:.82rem;line-height:1.7;color:rgba(255,255,255,.75);min-height:120px}
+    .et-detail b{color:var(--white)}
+    .leg{display:flex;gap:1.2rem;margin-bottom:1.1rem}
+    .leg span{font-size:.68rem;color:var(--gray);display:flex;align-items:center;gap:.4rem}
+    .leg i{width:10px;height:10px;display:inline-block}
+
+    /* ── MEDIOS ────────────────────────────────────────────────── */
+    .med-bar{display:flex;gap:.6rem;margin-bottom:1rem}
+    .med-bar .med-input{flex:1}
+    .btn-go{font-family:var(--hn);font-weight:700;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:var(--blue);border:none;padding:.8rem 1.4rem;transition:background .2s;white-space:nowrap}
+    .btn-go:hover{background:#0035cc}
+    .med-list{display:flex;flex-direction:column;gap:.7rem;max-height:430px;overflow-y:auto;padding-right:.4rem}
+    .med-item{background:var(--card-bg2);border:1px solid transparent;padding:.85rem 1rem;transition:border-color .2s}
+    .med-item:hover{border-color:rgba(61,111,255,.4)}
+    .med-t{font-size:.84rem;line-height:1.5;color:rgba(255,255,255,.85);text-decoration:none;display:block}
+    .med-t:hover{color:var(--white)}
+    .med-m{display:flex;gap:.5rem;margin-top:.45rem;align-items:center;flex-wrap:wrap}
+    .doc-badge{font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue-light);border:1px solid rgba(61,111,255,.35);padding:.15rem .5rem}
+    .doc-badge.pal{color:var(--amber);border-color:rgba(224,160,58,.35)}
+    .med-f{font-size:.64rem;color:rgba(255,255,255,.3)}
+    .med-kpis{display:flex;gap:1.6rem;margin-bottom:1rem;flex-wrap:wrap}
+    .med-kpis div{font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;color:var(--gray)}
+    .med-kpis b{color:var(--white);font-size:1rem;margin-right:.3rem}
+
+    /* loader */
+    .llm-load{display:flex;align-items:center;gap:.6rem;color:var(--gray);font-size:.8rem;padding:1.2rem 0}
+    .dots span{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--blue-light);margin-right:3px;animation:dotpulse 1.2s infinite}
+    .dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+    @keyframes dotpulse{0%,100%{opacity:.25}50%{opacity:1}}
+
+    /* ── DATOS FRÍOS ───────────────────────────────────────────── */
+    .frios-controls{display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:560px;margin-bottom:1.4rem}
+    .ind-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+    .ind-card{background:var(--card-bg);border:1px solid var(--card-border);padding:1.05rem 1rem;display:flex;flex-direction:column;gap:.4rem}
+    .ind-name{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);line-height:1.45;min-height:2em}
+    .ind-val{font-weight:800;font-size:1.45rem;letter-spacing:-.03em}
+    .ind-yr{font-size:.6rem;color:rgba(255,255,255,.32)}
+    .ind-spark{margin-top:.3rem}
+    .ind-spark polyline{fill:none;stroke:var(--blue-light);stroke-width:1.6}
+    .ind-spark circle{fill:var(--green)}
+    .ind-src{font-size:.56rem;color:rgba(255,255,255,.28);line-height:1.4}
+    .proxy-tag{font-size:.54rem;letter-spacing:.06em;color:var(--amber)}
+
+    /* ── ACTORES ───────────────────────────────────────────────── */
+    .com-pills{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1.4rem}
+    .com-pill{font-family:var(--hn);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--gray);border:1px solid var(--gray-light);padding:.45rem .85rem;transition:all .2s;user-select:none}
+    .com-pill:hover{color:var(--white);border-color:var(--white)}
+    .com-pill.active{background:var(--blue);border-color:var(--blue);color:#fff}
+    .com-desc{font-size:.8rem;color:var(--gray);line-height:1.65;margin-bottom:1.3rem;max-width:760px}
+    .com-desc b{color:var(--white)}
+    .act-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+    .act-card{background:var(--card-bg);border:1px solid var(--card-border);padding:1.15rem 1.2rem;display:flex;flex-direction:column;gap:.55rem;transition:border-color .2s}
+    .act-card:hover{border-color:rgba(61,111,255,.45)}
+    .act-name{font-weight:700;font-size:.95rem;letter-spacing:-.01em}
+    .act-tipo{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
+    .act-int{font-size:.74rem;color:rgba(255,255,255,.6);line-height:1.55}
+    .act-inf{display:flex;align-items:center;gap:.5rem;margin-top:.2rem}
+    .act-inf-l{font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray)}
+    .act-dots{display:flex;gap:3px}
+    .act-dot{width:9px;height:9px;border-radius:50%;background:var(--card-bg2)}
+    .act-dot.on{background:var(--blue-light)}
+
+    /* ── WIZARD PROYECTO DE LEY ────────────────────────────────── */
+    .wiz-bar{display:flex;gap:.6rem;margin-bottom:1.2rem;max-width:680px}
+    .wiz-bar .wiz-input{flex:1}
+    .wiz-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem}
+    .funnel{display:flex;flex-direction:column;gap:.5rem}
+    .fu-row{display:grid;grid-template-columns:150px 1fr 56px;gap:.6rem;align-items:center}
+    .fu-l{font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--gray)}
+    .fu-track{height:16px;background:var(--card-bg2);overflow:hidden}
+    .fu-fill{height:100%;background:linear-gradient(90deg,#0047FF,#4ade80);width:0;transition:width .8s}
+    .fu-v{font-size:.74rem;font-weight:700;text-align:right}
+    .reco{background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.25);padding:1.2rem 1.3rem}
+    .reco h4{font-size:.64rem;letter-spacing:.16em;text-transform:uppercase;color:var(--green);margin-bottom:.8rem}
+    .reco ul{list-style:none;display:flex;flex-direction:column;gap:.65rem}
+    .reco li{font-size:.8rem;line-height:1.6;color:rgba(255,255,255,.78);padding-left:1.1rem;position:relative}
+    .reco li::before{content:'→';position:absolute;left:0;color:var(--green)}
+    .reco b{color:var(--white)}
+    .banc-list{display:flex;flex-direction:column;gap:.45rem;margin-top:.6rem}
+
+    /* ── LOCKED / PAYWALL TEASER ───────────────────────────────── */
+    .locked{position:relative;overflow:hidden}
+    .locked .locked-content{filter:blur(5px);pointer-events:none;user-select:none;opacity:.65}
+    .locked-cta{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.7rem;background:rgba(6,8,16,.45);text-align:center;padding:1rem}
+    .locked-cta .lk{font-size:1.5rem}
+    .locked-cta .lt{font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--white);font-weight:700}
+    .locked-cta .ld{font-size:.72rem;color:var(--gray);max-width:340px;line-height:1.6}
+    .btn-up{font-family:var(--hn);font-weight:700;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:#060810;background:var(--green);border:none;padding:.6rem 1.2rem;text-decoration:none;transition:opacity .2s}
+    .btn-up:hover{opacity:.85}
+
+    /* ── PLANES / CTA FINAL ────────────────────────────────────── */
+    .plans{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-top:1.6rem}
+    .plan-card{background:var(--card-bg);border:1px solid var(--card-border);padding:1.7rem 1.6rem;display:flex;flex-direction:column;gap:.9rem}
+    .plan-card.pro{border-color:rgba(0,71,255,.55);box-shadow:0 0 40px rgba(0,71,255,.12)}
+    .plan-name{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--blue-light);font-weight:600}
+    .plan-price{font-weight:800;font-size:2rem;letter-spacing:-.03em}
+    .plan-price span{font-size:.8rem;font-weight:400;color:var(--gray)}
+    .plan-feats{list-style:none;display:flex;flex-direction:column;gap:.5rem}
+    .plan-feats li{font-size:.78rem;color:rgba(255,255,255,.7);line-height:1.5;padding-left:1.1rem;position:relative}
+    .plan-feats li::before{content:'✓';position:absolute;left:0;color:var(--green)}
+    .plan-feats li.no::before{content:'—';color:rgba(255,255,255,.25)}
+    .plan-feats li.no{color:rgba(255,255,255,.35)}
+    .btn-plan{font-family:var(--hn);font-weight:700;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;text-align:center;color:#fff;background:var(--blue);border:none;padding:.85rem 1rem;text-decoration:none;margin-top:auto;transition:background .2s}
+    .btn-plan:hover{background:#0035cc}
+    .btn-plan.ghost{background:none;border:1.5px solid rgba(255,255,255,.25);color:var(--gray)}
+    .btn-plan.ghost:hover{border-color:var(--white);color:var(--white)}
+
+    /* toast */
+    .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);background:#0e1220;border:1px solid rgba(0,71,255,.5);color:var(--white);font-size:.8rem;padding:.8rem 1.4rem;z-index:3000;opacity:0;transition:all .35s;pointer-events:none}
+    .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+    footer{max-width:1080px;margin:5rem auto 0;padding:2.2rem 2rem 3rem;border-top:1px solid rgba(255,255,255,.07)}
+    footer p{font-size:.68rem;color:rgba(255,255,255,.3);line-height:1.8;max-width:820px}
+    footer b{color:rgba(255,255,255,.5)}
+
+    /* ── RESPONSIVE ────────────────────────────────────────────── */
+    @media (max-width:900px){
+      .cursor,.cursor-ring{display:none}
+      body,a,button,select,input{cursor:auto}
+      .electoral-nav{flex-direction:column;align-items:stretch;padding:.6rem 1.1rem;gap:.5rem}
+      .e-nav-right{justify-content:center}
+      .e-nav-left{justify-content:center}
+      .setup-grid,.radio-grid,.et-grid,.wiz-grid,.plans{grid-template-columns:1fr}
+      .kpis{grid-template-columns:repeat(2,1fr)}
+      .ind-grid{grid-template-columns:repeat(2,1fr)}
+      .act-grid{grid-template-columns:1fr}
+      .frios-controls{grid-template-columns:1fr}
+      section{padding:2.6rem 1.1rem 0}
+      .page-header{padding:0 1.1rem;margin-top:2.4rem}
+      .anchor-nav{padding:0 1.1rem}
+      .bar-row{grid-template-columns:110px 1fr 56px}
+      #map-electoral{height:330px}
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="electoral.html" class="e-btn-back">← Volver</a>
+      <span class="nav-page-tag">Curul 360</span>
+      <span class="nav-demo-tag">Demo · muestra gratuita</span>
+    </div>
+    <div class="e-nav-right">
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- ══════════ HERO + SWITCH ══════════ -->
+  <div class="page-header">
+    <div class="page-tag">Herramienta para congresistas y candidatos · Congreso 2026–2030</div>
+    <h1 class="page-title">Tu curul, en datos.</h1>
+    <p class="page-sub" id="hero-sub">
+      Inteligencia electoral, legislativa y de medios en un solo tablero: <strong>dónde está tu voto</strong> (hasta el barrio),
+      <strong>cómo has votado en el Congreso</strong>, qué dice la prensa de ti, los datos oficiales de tu territorio
+      con actualización periódica, los <strong>actores de presión de tu comisión</strong> y un simulador para armar tu próximo
+      proyecto de ley con el histórico completo desde 1990.
+    </p>
+
+    <div class="mode-switch" role="tablist">
+      <button class="mode-btn active" id="mode-inc" onclick="setMode('inc')">Ya me he lanzado</button>
+      <button class="mode-btn" id="mode-new" onclick="setMode('new')">Soy candidato nuevo</button>
+    </div>
+    <p class="mode-hint" id="mode-hint">
+      Congresistas en ejercicio y cualquier persona que haya aparecido en un tarjetón de Congreso (2014–2026)
+      o Asamblea (2023): busca tu nombre y carga tu radiografía completa.
+    </p>
+  </div>
+
+  <div class="anchor-nav" id="anchor-nav">
+    <a href="#radiografia" data-modes="inc">Radiografía electoral</a>
+    <a href="#voto-congreso" data-modes="inc">Voto en el Congreso</a>
+    <a href="#territorio" data-modes="new">Tu territorio</a>
+    <a href="#etario">Perfil etario</a>
+    <a href="#medios">Escucha de medios</a>
+    <a href="#frios">Datos fríos</a>
+    <a href="#actores">Actores de presión</a>
+    <a href="#ley">Arma tu proyecto de ley</a>
+    <a href="#planes" style="color:var(--green);border-color:rgba(74,222,128,.4)">Planes</a>
+  </div>
+
+  <!-- ══════════ SETUP: PERSONA (modo inc) ══════════ -->
+  <section id="setup-inc" data-modes="inc">
+    <div class="sec-tag">Paso 1 · ¿Quién eres?</div>
+    <div class="sec-title">Busca tu nombre en el histórico electoral</div>
+    <p class="sec-sub">El buscador cubre <strong>Congreso 2014 · 2018 · 2022 · 2026</strong> y <strong>Asambleas 2023</strong>,
+      con datos mesa a mesa de la Registraduría. Prueba con los ejemplos o escribe cualquier nombre.</p>
+
+    <div class="setup-grid">
+      <div>
+        <div class="search-wrap">
+          <input class="search-input" id="q-persona" placeholder="Escribe el nombre del congresista o candidato…" autocomplete="off" />
+          <div class="search-dd" id="dd-persona"></div>
+        </div>
+        <div class="chips" id="preset-personas"></div>
+      </div>
+      <div class="panel" style="padding:1.1rem 1.3rem">
+        <h3>¿Qué se carga?</h3>
+        <p style="font-size:.78rem;color:var(--gray);line-height:1.7">
+          Todas tus candidaturas (con toggle entre elecciones), tus votos agregados por departamento y municipio,
+          y —si eres congresista 2014-2026 con voto nominal registrado— tu récord de votación en plenaria.
+        </p>
+      </div>
+    </div>
+
+    <div class="profile" id="profile">
+      <div id="pf-photo-wrap"></div>
+      <div>
+        <div class="pf-name" id="pf-name"></div>
+        <div class="pf-meta" id="pf-meta"></div>
+        <div class="pf-hist" id="pf-hist"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ SETUP: TERRITORIO (modo new) ══════════ -->
+  <section id="setup-new" data-modes="new" style="display:none">
+    <div class="sec-tag">Paso 1 · ¿Dónde vas a competir?</div>
+    <div class="sec-title">Elige tu territorio y tu corporación</div>
+    <p class="sec-sub">Sin historial electoral propio, la campaña arranca por <strong>conocer el terreno</strong>:
+      datos oficiales del municipio, perfil etario del electorado, la prensa que marca la agenda local y
+      el mapa de actores de la comisión a la que aspiras llegar.</p>
+
+    <div class="setup-grid">
+      <div class="panel" style="padding:1.2rem 1.4rem">
+        <div class="sel-label">Departamento</div>
+        <select class="sel" id="new-dep" onchange="newDepChange()"><option value="">Cargando…</option></select>
+        <div class="sel-label">Municipio</div>
+        <select class="sel" id="new-mun" onchange="newMunChange()"><option value="">— Elige departamento —</option></select>
+        <div class="sel-label">Corporación a la que aspiras</div>
+        <select class="sel" id="new-corp">
+          <option value="camara">Cámara de Representantes</option>
+          <option value="senado">Senado de la República</option>
+        </select>
+        <div class="chips" id="preset-territorios"></div>
+      </div>
+      <div class="panel" style="padding:1.2rem 1.4rem">
+        <h3>Lo que te muestra el demo</h3>
+        <p style="font-size:.78rem;color:var(--gray);line-height:1.7">
+          Indicadores oficiales del municipio (Policía Nacional · MEN · datos.gov.co) con serie 2018-2024,
+          escucha de prensa por tema, actores de presión por comisión y el simulador de proyecto de ley.
+          En la plataforma completa se suma la <b style="color:var(--white)">huella electoral por barrio</b> de tu bloque
+          ideológico y el censo electoral por puesto.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ M1 · RADIOGRAFÍA ELECTORAL ══════════ -->
+  <section id="radiografia" data-modes="inc">
+    <div class="sec-tag">Módulo 01 · Radiografía electoral</div>
+    <div class="sec-title">¿Dónde está tu voto?</div>
+    <p class="sec-sub">Votación mesa a mesa de la Registraduría, agregada por departamento y municipio.
+      Si tienes más de una elección encima, el toggle del perfil cambia entre ellas: <strong>así se ve tu evolución
+      entre legislaturas</strong>.</p>
+
+    <div class="kpis" id="radio-kpis" style="display:none"></div>
+
+    <div class="radio-grid">
+      <div class="panel">
+        <h3>Mapa por departamento</h3>
+        <div id="map-electoral"><div class="placeholder-msg">Busca un nombre arriba para pintar el mapa.</div></div>
+      </div>
+      <div class="panel">
+        <h3>Top 10 municipios</h3>
+        <div class="bars" id="top-muns"><div class="placeholder-msg">Sin datos aún.</div></div>
+      </div>
+    </div>
+
+    <div class="panel locked" style="margin-top:1.2rem">
+      <div class="locked-content">
+        <h3>Drill barrial · Bogotá, Medellín y 25 ciudades más</h3>
+        <div class="bars">
+          <div class="bar-row"><span class="bar-name">Chapinero Alto</span><span class="bar-track"><span class="bar-fill" style="width:82%"></span></span><span class="bar-val">4.218</span></div>
+          <div class="bar-row"><span class="bar-name">La Soledad</span><span class="bar-track"><span class="bar-fill" style="width:64%"></span></span><span class="bar-val">3.371</span></div>
+          <div class="bar-row"><span class="bar-name">Cedritos</span><span class="bar-track"><span class="bar-fill" style="width:51%"></span></span><span class="bar-val">2.807</span></div>
+          <div class="bar-row"><span class="bar-name">Laureles</span><span class="bar-track"><span class="bar-fill" style="width:43%"></span></span><span class="bar-val">2.216</span></div>
+        </div>
+      </div>
+      <div class="locked-cta">
+        <div class="lk">🔒</div>
+        <div class="lt">Tu voto, barrio por barrio</div>
+        <div class="ld">Puesto de votación → barrio catastral por georreferenciación. Incluye comuna/localidad, censo por puesto y comparación entre elecciones.</div>
+        <a class="btn-up" href="#planes">Ver planes</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ M2 · VOTO EN EL CONGRESO ══════════ -->
+  <section id="voto-congreso" data-modes="inc">
+    <div class="sec-tag">Módulo 02 · Tu huella legislativa</div>
+    <div class="sec-title">¿Cómo has votado en el Congreso?</div>
+    <p class="sec-sub">Voto nominal reconstruido desde las actas de plenaria de <strong>Cámara (2014-2026)</strong> y la API pública del
+      <strong>Senado (2017-2026)</strong>: alineación con el gobierno, récord Sí / No / Abstención y detalle por proyecto.
+      Es lo que un periodista —o tu rival— va a mirar primero.</p>
+
+    <div class="panel" id="vc-panel">
+      <div class="placeholder-msg" id="vc-empty">Busca un congresista en el Paso 1. Si la persona no tiene voto nominal registrado (candidato nuevo o Congreso anterior a 2014), este módulo lo dice honestamente.</div>
+      <div id="vc-body" style="display:none"></div>
+    </div>
+  </section>
+
+  <!-- ══════════ SETUP NEW → TERRITORIO ancla ══════════ -->
+  <section id="territorio" data-modes="new" style="display:none;padding-top:0"></section>
+
+  <!-- ══════════ M3 · PERFIL ETARIO ══════════ -->
+  <section id="etario">
+    <div class="sec-tag">Módulo 03 · Perfil etario del electorado</div>
+    <div class="sec-title">¿Quién vota por cada bloque, por edad?</div>
+    <p class="sec-sub">Composición etaria del voto en la 1ª vuelta presidencial 2026 (duelo izquierda–derecha), estimada por
+      <strong>inferencia ecológica a nivel de puesto</strong> sobre los registros de sufragantes por edad de la Registraduría.
+      Haz clic en una franja para el detalle territorial.</p>
+
+    <div class="et-grid">
+      <div class="panel">
+        <h3>Share del duelo por franja de edad · 1V 2026</h3>
+        <div class="leg">
+          <span><i style="background:#c0392b"></i> Bloque izquierda</span>
+          <span><i style="background:#1f47cc"></i> Bloque derecha</span>
+        </div>
+        <div id="et-bands"></div>
+        <div class="note">Inferencia ecológica (EI RxC con cotas Duncan-Davis) · IC95 nacional ±3-6 pp según franja.
+          En la plataforma completa este perfil se calcula para <b>tu territorio específico</b> y tu bloque.</div>
+      </div>
+      <div class="panel">
+        <h3>Dónde pesa tu grupo etario</h3>
+        <div class="et-detail" id="et-detail">Elige una franja de edad a la izquierda.</div>
+        <div class="note" style="margin-top:1rem">Fuente: análisis etario 1V-2026 de ricardoruiz.co (Edadygenero RNEC × proyecciones DANE × preconteo por puesto).
+          La franja <b>61+</b> es la que más crece hacia 2030 (×1,135 en el censo).</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ M4 · ESCUCHA DE MEDIOS ══════════ -->
+  <section id="medios">
+    <div class="sec-tag">Módulo 04 · Escucha social y de medios</div>
+    <div class="sec-title">¿Qué está diciendo la prensa?</div>
+    <p class="sec-sub">Rastreo en vivo sobre <strong>todo el ecosistema de prensa nacional y regional</strong> (motor Google News,
+      filtrado de ruido institucional y de redes). Búscate por nombre, por tu partido o por los temas de tu comisión.
+      En la plataforma completa se suman alertas diarias y lectura de tono con IA.</p>
+
+    <div class="panel">
+      <div class="med-bar">
+        <input class="med-input" id="med-q" placeholder="Nombre, partido o tema — ej. «reforma a la salud»" autocomplete="off" />
+        <button class="btn-go" onclick="doMedios()">Rastrear</button>
+      </div>
+      <div class="chips" id="med-chips"></div>
+      <div class="med-kpis" id="med-kpis" style="display:none"></div>
+      <div id="med-out" style="margin-top:1rem"><div class="placeholder-msg">Escribe un nombre o un tema y pulsa Rastrear.</div></div>
+    </div>
+  </section>
+
+  <!-- ══════════ M5 · DATOS FRÍOS ══════════ -->
+  <section id="frios">
+    <div class="sec-tag">Módulo 05 · Datos fríos del territorio</div>
+    <div class="sec-title">Los números oficiales de tu municipio</div>
+    <p class="sec-sub">8 indicadores oficiales (<strong>Policía Nacional · Ministerio de Educación · datos.gov.co</strong>) para los
+      1.108 municipios, con serie 2018-2024. La seguridad se actualiza con corte mensual de la Policía; educación y
+      demografía con corte anual. En la plataforma completa: IPM, NBI, salud, servicios y agua (DANE · MinSalud).</p>
+
+    <div class="frios-controls">
+      <div>
+        <div class="sel-label">Departamento</div>
+        <select class="sel" id="fr-dep" onchange="frDepChange()"><option value="">Cargando catálogo…</option></select>
+      </div>
+      <div>
+        <div class="sel-label">Municipio</div>
+        <select class="sel" id="fr-mun" onchange="frMunChange()"><option value="">— Elige departamento —</option></select>
+      </div>
+    </div>
+    <div class="ind-grid" id="ind-grid"><div class="placeholder-msg" style="grid-column:1/-1">Elige un municipio para cargar sus indicadores.</div></div>
+    <div class="note" id="ind-note" style="display:none">Los indicadores marcados <span class="proxy-tag">≈ ETC</span> usan la Entidad Territorial Certificada departamental como aproximación (municipio no certificado en educación).</div>
+  </section>
+
+  <!-- ══════════ M6 · ACTORES DE PRESIÓN ══════════ -->
+  <section id="actores">
+    <div class="sec-tag">Módulo 06 · Actores de presión por comisión</div>
+    <div class="sec-title">¿Quién se sienta al otro lado de la mesa?</div>
+    <p class="sec-sub">Cada comisión constitucional tiene su ecosistema de gremios, sindicatos, centros de pensamiento y autoridades
+      que <strong>viven en sus debates</strong>. Elige tu comisión (o la que aspiras integrar) y mira el mapa base.
+      En la plataforma completa el mapa se construye por <strong>proyecto de ley</strong> con el método Mactor
+      (influencia × posición) y se actualiza con lo que cada actor dice en prensa.</p>
+
+    <div class="com-pills" id="com-pills"></div>
+    <div class="com-desc" id="com-desc"></div>
+    <div class="act-grid" id="act-grid"></div>
+    <div class="note">Mapa base curado por el analista a partir de la participación pública de cada organización en los debates
+      de la comisión (audiencias, ponencias, comunicados). <b>No es un señalamiento</b>: describe presencia e interés en la agenda, no posiciones imputadas.</div>
+  </section>
+
+  <!-- ══════════ M7 · ARMA TU PROYECTO DE LEY ══════════ -->
+  <section id="ley">
+    <div class="sec-tag">Módulo 07 · Simulador legislativo</div>
+    <div class="sec-title">Arma tu proyecto de ley con el histórico desde 1990</div>
+    <p class="sec-sub">Escribe el tema. El simulador consulta en vivo los <strong>13.172 proyectos radicados desde 1990</strong>:
+      cuántas veces se ha intentado, dónde muere el trámite, qué bancadas lo empujan y qué tienes que hacer distinto
+      para que el tuyo no muera por vencimiento de términos.</p>
+
+    <div class="wiz-bar">
+      <input class="wiz-input" id="wiz-q" placeholder="Tema del proyecto — ej. «salud mental», «seguridad vial», «primera infancia»" autocomplete="off" />
+      <button class="btn-go" onclick="doTema()">Simular</button>
+    </div>
+    <div class="chips" id="wiz-chips" style="margin-bottom:1.4rem"></div>
+
+    <div id="wiz-out"><div class="placeholder-msg panel">El resultado combina el embudo de supervivencia del tema, la mortalidad por calendario y una hoja de ruta táctica.</div></div>
+  </section>
+
+  <!-- ══════════ PLANES ══════════ -->
+  <section id="planes">
+    <div class="sec-tag">Esto es una muestra</div>
+    <div class="sec-title">La plataforma completa, mes a mes</div>
+    <p class="sec-sub">Todo lo que acabas de ver corre sobre datos reales. La versión de pago le quita los candados,
+      te agrega alertas y te asigna <strong>lectura de analista</strong> — no solo el dato, sino qué hacer con él.</p>
+
+    <div class="plans">
+      <div class="plan-card">
+        <div class="plan-name">Demo · lo que estás viendo</div>
+        <div class="plan-price">Gratis</div>
+        <ul class="plan-feats">
+          <li>Radiografía electoral por departamento y municipio</li>
+          <li>Voto nominal en Congreso (Cámara 2014-2026 · Senado 2017-2026)</li>
+          <li>Escucha de medios en vivo</li>
+          <li>8 indicadores oficiales por municipio</li>
+          <li>Simulador de proyecto de ley (histórico 1990-2026)</li>
+          <li class="no">Drill barrial y censo por puesto</li>
+          <li class="no">Perfil etario de TU territorio</li>
+          <li class="no">Alertas diarias de radicados y de prensa</li>
+          <li class="no">Mapa Mactor de actores por proyecto</li>
+        </ul>
+        <a class="btn-plan ghost" href="#radiografia">Seguir explorando</a>
+      </div>
+      <div class="plan-card pro">
+        <div class="plan-name">Curul 360 · mensual</div>
+        <div class="plan-price">Hablemos <span>· plan por curul o por campaña</span></div>
+        <ul class="plan-feats">
+          <li>Todo lo del demo, sin candados</li>
+          <li><b>Tu voto barrio por barrio</b> en 27 ciudades + censo por puesto</li>
+          <li>Perfil etario y de género de tu electorado específico</li>
+          <li>Alertas diarias: radicados nuevos, movimiento de tus proyectos, tu nombre en prensa</li>
+          <li>Actores de presión por proyecto (Mactor) con seguimiento de medios</li>
+          <li>Asesoría de radicación: comisión, calendario y coautorías sugeridas</li>
+          <li>Informes PDF mensuales listos para tu equipo</li>
+        </ul>
+        <a class="btn-plan" href="https://wa.me/573000000000?text=Hola%20Ricardo%2C%20vi%20el%20demo%20de%20Curul%20360%20y%20quiero%20saber%20m%C3%A1s" target="_blank" rel="noopener">Escríbeme por WhatsApp</a>
+        <a class="btn-plan ghost" href="mailto:contacto@ricardoruiz.co?subject=Curul%20360">contacto@ricardoruiz.co</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p><b>Fuentes y método.</b> Resultados electorales: archivos GCS y preconteos de la Registraduría Nacional, procesados mesa a mesa.
+      Voto nominal: actas de plenaria de la Cámara de Representantes (registro electrónico y OCR de escaneados) y API pública del Senado;
+      el registro de Senado solo publica Sí/No y arranca en 2017. Perfil etario: inferencia ecológica por puesto (Edadygenero RNEC ×
+      proyecciones DANE), IC95 ±3-6 pp — es estimación estadística, no dato individual. Prensa: agregación de titulares vía Google News,
+      con filtro de fuentes institucionales. Indicadores municipales: datos.gov.co (Policía Nacional · MEN). Histórico legislativo:
+      leyes.senado.gov.co, 1990-2026. Este demo es una muestra comercial: los módulos marcados con candado existen en producción
+      y se activan con el plan mensual.</p>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="cand-index.js?v=20260821"></script>
+  <script src="lab-indicadores.js"></script>
+  <script>
+  /* ═══════════════════════════════════════════════════════════════
+     Curul 360 — demo. Todo best-effort: cada módulo carga solo y un
+     fallo de red en uno no tumba a los demás.
+     ═══════════════════════════════════════════════════════════════ */
+  'use strict';
+
+  const CAUDAL_API = 'https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com';
+  const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const DEPTO_GEOJSON_URL = S3 + '/mapas-2026/DEPARTAMENTOS2.json';
+  const FOTOS_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/fotos-candidatos/';
+
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const fmt = n => (n == null || isNaN(n)) ? '—' : Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const norm = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
+  const title = s => (s || '').toLowerCase().replace(/(^|\s|\.)\S/g, m => m.toUpperCase());
+
+  function toast(msg, ms) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('on');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.remove('on'), ms || 2600);
+  }
+
+  /* ── Cursor custom ── */
+  (function(){
+    const c = document.getElementById('cursor'), r = document.getElementById('cursorRing');
+    document.addEventListener('mousemove', e => {
+      c.style.left = e.clientX + 'px'; c.style.top = e.clientY + 'px';
+      r.style.left = e.clientX + 'px'; r.style.top = e.clientY + 'px';
+    });
+    document.addEventListener('mouseover', e => {
+      const hot = e.target.closest('a,button,select,input,.chip,.hchip,.com-pill,.sd-item,.et-band');
+      c.style.transform = hot ? 'translate(-50%,-50%) scale(2)' : 'translate(-50%,-50%) scale(1)';
+    });
+  })();
+
+  /* ═══════════ MODO (inc = ya lanzado · new = candidato nuevo) ═══════════ */
+  let MODE = 'inc';
+  function setMode(m) {
+    MODE = m;
+    document.getElementById('mode-inc').classList.toggle('active', m === 'inc');
+    document.getElementById('mode-new').classList.toggle('active', m === 'new');
+    document.querySelectorAll('[data-modes]').forEach(el => {
+      const modes = el.dataset.modes.split(' ');
+      const show = modes.includes(m);
+      el.style.display = show ? '' : 'none';
+    });
+    document.getElementById('mode-hint').textContent = (m === 'inc')
+      ? 'Congresistas en ejercicio y cualquier persona que haya aparecido en un tarjetón de Congreso (2014–2026) o Asamblea (2023): busca tu nombre y carga tu radiografía completa.'
+      : 'Sin historial electoral propio: la herramienta arranca por tu territorio — datos oficiales, electorado por edad, prensa local y el mapa de la comisión a la que aspiras.';
+    if (m === 'new') initFrios();
+  }
+
+  /* ═══════════ REGISTRO DE CANDIDATOS (cand-index.js) ═══════════ */
+  const SRC_YEAR = { endoso: 2026, asamblea: 2023, con2022: 2022, con2018: 2018, con2014: 2014 };
+  const SRC_LABEL = { endoso: '2026', asamblea: 'Asamblea 2023', con2022: '2022', con2018: '2018', con2014: '2014' };
+  let PERSONAS = [];          // [{key, nombre, cands:[...ordenadas año desc]}]
+  let REGISTRY_READY = false;
+  let CURRENT = null;         // candidatura activa
+
+  async function initRegistry() {
+    if (!window.CandRegistry) return;
+    try {
+      const all = await CandRegistry.load({ includeParties: false });
+      const by = {};
+      all.forEach(c => {
+        const k = norm(c.nombre);
+        if (!k) return;
+        (by[k] = by[k] || []).push(c);
+      });
+      PERSONAS = Object.keys(by).map(k => {
+        const cands = by[k].slice().sort((a, b) =>
+          (SRC_YEAR[b.source] || 0) - (SRC_YEAR[a.source] || 0) || (b.votos - a.votos));
+        return { key: k, nombre: cands[0].nombre, cands };
+      });
+      REGISTRY_READY = true;
+    } catch (e) {
+      console.warn('registro no disponible', e);
+    }
+  }
+
+  function personaMatch(q, nombre) {
+    const words = norm(q).split(' ').filter(Boolean);
+    const toks = norm(nombre).split(' ');
+    return words.every(w => toks.some(t => t.startsWith(w)));
+  }
+
+  const qInput = document.getElementById('q-persona');
+  const dd = document.getElementById('dd-persona');
+  qInput.addEventListener('input', () => {
+    const q = qInput.value.trim();
+    if (q.length < 3 || !REGISTRY_READY) { dd.classList.remove('open'); return; }
+    const hits = PERSONAS.filter(p => personaMatch(q, p.nombre)).slice(0, 12);
+    if (!hits.length) { dd.classList.remove('open'); return; }
+    dd.innerHTML = hits.map((p, i) => {
+      const c = p.cands[0];
+      const yrs = [...new Set(p.cands.map(x => SRC_LABEL[x.source] || ''))].join(' · ');
+      return `<div class="sd-item" data-i="${i}">
+        <div class="sd-n">${esc(title(p.nombre))}</div>
+        <div class="sd-m">${esc(c.corp)} · ${esc(c.partido || '')} · ${esc(yrs)}</div></div>`;
+    }).join('');
+    dd.classList.add('open');
+    dd.querySelectorAll('.sd-item').forEach(el => {
+      el.onclick = () => { dd.classList.remove('open'); pickPersona(hits[+el.dataset.i]); };
+    });
+  });
+  document.addEventListener('click', e => { if (!e.target.closest('.search-wrap')) dd.classList.remove('open'); });
+
+  const PRESETS_INC = ['CATHERINE JUVINAO', 'KATHERINE MIRANDA', 'ANGELICA LOZANO'];
+  function renderPresets() {
+    const box = document.getElementById('preset-personas');
+    box.innerHTML = PRESETS_INC.map(n => `<span class="chip" data-n="${esc(n)}">${esc(title(n))}</span>`).join('');
+    box.querySelectorAll('.chip').forEach(el => {
+      el.onclick = () => {
+        const hit = PERSONAS.find(p => personaMatch(el.dataset.n, p.nombre));
+        if (hit) { qInput.value = title(hit.nombre); pickPersona(hit); }
+        else toast('El registro aún está cargando, intenta en unos segundos…');
+      };
+    });
+  }
+
+  function pickPersona(p) {
+    const c = p.cands[0];
+    // Perfil
+    const prof = document.getElementById('profile');
+    prof.classList.add('on');
+    const initials = p.nombre.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('');
+    const pw = document.getElementById('pf-photo-wrap');
+    pw.innerHTML = `<div class="pf-initials" id="pf-init">${esc(initials)}</div>`;
+    const img = new Image();
+    img.className = 'pf-photo';
+    img.onload = () => { pw.innerHTML = ''; pw.appendChild(img); };
+    img.src = FOTOS_BASE + encodeURIComponent(c.slug) + '.jpg';
+    document.getElementById('pf-name').textContent = title(p.nombre);
+    document.getElementById('pf-meta').textContent = [c.corp, c.partido, c.circunscripcion].filter(Boolean).join(' · ');
+    // Historial de candidaturas (toggle)
+    const hist = document.getElementById('pf-hist');
+    hist.innerHTML = p.cands.map((x, i) =>
+      `<span class="hchip${i === 0 ? ' cur' : ''}" data-i="${i}">${esc(SRC_LABEL[x.source] || '')} · ${esc(x.corp)}</span>`).join('');
+    hist.querySelectorAll('.hchip').forEach(el => {
+      el.onclick = () => {
+        hist.querySelectorAll('.hchip').forEach(x => x.classList.remove('cur'));
+        el.classList.add('cur');
+        loadElection(p.cands[+el.dataset.i]);
+      };
+    });
+    loadElection(c);
+    renderVotoCongreso(p.nombre);
+    // Pre-carga escucha de medios con nombre "de prensa"
+    const toks = p.nombre.split(' ').filter(Boolean);
+    const short = toks.length >= 3 ? title(toks[0] + ' ' + toks[toks.length - 2]) : title(p.nombre);
+    document.getElementById('med-q').value = short;
+    prof.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  /* ═══════════ M1 · Radiografía: fetch mesa a mesa + mapa ═══════════ */
+  const ISO_TO_REG = {
+    COAMA:'60', COANT:'1', COARA:'40', COATL:'3', COBOL:'5', COBOY:'7', COCAL:'9',
+    COCAQ:'44', COCAS:'46', COCAU:'11', COCES:'12', COCHO:'17', COCOR:'13', COCUN:'15',
+    CODC:'16', COGUA:'50', COGUV:'54', COHUI:'19', COLAG:'48', COMAG:'21', COMET:'52',
+    CONAR:'23', CONSA:'25', COPUT:'64', COQUI:'26', CORIS:'24', COSAN:'27', COSAP:'56',
+    COSUC:'28', COTOL:'29', COVAC:'31', COVAU:'68', COVID:'72'
+  };
+  const NAME_TO_REG = {
+    'ANTIOQUIA':'1','ATLANTICO':'3','BOGOTA':'16','BOGOTA D.C.':'16','DISTRITO CAPITAL':'16',
+    'DISTRITO CAPITAL DE BOGOTA':'16','BOLIVAR':'5','BOYACA':'7','CALDAS':'9','CAQUETA':'44',
+    'CASANARE':'46','CAUCA':'11','CESAR':'12','CHOCO':'17','CORDOBA':'13','CUNDINAMARCA':'15',
+    'GUAINIA':'50','GUAVIARE':'54','HUILA':'19','LA GUAJIRA':'48','GUAJIRA':'48','MAGDALENA':'21',
+    'META':'52','NARINO':'23','NORTE DE SANTANDER':'25','PUTUMAYO':'64','QUINDIO':'26','RISARALDA':'24',
+    'SAN ANDRES':'56','SAN ANDRES Y PROVIDENCIA':'56','SANTANDER':'27','SUCRE':'28','TOLIMA':'29',
+    'VALLE DEL CAUCA':'31','VALLE':'31','ARAUCA':'40','AMAZONAS':'60','VAUPES':'68','VICHADA':'72'
+  };
+  // Registraduría → DANE (para enganchar el módulo de datos fríos)
+  const REG_TO_DANE = {
+    '1':'05','3':'08','16':'11','5':'13','7':'15','9':'17','44':'18','11':'19','12':'20','13':'23',
+    '15':'25','17':'27','19':'41','48':'44','21':'47','52':'50','23':'52','25':'54','26':'63','24':'66',
+    '27':'68','28':'70','29':'73','31':'76','40':'81','46':'85','64':'86','56':'88','60':'91','50':'94',
+    '54':'95','68':'97','72':'99'
+  };
+
+  let MAP = null, MAP_LAYER = null, GEO_DEPTOS = null;
+  let _elecTok = 0;
+
+  async function ensureMap() {
+    if (MAP || !window.L) return;
+    const el = document.getElementById('map-electoral');
+    el.innerHTML = '';
+    MAP = L.map(el, { zoomControl: false, attributionControl: false, dragging: true, scrollWheelZoom: false });
+  }
+
+  async function loadElection(c) {
+    CURRENT = c;
+    const tok = ++_elecTok;
+    toast('Cargando votación mesa a mesa…', 5000);
+    document.getElementById('top-muns').innerHTML = '<div class="llm-load">Cargando <span class="dots"><span></span><span></span><span></span></span></div>';
+    let d;
+    try {
+      const r = await fetch(c.dataUrl);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      d = await r.json();
+    } catch (e) {
+      if (tok !== _elecTok) return;
+      document.getElementById('top-muns').innerHTML = '<div class="err">No se pudo cargar esta elección. Intenta otra del historial.</div>';
+      return;
+    }
+    if (tok !== _elecTok) return;
+
+    const mesas = d.mesas || [];
+    const byDep = {}, byMun = {};
+    let total = 0;
+    mesas.forEach(m => {
+      const v = +m.v || 0; total += v;
+      const dk = String(+m.dep);
+      (byDep[dk] = byDep[dk] || { nom: m.depNom, v: 0 }).v += v;
+      const mk = m.dep + '-' + m.mun;
+      (byMun[mk] = byMun[mk] || { nom: m.munNom, depNom: m.depNom, dep: dk, v: 0 }).v += v;
+    });
+    const deps = Object.entries(byDep).sort((a, b) => b[1].v - a[1].v);
+    const muns = Object.values(byMun).sort((a, b) => b.v - a.v);
+
+    // KPIs
+    const kp = document.getElementById('radio-kpis');
+    kp.style.display = 'grid';
+    kp.innerHTML = `
+      <div class="kpi hl"><div class="n">${fmt(total)}</div><div class="l">Votos · ${esc(SRC_LABEL[c.source] || '')}</div></div>
+      <div class="kpi hl2"><div class="n">${fmt(deps.length)}</div><div class="l">Departamentos con voto</div></div>
+      <div class="kpi"><div class="n">${fmt(muns.length)}</div><div class="l">Municipios con voto</div></div>
+      <div class="kpi hl3"><div class="n">${esc(title(deps.length ? deps[0][1].nom : '—'))}</div><div class="l">Territorio más fuerte</div></div>`;
+
+    // Top municipios
+    const maxV = muns.length ? muns[0].v : 1;
+    document.getElementById('top-muns').innerHTML = muns.slice(0, 10).map(m => `
+      <div class="bar-row">
+        <span class="bar-name" title="${esc(m.nom)} · ${esc(m.depNom)}">${esc(title(m.nom))}</span>
+        <span class="bar-track"><span class="bar-fill" style="width:0" data-w="${(100 * m.v / maxV).toFixed(1)}"></span></span>
+        <span class="bar-val">${fmt(m.v)}</span>
+      </div>`).join('') || '<div class="placeholder-msg">Sin votos registrados.</div>';
+    requestAnimationFrame(() => {
+      document.querySelectorAll('#top-muns .bar-fill').forEach(el => { el.style.width = el.dataset.w + '%'; });
+    });
+
+    // Mapa
+    try {
+      await ensureMap();
+      if (!GEO_DEPTOS) {
+        const r = await fetch(DEPTO_GEOJSON_URL);
+        GEO_DEPTOS = await r.json();
+      }
+      if (tok !== _elecTok || !MAP) return;
+      if (MAP_LAYER) { MAP.removeLayer(MAP_LAYER); MAP_LAYER = null; }
+      const maxDep = deps.length ? deps[0][1].v : 1;
+      MAP_LAYER = L.geoJSON(GEO_DEPTOS, {
+        style: f => {
+          const code = depCodeOf(f.properties);
+          const e = code ? byDep[code] : null;
+          const t = e ? Math.pow(e.v / maxDep, 0.45) : 0;
+          return {
+            color: 'rgba(255,255,255,0.18)', weight: .7,
+            fillColor: e ? `rgba(0,71,255,${(0.12 + 0.78 * t).toFixed(2)})` : 'rgba(255,255,255,0.04)',
+            fillOpacity: 1
+          };
+        },
+        onEachFeature: (f, layer) => {
+          const code = depCodeOf(f.properties);
+          const e = code ? byDep[code] : null;
+          const nm = f.properties.name || f.properties.NOMBRE_DPT || '';
+          layer.bindTooltip(`<div style="font-family:var(--hn)"><b>${esc(title(nm))}</b><br>${e ? fmt(e.v) + ' votos' : 'Sin votos'}</div>`, { sticky: true });
+        }
+      }).addTo(MAP);
+      MAP.fitBounds(MAP_LAYER.getBounds(), { padding: [8, 8], animate: false });
+      // recorte al continente (evita que San Andrés dispare el encuadre)
+      MAP.setMaxBounds(null);
+    } catch (e) { console.warn('mapa', e); }
+
+    // Enganche con datos fríos: auto-seleccionar el depto más fuerte
+    if (deps.length) {
+      const dane = REG_TO_DANE[deps[0][0]];
+      if (dane) setFriosDep(dane);
+    }
+    toast('Radiografía cargada: ' + fmt(total) + ' votos');
+  }
+
+  function depCodeOf(props) {
+    if (props.id && ISO_TO_REG[props.id]) return ISO_TO_REG[props.id];
+    const nm = norm(props.name || props.NOMBRE_DPT || '');
+    return NAME_TO_REG[nm] || null;
+  }
+
+  /* ═══════════ M2 · Voto en el Congreso (Lambda caudal) ═══════════ */
+  let _vcTok = 0;
+  function _pickCongresista(nombre, cands) {
+    const want = new Set(norm(nombre).split(' ').filter(w => w.length > 1));
+    for (const c of (cands || [])) {
+      const got = new Set(norm(c.nombre).split(' ').filter(w => w.length > 1));
+      if (got.size === want.size && [...got].every(w => want.has(w))) return c.key;
+    }
+    return null;
+  }
+  async function renderVotoCongreso(nombre) {
+    const empty = document.getElementById('vc-empty'), body = document.getElementById('vc-body');
+    const tok = ++_vcTok;
+    empty.style.display = 'block'; body.style.display = 'none';
+    empty.innerHTML = '<div class="llm-load">Buscando su récord de votación en plenaria <span class="dots"><span></span><span></span><span></span></span></div>';
+    let d;
+    const call = payload => fetch(CAUDAL_API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    }).then(r => r.json());
+    try { d = await call({ action: 'congresista', q: nombre }); }
+    catch (e) { if (tok === _vcTok) empty.innerHTML = '<div class="placeholder-msg">Sin conexión con el archivo legislativo. Reintenta.</div>'; return; }
+    if (tok !== _vcTok) return;
+    if (d && d.candidatos) {
+      const key = _pickCongresista(nombre, d.candidatos);
+      if (key) { try { d = await call({ action: 'congresista', key }); } catch (e) { d = null; } }
+      else d = null;
+      if (tok !== _vcTok) return;
+    }
+    if (!d || !d.encontrado) {
+      empty.innerHTML = '<div class="placeholder-msg">Esta persona no tiene voto nominal registrado en el archivo (candidato nuevo, congresista anterior a 2014 o votaciones sin registro electrónico). El módulo lo dice tal cual: <b style="color:var(--white)">sin datos no se inventa nada</b>.</div>';
+      return;
+    }
+    const su = d.resumen || {}, totV = d.n_votos || 0;
+    const alin = d.alineacion_gob;
+    const proys = (d.por_proyecto || []).slice(0, 40).map(p => {
+      const si = (p.r && p.r.Si) || 0, no = (p.r && p.r.No) || 0, ab = (p.r && p.r.Abstencion) || 0;
+      const n = si + no + ab || 1;
+      const num = esc(p.numero_senado || p.numero_camara || '');
+      return `<div class="vc-p"><div class="vc-p-t">${num ? `<span class="vc-p-num">${num}</span>` : ''}${esc(p.titulo || '')}</div>
+        <div class="vc-p-r"><span class="vc-bar">
+          <span style="width:${100 * si / n}%;background:var(--green)"></span>
+          <span style="width:${100 * no / n}%;background:#e5484d"></span>
+          <span style="width:${100 * ab / n}%;background:var(--amber)"></span></span>
+        <span class="vc-p-c">${si ? `<b style="color:var(--green)">${si} Sí</b>` : ''}${no ? ` <b style="color:#e5484d">${no} No</b>` : ''}${ab ? ` <b style="color:var(--amber)">${ab} Abst</b>` : ''}</span></div></div>`;
+    }).join('');
+    body.innerHTML =
+      (d.bancada || d.camara ? `<div class="vc-banc">${esc([d.bancada, d.camara].filter(Boolean).join(' · '))}</div>` : '')
+      + (alin != null ? `<div class="vc-head"><div class="vc-align-n">${alin}%</div>
+          <div class="vc-align-t">Alineación con el gobierno<br><span>sobre ${d.n_contestadas || 0} votaciones contestadas</span></div></div>` : '')
+      + `<div class="vc-tot"><b style="color:var(--green)">${su.Si || 0} Sí</b> · <b style="color:#e5484d">${su.No || 0} No</b>${su.Abstencion ? ` · <b style="color:var(--amber)">${su.Abstencion} Abstención</b>` : ''}
+         <span> · ${fmt(totV)} votos en ${d.n_proyectos || 0} proyectos</span></div>`
+      + `<div style="font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gray);margin-bottom:.7rem">Récord por proyecto</div>`
+      + `<div class="vc-list">${proys}</div>`
+      + `<div class="note">${/senado/i.test(d.camara || '') ? 'El registro público del Senado solo trae Sí/No (sin abstención) y arranca en 2017.' : 'Reconstruido de las actas de plenaria de Cámara (registro electrónico + OCR de escaneados 2014-2017).'}</div>`;
+    empty.style.display = 'none';
+    body.style.display = 'block';
+  }
+
+  /* ═══════════ M3 · Perfil etario (datos del análisis 1V-2026) ═══════════ */
+  const ETARIO = [
+    { band: '18 – 25', izq: 60, der: 23, txt: '<b>La franja de la izquierda.</b> Entre los votantes de 18-25, el bloque de izquierda ganó en casi todo el país en 1V-2026 — el mapa joven solo se le escapó en Antioquia y los Llanos. Si tu electorado es joven, tu problema no es convencer: es <b>movilizar</b> (es la franja que menos vota).' },
+    { band: '26 – 35', izq: 52, der: 33, txt: '<b>Todavía terreno de izquierda, pero en disputa.</b> La ventaja se estrecha frente a los más jóvenes. Es la franja con mayor peso digital: la conversación de redes pesa más que la plaza pública.' },
+    { band: '36 – 45', izq: 40, der: 45, txt: '<b>La franja bisagra.</b> Aquí se cruzan las líneas: ningún bloque domina y es donde el IC de la estimación es más ancho (±10 pp). Quien gana esta franja suele ganar el municipio.' },
+    { band: '46 – 60', izq: 25, der: 62, txt: '<b>Ventaja clara de la derecha.</b> Franja de alta participación y voto estable entre elecciones. Se disputa con presencia territorial, no con redes.' },
+    { band: '61 +', izq: 7, der: 79, txt: '<b>El bastión de la derecha — en TODOS los departamentos.</b> En 1V-2026 el bloque de derecha ganó la franja 61+ en los 33 departamentos, sin excepción. Además es la franja que más crece hacia 2030 (×1,135 en el censo). El 38% del electorado de Abelardo fue 61+.' },
+  ];
+  function renderEtario() {
+    const box = document.getElementById('et-bands');
+    box.innerHTML = ETARIO.map((b, i) => {
+      const rest = 100 - b.izq - b.der;
+      return `<div class="et-band" data-i="${i}">
+        <div class="et-band-h"><span>${b.band} años</span><span>${b.izq}% · ${b.der}%</span></div>
+        <div class="et-track">
+          <span class="et-l" style="width:${b.izq}%"></span>
+          <span style="width:${rest}%"></span>
+          <span class="et-r" style="width:${b.der}%"></span>
+        </div></div>`;
+    }).join('');
+    box.querySelectorAll('.et-band').forEach(el => {
+      el.onclick = () => {
+        box.querySelectorAll('.et-band').forEach(x => x.classList.remove('sel'));
+        el.classList.add('sel');
+        document.getElementById('et-detail').innerHTML = ETARIO[+el.dataset.i].txt;
+      };
+    });
+  }
+
+  /* ═══════════ M4 · Escucha de medios (Lambda caudal · Google News) ═══════════ */
+  let _medTok = 0;
+  const MED_CHIPS_NEW = ['reforma a la salud', 'reforma pensional', 'seguridad ciudadana', 'presupuesto general'];
+  function renderMedChips() {
+    const box = document.getElementById('med-chips');
+    box.innerHTML = MED_CHIPS_NEW.map(t => `<span class="chip" data-q="${esc(t)}">${esc(t)}</span>`).join('');
+    box.querySelectorAll('.chip').forEach(el => {
+      el.onclick = () => { document.getElementById('med-q').value = el.dataset.q; doMedios(); };
+    });
+  }
+  async function doMedios() {
+    const q = document.getElementById('med-q').value.trim();
+    if (!q) { toast('Escribe un nombre o un tema.'); return; }
+    const tok = ++_medTok;
+    const out = document.getElementById('med-out'), kp = document.getElementById('med-kpis');
+    kp.style.display = 'none';
+    out.innerHTML = '<div class="llm-load">Rastreando prensa nacional y regional <span class="dots"><span></span><span></span><span></span></span></div>';
+    let d;
+    try {
+      const r = await fetch(CAUDAL_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'medios', query: q, dias: 30 })
+      });
+      d = await r.json();
+    } catch (e) { if (tok === _medTok) out.innerHTML = '<div class="err">No se pudo consultar la prensa. Reintenta.</div>'; return; }
+    if (tok !== _medTok) return;
+    const rs = d.resultados || [];
+    const alc = Object.fromEntries((d.por_alcance || []).map(x => [x.alcance, x.n]));
+    kp.style.display = 'flex';
+    kp.innerHTML = `
+      <div><b>${fmt(d.n || rs.length)}</b> titulares</div>
+      <div><b>${fmt(alc.nacional || 0)}</b> nacional</div>
+      <div><b>${fmt(alc.regional || 0)}</b> regional</div>
+      <div><b>${d.dias || 30}</b> días</div>`;
+    out.innerHTML = rs.length
+      ? `<div class="med-list">${rs.map(r => `
+          <div class="med-item">
+            <a class="med-t" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.titulo)}</a>
+            <div class="med-m">
+              <span class="doc-badge">${esc(r.medio)}</span>
+              ${r.alcance === 'regional' ? '<span class="doc-badge pal">Regional</span>' : ''}
+              <span class="med-f">${esc(r.fecha || '')}</span>
+            </div>
+          </div>`).join('')}</div>`
+      : '<div class="placeholder-msg">Sin cobertura de prensa reciente para esa búsqueda. Prueba con menos palabras o un tema más amplio.</div>';
+  }
+
+  /* ═══════════ M5 · Datos fríos (lab-indicadores.js) ═══════════ */
+  let FRIOS_READY = false;
+  async function initFrios() {
+    if (FRIOS_READY || !window.LabIndicadores) return;
+    try {
+      await LabIndicadores.load();
+      FRIOS_READY = true;
+      const deptos = LabIndicadores.getDeptosCatalog();
+      const opts = '<option value="">— Departamento —</option>' +
+        deptos.map(d => `<option value="${esc(d.cod)}">${esc(d.nombre)}</option>`).join('');
+      const frDep = document.getElementById('fr-dep');
+      const newDep = document.getElementById('new-dep');
+      frDep.innerHTML = opts;
+      if (newDep) newDep.innerHTML = opts;
+      renderTerritorioPresets();
+    } catch (e) {
+      document.getElementById('fr-dep').innerHTML = '<option value="">No disponible</option>';
+    }
+  }
+  function munOptions(codDep) {
+    const muns = LabIndicadores.getMunsByDepto(codDep) || [];
+    return '<option value="">— Municipio —</option>' +
+      muns.map(m => `<option value="${esc(m.divipola)}">${esc(m.nombre)}</option>`).join('');
+  }
+  function frDepChange() {
+    const cod = document.getElementById('fr-dep').value;
+    document.getElementById('fr-mun').innerHTML = cod && FRIOS_READY ? munOptions(cod) : '<option value="">— Elige departamento —</option>';
+  }
+  function frMunChange() {
+    const div = document.getElementById('fr-mun').value;
+    if (div) renderIndicadores(div);
+  }
+  async function setFriosDep(codDane) {
+    await initFrios();
+    if (!FRIOS_READY) return;
+    const sel = document.getElementById('fr-dep');
+    if ([...sel.options].some(o => o.value === codDane)) {
+      sel.value = codDane;
+      frDepChange();
+      // auto-elige el municipio con más registros (la capital suele ser el primero con datos)
+      const muns = LabIndicadores.getMunsByDepto(codDane) || [];
+      if (muns.length) {
+        const cap = muns.find(m => /\b001$/.test(m.divipola)) || muns[0];
+        document.getElementById('fr-mun').value = cap.divipola;
+        renderIndicadores(cap.divipola);
+      }
+    }
+  }
+  function sparkSVG(serie) {
+    const years = Object.keys(serie || {}).sort();
+    const vals = years.map(y => +serie[y]).filter(v => !isNaN(v));
+    if (vals.length < 2) return '';
+    const W = 120, H = 30, mn = Math.min(...vals), mx = Math.max(...vals), rg = (mx - mn) || 1;
+    const pts = vals.map((v, i) => `${(i * W / (vals.length - 1)).toFixed(1)},${(H - 3 - (H - 6) * (v - mn) / rg).toFixed(1)}`);
+    const last = pts[pts.length - 1].split(',');
+    return `<svg class="ind-spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      <polyline points="${pts.join(' ')}"/><circle cx="${last[0]}" cy="${last[1]}" r="2.4"/></svg>`;
+  }
+  function renderIndicadores(divipola) {
+    const grid = document.getElementById('ind-grid');
+    const mun = LabIndicadores.getMun(divipola);
+    if (!mun) { grid.innerHTML = '<div class="placeholder-msg" style="grid-column:1/-1">Sin datos para este municipio.</div>'; return; }
+    const cat = LabIndicadores.getCatalog();
+    let hasProxy = false;
+    grid.innerHTML = cat.map(ind => {
+      const latest = LabIndicadores.getLatestValue(divipola, ind.id);
+      const serie = LabIndicadores.getSerie(divipola, ind.id);
+      const isProxy = latest && latest.isProxy;
+      if (isProxy) hasProxy = true;
+      const val = latest && latest.value != null ? LabIndicadores.formatValue(latest.value, ind.id) : '—';
+      return `<div class="ind-card">
+        <div class="ind-name">${esc(ind.nombre)}${isProxy ? ' <span class="proxy-tag">≈ ETC</span>' : ''}</div>
+        <div class="ind-val">${esc(val)}</div>
+        <div class="ind-yr">${latest && latest.year ? 'Corte ' + latest.year : ''} · ${esc(mun.nombre)}</div>
+        ${serie ? sparkSVG(serie.values) : ''}
+        <div class="ind-src">${esc(ind.fuente || '')}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('ind-note').style.display = hasProxy ? 'block' : 'none';
+  }
+
+  /* territorio (modo new) */
+  const PRESET_TERR = [['11001', 'Bogotá'], ['05001', 'Medellín'], ['76001', 'Cali'], ['08001', 'Barranquilla']];
+  function renderTerritorioPresets() {
+    const box = document.getElementById('preset-territorios');
+    if (!box) return;
+    box.innerHTML = PRESET_TERR.map(t => `<span class="chip" data-d="${t[0]}">${t[1]}</span>`).join('');
+    box.querySelectorAll('.chip').forEach(el => {
+      el.onclick = () => {
+        const div = el.dataset.d, dep = div.slice(0, 2);
+        const nd = document.getElementById('new-dep');
+        nd.value = dep; newDepChange();
+        document.getElementById('new-mun').value = div;
+        newMunChange();
+      };
+    });
+  }
+  function newDepChange() {
+    const cod = document.getElementById('new-dep').value;
+    document.getElementById('new-mun').innerHTML = cod && FRIOS_READY ? munOptions(cod) : '<option value="">— Elige departamento —</option>';
+  }
+  function newMunChange() {
+    const div = document.getElementById('new-mun').value;
+    if (!div) return;
+    // sincroniza con datos fríos + medios
+    const dep = div.slice(0, 2);
+    const frDep = document.getElementById('fr-dep');
+    frDep.value = dep; frDepChange();
+    document.getElementById('fr-mun').value = div;
+    renderIndicadores(div);
+    const mun = LabIndicadores.getMun(div);
+    if (mun) document.getElementById('med-q').value = mun.nombre;
+    toast('Territorio cargado: revisa Datos fríos, Medios y el simulador.');
+  }
+
+  /* ═══════════ M6 · Actores de presión por comisión ═══════════ */
+  const COMISIONES = {
+    PRIMERA: {
+      nombre: 'Primera', temas: 'Reforma constitucional · justicia · paz · asuntos electorales',
+      desc: 'La comisión de las <b>reformas constitucionales</b>: actos legislativos, estatutarias, justicia, paz y reglas electorales. Es la de mayor visibilidad mediática y donde más pesan los centros de pensamiento jurídico.',
+      actores: [
+        { n: 'Dejusticia', t: 'Centro de pensamiento', i: 'Litigio estratégico y conceptos técnicos en estatutarias y reformas de justicia.', f: 5 },
+        { n: 'MOE · Misión de Observación Electoral', t: 'Sociedad civil', i: 'Conceptos sobre toda reforma electoral y de partidos; voz citada en audiencias.', f: 5 },
+        { n: 'Comisión Colombiana de Juristas', t: 'Sociedad civil', i: 'DD.HH. y justicia transicional; activa en implementación del Acuerdo de Paz.', f: 4 },
+        { n: 'Fedemunicipios', t: 'Gremio territorial', i: 'Descentralización, régimen municipal y competencias territoriales.', f: 3 },
+        { n: 'Consejo Gremial Nacional', t: 'Gremio', i: 'Interviene cuando la reforma constitucional toca reglas económicas.', f: 4 },
+        { n: 'Academia (Externado · Rosario · Andes)', t: 'Academia', i: 'Conceptos de constitucionalistas en audiencias públicas.', f: 3 },
+      ]
+    },
+    SEGUNDA: {
+      nombre: 'Segunda', temas: 'Relaciones exteriores · defensa · comercio exterior',
+      desc: 'Política internacional, fuerza pública, fronteras, tratados y comercio exterior. Los gremios exportadores y las asociaciones de la fuerza pública en retiro son actores permanentes.',
+      actores: [
+        { n: 'ANDI', t: 'Gremio', i: 'Tratados comerciales y política de comercio exterior.', f: 5 },
+        { n: 'Analdex', t: 'Gremio', i: 'Exportadores: aranceles, acuerdos y facilitación de comercio.', f: 4 },
+        { n: 'AmCham Colombia', t: 'Gremio binacional', i: 'Relación comercial con EE.UU. e inversión extranjera.', f: 4 },
+        { n: 'ACORE', t: 'Asociación fuerza pública (r)', i: 'Carrera militar, seguridad nacional y presupuesto de defensa.', f: 3 },
+        { n: 'ProColombia / Cancillería', t: 'Entidad', i: 'Agenda oficial de internacionalización; insumo técnico permanente.', f: 4 },
+        { n: 'ONG de migración y frontera', t: 'Sociedad civil', i: 'Política migratoria y atención en zonas de frontera.', f: 3 },
+      ]
+    },
+    TERCERA: {
+      nombre: 'Tercera', temas: 'Hacienda · crédito público · impuestos · banca',
+      desc: 'La comisión de las <b>reformas tributarias</b> y el sistema financiero. Concentra el lobby económico más profesionalizado del Congreso.',
+      actores: [
+        { n: 'ANIF', t: 'Centro de estudios', i: 'Análisis macro y financiero; voz técnica en toda tributaria.', f: 5 },
+        { n: 'Fedesarrollo', t: 'Centro de pensamiento', i: 'Evaluación fiscal independiente; sus cifras marcan el debate.', f: 5 },
+        { n: 'Asobancaria', t: 'Gremio financiero', i: 'Regulación bancaria, crédito e inclusión financiera.', f: 5 },
+        { n: 'Consejo Gremial Nacional', t: 'Gremio', i: 'Posición unificada del empresariado en reformas tributarias.', f: 5 },
+        { n: 'Fenalco', t: 'Gremio', i: 'Comercio: IVA, facturación y régimen simple.', f: 4 },
+        { n: 'Banco de la República / MinHacienda', t: 'Autoridad', i: 'Marco técnico oficial: sus conceptos definen viabilidad fiscal.', f: 5 },
+      ]
+    },
+    CUARTA: {
+      nombre: 'Cuarta', temas: 'Presupuesto · control fiscal · contratación pública',
+      desc: 'Leyes orgánicas de presupuesto, vigencias, control fiscal y contratación estatal. Menos mediática, pero donde se decide <b>la plata</b>.',
+      actores: [
+        { n: 'MinHacienda · DNP', t: 'Entidad', i: 'Dueños del Presupuesto General: definen el marco de gasto.', f: 5 },
+        { n: 'Contraloría General', t: 'Órgano de control', i: 'Control fiscal y conceptos sobre reformas presupuestales.', f: 4 },
+        { n: 'Colombia Compra Eficiente', t: 'Entidad', i: 'Reglas de contratación pública y pliegos tipo.', f: 4 },
+        { n: 'Cámara Colombiana de la Infraestructura', t: 'Gremio', i: 'Contratación de obra pública, APP y pliegos tipo.', f: 5 },
+        { n: 'Federación de Departamentos', t: 'Gremio territorial', i: 'Regalías y transferencias territoriales (SGP).', f: 4 },
+        { n: 'Observatorios fiscales (OFI · universidades)', t: 'Academia', i: 'Seguimiento independiente del gasto público.', f: 3 },
+      ]
+    },
+    QUINTA: {
+      nombre: 'Quinta', temas: 'Agro · ambiente · minas y energía · recursos naturales',
+      desc: 'Régimen agropecuario, ambiente, minería y energía: la comisión con el choque de intereses más directo entre <b>extractivos, agro y conservación</b>.',
+      actores: [
+        { n: 'SAC · Sociedad de Agricultores', t: 'Gremio', i: 'Política agropecuaria, crédito rural e insumos.', f: 5 },
+        { n: 'Fedegán', t: 'Gremio', i: 'Ganadería: tierras, sanidad y seguridad rural.', f: 4 },
+        { n: 'ACP · Asociación Colombiana del Petróleo', t: 'Gremio', i: 'Hidrocarburos: regalías, licencias y transición energética.', f: 5 },
+        { n: 'ACM · Asociación Colombiana de Minería', t: 'Gremio', i: 'Minería formal: títulos, consultas y regalías.', f: 4 },
+        { n: 'WWF · Ambiente y Sociedad', t: 'ONG ambiental', i: 'Conservación, deforestación y acuerdos climáticos.', f: 4 },
+        { n: 'Dignidad Agropecuaria', t: 'Movimiento campesino', i: 'Voz de los pequeños productores; capacidad de movilización.', f: 3 },
+      ]
+    },
+    SEXTA: {
+      nombre: 'Sexta', temas: 'Transporte · TIC · educación · cultura · ciencia',
+      desc: 'Infraestructura, telecomunicaciones, educación y ciencia. Mezcla gremios de infraestructura con el sindicato más grande del país (Fecode).',
+      actores: [
+        { n: 'Fecode', t: 'Sindicato', i: 'Estatuto docente y financiación educativa; alta capacidad de movilización.', f: 5 },
+        { n: 'Cámara Colombiana de la Infraestructura', t: 'Gremio', i: 'Vías, concesiones y planes de transporte.', f: 5 },
+        { n: 'Asomóvil · CCIT', t: 'Gremio TIC', i: 'Espectro, conectividad y regulación digital.', f: 4 },
+        { n: 'Ascún', t: 'Academia', i: 'Universidades: reforma a la educación superior y ciencia.', f: 4 },
+        { n: 'ANDI (transformación digital)', t: 'Gremio', i: 'Agenda de industria 4.0 y economía digital.', f: 3 },
+        { n: 'Transportadores (ATC · Fedetranscarga)', t: 'Gremio', i: 'Fletes, chatarrización y peajes; capacidad de paro.', f: 4 },
+      ]
+    },
+    SEPTIMA: {
+      nombre: 'Séptima', temas: 'Salud · trabajo · pensiones · vivienda · mujer y familia',
+      desc: 'La comisión de las <b>reformas sociales</b>: salud, laboral y pensional. El pulso permanente entre EPS, aseguradoras, sindicatos y fondos privados.',
+      actores: [
+        { n: 'ACEMI', t: 'Gremio salud (EPS)', i: 'Aseguramiento en salud; actor central de toda reforma al sistema.', f: 5 },
+        { n: 'CUT · CGT · CTC', t: 'Sindicatos', i: 'Reforma laboral y pensional; capacidad de movilización nacional.', f: 5 },
+        { n: 'Asofondos', t: 'Gremio pensional', i: 'Fondos privados de pensiones: pilares, traslados y ahorro.', f: 5 },
+        { n: 'Fasecolda', t: 'Gremio asegurador', i: 'Riesgos laborales, rentas vitalicias y aseguramiento.', f: 4 },
+        { n: 'Federación Médica · Colegios médicos', t: 'Profesional', i: 'Talento humano en salud y condiciones laborales del sector.', f: 4 },
+        { n: 'Camacol', t: 'Gremio vivienda', i: 'Subsidios, construcción y política de vivienda social.', f: 4 },
+      ]
+    },
+  };
+  let COM_SEL = 'SEPTIMA';
+  function renderComisiones() {
+    const pills = document.getElementById('com-pills');
+    pills.innerHTML = Object.keys(COMISIONES).map(k =>
+      `<span class="com-pill${k === COM_SEL ? ' active' : ''}" data-k="${k}">${COMISIONES[k].nombre}</span>`).join('');
+    pills.querySelectorAll('.com-pill').forEach(el => {
+      el.onclick = () => { COM_SEL = el.dataset.k; renderComisiones(); };
+    });
+    const c = COMISIONES[COM_SEL];
+    document.getElementById('com-desc').innerHTML =
+      `<b>Comisión ${c.nombre}</b> — ${esc(c.temas)}.<br>${c.desc}`;
+    document.getElementById('act-grid').innerHTML = c.actores.map(a => `
+      <div class="act-card">
+        <div class="act-name">${esc(a.n)}</div>
+        <div class="act-tipo">${esc(a.t)}</div>
+        <div class="act-int">${esc(a.i)}</div>
+        <div class="act-inf"><span class="act-inf-l">Peso en el debate</span>
+          <span class="act-dots">${[1,2,3,4,5].map(x => `<span class="act-dot${x <= a.f ? ' on' : ''}"></span>`).join('')}</span></div>
+      </div>`).join('');
+  }
+
+  /* ═══════════ M7 · Simulador de proyecto de ley (Lambda caudal · tema) ═══════════ */
+  const WIZ_EJEMPLOS = ['salud mental', 'feminicidio', 'seguridad vial', 'primera infancia', 'cannabis', 'protección animal'];
+  const COM_KEYWORDS = [
+    [/salud|pension|laboral|trabajo|vivienda|mujer|familia|seguridad social/i, 'SEPTIMA'],
+    [/impuesto|tributar|banca|financier|credito|iva/i, 'TERCERA'],
+    [/presupuesto|regalia|contratacion|fiscal/i, 'CUARTA'],
+    [/agro|agrari|campesin|ambient|clima|miner|energ|petrole|animal/i, 'QUINTA'],
+    [/educacion|docente|universidad|transporte|vial|via|tic|internet|cultura|ciencia|deporte/i, 'SEXTA'],
+    [/defensa|militar|exterior|internacional|frontera|migra/i, 'SEGUNDA'],
+    [/constitucion|justicia|penal|paz|electoral|partido|feminicidio|carcel/i, 'PRIMERA'],
+  ];
+  let _wizTok = 0;
+  function renderWizChips() {
+    const box = document.getElementById('wiz-chips');
+    box.innerHTML = WIZ_EJEMPLOS.map(t => `<span class="chip" data-q="${esc(t)}">${esc(t)}</span>`).join('');
+    box.querySelectorAll('.chip').forEach(el => {
+      el.onclick = () => { document.getElementById('wiz-q').value = el.dataset.q; doTema(); };
+    });
+  }
+  async function doTema() {
+    const q = document.getElementById('wiz-q').value.trim();
+    if (!q) { toast('Escribe un tema.'); return; }
+    const tok = ++_wizTok;
+    const out = document.getElementById('wiz-out');
+    out.innerHTML = '<div class="llm-load panel">Consultando 13.172 proyectos desde 1990 <span class="dots"><span></span><span></span><span></span></span></div>';
+    let d;
+    try {
+      const r = await fetch(CAUDAL_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'tema', query: q, lectura: false })
+      });
+      d = await r.json();
+    } catch (e) { if (tok === _wizTok) out.innerHTML = '<div class="err">No se pudo consultar el archivo legislativo. Reintenta.</div>'; return; }
+    if (tok !== _wizTok) return;
+    const s = d.resumen || {};
+    if (!s.n_intentos) {
+      out.innerHTML = `<div class="panel"><div class="placeholder-msg">No hay antecedentes con «${esc(q)}» en los títulos del archivo.
+        Eso puede ser bueno (tema virgen) o una señal de que el Congreso lo nombra distinto — prueba un sinónimo.</div></div>`;
+      return;
+    }
+    const emb = s.embudo || {};
+    const stages = Object.entries(emb);
+    const maxE = stages.length ? Math.max(...stages.map(x => +x[1] || 0), 1) : 1;
+    const funnel = stages.map(([k, v]) => `
+      <div class="fu-row"><span class="fu-l">${esc(k)}</span>
+      <span class="fu-track"><span class="fu-fill" style="width:0" data-w="${(100 * (+v || 0) / maxE).toFixed(1)}"></span></span>
+      <span class="fu-v">${fmt(+v || 0)}</span></div>`).join('');
+    // bancadas y autores llegan como tuplas [nombre, n]
+    const tup = x => Array.isArray(x) ? { nombre: x[0], n: +x[1] || 0 } : { nombre: x.partido || x.nombre || '', n: x.n || x.count || 0 };
+    const bancadas = (s.bancadas || []).slice(0, 5).map(tup);
+    const maxB = bancadas.length ? Math.max(...bancadas.map(b => b.n), 1) : 1;
+    const bancHTML = bancadas.map(b =>
+      `<div class="bar-row"><span class="bar-name" title="${esc(b.nombre)}">${esc(title(b.nombre))}</span>
+        <span class="bar-track"><span class="bar-fill" style="width:${(100 * b.n / maxB).toFixed(1)}%"></span></span>
+        <span class="bar-val">${fmt(b.n)}</span></div>`).join('');
+    const autores = (s.top_autores || []).slice(0, 4).map(tup);
+    // Comisión sugerida por keywords
+    let comSug = null;
+    for (const [re, k] of COM_KEYWORDS) { if (re.test(q)) { comSug = k; break; } }
+    // Hoja de ruta determinista sobre los datos
+    const pctExito = s.pct_exito != null ? Math.round(s.pct_exito) : null;
+    const tiempo = s.n_muerte_por_tiempo || 0, caidos = s.n_caidos || 0;
+    const recos = [];
+    if (pctExito != null) recos.push(`De <b>${fmt(s.n_intentos)}</b> intentos históricos, solo <b>${fmt(s.n_leyes)}</b> llegaron a ley (<b>${pctExito}%</b>). Tu proyecto compite contra esa base — diferénciate desde la exposición de motivos citando por qué murieron los anteriores.`);
+    if (tiempo && caidos) recos.push(`<b>${fmt(tiempo)}</b> de los <b>${fmt(caidos)}</b> caídos murieron por <b>vencimiento de términos</b> (Art. 190, Ley 5ª), no por votos en contra. La estrategia es de <b>calendario</b>: radica en julio, en el primer año del cuatrienio — el año 4 mata el 34,7% de lo que toca.`);
+    recos.push(`El orden del día decide: la probabilidad de que un proyecto se debata cae de <b>~53%</b> en el 1er lugar de la agenda a <b>~21%</b> del 4º en adelante. Negocia posición con la mesa directiva, no solo la ponencia.`);
+    if (bancadas.length > 1) recos.push(`El tema tiene tracción en varias bancadas — busca <b>coautoría transversal</b> con ${esc(title(bancadas[0].nombre))} y ${esc(title(bancadas[1].nombre))}: las firmas cruzadas suben la probabilidad de agenda.`);
+    if (autores.length) recos.push(`Quienes más lo han intentado: ${autores.map(a => `<b>${esc(a.nombre)}</b> (${a.n})`).join(' · ')}. Si siguen en el Congreso, son tu primera llamada — o tu competencia por la autoría.`);
+    if (comSug) recos.push(`Por materia, el trámite iría a la <b>Comisión ${COMISIONES[comSug].nombre}</b> (${esc(COMISIONES[comSug].temas)}). Revisa abajo sus <a href="#actores" style="color:var(--green)" onclick="COM_SEL='${comSug}';renderComisiones()">actores de presión</a> antes de radicar.`);
+    recos.push(`En la plataforma completa: borrador de exposición de motivos con los antecedentes citados, alerta cuando tu proyecto entre (o desaparezca) del orden del día, y seguimiento de quién pide audiencia pública.`);
+
+    out.innerHTML = `
+      <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+        <div class="kpi hl2"><div class="n">${fmt(s.n_intentos)}</div><div class="l">Intentos desde ${(s.periodo && s.periodo[0]) || 1990}</div></div>
+        <div class="kpi hl"><div class="n">${fmt(s.n_leyes)}</div><div class="l">Llegaron a ley</div></div>
+        <div class="kpi hl3"><div class="n">${fmt(tiempo)}</div><div class="l">Muertos por calendario (Art. 190)</div></div>
+        <div class="kpi"><div class="n">${pctExito != null ? pctExito + '%' : '—'}</div><div class="l">Tasa de éxito del tema</div></div>
+      </div>
+      <div class="wiz-grid">
+        <div class="panel">
+          <h3>Embudo de supervivencia · «${esc(q)}»</h3>
+          <div class="funnel">${funnel}</div>
+          ${bancHTML ? `<h3 style="margin-top:1.4rem">Bancadas que lo empujan</h3><div class="banc-list">${bancHTML}</div>` : ''}
+        </div>
+        <div class="reco">
+          <h4>Hoja de ruta táctica</h4>
+          <ul>${recos.map(r => `<li>${r}</li>`).join('')}</ul>
+        </div>
+      </div>`;
+    requestAnimationFrame(() => {
+      document.querySelectorAll('#wiz-out .fu-fill').forEach(el => { el.style.width = el.dataset.w + '%'; });
+    });
+  }
+
+  /* ═══════════ INIT ═══════════ */
+  (function init() {
+    renderEtario();
+    renderMedChips();
+    renderWizChips();
+    renderComisiones();
+    initRegistry().then(renderPresets);
+    initFrios();
+    document.getElementById('med-q').addEventListener('keydown', e => { if (e.key === 'Enter') doMedios(); });
+    document.getElementById('wiz-q').addEventListener('keydown', e => { if (e.key === 'Enter') doTema(); });
+  })();
+  </script>
+</body>
+</html>

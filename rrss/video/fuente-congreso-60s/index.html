@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="es" data-resolution="portrait">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "HelveticaNeue"; src: url("fonts/helveticaneue-light.woff2") format("woff2");  font-weight: 300; font-display: block; }
+      @font-face { font-family: "HelveticaNeue"; src: url("fonts/helveticaneue.woff2") format("woff2");        font-weight: 400; font-display: block; }
+      @font-face { font-family: "HelveticaNeue"; src: url("fonts/helveticaneue-medium.woff2") format("woff2"); font-weight: 500; font-display: block; }
+      @font-face { font-family: "HelveticaNeue"; src: url("fonts/helveticaneue-bold.woff2") format("woff2");   font-weight: 700; font-display: block; }
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #060810; }
+      body { font-family: "HelveticaNeue"; color: #f4f3ef; -webkit-font-smoothing: antialiased; }
+
+      #glow { position: absolute; inset: 0;
+        background:
+          radial-gradient(920px 720px at 20% 10%, rgba(0,71,255,.32), transparent 60%),
+          radial-gradient(820px 820px at 88% 90%, rgba(61,111,255,.17), transparent 62%); }
+
+      .escena { position: absolute; inset: 0; }
+      .kicker { position: absolute; left: 90px; font-size: 29px; letter-spacing: .30em;
+        color: #3d6fff; text-transform: uppercase; font-weight: 500; }
+      .h1 { position: absolute; left: 90px; width: 910px; font-size: 94px; font-weight: 700;
+        letter-spacing: -.038em; line-height: .98; }
+      .sub { position: absolute; left: 90px; width: 880px; font-size: 33px; font-weight: 300;
+        line-height: 1.35; color: rgba(244,243,239,.62); }
+      .pie { position: absolute; left: 90px; bottom: 108px; font-size: 25px; font-weight: 300;
+        color: rgba(244,243,239,.40); }
+      .marca { position: absolute; right: 90px; bottom: 108px; font-size: 27px;
+        font-weight: 500; color: #3d6fff; }
+
+      /* ---------- E1 ---------- */
+      #e1-cifra { position: absolute; left: 90px; top: 790px; font-size: 300px; font-weight: 700;
+        letter-spacing: -.055em; line-height: 1; }
+      #e1-lbl { position: absolute; left: 90px; top: 1110px; width: 880px; font-size: 40px;
+        font-weight: 300; color: rgba(244,243,239,.72); }
+      .chip { position: absolute; top: 1265px; height: 118px; border-radius: 8px;
+        border: 1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.035);
+        padding: 20px 30px; }
+      .chip .n { font-size: 40px; font-weight: 700; }
+      .chip .t { font-size: 24px; font-weight: 300; color: rgba(244,243,239,.55); margin-top: 4px; }
+
+      /* ---------- E2 · ritmo ---------- */
+      #ritmo { position: absolute; left: 90px; top: 740px; width: 900px; height: 620px; }
+      .rcol { position: absolute; bottom: 96px; width: 220px; }
+      .rbar { position: absolute; bottom: 0; width: 100%; height: 100%; border-radius: 6px 6px 0 0;
+        background: linear-gradient(180deg,#22304f 0%,#1a2540 100%); transform-origin: 50% 100%; }
+      .rcol.hoy .rbar { background: linear-gradient(180deg,#0047FF 0%,#2f5bd8 100%); }
+      .rnum { position: absolute; width: 100%; text-align: center; font-size: 54px; font-weight: 700; }
+      .rcol.hoy .rnum { color: #f4f3ef; }
+      .rcol:not(.hoy) .rnum { color: rgba(244,243,239,.55); }
+      .rano { position: absolute; bottom: -70px; width: 100%; text-align: center;
+        font-size: 32px; font-weight: 300; color: rgba(244,243,239,.50); }
+      .rcol.hoy .rano { color: #f4f3ef; font-weight: 700; }
+
+      /* ---------- E3 filas ---------- */
+      .fila { position: absolute; left: 90px; width: 900px; height: 104px; }
+      .fila .nom { position: absolute; left: 0; top: 6px; font-size: 35px; font-weight: 500; }
+      .fila .num { position: absolute; right: 0; top: 0; font-size: 46px; font-weight: 700; }
+      .fila .riel { position: absolute; left: 0; bottom: 10px; width: 100%; height: 12px;
+        border-radius: 6px; background: rgba(255,255,255,.07); }
+      .fila .barra { position: absolute; left: 0; bottom: 10px; height: 12px; border-radius: 6px;
+        background: linear-gradient(90deg,#0047FF 0%,#3d6fff 100%); transform-origin: 0 50%; }
+      .fila.top .barra { background: linear-gradient(90deg,#f97316 0%,#fb923c 100%); }
+      .fila.top .num { color: #f97316; }
+
+      /* ---------- E4 tarjetas ---------- */
+      .tarj { position: absolute; left: 90px; width: 900px; height: 250px;
+        border-left: 4px solid #0047FF; padding: 6px 0 0 34px; }
+      .tarj.uno { border-left-color: #f97316; }
+      .tarj .rk { font-size: 26px; font-weight: 700; color: #3d6fff; letter-spacing: .18em; }
+      .tarj.uno .rk { color: #f97316; }
+      .tarj .tt { margin-top: 12px; font-size: 47px; font-weight: 700; letter-spacing: -.02em; line-height: 1.06; }
+      .tarj .mm { margin-top: 16px; font-size: 30px; font-weight: 300; color: rgba(244,243,239,.60); }
+      .tarj .mm b { font-weight: 700; color: #f4f3ef; }
+
+      /* ---------- E5 embudo ---------- */
+      #e5-pct { position: absolute; left: 90px; top: 740px; font-size: 230px; font-weight: 700;
+        letter-spacing: -.05em; line-height: 1; color: #f97316; }
+      #e5-lbl { position: absolute; left: 90px; top: 1010px; width: 880px; font-size: 39px;
+        font-weight: 300; color: rgba(244,243,239,.72); }
+      .emb { position: absolute; left: 90px; height: 62px; border-radius: 6px; }
+      .emb .et { position: absolute; left: 26px; top: 15px; font-size: 27px; font-weight: 500;
+        color: rgba(255,255,255,.92); white-space: nowrap; }
+      .embv { position: absolute; right: 90px; width: 260px; text-align: right;
+        font-size: 27px; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="60"
+         data-width="1080" data-height="1920">
+
+      <div id="glow" class="clip" data-start="0" data-duration="60" data-track-index="0"></div>
+
+      <!-- ===== E1 · 0 – 11 ===== -->
+      <div id="e1" class="escena clip" data-start="0" data-duration="11" data-track-index="1">
+        <div class="kicker" id="e1-k" style="top:250px">Congreso de Colombia</div>
+        <div class="h1"     id="e1-t" style="top:310px">Legislatura<br />2026–2027</div>
+        <div class="sub"    id="e1-s" style="top:560px">Del 20 de julio al 5 de agosto de 2026.</div>
+        <div id="e1-cifra">0</div>
+        <div id="e1-lbl">proyectos de ley radicados</div>
+        <div class="chip" id="e1-c1" style="left:90px;  width:430px"><div class="n">154</div><div class="t">Senado</div></div>
+        <div class="chip" id="e1-c2" style="left:560px; width:430px"><div class="n">100</div><div class="t">Cámara</div></div>
+      </div>
+
+      <!-- ===== E2 · 11 – 24 · ritmo ===== -->
+      <div id="e2" class="escena clip" data-start="11" data-duration="13" data-track-index="2">
+        <div class="kicker" id="e2-k" style="top:250px">El ritmo</div>
+        <div class="h1"     id="e2-t" style="top:310px">El doble que<br />hace ocho años</div>
+        <div class="sub"    id="e2-s" style="top:560px">Radicados en los mismos 10 días hábiles de cada año. Solo Senado.</div>
+        <div id="ritmo">
+          <div class="rcol hoy" id="r0" style="left:20px;  height:430px">
+            <div class="rnum" style="bottom:446px">78</div><div class="rbar" id="rb0"></div><div class="rano">2026</div></div>
+          <div class="rcol" id="r1" style="left:340px; height:331px">
+            <div class="rnum" style="bottom:347px">60</div><div class="rbar" id="rb1"></div><div class="rano">2022</div></div>
+          <div class="rcol" id="r2" style="left:660px; height:215px">
+            <div class="rnum" style="bottom:231px">39</div><div class="rbar" id="rb2"></div><div class="rano">2018</div></div>
+        </div>
+      </div>
+
+      <!-- ===== E3 · 24 – 35.5 · quién ===== -->
+      <div id="e3" class="escena clip" data-start="24" data-duration="11.5" data-track-index="3">
+        <div class="kicker" id="e3-k" style="top:250px">Senado · quién encabeza</div>
+        <div class="h1"     id="e3-t" style="top:310px">Autor,<br />no firmón</div>
+        <div class="sub"    id="e3-s" style="top:560px">Proyectos en los que cada congresista va de primer firmante.</div>
+        <div class="fila top" id="f0" style="top:790px">
+          <div class="nom">Ana Paola Agudelo</div><div class="num">20</div>
+          <div class="riel"></div><div class="barra" id="b0" style="width:900px"></div></div>
+        <div class="fila" id="f1" style="top:920px">
+          <div class="nom">Pedro Flórez</div><div class="num">18</div>
+          <div class="riel"></div><div class="barra" id="b1" style="width:810px"></div></div>
+        <div class="fila" id="f2" style="top:1050px">
+          <div class="nom">Antonio Correa</div><div class="num">14</div>
+          <div class="riel"></div><div class="barra" id="b2" style="width:630px"></div></div>
+        <div class="fila" id="f3" style="top:1180px">
+          <div class="nom">Óscar Sánchez</div><div class="num">9</div>
+          <div class="riel"></div><div class="barra" id="b3" style="width:405px"></div></div>
+        <div class="fila" id="f4" style="top:1310px">
+          <div class="nom">Juan Fernando Caicedo</div><div class="num">8</div>
+          <div class="riel"></div><div class="barra" id="b4" style="width:360px"></div></div>
+      </div>
+
+      <!-- ===== E4 · 35.5 – 48.5 · los 3 ===== -->
+      <div id="e4" class="escena clip" data-start="35.5" data-duration="13" data-track-index="4">
+        <div class="kicker" id="e4-k" style="top:250px">Los que más pesan</div>
+        <div class="h1"     id="e4-t" style="top:310px">Medido en<br />firmas de respaldo</div>
+        <div class="sub"    id="e4-s" style="top:570px">Cuántos congresistas se le montaron a cada proyecto.</div>
+        <div class="tarj uno" id="t1" style="top:780px">
+          <div class="rk">01</div>
+          <div class="tt">Reforma al sistema<br />de salud</div>
+          <div class="mm"><b>65</b> firmas · Cámara 024/2026</div>
+        </div>
+        <div class="tarj" id="t2" style="top:1090px">
+          <div class="rk">02</div>
+          <div class="tt">Jurisdicción agraria<br />y rural</div>
+          <div class="mm"><b>58</b> firmas · Cámara 031/2026</div>
+        </div>
+        <div class="tarj" id="t3" style="top:1400px">
+          <div class="rk">03</div>
+          <div class="tt">Prohibición del<br />fracking</div>
+          <div class="mm"><b>55</b> firmas · segunda vez que se radica</div>
+        </div>
+      </div>
+
+      <!-- ===== E5 · 48.5 – 60 · destino ===== -->
+      <div id="e5" class="escena clip" data-start="48.5" data-duration="11.5" data-track-index="5">
+        <div class="kicker" id="e5-k" style="top:250px">Lo que dice la historia</div>
+        <div class="h1"     id="e5-t" style="top:310px">Casi todo<br />se muere</div>
+        <div class="sub"    id="e5-s" style="top:560px">13.420 proyectos de ley con fecha, desde 1990.</div>
+        <div id="e5-pct">0%</div>
+        <div id="e5-lbl">de los radicados termina siendo ley</div>
+        <div class="emb" id="em0" style="top:1180px; width:760px; background:rgba(255,255,255,.10)">
+          <div class="et">Se radican</div></div>
+        <div class="emb" id="em1" style="top:1262px; width:277px; background:rgba(0,71,255,.55)">
+          <div class="et">Llegan a 1er debate</div></div>
+        <div class="emb" id="em2" style="top:1344px; width:140px; background:#f97316">
+          <div class="et" style="color:#1a1006">Ley</div></div>
+        <div class="embv" id="ev0" style="top:1195px; color:rgba(244,243,239,.70)">13.420</div>
+        <div class="embv" id="ev1" style="top:1277px; color:rgba(244,243,239,.70)">4.886</div>
+        <div class="embv" id="ev2" style="top:1359px; color:#f97316">2.467</div>
+        <div class="sub" id="e5-proy" style="top:1490px; font-size:35px; color:rgba(244,243,239,.80)">
+          De los 254 de esta legislatura, la historia proyecta <b style="font-weight:700;color:#f4f3ef">47 leyes</b>.
+        </div>
+      </div>
+
+      <div class="pie clip"   data-start="0" data-duration="60" data-track-index="6">Registro oficial del Congreso · datos al 8 de agosto de 2026</div>
+      <div class="marca clip" data-start="0" data-duration="60" data-track-index="7">ricardoruiz.co</div>
+
+      <audio class="clip" id="a1" src="assets/e1.mp3" data-start="0.5"  data-duration="6.64"  data-track-index="8"></audio>
+      <audio class="clip" id="a2" src="assets/e2.mp3" data-start="11.6" data-duration="11.78" data-track-index="9"></audio>
+      <audio class="clip" id="a3" src="assets/e3.mp3" data-start="24.6" data-duration="9.27"  data-track-index="10"></audio>
+      <audio class="clip" id="a4" src="assets/e4.mp3" data-start="36.1" data-duration="11.81" data-track-index="11"></audio>
+      <audio class="clip" id="a5" src="assets/e5.mp3" data-start="49.1" data-duration="10.19" data-track-index="12"></audio>
+    </div>
+
+    <script>
+      const fmt = (n) => Math.round(n).toLocaleString("es-CO");
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const entra = (sel, t, y) =>
+        tl.from(sel, { opacity: 0, y: y === undefined ? 30 : y, duration: .7, ease: "power3.out" }, t);
+      const cabeza = (p, t) => { entra("#" + p + "-k", t, 0); entra("#" + p + "-t", t + .15, 40); entra("#" + p + "-s", t + .5, 24); };
+
+      /* E1 */
+      cabeza("e1", 0.15);
+      const p1 = { n: 0 };
+      tl.from("#e1-cifra", { opacity: 0, duration: .4 }, 1.1)
+        .to(p1, { n: 254, duration: 2.0, ease: "power2.out",
+          onUpdate: () => { document.getElementById("e1-cifra").textContent = fmt(p1.n); } }, 1.2);
+      entra("#e1-lbl", 3.1, 20); entra("#e1-c1", 3.7, 22); entra("#e1-c2", 3.85, 22);
+
+      /* E2 · ritmo */
+      cabeza("e2", 11.15);
+      [0, 1, 2].forEach((i) => {
+        const t = 12.5 + i * 0.5;
+        tl.from("#rb" + i, { scaleY: 0, duration: .9, ease: "power3.out" }, t);
+        tl.from("#r" + i + " .rnum", { opacity: 0, y: 18, duration: .5 }, t + .35);
+        tl.from("#r" + i + " .rano", { opacity: 0, duration: .4 }, t + .2);
+      });
+      tl.fromTo("#r0 .rnum", { scale: 1 }, { scale: 1.14, duration: .35, yoyo: true, repeat: 1,
+        ease: "sine.inOut", transformOrigin: "50% 100%" }, 16.4);
+
+      /* E3 */
+      cabeza("e3", 24.15);
+      [0, 1, 2, 3, 4].forEach((i) => {
+        const t = 25.6 + i * 0.4;
+        entra("#f" + i, t, 26);
+        tl.from("#b" + i, { scaleX: 0, duration: .8, ease: "power3.out" }, t + .1);
+      });
+      tl.fromTo("#f0 .num", { scale: 1 }, { scale: 1.16, duration: .35, yoyo: true, repeat: 1,
+        ease: "sine.inOut", transformOrigin: "100% 50%" }, 28.6);
+
+      /* E4 */
+      cabeza("e4", 35.65);
+      entra("#t1", 37.2, 34); entra("#t2", 40.6, 34); entra("#t3", 44.2, 34);
+
+      /* E5 */
+      cabeza("e5", 48.65);
+      const p5 = { n: 0 };
+      tl.from("#e5-pct", { opacity: 0, duration: .4 }, 49.9)
+        .to(p5, { n: 18.4, duration: 1.5, ease: "power2.out",
+          onUpdate: () => { document.getElementById("e5-pct").textContent = p5.n.toFixed(1).replace(".", ",") + "%"; } }, 50.0);
+      entra("#e5-lbl", 51.5, 20);
+      [0, 1, 2].forEach((i) => {
+        tl.from("#em" + i, { scaleX: 0, opacity: 0, duration: .7, ease: "power3.out",
+          transformOrigin: "0% 50%" }, 52.2 + i * 0.35);
+        tl.from("#ev" + i, { opacity: 0, duration: .5 }, 52.5 + i * 0.35);
+      });
+      entra("#e5-proy", 54.2, 22);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>
