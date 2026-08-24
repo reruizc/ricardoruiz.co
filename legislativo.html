@@ -49,6 +49,18 @@
     </div>
   </nav>
 
+  <div class="agenda-news" id="agenda-news" aria-label="Órdenes del día próximas">
+    <div class="agenda-news-label"><i></i> En agenda</div>
+    <div class="agenda-news-window">
+      <div class="agenda-news-track" id="agenda-news-track">
+        <span class="agenda-news-loading">Consultando Cámara y Senado…</span>
+      </div>
+    </div>
+    <a class="agenda-news-next" id="agenda-news-next"
+       href="https://www.camara.gov.co/secretaria-general/orden-del-dia-secretaria-general/"
+       target="_blank" rel="noopener">Próx. orden del día <b>→</b></a>
+  </div>
+
   <div class="page-header">
     <div class="hdr-2">
       <div class="hdr-txt">
@@ -64,29 +76,10 @@
         <div class="ritmo-s" id="ritmo-sub">Proyectos de ley radicados por día en Senado y Cámara.</div>
         <div id="ritmo-rows"></div>
         <div class="ritmo-cmp" id="ritmo-cmp"></div>
-        <div class="ritmo-foot" id="ritmo-foot">Las dos cámaras, deduplicadas: un proyecto que cruza de cámara se cuenta una sola vez. La fecha de radicación de Cámara sale de la ficha de cada proyecto, no del listado. La ventana no llega hasta hoy porque el listado de Cámara publica con rezago; se cierra donde el dato ya está completo. Solo días hábiles: los fines de semana no hay radicación.</div>
+        <div class="ritmo-foot" id="ritmo-foot">Las dos cámaras, deduplicadas: un proyecto que cruza de cámara se cuenta una sola vez. La fecha de radicación de Cámara sale de la ficha de cada proyecto, no del listado. La ventana no llega hasta hoy porque el listado de Cámara publica con rezago; se cierra donde el dato ya está completo. Se excluyen fines de semana, pero no festivos nacionales.</div>
       </div>
     </div>
   </div>
-
-  <a class="agenda-strip" id="agenda-strip"
-     href="https://www.camara.gov.co/secretaria-general/orden-del-dia-secretaria-general/"
-     target="_blank" rel="noopener" aria-live="polite">
-    <div class="agenda-strip-bg"></div>
-    <div class="agenda-strip-date">
-      <span id="agenda-dia">—</span>
-      <small id="agenda-mes">orden del día</small>
-    </div>
-    <div class="agenda-strip-copy">
-      <div class="agenda-strip-tag"><i></i><span id="agenda-tag">Agenda legislativa · actualizando</span></div>
-      <div class="agenda-strip-title" id="agenda-title">Revisando lo próximo en el orden del día</div>
-      <div class="agenda-strip-sub" id="agenda-sub">Cámara y Senado · fuente oficial</div>
-    </div>
-    <div class="agenda-strip-action">
-      <span id="agenda-pos">Agenda diaria</span>
-      <b>Ver documento oficial ↗</b>
-    </div>
-  </a>
 
   <!-- ══ HUB · una ficha por sección ══════════════════════════════
        Cada tarjeta ya apunta a su imagen; si el archivo no está, se ve igual
@@ -167,50 +160,49 @@
 
   <script src="legislativo-base.js"></script>
   <script>
-  /* ── orden del día · franja superior ────────────────────────────
+  /* ── orden del día · ticker bajo el menú ─────────────────────────
      El pipeline diario cosecha las dos cámaras y publica un JSON pequeño.
-     La franja rota las próximas sesiones; cada estado enlaza al PDF oficial. */
+     Las noticias corren a la izquierda; el bloque blanco abre siempre la
+     siguiente orden del día disponible en su fuente oficial. */
   (async()=>{
-    const box=document.getElementById('agenda-strip'); if(!box) return;
+    const track=document.getElementById('agenda-news-track');
+    const next=document.getElementById('agenda-news-next');
+    if(!track||!next) return;
     const URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/ordenes-vigentes.json';
-    const $=id=>document.getElementById(id);
     const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     const limpia=t=>String(t||'').replace(/\s+/g,' ').trim();
     const frase=t=>{const s=limpia(t).toLowerCase();return s?s.charAt(0).toUpperCase()+s.slice(1):'';};
-    function pintar(r,i,n){
-      const d=new Date(r.fecha+'T12:00:00-05:00');
-      const ps=(r.proyectos||[]).filter(p=>p.titulo);
-      $('agenda-dia').textContent=isNaN(d)?'—':d.getDate();
-      $('agenda-mes').textContent=isNaN(d)?'orden del día':`${meses[d.getMonth()]} · ${d.getFullYear()}`;
-      $('agenda-tag').textContent=`${r.corporacion||'Congreso'} · ${r.ambito||'Orden del día'}`;
-      if(ps.length){
-        $('agenda-title').textContent=frase(ps[0].titulo);
-        $('agenda-sub').textContent=ps.length===1
-          ? `${ps[0].numero||'Proyecto'} · único proyecto listado para esta sesión`
-          : `${ps[0].numero||'Proyecto'} · y ${ps.length-1} proyecto${ps.length===2?'':'s'} más en la agenda`;
-      }else{
-        $('agenda-title').textContent=frase(r.titulo)||'Orden del día publicado';
-        $('agenda-sub').textContent='Sesión, elección o control político · consulta el documento oficial';
-      }
-      $('agenda-pos').textContent=n>1?`${i+1} de ${n} próximas`:'Próxima sesión';
-      box.href=r.url||box.href;
-      box.setAttribute('aria-label',`${$('agenda-tag').textContent}. ${$('agenda-title').textContent}. Ver documento oficial`);
-      box.classList.remove('agenda-flash'); void box.offsetWidth; box.classList.add('agenda-flash');
+    function noticia(r){
+      const d=new Date(r.fecha+'T12:00:00-05:00'), ps=(r.proyectos||[]).filter(p=>p.titulo);
+      const fecha=isNaN(d)?'':`${d.getDate()} ${meses[d.getMonth()]}`;
+      const asunto=ps.length
+        ? `${frase(ps[0].titulo)}${ps.length>1?` · +${ps.length-1} más`:''}`
+        : (frase(r.titulo)||'Orden del día publicado');
+      return `<span class="agenda-news-item"><time>${esc(fecha)}</time><b>${esc(r.ambito||r.corporacion||'Congreso')}</b><span>${esc(asunto)}</span></span>`;
     }
     try{
       const r=await fetch(URL+'?v='+Math.floor(Date.now()/300000));
       if(!r.ok) throw new Error('HTTP '+r.status);
-      const j=await r.json(), rows=(j.ordenes||[]).filter(x=>x.fecha&&x.url);
+      const j=await r.json(), actualizado=new Date(j.v).getTime();
+      /* No mostramos como noticia un caché que dejó de actualizarse. El enlace
+         blanco conserva su destino oficial de respaldo definido en el HTML. */
+      if(!actualizado||Date.now()-actualizado>30*60*60*1000) throw new Error('feed desactualizado');
+      const partes=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+      const toma=t=>partes.find(p=>p.type===t)?.value;
+      const hoy=`${toma('year')}-${toma('month')}-${toma('day')}`;
+      const rows=(j.ordenes||[]).filter(x=>x.fecha>=hoy&&x.url);
       if(!rows.length) throw new Error('sin próximas sesiones');
-      let i=0; pintar(rows[i],i,rows.length);
-      if(rows.length>1) setInterval(()=>{i=(i+1)%rows.length;pintar(rows[i],i,rows.length)},6500);
+      const una=rows.map(noticia).join('');
+      /* Se duplica la tira para que el loop sea continuo, sin salto vacío. */
+      track.innerHTML=`<span class="agenda-news-set">${una}</span><span class="agenda-news-set" aria-hidden="true">${una}</span>`;
+      track.style.setProperty('--agenda-seg',Math.max(24,rows.length*10)+'s');
+      /* El ticker admite agendas semanales; el CTA, en cambio, debe abrir una
+         ORDEN DEL DÍA propiamente dicha, no el primer documento genérico. */
+      const prox=rows.find(x=>/orden del d[ií]a/i.test(limpia(x.titulo)))||rows[0];
+      next.href=prox.url;
+      next.setAttribute('aria-label',`Próxima orden del día: ${prox.ambito||prox.corporacion}. Abrir documento oficial`);
     }catch(e){
-      $('agenda-dia').textContent='↻';
-      $('agenda-mes').textContent='agenda diaria';
-      $('agenda-tag').textContent='Orden del día · fuentes oficiales';
-      $('agenda-title').textContent='La próxima agenda todavía no está disponible';
-      $('agenda-sub').textContent='Abre el registro oficial de la Cámara mientras vuelve el feed';
-      $('agenda-pos').textContent='Consulta directa';
+      track.innerHTML='<span class="agenda-news-loading">La próxima agenda todavía no está disponible · consulta la fuente oficial</span>';
     }
   })();
 
@@ -254,7 +246,7 @@
         `La fecha de radicación de Cámara sale de la ficha de cada proyecto, no del listado. `+
         `La ventana cierra <b>${lag} días</b> antes de hoy: el listado de Cámara publica con rezago `+
         `y ese margen se recalcula con el rezago medido, así que hasta ahí el dato está completo. `+
-        `Solo días hábiles: los fines de semana no hay radicación.`;
+        `Se excluyen fines de semana; no se descuentan festivos nacionales.`;
       const anios=Object.keys(j.series||{}).sort((a,b)=>b-a);
       if(!anios.length) return;
       const vivo=anios[0];

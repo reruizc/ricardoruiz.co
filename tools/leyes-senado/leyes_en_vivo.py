@@ -455,6 +455,21 @@ def build(only=None, upload=False):
 
 # ──────────────────────────────────────────────────────────── Lambda
 def handler(event, context):                       # noqa: ARG001
+    # La misma Lambda mantiene los dos feeds legislativos. ``job=ordenes``
+    # permite que el disparador cloud ejecute solo el trabajo corto de agenda.
+    query = (event or {}).get('queryStringParameters') or {}
+    job = (event or {}).get('job') or query.get('job')
+    if job == 'ordenes':
+        token = ((event or {}).get('headers') or {}).get('x-caudal-token', '')
+        expected = __import__('os').environ.get('ORDENES_TRIGGER_TOKEN', '')
+        if (event or {}).get('requestContext') and (not expected or token != expected):
+            return {'statusCode': 403, 'body': '{"ok":false}'}
+        from ordenes_cloud import build_ordenes
+        out = build_ordenes(upload=True)
+        body = json.dumps({'ok': True, 'ordenes': out['n'],
+                           'fuentes_ok': out['fuentes_ok'],
+                           'fuentes_error': out['fuentes_error'], 'v': out['v']})
+        return {'statusCode': 200, 'headers': {'content-type': 'application/json'}, 'body': body}
     r = build(upload=True)
     return {'ok': True, 'senado': len(r['senado']), 'camara': len(r['camara']),
             'actualizado': r['actualizado']}

@@ -120,6 +120,11 @@ def archivos(leg=None):
              productor='run_diario.sh · build_ritmo.py --upload',
              consumidor='legislativo.html · monitor de ritmo de radicación',
              nota='`v` es solo fecha (YYYY-MM-DD): la edad interna se mide contra su medianoche.'),
+        dict(bucket=BUCKET_PUB, key=f'{PREFIJO_PUB}/ordenes-vigentes.json', clase='diario',
+             min_bytes=250, campo_fecha='v',
+             productor='run_diario.sh · build_ordenes_vigentes.py + aws s3 cp',
+             consumidor='legislativo.html · ticker rojo y enlace “Próx. orden del día”',
+             nota='`v` lleva fecha y hora ISO: permite detectar un feed viejo aunque S3 conserve el archivo.'),
 
         # ─────────── periódicos, sin cron ───────────
         dict(bucket=BUCKET_PRIV, key='metadata/normativa.jsonl', clase='mensual',

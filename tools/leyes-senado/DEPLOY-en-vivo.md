@@ -8,6 +8,8 @@ proyectos de ley radicados en Senado + Cámara (legislatura 2026-2027).
 - **Handler:** `leyes_en_vivo.handler`
 - **Salida:** `s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/en-vivo.json`
   + PDFs en `…/legislativo/en-vivo/{senado,camara}/{NUMERO}.pdf`
+- **Segunda salida:** `ordenes-vigentes.json`, construida sin PDFs ni caché
+  local por `ordenes_cloud.py` cuando la invocación lleva `job=ordenes`.
 - **Frontend:** ya lee ese JSON (`EN_VIVO_URL` en `legislativo.html`).
 
 ## Fuentes
@@ -55,7 +57,14 @@ aws lambda update-function-code --function-name leyes-en-vivo \
   --zip-file fileb://tools/leyes-senado/leyes-en-vivo.zip
 ```
 
-## 4 · EventBridge · 3×/día (08:00, 13:00, 18:00 hora Colombia = UTC-5)
+## 4 · Horario cloud · 3×/día (08:00, 13:00, 18:00 hora Colombia = UTC-5)
+
+Las órdenes se disparan desde `.github/workflows/ordenes-legislativo.yml` hacia
+la Function URL de esta Lambda. GitHub solo guarda `ORDENES_TRIGGER_TOKEN`: no
+recibe credenciales AWS. El handler valida ese encabezado antes de cosechar.
+
+La regla de EventBridge siguiente sigue siendo la opción preferida para el feed
+completo `en-vivo.json` cuando una identidad administradora pueda crearla.
 
 > ⚠ **REQUIERE IDENTIDAD ADMIN.** `ricardo-mac-cli` NO tiene `events:*` ni puede
 > auto-otorgárselo (`iam:PutUserPolicy` está bloqueado — guardarraíl anti-escalada).

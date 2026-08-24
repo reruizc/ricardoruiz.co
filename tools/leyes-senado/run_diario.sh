@@ -167,13 +167,13 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
 
   # Feed corto para la franja de agenda del hub Legislativo. Se construye
   # después de ambas cosechas: nunca toca la red ni disfraza un caché viejo.
-  etapa --nombre ordenes_vigentes_build --timeout 300 \
+  etapa --nombre ordenes_vigentes_build --critica --timeout 300 \
         --desc "próximas órdenes del día → feed del hub" \
         -- python3 tools/caudal/actas/build_ordenes_vigentes.py
   rc_ord_vig=$?
 
   if [ $rc_ord_vig -eq 0 ]; then
-    etapa --nombre ordenes_vigentes_upload --timeout 300 \
+    etapa --nombre ordenes_vigentes_upload --critica --timeout 300 \
           --desc "ordenes-vigentes.json → S3" \
           -- aws s3 cp "$REPO/Bases de datos/leyes-senado/actas/ordenes-vigentes.json" \
              "s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/ordenes-vigentes.json" \

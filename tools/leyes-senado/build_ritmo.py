@@ -293,8 +293,8 @@ def build(upload=False):
                    f'listado. La ventana cierra {lag} días antes de hoy porque el '
                    'listado de Cámara publica con rezago; ese margen se recalcula en '
                    'cada corrida con el rezago que hemos medido, y hasta ahí el dato '
-                   'está completo. Solo días hábiles: los fines de semana no hay '
-                   'radicación.'),
+                   'está completo. Se excluyen fines de semana; no se descuentan '
+                   'festivos nacionales.'),
     }
     STAGE.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')

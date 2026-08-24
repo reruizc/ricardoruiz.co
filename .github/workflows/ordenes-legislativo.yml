@@ -1,0 +1,46 @@
+name: Ordenes del dia legislativo
+
+on:
+  schedule:
+    # 08:00, 13:00 y 18:00 en Colombia (UTC-5 todo el año).
+    - cron: '0 13,18,23 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ordenes-legislativo
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Actualizar feed en AWS
+        env:
+          TRIGGER_TOKEN: ${{ secrets.ORDENES_TRIGGER_TOKEN }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --retry 2 --retry-all-errors --max-time 240 \
+            -H "x-caudal-token: ${TRIGGER_TOKEN}" \
+            'https://otticg3nbjy3aaefqpr2ebmlie0rkrfe.lambda-url.us-east-1.on.aws/?job=ordenes'
+
+      - name: Verificar publicación pública
+        run: |
+          python3 - <<'PY'
+          import datetime as dt
+          import json
+          import urllib.request
+
+          url = ('https://elecciones-2026.s3.us-east-1.amazonaws.com/'
+                 'ricardoruiz.co/congreso-2026/output/legislativo/ordenes-vigentes.json')
+          with urllib.request.urlopen(url + '?verify=github', timeout=30) as response:
+              feed = json.load(response)
+          age = dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(feed['v'])
+          assert age.total_seconds() < 600, f"feed viejo: {age}"
+          assert isinstance(feed.get('ordenes'), list)
+          assert feed.get('fuentes_ok', 0) >= 1, feed.get('fuentes_error')
+          print(f"OK · {feed['n']} órdenes · {feed['fuentes_ok']} fuentes")
+          PY

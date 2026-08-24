@@ -17,5 +17,6 @@ OUT = HERE / 'leyes-en-vivo.zip'
 with zipfile.ZipFile(OUT, 'w', zipfile.ZIP_DEFLATED) as z:
     z.write(HERE / 'leyes_en_vivo.py', 'leyes_en_vivo.py')
     z.write(HERE / 'explica_en_vivo.py', 'explica_en_vivo.py')
+    z.write(HERE / 'ordenes_cloud.py', 'ordenes_cloud.py')
 
 print(f'· {OUT.relative_to(HERE.parents[1])}  ({OUT.stat().st_size} bytes)')
