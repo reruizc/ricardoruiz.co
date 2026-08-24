@@ -60,12 +60,11 @@ VENTANA — CONSOLIDADA, y el rezago SE MIDE SOLO
   (Un cron caído infla el lag observado — el proyecto se "ve" tarde — así que el
   error empuja hacia la ventana más conservadora, nunca hacia publicar de más.)
 
-  La ventana es RODANTE dentro de eso: los 14 días corridos que terminan en la
-  frontera, mapeados a las mismas fechas calendario de hace 4 y 8 años (el
-  calendario legislativo se repite: instalación el 20 de julio, mismas
-  legislaturas, mismos recesos). Una ventana fija en el arranque se habría
-  quedado mostrando julio para siempre. Nada baja del 20-jul-2026: antes de esa
-  fecha no hay legislatura viva que medir.
+  El cuadro se llama "El arranque", así que la ventana es ACUMULADA desde la
+  instalación (20-jul) hasta el último día cerrado (ayer), mapeada a las mismas
+  fechas de hace 4 y 8 años. Los días más recientes pueden crecer cuando Cámara
+  publique su rezago: se marcan como provisionales en vez de ocultar tres
+  semanas y dejar el gráfico congelado en julio.
 
   SOLO DÍAS HÁBILES: en el Congreso no se radica los fines de semana, así que
   sus ceros no son actividad baja sino ausencia de calendario — dejarlos hundía
@@ -114,7 +113,6 @@ S3_BUCKET = 'elecciones-2026'
 S3_PREFIX = 'ricardoruiz.co/congreso-2026/output/legislativo'
 
 ANIOS = [2026, 2022, 2018]      # la viva primero
-DIAS = 14                        # las últimas dos semanas de la ventana
 LAG_MIN, LAG_MAX = 3, 21         # cotas del rezago de publicación de Cámara
 INSTALACION = dt.date(2026, 7, 20)
 REGISTROS = ('senado', 'camara')
@@ -182,14 +180,18 @@ def lag_observado():
         return fallback                                # el monitor no se cae por esto
 
 
-def ventana(lag):
-    """Los DIAS días corridos que terminan en la frontera de consolidación
-    (`hoy − lag`), sin bajar del 20-jul-2026. En calendario 2026 y SIN filtrar
-    hábiles todavía: el filtro se aplica después, sobre el calendario de cada
-    año."""
-    frontera = dt.date.today() - dt.timedelta(days=lag)
-    corrida = [frontera - dt.timedelta(days=i) for i in range(DIAS - 1, -1, -1)]
-    return [d for d in corrida if d >= INSTALACION]
+def ventana():
+    """Arranque acumulado desde la instalación hasta el último día cerrado.
+
+    Hoy queda fuera: la corrida de la mañana no debe comparar un día 2026 aún
+    abierto contra días históricos completos. El filtro de hábiles se aplica
+    después sobre el calendario de cada legislatura.
+    """
+    cierre = dt.date.today() - dt.timedelta(days=1)
+    if cierre < INSTALACION:
+        return []
+    return [INSTALACION + dt.timedelta(days=i)
+            for i in range((cierre - INSTALACION).days + 1)]
 
 
 def equivalente(fecha, anio):
@@ -231,7 +233,7 @@ def cargar(corrida):
 
 def build(upload=False):
     lag, lag_info = lag_observado()
-    corrida = ventana(lag)
+    corrida = ventana()
     if not corrida:
         sys.exit('la ventana quedó vacía (¿fecha del sistema anterior a la instalación?)')
     acum = cargar(corrida)
@@ -282,7 +284,10 @@ def build(upload=False):
         'ventana': {
             'desde': d0.strftime('%m-%d'), 'hasta': d1.strftime('%m-%d'),
             'dias': n, 'solo_habiles': True,
-            'consolidada': True, 'lag_dias': lag, 'lag': lag_info,
+            'acumulada': True, 'hasta_ultimo_dia_cerrado': True,
+            'consolidada': False, 'lag_dias': lag, 'lag': lag_info,
+            'consolidada_hasta': (hoy - dt.timedelta(days=lag)).isoformat(),
+            'provisional_desde': (hoy - dt.timedelta(days=lag - 1)).isoformat(),
         },
         'registros': list(REGISTROS),
         'series': series,
@@ -290,11 +295,10 @@ def build(upload=False):
                    'la Cámara de Representantes (camara.gov.co), deduplicados: un '
                    'proyecto que cruza de cámara se cuenta una sola vez. La fecha de '
                    'radicación de Cámara sale de la ficha de cada proyecto, no del '
-                   f'listado. La ventana cierra {lag} días antes de hoy porque el '
-                   'listado de Cámara publica con rezago; ese margen se recalcula en '
-                   'cada corrida con el rezago que hemos medido, y hasta ahí el dato '
-                   'está completo. Se excluyen fines de semana; no se descuentan '
-                   'festivos nacionales.'),
+                   'listado. La ventana acumula desde el 20 de julio hasta el último '
+                   f'día cerrado; los últimos {lag} días son provisionales porque el '
+                   'listado de Cámara publica con rezago y pueden crecer en corridas '
+                   'posteriores. Se excluyen fines de semana; no se descuentan festivos.'),
     }
     STAGE.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')
@@ -304,8 +308,8 @@ def build(upload=False):
            if lag_info.get('fuente') == 'medido' else lag_info.get('fuente'))
     print(f'· rezago de Cámara → {lag} días ({det})'
           + ('  [acotado]' if lag_info.get('acotado') else ''))
-    print(f'· ventana consolidada {d0.isoformat()} → {d1.isoformat()} '
-          f'({n} días hábiles · cierra {lag} días antes de hoy)')
+    print(f'· arranque acumulado {d0.isoformat()} → {d1.isoformat()} '
+          f'({n} días hábiles · últimos {lag} días provisionales para Cámara)')
     for a in ANIOS:
         s = series[str(a)]
         print(f'· {a}: {s["total"]:>4} proyectos  (Senado {s["total_senado"]:>3} · '
