@@ -122,9 +122,9 @@ def archivos(leg=None):
              nota='`v` es solo fecha (YYYY-MM-DD): la edad interna se mide contra su medianoche.'),
         dict(bucket=BUCKET_PUB, key=f'{PREFIJO_PUB}/ordenes-vigentes.json', clase='diario',
              min_bytes=250, campo_fecha='v',
-             productor='run_diario.sh · build_ordenes_vigentes.py + aws s3 cp',
+             productor='GitHub Actions · Lambda leyes-en-vivo · ordenes_cloud.py',
              consumidor='legislativo.html · ticker rojo y enlace “Próx. orden del día”',
-             nota='`v` lleva fecha y hora ISO: permite detectar un feed viejo aunque S3 conserve el archivo.'),
+             nota='Cloud autónomo del Mac; `v` detecta feed viejo y cada corrida verifica de nuevo el objeto público.'),
 
         # ─────────── periódicos, sin cron ───────────
         dict(bucket=BUCKET_PRIV, key='metadata/normativa.jsonl', clase='mensual',
