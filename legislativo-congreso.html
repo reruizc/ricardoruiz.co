@@ -137,6 +137,20 @@
   function avHTML(nombre, color){
     return `<span class="bt-av" data-nom="${esc(nombre)}" style="background:${color||'#1a2030'}">${esc(initials(nombre))}</span>`;
   }
+  function partidoCorto(partido){
+    const p=String(partido||'').trim().toUpperCase();
+    const known={
+      'PARTIDO LIBERAL COLOMBIANO':'LIBERAL',
+      'MOVIMIENTO SALVACIÓN NACIONAL':'SALVACIÓN',
+      'PARTIDO CENTRO DEMOCRÁTICO':'CENTRO DEMOCRÁTICO',
+      'PARTIDO ALIANZA VERDE':'ALIANZA VERDE',
+      'MOVIMIENTO POLÍTICO PACTO HISTÓRICO':'PACTO HISTÓRICO',
+      'PARTIDO CONSERVADOR COLOMBIANO':'CONSERVADOR',
+      'PARTIDO CAMBIO RADICAL':'CAMBIO RADICAL',
+      'PARTIDO DE LA UNIÓN POR LA GENTE - PARTIDO DE LA U':'PARTIDO DE LA U'
+    };
+    return known[p]||p.replace(/^PARTIDO\s+|^MOVIMIENTO POLÍTICO\s+|^MOVIMIENTO\s+/,'');
+  }
   async function hydratePhotos(root){
     const map=await slugMap();
     (root||document).querySelectorAll('.bt-av[data-nom]').forEach(el=>{
@@ -243,7 +257,7 @@
           const slug=map[norm(e.nombre)];
           const href=slug?`analisis-candidato.html?cand=${encodeURIComponent(slug)}`
             :`analisis-candidato.html?q=${encodeURIComponent(e.nombre)}`;
-          return `<div class="bt-modal-row">${avHTML(e.nombre,col)}<div class="bt-modal-name"><b>${esc(tCase(e.nombre))}</b><span>${e.corp==='SENADO'?'Senado':'Cámara'} · ${esc(depNice(e.dep))}</span></div><a href="${href}" class="bt-profile">Ver perfil →</a></div>`;
+          return `<div class="bt-modal-row">${avHTML(e.nombre,col)}<div class="bt-modal-name"><b>${esc(tCase(e.nombre))}</b><span>${e.corp==='SENADO'?'Senado':'Cámara'} · ${esc(depNice(e.dep))}</span></div><span class="bt-party">${esc(partidoCorto(e.partido))}</span><a href="${href}" class="bt-profile">Ver perfil →</a></div>`;
         }).join('')}</div>`;
       hydratePhotos(body);
     }
