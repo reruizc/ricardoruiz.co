@@ -164,7 +164,7 @@
     .bub:hover{transform:scale(1.08)}
     .bub.on{border-color:#fff;transform:scale(1.12)}
     .bub.ph{background:var(--card-bg2);color:rgba(255,255,255,.28);border:1.5px dashed var(--gray-light);font-size:1rem;font-weight:400}
-    .hemi-svg{width:100%;height:auto;display:block}
+    .hemi-svg{width:100%;height:auto;display:block;max-height:320px}
     .hemi-dot{cursor:pointer;transition:r .1s,opacity .1s}
     .hemi-legend{display:flex;flex-wrap:wrap;gap:.4rem 1.1rem;margin-top:.9rem}
     .hemi-legend-item{display:flex;align-items:center;gap:.4rem;font-size:.66rem;color:var(--gray)}
@@ -576,7 +576,7 @@
     const dotR=opts.dotR||HEMI_DOT, dotRHover=opts.dotRHover||HEMI_DOT_HOVER;
     const vbH=opts.vbH||300, cy=opts.cy||282;
     const svg=document.getElementById(svgId); if(!svg||!list.length) return;
-    svg.innerHTML=''; svg.setAttribute('viewBox',`0 0 600 ${vbH}`);
+    svg.innerHTML='';
     const cx=300;
     const rings=buildHemiRings(list.length,opts.rStart,opts.rStep,opts.spacing);
     const positions=[];
@@ -586,6 +586,14 @@
         positions.push({x:cx+ring.r*Math.cos(angle), y:cy+ring.r*Math.sin(angle)});
       }
     });
+    /* El hemiciclo no usa un lienzo fijo: se recorta al contorno real de sus
+       asientos. Así, una comisión pequeña también ocupa el ancho disponible
+       sin deformar el semicírculo. */
+    const pad=dotR+18;
+    const minX=Math.min(...positions.map(p=>p.x))-pad, maxX=Math.max(...positions.map(p=>p.x))+pad;
+    const minY=Math.min(...positions.map(p=>p.y))-pad, maxY=Math.max(...positions.map(p=>p.y))+pad;
+    svg.setAttribute('viewBox',`${minX.toFixed(1)} ${minY.toFixed(1)} ${(maxX-minX).toFixed(1)} ${(maxY-minY).toFixed(1)}`);
+    svg.setAttribute('preserveAspectRatio','xMidYMid meet');
     const groupsMap={};
     list.forEach((m,i)=>{
       const b=bancadaForMember(m);
@@ -593,6 +601,7 @@
       groupsMap[b.name].idx.push(i);
     });
     const groups=Object.values(groupsMap).sort((a,b)=>b.idx.length-a.idx.length);
+    const photoSeats=[];
     let pos=0;
     groups.forEach(g=>{
       g.idx.forEach(originalIndex=>{
@@ -634,10 +643,36 @@
         lab.setAttribute('style','font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:700;font-size:'+(g.sigla.length>2?(opts.fSmall||7.5):(opts.fBig||9))+'px;pointer-events:none;user-select:none');
         lab.textContent=g.sigla;
         svg.appendChild(lab);
+        photoSeats.push({m,x,y,r:dotR,label:lab,clipId:`${svgId}-clip-${originalIndex}`});
       });
     });
+    hydrateHemiPhotos(svg,photoSeats);
     const legend=document.getElementById(legendId);
     if(legend) legend.innerHTML=groups.map(g=>`<span class="hemi-legend-item"><span class="hemi-legend-dot" style="background:${g.color}"></span><b style="color:${lift(g.color)};font-weight:700">${esc(g.sigla)}</b> ${esc(g.name)} · ${g.idx.length}</span>`).join('');
+  }
+  async function hydrateHemiPhotos(svg,seats){
+    const registry=await getVotosCongreso();
+    seats.forEach(({m,x,y,r,label,clipId})=>{
+      const hit=regMatches(m.nombre,registry).find(c=>c.source==='endoso')||regMatches(m.nombre,registry).find(c=>c.source==='asamblea');
+      if(!hit||!hit.slug) return;
+      const probe=new Image();
+      probe.onload=()=>{
+        if(!svg.isConnected) return;
+        const defs=svg.querySelector('defs')||svg.insertBefore(document.createElementNS('http://www.w3.org/2000/svg','defs'),svg.firstChild);
+        const clip=document.createElementNS('http://www.w3.org/2000/svg','clipPath');
+        clip.id=clipId;
+        const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+        circle.setAttribute('cx',x); circle.setAttribute('cy',y); circle.setAttribute('r',r-1);
+        clip.appendChild(circle); defs.appendChild(clip);
+        const image=document.createElementNS('http://www.w3.org/2000/svg','image');
+        image.setAttribute('href',probe.src); image.setAttribute('x',x-r); image.setAttribute('y',y-r);
+        image.setAttribute('width',r*2); image.setAttribute('height',r*2);
+        image.setAttribute('preserveAspectRatio','xMidYMid slice'); image.setAttribute('clip-path',`url(#${clipId})`);
+        image.style.pointerEvents='none';
+        svg.appendChild(image); label.setAttribute('display','none');
+      };
+      probe.src=`${S3_PHOTOS}/${encodeURIComponent(hit.slug)}.jpg`;
+    });
   }
   function renderGroups(){
     const senList=MIEMBROS.senado||[], camList=MIEMBROS.camara||[];
@@ -651,12 +686,12 @@
        pinta ese bloque, que si no queda como un hemiciclo vacío */
     const senGroup=COM.sen>0?`
       <div class="mem-group">
-        <div class="mem-group-title"><b>Senado</b> · ${COM.sen} cupos${senList.length?` · ${senList.length} confirmados`:''}</div>
+        <div class="mem-group-title"><b>Senado</b>${senList.length?` · ${senList.length} integrantes`: ` · ${COM.sen} cupos`}</div>
         ${senBody}
       </div>`:'';
     document.getElementById('mem-groups').innerHTML=`${senGroup}
       <div class="mem-group">
-        <div class="mem-group-title"><b>Cámara de Representantes</b> · ${COM.cam} cupos${camList.length?` · ${camList.length} confirmados`:''}</div>
+        <div class="mem-group-title"><b>Cámara de Representantes</b>${camList.length?` · ${camList.length} integrantes`: ` · ${COM.cam} cupos`}</div>
         ${camBody}
       </div>`;
     document.getElementById('mem-groups').addEventListener('click',onBubClick);
