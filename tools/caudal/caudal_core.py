@@ -514,7 +514,7 @@ def sector_cliente(k):
 # sus propios temas y sus propias empresas vigiladas. El perfil es esa misma
 # estructura, pero editable y guardada por cuenta (KV del worker). Los presets
 # se quedan como fallback y como PLANTILLA de arranque — `perfil_desde_sector`.
-PERFIL_MAX_TEMAS    = 12
+PERFIL_MAX_TEMAS    = 15
 PERFIL_MAX_EMPRESAS = 15
 PERFIL_MAX_TEMA_LEN = 80
 
