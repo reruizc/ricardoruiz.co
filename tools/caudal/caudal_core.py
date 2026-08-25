@@ -477,6 +477,20 @@ SECTORES_CLIENTE = [
      'temas': ['educacion', 'universidades', 'instituciones educativas']},
     {'k': 'trabajo', 'nombre': 'Trabajo y pensiones', 'comision': 'Séptima', 'sector_sanciones': '',
      'temas': ['reforma laboral', 'regimen pensional', 'seguridad social', 'salario minimo']},
+    {'k': 'comercio', 'nombre': 'Comercio y consumo', 'tipo': 'gremio', 'comision': 'Sexta',
+     'sector_sanciones': 'consumo',
+     'temas': ['proteccion al consumidor', 'comercio electronico', 'establecimientos de comercio',
+               'publicidad']},
+    {'k': 'vivienda', 'nombre': 'Vivienda y construcción', 'tipo': 'gremio', 'comision': 'Séptima',
+     'sector_sanciones': 'contratacion',
+     'temas': ['vivienda de interes social', 'politica de vivienda', 'licencia de construccion',
+               'subsidio de vivienda']},
+    {'k': 'turismo', 'nombre': 'Turismo y hotelería', 'tipo': 'gremio', 'comision': 'Sexta',
+     'sector_sanciones': 'consumo',
+     'temas': ['turismo', 'prestadores de servicios turisticos', 'actividad turistica', 'hoteleria']},
+    {'k': 'puertos', 'nombre': 'Puertos y logística', 'tipo': 'gremio', 'comision': 'Sexta',
+     'sector_sanciones': 'transporte',
+     'temas': ['puertos maritimos', 'sociedades portuarias', 'actividad portuaria', 'logistica']},
 ]
 
 
