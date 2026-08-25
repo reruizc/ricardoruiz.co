@@ -3132,7 +3132,7 @@
     if(PF_WIZARD_STEP===1&&!PF_DRAFT.tipo) return pfMsg('Elige empresa, holding o gremio.');
     if(PF_WIZARD_STEP===2){ const n=document.getElementById('pf-wiz-nombre'); PF_DRAFT.nombre=(n&&n.value||'').trim(); if(!PF_DRAFT.nombre) return pfMsg('Ponle un nombre al perfil.'); }
     if(PF_WIZARD_STEP===3){ const inp=document.getElementById('pf-wiz-tema'); if(inp&&inp.value.trim()) pfWizardAddTopic(); if(!PF_DRAFT.temas.length) return pfMsg('Agrega al menos un tema.'); }
-    if(PF_WIZARD_STEP===6){ delete modalCard.dataset.pfWizard; modal.classList.remove('on'); pfGuardar(); return; }
+    if(PF_WIZARD_STEP===6){ pfGuardar({wizard:true}); return; }
     PF_WIZARD_STEP++; pfRenderWizard();
   }
   function pfEditar(p){
@@ -3270,7 +3270,7 @@
     if(n) d.nombre=n.value.trim(); if(de) d.descripcion=de.value.trim();
     if(s) d.sector_sanciones=s.value; if(c) d.comision=c.value;
   }
-  async function pfGuardar(){
+  async function pfGuardar(opts){
     pfLeerForm(); const d=PF_DRAFT; if(!d) return;
     if(!d.nombre) return pfMsg('Ponle un nombre al perfil.');
     if(!d.temas.length&&!d.empresas.length) return pfMsg(
@@ -3278,12 +3278,19 @@
         ? 'Agrega al menos un tema que le aplique, o un competidor a seguir.'
         : 'Agrega al menos un tema o una empresa vigilada.');
     pfMsg('Guardando…');
+    const btn=document.getElementById(opts&&opts.wizard?'pf-wiz-next':'pf-save');
+    if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
     try{
       const r=await wcall('/caudal/perfil/save',{method:'POST',body:JSON.stringify(d)});
-      PF_ACTIVE=r.perfil; pfCerrarEdit(); await pfLoadList();
+      PF_ACTIVE=r.perfil;
+      if(opts&&opts.wizard){ delete modalCard.dataset.pfWizard; modal.classList.remove('on'); }
+      pfCerrarEdit(); await pfLoadList();
       document.querySelectorAll('#cli-sectors .chip').forEach(c=>c.classList.remove('on'));
       cliLoad({perfil:PF_ACTIVE});
-    }catch(err){ pfMsg(err.message||'No se pudo guardar.'); }
+    }catch(err){
+      pfMsg(err.message||'No se pudo guardar.');
+      if(btn){ btn.disabled=false; btn.textContent=opts&&opts.wizard?'Crear perfil':(d.perfilId?'Guardar cambios':'Crear perfil'); }
+    }
   }
   async function pfBorrar(){
     const d=PF_DRAFT; if(!d||!d.perfilId) return;
