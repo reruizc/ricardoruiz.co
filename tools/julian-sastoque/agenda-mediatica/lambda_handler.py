@@ -9,6 +9,7 @@ es solo el índice de titulares; cada tarjeta conserva el enlace al medio origin
 """
 import html, json, os, re, urllib.parse, urllib.request
 import xml.etree.ElementTree as ET
+from collections import Counter
 from datetime import datetime, timezone
 
 BUCKET=os.getenv('AGENDA_S3_BUCKET','elecciones-2026')
@@ -46,6 +47,32 @@ def dedupe(items):
   k=re.sub(r'[^a-z0-9]','',x['titulo'].lower())[:120]
   if k and k not in seen: seen.add(k); out.append(x)
  return out
+STOPWORDS=set('a al algo ante bajo con contra como cuando de del desde donde el ella en entre es esta este fue ha hasta la las lo los más menos mi no o para por que se si sin sobre su sus te un una y ya cómo cuál cuáles'.split())
+TOPICS={
+ 'Movilidad':('pico y placa','movilidad','transmilenio','taxi','vía','via','metro'),
+ 'Seguridad':('seguridad','policía','policia','hurto','delito','crimen','violencia'),
+ 'Ambiente':('ambiente','basura','residuos','reciclaje','agua','árbol','arbol'),
+ 'Empleo y economía':('empleo','economía','economia','trabajo','empresa','negocio'),
+ 'Gestión y control':('concejo','concejal','contrato','denuncia','control político','control politico'),
+ 'Salud y bienestar':('salud','hospital','mental','bienestar'),
+}
+def is_direct(x):
+ t=x['titulo'].lower()
+ return 'rodríguez sastoque' in t or 'rodriguez sastoque' in t or 'julián sastoque' in t or 'julian sastoque' in t
+def build_salience(items):
+ words=Counter(); medios=Counter(); temas=Counter()
+ for x in items:
+  medios[x.get('medio') or 'Medio sin identificar']+=1
+  low=x['titulo'].lower()
+  for token in re.findall(r"[a-záéíóúüñ]{4,}",low):
+   if token not in STOPWORDS and token not in ('bogotá','bogota','julian','julián','rodríguez','rodriguez','sastoque'):
+    words[token]+=1
+  for tema,terms in TOPICS.items():
+   if any(term in low for term in terms): temas[tema]+=1
+ return {'palabras':[{'w':w,'n':n} for w,n in words.most_common(30)],
+         'medios':[{'medio':m,'n':n} for m,n in medios.most_common(12)],
+         'temas':[{'tema':t,'n':n,'pct':round(100*n/max(1,len(items)))} for t,n in temas.most_common()],
+         'mencion_directa':sum(1 for x in items if is_direct(x))}
 def call_ai(top,items):
  if not API_KEY: return {'prioridad':'Pendiente de análisis IA','lectura':'La captura está disponible, pero DeepSeek aún no está configurado.','postura':'Verificar la noticia antes de intervenir.','acciones':['Revisar la fuente original y definir vocería.'],'evitar':['No publicar una postura automática sin revisión humana.']}
  paquete='\n'.join(f"{i+1}. {x['titulo']} ({x['medio']})" for i,x in enumerate(items[:12]))
@@ -67,10 +94,11 @@ def handler(event,context):
  items=dedupe(items)
  if not items: raise RuntimeError('No se obtuvieron titulares')
  # Prioriza menciones directas; si no las hay, el primer resultado de agenda Bogotá.
- direct=[x for x in items if 'rodríguez sastoque' in x['titulo'].lower() or 'rodriguez sastoque' in x['titulo'].lower()]
+ direct=[x for x in items if is_direct(x)]
  top=(direct or items)[0]
+ salience=build_salience(items)
  payload={'generado_en':datetime.now(timezone.utc).isoformat(),'ventana':'24 h (agenda) · 7 d (mención directa)',
-          'n_titulares':len(items),'noticia_dominante':top,'titulares':items,'recomendacion':call_ai(top,items),'modelo':MODEL}
+          'n_titulares':len(items),'noticia_dominante':top,'titulares':items,'recomendacion':call_ai(top,items),'saliencia':salience,'modelo':MODEL}
  import boto3
  boto3.client('s3').put_object(Bucket=BUCKET,Key=KEY,Body=json.dumps(payload,ensure_ascii=False).encode(),ContentType='application/json',CacheControl='public, max-age=300')
  return {'ok':True,'key':KEY,'n_titulares':len(items)}
