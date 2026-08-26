@@ -59,7 +59,7 @@ def handler(event,context):
  if (event or {}).get('requestContext',{}).get('http',{}).get('method')=='GET':
   import boto3
   obj=boto3.client('s3').get_object(Bucket=BUCKET,Key=KEY)
-  return {'statusCode':200,'headers':{'content-type':'application/json; charset=utf-8','cache-control':'public, max-age=300','access-control-allow-origin':'*'},'body':obj['Body'].read().decode()}
+  return {'statusCode':200,'headers':{'content-type':'application/json; charset=utf-8','cache-control':'public, max-age=300'},'body':obj['Body'].read().decode()}
  items=[]
  for _,query in QUERIES:
   try: items.extend(fetch_rss(query))
