@@ -44,13 +44,14 @@ fetch(RRData.publicUrl('congreso-2026/output/mapas-2026/DEPARTAMENTOS2.json')).t
 </script>
 <script>
 /* Índice compartido: misma fuente y ranking que analisis-candidato.html. */
-let historicalIndex=[], historicalPending=[], historicalBaseReady=false, historicalLoaded=0, historicalSources=0, historicalLocalDone=false;
+let historicalIndex=[], historicalLoaded=0, historicalSources=0, historicalLocalDone=false, historicalBaseReady=false;
 const historicalTotal=CandRegistry.SOURCES.length+CandRegistry.LOCAL_SOURCES.length;
 const escHtml=s=>String(s||'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const STRATEGY_LOADING_MESSAGES=['Calculando cuánto necesita para ganar…','Midiendo el momentum de cada partido político…','Analizando cómo votaron en su barrio en la última elección…','Identificando dónde puede crecer su campaña…','Conectando las señales que pueden mover la elección…'];let strategyLoadingIndex=Math.floor(Math.random()*STRATEGY_LOADING_MESSAGES.length);function rotateStrategyMessage(){preloadText.textContent=STRATEGY_LOADING_MESSAGES[strategyLoadingIndex];strategyLoadingIndex=(strategyLoadingIndex+1)%STRATEGY_LOADING_MESSAGES.length}function paintIndexProgress(){historicalSources++;preloadBar.style.width=`${Math.min(96,7+(historicalSources/historicalTotal)*89)}%`;preloadMeta.textContent='Preparando inteligencia electoral';const note=document.getElementById('searchNote');if(note)note.textContent='La información electoral se está preparando en segundo plano.'}
-function appendHistorical(list){if(!list||!list.length)return;if(!historicalBaseReady){historicalPending.push(list);return}historicalIndex=historicalIndex.concat(list);}
+function appendHistorical(list){if(!list||!list.length)return;historicalIndex=historicalIndex.concat(list);if(candidateSearch?.value.trim().length>=2)searchCandidate(candidateSearch.value);}
 async function prepareHistoricalIndex(){
-  const base=CandRegistry.load({includeParties:false,onSource:(list,src)=>{historicalLoaded+=list.length;paintIndexProgress()}}).then(list=>{historicalIndex=list;historicalBaseReady=true;historicalPending.forEach(appendHistorical);historicalPending=[];return list});
+  historicalBaseReady=true;
+  const base=CandRegistry.load({includeParties:false,onSource:(list,src)=>{historicalLoaded+=list.length;appendHistorical(list);paintIndexProgress()}});
   const local=CandRegistry.loadLocal({includeParties:false,onSource:(list,src)=>{historicalLoaded+=list.length;appendHistorical(list);paintIndexProgress()}}).then(()=>{historicalLocalDone=true;const note=document.getElementById('searchNote');if(note)note.textContent='La información electoral está lista para buscar.'}).catch(()=>{historicalLocalDone=true});
   await Promise.allSettled([base,local]);
   preloadBar.style.width='100%';preloadMeta.textContent='Inteligencia electoral preparada';
@@ -58,8 +59,9 @@ async function prepareHistoricalIndex(){
 function beginHistorical(){
   showScreen('existing');
   searchResults.innerHTML='<div class="search-preparing" id="searchPreparing"><div><div class="preload-mark"></div><h3>Estamos preparando su historial.</h3><p id="searchPrepText">Contrastando candidaturas, corporaciones y resultados territoriales.</p></div></div><p class="search-note" id="searchNote">El índice sigue preparándose en segundo plano.</p>';
-  candidateSearch.disabled=true;
-  setTimeout(()=>{document.getElementById('searchPreparing')?.remove();candidateSearch.disabled=false;candidateSearch.focus();const note=document.getElementById('searchNote');if(note)note.textContent='Escriba al menos dos letras para buscar entre las candidaturas disponibles.'},10000);
+  candidateSearch.disabled=false;
+  candidateSearch.focus();
+  setTimeout(()=>{document.getElementById('searchPreparing')?.remove();const note=document.getElementById('searchNote');if(note)note.textContent='Escriba al menos dos letras: los resultados aparecerán mientras el índice termina de llegar.'},700);
 }
 function searchCandidate(query){
   const q=(query||'').trim();
