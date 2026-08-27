@@ -17,7 +17,8 @@
 (function (global) {
   'use strict';
 
-  const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  // Public data is served through CloudFront, not directly from the S3 origin.
+  const S3 = global.RRData.publicUrl('congreso-2026/output');
 
   // Cada fuente vive en `${S3}/${dir}/`: el índice es `${dir}/${indexFile}` y
   // cada candidato es `${dir}/${slug}.json`. `list(raw)` extrae el array de
