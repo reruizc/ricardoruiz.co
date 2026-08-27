@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Administrador · Brújula Asunción</title>
+<style>
+:root{--bg:#f4efe7;--card:#fffaf2;--ink:#151515;--muted:#706d67;--line:#d9d0c3;--red:#c8102e;--blue:#1f5fbf;--green:#24734d}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif}.gate{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:4}.wrap{max-width:1180px;margin:auto;padding:28px 20px 60px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:28px}.eyebrow,.label{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:800}h1{font:700 clamp(1.8rem,4vw,3.2rem) Georgia,serif;margin:.2rem 0}.live{color:var(--green);font-weight:800}.btn{border:1px solid var(--line);background:var(--card);padding:10px 14px;border-radius:8px;font-weight:750;cursor:pointer}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}.kpi{font:700 2.25rem Georgia,serif;margin-top:7px}.section{margin-top:24px}.section h2{font:700 1.2rem Georgia,serif;margin:0 0 12px}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.bar-row{display:grid;grid-template-columns:minmax(120px,1fr) 3fr 54px;align-items:center;gap:10px;margin:10px 0;font-size:.86rem}.track{height:12px;background:#e5ddd2;border-radius:20px;overflow:hidden}.fill{height:100%;background:var(--blue);border-radius:20px}.fill.red{background:var(--red)}table{width:100%;border-collapse:collapse;font-size:.82rem}th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.06em}.scroll{overflow:auto;max-height:460px}.empty{color:var(--muted);padding:28px;text-align:center}.note{font-size:.78rem;color:var(--muted);line-height:1.5}.error{color:#9e1c1c}.controls{display:flex;gap:8px;flex-wrap:wrap}@media(max-width:800px){.grid{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}@media(max-width:470px){.grid{grid-template-columns:1fr}.bar-row{grid-template-columns:100px 1fr 44px}}
+</style>
+</head>
+<body>
+<div class="gate" id="gate"><div>Verificando acceso de administrador…</div></div>
+<main class="wrap" id="main" hidden>
+  <div class="top"><div><div class="eyebrow">Brújula Asunción 2026 · administración</div><h1>Resultados de la encuesta</h1><div class="live" id="status">● En tiempo real</div></div><div class="controls"><button class="btn" onclick="load()">Actualizar</button><button class="btn" onclick="exportCsv()">Exportar CSV</button></div></div>
+  <div class="grid">
+    <div class="card"><div class="label">Respuestas completas</div><div class="kpi" id="k-total">—</div></div>
+    <div class="card"><div class="label">Hoy</div><div class="kpi" id="k-today">—</div></div>
+    <div class="card"><div class="label">Afinidad principal</div><div class="kpi" id="k-top">—</div></div>
+    <div class="card"><div class="label">Última respuesta</div><div class="kpi" id="k-last" style="font-size:1.35rem">—</div></div>
+  </div>
+  <section class="section two">
+    <div class="card"><h2>Candidato declarado</h2><div id="declared"></div></div>
+    <div class="card"><h2>Candidato con mayor afinidad</h2><div id="affinity"></div></div>
+  </section>
+  <section class="section two">
+    <div class="card"><h2>Lenguaje, edad y canal</h2><div id="segments"></div></div>
+    <div class="card"><h2>Barrios con más respuestas</h2><div id="barrios"></div></div>
+  </section>
+  <section class="section card"><h2>Promedio por pregunta</h2><p class="note">Promedio de respuesta en la escala 1–5. Sirve para ver hacia qué polo se inclina el conjunto de participantes; no es una encuesta representativa.</p><div class="scroll"><table><thead><tr><th>Pregunta</th><th>Respuestas</th><th>Promedio</th><th>Distribución 1 · 2 · 3 · 4 · 5</th></tr></thead><tbody id="questions"></tbody></table></div></section>
+  <section class="section card"><h2>Actividad reciente</h2><div class="scroll"><table><thead><tr><th>Fecha</th><th>Declaró</th><th>Mayor afinidad</th><th>Edad</th><th>Canal</th><th>Barrio</th></tr></thead><tbody id="recent"></tbody></table></div></section>
+  <p class="note">Panel anónimo: no recibe nombres, correos, IP, coordenadas ni locales de votación. Actualización automática cada 30 segundos.</p>
+</main>
+<script src="config.js"></script>
+<script>
+const CFG=window.BRUJULA_CONFIG||{}, tok=localStorage.getItem('rr-token');
+const N={camilo:'Camilo Pérez',soledad:'Soledad Núñez',none:'Indeciso',informada:'Versión informada',popular:'Versión de barrio',ig:'Instagram / reels',x:'X / prensa / debates',fb:'WhatsApp / Facebook',tt:'TikTok / Shorts',rd:'Radio / comunidad'};
+let ROWS=[]; const $=id=>document.getElementById(id); const esc=s=>String(s??'—').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+function deny(){location.replace('../login.html');}
+async function gate(){if(!tok)return deny();try{const r=await fetch((CFG.auth||'https://rr-auth.reruizc.workers.dev')+'/auth/me',{headers:{Authorization:`Bearer ${tok}`}});const d=await r.json();if(!r.ok||!d.user?.isAdmin)return deny();$('gate').remove();$('main').hidden=false;load();}catch(e){$('gate').innerHTML='<div class="error">No se pudo verificar el acceso.</div>';}}
+function counts(field){const out={};ROWS.forEach(r=>{const v=r[field];if(v!==null&&v!==undefined&&v!=='')out[v]=(out[v]||0)+1});return out}
+function bars(el,data,colors={}){const total=Object.values(data).reduce((a,b)=>a+b,0)||1;$(el).innerHTML=Object.entries(data).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="bar-row"><span>${esc(N[k]||k)}</span><div class="track"><div class="fill" style="width:${100*v/total}%;background:${colors[k]||'var(--blue)'}"></div></div><b>${v} · ${(100*v/total).toFixed(1)}%</b></div>`).join('')||'<div class="empty">Sin datos</div>'}
+function render(){
+  $('k-total').textContent=ROWS.length.toLocaleString('es-PY'); const today=new Date().toISOString().slice(0,10); $('k-today').textContent=ROWS.filter(r=>(r.ts_server||'').startsWith(today)).length;
+  const ac=counts('candidato_afin'), top=Object.entries(ac).sort((a,b)=>b[1]-a[1])[0]; $('k-top').textContent=top?N[top[0]]:'—'; $('k-last').textContent=ROWS[0]?.ts_server?new Date(ROWS[0].ts_server).toLocaleString('es-PY',{dateStyle:'short',timeStyle:'short'}):'—';
+  bars('declared',counts('candidato_declarado'),{camilo:'var(--red)',soledad:'var(--blue)',none:'#777'});bars('affinity',ac,{camilo:'var(--red)',soledad:'var(--blue)'});
+  const seg={...counts('lenguaje'),...Object.fromEntries(Object.entries(counts('edad')).map(([k,v])=>['Edad '+k.replace('_','–').replace('mas','+'),v])),...counts('canal')};bars('segments',seg);
+  const bc=counts('barrio');bars('barrios',Object.fromEntries(Object.entries(bc).sort((a,b)=>b[1]-a[1]).slice(0,12)));
+  const qs={};ROWS.forEach(r=>Object.entries(r.respuestas||{}).forEach(([code,v])=>{if(!v)return;(qs[code]||={n:0,sum:0,d:[0,0,0,0,0]}).n++;qs[code].sum+=v;qs[code].d[v-1]++;}));
+  $('questions').innerHTML=Object.entries(qs).sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(([code,q])=>`<tr><td>${esc(code)}</td><td>${q.n}</td><td><b>${(q.sum/q.n).toFixed(2)}</b></td><td>${q.d.join(' · ')}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Sin datos</td></tr>';
+  $('recent').innerHTML=ROWS.slice(0,100).map(r=>`<tr><td>${new Date(r.ts_server).toLocaleString('es-PY')}</td><td>${esc(N[r.candidato_declarado]||r.candidato_declarado)}</td><td>${esc(N[r.candidato_afin]||r.candidato_afin)}</td><td>${esc(r.edad)}</td><td>${esc(N[r.canal]||r.canal)}</td><td>${esc(r.barrio)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Aún no hay respuestas</td></tr>';
+}
+async function load(){if(!CFG.api){$('status').textContent='API pendiente de desplegar';$('status').className='error';return;}$('status').textContent='● Actualizando…';try{const r=await fetch(CFG.api.replace(/\/$/,'')+'/admin/respuestas?t='+Date.now(),{headers:{Authorization:`Bearer ${tok}`},cache:'no-store'});if(r.status===403)return deny();const d=await r.json();if(!r.ok)throw new Error(d.error||r.status);ROWS=d.respuestas||[];render();$('status').textContent='● En tiempo real · actualizado '+new Date().toLocaleTimeString('es-PY');$('status').className='live';}catch(e){$('status').textContent='Error: '+e.message;$('status').className='error';}}
+function exportCsv(){const cols=['ts_server','version','lenguaje','candidato_declarado','candidato_afin','empate','edad','canal','zona','barrio','temas','afinidad_camilo','afinidad_soledad','respuestas'];const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const lines=[cols.join(','),...ROWS.map(r=>[r.ts_server,r.version,r.lenguaje,r.candidato_declarado,r.candidato_afin,r.empate,r.edad,r.canal,r.zona,r.barrio,(r.temas||[]).join('|'),r.afinidades?.camilo,r.afinidades?.soledad,JSON.stringify(r.respuestas||{})].map(q).join(','))];const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));a.download='brujula-asuncion-respuestas-'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href)}
+gate();setInterval(()=>{if(!$('main').hidden)load()},30000);
+</script>
+</body></html>

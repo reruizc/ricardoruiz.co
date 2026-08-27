@@ -1,11 +1,11 @@
 /* Brújula Asunción 2026 · contenido editorial
-   Fuente: BRUJULA_POLITICA_ASUNCION_2026_PARAGUAYO_REVISADO.docx (corte 14-ago-2026).
+   Fuente: BRUJULA ASUNCIÓN AJUSTADA 2 CANDIDATOS.docx (corte 24-ago-2026).
    Para actualizar una posición: cambiar `pos` (1-5) y `conf` ('A' alta · 'M' media · 'B' baja).
    ⚠ conf:'B' = "posición pendiente de verificación": la pregunta NO entra al cálculo de
    afinidad de ese candidato (ni lo favorece ni lo perjudica). El 3 que lleva es provisional. */
 window.BRUJULA = {
-  version: '2026-08-21',
-  eleccion: { fecha: '4 de octubre de 2026', cargo: 'Intendencia de Asunción', corte: '14 de agosto de 2026' },
+  version: '2026-08-26',
+  eleccion: { fecha: '4 de octubre de 2026', cargo: 'Intendencia de Asunción', corte: '24 de agosto de 2026' },
 
   candidatos: [
     { id:'camilo', nombre:'Camilo Pérez', nombreLargo:'Camilo Pérez López Moreira', partido:'ANR – Partido Colorado', lista:'1', color:'#c8102e', foto:true,
@@ -18,16 +18,6 @@ window.BRUJULA = {
       resumen:'Ingeniera civil, ex secretaria ejecutiva de Senavitat (2014-2018) y candidata a la Vicepresidencia en 2023. Encabeza una coalición de 16 partidos. Su mensaje: reconstrucción institucional, saneamiento financiero y profesionalización de la Municipalidad.',
       frase:'“El problema es una institución capturada y mal administrada; hay que profesionalizarla y reconstruirla.”',
       redes:{ ig:'@sole.nu', x:'@solenu' } },
-    { id:'rodri', nombre:'Rodri Franco', nombreLargo:'Rodrigo Francisco Franco Arriola', partido:'Partido Demócrata Cristiano', lista:'6', color:'#0e7c4a', foto:true,
-      arquetipo:'Reformador disruptivo · outsider de derecha', ubicacion:'8,5 / 10 · derecha liberal y de orden',
-      resumen:'28 años, estudiante de Ingeniería Civil (FIUNA) y comunicador digital. Conocido como “Bukele’i”. Propone pasar de ~60 direcciones municipales a 12, bajar la planta a menos de 5.000 personas, videovigilancia y servicios en competencia abierta.',
-      frase:'“La Municipalidad no solamente funciona mal: está sobredimensionada y hay que achicarla.”',
-      redes:{ ig:'@rodrifrancopy', x:'@rodrifrancopy' } },
-    { id:'arlene', nombre:'Arlene Aquino', nombreLargo:'Edith Arlene Aquino Morel', partido:'Partido Patria Soñada', lista:'300', color:'#e07b1a', foto:true,
-      arquetipo:'Outsider ciudadana-comunitaria', ubicacion:'5,5 / 10 · centro ciudadano',
-      resumen:'Abogada y escribana, ex candidata a diputada (~14.000 votos). Salió del espacio de Cruzada Nacional y sostiene su candidatura con Patria Soñada. Campaña de barrio y casa por casa: titulación masiva, servicios municipales con alianzas, transparencia y tecnología.',
-      frase:'“La Municipalidad debe volver a los barrios y trabajar directamente con el ciudadano.”',
-      redes:{ ig:'@arleneaquinomorel', x:'@ArleneAquino', web:'Arlene es Asunción' } },
   ],
 
   /* Ejes de la brújula, derivados de las preguntas estructurales (no del partido).

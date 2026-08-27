@@ -1,7 +1,7 @@
 # Brújula Asunción 2026
 
 Test de afinidad programática para la **Intendencia de Asunción** (elección del 4 de
-octubre de 2026). Diez preguntas → afinidad con los cuatro candidatos + brújula de tres
+octubre de 2026). Doce preguntas → afinidad con Camilo Pérez y Soledad Núñez + brújula de tres
 ejes + perfil de votante + mapa de los 68 barrios + cómo votó tu zona en seis elecciones.
 
 Es el mismo patrón del `test-presidencial-2026.html` de Colombia, adaptado a Paraguay:
@@ -12,7 +12,8 @@ se puede abrir con doble clic y funciona igual.
 ```
 brujula-asuncion/            ← en el repo · https://ricardoruiz.co/brujula-asuncion/
   index.html            la página (single-file salvo los 2 scripts de abajo)
-  contenido.js          candidatos, 10 preguntas, posiciones, ejes, arquetipos  ← lo editable a mano
+  contenido.js          candidatos, ejes y arquetipos
+  banco.js              120 preguntas, dos versiones de lenguaje y posiciones de los dos candidatos
   datos/datos.js        bundle de zonas + puestos + barrios (lo genera el builder)
   datos/geo.js          los 68 polígonos del INE, recortados a código+nombre (lo genera el builder)
   datos/{zonas,puestos,barrios}.json   los mismos datos sueltos, por si otro módulo los usa
@@ -35,17 +36,20 @@ Tarda ~20 s. Lee los CSV del TSJE y los Excel de `ASUNCIÓN/`, y reescribe
 **mirarlos**: dicen cuántos puestos quedaron sin resultado y cuáles perdieron la
 comparación con 2018.
 
-## Actualizar una posición de candidato
+## Actualizar el banco electoral
 
-Todo vive en `contenido.js`, en `preguntas[n].pos[candidato]`:
+La fuente es `Proyecto BL Paraguay/BRUJULA ASUNCIÓN AJUSTADA 2 CANDIDATOS.docx`.
+Para regenerar `banco.js`:
 
-```js
-camilo:{pos:2, conf:'A', txt:'…por qué…'}
+```bash
+python3 brujula-asuncion/tools/build_banco.py \
+  'Proyecto BL Paraguay/BRUJULA ASUNCIÓN AJUSTADA 2 CANDIDATOS.docx' \
+  brujula-asuncion/banco.js
 ```
 
 - `pos` 1-5 en la escala de esa pregunta.
-- `conf`: `'A'` alta · `'M'` media · `'B'` **pendiente de verificación**.
-- `txt`: la justificación que se muestra en "pregunta por pregunta".
+- `evidencia`: `E` explícita o `I` inferencia sustentada, según el documento.
+- El importador traduce `E` a confianza alta y `I` a confianza media.
 
 ⚠️ **`conf:'B'` no es un 3, es un hueco.** Esa pregunta **no entra** al cálculo de ese
 candidato: ni lo favorece ni lo perjudica, y el ranking lo declara ("2 pendientes").
@@ -145,15 +149,15 @@ y la matriz de arquetipos son 2012; para cruzar con el censo 2022 hay que cambia
 
 ## Pendientes
 
-1. **Fotos de los candidatos**: dejar `img/cand-{camilo,soledad,rodri,arlene}.jpg`
+1. **Fotos de los candidatos**: dejar `img/cand-{camilo,soledad}.jpg`
    (cuadradas, ~300 px) y poner `foto:true` en `contenido.js`. Mientras tanto el avatar
    muestra las iniciales — y **no se pide la imagen**, para no dejar 404 en consola.
-2. **Actualizar posiciones tras el foro del 20 de agosto** (ver arriba).
+2. Mantener actualizado el banco desde el documento editorial de dos candidatos.
 2b. ~~Mapa por barrio~~ ✅ hecho con la cartografía censal del INE (ver abajo).
 3. Decidir dónde se publica y con qué marca. Hoy lleva `noindex,nofollow` y no está
    enlazada desde ningún lado.
-4. Si se quiere medir uso, falta el envío anónimo de respuestas (en Colombia eso lo hacía
-   una Lambda + S3; acá no hay backend todavía).
+4. ~~Captura y administrador de respuestas~~ ✅ implementados. Falta desplegar la Lambda/API
+   descrita en `tools/brujula-asuncion-backend/README.md` y copiar su URL a `config.js`.
 5. **Georreferenciar los 145 locales de votación** (lat/lon) para pasar las capas de voto
    de zona a barrio por punto-en-polígono — el salto de 6 a 68 colores. El TSJE no publica
    coordenadas; habría que geocodificar por nombre/dirección y validar a mano.

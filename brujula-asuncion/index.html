@@ -237,7 +237,7 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
       <p class="qhint">Con esto te mostramos cómo votó tu zona en las municipales de 2010, 2015 y 2021 (y las presidenciales), qué perfil de votante predomina y qué preocupa en tu barrio según la prensa y los reclamos vecinales de este año.</p>
       <div class="field"><label>Zona electoral</label><select id="sel-zona" onchange="onZona()"><option value="">Elegí tu zona…</option></select></div>
       <div class="field"><label>Barrio (opcional)</label><select id="sel-barrio" onchange="onBarrio()" disabled><option value="">Primero la zona</option></select></div>
-      <div class="field"><label>Local de votación (opcional)</label><select id="sel-puesto" onchange="onPuesto()" disabled><option value="">Primero la zona</option></select></div>
+      <div class="field" hidden aria-hidden="true"><label>Local de votación (opcional)</label><select id="sel-puesto" onchange="onPuesto()" disabled><option value="">Primero la zona</option></select></div>
       <div class="field" id="ubi-map-wrap" style="display:none"><label>O tocá tu barrio en el mapa</label><div class="map sm" id="map-ubi"></div></div>
       <p class="qhint" style="margin-top:.2rem">Si no votás en Asunción o no querés decirlo, podés seguir sin elegir zona.</p>
       <div class="actions"><button class="btn btn-ghost" onclick="goTo('p-res')">← Volver al resultado</button><button class="btn" onclick="renderAll();goTo('p-barrio')">Ver datos de mi barrio →</button></div>
@@ -255,7 +255,7 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
     <div class="panel" id="p-res">
       <div class="qhead"><span class="qnum">Tu brújula</span><span class="qtag">Resultado</span></div>
       <div id="res-hero"></div>
-      <div class="sec"><div class="sec-eyebrow"><span>Afinidad programática con los cuatro</span><span id="res-n"></span></div>
+      <div class="sec"><div class="sec-eyebrow"><span>Afinidad programática con los dos candidatos</span><span id="res-n"></span></div>
         <div class="rank" id="res-rank"></div>
         <label class="toggle" id="toggle-wrap" style="display:none"><input type="checkbox" id="toggle-pond" onchange="renderAll()"> Dar doble peso a los temas que elegiste como prioritarios</label>
         <p class="note" id="res-note"></p>
@@ -264,7 +264,7 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
       <div class="sec" id="res-prio-wrap"></div>
       <div class="sec" id="res-arq-wrap"></div>
       <div class="actions result-actions"><button class="btn" onclick="goTo('p-brujula')">Ver brújula</button><button class="btn btn-ghost" onclick="goTo('p-ubi')">Ver cómo vota mi barrio</button></div>
-      <p class="foot">La afinidad mide distancia entre tus respuestas y las posiciones públicas de cada candidatura (programas, entrevistas y declaraciones verificables, corte 14-ago-2026), con 12 preguntas de igual peso. Los datos de tu zona son resultados oficiales del TSJE (municipales 2010, 2015 y 2021; presidenciales 2013, 2018 y 2023) y un modelo territorial inferencial; no son una predicción de 2026. Esto no es una encuesta.</p>
+      <p class="foot">La afinidad mide distancia entre tus respuestas y las posiciones públicas de cada candidatura (programas, entrevistas y declaraciones verificables, corte 24-ago-2026), con 12 preguntas de igual peso. Los datos de tu zona son resultados oficiales del TSJE (municipales 2010, 2015 y 2021; presidenciales 2013, 2018 y 2023) y un modelo territorial inferencial; no son una predicción de 2026. Esto no es una encuesta.</p>
       <div class="actions"><button class="btn btn-ghost" onclick="restart()">Repetir</button><button class="btn btn-ghost" onclick="openModal()">Metodología</button></div>
     </div>
 
@@ -287,7 +287,7 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
       <div class="actions"><button class="btn btn-ghost" onclick="goTo('p-res')">← Volver al resultado</button></div>
     </div>
   </div>
-  <div class="full-footer">Brújula Asunción 2026 · v1 · corte de posiciones 14-ago-2026</div>
+  <div class="full-footer">Brújula Asunción 2026 · v1 · corte de posiciones 24-ago-2026</div>
 </div>
 
 <div class="modal img-modal" id="img-modal" onclick="if(event.target===this)closeImg()"><img id="img-zoom" alt=""></div>
@@ -303,6 +303,7 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
   </div>
 </div>
 
+<script src="config.js"></script>
 <script src="contenido.js"></script>
 <script src="banco.js"></script>
 <script src="datos/datos.js"></script>
@@ -310,6 +311,7 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
 const B = window.BRUJULA, D = window.BRUJULA_DATOS || {zonas:[],puestos:[],barrios:[],meta:{}};
+const CFG = window.BRUJULA_CONFIG || {};
 const CAND = B.candidatos, BANCO = window.BRUJULA_BANCO;
 let Q = [];
 const STATE = { lenguaje:null, cand:null, verCand:null, edad:null, canal:null, zona:null, barrio:null, puesto:null, prio:[], temas:[], ans:{}, qi:0 };
@@ -322,7 +324,7 @@ function openModal(){ $('modal').classList.add('open'); } function closeModal(){
 function openImg(src,alt){ $('img-zoom').src=src; $('img-zoom').alt=alt; $('img-modal').classList.add('open'); } function closeImg(){ $('img-modal').classList.remove('open'); }
 /* La foto solo se pide si contenido.js la declara (foto:true). Así no hay 404 en
    consola mientras las fotos no estén: el avatar cae a las iniciales. */
-function avatar(c,extra){ return `<div class="avatar cand-${c.id} ${extra||''}" style="--cc:${c.color}">${c.foto?`<img src="img/cand-${c.id}.jpg?v=2" alt="Foto de ${c.nombre}" onerror="this.remove()">`:''}${c.nombre.split(' ').map(w=>w[0]).join('')}</div>`; }
+function avatar(c,extra){ return `<div class="avatar cand-${c.id} ${extra||''}" style="--cc:${c.color}">${c.foto?`<img src="img/cand-${c.id}.jpg?v=3" alt="Foto de ${c.nombre}" onerror="this.remove()">`:''}${c.nombre.split(' ').map(w=>w[0]).join('')}</div>`; }
 function wording(q){ return STATE.lenguaje==='popular' && q.popular ? q.popular : q; }
 
 /* ── 0. lenguaje ── */
@@ -393,7 +395,35 @@ function renderQ(){
 }
 function pickAns(n,v){ STATE.ans[n]=v; document.querySelectorAll('#q-opts .opt').forEach(b=>b.classList.toggle('sel', +b.getAttribute('onclick').match(/,([0-5])\)/)[1]===v)); $('btn-next').disabled=false; }
 function prevQ(){ if(STATE.qi>0){STATE.qi--; renderQ();} }
-function nextQ(){ if(STATE.qi<Q.length-1){ STATE.qi++; renderQ(); } else { $('progressFill').style.width='100%'; renderAll(); goTo('p-res'); } }
+function nextQ(){ if(STATE.qi<Q.length-1){ STATE.qi++; renderQ(); } else { $('progressFill').style.width='100%'; renderAll(); goTo('p-res'); submitAnonymous(); } }
+
+/* ── captura anónima ──
+   Solo se envía una vez al terminar. No incluye IP, nombre, correo, coordenadas ni
+   local de votación. El backend vuelve a sanear todo antes de escribir en S3. */
+function responsePayload(){
+  const resultados=CAND.map(c=>({id:c.id,...afinidad(c)})).sort((a,b)=>(b.pct??-1)-(a.pct??-1));
+  const respuestas={}; Q.forEach(q=>{ const v=STATE.ans[q.n]; if(v!==undefined) respuestas[q.codigo]=v; });
+  return {
+    schema:1, version:B.version, lenguaje:STATE.lenguaje,
+    candidato_declarado:STATE.cand, edad:STATE.edad, canal:STATE.canal,
+    temas:STATE.temas.slice(0,2), zona:STATE.zona, barrio:STATE.barrio,
+    respuestas, afinidades:Object.fromEntries(resultados.map(r=>[r.id,r.pct])),
+    candidato_afin:resultados[0]?.id||null,
+    empate:!!(resultados[1]&&resultados[0].pct===resultados[1].pct)
+  };
+}
+async function submitAnonymous(){
+  if(!CFG.api) return;
+  const key=`brujula-asuncion-enviado-${B.version}`;
+  try{
+    if(sessionStorage.getItem(key)) return;
+    const r=await fetch(`${CFG.api.replace(/\/$/,'')}/respuesta`,{
+      method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
+      body:JSON.stringify(responsePayload()),keepalive:true
+    });
+    if(r.ok) sessionStorage.setItem(key,'1');
+  }catch(e){ console.warn('[brujula] No se pudo guardar la respuesta anónima',e); }
+}
 
 /* prioridades: del barrio elegido (preocupaciones con intensidad 5) si lo hay */
 function inferPrio(){
@@ -590,7 +620,7 @@ function renderShare(res){
   if(bc) bc.onclick = () => { if(navigator.clipboard) navigator.clipboard.writeText(txt).then(()=>{ bc.textContent='Copiado ✓'; }); };
 }
 
-function restart(){ Object.assign(STATE,{lenguaje:null,cand:null,verCand:null,edad:null,canal:null,zona:null,barrio:null,puesto:null,prio:[],temas:[],ans:{},qi:0}); document.querySelectorAll('.sel').forEach(e=>e.classList.remove('sel')); $('sel-zona').value=''; onZona(); $('btn-lang').disabled=$('btn-cand').disabled=$('btn-demo').disabled=$('btn-canal').disabled=$('btn-prio').disabled=true; $('toggle-pond').checked=false; goTo('p-welcome'); }
+function restart(){ sessionStorage.removeItem(`brujula-asuncion-enviado-${B.version}`); Object.assign(STATE,{lenguaje:null,cand:null,verCand:null,edad:null,canal:null,zona:null,barrio:null,puesto:null,prio:[],temas:[],ans:{},qi:0}); document.querySelectorAll('.sel').forEach(e=>e.classList.remove('sel')); $('sel-zona').value=''; onZona(); $('btn-lang').disabled=$('btn-cand').disabled=$('btn-demo').disabled=$('btn-canal').disabled=$('btn-prio').disabled=true; $('toggle-pond').checked=false; goTo('p-welcome'); }
 window.STATE = STATE;
 </script>
 </body>

@@ -1,4 +1,4 @@
-# Fotos de los cuatro candidatos
+# Fotos de los dos candidatos
 
 ## Dónde van
 
@@ -6,8 +6,6 @@
 /Users/ricardoruiz/ricardoruiz.co/Proyecto BL Paraguay/brujula/img/
     cand-camilo.jpg     Camilo Pérez López Moreira   · ANR – Partido Colorado · Lista 1
     cand-soledad.jpg    Soledad Núñez Méndez         · Alianza Juntos por Asunción · Lista 4
-    cand-rodri.jpg      Rodrigo "Rodri" Franco Arriola · Partido Demócrata Cristiano · Lista 6
-    cand-arlene.jpg     Edith Arlene Aquino Morel    · Partido Patria Soñada · Lista 300
 ```
 
 Los nombres de archivo son **exactos** (minúsculas, sin tildes, `.jpg`). El `id` de cada
@@ -45,7 +43,7 @@ Se pueden encender de a una: el que tenga foto la muestra, el que no, sigue con 
 
 ## ⚠️ Lo que NO hay que hacer
 
-**No generar las fotos con IA.** Son cuatro personas reales en campaña; una imagen
+**No generar las fotos con IA.** Son dos personas reales en campaña; una imagen
 sintética de una persona real dentro de una herramienta electoral es una foto falsa,
 por más que se le parezca. Tienen que ser fotografías reales, de una fuente que se pueda
 citar.
@@ -58,9 +56,9 @@ ya contempla ese caso y no se rompe.
 
 Copiar y pegar:
 
-> Necesito la foto oficial de campaña de cada uno de los cuatro candidatos a la
+> Necesito la foto oficial de campaña de los dos candidatos a la
 > Intendencia de Asunción (Paraguay) en la elección municipal del 4 de octubre de 2026.
-> Son estos cuatro, con sus cuentas verificadas:
+> Son estos dos, con sus cuentas verificadas:
 >
 > 1. **Camilo Pérez López Moreira** — ANR/Partido Colorado, Lista 1. Presidente del
 >    Comité Olímpico Paraguayo desde 2011, miembro del COI. Instagram y Facebook
@@ -68,11 +66,6 @@ Copiar y pegar:
 > 2. **Soledad Núñez Méndez** — Alianza Juntos por Asunción, Lista 4. Ingeniera civil,
 >    ex titular de Senavitat, candidata a vicepresidenta en 2023. Instagram @sole.nu,
 >    X @solenu.
-> 3. **Rodrigo Franco Arriola, "Rodri Franco"** — Partido Demócrata Cristiano, Lista 6.
->    Conocido como "Bukele'i". Instagram y X @rodrifrancopy.
-> 4. **Edith Arlene Aquino Morel** — Partido Patria Soñada, Lista 300. Abogada y
->    escribana. Instagram @arleneaquinomorel, X @ArleneAquino. Sitio de campaña
->    "Arlene es Asunción".
 >
 > Para cada uno necesito: **una fotografía real** de retrato (cabeza y hombros, de frente,
 > cara centrada), de su material de campaña, de sus redes verificadas o de prensa
@@ -85,7 +78,7 @@ Copiar y pegar:
 > decímelo en vez de sustituirla.
 >
 > Entregá cada una recortada cuadrada 400×400 px con la cara centrada, en JPG, nombradas
-> exactamente `cand-camilo.jpg`, `cand-soledad.jpg`, `cand-rodri.jpg`, `cand-arlene.jpg`.
+> exactamente `cand-camilo.jpg` y `cand-soledad.jpg`.
 
 ## Uso
 

@@ -27,18 +27,24 @@ def parse_version(start, end):
         i += 1
     return questions
 
-v1 = parse_version(8, 875)
-v2 = parse_version(875, 1742)
+v1_start = next(i for i, text in enumerate(paras) if text.startswith("VERSIÓN 1."))
+v2_start = next(i for i, text in enumerate(paras) if text.startswith("VERSIÓN 2."))
+matrix_start = next(i for i, text in enumerate(paras) if text.startswith("MATRIZ MAESTRA"))
+v1 = parse_version(v1_start, v2_start)
+v2 = parse_version(v2_start, matrix_start)
 scores = {}
 for row in doc.tables[0].rows[1:]:
     cells = [c.text.strip() for c in row.cells]
     code = cells[0]
     positions = {}
-    for candidate, raw in zip(("camilo", "soledad", "rodri", "arlene"), cells[4:]):
-        m = re.match(r"(\d) \(([AMB])\)", raw)
+    for candidate, raw in zip(("camilo", "soledad"), cells[3:5]):
+        m = re.match(r"(\d)\s*[·(]\s*([EIAMB])", raw)
         if not m:
             raise ValueError(f"Posición inválida: {code} {candidate} {raw}")
-        positions[candidate] = {"pos": int(m.group(1)), "conf": m.group(2)}
+        # E (explícita) entra como evidencia alta; I (inferencia sustentada), media.
+        evidence = m.group(2)
+        confidence = {"E": "A", "I": "M"}.get(evidence, evidence)
+        positions[candidate] = {"pos": int(m.group(1)), "conf": confidence, "evidencia": evidence}
     scores[code] = positions
 
 bank = []
