@@ -41,13 +41,15 @@
 #     pone timeout y anota rc/duración; al final `salud/check.py` junta eso con
 #     la frescura de S3 y el estado de la Lambda en `diario/estado.json`.
 #
-# launchd corre con un entorno mínimo → fijamos PATH (aws y python3 viven en
-# /opt/homebrew/bin) y HOME lo pone launchd (para que aws lea ~/.aws/credentials).
+# launchd y systemd corren con un entorno mínimo → fijamos PATH. `CAUDAL_REPO`
+# permite usar exactamente este mismo runner en una máquina remota sin rutas de
+# macOS; si no viene definida, se deriva desde la ubicación del script.
 # El ritmo lento embebido en harvest_diario esquiva el WAF; una corrida diaria
 # baja SOLO los PDFs nuevos, así que reintentos suaves no reactivan el ban.
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-REPO="/Users/ricardoruiz/ricardoruiz.co"
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPO="${CAUDAL_REPO:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 DIARIO="$REPO/Bases de datos/leyes-senado/diario"
 LOG="$DIARIO/cron.log"
 LOCK="$DIARIO/.run_diario.lock"
