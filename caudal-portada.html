@@ -673,13 +673,25 @@
         process:{type:'Seguimiento legislativo',title:'El trámite se mueve',copy:'Una nueva ponencia, debate o modificación puede alterar las probabilidades y el alcance de un proyecto. El radar hace visible ese cambio a tiempo.'}
       };
       if(!dialog||!type||!title||!copy||!link||typeof dialog.showModal!=='function') return;
+      /* Pintar el modal vive aparte porque se usa dos veces: con el texto de
+         maqueta al abrir, y otra vez con el dato real cuando la API responde. */
+      function pinta(d){
+        type.textContent=d.type; title.textContent=d.title; copy.textContent=d.copy;
+        link.hidden=!d.url;
+        if(d.url){
+          link.href=d.url;
+          /* mandar al PDF del radicado no es lo mismo que a una ficha: el boton lo dice */
+          link.innerHTML=(/\.pdf($|\?)/i.test(d.url)?'Ver el texto radicado':'Ver fuente oficial')
+            +' <span aria-hidden="true">↗</span>';
+        }
+      }
       document.querySelectorAll('.blip[data-detail]').forEach(signal=>signal.addEventListener('click',()=>{
-        const detail=details[signal.dataset.detail];
+        const k=signal.dataset.detail, detail=details[k];
         if(!detail) return;
-        type.textContent=detail.type; title.textContent=detail.title; copy.textContent=detail.copy;
-        link.hidden=!detail.url;
-        if(detail.url) link.href=detail.url;
+        dialog.dataset.k=k;      /* para que un dato lento no pise otra señal ya abierta */
+        pinta(detail);
         dialog.showModal();
+        conDato(k);
       }));
 
       /* ─── La señal legislativa sale del feed real, no del texto de arriba ───
@@ -731,13 +743,113 @@
                `\n\nProyecto ${u.numero||''} · ${u.camara}${u.comision?' · Comisión '+u.comision:''}. Leído del registro oficial${leido?' el '+enLetras(leido):''}.`,
           url:u.pdf?`${S3PDF}/${u.pdf}`:(u.fuente||'https://leyes.senado.gov.co/proyectos-de-ley')
         };
-        /* si hay PDF el botón lo dice: no es lo mismo mandar al texto radicado
-           que a un listado donde el cliente tiene que buscarlo él */
-        if(u.pdf&&link) link.innerHTML='Ver el texto radicado <span aria-hidden="true">↗</span>';
         /* la etiqueta que se ve en el sextante, sin abrir nada */
         const blip=document.querySelector('.blip[data-detail="education-bill"]');
         if(blip) blip.dataset.label=`PL · ${(titulo||'nuevo radicado').toLowerCase().slice(0,46)}`;
       }).catch(()=>{ /* se queda la maqueta; la portada no depende de esto */ });
+
+      /* ─── Las otras señales, bajo demanda ────────────────────────────────
+         Se piden al HACER CLIC, no al cargar: esta es la landing comercial y
+         no puede disparar cinco llamadas a la API en cada visita. El modal
+         abre de una con el texto de maqueta —nunca una pantalla vacía— y el
+         dato real lo reemplaza cuando llega. Si la API no responde, se queda
+         la maqueta y no se avisa: aquí un error tecnico no le dice nada al
+         visitante.
+         Cada señal declara de dónde salió y con qué corte, que es lo que la
+         vuelve verificable. Redes no está: el piloto de escucha social esta
+         congelado y no hay fuente que consultar. */
+      const API='https://rr-auth.reruizc.workers.dev/caudal/api';
+      const cacheSenal={};
+      const pedir=async body=>{
+        const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        if(!r.ok) throw new Error(r.status);
+        const d=await r.json(); if(d&&d.error) throw new Error(d.error); return d;
+      };
+      const primero=(d,...llaves)=>{for(const k of llaves){const v=d&&d[k];if(Array.isArray(v)&&v.length)return v[0];}return null;};
+      /* la sancion mas reciente de una entidad: la accion filtra por texto y
+         aca se confirma contra el nombre de la fuente, para no colar la de otra */
+      const deEntidad=(d,re)=>((d.resultados||d.recientes||[]).filter(x=>re.test(x.fuente_nombre||x.fuente||''))
+        .sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||''))))[0]||null;
+
+      const FUENTES={
+        decree:{
+          req:{action:'ejecutivo'},
+          arma(d){
+            const x=primero(d,'recientes'); if(!x) return null;
+            const f=ymd(x.fecha), tipo=(x.tipo||'Norma');
+            return {
+              type:`Señal regulatoria · ${tipo}${f?' del '+enLetras(f):''}`,
+              title:recorta(x.titulo||`${tipo} ${x.numero||''}`,88),
+              copy:`${recorta(x.descripcion||x.titulo||'',300)}\n\n${tipo} ${x.numero||''} de ${x.anio||''} · Presidencia. Uno de ${(d.total||0).toLocaleString('es-CO')} actos del Ejecutivo que sigue Caudal.`,
+              url:x.url||''
+            };
+          }
+        },
+        headlines:{
+          req:{action:'medios'},
+          arma(d){
+            const x=primero(d,'resultados'); if(!x) return null;
+            return {
+              type:'Conversación pública · prensa rastreada por tema',
+              title:recorta(x.titulo||'Titulares en el radar',88),
+              copy:`${x.medio||'Medio'}${x.alcance?' · '+x.alcance:''}.\n\n${(d.n||0).toLocaleString('es-CO')} titulares de ${(d.n_medios||0)} medios distintos en la ventana consultada. Caudal los agrupa por tema para separar el volumen del ruido.`,
+              url:x.url||''
+            };
+          }
+        },
+        supersalud:{
+          req:{action:'sanciones',query:'supersalud'},
+          arma:d=>armaSancion(d,/salud/i,'Supersalud')
+        },
+        sic:{
+          req:{action:'sanciones',query:'industria y comercio'},
+          arma:d=>armaSancion(d,/industria y comercio/i,'SIC')
+        },
+        sucop:{
+          req:{action:'sucop'},
+          arma(d){
+            const x=primero(d,'recientes'); if(!x) return null;
+            const ab=(d.ventana&&d.ventana.abiertas)||0;
+            return {
+              type:`Oportunidad · consulta pública${ab?` · ${ab} abiertas hoy`:''}`,
+              title:recorta(x.titulo||x.objeto||'Consulta abierta',88),
+              copy:`${recorta(x.objeto||x.titulo||'',300)}\n\n${x.entidad||'Entidad'}${x.sector?' · '+x.sector:''}. Es un borrador en consulta: todavía admite comentarios antes de que la norma se expida.`,
+              url:x.url||''
+            };
+          }
+        }
+      };
+      function armaSancion(d,re,corto){
+        const x=deEntidad(d,re); if(!x) return null;
+        const f=ymd(x.fecha), monto=Number(x.monto||0);
+        /* ⚠️ El slim escribe "—" cuando el acto no tiene destinatario, y un guion
+           es truthy: sin esto el titulo cae al tipo de acto y sale un escueto
+           "sancion". Es el mismo tropiezo del motor de alertas — sin entidad,
+           el titular es el ACTO MISMO, que es lo que de verdad describe algo. */
+        const quien=(x.sancionado||'').replace(/^[\s—–\-]*$/,'').trim();
+        const motivo=(x.motivo||x.descripcion||'').trim();
+        const titulo=quien||motivo||x.tipo_acto||'Actuación de control';
+        /* si el motivo ya subio a titulo, no repetirlo debajo */
+        const cuerpo=quien?motivo:'';
+        return {
+          type:`Control sectorial · ${corto}${f?' · '+enLetras(f):''}`,
+          title:recorta(titulo,88),
+          copy:`${cuerpo?recorta(cuerpo,300)+'\n\n':''}${monto?`Monto: $${monto.toLocaleString('es-CO')}.\n\n`:''}${x.fuente_nombre||corto}${x.resolucion?' · '+x.resolucion:''}. Tomado del registro de actos que Caudal consulta a diario.`,
+          url:x.url||''
+        };
+      }
+
+      /* pinta y, si la señal tiene fuente, la sustituye por el dato real */
+      async function conDato(k){
+        if(!FUENTES[k]) return;
+        if(cacheSenal[k]===undefined){
+          try{ cacheSenal[k]=FUENTES[k].arma(await pedir(FUENTES[k].req)); }
+          catch(e){ cacheSenal[k]=null; }
+        }
+        const real=cacheSenal[k];
+        if(!real||!dialog.open||dialog.dataset.k!==k) return;   // ya cerró o cambió de señal
+        pinta(real);
+      }
     })();
 
     // ─── REENVÍO DE TOKEN DE INVITADO (?acceso=) A LA PLATAFORMA ───────────────
