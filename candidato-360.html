@@ -51,6 +51,30 @@
 /* Foto de hoja de vida para el encabezado del CRM. */
 .profile{position:relative}.profile .avatar.crm-avatar-hidden{display:none}.crm-profile-photo,.crm-profile-photo-missing{width:116px;height:142px;flex:0 0 116px;object-fit:cover;object-position:center;border:1px solid var(--line);background:#d8e8e0}.crm-profile-photo{animation:photoIn .3s ease}.crm-profile-photo-missing{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;text-align:center;color:var(--muted);font-size:11px;line-height:1.35}.crm-profile-photo-missing strong{color:var(--ink);font-size:24px;margin-bottom:8px}.crm-profile-photo-missing a{display:inline-block;margin-top:8px;color:var(--green);font-weight:800;text-decoration:none;border-bottom:1px solid currentColor}@keyframes photoIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}@media(max-width:620px){.crm-profile-photo,.crm-profile-photo-missing{width:76px;height:94px;flex-basis:76px}.crm-profile-photo-missing strong{font-size:18px}}
 </style>
+<style>
+/* Pantalla de espera del índice electoral: los concejos y las JAL son el 92,5%
+   de las candidaturas y llegan de dos en dos, así que la lista tarda. Cuadritos
+   + progreso real + datos curiosos, mismo criterio que analisis-candidato.html. */
+.idx-load{border:1px solid var(--line);background:var(--cream);padding:18px 20px;margin-bottom:14px}
+.idx-load-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.idx-load-count{font:800 26px var(--sans);letter-spacing:-.02em;color:var(--ink)}
+.idx-load-count b{color:var(--green)}
+.idx-load-state{font:500 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.idx-bar{height:5px;background:rgba(16,34,56,.09);margin:12px 0 4px;overflow:hidden}
+.idx-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--mint));transition:width .45s ease}
+.idx-fact{margin-top:14px;padding-top:13px;border-top:1px solid var(--line);font-size:13.5px;line-height:1.5;color:var(--muted);min-height:56px;transition:opacity .28s}
+.idx-fact.fade{opacity:0}
+.idx-fact b{color:var(--ink);font-weight:700}
+.idx-kicker{display:block;font:600 10px var(--mono);letter-spacing:.11em;text-transform:uppercase;color:var(--green);margin-bottom:5px}
+.idx-skel{display:grid;gap:9px}
+.idx-skel-row{display:flex;align-items:center;gap:13px;border:1px solid var(--line);background:var(--cream);padding:13px 15px}
+.idx-skel-av{width:38px;height:38px;flex:0 0 38px;border-radius:50%}
+.idx-skel-l{flex:1;display:grid;gap:7px}
+.idx-sh{background:linear-gradient(90deg,rgba(16,34,56,.055) 25%,rgba(16,34,56,.11) 37%,rgba(16,34,56,.055) 63%);background-size:400% 100%;animation:idxsh 1.4s ease infinite;height:11px}
+.idx-sh.w60{width:60%}.idx-sh.w35{width:35%}
+@keyframes idxsh{0%{background-position:100% 50%}100%{background-position:0 50%}}
+@media(prefers-reduced-motion:reduce){.idx-sh{animation:none}}
+</style>
 </head>
 <body>
 <div class="preload active" id="preload"><div class="preload-card"><div class="preload-mark"></div><div class="kicker" style="color:#91d5a9">Candidato 360 · Colombia</div><h2>Estamos preparando su estrategia.</h2><p id="preloadText">Calculando cuánto necesita para ganar…</p><div class="load-track"><i id="preloadBar"></i></div><div class="load-meta" id="preloadMeta">Preparando inteligencia electoral</div></div></div>
@@ -66,12 +90,29 @@
 </main>
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
-<script src="cand-index.js"></script>
+<script src="cand-index.js?v=20260821"></script>
 <!-- La versión evita reutilizar una estimación anterior desde la caché del navegador. -->
 <script src="vote-target.js?v=20260827-alcaldia"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
-const S3=RRData.publicUrl('congreso-2026/output');const DANE_BY_DEPARTMENT={'AMAZONAS':'91','ANTIOQUIA':'05','ARAUCA':'81','ATLÁNTICO':'08','BOLÍVAR':'13','BOYACÁ':'15','CALDAS':'17','CAQUETÁ':'18','CASANARE':'85','CAUCA':'19','CESAR':'20','CHOCÓ':'27','CÓRDOBA':'23','CUNDINAMARCA':'25','GUAINÍA':'94','GUAVIARE':'95','HUILA':'41','LA GUAJIRA':'44','MAGDALENA':'47','META':'50','NARIÑO':'52','NORTE DE SANTANDER':'54','PUTUMAYO':'86','QUINDÍO':'63','RISARALDA':'66','SAN ANDRÉS Y PROVIDENCIA':'88','SANTANDER':'68','SUCRE':'70','TOLIMA':'73','VALLE DEL CAUCA':'76','VAUPÉS':'97','VICHADA':'99','BOGOTÁ D.C.':'11'};const PARTY_INDEXES=['asamblea-2023/index-asamblea-2023.json','gobernacion-2023/index-gobernacion-2023.json','alcaldia-2023/index-alcaldia-2023.json','concejo-2023/index-concejo-2023.json','jal-2023/index-jal-2023.json'];const MUNICIPAL_ELECTIONS=['concejo','alcaldia','jal'];let municipalitiesByDepartment={},comunasData=null;const screens=[...document.querySelectorAll('.screen')];function showScreen(id){screens.forEach(s=>s.classList.toggle('hidden',s.id!==id));scrollTo({top:0,behavior:'smooth'});if(id==='existing')setTimeout(()=>candidateSearch.focus(),80)}function showIntroInfo(topic){const copy={how:'<b>Así funciona.</b> Partimos de su historial electoral —o de una candidatura nueva— y conectamos territorio, resultados, conversación pública y agenda normativa en un mismo CRM.',why:'<b>Por qué elegirnos.</b> Porque reúne en un solo lugar evidencia electoral territorial, análisis de competencia y seguimiento de campaña: una lectura que hoy no ofrece otra plataforma para candidaturas en Colombia.'};introInfo.innerHTML=copy[topic];introInfo.classList.add('active')}function clean(v){return v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}function searchCandidate(v){const ok=clean(v).includes('julian')||clean(v).includes('rodriguez')||v.trim()==='';document.querySelector('.result').classList.toggle('hidden',!ok);noResult.classList.toggle('hidden',ok)}function openJulian(){showScreen('dashboard')}function togglePublicName(){publicNameField.classList.toggle('hidden',!publicFigure.checked);publicName.required=publicFigure.checked}function toggleParty(){const isNew=partyMode.value==='new';partyExisting.classList.toggle('hidden',isNew);partyNew.classList.toggle('hidden',!isNew);party.required=!isNew;partyName.required=isNew}function optionList(items,label){return `<option value="">${label}</option>`+items.map(x=>`<option value="${x.value||x}">${x.label||x}</option>`).join('')}async function loadDepartments(){try{const data=await fetch(`${S3}/mapas-2026/DEPARTAMENTOS2.json`).then(r=>r.ok?r.json():Promise.reject());const departments=data.features.map(f=>f.properties.name).filter(n=>DANE_BY_DEPARTMENT[n]).sort((a,b)=>a.localeCompare(b,'es'));department.innerHTML=optionList(departments.map(name=>({value:DANE_BY_DEPARTMENT[name],label:name})),'Seleccione un departamento');}catch(e){department.innerHTML='<option value="">No se pudieron cargar los departamentos</option>'}}async function loadMunicipalities(){const dep=department.value;if(!dep)return;municipality.innerHTML='<option value="">Cargando municipios…</option>';try{let data=municipalitiesByDepartment[dep];if(!data){data=await fetch(`${S3}/mapas-2026/Departamentos-mps/${dep}.json`).then(r=>r.ok?r.json():Promise.reject());municipalitiesByDepartment[dep]=data}const municipalities=[...new Set(data.features.map(f=>f.properties.mpio_cnmbr).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));municipality.innerHTML=optionList(municipalities,'Seleccione municipio o distrito');}catch(e){municipality.innerHTML='<option value="">No se pudieron cargar los municipios</option>'}}async function loadLocalities(){locality.innerHTML='<option value="">Cargando comunas o localidades…</option>';localityStatus.textContent='';try{if(!comunasData){const raw=await fetch(`${S3}/Divipole-actualizado/COMUNAS_DATA.csv`).then(r=>r.ok?r.text():Promise.reject());comunasData=raw.split(/\r?\n/).slice(1).map(row=>row.replace(/^\uFEFF/,'').split(';'))}const dep=department.options[department.selectedIndex].text.toUpperCase(),mun=municipality.value.toUpperCase();const localities=[...new Set(comunasData.filter(row=>row[5]===dep&&row[6]===mun).map(row=>row[10]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));locality.innerHTML=optionList(localities,'Seleccione comuna o localidad');localityStatus.textContent=localities.length?`${localities.length} comunas o localidades disponibles.`:'No hay una división local disponible para este municipio en la fuente actual.'}catch(e){locality.innerHTML='<option value="">No se pudieron cargar las comunas o localidades</option>';localityStatus.textContent='La fuente territorial no está disponible en este momento.'}}function updateTerritory(){const municipal=MUNICIPAL_ELECTIONS.includes(election.value);municipalityField.classList.toggle('hidden',!municipal);localityField.classList.toggle('hidden',election.value!=='jal');municipality.required=municipal;locality.required=election.value==='jal';if(municipal&&department.value)loadMunicipalities();else municipality.innerHTML='<option value="">Primero seleccione departamento</option>';if(election.value!=='jal')locality.innerHTML='<option value="">Primero seleccione municipio</option>'}function updateLocality(){if(election.value==='jal'&&municipality.value)loadLocalities()}async function loadParties(){try{const all=await Promise.all(PARTY_INDEXES.map(path=>fetch(`${S3}/${path}`).then(r=>r.ok?r.json():Promise.reject())));const parties=[...new Set(all.flatMap(data=>(data.candidatos||[]).map(c=>c.partido).filter(Boolean)))].sort((a,b)=>a.localeCompare(b,'es'));party.innerHTML=optionList(parties,'Seleccione de la base');partyStatus.textContent=`${parties.length} partidos, movimientos, coaliciones y listas encontrados en los índices territoriales.`}catch(e){party.innerHTML='<option value="">No se pudo cargar la base de partidos</option>';partyStatus.textContent='Intente de nuevo en unos segundos.'}}function createNew(e){e.preventDefault();const name=newName.value.trim(),territory=election.value==='jal'?locality.value:municipality.value||department.options[department.selectedIndex].text;newInitials.textContent=name.split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase();welcomeName.textContent=`Bienvenido, ${name.split(' ')[0]}.`;welcomeMeta.textContent=`Su candidatura en ${territory} ya tiene un punto de partida.${publicFigure.checked?' También dejaremos preparada la consulta de identidad pública en DeepSec.':''}`;showScreen('created')};toggleParty();loadDepartments();loadParties();
+const S3=RRData.publicUrl('congreso-2026/output');/* Los códigos de departamento los pone el bloque electoral de abajo. El nombre
+   del archivo Departamentos-mps/{cod}.json es el código ELECTORAL, no el DANE:
+   01.json es Antioquia (DANE 05) y 05.json es Bolívar (DANE 13). Un diccionario
+   DANE aquí no da 404: carga el departamento equivocado con HTTP 200. */
+const MUNICIPAL_ELECTIONS=['concejo','alcaldia','jal'];let municipalitiesByDepartment={},comunasData=null;const screens=[...document.querySelectorAll('.screen')];function showScreen(id){screens.forEach(s=>s.classList.toggle('hidden',s.id!==id));scrollTo({top:0,behavior:'smooth'});if(id==='existing')setTimeout(()=>candidateSearch.focus(),80)}function showIntroInfo(topic){const copy={how:'<b>Así funciona.</b> Partimos de su historial electoral —o de una candidatura nueva— y conectamos territorio, resultados, conversación pública y agenda normativa en un mismo CRM.',why:'<b>Por qué elegirnos.</b> Porque reúne en un solo lugar evidencia electoral territorial, análisis de competencia y seguimiento de campaña: una lectura que hoy no ofrece otra plataforma para candidaturas en Colombia.'};introInfo.innerHTML=copy[topic];introInfo.classList.add('active')}function clean(v){return v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}function searchCandidate(v){const ok=clean(v).includes('julian')||clean(v).includes('rodriguez')||v.trim()==='';document.querySelector('.result').classList.toggle('hidden',!ok);noResult.classList.toggle('hidden',ok)}function openJulian(){showScreen('dashboard')}function togglePublicName(){publicNameField.classList.toggle('hidden',!publicFigure.checked);publicName.required=publicFigure.checked}function toggleParty(){const isNew=partyMode.value==='new';partyExisting.classList.toggle('hidden',isNew);partyNew.classList.toggle('hidden',!isNew);party.required=!isNew;partyName.required=isNew}function optionList(items,label){return `<option value="">${label}</option>`+items.map(x=>`<option value="${x.value||x}">${x.label||x}</option>`).join('')}async function loadMunicipalities(){const dep=department.value;if(!dep)return;municipality.innerHTML='<option value="">Cargando municipios…</option>';try{let data=municipalitiesByDepartment[dep];if(!data){data=await fetch(`${S3}/mapas-2026/Departamentos-mps/${dep}.json`).then(r=>r.ok?r.json():Promise.reject());municipalitiesByDepartment[dep]=data}const municipalities=[...new Set(data.features.map(f=>f.properties.mpio_cnmbr).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));municipality.innerHTML=optionList(municipalities,'Seleccione municipio o distrito');}catch(e){municipality.innerHTML='<option value="">No se pudieron cargar los municipios</option>'}}async function loadLocalities(){locality.innerHTML='<option value="">Cargando comunas o localidades…</option>';localityStatus.textContent='';try{if(!comunasData){const raw=await fetch(`${S3}/Divipole-actualizado/COMUNAS_DATA.csv`).then(r=>r.ok?r.text():Promise.reject());comunasData=raw.split(/\r?\n/).slice(1).map(row=>row.replace(/^\uFEFF/,'').split(';'))}const dep=department.options[department.selectedIndex].text.toUpperCase(),mun=municipality.value.toUpperCase();const localities=[...new Set(comunasData.filter(row=>row[5]===dep&&row[6]===mun).map(row=>row[10]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));locality.innerHTML=optionList(localities,'Seleccione comuna o localidad');localityStatus.textContent=localities.length?`${localities.length} comunas o localidades disponibles.`:'No hay una división local disponible para este municipio en la fuente actual.'}catch(e){locality.innerHTML='<option value="">No se pudieron cargar las comunas o localidades</option>';localityStatus.textContent='La fuente territorial no está disponible en este momento.'}}function updateTerritory(){const municipal=MUNICIPAL_ELECTIONS.includes(election.value);municipalityField.classList.toggle('hidden',!municipal);localityField.classList.toggle('hidden',election.value!=='jal');municipality.required=municipal;locality.required=election.value==='jal';if(municipal&&department.value)loadMunicipalities();else municipality.innerHTML='<option value="">Primero seleccione departamento</option>';if(election.value!=='jal')locality.innerHTML='<option value="">Primero seleccione municipio</option>'}function updateLocality(){if(election.value==='jal'&&municipality.value)loadLocalities()}/* Los partidos salen del indice que ya esta en memoria: son las mismas cinco
+   fuentes territoriales de 2023 que CandRegistry descarga de todos modos. Antes
+   se pedían aparte con Promise.all (3,5 MB duplicados, en paralelo, desde el
+   primer segundo) y eso era lo que dejaba la busqueda esperando: el índice de
+   concejo compitiendo consigo mismo. Se repinta cada vez que llega una fuente. */
+const PARTY_SOURCES=new Set(['asamblea','gob2023','alc2023','concejo','jal']);
+function loadParties(){
+  const parties=[...new Set(historicalIndex.filter(c=>PARTY_SOURCES.has(c.source)).map(c=>c.partido).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  if(!parties.length){party.innerHTML='<option value="">Cargando la base de partidos…</option>';partyStatus.textContent='Se completa mientras llega el índice electoral.';return}
+  const elegido=party.value;
+  party.innerHTML=optionList(parties,'Seleccione de la base');
+  if(elegido)party.value=elegido;
+  partyStatus.textContent=`${parties.length} partidos, movimientos, coaliciones y listas encontrados en los índices territoriales.${historicalLocalDone?'':' Siguen llegando.'}`;
+}function createNew(e){e.preventDefault();const name=newName.value.trim(),territory=election.value==='jal'?locality.value:municipality.value||department.options[department.selectedIndex].text;newInitials.textContent=name.split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase();welcomeName.textContent=`Bienvenido, ${name.split(' ')[0]}.`;welcomeMeta.textContent=`Su candidatura en ${territory} ya tiene un punto de partida.${publicFigure.checked?' También dejaremos preparada la consulta de identidad pública en DeepSec.':''}`;showScreen('created')};toggleParty();loadParties();
 </script>
 <script>
 /* Los archivos municipales de la plataforma se organizan por código electoral,
@@ -84,7 +125,7 @@ let historicalIndex=[], historicalLoaded=0, historicalSources=0, historicalLocal
 const historicalTotal=CandRegistry.SOURCES.length+CandRegistry.LOCAL_SOURCES.length;
 const escHtml=s=>String(s||'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const STRATEGY_LOADING_MESSAGES=['Calculando cuánto necesita para ganar…','Midiendo el momentum de cada partido político…','Analizando cómo votaron en su barrio en la última elección…','Identificando dónde puede crecer su campaña…','Conectando las señales que pueden mover la elección…'];let strategyLoadingIndex=Math.floor(Math.random()*STRATEGY_LOADING_MESSAGES.length);function rotateStrategyMessage(){preloadText.textContent=STRATEGY_LOADING_MESSAGES[strategyLoadingIndex];strategyLoadingIndex=(strategyLoadingIndex+1)%STRATEGY_LOADING_MESSAGES.length}function paintIndexProgress(){historicalSources++;preloadBar.style.width=`${Math.min(96,7+(historicalSources/historicalTotal)*89)}%`;preloadMeta.textContent='Preparando inteligencia electoral';const note=document.getElementById('searchNote');if(note)note.textContent='La información electoral se está preparando en segundo plano.'}
-function appendHistorical(list){if(!list||!list.length)return;historicalIndex=historicalIndex.concat(list);if(candidateSearch?.value.trim().length>=2)searchCandidate(candidateSearch.value);}
+function appendHistorical(list){if(!list||!list.length)return;historicalIndex=historicalIndex.concat(list);if(typeof loadParties==='function')loadParties();if(candidateSearch?.value.trim().length>=2)searchCandidate(candidateSearch.value);}
 async function prepareHistoricalIndex(){
   historicalBaseReady=true;
   const base=CandRegistry.load({includeParties:false,onSource:(list,src)=>{historicalLoaded+=list.length;appendHistorical(list);paintIndexProgress()}});
@@ -118,7 +159,13 @@ const candidateProfiles=new Map();
    componentes del nombre coinciden, representa a una sola persona y no a una
    tarjeta por cada elección. El historial conserva todas sus candidaturas. */
 function fourNameKey(candidate){const key=CandRegistry.personaKey(candidate?.nombre),isRobertoOrtizCali=key==='ROBERTO ORTIZ URUENA'&&normalizedText(candidate?.circunscripcion).includes('CALI');return isRobertoOrtizCali?`CALI-${key}`:key.split(/\s+/).filter(Boolean).length===4?key:''}
-function candidateYear(candidate){return Number(String(candidate?.corp||'').match(/20\d{2}/)?.[0]||0)}
+/* El año sale del corp ("ALCALDÍA · BOGOTÁ D.C. · 2019"). Medido sobre los
+   índices: la ÚNICA fuente que no lo trae es endoso (2.822 candidaturas de 2026,
+   corp "SENADO" / "CÁMARA" / "CONSULTAS"), y quedaban en año 0 → se ordenaban al
+   FINAL del historial, así que history[0] no era la candidatura más reciente: la
+   ficha tomaba el slug de 2023 y con él su foto, que solo existe para las de 2026. */
+const SRC_YEAR={endoso:2026};
+function candidateYear(candidate){return Number(String(candidate?.corp||'').match(/20\d{2}/)?.[0]||SRC_YEAR[candidate?.source]||0)}
 function candidateProfile(candidate){const key=fourNameKey(candidate);if(!key)return{...candidate,id:candidate.slug};const seen=new Set;const history=historicalIndex.filter(item=>fourNameKey(item)===key).filter(item=>{const itemKey=item.slug||`${item.nombre}|${item.corp}|${item.partido}`;if(seen.has(itemKey))return false;seen.add(itemKey);return true}).sort((a,b)=>candidateYear(b)-candidateYear(a));if(history.length<2)return{...candidate,id:candidate.slug};const years=[...new Set(history.map(candidateYear).filter(Boolean))].sort((a,b)=>a-b);return{...history[0],id:`persona-${key.toLowerCase().replace(/\s+/g,'-')}`,nombre:history[0].nombre,history,historyVotes:history.reduce((sum,item)=>sum+Number(item.votos||0),0),historyLabel:`${history.length} candidaturas registradas · ${years.join(', ')}`}}
 const CRM_CORPORATIONS={concejo:'Concejo municipal o distrital',alcaldia:'Alcaldía municipal o distrital',jal:'Junta administradora local',asamblea:'Asamblea departamental',gobernacion:'Gobernación'};
 function historicalCorporation(candidate){const first=String(candidate.corp||'').split('·')[0].trim().toLowerCase();if(first.includes('jal')||first.includes('administradora'))return CRM_CORPORATIONS.jal;if(first.includes('concejo'))return CRM_CORPORATIONS.concejo;if(first.includes('alcald'))return CRM_CORPORATIONS.alcaldia;if(first.includes('asamblea'))return CRM_CORPORATIONS.asamblea;if(first.includes('gobern'))return CRM_CORPORATIONS.gobernacion;return candidate.corp||'Corporación anterior'}
@@ -137,72 +184,20 @@ function normalizedText(value){return String(value||'').normalize('NFD').replace
 function depCodeFromFeature(props){return String(props?.electoral_id??props?.ELECTORAL_ID??props?.codigo??props?.COD_DEP??'').replace(/^0+/,'')||'0'}
 function depNameFromFeature(props){return props?.name||props?.nombre||props?.DEP_NOMBRE||props?.dpto_cnmbr||'Departamento'}
 function rotateGeoJSON90Left(geoData){const cx=-74.08,cy=4.65,rotate=([lon,lat])=>[cx-(lat-cy),cy+(lon-cx)],geometry=geom=>geom.type==='Polygon'?{...geom,coordinates:geom.coordinates.map(ring=>ring.map(rotate))}:geom.type==='MultiPolygon'?{...geom,coordinates:geom.coordinates.map(polygon=>polygon.map(ring=>ring.map(rotate)))}:geom;return{...geoData,features:geoData.features.map(feature=>({...feature,geometry:geometry(feature.geometry)}))}}
-function renderMapBreakdown(votesByArea,namesByArea,title){const rows=Object.entries(votesByArea).map(([key,v])=>({name:namesByArea[key]||key,v:Number(v)||0})).filter(row=>row.v>0).sort((a,b)=>b.v-a.v),max=Math.max(1,...rows.map(row=>row.v));crmBreakdown.innerHTML=`<h4 id="crmBreakdownTitle">${title}</h4>`+(rows.length?rows.map(row=>`<div class="crm-breakdown-item"><div class="crm-breakdown-row"><b>${escHtml(row.name)}</b><span>${row.v.toLocaleString('es-CO')}</span></div><div class="crm-breakdown-bar"><i style="width:${Math.max(3,Math.round(row.v/max*100))}%"></i></div></div>`).join(''):'<p class="helper">No hay votos desagregados disponibles.</p>')}
-async function loadHistoricalMap(candidate){const mapEl=document.getElementById('crmMap');crmMapTitle.textContent='¿Dónde estuvo su votación?';crmMapVotes.textContent='Cargando';crmMapNote.textContent='Cargando distribución territorial desde el historial del candidato.';try{const candidateData=await fetch(candidate.dataUrl).then(r=>r.ok?r.json():Promise.reject());const mesas=candidateData.mesas||[],total=mesas.reduce((sum,m)=>sum+Number(m.v||0),0)||Number(candidate.votos)||0,isBogotaLocal=String(candidate.corp||'').startsWith('JAL')&&mesas.some(m=>String(m.dep)==='16');let geoData,votesByArea,namesByArea,featureCode,featureName,detailNote,breakdownTitle;if(isBogotaLocal){geoData=rotateGeoJSON90Left(await fetch(`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`).then(r=>r.ok?r.json():Promise.reject()));votesByArea={};namesByArea={};mesas.forEach(m=>{const key=String(m.com||m.zon||'').padStart(2,'0');votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=m.comNom||`Localidad ${key}`});featureCode=p=>String(p.LocCodigo||'').padStart(2,'0');featureName=p=>p.LocNombre||'Localidad';crmMapTitle.textContent='¿Dónde estuvo su votación en Bogotá?';detailNote='Distribución por localidad de su candidatura JAL, con la misma orientación del mapa de Análisis de Candidato.';breakdownTitle='Votos por localidad'}else{geoData=await fetch(`${S3}/mapas-2026/DEPARTAMENTOS2.json`).then(r=>r.ok?r.json():Promise.reject());votesByArea={};namesByArea={};mesas.forEach(m=>{const key=String(m.dep||'').replace(/^0+/,'')||'0';votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=m.depNom||`Departamento ${key}`});featureCode=p=>depCodeFromFeature(p);featureName=p=>depNameFromFeature(p);detailNote='Distribución por departamento en la candidatura histórica. El territorio nuevo se aplica a la estrategia de 2027, no altera esta evidencia.';breakdownTitle='Votos por departamento'}const max=Math.max(1,...Object.values(votesByArea));renderMapBreakdown(votesByArea,namesByArea,breakdownTitle);if(!crmLeafletMap){crmLeafletMap=L.map(mapEl,{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false}).setView([4.6,-74.1],5)}else{crmLeafletMap.invalidateSize();if(crmMapLayer)crmLeafletMap.removeLayer(crmMapLayer)}const color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';crmMapLayer=L.geoJSON(geoData,{style:feature=>{const votes=votesByArea[featureCode(feature.properties)]||0;return{color:'#fff',weight:1,fillColor:color(votes/max),fillOpacity:.94}},onEachFeature:(feature,layer)=>{const votes=votesByArea[featureCode(feature.properties)]||0;layer.bindTooltip(`<strong>${featureName(feature.properties)}</strong><br>${votes.toLocaleString('es-CO')} votos`,{sticky:true})}}).addTo(crmLeafletMap);const bounds=crmMapLayer.getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[15,15],animate:false});crmMapVotes.textContent=`${total.toLocaleString('es-CO')} votos`;crmMapNote.textContent=detailNote;setTimeout(()=>crmLeafletMap.invalidateSize(),120)}catch(e){mapEl.innerHTML='<div style="padding:28px;color:#667068">No fue posible cargar el mapa histórico en este momento.</div>';crmBreakdown.innerHTML='<p class="helper">No fue posible cargar el desglose territorial.</p>';crmMapVotes.textContent='Sin mapa';crmMapNote.textContent='La fuente del historial no respondió; podrá reintentar al abrir el CRM.'}}
 /* Para alcaldías y concejos la evidencia mesa a mesa pertenece normalmente a
    un solo municipio. En ese caso el mapa no debe volver a la escala nacional:
    se recorta la geometría municipal de su departamento y se ajusta a ella. */
-async function loadHistoricalMap(candidate){
-  const mapEl=document.getElementById('crmMap');
-  crmMapTitle.textContent='¿Dónde estuvo su votación?';
-  crmMapVotes.textContent='Cargando';
-  crmMapNote.textContent='Cargando distribución territorial desde el historial del candidato.';
-  try{
-    const candidateData=await fetch(candidate.dataUrl).then(r=>r.ok?r.json():Promise.reject());
-    const mesas=candidateData.mesas||[];
-    const total=mesas.reduce((sum,m)=>sum+Number(m.v||0),0)||Number(candidate.votos)||0;
-    const isBogotaLocal=String(candidate.corp||'').startsWith('JAL')&&mesas.some(m=>String(m.dep)==='16');
-    const municipalityCodes=[...new Set(mesas.map(m=>String(m.mun||'').replace(/^0+/,'')).filter(Boolean))];
-    let geoData,votesByArea,namesByArea,featureCode,featureName,detailNote,breakdownTitle;
-    if(isBogotaLocal){
-      geoData=rotateGeoJSON90Left(await fetch(`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`).then(r=>r.ok?r.json():Promise.reject()));
-      votesByArea={}; namesByArea={};
-      mesas.forEach(m=>{const key=String(m.com||m.zon||'').padStart(2,'0');votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=m.comNom||`Localidad ${key}`});
-      featureCode=p=>String(p.LocCodigo||'').padStart(2,'0'); featureName=p=>p.LocNombre||'Localidad';
-      crmMapTitle.textContent='¿Dónde estuvo su votación en Bogotá?';
-      detailNote='Distribución por localidad de su candidatura JAL, con la misma orientación del mapa de Análisis de Candidato.';
-      breakdownTitle='Votos por localidad';
-    }else if(municipalityCodes.length===1&&mesas[0]?.dep){
-      const depCode=String(mesas[0].dep).padStart(2,'0');
-      const municipalGeo=await fetch(`${S3}/mapas-2026/Departamentos-mps/${depCode}.json`).then(r=>r.ok?r.json():Promise.reject());
-      const municipalCode=municipalityCodes[0];
-      geoData={...municipalGeo,features:municipalGeo.features.filter(feature=>String(feature.properties?.mun_elec||feature.properties?.mun_electoral||'').replace(/^0+/,'')===municipalCode)};
-      if(!geoData.features.length)throw new Error('Municipio histórico sin geometría');
-      const municipalName=mesas.find(m=>m.munNom)?.munNom||candidate.circunscripcion||'municipio';
-      votesByArea={[municipalCode]:total}; namesByArea={[municipalCode]:municipalName};
-      featureCode=p=>String(p.mun_elec||p.mun_electoral||'').replace(/^0+/,''); featureName=p=>p.mpio_cnmbr||municipalName;
-      crmMapTitle.textContent=`¿Dónde estuvo su votación en ${municipalName}?`;
-      detailNote='Votación histórica concentrada en este municipio; la nueva campaña puede ubicarse en otro territorio.';
-      breakdownTitle='Votos en el municipio';
-    }else{
-      geoData=await fetch(`${S3}/mapas-2026/DEPARTAMENTOS2.json`).then(r=>r.ok?r.json():Promise.reject());
-      votesByArea={}; namesByArea={};
-      mesas.forEach(m=>{const key=String(m.dep||'').replace(/^0+/,'')||'0';votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=m.depNom||`Departamento ${key}`});
-      featureCode=p=>depCodeFromFeature(p); featureName=p=>depNameFromFeature(p);
-      detailNote='Distribución por departamento en la candidatura histórica. El territorio nuevo se aplica a la estrategia de 2027, no altera esta evidencia.';
-      breakdownTitle='Votos por departamento';
-    }
-    const max=Math.max(1,...Object.values(votesByArea));
-    renderMapBreakdown(votesByArea,namesByArea,breakdownTitle);
-if(!crmLeafletMap){crmLeafletMap=L.map(mapEl,{zoomControl:false,attributionControl:true,scrollWheelZoom:false,dragging:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false}).setView([4.6,-74.1],5);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,opacity:.72,attribution:'&copy; OpenStreetMap contributors'}).addTo(crmLeafletMap)}else{crmLeafletMap.invalidateSize();if(crmMapLayer)crmLeafletMap.removeLayer(crmMapLayer)}
-    const color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';
-    crmMapLayer=L.geoJSON(geoData,{style:feature=>{const votes=votesByArea[featureCode(feature.properties)]||0;return{color:'#fff',weight:1,fillColor:color(votes/max),fillOpacity:.94}},onEachFeature:(feature,layer)=>{const votes=votesByArea[featureCode(feature.properties)]||0;layer.bindTooltip(`<strong>${featureName(feature.properties)}</strong><br>${votes.toLocaleString('es-CO')} votos`,{sticky:true})}}).addTo(crmLeafletMap);
-    const bounds=crmMapLayer.getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[15,15],animate:false});
-    crmMapVotes.textContent=`${total.toLocaleString('es-CO')} votos`;crmMapNote.textContent=detailNote;setTimeout(()=>crmLeafletMap.invalidateSize(),120);
-  }catch(e){mapEl.innerHTML='<div style="padding:28px;color:#667068">No fue posible cargar el mapa histórico en este momento.</div>';crmBreakdown.innerHTML='<p class="helper">No fue posible cargar el desglose territorial.</p>';crmMapVotes.textContent='Sin mapa';crmMapNote.textContent='La fuente del historial no respondió; podrá reintentar al abrir el CRM.'}
-}
-function openJulian(){searchCandidate(candidateSearch.value)}
 /* Esta es la versión final de la función: queda después de la definición
    heredada para que los CRM históricos siempre resuelvan primero el municipio. */
 async function loadHistoricalMap(candidate){
   const mapEl=document.getElementById('crmMap');crmMapTitle.textContent='¿Dónde estuvo su votación?';crmMapVotes.textContent='Cargando';crmMapNote.textContent='Cargando distribución territorial desde el historial del candidato.';
   try{
-    const candidateData=await fetch(candidate.dataUrl).then(r=>r.ok?r.json():Promise.reject()),mesas=candidateData.mesas||[],total=mesas.reduce((sum,m)=>sum+Number(m.v||0),0)||Number(candidate.votos)||0,isBogotaLocal=String(candidate.corp||'').startsWith('JAL')&&mesas.some(m=>String(m.dep)==='16'),municipalityCodes=[...new Set(mesas.map(m=>String(m.mun||'').replace(/^0+/, '')).filter(Boolean))];
+    const candidateData=await datosCandidatura(candidate),mesas=candidateData.mesas||[],total=mesas.reduce((sum,m)=>sum+Number(m.v||0),0)||Number(candidate.votos)||0,isBogotaLocal=String(candidate.corp||'').startsWith('JAL')&&mesas.some(m=>String(m.dep)==='16'),municipalityCodes=[...new Set(mesas.map(m=>String(m.mun||'').replace(/^0+/, '')).filter(Boolean))];
     let geoData,votesByArea,namesByArea,featureCode,featureName,detailNote,breakdownTitle;
-    if(isBogotaLocal){geoData=rotateGeoJSON90Left(await fetch(`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`).then(r=>r.ok?r.json():Promise.reject()));votesByArea={};namesByArea={};mesas.forEach(m=>{const key=String(m.com||m.zon||'').padStart(2,'0');votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=m.comNom||`Localidad ${key}`});featureCode=p=>String(p.LocCodigo||'').padStart(2,'0');featureName=p=>p.LocNombre||'Localidad';crmMapTitle.textContent='¿Dónde estuvo su votación en Bogotá?';detailNote='Distribución por localidad de su candidatura JAL, con la misma orientación del mapa de Análisis de Candidato.';breakdownTitle='Votos por localidad'}
+    if(isBogotaLocal){geoData=rotateGeoJSON90Left(await fetch(`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`).then(r=>r.ok?r.json():Promise.reject()));votesByArea={};namesByArea={};mesas.forEach(m=>{const key=claveLocal(m);votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=nombreLocal(m)||namesByArea[key]});featureCode=p=>String(p.LocCodigo||'').padStart(2,'0');featureName=p=>p.LocNombre||'Localidad';crmMapTitle.textContent='¿Dónde estuvo su votación en Bogotá?';detailNote='Distribución por localidad de su candidatura JAL, con la misma orientación del mapa de Análisis de Candidato.';breakdownTitle='Votos por localidad'}
     else if(municipalityCodes.length===1&&mesas[0]?.dep){const depCode=String(mesas[0].dep).padStart(2,'0'),municipalGeo=await fetch(`${S3}/mapas-2026/Departamentos-mps/${depCode}.json`).then(r=>r.ok?r.json():Promise.reject()),municipalCode=municipalityCodes[0];geoData={...municipalGeo,features:municipalGeo.features.filter(feature=>String(feature.properties?.mun_elec||feature.properties?.mun_electoral||'').replace(/^0+/,'')===municipalCode)};if(!geoData.features.length)throw new Error('Municipio histórico sin geometría');const municipalName=mesas.find(m=>m.munNom)?.munNom||candidate.circunscripcion||'municipio';votesByArea={[municipalCode]:total};namesByArea={[municipalCode]:municipalName};featureCode=p=>String(p.mun_elec||p.mun_electoral||'').replace(/^0+/,'');featureName=p=>p.mpio_cnmbr||municipalName;crmMapTitle.textContent=`¿Dónde estuvo su votación en ${municipalName}?`;detailNote='Votación histórica concentrada en este municipio; la nueva campaña puede ubicarse en otro territorio.';breakdownTitle='Votos en el municipio'}
     else{geoData=await fetch(`${S3}/mapas-2026/DEPARTAMENTOS2.json`).then(r=>r.ok?r.json():Promise.reject());votesByArea={};namesByArea={};mesas.forEach(m=>{const key=String(m.dep||'').replace(/^0+/,'')||'0';votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=m.depNom||`Departamento ${key}`});featureCode=p=>depCodeFromFeature(p);featureName=p=>depNameFromFeature(p);detailNote='Distribución por departamento en la candidatura histórica. El territorio nuevo se aplica a la estrategia de 2027, no altera esta evidencia.';breakdownTitle='Votos por departamento'}
-    const max=Math.max(1,...Object.values(votesByArea));renderMapBreakdown(votesByArea,namesByArea,breakdownTitle);if(!crmLeafletMap){crmLeafletMap=L.map(mapEl,{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false}).setView([4.6,-74.1],5)}else{crmLeafletMap.invalidateSize();if(crmMapLayer)crmLeafletMap.removeLayer(crmMapLayer)}const color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';crmMapLayer=L.geoJSON(geoData,{style:feature=>{const votes=votesByArea[featureCode(feature.properties)]||0;return{color:'#fff',weight:1,fillColor:color(votes/max),fillOpacity:.94}},onEachFeature:(feature,layer)=>{const votes=votesByArea[featureCode(feature.properties)]||0;layer.bindTooltip(`<strong>${featureName(feature.properties)}</strong><br>${votes.toLocaleString('es-CO')} votos`,{sticky:true})}}).addTo(crmLeafletMap);const bounds=crmMapLayer.getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[15,15],animate:false});crmMapVotes.textContent=`${total.toLocaleString('es-CO')} votos`;crmMapNote.textContent=detailNote;setTimeout(()=>crmLeafletMap.invalidateSize(),120)
+    completaNombres(geoData,featureCode,featureName,namesByArea);const max=Math.max(1,...Object.values(votesByArea));renderMapBreakdown(votesByArea,namesByArea,breakdownTitle);if(!crmLeafletMap){crmLeafletMap=L.map(mapEl,{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false}).setView([4.6,-74.1],5)}else{crmLeafletMap.invalidateSize();if(crmMapLayer)crmLeafletMap.removeLayer(crmMapLayer)}const color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';aplicarBasemap(isBogotaLocal);crmMapLayer=L.geoJSON(geoData,{style:feature=>{const votes=votesByArea[featureCode(feature.properties)]||0;return{color:'#fff',weight:1,fillColor:color(votes/max),fillOpacity:.94}},onEachFeature:(feature,layer)=>{const votes=votesByArea[featureCode(feature.properties)]||0;layer.bindTooltip(`<strong>${featureName(feature.properties)}</strong><br>${votes.toLocaleString('es-CO')} votos`,{sticky:true})}}).addTo(crmLeafletMap);const bounds=crmMapLayer.getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[15,15],animate:false});crmMapVotes.textContent=`${total.toLocaleString('es-CO')} votos`;crmMapNote.textContent=detailNote+notaRecorte();setTimeout(()=>crmLeafletMap.invalidateSize(),120)
   }catch(e){mapEl.innerHTML='<div style="padding:28px;color:#667068">No fue posible cargar el mapa histórico en este momento.</div>';crmBreakdown.innerHTML='<p class="helper">No fue posible cargar el desglose territorial.</p>';crmMapVotes.textContent='Sin mapa';crmMapNote.textContent='La fuente del historial no respondió; podrá reintentar al abrir el CRM.'}
 }
 /* Las JAL se leen a escala de comuna/localidad. Las mismas capas locales de
@@ -225,56 +220,87 @@ loadHistoricalMap=async function(candidate){
   if(!isJal)return historicalMapFallback(candidate);
   const mapEl=document.getElementById('crmMap');crmMapVotes.textContent='Cargando';crmMapNote.textContent='Cargando distribución local de la candidatura JAL.';
   try{
-    const data=await fetch(candidate.dataUrl).then(r=>r.ok?r.json():Promise.reject()),mesas=data.mesas||[],city=normalizedText(mesas[0]?.munNom||candidate.circunscripcion),config=CITY_JAL_LAYERS.find(item=>item.match.some(name=>city.includes(name)));
+    const data=await datosCandidatura(candidate),mesas=data.mesas||[],city=normalizedText(mesas[0]?.munNom||candidate.circunscripcion),config=CITY_JAL_LAYERS.find(item=>item.match.some(name=>city.includes(name)));
     if(!config)throw new Error('Ciudad sin capa local');
     let geoData=await fetch(`${S3}/mapas-2026/Ciudades-COM-LOC/${config.path}`).then(r=>r.ok?r.json():Promise.reject());if(config.rotate)geoData=rotateGeoJSON90Left(geoData);
-    const votesByArea={},namesByArea={};mesas.forEach(m=>{const key=config.mesaKey?config.mesaKey(m):String(m.com||m.zon||'').padStart(2,'0');votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=m.comNom||`${config.title} ${key}`});
+    const votesByArea={},namesByArea={};mesas.forEach(m=>{const key=config.mesaKey?config.mesaKey(m):claveLocal(m);votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=nombreLocal(m)||namesByArea[key]});
     const total=mesas.reduce((sum,m)=>sum+Number(m.v||0),0)||Number(candidate.votos)||0,max=Math.max(1,...Object.values(votesByArea)),targetKey=Object.entries(votesByArea).sort((a,b)=>b[1]-a[1])[0]?.[0];
-    crmMapState={config,geoData,votesByArea,namesByArea,mesas,total,max,targetKey};crmMapTitle.textContent=`¿Dónde estuvo su votación en ${mesas[0]?.munNom||'la ciudad'}?`;ensureCRMMapToggles();renderMapBreakdown(votesByArea,namesByArea,`Votos por ${config.title}`);
+    completaNombres(geoData,config.code,config.name,namesByArea);crmMapState={config,geoData,votesByArea,namesByArea,mesas,total,max,targetKey};crmMapTitle.textContent=`¿Dónde estuvo su votación en ${mesas[0]?.munNom||'la ciudad'}?`;ensureCRMMapToggles();renderMapBreakdown(votesByArea,namesByArea,`Votos por ${config.title}`);
     if(!crmLeafletMap){crmLeafletMap=L.map(mapEl,{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false}).setView([4.6,-74.1],5)}else{crmLeafletMap.invalidateSize();if(crmMapLayer)crmLeafletMap.removeLayer(crmMapLayer)}
     const color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';
-    let targetLayer=null;crmMapLayer=L.geoJSON(geoData,{style:feature=>{const key=config.code(feature.properties);const votes=votesByArea[key]||0;return{color:'#fff',weight:key===targetKey?2:1,fillColor:color(votes/max),fillOpacity:key===targetKey?.78:.38}},onEachFeature:(feature,layer)=>{const key=config.code(feature.properties),votes=votesByArea[key]||0;layer.bindTooltip(`<strong>${config.name(feature.properties)}</strong><br>${votes.toLocaleString('es-CO')} votos`,{sticky:true});if(key===targetKey)targetLayer=layer}}).addTo(crmLeafletMap);
+    aplicarBasemap(Boolean(config.rotate));let targetLayer=null;crmMapLayer=L.geoJSON(geoData,{style:feature=>{const key=config.code(feature.properties);const votes=votesByArea[key]||0;return{color:'#fff',weight:key===targetKey?2:1,fillColor:color(votes/max),fillOpacity:key===targetKey?.78:.38}},onEachFeature:(feature,layer)=>{const key=config.code(feature.properties),votes=votesByArea[key]||0;layer.bindTooltip(`<strong>${config.name(feature.properties)}</strong><br>${votes.toLocaleString('es-CO')} votos`,{sticky:true});if(key===targetKey)targetLayer=layer}}).addTo(crmLeafletMap);
     refreshCRMMapMode();crmMapLayer.eachLayer(layer=>layer.on('click',()=>showCRMMapDetail(layer)));const bounds=(targetLayer||crmMapLayer).getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[30,30],animate:false});crmMapVotes.textContent=`${total.toLocaleString('es-CO')} votos`;setTimeout(()=>crmLeafletMap.invalidateSize(),120);
   }catch(error){return historicalMapFallback(candidate)}
 };
 let crmMapMode='total',crmMapState=null;
 function projectedVotesByArea(){const state=crmMapState||{},base=state.votesByArea||{},total=Object.values(base).reduce((sum,value)=>sum+Number(value||0),0),goal=Number(String(crmVoteNumber.textContent||'').replace(/\D/g,''));if(!total||!goal)return base;const parts=Object.entries(base).map(([key,value])=>{const raw=Number(value)*goal/total;return{key,raw,value:Math.floor(raw),rest:raw-Math.floor(raw)}});let remaining=goal-parts.reduce((sum,item)=>sum+item.value,0);parts.sort((a,b)=>b.rest-a.rest).slice(0,remaining).forEach(item=>item.value++);return Object.fromEntries(parts.map(item=>[item.key,item.value]))}
 function ensureCRMMapToggles(){const head=crmMapTitle.closest('.panel-head');if(!head||document.getElementById('crmMapToggles'))return;head.insertAdjacentHTML('beforeend','<div class="map-toggles" id="crmMapToggles"><button class="map-toggle active" type="button" data-mode="total">TOTAL</button><button class="map-toggle" type="button" data-mode="proyectado">PROYECTADO</button></div>');document.getElementById('crmMapToggles').addEventListener('click',event=>{const button=event.target.closest('[data-mode]');if(button){crmMapMode=button.dataset.mode;refreshCRMMapMode()}})}
-function refreshCRMMapMode(){const state=crmMapState;if(!state||!crmMapLayer)return;const values=crmMapMode==='proyectado'?projectedVotesByArea():state.votesByArea,max=Math.max(1,...Object.values(values));const title=crmMapMode==='proyectado'?`Meta proyectada por ${state.config.title}`:`Votos por ${state.config.title}`;renderMapBreakdown(values,state.namesByArea,title);document.querySelectorAll('#crmMapToggles .map-toggle').forEach(button=>button.classList.toggle('active',button.dataset.mode===crmMapMode));const color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';crmMapLayer.eachLayer(layer=>{const key=state.config.code(layer.feature.properties),observed=Number(state.votesByArea[key]||0),projected=Number(projectedVotesByArea()[key]||0),value=Number(values[key]||0);layer.setStyle({fillColor:color(value/max),fillOpacity:key===state.targetKey?.78:.38});layer.bindTooltip(`<strong>${state.config.name(layer.feature.properties)}</strong><br>${crmMapMode==='proyectado'?projected:observed} ${crmMapMode==='proyectado'?'votos proyectados':'votos'}`,{sticky:true});layer.off('click.crmDetail').on('click.crmDetail',()=>{crmMapNote.textContent=`${state.config.name(layer.feature.properties)}: ${observed.toLocaleString('es-CO')} votos históricos · ${projected.toLocaleString('es-CO')} votos proyectados para la meta.`})});crmMapNote.textContent=crmMapMode==='proyectado'?`Meta total distribuida proporcionalmente a la votación histórica. Haga clic en una ${state.config.title} para ver su detalle.`:`Votación total histórica. Haga clic en una ${state.config.title} para ver el detalle y su meta proyectada.`}
+function refreshCRMMapMode(){const state=crmMapState;if(!state||!crmMapLayer)return;const values=crmMapMode==='proyectado'?projectedVotesByArea():state.votesByArea,max=Math.max(1,...Object.values(values));const title=crmMapMode==='proyectado'?`Meta proyectada por ${state.config.title}`:`Votos por ${state.config.title}`;renderMapBreakdown(values,state.namesByArea,title);document.querySelectorAll('#crmMapToggles .map-toggle').forEach(button=>button.classList.toggle('active',button.dataset.mode===crmMapMode));const color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';crmMapLayer.eachLayer(layer=>{const key=state.config.code(layer.feature.properties),observed=Number(state.votesByArea[key]||0),projected=Number(projectedVotesByArea()[key]||0),value=Number(values[key]||0);layer.setStyle({fillColor:color(value/max),fillOpacity:key===state.targetKey?.78:.38});layer.bindTooltip(`<strong>${state.config.name(layer.feature.properties)}</strong><br>${crmMapMode==='proyectado'?projected:observed} ${crmMapMode==='proyectado'?'votos proyectados':'votos'}`,{sticky:true});layer.off('click.crmDetail').on('click.crmDetail',()=>{crmMapNote.textContent=`${state.config.name(layer.feature.properties)}: ${observed.toLocaleString('es-CO')} votos históricos · ${projected.toLocaleString('es-CO')} votos proyectados para la meta.`})});crmMapNote.textContent=crmMapMode==='proyectado'?`Meta total distribuida proporcionalmente a la votación histórica. Haga clic en una ${state.config.title} para ver su detalle.`:`Votación total histórica. Haga clic en una ${state.config.title} para ver el detalle y su meta proyectada.`+notaRecorte()}
 const refreshCRMMapModeBase=refreshCRMMapMode;
 refreshCRMMapMode=function(){refreshCRMMapModeBase();if(crmMapState?.focusKey)renderBarriosForArea(crmMapState.focusKey)};
 let puestosBarrioPromise=null;
+/* ⚠️ com "000" NO es una comuna: es el marcador de "no aplica" que traen las
+   circunscripciones NACIONALES (comNom "NACIONAL" — Senado, Cámara, consultas).
+   Como "000" es truthy, `m.com||m.zon` lo prefería sobre la zona y TODA la ciudad
+   caía en una sola clave: el mapa de Bogotá salía plano con una fila "NACIONAL".
+   En Bogotá la zona electoral ES la localidad, así que al descartar el marcador
+   la candidatura nacional se desagrega bien. Se normaliza a 2 dígitos porque el
+   código del GeoJSON (LocCodigo, CODIGO, comuna) viene padeado a 2. */
+/* El mismo marcador de "no aplica" viaja en el NOMBRE: comNom llega como
+   "NACIONAL" en toda circunscripción nacional, así que el desglose salía con
+   veinte filas llamadas NACIONAL. Se descarta y el nombre real lo pone el
+   GeoJSON, que es la fuente correcta para el rótulo de un polígono. */
+const COM_NOM_NULO=new Set(['NACIONAL','NULL','SN','']);
+function nombreLocal(mesa){const n=String(mesa.comNom||'').trim();return COM_NOM_NULO.has(n.toUpperCase())?'':n}
+function completaNombres(geoData,code,name,namesByArea){
+  (geoData?.features||[]).forEach(f=>{const k=code(f.properties);if(k&&!namesByArea[k])namesByArea[k]=name(f.properties)});
+  return namesByArea;
+}
+function claveLocal(mesa){
+  const com=String(mesa.com||'').replace(/^0+/,''),zon=String(mesa.zon||'').replace(/^0+/,'');
+  return (com||zon||'').padStart(2,'0');
+}
 function electoralPlaceCode(mesa){return `${String(mesa.dep||'').padStart(2,'0')}${String(mesa.mun||'').padStart(3,'0')}${String(mesa.zon||'').padStart(2,'0')}${String(mesa.pue||'').padStart(2,'0')}`}
 async function puestosPorBarrio(){if(!puestosBarrioPromise)puestosBarrioPromise=fetch(`${S3}/mapas-2026/PUESTOS_GEOREF.csv`).then(r=>r.ok?r.text():Promise.reject()).then(raw=>{const lookup={};raw.split(/\r?\n/).slice(1).forEach(line=>{const row=line.split(';'),code=row[1],barrio=row[7];if(code&&barrio)lookup[code]={barrio,lat:Number(row[9]),lng:Number(row[10])}});return lookup});return puestosBarrioPromise}
 function distributeVotes(source,target){const total=Object.values(source).reduce((sum,value)=>sum+Number(value||0),0);if(!total||!target)return source;const rows=Object.entries(source).map(([key,value])=>{const raw=Number(value)*target/total;return{key,value:Math.floor(raw),rest:raw-Math.floor(raw)}});let pending=target-rows.reduce((sum,row)=>sum+row.value,0);rows.sort((a,b)=>b.rest-a.rest).slice(0,pending).forEach(row=>row.value++);return Object.fromEntries(rows.map(row=>[row.key,row.value]))}
-async function renderBarriosForArea(key){const state=crmMapState;if(!state)return;state.focusKey=key;crmBreakdown.innerHTML='<h4>Votos por barrio</h4><p class="helper">Cruzando puestos de votación con barrios…</p>';try{const places=await puestosPorBarrio(),mesas=state.mesas.filter(m=>(state.config.mesaKey?state.config.mesaKey(m):String(m.com||m.zon||'').padStart(2,'0'))===key),historical={},points={};mesas.forEach(m=>{const place=places[electoralPlaceCode(m)],name=place?.barrio||m.pueNom||'Puesto sin barrio identificado';historical[name]=(historical[name]||0)+Number(m.v||0);if(place&&Number.isFinite(place.lat)&&Number.isFinite(place.lng))points[name]=place});const localGoal=Number(projectedVotesByArea()[key]||0),values=crmMapMode==='proyectado'?distributeVotes(historical,localGoal):historical,title=`${crmMapMode==='proyectado'?'Meta proyectada':'Votos totales'} por barrio`;renderMapBreakdown(values,Object.fromEntries(Object.keys(values).map(name=>[name,name])),title);if(crmBarrioLayer)crmLeafletMap.removeLayer(crmBarrioLayer);crmBarrioLayer=L.layerGroup(Object.entries(points).map(([name,point])=>L.circleMarker([point.lat,point.lng],{radius:6,color:'#fff',weight:1,fillColor:'#ee745e',fillOpacity:.9}).bindTooltip(`<strong>${name}</strong><br>${Number(values[name]||0).toLocaleString('es-CO')} ${crmMapMode==='proyectado'?'votos proyectados':'votos'}`,{sticky:true}))).addTo(crmLeafletMap);crmMapNote.textContent=`Detalle por barrio de ${state.config.name((crmMapLayer.getLayers().find(layer=>state.config.code(layer.feature.properties)===key)||{}).feature?.properties||{})}. Seleccione TOTAL o PROYECTADO para cambiar la lectura.`}catch(error){crmBreakdown.innerHTML='<h4>Votos por barrio</h4><p class="helper">No fue posible cruzar los puestos con barrios en este momento.</p>'}}
 function showCRMMapDetail(layer){const state=crmMapState;if(!state)return;const key=state.config.code(layer.feature.properties);layer.openTooltip();renderBarriosForArea(key)}
 function openMapAreaFromBreakdown(key){const state=crmMapState;if(!state||!crmMapLayer)return;const layer=crmMapLayer.getLayers().find(item=>state.config.code(item.feature.properties)===key);if(layer){crmLeafletMap.fitBounds(layer.getBounds(),{padding:[30,30],animate:false});showCRMMapDetail(layer)}}
 function renderMapBreakdown(votesByArea,namesByArea,title){const rows=Object.entries(votesByArea).map(([key,value])=>({key,name:namesByArea[key]||key,value:Number(value)||0})).filter(row=>row.value>0).sort((a,b)=>b.value-a.value),max=Math.max(1,...rows.map(row=>row.value));crmBreakdown.innerHTML=`<h4 id="crmBreakdownTitle">${title}</h4>`+(rows.length?rows.map(row=>`<button class="crm-breakdown-item" type="button" data-area-key="${escHtml(row.key)}" onclick="openMapAreaFromBreakdown(this.dataset.areaKey)"><span class="crm-breakdown-row"><b>${escHtml(row.name)}</b><span>${row.value.toLocaleString('es-CO')}</span></span><span class="crm-breakdown-bar"><i style="width:${Math.max(3,Math.round(row.value/max*100))}%"></i></span></button>`).join(''):'<p class="helper">No hay votos desagregados disponibles.</p>')}
 /* El CSV nacional es complementario: si la red no permite descargarlo, se
    conserva el desglose por puesto para que el clic nunca termine vacío. */
-async function renderBarriosForArea(key){const state=crmMapState;if(!state)return;state.focusKey=key;let places={};try{places=await puestosPorBarrio()}catch(error){}const mesas=state.mesas.filter(m=>(state.config.mesaKey?state.config.mesaKey(m):String(m.com||m.zon||'').padStart(2,'0'))===key),historical={},points={};mesas.forEach(m=>{const place=places[electoralPlaceCode(m)],name=place?.barrio||m.pueNom||'Puesto sin barrio identificado';historical[name]=(historical[name]||0)+Number(m.v||0);if(place&&Number.isFinite(place.lat)&&Number.isFinite(place.lng))points[name]=place});const localGoal=Number(projectedVotesByArea()[key]||0),values=crmMapMode==='proyectado'?distributeVotes(historical,localGoal):historical,title=`${crmMapMode==='proyectado'?'Meta proyectada':'Votos totales'} por barrio`;renderMapBreakdown(values,Object.fromEntries(Object.keys(values).map(name=>[name,name])),title);if(crmBarrioLayer)crmLeafletMap.removeLayer(crmBarrioLayer);crmBarrioLayer=L.layerGroup(Object.entries(points).map(([name,point])=>L.circleMarker([point.lat,point.lng],{radius:6,color:'#fff',weight:1,fillColor:'#ee745e',fillOpacity:.9}).bindTooltip(`<strong>${name}</strong><br>${Number(values[name]||0).toLocaleString('es-CO')} ${crmMapMode==='proyectado'?'votos proyectados':'votos'}`,{sticky:true}))).addTo(crmLeafletMap);const layer=crmMapLayer.getLayers().find(item=>state.config.code(item.feature.properties)===key);crmMapNote.textContent=`Detalle por barrio de ${layer?state.config.name(layer.feature.properties):'la localidad'}. ${Object.keys(places).length?'':'La fuente de barrios no respondió; se muestran puestos de votación.'}`}
+async function renderBarriosForArea(key){const state=crmMapState;if(!state)return;state.focusKey=key;let places={};try{places=await puestosPorBarrio()}catch(error){}const mesas=state.mesas.filter(m=>(state.config.mesaKey?state.config.mesaKey(m):claveLocal(m))===key),historical={},points={};mesas.forEach(m=>{const place=places[electoralPlaceCode(m)],name=place?.barrio||m.pueNom||'Puesto sin barrio identificado';historical[name]=(historical[name]||0)+Number(m.v||0);if(place&&Number.isFinite(place.lat)&&Number.isFinite(place.lng))points[name]=place});const localGoal=Number(projectedVotesByArea()[key]||0),values=crmMapMode==='proyectado'?distributeVotes(historical,localGoal):historical,title=`${crmMapMode==='proyectado'?'Meta proyectada':'Votos totales'} por barrio`;renderMapBreakdown(values,Object.fromEntries(Object.keys(values).map(name=>[name,name])),title);if(crmBarrioLayer)crmLeafletMap.removeLayer(crmBarrioLayer);crmBarrioLayer=L.layerGroup(Object.entries(points).map(([name,point])=>L.circleMarker([point.lat,point.lng],{radius:6,color:'#fff',weight:1,fillColor:'#ee745e',fillOpacity:.9}).bindTooltip(`<strong>${name}</strong><br>${Number(values[name]||0).toLocaleString('es-CO')} ${crmMapMode==='proyectado'?'votos proyectados':'votos'}`,{sticky:true}))).addTo(crmLeafletMap);const layer=crmMapLayer.getLayers().find(item=>state.config.code(item.feature.properties)===key);crmMapNote.textContent=`Detalle por barrio de ${layer?state.config.name(layer.feature.properties):'la localidad'}. ${Object.keys(places).length?'':'La fuente de barrios no respondió; se muestran puestos de votación.'}`}
 const localHistoryMap=loadHistoricalMap;
-async function renderBogotaCampaignMap(candidate){const data=await fetch(candidate.dataUrl).then(r=>r.ok?r.json():Promise.reject()),mesas=data.mesas||[],geoSource=rotateGeoJSON90Left(await fetch(`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`).then(r=>r.ok?r.json():Promise.reject())),geoData={...geoSource,features:geoSource.features.filter(feature=>String(feature.properties.LocCodigo)!=='20')},config={title:'localidad',code:p=>String(p.LocCodigo||'').padStart(2,'0'),name:p=>p.LocNombre||'Localidad'},votesByArea={},namesByArea={};mesas.forEach(m=>{const key=String(m.com||m.zon||'').padStart(2,'0');votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=m.comNom||`Localidad ${key}`});const total=mesas.reduce((sum,m)=>sum+Number(m.v||0),0)||Number(candidate.votos)||0,max=Math.max(1,...Object.values(votesByArea));crmMapMode='total';crmMapState={config,geoData,votesByArea,namesByArea,mesas,total,max,targetKey:null};crmMapTitle.textContent='¿Dónde estuvo su votación en Bogotá?';ensureCRMMapToggles();if(crmBarrioLayer){crmLeafletMap?.removeLayer(crmBarrioLayer);crmBarrioLayer=null}if(!crmLeafletMap){crmLeafletMap=L.map(document.getElementById('crmMap'),{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false}).setView([4.6,-74.1],5)}else{if(crmMapLayer)crmLeafletMap.removeLayer(crmMapLayer)}const color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';crmMapLayer=L.geoJSON(geoData,{style:feature=>{const value=votesByArea[config.code(feature.properties)]||0;return{color:'#fff',weight:1,fillColor:color(value/max),fillOpacity:.46}},onEachFeature:(feature,layer)=>layer.on('click',()=>showCRMMapDetail(layer))}).addTo(crmLeafletMap);refreshCRMMapMode();const bounds=crmMapLayer.getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[24,24],animate:false});crmMapVotes.textContent=`${total.toLocaleString('es-CO')} votos`;crmMapNote.textContent='Vista de Bogotá sin Sumapaz. Seleccione una localidad para abrir el desglose por barrio.'}
+async function renderBogotaCampaignMap(candidate){const data=await datosCandidatura(candidate),mesas=data.mesas||[],geoSource=rotateGeoJSON90Left(await fetch(`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`).then(r=>r.ok?r.json():Promise.reject())),geoData={...geoSource,features:geoSource.features.filter(feature=>String(feature.properties.LocCodigo)!=='20')},config={title:'localidad',code:p=>String(p.LocCodigo||'').padStart(2,'0'),name:p=>p.LocNombre||'Localidad'},votesByArea={},namesByArea={};mesas.forEach(m=>{const key=claveLocal(m);votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=nombreLocal(m)||namesByArea[key]});completaNombres(geoData,config.code,config.name,namesByArea);const total=mesas.reduce((sum,m)=>sum+Number(m.v||0),0)||Number(candidate.votos)||0,max=Math.max(1,...Object.values(votesByArea));crmMapMode='total';crmMapState={config,geoData,votesByArea,namesByArea,mesas,total,max,targetKey:null};crmMapTitle.textContent='¿Dónde estuvo su votación en Bogotá?';ensureCRMMapToggles();if(crmBarrioLayer){crmLeafletMap?.removeLayer(crmBarrioLayer);crmBarrioLayer=null}if(!crmLeafletMap){crmLeafletMap=L.map(document.getElementById('crmMap'),{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false}).setView([4.6,-74.1],5)}else{if(crmMapLayer)crmLeafletMap.removeLayer(crmMapLayer)}const color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';aplicarBasemap(true);crmMapLayer=L.geoJSON(geoData,{style:feature=>{const value=votesByArea[config.code(feature.properties)]||0;return{color:'#fff',weight:1,fillColor:color(value/max),fillOpacity:.46}},onEachFeature:(feature,layer)=>layer.on('click',()=>showCRMMapDetail(layer))}).addTo(crmLeafletMap);refreshCRMMapMode();const bounds=crmMapLayer.getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[24,24],animate:false});crmMapVotes.textContent=`${total.toLocaleString('es-CO')} votos`;crmMapNote.textContent='Vista de Bogotá sin Sumapaz. Seleccione una localidad para abrir el desglose por barrio.'+notaRecorte()}
 loadHistoricalMap=async function(candidate){const isOther=document.querySelector('input[name="corporationRoute"]:checked')?.value==='other',isBogota=normalizedText(campaignMunicipality?.value).includes('BOGOTA'),wideCampaign=isOther&&isBogota&&['concejo','alcaldia'].includes(otherCorporation.value);return wideCampaign?renderBogotaCampaignMap(candidate):localHistoryMap(candidate)};
 let bogotaPuestoBarrioPromise=null;
 const bogotaBarriosPorLocalidad=new Map();
 function loadCandidateMapScript(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.async=true;script.onload=resolve;script.onerror=()=>reject(new Error(`No se pudo cargar ${src}`));document.head.appendChild(script)})}
 async function bogotaBarrios(localityCode){const key=String(localityCode||'').padStart(2,'0');if(!bogotaPuestoBarrioPromise)bogotaPuestoBarrioPromise=window.Candidato360BogotaPuestoBarrio?Promise.resolve(window.Candidato360BogotaPuestoBarrio):loadCandidateMapScript('candidato-360-data/bogota-puesto-barrio.js').then(()=>window.Candidato360BogotaPuestoBarrio);if(!bogotaBarriosPorLocalidad.has(key))bogotaBarriosPorLocalidad.set(key,(window.Candidato360BogotaBarrios?.[key]?Promise.resolve():loadCandidateMapScript(`candidato-360-data/bogota-barrios/${key}.js`)).then(()=>{const geo=window.Candidato360BogotaBarrios?.[key];if(!geo)throw new Error(`No hay cartografía barrial disponible para la localidad ${key}`);return rotateGeoJSON90Left(geo)}));return Promise.all([bogotaPuestoBarrioPromise,bogotaBarriosPorLocalidad.get(key)])}
 const renderGenericBarrios=renderBarriosForArea;
-renderBarriosForArea=async function(key){const state=crmMapState,isBogota=state?.mesas?.some(m=>String(m.dep)==='16');if(!isBogota)return renderGenericBarrios(key);state.focusKey=key;crmBreakdown.innerHTML='<h4>Votos por barrio</h4><p class="helper">Cargando polígonos y resultados barriales…</p>';try{const [puestoBarrio,geo]=await bogotaBarrios(key),mesas=state.mesas.filter(m=>String(m.com||m.zon||'').padStart(2,'0')===key),historical={};mesas.forEach(m=>{const barrio=puestoBarrio[`${String(m.zon||'').padStart(2,'0')}-${String(m.pue||'').padStart(2,'0')}`];if(barrio)historical[String(barrio).padStart(6,'0')]=(historical[String(barrio).padStart(6,'0')]||0)+Number(m.v||0)});const localGoal=Number(projectedVotesByArea()[key]||0),values=crmMapMode==='proyectado'?distributeVotes(historical,localGoal):historical,features=geo.features,names=Object.fromEntries(features.map(feature=>[String(feature.properties.codigo).padStart(6,'0'),feature.properties.nombre]));renderMapBreakdown(values,names,`${crmMapMode==='proyectado'?'Meta proyectada':'Votos totales'} por barrio`);if(crmBarrioLayer)crmLeafletMap.removeLayer(crmBarrioLayer);const max=Math.max(1,...Object.values(values)),color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';crmBarrioLayer=L.geoJSON({...geo,features},{style:feature=>{const votes=values[String(feature.properties.codigo).padStart(6,'0')]||0;return{fillColor:color(votes/max),fillOpacity:votes?.82:.28,color:'rgba(23,37,28,.38)',weight:.55}},onEachFeature:(feature,layer)=>{const code=String(feature.properties.codigo).padStart(6,'0'),votes=Number(values[code]||0);layer.bindTooltip(`<strong>${feature.properties.nombre}</strong><br>${votes.toLocaleString('es-CO')} ${crmMapMode==='proyectado'?'votos proyectados':'votos'}`,{sticky:true});layer.on('mouseover',()=>layer.setStyle({weight:1.5,color:'#fff'}));layer.on('mouseout',()=>crmBarrioLayer.resetStyle(layer))}}).addTo(crmLeafletMap);const bounds=crmBarrioLayer.getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[20,20],animate:false});crmMapNote.textContent=`Detalle poligonal por barrio de ${features[0]?.properties.loc_nombre||'la localidad'}.`}catch(error){return renderGenericBarrios(key)}};
+renderBarriosForArea=async function(key){const state=crmMapState,isBogota=state?.mesas?.some(m=>String(m.dep)==='16');if(!isBogota)return renderGenericBarrios(key);state.focusKey=key;crmBreakdown.innerHTML='<h4>Votos por barrio</h4><p class="helper">Cargando polígonos y resultados barriales…</p>';try{const [puestoBarrio,geo]=await bogotaBarrios(key),mesas=state.mesas.filter(m=>claveLocal(m)===key),historical={};mesas.forEach(m=>{const barrio=puestoBarrio[`${String(m.zon||'').padStart(2,'0')}-${String(m.pue||'').padStart(2,'0')}`];if(barrio)historical[String(barrio).padStart(6,'0')]=(historical[String(barrio).padStart(6,'0')]||0)+Number(m.v||0)});const localGoal=Number(projectedVotesByArea()[key]||0),values=crmMapMode==='proyectado'?distributeVotes(historical,localGoal):historical,features=geo.features,names=Object.fromEntries(features.map(feature=>[String(feature.properties.codigo).padStart(6,'0'),feature.properties.nombre]));renderMapBreakdown(values,names,`${crmMapMode==='proyectado'?'Meta proyectada':'Votos totales'} por barrio`);if(crmBarrioLayer)crmLeafletMap.removeLayer(crmBarrioLayer);const max=Math.max(1,...Object.values(values)),color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';crmBarrioLayer=L.geoJSON({...geo,features},{style:feature=>{const votes=values[String(feature.properties.codigo).padStart(6,'0')]||0;return{fillColor:color(votes/max),fillOpacity:votes?.82:.28,color:'rgba(23,37,28,.38)',weight:.55}},onEachFeature:(feature,layer)=>{const code=String(feature.properties.codigo).padStart(6,'0'),votes=Number(values[code]||0);layer.bindTooltip(`<strong>${feature.properties.nombre}</strong><br>${votes.toLocaleString('es-CO')} ${crmMapMode==='proyectado'?'votos proyectados':'votos'}`,{sticky:true});layer.on('mouseover',()=>layer.setStyle({weight:1.5,color:'#fff'}));layer.on('mouseout',()=>crmBarrioLayer.resetStyle(layer))}}).addTo(crmLeafletMap);const bounds=crmBarrioLayer.getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[20,20],animate:false});crmMapNote.textContent=`Detalle poligonal por barrio de ${features[0]?.properties.loc_nombre||'la localidad'}.`}catch(error){return renderGenericBarrios(key)}};
 let caliPuestoBarrioPromise=null;
 const caliBarriosPorComuna=new Map();
 async function caliBarrios(comunaCode){const key=String(comunaCode||'').padStart(2,'0');if(!caliPuestoBarrioPromise)caliPuestoBarrioPromise=window.Candidato360CaliPuestoBarrio?Promise.resolve(window.Candidato360CaliPuestoBarrio):loadCandidateMapScript('candidato-360-data/cali-puesto-barrio.js').then(()=>window.Candidato360CaliPuestoBarrio);if(!caliBarriosPorComuna.has(key))caliBarriosPorComuna.set(key,(window.Candidato360CaliBarrios?.[key]?Promise.resolve():loadCandidateMapScript(`candidato-360-data/cali-barrios/${key}.js`)).then(()=>{const geo=window.Candidato360CaliBarrios?.[key];if(!geo)throw new Error(`No hay cartografía barrial disponible para la comuna ${key}`);return geo}));return Promise.all([caliPuestoBarrioPromise,caliBarriosPorComuna.get(key)])}
-async function renderCaliCampaignMap(candidate){const data=await fetch(candidate.dataUrl).then(r=>r.ok?r.json():Promise.reject()),mesas=data.mesas||[],geoData=await fetch(`${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`).then(r=>r.ok?r.json():Promise.reject()),config={title:'comuna',code:p=>String(p.comuna||'').padStart(2,'0'),name:p=>p.nombre||`Comuna ${p.comuna}`},votesByArea={},namesByArea={};mesas.forEach(m=>{const key=String(m.com||m.zon||'').padStart(2,'0');votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=(m.comNom||`Comuna ${Number(key)}`).replace(/^\d+\s*COMUNA\s*/i,'Comuna ')});const total=mesas.reduce((sum,m)=>sum+Number(m.v||0),0)||Number(candidate.votos)||0,max=Math.max(1,...Object.values(votesByArea)),targetKey=Object.entries(votesByArea).sort((a,b)=>b[1]-a[1])[0]?.[0];crmMapMode='total';crmMapState={city:'cali',config,geoData,votesByArea,namesByArea,mesas,total,max,targetKey};crmMapTitle.textContent='¿Dónde estuvo su votación en Cali?';ensureCRMMapToggles();if(crmBarrioLayer){crmLeafletMap?.removeLayer(crmBarrioLayer);crmBarrioLayer=null}if(!crmLeafletMap){crmLeafletMap=L.map(document.getElementById('crmMap'),{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false}).setView([3.44,-76.53],11)}else if(crmMapLayer)crmLeafletMap.removeLayer(crmMapLayer);const color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';crmMapLayer=L.geoJSON(geoData,{style:feature=>{const key=config.code(feature.properties),value=votesByArea[key]||0;return{color:'#fff',weight:key===targetKey?2:1,fillColor:color(value/max),fillOpacity:key===targetKey?.78:.42}},onEachFeature:(feature,layer)=>layer.on('click',()=>showCRMMapDetail(layer))}).addTo(crmLeafletMap);refreshCRMMapMode();const bounds=crmMapLayer.getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[24,24],animate:false});crmMapVotes.textContent=`${total.toLocaleString('es-CO')} votos`;crmMapNote.textContent='Seleccione una comuna para abrir la votación por barrio.'}
+async function renderCaliCampaignMap(candidate){const data=await datosCandidatura(candidate),mesas=data.mesas||[],geoData=await fetch(`${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`).then(r=>r.ok?r.json():Promise.reject()),config={title:'comuna',code:p=>String(p.comuna||'').padStart(2,'0'),name:p=>p.nombre||`Comuna ${p.comuna}`},votesByArea={},namesByArea={};mesas.forEach(m=>{const key=claveLocal(m);votesByArea[key]=(votesByArea[key]||0)+Number(m.v||0);namesByArea[key]=(nombreLocal(m)||namesByArea[key]||`Comuna ${Number(key)}`).replace(/^\d+\s*COMUNA\s*/i,'Comuna ')});completaNombres(geoData,config.code,config.name,namesByArea);const total=mesas.reduce((sum,m)=>sum+Number(m.v||0),0)||Number(candidate.votos)||0,max=Math.max(1,...Object.values(votesByArea)),targetKey=Object.entries(votesByArea).sort((a,b)=>b[1]-a[1])[0]?.[0];crmMapMode='total';crmMapState={city:'cali',config,geoData,votesByArea,namesByArea,mesas,total,max,targetKey};crmMapTitle.textContent='¿Dónde estuvo su votación en Cali?';ensureCRMMapToggles();if(crmBarrioLayer){crmLeafletMap?.removeLayer(crmBarrioLayer);crmBarrioLayer=null}if(!crmLeafletMap){crmLeafletMap=L.map(document.getElementById('crmMap'),{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,touchZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false,tap:false}).setView([3.44,-76.53],11)}else if(crmMapLayer)crmLeafletMap.removeLayer(crmMapLayer);const color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';aplicarBasemap(false);crmMapLayer=L.geoJSON(geoData,{style:feature=>{const key=config.code(feature.properties),value=votesByArea[key]||0;return{color:'#fff',weight:key===targetKey?2:1,fillColor:color(value/max),fillOpacity:key===targetKey?.78:.42}},onEachFeature:(feature,layer)=>layer.on('click',()=>showCRMMapDetail(layer))}).addTo(crmLeafletMap);refreshCRMMapMode();const bounds=crmMapLayer.getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[24,24],animate:false});crmMapVotes.textContent=`${total.toLocaleString('es-CO')} votos`;crmMapNote.textContent='Seleccione una comuna para abrir la votación por barrio.'+notaRecorte()}
 const mapBeforeCali=loadHistoricalMap;
 loadHistoricalMap=async function(candidate){const isCali=normalizedText(candidate?.circunscripcion).includes('CALIVALLEDELCAUCA')||String(candidate?.corp||'').includes('· CALI ·');return isCali?renderCaliCampaignMap(candidate):mapBeforeCali(candidate)};
 const renderBarriosBeforeCali=renderBarriosForArea;
-renderBarriosForArea=async function(key){const state=crmMapState;if(state?.city!=='cali')return renderBarriosBeforeCali(key);state.focusKey=key;crmBreakdown.innerHTML='<h4>Votos por barrio</h4><p class="helper">Cargando polígonos y resultados barriales…</p>';try{const [puestoBarrio,geo]=await caliBarrios(key),mesas=state.mesas.filter(m=>String(m.com||m.zon||'').padStart(2,'0')===key),historical={};mesas.forEach(m=>{const barrio=puestoBarrio[electoralPlaceCode(m)]?.barrio;if(barrio)historical[barrio]=(historical[barrio]||0)+Number(m.v||0)});const localGoal=Number(projectedVotesByArea()[key]||0),values=crmMapMode==='proyectado'?distributeVotes(historical,localGoal):historical,features=geo.features,names=Object.fromEntries(features.map(feature=>[feature.properties.barrio,feature.properties.barrio]));renderMapBreakdown(values,names,`${crmMapMode==='proyectado'?'Meta proyectada':'Votos totales'} por barrio`);if(crmBarrioLayer)crmLeafletMap.removeLayer(crmBarrioLayer);const max=Math.max(1,...Object.values(values)),color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';crmBarrioLayer=L.geoJSON({...geo,features},{style:feature=>{const votes=values[feature.properties.barrio]||0;return{fillColor:color(votes/max),fillOpacity:votes?.82:.28,color:'rgba(23,37,28,.38)',weight:.55}},onEachFeature:(feature,layer)=>{const name=feature.properties.barrio,votes=Number(values[name]||0);layer.bindTooltip(`<strong>${name}</strong><br>${votes.toLocaleString('es-CO')} ${crmMapMode==='proyectado'?'votos proyectados':'votos'}`,{sticky:true});layer.on('mouseover',()=>layer.setStyle({weight:1.5,color:'#fff'}));layer.on('mouseout',()=>crmBarrioLayer.resetStyle(layer))}}).addTo(crmLeafletMap);const bounds=crmBarrioLayer.getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[20,20],animate:false});crmMapNote.textContent=`Detalle poligonal por barrio de ${state.namesByArea[key]||`la comuna ${key}`}.`}catch(error){crmBreakdown.innerHTML='<h4>Votos por barrio</h4><p class="helper">No fue posible cargar los polígonos barriales de esta comuna.</p>'}}
+renderBarriosForArea=async function(key){const state=crmMapState;if(state?.city!=='cali')return renderBarriosBeforeCali(key);state.focusKey=key;crmBreakdown.innerHTML='<h4>Votos por barrio</h4><p class="helper">Cargando polígonos y resultados barriales…</p>';try{const [puestoBarrio,geo]=await caliBarrios(key),mesas=state.mesas.filter(m=>claveLocal(m)===key),historical={};mesas.forEach(m=>{const barrio=puestoBarrio[electoralPlaceCode(m)]?.barrio;if(barrio)historical[barrio]=(historical[barrio]||0)+Number(m.v||0)});const localGoal=Number(projectedVotesByArea()[key]||0),values=crmMapMode==='proyectado'?distributeVotes(historical,localGoal):historical,features=geo.features,names=Object.fromEntries(features.map(feature=>[feature.properties.barrio,feature.properties.barrio]));renderMapBreakdown(values,names,`${crmMapMode==='proyectado'?'Meta proyectada':'Votos totales'} por barrio`);if(crmBarrioLayer)crmLeafletMap.removeLayer(crmBarrioLayer);const max=Math.max(1,...Object.values(values)),color=ratio=>ratio<=0?'#d8dfd7':ratio<.12?'#b7d9bf':ratio<.35?'#79b987':ratio<.65?'#3e8a5b':'#174f35';crmBarrioLayer=L.geoJSON({...geo,features},{style:feature=>{const votes=values[feature.properties.barrio]||0;return{fillColor:color(votes/max),fillOpacity:votes?.82:.28,color:'rgba(23,37,28,.38)',weight:.55}},onEachFeature:(feature,layer)=>{const name=feature.properties.barrio,votes=Number(values[name]||0);layer.bindTooltip(`<strong>${name}</strong><br>${votes.toLocaleString('es-CO')} ${crmMapMode==='proyectado'?'votos proyectados':'votos'}`,{sticky:true});layer.on('mouseover',()=>layer.setStyle({weight:1.5,color:'#fff'}));layer.on('mouseout',()=>crmBarrioLayer.resetStyle(layer))}}).addTo(crmLeafletMap);const bounds=crmBarrioLayer.getBounds();if(bounds.isValid())crmLeafletMap.fitBounds(bounds,{padding:[20,20],animate:false});crmMapNote.textContent=`Detalle poligonal por barrio de ${state.namesByArea[key]||`la comuna ${key}`}.`}catch(error){crmBreakdown.innerHTML='<h4>Votos por barrio</h4><p class="helper">No fue posible cargar los polígonos barriales de esta comuna.</p>'}}
 /* Base vial de bajo contraste: se crea junto con el único mapa Leaflet de este
    CRM y queda debajo de la capa de resultados electorales. */
 const createCRMLeafletMap=L.map;
-L.map=function(container,options){const map=createCRMLeafletMap(container,{...(options||{}),attributionControl:true});L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,opacity:.72,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);return map};
+L.map=function(container,options){return createCRMLeafletMap(container,{...(options||{}),attributionControl:true})};
+let crmTileLayer=null;
+/* La base vial solo se pinta donde la geometria NO va rotada. Bogota se dibuja
+   con rotateGeoJSON90Left (convencion del proyecto) y un callejero sin rotar
+   debajo contradice los poligonos: Soacha aparecia al norte y Chia al oriente.
+   Leaflet pone las teselas en tilePane, siempre por debajo de la capa de datos. */
+function aplicarBasemap(rotado){
+  if(!crmLeafletMap)return;
+  if(rotado){if(crmTileLayer){crmLeafletMap.removeLayer(crmTileLayer);crmTileLayer=null}return}
+  if(crmTileLayer)return;
+  crmTileLayer=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,opacity:.72,attribution:'&copy; OpenStreetMap contributors'}).addTo(crmLeafletMap);
+}
 rotateStrategyMessage();const strategyMessageTimer=setInterval(rotateStrategyMessage,950);setTimeout(()=>{preload.classList.remove('active');clearInterval(strategyMessageTimer)},5000);
 prepareHistoricalIndex();
 /* Los polígonos barriales se cargan bajo demanda, sólo para la localidad elegida. */
@@ -384,7 +410,72 @@ searchCandidate=function(query,now=false){queuedSearch=query||'';clearTimeout(se
 /* Misma ruta de fotografías usada por Análisis de Candidato: slug.jpg en S3. */
 const CANDIDATE_PHOTO_BASE=RRData.publicUrl('congreso-2026/output/fotos-candidatos');
 const PHOTO_UPLOAD_URL='https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnhGdM7ydzg7tEgiDcPRS?usp=share_link';
-function renderCRMProfilePhoto(candidate){const avatar=document.getElementById('crmInitials');if(!avatar||!candidate)return;avatar.classList.add('crm-avatar-hidden');document.getElementById('crmProfilePhoto')?.remove();document.getElementById('crmProfilePhotoMissing')?.remove();const photo=document.createElement('img');photo.id='crmProfilePhoto';photo.className='crm-profile-photo';photo.alt=`Foto de ${candidate.nombre||'candidato'}`;photo.src=candidate.fotoUrl||`${CANDIDATE_PHOTO_BASE}/${candidate.slug}.jpg`;photo.onerror=()=>{photo.remove();const missing=document.createElement('div');missing.id='crmProfilePhotoMissing';missing.className='crm-profile-photo-missing';missing.innerHTML=`<strong>${initials(candidate.nombre)}</strong><span>Aún no hay foto de hoja de vida.</span><a href="${PHOTO_UPLOAD_URL}" target="_blank" rel="noopener">¿Es usted? Súbala aquí</a>`;avatar.after(missing)};avatar.after(photo)}
+/* La foto vive en fotos-candidatos/{slug}.jpg y solo existe para ALGUNAS
+   candidaturas (82 hoy, casi todas de 2026). Una persona con historial tiene un
+   slug por elección, así que se prueban TODOS de la más reciente a la más
+   antigua en vez de rendirse con el primero. Los presidenciales tienen la suya
+   en el índice presidencial (4,7 KB), que además usa el nombre corto de la RNEC
+   ("CLAUDIA LÓPEZ HERNÁNDEZ") mientras el registro territorial guarda el legal
+   completo ("CLAUDIA NAYIBE LOPEZ HERNANDEZ") — por eso no basta el nombre exacto. */
+const PRES_INDEX_URL=RRData.publicUrl('congreso-2026/output/presidencial/index-presidencial.json');
+let fotosPresPromise=null;
+function fotosPresidenciales(){
+  if(!fotosPresPromise)fotosPresPromise=fetch(PRES_INDEX_URL).then(r=>r.ok?r.json():Promise.reject())
+    .then(d=>(d.personas||[]).filter(p=>p.foto).map(p=>({clave:CandRegistry.personaKey(p.nombre),foto:p.foto})))
+    .catch(()=>[]);
+  return fotosPresPromise;
+}
+/* Heurística acotada al índice presidencial (13 personas, no a las 439.015 del
+   registro): primer nombre + los DOS apellidos. Exigir dos apellidos es lo que
+   evita el falso positivo documentado en el proyecto — con un solo apellido,
+   "GUSTAVO PETRO" casaría con "GUSTAVO MIGUEL OSORIO PETRO". */
+function mismaPersonaPresidencial(claveCorta,claveLarga){
+  if(claveCorta===claveLarga)return true;
+  const a=claveCorta.split(/\s+/).filter(Boolean),b=claveLarga.split(/\s+/).filter(Boolean);
+  if(a.length<3||b.length<3)return false;
+  return a[0]===b[0]&&a[a.length-1]===b[b.length-1]&&a[a.length-2]===b[b.length-2];
+}
+/* ⚠️ MANDA EL BANCO DE fotos-candidatos/, que es el que se alimenta a mano.
+   Se prueban TODOS los slugs de la persona (uno por elección, del más reciente
+   al más antiguo) porque la foto puede estar cargada bajo cualquiera de ellos:
+   Claudia López está como CLAUDIA_NAYIBE_LOPEZ_HERNANDEZ_2026-CONSULTAS. La del
+   índice presidencial es solo el respaldo para cuando el banco aún no la tiene. */
+async function urlsDeFoto(candidate){
+  const urls=[];
+  if(candidate.fotoUrl)urls.push(candidate.fotoUrl);
+  const slugs=(candidate.history?.length?candidate.history:[candidate]).map(c=>c.slug).filter(Boolean);
+  if(candidate.slug)slugs.unshift(candidate.slug);
+  slugs.forEach(slug=>urls.push(`${CANDIDATE_PHOTO_BASE}/${slug}.jpg`));
+  const clave=CandRegistry.personaKey(candidate.nombre||'');
+  const pres=await fotosPresidenciales();
+  const hit=pres.find(p=>mismaPersonaPresidencial(p.clave,clave));
+  if(hit)urls.push(hit.foto);
+  return [...new Set(urls)];
+}
+function sinFoto(avatar,candidate){
+  const missing=document.createElement('div');missing.id='crmProfilePhotoMissing';missing.className='crm-profile-photo-missing';
+  missing.innerHTML=`<strong>${escHtml(initials(candidate.nombre))}</strong><span>Aún no hay foto de hoja de vida.</span><a href="${PHOTO_UPLOAD_URL}" target="_blank" rel="noopener">¿Es usted? Súbala aquí</a>`;
+  avatar.after(missing);
+}
+async function renderCRMProfilePhoto(candidate){
+  const avatar=document.getElementById('crmInitials');if(!avatar||!candidate)return;
+  avatar.classList.add('crm-avatar-hidden');
+  document.getElementById('crmProfilePhoto')?.remove();
+  document.getElementById('crmProfilePhotoMissing')?.remove();
+  const urls=await urlsDeFoto(candidate);
+  /* Se prueban en orden con Image(): la primera que cargue se queda. Un 404 de
+     S3 en <img> no ensucia nada mas que la consola. */
+  for(const url of urls){
+    const ok=await new Promise(resolve=>{const probe=new Image();probe.onload=()=>resolve(true);probe.onerror=()=>resolve(false);probe.src=url});
+    if(!ok)continue;
+    if(crmCandidate!==candidate)return;            // se abrio otra ficha mientras probabamos
+    const photo=document.createElement('img');photo.id='crmProfilePhoto';photo.className='crm-profile-photo';
+    photo.alt=`Foto de ${candidate.nombre||'candidato'}`;photo.src=url;
+    avatar.after(photo);
+    return;
+  }
+  if(crmCandidate===candidate)sinFoto(avatar,candidate);
+}
 const launchCRMWithProfilePhoto=launchCRM;launchCRM=async function(event){const result=await launchCRMWithProfilePhoto(event);if(crmCandidate)renderCRMProfilePhoto(crmCandidate);return result};
 </script>
 <script>
@@ -397,7 +488,7 @@ let electionViewRecords=[],electionViewSnapshots=new Map(),electionViewActive=''
 function electionViewHistory(candidate){
   const source=Array.isArray(candidate?.history)&&candidate.history.length?candidate.history:[candidate];
   const byYear=new Map();
-  source.forEach(item=>{const year=String(item?.ano||item?.year||'').match(/\d{4}/)?.[0];if(!year)return;const existing=byYear.get(year);if(!existing||Number(item.votos||0)>Number(existing.votos||0))byYear.set(year,item)});
+  source.forEach(item=>{const year=String(candidateYear(item)||'').match(/\d{4}/)?.[0];if(!year)return;const existing=byYear.get(year);if(!existing||Number(item.votos||0)>Number(existing.votos||0))byYear.set(year,item)});
   return [...byYear.entries()].sort((a,b)=>Number(a[0])-Number(b[0])).map(([year,candidate])=>({year,candidate}));
 }
 
@@ -416,18 +507,17 @@ function isBogotaElection(candidate,target){
   return (territorialOffice&&municipality.includes('BOGOTA'))||targetIsBogota;
 }
 
+/* Una elección «aplica» cuando deja al menos una mesa DENTRO del territorio
+   objetivo. Antes se decidía con un includes() sobre el nombre del municipio y
+   se pintaba la elección entera: el Senado 2014 de una candidata a Bogotá
+   pasaba el filtro por tener mesas en Bogotá, y luego se pintaba con TODAS sus
+   mesas del país. Ahora el recorte lo hace datosCandidatura y aquí solo se
+   comprueba que haya quedado algo. */
 async function electionAppliesToTarget(candidate){
-  const target=currentTargetTerritory();
-  if(!target?.corporation)return {applies:true};
+  if(!alcanceObjetivo())return {applies:true};
   try{
-    const data=await fetch(candidate.dataUrl).then(response=>response.ok?response.json():Promise.reject());
-    const mesas=data.mesas||[];
-    const wantedMunicipality=target.municipality;
-    const wantedDepartment=target.department;
-    const municipalityMatch=!wantedMunicipality||mesas.some(m=>normalizedText(m.munNom||'').includes(wantedMunicipality)||wantedMunicipality.includes(normalizedText(m.munNom||'')));
-    const departmentMatch=!wantedDepartment||mesas.some(m=>normalizedText(m.depNom||'').includes(wantedDepartment)||wantedDepartment.includes(normalizedText(m.depNom||'')));
-    const requiresMunicipality=['jal','concejo','alcaldia'].includes(target.corporation);
-    return {applies:requiresMunicipality?municipalityMatch:departmentMatch,data};
+    const data=await datosCandidatura(candidate);
+    return {applies:(data.mesas||[]).length>0,data};
   }catch(error){return {applies:false}}
 }
 
@@ -516,6 +606,165 @@ loadHistoricalMap=async function(candidate){
   await showElectionYear(records[records.length-1],{restoreToggles:false});
   renderElectionViewToggles();
 };
+</script>
+<script>
+/* RECORTE TERRITORIAL DE LA CANDIDATURA HISTÓRICA
+   ------------------------------------------------------------------
+   Una candidatura anterior puede ser de MAYOR alcance que la corporación a la
+   que se aspira. Claudia Lopez fue candidata al Senado en 2014 (nacional) y a
+   la Alcaldía de Bogotá en 2019; si en 2027 vuelve a competir por Bogotá, el
+   mapa del Senado 2014 debe mostrar SOLO sus votos en Bogotá.
+
+   Antes esto no se recortaba. renderBogotaCampaignMap agregaba por m.com||m.zon
+   sin filtrar por departamento ni municipio, y la zona electoral 01, 02, … existe
+   en TODOS los municipios del país: los votos de Medellín, Cali o Barranquilla
+   se sumaban DENTRO de las localidades de Bogotá que llevan el mismo número, y
+   namesByArea se sobrescribía con el comNom de la última mesa procesada. No
+   fallaba: inflaba a la candidata en su propio territorio.
+
+   El recorte se hace por CÓDIGO ELECTORAL, no por nombre: comparar «CALI» con
+   includes() también casa con «CALIMA». El código del departamento es el value
+   del select; el del municipio sale del mun_elec del GeoJSON ya cacheado en
+   municipalitiesByDepartment. Si el GeoJSON no está, se cae a comparar nombres
+   normalizados por igualdad (nunca por includes).
+
+   Lo omitido NO se esconde: datosCandidatura devuelve cuántas mesas y cuántos
+   votos quedaron fuera, y notaRecorte() lo declara debajo del mapa.           */
+const CORP_MUNICIPAL=['jal','concejo','alcaldia'],CORP_DEPARTAMENTAL=['asamblea','gobernacion'];
+let recorteActivo=null;
+const datosCandidaturaCache=new Map();
+
+/* Territorio al que se aspira. null = ruta «misma corporación»: no hay a qué
+   recortar y la evidencia histórica se muestra completa. */
+function alcanceObjetivo(){
+  const target=currentTargetTerritory();
+  if(!target?.corporation)return null;
+  const departamento=String(campaignDepartment?.value||'').replace(/^0+/,'');
+  if(CORP_MUNICIPAL.includes(target.corporation)&&target.municipality)
+    return {tipo:'municipio',departamento,municipio:codigoMunicipioObjetivo(),municipioNombre:target.municipality,departamentoNombre:target.department};
+  if(CORP_DEPARTAMENTAL.includes(target.corporation)&&target.department)
+    return {tipo:'departamento',departamento,departamentoNombre:target.department};
+  return null;
+}
+
+/* El select de municipio guarda el NOMBRE (mpio_cnmbr). El código electoral vive
+   en el mismo GeoJSON que ya bajó loadCampaignMunicipalities. */
+function codigoMunicipioObjetivo(){
+  const geo=municipalitiesByDepartment[`crm-${campaignDepartment?.value||''}`];
+  const nombre=normalizedText(campaignMunicipality?.value||'');
+  const feature=geo?.features?.find(f=>normalizedText(f.properties?.mpio_cnmbr||'')===nombre);
+  const codigo=feature?.properties?.mun_elec??feature?.properties?.mun_electoral;
+  return codigo===undefined?'':String(codigo).replace(/^0+/,'');
+}
+
+function mesaEnAlcance(mesa,alcance){
+  const dep=String(mesa.dep||'').replace(/^0+/,''),mun=String(mesa.mun||'').replace(/^0+/,'');
+  if(alcance.departamento&&dep&&dep!==alcance.departamento)return false;
+  if(alcance.tipo==='departamento')return alcance.departamento?Boolean(dep):normalizedText(mesa.depNom||'')===alcance.departamentoNombre;
+  if(alcance.municipio)return mun===alcance.municipio;
+  return normalizedText(mesa.munNom||'')===alcance.municipioNombre;
+}
+
+/* Una sola lectura por candidatura: electionAppliesToTarget y el renderizador
+   pedían el MISMO JSON mesa a mesa por separado. */
+async function datosCandidatura(candidate){
+  const url=candidate?.dataUrl||'';
+  if(!datosCandidaturaCache.has(url))
+    datosCandidaturaCache.set(url,fetch(url).then(r=>r.ok?r.json():Promise.reject(new Error('HTTP '+r.status))).catch(error=>{datosCandidaturaCache.delete(url);throw error}));
+  const data=await datosCandidaturaCache.get(url);
+  const alcance=alcanceObjetivo();
+  const mesas=data.mesas||[];
+  if(!alcance){recorteActivo=null;return {...data,mesas,recorte:null}}
+  const dentro=mesas.filter(mesa=>mesaEnAlcance(mesa,alcance));
+  const votos=(m)=>m.reduce((sum,mesa)=>sum+Number(mesa.v||0),0);
+  recorteActivo={alcance,mesasFuera:mesas.length-dentro.length,votosFuera:votos(mesas)-votos(dentro),votosDentro:votos(dentro)};
+  return {...data,mesas:dentro,recorte:recorteActivo};
+}
+
+/* Lo recortado se declara, no se esconde. */
+function notaRecorte(recorte=recorteActivo){
+  if(!recorte||!recorte.mesasFuera)return '';
+  const donde=recorte.alcance.tipo==='municipio'?(campaignMunicipality?.value||'el municipio'):(campaignDepartment?.options?.[campaignDepartment.selectedIndex]?.text||'el departamento');
+  return ` Se muestran solo los votos en ${donde}: quedaron por fuera ${recorte.votosFuera.toLocaleString('es-CO')} votos en ${recorte.mesasFuera.toLocaleString('es-CO')} mesas de otros territorios, que no cuentan para esta candidatura.`;
+}
+</script>
+<script>
+/* ESPERA DEL ÍNDICE ELECTORAL
+   ------------------------------------------------------------------
+   Las 8 fuentes locales (concejos y JAL) son el grueso de las 439.015
+   candidaturas, pesan ~11 MB y cand-index las baja de dos en dos a propósito.
+   Antes la pantalla de búsqueda mostraba una lista vacía y una nota: parecía
+   que faltaran los datos. Ahora muestra cuadritos, el progreso REAL por fuente
+   que aterriza y datos curiosos del propio archivo mientras tanto.
+
+   El progreso se lee por sondeo cada 400 ms en vez de envolver appendHistorical:
+   una capa menos en un archivo que ya tiene demasiadas. Y NO usa rAF, así que
+   funciona igual en una pestaña de fondo (el odómetro de analisis-candidato sí
+   se congela ahí). La barra nunca retrocede: un avance que se devuelve se lee
+   como error. */
+const C360_FACTS=[
+  ['El votante mediano no existe','Un concejal <b>mediano</b> saca <b>69</b> votos. El más votado del país, <b>Edison Julián Forero</b>, sacó <b>70.032</b>: mil veces más.'],
+  ['La política se decide abajo','<b>8 de cada 10</b> candidaturas de este archivo son al Concejo, y el <b>61%</b> de ellas no llegó a <b>100</b> votos.'],
+  ['Cuánto cuesta cada silla','Votación mediana por cargo: concejal <b>69</b> · edil <b>175</b> · diputado <b>1.126</b> · alcalde <b>1.250</b> · senador <b>1.491</b> · representante <b>2.157</b> · gobernador <b>22.429</b>.'],
+  ['Un gobernador vale 325 concejales','El gobernador mediano saca <b>22.429</b> votos; el concejal mediano, <b>69</b>. Esa es la distancia entre los dos extremos del voto colombiano.'],
+  ['Bogotá pesa más que el Senado','<b>Carlos Fernando Galán</b> sacó <b>1.499.734</b> votos en la Alcaldía de 2023: más que el senador más votado de todo el archivo, <b>Álvaro Uribe</b> con <b>891.964</b>.'],
+  ['El edil que le gana al alcalde','El más votado de una JAL, <b>Juan Camilo Ramírez</b> en Suba, sacó <b>12.165</b> votos: casi <b>diez veces</b> lo que saca un alcalde mediano.'],
+  ['Diez por silla','Al Concejo de Bogotá de 2023 se presentaron <b>435</b> candidatos para <b>45</b> curules.'],
+  ['El efecto de la lista cerrada','El Pacto Histórico y el Centro Democrático aparecen con <b>cero</b> votos nominales al Senado: el voto fue al logo, no a la persona.'],
+  ['La misma persona, dos nombres','La Registraduría lo inscribe como «Gustavo Petro» en la presidencial y «Gustavo Francisco Petro Urrego» en la Alcaldía: aquí se unen en una sola ficha.'],
+  ['El país cabe en este archivo','Son <b>437.845</b> candidaturas reales, con los concejos de <b>1.020</b> municipios en cuatro elecciones.']
+];
+let idxOrden=[],idxI=0,idxFactTimer=null,idxPollTimer=null,idxPct=0;
+function idxPintaFact(){
+  const el=document.getElementById('idx-fact');if(!el)return;
+  if(!idxOrden.length){ /* Fisher-Yates: con orden fijo, quien entra dos veces ve siempre los mismos. */
+    idxOrden=C360_FACTS.map((_,i)=>i);
+    for(let i=idxOrden.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[idxOrden[i],idxOrden[j]]=[idxOrden[j],idxOrden[i]]}
+  }
+  const [k,txt]=C360_FACTS[idxOrden[idxI%idxOrden.length]];idxI++;
+  el.classList.add('fade');
+  setTimeout(()=>{el.innerHTML=`<span class="idx-kicker">${k}</span>${txt}`;el.classList.remove('fade')},300);
+}
+function idxLoaderHTML(){
+  const [k,txt]=C360_FACTS[Math.floor(Math.random()*C360_FACTS.length)];
+  return `<div class="idx-load" id="idx-load">
+    <div class="idx-load-top"><div class="idx-load-count"><b id="idx-count">0</b> candidaturas listas</div>
+    <div class="idx-load-state" id="idx-state">Preparando el índice electoral</div></div>
+    <div class="idx-bar"><i id="idx-bar" style="width:4%"></i></div>
+    <div class="idx-fact" id="idx-fact"><span class="idx-kicker">${k}</span>${txt}</div></div>
+  <div class="idx-skel" id="idx-skel">${'<div class="idx-skel-row"><div class="idx-skel-av idx-sh"></div><div class="idx-skel-l"><i class="idx-sh w60"></i><i class="idx-sh w35"></i></div></div>'.repeat(3)}</div>`;
+}
+function idxRefresca(){
+  const bar=document.getElementById('idx-bar');if(!bar)return idxDetiene();
+  /* historicalSources cuenta fuentes aterrizadas sobre historicalTotal (29). */
+  const pct=Math.min(97,4+(historicalSources/historicalTotal)*93);
+  if(pct>idxPct){idxPct=pct;bar.style.width=`${pct}%`}
+  const n=document.getElementById('idx-count');if(n)n.textContent=historicalIndex.length.toLocaleString('es-CO');
+  const st=document.getElementById('idx-state');
+  if(st)st.textContent=historicalLocalDone?'Índice completo':`Faltan ${Math.max(0,historicalTotal-historicalSources)} fuentes`;
+  if(historicalLocalDone){bar.style.width='100%';setTimeout(idxCierra,700)}
+}
+function idxDetiene(){clearInterval(idxFactTimer);clearInterval(idxPollTimer);idxFactTimer=idxPollTimer=null}
+function idxCierra(){idxDetiene();document.getElementById('idx-load')?.remove();document.getElementById('idx-skel')?.remove()}
+function idxArranca(){
+  if(historicalLocalDone)return;
+  const cont=document.getElementById('searchResults');if(!cont||document.getElementById('idx-load'))return;
+  cont.insertAdjacentHTML('afterbegin',idxLoaderHTML());
+  idxI=1;idxOrden=[];idxPct=0;
+  idxFactTimer=setInterval(idxPintaFact,5200);
+  idxPollTimer=setInterval(idxRefresca,400);
+  idxRefresca();
+}
+/* Los cuadritos son el marcador de posición de la lista: sobran en cuanto hay
+   resultados de verdad, pero el progreso se queda hasta que el índice termine. */
+function idxSoloProgreso(hayConsulta){
+  const skel=document.getElementById('idx-skel');
+  if(skel)skel.style.display=hayConsulta?'none':'grid';
+}
+const beginHistoricalSinLoader=beginHistorical;
+beginHistorical=function(){beginHistoricalSinLoader();setTimeout(idxArranca,750)};
+const searchCandidateSinLoader=searchCandidate;
+searchCandidate=function(query,now){const r=searchCandidateSinLoader(query,now);idxSoloProgreso((query||'').trim().length>=2);return r};
 </script>
 </body>
 </html>
