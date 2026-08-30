@@ -177,7 +177,7 @@
     .signal-dialog-inner{position:relative;padding:2rem}
     .signal-dialog .eyebrow{color:var(--blue)}
     .signal-dialog h2{font-size:clamp(1.5rem,4vw,2rem);line-height:1.1;letter-spacing:-.03em;margin:.7rem 0}
-    .signal-dialog p{color:var(--ink2);font-size:.98rem;line-height:1.6}
+    .signal-dialog p{color:var(--ink2);font-size:.98rem;line-height:1.6;white-space:pre-line}
     .signal-dialog .cta{margin-top:1.5rem}
     .dialog-close{position:absolute;top:.8rem;right:.8rem;width:2rem;height:2rem;border:1px solid var(--border2);background:transparent;color:var(--ink);font:inherit;font-size:1.25rem;line-height:1;cursor:none}
     .dialog-close:hover{border-color:var(--blue);color:var(--blue)}
@@ -407,7 +407,7 @@
       <div class="container">
         <div class="hero-grid">
           <div class="hero-copy">
-            <span class="live-badge"><span class="dot"></span>Monitoreo en tiempo real — CO</span>
+            <span class="live-badge"><span class="dot"></span><span id="liveStamp">Monitoreo continuo — CO</span></span>
             <div class="brand-mark" style="margin-top:1.4rem"><b>Caudal</b> × Cauce · inteligencia de asuntos públicos, regulatorios y reputacionales</div>
             <h1>Todo el entorno que afecta a tu organización, <em class="ac">leído</em>.</h1>
             <svg class="wave-break" aria-hidden="true"><use href="#wave"/></svg>
@@ -681,6 +681,63 @@
         if(detail.url) link.href=detail.url;
         dialog.showModal();
       }));
+
+      /* ─── La señal legislativa sale del feed real, no del texto de arriba ───
+         `en-vivo.json` lo escribe el rastreo diario (2 corridas al día) con los
+         15 últimos radicados de cada cámara y su resumen ciudadano.
+         ⚠️ El registro del Congreso publica CON REZAGO —medido entre 0 y 13 días—
+         así que "lo último radicado" casi nunca es de hoy. Por eso se muestra la
+         fecha real del proyecto y la hora en que se leyó el feed, en vez de
+         prometer tiempo real: el desfase es de la fuente, no nuestro, y es mejor
+         que lo diga la página a que lo note el cliente.
+         Si el feed no responde queda el texto de la maqueta: esto nunca puede
+         romper la portada. */
+      const FEED='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/en-vivo.json';
+      const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      /* las dos cámaras escriben la fecha distinto (2026/08/26 vs 2026-08-25) */
+      const ymd=v=>{const m=String(v||'').match(/(\d{4})[-/](\d{2})[-/](\d{2})/);return m?{y:+m[1],m:+m[2],d:+m[3],k:m[1]+m[2]+m[3]}:null;};
+      const enLetras=f=>f?`${f.d} de ${MESES[f.m-1]} de ${f.y}`:'';
+      const S3PDF='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo';
+      /* cortar en frontera de palabra: un título partido a media palabra
+         ("…Santa Cat") se lee como error de la herramienta, no como recorte */
+      const recorta=(t,n)=>{t=String(t||'').trim();if(t.length<=n)return t;
+        const c=t.slice(0,n);const i=c.lastIndexOf(' ');return (i>n*0.6?c.slice(0,i):c).replace(/[ ,;:.]+$/,'')+'…';};
+
+      fetch(FEED).then(r=>r.ok?r.json():Promise.reject(new Error(r.status))).then(feed=>{
+        const items=[...(feed.senado||[]).map(x=>({...x,camara:'Senado'})),
+                     ...(feed.camara||[]).map(x=>({...x,camara:'Cámara'}))]
+                    .map(x=>({...x,f:ymd(x.fecha)}))
+                    .filter(x=>x.f)                       // algunos llegan sin fecha
+                    .sort((a,b)=>b.f.k.localeCompare(a.f.k));
+        const u=items[0];
+
+        /* el sello: cuándo se leyó el feed, no "tiempo real" */
+        const leido=ymd(feed.actualizado);
+        const stamp=document.getElementById('liveStamp');
+        if(stamp&&leido){
+          const hoy=new Date(), esHoy=leido.y===hoy.getFullYear()&&leido.m===hoy.getMonth()+1&&leido.d===hoy.getDate();
+          stamp.textContent=esHoy?'Señales revisadas hoy — CO':`Señales revisadas el ${enLetras(leido)} — CO`;
+        }
+
+        if(!u) return;
+        const e=u.explica||{};
+        const cambia=Array.isArray(e.cambia)?e.cambia.join(' '):'';
+        const titulo=e.titular||(u.titulo||'').replace(/^POR (MEDIO DE LA CUAL|LA CUAL|EL CUAL)\s*/i,'').toLowerCase().replace(/^./,c=>c.toUpperCase());
+        const cuerpo=[cambia||e.afecta||'', e.ojo?`Ojo: ${e.ojo}`:''].filter(Boolean).join(' ');
+        details['education-bill']={
+          type:`Señal legislativa · radicado el ${enLetras(u.f)}`,
+          title:recorta(titulo||'Proyecto recién radicado',88),
+          copy:(cuerpo||'Proyecto recién radicado en el Congreso.')+
+               `\n\nProyecto ${u.numero||''} · ${u.camara}${u.comision?' · Comisión '+u.comision:''}. Leído del registro oficial${leido?' el '+enLetras(leido):''}.`,
+          url:u.pdf?`${S3PDF}/${u.pdf}`:(u.fuente||'https://leyes.senado.gov.co/proyectos-de-ley')
+        };
+        /* si hay PDF el botón lo dice: no es lo mismo mandar al texto radicado
+           que a un listado donde el cliente tiene que buscarlo él */
+        if(u.pdf&&link) link.innerHTML='Ver el texto radicado <span aria-hidden="true">↗</span>';
+        /* la etiqueta que se ve en el sextante, sin abrir nada */
+        const blip=document.querySelector('.blip[data-detail="education-bill"]');
+        if(blip) blip.dataset.label=`PL · ${(titulo||'nuevo radicado').toLowerCase().slice(0,46)}`;
+      }).catch(()=>{ /* se queda la maqueta; la portada no depende de esto */ });
     })();
 
     // ─── REENVÍO DE TOKEN DE INVITADO (?acceso=) A LA PLATAFORMA ───────────────
