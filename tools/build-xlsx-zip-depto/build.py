@@ -47,6 +47,17 @@ for _d in _div["deptos"]:
 # divipola.json trae 2 nombres de depto defectuosos; se corrigen aquí.
 DEP_NOMBRE.update({"25": "Norte De Santander", "31": "Valle Del Cauca"})
 
+# Los rótulos estructurales y los municipios históricos viven en UN solo sitio
+# (tools/build-csv-names/build.py) para que el ZIP y el CSV no se desincronicen:
+# ya estaban duplicados los mapas de nombres y arreglar uno dejaba el otro atrás.
+import importlib.util as _ilu
+_spec = _ilu.spec_from_file_location(
+    "_csvnames", Path(__file__).resolve().parent.parent / "build-csv-names" / "build.py")
+_csvnames = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_csvnames)
+rotulo_puesto = _csvnames.rotulo_puesto
+MUN_HISTORICOS = _csvnames.MUN_HISTORICOS
+
 PUESTO_NOMBRE = {}
 def _load_puesto_nombres():
     """Divipol 2021 como fallback; el georef 2026 (primario) lo pisa después."""
@@ -204,13 +215,17 @@ def process_file(csv_in: Path, zip_out: Path):
                 rows_in_sheet = 1
             if ins_names:
                 mun_cod = (row[cod_mme_idx].strip() if cod_mme_idx < len(row) else "").zfill(3)
-                mun_nombre = MUN_NOMBRE.get(f"{cod_dde}-{mun_cod}", "")
+                mun_nombre = (MUN_NOMBRE.get(f"{cod_dde}-{mun_cod}", "")
+                              or MUN_HISTORICOS.get(f"{cod_dde}-{mun_cod}", ""))
+                if not mun_nombre:
+                    mun_nombre = "[PAIS NO IDENTIFICADO]" if cod_dde == "88" else "[MUNICIPIO NO IDENTIFICADO]"
                 out = (list(row[:cod_dde_idx+1]) + [dep_nombre]
                        + list(row[cod_dde_idx+1:cod_mme_idx+1]) + [mun_nombre])
                 if ins_pp:
                     zz2 = (row[cod_zz_idx].strip() if cod_zz_idx < len(row) else "").zfill(2)
                     pp2 = (row[cod_pp_idx].strip() if cod_pp_idx < len(row) else "").zfill(2)
-                    pp_nombre = PUESTO_NOMBRE.get(cod_dde + mun_cod + zz2 + pp2, "")
+                    pp_nombre = (PUESTO_NOMBRE.get(cod_dde + mun_cod + zz2 + pp2, "")
+                                 or rotulo_puesto(cod_dde, mun_cod, zz2, pp2, dep_nombre, mun_nombre))
                     out += list(row[cod_mme_idx+1:cod_pp_idx+1]) + [pp_nombre] + list(row[cod_pp_idx+1:])
                 else:
                     out += list(row[cod_mme_idx+1:])
