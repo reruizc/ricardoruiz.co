@@ -14,7 +14,7 @@ Fuentes de nombres:
             Los ~0,3% sin match (agregados especiales zona 90/99) quedan en blanco.
 
 Uso:
-  python3 tools/build-csv-names/build.py "GCS_2023TER.csv"
+  python3 tools/build-csv-names/build.py "GCS_2023TER.csv" [--rotulos]
   python3 tools/build-csv-names/build.py "GCS_2023TER_PUESTO.csv" --src-dir "..." --out "..."
 
 Salida por defecto: Bases de datos/output_csv_names/<mismo nombre>.csv
@@ -78,13 +78,48 @@ def load_maps():
     return dep_nombre, mun_nombre, puesto_nombre
 
 
-def enrich(csv_in: Path, csv_out: Path):
+# ─── Rótulos estructurales para lo que Divipole no nombra ──────────────────
+# Los códigos de puesto de 2014/2018 no siempre existen en Divipol 2021 ni en
+# el georef 2026: puestos cerrados, consulados renumerados, zonas especiales.
+# En vez de dejar la celda vacía se pone un rótulo DERIVADO DEL PROPIO CÓDIGO,
+# entre corchetes para que nunca se confunda con el nombre real del puesto.
+#
+# La base de cada rótulo se midió sobre Divipol 2021, no se supuso:
+#   zona 00 · puesto 00 → 851 de 868 (98,0%) se llaman "PUESTO CABECERA MUNICIPAL"
+#                          y 17 "CORREGIMIENTO DEPARTAMENTAL" (deptos 50/60/68)
+#   zona 98             → 66% son "CARCEL" y variantes
+#   zona 99             → 4.966 nombres distintos en 6.996 puestos: es la zona
+#                          RURAL y cada puesto tiene nombre propio → NO se infiere
+#   zona 90             → 106 nombres distintos en 108 puestos (estadios, centros
+#                          de convención): tampoco se infiere; solo se dice qué es
+# El exterior (dep 88) sí conserva el país, que viene de divipola; la ciudad va
+# en la zona/puesto y esa no se puede recuperar sin el Divipole de ese año.
+CORREG_DEPTOS = {"50", "60", "68"}   # Guainía, Amazonas, Vaupés
+
+
+def rotulo_puesto(dep2, mun3, zz2, pp2, dep_n, mun_n):
+    """Rótulo estructural cuando no hay nombre oficial. Siempre entre corchetes."""
+    if dep2 == "88":
+        pais = mun_n or dep_n
+        return f"[CONSULADO · {pais.upper()}]" if pais else "[CONSULADO]"
+    if zz2 == "00" and pp2 == "00":
+        return "[CORREGIMIENTO DEPARTAMENTAL]" if dep2 in CORREG_DEPTOS else "[CABECERA MUNICIPAL]"
+    if zz2 == "90":
+        return "[PUESTO CENSO]"
+    if zz2 == "98":
+        return "[CARCEL]"
+    if zz2 == "99":
+        return "[PUESTO RURAL · SIN NOMBRE EN DIVIPOLE]"
+    return "[PUESTO SIN NOMBRE EN DIVIPOLE]"
+
+
+def enrich(csv_in: Path, csv_out: Path, rotulos: bool = False):
     dep_nombre, mun_nombre, puesto_nombre = load_maps()
     csv_out.parent.mkdir(parents=True, exist_ok=True)
 
     t0 = time.time()
     n = 0
-    stats = {"dep": 0, "mun": 0, "pp": 0}
+    stats = {"dep": 0, "mun": 0, "pp": 0, "rot": 0}
     with csv_in.open("r", encoding="utf-8-sig", newline="") as fi, \
          csv_out.open("w", encoding="utf-8-sig", newline="") as fo:
         reader = csv.reader(fi, delimiter=";", quoting=csv.QUOTE_MINIMAL)
@@ -112,6 +147,9 @@ def enrich(csv_in: Path, csv_out: Path):
             dep_n = dep_nombre.get(dep2, "")
             mun_n = mun_nombre.get(f"{dep2}-{mun3}", "")
             pp_n  = puesto_nombre.get(dep2 + mun3 + zz2 + pp2, "")
+            if not pp_n and rotulos:
+                pp_n = rotulo_puesto(dep2, mun3, zz2, pp2, dep_n, mun_n)
+                stats["rot"] += 1
             if dep_n: stats["dep"] += 1
             if mun_n: stats["mun"] += 1
             if pp_n:  stats["pp"] += 1
@@ -127,6 +165,8 @@ def enrich(csv_in: Path, csv_out: Path):
     print(f"OK · {n:,} filas en {dt:.0f}s → {csv_out}")
     for k, label in (("dep", "DES_DDE"), ("mun", "DES_MME"), ("pp", "DES_PP")):
         print(f"   {label}: {stats[k]:,} con nombre ({stats[k]/n*100:.3f}%)")
+    if rotulos:
+        print(f"   DES_PP rótulo estructural: {stats['rot']:,} ({stats['rot']/n*100:.3f}%)")
     return n
 
 
@@ -148,7 +188,7 @@ def main():
         raise SystemExit(f"no existe: {args[0]}")
     csv_out = out or (OUT_DIR / csv_in.name)
     print(f"{csv_in.name} → {csv_out}")
-    enrich(csv_in, csv_out)
+    enrich(csv_in, csv_out, rotulos="--rotulos" in sys.argv)
 
 
 if __name__ == "__main__":
