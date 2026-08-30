@@ -923,16 +923,161 @@
       || '<div class="cob-note">Sin lectura disponible.</div>';
   }
 
+  /* ---------- pilar SUCOP · borradores en consulta pública ----------
+     Lo que separa a este pilar de los otros seis: su dato VENCE. Toda la UI de
+     acá abajo existe para que el cliente no confunda las dos cosas — lo que
+     todavía puede comentar (y cuánto le queda) contra lo que ya es archivo. */
+  const SUC={estado:'abiertas', q:''};
+  const SUC_ESTADOS=[['abiertas','Se puede comentar'],['cierra_pronto','Cierran en ≤7 días'],
+                     ['cerrada','Ya cerradas'],['planeacion','Anunciadas, sin fecha'],['','Todas']];
+  const SUC_EJEMPLOS=['minería','salud','datos personales','transporte','educación'];
+  let SUC_STATS=null, _sucInited=false, _sucSeq=0;
+  /* La cuenta regresiva en palabras. Es el corazón del pilar: "cierra hoy" y
+     "cerró hace 3 meses" no pueden verse igual. */
+  function sucPlazo(r){
+    const d=r.dias_restantes, ec=r.estado_consulta;
+    if(ec==='cierra_pronto'||ec==='abierta'){
+      if(d===0) return ['urge','Cierra hoy'];
+      if(d===1) return ['urge','Cierra mañana'];
+      return [ec==='cierra_pronto'?'urge':'viva', `Quedan ${d} días`];
+    }
+    if(ec==='por_abrir') return ['viva', 'Aún no abre'];
+    if(ec==='cerrada'){
+      const dd=(d==null)?null:Math.abs(d);
+      return ['venc', dd==null?'Cerrada':(dd===0?'Cerró hoy':`Cerró hace ${dd} ${dd===1?'día':'días'}`)];
+    }
+    if(ec==='planeacion') return ['venc','Anunciada, sin fecha'];
+    if(ec==='cancelada')  return ['venc','Cancelada'];
+    return ['venc','Sin ventana publicada'];
+  }
+  function sucCard(r){
+    const [cls,txt]=sucPlazo(r);
+    const viva=(r.estado_consulta==='cierra_pronto'||r.estado_consulta==='abierta');
+    // shortTitle quita el «Por medio de la cual se…» — sin eso, un título legal
+    // completo ocupa dos líneas subrayadas y entierra de qué trata el borrador,
+    // que es lo único que el cliente está leyendo en esta lista.
+    const tit=shortTitle((r.titulo||'—').replace(/^["“]|["”]$/g,''))||'—';
+    const obj=(r.objeto||'').replace(/\s+/g,' ').trim();
+    const href=r.url?encodeURI(r.url):'';
+    const name=href
+      ?`<a class="sanc-name" href="${esc(href)}" target="_blank" rel="noopener" style="color:inherit">${esc(tit)}</a>`
+      :`<span class="sanc-name">${esc(tit)}</span>`;
+    // la ventana en crudo, para que el plazo sea auditable y no una afirmación
+    const vent=(r.fecha_inicio||r.fecha_fin)?`${esc(r.fecha_inicio||'—')} → ${esc(r.fecha_fin||'—')}`:'';
+    return `<div class="sanc${cls==='urge'?' suc-urg':''}">
+      <div class="sanc-top">${name}<span class="doc-badge ${cls}">${esc(txt)}</span></div>
+      ${obj?`<div class="sanc-motivo">${esc(obj.length>320?obj.slice(0,317)+'…':obj)}</div>`:''}
+      <div class="sanc-tags">
+        <span class="doc-badge${viva?' pal':''}">${esc(r.entidad||'—')}</span>
+        ${r.tipo_norma&&r.tipo_norma!=='No especificado'?`<span class="doc-badge">${esc(r.tipo_norma)}</span>`:''}
+        ${r.tipo==='agenda'?'<span class="doc-badge">Agenda regulatoria</span>':''}
+        ${vent?`<span class="sanc-fecha">${vent}</span>`:''}
+        ${r.comentarios?` · ${fmt(r.comentarios)} comentario${r.comentarios===1?'':'s'}`:''}
+        ${href?` · <a href="${esc(href)}" target="_blank" rel="noopener" style="color:var(--ink3)">ficha oficial ↗</a>`:''}
+      </div>
+    </div>`;
+  }
+  function sucRenderLanding(s){
+    const el=document.getElementById('suc-landing'); if(!el||!s) return;
+    const v=s.ventana||{};
+    const rango=s.rango_fechas&&s.rango_fechas[0]?`${s.rango_fechas[0].slice(0,4)}–${s.rango_fechas[1].slice(0,4)}`:'—';
+    const ab=(s.abiertos||[]);
+    const urg=ab.filter(r=>r.estado_consulta==='cierra_pronto');
+    el.innerHTML=`
+      <div class="land-h">Lo que todavía se puede comentar · consultado hoy, ${esc(s.hoy||'')}</div>
+      <div class="kpis">
+        <div class="kpi"><div class="n" style="color:var(--green)">${fmt(v.abiertas||0)}</div><div class="l">Abiertas ahora</div></div>
+        <div class="kpi"><div class="n" style="color:var(--red)">${fmt(v.cierran_en_7_dias||0)}</div><div class="l">Cierran en ≤7 días</div></div>
+        <div class="kpi"><div class="n">${fmt(s.total||0)}</div><div class="l">Procesos en total</div></div>
+        <div class="kpi"><div class="n">${rango}</div><div class="l">Periodo</div></div>
+      </div>
+      <div class="cob-note" style="margin-bottom:1.4rem">
+        El plazo se calcula contra la fecha de <b>hoy</b>, no contra la de la
+        cosecha: ${esc(v.cerradas!=null?fmt(v.cerradas):'—')} procesos ya vencieron y
+        ${fmt(v.en_planeacion||0)} están anunciados sin fecha. Último barrido de la
+        fuente: ${esc(s.cosechado_a||'—')}.
+      </div>
+      ${ab.length?`<div class="panel wide"><h3>Ventana abierta${urg.length?` · ${urg.length} cierra${urg.length===1?'':'n'} esta semana`:''}</h3>
+        <div class="sanc-list">${ab.map(sucCard).join('')}</div></div>`:
+        `<div class="panel wide"><h3>Ventana abierta</h3><div class="cob-note">Hoy no hay ninguna consulta pública abierta. Vuelve mañana: la fuente se mueve todos los días hábiles.</div></div>`}
+      <div class="reg-sectors-grid">
+        ${(s.por_entidad||[]).slice(0,12).map(x=>`<div class="sec-card" data-ent="${esc(x.entidad)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(x.entidad)}</div></div>`).join('')}
+      </div>
+      <div class="panel wide"><h3>Lo último publicado</h3><div class="sanc-list">${(s.recientes||[]).map(sucCard).join('')}</div></div>`;
+    el.querySelectorAll('.sec-card').forEach(c=>c.onclick=()=>{
+      SUC.estado=''; SUC.q=''; const i=document.getElementById('sq'); if(i) i.value='';
+      sucSyncEstados(); sucBuscar({entidad:c.dataset.ent});
+    });
+  }
+  function sucRenderResults(d){
+    const el=document.getElementById('suc-results'); if(!el) return;
+    el.style.display='block';
+    const et=(SUC_ESTADOS.find(([k])=>k===(d.estado||''))||['','Todas'])[1];
+    const scope=[d.entidad?esc(d.entidad):'', d.query?`«${esc(d.query)}»`:'', esc(et)].filter(Boolean).join(' · ');
+    const v=d.ventana||{};
+    const emp=(d.empresas||[]).length?`<div class="cob-note" style="margin-bottom:1rem">
+        <b>${esc(d.empresas.map(e=>e.nombre).join(', '))}</b> es una empresa del diccionario: el
+        Estado no regula marcas sino actividades, así que se buscó por su tema —
+        ${esc(d.empresas.flatMap(e=>e.nucleo||[]).join(' · ')||'—')} — además del nombre literal.
+      </div>`:'';
+    el.innerHTML=`
+      <div class="r-titular" style="font-size:1.4rem">${fmt(d.n)} ${d.n===1?'proceso':'procesos'}</div>
+      <div class="r-sub" style="margin-bottom:1rem">${scope||'todos los procesos'}${
+        v.abiertas?` · <b style="color:var(--green)">${fmt(v.abiertas)} todavía se puede${v.abiertas===1?'':'n'} comentar</b>`:
+        ' · ninguno con la ventana abierta'}</div>
+      ${emp}
+      ${d.mostrados<d.n?`<div class="cob-note" style="margin-bottom:1rem">Mostrando ${d.mostrados} de ${fmt(d.n)} — primero lo que cierra antes. Afina la búsqueda para ver menos.</div>`:''}
+      ${listaConMuro(d.resultados, sucCard, 'borrador', 'borradores', `acceso · ${d.query||'consulta pública'}`, 'Sin coincidencias. Prueba otro término o cambia el estado.')}`;
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  async function sucBuscar(extra){
+    const mine=++_sucSeq;
+    const el=document.getElementById('suc-results'), landing=document.getElementById('suc-landing');
+    if(landing) landing.style.display='none';
+    if(el){ el.style.display='block'; el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Buscando borradores <span class="dots"><span></span><span></span><span></span></span></div>'; }
+    let d; try{ d=await call(Object.assign({action:'sucop', query:SUC.q, estado:SUC.estado}, extra||{})); }
+    catch(e){ if(mine===_sucSeq&&el) el.innerHTML='<div class="err">No se pudo consultar. Reintenta.</div>'; return; }
+    if(mine!==_sucSeq) return;
+    sucRenderResults(d);
+  }
+  async function sucLoadStats(){
+    // el landing NO se cachea entre visitas como los otros pilares: su número
+    // principal es una cuenta regresiva, y servirla de memoria la envejecería
+    // dentro de la misma sesión.
+    const el=document.getElementById('suc-landing');
+    if(el&&!SUC_STATS) el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Cargando las consultas abiertas <span class="dots"><span></span><span></span><span></span></span></div>';
+    try{ SUC_STATS=await call({action:'sucop'}); }catch(e){ /* deja lo anterior */ }
+    if(SUC_STATS) sucRenderLanding(SUC_STATS);
+    else if(el) el.innerHTML='<div class="err">No se pudieron cargar las consultas. Reintenta.</div>';
+  }
+  function sucShowLanding(){ const r=document.getElementById('suc-results'); if(r) r.style.display='none'; const l=document.getElementById('suc-landing'); if(l) l.style.display='block'; }
+  function sucSyncEstados(){ document.querySelectorAll('#sestados .chip').forEach(c=>c.classList.toggle('on',(c.dataset.est||'')===SUC.estado)); }
+  function sucInit(){
+    if(_sucInited) return; _sucInited=true;
+    const sq=document.getElementById('sq'), sgo=document.getElementById('sgo');
+    const go=()=>{ SUC.q=(sq&&sq.value||'').trim(); if(!SUC.q&&SUC.estado==='abiertas') sucShowLanding(); else sucBuscar(); };
+    if(sgo) sgo.onclick=go;
+    if(sq) sq.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
+    const cont=document.getElementById('sestados');
+    if(cont) SUC_ESTADOS.forEach(([k,t])=>{ const c=document.createElement('span'); c.className='chip'+(k===SUC.estado?' on':''); c.dataset.est=k; c.textContent=t; c.onclick=()=>{ SUC.estado=k; sucSyncEstados(); if(!SUC.q&&k==='abiertas') sucShowLanding(); else sucBuscar(); }; cont.appendChild(c); });
+    const sb=document.getElementById('sucBack'); if(sb) sb.onclick=()=>showView('home');
+  }
+
   /* Lo que caudal.html necesita de acá: la búsqueda universal entra a los
      `*Buscar`/`*Card`/`*Init` de cada pilar, y caudal-base.js llama los
      `*LoadStats` al abrir la vista. Los nombres se conservan tal cual: allá
      se usan como identificador suelto y resuelven contra `window`.
-     (`_ampliarEmp` va aparte, como global, porque se reasigna.) */
+     (`_ampliarEmp` va aparte, como global, porque se reasigna.)
+     SUCOP viaja entero por acá: la búsqueda universal, que vive en caudal.html,
+     lee `SUC` y llama `sucBuscar`/`sucSyncEstados`/`sucCard`. `SUC` es un const
+     que solo se MUTA (`SUC.q=…`), nunca se reasigna, así que la referencia
+     compartida por `window` siempre es la misma. */
   Object.assign(window, {
     q, buscar, EJEMPLOS, empresaHint, wireEmpresaHint,
     REG, regBuscar, regInit, regLoadStats, sancCard, fmtCOP,
     EJE, ejeBuscar, ejeInit, ejeLoadStats, ejeCard,
     CON, conBuscar, conInit, conLoadStats, conCard,
     MED, medBuscar, medInit, medLoadLanding, medHeadCard,
+    SUC, sucBuscar, sucInit, sucLoadStats, sucCard, sucSyncEstados,
   });
 })();
