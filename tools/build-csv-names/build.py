@@ -78,6 +78,28 @@ def load_maps():
     return dep_nombre, mun_nombre, puesto_nombre
 
 
+# ─── Municipios que existieron y desaparecieron del Divipole ───────────────
+# El código de municipio de un año viejo puede no existir hoy porque la entidad
+# se fusionó o se absorbió. Cada entrada se resuelve por eliminación contra el
+# universo real del departamento, nunca a ojo, y se deja escrita la cadena.
+#
+# 50-050 · MAPIRIPANA (Guainía)
+#   · 2014 y 2018 traen 9 entidades en el dep 50; Divipol 2021 y el georef 2026
+#     solo traen 8, y la que falta es exactamente el código 050.
+#   · Guainía = Inírida + 8 corregimientos departamentales. Los códigos vivos
+#     cubren 7 de esos 8 (070 Barrancominas · 073 Cacahual · 078 La Guadalupe ·
+#     083 Morichal · 087 Pana Pana · 090 Puerto Colombia · 092 San Felipe): el
+#     único corregimiento sin código es Mapiripana.
+#   · Hoy Mapiripana existe como PUESTO dentro de Barrancominas
+#     (50-070-99-05 "COLEGIO DIVINO NIÑO DE MAPIRIPANA"), coherente con que el
+#     municipio de Barrancominas lo absorbiera.
+#   · En 2014/2018 el 050 y el 070 conviven como entidades distintas, así que no
+#     son el mismo lugar renumerado.
+MUN_HISTORICOS = {
+    "50-050": "Mapiripana",
+}
+
+
 # ─── Rótulos estructurales para lo que Divipole no nombra ──────────────────
 # Los códigos de puesto de 2014/2018 no siempre existen en Divipol 2021 ni en
 # el georef 2026: puestos cerrados, consulados renumerados, zonas especiales.
@@ -100,7 +122,8 @@ CORREG_DEPTOS = {"50", "60", "68"}   # Guainía, Amazonas, Vaupés
 def rotulo_puesto(dep2, mun3, zz2, pp2, dep_n, mun_n):
     """Rótulo estructural cuando no hay nombre oficial. Siempre entre corchetes."""
     if dep2 == "88":
-        pais = mun_n or dep_n
+        # dep_n aquí es literalmente "Consulados": no aporta y no debe repetirse.
+        pais = mun_n if mun_n and not mun_n.startswith("[") else ""
         return f"[CONSULADO · {pais.upper()}]" if pais else "[CONSULADO]"
     if zz2 == "00" and pp2 == "00":
         return "[CORREGIMIENTO DEPARTAMENTAL]" if dep2 in CORREG_DEPTOS else "[CABECERA MUNICIPAL]"
@@ -145,7 +168,9 @@ def enrich(csv_in: Path, csv_out: Path, rotulos: bool = False):
             zz2  = row[i_z].strip().zfill(2)
             pp2  = row[i_p].strip().zfill(2)
             dep_n = dep_nombre.get(dep2, "")
-            mun_n = mun_nombre.get(f"{dep2}-{mun3}", "")
+            mun_n = mun_nombre.get(f"{dep2}-{mun3}", "") or MUN_HISTORICOS.get(f"{dep2}-{mun3}", "")
+            if not mun_n and rotulos:
+                mun_n = "[PAIS NO IDENTIFICADO]" if dep2 == "88" else "[MUNICIPIO NO IDENTIFICADO]"
             pp_n  = puesto_nombre.get(dep2 + mun3 + zz2 + pp2, "")
             if not pp_n and rotulos:
                 pp_n = rotulo_puesto(dep2, mun3, zz2, pp2, dep_n, mun_n)
