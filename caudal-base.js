@@ -239,7 +239,18 @@
      final de ese script. Se llaman con guarda porque el shell corre ANTES:
      si algo no está definido todavía (o desaparece de la página), el router
      sigue funcionando en vez de reventar. */
-  function hook(n,...a){ const f=window[n]; if(typeof f==='function') return f(...a); }
+  /* El puente hacia las vistas, que viven en los otros archivos y se cargan
+     después. La guarda de `typeof` es lo que hace que el orden de los
+     <script> no importe, pero cambia el modo de falla: sin el warn, un
+     loader renombrado —o un módulo que no cargó— deja la vista vacía y NO
+     dice nada. El aviso es lo único que separa "no hay datos" de "está
+     roto". */
+  function hook(n,...a){
+    const f=window[n];
+    if(typeof f==='function') return f(...a);
+    console.warn(`[caudal] hook «${n}» no está definido: la vista va a quedar `
+      +`vacía. ¿Se renombró la función, o no cargó su archivo?`);
+  }
 
   /* Lo que el <script> inline de caudal.html necesita de acá. Los nombres se
      conservan tal cual: el código de las vistas los usa como identificador
