@@ -2,7 +2,7 @@
 
 Test de afinidad programática para la **Intendencia de Asunción** (elección del 4 de
 octubre de 2026). Doce preguntas → afinidad con Camilo Pérez y Soledad Núñez + brújula de tres
-ejes + mapa de los 68 barrios + cómo votó tu zona en seis elecciones. Al final, una pregunta
+bloques + mapa de los 68 barrios + cómo votó tu zona en seis elecciones. Al final, una pregunta
 de contexto nacional que no cuenta para el resultado (ver abajo).
 
 Es el mismo patrón del `test-presidencial-2026.html` de Colombia, adaptado a Paraguay:
@@ -106,10 +106,71 @@ algo, no cuánto debería importarle a cada votante.
 Autotest del motor (cada candidato respondiendo como él mismo da 100% consigo mismo):
 
 ```bash
-node -e "global.window={};require('./brujula/contenido.js');const B=window.BRUJULA,Q=B.preguntas;
-const a=(ans,c)=>{let s=0,m=0;for(const q of Q){const p=q.pos[c];if(p.conf==='B')continue;s+=Math.abs(ans[q.n]-p.pos);m+=4}return Math.round(100*(1-s/m))};
-for(const c of B.candidatos){const ans={};Q.forEach(q=>ans[q.n]=q.pos[c.id].pos);console.log(c.id,B.candidatos.map(k=>k.id+':'+a(ans,k.id)).join(' '))}"
+cd brujula-asuncion && node -e "global.window={};require('./banco.js');const B=window.BRUJULA_BANCO;
+const a=(ans,c)=>{let s=0,m=0;for(const q of B){const p=q.pos[c];if(p.conf==='B')continue;s+=Math.abs(ans[q.codigo]-p.pos);m+=4}return Math.round(100*(1-s/m))};
+for(const c of ['camilo','soledad']){const ans={};B.forEach(q=>ans[q.codigo]=q.pos[c].pos);
+console.log(c,['camilo','soledad'].map(k=>k+':'+a(ans,k)).join(' '))}"
 ```
+
+## El ajuste ideológico de los temas 3, 7, 9 y 11
+
+`AJUSTE BRUJULA ASUNCIÓN.docx` (en `Proyecto BL Paraguay/`) reescribe las cinco respuestas
+de las 40 preguntas de esos cuatro temas, en las dos versiones de lenguaje, con una escala
+ideológica uniforme: **1 derecha marcada … 5 izquierda marcada**, siempre `D-D-N-I-I`. Las
+preguntas no cambian. Cada pregunta ajustada lleva ahora `ideo` (las etiquetas por opción).
+
+```bash
+python3 tools/parse_ajuste.py '../Proyecto BL Paraguay/AJUSTE BRUJULA ASUNCIÓN.docx' /tmp/ajuste.json
+python3 tools/aplicar_ajuste.py /tmp/ajuste.json banco.js
+```
+
+⚠️⚠️ **La escala nueva NO es la vieja invertida, y por eso el remapeo de posiciones no se
+puede automatizar.** En unas preguntas conserva la dirección (3.1, 11.1), en otras la
+invierte (7.1, 9.1) y en otras **cambia de eje**: 3.3 pasa de "mantenimiento vs obra nueva"
+a "austeridad vs inversión pública", que no es lo mismo. Aplicar el documento sin tocar las
+posiciones dejaba a Soledad como la más privatizadora de plazas y a Camilo como el más
+anti-densificación — al revés de lo que dicen sus programas, sin que nada fallara.
+
+Se intentó detectarlo por similitud de texto y **no sirve**: el documento reescribió todo,
+los ratios quedaron en ~0,3 y empatados. `MAPEO` en `aplicar_ajuste.py` se armó leyendo las
+40 preguntas y comparando el **contenido** de la opción que ocupaba cada candidato con las
+opciones nuevas. La etiqueta ideológica no interviene en ese mapeo: la afinidad se calcula
+sobre contenido, y la etiqueta es metadato de análisis.
+
+**16 posiciones se movieron y 9 quedaron en `conf:'B'`** (3.5, 7.5, 7.10 y 11.7 en los dos
+candidatos, y 9.9 en Soledad): son las preguntas donde el eje cambió de naturaleza y la
+posición vieja no tiene equivalente. El motor las excluye del cálculo y lo declara. Para
+cerrarlas hace falta una posición verificada, no una inferencia.
+
+⚠️ Al regenerar: `aplicar_ajuste.py` es **idempotente** y solo toca los 4 temas; se verificó
+que las 80 preguntas restantes quedan byte a byte idénticas.
+
+## El pentágono
+
+`B.bloques` en `contenido.js`: los 5 bloques del documento (Ciudad en Movimiento · Ciudad
+que Cuida · Muni que Funciona · Barrios Vivos · Oportunidades Urbanas) agrupan los 12 temas
+sin repetir ni omitir. Cada vértice promedia, en la escala 1-5 del banco normalizada a 0-1,
+las preguntas del cuestionario que caen en sus temas. Se dibujan **dos polígonos sobre los
+mismos ejes y las mismas preguntas**: el de quien responde y el del candidato elegido en el
+ranking, que se cambia con los chips de arriba del gráfico.
+
+⚠️ **`inv:true` en movilidad (tema 6).** En once de los doce temas el 1 es
+mercado/control/ajuste y el 5 público/comunitario; en movilidad corre al revés (1 es
+transporte público y 5 el automóvil). Sin invertirlo, ese tema tira del vértice hacia el
+lado contrario al que dice la respuesta. Al sumar temas nuevos, **mirar la dirección de la
+escala antes de meterlos a un bloque.**
+
+⚠️ **El pentágono no se rotula izquierda/derecha, y no es un descuido.** Solo 4 de los 12
+temas tienen la escala ideológica del ajuste; los otros 8 son ejes programáticos. Los polos
+de cada barra describen lo que de verdad separa a las opciones. Si algún día se ajustan los
+8 temas restantes, ahí sí el pentágono puede leerse como un mapa ideológico.
+
+Cobertura del ajuste por bloque: Movimiento 1/3 · Cuida **0/2** · Funciona **0/2** ·
+Barrios 1/2 · Oportunidades 2/3.
+
+⚠️ El bloque del tema que el usuario elige como prioritario queda sobre-representado (le
+tocan 2-3 preguntas de ese tema en vez de 1). Es consecuencia del cuestionario
+personalizado, no del pentágono; la nota al pie lo dice.
 
 ## Los datos territoriales y sus trampas
 

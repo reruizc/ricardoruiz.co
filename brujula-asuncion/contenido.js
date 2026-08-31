@@ -20,16 +20,32 @@ window.BRUJULA = {
       redes:{ ig:'@sole.nu', x:'@solenu' } },
   ],
 
-  /* Ejes de la brújula, derivados de las preguntas estructurales (no del partido).
-     inv:true = la escala de la pregunta va al revés del eje. */
-  ejes: {
-    estado: { nombre:'Estado municipal', polos:['Menos Municipalidad: competencia, ajuste y privados','Más Municipalidad: servicio directo y estructura'],
-              preguntas:[{q:2},{q:4},{q:5},{q:7,inv:true}] },
-    ciudad: { nombre:'Visión de ciudad', polos:['Autos, control, inversión y desarrollo','Transporte público, prevención y vida barrial'],
-              preguntas:[{q:6,inv:true},{q:8},{q:9,inv:true},{q:10,inv:true}] },
-    obras:  { nombre:'Estilo de obra', polos:['Rápido y extensivo · grandes obras','De fondo y distribuido · barrio por barrio'],
-              preguntas:[{q:1},{q:3}] },
-  },
+  /* Los 5 bloques del pentágono. Cada vértice promedia las preguntas del cuestionario que
+     caen en sus temas, en la escala 1-5 del banco normalizada a 0-1.
+     ⚠️ `inv:true` porque la escala de ese tema corre al revés que la de los demás: en
+     movilidad el 1 es transporte público y el 5 el automóvil, mientras que en los otros
+     once el 1 es mercado/control y el 5 público/comunitario. Sin invertirlo, ese tema
+     tiraría del vértice hacia el lado contrario al que dice la respuesta.
+     ⚠️ No se rotulan como izquierda/derecha: solo cuatro temas (3, 7, 9 y 11) tienen la
+     escala ideológica del ajuste; el resto son ejes programáticos. Los polos describen
+     lo que de verdad separa a las opciones. */
+  bloques: [
+    { id:'movimiento', nombre:'Ciudad en Movimiento', corto:'Movimiento',
+      temas:[{t:1},{t:3},{t:6,inv:true}],
+      polos:['Obra rápida, autos y ejecución privada','Obra de fondo, transporte público y red pública'] },
+    { id:'cuida', nombre:'Ciudad que Cuida', corto:'Cuida',
+      temas:[{t:2},{t:12}],
+      polos:['Servicios tercerizados y salud del nivel nacional','Servicio municipal directo y prevención territorial'] },
+    { id:'funciona', nombre:'Muni que Funciona', corto:'Funciona',
+      temas:[{t:4},{t:5}],
+      polos:['Ajustar la estructura y pagar la deuda primero','Sostener la estructura, las obras y los servicios'] },
+    { id:'barrios', nombre:'Barrios Vivos', corto:'Barrios',
+      temas:[{t:7},{t:8}],
+      polos:['Concesiones privadas y vigilancia','Espacio público garantizado y prevención comunitaria'] },
+    { id:'oportunidades', nombre:'Oportunidades Urbanas', corto:'Oportunidades',
+      temas:[{t:9},{t:10},{t:11}],
+      polos:['Mercado inmobiliario y empleo desde el sector privado','Protección de residentes y empleo como política pública'] },
+  ],
 
   /* Temas de la conversación pública (códigos del rastreo de prensa) y a qué pregunta pesan. */
   temas: [

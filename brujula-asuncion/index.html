@@ -104,6 +104,11 @@ select,.sel-box{width:100%;font-family:'Fraunces',serif;font-size:1rem;padding:.
 .coin small{display:block;color:var(--text-meta);font-size:.74rem;font-weight:300;margin-top:.1rem}
 /* brújula */
 .compass-wrap{display:grid;grid-template-columns:1fr;gap:.9rem}
+.penta-pick{display:flex;gap:.4rem;flex-wrap:wrap;justify-content:center}
+.penta-leg{display:flex;gap:1.1rem;justify-content:center;font-size:.8rem;color:var(--text-soft);margin-bottom:.5rem}
+.penta-leg i.sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:.35rem;vertical-align:-1px}
+.penta-leg i.sw.mine{background:#0a0a0a}
+.ab-name small{font-weight:400;color:var(--text-meta)}
 .compass{width:100%;aspect-ratio:1/1;max-width:440px;margin:0 auto;display:block}
 .axis-legend{font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.08em;color:var(--text-meta);line-height:1.5}
 .axisbar{margin-top:.9rem}.axisbar .ab-name{font-size:.85rem;font-weight:500;margin-bottom:.25rem}
@@ -269,9 +274,9 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
     </div>
 
     <div class="panel" id="p-brujula">
-      <div class="qhead"><span class="qnum">Tu brújula</span><span class="qtag">Ejes</span></div>
-      <div class="sec" id="ejes-sec"><div class="sec-eyebrow"><span>La brújula · ejes derivados de tus respuestas</span></div>
-        <div class="card compass-wrap"><svg class="compass" id="compass" viewBox="0 0 400 400"></svg><div id="axisbars"></div></div>
+      <div class="qhead"><span class="qnum">Tu brújula</span><span class="qtag">5 bloques</span></div>
+      <div class="sec" id="ejes-sec"><div class="sec-eyebrow"><span>Tus respuestas y las del candidato, bloque por bloque</span><span id="penta-cand"></span></div>
+        <div class="card compass-wrap"><div id="penta-pick" class="penta-pick"></div><svg class="compass" id="compass" viewBox="0 0 420 400"></svg><div id="axisbars"></div></div>
       </div>
       <div class="sec"><div class="sec-eyebrow"><span>Compartir</span></div><div class="share-row" id="share-row"></div></div>
       <div class="actions"><button class="btn btn-ghost" onclick="goTo('p-res')">← Volver al resultado</button></div>
@@ -303,11 +308,11 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
   </div>
 </div>
 
-<script src="config.js?v=20260830"></script>
-<script src="contenido.js?v=20260830"></script>
-<script src="banco.js?v=20260830"></script>
-<script src="datos/datos.js?v=20260830"></script>
-<script src="datos/geo.js?v=20260830"></script>
+<script src="config.js?v=20260831"></script>
+<script src="contenido.js?v=20260831"></script>
+<script src="banco.js?v=20260831"></script>
+<script src="datos/datos.js?v=20260831"></script>
+<script src="datos/geo.js?v=20260831"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
 const B = window.BRUJULA, D = window.BRUJULA_DATOS || {zonas:[],puestos:[],barrios:[],meta:{}};
@@ -450,15 +455,6 @@ function afinidad(c){
   }
   return { pct: max? Math.round(100*(1-sum/max)) : null, n, pend };
 }
-function ejeVal(src, key){ // src: answers (STATE.ans) o candidato id
-  const e = B.ejes[key]; let s=0,n=0;
-  for(const {q,inv} of e.preguntas){
-    let v = typeof src==='string' ? Q[q-1].pos[src].pos : STATE.ans[q];
-    if(!v) continue; if(inv) v = 6-v; s+=v; n++;
-  }
-  return n? (s/n-1)/4 : null; // 0..1
-}
-
 /* ── render resultado ── */
 function renderAll(){
   const res = CAND.map(c=>({c,...afinidad(c)})).sort((a,b)=>(b.pct??-1)-(a.pct??-1));
@@ -482,24 +478,52 @@ function renderAll(){
   renderCompass(); renderPrio(); calcArquetipo(); renderZona(); renderShare(res);
 }
 
+/* Pentágono: 5 bloques temáticos. Cada vértice promedia, en la escala 1-5 del banco
+   normalizada a 0-1, las preguntas del cuestionario que caen en los temas del bloque.
+   Se dibujan dos polígonos sobre los mismos ejes y las mismas preguntas: el de quien
+   responde y el del candidato elegido en el ranking. */
+function valBloque(bloque, src){   // src: null = respuestas del usuario · string = id de candidato
+  let s=0, n=0;
+  for(const q of Q){
+    if(q.extra) continue;
+    const meta = bloque.temas.find(t=>t.t===q.tema.id); if(!meta) continue;
+    let v;
+    if(src){ const p=q.pos[src]; if(!p || p.conf==='B') continue; v=p.pos; }
+    else { v=STATE.ans[q.n]; }
+    if(!v) continue;
+    if(meta.inv) v = 6-v;
+    s += v; n++;
+  }
+  return n ? {v:(s/n-1)/4, n} : null;
+}
 function renderCompass(){
-  const svg = $('compass'); const W=400, pad=44;
-  const px = v => pad + v*(W-2*pad), py = v => W-pad - v*(W-2*pad);
-  const me = { x: ejeVal(STATE.ans,'estado'), y: ejeVal(STATE.ans,'ciudad') };
-  let s = `<rect x="0" y="0" width="${W}" height="${W}" rx="14" fill="#fcf8f1"/>`;
-  s += `<line x1="${px(.5)}" y1="${pad}" x2="${px(.5)}" y2="${W-pad}" stroke="#d8cfc1"/><line x1="${pad}" y1="${py(.5)}" x2="${W-pad}" y2="${py(.5)}" stroke="#d8cfc1"/>`;
-  s += `<rect x="${pad}" y="${pad}" width="${W-2*pad}" height="${W-2*pad}" fill="none" stroke="#e6e0d6"/>`;
-  const lab = (x,y,t,a)=>`<text x="${x}" y="${y}" font-family="DM Mono,monospace" font-size="9" fill="#888682" text-anchor="${a||'middle'}" letter-spacing=".5">${t}</text>`;
-  s += lab(W/2,18,'TRANSPORTE PÚBLICO · PREVENCIÓN · VIDA BARRIAL') + lab(W/2,W-12,'AUTOS · CONTROL · DESARROLLO INMOBILIARIO');
-  s += `<text transform="translate(14 ${W/2}) rotate(-90)" font-family="DM Mono,monospace" font-size="9" fill="#888682" text-anchor="middle" letter-spacing=".5">MENOS MUNICIPALIDAD</text><text transform="translate(${W-10} ${W/2}) rotate(90)" font-family="DM Mono,monospace" font-size="9" fill="#888682" text-anchor="middle" letter-spacing=".5">MÁS MUNICIPALIDAD</text>`;
-  for(const c of CAND){ const x=ejeVal(c.id,'estado'), y=ejeVal(c.id,'ciudad');
-    s += `<circle cx="${px(x)}" cy="${py(y)}" r="11" fill="${c.color}" stroke="#fff" stroke-width="2"/><text x="${px(x)}" y="${py(y)+3}" font-family="Syne,sans-serif" font-weight="700" font-size="8" fill="#fff" text-anchor="middle">${c.nombre.split(' ').map(w=>w[0]).join('')}</text><text x="${px(x)}" y="${py(y)+24}" font-family="Fraunces,serif" font-size="10.5" fill="#0a0a0a" text-anchor="middle">${c.nombre}</text>`; }
-  if(me.x!=null && me.y!=null) s += `<circle cx="${px(me.x)}" cy="${py(me.y)}" r="13" fill="#0a0a0a" stroke="#fff" stroke-width="2.5"/><text x="${px(me.x)}" y="${py(me.y)+4}" font-family="Syne,sans-serif" font-weight="800" font-size="9" fill="#fff" text-anchor="middle">VOS</text>`;
-  svg.innerHTML = s;
-  // barras por eje
-  $('axisbars').innerHTML = Object.entries(B.ejes).map(([k,e])=>{ const mv = ejeVal(STATE.ans,k);
-    return `<div class="axisbar"><div class="ab-name">${e.nombre}</div><div class="ab-track">${CAND.map(c=>`<span class="ab-dot" title="${c.nombre}" style="left:${100*ejeVal(c.id,k)}%;background:${c.color}"></span>`).join('')}${mv!=null?`<span class="ab-dot me" title="Vos" style="left:${100*mv}%"></span>`:''}</div><div class="ab-polos"><span>${e.polos[0]}</span><span>${e.polos[1]}</span></div></div>`; }).join('')
-    + `<p class="note">El punto negro sos vos. Los ejes se calculan con las mismas preguntas para todos, así que no hay etiquetas de izquierda o derecha: hay respuestas.</p>`;
+  const BL = B.bloques, svg=$('compass');
+  const ref = CAND.find(c=>c.id===STATE.verCand) || CAND.find(c=>c.id===STATE.cand) || CAND[0];
+  $('penta-cand').textContent = 'Vos vs ' + ref.nombre;
+  $('penta-pick').innerHTML = CAND.map(c=>`<button class="chip ${c.id===ref.id?'sel':''}" onclick="pickResCand('${c.id}');renderCompass()">${c.nombre}</button>`).join('');
+
+  const CX=210, CY=196, R=118;
+  const pt=(i,r)=>{ const a=-Math.PI/2 + i*2*Math.PI/5; return [CX+Math.cos(a)*R*r, CY+Math.sin(a)*R*r]; };
+  const poly=(vals,r0)=>vals.map((v,i)=>pt(i, v==null? r0 : .12+v.v*.88).join(',')).join(' ');
+  const mios = BL.map(b=>valBloque(b,null)), suyos = BL.map(b=>valBloque(b,ref.id));
+
+  let g='';
+  for(const r of [.25,.5,.75,1])
+    g += `<polygon points="${BL.map((_,i)=>pt(i,r).join(',')).join(' ')}" fill="none" stroke="#e6e0d6" stroke-width="1"/>`;
+  BL.forEach((_,i)=>{ const [x,y]=pt(i,1); g += `<line x1="${CX}" y1="${CY}" x2="${x}" y2="${y}" stroke="#e6e0d6"/>`; });
+  g += `<polygon points="${poly(suyos,.12)}" fill="${ref.color}" fill-opacity=".22" stroke="${ref.color}" stroke-width="2.5" stroke-linejoin="round"/>`;
+  g += `<polygon points="${poly(mios,.12)}" fill="#0a0a0a" fill-opacity=".14" stroke="#0a0a0a" stroke-width="2.5" stroke-dasharray="5 3" stroke-linejoin="round"/>`;
+  BL.forEach((b,i)=>{ const [x,y]=pt(i,1.20); const anc = Math.abs(x-CX)<10?'middle':(x>CX?'start':'end');
+    g += `<text x="${x}" y="${y+(y<CY?-1:9)}" font-family="DM Mono,monospace" font-size="9" fill="#5c5c5a" text-anchor="${anc}" letter-spacing=".4">${b.corto.toUpperCase()}</text>`; });
+  svg.innerHTML = g;
+
+  const pct=x=>x==null?'—':Math.round(x.v*100)+'%';
+  $('axisbars').innerHTML = `<div class="penta-leg"><span><i class="sw mine"></i>Vos</span><span><i class="sw" style="background:${ref.color}"></i>${ref.nombre}</span></div>`
+    + BL.map((b,i)=>{ const m=mios[i], su=suyos[i];
+      return `<div class="axisbar"><div class="ab-name">${b.nombre} <small>· vos ${pct(m)} · ${ref.nombre.split(' ')[0]} ${pct(su)}</small></div>
+        <div class="ab-track">${su!=null?`<span class="ab-dot" title="${ref.nombre}" style="left:${su.v*100}%;background:${ref.color}"></span>`:''}${m!=null?`<span class="ab-dot me" title="Vos" style="left:${m.v*100}%"></span>`:''}</div>
+        <div class="ab-polos"><span>${b.polos[0]}</span><span>${b.polos[1]}</span></div></div>`; }).join('')
+    + `<p class="note">Cada vértice resume las preguntas de ese bloque que te tocaron: hacia afuera, el polo de la derecha de cada barra. Los dos polígonos se calculan sobre las mismas preguntas, así que la comparación es directa; lo que no se puede leer acá es izquierda o derecha, porque solo cuatro de los doce temas tienen esa escala. Las posiciones pendientes del candidato no entran.</p>`;
 }
 
 function renderPrio(){
