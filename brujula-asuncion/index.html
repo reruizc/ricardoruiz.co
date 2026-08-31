@@ -248,6 +248,7 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
       <div class="qhead"><span class="qnum" id="q-num">Pregunta 1 de 12</span><span class="qtag" id="q-tag">Calles</span></div>
       <p class="qtext" id="q-text"></p>
       <div class="opts" id="q-opts"></div>
+      <p class="note" id="q-nota" style="display:none"></p>
       <div class="actions"><button class="btn btn-ghost" onclick="prevQ()" id="btn-prev">← Anterior</button><button class="btn" id="btn-next" disabled onclick="nextQ()">Siguiente →</button></div>
     </div>
 
@@ -262,7 +263,6 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
       </div>
       <div class="sec" id="res-mine-wrap"></div>
       <div class="sec" id="res-prio-wrap"></div>
-      <div class="sec" id="res-arq-wrap"></div>
       <div class="actions result-actions"><button class="btn" onclick="goTo('p-brujula')">Ver brújula</button><button class="btn btn-ghost" onclick="goTo('p-ubi')">Ver cómo vota mi barrio</button></div>
       <p class="foot">La afinidad mide distancia entre tus respuestas y las posiciones públicas de cada candidatura (programas, entrevistas y declaraciones verificables, corte 24-ago-2026), con 12 preguntas de igual peso. Los datos de tu zona son resultados oficiales del TSJE (municipales 2010, 2015 y 2021; presidenciales 2013, 2018 y 2023) y un modelo territorial inferencial; no son una predicción de 2026. Esto no es una encuesta.</p>
       <div class="actions"><button class="btn btn-ghost" onclick="restart()">Repetir</button><button class="btn btn-ghost" onclick="openModal()">Metodología</button></div>
@@ -303,11 +303,11 @@ summary::-webkit-details-marker{display:none}summary::after{content:'+';font-fam
   </div>
 </div>
 
-<script src="config.js"></script>
-<script src="contenido.js"></script>
-<script src="banco.js"></script>
-<script src="datos/datos.js"></script>
-<script src="datos/geo.js"></script>
+<script src="config.js?v=20260830"></script>
+<script src="contenido.js?v=20260830"></script>
+<script src="banco.js?v=20260830"></script>
+<script src="datos/datos.js?v=20260830"></script>
+<script src="datos/geo.js?v=20260830"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
 const B = window.BRUJULA, D = window.BRUJULA_DATOS || {zonas:[],puestos:[],barrios:[],meta:{}};
@@ -363,7 +363,8 @@ function prepQ(){
   const base=[1,2,3,4,5,6,7,8,9].map(id=>BANCO.find(q=>q.codigo===`${id}.1`));
   const extras=[];
   STATE.temas.forEach((tema,index)=>extras.push(...BANCO.filter(q=>q.tema.id===tema&&!base.includes(q)).slice(0,index===0?2:1)));
-  Q=[...base,...extras].map((q,index)=>({...q,n:index+1,tag:q.tema.nombre}));
+  const pres = B.extra && B.extra.presidente ? [{...B.extra.presidente}] : [];
+  Q=[...base,...extras,...pres].map((q,index)=>({...q,n:index+1,tag:q.tag||q.tema.nombre}));
 }
 
 /* ── 3. ubicación ── */
@@ -385,11 +386,14 @@ function startQ(){ prepQ(); STATE.qi=0; renderQ(); goTo('p-q'); }
 function renderQ(){
   const q = Q[STATE.qi]; const cur = STATE.ans[q.n];
   const w = wording(q);
-  $('q-num').textContent = `Pregunta ${q.n} de ${Q.length}`; $('q-tag').textContent = q.tag; $('q-text').textContent = w.texto;
+  const nCalc = Q.filter(x=>!x.extra).length;
+  $('q-num').textContent = q.extra ? 'Una última, fuera del test' : `Pregunta ${q.n} de ${nCalc}`;
+  $('q-tag').textContent = q.tag; $('q-text').textContent = w.texto;
   $('progressFill').style.width = (100*STATE.qi/Q.length)+'%';
   const order = (q.orden ||= w.escala.map((_,i)=>i+1).sort(()=>Math.random()-.5));
   $('q-opts').innerHTML = order.map(v=>`<button class="opt ${cur===v?'sel':''}" onclick="pickAns(${q.n},${v})"><span class="opt-num">${v}</span><span class="opt-text">${esc(w.escala[v-1])}</span></button>`).join('')
     + `<button class="opt skip ${cur===0?'sel':''}" onclick="pickAns(${q.n},0)"><span class="opt-dot" style="opacity:.25"></span><span class="opt-text">No tengo posición sobre esto · saltar</span></button>`;
+  $('q-nota').textContent = q.extra && q.nota ? q.nota : ''; $('q-nota').style.display = q.extra && q.nota ? 'block':'none';
   $('btn-next').disabled = cur===undefined; $('btn-prev').style.visibility = STATE.qi===0?'hidden':'visible';
   $('btn-next').textContent = STATE.qi===Q.length-1 ? 'Ver mi brújula →' : 'Siguiente →';
 }
@@ -402,12 +406,14 @@ function nextQ(){ if(STATE.qi<Q.length-1){ STATE.qi++; renderQ(); } else { $('pr
    local de votación. El backend vuelve a sanear todo antes de escribir en S3. */
 function responsePayload(){
   const resultados=CAND.map(c=>({id:c.id,...afinidad(c)})).sort((a,b)=>(b.pct??-1)-(a.pct??-1));
-  const respuestas={}; Q.forEach(q=>{ const v=STATE.ans[q.n]; if(v!==undefined) respuestas[q.codigo]=v; });
+  const respuestas={}; let presidente=null;
+  Q.forEach(q=>{ const v=STATE.ans[q.n]; if(v===undefined) return; if(q.extra) presidente=v; else respuestas[q.codigo]=v; });
   return {
     schema:1, version:B.version, lenguaje:STATE.lenguaje,
     candidato_declarado:STATE.cand, edad:STATE.edad, canal:STATE.canal,
     temas:STATE.temas.slice(0,2), zona:STATE.zona, barrio:STATE.barrio,
-    respuestas, afinidades:Object.fromEntries(resultados.map(r=>[r.id,r.pct])),
+    respuestas, presidente, arquetipo:STATE.arq||null,
+    afinidades:Object.fromEntries(resultados.map(r=>[r.id,r.pct])),
     candidato_afin:resultados[0]?.id||null,
     empate:!!(resultados[1]&&resultados[0].pct===resultados[1].pct)
   };
@@ -436,6 +442,7 @@ function pesoQ(q){ return 1; }
 function afinidad(c){
   let sum=0, max=0, n=0, pend=[];
   for(const q of Q){
+    if(q.extra) continue;
     const a = STATE.ans[q.n]; if(!a) continue;
     const p = q.pos[c.id];
     if(p.conf==='B'){ pend.push(q.n); continue; }
@@ -455,10 +462,10 @@ function ejeVal(src, key){ // src: answers (STATE.ans) o candidato id
 /* ── render resultado ── */
 function renderAll(){
   const res = CAND.map(c=>({c,...afinidad(c)})).sort((a,b)=>(b.pct??-1)-(a.pct??-1));
-  const top = res[0]; const nAns = Object.values(STATE.ans).filter(v=>v>0).length;
+  const top = res[0]; const nAns = Q.filter(q=>!q.extra&&STATE.ans[q.n]>0).length;
   const mine = CAND.find(c=>c.id===STATE.cand);
   $('toggle-wrap').style.display = STATE.prio.length ? 'flex':'none';
-  $('res-n').textContent = `${nAns} de ${Q.length} respondidas`;
+  $('res-n').textContent = `${nAns} de ${Q.filter(q=>!q.extra).length} respondidas`;
   // hero
   const tie = res[1] && res[1].pct===top.pct;
   $('res-hero').innerHTML = top.pct==null ? `<div class="card">Respondiste muy pocas preguntas para calcular afinidad. <button class="link" onclick="restart()">Volvé a intentar</button>.</div>` :
@@ -468,11 +475,11 @@ function renderAll(){
   $('res-note').innerHTML = mine?'★ = el candidato que declaraste. ':'';
   // coincidencias con el declarado (o el top)
   const ref = CAND.find(c=>c.id===STATE.verCand) || mine || top.c;
-  const rows = Q.filter(q=>STATE.ans[q.n]&&q.pos[ref.id].conf!=='B').map(q=>({q, d:Math.abs(STATE.ans[q.n]-q.pos[ref.id].pos)})).sort((a,b)=>a.d-b.d);
+  const rows = Q.filter(q=>!q.extra&&STATE.ans[q.n]&&q.pos[ref.id].conf!=='B').map(q=>({q, d:Math.abs(STATE.ans[q.n]-q.pos[ref.id].pos)})).sort((a,b)=>a.d-b.d);
   const coinc = rows.filter(r=>r.d<=1).slice(0,2), disc = rows.filter(r=>r.d>=2).sort((a,b)=>b.d-a.d).slice(0,2);
   const lbl = (q,v)=> { const w=wording(q); return `<small>Vos: “${esc(w.escala[v-1])}” · ${ref.nombre}: “${esc(w.escala[q.pos[ref.id].pos-1])}”</small>`; };
   $('res-mine-wrap').innerHTML = `<div class="sec-eyebrow"><span>${mine?'Tu candidato, tema por tema':'Con quien más coincidís, tema por tema'}</span></div><div class="card" style="border-left:4px solid ${ref.color}"><div class="two"><div><div class="mini-h ok">Donde más coincidís con ${ref.nombre}</div>${coinc.length?coinc.map(r=>`<div class="coin"><b>${r.q.tag}</b> · distancia ${r.d}${lbl(r.q,STATE.ans[r.q.n])}</div>`).join(''):'<div class="coin">Sin coincidencias claras.</div>'}</div><div><div class="mini-h no">Donde más discrepás</div>${disc.length?disc.map(r=>`<div class="coin"><b>${r.q.tag}</b> · distancia ${r.d}${lbl(r.q,STATE.ans[r.q.n])}</div>`).join(''):'<div class="coin">No hay discrepancias fuertes.</div>'}</div></div>${mine&&mine.id!==top.c.id?`<p class="note">Con <b>${mine.nombre}</b> tu afinidad es <b>${res.find(r=>r.c.id===mine.id).pct}%</b>; con <b>${top.c.nombre}</b>, <b>${top.pct}%</b>. Esto mide programas, no confianza, trayectoria ni simpatía — que también cuentan al votar.</p>`:''}</div>`;
-  renderCompass(); renderPrio(); renderArq(); $('res-rank').parentElement.after($('res-arq-wrap')); renderZona(); renderShare(res);
+  renderCompass(); renderPrio(); calcArquetipo(); renderZona(); renderShare(res);
 }
 
 function renderCompass(){
@@ -502,15 +509,17 @@ function renderPrio(){
   w.innerHTML = `<div class="sec-eyebrow"><span>Lo que más preocupa en tu barrio</span></div><div class="card"><p style="font-size:.95rem;line-height:1.5">En <b>${esc(STATE.barrio)}</b> la conversación de 2026 la dominan <b>${names.join('</b> y <b>')}</b>. Si querés que esos temas pesen el doble en tu afinidad, activá la opción bajo el ranking; por defecto las preguntas pesan igual.</p></div>`;
 }
 
-function renderArq(){
+/* Arquetipo estimado del votante. NO se le muestra a quien responde — es una etiqueta de
+   segmentación, no un resultado — pero sí viaja en el payload anónimo para que el panel de
+   administración pueda cruzar perfil × candidato. */
+function calcArquetipo(){
   const z = D.zonas.find(z=>z.cod===STATE.zona); const b = D.barrios.find(x=>x.nombre===STATE.barrio);
   const base = (b||z||{}).arquetipos || {A1:7,A2:28,A3:51,A4:7,A5:7};
   const score = {}; for(const k in base) score[k] = base[k]/100; // prior territorial
   const canal = B.demo.canales.find(c=>c.id===STATE.canal); if(canal) for(const k in canal.arq) score[k] = (score[k]||0) + canal.arq[k]*.25;
   const edad = STATE.edad; const bonus = {'18_24':{A4:.45,A1:.3},'25_34':{A1:.35,A2:.2},'35_44':{A2:.3,A3:.2},'45_59':{A3:.35,A2:.1},'60_mas':{A3:.4,A5:.1}}[edad]||{};
   for(const k in bonus) score[k]+=bonus[k];
-  const id = Object.entries(score).sort((a,b)=>b[1]-a[1])[0][0]; const a = B.arquetipos[id];
-  $('res-arq-wrap').innerHTML = `<div class="sec-eyebrow"><span>Tu perfil de votante (estimado)</span><span>${id}</span></div><div class="card arq"><img src="${a.img}" alt="${esc(a.nombre)}" onclick="openImg(this.src,this.alt)" onerror="this.style.display='none'"><div><div class="arq-name" style="color:${a.color}">${a.nombre}</div><p class="arq-lect">${a.lectura}</p><ul class="arq-claves">${a.claves.map(c=>`<li>${c}</li>`).join('')}</ul><p class="note">Estimación a partir de tu edad, por dónde te informás y el perfil de tu barrio. Es un perfil de comunicación, no una etiqueta: describe cómo suele decidir un segmento, no a vos.</p></div></div>`;
+  STATE.arq = Object.entries(score).sort((a,b)=>b[1]-a[1])[0][0];
 }
 
 function voteBars(rows){ return rows.map(r=>`<div class="vote-row"><div class="vote-name">${r.n}${r.s?`<small>${r.s}</small>`:''}</div><div class="vote-track"><div class="vote-fill" style="width:${r.p||0}%;background:${r.c}"></div></div><div class="vote-pct">${r.p==null?'—':r.p.toFixed(1)+'%'}</div></div>`).join(''); }
@@ -546,17 +555,15 @@ function renderZona(){
     ${serieANR(u)}
     ${faltan.length?`<p class="note">Sin ${faltan.map(e=>e.titulo).join(', ')}: ${p&&p.sede_cambiada?'este local cambió de sede conservando el mismo código, y el resultado de esos años corresponde a otro colegio.':'no hay resultado para esta unidad en esos años.'}</p>`:''}
     <p class="note">Resultados oficiales del TSJE por mesa. Son el historial, no una proyección: en 2026 compiten otras candidaturas.</p>`;
-  const arq = u.arquetipos; const cols={A1:'#b5224e',A2:'#1b6a8a',A3:'#2f6b3f',A4:'#d96a1a',A5:'#5c4a1e'};
-  h += `<div class="mini-h" style="color:var(--text-meta);margin-top:1rem">Perfiles de votante estimados${p?' en este local':' en la zona'}</div><div class="stack">${Object.entries(arq).map(([k,v])=>`<i style="width:${v}%;background:${cols[k]}" title="${B.arquetipos[k].nombre} ${v}%"></i>`).join('')}</div><div class="legend">${Object.entries(arq).map(([k,v])=>`<span><i style="background:${cols[k]}"></i>${B.arquetipos[k].nombre} ${v}%</span>`).join('')}</div>`;
   if(!p) h += `<div class="kv"><div><b>${z.p_mujeres}%</b><span>mujeres en el padrón</span></div><div><b>${z.edad['18_24']+z.edad['25_34']}%</b><span>menores de 35</span></div><div><b>${z.edad['60_mas']}%</b><span>60 o más</span></div><div><b>${fmt(z.proy_votantes_2026.base)}</b><span>votantes proyectados 2026 (base)</span></div></div>`;
   h += `</div>`;
   if(b){
     const temas = D.meta.temas||{};
-    h += `<div class="card" style="margin-top:.7rem"><div class="zona-head"><div class="zona-name">${esc(b.nombre)}</div><div class="zona-meta">${esc(b.perfil_2026||b.tipo||'')}</div></div>
+    h += `<div class="card" style="margin-top:.7rem"><div class="zona-head"><div class="zona-name">${esc(b.nombre)}</div><div class="zona-meta">${fmt(b.electores_2026)} electores estimados</div></div>
       <div class="mini-h" style="color:var(--text-meta)">Qué preocupa en el barrio · prensa y reclamos vecinales 2026</div>
       <div class="pre-chips">${b.preocupaciones.map(([c,i])=>`<span class="pre-chip i${i}">${esc(temas[c]||c)} · ${i}/5</span>`).join('')}</div>
       ${b.arquetipo_preocupacion?`<p class="note" style="margin-top:.7rem">Lectura del barrio: <b>${esc(b.arquetipo_preocupacion)}</b>. ${esc(b.comportamiento||'')}${b.evidencia==='D'?' · Evidencia documentada en prensa.':b.evidencia==='D/T'?' · Evidencia documentada y territorial.':' · Evidencia territorial inferida.'}</p>`:''}
-      <p class="note" style="margin-top:.4rem">${fmt(b.electores_2026)} electores estimados · prioridad territorial ${esc(b.prioridad||'—').toLowerCase()} · riesgo electoral ${esc(b.riesgo||'—').toLowerCase()}.</p></div>`;
+      </div>`;
   }
   w.innerHTML = h;
 }
@@ -571,7 +578,6 @@ const CAPAS = [
   {id:'anr21', l:'ANR 2021', leg:['gana la oposición','gana ANR · centro = 50%'], nivel:'zona', val:b=>{const z=D.zonas.find(z=>z.cod===b.zona); return z&&z.elecciones.mun2021? z.elecciones.mun2021.p.anr:null;}, fmt:v=>v.toFixed(1)+'% ANR · Intendente 2021', dom:[35,65], col:t=>t<.5?mix('#1f5fbf','#f1ece2',t*2):mix('#f1ece2','#c8102e',(t-.5)*2)},
   {id:'swing', l:'Cambio 2015→2021', leg:['cayó ANR','subió ANR · centro = sin cambio'], nivel:'zona', val:b=>{const z=D.zonas.find(z=>z.cod===b.zona); const a=z&&z.elecciones.mun2015, c=z&&z.elecciones.mun2021; return a&&c? c.p.anr-a.p.anr:null;}, fmt:v=>(v>0?'+':'')+v.toFixed(1)+' pp ANR entre 2015 y 2021', dom:[-12,12], col:t=>t<.5?mix('#1f5fbf','#f1ece2',t*2):mix('#f1ece2','#c8102e',(t-.5)*2)},
   {id:'brecha', l:'Brecha nacional−municipal', leg:['vota igual','castiga en la municipal'], nivel:'zona', val:b=>{const z=D.zonas.find(z=>z.cod===b.zona); const a=z&&z.elecciones.pres2023, c=z&&z.elecciones.mun2021; return a&&c? a.p.anr-c.p.anr:null;}, fmt:v=>v.toFixed(1)+' pp más ANR en la presidencial 2023 que en la municipal 2021', dom:[-8,12], col:t=>mix('#e6e0d6','#7a3b8f',t)},
-  {id:'arq', l:'Perfil de votante', leg:null, nivel:'barrio', val:b=>Object.entries(b.arquetipos).sort((x,y)=>y[1]-x[1])[0][0], fmt:v=>B.arquetipos[v].nombre, cat:{A1:'#b5224e',A2:'#1b6a8a',A3:'#2f6b3f',A4:'#d96a1a',A5:'#5c4a1e'}},
   {id:'prio', l:'Prioridad territorial', leg:null, nivel:'barrio', val:b=>b.prioridad||'—', fmt:v=>'prioridad '+v.toLowerCase(), cat:{Alta:'#c8102e',Media:'#e6a23c',Baja:'#b8b0a4','—':'#ddd'}},
 ];
 function hex(c){ return [1,3,5].map(i=>parseInt(c.slice(i,i+2),16)); }

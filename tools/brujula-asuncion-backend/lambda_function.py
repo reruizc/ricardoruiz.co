@@ -24,6 +24,7 @@ CANDIDATOS = {"camilo", "soledad", "none"}
 LENGUAJES = {"informada", "popular"}
 EDADES = {"18_24", "25_34", "35_44", "45_59", "60_mas"}
 CANALES = {"ig", "x", "fb", "tt", "rd"}
+ARQUETIPOS = {"A1", "A2", "A3", "A4", "A5"}
 
 
 def response(code, body, origin=None):
@@ -70,6 +71,10 @@ def sanitize(data):
                 affinities[candidate] = round(float(value), 1)
     topics = data.get("temas")
     topics = [x for x in topics[:2] if isinstance(x, int) and 1 <= x <= 12] if isinstance(topics, list) else []
+    # Gestión presidencial: 1 muy mala .. 5 muy buena, 0 = prefirió saltarla.
+    # No entra al cálculo de afinidad; se guarda aparte para no ensuciar el promedio por pregunta.
+    president = data.get("presidente")
+    president = president if isinstance(president, int) and 0 <= president <= 5 else None
     zone = data.get("zona")
     zone = zone if isinstance(zone, int) and 1 <= zone <= 20 else None
     out = {
@@ -83,6 +88,8 @@ def sanitize(data):
         "zona": zone,
         "barrio": clean_str(data.get("barrio"), cap=80),
         "respuestas": clean_answers,
+        "presidente": president,
+        "arquetipo": clean_str(data.get("arquetipo"), ARQUETIPOS, cap=2),
         "afinidades": affinities,
         "candidato_afin": clean_str(data.get("candidato_afin"), {"camilo", "soledad"}),
         "empate": bool(data.get("empate")),

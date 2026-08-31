@@ -26,14 +26,20 @@
     <div class="card"><h2>Lenguaje, edad y canal</h2><div id="segments"></div></div>
     <div class="card"><h2>Barrios con más respuestas</h2><div id="barrios"></div></div>
   </section>
+  <section class="section two">
+    <div class="card"><h2>Perfil de votante × candidato</h2><p class="note">Arquetipo estimado de quien responde (edad, canal de información y perfil del barrio). No se le muestra a quien contesta el test: es segmentación interna.</p><div id="perfil"></div></div>
+    <div class="card"><h2>Gestión del presidente Peña</h2><p class="note">Pregunta de contexto nacional: no entra al cálculo de afinidad municipal.</p><div id="presidente"></div></div>
+  </section>
   <section class="section card"><h2>Promedio por pregunta</h2><p class="note">Promedio de respuesta en la escala 1–5. Sirve para ver hacia qué polo se inclina el conjunto de participantes; no es una encuesta representativa.</p><div class="scroll"><table><thead><tr><th>Pregunta</th><th>Respuestas</th><th>Promedio</th><th>Distribución 1 · 2 · 3 · 4 · 5</th></tr></thead><tbody id="questions"></tbody></table></div></section>
-  <section class="section card"><h2>Actividad reciente</h2><div class="scroll"><table><thead><tr><th>Fecha</th><th>Declaró</th><th>Mayor afinidad</th><th>Edad</th><th>Canal</th><th>Barrio</th></tr></thead><tbody id="recent"></tbody></table></div></section>
+  <section class="section card"><h2>Actividad reciente</h2><div class="scroll"><table><thead><tr><th>Fecha</th><th>Declaró</th><th>Mayor afinidad</th><th>Edad</th><th>Canal</th><th>Perfil</th><th>Peña</th><th>Barrio</th></tr></thead><tbody id="recent"></tbody></table></div></section>
   <p class="note">Panel anónimo: no recibe nombres, correos, IP, coordenadas ni locales de votación. Actualización automática cada 30 segundos.</p>
 </main>
-<script src="config.js"></script>
+<script src="config.js?v=20260830"></script>
 <script>
 const CFG=window.BRUJULA_CONFIG||{}, tok=localStorage.getItem('rr-token');
-const N={camilo:'Camilo Pérez',soledad:'Soledad Núñez',none:'Indeciso',informada:'Versión informada',popular:'Versión de barrio',ig:'Instagram / reels',x:'X / prensa / debates',fb:'WhatsApp / Facebook',tt:'TikTok / Shorts',rd:'Radio / comunidad'};
+const N={camilo:'Camilo Pérez',soledad:'Soledad Núñez',none:'Indeciso',informada:'Versión informada',popular:'Versión de barrio',ig:'Instagram / reels',x:'X / prensa / debates',fb:'WhatsApp / Facebook',tt:'TikTok / Shorts',rd:'Radio / comunidad',A1:'Influencer aspiracional urbana',A2:'Profesional conectado de gestión',A3:'Familia viral comunitaria',A4:'Joven viral popular',A5:'Residente resiliente del Bañado'};
+const ARQ=['A1','A2','A3','A4','A5'], ARQC={A1:'#b5224e',A2:'#1b6a8a',A3:'#2f6b3f',A4:'#d96a1a',A5:'#5c4a1e'};
+const PRES={5:'Muy buena',4:'Buena',3:'Ni buena ni mala',2:'Mala',1:'Muy mala'};
 let ROWS=[]; const $=id=>document.getElementById(id); const esc=s=>String(s??'—').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
 function loginUrl(){return `../login.html?next=${encodeURIComponent(location.pathname+location.search)}`}
 function deny(){location.replace(loginUrl());}
@@ -50,10 +56,23 @@ function render(){
   const bc=counts('barrio');bars('barrios',Object.fromEntries(Object.entries(bc).sort((a,b)=>b[1]-a[1]).slice(0,12)));
   const qs={};ROWS.forEach(r=>Object.entries(r.respuestas||{}).forEach(([code,v])=>{if(!v)return;(qs[code]||={n:0,sum:0,d:[0,0,0,0,0]}).n++;qs[code].sum+=v;qs[code].d[v-1]++;}));
   $('questions').innerHTML=Object.entries(qs).sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(([code,q])=>`<tr><td>${esc(code)}</td><td>${q.n}</td><td><b>${(q.sum/q.n).toFixed(2)}</b></td><td>${q.d.join(' · ')}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Sin datos</td></tr>';
-  $('recent').innerHTML=ROWS.slice(0,100).map(r=>`<tr><td>${new Date(r.ts_server).toLocaleString('es-PY')}</td><td>${esc(N[r.candidato_declarado]||r.candidato_declarado)}</td><td>${esc(N[r.candidato_afin]||r.candidato_afin)}</td><td>${esc(r.edad)}</td><td>${esc(N[r.canal]||r.canal)}</td><td>${esc(r.barrio)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Aún no hay respuestas</td></tr>';
+  // perfil de votante × candidato afín
+  const filas=ARQ.map(a=>{const rs=ROWS.filter(r=>r.arquetipo===a);const c=rs.filter(r=>r.candidato_afin==='camilo').length,so=rs.filter(r=>r.candidato_afin==='soledad').length;return {a,n:rs.length,c,so};}).filter(f=>f.n);
+  const totP=filas.reduce((x,f)=>x+f.n,0);
+  $('perfil').innerHTML=totP?`<table><thead><tr><th>Perfil</th><th>Respuestas</th><th>Camilo</th><th>Soledad</th></tr></thead><tbody>${filas.sort((x,y)=>y.n-x.n).map(f=>{const d=f.c+f.so;return `<tr><td><b style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${ARQC[f.a]};margin-right:.4rem"></b>${esc(N[f.a])}</td><td>${f.n} · ${(100*f.n/totP).toFixed(1)}%</td><td>${d?(100*f.c/d).toFixed(0)+'%':'—'}</td><td>${d?(100*f.so/d).toFixed(0)+'%':'—'}</td></tr>`}).join('')}</tbody></table>`:'<div class="empty">Sin datos</div>';
+  // gestión presidencial
+  const pr=ROWS.map(r=>r.presidente).filter(v=>typeof v==='number'&&v>=1&&v<=5);
+  if(pr.length){
+    const dist={};pr.forEach(v=>dist[v]=(dist[v]||0)+1);
+    const prom=(pr.reduce((a,b)=>a+b,0)/pr.length);
+    const porCand=['camilo','soledad'].map(c=>{const v=ROWS.filter(r=>r.candidato_afin===c&&r.presidente>=1).map(r=>r.presidente);return {c,n:v.length,m:v.length?(v.reduce((a,b)=>a+b,0)/v.length):null}});
+    $('presidente').innerHTML=[5,4,3,2,1].map(v=>`<div class="bar-row"><span>${PRES[v]}</span><div class="track"><div class="fill" style="width:${100*(dist[v]||0)/pr.length}%;background:${v>=4?'var(--green)':v===3?'#9a9384':'var(--red)'}"></div></div><b>${dist[v]||0} · ${(100*(dist[v]||0)/pr.length).toFixed(1)}%</b></div>`).join('')
+      +`<p class="note">Promedio general <b>${prom.toFixed(2)}</b> sobre 5 (${pr.length} respuestas). ${porCand.filter(x=>x.m!=null).map(x=>`Afines a ${N[x.c]}: <b>${x.m.toFixed(2)}</b> (${x.n})`).join(' · ')}</p>`;
+  } else $('presidente').innerHTML='<div class="empty">Sin datos</div>';
+  $('recent').innerHTML=ROWS.slice(0,100).map(r=>`<tr><td>${new Date(r.ts_server).toLocaleString('es-PY')}</td><td>${esc(N[r.candidato_declarado]||r.candidato_declarado)}</td><td>${esc(N[r.candidato_afin]||r.candidato_afin)}</td><td>${esc(r.edad)}</td><td>${esc(N[r.canal]||r.canal)}</td><td>${esc(r.arquetipo)}</td><td>${esc(PRES[r.presidente])}</td><td>${esc(r.barrio)}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">Aún no hay respuestas</td></tr>';
 }
 async function load(){if(!CFG.api){$('status').textContent='API pendiente de desplegar';$('status').className='error';return;}$('status').textContent='● Actualizando…';try{const r=await fetch(CFG.api.replace(/\/$/,'')+'/admin/respuestas?t='+Date.now(),{headers:{Authorization:`Bearer ${tok}`},cache:'no-store'});if(r.status===401)return deny();if(r.status===403){$('status').textContent='Esta cuenta no tiene permisos para consultar las respuestas.';$('status').className='error';return;}const d=await r.json();if(!r.ok)throw new Error(d.error||r.status);ROWS=d.respuestas||[];render();$('status').textContent='● En tiempo real · actualizado '+new Date().toLocaleTimeString('es-PY');$('status').className='live';}catch(e){$('status').textContent='Error: '+e.message;$('status').className='error';}}
-function exportCsv(){const cols=['ts_server','version','lenguaje','candidato_declarado','candidato_afin','empate','edad','canal','zona','barrio','temas','afinidad_camilo','afinidad_soledad','respuestas'];const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const lines=[cols.join(','),...ROWS.map(r=>[r.ts_server,r.version,r.lenguaje,r.candidato_declarado,r.candidato_afin,r.empate,r.edad,r.canal,r.zona,r.barrio,(r.temas||[]).join('|'),r.afinidades?.camilo,r.afinidades?.soledad,JSON.stringify(r.respuestas||{})].map(q).join(','))];const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));a.download='brujula-asuncion-respuestas-'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href)}
+function exportCsv(){const cols=['ts_server','version','lenguaje','candidato_declarado','candidato_afin','empate','edad','canal','zona','barrio','temas','arquetipo','presidente','afinidad_camilo','afinidad_soledad','respuestas'];const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const lines=[cols.join(','),...ROWS.map(r=>[r.ts_server,r.version,r.lenguaje,r.candidato_declarado,r.candidato_afin,r.empate,r.edad,r.canal,r.zona,r.barrio,(r.temas||[]).join('|'),r.arquetipo,r.presidente,r.afinidades?.camilo,r.afinidades?.soledad,JSON.stringify(r.respuestas||{})].map(q).join(','))];const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));a.download='brujula-asuncion-respuestas-'+new Date().toISOString().slice(0,10)+'.csv';a.click();URL.revokeObjectURL(a.href)}
 gate();setInterval(()=>{if(!$('main').hidden)load()},30000);
 </script>
 </body></html>

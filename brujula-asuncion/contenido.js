@@ -122,6 +122,22 @@ window.BRUJULA = {
             arlene:{pos:5,conf:'A',txt:'Su propuesta prioriza una presencia territorial sostenida, servicios básicos y prevención cercana a los barrios.'} } },
   ],
 
+  /* Pregunta de contexto nacional. NO entra al cálculo de afinidad ni a los ejes:
+     no hay posición de candidatos porque no es una pregunta municipal. Se guarda aparte
+     en el payload (`presidente`) para que no ensucie el promedio por pregunta del panel.
+     Escala 1-5 donde 5 = muy buena. `orden` fija la presentación de mejor a peor y, de
+     paso, impide que renderQ la baraje (una escala de valoración no se baraja). */
+  extra: {
+    presidente: {
+      codigo:'PR', tag:'Gestión nacional', extra:true, orden:[5,4,3,2,1],
+      texto:'Pensando en cómo viene gobernando el presidente Santiago Peña, ¿cómo calificarías su gestión?',
+      escala:['Muy mala','Mala','Ni buena ni mala','Buena','Muy buena'],
+      popular:{ texto:'¿Y cómo ves al presidente Santiago Peña? ¿Le está yendo bien o le está yendo mal?',
+                escala:['Muy mal nomás','Mal','Ahí nomás','Bien','Muy bien'] },
+      nota:'Esta no cuenta para tu resultado: no es una pregunta municipal. La preguntamos porque nos sirve para el estudio.'
+    }
+  },
+
   /* 5 arquetipos sociodigitales del modelo territorial (inferenciales) */
   arquetipos: {
     A1:{ nombre:'Influencer aspiracional urbana', img:'img/arq-influencer.jpg', color:'#b5224e', lectura:'Voto joven y urbano, sensible a la estética de la ciudad, la movilidad, la cultura y el estilo de vida. No vota por identidad partidaria: evalúa si una candidatura representa una ciudad deseable.', claves:['La ciudad moderna también se vota.','Asunción con movilidad, cultura y oportunidades.','Menos promesas viejas; más soluciones que se ven.'] },

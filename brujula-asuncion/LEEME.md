@@ -2,7 +2,8 @@
 
 Test de afinidad programática para la **Intendencia de Asunción** (elección del 4 de
 octubre de 2026). Doce preguntas → afinidad con Camilo Pérez y Soledad Núñez + brújula de tres
-ejes + perfil de votante + mapa de los 68 barrios + cómo votó tu zona en seis elecciones.
+ejes + mapa de los 68 barrios + cómo votó tu zona en seis elecciones. Al final, una pregunta
+de contexto nacional que no cuenta para el resultado (ver abajo).
 
 Es el mismo patrón del `test-presidencial-2026.html` de Colombia, adaptado a Paraguay:
 página única, sin backend, sin datos personales. **La diferencia grande: acá no hay
@@ -23,6 +24,41 @@ brujula-asuncion/            ← en el repo · https://ricardoruiz.co/brujula-as
 ```
 
 Abrir: `open index.html` (funciona con `file://` gracias a `datos/datos.js`) o servirlo.
+
+## Lo que NO ve quien responde
+
+⚠️ **El arquetipo de votante se calcula y no se muestra.** Es una etiqueta de segmentación
+—dice cómo suele decidir un segmento, no quién sos— y devolvérsela al votante convierte un
+test de afinidad en una clasificación. `calcArquetipo()` lo deja en `STATE.arq` y viaja en el
+payload anónimo; el cruce **perfil × candidato** vive en `admin.html`. Por la misma razón
+salieron de la vista del usuario el reparto de *Perfiles de votante estimados en la zona*, la
+capa **Perfil de votante** del mapa y la etiqueta socioeconómica del barrio (`perfil_2026`,
+que producía rótulos como "POPULAR-OBRERO" sobre el nombre del barrio).
+
+⚠️ Al tocar esto, recordar que **la etiqueta sigue existiendo en el dato** (`b.arquetipos`,
+`b.perfil_2026`): lo que se quitó es la superficie, no la fuente. Sigue visible la *Lectura
+del barrio* (`arquetipo_preocupacion`), que describe el reclamo del barrio, no a quien vota.
+
+## La pregunta de contexto nacional
+
+`B.extra.presidente` en `contenido.js`: percepción de la gestión de Santiago Peña, **1** muy
+mala … **5** muy buena. `prepQ` la agrega al final del cuestionario con `extra:true`, y esa
+bandera la excluye de `afinidad()`, de los ejes y del contador ("Pregunta N de 12" no la
+cuenta; ella se anuncia como *"Una última, fuera del test"*). No tiene posiciones de
+candidato porque no es una pregunta municipal.
+
+⚠️ Va en su **propio campo** del payload (`presidente`), no dentro de `respuestas`: metida
+ahí ensuciaría el promedio por pregunta del panel, que asume escala programática.
+⚠️ `orden:[5,4,3,2,1]` cumple dos funciones: presenta la escala de mejor a peor y, al venir
+preasignado, **impide que `renderQ` la baraje** — una escala de valoración no se baraja.
+
+## Cache-buster
+
+Los cinco scripts locales se cargan con `?v=YYYYMMDD` desde `index.html` (y `config.js`
+desde `admin.html`). **Bumpearlo cada vez que se toque `contenido.js`, `banco.js` o los
+`datos/*.js`**, o el navegador sirve la copia vieja sin dar ningún error — pasó al probar
+esta tanda: la página seguía sin la pregunta nueva porque el `contenido.js` cacheado no la
+traía.
 
 ## Regenerar los datos
 
@@ -156,8 +192,10 @@ y la matriz de arquetipos son 2012; para cruzar con el censo 2022 hay que cambia
 2b. ~~Mapa por barrio~~ ✅ hecho con la cartografía censal del INE (ver abajo).
 3. Decidir dónde se publica y con qué marca. Hoy lleva `noindex,nofollow` y no está
    enlazada desde ningún lado.
-4. ~~Captura y administrador de respuestas~~ ✅ implementados. Falta desplegar la Lambda/API
-   descrita en `tools/brujula-asuncion-backend/README.md` y copiar su URL a `config.js`.
+4. ~~Captura y administrador de respuestas~~ ✅ implementados y desplegados.
+   ⚠️ **`arquetipo` y `presidente` exigen redesplegar la Lambda**: `sanitize()` descarta
+   todo campo que no esté en su whitelist, así que hasta ese despliegue los dos llegan y se
+   pierden **en silencio** (la respuesta se guarda igual, sin esos dos campos).
 5. **Georreferenciar los 145 locales de votación** (lat/lon) para pasar las capas de voto
    de zona a barrio por punto-en-polígono — el salto de 6 a 68 colores. El TSJE no publica
    coordenadas; habría que geocodificar por nombre/dirección y validar a mano.
