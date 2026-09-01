@@ -16,7 +16,12 @@ import boto3
 BUCKET = os.environ.get("BUCKET", "elecciones-2026")
 PREFIX = os.environ.get("PREFIX", "ricardoruiz.co/brujula-asuncion/respuestas")
 AUTH_ME = os.environ.get("AUTH_ME", "https://rr-auth.reruizc.workers.dev/auth/me")
-ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "https://ricardoruiz.co")
+# ALLOWED_ORIGIN admite una LISTA separada por comas: el sitio vive en más de un dominio
+# (ricardoruiz.co y el dominio propio de la Brújula). Un solo valor sigue funcionando igual.
+_DEFAULT_ORIGIN = "https://ricardoruiz.co"
+ALLOWED_ORIGINS = [o.strip().rstrip("/") for o in
+                   os.environ.get("ALLOWED_ORIGIN", _DEFAULT_ORIGIN).split(",") if o.strip()] \
+                  or [_DEFAULT_ORIGIN]
 MAX_ADMIN_ROWS = int(os.environ.get("MAX_ADMIN_ROWS", "10000"))
 s3 = boto3.client("s3")
 
@@ -28,7 +33,10 @@ ARQUETIPOS = {"A1", "A2", "A3", "A4", "A5"}
 
 
 def response(code, body, origin=None):
-    allow = origin if origin == ALLOWED_ORIGIN else ALLOWED_ORIGIN
+    pedido = (origin or "").strip().rstrip("/")
+    # Se devuelve el origen pedido solo si está en la lista; si no, el primero (nunca "*",
+    # que con Authorization el navegador rechaza).
+    allow = pedido if pedido in ALLOWED_ORIGINS else ALLOWED_ORIGINS[0]
     return {
         "statusCode": code,
         "headers": {
