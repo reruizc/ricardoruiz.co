@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi Congreso · Tu curul, día a día · Ricardo Ruiz</title>
+  <meta name="description" content="Espacio de trabajo para congresistas y sus equipos (UTL): la agenda de tu comisión, los proyectos que firmas, cómo votas, el control político y la prensa, en un solo tablero." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
+  <style>
+    /* ── solo de esta página ─────────────────────────────────────── */
+    .mc-pick{position:relative;max-width:560px}
+    .mc-pick .f-input{width:100%;min-width:0;font-size:1rem;padding:.8rem 1rem}
+    .mc-ac{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:50;background:#0e1220;border:1px solid var(--card-border);box-shadow:0 12px 30px rgba(0,0,0,.5);display:none;max-height:340px;overflow:auto}
+    .mc-ac.on{display:block}
+    .mc-ac-row{display:flex;align-items:center;gap:.7rem;padding:.6rem .9rem;border-bottom:1px solid rgba(255,255,255,.05);cursor:none}
+    .mc-ac-row:hover,.mc-ac-row.sel{background:rgba(0,71,255,.14)}
+    .mc-ac-row i{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .mc-ac-row b{font-weight:500;color:var(--white);font-size:.9rem}
+    .mc-ac-row small{color:var(--gray);font-size:.7rem;margin-left:auto;white-space:nowrap}
+    .mc-hint{font-size:.72rem;color:var(--gray);margin-top:.6rem;line-height:1.5}
+    .mc-hint b{color:var(--white);cursor:none;border-bottom:1px dotted var(--gray)}
+    /* identidad */
+    .mc-head{display:flex;gap:1.3rem;align-items:flex-start;background:var(--card-bg);border:1px solid var(--card-border);padding:1.4rem 1.5rem;margin-bottom:1.2rem;position:relative}
+    .mc-head .fc-photo{width:88px;height:112px}
+    .mc-head .fc-photo img{width:100%;height:100%;object-fit:cover}
+    .mc-head .fc-photo span{font-weight:800;font-size:1.4rem;color:#fff}
+    .mc-name{font-family:var(--hn);font-weight:800;font-size:clamp(1.3rem,2.6vw,1.9rem);letter-spacing:-.03em;line-height:1.1;color:var(--white)}
+    .mc-meta{font-size:.78rem;color:var(--gray);margin-top:.45rem;line-height:1.6}
+    .mc-meta b{color:var(--white);font-weight:500}
+    .mc-chips{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.7rem}
+    .mc-chip{font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;padding:.3rem .6rem;border:1px solid var(--card-border);color:var(--gray)}
+    .mc-chip.b{border-color:currentColor}
+    .mc-change{position:absolute;right:1.2rem;top:1.2rem;font-size:.62rem;letter-spacing:.09em;text-transform:uppercase;color:var(--gray);background:none;border:1px solid var(--gray-light);padding:.35rem .7rem;cursor:none}
+    .mc-change:hover{color:var(--white);border-color:var(--white)}
+    /* paneles */
+    .mc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-top:1.2rem}
+    .mc-grid .panel{min-width:0}
+    .mc-grid .panel h3{display:flex;align-items:center;gap:.6rem}
+    .mc-grid .panel h3 small{margin-left:auto;font-size:.6rem;letter-spacing:.06em;color:rgba(255,255,255,.35);text-transform:none}
+    .mc-row{display:flex;gap:.8rem;align-items:flex-start;padding:.65rem 0;border-bottom:1px solid rgba(255,255,255,.05)}
+    .mc-row:last-child{border-bottom:none}
+    .mc-row .d{font-size:.62rem;color:var(--gray);width:60px;flex-shrink:0;padding-top:.15rem;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+    .mc-row .t{font-size:.82rem;color:var(--white);line-height:1.45;min-width:0}
+    .mc-row .t small{display:block;font-size:.66rem;color:var(--gray);margin-top:.2rem}
+    .mc-row .t a{color:var(--blue-light);text-decoration:none}
+    .mc-row .n{margin-left:auto;font-weight:700;font-size:.8rem;white-space:nowrap;padding-top:.1rem}
+    .mc-star{color:var(--amber)}
+    .mc-align{display:flex;align-items:baseline;gap:.7rem;margin-bottom:.6rem}
+    .mc-align .n{font-family:var(--hn);font-weight:800;font-size:2rem;letter-spacing:-.04em;color:var(--white)}
+    .mc-align .t{font-size:.74rem;color:var(--gray);line-height:1.45}
+    .mc-bar{display:flex;height:8px;overflow:hidden;margin:.5rem 0 .9rem;background:rgba(255,255,255,.06)}
+    .mc-bar i{display:block;height:100%}
+    .mc-bar .si{background:var(--green)}.mc-bar .no{background:var(--red)}.mc-bar .ab{background:var(--amber)}
+    .mc-empty{font-size:.78rem;color:var(--gray);line-height:1.6}
+    .mc-faces{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.6rem}
+    .mc-roadmap{margin-top:1.4rem;border-top:2px solid var(--amber)}
+    .mc-roadmap ul{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.4rem;margin-top:.9rem}
+    .mc-roadmap li{font-size:.78rem;color:var(--gray);line-height:1.5;padding-left:1rem;position:relative}
+    .mc-roadmap li::before{content:'→';position:absolute;left:0;color:var(--amber)}
+    .mc-roadmap li b{color:var(--white);font-weight:500}
+    @media(max-width:900px){ .mc-grid{grid-template-columns:1fr} .mc-roadmap ul{grid-template-columns:1fr} }
+    @media(max-width:600px){ .mc-head{flex-direction:column} .mc-change{position:static;margin-top:.6rem} .kpis{grid-template-columns:repeat(2,1fr)} }
+  </style>
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="legislativo.html" class="e-btn-back" id="nav-back-btn">← Volver</a>
+      <a href="pricing.html" class="e-btn-planes" id="nav-planes">Planes &amp; Precios</a>
+      <span class="nav-page-tag">Mi Congreso</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">Mi Congreso · espacio de trabajo · Congreso 2026–2030</div>
+    <h1 class="page-title">Tu curul, día a día</h1>
+    <p class="page-sub">Para congresistas y sus equipos de trabajo legislativo. Elige tu nombre y el tablero arma lo que hoy se lleva a mano: la agenda de tu comisión, los proyectos que firmas, cómo has votado, a quién has citado y qué dice la prensa. Todo sale de registros públicos y se actualiza con el rastreo diario.</p>
+  </div>
+
+  <section id="mi-congreso">
+    <!-- paso 1 · elegir congresista -->
+    <div id="mc-elegir">
+      <div class="sec-tag">Paso 1</div>
+      <h2 class="sec-title" style="font-size:1.25rem">¿Quién eres?</h2>
+      <div class="mc-pick">
+        <input class="f-input" id="mc-q" type="text" placeholder="Escribe tu nombre (senador o representante 2026–2030)…" autocomplete="off" />
+        <div class="mc-ac" id="mc-ac"></div>
+      </div>
+      <div class="mc-hint">Cubre a los 285 electos. Prueba con <b data-ej="Wilson Neber Arias Castillo">Wilson Arias</b>, <b data-ej="Alfredo Ape Cuello Baute">Ape Cuello</b> o <b data-ej="Catherine Juvinao Clavijo">Catherine Juvinao</b>. Tu elección se guarda en este navegador.</div>
+    </div>
+
+    <!-- paso 2 · el tablero -->
+    <div id="mc-tablero" style="display:none">
+      <div class="mc-head" id="mc-head"></div>
+      <div class="kpis" id="mc-kpis"></div>
+      <div class="mc-grid">
+        <div class="panel"><h3>Mi agenda <small id="mc-agenda-src"></small></h3><div id="mc-agenda"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+        <div class="panel"><h3>Mis proyectos en esta legislatura <small>rastreo diario · Senado y Cámara</small></h3><div id="mc-proy"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+        <div class="panel"><h3>Cómo he votado <small id="mc-voto-src"></small></h3><div id="mc-voto"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+        <div class="panel"><h3>Control político <small>citaciones en órdenes del día</small></h3><div id="mc-cit"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+        <div class="panel"><h3>En la prensa <small>últimos 30 días · Google News</small></h3><div id="mc-prensa"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+        <div class="panel"><h3>Mi bancada <small>listado de electos</small></h3><div id="mc-banc"></div></div>
+      </div>
+      <div class="panel mc-roadmap">
+        <h3>Lo que viene en Mi Congreso</h3>
+        <p class="note" style="margin:0">Esta es la primera versión, montada sobre el mismo motor que alimenta el Legislativo. Lo siguiente, en orden:</p>
+        <ul>
+          <li><b>Alertas</b> por correo cuando uno de tus proyectos entre al orden del día o cambie de estado.</li>
+          <li><b>Antecedentes</b>: qué se ha radicado antes sobre el mismo tema, cuántas veces y por qué murió.</li>
+          <li><b>Reloj del trámite</b> (art. 190 Ley 5ª) por proyecto, con el bloqueo real de tu comisión.</li>
+          <li><b>Cómo votó mi bancada</b> en cada proyecto de fondo, y quién se salió.</li>
+          <li><b>Mi territorio</b>: dónde está tu voto hasta el barrio, desde la ficha electoral.</li>
+          <li><b>Borrador de exposición de motivos</b> con el histórico desde 1990 como insumo.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Mi Congreso · Congreso 2026–2030</span>
+    <a href="legislativo.html" class="e-btn-back" style="font-size:.62rem">← Legislativo</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script src="legislativo-electos.js"></script>
+  <script>
+  /* ── Mi Congreso · v1 ─────────────────────────────────────────────
+     Todo lo que se pinta sale de fuentes que ya existen:
+       · ELECTOS (legislativo-electos.js)          → identidad y bancada
+       · comisiones-2026.json (S3)                 → comisión y mesa directiva
+       · ordenes-vigentes.json (S3)                → agenda de su comisión y plenaria
+       · action:'radicados'                        → proyectos que firma
+       · action:'congresista'                      → voto nominal + citaciones
+       · action:'medios'                           → prensa
+       · endoso/index.json (S3)                    → foto, votos 2026 y ficha
+     La elección se guarda en localStorage['mi-congreso-v1']. */
+  const S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const URL_COM=S3+'/legislativo/comisiones-2026.json';
+  const URL_ORD=S3+'/legislativo/ordenes-vigentes.json';
+  const URL_ENDOSO=S3+'/endoso/index.json';
+  const S3_PHOTOS=S3+'/fotos-candidatos';
+  const KEY='mi-congreso-v1';
+  const initials=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+  const toks=s=>norm(s).replace(/[^a-z0-9ñ\s]/g,' ').split(/\s+/).filter(t=>t.length>2&&!/^(h\.?[sr]\.?|de|del|la|los|las|y)$/.test(t));
+  /* dos nombres son la misma persona si el más corto cabe entero en el largo
+     y comparten al menos dos tokens (un apellido solo casa homónimos) */
+  function mismaPersona(a,b){
+    const A=toks(a), B=toks(b); if(A.length<2||B.length<2) return false;
+    const [c,l]=A.length<=B.length?[A,B]:[B,A];
+    return c.every(t=>l.includes(t));
+  }
+  const fechaCorta=f=>{ const m=String(f||'').match(/(\d{4})[-/](\d{2})[-/](\d{2})/); if(!m) return ''; const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; return `${+m[3]} ${M[+m[2]-1]}`; };
+  const TITLE_PREF=/^\s*por\s+(?:medio\s+de\s+)?(?:el\s+medio\s+de\s+)?(?:la|el|los|las)?\s*cual(?:es)?\s+se\s+/i;
+  function shortTitle(t){
+    let s=String(t||'').replace(TITLE_PREF,'').replace(/\s+/g,' ').trim();
+    if(s.length<6) s=String(t||'').replace(/\s+/g,' ').trim();
+    /* el récord de voto trae a veces solo el número ("089 de 2024 Senado"):
+       se deja tal cual, que en minúscula queda peor */
+    if(/^\d+\s+de\s+\d{4}/i.test(s)) return s;
+    return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase();
+  }
+  const chamberNice=c=>c==='SENADO'?'Senado':'Cámara de Representantes';
+  /* recorte por palabra, con puntos suspensivos: cortar a mitad de palabra
+     deja títulos tipo "…y se dictan otras disp" */
+  const cut=(s,n)=>{ s=String(s||''); if(s.length<=n) return s; const c=s.slice(0,n); const i=c.lastIndexOf(' '); return (i>n*0.6?c.slice(0,i):c)+'…'; };
+  /* el listado trae Senado en Title Case y Cámara en MAYÚSCULA SOSTENIDA */
+  const nice=n=>{ n=String(n||''); return n===n.toUpperCase()?tCase(n):n; };
+
+  /* ── buscador ────────────────────────────────────────────────────── */
+  const q=document.getElementById('mc-q'), ac=document.getElementById('mc-ac');
+  let AC_SEL=0, AC_LIST=[];
+  function acRender(){
+    const v=norm(q.value.trim());
+    if(v.length<2){ ac.classList.remove('on'); AC_LIST=[]; return; }
+    const parts=v.split(/\s+/);
+    AC_LIST=ELECTOS.filter(e=>{ const n=norm(e.nombre+' '+e.partido); return parts.every(p=>n.includes(p)); })
+      .sort((a,b)=>(norm(a.nombre).startsWith(v)?0:1)-(norm(b.nombre).startsWith(v)?0:1)).slice(0,8);
+    AC_SEL=0;
+    if(!AC_LIST.length){ ac.innerHTML='<div class="mc-ac-row"><small style="margin:0">Nadie coincide en el listado de electos 2026–2030.</small></div>'; ac.classList.add('on'); return; }
+    ac.innerHTML=AC_LIST.map((e,i)=>{ const b=bancadaOf(e.partido); return `<div class="mc-ac-row${i===AC_SEL?' sel':''}" data-i="${i}"><i style="background:${b.color}"></i><b>${esc(nice(e.nombre))}</b><small>${e.corp==='SENADO'?'Senado':'Cámara'} · ${esc(depNice(e.dep))}</small></div>`; }).join('');
+    ac.classList.add('on');
+    ac.querySelectorAll('.mc-ac-row[data-i]').forEach(r=>r.addEventListener('mousedown',ev=>{ ev.preventDefault(); elegir(AC_LIST[+r.dataset.i]); }));
+  }
+  q.addEventListener('input',acRender);
+  q.addEventListener('keydown',ev=>{
+    if(!AC_LIST.length) return;
+    if(ev.key==='ArrowDown'){ AC_SEL=(AC_SEL+1)%AC_LIST.length; acRender(); q.value=q.value; }
+    else if(ev.key==='ArrowUp'){ AC_SEL=(AC_SEL-1+AC_LIST.length)%AC_LIST.length; }
+    else if(ev.key==='Enter'){ ev.preventDefault(); elegir(AC_LIST[AC_SEL]); return; }
+    else if(ev.key==='Escape'){ ac.classList.remove('on'); return; }
+    else return;
+    ac.querySelectorAll('.mc-ac-row[data-i]').forEach((r,i)=>r.classList.toggle('sel',i===AC_SEL));
+  });
+  q.addEventListener('blur',()=>setTimeout(()=>ac.classList.remove('on'),150));
+  document.querySelectorAll('.mc-hint b[data-ej]').forEach(b=>b.addEventListener('click',()=>{
+    const e=ELECTOS.find(x=>norm(x.nombre)===norm(b.dataset.ej)); if(e) elegir(e);
+  }));
+
+  /* ── elegir / recordar ───────────────────────────────────────────── */
+  let ME=null, SEQ=0;
+  function elegir(e){
+    if(!e) return;
+    ME=e; ac.classList.remove('on'); q.value='';
+    try{ localStorage.setItem(KEY,JSON.stringify({nombre:e.nombre,corp:e.corp})); }catch(err){}
+    document.getElementById('mc-elegir').style.display='none';
+    document.getElementById('mc-tablero').style.display='';
+    montar(++SEQ);
+  }
+  function cambiar(){
+    ME=null; try{ localStorage.removeItem(KEY); }catch(err){}
+    document.getElementById('mc-tablero').style.display='none';
+    document.getElementById('mc-elegir').style.display='';
+    q.focus();
+  }
+
+  /* ── el tablero ──────────────────────────────────────────────────── */
+  const _cache={};
+  async function getJSON(url,bust){
+    const k=url; if(_cache[k]) return _cache[k];
+    _cache[k]=(async()=>{ const r=await fetch(url+(bust?'?v='+Math.floor(Date.now()/bust):''),{cache:'default'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })();
+    return _cache[k];
+  }
+  const KPI={};
+  function pintaKpis(){
+    const k=KPI, box=document.getElementById('mc-kpis');
+    const cell=(n,l,cls)=>`<div class="kpi${cls?' '+cls:''}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+    box.innerHTML=
+      cell(k.proy!=null?k.proy:'—','proyectos que firmo · 2026-27','hl2')+
+      cell(k.alin!=null?k.alin+'%':'—','votos con la bancada de gobierno','hl')+
+      cell(k.votos!=null?fmt(k.votos):'—','votos nominales registrados')+
+      cell(k.cit!=null?k.cit:'—','citaciones de control político')+
+      cell(k.banc!=null?k.banc:'—','colegas en mi bancada');
+  }
+  async function montar(my){
+    const e=ME, b=bancadaOf(e.partido);
+    Object.keys(KPI).forEach(k=>delete KPI[k]);
+    /* identidad, de inmediato; foto y comisión llegan después */
+    document.getElementById('mc-head').innerHTML=`
+      <div class="fc-photo" id="mc-photo" style="background:${b.color}"><span>${esc(initials(e.nombre))}</span></div>
+      <div style="min-width:0;flex:1">
+        <div class="mc-name">${esc(nice(e.nombre))}</div>
+        <div class="mc-meta"><b>${chamberNice(e.corp)}</b> · ${esc(depNice(e.dep))} · ${esc(e.partido)}</div>
+        <div class="mc-chips"><span class="mc-chip b" style="color:${lift(b.color)}">${esc(b.name)}</span><span class="mc-chip" id="mc-com-chip">Comisión: buscando…</span><span class="mc-chip" id="mc-votos-chip"></span></div>
+        <div id="mc-ficha"></div>
+      </div>
+      <button class="mc-change" type="button" onclick="cambiar()">Cambiar de congresista</button>`;
+    /* mi bancada: sale del listado, no espera a la red */
+    const colegas=ELECTOS.filter(x=>bancadaOf(x.partido).name===b.name&&x.nombre!==e.nombre);
+    KPI.banc=colegas.length; pintaKpis();
+    const sen=colegas.filter(x=>x.corp==='SENADO').length;
+    document.getElementById('mc-banc').innerHTML=`<div class="mc-empty" style="margin-bottom:.4rem"><b style="color:var(--white)">${esc(b.name)}</b> · ${colegas.length} colegas: ${sen} en Senado y ${colegas.length-sen} en Cámara.</div>`
+      +`<div class="mc-faces">${colegas.slice(0,14).map(x=>`<span class="bt-av" title="${esc(nice(x.nombre))}" style="background:${b.color}">${esc(initials(x.nombre))}</span>`).join('')}${colegas.length>14?`<span class="bt-av more">+${colegas.length-14}</span>`:''}</div>`
+      +`<a class="ps-cta" href="legislativo-congreso.html">Ver la bancada completa →</a>`;
+    /* lo demás, en paralelo; cada panel se pinta cuando llega su dato */
+    cargarFoto(e,my); cargarComision(e,my); cargarProyectos(e,my); cargarVoto(e,my); cargarPrensa(e,my);
+  }
+  async function cargarFoto(e,my){
+    try{
+      const d=await getJSON(URL_ENDOSO);
+      const list=Array.isArray(d)?d:(d.candidatos||[]);
+      const corp=e.corp==='SENADO'?'SENADO':'CAMARA';
+      const hit=list.filter(c=>c.tipo!=='partido'&&(c.corp||'').toUpperCase().startsWith(corp)&&mismaPersona(c.nombre,e.nombre)).sort((a,b)=>(b.votos||0)-(a.votos||0))[0];
+      if(my!==SEQ||!hit) return;
+      const ch=document.getElementById('mc-votos-chip'); if(ch&&hit.votos) ch.textContent=`${fmt(hit.votos)} votos en 2026`;
+      const f=document.getElementById('mc-ficha'); if(f) f.innerHTML=`<a class="ps-cta" href="analisis-candidato.html?cand=${encodeURIComponent(hit.slug)}">Mi ficha electoral · mapa y drill territorial →</a>`;
+      const ph=document.getElementById('mc-photo'); if(!ph) return;
+      const img=new Image(); img.alt=nice(e.nombre); img.onload=()=>{ if(my===SEQ){ ph.innerHTML=''; ph.appendChild(img); } };
+      img.src=`${S3_PHOTOS}/${encodeURIComponent(hit.slug)}.jpg`;
+    }catch(err){ /* sin foto ni ficha: el tablero sigue */ }
+  }
+  async function cargarComision(e,my){
+    const chip=document.getElementById('mc-com-chip'), box=document.getElementById('mc-agenda');
+    let comKey=null, mesa=null;
+    try{
+      const j=await getJSON(URL_COM,3600000);
+      const corp=e.corp==='SENADO'?'senado':'camara';
+      for(const [k,v] of Object.entries(j.comisiones||{})){
+        if(((v||{})[corp]||[]).some(m=>mismaPersona(m.nombre,e.nombre))){ comKey=k; mesa=(v.mesa||[]).find(p=>p.corp===corp&&mismaPersona(p.nombre,e.nombre)); break; }
+      }
+    }catch(err){}
+    if(my!==SEQ) return;
+    const nombreCom=k=>k==='ACUSACIONES'?'Investigación y Acusación':'Comisión '+tCase(k);
+    if(chip) chip.innerHTML=comKey?`${esc(nombreCom(comKey))}${mesa?` · <span class="mc-star">★ ${mesa.cargo==='presidencia'?'preside':'vicepresidencia'}</span>`:''}`:'Comisión: no figura en nuestro registro';
+    /* agenda: órdenes del día vigentes de su comisión + plenaria de su cámara */
+    try{
+      const j=await getJSON(URL_ORD,300000);
+      if(my!==SEQ) return;
+      const partes=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+      const toma=t=>partes.find(p=>p.type===t)?.value; const hoy=`${toma('year')}-${toma('month')}-${toma('day')}`;
+      const miCam=e.corp==='SENADO'?/senado/i:/c[aá]mara/i;
+      const miCom=comKey?new RegExp(comKey==='ACUSACIONES'?'acusaci':tCase(comKey),'i'):null;
+      const rows=(j.ordenes||[]).filter(o=>(o.fecha_fin||o.fecha)>=hoy&&miCam.test(o.corporacion||''))
+        .filter(o=>/plenaria/i.test(o.ambito||'')||(miCom&&miCom.test(o.ambito||'')))
+        .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+      const src=document.getElementById('mc-agenda-src'); if(src) src.textContent=`órdenes del día publicados · ${fechaCorta(j.v)||''}`;
+      if(!rows.length){ box.innerHTML=`<div class="mc-empty">No hay orden del día publicado hoy ni en los próximos días para ${comKey?nombreCom(comKey)+' ni la plenaria':'la plenaria'} de ${chamberNice(e.corp)}. Se actualiza cada vez que las secretarías publican.</div>`; return; }
+      box.innerHTML=rows.map(o=>{
+        const ps=(o.proyectos||[]).filter(p=>p.titulo);
+        return `<div class="mc-row"><span class="d">${esc(fechaCorta(o.fecha))}</span><span class="t"><b style="font-weight:500">${esc(o.ambito||o.corporacion)}</b>${ps.length?` · ${ps.length} proyecto${ps.length===1?'':'s'}`:''}<small>${ps.slice(0,3).map(p=>esc(cut(shortTitle(p.titulo),110))).join(' · ')}${ps.length>3?` · y ${ps.length-3} más`:''}</small><small><a href="${esc(o.url)}" target="_blank" rel="noopener">Abrir el documento oficial ↗</a></small></span></div>`;
+      }).join('');
+    }catch(err){ if(my===SEQ) box.innerHTML='<div class="mc-empty">No se pudo consultar la agenda en este momento.</div>'; }
+  }
+  async function cargarProyectos(e,my){
+    const box=document.getElementById('mc-proy');
+    try{
+      const r=await call({action:'radicados'});
+      if(my!==SEQ) return;
+      const todos=[...(r.radicados||[]).map(x=>({...x,_cam:'Senado'})),...(r.radicados_camara||[]).map(x=>({...x,_cam:'Cámara'}))];
+      const mios=todos.map(x=>{
+        const auts=autoresDe(x.autor); const i=auts.findIndex(a=>mismaPersona(a,e.nombre));
+        return i<0?null:{...x,_auts:auts,_primero:i===0};
+      }).filter(Boolean).sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
+      KPI.proy=mios.length; pintaKpis();
+      if(!mios.length){ box.innerHTML=`<div class="mc-empty">No aparece como firmante de ningún proyecto radicado en la legislatura 2026-2027, según los registros de Senado y Cámara. Los proyectos entran al rastreo apenas las secretarías los publican, con rezago de días en Cámara.</div>`; return; }
+      box.innerHTML=mios.slice(0,12).map(x=>{
+        const num=x._cam==='Cámara'?(x.numero_camara||x.numero_senado):(x.numero_senado||x.numero_camara);
+        return `<div class="mc-row"><span class="d">${esc(num||'—')}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),150))}<small>${esc(x._cam)}${x.comision?' · Comisión '+esc(tCase(x.comision)):''}${x.estado?' · '+esc(x.estado):''}${x.fecha?' · radicado '+esc(fechaCorta(x.fecha)):''} · ${x._auts.length===1?'firma solo':x._auts.length+' firmantes'}${x.fuente_url?` · <a href="${esc(x.fuente_url)}" target="_blank" rel="noopener">fuente ↗</a>`:''}</small></span></div>`;
+      }).join('')+(mios.length>12?`<div class="note" style="margin-top:.6rem">Y ${mios.length-12} más. El Radar legislativo tiene la lista completa.</div>`:'')
+      +`<div class="note" style="margin-top:.6rem">★ = primera firma (autor principal). El resto son coautorías: en el registro, adherir a un proyecto y redactarlo pesan igual.</div>`;
+    }catch(err){ if(my===SEQ) box.innerHTML='<div class="mc-empty">No se pudo consultar el registro de radicados.</div>'; }
+  }
+  async function cargarVoto(e,my){
+    const box=document.getElementById('mc-voto'), cit=document.getElementById('mc-cit'), src=document.getElementById('mc-voto-src');
+    let d=null;
+    try{ d=await call({action:'congresista',q:e.nombre}); }catch(err){ d=null; }
+    if(my!==SEQ) return;
+    if(!d||!d.encontrado){
+      box.innerHTML=`<div class="mc-empty">Sin voto nominal registrado a tu nombre. El registro cubre las plenarias de Cámara (2014–2026) y de Senado (2017–2026): si esta es tu primera legislatura, tus votos empezarán a aparecer con las primeras plenarias de fondo.</div>`;
+      cit.innerHTML=`<div class="mc-empty">Sin citaciones registradas a tu nombre todavía. Se leen de los órdenes del día de comisión y plenaria; no todas las comisiones publican su control político.</div>`;
+      KPI.votos=0; KPI.cit=0; pintaKpis(); return;
+    }
+    const su=d.resumen||{}, tot=d.n_votos||0, si=su.Si||0, no=su.No||0, ab=su.Abstencion||0;
+    const esSen=/senado/i.test(d.camara||'');
+    if(src) src.textContent=esSen?'plenaria de Senado · 2017–2026':'plenaria de Cámara · 2014–2026';
+    KPI.votos=tot; KPI.alin=d.alineacion_gob; pintaKpis();
+    const top=Object.values(d.por_proyecto||{}).sort((a,b)=>(b.n||0)-(a.n||0)).slice(0,6);
+    box.innerHTML=(d.alineacion_gob!=null?`<div class="mc-align"><span class="n">${d.alineacion_gob}%</span><span class="t">de tus votos coinciden con la bancada de gobierno (Pacto) en ${d.n_contestadas||0} votaciones contestadas${d.otra_camara?' · incluye tu paso por la otra cámara':''}</span></div>`:'')
+      +`<div class="mc-bar"><i class="si" style="width:${tot?100*si/tot:0}%"></i><i class="no" style="width:${tot?100*no/tot:0}%"></i><i class="ab" style="width:${tot?100*ab/tot:0}%"></i></div>`
+      +`<div class="mc-empty" style="margin-bottom:.5rem"><b style="color:var(--green)">${fmt(si)} Sí</b> · <b style="color:var(--red)">${fmt(no)} No</b>${ab?` · <b style="color:var(--amber)">${fmt(ab)} abstenciones</b>`:''} en ${fmt(tot)} votos nominales sobre ${fmt(d.n_proyectos||0)} proyectos.</div>`
+      +(top.length?`<div class="seg-sub" style="margin-top:.6rem">Donde más has votado</div>`+top.map(p=>`<div class="mc-row"><span class="d">${esc(p.numero_senado||p.numero_camara||p.tk||'')}</span><span class="t">${esc(cut(shortTitle(p.titulo),120))}<small>${Object.entries(p.r||{}).map(([k,v])=>`${v} ${k}`).join(' · ')}</small></span><span class="n">${p.n}</span></div>`).join(''):'')
+      +`<div class="note" style="margin-top:.6rem">${esSen?'La API pública del Senado solo registra Sí y No, sin abstención ni «no votó».':'Actas de plenaria de Cámara: voto electrónico y OCR de las actas 2014-2017.'} El sentido de cada voto (ponencia, articulado, aplazamiento) llega en la siguiente versión.</div>`;
+    const c=d.citaciones;
+    if(!c||!c.n_citaciones){ cit.innerHTML=`<div class="mc-empty">Sin citaciones a tu nombre en los órdenes del día que se rastrean. Ojo: hay comisiones que no publican su control político, así que «0» no siempre significa «no citó».</div>`; KPI.cit=0; pintaKpis(); return; }
+    KPI.cit=c.n_citaciones; pintaKpis();
+    const ultimas=(c.citaciones||[]).slice().sort((a,b)=>String(b.primera||'').localeCompare(String(a.primera||''))).slice(0,5);
+    cit.innerHTML=`<div class="mc-empty" style="margin-bottom:.4rem"><b style="color:var(--white)">${c.n_citaciones} citaciones</b> que llegaron ${c.n_agendamientos||0} veces a un orden del día.</div>`
+      +((c.citados_top||[]).length?`<div class="seg-sub">A quién has citado más</div>`+(c.citados_top||[]).slice(0,5).map(x=>`<div class="mc-row"><span class="t">${esc(tCase(x.nombre))}</span><span class="n">${x.n}</span></div>`).join(''):'')
+      +(ultimas.length?`<div class="seg-sub" style="margin-top:.7rem">Las últimas</div>`+ultimas.map(x=>`<div class="mc-row"><span class="d">${esc(fechaCorta(x.primera))}</span><span class="t">${esc(cut(x.tema,140))}<small>${esc(tCase(x.ambito||''))} · ${x.camara==='senado'?'Senado':'Cámara'}</small></span></div>`).join(''):'');
+  }
+  async function cargarPrensa(e,my){
+    const box=document.getElementById('mc-prensa');
+    /* nombre corto (primer nombre + primer apellido) — así lo escribe la prensa */
+    const t=nice(e.nombre).split(/\s+/); const corto=t.length>=3?`${t[0]} ${t[t.length-2]}`:nice(e.nombre);
+    try{
+      const d=await call({action:'medios',query:corto,dias:30});
+      if(my!==SEQ) return;
+      const rs=(d.resultados||[]).slice(0,8);
+      if(!rs.length){ box.innerHTML=`<div class="mc-empty">Sin titulares que mencionen «${esc(corto)}» en los últimos 30 días.</div>`; return; }
+      box.innerHTML=`<div class="mc-empty" style="margin-bottom:.4rem">${d.n||rs.length} titulares en ${d.n_medios||'varios'} medios buscando «${esc(corto)}».</div>`
+        +rs.map(r=>`<div class="mc-row"><span class="d">${esc(fechaCorta(r.fecha||r.fecha_pub||''))}</span><span class="t"><a href="${esc(r.url||'#')}" target="_blank" rel="noopener">${esc(r.titulo||r.title||'')}</a><small>${esc(r.medio||'')}${r.alcance==='regional'?' · regional':''}</small></span></div>`).join('');
+    }catch(err){ if(my===SEQ) box.innerHTML='<div class="mc-empty">No se pudo consultar la prensa en este momento.</div>'; }
+  }
+
+  /* ── init: si ya eligió antes, entra directo al tablero ─────────── */
+  (function(){
+    let saved=null; try{ saved=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(err){}
+    const e=saved&&ELECTOS.find(x=>x.nombre===saved.nombre&&x.corp===saved.corp);
+    if(e) elegir(e); else q.focus();
+  })();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>
