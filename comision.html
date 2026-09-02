@@ -314,7 +314,7 @@
   <section id="miembros">
     <div class="sec-tag">Integrantes</div>
     <h2 class="sec-title">Quién está en la comisión</h2>
-    <p class="sec-sub" id="mem-sub">Haz clic en cada persona para ver su información. Las plenarias eligen los integrantes tras la instalación del 20 de julio de 2026 — mientras tanto, cada cupo aparece marcado como pendiente.</p>
+    <p class="sec-sub" id="mem-sub">Haz clic en cada persona para ver su información. Cargando la conformación vigente de la comisión…</p>
     <div id="mem-presidente" style="display:none"></div>
     <div class="mem-wrap">
       <div class="mem-col" id="mem-groups"></div>
@@ -525,7 +525,27 @@
     loadProyectos();
     loadRadicados();
     loadHistoricoComision();
-    document.getElementById('hist-sub').innerHTML=`Desde 1991, esta comisión ha tramitado <b style="color:var(--white)">${fmt((COM_HIST[COM.key]||{}).t)}</b> proyectos de ley, de los cuales <b style="color:var(--green)">${(COM_HIST[COM.key]||{}).l||0}</b> terminaron sancionados como ley (${(COM_HIST[COM.key]||{}).t?Math.round(100*(COM_HIST[COM.key]||{}).l/(COM_HIST[COM.key]||{}).t):0}%). Fuente: Secretaría del Senado · análisis propio 1990–2026.`;
+    paintHistSub();
+  }
+  function paintHistSub(){
+    const h=COM_HIST[COM.key]||{t:0,l:0};
+    document.getElementById('hist-sub').innerHTML=`Desde 1991, esta comisión ha tramitado <b style="color:var(--white)">${fmt(h.t)}</b> proyectos de ley, de los cuales <b style="color:var(--green)">${fmt(h.l||0)}</b> terminaron sancionados como ley (${h.t?Math.round(100*h.l/h.t):0}%). Fuente: registros de Senado y Cámara · análisis propio 1990–2026.`;
+  }
+  /* refresco en vivo del histórico de la comisión: COM_HIST arranca con el
+     snapshot embebido (jul-2026) y, si `stats` responde, se actualiza — es la
+     misma línea de legislativo-comisiones.html. El stats trae la Séptima DOS
+     veces (SEPTIMA y SÉPTIMA por el casing de la fuente): al colapsar la tilde
+     hay que SUMAR, no pisar. */
+  function refrescaComHist(s){
+    if(!s||!s.por_comision) return false;
+    const H={};
+    Object.entries(s.por_comision).forEach(([k,v])=>{
+      const key=k.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if(COM_HIST[key]) H[key]={t:(H[key]?H[key].t:0)+(v.total||0),l:(H[key]?H[key].l:0)+(v.ley||0)};
+    });
+    if(!Object.keys(H).length) return false;
+    COM_HIST={...COM_HIST,...H};
+    return true;
   }
   function paintKpis(){
     const box=document.getElementById('com-kpis');
@@ -1101,6 +1121,7 @@
   async function loadHistoricoComision(){
     try{
       const s=await call({action:'stats'});
+      if(refrescaComHist(s)){ paintKpis(); paintHistSub(); maybeRenderFindGrid(); }
       const mb=document.getElementById('mort-box');
       mb.innerHTML=s&&s.mortandad_por_anio_cuatrienio?mortandadChart(s.mortandad_por_anio_cuatrienio):'<div class="note" style="margin-top:0">Sin datos de mortandad por ahora.</div>';
       requestAnimationFrame(()=>mb.querySelectorAll('.mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));

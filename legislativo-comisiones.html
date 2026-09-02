@@ -52,7 +52,7 @@
   <div class="page-header compacta">
     <div class="page-tag">Comisiones · Congreso 2026–2030</div>
     <h1 class="page-title">Las siete mesas donde se decide todo</h1>
-    <p class="page-sub">Cada proyecto de ley vive o muere primero en una de las <strong>siete comisiones constitucionales permanentes</strong> (Ley 3ª de 1992). El <strong>28 de julio de 2026</strong> las plenarias de Senado y Cámara aprobaron la conformación: los <strong>103 senadores</strong> y los representantes ya tienen comisión asignada. El <strong>29 de julio</strong> las comisiones eligieron sus <strong>mesas directivas</strong>, y cada tarjeta muestra quién preside junto a lo que tramita la comisión y cómo le ha ido en el histórico 1990-2026. Quedan por votar la presidencia de la <strong>Comisión Segunda de Senado</strong> y la de la <strong>Sexta de Cámara</strong>.</p>
+    <p class="page-sub">Cada proyecto de ley vive o muere primero en una de las <strong>siete comisiones constitucionales permanentes</strong> (Ley 3ª de 1992). El <strong>28 de julio de 2026</strong> las plenarias de Senado y Cámara aprobaron la conformación: los <strong>103 senadores</strong> y los representantes ya tienen comisión asignada. El <strong>29 de julio</strong> las comisiones eligieron sus <strong>mesas directivas</strong>, y cada tarjeta muestra quién preside junto a lo que tramita la comisión y cómo le ha ido en el histórico 1990-2026.<span id="mesas-faltan"></span></p>
   </div>
 
   <section id="comisiones">
@@ -73,6 +73,8 @@
   </footer>
 
   <script src="legislativo-base.js"></script>
+  <script src="platform-config.js"></script>
+  <script src="data-client.js"></script>
   <script src="cand-index.js?v=20260821"></script>
   <script>
   /* ── comisiones constitucionales ────────────────────────────── */
@@ -183,12 +185,28 @@
     });
     hydratePhotos(grid);
   }
+  /* qué mesas directivas faltan se lee del JSON, no de una frase escrita en
+     julio: cuando el registro traiga la presidencia, la nota desaparece sola */
+  function pintaMesasFaltantes(){
+    const el=document.getElementById('mesas-faltan'); if(!el||!COM_MIEMBROS) return;
+    const faltan=[];
+    COMISIONES.forEach(c=>{
+      const mesa=((COM_MIEMBROS[c.key]||{}).mesa)||[];
+      ['senado','camara'].forEach(corp=>{
+        if(!mesa.some(p=>p.cargo==='presidencia'&&p.corp===corp))
+          faltan.push(`la <strong>${c.nombre} de ${corp==='senado'?'Senado':'Cámara'}</strong>`);
+      });
+    });
+    if(!faltan.length){ el.textContent=''; return; }
+    const lista=faltan.length>1?faltan.slice(0,-1).join(', ')+' y '+faltan[faltan.length-1]:faltan[0];
+    el.innerHTML=` En nuestro registro todavía no figura la presidencia de ${lista}; se actualiza apenas la comisión la publique.`;
+  }
   async function loadComisionMiembros(){
     try{
       const r=await fetch(COMISIONES_URL+'?v='+Math.floor(Date.now()/3600000));
       if(!r.ok) return;
       const j=await r.json();
-      if(j&&j.comisiones){ COM_MIEMBROS=j.comisiones; renderComisiones(); }
+      if(j&&j.comisiones){ COM_MIEMBROS=j.comisiones; renderComisiones(); pintaMesasFaltantes(); }
     }catch(e){/* aún no publicado — la tarjeta muestra la nota */}
   }
 
@@ -204,7 +222,10 @@
       const H={};
       Object.entries(s.por_comision).forEach(([k,v])=>{
         const key=k.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-        if(COM_HIST[key]) H[key]={t:v.total,l:v.ley};
+        /* el stats trae la Séptima DOS veces (SEPTIMA y SÉPTIMA, por el casing
+           de la fuente); al colapsar la tilde hay que SUMAR, no pisar: pisando,
+           la tarjeta mostraba 669 proyectos y 1% en ley */
+        if(COM_HIST[key]) H[key]={t:(H[key]?H[key].t:0)+(v.total||0),l:(H[key]?H[key].l:0)+(v.ley||0)};
       });
       if(Object.keys(H).length){ COM_HIST={...COM_HIST,...H}; renderComisiones(); }
     }catch(e){ /* queda el snapshot embebido */ }

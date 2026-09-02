@@ -56,9 +56,13 @@
         <span class="agenda-news-loading">Consultando Cámara y Senado…</span>
       </div>
     </div>
-    <a class="agenda-news-next" id="agenda-news-next"
-       href="https://www.camara.gov.co/secretaria-general/orden-del-dia-secretaria-general/"
-       target="_blank" rel="noopener">Próx. orden del día <b>→</b></a>
+    <div class="agenda-news-picker" id="agenda-news-picker">
+      <button type="button" id="agenda-news-summary" popovertarget="agenda-news-menu">Ver agendas <b>▾</b></button>
+      <div class="agenda-news-menu" id="agenda-news-menu" popover>
+        <a href="https://www.camara.gov.co/secretaria-general/orden-del-dia-secretaria-general/"
+           target="_blank" rel="noopener">Consultar Cámara de Representantes</a>
+      </div>
+    </div>
   </div>
 
   <div class="page-header">
@@ -134,7 +138,7 @@
       </button>
       <button class="card card-img" style="background-image:url('imagenes/legislativo-proyectos.jpg')" onclick="location.href='legislativo-proyectos.html'">
         <div class="card-glow"></div>
-        <div class="card-kpi">10.664<small>proyectos desde 1990</small></div>
+        <div class="card-kpi" id="hub-kpi-proy">14.055<small>proyectos desde 1990</small></div>
         <div class="card-label">
           <div class="card-name">Radar legislativo</div>
           <div class="card-sub">Busca cualquier tema en el archivo completo del Congreso.</div>
@@ -142,7 +146,7 @@
       </button>
       <button class="card card-img" style="background-image:url('imagenes/legislativo-historico.jpg')" onclick="location.href='legislativo-historico.html'">
         <div class="card-glow"></div>
-        <div class="card-kpi">1 de 4<small>termina en ley</small></div>
+        <div class="card-kpi" id="hub-kpi-ley">18%<small>termina en ley</small></div>
         <div class="card-label">
           <div class="card-name">El histórico en cifras</div>
           <div class="card-sub">Dónde se cae el trámite y por qué, en 36 legislaturas.</div>
@@ -169,12 +173,14 @@
   <script>
   /* ── orden del día · ticker bajo el menú ─────────────────────────
      El pipeline diario cosecha las dos cámaras y publica un JSON pequeño.
-     Las noticias corren a la izquierda; el bloque blanco abre siempre la
-     siguiente orden del día disponible en su fuente oficial. */
+     Las noticias corren a la izquierda; el selector blanco permite abrir
+     cualquiera de las agendas vigentes en su fuente oficial. */
   (async()=>{
     const track=document.getElementById('agenda-news-track');
-    const next=document.getElementById('agenda-news-next');
-    if(!track||!next) return;
+    const picker=document.getElementById('agenda-news-picker');
+    const summary=document.getElementById('agenda-news-summary');
+    const menu=document.getElementById('agenda-news-menu');
+    if(!track||!picker||!summary||!menu) return;
     const URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/ordenes-vigentes.json';
     const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     const limpia=t=>String(t||'').replace(/\s+/g,' ').trim();
@@ -182,10 +188,29 @@
     function noticia(r){
       const d=new Date(r.fecha+'T12:00:00-05:00'), ps=(r.proyectos||[]).filter(p=>p.titulo);
       const fecha=isNaN(d)?'':`${d.getDate()} ${meses[d.getMonth()]}`;
-      const asunto=ps.length
-        ? `${frase(ps[0].titulo)}${ps.length>1?` · +${ps.length-1} más`:''}`
-        : (frase(r.titulo)||'Orden del día publicado');
-      return `<span class="agenda-news-item"><time>${esc(fecha)}</time><b>${esc(r.ambito||r.corporacion||'Congreso')}</b><span>${esc(asunto)}</span></span>`;
+      const asuntos=ps.length?ps.map(p=>frase(p.titulo)):[frase(r.titulo)||'Orden del día publicado'];
+      return asuntos.map((asunto,i)=>`<span class="agenda-news-item"><time>${esc(fecha)}</time><b>${esc(r.ambito||r.corporacion||'Congreso')}</b><span>${esc(asunto)}</span>${ps.length?`<em>${i+1}/${ps.length}</em>`:''}</span>`).join('');
+    }
+    function llenaMenu(rows){
+      menu.innerHTML='';
+      let grupo='';
+      rows.forEach(r=>{
+        if(r.fecha!==grupo){
+          grupo=r.fecha;
+          const d=new Date(grupo+'T12:00:00-05:00');
+          const h=document.createElement('div'); h.className='agenda-news-menu-date';
+          h.textContent=isNaN(d)?grupo:`${d.getDate()} ${meses[d.getMonth()]} ${d.getFullYear()}`;
+          menu.appendChild(h);
+        }
+        const a=document.createElement('a');
+        a.href=r.url; a.target='_blank'; a.rel='noopener';
+        const b=document.createElement('b'); b.textContent=r.ambito||r.corporacion||'Congreso';
+        const s=document.createElement('span');
+        const n=(r.proyectos||[]).filter(p=>p.titulo).length;
+        s.textContent=n?`${n} proyecto${n===1?'':'s'} en el orden del día`:limpia(r.titulo)||'Documento oficial';
+        a.append(b,s); menu.appendChild(a);
+      });
+      summary.innerHTML=`Ver ${rows.length} agenda${rows.length===1?'':'s'} <b>▾</b>`;
     }
     try{
       const r=await fetch(URL+'?v='+Math.floor(Date.now()/300000));
@@ -197,20 +222,24 @@
       const partes=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
       const toma=t=>partes.find(p=>p.type===t)?.value;
       const hoy=`${toma('year')}-${toma('month')}-${toma('day')}`;
-      const rows=(j.ordenes||[]).filter(x=>x.fecha>=hoy&&x.url);
+      const rows=(j.ordenes||[]).filter(x=>(x.fecha_fin||x.fecha)>=hoy&&x.url)
+        .sort((a,b)=>(a.fecha+a.corporacion+a.ambito).localeCompare(b.fecha+b.corporacion+b.ambito));
       if(!rows.length) throw new Error('sin próximas sesiones');
       const una=rows.map(noticia).join('');
       /* Se duplica la tira para que el loop sea continuo, sin salto vacío. */
       track.innerHTML=`<span class="agenda-news-set">${una}</span><span class="agenda-news-set" aria-hidden="true">${una}</span>`;
-      track.style.setProperty('--agenda-seg',Math.max(24,rows.length*10)+'s');
-      /* El ticker admite agendas semanales; el CTA, en cambio, debe abrir una
-         ORDEN DEL DÍA propiamente dicha, no el primer documento genérico. */
-      const prox=rows.find(x=>/orden del d[ií]a/i.test(limpia(x.titulo)))||rows[0];
-      next.href=prox.url;
-      next.setAttribute('aria-label',`Próxima orden del día: ${prox.ambito||prox.corporacion}. Abrir documento oficial`);
+      const nItems=rows.reduce((n,x)=>n+Math.max(1,(x.proyectos||[]).filter(p=>p.titulo).length),0);
+      track.style.setProperty('--agenda-seg',Math.max(30,nItems*11)+'s');
+      llenaMenu(rows);
     }catch(e){
       track.innerHTML='<span class="agenda-news-loading">La próxima agenda todavía no está disponible · consulta la fuente oficial</span>';
     }
+    menu.addEventListener('beforetoggle',e=>{
+      if(e.newState!=='open') return;
+      const r=summary.getBoundingClientRect();
+      menu.style.top=`${r.bottom}px`;
+      menu.style.right=`${Math.max(0,innerWidth-r.right)}px`;
+    });
   })();
 
   /* El hub solo necesita la fecha del último radicado, para la ficha de
@@ -229,6 +258,21 @@
       const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
       k.innerHTML=(m?`${+m[3]} ${M[+m[2]-1]}`:'—')+'<small>último radicado</small>';
     }catch(e){ k.innerHTML='<small>último radicado</small>'; }
+  })();
+
+  /* Las dos cifras del histórico salen del MISMO stats que pintan
+     legislativo-historico.html y comisiones: si el dataset crece, el hub no
+     se queda con un número viejo. El valor escrito en el HTML es el respaldo
+     si la API no responde y debe coincidir con el último build. */
+  (async()=>{
+    const kp=document.getElementById('hub-kpi-proy'), kl=document.getElementById('hub-kpi-ley');
+    if(!kp&&!kl) return;
+    try{
+      const s=await call({action:'stats'});
+      if(kp&&s&&s.n_proyectos) kp.innerHTML=fmt(s.n_proyectos)+'<small>proyectos desde 1990</small>';
+      const eu=s&&s.embudo_universo;
+      if(kl&&eu&&eu.radicado&&eu.ley) kl.innerHTML=Math.round(100*eu.ley/eu.radicado)+'%<small>termina en ley</small>';
+    }catch(e){ /* queda el respaldo del HTML */ }
   })();
 
   /* ── monitor de ritmo: 2026 vs 2022 vs 2018 ─────────────────────
