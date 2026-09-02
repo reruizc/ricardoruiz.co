@@ -8,6 +8,19 @@
 <meta property="og:title" content="¿Quién quiere ser juez? · Entrena para el concurso">
 <meta property="og:description" content="30 preguntas como en el examen real: aptitudes, conocimientos y comportamiento. Respondes todas y al final sabes tu puntaje sobre 1.000, con el corte en 800.">
 <meta property="og:type" content="website">
+<link rel="canonical" href="https://ricardoruiz.co/quien-quiere-ser-juez.html">
+<meta property="og:url" content="https://ricardoruiz.co/quien-quiere-ser-juez.html">
+<meta property="og:locale" content="es_CO">
+<meta property="og:image" content="https://ricardoruiz.co/quien-quiere-ser-juez/portada-20260902.png">
+<meta property="og:image:width" content="1536">
+<meta property="og:image:height" content="1024">
+<meta property="og:image:alt" content="¿Quién quiere ser juez? Prueba pública gratuita. 30 preguntas por partida y 8 especialidades. Pruébalo y ayúdame a mejorarlo.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="¿Quién quiere ser juez? · Prueba pública gratuita">
+<meta name="twitter:description" content="30 preguntas por partida, 8 especialidades y explicaciones para repasar. Pruébalo y ayúdame a mejorarlo.">
+<meta name="twitter:image" content="https://ricardoruiz.co/quien-quiere-ser-juez/portada-20260902.png">
+<meta name="twitter:image:alt" content="¿Quién quiere ser juez? Simulador gratuito de entrenamiento. Prueba pública.">
+<script defer src="track.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
@@ -145,6 +158,9 @@ h1 em{font-style:normal;color:var(--blue2)}
 .fb-c{color:var(--gold);font-size:.82rem;margin-bottom:8px}
 .fb-p{color:var(--mute);font-size:.86rem;line-height:1.6;margin-bottom:16px}
 .fb .btn{width:100%}
+.report-question{display:block;margin-top:14px;color:var(--gold);font-size:.84rem;text-underline-offset:3px}
+.beta-note{border:1px solid var(--line);border-radius:12px;padding:14px 18px;color:var(--mute);font-size:.88rem}
+.beta-note a{color:var(--gold)}
 
 /* panel de avance (reemplaza a la escalera) */
 .ladder{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 12px;align-self:start}
@@ -315,9 +331,12 @@ footer b{color:var(--mute)}
     <div class="fact"><b>200</b><span>preguntas tiene el examen real</span></div>
     <div class="fact"><b>4h 30m</b><span>dura la prueba escrita</span></div>
     <div class="fact"><b>800/1000</b><span>puntaje mínimo para aprobar</span></div>
-    <div class="fact"><b id="f-jug">0</b><span>partidas jugadas aquí</span></div>
+    <div class="fact"><b id="f-jug">0</b><span>partidas que has iniciado<br>en este navegador</span></div>
   </div>
 
+  <p class="beta-note"><b>Prueba pública gratuita.</b> Juega y ayúdame a mejorar el simulador.
+  Al revisar cada respuesta puedes reportar una corrección por correo. También puedes escribir a
+  <a href="mailto:hola@ricardoruiz.co?subject=Sugerencia%20sobre%20el%20simulador%20judicial">hola@ricardoruiz.co</a>.</p>
   <div class="salas" id="salas-grid"></div>
   <p class="soon-note">Próximamente: Extinción de Dominio · Responsabilidad Penal para Adolescentes —
   el árbol completo de la convocatoria.</p>
@@ -738,6 +757,16 @@ function tickTimer(){
   r.style.stroke = STATE.tleft<=15 ? 'var(--red)' : STATE.tleft<=35 ? 'var(--amber)' : 'var(--blue2)';
 }
 
+// El reporte abre un borrador; solo se envía si el jugador decide hacerlo.
+function reportQuestion(q){
+  const subject = 'Corrección simulador judicial · '+q.id;
+  const body = 'Pregunta: '+q.id+'\nBanco: '+B.v+'\nSala: '+STATE.sala+'\nCargo: '+STATE.cargo
+    +'\n\nEnunciado: '+q.p+'\nReferencia: '+q.cita
+    +'\n\nQué corregiría:\n\nFuente que sustenta la corrección:\n';
+  return '<a class="report-question" href="mailto:hola@ricardoruiz.co?subject='
+    +encodeURIComponent(subject)+'&amp;body='+encodeURIComponent(body)
+    +'">Reportar una corrección · '+esc(q.id)+'</a>';
+}
 function answer(i){
   if(STATE.over || STATE.answered) return;
   STATE.answered = true;
@@ -764,7 +793,7 @@ function answer(i){
     + '<div class="fb-c">§ '+esc(q.cita)+'</div>'
     + '<div class="fb-p">'+esc(q.pista)+'</div>'
     + '<button class="btn btn-p" id="btn-next" onclick="nextQuestion()">'
-    + (STATE.idx>=NQ-1 ? 'Ver mi resultado →' : 'Siguiente pregunta →')+'</button>';
+    + (STATE.idx>=NQ-1 ? 'Ver mi resultado →' : 'Siguiente pregunta →')+'</button>'+reportQuestion(q);
   $('fb').classList.add('on');
   const nb=$('btn-next'); if(nb){ nb.focus(); nb.scrollIntoView({block:'nearest'}); }
 }
@@ -777,6 +806,7 @@ function nextQuestion(){
 }
 // Enter o barra espaciadora avanzan, para no obligar al mouse en 30 preguntas
 document.addEventListener('keydown', e=>{
+  if(e.target.closest('a, input, select, textarea')) return;
   if((e.key==='Enter'||e.key===' ') && STATE.answered && !STATE.over && $('btn-next')){
     e.preventDefault(); nextQuestion();
   }
@@ -831,7 +861,7 @@ function endGame(){
         + (l.dada>=0 ? '<div class="rv-mine">Marcaste: '+esc(q.o[l.dada])+'</div>' : '<div class="rv-mine">Se agotó el tiempo.</div>')
         + '<div class="rf-ok">'+(q._puntua?'Correcta: ':'Criterio esperado: ')+esc(q.o[q.r])+'</div>'
         + '<div class="rf-cita">§ '+esc(q.cita)+'</div>'
-        + '<div class="rv-p">'+esc(q.pista)+'</div></div>').join('');
+        + '<div class="rv-p">'+esc(q.pista)+'</div>'+reportQuestion(q)+'</div>').join('');
   } else {
     rf.style.display='block';
     rf.innerHTML = '<div class="rf-t">Sin errores</div><div>Respondiste las 30 sin fallar una sola. Cambia de sala y sube la exigencia.</div>';
@@ -1176,8 +1206,8 @@ function lecturaNivel(niv){
 function lecturaComponente(gen, esp){
   if(gen.n<3 || esp.n<3) return '';
   const d = gen.pct - esp.pct;
-  if(d <= -15) return 'Vas mejor en el componente general que en tu especialidad. Ojo: el específico pesa 45 de las 80 preguntas de conocimientos.';
-  if(d >= 15) return 'Dominas tu especialidad, pero el componente general (constitucional, proceso y prueba) te está restando. Son 35 preguntas que todos los cargos comparten.';
+  if(d >= 15) return 'Vas mejor en el componente general que en tu especialidad. Ojo: el específico pesa 45 de las 80 preguntas de conocimientos.';
+  if(d <= -15) return 'Dominas tu especialidad, pero el componente general (constitucional, proceso y prueba) te está restando. Son 35 preguntas que todos los cargos comparten.';
   return 'Estás parejo entre el componente general y el específico de tu sala.';
 }
 function lecturaRitmo(seg){
