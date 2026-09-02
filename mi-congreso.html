@@ -439,7 +439,10 @@
         MAPLAYER=L.geoJSON(geo,{style:f=>estiloDe(vals[depKey(f.properties.name||'')]||0,max),
           onEachFeature:(f,ly)=>{ const v=vals[depKey(f.properties.name||'')]||0; ly.bindTooltip(`<b>${esc(f.properties.name||'')}</b><br>${fmt(v)} votos`,{sticky:true}); }}).addTo(MAP);
         const top=depKeys.slice(0,3).map(k=>`${tCase(deps[k].nom)} ${fmt(deps[k].v)}`).join(' · ');
-        leyenda=`Intensidad = concentración de tu votación por departamento. ${top?'Donde más: '+top+'.':''}`;
+        /* lo que no tiene polígono (consulados) se declara, no se esconde */
+        const geoKeys=new Set(geo.features.map(f=>depKey(f.properties.name||'')));
+        const fuera=depKeys.filter(k=>!geoKeys.has(depKey(deps[k].nom))).reduce((t,k)=>t+deps[k].v,0);
+        leyenda=`Intensidad = concentración de tu votación por departamento. ${top?'Donde más: '+top+'.':''}${fuera?` ${fmt(fuera)} votos en el exterior (consulados), fuera del mapa.`:''}`;
       }else if(depKeys[0]==='16'){
         const geo=rotateGeoJSON90Left(await getJSON(GEO_BOG)); if(my!==SEQ) return;
         const max=Math.max(1,...Object.values(locs));
