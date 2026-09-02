@@ -62,7 +62,27 @@
     .mc-roadmap li{font-size:.78rem;color:var(--gray);line-height:1.5;padding-left:1rem;position:relative}
     .mc-roadmap li::before{content:'→';position:absolute;left:0;color:var(--amber)}
     .mc-roadmap li b{color:var(--white);font-weight:500}
-    @media(max-width:900px){ .mc-grid{grid-template-columns:1fr} .mc-roadmap ul{grid-template-columns:1fr} }
+    /* alertas */
+    .mc-alert{margin-top:1.2rem;border-top:2px solid var(--green);display:grid;grid-template-columns:1.1fr .9fr;gap:1.6rem}
+    .mc-alert h3{color:var(--green)}
+    .mc-alert p{font-size:.82rem;color:var(--gray);line-height:1.6}
+    .mc-alert ul{list-style:none;margin:.6rem 0 0;display:grid;gap:.35rem}
+    .mc-alert li{font-size:.78rem;color:var(--gray);padding-left:1rem;position:relative;line-height:1.5}
+    .mc-alert li::before{content:'✓';position:absolute;left:0;color:var(--green)}
+    .mc-alert form{display:flex;flex-direction:column;gap:.7rem}
+    .mc-alert .f-input{min-width:0;width:100%}
+    .mc-alert label.ck{display:flex;gap:.55rem;align-items:flex-start;font-size:.7rem;color:var(--gray);line-height:1.5}
+    .mc-alert label.ck input{margin-top:.2rem;flex-shrink:0}
+    .mc-alert button.go{font-family:var(--hn);font-weight:700;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:#06210f;background:var(--green);border:none;padding:.75rem 1rem;cursor:none}
+    .mc-alert button.go:disabled{opacity:.5}
+    .mc-alert .st{font-size:.78rem;line-height:1.55;padding:.7rem .85rem;border:1px solid var(--card-border);background:rgba(255,255,255,.03)}
+    .mc-alert .st.ok{border-color:rgba(74,222,128,.4);color:var(--white)}
+    .mc-alert .st.warn{border-color:rgba(224,160,58,.45);color:var(--white)}
+    .mc-alert .st.err{border-color:rgba(209,88,78,.5);color:var(--white)}
+    .mc-alert .st b{color:var(--green)}
+    .mc-alert .st a{color:var(--gray);font-size:.68rem}
+    .mc-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+    @media(max-width:900px){ .mc-grid{grid-template-columns:1fr} .mc-roadmap ul{grid-template-columns:1fr} .mc-alert{grid-template-columns:1fr} }
     @media(max-width:600px){ .mc-head{flex-direction:column} .mc-change{position:static;margin-top:.6rem} .kpis{grid-template-columns:repeat(2,1fr)} }
   </style>
 </head>
@@ -121,11 +141,31 @@
         <div class="panel"><h3>En la prensa <small>últimos 30 días · Google News</small></h3><div id="mc-prensa"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
         <div class="panel"><h3>Mi bancada <small>listado de electos</small></h3><div id="mc-banc"></div></div>
       </div>
+      <div class="panel mc-alert" id="mc-alert">
+        <div>
+          <h3>Alertas por correo</h3>
+          <p>Deja un correo y te avisamos cuando algo se mueva en tu curul. Un solo mensaje por corrida, dos corridas al día detrás del rastreo de las secretarías, y solo si hay algo que decir.</p>
+          <ul>
+            <li>Un proyecto que firmas <b>cambia de estado</b> (ponentes designados, ponencia, archivo, retiro).</li>
+            <li>Un proyecto tuyo <b>entra al orden del día</b> de una comisión o de la plenaria.</li>
+            <li>Tu comisión o la plenaria de tu cámara <b>publican sesión</b>.</li>
+          </ul>
+          <p style="margin-top:.7rem;font-size:.7rem">Primero llega un resumen de cómo va tu curul hoy; desde ahí, solo lo nuevo. Cada correo trae el enlace para darte de baja.</p>
+        </div>
+        <div>
+          <form id="mc-alert-form" autocomplete="off">
+            <input class="f-input" id="mc-alert-correo" type="email" placeholder="tu@correo.co" required />
+            <input class="mc-hp" type="text" name="website" tabindex="-1" aria-hidden="true" />
+            <label class="ck"><input type="checkbox" id="mc-alert-consent" required /><span>Autorizo el tratamiento de este correo para recibir las alertas de Mi Congreso, según la Ley 1581 de 2012. Puedo retirarlo cuando quiera con el enlace de cada mensaje.</span></label>
+            <button class="go" type="submit" id="mc-alert-btn">Activar alertas para <span id="mc-alert-quien">este congresista</span></button>
+          </form>
+          <div class="st" id="mc-alert-st" style="display:none;margin-top:.8rem"></div>
+        </div>
+      </div>
       <div class="panel mc-roadmap">
         <h3>Lo que viene en Mi Congreso</h3>
         <p class="note" style="margin:0">Esta es la primera versión, montada sobre el mismo motor que alimenta el Legislativo. Lo siguiente, en orden:</p>
         <ul>
-          <li><b>Alertas</b> por correo cuando uno de tus proyectos entre al orden del día o cambie de estado.</li>
           <li><b>Antecedentes</b>: qué se ha radicado antes sobre el mismo tema, cuántas veces y por qué murió.</li>
           <li><b>Reloj del trámite</b> (art. 190 Ley 5ª) por proyecto, con el bloqueo real de tu comisión.</li>
           <li><b>Cómo votó mi bancada</b> en cada proyecto de fondo, y quién se salió.</li>
@@ -273,6 +313,7 @@
       +`<a class="ps-cta" href="legislativo-congreso.html">Ver la bancada completa →</a>`;
     /* lo demás, en paralelo; cada panel se pinta cuando llega su dato */
     cargarFoto(e,my); cargarComision(e,my); cargarProyectos(e,my); cargarVoto(e,my); cargarPrensa(e,my);
+    alertaPinta();
   }
   async function cargarFoto(e,my){
     try{
@@ -380,6 +421,64 @@
         +rs.map(r=>`<div class="mc-row"><span class="d">${esc(fechaCorta(r.fecha||r.fecha_pub||''))}</span><span class="t"><a href="${esc(r.url||'#')}" target="_blank" rel="noopener">${esc(r.titulo||r.title||'')}</a><small>${esc(r.medio||'')}${r.alcance==='regional'?' · regional':''}</small></span></div>`).join('');
     }catch(err){ if(my===SEQ) box.innerHTML='<div class="mc-empty">No se pudo consultar la prensa en este momento.</div>'; }
   }
+
+  /* ── alertas por correo ───────────────────────────────────────────
+     Alta sin sesión contra el worker; nada se manda hasta que la persona
+     confirme desde su bandeja. Los enlaces del correo (confirmar · baja)
+     vuelven aquí con ?alerta=… y el aviso se pinta al cargar. */
+  const AUTH_URL='https://rr-auth.reruizc.workers.dev';
+  const AL_KEY='mi-congreso-alerta-v1';
+  function alertaSt(cls,html){ const st=document.getElementById('mc-alert-st'); if(!st) return; st.className='st '+cls; st.innerHTML=html; st.style.display=''; }
+  function alertaPinta(){
+    if(!ME) return;
+    const q=document.getElementById('mc-alert-quien'); if(q) q.textContent=nice(ME.nombre).split(/\s+/).slice(0,2).join(' ');
+    let s=null; try{ s=JSON.parse(localStorage.getItem(AL_KEY)||'null'); }catch(err){}
+    if(s&&s.correo){
+      const mismo=norm(s.congresista||'')===norm(ME.nombre);
+      const c=document.getElementById('mc-alert-correo'); if(c&&!c.value) c.value=s.correo;
+      if(s.estado==='confirmada') alertaSt('ok',`<b>Alertas activas</b> para ${esc(nice(s.congresista||''))} en <b>${esc(s.correo)}</b>.${mismo?'':' Estás viendo a otro congresista: si activas aquí, las alertas pasan a este.'}`);
+      else alertaSt('warn',`Falta un clic: te mandamos un correo a <b>${esc(s.correo)}</b> para confirmar. Si no llega, revisa spam o vuelve a activar.`);
+    }
+  }
+  document.getElementById('mc-alert-form').addEventListener('submit',async ev=>{
+    ev.preventDefault();
+    if(!ME) return;
+    const correo=document.getElementById('mc-alert-correo').value.trim();
+    const consent=document.getElementById('mc-alert-consent').checked;
+    const hp=document.querySelector('#mc-alert-form .mc-hp').value;
+    const btn=document.getElementById('mc-alert-btn');
+    if(!consent){ alertaSt('err','Marca la autorización para poder enviarte correos.'); return; }
+    btn.disabled=true; alertaSt('warn','Enviando…');
+    try{
+      const r=await fetch(AUTH_URL+'/micongreso/alerta',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({correo,congresista:ME.nombre,corp:ME.corp,consent:true,website:hp})});
+      const d=await r.json().catch(()=>({}));
+      /* 404 = el worker todavía no tiene la ruta desplegada: se dice así,
+         no como un error de la persona */
+      if(r.status===404){ alertaSt('warn','Las alertas por correo se están activando en estos días. Vuelve a intentarlo pronto.'); return; }
+      if(!r.ok||!d.ok){ alertaSt('err',esc(d.error||`No se pudo activar (HTTP ${r.status}). Inténtalo en unos minutos.`)); return; }
+      const estado=d.estado==='confirmada'?'confirmada':'pendiente';
+      try{ localStorage.setItem(AL_KEY,JSON.stringify({correo,congresista:ME.nombre,corp:ME.corp,estado})); }catch(err){}
+      if(estado==='confirmada') alertaSt('ok',`<b>Listo.</b> Las alertas ahora siguen a ${esc(nice(ME.nombre))} en <b>${esc(correo)}</b>.`);
+      else alertaSt('ok',`<b>Revisa tu correo.</b> Te mandamos un mensaje a <b>${esc(correo)}</b> con un enlace para confirmar. Sin ese clic no se envía nada.`);
+    }catch(err){ alertaSt('err','No se pudo hablar con el servidor. Inténtalo en unos minutos.'); }
+    finally{ btn.disabled=false; }
+  });
+  (function(){
+    const v=new URLSearchParams(location.search).get('alerta'); if(!v) return;
+    let s=null; try{ s=JSON.parse(localStorage.getItem(AL_KEY)||'null'); }catch(err){}
+    if(v==='confirmada'){ if(s){ s.estado='confirmada'; try{ localStorage.setItem(AL_KEY,JSON.stringify(s)); }catch(err){} } }
+    if(v==='baja'){ try{ localStorage.removeItem(AL_KEY); }catch(err){} }
+    const MSG={confirmada:['ok','<b>Alertas confirmadas.</b> El primer correo, con el resumen de tu curul, sale en la próxima corrida (dos al día).'],
+               baja:['warn','Quedaste por fuera de las alertas. Puedes volver a activarlas cuando quieras.'],
+               vencida:['err','Ese enlace venció (dura 72 horas). Vuelve a activar las alertas para recibir uno nuevo.'],
+               invalida:['err','Ese enlace no es válido.'], error:['err','No se pudo completar la operación. Inténtalo de nuevo.']};
+    const m=MSG[v]; if(!m) return;
+    /* se pinta apenas exista el panel (el tablero puede tardar en montarse) */
+    const t=setInterval(()=>{ const st=document.getElementById('mc-alert-st'); if(!st) return; clearInterval(t); alertaSt(m[0],m[1]); st.scrollIntoView({block:'center'}); },200);
+    setTimeout(()=>clearInterval(t),8000);
+    history.replaceState(null,'',location.pathname);
+  })();
 
   /* ── init: si ya eligió antes, entra directo al tablero ─────────── */
   (function(){

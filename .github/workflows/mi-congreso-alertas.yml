@@ -1,0 +1,40 @@
+name: Mi Congreso · alertas
+
+# Corre detrás del refresco del feed legislativo (08:00 y 18:00 Colombia):
+# 08:40 y 18:40, hora de Bogotá (UTC-5 todo el año). El motor lee fuentes
+# públicas (Lambda caudal-analiza, S3) y el worker rr-auth; no necesita AWS.
+on:
+  schedule:
+    - cron: '40 13,23 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Solo simular (no manda correos ni sella el snapshot)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mi-congreso-alertas
+  cancel-in-progress: false
+
+jobs:
+  alertas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Correr el motor
+        env:
+          CAUDAL_ALERTAS_TOKEN: ${{ secrets.CAUDAL_ALERTAS_TOKEN }}
+        run: |
+          if [ -z "$CAUDAL_ALERTAS_TOKEN" ]; then
+            echo "::error::Falta el secreto CAUDAL_ALERTAS_TOKEN en el repositorio (Settings → Secrets → Actions)."
+            exit 1
+          fi
+          EXTRA=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then EXTRA="--dry-run"; fi
+          python3 tools/mi-congreso/alertas/motor.py $EXTRA
