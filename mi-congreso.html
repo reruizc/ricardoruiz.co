@@ -10,6 +10,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
     /* ── tema CLARO de esta página ──────────────────────────────────
        El chasis compartido (legislativo-base.css) es oscuro. Aquí se
@@ -52,7 +54,7 @@
     .mc-hint b{color:var(--white);cursor:none;border-bottom:1px dotted var(--gray)}
     /* identidad */
     .mc-head{display:flex;gap:1.3rem;align-items:flex-start;background:var(--card-bg);border:1px solid var(--card-border);padding:1.4rem 1.5rem;margin-bottom:1.2rem;position:relative}
-    .mc-head .fc-photo{width:88px;height:112px}
+    .mc-head .fc-photo{width:123px;height:157px}
     .mc-head .fc-photo img{width:100%;height:100%;object-fit:cover}
     .mc-head .fc-photo span{font-weight:800;font-size:1.4rem;color:#fff}
     .mc-name{font-family:var(--hn);font-weight:800;font-size:clamp(1.3rem,2.6vw,1.9rem);letter-spacing:-.03em;line-height:1.1;color:var(--white)}
@@ -89,6 +91,12 @@
     .mc-roadmap li{font-size:.78rem;color:var(--gray);line-height:1.5;padding-left:1rem;position:relative}
     .mc-roadmap li::before{content:'→';position:absolute;left:0;color:var(--amber)}
     .mc-roadmap li b{color:var(--white);font-weight:500}
+    /* mapa de votación (dentro de «Cómo he votado») */
+    .mc-map{height:320px;margin:.3rem 0 .6rem;background:transparent}
+    .leaflet-container{background:transparent!important;font-family:var(--hn)!important;cursor:none}
+    .leaflet-tooltip{font-family:var(--hn)!important;font-weight:400!important;font-size:.78rem!important;background:#fff!important;border:1px solid rgba(20,22,31,.18)!important;color:var(--white)!important;border-radius:0!important;padding:.35rem .55rem!important;box-shadow:0 4px 14px rgba(20,22,31,.12)!important}
+    .leaflet-tooltip:before{display:none!important}
+    .leaflet-interactive{cursor:none}
     /* alertas */
     .mc-alert{margin-top:1.2rem;border-top:2px solid var(--green);display:grid;grid-template-columns:1.1fr .9fr;gap:1.6rem}
     .mc-alert h3{color:var(--green)}
@@ -163,7 +171,13 @@
       <div class="mc-grid">
         <div class="panel"><h3>Mi agenda <small id="mc-agenda-src"></small></h3><div id="mc-agenda"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
         <div class="panel"><h3>Mis proyectos en esta legislatura <small>rastreo diario · Senado y Cámara</small></h3><div id="mc-proy"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
-        <div class="panel"><h3>Cómo he votado <small id="mc-voto-src"></small></h3><div id="mc-voto"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+        <div class="panel"><h3>Cómo he votado <small id="mc-voto-src"></small></h3>
+          <div class="seg-sub" style="margin-top:0">Dónde me votaron · 2026</div>
+          <div class="mc-map" id="mc-map"></div>
+          <div class="note" id="mc-map-note" style="margin-top:0">Cargando el mapa de tu votación…</div>
+          <div class="seg-sub">En plenaria</div>
+          <div id="mc-voto"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div>
+        </div>
         <div class="panel"><h3>Control político <small>citaciones en órdenes del día</small></h3><div id="mc-cit"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
         <div class="panel"><h3>En la prensa <small>últimos 30 días · Google News</small></h3><div id="mc-prensa"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
         <div class="panel"><h3>Mi bancada <small>listado de electos</small></h3><div id="mc-banc"></div></div>
@@ -247,6 +261,9 @@
     return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase();
   }
   const chamberNice=c=>c==='SENADO'?'Senado':'Cámara de Representantes';
+  /* Senado manda «SEXTA»; Cámara manda «Comisión Séptima Constitucional
+     Permanente» → un solo rótulo corto: «Comisión Séptima» */
+  const comisionNice=c=>{ const m=norm(c).match(/(primera|segunda|tercera|cuarta|quinta|sexta|septima)/); return m?'Comisión '+tCase(m[1]).replace('Septima','Séptima'):'Comisión '+tCase(String(c||'').replace(/^comisi[oó]n\s+/i,'')); };
   /* recorte por palabra, con puntos suspensivos: cortar a mitad de palabra
      deja títulos tipo "…y se dictan otras disp" */
   const cut=(s,n)=>{ s=String(s||''); if(s.length<=n) return s; const c=s.slice(0,n); const i=c.lastIndexOf(' '); return (i>n*0.6?c.slice(0,i):c)+'…'; };
@@ -295,6 +312,8 @@
   }
   function cambiar(){
     ME=null; try{ localStorage.removeItem(KEY); }catch(err){}
+    if(MAP&&MAPLAYER){ MAP.removeLayer(MAPLAYER); MAPLAYER=null; }
+    const n=document.getElementById('mc-map-note'); if(n) n.textContent='Cargando el mapa de tu votación…';
     document.getElementById('mc-tablero').style.display='none';
     document.getElementById('mc-elegir').style.display='';
     q.focus();
@@ -348,13 +367,112 @@
       const list=Array.isArray(d)?d:(d.candidatos||[]);
       const corp=e.corp==='SENADO'?'SENADO':'CAMARA';
       const hit=list.filter(c=>c.tipo!=='partido'&&(c.corp||'').toUpperCase().startsWith(corp)&&mismaPersona(c.nombre,e.nombre)).sort((a,b)=>(b.votos||0)-(a.votos||0))[0];
-      if(my!==SEQ||!hit) return;
+      if(my!==SEQ) return;
+      if(!hit){
+        const n=document.getElementById('mc-map-note'); const m=document.getElementById('mc-map');
+        if(m) m.style.display='none';
+        if(n) n.textContent='Sin votación personal en el registro 2026: tu lista fue cerrada y el voto fue al logo del partido, así que no hay mapa individual.';
+        return;
+      }
       const ch=document.getElementById('mc-votos-chip'); if(ch&&hit.votos) ch.textContent=`${fmt(hit.votos)} votos en 2026`;
+      cargarMapa(hit,e,my);
       const f=document.getElementById('mc-ficha'); if(f) f.innerHTML=`<a class="ps-cta" href="analisis-candidato.html?cand=${encodeURIComponent(hit.slug)}">Mi ficha electoral · mapa y drill territorial →</a>`;
       const ph=document.getElementById('mc-photo'); if(!ph) return;
       const img=new Image(); img.alt=nice(e.nombre); img.onload=()=>{ if(my===SEQ){ ph.innerHTML=''; ph.appendChild(img); } };
       img.src=`${S3_PHOTOS}/${encodeURIComponent(hit.slug)}.jpg`;
     }catch(err){ /* sin foto ni ficha: el tablero sigue */ }
+  }
+  /* ── mapa de votación 2026 ──────────────────────────────────────
+     Heredado de brujula-2027.html / analisis-candidato.html: choropleth sin
+     tiles sobre los GeoJSON del proyecto. Regla: senador → el país por
+     departamentos; representante → su departamento por municipios (mun_elec);
+     Bogotá → las 20 localidades, giradas 90° a la izquierda (convención del
+     sitio). Una candidatura de Cámara repartida en varios departamentos
+     (étnica, CITREP) cae al mapa nacional. */
+  const GEO_DEPTOS=S3+'/mapas-2026/DEPARTAMENTOS2.json';
+  const GEO_MUNS=c=>S3+'/mapas-2026/Departamentos-mps/'+String(c).padStart(2,'0')+'.json';
+  const GEO_BOG=S3+'/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json';
+  let MAP=null, MAPLAYER=null;
+  function depKey(s){
+    s=norm(s).toUpperCase();
+    if(s.indexOf('BOGOTA')>=0) return 'BOGOTA';
+    if(s.indexOf('VALLE')>=0) return 'VALLE';
+    if(s.indexOf('SAN ANDRES')>=0) return 'SANANDRES';
+    if(s.indexOf('NORTE')>=0&&s.indexOf('SAN')>=0) return 'NSANTANDER';
+    return s.replace(/[^A-Z]/g,'');
+  }
+  function rotateGeoJSON90Left(geo){
+    const cx=-74.08, cy=4.65;
+    const rc=([lon,lat])=>[cx-(lat-cy), cy+(lon-cx)];
+    const rg=g=>g.type==='Polygon'?{...g,coordinates:g.coordinates.map(r=>r.map(rc))}
+      :g.type==='MultiPolygon'?{...g,coordinates:g.coordinates.map(p=>p.map(r=>r.map(rc)))}:g;
+    return {...geo,features:geo.features.map(f=>({...f,geometry:rg(f.geometry)}))};
+  }
+  const estiloDe=(v,max)=>({color:'rgba(20,22,31,.28)',weight:.7,fillColor:'#0047FF',fillOpacity:v?.1+.8*Math.sqrt(v/max):.03});
+  async function cargarMapa(hit,e,my){
+    const box=document.getElementById('mc-map'), note=document.getElementById('mc-map-note');
+    if(!box||!window.L){ if(note) note.textContent='El mapa no está disponible en este navegador.'; return; }
+    box.style.display='';
+    if(note) note.textContent=e.corp==='SENADO'
+      ?'Descargando tu votación mesa a mesa (con votación nacional son varios MB: puede tardar hasta 20 segundos)…'
+      :'Descargando tu votación mesa a mesa…';
+    try{
+      const d=await getJSON(S3+'/endoso/'+encodeURIComponent(hit.slug)+'.json');
+      if(my!==SEQ) return;
+      const deps={}, muns={}, locs={}; let total=0, sinLoc=0;
+      (d.mesas||[]).forEach(r=>{
+        const v=r.v||0; total+=v;
+        const dep=String(r.dep||''); if(!dep) return;
+        (deps[dep]=deps[dep]||{nom:r.depNom||'',v:0}).v+=v;
+        const mk=dep+'-'+String(r.mun||''); (muns[mk]=muns[mk]||{dep,mun:String(r.mun||''),nom:r.munNom||'',v:0}).v+=v;
+        if(dep==='16'){ const z=String(r.zon||'').padStart(2,'0'); if(/^(0[1-9]|1\d|20)$/.test(z)) locs[z]=(locs[z]||0)+v; else sinLoc+=v; }
+      });
+      const depKeys=Object.keys(deps).filter(k=>deps[k].v>0).sort((a,b)=>deps[b].v-deps[a].v);
+      if(!MAP){ MAP=L.map('mc-map',{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,doubleClickZoom:false,boxZoom:false,keyboard:false}); }
+      if(MAPLAYER){ MAP.removeLayer(MAPLAYER); MAPLAYER=null; }
+      const nacional = e.corp==='SENADO' || depKeys.length!==1;
+      let leyenda='';
+      if(nacional){
+        const geo=await getJSON(GEO_DEPTOS); if(my!==SEQ) return;
+        const vals={}; depKeys.forEach(k=>{ vals[depKey(deps[k].nom)]=deps[k].v; });
+        const max=Math.max(1,...Object.values(vals));
+        MAPLAYER=L.geoJSON(geo,{style:f=>estiloDe(vals[depKey(f.properties.name||'')]||0,max),
+          onEachFeature:(f,ly)=>{ const v=vals[depKey(f.properties.name||'')]||0; ly.bindTooltip(`<b>${esc(f.properties.name||'')}</b><br>${fmt(v)} votos`,{sticky:true}); }}).addTo(MAP);
+        const top=depKeys.slice(0,3).map(k=>`${tCase(deps[k].nom)} ${fmt(deps[k].v)}`).join(' · ');
+        leyenda=`Intensidad = concentración de tu votación por departamento. ${top?'Donde más: '+top+'.':''}`;
+      }else if(depKeys[0]==='16'){
+        const geo=rotateGeoJSON90Left(await getJSON(GEO_BOG)); if(my!==SEQ) return;
+        const max=Math.max(1,...Object.values(locs));
+        MAPLAYER=L.geoJSON(geo,{style:f=>estiloDe(locs[String(f.properties.LocCodigo).padStart(2,'0')]||0,max),
+          onEachFeature:(f,ly)=>{ const v=locs[String(f.properties.LocCodigo).padStart(2,'0')]||0; ly.bindTooltip(`<b>${esc(tCase(f.properties.LocNombre||''))}</b><br>${fmt(v)} votos`,{sticky:true}); }}).addTo(MAP);
+        const top=Object.entries(locs).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([z,v])=>{ const f=geo.features.find(x=>String(x.properties.LocCodigo).padStart(2,'0')===z); return `${tCase((f||{}).properties?.LocNombre||'loc. '+z)} ${fmt(v)}`; }).join(' · ');
+        leyenda=`Bogotá por localidades (mapa girado 90°, como en el resto del sitio). ${top?'Donde más: '+top+'.':''}${sinLoc?` ${fmt(sinLoc)} votos sin localidad (consulados, cárceles, puesto censo).`:''}`;
+      }else{
+        const dep=depKeys[0];
+        const geo=await getJSON(GEO_MUNS(dep)); if(my!==SEQ) return;
+        const vals={}; Object.values(muns).forEach(m=>{ if(m.dep===dep) vals[String(parseInt(m.mun,10))]=m.v; });
+        const max=Math.max(1,...Object.values(vals));
+        const nomDe=f=>f.properties.mpio_cnmbr||f.properties.name||f.properties.mun_nom||'Municipio';
+        MAPLAYER=L.geoJSON(geo,{style:f=>estiloDe(vals[String(parseInt(f.properties.mun_elec,10))]||0,max),
+          onEachFeature:(f,ly)=>{ const v=vals[String(parseInt(f.properties.mun_elec,10))]||0; ly.bindTooltip(`<b>${esc(tCase(nomDe(f)))}</b><br>${fmt(v)} votos`,{sticky:true}); }}).addTo(MAP);
+        const top=Object.values(muns).filter(m=>m.dep===dep).sort((a,b)=>b.v-a.v).slice(0,3).map(m=>`${tCase(m.nom)} ${fmt(m.v)}`).join(' · ');
+        leyenda=`${tCase(deps[dep].nom)} por municipios. Intensidad = concentración de tu votación. ${top?'Donde más: '+top+'.':''}`;
+      }
+      /* Encuadre robusto. Leaflet mide el contenedor al crearse y, sobre un
+         mapa recién creado SIN vista, fitBounds devolvía zoom = Infinity
+         (medido: 20 localidades en el DOM y trazos de 0×0). Se fija una vista
+         definida primero y se calcula el zoom sobre ella; setTimeout y no
+         rAF, que se congela en pestaña de fondo. */
+      setTimeout(()=>{
+        if(my!==SEQ||!MAPLAYER) return;
+        MAP.invalidateSize();
+        const b=MAPLAYER.getBounds(); if(!b.isValid()) return;
+        MAP.setView(b.getCenter(), 6, {animate:false});
+        const z=MAP.getBoundsZoom(b, false, L.point(6,6));
+        MAP.setView(b.getCenter(), Number.isFinite(z)?z:6, {animate:false});
+      },0);
+      if(note) note.textContent=leyenda+` Total 2026: ${fmt(total)} votos.`;
+    }catch(err){ if(my===SEQ&&note) note.textContent='El mapa no cargó en este momento; las cifras de la ficha sí son reales.'; }
   }
   async function cargarComision(e,my){
     const chip=document.getElementById('mc-com-chip'), box=document.getElementById('mc-agenda');
@@ -402,7 +520,7 @@
       if(!mios.length){ box.innerHTML=`<div class="mc-empty">No aparece como firmante de ningún proyecto radicado en la legislatura 2026-2027, según los registros de Senado y Cámara. Los proyectos entran al rastreo apenas las secretarías los publican, con rezago de días en Cámara.</div>`; return; }
       box.innerHTML=mios.slice(0,12).map(x=>{
         const num=x._cam==='Cámara'?(x.numero_camara||x.numero_senado):(x.numero_senado||x.numero_camara);
-        return `<div class="mc-row"><span class="d">${esc(num||'—')}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),150))}<small>${esc(x._cam)}${x.comision?' · Comisión '+esc(tCase(x.comision)):''}${x.estado?' · '+esc(x.estado):''}${x.fecha?' · radicado '+esc(fechaCorta(x.fecha)):''} · ${x._auts.length===1?'firma solo':x._auts.length+' firmantes'}${x.fuente_url?` · <a href="${esc(x.fuente_url)}" target="_blank" rel="noopener">fuente ↗</a>`:''}</small></span></div>`;
+        return `<div class="mc-row"><span class="d">${esc(num||'—')}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),150))}<small>${esc(x._cam)}${x.comision?' · '+esc(comisionNice(x.comision)):''}${x.estado?' · '+esc(x.estado):''}${x.fecha?' · radicado '+esc(fechaCorta(x.fecha)):''} · ${x._auts.length===1?'firma solo':x._auts.length+' firmantes'}${x.fuente_url?` · <a href="${esc(x.fuente_url)}" target="_blank" rel="noopener">fuente ↗</a>`:''}</small></span></div>`;
       }).join('')+(mios.length>12?`<div class="note" style="margin-top:.6rem">Y ${mios.length-12} más. El Radar legislativo tiene la lista completa.</div>`:'')
       +`<div class="note" style="margin-top:.6rem">★ = primera firma (autor principal). El resto son coautorías: en el registro, adherir a un proyecto y redactarlo pesan igual.</div>`;
     }catch(err){ if(my===SEQ) box.innerHTML='<div class="mc-empty">No se pudo consultar el registro de radicados.</div>'; }
