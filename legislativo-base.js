@@ -24,9 +24,14 @@
     const up=v=>Math.round(v+(255-v)*0.5).toString(16).padStart(2,'0');
     return '#'+up(r)+up(g)+up(b);
   }
-  const API='https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com';
+  /* La API va por el proxy del worker (`/caudal/api`), NO por la Lambda
+     directa: el proxy pone límite por IP y esconde la URL. Estas páginas son
+     públicas y sin sesión, así que llegan como anónimas — les basta, ninguna
+     usa una acción cara. */
+  const API='https://rr-auth.reruizc.workers.dev/caudal/api';
   async function call(payload){
     const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(r.status===429) throw new Error('Demasiadas consultas seguidas. Espera un minuto.');
     return r.json();
   }
   /* ── modal compartido ────────────────────────────────────────── */

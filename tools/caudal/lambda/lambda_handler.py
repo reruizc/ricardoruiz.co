@@ -3257,6 +3257,28 @@ def _resp(code, payload):
 # un header propio dispara preflight y CORS aquí solo admite Content-Type.
 # Contra un cliente que no sea navegador, lo que protege es el secreto.
 ORIGEN_HEADER  = 'x-caudal-origin'
+# Máximo de filas que devuelve `buscar`. Por encima de esto la acción dejaba de
+# ser una búsqueda y pasaba a ser una descarga del dataset (medido: las páginas
+# del Legislativo pedían 20.000 y comision.html 20.000 por comisión). Lo que se
+# necesita de la lista completa va en `agregados`, no en la lista.
+BUSCAR_LIMIT_MAX = 500
+
+def _buscar_agregados(hits):
+    """Conteos sobre TODOS los hits de una búsqueda (antes de truncar): total,
+    por resultado, y embudo por etapa máxima alcanzada (`et` 0..5 = presentado ·
+    1er/2º debate Senado · 1er/2º debate Cámara · ley). Es lo que comision.html
+    calculaba en el navegador a partir de la lista entera."""
+    por_res = {}
+    embudo = [0] * 6
+    for h in hits:
+        r = h.get('res') or 'OTRO'
+        por_res[r] = por_res.get(r, 0) + 1
+        et = h.get('et')
+        if isinstance(et, int):
+            for i in range(0, min(et, 5) + 1):
+                embudo[i] += 1
+    return {'n_total': len(hits), 'por_res': por_res, 'embudo': embudo}
+
 ACCIONES_CARAS = frozenset({'gaceta', 'contexto', 'cliente-lectura', 'tema-lectura'})
 
 
@@ -3307,20 +3329,35 @@ def handler(event, context):
                  if body.get('expandir_ia') else [])
         # relajar=True (③): consultas de varias palabras no colapsan por AND; anclan
         # al término más específico y rankean por nº de coincidencias.
-        hits, meta = caudal.buscar(q, anio_min=body.get('anio_min'),
-                                   anio_max=body.get('anio_max'),
-                                   comision=body.get('comision'),
-                                   resultado=body.get('resultado'),
-                                   tipologia=body.get('tipologia'),
-                                   empuje=body.get('empuje'),
-                                   limit=body.get('limit', 50),
-                                   extra_terms=extra, relajar=True, with_meta=True)
+        # Tope duro (sep-2026): las páginas públicas del Legislativo pedían
+        # `limit:20000` y esta acción entregaba el dataset entero en una sola
+        # llamada, sin registro de quién lo pedía. Lo que necesitaban de la
+        # lista completa —el embudo por etapa y los conteos por resultado— se
+        # calcula acá sobre TODOS los hits y viaja en `agregados`; la lista se
+        # trunca a BUSCAR_LIMIT_MAX. Ya viene ordenada del más reciente al más
+        # viejo, así que truncar no esconde lo nuevo.
+        try:
+            limit = int(body.get('limit') or 50)
+        except (TypeError, ValueError):
+            limit = 50
+        limit = max(1, min(limit, BUSCAR_LIMIT_MAX))
+        todos, meta = caudal.buscar(q, anio_min=body.get('anio_min'),
+                                    anio_max=body.get('anio_max'),
+                                    comision=body.get('comision'),
+                                    resultado=body.get('resultado'),
+                                    tipologia=body.get('tipologia'),
+                                    empuje=body.get('empuje'),
+                                    limit=None,
+                                    extra_terms=extra, relajar=True, with_meta=True)
+        hits = todos[:limit]
         rel = (meta or {}).get('relajado')
         flex = None
         if rel and rel.get('n_total', 0) > rel.get('n_estricto', 0):
             flex = {'anchor': rel['anchor'], 'n_estricto': rel['n_estricto'],
                     'n_total': rel['n_total']}
         return _resp(200, {'query': q, 'n': len(hits), 'resultados': hits,
+                           'agregados': _buscar_agregados(todos),
+                           'truncado': len(todos) > len(hits),
                            'expansion': {'terminos': extra} if extra else None,
                            'flexible': flex})
 

@@ -83,7 +83,7 @@
     <a href="index.html" class="e-btn-back" style="font-size:.62rem">← Inicio</a>
   </footer>
 
-  <script src="legislativo-base.js"></script>
+  <script src="legislativo-base.js?v=20260903"></script>
   <script>
   /* ── proyectos de ley (radar) ───────────────────────────────── */
   const TITLE_PREF=/^\s*por\s+(?:medio\s+de\s+)?(?:el\s+medio\s+de\s+)?(?:la|el|los|las)?\s*cual(?:es)?\s+se\s+/i;
@@ -121,7 +121,7 @@
   const titleCase=s=>String(s||'').toLowerCase().replace(/(^|\s)(\p{L})/gu,(m,sp,ch)=>sp+ch.toUpperCase());
   async function proysInit(){
     try{
-      const [r,rad]=await Promise.all([call({action:'buscar',query:'',anio_min:2024,limit:2000}),getRadicadosConverted()]);
+      const [r,rad]=await Promise.all([call({action:'buscar',query:'',anio_min:2024,limit:500}),getRadicadosConverted()]);
       P_ALL=[...rad,...(r.resultados||[])].sort((a,b)=>(b.a-a.a)||(b.id-a.id));
       P_MODE='recientes';
       proysRender();
@@ -134,11 +134,10 @@
     if(!q){ proysInit(); return; }
     document.getElementById('p-list').innerHTML='<div class="loading">Buscando <span class="dots"><span></span><span></span><span></span></span></div>';
     try{
-      // el backend ordena ASCENDENTE por año y trunca al límite pedido — hay que
-      // pedir un límite alto para no quedarnos con los resultados más VIEJOS
-      // de un tema con muchos intentos, en vez de los más recientes.
+      // el backend ya ordena del más reciente al más viejo y tope a 500 filas:
+      // la página muestra de a 5 y filtra por resultado, con 500 alcanza.
       const nq=norm(q);
-      const [r,rad]=await Promise.all([call({action:'buscar',query:q,limit:20000}),getRadicadosConverted()]);
+      const [r,rad]=await Promise.all([call({action:'buscar',query:q,limit:500}),getRadicadosConverted()]);
       const radHit=rad.filter(x=>norm(x.t+' '+x.ap).includes(nq));
       P_ALL=[...radHit,...(r.resultados||[])].sort((a,b)=>(b.a-a.a)||(b.id-a.id));
       P_MODE='busqueda';

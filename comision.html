@@ -369,9 +369,11 @@
   const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const fmt=n=>String(n==null?'—':n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
   const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
-  const API='https://l3kmprdjkl.execute-api.us-east-1.amazonaws.com';
+  /* por el proxy del worker (límite por IP), no por la Lambda directa */
+  const API='https://rr-auth.reruizc.workers.dev/caudal/api';
   async function call(payload){
     const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(r.status===429) throw new Error('Demasiadas consultas seguidas. Espera un minuto.');
     return r.json();
   }
 
@@ -979,7 +981,8 @@
   const TITLE_PREF=/^\s*por\s+(?:medio\s+de\s+)?(?:el\s+medio\s+de\s+)?(?:la|el|los|las)?\s*cual(?:es)?\s+se\s+/i;
   function shortTitle(t){ let s=String(t||'').replace(TITLE_PREF,'').replace(/\s+/g,' ').trim(); if(s.length<6) s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
   const RES_TXT={EN_TRAMITE:['En trámite','res-tramite'],LEY:['Ley','res-ley'],ARCHIVADO_TIEMPO:['Archivado por tiempo','res-tiempo'],ARCHIVADO_OTRO:['Archivado','res-otro'],RETIRADO:['Retirado','res-otro'],SIN_DATO:['Sin dato','res-otro'],OTRO:['Otro','res-otro']};
-  let PROY_COMISION=null; // lista completa de la comisión (para embudo + hallazgos)
+  let PROY_COMISION=null; // los más recientes de la comisión (tope 500 del servidor)
+  let PROY_AGREG=null;    // {n_total, por_res, embudo[6]} sobre TODA la comisión, del servidor
   /* ── recién radicados (legislatura viva 2026-2027) ──────────────
      El histórico de abajo (buscar/proyectos.jsonl) se corta el 2026-07-10,
      antes de la instalación del Congreso el 20 de julio — por eso los
@@ -1022,11 +1025,12 @@
     const box=document.getElementById('com-proy-list');
     const shortName=COM.nombre.replace('Comisión ','');
     try{
-      // el backend ordena ASCENDENTE por año y trunca al límite pedido — hay que
-      // pedir un límite mayor que el total de la comisión (máx ~2.4k) para no
-      // quedarnos con los proyectos más VIEJOS en vez de los más recientes.
-      const r=await call({action:'buscar', comision:shortName, limit:20000});
+      // la lista viene del más reciente al más viejo (tope 500 del servidor);
+      // el embudo y los conteos salen de `agregados`, calculados sobre TODA la
+      // comisión en el servidor — ya no hace falta traerse los ~2.4k proyectos.
+      const r=await call({action:'buscar', comision:shortName, limit:500});
       PROY_COMISION=r.resultados||[];
+      PROY_AGREG=r.agregados||null;
       renderEmbudoYHallazgosProyectos();
       const items=[...PROY_COMISION].sort((a,b)=>(b.a-a.a)||(b.id-a.id)).slice(0,5);
       if(!items.length){ box.innerHTML='<div class="note" style="margin-top:0">Sin proyectos registrados para esta comisión todavía.</div>'; return; }
@@ -1066,11 +1070,16 @@
   function renderEmbudoYHallazgosProyectos(){
     const items=PROY_COMISION||[];
     const box=document.getElementById('embudo-box');
-    if(!items.length){ box.innerHTML='<div class="note" style="margin-top:0">Sin proyectos registrados todavía.</div>'; FIND_A={nTotal:0,nLey:0,nTiempo:0}; maybeRenderFindGrid(); return; }
-    const embudo={}; ETAPA_LABEL.forEach((lab,i)=>{ embudo[lab]=items.filter(it=>it.et>=i).length; });
+    // agregados del servidor (toda la comisión); si no vienen, cae a la lista
+    // recibida, que es solo una porción — mejor una cifra parcial que ninguna
+    const ag=PROY_AGREG||{n_total:items.length,
+      por_res:items.reduce((m,it)=>{m[it.res]=(m[it.res]||0)+1;return m;},{}),
+      embudo:ETAPA_LABEL.map((_,i)=>items.filter(it=>it.et>=i).length)};
+    if(!ag.n_total){ box.innerHTML='<div class="note" style="margin-top:0">Sin proyectos registrados todavía.</div>'; FIND_A={nTotal:0,nLey:0,nTiempo:0}; maybeRenderFindGrid(); return; }
+    const embudo={}; ETAPA_LABEL.forEach((lab,i)=>{ embudo[lab]=ag.embudo[i]||0; });
     box.innerHTML=funnel(embudo);
     requestAnimationFrame(()=>box.querySelectorAll('.f2-bar').forEach(b=>b.style.width=b.dataset.w+'%'));
-    FIND_A={nTotal:items.length, nLey:items.filter(it=>it.res==='LEY').length, nTiempo:items.filter(it=>it.res==='ARCHIVADO_TIEMPO').length};
+    FIND_A={nTotal:ag.n_total, nLey:ag.por_res.LEY||0, nTiempo:ag.por_res.ARCHIVADO_TIEMPO||0};
     maybeRenderFindGrid();
   }
   function mortandadChart(mort){
