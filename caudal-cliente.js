@@ -801,7 +801,8 @@
   function cliMuroLectura(){
     const el=document.getElementById('cli-lectura-body'); if(!el) return;
     el.innerHTML=`<div class="muro-t" style="margin-bottom:.7rem">Acá va el briefing del día: qué señales de las de arriba mueven la aguja, por qué, y qué hacer con cada una. Se escribe sobre esto mismo, y va con acceso.</div>`
-      + `<a class="muro-btn" href="${mailtoHref('acceso · '+MARCA.nombre)}">Escríbenos · ${CONTACTO_MAIL}</a>`;
+      + `<a class="muro-btn" href="${window.COMPRA_URL||'caudal-portada.html?comprar=1'}">Conseguir acceso →</a>`
+      + ` <a class="muro-btn" style="opacity:.75" href="${mailtoHref('acceso · '+MARCA.nombre)}">o escríbenos · ${CONTACTO_MAIL}</a>`;
   }
   // La lectura se genera aparte del radar: medida contra producción tarda entre
   // 20 s y 51 s (la varianza es del modelo), o sea que se pasa del techo de

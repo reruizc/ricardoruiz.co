@@ -1166,6 +1166,14 @@ if (!token || !user) window.location.href = 'login.html';
 
 /* ─── PLAN CONFIG ─── */
 const PLANS = {
+  // SKU aparte (sep-2026): quien paga Caudal no compra el electoral. Sin esta
+  // entrada el chip diría "Básico" con el plan activo.
+  caudal: {
+    label: 'Caudal', downloads: 0,
+    desc: 'Acceso completo a Caudal: inteligencia legislativa y regulatoria por perfil, con lectura del analista y alertas.',
+    perks: ['Los 7 pilares de Caudal', 'Perfiles por sector y empresa vigilada', 'Lectura del analista y alertas por correo'],
+    tools: ['caudal'],
+  },
   free: {
     label: 'Básico', downloads: 0,
     desc: 'Acceso a resultados electorales 2025-2026 y visualizaciones básicas.',
@@ -1224,8 +1232,9 @@ const PRIVATE_TOOLS = [
     desc: 'Módulo de Cauce sobre el histórico legislativo (1990–2026, 13.172 registros). Busca un tema y devuelve el embudo de supervivencia del trámite, la línea de intentos, qué bancadas lo impulsan y una lectura del analista asistida por IA. Ficha por proyecto con autores + partido y punteros a las gacetas. Datos privados en S3 + Lambda caudal-analiza.',
     href: 'caudal.html',
     cta: 'Abrir Caudal ↗',
-    note: 'Privado · gated por whitelist',
+    note: 'Acceso por plan Caudal o autorización',
     allowedEmails: ['reruizc@gmail.com', 'nuevagemela@gmail.com', 'diego@cauce.co'],
+    allowedPlans: ['caudal'],
   },
   {
     id: 'charla-sabana',
@@ -1668,7 +1677,8 @@ function render() {
 
   /* ACCESOS — personal · encargos · admin (lista compacta, columna A del fold) */
   const accessEl = document.getElementById('access-list');
-  const visiblePrivate = PRIVATE_TOOLS.filter(p => (p.allowedEmails || []).map(x => x.toLowerCase()).includes(userEmail));
+  const visiblePrivate = PRIVATE_TOOLS.filter(p => (p.allowedEmails || []).map(x => x.toLowerCase()).includes(userEmail)
+    || (p.allowedPlans || []).includes(String(user.plan || '').toLowerCase()));
   const groupOrder = ['personal', 'encargos', 'admin'];
   const byGroup = {};
   visiblePrivate.forEach(p => {
