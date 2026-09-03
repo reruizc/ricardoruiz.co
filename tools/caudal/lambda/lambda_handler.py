@@ -397,6 +397,62 @@ def _coords_de(rec, imp, perfil=None):
                              _imp_ref(imp), imp['antec'])
 
 
+def _imp_de_rec(rec, perfil=None):
+    """Las tres coordenadas de un registro de la legislatura viva, o None.
+    Best-effort a propósito: si el modelo no carga, la ficha y el radar salen
+    sin este bloque en vez de caerse — el dato es el producto, esto lo explica."""
+    try:
+        if not rec or rec.get('legislatura') != IMPORTANCIA_LEG:
+            return None
+        imp = _importancia()
+        if imp is None:
+            return None
+        return _coords_de(rec, imp, perfil)
+    except Exception as e:  # noqa: BLE001
+        print(f'[importancia] omitida para {rec.get("id") if rec else "?"}: {str(e)[:120]}')
+        return None
+
+
+def _imp_por_numero(numero, camara):
+    """Registro vivo por número de radicado y cámara ('senado'|'camara').
+    El número se REINICIA por cámara (1.012 tokens existen en las dos para
+    proyectos distintos), así que sin la cámara no se busca."""
+    tok = _num_token(numero)
+    if not tok or camara not in ('senado', 'camara'):
+        return None
+    campo = 'numero_camara' if camara == 'camara' else 'numero_senado'
+    for r in _viva_recs():
+        if _num_token(r.get(campo)) == tok:
+            return r
+    return None
+
+
+def _imp_compacta(c):
+    """Lo que radar y alertas necesitan de las coordenadas: banda + tasa
+    observada, impacto con su confianza, político con su etiqueta. Los
+    porcentajes crudos del eje 1 NO viajan como titular — el modelo ordena
+    mejor de lo que calibra, y la salida honesta es la banda."""
+    if not c:
+        return None
+    av = c.get('avance') or {}
+    ba = av.get('banda') or {}
+    im = c.get('impacto') or {}
+    po = c.get('politico') or {}
+    co = po.get('cohesion') or {}
+    return {
+        'avance': {'banda': ba.get('banda'), 'observado': ba.get('observado_historico'),
+                   'p_ley': av.get('p_ley'),
+                   'factores': [{'dice': f.get('dice'), 'sentido': f.get('sentido')}
+                                for f in (av.get('factores') or []) if f.get('presente')][:3]},
+        'impacto': {'score': im.get('score'), 'confianza': im.get('confianza'),
+                    'base': im.get('base'), 'n_obligaciones': im.get('n_obligaciones'),
+                    'n_sanciones': im.get('n_sanciones'), 'sectores': im.get('sectores') or []},
+        'politico': {'score': po.get('score'), 'etiqueta': po.get('etiqueta'),
+                     'cohesion': co.get('lectura'), 'n_firmantes': po.get('n_firmantes'),
+                     'radicaciones_previas': po.get('radicaciones_previas')},
+    }
+
+
 def _articulado_compacto(art):
     """Lo que el Radar necesita de una extracción: suficiente para decidir si
     hay que actuar, sin arrastrar la ficha entera a cada señal."""
@@ -466,6 +522,12 @@ def _enriquecer_senales_congreso(senales, sect_cliente, quien_vigila):
     del perfil). Ahí está el valor: no en la ficha suelta, sino en el cruce."""
     n_art = n_aplica = 0
     for sg in senales:
+        # POR QUÉ IMPORTA (aditivo, solo legislatura viva): banda de avance +
+        # impacto + político, compactos. Va ANTES del articulado a propósito:
+        # un proyecto sin texto leído igual tiene banda y peso político.
+        _imp = _imp_compacta(_imp_de_rec(_full().get(f"{sg.get('tb', 'pdly')}:{sg.get('id')}")))
+        if _imp:
+            sg['importancia'] = _imp
         art = _articulado_de(sg.get('tb', 'pdly'), sg.get('id'))
         if not art:
             continue
@@ -3431,11 +3493,18 @@ def handler(event, context):
 
         lentes = {k: dict(v) for k, v in _ejes.LENTES.items()}
         pid = body.get('id')
+        rec = None
         if pid is not None:
             rec = _full().get(f"{body.get('tb', 'pdly')}:{int(pid)}")
+        elif body.get('numero'):
+            # el motor de alertas conoce el id en Senado pero en Cámara solo el
+            # número → se resuelve contra la legislatura viva, POR CÁMARA
+            rec = _imp_por_numero(body.get('numero'), str(body.get('camara') or '').lower())
+        if pid is not None or body.get('numero'):
             if not rec:
                 return _resp(404, {'error': 'proyecto no encontrado'})
-            return _resp(200, {'coordenadas': _coords_de(rec, imp, body.get('perfil')),
+            coords = _coords_de(rec, imp, body.get('perfil'))
+            return _resp(200, {'coordenadas': coords, 'compacta': _imp_compacta(coords),
                                'modelo': imp['modelo'].meta, 'lentes': lentes})
 
         lente = str(body.get('lente') or '').strip()
@@ -3550,6 +3619,11 @@ def handler(event, context):
         art = _articulado_de(ficha.get('tabla', 'pdly'), ficha['id'])
         if art:
             ficha['articulado'] = art
+        # POR QUÉ IMPORTA (aditivo): solo para la legislatura viva — a un proyecto
+        # con desenlace conocido no se le pronostica nada
+        _imp = _imp_de_rec(_full().get(f"{body.get('tb', 'pdly')}:{int(pid)}"))
+        if _imp:
+            ficha['importancia'] = _imp
         return _resp(200, ficha)
 
     if action == 'congresista':

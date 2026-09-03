@@ -356,6 +356,37 @@ def _articulado_html(ev):
             f'{e(_procedencia((ev.get("meta") or {}).get("articulado")))}</div></div>')
 
 
+def _importancia_txt(ev):
+    """Las tres coordenadas en una frase, o '' si la señal no las trae."""
+    c = (ev.get('meta') or {}).get('importancia')
+    if not c:
+        return ''
+    av, im, po = c.get('avance') or {}, c.get('impacto') or {}, c.get('politico') or {}
+    partes = []
+    if av.get('banda'):
+        obs = (f' ({str(av["observado"]).replace(".", ",")}% de esa banda llegó a ley, 2015-2024)'
+               if av.get('observado') is not None else '')
+        partes.append(f'avance {av["banda"].upper()}{obs}')
+    if im.get('score') is not None:
+        partes.append(f'impacto {round(im["score"])}/100'
+                      + (f' ({im["confianza"]})' if im.get('confianza') else ''))
+    else:
+        partes.append('impacto sin texto leído')
+    if po.get('score') is not None:
+        et = (po.get('etiqueta') or '').replace('_', ' ')
+        partes.append(f'político {round(po["score"])}/100' + (f' · {et}' if et else ''))
+    return ' · '.join(partes)
+
+
+def _importancia_html(ev):
+    t = _importancia_txt(ev)
+    if not t:
+        return ''
+    return (f'<div style="font-size:11px;color:{TENUE};padding-top:7px;">'
+            f'<span style="color:{AZUL};font-weight:700;letter-spacing:.08em;">POR QUÉ IMPORTA</span> '
+            f'{e(t)}</div>')
+
+
 def _senal_html(ev):
     n = NIVEL.get(ev['nivel'], NIVEL['bajo'])
     # 260 y no 190: el título de un proyecto es boilerplate al principio («Por
@@ -416,6 +447,7 @@ def _senal_html(ev):
             {deltas}
             <div style="font-size:11px;color:{n["color"]};padding-top:8px;
                         font-style:italic;">por qué: {e(ev.get('porque', ''))}</div>
+            {_importancia_html(ev)}
             {_articulado_html(ev)}
             {cobertura}
           </td></tr>
@@ -619,6 +651,8 @@ def digest_texto(digest, sector):
             if ev.get('detalle'):
                 L.append(f'       {recortar(ev["detalle"], 220)}')
             L.append(f'       por qué: {ev.get("porque", "")}')
+            if _importancia_txt(ev):
+                L.append(f'       importa: {_importancia_txt(ev)}')
             filas = _filas_articulado(ev)
             if filas:
                 L.append('       QUÉ CAMBIA:')

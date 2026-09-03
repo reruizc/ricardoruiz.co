@@ -233,6 +233,8 @@ def articulado_de(ev):
 
 def recolectar(fecha, destinos_activos, usar_api=True, avisos=None):
     """Todos los eventos crudos del día, de las 5 fuentes."""
+    global IMP_API
+    IMP_API = bool(usar_api)
     avisos = avisos if avisos is not None else []
     eventos = []
 
@@ -390,8 +392,38 @@ def _extra_congreso(art, k):
     return {'articulado': art, 'obligacion_clave': o, 'obligacion_clase': clase}
 
 
+# POR QUÉ IMPORTA · las tres coordenadas del modelo de importancia, por evento.
+# Se piden a la Lambda (acción `importancia`) una vez por proyecto y corrida;
+# en Senado por id, en Cámara por número + cámara (el número se repite entre
+# las dos). Best-effort: sin API o sin modelo la señal sale sin este bloque.
+IMP_API = True
+_IMP_CACHE = {}
+
+
+def importancia_de(ev):
+    if not IMP_API:
+        return None
+    m = ev.get('meta') or {}
+    if m.get('pid') and str(m.get('tab') or 'pdly') in ('pdly', 'pal'):
+        payload = {'action': 'importancia', 'id': int(m['pid']), 'tb': m.get('tab') or 'pdly'}
+        llave = f"id:{payload['tb']}:{payload['id']}"
+    elif m.get('numero') and m.get('camara'):
+        payload = {'action': 'importancia', 'numero': m['numero'],
+                   'camara': str(m['camara']).lower()}
+        llave = f"num:{payload['camara']}:{payload['numero']}"
+    else:
+        return None
+    if llave in _IMP_CACHE:
+        return _IMP_CACHE[llave]
+    d, _err = F.api_seguro(payload, timeout=25)
+    comp = (d or {}).get('compacta') if isinstance(d, dict) else None
+    _IMP_CACHE[llave] = comp
+    return comp
+
+
 def _clasificar_congreso(ev):
     art = articulado_de(ev)
+    imp = importancia_de(ev)
 
     if ev['tipo'] == 'radicado_nuevo':
         out = []
@@ -401,6 +433,7 @@ def _clasificar_congreso(ev):
             ev['meta']['tipologia'] = tipologia
             extra = _extra_congreso(art, k)
             extra['hits'] = hits
+            extra['importancia'] = imp
             out.append((k, nivel, porque, extra))
         return out
 
@@ -433,6 +466,7 @@ def _clasificar_congreso(ev):
                       f'es el movimiento del trámite, no lo que dice el articulado')
         extra = _extra_congreso(art, k)
         extra['hits'] = hits
+        extra['importancia'] = imp
         out.append((k, nivel, porque, extra))
     return out
 

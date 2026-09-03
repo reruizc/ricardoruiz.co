@@ -305,7 +305,7 @@
      se hablan por `window`, así que el orden entre los tres no importa.
      ⚠️ Al tocar cualquiera hay que bumpear su ?v=. -->
 <script src="caudal-pilares.js?v=20260829b"></script>
-<script src="caudal-cliente.js?v=20260903"></script>
+<script src="caudal-cliente.js?v=20260903b"></script>
 <script src="caudal-votos.js?v=20260829"></script>
 <script>
 (function(){
@@ -1044,6 +1044,37 @@
         <b>${esc(g.tipo.replace(/_/g,' '))}</b>${esc(g.gaceta)}${ok?'<div class="gac-hint">▸ analizar</div>':''}</div>`;
     }).join('')||'<div class="cob-note">Sin gacetas referenciadas.</div>';
     _gacContexto=`Proyecto de ley ${f.numero_senado||f.numero_camara||''} · ${f.titulo}`;
+    // POR QUÉ IMPORTA · tres coordenadas (avance · impacto · político). Solo
+    // viene para la legislatura viva. No se combinan en un número: el eje 1 se
+    // validó contra desenlace (AUC 0,745 fuera de muestra), el 3 es heurística
+    // declarada, y decirlo es parte del producto.
+    const impHTML=(c=>{
+      if(!c) return '';
+      const av=c.avance||{}, ba=av.banda||{}, im=c.impacto||{}, po=c.politico||{}, coh=po.cohesion||{};
+      const BC={alto:'var(--green)',medio:'var(--amber)',bajo:'var(--red)'};
+      const bcol=BC[ba.banda]||'var(--gray)';
+      const fac=(av.factores||[]).filter(x=>x.presente).slice(0,4);
+      const facHTML=fac.length?`<div class="ga-t" style="margin-top:.45rem">${fac.map(x=>`<span style="color:${x.sentido==='a favor'?'var(--green)':'var(--red)'}">${x.sentido==='a favor'?'▲':'▼'}</span> ${esc(x.dice)}`).join('<br>')}</div>`:'';
+      const impTxt=(im.score!=null)?`<b style="font-size:1.35rem;color:var(--teal)">${Math.round(im.score)}</b><span style="color:var(--ink3)">/100</span>`:`<b style="font-size:1rem;color:var(--ink3)">sin texto leído</b>`;
+      const impDet=(im.score!=null)?[im.n_obligaciones?`${im.n_obligaciones} obligación(es)`:'',im.n_sanciones?`${im.n_sanciones} sanción(es)`:'',(im.sectores||[]).length?`toca ${esc(im.sectores.join(', '))}`:''].filter(Boolean).join(' · ')||'articulado sin cargas nuevas':'todavía no se ha extraído el articulado; el impacto sería un piso, no una medida';
+      const etiq={iniciativa_sectorial:'iniciativa sectorial',bandera:'bandera política',agenda_gobierno:'agenda del Gobierno',reforma_estructural:'reforma estructural'}[po.etiqueta]||(po.etiqueta||'').replace(/_/g,' ');
+      const polDet=[coh.lectura?esc(coh.lectura):'', po.radicaciones_previas?`re-radicado ${po.radicaciones_previas}×`:'', po.n_firmantes?`${po.n_firmantes} firma(s)`:''].filter(Boolean).join(' · ');
+      return `<div class="bloq-card" style="border-color:rgba(152,192,248,.3);background:linear-gradient(180deg,rgba(152,192,248,.06),transparent)">
+        <div class="ga-tag" style="color:var(--teal)">◈ Por qué importa · tres coordenadas</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;margin-top:.5rem">
+          <div><div class="ga-t" style="opacity:.75">Avance · ¿va a pasar?</div>
+            <div><b style="font-size:1.35rem;color:${bcol};text-transform:uppercase">${esc(ba.banda||'—')}</b></div>
+            <div class="ga-t">${ba.observado_historico!=null?`de los proyectos que el modelo puso en «${esc(ba.banda)}» entre 2015 y 2024, llegó a ley el <b>${ba.observado_historico}%</b>`:'sin banda'}</div>${facHTML}</div>
+          <div><div class="ga-t" style="opacity:.75">Impacto · ¿qué te hace si pasa?</div>
+            <div>${impTxt}</div>
+            <div class="ga-t">${impDet}${im.base?` · leído de ${esc(im.base)}`:''}${im.confianza?` · confianza ${esc(im.confianza)}`:''}</div></div>
+          <div><div class="ga-t" style="opacity:.75">Político · ¿qué significa?</div>
+            <div><b style="font-size:1.35rem;color:var(--blue)">${po.score!=null?Math.round(po.score):'—'}</b><span style="color:var(--ink3)">/100</span>${etiq?` <span class="ichip" style="padding:.1rem .45rem;font-size:.6rem">${esc(etiq)}</span>`:''}</div>
+            <div class="ga-t">${polDet||'sin firma legible'}</div></div>
+        </div>
+        <div class="cob-note">Tres lentes, no un promedio: el avance se validó contra 36 años de desenlaces (AUC 0,745 fuera de muestra; use la banda, no el porcentaje); el impacto sale del articulado extraído; el peso político es una heurística declarada, no validada contra desenlace.</div>
+      </div>`;
+    })(f.importancia);
     modalCard.innerHTML=`
       <button class="modal-close">✕</button>
       <h2>${esc(f.titulo)}</h2>
@@ -1056,6 +1087,7 @@
         ${meta('Presentado',f.fecha_presentacion)}${f.dias_a_primer_debate!=null?meta('Días a 1er debate',f.dias_a_primer_debate):''}
         ${f.reloj?meta('Reloj de trámite',f.reloj.tipo==='acto_legislativo'?'Acto legislativo · 1 año, 8 debates (2 vueltas)':'Ley ordinaria · 2 legislaturas, 4 debates'):''}
       </div>
+      ${impHTML}
       ${artHTML(f.articulado)}
       <button id="btn-medios" class="btn-medios">◈ Rastreo en medios · ¿tuvo controversia o impopularidad?</button>
       <div id="medios-analisis"></div>

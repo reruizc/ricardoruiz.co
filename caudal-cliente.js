@@ -566,9 +566,20 @@
           <div style="margin-top:.2rem;font-size:.6rem;color:var(--ink3)">Leído de ${esc(a.base_txt||'—')}</div></div>`;
       }
       const apTag=ap?`<span class="sig-aplica" title="El articulado toca ${esc((ap.sectores||[]).join(', '))}${(ap.vigiladas||[]).length?' · vigiladas: '+esc(ap.vigiladas.join(', ')):''}">te aplica</span>`:'';
+      // POR QUÉ IMPORTA · las tres coordenadas en una línea (solo legislatura viva)
+      let imp='';
+      if(x.importancia){
+        const c=x.importancia, av=c.avance||{}, im=c.impacto||{}, po=c.politico||{};
+        const BC={alto:'var(--green)',medio:'var(--amber)',bajo:'var(--red)'};
+        const p=[];
+        if(av.banda) p.push(`<span title="${esc(av.observado!=null?`de los que el modelo puso en «${av.banda}» (2015-2024), llegó a ley el ${av.observado}%`:'banda de avance')}">avance <b style="color:${BC[av.banda]||'inherit'}">${esc(av.banda)}</b></span>`);
+        p.push(im.score!=null?`<span title="impacto del articulado${im.confianza?' · confianza '+esc(im.confianza):''}">impacto <b>${Math.round(im.score)}</b></span>`:`<span title="todavía no se ha extraído el articulado">impacto <b style="color:var(--ink3)">sin texto</b></span>`);
+        if(po.score!=null) p.push(`<span title="${esc((po.etiqueta||'').replace(/_/g,' '))}${po.cohesion?' · '+esc(po.cohesion):''} · heurística declarada">político <b>${Math.round(po.score)}</b></span>`);
+        imp=`<div class="sig-tags" style="margin-top:.2rem">◈ ${p.join(' · ')}</div>`;
+      }
       return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
         <div class="sig-title">${apTag}${vt}${esc(shortTitle(x.titulo).slice(0,120))}</div>
-        <div class="sig-tags">${tags}</div>${art}<div class="sig-action">${esc(x.accion)}</div></div></div>`;
+        <div class="sig-tags">${tags}</div>${imp}${art}<div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
     if(x.tipo==='medios'){
       const tags=[x.medio?esc(x.medio):'', x.alcance==='regional'?'Regional':'Nacional', x.fecha?esc(x.fecha):''].filter(Boolean).join(' · ');
