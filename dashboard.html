@@ -1584,6 +1584,49 @@ function formatNewsDate(iso) {
 }
 
 /* ─── RENDER ─── */
+/* el nombre del perfil lo escribe el usuario: se escapa antes de pintarlo */
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* CAUDAL · «hoy» del cliente en el hero del dashboard.
+   Pregunta al worker si esta cuenta tiene acceso a Caudal y perfiles guardados.
+   Si los tiene, el hero deja de mostrar noticias del sitio y muestra a qué
+   cliente entra y qué vigila, con un enlace directo a su radar. Es aditivo y
+   best-effort: si el worker no responde, el hero se queda como estaba. */
+async function pintarCaudalHoy(heroEl) {
+  if (!heroEl) return;
+  const token = localStorage.getItem('rr-token');
+  if (!token) return;
+  const B = 'https://rr-auth.reruizc.workers.dev';
+  const H = { Authorization: 'Bearer ' + token };
+  try {
+    const ac = await fetch(B + '/caudal/acceso/me', { headers: H }).then(r => r.json());
+    if (!ac || !ac.ok || !ac.acceso) return;
+    const li = await fetch(B + '/caudal/perfil/list', { headers: H }).then(r => r.json());
+    const perfiles = (li && li.perfiles) || [];
+    if (!perfiles.length) {
+      heroEl.innerHTML = '<div class="hl-kicker">Caudal</div>' +
+        '<a class="hl-item" href="caudal.html#sextante"><span class="n">— 01</span>' +
+        '<span class="t">Arma el perfil de tu cliente y Caudal abre en lo suyo</span>' +
+        '<span class="d">Empezar</span></a>';
+      return;
+    }
+    let ult = '';
+    try { ult = localStorage.getItem('caudal-perfil-ult:' + ((user.email || '').toLowerCase())) || ''; } catch (e) {}
+    const orden = perfiles.slice().sort((a, b) => (b.perfilId === ult) - (a.perfilId === ult));
+    heroEl.innerHTML = '<div class="hl-kicker">Caudal · hoy</div>' + orden.slice(0, 3).map((p, i) => {
+      const que = [p.n_temas ? p.n_temas + ' tema' + (p.n_temas === 1 ? '' : 's') : '',
+                   p.n_empresas ? p.n_empresas + ' vigilada' + (p.n_empresas === 1 ? '' : 's') : '']
+                  .filter(Boolean).join(' · ');
+      return '<a class="hl-item" href="caudal.html#sextante"><span class="n">— 0' + (i + 1) + '</span>' +
+             '<span class="t">' + escapeHtml(p.nombre || 'Perfil sin nombre') + '</span>' +
+             '<span class="d">' + escapeHtml(que) + '</span></a>';
+    }).join('');
+  } catch (e) { /* el hero se queda con las novedades del sitio */ }
+}
+
 function render() {
   if (!user) return;
   const t = getT();
@@ -1615,7 +1658,11 @@ function render() {
   /* HERO */
   document.getElementById('hero-word').textContent = getGreeting() + ',';
   document.getElementById('hero-name').textContent = firstName;
-  /* Hero · las últimas 3 novedades que se generaron */
+  /* Hero · las últimas 3 novedades que se generaron.
+     ⚠️ Para quien tiene Caudal, el hero NO habla de noticias electorales: habla
+     de SU cliente. Pablo Cárdenas (Cauce) lo dijo del dashboard — «lo último
+     debería ser respecto de los temas que el cliente tiene interés». Se resuelve
+     abajo, en pintarCaudalHoy(), que reemplaza este bloque cuando aplica. */
   const latest = NEWS.slice(0, 3);
   const heroEl = document.getElementById('hero-aside-text');
   if (latest.length) {
@@ -1627,6 +1674,8 @@ function render() {
   } else {
     heroEl.innerHTML = `<div class="hl-kicker">${t.latestKicker}</div><div class="hl-item"><span class="t" style="color:var(--ink-3)">${t.newsLoading}</span></div>`;
   }
+
+  pintarCaudalHoy(heroEl);
 
   const renewalShort = user.planExpiresAt ? formatExpiryShort(user.planExpiresAt) : t.qsRenewalNone;
   const usedNow = planKey === 'free' ? 0 : 1;

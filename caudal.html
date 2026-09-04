@@ -305,7 +305,7 @@
      se hablan por `window`, así que el orden entre los tres no importa.
      ⚠️ Al tocar cualquiera hay que bumpear su ?v=. -->
 <script src="caudal-pilares.js?v=20260829b"></script>
-<script src="caudal-cliente.js?v=20260903b"></script>
+<script src="caudal-cliente.js?v=20260903c"></script>
 <script src="caudal-votos.js?v=20260829"></script>
 <script>
 (function(){
@@ -884,6 +884,16 @@
     cliInit();
     const rc=document.getElementById('radar-cta'); if(rc) rc.onclick=()=>showView('cliente');
     if(location.hash==='#sextante') showView('cliente');
+    // ENTRAR POR EL CLIENTE, no por la portada de pilares. Quien tiene acceso y
+    // un perfil guardado abre Caudal en el radar de ese cliente con la lectura
+    // del día — es el «i-ching del día» que pidió Pablo. Solo si no viene
+    // pidiendo otra cosa (?tema=, #hash, o una vista concreta): una URL
+    // explícita siempre manda sobre el default.
+    const _sinDestino=!location.hash && !(new URLSearchParams(location.search).get('tema'));
+    if(ACCESO && HAS_SESSION && !IS_GUEST && _sinDestino){
+      window.CLI_AUTO_PERFIL=true;   // lo consume cliInit cuando llega la lista
+      showView('cliente');
+    }
     // (el botón «atrás» lo cablea pintarBack, que conoce la pila de vistas)
     // Punto 2: el buscador del home entra a la búsqueda UNIVERSAL (4 pilares)
     const hq=document.getElementById('hq'), hgo=document.getElementById('hgo');

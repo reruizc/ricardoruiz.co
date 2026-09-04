@@ -145,7 +145,10 @@
     pfRenderBar();
     // Los perfiles piden cuenta CON acceso (el worker exige sesión). El invitado
     // por link y el visitante sin acceso se quedan con el radar sobre los presets.
-    if(ACCESO && !IS_GUEST && HAS_SESSION){ pfLoadList(); call({action:'perfil_meta'}).then(m=>{PF_META=m;}).catch(()=>{}); }
+    if(ACCESO && !IS_GUEST && HAS_SESSION){
+      pfLoadList().then(()=>{ if(window.CLI_AUTO_PERFIL){ window.CLI_AUTO_PERFIL=false; pfAutoAbrir(); } });
+      call({action:'perfil_meta'}).then(m=>{PF_META=m;}).catch(()=>{});
+    }
     // toggle Legislativo/Regulatorio/Prensa — delegado porque #cli-toggle se
     // recrea en cada cliRender(); click de nuevo en el mismo chip lo colapsa.
     const vc=document.getElementById('view-cliente');
@@ -246,6 +249,32 @@
       comision:p.comision||'', alertas:p.alertas||{activo:false}});
     // el contador tiene que contar lo mismo que se ve, no lo que trajo el list
     if(PF_LIMIT) PF_LIMIT.usados=PF_LIST.length;
+  }
+  // Cuál fue el último perfil que abrió esta cuenta. Es lo que permite que
+  // Caudal ENTRE por el radar de su cliente en vez de por la portada de
+  // pilares (pedido de Pablo: «lo último debería ser respecto de los temas que
+  // el cliente tiene interés… el i-ching del día»). Va por cuenta, no global:
+  // dos personas en el mismo navegador no comparten cliente.
+  function _pfUltKey(){
+    let em=''; try{ em=(JSON.parse(localStorage.getItem('rr-user')||'null')||{}).email||''; }catch(e){}
+    return 'caudal-perfil-ult:'+(em||'anon');
+  }
+  function pfUltimoGuardar(perfilId){
+    try{ localStorage.setItem(_pfUltKey(), perfilId||''); }catch(e){}
+  }
+  function pfUltimoLeer(){
+    try{ return localStorage.getItem(_pfUltKey())||''; }catch(e){ return ''; }
+  }
+  // Abre solo: el último que usó, o el único que tenga. Si tiene varios y
+  // ninguno marcado, NO elige por él — mostrar el radar del cliente equivocado
+  // es peor que mostrar la lista.
+  async function pfAutoAbrir(){
+    if(!PF_LIST.length) return false;
+    const ult=pfUltimoLeer();
+    const cual=(ult&&PF_LIST.some(p=>p.perfilId===ult))?ult:(PF_LIST.length===1?PF_LIST[0].perfilId:'');
+    if(!cual) return false;
+    await pfAbrir(cual);
+    return true;
   }
   async function pfLoadList(){
     try{ const d=await wcall('/caudal/perfil/list'); PF_LIST=d.perfiles||[]; PF_LIMIT={usados:d.count,tope:d.ownedLimit,plan:d.plan}; PF_CADENCIA=d.cadencia||null; }
@@ -516,7 +545,7 @@
   async function pfAbrir(perfilId){
     try{
       const d=await wcall('/caudal/perfil/load?perfilId='+encodeURIComponent(perfilId));
-      PF_ACTIVE=d.perfil; pfCerrarEdit(); pfRenderBar();
+      PF_ACTIVE=d.perfil; pfUltimoGuardar(perfilId); pfCerrarEdit(); pfRenderBar();
       document.querySelectorAll('#cli-sectors .chip').forEach(c=>c.classList.remove('on'));
       cliLoad({perfil:PF_ACTIVE});
     }catch(err){ const b=document.getElementById('cli-body'); if(b) b.innerHTML='<div class="err">No se pudo abrir el perfil: '+esc(err.message)+'</div>'; }
