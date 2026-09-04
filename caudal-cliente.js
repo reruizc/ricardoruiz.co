@@ -868,7 +868,7 @@
   // una vez y se recoge SONDEANDO el caché — un GET a S3, ~0,3 s. Si el modelo
   // alcanza a contestar dentro del gateway, el disparo la trae de una y el
   // sondeo se apaga; si lo cortan, la Lambda igual termina y el sondeo la pesca.
-  const CLI_LECT_POLL=3500, CLI_LECT_MAX=90000;
+  const CLI_LECT_POLL=3500, CLI_LECT_MAX=150000;   // 150 s: el plan de acción alarga la primera lectura (medido sep-2026)
   let _cliLectTimer=null;
   function cliLecturaStop(){ if(_cliLectTimer){ clearTimeout(_cliLectTimer); _cliLectTimer=null; } }
   function cliPedirLectura(key, mine){
