@@ -2023,6 +2023,121 @@ def _call_llm(step, system, user, max_tokens=1200):
     return _call_deepseek(cfg['model'], system, user, max_tokens)
 
 
+# --- RESPUESTA TRANSVERSAL (la búsqueda contesta, no cuenta) ----------------
+# Pedido de Pablo Cárdenas (Cauce, sep-2026): "quiero saber si ya se citó a la
+# junta de Ecopetrol" devolvía seis tarjetas con conteos — "se siente muy
+# Google". Esto toma lo que los seis pilares ya trajeron para la consulta y le
+# pide al modelo que CONTESTE la pregunta con las transversales clave, citando
+# solo lo que se le dio. Si el dato no está, la respuesta correcta es decirlo.
+# Mismo patrón preparar → disparar → sondear que `tema-lectura` (techo de 30 s).
+RESP_SYSTEM = (
+    "Eres analista de asuntos públicos de Cauce. Escribes en español, tuteo neutro "
+    "de Bogotá (sin voseo). Te dan una PREGUNTA de un cliente y la EVIDENCIA que "
+    "Caudal encontró en sus fuentes (Congreso, reguladores, Ejecutivo, consulta "
+    "pública SUCOP, contratación estatal y prensa). REGLAS DURAS: (1) contestas la "
+    "pregunta de frente, en la primera frase; (2) solo usas la evidencia entregada: "
+    "no inventas fechas, cifras, nombres ni hechos; (3) si la evidencia NO permite "
+    "responder con certeza, lo dices explícitamente y explicas qué sí se sabe y qué "
+    "haría falta; (4) la prensa es indicio, no acto del Estado: distingue lo que "
+    "reporta un medio de lo que hizo una autoridad; (5) devuelves SIEMPRE un JSON "
+    "válido con las claves: respuesta (2-4 frases que contestan), certeza "
+    "({nivel: alta|media|baja, por_que}), transversales (lista de 3 a 5 frases "
+    "cortas con lo clave para informar a una organización), en_tramite (qué está "
+    "vivo en el Estado sobre esto, o vacío), prensa (qué dice la prensa, o vacío), "
+    "accion (una recomendación concreta y prudente, o vacío), fuentes (lista de "
+    "{pilar, ref} tomados LITERALMENTE de la evidencia que usaste)."
+)
+
+
+def _resp_contexto(query, ctx):
+    """Compacta lo que el navegador ya trajo de los seis pilares a un texto
+    acotado. Cada línea lleva un `ref` corto que el modelo debe citar tal cual;
+    así `fuentes` es verificable contra lo que se le dio y no contra su memoria."""
+    ctx = ctx if isinstance(ctx, dict) else {}
+    def s(v, n): return str(v or '').replace('\n', ' ').strip()[:n]
+    L = []
+    cong = [x for x in (ctx.get('congreso') or []) if isinstance(x, dict)]
+    cong.sort(key=lambda x: -(x.get('anio') or 0))
+    if cong:
+        L.append('CONGRESO (proyectos de ley; los más recientes primero):')
+        for i, x in enumerate(cong[:8], 1):
+            L.append(f"  [C{i}] {x.get('anio') or '—'} · {s(x.get('resultado_txt') or x.get('resultado'), 30)} · "
+                     f"{s(x.get('numero') or x.get('num'), 14)} · {s(x.get('titulo'), 150)}")
+    reg = [x for x in (ctx.get('regulatorio') or []) if isinstance(x, dict)]
+    reg.sort(key=lambda x: s(x.get('fecha'), 10), reverse=True)
+    if reg:
+        L.append('REGULADORES (actos de superintendencias/ANLA):')
+        for i, x in enumerate(reg[:6], 1):
+            L.append(f"  [R{i}] {s(x.get('fecha'),10)} · {s(x.get('fuente_nombre') or x.get('fuente'),30)} · "
+                     f"{s(x.get('tipo'),30)} · {s(x.get('sancionado'),60)} · {s(x.get('motivo'),140)}")
+    eje = [x for x in (ctx.get('ejecutivo') or []) if isinstance(x, dict)]
+    eje.sort(key=lambda x: s(x.get('fecha'), 10), reverse=True)
+    if eje:
+        L.append('EJECUTIVO (decretos y normativa de Presidencia):')
+        for i, x in enumerate(eje[:6], 1):
+            L.append(f"  [E{i}] {s(x.get('fecha'),10)} · {s(x.get('tipo'),20)} {s(x.get('numero'),8)} · {s(x.get('descripcion'),160)}")
+    suc = [x for x in (ctx.get('sucop') or []) if isinstance(x, dict)]
+    suc.sort(key=lambda x: s(x.get('fecha_inicio') or x.get('creado'), 10), reverse=True)
+    if suc:
+        L.append('CONSULTA PÚBLICA SUCOP (borradores de norma abiertos a comentarios):')
+        for i, x in enumerate(suc[:6], 1):
+            L.append(f"  [S{i}] {s(x.get('entidad'),50)} · {s(x.get('titulo') or x.get('objeto'),140)} · "
+                     f"{s(x.get('estado_vista'),25)} · cierra {s(x.get('fecha_fin'),10)}")
+    med = [x for x in (ctx.get('medios') or []) if isinstance(x, dict)]
+    med.sort(key=lambda x: s(x.get('fecha'), 10), reverse=True)
+    if med:
+        L.append('PRENSA (titulares; indicio, no acto):')
+        for i, x in enumerate(med[:10], 1):
+            L.append(f"  [M{i}] {s(x.get('fecha'),10)} · {s(x.get('medio'),25)} · {s(x.get('titulo'),150)}")
+    con = [x for x in (ctx.get('contratacion') or []) if isinstance(x, dict)]
+    if con:
+        L.append('CONTRATACIÓN ESTATAL (SECOP):')
+        for i, x in enumerate(con[:4], 1):
+            L.append(f"  [K{i}] {s(x.get('fecha'),10)} · {s(x.get('entidad'),60)} · {s(x.get('objeto'),120)} · valor {s(x.get('valor'),14)}")
+    if not L:
+        L.append('(Caudal no encontró registros en ninguna fuente para esta consulta.)')
+    return '\n'.join(L)
+
+
+def _respuesta_pedir(query, ctx):
+    """Deja el prompt en caché; devuelve (key, respuesta_hecha_o_None)."""
+    evidencia = _resp_contexto(query, ctx)
+    key = _hash24(PROMPT_VERSION + '|resp|' + query.strip().lower() + '|' + _hash24(evidencia))
+    hecha = _cache_get('resp-' + key)
+    if hecha:
+        return key, hecha
+    user = (f"PREGUNTA del cliente: «{query.strip()}»\n\nEVIDENCIA encontrada por Caudal "
+            f"(cita los ref entre corchetes tal cual):\n{evidencia}\n\n"
+            "Contesta en JSON según las reglas. Si la evidencia no responde la pregunta "
+            "concreta (por ejemplo, una fecha que nadie ha fijado), dilo en `respuesta` y "
+            "pon certeza baja: eso es más útil que rellenar.")
+    _cache_put('resp-in-' + key, {'user': user, 'query': query})
+    return key, None
+
+
+def _respuesta_generar(key):
+    prompt = _cache_get('resp-in-' + key)
+    if not prompt or not prompt.get('user'):
+        return {'estado': 'sin_tema'}
+    lock = _cache_get('resp-lock-' + key)
+    if lock and _time.time() - float(lock.get('t') or 0) < LECTURA_LOCK_TTL:
+        return {'estado': 'generando'}
+    _cache_put('resp-lock-' + key, {'t': _time.time()})
+    try:
+        raw = _call_llm('sintesis', RESP_SYSTEM, prompt['user'], max_tokens=6000).strip()
+        if raw.startswith('```'):
+            raw = raw.split('```')[1].lstrip('json').strip()
+        data = json.loads(raw)
+        if not isinstance(data, dict) or not data.get('respuesta'):
+            raise ValueError('respuesta vacía')
+    except Exception as e:
+        data = {'error': str(e)[:200]}
+    data['_model'] = STEP_MODELS['sintesis']['model']
+    if 'error' not in data:
+        _cache_put('resp-' + key, data)
+    return {'estado': 'lista', 'lectura': data} if 'error' not in data else {'estado': 'error', 'error': data['error']}
+
+
 # --- síntesis de tema (lectura interpretativa del resumen) ------------------
 SINT_SYSTEM = (
     "Eres analista legislativo de Cauce. Escribes en español, tuteo neutro de "
@@ -3341,7 +3456,7 @@ def _buscar_agregados(hits):
                 embudo[i] += 1
     return {'n_total': len(hits), 'por_res': por_res, 'embudo': embudo}
 
-ACCIONES_CARAS = frozenset({'gaceta', 'contexto', 'cliente-lectura', 'tema-lectura'})
+ACCIONES_CARAS = frozenset({'gaceta', 'contexto', 'cliente-lectura', 'tema-lectura', 'respuesta-lectura'})
 
 
 def _con_credencial(event):
@@ -4448,6 +4563,30 @@ def handler(event, context):
                 if hecha:
                     out['lectura'] = hecha
         return _resp(200, out)
+
+    if action == 'respuesta':
+        # preparar: el navegador manda lo que ya trajo de los pilares
+        q = str(body.get('query') or '').strip()
+        if not q:
+            return _resp(400, {'error': 'falta query'})
+        key, hecha = _respuesta_pedir(q, body.get('contexto'))
+        if hecha:
+            return _resp(200, {'estado': 'lista', 'lectura': hecha, 'key': key})
+        return _resp(200, {'estado': 'pendiente', 'key': key})
+
+    if action == 'respuesta-lectura':
+        # disparar / sondear — gemela de tema-lectura
+        key = str(body.get('key') or '').strip()
+        if not key or not key.isalnum():
+            return _resp(400, {'error': 'falta la llave (key)'})
+        hecha = _cache_get('resp-' + key)
+        if hecha:
+            return _resp(200, {'estado': 'lista', 'lectura': hecha, 'key': key})
+        if body.get('solo_cache'):
+            return _resp(200, {'estado': 'pendiente', 'key': key})
+        r = _respuesta_generar(key)
+        r['key'] = key
+        return _resp(200, r)
 
     if action == 'tema-lectura':
         # gemela de `cliente-lectura`. Dos modos:

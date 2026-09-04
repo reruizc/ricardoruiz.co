@@ -723,14 +723,14 @@
     box.innerHTML=`
       <div class="r-sub">Tema: <b>${esc(query)}</b></div>
       ${fallo}
-      <div class="lectura" id="uni-summary"><div class="tag">◈ Resumen del tema · DeepSeek sobre datos oficiales</div><div id="uni-summary-body"><div class="llm-load">Preparando resumen <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+      <div class="lectura" id="uni-summary"><div class="tag">◈ Respuesta · sobre lo que Caudal encontró en sus fuentes</div><div id="uni-summary-body"><div class="llm-load">Leyendo las fuentes <span class="dots"><span></span><span></span><span></span></span></div></div></div>
       <div class="uni-what">${ACCESO?'Explora el tema por fuente y abre los registros completos.':HAS_SESSION?'Abre una tarjeta para ver una muestra. Para acceder al archivo completo, puedes escoger un plan.':'Puedes ver algunos resultados si te registras. Crear una cuenta es gratis.'}</div>
       ${empresaHint(emps,'uni-emp-hint')}
       <div class="uni-cards">${UNI_TABS.map(([k,n])=>{const disponible=counts[k]!==null;const accion=ACCESO?'Ver resultados →':HAS_SESSION?'Ver muestra →':'Ver algunos resultados →';return `<button class="uni-card" data-k="${k}" type="button"${disponible?'':' disabled'}><span class="uni-card-name">${n}</span><b>${disponible?fmt(counts[k]):'—'}</b><span class="uni-card-action">${disponible?accion:'Fuente no disponible'}</span></button>`}).join('')}</div>
       <div id="uni-tab-body"></div>`;
     const rl=document.getElementById('uni-radar-link'); if(rl) rl.onclick=()=>showView('cliente');
     wireEmpresaHint('uni-emp-hint', ()=>uniSearch(query));
-    uniLoadSummary(query, cD, mine);
+    uniLoadRespuesta(query, mine);
     const cards=[...box.querySelectorAll('.uni-card')];
     const show=k=>{ cards.forEach(t=>t.classList.toggle('on',t.dataset.k===k)); document.getElementById('uni-tab-body').innerHTML=uniTabBody(k); wireUniTab(k); };
     cards.forEach(t=>t.onclick=()=>{
@@ -764,27 +764,54 @@
     el.innerHTML=blk('Hallazgo',l.hallazgo)+blk('Por qué importa',l.veredicto)
       || '<div class="cob-note">Sin resumen disponible para este tema.</div>';
   }
-  function uniResumenFallback(){
-    const el=document.getElementById('uni-summary-body'); if(el) el.innerHTML='<div class="cob-note">El resumen con DeepSeek está disponible al registrarte.</div>';
+  function uniResumenFallback(msg){
+    const el=document.getElementById('uni-summary-body'); if(!el) return;
+    const registrado=HAS_SESSION;
+    el.innerHTML=msg?`<div class="cob-note">${esc(msg)}</div>`:`<div class="cob-note">La respuesta del analista sobre estas fuentes va con acceso a Caudal. <a class="bd-link" href="${registrado?COMPRA_URL:'register.html?next='+encodeURIComponent('caudal.html')}">${registrado?'Conseguir acceso →':'Registrarme gratis →'}</a></div>`;
   }
-  function uniLoadSummary(query, tema, mine){
-    // La síntesis es la misma lectura de tema cacheada que usa Congreso. El
-    // backend solo permite generarla con una sesión habilitada; al visitante se
-    // le explica el registro sin exponer una llamada costosa.
+  // RESPUESTA TRANSVERSAL: contesta la pregunta con lo que trajeron los seis
+  // pilares (pedido de Pablo: "se siente muy Google"). El contexto se manda
+  // compacto desde lo que ya está en _uniData — no se repiten las búsquedas.
+  function uniContexto(){
+    const d=_uniData||{};
+    const pick=(arr,keys,n)=>(arr||[]).slice(0,n).map(x=>{const o={};keys.forEach(k=>{if(x[k]!=null)o[k]=x[k];});return o;});
+    const cR=d.congreso&&d.congreso.resumen;
+    return {
+      congreso: pick((cR&&cR.intentos||[]).filter(i=>!i.match_texto), ['anio','resultado_txt','resultado','numero','num','titulo'], 12),
+      regulatorio: pick(d.regulatorio&&d.regulatorio.resultados, ['fecha','fuente_nombre','fuente','tipo','sancionado','motivo'], 8),
+      ejecutivo: pick(d.ejecutivo&&d.ejecutivo.resultados, ['fecha','tipo','numero','descripcion'], 8),
+      sucop: pick(d.sucop&&d.sucop.resultados, ['entidad','titulo','objeto','estado_vista','fecha_fin','fecha_inicio','creado'], 8),
+      medios: pick(d.medios&&d.medios.resultados, ['fecha','medio','titulo'], 12),
+      contratacion: pick(d.contratacion&&d.contratacion.resultados, ['fecha','entidad','objeto','valor'], 5),
+    };
+  }
+  function uniPintarRespuesta(l){
+    const el=document.getElementById('uni-summary-body'); if(!el) return;
+    const cz=l.certeza||{}; const CC={alta:'var(--green)',media:'var(--amber)',baja:'var(--red)'};
+    const chip=cz.nivel?`<span class="ichip" style="padding:.12rem .5rem;font-size:.62rem;color:${CC[cz.nivel]||'inherit'};border-color:${CC[cz.nivel]||'inherit'}55" title="${esc(cz.por_que||'')}">certeza ${esc(cz.nivel)}</span>`:'';
+    const li=a=>(a||[]).length?`<ul style="margin:.35rem 0 0 1rem;padding:0;line-height:1.5">${a.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:'';
+    const blk=(h,t)=>t?`<div class="blk"><div class="h">${h}</div><div class="t">${esc(t)}</div></div>`:'';
+    const fu=(l.fuentes||[]).length?`<div class="cob-note" style="margin-top:.5rem">Fuentes usadas: ${l.fuentes.map(f=>esc((f.pilar?f.pilar+' ':'')+(f.ref||''))).join(' · ')}</div>`:'';
+    el.innerHTML=`<div class="blk"><div class="t" style="font-size:1.02rem;line-height:1.55">${esc(l.respuesta||'')} ${chip}</div>${cz.por_que?`<div class="cob-note" style="margin-top:.3rem">${esc(cz.por_que)}</div>`:''}</div>
+      ${(l.transversales||[]).length?`<div class="blk"><div class="h">Lo clave para informar</div>${li(l.transversales)}</div>`:''}
+      ${blk('Qué está vivo en el Estado',l.en_tramite)}${blk('Qué dice la prensa',l.prensa)}${blk('Qué hacer',l.accion)}${fu}`;
+  }
+  function uniLoadRespuesta(query, mine){
     if(!HAS_SESSION || !ACCESO) return uniResumenFallback();
-    call({action:'tema',query,lectura:true}).then(d=>{
+    call({action:'respuesta',query,contexto:uniContexto()}).then(d=>{
       if(mine!==_uniSeq) return;
-      if(d&&d.lectura) return uniPintarResumen(d.lectura);
-      if(!d||!d.lectura_key) return uniResumenFallback();
-      const key=d.lectura_key, t0=Date.now();
-      const tick=()=>call({action:'tema-lectura',key,solo_cache:true}).then(x=>{
+      if(d&&d.estado==='lista'&&d.lectura) return uniPintarRespuesta(d.lectura);
+      if(!d||!d.key) return uniResumenFallback('No se pudo preparar la respuesta.');
+      const key=d.key, t0=Date.now();
+      const tick=()=>call({action:'respuesta-lectura',key,solo_cache:true}).then(x=>{
         if(mine!==_uniSeq) return;
-        if(x&&x.estado==='lista'&&x.lectura) return uniPintarResumen(x.lectura);
-        if(Date.now()-t0<90000) setTimeout(tick,3500); else uniResumenFallback();
-      }).catch(uniResumenFallback);
-      call({action:'tema-lectura',key}).catch(()=>{});
+        if(x&&x.estado==='lista'&&x.lectura) return uniPintarRespuesta(x.lectura);
+        if(Date.now()-t0<90000) setTimeout(tick,3500); else uniResumenFallback('La respuesta tardó más de lo normal. Vuelve a buscar en un momento.');
+      }).catch(()=>uniResumenFallback('No se pudo consultar la respuesta.'));
+      // disparo: suele morir en el gateway a los 30 s; la Lambda termina igual
+      call({action:'respuesta-lectura',key}).catch(()=>{});
       setTimeout(tick,3500);
-    }).catch(uniResumenFallback);
+    }).catch(()=>uniResumenFallback('No se pudo preparar la respuesta.'));
   }
   function uniMiniRow(it){
     const rc=RES_COLOR[it.resultado]||'var(--gray)';
