@@ -803,7 +803,7 @@
         <b style="color:var(--teal);font-size:1rem">${i+1}</b>
         <div><div style="font-weight:700;color:var(--ink)">${esc(p.accion||'')}</div>
           ${p.por_que?`<div class="ga-t">${esc(p.por_que)}</div>`:''}
-          <div class="ga-t" style="margin-top:.25rem">${pz?`<span class="ichip" style="padding:.1rem .45rem;font-size:.6rem;${sinPlazo?'opacity:.6':'color:var(--amber);border-color:var(--amber)'}">${esc(pz)}</span> `:''}${p.responsable?`<span class="ichip" style="padding:.1rem .45rem;font-size:.6rem">${esc(p.responsable)}</span>`:''}</div>
+          <div class="ga-t" style="margin-top:.25rem">${pz?`<span class="ichip" style="display:inline-block;width:auto;padding:.1rem .45rem;font-size:.6rem;${sinPlazo?'opacity:.6':'color:var(--amber);border-color:var(--amber)'}">${esc(pz)}</span> `:''}${p.responsable?`<span class="ichip" style="display:inline-block;width:auto;padding:.1rem .45rem;font-size:.6rem">${esc(p.responsable)}</span>`:''}</div>
           ${p.preparar?`<div class="ga-t" style="margin-top:.2rem"><span style="opacity:.7">Preparar:</span> ${esc(p.preparar)}</div>`:''}</div></div>`;}).join('')}</div>`:'';
     const acc=plan?'':((l.acciones&&l.acciones.length)?`<div class="blk"><div class="h">Acciones</div>${l.acciones.map(a=>`<div class="acc">${esc(a)}</div>`).join('')}</div>`:'');
     body.innerHTML=(l.titular?`<div class="blk"><div class="t" style="font-weight:700;font-size:.95rem;color:var(--ink)">${esc(l.titular)}</div></div>`:'')
