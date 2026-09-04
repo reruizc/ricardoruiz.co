@@ -793,12 +793,24 @@
            + `<div class="lc-t">${esc(t)}</div></div>`;
     }).join('');
     const blk=(h,t)=>t?`<div class="blk"><div class="h">${h}</div><div class="t">${esc(t)}</div></div>`:'';
-    const acc=(l.acciones&&l.acciones.length)?`<div class="blk"><div class="h">Acciones</div>${l.acciones.map(a=>`<div class="acc">${esc(a)}</div>`).join('')}</div>`:'';
+    // PLAN DE ACCIÓN (pedido de Pablo: «me recomienda planes de acción»). Cada
+    // punto trae qué, por qué, plazo (solo si la evidencia lo trae), rol y qué
+    // preparar. Las lecturas viejas traen `acciones` (texto suelto): se
+    // conservan como respaldo para no dejar el bloque vacío.
+    const plan=(l.plan&&l.plan.length)?`<div class="blk"><div class="h">Plan de acción</div>${l.plan.map((p,i)=>{
+      const pz=(p.plazo||'').trim(); const sinPlazo=!pz||/sin plazo/i.test(pz);
+      return `<div class="acc" style="display:grid;grid-template-columns:auto 1fr;gap:.2rem .7rem;align-items:start">
+        <b style="color:var(--teal);font-size:1rem">${i+1}</b>
+        <div><div style="font-weight:700;color:var(--ink)">${esc(p.accion||'')}</div>
+          ${p.por_que?`<div class="ga-t">${esc(p.por_que)}</div>`:''}
+          <div class="ga-t" style="margin-top:.25rem">${pz?`<span class="ichip" style="padding:.1rem .45rem;font-size:.6rem;${sinPlazo?'opacity:.6':'color:var(--amber);border-color:var(--amber)'}">${esc(pz)}</span> `:''}${p.responsable?`<span class="ichip" style="padding:.1rem .45rem;font-size:.6rem">${esc(p.responsable)}</span>`:''}</div>
+          ${p.preparar?`<div class="ga-t" style="margin-top:.2rem"><span style="opacity:.7">Preparar:</span> ${esc(p.preparar)}</div>`:''}</div></div>`;}).join('')}</div>`:'';
+    const acc=plan?'':((l.acciones&&l.acciones.length)?`<div class="blk"><div class="h">Acciones</div>${l.acciones.map(a=>`<div class="acc">${esc(a)}</div>`).join('')}</div>`:'');
     body.innerHTML=(l.titular?`<div class="blk"><div class="t" style="font-weight:700;font-size:.95rem;color:var(--ink)">${esc(l.titular)}</div></div>`:'')
       + (partes?`<div class="lc-grid">${partes}</div>`:'')
       // compatibilidad: lecturas cacheadas de antes del cambio traen el campo viejo
       + blk('Lo que mueve la aguja', l.lo_que_importa)
-      + acc + blk('En el horizonte', l.horizonte)
+      + plan + acc + blk('En el horizonte', l.horizonte)
       || '<div class="cob-note">Sin lectura disponible.</div>';
   }
   // `arg` = {sector:'salud'} (preset/demo) o {perfil:{…}} (el perfil del cliente).

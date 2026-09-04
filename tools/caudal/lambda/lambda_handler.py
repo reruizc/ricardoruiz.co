@@ -106,7 +106,7 @@ def _vocab_empresa(emps, ampliar=False):
     return out
 
 BUCKET = os.environ.get('CAUDAL_BUCKET', 'caudal-legislativo')
-PROMPT_VERSION = 'v9'            # bumpear para invalidar cache de síntesis
+PROMPT_VERSION = 'v10'           # bumpear para invalidar cache de síntesis (v10: plan de acción)
 CACHE_PREFIX = 'analisis-cache/'
 HTTP_TIMEOUT = 55
 
@@ -2440,8 +2440,20 @@ CLIENTE_SYSTEM = (
     "nuevo. Un punto cardinal quieto es información, no un hueco.\n\n"
     "Campos del JSON: titular (una frase potente y precisa de lo principal de "
     "hoy), norte, este, sur, oeste (2-3 frases cada uno, citando ítems "
-    "concretos por nombre), acciones (lista de 2-4 acciones concretas) y "
-    "horizonte (1-2 frases sobre qué ventana se abre próximamente).")
+    "concretos por nombre), acciones (lista de 2-4 acciones concretas), "
+    "horizonte (1-2 frases sobre qué ventana se abre próximamente) y plan "
+    "(lista de 2-4 objetos, el PLAN DE ACCIÓN de la semana).\n\n"
+    "REGLAS DEL PLAN: cada objeto trae accion (qué hacer, un verbo concreto: "
+    "radicar concepto, pedir audiencia, preparar comentarios, monitorear, "
+    "hablar con), por_que (la señal concreta que la motiva, nombrada), plazo "
+    "(SOLO si la evidencia lo trae: cierre de una consulta pública, comisión y "
+    "estado de un proyecto, fecha de un acto; si no hay fecha en la evidencia "
+    "escribe «sin plazo en la evidencia» — NUNCA inventes una fecha), "
+    "responsable (un ROL, no un nombre: asuntos públicos, jurídico, vocería, "
+    "dirección, gremio) y preparar (qué insumo hay que tener listo: concepto, "
+    "cifras, argumentos, contactos). Ordena el plan de lo más urgente a lo "
+    "menos. Si la evidencia no justifica una acción, no la inventes: un plan "
+    "de dos puntos honestos vale más que uno de cuatro rellenos.")
 
 
 # cuántas señales entran al briefing. Es un tope de COSTO y de foco, no de
@@ -2559,8 +2571,18 @@ def _lectura_cliente_prompt(s, senales, kpis):
         x = dict(x, nivel=('[MOVIMIENTO ≤72h] ' if x.get('mov') else '[ESTADO] ') + str(x.get('nivel')))
         vig = f" · VIGILADA DEL CLIENTE: {x['vigilada']}" if x.get('vigilada') else ''
         if x['tipo'] == 'congreso':
+            imp = x.get('importancia') or {}
+            banda = ((imp.get('avance') or {}).get('banda') or '')
+            ap = x.get('te_aplica') or {}
+            extra = ''
+            if x.get('comision'):
+                extra += f" · Comisión {x['comision']}"
+            if banda:
+                extra += f" · probabilidad de avance {banda.upper()}"
+            if ap:
+                extra += " · LE APLICA al cliente" + (f" (vigiladas: {', '.join(ap.get('vigiladas') or [])})" if ap.get('vigiladas') else '')
             lines.append(f"- [LEGISLATIVO · prioridad {x['nivel']}] ({x['anio']}, "
-                         f"{x.get('resultado_txt', x.get('resultado'))}) {x['titulo'][:95]}")
+                         f"{x.get('resultado_txt', x.get('resultado'))}{extra}) {x['titulo'][:95]}")
         elif x['tipo'] == 'medios':
             lines.append(f"- [PRENSA · prioridad {x['nivel']}{vig}] {x.get('fecha', '')} "
                          f"{x.get('medio', '')}: {x['titulo'][:90]}")
