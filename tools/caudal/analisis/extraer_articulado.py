@@ -79,6 +79,12 @@ OUT = REPO / 'Bases de datos' / 'leyes-senado' / 'analisis'
 EXDIR = Path(os.environ['CAUDAL_EXTRACCION_DIR']) if os.environ.get('CAUDAL_EXTRACCION_DIR') \
     else OUT / 'extract'                 # una respuesta por proyecto (caché)
 TXTCACHE = OUT / 'txt'               # ventana enviada al modelo (para auditar)
+
+# Cuántas obligaciones se le piden al modelo por documento. Medido: con 8, el
+# 32B llega al tope en el 60% de los documentos con texto radicado (el 30B en
+# el 27%) — o sea que en más de la mitad de los casos el techo lo pone el
+# prompt, no el modelo. Subirlo es más barato que un modelo más grande.
+MAX_OBLIGACIONES = int(os.environ.get('CAUDAL_MAX_OBLIGACIONES', '8'))
 BUCKET = 'caudal-legislativo'
 
 DEEPSEEK_MODEL = os.environ.get('CAUDAL_EXTRACCION_MODEL', 'deepseek-v4-flash')
@@ -184,7 +190,8 @@ ART_SYSTEM = (
     "plataformas, entidades públicas…)\", \"plazo\": \"el plazo si el texto lo "
     "fija, si no null\"}\n"
     "  Solo deberes exigibles a alguien concreto. NO metas declaraciones de "
-    "principios, definiciones ni objetivos. MÁXIMO 8, las más relevantes para "
+    "principios, definiciones ni objetivos. MÁXIMO " + str(MAX_OBLIGACIONES) +
+    ", las más relevantes para "
     "quien tiene que cumplirlas, y cada una en UNA frase de máximo 25 palabras.\n"
     "\n"
     "- aplica_a: a quién le aplica la norma.\n"
@@ -586,7 +593,7 @@ def _norm_extraccion(ex, item, base):
                          'efecto': ef if ef in _EFECTOS else None})
 
     obligaciones = []
-    for x in _lista(ex.get('obligaciones'))[:12]:
+    for x in _lista(ex.get('obligaciones'))[:MAX_OBLIGACIONES + 4]:
         if not isinstance(x, dict):
             continue
         que = _s(x.get('obligacion'), 320)
