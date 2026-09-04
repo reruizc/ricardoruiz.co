@@ -76,12 +76,26 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 DIST = REPO / 'Bases de datos' / 'leyes-senado' / 'dist'
 OUT = REPO / 'Bases de datos' / 'leyes-senado' / 'analisis'
-EXDIR = OUT / 'extract'              # una respuesta por proyecto (caché)
+EXDIR = Path(os.environ['CAUDAL_EXTRACCION_DIR']) if os.environ.get('CAUDAL_EXTRACCION_DIR') \
+    else OUT / 'extract'                 # una respuesta por proyecto (caché)
 TXTCACHE = OUT / 'txt'               # ventana enviada al modelo (para auditar)
 BUCKET = 'caudal-legislativo'
 
 DEEPSEEK_MODEL = os.environ.get('CAUDAL_EXTRACCION_MODEL', 'deepseek-v4-flash')
 DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
+
+# ── Backend LOCAL (sep-2026) ─────────────────────────────────────────────────
+# La Mac M5 Pro (48 GB) corre un modelo local por Ollama. Se elige con
+#   CAUDAL_EXTRACCION_BACKEND=ollama  CAUDAL_EXTRACCION_MODEL=qwen3:30b-a3b
+# y va por la API NATIVA de Ollama (/api/chat), no por la OpenAI-compatible:
+# solo la nativa acepta `think:false` (Qwen3 razona por defecto y eso triplica
+# la salida) y `options.num_ctx` (el default de Ollama es 4k y la ventana que
+# se manda son ~8k tokens: sin esto trunca el documento EN SILENCIO).
+# Las extracciones locales van a un caché APARTE (CAUDAL_EXTRACCION_DIR) para
+# poder compararlas contra las de DeepSeek sin pisarlas.
+BACKEND = os.environ.get('CAUDAL_EXTRACCION_BACKEND', 'deepseek')
+OLLAMA_URL = os.environ.get('CAUDAL_OLLAMA_URL', 'http://localhost:11434/api/chat')
+OLLAMA_NUM_CTX = int(os.environ.get('CAUDAL_OLLAMA_CTX', '32768'))
 
 # ⚠ Sube esto al tocar ART_SYSTEM o el vocabulario de sectores: entra a la llave
 # de caché (`_pv`) y las extracciones viejas se re-piden solas.
@@ -451,6 +465,38 @@ class Truncado(Exception):
     pass
 
 
+def _ollama(system, user, max_tokens, timeout=1800):
+    """Misma firma que _deepseek, contra el modelo local. `usage` se arma con
+    los conteos que Ollama devuelve (prompt_eval_count / eval_count) para que el
+    reporte de costo y las stats sigan funcionando (el costo en USD sale 0 de
+    verdad: la tarifa es del proveedor, no del backend)."""
+    import urllib.request
+    body = json.dumps({
+        'model': DEEPSEEK_MODEL,
+        'messages': [{'role': 'system', 'content': system},
+                     {'role': 'user', 'content': user}],
+        'stream': False, 'think': False, 'format': 'json',
+        'options': {'temperature': 0.1, 'num_ctx': OLLAMA_NUM_CTX,
+                    'num_predict': max_tokens},
+    }).encode('utf-8')
+    req = urllib.request.Request(OLLAMA_URL, data=body,
+                                 headers={'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        d = json.loads(r.read())
+    usage = {'prompt_tokens': d.get('prompt_eval_count', 0),
+             'completion_tokens': d.get('eval_count', 0),
+             'eval_ms': (d.get('eval_duration') or 0) / 1e6,
+             'prompt_ms': (d.get('prompt_eval_duration') or 0) / 1e6}
+    fin = 'stop' if d.get('done_reason', 'stop') == 'stop' else 'length'
+    return (d.get('message') or {}).get('content', ''), usage, fin
+
+
+def _llm(system, user, max_tokens, timeout=180):
+    if BACKEND == 'ollama':
+        return _ollama(system, user, max_tokens)
+    return _deepseek(system, user, max_tokens, timeout)
+
+
 def _deepseek(system, user, max_tokens, timeout=180):
     key = os.environ.get('DEEPSEEK_API_KEY')
     if not key:
@@ -481,7 +527,7 @@ def _extraer(system, user, presupuestos=MAX_TOKENS):
     tot = {'prompt_tokens': 0, 'completion_tokens': 0}
     ultimo = None
     for max_tok in presupuestos:
-        raw, usage, fin = _deepseek(system, user, max_tokens=max_tok)
+        raw, usage, fin = _llm(system, user, max_tokens=max_tok)
         tot['prompt_tokens'] += usage.get('prompt_tokens', 0)
         tot['completion_tokens'] += usage.get('completion_tokens', 0)
         raw = (raw or '').strip()
@@ -732,6 +778,7 @@ def _procesar(item, guardar_txt=False):
                   'base_intentada': item['base'],
                   'chars': chars,
                   'tok_in': usage['prompt_tokens'], 'tok_out': usage['completion_tokens'],
+                  'backend': BACKEND, 'eval_ms': usage.get('eval_ms'), 'prompt_ms': usage.get('prompt_ms'),
                   'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
     d['_meta']['vacios'] = _vacios(d)
     return d
@@ -752,6 +799,9 @@ def cmd_extract(args):
         sel = [p for p in sel if p['base'] in args.base.split(',')]
     if args.sin_titulo:
         sel = [p for p in sel if p['base'] != 'titulo']
+    if args.toks:
+        quiero = set(args.toks.split(','))
+        sel = [p for p in sel if p['tok'] in quiero]
     # los que ya están en caché con el prompt vigente no se vuelven a pedir
     pend = [p for p in sel if not _cacheado(p['tok'], p['base'])]
     # documento primero, título después: el orden en que aporta valor
@@ -811,7 +861,7 @@ def cmd_build(args):
     """Caché por proyecto → artefacto único para S3 (metadata/articulado.json)."""
     plan = {p['tok']: p for p in construir_plan()}
     por_proyecto, por_sector = {}, defaultdict(list)
-    bases, conf, vac = Counter(), Counter(), Counter()
+    bases, conf, vac, modelos = Counter(), Counter(), Counter(), Counter()
     n_camp = Counter()
     tin = tout = 0
     for f in sorted(EXDIR.glob('*.json')):
@@ -827,6 +877,10 @@ def cmd_build(args):
         tout += meta.get('tok_out', 0)
         # el `pv` viaja al artefacto: la UI puede saber con qué prompt se extrajo
         d['pv'] = meta.get('pv')
+        # qué modelo extrajo ESTE documento: el caché es mixto (nube + local) y
+        # sin esto el artefacto atribuye todo al modelo de la nube. Si mañana un
+        # modelo resulta flojo en algún campo, es lo que dice qué revisar.
+        d['modelo'] = meta.get('model') or DEEPSEEK_MODEL
         d['vacios'] = meta.get('vacios', [])
         p = plan.get(tok) or {}
         d['titulo'] = p.get('titulo', '')
@@ -837,6 +891,7 @@ def cmd_build(args):
         por_proyecto[tok] = d
         bases[d.get('base')] += 1
         conf[d.get('confianza')] += 1
+        modelos[d['modelo']] += 1
         for k in d['vacios']:
             vac[k] += 1
         for k in CAMPOS:
@@ -847,10 +902,13 @@ def cmd_build(args):
 
     n = len(por_proyecto)
     out = {
-        'v': time.strftime('%Y-%m-%d'), 'pv': PROMPT_VERSION, 'model': DEEPSEEK_MODEL,
+        'v': time.strftime('%Y-%m-%d'), 'pv': PROMPT_VERSION,
+        'model': modelos.most_common(1)[0][0] if modelos else DEEPSEEK_MODEL,
+        'modelos': dict(modelos),
         'n': n,
         'stats': {
             'por_base': dict(bases), 'por_confianza': dict(conf),
+            'por_modelo': dict(modelos),
             'campos_llenos': {k: n_camp.get(k, 0) for k in CAMPOS},
             'campos_vacios': dict(vac),
             'por_sector': {k: len(v) for k, v in sorted(por_sector.items(),
@@ -867,6 +925,7 @@ def cmd_build(args):
     mb = dest.stat().st_size / 1024 / 1024
     print(f'→ {dest.relative_to(REPO)} · {n} proyectos · {mb:.2f} MB')
     print('  bases:', dict(bases))
+    print('  modelos:', dict(modelos))
     print('  confianza:', dict(conf))
     print('  campos llenos:', {k: f'{v} ({v/max(n,1):.0%})' for k, v in n_camp.items()})
     print('  costo acumulado del corpus extraído: USD %.4f' % _usd(tin, tout))
@@ -941,6 +1000,7 @@ def main():
     p.add_argument('--legislatura', help='p.ej. 2026-2027')
     p.add_argument('--base', help='filtra por base: texto_radicado,ponencia,…')
     p.add_argument('--sin-titulo', action='store_true', help='omite los que solo tienen título')
+    p.add_argument('--toks', help='coma-separado: solo estos tokens (p.ej. pdly:9981) — para benchmarks')
     p.add_argument('--limit', type=int, default=0)
     p.add_argument('--workers', type=int, default=4)
     p.add_argument('--guardar-txt', action='store_true', help='guarda la ventana enviada (auditoría)')
