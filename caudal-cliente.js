@@ -145,10 +145,7 @@
     pfRenderBar();
     // Los perfiles piden cuenta CON acceso (el worker exige sesión). El invitado
     // por link y el visitante sin acceso se quedan con el radar sobre los presets.
-    if(ACCESO && !IS_GUEST && HAS_SESSION){
-      pfLoadList().then(()=>{ if(window.CLI_AUTO_PERFIL){ window.CLI_AUTO_PERFIL=false; pfAutoAbrir(); } });
-      call({action:'perfil_meta'}).then(m=>{PF_META=m;}).catch(()=>{});
-    }
+    if(ACCESO && !IS_GUEST && HAS_SESSION){ pfLoadList(); call({action:'perfil_meta'}).then(m=>{PF_META=m;}).catch(()=>{}); }
     // toggle Legislativo/Regulatorio/Prensa — delegado porque #cli-toggle se
     // recrea en cada cliRender(); click de nuevo en el mismo chip lo colapsa.
     const vc=document.getElementById('view-cliente');
@@ -272,7 +269,13 @@
     if(!PF_LIST.length) return false;
     const ult=pfUltimoLeer();
     const cual=(ult&&PF_LIST.some(p=>p.perfilId===ult))?ult:(PF_LIST.length===1?PF_LIST[0].perfilId:'');
-    if(!cual) return false;
+    if(!cual){
+      // varios clientes y ninguno marcado: NO se elige por el usuario — abrir el
+      // radar del cliente equivocado es peor que pedirle que escoja.
+      const b=document.getElementById('cli-body');
+      if(b) b.innerHTML='<div class="cob-note" style="margin:0">Escoge arriba el cliente con el que vas a trabajar hoy. Caudal recuerda el último y la próxima vez abre directo en él.</div>';
+      return false;
+    }
     await pfAbrir(cual);
     return true;
   }
@@ -283,6 +286,9 @@
     // recién borrado no puede revivir por aquí.
     pfMergeActivo();
     pfRenderBar();
+    // la entrada automática espera a que exista la lista: se dispara acá, la
+    // pida quien la pida (setAcceso o cliInit), y una sola vez.
+    if(window.CLI_AUTO_PERFIL){ window.CLI_AUTO_PERFIL=false; pfAutoAbrir(); }
   }
   function pfRenderBar(){
     const bar=document.getElementById('cli-perfiles'); if(!bar) return;

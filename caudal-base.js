@@ -136,6 +136,13 @@
     pintarNav();
     if(ACCESO && !IS_GUEST && HAS_SESSION){
       hook('pfLoadList'); call({action:'perfil_meta'}).then(m=>{window.PF_META=m;}).catch(()=>{});
+      // ENTRAR POR EL CLIENTE, no por la portada de pilares: quien tiene acceso
+      // abre Caudal en el radar de su cliente («el i-ching del día», pedido de
+      // Pablo). Va acá y no en initHome porque ahí el acceso aún no se ha
+      // resuelto. Solo si la URL no pide otra cosa y el usuario no navegó ya.
+      const sinDestino=!location.hash && !(new URLSearchParams(location.search).get('tema'));
+      const enHome=!document.getElementById('view-home').hidden;
+      if(sinDestino && enHome){ window.CLI_AUTO_PERFIL=true; showView('cliente'); }
     }
   }
 
