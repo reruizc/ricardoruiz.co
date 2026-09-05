@@ -116,8 +116,15 @@ def parse_monto(titulo):
     return v if 0 < v < 1e15 else None
 
 
+# destinatario de actos que NO son sanción ("impone medida cautelar a CAFAM",
+# "interviene a la EPS X", "cierra servicio de urgencias de la Clínica Y")
+ACTO_DEST_RE = re.compile(
+    r'(?:medida[s]?\s+cautelar(?:es)?\s+(?:a|contra|sobre)|interviene\s+(?:a|la|el)?|toma\s+(?:de\s+)?posesi[oó]n\s+de'
+    r'|ordena\s+(?:la\s+)?(?:intervenci[oó]n|liquidaci[oó]n)\s+de|cierra\s+(?:el\s+)?(?:servicio|servicios|sede|unidad)[^,]{0,40}?\s+de'
+    r'|cierra\s+(?:a\s+)?)\s*(.+?)(?:\s+(?:por|tras|luego|ante|debido|en\s+\w+)\b|[.:,]|$)', re.I)
+
 def parse_sancionado(titulo):
-    m = SANC_RE.search(titulo)
+    m = SANC_RE.search(titulo) or ACTO_DEST_RE.search(titulo)
     if not m:
         return None
     s = m.group(1).strip()
@@ -325,6 +332,47 @@ SNS_NEG = re.compile(
     r'|order[óo]|órdenes\s+de\s+cumplimiento|acuerdos\s+por)', re.I)
 
 
+# ⚠️ Supersalud anuncia en comunicados MUCHO más que multas: medidas cautelares,
+# intervenciones (tomas de posesión, prórrogas), cierres de servicio,
+# liquidaciones, aperturas de investigación y circulares. Hasta sep-2026 todo
+# eso se descartaba y la fuente parecía "seca" (última sanción: 6-feb-2025)
+# cuando en 2026 llevaba ~40 actos publicados. Ahora cada comunicado se
+# clasifica en el `tipo_acto` del reencuadre del pilar; las sanciones siguen
+# saliendo por SNS_POS/SNS_NEG, así que la vista de sanciones no cambia.
+SNS_ACTOS = [
+    ('otro',                   'Medida cautelar',          re.compile(r'medida[s]?\s+cautelar', re.I)),
+    # ⚠️ 'interven' a secas casaba "hospitales intervenidos avanzan…" y
+    # "revisará resultados de interventores" — noticias, no actos. Se exige el
+    # verbo del acto (interviene · toma posesión · ordena/prorroga/levanta la intervención).
+    ('otro',                   'Intervención',             re.compile(r'(\binterviene\b|toma\s+(?:de\s+)?posesi|(?:ordena|prorroga|pr[oó]rroga|mantiene|levanta|decreta|extiende|confirma)\b[^.]{0,60}intervenci)', re.I)),
+    # 'cierra' a secas casaba "cierre masivo de 514.000 reclamaciones"; se exige
+    # que lo cerrado sea un servicio/sede/unidad/institución
+    ('otro',                   'Cierre de servicio',       re.compile(r'cierr[ae]\b(?![^.]{0,40}(?:reclamaci|pqr|queja|caso|brecha))[^.]{0,40}(?:servicio|sede|unidad|cl[ií]nica|ips|eps|hospital|centro|consultorio|laboratorio|farmacia|droguer)', re.I)),
+    # "descarta liquidación de X" es lo contrario de un acto de liquidación
+    ('otro',                   'Liquidación',              re.compile(r'(?<!descarta )(?<!descarta la )(?<!no habr[aá] )liquidaci', re.I)),
+    ('apertura_investigacion', 'Apertura de investigación',re.compile(r'(abre|inicia|anuncia)\s+(?:proceso|investigaci|averigua|indaga)|proceso\s+sancionatorio|pliego\s+de\s+cargos|formula\s+cargos', re.I)),
+    ('circular',               'Circular',                 re.compile(r'\bcircular', re.I)),
+    ('archivo',                'Archivo',                  re.compile(r'\barchiv', re.I)),
+]
+
+def clasifica_sns(titulo, path):
+    """(tipo_acto, rotulo) del comunicado, o None si es prensa sin acto
+    (balances, seminarios, visitas, jornadas)."""
+    fn = path.rsplit('/', 1)[-1]
+    hay = f'{titulo} {fn}'
+    if es_sancion_sns(titulo, path):
+        return ('sancion', 'Multa' if re.search(r'\bmulta', hay, re.I) else 'Sanción')
+    # un comunicado que DESMIENTE un acto no es el acto ("descarta liquidación de
+    # Asmet"); el lookbehind no alcanza porque el nombre de archivo repite la
+    # frase con guiones bajos
+    if re.search(r'(descarta|desmiente|niega|no habr[aá]|aclara que no)', hay, re.I):
+        return None
+    for tipo_acto, rotulo, rx in SNS_ACTOS:
+        if rx.search(hay):
+            return (tipo_acto, rotulo)
+    return None
+
+
 def es_sancion_sns(titulo, path):
     """Sanción individual impuesta por Supersalud (título O nombre de archivo)."""
     fn = path.rsplit('/', 1)[-1]
@@ -342,9 +390,9 @@ def fetch_supersalud():
     + filename (NO el es_sancion genérico)."""
     from urllib.parse import quote
     path = 'https://docs.supersalud.gov.co/PortalWeb/Comunicaciones/Comunicados'
-    qt = ('(multa OR multas OR sancion OR sanciona OR sancionó OR sancionatorio '
-          'OR sancionada OR sancionados OR sancionar OR sancionado) '
-          f'path:"{path}"')
+    # sin keyword: se revisa TODO el repositorio y clasifica_sns decide qué es
+    # un acto (sanción, cautelar, intervención…) y qué es prensa sin acto
+    qt = f'path:"{path}"' 
     rows, seen, start = [], set(), 0
     while True:
         url = ('https://www.supersalud.gov.co/es-co/_api/search/query'
@@ -363,18 +411,24 @@ def fetch_supersalud():
         for r in table:
             c = {x['Key']: x['Value'] for x in r['Cells']}
             titulo, url_doc = c.get('Title') or '', c.get('Path') or ''
-            if (not titulo or not url_doc.lower().endswith('.pdf')
-                    or url_doc in seen or not es_sancion_sns(titulo, url_doc)):
+            if not titulo or not url_doc.lower().endswith('.pdf') or url_doc in seen:
+                continue
+            acto = clasifica_sns(titulo, url_doc)
+            if not acto:
                 continue
             seen.add(url_doc)
             rec = parse_titulo(titulo)
+            rec['tipo_acto'], rotulo = acto
+            if rec['tipo_acto'] != 'sancion':
+                rec['tipo'] = f'{rotulo} (comunicado oficial)'
+                rec['estado'] = 'Anunciada'
             rec['url'] = url_doc
             rec['fecha'] = (c.get('Write') or '')[:10] or None
             rec['id'] = f'sns-{url_doc.rsplit("/", 1)[-1]}'
             rows.append(rec)
         total = rr.get('TotalRows', 0)
         start += len(table)
-        print(f'  supersalud: {len(rows)} sanciones de {total} candidatos revisados')
+        print(f'  supersalud: {len(rows)} actos de {total} comunicados revisados')
         if not table or start >= total:
             break
         time.sleep(0.3)

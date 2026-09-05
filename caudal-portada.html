@@ -480,7 +480,7 @@
           <div class="stat"><div class="n">14.964</div><div class="l">registros del Congreso · 1990–2026</div></div>
           <div class="stat"><div class="n">63.004</div><div class="l">actos regulatorios · 10 fuentes</div></div>
           <div class="stat"><div class="n">en vivo</div><div class="l">prensa nacional y regional</div></div>
-          <div class="stat"><div class="n">6<small>/10</small></div><div class="l">pilares activos · el resto por etapas</div></div>
+          <div class="stat"><div class="n">7<small>/10</small></div><div class="l">pilares activos · el resto por etapas</div></div>
         </div>
       </div>
     </section>
@@ -567,7 +567,7 @@
         <div class="sec-head">
           <span class="eyebrow"><svg class="wave" aria-hidden="true"><use href="#wave"/></svg>Infraestructura de datos</span>
           <h2>Nueve fuentes, <em class="ac">un solo radar</em>.</h2>
-          <p class="sub">Legislación, regulación, contratación, medios, redes y más —estatal y no estatal—. Seis
+          <p class="sub">Legislación, regulación, contratación, medios, redes y más —estatal y no estatal—. Siete
             fuentes ya están vivas; el resto se enciende por etapas. Todo lo que puede afectar tu
             reputación o tu operación, reunido en el mismo lugar.</p>
         </div>
@@ -907,6 +907,15 @@
           }
         }
       };
+      function contextoActo(x,motivo){
+        const f=String(x.fuente||''), d=String(x.descripcion||'').trim();
+        if(!d||d==='0') return '';
+        if(/^secop/.test(f)) return `Impuesta por ${d}, entidad contratante.`;
+        if(f==='anla-gaceta') return `Proyecto: ${recorta(d,140)}.`;
+        if(f==='invima') return `Sector ${d.toLowerCase()}.`;
+        if(esFrase(d)&&d!==motivo) return recorta(d,220);
+        return '';
+      }
       /* arma el modal desde UN acto ya elegido (quien elige es cada fuente) */
       function armaActo(x,rotulo){
         if(!x) return null;
@@ -921,10 +930,15 @@
         /* si el motivo ya subio a titulo, no repetirlo debajo */
         const cuerpo=(quien&&esFrase(motivo))?motivo:'';
         const ficha=[x.tipo,x.fuente_nombre,x.resolucion].filter(Boolean).join(' · ');
+        /* `descripcion` significa algo distinto en cada fuente: en SECOP es la
+           entidad que impuso la sanción, en la ANLA el proyecto, en INVIMA el
+           sector. Es lo que le da CONTEXTO al acto — sin esto la señal era
+           un nombre y un número. */
+        const ctx=contextoActo(x,motivo);
         return {
           type:`${rotulo}${f?' · '+enLetras(f):''}`,
           title:recorta(titulo,88),
-          copy:`${cuerpo?recorta(cuerpo,300)+'\n\n':''}${monto?`Monto: $${monto.toLocaleString('es-CO')}.\n\n`:''}${ficha||'Registro de actos'}. Tomado del registro que Caudal consulta a diario.`,
+          copy:`${cuerpo?recorta(cuerpo,300)+'\n\n':''}${ctx?ctx+'\n\n':''}${monto?`Monto: $${monto.toLocaleString('es-CO')}.\n\n`:''}${ficha||'Registro de actos'}. Tomado del registro que Caudal consulta a diario.`,
           url:x.url||''
         };
       }
@@ -955,7 +969,8 @@
         const quien = (x.sancionado||'').replace(/^[\s—–\-]*$/,'').trim();
         pon('pb-reg-amt', monto ? '$'+monto.toLocaleString('es-CO') : 'Una sanción');
         pon('pb-reg-who', recorta(quien || x.fuente_nombre || 'Regulación · operación', 60));
-        pon('pb-reg-d', `Sanción en firme el ${enLetras(f)}, según ${x.fuente_nombre||'el registro oficial'}. `+
+        const quienImpuso=/^secop/.test(String(x.fuente||''))&&x.descripcion?` impuesta por ${x.descripcion} y`:'';
+        pon('pb-reg-d', `Sanción${quienImpuso} en firme el ${enLetras(f)}, según ${x.fuente_nombre||'el registro oficial'}. `+
           'Una decisión así cambia tu operación desde el día en que se publica —y llega a la conversación mucho después.');
       }).catch(()=>{});
     })();
@@ -1026,7 +1041,7 @@
       {id:'sucop', name:'Consulta pública de normas · SUCOP', status:'live', n:'3.899', unit:'borradores · desde 2020', desc:'Proyectos de decreto y resolución abiertos a comentarios antes de expedirse: la señal más temprana de Caudal.', view:'sucop'},
       {id:'gacetas', name:'Diarios y gacetas oficiales', status:'soon', desc:'Diario Oficial y Gaceta del Congreso: el texto completo del trámite.'},
       {id:'territorial', name:'Entidades territoriales', status:'soon', desc:'Concejos, asambleas y gobiernos locales.'},
-      {id:'redes', name:'Redes sociales oficiales y voceros', status:'wired', desc:'Cuentas oficiales de entidades y voceros clave. Fuente conectada; el primer corte se publica con la salida al público.'}
+      {id:'redes', name:'Redes sociales oficiales y voceros', status:'live', n:'94', unit:'entidades y gremios · cuentas verificadas', desc:'Diccionario de cuentas oficiales del Estado, reguladores, cortes, Congreso y gremios, con el cargo que habla por cada uno. Las cuentas se leen del sitio oficial, no de memoria.', href:'caudal-voceros.html'}
     ];
     const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     (function renderPillars(){
@@ -1037,7 +1052,7 @@
         const live=p.status==='live';
         const tag=live?'<span class="pc-status s-live">Activo</span>':p.status==='wired'?'<span class="pc-status s-soon">Conectado · corte mensual</span>':'<span class="pc-status s-soon">Próximamente</span>';
         const num=p.n?`<div class="pc-n">${esc(p.n)}<small>${esc(p.unit||'')}</small></div>`:'';
-        return `<div class="pcard ${p.status}"${live?` data-view="${p.view}"`:''}>
+        return `<div class="pcard ${p.status}" data-id="${esc(p.id)}"${live?` data-view="${p.view||''}"`:''}>
           <div class="pc-map" aria-hidden="true" style="background-image:url('imagenes/caudal-${esc(p.id)}.jpg')"></div>
           <div class="pc-body">
             <div class="pc-top"><div class="pc-name">${esc(p.name)}</div>${tag}</div>
@@ -1046,7 +1061,7 @@
           </div>
         </div>`;
       }).join('');
-      el.querySelectorAll('.pcard.live').forEach(c=>{ c.onclick=()=>{ location.href='caudal.html'+q; }; });
+      el.querySelectorAll('.pcard.live').forEach(c=>{ const p=PILLARS.find(x=>x.id===c.dataset.id); c.onclick=()=>{ location.href=(p&&p.href)?p.href:'caudal.html'+q; }; });
       attachHover(el.querySelectorAll('.pcard.live'));
     })();
 
