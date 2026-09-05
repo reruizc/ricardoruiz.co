@@ -27,7 +27,6 @@
   .g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
   .player{display:flex;align-items:center;gap:10px}
-  .avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--green),#0f6b36);display:grid;place-items:center;font-weight:700;flex:none}
   .teams{font-size:.9rem;color:var(--dim)}
   .teams b{color:var(--ink)}
   table{width:100%;border-collapse:collapse;font-size:.9rem}
@@ -112,8 +111,41 @@
   .ov .tocar{margin-top:22px;color:rgba(255,255,255,.5);font-size:.85rem;animation:subir .4s 1.8s both}
   @keyframes subir{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
   @media(prefers-reduced-motion:reduce){.ov *{animation:none!important}}
+  /* ---- fotos de jugador (con la inicial de respaldo si no hay archivo) ---- */
+  .av{position:relative;display:inline-grid;place-items:center;border-radius:50%;overflow:hidden;flex:none;
+    background:linear-gradient(135deg,var(--green),#0f6b36);font-weight:700;color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.12)}
+  .av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .av b{font-size:.9em}
+  .ko .row .av{margin-right:8px;vertical-align:middle}
+  .ko .row .con-foto{display:flex;align-items:center}
+  .ko .row .con-foto>div{min-width:0}
+  .versus{display:flex;align-items:center;justify-content:center;gap:14px;padding:10px 0 4px}
+  .versus .av{box-shadow:0 0 0 3px var(--gold),0 0 22px rgba(245,197,66,.35);animation:latir 2.2s infinite}
+  .versus .vs{font-weight:900;font-size:1.3rem;color:var(--gold);letter-spacing:.1em;animation:latir 2.2s .3s infinite}
+  @keyframes latir{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+  .champ .av{box-shadow:0 0 0 4px var(--gold),0 0 40px rgba(245,197,66,.5);animation:corona 1.2s cubic-bezier(.3,1.5,.5,1) both}
+  @keyframes corona{from{transform:scale(.2) rotate(-30deg);opacity:0}to{transform:scale(1) rotate(0);opacity:1}}
+  .confeti{position:absolute;top:-12px;width:8px;height:14px;border-radius:2px;opacity:.9;animation:cae linear infinite}
+  @keyframes cae{to{transform:translateY(110vh) rotate(720deg)}}
+  .champ{position:relative;overflow:hidden}
+  /* ---- overlay de eliminacion con foto ---- */
+  .ov .quien-foto{position:relative;display:inline-block;animation:caer 1.5s cubic-bezier(.3,1.4,.5,1) both}
+  .ov .quien-foto .av{width:150px;height:150px;font-size:3.4rem;box-shadow:0 0 0 4px rgba(255,90,90,.6),0 0 40px rgba(239,68,68,.45)}
+  .ov .quien-foto .av img{animation:apagar 1.4s .9s both}
+  @keyframes apagar{from{filter:none}to{filter:grayscale(1) contrast(1.15) brightness(.75)}}
+  .ov .quien-foto .esc{position:absolute;right:-10px;bottom:-6px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.7))}
+  /* ---- entrada y destello ---- */
+  body.intro .card,body.intro details.fecha,body.intro .ko{animation:aparecer .45s both;animation-delay:calc(var(--i,0)*45ms)}
+  @keyframes aparecer{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .match.flash{animation:destello 1.4s ease-out}
+  @keyframes destello{0%{background:rgba(74,222,128,.35)}100%{background:transparent}}
+  .match .score input{transition:transform .15s}
+  .match.flash .score input{transform:scale(1.12)}
   .tag{font-size:.7rem;padding:2px 7px;border-radius:6px;background:#132417;color:var(--dim);border:1px solid var(--line)}
   @media(max-width:720px){
+    details.fecha>summary{flex-wrap:wrap}
+    .sm-h{flex-basis:100%;margin-left:0;text-align:left;padding-left:22px}
+    h2 .tag{display:block;width:max-content;margin-top:6px}
     .match{grid-template-columns:44px 1fr 84px 1fr;}
     .match .grp{display:none}
     .bracket{grid-template-columns:1fr}
@@ -168,7 +200,7 @@
 
 <script>
 // ---------- Sorteo del 5-sep-2026 (se puede re-sortear con el botón) ----------
-const JUGADORES = ["Miguel","Camilo","Gamba","Pelu","Piraquive","Ochica","Ricardo","Jorge/Polo"];
+const JUGADORES = ["Miguel","Camilo","Gamba","Pelu","Piraquive","Ochica","Ricardo","Polo"];
 const CLUBES    = ["Juventus","Real Madrid","Liverpool","Chelsea","Bayern","Barcelona","Manchester City","PSG"];
 const POOL      = ["Argentina","Brasil","Francia","Inglaterra","España","Alemania","Portugal","Países Bajos","Colombia","Uruguay","Croacia","Bélgica","Marruecos","México","Japón","Noruega"];
 const SORTEO_INICIAL = {
@@ -218,6 +250,16 @@ function tabla(g){
   return {rows,completo};
 }
 
+// ---------- fotos de jugador ----------
+const slug=n=>n.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-');
+const FOTO=i=>`torneo-fifa/jugadores/${slug(JUGADORES[i])}.jpg`;
+const jugadorDe=t=>t<8?t:t-8;
+const FOTO_ROTA=new Set(JSON.parse(sessionStorage.getItem('fifa8-fotorota')||'[]'));
+function fotoRota(i){ FOTO_ROTA.add(i); sessionStorage.setItem('fifa8-fotorota',JSON.stringify([...FOTO_ROTA])); }
+function avatar(i,size){   // si la foto no existe, se queda la inicial y no se vuelve a pedir en esta sesion
+  const img=FOTO_ROTA.has(i)?'':`<img src="${FOTO(i)}" alt="" onerror="fotoRota(${i});this.remove()">`;
+  return `<span class="av" style="width:${size}px;height:${size}px;font-size:${Math.round(size*.42)}px"><b>${JUGADORES[i][0]}</b>${img}</span>`;
+}
 // ---------- escudos propios: color y patron de cada camiseta, sin logos ajenos ----------
 const ESC={
   'Juventus':          {p:'rayas',   c:['#ffffff','#000000']},
@@ -267,7 +309,7 @@ function escudo(n,size){
 }
 // ---------- eliminacion matematica ----------
 function jugadoId(id){ const x=S[id]; return !!(x&&x[0]!==''&&x[1]!==''); }
-function eliminados(){
+function eliminados(soloGrupos){
   const G=grupos(), fx=fixture(), fuera=new Set();
   for(const g of 'ABCD'){
     const eqs=G[g], pend=fx.filter(m=>m.g===g&&!jugadoId(m.id)), pts={};
@@ -285,6 +327,7 @@ function eliminados(){
     }
     eqs.forEach(t=>{ if(!puede[t]) fuera.add(t); });
   }
+  if(soloGrupos) return fuera;
   // en eliminatoria basta perder
   const B=bracketAlDia()?BRACKET:null;
   const cae=(id,x,y)=>{ const w=ganador(id,x,y); if(w!=null) fuera.add(w===x?y:x); };
@@ -296,7 +339,7 @@ function eliminados(){
 }
 // ---------- el anuncio ----------
 let ANUNCIADOS=new Set(JSON.parse(localStorage.getItem('fifa8-elim')||'[]'));
-let PRIMER_RENDER=true, COLA=[], MOSTRANDO=false;
+let PRIMER_RENDER=true, COLA=[], MOSTRANDO=false, PREV_DONE=new Set();
 function revisarEliminados(){
   const fuera=eliminados(), nuevos=[...fuera].filter(t=>!ANUNCIADOS.has(t));
   if(!nuevos.length) return;
@@ -314,7 +357,7 @@ function siguienteAnuncio(){
   const sinEquipos=eliminados().has(mio) && !COLA.includes(mio);   // el aviso va con el ultimo de los dos
   const v=document.querySelector('.ov')||document.body.appendChild(Object.assign(document.createElement('div'),{className:'ov'}));
   v.innerHTML=`<div class="caja">
-    <div class="cresta">${escudo(e.n,96)}</div>
+    <div class="quien-foto">${avatar(jugadorDe(t),150)}${escudo(e.n,56)}</div>
     <div class="grieta">ELIMINADO</div>
     <div class="quien">${e.n} · <b>${e.j}</b></div>
     <div class="motivo">Ya no le alcanza para clasificar</div>
@@ -327,13 +370,13 @@ function siguienteAnuncio(){
 function render(){
   const G=grupos();
   document.getElementById('jugadores').innerHTML=JUGADORES.map((j,i)=>`
-    <div class="card player"><div class="avatar">${j[0]}</div>
+    <div class="card player" style="--i:${i}">${avatar(i,46)}
       <div><b>${j}</b><div class="teams">${escudo(CLUBES[i],15)}<b>${CLUBES[i]}</b> · grupo ${"ABCD".split('').find(g=>G[g].includes(i))}<br>${escudo(SORTEO.sec[i],15)}<b>${SORTEO.sec[i]}</b> · grupo ${"ABCD".split('').find(g=>G[g].includes(i+8))}</div></div></div>`).join('');
 
-  const FUERA=eliminados();
+  const FUERA=eliminados(true);
   document.getElementById('grupos').innerHTML="ABCD".split('').map(g=>{
     const {rows,completo}=tabla(g);
-    return `<div class="card"><h3>Grupo ${g} ${completo?'<span class="tag">cerrado</span>':''}</h3>
+    return `<div class="card" style="--i:${'ABCD'.indexOf(g)+8}"><h3>Grupo ${g} ${completo?'<span class="tag">cerrado</span>':''}</h3>
       <table><tr><th style="text-align:left">Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>DG</th><th>Pts</th></tr>
       ${rows.map((r,i)=>{const e=equipo(r.t);const fuera=FUERA.has(r.t);
         return `<tr class="${fuera?'out':(i<2?(completo?'q':'q prov'):'')}"><td class="t">${escudo(e.n,16)}${e.n}<small>${e.j}</small></td><td>${r.pj}</td><td>${r.pg}</td><td>${r.pe}</td><td>${r.pp}</td><td>${r.gf-r.gc>0?'+':''}${r.gf-r.gc}</td><td><b>${r.pts}</b></td></tr>`}).join('')}
@@ -341,18 +384,20 @@ function render(){
 
   const fx=fixture();
   const jugado=m=>{const x=S[m.id];return x&&x[0]!==''&&x[1]!=='';};
+  const nuevosDone=new Set(fx.filter(m=>jugado(m)&&!PREV_DONE.has(m.id)).map(m=>m.id));
+  PREV_DONE=new Set(fx.filter(jugado).map(m=>m.id));
   const FECHAS=[[0,8,'Primera fecha'],[8,16,'Segunda fecha'],[16,24,'Tercera fecha']];
   const enCurso=FECHAS.findIndex(([a,b])=>fx.slice(a,b).some(m=>!jugado(m)));   // solo se despliega la fecha que se esta jugando
   document.getElementById('fixture').innerHTML=FECHAS.map(([a,b,tit],fi)=>{
     const ms=fx.slice(a,b), n=ms.filter(jugado).length, lista=ms.map(m=>{
       const H=equipo(m.h),A=equipo(m.a),sc=S[m.id]||['',''],done=jugado(m);
       const q=META[m.id]&&META[m.id].por;
-      return `<div class="match ${done?'done':''}" ${q?`title="Registrado por ${q}"`:''}><span class="time">${hhmm(m.t)}</span>
+      return `<div class="match ${done?'done':''} ${nuevosDone.has(m.id)&&!PRIMER_RENDER?'flash':''}" ${q?`title="Registrado por ${q}"`:''}><span class="time">${hhmm(m.t)}</span>
         <div class="side home"><b class="${done&&+sc[0]>+sc[1]?'won':''}">${H.n}${escudo(H.n,15)}</b><small>${H.j}</small></div>
         <div class="score"><input type="number" min="0" max="20" inputmode="numeric" data-k="${m.id}-0" value="${sc[0]}" onchange="registrar('${m.id}',0,this.value)"><span>–</span><input type="number" min="0" max="20" inputmode="numeric" data-k="${m.id}-1" value="${sc[1]}" onchange="registrar('${m.id}',1,this.value)"></div>
         <div class="side"><b class="${done&&+sc[1]>+sc[0]?'won':''}">${escudo(A.n,15)}${A.n}</b><small>${A.j}</small></div>
         <span class="grp">${m.g}</span></div>`;}).join('');
-    return `<details class="fecha" ${fi===enCurso?'open':''}><summary>${tit}
+    return `<details class="fecha" style="--i:${12+fi}" ${fi===enCurso?'open':''}><summary>${tit}
       <span class="sm-h">${hhmm(ms[0].t)} → ${hhmm(ms[ms.length-1].t+8)} · ${n}/8 jugados</span></summary>
       <div class="cont">${lista}</div></details>`;}).join('');
 
@@ -422,15 +467,18 @@ function renderLlaves(){
   const box=(q,cls='')=>{
     const [id,t,x,y,lx,ly]=q, s=S[id]||['','',''], X=x!=null?equipo(x):null, Y=y!=null?equipo(y):null;
     const dis=(x==null||y==null)?'disabled':'', tie=s[0]!==''&&s[1]!==''&&+s[0]===+s[1];
-    const row=(e,l,i)=>`<div class="row"><div><b>${e?escudo(e.n,16)+e.n:'<span class="muted">'+l+'</span>'}</b><small>${e?e.j:'por definir'}</small></div><input type="number" min="0" max="20" inputmode="numeric" ${dis} data-k="${id}-${i}" value="${s[i]}" onchange="registrar('${id}',${i},this.value)"></div>`;
-    return `<div class="ko ${cls}"><div class="lbl"><span>${id==='F'?'Final':id[0]==='Q'?'Cuartos '+id[1]:'Semifinal '+id[1]}</span><span>${t}</span></div>
-      ${row(X,lx,0)}${row(Y,ly,1)}
+    const conFoto=id[0]!=='Q', tIdx=[x,y];
+    const row=(e,l,i)=>`<div class="row"><div class="${conFoto&&e?'con-foto':''}">${conFoto&&e?avatar(jugadorDe(tIdx[i]),34):''}<div><b>${e?escudo(e.n,16)+e.n:'<span class="muted">'+l+'</span>'}</b><small>${e?e.j:'por definir'}</small></div></div><input type="number" min="0" max="20" inputmode="numeric" ${dis} data-k="${id}-${i}" value="${s[i]}" onchange="registrar('${id}',${i},this.value)"></div>`;
+    const versus=(id==='F'&&X&&Y&&!(s[0]!==''&&s[1]!==''))?`<div class="versus">${avatar(jugadorDe(x),64)}<span class="vs">VS</span>${avatar(jugadorDe(y),64)}</div>`:'';
+    return `<div class="ko ${cls}" style="--i:${id==='F'?6:id[0]==='S'?4+ +id[1]:+id[1]-1}"><div class="lbl"><span>${id==='F'?'Final':id[0]==='Q'?'Cuartos '+id[1]:'Semifinal '+id[1]}</span><span>${t}</span></div>
+      ${versus}${row(X,lx,0)}${row(Y,ly,1)}
       ${tie?`<div class="pen">Penales, ganó: <select onchange="registrar('${id}',2,this.value)"><option value="">—</option><option value="h" ${s[2]==='h'?'selected':''}>${X.n}</option><option value="a" ${s[2]==='a'?'selected':''}>${Y.n}</option></select></div>`:''}
     </div>`;
   };
   document.getElementById('llaves').innerHTML=`<div class="round">${Q.map(q=>box(q)).join('')}</div><div class="round">${SF.map(q=>box(q)).join('')}</div><div class="round">${box(F[0],'final')}</div>`;
   const c=ganador('F',ws[0],ws[1]); const el=document.getElementById('campeon');
-  if(c!=null){const e=equipo(c); el.hidden=false; el.innerHTML=`<div class="muted">🏆 CAMPEÓN DE LA COPA DE LOS 8</div><div style="margin:8px 0">${escudo(e.n,64)}</div><div class="big">${e.j}</div><div>con ${e.n}</div>`;} else el.hidden=true;
+  if(c!=null){const e=equipo(c); el.hidden=false; const conf=Array.from({length:28},(_,k)=>`<span class="confeti" style="left:${(k*3.6)%100}%;background:${['#f5c542','#4ade80','#3b82f6','#ef4444','#fff'][k%5]};animation-duration:${2.6+(k%5)*.5}s;animation-delay:${(k%7)*.35}s"></span>`).join('');
+    el.innerHTML=`${conf}<div class="muted">🏆 CAMPEÓN DE LA COPA DE LOS 8</div><div style="margin:12px 0 6px">${avatar(jugadorDe(c),120)}</div><div style="margin:4px 0">${escudo(e.n,40)}</div><div class="big">${e.j}</div><div>con ${e.n}</div>`;} else el.hidden=true;
 }
 
 function setG(id,i,v){ S[id]=S[id]||['','','']; S[id][i]=v; guardarLocal(); render();
@@ -491,8 +539,8 @@ function resortear(){
   localStorage.setItem(LS_SORTEO,JSON.stringify(SORTEO)); S={}; BRACKET=null; localStorage.removeItem(LS_SCORES); render(); publicar();
 }
 document.getElementById('barra-admin').hidden=!ADMIN;
-render();
-traer().finally(()=>{ PRIMER_RENDER=false; });
+document.body.classList.add('intro'); render();
+traer().finally(()=>{ PRIMER_RENDER=false; setTimeout(()=>document.body.classList.remove('intro'),1500); });
 setInterval(()=>{ if(document.hidden) return;
   if(document.activeElement && document.activeElement.tagName==='INPUT') return;   // alguien esta escribiendo
   traer(); }, 15000);
