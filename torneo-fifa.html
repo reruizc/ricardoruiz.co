@@ -175,6 +175,35 @@
     details.seccion>summary{font-size:1.1rem;flex-wrap:wrap}
     #res-grupos{margin-left:0;flex-basis:100%;padding-left:0}
   }
+  /* ---- anuncios de fase: semifinales y final ---- */
+  .ov.fase{background:radial-gradient(circle at 50% 35%,rgba(8,26,50,.94),rgba(2,4,10,.98))}
+  .ov.oro{background:radial-gradient(circle at 50% 35%,rgba(70,50,6,.94),rgba(8,5,1,.985))}
+  .ov .rotulo{font-size:clamp(1.6rem,8vw,3.4rem);font-weight:900;letter-spacing:.14em;margin-bottom:6px;
+    animation:golpe .55s .1s both}
+  .ov.fase .rotulo{color:#7db3ff;text-shadow:0 0 26px rgba(59,130,246,.6)}
+  .ov.oro .rotulo{color:var(--gold);text-shadow:0 0 30px rgba(245,197,66,.65)}
+  .ov .bajada{color:rgba(255,255,255,.62);font-size:.92rem;margin-bottom:20px;animation:subir .4s .5s both}
+  .cruce{display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0;animation:subir .5s both}
+  .cruce .lado{display:flex;flex-direction:column;align-items:center;gap:6px;width:38vw;max-width:150px}
+  .cruce .lado b{font-size:.95rem;line-height:1.15;text-align:center}
+  .cruce .lado small{color:rgba(255,255,255,.55);font-size:.78rem}
+  .cruce .x{font-weight:900;color:rgba(255,255,255,.45);font-size:1.1rem}
+  .ov.fase .cruce .av{box-shadow:0 0 0 3px rgba(125,179,255,.55)}
+  /* la final: los dos de frente, grandes */
+  .duelo{display:flex;align-items:center;justify-content:center;gap:clamp(8px,4vw,28px);margin:8px 0 6px}
+  .duelo .lado{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .duelo .av{box-shadow:0 0 0 4px var(--gold),0 0 46px rgba(245,197,66,.5)}
+  .duelo .izq{animation:entraIzq .8s cubic-bezier(.2,1.3,.4,1) both}
+  .duelo .der{animation:entraDer .8s cubic-bezier(.2,1.3,.4,1) both}
+  @keyframes entraIzq{from{transform:translateX(-60vw) rotate(-12deg);opacity:0}to{transform:none;opacity:1}}
+  @keyframes entraDer{from{transform:translateX(60vw) rotate(12deg);opacity:0}to{transform:none;opacity:1}}
+  .duelo .vsbig{font-size:clamp(1.8rem,9vw,3.4rem);font-weight:900;color:var(--gold);letter-spacing:.06em;
+    text-shadow:0 0 30px rgba(245,197,66,.7);animation:golpe .5s .8s both}
+  .duelo .lado b{font-size:clamp(.95rem,4vw,1.25rem);text-align:center;max-width:34vw}
+  .duelo .lado small{color:rgba(255,255,255,.6)}
+  .destello{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 42%,rgba(255,255,255,.9),transparent 42%);
+    opacity:0;animation:flash .7s .75s both}
+  @keyframes flash{0%{opacity:0}18%{opacity:.85}100%{opacity:0}}
   .tag{font-size:.7rem;padding:2px 7px;border-radius:6px;background:#132417;color:var(--dim);border:1px solid var(--line)}
   @media(max-width:720px){
     details.fecha>summary{flex-wrap:wrap}
@@ -204,8 +233,10 @@
   <div class="muted" id="estado" style="margin-top:8px"></div>
 </header>
 
-<h2>Los jugadores y sus equipos</h2>
-<div class="grid g4" id="jugadores"></div>
+<details id="det-jugadores" class="seccion">
+  <summary>Los jugadores y sus equipos <span class="sm-h">8 jugadores · 16 equipos</span></summary>
+  <div class="cont"><div class="grid g4" id="jugadores"></div></div>
+</details>
 
 <section id="sec-grupos">
   <details id="det-grupos" class="seccion" open>
@@ -297,8 +328,8 @@ const slug=n=>n.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().re
 const FOTO=(i,t)=>{ const base=`torneo-fifa/jugadores/${slug(JUGADORES[i])}`;
   return t==null?[base+'.jpg']:[`${base}-${slug(equipo(t).n)}.jpg`, base+'.jpg']; };
 const jugadorDe=t=>t<8?t:t-8;
-const FOTO_ROTA=new Set(JSON.parse(sessionStorage.getItem('fifa8-fotorota')||'[]').filter(u=>typeof u==='string'));   // solo urls; ignora restos del formato viejo
-function fotoRota(u){ FOTO_ROTA.add(u); sessionStorage.setItem('fifa8-fotorota',JSON.stringify([...FOTO_ROTA])); }
+const FOTO_ROTA=new Set();   // solo en memoria: si una foto se sube despues, al recargar se vuelve a pedir
+function fotoRota(u){ FOTO_ROTA.add(u); }
 function fotoFalla(img){   // cae al siguiente archivo de la cadena; una url que no existe no se vuelve a pedir en la sesion
   fotoRota(img.getAttribute('src')); const alt=img.dataset.alt;
   if(alt){ img.dataset.alt=''; img.src=alt; } else img.remove();
@@ -390,29 +421,85 @@ let ANUNCIADOS=new Set(JSON.parse(localStorage.getItem('fifa8-elim')||'[]'));
 let PRIMER_RENDER=true, COLA=[], MOSTRANDO=false, PREV_DONE=new Set();
 function revisarEliminados(){
   const fuera=eliminados(), nuevos=[...fuera].filter(t=>!ANUNCIADOS.has(t));
-  if(!nuevos.length) return;
-  nuevos.forEach(t=>ANUNCIADOS.add(t));
-  localStorage.setItem('fifa8-elim',JSON.stringify([...ANUNCIADOS]));
-  if(PRIMER_RENDER) return;                        // al abrir la pagina no se reviven anuncios viejos
-  COLA.push(...nuevos); if(!MOSTRANDO) siguienteAnuncio();
+  if(nuevos.length){
+    nuevos.forEach(t=>ANUNCIADOS.add(t));
+    localStorage.setItem('fifa8-elim',JSON.stringify([...ANUNCIADOS]));
+    if(!PRIMER_RENDER) COLA.push(...nuevos.map(t=>({tipo:'elim',t})));   // al abrir la pagina no se reviven anuncios viejos
+  }
+  revisarHitos();
+  if(COLA.length && !MOSTRANDO) siguienteAnuncio();
+}
+// ---------- hitos del torneo: semifinales y final ----------
+let HITOS=new Set(JSON.parse(localStorage.getItem('fifa8-hitos')||'[]'));
+function marcarHito(k){ HITOS.add(k); localStorage.setItem('fifa8-hitos',JSON.stringify([...HITOS])); }
+function revisarHitos(){
+  if(!bracketAlDia()) return;
+  const w=BRACKET.map((par,i)=>ganador('Q'+(i+1),par[0],par[1]));
+  if(w.every(x=>x!=null) && !HITOS.has('semis')){
+    marcarHito('semis'); if(!PRIMER_RENDER) COLA.push({tipo:'semis',w});
+  }
+  const f1=ganador('S1',w[0],w[1]), f2=ganador('S2',w[2],w[3]);
+  if(f1!=null&&f2!=null && !HITOS.has('final')){
+    marcarHito('final'); if(!PRIMER_RENDER) COLA.push({tipo:'final',a:f1,b:f2});
+  }
+  const camp=ganador('F',f1,f2);
+  if(camp!=null && !HITOS.has('campeon')){
+    marcarHito('campeon'); if(!PRIMER_RENDER) COLA.push({tipo:'campeon',t:camp});
+  }
+}
+function caja(t,size){   // foto + escudo + nombres, para los anuncios de fase
+  const e=equipo(t);
+  return `<div class="lado">${avatar(jugadorDe(t),size,t)}<b>${escudo(e.n,15)} ${e.n}</b><small>${e.j}</small></div>`;
 }
 function siguienteAnuncio(){
-  const t=COLA.shift();
-  if(t==null){ MOSTRANDO=false; const v=document.querySelector('.ov'); if(v)v.remove(); return; }
+  const a=COLA.shift();
+  const v0=document.querySelector('.ov'); if(v0) v0.remove();
+  if(!a){ MOSTRANDO=false; return; }
   MOSTRANDO=true;
-  const e=equipo(t);
-  const mio=t<8?t+8:t-8;                            // el otro equipo de esa misma persona
-  const sinEquipos=eliminados().has(mio) && !COLA.includes(mio);   // el aviso va con el ultimo de los dos
-  const v=document.querySelector('.ov')||document.body.appendChild(Object.assign(document.createElement('div'),{className:'ov'}));
-  v.innerHTML=`<div class="caja">
-    <div class="quien-foto">${avatar(jugadorDe(t),150,t)}${escudo(e.n,56)}</div>
-    <div class="grieta">ELIMINADO</div>
-    <div class="quien">${e.n} · <b>${e.j}</b></div>
-    <div class="motivo">Ya no le alcanza para clasificar</div>
-    ${sinEquipos?`<div class="fuera">☠ ${e.j} se queda sin equipos</div>`:''}
-    <div class="tocar">toca para seguir${COLA.length?` · faltan ${COLA.length}`:''}</div></div>`;
+  const v=document.body.appendChild(document.createElement('div'));
+  let dur=5200;
+  if(a.tipo==='elim'){
+    const t=a.t, e=equipo(t), mio=t<8?t+8:t-8;
+    const sinEquipos=eliminados().has(mio) && !COLA.some(x=>x.tipo==='elim'&&x.t===mio);   // el aviso va con el ultimo de los dos
+    v.className='ov';
+    v.innerHTML=`<div class="caja">
+      <div class="quien-foto">${avatar(jugadorDe(t),150,t)}${escudo(e.n,56)}</div>
+      <div class="grieta">ELIMINADO</div>
+      <div class="quien">${e.n} · <b>${e.j}</b></div>
+      <div class="motivo">Ya no le alcanza para clasificar</div>
+      ${sinEquipos?`<div class="fuera">☠ ${e.j} se queda sin equipos</div>`:''}
+      <div class="tocar">toca para seguir${COLA.length?` · faltan ${COLA.length}`:''}</div></div>`;
+  } else if(a.tipo==='semis'){
+    v.className='ov fase';
+    v.innerHTML=`<div class="caja">
+      <div class="rotulo">SEMIFINALES</div>
+      <div class="bajada">Quedan cuatro · 15:05 y 15:15</div>
+      <div class="cruce" style="animation-delay:.6s">${caja(a.w[0],78)}<span class="x">VS</span>${caja(a.w[1],78)}</div>
+      <div class="cruce" style="animation-delay:.95s">${caja(a.w[2],78)}<span class="x">VS</span>${caja(a.w[3],78)}</div>
+      <div class="tocar">toca para seguir${COLA.length?` · faltan ${COLA.length}`:''}</div></div>`;
+    dur=7000;
+  } else if(a.tipo==='final'){
+    v.className='ov oro';
+    v.innerHTML=`<div class="destello"></div><div class="caja">
+      <div class="rotulo">LA FINAL</div>
+      <div class="bajada">15:25 · el que gana se lleva la Copa de los 8</div>
+      <div class="duelo"><div class="izq">${caja(a.a,110)}</div><span class="vsbig">VS</span><div class="der">${caja(a.b,110)}</div></div>
+      <div class="tocar">toca para seguir${COLA.length?` · faltan ${COLA.length}`:''}</div></div>`;
+    dur=8000;
+  } else {   // campeon
+    const e=equipo(a.t);
+    const conf=Array.from({length:34},(_,k)=>`<span class="confeti" style="left:${(k*2.9)%100}%;background:${['#f5c542','#4ade80','#3b82f6','#ef4444','#fff'][k%5]};animation-duration:${2.4+(k%5)*.5}s;animation-delay:${(k%7)*.3}s"></span>`).join('');
+    v.className='ov oro'; v.style.overflow='hidden';
+    v.innerHTML=`${conf}<div class="destello"></div><div class="caja">
+      <div class="rotulo">🏆 CAMPEÓN</div>
+      <div class="duelo"><div class="izq"><div class="lado">${avatar(jugadorDe(a.t),150,a.t)}</div></div></div>
+      <div class="quien" style="margin-top:14px;font-size:clamp(1.5rem,8vw,2.6rem);color:var(--gold)"><b>${e.j}</b></div>
+      <div class="bajada" style="margin:8px 0 0">${escudo(e.n,18)} con ${e.n}</div>
+      <div class="tocar">toca para seguir</div></div>`;
+    dur=9000;
+  }
   v.onclick=()=>{ clearTimeout(v._t); siguienteAnuncio(); };
-  v._t=setTimeout(()=>siguienteAnuncio(),5200);
+  v._t=setTimeout(()=>siguienteAnuncio(),dur);
 }
 // ---------- render ----------
 function render(){
@@ -608,6 +695,7 @@ function resortear(){
   localStorage.setItem(LS_SORTEO,JSON.stringify(SORTEO)); S={}; BRACKET=null; localStorage.removeItem(LS_SCORES); render(); publicar();
 }
 document.getElementById('barra-admin').hidden=!ADMIN;
+try{sessionStorage.removeItem('fifa8-fotorota');}catch(e){}
 document.body.classList.add('intro'); render();
 traer().finally(()=>{ PRIMER_RENDER=false; setTimeout(()=>document.body.classList.remove('intro'),1500); });
 setInterval(()=>{ if(document.hidden) return;
