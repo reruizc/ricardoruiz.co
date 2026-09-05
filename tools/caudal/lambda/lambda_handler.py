@@ -847,6 +847,85 @@ SUCOP_ESTADOS = ('abierta', 'cierra_pronto', 'cerrada', 'por_abrir',
                  'planeacion', 'cancelada', 'sin_fechas')
 
 _SUCOP = None
+
+# ─── Pilar «Diarios y gacetas oficiales» · Gaceta del Congreso ──────────────
+# metadata/gacetas.json (build_gacetas_s3.py): una gaceta = una lista compacta
+#   [num, anio, fecha, ent('S'|'C'), texto(0|1), [[tb(0 pdly|1 pal), id, tipo_doc]…]]
+# Cache warm. Es índice + cruce con el dataset; el texto de cada gaceta ya vive
+# en gacetas-texto/ y lo sirve la acción `gaceta` cuando alguien la pide.
+_GAC = None
+_GAC_TB = {0: 'pdly', 1: 'pal'}
+_GAC_DOC = {'em': 'Exposición de motivos', 'p1': 'Ponencia para primer debate',
+            'p2': 'Ponencia para segundo debate', 'p3': 'Ponencia para tercer debate',
+            'p4': 'Ponencia para cuarto debate', 'tp': 'Texto aprobado en plenaria',
+            'ta': 'Texto aprobado', 'co': 'Informe de conciliación', 'ob': 'Objeciones',
+            'td': 'Texto definitivo'}
+
+
+def _gacetas():
+    global _GAC
+    if _GAC is None:
+        try:
+            d = _get_json('metadata/gacetas.json')
+        except Exception:
+            d = {'items': [], 'n': 0, 'por_anio': {}, 'rango': ['', '']}
+        idx, por_proy = {}, {}
+        for it in d.get('items') or []:
+            idx[(it[0], it[1])] = it
+            for tb, pid, _td in it[5] or []:
+                por_proy.setdefault((tb, pid), []).append(it)
+        _GAC = (d, idx, por_proy)
+    return _GAC
+
+
+def _gac_indice_map():
+    """(tb, id) → entrada del índice de proyectos, para titular la cita."""
+    m = getattr(_gac_indice_map, '_m', None)
+    if m is None:
+        m = {}
+        for it in _caudal().indice:
+            m[(0 if it.get('tb') == 'pdly' else 1, int(it['id']))] = it
+        _gac_indice_map._m = m
+    return m
+
+
+def _gac_pdf(num, anio, fecha, ent):
+    """Deep-link del portal de la Imprenta (el que abre el visor con el PDF).
+    `fec` va D-M-AAAA SIN ceros, que es como lo escribe el portal."""
+    if not fecha:
+        return ''
+    y, mo, dd = fecha.split('-')
+    e = 'Camara' if ent == 'C' else 'Senado'
+    return f'https://svrpubindc.imprenta.gov.co/senado/index2.xhtml?ent={e}&fec={int(dd)}-{int(mo)}-{y}&num={num}'
+
+
+def _gac_proy(tb, pid, td):
+    it = _gac_indice_map().get((tb, pid)) or {}
+    return {'id': pid, 'tb': _GAC_TB.get(tb, 'pdly'), 'titulo': it.get('t', ''),
+            'numero': it.get('ns') or it.get('nc') or '', 'anio': it.get('a'),
+            'res': it.get('res', ''), 'leg': it.get('leg', ''),
+            'tipo_doc': td, 'documento': _GAC_DOC.get(td, td)}
+
+
+def _gac_card(it, max_proy=6):
+    num, anio, fecha, ent, texto, cit = it
+    return {'num': num, 'anio': anio, 'key': f'{num}-{anio}', 'fecha': fecha,
+            'entidad': 'Cámara' if ent == 'C' else ('Senado' if ent == 'S' else ''),
+            'texto': bool(texto), 'pdf': _gac_pdf(num, anio, fecha, ent),
+            'n_proyectos': len(cit or []),
+            'proyectos': [_gac_proy(tb, pid, td) for tb, pid, td in (cit or [])[:max_proy]]}
+
+
+def _gac_num_anio(q):
+    """'857/2013' · '857-13' · 'gaceta 857 de 2013' → (857, 2013) o None."""
+    m = re.match(r'^\s*(?:gaceta\s*)?(?:n[oº°.]*\s*)?(\d{1,5})\s*(?:[/\-]|de)\s*(\d{2,4})\s*$', q or '', re.I)
+    if not m:
+        return None
+    num, y = int(m.group(1)), int(m.group(2))
+    if y < 100:
+        y += 1900 if y >= 90 else 2000
+    return (num, y)
+
 _SUCOP_STATS = None
 
 
@@ -3984,6 +4063,68 @@ def handler(event, context):
             'por_tipo': [{'tipo': t, 'n': n} for t, n in tic.most_common()],
             'empresas': _empresas_payload(emps),
             'resultados': out,
+        })
+
+    if action == 'gacetas':        # pilar Diarios y gacetas · Gaceta del Congreso
+        d, idx, por_proy = _gacetas()
+        q = (body.get('query') or '').strip()
+        na = _gac_num_anio(q)
+        num, anio = body.get('num'), body.get('anio')
+        if na:
+            num, anio = na
+        try:
+            num = int(num) if num not in (None, '') else None
+            anio = int(anio) if anio not in (None, '') else None
+        except (TypeError, ValueError):
+            return _resp(400, {'error': 'num y anio deben ser enteros'})
+        if q and not na and re.fullmatch(r'\d{4}', q):
+            anio, q = int(q), ''
+
+        if num and anio:                                    # ficha de UNA gaceta
+            it = idx.get((num, anio))
+            if not it:
+                return _resp(200, {'mode': 'ficha', 'gaceta': None, 'num': num, 'anio': anio})
+            g = _gac_card(it, max_proy=60)
+            return _resp(200, {'mode': 'ficha', 'gaceta': g})
+
+        if anio and not q:                                  # todas las de un año
+            lst = [_gac_card(it, 3) for it in (d.get('items') or []) if it[1] == anio]
+            return _resp(200, {'mode': 'lista', 'anio': anio, 'n': len(lst),
+                               'con_texto': sum(1 for x in lst if x['texto']),
+                               'resultados': lst[:300], 'mostrados': min(len(lst), 300)})
+
+        if q:                                               # por tema → proyectos → sus gacetas
+            hits = caudal.buscar(q, relajar=True, limit=60)
+            res, n_gac = [], 0
+            for h in hits:
+                tb = 0 if h.get('tb') == 'pdly' else 1
+                gs = por_proy.get((tb, int(h['id']))) or []
+                if not gs:
+                    continue
+                gs = sorted(gs, key=lambda x: x[2] or '', reverse=True)
+                cards = []
+                for it in gs:
+                    c = _gac_card(it, 0)
+                    c['tipo_doc'] = next((td for t2, p2, td in it[5] if t2 == tb and p2 == int(h['id'])), '')
+                    c['documento'] = _GAC_DOC.get(c['tipo_doc'], c['tipo_doc'])
+                    cards.append(c)
+                n_gac += len(cards)
+                res.append({'proyecto': {'id': h['id'], 'tb': h.get('tb', 'pdly'), 'titulo': h.get('t', ''),
+                                         'numero': h.get('ns') or h.get('nc') or '', 'anio': h.get('a'),
+                                         'res': h.get('res', ''), 'leg': h.get('leg', '')},
+                            'gacetas': cards})
+            return _resp(200, {'mode': 'busqueda', 'query': q, 'n_proyectos': len(res),
+                               'n_gacetas': n_gac, 'resultados': res[:40]})
+
+        items = d.get('items') or []                         # landing
+        recientes = [_gac_card(it, 3) for it in items if it[2]][:30]
+        return _resp(200, {
+            'mode': 'stats', 'total': d.get('n', len(items)),
+            'con_fecha': d.get('n_enumeradas', 0), 'solo_citadas': d.get('n_solo_citadas', 0),
+            'con_texto': d.get('con_texto', 0), 'con_proyectos': d.get('con_proyectos', 0),
+            'rango': d.get('rango', ['', '']), 'por_anio': d.get('por_anio', {}),
+            'tipos_doc': d.get('tipos_doc', {}), 'fuente': d.get('fuente', {}),
+            'cosechado_a': d.get('v', ''), 'recientes': recientes,
         })
 
     if action == 'sucop':          # pilar SUCOP · borradores de norma en consulta pública

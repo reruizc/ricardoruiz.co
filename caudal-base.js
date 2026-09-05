@@ -224,7 +224,7 @@
       if(_navStack.length>24) _navStack.shift();   // tope: es historial, no un log
     }
     _view=v;
-    ['home','buscar','congreso','control','regulatorio','ejecutivo','sucop','contratacion','cliente','medios','radicados','bancadas','coaliciones'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
+    ['home','buscar','congreso','control','regulatorio','ejecutivo','sucop','gacetas','contratacion','cliente','medios','radicados','bancadas','coaliciones'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
     window.scrollTo(0,0);
     pintarBack();
     if(v==='congreso') requestAnimationFrame(()=>document.querySelectorAll('#view-congreso .mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
@@ -233,6 +233,7 @@
     // SUCOP se recarga en CADA entrada, no solo la primera: su landing es una
     // cuenta regresiva y un caché de sesión la dejaría mintiendo.
     if(v==='sucop') hook('sucLoadStats');
+    if(v==='gacetas') hook('gacLoadStats');
     if(v==='contratacion') hook('conLoadStats');
     if(v==='medios') hook('medLoadLanding');
     if(v==='control') hook('controlLoad');

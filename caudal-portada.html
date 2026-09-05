@@ -155,6 +155,9 @@
     .sec-paper .cta.ghost:hover,.sec-blue .cta.ghost:hover{border-color:var(--pin);color:var(--pin)}
     .sec-blue .cta.primary{background:var(--navy);color:var(--blue);border-color:var(--navy)}
 
+    /* "por qué te importa" dentro del diálogo de señal */
+    .signal-dialog .sig-afecta{margin:1.1rem 0 0;padding:.8rem 1rem;border-left:3px solid #98c0f8;background:rgba(152,192,248,.08);font-size:.92rem;line-height:1.55;color:#d9dde6}
+    .signal-dialog .sig-afecta::before{content:'Qué significa para tu organización · ';font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:#98c0f8;display:block;margin-bottom:.3rem}
     /* Sextante · rosa de los vientos (N Oportunidad · E Conversación · S Competencia · O Estado) */
     .hero-visual{position:relative;min-height:460px;display:flex;align-items:center;justify-content:center}
     .sextante{position:relative;width:100%;max-width:480px;aspect-ratio:1;margin-left:auto}
@@ -480,7 +483,7 @@
           <div class="stat"><div class="n">14.964</div><div class="l">registros del Congreso · 1990–2026</div></div>
           <div class="stat"><div class="n">63.004</div><div class="l">actos regulatorios · 10 fuentes</div></div>
           <div class="stat"><div class="n">en vivo</div><div class="l">prensa nacional y regional</div></div>
-          <div class="stat"><div class="n">7<small>/10</small></div><div class="l">pilares activos · el resto por etapas</div></div>
+          <div class="stat"><div class="n">9<small>/10</small></div><div class="l">pilares activos · el resto por etapas</div></div>
         </div>
       </div>
     </section>
@@ -491,6 +494,7 @@
         <span class="eyebrow" id="signalDetailType">Señal legislativa</span>
         <h2 id="educationBillTitle">Lo último radicado en el Congreso</h2>
         <p id="signalDetailCopy">Cada semana entran proyectos nuevos al Congreso. El radar los lee desde el registro oficial —no desde la noticia— y resume qué cambiaría y a quién le aplica.</p>
+        <p class="sig-afecta" id="signalDetailAfecta" hidden></p>
         <a class="cta primary" id="signalDetailLink" href="https://leyes.senado.gov.co/proyectos-de-ley" target="_blank" rel="noopener">Ver fuente oficial <span aria-hidden="true">↗</span></a>
       </div>
     </dialog>
@@ -567,8 +571,8 @@
         <div class="sec-head">
           <span class="eyebrow"><svg class="wave" aria-hidden="true"><use href="#wave"/></svg>Infraestructura de datos</span>
           <h2>Nueve fuentes, <em class="ac">un solo radar</em>.</h2>
-          <p class="sub">Legislación, regulación, contratación, medios, redes y más —estatal y no estatal—. Siete
-            fuentes ya están vivas; el resto se enciende por etapas. Todo lo que puede afectar tu
+          <p class="sub">Legislación, regulación, contratación, medios, redes y más —estatal y no estatal—. Nueve
+            fuentes ya están vivas; la última se enciende por etapas. Todo lo que puede afectar tu
             reputación o tu operación, reunido en el mismo lugar.</p>
         </div>
         <div class="pillars" id="pillars"></div>
@@ -618,7 +622,7 @@
             <div class="acc-precio" id="acc-precio">$2.500.000<small>COP / mes</small></div>
             <div class="acc-nota">Por cuenta, para un gremio, una empresa o una firma de asuntos públicos. Se activa solo al pagar y se renueva mes a mes. <b>El contrato anual va aparte, y es lo que de verdad recomendamos: ahí entra el analista.</b></div>
             <ul class="acc-list">
-              <li>Los 7 pilares completos: Congreso, superintendencias, Ejecutivo, SUCOP, contratación, medios y altas cortes.</li>
+              <li>Los nueve pilares que ya están vivos —Congreso, superintendencias, Ejecutivo, SUCOP, contratación, medios, Corte Constitucional, Gaceta del Congreso y cuentas oficiales— y lo que se va abriendo dentro del mismo plan: Consejo de Estado, Corte Suprema, Diario Oficial y entidades territoriales entran sin costo adicional.</li>
               <li>Perfiles por sector y por empresa vigilada, con el radar que descarta el ruido.</li>
               <li>La lectura del analista sobre cada tema y cada radar, escrita sobre los datos que ves.</li>
               <li>Alertas por correo cuando algo se mueve en lo que vigilas, con el acto y la fuente citados.</li>
@@ -714,21 +718,36 @@
       const title=document.getElementById('educationBillTitle');
       const copy=document.getElementById('signalDetailCopy');
       const link=document.getElementById('signalDetailLink');
+      /* Lo que cada señal significa para una organización que contrate Caudal:
+         un gremio, una empresa vigilada, una firma de asuntos públicos. Va en el
+         diálogo, aparte del dato, porque el dato solo no dice por qué mirarlo. */
+      const AFECTA={
+        pl:'Un proyecto recién radicado tarda meses en moverse, pero ya define quién se sienta a la mesa y qué obligaciones vienen. Si toca tu sector, Caudal te dice qué cambiaría, en qué comisión se discute y cuándo se agenda — con tiempo para llegar a la ponencia, no al debate.',
+        decree:'Un decreto rige desde que se publica: crea obligaciones, plazos o requisitos que te aplican sin aviso. Caudal lo cruza con tu sector y tus vigiladas y te dice el mismo día si te toca y qué artículo.',
+        headlines:'Noticias como esta mueven la reputación de un sector entero antes de que llegue una pregunta a tu vocero. Caudal las revisa a diario y el analista establece cómo te tocan reputacionalmente — y si conviene salir a hablar o dejar pasar.',
+        social:'Una mención en redes escala en horas. Saber cuándo es una queja aislada y cuándo es el arranque de una conversación es lo que separa una respuesta a tiempo de una crisis.',
+        control:'El criterio con que el Estado sancionó a otro es el que va a usar contigo. Si contratas con el Estado, una cláusula penal o una inhabilidad en SECOP es lo primero que revisa una entidad antes de adjudicar; en tu sector, marca a qué le está poniendo la lupa la autoridad. Caudal avisa cuando el registro nombra a tu organización, a tus vigiladas o a tu competencia.',
+        anla:'Si operas un proyecto con licencia ambiental o dependes de uno —energía, minería, infraestructura, agro—, cada resolución de la ANLA fija condiciones, plazos y sanciones que cambian el cronograma y el costo. Caudal la cruza con tus proyectos y avisa el día que sale, no cuando llega la prensa.',
+        sucop:'Es el único momento en que la norma todavía se puede cambiar: mientras la consulta está abierta se pueden presentar observaciones y la entidad debe responderlas. Caudal te avisa cuando un borrador toca tu actividad, con los días que quedan para comentar.',
+        process:'Un proyecto que cambia de etapa cambia de probabilidad: pasar el primer debate lo saca del 63 % que muere sin discutirse. Caudal te dice cuándo tu tema se mueve, quién es el ponente y qué dice la ponencia — para incidir antes de la votación, no después.'
+      };
       const details={
-        'education-bill':{type:'Señal legislativa',title:'Lo último radicado en el Congreso',copy:'Cada semana entran proyectos nuevos al Congreso. El radar los lee desde el registro oficial —no desde la noticia— y resume qué cambiaría y a quién le aplica.',url:'https://leyes.senado.gov.co/proyectos-de-ley'},
-        decree:{type:'Señal regulatoria · Presidencia',title:'Decreto en seguimiento',copy:'Los decretos pueden activar obligaciones, modificar plazos o precisar la aplicación de una norma. Caudal los cruza con el sector y los temas que siguen tus equipos.'},
-        headlines:{type:'Conversación pública · prensa del sector empresarial',title:'Lo que se está diciendo del sector',copy:'Noticias como estas pueden afectar a tu organización. Caudal las revisa a diario, las cruza con lo que pasa en el Estado y el analista establece cómo te toca reputacionalmente.'},
-        social:{type:'Conversación pública · redes',title:'Mención de marca',copy:'Una mención relevante puede evolucionar rápidamente. El radar ayuda a separar una interacción aislada de una conversación que necesita respuesta.'},
-        control:{type:'Control del Estado · última sanción registrada',title:'Una sanción acaba de quedar en el registro',copy:'Las multas, inhabilidades y sanciones del Estado marcan el criterio de la autoridad y anticipan a qué le está poniendo la lupa en tu sector.'},
-        anla:{type:'Control ambiental · ANLA',title:'Trámite ambiental en movimiento',copy:'Licencias, planes de manejo y procedimientos sancionatorios ambientales condicionan la operación de proyectos enteros. La ANLA publica a diario y el radar lo sigue.'},
-        sucop:{type:'Oportunidad · participación pública',title:'Consulta abierta',copy:'Las consultas públicas permiten leer propuestas regulatorias y aportar observaciones antes de que una medida sea adoptada.'},
-        process:{type:'Seguimiento legislativo',title:'El trámite se mueve',copy:'Una nueva ponencia, debate o modificación puede alterar las probabilidades y el alcance de un proyecto. El radar hace visible ese cambio a tiempo.'}
+        'education-bill':{type:'Señal legislativa',title:'Lo último radicado en el Congreso',copy:'Cada semana entran proyectos nuevos al Congreso. El radar los lee desde el registro oficial —no desde la noticia— y resume qué cambiaría y a quién le aplica.',url:'https://leyes.senado.gov.co/proyectos-de-ley',afecta:AFECTA.pl},
+        decree:{type:'Señal regulatoria · Presidencia',title:'Decreto en seguimiento',copy:'Los decretos pueden activar obligaciones, modificar plazos o precisar la aplicación de una norma. Caudal los cruza con el sector y los temas que siguen tus equipos.',afecta:AFECTA.decree},
+        headlines:{type:'Conversación pública · prensa del sector empresarial',title:'Lo que se está diciendo del sector',copy:'Caudal revisa a diario la prensa nacional y regional del sector empresarial y la cruza con lo que se está moviendo en el Estado.',afecta:AFECTA.headlines},
+        social:{type:'Conversación pública · redes',title:'Mención de marca',copy:'Una mención relevante puede evolucionar rápidamente. El radar ayuda a separar una interacción aislada de una conversación que necesita respuesta.',afecta:AFECTA.social},
+        control:{type:'Control del Estado · última sanción registrada',title:'Una sanción acaba de quedar en el registro',copy:'Las multas, inhabilidades y sanciones del Estado marcan el criterio de la autoridad y anticipan a qué le está poniendo la lupa en tu sector.',afecta:AFECTA.control},
+        anla:{type:'Control ambiental · ANLA',title:'Trámite ambiental en movimiento',copy:'Licencias, planes de manejo y procedimientos sancionatorios ambientales condicionan la operación de proyectos enteros. La ANLA publica a diario y el radar lo sigue.',afecta:AFECTA.anla},
+        sucop:{type:'Oportunidad · participación pública',title:'Consulta abierta',copy:'Las consultas públicas permiten leer propuestas regulatorias y aportar observaciones antes de que una medida sea adoptada.',afecta:AFECTA.sucop},
+        process:{type:'Seguimiento legislativo',title:'El trámite se mueve',copy:'Una nueva ponencia, debate o modificación puede alterar las probabilidades y el alcance de un proyecto. El radar hace visible ese cambio a tiempo.',afecta:AFECTA.process}
       };
       if(!dialog||!type||!title||!copy||!link||typeof dialog.showModal!=='function') return;
       /* Pintar el modal vive aparte porque se usa dos veces: con el texto de
          maqueta al abrir, y otra vez con el dato real cuando la API responde. */
       function pinta(d){
-        type.textContent=d.type; title.textContent=d.title; copy.textContent=d.copy;
+        type.textContent=d.type; title.textContent=oracion(d.title,true); copy.textContent=d.copy;
+        const af=document.getElementById('signalDetailAfecta');
+        if(af){ af.hidden=!d.afecta; af.textContent=d.afecta||''; }
         link.hidden=!d.url;
         if(d.url){
           link.href=d.url;
@@ -767,6 +786,27 @@
       const recorta=(t,n)=>{t=String(t||'').trim();if(t.length<=n)return t;
         const c=t.slice(0,n);const i=c.lastIndexOf(' ');return (i>n*0.6?c.slice(0,i):c).replace(/[ ,;:.]+$/,'')+'…';};
       const pon=(id,t)=>{const el=document.getElementById(id); if(el&&t) el.textContent=t;};
+      /* Las fuentes escriben en MAYÚSCULA SOSTENIDA (razones sociales, números de
+         resolución, títulos de borradores) y en pantalla se lee como un grito.
+         Se pasa a tipo oración: primera letra en mayúscula, el resto en minúscula,
+         conservando siglas (S.A.S, EPS, ANLA) y dejando en pie lo que ya venía
+         mezclado. Nombres cortos (≤6 palabras) van en Mayúscula Inicial por
+         palabra, que es como se escribe un nombre propio. */
+      const SIGLAS=new Set(['SAS','LTDA','EPS','IPS','ESE','EPM','ANLA','DIAN','SIC','INVIMA','SECOP','ICBF','SENA','DNP','DANE','UGPP','ONU','EEUU','TIC','IVA','PL','PAL','CP','KV','MW','FOMAG','CAFAM','ANI','ANH','ANM','CREG','CRC','CRA','UPC','POS','PBS','ADRES','SFC','CGR','PGN','FNC','EPSI','MWAC','MWP','STN','CNE']);
+      const oracion=(t,nombre)=>{
+        t=String(t||'').replace(/^["“”']+|["“”']+$/g,'').trim(); if(!t) return t;
+        const letras=t.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g,''); if(!letras) return t;
+        const may=(letras.match(/[A-ZÁÉÍÓÚÑ]/g)||[]).length/letras.length;
+        if(may<0.7) return t;                    // ya viene mezclado: no se toca
+        const w=t.toLowerCase().split(/(\s+)/).map(x=>{
+          const u=x.toUpperCase(), k=u.replace(/\./g,'');
+          if(/[a-z]\.[a-z]/i.test(x)||SIGLAS.has(k)) return u;   // S.A.S · EPS
+          return x;
+        });
+        let out=w.join('');
+        if(nombre&&t.split(/\s+/).length<=6) out=out.replace(/(^|[\s(\-])([a-záéíóúñ])/g,(m,a,b)=>a+b.toUpperCase());
+        return out.charAt(0).toUpperCase()+out.slice(1);
+      };
 
       fetch(FEED).then(r=>r.ok?r.json():Promise.reject(new Error(r.status))).then(feed=>{
         const items=[...(feed.senado||[]).map(x=>({...x,camara:'Senado'})),
@@ -790,6 +830,7 @@
         const titulo=e.titular||(u.titulo||'').replace(/^POR (MEDIO DE LA CUAL|LA CUAL|EL CUAL)\s*/i,'').toLowerCase().replace(/^./,c=>c.toUpperCase());
         const cuerpo=[cambia||e.afecta||'', e.ojo?`Ojo: ${e.ojo}`:''].filter(Boolean).join(' ');
         details['education-bill']={
+          afecta:AFECTA.pl,
           type:`Señal legislativa · radicado el ${enLetras(u.f)}`,
           title:recorta(titulo||'Proyecto recién radicado',88),
           copy:(cuerpo||'Proyecto recién radicado en el Congreso.')+
@@ -851,6 +892,7 @@
             const x=primero(d,'recientes'); if(!x) return null;
             const f=ymd(x.fecha), tipo=(x.tipo||'Norma');
             return {
+              afecta:AFECTA.decree,
               type:`Señal regulatoria · ${tipo}${f?' del '+enLetras(f):''}`,
               title:recorta(x.titulo||`${tipo} ${x.numero||''}`,88),
               copy:`${recorta(x.descripcion||x.titulo||'',300)}\n\n${tipo} ${x.numero||''} de ${x.anio||''} · Presidencia. Uno de ${(d.total||0).toLocaleString('es-CO')} actos del Ejecutivo que sigue Caudal.`,
@@ -868,12 +910,12 @@
             const x=primero(d,'resultados'); if(!x) return null;
             const f=ymd(x.fecha);
             return {
+              afecta:AFECTA.headlines,
               type:'Conversación pública · prensa del sector empresarial',
               title:recorta(x.titulo||'Lo que se está diciendo del sector',88),
               copy:`${x.medio||'Medio'}${x.alcance?' · '+x.alcance:''}${f?' · '+enLetras(f):''}.\n\n`+
-                   `Noticias como esta pueden afectar a tu organización. Caudal revisa a diario la prensa `+
-                   `nacional y regional —${(d.n||0).toLocaleString('es-CO')} titulares de ${(d.n_medios||0)} medios en esta consulta—, `+
-                   `los cruza con lo que se está moviendo en el Estado y el analista establece cómo te toca reputacionalmente.`,
+                   `${(d.n||0).toLocaleString('es-CO')} titulares de ${(d.n_medios||0)} medios nacionales y regionales en esta consulta, `+
+                   `cruzados con lo que se está moviendo en el Estado.`,
               url:x.url||''
             };
           }
@@ -887,11 +929,11 @@
            publica a diario. */
         control:{
           req:{action:'sanciones'},
-          arma:d=>armaActo(eligeSancion(d),'Control del Estado · última sanción registrada')
+          arma:d=>armaActo(eligeSancion(d),'Control del Estado · última sanción registrada',AFECTA.control)
         },
         anla:{
           req:{action:'sanciones',query:'ANLA',tipo_acto:'todo'},
-          arma:d=>armaActo(deEntidad(d,/ANLA/i),'Control ambiental · ANLA')
+          arma:d=>armaActo(deEntidad(d,/ANLA/i),'Control ambiental · ANLA',AFECTA.anla)
         },
         sucop:{
           req:{action:'sucop'},
@@ -899,9 +941,10 @@
             const x=primero(d,'recientes'); if(!x) return null;
             const ab=(d.ventana&&d.ventana.abiertas)||0;
             return {
+              afecta:AFECTA.sucop,
               type:`Oportunidad · consulta pública${ab?` · ${ab} abiertas hoy`:''}`,
-              title:recorta(x.titulo||x.objeto||'Consulta abierta',88),
-              copy:`${recorta(x.objeto||x.titulo||'',300)}\n\n${x.entidad||'Entidad'}${x.sector?' · '+x.sector:''}. Es un borrador en consulta: todavía admite comentarios antes de que la norma se expida.`,
+              title:recorta(oracion(x.titulo||x.objeto||'Consulta abierta'),88),
+              copy:`${recorta(oracion(x.objeto||x.titulo||''),300)}\n\n${x.entidad||'Entidad'}${x.sector?' · '+x.sector:''}. Es un borrador en consulta: todavía admite comentarios antes de que la norma se expida.`,
               url:x.url||''
             };
           }
@@ -910,14 +953,14 @@
       function contextoActo(x,motivo){
         const f=String(x.fuente||''), d=String(x.descripcion||'').trim();
         if(!d||d==='0') return '';
-        if(/^secop/.test(f)) return `Impuesta por ${d}, entidad contratante.`;
-        if(f==='anla-gaceta') return `Proyecto: ${recorta(d,140)}.`;
+        if(/^secop/.test(f)) return `Impuesta por ${oracion(d,true)}, la entidad contratante.`;
+        if(f==='anla-gaceta') return `Proyecto: ${recorta(oracion(d),140)}.`;
         if(f==='invima') return `Sector ${d.toLowerCase()}.`;
         if(esFrase(d)&&d!==motivo) return recorta(d,220);
         return '';
       }
       /* arma el modal desde UN acto ya elegido (quien elige es cada fuente) */
-      function armaActo(x,rotulo){
+      function armaActo(x,rotulo,afecta){
         if(!x) return null;
         const f=ymd(x.fecha), monto=Number(x.monto||0);
         /* ⚠️ El slim escribe "—" cuando el acto no tiene destinatario, y un guion
@@ -928,14 +971,15 @@
         const motivo=(x.motivo||x.descripcion||'').trim();
         const titulo=quien||(esFrase(motivo)?motivo:'')||x.tipo||x.tipo_acto||'Actuación de control';
         /* si el motivo ya subio a titulo, no repetirlo debajo */
-        const cuerpo=(quien&&esFrase(motivo))?motivo:'';
-        const ficha=[x.tipo,x.fuente_nombre,x.resolucion].filter(Boolean).join(' · ');
+        const cuerpo=(quien&&esFrase(motivo))?oracion(motivo):'';
+        const ficha=[oracion(x.tipo),x.fuente_nombre,oracion(x.resolucion)].filter(Boolean).join(' · ');
         /* `descripcion` significa algo distinto en cada fuente: en SECOP es la
            entidad que impuso la sanción, en la ANLA el proyecto, en INVIMA el
            sector. Es lo que le da CONTEXTO al acto — sin esto la señal era
            un nombre y un número. */
         const ctx=contextoActo(x,motivo);
         return {
+          afecta:afecta||AFECTA.control,
           type:`${rotulo}${f?' · '+enLetras(f):''}`,
           title:recorta(titulo,88),
           copy:`${cuerpo?recorta(cuerpo,300)+'\n\n':''}${ctx?ctx+'\n\n':''}${monto?`Monto: $${monto.toLocaleString('es-CO')}.\n\n`:''}${ficha||'Registro de actos'}. Tomado del registro que Caudal consulta a diario.`,
@@ -968,8 +1012,8 @@
         const f = ymd(x.fecha), monto = Number(x.monto||0);
         const quien = (x.sancionado||'').replace(/^[\s—–\-]*$/,'').trim();
         pon('pb-reg-amt', monto ? '$'+monto.toLocaleString('es-CO') : 'Una sanción');
-        pon('pb-reg-who', recorta(quien || x.fuente_nombre || 'Regulación · operación', 60));
-        const quienImpuso=/^secop/.test(String(x.fuente||''))&&x.descripcion?` impuesta por ${x.descripcion} y`:'';
+        pon('pb-reg-who', recorta(oracion(quien || x.fuente_nombre || 'Regulación · operación',true), 60));
+        const quienImpuso=/^secop/.test(String(x.fuente||''))&&x.descripcion?` impuesta por ${oracion(x.descripcion,true)} y`:'';
         pon('pb-reg-d', `Sanción${quienImpuso} en firme el ${enLetras(f)}, según ${x.fuente_nombre||'el registro oficial'}. `+
           'Una decisión así cambia tu operación desde el día en que se publica —y llega a la conversación mucho después.');
       }).catch(()=>{});
@@ -1036,10 +1080,10 @@
       {id:'regulatorio', name:'Superintendencias y comisiones', status:'live', n:'63.004', unit:'actos · 10 fuentes', desc:'Actos de ANLA, INVIMA, SECOP, Superfinanciera, Supersalud, SIC, Contraloría y más —incluye 7.229 sanciones.', view:'regulatorio'},
       {id:'medios', name:'Medios nacionales y regionales', status:'live', n:'en vivo', unit:'prensa por tema', desc:'Titulares de prensa nacional y regional, rastreados por tema — sin un conector por medio.', view:'medios'},
       {id:'datos', name:'Datos abiertos y contratación', status:'live', n:'5,87 M', unit:'contratos · SECOP II', desc:'Todos los contratos electrónicos del Estado, consultados en vivo y actualizados a diario. Cada uno enlaza su proceso en SECOP.', view:'contratacion'},
-      {id:'control', name:'Órganos de control y altas cortes', status:'soon', desc:'Procuraduría, Consejo de Estado, Corte Constitucional.'},
+      {id:'control', name:'Órganos de control y altas cortes', status:'live', n:'499', unit:'providencias · Corte Constitucional', desc:'Sentencias y autos de la Corte Constitucional que cambian la lectura de la norma en contratación, salud, pensiones, ambiente y elecciones, con su enlace oficial. Consejo de Estado y Corte Suprema entran en el siguiente corte.', view:'control'},
       {id:'ejecutivo', name:'Ejecutivo nacional · Presidencia', status:'live', n:'10.193', unit:'decretos · desde 2015', desc:'Decretos, resoluciones, directivas, circulares y agenda regulatoria de la Presidencia. Cada norma enlaza su texto oficial.', view:'ejecutivo'},
       {id:'sucop', name:'Consulta pública de normas · SUCOP', status:'live', n:'3.899', unit:'borradores · desde 2020', desc:'Proyectos de decreto y resolución abiertos a comentarios antes de expedirse: la señal más temprana de Caudal.', view:'sucop'},
-      {id:'gacetas', name:'Diarios y gacetas oficiales', status:'soon', desc:'Diario Oficial y Gaceta del Congreso: el texto completo del trámite.'},
+      {id:'gacetas', name:'Diarios y gacetas oficiales', status:'live', n:'32.585', unit:'gacetas del Congreso · desde 2000', desc:'La Gaceta del Congreso enumerada y cruzada con el trámite: qué proyecto cita cada una, como qué documento, y cuáles ya se pueden leer en Caudal. El Diario Oficial entra en el siguiente corte.', view:'gacetas'},
       {id:'territorial', name:'Entidades territoriales', status:'soon', desc:'Concejos, asambleas y gobiernos locales.'},
       {id:'redes', name:'Redes sociales oficiales y voceros', status:'live', n:'94', unit:'entidades y gremios · cuentas verificadas', desc:'Diccionario de cuentas oficiales del Estado, reguladores, cortes, Congreso y gremios, con el cargo que habla por cada uno. Las cuentas se leen del sitio oficial, no de memoria.', href:'caudal-voceros.html'}
     ];

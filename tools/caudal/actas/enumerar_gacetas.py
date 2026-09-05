@@ -81,7 +81,12 @@ def post(vs, extra):
 
 def to_iso(dmy):
     d, m, y = dmy.split('/')
-    return f'{y}-{m}-{d}'
+    # ⚠️ 2 de 31.152 filas llegaron con año de 2 dígitos ('18/06/09') y se
+    # guardaron como año 9 ('0009-06-18'). El portal es de 2001+, así que un
+    # año corto es siglo XXI.
+    if len(y) == 2:
+        y = '20' + y
+    return f'{y}-{m.zfill(2)}-{d.zfill(2)}'
 
 
 def load_existing():

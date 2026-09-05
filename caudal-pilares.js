@@ -1063,6 +1063,140 @@
     const sb=document.getElementById('sucBack'); if(sb) sb.onclick=()=>showView('home');
   }
 
+
+  /* ---------- pilar Gacetas · Gaceta del Congreso ----------
+     Índice de las 32k gacetas (metadata/gacetas.json) cruzado con el dataset:
+     qué proyecto cita cada una y como qué documento, y si su texto ya está
+     leído en Caudal. Tres modos: ficha por número, lista por año y búsqueda
+     por tema (proyectos → sus gacetas). El PDF abre en el visor de la Imprenta
+     por deep-link; no se guardan PDFs. */
+  const GAC={q:'', anio:''};
+  let GAC_STATS=null, _gacInited=false, _gacSeq=0;
+  const GAC_DOC={em:'Exposición de motivos',p1:'Ponencia 1er debate',p2:'Ponencia 2º debate',p3:'Ponencia 3er debate',p4:'Ponencia 4º debate',tp:'Texto de plenaria',ta:'Texto aprobado',co:'Conciliación',ob:'Objeciones',td:'Texto definitivo'};
+  function gacProyLine(p){
+    const tit=shortTitle(p.titulo||'—')||'—';
+    const doc=p.documento||GAC_DOC[p.tipo_doc]||p.tipo_doc||'';
+    const res=RES_TXT&&RES_TXT[p.res]?RES_TXT[p.res]:(p.res||'');
+    return `<div class="gac-proy" data-id="${esc(p.id)}" data-tb="${esc(p.tb||'pdly')}">
+      <span class="doc-badge pal">${esc(doc)}</span>
+      <a href="#" class="sanc-name" style="color:inherit">${esc(p.numero?p.numero+' · ':'')}${esc(tit)}</a>
+      ${p.leg?`<span class="sanc-fecha">${esc(p.leg)}</span>`:''}${res?` · <span style="color:var(--ink3)">${esc(res)}</span>`:''}
+    </div>`;
+  }
+  function gacCard(g,full){
+    const fecha=g.fecha||'sin fecha en el portal';
+    const badge=g.texto?'<span class="doc-badge viva">Texto leído en Caudal</span>':'<span class="doc-badge">Solo PDF</span>';
+    const ent=g.entidad?`<span class="doc-badge">${esc(g.entidad)}</span>`:'';
+    const pdf=g.pdf?`<a href="${esc(g.pdf)}" target="_blank" rel="noopener" style="color:var(--ink3)">abrir en la Imprenta ↗</a>`:'<span style="color:var(--ink3)">sin PDF enlazable (no está en el portal)</span>';
+    const proys=(g.proyectos||[]);
+    const nP=g.n_proyectos||0;
+    const lista=proys.length?`<div class="gac-proys">${proys.map(gacProyLine).join('')}${nP>proys.length&&!full?`<div class="cob-note">y ${nP-proys.length} más — abre la gaceta para verlos todos</div>`:''}</div>`
+      :'<div class="cob-note">Ningún proyecto del dataset la cita: puede ser un acta, un orden del día o un documento sin proyecto asociado.</div>';
+    return `<div class="sanc gac-card" data-key="${esc(g.key)}">
+      <div class="sanc-top"><a href="#" class="sanc-name gac-open" style="color:inherit">Gaceta ${esc(g.num)} de ${esc(g.anio)}</a>${badge}</div>
+      <div class="sanc-tags">${ent}<span class="sanc-fecha">${esc(fecha)}</span> · ${nP} proyecto${nP===1?'':'s'} · ${pdf}</div>
+      ${lista}
+    </div>`;
+  }
+  function gacWire(root){
+    root.querySelectorAll('.gac-open').forEach(a=>a.onclick=e=>{ e.preventDefault(); const k=a.closest('.gac-card').dataset.key; const [n,y]=k.split('-'); gacBuscar({num:+n,anio:+y}); });
+    root.querySelectorAll('.gac-proy').forEach(d=>{ const a=d.querySelector('a'); if(a) a.onclick=e=>{ e.preventDefault(); if(typeof abrirProyecto==='function') abrirProyecto(+d.dataset.id, d.dataset.tb); }; });
+  }
+  function gacRenderLanding(s){
+    const el=document.getElementById('gac-landing'); if(!el||!s) return;
+    const anios=Object.entries(s.por_anio||{}).filter(([a])=>+a>=2010).sort((a,b)=>a[0].localeCompare(b[0]));
+    const mx=Math.max(1,...anios.map(([,n])=>n));
+    const rango=s.rango&&s.rango[0]?`${s.rango[0].slice(0,4)}–${s.rango[1].slice(0,4)}`:'—';
+    const td=s.tipos_doc||{};
+    el.innerHTML=`
+      <div class="land-h">La Gaceta del Congreso, enumerada y cruzada con el trámite · índice del ${esc(s.cosechado_a||'')}</div>
+      <div class="kpis">
+        <div class="kpi"><div class="n">${fmt(s.total||0)}</div><div class="l">Gacetas en el índice</div></div>
+        <div class="kpi"><div class="n" style="color:var(--green)">${fmt(s.con_texto||0)}</div><div class="l">Con el texto leído en Caudal</div></div>
+        <div class="kpi"><div class="n">${fmt(s.con_proyectos||0)}</div><div class="l">Citadas por algún proyecto</div></div>
+        <div class="kpi"><div class="n">${rango}</div><div class="l">Periodo</div></div>
+      </div>
+      <div class="cob-note" style="margin-bottom:1.4rem">
+        Qué contienen las citas del dataset: ${fmt(td.em||0)} exposiciones de motivos ·
+        ${fmt((td.p1||0)+(td.p2||0)+(td.p3||0)+(td.p4||0))} ponencias · ${fmt(td.tp||0)} textos de plenaria ·
+        ${fmt(td.co||0)} conciliaciones. ${fmt(s.solo_citadas||0)} gacetas las cita el dataset pero no
+        están en el portal de la Imprenta (anteriores a 2001 o «Anales del Congreso»): salen sin fecha ni PDF.
+        Fuente: ${esc((s.fuente||{}).nombre||'Imprenta Nacional')}.
+      </div>
+      <div class="panel wide"><h3>Gacetas por año</h3>
+        <div class="gac-bars">${anios.map(([a,n])=>`<div class="gac-bar" data-anio="${a}" title="${fmt(n)} gacetas en ${a}"><div class="gac-bar-fill" style="height:${Math.round(n/mx*100)}%"></div><div class="gac-bar-l">${a.slice(2)}</div></div>`).join('')}</div>
+        <div class="cob-note">Toca un año para ver sus gacetas. 2026 va hasta la última enumerada.</div>
+      </div>
+      <div class="panel wide"><h3>Lo último publicado</h3><div class="sanc-list">${(s.recientes||[]).map(g=>gacCard(g,false)).join('')}</div></div>`;
+    el.querySelectorAll('.gac-bar').forEach(b=>b.onclick=()=>{ GAC.q=''; const i=document.getElementById('gq'); if(i) i.value=''; gacBuscar({anio:+b.dataset.anio}); });
+    gacWire(el);
+  }
+  function gacRenderResults(d){
+    const el=document.getElementById('gac-results'); if(!el) return;
+    el.style.display='block';
+    let html='';
+    if(d.mode==='ficha'){
+      if(!d.gaceta){
+        html=`<div class="r-titular" style="font-size:1.4rem">Gaceta ${esc(d.num)} de ${esc(d.anio)}</div>
+          <div class="cob-note">No está en el índice. El portal de la Imprenta arranca en 2001 y la enumeración va hasta la última cosecha; si es más nueva, entra en la siguiente corrida.</div>`;
+      } else {
+        const g=d.gaceta;
+        html=`<div class="r-titular" style="font-size:1.4rem">Gaceta ${esc(g.num)} de ${esc(g.anio)}</div>
+          <div class="r-sub" style="margin-bottom:1rem">${esc(g.entidad||'')}${g.fecha?` · publicada el ${esc(g.fecha)}`:''} · ${g.n_proyectos} proyecto${g.n_proyectos===1?'':'s'} la cita${g.n_proyectos===1?'':'n'}</div>
+          <div class="sanc-list">${gacCard(g,true)}</div>`;
+      }
+    } else if(d.mode==='lista'){
+      html=`<div class="r-titular" style="font-size:1.4rem">${fmt(d.n)} gacetas en ${esc(d.anio)}</div>
+        <div class="r-sub" style="margin-bottom:1rem">${fmt(d.con_texto||0)} con el texto leído en Caudal${d.mostrados<d.n?` · mostrando ${d.mostrados}`:''}</div>
+        ${listaConMuro(d.resultados, g=>gacCard(g,false), 'gaceta', 'gacetas', 'acceso · gacetas', 'Ninguna gaceta ese año.')}`;
+    } else {
+      const res=d.resultados||[];
+      html=`<div class="r-titular" style="font-size:1.4rem">${fmt(d.n_gacetas||0)} gacetas en ${fmt(d.n_proyectos||0)} proyecto${d.n_proyectos===1?'':'s'}</div>
+        <div class="r-sub" style="margin-bottom:1rem">«${esc(d.query||'')}» · primero lo más reciente</div>
+        ${res.length?res.map(r=>{const p=r.proyecto||{}; const tit=shortTitle(p.titulo||'—')||'—';
+          return `<div class="panel wide"><h3><a href="#" class="gac-pl" data-id="${esc(p.id)}" data-tb="${esc(p.tb||'pdly')}" style="color:inherit">${esc(p.numero?p.numero+' · ':'')}${esc(tit)}</a> <span class="sanc-fecha">${esc(p.leg||'')}</span></h3>
+            <div class="sanc-list">${(r.gacetas||[]).map(g=>`<div class="sanc gac-card" data-key="${esc(g.key)}"><div class="sanc-top"><a href="#" class="sanc-name gac-open" style="color:inherit">Gaceta ${esc(g.num)} de ${esc(g.anio)}</a>${g.texto?'<span class="doc-badge viva">Texto leído en Caudal</span>':'<span class="doc-badge">Solo PDF</span>'}</div>
+              <div class="sanc-tags"><span class="doc-badge pal">${esc(g.documento||'')}</span>${g.fecha?`<span class="sanc-fecha">${esc(g.fecha)}</span>`:''}${g.pdf?` · <a href="${esc(g.pdf)}" target="_blank" rel="noopener" style="color:var(--ink3)">abrir en la Imprenta ↗</a>`:''}</div></div>`).join('')}</div></div>`;}).join('')
+          :'<div class="cob-note">Ningún proyecto con ese tema tiene gacetas citadas. Prueba un número («857/2013») o un año.</div>'}`;
+    }
+    el.innerHTML=html;
+    el.querySelectorAll('.gac-pl').forEach(a=>a.onclick=e=>{ e.preventDefault(); if(typeof abrirProyecto==='function') abrirProyecto(+a.dataset.id, a.dataset.tb); });
+    gacWire(el);
+    el.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  async function gacBuscar(extra){
+    const mine=++_gacSeq;
+    const el=document.getElementById('gac-results'), landing=document.getElementById('gac-landing');
+    if(landing) landing.style.display='none';
+    if(el){ el.style.display='block'; el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Buscando en la Gaceta <span class="dots"><span></span><span></span><span></span></span></div>'; }
+    const body=Object.assign({action:'gacetas'}, extra||{query:GAC.q});
+    let d; try{ d=await call(body); }
+    catch(e){ if(mine===_gacSeq&&el) el.innerHTML='<div class="err">No se pudo consultar. Reintenta.</div>'; return; }
+    if(mine!==_gacSeq) return;
+    gacRenderResults(d);
+  }
+  async function gacLoadStats(){
+    gacInit();
+    const el=document.getElementById('gac-landing');
+    if(GAC_STATS){ gacRenderLanding(GAC_STATS); return; }
+    if(el) el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Cargando el índice de la Gaceta <span class="dots"><span></span><span></span><span></span></span></div>';
+    try{ GAC_STATS=await call({action:'gacetas'}); }catch(e){}
+    if(GAC_STATS) gacRenderLanding(GAC_STATS);
+    else if(el) el.innerHTML='<div class="err">No se pudo cargar el índice. Reintenta.</div>';
+  }
+  function gacShowLanding(){ const r=document.getElementById('gac-results'); if(r) r.style.display='none'; const l=document.getElementById('gac-landing'); if(l) l.style.display='block'; }
+  function gacInit(){
+    if(_gacInited) return; _gacInited=true;
+    const gq=document.getElementById('gq'), ggo=document.getElementById('ggo');
+    const go=()=>{ GAC.q=(gq&&gq.value||'').trim(); if(!GAC.q) gacShowLanding(); else gacBuscar({query:GAC.q}); };
+    if(ggo) ggo.onclick=go;
+    if(gq) gq.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
+    const cont=document.getElementById('ganios');
+    if(cont){ const y=new Date().getFullYear(); for(let a=y;a>=y-7;a--){ const c=document.createElement('span'); c.className='chip'; c.textContent=a; c.onclick=()=>{ if(gq) gq.value=''; GAC.q=''; gacBuscar({anio:a}); }; cont.appendChild(c); }
+      const t=document.createElement('span'); t.className='chip'; t.textContent='Inicio'; t.onclick=gacShowLanding; cont.appendChild(t); }
+    const gb=document.getElementById('gacBack'); if(gb) gb.onclick=()=>showView('home');
+  }
+
   /* Lo que caudal.html necesita de acá: la búsqueda universal entra a los
      `*Buscar`/`*Card`/`*Init` de cada pilar, y caudal-base.js llama los
      `*LoadStats` al abrir la vista. Los nombres se conservan tal cual: allá
@@ -1079,5 +1213,6 @@
     CON, conBuscar, conInit, conLoadStats, conCard,
     MED, medBuscar, medInit, medLoadLanding, medHeadCard,
     SUC, sucBuscar, sucInit, sucLoadStats, sucCard, sucSyncEstados,
+    GAC, gacBuscar, gacInit, gacLoadStats, gacCard,
   });
 })();
