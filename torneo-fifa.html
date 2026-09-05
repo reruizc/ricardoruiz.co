@@ -252,12 +252,19 @@ function tabla(g){
 
 // ---------- fotos de jugador ----------
 const slug=n=>n.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-');
-const FOTO=i=>`torneo-fifa/jugadores/${slug(JUGADORES[i])}.jpg`;
+// foto por CAMISETA si existe (miguel-juventus.jpg), si no la general (miguel.jpg), si no la inicial
+const FOTO=(i,t)=>{ const base=`torneo-fifa/jugadores/${slug(JUGADORES[i])}`;
+  return t==null?[base+'.jpg']:[`${base}-${slug(equipo(t).n)}.jpg`, base+'.jpg']; };
 const jugadorDe=t=>t<8?t:t-8;
-const FOTO_ROTA=new Set(JSON.parse(sessionStorage.getItem('fifa8-fotorota')||'[]'));
-function fotoRota(i){ FOTO_ROTA.add(i); sessionStorage.setItem('fifa8-fotorota',JSON.stringify([...FOTO_ROTA])); }
-function avatar(i,size){   // si la foto no existe, se queda la inicial y no se vuelve a pedir en esta sesion
-  const img=FOTO_ROTA.has(i)?'':`<img src="${FOTO(i)}" alt="" onerror="fotoRota(${i});this.remove()">`;
+const FOTO_ROTA=new Set(JSON.parse(sessionStorage.getItem('fifa8-fotorota')||'[]').filter(u=>typeof u==='string'));   // solo urls; ignora restos del formato viejo
+function fotoRota(u){ FOTO_ROTA.add(u); sessionStorage.setItem('fifa8-fotorota',JSON.stringify([...FOTO_ROTA])); }
+function fotoFalla(img){   // cae al siguiente archivo de la cadena; una url que no existe no se vuelve a pedir en la sesion
+  fotoRota(img.getAttribute('src')); const alt=img.dataset.alt;
+  if(alt){ img.dataset.alt=''; img.src=alt; } else img.remove();
+}
+function avatar(i,size,t){
+  const urls=FOTO(i,t).filter(u=>!FOTO_ROTA.has(u));
+  const img=urls.length?`<img src="${urls[0]}" data-alt="${urls[1]||''}" alt="" onerror="fotoFalla(this)">`:'';
   return `<span class="av" style="width:${size}px;height:${size}px;font-size:${Math.round(size*.42)}px"><b>${JUGADORES[i][0]}</b>${img}</span>`;
 }
 // ---------- escudos propios: color y patron de cada camiseta, sin logos ajenos ----------
@@ -357,7 +364,7 @@ function siguienteAnuncio(){
   const sinEquipos=eliminados().has(mio) && !COLA.includes(mio);   // el aviso va con el ultimo de los dos
   const v=document.querySelector('.ov')||document.body.appendChild(Object.assign(document.createElement('div'),{className:'ov'}));
   v.innerHTML=`<div class="caja">
-    <div class="quien-foto">${avatar(jugadorDe(t),150)}${escudo(e.n,56)}</div>
+    <div class="quien-foto">${avatar(jugadorDe(t),150,t)}${escudo(e.n,56)}</div>
     <div class="grieta">ELIMINADO</div>
     <div class="quien">${e.n} · <b>${e.j}</b></div>
     <div class="motivo">Ya no le alcanza para clasificar</div>
@@ -468,8 +475,8 @@ function renderLlaves(){
     const [id,t,x,y,lx,ly]=q, s=S[id]||['','',''], X=x!=null?equipo(x):null, Y=y!=null?equipo(y):null;
     const dis=(x==null||y==null)?'disabled':'', tie=s[0]!==''&&s[1]!==''&&+s[0]===+s[1];
     const conFoto=id[0]!=='Q', tIdx=[x,y];
-    const row=(e,l,i)=>`<div class="row"><div class="${conFoto&&e?'con-foto':''}">${conFoto&&e?avatar(jugadorDe(tIdx[i]),34):''}<div><b>${e?escudo(e.n,16)+e.n:'<span class="muted">'+l+'</span>'}</b><small>${e?e.j:'por definir'}</small></div></div><input type="number" min="0" max="20" inputmode="numeric" ${dis} data-k="${id}-${i}" value="${s[i]}" onchange="registrar('${id}',${i},this.value)"></div>`;
-    const versus=(id==='F'&&X&&Y&&!(s[0]!==''&&s[1]!==''))?`<div class="versus">${avatar(jugadorDe(x),64)}<span class="vs">VS</span>${avatar(jugadorDe(y),64)}</div>`:'';
+    const row=(e,l,i)=>`<div class="row"><div class="${conFoto&&e?'con-foto':''}">${conFoto&&e?avatar(jugadorDe(tIdx[i]),34,tIdx[i]):''}<div><b>${e?escudo(e.n,16)+e.n:'<span class="muted">'+l+'</span>'}</b><small>${e?e.j:'por definir'}</small></div></div><input type="number" min="0" max="20" inputmode="numeric" ${dis} data-k="${id}-${i}" value="${s[i]}" onchange="registrar('${id}',${i},this.value)"></div>`;
+    const versus=(id==='F'&&X&&Y&&!(s[0]!==''&&s[1]!==''))?`<div class="versus">${avatar(jugadorDe(x),64,x)}<span class="vs">VS</span>${avatar(jugadorDe(y),64,y)}</div>`:'';
     return `<div class="ko ${cls}" style="--i:${id==='F'?6:id[0]==='S'?4+ +id[1]:+id[1]-1}"><div class="lbl"><span>${id==='F'?'Final':id[0]==='Q'?'Cuartos '+id[1]:'Semifinal '+id[1]}</span><span>${t}</span></div>
       ${versus}${row(X,lx,0)}${row(Y,ly,1)}
       ${tie?`<div class="pen">Penales, ganó: <select onchange="registrar('${id}',2,this.value)"><option value="">—</option><option value="h" ${s[2]==='h'?'selected':''}>${X.n}</option><option value="a" ${s[2]==='a'?'selected':''}>${Y.n}</option></select></div>`:''}
@@ -478,7 +485,7 @@ function renderLlaves(){
   document.getElementById('llaves').innerHTML=`<div class="round">${Q.map(q=>box(q)).join('')}</div><div class="round">${SF.map(q=>box(q)).join('')}</div><div class="round">${box(F[0],'final')}</div>`;
   const c=ganador('F',ws[0],ws[1]); const el=document.getElementById('campeon');
   if(c!=null){const e=equipo(c); el.hidden=false; const conf=Array.from({length:28},(_,k)=>`<span class="confeti" style="left:${(k*3.6)%100}%;background:${['#f5c542','#4ade80','#3b82f6','#ef4444','#fff'][k%5]};animation-duration:${2.6+(k%5)*.5}s;animation-delay:${(k%7)*.35}s"></span>`).join('');
-    el.innerHTML=`${conf}<div class="muted">🏆 CAMPEÓN DE LA COPA DE LOS 8</div><div style="margin:12px 0 6px">${avatar(jugadorDe(c),120)}</div><div style="margin:4px 0">${escudo(e.n,40)}</div><div class="big">${e.j}</div><div>con ${e.n}</div>`;} else el.hidden=true;
+    el.innerHTML=`${conf}<div class="muted">🏆 CAMPEÓN DE LA COPA DE LOS 8</div><div style="margin:12px 0 6px">${avatar(jugadorDe(c),120,c)}</div><div style="margin:4px 0">${escudo(e.n,40)}</div><div class="big">${e.j}</div><div>con ${e.n}</div>`;} else el.hidden=true;
 }
 
 function setG(id,i,v){ S[id]=S[id]||['','','']; S[id][i]=v; guardarLocal(); render();
