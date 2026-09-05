@@ -85,6 +85,33 @@
   .muted{color:var(--dim);font-size:.85rem}
   .live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green2);margin-right:6px;animation:pulso 1.6s infinite}
   @keyframes pulso{0%,100%{opacity:.35}50%{opacity:1}}
+  /* ---- escudos ---- */
+  .esc{flex:none;vertical-align:-3px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+  td.t .esc,.side .esc,.ko .row .esc{margin-right:6px}
+  .teams .esc{margin-right:4px}
+  tr.out td{opacity:.45}
+  tr.out td.t b,tr.out td.t{text-decoration:line-through;text-decoration-color:rgba(239,68,68,.7)}
+  tr.out td.t::before{content:"✕ ";color:var(--red);text-decoration:none}
+  /* ---- animacion de eliminacion ---- */
+  .ov{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,rgba(120,10,10,.92),rgba(4,2,2,.97));backdrop-filter:blur(3px);cursor:pointer;animation:ovIn .25s ease}
+  @keyframes ovIn{from{opacity:0}to{opacity:1}}
+  .ov .caja{text-align:center;padding:20px;max-width:92vw}
+  .ov .cresta{animation:caer 1.5s cubic-bezier(.3,1.4,.5,1) both}
+  @keyframes caer{0%{transform:translateY(-120px) rotate(-25deg) scale(.4);opacity:0}
+    45%{transform:translateY(10px) rotate(6deg) scale(1.12);opacity:1}
+    62%{transform:translateY(0) rotate(-4deg) scale(.97)}
+    100%{transform:translateY(0) rotate(0) scale(1);opacity:1}}
+  .ov .grieta{font-size:clamp(2.2rem,11vw,5rem);font-weight:900;letter-spacing:.16em;color:#ff5a5a;
+    text-shadow:0 0 24px rgba(239,68,68,.65);margin:14px 0 4px;animation:golpe .5s .55s both}
+  @keyframes golpe{0%{transform:scale(2.4);opacity:0;filter:blur(8px)}60%{transform:scale(.94);opacity:1;filter:blur(0)}100%{transform:scale(1)}}
+  .ov .quien{font-size:clamp(1.1rem,5vw,1.8rem);animation:subir .4s .95s both}
+  .ov .quien b{color:#fff}
+  .ov .motivo{color:#ffb4b4;margin-top:8px;font-size:.95rem;animation:subir .4s 1.15s both}
+  .ov .fuera{margin-top:18px;padding:10px 16px;border:1px solid rgba(255,90,90,.5);border-radius:999px;
+    display:inline-block;color:#ffd9d9;font-weight:700;animation:subir .4s 1.35s both}
+  .ov .tocar{margin-top:22px;color:rgba(255,255,255,.5);font-size:.85rem;animation:subir .4s 1.8s both}
+  @keyframes subir{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
+  @media(prefers-reduced-motion:reduce){.ov *{animation:none!important}}
   .tag{font-size:.7rem;padding:2px 7px;border-radius:6px;background:#132417;color:var(--dim);border:1px solid var(--line)}
   @media(max-width:720px){
     .match{grid-template-columns:44px 1fr 84px 1fr;}
@@ -94,6 +121,10 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <clipPath id="cEsc" clipPathUnits="objectBoundingBox">
+    <path d="M0,0 H1 V0.52 C1,0.78 0.78,0.94 0.5,1 C0.22,0.94 0,0.78 0,0.52 Z"/>
+  </clipPath></defs></svg>
 <div class="wrap">
 <header>
   <div class="pill">⚽ Sábado 5 de septiembre de 2026</div><div class="pill">🕚 11:00 → 16:00</div><div class="pill">🎮 1 consola · 8 jugadores · 16 equipos</div>
@@ -187,18 +218,125 @@ function tabla(g){
   return {rows,completo};
 }
 
+// ---------- escudos propios: color y patron de cada camiseta, sin logos ajenos ----------
+const ESC={
+  'Juventus':          {p:'rayas',   c:['#ffffff','#000000']},
+  'Real Madrid':       {p:'banda',   c:['#f7f7f7','#febe10']},
+  'Liverpool':         {p:'liso',    c:['#c8102e','#f6eb61']},
+  'Chelsea':           {p:'liso',    c:['#034694','#ffffff']},
+  'Bayern':            {p:'liso',    c:['#dc052d','#0066b2']},
+  'Barcelona':         {p:'rayas',   c:['#a50044','#004d98']},
+  'Manchester City':   {p:'liso',    c:['#6cabdd','#1c2c5b']},
+  'PSG':               {p:'franja',  c:['#004170','#da291c']},
+  'Uruguay':           {p:'liso',    c:['#5aa5d8','#111111']},
+  'Croacia':           {p:'ajedrez', c:['#ffffff','#ff0000']},
+  'Francia':           {p:'tri',     c:['#0055a4','#ffffff','#ef4135']},
+  'Brasil':            {p:'banda',   c:['#ffdf00','#009c3b']},
+  'Países Bajos':      {p:'liso',    c:['#f36c21','#ffffff']},
+  'Portugal':          {p:'mitad',   c:['#046a38','#da291c']},
+  'Inglaterra':        {p:'cruz',    c:['#ffffff','#cf142b']},
+  'Alemania':          {p:'bandas',  c:['#111111','#dd0000','#ffce00']},
+  'Argentina':         {p:'rayas',   c:['#75aadb','#ffffff']},
+  'España':            {p:'banda',   c:['#c60b1e','#ffc400']},
+  'Colombia':          {p:'bandas',  c:['#fcd116','#003893','#ce1126']},
+  'Bélgica':           {p:'bandas',  c:['#111111','#fdda24','#ef3340']},
+  'Marruecos':         {p:'liso',    c:['#c1272d','#006233']},
+  'México':            {p:'tri',     c:['#006847','#ffffff','#ce1126']},
+  'Japón':             {p:'liso',    c:['#1b1f8a','#ffffff']},
+  'Noruega':           {p:'cruz',    c:['#ba0c2f','#ffffff']},
+  'Italia':            {p:'liso',    c:['#0066b2','#ffffff']},
+};
+function escudo(n,size){
+  const s=size||18, e=ESC[n]||{p:'liso',c:['#3a4a58','#8fa3b3']}, [a,b,c]=e.c;
+  let d='';
+  switch(e.p){
+    case 'rayas':   d=`<rect width="20" height="24" fill="${a}"/>`+[2,8,14].map(x=>`<rect x="${x}" width="3.4" height="24" fill="${b}"/>`).join(''); break;
+    case 'franja':  d=`<rect width="20" height="24" fill="${a}"/><rect x="6.5" width="7" height="24" fill="#fff"/><rect x="8" width="4" height="24" fill="${b}"/>`; break;
+    case 'ajedrez': d=`<rect width="20" height="24" fill="${a}"/>`+[0,1,2,3,4].map(r=>[0,1,2,3].map(k=>((r+k)%2?`<rect x="${k*5}" y="${r*5}" width="5" height="5" fill="${b}"/>`:'')).join('')).join(''); break;
+    case 'cruz':    d=`<rect width="20" height="24" fill="${a}"/><rect x="7.5" width="5" height="24" fill="${b}"/><rect y="8" width="20" height="5" fill="${b}"/>`; break;
+    case 'tri':     d=`<rect width="20" height="24" fill="${a}"/><rect x="6.7" width="6.6" height="24" fill="${b}"/><rect x="13.3" width="6.7" height="24" fill="${c}"/>`; break;
+    case 'bandas':  d=`<rect width="20" height="24" fill="${a}"/><rect y="8" width="20" height="8" fill="${b}"/><rect y="16" width="20" height="8" fill="${c}"/>`; break;
+    case 'mitad':   d=`<rect width="20" height="24" fill="${a}"/><rect x="10" width="10" height="24" fill="${b}"/>`; break;
+    case 'banda':   d=`<rect width="20" height="24" fill="${a}"/><rect y="15" width="20" height="4" fill="${b}"/>`; break;
+    default:        d=`<rect width="20" height="24" fill="${a}"/><rect y="16" width="20" height="3" fill="${b}"/>`;
+  }
+  return `<svg class="esc" width="${s}" height="${s*1.2}" viewBox="0 0 20 24" role="img" aria-label="${n}">
+    <g clip-path="url(#cEsc)">${d}</g>
+    <path d="M0.6,0.6 H19.4 V12.4 C19.4,18.6 15.2,22.4 10,23.4 C4.8,22.4 0.6,18.6 0.6,12.4 Z"
+      fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.2" clip-path="url(#cEsc)"/></svg>`;
+}
+// ---------- eliminacion matematica ----------
+function jugadoId(id){ const x=S[id]; return !!(x&&x[0]!==''&&x[1]!==''); }
+function eliminados(){
+  const G=grupos(), fx=fixture(), fuera=new Set();
+  for(const g of 'ABCD'){
+    const eqs=G[g], pend=fx.filter(m=>m.g===g&&!jugadoId(m.id)), pts={};
+    eqs.forEach(t=>pts[t]=0);
+    fx.filter(m=>m.g===g&&jugadoId(m.id)).forEach(m=>{const [h,a]=[+S[m.id][0],+S[m.id][1]];
+      if(h>a)pts[m.h]+=3; else if(a>h)pts[m.a]+=3; else {pts[m.h]++;pts[m.a]++;}});
+    const puede={}; eqs.forEach(t=>puede[t]=false);
+    const n=pend.length, total=Math.pow(3,n);
+    for(let k=0;k<total;k++){                       // los 3^n desenlaces posibles del grupo
+      const p=Object.assign({},pts); let x=k;
+      for(let i=0;i<n;i++){ const r=x%3; x=(x-r)/3; const m=pend[i];
+        if(r===0)p[m.h]+=3; else if(r===1)p[m.a]+=3; else {p[m.h]++;p[m.a]++;} }
+      for(const t of eqs){ if(puede[t]) continue;
+        if(eqs.filter(o=>o!==t&&p[o]>p[t]).length<=1) puede[t]=true; }   // le cabe el 2do puesto
+    }
+    eqs.forEach(t=>{ if(!puede[t]) fuera.add(t); });
+  }
+  // en eliminatoria basta perder
+  const B=bracketAlDia()?BRACKET:null;
+  const cae=(id,x,y)=>{ const w=ganador(id,x,y); if(w!=null) fuera.add(w===x?y:x); };
+  if(B){ B.forEach((par,i)=>cae('Q'+(i+1),par[0],par[1]));
+    const w=B.map((par,i)=>ganador('Q'+(i+1),par[0],par[1]));
+    cae('S1',w[0],w[1]); cae('S2',w[2],w[3]);
+    cae('F',ganador('S1',w[0],w[1]),ganador('S2',w[2],w[3])); }
+  return fuera;
+}
+// ---------- el anuncio ----------
+let ANUNCIADOS=new Set(JSON.parse(localStorage.getItem('fifa8-elim')||'[]'));
+let PRIMER_RENDER=true, COLA=[], MOSTRANDO=false;
+function revisarEliminados(){
+  const fuera=eliminados(), nuevos=[...fuera].filter(t=>!ANUNCIADOS.has(t));
+  if(!nuevos.length) return;
+  nuevos.forEach(t=>ANUNCIADOS.add(t));
+  localStorage.setItem('fifa8-elim',JSON.stringify([...ANUNCIADOS]));
+  if(PRIMER_RENDER) return;                        // al abrir la pagina no se reviven anuncios viejos
+  COLA.push(...nuevos); if(!MOSTRANDO) siguienteAnuncio();
+}
+function siguienteAnuncio(){
+  const t=COLA.shift();
+  if(t==null){ MOSTRANDO=false; const v=document.querySelector('.ov'); if(v)v.remove(); return; }
+  MOSTRANDO=true;
+  const e=equipo(t);
+  const mio=t<8?t+8:t-8;                            // el otro equipo de esa misma persona
+  const sinEquipos=eliminados().has(mio) && !COLA.includes(mio);   // el aviso va con el ultimo de los dos
+  const v=document.querySelector('.ov')||document.body.appendChild(Object.assign(document.createElement('div'),{className:'ov'}));
+  v.innerHTML=`<div class="caja">
+    <div class="cresta">${escudo(e.n,96)}</div>
+    <div class="grieta">ELIMINADO</div>
+    <div class="quien">${e.n} · <b>${e.j}</b></div>
+    <div class="motivo">Ya no le alcanza para clasificar</div>
+    ${sinEquipos?`<div class="fuera">☠ ${e.j} se queda sin equipos</div>`:''}
+    <div class="tocar">toca para seguir${COLA.length?` · faltan ${COLA.length}`:''}</div></div>`;
+  v.onclick=()=>{ clearTimeout(v._t); siguienteAnuncio(); };
+  v._t=setTimeout(()=>siguienteAnuncio(),5200);
+}
 // ---------- render ----------
 function render(){
   const G=grupos();
   document.getElementById('jugadores').innerHTML=JUGADORES.map((j,i)=>`
     <div class="card player"><div class="avatar">${j[0]}</div>
-      <div><b>${j}</b><div class="teams">🏟 <b>${CLUBES[i]}</b> · grupo ${"ABCD".split('').find(g=>G[g].includes(i))}<br>🌍 <b>${SORTEO.sec[i]}</b> · grupo ${"ABCD".split('').find(g=>G[g].includes(i+8))}</div></div></div>`).join('');
+      <div><b>${j}</b><div class="teams">${escudo(CLUBES[i],15)}<b>${CLUBES[i]}</b> · grupo ${"ABCD".split('').find(g=>G[g].includes(i))}<br>${escudo(SORTEO.sec[i],15)}<b>${SORTEO.sec[i]}</b> · grupo ${"ABCD".split('').find(g=>G[g].includes(i+8))}</div></div></div>`).join('');
 
+  const FUERA=eliminados();
   document.getElementById('grupos').innerHTML="ABCD".split('').map(g=>{
     const {rows,completo}=tabla(g);
     return `<div class="card"><h3>Grupo ${g} ${completo?'<span class="tag">cerrado</span>':''}</h3>
       <table><tr><th style="text-align:left">Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>DG</th><th>Pts</th></tr>
-      ${rows.map((r,i)=>{const e=equipo(r.t);return `<tr class="${i<2?(completo?'q':'q prov'):''}"><td class="t">${e.n}<small>${e.j}</small></td><td>${r.pj}</td><td>${r.pg}</td><td>${r.pe}</td><td>${r.pp}</td><td>${r.gf-r.gc>0?'+':''}${r.gf-r.gc}</td><td><b>${r.pts}</b></td></tr>`}).join('')}
+      ${rows.map((r,i)=>{const e=equipo(r.t);const fuera=FUERA.has(r.t);
+        return `<tr class="${fuera?'out':(i<2?(completo?'q':'q prov'):'')}"><td class="t">${escudo(e.n,16)}${e.n}<small>${e.j}</small></td><td>${r.pj}</td><td>${r.pg}</td><td>${r.pe}</td><td>${r.pp}</td><td>${r.gf-r.gc>0?'+':''}${r.gf-r.gc}</td><td><b>${r.pts}</b></td></tr>`}).join('')}
       </table></div>`;}).join('');
 
   const fx=fixture();
@@ -210,9 +348,9 @@ function render(){
       const H=equipo(m.h),A=equipo(m.a),sc=S[m.id]||['',''],done=jugado(m);
       const q=META[m.id]&&META[m.id].por;
       return `<div class="match ${done?'done':''}" ${q?`title="Registrado por ${q}"`:''}><span class="time">${hhmm(m.t)}</span>
-        <div class="side home"><b class="${done&&+sc[0]>+sc[1]?'won':''}">${H.n}</b><small>${H.j}</small></div>
+        <div class="side home"><b class="${done&&+sc[0]>+sc[1]?'won':''}">${H.n}${escudo(H.n,15)}</b><small>${H.j}</small></div>
         <div class="score"><input type="number" min="0" max="20" inputmode="numeric" data-k="${m.id}-0" value="${sc[0]}" onchange="registrar('${m.id}',0,this.value)"><span>–</span><input type="number" min="0" max="20" inputmode="numeric" data-k="${m.id}-1" value="${sc[1]}" onchange="registrar('${m.id}',1,this.value)"></div>
-        <div class="side"><b class="${done&&+sc[1]>+sc[0]?'won':''}">${A.n}</b><small>${A.j}</small></div>
+        <div class="side"><b class="${done&&+sc[1]>+sc[0]?'won':''}">${escudo(A.n,15)}${A.n}</b><small>${A.j}</small></div>
         <span class="grp">${m.g}</span></div>`;}).join('');
     return `<details class="fecha" ${fi===enCurso?'open':''}><summary>${tit}
       <span class="sm-h">${hhmm(ms[0].t)} → ${hhmm(ms[ms.length-1].t+8)} · ${n}/8 jugados</span></summary>
@@ -225,6 +363,7 @@ function render(){
   document.getElementById('estado').innerHTML=
     `<span class="live"></span>En vivo · ${base}` +
     (PUB_ESTADO?` · ${PUB_ESTADO}`:'') + (ULTIMA_PUB?` · al día ${ULTIMA_PUB}`:'');
+  revisarEliminados();
 }
 function pos(g,i){ const {rows,completo}=tabla(g); return completo?rows[i].t:null; }
 // ---------- clasificados y sorteo de cuartos ----------
@@ -283,7 +422,7 @@ function renderLlaves(){
   const box=(q,cls='')=>{
     const [id,t,x,y,lx,ly]=q, s=S[id]||['','',''], X=x!=null?equipo(x):null, Y=y!=null?equipo(y):null;
     const dis=(x==null||y==null)?'disabled':'', tie=s[0]!==''&&s[1]!==''&&+s[0]===+s[1];
-    const row=(e,l,i)=>`<div class="row"><div><b>${e?e.n:'<span class="muted">'+l+'</span>'}</b><small>${e?e.j:'por definir'}</small></div><input type="number" min="0" max="20" inputmode="numeric" ${dis} data-k="${id}-${i}" value="${s[i]}" onchange="registrar('${id}',${i},this.value)"></div>`;
+    const row=(e,l,i)=>`<div class="row"><div><b>${e?escudo(e.n,16)+e.n:'<span class="muted">'+l+'</span>'}</b><small>${e?e.j:'por definir'}</small></div><input type="number" min="0" max="20" inputmode="numeric" ${dis} data-k="${id}-${i}" value="${s[i]}" onchange="registrar('${id}',${i},this.value)"></div>`;
     return `<div class="ko ${cls}"><div class="lbl"><span>${id==='F'?'Final':id[0]==='Q'?'Cuartos '+id[1]:'Semifinal '+id[1]}</span><span>${t}</span></div>
       ${row(X,lx,0)}${row(Y,ly,1)}
       ${tie?`<div class="pen">Penales, ganó: <select onchange="registrar('${id}',2,this.value)"><option value="">—</option><option value="h" ${s[2]==='h'?'selected':''}>${X.n}</option><option value="a" ${s[2]==='a'?'selected':''}>${Y.n}</option></select></div>`:''}
@@ -291,7 +430,7 @@ function renderLlaves(){
   };
   document.getElementById('llaves').innerHTML=`<div class="round">${Q.map(q=>box(q)).join('')}</div><div class="round">${SF.map(q=>box(q)).join('')}</div><div class="round">${box(F[0],'final')}</div>`;
   const c=ganador('F',ws[0],ws[1]); const el=document.getElementById('campeon');
-  if(c!=null){const e=equipo(c); el.hidden=false; el.innerHTML=`<div class="muted">🏆 CAMPEÓN DE LA COPA DE LOS 8</div><div class="big">${e.j}</div><div>con ${e.n}</div>`;} else el.hidden=true;
+  if(c!=null){const e=equipo(c); el.hidden=false; el.innerHTML=`<div class="muted">🏆 CAMPEÓN DE LA COPA DE LOS 8</div><div style="margin:8px 0">${escudo(e.n,64)}</div><div class="big">${e.j}</div><div>con ${e.n}</div>`;} else el.hidden=true;
 }
 
 function setG(id,i,v){ S[id]=S[id]||['','','']; S[id][i]=v; guardarLocal(); render();
@@ -353,7 +492,7 @@ function resortear(){
 }
 document.getElementById('barra-admin').hidden=!ADMIN;
 render();
-traer();
+traer().finally(()=>{ PRIMER_RENDER=false; });
 setInterval(()=>{ if(document.hidden) return;
   if(document.activeElement && document.activeElement.tagName==='INPUT') return;   // alguien esta escribiendo
   traer(); }, 15000);
