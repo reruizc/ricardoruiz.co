@@ -813,9 +813,13 @@ def cmd_extract(args):
     pend = [p for p in sel if not _cacheado(p['tok'], p['base'])]
     # documento primero, título después: el orden en que aporta valor
     pend.sort(key=lambda p: (p['base'] == 'titulo', -(p.get('anio') or 0)))
+    # el conteo del caché se toma ANTES de --limit: calculado después, un
+    # `--limit 30` sobre 1.176 pendientes reportaba "ya en caché 1146" y hacía
+    # creer que el corpus estaba hecho cuando estaba intacto.
+    n_cache = len(sel) - len(pend)
     if args.limit:
         pend = pend[:args.limit]
-    print(f'· universo {len(sel)} · ya en caché {len(sel) - len(pend)}'
+    print(f'· universo {len(sel)} · ya en caché {n_cache}'
           f' · a procesar ahora {len(pend)}')
     if args.dry_run:
         for p in pend[:20]:
