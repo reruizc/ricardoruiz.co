@@ -123,7 +123,11 @@ USD_OUT_PER_M = 0.42
 # Ventana máxima de texto que se le manda al modelo. Los radicados van de 15 KB a
 # 300 KB; mandar todo multiplicaría el costo sin ganar precisión (el articulado
 # vive en un tramo identificable). 28k chars ≈ 8k tokens.
-MAX_CHARS = 28_000
+# Cuánto texto se le manda al modelo. Medido sobre 455 documentos: 2,72
+# caracteres por token, así que 28.000 caracteres son ~10.300 tokens — el 31%
+# del contexto de 32k que ya le pedimos a Ollama. Más de la mitad de los
+# documentos llegan a ese tope y se truncan pudiendo caber enteros.
+MAX_CHARS = int(os.environ.get('CAUDAL_MAX_CHARS', '28000'))
 HEAD_CHARS = 2_500        # encabezado que se conserva siempre (título + fórmula)
 
 # Presupuesto de salida: 1er intento, reintento, y último recurso (ver _extraer).
