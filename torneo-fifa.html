@@ -35,8 +35,21 @@
   th{color:var(--dim);font-weight:500;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em}
   td.t{text-align:left}
   td.t small{display:block;color:var(--dim);font-size:.75rem}
-  tr.q td{background:rgba(34,197,94,.09)}
+  tr.q td{background:rgba(190,242,200,.13)}
+  tr.q td.t{color:#d9f7e2}
   tr.q td.t::before{content:"● ";color:var(--green2)}
+  tr.q.prov td{background:rgba(190,242,200,.10)}
+  tr.q.prov td.t::before{content:"○ ";color:#7fcf9b}
+  details.fecha{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  details.fecha+details.fecha{margin-top:12px}
+  details.fecha>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;gap:10px;font-weight:700}
+  details.fecha>summary::-webkit-details-marker{display:none}
+  details.fecha>summary::before{content:"▸";color:var(--green2);transition:transform .15s;display:inline-block}
+  details.fecha[open]>summary::before{transform:rotate(90deg)}
+  details.fecha>summary:hover{background:rgba(255,255,255,.03)}
+  details.fecha .cont{padding:0 14px 10px}
+  .sm-h{color:var(--dim);font-weight:400;font-size:.85rem;margin-left:auto;text-align:right}
+  .aviso{border-color:var(--gold);background:rgba(245,197,66,.08)}
   .match{display:grid;grid-template-columns:52px 1fr 92px 1fr 40px;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--line)}
   .match:last-child{border-bottom:0}
   .match .time{color:var(--dim);font-size:.85rem;font-variant-numeric:tabular-nums}
@@ -70,7 +83,6 @@
   button.p{background:var(--green);border-color:var(--green);color:#03170a;font-weight:700}
   button.d{border-color:rgba(239,68,68,.5);color:#fca5a5}
   .muted{color:var(--dim);font-size:.85rem}
-  body.pub input,body.pub select{pointer-events:none;opacity:.85}
   .live{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green2);margin-right:6px;animation:pulso 1.6s infinite}
   @keyframes pulso{0%,100%{opacity:.35}50%{opacity:1}}
   .tag{font-size:.7rem;padding:2px 7px;border-radius:6px;background:#132417;color:var(--dim);border:1px solid var(--line)}
@@ -102,10 +114,11 @@
 <div class="grid g4" id="grupos"></div>
 
 <h2>Fixture de la fase de grupos <span class="tag">3 min por tiempo · 8 min por partido</span></h2>
-<div class="grid g2" id="fixture"></div>
+<div id="fixture"></div>
 
 <h2>Eliminatorias <span class="tag">4 min por tiempo · 10 min por partido</span></h2>
 <div class="muted" style="margin-bottom:10px">Descanso 14:12 → 14:25 · Cuartos 14:25 · Semis 15:05 · Final 15:25 (con penales si hace falta)</div>
+<div id="panel-sorteo" style="margin-bottom:14px"></div>
 <div class="bracket" id="llaves"></div>
 <div class="champ" id="campeon" hidden></div>
 
@@ -113,11 +126,12 @@
 <ul class="rules">
   <li><b>Grupos:</b> todos contra todos, ida sola. 3 puntos por victoria, 1 por empate. Pasan los 2 primeros.</li>
   <li><b>Desempate en grupo:</b> puntos → diferencia de gol → goles a favor → enfrentamiento directo → moneda.</li>
-  <li><b>Cruces:</b> 1°A–2°B · 1°C–2°D · 1°B–2°A · 1°D–2°C. Semis: ganador Q1–Q2 y Q3–Q4.</li>
+  <li><b>Semifinales:</b> ganador de cuartos 1 contra el de cuartos 2, y el de cuartos 3 contra el de cuartos 4.</li>
   <li><b>Empate en eliminatoria:</b> directo a penales (sin alargue, que no hay tiempo).</li>
   <li><b>Si a alguien le toca contra sí mismo</b> en una llave: escoge con cuál equipo sigue y el otro lo juega la CPU en dificultad leyenda. Si pierde contra la CPU, se aguanta las burlas.</li>
   <li><b>Duración:</b> grupos a 3 minutos por tiempo, eliminatorias a 4. Quien se demore escogiendo táctica más de 1 minuto arranca perdiendo el saque.</li>
-  <li><b>Los marcadores los mete la mesa de control</b> (el computador del torneo) y se publican solos; en el celular esta página se refresca cada 15 segundos.</li>
+  <li><b>Cualquiera puede meter un resultado</b> desde su celular: escribes el marcador, confirmas y queda publicado para todos. La página se refresca sola cada 15 segundos.</li>
+  <li><b>Los cuartos se sortean</b> cuando se cierren los 24 partidos de grupo: un primero contra un segundo, nunca del mismo grupo. Ahí sí pueden cruzarse los dos equipos de una misma persona.</li>
 </ul>
 </div>
 
@@ -132,11 +146,15 @@ const SORTEO_INICIAL = {
 };
 const LS_SORTEO='fifa8-sorteo', LS_SCORES='fifa8-scores';
 const S3_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/torneo-fifa/resultados.json';
-const ADMIN = (location.hostname==='localhost' || location.hostname==='127.0.0.1') && !location.search.includes('ver=1');   // mesa de control: el servidor local de tools/torneo-fifa
-let ULTIMA_PUB=null, PUB_ESTADO='';
+const API='https://llwmzxofte.execute-api.us-east-1.amazonaws.com';   // recibe un marcador, lo mezcla en S3 y responde el estado nuevo
+const ADMIN = (location.hostname==='localhost' || location.hostname==='127.0.0.1') && location.search.includes('admin=1');   // solo para resortear grupos o borrar todo
+let YO = localStorage.getItem('fifa8-yo') || '';
+let ULTIMA_PUB=null, PUB_ESTADO='', BRACKET=null, META={};   // BRACKET: 4 pares de equipos sorteados para cuartos
 
 let SORTEO = JSON.parse(localStorage.getItem(LS_SORTEO)||'null') || SORTEO_INICIAL;
-let S = JSON.parse(localStorage.getItem(LS_SCORES)||'{}');   // marcadores {id:[h,a,pen]}
+let _g = JSON.parse(localStorage.getItem(LS_SCORES)||'{}');
+let S = _g.scores || {};                       // marcadores {id:[h,a,pen]}
+if(_g.bracket) BRACKET=_g.bracket;
 
 // equipos: 0-7 clubes (jugador i), 8-15 selecciones (jugador i-8)
 function equipo(t){ return t<8 ? {n:CLUBES[t], j:JUGADORES[t]} : {n:SORTEO.sec[t-8], j:JUGADORES[t-8]}; }
@@ -180,35 +198,84 @@ function render(){
     const {rows,completo}=tabla(g);
     return `<div class="card"><h3>Grupo ${g} ${completo?'<span class="tag">cerrado</span>':''}</h3>
       <table><tr><th style="text-align:left">Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>DG</th><th>Pts</th></tr>
-      ${rows.map((r,i)=>{const e=equipo(r.t);return `<tr class="${completo&&i<2?'q':''}"><td class="t">${e.n}<small>${e.j}</small></td><td>${r.pj}</td><td>${r.pg}</td><td>${r.pe}</td><td>${r.pp}</td><td>${r.gf-r.gc>0?'+':''}${r.gf-r.gc}</td><td><b>${r.pts}</b></td></tr>`}).join('')}
+      ${rows.map((r,i)=>{const e=equipo(r.t);return `<tr class="${i<2?(completo?'q':'q prov'):''}"><td class="t">${e.n}<small>${e.j}</small></td><td>${r.pj}</td><td>${r.pg}</td><td>${r.pe}</td><td>${r.pp}</td><td>${r.gf-r.gc>0?'+':''}${r.gf-r.gc}</td><td><b>${r.pts}</b></td></tr>`}).join('')}
       </table></div>`;}).join('');
 
   const fx=fixture();
-  const bloques=[[0,12,'Primera y segunda fecha · 11:00 → 12:36'],[12,24,'Tercera fecha y cierre · 12:36 → 14:12']];
-  document.getElementById('fixture').innerHTML=bloques.map(([a,b,tit])=>`<div class="card"><h3>${tit}</h3>${fx.slice(a,b).map(m=>{
-    const H=equipo(m.h),A=equipo(m.a),s=S[m.id]||['',''],done=s[0]!==''&&s[1]!=='';
-    return `<div class="match ${done?'done':''}"><span class="time">${hhmm(m.t)}</span>
-      <div class="side home"><b class="${done&&+s[0]>+s[1]?'won':''}">${H.n}</b><small>${H.j}</small></div>
-      <div class="score"><input type="number" min="0" max="20" inputmode="numeric" data-k="${m.id}-0" value="${s[0]}" oninput="setG('${m.id}',0,this.value)"><span>–</span><input type="number" min="0" max="20" inputmode="numeric" data-k="${m.id}-1" value="${s[1]}" oninput="setG('${m.id}',1,this.value)"></div>
-      <div class="side"><b class="${done&&+s[1]>+s[0]?'won':''}">${A.n}</b><small>${A.j}</small></div>
-      <span class="grp">${m.g}</span></div>`}).join('')}</div>`).join('');
+  const jugado=m=>{const x=S[m.id];return x&&x[0]!==''&&x[1]!=='';};
+  const FECHAS=[[0,8,'Primera fecha'],[8,16,'Segunda fecha'],[16,24,'Tercera fecha']];
+  const enCurso=FECHAS.findIndex(([a,b])=>fx.slice(a,b).some(m=>!jugado(m)));   // solo se despliega la fecha que se esta jugando
+  document.getElementById('fixture').innerHTML=FECHAS.map(([a,b,tit],fi)=>{
+    const ms=fx.slice(a,b), n=ms.filter(jugado).length, lista=ms.map(m=>{
+      const H=equipo(m.h),A=equipo(m.a),sc=S[m.id]||['',''],done=jugado(m);
+      const q=META[m.id]&&META[m.id].por;
+      return `<div class="match ${done?'done':''}" ${q?`title="Registrado por ${q}"`:''}><span class="time">${hhmm(m.t)}</span>
+        <div class="side home"><b class="${done&&+sc[0]>+sc[1]?'won':''}">${H.n}</b><small>${H.j}</small></div>
+        <div class="score"><input type="number" min="0" max="20" inputmode="numeric" data-k="${m.id}-0" value="${sc[0]}" onchange="registrar('${m.id}',0,this.value)"><span>–</span><input type="number" min="0" max="20" inputmode="numeric" data-k="${m.id}-1" value="${sc[1]}" onchange="registrar('${m.id}',1,this.value)"></div>
+        <div class="side"><b class="${done&&+sc[1]>+sc[0]?'won':''}">${A.n}</b><small>${A.j}</small></div>
+        <span class="grp">${m.g}</span></div>`;}).join('');
+    return `<details class="fecha" ${fi===enCurso?'open':''}><summary>${tit}
+      <span class="sm-h">${hhmm(ms[0].t)} → ${hhmm(ms[ms.length-1].t+8)} · ${n}/8 jugados</span></summary>
+      <div class="cont">${lista}</div></details>`;}).join('');
 
+  renderSorteo();
   renderLlaves();
   const jugados=fx.filter(m=>S[m.id]&&S[m.id][0]!==''&&S[m.id][1]!=='').length;
   const base=`${jugados} de 24 partidos de grupo registrados`;
-  document.getElementById('estado').innerHTML = ADMIN
-    ? `🎛 Mesa de control · ${base} · ${PUB_ESTADO}`
-    : `<span class="live"></span>En vivo · ${base}${ULTIMA_PUB?` · actualizado ${ULTIMA_PUB}`:''}`;
+  document.getElementById('estado').innerHTML=
+    `<span class="live"></span>En vivo · ${base}` +
+    (PUB_ESTADO?` · ${PUB_ESTADO}`:'') + (ULTIMA_PUB?` · al día ${ULTIMA_PUB}`:'');
 }
-
 function pos(g,i){ const {rows,completo}=tabla(g); return completo?rows[i].t:null; }
+// ---------- clasificados y sorteo de cuartos ----------
+function clasificados(){   // null si algun grupo sigue abierto
+  const out=[];
+  for(const g of 'ABCD'){ const {rows,completo}=tabla(g); if(!completo) return null;
+    out.push({t:rows[0].t,g,pos:1},{t:rows[1].t,g,pos:2}); }
+  return out;
+}
+function bracketAlDia(){   // el sorteo guardado sigue siendo valido?
+  const cl=clasificados(); if(!BRACKET||!cl) return false;
+  const vivos=new Set(cl.map(x=>x.t));
+  return BRACKET.flat().length===8 && BRACKET.flat().every(t=>vivos.has(t));
+}
+function sortearCuartos(){
+  const cl=clasificados(); if(!cl) return;
+  if(!confirm(BRACKET?'Esto vuelve a sortear los cuartos y borra los marcadores de la eliminatoria. ¿Seguro?'
+                     :'Fase de grupos cerrada. ¿Sorteamos los cuartos de final?')) return;
+  const primeros=cl.filter(x=>x.pos===1), segundos=cl.filter(x=>x.pos===2);
+  let par=segundos, i=0;
+  do{ par=shuffle([...segundos]); i++; }while(i<800 && primeros.some((p,k)=>p.g===par[k].g));  // un 1° nunca contra el 2° de su grupo
+  BRACKET=shuffle(primeros.map((p,k)=>[p.t,par[k].t]));
+  ['Q1','Q2','Q3','Q4','S1','S2','F'].forEach(id=>delete S[id]);
+  guardarLocal(); render(); enviar({bracket:BRACKET,por:quienSoy()}, 'cuartos sorteados');
+}
+function renderSorteo(){
+  const el=document.getElementById('panel-sorteo'), cl=clasificados();
+  const faltan=fixture().filter(m=>!(S[m.id]&&S[m.id][0]!==''&&S[m.id][1]!=='')).length;
+  if(!cl){ el.innerHTML=`<div class="card"><b>Los cuartos se sortean al cerrar los grupos.</b>
+    <div class="muted" style="margin-top:4px">Faltan ${faltan} ${faltan===1?'partido':'partidos'} de la fase de grupos.</div></div>`; return; }
+  const lista=cl.map(x=>`${equipo(x.t).n} <span class="muted">(${x.pos}° ${x.g} · ${equipo(x.t).j})</span>`).join(' · ');
+  if(!BRACKET||!bracketAlDia()){
+    const roto=BRACKET&&!bracketAlDia();
+    el.innerHTML=`<div class="card ${roto?'aviso':''}">
+      <b>${roto?'⚠ El sorteo quedó desactualizado':'✅ Fase de grupos completa'}</b>
+      <div class="muted" style="margin:6px 0 10px">${roto?'Cambió un resultado y ya no clasifican los mismos. Hay que sortear otra vez.':'Clasificados: '+lista}</div>
+      <button class="p" onclick="sortearCuartos()">🎲 Sortear los cuartos</button></div>`;
+  } else {
+    el.innerHTML=`<div class="card"><b>🎲 Cuartos sorteados</b>
+      <div class="muted" style="margin:6px 0 10px">${lista}</div>
+      <button onclick="sortearCuartos()">Volver a sortear</button></div>`;
+  }
+}
 function ganador(id,x,y){ // x,y = índices de equipo o null
   const s=S[id]; if(x==null||y==null||!s||s[0]===''||s[1]==='') return null;
   const h=+s[0],a=+s[1]; if(h>a) return x; if(a>h) return y; if(s[2]==='h') return x; if(s[2]==='a') return y; return null;
 }
 function renderLlaves(){
-  const Q=[['Q1','14:25',pos('A',0),pos('B',1),'1° A','2° B'],['Q2','14:35',pos('C',0),pos('D',1),'1° C','2° D'],
-           ['Q3','14:45',pos('B',0),pos('A',1),'1° B','2° A'],['Q4','14:55',pos('D',0),pos('C',1),'1° D','2° C']];
+  const B=bracketAlDia()?BRACKET:[[null,null],[null,null],[null,null],[null,null]];
+  const HOR=['14:25','14:35','14:45','14:55'];
+  const Q=B.map((par,i)=>['Q'+(i+1),HOR[i],par[0],par[1],'Sorteo pendiente','Sorteo pendiente']);
   const w=Q.map(q=>ganador(q[0],q[2],q[3]));
   const SF=[['S1','15:05',w[0],w[1],'Gana Q1','Gana Q2'],['S2','15:15',w[2],w[3],'Gana Q3','Gana Q4']];
   const ws=SF.map(q=>ganador(q[0],q[2],q[3]));
@@ -216,10 +283,10 @@ function renderLlaves(){
   const box=(q,cls='')=>{
     const [id,t,x,y,lx,ly]=q, s=S[id]||['','',''], X=x!=null?equipo(x):null, Y=y!=null?equipo(y):null;
     const dis=(x==null||y==null)?'disabled':'', tie=s[0]!==''&&s[1]!==''&&+s[0]===+s[1];
-    const row=(e,l,i)=>`<div class="row"><div><b>${e?e.n:'<span class="muted">'+l+'</span>'}</b><small>${e?e.j:'por definir'}</small></div><input type="number" min="0" max="20" inputmode="numeric" ${dis} data-k="${id}-${i}" value="${s[i]}" oninput="setG('${id}',${i},this.value)"></div>`;
+    const row=(e,l,i)=>`<div class="row"><div><b>${e?e.n:'<span class="muted">'+l+'</span>'}</b><small>${e?e.j:'por definir'}</small></div><input type="number" min="0" max="20" inputmode="numeric" ${dis} data-k="${id}-${i}" value="${s[i]}" onchange="registrar('${id}',${i},this.value)"></div>`;
     return `<div class="ko ${cls}"><div class="lbl"><span>${id==='F'?'Final':id[0]==='Q'?'Cuartos '+id[1]:'Semifinal '+id[1]}</span><span>${t}</span></div>
       ${row(X,lx,0)}${row(Y,ly,1)}
-      ${tie?`<div class="pen">Penales, ganó: <select onchange="setG('${id}',2,this.value)"><option value="">—</option><option value="h" ${s[2]==='h'?'selected':''}>${X.n}</option><option value="a" ${s[2]==='a'?'selected':''}>${Y.n}</option></select></div>`:''}
+      ${tie?`<div class="pen">Penales, ganó: <select onchange="registrar('${id}',2,this.value)"><option value="">—</option><option value="h" ${s[2]==='h'?'selected':''}>${X.n}</option><option value="a" ${s[2]==='a'?'selected':''}>${Y.n}</option></select></div>`:''}
     </div>`;
   };
   document.getElementById('llaves').innerHTML=`<div class="round">${Q.map(q=>box(q)).join('')}</div><div class="round">${SF.map(q=>box(q)).join('')}</div><div class="round">${box(F[0],'final')}</div>`;
@@ -227,28 +294,54 @@ function renderLlaves(){
   if(c!=null){const e=equipo(c); el.hidden=false; el.innerHTML=`<div class="muted">🏆 CAMPEÓN DE LA COPA DE LOS 8</div><div class="big">${e.j}</div><div>con ${e.n}</div>`;} else el.hidden=true;
 }
 
-function setG(id,i,v){ if(!ADMIN) return; S[id]=S[id]||['','','']; S[id][i]=v; localStorage.setItem(LS_SCORES,JSON.stringify(S));
-  render(); const el=document.querySelector(`[data-k="${id}-${i}"]`); if(el){el.focus();} // mantener foco tras re-render
-  publicar();
+function setG(id,i,v){ S[id]=S[id]||['','','']; S[id][i]=v; guardarLocal(); render();
+  const el=document.querySelector(`[data-k="${id}-${i}"]`); if(el){el.focus();}
 }
-// ---------- publicación (solo mesa de control) ----------
-let _pubT=null;
-function publicar(){ clearTimeout(_pubT); PUB_ESTADO='publicando…'; render(); _pubT=setTimeout(async()=>{
+// ---------- registrar un marcador: cualquiera puede, con confirmacion ----------
+function quienSoy(){
+  if(YO) return YO;
+  const n=(prompt('¿Quién eres? (queda anotado junto al resultado)','')||'').trim().slice(0,20);
+  if(n){ YO=n; localStorage.setItem('fifa8-yo',n); }
+  return YO;
+}
+function rotulo(id){
+  const m=fixture().find(x=>x.id===id);
+  if(m) return `${equipo(m.h).n} vs ${equipo(m.a).n}`;
+  const B=bracketAlDia()?BRACKET:null, i=+id[1]-1;
+  if(id[0]==='Q'&&B) return `${equipo(B[i][0]).n} vs ${equipo(B[i][1]).n}`;
+  return id==='F'?'la final':id[0]==='S'?'la semifinal '+id[1]:'cuartos '+id[1];
+}
+async function registrar(id,i,v){
+  const prev=(S[id]||['','',''])[i];
+  if(String(prev)===String(v)) return;                       // no cambio nada
+  const s=S[id]||['','','']; const a=i===0?v:s[0], b=i===1?v:s[1];
+  const texto = i===2 ? `Penales de ${rotulo(id)}: gana ${v==='h'?'el de arriba':'el de abajo'}`
+                      : `${rotulo(id)}  →  ${a===''?'—':a} - ${b===''?'—':b}`;
+  if(!confirm(`¿Publicamos este resultado para todos?\n\n${texto}`)){ render(); return; }
+  setG(id,i,v);
+  await enviar({id,i,v,por:quienSoy()}, 'marcador publicado');
+}
+async function enviar(cuerpo, exito){
+  PUB_ESTADO='publicando…'; render();
   try{
-    const r=await fetch('/publicar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sorteo:SORTEO,scores:S,ts:new Date().toISOString()})});
-    const j=await r.json(); PUB_ESTADO=j.ok?`✓ publicado ${new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`:`⚠ ${j.error||'no se pudo publicar'}`;
-  }catch(e){ PUB_ESTADO='⚠ sin servidor local (corre tools/torneo-fifa/servidor.py)'; }
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cuerpo)});
+    const j=await r.json();
+    if(j.ok){ S=j.scores||S; if(j.bracket!==undefined) BRACKET=j.bracket; META=j.meta||{}; guardarLocal();
+              PUB_ESTADO='✓ '+exito; }
+    else PUB_ESTADO='⚠ '+(j.error||'no se pudo publicar');
+  }catch(e){ PUB_ESTADO='⚠ sin conexión, este resultado no se publicó'; }
   render();
-},900); }
+}
 // ---------- modo espectador: lee lo publicado ----------
 async function traer(){
   try{
     const r=await fetch(S3_URL+'?t='+Date.now(),{cache:'no-store'}); if(!r.ok) return;
-    const j=await r.json(); if(j.sorteo) SORTEO=j.sorteo; S=j.scores||{};
+    const j=await r.json(); if(j.sorteo) SORTEO=j.sorteo; S=j.scores||{}; BRACKET=j.bracket||null; META=j.meta||{};
     ULTIMA_PUB=j.ts?new Date(j.ts).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}):null; render();
   }catch(e){}
 }
-function reiniciar(){ if(confirm('¿Borrar todos los marcadores?')){S={};localStorage.removeItem(LS_SCORES);render();publicar();} }
+function guardarLocal(){ localStorage.setItem(LS_SCORES,JSON.stringify({scores:S,bracket:BRACKET})); }
+function reiniciar(){ if(confirm('¿Borrar todos los marcadores?')){S={};BRACKET=null;localStorage.removeItem(LS_SCORES);render();publicar();} }
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function resortear(){
   if(!confirm('Esto cambia los segundos equipos y los grupos, y borra los marcadores. ¿Seguro?')) return;
@@ -256,10 +349,14 @@ function resortear(){
   const i1=shuffle([0,1,2,3,4,5,6,7]); let i2;
   do{ i2=shuffle([0,1,2,3,4,5,6,7]); }while(i2.slice(0,4).filter(x=>i1.slice(0,4).includes(x)).length!==2);
   SORTEO={sec,A:i1.slice(0,4),B:i1.slice(4),C:i2.slice(0,4),D:i2.slice(4)};
-  localStorage.setItem(LS_SORTEO,JSON.stringify(SORTEO)); S={}; localStorage.removeItem(LS_SCORES); render(); publicar();
+  localStorage.setItem(LS_SORTEO,JSON.stringify(SORTEO)); S={}; BRACKET=null; localStorage.removeItem(LS_SCORES); render(); publicar();
 }
-if(ADMIN){ document.getElementById('barra-admin').hidden=false; render(); }
-else { document.body.classList.add('pub'); render(); traer(); setInterval(traer,15000); }
+document.getElementById('barra-admin').hidden=!ADMIN;
+render();
+traer();
+setInterval(()=>{ if(document.hidden) return;
+  if(document.activeElement && document.activeElement.tagName==='INPUT') return;   // alguien esta escribiendo
+  traer(); }, 15000);
 </script>
 </body>
 </html>

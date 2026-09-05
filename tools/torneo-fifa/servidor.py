@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Mesa de control del torneo FIFA.
+"""Consola de emergencia del torneo FIFA (opcional).
 
-Sirve el repo en http://localhost:8768 (abrir /torneo-fifa.html) y, cada vez que
-la página manda un marcador, escribe `Bases de datos/torneo-fifa/resultados.json`
-y lo sube a S3 con la CLI (prefijo público congreso-2026/output/). Los celulares
-abren ricardoruiz.co/torneo-fifa.html y leen ese JSON cada 15 s.
+Los marcadores del dia a dia NO pasan por aqui: cualquiera los registra desde su
+celular contra la Lambda `torneo-fifa-publica`, que mezcla el cambio en el JSON
+de S3. Este servidor solo hace falta para las dos operaciones destructivas que la
+Lambda no expone a internet -- borrar todos los marcadores y volver a sortear los
+grupos -- disponibles en http://localhost:8768/torneo-fifa.html?admin=1
 
 Correr:  python3 tools/torneo-fifa/servidor.py
 """
