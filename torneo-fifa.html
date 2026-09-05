@@ -141,6 +141,40 @@
   @keyframes destello{0%{background:rgba(74,222,128,.35)}100%{background:transparent}}
   .match .score input{transition:transform .15s}
   .match.flash .score input{transform:scale(1.12)}
+  /* ---- la fase de grupos se pliega y encoge cuando ya hay cuartos ---- */
+  details.seccion{border:1px solid var(--line);border-radius:14px;background:rgba(14,26,18,.5);margin:28px 0}
+  details.seccion>summary{list-style:none;cursor:pointer;padding:14px 34px 14px 16px;display:flex;align-items:center;gap:10px;
+    position:relative;font-size:1.25rem;font-weight:700;border-left:4px solid var(--green);border-radius:14px}
+  details.seccion>summary::-webkit-details-marker{display:none}
+  details.seccion>summary::after{content:"▾";position:absolute;right:16px;top:15px;color:var(--green2);transition:transform .2s}
+  details.seccion:not([open])>summary::after{transform:rotate(-90deg)}
+  details.seccion>summary:hover{background:rgba(255,255,255,.03)}
+  details.seccion>.cont{padding:0 14px 16px}
+  .sub-h{margin:22px 0 10px;font-size:1rem;color:var(--dim);font-weight:500}
+  #res-grupos{margin-left:auto;padding-right:10px}
+  /* compacto: ya se jugaron los grupos, ocupan lo mínimo */
+  .mini .grid.g4{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+  .mini table{font-size:.8rem}
+  .mini th,.mini td{padding:3px 4px}
+  .mini td.t small{font-size:.68rem}
+  .mini .card{padding:10px}
+  .mini h3{font-size:.95rem}
+  .mini .esc{width:13px;height:15.6px}
+  /* ---- llaves grandes, con la cara de cada uno ---- */
+  .ko.grande{padding:14px}
+  .ko.grande .lbl{font-size:.78rem;margin-bottom:4px}
+  .ko.grande .row{grid-template-columns:1fr 56px;padding:10px 0;gap:10px}
+  .ko.grande .row b{font-size:1.06rem;line-height:1.2}
+  .ko.grande .row small{font-size:.8rem}
+  .ko.grande .row .av{width:52px;height:52px;font-size:1.3rem;margin-right:10px}
+  .ko.grande input{width:56px;height:44px;font-size:1.2rem}
+  .ko.grande .gana{box-shadow:inset 3px 0 0 var(--green2)}
+  @media(max-width:720px){
+    .ko.grande .row .av{width:46px;height:46px}
+    .ko.grande .row b{font-size:1rem}
+    details.seccion>summary{font-size:1.1rem;flex-wrap:wrap}
+    #res-grupos{margin-left:0;flex-basis:100%;padding-left:0}
+  }
   .tag{font-size:.7rem;padding:2px 7px;border-radius:6px;background:#132417;color:var(--dim);border:1px solid var(--line)}
   @media(max-width:720px){
     details.fecha>summary{flex-wrap:wrap}
@@ -173,17 +207,24 @@
 <h2>Los jugadores y sus equipos</h2>
 <div class="grid g4" id="jugadores"></div>
 
-<h2>Grupos</h2>
-<div class="grid g4" id="grupos"></div>
+<section id="sec-grupos">
+  <details id="det-grupos" class="seccion" open>
+    <summary>Fase de grupos <span class="sm-h" id="res-grupos"></span></summary>
+    <div class="cont">
+      <div class="grid g4" id="grupos"></div>
+      <h3 class="sub-h">Partidos <span class="tag">3 min por tiempo · 8 min por partido</span></h3>
+      <div id="fixture"></div>
+    </div>
+  </details>
+</section>
 
-<h2>Fixture de la fase de grupos <span class="tag">3 min por tiempo · 8 min por partido</span></h2>
-<div id="fixture"></div>
-
-<h2>Eliminatorias <span class="tag">4 min por tiempo · 10 min por partido</span></h2>
-<div class="muted" style="margin-bottom:10px">Descanso 14:12 → 14:25 · Cuartos 14:25 · Semis 15:05 · Final 15:25 (con penales si hace falta)</div>
-<div id="panel-sorteo" style="margin-bottom:14px"></div>
-<div class="bracket" id="llaves"></div>
-<div class="champ" id="campeon" hidden></div>
+<section id="sec-elim">
+  <h2>Eliminatorias <span class="tag">4 min por tiempo · 10 min por partido</span></h2>
+  <div class="muted" style="margin-bottom:10px">Descanso 14:12 → 14:25 · Cuartos 14:25 · Semis 15:05 · Final 15:25 (con penales si hace falta)</div>
+  <div id="panel-sorteo" style="margin-bottom:14px"></div>
+  <div class="bracket" id="llaves"></div>
+  <div class="champ" id="campeon" hidden></div>
+</section>
 
 <h2>Reglas</h2>
 <ul class="rules">
@@ -415,7 +456,27 @@ function render(){
   document.getElementById('estado').innerHTML=
     `<span class="live"></span>En vivo · ${base}` +
     (PUB_ESTADO?` · ${PUB_ESTADO}`:'') + (ULTIMA_PUB?` · al día ${ULTIMA_PUB}`:'');
+  ajustarFases();
   revisarEliminados();
+}
+// ---------- cuando arranca la eliminatoria, ella manda: sube y los grupos se pliegan ----------
+let _fasesListo=false;
+function ajustarFases(){
+  const det=document.getElementById('det-grupos'), gr=document.getElementById('sec-grupos'), el=document.getElementById('sec-elim');
+  if(!det||!gr||!el) return;
+  const jugados=fixture().filter(m=>{const x=S[m.id];return x&&x[0]!==''&&x[1]!=='';}).length;
+  const rg=document.getElementById('res-grupos');
+  if(rg) rg.textContent = jugados===24 ? 'terminada · 24 partidos' : `${jugados} de 24 partidos`;
+  const enEliminatoria=bracketAlDia();
+  det.classList.toggle('mini',enEliminatoria);
+  if(enEliminatoria && !_fasesListo){          // una sola vez, para no cerrarla si alguien la vuelve a abrir
+    _fasesListo=true; det.open=false;
+    el.parentNode.insertBefore(el,gr);
+  }
+  if(!enEliminatoria && _fasesListo){          // si se deshace el sorteo, todo vuelve a su sitio
+    _fasesListo=false; det.open=true;
+    gr.parentNode.insertBefore(gr,el);
+  }
 }
 function pos(g,i){ const {rows,completo}=tabla(g); return completo?rows[i].t:null; }
 // ---------- clasificados y sorteo de cuartos ----------
@@ -474,10 +535,11 @@ function renderLlaves(){
   const box=(q,cls='')=>{
     const [id,t,x,y,lx,ly]=q, s=S[id]||['','',''], X=x!=null?equipo(x):null, Y=y!=null?equipo(y):null;
     const dis=(x==null||y==null)?'disabled':'', tie=s[0]!==''&&s[1]!==''&&+s[0]===+s[1];
-    const conFoto=id[0]!=='Q', tIdx=[x,y];
-    const row=(e,l,i)=>`<div class="row"><div class="${conFoto&&e?'con-foto':''}">${conFoto&&e?avatar(jugadorDe(tIdx[i]),34,tIdx[i]):''}<div><b>${e?escudo(e.n,16)+e.n:'<span class="muted">'+l+'</span>'}</b><small>${e?e.j:'por definir'}</small></div></div><input type="number" min="0" max="20" inputmode="numeric" ${dis} data-k="${id}-${i}" value="${s[i]}" onchange="registrar('${id}',${i},this.value)"></div>`;
+    const conFoto=true, tIdx=[x,y];
+    const gana=(s[0]!==''&&s[1]!=='')?(+s[0]>+s[1]?0:(+s[1]>+s[0]?1:(s[2]==='h'?0:s[2]==='a'?1:-1))):-1;
+    const row=(e,l,i)=>`<div class="row ${gana===i?'gana':''}"><div class="${conFoto&&e?'con-foto':''}">${conFoto&&e?avatar(jugadorDe(tIdx[i]),34,tIdx[i]):''}<div><b>${e?escudo(e.n,16)+e.n:'<span class="muted">'+l+'</span>'}</b><small>${e?e.j:'por definir'}</small></div></div><input type="number" min="0" max="20" inputmode="numeric" ${dis} data-k="${id}-${i}" value="${s[i]}" onchange="registrar('${id}',${i},this.value)"></div>`;
     const versus=(id==='F'&&X&&Y&&!(s[0]!==''&&s[1]!==''))?`<div class="versus">${avatar(jugadorDe(x),64,x)}<span class="vs">VS</span>${avatar(jugadorDe(y),64,y)}</div>`:'';
-    return `<div class="ko ${cls}" style="--i:${id==='F'?6:id[0]==='S'?4+ +id[1]:+id[1]-1}"><div class="lbl"><span>${id==='F'?'Final':id[0]==='Q'?'Cuartos '+id[1]:'Semifinal '+id[1]}</span><span>${t}</span></div>
+    return `<div class="ko grande ${cls}" style="--i:${id==='F'?6:id[0]==='S'?4+ +id[1]:+id[1]-1}"><div class="lbl"><span>${id==='F'?'Final':id[0]==='Q'?'Cuartos '+id[1]:'Semifinal '+id[1]}</span><span>${t}</span></div>
       ${versus}${row(X,lx,0)}${row(Y,ly,1)}
       ${tie?`<div class="pen">Penales, ganó: <select onchange="registrar('${id}',2,this.value)"><option value="">—</option><option value="h" ${s[2]==='h'?'selected':''}>${X.n}</option><option value="a" ${s[2]==='a'?'selected':''}>${Y.n}</option></select></div>`:''}
     </div>`;
