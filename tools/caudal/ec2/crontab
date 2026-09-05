@@ -1,0 +1,19 @@
+# Crontab de la instancia de Caudal (ec2-user). Hora LOCAL de Bogotá: el
+# user-data fija la zona horaria del sistema y CRON_TZ la repite por si acaso.
+# Mismas horas que tenían los launchd de la Mac. Los run_*.sh leen CAUDAL_REPO.
+CRON_TZ=America/Bogota
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+CAUDAL_REPO=/srv/caudal/ricardoruiz.co
+HOME=/home/ec2-user
+
+# rastreo diario: Senado, Cámara, órdenes del día, SECOP, SUCOP, ANLA, dataset, gacetas
+0  8  * * * /bin/bash /srv/caudal/ricardoruiz.co/tools/leyes-senado/run_diario.sh
+30 19 * * * /bin/bash /srv/caudal/ricardoruiz.co/tools/leyes-senado/run_diario.sh
+# alertas por correo, ~45 min después del rastreo
+45 8  * * * /bin/bash /srv/caudal/ricardoruiz.co/tools/caudal/alertas/run_alertas.sh
+15 20 * * * /bin/bash /srv/caudal/ricardoruiz.co/tools/caudal/alertas/run_alertas.sh
+# brief de la mañana
+15 7  * * * /bin/bash /srv/caudal/ricardoruiz.co/tools/brief/run_brief.sh
+# el repo se actualiza solo (lo que se pushea a main llega a la instancia sin scp)
+50 7  * * * cd /srv/caudal/ricardoruiz.co && git pull -q --ff-only origin main

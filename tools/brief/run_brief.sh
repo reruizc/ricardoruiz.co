@@ -5,9 +5,9 @@
 # ~/.config/caudal/alertas.env, igual que hace el motor de alertas.
 
 set -uo pipefail
-export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-REPO="/Users/ricardoruiz/ricardoruiz.co"
+REPO="${CAUDAL_REPO:-/Users/ricardoruiz/ricardoruiz.co}"   # la instancia EC2 lo pasa por el crontab
 AQUI="$REPO/tools/brief"
 SALIDA="$REPO/Bases de datos/brief"
 LOG="$SALIDA/brief.log"
