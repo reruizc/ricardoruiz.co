@@ -204,6 +204,29 @@
   .destello{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 42%,rgba(255,255,255,.9),transparent 42%);
     opacity:0;animation:flash .7s .75s both}
   @keyframes flash{0%{opacity:0}18%{opacity:.85}100%{opacity:0}}
+  /* ---- las llaves van por rondas: la que se juega grande, las jugadas plegadas ---- */
+  #llaves{display:flex;flex-direction:column;gap:18px}
+  .ronda>h3{margin:0 0 10px;font-size:1.15rem;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .ronda>h3 span{font-size:.82rem;color:var(--dim);font-weight:400}
+  .cajas{display:grid;gap:12px}
+  .cajas.c4{grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}
+  .cajas.c2{grid-template-columns:repeat(auto-fit,minmax(310px,1fr))}
+  .cajas.c1{max-width:560px;margin:0 auto}
+  .ronda.term>details{border:1px solid var(--line);border-radius:12px;background:rgba(14,26,18,.45)}
+  .ronda.term summary{list-style:none;cursor:pointer;padding:11px 32px 11px 14px;position:relative;font-weight:700;color:var(--dim)}
+  .ronda.term summary::-webkit-details-marker{display:none}
+  .ronda.term summary::after{content:"▾";position:absolute;right:14px;color:var(--green2);transition:transform .2s}
+  .ronda.term details:not([open]) summary::after{transform:rotate(-90deg)}
+  .ronda.term summary b{color:var(--ink)}
+  .ronda.term .cajas{padding:0 12px 12px}
+  .ronda.term .ko{background:rgba(0,0,0,.2)}
+  .ronda.term .ko .row .av,.ronda.fut .ko .row .av{width:30px;height:30px;font-size:.85rem;margin-right:8px}
+  .ronda.term .ko .row b{font-size:.92rem}
+  .ronda.term .ko .row small{font-size:.72rem}
+  .ronda.term .ko input{width:40px;height:30px;font-size:.95rem}
+  .ronda.fut .ko{opacity:.55}
+  .ko.esfinal{border-color:var(--gold);box-shadow:0 0 0 1px rgba(245,197,66,.3),0 0 44px rgba(245,197,66,.16)}
+  .ronda.esfinalr>h3{color:var(--gold)}
   .tag{font-size:.7rem;padding:2px 7px;border-radius:6px;background:#132417;color:var(--dim);border:1px solid var(--line)}
   @media(max-width:720px){
     details.fecha>summary{flex-wrap:wrap}
@@ -253,7 +276,7 @@
   <h2>Eliminatorias <span class="tag">4 min por tiempo · 10 min por partido</span></h2>
   <div class="muted" style="margin-bottom:10px">Descanso 14:12 → 14:25 · Cuartos 14:25 · Semis 15:05 · Final 15:25 (con penales si hace falta)</div>
   <div id="panel-sorteo" style="margin-bottom:14px"></div>
-  <div class="bracket" id="llaves"></div>
+  <div id="llaves"></div>
   <div class="champ" id="campeon" hidden></div>
 </section>
 
@@ -614,31 +637,44 @@ function ganador(id,x,y){ // x,y = índices de equipo o null
 function renderLlaves(){
   const B=bracketAlDia()?BRACKET:[[null,null],[null,null],[null,null],[null,null]];
   const HOR=['14:25','14:35','14:45','14:55'];
-  const Q=B.map((par,i)=>['Q'+(i+1),HOR[i],par[0],par[1],'Sorteo pendiente','Sorteo pendiente']);
+  const Q=B.map((par,i)=>['Q'+(i+1),HOR[i],par[0],par[1]]);
   const w=Q.map(q=>ganador(q[0],q[2],q[3]));
-  const SF=[['S1','15:05',w[0],w[1],'Gana Q1','Gana Q2'],['S2','15:15',w[2],w[3],'Gana Q3','Gana Q4']];
+  const SF=[['S1','15:05',w[0],w[1]],['S2','15:15',w[2],w[3]]];
   const ws=SF.map(q=>ganador(q[0],q[2],q[3]));
-  const F=[['F','15:25',ws[0],ws[1],'Gana S1','Gana S2']];
-  const box=(q,cls='')=>{
-    const [id,t,x,y,lx,ly]=q, s=S[id]||['','',''], X=x!=null?equipo(x):null, Y=y!=null?equipo(y):null;
-    const dis=(x==null||y==null)?'disabled':'', tie=s[0]!==''&&s[1]!==''&&+s[0]===+s[1];
-    const conFoto=true, tIdx=[x,y];
-    const gana=(s[0]!==''&&s[1]!=='')?(+s[0]>+s[1]?0:(+s[1]>+s[0]?1:(s[2]==='h'?0:s[2]==='a'?1:-1))):-1;
-    const row=(e,l,i)=>`<div class="row ${gana===i?'gana':''}"><div class="${conFoto&&e?'con-foto':''}">${conFoto&&e?avatar(jugadorDe(tIdx[i]),34,tIdx[i]):''}<div><b>${e?escudo(e.n,16)+e.n:'<span class="muted">'+l+'</span>'}</b><small>${e?e.j:'por definir'}</small></div></div><input type="number" min="0" max="20" inputmode="numeric" ${dis} data-k="${id}-${i}" value="${s[i]}" onchange="registrar('${id}',${i},this.value)"></div>`;
-    const versus=(id==='F'&&X&&Y&&!(s[0]!==''&&s[1]!==''))?`<div class="versus">${avatar(jugadorDe(x),64,x)}<span class="vs">VS</span>${avatar(jugadorDe(y),64,y)}</div>`:'';
-    return `<div class="ko grande ${cls}" style="--i:${id==='F'?6:id[0]==='S'?4+ +id[1]:+id[1]-1}"><div class="lbl"><span>${id==='F'?'Final':id[0]==='Q'?'Cuartos '+id[1]:'Semifinal '+id[1]}</span><span>${t}</span></div>
-      ${versus}${row(X,lx,0)}${row(Y,ly,1)}
-      ${tie?`<div class="pen">Penales, ganó: <select onchange="registrar('${id}',2,this.value)"><option value="">—</option><option value="h" ${s[2]==='h'?'selected':''}>${X.n}</option><option value="a" ${s[2]==='a'?'selected':''}>${Y.n}</option></select></div>`:''}
+  const F=[['F','15:25',ws[0],ws[1]]];
+  const qListos=w.every(x=>x!=null), sListos=qListos&&ws.every(x=>x!=null);
+
+  const box=(q,modo)=>{
+    const [id,t,x,y]=q, sc=S[id]||['','',''], X=x!=null?equipo(x):null, Y=y!=null?equipo(y):null;
+    const dis=(x==null||y==null)?'disabled':'', tie=sc[0]!==''&&sc[1]!==''&&+sc[0]===+sc[1];
+    const grande=modo==='act', tIdx=[x,y];
+    const lbl=id==='F'?'Final':id[0]==='Q'?'Cuartos '+id[1]:'Semifinal '+id[1];
+    const gana=(sc[0]!==''&&sc[1]!=='')?(+sc[0]>+sc[1]?0:(+sc[1]>+sc[0]?1:(sc[2]==='h'?0:sc[2]==='a'?1:-1))):-1;
+    const espera=id[0]==='S'?('Gana cuartos '+(id[1]==='1'?'1 y 2':'3 y 4')):id==='F'?'Gana la semifinal':'Sorteo pendiente';
+    const row=(e,l,i)=>`<div class="row ${gana===i?'gana':''}"><div class="${e?'con-foto':''}">${e?avatar(jugadorDe(tIdx[i]),grande?52:30,tIdx[i]):''}<div><b>${e?escudo(e.n,grande?16:14)+e.n:'<span class="muted">'+l+'</span>'}</b><small>${e?e.j:'por definir'}</small></div></div><input type="number" min="0" max="20" inputmode="numeric" ${dis} data-k="${id}-${i}" value="${sc[i]}" onchange="registrar('${id}',${i},this.value)"></div>`;
+    const duelo=(id==='F'&&X&&Y&&!(sc[0]!==''&&sc[1]!==''))?`<div class="versus">${avatar(jugadorDe(x),64,x)}<span class="vs">VS</span>${avatar(jugadorDe(y),64,y)}</div>`:'';
+    return `<div class="ko ${grande?'grande':''} ${id==='F'&&grande?'esfinal':''}"><div class="lbl"><span>${lbl}</span><span>${t}</span></div>
+      ${duelo}${row(X,espera,0)}${row(Y,espera,1)}
+      ${tie?`<div class="pen">Penales, ganó: <select onchange="registrar('${id}',2,this.value)"><option value="">—</option><option value="h" ${sc[2]==='h'?'selected':''}>${X.n}</option><option value="a" ${sc[2]==='a'?'selected':''}>${Y.n}</option></select></div>`:''}
     </div>`;
   };
-  document.getElementById('llaves').innerHTML=`<div class="round">${Q.map(q=>box(q)).join('')}</div><div class="round">${SF.map(q=>box(q)).join('')}</div><div class="round">${box(F[0],'final')}</div>`;
-  const c=ganador('F',ws[0],ws[1]); const el=document.getElementById('campeon');
-  if(c!=null){const e=equipo(c); el.hidden=false; const conf=Array.from({length:28},(_,k)=>`<span class="confeti" style="left:${(k*3.6)%100}%;background:${['#f5c542','#4ade80','#3b82f6','#ef4444','#fff'][k%5]};animation-duration:${2.6+(k%5)*.5}s;animation-delay:${(k%7)*.35}s"></span>`).join('');
-    el.innerHTML=`${conf}<div class="muted">🏆 CAMPEÓN DE LA COPA DE LOS 8</div><div style="margin:12px 0 6px">${avatar(jugadorDe(c),120,c)}</div><div style="margin:4px 0">${escudo(e.n,40)}</div><div class="big">${e.j}</div><div>con ${e.n}</div>`;} else el.hidden=true;
-}
+  const ronda=(esFinal,titulo,sub,items,modo,cols)=>{
+    const cajas=`<div class="cajas c${cols}">${items.map(q=>box(q,modo)).join('')}</div>`;
+    if(modo==='term') return `<div class="ronda term"><details><summary><b>${titulo}</b> · ${sub}</summary>${cajas}</details></div>`;
+    return `<div class="ronda ${modo==='act'?'act':'fut'} ${esFinal&&modo==='act'?'esfinalr':''}"><h3>${titulo}<span>${sub}</span></h3>${cajas}</div>`;
+  };
+  document.getElementById('llaves').innerHTML=[
+    ronda(false,'Cuartos de final', qListos?'terminados':'14:25 → 14:55', Q, qListos?'term':'act', 4),
+    ronda(false,'Semifinales', sListos?'terminadas':(qListos?'15:05 y 15:15':'salen de los cuartos'), SF, sListos?'term':(qListos?'act':'fut'), 2),
+    ronda(true,'La final', sListos?'15:25 · el que gana se lleva la copa':'sale de las semifinales', F, sListos?'act':'fut', 1)
+  ].join('');
 
-function setG(id,i,v){ S[id]=S[id]||['','','']; S[id][i]=v; guardarLocal(); render();
-  const el=document.querySelector(`[data-k="${id}-${i}"]`); if(el){el.focus();}
+  const c=ganador('F',ws[0],ws[1]); const el=document.getElementById('campeon');
+  if(c!=null){const e=equipo(c);
+    const conf=Array.from({length:28},(_,k)=>`<span class="confeti" style="left:${(k*3.6)%100}%;background:${['#f5c542','#4ade80','#3b82f6','#ef4444','#fff'][k%5]};animation-duration:${2.6+(k%5)*.5}s;animation-delay:${(k%7)*.35}s"></span>`).join('');
+    el.hidden=false;
+    el.innerHTML=`${conf}<div class="muted">🏆 CAMPEÓN DE LA COPA DE LOS 8</div><div style="margin:12px 0 6px">${avatar(jugadorDe(c),120,c)}</div><div style="margin:4px 0">${escudo(e.n,40)}</div><div class="big">${e.j}</div><div>con ${e.n}</div>`;
+  } else el.hidden=true;
 }
 // ---------- registrar un marcador: cualquiera puede, con confirmacion ----------
 function quienSoy(){
