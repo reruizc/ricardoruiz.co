@@ -29,6 +29,7 @@ PREFIX=ricardoruiz.co/brujula-asuncion/respuestas
 ALLOWED_ORIGIN=https://ricardoruiz.co
 AUTH_ME=https://rr-auth.reruizc.workers.dev/auth/me
 MAX_ADMIN_ROWS=10000
+BRUJULA_ADMINS=nuevagemela@gmail.com   # correos con acceso al panel SIN ser admin global de rr-auth
 ```
 
 ## Servir la Brújula desde otro dominio
@@ -79,9 +80,44 @@ curl -s -o /dev/null -D- -X OPTIONS "https://ha0iona65c.execute-api.us-east-1.am
   -H "Access-Control-Request-Headers: authorization" | grep -i access-control-allow-origin
 ```
 
+## ⚠️⚠️ El panel decía "sin permisos" a TODOS, incluido el admin (sep-5-2026)
+
+`is_admin()` valida el token llamando a `rr-auth /auth/me` con `urllib`, y `urllib` sin
+`User-Agent` propio se presenta como `Python-urllib/3.13`. **Cloudflare (bot fight del
+worker) responde `403 · error code: 1010` a esa firma**, así que la Lambda recibía un
+`URLError`, devolvía `False` y `admin.html` mostraba *"Esta cuenta no tiene permisos"*
+aunque la sesión fuera de `reruizc@gmail.com`. Medido: mismo pedido con
+`-A "brujula-asuncion-lambda/1 (+https://ricardoruiz.co)"` → `401` JSON del worker (o
+sea, pasa el bot fight y el worker evalúa el token). Es por User-Agent, no por IP. En 30
+días de logs no hay una sola invocación con la duración de un listado exitoso: **las
+respuestas se guardaban bien (20 en S3), pero nadie las había podido leer por el panel.**
+Fix: `User-Agent` explícito en `is_admin`. Regla general del sitio: todo cliente Python que
+hable con `rr-auth` tiene que mandar un UA propio (mismo gotcha del motor de alertas).
+
+Ese mismo día quedaron aplicados los tres comandos de arriba: `ALLOWED_ORIGIN` de la
+Lambda y la `CorsConfiguration` de la HTTP API incluyen `https://brujulapolitica.pages.dev`
+(verificado: el preflight desde ese origen ya devuelve `access-control-allow-origin`).
+`brujulapolitica.com` NO es nuestro (un sitio ajeno con MediosCMS); el dominio de Pages
+sigue siendo `brujulapolitica.pages.dev` hasta que el equipo compre uno.
+
 El rol de Lambda usa permisos de logs y la política de `policy.json`. La URL ya está
 configurada en `brujula-asuncion/config.js`. El panel queda en
 `/brujula-asuncion/admin.html`.
 
 La captura es deliberadamente anónima: la Lambda aplica whitelist y no guarda IP,
 User-Agent, correo, nombre, coordenadas ni local de votación.
+
+## Quién ve el panel (sep-5-2026)
+
+`is_admin()` acepta dos cosas: el `isAdmin` global de `rr-auth` (hoy solo
+`reruizc@gmail.com`) **o** un correo de la lista `BRUJULA_ADMINS` de la Lambda. La lista
+existe para no volver admin de TODO el sitio a la cliente del caso: `nuevagemela@gmail.com`
+entra a este panel y a nada más. Como la variable vive en la Lambda, el correo no queda
+en el repo público. Para sumar a alguien: agregarlo a `BRUJULA_ADMINS` con
+`update-function-configuration` (⚠️ `--environment` reemplaza el bloque entero: van las
+seis variables). La persona además tiene que **tener cuenta en `register.html` con ese
+correo exacto**; autorizar el correo no crea la cuenta.
+
+`admin.html` ya no exige `isAdmin` en el navegador: confirma que la sesión exista y deja
+que la Lambda decida (403 → "esta cuenta no está autorizada"). Así la lista se administra
+en un solo sitio.

@@ -23,6 +23,9 @@ ALLOWED_ORIGINS = [o.strip().rstrip("/") for o in
                    os.environ.get("ALLOWED_ORIGIN", _DEFAULT_ORIGIN).split(",") if o.strip()] \
                   or [_DEFAULT_ORIGIN]
 MAX_ADMIN_ROWS = int(os.environ.get("MAX_ADMIN_ROWS", "10000"))
+# Correos con acceso al panel de ESTE módulo, sin ser admin global de rr-auth
+# (p. ej. la cliente del caso). Lista separada por comas, comparada en minúsculas.
+BRUJULA_ADMINS = {e.strip().lower() for e in os.environ.get("BRUJULA_ADMINS", "").split(",") if e.strip()}
 s3 = boto3.client("s3")
 
 CANDIDATOS = {"camilo", "soledad", "none"}
@@ -108,11 +111,19 @@ def sanitize(data):
 def is_admin(token):
     if not token:
         return False
-    req = urllib.request.Request(AUTH_ME, headers={"Authorization": f"Bearer {token}"})
+    # ⚠️ Sin User-Agent propio, Cloudflare (bot fight del worker rr-auth) responde
+    # 403 "error code: 1010" a urllib y este chequeo devolvía False para TODOS —
+    # el panel decía "sin permisos" aunque la cuenta fuera admin. Medido sep-2026.
+    req = urllib.request.Request(AUTH_ME, headers={
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "brujula-asuncion-lambda/1 (+https://ricardoruiz.co)",
+    })
     try:
         with urllib.request.urlopen(req, timeout=5) as res:
             body = json.loads(res.read().decode("utf-8"))
-        return bool((body.get("user") or {}).get("isAdmin"))
+        user = body.get("user") or {}
+        email = str(user.get("email") or "").strip().lower()
+        return bool(user.get("isAdmin")) or (email in BRUJULA_ADMINS)
     except (urllib.error.URLError, ValueError, TimeoutError):
         return False
 
