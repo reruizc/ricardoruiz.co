@@ -29,14 +29,6 @@
      durante la caída. Agregar gente ACÁ ya no sirve — hay que otorgar por CLI. */
   const EMERGENCIA = ['reruizc@gmail.com', 'nuevagemela@gmail.com', 'diego@cauce.co'];
 
-  /* ---------- cursor ---------- */
-  const cur=document.getElementById('cur'), ring=document.getElementById('curRing');
-  // Sin los dos nodos no hay cursor propio que mover; sin la guarda, el listener
-  // reventaría en cada movimiento del mouse y se llevaría por delante lo demás.
-  if(cur&&ring){
-  addEventListener('mousemove',e=>{cur.style.left=ring.style.left=e.clientX+'px'; cur.style.top=ring.style.top=e.clientY+'px';});
-  addEventListener('mouseover',e=>{const h=e.target.closest('button,a,.chip,.tl-item,input,select,.modal-close,.info-i,.pcard.live,.pcard.data,.pill-back,.sec-card,.pf-sug div,.chip .x'); ring.style.opacity=h?'1':'.5'; ring.style.transform=`translate(-50%,-50%) scale(${h?1.4:1})`;});
-  }
   // tooltips ⓘ: toggle al click; cierra al clickear afuera
   addEventListener('click',e=>{
     const i=e.target.closest('.info-i');
@@ -72,7 +64,7 @@
   // visitante frente a una pantalla de "verificando" mientras responde el worker
   // es la versión educada del "contáctenos" de la competencia.
   const token=localStorage.getItem('rr-token'); const uRaw=localStorage.getItem('rr-user');
-  const user=uRaw?JSON.parse(uRaw):null;
+  let user=null; try{user=uRaw?JSON.parse(uRaw):null;}catch(e){}
   const enEmergencia=em=>!!em&&EMERGENCIA.includes(String(em).toLowerCase().trim());
   const toLogin=()=>{localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');location.replace('login.html');};
   // ACCESO decide el muro · IS_GUEST es invitado por link (sin cuenta → no puede
@@ -158,14 +150,14 @@
     }
     if(!HAS_SESSION){
       // La entrada pública de esta plataforma es su portada, no la página raíz.
-      nl.innerHTML='<a href="portada-caudal.html" class="e-btn-back" id="navBack">← Caudal</a>'
-                 + '<a href="login.html" class="e-btn-logout nav-login" style="text-decoration:none">Iniciar sesión</a>';
+      nl.innerHTML='<a href="caudal-portada.html" class="e-btn-back" id="navBack">← Caudal</a>'
+                 + '<a href="login.html?next=caudal.html" class="e-btn-logout nav-login" style="text-decoration:none">Iniciar sesión</a>';
       pintarBack();
       return;
     }
     // La entrada de Caudal siempre es su propia portada; el dashboard no debe
     // interrumpir la navegación entre la explicación del producto y el panel.
-    nl.innerHTML='<a href="portada-caudal.html" class="e-btn-back" id="navBack">← Caudal</a>'
+    nl.innerHTML='<a href="caudal-portada.html" class="e-btn-back" id="navBack">← Caudal</a>'
                + (ACCESO?'<span class="priv-badge">Cliente</span>':'')
                + '<button class="e-btn-logout" id="navLogout" type="button">Salir</button>';
     const lo=document.getElementById('navLogout'); if(lo) lo.onclick=toLogin;
@@ -190,48 +182,47 @@
   // Pinta el botón «atrás» según la pila. Se llama desde showView Y desde
   // pintarNav, porque pintarNav REHACE el botón con innerHTML: sin volver a
   // cablear aquí, el enlace se queda con su href y saca al usuario del producto.
+  const VIEW_NAMES={home:'Explorar Caudal',buscar:'Resultados de búsqueda',congreso:'Congreso',control:'Órganos de control',regulatorio:'Regulatorio',ejecutivo:'Ejecutivo',sucop:'Consulta pública',gacetas:'Gacetas',contratacion:'Contratación',cliente:'Radar',medios:'Medios',radicados:'Últimos radicados',bancadas:'Disciplina de bancada',coaliciones:'Coaliciones'};
+  const VIEW_PARENT={radicados:'congreso',bancadas:'congreso',coaliciones:'bancadas'};
+  let _navStack=[];
   function pintarBack(){
     const nb=document.getElementById('navBack'); if(!nb) return;
-    if(_view==='cliente'){
-      nb.hidden=false; nb.textContent='← Volver a Caudal';
-      nb.onclick=e=>{ e.preventDefault(); showView('home'); };
+    nb.hidden=false;
+    if(_view==='home'){
+      nb.textContent='← Qué es Caudal'; nb.href='caudal-portada.html'+(GUEST_TOKEN?'?acceso='+encodeURIComponent(GUEST_TOKEN):''); nb.onclick=null;
       return;
     }
-    const prev=_navStack[_navStack.length-1];
-    if(prev){
-      nb.hidden=false; nb.textContent='← Volver';
-      nb.onclick=e=>{ e.preventDefault(); irAtras(); };
-      return;
-    }
-    // pila vacía: el enlace hace lo suyo (dashboard o el sitio) según la nav.
-    // El invitado no tiene a dónde salir, así que ahí el botón se esconde.
-    nb.onclick=null;
-    nb.hidden=!!IS_GUEST;
-    if(!IS_GUEST) nb.textContent='← Caudal';
+    const prev=_navStack[_navStack.length-1]||VIEW_PARENT[_view]||'home';
+    nb.textContent='← '+VIEW_NAMES[prev]; nb.href='#'+prev;
+    nb.onclick=e=>{if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();irAtras();};
   }
   function irAtras(){
-    const prev=_navStack.pop();
-    if(prev) showView(prev,{atras:true});
+    if(_navStack.length){history.back();return;}
+    showView(VIEW_PARENT[_view]||'home',{atras:true});
   }
-
-  // Pila de vistas: «atrás» devuelve al sitio DE DONDE VINIMOS, no a la portada.
-  // Antes, entrar por la búsqueda universal a un pilar y darle atrás te sacaba a
-  // la portada y te hacía repetir la consulta.
-  let _navStack=[];
-  function showView(v,opt){
-    if(_view && _view!==v && !(opt&&opt.atras)){
-      _navStack.push(_view);
-      if(_navStack.length>24) _navStack.shift();   // tope: es historial, no un log
+  function showView(v,opt={}){
+    if(!Object.prototype.hasOwnProperty.call(VIEW_NAMES,v)) return;
+    const changed=_view!==v;
+    if(changed && !opt.initial && !opt.history){
+      _navStack.push(_view||'home');
+      if(_navStack.length>24)_navStack.shift();
+      history.pushState({caudal:true,stack:_navStack.slice()},'',location.pathname+location.search+'#'+v);
+    }else if(opt.initial){
+      _navStack=[];
+      history.replaceState({caudal:true,stack:[]},'',location.pathname+location.search+'#'+v);
     }
     _view=v;
-    ['home','buscar','congreso','control','regulatorio','ejecutivo','sucop','gacetas','contratacion','cliente','medios','radicados','bancadas','coaliciones'].forEach(n=>{ const el=document.getElementById('view-'+n); if(el) el.hidden=(v!==n); });
-    window.scrollTo(0,0);
+    Object.keys(VIEW_NAMES).forEach(n=>{const el=document.getElementById('view-'+n);if(el)el.hidden=(v!==n);});
+    window.scrollTo({top:0,behavior:'instant'});
     pintarBack();
+    if(changed){
+      document.dispatchEvent(new CustomEvent('caudal:view',{detail:v}));
+      const target=document.querySelector('#view-'+v+' h1, #view-'+v+' input');
+      if(target&&!opt.initial){if(target.tagName==='H1')target.setAttribute('tabindex','-1');target.focus({preventScroll:true});}
+    }
     if(v==='congreso') requestAnimationFrame(()=>document.querySelectorAll('#view-congreso .mort-bar').forEach(x=>x.style.height=x.dataset.h+'%'));
     if(v==='regulatorio') hook('regLoadStats');
     if(v==='ejecutivo') hook('ejeLoadStats');
-    // SUCOP se recarga en CADA entrada, no solo la primera: su landing es una
-    // cuenta regresiva y un caché de sesión la dejaría mintiendo.
     if(v==='sucop') hook('sucLoadStats');
     if(v==='gacetas') hook('gacLoadStats');
     if(v==='contratacion') hook('conLoadStats');
@@ -241,6 +232,13 @@
     if(v==='bancadas') hook('bancLoad');
     if(v==='coaliciones') hook('coaLoad');
   }
+  addEventListener('popstate',e=>{
+    const raw=location.hash.slice(1)||'home';
+    const v=raw==='sextante'?'cliente':raw;
+    if(!Object.prototype.hasOwnProperty.call(VIEW_NAMES,v)) return;
+    _navStack=e.state&&e.state.caudal?e.state.stack||[]:[];
+    showView(v,{history:true});
+  });
 
   /* ---------- hooks de las vistas ----------
      Viven en el <script> inline de caudal.html y se publican en `window` al

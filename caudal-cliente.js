@@ -75,16 +75,13 @@
     const h1=document.getElementById('cli-h1');
     if(h1) h1.innerHTML=`<em>${esc(N)}</em>.`;
     const sub=document.getElementById('cli-sub');
-    if(sub) sub.textContent=`Arma el perfil de tu cliente —sus temas y las empresas que vigila— y `
-      +`${N} orienta en cuatro direcciones: lo que produce el Estado, lo que hace su competencia, `
-      +`lo que se está diciendo y lo que se está abriendo. Descarta el ruido y deja las señales que `
-      +`mueven su aguja, cada una con su estado real y una acción sugerida.`;
+    if(sub) sub.textContent='Crea el perfil de un cliente o explora un sector. El radar cruza el Estado, la competencia, la conversación pública y las oportunidades para priorizar qué necesita atención.';
     const r=document.getElementById('cli-rosa');
     if(r){
       r.innerHTML=`<div class="sext-stage">
         <img src="imagenes/caudal-sextante-mar.jpg" alt="" />
         ${MARCA.puntos.map(p=>`<button type="button" class="sext-pt ${p.dir}" data-c="${p.c}" aria-label="${esc(p.rumbo)}: ${esc(p.t)}"><span class="sext-let">${esc(p.let||p.c)}</span><span class="sext-lab">${esc(p.rumbo)}</span></button>`).join('')}
-        <div class="sext-desc" id="sextDesc"></div>
+        <div class="sext-desc" id="sextDesc" role="status" aria-live="polite"></div>
       </div>`;
       const desc=document.getElementById('sextDesc');
       r.querySelectorAll('.sext-pt').forEach(btn=>{
@@ -92,7 +89,7 @@
           ev.stopPropagation();
           const p=MARCA.puntos.find(x=>x.c===btn.dataset.c);
           if(!p||!desc) return;
-          r.querySelectorAll('.sext-pt').forEach(b=>b.classList.toggle('on', b===btn));
+          r.querySelectorAll('.sext-pt').forEach(b=>{b.classList.toggle('on', b===btn);b.setAttribute('aria-pressed',String(b===btn));});
           desc.className=`sext-desc at-${p.dir}`;
           desc.innerHTML=`<b>${esc(p.rumbo)}: ${esc(p.t)}</b> — ${esc(p.d)}`;
         };
@@ -104,10 +101,8 @@
     // portada: la tarjeta que lleva acá
     const t=document.querySelector('#radar-cta .rc-t'); if(t) t.textContent=N;
     const d=document.querySelector('#radar-cta .rc-d');
-    if(d) d.textContent=`Elige un sector o arma el perfil de tu cliente y ${N} cruza el Estado, `
-      +`su competencia y la conversación pública, filtra el ruido y te deja las señales que mueven `
-      +`su aguja, ya leídas y con una acción sugerida.`;
-    const g=document.querySelector('#radar-cta .rc-go'); if(g) g.textContent=`Abrir ${A} ${N} →`;
+    if(d) d.textContent='Sigue un sector o un cliente: el Estado, su competencia y la conversación pública, en un radar con señales priorizadas.';
+    const g=document.querySelector('#radar-cta .rc-go'); if(g) g.textContent='Abrir radar →';
     const e=document.querySelector('#cli-body .cli-empty');
     if(e) e.textContent=`Crea el perfil de un cliente —o abre un sector de muestra— para orientarlo.`;
   }
@@ -120,7 +115,7 @@
     // cuando el usuario los necesita.
     if(cont){
       const pinta=(lista,cls)=>lista.forEach(([k,t,reg])=>{
-        const c=document.createElement('span');
+        const c=document.createElement('button'); c.type='button';
         c.className='chip sec-chip'+(reg?' con-reg':'')+(cls?' '+cls:'');
         c.dataset.sec=k; c.textContent=t;
         c.title=cls?'Perfil de cliente real · varias líneas de negocio'
@@ -298,15 +293,15 @@
     }
     let h='<span class="pf-lbl">Perfiles de cliente</span>';
     const visibles=PF_LIST.filter(p=>(p.nombre||'').trim().toLowerCase()!=='prueba a2 editada');
-    h+=visibles.map(p=>`<span class="chip${PF_ACTIVE&&PF_ACTIVE.perfilId===p.perfilId?' on':''}" data-pf="${esc(p.perfilId)}" title="${esc(p.n_temas)} tema(s) · ${esc(p.n_empresas)} empresa(s) vigilada(s)">${esc(p.nombre)}</span>`).join('');
+    h+=visibles.map(p=>`<button type="button" class="chip${PF_ACTIVE&&PF_ACTIVE.perfilId===p.perfilId?' on':''}" data-pf="${esc(p.perfilId)}" title="${esc(p.n_temas)} tema(s) · ${esc(p.n_empresas)} empresa(s) vigilada(s)">${esc(p.nombre)}</button>`).join('');
     if(!visibles.length) h+='<span class="cob-note" style="margin:0">Todavía no tienes ninguno.</span>';
-    h+='<span class="chip add" data-pfnew="1">+ Nuevo perfil</span>';
+    h+='<button type="button" class="chip add" data-pfnew="1">+ Nuevo perfil</button>';
     if(PF_LIMIT) h+=`<span class="cob-note" style="margin:0">${PF_LIMIT.usados}/${PF_LIMIT.tope} · plan ${esc(PF_LIMIT.plan)}</span>`;
     // Puerta al editor del perfil abierto. Sin esto `pfEditar` quedaba huérfana
     // y un perfil guardado no se podía ni corregir ni borrar: `pfBorrar` exige
     // `PF_DRAFT.perfilId`, que solo existe cuando el editor abre uno existente.
     if(PF_ACTIVE&&PF_ACTIVE.perfilId)
-      h+=`<span class="chip add" data-pfedit="1" title="Corregir los temas, las empresas o el nombre de «${esc(PF_ACTIVE.nombre||'')}»">✎ Editar</span>`;
+      h+=`<button type="button" class="chip add" data-pfedit="1" title="Corregir los temas, las empresas o el nombre de «${esc(PF_ACTIVE.nombre||'')}»">✎ Editar</button>`;
     // El interruptor sale para el perfil abierto: es de ese perfil, no global.
     if(PF_ACTIVE&&PF_ACTIVE.perfilId) h+=pfAlertasHTML(PF_ACTIVE);
     bar.innerHTML=h;
@@ -859,7 +854,7 @@
   function cliMuroLectura(){
     const el=document.getElementById('cli-lectura-body'); if(!el) return;
     el.innerHTML=`<div class="muro-t" style="margin-bottom:.7rem">Acá va el briefing del día: qué señales de las de arriba mueven la aguja, por qué, y qué hacer con cada una. Se escribe sobre esto mismo, y va con acceso.</div>`
-      + `<a class="muro-btn" href="${window.COMPRA_URL||'caudal-portada.html?comprar=1'}">Conseguir acceso →</a>`
+      + `<a class="muro-btn" href="${window.COMPRA_URL||'caudal-pricing.html?comprar=1'}">Conseguir acceso →</a>`
       + ` <a class="muro-btn" style="opacity:.75" href="${mailtoHref('acceso · '+MARCA.nombre)}">o escríbenos · ${CONTACTO_MAIL}</a>`;
   }
   // La lectura se genera aparte del radar: medida contra producción tarda entre
