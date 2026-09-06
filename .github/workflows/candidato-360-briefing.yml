@@ -1,0 +1,50 @@
+name: Candidato 360 · briefing
+
+# Corre a diario a las 07:30 de Bogotá (12:30 UTC; Colombia no cambia de hora).
+# El motor decide a quién le toca: cada vínculo recibe su briefing cuando el
+# último envío tiene 3 días o más. Lee fuentes públicas (Lambda caudal-analiza)
+# y el worker rr-auth; no necesita AWS ni disco entre corridas.
+#
+# Necesita el secreto CAUDAL_ALERTAS_TOKEN en el repositorio (Settings →
+# Secrets → Actions), el MISMO valor que tiene el worker. Es el mismo secreto
+# que usa mi-congreso-alertas.yml.
+on:
+  schedule:
+    - cron: '30 12 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Solo simular (no manda correos ni sella el snapshot)'
+        type: boolean
+        default: false
+      forzar:
+        description: 'Ignorar la cadencia de 3 días'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: candidato-360-briefing
+  cancel-in-progress: false
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Correr el motor
+        env:
+          CAUDAL_ALERTAS_TOKEN: ${{ secrets.CAUDAL_ALERTAS_TOKEN }}
+        run: |
+          if [ -z "$CAUDAL_ALERTAS_TOKEN" ]; then
+            echo "::error::Falta el secreto CAUDAL_ALERTAS_TOKEN en el repositorio (Settings → Secrets → Actions)."
+            exit 1
+          fi
+          EXTRA=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then EXTRA="$EXTRA --dry-run"; fi
+          if [ "${{ inputs.forzar }}" = "true" ]; then EXTRA="$EXTRA --forzar"; fi
+          python3 tools/candidato-360/briefing/motor.py $EXTRA

@@ -205,9 +205,41 @@ async function guardarVinculo(payload) {
   if (!r.ok) return { ok: false, error: r.data?.error || `HTTP ${r.status}` };
   SESSION.vinculo = r.data.vinculo; return { ok: true };
 }
+let CAMPANA_ACTUAL = null;
 async function guardarCampana(campana) {
   if (!SESSION.vinculo) return;
+  CAMPANA_ACTUAL = campana;
   try { const r = await apiC360('/c360/campana', { method: 'POST', body: JSON.stringify({ campana }) }); if (r.ok) SESSION.vinculo = r.data.vinculo; } catch {}
+}
+/* La meta la calcula VoteTarget en el navegador; se guarda en la campaña para
+   que el briefing la recuerde. Solo si cambió, para no gastar escrituras de KV. */
+function guardarMeta(target) {
+  const c = CAMPANA_ACTUAL || SESSION.vinculo?.campana; if (!c || !target || !SESSION.vinculo) return;
+  if (Number(SESSION.vinculo.campana?.meta || 0) === Number(target)) return;
+  guardarCampana({ ...c, meta: target });
+}
+/* Interruptor del briefing (panel 03 del CRM). El estado vive en el vínculo. */
+function pintarBriefing() {
+  const b = SESSION.vinculo?.briefing || null, btn = $('crmBriefingBtn'), est = $('crmBriefingEstado'), sub = $('crmBriefingSub'), inp = $('crmBriefingCorreo');
+  if (!btn) return;
+  if (inp && !inp.value) inp.value = b?.correo || SESSION.user?.email || '';
+  const on = !!(b && b.activo);
+  btn.textContent = on ? 'Apagar briefing' : 'Activar briefing'; btn.classList.toggle('on', on);
+  est.textContent = on ? 'Encendido' : 'Apagado';
+  if (on) { const u = b.ultimoEnvio ? new Date(b.ultimoEnvio) : null; sub.textContent = u ? `último envío ${u.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} · ${b.envios || 0} enviados` : 'el primero sale en la próxima corrida (07:30)'; }
+  else sub.textContent = 'se activa con un clic';
+}
+async function toggleBriefing() {
+  if (!SESSION.acceso) return abrirPaywall();
+  if (!SESSION.vinculo) { alert('Primero abra el CRM de su candidatura: el briefing se ata a ella.'); return; }
+  const on = !!SESSION.vinculo.briefing?.activo, correo = ($('crmBriefingCorreo')?.value || '').trim();
+  const btn = $('crmBriefingBtn'); btn.disabled = true;
+  try {
+    const r = await apiC360('/c360/briefing', { method: 'POST', body: JSON.stringify({ activo: !on, correo }) });
+    if (!r.ok) { alert(r.data?.error || `No se pudo cambiar el briefing (HTTP ${r.status})`); return; }
+    SESSION.vinculo.briefing = r.data.briefing;
+  } finally { btn.disabled = false; }
+  pintarBriefing();
 }
 
 /* Aplica el estado de acceso a las dos rutas y a la portada. */
@@ -593,7 +625,7 @@ async function createNew(e) {
 /* ─── 8. CRM: apertura, meta de votos y foto ─────────────────────────────── */
 async function estimateVoteTarget(corp, territory) { return VoteTarget.estimate({ corp, territory: territory || crmCandidate?.circunscripcion || '', baseUrl: S3 }); }
 function pintarMeta(estimate) {
-  if (estimate.target) { $('crmVoteNumber').textContent = estimate.target.toLocaleString('es-CO'); $('crmVoteTarget').textContent = `Meta inicial: ${estimate.target.toLocaleString('es-CO')} votos`; }
+  if (estimate.target) { $('crmVoteNumber').textContent = estimate.target.toLocaleString('es-CO'); $('crmVoteTarget').textContent = `Meta inicial: ${estimate.target.toLocaleString('es-CO')} votos`; guardarMeta(estimate.target); }
   else { $('crmVoteNumber').textContent = '—'; $('crmVoteTarget').textContent = 'Meta pendiente de referencia territorial'; }
   $('crmVoteFormula').textContent = estimate.formula;
 }
@@ -620,6 +652,7 @@ async function launchCRM(event) {
     const r = await guardarVinculo({ tipo: 'historial', candidato: { id: crmCandidate.id, nombre: crmCandidate.nombre, slugs, corp: crmCandidate.corp, partido: crmCandidate.partido, circunscripcion: crmCandidate.circunscripcion }, campana });
     if (!r.ok) { if (r.existente) { alert(`Su cuenta ya está vinculada a ${vinculoDescripcion()}. Para cambiarla escriba a ${SESSION.soporte}.`); return abrirVinculo(); } if (r.sinAcceso) return abrirPaywall(); alert(`No se pudo guardar el vínculo: ${r.error}`); return; }
   } else guardarCampana(campana);
+  CAMPANA_ACTUAL = campana;
 
   $('crmBack').textContent = '← Cambiar corporación'; $('crmBack').onclick = () => showScreen('candidateRoute');
   $('crmInitials').textContent = initials(crmCandidate.nombre); $('crmName').textContent = crmCandidate.nombre;
@@ -630,6 +663,7 @@ async function launchCRM(event) {
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Mapa de historial electoral';
   showScreen('crm');
+  pintarBriefing();
   loadHistoricalMap(crmCandidate);
   renderCRMProfilePhoto(crmCandidate);
   pintarMeta(await estimateVoteTarget(corpKey, territory));
@@ -647,7 +681,9 @@ async function abrirCRMNuevo() {
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Territorio de campaña';
   document.getElementById('crmProfilePhoto')?.remove(); document.getElementById('crmProfilePhotoMissing')?.remove(); $('crmInitials').classList.remove('crm-avatar-hidden');
+  CAMPANA_ACTUAL = c;
   showScreen('crm');
+  pintarBriefing();
   renderTerritorioObjetivo(c);
   pintarMeta(await VoteTarget.estimate({ corp: c.corp, territory: lugar, baseUrl: S3 }));
 }
