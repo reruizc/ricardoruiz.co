@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Contratación pública de Colombia · SECOP II · Caudal</title>
+<meta name="description" content="Los seis millones de contratos electrónicos del Estado colombiano (SECOP II), consultados en vivo: busca por entidad, proveedor, objeto o radicado, y mira la forma real del gasto público — modalidad, tipo, territorio y quién contrata." />
+<meta property="og:title" content="La plata del Estado, rastreada · SECOP II" />
+<meta property="og:description" content="Contratos y procesos de contratación pública de Colombia, en vivo. Tres de cada cuatro contratos del Estado se firman sin proceso competitivo." />
+<meta property="og:type" content="website" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+<link href="caudal-base.css?v=20260907f" rel="stylesheet" />
+<link rel="stylesheet" href="caudal-ui.css?v=20260907b" />
+<style>
+  /* ===== layout propio de esta página ==============================
+     Dos columnas: a la izquierda cómo se busca y qué buscar, a la derecha
+     la forma del gasto. El rail NO se esconde al buscar — es justo cuando
+     una búsqueda vuelve vacía o llena de ruido cuando hacen falta las
+     reglas. */
+  /* El ancho lo fija `.caudal-app .wrap` de caudal-ui.css (1200px) y gana por
+     especificidad: acá NO se repite, para no dejar una regla que miente
+     sobre lo que la página mide de verdad. */
+  .con-land{display:grid; grid-template-columns:300px minmax(0,1fr); gap:2.2rem; align-items:start}
+  @media(max-width:920px){
+    /* En móvil no hay columnas, hay orden. El dato va primero —obligar a leer
+       seis reglas antes de ver una cifra es la forma más rápida de que nadie
+       lea ninguna— pero los TEMAS suben por encima de los gráficos: son los
+       puntos de entrada, y detrás de 4.400 px de scroll no existen. El rail
+       deja de ser caja (`display:contents`) para que sus bloques se ordenen
+       uno a uno contra la columna principal. */
+    .con-land{grid-template-columns:1fr; gap:2.2rem}
+    .con-rail{display:contents}
+    .con-rblk--temas{order:1; margin-bottom:0}
+    .con-main{order:2}
+    .con-rblk--guia{order:3}
+    .con-rblk--fuente{order:4}
+    .con-rblk--temas .con-temas{display:grid; grid-template-columns:1fr 1fr; gap:.5rem 1rem}
+  }
+  @media(max-width:460px){ .con-rblk--temas .con-temas{grid-template-columns:1fr} }
+
+  /* ---- rail izquierdo ---- */
+  .con-rblk{margin-bottom:2.2rem}
+  .con-rblk h4{font-size:.66rem; letter-spacing:.16em; text-transform:uppercase; color:var(--ink3);
+    margin:0 0 .9rem; padding-bottom:.5rem; border-bottom:1px solid var(--border)}
+  .con-tip{padding:.75rem 0; border-bottom:1px dashed var(--border)}
+  .con-tip:last-child{border-bottom:none}
+  .con-tip-t{font-size:.88rem; font-weight:600; line-height:1.3; margin-bottom:.25rem}
+  .con-tip-d{font-size:.78rem; line-height:1.5; color:var(--ink2)}
+  .con-tip-d code{font-size:.92em; background:var(--card2); padding:.05rem .3rem; border-radius:3px}
+  .con-ej{display:inline-block; margin-top:.5rem; font-family:inherit; font-size:.74rem;
+    padding:.28rem .6rem; border:1px solid var(--border2); background:transparent; color:var(--ink2);
+    border-radius:5px; transition:.15s}
+  .con-ej::before{content:'↳ probar: '; color:var(--ink3)}
+  .con-ej:hover{border-color:var(--teal); color:var(--teal)}
+  .con-tema{margin-bottom:1rem}
+  .con-tema-g{font-size:.72rem; font-weight:600; color:var(--ink2); margin-bottom:.4rem}
+  .con-tema .chips{gap:.3rem; margin:0}
+  .con-tema .chip{font-size:.68rem; padding:.26rem .55rem; text-transform:none; letter-spacing:.01em}
+  .con-rfuente .con-tip-d a{color:var(--teal)}
+
+  /* ---- dato del día ---- */
+  .con-dato{border-left:3px solid var(--teal); padding:.2rem 0 .2rem 1.1rem; margin-bottom:1.8rem}
+  .con-dato-k{font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color:var(--teal); font-weight:600}
+  .con-dato-n{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-weight:800;
+    font-size:clamp(2rem,4.4vw,2.9rem); letter-spacing:-.03em; line-height:1.05; margin:.25rem 0 .35rem}
+  .con-dato-t{font-size:.94rem; line-height:1.5; color:var(--ink2); max-width:46em}
+
+  /* ---- barras horizontales ---- */
+  .con-2{display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-bottom:1.2rem}
+  @media(max-width:820px){ .con-2{grid-template-columns:1fr} }
+  .con-kpis{grid-template-columns:repeat(4,1fr); margin:0 0 1.2rem}
+  @media(max-width:640px){ .con-kpis{grid-template-columns:repeat(2,1fr)} }
+  .con-bh-row{display:grid; grid-template-columns:1fr 4.5rem; gap:.5rem .7rem; align-items:center;
+    padding:.32rem .35rem; margin:0 -.35rem; border-radius:5px}
+  .con-bh-row.cl{cursor:pointer}
+  .con-bh-row.cl:hover{background:var(--card2)}
+  .con-bh-row.cl:hover .con-bh-fill{background:var(--teal)}
+  .con-bh-row.cl:focus-visible{outline:2px solid var(--teal); outline-offset:1px}
+  .con-bh-l{grid-column:1; font-size:.8rem; line-height:1.3; color:var(--ink2);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .con-bh-n{grid-column:2; grid-row:1 / span 2; text-align:right; font-size:.82rem;
+    font-weight:600; font-variant-numeric:tabular-nums}
+  .con-bh-track{grid-column:1; height:7px; background:var(--card2); border-radius:4px; overflow:hidden}
+  .con-bh-fill{height:100%; background:var(--teal-dim); border-radius:4px; transition:background .15s}
+
+  /* La rejilla de entidades trae nombres largos; a 4 columnas se corta todo. */
+  #con-landing .reg-sectors-grid{grid-template-columns:repeat(2,1fr)}
+  #con-landing .sec-card .l{white-space:normal; line-height:1.35}
+</style>
+</head>
+<body class="caudal-app">
+  <a class="skip-link" href="#app">Saltar al contenido</a>
+  <div class="cur" id="cur"></div><div class="cur-ring" id="curRing"></div>
+
+  <div class="gate" id="gate">
+    <div class="gate-text">Cargando</div>
+    <div class="gate-bar"></div>
+  </div>
+
+  <nav id="topNav" hidden>
+    <div class="e-nav-left">
+      <a href="caudal.html" class="e-btn-back" id="navBack">← Caudal</a>
+    </div>
+    <div class="cobrand-cluster">
+      <img class="cobrand" src="caudalxcauce.png" alt="Caudal × Cauce · navegar la complejidad" />
+      <div class="poweredby">
+        <span class="pb-txt">powered by</span>
+        <a href="index.html" class="logo-link">
+          <div class="logo-bars">
+            <div class="logo-bar" style="height:15px"></div>
+            <div class="logo-bar" style="height:11px"></div>
+            <div class="logo-bar" style="height:7px"></div>
+            <div class="logo-bar" style="height:3px"></div>
+          </div>
+          <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="wrap" id="app" tabindex="-1" hidden>
+    <div class="hero">
+      <h1>La plata del Estado, <em>rastreada</em>.</h1>
+      <p>Todos los contratos electrónicos del Estado colombiano y los procesos que
+         los preceden, consultados en vivo contra SECOP II. Busca una entidad, un
+         proveedor, un objeto o un radicado: cada resultado enlaza su expediente en
+         el portal. <b><span id="con-hero-n">6 millones de</span> contratos</b> · se actualiza a diario.</p>
+      <div class="search">
+        <input id="conq" aria-label="Entidad, proveedor, objeto o radicado" type="search" placeholder="busca una entidad, un proveedor, un objeto…" autocomplete="off" />
+        <button id="congo">Buscar</button>
+      </div>
+      <div class="chips" id="cchips"></div>
+    </div>
+
+    <div class="con-land">
+      <aside class="con-rail" id="con-rail"></aside>
+      <div class="con-main">
+        <div id="con-landing"></div>
+        <div id="con-results"></div>
+      </div>
+    </div>
+
+    <div class="foot">
+      Caudal · una alianza entre <a href="index.html">RicardoRuiz.co</a> (tecnología y automatización) y <a href="https://cauce.co/" target="_blank" rel="noopener">Cauce</a> (asesoría en asuntos públicos y regulatorios).<br />
+      Análisis asistido por IA sobre datos oficiales. Borrador; el criterio experto es del analista.
+    </div>
+  </main>
+
+<!-- Orden obligatorio: común (esc/fmt/muro) → shell (call/acceso/nav) → pilar.
+     ⚠️ Al tocar cualquiera de los tres hay que bumpear su ?v= acá Y en
+     caudal.html, que carga los mismos archivos. -->
+<script src="caudal-comun.js?v=20260907"></script>
+<script src="caudal-base.js?v=20260907d"></script>
+<script src="caudal-contratacion.js?v=20260907"></script>
+<script>
+(function(){
+  'use strict';
+  /* Esta página no tiene router: es una sola vista. `reveal()` de caudal-base.js
+     llama dos hooks que allá pertenecen al paraguas, así que acá se definen con
+     lo que sí aplica — sin ellos el shell avisa por consola que la vista quedará
+     vacía, y tendría razón. */
+  window.initHome=function(){
+    const conQuery=conInit();
+    // El landing va SIEMPRE, aunque se llegue con término: además de pintar los
+    // gráficos deja `CON_STATS`, de donde sale el universo cuando se filtra por
+    // una barra. Solo después se busca.
+    conLoadStats().then(function(){ if(conQuery) conBuscar(); });
+  };
+  window.loadStats=function(){ /* la mortandad del Congreso no se pinta acá */ };
+  /* El atrás: sin router, `_view` se queda en 'home' y el shell mandaría a la
+     portada. De acá se viene de Caudal. */
+  window.CAUDAL_BACK={txt:'← Caudal', href:'caudal.html'};
+  /* Igual que en caudal.html: en un microtask, para que corra después de que
+     los tres <script> queden evaluados. */
+  queueMicrotask(reveal);
+})();
+</script>
+</body>
+</html>

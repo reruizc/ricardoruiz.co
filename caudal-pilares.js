@@ -1,10 +1,12 @@
 /* caudal-pilares.js — los pilares que se consultan uno a uno
    ------------------------------------------------------------------
-   Cinco vistas: Congreso (la búsqueda por tema, que es el pilar más
-   viejo y por eso no lleva prefijo), Regulatorio, Ejecutivo, Medios y
-   Contratación. Cada una trae su estado, su landing, su búsqueda y su
-   cableado; entre ellas casi no se hablan, y lo poco que comparten
-   (`empresaHint`, `_ampliarEmp`) vive acá dentro.
+   Congreso (la búsqueda por tema, que es el pilar más viejo y por eso
+   no lleva prefijo), Regulatorio, Ejecutivo, Medios, SUCOP y Gacetas.
+   Cada una trae su estado, su landing, su búsqueda y su cableado; entre
+   ellas casi no se hablan. Contratación salió de acá a
+   caudal-contratacion.js (sep-2026) cuando ganó página propia, y lo que
+   compartía con las demás (`empresaHint`, `fmtCOP`) bajó a
+   caudal-comun.js.
 
    Fuera de este archivo: los helpers de formato y muro (`esc`, `fmt`,
    `cortar`, `listaConMuro`, los mapas de color) y la ficha del modal

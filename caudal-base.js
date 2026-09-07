@@ -2,7 +2,7 @@
    ------------------------------------------------------------------
    Lo que NO pertenece a ninguna vista en particular: acceso y sesión,
    cursor propio, el helper `call()` contra el worker y el router de
-   vistas. La lógica de las 13 vistas sigue en el <script> inline de
+   vistas. La lógica de las vistas sigue en el <script> inline de
    caudal.html; este archivo solo le presta el chasis.
 
    Es un IIFE: lo que la página necesita se publica al final con
@@ -186,12 +186,22 @@
   // Pinta el botón «atrás» según la pila. Se llama desde showView Y desde
   // pintarNav, porque pintarNav REHACE el botón con innerHTML: sin volver a
   // cablear aquí, el enlace se queda con su href y saca al usuario del producto.
-  const VIEW_NAMES={home:'Explorar Caudal',buscar:'Resultados de búsqueda',congreso:'Congreso',control:'Órganos de control',regulatorio:'Regulatorio',ejecutivo:'Ejecutivo',sucop:'Consulta pública',gacetas:'Gacetas',contratacion:'Contratación',cliente:'Radar',medios:'Medios',radicados:'Últimos radicados',bancadas:'Disciplina de bancada',coaliciones:'Coaliciones'};
+  const VIEW_NAMES={home:'Explorar Caudal',buscar:'Resultados de búsqueda',congreso:'Congreso',control:'Órganos de control',regulatorio:'Regulatorio',ejecutivo:'Ejecutivo',sucop:'Consulta pública',gacetas:'Gacetas',cliente:'Radar',medios:'Medios',radicados:'Últimos radicados',bancadas:'Disciplina de bancada',coaliciones:'Coaliciones'};
   const VIEW_PARENT={radicados:'congreso',bancadas:'congreso',coaliciones:'bancadas'};
   let _navStack=[];
   function pintarBack(){
     const nb=document.getElementById('navBack'); if(!nb) return;
     nb.hidden=false;
+    /* Página suelta, sin router de vistas (Contratación, sep-2026). Ahí `_view`
+       se queda en 'home' para siempre y el atrás diría «Qué es Caudal», que no
+       es de donde viene nadie. La página fija su propio destino y esto lo
+       respeta — hace falta acá y no en la página porque `pintarNav()` REHACE el
+       botón con innerHTML cada vez que llega el acceso, y pisaría cualquier
+       arreglo hecho desde afuera. */
+    if(window.CAUDAL_BACK){
+      nb.textContent=window.CAUDAL_BACK.txt; nb.href=window.CAUDAL_BACK.href; nb.onclick=null;
+      return;
+    }
     if(_view==='home'){
       nb.textContent='← Qué es Caudal'; nb.href='caudal-portada.html'+(GUEST_TOKEN?'?acceso='+encodeURIComponent(GUEST_TOKEN):''); nb.onclick=null;
       return;
@@ -229,7 +239,6 @@
     if(v==='ejecutivo') hook('ejeLoadStats');
     if(v==='sucop') hook('sucLoadStats');
     if(v==='gacetas') hook('gacLoadStats');
-    if(v==='contratacion') hook('conLoadStats');
     if(v==='medios') hook('medLoadLanding');
     if(v==='control') hook('controlLoad');
     if(v==='radicados') hook('radLoad');
