@@ -361,7 +361,7 @@
      Generar tarda 20-51 s (la varianza es del modelo) y el API Gateway corta a
      los 30: pedirla de una devolvía 503 al primero que buscaba un tema nuevo.
      Es el mismo patrón del radar del cliente. */
-  const TEMA_LECT_POLL=3500, TEMA_LECT_MAX=90000;
+  const TEMA_LECT_POLL=3500, TEMA_LECT_MAX=120000;   // 120 s: cabe un re-disparo
   let _temaLectTimer=null;
   function lecturaTemaStop(){ if(_temaLectTimer){ clearTimeout(_temaLectTimer); _temaLectTimer=null; } }
   function lecturaTemaFallback(msg){
@@ -370,18 +370,23 @@
   }
   function pedirLecturaTema(key, mine){
     lecturaTemaStop();
-    const t0=Date.now();
+    const t0=Date.now(); let disparos=0;
     const listo=d=>{
       if(mine!==_seq || !d || d.estado!=='lista' || !d.lectura || d.lectura.error) return false;
       lecturaTemaStop(); _lecturaData=d.lectura; renderLectura(d.lectura); return true;
     };
     // 1 · disparo: arranca la generación. Puede morir en el gateway a los 30 s
     //     y no pasa nada — la Lambda termina y deja la lectura en el caché.
-    call({action:'tema-lectura',key}).then(d=>{
-      if(mine!==_seq || listo(d)) return;
-      if(d && d.estado==='sin_tema'){ lecturaTemaStop(); return lecturaTemaFallback('La lectura caducó. Vuelve a buscar el tema para regenerarla.'); }
-      if(d && d.estado==='lista'){ lecturaTemaStop(); lecturaTemaFallback(); }   // respondió mal: no se cachea
-    }).catch(()=>{});
+    //     Si la generación se CAE, el sondeo lo nota (`reintentar`) y vuelve a
+    //     disparar: antes ese fallo dejaba girando el sondeo hasta rendirse.
+    const disparar=()=>{
+      disparos++;
+      call({action:'tema-lectura',key}).then(d=>{
+        if(mine!==_seq || listo(d)) return;
+        if(d && d.estado==='sin_tema'){ lecturaTemaStop(); return lecturaTemaFallback('La lectura caducó. Vuelve a buscar el tema para regenerarla.'); }
+      }).catch(()=>{});
+    };
+    disparar();
     // 2 · sondeo del caché en paralelo
     const tick=()=>{
       if(mine!==_seq) return lecturaTemaStop();
@@ -391,7 +396,11 @@
         if(el && !el.dataset.slow){ el.dataset.slow='1'; el.innerHTML='<div class="llm-load">La primera lectura de un tema tarda un poco más <span class="dots"><span></span><span></span><span></span></span></div>'; }
       }
       call({action:'tema-lectura',key,solo_cache:true})
-        .then(d=>{ if(!listo(d)) _temaLectTimer=setTimeout(tick,TEMA_LECT_POLL); })
+        .then(d=>{
+          if(listo(d)) return;
+          if(d && d.reintentar && disparos<3) disparar();   // nadie está generando: se cayó
+          _temaLectTimer=setTimeout(tick,TEMA_LECT_POLL);
+        })
         .catch(()=>{ if(mine===_seq) _temaLectTimer=setTimeout(tick,TEMA_LECT_POLL); });
     };
     _temaLectTimer=setTimeout(tick,TEMA_LECT_POLL);

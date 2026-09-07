@@ -326,9 +326,9 @@
      `caudal-contratacion.js` se carga acá SOLO por la búsqueda universal, que
      necesita `conCard` y `CON`: el pilar vive en caudal-contratacion.html.
      ⚠️ Al tocar cualquiera hay que bumpear su ?v= en las DOS páginas. -->
-<script src="caudal-pilares.js?v=20260907b"></script>
+<script src="caudal-pilares.js?v=20260907c"></script>
 <script src="caudal-contratacion.js?v=20260907"></script>
-<script src="caudal-cliente.js?v=20260907n"></script>
+<script src="caudal-cliente.js?v=20260907o"></script>
 <script src="caudal-votos.js?v=20260907"></script>
 <script>
 (function(){
@@ -959,6 +959,9 @@
       ${blk('Qué está vivo en el Estado',l.en_tramite)}${blk('Qué dice la prensa',l.prensa)}${blk('Qué hacer',l.accion)}${fu}`;
     const rosa=document.getElementById('uni-aviso-rosa'); if(rosa) rosa.onclick=()=>showView('cliente');
   }
+  // Tope del sondeo. Sube de 90 a 120 s porque ahora puede haber un
+  // re-disparo de por medio (fallo + reintento del modelo).
+  const UNI_RESP_MAX=120000;
   function uniLoadRespuesta(query, mine){
     // Ya no se corta por ACCESO: el anónimo tiene una pregunta de muestra y la
     // cuenta registrada tres por semana. Quién tiene cupo lo sabe el worker, que
@@ -969,14 +972,26 @@
       if(d&&d.error==='accion_restringida') return uniResumenFallback();
       if(d&&d.estado==='lista'&&d.lectura) return uniPintarRespuesta(d.lectura);
       if(!d||!d.key) return uniResumenFallback('No se pudo preparar la respuesta.');
-      const key=d.key, t0=Date.now();
+      const key=d.key, t0=Date.now(); let disparos=0, ultErr='';
+      // ⚠️ El disparo suele morir en el gateway a los 30 s y no pasa nada: la
+      // Lambda termina y deja la respuesta en el caché. Pero si la generación
+      // se CAE (el modelo devuelve el JSON cortado — pasó el 7-sep-2026 con
+      // «ya se eligió presidente de ecopetrol?»), antes nadie volvía a
+      // intentarlo y el sondeo giraba en vano hasta rendirse con «tardó más de
+      // lo normal», que era falso: no era lentitud, era un error. Ahora el
+      // servidor avisa con `reintentar` cuando no hay generación en vuelo.
+      const disparar=()=>{ disparos++; call({action:'respuesta-lectura',key}).catch(()=>{}); };
       const tick=()=>call({action:'respuesta-lectura',key,solo_cache:true}).then(x=>{
         if(mine!==_uniSeq) return;
         if(x&&x.estado==='lista'&&x.lectura) return uniPintarRespuesta(x.lectura);
-        if(Date.now()-t0<90000) setTimeout(tick,3500); else uniResumenFallback('La respuesta tardó más de lo normal. Vuelve a buscar en un momento.');
+        if(x&&x.ultimo_error) ultErr=x.ultimo_error;
+        if(x&&x.reintentar&&disparos<3) disparar();
+        if(Date.now()-t0<UNI_RESP_MAX) setTimeout(tick,3500);
+        else uniResumenFallback(ultErr
+          ? 'El modelo no alcanzó a redactar la respuesta. Vuelve a buscar: el segundo intento suele salir.'
+          : 'La respuesta tardó más de lo normal. Vuelve a buscar en un momento.');
       }).catch(()=>uniResumenFallback('No se pudo consultar la respuesta.'));
-      // disparo: suele morir en el gateway a los 30 s; la Lambda termina igual
-      call({action:'respuesta-lectura',key}).catch(()=>{});
+      disparar();
       setTimeout(tick,3500);
     }).catch(()=>uniResumenFallback('No se pudo preparar la respuesta.'));
   }

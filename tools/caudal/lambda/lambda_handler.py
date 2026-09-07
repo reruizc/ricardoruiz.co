@@ -2132,6 +2132,78 @@ def _call_llm(step, system, user, max_tokens=1200):
     return _call_deepseek(cfg['model'], system, user, max_tokens)
 
 
+def _exige(campo):
+    """Validador para `_llm_json`: el modelo respondió, pero sin lo que importa."""
+    def _v(d):
+        if not d.get(campo):
+            raise ValueError('el modelo devolvio `%s` vacio' % campo)
+    return _v
+
+
+def _llm_json(step, system, user, max_tokens, valida=None):
+    """Pide JSON al modelo y lo parsea, con UN reintento de presupuesto doble.
+
+    ⚠️⚠️ DeepSeek V4 gasta tokens en RAZONAR antes de escribir: cuando el
+    presupuesto se le acaba devuelve `content` vacío o el JSON cortado a media
+    llave (`finish_reason=length`) y `json.loads` revienta. Es el mismo gotcha
+    ya documentado en el harvester de Supersalud y en test-presidencial, que
+    acá no estaba aplicado.
+
+    Medido en producción (7-sep-2026): «ya se eligió presidente de ecopetrol?»
+    reventó tras 40,7 s con 6.000 tokens y la MISMA llave salió bien al segundo
+    intento en 16,6 s — o sea que el fallo es del presupuesto y de la varianza
+    del modelo, no del prompt. Subir el techo no encarece (solo se cobran los
+    tokens generados), así que el reintento sale gratis salvo cuando de verdad
+    hace falta.
+    """
+    ultimo = None
+    for mt in (max_tokens, max_tokens * 2):
+        try:
+            raw = (_call_llm(step, system, user, max_tokens=mt) or '').strip()
+            if raw.startswith('```'):                 # por si envuelve en fences
+                raw = raw.split('```')[1].lstrip('json').strip()
+            data = json.loads(raw)
+            if not isinstance(data, dict):
+                raise ValueError('el modelo no devolvio un objeto JSON')
+            if valida:
+                valida(data)
+            return data
+        except Exception as e:
+            ultimo = e
+    raise ultimo
+
+
+def _lectura_falla(pref, key, exc):
+    """Deja constancia del fallo Y suelta el candado.
+
+    ⚠️⚠️ Antes un fallo era INVISIBLE y terminal: la generación devolvía
+    `estado:'error'` a una petición que el navegador ya había abandonado en el
+    gateway, no se cacheaba nada, y el sondeo seguía leyendo 'pendiente' hasta
+    que el frontend se rendía a los 90 s con «tardó más de lo normal». El
+    usuario veía lentitud donde había un error, y NADIE volvía a intentarlo.
+    Soltar el candado (t=0) es lo que permite que el siguiente sondeo re-dispare
+    enseguida en vez de esperar los 70 s del TTL."""
+    _cache_put(pref + '-err-' + key, {'t': _time.time(), 'error': str(exc)[:200]})
+    _cache_put(pref + '-lock-' + key, {'t': 0})
+
+
+def _lectura_sondeo(pref, key):
+    """Qué contestarle al sondeo cuando la lectura aún no está en el caché.
+
+    `reintentar` es la pieza que faltaba: dice que NO hay generación en vuelo
+    —nadie disparó, o quien disparó se cayó—, así que el frontend puede volver
+    a disparar en lugar de esperar en vano hasta rendirse."""
+    lock = _cache_get(pref + '-lock-' + key)
+    viva = bool(lock and _time.time() - float(lock.get('t') or 0) < LECTURA_LOCK_TTL)
+    out = {'estado': 'generando' if viva else 'pendiente',
+           'reintentar': not viva, 'key': key}
+    if not viva:
+        err = _cache_get(pref + '-err-' + key)
+        if err:
+            out['ultimo_error'] = str(err.get('error') or '')[:200]
+    return out
+
+
 # --- RESPUESTA TRANSVERSAL (la búsqueda contesta, no cuenta) ----------------
 # Pedido de Pablo Cárdenas (Cauce, sep-2026): "quiero saber si ya se citó a la
 # junta de Ecopetrol" devolvía seis tarjetas con conteos — "se siente muy
@@ -2233,18 +2305,16 @@ def _respuesta_generar(key):
         return {'estado': 'generando'}
     _cache_put('resp-lock-' + key, {'t': _time.time()})
     try:
-        raw = _call_llm('sintesis', RESP_SYSTEM, prompt['user'], max_tokens=6000).strip()
-        if raw.startswith('```'):
-            raw = raw.split('```')[1].lstrip('json').strip()
-        data = json.loads(raw)
-        if not isinstance(data, dict) or not data.get('respuesta'):
-            raise ValueError('respuesta vacía')
+        data = _llm_json('sintesis', RESP_SYSTEM, prompt['user'], 6000,
+                         valida=_exige('respuesta'))
     except Exception as e:
-        data = {'error': str(e)[:200]}
+        # el fallo queda registrado y el candado suelto: el sondeo lo verá y
+        # re-disparará, en vez de dejar al cliente esperando una lectura muerta
+        _lectura_falla('resp', key, e)
+        return {'estado': 'error', 'error': str(e)[:200]}
     data['_model'] = STEP_MODELS['sintesis']['model']
-    if 'error' not in data:
-        _cache_put('resp-' + key, data)
-    return {'estado': 'lista', 'lectura': data} if 'error' not in data else {'estado': 'error', 'error': data['error']}
+    _cache_put('resp-' + key, data)
+    return {'estado': 'lista', 'lectura': data}
 
 
 # --- síntesis de tema (lectura interpretativa del resumen) ------------------
@@ -2430,20 +2500,15 @@ def _tema_lectura_generar(key):
     _cache_put('tema-lock-' + key, {'t': _time.time()})
     casos = prompt.get('casos') or []
     try:
-        # max_tokens alto: DeepSeek V4 gasta tokens en reasoning y con presupuesto
-        # bajo deja content vacío (finish_reason=length) — gotcha documentado.
-        raw = _call_llm('sintesis', SINT_SYSTEM, prompt['user'], max_tokens=6000)
-        raw = raw.strip()
-        if raw.startswith('```'):                    # por si envuelve en fences
-            raw = raw.split('```')[1].lstrip('json').strip()
-        data = json.loads(raw)
+        # `_llm_json` reintenta con el doble de presupuesto: DeepSeek V4 gasta
+        # tokens en reasoning y con el techo corto deja el JSON a medias.
+        data = _llm_json('sintesis', SINT_SYSTEM, prompt['user'], 6000)
     except Exception as e:
-        data = {'titular': '', 'hallazgo': '', 'por_que_caen': '',
-                'quien_propone': '', 'veredicto': '', 'error': str(e)[:200]}
+        _lectura_falla('tema', key, e)
+        return {'estado': 'error', 'error': str(e)[:200]}
     data['_model'] = STEP_MODELS['sintesis']['model']
     data['casos_evidencia'] = casos   # trazabilidad: qué gacetas sustentan la lectura
-    if 'error' not in data:          # no cachear fallos
-        _cache_put(key, data)
+    _cache_put(key, data)
     return {'estado': 'lista', 'lectura': data}
 
 
@@ -2861,16 +2926,12 @@ def _lectura_cliente_generar(key):
         return {'estado': 'generando'}
     _cache_put('cliente-lock-' + key, {'t': _time.time()})
     try:
-        raw = _call_llm('sintesis', CLIENTE_SYSTEM, prompt['user'], max_tokens=6000).strip()
-        if raw.startswith('```'):
-            raw = raw.split('```')[1].lstrip('json').strip()
-        data = json.loads(raw)
+        data = _llm_json('sintesis', CLIENTE_SYSTEM, prompt['user'], 6000)
     except Exception as e:
-        data = {'titular': '', 'lo_que_importa': '', 'acciones': [],
-                'horizonte': '', 'error': str(e)[:200]}
+        _lectura_falla('cliente', key, e)
+        return {'estado': 'error', 'error': str(e)[:200]}
     data['_model'] = STEP_MODELS['sintesis']['model']
-    if 'error' not in data:
-        _cache_put('cliente-' + key, data)
+    _cache_put('cliente-' + key, data)
     return {'estado': 'lista', 'lectura': data}
 
 
@@ -4978,7 +5039,7 @@ def handler(event, context):
         if lista:
             return _resp(200, {'estado': 'lista', 'lectura': lista, 'key': key})
         if body.get('solo_cache'):
-            return _resp(200, {'estado': 'pendiente', 'key': key})
+            return _resp(200, _lectura_sondeo('cliente', key))
         r = _lectura_cliente_generar(key)
         r['key'] = key
         return _resp(200, r)
@@ -5049,7 +5110,9 @@ def handler(event, context):
         if hecha:
             return _resp(200, {'estado': 'lista', 'lectura': hecha, 'key': key})
         if body.get('solo_cache'):
-            return _resp(200, {'estado': 'pendiente', 'key': key})
+            # el sondeo ya no dice solo 'pendiente': si no hay generación en
+            # vuelo devuelve `reintentar` y el navegador vuelve a disparar
+            return _resp(200, _lectura_sondeo('resp', key))
         r = _respuesta_generar(key)
         r['key'] = key
         return _resp(200, r)
@@ -5068,7 +5131,7 @@ def handler(event, context):
         if lista:
             return _resp(200, {'estado': 'lista', 'lectura': lista, 'key': key})
         if body.get('solo_cache'):
-            return _resp(200, {'estado': 'pendiente', 'key': key})
+            return _resp(200, _lectura_sondeo('tema', key))
         r = _tema_lectura_generar(key)
         r['key'] = key
         return _resp(200, r)

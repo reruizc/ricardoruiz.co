@@ -1328,19 +1328,23 @@
   function cliLecturaStop(){ if(_cliLectTimer){ clearTimeout(_cliLectTimer); _cliLectTimer=null; } }
   function cliPedirLectura(key, mine){
     cliLecturaStop();
-    const t0=Date.now();
+    const t0=Date.now(); let disparos=0;
     const listo=d=>{
       if(mine!==_cliSeq || !d || d.estado!=='lista' || !d.lectura || d.lectura.error) return false;
       cliLecturaStop(); cliRenderLectura(d.lectura); return true;
     };
     // 1 · disparo: arranca la generación. Puede morir en el gateway a los 30 s
     //     (503) y no pasa nada — la Lambda termina y deja la lectura hecha.
-    call({action:'cliente-lectura',key}).then(d=>{
-      if(mine!==_cliSeq || listo(d)) return;
-      if(d && d.estado==='sin_radar'){ cliLecturaStop(); return cliLecturaFallback('La lectura caducó. Vuelve a abrir '+MARCA.articulo+' '+MARCA.nombre+' para regenerarla.'); }
-      // el modelo respondió pero mal: no se cachea, así que sondear no sirve
-      if(d && d.estado==='lista'){ cliLecturaStop(); cliLecturaFallback(); }
-    }).catch(()=>{});
+    //     Si la generación se CAE (JSON cortado del modelo), el sondeo lo nota
+    //     por `reintentar` y vuelve a disparar en vez de girar en vano.
+    const disparar=()=>{
+      disparos++;
+      call({action:'cliente-lectura',key}).then(d=>{
+        if(mine!==_cliSeq || listo(d)) return;
+        if(d && d.estado==='sin_radar'){ cliLecturaStop(); return cliLecturaFallback('La lectura caducó. Vuelve a abrir '+MARCA.articulo+' '+MARCA.nombre+' para regenerarla.'); }
+      }).catch(()=>{});
+    };
+    disparar();
     // 2 · sondeo del caché en paralelo
     const tick=()=>{
       if(mine!==_cliSeq) return cliLecturaStop();
@@ -1349,7 +1353,11 @@
       //  con su propio innerHTML y lo dejaba mudo; el mensaje vive ahora en
       //  `.cli-wait-sub`, que no se sobrescribe)
       call({action:'cliente-lectura',key,solo_cache:true})
-        .then(d=>{ if(!listo(d)) _cliLectTimer=setTimeout(tick,CLI_LECT_POLL); })
+        .then(d=>{
+          if(listo(d)) return;
+          if(d && d.reintentar && disparos<3) disparar();
+          _cliLectTimer=setTimeout(tick,CLI_LECT_POLL);
+        })
         .catch(()=>{ if(mine===_cliSeq) _cliLectTimer=setTimeout(tick,CLI_LECT_POLL); });
     };
     _cliLectTimer=setTimeout(tick,CLI_LECT_POLL);
