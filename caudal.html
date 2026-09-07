@@ -1006,8 +1006,14 @@
   };
   const ART_FALTA_TXT={resumen:'un resumen',modifica:'qué norma modifica',obligaciones:'obligaciones nuevas',
     aplica_a:'a quién le aplica',sanciones:'sanciones',vigilancia:'quién vigila o reglamenta',vigencia:'vigencia'};
-  function artHTML(a){
-    if(!a) return `<div class="cob-note" style="margin:1rem 0">Este proyecto todavía no tiene el articulado extraído. La extracción va por tandas, empezando por la legislatura en curso.</div>`;
+  function artHTML(a,cob){
+    // Sin articulado, decir cuánto lleva leído SU cuatrienio: un campo vacío no
+    // distingue "el texto no existe" de "todavía no lo hemos leído", y esa es
+    // justo la diferencia por la que paga un cliente.
+    if(!a){
+      const d=cob?` Del cuatrienio ${esc(cob.cuatrienio)} llevamos leídos <b style="color:var(--ink2)">${cob.leidos} de ${cob.universo} proyectos (${cob.pct}%)</b>.`:'';
+      return `<div class="cob-note" style="margin:1rem 0">Este proyecto todavía no tiene el articulado extraído, así que Caudal no puede decir qué obliga.${d} La extracción va por tandas, empezando por la legislatura en curso.</div>`;
+    }
     const blk=(h,rows)=>rows&&rows.length?`<div class="art-blk"><div class="h">${h}</div>${rows.join('')}</div>`:'';
     const mod=(a.modifica||[]).map(m=>`<div class="art-row"><b>${esc(m.norma)}</b>${m.efecto?` — ${esc(m.efecto)}`:''}${(m.articulos||[]).length?`<div class="art-sub">Artículos: ${esc(m.articulos.join(', '))}</div>`:''}</div>`);
     const obl=(a.obligaciones||[]).map(o=>`<div class="art-row">${esc(o.obligacion)}<div class="art-sub">Recae sobre: <b style="color:var(--ink2)">${esc(o.sobre_quien||'no lo precisa')}</b>${o.plazo?` · Plazo: ${esc(o.plazo)}`:''}</div></div>`);
@@ -1200,7 +1206,7 @@
         ${f.reloj?meta('Reloj de trámite',f.reloj.tipo==='acto_legislativo'?'Acto legislativo · 1 año, 8 debates (2 vueltas)':'Ley ordinaria · 2 legislaturas, 4 debates'):''}
       </div>
       ${impHTML}
-      ${artHTML(f.articulado)}
+      ${artHTML(f.articulado,f.articulado_cobertura)}
       <button id="btn-medios" class="btn-medios">◈ Rastreo en medios · ¿tuvo controversia o impopularidad?</button>
       <div id="medios-analisis"></div>
       <h3 style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);margin-bottom:.7rem">Autores</h3>

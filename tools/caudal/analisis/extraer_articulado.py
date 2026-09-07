@@ -916,6 +916,16 @@ def cmd_build(args):
             por_sector[s].append(tok)
 
     n = len(por_proyecto)
+    cobertura = {}
+    for pl in plan.values():
+        cua = pl.get('cuatrienio') or 'sin cuatrienio'
+        c = cobertura.setdefault(cua, {'universo': 0, 'leidos': 0})
+        c['universo'] += 1
+        if pl['tok'] in por_proyecto:
+            c['leidos'] += 1
+    for c in cobertura.values():
+        c['pct'] = round(c['leidos'] / c['universo'] * 100) if c['universo'] else 0
+    cobertura = dict(sorted(cobertura.items(), reverse=True))
     out = {
         'v': time.strftime('%Y-%m-%d'), 'pv': PROMPT_VERSION,
         'model': modelos.most_common(1)[0][0] if modelos else DEEPSEEK_MODEL,
@@ -930,6 +940,12 @@ def cmd_build(args):
                                                         key=lambda x: -len(x[1]))},
             'tokens': {'in': tin, 'out': tout},
             'usd': round(_usd(tin, tout), 4),
+            # Cuánto del universo lleva leído cada cuatrienio. Sin esto, un
+            # cliente que busca un proyecto de 2023 y no lo encuentra no puede
+            # distinguir "no existe" de "no lo hemos leído", que es justo la
+            # diferencia por la que paga. Va dentro de `stats` porque la Lambda
+            # filtra las claves de nivel raíz y `stats` sí viaja entera.
+            'cobertura': cobertura,
         },
         'por_sector': {k: v for k, v in por_sector.items()},
         'por_proyecto': por_proyecto,
@@ -941,6 +957,8 @@ def cmd_build(args):
     print(f'→ {dest.relative_to(REPO)} · {n} proyectos · {mb:.2f} MB')
     print('  bases:', dict(bases))
     print('  modelos:', dict(modelos))
+    print('  cobertura:', ' · '.join(
+        f"{k} {v['leidos']}/{v['universo']} ({v['pct']}%)" for k, v in cobertura.items()))
     print('  confianza:', dict(conf))
     print('  campos llenos:', {k: f'{v} ({v/max(n,1):.0%})' for k, v in n_camp.items()})
     print('  costo acumulado del corpus extraído: USD %.4f' % _usd(tin, tout))

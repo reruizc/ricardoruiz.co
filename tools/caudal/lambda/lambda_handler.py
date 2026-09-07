@@ -309,6 +309,36 @@ def _articulado_de(tb, pid):
         return None
 
 
+def _cuatrienio_de(legislatura):
+    """'2023-2024' -> '2022-2026'. Los cuatrienios corren de 4 en 4 desde 1990."""
+    try:
+        a = int(str(legislatura or '')[:4])
+    except ValueError:
+        return None
+    if a < 1990:
+        return None
+    ini = 1990 + 4 * ((a - 1990) // 4)
+    return f'{ini}-{ini + 4}'
+
+
+def _articulado_cobertura(legislatura):
+    """Cuánto lleva leído el cuatrienio de ESTE proyecto.
+
+    Un proyecto sin articulado no dice nada por sí solo: el cliente no puede
+    saber si el texto no existe o si todavía no lo hemos leído, y esa es
+    justamente la diferencia por la que paga. Con esto la ficha lo declara.
+    """
+    cua = _cuatrienio_de(legislatura)
+    if not cua:
+        return None
+    cob = (_articulado().get('stats') or {}).get('cobertura') or {}
+    d = cob.get(cua)
+    if not d:
+        return None
+    return {'cuatrienio': cua, 'leidos': d.get('leidos'),
+            'universo': d.get('universo'), 'pct': d.get('pct')}
+
+
 # --- POR QUÉ IMPORTA · las tres coordenadas --------------------------------
 # El módulo vive en tools/caudal/importancia y viaja completo en el ZIP. Los
 # submódulos usan imports planos, así que el directorio entra al path igual que
@@ -3880,6 +3910,10 @@ def handler(event, context):
         art = _articulado_de(ficha.get('tabla', 'pdly'), ficha['id'])
         if art:
             ficha['articulado'] = art
+        else:
+            _cob = _articulado_cobertura(ficha.get('legislatura'))
+            if _cob:
+                ficha['articulado_cobertura'] = _cob
         # POR QUÉ IMPORTA (aditivo): solo para la legislatura viva — a un proyecto
         # con desenlace conocido no se le pronostica nada
         _imp = _imp_de_rec(_full().get(f"{body.get('tb', 'pdly')}:{int(pid)}"))
