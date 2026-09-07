@@ -1097,7 +1097,6 @@ _RAW = [
     # la bandera es por presencia jurídica y no por sector.
     ('pandaexchange', 'Panda Exchange', 'cripto', 'panda exchange',
      'criptoactivos y activos virtuales,sector financiero,tecnologia digital / IA', '', ''),
-
     # ═══ TANDA ⑧ · empresas verificadas contra SECOP II y actos regulatorios ═══
     # --- t1-alimentos-agro
     ('zenu', 'Zenú', 'alimentos', 'industria de alimentos zenu|alimentos zenu',
@@ -3908,6 +3907,13 @@ _RAW = [
      'mineria e hidrocarburos,comercio exterior y aduanas', 'ecopetrol comercial internacional', ''),
     ('grupoodinsa', 'Odinsa Aeropuertos', 'construccion', 'odinsa aeropuertos',
      'obra publica y contratacion estatal,aviacion / transporte aereo', 'odinsa aeropuertos sas', ''),
+    # --- tv-startups
+    ('habi', 'Habi', 'construccion', 'habi',
+     'vivienda y construccion,tecnologia digital / IA,sector financiero,ordenamiento territorial y urbanismo', 'habi sas|habi colombia|habi creditos', ''),
+    ('laika', 'Laika', 'retail', 'laika',
+     'comercio y retail,*proteccion animal,tecnologia digital / IA,competencia y consumidor', 'laika mascotas sas|laika colombia', ''),
+    ('mensajerosurbanos', 'Mensajeros Urbanos', 'transporte', 'mensajeros urbanos',
+     'transporte por plataformas,*laboral,puertos y logistica,competencia y consumidor', 'mensajeros urbanos sas', ''),
     # ═══ fin TANDA ⑧ ═══
 ]
 
