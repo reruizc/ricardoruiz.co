@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>La prensa contra el Estado · Caudal</title>
+  <meta name="description" content="No es un listado de titulares: mide el ritmo de la cobertura de prensa sobre un tema y lo cruza contra lo que el Estado colombiano está tramitando en el Congreso, los reguladores, el Ejecutivo, la consulta pública y la contratación. Pilar de Medios de Caudal." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <link rel="stylesheet" href="caudal-base.css?v=20260907" />
+  <style>
+    /* Esta página hereda el chasis visual de Caudal pero NO su router: no carga
+       caudal-base.js, porque `showView` está atado a las 13 vistas de
+       caudal.html. Lo único que necesita del shell es `call()`, que va en
+       caudal-medios.js con el mismo contrato (Bearer + token de invitado). */
+    body,a,button,input,select{cursor:auto}
+    a,button{cursor:pointer}
+    .wrap{max-width:1100px;margin:0 auto;padding:2.2rem 1.8rem 4rem}
+    .mx-hero{max-width:820px;margin-bottom:2rem}
+    .mx-hero .eyebrow{font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--teal);font-weight:600}
+    .mx-hero h1{font-size:clamp(1.9rem,3.6vw,2.9rem);letter-spacing:-.025em;line-height:1.08;margin:.6rem 0 .8rem;font-weight:700}
+    .mx-hero h1 em{font-style:normal;color:var(--teal)}
+    .mx-hero p{color:var(--ink2);font-size:1.02rem;line-height:1.6;margin:0}
+    .mx-search{display:flex;gap:.6rem;margin:1.6rem 0 .9rem}
+    .mx-search input{flex:1;font-family:inherit;font-size:1rem;padding:.8rem 1rem;border:1.5px solid var(--border2);background:#fff;color:var(--ink)}
+    .mx-search input:focus{outline:none;border-color:var(--teal)}
+    .mx-search button{font-family:inherit;font-size:.95rem;font-weight:600;padding:.8rem 1.6rem;border:none;background:var(--ink);color:#fff}
+    .mx-search button:hover{background:var(--teal)}
+
+    .panel{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.4rem 1.5rem;margin-bottom:1.2rem}
+    .panel h3{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);font-weight:700;margin:0 0 1rem}
+    .mx-load{color:var(--ink3);font-size:.9rem}
+    .mx-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem;margin-bottom:1.1rem}
+
+    /* barras horizontales — se reusan en temperatura y en concentración */
+    .mx-bars{display:flex;flex-direction:column;gap:.42rem;margin-bottom:1rem}
+    .mx-bar-row{display:grid;grid-template-columns:150px 1fr 54px;align-items:center;gap:.7rem}
+    .mx-bar-lab{font-size:.78rem;color:var(--ink2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .mx-bar-track{height:15px;background:rgba(17,20,28,.05);border-radius:3px;overflow:hidden}
+    .mx-bar-fill{height:100%;background:var(--teal);border-radius:3px}
+    /* rayado = ventana truncada por el tope de 100 del RSS: es un piso, no una medición */
+    .mx-bar-trunc{background:repeating-linear-gradient(45deg,var(--gray),var(--gray) 5px,rgba(107,123,135,.45) 5px,rgba(107,123,135,.45) 10px)}
+    .mx-bar-n{font-size:.82rem;font-weight:700;color:var(--ink)}
+    .mx-bar-n .mx-nd{font-size:.62rem;font-weight:600;color:var(--ink3);letter-spacing:.02em}
+
+    .mx-verdict{font-size:.92rem;line-height:1.55;padding:.85rem 1rem;border-left:3px solid var(--gray);background:rgba(17,20,28,.025);color:var(--ink2)}
+    .mx-verdict b{color:var(--ink)}
+    .mx-sube{border-left-color:var(--red)}
+    .mx-baja{border-left-color:var(--amber)}
+    .mx-neutro{border-left-color:var(--teal)}
+
+    /* el cruce con el Estado — la prensa primero y aparte, porque es la que se compara */
+    .mx-cross{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:.7rem;margin-bottom:1.1rem}
+    .mx-cross-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.2rem}
+    .mx-cross-press{border-color:var(--teal);border-width:1.5px}
+    .mx-cc-n{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif;font-weight:800;font-size:1.55rem;line-height:1;color:var(--ink)}
+    .mx-cross-press .mx-cc-n{color:var(--teal)}
+    .mx-cc-l{font-size:.78rem;font-weight:600;color:var(--ink)}
+    .mx-cc-s{font-size:.68rem;color:var(--ink3);line-height:1.35}
+    .mx-link{color:var(--teal);font-weight:600}
+    .mx-emp{border-left:3px solid var(--amber);padding-left:.8rem;margin-bottom:.9rem}
+
+    .mx-act{display:flex;flex-direction:column;gap:.1rem;margin-bottom:.9rem}
+    .mx-act-row{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.55rem 0;border-bottom:1px solid var(--border)}
+    .mx-act-row:last-child{border-bottom:none}
+    .mx-act-row b{font-size:.88rem;display:block}
+    .mx-act-cargo{font-size:.72rem;color:var(--ink3)}
+    .mx-act-n{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif;font-weight:800;font-size:1.2rem;color:var(--teal)}
+
+    #mx-map{height:430px;border:1px solid var(--border);border-radius:8px;margin-bottom:.8rem;background:var(--bg2)}
+    .leaflet-container{background:var(--bg2)!important;font-family:inherit}
+    .mx-leyenda{display:flex;flex-wrap:wrap;gap:1rem;font-size:.74rem;color:var(--ink2);margin-bottom:.7rem}
+    .mx-leyenda span{display:flex;align-items:center;gap:.4rem}
+    .mx-sw{width:13px;height:13px;border-radius:3px;display:inline-block}
+    .mx-sw-3{background:rgba(61,110,184,.9)} .mx-sw-1{background:rgba(61,110,184,.32)}
+    .mx-sw-0{background:rgba(180,50,42,.55)} .mx-sw-x{background:rgba(107,123,135,.18)}
+
+    .mx-spark{display:flex;align-items:flex-end;gap:2px;height:64px;margin-bottom:1rem}
+    .mx-spark i{flex:1;background:var(--teal);opacity:.75;border-radius:1px 1px 0 0;min-height:3px}
+    .mx-fecha{font-size:.7rem;color:var(--ink3);margin-left:auto}
+
+    .mx-intro{border:1px solid var(--border);border-radius:10px;padding:1.6rem 1.7rem;background:var(--card)}
+    .mx-intro h2{font-size:1.05rem;margin:0 0 .7rem;font-weight:700}
+    .mx-intro p{color:var(--ink2);line-height:1.6;font-size:.94rem;margin:0 0 .8rem}
+    .mx-intro ul{margin:.2rem 0 1rem;padding-left:1.1rem;color:var(--ink2);line-height:1.65;font-size:.94rem}
+    .mx-intro li{margin-bottom:.35rem}
+    .mx-intro li b{color:var(--ink)}
+    #mx-titulo{font-size:1.5rem;font-weight:700;margin:.4rem 0 1.2rem;letter-spacing:-.02em}
+    #mx-titulo em{font-style:normal;color:var(--teal)}
+    @media(max-width:640px){
+      .wrap{padding:1.4rem 1rem 3rem}
+      .mx-bar-row{grid-template-columns:104px 1fr 44px;gap:.45rem}
+      .mx-bar-lab{font-size:.7rem}
+      #mx-map{height:340px}
+      .mx-search{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+  <nav id="topNav">
+    <div class="e-nav-left">
+      <a href="caudal.html" class="e-btn-back">← Caudal</a>
+    </div>
+    <div class="cobrand-cluster">
+      <img class="cobrand" src="caudalxcauce.png" alt="Caudal × Cauce · navegar la complejidad" />
+      <div class="poweredby">
+        <span class="pb-txt">powered by</span>
+        <a href="index.html" class="logo-link">
+          <div class="logo-bars">
+            <div class="logo-bar" style="height:15px"></div>
+            <div class="logo-bar" style="height:11px"></div>
+            <div class="logo-bar" style="height:7px"></div>
+            <div class="logo-bar" style="height:3px"></div>
+          </div>
+          <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+        </a>
+      </div>
+    </div>
+    <div></div>
+  </nav>
+
+  <div class="wrap">
+    <div class="mx-hero">
+      <div class="eyebrow">Pilar · Medios</div>
+      <h1>La prensa, <em>contra el Estado</em>.</h1>
+      <p>Un listado de titulares lo da cualquier buscador. Lo que aquí se mide es
+         otra cosa: a qué ritmo está creciendo la cobertura de un tema, quién la
+         sostiene, dónde se cubre y dónde no — y, sobre todo, cómo se compara con
+         lo que el Estado colombiano está tramitando en ese mismo momento.</p>
+      <div class="mx-search">
+        <input id="mq" type="text" placeholder="un tema, una entidad, una reforma, una empresa…" autocomplete="off" />
+        <button id="mgo" type="button">Analizar</button>
+      </div>
+      <div class="chips" id="mchips"></div>
+    </div>
+
+    <div id="mx-intro" class="mx-intro">
+      <h2>Qué vas a ver</h2>
+      <p>Escribe un tema arriba. Caudal consulta el ecosistema de prensa colombiano
+         y, en paralelo, las cinco fuentes del Estado que ya tiene indexadas, y devuelve:</p>
+      <ul>
+        <li><b>Temperatura.</b> Titulares por día en cinco tramos, para saber si el tema
+            se está calentando o la prensa lo está soltando.</li>
+        <li><b>El cruce con el Estado.</b> La cobertura al lado de los proyectos en el
+            Congreso, los actos de los reguladores, los decretos, los borradores en
+            consulta pública y los contratos. El desfase entre ambos es la señal:
+            <i>ruido sin trámite</i> y <i>regulación en silencio</i> son riesgos opuestos.</li>
+        <li><b>Quién sostiene la cobertura.</b> Si el tema lo empujan tres salas de
+            redacción o lo está cubriendo la prensa como conjunto.</li>
+        <li><b>Quién es nombrado.</b> Qué entidades del Estado aparecen en los titulares,
+            con el cargo que habla por cada una.</li>
+        <li><b>Dónde se cubre y dónde no.</b> Mapa por departamento, distinguiendo el
+            silencio real de nuestros propios puntos ciegos.</li>
+      </ul>
+      <p style="font-size:.86rem;color:var(--ink3);margin:0">Las lecturas de esta página son
+         deterministas: salen de umbrales sobre las cifras que están al lado, no de un modelo.
+         Se pueden auditar mirando el número que las acompaña.</p>
+    </div>
+
+    <div id="mx-out" hidden>
+      <div id="mx-titulo"></div>
+      <div id="mx-temp"></div>
+      <div id="mx-cruce"></div>
+      <div id="mx-conc"></div>
+      <div id="mx-actores"></div>
+      <div id="mx-mapa"></div>
+      <div id="mx-atencion"></div>
+      <div id="mx-lista"></div>
+    </div>
+
+    <div class="cob-note" style="margin-top:2rem;line-height:1.6">
+      <b>Fuente y límites.</b> Los titulares vienen de Google News con <code>gl=CO</code>,
+      que cubre el ecosistema de prensa nacional y regional sin mantener un conector por
+      medio. Se descartan redes sociales y comunicados de entidades públicas: son fuente,
+      no prensa. La fuente devuelve como máximo 100 ítems por consulta, así que toda
+      ventana que llegue a ese tope se publica como «≥» y no entra a ningún cálculo de
+      ritmo — un conteo truncado presentado como conteo miente.
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="caudal-voceros.js?v=20260904"></script>
+  <script src="caudal-medios.js?v=20260907"></script>
+</body>
+</html>
