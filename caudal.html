@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-<link href="caudal-base.css?v=20260907b" rel="stylesheet" />
+<link href="caudal-base.css?v=20260907c" rel="stylesheet" />
 <link rel="stylesheet" href="caudal-ui.css?v=20260907b" />
 </head>
 <body class="caudal-app">
@@ -319,7 +319,7 @@
 <!-- El shell (acceso, cursor, call() y el router de vistas) vive aparte. Va
      ANTES de este script: define reveal/showView/call, que lo de abajo usa.
      ⚠️ Al tocar caudal-base.js hay que bumpear este ?v=. -->
-<script src="caudal-base.js?v=20260907"></script>
+<script src="caudal-base.js?v=20260907c"></script>
 <!-- Las vistas, agrupadas por afinidad. Van DESPUÉS del shell (usan call() y
      showView()) y ANTES del script de abajo, que en su initHome llama a los
      `*Init` de cada pilar y a cliInit. Entre ellos y el script de abajo solo
@@ -820,9 +820,10 @@
     wireEmpresaHint('uni-emp-hint', ()=>uniSearch(query));
     const again=document.getElementById('uni-again');
     if(again) again.onclick=()=>{ uniLoader.stop(); const q=document.getElementById('uq'); if(q){ q.value=''; q.focus(); } window.scrollTo({top:0,behavior:'smooth'}); };
-    // la lectura tarda 15-20 s: el mismo loader, ahora dentro de la tarjeta,
-    // y solo para quien la va a recibir (el muro no espera nada)
-    if(HAS_SESSION && ACCESO) uniLoader.mount(document.getElementById('uni-summary-body'),'Leyendo las fuentes y escribiendo la respuesta · suele tomar entre 15 y 20 segundos',true);
+    // la lectura tarda 15-20 s. Se pinta para todos: con la cuota gratuita el
+    // anónimo y el registrado también reciben respuesta, y quién tiene cupo lo
+    // decide el worker — acá no se puede adivinar sin preguntarle.
+    uniLoader.mount(document.getElementById('uni-summary-body'),'Leyendo las fuentes y escribiendo la respuesta · suele tomar entre 15 y 20 segundos',true);
     uniLoadRespuesta(query, mine);
     const cards=[...box.querySelectorAll('.uni-card')];
     const show=k=>{ cards.forEach(t=>t.classList.toggle('on',t.dataset.k===k)); document.getElementById('uni-tab-body').innerHTML=uniTabBody(k); wireUniTab(k); };
@@ -857,11 +858,26 @@
     el.innerHTML=blk('Hallazgo',l.hallazgo)+blk('Por qué importa',l.veredicto)
       || '<div class="cob-note">Sin resumen disponible para este tema.</div>';
   }
-  function uniResumenFallback(msg){
+  function uniResumenFallback(msg,agotada){
     uniLoader.stop();
     const el=document.getElementById('uni-summary-body'); if(!el) return;
     const registrado=HAS_SESSION;
     if(msg){ el.innerHTML=`<div class="cob-note">${esc(msg)}</div>`; return; }
+    // Se le acabó la cuota gratuita: el muro dice exactamente qué pasó y cuál
+    // es el siguiente paso, que es distinto para el anónimo (registrarse, y
+    // pasa de 1 a 3 por semana) y para el registrado (un plan).
+    if(agotada){
+      const reg=!!agotada.registrado;
+      const href=reg?COMPRA_URL:('register.html?next='+encodeURIComponent('caudal.html'));
+      el.innerHTML=`<div class="uni-cuota">
+        <div class="uc-t">${reg?'Usaste tus 3 respuestas de esta semana':'Ya usaste tu pregunta de muestra'}</div>
+        <div class="uc-d">${reg
+          ? 'La cuenta gratuita incluye 3 respuestas por semana. Con acceso a Caudal no hay límite, y además tienes el radar por cliente y las alertas al correo.'
+          : 'Crear una cuenta es gratis y te da <b>3 respuestas por semana</b>. Los resultados por fuente que ves abajo siguen disponibles.'}</div>
+        <a class="uc-cta" href="${href}">${reg?'Ver el acceso a Caudal →':'Crear cuenta gratis →'}</a>
+      </div>`;
+      return;
+    }
     // El muro vende con las cifras REALES de esta búsqueda (pedido de Ricardo,
     // sep-2026): decir cuánto encontró Caudal y que el analista lo lee por ti,
     // no un aviso administrativo de que la respuesta «va con acceso».
@@ -951,9 +967,13 @@
     const rosa=document.getElementById('uni-aviso-rosa'); if(rosa) rosa.onclick=()=>showView('cliente');
   }
   function uniLoadRespuesta(query, mine){
-    if(!HAS_SESSION || !ACCESO) return uniResumenFallback();
+    // Ya no se corta por ACCESO: el anónimo tiene una pregunta de muestra y la
+    // cuenta registrada tres por semana. Quién tiene cupo lo sabe el worker, que
+    // es donde vive el contador — acá solo se pinta lo que responda.
     call({action:'respuesta',query,contexto:uniContexto()}).then(d=>{
       if(mine!==_uniSeq) return;
+      if(d&&d.error==='sin_cuota') return uniResumenFallback(null,d);
+      if(d&&d.error==='accion_restringida') return uniResumenFallback();
       if(d&&d.estado==='lista'&&d.lectura) return uniPintarRespuesta(d.lectura);
       if(!d||!d.key) return uniResumenFallback('No se pudo preparar la respuesta.');
       const key=d.key, t0=Date.now();

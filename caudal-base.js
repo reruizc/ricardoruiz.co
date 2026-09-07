@@ -174,6 +174,11 @@
     // una cabecera propia dispararía preflight (ver la ruta en el worker).
     const body=GUEST_TOKEN?Object.assign({},payload,{_guest:GUEST_TOKEN}):payload;
     const r=await fetch(API,{method:'POST',headers:h,body:JSON.stringify(body)});
+    // Cuántas respuestas le quedan a quien no paga. El worker la manda en una
+    // cabecera (y la expone en Access-Control-Expose-Headers); se guarda global
+    // para que el muro pueda decir «te quedan 2» en vez de un aviso genérico.
+    const q=r.headers.get('X-Caudal-Cuota');
+    if(q!==null){ window.RESP_CUOTA={restantes:parseInt(q,10)||0,tope:parseInt(r.headers.get('X-Caudal-Cuota-Tope'),10)||0}; }
     return r.json();
   }
 
