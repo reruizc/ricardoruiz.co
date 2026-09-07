@@ -66,6 +66,18 @@ lo pone un humano. Por eso el paso 3 es a mano.
   en decenas de proyectos por razones ajenas. La evidencia fuerte es SECOP y los
   actos regulatorios, donde el match es contra la razón social completa.
 
+## ⚠️ `buscar_empresas` no es la búsqueda
+
+`caudal_core.buscar_empresas` es el **autocompletado del editor de perfil** y casa por
+**substring** a propósito: al escribir «epm» ofrece EPM, Aguas Regionales EPM y Fundación
+EPM para que el usuario elija. La búsqueda real usa **`empresas.empresas_en`**, que casa
+por **palabra completa** y con «epm» devuelve solo EPM.
+
+Medir regresión con `buscar_empresas` reporta diferencias que no existen (pasó al
+ampliar a 2.008: parecía que buscar «epm» arrastraba a sus filiales y contaminaba los
+temas). **Para medir regresión, usar `empresas_en`.** Con la función correcta, 25 de 25
+consultas de control dan resultado idéntico con 606 y con 2.008 entradas.
+
 ## Las dos pruebas que deciden si se puede desplegar
 
 1. **Falsos disparos**: una consulta temática normal (`reforma pensional`,
@@ -86,3 +98,24 @@ tarda **0,55 ms**, y `casa_registro_any()` **0,72 ms por registro**, o sea unos
 pasada solo ocurre en `harvest_anla.build`, que tiene memo por documento; al
 cambiar el diccionario el memo se invalida y **la primera corrida del cron
 después de ampliar tarda ~60 s en vez de ~4 s**. Es esperado, y una sola vez.
+
+## Desplegar
+
+```bash
+python3 tools/caudal/lambda/build_zip.py
+aws lambda update-function-code --function-name caudal-analiza \
+  --zip-file fileb://tools/caudal/lambda/caudal-analiza.zip
+aws lambda wait function-updated --function-name caudal-analiza
+python3 tools/caudal/salud/check.py     # debe dar 14/14 acciones
+```
+
+⚠️ **Antes de subir, comparar el ZIP contra el código en producción.** `build_zip.py`
+empaqueta lo que encuentre en el árbol, incluido trabajo sin commitear de otra
+conversación; el único archivo que debería salir distinto es `empresas.py`:
+
+```bash
+URL=$(aws lambda get-function --function-name caudal-analiza --query 'Code.Location' --output text)
+curl -s -o /tmp/actual.zip "$URL"   # y comparar hash por archivo contra el ZIP nuevo
+```
+
+Guardar el `CodeSha256` anterior antes de desplegar, por si hay que revertir.
