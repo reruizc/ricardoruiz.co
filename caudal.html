@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-<link href="caudal-base.css?v=20260907" rel="stylesheet" />
+<link href="caudal-base.css?v=20260907b" rel="stylesheet" />
 <link rel="stylesheet" href="caudal-ui.css?v=20260907b" />
 </head>
 <body class="caudal-app">
@@ -721,13 +721,56 @@
     arma(document.getElementById('hchips'), true);
     arma(document.getElementById('uchips'), true);
   }
+  /* ---------- la espera de la búsqueda ----------
+     Una respuesta tarda 15-20 s (seis fuentes + la lectura del modelo). En vez
+     de tres puntos, la espera lleva los logos, una barra infinita y datos del
+     propio archivo que rotan — todos cifras ya publicadas en Caudal, ninguna
+     inventada para el efecto. Un solo temporizador para las dos fases (buscar
+     y leer): cambia el mensaje, no el reloj. setInterval y no rAF: en una
+     pestaña de fondo rAF se congela y el dato se queda pegado. */
+  const UNI_FACTS=[
+    'Caudal cruza 14.964 registros del Congreso desde 1990, 63.004 actos de reguladores, 10.193 decretos de Presidencia y 5,87 millones de contratos del Estado.',
+    'El 63,5 % de los proyectos de ley muere antes del primer debate. El cementerio es el orden del día, no la votación.',
+    'Solo el 18,4 % de los proyectos de ley termina convertido en ley.',
+    'En la plenaria del Senado, el primer proyecto del orden del día se trata el 70 % de las veces; el sexto, una de cada cinco.',
+    'Hay un proyecto que se ha agendado 80 veces en el Senado sin evacuarse.',
+    'El Congreso no titula «aborto»: ese debate vive como «derechos sexuales y reproductivos». Caudal busca con el vocabulario real de los títulos.',
+  ];
+  const uniLoader={
+    _t:null,_i:0,
+    html(msg,compact){
+      return `<div class="uni-load${compact?' compact':''}" role="status" aria-live="polite">
+        <div class="uni-load-logos">
+          <img class="uni-load-cobrand" src="caudalxcauce.png" alt="Caudal × Cauce" />
+          <span class="uni-load-pb">powered by</span>
+          <span class="uni-load-rr"><span class="logo-bars"><span class="logo-bar" style="height:15px"></span><span class="logo-bar" style="height:11px"></span><span class="logo-bar" style="height:7px"></span><span class="logo-bar" style="height:3px"></span></span><span class="logo-text">Ricardo<span>.</span>Ruiz</span></span>
+        </div>
+        <div class="uni-bar"><span></span></div>
+        <div class="uni-load-msg">${esc(msg)}</div>
+        <div class="uni-load-fact" id="uni-fact"></div>
+      </div>`;
+    },
+    mount(el,msg,compact){
+      if(!el) return;
+      el.innerHTML=this.html(msg,compact);
+      if(!this._t){ this._i=Math.floor(Math.random()*UNI_FACTS.length); this._t=setInterval(()=>this.tick(),4200); }
+      this.tick(true);
+    },
+    tick(first){
+      const f=document.getElementById('uni-fact'); if(!f){ this.stop(); return; }
+      if(!first) this._i=(this._i+1)%UNI_FACTS.length;
+      f.style.opacity='0';
+      setTimeout(()=>{ f.textContent=UNI_FACTS[this._i]; f.style.opacity='1'; }, first?0:350);
+    },
+    stop(){ if(this._t){ clearInterval(this._t); this._t=null; } }
+  };
   async function uniSearch(query){
     query=(query||'').trim(); if(!query) return;
     const mine=++_uniSeq;
     showView('buscar');
     const uq=document.getElementById('uq'); if(uq) uq.value=query;
     const box=document.getElementById('uni-results');
-    box.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Buscando el tema <span class="dots"><span></span><span></span><span></span></span></div>';
+    uniLoader.mount(box,'Buscando en las seis fuentes de Caudal…');
     const amp=_ampliarEmp;
     const [cong,reg,eje,con,med,suc]=await Promise.allSettled([
       call({action:'tema', query, lectura:false, ampliar_empresa:amp}),
@@ -767,13 +810,19 @@
     box.innerHTML=`
       <div class="r-sub">Tema: <b>${esc(query)}</b></div>
       ${fallo}
-      <div class="lectura" id="uni-summary"><div class="tag">◈ Respuesta · sobre lo que Caudal encontró en sus fuentes</div><div id="uni-summary-body"><div class="llm-load">Leyendo las fuentes <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+      <div class="lectura" id="uni-summary"><div class="tag">◈ Respuesta · sobre lo que Caudal encontró en sus fuentes</div><div id="uni-summary-body"></div></div>
       <div class="uni-what">${ACCESO?'Explora el tema por fuente y abre los registros completos.':HAS_SESSION?'Abre una tarjeta para ver una muestra. Para acceder al archivo completo, puedes escoger un plan.':'Puedes ver algunos resultados si te registras. Crear una cuenta es gratis.'}</div>
       ${empresaHint(emps,'uni-emp-hint')}
       <div class="uni-cards">${UNI_TABS.map(([k,n])=>{const disponible=counts[k]!==null;const accion=ACCESO?'Ver resultados →':HAS_SESSION?'Ver muestra →':'Ver algunos resultados →';return `<button class="uni-card" data-k="${k}" type="button"${disponible?'':' disabled'}><span class="uni-card-name">${n}</span><b>${disponible?fmt(counts[k]):'—'}</b><span class="uni-card-action">${disponible?accion:'Fuente no disponible'}</span></button>`}).join('')}</div>
-      <div id="uni-tab-body"></div>`;
+      <div id="uni-tab-body"></div>
+      <div class="uni-again-wrap"><button type="button" class="uni-again" id="uni-again">↺ Hacer una nueva pregunta</button></div>`;
     const rl=document.getElementById('uni-radar-link'); if(rl) rl.onclick=()=>showView('cliente');
     wireEmpresaHint('uni-emp-hint', ()=>uniSearch(query));
+    const again=document.getElementById('uni-again');
+    if(again) again.onclick=()=>{ uniLoader.stop(); const q=document.getElementById('uq'); if(q){ q.value=''; q.focus(); } window.scrollTo({top:0,behavior:'smooth'}); };
+    // la lectura tarda 15-20 s: el mismo loader, ahora dentro de la tarjeta,
+    // y solo para quien la va a recibir (el muro no espera nada)
+    if(HAS_SESSION && ACCESO) uniLoader.mount(document.getElementById('uni-summary-body'),'Leyendo las fuentes y escribiendo la respuesta · suele tomar entre 15 y 20 segundos',true);
     uniLoadRespuesta(query, mine);
     const cards=[...box.querySelectorAll('.uni-card')];
     const show=k=>{ cards.forEach(t=>t.classList.toggle('on',t.dataset.k===k)); document.getElementById('uni-tab-body').innerHTML=uniTabBody(k); wireUniTab(k); };
@@ -809,6 +858,7 @@
       || '<div class="cob-note">Sin resumen disponible para este tema.</div>';
   }
   function uniResumenFallback(msg){
+    uniLoader.stop();
     const el=document.getElementById('uni-summary-body'); if(!el) return;
     const registrado=HAS_SESSION;
     if(msg){ el.innerHTML=`<div class="cob-note">${esc(msg)}</div>`; return; }
@@ -844,16 +894,61 @@
       contratacion: pick(d.contratacion&&d.contratacion.resultados, ['fecha','entidad','objeto','valor'], 5),
     };
   }
+  /* ---------- las fuentes, con nombre ----------
+     El modelo cita códigos cortos (M1, S1, C3…) porque así `fuentes` se puede
+     verificar contra la evidencia que se le dio y no contra su memoria. Pero
+     al cliente no le dice nada «prensa M1»: acá se traduce cada código al
+     registro real. La numeración replica EXACTAMENTE la de _resp_contexto en
+     la Lambda —mismos recortes, mismo orden, mismos cortes— o el M4 de la
+     respuesta sería otro titular. Si algún día cambia allá, cambia acá. */
+  function uniRefMap(){
+    const d=_uniData||{}; const map={};
+    const s=(v,n)=>String(v==null?'':v).replace(/\n/g,' ').trim().slice(0,n);
+    const desc=(k)=>(a,b)=>{const x=k(a),y=k(b);return x<y?1:x>y?-1:0;};   // estable, como Python
+    const cR=d.congreso&&d.congreso.resumen;
+    const cong=((cR&&cR.intentos)||[]).filter(i=>!i.match_texto).slice(0,12).slice().sort((a,b)=>((b.anio||0)-(a.anio||0)));
+    cong.slice(0,8).forEach((x,i)=>map['C'+(i+1)]={t:(x.numero||x.num||'proyecto de ley')+(x.anio?' · '+x.anio:''),tip:x.titulo||'',pilar:'Congreso'});
+    const reg=((d.regulatorio&&d.regulatorio.resultados)||[]).slice(0,8).slice().sort(desc(x=>s(x.fecha,10)));
+    reg.slice(0,6).forEach((x,i)=>map['R'+(i+1)]={t:x.fuente_nombre||x.fuente||'regulador',tip:[x.tipo,x.sancionado,x.motivo].filter(Boolean).join(' · '),pilar:'Reguladores'});
+    const eje=((d.ejecutivo&&d.ejecutivo.resultados)||[]).slice(0,8).slice().sort(desc(x=>s(x.fecha,10)));
+    eje.slice(0,6).forEach((x,i)=>map['E'+(i+1)]={t:[x.tipo,x.numero].filter(Boolean).join(' ')||'norma del Ejecutivo',tip:x.descripcion||'',url:x.url,pilar:'Ejecutivo'});
+    const suc=((d.sucop&&d.sucop.resultados)||[]).slice(0,8).slice().sort(desc(x=>s(x.fecha_inicio||x.creado,10)));
+    suc.slice(0,6).forEach((x,i)=>map['S'+(i+1)]={t:'consulta de '+(x.entidad||'entidad'),tip:x.titulo||x.objeto||'',url:x.url,pilar:'Consulta pública'});
+    const med=((d.medios&&d.medios.resultados)||[]).slice(0,12).slice().sort(desc(x=>s(x.fecha,10)));
+    med.slice(0,10).forEach((x,i)=>map['M'+(i+1)]={t:x.medio||'prensa',tip:x.titulo||'',url:x.url,pilar:'Prensa'});
+    const con=((d.contratacion&&d.contratacion.resultados)||[]).slice(0,5);
+    con.slice(0,4).forEach((x,i)=>map['K'+(i+1)]={t:'contrato · '+(x.entidad||'entidad'),tip:x.objeto||'',url:x.url,pilar:'Contratación'});
+    return map;
+  }
+  function uniRefHTML(code,map,largo){
+    const r=map[code]; if(!r) return esc(code);
+    const txt=largo&&r.tip?`${esc(r.t)} — ${esc(r.tip.slice(0,120))}`:esc(r.t);
+    return r.url?`<a class="uni-ref" href="${esc(r.url)}" target="_blank" rel="noopener" title="${esc(r.tip)}">${txt}</a>`:`<span class="uni-ref" title="${esc(r.tip)}">${txt}</span>`;
+  }
+  // «(M1)», «(M1, M4)», «(M1 y M4)» → «(El Tiempo, Portafolio)». Solo dentro de
+  // paréntesis: una M1 suelta en prosa no se toca.
+  function uniTexto(t,map){
+    t=String(t||''); const re=/\(([CRESMK]\d{1,2}(?:\s*(?:[,;]|\by\b)\s*[CRESMK]\d{1,2})*)\)/g;
+    let out='',last=0,m;
+    while((m=re.exec(t))){ out+=esc(t.slice(last,m.index)); out+='('+m[1].split(/\s*(?:[,;]|\by\b)\s*/).map(c=>uniRefHTML(c,map)).join(', ')+')'; last=re.lastIndex; }
+    return out+esc(t.slice(last));
+  }
   function uniPintarRespuesta(l){
+    uniLoader.stop();
     const el=document.getElementById('uni-summary-body'); if(!el) return;
+    const map=uniRefMap();
     const cz=l.certeza||{}; const CC={alta:'var(--green)',media:'var(--amber)',baja:'var(--red)'};
-    const chip=cz.nivel?`<span class="ichip" style="padding:.12rem .5rem;font-size:.62rem;color:${CC[cz.nivel]||'inherit'};border-color:${CC[cz.nivel]||'inherit'}55" title="${esc(cz.por_que||'')}">certeza ${esc(cz.nivel)}</span>`:'';
-    const li=a=>(a||[]).length?`<ul style="margin:.35rem 0 0 1rem;padding:0;line-height:1.5">${a.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:'';
-    const blk=(h,t)=>t?`<div class="blk"><div class="h">${h}</div><div class="t">${esc(t)}</div></div>`:'';
-    const fu=(l.fuentes||[]).length?`<div class="cob-note" style="margin-top:.5rem">Fuentes usadas: ${l.fuentes.map(f=>esc((f.pilar?f.pilar+' ':'')+(f.ref||''))).join(' · ')}</div>`:'';
-    el.innerHTML=`<div class="blk"><div class="t" style="font-size:1.02rem;line-height:1.55">${esc(l.respuesta||'')} ${chip}</div>${cz.por_que?`<div class="cob-note" style="margin-top:.3rem">${esc(cz.por_que)}</div>`:''}</div>
+    const chip=cz.nivel?`<span class="ichip" style="display:inline-block;width:auto;padding:.12rem .5rem;font-size:.62rem;color:${CC[cz.nivel]||'inherit'};border-color:${CC[cz.nivel]||'inherit'}55" title="${esc(cz.por_que||'')}">certeza ${esc(cz.nivel)}</span>`:'';
+    const li=a=>(a||[]).length?`<ul style="margin:.35rem 0 0 1rem;padding:0;line-height:1.5">${a.map(t=>`<li>${uniTexto(t,map)}</li>`).join('')}</ul>`:'';
+    const blk=(h,t)=>t?`<div class="blk"><div class="h">${h}</div><div class="t">${uniTexto(t,map)}</div></div>`:'';
+    // cada fuente, con su registro real; si el código no casa con nada, se
+    // muestra el pilar y nada más — nunca un nombre adivinado
+    const fu=(l.fuentes||[]).length?`<div class="blk"><div class="h">Fuentes usadas</div><ul class="uni-fuentes">${l.fuentes.map(f=>{const c=String(f.ref||'').toUpperCase().trim();const r=map[c];return `<li><span class="uni-fu-pilar">${esc(r?r.pilar:(f.pilar||''))}</span> ${r?uniRefHTML(c,map,true):esc(c)}</li>`;}).join('')}</ul></div>`:'';
+    const aviso=`<div class="uni-aviso">Esta es una <b>lectura general</b> a partir de nuestras fuentes de datos. Si quieres un análisis personalizado en tu sector, visita <a id="uni-aviso-rosa">la Rosa de los Vientos</a>; si necesitas el análisis desde tu empresa, <a href="mailto:hola@ricardoruiz.co?subject=${encodeURIComponent('Caudal · análisis desde mi empresa')}">habla con nosotros</a>.</div>`;
+    el.innerHTML=`${aviso}<div class="blk"><div class="t" style="font-size:1.02rem;line-height:1.55">${uniTexto(l.respuesta||'',map)} ${chip}</div>${cz.por_que?`<div class="cob-note" style="margin-top:.3rem">${uniTexto(cz.por_que,map)}</div>`:''}</div>
       ${(l.transversales||[]).length?`<div class="blk"><div class="h">Lo clave para informar</div>${li(l.transversales)}</div>`:''}
       ${blk('Qué está vivo en el Estado',l.en_tramite)}${blk('Qué dice la prensa',l.prensa)}${blk('Qué hacer',l.accion)}${fu}`;
+    const rosa=document.getElementById('uni-aviso-rosa'); if(rosa) rosa.onclick=()=>showView('cliente');
   }
   function uniLoadRespuesta(query, mine){
     if(!HAS_SESSION || !ACCESO) return uniResumenFallback();
