@@ -10,6 +10,8 @@
 #   camara_radicados          harvest_camara.py           lo mismo del lado Cámara
 #   camara_upload             build_diario_camara_s3.py   resuelve y baja gacetas nuevas
 #   en_vivo                   leyes_en_vivo.py            feed "En vivo" de legislativo.html
+#   ejecutivo_*               harvest_decretos.py         normativa de Presidencia (Socrata) → S3
+#   temas_*                   build_temas.py              temas del momento (chips de la búsqueda) → S3 público
 #   ordenes_camara            harvest_ordenes.py          órdenes del día: 14 comisiones + plenaria
 #   ordenes_senado_indice     harvest_ordenes_senado.py   refresca el índice DOCman + plenaria
 #   ordenes_senado_comisiones   ídem `buenas`             Cuarta/Quinta/Sexta
@@ -440,6 +442,48 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
     etapa --nombre supers_upload_sanciones \
           --omitida "el consolidado no pasó la verificación (rc=$rc_ver): en S3 se queda el bueno de ayer"
     etapa --nombre supers_upload_stats --omitida "ídem: no se sube un pilar a medias"
+  fi
+
+  # ── pilar Ejecutivo · normativa de Presidencia (Socrata 88h2-dykw, vía 1) ──
+  # No estaba en el cron: el índice se quedó en junio mientras la fuente ya iba
+  # por el 28-ago (medido sep-2026, «presupuesto general» daba 0 en 2027).
+  # Fetch completo (~12k filas, ~1 min); el upload exige un piso de filas para
+  # que un fetch a medias no encoja el índice en S3.
+  etapa --nombre ejecutivo_fetch --timeout 900 \
+        --desc "normativa de Presidencia · Socrata" \
+        -- python3 tools/caudal/ejecutivo/harvest_decretos.py fetch
+  rc_ej=$?
+  if [ $rc_ej -eq 0 ]; then
+    etapa --nombre ejecutivo_build --timeout 300 --desc "raw → normativa.jsonl + stats" \
+          -- python3 tools/caudal/ejecutivo/harvest_decretos.py build
+    rc_ej=$?
+  else
+    etapa --nombre ejecutivo_build --omitida "el fetch falló (rc=$rc_ej)"
+  fi
+  if [ $rc_ej -eq 0 ]; then
+    EJD="$REPO/Bases de datos/leyes-senado/ejecutivo/dist"
+    etapa --nombre ejecutivo_upload --timeout 300 --desc "normativa.jsonl + stats → S3 (piso 11.000 filas)" \
+          -- bash -c "n=\$(grep -c . \"$EJD/normativa.jsonl\"); [ \"\$n\" -ge 11000 ] || { echo \"solo \$n filas: no se sube\"; exit 1; }; \
+             aws s3 cp \"$EJD/normativa.jsonl\" s3://caudal-legislativo/metadata/normativa.jsonl --content-type application/json --cache-control 'private, max-age=300' && \
+             aws s3 cp \"$EJD/stats.json\" s3://caudal-legislativo/metadata/normativa-stats.json --content-type application/json --cache-control 'private, max-age=300'"
+  else
+    etapa --nombre ejecutivo_upload --omitida "no hay índice nuevo (rc=$rc_ej): en S3 queda el de ayer"
+  fi
+
+  # ── temas del momento (chips de la búsqueda de Caudal) ──
+  # Prensa política + radicados de la semana + consultas SUCOP abiertas → 8
+  # temas de búsqueda, validados contra el propio Caudal. Si el builder no
+  # produce al menos 4 temas válidos sale con rc=1 y NO se sube: en S3 queda
+  # el JSON anterior (última copia buena).
+  etapa --nombre temas_build --timeout 900 \
+        --desc "temas del momento: prensa + radicados + SUCOP" \
+        -- python3 tools/caudal/temas/build_temas.py
+  rc_tm=$?
+  if [ $rc_tm -eq 0 ]; then
+    etapa --nombre temas_upload --timeout 120 --desc "temas-del-momento.json → S3 público" \
+          -- python3 tools/caudal/temas/build_temas.py --upload-only
+  else
+    etapa --nombre temas_upload --omitida "el builder no produjo temas válidos (rc=$rc_tm): en S3 queda el de ayer"
   fi
 
   # ── chequeo de salud ──

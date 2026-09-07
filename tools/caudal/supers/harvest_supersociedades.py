@@ -686,7 +686,34 @@ def _dedup_cbj(regs):
 
 def fetch(solo=None, max_pages=MAX_PAGES):
     RAW.mkdir(parents=True, exist_ok=True)
-    regs, descartado = [], {}
+    regs, descartado, caidas = [], {}, {}
+
+    # ÚLTIMA COPIA BUENA (sep-2026). El 4-sep el buscador interno del portal
+    # quedó vacío en TODAS sus categorías (200 OK, «Sin Documentos»,
+    # totalArticulos en blanco, incluso con keyword: el índice del lado de
+    # ellos, no nuestro parser). Esta función escribía el raw con lo que
+    # hubiera —los 49 proyectos de la cola A— y BORRABA las 685 normas que ya
+    # tenía; el consolidado del pilar cayó bajo su piso y dejó de subir cinco
+    # corridas seguidas. Una circular de 2019 no deja de existir porque el
+    # buscador se caiga: si una categoría vuelve VACÍA y antes tenía actos, se
+    # conservan los de la corrida anterior y se deja constancia en
+    # `_cola_normativa_caida`. Cuando el portal vuelva, la cosecha nueva los
+    # reemplaza sola. Mismo principio que la copia buena de RedAcopio.
+    prev_norm, prev_generado, prev_recuperado = {}, None, None
+    if OUT_JSON.exists():
+        try:
+            _prev = json.loads(OUT_JSON.read_text(encoding='utf-8'))
+            prev_generado = _prev.get('_generado')
+            for r in _prev.get('registros', []):
+                if r.get('cola') == 'normativa':
+                    prev_norm.setdefault(r.get('categoria_id'), []).append(r)
+            _prev_caida = _prev.get('_cola_normativa_caida') or {}
+            prev_desde = _prev_caida.get('desde') or prev_generado
+            prev_recuperado = _prev.get('_recuperado_de_s3')
+        except (ValueError, OSError):
+            prev_desde = None
+    else:
+        prev_desde = None
 
     if solo in (None, 'normativa'):
         print('· cola B · buscador interno (emisor por FILA, trampa ①)')
@@ -730,6 +757,13 @@ def fetch(solo=None, max_pages=MAX_PAGES):
                     ambiguas.append((cat['nombre'], f['titulo']))
             print(f'    {cat["nombre"]:<32} {len(filas):>4} filas → {n_ok:>4} propias '
                   f'({n_irr} de título irregular) · portal dice {total if total is not None else "?"}')
+            if n_ok == 0 and prev_norm.get(cat_id):
+                conservados = prev_norm[cat_id]
+                regs.extend(conservados)
+                caidas[cat['nombre']] = len(conservados)
+                print(f'    ⚠⚠ {cat["nombre"]}: el portal devolvió CERO y la corrida '
+                      f'anterior tenía {len(conservados)} actos → se conservan '
+                      f'(última copia buena, desde {prev_desde})', file=sys.stderr)
         if ajenas:
             print(f'    ajenas descartadas dentro de lo recorrido: {dict(ajenas)}')
         if irregulares:
@@ -807,6 +841,21 @@ def fetch(solo=None, max_pages=MAX_PAGES):
                'Ejecutivo y Congreso.'),
         registros=regs,
     )
+    if caidas and prev_recuperado:
+        # la procedencia de la copia buena viaja con ella mientras dure la caída
+        payload['_recuperado_de_s3'] = prev_recuperado
+    if caidas:
+        payload['_cola_normativa_caida'] = dict(
+            fecha=time.strftime('%Y-%m-%d %H:%M:%S'),
+            desde=prev_desde,
+            categorias=caidas,
+            nota=('El buscador interno del portal devolvió CERO en estas categorías; '
+                  'sus actos son los de la última cosecha buena. Se reemplazan solos '
+                  'cuando el portal vuelva a responder.'),
+        )
+        print(f'\n  ⚠⚠ cola B CAÍDA en {len(caidas)} categorías: se publica la última '
+              f'copia buena ({sum(caidas.values())} actos, desde {prev_desde})',
+              file=sys.stderr)
     # si la corrida fue parcial (--solo), no pisamos lo que ya había de la otra cola
     if solo and OUT_JSON.exists():
         prev = json.loads(OUT_JSON.read_text(encoding='utf-8'))

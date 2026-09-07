@@ -778,7 +778,7 @@
     const tlRow=(it,inTexto)=>{
       const rc=RES_COLOR[it.resultado]||'var(--gray)';
       const key=(it.tb||'pdly')+':'+it.id;
-      return `<div class="tl-item" data-id="${it.id}" data-tb="${it.tb||'pdly'}" data-emp="${it.empuje||''}" data-tip="${it.tipologia||''}" data-mc="${it.mc!=null?it.mc:''}" data-nw="${it.nw!=null?it.nw:''}">
+      return `<div class="tl-item${it.resultado==='EN_TRAMITE'?' tl-live':''}" data-id="${it.id}" data-tb="${it.tb||'pdly'}" data-emp="${it.empuje||''}" data-tip="${it.tipologia||''}" data-mc="${it.mc!=null?it.mc:''}" data-nw="${it.nw!=null?it.nw:''}">
         <span class="tl-year">${it.anio||'—'}</span>
         <div class="tl-body">
           <div class="tl-titulo" title="${esc(it.titulo)}">${esc(shortTitle(it.titulo).slice(0,110))}</div>
@@ -786,6 +786,7 @@
           <div class="tl-tags">
             <span class="doc-badge ${it.tb==='pal'?'pal':''}">${TIPO_DOC[it.tb||'pdly']}</span>
             <span class="tl-res" style="color:${rc};border:1px solid ${rc}33;background:${rc}14">${RES_TXT[it.resultado]||'—'}</span>
+            ${(typeof camarasBadge==='function')?camarasBadge(it):''}
             ${it.empuje?`<span class="emp-badge" style="color:${EMP_COLOR[it.empuje]};background:${EMP_COLOR[it.empuje]}14;border:1px solid ${EMP_COLOR[it.empuje]}44" title="${it.empuje==='vitrina'?'Re-radicado sin superar el 1er debate':''}">${EMP_TXT[it.empuje]||''}${it.veces_presentado>1?' '+it.veces_presentado+'×':''}</span>`:''}
             ${it.tipologia&&it.tipologia!=='ordinaria'?`<span class="emp-badge" style="color:${TIP_COLOR[it.tipologia]};background:${TIP_COLOR[it.tipologia]}14;border:1px solid ${TIP_COLOR[it.tipologia]}44">${TIP_TXT[it.tipologia]||''}</span>`:''}
           </div>

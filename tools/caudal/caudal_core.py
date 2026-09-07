@@ -1073,6 +1073,10 @@ class Caudal:
                 'etapa_max': h.get('et', 0),
                 'mc': h.get('_mc'), 'nw': h.get('_nw'),
                 'match_texto': h.get('mt', False),   # matcheó por el texto de su gaceta, no por título
+                # números de radicado por cámara (sep-2026): el cliente lee
+                # «Cámara 152/26 · Senado 111/26», no un id interno. Los dos
+                # presentes = cruzó de cámara; uno solo = se quedó donde nació.
+                'numero_camara': h.get('nc'), 'numero_senado': h.get('ns'),
             } for h in sorted(hits, key=lambda h: -(h.get('a') or 0))],
         }
 

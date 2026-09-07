@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-<link href="caudal-base.css?v=20260906" rel="stylesheet" />
-<link rel="stylesheet" href="caudal-ui.css?v=20260905-2" />
+<link href="caudal-base.css?v=20260907" rel="stylesheet" />
+<link rel="stylesheet" href="caudal-ui.css?v=20260907" />
 </head>
 <body class="caudal-app">
   <a class="skip-link" href="#app">Saltar al contenido</a>
@@ -74,6 +74,7 @@
       <button class="pill-back" id="uniBack">← Portada de Caudal</button>
       <div class="hero" style="padding-bottom:.4rem">
         <div class="search"><input id="uq" type="text" placeholder="busca un tema…" autocomplete="off" /><button id="ugo">Buscar</button></div>
+        <div class="chips" id="uchips"></div>
       </div>
       <div id="uni-results"></div>
     </div>
@@ -324,7 +325,7 @@
      `*Init` de cada pilar y a cliInit. Entre ellos y el script de abajo solo
      se hablan por `window`, así que el orden entre los tres no importa.
      ⚠️ Al tocar cualquiera hay que bumpear su ?v=. -->
-<script src="caudal-pilares.js?v=20260904"></script>
+<script src="caudal-pilares.js?v=20260907"></script>
 <script src="caudal-cliente.js?v=20260905-2"></script>
 <script src="caudal-votos.js?v=20260829"></script>
 <script>
@@ -704,6 +705,22 @@
   const UNI_TABS=[['congreso','Congreso'],['regulatorio','Regulatorio'],['sucop','Consulta pública'],
                   ['ejecutivo','Ejecutivo'],['contratacion','Contratación'],['medios','Medios']];
   let _uniSeq=0, _uniData={};
+  const TEMAS_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/temas-del-momento.json';
+  async function pintarTemasDelMomento(){
+    let d=null;
+    try{ const r=await fetch(TEMAS_URL+'?v='+new Date().toISOString().slice(0,13).replace(/\D/g,'')); if(r.ok) d=await r.json(); }catch(e){}
+    const temas=(d&&d.temas||[]).filter(t=>t&&t.tema);
+    if(!temas.length) return;
+    const fecha=d.hoy?new Date(d.hoy+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long'}):'';
+    const arma=(cont, conTitulo)=>{
+      if(!cont) return;
+      cont.innerHTML='';
+      if(conTitulo){ const lb=document.createElement('span'); lb.className='chips-label'; lb.textContent='Temas del momento'+(fecha?' · '+fecha:''); cont.appendChild(lb); }
+      temas.forEach(t=>{ const ch=document.createElement('button'); ch.type='button'; ch.className='chip chip-tema'; ch.textContent=t.tema; if(t.por_que) ch.title=t.por_que; ch.onclick=()=>{ const uq=document.getElementById('uq'); if(uq) uq.value=t.tema; uniSearch(t.tema); }; cont.appendChild(ch); });
+    };
+    arma(document.getElementById('hchips'), true);
+    arma(document.getElementById('uchips'), true);
+  }
   async function uniSearch(query){
     query=(query||'').trim(); if(!query) return;
     const mine=++_uniSeq;
@@ -855,12 +872,23 @@
       setTimeout(tick,3500);
     }).catch(()=>uniResumenFallback('No se pudo preparar la respuesta.'));
   }
+  // Cámara(s) de radicación junto al estado (pedido de Ricardo, sep-2026): los
+  // dos números = cruzó de cámara («Cámara · Senado»); uno solo = se quedó donde
+  // nació. Sale del índice (nc/ns), no se infiere del origen del registro.
+  function camarasBadge(it){
+    const c=it.numero_camara, s=it.numero_senado;
+    if(!c&&!s) return '';
+    const tip=[c?`Cámara ${c}`:'', s?`Senado ${s}`:''].filter(Boolean).join(' · ');
+    const txt=c&&s?'Cámara y Senado':c?'Cámara':'Senado';
+    return `<span class="tl-cam" title="Radicado: ${esc(tip)}">${txt}</span>`;
+  }
   function uniMiniRow(it){
     const rc=RES_COLOR[it.resultado]||'var(--gray)';
-    return `<div class="tl-item" data-id="${it.id}" data-tb="${it.tb||'pdly'}">
+    const live=it.resultado==='EN_TRAMITE'?' tl-live':'';
+    return `<div class="tl-item${live}" data-id="${it.id}" data-tb="${it.tb||'pdly'}">
       <span class="tl-year">${it.anio||'—'}</span>
       <div class="tl-body"><div class="tl-titulo" title="${esc(it.titulo)}">${esc(shortTitle(it.titulo).slice(0,110))}</div>
-      <div class="tl-tags"><span class="doc-badge ${it.tb==='pal'?'pal':''}">${TIPO_DOC[it.tb||'pdly']}</span><span class="tl-res" style="color:${rc};border:1px solid ${rc}33;background:${rc}14">${RES_TXT[it.resultado]||'—'}</span></div></div></div>`;
+      <div class="tl-tags"><span class="doc-badge ${it.tb==='pal'?'pal':''}">${TIPO_DOC[it.tb||'pdly']}</span><span class="tl-res" style="color:${rc};border:1px solid ${rc}33;background:${rc}14">${RES_TXT[it.resultado]||'—'}</span>${camarasBadge(it)}</div></div></div>`;
   }
   function uniTabBody(k){
     const d=_uniData[k], query=_uniData.query;
@@ -882,6 +910,15 @@
     if(k==='contratacion'&&d&&d.sin_contratos)
       return `<div class="err"><b>${esc((d.empresas&&d.empresas[0]&&d.empresas[0].nombre)||query)}</b> no le vende al Estado por SECOP II. <a class="bd-link" id="uni-contratacion-full">abrir el pilar →</a></div>`;
     if(!l.length) return `<div class="err">${empty}</div>`;
+    // búsqueda flexible (sep-2026): el backend relajó el AND porque una palabra
+    // no aparece en ningún registro. Se dice cuál, y por cuál se buscó — nada
+    // aparece por magia (mismo principio que en Congreso).
+    const fx=d.flexible;
+    const flex=fx&&fx.anchor?`<div class="broaden" style="margin-bottom:.6rem"><b>Búsqueda flexible</b> · ${
+      fx.modo==='palabras'
+        ? `ninguna ${noun[0]} trae la frase exacta «${esc(query)}»; mostrando ${fmt(d.n)} que contienen todas tus palabras.`
+        : `ninguna ${noun[0]} contiene ${(fx.sin_coincidencia||[]).map(w=>`«<b>${esc(w)}</b>»`).join(' ni ')||'todas tus palabras'} junto a «<b>${esc(fx.anchor.join(', '))}</b>». Mostrando ${fmt(d.n)} por ese término, las que más palabras comparten primero.`
+    }</div>`:'';
     const tot=(d.total&&d.total.contratos)||d.n;
     // en SUCOP el conteo bruto no es la noticia: lo que importa es cuántos de
     // esos todavía admiten comentarios. Un 40 con 0 abiertos es archivo.
@@ -893,7 +930,7 @@
       : `${fmt(d.n)} ${d.n===1?noun[0]:noun[1]}`;
     const cP=cortar(l);
     const vistosP=ACCESO?cP.ver.slice(0,40):cP.ver;
-    return `<div class="cob-note" style="margin-bottom:.8rem">${cab} · <a class="bd-link" id="uni-${k}-full">abrir en el pilar →</a></div>`
+    return flex+`<div class="cob-note" style="margin-bottom:.8rem">${cab} · <a class="bd-link" id="uni-${k}-full">abrir en el pilar →</a></div>`
       + `<div class="sanc-list">${vistosP.map(card).join('')}</div>`
       + muroLista(cP.fuera, card, noun[0], noun[1], `acceso · ${query}`);
   }
@@ -935,6 +972,11 @@
     if(hq) hq.addEventListener('keydown',e=>{ if(e.key==='Enter') goHome(); });
     const hc=document.getElementById('hchips');
     if(hc) EJEMPLOS.forEach(t=>{ const ch=document.createElement('button'); ch.type='button'; ch.className='chip'; ch.textContent=t; ch.onclick=()=>uniSearch(t); hc.appendChild(ch); });
+    // Temas del momento (sep-2026): salen de un JSON que el cron regenera a
+    // diario cruzando prensa política, radicados de la semana y consultas
+    // SUCOP abiertas, con cada tema verificado contra el propio Caudal. Si el
+    // JSON no llega, quedan los ejemplos fijos de arriba: nunca una caja vacía.
+    pintarTemasDelMomento();
     const temaInicial=(new URLSearchParams(location.search).get('tema')||'').trim();
     if(temaInicial) uniSearch(temaInicial);
     const uq=document.getElementById('uq'), ugo=document.getElementById('ugo');

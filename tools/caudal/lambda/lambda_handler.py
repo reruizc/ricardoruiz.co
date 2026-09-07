@@ -3501,6 +3501,51 @@ CORS = {'Access-Control-Allow-Origin': '*',
 
 
 
+def _relajar_q(q, recs, campo='q', pasa=None):
+    """Búsqueda flexible para los pilares que filtran por substring sobre el blob
+    `q` (Ejecutivo · Regulatorio · SUCOP). Ese filtro exige la FRASE literal:
+    «reforma pensional» solo casa si las dos palabras van pegadas y en ese
+    orden, y «presupuesto general 2027» daba 0 en el Ejecutivo mientras
+    «presupuesto general» daba 128 (medido sep-2026) — ningún decreto menciona
+    2027 todavía, y el cero escondía los 128.
+
+    Dos niveles, solo cuando la frase dio cero:
+      1. `palabras`: todas las palabras, en cualquier orden y lugar del blob.
+      2. `ancla`: si tampoco, se ancla en la palabra ALFABÉTICA más específica
+         (menor frecuencia; los números nunca anclan: «2027» tenía 7 casos de
+         substring y ganaba como ancla siendo un calificador) y se rankea por
+         cuántas palabras coinciden, fecha como desempate. Se declara qué
+         palabra no aparece junto al ancla (`sin_coincidencia`).
+    Devuelve (hits, flexible) o (None, None) si no aplica. `pasa` = los otros
+    filtros del pilar (tipo, estado…), que se respetan igual."""
+    toks = [t for t in (q or '').split() if len(t) >= 3]
+    if len(toks) < 2:
+        return None, None
+    base = [r for r in recs if (pasa is None or pasa(r))]
+
+    def blob(r):
+        return r.get(campo) or ''
+    hits = [r for r in base if all(t in blob(r) for t in toks)]
+    if hits:
+        hits.sort(key=lambda r: r.get('fecha') or '', reverse=True)
+        return hits, {'modo': 'palabras', 'anchor': toks, 'sin_coincidencia': [],
+                      'n_estricto': 0, 'n_total': len(hits)}
+    cand = [t for t in toks if not t.isdigit()]
+    df = {t: sum(1 for r in base if t in blob(r)) for t in cand}
+    con = [t for t in cand if df[t] > 0]
+    if not con:
+        return None, None
+    anchor = min(con, key=lambda t: df[t])
+    hits = [r for r in base if anchor in blob(r)]
+    otros = [t for t in toks if t != anchor]
+    sin = [t for t in otros if not any(t in blob(r) for r in hits)]
+    hits.sort(key=lambda r: r.get('fecha') or '', reverse=True)
+    hits.sort(key=lambda r: -sum(1 for t in toks if t in blob(r)))
+    return hits, {'modo': 'ancla', 'anchor': [anchor], 'sin_coincidencia': sin,
+                  'con': [t for t in otros if t not in sin],
+                  'n_estricto': 0, 'n_total': len(hits)}
+
+
 def _fold_q(s):
     """Minúsculas y sin tildes — la MISMA regla con la que build_s3 y los
     harvesters construyen el blob `q`. Si las dos mitades no coinciden, la
@@ -4008,11 +4053,20 @@ def handler(event, context):
                 and (not q
                      or (empresas.casa_registro_any(emps, r.get('sancionado', ''))
                          if emps else q in r.get('q', '')))]
+        # búsqueda flexible (sep-2026), mismo criterio que Ejecutivo. Nunca con
+        # empresa: ahí el match es de identidad y relajarlo traería homónimos.
+        flexible = None
+        if q and not hits and not emps:
+            fh, flexible = _relajar_q(q, recs, pasa=lambda r: (not sector or r.get('sector') == sector))
+            if fh:
+                hits = fh
+            else:
+                flexible = None
         secc = Counter(r.get('sector', '') for r in hits)
         fuc = Counter(r.get('fuente_nombre', '') for r in hits)
         tac = Counter((r.get('tipo_acto') or 'sancion') for r in hits)
         montos = [r['monto'] for r in hits if r.get('monto')]
-        hits_sorted = sorted(hits, key=lambda r: r.get('fecha', ''), reverse=True)
+        hits_sorted = hits if flexible else sorted(hits, key=lambda r: r.get('fecha', ''), reverse=True)
         out = [{k: v for k, v in r.items() if k != 'q'} for r in hits_sorted[:120]]
         # cuántos actos NO-sanción quedaron fuera con el filtro por defecto: el
         # frontend lo usa para ofrecer el toggle sin mentir sobre el universo.
@@ -4029,6 +4083,7 @@ def handler(event, context):
             'tipo_acto': tipo_acto,
             'n': len(hits), 'mostrados': len(out),
             'otros_actos': otros,
+            'flexible': flexible,
             'por_sector': [{'sector': s, 'n': n} for s, n in secc.most_common()],
             'por_fuente': [{'fuente': f, 'n': n} for f, n in fuc.most_common()],
             'por_tipo_acto': [{'tipo_acto': t, 'n': n} for t, n in tac.most_common()],
@@ -4054,14 +4109,26 @@ def handler(event, context):
                 and (not q
                      or q in r.get('q', '')
                      or (vocab and any(v in empresas._n(r.get('q', '')) for v in vocab)))]
+        # búsqueda flexible (sep-2026): el AND de varias palabras no puede dejar
+        # en cero lo que sí existe por la palabra específica. Solo sin empresa
+        # (ahí el vocabulario del diccionario ya hizo su OR).
+        flexible = None
+        if q and not hits and not vocab:
+            fh, flexible = _relajar_q(
+                q, recs, pasa=lambda r: (not tipo or (r.get('tipo') or '').upper() == tipo))
+            if fh:
+                hits = fh
+            else:
+                flexible = None
         tic = Counter((r.get('tipo') or '—') for r in hits)
-        hits_sorted = sorted(hits, key=lambda r: r.get('fecha', ''), reverse=True)
+        hits_sorted = hits if flexible else sorted(hits, key=lambda r: r.get('fecha', ''), reverse=True)
         out = [{k: v for k, v in r.items() if k != 'q'} for r in hits_sorted[:120]]
         return _resp(200, {
             'mode': 'search', 'query': body.get('query', ''), 'tipo': tipo,
             'n': len(hits), 'mostrados': len(out),
             'por_tipo': [{'tipo': t, 'n': n} for t, n in tic.most_common()],
             'empresas': _empresas_payload(emps),
+            'flexible': flexible,
             'resultados': out,
         })
 
@@ -4175,7 +4242,7 @@ def handler(event, context):
         emps = empresas.empresas_en(body.get('query') or '')
         tops = set(empresas.topicos_de(emps, bool(body.get('ampliar_empresa')))) if emps else set()
 
-        def _pasa(r):
+        def _pasa(r, con_q=True):
             if tipo and (r.get('tipo') or '') != tipo:
                 return False
             ec = r.get('estado_consulta')
@@ -4188,12 +4255,22 @@ def handler(event, context):
                 return False
             if sector and sector not in (r.get('sector') or '').lower():
                 return False
-            if not q:
+            if not q or not con_q:
                 return True
             return (q in (r.get('q') or '')
                     or (tops and tops.intersection(r.get('topicos') or [])))
 
         hits = [r for r in recs if _pasa(r)]
+        # búsqueda flexible (sep-2026), mismo criterio que Ejecutivo. El orden
+        # sigue siendo el de urgencia (_sucop_orden): acá lo que importa es
+        # cuánto falta para que cierre la consulta, no cuántas palabras casan.
+        flexible = None
+        if q and not hits and not tops:
+            fh, flexible = _relajar_q(q, recs, pasa=lambda r: _pasa(r, con_q=False))
+            if fh:
+                hits = fh
+            else:
+                flexible = None
         hits_sorted = sorted(hits, key=_sucop_orden)
         out = [_sucop_card(r) for r in hits_sorted[:120]]
         # el desglose del subconjunto: cuántas de ESTAS todavía se pueden comentar
@@ -4208,6 +4285,7 @@ def handler(event, context):
             'por_entidad': [{'entidad': e, 'n': n} for e, n in
                             Counter((r.get('entidad') or '—') for r in hits).most_common(12)],
             'empresas': _empresas_payload(emps),
+            'flexible': flexible,
             'resultados': out,
         })
 
