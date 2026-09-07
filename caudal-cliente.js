@@ -132,6 +132,14 @@
       if(esEquipo()) pinta(CLI_CLIENTES,'cli-real');
       const drill=document.createElement('details');
       drill.className='sec-drill';
+      // El latido se apaga la primera vez que alguien lo abre, y no vuelve:
+      // llamar la atención sobre algo que el usuario ya conoce es ruido.
+      try{ if(localStorage.getItem('caudal-sec-visto')) drill.dataset.visto='1'; }catch(e){}
+      drill.addEventListener('toggle',()=>{
+        if(!drill.open) return;
+        drill.dataset.visto='1';
+        try{ localStorage.setItem('caudal-sec-visto','1'); }catch(e){}
+      });
       drill.innerHTML='<summary class="chip add">Explorar 15 sectores</summary><div class="sec-drill-list"></div>';
       const list=drill.querySelector('.sec-drill-list');
       CLI_SECS.forEach(([k,t,reg])=>{
@@ -709,19 +717,22 @@
         <div class="kpi ley"><div class="n">${k.en_tramite}</div><div class="l">En trámite · ventana</div></div>
         <div class="kpi"><div class="n">${vigN?(k.n_senales_vigiladas||0):(k.n_medios_sector?fmt(k.n_medios_sector):'—')}</div><div class="l">${vigN?(cl.tipo==='empresa'?'Sobre tu competencia':'Sobre tus vigiladas'):'Prensa reciente'}</div></div>
       </div>
-      ${secDesc}${avi}${desc}${lineasHTML}${alcanceHTML}${vigNote}
-      <div class="cli-note"><b>Activo ahora en ${esc(cl.nombre)}:</b> <b>${k.en_tramite}</b> proyecto(s) de ley en trámite · ${sancTxt} · <b>${fmt(k.n_medios_sector||0)}</b> titular(es) de prensa reciente · <b>${fmt(k.n_contratos_sector||0)}</b> contrato(s) reciente(s) en SECOP.</div>
-      ${k.n_medios_exterior?`<div class="cob-note" style="margin:.4rem 0"><b>${k.n_medios_exterior}</b> titular(es) de prensa del exterior quedaron fuera del radar: hablan del tema en Perú, Panamá o Estados Unidos, no en Colombia. Se descartan acá, no se borran de la fuente.</div>`:''}
-      ${k.n_con_articulado?`<div class="cli-note"><b>Qué cambian:</b> de las ${congreso.length} señales del Congreso, <b>${k.n_con_articulado}</b> ya tienen el articulado leído${k.n_te_aplica?` y <b>${k.n_te_aplica}</b> le aplican a tu sector o a tus vigiladas`:''}. El resto todavía no se ha extraído.</div>`:''}
-      <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt((k.n_sanciones_sector||0)+(k.n_otros_actos_sector||0))}</b> actos del regulador (<b>${fmt(k.n_sanciones_sector)}</b> de ellos sanciones)`:''} que tocan estos temas, ${MARCA.nombre} prioriza por accionabilidad — precisión sobre volumen.${(cl.temas_usados&&cl.temas_usados.length)?` Se buscó por: <b>${esc(cl.temas_usados.join(' · '))}</b>.`:''}</div>
+      <!-- LA LECTURA VA ARRIBA. Es lo que el cliente vino a leer: el contexto
+           del perfil (líneas de negocio, alcance, competencia) explica de dónde
+           sale el radar, pero se lee DESPUÉS de saber qué pasó. -->
       <div class="lectura">
         <div class="tag">◈ Lectura del analista · briefing de hoy para ${esc(cl.nombre)}</div>
-        <div id="cli-lectura-body"><div class="llm-load">Generando lectura <span class="dots"><span></span><span></span><span></span></span></div></div>
+        <div id="cli-lectura-body"></div>
         <div class="brief-bar" id="cli-brief-bar" hidden>
           <button type="button" class="brief-btn" id="cli-brief-btn">↓ Brief de 72 horas (.pdf)</button>
           <span class="brief-nota" id="cli-brief-nota"></span>
         </div>
       </div>
+      ${secDesc}${avi}${desc}${lineasHTML}${alcanceHTML}${vigNote}
+      <div class="cli-note"><b>Activo ahora en ${esc(cl.nombre)}:</b> <b>${k.en_tramite}</b> proyecto(s) de ley en trámite · ${sancTxt} · <b>${fmt(k.n_medios_sector||0)}</b> titular(es) de prensa reciente · <b>${fmt(k.n_contratos_sector||0)}</b> contrato(s) reciente(s) en SECOP.</div>
+      ${k.n_medios_exterior?`<div class="cob-note" style="margin:.4rem 0"><b>${k.n_medios_exterior}</b> titular(es) de prensa del exterior quedaron fuera del radar: hablan del tema en Perú, Panamá o Estados Unidos, no en Colombia. Se descartan acá, no se borran de la fuente.</div>`:''}
+      ${k.n_con_articulado?`<div class="cli-note"><b>Qué cambian:</b> de las ${congreso.length} señales del Congreso, <b>${k.n_con_articulado}</b> ya tienen el articulado leído${k.n_te_aplica?` y <b>${k.n_te_aplica}</b> le aplican a tu sector o a tus vigiladas`:''}. El resto todavía no se ha extraído.</div>`:''}
+      <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt((k.n_sanciones_sector||0)+(k.n_otros_actos_sector||0))}</b> actos del regulador (<b>${fmt(k.n_sanciones_sector)}</b> de ellos sanciones)`:''} que tocan estos temas, ${MARCA.nombre} prioriza por accionabilidad — precisión sobre volumen.${(cl.temas_usados&&cl.temas_usados.length)?` Se buscó por: <b>${esc(cl.temas_usados.join(' · '))}</b>.`:''}</div>
       <div class="cli-sub">Explorar el detalle</div>
       <div class="chips" id="cli-toggle" style="justify-content:flex-start;margin-top:.3rem">
         <span class="chip" data-p="congreso">Legislativo <b>${congreso.length}</b></span>
@@ -792,6 +803,7 @@
                   ['sur','S','Sur · competencia'],['oeste','O','Occidente · Estado']];
   function cliRenderLectura(l){
     const body=document.getElementById('cli-lectura-body'); if(!body) return;
+    cliLoaderStop();
     _CLI_LECTURA=l||null;
     const _k=(_CLI_LAST&&_CLI_LAST.kpis)||{};
     const cc=_k.cardinales||{}, md=_k.mov_dias||3;
@@ -827,6 +839,52 @@
       || '<div class="cob-note">Sin lectura disponible.</div>';
     briefWire();
   }
+  /* ── La espera de la lectura ──────────────────────────────────────────
+     La primera lectura de un perfil tarda 40-60 s: son seis fuentes cruzadas
+     más la generación del modelo, y el sondeo va a saltos. Tres puntos
+     durante un minuto se leen como «se colgó».
+
+     ⚠️ LOS PASOS DICEN LO QUE DE VERDAD PASA. Ninguno anuncia escucha de redes
+     sociales: Caudal tiene un DICCIONARIO de cuentas oficiales (quién habla por
+     cada entidad), no monitoreo de lo que se publica en ellas. Anunciarlo acá
+     sería vender en la barra de carga algo que el producto no hace — y es la
+     primera pantalla donde un cliente nuevo aprende qué es Caudal. */
+  const CLI_PASOS=[
+    n=>`Cruzando los proyectos del Congreso que tocan a ${n}`,
+    ()=>'Leyendo el articulado: qué obliga, a quién y con qué sanción',
+    ()=>'Revisando actos de superintendencias y reguladores',
+    ()=>'Buscando la norma que todavía está en consulta pública',
+    n=>`Rastreando prensa nacional y regional sobre ${n}`,
+    ()=>'Mirando qué contrata el Estado en SECOP',
+    ()=>'Pesando cada señal: avance, impacto del texto y peso político',
+    ()=>'Ordenando por lo que mueve la aguja — precisión sobre volumen',
+  ];
+  let _cliPasoT=null;
+  function cliLoaderStart(nombre){
+    const el=document.getElementById('cli-lectura-body'); if(!el) return;
+    cliLoaderStop();
+    const n=esc(nombre||'este perfil');
+    // se barajan salvo el primero y el último: el orden real de las consultas
+    // no es fijo, y ver siempre la misma secuencia delata que es decorado.
+    const medio=CLI_PASOS.slice(1,-1).map((f,i)=>[Math.random(),f]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+    const pasos=[CLI_PASOS[0],...medio,CLI_PASOS[CLI_PASOS.length-1]].map(f=>f(n));
+    el.innerHTML=`<div class="cli-wait" role="status" aria-live="polite">
+      <div class="cli-wait-bar"><span></span></div>
+      <div class="cli-wait-txt" id="cli-wait-txt">${pasos[0]}</div>
+      <div class="cli-wait-sub">La primera lectura de un perfil tarda un poco: son seis fuentes y el análisis se escribe encima.</div>
+    </div>`;
+    let i=0;
+    // setInterval y no rAF: en una pestaña de fondo rAF se congela y el texto
+    // se queda pegado en el primer paso (mismo criterio que uniLoader).
+    _cliPasoT=setInterval(()=>{
+      i=(i+1)%pasos.length;
+      const tx=document.getElementById('cli-wait-txt'); if(!tx) return cliLoaderStop();
+      tx.style.opacity='0';
+      setTimeout(()=>{ tx.textContent=pasos[i]; tx.style.opacity='1'; },180);
+    },4200);
+  }
+  function cliLoaderStop(){ if(_cliPasoT){ clearInterval(_cliPasoT); _cliPasoT=null; } }
+
   /* ── Cupo de sectores para quien no tiene cuenta ──────────────────────
      Los 15 sectores son PRESETS: su radar se precalcula y se cachea, así que
      servírselos a un visitante cuesta casi nada. Por eso son la mejor puerta
@@ -933,10 +991,23 @@
     try{ return 'Ver el documento en ' + new URL(u).hostname.replace(/^www\./,''); }
     catch(e){ return 'Ver el documento'; }
   }
+  /* ⚠️ `shortTitle` pasa TODO a minúscula y solo capitaliza la primera letra:
+     existe porque los títulos del Congreso vienen en MAYÚSCULA SOSTENIDA. Sobre
+     un titular de prensa, que ya viene bien escrito, destroza los nombres
+     propios — «Mina quebradona: prórroga de exploración en jericó». Así que se
+     aplica solo cuando el título de verdad viene gritado: mismo criterio (70 %
+     de mayúsculas) que `oracion()` en caudal-portada.js. */
+  function briefTitulo(s){
+    const v=String(s||'').trim();
+    const letras=v.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g,'');
+    if(!letras) return v;
+    const may=(letras.match(/[A-ZÁÉÍÓÚÜÑ]/g)||[]).length;
+    return may/letras.length>=0.7 ? shortTitle(v) : v;
+  }
   function briefSenalTexto(x){
     const meta=[BRIEF_FUENTE[x.tipo]||x.tipo, x.fecha||'', x.vigilada?('vigilada: '+x.vigilada):'',
                 x.entidad||x.medio||x.comision||''].filter(Boolean).join(' · ');
-    return {tit:shortTitle((x.titulo||'').trim()).slice(0,190), meta,
+    return {tit:briefTitulo(x.titulo).slice(0,190), meta,
             accion:(x.accion||'').trim(), url:(x.url||'').trim(),
             enlace:briefEtiquetaEnlace(x), nivel:x.nivel||''};
   }
@@ -951,8 +1022,10 @@
     const mov=todas.filter(x=>x&&x.mov);
     const porCard={norte:[],este:[],sur:[],oeste:[]};
     mov.forEach(x=>{ const c=porCard[x.card]?x.card:'oeste'; porCard[c].push(x); });
+    const hoy=new Date();
     return {nombre:cl.nombre||'tu perfil', kpis:k, porCard, nMov:mov.length,
-            nTotal:todas.length, dias:k.mov_dias||3, lectura:_CLI_LECTURA};
+            nTotal:todas.length, dias:k.mov_dias||3, lectura:_CLI_LECTURA,
+            cabecera:hoy.toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'})};
   }
   async function briefDescargar(){
     const btn=document.getElementById('cli-brief-btn');
@@ -961,89 +1034,208 @@
     if(btn){ btn.disabled=true; btn.textContent='Armando el brief…'; }
     let jsPDF; try{ jsPDF=await briefJsPDF(); }
     catch(e){ if(btn){btn.disabled=false;btn.textContent=txtPrev;} alert('No se pudo cargar el generador de PDF. Reintenta.'); return; }
-    const doc=new jsPDF({unit:'pt',format:'letter'});
-    const M=54, W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), AN=W-M*2;
-    let y=M;
-    const salto=(n)=>{ if(y+n>H-58){ doc.addPage(); y=M; } };
-    const linea=(txt,{size=10,style='normal',color=[40,44,52],gap=4,indent=0}={})=>{
+
+    /* ── El sistema visual es el del Brief de Asuntos Públicos de Cauce ────
+       Antes esto era texto corrido y se leía como un volcado. El brief que el
+       equipo ya usa tiene una gramática: encabezado con marca en cada página,
+       titular, bajada, línea de ventana, un bloque destacado con la lectura y
+       su «si solo hay tiempo para una cosa», secciones numeradas con barra de
+       color y cajas de «qué hacer», y al final lo que NO se movió — verificado,
+       no asumido. Ese último bloque es el que separa un informe de un listado.
+
+       ⚠️ HELVETICA Y NADA MÁS: jsPDF trae las 14 fuentes base y ninguna tilde
+       fuera de WinAnsi. Un solo carácter fuera de ese juego (→ ↗ ★ •) obliga a
+       escribir la cadena entera en 16 bits y sale como «!». Guiones y puntos
+       medios, nunca flechas. */
+    const doc=new jsPDF({unit:'pt',format:'letter',compress:true});
+    const W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight();
+    const M=52, AN=W-M*2, TOP=96, PIE=52;
+    const AZUL=[61,110,184], TINTA=[26,32,44], GRIS=[110,120,133], SUAVE=[248,247,244];
+    // acento por rumbo — el mismo orden de la Rosa
+    const ACENTO={norte:[176,124,32], este:[61,110,184], sur:[150,58,52], oeste:[46,101,78]};
+    let y=TOP;
+
+    const cabecera=()=>{
+      doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(...TINTA);
+      doc.text('CAUDAL × CAUCE', M, 48);
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...GRIS);
+      doc.text('navegar la complejidad', M+2, 60);
+      doc.setFontSize(7.5);
+      doc.text('BRIEF DE 72 HORAS · CAUDAL × CAUCE', W-M, 46, {align:'right'});
+      doc.text(D.cabecera.toUpperCase(), W-M, 57, {align:'right'});
+      doc.setDrawColor(...TINTA); doc.setLineWidth(1.1); doc.line(M, 70, W-M, 70);
+      doc.setLineWidth(0.5);
+    };
+    const nuevaPag=()=>{ doc.addPage(); cabecera(); y=TOP; };
+    const salto=n=>{ if(y+n>H-PIE) nuevaPag(); };
+    const parrafo=(txt,{size=9.5,style='normal',color=TINTA,lh=1.42,x=M,ancho=AN,gap=5}={})=>{
+      if(!txt) return;
       doc.setFont('helvetica',style); doc.setFontSize(size); doc.setTextColor(...color);
-      const ls=doc.splitTextToSize(String(txt||''),AN-indent);
-      ls.forEach(l=>{ salto(size+gap); doc.text(l,M+indent,y); y+=size+gap; });
+      doc.splitTextToSize(String(txt),ancho).forEach(l=>{
+        salto(size*lh); doc.text(l,x,y); y+=size*lh;
+      });
+      y+=gap;
     };
-    const enlace=(txt,url,{size=8,indent=0}={})=>{
-      salto(size+5); doc.setFont('helvetica','normal'); doc.setFontSize(size);
-      doc.setTextColor(37,99,235);
-      doc.textWithLink(String(txt),M+indent,y,{url:String(url)});
-      y+=size+5;
+    const eyebrow=(txt,color=GRIS,{x=M,size=7.2,gap=6}={})=>{
+      salto(size+gap); doc.setFont('helvetica','bold'); doc.setFontSize(size);
+      doc.setTextColor(...color);
+      // versalitas a mano: jsPDF no tiene small-caps y el espaciado lo simula
+      doc.text(String(txt).toUpperCase(),x,y,{charSpace:0.7}); y+=size+gap;
     };
-    const regla=()=>{ salto(12); doc.setDrawColor(214,219,226); doc.line(M,y,W-M,y); y+=12; };
+    // caja con fondo y barra lateral: se mide primero, se pinta después, para
+    // que el fondo no quede cortado a mitad de página
+    const caja=(alto,{fondo=SUAVE,barra=null,x=M,ancho=AN}={})=>{
+      doc.setFillColor(...fondo); doc.rect(x,y-9,ancho,alto+16,'F');
+      if(barra){ doc.setFillColor(...barra); doc.rect(x,y-9,2.6,alto+16,'F'); }
+    };
+    const alto=(txt,size,lh,ancho)=>{
+      doc.setFontSize(size);
+      return doc.splitTextToSize(String(txt||''),ancho).length*size*lh;
+    };
+
+    cabecera();
+
+    // ── TITULAR + BAJADA ────────────────────────────────────────────────
+    const tit=(D.lectura&&D.lectura.titular)||`Lo que se movió en ${D.nombre} en las últimas ${D.dias*24} horas`;
+    doc.setFont('helvetica','bold'); doc.setFontSize(19); doc.setTextColor(...TINTA);
+    doc.splitTextToSize(tit,AN).forEach((l,i)=>{ salto(26); doc.setTextColor(...(i?AZUL:TINTA)); doc.text(l,M,y); y+=25; });
+    y+=6;
+    parrafo(`Barrido de las últimas ${D.dias*24} horas sobre el Congreso, el Ejecutivo, los reguladores, `
+      +`la consulta pública de normas, la contratación del Estado y la prensa. `
+      +`${D.nMov} señal${D.nMov===1?'':'es'} con movimiento, de ${D.nTotal} vigentes para este perfil, ordenadas por los `
+      +`cuatro rumbos de la Rosa de los Vientos.`,{size:9.5,color:[70,78,90],gap:8});
     const hoy=new Date();
-    const fLarga=hoy.toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
+    const desde=new Date(hoy.getTime()-D.dias*864e5);
+    const f=d=>d.toLocaleDateString('es-CO',{day:'numeric',month:'long'});
+    doc.setDrawColor(214,219,226); doc.line(M,y,W-M,y); y+=12;
+    eyebrow(`Ventana ${f(desde)} a ${f(hoy)} de ${hoy.getFullYear()} · corte ${hoy.toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})} · Colombia`,GRIS,{size:7,gap:16});
 
-    // — portada del brief —
-    linea('CAUDAL · BRIEF DE 72 HORAS',{size:9,style:'bold',color:BRIEF_ACENTO,gap:6});
-    linea(D.nombre,{size:20,style:'bold',color:[16,20,28],gap:6});
-    linea(`${fLarga} · ventana de ${D.dias*24} horas`,{size:9,color:[110,120,133],gap:10});
-    regla();
-
-    // — el titular y los cuatro rumbos, tal como están en pantalla —
+    // ── LECTURA DEL ANALISTA ────────────────────────────────────────────
     const L=D.lectura||{};
-    if(L.titular) linea(L.titular,{size:12,style:'bold',color:[16,20,28],gap:8});
-    // Los CUATRO rumbos van siempre, aunque no se hayan movido: la Rosa tiene
-    // cuatro puntos y un brief que omite los quietos deja de ser un mapa. "Sin
-    // movimiento" es una respuesta, y de las útiles.
-    BRIEF_CARD.forEach(([k,nom])=>{
-      const txt=(L[k]||'').trim(); const lista=D.porCard[k]||[]; const n=lista.length;
-      salto(30);
-      linea(`${nom} — ${n?`${n} en ${D.dias*24} h`:'sin movimiento'}`,
-            {size:9,style:'bold',color:BRIEF_ACENTO,gap:5});
-      if(txt) linea(txt,{size:10,gap:4});
-      if(!txt&&!n) linea(`Nada nuevo en este rumbo dentro de la ventana.`,
-                         {size:9,color:[110,120,133],gap:4,indent:10});
-      lista.forEach(x=>{
-        const s=briefSenalTexto(x);
-        linea('- '+s.tit,{size:9,style:'bold',color:[16,20,28],gap:3,indent:10});
-        if(s.meta) linea(s.meta,{size:8,color:[110,120,133],gap:2,indent:20});
-        if(s.accion) linea(s.accion,{size:8.5,color:[60,66,76],gap:2,indent:20});
-        if(s.url&&s.enlace) enlace(s.enlace,s.url,{indent:20});
-      });
-      y+=6;
-    });
-
-    // — plan de acción, si la lectura lo trae —
-    if(L.plan&&L.plan.length){
-      regla(); linea('PLAN DE ACCIÓN',{size:9,style:'bold',color:BRIEF_ACENTO,gap:6});
-      L.plan.forEach((p,i)=>{
-        linea(`${i+1}. ${p.accion||''}`,{size:10,style:'bold',color:[16,20,28],gap:3});
-        if(p.por_que) linea(p.por_que,{size:9,gap:2,indent:14});
-        const m=[p.plazo,p.responsable].filter(Boolean).join(' · ');
-        if(m) linea(m,{size:8,color:[110,120,133],gap:2,indent:14});
-        if(p.preparar) linea('Preparar: '+p.preparar,{size:8.5,color:[60,66,76],gap:4,indent:14});
-      });
+    if(L.titular||L.lo_que_importa||(L.plan&&L.plan.length)){
+      const cuerpo=L.lo_que_importa||'';
+      const uno=(L.plan&&L.plan[0])||null;
+      let h=14+alto(cuerpo,9.5,1.42,AN-24);
+      if(uno) h+=34+alto(uno.por_que||uno.accion||'',9,1.42,AN-46);
+      salto(h+40);
+      caja(h+16,{fondo:[243,244,250],barra:AZUL});
+      const yc=y; y+=6;
+      eyebrow('La lectura del analista',AZUL,{x:M+14,size:7,gap:7});
+      parrafo(cuerpo,{size:9.5,x:M+14,ancho:AN-24,gap:6});
+      if(uno){
+        doc.setFillColor(255,255,255); doc.rect(M+14,y-6,AN-28,alto(uno.por_que||uno.accion||'',9,1.42,AN-46)+28,'F');
+        y+=4;
+        eyebrow('Si solo hay tiempo para una cosa',AZUL,{x:M+24,size:6.6,gap:6});
+        parrafo(`${uno.accion||''}${uno.por_que?' '+uno.por_que:''}`,{size:9,x:M+24,ancho:AN-46,gap:4});
+        y+=8;
+      }
+      y=Math.max(y,yc+h)+18;
     }
 
-    // — el alcance, que es parte del producto y no una nota al pie —
-    regla();
-    linea('QUÉ CUBRE ESTE BRIEF',{size:9,style:'bold',color:BRIEF_ACENTO,gap:5});
-    linea(`${D.nMov} señal(es) con movimiento en las últimas ${D.dias*24} horas, de ${D.nTotal} `
-      +`que el radar tiene vigentes para este perfil. Lo que no aparece acá no es que no exista: `
-      +`es que no se movió en la ventana.`,{size:8.5,color:[60,66,76],gap:3});
-    linea('Los proyectos del Congreso no entran como movimiento: el índice guarda el año, no la '
-      +'fecha de radicación, así que un proyecto figura como estado del frente y no como noticia '
-      +'del día. Van en el radar completo de la plataforma.',{size:8.5,color:[60,66,76],gap:3});
-    linea('Fuentes: Congreso · superintendencias y reguladores · Ejecutivo · consulta pública '
-      +'(SUCOP) · contratación (SECOP) · prensa nacional y regional. Cada señal enlaza su '
-      +'documento oficial.',{size:8.5,color:[60,66,76],gap:3});
-    linea('Caudal · una alianza entre RicardoRuiz.co y Cauce. Análisis asistido por IA sobre '
-      +'datos oficiales. Borrador; el criterio experto es del analista.',
-      {size:8,color:[110,120,133],gap:3});
+    // ── LOS CUATRO RUMBOS ───────────────────────────────────────────────
+    let nSec=0;
+    BRIEF_CARD.forEach(([k,nom])=>{
+      const lista=D.porCard[k]||[]; const txt=(L[k]||'').trim();
+      if(!lista.length && !txt) return;      // los quietos van al bloque final
+      nSec++;
+      const col=ACENTO[k]||AZUL;
+      // El fondo se pinta ANTES del texto (jsPDF no tiene z-order: pintarlo
+      // después lo taparía), así que hay que MEDIR la sección primero. Si no
+      // cabe entera en una página se va sin fondo y solo con la barra lateral:
+      // un fondo cortado a mitad de página se ve como un error de maquetación.
+      let hSec=16+ (txt?alto(txt,9.5,1.42,AN-28)+8:0);
+      lista.forEach(x=>{ const s=briefSenalTexto(x);
+        hSec+=alto(s.tit,9.5,1.42,AN-28)+2
+             +(s.meta?alto(s.meta,7.6,1.42,AN-28)+2:0)
+             +(s.accion?alto(s.accion,8.6,1.42,AN-28)+2:0)
+             +(s.url&&s.enlace?13:0)+4; });
+      const cabe=hSec+26<H-PIE-TOP;
+      if(cabe && y+hSec+26>H-PIE) nuevaPag(); else salto(70);
+      const y0=y;
+      if(cabe) caja(hSec,{fondo:[250,249,246]});
+      eyebrow(`${String(nSec).padStart(2,'0')} · ${nom} · ${lista.length?`${lista.length} en ${D.dias*24} h`:'sin movimiento'}`,col,{x:M+14,gap:7});
+      if(txt) parrafo(txt,{size:9.5,style:'bold',x:M+14,ancho:AN-28,gap:8});
+      lista.forEach(x=>{
+        const s=briefSenalTexto(x);
+        salto(38);
+        parrafo(s.tit,{size:9.5,style:'bold',x:M+14,ancho:AN-28,gap:2});
+        if(s.meta) parrafo(s.meta,{size:7.6,color:GRIS,x:M+14,ancho:AN-28,gap:2});
+        if(s.accion) parrafo(s.accion,{size:8.6,color:[70,78,90],x:M+14,ancho:AN-28,gap:2});
+        if(s.url&&s.enlace){
+          salto(13); doc.setFont('helvetica','normal'); doc.setFontSize(7.8);
+          doc.setTextColor(...AZUL); doc.textWithLink(s.enlace,M+14,y,{url:s.url}); y+=13;
+        }
+        y+=4;
+      });
+      // barra lateral del bloque, pintada al final porque solo ahora se sabe
+      // cuánto midió; si el rumbo cruzó de página, la barra cubre lo de esta.
+      doc.setFillColor(...col); doc.rect(M,y0-11,2.6,Math.max(10,y-y0+2),'F');
+      y+=12;
+    });
 
-    // pie con paginación (después de conocer el total)
+    // ── PLAN DE ACCIÓN ──────────────────────────────────────────────────
+    if(L.plan&&L.plan.length>1){
+      salto(50); doc.setDrawColor(214,219,226); doc.line(M,y,W-M,y); y+=14;
+      eyebrow('Plan de acción',AZUL,{gap:9});
+      L.plan.forEach((p,i)=>{
+        salto(34);
+        parrafo(`${i+1}. ${p.accion||''}`,{size:9.8,style:'bold',gap:3});
+        if(p.por_que) parrafo(p.por_que,{size:9,x:M+16,ancho:AN-16,gap:2});
+        const m=[p.plazo,p.responsable].filter(Boolean).join(' · ');
+        if(m) parrafo(m,{size:7.8,color:GRIS,x:M+16,ancho:AN-16,gap:2});
+        if(p.preparar) parrafo('Preparar: '+p.preparar,{size:8.4,color:[70,78,90],x:M+16,ancho:AN-16,gap:6});
+      });
+      y+=6;
+    }
+
+    // ── QUÉ NO SE MOVIÓ ─────────────────────────────────────────────────
+    // El bloque que separa un informe de un listado: decir dónde SÍ se miró y
+    // no había nada es información, y es lo que impide que un rumbo quieto se
+    // confunda con un rumbo no revisado.
+    const quietos=BRIEF_CARD.filter(([k])=>!(D.porCard[k]||[]).length);
+    salto(60); doc.setDrawColor(214,219,226); doc.line(M,y,W-M,y); y+=14;
+    eyebrow('Qué no se movió — verificado, no asumido',TINTA,{gap:10});
+    quietos.forEach(([k,nom])=>{
+      salto(20);
+      doc.setFont('helvetica','bold'); doc.setFontSize(8.6); doc.setTextColor(...TINTA);
+      doc.text(nom,M,y);
+      doc.setFont('helvetica','normal'); doc.setTextColor(...GRIS);
+      doc.splitTextToSize('Revisado en la ventana; sin novedad.',AN-172).forEach((l,i)=>{
+        doc.text(l,M+172,y+i*12);
+      });
+      y+=20;
+    });
+    salto(20);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.6); doc.setTextColor(...TINTA);
+    doc.text('Congreso · fecha',M,y);
+    doc.setFont('helvetica','normal'); doc.setTextColor(...GRIS);
+    doc.splitTextToSize('Los proyectos de ley no entran como movimiento: el índice guarda el año de radicación, no el día. Van en el radar completo de la plataforma.',AN-172).forEach((l,i)=>{ doc.text(l,M+172,y+i*12); });
+    y+=32;
+
+    // ── PIE METODOLÓGICO ────────────────────────────────────────────────
+    salto(70); doc.setDrawColor(214,219,226); doc.line(M,y,W-M,y); y+=12;
+    const pie=(lb,tx)=>{
+      salto(24);
+      doc.setFont('helvetica','bold'); doc.setFontSize(7.8); doc.setTextColor(...TINTA);
+      doc.text(lb,M,y);
+      const w=doc.getTextWidth(lb)+4;
+      doc.setFont('helvetica','normal'); doc.setTextColor(...GRIS);
+      const ls=doc.splitTextToSize(tx,AN-w);
+      ls.forEach((l,i)=>{ doc.text(l, i?M:M+w, y+i*10.5); });
+      y+=ls.length*10.5+5;
+    };
+    pie('Fuentes.','Registro de proyectos de ley del Senado y la Cámara; normativa de Presidencia; consulta pública de proyectos de norma del DNP (SUCOP); registro regulatorio de 12 fuentes; providencias de la Corte Constitucional; contratos y procesos del Estado (SECOP); prensa nacional y regional. Cada señal enlaza el acto o la nota que la respalda.');
+    pie('Ventana.',`Últimas ${D.dias*24} horas, con corte al momento de la descarga.`);
+    pie('Alcance.','Insumo de monitoreo. Análisis asistido por IA sobre datos oficiales; el criterio experto es del analista.');
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...GRIS);
+    doc.text('Caudal · módulo de inteligencia regulatoria de Cauce.',M,y);
+
+    // ── PAGINACIÓN (al final: solo ahora se sabe el total) ──────────────
     const tot=doc.internal.getNumberOfPages();
     for(let i=1;i<=tot;i++){
-      doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
-      doc.setTextColor(150,158,168);
-      doc.text(`Caudal · brief de ${D.dias*24} h · ${D.nombre}`,M,H-30);
+      doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7.2);
+      doc.setTextColor(...GRIS);
+      doc.text(`${D.nombre} · brief de ${D.dias*24} h`,M,H-30);
       doc.text(`${i} / ${tot}`,W-M,H-30,{align:'right'});
     }
     const slug=String(D.nombre).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
@@ -1096,15 +1288,17 @@
     // usuario lo abre: recorre los cuatro pilares enteros
     TB_ARG = esPerfil ? {perfil:req.perfil} : {sector:arg.sector};
     cliRender(d);
+    const cl_nombre=(d.cliente&&d.cliente.nombre)||(esPerfil?p.nombre:arg.sector)||'este perfil';
     // el radar ya está en pantalla; la lectura llega después (o ya venía hecha)
     // Sin acceso ni se pide: el worker devuelve 403 a `cliente-lectura`, y eso
     // le pintaría un error al visitante donde debería ir una invitación.
     if(!ACCESO) cliMuroLectura();
     else if(d.lectura && !d.lectura.error) cliRenderLectura(d.lectura);
-    else if(d.lectura_key) cliPedirLectura(d.lectura_key, mine);
+    else if(d.lectura_key){ cliLoaderStart(cl_nombre); cliPedirLectura(d.lectura_key, mine); }
     else cliLecturaFallback();
   }
   function cliLecturaFallback(msg){
+    cliLoaderStop();
     const el=document.getElementById('cli-lectura-body'); if(!el) return;
     el.innerHTML='<div class="cob-note">'+esc(msg||'No se pudo generar la lectura. Lo de arriba está completo.')+'</div>';
     // el brief sigue disponible: las señales de las últimas 72 h son dato
@@ -1114,6 +1308,7 @@
   // El muro del radar: el briefing es justamente lo que se vende acá, así que en
   // vez de un error va la invitación, en el mismo sitio donde iría la lectura.
   function cliMuroLectura(){
+    cliLoaderStop();
     const el=document.getElementById('cli-lectura-body'); if(!el) return;
     el.innerHTML=`<div class="muro-t" style="margin-bottom:.7rem">Acá va el briefing del día: qué señales de las de arriba mueven la aguja, por qué, y qué hacer con cada una. Se escribe sobre esto mismo, y va con acceso.</div>`
       + `<a class="muro-btn" href="${window.COMPRA_URL||'caudal-pricing.html?comprar=1'}">Conseguir acceso →</a>`
@@ -1127,6 +1322,9 @@
   // sondeo se apaga; si lo cortan, la Lambda igual termina y el sondeo la pesca.
   const CLI_LECT_POLL=3500, CLI_LECT_MAX=150000;   // 150 s: el plan de acción alarga la primera lectura (medido sep-2026)
   let _cliLectTimer=null;
+  // corta el SONDEO. NO toca el loader: se la llama al arrancar la petición y
+  // pararlo ahí lo mataría justo al nacer. El loader lo apagan los tres finales
+  // (lectura lista · fallback · muro).
   function cliLecturaStop(){ if(_cliLectTimer){ clearTimeout(_cliLectTimer); _cliLectTimer=null; } }
   function cliPedirLectura(key, mine){
     cliLecturaStop();
@@ -1147,10 +1345,9 @@
     const tick=()=>{
       if(mine!==_cliSeq) return cliLecturaStop();
       if(Date.now()-t0>CLI_LECT_MAX){ cliLecturaStop(); return cliLecturaFallback(); }
-      if(Date.now()-t0>12000){
-        const el=document.getElementById('cli-lectura-body');
-        if(el && !el.dataset.slow){ el.dataset.slow='1'; el.innerHTML='<div class="llm-load">La primera lectura de un perfil tarda un poco más <span class="dots"><span></span><span></span><span></span></span></div>'; }
-      }
+      // (el aviso de «tarda un poco más» que iba acá pisaba el loader de pasos
+      //  con su propio innerHTML y lo dejaba mudo; el mensaje vive ahora en
+      //  `.cli-wait-sub`, que no se sobrescribe)
       call({action:'cliente-lectura',key,solo_cache:true})
         .then(d=>{ if(!listo(d)) _cliLectTimer=setTimeout(tick,CLI_LECT_POLL); })
         .catch(()=>{ if(mine===_cliSeq) _cliLectTimer=setTimeout(tick,CLI_LECT_POLL); });

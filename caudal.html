@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-<link href="caudal-base.css?v=20260907f" rel="stylesheet" />
+<link href="caudal-base.css?v=20260907g" rel="stylesheet" />
 <link rel="stylesheet" href="caudal-ui.css?v=20260907b" />
 <script>
   /* Contratación dejó de ser una vista de acá (sep-2026) y tiene página propia.
@@ -17,6 +17,10 @@
      paraguas. `replace` y no `href`: el atrás del navegador no debe devolver a
      una URL que ya no muestra lo que promete. */
   if(location.hash==='#contratacion') location.replace('caudal-contratacion.html');
+  // Medios salió por lo mismo (sep-2026): con temperatura, cruce de fuentes y
+  // mapa ya no cabía dentro del shell. Un marcador a #medios debe llevar a la
+  // página nueva, no a la vista vieja, que solo listaba titulares.
+  if(location.hash==='#medios') location.replace('caudal-medios.html');
 </script>
 </head>
 <body class="caudal-app">
@@ -318,11 +322,13 @@
 <!-- Las vistas, agrupadas por afinidad. Van DESPUÉS del shell (usan call() y
      showView()) y ANTES del script de abajo, que en su initHome llama a los
      `*Init` de cada pilar y a cliInit. Entre ellos y el script de abajo solo
-     se hablan por `window`, así que el orden entre los tres no importa.
-     ⚠️ Al tocar cualquiera hay que bumpear su ?v=. -->
+     se hablan por `window`, así que el orden entre los cuatro no importa.
+     `caudal-contratacion.js` se carga acá SOLO por la búsqueda universal, que
+     necesita `conCard` y `CON`: el pilar vive en caudal-contratacion.html.
+     ⚠️ Al tocar cualquiera hay que bumpear su ?v= en las DOS páginas. -->
 <script src="caudal-pilares.js?v=20260907b"></script>
 <script src="caudal-contratacion.js?v=20260907"></script>
-<script src="caudal-cliente.js?v=20260907g"></script>
+<script src="caudal-cliente.js?v=20260907n"></script>
 <script src="caudal-votos.js?v=20260907"></script>
 <script>
 (function(){
@@ -534,7 +540,7 @@
   const PILLARS=[
     {id:'congreso',    name:'Congreso y órgano legislativo',    status:'live', n:'14.964', unit:'registros · 1990–2026', desc:'Proyectos de ley, actos legislativos y leyes. Cuántas veces se intentó, por qué se cae, quién lo empuja.'},
     {id:'regulatorio', name:'Superintendencias y comisiones',   status:'live', n:'63.004', unit:'actos · 10 fuentes', desc:'Actos de la ANLA, INVIMA, SECOP, Superfinanciera, Supersalud, Supertransporte, SIC, Contraloría y más — 7.229 de ellos sanciones. Cada uno cita su resolución o comunicado.'},
-    {id:'medios',      name:'Medios nacionales y regionales',   status:'live', n:'en vivo', unit:'prensa por tema',      desc:'Titulares de prensa nacional y regional, rastreados por tema — sin mantener un conector por medio.'},
+    {id:'medios',      name:'Medios nacionales y regionales',   status:'live', n:'en vivo', unit:'prensa por tema',      desc:'A qué ritmo crece la cobertura de un tema, quién la sostiene y en qué departamentos no se cubre — contrastado con lo que el Estado está tramitando en ese mismo momento.'},
     {id:'datos',       name:'Datos abiertos y contratación',    status:'live', n:'5,87 M', unit:'contratos · SECOP II', desc:'Todos los contratos electrónicos del Estado, consultados en vivo y actualizados a diario. Cada uno enlaza su proceso en SECOP.'},
     {id:'control',     name:'Órganos de control y altas cortes',status:'live', n:'10.861', unit:'providencias · Corte Constitucional', desc:'Sentencias y autos que cambian la interpretación de la norma, cosechados por 51 consultas temáticas desde 2021 — el alcance va declarado en la vista. Consejo de Estado y Corte Suprema entran en el siguiente corte.'},
     {id:'ejecutivo',   name:'Ejecutivo nacional · Presidencia',   status:'live', n:'10.193', unit:'decretos · desde 2015', desc:'Decretos, resoluciones, directivas, circulares y agenda regulatoria de la Presidencia. Cada norma enlaza su texto oficial.'},
@@ -550,7 +556,12 @@
       const st=PSTAT[p.status]||PSTAT.soon;
       const meta=p.n?`<div class="pc-meta">${esc(p.n)} ${esc(p.unit||'')}</div>`:'';
       const tag=(p.status==='live'||p.status==='data')?'a':'article';
-      const dest=p.id==='redes'?'caudal-voceros.html':p.id==='datos'?'caudal-contratacion.html':'#'+p.id;
+      // Los pilares que ya viven en su propia página van por href; el resto son
+      // vistas del router de caudal.html. Medios salió de `view-medios` porque
+      // con mapa, gráficos y cruce de fuentes engordaba el archivo que ya hubo
+      // que partir en seis por tamaño.
+      const PAGINA={redes:'caudal-voceros.html', datos:'caudal-contratacion.html', medios:'caudal-medios.html'};
+      const dest=PAGINA[p.id]||('#'+p.id);
       return `<${tag} ${tag==='a'?`href="${dest}"`:''} class="pcard ${p.status}" data-p="${p.id}" style="background-image:url('imagenes/caudal-${p.id}.jpg')">
         <span class="pc-status ${st[0]}">${st[1]}</span>
         <div class="pc-label">
@@ -567,7 +578,7 @@
       const id=c.dataset.p;
       if(id==='congreso') showView('congreso');
       else if(id==='regulatorio') showView('regulatorio');
-      else if(id==='medios') showView('medios');
+      else if(id==='medios') location.href='caudal-medios.html';
       else if(id==='control') showView('control');
       else if(id==='ejecutivo') showView('ejecutivo');
       else if(id==='sucop') showView('sucop');
