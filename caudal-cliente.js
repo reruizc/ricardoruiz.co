@@ -43,6 +43,13 @@
   // muestran lo que un preset genérico no puede — una empresa con varias líneas
   // de negocio, cada una en su comisión, y con competencia real en el Sur.
   const CLI_CLIENTES=[['didi','DiDi',1],['binance','Binance',1]];
+  // Son prospectos con nombre propio: un usuario nuevo no tiene por qué ver
+  // quién está en conversaciones con Cauce (reportado por Ricardo, sep-7-2026:
+  // los vio con una cuenta recién creada). Solo el equipo los ve como muestra.
+  const EQUIPO=['reruizc@gmail.com','nuevagemela@gmail.com','diego@cauce.co'];
+  function esEquipo(){
+    try{ const u=JSON.parse(localStorage.getItem('rr-user')||'null'); return !!(u&&EQUIPO.includes(String(u.email||'').toLowerCase())); }catch(e){ return false; }
+  }
   const CLI_SECS=[
     ['salud','Salud',1],['ambiente','Ambiente',1],['contratacion','Contratación',1],
     ['financiero','Financiero',1],['transporte','Transporte',1],['energia','Energía',0],
@@ -122,7 +129,7 @@
                    :(reg?'Tiene fuente conectada en el pilar Regulatorio'
                        :'Su regulador sectorial todavía no es fuente de Caudal');
         c.onclick=()=>cliLoad({sector:k}); cont.appendChild(c); });
-      pinta(CLI_CLIENTES,'cli-real');
+      if(esEquipo()) pinta(CLI_CLIENTES,'cli-real');
       const drill=document.createElement('details');
       drill.className='sec-drill';
       drill.innerHTML='<summary class="chip add">Explorar 15 sectores</summary><div class="sec-drill-list"></div>';
