@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-<link href="caudal-base.css?v=20260904" rel="stylesheet" />
+<link href="caudal-base.css?v=20260906" rel="stylesheet" />
 <link rel="stylesheet" href="caudal-ui.css?v=20260905-2" />
 </head>
 <body class="caudal-app">
@@ -794,7 +794,22 @@
   function uniResumenFallback(msg){
     const el=document.getElementById('uni-summary-body'); if(!el) return;
     const registrado=HAS_SESSION;
-    el.innerHTML=msg?`<div class="cob-note">${esc(msg)}</div>`:`<div class="cob-note">La respuesta del analista sobre estas fuentes va con acceso a Caudal. <a class="bd-link" href="${registrado?COMPRA_URL:'register.html?next='+encodeURIComponent('caudal.html')}">${registrado?'Conseguir acceso →':'Registrarme gratis →'}</a></div>`;
+    if(msg){ el.innerHTML=`<div class="cob-note">${esc(msg)}</div>`; return; }
+    // El muro vende con las cifras REALES de esta búsqueda (pedido de Ricardo,
+    // sep-2026): decir cuánto encontró Caudal y que el analista lo lee por ti,
+    // no un aviso administrativo de que la respuesta «va con acceso».
+    const c=(_uniData&&_uniData.counts)||{};
+    const vals=Object.values(c).filter(v=>typeof v==='number');
+    const total=vals.reduce((a,b)=>a+b,0), fuentes=vals.filter(v=>v>0).length;
+    const fmt=n=>n.toLocaleString('es-CO');
+    const cifra=total>0
+      ? `Son <b>${fmt(total)} resultados</b> en ${fuentes} fuente${fuentes===1?'':'s'} distinta${fuentes===1?'':'s'}: más de lo que alcanza a leer una persona.`
+      : 'Caudal busca a la vez en el Congreso, los reguladores, el Ejecutivo, la contratación y la prensa.';
+    const href=registrado?COMPRA_URL:'register.html?next='+encodeURIComponent('caudal.html');
+    const cta=registrado
+      ? 'Nuestro analista los lee por ti y te dice qué importa y qué hacer. Está disponible con acceso a Caudal. <a class="bd-link" href="'+href+'">Conseguir acceso →</a>'
+      : 'Nuestro analista los lee por ti y te dice qué importa y qué hacer. <a class="bd-link" href="'+href+'">Regístrate gratis aquí →</a>';
+    el.innerHTML=`<div class="cob-note" style="font-size:.95rem;line-height:1.55">${cifra} ${cta}</div>`;
   }
   // RESPUESTA TRANSVERSAL: contesta la pregunta con lo que trajeron los seis
   // pilares (pedido de Pablo: "se siente muy Google"). El contexto se manda
