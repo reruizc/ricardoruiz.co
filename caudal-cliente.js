@@ -711,6 +711,7 @@
       </div>
       ${secDesc}${avi}${desc}${lineasHTML}${alcanceHTML}${vigNote}
       <div class="cli-note"><b>Activo ahora en ${esc(cl.nombre)}:</b> <b>${k.en_tramite}</b> proyecto(s) de ley en trámite · ${sancTxt} · <b>${fmt(k.n_medios_sector||0)}</b> titular(es) de prensa reciente · <b>${fmt(k.n_contratos_sector||0)}</b> contrato(s) reciente(s) en SECOP.</div>
+      ${k.n_medios_exterior?`<div class="cob-note" style="margin:.4rem 0"><b>${k.n_medios_exterior}</b> titular(es) de prensa del exterior quedaron fuera del radar: hablan del tema en Perú, Panamá o Estados Unidos, no en Colombia. Se descartan acá, no se borran de la fuente.</div>`:''}
       ${k.n_con_articulado?`<div class="cli-note"><b>Qué cambian:</b> de las ${congreso.length} señales del Congreso, <b>${k.n_con_articulado}</b> ya tienen el articulado leído${k.n_te_aplica?` y <b>${k.n_te_aplica}</b> le aplican a tu sector o a tus vigiladas`:''}. El resto todavía no se ha extraído.</div>`:''}
       <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt((k.n_sanciones_sector||0)+(k.n_otros_actos_sector||0))}</b> actos del regulador (<b>${fmt(k.n_sanciones_sector)}</b> de ellos sanciones)`:''} que tocan estos temas, ${MARCA.nombre} prioriza por accionabilidad — precisión sobre volumen.${(cl.temas_usados&&cl.temas_usados.length)?` Se buscó por: <b>${esc(cl.temas_usados.join(' · '))}</b>.`:''}</div>
       <div class="lectura">
@@ -826,6 +827,60 @@
       || '<div class="cob-note">Sin lectura disponible.</div>';
     briefWire();
   }
+  /* ── Cupo de sectores para quien no tiene cuenta ──────────────────────
+     Los 15 sectores son PRESETS: su radar se precalcula y se cachea, así que
+     servírselos a un visitante cuesta casi nada. Por eso son la mejor puerta
+     de entrada — se le puede dar valor real antes de pedirle nada.
+
+     El tope es por SEMANA y por sector distinto: volver al mismo sector no
+     gasta cupo (quien vuelve está enganchado, no abusando), y el reloj se
+     reinicia solo. Es un gate de PRODUCTO, no de seguridad: vive en
+     localStorage y se puede saltar borrando el sitio. Da igual: lo que se
+     cobra es la lectura del analista y el perfil propio, y los dos exigen
+     cuenta del lado del worker.
+
+     ⚠️ NO aplica a perfiles de cliente: esos ya exigen sesión para guardarse. */
+  const ROSA_ANON_MAX=3, ROSA_LS='caudal-rosa-sem';
+  function rosaSemana(){
+    // semana ISO: el reset cae siempre en lunes, sin importar cuándo entró
+    const d=new Date(); d.setHours(0,0,0,0);
+    d.setDate(d.getDate()+3-((d.getDay()+6)%7));           // jueves de esa semana
+    const e=new Date(d.getFullYear(),0,4);
+    const n=1+Math.round(((d-e)/864e5-3+((e.getDay()+6)%7))/7);
+    return d.getFullYear()+'-W'+String(n).padStart(2,'0');
+  }
+  function rosaEstado(){
+    let s=null; try{ s=JSON.parse(localStorage.getItem(ROSA_LS)||'null'); }catch(e){}
+    if(!s||s.sem!==rosaSemana()) s={sem:rosaSemana(),vistos:[]};
+    if(!Array.isArray(s.vistos)) s.vistos=[];
+    return s;
+  }
+  // {max, usados, quedan, abierto} — `abierto` = tiene cuenta, sin tope acá.
+  function rosaCupo(){
+    if(HAS_SESSION) return {max:0,usados:0,quedan:99,abierto:true};
+    const s=rosaEstado();
+    return {max:ROSA_ANON_MAX, usados:s.vistos.length,
+            quedan:Math.max(0,ROSA_ANON_MAX-s.vistos.length), abierto:false};
+  }
+  // ¿puede abrir ESTE sector? Devuelve true y lo apunta; false si se acabó.
+  function rosaConsumir(sec){
+    if(HAS_SESSION) return true;
+    const s=rosaEstado();
+    if(s.vistos.includes(sec)) return true;                 // repetir no gasta
+    if(s.vistos.length>=ROSA_ANON_MAX) return false;
+    s.vistos.push(sec);
+    try{ localStorage.setItem(ROSA_LS,JSON.stringify(s)); }catch(e){}
+    return true;
+  }
+  function rosaMuroCupo(){
+    const body=document.getElementById('cli-body'); if(!body) return;
+    body.innerHTML=`<div class="muro-blk">
+      <div class="muro-t">Ya viste los ${ROSA_ANON_MAX} sectores de esta semana.</div>
+      <div class="muro-d">Crear una cuenta es gratis y abre los 15 sectores, la lectura del analista y el brief de 72 horas. Los que ya abriste siguen disponibles.</div>
+      <a class="muro-btn" href="register.html?next=${encodeURIComponent('caudal.html#cliente')}">Crear cuenta gratis →</a>
+    </div>`;
+  }
+
   /* ── BRIEF DE 72 HORAS ────────────────────────────────────────────────
      Lo que la Rosa deja en pantalla es para mirar; esto es para llevarlo a una
      reunión. Sale de lo que YA está cargado (`_CLI_LAST` + la lectura vigente):
@@ -1014,6 +1069,10 @@
     const mine=++_cliSeq;
     cliLecturaStop();
     const esPerfil=!!(arg&&arg.perfil);
+    // el cupo se cobra ANTES de pedir nada: si no hay, ni se llama a la Lambda
+    if(!esPerfil && arg && arg.sector && !rosaConsumir(arg.sector)){
+      PF_ACTIVE=null; pfRenderBar(); rosaMuroCupo(); return;
+    }
     if(esPerfil){ PF_ACTIVE=arg.perfil; document.querySelectorAll('#cli-sectors .chip').forEach(c=>c.classList.remove('on')); }
     else { PF_ACTIVE=null; document.querySelectorAll('#cli-sectors .chip').forEach(c=>c.classList.toggle('on',c.dataset.sec===arg.sector)); }
     pfRenderBar();
@@ -1103,5 +1162,5 @@
      `briefWire`/`briefDescargar` se exponen para soporte y verificación: la
      barra del brief solo aparece cuando la lectura aterriza, y sin esto no
      hay forma de probar el PDF si el modelo está lento. */
-  Object.assign(window, { cliInit, pfLoadList, briefWire, briefDescargar });
+  Object.assign(window, { cliInit, pfLoadList, briefWire, briefDescargar, rosaCupo, cliLoad });
 })();

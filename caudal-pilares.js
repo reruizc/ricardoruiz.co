@@ -44,7 +44,6 @@
     return n===1?t[0]:t[1];
   }
   let REG_STATS=null, _regInited=false, _regSeq=0;
-  function fmtCOP(n){ if(!n||n<=0) return ''; if(n>=1e12) return '$'+(n/1e12).toFixed(1).replace('.',',')+' B'; if(n>=1e6) return '$'+fmt(Math.round(n/1e6))+' M'; return '$'+fmt(Math.round(n)); }
   function sancCard(r){
     const mot=(r.motivo||'').replace(/\s+/g,' ').replace(/^[IVX]+\.\s*/,'').trim();
     const monto=r.monto?`<span class="sanc-monto">${fmtCOP(r.monto)}</span> · `:'';
@@ -225,305 +224,27 @@
     const eb=document.getElementById('ejeBack'); if(eb) eb.onclick=()=>showView('home');
   }
 
-  /* ---------- pilar Datos abiertos y contratación · SECOP II ---------- */
-  const CON={q:'', filtros:{}, solo:false, orden:'reciente', tab:'contratos', _last:null};
-  const CON_EJEMPLOS=['interventoría vías','dotación hospitalaria','alimentación escolar','carrotanques','comando conjunto caribe'];
-  let CON_STATS=null, _conInited=false, _conSeq=0;
-  function conCard(r){
-    const fin=r.fecha_fin&&r.fecha_fin!==r.fecha?` · termina ${esc(r.fecha_fin)}`:'';
-    const name=r.url
-      ?`<a class="sanc-name" href="${esc(r.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(r.entidad||'—')}</a>`
-      :`<span class="sanc-name">${esc(r.entidad||'—')}</span>`;
-    // el badge "matchea por" explica el ruido de $q: SECOP indexa TODAS las
-    // columnas, así que un contrato puede salir por su sector o su tipo de
-    // documento aunque el objeto no nombre el término buscado.
-    const match=r.match&&r.match!=='Objeto'?`<span class="doc-badge">match: ${esc(r.match)}</span>`:'';
-    const dond=[r.ciudad,r.departamento].filter(Boolean).join(', ');
-    return `<div class="sanc">
-      <div class="sanc-top">${name}<span class="sanc-fecha">${esc(r.fecha||'sin fecha')}</span></div>
-      ${r.objeto?`<div class="sanc-motivo">${esc(r.objeto.slice(0,300))}${r.objeto.length>300?'…':''}</div>`:''}
-      <div class="sanc-tags">
-        ${r.valor?`<span class="sanc-monto">${fmtCOP(r.valor)}</span> · `:''}${esc(r.proveedor||'—')}
-        ${dond?` · ${esc(dond)}`:''}${fin}
-        ${r.modalidad?` · <span class="doc-badge pal">${esc(r.modalidad)}</span>`:''}${match}
-        ${r.url?` · <a href="${esc(r.url)}" target="_blank" rel="noopener" style="color:var(--ink3)">proceso en SECOP ↗</a>`:''}
-      </div>
-    </div>`;
-  }
-  function conRenderLanding(s){
-    const el=document.getElementById('con-landing'); if(!el||!s) return;
-    const t=s.total||{};
-    const anios=(s.por_anio||[]).filter(x=>/^\d{4}$/.test(x.anio)).slice(0,8);
-    const frec=(s.fuente||{}).frecuencia||'—';
-    el.innerHTML=`
-      <div class="land-h">La contratación pública en números · SECOP II</div>
-      <div class="kpis">
-        <div class="kpi"><div class="n">${fmt(t.contratos||0)}</div><div class="l">Contratos</div></div>
-        <div class="kpi"><div class="n" style="color:var(--amber)">${fmtCOP(s.mediana_cop)||'—'}</div><div class="l">Contrato mediano</div></div>
-        <div class="kpi"><div class="n">${(s.por_departamento||[]).length}</div><div class="l">Departamentos</div></div>
-        <div class="kpi"><div class="n" style="color:var(--teal)">${esc(frec)}</div><div class="l">Actualización</div></div>
-      </div>
-      <div class="panel wide"><h3>Contratos por año de firma</h3>
-        <div class="reg-sectors-grid">${anios.map(x=>`<div class="sec-card" data-anio="${esc(x.anio)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(x.anio)}</div></div>`).join('')}</div>
-      </div>
-      <div class="panel wide"><h3>Por sector</h3>
-        <div class="reg-sectors-grid">${(s.por_sector||[]).slice(0,10).map(x=>`<div class="sec-card" data-sector="${esc(x.sector)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(x.sector)}</div></div>`).join('')}</div>
-      </div>
-      <div class="panel wide"><h3>Entidades que más contratan (por número de contratos)</h3>
-        <div class="cob-note" style="margin-bottom:.7rem">Se cuentan contratos, no pesos: la columna de valor de SECOP trae errores de digitación que ponían a una universidad técnica encabezando la contratación del país con una cifra mayor que el PIB mundial.</div>
-        <div class="reg-sectors-grid">${(s.top_entidades_n||[]).slice(0,8).map(x=>`<div class="sec-card" data-entidad="${esc(x.entidad)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(x.entidad)}</div></div>`).join('')}</div>
-      </div>
-      ${s.nota?`<div class="cob-note">${esc(s.nota)}</div>`:''}`;
-    el.querySelectorAll('.sec-card').forEach(c=>c.onclick=()=>{
-      const d=c.dataset;
-      CON.filtros={};
-      if(d.anio) CON.filtros.anio=d.anio;
-      if(d.sector) CON.filtros.sector=d.sector;
-      if(d.entidad) CON.filtros.entidad=d.entidad;
-      conBuscar();
-    });
-  }
-  // ② y ③ · bloque de coincidencia exacta por radicado.
-  // Nace del caso PAF-MENIES-O-134-2024 (ago-2026): el cliente llega con un
-  // número en la mano, la búsqueda por $q mira SOLO contratos, y ese contrato
-  // vive únicamente como proceso (régimen especial de patrimonio autónomo).
-  // Resultado viejo: "sin coincidencias", que se lee como "no existe".
-  const ADJ_TONO={adjudicado:'var(--teal)', adjudicado_sin_contrato:'#e0a33e', no_informa:'var(--ink3)'};
-  function identAdj(a){
-    if(!a) return '';
-    // ③ NUNCA se repite el campo `adjudicado` como si fuera verdad: el estado
-    // sale del cruce contra el dataset de contratos por id_del_portafolio.
-    const col=ADJ_TONO[a.estado]||'var(--ink3)';
-    const det=a.estado==='adjudicado'
-      ? `${a.n_contratos} ${a.n_contratos===1?'contrato firmado':'contratos firmados'} en el dataset de contratos.`
-      : a.estado==='adjudicado_sin_contrato'
-        ? 'La fuente lo da por adjudicado pero no hay contrato electrónico publicado — en régimen especial el contrato suele ir como documento adjunto al proceso.'
-        : 'El cruce contra el dataset de contratos no encontró contrato. Eso <b>no</b> quiere decir que no se adjudicó.';
-    const desm=a.campo_desmentido
-      ? `<div class="cob-note" style="margin:.45rem 0 0">⚠️ El campo <code>adjudicado</code> de la fuente dice <b>«${esc(a.campo_fuente||'—')}»</b> y sí hay contrato firmado. El campo está errado, no el cruce.</div>`
-      : '';
-    const cont=(a.contratos||[]).length
-      ? `<div style="margin-top:.6rem">${a.contratos.map(conCard).join('')}</div>` : '';
-    return `<div style="margin-top:.7rem;padding-left:.7rem;border-left:2px solid ${col}">
-        <div style="font-weight:600;color:${col}">${esc(a.etiqueta||'')}</div>
-        <div class="cob-note" style="margin:.25rem 0 0">${det}</div>
-        ${desm}
-        <details style="margin-top:.45rem"><summary style="cursor:pointer;color:var(--ink3);font-size:.86rem">Por qué no mostramos el campo tal cual</summary>
-          <div class="cob-note" style="margin-top:.4rem">${esc(a.nota||'')}</div></details>
-        ${cont}
-      </div>`;
-  }
-  function identProcCard(p){
-    const dond=[p.ciudad,p.departamento].filter(Boolean).join(', ');
-    const name=p.url
-      ?`<a class="sanc-name" href="${esc(p.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(p.entidad||'—')}</a>`
-      :`<span class="sanc-name">${esc(p.entidad||'—')}</span>`;
-    return `<div class="sanc">
-      <div class="sanc-top">${name}<span class="sanc-fecha">${esc(p.fecha_publicacion||'sin fecha')}</span></div>
-      ${p.objeto?`<div class="sanc-motivo">${esc(p.objeto.slice(0,300))}${p.objeto.length>300?'…':''}</div>`:''}
-      <div class="sanc-tags">
-        ${p.valor_base?`<span class="sanc-monto">${fmtCOP(p.valor_base)}</span> <span style="color:var(--ink3)">(precio base)</span> · `:''}${esc(p.referencia||'—')}
-        ${dond?` · ${esc(dond)}`:''}${p.duracion?` · ${esc(p.duracion)}`:''}
-        ${p.modalidad?` · <span class="doc-badge pal">${esc(p.modalidad)}</span>`:''}
-        ${p.url?` · <a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:var(--ink3)">proceso en SECOP ↗</a>`:''}
-      </div>
-      ${identAdj(p.adjudicacion)}
-    </div>`;
-  }
-  function identBlock(d){
-    const x=d&&d.identificador; if(!x) return '';
-    // el aviso que evita el falso "no existe": $q solo mira contratos.
-    const solo=x.solo_proceso
-      ? `<div class="cob-note" style="margin:.2rem 0 .9rem">Este radicado existe como <b>proceso</b> pero no tiene contrato electrónico publicado — es lo normal en el régimen especial de los patrimonios autónomos, donde el contrato va como documento adjunto. La búsqueda de abajo mira solo el dataset de contratos, por eso sale vacía: <b>«sin resultados» ahí significa «no está en ese dataset», no «no existe»</b>.</div>`
-      : '';
-    const amb=x.ambiguo
-      ? `<div class="cob-note" style="margin:.2rem 0 .9rem">⚠️ Ese número no es único en SECOP: cada entidad numera por su cuenta. Se muestran las ${fmt(x.n_contratos+x.n_procesos)} coincidencias — revisa la entidad para saber cuál es la tuya.</div>`
-      : '';
-    return `<div class="panel wide" style="border-color:var(--teal);margin-bottom:1.4rem">
-      <h3 style="margin-bottom:.3rem">Coincidencia exacta por radicado</h3>
-      <div class="cob-note" style="margin-bottom:.9rem">Búsqueda por igualdad de <code>${esc(x.consulta)}</code> sobre contratos y procesos, no por texto libre.</div>
-      ${solo}${amb}
-      ${x.n_contratos?`<div style="font-weight:600;margin:.4rem 0 .5rem">${fmt(x.n_contratos)} ${x.n_contratos===1?'contrato':'contratos'}</div>${x.contratos.map(conCard).join('')}`:''}
-      ${x.n_procesos?`<div style="font-weight:600;margin:1rem 0 .5rem">${fmt(x.n_procesos)} ${x.n_procesos===1?'proceso':'procesos'} <span style="color:var(--ink3);font-weight:400">· el proceso se publica antes que el contrato: es donde todavía se puede incidir</span></div>${x.procesos.map(identProcCard).join('')}`:''}
-    </div>`;
-  }
-  // Procesos (p6dx-8zbt) en la lista. Van en PESTAÑA aparte, nunca fusionados
-  // con los contratos: un proceso y el contrato que sale de él son la MISMA
-  // contratación, así que sumarlos duplicaría, y sus campos no son comparables
-  // (precio base ≠ valor firmado, fecha de publicación ≠ fecha de firma).
-  function procCard(r){
-    const a=r.adjudicacion||{};
-    const col=ADJ_TONO[a.estado]||'var(--ink3)';
-    const name=r.url
-      ?`<a class="sanc-name" href="${esc(r.url)}" target="_blank" rel="noopener" style="color:inherit">${esc(r.entidad||'—')}</a>`
-      :`<span class="sanc-name">${esc(r.entidad||'—')}</span>`;
-    const dond=[r.ciudad,r.departamento].filter(Boolean).join(', ');
-    // ③ el estado sale del cruce contra contratos, jamás del campo `adjudicado`
-    const est=a.etiqueta?`<span class="doc-badge" style="border-color:${col};color:${col}">${esc(a.etiqueta)}</span>`:'';
-    const desm=a.campo_desmentido?`<span class="doc-badge" style="border-color:#e0a33e;color:#e0a33e" title="El campo adjudicado de la fuente dice «${esc(a.campo_fuente||'')}» y sí hay contrato">campo errado</span>`:'';
-    return `<div class="sanc">
-      <div class="sanc-top">${name}<span class="sanc-fecha">${esc(r.fecha_publicacion||'sin fecha')}</span></div>
-      ${r.objeto?`<div class="sanc-motivo">${esc(r.objeto.slice(0,300))}${r.objeto.length>300?'…':''}</div>`:''}
-      <div class="sanc-tags">
-        ${r.valor_base?`<span class="sanc-monto">${fmtCOP(r.valor_base)}</span> <span style="color:var(--ink3)">precio base</span> · `:''}${esc(r.referencia||'—')}
-        ${r.proveedor?` · ${esc(r.proveedor)}`:''}${dond?` · ${esc(dond)}`:''}${r.duracion?` · ${esc(r.duracion)}`:''}
-        ${r.modalidad?` · <span class="doc-badge pal">${esc(r.modalidad)}</span>`:''}
-        ${est}${desm}
-        ${r.url?` · <a href="${esc(r.url)}" target="_blank" rel="noopener" style="color:var(--ink3)">ver en SECOP ↗</a>`:''}
-      </div>
-    </div>`;
-  }
-  function conTabs(d){
-    const p=d.procesos;
-    // sin procesos no hay pestaña que ofrecer: una pestaña vacía es ruido
-    if(!p&&!d.procesos_tarde) return '';
-    const nC=(d.total&&d.total.contratos)!=null?d.total.contratos:(d.n||0);
-    const nP=p?(p.total!=null?p.total:p.n):null;
-    if(d.procesos_tarde&&!p)
-      return `<div class="cob-note" style="margin-bottom:1rem">Los <b>procesos</b> de esta búsqueda no alcanzaron a cargar. Los contratos de abajo están completos; vuelve a buscar si quieres los procesos.</div>`;
-    return `<div class="chips" style="margin-bottom:1rem">
-      <span class="chip${CON.tab!=='procesos'?' on':''}" data-tab="contratos">Contratos <b>${fmt(nC)}</b></span>
-      <span class="chip${CON.tab==='procesos'?' on':''}" data-tab="procesos">Procesos <b>${fmt(nP)}</b></span>
-    </div>`;
-  }
-  function conProcBloque(d){
-    const p=d.procesos; if(!p) return '';
-    const ign=(p.filtros_ignorados||[]).length
-      ? `<div class="cob-note" style="margin-bottom:1rem">⚠️ ${(p.filtros_ignorados||[]).map(x=>`<b>${esc(x)}</b>`).join(' y ')} no ${p.filtros_ignorados.length>1?'existen':'existe'} en el registro de procesos: ese filtro <b>no</b> está aplicado acá. El conteo de arriba es sin él.</div>`
-      : '';
-    const idn=p.por_identidad&&(p.entidades||[]).length
-      ? `<div class="cob-note" style="margin-bottom:1rem">Entidades incluidas: ${p.entidades.slice(0,4).map(e=>`<b>${esc(e.nombre)}</b>`).join(' · ')}${/\.$/.test(p.entidades[0].nombre||'')?'':'.'}${p.nota_proveedor?` ${esc(p.nota_proveedor)}`:''}</div>`
-      : (p.nota_proveedor?`<div class="cob-note" style="margin-bottom:1rem">${esc(p.nota_proveedor)}</div>`:'');
-    return `
-      <div class="cob-note" style="margin-bottom:1rem">El proceso se publica <b>antes</b> que el contrato: acá la contratación todavía se puede pelear. ${esc(p.nota_adjudicado||'')}</div>
-      ${ign}${idn}
-      ${(p.por_departamento||[]).length>1?`<div class="cob-note" style="margin-bottom:1rem">Dónde está: ${(p.por_departamento||[]).slice(0,6).map(x=>`${esc(x.departamento)} (${fmt(x.n)})`).join(' · ')}</div>`:''}
-      ${listaConMuro(p.resultados, procCard, 'proceso', 'procesos', `acceso · ${d.query||'contratación'}`,
-        'Sin procesos para esta búsqueda.')}
-      ${p.total>p.n?`<div class="cob-note" style="margin-top:1rem">Mostrando ${fmt(p.n)} de ${fmt(p.total)}.</div>`:''}`;
-  }
-  function conRenderResults(d){
-    const el=document.getElementById('con-results'); if(!el) return;
-    el.style.display='block';
-    CON._last=d;                       // cambiar de pestaña no repite la consulta
-    if(!d.procesos) CON.tab='contratos';   // sin procesos no hay dónde estar
-    const f=d.filtros||{};
-    const scope=[d.query?`«${esc(d.query)}»`:'', f.entidad?esc(f.entidad):'', f.sector?esc(f.sector):'',
-                 f.departamento?esc(f.departamento):'', f.anio?esc(String(f.anio)):''].filter(Boolean).join(' · ');
-    const tot=d.total;
-    // ② Si el radicado se encontró pero el universo $q está vacío (el caso
-    // PAF-MENIES: el contrato solo existe como proceso), el titular NO puede
-    // gritar «0 contratos» encima de un hallazgo real — es la misma lectura
-    // equivocada que este camino existe para evitar.
-    const _ix=d.identificador, _n=w=>fmt(w);
-    const identSolo=_ix&&(!tot||!tot.contratos);
-    const titular=identSolo
-      ? [_ix.n_contratos?`${_n(_ix.n_contratos)} ${_ix.n_contratos===1?'contrato':'contratos'}`:'',
-         _ix.n_procesos?`${_n(_ix.n_procesos)} ${_ix.n_procesos===1?'proceso':'procesos'}`:''].filter(Boolean).join(' · ')
-      : (tot?`${fmt(tot.contratos)} ${tot.contratos===1?'contrato':'contratos'}`:`${fmt(d.n)} contratos`);
-    // ⚠️ NO se publica la suma de `valor_del_contrato`. Medido ago-2026: esa
-    // columna de SECOP trae errores de digitación de hasta 12 órdenes de
-    // magnitud —un contrato del CNE figura con 6,86e18 pesos y él solo era el
-    // 99,2% del total de su búsqueda— y no hay umbral limpio donde cortar (a 1
-    // billón todavía aparece un centro de salud rural con 9,9 billones). Sumar
-    // una columna rota no se arregla con un tope. El conteo sí es fiable.
-    const valor='';
-    const chips=(d.chips||[]).length?`<div class="cob-note" style="margin-bottom:1rem">
-        ¿Buscabas el filtro exacto? ${(d.chips||[]).map(c=>`<a href="#" class="con-chip" data-campo="${esc(c.campo)}" data-valor="${esc(c.valor)}" style="color:var(--teal)">${esc(c.etiqueta)}: ${esc(c.valor)} (${fmt(c.n)})</a>`).join(' · ')}
-        — filtra sin el ruido del texto libre.</div>`:'';
-    const solo=d.solo_objeto?`<div class="cob-note" style="margin-bottom:1rem">Precisión activa: de los ${fmt(d.revisadas||0)} contratos más recientes de esta búsqueda, ${fmt(d.n)} nombran la frase en el <b>objeto</b>. El total de arriba es el universo completo.</div>`:'';
-    // ④ con qué nombres exactos se contó: el usuario tiene que poder auditar
-    // que "los contratos de Claro" son de COMCEL S.A. y no de un homónimo.
-    const nomb=[...(d.proveedores||[]).map(x=>[x,'proveedor']),...(d.entidades||[]).map(x=>[x,'entidad contratante'])];
-    const ident=d.identidad_empresa&&nomb.length?`<div class="cob-note" style="margin-bottom:1rem">
-        Razones sociales incluidas: ${nomb.slice(0,6).map(([x,rol])=>`<b>${esc(x.nombre)}</b> <span style="color:var(--ink3)">(${fmt(x.n)} · ${rol})</span>`).join(' · ')}${nomb.length>6?` <span style="color:var(--ink3)">y ${nomb.length-6} más</span>`:''}${d.n_descartados?` — se descartaron ${fmt(d.n_descartados)} nombres que solo <i>contienen</i> la marca (${(d.descartados||[]).slice(0,2).map(x=>esc(x.nombre)).join(', ')}…).`:'.'}
-        ${d.truncado?' <b>Nota:</b> hay más razones sociales de las que caben en una consulta; el total puede quedarse corto.':''}</div>`:'';
-    el.innerHTML=`
-      <div class="r-titular" style="font-size:1.4rem">${titular}</div>
-      <div class="r-sub" style="margin-bottom:1rem">${scope||'toda la contratación'}${valor}${identSolo?' · encontrado por radicado exacto':''}</div>
-      ${empresaHint(d.empresas,'con-emp-hint','contratacion')}
-      ${identBlock(d)}
-      ${ident}${chips}${solo}
-      ${conTabs(d)}
-      <div class="chips" style="margin-bottom:1rem">
-        <span class="chip${CON.orden==='reciente'?' on':''}" data-orden="reciente">Más recientes</span>
-        <span class="chip${CON.orden==='valor'?' on':''}" data-orden="valor">Más caros</span>
-        ${d.query&&!d.identidad_empresa&&CON.tab!=='procesos'?`<span class="chip${CON.solo?' on':''}" data-solo="1">Solo en el objeto</span>`:''}
-        ${Object.keys(f).length?'<span class="chip" data-clear="1">✕ Quitar filtros</span>':''}
-      </div>
-      ${CON.tab==='procesos'?conProcBloque(d):`
-      ${(d.por_departamento||[]).length>1?`<div class="cob-note" style="margin-bottom:1rem">Dónde está: ${(d.por_departamento||[]).slice(0,6).map(x=>`${esc(x.departamento)} (${fmt(x.n)})`).join(' · ')}</div>`:''}
-      ${listaConMuro(d.resultados, conCard, 'contrato', 'contratos', `acceso · ${d.query||'contratación'}`,
-        d.sin_contratos
-          ? `<b>${esc((d.empresas&&d.empresas[0]&&d.empresas[0].nombre)||d.query)}</b> no le vende al Estado por SECOP II: no hay ninguna razón social suya entre los proveedores.${d.n_descartados?` Sí aparecen ${fmt(d.n_descartados)} nombres que <i>contienen</i> la marca (${(d.descartados||[]).slice(0,3).map(x=>esc(x.nombre)).join(', ')}…), pero son homónimos, no la empresa.`:''} Usa el enlace de arriba si quieres verlos igual.`
-          : (d.identificador
-             ? `Sin coincidencias <b>en el dataset de contratos</b> — pero el radicado sí existe: lo tienes arriba.`
-             : `Sin coincidencias.${Object.keys(f).length?' Hay filtros activos ('+esc(Object.values(f).join(' · '))+'): quítalos arriba y vuelve a buscar.':' Prueba otro término — recuerda que varias palabras se combinan con Y.'}`))}
-      ${tot&&tot.contratos>d.n?`<div class="cob-note" style="margin-top:1rem">Mostrando ${fmt(d.n)} de ${fmt(tot.contratos)}. Afina con un filtro para ver menos.</div>`:''}`}`;
-    wireEmpresaHint('con-emp-hint', conBuscar);
-    el.querySelectorAll('.chip[data-tab]').forEach(c=>c.onclick=()=>{
-      CON.tab=c.dataset.tab; if(CON._last) conRenderResults(CON._last); });
-    el.querySelectorAll('.chip[data-orden]').forEach(c=>c.onclick=()=>{ CON.orden=c.dataset.orden; conBuscar(); });
-    el.querySelectorAll('.chip[data-solo]').forEach(c=>c.onclick=()=>{ CON.solo=!CON.solo; conBuscar(); });
-    el.querySelectorAll('.chip[data-clear]').forEach(c=>c.onclick=()=>{ CON.filtros={}; conBuscar(); });
-    el.querySelectorAll('.con-chip').forEach(a=>a.onclick=(e)=>{
-      e.preventDefault();
-      const campo=a.dataset.campo, valor=a.dataset.valor;
-      const MAP={departamento:'departamento', estado_contrato:'estado', modalidad_de_contratacion:'modalidad',
-                 tipo_de_contrato:'tipo', sector:'sector', orden:'orden_entidad'};
-      if(MAP[campo]){ CON.filtros={[MAP[campo]]:valor}; CON.q=''; const i=document.getElementById('conq'); if(i) i.value=''; conBuscar(); }
-    });
-    el.scrollIntoView({behavior:'smooth',block:'start'});
-  }
-  async function conBuscar(){
-    const mine=++_conSeq;
-    const el=document.getElementById('con-results'), landing=document.getElementById('con-landing');
-    if(landing) landing.style.display='none';
-    if(el){ el.style.display='block'; el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Consultando SECOP en vivo <span class="dots"><span></span><span></span><span></span></span></div>'; }
-    let d; try{ d=await call(Object.assign({action:'contratacion', query:CON.q, limit:50,
-                                            orden:CON.orden, solo_objeto:CON.solo,
-                                            ampliar_empresa:_ampliarEmp}, CON.filtros)); }
-    catch(e){ if(mine===_conSeq&&el) el.innerHTML='<div class="err">No se pudo consultar SECOP. Reintenta.</div>'; return; }
-    if(mine!==_conSeq) return;
-    if(d&&d.error){ if(el) el.innerHTML=`<div class="err">${esc(d.error)}</div>`; return; }
-    // si no hay contratos pero sí procesos, abrir en procesos: es el caso
-    // PAF-MENIES generalizado — mandar a una lista vacía cuando el hallazgo está
-    // en la otra pestaña es el mismo falso negativo que venimos corrigiendo.
-    const nP=d.procesos?(d.procesos.total!=null?d.procesos.total:d.procesos.n):0;
-    if(!(d.total&&d.total.contratos)&&!d.n&&nP) CON.tab='procesos';
-    conRenderResults(d);
-  }
-  async function conLoadStats(){
-    if(CON_STATS){ conRenderLanding(CON_STATS); return; }
-    const el=document.getElementById('con-landing');
-    if(el) el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Cargando el pilar de contratación <span class="dots"><span></span><span></span><span></span></span></div>';
-    try{ CON_STATS=await call({action:'contratacion'}); }catch(e){ CON_STATS=null; }
-    if(CON_STATS) conRenderLanding(CON_STATS);
-    else if(el) el.innerHTML='<div class="err">No se pudo cargar la contratación. Reintenta.</div>';
-  }
-  function conShowLanding(){ const r=document.getElementById('con-results'); if(r) r.style.display='none'; const l=document.getElementById('con-landing'); if(l) l.style.display='block'; }
-  function conInit(){
-    if(_conInited) return; _conInited=true;
-    // ⚠️ ids propios (`conq`/`congo`): este buscador y el de congresistas usaban
-    // los MISMOS `cq`/`cgo`, y como getElementById devuelve el primero del DOM,
-    // este pilar leía la caja de congresistas — escribías acá y no buscaba nada.
-    const cq=document.getElementById('conq'), cgo=document.getElementById('congo');
-    const go=()=>{ CON.q=(cq&&cq.value||'').trim(); if(!CON.q&&!Object.keys(CON.filtros).length) conShowLanding(); else conBuscar(); };
-    if(cgo) cgo.onclick=go;
-    if(cq) cq.addEventListener('keydown',e=>{ if(e.key==='Enter') go(); });
-    const cont=document.getElementById('cchips');
-    if(cont) CON_EJEMPLOS.forEach(t=>{ const c=document.createElement('span'); c.className='chip'; c.textContent=t; c.onclick=()=>{ if(cq) cq.value=t; CON.q=t; CON.filtros={}; conBuscar(); }; cont.appendChild(c); });
-    const cb=document.getElementById('conBack'); if(cb) cb.onclick=()=>showView('home');
-  }
+  /* ---------- pilar Datos abiertos y contratación · SECOP II ----------
+     Se mudó a caudal-contratacion.js (sep-2026), que tiene página propia
+     (caudal-contratacion.html) y que caudal.html carga igual: la búsqueda
+     universal de acá sigue necesitando `conCard`/`CON` para su pestaña de
+     contratación. */
+
   /* ---------- pilar Medios · prensa nacional y regional ---------- */
   const MED={q:''};
   const MED_EJEMPLOS=['reforma tributaria','presupuesto general 2027','trámites empresariales','energía eléctrica','inteligencia artificial','transporte de carga'];
   let MED_STATS=null, _medInited=false, _medSeq=0;
   function medAlcanceBadge(a){ return a==='regional' ? '<span class="doc-badge pal">Regional</span>' : '<span class="doc-badge">Nacional</span>'; }
+  /* ⚠️ La prensa del exterior se MARCA acá, no se filtra: en el pilar el
+     usuario buscó lo que buscó, y una nota de Perú sobre su tema puede ser el
+     contexto que necesita. Donde sí sale del camino es en el radar del cliente
+     (Rosa de los Vientos), que promete el movimiento de SU sector en Colombia.
+     Medido: 6,8% de los titulares de un sector son del exterior. */
+  function medExteriorBadge(x){ return x ? '<span class="doc-badge pal" title="El titular habla de otro país y no menciona nada colombiano">Exterior</span>' : ''; }
   function medHeadCard(r){
     return `<div class="sanc">
       <div class="sanc-top"><a class="sanc-name" href="${esc(r.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(r.titulo)}</a><span class="sanc-fecha">${esc(r.fecha||'')}</span></div>
-      <div class="sanc-tags"><span class="doc-badge">${esc(r.medio)}</span>${medAlcanceBadge(r.alcance)}</div>
+      <div class="sanc-tags"><span class="doc-badge">${esc(r.medio)}</span>${medAlcanceBadge(r.alcance)}${medExteriorBadge(r.exterior)}</div>
     </div>`;
   }
   function medRenderLanding(s){
@@ -599,39 +320,9 @@
   let _seq=0;
   // ④ estado del tema actual (para el switch de estadísticas sin re-consultar)
   let _statMode='titulo', _temaR=null, _temaQ=''; let _lecturaData=null; const _snipCache={};
-  /* ④ Traductor marca → tema. El usuario buscó «Uber» y le salen proyectos que
-     dicen "plataformas tecnológicas": tiene que ver POR QUÉ. Mismo principio que
-     el aviso de sinónimos y el de búsqueda flexible — nada aparece por magia.
-     `ampliado` alterna núcleo (preciso, por defecto) ↔ núcleo + contexto. */
-  /* Global por la misma razón que STATS: lo alterna el enlace «ampliar» de acá
-     y lo lee la búsqueda universal, que vive en caudal.html. */
-  window._ampliarEmp=false;
-  function empresaHint(emps, id, modo){
-    if(!emps||!emps.length) return '';
-    const e=emps[0], esGremio=e.tipo==='gremio';
-    // En CONTRATACIÓN el diccionario juega su otra cara: acá la empresa sí
-    // aparece con nombre propio (es el proveedor), así que no se traduce a
-    // tema — se filtra por identidad. Ampliar = ver todo lo que menciona la
-    // marca, con los homónimos que eso arrastra.
-    if(modo==='contratacion'){
-      const mas=` <span class="bd-link" id="${id}-mas">${_ampliarEmp?'volver a solo sus contratos':'ampliar: ver todo lo que menciona «'+esc(e.nombre)+'»'} →</span>`;
-      return `<div class="broaden" id="${id}"><b>${esc(e.nombre)}</b> ${esGremio?'es un gremio':'es una empresa'} del diccionario de Caudal.
-        ${_ampliarEmp
-          ? 'Estás viendo <b>todo lo que menciona su nombre</b> en SECOP — incluye homónimos (en Colombia hay personas que se apellidan así).'
-          : 'Se filtró por <b>identidad del proveedor</b>: son los contratos que <b>son de la empresa</b>, no los que nombran la marca.'}${mas}</div>`;
-    }
-    const nuc=(e.nucleo||[]).map(esc).join(' · ');
-    const ctx=(e.contexto||[]);
-    const mas=ctx.length
-      ? ` <span class="bd-link" id="${id}-mas">${_ampliarEmp?'volver a lo esencial':'ampliar a: '+ctx.map(esc).join(' · ')} →</span>`
-      : '';
-    return `<div class="broaden" id="${id}"><b>${esc(e.nombre)}</b> ${esGremio?'es un gremio':'es una empresa'} del diccionario de Caudal.
-      El Estado no legisla marcas, legisla actividades — así que se buscó por: <b>${nuc}</b>${_ampliarEmp&&ctx.length?' · '+ctx.map(esc).join(' · '):''}.${mas}</div>`;
-  }
-  function wireEmpresaHint(id, rerun){
-    const el=document.getElementById(id+'-mas'); if(!el) return;
-    el.onclick=()=>{ _ampliarEmp=!_ampliarEmp; rerun(); };
-  }
+  /* ④ El traductor marca → tema (`empresaHint`/`wireEmpresaHint`/`_ampliarEmp`)
+     se mudó a caudal-comun.js: lo usan estos pilares Y la página propia de
+     Contratación, que carga este archivo. */
 
   async function buscar(){
     const query=q.value.trim(); if(!query) return;
@@ -1208,10 +899,9 @@
      que solo se MUTA (`SUC.q=…`), nunca se reasigna, así que la referencia
      compartida por `window` siempre es la misma. */
   Object.assign(window, {
-    q, buscar, EJEMPLOS, empresaHint, wireEmpresaHint,
-    REG, regBuscar, regInit, regLoadStats, sancCard, fmtCOP,
+    q, buscar, EJEMPLOS,
+    REG, regBuscar, regInit, regLoadStats, sancCard,
     EJE, ejeBuscar, ejeInit, ejeLoadStats, ejeCard,
-    CON, conBuscar, conInit, conLoadStats, conCard,
     MED, medBuscar, medInit, medLoadLanding, medHeadCard,
     SUC, sucBuscar, sucInit, sucLoadStats, sucCard, sucSyncEstados,
     GAC, gacBuscar, gacInit, gacLoadStats, gacCard,

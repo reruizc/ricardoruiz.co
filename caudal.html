@@ -8,8 +8,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-<link href="caudal-base.css?v=20260907e" rel="stylesheet" />
+<link href="caudal-base.css?v=20260907f" rel="stylesheet" />
 <link rel="stylesheet" href="caudal-ui.css?v=20260907b" />
+<script>
+  /* Contratación dejó de ser una vista de acá (sep-2026) y tiene página propia.
+     Va en el <head> y no en initHome para que un enlace viejo a #contratacion
+     —o un marcador de alguien— salte directo, sin pintar antes la portada del
+     paraguas. `replace` y no `href`: el atrás del navegador no debe devolver a
+     una URL que ya no muestra lo que promete. */
+  if(location.hash==='#contratacion') location.replace('caudal-contratacion.html');
+</script>
 </head>
 <body class="caudal-app">
   <a class="skip-link" href="#app">Saltar al contenido</a>
@@ -271,25 +279,11 @@
       <div id="gac-results"></div>
     </div>
 
-    <!-- ===== PILAR · Datos abiertos y contratación (SECOP II) ===== -->
-    <div id="view-contratacion" hidden>
-      <button class="pill-back" id="conBack">← Volver a Caudal</button>
-      <div class="hero">
-        <h1>La plata del Estado, <em>rastreada</em>.</h1>
-        <p>Todos los contratos electrónicos del Estado colombiano (SECOP II),
-           consultados en vivo. Busca una entidad, un proveedor o un objeto: cada
-           contrato enlaza su proceso en SECOP. 5,87 M de contratos · se actualiza
-           a diario.</p>
-        <div class="search">
-          <input id="conq" type="text" placeholder="busca una entidad, un proveedor, un objeto…" autocomplete="off" />
-          <button id="congo">Buscar</button>
-        </div>
-        <div class="chips" id="cchips"></div>
-      </div>
-
-      <div id="con-landing"></div>
-      <div id="con-results"></div>
-    </div>
+    <!-- El pilar de Datos abiertos y contratación (SECOP II) se mudó a
+         caudal-contratacion.html (sep-2026): tiene página propia, indexable,
+         con guía de búsqueda a la izquierda y la forma del gasto a la derecha.
+         Acá se sigue cargando su módulo, porque la búsqueda universal necesita
+         `conCard` y `CON` para su pestaña de contratación. -->
 
     <!-- ===== VISTA CLIENTE · Radar (SKU A) ===== -->
     <div id="view-cliente" hidden>
@@ -319,14 +313,16 @@
 <!-- El shell (acceso, cursor, call() y el router de vistas) vive aparte. Va
      ANTES de este script: define reveal/showView/call, que lo de abajo usa.
      ⚠️ Al tocar caudal-base.js hay que bumpear este ?v=. -->
-<script src="caudal-base.js?v=20260907c"></script>
+<script src="caudal-comun.js?v=20260907"></script>
+<script src="caudal-base.js?v=20260907d"></script>
 <!-- Las vistas, agrupadas por afinidad. Van DESPUÉS del shell (usan call() y
      showView()) y ANTES del script de abajo, que en su initHome llama a los
      `*Init` de cada pilar y a cliInit. Entre ellos y el script de abajo solo
      se hablan por `window`, así que el orden entre los tres no importa.
      ⚠️ Al tocar cualquiera hay que bumpear su ?v=. -->
-<script src="caudal-pilares.js?v=20260907"></script>
-<script src="caudal-cliente.js?v=20260907f"></script>
+<script src="caudal-pilares.js?v=20260907b"></script>
+<script src="caudal-contratacion.js?v=20260907"></script>
+<script src="caudal-cliente.js?v=20260907g"></script>
 <script src="caudal-votos.js?v=20260907"></script>
 <script>
 (function(){
@@ -369,58 +365,11 @@
   function shortTitle(t){ let s=String(t||'').replace(TITLE_PREF,'').replace(/\s+/g,' ').trim(); if(s.length<6) s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
 
   /* ---------- muro del freemium ---------- */
-  // El corte va DESPUÉS de ejecutar la consulta, no antes. Buscar no cuesta casi
-  // nada (19 de las 23 acciones solo leen índices), así que el visitante ve
-  // títulos y cifras REALES y choca con el muro justo donde empieza el trabajo:
-  // la lectura del analista. Bloquear antes de buscar ahorraría cero y regalaría
-  // el argumento — un blur sobre nada se huele en cinco segundos.
-  const CONTACTO_MAIL='hola@ricardoruiz.co';
-  // A dónde manda el muro a quien ya tiene cuenta: la compra de Caudal (SKU
-  // propio, sep-2026), NO pricing.html — ahí todo lo legislativo sale gratis.
-  const COMPRA_URL='caudal-pricing.html?comprar=1';
-  window.COMPRA_URL=COMPRA_URL;
-  const CORTE_LIBRE=10;
-  function mailtoHref(asunto){
-    const cuerpo='Hola,\n\nVi Caudal y quiero acceso.\n\nOrganización:\nSector que me interesa:\nQué necesito seguir:\n\n';
-    return `mailto:${CONTACTO_MAIL}?subject=${encodeURIComponent('Caudal · '+asunto)}&body=${encodeURIComponent(cuerpo)}`;
-  }
-  // Devuelve {ver, fuera}: lo que se pinta entero y lo que va detrás del muro.
-  function cortar(arr){
-    const a=arr||[];
-    if(ACCESO) return {ver:a, fuera:[]};
-    return {ver:a.slice(0,CORTE_LIBRE), fuera:a.slice(CORTE_LIBRE)};
-  }
-  // `fuera` son los items que sobraron; `render` es la misma función con la que
-  // se pintan los visibles, para que lo difuminado sea el contenido de verdad.
-  function muroLista(fuera, render, sing, plu, asunto){
-    if(!fuera||!fuera.length) return '';
-    const n=fuera.length;
-    const registrado=HAS_SESSION;
-    return `<div class="muro">
-      <div class="muro-tapa">${fuera.slice(0,4).map(render).join('')}</div>
-      <div class="muro-cta">
-        <div class="muro-n">y ${fmt(n)} ${n===1?sing:plu} más</div>
-        <div class="muro-t">${registrado?'Con acceso a Caudal ves el archivo completo, la lectura del analista y las alertas por perfil.':'Crea una cuenta gratis para ver una muestra de los resultados.'}</div>
-        <a class="muro-btn" href="${registrado?COMPRA_URL:'register.html?next='+encodeURIComponent('caudal.html')}">${registrado?'Conseguir acceso →':'Registrarme gratis →'}</a>
-      </div></div>`;
-  }
-  // Envoltorio para las listas de los pilares, que son todas de la misma forma
-  // (`d.resultados` + su tarjeta). Los LANDINGS ("lo último publicado") NO se
-  // cortan a propósito: son el escaparate, y recortarlos haría que la página se
-  // sienta mezquina antes de que el visitante busque nada.
-  function listaConMuro(items, card, sing, plu, asunto, vacio){
-    const c=cortar(items||[]);
-    const cuerpo=c.ver.map(card).join('')||`<div class="err">${vacio}</div>`;
-    return `<div class="sanc-list">${cuerpo}</div>`+muroLista(c.fuera, card, sing, plu, asunto);
-  }
-  function muroLectura(asunto){
-    const registrado=HAS_SESSION;
-    return `<div class="muro-blk">
-      <div class="tag">◈ Lectura del analista</div>
-      <div class="t">Acá va la lectura: qué patrón siguen estos intentos, por qué se caen y qué predice eso del que está en trámite. Se escribe sobre los mismos datos que acabas de ver, y va con acceso.</div>
-      <a class="muro-btn" href="${registrado?COMPRA_URL:'register.html?next='+encodeURIComponent('caudal.html')}">${registrado?'Conseguir acceso →':'Registrarme gratis →'}</a>
-    </div>`;
-  }
+  // Vive en caudal-comun.js (sep-2026): al sacar Contratación a su propia
+  // página, el muro pasó a pintarse desde dos sitios y es lo que se cobra —
+  // dos copias que se desincronizan es un fallo comercial, no cosmético.
+  // De allá salen: CONTACTO_MAIL · COMPRA_URL · CORTE_LIBRE · mailtoHref ·
+  // cortar · muroLista · listaConMuro · muroLectura (y esc/fmt/fmtCOP).
 
   // stats globales (mortandad por año de cuatrienio) — 1 fetch cacheado
   /* Global, no `let` del closure: `loadStats()` lo llena acá y el pilar
@@ -510,7 +459,7 @@
   const EMP_INFO=`<div class="row"><b>Ley</b> — llegó a convertirse en ley.</div><div class="row"><b>Empujado</b> — no es ley, pero superó el 2º debate: alguien lo movió de verdad.</div><div class="row"><b>Vitrina</b> — re-radicado en varios términos sin pasar del 1er debate: se radica para figurar, no para empujarlo.</div><div class="row"><b>1 debate</b> — alcanzó un solo debate y ahí quedó.</div><div class="row"><b>Sin tracción</b> — un solo intento, sin ningún debate.</div>`;
   const EMBUDO_INFO=`<div class="row">Cada fila es una <b>fase del trámite</b>, en orden: presentado → 1º y 2º debate en Senado → 1º y 2º debate en Cámara → ley.</div><div class="row">El <b>↓ %</b> dice cuántos <b>sobreviven</b> de una fase a la siguiente — ahí se ve dónde se cae el tema.</div>`;
   function infoIcon(html){ return `<span class="info-i">i<span class="info-pop">${html}</span></span>`; }
-  const fmt=n=>String(n==null?'—':n).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+  /* `fmt`, `esc` y `fmtCOP` viven en caudal-comun.js. */
 
   // landing pre-búsqueda: totales del histórico + mortandad + composición
   function renderLanding(s){
@@ -577,7 +526,6 @@
     [/gobierno/i,'#6b7b87'],
   ];
   const pcolor=p=>{ for(const[re,c]of PARTY_COLOR) if(re.test(p)) return c; return '#8494a0'; };
-  const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
 
   /* ---------- home · paraguas + router de pilares ---------- */
@@ -602,7 +550,7 @@
       const st=PSTAT[p.status]||PSTAT.soon;
       const meta=p.n?`<div class="pc-meta">${esc(p.n)} ${esc(p.unit||'')}</div>`:'';
       const tag=(p.status==='live'||p.status==='data')?'a':'article';
-      const dest=p.id==='redes'?'caudal-voceros.html':'#'+(p.id==='datos'?'contratacion':p.id);
+      const dest=p.id==='redes'?'caudal-voceros.html':p.id==='datos'?'caudal-contratacion.html':'#'+p.id;
       return `<${tag} ${tag==='a'?`href="${dest}"`:''} class="pcard ${p.status}" data-p="${p.id}" style="background-image:url('imagenes/caudal-${p.id}.jpg')">
         <span class="pc-status ${st[0]}">${st[1]}</span>
         <div class="pc-label">
@@ -623,7 +571,7 @@
       else if(id==='control') showView('control');
       else if(id==='ejecutivo') showView('ejecutivo');
       else if(id==='sucop') showView('sucop');
-      else if(id==='datos') showView('contratacion');
+      else if(id==='datos') location.href='caudal-contratacion.html';
       else if(id==='gacetas') showView('gacetas');
       else if(id==='redes') return;   // página propia: es un diccionario, no una vista
     });
@@ -764,6 +712,39 @@
     },
     stop(){ if(this._t){ clearInterval(this._t); this._t=null; } }
   };
+  /* ── Puente búsqueda → Rosa de los Vientos ────────────────────────────
+     Una búsqueda por tema responde «qué hay sobre esto»; la Rosa responde «qué
+     se está moviendo en mi sector», que es la pregunta de quien va a comprar.
+     El puente va aquí porque es el punto donde el visitante ya vio que hay
+     dato y todavía no sabe que existe la otra vista.
+
+     Y es lo ÚNICO que un anónimo puede abrir entero sin registrarse: los
+     sectores son presets cacheados, así que darle 3 por semana no cuesta y le
+     muestra el producto de verdad. El cupo lo lleva caudal-cliente.js. */
+  function rosaPuente(sug){
+    const cupo=(window.rosaCupo?rosaCupo():{abierto:true});
+    const nom=sug&&sug.nombre;
+    const linea=nom
+      ? `Este tema cae en <b>${esc(nom)}</b>${sug.comision?` · Comisión ${esc(sug.comision)}`:''}. Ábrelo en la Rosa de los Vientos y mira qué se le movió al sector en las últimas 72 horas: Congreso, reguladores, contratación y prensa, ya priorizados.`
+      : `Si lo tuyo es un sector y no un tema suelto, la Rosa de los Vientos cruza Congreso, reguladores, contratación y prensa, y te deja lo que mueve la aguja con una acción sugerida.`;
+    const cola=cupo.abierto ? ''
+      : (cupo.quedan>0
+          ? `<span class="rp-cupo">${cupo.quedan} de ${cupo.max} sectores disponibles esta semana sin cuenta</span>`
+          : `<span class="rp-cupo">Ya usaste los ${cupo.max} sectores de esta semana · con cuenta gratis se abren los 15</span>`);
+    return `<div class="rosa-puente" id="uni-rosa-puente">
+      <div class="rp-txt"><span class="rp-tag">Rosa de los Vientos</span>${linea}${cola}</div>
+      <button type="button" class="rp-btn" id="uni-rosa-btn" data-sec="${esc((sug&&sug.k)||'')}">${nom?`Ver ${esc(nom)} →`:'Abrir la Rosa →'}</button>
+    </div>`;
+  }
+  function wireRosaPuente(){
+    const b=document.getElementById('uni-rosa-btn'); if(!b) return;
+    b.onclick=()=>{
+      const sec=b.dataset.sec;
+      showView('cliente');
+      // el sector sugerido se abre solo; sin sugerencia se deja escoger
+      if(sec && window.cliLoad) setTimeout(()=>cliLoad({sector:sec}),60);
+    };
+  }
   async function uniSearch(query){
     query=(query||'').trim(); if(!query) return;
     const mine=++_uniSeq;
@@ -812,11 +793,12 @@
       ${fallo}
       <div class="lectura" id="uni-summary"><div class="tag">◈ Respuesta · sobre lo que Caudal encontró en sus fuentes</div><div id="uni-summary-body"></div></div>
       <div class="uni-what">${ACCESO?'Explora el tema por fuente y abre los registros completos.':HAS_SESSION?'Abre una tarjeta para ver una muestra. Para acceder al archivo completo, puedes escoger un plan.':'Puedes ver algunos resultados si te registras. Crear una cuenta es gratis.'}</div>
+      ${rosaPuente(cR&&cR.sector_sugerido||(cD&&cD.sector_sugerido))}
       ${empresaHint(emps,'uni-emp-hint')}
       <div class="uni-cards">${UNI_TABS.map(([k,n])=>{const disponible=counts[k]!==null;const accion=ACCESO?'Ver resultados →':HAS_SESSION?'Ver muestra →':'Ver algunos resultados →';return `<button class="uni-card" data-k="${k}" type="button"${disponible?'':' disabled'}><span class="uni-card-name">${n}</span><b>${disponible?fmt(counts[k]):'—'}</b><span class="uni-card-action">${disponible?accion:'Fuente no disponible'}</span></button>`}).join('')}</div>
       <div id="uni-tab-body"></div>
       <div class="uni-again-wrap"><button type="button" class="uni-again" id="uni-again">↺ Hacer una nueva pregunta</button></div>`;
-    const rl=document.getElementById('uni-radar-link'); if(rl) rl.onclick=()=>showView('cliente');
+    wireRosaPuente();
     wireEmpresaHint('uni-emp-hint', ()=>uniSearch(query));
     const again=document.getElementById('uni-again');
     if(again) again.onclick=()=>{ uniLoader.stop(); const q=document.getElementById('uq'); if(q){ q.value=''; q.focus(); } window.scrollTo({top:0,behavior:'smooth'}); };
@@ -1023,7 +1005,7 @@
     const noun={regulatorio:['sanción','sanciones'], ejecutivo:['norma','normas'], contratacion:['contrato','contratos'], medios:['titular','titulares'], sucop:['borrador','borradores']}[k];
     const empty={regulatorio:'Sin sanciones para este término.', ejecutivo:'Sin normas del Ejecutivo para este término.', contratacion:'Sin contratos en SECOP para este término.', medios:'Sin cobertura de prensa reciente para este tema.', sucop:'Ningún borrador en consulta pública sobre este tema.'}[k];
     if(k==='contratacion'&&d&&d.sin_contratos)
-      return `<div class="err"><b>${esc((d.empresas&&d.empresas[0]&&d.empresas[0].nombre)||query)}</b> no le vende al Estado por SECOP II. <a class="bd-link" id="uni-contratacion-full">abrir el pilar →</a></div>`;
+      return `<div class="err"><b>${esc((d.empresas&&d.empresas[0]&&d.empresas[0].nombre)||query)}</b> no le vende al Estado por SECOP II. <a class="bd-link" href="caudal-contratacion.html?q=${encodeURIComponent(query)}">abrir el pilar →</a></div>`;
     if(!l.length) return `<div class="err">${empty}</div>`;
     // búsqueda flexible (sep-2026): el backend relajó el AND porque una palabra
     // no aparece en ningún registro. Se dice cuál, y por cuál se buscó — nada
@@ -1060,7 +1042,9 @@
     f.onclick=()=>{
       if(k==='regulatorio'){ showView('regulatorio'); const e=document.getElementById('rq'); if(e)e.value=query; REG.q=query; regBuscar(); }
       if(k==='ejecutivo'){ showView('ejecutivo'); const e=document.getElementById('eq'); if(e)e.value=query; EJE.q=query; ejeBuscar(); }
-      if(k==='contratacion'){ showView('contratacion'); const e=document.getElementById('conq'); if(e)e.value=query; CON.q=query; CON.filtros={}; conBuscar(); }
+      // contratación vive en su propia página: el término viaja en la URL y
+      // allá `conInit` lo recoge, para no aterrizar en un buscador vacío.
+      if(k==='contratacion'){ location.href='caudal-contratacion.html?q='+encodeURIComponent(query); }
       if(k==='medios'){ showView('medios'); const e=document.getElementById('mq'); if(e)e.value=query; MED.q=query; medBuscar(); }
       // en SUCOP se abre sin filtro de estado: el usuario venía viendo el
       // universo del tema, no solo lo abierto, y cambiárselo al saltar confunde.
@@ -1073,7 +1057,6 @@
     regInit();
     ejeInit();
     sucInit();
-    conInit();
     medInit();
     cliInit();
     const rc=document.getElementById('radar-cta'); if(rc) rc.onclick=e=>{ if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey) return; e.preventDefault(); showView('cliente'); };

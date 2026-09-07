@@ -2633,6 +2633,110 @@ def _anotar_cardinales(senales):
 LECTURA_LOCK_TTL = 70
 
 
+# ── Puente búsqueda → Rosa de los Vientos ──────────────────────────────────
+# Quien busca un tema suelto ("reforma pensional") casi siempre está mirando por
+# el lado de UN sector, y la Rosa es la vista que responde eso. El puente vive
+# acá y no en el frontend porque los temas de cada sector viven acá: duplicar la
+# tabla en JS sería tener dos verdades sobre qué es "trabajo y pensiones".
+#
+# Solo se sugieren sectores tipo gremio: los de tipo empresa (DiDi, Binance) son
+# prospectos con nombre y no se le ofrecen a un visitante.
+_SECT_STOP = frozenset((
+    'de','del','la','el','los','las','y','o','en','para','por','con','sin','que',
+    'una','uno','un','al','se','su','sus','ley','proyecto','reforma','nueva','nuevo',
+    'nacional','colombia','general','sistema','regimen','politica','publico','publica',
+))
+
+
+def _sect_pal(txt):
+    return {w for w in re.split(r'[^a-z0-9]+', _secop_norm(txt or ''))
+            if len(w) > 3 and w not in _SECT_STOP}
+
+
+def _sect_casa(a, b):
+    """¿Dos palabras son la misma raíz? Prefijo común de 5+ letras.
+
+    Sin esto «pensional» no casa con «regimen pensional», ni «obra» con «obras
+    publicas», y el sugeridor se cae justo en las consultas más frecuentes.
+    5 letras es el mínimo que no confunde «salud» con «saludo» ni «puerto» con
+    «puerta» (medido sobre los temas reales de los sectores).
+    """
+    if a == b:
+        return True
+    n = min(len(a), len(b))
+    return n >= 5 and a[:5] == b[:5] and (a.startswith(b) or b.startswith(a))
+
+
+# Peso por especificidad: una palabra que solo aparece en UN sector identifica
+# el sector; una que aparece en varios («publicos», «transporte») no. Se calcula
+# sobre los temas reales, no a ojo.
+_SECT_IDX = None
+
+
+def _sect_idx():
+    global _SECT_IDX
+    if _SECT_IDX is None:
+        secs, freq = [], {}
+        for s in caudal_core.SECTORES_CLIENTE:
+            if s.get('tipo') == 'empresa':
+                continue
+            pal = {}
+            for tema in (s.get('temas') or []):
+                for w in _sect_pal(tema):
+                    pal.setdefault(w, tema)
+            secs.append((s, pal))
+            for w in pal:
+                freq[w] = freq.get(w, 0) + 1
+        _SECT_IDX = (secs, freq)
+    return _SECT_IDX
+
+
+def _sector_sugerido(query):
+    """Sector de la Rosa más cercano a una consulta libre, o None.
+
+    Dos entradas: las palabras de la consulta contra los temas de cada sector,
+    y —si la consulta es una marca del diccionario— los tópicos de esa empresa,
+    que es como «uber» llega a Transporte sin que «uber» sea tema de nadie.
+    """
+    q = _secop_norm(query or '')
+    if len(q) < 3:
+        return None
+    qpal = _sect_pal(q)
+    # ④ si la consulta es una empresa, sus tópicos entran como si el usuario
+    #    los hubiera escrito: el diccionario ya sabe a qué se dedica.
+    try:
+        for e in empresas.empresas_en(query):
+            for top in (e.get('nucleo') or [])[:2]:
+                qpal |= _sect_pal(top)
+    except Exception:                                              # noqa: BLE001
+        pass
+    if not qpal:
+        return None
+    secs, freq = _sect_idx()
+    mejor, mejor_pts, mejor_por = None, 0, ''
+    for s, pal in secs:
+        pts, por = 0, ''
+        for tema in (s.get('temas') or []):
+            tn = _secop_norm(tema)
+            if tn and (tn in q or (len(tn) > 6 and q in tn)):
+                pts += 4
+                por = por or tema
+        for w, tema in pal.items():
+            if any(_sect_casa(w, x) for x in qpal):
+                pts += 2 if freq.get(w, 9) == 1 else 1
+                por = por or tema
+        if pts > mejor_pts:
+            mejor, mejor_pts, mejor_por = s, pts, por
+    # 2 = una palabra que solo existe en ese sector, o dos compartidas. Menos
+    # que eso es una coincidencia suelta y es mejor no sugerir nada.
+    if not mejor or mejor_pts < 2:
+        return None
+    return {'k': mejor['k'], 'nombre': mejor['nombre'],
+            'comision': mejor.get('comision', ''),
+            'regulatorio': bool(mejor.get('sector_sanciones')),
+            'por_que': mejor_por, 'puntaje': mejor_pts}
+
+
 def _lectura_cliente_key(s, kpis):
     """Firma de la lectura: mismo perfil + mismo radar = misma lectura.
 
@@ -3149,6 +3253,67 @@ def _medios_parse_feed(xml_bytes):
     return out
 
 
+# ── País del titular ───────────────────────────────────────────────────────
+# ⚠️ AÑADIR "Colombia" A LA CONSULTA NO LA VUELVE UN AND. `_medios_gn_url` ya lo
+# hace y aun así entra prensa de otros países: medido sobre 745 titulares de
+# cinco sectores, el **6,8 %** es del exterior — «Perú: gobierno de Fujimori
+# busca modificar ley de áreas protegidas», «Patagonia demanda a Trump por
+# reducir los límites de las áreas protegidas en Utah», Panamá, Ecuador,
+# Venezuela. En un radar que muestra cinco señales, un 6,8 % se ve como un
+# error de producto.
+#
+# La regla es la conservadora: un titular es del exterior solo si nombra un
+# país/actor extranjero Y NO nombra nada colombiano. Lo demás se queda.
+# ⚠️ El 33,4 % de los titulares no menciona ni lo uno ni lo otro (una nota de
+# «reforma laboral» en un medio colombiano no dice «Colombia»): exigir señal
+# colombiana para pasar borraría un tercio del radar. Por eso la duda se queda
+# dentro, no fuera.
+#
+# ⚠️ Los prefijos van SIN `\b` final: «colombi» seguido de «a» no es límite de
+# palabra, y ese detalle hacía que el detector marcara como extranjera una nota
+# titulada «Marco Rubio llega a Colombia». `\w*` cierra el prefijo.
+_MEDIOS_EXT_RE = re.compile(
+    r'\b(?:peru|peruan|chile|chilen|mexic|argentin|venezuel|venezolan|espan|'
+    r'ecuador|ecuatorian|boliv|brasil|brasilen|panam|uruguay|paraguay|guatemal|'
+    r'salvador|hondur|nicaragu|costa rica|dominican|cuba|estados unidos|eeuu|'
+    r'washington|trump|milei|boluarte|sheinbaum|maduro|lula|bukele|noboa|'
+    r'fujimori|madrid|barcelona|lima|buenos aires|caracas|quito|utah|'
+    r'california|texas|florida|nueva york|union europea|bruselas)\w*', re.I)
+_MEDIOS_CO_RE = re.compile(
+    r'\b(?:colombi|bogota|medellin|cali|barranquilla|cartagena|bucaramanga|'
+    r'cucuta|pereira|manizales|ibague|villavicencio|neiva|monteria|popayan|'
+    r'pasto|santa marta|valledupar|armenia|sincelejo|riohacha|quibdo|florencia|'
+    r'yopal|mocoa|leticia|tunja|antioquia|cundinamarca|santander|atlantico|'
+    r'bolivar|valle del cauca|magdalena|cesar|cordoba|narino|cauca|huila|'
+    r'tolima|boyaca|meta|caqueta|casanare|choco|guajira|risaralda|caldas|'
+    r'quindio|sucre|putumayo|amazonas|vichada|guainia|vaupes|guaviare|arauca|'
+    r'san andres|petro|minambiente|anla|dian|supersalud|superfinanciera|'
+    r'congreso de la republica|senado|camara de representantes|'
+    r'corte constitucional|consejo de estado|procuraduria|contraloria|'
+    r'fiscalia|ecopetrol|avianca|bancolombia|epm|isagen|dnp|conpes|secop)\w*',
+    re.I)
+
+
+# El dominio del medio es la otra señal, y más dura que el texto: un titular
+# como «Así buscan proteger los Monumentos Naturales provinciales en Entre
+# Ríos» no nombra ningún país, pero lo publica noticiasdebariloche.com.ar.
+# `.co` no entra a la lista por razones obvias, y tampoco `.com`/`.org`, que
+# no dicen nada del país.
+_MEDIOS_TLD_EXT = ('.ar', '.pe', '.mx', '.cl', '.es', '.pa', '.ve', '.ec',
+                   '.bo', '.br', '.uy', '.py', '.gt', '.sv', '.hn', '.ni',
+                   '.cr', '.do', '.cu', '.pr', '.us', '.fr', '.it', '.de')
+
+
+def _medios_es_exterior(titulo, medio):
+    b = _secop_norm(f'{titulo} {medio}')
+    if _MEDIOS_CO_RE.search(b):
+        return False
+    if _MEDIOS_EXT_RE.search(b):
+        return True
+    m = _secop_norm(medio).strip().rstrip('/')
+    return bool(m) and m.endswith(_MEDIOS_TLD_EXT)
+
+
 def _medios_query_events(query, dias):
     try:
         items = _medios_parse_feed(_medios_fetch_xml(_medios_gn_url(query, dias)))
@@ -3162,6 +3327,7 @@ def _medios_query_events(query, dias):
             continue
         events.append({'medio': medio, 'alcance': _medios_alcance(medio), 'titulo': titulo,
                        'url': it['link'], 'fecha': (it['fecha_pub'] or '')[:10],
+                       'exterior': _medios_es_exterior(titulo, medio),
                        '_fp': it['fecha_pub'] or ''})
     return events
 
@@ -3197,6 +3363,9 @@ def _medios_aggregate(events, cap):
     por_alcance = Counter(e['alcance'] for e in dedup)
     return {
         'n': len(dedup), 'n_medios': len(por_medio),
+        # cuántos hablan de otro país: el pilar los muestra marcados y el radar
+        # del cliente los deja fuera (ver _medios_para_sector).
+        'n_exterior': sum(1 for e in dedup if e.get('exterior')),
         'por_medio': [{'medio': m, 'n': n} for m, n in por_medio.most_common(20)],
         'por_alcance': [{'alcance': a, 'n': n} for a, n in por_alcance.most_common()],
         'resultados': [{k: v for k, v in e.items() if k not in ('_fp', '_gk')} for e in dedup[:cap]],
@@ -3248,7 +3417,16 @@ def _medios_para_sector(temas, dias=14, cap=6):
     with ThreadPoolExecutor(max_workers=4) as pool:
         for fut in as_completed([pool.submit(_medios_query_events, t, dias) for t in temas]):
             events.extend(fut.result())
-    out = _medios_aggregate(events, cap=cap)
+    # ⚠️ La prensa del exterior SALE del radar, pero se cuenta y se declara. Un
+    # cliente colombiano no necesita que le digan que Fujimori cambió la ley de
+    # áreas protegidas del Perú; y borrarlo en silencio tampoco sirve, porque
+    # para un perfil con operación regional esa nota sí es contexto. El pilar
+    # Medios (búsqueda libre) NO filtra: allá el usuario buscó lo que buscó y
+    # cada titular va marcado, que es distinto de esconderlo.
+    n_ext = sum(1 for e in events if e.get('exterior'))
+    dentro = [e for e in events if not e.get('exterior')]
+    out = _medios_aggregate(dentro, cap=cap)
+    out['n_exterior'] = n_ext
     _cache_put(ck, out)
     return out
 
@@ -4620,7 +4798,7 @@ def handler(event, context):
             sanc = [r for r in dels if (r.get('tipo_acto') or 'sancion') == 'sancion']
             n_sanc, n_otros = len(sanc), len(dels) - len(sanc)
             reg = _bloque_regulatorio(dels, vig_keys)
-        med, n_med = [], 0
+        med, n_med, n_med_ext = [], 0, 0
         cutoff = _time.strftime('%Y-%m-%d', _time.gmtime(_time.time() - 5 * 86400))
         med_vig, vig_urls = [], set()
         try:
@@ -4641,6 +4819,7 @@ def handler(event, context):
         # el radar vive de la identidad, que es lo correcto.
         med_agg = _medios_para_sector(s.get('temas', [])[:4])
         n_med = med_agg['n']
+        n_med_ext = med_agg.get('n_exterior', 0)
         for r in med_agg['resultados']:
             if len(med) >= 5:
                 break
@@ -4722,7 +4901,8 @@ def handler(event, context):
                 'en_tramite': sum(1 for x in rc['senales'] if x['resultado'] == 'EN_TRAMITE'),
                 'n_proyectos_sector': rc['n_tocados'], 'n_sanciones_sector': n_sanc,
                 'n_otros_actos_sector': n_otros,
-                'n_medios_sector': n_med, 'n_contratos_sector': n_con,
+                'n_medios_sector': n_med, 'n_medios_exterior': n_med_ext,
+                'n_contratos_sector': n_con,
                 'n_vigiladas': len(emps_vig), 'n_senales_vigiladas': n_vig,
                 'n_contratos_vigiladas': n_con_vig,
                 # articulado: cuántas señales del Congreso traen "qué cambia" y
@@ -4822,6 +5002,13 @@ def handler(event, context):
             ampliar_empresa=bool(body.get('ampliar_empresa')))
         out = {'query': q, 'resumen': resumen,
                'model_info': {'sintesis': STEP_MODELS['sintesis']}}
+        # Puente a la Rosa: la búsqueda universal siempre llama a `tema`, así
+        # que la sugerencia de sector viaja acá. Aditivo y sin costo — si no
+        # hay un sector claro no va el campo y el frontend ofrece la Rosa sin
+        # nombrar ninguno.
+        _sug = _sector_sugerido(q)
+        if _sug:
+            out['sector_sugerido'] = _sug
         if body.get('lectura', True) and resumen['n_intentos'] > 0:
             if not autorizado:
                 # Degrada, no rechaza. El visitante sin acceso se lleva el
