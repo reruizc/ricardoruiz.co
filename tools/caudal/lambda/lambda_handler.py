@@ -4058,8 +4058,12 @@ def handler(event, context):
                 and (not q or q in r.get('q', ''))]
         out = [{k: v for k, v in r.items() if k != 'q'}
                for r in sorted(recs, key=lambda r: r.get('fecha', ''), reverse=True)[:120]]
+        # La COBERTURA viaja también en la búsqueda, no solo en el landing: sin
+        # ella, cero resultados se lee como "no hay jurisprudencia" cuando lo
+        # cierto puede ser "ese tema no está entre las consultas cosechadas".
         return _resp(200, {'mode': 'search', 'query': body.get('query', ''),
                             'fuente': fuente, 'n': len(recs), 'mostrados': len(out),
+                            'cobertura': (_control_stats() or {}).get('cobertura', {}),
                             'resultados': out})
 
     if action == 'sanciones':      # pilar Regulatorio · actos de superintendencias

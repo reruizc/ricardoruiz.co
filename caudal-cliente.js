@@ -648,6 +648,9 @@
       <div class="sig-action">${esc(x.accion)}</div></div></div>`;
   }
   let _CLI_LAST=null;
+  // la lectura vigente en pantalla — el brief se arma de acá, así que lo
+  // descargado y lo mostrado no pueden discrepar.
+  let _CLI_LECTURA=null;
   function cliDetalleHTML(pilar,d){
     const cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[], medios=d.medios||[], con=d.contratacion||[];
     if(pilar==='congreso') return congreso.length?`<div class="sig-list">${congreso.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin proyectos accionables ahora.</div>';
@@ -660,7 +663,9 @@
   }
   function cliRender(d){
     const body=document.getElementById('cli-body'); if(!body) return;
-    _CLI_LAST=d;
+    _CLI_LAST=d; _CLI_LECTURA=null;
+    // el brief se re-habilita cuando la lectura del radar nuevo aterriza
+    const _bb=document.getElementById('cli-brief-bar'); if(_bb) _bb.hidden=true;
     const k=d.kpis, cl=d.cliente, congreso=d.congreso||[], reg=d.regulatorio||[], medios=d.medios||[], con=d.contratacion||[];
     // el bloque regulatorio puede traer sanciones o —desde la ANLA— resoluciones,
     // aperturas y archivos. Se nombra por lo que de verdad trae, no por lo que
@@ -711,6 +716,10 @@
       <div class="lectura">
         <div class="tag">◈ Lectura del analista · briefing de hoy para ${esc(cl.nombre)}</div>
         <div id="cli-lectura-body"><div class="llm-load">Generando lectura <span class="dots"><span></span><span></span><span></span></span></div></div>
+        <div class="brief-bar" id="cli-brief-bar" hidden>
+          <button type="button" class="brief-btn" id="cli-brief-btn">↓ Brief de 72 horas (.pdf)</button>
+          <span class="brief-nota" id="cli-brief-nota"></span>
+        </div>
       </div>
       <div class="cli-sub">Explorar el detalle</div>
       <div class="chips" id="cli-toggle" style="justify-content:flex-start;margin-top:.3rem">
@@ -782,6 +791,7 @@
                   ['sur','S','Sur · competencia'],['oeste','O','Occidente · Estado']];
   function cliRenderLectura(l){
     const body=document.getElementById('cli-lectura-body'); if(!body) return;
+    _CLI_LECTURA=l||null;
     const _k=(_CLI_LAST&&_CLI_LAST.kpis)||{};
     const cc=_k.cardinales||{}, md=_k.mov_dias||3;
     const partes=CARD_ORD.map(([k,letra,nom])=>{
@@ -814,7 +824,190 @@
       + blk('Lo que mueve la aguja', l.lo_que_importa)
       + plan + acc + blk('En el horizonte', l.horizonte)
       || '<div class="cob-note">Sin lectura disponible.</div>';
+    briefWire();
   }
+  /* ── BRIEF DE 72 HORAS ────────────────────────────────────────────────
+     Lo que la Rosa deja en pantalla es para mirar; esto es para llevarlo a una
+     reunión. Sale de lo que YA está cargado (`_CLI_LAST` + la lectura vigente):
+     cero llamadas nuevas, cero costo de modelo y nada que se pueda desfasar
+     entre lo que se ve y lo que se descarga.
+
+     ⚠️ La ventana son las señales marcadas `mov` por la Lambda (≤3 días =
+     72 h), NO todo el radar. Y hay un límite que se declara en el propio PDF:
+     las señales del Congreso no traen fecha en el índice, así que nunca entran
+     como movimiento — un proyecto en trámite es estado, no noticia. Prometer
+     "todo lo de las últimas 72 horas" incluyendo el Congreso sería falso.
+
+     ⚠️ Si en 72 h no se movió nada, el brief SE GENERA IGUAL y lo dice. Un
+     "no pasó nada" verificado es información; fabricar contenido para llenar
+     la página es lo contrario de lo que se vende acá. */
+  // El acento del PDF es el azul de lectura de la paleta Cauce (--teal, que
+  // pese al nombre de la variable es #3d6eb8). Un teal literal se vería de
+  // otra marca.
+  const BRIEF_ACENTO=[61,110,184];
+  const BRIEF_CDN='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+  let _briefLoading=null;
+  function briefJsPDF(){
+    if(window.jspdf&&window.jspdf.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
+    if(_briefLoading) return _briefLoading;
+    _briefLoading=new Promise((ok,err)=>{
+      const s=document.createElement('script'); s.src=BRIEF_CDN;
+      s.onload=()=>ok(window.jspdf&&window.jspdf.jsPDF);
+      s.onerror=()=>{_briefLoading=null;err(new Error('cdn'))};
+      document.head.appendChild(s);
+    });
+    return _briefLoading;
+  }
+  // Fuente del PDF: el orden de la Rosa (N · E · S · O), no el de la respuesta.
+  const BRIEF_CARD=[['norte','NORTE · oportunidades'],['este','ORIENTE · conversación'],
+                    ['sur','SUR · competencia'],['oeste','OCCIDENTE · Estado']];
+  const BRIEF_FUENTE={congreso:'Congreso',regulatorio:'Regulatorio',medios:'Prensa',
+                      contratacion:'Contratación',ejecutivo:'Ejecutivo',sucop:'Consulta pública'};
+  // ⚠️ La URL va como ENLACE, nunca como texto. Medido en el primer brief: una
+  // sola nota de prensa de Google News ocupaba CINCO LÍNEAS de base64 —
+  // `news.google.com/rss/articles/CBMivAFBVV95cUxQ…` son más de 500 caracteres —
+  // y tres notas convertían la página en un muro de ruido. El PDF muestra el
+  // medio y el enlace queda detrás, que es como se lee un documento.
+  // ⚠️ SIN FLECHAS NI SÍMBOLOS FUERA DE WinAnsi. Medido: un solo `↗` obliga a
+  // jsPDF a escribir TODA la cadena en 16 bits y la flecha sale como «!». Es el
+  // mismo gotcha que el subset de Inter en los informes Word — acá con
+  // helvetica y peor, porque contamina la línea entera.
+  function briefEtiquetaEnlace(x){
+    const u=(x.url||'').trim(); if(!u) return '';
+    if(/news\.google\./i.test(u)) return 'Abrir la nota' + (x.medio?` en ${x.medio}`:'');
+    try{ return 'Ver el documento en ' + new URL(u).hostname.replace(/^www\./,''); }
+    catch(e){ return 'Ver el documento'; }
+  }
+  function briefSenalTexto(x){
+    const meta=[BRIEF_FUENTE[x.tipo]||x.tipo, x.fecha||'', x.vigilada?('vigilada: '+x.vigilada):'',
+                x.entidad||x.medio||x.comision||''].filter(Boolean).join(' · ');
+    return {tit:shortTitle((x.titulo||'').trim()).slice(0,190), meta,
+            accion:(x.accion||'').trim(), url:(x.url||'').trim(),
+            enlace:briefEtiquetaEnlace(x), nivel:x.nivel||''};
+  }
+  function briefDatos(){
+    const d=_CLI_LAST; if(!d) return null;
+    const cl=d.cliente||{}, k=d.kpis||{};
+    const todas=[].concat(d.congreso||[],d.regulatorio||[],d.medios||[],
+                          d.contratacion||[],d.ejecutivo||[],d.sucop||[]);
+    // `mov` lo marca la Lambda contra su propio reloj: no se recalcula acá para
+    // que el PDF y la pantalla no puedan discrepar por la zona horaria del
+    // navegador de quien descarga.
+    const mov=todas.filter(x=>x&&x.mov);
+    const porCard={norte:[],este:[],sur:[],oeste:[]};
+    mov.forEach(x=>{ const c=porCard[x.card]?x.card:'oeste'; porCard[c].push(x); });
+    return {nombre:cl.nombre||'tu perfil', kpis:k, porCard, nMov:mov.length,
+            nTotal:todas.length, dias:k.mov_dias||3, lectura:_CLI_LECTURA};
+  }
+  async function briefDescargar(){
+    const btn=document.getElementById('cli-brief-btn');
+    const D=briefDatos(); if(!D) return;
+    const txtPrev=btn?btn.textContent:'';
+    if(btn){ btn.disabled=true; btn.textContent='Armando el brief…'; }
+    let jsPDF; try{ jsPDF=await briefJsPDF(); }
+    catch(e){ if(btn){btn.disabled=false;btn.textContent=txtPrev;} alert('No se pudo cargar el generador de PDF. Reintenta.'); return; }
+    const doc=new jsPDF({unit:'pt',format:'letter'});
+    const M=54, W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), AN=W-M*2;
+    let y=M;
+    const salto=(n)=>{ if(y+n>H-58){ doc.addPage(); y=M; } };
+    const linea=(txt,{size=10,style='normal',color=[40,44,52],gap=4,indent=0}={})=>{
+      doc.setFont('helvetica',style); doc.setFontSize(size); doc.setTextColor(...color);
+      const ls=doc.splitTextToSize(String(txt||''),AN-indent);
+      ls.forEach(l=>{ salto(size+gap); doc.text(l,M+indent,y); y+=size+gap; });
+    };
+    const enlace=(txt,url,{size=8,indent=0}={})=>{
+      salto(size+5); doc.setFont('helvetica','normal'); doc.setFontSize(size);
+      doc.setTextColor(37,99,235);
+      doc.textWithLink(String(txt),M+indent,y,{url:String(url)});
+      y+=size+5;
+    };
+    const regla=()=>{ salto(12); doc.setDrawColor(214,219,226); doc.line(M,y,W-M,y); y+=12; };
+    const hoy=new Date();
+    const fLarga=hoy.toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
+
+    // — portada del brief —
+    linea('CAUDAL · BRIEF DE 72 HORAS',{size:9,style:'bold',color:BRIEF_ACENTO,gap:6});
+    linea(D.nombre,{size:20,style:'bold',color:[16,20,28],gap:6});
+    linea(`${fLarga} · ventana de ${D.dias*24} horas`,{size:9,color:[110,120,133],gap:10});
+    regla();
+
+    // — el titular y los cuatro rumbos, tal como están en pantalla —
+    const L=D.lectura||{};
+    if(L.titular) linea(L.titular,{size:12,style:'bold',color:[16,20,28],gap:8});
+    // Los CUATRO rumbos van siempre, aunque no se hayan movido: la Rosa tiene
+    // cuatro puntos y un brief que omite los quietos deja de ser un mapa. "Sin
+    // movimiento" es una respuesta, y de las útiles.
+    BRIEF_CARD.forEach(([k,nom])=>{
+      const txt=(L[k]||'').trim(); const lista=D.porCard[k]||[]; const n=lista.length;
+      salto(30);
+      linea(`${nom} — ${n?`${n} en ${D.dias*24} h`:'sin movimiento'}`,
+            {size:9,style:'bold',color:BRIEF_ACENTO,gap:5});
+      if(txt) linea(txt,{size:10,gap:4});
+      if(!txt&&!n) linea(`Nada nuevo en este rumbo dentro de la ventana.`,
+                         {size:9,color:[110,120,133],gap:4,indent:10});
+      lista.forEach(x=>{
+        const s=briefSenalTexto(x);
+        linea('- '+s.tit,{size:9,style:'bold',color:[16,20,28],gap:3,indent:10});
+        if(s.meta) linea(s.meta,{size:8,color:[110,120,133],gap:2,indent:20});
+        if(s.accion) linea(s.accion,{size:8.5,color:[60,66,76],gap:2,indent:20});
+        if(s.url&&s.enlace) enlace(s.enlace,s.url,{indent:20});
+      });
+      y+=6;
+    });
+
+    // — plan de acción, si la lectura lo trae —
+    if(L.plan&&L.plan.length){
+      regla(); linea('PLAN DE ACCIÓN',{size:9,style:'bold',color:BRIEF_ACENTO,gap:6});
+      L.plan.forEach((p,i)=>{
+        linea(`${i+1}. ${p.accion||''}`,{size:10,style:'bold',color:[16,20,28],gap:3});
+        if(p.por_que) linea(p.por_que,{size:9,gap:2,indent:14});
+        const m=[p.plazo,p.responsable].filter(Boolean).join(' · ');
+        if(m) linea(m,{size:8,color:[110,120,133],gap:2,indent:14});
+        if(p.preparar) linea('Preparar: '+p.preparar,{size:8.5,color:[60,66,76],gap:4,indent:14});
+      });
+    }
+
+    // — el alcance, que es parte del producto y no una nota al pie —
+    regla();
+    linea('QUÉ CUBRE ESTE BRIEF',{size:9,style:'bold',color:BRIEF_ACENTO,gap:5});
+    linea(`${D.nMov} señal(es) con movimiento en las últimas ${D.dias*24} horas, de ${D.nTotal} `
+      +`que el radar tiene vigentes para este perfil. Lo que no aparece acá no es que no exista: `
+      +`es que no se movió en la ventana.`,{size:8.5,color:[60,66,76],gap:3});
+    linea('Los proyectos del Congreso no entran como movimiento: el índice guarda el año, no la '
+      +'fecha de radicación, así que un proyecto figura como estado del frente y no como noticia '
+      +'del día. Van en el radar completo de la plataforma.',{size:8.5,color:[60,66,76],gap:3});
+    linea('Fuentes: Congreso · superintendencias y reguladores · Ejecutivo · consulta pública '
+      +'(SUCOP) · contratación (SECOP) · prensa nacional y regional. Cada señal enlaza su '
+      +'documento oficial.',{size:8.5,color:[60,66,76],gap:3});
+    linea('Caudal · una alianza entre RicardoRuiz.co y Cauce. Análisis asistido por IA sobre '
+      +'datos oficiales. Borrador; el criterio experto es del analista.',
+      {size:8,color:[110,120,133],gap:3});
+
+    // pie con paginación (después de conocer el total)
+    const tot=doc.internal.getNumberOfPages();
+    for(let i=1;i<=tot;i++){
+      doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7.5);
+      doc.setTextColor(150,158,168);
+      doc.text(`Caudal · brief de ${D.dias*24} h · ${D.nombre}`,M,H-30);
+      doc.text(`${i} / ${tot}`,W-M,H-30,{align:'right'});
+    }
+    const slug=String(D.nombre).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'perfil';
+    doc.save(`caudal-brief-72h-${slug}-${hoy.toISOString().slice(0,10)}.pdf`);
+    if(btn){ btn.disabled=false; btn.textContent=txtPrev; }
+  }
+  function briefWire(){
+    const bar=document.getElementById('cli-brief-bar'), btn=document.getElementById('cli-brief-btn'),
+          nota=document.getElementById('cli-brief-nota');
+    if(!bar||!btn) return;
+    const D=briefDatos(); if(!D) return;
+    bar.hidden=false;
+    btn.onclick=briefDescargar;
+    nota.textContent=D.nMov
+      ? `${D.nMov} señal${D.nMov===1?'':'es'} con movimiento en ${D.dias*24} h · el resto queda en el radar`
+      : `Sin movimiento en ${D.dias*24} h — el brief lo dice y trae el estado de los cuatro rumbos`;
+  }
+
   // `arg` = {sector:'salud'} (preset/demo) o {perfil:{…}} (el perfil del cliente).
   // El resto del flujo es idéntico: los presets siguen siendo el fallback.
   async function cliLoad(arg){
@@ -855,6 +1048,9 @@
   function cliLecturaFallback(msg){
     const el=document.getElementById('cli-lectura-body'); if(!el) return;
     el.innerHTML='<div class="cob-note">'+esc(msg||'No se pudo generar la lectura. Lo de arriba está completo.')+'</div>';
+    // el brief sigue disponible: las señales de las últimas 72 h son dato
+    // propio y no dependen de que el modelo haya respondido.
+    _CLI_LECTURA=null; briefWire();
   }
   // El muro del radar: el briefing es justamente lo que se vende acá, así que en
   // vez de un error va la invitación, en el mismo sitio donde iría la lectura.
@@ -903,6 +1099,9 @@
     _cliLectTimer=setTimeout(tick,CLI_LECT_POLL);
   }
 
-  /* `cliInit` lo llama initHome; `pfLoadList`, caudal-base.js al abrir sesión. */
-  Object.assign(window, { cliInit, pfLoadList });
+  /* `cliInit` lo llama initHome; `pfLoadList`, caudal-base.js al abrir sesión.
+     `briefWire`/`briefDescargar` se exponen para soporte y verificación: la
+     barra del brief solo aparece cuando la lectura aterriza, y sin esto no
+     hay forma de probar el PDF si el modelo está lento. */
+  Object.assign(window, { cliInit, pfLoadList, briefWire, briefDescargar });
 })();

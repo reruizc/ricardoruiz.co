@@ -18,7 +18,31 @@
   const CONTROL_EJEMPLOS=['salud','contratación','pensiones','ambiente','elecciones'];
   const CONTROL={q:'', fuente:''}; let CONTROL_STATS=null, _controlSeq=0;
   function controlCard(x){
-    return `<div class="sanc"><div class="sanc-top"><a class="sanc-name" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.titulo||x.identificador)}</a><span class="sanc-fecha">${esc(x.fecha||'s. f.')}</span></div><div class="sanc-tags"><span class="doc-badge">${esc(x.fuente_nombre)}</span><span class="doc-badge">${esc(x.tipo)}</span></div><div class="sanc-motivo"><b>${esc(x.tema)}</b>${x.resumen?` · ${esc(x.resumen)}`:''}</div></div>`;
+    // `sintesis` es el TEMA que escribe la relatoría (qué se decidió) y
+    // `resumen` el caso. Los dos pueden venir vacíos: "Sin información" es el
+    // marcador de ausencia de la Corte y el harvester ya lo convierte en vacío,
+    // así que acá se omite en vez de imprimir un campo hueco.
+    const temas=(x.temas&&x.temas.length?x.temas:[x.tema]).filter(Boolean);
+    const chips=temas.slice(0,3).map(t=>`<span class="doc-badge pal">${esc(t)}</span>`).join('')
+      +(temas.length>3?`<span class="doc-badge pal">+${temas.length-3}</span>`:'');
+    const cuerpo=[x.sintesis,x.resumen].filter(Boolean).map(esc).join(' · ');
+    return `<div class="sanc"><div class="sanc-top"><a class="sanc-name" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.identificador)}${x.caso?` · ${esc(x.caso)}`:''}</a><span class="sanc-fecha">${esc(x.fecha||'s. f.')}</span></div><div class="sanc-tags"><span class="doc-badge">${esc(x.fuente_nombre)}</span><span class="doc-badge">${esc(x.tipo)}</span>${chips}</div>${cuerpo?`<div class="sanc-motivo">${cuerpo}</div>`:''}</div>`;
+  }
+  /* ⚠️ EL ALCANCE SE DECLARA, SIEMPRE. El índice es la unión de N consultas
+     temáticas sobre la relatoría de la Corte Constitucional — no el flujo
+     completo de la Corte, y todavía no incluye Consejo de Estado ni Corte
+     Suprema. Sin decirlo, un cero se lee como «no hay jurisprudencia» cuando
+     lo cierto es «no cosechamos ese tema», que es la diferencia entre informar
+     y engañar. Es la misma regla que ya se cumple en el índice de bloqueo del
+     Senado y en el voto nominal. */
+  function controlAlcance(c){
+    if(!c||!c.n_consultas) return '';
+    const pend=(c.fuentes_pendientes||[]).join(' · ');
+    return `<div class="cob-note" style="margin-top:.6rem"><b>Alcance de esta fuente.</b> `
+      +`${c.n_consultas} consultas temáticas sobre la relatoría de la Corte Constitucional`
+      +`${c.desde?`, desde ${esc(c.desde)}`:''} — no es el flujo completo de la Corte. `
+      +`Un tema fuera de esa lista devuelve cero porque no se ha cosechado, no porque no exista jurisprudencia.`
+      +`${pend?` Pendientes de conectar: ${esc(pend)}.`:''}</div>`;
   }
   function controlWire(){
     const chips=document.getElementById('ctrlchips'), qel=document.getElementById('ctrlq'), go=document.getElementById('ctrlgo'), back=document.getElementById('controlBack');
@@ -29,8 +53,13 @@
     const l=document.getElementById('control-landing'), r=document.getElementById('control-results'); if(!l||!r) return;
     controlWire();
     const rows=d.resultados||d.recientes||[];
-    l.innerHTML=`<div class="cli-note"><b>Fuentes oficiales.</b> ${d.total||d.n||0} providencias indexadas · ${(d.por_fuente||[]).map(x=>`${esc(x.fuente)}: ${x.n}`).join(' · ')||'cargando cobertura'}.</div>`;
-    r.innerHTML=rows.length?`<div class="rad-sec">${d.mode==='search'?'Resultados':'Providencias recientes'} · ${d.n||rows.length}</div>${rows.map(controlCard).join('')}`:`<div class="err">No encontramos providencias para «${esc(CONTROL.q)}».</div>`;
+    const cob=d.cobertura||(CONTROL_STATS&&CONTROL_STATS.cobertura)||null;
+    const anios=(d.por_anio||[]).map(x=>`${esc(x.anio)}: ${fmt(x.n)}`).join(' · ');
+    l.innerHTML=`<div class="cli-note"><b>Fuentes oficiales.</b> ${fmt(d.total||d.n||0)} providencias indexadas · ${(d.por_fuente||[]).map(x=>`${esc(x.fuente)}: ${fmt(x.n)}`).join(' · ')||'cargando cobertura'}${(d.por_tipo||[]).length?` · ${(d.por_tipo||[]).map(x=>`${esc(x.tipo)}: ${fmt(x.n)}`).join(' · ')}`:''}.${anios?`<br><span style="color:var(--ink3)">Por año — ${anios}</span>`:''}</div>`
+      + controlAlcance(cob);
+    r.innerHTML=rows.length
+      ? `<div class="rad-sec">${d.mode==='search'?'Resultados':'Providencias recientes'} · ${fmt(d.n||rows.length)}${d.mostrados&&d.n>d.mostrados?` (se muestran ${fmt(d.mostrados)})`:''}</div>${rows.map(controlCard).join('')}`
+      : `<div class="cli-empty">Ninguna de las ${cob&&cob.n_consultas?cob.n_consultas:''} consultas cosechadas trae «${esc(CONTROL.q)}».<br><span style="color:var(--ink3)">Eso no significa que la Corte no se haya pronunciado: significa que ese tema todavía no está en el índice. Escríbenos y lo cosechamos.</span></div>`;
   }
   async function controlLoad(){
     const l=document.getElementById('control-landing'), r=document.getElementById('control-results'); if(!l||!r) return;
