@@ -664,6 +664,9 @@
   const UNI_TABS=[['congreso','Congreso'],['regulatorio','Regulatorio'],['sucop','Consulta pública'],
                   ['ejecutivo','Ejecutivo'],['contratacion','Contratación'],['medios','Medios']];
   let _uniSeq=0, _uniData={};
+  // aviso de «la respuesta ya está pintada» para la oferta de rehacer con el
+  // Congreso; lo setea cada búsqueda y lo dispara uniPintarRespuesta
+  let _uniOnResp=null;
   const TEMAS_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/temas-del-momento.json';
   async function pintarTemasDelMomento(){
     let d=null;
@@ -768,6 +771,7 @@
   async function uniSearch(query){
     query=(query||'').trim(); if(!query) return;
     const mine=++_uniSeq;
+    _uniOnResp=null;
     showView('buscar');
     const uq=document.getElementById('uq'); if(uq) uq.value=query;
     const box=document.getElementById('uni-results');
@@ -791,7 +795,7 @@
     box.innerHTML=`
       <div class="r-sub">Tema: <b>${esc(query)}</b></div>
       <div id="uni-fallo"></div>
-      <div class="lectura" id="uni-summary"><div class="tag">◈ Respuesta · sobre lo que Caudal encontró en sus fuentes</div><div id="uni-summary-body"></div></div>
+      <div class="lectura" id="uni-summary"><div class="tag">◈ Respuesta · sobre lo que Caudal encontró en sus fuentes</div><div id="uni-summary-body"></div><div id="uni-recalc"></div></div>
       <div class="uni-what">${ACCESO?'Explora el tema por fuente y abre los registros completos.':HAS_SESSION?'Abre una tarjeta para ver una muestra. Para acceder al archivo completo, puedes escoger un plan.':'Puedes ver algunos resultados si te registras. Crear una cuenta es gratis.'}</div>
       <div id="uni-puente"></div>
       <div id="uni-hint"></div>
@@ -845,12 +849,38 @@
     //   ⚠️ `UNI_MIN_FUENTES` evita el caso feo: si a los 2,5 s solo llegó una
     //   fuente, esperar es mejor que contestar con casi nada. Si al vencer el
     //   plazo no hay suficientes, cada llegada posterior vuelve a intentarlo.
-    const listas=new Set(); let disparado=false; const tIni=performance.now();
+    const listas=new Set(); let disparado=false, congresoFuera=false, respLista=false;
+    const tIni=performance.now();
+    // ⚠️ EL BOTÓN NO SE OFRECE ANTES DE TIEMPO, Y ESA ES LA GRACIA. Para prometer
+    // «+20 segundos» habría que saber de antemano cuánto va a tardar el Congreso,
+    // y casi nunca tarda: preguntarlo siempre sería preguntar de más en el 95% de
+    // las búsquedas. Aparece SOLO cuando ya pasaron las dos cosas que lo hacen
+    // una decisión real: (a) la respuesta se escribió sin el Congreso y (b) el
+    // Congreso ya llegó — que es justo cuando se sabe cuántos proyectos trae y
+    // cuánto cuesta de verdad rehacerla (solo la generación; ya no hay que
+    // esperar a nadie). Escoge el cliente, con el dato en la mano.
+    const ofrecerCongreso=()=>{
+      if(!congresoFuera||!respLista||!datos.congreso||mine!==_uniSeq) return;
+      const el=document.getElementById('uni-recalc'); if(!el) return;
+      el.innerHTML=`<div style="padding:.2rem 0 .6rem"><button type="button" class="uni-again" id="uni-recalc-btn">↻ Rehacer con el Congreso · ${fmt(counts.congreso)} proyecto${counts.congreso===1?'':'s'} de ley · unos 20 s más</button></div>`;
+      document.getElementById('uni-recalc-btn').onclick=()=>{
+        el.innerHTML=''; congresoFuera=false; respLista=false;
+        uniLoader.mount(document.getElementById('uni-summary-body'),
+          'Rehaciendo la respuesta con el Congreso incluido · unos 20 segundos',true);
+        const con=UNI_TABS.filter(([k])=>datos[k]);
+        uniLoadRespuesta(query, mine, con.map(([,n])=>n), UNI_TABS.length-con.length);
+      };
+    };
+    _uniOnResp=()=>{ respLista=true; ofrecerCongreso(); };
     const arrancarLectura=()=>{
       if(disparado||mine!==_uniSeq) return;
       const todas=listas.size===UNI_TABS.length;
-      if(!todas && (performance.now()-tIni<UNI_ESPERA_MS || listas.size<UNI_MIN_FUENTES)) return;
+      const t=performance.now()-tIni;
+      // se espera a una fuente pendiente mientras su propio plazo no venza
+      const enPlazo=UNI_TABS.some(([k])=>!listas.has(k)&&t<plazoDe(k));
+      if(!todas && (enPlazo || listas.size<UNI_MIN_FUENTES)) return;
       disparado=true;
+      congresoFuera=!datos.congreso;
       const usadas=UNI_TABS.filter(([k])=>listas.has(k));
       uniLoader.mount(document.getElementById('uni-summary-body'),
         'Leyendo las fuentes y escribiendo la respuesta · suele tomar entre 15 y 20 segundos',true);
@@ -863,8 +893,10 @@
       pintarTarjeta(k,d);
       listas.add(k);           // una fuente que responde «no tengo nada» SÍ contestó
       arrancarLectura();
+      if(k==='congreso') ofrecerCongreso();   // si llegó tarde, se ofrece rehacer
     }));
     setTimeout(arrancarLectura, UNI_ESPERA_MS);
+    setTimeout(arrancarLectura, UNI_ESPERA_CONGRESO);
     await Promise.all(llegadas);
     if(mine!==_uniSeq) return;
     const cD=datos.congreso, rD=datos.regulatorio, eD=datos.ejecutivo,
@@ -1034,6 +1066,7 @@
       ${(l.transversales||[]).length?`<div class="blk"><div class="h">Lo clave para informar</div>${li(l.transversales)}</div>`:''}
       ${blk('Qué está vivo en el Estado',l.en_tramite)}${blk('Qué dice la prensa',l.prensa)}${blk('Qué hacer',l.accion)}${fu}`;
     const rosa=document.getElementById('uni-aviso-rosa'); if(rosa) rosa.onclick=()=>showView('cliente');
+    if(_uniOnResp) _uniOnResp();
   }
   // Tope del sondeo. Sube de 90 a 120 s porque ahora puede haber un
   // re-disparo de por medio (fallo + reintento del modelo).
@@ -1044,6 +1077,14 @@
   // plazo entran las cuatro primeras y se ahorran ~2,6 s de espera pura.
   // Subirlo mete más fuentes y arranca más tarde; bajarlo, al revés.
   const UNI_ESPERA_MS=2500;
+  // ⚠️ EL CONGRESO TIENE PLAZO PROPIO Y MÁS LARGO (decisión de Ricardo, sep-8-2026):
+  // es la fuente estructural de Caudal, no una más. Medido: llega en 1-4 s casi
+  // siempre —1,4 s en la prueba del tungsteno— así que con 6 s entra en el caso
+  // normal y solo se queda fuera cuando de verdad se atasca (se midió una corrida
+  // de 20,9 s). Cuesta ~3 s frente a cortar a los 2,5, y compra la fuente que hace
+  // que la respuesta hable de proyectos de ley y no solo de decretos y prensa.
+  const UNI_ESPERA_CONGRESO=6000;
+  const plazoDe=k=>k==='congreso'?UNI_ESPERA_CONGRESO:UNI_ESPERA_MS;
   // Piso duro: con menos de esto no se contesta aunque venza el plazo.
   const UNI_MIN_FUENTES=4;
   function uniLoadRespuesta(query, mine, fuentesUsadas, nFaltaron){
