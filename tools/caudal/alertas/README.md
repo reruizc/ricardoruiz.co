@@ -69,6 +69,7 @@ python3 tools/caudal/alertas/motor.py --sectores salud,cli-a1b2c3
 python3 tools/caudal/alertas/motor.py --momento manana   # cuál de las dos corridas es
 python3 tools/caudal/alertas/motor.py --baseline         # sella el estado sin enviar nada
 python3 tools/caudal/alertas/motor.py --estado           # qué sabe el motor (incluye buzones)
+python3 tools/caudal/alertas/motor.py --whatsapp         # + imprime los avisos de WhatsApp para copiar
 ```
 
 Para ensayar un perfil sin tocar producción ni tener red, `CAUDAL_PERFILES_FIXTURE`
@@ -578,6 +579,96 @@ darle a esa key permiso de lectura.
 
 ---
 
+## WhatsApp · el aviso corto (piloto · nivel 0)
+
+El motor escribe, junto a cada digest, un **`{destino}.wa.txt`** de ≤700
+caracteres listo para pegar en un chat. Hoy lo reenvía una persona a mano; no
+hay API de por medio.
+
+```bash
+python3 tools/caudal/alertas/motor.py --whatsapp   # los imprime para copiar del terminal
+```
+
+Sin el flag el motor solo dice cuántos hay y dónde quedaron. Los archivos se
+escriben siempre.
+
+### WhatsApp no es el correo por otro canal
+
+Fuera de la ventana de 24 horas, un mensaje que **inicia el negocio** solo puede
+ser una **plantilla aprobada por Meta**, con cuerpo de 1024 caracteres y sin
+listas largas. No cabe un digest de seis señales con su articulado. Así que este
+texto no resume el digest: lo **anuncia**, y el detalle sigue viviendo en el
+correo y en Caudal.
+
+El objetivo son **700 caracteres**, no los 1024 del límite: por encima de ~700
+WhatsApp esconde el resto tras «Leer más», y un aviso que hay que desplegar para
+saber si urge no es un aviso. El margen es a propósito — el día que esto se
+automatice por la Cloud API, este MISMO texto es el cuerpo de la plantilla y no
+hay que rediseñarlo. Si no cabe, `whatsapp_texto` prueba con menos señales y
+títulos más cortos (3→2→1) antes de rendirse: **el corte nuestro cae donde
+decidimos, el de WhatsApp cae donde caiga.**
+
+Medido sobre los 18 digests reales del archivo: **134 destinos, ninguno vacío,
+el más largo 572 caracteres.**
+
+### Las cuatro decisiones del formato
+
+- **Se prioriza lo alto y se DICE cuando no hay nada alto.** Un día tranquilo
+  dice «3 movimientos, ninguno alto». El que reenvía a mano necesita distinguir
+  de un vistazo el día urgente del tranquilo; si los dos se ven igual va a
+  reenviar los dos, y a la tercera semana el cliente deja de abrir el que
+  importa — el mismo motivo por el que el motor no manda correos vacíos.
+- ⚠️ **En el pilar Ejecutivo el `titulo` es la MATRÍCULA, no el asunto.** La
+  fuente guarda «DECRETO No. 0898 DEL 29 DE JULIO DE 2026» ahí y el «por el cual
+  se reglamentan los artículos 35, 38…» en la descripción. En el correo da igual
+  porque salen los dos renglones; acá, con una línea por señal, el aviso de DiDi
+  se leía **«Decreto no. 0898 · Decreto no. 1040 · Decreto no. 1226»** — tres
+  matrículas y cero información. `_wa_asunto` usa la descripción en ese pilar; la
+  etiqueta ya lleva el número. Los otros pilares no tienen el problema (medido):
+  en Regulatorio el título es el objeto del acto y en Contratación es «entidad →
+  proveedor», que es lo primero que hay que leer.
+- ⚠️ **El resto se cuenta contra `total`, no contra lo que trae `pilares`.** Los
+  pilares del digest vienen recortados (`omitidos`), así que un destino con 34
+  señales y 12 en la lista decía «+9 más»: el aviso subestimaba en 22 justo lo
+  que promete resumir.
+- ⚠️ **WhatsApp no tiene escape para su marcado.** Un `_` en un título —los hay
+  en URLs y nombres de archivo del registro— pone a WhatsApp a cursivar media
+  frase, y un `*` suelto parte la negrita del renglón siguiente. `_wa_plano` los
+  **borra**, porque no existe forma de escaparlos. Por lo mismo el tipo de norma
+  pasa por `_wa_norma`: la fuente guarda la categoría del dataset en plural y
+  gritada («DECRETOS»), que en un chat parece un grito y además no es como se
+  nombra una norma.
+
+El punto rojo se pone **solo cuando discrimina dentro de lo mostrado**: si los
+tres renglones son altos, el resumen ya lo dijo y marcarlos todos es ruido.
+
+### Por qué el nivel 0 y no la Cloud API de una vez
+
+Con el volumen real —un cliente recibe entre 8 y 15 digests al mes— el costo por
+mensaje es irrelevante: la tarifa de utilidad de Colombia deja un cliente por
+**centavos de dólar al mes**. Lo que cuesta es el montaje (verificación de
+negocio ante Meta, número dedicado, plantilla aprobada), y eso solo vale la pena
+después de saber si el canal se usa. Reenviar 15 mensajes al mes a mano no es una
+carga; construir la tubería para descubrir que nadie los abre, sí.
+
+Tres cosas que hay que resolver ANTES de automatizar:
+
+1. **El enlace lleva a una puerta cerrada.** El gate de `caudal.html` son tres
+   correos escritos a mano. Un WhatsApp que lleva a un login que el cliente no
+   puede pasar es peor que no mandarlo. (Diego, de Cauce, sí está en esa lista:
+   por eso el piloto arranca con él.)
+2. **La cadencia no puede ser la del correo.** Premium hoy es `cada-corrida`,
+   dos veces al día. En WhatsApp eso se lee como spam.
+3. **El consentimiento es aparte.** El opt-in que existe (`alertas.activo`) es
+   para correo; Meta y la Ley 1581 piden uno propio que identifique el canal.
+
+⚠️ **Y una fecha:** desde el **1 de octubre de 2026** Meta cobra los mensajes de
+servicio y las plantillas de utilidad *dentro* de la ventana de 24 h, que hoy
+son gratis. O sea que el truco de «mando la plantilla corta, el cliente responde
+y le suelto el digest completo gratis» se acaba. No diseñar contando con él.
+
+---
+
 ## Archivos
 
 ```
@@ -586,11 +677,13 @@ articulado.py   el texto leído de cada proyecto + el filtro de confianza que de
 fuentes.py      lectores de las 6 fuentes → eventos con forma común
 motor.py        orquestador: diff contra estado, clasificación, armado, silencio
 render.py       HTML de correo (tablas + estilos inline, sin fuentes web ni JS) + texto plano
+                + el aviso de WhatsApp (`whatsapp_texto`, ≤700 caracteres)
 sender.py       Resend, con cola cuando falta la key · --diagnostico para la cuenta/dominio
 run_alertas.sh  runner del cron (candado, timeout, log rotado)
 co.ricardoruiz.caudal-alertas.plist   agente de launchd
 destinatarios.ejemplo.json            plantilla; el real va gitignored
 datos/          estado, cache de S3 y digests (gitignored)
+                digests/<fecha>/<destino>.wa.txt es el aviso de WhatsApp del día
 ```
 
 `datos/` vive bajo `tools/` porque era el único árbol que la sesión que lo

@@ -690,6 +690,172 @@ def digest_texto(digest, sector):
 
 
 # ---------------------------------------------------------------------------
+# WHATSAPP · el aviso corto que se reenvía a mano (piloto · nivel 0)
+# ---------------------------------------------------------------------------
+# WhatsApp NO es el correo por otro canal. Un mensaje que inicia el negocio solo
+# puede ser una plantilla aprobada por Meta, con cuerpo de 1024 caracteres y sin
+# listas largas: no cabe un digest de seis señales con su articulado. Así que
+# este texto no resume el digest, lo ANUNCIA — el detalle sigue viviendo en el
+# correo y en Caudal.
+#
+# Va calibrado a WA_TOPE (~700) porque por encima de ahí WhatsApp esconde el
+# resto tras «Leer más», y un aviso que hay que desplegar para saber si urge no
+# es un aviso. El tope real de una plantilla son 1024: el margen es a propósito,
+# para que el día que esto se automatice por la Cloud API este MISMO texto quepa
+# como cuerpo de plantilla sin rediseñarlo.
+
+WA_TOPE = 700
+WA_ENLACE = 'https://ricardoruiz.co/caudal.html'
+
+# WhatsApp no tiene escape para su marcado: o el carácter no está, o formatea.
+_RX_WA_FORMATO = re.compile(r'[*_~`]')
+
+
+def _wa_plano(s):
+    """Quita los caracteres que WhatsApp lee como formato.
+
+    Un guion bajo —los hay en URLs y en nombres de archivo del registro— pone a
+    WhatsApp a cursivar media frase, y un asterisco suelto parte la negrita del
+    renglón siguiente. Se borran en vez de escaparse porque no hay escape.
+    """
+    return _RX_WA_FORMATO.sub('', str(s or '')).strip()
+
+
+# La fuente del Ejecutivo guarda la CATEGORÍA del dataset, en plural y gritada
+# («DECRETOS», «RESOLUCIONES»). Escrito así en un renglón de WhatsApp parece un
+# grito y además no es como se nombra una norma. Mapa cerrado a propósito: un
+# singularizador genérico del español se equivoca justo en los casos raros, y
+# lo que no esté en el mapa cae a Título Capitalizado, que nunca queda mal.
+_WA_TIPO_NORMA = {
+    'DECRETOS': 'Decreto', 'RESOLUCIONES': 'Resolución', 'CIRCULARES': 'Circular',
+    'DIRECTIVAS': 'Directiva', 'LEYES': 'Ley', 'ACTOS LEGISLATIVOS': 'Acto legislativo',
+    'DECRETOS LEY': 'Decreto ley', 'RESOLUCIONES DE NOMBRAMIENTOS': 'Resolución',
+    'AGENDA REGULATORIA': 'Agenda regulatoria',
+}
+
+
+def _wa_norma(tipo):
+    t = str(tipo or '').strip()
+    return _WA_TIPO_NORMA.get(t.upper(), t.capitalize() if t.isupper() else t)
+
+
+def _wa_etiqueta(ev):
+    """El dato más identificador de la señal, en pocas palabras.
+
+    En el correo esto es `_meta_linea`, que encadena todo lo que sepa. Acá cada
+    carácter compite con el titular, así que se escoge UNO: el que permite
+    reconocer de qué se está hablando sin abrir nada.
+    """
+    m = ev.get('meta') or {}
+    p = ev.get('pilar')
+    if p == 'congreso' and m.get('numero'):
+        return f'PL {m["numero"]}'
+    if p == 'regulatorio' and m.get('fuente'):
+        return str(m['fuente'])
+    if p == 'ejecutivo' and m.get('tipo_norma'):
+        return f'{_wa_norma(m["tipo_norma"])} {m.get("numero", "")}'.strip()
+    if p == 'medios' and m.get('medio'):
+        return str(m['medio'])
+    # 'Prensa sin acto del Estado detrás' es el rótulo del correo, no de un
+    # renglón de 110 caracteres.
+    return PILAR.get(p, p or '').split(' sin ')[0]
+
+
+def _wa_asunto(ev):
+    """De qué trata la señal, en las palabras de la fuente.
+
+    ⚠️ En el pilar Ejecutivo el `titulo` es la MATRÍCULA, no el asunto: la
+    fuente guarda «DECRETO No. 0898 DEL 29 DE JULIO DE 2026» ahí y el «por el
+    cual se reglamentan los artículos 35, 38…» en la descripción. En el correo
+    da igual porque salen los dos renglones; acá, con una línea por señal, un
+    aviso con tres decretos se leía «Decreto no. 0898 · Decreto no. 1040 ·
+    Decreto no. 1226» — tres matrículas y cero información. La etiqueta ya
+    lleva el número, así que la línea la ocupa lo que la norma hace.
+
+    Los otros pilares NO tienen este problema (medido): en Regulatorio el
+    título es el objeto del acto y en Contratación es «entidad → proveedor»,
+    que es justo lo que hay que leer primero.
+    """
+    t = (ev['detalle'] if ev.get('pilar') == 'ejecutivo'
+         and (ev.get('detalle') or '').strip() else ev.get('titulo')) or ''
+    # El registro abre comillas y no siempre las cierra («"Por el cual se
+    # incorporan…»). Una comilla suelta al inicio se lee como texto roto.
+    return t.strip().lstrip('"\u00ab\u201c\u2018\'').strip()
+
+
+def whatsapp_texto(digest, sector, tope=WA_TOPE):
+    """Aviso corto para reenviar por WhatsApp. Devuelve '' si no hay señales.
+
+    Prioriza las altas y DICE cuando no hay ninguna. El que reenvía a mano
+    necesita distinguir de un vistazo el día urgente del día tranquilo; si los
+    dos se ven igual va a reenviar los dos, y a la tercera semana el cliente
+    deja de abrir el que importa — el mismo motivo por el que el motor no manda
+    correos vacíos.
+    """
+    altas, otras = [], []
+    for pilar in PILAR_ORDEN:
+        for ev in (sector.get('pilares') or {}).get(pilar) or []:
+            (altas if ev.get('nivel') == 'alto' else otras).append(ev)
+    orden = altas + otras
+    if not orden:
+        return ''
+
+    try:
+        d = dt.date.fromisoformat(digest['fecha'])
+        dia = f'{d.day} {MESES[d.month][:3]}'
+    except (ValueError, IndexError):
+        dia = digest['fecha']
+
+    nombre = _wa_plano(sector.get('nombre') or sector.get('k') or '')
+    total = sector.get('total', len(orden))
+    n_alt = len(altas)
+    if n_alt and n_alt >= total:
+        resumen = (f'{n_alt} señal{"es" if n_alt != 1 else ""}, '
+                   f'{"todas altas" if n_alt != 1 else "alta"}')
+    elif n_alt:
+        resumen = (f'{n_alt} señal{"es" if n_alt != 1 else ""} '
+                   f'alta{"s" if n_alt != 1 else ""} de {total}')
+    else:
+        resumen = f'{total} movimiento{"s" if total != 1 else ""}, ninguno alto'
+
+    # Cabe o no cabe. Se prueba con menos señales y títulos más cortos hasta que
+    # entra: recortar es preferible a mandar un mensaje que WhatsApp corta a la
+    # mitad, porque el corte de WhatsApp cae donde caiga y el nuestro no.
+    txt = ''
+    for n_items, largo in ((3, 110), (3, 85), (2, 95), (2, 70), (1, 90), (1, 60)):
+        L = [f'*Caudal · {nombre}*', f'{resumen} · {dia}', '']
+        muestra = orden[:n_items]
+        # El punto rojo solo donde discrimina. Si TODO lo mostrado es alto, el
+        # resumen ya lo dijo y marcar cada renglón es ruido; si no hay ninguno,
+        # tampoco hay nada que marcar. Se evalúa sobre lo MOSTRADO, no sobre el
+        # total: con 5 altas de 8 y tres renglones, los tres son altas.
+        mixto = 0 < sum(1 for x in muestra if x.get('nivel') == 'alto') < len(muestra)
+        for ev in muestra:
+            etq = _wa_plano(recortar(_wa_etiqueta(ev), 34))
+            tit = _wa_plano(recortar(titulo_legible(_wa_asunto(ev)), largo))
+            marca = '🔴 ' if mixto and ev.get('nivel') == 'alto' else ''
+            L.append(f'{marca}*{etq}* — {tit}' if etq else f'{marca}{tit}')
+        # ⚠️ El resto se cuenta contra `total`, NO contra `orden`: los pilares
+        # del digest vienen recortados (`omitidos`), así que un destino con 34
+        # señales y 12 en la lista decía «+9 más» — el aviso subestimaba en 22
+        # justo lo que promete resumir. «Detalle» y no «el correo» porque el
+        # correo tampoco las trae todas: las que sobran quedan en el digest.
+        resto = max(0, total - len(muestra))
+        if resto:
+            L.append('')
+            L.append(f'+ {resto} señal{"es" if resto != 1 else ""} más en el detalle.')
+        L.append('')
+        L.append(f'Detalle: {WA_ENLACE}')
+        txt = '\n'.join(L)
+        if len(txt) <= tope:
+            return txt
+    # Ni con una señal y 60 caracteres cabe: pasa solo si el nombre del destino
+    # es larguísimo. Se manda igual — el corte de WhatsApp es preferible a un
+    # aviso vacío — pero se devuelve tal cual, sin truncar a mitad de palabra.
+    return txt
+
+
+# ---------------------------------------------------------------------------
 # CANAL DE OPERACIÓN (interno)
 # ---------------------------------------------------------------------------
 

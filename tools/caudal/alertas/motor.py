@@ -909,6 +909,27 @@ def para_de(s, conf):
     return conf.get(s['k']) or conf.get('_todos') or []
 
 
+def imprimir_whatsapp(wa_listos, dest_dir, completo):
+    """Los avisos de WhatsApp: el índice siempre, el texto solo si se pide.
+
+    Sin `--whatsapp` basta con saber que están y dónde. Con `--whatsapp` salen
+    enteros para copiar del terminal y pegar en el chat, que es todo lo que
+    necesita el piloto: no hay API de por medio, hay una persona reenviando.
+    """
+    if not wa_listos:
+        return
+    clientes = [x for x in wa_listos if x[1].get('tipo') == 'cliente']
+    print(f"\nWhatsApp · {len(wa_listos)} aviso(s) listos "
+          f"({len(clientes)} de cliente) en {dest_dir}/*.wa.txt")
+    if not completo:
+        print("  (se imprimen enteros con --whatsapp)")
+        return
+    for k, s, wa in wa_listos:
+        quien = 'CLIENTE' if s.get('tipo') == 'cliente' else 'sector'
+        print(f"\n{'─' * 60}\n{quien} · {k} · {len(wa)} caracteres\n{'─' * 60}")
+        print(wa)
+
+
 def main():
     ap = argparse.ArgumentParser(description='Caudal · motor de alertas')
     ap.add_argument('--fecha', default=dt.date.today().isoformat())
@@ -927,6 +948,9 @@ def main():
     ap.add_argument('--sin-api', action='store_true',
                     help='no consulta la Lambda (sin prensa ni contratación)')
     ap.add_argument('--estado', action='store_true', help='qué sabe el motor')
+    ap.add_argument('--whatsapp', action='store_true',
+                    help='imprime los avisos de WhatsApp listos para copiar '
+                         '(siempre se escriben como {destino}.wa.txt)')
     args = ap.parse_args()
 
     if args.estado:
@@ -1004,6 +1028,7 @@ def main():
 
     conf = destinatarios()
     resultados = []
+    wa_listos = []
     for k, s in digest['sectores'].items():
         html = render.digest_html(digest, s)
         txt = render.digest_texto(digest, s)
@@ -1011,6 +1036,16 @@ def main():
             fh.write(html)
         with open(os.path.join(dest_dir, f'{k}.txt'), 'w', encoding='utf-8') as fh:
             fh.write(txt)
+        # El aviso corto de WhatsApp. Se escribe SIEMPRE aunque hoy se reenvíe
+        # a mano (piloto · nivel 0): así el día que se automatice por la Cloud
+        # API el motor ya no cambia, solo se le engancha un transporte más —
+        # igual que `sender` eligió entre Resend directo y el worker.
+        wa = render.whatsapp_texto(digest, s)
+        if wa:
+            with open(os.path.join(dest_dir, f'{k}.wa.txt'), 'w',
+                      encoding='utf-8') as fh:
+                fh.write(wa)
+            wa_listos.append((k, s, wa))
         pr = s.get('prensa') or {}
         extra = (f" · prensa: {pr.get('cobertura', 0)} como cobertura, "
                  f"{pr.get('sueltos', 0)} por empresa, {pr.get('tema', 0)} por tema, "
@@ -1044,11 +1079,15 @@ def main():
 
     if args.dry_run:
         print(f"\n--dry-run: escrito en {dest_dir}, sin enviar y sin guardar estado.")
+        # También en dry-run: `--dry-run --whatsapp` es justo como se ensaya el
+        # aviso sin sellar el estado ni mandar un correo de verdad.
+        imprimir_whatsapp(wa_listos, dest_dir, args.whatsapp)
         return 0
 
     guardar_estado(estado)
     sender.reportar(resultados)
     print(f"\nArtefactos en {dest_dir}")
+    imprimir_whatsapp(wa_listos, dest_dir, args.whatsapp)
     return 0
 
 
