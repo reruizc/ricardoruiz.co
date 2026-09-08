@@ -223,6 +223,16 @@ function guardarMeta(target) {
   if (Number(SESSION.vinculo.campana?.meta || 0) === Number(target)) return;
   guardarCampana({ ...c, meta: target });
 }
+/* Paneles 04 y 05: viven en su propio HTML (candidato-360-medios.html y
+   candidato-360-redes.html) y lo que el CRM muestra es solo el estado de lo
+   que esas páginas guardaron en el vínculo. */
+function pintarEscucha() {
+  const e = SESSION.vinculo?.escucha || {};
+  const ideas = e.ideas?.length || 0, perfiles = e.redes?.perfiles?.length || 0;
+  const medios = $('crmMediosEstado'), redes = $('crmRedesEstado');
+  if (medios) medios.textContent = ideas ? `${ideas} ${ideas === 1 ? 'idea' : 'ideas'}` : 'Sin ideas';
+  if (redes) redes.textContent = perfiles ? `${perfiles} ${perfiles === 1 ? 'cuenta' : 'cuentas'}${e.redes.validado ? ' · validadas' : ' · sin validar'}` : 'Sin cuentas';
+}
 /* Interruptor del briefing (panel 03 del CRM). El estado vive en el vínculo. */
 function pintarBriefing() {
   const b = SESSION.vinculo?.briefing || null, btn = $('crmBriefingBtn'), est = $('crmBriefingEstado'), sub = $('crmBriefingSub'), inp = $('crmBriefingCorreo');
@@ -859,6 +869,14 @@ async function createNew(e) {
     if (!r.ok) { if (r.existente) { alert(`Su cuenta ya está vinculada a ${vinculoDescripcion()}. Para cambiarla escriba a ${SESSION.soporte}.`); return abrirVinculo(); } if (r.sinAcceso) return abrirPaywall(); alert(`No se pudo guardar la candidatura: ${r.error}`); return; }
   }
   NUEVO = { ...nuevo, campana };
+  /* El vínculo solo guarda lo que su normalizador conoce; las redes tienen ruta
+     propia (/c360/escucha) porque las escriben también los paneles. */
+  if (nuevo.redes?.perfiles?.length && SESSION.vinculo && !SESSION.vinculo.local) {
+    const r = await apiC360('/c360/escucha', { method: 'POST', body: JSON.stringify({ redes: nuevo.redes }) });
+    if (r.ok && r.data?.vinculo) SESSION.vinculo = r.data.vinculo;
+  } else if (nuevo.redes?.perfiles?.length && SESSION.vinculo?.local) {
+    SESSION.vinculo.escucha = { redes: nuevo.redes };
+  }
   abrirCRMNuevo();
 }
 
@@ -905,6 +923,7 @@ async function launchCRM(event) {
   $('crmMapPanelNum').textContent = '01 · Mapa de historial electoral';
   showScreen('crm');
   pintarBriefing();
+  pintarEscucha();
   loadHistoricalMap(crmCandidate);
   renderCRMProfilePhoto(crmCandidate);
   pintarPuntaje(crmCandidate);
@@ -927,6 +946,7 @@ async function abrirCRMNuevo() {
   CAMPANA_ACTUAL = c;
   showScreen('crm');
   pintarBriefing();
+  pintarEscucha();
   renderTerritorioObjetivo(c);
   pintarMeta(await VoteTarget.estimate({ corp: c.corp, territory: lugar, baseUrl: S3 }));
 }

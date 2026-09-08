@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Las cuentas de su campaña en X, TikTok e Instagram, buscadas y validadas antes de montar la escucha.">
+<title>Redes sociales · Candidato 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- ⚠️ Al tocar candidato-360.css o candidato-360-panel.js hay que bumpear su ?v= acá y en candidato-360-medios.html. -->
+<link rel="stylesheet" href="candidato-360.css?v=20260908d">
+<style>
+/* Las fichas de red y sus veredictos ya están en candidato-360.css (el paso 2
+   del wizard usa las mismas): acá solo va el chasis del panel. */
+.panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
+.panel-hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:30px}
+.panel-hero h1{font:800 clamp(30px,4.4vw,46px)/1.06 var(--display);letter-spacing:-.02em;margin:8px 0 10px;color:var(--ink)}
+.panel-hero p{margin:0;max-width:62ch;font-size:15px;line-height:1.6;color:var(--muted)}
+.panel-candidatura{display:inline-block;margin-top:14px;font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--green);border:1px solid rgba(20,124,112,.32);padding:6px 10px}
+.nav-salir{text-decoration:none;display:inline-block}
+.hidden{display:none}
+.guardado{margin-top:18px;border-left:3px solid var(--green);background:var(--cream);padding:13px 16px;font-size:13.5px;line-height:1.55;color:var(--muted)}
+.guardado b{color:var(--ink)}
+.panel-nota{margin-top:24px;font-size:12.5px;line-height:1.55;color:var(--muted)}
+</style>
+</head>
+<body>
+<nav class="topbar"><div class="nav-left"><a href="candidato-360.html?abrir=1" class="nav-planes">← CRM</a><div class="nav-auth" id="navAuth"></div></div><div class="nav-right"><a class="brand" href="index.html"><span class="mark"><i></i><i></i><i></i><i></i></span><b>Ricardo<span>.</span>Ruiz</b></a></div></nav>
+
+<main class="app-shell"><div class="panel-shell">
+  <header class="panel-hero">
+    <div class="kicker">Candidato 360 · panel 05</div>
+    <h1>Sus redes sociales.</h1>
+    <p>Escriba el usuario de cada red donde tenga cuenta. Antes de guardar nada buscamos ese usuario en la red y comprobamos que sea el suyo: montar la escucha sobre un perfil que no es —un homónimo, una cuenta vieja, un error de dedo— es peor que no montarla.</p>
+    <span class="panel-candidatura" id="panelCandidatura"></span>
+  </header>
+
+  <div id="panelMuro" class="hidden"></div>
+
+  <div id="panelCuerpo">
+    <section class="panel">
+      <span class="panel-num">Sus cuentas</span>
+      <h3 style="margin:6px 0 4px">¿En qué redes está?</h3>
+      <p class="helper">Marque las que use y escriba el usuario. Puede pegar la dirección completa del perfil: la limpiamos.</p>
+      <div class="redes-grid" id="redesGrid"></div>
+      <div class="redes-acciones">
+        <button type="button" class="redes-btn" id="redesBuscar">Buscar y validar</button>
+        <button type="button" class="wall-btn" id="redesGuardar">Guardar sin validar</button>
+        <span class="redes-estado" id="redesEstado">Marque una red y escriba su usuario</span>
+      </div>
+      <div class="redes-resultado hidden" id="redesResultado"></div>
+      <div class="guardado hidden" id="redesGuardado"></div>
+    </section>
+    <p class="panel-nota">Lo que se guarda es el usuario y el sello con el que salió. El briefing y la escucha de medios usan esas cuentas para saber de quién hablan los titulares; si una queda «sin comprobar», se guarda igual pero marcada, y ninguna lectura se presenta como verificada cuando no lo está.</p>
+  </div>
+</div></main>
+
+<script src="platform-config.js"></script>
+<script src="data-client.js"></script>
+<script src="candidato-360-panel.js?v=20260908d"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.C360Panel, $ = P.$, esc = P.esc;
+  const REDES = [
+    { key: 'x', nombre: 'X', detalle: 'antes Twitter', ph: '@usuario' },
+    { key: 'tiktok', nombre: 'TikTok', detalle: 'video corto', ph: '@usuario' },
+    { key: 'instagram', nombre: 'Instagram', detalle: 'perfil público', ph: 'usuario' }
+  ];
+  const VEREDICTOS = {
+    confirmado: { etiqueta: 'Confirmado', clase: 'ok' },
+    probable: { etiqueta: 'Probable', clase: 'ok' },
+    dudoso: { etiqueta: 'Dudoso', clase: 'warn' },
+    no_encontrado: { etiqueta: 'Sin cuenta', clase: 'bad' },
+    no_verificable: { etiqueta: 'Sin comprobar', clase: 'warn' },
+    sin_validar: { etiqueta: 'Sin validar', clase: 'warn' }
+  };
+  let validacion = null, cargando = false;
+
+  /* Misma limpieza que el worker, para que la firma del cache coincida. */
+  const limpiar = v => String(v || '').trim()
+    .replace(/^https?:\/\//i, '').replace(/^www\./i, '')
+    .replace(/^(x|twitter|tiktok|instagram)\.com\//i, '')
+    .split(/[?#]/)[0].split('/')[0].replace(/^@+/, '').trim();
+
+  function montar(guardadas) {
+    $('redesGrid').innerHTML = REDES.map(r => {
+      const prev = guardadas.find(p => p.red === r.key);
+      return `<div class="red-row${prev ? ' on' : ''}" data-red="${r.key}">
+        <button type="button" class="red-chip" data-chip="${r.key}" aria-pressed="${prev ? 'true' : 'false'}"><i></i><b>${esc(r.nombre)}</b><small>${esc(r.detalle)}</small></button>
+        <input class="red-handle" id="red-${r.key}" placeholder="${esc(r.ph)}" autocomplete="off" ${prev ? '' : 'disabled'} value="${esc(prev?.handle || '')}">
+      </div>`;
+    }).join('');
+    $('redesGrid').querySelectorAll('[data-chip]').forEach(b => b.addEventListener('click', () => alternar(b.dataset.chip)));
+    $('redesGrid').querySelectorAll('.red-handle').forEach(i => i.addEventListener('input', tocadas));
+    estado();
+  }
+  function alternar(key) {
+    const row = document.querySelector(`.red-row[data-red="${key}"]`);
+    const activa = row.classList.toggle('on');
+    row.querySelector('.red-chip').setAttribute('aria-pressed', String(activa));
+    const input = row.querySelector('.red-handle');
+    input.disabled = !activa;
+    if (activa) input.focus({ preventScroll: true }); else input.value = '';
+    tocadas();
+  }
+  const elegidas = () => REDES.map(r => ({ red: r.key, handle: limpiar($(`red-${r.key}`)?.value) }))
+    .filter(r => document.querySelector(`.red-row[data-red="${r.red}"]`)?.classList.contains('on') && r.handle);
+  const firma = () => elegidas().map(r => `${r.red}:${r.handle.toLowerCase()}`).join(',');
+  function tocadas() {
+    if (validacion && validacion.firma !== firma()) { validacion = null; $('redesResultado').classList.add('hidden'); }
+    estado();
+  }
+  function estado() {
+    const n = elegidas().length;
+    $('redesBuscar').disabled = cargando || !n;
+    $('redesGuardar').disabled = cargando || !n;
+    $('redesBuscar').textContent = cargando ? 'Buscando…' : validacion ? 'Volver a validar' : 'Buscar y validar';
+    const est = $('redesEstado');
+    est.className = 'redes-estado' + (validacion ? ' ok' : '');
+    est.textContent = cargando ? 'Consultando cada red y leyendo señales abiertas…'
+      : validacion ? `Validado · ${validacion.perfiles.length} ${validacion.perfiles.length === 1 ? 'perfil' : 'perfiles'}`
+      : n ? `${n} ${n === 1 ? 'red marcada' : 'redes marcadas'} · sin validar` : 'Marque una red y escriba su usuario';
+  }
+
+  function pintarValidacion(d) {
+    const fichas = d.perfiles.map(p => {
+      const v = VEREDICTOS[p.veredicto] || VEREDICTOS.no_verificable, def = REDES.find(x => x.key === p.red) || { nombre: p.red };
+      const datos = [p.nombre_perfil ? `perfil a nombre de <b>${esc(p.nombre_perfil)}</b>` : '', p.seguidores != null ? `${esc(String(p.seguidores))} seguidores` : '', p.verificada ? 'cuenta verificada por la plataforma' : ''].filter(Boolean).join(' · ');
+      return `<div class="red-ficha ${v.clase}">
+        <div class="red-ficha-top"><b>${esc(def.nombre)}</b><a href="${esc(p.url)}" target="_blank" rel="noopener">@${esc(p.handle)}</a><span class="red-sello">${v.etiqueta}${p.confianza ? ` · ${p.confianza}%` : ''}</span></div>
+        ${datos ? `<p class="red-ficha-datos">${datos}</p>` : ''}
+        <p class="red-ficha-motivo">${esc(p.motivo || '')}</p></div>`;
+    }).join('');
+    const homonimo = d.riesgo_homonimo ? `<p class="redes-homonimo"><b>Cuidado con el homónimo:</b> ${esc(d.riesgo_homonimo)}</p>` : '';
+    const alertas = (d.alertas || []).length ? `<ul class="redes-alertas">${d.alertas.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '';
+    const prensa = (d.titulares || []).length ? `<details class="redes-prensa"><summary>${d.titulares.length} titulares abiertos con ese nombre</summary><ul>${d.titulares.map(t => `<li><a href="${esc(t.link)}" target="_blank" rel="noopener">${esc(t.titulo)}</a>${t.medio ? ` · ${esc(t.medio)}` : ''}</li>`).join('')}</ul></details>` : '';
+    $('redesResultado').classList.remove('hidden');
+    $('redesResultado').innerHTML = `${d.resumen ? `<p class="redes-resumen">${esc(d.resumen)}</p>` : ''}${fichas}${homonimo}${alertas}${prensa}<p class="redes-pie">${esc(d.modelo || 'DeepSeek')} leyó lo que respondió cada red${d.cache_hit ? ' (respuesta guardada de una consulta reciente)' : ''}. Si algún veredicto no cuadra, corrija el usuario y vuelva a validar.</p>`;
+  }
+  function fallo(r) {
+    const motivo = r.status === 404 ? 'El buscador de redes todavía no está publicado en el servidor (falta la ruta <code>/c360/redes</code>).'
+      : r.status === 401 ? 'Su sesión venció. Vuelva a entrar y repita la validación.'
+      : r.status === 403 ? 'Su cuenta no tiene acceso a la validación de redes.'
+      : r.data?.detalle ? esc(String(r.data.detalle))
+      : r.status === 0 ? 'No hubo conexión con el servidor.'
+      : `El servidor respondió ${esc(String(r.status))}.`;
+    $('redesResultado').classList.remove('hidden');
+    $('redesResultado').innerHTML = `<div class="redes-fallo"><b>No se pudo validar.</b><p>${motivo}</p><p class="redes-fallo-salida">Puede guardarlas <b>sin validar</b>: quedan tal como las escribió y marcadas como no comprobadas.</p></div>`;
+  }
+
+  async function guardar(perfiles, meta) {
+    const r = await P.guardarEscucha({ redes: Object.assign({ perfiles }, meta || {}) });
+    const caja = $('redesGuardado');
+    caja.classList.remove('hidden');
+    if (!r.ok) { caja.innerHTML = `<b>No se pudo guardar.</b> ${esc(r.data?.error || `El servidor respondió ${r.status}`)}. Vuelva a intentar; sus usuarios siguen escritos acá.`; return false; }
+    const g = r.data.vinculo?.escucha?.redes;
+    caja.innerHTML = `<b>Guardado.</b> La campaña escuchará ${esc((g?.perfiles || perfiles).map(p => `@${p.handle}`).join(', '))}${g?.validado ? ', con los veredictos de esta validación.' : ', marcadas como no validadas.'}`;
+    return true;
+  }
+
+  async function validar() {
+    const redes = elegidas(); if (!redes.length) return;
+    redes.forEach(r => { const i = $(`red-${r.red}`); if (i && i.value !== r.handle) i.value = r.handle; });
+    const f = firma();
+    cargando = true; estado();
+    $('redesResultado').classList.remove('hidden');
+    $('redesResultado').innerHTML = `<div class="redes-cargando"><i></i><span>Buscando @${esc(redes.map(r => r.handle).join(', @'))} y cruzando con la prensa abierta…</span></div>`;
+    const t = P.territorio();
+    let r;
+    try {
+      r = await P.api('/c360/redes', { method: 'POST', body: JSON.stringify({
+        nombre: P.nombreCandidatura(), alias: P.nombrePublico(), territorio: t.texto, redes }) });
+    } catch (e) { r = { status: 0, ok: false, data: {} }; }
+    cargando = false;
+    if (!r.ok || !Array.isArray(r.data?.perfiles)) { fallo(r); estado(); return; }
+    validacion = Object.assign({}, r.data, { firma: f });
+    pintarValidacion(validacion);
+    estado();
+    await guardar(validacion.perfiles.map(p => ({ red: p.red, handle: p.handle, veredicto: p.veredicto, confianza: p.confianza, nombrePerfil: p.nombre_perfil })),
+      { validadoEn: validacion.generado_en, modelo: validacion.modelo, resumen: validacion.resumen });
+  }
+
+  (async function init() {
+    if (!(await P.arrancar('candidato-360-redes.html'))) return;
+    const guardadas = P.SESION.vinculo?.escucha?.redes?.perfiles || [];
+    montar(guardadas);
+    $('redesBuscar').addEventListener('click', validar);
+    $('redesGuardar').addEventListener('click', () => guardar(elegidas().map(r => Object.assign({}, r, { veredicto: 'sin_validar' }))));
+    if (guardadas.length) {
+      const previo = P.SESION.vinculo.escucha.redes;
+      $('redesGuardado').classList.remove('hidden');
+      $('redesGuardado').innerHTML = `<b>Ya tiene cuentas guardadas:</b> ${esc(guardadas.map(p => `@${p.handle}`).join(', '))}${previo.validado ? ` · validadas${previo.validadoEn ? ` el ${esc(previo.validadoEn.slice(0, 10))}` : ''}.` : ' · sin validar.'}`;
+    }
+  })();
+})();
+</script>
+</body>
+</html>

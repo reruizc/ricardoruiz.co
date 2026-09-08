@@ -90,9 +90,10 @@ tiene y el KV `RR_STORE` que ya está bindeado.
 ## Probar
 
 ```bash
-node tools/candidato-360/redes/prueba-wizard.mjs   # el paso 2 de la página, con el worker stubbeado (17 comprobaciones)
+node tools/candidato-360/redes/prueba-wizard.mjs   # el paso 2 del wizard, con el worker stubbeado (17 comprobaciones)
+node tools/candidato-360/prueba-paneles.mjs        # los paneles 04 y 05 (22)
 # en rr-auth:
-node test/c360-redes.test.mjs                      # sondeos, RSS, sellado de veredictos y cache (32, sin red ni DeepSeek)
+node test/c360-redes.test.mjs                      # sondeos, RSS, sellado de veredictos, cache y escucha (38, sin red ni DeepSeek)
 npx wrangler dev --local                           # y contra 127.0.0.1:8788, con una sesión sembrada en el KV local:
 #   npx wrangler kv key put --local --binding RR_STORE "sessions:tok" '{"email":"…","plan":"premium"}'
 ```
@@ -104,6 +105,35 @@ npx wrangler dev --local                           # y contra 127.0.0.1:8788, co
 > cambió de forma. El de Instagram es el más frágil de los tres — si empieza a
 > devolver siempre `Sin comprobar`, es que el muro de login se cerró más y toca
 > cambiar de fuente, no que las cuentas no existan.
+
+## Dónde se usa
+
+| Sitio | Qué hace |
+|---|---|
+| Paso 2 del wizard de candidatura nueva (`candidato-360.html`) | Marca las redes y valida antes de construir el punto de partida |
+| **Panel 05 · `candidato-360-redes.html`** | La misma validación, ya con la candidatura abierta: precarga lo guardado, revalida y guarda |
+| **Panel 04 · `candidato-360-medios.html`** | No usa `/c360/redes`, pero comparte el mismo almacenamiento: las tres ideas de campaña con las que se filtra la lectura de prensa |
+
+Los dos paneles son HTML propios (con `candidato-360-panel.js` de chasis) y no
+acordeones del CRM: son dos preguntas con ritmos distintos —una se abre para
+leer, la otra para configurar—.
+
+## Lo que se guarda · `POST /c360/escucha`
+
+Las cuentas y las ideas viven en el vínculo, bajo `escucha`, y NO dentro de
+`campana` (no dependen de la corporación ni del territorio) ni dentro de
+`nuevo` (una candidatura con historial también tiene redes).
+
+```jsonc
+{ "redes": { "perfiles": [{ "red": "tiktok", "handle": "laprofe", "veredicto": "confirmado", "confianza": 88, "nombrePerfil": "Alejandra Palacio" }],
+             "validadoEn": "…", "modelo": "deepseek-v4-flash", "resumen": "…" },
+  "ideas": ["acueducto veredal", "seguridad en el comercio", "parque de la 45"] }
+```
+
+Se **fusiona campo a campo**: guardar las ideas desde el panel de medios no
+borra las redes que guardó el de redes. Y `validado` no lo decide el cliente —
+lo es si algún perfil trae un veredicto de verdad, así que un frontend viejo no
+puede sellar lo que nadie comprobó.
 
 ## El muro, y dónde cae
 

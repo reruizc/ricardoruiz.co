@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Lectura de noticias de su territorio, afinada con las tres ideas de su campaña.">
+<title>Lectura de noticias · Candidato 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- ⚠️ Al tocar candidato-360.css o candidato-360-panel.js hay que bumpear su ?v= acá y en candidato-360-redes.html. -->
+<link rel="stylesheet" href="candidato-360.css?v=20260908d">
+<style>
+/* Lo propio de este panel; el resto lo pone candidato-360.css. */
+.panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
+.panel-hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:30px}
+.panel-hero h1{font:800 clamp(30px,4.4vw,46px)/1.06 var(--display);letter-spacing:-.02em;margin:8px 0 10px;color:var(--ink)}
+.panel-hero p{margin:0;max-width:62ch;font-size:15px;line-height:1.6;color:var(--muted)}
+.panel-candidatura{display:inline-block;margin-top:14px;font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--green);border:1px solid rgba(20,124,112,.32);padding:6px 10px}
+.nav-salir{text-decoration:none;display:inline-block}
+.hidden{display:none}
+.ideas{display:grid;gap:12px;margin:18px 0 20px}
+.idea-row{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:center}
+.idea-row span{font:800 15px var(--sans);color:var(--green)}
+.idea-row input{width:100%;box-sizing:border-box;border:0;border-bottom:1px solid var(--line);background:transparent;padding:11px 0;font:15px var(--sans);color:var(--ink)}
+.idea-row input:focus{outline:0;border-bottom-color:var(--green)}
+.idea-acciones{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.idea-btn{border:1px solid var(--forest);background:var(--forest);color:#fff;padding:12px 18px;font:700 13px var(--sans);cursor:pointer}
+.idea-btn:disabled{opacity:.35;cursor:default}
+.idea-estado{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lectura{display:grid;gap:16px;margin-top:26px}
+.tema{border:1px solid var(--line);background:#fff;padding:18px 20px}
+.tema-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.tema-top h3{margin:0;font:700 19px var(--sans);color:var(--ink);flex:1 1 240px}
+.tema-cifra{font:800 26px var(--sans);letter-spacing:-.02em;color:var(--green);line-height:1}
+.tema-cifra small{display:block;font:500 10px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.tema-lectura{margin:8px 0 14px;font-size:14px;line-height:1.55;color:var(--muted)}
+.tema-lectura b{color:var(--ink)}
+.tema-titulares{margin:0;padding:0;list-style:none;display:grid;gap:9px}
+.tema-titulares li{border-top:1px solid var(--line);padding-top:9px;font-size:13.5px;line-height:1.45}
+.tema-titulares a{color:var(--ink);text-decoration:none}
+.tema-titulares a:hover{text-decoration:underline}
+.tema-titulares small{display:block;margin-top:3px;font:500 10px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.tema.vacio .tema-cifra{color:var(--muted)}
+.tema-orden{font:600 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--coral);border:1px solid rgba(239,112,93,.4);padding:3px 7px}
+.panel-nota{margin-top:26px;border-left:3px solid var(--green);background:var(--cream);padding:13px 16px;font-size:13px;line-height:1.55;color:var(--muted)}
+.panel-error{border-left:3px solid var(--coral);background:rgba(239,112,93,.08);padding:13px 16px;font-size:14px;line-height:1.5;color:var(--ink);margin-top:18px}
+</style>
+</head>
+<body>
+<nav class="topbar"><div class="nav-left"><a href="candidato-360.html?abrir=1" class="nav-planes">← CRM</a><div class="nav-auth" id="navAuth"></div></div><div class="nav-right"><a class="brand" href="index.html"><span class="mark"><i></i><i></i><i></i><i></i></span><b>Ricardo<span>.</span>Ruiz</b></a></div></nav>
+
+<main class="app-shell"><div class="panel-shell">
+  <header class="panel-hero">
+    <div class="kicker">Candidato 360 · panel 04</div>
+    <h1>Lectura de noticias.</h1>
+    <p>La prensa de su territorio, leída con <b>sus</b> temas. Escriba las tres ideas con las que va a hacer campaña y buscamos, para cada una, qué se está publicando donde usted se lanza. Sirve para saber cuál de las tres ya está en la agenda pública, cuál toca poner y cuál está ocupada por otro.</p>
+    <span class="panel-candidatura" id="panelCandidatura"></span>
+  </header>
+
+  <div id="panelMuro" class="hidden"></div>
+
+  <div id="panelCuerpo">
+    <section class="panel">
+      <span class="panel-num">Sus tres ideas de campaña</span>
+      <h3 style="margin:6px 0 4px">¿De qué va a hablar en esta campaña?</h3>
+      <p class="helper">Una idea por línea, como la diría en una reunión: «recuperar el parque de la 45», «acueducto veredal», «seguridad en el comercio». Entre más concreta, mejor busca.</p>
+      <div class="ideas" id="ideas"></div>
+      <div class="idea-acciones">
+        <button type="button" class="idea-btn" id="btnLeer">Leer la conversación</button>
+        <span class="idea-estado" id="estadoIdeas">Sin ideas guardadas</span>
+      </div>
+    </section>
+    <div class="lectura" id="lectura"></div>
+  </div>
+</div></main>
+
+<script src="platform-config.js"></script>
+<script src="data-client.js"></script>
+<script src="candidato-360-panel.js?v=20260908d"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.C360Panel, $ = P.$, esc = P.esc, num = P.num;
+  const VENTANA = 30;          /* días · la misma ventana del briefing */
+  const MAX_IDEAS = 3;
+  let ideasGuardadas = [];
+
+  function pintarIdeas() {
+    $('ideas').innerHTML = Array.from({ length: MAX_IDEAS }, (_, i) => `<div class="idea-row">
+      <span>${i + 1}</span>
+      <input id="idea-${i}" maxlength="120" autocomplete="off" placeholder="${i === 0 ? 'Ej. acueducto veredal' : i === 1 ? 'Ej. seguridad en el comercio' : 'Ej. recuperar el parque de la 45'}" value="${esc(ideasGuardadas[i] || '')}">
+    </div>`).join('');
+    pintarEstado();
+    for (let i = 0; i < MAX_IDEAS; i++) $(`idea-${i}`).addEventListener('input', pintarEstado);
+  }
+  const ideasEscritas = () => Array.from({ length: MAX_IDEAS }, (_, i) => ($(`idea-${i}`)?.value || '').trim()).filter(Boolean);
+  function pintarEstado() {
+    const n = ideasEscritas().length;
+    $('btnLeer').disabled = !n;
+    $('estadoIdeas').textContent = n ? `${n} ${n === 1 ? 'idea' : 'ideas'} · se guardan al leer` : 'Escriba al menos una idea';
+  }
+
+  /* La consulta es la idea ENTRE COMILLAS más el territorio: sin las comillas
+     Google News devuelve cada palabra suelta y «seguridad» trae el país entero.
+     Sin el territorio, la conversación no es la suya. */
+  function consulta(idea, t) {
+    const lugar = t.localidad || t.municipio || '';
+    return `"${idea}"${lugar ? ` ${lugar}` : ''}`;
+  }
+
+  function tarjeta(idea, datos, esLider) {
+    const res = (datos?.resultados || []).slice(0, 5);
+    const n = Number(datos?.n || 0);
+    const medios = [...new Set((datos?.por_medio || []).map(m => m.medio).filter(Boolean))].slice(0, 4);
+    const lectura = !n
+      ? 'Nadie está publicando sobre esto en su territorio. Eso también es información: o el tema no está en la agenda —y entrar es suyo—, o la agenda lo llama de otra manera; pruebe con las palabras que usa la gente, no con las del programa.'
+      : `<b>${num(n)} ${n === 1 ? 'titular' : 'titulares'}</b> en los últimos ${VENTANA} días${medios.length ? `, en ${esc(medios.join(', '))}${medios.length >= 4 ? ' y otros' : ''}` : ''}. ${esLider ? 'Es su idea con más conversación abierta: es la que puede disputar desde mañana.' : 'Hay conversación; entre a ella con lo que ya se está diciendo.'}`;
+    return `<article class="tema${n ? '' : ' vacio'}">
+      <div class="tema-top">
+        <h3>${esc(idea)}</h3>
+        ${esLider && n ? '<span class="tema-orden">Más conversación</span>' : ''}
+        <span class="tema-cifra">${num(n)}<small>titulares · ${VENTANA} días</small></span>
+      </div>
+      <p class="tema-lectura">${lectura}</p>
+      ${res.length ? `<ul class="tema-titulares">${res.map(r => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.titulo)}</a><small>${esc(r.medio || 'medio sin identificar')}${r.fecha ? ` · ${esc(String(r.fecha).slice(0, 10))}` : ''}</small></li>`).join('')}</ul>` : ''}
+    </article>`;
+  }
+
+  async function leer() {
+    const ideas = ideasEscritas();
+    if (!ideas.length) return;
+    const t = P.territorio();
+    $('btnLeer').disabled = true;
+    $('estadoIdeas').textContent = 'Buscando…';
+    $('lectura').innerHTML = `<div class="redes-cargando"><i></i><span>Buscando en la prensa abierta ${esc(ideas.length === 1 ? 'su idea' : `sus ${ideas.length} ideas`)}${t.texto ? ` en ${esc(t.municipio || t.texto)}` : ''}…</span></div>`;
+    /* Las ideas se guardan aunque la búsqueda se caiga: son suyas, no del
+       resultado. */
+    P.guardarEscucha({ ideas }).catch(() => {});
+    ideasGuardadas = ideas;
+    const respuestas = await Promise.all(ideas.map(idea =>
+      P.caudal({ action: 'medios', query: consulta(idea, t), dias: VENTANA }).catch(e => ({ _error: String(e.message || e) }))));
+    const caidas = respuestas.filter(r => r._error);
+    if (caidas.length === respuestas.length) {
+      $('lectura').innerHTML = `<div class="panel-error"><b>La fuente de prensa no respondió.</b> ${esc(caidas[0]._error)} Sus ideas quedaron guardadas; vuelva a intentar en un minuto.</div>`;
+      $('btnLeer').disabled = false; pintarEstado();
+      return;
+    }
+    const conteos = respuestas.map(r => Number(r?.n || 0));
+    const lider = conteos.indexOf(Math.max(...conteos));
+    const orden = ideas.map((idea, i) => ({ idea, datos: respuestas[i], n: conteos[i], lider: i === lider && conteos[i] > 0 }))
+      .sort((a, b) => b.n - a.n);
+    $('lectura').innerHTML = orden.map(o => o.datos?._error
+      ? `<div class="panel-error"><b>${esc(o.idea)}</b> — no se pudo consultar: ${esc(o.datos._error)}</div>`
+      : tarjeta(o.idea, o.datos, o.lider)).join('')
+      + `<p class="panel-nota">Fuente: prensa abierta indexada por Google News, ventana de ${VENTANA} días, consultada con su idea entre comillas y su territorio. Cuenta lo que se PUBLICA, no lo que la gente piensa: un tema sin titulares puede estar vivo en la calle y mudo en los medios. Sus ideas quedan guardadas en la candidatura y el briefing las usa para filtrar.</p>`;
+    $('btnLeer').disabled = false;
+    $('estadoIdeas').textContent = `${ideas.length} ${ideas.length === 1 ? 'idea guardada' : 'ideas guardadas'}`;
+  }
+
+  (async function init() {
+    if (!(await P.arrancar('candidato-360-medios.html'))) return;
+    ideasGuardadas = P.SESION.vinculo?.escucha?.ideas || [];
+    pintarIdeas();
+    $('btnLeer').addEventListener('click', leer);
+    if (ideasGuardadas.length) { $('estadoIdeas').textContent = `${ideasGuardadas.length} ${ideasGuardadas.length === 1 ? 'idea guardada' : 'ideas guardadas'}`; leer(); }
+  })();
+})();
+</script>
+</body>
+</html>
