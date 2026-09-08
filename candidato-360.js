@@ -17,8 +17,11 @@
     10. Arranque
 
    Reglas del producto que viven acá (decisión de Ricardo, sep-2026):
-   · La búsqueda y el wizard se ven, pero BORROSOS, hasta que la cuenta tenga
-     acceso (plan c360, cortesía o admin). El dato es la vitrina.
+   · El dato es la vitrina, y una vitrina no se tapa: sin acceso se busca el
+     nombre, se ve el historial y se entra a la candidatura. El muro cae en el
+     CRM (mapa, meta y briefing), que es lo que se cobra. El único que sigue
+     borroso es el wizard de candidatura nueva: es un formulario, no un dato.
+     Acceso = plan c360, cortesía o admin.
    · Una cuenta se vincula a UN candidato y no se cambia desde la plataforma:
      el vínculo vive en el worker (POST /c360/vinculo devuelve 409 si ya hay
      uno) y solo soporte lo borra. La campaña (corporación + territorio) sí
@@ -277,6 +280,7 @@ function aplicarGate() {
     intro.classList.toggle('is-pruebas', PRUEBAS);
   }
   aplicarGateExistente();
+  aplicarGateRuta();
   aplicarGateNuevo();
   if (new URLSearchParams(location.search).get('comprar') === '1' && SESSION.listo && !SESSION.acceso) { history.replaceState(null, '', PAGINA); abrirPaywall(SESSION.token ? 'Su cuenta ya existe. Falta activar el acceso a Candidato 360.' : ''); }
 }
@@ -287,12 +291,40 @@ function muro(contenedor, texto) {
   wall.innerHTML = `<div class="c360-wall-card"><span class="kicker">Candidato 360 · acceso</span><p>${texto}</p><button type="button" onclick="abrirPaywall()">Activar mi candidatura</button></div>`;
 }
 function quitarMuro(contenedor) { contenedor?.querySelector(':scope > .c360-wall')?.remove(); }
+/* La búsqueda NO se tapa: el índice de candidaturas es la vitrina, y una
+   vitrina borrosa no vende nada. Sin acceso se buscan los nombres y se
+   selecciona uno igual que con acceso; el muro cae al ENTRAR al candidato
+   (openHistoricCandidate → abrirPaywall), que es donde empieza lo que se
+   cobra: el CRM, el mapa, la meta de votos y el briefing. */
 function aplicarGateExistente() {
   const box = document.querySelector('#existing .search-box'); if (!box) return;
+  box.classList.remove('locked'); quitarMuro(box);
   const bloqueado = SESSION.listo && !SESSION.acceso;
-  box.classList.toggle('locked', bloqueado);
-  if (bloqueado) muro(box, 'Busque su nombre: verá que su historial está aquí. Para abrirlo y construir el CRM, active su acceso. Cada cuenta se vincula a <b>un solo candidato</b>.');
-  else quitarMuro(box);
+  let aviso = box.querySelector(':scope > .c360-vitrina');
+  if (!bloqueado) return aviso?.remove();
+  if (!aviso) {
+    aviso = document.createElement('div');
+    aviso.className = 'c360-vitrina';
+    box.querySelector('.search-row')?.after(aviso);
+  }
+  aviso.innerHTML = `<p>Búsquese: su historial está acá y lo puede abrir para ver de qué candidaturas hablamos. Lo que necesita acceso es el CRM que se construye con él — mapa, meta de votos y briefing. Cada cuenta se vincula a <b>un solo candidato</b>.</p><button type="button" onclick="abrirPaywall()">Activar mi candidatura</button>`;
+}
+/* La pantalla del candidato se ve completa; lo que se anuncia es que el CRM
+   —lo que se cobra— pide acceso. Anunciarlo ACÁ y no al final evita que
+   alguien llene la corporación y el territorio para chocarse con un muro. */
+function aplicarGateRuta() {
+  const form = document.querySelector('#candidateRoute form'); if (!form) return;
+  const bloqueado = SESSION.listo && !SESSION.acceso;
+  let aviso = form.querySelector(':scope > .c360-vitrina');
+  const boton = form.querySelector('button.next');
+  if (boton) boton.textContent = bloqueado ? 'Activar y abrir el CRM →' : 'Abrir CRM de campaña →';
+  if (!bloqueado) return aviso?.remove();
+  if (!aviso) {
+    aviso = document.createElement('div');
+    aviso.className = 'c360-vitrina';
+    boton?.before(aviso);
+  }
+  aviso.innerHTML = `<p>Este es su historial y hasta acá puede llegar sin cuenta. El CRM —mapa por puesto de votación, meta de votos y briefing cada tres días— se abre con el acceso activo, y deja su cuenta vinculada a <b>este candidato</b>.</p><button type="button" onclick="abrirPaywall()">Ver qué incluye</button>`;
 }
 function aplicarGateNuevo() {
   const box = document.querySelector('#new .search-box'); if (!box) return;
@@ -438,7 +470,8 @@ function searchCandidateImmediate(query) {
   if (rank.total > items.length) $('searchResults').insertAdjacentHTML('beforeend', `<p class="search-note search-more">${items.length} de ${rank.total.toLocaleString('es-CO')} coincidencias · agregue un apellido para afinar.</p>`);
 }
 function openHistoricCandidate(id) {
-  if (!SESSION.acceso) return abrirPaywall();
+  /* Sin acceso también se entra: ver su nombre y sus candidaturas es
+     justamente lo que convence. El muro cae en launchCRM. */
   const profile = candidateProfiles.get(id) || historicalIndex.find(c => c.slug === id);
   if (!profile) return;
   if (SESSION.vinculo && !PRUEBAS && !vinculoCoincide(profile)) { alert(`Su cuenta ya está vinculada a ${vinculoDescripcion()}. Para cambiar de candidato escriba a ${SESSION.soporte}.`); return abrirVinculo(); }
@@ -457,6 +490,7 @@ function abrirRutaCandidato(profile) {
   campaignDeptOptions();
   document.querySelector(`input[name="corporationRoute"][value="${sameCorp ? 'same' : 'other'}"]`).checked = true;
   toggleCorporationChoice();
+  aplicarGateRuta();
   showScreen('candidateRoute');
 }
 
