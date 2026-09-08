@@ -184,22 +184,69 @@ def _deepseek(key, user, max_tokens):
     return (ch['message'].get('content') or '').strip(), ch.get('finish_reason')
 
 
+# ⚠️⚠️ SUBIR EL TECHO NO BASTA: HAY QUE BAJAR LA ENTRADA.
+# El 8-sep-2026 el builder se cayó con «el modelo se truncó dos veces» y la
+# página amaneció mostrando los temas de ayer. El corpus de ese día eran 357
+# ítems (309 de prensa) y V4 se gastó los 12.000 tokens razonando sobre ellos
+# antes de escribir el JSON. Cuanto más largo el corpus, más razona y menos
+# presupuesto le queda para responder, así que el reintento a secas volvía a
+# chocar contra el mismo muro.
+#
+# Ahora cada intento sube el techo Y RECORTA el corpus. El recorte devuelve el
+# corpus REALMENTE usado, porque la evidencia se cita por índice de línea: si se
+# valida contra la lista completa, los índices se corren y las citas del modelo
+# apuntarían a otro ítem. Los tres intentos cuestan solo cuando hace falta.
+# Medido el 8-sep-2026 con el corpus de ese día (366 ítems): con techo 6.000 se
+# trunca, con 12.000 y 180 ítems TAMBIÉN, y con 16.000 sale al primer intento
+# con el corpus COMPLETO en 33 s y 1.220 caracteres de salida. O sea que el
+# problema nunca fue lo largo del corpus sino lo bajo del techo — y subirlo no
+# encarece nada, porque solo se cobran los tokens que el modelo llega a
+# escribir. El recorte queda como red de abajo, no como primera línea: recortar
+# cuesta cobertura (con 110 ítems salieron 5 temas donde con 366 salen 8).
+_INTENTOS = ((16000, None), (16000, 180), (20000, 110))
+
+
 def proponer(key, corpus):
-    lineas = [f'{i+1}. [{c["capa"]}] {c["texto"][:160]}' for i, c in enumerate(corpus)]
-    user = 'ÍTEMS DE HOY:\n' + '\n'.join(lineas)
-    # V4 gasta presupuesto en razonamiento: con techo corto devuelve vacío
-    # (gotcha ya documentado en todo el proyecto) → 6000 y reintento a 12000.
-    for mt in (6000, 12000):
+    """Devuelve (propuestas, corpus_usado). El corpus usado es el que hay que
+    pasarle a `validar`: la evidencia va por número de línea."""
+    ultimo = ''
+    for mt, cap in _INTENTOS:
+        usado = corpus if cap is None else _recortar(corpus, cap)
+        lineas = [f'{i+1}. [{c["capa"]}] {c["texto"][:160]}' for i, c in enumerate(usado)]
+        user = 'ÍTEMS DE HOY:\n' + '\n'.join(lineas)
         raw, fin = _deepseek(key, user, mt)
         if raw.startswith('```'):
             raw = raw.split('```')[1].lstrip('json').strip()
         if fin == 'length' and not raw.endswith('}'):
+            ultimo = f'truncado con techo {mt} y {len(usado)} ítems'
+            print(f'    · reintento: {ultimo}', file=sys.stderr)
             continue
         try:
-            return json.loads(raw).get('temas') or []
+            return (json.loads(raw).get('temas') or []), usado
         except ValueError:
+            ultimo = f'JSON inválido con techo {mt} y {len(usado)} ítems'
+            print(f'    · reintento: {ultimo}', file=sys.stderr)
             continue
-    raise ValueError('el modelo se truncó o devolvió JSON inválido dos veces')
+    raise ValueError(f'el modelo se truncó o devolvió JSON inválido en los '
+                     f'{len(_INTENTOS)} intentos (último: {ultimo})')
+
+
+def _recortar(corpus, cap):
+    """Recorta conservando la MEZCLA de las tres capas. Cortar de plano por el
+    final borraría radicados y consultas —que van al final de la lista y son las
+    capas chicas— y el builder se quedaría proponiendo solo temas de prensa."""
+    if len(corpus) <= cap:
+        return corpus
+    porcapa = {}
+    for c in corpus:
+        porcapa.setdefault(c['capa'], []).append(c)
+    # las capas chicas entran enteras; la prensa absorbe el recorte
+    chicas = [c for k, v in porcapa.items() if k != 'prensa' for c in v]
+    sitio = max(cap - len(chicas), cap // 2)
+    # por identidad, no por igualdad: dos titulares con el mismo texto son dos
+    # ítems distintos y `c in lista` los confundiría
+    dejar = {id(c) for c in porcapa.get('prensa', [])[:sitio]} | {id(c) for c in chicas}
+    return [c for c in corpus if id(c) in dejar]
 
 
 # ---------------------------------------------------------------- validación
@@ -267,8 +314,8 @@ def build(dry_run=False):
         print('! sin DEEPSEEK_API_KEY: no se construye', file=sys.stderr)
         return 1
     print('· modelo')
-    props = proponer(key, corpus)
-    print(f'    propuso {len(props)}')
+    props, corpus = proponer(key, corpus)
+    print(f'    propuso {len(props)} · corpus usado {len(corpus)}')
     temas = validar(props, corpus)
     print(f'    con evidencia válida {len(temas)}')
     temas, fuera = verificar_en_caudal(temas)

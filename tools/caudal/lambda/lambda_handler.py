@@ -3451,14 +3451,80 @@ def _medios_landing():
     return out
 
 
+# ⚠️⚠️ GOOGLE NEWS NO ENTIENDE PREGUNTAS, Y EL CERO PARECÍA AUSENCIA DE NOTICIA.
+# Medido sep-8-2026 con el caso que lo destapó: «como afecta el descubrimiento de
+# tungsteno al sector minero» devolvía CERO titulares, mientras que «tungsteno»
+# devolvía 32 de 19 medios —Caracol, El Colombiano, Portafolio, Valora— sobre el
+# hallazgo de Collective Mining en Caldas. La noticia existía; la consulta era el
+# problema. Y como la respuesta transversal solo ve la evidencia que se le pasa,
+# el modelo concluía —con razón, sobre lo que tenía— que no había información.
+#
+# Es el hermano de `_relajar_q` (Ejecutivo · Regulatorio · SUCOP), que se agregó
+# el 7-sep y a este pilar nunca se le aplicó. Acá el filtro no es substring sobre
+# un blob local sino un motor de búsqueda, así que relajar no es «todas las
+# palabras en cualquier orden» sino QUITAR las que no aportan.
+#
+# Tres niveles, y solo se baja al siguiente si el anterior dio CERO:
+#   1. la consulta tal cual — las búsquedas ya afinadas no se tocan (medido:
+#      «reforma pensional» 100 y «presupuesto general nacion 2027» 100 ganan acá
+#      y nunca llegan a los niveles de abajo → cero regresión).
+#   2. sin palabras funcionales ni verbos de pregunta. Es el nivel que arregla el
+#      caso: quitar «afecta» es lo decisivo (con él 0, sin él 6).
+#   3. los dos términos más largos, como proxy de especificidad.
+# El caso normal sigue costando UNA sola llamada.
+_MEDIOS_STOP = frozenset((
+    # funcionales
+    'de','del','la','el','los','las','un','una','unos','unas','al','a','y','o','u',
+    'en','con','sin','por','para','sobre','entre','desde','hasta','tras','ante',
+    'se','su','sus','le','les','lo','me','mi','nos','te','tu','ese','esa','eso',
+    'este','esta','esto','estos','estas','esos','esas','aquel','ahi','alli','aqui',
+    # interrogativos y muletillas de pregunta
+    'que','cual','cuales','como','cuando','donde','quien','quienes','cuanto',
+    'cuanta','cuantos','cuantas','porque','acaso','si','no','ya','tambien',
+    # verbos vacíos en una consulta (el que rompía el caso va acá: «afecta»)
+    'afecta','afectan','afectara','afectaria','es','son','esta','estan','estar',
+    'hay','tiene','tienen','va','van','pasa','pasando','paso','sera','seran',
+    'puede','pueden','debe','deben','hace','hacen','saber','pasar','ver','decir',
+    'significa','implica','implican','impacta','impactan','sucede','ocurre',
+))
+
+
+def _medios_relajar(query):
+    """Consultas de reserva, de más fiel a más laxa. La primera es SIEMPRE la
+    consulta tal cual; las siguientes solo se usan si la anterior dio cero."""
+    toks = [t for t in re.split(r'[^0-9a-záéíóúñü]+', (query or '').lower()) if t]
+    utiles = [t for t in toks if len(t) >= 3 and _medios_strip_accents(t) not in _MEDIOS_STOP]
+    fuera = [t for t in toks if t not in utiles]
+    fases = [{'modo': 'exacta', 'q': query, 'omitidas': []}]
+    if utiles and len(utiles) < len(toks):
+        fases.append({'modo': 'palabras', 'q': ' '.join(utiles), 'omitidas': fuera})
+    if len(utiles) > 2:
+        top = sorted(sorted(utiles, key=len, reverse=True)[:2], key=utiles.index)
+        fases.append({'modo': 'terminos', 'q': ' '.join(top),
+                      'omitidas': [t for t in toks if t not in top]})
+    return fases
+
+
 def _medios_buscar(query, dias):
     dias = dias or 30
     ck = f'medios-q-{_hash24(_medios_norm(query))}-{dias}-{_medios_cache_bucket()}'
     cached = _cache_get(ck)
     if cached:
         return cached
-    out = dict(_medios_aggregate(_medios_query_events(query, dias), cap=60),
+    fases = _medios_relajar(query)
+    usada, events = fases[0], []
+    for fase in fases:
+        events = _medios_query_events(fase['q'], dias)
+        usada = fase
+        if events:
+            break
+    out = dict(_medios_aggregate(events, cap=60),
                mode='search', query=query, dias=dias)
+    # Se DECLARA con qué se buscó de verdad, igual que los otros pilares: nada
+    # de resultados que aparecen por magia (ni de ceros que parecen ausencia).
+    if usada['modo'] != 'exacta':
+        out['flexible'] = {'modo': usada['modo'], 'consulta_usada': usada['q'],
+                           'omitidas': usada['omitidas']}
     _cache_put(ck, out)
     return out
 

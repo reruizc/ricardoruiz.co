@@ -671,10 +671,19 @@
     const temas=(d&&d.temas||[]).filter(t=>t&&t.tema);
     if(!temas.length) return;
     const fecha=d.hoy?new Date(d.hoy+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long'}):'';
+    // ⚠️ El builder falla cerrado: si el modelo se trunca no publica y en S3
+    // queda el JSON de ayer (pasó el 8-sep-2026). La guarda es correcta —mejor
+    // el de ayer que basura— pero el rótulo decía «Temas del momento · 7 de
+    // septiembre» a mediodía del 8, y quien lo lee no sabe si es un error o el
+    // dato. Cuando no son de hoy se dice: dejan de anunciarse como del momento.
+    const hoyBog=new Date().toLocaleDateString('en-CA',{timeZone:'America/Bogota'});
+    const alDia=!d.hoy||d.hoy===hoyBog;
+    const rotulo=alDia?('Temas del momento'+(fecha?' · '+fecha:'')):('Temas del '+fecha);
+    const nota=alDia?'':'Son los últimos temas que alcanzamos a calcular; los de hoy todavía no están listos.';
     const arma=(cont, conTitulo)=>{
       if(!cont) return;
       cont.innerHTML='';
-      if(conTitulo){ const lb=document.createElement('span'); lb.className='chips-label'; lb.textContent='Temas del momento'+(fecha?' · '+fecha:''); cont.appendChild(lb); }
+      if(conTitulo){ const lb=document.createElement('span'); lb.className='chips-label'; lb.textContent=rotulo; if(nota) lb.title=nota; cont.appendChild(lb); }
       temas.forEach(t=>{ const ch=document.createElement('button'); ch.type='button'; ch.className='chip chip-tema'; ch.textContent=t.tema; if(t.por_que) ch.title=t.por_que; ch.onclick=()=>{ const uq=document.getElementById('uq'); if(uq) uq.value=t.tema; uniSearch(t.tema); }; cont.appendChild(ch); });
     };
     arma(document.getElementById('hchips'), true);
@@ -762,68 +771,103 @@
     showView('buscar');
     const uq=document.getElementById('uq'); if(uq) uq.value=query;
     const box=document.getElementById('uni-results');
-    uniLoader.mount(box,'Buscando en las seis fuentes de Caudal…');
     const amp=_ampliarEmp;
-    const [cong,reg,eje,con,med,suc]=await Promise.allSettled([
-      call({action:'tema', query, lectura:false, ampliar_empresa:amp}),
-      call({action:'sanciones', query}),
-      call({action:'ejecutivo', query, ampliar_empresa:amp}),
-      call({action:'contratacion', query, limit:40, ampliar_empresa:amp}),
-      call({action:'medios', query}),
-      call({action:'sucop', query, ampliar_empresa:amp}),
-    ]);
-    if(mine!==_uniSeq) return;
-    // Un rechazo de red NO equivale a cero resultados. Esto importa sobre todo
-    // en previews `file://`: el worker solo autoriza el origen del sitio y el
-    // navegador bloquea la respuesta por CORS. Antes esos seis rechazos se
-    // pintaban como seis ceros, que parecía una base vacía.
-    const V=x=>x&&x.status==='fulfilled'&&x.value&&!x.value.error?x.value:null;
-    const cD=V(cong), rD=V(reg), eD=V(eje), oD=V(con), mD=V(med), sD=V(suc);
-    const cR=cD&&cD.resumen;
-    const counts={
-      congreso: cD?(cR?((cR.intentos||[]).filter(i=>!i.match_texto).length):0):null,
-      regulatorio: rD?(rD.n||0):null, ejecutivo: eD?(eD.n||0):null, medios: mD?(mD.n||0):null,
-      sucop: sD?(sD.n||0):null,
-      // el total de SECOP es el universo de la búsqueda; con filtro de empresa
-      // el universo YA es el de la empresa, así que en los dos casos manda
-      // `total` y solo se cae a las filas traídas si el agregado falló.
-      contratacion: oD?((oD.total&&oD.total.contratos)||oD.n||0):null,
+    // ⚠️ LA PANTALLA NO ESPERA A LA ÚLTIMA FUENTE (sep-8-2026). Antes esto era
+    // un `await Promise.allSettled` de las seis y el recuadro quedaba en blanco
+    // 4-8 s —lo que tarde la más lenta, que suele ser SECOP porque consulta en
+    // vivo— antes de pintar NADA. Medido: los seis pilares tardan 7,9 s en frío
+    // y ~4 s en caliente, y en ese rato no había nada que mirar. Ahora el
+    // armazón sale de una y cada tarjeta se llena cuando aterriza SU fuente.
+    // La respuesta sigue esperando a las seis, y tiene que ser así: se le pide
+    // al modelo que conteste con la evidencia de todas, no con la que alcanzó.
+    const peticiones={
+      congreso: call({action:'tema', query, lectura:false, ampliar_empresa:amp}),
+      regulatorio: call({action:'sanciones', query}),
+      ejecutivo: call({action:'ejecutivo', query, ampliar_empresa:amp}),
+      contratacion: call({action:'contratacion', query, limit:40, ampliar_empresa:amp}),
+      medios: call({action:'medios', query}),
+      sucop: call({action:'sucop', query, ampliar_empresa:amp}),
     };
-    _uniData={congreso:cD, regulatorio:rD, ejecutivo:eD, contratacion:oD, medios:mD, sucop:sD, query, counts};
-    // ④ la traducción marca → tema se muestra ARRIBA de las pestañas: aplica a
-    // todos los pilares a la vez, no a uno. La reporta cualquiera que la resuelva.
-    const emps=(cR&&cR.empresas)||(rD&&rD.empresas)||(eD&&eD.empresas)||(oD&&oD.empresas)||(sD&&sD.empresas)||null;
-    const nFailed=Object.values(counts).filter(v=>v===null).length;
-    const fallo=nFailed===UNI_TABS.length
-      ? `<div class="err">${location.protocol==='file:'
-          ? 'Esta copia local está abierta como archivo y el navegador bloqueó la conexión con Caudal. Prueba la búsqueda en ricardoruiz.co; los datos no están vacíos.'
-          : 'No se pudo conectar con las fuentes de Caudal. Reintenta en un momento.'}</div>`
-      : nFailed?'<div class="cob-note">Una o más fuentes no respondieron; se muestran las que sí fue posible consultar.</div>':'';
     box.innerHTML=`
       <div class="r-sub">Tema: <b>${esc(query)}</b></div>
-      ${fallo}
+      <div id="uni-fallo"></div>
       <div class="lectura" id="uni-summary"><div class="tag">◈ Respuesta · sobre lo que Caudal encontró en sus fuentes</div><div id="uni-summary-body"></div></div>
       <div class="uni-what">${ACCESO?'Explora el tema por fuente y abre los registros completos.':HAS_SESSION?'Abre una tarjeta para ver una muestra. Para acceder al archivo completo, puedes escoger un plan.':'Puedes ver algunos resultados si te registras. Crear una cuenta es gratis.'}</div>
-      ${rosaPuente(cR&&cR.sector_sugerido||(cD&&cD.sector_sugerido))}
-      ${empresaHint(emps,'uni-emp-hint')}
-      <div class="uni-cards">${UNI_TABS.map(([k,n])=>{const disponible=counts[k]!==null;const accion=ACCESO?'Ver resultados →':HAS_SESSION?'Ver muestra →':'Ver algunos resultados →';return `<button class="uni-card" data-k="${k}" type="button"${disponible?'':' disabled'}><span class="uni-card-name">${n}</span><b>${disponible?fmt(counts[k]):'—'}</b><span class="uni-card-action">${disponible?accion:'Fuente no disponible'}</span></button>`}).join('')}</div>
+      <div id="uni-puente"></div>
+      <div id="uni-hint"></div>
+      <div class="uni-cards">${UNI_TABS.map(([k,n])=>`<button class="uni-card" data-k="${k}" type="button" data-estado="cargando" disabled><span class="uni-card-name">${n}</span><b>·</b><span class="uni-card-action">Buscando…</span></button>`).join('')}</div>
       <div id="uni-tab-body"></div>
       <div class="uni-again-wrap"><button type="button" class="uni-again" id="uni-again">↺ Hacer una nueva pregunta</button></div>`;
-    wireRosaPuente();
-    wireEmpresaHint('uni-emp-hint', ()=>uniSearch(query));
     const again=document.getElementById('uni-again');
     if(again) again.onclick=()=>{ uniLoader.stop(); const q=document.getElementById('uq'); if(q){ q.value=''; q.focus(); } window.scrollTo({top:0,behavior:'smooth'}); };
     // la lectura tarda 15-20 s. Se pinta para todos: con la cuota gratuita el
     // anónimo y el registrado también reciben respuesta, y quién tiene cupo lo
     // decide el worker — acá no se puede adivinar sin preguntarle.
-    uniLoader.mount(document.getElementById('uni-summary-body'),'Leyendo las fuentes y escribiendo la respuesta · suele tomar entre 15 y 20 segundos',true);
-    uniLoadRespuesta(query, mine);
+    uniLoader.mount(document.getElementById('uni-summary-body'),'Buscando en las seis fuentes de Caudal…',true);
+    // Un rechazo de red NO equivale a cero resultados. Esto importa sobre todo
+    // en previews `file://`: el worker solo autoriza el origen del sitio y el
+    // navegador bloquea la respuesta por CORS. Antes esos seis rechazos se
+    // pintaban como seis ceros, que parecía una base vacía.
+    const V=x=>x&&!x.error?x:null;
+    const cuentaDe={
+      congreso:d=>{const r=d.resumen;return r?((r.intentos||[]).filter(i=>!i.match_texto).length):0;},
+      // el total de SECOP es el universo de la búsqueda; con filtro de empresa
+      // el universo YA es el de la empresa, así que en los dos casos manda
+      // `total` y solo se cae a las filas traídas si el agregado falló.
+      contratacion:d=>(d.total&&d.total.contratos)||d.n||0,
+    };
+    const datos={}, counts={};
+    // `_uniData` se llena por llegada (no al final) para que una tarjeta ya
+    // aterrizada se pueda abrir sin esperar a las otras cinco: `uniTabBody` lee
+    // de aquí. Las que faltan simplemente no están todavía.
+    _uniData={query, counts};
     const cards=[...box.querySelectorAll('.uni-card')];
     const show=k=>{ cards.forEach(t=>t.classList.toggle('on',t.dataset.k===k)); document.getElementById('uni-tab-body').innerHTML=uniTabBody(k); wireUniTab(k); };
-    cards.forEach(t=>t.onclick=()=>{
-      if(!HAS_SESSION) return pedirRegistroTema(query);
-      show(t.dataset.k);
-    });
+    const pintarTarjeta=(k,d)=>{
+      const btn=box.querySelector(`.uni-card[data-k="${k}"]`); if(!btn) return;
+      const ok=counts[k]!==null;
+      const accion=ACCESO?'Ver resultados →':HAS_SESSION?'Ver muestra →':'Ver algunos resultados →';
+      btn.dataset.estado=ok?'listo':'falla';
+      btn.disabled=!ok;
+      btn.querySelector('b').textContent=ok?fmt(counts[k]):'—';
+      btn.querySelector('.uni-card-action').textContent=ok?accion:'Fuente no disponible';
+      if(ok) btn.onclick=()=>{ if(!HAS_SESSION) return pedirRegistroTema(query); show(k); };
+    };
+    const llegadas=UNI_TABS.map(([k])=>peticiones[k].then(v=>v,()=>null).then(v=>{
+      if(mine!==_uniSeq) return;
+      const d=V(v); datos[k]=d; _uniData[k]=d;
+      counts[k]=d?(cuentaDe[k]?cuentaDe[k](d):(d.n||0)):null;
+      pintarTarjeta(k,d);
+    }));
+    await Promise.all(llegadas);
+    if(mine!==_uniSeq) return;
+    const cD=datos.congreso, rD=datos.regulatorio, eD=datos.ejecutivo,
+          oD=datos.contratacion, mD=datos.medios, sD=datos.sucop;
+    const cR=cD&&cD.resumen;
+    _uniData={congreso:cD, regulatorio:rD, ejecutivo:eD, contratacion:oD, medios:mD, sucop:sD, query, counts};
+    // si el usuario ya abrió una pestaña mientras cargaban las demás, se repinta
+    // con el dato completo (los conteos del muro salen de aquí)
+    const abierta=cards.find(t=>t.classList.contains('on'));
+    if(abierta) show(abierta.dataset.k);
+    // ④ la traducción marca → tema se muestra ARRIBA de las pestañas: aplica a
+    // todos los pilares a la vez, no a uno. La reporta cualquiera que la resuelva.
+    const emps=(cR&&cR.empresas)||(rD&&rD.empresas)||(eD&&eD.empresas)||(oD&&oD.empresas)||(sD&&sD.empresas)||null;
+    const nFailed=Object.values(counts).filter(v=>v===null).length;
+    const elFallo=document.getElementById('uni-fallo');
+    if(elFallo) elFallo.innerHTML=nFailed===UNI_TABS.length
+      ? `<div class="err">${location.protocol==='file:'
+          ? 'Esta copia local está abierta como archivo y el navegador bloqueó la conexión con Caudal. Prueba la búsqueda en ricardoruiz.co; los datos no están vacíos.'
+          : 'No se pudo conectar con las fuentes de Caudal. Reintenta en un momento.'}</div>`
+      : nFailed?'<div class="cob-note">Una o más fuentes no respondieron; se muestran las que sí fue posible consultar.</div>':'';
+    const elPuente=document.getElementById('uni-puente');
+    if(elPuente) elPuente.innerHTML=rosaPuente(cR&&cR.sector_sugerido||(cD&&cD.sector_sugerido));
+    const elHint=document.getElementById('uni-hint');
+    if(elHint) elHint.innerHTML=empresaHint(emps,'uni-emp-hint');
+    wireRosaPuente();
+    wireEmpresaHint('uni-emp-hint', ()=>uniSearch(query));
+    // el mensaje cambia de fase; el reloj del loader no se reinicia
+    uniLoader.mount(document.getElementById('uni-summary-body'),'Leyendo las fuentes y escribiendo la respuesta · suele tomar entre 15 y 20 segundos',true);
+    uniLoadRespuesta(query, mine);
   }
   function pedirRegistroTema(query){
     const next='caudal.html?tema='+encodeURIComponent(query);
@@ -986,13 +1030,19 @@
         if(x&&x.estado==='lista'&&x.lectura) return uniPintarRespuesta(x.lectura);
         if(x&&x.ultimo_error) ultErr=x.ultimo_error;
         if(x&&x.reintentar&&disparos<3) disparar();
-        if(Date.now()-t0<UNI_RESP_MAX) setTimeout(tick,3500);
+        // Cadencia por tramos. Un sondeo cuesta 0,13-0,43 s y la generación
+        // nunca baja de ~10 s, así que preguntar cada 3,5 s desde el arranque
+        // hacía dos cosas malas: sondeos inútiles al principio y, al final,
+        // hasta 3,5 s de reloj muerto entre que la respuesta queda en caché y
+        // el navegador se entera (1,75 s de media, sobre un total de ~25 s).
+        // Ahora se espera 8 s antes del primero y luego se pregunta seguido.
+        if(Date.now()-t0<UNI_RESP_MAX) setTimeout(tick, Date.now()-t0<14000?1400:2200);
         else uniResumenFallback(ultErr
           ? 'El modelo no alcanzó a redactar la respuesta. Vuelve a buscar: el segundo intento suele salir.'
           : 'La respuesta tardó más de lo normal. Vuelve a buscar en un momento.');
       }).catch(()=>uniResumenFallback('No se pudo consultar la respuesta.'));
       disparar();
-      setTimeout(tick,3500);
+      setTimeout(tick,8000);
     }).catch(()=>uniResumenFallback('No se pudo preparar la respuesta.'));
   }
   // Cámara(s) de radicación junto al estado (pedido de Ricardo, sep-2026): los
@@ -1037,11 +1087,15 @@
     // no aparece en ningún registro. Se dice cuál, y por cuál se buscó — nada
     // aparece por magia (mismo principio que en Congreso).
     const fx=d.flexible;
-    const flex=fx&&fx.anchor?`<div class="broaden" style="margin-bottom:.6rem"><b>Búsqueda flexible</b> · ${
+    // Medios no filtra un blob local sino que le pregunta a Google News, que no
+    // entiende preguntas: ahí relajar es QUITAR palabras, no reordenarlas, así
+    // que su aviso dice con qué consulta se buscó de verdad.
+    const flexMed=fx&&fx.consulta_usada?`<div class="broaden" style="margin-bottom:.6rem"><b>Búsqueda flexible</b> · la prensa no devolvió nada para la pregunta completa; se buscó por «<b>${esc(fx.consulta_usada)}</b>»${(fx.omitidas||[]).length?`, dejando fuera ${fx.omitidas.map(w=>`«${esc(w)}»`).join(', ')}`:''}. Mostrando ${fmt(d.n)} ${d.n===1?noun[0]:noun[1]}.</div>`:'';
+    const flex=flexMed||(fx&&fx.anchor?`<div class="broaden" style="margin-bottom:.6rem"><b>Búsqueda flexible</b> · ${
       fx.modo==='palabras'
         ? `ninguna ${noun[0]} trae la frase exacta «${esc(query)}»; mostrando ${fmt(d.n)} que contienen todas tus palabras.`
         : `ninguna ${noun[0]} contiene ${(fx.sin_coincidencia||[]).map(w=>`«<b>${esc(w)}</b>»`).join(' ni ')||'todas tus palabras'} junto a «<b>${esc(fx.anchor.join(', '))}</b>». Mostrando ${fmt(d.n)} por ese término, las que más palabras comparten primero.`
-    }</div>`:'';
+    }</div>`:'');
     const tot=(d.total&&d.total.contratos)||d.n;
     // en SUCOP el conteo bruto no es la noticia: lo que importa es cuántos de
     // esos todavía admiten comentarios. Un 40 con 0 abiertos es archivo.
