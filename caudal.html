@@ -833,12 +833,38 @@
       btn.querySelector('.uni-card-action').textContent=ok?accion:'Fuente no disponible';
       if(ok) btn.onclick=()=>{ if(!HAS_SESSION) return pedirRegistroTema(query); show(k); };
     };
+    // ⚠️⚠️ LA GENERACIÓN ARRANCA CON LAS FUENTES RÁPIDAS, NO CON LAS SEIS
+    // (decisión de Ricardo, sep-8-2026). Antes se esperaba a la última —medido:
+    // 5,1 s, casi siempre SUCOP o el regulador— y esos segundos eran puramente
+    // serie: el modelo ni había empezado. Ahora se dispara al vencer un plazo
+    // de gracia, con lo que haya llegado.
+    //   ⚠️ El costo es REAL y por eso se declara en la respuesta: lo que llega
+    //   tarde llena su tarjeta pero NO entra a la evidencia que lee el modelo.
+    //   Escribir «no hay nada del regulador» cuando en realidad no dio tiempo a
+    //   preguntarle sería el mismo error que el pilar de medios en cero.
+    //   ⚠️ `UNI_MIN_FUENTES` evita el caso feo: si a los 2,5 s solo llegó una
+    //   fuente, esperar es mejor que contestar con casi nada. Si al vencer el
+    //   plazo no hay suficientes, cada llegada posterior vuelve a intentarlo.
+    const listas=new Set(); let disparado=false; const tIni=performance.now();
+    const arrancarLectura=()=>{
+      if(disparado||mine!==_uniSeq) return;
+      const todas=listas.size===UNI_TABS.length;
+      if(!todas && (performance.now()-tIni<UNI_ESPERA_MS || listas.size<UNI_MIN_FUENTES)) return;
+      disparado=true;
+      const usadas=UNI_TABS.filter(([k])=>listas.has(k));
+      uniLoader.mount(document.getElementById('uni-summary-body'),
+        'Leyendo las fuentes y escribiendo la respuesta · suele tomar entre 15 y 20 segundos',true);
+      uniLoadRespuesta(query, mine, usadas.map(([,n])=>n), UNI_TABS.length-usadas.length);
+    };
     const llegadas=UNI_TABS.map(([k])=>peticiones[k].then(v=>v,()=>null).then(v=>{
       if(mine!==_uniSeq) return;
       const d=V(v); datos[k]=d; _uniData[k]=d;
       counts[k]=d?(cuentaDe[k]?cuentaDe[k](d):(d.n||0)):null;
       pintarTarjeta(k,d);
+      listas.add(k);           // una fuente que responde «no tengo nada» SÍ contestó
+      arrancarLectura();
     }));
+    setTimeout(arrancarLectura, UNI_ESPERA_MS);
     await Promise.all(llegadas);
     if(mine!==_uniSeq) return;
     const cD=datos.congreso, rD=datos.regulatorio, eD=datos.ejecutivo,
@@ -865,9 +891,9 @@
     if(elHint) elHint.innerHTML=empresaHint(emps,'uni-emp-hint');
     wireRosaPuente();
     wireEmpresaHint('uni-emp-hint', ()=>uniSearch(query));
-    // el mensaje cambia de fase; el reloj del loader no se reinicia
-    uniLoader.mount(document.getElementById('uni-summary-body'),'Leyendo las fuentes y escribiendo la respuesta · suele tomar entre 15 y 20 segundos',true);
-    uniLoadRespuesta(query, mine);
+    // red de seguridad: si el plazo nunca llegó a juntar el mínimo (varias
+    // fuentes caídas), acá ya están todas las que iban a llegar
+    arrancarLectura();
   }
   function pedirRegistroTema(query){
     const next='caudal.html?tema='+encodeURIComponent(query);
@@ -986,7 +1012,7 @@
     while((m=re.exec(t))){ out+=esc(t.slice(last,m.index)); out+='('+m[1].split(/\s*(?:[,;]|\by\b)\s*/).map(c=>uniRefHTML(c,map)).join(', ')+')'; last=re.lastIndex; }
     return out+esc(t.slice(last));
   }
-  function uniPintarRespuesta(l){
+  function uniPintarRespuesta(l,fuentesUsadas,nFaltaron){
     uniLoader.stop();
     const el=document.getElementById('uni-summary-body'); if(!el) return;
     const map=uniRefMap();
@@ -997,8 +1023,14 @@
     // cada fuente, con su registro real; si el código no casa con nada, se
     // muestra el pilar y nada más — nunca un nombre adivinado
     const fu=(l.fuentes||[]).length?`<div class="blk"><div class="h">Fuentes usadas</div><ul class="uni-fuentes">${l.fuentes.map(f=>{const c=String(f.ref||'').toUpperCase().trim();const r=map[c];return `<li><span class="uni-fu-pilar">${esc(r?r.pilar:(f.pilar||''))}</span> ${r?uniRefHTML(c,map,true):esc(c)}</li>`;}).join('')}</ul></div>`:'';
+    // ⚠️ Si la respuesta se escribió sin alguna fuente, se dice CUÁLES entraron.
+    // Sin esto, «no hay actos del regulador» y «no dio tiempo a preguntarle» se
+    // leerían igual — que es exactamente el error que tenía el pilar de medios.
+    const alcance=(nFaltaron>0&&fuentesUsadas&&fuentesUsadas.length)
+      ? `<div class="cob-note" style="margin:.5rem 0 .2rem">Escrita con ${fuentesUsadas.length} de ${fuentesUsadas.length+nFaltaron} fuentes —${esc(fuentesUsadas.join(', '))}—; las demás no alcanzaron a entrar. Lo que trajeron está abajo, en sus tarjetas.</div>`
+      : '';
     const aviso=`<div class="uni-aviso">Esta es una <b>lectura general</b> a partir de nuestras fuentes de datos. Si quieres un análisis personalizado en tu sector, visita <a id="uni-aviso-rosa">la Rosa de los Vientos</a>; si necesitas el análisis desde tu empresa, <a href="mailto:hola@ricardoruiz.co?subject=${encodeURIComponent('Caudal · análisis desde mi empresa')}">habla con nosotros</a>.</div>`;
-    el.innerHTML=`${aviso}<div class="blk"><div class="t" style="font-size:1.02rem;line-height:1.55">${uniTexto(l.respuesta||'',map)} ${chip}</div>${cz.por_que?`<div class="cob-note" style="margin-top:.3rem">${uniTexto(cz.por_que,map)}</div>`:''}</div>
+    el.innerHTML=`${aviso}${alcance}<div class="blk"><div class="t" style="font-size:1.02rem;line-height:1.55">${uniTexto(l.respuesta||'',map)} ${chip}</div>${cz.por_que?`<div class="cob-note" style="margin-top:.3rem">${uniTexto(cz.por_que,map)}</div>`:''}</div>
       ${(l.transversales||[]).length?`<div class="blk"><div class="h">Lo clave para informar</div>${li(l.transversales)}</div>`:''}
       ${blk('Qué está vivo en el Estado',l.en_tramite)}${blk('Qué dice la prensa',l.prensa)}${blk('Qué hacer',l.accion)}${fu}`;
     const rosa=document.getElementById('uni-aviso-rosa'); if(rosa) rosa.onclick=()=>showView('cliente');
@@ -1006,7 +1038,15 @@
   // Tope del sondeo. Sube de 90 a 120 s porque ahora puede haber un
   // re-disparo de por medio (fallo + reintento del modelo).
   const UNI_RESP_MAX=120000;
-  function uniLoadRespuesta(query, mine){
+  // Plazo de gracia antes de arrancar la lectura sin esperar a las seis fuentes.
+  // 2.500 ms sale de la medición en producción: ejecutivo 0,9 · medios 1,3 ·
+  // congreso 1,4 · contratación 1,9 · regulatorio 3,7 · sucop 5,1. Con este
+  // plazo entran las cuatro primeras y se ahorran ~2,6 s de espera pura.
+  // Subirlo mete más fuentes y arranca más tarde; bajarlo, al revés.
+  const UNI_ESPERA_MS=2500;
+  // Piso duro: con menos de esto no se contesta aunque venza el plazo.
+  const UNI_MIN_FUENTES=4;
+  function uniLoadRespuesta(query, mine, fuentesUsadas, nFaltaron){
     // Ya no se corta por ACCESO: el anónimo tiene una pregunta de muestra y la
     // cuenta registrada tres por semana. Quién tiene cupo lo sabe el worker, que
     // es donde vive el contador — acá solo se pinta lo que responda.
@@ -1014,7 +1054,7 @@
       if(mine!==_uniSeq) return;
       if(d&&d.error==='sin_cuota') return uniResumenFallback(null,d);
       if(d&&d.error==='accion_restringida') return uniResumenFallback();
-      if(d&&d.estado==='lista'&&d.lectura) return uniPintarRespuesta(d.lectura);
+      if(d&&d.estado==='lista'&&d.lectura) return uniPintarRespuesta(d.lectura,fuentesUsadas,nFaltaron);
       if(!d||!d.key) return uniResumenFallback('No se pudo preparar la respuesta.');
       const key=d.key, t0=Date.now(); let disparos=0, ultErr='';
       // ⚠️ El disparo suele morir en el gateway a los 30 s y no pasa nada: la
@@ -1027,7 +1067,7 @@
       const disparar=()=>{ disparos++; call({action:'respuesta-lectura',key}).catch(()=>{}); };
       const tick=()=>call({action:'respuesta-lectura',key,solo_cache:true}).then(x=>{
         if(mine!==_uniSeq) return;
-        if(x&&x.estado==='lista'&&x.lectura) return uniPintarRespuesta(x.lectura);
+        if(x&&x.estado==='lista'&&x.lectura) return uniPintarRespuesta(x.lectura,fuentesUsadas,nFaltaron);
         if(x&&x.ultimo_error) ultErr=x.ultimo_error;
         if(x&&x.reintentar&&disparos<3) disparar();
         // Cadencia por tramos. Un sondeo cuesta 0,13-0,43 s y la generación
