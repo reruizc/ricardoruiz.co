@@ -105,6 +105,15 @@ npx wrangler dev --local                           # y contra 127.0.0.1:8788, co
 > devolver siempre `Sin comprobar`, es que el muro de login se cerró más y toca
 > cambiar de fuente, no que las cuentas no existan.
 
+## El muro, y dónde cae
+
+El índice electoral es la vitrina: sin acceso se busca el nombre, se ve el
+historial y se entra a la candidatura. El muro cae al abrir el **CRM** —mapa por
+puesto, meta de votos y briefing—, y se anuncia desde la pantalla del candidato
+para que nadie llene la corporación y el territorio para chocarse al final.
+El wizard de candidatura nueva sigue borroso: es un formulario, no un dato.
+Comprobado en `tools/candidato-360/prueba-vitrina.mjs` (12 comprobaciones).
+
 ## Modo pruebas del frontend
 
 `candidato-360.js` levanta la regla de «una cuenta = un candidato» para la
