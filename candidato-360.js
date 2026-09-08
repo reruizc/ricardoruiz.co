@@ -133,6 +133,7 @@ async function cargarSesion() {
   }
   await planes;
   SESSION.listo = true;
+  resolverModoPruebas();
   pintarNav();
   aplicarGate();
 }
@@ -209,6 +210,7 @@ let CAMPANA_ACTUAL = null;
 async function guardarCampana(campana) {
   if (!SESSION.vinculo) return;
   CAMPANA_ACTUAL = campana;
+  if (SESSION.vinculo.local) { SESSION.vinculo.campana = campana; return; }
   try { const r = await apiC360('/c360/campana', { method: 'POST', body: JSON.stringify({ campana }) }); if (r.ok) SESSION.vinculo = r.data.vinculo; } catch {}
 }
 /* La meta la calcula VoteTarget en el navegador; se guarda en la campaña para
@@ -233,6 +235,9 @@ async function toggleBriefing() {
   if (!SESSION.acceso) return abrirPaywall();
   if (!SESSION.vinculo) { alert('Primero abra el CRM de su candidatura: el briefing se ata a ella.'); return; }
   const on = !!SESSION.vinculo.briefing?.activo, correo = ($('crmBriefingCorreo')?.value || '').trim();
+  /* Con vínculo local no hay a quién avisarle: el interruptor se mueve para
+     poder ver el panel, y se dice que no queda encendido de verdad. */
+  if (SESSION.vinculo.local) { SESSION.vinculo.briefing = { activo: !on, correo, envios: 0 }; pintarBriefing(); $('crmBriefingSub').textContent = 'modo pruebas: el interruptor no se guardó en el servidor'; return; }
   const btn = $('crmBriefingBtn'); btn.disabled = true;
   try {
     const r = await apiC360('/c360/briefing', { method: 'POST', body: JSON.stringify({ activo: !on, correo }) });
@@ -242,12 +247,34 @@ async function toggleBriefing() {
   pintarBriefing();
 }
 
+/* ─── 3 bis. Modo pruebas (cuenta de administración) ─────────────────────────
+   «Una cuenta = un candidato» es una regla del PRODUCTO: existe para que un
+   cliente no se equivoque de candidatura, no para que quien construye la
+   plataforma no pueda recorrerla. Con la cuenta de administración la página
+   trabaja EN LOCAL: se entra por las dos rutas cuantas veces haga falta, se
+   cambia de candidato y NADA se escribe en el worker — así ninguna prueba deja
+   puesto un vínculo que después solo soporte puede borrar. Se apaga con
+   ?pruebas=0 para ver la página tal como la ve un cliente. */
+const ADMIN_EMAILS = ['reruizc@gmail.com'];
+let PRUEBAS = false;
+function esAdmin() { return SESSION.fuente === 'admin' || ADMIN_EMAILS.includes(String(SESSION.user?.email || '').toLowerCase().trim()); }
+function resolverModoPruebas() {
+  PRUEBAS = esAdmin() && new URLSearchParams(location.search).get('pruebas') !== '0';
+  /* El muro es de vitrina (el dato de esta página es público); abrirlo en local
+     no da acceso a nada del worker, que sigue decidiendo por su cuenta. */
+  if (PRUEBAS) SESSION.acceso = true;
+}
+/* Vínculo de mentiras, solo en memoria: el CRM necesita uno para pintarse. */
+function vinculoLocal(payload) { SESSION.vinculo = Object.assign({ local: true }, payload); }
+
 /* Aplica el estado de acceso a las dos rutas y a la portada. */
 function aplicarGate() {
   const intro = $('introVinculo');
   if (intro) {
-    if (SESSION.vinculo) { intro.innerHTML = `Su cuenta está vinculada a <b>${escHtml(vinculoDescripcion())}</b>. Cualquiera de las dos rutas abre esa candidatura; para cambiarla escriba a <a href="mailto:${escHtml(SESSION.soporte)}">${escHtml(SESSION.soporte)}</a>.`; intro.classList.remove('hidden'); }
-    else intro.classList.add('hidden');
+    if (PRUEBAS) intro.innerHTML = `<b>Modo pruebas · cuenta de administración.</b> La restricción de «un solo candidato» está levantada: puede abrir cualquier candidatura por las dos rutas y nada se guarda en el servidor.${SESSION.vinculo && !SESSION.vinculo.local ? ` (El vínculo real de la cuenta sigue siendo ${escHtml(vinculoDescripcion())}.)` : ''} Para ver la página como la ve un cliente, abra <a href="${PAGINA}?pruebas=0">${PAGINA}?pruebas=0</a>.`;
+    else if (SESSION.vinculo) intro.innerHTML = `Su cuenta está vinculada a <b>${escHtml(vinculoDescripcion())}</b>. Cualquiera de las dos rutas abre esa candidatura; para cambiarla escriba a <a href="mailto:${escHtml(SESSION.soporte)}">${escHtml(SESSION.soporte)}</a>.`;
+    intro.classList.toggle('hidden', !PRUEBAS && !SESSION.vinculo);
+    intro.classList.toggle('is-pruebas', PRUEBAS);
   }
   aplicarGateExistente();
   aplicarGateNuevo();
@@ -380,8 +407,8 @@ function candidateProfile(candidate) {
   return { ...history[0], id: `persona-${key.toLowerCase().replace(/\s+/g, '-')}`, nombre: history[0].nombre, history, historyVotes: history.reduce((sum, item) => sum + Number(item.votos || 0), 0), historyLabel: `${history.length} candidaturas registradas · ${years.join(', ')}` };
 }
 function beginHistorical() {
-  /* Con vínculo no se busca: la cuenta ya tiene candidato. */
-  if (SESSION.vinculo) return abrirVinculo();
+  /* Con vínculo no se busca: la cuenta ya tiene candidato (en modo pruebas sí). */
+  if (SESSION.vinculo && !PRUEBAS) return abrirVinculo();
   showScreen('existing');
   $('searchResults').innerHTML = '<p class="search-note" id="searchNote">Escriba al menos dos letras: los resultados aparecerán mientras el índice termina de llegar.</p>';
   $('candidateSearch').disabled = false;
@@ -414,7 +441,7 @@ function openHistoricCandidate(id) {
   if (!SESSION.acceso) return abrirPaywall();
   const profile = candidateProfiles.get(id) || historicalIndex.find(c => c.slug === id);
   if (!profile) return;
-  if (SESSION.vinculo && !vinculoCoincide(profile)) { alert(`Su cuenta ya está vinculada a ${vinculoDescripcion()}. Para cambiar de candidato escriba a ${SESSION.soporte}.`); return abrirVinculo(); }
+  if (SESSION.vinculo && !PRUEBAS && !vinculoCoincide(profile)) { alert(`Su cuenta ya está vinculada a ${vinculoDescripcion()}. Para cambiar de candidato escriba a ${SESSION.soporte}.`); return abrirVinculo(); }
   abrirRutaCandidato(profile);
 }
 function abrirRutaCandidato(profile) {
@@ -559,6 +586,170 @@ function updateTerritory() {
 }
 function updateLocality() { if ($('election').value === 'jal' && $('municipality').value) loadLocalities(); }
 function togglePublicName() { $('publicNameField').classList.toggle('hidden', !$('publicFigure').checked); $('publicName').required = $('publicFigure').checked; }
+/* ─── 7 bis. Identidad pública: redes sociales y su validación ───────────────
+   Hasta acá el paso 2 preguntaba un mote y seguía de largo: la escucha de la
+   candidatura se armaba sobre un texto que nadie comprobó. Ahora la persona
+   marca en qué redes está, escribe el usuario y ANTES de construir el punto de
+   partida se valida: el worker (POST /c360/redes) sondea cada red por su
+   fuente pública y le pide a DeepSeek un veredicto SOBRE ESA EVIDENCIA.
+
+   Dos reglas del producto viven acá:
+   · La llave de DeepSeek no puede estar en el navegador — este repo es
+     público. Por eso la llamada va al worker y no a la Lambda. Contrato y
+     despliegue: tools/candidato-360/redes/README.md.
+   · Validar nunca bloquea. Si la red no deja comprobar (las tres bloquean
+     tráfico de servidor de a ratos) o el endpoint todavía no está desplegado,
+     el wizard sigue y la candidatura queda marcada «sin validar». Un candidato
+     no se puede quedar por fuera de su propia campaña porque X no contestó. */
+const REDES_DEFS = [
+  { key: 'x', nombre: 'X', detalle: 'antes Twitter', ph: '@usuario' },
+  { key: 'tiktok', nombre: 'TikTok', detalle: 'video corto', ph: '@usuario' },
+  { key: 'instagram', nombre: 'Instagram', detalle: 'perfil público', ph: 'usuario' }
+];
+const VEREDICTOS = {
+  confirmado: { etiqueta: 'Confirmado', clase: 'ok' },
+  probable: { etiqueta: 'Probable', clase: 'ok' },
+  dudoso: { etiqueta: 'Dudoso', clase: 'warn' },
+  no_encontrado: { etiqueta: 'Sin cuenta', clase: 'bad' },
+  no_verificable: { etiqueta: 'Sin comprobar', clase: 'warn' }
+};
+let REDES_VALIDACION = null;   /* respuesta del worker + la firma que la produjo */
+let redesCargando = false, redesOmitir = false;
+
+/* El usuario pega la URL completa tan seguido como escribe el @. Misma
+   normalización que la Lambda, para que la firma del cache coincida. */
+function limpiarHandle(valor) {
+  return String(valor || '').trim()
+    .replace(/^https?:\/\//i, '').replace(/^www\./i, '')
+    .replace(/^(x|twitter|tiktok|instagram)\.com\//i, '')
+    .split(/[?#]/)[0].split('/')[0].replace(/^@+/, '').trim();
+}
+function montarRedes() {
+  const grid = $('redesGrid'); if (!grid) return;
+  grid.innerHTML = REDES_DEFS.map(r => `<div class="red-row" data-red="${r.key}">
+    <button type="button" class="red-chip" onclick="toggleRed('${r.key}')" aria-pressed="false"><i></i><b>${escHtml(r.nombre)}</b><small>${escHtml(r.detalle)}</small></button>
+    <input class="red-handle" id="red-${r.key}" placeholder="${escHtml(r.ph)}" autocomplete="off" disabled oninput="redesTocadas()">
+  </div>`).join('');
+  pintarEstadoRedes();
+}
+function toggleRed(key) {
+  const row = document.querySelector(`.red-row[data-red="${key}"]`); if (!row) return;
+  const activa = row.classList.toggle('on');
+  row.querySelector('.red-chip').setAttribute('aria-pressed', String(activa));
+  const input = row.querySelector('.red-handle');
+  input.disabled = !activa;
+  if (activa) input.focus({ preventScroll: true }); else input.value = '';
+  redesTocadas();
+}
+function redesElegidas() {
+  return REDES_DEFS.map(r => ({ red: r.key, handle: limpiarHandle($(`red-${r.key}`)?.value) }))
+    .filter(r => document.querySelector(`.red-row[data-red="${r.red}"]`)?.classList.contains('on') && r.handle);
+}
+function firmaRedes() {
+  const n = ($('newName')?.value || '').trim().toLowerCase();
+  return `${n}|${($('publicName')?.value || '').trim().toLowerCase()}|` + redesElegidas().map(r => `${r.red}:${r.handle.toLowerCase()}`).join(',');
+}
+/* Editar un usuario después de validar invalida el veredicto: si no, la
+   candidatura se guardaría con el sello de una cuenta que ya no es la escrita. */
+function redesTocadas() {
+  if (REDES_VALIDACION && REDES_VALIDACION.firma !== firmaRedes()) { REDES_VALIDACION = null; redesOmitir = false; $('redesResultado').classList.add('hidden'); }
+  pintarEstadoRedes();
+}
+function pintarEstadoRedes() {
+  const est = $('redesEstado'), btn = $('redesBuscar'); if (!est || !btn) return;
+  const n = redesElegidas().length;
+  btn.disabled = redesCargando || !n;
+  btn.textContent = redesCargando ? 'Buscando…' : (REDES_VALIDACION ? 'Volver a validar' : 'Buscar y validar');
+  est.className = 'redes-estado' + (REDES_VALIDACION ? ' ok' : '');
+  est.textContent = redesCargando ? 'Consultando cada red y leyendo señales abiertas…'
+    : REDES_VALIDACION ? `Validado · ${REDES_VALIDACION.perfiles.length} ${REDES_VALIDACION.perfiles.length === 1 ? 'perfil' : 'perfiles'}`
+    : n ? `${n} ${n === 1 ? 'red marcada' : 'redes marcadas'} · sin validar` : 'Marque una red y escriba su usuario';
+}
+async function validarRedes() {
+  const redes = redesElegidas(); if (!redes.length) return;
+  const nombre = ($('newName')?.value || '').trim();
+  if (nombre.length < 3) { $('newName')?.focus(); return avisoRedes('Escriba primero su nombre completo: sin él no hay con qué comparar el perfil.'); }
+  /* El usuario que se valida es el limpio: si pegó la URL, la casilla queda
+     con el @ que de verdad se va a guardar. */
+  redes.forEach(r => { const input = $(`red-${r.red}`); if (input && input.value !== r.handle) input.value = r.handle; });
+  const firma = firmaRedes();
+  redesCargando = true; pintarEstadoRedes();
+  $('redesResultado').classList.remove('hidden');
+  $('redesResultado').innerHTML = `<div class="redes-cargando"><i></i><span>Buscando @${escHtml(redes.map(r => r.handle).join(', @'))} en ${redes.length === 1 ? 'su red' : 'sus redes'} y cruzando con la prensa abierta…</span></div>`;
+  const dep = $('department'), territorio = [$('locality')?.value, $('municipality')?.value, dep?.options[dep.selectedIndex]?.text].filter(Boolean).join(' · ');
+  let r;
+  try {
+    r = await apiC360('/c360/redes', { method: 'POST', body: JSON.stringify({ nombre, alias: ($('publicName')?.value || '').trim(), corp: CRM_CORPORATIONS[$('election')?.value] || '', territorio, redes }) });
+  } catch (e) { r = { status: 0, ok: false, data: {} }; }
+  redesCargando = false;
+  if (!r.ok || !Array.isArray(r.data?.perfiles)) return pintarFalloRedes(r);
+  REDES_VALIDACION = Object.assign({}, r.data, { firma });
+  redesOmitir = false;
+  pintarValidacionRedes(REDES_VALIDACION);
+  pintarEstadoRedes();
+}
+/* El error se dice tal cual es. Un 404 acá no es «no encontramos su perfil»:
+   es que la ruta del worker todavía no existe, y confundir las dos cosas hace
+   que el candidato borre un usuario que estaba bien escrito. */
+function pintarFalloRedes(r) {
+  const motivo = r.status === 404 ? 'El buscador de redes todavía no está publicado en el servidor (falta la ruta <code>/c360/redes</code>).'
+    : r.status === 403 ? 'Su cuenta no tiene acceso a la validación de redes.'
+    : r.status === 400 && r.data?.error === 'sin_redes' ? 'Ninguno de los usuarios escritos tiene la forma de un usuario de red social.'
+    : r.status === 502 ? 'El modelo no contestó a tiempo. Vuelva a intentar en un minuto.'
+    : r.status === 0 ? 'No hubo conexión con el servidor.'
+    : `El servidor respondió ${escHtml(String(r.status))}${r.data?.error ? ` (${escHtml(String(r.data.error))})` : ''}.`;
+  $('redesResultado').innerHTML = `<div class="redes-fallo"><b>No se pudo validar.</b><p>${motivo}</p><p class="redes-fallo-salida">Puede seguir: la candidatura queda marcada <b>sin validar</b> y las redes se guardan tal como las escribió.</p></div>`;
+  redesOmitir = true;
+  pintarEstadoRedes();
+}
+function avisoRedes(texto) {
+  $('redesResultado').classList.remove('hidden');
+  $('redesResultado').innerHTML = `<div class="redes-fallo"><p>${escHtml(texto)}</p></div>`;
+}
+function pintarValidacionRedes(d) {
+  const fichas = d.perfiles.map(p => {
+    const v = VEREDICTOS[p.veredicto] || VEREDICTOS.no_verificable, def = REDES_DEFS.find(x => x.key === p.red) || { nombre: p.red };
+    const datos = [p.nombre_perfil ? `perfil a nombre de <b>${escHtml(p.nombre_perfil)}</b>` : '', p.seguidores != null ? `${escHtml(String(p.seguidores))} seguidores` : '', p.verificada ? 'cuenta verificada por la plataforma' : ''].filter(Boolean).join(' · ');
+    return `<div class="red-ficha ${v.clase}">
+      <div class="red-ficha-top"><b>${escHtml(def.nombre)}</b><a href="${escHtml(p.url)}" target="_blank" rel="noopener">@${escHtml(p.handle)}</a><span class="red-sello">${v.etiqueta}${p.confianza ? ` · ${p.confianza}%` : ''}</span></div>
+      ${datos ? `<p class="red-ficha-datos">${datos}</p>` : ''}
+      <p class="red-ficha-motivo">${escHtml(p.motivo || '')}</p></div>`;
+  }).join('');
+  const alertas = (d.alertas || []).length ? `<ul class="redes-alertas">${d.alertas.map(a => `<li>${escHtml(a)}</li>`).join('')}</ul>` : '';
+  const homonimo = d.riesgo_homonimo ? `<p class="redes-homonimo"><b>Cuidado con el homónimo:</b> ${escHtml(d.riesgo_homonimo)}</p>` : '';
+  const prensa = (d.titulares || []).length ? `<details class="redes-prensa"><summary>${d.titulares.length} titulares abiertos con ese nombre</summary><ul>${d.titulares.map(t => `<li><a href="${escHtml(t.link)}" target="_blank" rel="noopener">${escHtml(t.titulo)}</a>${t.medio ? ` · ${escHtml(t.medio)}` : ''}</li>`).join('')}</ul></details>` : '';
+  $('redesResultado').classList.remove('hidden');
+  $('redesResultado').innerHTML = `${d.resumen ? `<p class="redes-resumen">${escHtml(d.resumen)}</p>` : ''}${fichas}${homonimo}${alertas}${prensa}<p class="redes-pie">${escHtml(d.modelo || 'DeepSeek')} leyó lo que respondió cada red${d.cache_hit ? ' (respuesta guardada de una consulta reciente)' : ''}. Si algún veredicto no cuadra, corrija el usuario y vuelva a validar.</p>`;
+}
+/* Lo que se guarda en el vínculo: los usuarios y el sello con el que salieron.
+   Sin validación se guarda igual, pero marcado — el briefing necesita saber si
+   puede confiar en el perfil antes de escuchar en su nombre. */
+/* Una frase para el CRM: qué identidad quedó lista para escuchar. */
+function textoRedesCRM(redes) {
+  if (!redes || !redes.perfiles?.length) return '';
+  const buenos = redes.perfiles.filter(p => p.veredicto === 'confirmado' || p.veredicto === 'probable');
+  const lista = redes.perfiles.map(p => `@${p.handle} (${(REDES_DEFS.find(d => d.key === p.red) || {}).nombre || p.red})`).join(', ');
+  if (!redes.validado) return ` Escucharemos ${lista}: son las cuentas que usted escribió, todavía sin validar.`;
+  return buenos.length
+    ? ` Escucharemos ${buenos.map(p => `@${p.handle}`).join(', ')}: ${buenos.length === 1 ? 'la cuenta quedó validada' : 'las cuentas quedaron validadas'} contra la fuente pública de cada red.`
+    : ` Ninguna de las cuentas escritas (${lista}) pudo validarse; la escucha queda pendiente de confirmarlas.`;
+}
+function redesParaGuardar() {
+  const elegidas = redesElegidas();
+  if (!elegidas.length) return null;
+  const val = REDES_VALIDACION && REDES_VALIDACION.firma === firmaRedes() ? REDES_VALIDACION : null;
+  return {
+    validado: !!val,
+    validadoEn: val ? val.generado_en : null,
+    modelo: val ? val.modelo : null,
+    resumen: val ? val.resumen : '',
+    perfiles: elegidas.map(e => {
+      const p = val?.perfiles.find(x => x.red === e.red);
+      return { red: e.red, handle: e.handle, url: p?.url || `https://${e.red === 'x' ? 'x.com/' : e.red === 'tiktok' ? 'www.tiktok.com/@' : 'www.instagram.com/'}${e.handle}`, veredicto: p?.veredicto || 'sin_validar', confianza: p?.confianza || 0, nombrePerfil: p?.nombre_perfil || '' };
+    })
+  };
+}
+
 function toggleParty() { const isNew = $('partyMode').value === 'new'; $('partyExisting').classList.toggle('hidden', isNew); $('partyNew').classList.toggle('hidden', !isNew); $('party').required = !isNew; $('partyName').required = isNew; }
 /* Una pregunta a la vez. Los campos se MUEVEN, no se recrean, para conservar
    validaciones y datos ya cargados. */
@@ -566,13 +757,13 @@ const NEW_STEPS_TOTAL = 6;
 function montarWizardNuevo() {
   const form = document.querySelector('#new form'); if (!form) return;
   const findField = id => $(id)?.closest('.field');
-  const fields = { name: findField('newName'), pub: findField('publicFigure'), pubName: $('publicNameField'), election: findField('election'), department: findField('department'), municipality: findField('municipality'), locality: findField('locality'), partyMode: findField('partyMode'), partyExisting: $('partyExisting'), partyNew: $('partyNew'), goal: findField('goal') };
+  const fields = { name: findField('newName'), pub: findField('publicFigure'), pubName: $('publicNameField'), redes: $('redesField'), election: findField('election'), department: findField('department'), municipality: findField('municipality'), locality: findField('locality'), partyMode: findField('partyMode'), partyExisting: $('partyExisting'), partyNew: $('partyNew'), goal: findField('goal') };
   const formGrid = form.querySelector('.form-grid'), originalSubmit = form.querySelector('[type="submit"]');
   const wizard = document.createElement('div'); wizard.className = 'new-wizard'; formGrid.before(wizard);
   Object.values(fields).forEach(f => f?.remove()); formGrid.remove(); originalSubmit.remove();
   const steps = [
     { title: '¿Cómo aparecerá en campaña?', copy: 'Empecemos por su nombre completo.', fields: [fields.name] },
-    { title: '¿Su identidad es pública?', copy: 'Podemos preparar señales abiertas bajo su nombre, apodo o trayectoria.', fields: [fields.pub, fields.pubName] },
+    { title: '¿Dónde puede encontrarlo la gente?', copy: 'Su nombre público y sus redes. Buscamos cada cuenta y la validamos antes de montar la escucha sobre ella.', fields: [fields.pub, fields.pubName, fields.redes], redes: true },
     { title: '¿A qué corporación aspira?', copy: 'La corporación define el territorio y la lectura electoral que activaremos.', fields: [fields.election], cards: true },
     { title: '¿Dónde será la candidatura?', copy: 'Ubique el territorio en el que va a competir.', fields: [fields.department, fields.municipality, fields.locality] },
     { title: '¿Con qué partido o movimiento?', copy: 'Puede vincular una organización existente o preparar una nueva.', fields: [fields.partyMode, fields.partyExisting, fields.partyNew] },
@@ -591,12 +782,22 @@ function montarWizardNuevo() {
     if (!def.final) next.addEventListener('click', () => advanceNewWizard(index));
     actions.append(next); step.append(actions); wizard.append(step);
   });
+  montarRedes();   /* después de repartir los campos: antes, #redesGrid está desprendido del documento */
   function showNewWizardStep(index) {
     wizard.querySelectorAll('.new-wizard-step').forEach((s, p) => s.classList.toggle('active', p === index));
     const stepLabel = document.querySelector('#new .flow-top .step'); if (stepLabel) stepLabel.textContent = `Paso ${index + 1} de ${NEW_STEPS_TOTAL} · Candidatura nueva`;
   }
   function advanceNewWizard(index) {
     if (index === 2 && !electionSelect.value) { $('newCorporationPicker').classList.add('shake'); setTimeout(() => $('newCorporationPicker').classList.remove('shake'), 500); return; }
+    /* Identidad: si marcó redes y no las ha validado, se pide una vez. A la
+       segunda pasa igual — la validación informa, no es un peaje. */
+    if (steps[index].redes && redesElegidas().length && !redesOmitir && !(REDES_VALIDACION && REDES_VALIDACION.firma === firmaRedes())) {
+      redesOmitir = true;
+      $('redesResultado').classList.remove('hidden');
+      $('redesResultado').innerHTML = '<div class="redes-fallo"><b>Sus redes están sin validar.</b><p>Toque <b>Buscar y validar</b> para comprobar que esas cuentas son suyas. Si prefiere seguir, vuelva a tocar «Siguiente» y quedarán guardadas sin validar.</p></div>';
+      $('redesBuscar').classList.add('shake'); setTimeout(() => $('redesBuscar').classList.remove('shake'), 500);
+      return;
+    }
     const required = steps[index].fields.flatMap(f => f ? [...f.querySelectorAll('input,select')] : []).filter(input => input.required && !input.closest('.hidden'));
     const invalid = required.find(input => !input.checkValidity()); if (invalid) { invalid.reportValidity(); return; }
     showNewWizardStep(index + 1);
@@ -609,10 +810,11 @@ async function createNew(e) {
   e.preventDefault();
   if (!SESSION.acceso) return abrirPaywall();
   const dep = $('department'), depNombre = dep.options[dep.selectedIndex]?.text || '';
-  const nuevo = { nombre: $('newName').value.trim(), publico: $('publicFigure').checked, nombrePublico: $('publicName').value.trim(), partido: $('partyMode').value === 'new' ? $('partyName').value.trim() : $('party').value, partidoNuevo: $('partyMode').value === 'new', objetivo: $('goal').value };
+  const nuevo = { nombre: $('newName').value.trim(), publico: $('publicFigure').checked, nombrePublico: $('publicName').value.trim(), partido: $('partyMode').value === 'new' ? $('partyName').value.trim() : $('party').value, partidoNuevo: $('partyMode').value === 'new', objetivo: $('goal').value, redes: redesParaGuardar() };
   const campana = { corp: $('election').value, ruta: 'other', departamento: dep.value, departamentoNombre: depNombre, municipio: MUNICIPAL_ELECTIONS.includes($('election').value) ? $('municipality').value : '', localidad: $('election').value === 'jal' ? $('locality').value : '' };
   if (!nuevo.nombre || !campana.corp || !campana.departamento) return;
-  if (!SESSION.vinculo) {
+  if (PRUEBAS) vinculoLocal({ tipo: 'nuevo', nuevo, campana });
+  else if (!SESSION.vinculo) {
     const sigue = await confirmarVinculo(nuevo.nombre, `${CRM_CORPORATIONS[campana.corp]} · ${[campana.localidad, campana.municipio, depNombre].filter(Boolean).join(' · ')}`);
     if (!sigue) return;
     const r = await guardarVinculo({ tipo: 'nuevo', nuevo, campana });
@@ -645,7 +847,8 @@ async function launchCRM(event) {
   const corporation = CRM_CORPORATIONS[corpKey], territory = campaignTerritory(corpKey);
   if (territory === null) { $('campaignPlace').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('campaignDepartment').focus({ preventScroll: true }); return; }
   const campana = campanaActual(corpKey);
-  if (!SESSION.vinculo) {
+  if (PRUEBAS) vinculoLocal({ tipo: 'historial', candidato: { id: crmCandidate.id, nombre: crmCandidate.nombre, slugs: (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean), corp: crmCandidate.corp, partido: crmCandidate.partido, circunscripcion: crmCandidate.circunscripcion }, campana });
+  else if (!SESSION.vinculo) {
     const sigue = await confirmarVinculo(crmCandidate.nombre, `${corporation}${territory ? ` · ${territory}` : ''}`);
     if (!sigue) return;
     const slugs = (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean);
@@ -677,7 +880,7 @@ async function abrirCRMNuevo() {
   $('crmBack').textContent = '← Inicio'; $('crmBack').onclick = () => showScreen('intro');
   $('crmInitials').textContent = initials(n.nombre); $('crmName').textContent = n.nombre;
   $('crmTarget').textContent = `Candidatura 2027 · ${CRM_CORPORATIONS[c.corp]} · ${lugar}`;
-  $('crmContext').textContent = `Candidatura nueva${n.partido ? ` con ${n.partido}${n.partidoNuevo ? ' (movimiento por constituir)' : ''}` : ''}. Sin historial propio, el punto de partida es el territorio: la referencia son los resultados de 2023 en ${lugar}.${n.objetivo ? ` Primer objetivo: ${n.objetivo.toLowerCase()}.` : ''}`;
+  $('crmContext').textContent = `Candidatura nueva${n.partido ? ` con ${n.partido}${n.partidoNuevo ? ' (movimiento por constituir)' : ''}` : ''}. Sin historial propio, el punto de partida es el territorio: la referencia son los resultados de 2023 en ${lugar}.${n.objetivo ? ` Primer objetivo: ${n.objetivo.toLowerCase()}.` : ''}${textoRedesCRM(n.redes)}`;
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Territorio de campaña';
   document.getElementById('crmProfilePhoto')?.remove(); document.getElementById('crmProfilePhotoMissing')?.remove(); $('crmInitials').classList.remove('crm-avatar-hidden');
