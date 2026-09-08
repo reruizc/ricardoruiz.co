@@ -595,8 +595,8 @@ function togglePublicName() { $('publicNameField').classList.toggle('hidden', !$
 
    Dos reglas del producto viven acá:
    · La llave de DeepSeek no puede estar en el navegador — este repo es
-     público. Por eso la llamada va al worker y no a la Lambda. Contrato y
-     despliegue: tools/candidato-360/redes/README.md.
+     público. Por eso el sondeo y el modelo viven en el worker (rr-auth ·
+     src/c360-redes.js). Contrato: tools/candidato-360/redes/README.md.
    · Validar nunca bloquea. Si la red no deja comprobar (las tres bloquean
      tráfico de servidor de a ratos) o el endpoint todavía no está desplegado,
      el wizard sigue y la candidatura queda marcada «sin validar». Un candidato
@@ -617,7 +617,7 @@ let REDES_VALIDACION = null;   /* respuesta del worker + la firma que la produjo
 let redesCargando = false, redesOmitir = false;
 
 /* El usuario pega la URL completa tan seguido como escribe el @. Misma
-   normalización que la Lambda, para que la firma del cache coincida. */
+   normalización que el worker, para que la firma del cache coincida. */
 function limpiarHandle(valor) {
   return String(valor || '').trim()
     .replace(/^https?:\/\//i, '').replace(/^www\./i, '')
@@ -692,9 +692,13 @@ async function validarRedes() {
    es que la ruta del worker todavía no existe, y confundir las dos cosas hace
    que el candidato borre un usuario que estaba bien escrito. */
 function pintarFalloRedes(r) {
+  /* El worker manda un `detalle` en español para casi todo (nombre corto, sin
+     redes válidas, cuota del día, el modelo caído): se prefiere ese antes que
+     una frase nuestra que puede estar diciendo otra cosa. */
   const motivo = r.status === 404 ? 'El buscador de redes todavía no está publicado en el servidor (falta la ruta <code>/c360/redes</code>).'
+    : r.status === 401 ? 'Su sesión venció. Vuelva a entrar y repita la validación.'
     : r.status === 403 ? 'Su cuenta no tiene acceso a la validación de redes.'
-    : r.status === 400 && r.data?.error === 'sin_redes' ? 'Ninguno de los usuarios escritos tiene la forma de un usuario de red social.'
+    : r.data?.detalle ? escHtml(String(r.data.detalle))
     : r.status === 502 ? 'El modelo no contestó a tiempo. Vuelva a intentar en un minuto.'
     : r.status === 0 ? 'No hubo conexión con el servidor.'
     : `El servidor respondió ${escHtml(String(r.status))}${r.data?.error ? ` (${escHtml(String(r.data.error))})` : ''}.`;

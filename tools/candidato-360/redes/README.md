@@ -6,6 +6,12 @@ comprobó**. Ahora la persona marca en qué redes está (X, TikTok, Instagram),
 escribe el usuario, y antes de construir el punto de partida la plataforma
 busca esa cuenta y dice si parece ser la suya.
 
+> **El código del backend vive en `rr-auth`** (worker de Cloudflare), no acá:
+> `src/c360-redes.js` + la ruta `POST /c360/redes` en `src/index.js`. Este repo
+> es público y el worker ya guarda `DEEPSEEK_API_KEY` como secreto; poner la
+> llave a un paso del navegador sería regalarla. Acá queda el contrato que
+> consume la página y la prueba del wizard.
+
 ## Qué hace, en orden
 
 | Paso | Fuente | Qué aporta |
@@ -14,31 +20,33 @@ busca esa cuenta y dice si parece ser la suya.
 | **2. Señales abiertas** | Google News RSS con el nombre y el nombre público (12 meses) | Si esa persona ya aparece en prensa y con qué rol — sirve para detectar el homónimo |
 | **3. Veredicto** | DeepSeek V4 Flash | Lee **solo** lo anterior y devuelve, red por red, `confirmado · probable · dudoso · no_encontrado · no_verificable` con una frase de por qué |
 
-Cache en S3, 7 días, con el resultado del sondeo dentro de la llave: si mañana
-la cuenta aparece o cambia de nombre es otra pregunta, y no puede contestarla
-el cache de ayer.
+Los tres sondeos salen del **edge de Cloudflare**, no del navegador: pedidos
+desde la página los mata CORS. El resultado se guarda 7 días en KV
+(`c360:redes:<hash24>`), con el sondeo dentro de la llave — si mañana la cuenta
+aparece o cambia de nombre es otra pregunta, y no puede contestarla el cache de
+ayer. Tope de **40 validaciones por cuenta y por día**: una validación cuesta
+una llamada al modelo.
 
 ## Las dos reglas que sostienen esto
 
 - **Un sondeo que no responde NO es un perfil falso.** Las tres redes bloquean
-  tráfico de datacenter de a ratos. La Lambda distingue «no existe» (404
-  limpio) de «no pude comprobarlo» (bloqueo, timeout, muro de login) y el
-  frontend los pinta distinto: `Sin cuenta` en coral, `Sin comprobar` en ámbar.
+  tráfico de servidor de a ratos. El worker distingue «no existe» (404 limpio)
+  de «no pude comprobarlo» (bloqueo, timeout, muro de login) y la página los
+  pinta distinto: `Sin cuenta` en coral, `Sin comprobar` en ámbar.
 - **El sondeo manda sobre el modelo.** DeepSeek no puede subir un veredicto por
   encima de la evidencia: está en el system prompt y se vuelve a imponer en
-  código (`_sellar_veredictos`) porque un prompt no es un control. Un
+  código (`sellarVeredictos`) porque un prompt no es un control. Un
   «confirmado» sobre una red que no contestó se degrada a `no_verificable`
   antes de salir.
 
-Validar **nunca bloquea**. Si la red no deja comprobar o el endpoint todavía no
-está desplegado, el wizard sigue y la candidatura queda guardada con
+Validar **nunca bloquea**. Si la red no deja comprobar, si se acabó la cuota o
+si el modelo se cae, el wizard sigue y la candidatura queda guardada con
 `redes.validado = false`. Un candidato no se puede quedar por fuera de su
 propia campaña porque X no contestó.
 
-## Contrato
+## Contrato · `POST /c360/redes`
 
-`POST` (la llave de DeepSeek no puede viajar al navegador: este repo es
-público, así que el frontend habla con el worker y el worker con la Lambda).
+Sesión con acceso a Candidato 360 (`Authorization: Bearer <token>`).
 
 ```jsonc
 // petición
@@ -60,84 +68,42 @@ público, así que el frontend habla con el worker y el worker con la Lambda).
   "modelo": "deepseek-v4-flash", "generado_en": "…", "cache_hit": false }
 ```
 
-Errores que el frontend distingue y traduce: `404` (la ruta del worker todavía
-no existe), `403` (la cuenta no tiene acceso), `400 sin_redes`, `502` (el
-modelo no contestó).
+Errores, todos con `detalle` en español que la página muestra tal cual:
+`401` sesión vencida · `403` sin acceso · `400 falta_nombre` · `400 sin_redes` ·
+`429 cuota` · `502 modelo_no_respondio`. Un `404` significa que la ruta todavía
+no está desplegada, y la página lo dice así — no como «no encontramos su
+perfil», que haría borrar un usuario bien escrito.
 
-## La ruta del worker (`rr-auth`) · **falta desplegar**
+## Desplegar
 
-| Ruta | Quién | Para qué |
-|---|---|---|
-| `POST /c360/redes` | sesión con acceso a Candidato 360 | Reenvía el cuerpo a la Lambda y devuelve su respuesta tal cual |
-
-Mismo patrón de `/caudal/api`: el worker decide **quién** puede llamar (limita
-por IP y comprueba el acceso), le habla a la Lambda con un secreto compartido y
-así la URL de la Lambda no queda publicada en un repo abierto.
-
-```js
-// rr-auth · src/index.js
-if (url.pathname === '/c360/redes' && request.method === 'POST') {
-  const sesion = await sesionDe(request, env);                 // el mismo helper de /c360/me
-  if (!sesion) return json(401, { ok: false, error: 'sin_sesion' });
-  if (!(await tieneAccesoC360(sesion.email, env))) return json(403, { ok: false, error: 'sin_acceso' });
-  if (await excedeCuota(`c360redes:${sesion.email}`, 20, 86400, env))   // 20 validaciones al día
-    return json(429, { ok: false, error: 'cuota' });
-  const r = await fetch(env.C360_REDES_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-C360-Service': env.C360_SERVICE_TOKEN },
-    body: await request.text(),
-  });
-  return new Response(await r.text(), { status: r.status, headers: cors(request, 'application/json') });
-}
-```
-
-Variables del worker: `C360_REDES_URL` (la URL del Function URL / API Gateway)
-y `C360_SERVICE_TOKEN` (el mismo valor que la Lambda lleva en
-`C360_SERVICE_TOKEN`; sin la cabecera la Lambda responde 404 como una ruta que
-no existe).
-
-## Desplegar la Lambda
+En `rr-auth` (el worker es compartido: un despliegue afecta a Caudal, el Lab,
+Gastos y el juez a la vez):
 
 ```bash
-cd tools/candidato-360/redes
-zip -j function.zip lambda_handler.py
-aws lambda create-function \
-  --function-name candidato-360-redes \
-  --runtime python3.12 --handler lambda_handler.handler \
-  --role "$LAMBDA_ROLE_ARN" --timeout 60 --memory-size 512 \
-  --zip-file fileb://function.zip
-aws lambda update-function-configuration \
-  --function-name candidato-360-redes \
-  --environment "Variables={DEEPSEEK_API_KEY=…,C360_SERVICE_TOKEN=…,S3_BUCKET=elecciones-2026}"
-# actualizar después:
-aws lambda update-function-code --function-name candidato-360-redes --zip-file fileb://function.zip
+npx wrangler deploy --dry-run   # valida que compile
+npx wrangler deploy             # publica
 ```
 
-Permisos: `s3:GetObject` y `s3:PutObject` sobre
-`elecciones-2026/ricardoruiz.co/candidato-360/redes-cache/*` (el cache falla en
-silencio si no los tiene: se paga otra llamada a DeepSeek, no se cae nada).
-
-Variables: ver la cabecera de `lambda_handler.py`. `PROMPT_VERSION` se bumpea al
-tocar el prompt — si no, el cache sirve la lectura vieja.
+No hace falta ningún secreto nuevo: usa el `DEEPSEEK_API_KEY` que el worker ya
+tiene y el KV `RR_STORE` que ya está bindeado.
 
 ## Probar
 
 ```bash
-python3 tools/candidato-360/redes/prueba_offline.py     # sin red ni DeepSeek: el sellado de veredictos
-python3 tools/candidato-360/redes/lambda_handler.py --sondeo   # solo los sondeos, contra las tres redes
-python3 tools/candidato-360/redes/lambda_handler.py --prompt   # lo que se le manda al modelo
-DEEPSEEK_API_KEY=… python3 tools/candidato-360/redes/lambda_handler.py   # la respuesta completa
-node tools/candidato-360/redes/prueba-wizard.mjs        # el paso 2 de la página, con el worker stubbeado
+node tools/candidato-360/redes/prueba-wizard.mjs   # el paso 2 de la página, con el worker stubbeado (17 comprobaciones)
+# en rr-auth:
+node test/c360-redes.test.mjs                      # sondeos, RSS, sellado de veredictos y cache (32, sin red ni DeepSeek)
+npx wrangler dev --local                           # y contra 127.0.0.1:8788, con una sesión sembrada en el KV local:
+#   npx wrangler kv key put --local --binding RR_STORE "sessions:tok" '{"email":"…","plan":"premium"}'
 ```
 
-> **Sin comprobar contra las redes de verdad.** Los tres sondeos se escribieron
-> contra endpoints públicos documentados, pero el entorno donde se programaron
-> no tiene salida a `cdn.syndication.twimg.com`, `www.tiktok.com` ni
-> `www.instagram.com`: la primera corrida de `--sondeo` en una máquina con red
-> es la que dice si alguno de los tres cambió de forma. Lo que sí está medido
-> es que un sondeo caído no puede terminar en un veredicto falso
-> (`prueba_offline.py`) y que la página se comporta con cualquiera de las
-> respuestas (`prueba-wizard.mjs`, 17 comprobaciones).
+> **Los tres sondeos no se han corrido contra las redes de verdad.** Se
+> escribieron contra endpoints públicos documentados, pero el entorno donde se
+> programaron no tiene salida a `cdn.syndication.twimg.com`, `www.tiktok.com`
+> ni `www.instagram.com`: la primera validación real es la que dice si alguno
+> cambió de forma. El de Instagram es el más frágil de los tres — si empieza a
+> devolver siempre `Sin comprobar`, es que el muro de login se cerró más y toca
+> cambiar de fuente, no que las cuentas no existan.
 
 ## Modo pruebas del frontend
 
