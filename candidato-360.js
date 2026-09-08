@@ -907,6 +907,7 @@ async function launchCRM(event) {
   pintarBriefing();
   loadHistoricalMap(crmCandidate);
   renderCRMProfilePhoto(crmCandidate);
+  pintarPuntaje(crmCandidate);
   pintarMeta(await estimateVoteTarget(corpKey, territory));
 }
 /* CRM de una candidatura nueva: sin historial, el punto de partida es el
@@ -922,6 +923,7 @@ async function abrirCRMNuevo() {
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Territorio de campaña';
   document.getElementById('crmProfilePhoto')?.remove(); document.getElementById('crmProfilePhotoMissing')?.remove(); $('crmInitials').classList.remove('crm-avatar-hidden');
+  $('crmPuntaje').innerHTML = ''; $('crmPuntaje').classList.add('hidden'); PUNTAJE_ACTUAL = null;   /* sin historial no hay puntaje: un cero ahí sería una calificación, no un dato */
   CAMPANA_ACTUAL = c;
   showScreen('crm');
   pintarBriefing();
@@ -953,7 +955,7 @@ const PHOTO_UPLOAD_URL = 'https://drive.google.com/drive/folders/1ULVQC1Cyz_fjnh
 const PRES_INDEX_URL = RRData.publicUrl('congreso-2026/output/presidencial/index-presidencial.json');
 let fotosPresPromise = null;
 function fotosPresidenciales() {
-  if (!fotosPresPromise) fotosPresPromise = fetch(PRES_INDEX_URL).then(r => r.ok ? r.json() : Promise.reject()).then(d => (d.personas || []).filter(p => p.foto).map(p => ({ clave: CandRegistry.personaKey(p.nombre), foto: p.foto }))).catch(() => []);
+  if (!fotosPresPromise) fotosPresPromise = indicePresidencial().then(d => (d?.personas || []).filter(p => p.foto).map(p => ({ clave: CandRegistry.personaKey(p.nombre), foto: p.foto })));
   return fotosPresPromise;
 }
 function mismaPersonaPresidencial(claveCorta, claveLarga) {
@@ -992,6 +994,120 @@ async function renderCRMProfilePhoto(candidate) {
   if (crmCandidate === candidate) sinFoto(avatar, candidate);
 }
 
+/* ─── 8 bis. Puntaje electoral ───────────────────────────────────────────────
+   El mismo puntaje de analisis-candidato.html y del modal de Caudal, para que
+   un número signifique lo mismo en toda la plataforma:
+
+       100 · log10(votos + 1) / log10(vmax + 1),   vmax = votos del presidente
+
+   Es logarítmica a propósito. Entre una JAL (342 votos) y la Presidencia (12,9
+   millones) hay cuatro órdenes de magnitud: en una regla lineal TODA candidatura
+   territorial —que es la clientela de esta página— valdría 0. En la logarítmica
+   cada escalón es «diez veces más votos», que es como se lee de verdad una
+   carrera política.
+
+   El número solo dice tamaño. Lo que dice DESEMPEÑO es el cuartil: contra
+   quiénes compitió esa misma elección y a cuántos superó. Por eso el color sale
+   del cuartil y no del puntaje — 40 puntos en una JAL de Tunja y 40 puntos en el
+   Concejo de Bogotá no son la misma noticia. */
+let SCORE_LOG_MAX = Math.log10(12950643 + 1);   /* respaldo: 2V 2026, se refresca con presIndex.vmax */
+let presIndexPromise = null;
+function indicePresidencial() {
+  if (!presIndexPromise) presIndexPromise = fetch(PRES_INDEX_URL).then(r => r.ok ? r.json() : Promise.reject())
+    .then(d => { if (d?.vmax) SCORE_LOG_MAX = Math.log10(Number(d.vmax) + 1); return d; }).catch(() => null);
+  return presIndexPromise;
+}
+function puntajeDeVotos(votos) {
+  const v = Number(votos || 0); if (!v) return 1;
+  return Math.max(1, Math.min(99, Math.round(100 * Math.log10(v + 1) / SCORE_LOG_MAX)));
+}
+const CUARTILES = {
+  4: { etiqueta: 'Cuartil superior', clase: 'q4' },
+  3: { etiqueta: 'Tercer cuartil', clase: 'q3' },
+  2: { etiqueta: 'Segundo cuartil', clase: 'q2' },
+  1: { etiqueta: 'Cuartil inferior', clase: 'q1' }
+};
+/* Rivales = la MISMA elección. `corp` ya trae corporación · territorio · año
+   ("CONCEJO · TUNJA · 2023"), así que una comparación de cadenas basta y no hay
+   que reconstruir la circunscripción. Con menos de 8 candidaturas un cuartil no
+   dice nada y se calla. */
+function cuartilElectoral(candidatura) {
+  const corp = String(candidatura?.corp || ''); if (!corp) return null;
+  const votos = Number(candidatura.votos || 0);
+  const rivales = historicalIndex.filter(c => c.corp === corp);
+  if (rivales.length < 8) return null;
+  const debajo = rivales.filter(c => Number(c.votos || 0) < votos).length;
+  const percentil = Math.round(100 * debajo / rivales.length);
+  return { cuartil: percentil >= 75 ? 4 : percentil >= 50 ? 3 : percentil >= 25 ? 2 : 1, rivales: rivales.length, percentil };
+}
+/* La candidatura que se puntúa es la MÁS RECIENTE (history ya viene ordenado
+   por año descendente): el puntaje es «cómo le fue la última vez», no su récord
+   histórico. */
+function candidaturaPuntuada(profile) { return profile?.history?.length ? profile.history[0] : profile; }
+/* Referencia territorial: en Bogotá el alcalde, en el resto el gobernador del
+   departamento donde se va a lanzar. Sale del mismo índice que ya está en
+   memoria: el más votado de esa elección es quien la ganó. */
+function referenciaEjecutiva() {
+  const campana = CAMPANA_ACTUAL || SESSION.vinculo?.campana || null;
+  const territorio = normalizedText(campana?.departamentoNombre || crmCandidate?.circunscripcion || '');
+  const esBogota = territorio.includes('BOGOTA');
+  const cargo = esBogota ? 'ALCALDIA' : 'GOBERNACION';
+  const lugar = esBogota ? 'BOGOTA' : territorio;
+  if (!lugar) return null;
+  const candidatos = historicalIndex.filter(c => {
+    const corp = normalizedText(c.corp);
+    return corp.startsWith(cargo) && (corp.includes(lugar) || normalizedText(c.circunscripcion).includes(lugar));
+  });
+  if (!candidatos.length) return null;
+  const ganador = candidatos.sort((a, b) => (candidateYear(b) - candidateYear(a)) || (Number(b.votos || 0) - Number(a.votos || 0)))
+    .filter((c, _, lista) => candidateYear(c) === candidateYear(lista[0]))
+    .sort((a, b) => Number(b.votos || 0) - Number(a.votos || 0))[0];
+  if (!ganador?.votos) return null;
+  return { cargo: esBogota ? 'Alcaldía de Bogotá' : `Gobernación de ${campana?.departamentoNombre || crmCandidate?.circunscripcion || ''}`.trim(),
+           nombre: ganador.nombre, votos: Number(ganador.votos), anio: candidateYear(ganador), puntaje: puntajeDeVotos(ganador.votos) };
+}
+let PUNTAJE_ACTUAL = null;
+/* La estrella vive en el encabezado del CRM, al lado del nombre: es lo primero
+   que la persona busca de sí misma. Solo aparece con historial — una
+   candidatura nueva no tiene desempeño pasado que mostrar, y un cero ahí sería
+   una calificación, no un dato. */
+async function pintarPuntaje(profile) {
+  const caja = $('crmPuntaje'); if (!caja) return;
+  const candidatura = candidaturaPuntuada(profile);
+  const votos = Number(candidatura?.votos || 0);
+  if (!votos) { caja.innerHTML = ''; caja.classList.add('hidden'); PUNTAJE_ACTUAL = null; return; }
+  await indicePresidencial();   /* refresca vmax antes de calcular, si el índice contesta */
+  const cuartil = cuartilElectoral(candidatura);
+  PUNTAJE_ACTUAL = { candidatura, votos, puntaje: puntajeDeVotos(votos), cuartil };
+  const clase = cuartil ? CUARTILES[cuartil.cuartil].clase : 'qsin';
+  caja.classList.remove('hidden');
+  caja.innerHTML = `<span class="puntaje ${clase}" title="Puntuación electoral pasada">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.4L12 17.4l-5.8 3 1.1-6.4L2.6 9.4l6.5-.9z"/></svg>
+      <b>${PUNTAJE_ACTUAL.puntaje}</b>
+      <button type="button" class="puntaje-i" aria-label="Qué significa esta puntuación" onclick="mostrarPuntajeInfo()">i</button>
+    </span>`;
+}
+function mostrarPuntajeInfo() {
+  const p = PUNTAJE_ACTUAL; if (!p) return;
+  const c = p.candidatura, ref = referenciaEjecutiva();
+  const eleccion = String(c.corp || 'su última candidatura');
+  const escala = [
+    `<li><b>100</b> · Presidencia de la República — el presidente electo es el techo de la escala.</li>`,
+    ref ? `<li><b>${ref.puntaje}</b> · ${escHtml(ref.cargo)}${ref.anio ? ` ${ref.anio}` : ''} — ${escHtml(ref.nombre)}, ${ref.votos.toLocaleString('es-CO')} votos.</li>` : '',
+    `<li><b>${p.puntaje}</b> · usted, con ${p.votos.toLocaleString('es-CO')} votos en ${escHtml(eleccion)}.</li>`
+  ].filter(Boolean).join('');
+  $('introModalKicker').textContent = 'Candidato 360 · puntuación electoral';
+  $('introModalTitle').textContent = `Su puntuación electoral pasada: ${p.puntaje}`;
+  $('introModalText').innerHTML = `
+    <p>Es el tamaño de su última votación en una escala donde el <b>presidente electo vale 100</b>. La escala es logarítmica: cada escalón vale diez veces más votos, porque entre una JAL y una Presidencia hay cuatro órdenes de magnitud y en una regla lineal toda candidatura territorial marcaría cero.</p>
+    <ul class="puntaje-escala">${escala}</ul>
+    ${p.cuartil
+      ? `<p>El color viene del <b>cuartil</b>, no del puntaje: es contra quiénes compitió. En ${escHtml(eleccion)} hubo <b>${p.cuartil.rivales.toLocaleString('es-CO')} candidaturas</b> y usted superó al <b>${p.cuartil.percentil}%</b> — ${CUARTILES[p.cuartil.cuartil].etiqueta.toLowerCase()}.</p>`
+      : `<p>No pintamos cuartil: en esa elección hay menos de ocho candidaturas en el índice y comparar contra tan pocos no dice nada.</p>`}
+    <p class="puntaje-nota">Mide tamaño de votación, no favorabilidad ni intención de voto. Misma fórmula del Análisis de Candidato y de Caudal: 100 · log10(votos + 1) / log10(votos del presidente + 1).</p>`;
+  $('introModal').classList.add('open');
+}
+
 /* ─── 9. Mapas ───────────────────────────────────────────────────────────── */
 let crmLeafletMap = null, crmMapLayer = null, crmBarrioLayer = null, crmTileLayer = null;
 let crmMapMode = 'total', crmMapState = null;
@@ -1009,11 +1125,34 @@ function crearMapa(center, zoom) {
    debajo contradice los polígonos: Soacha aparecía al norte y Chía al oriente. */
 function aplicarBasemap(rotado) {
   if (!crmLeafletMap) return;
-  if (rotado) { if (crmTileLayer) { crmLeafletMap.removeLayer(crmTileLayer); crmTileLayer = null; } return; }
-  if (crmTileLayer) return;
-  crmTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, opacity: .72, attribution: '&copy; OpenStreetMap contributors' }).addTo(crmLeafletMap);
+  if (rotado) return quitarBasemap();
+  ponerBasemap('crm-basemap');
 }
-function encuadrar(layer, padding = 24) { const bounds = layer?.getBounds(); if (bounds?.isValid()) crmLeafletMap.fitBounds(bounds, { padding: [padding, padding], animate: false }); setTimeout(() => crmLeafletMap?.invalidateSize(), 120); }
+/* Dos intensidades: el callejero de una ciudad se lee de frente; el de un
+   barrio va de fondo, en gris, para que el color del voto siga mandando. */
+function ponerBasemap(clase) {
+  const tenue = clase === 'crm-basemap-tenue', opacidad = tenue ? .58 : .72;
+  if (crmTileLayer) {
+    const cont = crmTileLayer.getContainer();
+    cont?.classList.toggle('crm-basemap-tenue', tenue); cont?.classList.toggle('crm-basemap', !tenue);
+    crmTileLayer.setOpacity(opacidad);
+    return;
+  }
+  crmTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, opacity: opacidad, className: clase, attribution: '&copy; OpenStreetMap contributors' }).addTo(crmLeafletMap);
+}
+function quitarBasemap() { if (crmTileLayer) { crmLeafletMap.removeLayer(crmTileLayer); crmTileLayer = null; } }
+/* El encuadre puede NO ser el de la capa: Sumapaz es el 42% de Bogotá y
+   metida en el fitBounds deja la ciudad urbana del tamaño de una uña. Se
+   dibuja completa —y se desborda del marco, que para eso el contenedor
+   recorta— pero el encuadre lo mandan las localidades urbanas. */
+function encuadrarBounds(bounds, padding = 24) { if (bounds?.isValid()) crmLeafletMap.fitBounds(bounds, { padding: [padding, padding], animate: false }); setTimeout(() => crmLeafletMap?.invalidateSize(), 60); }
+function encuadrar(layer, padding = 24) { encuadrarBounds(layer?.getBounds(), padding); }
+/* Bounds de una capa saltándose los rasgos que `excluir` marque. */
+function boundsSin(capa, excluir) {
+  const b = L.latLngBounds([]);
+  capa.eachLayer(item => { if (!excluir(item.feature)) b.extend(item.getBounds ? item.getBounds() : item.getLatLng()); });
+  return b.isValid() ? b : capa.getBounds();
+}
 function rotateGeoJSON90Left(geoData) {
   const cx = -74.08, cy = 4.65, rotate = ([lon, lat]) => [cx - (lat - cy), cy + (lon - cx)];
   const geometry = geom => geom.type === 'Polygon' ? { ...geom, coordinates: geom.coordinates.map(ring => ring.map(rotate)) } : geom.type === 'MultiPolygon' ? { ...geom, coordinates: geom.coordinates.map(polygon => polygon.map(ring => ring.map(rotate))) } : geom;
@@ -1149,6 +1288,8 @@ async function renderGenericMap(candidate) {
 }
 /* Las JAL se leen a escala de comuna/localidad con las capas de Análisis de
    Candidato. */
+/* Sumapaz (localidad 20) es rural y enorme; se pinta, pero no encuadra. */
+const ES_SUMAPAZ = f => String(f?.properties?.LocCodigo || '') === '20';
 const CITY_JAL_LAYERS = [
   { match: ['BOGOTA'], path: 'BOG-LOCALIDADX.json', title: 'localidad', code: p => String(p.LocCodigo || '').padStart(2, '0'), name: p => p.LocNombre || 'Localidad', rotate: true },
   { match: ['MEDELLIN'], path: 'MEDELLINX.json', title: 'comuna', code: p => String(p.CODIGO || '').padStart(2, '0'), name: p => p.NOMBRE || p.IDENTIFICACION || 'Comuna' },
@@ -1162,11 +1303,11 @@ const CITY_JAL_LAYERS = [
 function cityLayerFor(nombre) { const city = normalizedText(nombre); return CITY_JAL_LAYERS.find(item => item.match.some(name => city.includes(name))) || null; }
 /* Pinta una ciudad por comuna/localidad con el estado compartido de los mapas
    de ciudad (toggles, detalle por barrio, niveles). */
-function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city, rotate, title, note, center, zoom, fitTarget }) {
+function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city, rotate, title, note, center, zoom, fitTarget, fueraDelEncuadre }) {
   completaNombres(geoData, config.code, config.name, namesByArea);
   const max = Math.max(1, ...Object.values(votesByArea));
   crmMapMode = 'total';
-  crmMapState = { city, config, geoData, votesByArea, namesByArea, mesas, total, max, targetKey, focusKey: null };
+  crmMapState = { city, config, geoData, votesByArea, namesByArea, mesas, total, max, targetKey, focusKey: null, rotado: Boolean(rotate) };
   $('crmMapTitle').textContent = title; ensureCRMMapToggles();
   crearMapa(center || [4.6, -74.1], zoom || 5); aplicarBasemap(Boolean(rotate));
   let targetLayer = null;
@@ -1175,7 +1316,7 @@ function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea,
     onEachFeature: (f, layer) => { if (config.code(f.properties) === targetKey) targetLayer = layer; layer.on('click', () => showCRMMapDetail(layer)); }
   }).addTo(crmLeafletMap);
   refreshCRMMapMode();
-  encuadrar(fitTarget && targetLayer ? targetLayer : crmMapLayer, 24);
+  encuadrarBounds(fitTarget && targetLayer ? targetLayer.getBounds() : fueraDelEncuadre ? boundsSin(crmMapLayer, fueraDelEncuadre) : crmMapLayer.getBounds(), 24);
   $('crmMapVotes').textContent = `${total.toLocaleString('es-CO')} votos`;
   $('crmMapNote').textContent = note + notaRecorte();
 }
@@ -1190,12 +1331,11 @@ async function renderJalCityMap(candidate) {
 }
 async function renderBogotaCampaignMap(candidate) {
   const data = await datosCandidatura(candidate), mesas = data.mesas || [];
-  const geoSource = rotateGeoJSON90Left(await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`));
-  const geoData = { ...geoSource, features: geoSource.features.filter(f => String(f.properties.LocCodigo) !== '20') };   /* sin Sumapaz: aplasta el mapa */
+  const geoData = rotateGeoJSON90Left(await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`));
   const config = { title: 'localidad', code: p => String(p.LocCodigo || '').padStart(2, '0'), name: p => p.LocNombre || 'Localidad' };
   const { votesByArea, namesByArea } = agregarPorArea(mesas, claveLocal);
   const total = mesas.reduce((sum, m) => sum + Number(m.v || 0), 0) || Number(candidate.votos) || 0;
-  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey: null, city: 'BOGOTA', rotate: true, title: '¿Dónde estuvo su votación en Bogotá?', note: 'Vista de Bogotá sin Sumapaz. Seleccione una localidad para abrir el desglose por barrio.' });
+  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey: null, city: 'BOGOTA', rotate: true, fueraDelEncuadre: ES_SUMAPAZ, title: '¿Dónde estuvo su votación en Bogotá?', note: 'Sumapaz se dibuja completa aunque se salga del marco: el encuadre lo mandan las 19 localidades urbanas, que es donde están los votos. Seleccione una localidad para abrir el desglose por barrio.' });
 }
 async function renderCaliCampaignMap(candidate) {
   const data = await datosCandidatura(candidate), mesas = data.mesas || [], geoData = await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`);
@@ -1246,11 +1386,20 @@ async function caliBarrios(comunaCode) {
   if (!caliBarriosPorComuna.has(key)) caliBarriosPorComuna.set(key, (window.Candidato360CaliBarrios?.[key] ? Promise.resolve() : loadCandidateMapScript(`candidato-360-data/cali-barrios/${key}.js`)).then(() => { const geo = window.Candidato360CaliBarrios?.[key]; if (!geo) throw new Error(`Sin cartografía barrial para la comuna ${key}`); return geo; }));
   return Promise.all([caliPuestoBarrioPromise, caliBarriosPorComuna.get(key)]);
 }
+/* A escala de barrio la pregunta deja de ser «cuánto» y pasa a ser «dónde
+   queda»: sin calles nadie reconoce su cuadra. Los polígonos barriales SÍ van
+   en coordenadas reales (a diferencia de las localidades de Bogotá, que van
+   rotadas), así que acá el callejero calza — se pone en gris y atenuado, y el
+   relleno baja de opacidad para que las carreras se lean por debajo. Mientras
+   dura esta vista se esconde la capa de localidades: rotada sobre un
+   callejero sin rotar, contradice cada calle que hay debajo. */
 function pintarBarrios(geo, values, codeOf, nameOf, nota) {
   if (crmBarrioLayer) crmLeafletMap.removeLayer(crmBarrioLayer);
+  ponerBasemap('crm-basemap-tenue');
+  if (crmMapLayer && crmMapState?.rotado) crmLeafletMap.removeLayer(crmMapLayer);   /* se saca del mapa, no del grupo: sus capas siguen ahí */
   const max = Math.max(1, ...Object.values(values));
   crmBarrioLayer = L.geoJSON(geo, {
-    style: f => { const votes = values[codeOf(f)] || 0; return { fillColor: MAP_COLOR(votes / max), fillOpacity: votes ? .82 : .28, color: 'rgba(23,37,28,.38)', weight: .55 }; },
+    style: f => { const votes = values[codeOf(f)] || 0; return { fillColor: MAP_COLOR(votes / max), fillOpacity: votes ? .62 : .12, color: 'rgba(16,34,56,.55)', weight: .7 }; },
     onEachFeature: (f, layer) => { const votes = Number(values[codeOf(f)] || 0); layer.bindTooltip(`<strong>${nameOf(f)}</strong><br>${votes.toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : 'votos'}`, { sticky: true }); layer.on('mouseover', () => layer.setStyle({ weight: 1.5, color: '#fff' })); layer.on('mouseout', () => crmBarrioLayer.resetStyle(layer)); }
   }).addTo(crmLeafletMap);
   encuadrar(crmBarrioLayer, 20);
@@ -1375,7 +1524,17 @@ function refreshMapLevels() {
   const controls = document.createElement('div'); controls.className = 'crm-map-levels';
   controls.innerHTML = `${isJal ? '' : '<button type="button" class="crm-map-level" data-level="municipio">Municipio</button>'}<button type="button" class="crm-map-level" data-level="localidad">${localLabel}</button><button type="button" class="crm-map-level" data-level="barrio" disabled>Barrio</button>`;
   mapEl.append(controls);
-  const volver = level => { if (crmBarrioLayer) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; } if (crmMapState) crmMapState.focusKey = null; refreshCRMMapMode(); encuadrar(crmMapLayer, 24); setMapLevel(level); };
+  /* Volver a la ciudad deshace lo del barrio: sin callejero (la capa de
+     Bogotá va rotada) y con las localidades de vuelta en el mapa. */
+  const volver = level => {
+    if (crmBarrioLayer) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
+    if (crmMapLayer && !crmLeafletMap.hasLayer(crmMapLayer)) crmMapLayer.addTo(crmLeafletMap);
+    aplicarBasemap(Boolean(crmMapState?.rotado));
+    if (crmMapState) crmMapState.focusKey = null;
+    refreshCRMMapMode();
+    encuadrarBounds(crmMapState?.rotado ? boundsSin(crmMapLayer, ES_SUMAPAZ) : crmMapLayer.getBounds(), 24);
+    setMapLevel(level);
+  };
   controls.querySelector('[data-level="municipio"]')?.addEventListener('click', () => volver('municipio'));
   controls.querySelector('[data-level="localidad"]')?.addEventListener('click', () => volver('localidad'));
   controls.querySelector('[data-level="barrio"]').addEventListener('click', () => { if (crmMapState?.focusKey) { renderBarriosForArea(crmMapState.focusKey); setMapLevel('barrio'); } });
@@ -1400,7 +1559,7 @@ async function renderTerritorioObjetivo(c) {
     let geoData, isTarget, nameOf, rotate = false, unidad = 'municipio', filas;
     if (dep === '16' && CORP_MUNICIPAL.includes(c.corp)) {
       const src = rotateGeoJSON90Left(await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`)); rotate = true; unidad = 'localidad';
-      geoData = { ...src, features: src.features.filter(f => String(f.properties.LocCodigo) !== '20') };
+      geoData = src;   /* Sumapaz entra al dibujo; el encuadre la deja fuera (ES_SUMAPAZ) */
       nameOf = f => f.properties.LocNombre || 'Localidad'; isTarget = f => c.corp !== 'jal' || normalizedText(f.properties.LocNombre) === normalizedText(cortoLocal(c.localidad));
     } else if (CORP_MUNICIPAL.includes(c.corp) && c.corp === 'jal' && cityLayerFor(c.municipio)) {
       const cfg = cityLayerFor(c.municipio); let src = await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/${cfg.path}`); if (cfg.rotate) { src = rotateGeoJSON90Left(src); rotate = true; }
@@ -1412,7 +1571,8 @@ async function renderTerritorioObjetivo(c) {
     crearMapa([4.6, -74.1], 5); aplicarBasemap(rotate);
     let targetLayer = null, n = 0;
     crmMapLayer = L.geoJSON(geoData, { style: f => ({ color: '#fff', weight: isTarget(f) ? 2 : 1, fillColor: isTarget(f) ? '#3e8a5b' : '#d8dfd7', fillOpacity: isTarget(f) ? .82 : .5 }), onEachFeature: (f, layer) => { layer.bindTooltip(`<strong>${nameOf(f)}</strong>`, { sticky: true }); if (isTarget(f)) { n++; if (!targetLayer) targetLayer = layer; } } }).addTo(crmLeafletMap);
-    encuadrar(CORP_DEPARTAMENTAL.includes(c.corp) || n > 1 ? crmMapLayer : (targetLayer || crmMapLayer), 24);
+    const capaEncuadre = CORP_DEPARTAMENTAL.includes(c.corp) || n > 1 ? crmMapLayer : (targetLayer || crmMapLayer);
+    encuadrarBounds(capaEncuadre === crmMapLayer && rotate ? boundsSin(crmMapLayer, ES_SUMAPAZ) : capaEncuadre.getBounds(), 24);
     filas = geoData.features.map(nameOf).sort((a, b) => a.localeCompare(b, 'es'));
     $('crmBreakdown').innerHTML = `<h4>${CORP_DEPARTAMENTAL.includes(c.corp) ? `Municipios de ${c.departamentoNombre}` : `${unidad === 'municipio' ? 'Municipios' : unidad === 'comuna' ? 'Comunas' : 'Localidades'} en el mapa`}</h4>` + filas.map(nm => `<div class="crm-breakdown-item static${normalizedText(nm) === (c.corp === 'jal' ? loc : muni) ? ' is-target' : ''}"><span class="crm-breakdown-row"><b>${escHtml(nm)}</b></span></div>`).join('');
     $('crmMapNote').textContent = CORP_DEPARTAMENTAL.includes(c.corp) ? `La circunscripción es todo ${c.departamentoNombre}: ${filas.length} municipios.` : `En verde, el territorio al que aspira. Sin historial propio no hay votos que distribuir; la meta de la derecha sale de los resultados de 2023 en ese territorio.`;
