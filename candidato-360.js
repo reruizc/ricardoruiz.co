@@ -39,6 +39,7 @@ const CRM_CORPORATIONS = { concejo: 'Concejo municipal o distrital', alcaldia: '
    no el DANE: 01.json es Antioquia (DANE 05) y 05.json es Bolívar (DANE 13).
    Un diccionario DANE aquí no da 404: carga el departamento equivocado con
    HTTP 200. Esta tabla es la única fuente de códigos de la página. */
+const DEP_BOGOTA = 'Distrito Capital de Bogotá';
 const DEP_CODES = { 'Amazonas': '60', 'Antioquia': '01', 'Arauca': '40', 'Atlántico': '03', 'Bolívar': '05', 'Boyacá': '07', 'Caldas': '09', 'Caquetá': '44', 'Casanare': '46', 'Cauca': '11', 'Cesar': '12', 'Chocó': '17', 'Córdoba': '13', 'Cundinamarca': '15', 'Distrito Capital de Bogotá': '16', 'Guainía': '50', 'Guaviare': '54', 'Huila': '19', 'La Guajira': '48', 'Magdalena': '21', 'Meta': '52', 'Nariño': '23', 'Norte de Santander': '25', 'Putumayo': '64', 'Quindío': '26', 'Risaralda': '24', 'San Andrés y Providencia': '56', 'Santander': '27', 'Sucre': '28', 'Tolima': '29', 'Valle del Cauca': '31', 'Vaupés': '68', 'Vichada': '72' };
 
 const escHtml = s => String(s || '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
@@ -547,6 +548,7 @@ function toggleCorporationChoice() {
 function updateCampaignTerritory() {
   const corp = $('otherCorporation').value, municipal = CORP_MUNICIPAL.includes(corp), jal = corp === 'jal';
   $('campaignMunicipalityField').classList.toggle('hidden', !municipal); $('campaignLocalityField').classList.toggle('hidden', !jal);
+  if (!municipal) $('campaignMunicipalityNota').classList.add('hidden');
   $('campaignDepartment').required = municipal || CORP_DEPARTAMENTAL.includes(corp); $('campaignMunicipality').required = municipal; $('campaignLocality').required = jal;
   if ($('campaignDepartment').value && municipal) loadCampaignMunicipalities();
 }
@@ -557,13 +559,32 @@ async function cargarMunicipios(select, dep, cacheKey) {
     municipalitiesByDepartment[cacheKey] = data;
     const municipalities = [...new Set(data.features.map(f => f.properties.mpio_cnmbr).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
     select.innerHTML = optionList(municipalities, 'Seleccione municipio o distrito');
-  } catch (e) { select.innerHTML = '<option value="">No se pudieron cargar los municipios</option>'; }
+    return municipalities;
+  } catch (e) { select.innerHTML = '<option value="">No se pudieron cargar los municipios</option>'; return []; }
+}
+/* Un departamento con UN solo municipio no tiene nada que preguntar: Bogotá
+   D.C. es distrito y departamento a la vez, y pedir «municipio o distrito»
+   después de haberla elegido en el departamento es un paso vacío. La regla se
+   decide con el DATO (cuántos municipios trae la fuente) y no con un `if` sobre
+   el código 16: si mañana entra otro distrito, ya está resuelto. El valor se
+   pone igual —el mapa, la meta y el briefing lo necesitan—, lo que se ahorra es
+   la pregunta. */
+function municipioImplicito(select, field, nota, municipios) {
+  const unico = municipios.length === 1;
+  field.classList.toggle('hidden', unico);
+  if (unico) select.value = municipios[0];
+  if (nota) {
+    nota.classList.toggle('hidden', !unico);
+    nota.textContent = unico ? `${municipios[0]} es el único municipio del departamento: la candidatura queda ubicada ahí.` : '';
+  }
+  return unico;
 }
 let municipalitiesByDepartment = {};
 async function loadCampaignMunicipalities() {
   const dep = $('campaignDepartment').value; if (!dep) return;
   $('campaignLocality').innerHTML = '<option value="">Primero seleccione municipio</option>';
-  await cargarMunicipios($('campaignMunicipality'), dep, `crm-${dep}`);
+  const municipios = await cargarMunicipios($('campaignMunicipality'), dep, `crm-${dep}`);
+  if (municipioImplicito($('campaignMunicipality'), $('campaignMunicipalityField'), $('campaignMunicipalityNota'), municipios)) loadCampaignLocalities();
 }
 async function cargarLocalidades(select, status, depNombre, munNombre) {
   select.innerHTML = '<option value="">Cargando comunas o localidades…</option>'; status.textContent = '';
@@ -615,15 +636,25 @@ async function cargarDepartamentos() {
   try {
     const data = await fetchJSON(`${S3}/mapas-2026/DEPARTAMENTOS2.json`);
     const names = data.features.map(f => f.properties.name).filter(n => DEP_CODES[n]).sort((a, b) => a.localeCompare(b, 'es'));
-    $('department').innerHTML = '<option value="">Seleccione un departamento</option>' + names.map(n => `<option value="${DEP_CODES[n]}">${n === 'Distrito Capital de Bogotá' ? 'Bogotá D.C.' : n}</option>`).join('');
+    /* Bogotá encabeza la lista y el resto sigue alfabético: una de cada cinco
+       candidaturas territoriales del país se juega ahí, y en un desplegable de
+       33 departamentos «Distrito Capital» quedaba enterrado en la D. */
+    const orden = [...names.filter(n => n === DEP_BOGOTA), ...names.filter(n => n !== DEP_BOGOTA)];
+    $('department').innerHTML = '<option value="">Seleccione un departamento</option>' + orden.map(n => `<option value="${DEP_CODES[n]}">${n === DEP_BOGOTA ? 'Bogotá D.C.' : n}</option>`).join('');
     campaignDeptOptions();
   } catch (e) { $('department').innerHTML = '<option value="">No se pudieron cargar los departamentos</option>'; }
 }
-async function loadMunicipalities() { const dep = $('department').value; if (!dep) return; await cargarMunicipios($('municipality'), dep, dep); }
+async function loadMunicipalities() {
+  const dep = $('department').value; if (!dep) return;
+  const municipios = await cargarMunicipios($('municipality'), dep, dep);
+  /* Al fijarlo por código no hay evento `change`: la localidad se pide a mano. */
+  if (municipioImplicito($('municipality'), $('municipalityField'), $('municipalityNota'), municipios)) updateLocality();
+}
 async function loadLocalities() { await cargarLocalidades($('locality'), $('localityStatus'), $('department').options[$('department').selectedIndex].text, $('municipality').value); }
 function updateTerritory() {
   const election = $('election').value, municipal = MUNICIPAL_ELECTIONS.includes(election);
   $('municipalityField').classList.toggle('hidden', !municipal); $('localityField').classList.toggle('hidden', election !== 'jal');
+  if (!municipal) $('municipalityNota').classList.add('hidden');
   $('municipality').required = municipal; $('locality').required = election === 'jal';
   if (municipal && $('department').value) loadMunicipalities(); else $('municipality').innerHTML = '<option value="">Primero seleccione departamento</option>';
   if (election !== 'jal') $('locality').innerHTML = '<option value="">Primero seleccione municipio</option>';
