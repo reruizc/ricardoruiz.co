@@ -359,7 +359,6 @@ function paintIndexProgress() {
 function appendHistorical(list) {
   if (!list || !list.length) return;
   historicalIndex = historicalIndex.concat(list);
-  loadParties();
   if ($('candidateSearch')?.value.trim().length >= 2) searchCandidate($('candidateSearch').value);
 }
 async function prepareHistoricalIndex() {
@@ -372,17 +371,107 @@ async function prepareHistoricalIndex() {
   historicalLocalDone = true;
   $('preloadBar').style.width = '100%'; $('preloadMeta').textContent = 'Inteligencia electoral preparada';
 }
-/* Los partidos salen del índice que ya está en memoria: son las mismas cinco
-   fuentes territoriales de 2023 que CandRegistry descarga de todos modos. */
-const PARTY_SOURCES = new Set(['asamblea', 'gob2023', 'alc2023', 'concejo', 'jal']);
+/* ─── 6 bis. Partidos: se escriben, no se buscan en una lista de mil ─────────
+   En las territoriales de 2023 se inscribieron 2.258 organizaciones distintas
+   en el país. Muchas son la misma coalición escrita de diez formas y muchas
+   solo existen en un departamento. Un desplegable nacional con eso es
+   inservible: en Bogotá hay 43 organizaciones y en Antioquia 341, y quien
+   busca la suya en una lista de dos mil termina eligiendo la homónima de otro
+   departamento.
+
+   Por eso: se escribe, se sugiere lo del DEPARTAMENTO elegido y se acepta
+   texto libre (una coalición nueva de 2027 no está en ningún catálogo de
+   2023). El catálogo lo construye tools/candidato-360/partidos/construir.mjs y
+   vive partido por departamento en candidato-360-data/partidos/. */
+const partidosPorDep = new Map();
+function cargarPartidos(dep) {
+  const key = String(dep || '').padStart(2, '0');
+  if (!/^\d{2}$/.test(key)) return Promise.resolve([]);
+  if (!partidosPorDep.has(key)) partidosPorDep.set(key, (window.Candidato360Partidos?.[key] ? Promise.resolve() : loadCandidateMapScript(`candidato-360-data/partidos/${key}.js`))
+    .then(() => window.Candidato360Partidos?.[key] || [])
+    .catch(() => []));
+  return partidosPorDep.get(key);
+}
+/* El departamento de una candidatura histórica: el segundo segmento del slug
+   es el código ELECTORAL en las cinco fuentes territoriales (JAL2023-16-… es
+   Bogotá). Si el slug no sirve, se busca por el nombre de la circunscripción. */
+function departamentoDeCandidatura(candidate) {
+  const delSlug = String(candidate?.slug || '').split('-')[1];
+  if (/^\d{1,2}$/.test(delSlug || '')) { const p = delSlug.padStart(2, '0'); if (Object.values(DEP_CODES).includes(p)) return p; }
+  const texto = normalizedText(`${candidate?.circunscripcion || ''} ${candidate?.corp || ''}`);
+  if (/BOGOTA/.test(texto)) return '16';
+  const hit = Object.entries(DEP_CODES).find(([nombre]) => nombre !== DEP_BOGOTA && texto.includes(normalizedText(nombre)));
+  return hit ? hit[1] : '';
+}
+/* Ranking de sugerencias: cada palabra escrita tiene que prefijar alguna
+   palabra del nombre (igual que el buscador de candidatos, que la gente ya
+   sabe usar). Desempata el tamaño: primero las organizaciones que más
+   candidaturas inscribieron en ese departamento. */
+/* ⚠️ normalizedText() pega todo (quita hasta los espacios), que es justo lo
+   que NO sirve acá: hay que comparar palabra por palabra. */
+const normPalabras = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9Ñ]+/g, ' ').trim();
+function rankearPartidos(lista, consulta, limite = 8) {
+  const q = normPalabras(consulta).split(' ').filter(Boolean);
+  if (!q.length) return lista.slice(0, limite);
+  const puntuadas = [];
+  for (const item of lista) {
+    const n = normPalabras(item[0]), palabras = n.split(' ');
+    if (!q.every(w => palabras.some(pal => pal.startsWith(w)))) continue;
+    puntuadas.push({ item, punto: (n.startsWith(q.join(' ')) ? 2 : 0) + (palabras[0]?.startsWith(q[0]) ? 1 : 0) });
+  }
+  return puntuadas.sort((a, b) => b.punto - a.punto || b.item[1] - a.item[1]).slice(0, limite).map(x => x.item);
+}
+/* Un autocompletado sencillo y accesible: flechas, Enter, Escape y clic.
+   `fuente()` devuelve la lista vigente; el campo NUNCA obliga a elegir de ella. */
+function montarSugeridor({ input, lista, fuente, alElegir }) {
+  const caja = $(input), menu = $(lista); if (!caja || !menu) return;
+  if (caja.dataset.sugeridor === '1') return;
+  caja.dataset.sugeridor = '1';
+  caja.setAttribute('autocomplete', 'off'); caja.setAttribute('role', 'combobox'); caja.setAttribute('aria-expanded', 'false');
+  let opciones = [], activo = -1;
+  const cerrar = () => { menu.classList.add('hidden'); menu.innerHTML = ''; activo = -1; caja.setAttribute('aria-expanded', 'false'); };
+  const pintar = () => {
+    menu.innerHTML = opciones.map((o, i) => `<button type="button" class="sugerencia${i === activo ? ' activa' : ''}" data-i="${i}"><b>${escHtml(o[0])}</b><small>${Number(o[1]).toLocaleString('es-CO')} candidatura${o[1] === 1 ? '' : 's'} en 2023</small></button>`).join('');
+    menu.classList.toggle('hidden', !opciones.length); caja.setAttribute('aria-expanded', String(Boolean(opciones.length)));
+  };
+  const elegir = i => { const o = opciones[i]; if (!o) return; caja.value = o[0]; cerrar(); alElegir?.(o[0]); };
+  const abrir = async () => { opciones = rankearPartidos(await fuente(), caja.value); activo = -1; pintar(); };
+  caja.addEventListener('input', () => { abrir(); alElegir?.(caja.value); });
+  caja.addEventListener('focus', abrir);
+  caja.addEventListener('blur', () => setTimeout(cerrar, 140));
+  caja.addEventListener('keydown', e => {
+    if (e.key === 'Escape') return cerrar();
+    if (!opciones.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); activo = (activo + 1) % opciones.length; pintar(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); activo = (activo <= 0 ? opciones.length : activo) - 1; pintar(); }
+    else if (e.key === 'Enter' && activo >= 0) { e.preventDefault(); elegir(activo); }
+  });
+  menu.addEventListener('mousedown', e => { const boton = e.target.closest('[data-i]'); if (boton) { e.preventDefault(); elegir(Number(boton.dataset.i)); } });
+}
+/* Conecta un campo de partido con el departamento que lo filtra. */
+function montarCampoPartido({ input, lista, estado, departamento }) {
+  montarSugeridor({ input, lista, fuente: () => cargarPartidos(departamento()), alElegir: () => pintarEstadoPartido({ input, estado, departamento }) });
+  pintarEstadoPartido({ input, estado, departamento });
+}
+async function pintarEstadoPartido({ input, estado, departamento }) {
+  const nota = $(estado); if (!nota) return;
+  const dep = departamento();
+  if (!dep) { nota.textContent = 'Seleccione primero el departamento y le sugerimos las organizaciones que inscribieron candidatura allí.'; return; }
+  const catalogo = await cargarPartidos(dep), nombre = nombreDepartamento(dep);
+  if (!catalogo.length) { nota.textContent = 'No pudimos cargar el catálogo de ese departamento: escriba el nombre y lo tomamos como está.'; return; }
+  const escrito = String($(input)?.value || '').trim();
+  const enCatalogo = escrito && catalogo.some(([n]) => normalizedText(n) === normalizedText(escrito));
+  nota.textContent = escrito && !enCatalogo
+    ? `No aparece en ${nombre} en 2023. Lo tomamos como está: puede ser una organización nueva o una coalición que se inscribe ahora.`
+    : `${catalogo.length} organizaciones inscribieron candidatura en ${nombre} en 2023. Escriba y le sugerimos; también puede escribir una que no esté.`;
+}
+function nombreDepartamento(dep) {
+  const hit = Object.entries(DEP_CODES).find(([, code]) => code === String(dep).padStart(2, '0'));
+  return hit ? (hit[0] === DEP_BOGOTA ? 'Bogotá D.C.' : hit[0]) : 'ese departamento';
+}
+/* El campo del wizard de candidatura nueva, filtrado por su departamento. */
 function loadParties() {
-  const party = $('party'), partyStatus = $('partyStatus'); if (!party) return;
-  const parties = [...new Set(historicalIndex.filter(c => PARTY_SOURCES.has(c.source)).map(c => c.partido).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
-  if (!parties.length) { party.innerHTML = '<option value="">Cargando la base de partidos…</option>'; partyStatus.textContent = 'Se completa mientras llega el índice electoral.'; return; }
-  const elegido = party.value;
-  party.innerHTML = optionList(parties, 'Seleccione de la base');
-  if (elegido) party.value = elegido;
-  partyStatus.textContent = `${parties.length} partidos, movimientos, coaliciones y listas encontrados en los índices territoriales.${historicalLocalDone ? '' : ' Siguen llegando.'}`;
+  montarCampoPartido({ input: 'party', lista: 'partyLista', estado: 'partyStatus', departamento: () => $('department')?.value || '' });
 }
 
 /* Pantalla de espera del índice: cuadritos + progreso REAL por fuente + datos
@@ -492,6 +581,10 @@ function abrirRutaCandidato(profile) {
   crmCandidate = profile;
   $('routeInitials').textContent = initials(profile.nombre); $('routeName').textContent = profile.nombre;
   $('routeHistory').textContent = profile.historyLabel ? `Historial: ${profile.historyLabel}` : `Historial: ${profile.corp || 'candidatura registrada'}${profile.partido ? ` · ${profile.partido}` : ''}`;
+  /* Se precarga el partido de su última elección, pero es un campo abierto:
+     asumir que repite aval era el error. */
+  if ($('campaignParty')) $('campaignParty').value = profile.partido || '';
+  montarCampoPartido({ input: 'campaignParty', lista: 'campaignPartyLista', estado: 'campaignPartyStatus', departamento: departamentoDeCampana });
   const sameCorp = corporacionHistorica(profile);
   /* "La misma corporación" solo aplica si la última fue territorial: un Senado
      o una consulta no tienen "misma corporación" en las locales de 2027. */
@@ -544,9 +637,24 @@ function toggleCorporationChoice() {
   historicCorporationPicker.classList.toggle('hidden', !isOther);
   $('campaignPlace').classList.toggle('hidden', !isOther);
   if (isOther) updateCampaignTerritory();
+  refrescarPartidoCampana();
+}
+/* El departamento que filtra el catálogo de partidos de la ruta: el elegido
+   para 2027 si cambia de corporación, y si no el de su candidatura anterior. */
+function departamentoDeCampana() {
+  const isOther = document.querySelector('input[name="corporationRoute"]:checked')?.value === 'other';
+  return (isOther ? $('campaignDepartment')?.value : '') || departamentoDeCandidatura(crmCandidate);
+}
+function refrescarPartidoCampana() { pintarEstadoPartido({ input: 'campaignParty', estado: 'campaignPartyStatus', departamento: departamentoDeCampana }); }
+/* El partido con el que se lanza, que NO tiene por qué ser el de su última
+   elección: la mitad de las candidaturas territoriales cambia de aval entre
+   una elección y la siguiente. Manda lo que la persona escribió. */
+function partidoVigente() {
+  return String(CAMPANA_ACTUAL?.partido || $('campaignParty')?.value || '').trim() || crmCandidate?.partido || '';
 }
 function updateCampaignTerritory() {
   const corp = $('otherCorporation').value, municipal = CORP_MUNICIPAL.includes(corp), jal = corp === 'jal';
+  refrescarPartidoCampana();
   $('campaignMunicipalityField').classList.toggle('hidden', !municipal); $('campaignLocalityField').classList.toggle('hidden', !jal);
   if (!municipal) $('campaignMunicipalityNota').classList.add('hidden');
   $('campaignDepartment').required = municipal || CORP_DEPARTAMENTAL.includes(corp); $('campaignMunicipality').required = municipal; $('campaignLocality').required = jal;
@@ -581,7 +689,9 @@ function municipioImplicito(select, field, nota, municipios) {
 }
 let municipalitiesByDepartment = {};
 async function loadCampaignMunicipalities() {
-  const dep = $('campaignDepartment').value; if (!dep) return;
+  const dep = $('campaignDepartment').value;
+  refrescarPartidoCampana();                 /* otro departamento, otro catálogo de partidos */
+  if (!dep) return;
   $('campaignLocality').innerHTML = '<option value="">Primero seleccione municipio</option>';
   const municipios = await cargarMunicipios($('campaignMunicipality'), dep, `crm-${dep}`);
   if (municipioImplicito($('campaignMunicipality'), $('campaignMunicipalityField'), $('campaignMunicipalityNota'), municipios)) loadCampaignLocalities();
@@ -614,13 +724,14 @@ function currentTargetTerritory() {
 /* Lo que se guarda como campaña en el vínculo (editable). */
 function campanaActual(corpKey) {
   const isOther = document.querySelector('input[name="corporationRoute"]:checked')?.value === 'other';
-  return { corp: corpKey, ruta: isOther ? 'other' : 'same', departamento: isOther ? $('campaignDepartment').value : '', departamentoNombre: isOther ? ($('campaignDepartment').options[$('campaignDepartment').selectedIndex]?.text || '') : '', municipio: isOther ? $('campaignMunicipality').value : '', localidad: isOther ? $('campaignLocality').value : '' };
+  return { corp: corpKey, partido: String($('campaignParty')?.value || '').trim() || crmCandidate?.partido || '', ruta: isOther ? 'other' : 'same', departamento: isOther ? $('campaignDepartment').value : '', departamentoNombre: isOther ? ($('campaignDepartment').options[$('campaignDepartment').selectedIndex]?.text || '') : '', municipio: isOther ? $('campaignMunicipality').value : '', localidad: isOther ? $('campaignLocality').value : '' };
 }
 /* Rellena la ruta con la campaña guardada (al volver con vínculo). */
 async function precargarCampana(campana) {
   if (!campana) return;
   const isOther = campana.ruta === 'other' || !corporacionHistorica(crmCandidate);
   document.querySelector(`input[name="corporationRoute"][value="${isOther ? 'other' : 'same'}"]`).checked = true;
+  if (campana.partido && $('campaignParty')) $('campaignParty').value = campana.partido;
   toggleCorporationChoice();
   if (!isOther) return;
   $('otherCorporation').value = campana.corp; marcarCard(historicCorporationPicker, campana.corp); updateCampaignTerritory();
@@ -653,6 +764,7 @@ async function loadMunicipalities() {
 async function loadLocalities() { await cargarLocalidades($('locality'), $('localityStatus'), $('department').options[$('department').selectedIndex].text, $('municipality').value); }
 function updateTerritory() {
   const election = $('election').value, municipal = MUNICIPAL_ELECTIONS.includes(election);
+  pintarEstadoPartido({ input: 'party', estado: 'partyStatus', departamento: () => $('department').value });
   $('municipalityField').classList.toggle('hidden', !municipal); $('localityField').classList.toggle('hidden', election !== 'jal');
   if (!municipal) $('municipalityNota').classList.add('hidden');
   $('municipality').required = municipal; $('locality').required = election === 'jal';
@@ -1008,7 +1120,7 @@ async function launchCRM(event) {
   $('crmTarget').textContent = `Candidatura 2027 · ${corporation}${territory ? ` · ${territory}` : ''}`;
   $('crmContext').textContent = crmCandidate.history?.length
     ? `Integramos ${crmCandidate.history.length} candidaturas de la misma persona (${[...new Set(crmCandidate.history.map(candidateYear).filter(Boolean))].sort((a, b) => a - b).join(', ')}). El CRM conserva todo su historial; el mapa toma la elección más reciente como referencia territorial para no mezclar votaciones de años diferentes.`
-    : `Partimos de ${crmCandidate.corp || 'su historial electoral'}${crmCandidate.partido ? ` y ${crmCandidate.partido}` : ''}. El mapa conserva la votación histórica; la nueva campaña queda ubicada en ${territory || 'su territorio electoral anterior'}.`;
+    : `Partimos de ${crmCandidate.corp || 'su historial electoral'}${crmCandidate.partido ? ` y ${crmCandidate.partido}` : ''}. El mapa conserva la votación histórica; la nueva campaña queda ubicada en ${territory || 'su territorio electoral anterior'}${campana.partido && normalizedText(campana.partido) !== normalizedText(crmCandidate.partido || '') ? ` y se inscribe con ${campana.partido}` : ''}.`;
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Mapa de historial electoral';
   showScreen('crm');
@@ -1437,7 +1549,7 @@ function repartoSaltoCiudad(state, goal) {
   const llaves = Object.keys(state.namesByArea || {});
   const porArea = emparejarAreas(s.porArea, llaves, state.namesByArea);
   if (Object.keys(porArea).length < 2) return null;
-  const base = baseDestino({ porArea, partido: crmCandidate?.partido, nombreCandidato: crmCandidate?.nombre });
+  const base = baseDestino({ porArea, partido: partidoVigente(), nombreCandidato: crmCandidate?.nombre });
   if (!base) return null;
   const origen = Object.keys(state.votesByArea || {}).filter(k => Number(state.votesByArea[k] || 0) > 0);
   const reparto = repartoSalto({ meta: goal, propio: state.votesByArea, origen, base, arraigo: s.arraigo });
@@ -1454,7 +1566,7 @@ async function pintarProyeccionDepartamental(goal) {
     const nameOf = f => f.properties.mpio_cnmbr || 'Municipio';
     const nombres = Object.fromEntries(geoData.features.map(f => [normalizedText(nameOf(f)), nameOf(f)]));
     const porArea = emparejarAreas(s.porArea, Object.keys(nombres), nombres);
-    const base = baseDestino({ porArea, partido: crmCandidate?.partido, nombreCandidato: crmCandidate?.nombre });
+    const base = baseDestino({ porArea, partido: partidoVigente(), nombreCandidato: crmCandidate?.nombre });
     if (!base) return false;
     const origenNombre = normalizedText(String(crmCandidate?.corp || '').split('·')[1] || crmCandidate?.circunscripcion || '');
     const origen = Object.keys(nombres).filter(k => k === origenNombre || (origenNombre && k.includes(origenNombre)));

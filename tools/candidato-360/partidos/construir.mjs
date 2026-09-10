@@ -1,0 +1,122 @@
+/* construir.mjs — el catálogo de partidos POR DEPARTAMENTO.
+   ═══════════════════════════════════════════════════════════════════════════
+   A nivel nacional hay más de mil organizaciones inscritas en las
+   territoriales de 2023, y muchas se repiten con el mismo nombre en distinto
+   orden entre un departamento y otro («MOVIMIENTO X - PARTIDO Y» acá,
+   «PARTIDO Y - MOVIMIENTO X» allá). Un desplegable nacional con esa lista es
+   inservible: nadie encuentra su partido y quien lo encuentra suele elegir el
+   homónimo de otro departamento.
+
+   Este script baja los cinco índices territoriales de 2023 (Concejo, JAL,
+   Asamblea, Alcaldía, Gobernación) y arma, para cada departamento, la lista de
+   organizaciones que efectivamente inscribieron candidatura allí, con cuántas
+   inscribieron. El código de departamento sale del slug: el segundo segmento
+   (ASAM2023-31-8-51 → 31 = Valle) es el código ELECTORAL, el mismo que usa el
+   resto de la plataforma.
+
+   Escribe un archivo por departamento en `candidato-360-data/partidos/`, que la
+   página carga bajo demanda: Bogotá son 3 KB, no los 196 KB del país entero.
+   Va en el repo y no en S3 porque pesa poco y porque es catálogo de interfaz:
+   si no carga, no hay autocompletado y el campo queda en texto libre.
+
+     node tools/candidato-360/partidos/construir.mjs
+     node tools/candidato-360/partidos/construir.mjs --salida otra/carpeta
+   ═══════════════════════════════════════════════════════════════════════════ */
+import { writeFile, mkdir } from 'node:fs/promises';
+import path from 'node:path';
+
+const args = {};
+for (let i = 2; i < process.argv.length; i++) if (process.argv[i].startsWith('--')) args[process.argv[i].slice(2)] = process.argv[++i];
+const AQUI = path.dirname(new URL(import.meta.url).pathname);
+const REPO = path.resolve(AQUI, '../../..');
+const BASE = (args.base || 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output').replace(/\/$/, '');
+const SALIDA = path.resolve(args.salida || path.join(REPO, 'candidato-360-data/partidos'));
+
+const FUENTES = [
+  { dir: 'concejo-2023',     archivo: 'index-concejo-2023.json',     corp: 'concejo' },
+  { dir: 'jal-2023',         archivo: 'index-jal-2023.json',         corp: 'jal' },
+  { dir: 'asamblea-2023',    archivo: 'index-asamblea-2023.json',    corp: 'asamblea' },
+  { dir: 'alcaldia-2023',    archivo: 'index-alcaldia-2023.json',    corp: 'alcaldia' },
+  { dir: 'gobernacion-2023', archivo: 'index-gobernacion-2023.json', corp: 'gobernacion' },
+];
+
+/* El nombre se guarda TAL CUAL viene de la Registraduría (es lo que la persona
+   reconoce), pero se deduplica por una llave normalizada: sin tildes, sin
+   puntuación y con las palabras ordenadas. Así «PARTIDO A - MOVIMIENTO B» y
+   «MOVIMIENTO B - PARTIDO A» son la misma organización, que es el problema que
+   motivó todo esto. Gana como etiqueta la forma más frecuente. */
+const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9ÑÜ ]+/g, ' ').replace(/\s+/g, ' ').trim();
+/* Se quitan SOLO las palabras estructurales. «COALICIÓN», «ALIANZA» o «POR» se
+   conservan: en los movimientos locales cargan significado y quitarlas fundía
+   organizaciones distintas («COALICIÓN POR BOGOTÁ» con «MOVIMIENTO BOGOTÁ»). */
+const RUIDO = new Set(['PARTIDO', 'MOVIMIENTO', 'POLITICO', 'POLITICA', 'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'Y']);
+function llave(nombre) {
+  const palabras = norm(nombre).split(' ').filter(w => w && !RUIDO.has(w));
+  return (palabras.length ? palabras : norm(nombre).split(' ')).sort().join(' ');
+}
+
+const porDep = new Map();        /* dep → Map(llave → {formas: Map(nombre→n), n, corps:Set}) */
+const nacional = new Map();
+
+async function baja(url) {
+  for (let i = 0; i < 4; i++) {
+    try { const r = await fetch(url); if (!r.ok) throw new Error(`HTTP ${r.status}`); return await r.json(); }
+    catch (e) { if (i === 3) { console.warn(`  ✗ ${url}: ${e.message}`); return null; } await new Promise(r => setTimeout(r, 600 * 2 ** i)); }
+  }
+}
+function anota(mapa, nombre, corp) {
+  const k = llave(nombre); if (!k) return;
+  if (!mapa.has(k)) mapa.set(k, { formas: new Map(), n: 0, corps: new Set() });
+  const e = mapa.get(k);
+  e.formas.set(nombre, (e.formas.get(nombre) || 0) + 1);
+  e.n++; e.corps.add(corp);
+}
+
+for (const f of FUENTES) {
+  process.stdout.write(`· ${f.dir} … `);
+  const raw = await baja(`${BASE}/${f.dir}/${f.archivo}`);
+  const lista = raw?.candidatos || (Array.isArray(raw) ? raw : []);
+  let usados = 0;
+  for (const c of lista) {
+    const partido = String(c.partido || '').trim(); if (!partido) continue;
+    const dep = String(c.slug || '').split('-')[1];        /* código ELECTORAL */
+    if (!dep || !/^\d+$/.test(dep)) continue;
+    const clave = String(Number(dep));
+    if (!porDep.has(clave)) porDep.set(clave, new Map());
+    anota(porDep.get(clave), partido, f.corp);
+    anota(nacional, partido, f.corp);
+    usados++;
+  }
+  console.log(`${lista.length} candidaturas, ${usados} con partido y departamento`);
+}
+
+const ordenar = mapa => [...mapa.values()]
+  .map(e => ({ nombre: [...e.formas.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'))[0][0], n: e.n }))
+  .sort((a, b) => b.n - a.n || a.nombre.localeCompare(b.nombre, 'es'))
+  .map(e => [e.nombre, e.n]);
+
+/* Un archivo por departamento: la página carga solo el suyo. */
+await mkdir(SALIDA, { recursive: true });
+const { statSync } = await import('node:fs');
+const cabecera = dep => `/* Partidos y movimientos que inscribieron candidatura en el departamento ${dep}
+   (código ELECTORAL) en las territoriales de 2023. Cada entrada es
+   [nombre, candidaturas inscritas]. Lo construye
+   tools/candidato-360/partidos/construir.mjs — no se edita a mano. */\n`;
+let total = 0, bytes = 0;
+for (const [dep, mapa] of [...porDep.entries()].sort((a, b) => Number(a[0]) - Number(b[0]))) {
+  const lista = ordenar(mapa), archivo = path.join(SALIDA, `${dep.padStart(2, '0')}.js`);
+  await writeFile(archivo, `${cabecera(dep.padStart(2, '0'))}window.Candidato360Partidos=window.Candidato360Partidos||{};window.Candidato360Partidos["${dep.padStart(2, '0')}"]=${JSON.stringify(lista)};\n`);
+  total++; bytes += statSync(archivo).size;
+}
+console.log(`\n${total} departamentos · ${nacional.size} organizaciones distintas en el país · ${(bytes / 1024).toFixed(0)} KB en total`);
+for (const [dep, mapa] of [...porDep.entries()].sort((a, b) => Number(a[0]) - Number(b[0]))) {
+  if (!['16', '1', '31', '15'].includes(dep)) continue;
+  const lista = ordenar(mapa);
+  console.log(`  dep ${dep.padStart(2, '0')}: ${lista.length} organizaciones · ${(statSync(path.join(SALIDA, `${dep.padStart(2, '0')}.js`)).size / 1024).toFixed(1)} KB · top: ${lista.slice(0, 3).map(([n, c]) => `${n} (${c})`).join(' · ')}`);
+}
+/* Las fusiones, para poder auditarlas: si dos organizaciones distintas caen en
+   la misma llave, acá se ve. */
+const fusiones = [...nacional.entries()].filter(([, e]) => e.formas.size > 1).sort((a, b) => b[1].formas.size - a[1].formas.size).slice(0, 12);
+console.log(`\n${[...nacional.values()].filter(e => e.formas.size > 1).length} organizaciones tenían el nombre escrito de más de una forma. Las mayores:`);
+for (const [, e] of fusiones) console.log(`  · ${[...e.formas.keys()].join('  |  ')}`);
+console.log(`\nEscrito ${SALIDA}/`);
