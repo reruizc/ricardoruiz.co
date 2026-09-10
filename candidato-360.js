@@ -1541,7 +1541,10 @@ function completaNombres(geoData, code, name, namesByArea) { (geoData?.features 
 function electoralPlaceCode(mesa) { return `${String(mesa.dep || '').padStart(2, '0')}${String(mesa.mun || '').padStart(3, '0')}${String(mesa.zon || '').padStart(2, '0')}${String(mesa.pue || '').padStart(2, '0')}`; }
 let puestosBarrioPromise = null;
 async function puestosPorBarrio() {
-  if (!puestosBarrioPromise) puestosBarrioPromise = fetch(`${S3}/mapas-2026/PUESTOS_GEOREF.csv`).then(r => r.ok ? r.text() : Promise.reject()).then(raw => { const lookup = {}; raw.split(/\r?\n/).slice(1).forEach(line => { const row = line.split(';'), code = row[1], barrio = row[7]; if (code && barrio) lookup[code] = { barrio, lat: Number(row[9]), lng: Number(row[10]) }; }); return lookup; });
+  /* Columnas: 1 código completo (dep+mun+zon+pue), 7 barrio, 9/10 lat/lng,
+     13/14 mujeres/hombres — la suma es el CENSO del puesto, que es lo que
+     permite repartir una meta por barrio donde la persona nunca sacó votos. */
+  if (!puestosBarrioPromise) puestosBarrioPromise = fetch(`${S3}/mapas-2026/PUESTOS_GEOREF.csv`).then(r => r.ok ? r.text() : Promise.reject()).then(raw => { const lookup = {}; raw.split(/\r?\n/).slice(1).forEach(line => { const row = line.split(';'), code = row[1], barrio = row[7]; if (code && barrio) lookup[code] = { barrio, lat: Number(row[9]), lng: Number(row[10]), censo: (Number(row[13]) || 0) + (Number(row[14]) || 0) }; }); return lookup; });
   return puestosBarrioPromise;
 }
 /* Reparte una meta en proporción a lo observado sin perder un voto por redondeo. */
@@ -1759,10 +1762,16 @@ async function renderSingleElection(candidate) {
 function loadCandidateMapScript(src) { return new Promise((resolve, reject) => { const script = document.createElement('script'); script.src = src; script.async = true; script.onload = resolve; script.onerror = () => reject(new Error(`No se pudo cargar ${src}`)); document.head.appendChild(script); }); }
 let bogotaPuestoBarrioPromise = null, caliPuestoBarrioPromise = null;
 const bogotaBarriosPorLocalidad = new Map(), caliBarriosPorComuna = new Map();
+/* ⚠️ Los polígonos de barrio van SIN rotar. La ciudad se dibuja rotada 90°
+   (convención del proyecto: Bogotá es larga de norte a sur y así cabe en el
+   panel), pero a escala de barrio entra el callejero real de OpenStreetMap
+   debajo. Rotar los barrios sobre un callejero sin rotar los mandaba a los
+   cerros orientales: la silueta se veía bien y no coincidía con ninguna calle.
+   Por eso pintarBarrios saca del mapa la capa de localidades, que sí va rotada. */
 async function bogotaBarrios(localityCode) {
   const key = String(localityCode || '').padStart(2, '0');
   if (!bogotaPuestoBarrioPromise) bogotaPuestoBarrioPromise = window.Candidato360BogotaPuestoBarrio ? Promise.resolve(window.Candidato360BogotaPuestoBarrio) : loadCandidateMapScript('candidato-360-data/bogota-puesto-barrio.js').then(() => window.Candidato360BogotaPuestoBarrio);
-  if (!bogotaBarriosPorLocalidad.has(key)) bogotaBarriosPorLocalidad.set(key, (window.Candidato360BogotaBarrios?.[key] ? Promise.resolve() : loadCandidateMapScript(`candidato-360-data/bogota-barrios/${key}.js`)).then(() => { const geo = window.Candidato360BogotaBarrios?.[key]; if (!geo) throw new Error(`Sin cartografía barrial para la localidad ${key}`); return rotateGeoJSON90Left(geo); }));
+  if (!bogotaBarriosPorLocalidad.has(key)) bogotaBarriosPorLocalidad.set(key, (window.Candidato360BogotaBarrios?.[key] ? Promise.resolve() : loadCandidateMapScript(`candidato-360-data/bogota-barrios/${key}.js`)).then(() => { const geo = window.Candidato360BogotaBarrios?.[key]; if (!geo) throw new Error(`Sin cartografía barrial para la localidad ${key}`); return geo; }));
   return Promise.all([bogotaPuestoBarrioPromise, bogotaBarriosPorLocalidad.get(key)]);
 }
 async function caliBarrios(comunaCode) {
@@ -1788,7 +1797,55 @@ function pintarBarrios(geo, values, codeOf, nameOf, nota) {
     onEachFeature: (f, layer) => { const votes = Number(values[codeOf(f)] || 0); layer.bindTooltip(`<strong>${nameOf(f)}</strong><br>${votes.toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : 'votos'}`, { sticky: true }); layer.on('mouseover', () => layer.setStyle({ weight: 1.5, color: '#fff' })); layer.on('mouseout', () => crmBarrioLayer.resetStyle(layer)); }
   }).addTo(crmLeafletMap);
   encuadrar(crmBarrioLayer, 20);
-  $('crmMapNote').textContent = nota;
+  $('crmMapNote').innerHTML = nota;
+}
+/* ── La meta a escala de barrio ──────────────────────────────────────────────
+   Repartir la meta de una localidad entre sus barrios necesita un peso. Si la
+   persona ya sacó votos ahí, el peso es su propia huella: es lo más suyo que
+   hay. Si no —una localidad que nunca disputó, o un salto de corporación que
+   le manda meta a media ciudad—, el peso es el CENSO ELECTORAL de cada barrio.
+   No dice dónde la quieren; dice dónde hay gente que vota, que es la única
+   pregunta que los datos pueden contestar ahí. La nota del mapa lo aclara,
+   porque un mapa de censo leído como un mapa de apoyo miente. */
+async function censoBarrialBogota(localidad, puestoBarrio, code6) {
+  const places = await puestosPorBarrio(), out = {};
+  Object.entries(puestoBarrio || {}).forEach(([zonaPuesto, barrio]) => {
+    if (!String(zonaPuesto).startsWith(`${localidad}-`)) return;
+    const censo = places[`16001${String(zonaPuesto).replace('-', '')}`]?.censo || 0;
+    if (censo) out[code6(barrio)] = (out[code6(barrio)] || 0) + censo;
+  });
+  return out;
+}
+async function censoBarrialCali(comuna, puestoBarrio) {
+  const places = await puestosPorBarrio(), out = {}, c = String(comuna).padStart(2, '0');
+  Object.entries(puestoBarrio || {}).forEach(([code, info]) => {
+    if (String(info?.comuna || '').padStart(2, '0') !== c || !info?.barrio) return;
+    const censo = places[code]?.censo || 0;
+    if (censo) out[info.barrio] = (out[info.barrio] || 0) + censo;
+  });
+  return out;
+}
+async function valoresBarriales(historical, localGoal, censoDe) {
+  if (crmMapMode !== 'proyectado') return { values: historical, base: 'historial' };
+  if (Object.values(historical).some(v => v > 0)) return { values: distributeVotes(historical, localGoal), base: 'historial' };
+  if (!localGoal) return { values: {}, base: 'sin-meta' };
+  try {
+    const censo = await censoDe();
+    if (Object.values(censo).some(v => v > 0)) return { values: distributeVotes(censo, localGoal), base: 'censo' };
+  } catch (e) { /* el CSV de puestos no respondió */ }
+  return { values: {}, base: 'sin-base' };
+}
+function tituloBarrial(base) {
+  return crmMapMode !== 'proyectado' ? 'Votos totales por barrio'
+    : base === 'censo' ? 'Meta proyectada por barrio · censo' : 'Meta proyectada por barrio';
+}
+function notaBarrial(donde, base) {
+  const cabeza = `Detalle poligonal por barrio de ${donde}.`;
+  if (crmMapMode !== 'proyectado') return cabeza;
+  if (base === 'censo') return `${cabeza} Usted no tuvo votos acá, así que la meta se reparte por el <b>censo electoral</b> de cada barrio: dice dónde hay gente que vota, no dónde ya votaron por usted.`;
+  if (base === 'historial') return `${cabeza} La meta de esta zona se reparte en la misma proporción en que ya votaron por usted, barrio por barrio.`;
+  if (base === 'sin-meta') return `${cabeza} Esta zona no recibe meta en la proyección.`;
+  return `${cabeza} No se pudo repartir la meta por barrio: el censo por puesto de votación no respondió.`;
 }
 async function renderBarriosForArea(key) {
   const state = crmMapState; if (!state) return;
@@ -1801,18 +1858,22 @@ async function renderBarriosForArea(key) {
     try {
       const [puestoBarrio, geo] = await caliBarrios(key), historical = {};
       mesas.forEach(m => { const barrio = puestoBarrio[electoralPlaceCode(m)]?.barrio; if (barrio) historical[barrio] = (historical[barrio] || 0) + Number(m.v || 0); });
-      const values = conValores(historical);
-      renderMapBreakdown(values, Object.fromEntries(geo.features.map(f => [f.properties.barrio, f.properties.barrio])), titulo);
-      return pintarBarrios(geo, values, f => f.properties.barrio, f => f.properties.barrio, `Detalle poligonal por barrio de ${state.namesByArea[key] || `la comuna ${key}`}.`);
+      const { values, base } = await valoresBarriales(historical, localGoal, () => censoBarrialCali(key, puestoBarrio));
+      renderMapBreakdown(values, Object.fromEntries(geo.features.map(f => [f.properties.barrio, f.properties.barrio])), tituloBarrial(base));
+      return pintarBarrios(geo, values, f => f.properties.barrio, f => f.properties.barrio, notaBarrial(state.namesByArea[key] || `la comuna ${key}`, base));
     } catch (e) { $('crmBreakdown').innerHTML = '<h4>Votos por barrio</h4><p class="helper">No fue posible cargar los polígonos barriales de esta comuna.</p>'; return; }
   }
-  if (state.mesas.some(m => String(m.dep) === '16')) {
+  /* Bogotá se reconoce por la capa que está pintada, no por las mesas: con un
+     salto de corporación la meta cae en localidades donde la persona nunca
+     tuvo una mesa, y mirar las mesas mandaba esas localidades al camino
+     genérico de puestos de votación. */
+  if (String(state.city || '').startsWith('BOGOTA') || state.mesas.some(m => String(m.dep) === '16')) {
     try {
       const [puestoBarrio, geo] = await bogotaBarrios(key), historical = {}, code6 = v => String(v).padStart(6, '0');
       mesas.forEach(m => { const barrio = puestoBarrio[`${String(m.zon || '').padStart(2, '0')}-${String(m.pue || '').padStart(2, '0')}`]; if (barrio) historical[code6(barrio)] = (historical[code6(barrio)] || 0) + Number(m.v || 0); });
-      const values = conValores(historical);
-      renderMapBreakdown(values, Object.fromEntries(geo.features.map(f => [code6(f.properties.codigo), f.properties.nombre])), titulo);
-      return pintarBarrios(geo, values, f => code6(f.properties.codigo), f => f.properties.nombre, `Detalle poligonal por barrio de ${geo.features[0]?.properties.loc_nombre || 'la localidad'}.`);
+      const { values, base } = await valoresBarriales(historical, localGoal, () => censoBarrialBogota(key, puestoBarrio, code6));
+      renderMapBreakdown(values, Object.fromEntries(geo.features.map(f => [code6(f.properties.codigo), f.properties.nombre])), tituloBarrial(base));
+      return pintarBarrios(geo, values, f => code6(f.properties.codigo), f => f.properties.nombre, notaBarrial(geo.features[0]?.properties.loc_nombre || 'la localidad', base));
     } catch (e) { /* sin polígono → puestos */ }
   }
   let places = {}; try { places = await puestosPorBarrio(); } catch (e) {}

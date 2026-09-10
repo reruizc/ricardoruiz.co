@@ -37,6 +37,14 @@ const BOG = { type:'FeatureCollection', features:[
   caja('20','SUMAPAZ',     [-74.35,3.72,-74.00,4.50]),   // el 42% de la ciudad, al sur
 ]};
 
+/* Censo por puesto de votación: 41 columnas, de las que importan la 1 (código
+   completo), la 7 (barrio) y la 13/14 (mujeres/hombres). Dos puestos de
+   Teusaquillo con censos muy distintos, para ver si el reparto los distingue. */
+const filaPuesto = (code, barrio, mujeres, hombres) => [ '1', code, 'BOGOTA D.C.', 'BOGOTA', code.slice(5,7), code.slice(7,9), '', barrio, '', '4.63', '-74.08', '', '', String(mujeres), String(hombres), '10' ].join(';');
+/* 13-01 cae en el barrio 007203 (Chapinero Occidental) y 13-03 en el 007206
+   (Belalcázar), según el mapa puesto→barrio del repo. Censos muy distintos. */
+const PUESTOS = ['CABECERA', filaPuesto('160010101', 'OTRA LOCALIDAD', 1, 1), filaPuesto('160011301', 'CHAPINERO OCCIDENTAL', 20000, 18000), filaPuesto('160011303', 'BELALCAZAR', 3000, 2000)].join('\n');
+
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
 const errores = []; p.on('pageerror', e => errores.push(e.message));
@@ -47,6 +55,7 @@ await p.route('**', async route => {
   if (u.includes('leaflet.min.css')) return route.fulfill({ status: 200, contentType: 'text/css', body: leafletCSS });
   if (u.includes('tile.openstreetmap.org')) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: tile });
   if (u.includes('BOG-LOCALIDADX')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(BOG) });
+  if (u.includes('PUESTOS_GEOREF.csv')) return route.fulfill({ status: 200, contentType: 'text/csv', body: PUESTOS });
   if (u.includes('/c360/')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok:true, acceso:true, fuente:'admin', vinculo:null, email:'reruizc@gmail.com' }) });
   return route.abort();
 });
@@ -86,11 +95,28 @@ r.callejero = await p.evaluate(() => {
 });
 r.localidadesFuera = await p.evaluate(() => !crmLeafletMap.hasLayer(crmMapLayer));
 r.barriosPintados = await p.evaluate(() => crmBarrioLayer ? crmBarrioLayer.getLayers().length : 0);
+r.dondeCaenLosBarrios = await p.evaluate(() => { const b = crmBarrioLayer.getBounds(); return { w:+b.getWest().toFixed(4), e:+b.getEast().toFixed(4), s:+b.getSouth().toFixed(4), n:+b.getNorth().toFixed(4) }; });
 r.rellenoBarrio = await p.evaluate(() => {
   const l = crmBarrioLayer.getLayers().find(x => x.options.fillOpacity > .3);
   return l ? l.options.fillOpacity : null;
 });
 await p.screenshot({ path: SP + '/mapa-barrio.png' });
+
+/* La meta por barrio en una localidad donde nunca sacó un voto: sin censo esto
+   quedaba en «no hay votos desagregados» y el mapa se veía vacío. */
+r.censo = await p.evaluate(async () => {
+  crmMapMode = 'proyectado';
+  crmMapState.votesByArea = { '13': 0, '11': 120 };
+  window.projectedVotesByArea = () => ({ '13': 900, '11': 0 });
+  /* Sus mesas siguen en Suba: en Teusaquillo nunca sacó un voto, que es el caso
+     que trae un salto de corporación (la meta cae en media ciudad). */
+  crmMapState.mesas = [{ dep:'16', mun:'001', zon:'11', pue:'02', com:'11', comNom:'SUBA', v:120 }];
+  await renderBarriosForArea('13');
+  await new Promise(r => setTimeout(r, 600));
+  const filas = [...document.querySelectorAll('#crmBreakdown .crm-breakdown-item')].map(x => x.textContent);
+  return { titulo: document.querySelector('#crmBreakdown h4')?.textContent || '', filas, nota: document.getElementById('crmMapNote').textContent,
+    pintados: crmBarrioLayer.getLayers().filter(l => l.options.fillOpacity > .3).length };
+});
 
 // Y volver a localidad restituye todo
 await p.evaluate(() => document.querySelector('.crm-map-levels [data-level="localidad"]').click());
@@ -106,12 +132,23 @@ const pruebas = [
   ['y va atenuado y en gris', r.callejero.clase.includes('tenue') && Number(r.callejero.opacidad) < .7 && r.callejero.filtro.includes('grayscale')],
   ['las localidades rotadas se quitan mientras dura el barrio', r.localidadesFuera === true],
   ['los barrios se pintan', r.barriosPintados > 10],
+  /* Teusaquillo de verdad está en -74,11…-74,06 × 4,61…4,67. Rotados 90° sobre
+     (-74,08 · 4,65) se irían a los cerros orientales: la silueta se ve bien y
+     no coincide con una sola calle del callejero que está debajo. */
+  ['y caen sobre el Teusaquillo real, no sobre su reflejo rotado',
+    r.dondeCaenLosBarrios.w > -74.12 && r.dondeCaenLosBarrios.e < -74.06 && r.dondeCaenLosBarrios.s > 4.60 && r.dondeCaenLosBarrios.n < 4.68],
   ['con relleno que deja ver las calles', r.rellenoBarrio !== null && r.rellenoBarrio <= .65],
   ['volver a localidad restituye la ciudad', r.vuelta.localidades === true && r.vuelta.tiles === true && r.vuelta.barrios === true],
+  ['sin meta propia, la meta se reparte por censo y el mapa deja de estar vacío',
+    r.censo.pintados >= 2 && r.censo.filas.length >= 2],
+  ['el reparto sigue el tamaño del censo (Chapinero Occidental pesa más que Belalcázar)',
+    /Chapinero Occidental/i.test(r.censo.filas[0] || '') && /Belalcazar/i.test(r.censo.filas[1] || '')],
+  ['y la nota avisa que eso es censo, no apoyo', /censo electoral/i.test(r.censo.nota) && /no dónde ya votaron por usted/i.test(r.censo.nota)],
   ['sin errores de JavaScript', errores.length === 0],
 ];
 for (const [t, ok] of pruebas) console.log(`${ok ? '✓' : '✗'} ${t}`);
 if (errores.length) console.log(errores.slice(0, 3));
 const f = pruebas.filter(([, ok]) => !ok).length;
+if (f) console.log(JSON.stringify({ censo: r.censo, barrios: r.dondeCaenLosBarrios }, null, 1).slice(0, 1500));
 console.log(f ? `\n${f} fallaron` : `\n${pruebas.length} de ${pruebas.length} pasaron`);
 process.exit(f ? 1 : 0);
