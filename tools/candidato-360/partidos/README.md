@@ -7,7 +7,7 @@ Dos supuestos que la página daba por buenos:
    corporación sigue la **huella del partido** en el territorio de destino. Con
    el partido viejo, reparte mal. Ahora se pregunta, precargado con el de su
    última elección pero abierto.
-2. **Que un desplegable nacional sirve.** Entre las dos elecciones hay **2.338
+2. **Que un desplegable nacional sirve.** Entre las dos elecciones hay **2.309
    organizaciones distintas** en el país. Muchas son la misma coalición escrita
    de diez formas («PARTIDO CAMBIO RADICAL - PARTIDO POLITICO MIRA», «CAMBIO
    RADICAL MIRA», «CAMBIO RADICAL - MIRA»…) y muchas solo existen en un
@@ -19,11 +19,11 @@ Dos supuestos que la página daba por buenos:
 
 | Departamento | Organizaciones | Solo en Cámara 2026 |
 |---|---|---|
-| Bogotá D.C. | 52 | 9 |
+| Bogotá D.C. | 51 | 8 |
 | Valle del Cauca | 149 | 6 |
-| Antioquia | 348 | 7 |
+| Antioquia | 347 | 6 |
 | Cundinamarca | 360 | 3 |
-| **Todo el país** | **2.338** | |
+| **Todo el país** | **2.309** | |
 
 ## El catálogo
 
@@ -33,6 +33,23 @@ Dos supuestos que la página daba por buenos:
 |---|---|
 | Los cinco índices territoriales de **2023** (Concejo, JAL, Asamblea, Alcaldía, Gobernación) | Los movimientos locales que solo existen en un municipio y que sí avalan una candidatura territorial. El departamento sale del **slug**: su segundo segmento es el código ELECTORAL (`JAL2023-16-…` es Bogotá) |
 | La **Cámara de 2026** (`camara/dep-XX.json`) | Qué está vivo hoy, con cuántos votos. Se toma `por_circunscripcion.TERRITORIAL`, no el total: las listas de las circunscripciones especiales (consejos comunitarios, indígenas) no avalan una candidatura territorial de 2027 |
+
+### La sucursal regional
+
+En 2023 el Pacto se inscribió en Bogotá como «PACTO HISTÓRICO BOGOTÁ» y en 2026
+la lista se llama «MOVIMIENTO POLÍTICO PACTO HISTÓRICO»: es la misma
+organización y quedaba como dos. Se funden, con **dos condiciones**:
+
+1. Al quitar el nombre del departamento tiene que quedar un nombre que **ya
+   existe en ese mismo departamento**. Sin eso, quitar «Bogotá» a diestra y
+   siniestra fundiría movimientos que no son sucursal de nada: «BOGOTÁ ENTRE
+   TODOS» y «BOGOTÁ MÁS FUERTE» son ellos mismos y su nombre **es** la ciudad.
+2. Lo que queda tiene que tener **dos palabras o más**. Con una sola, cualquier
+   movimiento regional cae en un genérico: «FUERZA TOLIMA» aterrizaba en «LA
+   FUERZA» y «ALMA DEL HUILA» en «ALMA», que no son sus casas matrices.
+
+Con las dos condiciones se funden 11, todas variantes departamentales del Pacto.
+El script las imprime al final para poder revisarlas.
 
 Cada entrada queda como `[nombre, candidaturas de 2023, votos a Cámara 2026]`.
 Cuando una organización está en las dos, la etiqueta que se muestra es la de
@@ -74,6 +91,6 @@ dice y se guarda como está. El partido de la campaña viaja en `campana.partido
 ## Pruebas
 
 ```
-node tools/candidato-360/prueba-partido.mjs     # el campo, el filtro y el reparto (17)
+node tools/candidato-360/prueba-partido.mjs     # el campo, el filtro y el reparto (19)
 node test/c360-campana.test.mjs                 # en rr-auth: que el worker no bote el partido (11)
 ```

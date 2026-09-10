@@ -66,6 +66,7 @@ function llave(nombre) {
 const porDep = new Map();        /* dep → Map(llave → {formas, n, votos2026, corps}) */
 const nacional = new Map();
 const DEPS = ['01', '03', '05', '07', '09', '11', '12', '13', '15', '16', '17', '19', '21', '23', '24', '25', '26', '27', '28', '29', '31', '40', '44', '46', '48', '50', '52', '54', '56', '60', '64', '68', '72'];
+const nombreDep = new Map();     /* dep → nombre, para reconocer la variante regional */
 
 async function baja(url) {
   for (let i = 0; i < 4; i++) {
@@ -106,6 +107,7 @@ for (const dep of DEPS) {
   const partidos = d?.por_circunscripcion?.TERRITORIAL?.partidos || d?.partidos;
   if (!partidos) { console.log(`· cámara 2026 dep ${dep}: sin datos`); continue; }
   const clave = String(Number(dep));
+  nombreDep.set(clave, d.nombre || '');
   if (!porDep.has(clave)) porDep.set(clave, new Map());
   for (const [nombre, votos] of Object.entries(partidos)) {
     for (const mapa of [porDep.get(clave), nacional]) {
@@ -118,6 +120,47 @@ for (const dep of DEPS) {
   }
 }
 console.log(`· cámara 2026 · ${DEPS.length} departamentos`);
+
+/* ── La sucursal regional de un partido nacional ─────────────────────────────
+   En 2023 el Pacto se inscribió en Bogotá como «PACTO HISTÓRICO BOGOTÁ» y en
+   2026 la lista se llama «MOVIMIENTO POLÍTICO PACTO HISTÓRICO»: es la misma
+   organización y quedaban como dos.
+
+   La regla se aplica SOLO si al quitar el nombre del departamento queda un
+   nombre que YA EXISTE en ese mismo departamento. Sin esa condición, quitar
+   «Bogotá» a diestra y siniestra fundiría movimientos que no son sucursal de
+   nada: «BOGOTÁ ENTRE TODOS» y «BOGOTÁ MÁS FUERTE» son ellos mismos, y su
+   nombre ES la ciudad.
+
+   Y lo que queda tiene que tener DOS palabras o más. Con una sola, cualquier
+   movimiento regional cae en un genérico: «FUERZA TOLIMA» aterrizaba en «LA
+   FUERZA» y «ALMA DEL HUILA» en «ALMA», que no son sus casas matrices. */
+function fundirVariantesRegionales(mapa, nombre, etiqueta) {
+  const tokens = new Set(norm(nombre).split(' ').filter(w => w.length > 2 && !RUIDO.has(w)));
+  if (!tokens.size) return [];
+  const hechas = [];
+  for (const [k, e] of [...mapa.entries()]) {
+    const palabras = k.split(' '), sinDep = palabras.filter(w => !tokens.has(w));
+    if (sinDep.length === palabras.length || sinDep.length < 2) continue;
+    const destino = mapa.get(sinDep.join(' '));
+    if (!destino || destino === e) continue;
+    for (const [forma, n] of e.formas) destino.formas.set(forma, (destino.formas.get(forma) || 0) + n);
+    destino.n += e.n; destino.votos2026 += e.votos2026;
+    destino.etiqueta2026 = destino.etiqueta2026 || e.etiqueta2026;
+    e.corps.forEach(c => destino.corps.add(c));
+    mapa.delete(k);
+    hechas.push(`${etiqueta}: ${[...e.formas.keys()].join(' / ')} → ${destino.etiqueta2026 || [...destino.formas.keys()][0]}`);
+  }
+  return hechas;
+}
+const fundidas = [];
+for (const [dep, mapa] of porDep) {
+  const nombre = nombreDep.get(dep); if (!nombre) continue;
+  fundidas.push(...fundirVariantesRegionales(mapa, nombre, nombre));
+  fundirVariantesRegionales(nacional, nombre, nombre);
+}
+console.log(`· ${fundidas.length} variantes regionales fundidas con su partido nacional`);
+for (const f of fundidas.slice(0, 10)) console.log(`    ${f}`);
 
 /* [nombre, candidaturas 2023, votos a Cámara 2026]. Se recortan los ceros del
    final para que el archivo no cargue con datos que no dicen nada. */
