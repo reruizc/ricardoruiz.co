@@ -162,15 +162,48 @@ for (const [dep, mapa] of porDep) {
 console.log(`· ${fundidas.length} variantes regionales fundidas con su partido nacional`);
 for (const f of fundidas.slice(0, 10)) console.log(`    ${f}`);
 
-/* [nombre, candidaturas 2023, votos a Cámara 2026]. Se recortan los ceros del
-   final para que el archivo no cargue con datos que no dicen nada. */
+/* ── Coaliciones ─────────────────────────────────────────────────────────────
+   «PARTIDO CAMBIO RADICAL - PARTIDO POLITICO MIRA» es una lista de coalición,
+   no una organización con la que alguien «se lanza». Se marcan para que la
+   página no las ofrezca en la selección, pero se quedan en el catálogo: sí
+   sirven para medir la huella de cada partido en el territorio.
+
+   Es coalición si empieza por «COALICIÓN» o si, partida por sus separadores
+   (guion, «y», «+»), DOS o más de sus partes existen por sí solas como
+   organización en el país. La condición de las dos partes es lo que salva a
+   «PARTIDO DE LA UNIÓN POR LA GENTE - PARTIDO DE LA U», que lleva guion y es
+   un solo partido. */
+const partesDe = n => String(n).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/^COALICION\s+/, '').replace(/^PARTIDOS\s+/, '').split(/\s*[-+\/|,]\s*|\s+Y\s+/).map(x => x.trim()).filter(x => x.length >= 2);
+/* Partidos conocidos: los que aparecen solos en algún índice, más el
+   diccionario curado de partidos-bloques.js (el mismo de alcaldias-2023),
+   que trae las formas cortas que en los índices solo salen dentro de una
+   coalición: «PARTIDO DE LA U», «PARTIDO CONSERVADOR». */
+const solas = new Set();
+{
+  const vm = await import('node:vm');
+  const ctx = { window: {} }; vm.createContext(ctx);
+  vm.runInContext(await (await import('node:fs/promises')).readFile(path.join(REPO, 'partidos-bloques.js'), 'utf8'), ctx);
+  for (const nombre of Object.keys(ctx.window.PartidosBloques?.PARTIDO_BLOQUE || {})) solas.add(llave(nombre));
+}
+for (const e of nacional.values()) for (const forma of e.formas.keys()) if (partesDe(forma).length === 1 && !/^COALICI/.test(norm(forma))) solas.add(llave(forma));
+/* Una parte es un partido conocido si su llave existe tal cual, o si todas sus
+   palabras caben en la llave de uno conocido: «PARTIDO CONSERVADOR» ⊂
+   «PARTIDO CONSERVADOR COLOMBIANO». Sin esto, la mitad de las coaliciones del
+   conservatismo —que la Registraduría escribe de veinte formas— se colaban. */
+const solasPalabras = [...solas].map(k => new Set(k.split(' ')));
+const conocida = parte => { const k = llave(parte); if (solas.has(k)) return true; const w = k.split(' ').filter(Boolean); return w.length > 0 && w.every(x => x.length >= 4) && solasPalabras.some(set => w.every(x => set.has(x))); };
+const esCoalicion = nombre => /^COALICI/.test(norm(nombre)) || partesDe(nombre).filter(conocida).length >= 2;
+
+/* [nombre, candidaturas 2023, votos a Cámara 2026, coalición]. Se recortan
+   los ceros del final para que el archivo no cargue con datos que no dicen
+   nada; la marca de coalición solo va cuando es 1. */
 const ordenar = mapa => [...mapa.values()]
   .map(e => ({
     nombre: e.etiqueta2026 || [...e.formas.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'es'))[0][0],
     n: e.n, votos2026: e.votos2026,
   }))
   .sort((a, b) => b.votos2026 - a.votos2026 || b.n - a.n || a.nombre.localeCompare(b.nombre, 'es'))
-  .map(e => e.votos2026 ? [e.nombre, e.n, e.votos2026] : [e.nombre, e.n]);
+  .map(e => { const fila = e.votos2026 ? [e.nombre, e.n, e.votos2026] : [e.nombre, e.n]; if (esCoalicion(e.nombre)) { while (fila.length < 3) fila.push(0); fila.push(1); } return fila; });
 
 /* Un archivo por departamento: la página carga solo el suyo. */
 await mkdir(SALIDA, { recursive: true });
@@ -179,7 +212,9 @@ const cabecera = dep => `/* Partidos y movimientos vivos en el departamento ${de
    los que inscribieron candidatura en las territoriales de 2023 y los que
    sacaron votos a la Cámara en 2026. Cada entrada es
    [nombre, candidaturas de 2023, votos a Cámara 2026]. Lo construye
-   tools/candidato-360/partidos/construir.mjs — no se edita a mano. */\n`;
+   tools/candidato-360/partidos/construir.mjs — no se edita a mano.
+   Un cuarto campo en 1 marca una COALICIÓN: no se ofrece al elegir, pero
+   cuenta para la huella del partido. */\n`;
 let total = 0, bytes = 0;
 for (const [dep, mapa] of [...porDep.entries()].sort((a, b) => Number(a[0]) - Number(b[0]))) {
   const lista = ordenar(mapa), archivo = path.join(SALIDA, `${dep.padStart(2, '0')}.js`);
@@ -190,8 +225,8 @@ console.log(`\n${total} departamentos · ${nacional.size} organizaciones distint
 for (const [dep, mapa] of [...porDep.entries()].sort((a, b) => Number(a[0]) - Number(b[0]))) {
   if (!['16', '1', '31', '15'].includes(dep)) continue;
   const lista = ordenar(mapa);
-  const soloCamara = lista.filter(e => e[2] && !e[1]).length;
-  console.log(`  dep ${dep.padStart(2, '0')}: ${lista.length} organizaciones (${soloCamara} solo en Cámara 2026) · ${(statSync(path.join(SALIDA, `${dep.padStart(2, '0')}.js`)).size / 1024).toFixed(1)} KB · top: ${lista.slice(0, 3).map(([n, c, v]) => `${n} (${v ? v.toLocaleString('es-CO') + ' votos 2026' : c + ' candidaturas 2023'})`).join(' · ')}`);
+  const soloCamara = lista.filter(e => e[2] && !e[1]).length, coaliciones = lista.filter(e => e[3] === 1).length;
+  console.log(`  dep ${dep.padStart(2, '0')}: ${lista.length} organizaciones (${soloCamara} solo en Cámara 2026, ${coaliciones} coaliciones que no se ofrecen) · ${(statSync(path.join(SALIDA, `${dep.padStart(2, '0')}.js`)).size / 1024).toFixed(1)} KB · top: ${lista.slice(0, 3).map(([n, c, v]) => `${n} (${v ? v.toLocaleString('es-CO') + ' votos 2026' : c + ' candidaturas 2023'})`).join(' · ')}`);
 }
 /* Las fusiones, para poder auditarlas: si dos organizaciones distintas caen en
    la misma llave, acá se ve. */

@@ -280,12 +280,27 @@ function resolverModoPruebas() {
 }
 /* Vínculo de mentiras, solo en memoria: el CRM necesita uno para pintarse. */
 function vinculoLocal(payload) { SESSION.vinculo = Object.assign({ local: true }, payload); }
+/* El vínculo real de la cuenta de administración estorba para probar: las
+   páginas de medios y redes lo leen del servidor, no del modo pruebas. Esto
+   llama a la ruta de soporte que ya existe (DELETE /c360/admin/vinculo), que
+   deja copia del borrado 400 días. Solo funciona para quien es admin. */
+async function borrarVinculoPropio() {
+  if (!PRUEBAS || !SESSION.user?.email) return;
+  if (!confirm(`¿Borrar de su cuenta el vínculo con ${vinculoDescripcion()}? Queda una copia en soporte por 400 días.`)) return;
+  try {
+    const r = await apiC360(`/c360/admin/vinculo?email=${encodeURIComponent(SESSION.user.email)}&motivo=${encodeURIComponent('pruebas: cuenta de administración')}`, { method: 'DELETE' });
+    if (!r.ok) { alert(`No se pudo borrar: ${r.data?.error || r.status}`); return; }
+    SESSION.vinculo = null; CAMPANA_ACTUAL = null;
+    aplicarGate();
+    alert('Listo: la cuenta quedó sin vínculo. Las páginas de medios y redes también lo van a ver vacío.');
+  } catch (e) { alert('No se pudo borrar el vínculo: ' + e.message); }
+}
 
 /* Aplica el estado de acceso a las dos rutas y a la portada. */
 function aplicarGate() {
   const intro = $('introVinculo');
   if (intro) {
-    if (PRUEBAS) intro.innerHTML = `<b>Modo pruebas · cuenta de administración.</b> La restricción de «un solo candidato» está levantada: puede abrir cualquier candidatura por las dos rutas y nada se guarda en el servidor.${SESSION.vinculo && !SESSION.vinculo.local ? ` (El vínculo real de la cuenta sigue siendo ${escHtml(vinculoDescripcion())}.)` : ''} Para ver la página como la ve un cliente, abra <a href="${PAGINA}?pruebas=0">${PAGINA}?pruebas=0</a>.`;
+    if (PRUEBAS) intro.innerHTML = `<b>Modo pruebas · cuenta de administración.</b> La restricción de «un solo candidato» está levantada: puede abrir cualquier candidatura por las dos rutas y nada se guarda en el servidor.${SESSION.vinculo && !SESSION.vinculo.local ? ` El vínculo real de la cuenta sigue siendo <b>${escHtml(vinculoDescripcion())}</b> y las páginas de medios y redes lo leen de ahí: <button type="button" class="enlace-boton" onclick="borrarVinculoPropio()">borrarlo de la cuenta</button>.` : ''} Para ver la página como la ve un cliente, abra <a href="${PAGINA}?pruebas=0">${PAGINA}?pruebas=0</a>.`;
     else if (SESSION.vinculo) intro.innerHTML = `Su cuenta está vinculada a <b>${escHtml(vinculoDescripcion())}</b>. Cualquiera de las dos rutas abre esa candidatura; para cambiarla escriba a <a href="mailto:${escHtml(SESSION.soporte)}">${escHtml(SESSION.soporte)}</a>.`;
     intro.classList.toggle('hidden', !PRUEBAS && !SESSION.vinculo);
     intro.classList.toggle('is-pruebas', PRUEBAS);
@@ -426,7 +441,13 @@ function pesoPartidos(lista) {
   const maxVotos = Math.max(1, ...lista.map(x => x[2] || 0)), maxCand = Math.max(1, ...lista.map(x => x[1] || 0));
   return item => Math.max((item[2] || 0) / maxVotos, (item[1] || 0) / maxCand);
 }
+/* Las coaliciones (cuarto campo = 1) no se ofrecen: uno se lanza «con Cambio
+   Radical», no «con Cambio Radical - MIRA - La U». Se quedan en el catálogo
+   porque sí sirven para medir la huella del partido en el territorio. */
+const esCoalicion = item => Number(item?.[3] || 0) === 1;
+const partidosElegibles = lista => (lista || []).filter(x => !esCoalicion(x));
 function rankearPartidos(lista, consulta, limite = 8) {
+  lista = partidosElegibles(lista);
   const peso = pesoPartidos(lista);
   const q = normPalabras(consulta).split(' ').filter(Boolean);
   if (!q.length) return lista.slice(0, limite);
@@ -481,7 +502,7 @@ async function pintarEstadoPartido({ input, estado, departamento }) {
   const nota = $(estado); if (!nota) return;
   const dep = departamento();
   if (!dep) { nota.textContent = 'Seleccione primero el departamento y le sugerimos las organizaciones que inscribieron candidatura allí.'; return; }
-  const catalogo = await cargarPartidos(dep), nombre = nombreDepartamento(dep);
+  const catalogo = partidosElegibles(await cargarPartidos(dep)), nombre = nombreDepartamento(dep);
   if (!catalogo.length) { nota.textContent = 'No pudimos cargar el catálogo de ese departamento: escriba el nombre y lo tomamos como está.'; return; }
   const escrito = String($(input)?.value || '').trim();
   const enCatalogo = escrito && catalogo.some(([n]) => normalizedText(n) === normalizedText(escrito));
@@ -1398,15 +1419,23 @@ function proporciones(mapa) {
 /* La huella del partido en la corporación destino. `porArea` es
    {área: {partidos: [[nombre, votos]…], votantes}}, el formato de los
    resultados-*.json. Se aceptan las partes de una coalición y se suman. */
+/* Las palabras que identifican a un partido, sin las estructurales: «PARTIDO
+   NUEVO LIBERALISMO» → {NUEVO, LIBERALISMO}. Una lista de coalición cuenta para
+   el partido si trae TODAS sus palabras: «NUEVO LIBERALISMO- AGRUPACION POLITICA
+   EN MARCHA» sí es huella del Nuevo Liberalismo aunque no diga «PARTIDO». */
+const PALABRAS_ESTRUCTURALES = new Set(['PARTIDO', 'MOVIMIENTO', 'POLITICO', 'POLITICA', 'COALICION', 'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'Y']);
+function nucleoPartido(nombre) { return normPalabras(nombre).split(' ').filter(w => w && !PALABRAS_ESTRUCTURALES.has(w)); }
 function huellaPartido(porArea, partes) {
   const claves = (partes || []).map(p => PartidosBloques.norm(p)).filter(Boolean);
+  const nucleos = claves.map(nucleoPartido).filter(n => n.length);
   if (!claves.length) return { huella: null, cobertura: 0, votos: 0 };
   const huella = {}; let areasCon = 0, votos = 0;
   for (const [area, d] of Object.entries(porArea || {})) {
     let v = 0;
     for (const [nombre, n] of (d?.partidos || [])) {
-      const nn = PartidosBloques.norm(nombre);
-      if (claves.some(c => nn === c || (c.length > 8 && nn.includes(c)) || (nn.length > 8 && c.includes(nn)))) v += Number(n) || 0;
+      const nn = PartidosBloques.norm(nombre), palabras = new Set(normPalabras(nombre).split(' '));
+      const calza = claves.some(c => nn === c || (c.length > 8 && nn.includes(c)) || (nn.length > 8 && c.includes(nn))) || nucleos.some(nu => nu.every(w => palabras.has(w)));
+      if (calza) v += Number(n) || 0;
     }
     huella[area] = v; votos += v; if (v > 0) areasCon++;
   }
@@ -1620,7 +1649,12 @@ let crmMapMode = 'total', crmMapState = null;
 const MAP_COLOR = ratio => ratio <= 0 ? '#d8dfd7' : ratio < .12 ? '#b7d9bf' : ratio < .35 ? '#79b987' : ratio < .65 ? '#3e8a5b' : '#174f35';
 function crearMapa(center, zoom) {
   const mapEl = $('crmMap');
-  if (!crmLeafletMap) { mapEl.innerHTML = ''; crmLeafletMap = L.map(mapEl, { zoomControl: false, attributionControl: true, scrollWheelZoom: false, dragging: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false }).setView(center, zoom); }
+  /* zoomSnap: Leaflet, por defecto, solo usa zooms ENTEROS. fitBounds elegía
+     el mayor entero en el que cabía la ciudad, y entre un nivel y el siguiente
+     hay un factor 2: Bogotá quedaba en zoom 11 ocupando la mitad del marco,
+     con Kennedy y Bosa diminutas y el resto vacío. Con zoom fraccionario el
+     encuadre es exacto. */
+  if (!crmLeafletMap) { mapEl.innerHTML = ''; crmLeafletMap = L.map(mapEl, { zoomControl: false, attributionControl: true, zoomSnap: 0.1, scrollWheelZoom: false, dragging: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false }).setView(center, zoom); }
   else { crmLeafletMap.invalidateSize(); if (crmMapLayer) { crmLeafletMap.removeLayer(crmMapLayer); crmMapLayer = null; } }
   if (crmBarrioLayer) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
   mapEl.querySelector('.crm-territory-notice')?.remove();
@@ -1867,6 +1901,21 @@ async function renderGenericMap(candidate) {
    Candidato. */
 /* Sumapaz (localidad 20) es rural y enorme; se pinta, pero no encuadra. */
 const ES_SUMAPAZ = f => String(f?.properties?.LocCodigo || '') === '20';
+/* Bogotá se encuadra por su PERÍMETRO URBANO, no por sus localidades. Usme
+   baja hasta 4,27 y Ciudad Bolívar hasta 4,38 de latitud, casi todo páramo y
+   vereda; encuadrar por el polígono completo estiraba el marco hacia el sur y
+   dejaba a Kennedy y a Bosa —donde vive la mitad de los votos— del tamaño de
+   una uña. La ventana va de Suba (4,84) al norte urbano de Usme y Ciudad
+   Bolívar (4,49), y de Bosa (-74,22) a los cerros (-73,99). Lo que queda por
+   fuera —el sur de Usme y Ciudad Bolívar, Sumapaz— se sigue dibujando,
+   desbordado por la derecha del mapa rotado. En coordenadas reales; se rota
+   igual que la capa. */
+const BOGOTA_VENTANA_URBANA = { sur: 4.49, norte: 4.837, oeste: -74.224, este: -73.987 };
+function encuadreBogota() {
+  const { sur, norte, oeste, este } = BOGOTA_VENTANA_URBANA;
+  const esquinas = [[oeste, sur], [este, sur], [oeste, norte], [este, norte]].map(c => rotateGeoJSON90Left({ features: [{ geometry: { type: 'Polygon', coordinates: [[c]] } }] }).features[0].geometry.coordinates[0][0]);
+  return L.latLngBounds(esquinas.map(([lon, lat]) => [lat, lon]));
+}
 const CITY_JAL_LAYERS = [
   { match: ['BOGOTA'], path: 'BOG-LOCALIDADX.json', title: 'localidad', code: p => String(p.LocCodigo || '').padStart(2, '0'), name: p => p.LocNombre || 'Localidad', rotate: true },
   { match: ['MEDELLIN'], path: 'MEDELLINX.json', title: 'comuna', code: p => String(p.CODIGO || '').padStart(2, '0'), name: p => p.NOMBRE || p.IDENTIFICACION || 'Comuna' },
@@ -1880,12 +1929,12 @@ const CITY_JAL_LAYERS = [
 function cityLayerFor(nombre) { const city = normalizedText(nombre); return CITY_JAL_LAYERS.find(item => item.match.some(name => city.includes(name))) || null; }
 /* Pinta una ciudad por comuna/localidad con el estado compartido de los mapas
    de ciudad (toggles, detalle por barrio, niveles). */
-function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city, rotate, lugar, title, note, center, zoom, fitTarget, fueraDelEncuadre }) {
+function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city, rotate, lugar, title, note, center, zoom, fitTarget, fueraDelEncuadre, encuadre }) {
   completaNombres(geoData, config.code, config.name, namesByArea);
   const max = Math.max(1, ...Object.values(votesByArea));
   crmMapMode = 'total';
   const m0 = mesas[0] || {};
-  crmMapState = { city, ciudad: `${String(m0.dep || '').padStart(2, '0')}${String(m0.mun || '').padStart(3, '0')}`, config, geoData, votesByArea, namesByArea, mesas, total, max, targetKey, focusKey: null, rotado: Boolean(rotate), tituloLugar: lugar || '' };
+  crmMapState = { city, ciudad: `${String(m0.dep || '').padStart(2, '0')}${String(m0.mun || '').padStart(3, '0')}`, config, geoData, votesByArea, namesByArea, mesas, total, max, targetKey, focusKey: null, rotado: Boolean(rotate), tituloLugar: lugar || '', encuadre: encuadre || null, fueraDelEncuadre: fueraDelEncuadre || null };
   $('crmMapTitle').textContent = lugar ? tituloMapa('total') : title; ensureCRMMapToggles();
   crearMapa(center || [4.6, -74.1], zoom || 5); aplicarBasemap(Boolean(rotate));
   let targetLayer = null;
@@ -1894,7 +1943,7 @@ function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea,
     onEachFeature: (f, layer) => { if (config.code(f.properties) === targetKey) targetLayer = layer; layer.on('click', () => showCRMMapDetail(layer)); }
   }).addTo(crmLeafletMap);
   refreshCRMMapMode();
-  encuadrarBounds(fitTarget && targetLayer ? targetLayer.getBounds() : boundsDeVotos(crmMapLayer, config, votesByArea, fueraDelEncuadre), 24);
+  encuadrarBounds(fitTarget && targetLayer ? targetLayer.getBounds() : encuadre || boundsDeVotos(crmMapLayer, config, votesByArea, fueraDelEncuadre), 24);
   $('crmMapVotes').textContent = `${total.toLocaleString('es-CO')} votos`;
   $('crmMapNote').textContent = note + notaRecorte();
 }
@@ -1913,7 +1962,7 @@ async function renderBogotaCampaignMap(candidate) {
   const config = { title: 'localidad', code: p => String(p.LocCodigo || '').padStart(2, '0'), name: p => p.LocNombre || 'Localidad' };
   const { votesByArea, namesByArea } = agregarPorArea(mesas, claveLocal);
   const total = mesas.reduce((sum, m) => sum + Number(m.v || 0), 0) || Number(candidate.votos) || 0;
-  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey: null, city: 'BOGOTA', rotate: true, fueraDelEncuadre: ES_SUMAPAZ, lugar: 'Bogotá', note: 'Sumapaz se dibuja completa aunque se salga del marco: el encuadre lo mandan las 19 localidades urbanas, que es donde están los votos. Seleccione una localidad para abrir el desglose por barrio.' });
+  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey: null, city: 'BOGOTA', rotate: true, fueraDelEncuadre: ES_SUMAPAZ, encuadre: encuadreBogota(), lugar: 'Bogotá', note: 'El mapa encuadra el perímetro urbano, que es donde están los votos; el sur rural de Usme y Ciudad Bolívar y Sumapaz se dibujan aunque se salgan del marco. Seleccione una localidad para abrir el desglose por barrio.' });
 }
 async function renderCaliCampaignMap(candidate) {
   const data = await datosCandidatura(candidate), mesas = data.mesas || [], geoData = await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`);
@@ -1987,6 +2036,12 @@ const CITY_BARRIO_LAYERS = [
   { match: ['PEREIRA'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/PEREIRA-BARRIOS.json`, name: p => p.NOMBRE || 'Barrio', code: p => String(p.NOMBRE || '') },
   { match: ['MANIZALES'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/MANIZALES-BARRIOS.json`, name: p => p.BARRIOS || 'Barrio', code: p => String(p.BARRIOS || '') },
   { match: ['BARRANQUILLA'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/BARRANQUILLA-BARRIOS.json`, name: p => p.NOMBRE || 'Barrio', code: p => String(p.NOMBRE || '') },
+  /* Ibagué y Montería: NO hay capa publicada todavía. Quedan enchufadas a la
+     ruta convencional y con lectores tolerantes al nombre del campo; el día
+     que el archivo aparezca en S3, el nivel de barrio arranca solo. Mientras
+     tanto el 404 cae al modo de puestos de votación, como hasta ahora. */
+  { match: ['IBAGUE'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/IBAGUE-BARRIOS.json`, name: p => p.NOMBRE || p.BARRIO || p.nombre || p.barrio || 'Barrio', code: p => String(p.CODIGO || p.NOMBRE || p.BARRIO || p.nombre || p.barrio || '') },
+  { match: ['MONTERIA'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/MONTERIA-BARRIOS.json`, name: p => p.NOMBRE || p.BARRIO || p.nombre || p.barrio || 'Barrio', code: p => String(p.CODIGO || p.NOMBRE || p.BARRIO || p.nombre || p.barrio || '') },
 ];
 function cityBarrioLayerFor(city) { const c = normalizedText(city || ''); return CITY_BARRIO_LAYERS.find(x => x.match.some(m => c.includes(m))) || null; }
 /* Ray casting. Un punto está en el polígono si cruza un número impar de
@@ -2252,7 +2307,7 @@ function refreshMapLevels() {
     aplicarBasemap(Boolean(crmMapState?.rotado));
     if (crmMapState) crmMapState.focusKey = null;
     refreshCRMMapMode();
-    encuadrarBounds(boundsDeVotos(crmMapLayer, crmMapState.config, crmMapState.votesByArea, crmMapState.rotado ? ES_SUMAPAZ : null), 24);
+    encuadrarBounds(crmMapState.encuadre || boundsDeVotos(crmMapLayer, crmMapState.config, crmMapState.votesByArea, crmMapState.fueraDelEncuadre), 24);
     setMapLevel(level);
   };
   controls.querySelector('[data-level="municipio"]')?.addEventListener('click', () => volver('municipio'));

@@ -21,7 +21,9 @@ const dv = js.slice(js.indexOf('function distributeVotes('), js.indexOf('functio
 const ctx = { window: {}, console };
 vm.createContext(ctx);
 vm.runInContext(await readFile(new URL('../../partidos-bloques.js', import.meta.url), 'utf8'), ctx);
-vm.runInContext(`const PartidosBloques = window.PartidosBloques; ${dv}\n${motor}\nthis.M = { tipoSalto, proporciones, baseDestino, arraigoEmpirico, repartoSalto, huellaPartido };`, ctx);
+/* normPalabras vive en la sección 6 bis (partidos); se trae esa línea sola. */
+const normPalabrasSrc = js.match(/^const normPalabras = .*$/m)[0];
+vm.runInContext(`const PartidosBloques = window.PartidosBloques; ${normPalabrasSrc}\n${dv}\n${motor}\nthis.M = { tipoSalto, proporciones, baseDestino, arraigoEmpirico, repartoSalto, huellaPartido };`, ctx);
 const M = ctx.M;
 
 const fallos = [];
@@ -55,6 +57,16 @@ revisar('un partido sin huella cae a PARTICIPACIÓN (no tiene bloque)', base.cap
 const sinNL = Object.fromEntries(Object.entries(porArea).map(([k, d]) => [k, { ...d, partidos: d.partidos.filter(([p]) => p !== NL) }]));
 base = M.baseDestino({ porArea: sinNL, partido: 'PARTIDO NUEVO LIBERALISMO', nombreCandidato: 'X' });
 revisar('un partido de centro-izquierda que no corrió cae al BLOQUE (verdes)', base.capa === 'bloque' && base.bloque === 'ci');
+
+/* Una lista de coalición cuenta para el partido que la integra: si la persona
+   eligió «PARTIDO NUEVO LIBERALISMO», los votos de «NUEVO LIBERALISMO-
+   AGRUPACION POLITICA EN MARCHA» son su huella aunque no diga «PARTIDO». */
+const conCoalicion = { '12': { votantes: 1, partidos: [['NUEVO LIBERALISMO- AGRUPACION POLITICA EN MARCHA', 700], [PH, 100]] }, '02': { votantes: 1, partidos: [['PARTIDO CAMBIO RADICAL - PARTIDO POLITICO MIRA', 300], [PH, 100]] } };
+const hNL = M.huellaPartido(conCoalicion, ['PARTIDO NUEVO LIBERALISMO']);
+revisar('la lista de coalición cuenta para el partido que la integra (por sus palabras)', hNL.huella['12'] === 700 && hNL.huella['02'] === 0);
+const hCR = M.huellaPartido(conCoalicion, ['PARTIDO CAMBIO RADICAL']);
+revisar('y Cambio Radical recoge la lista «Cambio Radical - MIRA»', hCR.huella['02'] === 300 && hCR.huella['12'] === 0);
+revisar('pero un partido ajeno no recoge nada', M.huellaPartido(conCoalicion, ['PARTIDO LIBERAL COLOMBIANO']).votos === 0);
 
 /* ── El reparto ───────────────────────────────────────────────────────── */
 base = M.baseDestino({ porArea, partido: NL, nombreCandidato: 'X' });

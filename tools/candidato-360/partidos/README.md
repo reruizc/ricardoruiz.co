@@ -51,7 +51,29 @@ organización y quedaba como dos. Se funden, con **dos condiciones**:
 Con las dos condiciones se funden 11, todas variantes departamentales del Pacto.
 El script las imprime al final para poder revisarlas.
 
-Cada entrada queda como `[nombre, candidaturas de 2023, votos a Cámara 2026]`.
+### Las coaliciones no se ofrecen
+
+«PARTIDO CAMBIO RADICAL - PARTIDO POLITICO MIRA» es una lista de coalición, no
+una organización con la que alguien «se lanza». Se marcan (cuarto campo en 1) y
+la página **no las ofrece** al elegir, pero se quedan en el catálogo porque sí
+miden la huella de cada partido en el territorio: si la persona eligió
+«PARTIDO NUEVO LIBERALISMO», los votos de «NUEVO LIBERALISMO- AGRUPACION
+POLITICA EN MARCHA» cuentan como suyos (`huellaPartido` compara por las
+palabras que identifican al partido, sin «PARTIDO», «MOVIMIENTO», «DE», «LA»).
+
+Es coalición si empieza por «COALICIÓN» o si, partida por sus separadores
+(guion, «y», «+», coma), **dos o más** de sus partes son partidos conocidos: los
+que aparecen solos en algún índice más el diccionario curado de
+`partidos-bloques.js`, que trae las formas cortas que en los índices solo salen
+dentro de una coalición («PARTIDO DE LA U», «PARTIDO CONSERVADOR»). Una parte
+también cuenta como conocida si todas sus palabras caben en un partido conocido
+(«PARTIDO CONSERVADOR» ⊂ «PARTIDO CONSERVADOR COLOMBIANO»). La condición de las
+dos partes salva a «PARTIDO DE LA UNIÓN POR LA GENTE - PARTIDO DE LA U», que
+lleva guion y es un solo partido. En Bogotá quedan 37 organizaciones ofrecidas
+y 14 coaliciones ocultas; se escapan tres variantes con errores de escritura de
+la Registraduría («COLOMBIA JUSTAS LIBRES», «PDO. CONSERVADOR COL.»).
+
+Cada entrada queda como `[nombre, candidaturas de 2023, votos a Cámara 2026, coalición]`.
 Cuando una organización está en las dos, la etiqueta que se muestra es la de
 **2026**: es su nombre vigente. En el orden de las sugerencias las dos cifras se
 miden cada una contra la mayor de su columna y gana la más alta de las dos; sin
@@ -91,6 +113,6 @@ dice y se guarda como está. El partido de la campaña viaja en `campana.partido
 ## Pruebas
 
 ```
-node tools/candidato-360/prueba-partido.mjs     # el campo, el filtro y el reparto (19)
+node tools/candidato-360/prueba-partido.mjs     # el campo, el filtro, las coaliciones y el reparto (21)
 node test/c360-campana.test.mjs                 # en rr-auth: que el worker no bote el partido (11)
 ```

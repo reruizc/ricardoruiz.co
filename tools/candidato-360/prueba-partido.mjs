@@ -93,6 +93,17 @@ r.orden = await p.evaluate(async () => {
   return [...document.querySelectorAll('#campaignPartyLista .sugerencia b')].map(x => x.textContent).slice(0, 3);
 });
 
+/* Las coaliciones no se ofrecen: uno se lanza «con Cambio Radical», no «con
+   Cambio Radical - MIRA - La U». En el catálogo siguen (miden la huella). */
+r.coaliciones = await p.evaluate(async () => {
+  const caja = document.getElementById('campaignParty');
+  caja.value = 'cambio'; caja.dispatchEvent(new Event('input'));
+  await new Promise(r => setTimeout(r, 350));
+  const ofrecidas = [...document.querySelectorAll('#campaignPartyLista .sugerencia b')].map(x => x.textContent);
+  const cat = await cargarPartidos('16');
+  return { ofrecidas, enCatalogo: cat.filter(([n]) => /CAMBIO RADICAL/i.test(n)).length, marcadas: cat.filter(e => /CAMBIO RADICAL/i.test(e[0]) && e[3] === 1).length };
+});
+
 /* La sucursal regional de un partido nacional es UNA sola entrada, y los
    movimientos que llevan la ciudad en el nombre siguen siendo ellos mismos. */
 r.fusion = await p.evaluate(async () => {
@@ -159,6 +170,9 @@ const pruebas = [
   ['«PACTO HISTÓRICO BOGOTÁ» de 2023 y la lista de 2026 son UNA entrada, con las dos cifras',
     r.fusion.cuantos === 1 && r.fusion.entrada[1] >= 1 && r.fusion.entrada[2] === 932728],
   ['pero un movimiento que se llama por la ciudad NO se funde con nadie', r.fusion.propios === 2],
+  ['al escribir «cambio» en Bogotá se ofrece Cambio Radical UNA vez, sin sus coaliciones',
+    r.coaliciones.ofrecidas.filter(x => /CAMBIO RADICAL/i.test(x)).length === 1 && r.coaliciones.ofrecidas.every(x => !/MIRA|DE LA U/i.test(x))],
+  ['y las coaliciones siguen en el catálogo, marcadas, para medir la huella', r.coaliciones.enCatalogo >= 4 && r.coaliciones.marcadas >= 3],
   ['una organización que no está en ninguna de las dos se acepta igual', /No aparece en Bogotá/i.test(r.notaLibre)],
   ['y es lo escrito, no el historial, lo que manda', r.vigente === 'COALICIÓN QUE NACE EN 2027' && r.campana.partido === 'COALICIÓN QUE NACE EN 2027'],
   ['Antioquia y Bogotá NO tienen el mismo catálogo', r.antioquia.cuantas > 200 && r.bogota.cuantas < 70 && r.antioquia.cuantas !== r.bogota.cuantas],

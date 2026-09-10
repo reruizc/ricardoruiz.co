@@ -84,6 +84,10 @@ r.encuadre = await p.evaluate(() => {
   return { mapaSur: +b.getSouth().toFixed(3), sumapazSur: +s.getSouth().toFixed(3), sumapazDentro: b.contains(s) };
 });
 r.sinTilesEnCiudad = await p.evaluate(() => crmTileLayer === null);
+/* El marco es la ventana urbana (Suba → norte de Usme, Bosa → cerros) y
+   Leaflet la respeta con zoom fraccionario: antes redondeaba al entero y la
+   ciudad quedaba en medio marco, con Kennedy y Bosa diminutas. */
+r.ventana = await p.evaluate(() => { const m = crmLeafletMap.getBounds(), v = encuadreBogota(); return { contiene: m.contains(v), veces: +((m.getEast() - m.getWest()) / (v.getEast() - v.getWest())).toFixed(2), zoom: crmLeafletMap.getZoom() }; });
 await p.screenshot({ path: SP + '/mapa-bogota.png', clip: { x: 0, y: 0, width: 1280, height: 900 } });
 
 // Bajar a barrio (Teusaquillo = 13, hay polígonos locales en el repo)
@@ -128,6 +132,7 @@ const pruebas = [
   ['Sumapaz se dibuja', r.sumapazDibujada === true],
   ['pero el encuadre no baja hasta Sumapaz', r.encuadre.sumapazDentro === false && r.encuadre.mapaSur > r.encuadre.sumapazSur],
   ['la ciudad rotada sigue sin callejero', r.sinTilesEnCiudad === true],
+  ['el marco es la ventana urbana, sin medio mapa vacío alrededor', r.ventana.contiene === true && r.ventana.veces < 1.6],
   ['a nivel barrio aparece el callejero', r.callejero.hay === true],
   ['y va atenuado y en gris', r.callejero.clase.includes('tenue') && Number(r.callejero.opacidad) < .7 && r.callejero.filtro.includes('grayscale')],
   ['las localidades rotadas se quitan mientras dura el barrio', r.localidadesFuera === true],

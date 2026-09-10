@@ -119,7 +119,7 @@
      AGRUPACION POLITICA EN MARCHA". Se parte por los separadores usuales y se
      devuelven las partes que tienen sentido como partido. */
   function partesDeCoalicion(partido) {
-    return norm(partido).replace(/^COALICION\s+/, '').split(/\s*[-+\/|]\s*|\s+Y\s+/).map(p => p.trim()).filter(p => p.length >= 4);
+    return norm(partido).replace(/^COALICION\s+/, '').replace(/^PARTIDOS\s+/, '').split(/\s*[-+\/|,]\s*|\s+Y\s+/).map(p => p.trim()).filter(p => p.length >= 4);
   }
   /* El bloque de una candidatura: el de su partido o, en coalición, el bloque
      más repetido entre sus partes (empate → la primera parte). */
