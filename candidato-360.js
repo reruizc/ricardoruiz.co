@@ -1069,7 +1069,14 @@ async function createNew(e) {
 }
 
 /* ─── 8. CRM: apertura, meta de votos y foto ─────────────────────────────── */
-async function estimateVoteTarget(corp, territory) { return VoteTarget.estimate({ corp, territory: territory || crmCandidate?.circunscripcion || '', baseUrl: S3 }); }
+/* La meta depende del PARTIDO: no cuesta lo mismo entrar de décimo en una
+   lista grande que arrastrar una lista pequeña. Va el aval con el que se
+   lanza y el departamento (para estimar con la Cámara 2026 a quien no corrió
+   en 2023). */
+async function estimateVoteTarget(corp, territory) {
+  const departamento = CAMPANA_ACTUAL?.departamento || departamentoDeCandidatura(crmCandidate);
+  return VoteTarget.estimate({ corp, territory: territory || crmCandidate?.circunscripcion || '', baseUrl: S3, partido: partidoVigente(), departamento });
+}
 let META_ACTUAL = null;
 function pintarMeta(estimate) {
   META_ACTUAL = estimate || null;
@@ -1106,8 +1113,18 @@ function mostrarMetaInfo() {
   }
   const pct = x => `${(x * 100).toFixed(1).replace('.', ',')} %`;
   const veces = x => `× ${x.toLocaleString('es-CO', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
-  const R = d.referencia || {};
-  const puntoDePartida = R.tipo === 'ganadora'
+  const R = d.referencia || {}, P = d.partido;
+  const fmt = n => Number(n || 0).toLocaleString('es-CO');
+  /* Con partido, el punto de partida es la LISTA; la última curul de la
+     corporación queda como el piso, para que se vea la diferencia. */
+  const porPartido = R.tipo !== 'partido' || !P ? '' : P.tipo === 'lista-con-curul'
+    ? `<li><b>${fmt(P.votos)}</b> · entrar de <b>${P.k}</b> en la lista de ${escHtml(P.lista.nombre)}: en 2023 ganó ${P.k} curul${P.k === 1 ? '' : 'es'} con ${fmt(P.lista.total)} votos, y su ${P.k === 1 ? 'único' : `${P.k}.º`} elegido${P.lista.ultimoNombre ? ` (${escHtml(P.lista.ultimoNombre)})` : ''} sacó ${fmt(P.votos)}. ${P.k >= 3 ? 'En una lista grande la entrada no depende de arrastrarla: depende de quedar entre los primeros.' : 'En una lista corta hay que estar arriba.'}</li>`
+    : P.tipo === 'lista-sin-curul'
+      ? `<li><b>${fmt(P.votos)}</b> · <b>jalar la lista</b> de ${escHtml(P.lista.nombre)}: en 2023 sumó ${fmt(P.lista.total)} y la cifra repartidora fue ${fmt(P.cifra)}, le faltaron ${fmt(P.faltanLista)}. Si el resto de la lista repite, a quien la encabece le toca poner ${fmt(P.votos)}.</li>`
+      : `<li><b>${fmt(P.votos)}</b> · ${escHtml(P.nombre)} no tuvo lista en esta corporación en 2023. Su fuerza se estima con la <b>Cámara de 2026</b>: ${fmt(P.camara.votos)} votos en el departamento, que al tamaño de esta corporación son ${fmt(P.camara.totalEstimado)}. ${P.k ? `Con eso arrastraría ${P.k} curul${P.k === 1 ? '' : 'es'} y entrar de ${P.k} cuesta lo que suele sacar el ${P.k}.º de una lista así.` : `No alcanza la cifra repartidora (${fmt(P.cifra)}): a quien encabece le toca poner la diferencia.`}</li>`;
+  const piso = R.tipo === 'partido' ? `<li><b>${fmt(R.piso)}</b> · el <b>piso de la corporación</b>: la última curul ${escHtml(corpConArticulo(d.corporacionClave, d.corporacion, 1))} de ${escHtml(d.territorio)} en 2023${R.curules ? `, con ${R.curules} curules` : ''}. Es lo mínimo con que alguien entró, no lo que cuesta entrar por su lista.</li>` : '';
+  const sinPartido = P && P.tipo === 'sin-dato' ? `<p class="puntaje-nota">De ${escHtml(P.nombre)} no hay lista en esta corporación en 2023 ni votación a Cámara en 2026 en este departamento, así que la meta es la de la corporación. Si es una organización nueva, tómela como piso.</p>` : '';
+  const puntoDePartida = R.tipo === 'partido' ? porPartido + piso : R.tipo === 'ganadora'
     ? `<li><b>${R.votos.toLocaleString('es-CO')}</b> · lo que sacó <b>quien ganó</b> ${escHtml(corpConArticulo(d.corporacionClave, d.corporacion, 1))} de ${escHtml(d.territorio)} en 2023${R.nombre ? ` (${escHtml(R.nombre)})` : ''}. En un cargo uninominal la meta es ganar, no pasar un corte.</li>`
     : R.tipo === 'curul-verificada'
       ? `<li><b>${R.votos.toLocaleString('es-CO')}</b> · la <b>última curul</b> ${escHtml(corpConArticulo(d.corporacionClave, d.corporacion, 1))} de ${escHtml(d.territorio)} en 2023${R.curules ? `, de ${R.curules} curules` : ''}, tomada del acto de escrutinio.</li>`
@@ -1123,7 +1140,8 @@ function mostrarMetaInfo() {
   ].join('');
   $('introModalTitle').textContent = `Su meta: ${d.objetivo.toLocaleString('es-CO')} votos`;
   $('introModalText').innerHTML = `
-    <p>No es un pronóstico de cuántos votos va a sacar. Es <b>cuántos hacen falta</b>: lo que costó entrar ${escHtml(corpConArticulo(d.corporacionClave, d.corporacion))} de ${escHtml(d.territorio)} en 2023, puesto en 2027.</p>
+    <p>No es un pronóstico de cuántos votos va a sacar. Es <b>cuántos hacen falta</b>: lo que costó entrar ${escHtml(corpConArticulo(d.corporacionClave, d.corporacion))} de ${escHtml(d.territorio)} en 2023${R.tipo === 'partido' ? ` <b>por la lista de ${escHtml(P.nombre)}</b>` : ''}, puesto en 2027.${R.tipo === 'partido' ? ' No cuesta lo mismo entrar de décimo en una lista grande que arrastrar una lista pequeña.' : ''}</p>
+    ${sinPartido}
     <p style="margin-bottom:8px"><b>De dónde parte</b></p>
     <ul class="puntaje-escala">${puntoDePartida}</ul>
     <p style="margin-bottom:8px"><b>Qué le ajustamos</b></p>
@@ -1197,7 +1215,7 @@ async function abrirCRMNuevo() {
   pintarBriefing();
   pintarEscucha();
   renderTerritorioObjetivo(c);
-  pintarMeta(await VoteTarget.estimate({ corp: c.corp, territory: lugar, baseUrl: S3 }));
+  pintarMeta(await VoteTarget.estimate({ corp: c.corp, territory: lugar, baseUrl: S3, partido: n.partido || '', departamento: c.departamento || '' }));
 }
 /* Volver a la candidatura vinculada (al cargar o al intentar cambiarla). */
 async function abrirVinculo() {

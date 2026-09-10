@@ -154,7 +154,88 @@
     });
     elected.sort((a, b) => Number(a.votos || 0) - Number(b.votos || 0));
     if (!elected.length) return null;
-    return { cutoff: Number(elected[0].votos || 0), seats, validVotes };
+    /* cifra repartidora = el cociente más bajo que alcanzó curul: lo que una
+       LISTA necesita para una curul. Se devuelve todo lo reconstruido porque
+       la meta por partido se calcula encima de esto. */
+    const cifra = quotients[Math.min(seats, quotients.length) - 1].value;
+    return { cutoff: Number(elected[0].votos || 0), seats, validVotes, parties, allocations, cifra, threshold };
+  }
+
+  /* ── La meta según el partido ───────────────────────────────────────────
+     La última curul de la corporación es un piso engañoso: en Bogotá 2023
+     fue la tercera de una lista arrastrada por un candidato de 70.000 votos,
+     y entrar por la Alianza Verde costó el doble. Lo que cuesta entrar
+     depende de la LISTA con la que se va:
+       · si la lista ganó k curules, hay que entrar de k: la meta es lo que
+         sacó el k-ésimo de esa lista;
+       · si la lista no ganó curul, primero la lista tiene que llegar a la
+         cifra repartidora: a quien la encabece le toca poner lo que falte,
+         suponiendo que el resto de la lista repita;
+       · si el partido no corrió en 2023 en esa corporación, su fuerza se
+         estima con la Cámara de 2026 en el departamento, escalada al tamaño
+         de la corporación, y de ahí se deduce si arrastraría curul. */
+  const ESTRUCTURALES = new Set(['PARTIDO', 'PARTIDOS', 'MOVIMIENTO', 'POLITICO', 'POLITICA', 'COALICION', 'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'Y']);
+  const palabras = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9Ñ]+/g, ' ').trim().split(' ').filter(Boolean);
+  const nucleo = s => palabras(s).filter(w => !ESTRUCTURALES.has(w));
+  function listaDelPartido(parties, partido) {
+    const nu = nucleo(partido);
+    if (!nu.length) return null;
+    const exacto = normalize(partido);
+    const candidatas = parties.filter(party => normalize(party.name) === exacto || (() => { const set = new Set(palabras(party.name)); return nu.every(w => set.has(w)); })());
+    return candidatas.sort((a, b) => b.votes - a.votes)[0] || null;
+  }
+  function mediana(xs) { const s = xs.filter(Number.isFinite).sort((a, b) => a - b); return s.length ? s[Math.floor((s.length - 1) / 2)] : null; }
+  /* Qué parte del total de una lista suele sacar su k-ésimo candidato, y su
+     cabeza, medido en las listas de esa misma elección. Con eso se traduce
+     una fuerza de lista estimada en una meta personal. */
+  function participacionesTipicas(parties, allocations) {
+    const porK = new Map(), cabezas = [];
+    parties.forEach(party => {
+      const k = allocations.get(party.name) || 0, top = Number(party.candidates[0] && party.candidates[0].votos || 0);
+      if (!party.votes) return;
+      if (k <= 1 && top) cabezas.push(top / party.votes);
+      if (k >= 1 && party.candidates[k - 1]) { if (!porK.has(k)) porK.set(k, []); porK.get(k).push(Number(party.candidates[k - 1].votos || 0) / party.votes); }
+    });
+    return { cabeza: mediana(cabezas) || 0.5, k: k => { const ks = [...porK.keys()].sort((a, b) => Math.abs(a - k) - Math.abs(b - k)); return ks.length ? mediana(porK.get(ks[0])) : null; } };
+  }
+  function referenciaPorPartido({ reconstructed, partido, camara }) {
+    if (!reconstructed || reconstructed.sparse || !partido) return null;
+    const { parties, allocations, cifra, validVotes } = reconstructed;
+    const lista = listaDelPartido(parties, partido);
+    const entera = v => Math.max(1, Math.round(v));
+    if (lista) {
+      const k = allocations.get(lista.name) || 0, top = Number(lista.candidates[0] && lista.candidates[0].votos || 0);
+      if (k >= 1) {
+        const ultimo = lista.candidates[k - 1];
+        return { tipo: 'lista-con-curul', votos: entera(ultimo.votos), k, lista: { nombre: lista.name, total: lista.votes, candidatos: lista.candidates.length, cabeza: top, ultimoNombre: ultimo.nombre || '' }, cifra: entera(cifra) };
+      }
+      const faltante = Math.max(top, cifra - (lista.votes - top));
+      return { tipo: 'lista-sin-curul', votos: entera(faltante), k: 0, lista: { nombre: lista.name, total: lista.votes, candidatos: lista.candidates.length, cabeza: top }, cifra: entera(cifra), faltanLista: entera(Math.max(0, cifra - lista.votes)) };
+    }
+    if (camara && camara.votval > 0) {
+      const enCamara = listaDelPartido(Object.entries(camara.partidos || {}).map(([name, votes]) => ({ name, votes: Number(votes) || 0, candidates: [] })), partido);
+      if (enCamara && enCamara.votes > 0) {
+        const escala = validVotes / camara.votval, total = enCamara.votes * escala;
+        const tipicas = participacionesTipicas(parties, allocations);
+        const kEst = Math.floor(total / cifra);
+        if (kEst >= 1) {
+          const share = tipicas.k(kEst) || (1 / (kEst + 1));
+          return { tipo: 'proxy-camara', votos: entera(total * share), k: kEst, cifra: entera(cifra), camara: { nombre: enCamara.name, votos: enCamara.votes, votval: camara.votval, escala, totalEstimado: entera(total) } };
+        }
+        const cabeza = total * tipicas.cabeza;
+        return { tipo: 'proxy-camara', votos: entera(Math.max(cabeza, cifra - (total - cabeza))), k: 0, cifra: entera(cifra), camara: { nombre: enCamara.name, votos: enCamara.votes, votval: camara.votval, escala, totalEstimado: entera(total), cabezaEstimada: entera(cabeza) } };
+      }
+    }
+    return { tipo: 'sin-dato', votos: 0, cifra: entera(cifra) };
+  }
+  async function camaraDepartamento(baseUrl, departamento) {
+    const dep = String(departamento || '').replace(/\D/g, '').padStart(2, '0');
+    if (!dep || dep === '00') return null;
+    try {
+      const d = await json(`${baseUrl}/camara/dep-${dep}.json`);
+      const t = d && d.por_circunscripcion && d.por_circunscripcion.TERRITORIAL;
+      return t && t.partidos ? { partidos: t.partidos, votval: Number(t.votval) || 0 } : d && d.partidos ? { partidos: d.partidos, votval: Number(d.votval) || 0 } : null;
+    } catch (error) { return null; }
   }
 
   function verifiedCutoff(corp, territory) {
@@ -274,7 +355,7 @@
     return `${census} × ${participation} × margen competitivo ${Math.round(COMPETITIVE_MARGIN * 100)}%`;
   }
 
-  async function estimate({ corp, territory, baseUrl }) {
+  async function estimate({ corp, territory, baseUrl, partido, departamento }) {
     const source = CORPORATIONS[corp];
     if (!source || !territory) return { target: null, formula: 'Seleccione una corporación y un territorio para calcular la meta.', detalle: { falla: 'sin-territorio' } };
     try {
@@ -302,8 +383,15 @@
       const reconstructed = reconstructedCutoff(match.rows);
       const reference = verified || reconstructed;
       if (!reference || !reference.cutoff) throw new Error('No fue posible reconstruir la última curul');
+      /* La meta por partido solo se calcula sobre la reconstrucción completa
+         (con curules por lista); el corte verificado a mano sigue siendo el
+         piso de la corporación. */
+      const camara = partido && reconstructed && !reconstructed.sparse && !listaDelPartido(reconstructed.parties, partido) ? await camaraDepartamento(baseUrl, departamento) : null;
+      const porPartido = partido ? referenciaPorPartido({ reconstructed, partido, camara }) : null;
+      const usaPartido = Boolean(porPartido && porPartido.votos > 0);
+      const referenceVotes = usaPartido ? porPartido.votos : Number(reference.cutoff);
       const metrics = await metricsPromise;
-      const projected = projection(reference.cutoff, metrics);
+      const projected = projection(referenceVotes, metrics);
       const target = roundTarget(projected.target);
       const method = verified
         ? 'última curul verificada'
@@ -311,11 +399,21 @@
           ? 'piso personal observado (la fuente no permite reconstruir todas las curules)'
           : 'corte de última curul reconstruido con umbral y cifra repartidora';
       const seatsText = reference.seats ? `; ${reference.seats} curules` : '';
+      const textoPartido = !usaPartido ? '' : porPartido.tipo === 'lista-con-curul'
+        ? `entrar de ${porPartido.k} en la lista de ${porPartido.lista.nombre}, que en 2023 ganó ${porPartido.k} curul${porPartido.k === 1 ? '' : 'es'} y cuyo último elegido sacó ${porPartido.votos.toLocaleString('es-CO')} votos`
+        : porPartido.tipo === 'lista-sin-curul'
+          ? `llevar a la lista de ${porPartido.lista.nombre} hasta la cifra repartidora (${porPartido.cifra.toLocaleString('es-CO')}): sumó ${porPartido.lista.total.toLocaleString('es-CO')} y a quien la encabece le tocan ${porPartido.votos.toLocaleString('es-CO')}`
+          : `una lista estimada con la Cámara de 2026 (${porPartido.camara.totalEstimado.toLocaleString('es-CO')} votos al tamaño de esta corporación), que ${porPartido.k ? `arrastraría ${porPartido.k} curul${porPartido.k === 1 ? '' : 'es'}` : 'no alcanzaría la cifra repartidora'}: ${porPartido.votos.toLocaleString('es-CO')} votos personales`;
       return {
         target,
-        formula: `Meta para ${source.label} en ${match.label}: ${method} en 2023 (${Number(reference.cutoff).toLocaleString('es-CO')} votos${seatsText}) × ${projectionText(projected, metrics)}.`,
-        detalle: detalleDe({ corp, source, label: match.label, metrics, projected, target,
-          referencia: { tipo: verified ? 'curul-verificada' : reference.sparse ? 'piso-observado' : 'curul-reconstruida', votos: Number(reference.cutoff), curules: reference.seats || null, validos: reference.validVotes || null } }),
+        formula: usaPartido
+          ? `Meta para ${source.label} en ${match.label} con ${partido}: ${textoPartido} × ${projectionText(projected, metrics)}. La última curul de la corporación (${Number(reference.cutoff).toLocaleString('es-CO')} votos) es solo el piso.`
+          : `Meta para ${source.label} en ${match.label}: ${method} en 2023 (${Number(reference.cutoff).toLocaleString('es-CO')} votos${seatsText}) × ${projectionText(projected, metrics)}.`,
+        detalle: Object.assign(detalleDe({ corp, source, label: match.label, metrics, projected, target,
+          referencia: usaPartido
+            ? { tipo: 'partido', votos: referenceVotes, curules: reference.seats || null, validos: reference.validVotes || null, piso: Number(reference.cutoff), pisoTipo: verified ? 'curul-verificada' : reference.sparse ? 'piso-observado' : 'curul-reconstruida' }
+            : { tipo: verified ? 'curul-verificada' : reference.sparse ? 'piso-observado' : 'curul-reconstruida', votos: Number(reference.cutoff), curules: reference.seats || null, validos: reference.validVotes || null } }),
+          { partido: partido ? Object.assign({ nombre: partido }, porPartido || { tipo: 'sin-dato', votos: 0 }) : null }),
       };
     } catch (error) {
       return {

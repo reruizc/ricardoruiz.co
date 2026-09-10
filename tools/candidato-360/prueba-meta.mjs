@@ -25,6 +25,10 @@ const INDICE = { candidatos: [...lista('PARTIDO A', [9000, 5000, 1000]), ...list
 const RESULTADOS = { cities: [{ key: '16-001', name: 'BOGOTÁ', dep: 'BOGOTÁ D.C.', potencial: 100000 }],
   data: { '16-001': { comunas: { '13': { name: 'TEUSAQUILLO', votantes: 20000, validos: 19000, partidos: [['PARTIDO A', 9000]] }, '11': { name: 'SUBA', votantes: 30000, validos: 29000, partidos: [['PARTIDO A', 12000]] } } } } };
 
+/* Cámara 2026 en Bogotá, de mentiras: Salvación Nacional no corrió al Concejo
+   en 2023 y su fuerza se estima con esto. */
+const CAMARA = { por_circunscripcion: { TERRITORIAL: { votval: 27400, partidos: { 'MOVIMIENTO SALVACIÓN NACIONAL': 5480, 'PARTIDO A': 9000 } } } };
+
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
 const errores = []; p.on('pageerror', e => errores.push(e.message));
@@ -33,6 +37,7 @@ await p.route('**', async route => {
   if (u.startsWith('file://')) return route.continue();
   if (u.includes('index-concejo-2023.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(INDICE) });
   if (u.includes('resultados-concejo-2023.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(RESULTADOS) });
+  if (u.includes('camara/dep-16.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CAMARA) });
   if (u.includes('/c360/')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, acceso: true, fuente: 'admin', vinculo: null, email: 'reruizc@gmail.com' }) });
   return route.abort();
 });
@@ -59,6 +64,19 @@ await p.locator('#crm .panel .panel-head').first().screenshot({ path: SP + '/met
 await p.evaluate(() => document.querySelector('.metric-linea .meta-i').click());
 r.ficha = await p.evaluate(() => ({ abierta: document.getElementById('introModal').classList.contains('open'), titulo: document.getElementById('introModalTitle').textContent, texto: document.getElementById('introModalText').textContent }));
 await p.screenshot({ path: SP + '/meta-ficha.png' });
+
+/* ── La meta según el partido ────────────────────────────────────────── */
+/* No cuesta lo mismo entrar de segundo en la lista A (5.000) que arrastrar la
+   lista C, que no ganó curul (a su cabeza le tocan 6.600). */
+r.porPartido = {};
+for (const partido of ['PARTIDO A', 'PARTIDO C', 'MOVIMIENTO SALVACIÓN NACIONAL', 'PARTIDO INEXISTENTE']) {
+  r.porPartido[partido] = await p.evaluate(async partido => {
+    const e = await VoteTarget.estimate({ corp: 'concejo', territory: 'BOGOTÁ D.C.', baseUrl: 'https://stub/output', partido, departamento: '16' });
+    pintarMeta(e); mostrarMetaInfo();
+    return { target: e.target, ref: e.detalle.referencia, tipo: e.detalle.partido?.tipo, k: e.detalle.partido?.k, texto: document.getElementById('introModalText').textContent, formula: e.formula };
+  }, partido);
+}
+await p.screenshot({ path: SP + '/meta-partido.png' });
 
 /* Con salto de corporación, la explicación del reparto cambia. */
 r.conSalto = await p.evaluate(() => {
@@ -93,6 +111,17 @@ const pruebas = [
   ['explica el censo, la participación y el margen competitivo', /censo electoral/i.test(r.ficha.texto) && /participación/i.test(r.ficha.texto) && /margen competitivo/i.test(r.ficha.texto)],
   ['dice que redondea hacia arriba y por qué', /redondeamos hacia arriba/i.test(r.ficha.texto)],
   ['explica por qué la meta cae donde cae en el mapa', /misma proporción en que ya votaron por usted/i.test(r.ficha.texto)],
+  ['con partido, la meta es la de SU lista: entrar de 2 en la lista A cuesta 5.000, no el piso',
+    r.porPartido['PARTIDO A'].tipo === 'lista-con-curul' && r.porPartido['PARTIDO A'].k === 2 && r.porPartido['PARTIDO A'].ref.votos === 5000 && r.porPartido['PARTIDO A'].ref.piso === 5000],
+  ['y la ficha lo cuenta: entrar de 2 en la lista, y el piso de la corporación aparte',
+    /entrar de 2 en la lista de PARTIDO A/.test(r.porPartido['PARTIDO A'].texto) && /piso de la corporación/.test(r.porPartido['PARTIDO A'].texto)],
+  ['una lista sin curul tiene que jalarse hasta la cifra repartidora: 6.600 para la C',
+    r.porPartido['PARTIDO C'].tipo === 'lista-sin-curul' && r.porPartido['PARTIDO C'].ref.votos === 6600 && r.porPartido['PARTIDO C'].target === Math.ceil(6600 * d.censo.factor * d.participacion.factor * (1 + d.margen) / 10) * 10 && /jalar la lista/i.test(r.porPartido['PARTIDO C'].texto) && /cifra repartidora fue 7.500/.test(r.porPartido['PARTIDO C'].texto)],
+  ['un partido sin lista en 2023 se estima con su Cámara de 2026',
+    r.porPartido['MOVIMIENTO SALVACIÓN NACIONAL'].tipo === 'proxy-camara' && r.porPartido['MOVIMIENTO SALVACIÓN NACIONAL'].ref.votos > 5000 && /Cámara de 2026/.test(r.porPartido['MOVIMIENTO SALVACIÓN NACIONAL'].texto)],
+  ['y uno sin ningún dato cae al piso de la corporación, diciéndolo',
+    r.porPartido['PARTIDO INEXISTENTE'].tipo === 'sin-dato' && r.porPartido['PARTIDO INEXISTENTE'].target === r.estimate.target && /no hay lista en esta corporación en 2023 ni votación a Cámara/.test(r.porPartido['PARTIDO INEXISTENTE'].texto)],
+  ['la frase corta de la meta también nombra el partido', /con PARTIDO C: llevar a la lista/.test(r.porPartido['PARTIDO C'].formula)],
   ['con salto, esa explicación pasa a ser la del salto', /Salto de Junta administradora local a Concejo/.test(r.conSalto) && /2,4 veces/.test(r.conSalto)],
   ['sin referencia no hay número', r.sinMeta.numero === '—'],
   ['ni ⓘ que prometa una explicación', r.sinMeta.ocultas === true],
