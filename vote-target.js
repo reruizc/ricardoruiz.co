@@ -226,8 +226,36 @@
     return {
       target: referenceVotes * censusFactor * participationFactor * (1 + COMPETITIVE_MARGIN),
       censusFactor,
+      participationFactor,
       participation2023,
       participation2027,
+    };
+  }
+
+  /* El MISMO cálculo, pero desarmado en piezas nombradas. `formula` lo cuenta
+     en una línea; esto deja que la interfaz lo explique paso a paso sin volver
+     a calcular nada (y sin que las dos versiones se puedan desincronizar). */
+  function detalleDe({ corp, source, label, referencia, metrics, projected, target }) {
+    return {
+      corporacion: source.label,
+      corporacionClave: corp,
+      territorio: label,
+      uninominal: !source.multiSeat,
+      referencia: referencia,
+      censo: {
+        potencial: metrics && metrics.potential ? Number(metrics.potential) : null,
+        crecimiento: CENSUS_GROWTH_2023_2027,
+        factor: projected.censusFactor,
+      },
+      participacion: {
+        p2023: projected.participation2023,
+        p2027: projected.participation2027,
+        alza: PARTICIPATION_UPLIFT,
+        factor: projected.participationFactor,
+      },
+      margen: COMPETITIVE_MARGIN,
+      crudo: projected.target,
+      objetivo: target,
     };
   }
 
@@ -248,7 +276,7 @@
 
   async function estimate({ corp, territory, baseUrl }) {
     const source = CORPORATIONS[corp];
-    if (!source || !territory) return { target: null, formula: 'Seleccione una corporación y un territorio para calcular la meta.' };
+    if (!source || !territory) return { target: null, formula: 'Seleccione una corporación y un territorio para calcular la meta.', detalle: { falla: 'sin-territorio' } };
     try {
       const index = await json(`${baseUrl}/${source.index}`);
       const match = resolveTerritoryRows(index.candidatos || [], territory);
@@ -265,6 +293,8 @@
         return {
           target,
           formula: `Meta para ${source.label} en ${match.label}: votación ganadora de 2023 (${referenceVotes.toLocaleString('es-CO')} votos) × ${projectionText(projected, metrics)}.`,
+          detalle: detalleDe({ corp, source, label: match.label, metrics, projected, target,
+            referencia: { tipo: 'ganadora', votos: referenceVotes, curules: 1, nombre: (winner && winner.nombre) || '', partido: (winner && winner.partido) || '' } }),
         };
       }
 
@@ -284,11 +314,14 @@
       return {
         target,
         formula: `Meta para ${source.label} en ${match.label}: ${method} en 2023 (${Number(reference.cutoff).toLocaleString('es-CO')} votos${seatsText}) × ${projectionText(projected, metrics)}.`,
+        detalle: detalleDe({ corp, source, label: match.label, metrics, projected, target,
+          referencia: { tipo: verified ? 'curul-verificada' : reference.sparse ? 'piso-observado' : 'curul-reconstruida', votos: Number(reference.cutoff), curules: reference.seats || null, validos: reference.validVotes || null } }),
       };
     } catch (error) {
       return {
         target: null,
         formula: `Aún no hay una referencia territorial completa para ${territory}. No se usó la votación anterior como sustituto porque la meta depende de la corporación y del lugar.`,
+        detalle: { falla: 'sin-referencia', territorio: territory, corporacion: source.label, motivo: error && error.message },
       };
     }
   }

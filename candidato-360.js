@@ -913,10 +913,69 @@ async function createNew(e) {
 
 /* ─── 8. CRM: apertura, meta de votos y foto ─────────────────────────────── */
 async function estimateVoteTarget(corp, territory) { return VoteTarget.estimate({ corp, territory: territory || crmCandidate?.circunscripcion || '', baseUrl: S3 }); }
+let META_ACTUAL = null;
 function pintarMeta(estimate) {
+  META_ACTUAL = estimate || null;
   if (estimate.target) { $('crmVoteNumber').textContent = estimate.target.toLocaleString('es-CO'); $('crmVoteTarget').textContent = `Meta inicial: ${estimate.target.toLocaleString('es-CO')} votos`; guardarMeta(estimate.target); }
   else { $('crmVoteNumber').textContent = '—'; $('crmVoteTarget').textContent = 'Meta pendiente de referencia territorial'; }
   $('crmVoteFormula').textContent = estimate.formula;
+  /* La ⓘ solo aparece cuando hay una meta que explicar: junto a un guion no
+     explica nada, y el propio panel ya dice que falta la referencia. */
+  document.querySelectorAll('.meta-i').forEach(b => b.classList.toggle('hidden', !(estimate.target && estimate.detalle)));
+}
+/* Cómo se reparte la meta sobre el mapa, en una frase. Es la otra mitad de la
+   pregunta «por qué proyectan esa votación»: de dónde sale el número y por qué
+   cae donde cae. */
+function comoSeReparte() {
+  if (SALTO_ACTUAL?.base) return notaSalto(SALTO_ACTUAL.base);
+  if (!crmCandidate) return 'Sin historial propio, el mapa reparte la meta según la votación de 2023 en el territorio al que aspira.';
+  return 'Como sigue en la misma corporación, el mapa reparte la meta en la misma proporción en que ya votaron por usted: donde sacó el 20 % de sus votos le corresponde el 20 % de la meta.';
+}
+/* «entrar a la Concejo» no lo dice nadie. El artículo va por corporación. */
+const CORP_ARTICULO = { jal: ['la', 'de la'], concejo: ['el', 'del'], alcaldia: ['la', 'de la'], asamblea: ['la', 'de la'], gobernacion: ['la', 'de la'] };
+function corpConArticulo(clave, etiqueta, forma = 0) {
+  const art = (CORP_ARTICULO[clave] || ['la', 'de la'])[forma];
+  return `${forma === 0 ? (art === 'el' ? 'al' : 'a la') : art} ${etiqueta}`;
+}
+function mostrarMetaInfo() {
+  const e = META_ACTUAL; if (!e) return;
+  const d = e.detalle;
+  $('introModalKicker').textContent = 'Candidato 360 · meta de votos';
+  if (!d || d.falla) {
+    $('introModalTitle').textContent = 'Todavía no hay meta para este territorio';
+    $('introModalText').innerHTML = `<p>${escHtml(e.formula)}</p>
+      <p class="puntaje-nota">La meta se calcula contra la elección de 2023 de <b>esa</b> corporación en <b>ese</b> lugar. Cuando la referencia no está completa preferimos no mostrar un número: una meta inventada es peor que ninguna.</p>`;
+    return $('introModal').classList.add('open');
+  }
+  const pct = x => `${(x * 100).toFixed(1).replace('.', ',')} %`;
+  const veces = x => `× ${x.toLocaleString('es-CO', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
+  const R = d.referencia || {};
+  const puntoDePartida = R.tipo === 'ganadora'
+    ? `<li><b>${R.votos.toLocaleString('es-CO')}</b> · lo que sacó <b>quien ganó</b> ${escHtml(corpConArticulo(d.corporacionClave, d.corporacion, 1))} de ${escHtml(d.territorio)} en 2023${R.nombre ? ` (${escHtml(R.nombre)})` : ''}. En un cargo uninominal la meta es ganar, no pasar un corte.</li>`
+    : R.tipo === 'curul-verificada'
+      ? `<li><b>${R.votos.toLocaleString('es-CO')}</b> · la <b>última curul</b> ${escHtml(corpConArticulo(d.corporacionClave, d.corporacion, 1))} de ${escHtml(d.territorio)} en 2023${R.curules ? `, de ${R.curules} curules` : ''}, tomada del acto de escrutinio.</li>`
+      : R.tipo === 'piso-observado'
+        ? `<li><b>${R.votos.toLocaleString('es-CO')}</b> · el <b>piso observado</b> entre quienes salieron elegidos en 2023${R.curules ? ` (${R.curules} curules)` : ''}. La fuente no permite reconstruir todas las curules, así que este número es un mínimo, no un corte exacto.</li>`
+        : `<li><b>${R.votos.toLocaleString('es-CO')}</b> · el <b>corte de la última curul</b> ${escHtml(corpConArticulo(d.corporacionClave, d.corporacion, 1))} de ${escHtml(d.territorio)} en 2023${R.curules ? `, con ${R.curules} curules` : ''}, reconstruido con umbral y cifra repartidora.</li>`;
+  const ajustes = [
+    `<li><b>${veces(d.censo.factor)}</b> · censo electoral: ${d.censo.potencial ? `${d.censo.potencial.toLocaleString('es-CO')} personas habilitadas en 2023 y ` : ''}un crecimiento de ${pct(d.censo.crecimiento)} hasta 2027.</li>`,
+    d.participacion.p2023
+      ? `<li><b>${veces(d.participacion.factor)}</b> · participación: votó el ${pct(d.participacion.p2023)} en 2023 y proyectamos ${pct(d.participacion.p2027)} en 2027 (las locales de mitad de periodo suben poco).</li>`
+      : `<li><b>× 1,000</b> · participación: sin dato de censo y votantes para ese territorio la dejamos estable, sin inventar un alza.</li>`,
+    `<li><b>${veces(1 + d.margen)}</b> · margen competitivo: ${Math.round(d.margen * 100)} % por encima del corte. Empatar con la última curul no la gana; hay que pasarla.</li>`
+  ].join('');
+  $('introModalTitle').textContent = `Su meta: ${d.objetivo.toLocaleString('es-CO')} votos`;
+  $('introModalText').innerHTML = `
+    <p>No es un pronóstico de cuántos votos va a sacar. Es <b>cuántos hacen falta</b>: lo que costó entrar ${escHtml(corpConArticulo(d.corporacionClave, d.corporacion))} de ${escHtml(d.territorio)} en 2023, puesto en 2027.</p>
+    <p style="margin-bottom:8px"><b>De dónde parte</b></p>
+    <ul class="puntaje-escala">${puntoDePartida}</ul>
+    <p style="margin-bottom:8px"><b>Qué le ajustamos</b></p>
+    <ul class="puntaje-escala">${ajustes}</ul>
+    <p>${d.referencia.votos.toLocaleString('es-CO')} × esos tres factores dan ${Math.round(d.crudo).toLocaleString('es-CO')}, que redondeamos hacia arriba a <b>${d.objetivo.toLocaleString('es-CO')}</b>. Redondear hacia abajo sería fijar una meta que no alcanza.</p>
+    <p style="margin-bottom:8px"><b>Por qué cae donde cae en el mapa</b></p>
+    <p>${escHtml(comoSeReparte())}</p>
+    <p class="puntaje-nota">Es un punto de partida, no una promesa: 2027 puede traer más listas, otra composición del concejo o un censo distinto. Se recalcula cada vez que usted cambia de corporación o de territorio.</p>`;
+  $('introModal').classList.add('open');
 }
 function vinculoCoincide(profile) {
   const v = SESSION.vinculo; if (!v || v.tipo !== 'historial') return false;

@@ -123,6 +123,7 @@ lo que pesa en la huella y la nota del mapa lo dice.
 ```
 node tools/candidato-360/prueba-salto.mjs          # el motor puro y la tabla publicada (23)
 node tools/candidato-360/prueba-salto-crm.mjs      # el CRM con Leaflet, sin red (13)
+node tools/candidato-360/prueba-meta.mjs           # la ⓘ que explica la meta y su reparto (17)
 ```
 
 `estudio.mjs` se puede probar sin S3 apuntando `--base` a una carpeta servida
