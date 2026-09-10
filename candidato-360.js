@@ -1305,10 +1305,15 @@ function repartoSalto({ meta, propio, origen, base, arraigo }) {
      capa de municipios del departamento con el reparto; en «Total» vuelve el
      mapa histórico. */
 let SALTO_ACTUAL = null;
-const SALTOS_ARRAIGO_URL = `${S3}/candidato-360/saltos-arraigo.json`;
+/* El estudio de saltos viaja CON el sitio (lo produce
+   tools/candidato-360/saltos/estudio.mjs y queda versionado en el repo: son
+   22 KB). La copia en S3 existe para poder refrescarlo sin desplegar, y por
+   eso manda cuando está. */
+const SALTOS_ARRAIGO_URL = 'candidato-360-data/saltos-arraigo.json';
+const SALTOS_ARRAIGO_URL_S3 = `${S3}/candidato-360/saltos-arraigo.json`;
 let saltosArraigoPromise = null;
 function tablaArraigo() {
-  if (!saltosArraigoPromise) saltosArraigoPromise = fetchJSON(SALTOS_ARRAIGO_URL).catch(() => null);
+  if (!saltosArraigoPromise) saltosArraigoPromise = fetchJSON(SALTOS_ARRAIGO_URL_S3).catch(() => fetchJSON(SALTOS_ARRAIGO_URL)).catch(() => null);
   return saltosArraigoPromise;
 }
 /* Los resultados por área de la corporación destino, en el formato

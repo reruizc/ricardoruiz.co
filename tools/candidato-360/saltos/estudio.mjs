@@ -80,6 +80,23 @@ const FUENTE = {
   gobernacion: { 2011: 'gob2011',  2015: 'gob2015',  2019: 'gob2019',  2023: 'gob2023' },
 };
 
+/* ── El motor de la web, tal cual ────────────────────────────────────────
+   El «neutro» contra el que se compara el arraigo tiene que ser EXACTAMENTE
+   la base que usa candidato-360.js para repartir (huella del partido → bloque
+   → participación). Si acá se midiera contra otra cosa, el lift no sería el
+   multiplicador que la web necesita. Por eso se carga la sección 8 ter del
+   propio archivo en vez de reescribirla. */
+const ctxMotor = { window: {}, console };
+vm.createContext(ctxMotor);
+vm.runInContext(await readFile(path.join(REPO, 'partidos-bloques.js'), 'utf8'), ctxMotor);
+{
+  const js = await readFile(path.join(REPO, 'candidato-360.js'), 'utf8');
+  const motor = js.slice(js.indexOf('/* ─── 8 ter.'), js.indexOf('/* ── El salto en el CRM'));
+  const dv = js.slice(js.indexOf('function distributeVotes('), js.indexOf('function projectedVotesByArea('));
+  vm.runInContext(`const PartidosBloques = window.PartidosBloques; ${dv}\n${motor}\nthis.baseDestino = baseDestino;`, ctxMotor);
+}
+const baseDestino = ctxMotor.baseDestino;
+
 /* ── cand-index.js, tal cual lo usa la web ───────────────────────────────── */
 const ctx = { window: { RRData: { publicUrl: p => `${BASE.replace(/\/congreso-2026\/output$/, '')}/${p}` } }, console };
 vm.createContext(ctx);
@@ -125,6 +142,7 @@ async function indice(corp, ano) {
   indices[k] = lista;
   return lista;
 }
+
 const normPartido = s => CR.normPersona(String(s || '').replace(/^(PARTIDO|MOVIMIENTO|COALICION)\s+/i, ''));
 
 /* ── Geografía de las mesas ─────────────────────────────────────────────── */
@@ -159,26 +177,22 @@ function medir(unidad, mesasOrigen, mesasDestino) {
   }
   return { dep: depOrigen, mun: munOrigen, origenKey, ambitoOrigen, vDestino, vAmbito, enOrigen, arraigo: enOrigen / vAmbito };
 }
-/* Lo mismo, para la lista del partido en el destino (el neutro). */
-function medirNeutro(unidad, medida, mesasPartido) {
-  const ambitoDe = unidad === 'localidad' ? munKey : dep2;
-  const enAmbito = mesasPartido.filter(m => ambitoDe(m) === medida.ambitoOrigen);
-  const v = total(sumaPor(enAmbito, ambitoDe)); if (!v) return null;
-  const enOrigen = unidad === 'localidad' ? total(sumaPor(enAmbito.filter(m => locKey(m) === medida.origenKey), locKey)) : total(sumaPor(enAmbito.filter(m => munKey(m) === medida.mun), munKey));
-  return enOrigen / v;
-}
-/* Neutro de participación para 2023 desde los resultados por área. */
+/* El NEUTRO: qué peso tendría el territorio de origen si esa candidatura
+   repartiera como reparte la web —la huella de su partido en la corporación
+   de destino (2023), o su bloque, o la participación—. Solo existe para
+   destinos 2023: los resultados por área son de esa elección. */
 const resultadosCache = {};
-async function neutroParticipacion(unidad, medida) {
+async function neutroBase(unidad, medida, candidatoDestino) {
   const url = unidad === 'localidad' ? `${BASE}/concejo-2023/resultados-concejo-2023.json` : `${BASE}/asamblea-2023/dep/${medida.dep}.json`;
   if (!(url in resultadosCache)) resultadosCache[url] = await bajar(url);
   const r = resultadosCache[url]; if (!r) return null;
-  const comunas = unidad === 'localidad' ? r?.data?.[medida.mun]?.comunas : r?.comunas; if (!comunas) return null;
-  const val = d => Number(d?.validos || d?.votantes || 0);
-  const tot = Object.values(comunas).reduce((s, d) => s + val(d), 0); if (!tot) return null;
+  const porArea = unidad === 'localidad' ? r?.data?.[medida.mun]?.comunas : r?.comunas;
+  if (!porArea || Object.keys(porArea).length < 2) return null;
+  const base = baseDestino({ porArea, partido: candidatoDestino.partido, nombreCandidato: candidatoDestino.nombre });
+  if (!base) return null;
   const llave = unidad === 'localidad' ? medida.origenKey : medida.mun.slice(3);
-  const d = comunas[llave] || comunas[String(Number(llave))] || comunas[llave.padStart(3, '0')]; if (!d) return null;
-  return val(d) / tot;
+  const peso = base.proporciones[llave] ?? base.proporciones[String(Number(llave))];
+  return peso == null ? null : { peso, capa: base.capa, etiqueta: base.etiqueta };
 }
 
 /* ── Emparejar personas Y → Y+4 ─────────────────────────────────────────── */
@@ -191,11 +205,6 @@ function unicos(lista) {
   }
   return por;
 }
-function listasDePartido(lista) {
-  const por = {};
-  for (const c of lista) if (CR.isPartyEntry(c) || c.tipo === 'partido') { const k = `${normPartido(c.partido || c.nombre)}|${CR.normPersona(c.circunscripcion)}`; (por[k] ||= []).push(c); }
-  return por;
-}
 
 const casos = [];
 for (const clave of CLAVES) {
@@ -206,7 +215,7 @@ for (const clave of CLAVES) {
     process.stdout.write(`  ${y} → ${y2}: índices… `);
     const [io, id] = await Promise.all([indice(S.origen, y), indice(S.destino, y2)]);
     if (!io?.length || !id?.length) { console.log('sin datos'); continue; }
-    const uo = unicos(io), ud = unicos(id), partidos = listasDePartido(id);
+    const uo = unicos(io), ud = unicos(id);
     let pares = [...uo.entries()].filter(([k, c]) => c && ud.get(k)).map(([k, c]) => ({ k, a: c, b: ud.get(k) }));
     if (pares.length > LIMITE) pares = pares.sort(() => Math.random() - .5).slice(0, LIMITE);
     console.log(`${io.length} y ${id.length} candidaturas, ${pares.length} nombres únicos en ambos`);
@@ -214,10 +223,8 @@ for (const clave of CLAVES) {
       const [ma, mb] = await Promise.all([mesasDe(a), mesasDe(b)]);
       if (!ma.length || !mb.length) return null;
       const m = medir(S.unidad, ma, mb); if (!m || m.descartado) return null;
-      let neutro = null, neutroFuente = '';
-      const lp = partidos[`${normPartido(b.partido)}|${CR.normPersona(b.circunscripcion)}`] || partidos[`${normPartido(b.partido)}|`];
-      if (lp?.length === 1) { const mp = await mesasDe(lp[0]); const n = medirNeutro(S.unidad, m, mp); if (n != null) { neutro = n; neutroFuente = 'partido'; } }
-      if (neutro == null && y2 === 2023) { const n = await neutroParticipacion(S.unidad, m); if (n != null) { neutro = n; neutroFuente = 'participacion'; } }
+      const nb = y2 === 2023 ? await neutroBase(S.unidad, m, b) : null;
+      const neutro = nb?.peso ?? null, neutroFuente = nb?.capa || '';
       const va = Number(a.votos) || 0, vb = Number(b.votos) || 0;
       return { salto: clave, anoOrigen: y, anoDestino: y2, persona: k, nombre: b.nombre, dep: m.dep, municipio: m.mun, origen: m.origenKey,
         partidoOrigen: a.partido || '', partidoDestino: b.partido || '', mismoPartido: normPartido(a.partido) === normPartido(b.partido),
@@ -233,18 +240,16 @@ for (const clave of CLAVES) {
 /* ── Agregar ─────────────────────────────────────────────────────────────── */
 const cuantil = (xs, q) => { const s = xs.filter(x => Number.isFinite(x)).sort((a, b) => a - b); if (!s.length) return null; const p = (s.length - 1) * q, lo = Math.floor(p), hi = Math.ceil(p); return +(s[lo] + (s[hi] - s[lo]) * (p - lo)).toFixed(4); };
 function resumen(cs) {
-  /* lift_* solo con el neutro del PARTIDO: es lo que multiplica repartoSalto
-     (el origen pesa lift × su peso en la huella del partido). El de la
-     participación queda aparte, como referencia. */
-  const lifts = cs.filter(c => c.neutroFuente === 'partido').map(c => c.lift).filter(x => Number.isFinite(x));
-  const liftsPart = cs.filter(c => c.neutroFuente === 'participacion').map(c => c.lift).filter(x => Number.isFinite(x));
+  /* El lift es lo que multiplica repartoSalto: el origen pesa lift × su peso
+     en la base. Se mide contra la MISMA base que usa la web, así que entran
+     todos los casos que tuvieron neutro, sea cual sea la capa. */
+  const lifts = cs.map(c => c.lift).filter(x => Number.isFinite(x));
   const gaps = cs.map(c => c.gap).filter(x => Number.isFinite(x));
   return { n: cs.length, arraigo_mediana: cuantil(cs.map(c => c.arraigo), .5), arraigo_p25: cuantil(cs.map(c => c.arraigo), .25), arraigo_p75: cuantil(cs.map(c => c.arraigo), .75),
     lift_n: lifts.length, lift_mediana: cuantil(lifts, .5), lift_p25: cuantil(lifts, .25), lift_p75: cuantil(lifts, .75),
-    lift_participacion_n: liftsPart.length, lift_participacion_mediana: cuantil(liftsPart, .5),
     gap_n: gaps.length, gap_mediana: cuantil(gaps, .5), gap_p25: cuantil(gaps, .25), gap_p75: cuantil(gaps, .75) };
 }
-const tabla = { _generado: new Date().toISOString().slice(0, 10), _metodo: 'mediana por candidatura; arraigo = fracción de la votación de destino que cae en el territorio de origen; lift = arraigo ÷ lo mismo para la lista del partido (lift_participacion: frente a los válidos por área de 2023); gap = votos destino ÷ votos origen; solo saltos Y→Y+4' };
+const tabla = { _generado: new Date().toISOString().slice(0, 10), _metodo: 'mediana por candidatura; arraigo = fracción de la votación de destino que cae en el territorio de origen; lift = arraigo ÷ el peso del origen en la base con que reparte la web (huella del partido → bloque → participación, 2023); gap = votos destino ÷ votos origen; solo saltos Y→Y+4' };
 for (const clave of CLAVES) {
   const cs = casos.filter(c => c.salto === clave); if (!cs.length) continue;
   const t = { _nacional: resumen(cs) };

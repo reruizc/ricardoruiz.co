@@ -94,6 +94,15 @@ revisar('el lift se acota: nunca más del 95 % en el origen', M.repartoSalto({ m
 revisar('con pocos casos de lift se cae a la fracción cruda',
   M.arraigoEmpirico({ 'jal>concejo': { _nacional: { n: 40, arraigo_mediana: .28, lift_mediana: 2.5, lift_n: 3 } } }, 'jal>concejo', '16')?.lift === null);
 
+/* ── La tabla que viaja con el sitio ──────────────────────────────────── */
+const real = JSON.parse(await readFile(new URL('../../candidato-360-data/saltos-arraigo.json', import.meta.url), 'utf8'));
+revisar('la tabla publicada trae los tres saltos', ['jal>concejo', 'concejo>asamblea', 'alcaldia>gobernacion'].every(k => real[k]?._nacional?.n > 0));
+const bog = M.arraigoEmpirico(real, 'jal>concejo', '16');
+revisar('Bogotá tiene casos propios de JAL → Concejo y trae lift', bog?.ambito === 'departamento' && bog.lift > 1);
+revisar('cada arraigo publicado es una fracción y cada lift un múltiplo sensato',
+  Object.entries(real).filter(([k]) => !k.startsWith('_')).every(([, t]) => Object.values(t).every(r =>
+    r.arraigo_mediana >= 0 && r.arraigo_mediana <= 1 && (r.lift_mediana == null || (r.lift_mediana > 0 && r.lift_mediana < 50)))));
+
 console.log();
 console.log(fallos.length ? `${fallos.length} fallaron: ${fallos.join(' · ')}` : 'todas pasaron');
 process.exit(fallos.length ? 1 : 0);

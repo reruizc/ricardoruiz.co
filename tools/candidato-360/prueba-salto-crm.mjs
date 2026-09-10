@@ -37,7 +37,7 @@ const RESULTADOS = { data: { '16-001': { comunas: {
   '11': { name: 'SUBA',        validos: 500000, votantes: 520000, partidos: [[NL, 32000], [PH, 90000]] },
   '20': { name: 'SUMAPAZ',     validos: 3000,   votantes: 3200,   partidos: [[NL, 0],     [PH, 900]] },
 } } } };
-let tablaArraigo = null;   /* primero sin estudio; después con lift */
+let tablaArraigo = null;   /* primero sin estudio (ninguna de las dos copias); después con lift */
 
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
