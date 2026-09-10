@@ -9,10 +9,15 @@ entrar; con esto, cada tres días el candidato recibe en su correo lo que pasó 
 
 | Sección | Fuente | Regla |
 |---|---|---|
+| **De lo que habla el país** | Google News con tres anclajes anchos: `"Colombia"`, `"Gobierno Nacional"`, `"Congreso de la República"` | No hay un «top» que pedir: Google News entrega titulares por consulta, no un ranking. Así que se calcula. Los titulares se agrupan por historia (palabras cortadas a seis letras, porque cada medio conjuga el hecho a su manera) y las historias se ordenan por **cuántos medios distintos** las publicaron, no por cuántos titulares: un portal que repite su nota cinco veces no es «de lo que habla todo el mundo». Se muestran las tres primeras, con el titular más reciente de cada una |
 | **La conversación · sobre usted** | Google News (acción `medios` de la Lambda) con el nombre y el nombre público entre comillas | Un titular «lo nombra» si trae nombre + apellido (o los dos apellidos) |
 | **La conversación · su territorio** | Consultas entre comillas: la localidad (JAL), «Alcaldía de X», «Concejo de X», el municipio | Cada titular recibe un **puntaje**: +3 si nombra la localidad, +2 si nombra un actor institucional (alcaldía, concejo, secretaría, obra, licitación…), +1 si nombra el municipio. En Bogotá, Medellín, Cali, Barranquilla y Cartagena se exige ≥2: «Bogotá» aparece en cualquier cosa. Clima, loterías, vacantes y cortes de luz salen por regex |
 | **La plata** | SECOP II (acción `contratacion`) con `orden_entidad: Territorial`, `departamento` y `query` = municipio | Sin el filtro territorial salían la UNP o la Fuerza Aérea solo por estar ubicadas en Bogotá. Para una JAL se consulta además la **localidad**: la Alcaldía Local firma contratos propios y van primero |
 | **Las reglas** | Normativa del Ejecutivo (acción `ejecutivo`) con el municipio y el departamento | Ventana de 30 días (el dataset de Presidencia es mensual). Si no hay nada, la sección **no aparece** |
+
+En el panel 04 el orden es: lo que lo nombra a usted, la agenda del país y
+después su territorio. Lo que ya salió como suyo o como local no se repite
+arriba: en el bloque del país estorba y abajo es donde sirve.
 
 Y el pie recuerda la **meta de votos** que calculó `VoteTarget` en el CRM (la
 guarda el frontend en `campana.meta`).

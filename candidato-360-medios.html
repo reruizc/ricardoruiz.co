@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- ⚠️ Al tocar candidato-360.css o candidato-360-panel.js hay que bumpear su ?v= acá y en candidato-360-redes.html. -->
-<link rel="stylesheet" href="candidato-360.css?v=20260910b">
+<link rel="stylesheet" href="candidato-360.css?v=20260914">
 <style>
 /* Lo propio de este panel; el resto lo pone candidato-360.css. */
 .panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
@@ -81,7 +81,7 @@
 
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
-<script src="candidato-360-panel.js?v=20260910b"></script>
+<script src="candidato-360-panel.js?v=20260914"></script>
 <script>
 (function () {
   'use strict';
@@ -167,13 +167,27 @@
      sale del vínculo. Las consultas y el puntaje son los MISMOS del briefing
      (candidato-360-panel.js los porta de motor.py), para que lo que se ve acá
      sea lo que llega al correo. */
-  function pintarTerritorio(t, usted, territorio, fallos, consultas) {
+  /* Un grupo del top nacional: el titular más reciente de la historia y, si
+     varios medios la cubrieron, cuántos y algunos de los otros titulares. */
+  function bloqueNacional(grupos) {
+    if (!grupos.length) return '';
+    const fila = g => `<li><a href="${esc(g.titular.url)}" target="_blank" rel="noopener">${esc(g.titular.titulo)}</a>`
+      + `<small>${esc(g.titular.medio || 'medio sin identificar')}${g.titular.fecha ? ` · ${esc(String(g.titular.fecha).slice(0, 10))}` : ''}`
+      + (g.medios > 1 ? ` · <b>${num(g.medios)} medios lo publicaron</b>` : ' · un solo medio') + `</small></li>`;
+    return `<article class="tema">
+      <div class="tema-top"><h3>De lo que habla el país</h3><span class="tema-cifra">${grupos.length}<small>historias · ${VENTANA} días</small></span></div>
+      <p class="tema-lectura">Las historias nacionales que <b>más medios distintos</b> publicaron. No es un ranking que alguien nos pase: se cuenta cuántos medios cubren la misma historia, que es lo que la vuelve conversación de todos.</p>
+      <ul class="tema-titulares">${grupos.map(fila).join('')}</ul></article>`;
+  }
+
+  function pintarTerritorio(t, usted, nacional, territorio, fallos, consultas) {
     const linea = it => `<li><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.titulo)}</a><small>${esc(it.medio || 'medio sin identificar')}${it.fecha ? ` · ${esc(String(it.fecha).slice(0, 10))}` : ''}</small></li>`;
     const bloques = [];
     if (usted.length) bloques.push(`<article class="tema">
       <div class="tema-top"><h3>Lo que lo nombra a usted</h3><span class="tema-cifra">${num(usted.length)}<small>titulares · ${VENTANA} días</small></span></div>
       <p class="tema-lectura">Titulares que traen su nombre y un apellido. <b>Léalos primero</b>: son los que ya circulan con usted adentro.</p>
       <ul class="tema-titulares">${usted.slice(0, 6).map(linea).join('')}</ul></article>`);
+    bloques.push(bloqueNacional(nacional));
     bloques.push(territorio.length ? `<article class="tema">
       <div class="tema-top"><h3>Lo que pasa en ${esc(t.etiqueta)}</h3><span class="tema-cifra">${num(territorio.length)}<small>titulares · ${VENTANA} días</small></span></div>
       <p class="tema-lectura">Ordenados por qué tanto le tocan al territorio: primero los que nombran su ${t.corp === 'jal' ? 'localidad' : 'lugar'} y a quien lo gobierna, después el resto. Los titulares de clima, loterías y vacantes salen por filtro.</p>
@@ -181,13 +195,13 @@
       : `<article class="tema vacio">
       <div class="tema-top"><h3>Lo que pasa en ${esc(t.etiqueta)}</h3><span class="tema-cifra">0<small>titulares · ${VENTANA} días</small></span></div>
       <p class="tema-lectura">${fallos >= consultas ? 'La fuente de prensa no respondió; vuelva a intentar en un minuto.' : 'La prensa indexada no publicó nada sobre su territorio en la ventana. En municipios pequeños es lo normal: la conversación existe, pero no pasa por medios que Google News indexe. Ahí el radar que sirve es el de contratos y normas del briefing, no el de titulares.'}</p></article>`);
-    $('territorioLectura').innerHTML = bloques.join('');
+    $('territorioLectura').innerHTML = bloques.filter(Boolean).join('');
   }
 
   async function leerTerritorio() {
     const t = P.territorioDe();
-    $('territorioTitulo').textContent = t.etiqueta ? `¿Qué se está diciendo en ${t.etiqueta}?` : '¿Qué se está diciendo en su territorio?';
-    $('territorioEscala').innerHTML = `Se lee a escala de <b>${esc(t.departamental ? 'departamento' : t.corp === 'jal' ? 'localidad' : 'municipio')}</b> porque aspira a ${esc(t.corpLabel)}${t.etiqueta ? `: la conversación de <b>${esc(t.etiqueta)}</b>, más ${esc(t.entidad)} y ${esc(t.cuerpo)}` : ''}.`;
+    $('territorioTitulo').textContent = t.etiqueta ? `¿De qué se está hablando, y qué se dice en ${t.etiqueta}?` : '¿De qué se está hablando?';
+    $('territorioEscala').innerHTML = `Primero la agenda del país, la que todo el mundo comenta. Después su territorio, a escala de <b>${esc(t.departamental ? 'departamento' : t.corp === 'jal' ? 'localidad' : 'municipio')}</b> porque aspira a ${esc(t.corpLabel)}${t.etiqueta ? `: la conversación de <b>${esc(t.etiqueta)}</b>, más ${esc(t.entidad)} y ${esc(t.cuerpo)}` : ''}.`;
     const consultas = P.consultasTerritorio(t);
     if (!consultas.length) { $('territorioLectura').innerHTML = '<div class="panel-error">Su candidatura todavía no tiene territorio guardado; ábrala en el CRM y escoja dónde se lanza.</div>'; return; }
     $('territorioRecargar').disabled = true;
@@ -196,25 +210,35 @@
        del territorio, va aparte y de primero. */
     const personas = P.terminosPersona();
     const nombres = [P.nombreCandidatura(), P.nombrePublico()].filter(n => P.toks(n, 3).length >= 2).map(n => `"${n}"`);
-    const todas = consultas.concat(nombres);
+    const nacionales = P.consultasNacionales();
+    const todas = consultas.concat(nombres, nacionales);
     const rs = await Promise.all(todas.map(q => P.caudal({ action: 'medios', query: q, dias: VENTANA }).catch(() => ({ _error: true }))));
-    const locales = P.terminosLocales(t), vistos = new Set(), usted = [], territorio = [];
+    const locales = P.terminosLocales(t), vistos = new Set(), usted = [], territorio = [], pais = [];
     let fallos = 0;
-    for (const d of rs) {
-      if (d?._error) { fallos++; continue; }
+    rs.forEach((d, i) => {
+      if (d?._error) { fallos++; return; }
+      const esNacional = i >= consultas.length + nombres.length;
       for (const r of (d?.resultados || [])) {
         const titulo = r.titulo || '', k = P.norm(titulo).slice(0, 90);
-        if (!k || vistos.has(k)) continue;
-        vistos.add(k);
+        if (!k) continue;
         const item = { titulo, medio: r.medio || '', url: r.url || '', fecha: r.fecha || '' };
+        /* El top nacional se agrupa por cobertura, así que necesita los
+           titulares REPETIDOS entre medios: esos duplicados son justamente la
+           señal. Los otros dos bloques sí se quedan con uno de cada uno. */
+        if (esNacional) { pais.push(item); continue; }
+        if (vistos.has(k)) continue;
+        vistos.add(k);
         if (P.mencionaPersona(titulo, personas)) { usted.push(item); continue; }
         const pts = P.puntajeLocal(titulo, t, locales);
         if (pts) territorio.push({ ...item, pts });
       }
-    }
+    });
+    /* Lo que ya salió como suyo o como local no se repite arriba: en el bloque
+       del país estorba, y abajo es donde le sirve. */
+    const nacional = P.agruparPorCobertura(pais.filter(it => !vistos.has(P.norm(it.titulo).slice(0, 90)) && !P.mencionaPersona(it.titulo, personas) && !P.puntajeLocal(it.titulo, t, locales))).slice(0, 3);
     usted.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
     territorio.sort((a, b) => (b.pts - a.pts) || String(b.fecha).localeCompare(String(a.fecha)));
-    pintarTerritorio(t, usted, territorio, fallos, todas.length);
+    pintarTerritorio(t, usted, nacional, territorio, fallos, todas.length);
     $('territorioRecargar').disabled = false;
   }
 

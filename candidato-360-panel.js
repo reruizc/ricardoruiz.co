@@ -130,6 +130,46 @@
     }
     return q;
   }
+  /* ── Lo que habla todo el mundo ─────────────────────────────────────────
+     No hay un «top» que pedir: Google News entrega titulares por consulta, no
+     un ranking. Así que se pregunta por los anclajes más anchos de la agenda
+     nacional —el país y las dos ramas que la ocupan— y el ranking se CALCULA:
+     una historia importa cuando la publican muchos medios distintos. Esa es la
+     definición operativa de «de la que habla todo el mundo», y es medida, no
+     declarada. */
+  const CONSULTAS_NACIONALES = ['"Colombia"', '"Gobierno Nacional"', '"Congreso de la República"'];
+  function consultasNacionales() { return CONSULTAS_NACIONALES.slice(); }
+
+  const VACIAS = new Set(['PARA', 'POR', 'CON', 'LOS', 'LAS', 'DEL', 'QUE', 'UNA', 'UNO', 'SUS', 'ESTE', 'ESTA', 'ESTOS', 'ESTAS', 'COMO', 'MAS', 'PERO', 'SOBRE', 'ENTRE', 'DESDE', 'HASTA', 'TRAS', 'ANTE', 'SEGUN', 'SOLO', 'YA', 'HOY', 'ASI', 'FUE', 'SER', 'SON', 'HAY', 'VA', 'VAN', 'TIENE', 'TRAS']);
+  /* Las palabras se cortan a seis letras: cada medio conjuga el mismo hecho a
+     su manera —«sanciona», «sancionó», «sancionada»— y sin el corte la misma
+     historia se parte en tres. */
+  const clave = titulo => new Set(toks(titulo, 5).filter(w => !VACIAS.has(w)).map(w => w.slice(0, 6)));
+  const parecido = (a, b) => { if (!a.size || !b.size) return 0; let comunes = 0; for (const w of a) if (b.has(w)) comunes++; return comunes / Math.min(a.size, b.size); };
+  /* Agrupa titulares que cuentan la MISMA historia y ordena por cuántos medios
+     distintos la publicaron. Sin el conteo por medio, un solo portal que
+     repite la nota cinco veces se llevaría el primer puesto.
+
+     ⚠️ Se compara contra CADA titular del grupo, no contra la unión de sus
+     palabras: la unión crece con cada titular que entra y el parecido se
+     diluye, así que el cuarto medio que cuenta la misma historia se quedaba
+     por fuera. */
+  function agruparPorCobertura(items, umbral = 0.45) {
+    const grupos = [];
+    for (const it of items) {
+      const k = clave(it.titulo);
+      if (k.size < 2) continue;
+      const g = grupos.find(x => x.claves.some(c => parecido(c, k) >= umbral));
+      if (g) { g.items.push(it); g.claves.push(k); }
+      else grupos.push({ claves: [k], items: [it] });
+    }
+    return grupos.map(g => {
+      const medios = new Set(g.items.map(x => norm(x.medio)).filter(Boolean));
+      const ordenados = g.items.slice().sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+      return { titular: ordenados[0], medios: medios.size, titulares: g.items.length, otros: ordenados.slice(1, 4) };
+    }).sort((a, b) => (b.medios - a.medios) || (b.titulares - a.titulares) || String(b.titular.fecha).localeCompare(String(a.titular.fecha)));
+  }
+
   function terminosLocales(t) {
     const base = t.departamental ? toks(t.depNombre)
       : (t.esBogota ? ['BOGOTA'] : toks(t.munLimpio)).concat(t.corp === 'jal' && t.loc ? toks(t.loc) : []);
@@ -186,6 +226,17 @@
     $('panelCuerpo')?.classList.add('hidden');
   }
 
+  const ADMIN = ['reruizc@gmail.com'];
+  function esAdmin() { return SESION.fuente === 'admin' || ADMIN.includes(String(SESION.user?.email || '').toLowerCase().trim()); }
+  /* Desata la cuenta de la candidatura actual con la ruta de soporte que ya
+     existe. Deja copia 400 días del lado del worker. Solo administración. */
+  async function soltarVinculo() {
+    if (!esAdmin() || !SESION.user?.email) return;
+    if (!confirm(`¿Soltar la candidatura ${nombreCandidatura()} de esta cuenta? Queda copia en soporte.`)) return;
+    const r = await api(`/c360/admin/vinculo?email=${encodeURIComponent(SESION.user.email)}&motivo=${encodeURIComponent('pruebas: cuenta de administración')}`, { method: 'DELETE' });
+    if (!r.ok) { alert(`No se pudo soltar: ${r.data?.error || r.status}`); return; }
+    location.reload();
+  }
   async function arrancar(pagina) {
     try { SESION.token = localStorage.getItem('rr-token') || null; SESION.user = JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch {}
     if (SESION.token) {
@@ -208,7 +259,12 @@
     const cab = $('panelCandidatura');
     if (cab) {
       const t = territorio();
-      cab.innerHTML = `<b>${esc(nombreCandidatura())}</b>${t.texto ? ` · ${esc(t.texto)}` : ''}`;
+      /* Los paneles leen el vínculo del SERVIDOR, así que el modo pruebas de
+         candidato-360.html no los afecta: si la cuenta de administración quedó
+         atada a una candidatura vieja, es la que se ve acá. Por eso el botón
+         para soltarla vive también en esta cabecera. */
+      cab.innerHTML = `<b>${esc(nombreCandidatura())}</b>${t.texto ? ` · ${esc(t.texto)}` : ''}` +
+        (esAdmin() ? ` <button type="button" class="soltar-vinculo" onclick="C360Panel.soltarVinculo()">soltar</button>` : '');
     }
     return true;
   }
@@ -220,5 +276,5 @@
   }
 
   global.C360Panel = { SESION, api, caudal, arrancar, guardarEscucha, territorio, nombreCandidatura, nombrePublico, muro, $, esc, num,
-    territorioDe, consultasTerritorio, terminosLocales, terminosPersona, puntajeLocal, mencionaPersona, oracion, norm, toks };
+    territorioDe, consultasTerritorio, consultasNacionales, agruparPorCobertura, terminosLocales, esAdmin, soltarVinculo, terminosPersona, puntajeLocal, mencionaPersona, oracion, norm, toks };
 })(window);
