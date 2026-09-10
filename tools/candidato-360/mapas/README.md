@@ -70,6 +70,36 @@ Si el mapa se arma mientras el panel se acomoda, elige un zoom para una caja que
 ya no existe. `encuadrarBounds` mide y encuadra tres veces —de una, a los 60 ms
 y a los 260 ms—. Sin eso el mapa quedaba **23 veces** más ancho de lo debido.
 
+## El color es el del partido
+
+El mapa codifica una **magnitud** (cuántos votos), así que la rampa es de un solo
+tono, de claro a oscuro. Lo que cambia con el partido es el **tono**: rojo para
+el Liberal, azul para el Conservador, púrpura para el Pacto, verde para la
+Alianza Verde. La paleta y la rampa viven en `partidos-bloques.js`
+(`PARTIDO_COLOR`, `rampaDePartido`), junto al diccionario de bloques.
+
+Los pasos se calculan en **OKLab**, no mezclando con blanco en sRGB: mezclar en
+sRGB apaga el tono y los pasos claros salen grises. Las claridades están
+elegidas para que ningún par consecutivo baje de ΔE 8 y para que el paso más
+claro no se confunda con el gris de «sin votos» — si no, «pocos votos» y
+«ningún voto» se verían igual. Lo comprueba `prueba-colores.mjs` sobre las 29
+bases.
+
+Tres decisiones que vale la pena conocer:
+
+- El **Pacto no es rojo** aunque así se pinte en otras páginas del sitio: en
+  rojo choca con el Liberal. De los dos tonos que se propusieron (amarillo o
+  púrpura) se tomó el púrpura, porque el amarillo casi no tiene recorrido hacia
+  lo oscuro y la rampa se aplana.
+- Una **coalición** hereda el color de la primera parte que se reconozca:
+  «Nuevo Liberalismo - Agrupación Política En Marcha» va en el del Nuevo
+  Liberalismo.
+- Un movimiento **sin color propio** toma el de su **bloque ideológico**, que es
+  información de verdad, y no un tono inventado por una función de hash. La nota
+  del mapa lo dice.
+
+Sin partido —o antes de elegirlo— el mapa se queda con el verde de siempre.
+
 ## Modales sobre el mapa
 
 Leaflet pone sus paneles en z-index 400-1000 y `.leaflet-container` no crea
@@ -85,6 +115,7 @@ node tools/candidato-360/prueba-mapa.mjs        # Bogotá: ventana urbana, calle
 node tools/candidato-360/prueba-ciudades.mjs    # Medellín: encuadre, barrios, modal (10)
 node tools/candidato-360/prueba-salto-crm.mjs   # el salto de corporación en el mapa (13)
 node tools/candidato-360/prueba-barrios-voronoi.mjs  # los barrios aproximados de Ibagué y Montería (14)
+node tools/candidato-360/prueba-colores.mjs     # la rampa según el partido (10)
 ```
 
 Las tres necesitan Leaflet en disco:

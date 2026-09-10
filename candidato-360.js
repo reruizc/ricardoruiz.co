@@ -691,6 +691,7 @@ function departamentoDeCampana() {
   return (isOther ? $('campaignDepartment')?.value : '') || departamentoDeCandidatura(crmCandidate);
 }
 function refrescarPartidoCampana() { pintarEstadoPartido({ input: 'campaignParty', estado: 'campaignPartyStatus', departamento: departamentoDeCampana }); }
+
 /* El partido con el que se lanza, que NO tiene por qué ser el de su última
    elección: la mitad de las candidaturas territoriales cambia de aval entre
    una elección y la siguiente. Manda lo que la persona escribió. */
@@ -1664,7 +1665,27 @@ async function pintarProyeccionDepartamental(goal) {
 /* ─── 9. Mapas ───────────────────────────────────────────────────────────── */
 let crmLeafletMap = null, crmMapLayer = null, crmBarrioLayer = null, crmTileLayer = null;
 let crmMapMode = 'total', crmMapState = null;
-const MAP_COLOR = ratio => ratio <= 0 ? '#d8dfd7' : ratio < .12 ? '#b7d9bf' : ratio < .35 ? '#79b987' : ratio < .65 ? '#3e8a5b' : '#174f35';
+/* El mapa se pinta con el color del PARTIDO con el que la persona se lanza: una
+   rampa de un solo tono, de claro a oscuro, porque lo que codifica es una
+   magnitud (cuántos votos). El tono da identidad; la claridad, la cantidad.
+   Sin partido —o con uno sin color ni bloque— queda el verde de siempre. */
+const RAMPA_POR_DEFECTO = ['#b7d9bf', '#79b987', '#3e8a5b', '#174f35'];
+let RAMPA_MAPA = RAMPA_POR_DEFECTO;
+function fijarRampaMapa(partido, nombreCandidato) {
+  RAMPA_MAPA = (window.PartidosBloques?.rampaDePartido?.(partido, nombreCandidato)) || RAMPA_POR_DEFECTO;
+  /* Las barras del desglose van del mismo color que el mapa: son el mismo dato
+     leído de otra forma, y verlas en verde al lado de un mapa azul confunde. */
+  document.getElementById('crm')?.style.setProperty('--partido', RAMPA_MAPA[2]);
+  return RAMPA_MAPA;
+}
+const MAP_COLOR = ratio => ratio <= 0 ? (window.PartidosBloques?.SIN_VOTOS || '#eef0ea') : ratio < .12 ? RAMPA_MAPA[0] : ratio < .35 ? RAMPA_MAPA[1] : ratio < .65 ? RAMPA_MAPA[2] : RAMPA_MAPA[3];
+/* Una frase para la nota del mapa cuando el color no es el de la casa. */
+function notaColorPartido() {
+  const partido = partidoVigente();
+  if (!partido || RAMPA_MAPA === RAMPA_POR_DEFECTO) return '';
+  const propio = window.PartidosBloques?.PARTIDO_COLOR?.[window.PartidosBloques.norm(partido)];
+  return ` El mapa va en el color de ${partido}${propio ? '' : ' (el de su bloque ideológico: esa organización no tiene color propio en la paleta)'}.`;
+}
 function crearMapa(center, zoom) {
   const mapEl = $('crmMap');
   /* zoomSnap: Leaflet, por defecto, solo usa zooms ENTEROS. fitBounds elegía
@@ -1890,6 +1911,7 @@ function notaRecorte(recorte = recorteActivo) {
    departamento cuando la evidencia pertenece a un solo municipio. */
 async function renderGenericMap(candidate) {
   crmMapState = null;
+  fijarRampaMapa(partidoVigente(), candidate?.nombre);
   const candidateData = await datosCandidatura(candidate), mesas = candidateData.mesas || [], total = mesas.reduce((sum, m) => sum + Number(m.v || 0), 0) || Number(candidate.votos) || 0;
   const municipalityCodes = [...new Set(mesas.map(m => String(m.mun || '').replace(/^0+/, '')).filter(Boolean))];
   let geoData, votesByArea = {}, namesByArea = {}, featureCode, featureName, detailNote, breakdownTitle;
@@ -1913,7 +1935,7 @@ async function renderGenericMap(candidate) {
   crearMapa([4.6, -74.1], 5); aplicarBasemap(false);
   crmMapLayer = L.geoJSON(geoData, { style: f => ({ color: '#fff', weight: 1, fillColor: MAP_COLOR((votesByArea[featureCode(f.properties)] || 0) / max), fillOpacity: .94 }), onEachFeature: (f, layer) => layer.bindTooltip(`<strong>${featureName(f.properties)}</strong><br>${(votesByArea[featureCode(f.properties)] || 0).toLocaleString('es-CO')} votos`, { sticky: true }) }).addTo(crmLeafletMap);
   encuadrar(crmMapLayer, 15);
-  $('crmMapVotes').textContent = `${total.toLocaleString('es-CO')} votos`; $('crmMapNote').textContent = detailNote + notaRecorte();
+  $('crmMapVotes').textContent = `${total.toLocaleString('es-CO')} votos`; $('crmMapNote').textContent = detailNote + notaRecorte() + notaColorPartido();
 }
 /* Las JAL se leen a escala de comuna/localidad con las capas de Análisis de
    Candidato. */
@@ -1952,6 +1974,7 @@ function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea,
   const max = Math.max(1, ...Object.values(votesByArea));
   crmMapMode = 'total';
   const m0 = mesas[0] || {};
+  fijarRampaMapa(partidoVigente(), crmCandidate?.nombre);
   crmMapState = { city, ciudad: `${String(m0.dep || '').padStart(2, '0')}${String(m0.mun || '').padStart(3, '0')}`, config, geoData, votesByArea, namesByArea, mesas, total, max, targetKey, focusKey: null, rotado: Boolean(rotate), tituloLugar: lugar || '', encuadre: encuadre || null, fueraDelEncuadre: fueraDelEncuadre || null };
   $('crmMapTitle').textContent = lugar ? tituloMapa('total') : title; ensureCRMMapToggles();
   crearMapa(center || [4.6, -74.1], zoom || 5); aplicarBasemap(Boolean(rotate));
@@ -1963,7 +1986,7 @@ function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea,
   refreshCRMMapMode();
   encuadrarBounds(fitTarget && targetLayer ? targetLayer.getBounds() : encuadre || boundsDeVotos(crmMapLayer, config, votesByArea, fueraDelEncuadre), 24);
   $('crmMapVotes').textContent = `${total.toLocaleString('es-CO')} votos`;
-  $('crmMapNote').textContent = note + notaRecorte();
+  $('crmMapNote').textContent = note + notaRecorte() + notaColorPartido();
 }
 function agregarPorArea(mesas, keyFn) { const votesByArea = {}, namesByArea = {}; mesas.forEach(m => { const key = keyFn(m); votesByArea[key] = (votesByArea[key] || 0) + Number(m.v || 0); namesByArea[key] = nombreLocal(m) || namesByArea[key]; }); return { votesByArea, namesByArea }; }
 async function renderJalCityMap(candidate) {

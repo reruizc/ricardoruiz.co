@@ -133,5 +133,137 @@
     return bloques.slice().sort((a, b) => cuenta[b] - cuenta[a])[0];
   }
 
-  global.PartidosBloques = { BLOQUE_LABEL, BLOQUE_ORDER, PARTIDO_BLOQUE, CAND_BLOQUE_OVERRIDE, bloqueDePartido, partesDeCoalicion, bloqueDeCandidatura, norm };
+  /* ═══ COLOR DEL PARTIDO ══════════════════════════════════════════════════
+     El mapa del CRM pinta la votación con una rampa de un solo tono, de claro
+     a oscuro (que es como se codifica una MAGNITUD). Lo que cambia acá es el
+     tono: el del partido con el que la persona se lanza, para que su mapa se
+     vea suyo y no siempre verde.
+
+     Los valores salen de las paletas que ya usaban resultados-concejo-2023 y
+     alcaldias-2023, con cuatro correcciones pedidas en sep-2026:
+       · el Pacto pasa de rojo a PÚRPURA — en rojo chocaba con el Liberal, y
+         de los dos que se propusieron (amarillo o púrpura) el púrpura hace
+         mejor rampa: el amarillo casi no tiene recorrido hacia lo oscuro;
+       · Centro Democrático a azul claro y Salvación Nacional a azul cielo,
+         para que los tres azules (con el Conservador) se distingan.
+
+     Un partido sin color propio hereda el de su BLOQUE ideológico: es
+     información de verdad, no un tono inventado por una función de hash. */
+  const PARTIDO_COLOR = {
+    'PARTIDO LIBERAL COLOMBIANO': '#C81E1E',
+    'PARTIDO CONSERVADOR COLOMBIANO': '#1D4ED8',
+    'PARTIDO CENTRO DEMOCRATICO': '#3B82F6',
+    'MOVIMIENTO SALVACION NACIONAL': '#0EA5E9',
+    'PACTO HISTORICO': '#7C3AED',
+    'MOVIMIENTO POLITICO PACTO HISTORICO': '#7C3AED',
+    'PACTO HISTORICO BOGOTA': '#7C3AED',
+    'PACTO HISTORICO COLOMBIA PUEDE': '#7C3AED',
+    'COLOMBIA HUMANA-PACTO HISTORICO': '#7C3AED',
+    'MOVIMIENTO POLITICO COLOMBIA HUMANA': '#7C3AED',
+    'PARTIDO ALIANZA VERDE': '#16A34A',
+    'PARTIDO CAMBIO RADICAL': '#D5194E',
+    'PARTIDO DE LA UNION POR LA GENTE - PARTIDO DE LA U': '#EA580C',
+    'PARTIDO DE LA U': '#EA580C',
+    'PARTIDO NUEVO LIBERALISMO': '#B45309',
+    'NUEVO LIBERALISMO EN MARCHA': '#B45309',
+    'AGRUPACION POLITICA EN MARCHA': '#0891B2',
+    'PARTIDO POLITICO MIRA': '#0F766E',
+    'PARTIDO POLO DEMOCRATICO ALTERNATIVO': '#CA8A04',
+    'PARTIDO POLITICO DIGNIDAD & COMPROMISO': '#A16207',
+    'PARTIDO POLITICO DIGNIDAD Y COMPROMISO': '#A16207',
+    'PARTIDO POLITICO CREEMOS': '#1866DF',
+    'MOVIMIENTO POLITICO FUERZA CIUDADANA': '#9333EA',
+    'PARTIDO POLITICO LA FUERZA DE LA PAZ': '#65A30D',
+    'PARTIDO VERDE OXIGENO': '#0D9488',
+    'PARTIDO COLOMBIA RENACIENTE': '#059669',
+    'PARTIDO COLOMBIA JUSTA LIBRES': '#7E22CE',
+    'PARTIDO POLITICO GENTE EN MOVIMIENTO': '#DB2777',
+    'PARTIDO DEMOCRATA COLOMBIANO': '#0E7490',
+    'PARTIDO POLITICO ESPERANZA DEMOCRATICA': '#B45309',
+    'PARTIDO ECOLOGISTA COLOMBIANO': '#4D7C0F',
+    'PARTIDO LIGA GOBERNANTES ANTICORRUPCION - LIGA': '#BE123C',
+    'MOVIMIENTO ALTERNATIVO INDIGENA Y SOCIAL "MAIS"': '#C2410C',
+    'MOVIMIENTO AUTORIDADES INDIGENAS DE COLOMBIA "AICO"': '#A16207',
+    'MOVIMIENTO ALIANZA DEMOCRATICA AMPLIA': '#7C3AED',
+    'NUEVA FUERZA DEMOCRATICA': '#4F46E5',
+    'PARTIDO COMUNES': '#B91C1C',
+    'UNION PATRIOTICA': '#B91C1C',
+    /* Formas cortas: en las coaliciones el partido casi nunca viene con su
+       nombre legal completo («CAMBIO RADICAL - MIRA», no «PARTIDO CAMBIO
+       RADICAL - PARTIDO POLITICO MIRA»). */
+    'LIBERAL COLOMBIANO': '#C81E1E',
+    'CONSERVADOR COLOMBIANO': '#1D4ED8',
+    'PARTIDO CONSERVADOR': '#1D4ED8',
+    'CENTRO DEMOCRATICO': '#3B82F6',
+    'SALVACION NACIONAL': '#0EA5E9',
+    'ALIANZA VERDE': '#16A34A',
+    'CAMBIO RADICAL': '#D5194E',
+    'NUEVO LIBERALISMO': '#B45309',
+    'MIRA': '#0F766E',
+    'COLOMBIA JUSTA LIBRES': '#7E22CE',
+    'POLO DEMOCRATICO ALTERNATIVO': '#CA8A04',
+  };
+  /* El color de cada bloque, para quien no tiene color propio. */
+  const BLOQUE_COLOR = { izq: '#B91C1C', ci: '#0D9488', c: '#7C3AED', cd: '#2563EB', d: '#1E40AF', sc: '#3E8A5B' };
+
+  /* La rampa se calcula en OKLab, no mezclando con blanco en sRGB: mezclar en
+     sRGB apaga el tono y los pasos claros salen grises. Acá se conserva el
+     tono, se fija la CLARIDAD de cada paso y el croma se baja en los claros
+     (un color muy claro no puede ser muy saturado sin salirse del gamut). */
+  /* Cuatro pasos (los mismos cortes que ya tenía el mapa) más el gris de «sin
+     votos». Las claridades y el croma están elegidos para que ningún par
+     consecutivo baje de ΔE 8 en OKLab y para que el paso más claro no se
+     confunda con ese gris: lo comprueba prueba-colores.mjs. */
+  const L_PASOS = [0.86, 0.725, 0.575, 0.415];
+  const C_PASOS = [0.55, 0.85, 1.00, 0.88];
+  const SIN_VOTOS = '#eef0ea';
+  const srgb = v => v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  const gamma = v => v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+  function hexALineal(hex) {
+    const h = String(hex || '').replace('#', '');
+    const n = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+    return [0, 2, 4].map(i => srgb(parseInt(n.slice(i, i + 2), 16) / 255));
+  }
+  function aOklab([r, g, b]) {
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+  }
+  function deOklab([L, a, b]) {
+    const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+    const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+    const s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+    return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s];
+  }
+  const aHex = lin => '#' + lin.map(v => Math.round(Math.min(1, Math.max(0, gamma(Math.min(1, Math.max(0, v))))) * 255).toString(16).padStart(2, '0')).join('');
+  /* Baja el croma hasta que el color quepa en sRGB: sin esto, un tono vivo a
+     claridad alta se recorta y el paso pierde el tono. */
+  function enGamut(L, C, h) {
+    for (let c = C; c > 0.0005; c -= 0.004) {
+      const lin = deOklab([L, c * Math.cos(h), c * Math.sin(h)]);
+      if (lin.every(v => v >= -0.001 && v <= 1.001)) return aHex(lin);
+    }
+    return aHex(deOklab([L, 0, 0]));
+  }
+  function rampaDeColor(base) {
+    const [L, a, b] = aOklab(hexALineal(base));
+    const C = Math.hypot(a, b), h = Math.atan2(b, a);
+    return L_PASOS.map((paso, i) => enGamut(paso, Math.max(C, 0.06) * C_PASOS[i], h));
+  }
+  /* El color propio del partido, el de su bloque, o nada. */
+  function colorDePartido(partido, nombreCandidato) {
+    const n = norm(partido);
+    if (!n) return '';
+    if (PARTIDO_COLOR[n]) return PARTIDO_COLOR[n];
+    for (const parte of partesDeCoalicion(partido)) if (PARTIDO_COLOR[norm(parte)]) return PARTIDO_COLOR[norm(parte)];
+    const bloque = bloqueDeCandidatura(partido, nombreCandidato || '');
+    return BLOQUE_COLOR[bloque] || '';
+  }
+  function rampaDePartido(partido, nombreCandidato) {
+    const base = colorDePartido(partido, nombreCandidato);
+    return base ? rampaDeColor(base) : null;
+  }
+
+  global.PartidosBloques = { BLOQUE_LABEL, BLOQUE_ORDER, PARTIDO_BLOQUE, CAND_BLOQUE_OVERRIDE, PARTIDO_COLOR, BLOQUE_COLOR, SIN_VOTOS, L_PASOS, bloqueDePartido, partesDeCoalicion, bloqueDeCandidatura, colorDePartido, rampaDeColor, rampaDePartido, norm };
 })(typeof window !== 'undefined' ? window : globalThis);
