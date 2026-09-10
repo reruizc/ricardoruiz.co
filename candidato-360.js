@@ -1651,8 +1651,39 @@ function quitarBasemap() { if (crmTileLayer) { crmLeafletMap.removeLayer(crmTile
    metida en el fitBounds deja la ciudad urbana del tamaño de una uña. Se
    dibuja completa —y se desborda del marco, que para eso el contenedor
    recorta— pero el encuadre lo mandan las localidades urbanas. */
-function encuadrarBounds(bounds, padding = 24) { if (bounds?.isValid()) crmLeafletMap.fitBounds(bounds, { padding: [padding, padding], animate: false }); setTimeout(() => crmLeafletMap?.invalidateSize(), 60); }
+/* ⚠️ Leaflet calcula el zoom con el tamaño que TIENE el contenedor en ese
+   instante. Si el mapa se arma mientras el panel todavía se está acomodando
+   —fuentes, la ficha de la izquierda, el desglose de la derecha—, mide de
+   menos y elige un zoom para una caja que ya no existe: al crecer el
+   contenedor, la ciudad queda diminuta en un marco enorme. Por eso se mide
+   antes, se encuadra, y se vuelve a medir y encuadrar cuando el navegador ya
+   acomodó todo. Era lo que dejaba a Cali del tamaño de una uña. */
+function encuadrarBounds(bounds, padding = 24) {
+  if (!crmLeafletMap || !bounds?.isValid()) return;
+  const ajustar = () => { crmLeafletMap?.invalidateSize(); crmLeafletMap?.fitBounds(bounds, { padding: [padding, padding], animate: false }); };
+  ajustar();
+  setTimeout(ajustar, 60);
+  setTimeout(ajustar, 260);
+}
 function encuadrar(layer, padding = 24) { encuadrarBounds(layer?.getBounds(), padding); }
+/* Encuadre por donde ESTÁN los votos. Un municipio como Cali llega hasta los
+   Farallones y Bogotá hasta el páramo de Sumapaz: encuadrar por el polígono
+   completo deja la ciudad —donde vive la campaña— del tamaño de una uña. Se
+   toman las áreas que concentran el 98 % de la votación y se encuadra ahí; el
+   resto se sigue dibujando, solo que desbordado. Sin votos, la capa entera. */
+function boundsDeVotos(capa, config, votesByArea, excluir, cobertura = .98) {
+  const total = Object.values(votesByArea || {}).reduce((s, v) => s + Number(v || 0), 0);
+  if (!total) return boundsSin(capa, excluir || (() => false));
+  const orden = Object.entries(votesByArea).map(([k, v]) => [k, Number(v) || 0]).sort((a, b) => b[1] - a[1]);
+  const dentro = new Set(); let suma = 0;
+  for (const [k, v] of orden) { if (suma >= total * cobertura) break; dentro.add(k); suma += v; }
+  const b = L.latLngBounds([]);
+  capa.eachLayer(item => {
+    if (excluir?.(item.feature) || !dentro.has(config.code(item.feature.properties))) return;
+    b.extend(item.getBounds ? item.getBounds() : item.getLatLng());
+  });
+  return b.isValid() ? b : boundsSin(capa, excluir || (() => false));
+}
 /* Bounds de una capa saltándose los rasgos que `excluir` marque. */
 function boundsSin(capa, excluir) {
   const b = L.latLngBounds([]);
@@ -1680,7 +1711,20 @@ async function puestosPorBarrio() {
   /* Columnas: 1 código completo (dep+mun+zon+pue), 7 barrio, 9/10 lat/lng,
      13/14 mujeres/hombres — la suma es el CENSO del puesto, que es lo que
      permite repartir una meta por barrio donde la persona nunca sacó votos. */
-  if (!puestosBarrioPromise) puestosBarrioPromise = fetch(`${S3}/mapas-2026/PUESTOS_GEOREF.csv`).then(r => r.ok ? r.text() : Promise.reject()).then(raw => { const lookup = {}; raw.split(/\r?\n/).slice(1).forEach(line => { const row = line.split(';'), code = row[1], barrio = row[7]; if (code && barrio) lookup[code] = { barrio, lat: Number(row[9]), lng: Number(row[10]), censo: (Number(row[13]) || 0) + (Number(row[14]) || 0) }; }); return lookup; });
+  if (!puestosBarrioPromise) puestosBarrioPromise = fetch(`${S3}/mapas-2026/PUESTOS_GEOREF.csv`).then(r => r.ok ? r.text() : Promise.reject()).then(raw => {
+    const lookup = {};
+    raw.split(/\r?\n/).slice(1).forEach(line => {
+      const row = line.split(';'), code = String(row[1] || ''), barrio = row[7];
+      if (!code || !barrio) return;
+      /* La «mesa» es falsa pero sirve para lo único que importa: pasarla por la
+         MISMA función de llave de área que usa el mapa de esa ciudad, sea por
+         código de comuna o por nombre. Así no hay una segunda regla que
+         mantener sincronizada. */
+      const mesa = { dep: code.slice(0, 2), mun: code.slice(2, 5), zon: code.slice(5, 7), pue: code.slice(7, 9), com: String(row[11] || ''), comNom: String(row[12] || '') };
+      lookup[code] = { barrio, lat: Number(row[9]), lng: Number(row[10]), censo: (Number(row[13]) || 0) + (Number(row[14]) || 0), mesa };
+    });
+    return lookup;
+  });
   return puestosBarrioPromise;
 }
 /* Reparte una meta en proporción a lo observado sin perder un voto por redondeo. */
@@ -1712,8 +1756,17 @@ function ensureCRMMapToggles() {
   head.insertAdjacentHTML('beforeend', '<div class="map-toggles" id="crmMapToggles"><button class="map-toggle active" type="button" data-mode="total">TOTAL</button><button class="map-toggle" type="button" data-mode="proyectado">PROYECTADO</button></div>');
   $('crmMapToggles').addEventListener('click', event => { const button = event.target.closest('[data-mode]'); if (button) { crmMapMode = button.dataset.mode; refreshCRMMapMode(); } });
 }
+/* «¿Dónde estuvo su votación?» es historia; «Proyectado» es lo contrario: lo
+   que falta por conseguir. Mantener el mismo título hacía leer la meta como si
+   fuera votación pasada. */
+function tituloMapa(modo = crmMapMode) {
+  const state = crmMapState; if (!state) return '';
+  const donde = state.tituloLugar || '';
+  return modo === 'proyectado' ? `¿Dónde debería estar su votación${donde ? ` en ${donde}` : ''}?` : `¿Dónde estuvo su votación${donde ? ` en ${donde}` : ''}?`;
+}
 function refreshCRMMapMode() {
   const state = crmMapState; if (!state || !crmMapLayer) return;
+  if (state.tituloLugar) $('crmMapTitle').textContent = tituloMapa();
   /* Salto a escala de departamento: «Proyectado» pinta los municipios del
      destino; «Total» devuelve el mapa histórico de la ciudad. */
   if (SALTO_ACTUAL?.tipo.unidad === 'municipio') {
@@ -1827,12 +1880,13 @@ const CITY_JAL_LAYERS = [
 function cityLayerFor(nombre) { const city = normalizedText(nombre); return CITY_JAL_LAYERS.find(item => item.match.some(name => city.includes(name))) || null; }
 /* Pinta una ciudad por comuna/localidad con el estado compartido de los mapas
    de ciudad (toggles, detalle por barrio, niveles). */
-function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city, rotate, title, note, center, zoom, fitTarget, fueraDelEncuadre }) {
+function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city, rotate, lugar, title, note, center, zoom, fitTarget, fueraDelEncuadre }) {
   completaNombres(geoData, config.code, config.name, namesByArea);
   const max = Math.max(1, ...Object.values(votesByArea));
   crmMapMode = 'total';
-  crmMapState = { city, config, geoData, votesByArea, namesByArea, mesas, total, max, targetKey, focusKey: null, rotado: Boolean(rotate) };
-  $('crmMapTitle').textContent = title; ensureCRMMapToggles();
+  const m0 = mesas[0] || {};
+  crmMapState = { city, ciudad: `${String(m0.dep || '').padStart(2, '0')}${String(m0.mun || '').padStart(3, '0')}`, config, geoData, votesByArea, namesByArea, mesas, total, max, targetKey, focusKey: null, rotado: Boolean(rotate), tituloLugar: lugar || '' };
+  $('crmMapTitle').textContent = lugar ? tituloMapa('total') : title; ensureCRMMapToggles();
   crearMapa(center || [4.6, -74.1], zoom || 5); aplicarBasemap(Boolean(rotate));
   let targetLayer = null;
   crmMapLayer = L.geoJSON(geoData, {
@@ -1840,7 +1894,7 @@ function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea,
     onEachFeature: (f, layer) => { if (config.code(f.properties) === targetKey) targetLayer = layer; layer.on('click', () => showCRMMapDetail(layer)); }
   }).addTo(crmLeafletMap);
   refreshCRMMapMode();
-  encuadrarBounds(fitTarget && targetLayer ? targetLayer.getBounds() : fueraDelEncuadre ? boundsSin(crmMapLayer, fueraDelEncuadre) : crmMapLayer.getBounds(), 24);
+  encuadrarBounds(fitTarget && targetLayer ? targetLayer.getBounds() : boundsDeVotos(crmMapLayer, config, votesByArea, fueraDelEncuadre), 24);
   $('crmMapVotes').textContent = `${total.toLocaleString('es-CO')} votos`;
   $('crmMapNote').textContent = note + notaRecorte();
 }
@@ -1851,7 +1905,7 @@ async function renderJalCityMap(candidate) {
   let geoData = await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/${config.path}`); if (config.rotate) geoData = rotateGeoJSON90Left(geoData);
   const { votesByArea, namesByArea } = agregarPorArea(mesas, m => config.mesaKey ? config.mesaKey(m) : claveLocal(m));
   const total = mesas.reduce((sum, m) => sum + Number(m.v || 0), 0) || Number(candidate.votos) || 0, targetKey = Object.entries(votesByArea).sort((a, b) => b[1] - a[1])[0]?.[0];
-  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city: normalizedText(mesas[0]?.munNom || ''), rotate: config.rotate, title: `¿Dónde estuvo su votación en ${mesas[0]?.munNom || 'la ciudad'}?`, note: `Distribución por ${config.title} de su candidatura JAL. Haga clic en una ${config.title} para ver el detalle por barrio.`, fitTarget: true });
+  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city: normalizedText(mesas[0]?.munNom || ''), rotate: config.rotate, lugar: mesas[0]?.munNom || '', note: `Distribución por ${config.title} de su candidatura JAL. Haga clic en una ${config.title} para ver el detalle por barrio.`, fitTarget: true });
 }
 async function renderBogotaCampaignMap(candidate) {
   const data = await datosCandidatura(candidate), mesas = data.mesas || [];
@@ -1859,7 +1913,7 @@ async function renderBogotaCampaignMap(candidate) {
   const config = { title: 'localidad', code: p => String(p.LocCodigo || '').padStart(2, '0'), name: p => p.LocNombre || 'Localidad' };
   const { votesByArea, namesByArea } = agregarPorArea(mesas, claveLocal);
   const total = mesas.reduce((sum, m) => sum + Number(m.v || 0), 0) || Number(candidate.votos) || 0;
-  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey: null, city: 'BOGOTA', rotate: true, fueraDelEncuadre: ES_SUMAPAZ, title: '¿Dónde estuvo su votación en Bogotá?', note: 'Sumapaz se dibuja completa aunque se salga del marco: el encuadre lo mandan las 19 localidades urbanas, que es donde están los votos. Seleccione una localidad para abrir el desglose por barrio.' });
+  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey: null, city: 'BOGOTA', rotate: true, fueraDelEncuadre: ES_SUMAPAZ, lugar: 'Bogotá', note: 'Sumapaz se dibuja completa aunque se salga del marco: el encuadre lo mandan las 19 localidades urbanas, que es donde están los votos. Seleccione una localidad para abrir el desglose por barrio.' });
 }
 async function renderCaliCampaignMap(candidate) {
   const data = await datosCandidatura(candidate), mesas = data.mesas || [], geoData = await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`);
@@ -1867,7 +1921,7 @@ async function renderCaliCampaignMap(candidate) {
   const votesByArea = {}, namesByArea = {};
   mesas.forEach(m => { const key = claveLocal(m); votesByArea[key] = (votesByArea[key] || 0) + Number(m.v || 0); namesByArea[key] = (nombreLocal(m) || namesByArea[key] || `Comuna ${Number(key)}`).replace(/^\d+\s*COMUNA\s*/i, 'Comuna '); });
   const total = mesas.reduce((sum, m) => sum + Number(m.v || 0), 0) || Number(candidate.votos) || 0, targetKey = Object.entries(votesByArea).sort((a, b) => b[1] - a[1])[0]?.[0];
-  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city: 'CALI', rotate: false, title: '¿Dónde estuvo su votación en Cali?', note: 'Seleccione una comuna para abrir la votación por barrio.', center: [3.44, -76.53], zoom: 11 });
+  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city: 'CALI', rotate: false, lugar: 'Cali', note: 'Seleccione una comuna para abrir la votación por barrio.' });
 }
 function isBogotaElection(candidate, target) {
   const corp = normalizedText(candidate?.corp || ''), municipality = normalizedText(candidate?.circunscripcion || '');
@@ -1915,6 +1969,64 @@ async function caliBarrios(comunaCode) {
   if (!caliPuestoBarrioPromise) caliPuestoBarrioPromise = window.Candidato360CaliPuestoBarrio ? Promise.resolve(window.Candidato360CaliPuestoBarrio) : loadCandidateMapScript('candidato-360-data/cali-puesto-barrio.js').then(() => window.Candidato360CaliPuestoBarrio);
   if (!caliBarriosPorComuna.has(key)) caliBarriosPorComuna.set(key, (window.Candidato360CaliBarrios?.[key] ? Promise.resolve() : loadCandidateMapScript(`candidato-360-data/cali-barrios/${key}.js`)).then(() => { const geo = window.Candidato360CaliBarrios?.[key]; if (!geo) throw new Error(`Sin cartografía barrial para la comuna ${key}`); return geo; }));
   return Promise.all([caliPuestoBarrioPromise, caliBarriosPorComuna.get(key)]);
+}
+/* ─── Barrios de las demás ciudades ──────────────────────────────────────────
+   Bogotá y Cali traen cartografía barrial partida por localidad/comuna y un
+   diccionario puesto→barrio hecho a mano. Para el resto hay un GeoJSON de
+   ciudad entera y ningún diccionario, así que el puesto se ubica por
+   COORDENADA: cada puesto de votación tiene lat/lng en PUESTOS_GEOREF y se
+   busca en qué polígono cae. Es exacto y no depende de que el nombre del
+   barrio en la Registraduría coincida con el del catastro, que casi nunca
+   pasa («LA ESPERANZA #2» contra «La Esperanza No. 2»).
+
+   Medellín, Ibagué y Montería: Medellín tiene su capa oficial aparte; para
+   Ibagué y Montería no hay cartografía barrial publicada y el mapa se queda en
+   los puestos de votación, que es el modo degradado de siempre. */
+const CITY_BARRIO_LAYERS = [
+  { match: ['MEDELLIN'], url: () => `${RRData.publicUrl('bases+de+datos')}/MEDELLIN_BARRIOS_OFICIAL.json`, name: p => p.NOMBRE || 'Barrio', code: p => String(p.CODIGO || p.NOMBRE || '') },
+  { match: ['PEREIRA'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/PEREIRA-BARRIOS.json`, name: p => p.NOMBRE || 'Barrio', code: p => String(p.NOMBRE || '') },
+  { match: ['MANIZALES'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/MANIZALES-BARRIOS.json`, name: p => p.BARRIOS || 'Barrio', code: p => String(p.BARRIOS || '') },
+  { match: ['BARRANQUILLA'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/BARRANQUILLA-BARRIOS.json`, name: p => p.NOMBRE || 'Barrio', code: p => String(p.NOMBRE || '') },
+];
+function cityBarrioLayerFor(city) { const c = normalizedText(city || ''); return CITY_BARRIO_LAYERS.find(x => x.match.some(m => c.includes(m))) || null; }
+/* Ray casting. Un punto está en el polígono si cruza un número impar de
+   aristas; los anillos interiores (huecos) lo sacan. */
+function puntoEnAnillo(x, y, anillo) {
+  let dentro = false;
+  for (let i = 0, j = anillo.length - 1; i < anillo.length; j = i++) {
+    const xi = anillo[i][0], yi = anillo[i][1], xj = anillo[j][0], yj = anillo[j][1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) dentro = !dentro;
+  }
+  return dentro;
+}
+function puntoEnGeometria(x, y, geom) {
+  const poligonos = geom?.type === 'Polygon' ? [geom.coordinates] : geom?.type === 'MultiPolygon' ? geom.coordinates : [];
+  return poligonos.some(anillos => puntoEnAnillo(x, y, anillos[0]) && !anillos.slice(1).some(hueco => puntoEnAnillo(x, y, hueco)));
+}
+/* Índice con caja envolvente: descarta el 99 % de los polígonos sin recorrer
+   sus vértices. Con 332 barrios y 200 puestos la diferencia se nota. */
+function indiceBarrios(geo, cfg) {
+  return (geo?.features || []).map(f => {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const recorre = c => { if (typeof c[0] === 'number') { x0 = Math.min(x0, c[0]); x1 = Math.max(x1, c[0]); y0 = Math.min(y0, c[1]); y1 = Math.max(y1, c[1]); } else c.forEach(recorre); };
+    if (f.geometry?.coordinates) recorre(f.geometry.coordinates);
+    return { f, code: cfg.code(f.properties), caja: [x0, y0, x1, y1] };
+  }).filter(x => x.code && Number.isFinite(x.caja[0]));
+}
+function barrioDelPunto(indice, lng, lat) {
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return '';
+  for (const item of indice) {
+    const [x0, y0, x1, y1] = item.caja;
+    if (lng < x0 || lng > x1 || lat < y0 || lat > y1) continue;
+    if (puntoEnGeometria(lng, lat, item.f.geometry)) return item.code;
+  }
+  return '';
+}
+const barriosCiudadCache = new Map();
+function cargarBarriosCiudad(cfg) {
+  const url = cfg.url();
+  if (!barriosCiudadCache.has(url)) barriosCiudadCache.set(url, fetchJSON(url).then(geo => ({ geo, indice: indiceBarrios(geo, cfg) })));
+  return barriosCiudadCache.get(url);
 }
 /* A escala de barrio la pregunta deja de ser «cuánto» y pasa a ser «dónde
    queda»: sin calles nadie reconoce su cuadra. Los polígonos barriales SÍ van
@@ -2011,6 +2123,32 @@ async function renderBarriosForArea(key) {
       renderMapBreakdown(values, Object.fromEntries(geo.features.map(f => [code6(f.properties.codigo), f.properties.nombre])), tituloBarrial(base));
       return pintarBarrios(geo, values, f => code6(f.properties.codigo), f => f.properties.nombre, notaBarrial(geo.features[0]?.properties.loc_nombre || 'la localidad', base));
     } catch (e) { /* sin polígono → puestos */ }
+  }
+  /* Las demás ciudades con cartografía barrial: el puesto se ubica por
+     coordenada dentro del polígono, y se dibujan solo los barrios de la
+     comuna que se abrió. */
+  const capaBarrios = cityBarrioLayerFor(state.city);
+  if (capaBarrios) {
+    try {
+      const [{ geo, indice }, places] = await Promise.all([cargarBarriosCiudad(capaBarrios), puestosPorBarrio()]);
+      const llaveDe = m => (state.config.mesaKey ? state.config.mesaKey(m) : claveLocal(m));
+      const ciudad = state.ciudad || `${String(state.mesas[0]?.dep || '').padStart(2, '0')}${String(state.mesas[0]?.mun || '').padStart(3, '0')}`;
+      /* Todos los puestos de esa comuna, tenga o no votos ahí: los suyos dan el
+         mapa de votación y el resto da el censo con el que se reparte la meta. */
+      const deLaComuna = Object.entries(places).filter(([code, p]) => code.startsWith(ciudad) && p.mesa && llaveDe(p.mesa) === key);
+      const barrioPorPuesto = new Map(deLaComuna.map(([code, p]) => [code, barrioDelPunto(indice, p.lng, p.lat)]));
+      const dentro = new Set([...barrioPorPuesto.values()].filter(Boolean));
+      if (dentro.size) {
+        const historical = {};
+        mesas.forEach(m => { const b = barrioPorPuesto.get(electoralPlaceCode(m)); if (b) historical[b] = (historical[b] || 0) + Number(m.v || 0); });
+        const censoDe = () => { const out = {}; for (const [code, p] of deLaComuna) { const b = barrioPorPuesto.get(code); if (b && p.censo) out[b] = (out[b] || 0) + p.censo; } return out; };
+        const { values, base } = await valoresBarriales(historical, localGoal, censoDe);
+        const recorte = { type: 'FeatureCollection', features: geo.features.filter(f => dentro.has(capaBarrios.code(f.properties))) };
+        const nombres = Object.fromEntries(recorte.features.map(f => [capaBarrios.code(f.properties), capaBarrios.name(f.properties)]));
+        renderMapBreakdown(values, nombres, tituloBarrial(base));
+        return pintarBarrios(recorte, values, f => capaBarrios.code(f.properties), f => capaBarrios.name(f.properties), notaBarrial(state.namesByArea[key] || `la ${state.config.title} ${key}`, base));
+      }
+    } catch (e) { /* sin cartografía barrial → puestos */ }
   }
   let places = {}; try { places = await puestosPorBarrio(); } catch (e) {}
   const historical = {}, points = {};
@@ -2114,7 +2252,7 @@ function refreshMapLevels() {
     aplicarBasemap(Boolean(crmMapState?.rotado));
     if (crmMapState) crmMapState.focusKey = null;
     refreshCRMMapMode();
-    encuadrarBounds(crmMapState?.rotado ? boundsSin(crmMapLayer, ES_SUMAPAZ) : crmMapLayer.getBounds(), 24);
+    encuadrarBounds(boundsDeVotos(crmMapLayer, crmMapState.config, crmMapState.votesByArea, crmMapState.rotado ? ES_SUMAPAZ : null), 24);
     setMapLevel(level);
   };
   controls.querySelector('[data-level="municipio"]')?.addEventListener('click', () => volver('municipio'));
