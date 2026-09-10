@@ -7,9 +7,13 @@
        territoriales cambia de partido entre una elección y la siguiente, y el
        reparto de la meta en un salto de corporación sigue la huella del
        partido: con el partido viejo, reparte mal.
-     · que un desplegable nacional sirve. En 2023 se inscribieron 2.258
-       organizaciones distintas en el país; en Bogotá 43. Y muchas se repiten
-       con las mismas palabras en otro orden entre departamentos.
+     · que un desplegable nacional sirve. Entre las territoriales de 2023 y la
+       Cámara de 2026 hay 2.338 organizaciones distintas en el país; en Bogotá
+       52. Y muchas se repiten con las mismas palabras en otro orden entre
+       departamentos.
+     · que con 2023 basta. Salvación Nacional no existía entonces y sacó
+       190.113 votos a Cámara en Bogotá en 2026: si el catálogo solo mira
+       atrás, el partido de quien se lanza hoy no aparece.
 
    Acá se comprueba que el campo sugiere lo del departamento elegido, que
    acepta lo que no está en el catálogo, y que lo escrito es lo que manda en el
@@ -72,7 +76,24 @@ await p.waitForTimeout(250);
 r.elegido = await p.inputValue('#campaignParty');
 r.notaCatalogo = await p.textContent('#campaignPartyStatus');
 
-/* Una organización que no está en 2023 se acepta igual. */
+/* Un partido que NO existía en 2023 pero sí en la Cámara de 2026. */
+r.nueva = await p.evaluate(async () => {
+  const caja = document.getElementById('campaignParty');
+  caja.value = 'salva'; caja.dispatchEvent(new Event('input'));
+  await new Promise(r => setTimeout(r, 350));
+  const primera = document.querySelector('#campaignPartyLista .sugerencia');
+  return { nombre: primera?.querySelector('b')?.textContent || '', respaldo: primera?.querySelector('small')?.textContent || '' };
+});
+/* Y que el tamaño de 2026 pese: escribir «partido» en Bogotá debe traer
+   primero a los grandes de hoy, no al movimiento local con más inscritos. */
+r.orden = await p.evaluate(async () => {
+  const caja = document.getElementById('campaignParty');
+  caja.value = ''; caja.dispatchEvent(new Event('input'));
+  await new Promise(r => setTimeout(r, 350));
+  return [...document.querySelectorAll('#campaignPartyLista .sugerencia b')].map(x => x.textContent).slice(0, 3);
+});
+
+/* Una organización que no está en ninguna de las dos se acepta igual. */
 await p.fill('#campaignParty', 'COALICIÓN QUE NACE EN 2027');
 await p.waitForTimeout(400);
 r.notaLibre = await p.textContent('#campaignPartyStatus');
@@ -119,13 +140,17 @@ const pruebas = [
   ['viene precargado con el de su última elección', /NUEVO LIBERALISMO/.test(r.precargado)],
   ['pero se puede cambiar: el departamento sale del historial', r.depDeducido === '16'],
   ['al escribir sugiere organizaciones de ese departamento', r.sugerencias.length > 0 && r.sugerencias.some(x => /ALIANZA VERDE/i.test(x))],
-  ['y dice cuántas candidaturas inscribió cada una en 2023', /candidaturas? en 2023/.test(r.conCuantas)],
+  ['y dice por qué está en la lista, con lo más reciente primero',
+    /votos a Cámara en 2026/.test(r.conCuantas) && /candidaturas territoriales en 2023/.test(r.conCuantas)],
   ['las sugerencias quedan por encima del formulario, no debajo del botón', r.sugerenciaVisible === true],
   ['elegir una la escribe en el campo', /ALIANZA VERDE/i.test(r.elegido)],
-  ['la nota cuenta el tamaño del catálogo del departamento', /organizaciones inscribieron candidatura en Bogotá/i.test(r.notaCatalogo)],
-  ['una organización que no existía en 2023 se acepta igual', /No aparece en Bogotá/i.test(r.notaLibre)],
+  ['la nota cuenta el tamaño del catálogo del departamento y de dónde sale', /organizaciones con votación en Bogotá/i.test(r.notaCatalogo) && /Cámara en 2026/.test(r.notaCatalogo)],
+  ['un partido nuevo, que no corrió en 2023, igual se sugiere',
+    /SALVACIÓN NACIONAL/i.test(r.nueva.nombre) && /190.113 votos a Cámara en 2026/.test(r.nueva.respaldo) && !/2023/.test(r.nueva.respaldo)],
+  ['y los grandes de hoy encabezan la lista', /PACTO HISTÓRICO/i.test(r.orden[0] || '')],
+  ['una organización que no está en ninguna de las dos se acepta igual', /No aparece en Bogotá/i.test(r.notaLibre)],
   ['y es lo escrito, no el historial, lo que manda', r.vigente === 'COALICIÓN QUE NACE EN 2027' && r.campana.partido === 'COALICIÓN QUE NACE EN 2027'],
-  ['Antioquia y Bogotá NO tienen el mismo catálogo', r.antioquia.cuantas > 200 && r.bogota.cuantas < 60 && r.antioquia.cuantas !== r.bogota.cuantas],
+  ['Antioquia y Bogotá NO tienen el mismo catálogo', r.antioquia.cuantas > 200 && r.bogota.cuantas < 70 && r.antioquia.cuantas !== r.bogota.cuantas],
   ['cambiar de departamento cambia la nota', /Antioquia/.test(r.antioquia.nota) && /Bogotá/.test(r.bogota.nota)],
   ['solo se descarga el archivo del departamento que se necesita', pedidos.length && pedidos.every(f => ['16.js', '01.js', '31.js'].includes(f))],
   ['el wizard de candidatura nueva usa el mismo campo', r.wizard.esInput === 'INPUT' && r.wizard.sugerencias.some(x => /CAMBIO RADICAL/i.test(x))],

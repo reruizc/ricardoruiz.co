@@ -380,9 +380,16 @@ async function prepareHistoricalIndex() {
    departamento.
 
    Por eso: se escribe, se sugiere lo del DEPARTAMENTO elegido y se acepta
-   texto libre (una coalición nueva de 2027 no está en ningún catálogo de
-   2023). El catálogo lo construye tools/candidato-360/partidos/construir.mjs y
-   vive partido por departamento en candidato-360-data/partidos/. */
+   texto libre (una coalición que se inscribe en 2027 no está en ningún
+   catálogo anterior).
+
+   El catálogo cruza dos elecciones porque ninguna sola alcanza: las
+   territoriales de 2023 traen los movimientos locales que solo existen en un
+   municipio, y la CÁMARA DE 2026 dice qué está vivo hoy —Salvación Nacional no
+   existía en 2023 y sacó 190.113 votos en Bogotá—. Cada entrada es
+   [nombre, candidaturas de 2023, votos a Cámara 2026]; lo construye
+   tools/candidato-360/partidos/construir.mjs y vive partido por departamento
+   en candidato-360-data/partidos/. */
 const partidosPorDep = new Map();
 function cargarPartidos(dep) {
   const key = String(dep || '').padStart(2, '0');
@@ -410,7 +417,17 @@ function departamentoDeCandidatura(candidate) {
 /* ⚠️ normalizedText() pega todo (quita hasta los espacios), que es justo lo
    que NO sirve acá: hay que comparar palabra por palabra. */
 const normPalabras = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9Ñ]+/g, ' ').trim();
+/* El tamaño de una organización en su departamento, en una escala común: no se
+   pueden comparar votos a Cámara con número de candidaturas, así que cada uno
+   se mide contra el mayor de su propia columna y gana el más alto de los dos.
+   Sin esto, un movimiento local de 2023 con 300 candidaturas aplastaría a
+   Salvación Nacional, que no tiene ninguna. */
+function pesoPartidos(lista) {
+  const maxVotos = Math.max(1, ...lista.map(x => x[2] || 0)), maxCand = Math.max(1, ...lista.map(x => x[1] || 0));
+  return item => Math.max((item[2] || 0) / maxVotos, (item[1] || 0) / maxCand);
+}
 function rankearPartidos(lista, consulta, limite = 8) {
+  const peso = pesoPartidos(lista);
   const q = normPalabras(consulta).split(' ').filter(Boolean);
   if (!q.length) return lista.slice(0, limite);
   const puntuadas = [];
@@ -419,7 +436,14 @@ function rankearPartidos(lista, consulta, limite = 8) {
     if (!q.every(w => palabras.some(pal => pal.startsWith(w)))) continue;
     puntuadas.push({ item, punto: (n.startsWith(q.join(' ')) ? 2 : 0) + (palabras[0]?.startsWith(q[0]) ? 1 : 0) });
   }
-  return puntuadas.sort((a, b) => b.punto - a.punto || b.item[1] - a.item[1]).slice(0, limite).map(x => x.item);
+  return puntuadas.sort((a, b) => b.punto - a.punto || peso(b.item) - peso(a.item)).slice(0, limite).map(x => x.item);
+}
+/* Por qué esa organización está en la lista: lo más reciente primero. */
+function respaldoPartido([, cand, votos]) {
+  const partes = [];
+  if (votos) partes.push(`${Number(votos).toLocaleString('es-CO')} votos a Cámara en 2026`);
+  if (cand) partes.push(`${Number(cand).toLocaleString('es-CO')} candidatura${cand === 1 ? '' : 's'} territorial${cand === 1 ? '' : 'es'} en 2023`);
+  return partes.join(' · ') || 'sin votación reciente registrada';
 }
 /* Un autocompletado sencillo y accesible: flechas, Enter, Escape y clic.
    `fuente()` devuelve la lista vigente; el campo NUNCA obliga a elegir de ella. */
@@ -431,7 +455,7 @@ function montarSugeridor({ input, lista, fuente, alElegir }) {
   let opciones = [], activo = -1;
   const cerrar = () => { menu.classList.add('hidden'); menu.innerHTML = ''; activo = -1; caja.setAttribute('aria-expanded', 'false'); };
   const pintar = () => {
-    menu.innerHTML = opciones.map((o, i) => `<button type="button" class="sugerencia${i === activo ? ' activa' : ''}" data-i="${i}"><b>${escHtml(o[0])}</b><small>${Number(o[1]).toLocaleString('es-CO')} candidatura${o[1] === 1 ? '' : 's'} en 2023</small></button>`).join('');
+    menu.innerHTML = opciones.map((o, i) => `<button type="button" class="sugerencia${i === activo ? ' activa' : ''}" data-i="${i}"><b>${escHtml(o[0])}</b><small>${escHtml(respaldoPartido(o))}</small></button>`).join('');
     menu.classList.toggle('hidden', !opciones.length); caja.setAttribute('aria-expanded', String(Boolean(opciones.length)));
   };
   const elegir = i => { const o = opciones[i]; if (!o) return; caja.value = o[0]; cerrar(); alElegir?.(o[0]); };
@@ -462,8 +486,8 @@ async function pintarEstadoPartido({ input, estado, departamento }) {
   const escrito = String($(input)?.value || '').trim();
   const enCatalogo = escrito && catalogo.some(([n]) => normalizedText(n) === normalizedText(escrito));
   nota.textContent = escrito && !enCatalogo
-    ? `No aparece en ${nombre} en 2023. Lo tomamos como está: puede ser una organización nueva o una coalición que se inscribe ahora.`
-    : `${catalogo.length} organizaciones inscribieron candidatura en ${nombre} en 2023. Escriba y le sugerimos; también puede escribir una que no esté.`;
+    ? `No aparece en ${nombre} ni en las territoriales de 2023 ni en la Cámara de 2026. Lo tomamos como está: puede ser una organización nueva o una coalición que se inscribe ahora.`
+    : `${catalogo.length} organizaciones con votación en ${nombre}: las que inscribieron candidatura en las territoriales de 2023 y las que sacaron votos a la Cámara en 2026. Escriba y le sugerimos; también puede escribir una que no esté.`;
 }
 function nombreDepartamento(dep) {
   const hit = Object.entries(DEP_CODES).find(([, code]) => code === String(dep).padStart(2, '0'));
