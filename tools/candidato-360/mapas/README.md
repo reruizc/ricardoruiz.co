@@ -14,8 +14,8 @@
 `candidato-360-data/` y un diccionario puesto→barrio hecho a mano. Es lo más
 preciso y no se toca.
 
-**Medellín, Pereira, Manizales y Barranquilla** tienen un GeoJSON de ciudad
-entera y ningún diccionario. Ahí el puesto de votación se ubica **por
+**Medellín, Pereira, Manizales, Barranquilla, Ibagué y Montería** tienen un
+GeoJSON de ciudad entera y ningún diccionario. Ahí el puesto de votación se ubica **por
 coordenada**: cada puesto trae lat/lng en `PUESTOS_GEOREF.csv` y se busca en qué
 polígono cae (ray casting con caja envolvente). Es exacto y evita casar nombres,
 que casi nunca coinciden entre la Registraduría y el catastro («LA ESPERANZA #2»
@@ -28,7 +28,11 @@ puesto de esa comuna.
 | Cali | `candidato-360-data/cali-barrios/{comuna}.js` + diccionario |
 | Medellín | `bases+de+datos/MEDELLIN_BARRIOS_OFICIAL.json` (por coordenada) |
 | Pereira · Manizales · Barranquilla | `Ciudades-COM-LOC/<CIUDAD>-BARRIOS.json` (por coordenada) |
-| **Ibagué · Montería** | **No hay capa publicada.** Quedan enchufadas a `Ciudades-COM-LOC/IBAGUE-BARRIOS.json` y `MONTERIA-BARRIOS.json`: el día que el archivo aparezca en S3, el nivel de barrio arranca solo. Mientras tanto, puestos de votación como puntos |
+| Ibagué · Montería | `candidato-360-data/barrios-voronoi/` — **aproximación por Voronoi** sobre los puestos de votación, recortada por comuna (ver `tools/candidato-360/barrios-voronoi/`). No hay capa oficial publicada; la nota del mapa lo avisa |
+
+Un puesto a menos de 60 m del borde de un barrio —la coordenada de la
+Registraduría no es de topógrafo— se queda con el barrio más cercano; más lejos,
+no se inventa.
 
 Para sumar una ciudad basta agregarla a `CITY_BARRIO_LAYERS` en
 `candidato-360.js` con la URL de su capa y cómo leer el nombre y el código del
@@ -80,6 +84,7 @@ cosas basta; están las dos porque el costo es cero y el síntoma es feo.
 node tools/candidato-360/prueba-mapa.mjs        # Bogotá: ventana urbana, callejero, censo (15)
 node tools/candidato-360/prueba-ciudades.mjs    # Medellín: encuadre, barrios, modal (10)
 node tools/candidato-360/prueba-salto-crm.mjs   # el salto de corporación en el mapa (13)
+node tools/candidato-360/prueba-barrios-voronoi.mjs  # los barrios aproximados de Ibagué y Montería (14)
 ```
 
 Las tres necesitan Leaflet en disco:

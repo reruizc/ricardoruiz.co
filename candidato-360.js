@@ -2036,12 +2036,14 @@ const CITY_BARRIO_LAYERS = [
   { match: ['PEREIRA'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/PEREIRA-BARRIOS.json`, name: p => p.NOMBRE || 'Barrio', code: p => String(p.NOMBRE || '') },
   { match: ['MANIZALES'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/MANIZALES-BARRIOS.json`, name: p => p.BARRIOS || 'Barrio', code: p => String(p.BARRIOS || '') },
   { match: ['BARRANQUILLA'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/BARRANQUILLA-BARRIOS.json`, name: p => p.NOMBRE || 'Barrio', code: p => String(p.NOMBRE || '') },
-  /* Ibagué y Montería: NO hay capa publicada todavía. Quedan enchufadas a la
-     ruta convencional y con lectores tolerantes al nombre del campo; el día
-     que el archivo aparezca en S3, el nivel de barrio arranca solo. Mientras
-     tanto el 404 cae al modo de puestos de votación, como hasta ahora. */
-  { match: ['IBAGUE'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/IBAGUE-BARRIOS.json`, name: p => p.NOMBRE || p.BARRIO || p.nombre || p.barrio || 'Barrio', code: p => String(p.CODIGO || p.NOMBRE || p.BARRIO || p.nombre || p.barrio || '') },
-  { match: ['MONTERIA'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/MONTERIA-BARRIOS.json`, name: p => p.NOMBRE || p.BARRIO || p.nombre || p.barrio || 'Barrio', code: p => String(p.CODIGO || p.NOMBRE || p.BARRIO || p.nombre || p.barrio || '') },
+  /* Ibagué y Montería no tienen cartografía barrial publicada en ninguna
+     fuente alcanzable. Sus barrios son una APROXIMACIÓN por Voronoi sobre los
+     puestos de votación, recortada por comuna —lo mismo que el proyecto hizo
+     para Medellín antes de tener la capa oficial— y viven en el repo
+     (tools/candidato-360/barrios-voronoi/). El aviso va en la nota del mapa:
+     un límite de Voronoi leído como límite administrativo miente. */
+  { match: ['IBAGUE'], url: () => 'candidato-360-data/barrios-voronoi/IBAGUE-BARRIOS.json', name: p => p.NOMBRE || 'Barrio', code: p => String(p.CODIGO || p.NOMBRE || ''), aviso: 'Los barrios de Ibagué son una aproximación: cada uno es el área más cercana a sus puestos de votación, no el límite oficial.' },
+  { match: ['MONTERIA'], url: () => 'candidato-360-data/barrios-voronoi/MONTERIA-BARRIOS.json', name: p => p.NOMBRE || 'Barrio', code: p => String(p.CODIGO || p.NOMBRE || ''), aviso: 'Los barrios de Montería son una aproximación: cada uno es el área más cercana a sus puestos de votación, no el límite oficial.' },
 ];
 function cityBarrioLayerFor(city) { const c = normalizedText(city || ''); return CITY_BARRIO_LAYERS.find(x => x.match.some(m => c.includes(m))) || null; }
 /* Ray casting. Un punto está en el polígono si cruza un número impar de
@@ -2075,7 +2077,17 @@ function barrioDelPunto(indice, lng, lat) {
     if (lng < x0 || lng > x1 || lat < y0 || lat > y1) continue;
     if (puntoEnGeometria(lng, lat, item.f.geometry)) return item.code;
   }
-  return '';
+  /* Un puesto a pocos metros del borde —la coordenada de la Registraduría no
+     es de topógrafo— se queda con el barrio cuya caja está más cerca, hasta
+     60 m. Más lejos que eso, mejor no inventar. */
+  const TOLERANCIA = 0.00055;
+  let mejor = '', mejorDist = TOLERANCIA;
+  for (const item of indice) {
+    const [x0, y0, x1, y1] = item.caja;
+    const dx = Math.max(x0 - lng, 0, lng - x1), dy = Math.max(y0 - lat, 0, lat - y1), d = Math.hypot(dx, dy);
+    if (d < mejorDist) { mejorDist = d; mejor = item.code; }
+  }
+  return mejor;
 }
 const barriosCiudadCache = new Map();
 function cargarBarriosCiudad(cfg) {
@@ -2201,7 +2213,7 @@ async function renderBarriosForArea(key) {
         const recorte = { type: 'FeatureCollection', features: geo.features.filter(f => dentro.has(capaBarrios.code(f.properties))) };
         const nombres = Object.fromEntries(recorte.features.map(f => [capaBarrios.code(f.properties), capaBarrios.name(f.properties)]));
         renderMapBreakdown(values, nombres, tituloBarrial(base));
-        return pintarBarrios(recorte, values, f => capaBarrios.code(f.properties), f => capaBarrios.name(f.properties), notaBarrial(state.namesByArea[key] || `la ${state.config.title} ${key}`, base));
+        return pintarBarrios(recorte, values, f => capaBarrios.code(f.properties), f => capaBarrios.name(f.properties), notaBarrial(state.namesByArea[key] || `la ${state.config.title} ${key}`, base) + (capaBarrios.aviso ? ` ${capaBarrios.aviso}` : ''));
       }
     } catch (e) { /* sin cartografía barrial → puestos */ }
   }
