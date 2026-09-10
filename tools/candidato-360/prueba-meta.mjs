@@ -29,6 +29,13 @@ const RESULTADOS = { cities: [{ key: '16-001', name: 'BOGOTÁ', dep: 'BOGOTÁ D.
    en 2023 y su fuerza se estima con esto. */
 const CAMARA = { por_circunscripcion: { TERRITORIAL: { votval: 27400, partidos: { 'MOVIMIENTO SALVACIÓN NACIONAL': 5480, 'PARTIDO A': 9000 } } } };
 
+/* Asamblea de Cundinamarca y JAL de Suba, de mentiras, con la misma forma que
+   los índices reales: la circunscripción de la Asamblea es el departamento y
+   la de la JAL es «LOCALIDAD · CIUDAD». Dos listas y tres curules cada una. */
+const listaEn = (circ, partido, votos) => votos.map((v, i) => ({ nombre: `${partido} ${i + 1}`, slug: `${partido}-${i}`, circunscripcion: circ, partido, votos: v }));
+const INDICE_ASAMBLEA = { candidatos: [...listaEn('CUNDINAMARCA', 'PARTIDO CAMBIO RADICAL', [40000, 20000, 8000]), ...listaEn('CUNDINAMARCA', 'CENTRO DEMOCRATICO Y SALVACION NACIONAL', [25000, 9000, 3000]), ...listaEn('BOYACÁ', 'PARTIDO LIBERAL COLOMBIANO', [30000, 15000, 5000])] };
+const INDICE_JAL = { candidatos: [...listaEn('SUBA · BOGOTÁ D.C.', 'NUEVO LIBERALISMO- AGRUPACION POLITICA EN MARCHA', [9000, 4000, 1500]), ...listaEn('SUBA · BOGOTÁ D.C.', 'PARTIDO ALIANZA VERDE', [7000, 2500, 900]), ...listaEn('USAQUÉN · BOGOTÁ D.C.', 'PARTIDO ALIANZA VERDE', [5000, 2000, 700])] };
+
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
 const errores = []; p.on('pageerror', e => errores.push(e.message));
@@ -38,6 +45,8 @@ await p.route('**', async route => {
   if (u.includes('index-concejo-2023.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(INDICE) });
   if (u.includes('resultados-concejo-2023.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(RESULTADOS) });
   if (u.includes('camara/dep-16.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CAMARA) });
+  if (u.includes('index-asamblea-2023.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(INDICE_ASAMBLEA) });
+  if (u.includes('index-jal-2023.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(INDICE_JAL) });
   if (u.includes('/c360/')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, acceso: true, fuente: 'admin', vinculo: null, email: 'reruizc@gmail.com' }) });
   return route.abort();
 });
@@ -77,6 +86,28 @@ for (const partido of ['PARTIDO A', 'PARTIDO C', 'MOVIMIENTO SALVACIÓN NACIONAL
   }, partido);
 }
 await p.screenshot({ path: SP + '/meta-partido.png' });
+
+/* ── La misma lógica en Asamblea y JAL ───────────────────────────────── */
+/* Cundinamarca: 3 curules; Cambio Radical (68.000) se lleva 2 y la coalición
+   CD-Salvación (37.000) 1. Cifra = 34.000. Elegidos: 40.000 y 20.000 de CR y
+   25.000 de la coalición, así que el piso es 20.000. Salvación Nacional tiene
+   que encontrar su lista bajo el nombre de la coalición. */
+r.asamblea = {};
+for (const partido of [null, 'PARTIDO CAMBIO RADICAL', 'MOVIMIENTO SALVACIÓN NACIONAL']) {
+  r.asamblea[String(partido)] = await p.evaluate(async partido => {
+    const e = await VoteTarget.estimate({ corp: 'asamblea', territory: 'Cundinamarca', baseUrl: 'https://stub/output', partido, departamento: '15' });
+    return { target: e.target, ref: e.detalle.referencia?.votos, tipo: e.detalle.partido?.tipo, k: e.detalle.partido?.k, lista: e.detalle.partido?.lista?.nombre, territorio: e.detalle.territorio };
+  }, partido);
+}
+/* Suba: 3 curules; Nuevo Liberalismo (14.500) 2 y Alianza Verde (10.400) 1.
+   La lista de Usaquén NO cuenta: es otra JAL. */
+r.jal = {};
+for (const partido of [null, 'PARTIDO NUEVO LIBERALISMO', 'PARTIDO ALIANZA VERDE']) {
+  r.jal[String(partido)] = await p.evaluate(async partido => {
+    const e = await VoteTarget.estimate({ corp: 'jal', territory: 'SUBA · BOGOTÁ, D.C. · Bogotá D.C.', baseUrl: 'https://stub/output', partido, departamento: '16' });
+    return { target: e.target, ref: e.detalle.referencia?.votos, tipo: e.detalle.partido?.tipo, k: e.detalle.partido?.k, lista: e.detalle.partido?.lista?.nombre, total: e.detalle.partido?.lista?.total, territorio: e.detalle.territorio };
+  }, partido);
+}
 
 /* Con salto de corporación, la explicación del reparto cambia. */
 r.conSalto = await p.evaluate(() => {
@@ -122,6 +153,12 @@ const pruebas = [
   ['y uno sin ningún dato cae al piso de la corporación, diciéndolo',
     r.porPartido['PARTIDO INEXISTENTE'].tipo === 'sin-dato' && r.porPartido['PARTIDO INEXISTENTE'].target === r.estimate.target && /no hay lista en esta corporación en 2023 ni votación a Cámara/.test(r.porPartido['PARTIDO INEXISTENTE'].texto)],
   ['la frase corta de la meta también nombra el partido', /con PARTIDO C: llevar a la lista/.test(r.porPartido['PARTIDO C'].formula)],
+  ['Asamblea: el piso de la corporación es la curul más barata (20.000)', r.asamblea['null'].ref === 20000 && r.asamblea['null'].territorio === 'CUNDINAMARCA'],
+  ['Asamblea: entrar de 2 por Cambio Radical cuesta 20.000, no el piso', r.asamblea['PARTIDO CAMBIO RADICAL'].tipo === 'lista-con-curul' && r.asamblea['PARTIDO CAMBIO RADICAL'].k === 2 && r.asamblea['PARTIDO CAMBIO RADICAL'].ref === 20000],
+  ['Asamblea: Salvación Nacional encuentra su lista bajo el nombre de la coalición y debe encabezarla: 25.000', r.asamblea['MOVIMIENTO SALVACIÓN NACIONAL'].tipo === 'lista-con-curul' && /SALVACION NACIONAL/.test(r.asamblea['MOVIMIENTO SALVACIÓN NACIONAL'].lista) && r.asamblea['MOVIMIENTO SALVACIÓN NACIONAL'].k === 1 && r.asamblea['MOVIMIENTO SALVACIÓN NACIONAL'].ref === 25000],
+  ['JAL: la localidad se resuelve sola y la lista de Usaquén no se mezcla', r.jal['null'].territorio === 'SUBA · BOGOTÁ D.C.' && r.jal['PARTIDO ALIANZA VERDE'].total === 10400],
+  ['JAL: Nuevo Liberalismo se encuentra en «NUEVO LIBERALISMO- AGRUPACION…» y entra de 2 con 4.000', r.jal['PARTIDO NUEVO LIBERALISMO'].k === 2 && r.jal['PARTIDO NUEVO LIBERALISMO'].ref === 4000 && /AGRUPACION/.test(r.jal['PARTIDO NUEVO LIBERALISMO'].lista)],
+  ['JAL: por la Alianza Verde hay que ser primero: 7.000, no el piso de 4.000', r.jal['PARTIDO ALIANZA VERDE'].k === 1 && r.jal['PARTIDO ALIANZA VERDE'].ref === 7000 && r.jal['null'].ref === 4000],
   ['con salto, esa explicación pasa a ser la del salto', /Salto de Junta administradora local a Concejo/.test(r.conSalto) && /2,4 veces/.test(r.conSalto)],
   ['sin referencia no hay número', r.sinMeta.numero === '—'],
   ['ni ⓘ que prometa una explicación', r.sinMeta.ocultas === true],

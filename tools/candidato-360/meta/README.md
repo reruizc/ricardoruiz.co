@@ -25,6 +25,23 @@ lista de ese partido en esa corporación y territorio en 2023:
 | **El partido no corrió en 2023** | Su fuerza se estima con la **Cámara de 2026** en el departamento, escalada al tamaño de la corporación (`votos × válidos_corp / válidos_cámara`). Si eso arrastra k curules, la meta es lo que suele sacar el k-ésimo de una lista de ese tamaño (mediana de las listas de 2023 con k curules); si no, la lista tiene que jalarse como en el caso anterior | Salvación Nacional: 190.113 a Cámara en Bogotá |
 | **Sin lista ni Cámara** | El piso de la corporación, diciéndolo | Una organización nueva |
 
+**Es una sola lógica para Concejo, Asamblea y JAL**: las tres se reconstruyen
+igual (umbral y cifra repartidora sobre las listas de la circunscripción) y la
+meta por partido se calcula encima. Corrido contra los índices reales:
+
+| Corporación | Piso de la corporación | Por lista |
+|---|---|---|
+| Asamblea de Antioquia (26 curules) | 11.788 | Centro Democrático, 6 curules → 18.662 · Liberal, 4 → 25.474 |
+| Asamblea de Cundinamarca (16) | 13.545 | Cambio Radical, 4 → 13.545 · Alianza Verde, 1 → 17.588 · Salvación Nacional, en la lista «Centro Democrático y Salvación Nacional», 1 → 17.566 |
+| JAL de Suba (11) | 3.873 | Alianza Verde, 2 → 5.090 · Nuevo Liberalismo, en «Nuevo Liberalismo - Agrupación Política En Marcha», 3 → 3.873 · Salvación Nacional, sin lista en 2023, por Cámara 2026 → 5.865 |
+| JAL de Teusaquillo (9) | 1.114 (curul verificada) | Alianza Verde, 2 → 1.114 · Centro Democrático, 2 → 1.896 |
+
+En la JAL la circunscripción es «LOCALIDAD · CIUDAD» y el índice se filtra a
+esa localidad: la lista de la Alianza Verde en Usaquén no cuenta para Suba.
+Para la Cámara de 2026 se usa el departamento de la localidad; es el mismo
+proxy que en Concejo, con la misma limitación: mide la marca en el
+departamento, no en la localidad.
+
 La lista del partido se encuentra por las palabras que lo identifican (sin
 «PARTIDO», «MOVIMIENTO», «DE», «LA»…): «PARTIDO NUEVO LIBERALISMO» encuentra la
 lista «NUEVO LIBERALISMO EN MARCHA», y si hay varias coaliciones con el
@@ -49,9 +66,11 @@ sacó el ganador, sea cual sea el aval.
 ## Pruebas
 
 ```
-node tools/candidato-360/prueba-meta.mjs     # la ficha ⓘ y la meta por partido (23)
+node tools/candidato-360/prueba-meta.mjs     # la ficha ⓘ y la meta por partido en Concejo, Asamblea y JAL (29)
 ```
 
 La prueba usa un Concejo de tres listas y tres curules y comprueba los cuatro
-casos, además de que las piezas que muestra la ficha multipliquen exactamente
-la meta que se ve en pantalla.
+casos, más una Asamblea (donde Salvación Nacional tiene que dar con su lista
+de coalición) y una JAL (donde la lista de otra localidad no puede mezclarse),
+además de que las piezas que muestra la ficha multipliquen exactamente la meta
+que se ve en pantalla.
