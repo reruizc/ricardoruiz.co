@@ -788,7 +788,7 @@ function avisoRedes(texto) {
 function pintarValidacionRedes(d) {
   const fichas = d.perfiles.map(p => {
     const v = VEREDICTOS[p.veredicto] || VEREDICTOS.no_verificable, def = REDES_DEFS.find(x => x.key === p.red) || { nombre: p.red };
-    const datos = [p.nombre_perfil ? `perfil a nombre de <b>${escHtml(p.nombre_perfil)}</b>` : '', p.seguidores != null ? `${escHtml(String(p.seguidores))} seguidores` : '', p.verificada ? 'cuenta verificada por la plataforma' : ''].filter(Boolean).join(' · ');
+    const datos = [p.nombre_perfil ? `perfil a nombre de <b>${escHtml(p.nombre_perfil)}</b>` : '', p.seguidores != null ? `${escHtml(String(p.seguidores))} seguidores` : '', p.verificada ? 'cuenta verificada por la plataforma' : '', p.fuente === 'apify' ? 'comprobado vía Apify' : ''].filter(Boolean).join(' · ');
     return `<div class="red-ficha ${v.clase}">
       <div class="red-ficha-top"><b>${escHtml(def.nombre)}</b><a href="${escHtml(p.url)}" target="_blank" rel="noopener">@${escHtml(p.handle)}</a><span class="red-sello">${v.etiqueta}${p.confianza ? ` · ${p.confianza}%` : ''}</span></div>
       ${datos ? `<p class="red-ficha-datos">${datos}</p>` : ''}

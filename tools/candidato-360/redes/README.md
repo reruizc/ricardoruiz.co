@@ -16,7 +16,7 @@ busca esa cuenta y dice si parece ser la suya.
 
 | Paso | Fuente | Qué aporta |
 |---|---|---|
-| **1. Sondeo** | El endpoint público de cada red: el widget «Follow» de X (`cdn.syndication.twimg.com`), el **oEmbed** de TikTok y los metadatos `og:` del perfil de Instagram | Lo único que dice si la cuenta **existe** y con qué nombre. Sin llaves ni sesión |
+| **1. Sondeo** | El endpoint público de cada red: el widget «Follow» de X (`cdn.syndication.twimg.com`), el **oEmbed** de TikTok y los metadatos `og:` del perfil de Instagram. Si alguno no concluye, **Apify** de respaldo (ver abajo) | Lo único que dice si la cuenta **existe** y con qué nombre |
 | **2. Señales abiertas** | Google News RSS con el nombre y el nombre público (12 meses) | Si esa persona ya aparece en prensa y con qué rol — sirve para detectar el homónimo |
 | **3. Veredicto** | DeepSeek V4 Flash | Lee **solo** lo anterior y devuelve, red por red, `confirmado · probable · dudoso · no_encontrado · no_verificable` con una frase de por qué |
 
@@ -26,6 +26,48 @@ desde la página los mata CORS. El resultado se guarda 7 días en KV
 aparece o cambia de nombre es otra pregunta, y no puede contestarla el cache de
 ayer. Tope de **40 validaciones por cuenta y por día**: una validación cuesta
 una llamada al modelo.
+
+## El respaldo de Apify
+
+Los sondeos de X e Instagram viven de endpoints que las plataformas no prometen
+mantener. Cuando uno se cierra, la respuesta honesta es «no pude comprobarlo»:
+cierta, pero inútil para quien está armando su campaña. Ahí entra Apify —
+mantener el acceso a las redes es su negocio, no el nuestro.
+
+Es **respaldo, no primera llamada**, y solo se dispara cuando el sondeo directo
+queda en `bloqueado` o `error`. Si la red contestó —exista la cuenta o no—, la
+pregunta ya está resuelta y no hay nada que comprar. Por eso el oEmbed de TikTok
+(que es el endpoint oficial de incrustación, gratis y sin llave) casi nunca
+llega a costar un peso.
+
+| Red | Actor por defecto | Costo aproximado por consulta |
+|---|---|---|
+| Instagram | `apify/instagram-profile-scraper` | ~US$0,0016–0,0026 |
+| TikTok | `clockworks/tiktok-profile-scraper` | ~US$0,0001 |
+| X | `apidojo/twitter-user-scraper` | ~US$0,017 |
+
+Con el cache de 7 días y el tope de 40 validaciones por cuenta y día, un
+candidato que valida sus tres redes cuesta unos dos centavos de dólar.
+
+Se enciende con un secreto y se apaga quitándolo:
+
+```bash
+npx wrangler secret put APIFY_TOKEN
+```
+
+Sin `APIFY_TOKEN` el respaldo no existe y todo se comporta como antes. Los
+actores se cambian sin tocar código con `APIFY_ACTOR_INSTAGRAM`,
+`APIFY_ACTOR_TIKTOK` y `APIFY_ACTOR_X` (el catálogo de Apify se mueve seguido);
+el lector de la respuesta busca los nombres de campo usuales
+(`fullName`/`nickName`/`authorMeta`…) en vez de casar un esquema exacto.
+
+**Un dataset vacío de Apify NO significa que la cuenta no existe.** Puede ser
+eso o el actor caído, y confundirlos haría que la página le dijera a alguien que
+su cuenta no existe. Solo un error explícito del actor («not found») confirma la
+ausencia; lo demás queda en «no pude comprobarlo». Cuando el respaldo tampoco
+concluye se conserva el motivo del sondeo directo y se añade por qué falló el
+respaldo. En pantalla, un perfil resuelto por Apify lo dice: «comprobado vía
+Apify».
 
 ## Las dos reglas que sostienen esto
 
@@ -93,7 +135,7 @@ tiene y el KV `RR_STORE` que ya está bindeado.
 node tools/candidato-360/redes/prueba-wizard.mjs   # el paso 2 del wizard, con el worker stubbeado (17 comprobaciones)
 node tools/candidato-360/prueba-paneles.mjs        # los paneles 04 y 05 (22)
 # en rr-auth:
-node test/c360-redes.test.mjs                      # sondeos, RSS, sellado de veredictos, cache y escucha (38, sin red ni DeepSeek)
+node test/c360-redes.test.mjs                      # sondeos, respaldo de Apify, RSS, sellado, cache y escucha (53, sin red ni DeepSeek)
 npx wrangler dev --local                           # y contra 127.0.0.1:8788, con una sesión sembrada en el KV local:
 #   npx wrangler kv key put --local --binding RR_STORE "sessions:tok" '{"email":"…","plan":"premium"}'
 ```
