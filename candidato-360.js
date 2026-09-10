@@ -958,7 +958,9 @@ async function launchCRM(event) {
   loadHistoricalMap(crmCandidate);
   renderCRMProfilePhoto(crmCandidate);
   pintarPuntaje(crmCandidate);
+  await prepararSalto(corpKey, campana);
   pintarMeta(await estimateVoteTarget(corpKey, territory));
+  if (SALTO_ACTUAL && crmMapMode === 'proyectado') refreshCRMMapMode();
 }
 /* CRM de una candidatura nueva: sin historial, el punto de partida es el
    territorio al que aspira y la referencia de 2023 de ese territorio. */
@@ -1159,6 +1161,259 @@ function mostrarPuntajeInfo() {
   $('introModal').classList.add('open');
 }
 
+/* ─── 8 ter. Reparto de la meta cuando la candidatura SALTA de corporación ───
+   La proyección repartía la meta proporcional al historial propio. Eso está
+   bien mientras la corporación sea la misma; en un salto de escala colapsa:
+   una edil de Barrios Unidos con 709 votos que se lanza al Concejo recibía sus
+   6.770 votos proyectados enteros en Barrios Unidos, como si las otras 19
+   localidades no existieran.
+
+   La idea, en una frase: LO QUE YA TIENE SE QUEDA DONDE LO CONSIGUIÓ; LO QUE
+   LE FALTA LO BUSCA DONDE YA VOTA SU PARTIDO.
+
+       reparto = arraigo · propio  +  (1 − arraigo) · base
+
+   · `propio`  es su huella histórica dentro del territorio de origen.
+   · `base`    es cómo vota el territorio destino, en cascada: la huella real
+               del PARTIDO en esa corporación (resultados 2023) → si no
+               alcanza, la del BLOQUE ideológico (partidos-bloques.js) → si
+               tampoco, la PARTICIPACIÓN (dónde vota la gente).
+   · `arraigo` es qué fracción de su votación destino cae en el territorio de
+               origen. NO es una perilla: sale del estudio de quienes ya dieron
+               ese mismo salto en el ciclo siguiente (tools/candidato-360/
+               saltos/estudio.mjs → saltos-arraigo.json, mediana por salto y
+               departamento; nacional si el departamento tiene pocos casos).
+               Sin estudio publicado, arraigo = la parte que el origen pesa en
+               la base — es decir, sin bono: solo el patrón del partido.
+
+   Toda la lógica es pura (entra un objeto, sale un objeto) para poderla probar
+   sin mapa y sin red: prueba-salto.mjs. */
+const SALTOS = { 'jal>concejo': 'localidad', 'concejo>asamblea': 'municipio', 'alcaldia>gobernacion': 'municipio', 'concejo>gobernacion': 'municipio', 'alcaldia>asamblea': 'municipio' };
+const ARRAIGO_N_MINIMO = 5;   /* con menos casos, una mediana es una anécdota */
+function tipoSalto(corpOrigen, corpDestino) {
+  const k = `${corpOrigen}>${corpDestino}`;
+  return SALTOS[k] ? { clave: k, unidad: SALTOS[k] } : null;
+}
+/* Normaliza un mapa {área: valor} a proporciones que suman 1. Vacío → null. */
+function proporciones(mapa) {
+  const entradas = Object.entries(mapa || {}).map(([k, v]) => [k, Math.max(0, Number(v) || 0)]);
+  const total = entradas.reduce((s, [, v]) => s + v, 0);
+  return total > 0 ? Object.fromEntries(entradas.map(([k, v]) => [k, v / total])) : null;
+}
+/* La huella del partido en la corporación destino. `porArea` es
+   {área: {partidos: [[nombre, votos]…], votantes}}, el formato de los
+   resultados-*.json. Se aceptan las partes de una coalición y se suman. */
+function huellaPartido(porArea, partes) {
+  const claves = (partes || []).map(p => PartidosBloques.norm(p)).filter(Boolean);
+  if (!claves.length) return { huella: null, cobertura: 0, votos: 0 };
+  const huella = {}; let areasCon = 0, votos = 0;
+  for (const [area, d] of Object.entries(porArea || {})) {
+    let v = 0;
+    for (const [nombre, n] of (d?.partidos || [])) {
+      const nn = PartidosBloques.norm(nombre);
+      if (claves.some(c => nn === c || (c.length > 8 && nn.includes(c)) || (nn.length > 8 && c.includes(nn)))) v += Number(n) || 0;
+    }
+    huella[area] = v; votos += v; if (v > 0) areasCon++;
+  }
+  const n = Object.keys(porArea || {}).length;
+  return { huella, cobertura: n ? areasCon / n : 0, votos };
+}
+function huellaBloque(porArea, bloque) {
+  if (!bloque || bloque === 'sc') return { huella: null, cobertura: 0, votos: 0 };
+  const huella = {}; let areasCon = 0, votos = 0;
+  for (const [area, d] of Object.entries(porArea || {})) {
+    let v = 0;
+    for (const [nombre, n] of (d?.partidos || [])) if (PartidosBloques.bloqueDePartido(nombre) === bloque) v += Number(n) || 0;
+    huella[area] = v; votos += v; if (v > 0) areasCon++;
+  }
+  const n = Object.keys(porArea || {}).length;
+  return { huella, cobertura: n ? areasCon / n : 0, votos };
+}
+function huellaParticipacion(porArea) {
+  return Object.fromEntries(Object.entries(porArea || {}).map(([area, d]) => [area, Number(d?.votantes || d?.validos || 0)]));
+}
+/* La cascada de la base. Un partido cuenta como «con masa» si aparece en al
+   menos el 60 % de las áreas y pesa ≥ 1 % de los válidos: por debajo de eso su
+   huella es ruido de dos o tres candidatos, no un patrón del territorio. */
+function baseDestino({ porArea, partido, nombreCandidato }) {
+  const partes = PartidosBloques.partesDeCoalicion(partido || '');
+  const totalValidos = Object.values(porArea || {}).reduce((s, d) => s + (d?.partidos || []).reduce((t, [, v]) => t + (Number(v) || 0), 0), 0);
+  const hp = huellaPartido(porArea, partes);
+  if (hp.huella && hp.cobertura >= .6 && totalValidos && hp.votos / totalValidos >= .01) return { capa: 'partido', etiqueta: partes.join(' + '), proporciones: proporciones(hp.huella) };
+  const bloque = PartidosBloques.bloqueDeCandidatura(partido || '', nombreCandidato || '');
+  const hb = huellaBloque(porArea, bloque);
+  if (hb.huella && hb.cobertura >= .6 && hb.votos > 0) return { capa: 'bloque', etiqueta: PartidosBloques.BLOQUE_LABEL[bloque] || bloque, bloque, proporciones: proporciones(hb.huella) };
+  const part = proporciones(huellaParticipacion(porArea));
+  return part ? { capa: 'participacion', etiqueta: 'participación', proporciones: part } : null;
+}
+/* El arraigo empírico para este salto: departamento si tiene casos, nacional
+   si no; null si no hay estudio (o no llega al mínimo). */
+function arraigoEmpirico(tabla, claveSalto, departamento) {
+  const t = tabla?.[claveSalto]; if (!t) return null;
+  const dep = t[String(departamento || '').replace(/^0+/, '')], nac = t._nacional;
+  /* `lift` es cuántas veces pesa el origen frente a lo que pesa en la huella
+     del partido (mediana medida). Manda sobre la fracción cruda porque no
+     depende del tamaño del territorio de origen: Suba no es La Candelaria. */
+  const arma = (d, ambito) => ({ valor: d.arraigo_mediana, lift: Number(d.lift_n) >= ARRAIGO_N_MINIMO && d.lift_mediana != null ? Number(d.lift_mediana) : null, n: d.n, ambito });
+  if (dep && dep.n >= ARRAIGO_N_MINIMO) return arma(dep, 'departamento');
+  if (nac && nac.n >= ARRAIGO_N_MINIMO) return arma(nac, 'nacional');
+  return null;
+}
+/* Reparte `meta` entre las áreas del destino. `propio` es {área: votos} del
+   historial (solo tiene áreas del origen); `origen` es el conjunto de claves
+   que forman el territorio de origen dentro del destino. `arraigo` es null
+   (sin estudio), una fracción, o {valor, lift} del estudio: con lift, el
+   origen pesa lift × su peso en la base, acotado al 95 %. Devuelve enteros
+   que suman exactamente `meta` (mismo cuidado de distributeVotes). */
+function repartoSalto({ meta, propio, origen, base, arraigo }) {
+  const areas = Object.keys(base?.proporciones || {});
+  if (!areas.length || !meta) return null;
+  const origenSet = new Set(origen || []);
+  const pesoOrigenEnBase = areas.filter(a => origenSet.has(a)).reduce((s, a) => s + base.proporciones[a], 0);
+  /* Sin estudio, el origen pesa lo que pesa en la base: cero bono. Con
+     estudio, el origen recibe la fracción medida y el resto sale a la base
+     RE-NORMALIZADA fuera del origen — si no, el origen cobraría dos veces. */
+  const cfg = arraigo != null && typeof arraigo === 'object' ? arraigo : { valor: arraigo };
+  const acota = x => Math.max(0, Math.min(.95, Number(x) || 0));
+  const a = cfg.lift != null && pesoOrigenEnBase > 0 ? acota(cfg.lift * pesoOrigenEnBase)
+    : cfg.valor != null ? acota(cfg.valor) : pesoOrigenEnBase;
+  const propioProp = proporciones(Object.fromEntries(Object.entries(propio || {}).filter(([k]) => origenSet.has(k))));
+  const fueraTotal = areas.filter(x => !origenSet.has(x)).reduce((s, x) => s + base.proporciones[x], 0);
+  const crudo = {};
+  for (const area of areas) {
+    const enOrigen = origenSet.has(area);
+    let p;
+    if (enOrigen) {
+      /* dentro del origen: la forma la pone su huella propia; si no la hay, la base */
+      const forma = propioProp ? (propioProp[area] || 0) : (pesoOrigenEnBase ? base.proporciones[area] / pesoOrigenEnBase : 0);
+      p = a * forma;
+    } else {
+      p = fueraTotal ? (1 - a) * base.proporciones[area] / fueraTotal : 0;
+    }
+    crudo[area] = p * meta;
+  }
+  return distributeVotes(crudo, meta);
+}
+
+/* ── El salto en el CRM ──────────────────────────────────────────────────────
+   Se prepara al abrir el CRM (launchCRM) y lo consume projectedVotesByArea.
+   Dos geometrías:
+   · localidad (JAL → Concejo en las 11 ciudades con resultados por comuna):
+     la misma capa que ya pinta el mapa, así que solo cambian los números.
+   · municipio (→ Asamblea / Gobernación): el destino es el departamento
+     entero, que el mapa histórico no muestra. En «Proyectado» se pinta la
+     capa de municipios del departamento con el reparto; en «Total» vuelve el
+     mapa histórico. */
+let SALTO_ACTUAL = null;
+const SALTOS_ARRAIGO_URL = `${S3}/candidato-360/saltos-arraigo.json`;
+let saltosArraigoPromise = null;
+function tablaArraigo() {
+  if (!saltosArraigoPromise) saltosArraigoPromise = fetchJSON(SALTOS_ARRAIGO_URL).catch(() => null);
+  return saltosArraigoPromise;
+}
+/* Los resultados por área de la corporación destino, en el formato
+   {área: {name, partidos, votantes}} que espera baseDestino. */
+async function resultadosDestino(unidad, mesas, campana) {
+  if (unidad === 'localidad') {
+    const m = mesas?.[0]; if (!m) return null;
+    const key = `${String(m.dep || '').padStart(2, '0')}-${String(m.mun || '').padStart(3, '0')}`;
+    const r = await fetchJSON(`${S3}/concejo-2023/resultados-concejo-2023.json`);
+    const comunas = r?.data?.[key]?.comunas; if (!comunas) return null;
+    return { porArea: comunas, key };
+  }
+  const dde = String(campana?.departamento || mesas?.[0]?.dep || '').padStart(2, '0'); if (!dde || dde === '00') return null;
+  const r = await fetchJSON(`${S3}/asamblea-2023/dep/${dde}.json`);
+  const comunas = r?.comunas; if (!comunas) return null;
+  return { porArea: comunas, key: dde };
+}
+/* Empareja las áreas de los resultados con las llaves del mapa: por código y,
+   si no calza, por nombre normalizado. Devuelve porArea re-indexado con las
+   llaves del mapa. */
+function emparejarAreas(porArea, llavesMapa, nombresMapa) {
+  const salida = {}, porNombre = {};
+  for (const [k, nombre] of Object.entries(nombresMapa || {})) porNombre[normalizedText(nombre)] = k;
+  for (const [code, d] of Object.entries(porArea || {})) {
+    const c2 = String(code).padStart(2, '0');
+    const llave = llavesMapa.includes(code) ? code : llavesMapa.includes(c2) ? c2 : porNombre[normalizedText(d?.name || '')];
+    if (llave) salida[llave] = d;
+  }
+  return salida;
+}
+async function prepararSalto(corpDestino, campana) {
+  SALTO_ACTUAL = null;
+  const corpOrigen = corporacionHistorica(crmCandidate);
+  const tipo = tipoSalto(corpOrigen, corpDestino); if (!tipo || !crmCandidate) return null;
+  try {
+    const data = await datosCandidatura(crmCandidate), mesas = data.mesas || [];
+    const rd = await resultadosDestino(tipo.unidad, mesas, campana); if (!rd) return null;
+    const tabla = await tablaArraigo();
+    const arraigo = arraigoEmpirico(tabla, tipo.clave, campana?.departamento || mesas[0]?.dep);
+    SALTO_ACTUAL = { tipo, porArea: rd.porArea, arraigo, corpOrigen, corpDestino, campana };
+    return SALTO_ACTUAL;
+  } catch (e) { return null; }
+}
+/* Texto de la nota del mapa: dice qué capa se usó y de dónde salió el arraigo.
+   Sin esto un reparto por bloque se leería como una predicción del partido. */
+function notaSalto(base) {
+  const s = SALTO_ACTUAL; if (!s || !base) return '';
+  const capa = base.capa === 'partido' ? `la huella de ${base.etiqueta} en esa corporación (2023)`
+    : base.capa === 'bloque' ? `el bloque ${base.etiqueta.toLowerCase()} (su partido no tiene huella suficiente en esa corporación)`
+    : 'la participación electoral (ni su partido ni su bloque tienen huella suficiente)';
+  const ambito = s.arraigo?.ambito === 'departamento' ? 'en este departamento' : 'en el país';
+  const arraigo = s.arraigo?.lift != null
+    ? `Su territorio de origen pesa ${s.arraigo.lift.toLocaleString('es-CO', { maximumFractionDigits: 1 })} veces lo que pesa en esa huella: es la mediana de ${s.arraigo.n} candidaturas que dieron este mismo salto ${ambito}.`
+    : s.arraigo
+    ? `El ${Math.round(s.arraigo.valor * 100)} % se queda en su territorio de origen: es la mediana de ${s.arraigo.n} candidaturas que dieron este mismo salto ${ambito}.`
+    : 'Sin estudio de saltos publicado, su territorio de origen pesa lo que pesa en esa huella: no lleva bono.';
+  return `Salto de ${CRM_CORPORATIONS[s.corpOrigen] || s.corpOrigen} a ${CRM_CORPORATIONS[s.corpDestino] || s.corpDestino}: la meta se reparte según ${capa}. ${arraigo}`;
+}
+/* Reparto para la geometría de localidad (el mapa de ciudad que ya está). */
+function repartoSaltoCiudad(state, goal) {
+  const s = SALTO_ACTUAL; if (!s || s.tipo.unidad !== 'localidad') return null;
+  const llaves = Object.keys(state.namesByArea || {});
+  const porArea = emparejarAreas(s.porArea, llaves, state.namesByArea);
+  if (Object.keys(porArea).length < 2) return null;
+  const base = baseDestino({ porArea, partido: crmCandidate?.partido, nombreCandidato: crmCandidate?.nombre });
+  if (!base) return null;
+  const origen = Object.keys(state.votesByArea || {}).filter(k => Number(state.votesByArea[k] || 0) > 0);
+  const reparto = repartoSalto({ meta: goal, propio: state.votesByArea, origen, base, arraigo: s.arraigo });
+  if (!reparto) return null;
+  s.base = base;
+  return reparto;
+}
+/* Geometría de municipio: pinta el departamento con el reparto. */
+async function pintarProyeccionDepartamental(goal) {
+  const s = SALTO_ACTUAL; if (!s || s.tipo.unidad !== 'municipio') return false;
+  const dep = String(s.campana?.departamento || '').padStart(2, '0');
+  try {
+    const geoData = await fetchJSON(`${S3}/mapas-2026/Departamentos-mps/${dep}.json`);
+    const nameOf = f => f.properties.mpio_cnmbr || 'Municipio';
+    const nombres = Object.fromEntries(geoData.features.map(f => [normalizedText(nameOf(f)), nameOf(f)]));
+    const porArea = emparejarAreas(s.porArea, Object.keys(nombres), nombres);
+    const base = baseDestino({ porArea, partido: crmCandidate?.partido, nombreCandidato: crmCandidate?.nombre });
+    if (!base) return false;
+    const origenNombre = normalizedText(String(crmCandidate?.corp || '').split('·')[1] || crmCandidate?.circunscripcion || '');
+    const origen = Object.keys(nombres).filter(k => k === origenNombre || (origenNombre && k.includes(origenNombre)));
+    const propio = Object.fromEntries(origen.map(k => [k, Number(crmCandidate?.votos || 1)]));
+    const reparto = repartoSalto({ meta: goal, propio, origen, base, arraigo: s.arraigo });
+    if (!reparto) return false;
+    s.base = base;
+    const max = Math.max(1, ...Object.values(reparto));
+    crearMapa([4.6, -74.1], 5); aplicarBasemap(false);
+    crmMapLayer = L.geoJSON(geoData, {
+      style: f => { const k = normalizedText(nameOf(f)), v = reparto[k] || 0; return { color: '#fff', weight: origen.includes(k) ? 2 : 1, fillColor: MAP_COLOR(v / max), fillOpacity: origen.includes(k) ? .9 : .78 }; },
+      onEachFeature: (f, layer) => { const k = normalizedText(nameOf(f)); layer.bindTooltip(`<strong>${nameOf(f)}</strong><br>${(reparto[k] || 0).toLocaleString('es-CO')} votos proyectados`, { sticky: true }); }
+    }).addTo(crmLeafletMap);
+    encuadrar(crmMapLayer, 24);
+    renderMapBreakdown(reparto, nombres, `Meta proyectada por municipio`);
+    $('crmMapTitle').textContent = `¿Dónde buscar los votos en ${s.campana?.departamentoNombre || 'el departamento'}?`;
+    $('crmMapVotes').textContent = `${goal.toLocaleString('es-CO')} votos · meta`;
+    $('crmMapNote').textContent = notaSalto(base);
+    if (crmMapState) crmMapState.geometriaDestino = true;
+    return true;
+  } catch (e) { return false; }
+}
+
 /* ─── 9. Mapas ───────────────────────────────────────────────────────────── */
 let crmLeafletMap = null, crmMapLayer = null, crmBarrioLayer = null, crmTileLayer = null;
 let crmMapMode = 'total', crmMapState = null;
@@ -1234,7 +1489,14 @@ function distributeVotes(source, target) {
   rows.sort((a, b) => b.rest - a.rest).slice(0, pending).forEach(row => row.value++);
   return Object.fromEntries(rows.map(row => [row.key, row.value]));
 }
-function projectedVotesByArea() { const goal = Number(String($('crmVoteNumber').textContent || '').replace(/\D/g, '')); return distributeVotes(crmMapState?.votesByArea || {}, goal); }
+function projectedVotesByArea() {
+  const goal = Number(String($('crmVoteNumber').textContent || '').replace(/\D/g, ''));
+  /* Con salto de corporación la meta no puede caer donde cayó el historial:
+     se reparte con la huella del destino (sección 8 ter). Si el salto no se
+     pudo preparar, se conserva el reparto proporcional de siempre. */
+  const salto = crmMapState ? repartoSaltoCiudad(crmMapState, goal) : null;
+  return salto || distributeVotes(crmMapState?.votesByArea || {}, goal);
+}
 function renderMapBreakdown(votesByArea, namesByArea, title) {
   const rows = Object.entries(votesByArea).map(([key, value]) => ({ key, name: namesByArea[key] || key, value: Number(value) || 0 })).filter(row => row.value > 0).sort((a, b) => b.value - a.value), max = Math.max(1, ...rows.map(row => row.value));
   $('crmBreakdown').innerHTML = `<h4 id="crmBreakdownTitle">${title}</h4>` + (rows.length ? rows.map(row => `<button class="crm-breakdown-item" type="button" data-area-key="${escHtml(row.key)}" onclick="openMapAreaFromBreakdown(this.dataset.areaKey)"><span class="crm-breakdown-row"><b>${escHtml(row.name)}</b><span>${row.value.toLocaleString('es-CO')}</span></span><span class="crm-breakdown-bar"><i style="width:${Math.max(3, Math.round(row.value / max * 100))}%"></i></span></button>`).join('') : '<p class="helper">No hay votos desagregados disponibles.</p>');
@@ -1249,6 +1511,14 @@ function ensureCRMMapToggles() {
 }
 function refreshCRMMapMode() {
   const state = crmMapState; if (!state || !crmMapLayer) return;
+  /* Salto a escala de departamento: «Proyectado» pinta los municipios del
+     destino; «Total» devuelve el mapa histórico de la ciudad. */
+  if (SALTO_ACTUAL?.tipo.unidad === 'municipio') {
+    const goal = Number(String($('crmVoteNumber').textContent || '').replace(/\D/g, ''));
+    document.querySelectorAll('#crmMapToggles .map-toggle[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === crmMapMode));
+    if (crmMapMode === 'proyectado') { pintarProyeccionDepartamental(goal); return; }
+    if (state.geometriaDestino) { loadHistoricalMap(crmCandidate); return; }
+  }
   const projected = projectedVotesByArea(), values = crmMapMode === 'proyectado' ? projected : state.votesByArea, max = Math.max(1, ...Object.values(values));
   renderMapBreakdown(values, state.namesByArea, crmMapMode === 'proyectado' ? `Meta proyectada por ${state.config.title}` : `Votos por ${state.config.title}`);
   document.querySelectorAll('#crmMapToggles .map-toggle[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === crmMapMode));
@@ -1257,7 +1527,7 @@ function refreshCRMMapMode() {
     layer.setStyle({ fillColor: MAP_COLOR(value / max), fillOpacity: key === state.targetKey ? .78 : .38 });
     layer.bindTooltip(`<strong>${state.config.name(layer.feature.properties)}</strong><br>${(crmMapMode === 'proyectado' ? proj : observed).toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : 'votos'}`, { sticky: true });
   });
-  $('crmMapNote').textContent = (crmMapMode === 'proyectado' ? `Meta total distribuida proporcionalmente a la votación histórica. Haga clic en una ${state.config.title} para ver su detalle.` : `Votación total histórica. Haga clic en una ${state.config.title} para ver el detalle y su meta proyectada.`) + notaRecorte();
+  $('crmMapNote').textContent = (crmMapMode === 'proyectado' ? (SALTO_ACTUAL?.base ? notaSalto(SALTO_ACTUAL.base) + ` Haga clic en una ${state.config.title} para ver su detalle.` : `Meta total distribuida proporcionalmente a la votación histórica. Haga clic en una ${state.config.title} para ver su detalle.`) : `Votación total histórica. Haga clic en una ${state.config.title} para ver el detalle y su meta proyectada.`) + notaRecorte();
   if (state.focusKey) renderBarriosForArea(state.focusKey);
 }
 function showCRMMapDetail(layer) { const state = crmMapState; if (!state) return; layer.openTooltip(); renderBarriosForArea(state.config.code(layer.feature.properties)); setMapLevel('barrio'); }
