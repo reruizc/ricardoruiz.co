@@ -59,6 +59,113 @@
   }
   function nombrePublico(v = SESION.vinculo) { return v?.tipo === 'nuevo' ? (v.nuevo?.nombrePublico || '') : ''; }
 
+
+  /* ═══ El territorio de la candidatura ═════════════════════════════════════
+     PUERTO FIEL de tools/candidato-360/briefing/motor.py (funciones
+     `territorio_de`, `prensa`, `puntaje_local`). Esa es la fuente de verdad: si
+     allá cambian las reglas, hay que cambiarlas acá — y al revés.
+
+     Se duplica a propósito. El briefing corre en Python en GitHub Actions y este
+     panel corre en el navegador; unificarlos hoy significaría reescribir el
+     motor del briefing, que funciona. Lo que sí se gana duplicando con
+     fidelidad: lo que el candidato ve en pantalla es EXACTAMENTE lo que le va a
+     llegar al correo cada tres días. Una lectura que contradiga al briefing
+     valdría menos que no tenerla.
+
+     La escala la manda la corporación, que es la pregunta de fondo:
+       · JAL          → su localidad, dentro de la ciudad
+       · Concejo      → su municipio (o Bogotá)
+       · Alcaldía     → su municipio (o Bogotá)
+       · Asamblea     → su departamento
+       · Gobernación  → su departamento                                        */
+  const CORP_LABEL = { jal: 'Junta Administradora Local', concejo: 'Concejo', alcaldia: 'Alcaldía', asamblea: 'Asamblea Departamental', gobernacion: 'Gobernación' };
+  const CORP_DEPARTAMENTAL = new Set(['asamblea', 'gobernacion']);
+  const RUIDO_TOK = new Set(['PARA', 'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'MUNICIPIO', 'DISTRITO', 'CAPITAL', 'SANTA', 'SAN', 'JOSE', 'MARIA', 'LOCALIDAD', 'COMUNA', 'BOGOTA', 'CIUDAD', 'CANDIDATO', 'CANDIDATA']);
+  const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+  const toks = (s, min = 4) => norm(s).split(' ').filter(t => t.length >= min && !RUIDO_TOK.has(t));
+  /* La RNEC y el SECOP escriben en MAYÚSCULA SOSTENIDA; en pantalla es un grito. */
+  function oracion(s) {
+    const t = String(s ?? '').replace(/\s+/g, ' ').trim();
+    const letras = [...t].filter(c => /[a-zá-úñ]/i.test(c));
+    if (!letras.length || letras.filter(c => c === c.toUpperCase()).length / letras.length < .7) return t;
+    return t.slice(0, 1).toUpperCase() + t.slice(1).toLowerCase();
+  }
+
+  function territorioDe(v = SESION.vinculo) {
+    const c = v?.campana || {};
+    let corp = String(c.corp || '').toLowerCase();
+    let depNombre = c.departamentoNombre || '', mun = c.municipio || '', loc = c.localidad || '';
+    /* Ruta «misma corporación»: la campaña no trae territorio y se deriva del
+       corp del historial ("JAL · TEUSAQUILLO · BOGOTÁ D.C. · 2015"). */
+    if (!mun && !depNombre && v?.candidato) {
+      const corpHist = String(v.candidato.corp || '');
+      corp = corp || Object.keys(CORP_LABEL).find(k => norm(corpHist).toLowerCase().includes(k)) || '';
+      const partes = corpHist.split('·').map(p => p.trim()).filter(p => p && !/^20\d\d$/.test(p));
+      if (CORP_DEPARTAMENTAL.has(corp)) depNombre = partes[1] || '';
+      else if (corp === 'jal') { loc = loc || partes[1] || ''; mun = partes[2] || ''; }
+      else mun = partes[1] || '';
+      if (!depNombre && norm(mun).includes('BOGOTA')) depNombre = 'Bogotá D.C.';
+    }
+    const munLimpio = mun.replace(/,?\s*D\.?\s*C\.?$/i, '').trim();
+    const esBogota = norm(mun).includes('BOGOTA') || norm(depNombre).includes('BOGOTA');
+    const departamental = CORP_DEPARTAMENTAL.has(corp);
+    const base = departamental ? depNombre : (esBogota ? 'Bogotá' : oracion(munLimpio));
+    return {
+      corp, corpLabel: CORP_LABEL[corp] || 'Candidatura', depNombre, mun, munLimpio, loc, esBogota, departamental, base,
+      etiqueta: departamental ? depNombre : ((corp === 'jal' && loc ? `${oracion(loc)} · ` : '') + base),
+      entidad: departamental ? `Gobernación de ${depNombre}` : `Alcaldía de ${base}`,
+      cuerpo: departamental ? `Asamblea de ${depNombre}` : `Concejo de ${base}`,
+    };
+  }
+
+  /* Las consultas del territorio: el lugar y quienes lo gobiernan. Entre
+     comillas, porque sin ellas «Concejo de Tunja» trae concejos de todo el país. */
+  function consultasTerritorio(t) {
+    const q = [];
+    if (t.departamental) q.push(`"${t.depNombre}"`, `"${t.entidad}"`, `"${t.cuerpo}"`);
+    else {
+      if (t.corp === 'jal' && t.loc) q.push(`"${oracion(t.loc)}" ${t.base}`);
+      q.push(`"${t.entidad}"`, `"${t.cuerpo}"`);
+      if (!t.esBogota) q.push(`"${t.base}"`);
+    }
+    return q;
+  }
+  function terminosLocales(t) {
+    const base = t.departamental ? toks(t.depNombre)
+      : (t.esBogota ? ['BOGOTA'] : toks(t.munLimpio)).concat(t.corp === 'jal' && t.loc ? toks(t.loc) : []);
+    return base.filter(Boolean);
+  }
+
+  const INSTITUCIONAL = ['ALCALD', 'CONCEJO', 'CONCEJAL', 'GOBERN', 'ASAMBLEA', 'DIPUTAD', 'DISTRIT', 'SECRETAR', 'EDIL', ' JAL', 'PLAN DE DESARROLLO',
+    'PRESUPUESTO', 'CONTRAT', 'LICITA', 'PERSONER', 'CONTRALOR', 'OBRA', 'VIA ', 'VIAS ', 'TRANSMILENIO', 'METRO', 'ACUEDUCTO', 'HOSPITAL',
+    'COLEGIO', 'SEGURIDAD', 'HOMICID', 'HURTO', 'PROTESTA', 'PARO', 'ELECCI', 'CANDIDAT', 'CAMPAÑA', 'CAMPANA', 'PARTIDO '];
+  const RUIDO_TITULAR = /\b(CLIMA|LOTER|HOROSCOP|CORTES? DE LUZ|PICO Y PLACA|SORTEO|BALOTO|VACANTES|PRONOSTICO|TEMPERATURA|CHANCE|MILLONARIOS VS|VS MILLONARIOS)\b/;
+  const CIUDADES_GRANDES = new Set(['MEDELLIN', 'CALI', 'BARRANQUILLA', 'CARTAGENA']);
+
+  /* Cuánto le importa el titular a ESTE territorio. 0 = no cuenta.
+     En Bogotá, Medellín o Cali el nombre de la ciudad aparece en cualquier cosa
+     —el clima, una vacante, un partido—, así que ahí se exige la localidad o un
+     actor institucional; en un municipio pequeño basta el nombre. */
+  function puntajeLocal(titulo, t, locales) {
+    const n = ' ' + norm(titulo) + ' ';
+    if (RUIDO_TITULAR.test(n)) return 0;
+    if (!locales.some(x => n.includes(x))) return 0;
+    let p = 0;
+    if (t.corp === 'jal' && t.loc && toks(t.loc).some(x => n.includes(x))) p += 3;
+    if (INSTITUCIONAL.some(k => n.includes(k))) p += 2;
+    if (locales.some(x => n.includes(x))) p += 1;
+    const grande = t.esBogota || CIUDADES_GRANDES.has(norm(t.munLimpio));
+    return (p >= 2 || !grande) ? p : 0;
+  }
+  /* Un titular «lo nombra» si trae nombre + apellido (o los dos apellidos). */
+  function terminosPersona(v = SESION.vinculo) {
+    return [nombreCandidatura(v), nombrePublico(v)].map(n => toks(n, 3)).filter(tk => tk.length >= 2);
+  }
+  function mencionaPersona(titulo, personas) {
+    const n = norm(titulo);
+    return personas.some(tk => tk.filter(x => n.includes(x)).length >= 2);
+  }
+
   function pintarNav(pagina) {
     const nav = $('navAuth'); if (!nav) return;
     const next = encodeURIComponent(pagina);
@@ -112,5 +219,6 @@
     return r;
   }
 
-  global.C360Panel = { SESION, api, caudal, arrancar, guardarEscucha, territorio, nombreCandidatura, nombrePublico, muro, $, esc, num };
+  global.C360Panel = { SESION, api, caudal, arrancar, guardarEscucha, territorio, nombreCandidatura, nombrePublico, muro, $, esc, num,
+    territorioDe, consultasTerritorio, terminosLocales, terminosPersona, puntajeLocal, mencionaPersona, oracion, norm, toks };
 })(window);

@@ -79,6 +79,64 @@ for (const [caso, opts, espera] of [
   await b.close();
 }
 
+/* ── Medios · la conversación del territorio (sin escribir nada) ────────── */
+{
+  /* La consulta que se le hace a la prensa depende de la CORPORACIÓN: es lo que
+     decide si se lee una localidad, un municipio o un departamento. */
+  const casos = [
+    ['JAL de Teusaquillo', { corp: 'jal', departamentoNombre: 'Distrito Capital de Bogotá', municipio: 'BOGOTÁ, D.C.', localidad: 'TEUSAQUILLO' },
+      { escala: /localidad/, etiqueta: /Teusaquillo/, consultas: [/"Teusaquillo" Bogotá/, /"Alcaldía de Bogotá"/, /"Concejo de Bogotá"/] }],
+    ['Concejo de Tunja', { corp: 'concejo', departamentoNombre: 'Boyacá', municipio: 'TUNJA' },
+      { escala: /municipio/, etiqueta: /Tunja/, consultas: [/"Alcaldía de Tunja"/, /"Concejo de Tunja"/, /"Tunja"/] }],
+    ['Gobernación de Boyacá', { corp: 'gobernacion', departamentoNombre: 'Boyacá' },
+      { escala: /departamento/, etiqueta: /Boyacá/, consultas: [/"Boyacá"/, /"Gobernación de Boyacá"/, /"Asamblea de Boyacá"/] }],
+  ];
+  for (const [titulo, campana, espera] of casos) {
+    const v = Object.assign(JSON.parse(JSON.stringify(VINCULO)), { campana });
+    const { b, p, consultas } = await abrir('candidato-360-medios.html', { vinculo: v, medios: () => titulares(6) });
+    await p.waitForSelector('#territorioLectura .tema');
+    const qs = consultas.map(c => c.query);
+    revisar(`${titulo}: se lee a la escala correcta`,
+      espera.escala.test(await p.textContent('#territorioEscala')) && espera.etiqueta.test(await p.textContent('#territorioTitulo')));
+    revisar(`${titulo}: consulta el lugar y a quien lo gobierna`, espera.consultas.every(re => qs.some(q => re.test(q))));
+    await b.close();
+  }
+}
+{
+  /* El puntaje del briefing: el ruido se cae y lo institucional sube. */
+  const conRuido = () => ({ n: 4, por_medio: [], resultados: [
+    { titulo: 'El clima en Tunja para este fin de semana', url: 'https://x.co/a', medio: 'Medio', fecha: '2026-09-09' },
+    { titulo: 'Resultados de la lotería de Boyacá', url: 'https://x.co/b', medio: 'Medio', fecha: '2026-09-09' },
+    { titulo: 'Nada que ver con el territorio', url: 'https://x.co/c', medio: 'Medio', fecha: '2026-09-09' },
+    { titulo: 'El Concejo de Tunja aprobó el presupuesto de 2027', url: 'https://x.co/d', medio: 'El Tiempo', fecha: '2026-09-08' },
+    { titulo: 'Obra de acueducto avanza en Tunja', url: 'https://x.co/e', medio: 'Boyacá 7 Días', fecha: '2026-09-07' },
+    { titulo: 'Alejandra Palacio Restrepo lanza su candidatura', url: 'https://x.co/f', medio: 'Semana', fecha: '2026-09-06' },
+  ] });
+  const v = Object.assign(JSON.parse(JSON.stringify(VINCULO)), { campana: { corp: 'concejo', departamentoNombre: 'Boyacá', municipio: 'TUNJA' } });
+  const { b, p, errores } = await abrir('candidato-360-medios.html', { vinculo: v, medios: conRuido });
+  await p.waitForSelector('#territorioLectura .tema');
+  const titulares_ = await p.$$eval('#territorioLectura .tema-titulares li a', n => n.map(x => x.textContent));
+  revisar('el clima, la lotería y lo ajeno al territorio no entran',
+    !titulares_.some(t => /clima|lotería|Nada que ver/i.test(t)));
+  /* Dentro del bloque del territorio (el de «lo nombra a usted» va aparte y antes). */
+  const delTerritorio = await p.$$eval('#territorioLectura .tema:last-child .tema-titulares li a', n => n.map(x => x.textContent));
+  revisar('lo institucional del municipio sí entra y va de primero', /Concejo de Tunja/.test(delTerritorio[0] || ''));
+  const bloques = await p.$$eval('#territorioLectura .tema h3', n => n.map(x => x.textContent));
+  revisar('un titular que lo nombra va en su propio bloque, antes del territorio',
+    /nombra a usted/.test(bloques[0] || '') && /Tunja/.test(bloques[1] || ''));
+  revisar('territorio sin errores de JavaScript', errores.length === 0);
+  await p.screenshot({ path: (process.env.SALIDA_PRUEBA || '/tmp') + '/panel-medios-territorio.png', fullPage: true });
+  await b.close();
+}
+{
+  const v = Object.assign(JSON.parse(JSON.stringify(VINCULO)), { campana: { corp: 'concejo', departamentoNombre: 'Boyacá', municipio: 'TUNJA' } });
+  const { b, p } = await abrir('candidato-360-medios.html', { vinculo: v, medios: () => titulares(0) });
+  await p.waitForSelector('#territorioLectura .tema.vacio');
+  revisar('sin titulares se explica por qué, en vez de dejar el bloque vacío',
+    /no publicó nada/.test(await p.textContent('#territorioLectura .tema.vacio')));
+  await b.close();
+}
+
 /* ── Medios ────────────────────────────────────────────────────────────── */
 {
   const porIdea = q => titulares(/acueducto/.test(q) ? 12 : /seguridad/.test(q) ? 40 : 0);
@@ -89,13 +147,14 @@ for (const [caso, opts, espera] of [
   await p.fill('#idea-2', 'parque de la 45');
   await p.click('#btnLeer');
   await p.waitForSelector('.tema');
+  const deIdeas = consultas.filter(c => /acueducto|seguridad en el comercio|parque de la 45/i.test(c.query));
   revisar('consulta cada idea entre comillas y con el territorio',
-    consultas.length === 3 && consultas.every(c => c.action === 'medios' && /^"/.test(c.query) && c.query.includes('TEUSAQUILLO')));
-  const orden = await p.$$eval('.tema h3', n => n.map(x => x.textContent));
+    deIdeas.length === 3 && deIdeas.every(c => c.action === 'medios' && /^"/.test(c.query) && c.query.includes('TEUSAQUILLO')));
+  const orden = await p.$$eval('#lectura .tema h3', n => n.map(x => x.textContent));
   revisar('ordena por conversación: primero la idea con más titulares', orden[0] === 'seguridad en el comercio' && orden[2] === 'parque de la 45');
   revisar('marca cuál es la de más conversación', (await p.$$('.tema-orden')).length === 1);
   revisar('la idea sin titulares no se esconde: dice que la agenda está libre',
-    /no está en la agenda/.test(await p.textContent('.tema.vacio')));
+    /no está en la agenda/.test(await p.textContent('#lectura .tema.vacio')));
   revisar('las ideas se guardan', guardados.some(g => JSON.stringify(g.ideas) === '["acueducto veredal","seguridad en el comercio","parque de la 45"]'));
   revisar('cita la fuente y su ventana', /Google News/.test(await p.textContent('.panel-nota')) && /30 días/.test(await p.textContent('.panel-nota')));
   revisar('medios sin errores de JavaScript', errores.length === 0);
@@ -158,7 +217,7 @@ for (const [caso, opts, espera] of [
   conIdeas.escucha = { ideas: ['acueducto veredal', 'seguridad'] };
   const { b, p } = await abrir('candidato-360-medios.html', { vinculo: conIdeas, medios: () => titulares(5) });
   await p.waitForSelector('.tema');
-  revisar('medios precarga las ideas guardadas y lee de una', (await p.inputValue('#idea-0')) === 'acueducto veredal' && (await p.$$('.tema')).length === 2);
+  revisar('medios precarga las ideas guardadas y lee de una', (await p.inputValue('#idea-0')) === 'acueducto veredal' && (await p.$$('#lectura .tema')).length === 2);
   await b.close();
 }
 

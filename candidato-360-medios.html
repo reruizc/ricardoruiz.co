@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- ⚠️ Al tocar candidato-360.css o candidato-360-panel.js hay que bumpear su ?v= acá y en candidato-360-redes.html. -->
-<link rel="stylesheet" href="candidato-360.css?v=20260910">
+<link rel="stylesheet" href="candidato-360.css?v=20260910b">
 <style>
 /* Lo propio de este panel; el resto lo pone candidato-360.css. */
 .panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
@@ -52,17 +52,23 @@
   <header class="panel-hero">
     <div class="kicker">Candidato 360 · panel 04</div>
     <h1>Lectura de noticias.</h1>
-    <p>La prensa de su territorio, leída con <b>sus</b> temas. Escriba las tres ideas con las que va a hacer campaña y buscamos, para cada una, qué se está publicando donde usted se lanza. Sirve para saber cuál de las tres ya está en la agenda pública, cuál toca poner y cuál está ocupada por otro.</p>
+    <p>Lo que se está publicando <b>donde usted se lanza</b>, a la escala de la corporación a la que aspira: su localidad si va a la JAL, su municipio si va al Concejo o la Alcaldía, su departamento si va a la Asamblea o la Gobernación. Es la misma lectura que le llega al correo cada tres días, con las mismas reglas.</p>
     <span class="panel-candidatura" id="panelCandidatura"></span>
   </header>
 
   <div id="panelMuro" class="hidden"></div>
 
   <div id="panelCuerpo">
+    <section class="panel" id="panelTerritorio">
+      <div class="panel-head"><div><span class="panel-num">La conversación de su territorio</span><h3 id="territorioTitulo" style="margin:6px 0 4px">Cargando…</h3></div><button type="button" class="wall-btn" id="territorioRecargar">Actualizar</button></div>
+      <p class="helper" id="territorioEscala"></p>
+      <div id="territorioLectura"></div>
+    </section>
+
     <section class="panel">
       <span class="panel-num">Sus tres ideas de campaña</span>
-      <h3 style="margin:6px 0 4px">¿De qué va a hablar en esta campaña?</h3>
-      <p class="helper">Una idea por línea, como la diría en una reunión: «recuperar el parque de la 45», «acueducto veredal», «seguridad en el comercio». Entre más concreta, mejor busca.</p>
+      <h3 style="margin:6px 0 4px">¿Y de qué va a hablar usted?</h3>
+      <p class="helper">Lo de arriba es su territorio completo; esto es lo <b>suyo</b> dentro de él. Una idea por línea, como la diría en una reunión: «recuperar el parque de la 45», «acueducto veredal», «seguridad en el comercio». Entre más concreta, mejor busca.</p>
       <div class="ideas" id="ideas"></div>
       <div class="idea-acciones">
         <button type="button" class="idea-btn" id="btnLeer">Leer la conversación</button>
@@ -75,7 +81,7 @@
 
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
-<script src="candidato-360-panel.js?v=20260910"></script>
+<script src="candidato-360-panel.js?v=20260910b"></script>
 <script>
 (function () {
   'use strict';
@@ -156,11 +162,69 @@
     $('estadoIdeas').textContent = `${ideas.length} ${ideas.length === 1 ? 'idea guardada' : 'ideas guardadas'}`;
   }
 
+  /* ── La conversación del territorio ────────────────────────────────────────
+     No pide nada: la escala sale de la corporación a la que aspira y el lugar
+     sale del vínculo. Las consultas y el puntaje son los MISMOS del briefing
+     (candidato-360-panel.js los porta de motor.py), para que lo que se ve acá
+     sea lo que llega al correo. */
+  function pintarTerritorio(t, usted, territorio, fallos, consultas) {
+    const linea = it => `<li><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.titulo)}</a><small>${esc(it.medio || 'medio sin identificar')}${it.fecha ? ` · ${esc(String(it.fecha).slice(0, 10))}` : ''}</small></li>`;
+    const bloques = [];
+    if (usted.length) bloques.push(`<article class="tema">
+      <div class="tema-top"><h3>Lo que lo nombra a usted</h3><span class="tema-cifra">${num(usted.length)}<small>titulares · ${VENTANA} días</small></span></div>
+      <p class="tema-lectura">Titulares que traen su nombre y un apellido. <b>Léalos primero</b>: son los que ya circulan con usted adentro.</p>
+      <ul class="tema-titulares">${usted.slice(0, 6).map(linea).join('')}</ul></article>`);
+    bloques.push(territorio.length ? `<article class="tema">
+      <div class="tema-top"><h3>Lo que pasa en ${esc(t.etiqueta)}</h3><span class="tema-cifra">${num(territorio.length)}<small>titulares · ${VENTANA} días</small></span></div>
+      <p class="tema-lectura">Ordenados por qué tanto le tocan al territorio: primero los que nombran su ${t.corp === 'jal' ? 'localidad' : 'lugar'} y a quien lo gobierna, después el resto. Los titulares de clima, loterías y vacantes salen por filtro.</p>
+      <ul class="tema-titulares">${territorio.slice(0, 10).map(linea).join('')}</ul></article>`
+      : `<article class="tema vacio">
+      <div class="tema-top"><h3>Lo que pasa en ${esc(t.etiqueta)}</h3><span class="tema-cifra">0<small>titulares · ${VENTANA} días</small></span></div>
+      <p class="tema-lectura">${fallos >= consultas ? 'La fuente de prensa no respondió; vuelva a intentar en un minuto.' : 'La prensa indexada no publicó nada sobre su territorio en la ventana. En municipios pequeños es lo normal: la conversación existe, pero no pasa por medios que Google News indexe. Ahí el radar que sirve es el de contratos y normas del briefing, no el de titulares.'}</p></article>`);
+    $('territorioLectura').innerHTML = bloques.join('');
+  }
+
+  async function leerTerritorio() {
+    const t = P.territorioDe();
+    $('territorioTitulo').textContent = t.etiqueta ? `¿Qué se está diciendo en ${t.etiqueta}?` : '¿Qué se está diciendo en su territorio?';
+    $('territorioEscala').innerHTML = `Se lee a escala de <b>${esc(t.departamental ? 'departamento' : t.corp === 'jal' ? 'localidad' : 'municipio')}</b> porque aspira a ${esc(t.corpLabel)}${t.etiqueta ? `: la conversación de <b>${esc(t.etiqueta)}</b>, más ${esc(t.entidad)} y ${esc(t.cuerpo)}` : ''}.`;
+    const consultas = P.consultasTerritorio(t);
+    if (!consultas.length) { $('territorioLectura').innerHTML = '<div class="panel-error">Su candidatura todavía no tiene territorio guardado; ábrala en el CRM y escoja dónde se lanza.</div>'; return; }
+    $('territorioRecargar').disabled = true;
+    $('territorioLectura').innerHTML = `<div class="redes-cargando"><i></i><span>Leyendo la prensa de ${esc(t.etiqueta || 'su territorio')}…</span></div>`;
+    /* También se busca su nombre: un titular que lo nombra no compite con los
+       del territorio, va aparte y de primero. */
+    const personas = P.terminosPersona();
+    const nombres = [P.nombreCandidatura(), P.nombrePublico()].filter(n => P.toks(n, 3).length >= 2).map(n => `"${n}"`);
+    const todas = consultas.concat(nombres);
+    const rs = await Promise.all(todas.map(q => P.caudal({ action: 'medios', query: q, dias: VENTANA }).catch(() => ({ _error: true }))));
+    const locales = P.terminosLocales(t), vistos = new Set(), usted = [], territorio = [];
+    let fallos = 0;
+    for (const d of rs) {
+      if (d?._error) { fallos++; continue; }
+      for (const r of (d?.resultados || [])) {
+        const titulo = r.titulo || '', k = P.norm(titulo).slice(0, 90);
+        if (!k || vistos.has(k)) continue;
+        vistos.add(k);
+        const item = { titulo, medio: r.medio || '', url: r.url || '', fecha: r.fecha || '' };
+        if (P.mencionaPersona(titulo, personas)) { usted.push(item); continue; }
+        const pts = P.puntajeLocal(titulo, t, locales);
+        if (pts) territorio.push({ ...item, pts });
+      }
+    }
+    usted.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    territorio.sort((a, b) => (b.pts - a.pts) || String(b.fecha).localeCompare(String(a.fecha)));
+    pintarTerritorio(t, usted, territorio, fallos, todas.length);
+    $('territorioRecargar').disabled = false;
+  }
+
   (async function init() {
     if (!(await P.arrancar('candidato-360-medios.html'))) return;
     ideasGuardadas = P.SESION.vinculo?.escucha?.ideas || [];
     pintarIdeas();
     $('btnLeer').addEventListener('click', leer);
+    $('territorioRecargar').addEventListener('click', leerTerritorio);
+    leerTerritorio();
     if (ideasGuardadas.length) { $('estadoIdeas').textContent = `${ideasGuardadas.length} ${ideasGuardadas.length === 1 ? 'idea guardada' : 'ideas guardadas'}`; leer(); }
   })();
 })();

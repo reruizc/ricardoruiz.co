@@ -154,11 +154,37 @@ npx wrangler dev --local                           # y contra 127.0.0.1:8788, co
 |---|---|
 | Paso 2 del wizard de candidatura nueva (`candidato-360.html`) | Marca las redes y valida antes de construir el punto de partida |
 | **Panel 05 · `candidato-360-redes.html`** | La misma validación, ya con la candidatura abierta: precarga lo guardado, revalida y guarda |
-| **Panel 04 · `candidato-360-medios.html`** | No usa `/c360/redes`, pero comparte el mismo almacenamiento: las tres ideas de campaña con las que se filtra la lectura de prensa |
+| **Panel 04 · `candidato-360-medios.html`** | No usa `/c360/redes`. Abre leyendo la prensa del territorio **a la escala de la corporación** (localidad para JAL, municipio para Concejo y Alcaldía, departamento para Asamblea y Gobernación) y guarda acá las tres ideas de campaña, que son la capa personal encima de esa lectura |
 
 Los dos paneles son HTML propios (con `candidato-360-panel.js` de chasis) y no
 acordeones del CRM: son dos preguntas con ritmos distintos —una se abre para
 leer, la otra para configurar—.
+
+## La lectura del territorio (panel 04)
+
+Las consultas y el puntaje son un **puerto fiel** de
+`tools/candidato-360/briefing/motor.py` (`territorio_de`, `prensa`,
+`puntaje_local`), portado a JS en `candidato-360-panel.js`. Esa es la fuente de
+verdad: si allá cambian las reglas, hay que cambiarlas acá — y al revés.
+
+Se duplica a propósito. El briefing corre en Python en GitHub Actions y el panel
+en el navegador; unificarlos hoy significaría reescribir un motor que funciona.
+Lo que se gana duplicando **con fidelidad** es que lo que el candidato ve en
+pantalla sea exactamente lo que le llega al correo cada tres días: una lectura
+que contradiga al briefing valdría menos que no tenerla.
+
+| Corporación | Escala | Consultas |
+|---|---|---|
+| JAL | Localidad | `"Localidad" Ciudad` · `"Alcaldía de Ciudad"` · `"Concejo de Ciudad"` |
+| Concejo · Alcaldía | Municipio | `"Alcaldía de X"` · `"Concejo de X"` · `"X"` (en Bogotá se omite: el nombre solo trae de todo) |
+| Asamblea · Gobernación | Departamento | `"Depto"` · `"Gobernación de Depto"` · `"Asamblea de Depto"` |
+
+Más el nombre de la candidatura, cuyos titulares van en su propio bloque y de
+primero. Cada titular recibe un puntaje: +3 si nombra la localidad, +2 si nombra
+un actor institucional (alcaldía, concejo, obra, presupuesto, licitación…), +1
+si nombra el lugar. En Bogotá, Medellín, Cali, Barranquilla y Cartagena se exige
+≥2, porque el nombre de la ciudad aparece en cualquier cosa. Clima, loterías,
+horóscopos, pico y placa y vacantes salen por regex.
 
 ## Lo que se guarda · `POST /c360/escucha`
 
