@@ -226,7 +226,7 @@
     $('panelCuerpo')?.classList.add('hidden');
   }
 
-  const ADMIN = ['reruizc@gmail.com'];
+  const ADMIN = ['reruizc@gmail.com', 'nuevagemela@gmail.com'];
   function esAdmin() { return SESION.fuente === 'admin' || ADMIN.includes(String(SESION.user?.email || '').toLowerCase().trim()); }
   /* Desata la cuenta de la candidatura actual con la ruta de soporte que ya
      existe. Deja copia 400 días del lado del worker. Solo administración. */

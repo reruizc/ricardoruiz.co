@@ -270,7 +270,7 @@ async function toggleBriefing() {
    cambia de candidato y NADA se escribe en el worker — así ninguna prueba deja
    puesto un vínculo que después solo soporte puede borrar. Se apaga con
    ?pruebas=0 para ver la página tal como la ve un cliente. */
-const ADMIN_EMAILS = ['reruizc@gmail.com'];
+const ADMIN_EMAILS = ['reruizc@gmail.com', 'nuevagemela@gmail.com'];
 let PRUEBAS = false;
 function esAdmin() { return SESSION.fuente === 'admin' || ADMIN_EMAILS.includes(String(SESSION.user?.email || '').toLowerCase().trim()); }
 function resolverModoPruebas() {
