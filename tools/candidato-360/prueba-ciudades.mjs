@@ -68,7 +68,7 @@ await p.route('**', async route => {
 });
 await p.addInitScript(() => { localStorage.setItem('rr-token', 't'); localStorage.setItem('rr-user', JSON.stringify({ email: 'reruizc@gmail.com' })); });
 await p.goto('file://' + process.cwd() + '/candidato-360.html');
-await p.waitForFunction(() => typeof window.renderJalCityMap === 'function' && typeof window.L === 'object');
+await p.waitForFunction(() => typeof window.renderCiudadMap === 'function' && typeof window.L === 'object');
 
 /* Una edil del Doce de Octubre: todos sus votos en la comuna 06. */
 await p.evaluate(() => {
@@ -80,7 +80,7 @@ await p.evaluate(() => {
   showScreen('crm');
   document.getElementById('crmVoteNumber').textContent = '1.800';
 });
-await p.evaluate(() => renderJalCityMap(crmCandidate));
+await p.evaluate(() => renderCiudadMap(crmCandidate));
 await p.waitForTimeout(900);
 
 const r = {};
@@ -96,7 +96,7 @@ r.reencuadre = await p.evaluate(async () => {
   const caja = document.getElementById('crmMap');
   caja.style.height = '90px';
   crmLeafletMap.invalidateSize();
-  await renderJalCityMap(crmCandidate);
+  await renderCiudadMap(crmCandidate);
   caja.style.height = '';                       /* el panel termina de acomodarse */
   await new Promise(r => setTimeout(r, 500));
   const mapa = crmLeafletMap.getBounds(), capa = crmMapLayer.getLayers().find(l => l.feature.properties.CODIGO === '06').getBounds();

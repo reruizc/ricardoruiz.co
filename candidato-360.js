@@ -14,6 +14,7 @@
      7. Ruta de candidatura nueva: wizard
      8. CRM: apertura, meta de votos y foto
      9. Mapas: recorte territorial, ciudad, barrios, vistas por año, niveles
+     9 bis. Arquetipos del territorio y perfil del votante
     10. Arranque
 
    Reglas del producto que viven acá (decisión de Ricardo, sep-2026):
@@ -1207,6 +1208,8 @@ async function launchCRM(event) {
   showScreen('crm');
   pintarBriefing();
   pintarEscucha();
+  pintarArquetipos();
+  pintarPerfil();
   loadHistoricalMap(crmCandidate);
   renderCRMProfilePhoto(crmCandidate);
   pintarPuntaje(crmCandidate);
@@ -1232,6 +1235,8 @@ async function abrirCRMNuevo() {
   showScreen('crm');
   pintarBriefing();
   pintarEscucha();
+  pintarArquetipos();
+  pintarPerfil();
   renderTerritorioObjetivo(c);
   pintarMeta(await VoteTarget.estimate({ corp: c.corp, territory: lugar, baseUrl: S3, partido: n.partido || '', departamento: c.departamento || '' }));
 }
@@ -1811,7 +1816,8 @@ async function puestosPorBarrio() {
          código de comuna o por nombre. Así no hay una segunda regla que
          mantener sincronizada. */
       const mesa = { dep: code.slice(0, 2), mun: code.slice(2, 5), zon: code.slice(5, 7), pue: code.slice(7, 9), com: String(row[11] || ''), comNom: String(row[12] || '') };
-      lookup[code] = { barrio, lat: Number(row[9]), lng: Number(row[10]), censo: (Number(row[13]) || 0) + (Number(row[14]) || 0), mesa };
+      const mujeres = Number(row[13]) || 0, hombres = Number(row[14]) || 0;
+      lookup[code] = { barrio, lat: Number(row[9]), lng: Number(row[10]), censo: mujeres + hombres, mujeres, hombres, mesa };
     });
     return lookup;
   });
@@ -1911,6 +1917,9 @@ function mesaEnAlcance(mesa, alcance) {
 }
 async function datosCandidatura(candidate) {
   const url = candidate?.dataUrl || '';
+  /* Sin archivo no hay nada que pedir: `fetch('')` se trae la página actual y
+     el error aparece como si la fuente estuviera caída. */
+  if (!url) throw new Error('Candidatura sin archivo de datos');
   if (!datosCandidaturaCache.has(url)) datosCandidaturaCache.set(url, fetch(url).then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))).catch(error => { datosCandidaturaCache.delete(url); throw error; }));
   const data = await datosCandidaturaCache.get(url), alcance = alcanceObjetivo(), mesas = data.mesas || [];
   if (!alcance) { recorteActivo = null; return { ...data, mesas, recorte: null }; }
@@ -2023,13 +2032,32 @@ function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea,
   $('crmMapNote').textContent = note + notaRecorte() + notaColorPartido();
 }
 function agregarPorArea(mesas, keyFn) { const votesByArea = {}, namesByArea = {}; mesas.forEach(m => { const key = keyFn(m); votesByArea[key] = (votesByArea[key] || 0) + Number(m.v || 0); namesByArea[key] = nombreLocal(m) || namesByArea[key]; }); return { votesByArea, namesByArea }; }
-async function renderJalCityMap(candidate) {
-  const data = await datosCandidatura(candidate), mesas = data.mesas || [], config = cityLayerFor(mesas[0]?.munNom || candidate.circunscripcion);
+/* ¿Toda la votación cabe en UNA ciudad con capa de comunas? Entonces el mapa
+   es esa ciudad, sea JAL, Concejo o Alcaldía. Antes solo la JAL entraba acá y
+   un concejal de Medellín veía el municipio entero como una sola mancha, sin
+   comunas ni barrios, cuando la cartografía estaba a un clic. */
+async function ciudadDeLaCandidatura(candidate) {
+  const mesas = (await datosCandidatura(candidate)).mesas || [];
+  const municipios = new Set(mesas.filter(m => Number(m.v || 0)).map(m => `${m.dep}-${m.mun}`));
+  if (municipios.size !== 1) return null;
+  const config = cityLayerFor(mesas.find(m => m.munNom)?.munNom || candidate.circunscripcion);
+  return config ? { config, mesas } : null;
+}
+async function renderCiudadMap(candidate, ciudad) {
+  const { config, mesas } = ciudad || await ciudadDeLaCandidatura(candidate) || {};
   if (!config) throw new Error('Ciudad sin capa local');
   let geoData = await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/${config.path}`); if (config.rotate) geoData = rotateGeoJSON90Left(geoData);
   const { votesByArea, namesByArea } = agregarPorArea(mesas, m => config.mesaKey ? config.mesaKey(m) : claveLocal(m));
+  /* La Registraduría escribe la comuna como «06COMUNA 6 DOCE DE OCTUBRE»: el
+     código pegado al nombre. En el desglose sobra. */
+  Object.keys(namesByArea).forEach(k => { namesByArea[k] = String(namesByArea[k]).replace(/^\d+\s*/, ''); });
   const total = mesas.reduce((sum, m) => sum + Number(m.v || 0), 0) || Number(candidate.votos) || 0, targetKey = Object.entries(votesByArea).sort((a, b) => b[1] - a[1])[0]?.[0];
-  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city: normalizedText(mesas[0]?.munNom || ''), rotate: config.rotate, lugar: mesas[0]?.munNom || '', note: `Distribución por ${config.title} de su candidatura JAL. Haga clic en una ${config.title} para ver el detalle por barrio.`, fitTarget: true });
+  const esJal = String(candidate.corp || '').toUpperCase().startsWith('JAL'), lugar = mesas.find(m => m.munNom)?.munNom || '';
+  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city: normalizedText(lugar), rotate: config.rotate, lugar,
+    note: esJal
+      ? `Distribución por ${config.title} de su candidatura JAL. Haga clic en una ${config.title} para ver el detalle por barrio.`
+      : `Distribución por ${config.title} en ${lugar || 'la ciudad'}. Haga clic en una ${config.title} para ver el detalle por barrio.`,
+    fitTarget: esJal });
 }
 async function renderBogotaCampaignMap(candidate) {
   const data = await datosCandidatura(candidate), mesas = data.mesas || [];
@@ -2064,7 +2092,7 @@ async function renderSingleElection(candidate) {
   try {
     if (isCaliElection(candidate)) return await renderCaliCampaignMap(candidate);
     if (isBogotaElection(candidate, null) || (isBogotaElection(candidate, currentTargetTerritory()) && await historialEnObjetivo(candidate))) return await renderBogotaCampaignMap(candidate);
-    if (isJal) { try { return await renderJalCityMap(candidate); } catch (e) { /* ciudad sin capa → genérico */ } }
+    try { const ciudad = await ciudadDeLaCandidatura(candidate); if (ciudad) return await renderCiudadMap(candidate, ciudad); } catch (e) { /* ciudad sin capa → genérico */ }
     return await renderGenericMap(candidate);
   } catch (e) {
     $('crmMap').innerHTML = '<div style="padding:28px;color:#667068">No fue posible cargar el mapa histórico en este momento.</div>'; crmLeafletMap = null; crmMapLayer = null; crmTileLayer = null;
@@ -2503,6 +2531,275 @@ async function renderTerritorioObjetivo(c) {
     $('crmMap').innerHTML = '<div style="padding:28px;color:#667068">No fue posible cargar el territorio en este momento.</div>'; crmLeafletMap = null; crmMapLayer = null; crmTileLayer = null;
     $('crmBreakdown').innerHTML = '<p class="helper">No fue posible cargar el territorio.</p>'; $('crmMapNote').textContent = 'La fuente cartográfica no respondió.';
   }
+}
+
+/* ─── 9 bis. El territorio por dentro: arquetipos y perfil del votante ───────
+   Dos lecturas del mismo territorio que el mapa no da, las dos ponderadas por
+   SU votación —no «cómo es la ciudad» sino «cómo es el pedazo de ciudad donde
+   están sus votos»:
+
+   · ARQUETIPOS (hoy solo Medellín). El Proyecto DC reconstruyó barrio por
+     barrio qué mueve el voto —protección, continuidad, supervivencia, castigo,
+     pertenencia— con Alcaldía, Concejo y JAL de 2015, 2019 y 2023, y proyectó
+     2027. Acá se cruza con los votos de la persona. Otras ciudades ven la
+     tarjeta apagada diciendo qué falta, que es más honesto que esconderla.
+
+   · PERFIL DEL VOTANTE. El voto es secreto y nadie puede decir quién votó por
+     usted; lo que sí se puede es describir el ELECTORADO de los puestos donde
+     están sus votos. Sexo sale del censo por puesto de la Registraduría
+     (columnas MUJERES/HOMBRES de PUESTOS_GEOREF) y rural/urbano de la zona
+     electoral (99 = rural). La edad necesita el censo por edad por puesto, que
+     todavía no está publicado: la tarjeta lo dice en vez de estimarlo.        */
+const ARQ_BASE = RRData.publicUrl('bases+de+datos/Proyecto+DC/arquetipos');
+const VOT27_URL = `${RRData.publicUrl('bases+de+datos/Proyecto+DC/votacion-arquetipo-2027')}/votacion-2027.json?v=20260528`;
+const MEDELLIN = '01001';
+/* Una candidatura nueva no tiene archivo de mesas y no por eso se rompen las
+   tarjetas: se leen con cero votos y cada una decide qué mostrar. */
+async function mesasDelHistorial() { try { return (await datosCandidatura(crmCandidate)).mesas || []; } catch (e) { return []; } }
+const codigoMunicipio = mesa => `${String(mesa.dep || '').padStart(2, '0')}${String(mesa.mun || '').padStart(3, '0')}`;
+function municipioDeCampana() {
+  const a = alcanceObjetivo();
+  return a?.tipo === 'municipio' && a.municipio ? `${String(a.departamento).padStart(2, '0')}${String(a.municipio).padStart(3, '0')}` : '';
+}
+function municipioMayoritario(mesas) {
+  const votos = {};
+  (mesas || []).forEach(m => { const k = codigoMunicipio(m); if (k !== '00000') votos[k] = (votos[k] || 0) + Number(m.v || 0); });
+  return Object.entries(votos).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+}
+/* Los archivos del Proyecto DC (≈ 560 KB) se piden UNA vez y solo si la
+   candidatura toca Medellín. votacion-2027 trae el arquetipo ajustado a mano
+   por la socia: se aplica igual que en proyecto-dc/arquetipos.html para que
+   las dos páginas no digan cosas distintas del mismo barrio. */
+let arqPromise = null;
+function datosArquetipos() {
+  if (!arqPromise) arqPromise = Promise.all([
+    fetchJSON(`${ARQ_BASE}/arquetipos.json`),
+    fetchJSON(`${ARQ_BASE}/por-barrio.json`),
+    fetchJSON(`${ARQ_BASE}/por-comuna.json`),
+    fetchJSON(VOT27_URL).catch(() => null)
+  ]).then(([familias, barrios, comunas, vot27]) => {
+    Object.entries(vot27?.barrios || {}).forEach(([dap, v]) => {
+      const b = barrios[dap]; if (!b || !v.arquetipo_ajustado_2027) return;
+      b.proyeccion_2027 = { ...(b.proyeccion_2027 || {}), arquetipo_proy: v.arquetipo_ajustado_2027, arquetipo_alt: v.arquetipo_alterno_2027 || b.proyeccion_2027?.arquetipo_alt };
+    });
+    return { familias, barrios, comunas };
+  }).catch(e => { arqPromise = null; throw e; });
+  return arqPromise;
+}
+/* Votos de la candidatura repartidos por barrio (DAP) y por comuna de
+   Medellín. El puesto se ubica por coordenada en la capa barrial oficial —la
+   misma regla del mapa— y la comuna sale del propio polígono, no del nombre
+   que trae la mesa: «11COMUNA 11 LAURELES» contra «Laureles Estadio» no casa
+   por texto y sí por geometría. */
+async function votosArquetipoMedellin(mesas) {
+  const cfg = cityBarrioLayerFor('MEDELLIN');
+  const [capa, puestos] = await Promise.all([cargarBarriosCiudad(cfg), puestosPorBarrio()]);
+  const comunaDe = {};
+  (capa.geo.features || []).forEach(f => { const c = String(f.properties?.CODIGO || ''); if (c && f.properties?.COMUNA) comunaDe[c.slice(0, 2)] = f.properties.COMUNA; });
+  const porBarrio = {}, porComuna = {};
+  let votos = 0, ubicados = 0;
+  mesas.forEach(m => {
+    const v = Number(m.v || 0); if (!v || codigoMunicipio(m) !== MEDELLIN) return;
+    votos += v;
+    const p = puestos[electoralPlaceCode(m)]; if (!p) return;
+    const dap = barrioDelPunto(capa.indice, p.lng, p.lat); if (!dap) return;
+    ubicados += v;
+    porBarrio[dap] = (porBarrio[dap] || 0) + v;
+    const comuna = comunaDe[dap.slice(0, 2)]; if (comuna) porComuna[comuna] = (porComuna[comuna] || 0) + v;
+  });
+  return { porBarrio, porComuna, votos, ubicados };
+}
+/* La lectura completa: reparto de SUS votos por arquetipo en 2023 y en 2027,
+   comunas y barrios ordenados. Sin votos propios en la ciudad (una campaña
+   nueva en Medellín) se describe la ciudad con los votos de 2023 del propio
+   estudio, y la tarjeta lo dice. */
+async function lecturaArquetipos() {
+  const mesas = await mesasDelHistorial();
+  const { familias, barrios, comunas } = await datosArquetipos();
+  const propio = await votosArquetipoMedellin(mesas);
+  const conVotos = propio.ubicados > 0;
+  const pesos = conVotos ? propio.porBarrio : Object.fromEntries(Object.values(barrios).map(b => [b.dap, Number(b.proyeccion_2027?.votos_por_arquetipo ? Object.values(b.proyeccion_2027.votos_por_arquetipo).reduce((s, x) => s + Number(x || 0), 0) : 0)]));
+  const reparto = { '2023': {}, '2027': {} };
+  let total = 0, sinDato = 0;
+  Object.entries(pesos).forEach(([dap, v]) => {
+    if (!v) return; total += v;
+    const b = barrios[dap];
+    if (!b) { sinDato += v; return; }
+    const a23 = b.arquetipo?.['2023'], a27 = b.proyeccion_2027?.arquetipo_proy;
+    if (a23) reparto['2023'][a23] = (reparto['2023'][a23] || 0) + v;
+    if (a27) reparto['2027'][a27] = (reparto['2027'][a27] || 0) + v;
+  });
+  const orden = obj => Object.entries(obj).sort((a, b) => b[1] - a[1]);
+  const filasComuna = conVotos
+    ? orden(propio.porComuna).map(([nombre, v]) => ({ nombre, votos: v, a23: comunas[nombre]?.['2023']?.dominante, a27: comunas[nombre]?.['2027']?.dominante }))
+    : Object.entries(comunas).map(([nombre, c]) => ({ nombre, votos: Number(c['2023']?.votos_total || 0), a23: c['2023']?.dominante, a27: c['2027']?.dominante })).sort((a, b) => b.votos - a.votos);
+  const filasBarrio = orden(pesos).slice(0, 10).map(([dap, v]) => ({ dap, votos: v, nombre: barrios[dap]?.barrio || dap, comuna: barrios[dap]?.comuna || '', a23: barrios[dap]?.arquetipo?.['2023'], a27: barrios[dap]?.proyeccion_2027?.arquetipo_proy, riesgo: barrios[dap]?.proyeccion_2027?.nivel_riesgo }));
+  return { familias, conVotos, total, sinDato, reparto, filasComuna, filasBarrio, votosCiudad: propio.votos, ubicados: propio.ubicados };
+}
+function nombreArquetipo(familias, id, año) {
+  const f = familias?.arquetipos?.[id]; if (!f) return 'Sin dato';
+  return año === '2027' ? f.evol.nombre : f.base.nombre;
+}
+function colorArquetipo(familias, id) { return familias?.arquetipos?.[id]?.color || '#6b7280'; }
+let ARQUETIPOS_ACTUAL = null;
+/* La tarjeta: titular con el arquetipo donde está la mayoría de sus votos. */
+async function pintarArquetipos() {
+  const card = $('crmArquetipos'); if (!card) return;
+  ARQUETIPOS_ACTUAL = null;
+  const mesas = await mesasDelHistorial();
+  const enMedellin = municipioDeCampana() === MEDELLIN || municipioMayoritario(mesas) === MEDELLIN;
+  $('crmArqBtn').disabled = true;
+  if (!enMedellin) {
+    card.classList.add('module-apagado');
+    $('crmArqTitulo').textContent = 'Por ahora, solo Medellín.';
+    $('crmArqCopy').textContent = 'La cartografía emocional —qué mueve el voto en cada barrio— está reconstruida para los 152 barrios de Medellín con las elecciones de 2015, 2019 y 2023. Cuando exista para su ciudad, esta tarjeta se enciende sola.';
+    $('crmArqDato').textContent = '—'; $('crmArqSub').textContent = 'sin cartografía emocional acá';
+    return;
+  }
+  card.classList.remove('module-apagado');
+  $('crmArqTitulo').textContent = 'Leyendo los barrios de Medellín…';
+  $('crmArqCopy').textContent = 'Cruzando su votación con los cinco arquetipos del territorio.';
+  try {
+    const L = await lecturaArquetipos();
+    ARQUETIPOS_ACTUAL = L;
+    const top = Object.entries(L.reparto['2023']).sort((a, b) => b[1] - a[1])[0];
+    if (!top) throw new Error('sin cruce');
+    const [fam, votos] = top, pct = Math.round(votos / L.total * 100);
+    const base = L.familias.arquetipos[fam].base;
+    $('crmArqTitulo').textContent = L.conVotos ? `Su voto vive en barrios de ${base.nombre.toLowerCase()}.` : `Medellín vota desde ${base.nombre.toLowerCase()}.`;
+    $('crmArqCopy').textContent = `${base.deseo} ${L.conVotos ? `Es el arquetipo de ${pct} % de sus votos en la ciudad, repartidos en ${L.filasComuna.length} comunas.` : `Es el arquetipo dominante de la ciudad; cuando tenga votos propios acá la lectura se hace con ellos.`}`;
+    $('crmArqDato').textContent = `${pct} %`;
+    $('crmArqSub').textContent = L.conVotos ? 'de sus votos, en ese arquetipo' : 'del voto de la ciudad';
+    $('crmArqBtn').disabled = false;
+  } catch (e) {
+    $('crmArqTitulo').textContent = 'No pudimos leer los arquetipos.';
+    $('crmArqCopy').textContent = 'La fuente del Proyecto DC no respondió. Vuelva a abrir el CRM en un momento.';
+    $('crmArqDato').textContent = '—'; $('crmArqSub').textContent = 'fuente no disponible';
+  }
+}
+function barraArquetipos(L, año) {
+  const filas = Object.entries(L.reparto[año]).sort((a, b) => b[1] - a[1]);
+  if (!filas.length) return '';
+  return `<div class="arq-barra">${filas.map(([id, v]) => `<i style="flex:${v};background:${colorArquetipo(L.familias, id)}" title="${escHtml(nombreArquetipo(L.familias, id, año))}"></i>`).join('')}</div>
+    <ul class="arq-lista">${filas.map(([id, v]) => `<li><span class="arq-punto" style="background:${colorArquetipo(L.familias, id)}"></span><b>${Math.round(v / L.total * 100)} %</b> ${escHtml(nombreArquetipo(L.familias, id, año))}<em>${Math.round(v).toLocaleString('es-CO')} votos</em></li>`).join('')}</ul>`;
+}
+function mostrarArquetipos() {
+  const L = ARQUETIPOS_ACTUAL; if (!L) return;
+  const fam = id => escHtml(L.familias.arquetipos[id]?.label_corto || 'Sin dato');
+  $('introModalKicker').textContent = 'Candidato 360 · arquetipos del territorio';
+  $('introModalTitle').textContent = L.conVotos ? '¿En qué clase de barrio está su voto?' : 'Los arquetipos de Medellín';
+  $('introModalText').innerHTML = `
+    <p>Cada barrio de Medellín tiene un <b>arquetipo</b>: la emoción que ordena su voto, reconstruida con Alcaldía, Concejo y JAL de 2015, 2019 y 2023. ${L.conVotos ? `Acá están sus <b>${Math.round(L.total).toLocaleString('es-CO')} votos</b> repartidos por esa lectura${L.sinDato ? `; ${Math.round(L.sinDato).toLocaleString('es-CO')} cayeron en barrios sin medición` : ''}.` : 'Todavía no tiene votos propios en la ciudad, así que esto es la ciudad, no usted.'}</p>
+    <p style="margin-bottom:8px"><b>Su voto hoy (lectura 2023)</b></p>
+    ${barraArquetipos(L, '2023')}
+    <p style="margin-bottom:8px"><b>A dónde va ese mismo voto en 2027</b></p>
+    ${barraArquetipos(L, '2027')}
+    <p style="margin-bottom:8px"><b>Por comuna</b></p>
+    <ul class="puntaje-escala">${L.filasComuna.slice(0, 8).map(f => `<li><b>${Math.round(f.votos).toLocaleString('es-CO')}</b> ${escHtml(f.nombre)} · ${fam(f.a23)} → <b style="min-width:0;font-size:14px">${fam(f.a27)}</b> en 2027</li>`).join('')}</ul>
+    <p style="margin-bottom:8px"><b>Sus barrios más fuertes</b></p>
+    <ul class="puntaje-escala">${L.filasBarrio.slice(0, 6).map(f => `<li><b>${Math.round(f.votos).toLocaleString('es-CO')}</b> ${escHtml(f.nombre)}${f.comuna ? ` · ${escHtml(f.comuna)}` : ''} · ${fam(f.a23)}${f.riesgo ? ` · riesgo de cambio ${escHtml(String(f.riesgo).toLowerCase())}` : ''}</li>`).join('')}</ul>
+    <p class="puntaje-nota">Fuente: Proyecto DC · cartografía emocional de Medellín (152 barrios, 21 comunas), con la proyección 2027 ajustada. El arquetipo es del <b>barrio</b>, no de sus votantes: dice en qué clase de territorio está su votación, no qué siente cada persona que votó por usted.</p>`;
+  $('introModal').classList.add('open');
+}
+
+/* ── Perfil del votante ─────────────────────────────────────────────────────
+   Ponderar por votos el censo del puesto responde «cómo es el electorado
+   donde usted saca votos», que es distinto de «quién votó por usted» —eso no
+   lo sabe nadie— y distinto del promedio del municipio, que es contra lo que
+   se compara para que el número signifique algo. */
+const EDAD_PUESTO_URL = `${S3}/mapas-2026/CENSO_EDAD_PUESTO.json`;
+let edadPuestoPromise = null;
+function censoEdadPuesto() {
+  if (!edadPuestoPromise) edadPuestoPromise = fetch(EDAD_PUESTO_URL).then(r => r.ok ? r.json() : null).catch(() => null);
+  return edadPuestoPromise;
+}
+const ZONA_ESPECIAL = new Set(['90', '98']);   /* censo consolidado y cárceles: ni rural ni urbano */
+async function perfilDelVotante() {
+  const mesas = await mesasDelHistorial();
+  const puestos = await puestosPorBarrio();
+  const municipio = municipioMayoritario(mesas);
+  let votos = 0, conCenso = 0, mujeres = 0, rural = 0, urbano = 0, especial = 0, sinCoordenada = 0;
+  const edad = await censoEdadPuesto();
+  const bandas = edad?.bandas || [], edadVotos = bandas.map(() => 0); let conEdad = 0;
+  mesas.forEach(m => {
+    const v = Number(m.v || 0); if (!v) return;
+    votos += v;
+    const zona = String(m.zon || '').padStart(2, '0');
+    if (zona === '99') rural += v; else if (ZONA_ESPECIAL.has(zona)) especial += v; else urbano += v;
+    const code = electoralPlaceCode(m), p = puestos[code];
+    if (p && p.mujeres + p.hombres > 0) { conCenso += v; mujeres += v * p.mujeres / (p.mujeres + p.hombres); } else sinCoordenada += v;
+    const e = edad?.puestos?.[code];
+    if (e) { const tot = e.reduce((s, x) => s + Number(x || 0), 0); if (tot > 0) { conEdad += v; e.forEach((x, i) => { edadVotos[i] += v * Number(x || 0) / tot; }); } }
+  });
+  /* El municipio entero, para comparar: el censo de TODOS sus puestos. */
+  let munM = 0, munT = 0, munRural = 0, munCenso = 0;
+  Object.entries(puestos).forEach(([code, p]) => {
+    if (code.slice(0, 5) !== municipio) return;
+    const censo = p.mujeres + p.hombres; if (!censo) return;
+    munM += p.mujeres; munT += censo; munCenso += censo;
+    if (code.slice(5, 7) === '99') munRural += censo;
+  });
+  return {
+    votos, municipio,
+    mujeres: conCenso ? mujeres / conCenso : null, cobertura: votos ? conCenso / votos : 0, sinCoordenada,
+    mujeresMunicipio: munT ? munM / munT : null, ruralMunicipio: munCenso ? munRural / munCenso : null,
+    rural: votos ? rural / votos : 0, urbano: votos ? urbano / votos : 0, especial,
+    edad: conEdad ? { bandas, reparto: edadVotos.map(x => x / conEdad), cobertura: conEdad / votos, fuente: edad?.fuente || '' } : null
+  };
+}
+let PERFIL_ACTUAL = null;
+const pct1 = x => `${(x * 100).toFixed(1).replace('.', ',')} %`;
+async function pintarPerfil() {
+  const card = $('crmPerfil'); if (!card) return;
+  PERFIL_ACTUAL = null;
+  $('crmPerfilBtn').disabled = true;
+  $('crmPerfilTitulo').textContent = 'Leyendo el electorado de sus puestos…';
+  try {
+    const P = await perfilDelVotante();
+    if (!P.votos || P.mujeres === null) throw new Error('sin censo');
+    PERFIL_ACTUAL = P;
+    const dif = P.mujeresMunicipio === null ? null : P.mujeres - P.mujeresMunicipio;
+    const sesgo = dif === null || Math.abs(dif) < .005 ? 'igual que el promedio del municipio' : dif > 0 ? `${pct1(Math.abs(dif))} más mujeres que el promedio del municipio` : `${pct1(Math.abs(dif))} menos mujeres que el promedio del municipio`;
+    const campo = P.rural >= .5 ? 'rural' : P.rural >= .15 ? 'mixto, con una pata rural' : 'urbano';
+    $('crmPerfilTitulo').textContent = `Su voto es ${campo}: ${pct1(P.mujeres)} de mujeres.`;
+    $('crmPerfilCopy').textContent = `El electorado de los puestos donde usted saca votos, ponderado por cuántos saca en cada uno: ${sesgo}. ${P.rural ? `${pct1(P.rural)} de sus votos están en puestos rurales` : 'Ninguno de sus votos está en puestos rurales'}${P.ruralMunicipio !== null ? `, contra ${pct1(P.ruralMunicipio)} del censo del municipio` : ''}.`;
+    $('crmPerfilDato').textContent = pct1(P.mujeres);
+    $('crmPerfilSub').textContent = 'mujeres en el censo de sus puestos';
+    $('crmPerfilBtn').disabled = false;
+  } catch (e) {
+    $('crmPerfilTitulo').textContent = 'Todavía no hay perfil para esta candidatura.';
+    $('crmPerfilCopy').textContent = 'Los puestos de su votación no tienen censo publicado, así que preferimos no estimar un perfil que no podemos sostener.';
+    $('crmPerfilDato').textContent = '—'; $('crmPerfilSub').textContent = 'sin censo por puesto';
+  }
+}
+function mostrarPerfil() {
+  const P = PERFIL_ACTUAL; if (!P) return;
+  const barra = (a, b, etA, etB) => `<div class="arq-barra"><i style="flex:${Math.max(a, .0001)};background:var(--green)" title="${escHtml(etA)}"></i><i style="flex:${Math.max(b, .0001)};background:#c9d6cd" title="${escHtml(etB)}"></i></div>`;
+  const edad = P.edad
+    ? `<p style="margin-bottom:8px"><b>Edad</b></p>
+       ${`<ul class="arq-lista">${P.edad.reparto.map((x, i) => `<li><span class="arq-punto" style="background:var(--green);opacity:${1 - i * .2}"></span><b>${pct1(x)}</b> ${escHtml(P.edad.bandas[i])}</li>`).join('')}</ul>`}
+       <p class="puntaje-nota" style="border:0;padding-top:0">${escHtml(P.edad.fuente || 'Censo por edad de cada puesto, ponderado por su votación.')}</p>`
+    : `<p style="margin-bottom:8px"><b>Edad</b></p>
+       <p>Todavía no. El censo por edad existe por puesto de votación, pero no está publicado en la fuente que lee esta página; en cuanto se publique, la edad aparece acá sin tocar nada más. Preferimos decirlo a estimarla con el promedio del municipio y presentarla como suya.</p>`;
+  $('introModalKicker').textContent = 'Candidato 360 · perfil del votante';
+  $('introModalTitle').textContent = 'Cómo es el electorado donde usted vota';
+  $('introModalText').innerHTML = `
+    <p>El voto es secreto: <b>nadie</b> puede decir quién votó por usted. Lo que sí se puede es describir el electorado de los puestos donde están sus votos, ponderado por cuántos votos sacó en cada uno. Es una lectura del terreno, no de sus votantes.</p>
+    <p style="margin-bottom:8px"><b>Sexo</b></p>
+    ${barra(P.mujeres, 1 - P.mujeres, 'Mujeres', 'Hombres')}
+    <ul class="puntaje-escala">
+      <li><b>${pct1(P.mujeres)}</b> de mujeres en el censo de sus puestos.</li>
+      ${P.mujeresMunicipio === null ? '' : `<li><b>${pct1(P.mujeresMunicipio)}</b> de mujeres en el municipio entero. La diferencia es lo suyo: dónde saca votos, no cuántos.</li>`}
+    </ul>
+    <p style="margin-bottom:8px"><b>Rural y urbano</b></p>
+    ${barra(P.urbano, P.rural, 'Urbano', 'Rural')}
+    <ul class="puntaje-escala">
+      <li><b>${pct1(P.rural)}</b> de sus votos en puestos rurales (zona 99)${P.ruralMunicipio === null ? '' : `, contra ${pct1(P.ruralMunicipio)} del censo del municipio`}.</li>
+      <li><b>${pct1(P.urbano)}</b> en la cabecera.${P.especial ? ` Otros ${P.especial.toLocaleString('es-CO')} votos están en puestos especiales (cárceles y censo consolidado), que no son ni lo uno ni lo otro.` : ''}</li>
+    </ul>
+    ${edad}
+    <p class="puntaje-nota">Fuente: censo electoral por puesto de la Registraduría (PUESTOS_GEOREF, columnas de mujeres y hombres) y la zona electoral de cada mesa. Cubre el ${pct1(P.cobertura)} de su votación: ${P.sinCoordenada ? `${P.sinCoordenada.toLocaleString('es-CO')} votos están en puestos sin censo publicado` : 'todos sus puestos tienen censo publicado'}.</p>`;
+  $('introModal').classList.add('open');
 }
 
 /* ─── 10. Arranque ───────────────────────────────────────────────────────── */

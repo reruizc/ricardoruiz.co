@@ -22,6 +22,11 @@ territorial no se aplica: el mapa se queda donde estuvo la votación y la nota l
 dice (`recorteActivo.sinVotos`). Recortar dejaba un Bogotá vacío con «quedaron
 por fuera 37.111 votos».
 
+Una candidatura cuya votación cabe entera en **una ciudad con capa de comunas**
+se pinta por comuna, sea JAL, Concejo o Alcaldía (`ciudadDeLaCandidatura` →
+`renderCiudadMap`). Antes solo la JAL entraba por ahí y un concejal de Medellín
+veía el municipio entero como una mancha, con la cartografía a un clic.
+
 ## Barrios: dos caminos y un modo degradado
 
 **Bogotá y Cali** tienen cartografía barrial partida por localidad o comuna en
