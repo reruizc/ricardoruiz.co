@@ -1798,7 +1798,17 @@ function depNameFromFeature(props) { return props?.name || props?.nombre || prop
    Bogotá la zona electoral ES la localidad. El nombre real lo pone el GeoJSON. */
 const COM_NOM_NULO = new Set(['NACIONAL', 'NULL', 'SN', '']);
 function nombreLocal(mesa) { const n = String(mesa.comNom || '').trim(); return COM_NOM_NULO.has(n.toUpperCase()) ? '' : n; }
-function claveLocal(mesa) { const com = String(mesa.com || '').replace(/^0+/, ''), zon = String(mesa.zon || '').replace(/^0+/, ''); return (com || zon || '').padStart(2, '0'); }
+/* En Bogotá la ZONA electoral es la localidad, así que sirve de respaldo
+   cuando no hay comuna. Las zonas 90 y 98 no: son el censo consolidado y las
+   cárceles, que no quedan en ningún barrio. Colándose por el respaldo, la 90
+   se pintaba encima del corregimiento de Santa Elena, que en la cartografía
+   del DAP también es «90». */
+const ZONA_SIN_TERRITORIO = new Set(['90', '98']);
+function claveLocal(mesa) {
+  const com = String(mesa.com || '').replace(/^0+/, ''), zon = String(mesa.zon || '').padStart(2, '0');
+  if (com) return com.padStart(2, '0');
+  return ZONA_SIN_TERRITORIO.has(zon) ? '' : zon.replace(/^0+/, '').padStart(2, '0');
+}
 function completaNombres(geoData, code, name, namesByArea) { (geoData?.features || []).forEach(f => { const k = code(f.properties); if (k && !namesByArea[k]) namesByArea[k] = name(f.properties); }); return namesByArea; }
 function electoralPlaceCode(mesa) { return `${String(mesa.dep || '').padStart(2, '0')}${String(mesa.mun || '').padStart(3, '0')}${String(mesa.zon || '').padStart(2, '0')}${String(mesa.pue || '').padStart(2, '0')}`; }
 let puestosBarrioPromise = null;
@@ -2001,13 +2011,30 @@ function encuadreBogota() {
 }
 const CITY_JAL_LAYERS = [
   { match: ['BOGOTA'], path: 'BOG-LOCALIDADX.json', title: 'localidad', code: p => String(p.LocCodigo || '').padStart(2, '0'), name: p => p.LocNombre || 'Localidad', rotate: true },
-  { match: ['MEDELLIN'], path: 'MEDELLINX.json', title: 'comuna', code: p => String(p.CODIGO || '').padStart(2, '0'), name: p => p.NOMBRE || p.IDENTIFICACION || 'Comuna' },
+  /* La Registraduría numera los corregimientos de Medellín del 17 al 21 y la
+     cartografía del DAP los numera 50, 60, 70, 80 y 90. Sin esta tabla los
+     votos de Altavista, San Antonio de Prado, Palmitas, San Cristóbal y Santa
+     Elena no caían en ningún polígono. */
+  { match: ['MEDELLIN'], path: 'MEDELLINX.json', title: 'comuna', code: p => String(p.CODIGO || '').padStart(2, '0'), name: p => p.NOMBRE || p.IDENTIFICACION || 'Comuna',
+    mesaKey: m => { const k = claveLocal(m); return ({ '17': '70', '18': '80', '19': '50', '20': '60', '21': '90' })[k] || k; } },
   { match: ['CALI'], path: 'CALIX.json', title: 'comuna', code: p => String(p.comuna || '').padStart(2, '0'), name: p => p.nombre || 'Comuna' },
   { match: ['PEREIRA'], path: 'PEREIRAX.json', title: 'comuna', code: p => normalizedText(p.Comuna), name: p => p.Comuna || 'Comuna', mesaKey: m => normalizedText(String(m.comNom || '').replace(/^\d+\s*COMUNA\s*/i, '')) },
   { match: ['IBAGUE'], path: 'IBAGUEX.json', title: 'comuna', code: p => String(p.COMUNAS || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.COMUNAS || 'Comuna' },
   { match: ['BARRANQUILLA'], path: 'BARRANQUILLAX.json', title: 'localidad', code: p => ({ 4: '01', 2: '02', 1: '03', 3: '04', 5: '05' })[Number(p.id)] || '', name: p => p.nombre || 'Localidad' },
   { match: ['MONTERIA'], path: 'MONTERIAX.json', title: 'comuna', code: p => String(p.CC_COMUNA || '').padStart(2, '0'), name: p => p.NMG || 'Comuna' },
-  { match: ['MANIZALES'], path: 'MANIZALESX.json', title: 'comuna', code: p => String(p.ID_COMUNA || '').padStart(2, '0'), name: p => p.NOMBRES_CO || 'Comuna' }
+  { match: ['MANIZALES'], path: 'MANIZALESX.json', title: 'comuna', code: p => String(p.ID_COMUNA || '').padStart(2, '0'), name: p => p.NOMBRES_CO || 'Comuna' },
+  /* Las otras seis capitales con cartografía por comuna (las mismas de
+     veleta.html). El código de comuna viene escrito de seis maneras distintas
+     —número suelto, «COMUNA 2», «Comuna 5»—, así que se saca a dígitos. */
+  { match: ['BUCARAMANGA'], path: 'BUCARAMANGAX.json', title: 'comuna', code: p => String(p.COD_COMUNA || '').padStart(2, '0'), name: p => p.NOMBRE_COM || 'Comuna' },
+  /* La capa de Cúcuta trae diez polígonos numerados 0-5 y 7-10: al que le
+     falta número es la comuna 6, la única ausente de una ciudad que tiene
+     diez. Sin repararlo, uno de cada doce votos no caía en ningún lado. */
+  { match: ['CUCUTA'], path: 'CUCUTAX.json', title: 'comuna', code: p => { const n = String(p.Comuna ?? '').replace(/\D/g, ''); return (!n || n === '0' ? '6' : n).padStart(2, '0'); }, name: p => `Comuna ${Number(String(p.Comuna ?? '').replace(/\D/g, '')) || 6}` },
+  { match: ['NEIVA'], path: 'NEIVAX.json', title: 'comuna', code: p => String(p.comuna || '').replace(/\D/g, '').padStart(2, '0'), name: p => String(p.comuna || 'Comuna').replace(/\s+/g, ' ') },
+  { match: ['POPAYAN'], path: 'POPAYANX.json', title: 'comuna', code: p => String(p.COMUNAS || p.ACAD_TEXT || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.COMUNAS || 'Comuna' },
+  { match: ['SINCELEJO'], path: 'SINCELEJOX.json', title: 'comuna', code: p => String(p.Nombre || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.Nombre || 'Comuna' },
+  { match: ['VILLAVICENCIO'], path: 'VILLAVICENCIOX.json', title: 'comuna', code: p => String(p.Comuna || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.Comuna || 'Comuna' }
 ];
 function cityLayerFor(nombre) { const city = normalizedText(nombre); return CITY_JAL_LAYERS.find(item => item.match.some(name => city.includes(name))) || null; }
 /* Pinta una ciudad por comuna/localidad con el estado compartido de los mapas
@@ -2031,7 +2058,7 @@ function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea,
   $('crmMapVotes').textContent = `${total.toLocaleString('es-CO')} votos`;
   $('crmMapNote').textContent = note + notaRecorte() + notaColorPartido();
 }
-function agregarPorArea(mesas, keyFn) { const votesByArea = {}, namesByArea = {}; mesas.forEach(m => { const key = keyFn(m); votesByArea[key] = (votesByArea[key] || 0) + Number(m.v || 0); namesByArea[key] = nombreLocal(m) || namesByArea[key]; }); return { votesByArea, namesByArea }; }
+function agregarPorArea(mesas, keyFn) { const votesByArea = {}, namesByArea = {}; mesas.forEach(m => { const key = keyFn(m); if (!key) return; votesByArea[key] = (votesByArea[key] || 0) + Number(m.v || 0); namesByArea[key] = nombreLocal(m) || namesByArea[key]; }); return { votesByArea, namesByArea }; }
 /* ¿Toda la votación cabe en UNA ciudad con capa de comunas? Entonces el mapa
    es esa ciudad, sea JAL, Concejo o Alcaldía. Antes solo la JAL entraba acá y
    un concejal de Medellín veía el municipio entero como una sola mancha, sin
@@ -2050,7 +2077,7 @@ async function renderCiudadMap(candidate, ciudad) {
   const { votesByArea, namesByArea } = agregarPorArea(mesas, m => config.mesaKey ? config.mesaKey(m) : claveLocal(m));
   /* La Registraduría escribe la comuna como «06COMUNA 6 DOCE DE OCTUBRE»: el
      código pegado al nombre. En el desglose sobra. */
-  Object.keys(namesByArea).forEach(k => { namesByArea[k] = String(namesByArea[k]).replace(/^\d+\s*/, ''); });
+  Object.keys(namesByArea).forEach(k => { if (namesByArea[k]) namesByArea[k] = String(namesByArea[k]).replace(/^\d+\s*/, ''); else delete namesByArea[k]; });
   const total = mesas.reduce((sum, m) => sum + Number(m.v || 0), 0) || Number(candidate.votos) || 0, targetKey = Object.entries(votesByArea).sort((a, b) => b[1] - a[1])[0]?.[0];
   const esJal = String(candidate.corp || '').toUpperCase().startsWith('JAL'), lugar = mesas.find(m => m.munNom)?.munNom || '';
   pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city: normalizedText(lugar), rotate: config.rotate, lugar,
@@ -2139,6 +2166,9 @@ const CITY_BARRIO_LAYERS = [
   { match: ['PEREIRA'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/PEREIRA-BARRIOS.json`, name: p => p.NOMBRE || 'Barrio', code: p => String(p.NOMBRE || '') },
   { match: ['MANIZALES'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/MANIZALES-BARRIOS.json`, name: p => p.BARRIOS || 'Barrio', code: p => String(p.BARRIOS || '') },
   { match: ['BARRANQUILLA'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/BARRANQUILLA-BARRIOS.json`, name: p => p.NOMBRE || 'Barrio', code: p => String(p.NOMBRE || '') },
+  { match: ['BUCARAMANGA'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/BUCARAMANGA-BARRIOS.json`, name: p => p.barrio || 'Barrio', code: p => String(p.barrio || '') },
+  { match: ['CUCUTA'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/CUCUTA-BARRIOS.json`, name: p => p.barrio || 'Barrio', code: p => String(p.barrio || '') },
+  { match: ['POPAYAN'], url: () => `${S3}/mapas-2026/Ciudades-COM-LOC/POPAYAN-BARRIOS.json`, name: p => p.BARRIOS || 'Barrio', code: p => String(p.BARRIOS || '') },
   /* Ibagué y Montería no tienen cartografía barrial publicada en ninguna
      fuente alcanzable. Sus barrios son una APROXIMACIÓN por Voronoi sobre los
      puestos de votación, recortada por comuna —lo mismo que el proyecto hizo
@@ -2470,10 +2500,14 @@ function refreshMapLevels() {
   const mapEl = $('crmMap'); if (!mapEl) return;
   mapEl.querySelector('.crm-map-levels')?.remove();
   const state = crmMapState; if (!state?.config) return nivelesMunicipio();
-  const isJal = String(crmCandidate?.corp || '').toUpperCase().startsWith('JAL'), localLabel = state.config.title === 'comuna' ? 'Comuna' : 'Localidad';
+  const localLabel = state.config.title === 'comuna' ? 'Comuna' : 'Localidad';
   const detalle = ciudadTieneBarrios(state) ? 'Barrio' : 'Puestos';
+  /* Sin «Municipio»: cuando el mapa ES la ciudad, ese botón mostraba lo mismo
+     que «Comuna» —la ciudad entera dividida— y dejaba la alcaldía de Medellín
+     abriendo en un nivel que no existe. Los niveles son los que de verdad
+     cambian el dibujo. */
   const controls = document.createElement('div'); controls.className = 'crm-map-levels';
-  controls.innerHTML = `${isJal ? '' : '<button type="button" class="crm-map-level" data-level="municipio">Municipio</button>'}<button type="button" class="crm-map-level" data-level="localidad">${localLabel}</button><button type="button" class="crm-map-level" data-level="barrio" disabled>${detalle}</button>`;
+  controls.innerHTML = `<button type="button" class="crm-map-level" data-level="localidad">${localLabel}</button><button type="button" class="crm-map-level" data-level="barrio" disabled>${detalle}</button>`;
   mapEl.append(controls);
   /* Volver a la ciudad deshace lo del barrio: sin callejero (la capa de
      Bogotá va rotada) y con las localidades de vuelta en el mapa. */
@@ -2486,10 +2520,9 @@ function refreshMapLevels() {
     encuadrarBounds(crmMapState.encuadre || boundsDeVotos(crmMapLayer, crmMapState.config, crmMapState.votesByArea, crmMapState.fueraDelEncuadre), 24);
     setMapLevel(level);
   };
-  controls.querySelector('[data-level="municipio"]')?.addEventListener('click', () => volver('municipio'));
-  controls.querySelector('[data-level="localidad"]')?.addEventListener('click', () => volver('localidad'));
+  controls.querySelector('[data-level="localidad"]').addEventListener('click', () => volver('localidad'));
   controls.querySelector('[data-level="barrio"]').addEventListener('click', () => { if (crmMapState?.focusKey) { renderBarriosForArea(crmMapState.focusKey); setMapLevel('barrio'); } });
-  setMapLevel(state.focusKey ? 'barrio' : isJal ? 'localidad' : 'municipio');
+  setMapLevel(state.focusKey ? 'barrio' : 'localidad');
 }
 /* Punto de entrada del mapa histórico. */
 async function loadHistoricalMap(candidate) {

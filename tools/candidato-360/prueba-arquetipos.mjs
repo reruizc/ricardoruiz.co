@@ -4,7 +4,12 @@
 
      · un concejal de Medellín veía el municipio entero como una mancha: el
        mapa por comunas y barrios solo se armaba para la JAL, cuando la
-       cartografía es la misma;
+       cartografía es la misma —y el botón «Municipio» dibujaba exactamente lo
+       mismo que «Comuna»—;
+     · los corregimientos van del 17 al 21 en la Registraduría y del 50 al 90
+       en la cartografía del DAP, así que sus votos no caían en ningún
+       polígono, y la zona 90 (censo consolidado) se pintaba encima de Santa
+       Elena y salía en el desglose como «undefined»;
      · la tarjeta 06 cruza su votación con los arquetipos del Proyecto DC
        (protección, continuidad, supervivencia, castigo, pertenencia) barrio
        por barrio, con la proyección 2027 ajustada por la socia;
@@ -43,6 +48,9 @@ const MESAS = [
   { dep: '01', mun: '001', zon: '06', pue: '01', com: '06', comNom: '06COMUNA 6 DOCE DE OCTUBRE', munNom: 'MEDELLIN', v: 400 },
   { dep: '01', mun: '001', zon: '06', pue: '02', com: '06', comNom: '06COMUNA 6 DOCE DE OCTUBRE', munNom: 'MEDELLIN', v: 200 },
   { dep: '01', mun: '001', zon: '99', pue: '01', com: '20', comNom: '20CORREGIMIENTO SAN CRISTOBAL', munNom: 'MEDELLIN', v: 100 },
+  /* Censo consolidado: zona 90, sin comuna. No es un territorio y no puede
+     pintarse como uno —en Medellín el 90 del DAP es Santa Elena—. */
+  { dep: '01', mun: '001', zon: '90', pue: '01', com: '000', comNom: 'NACIONAL', munNom: 'MEDELLIN', v: 50 },
 ];
 const familia = (id, color, corto, nombre, evol) => [id, { color, label_corto: corto, orden: 1, base: { id, nombre, emocion: 'e', deseo: `Deseo de ${corto.toLowerCase()}.`, miedo: 'm', sesgo: 's' }, evol: { id: id + '_evol', nombre: evol, emocion: 'e', deseo: 'd', miedo: 'm', sesgo: 's' } }];
 const ARQUETIPOS = { familias: ['proteccion', 'castigo', 'pertenencia', 'continuidad'], arquetipos: Object.fromEntries([
@@ -98,7 +106,11 @@ await p.evaluate(c => { crmCandidate = c; CAMPANA_ACTUAL = { corp: 'concejo', pa
 await p.evaluate(() => loadHistoricalMap(crmCandidate));
 await p.waitForTimeout(1200);
 const r = {};
-r.mapa = await p.evaluate(() => ({ titulo: document.getElementById('crmMapTitle').textContent, unidad: crmMapState?.config?.title || null, ciudad: crmMapState?.city || null, niveles: [...document.querySelectorAll('.crm-map-levels [data-level]')].map(b => b.textContent.trim()), filas: [...document.querySelectorAll('#crmBreakdown .crm-breakdown-item b')].map(x => x.textContent) }));
+r.mapa = await p.evaluate(() => ({ titulo: document.getElementById('crmMapTitle').textContent, unidad: crmMapState?.config?.title || null, ciudad: crmMapState?.city || null,
+  niveles: [...document.querySelectorAll('.crm-map-levels [data-level]')].map(b => b.textContent.trim()),
+  activo: document.querySelector('.crm-map-levels .active')?.dataset.level,
+  filas: [...document.querySelectorAll('#crmBreakdown .crm-breakdown-item b')].map(x => x.textContent),
+  pintadas: Object.keys(crmMapState?.votesByArea || {}) }));
 
 /* 2 · Las dos tarjetas. */
 await p.evaluate(() => Promise.all([pintarArquetipos(), pintarPerfil()]));
@@ -123,10 +135,13 @@ await p.waitForTimeout(400);
 r.fuera = await p.evaluate(() => ({ titulo: document.getElementById('crmArqTitulo').textContent, apagada: document.getElementById('crmArquetipos').classList.contains('module-apagado'), boton: !document.getElementById('crmArqBtn').disabled }));
 await b.close();
 
-/* 400×(5000/9000) + 200×(3000/5000) + 100×(900/1700) = 395,2 de 700 = 56,5 % */
+/* Sexo: 400×(5000/9000) + 200×(3000/5000) + 100×(900/1700) = 395,2 de 700 = 56,5 %.
+   Rural: 100 de 750 = 13,3 % (los 50 del censo consolidado no son ni rural ni urbano). */
 const pruebas = [
-  ['un concejal de Medellín ve el mapa por comunas, no el municipio entero', r.mapa.unidad === 'comuna' && /Medell/i.test(r.mapa.titulo) && r.mapa.niveles.join('|') === 'Municipio|Comuna|Barrio'],
-  ['con su votación repartida por comuna', r.mapa.filas.length >= 1],
+  ['un concejal de Medellín ve el mapa por comunas, no el municipio entero', r.mapa.unidad === 'comuna' && /Medell/i.test(r.mapa.titulo)],
+  ['los niveles son los que cambian el dibujo: sin «Municipio»', r.mapa.niveles.join('|') === 'Comuna|Barrio' && r.mapa.activo === 'localidad'],
+  ['un corregimiento (17-21 en la Registraduría) cae en su polígono del DAP', r.mapa.pintadas.includes('60') && r.mapa.filas.some(f => /SAN CRISTOBAL/.test(f))],
+  ['la zona 90 no arma una comuna fantasma ni una fila sin nombre', r.mapa.filas.length === 2 && !r.mapa.filas.some(f => /undefined|^90$/.test(f))],
   ['la tarjeta de arquetipos nombra el arquetipo donde vive su voto', /protección y orden cotidiano/i.test(r.arq.titulo) && r.arq.dato === '57 %' && r.arq.boton && !r.arq.apagada],
   ['y dice en cuántas comunas está', /2 comunas/.test(r.arq.copy)],
   ['el modal reparte sus votos por arquetipo, hoy y en 2027', r.modalArq.barras === 2 && /57 % Protección y orden cotidiano/.test(r.modalArq.texto) && /29 % Castigo/.test(r.modalArq.texto)],
@@ -134,7 +149,7 @@ const pruebas = [
   ['con las comunas y los barrios de su votación', /Doce de Octubre/.test(r.modalArq.texto) && /Pedregal/.test(r.modalArq.texto) && /La Loma/.test(r.modalArq.texto)],
   ['la tarjeta de perfil pondera el censo de sus puestos por sus votos', r.perfil.dato === '56,5 %' && r.perfil.boton],
   ['y compara contra el municipio, no contra el aire', /54,7 %|1,8 %|más mujeres que el promedio del municipio/.test(r.perfil.copy)],
-  ['el peso rural sale de la zona 99', /14,3 % de sus votos están en puestos rurales/.test(r.perfil.copy) && /5,2 % del censo del municipio/.test(r.perfil.copy)],
+  ['el peso rural sale de la zona 99', /13,3 % de sus votos están en puestos rurales/.test(r.perfil.copy) && /5,2 % del censo del municipio/.test(r.perfil.copy)],
   ['el modal de perfil dice que el voto es secreto y qué falta para la edad', /nadie.{0,40}puede decir quién votó por usted/i.test(r.modalPerfil.texto) && /Edad/.test(r.modalPerfil.texto) && /no está publicado/.test(r.modalPerfil.texto)],
   ['fuera de Medellín la tarjeta se apaga y dice por qué', /solo Medellín/i.test(r.fuera.titulo) && r.fuera.apagada && !r.fuera.boton],
   ['sin errores de JavaScript', errores.length === 0],

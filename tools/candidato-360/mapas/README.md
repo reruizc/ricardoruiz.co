@@ -22,6 +22,29 @@ territorial no se aplica: el mapa se queda donde estuvo la votación y la nota l
 dice (`recorteActivo.sinVotos`). Recortar dejaba un Bogotá vacío con «quedaron
 por fuera 37.111 votos».
 
+Los botones de nivel son los que **cambian el dibujo**. En un mapa de ciudad no
+hay «Municipio»: mostraba exactamente lo mismo que «Comuna» —la ciudad entera
+dividida— y dejaba la alcaldía de Medellín abriendo en un nivel que no existe.
+Quedan **Comuna/Localidad** y **Barrio** (o **Puestos** donde no hay
+cartografía barrial). En un municipio sin comunas sí hay dos niveles reales,
+«Municipio | Puestos».
+
+Ciudades con capa por comuna o localidad (`CITY_JAL_LAYERS`, las mismas de
+veleta.html): Bogotá (localidades), Medellín, Cali, Barranquilla (localidades),
+Manizales, Pereira, Ibagué, Montería, Bucaramanga, Cúcuta, Neiva, Popayán,
+Sincelejo y Villavicencio.
+
+Dos cosas que la fuente escribe distinto y hay que traducir:
+
+- Los **corregimientos de Medellín** van del 17 al 21 en la Registraduría y del
+  50 al 90 en la cartografía del DAP (Altavista es 17 y 70). Sin la tabla, sus
+  votos no caían en ningún polígono.
+- Las **zonas 90 y 98** —censo consolidado y cárceles— no son territorio y no
+  pueden servir de comuna de respaldo: la 90 se pintaba encima del
+  corregimiento de Santa Elena, que en el DAP también es «90», y salía en el
+  desglose como «undefined». En Bogotá la zona sí es la localidad, así que el
+  respaldo se conserva para el resto.
+
 Una candidatura cuya votación cabe entera en **una ciudad con capa de comunas**
 se pinta por comuna, sea JAL, Concejo o Alcaldía (`ciudadDeLaCandidatura` →
 `renderCiudadMap`). Antes solo la JAL entraba por ahí y un concejal de Medellín
