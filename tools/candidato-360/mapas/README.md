@@ -7,6 +7,20 @@
 | **Municipio** | El departamento o el municipio completo | `mapas-2026/Departamentos-mps/` |
 | **Comuna / localidad** | La ciudad por comunas o localidades | `mapas-2026/Ciudades-COM-LOC/` |
 | **Barrio** | Los barrios de la comuna que se abrió | Ver abajo |
+| **Puestos** | Los puestos de votación en su coordenada, con el tamaño del punto como votación | `PUESTOS_GEOREF.csv` |
+
+El tercer botón se llama por lo que hay: «Barrio» en las ciudades con
+cartografía barrial (`ciudadTieneBarrios`), «Puestos» en el resto. Y en un
+**municipio sin capa de comunas** —La Ceja, Sabaneta, el 90 % del país— los
+niveles son solo dos, «Municipio | Puestos» (`nivelesMunicipio`): antes se veía
+el polígono del municipio y no había forma de bajar. A escala de puestos el
+polígono pasa a contorno y entra el callejero atenuado.
+
+Cuando la campaña nueva se ubica en un territorio donde el historial no tiene
+**ni un voto** (un representante de Antioquia al Concejo de Bogotá), el recorte
+territorial no se aplica: el mapa se queda donde estuvo la votación y la nota lo
+dice (`recorteActivo.sinVotos`). Recortar dejaba un Bogotá vacío con «quedaron
+por fuera 37.111 votos».
 
 ## Barrios: dos caminos y un modo degradado
 
