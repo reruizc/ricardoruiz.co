@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Cómo se lee el perfil del votante sin violar el secreto del voto: inferencia ecológica, cotas duras y lo que el método no puede decir.">
+<title>El perfil del votante, por dentro · Candidato 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<!-- ⚠️ Al tocar candidato-360.css hay que bumpear su ?v= acá y en las otras páginas del CRM. -->
+<link rel="stylesheet" href="candidato-360.css?v=20260916b">
+<style>
+/* Una página de método: se lee de arriba abajo, en una sola columna angosta.
+   Todo lo demás lo pone candidato-360.css. */
+.metodo{max-width:960px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 90px}
+.metodo-hero{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:14px}
+.metodo-hero h1{font:800 clamp(31px,4.6vw,52px)/1.03 var(--display);letter-spacing:-.022em;margin:9px 0 14px;max-width:16ch}
+.metodo-hero p{margin:0;max-width:62ch;font-size:16px;line-height:1.62;color:var(--muted)}
+.metodo-hero p b{color:var(--ink);font-weight:600}
+/* El índice: esta página es larga y conviene poder saltar. */
+.indice{display:flex;flex-wrap:wrap;gap:7px;margin:22px 0 0}
+.indice a{font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1px solid rgba(26,112,73,.3);padding:6px 10px}
+.indice a:hover{background:var(--mint);border-color:var(--green)}
+section.paso-metodo{padding:38px 0;border-bottom:1px solid var(--line);scroll-margin-top:80px}
+section.paso-metodo:last-of-type{border-bottom:0}
+.paso-num{font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--green)}
+.paso-metodo h2{font:800 clamp(22px,2.7vw,30px)/1.15 var(--display);letter-spacing:-.015em;margin:8px 0 16px;max-width:24ch}
+.paso-metodo h3{font:700 16px var(--display);margin:26px 0 10px}
+.paso-metodo p{margin:0 0 14px;max-width:66ch;font-size:15.5px;line-height:1.62}
+.paso-metodo li{max-width:64ch;line-height:1.58;margin-bottom:7px}
+.paso-metodo ul,.paso-metodo ol{padding-left:20px}
+/* Los números que hacen la cuenta a la vista: el corazón de la página. */
+.cuenta{border:1px solid var(--line);background:var(--cream);padding:20px 22px;margin:18px 0 20px}
+.cuenta h4{margin:0 0 12px;font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--green)}
+.cuenta table{width:100%;border-collapse:collapse;font-size:14px}
+.cuenta th{text-align:left;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 10px 8px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+.cuenta td{padding:8px 10px 8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.cuenta tr:last-child td{border-bottom:0}
+.cuenta td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.cuenta .total td{font-weight:700;border-top:1px solid var(--ink);border-bottom:0}
+.formula{font-family:var(--mono);font-size:14px;line-height:1.8;background:var(--paper);border-left:3px solid var(--green);padding:12px 16px;margin:14px 0;overflow-x:auto}
+.ojo{border-left:3px solid var(--coral);background:rgba(238,116,94,.07);padding:14px 17px;margin:18px 0;font-size:14.5px;line-height:1.6}
+.ojo b{color:var(--ink)}
+.tabla-fuentes{width:100%;border-collapse:collapse;font-size:14px;margin:14px 0 6px;display:block;overflow-x:auto}
+.tabla-fuentes th{text-align:left;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:0 14px 9px 0;border-bottom:1px solid var(--line)}
+.tabla-fuentes td{padding:10px 14px 10px 0;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
+.tabla-fuentes td:first-child{font-weight:600;white-space:nowrap}
+.escala{display:grid;gap:0;margin:16px 0 6px;border:1px solid var(--line)}
+.escala div{display:grid;grid-template-columns:130px 1fr;gap:14px;padding:12px 15px;border-bottom:1px solid var(--line);font-size:14.5px;line-height:1.5}
+.escala div:last-child{border-bottom:0}
+.escala b{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--green);padding-top:2px}
+.barra-cota{display:flex;height:26px;border:1px solid var(--line);margin:6px 0 4px;font:500 11px var(--mono);color:#fff}
+.barra-cota i{display:flex;align-items:center;justify-content:center;font-style:normal;white-space:nowrap;overflow:hidden}
+.barra-cota .no{background:#dfe4df;color:var(--muted)}
+.barra-cota .si{background:var(--green)}
+.pie-cota{font:500 11px var(--mono);color:var(--muted);letter-spacing:.04em}
+.cierre{margin-top:34px;padding:24px 26px;border:1px solid var(--green);background:#edf5ef}
+.cierre h2{margin:0 0 10px;font:800 22px var(--display)}
+.cierre p{margin:0 0 16px;max-width:62ch;font-size:15px;line-height:1.6}
+.cierre a{display:inline-block;background:var(--forest);color:#fff;text-decoration:none;padding:12px 20px;font:700 13px var(--sans)}
+.cierre a:hover{background:var(--green)}
+@media(max-width:560px){.escala div{grid-template-columns:1fr;gap:3px}.cuenta{padding:16px 15px}}
+</style>
+</head>
+<body>
+<nav class="topbar"><div class="nav-left"><a href="candidato-360.html?abrir=1" class="nav-planes">← CRM</a></div><div class="nav-right"><a class="brand" href="index.html"><span class="mark"><i></i><i></i><i></i><i></i></span><b>Ricardo<span>.</span>Ruiz</b></a></div></nav>
+
+<main class="app-shell"><div class="metodo">
+  <header class="metodo-hero">
+    <div class="kicker">Candidato 360 · método de la tarjeta 07</div>
+    <h1>Quién vota donde usted saca votos.</h1>
+    <p>El voto es secreto: <b>nadie</b> —ni la Registraduría, ni nosotros— puede decir quién votó por usted. Lo que sí se puede es describir el <b>electorado</b> de los puestos donde están sus votos y, con más trabajo, estimar cómo se repartió el voto entre grupos de edad. Esta página explica las dos cosas: qué hace la tarjeta hoy, qué haría con inferencia ecológica, y dónde está exactamente la frontera entre lo que se sabe y lo que se estima.</p>
+    <nav class="indice">
+      <a href="#dato">1 · El dato que sí existe</a>
+      <a href="#hoy">2 · Lo que hace la tarjeta hoy</a>
+      <a href="#falacia">3 · Por qué el promedio engaña</a>
+      <a href="#cotas">4 · Lo que se puede afirmar sin supuestos</a>
+      <a href="#estimador">5 · El estimador</a>
+      <a href="#proyeccion">6 · Cuando la edad no se observa</a>
+      <a href="#limites">7 · Lo que no puede decir</a>
+      <a href="#falta">8 · Qué falta acá</a>
+    </nav>
+  </header>
+
+  <section class="paso-metodo" id="dato">
+    <div class="paso-num">01 · El dato que sí existe</div>
+    <h2>Cuatro fuentes públicas, ninguna con nombres.</h2>
+    <p>El secreto del voto no impide medir: impide <em>identificar</em>. La Registraduría publica agregados que, cruzados, dan mucho más de lo que parece a primera vista.</p>
+    <table class="tabla-fuentes">
+      <thead><tr><th>Insumo</th><th>Qué trae</th><th>A qué nivel</th></tr></thead>
+      <tbody>
+        <tr><td>Censo por puesto</td><td>Cuántas mujeres y cuántos hombres están habilitados para votar en cada puesto</td><td>Puesto de votación (13.508 en el país)</td></tr>
+        <tr><td>Sufragantes por edad y sexo</td><td>Cuántas personas de cada banda de edad <em>efectivamente votaron</em>. Bandas: 18-20, 21-25, 26-30, 31-35, 36-40, 41-45, 46-50, 51-55, 56-60 y 61+</td><td>Mesa (≈112.000)</td></tr>
+        <tr><td>Resultados del escrutinio</td><td>Cuántos votos sacó cada candidatura</td><td>Mesa</td></tr>
+        <tr><td>Proyecciones de población</td><td>Cuánta gente de cada edad vive en cada departamento, año por año (DANE)</td><td>Departamento</td></tr>
+      </tbody>
+    </table>
+    <p>Fíjese en lo que <b>no</b> hay: ninguna fuente cruza <em>una persona</em> con <em>su voto</em>. Las dos primeras columnas viven en tablas separadas y esa separación es, literalmente, el secreto del voto. Todo lo que sigue es el arte de sacar conclusiones de grupo sin deshacer esa separación.</p>
+  </section>
+
+  <section class="paso-metodo" id="hoy">
+    <div class="paso-num">02 · Lo que hace la tarjeta hoy</div>
+    <h2>Un promedio ponderado, y dicho como lo que es.</h2>
+    <p>La tarjeta 07 del CRM no hace inferencia: hace una descripción honesta. Toma el censo de cada puesto donde usted sacó votos y lo pondera por <b>cuántos votos sacó ahí</b>. Es la respuesta a «cómo es el electorado del territorio donde usted es fuerte», no a «quién votó por usted».</p>
+    <div class="formula">% mujeres del perfil  =  Σ<sub>p</sub> ( votos<sub>p</sub> × mujeres<sub>p</sub> / censo<sub>p</sub> )  ÷  Σ<sub>p</sub> votos<sub>p</sub></div>
+    <div class="cuenta">
+      <h4>Ejemplo con tres puestos</h4>
+      <table>
+        <thead><tr><th>Puesto</th><th class="n">Sus votos</th><th class="n">Censo</th><th class="n">% mujeres</th><th class="n">Aporte</th></tr></thead>
+        <tbody>
+          <tr><td>El Triunfo</td><td class="n">400</td><td class="n">9.000</td><td class="n">55,6 %</td><td class="n">222,2</td></tr>
+          <tr><td>Pedregal</td><td class="n">200</td><td class="n">5.000</td><td class="n">60,0 %</td><td class="n">120,0</td></tr>
+          <tr><td>La Loma (rural)</td><td class="n">100</td><td class="n">1.700</td><td class="n">52,9 %</td><td class="n">52,9</td></tr>
+          <tr class="total"><td>Perfil</td><td class="n">700</td><td class="n">—</td><td class="n">56,5 %</td><td class="n">395,2</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>El número solo, suelto, no dice nada: <b>51,4 %</b> del censo electoral del país son mujeres, y en casi cualquier municipio la cifra ronda esa marca. Por eso la tarjeta siempre lo compara contra el promedio del municipio entero. Lo informativo no es «56,5 % de mujeres»: es «3,9 puntos por encima del municipio donde compite», porque eso sí es una característica <em>suya</em> —de dónde saca votos—, no del país.</p>
+    <p>Lo mismo con lo rural: la zona electoral 99 es, por convención de la Registraduría, el área rural del municipio. El 13,1 % del censo nacional vota en zona rural; su campaña puede estar muy por encima o muy por debajo, y eso cambia el tipo de campaña que tiene que hacer.</p>
+    <div class="ojo"><b>La frontera.</b> Este promedio describe el <em>terreno</em>. Decir «el 56,5 % de mis votantes son mujeres» a partir de él sería falso: sería suponer que dentro de cada puesto hombres y mujeres votaron igual por usted, que es justamente lo que no se sabe. Para acercarse a eso hace falta lo que sigue.</p></div>
+  </section>
+
+  <section class="paso-metodo" id="falacia">
+    <div class="paso-num">03 · Por qué el promedio engaña</div>
+    <h2>La falacia ecológica, con números.</h2>
+    <p>En 1950, el sociólogo William Robinson mostró que las correlaciones entre agregados pueden tener el signo contrario a las correlaciones entre individuos. Su ejemplo: los estados de EE. UU. con más inmigrantes tenían más alfabetización… y sin embargo los inmigrantes eran, individualmente, menos alfabetizados que los nativos. Los inmigrantes llegaban a los estados ricos, que ya tenían mejores escuelas.</p>
+    <p>Lo mismo pasa con el voto. Dos barrios, dos puestos:</p>
+    <div class="cuenta">
+      <h4>Dos puestos, dos historias que dan el mismo agregado</h4>
+      <table>
+        <thead><tr><th>Puesto</th><th class="n">Votantes jóvenes</th><th class="n">Votantes mayores</th><th class="n">Sus votos</th></tr></thead>
+        <tbody>
+          <tr><td>Puesto A</td><td class="n">800</td><td class="n">200</td><td class="n">400</td></tr>
+          <tr><td>Puesto B</td><td class="n">200</td><td class="n">800</td><td class="n">100</td></tr>
+        </tbody>
+      </table>
+      <p style="margin:12px 0 0;font-size:14px;color:var(--muted);max-width:none">Donde hay más jóvenes usted saca más votos, así que la tentación es decir «los jóvenes votan por mí». Pero en el puesto A esos 400 votos pueden ser 400 jóvenes y ningún mayor, o 250 jóvenes y 150 mayores, o 200 jóvenes y los 200 mayores <em>completos</em> —en cuyo caso los mayores lo apoyan dos veces más que los jóvenes—. Los tres mundos producen exactamente la misma tabla. El agregado no los distingue.</p>
+    </div>
+    <p>Esa es la falacia: el patrón entre territorios no es el patrón entre personas. La inferencia ecológica es el conjunto de técnicas que acota ese salto en vez de darlo a ciegas —y lo primero que hace es decir cuánto del salto es <em>aritméticamente imposible</em>.</p>
+  </section>
+
+  <section class="paso-metodo" id="cotas">
+    <div class="paso-num">04 · Sin un solo supuesto</div>
+    <h2>Las cotas duras: lo que la aritmética ya prohíbe.</h2>
+    <p>Antes de estimar nada, hay conclusiones que se siguen <b>solo de que los números tienen que cuadrar</b>. Se llaman cotas de Duncan-Davis (1953), y son el piso honesto de todo este trabajo.</p>
+    <p>Tome un puesto con <b>1.000 votantes</b>: 300 jóvenes y 700 mayores. Usted sacó <b>400 votos</b>. ¿Qué fracción de los jóvenes votó por usted?</p>
+    <div class="cuenta">
+      <h4>El rango que la aritmética permite</h4>
+      <div class="barra-cota">
+        <i class="si" style="flex:300">todos los jóvenes: 100 %</i>
+        <i class="no" style="flex:700">…los otros 100 votos salen de mayores</i>
+      </div>
+      <div class="pie-cota">Máximo: si sus 400 votos incluyeran a los 300 jóvenes → 100 % de los jóvenes.</div>
+      <div class="barra-cota" style="margin-top:14px">
+        <i class="no" style="flex:300">ningún joven: 0 %</i>
+        <i class="si" style="flex:700">sus 400 votos caben enteros entre los mayores</i>
+      </div>
+      <div class="pie-cota">Mínimo: como 400 &lt; 700, todos sus votos podrían ser de mayores → 0 % de los jóvenes.</div>
+      <p style="margin:14px 0 0;font-size:14px;color:var(--muted);max-width:none">Cota: <b>[0 %, 100 %]</b>. Este puesto, solo, no dice nada. Pero si usted hubiera sacado <b>800</b> votos, al menos 100 tendrían que venir de jóvenes (800 − 700 mayores) → la cota sería <b>[33 %, 100 %]</b>: un tercio de los jóvenes, mínimo, sin ningún supuesto.</p>
+    </div>
+    <p>La fuerza del método está en <b>agregar miles de puestos</b>: cada uno aporta su rango, y la intersección de todos deja una franja nacional muchísimo más estrecha que cualquiera individual. Esa franja es verdad aritmética, no modelo. Por eso la regla de la casa es que <b>ninguna cifra pública sale sin su cota al lado</b>.</p>
+  </section>
+
+  <section class="paso-metodo" id="estimador">
+    <div class="paso-num">05 · El estimador</div>
+    <h2>Tres niveles, del más terco al más informativo.</h2>
+    <p>Dentro de la franja que dejan las cotas hay que elegir un número. Ahí sí entran supuestos, y se declaran uno por uno. El modelo es el mismo en todos los casos: en cada puesto, la votación de una candidatura es la <b>mezcla</b> de cómo votó cada grupo de edad, pesada por cuántos votantes de ese grupo hay.</p>
+    <div class="formula">votos<sub>c</sub>(p) / total(p)  =  Σ<sub>a</sub> β<sub>ca</sub> · w<sub>a</sub>(p)<br><span style="color:var(--muted)">β<sub>ca</sub> = qué fracción del grupo <i>a</i> votó por <i>c</i>  ·  w<sub>a</sub>(p) = qué fracción de los votantes del puesto <i>p</i> es del grupo <i>a</i></span></div>
+    <div class="escala">
+      <div><b>Cotas</b><span>Duncan-Davis. Cero supuestos, rango en vez de número. Es lo que acompaña a toda cifra publicada.</span></div>
+      <div><b>Goodman + símplex</b><span>Mínimos cuadrados ponderados por votos, con β obligado a estar entre 0 y 1 y a sumar 1 entre candidaturas, estimado por <em>estratos</em> (región × urbano-rural). Las restricciones importan: sin ellas el ajuste devuelve «0 %» y «84 %» —soluciones de esquina— que son artefactos, no hallazgos.</span></div>
+      <div><b>Jerárquico RxC</b><span>King-Rosen-Tanner (1999): β varía de puesto a puesto alrededor de una media del estrato, con un modelo multinomial-Dirichlet. Da intervalos de credibilidad en vez de un punto. Es el estimador para cifras con incertidumbre declarada.</span></div>
+    </div>
+    <p>El supuesto duro es siempre el mismo —se llama <em>constancy</em>—: que dentro de un estrato, el grupo se comporta parecido de un puesto a otro. Es falso en sentido estricto (ese es el sesgo de agregación que Freedman le criticó a King), y por eso se acota por estratos pequeños y se publica junto a la cota dura, que no depende de él.</p>
+  </section>
+
+  <section class="paso-metodo" id="proyeccion">
+    <div class="paso-num">06 · Cuando la edad no se observa</div>
+    <h2>Proyectar el electorado, y luego comprobarlo contra el pasado.</h2>
+    <p>Hay un problema práctico: la tabla de sufragantes por edad va con retraso. Cuando toca estimar una elección cuya composición etaria todavía no se publicó, se proyecta en dos pasos:</p>
+    <ol>
+      <li><b>Departamento:</b> con la elección anterior se calcula qué fracción de cada banda de edad efectivamente votó, y esa tasa se aplica a la población proyectada del DANE. El total se reescala para que cuadre con los votantes reales de la elección nueva: la <em>forma</em> viene del pasado, el <em>nivel</em> del dato real.</li>
+      <li><b>Puesto:</b> se reparte con <em>raking</em> (ajuste proporcional iterativo, Deming-Stephan 1940), usando como semilla el perfil de ese mismo puesto en la elección anterior y como márgenes las edades del departamento y los votantes reales del puesto.</li>
+    </ol>
+    <h3>La comprobación</h3>
+    <p>Un supuesto sin comprobar es una opinión. Este se comprueba hacia atrás: se proyecta 2018 → 2022 con el mismo procedimiento y se compara contra la composición etaria de 2022, que sí se observa.</p>
+    <div class="cuenta">
+      <h4>Backtest 2018 → 2022</h4>
+      <table>
+        <thead><tr><th>Nivel</th><th>Error</th><th class="n">Resultado</th></tr></thead>
+        <tbody>
+          <tr><td>Nacional</td><td>Error medio por banda de edad</td><td class="n">0,32 pp</td></tr>
+          <tr><td>Departamento</td><td>Error medio (mediana)</td><td class="n">0,47 pp</td></tr>
+          <tr><td>Puesto</td><td>Error medio (mediana)</td><td class="n">1,87 pp</td></tr>
+          <tr><td>Sin ajuste demográfico</td><td>Error nacional del método ingenuo</td><td class="n">0,47 pp</td></tr>
+        </tbody>
+      </table>
+      <p style="margin:12px 0 0;font-size:14px;color:var(--muted);max-width:none">Y el cruce fue exigente: entre 2018 y 2022 hubo un estallido social y la participación subió 2,3 puntos. La señal que se quiere medir —cuánto varía la composición etaria <em>entre</em> puestos— es del orden de 2,6 a 7,9 puntos, unas cuatro veces el error de la proyección. Por eso el ejercicio se sostiene; si fuera al revés, no habría nada que estimar.</p>
+    </div>
+    <p>Ese error, además, no se esconde: entra al intervalo final por <em>bootstrap</em> por bloques (se re-muestrean municipios enteros, no puestos sueltos, porque los puestos de un mismo municipio no son independientes).</p>
+  </section>
+
+  <section class="paso-metodo" id="limites">
+    <div class="paso-num">07 · Lo que no puede decir</div>
+    <h2>Los límites, que van pegados al resultado.</h2>
+    <ul>
+      <li><b>Es de grupo, no de persona.</b> Estima cómo se comportó un grupo, y con un rango. Nunca dice cómo votó alguien, y ninguna suma de estas cifras reconstruye un voto individual.</li>
+      <li><b>61+ es una sola banda.</b> La Registraduría no desagrega 70+ ni 80+, y es justo el grupo que más crece. Toda la heterogeneidad interna de esa franja es invisible.</li>
+      <li><b>La composición proyectada es proyección.</b> Mientras la edad de los votantes no se publique para la elección en cuestión, ese paso aporta su propio error —medido, propagado, pero error—. El día que se publique, el modelo mejora gratis.</li>
+      <li><b>Hay territorio excluido.</b> El voto en el exterior, las cárceles y el «puesto censo» quedan fuera: no tienen geografía estable ni demografía comparable. Son alrededor del 2,6 % de los votos.</li>
+      <li><b>El sexo del censo no es el sexo de quien votó.</b> En la tarjeta 07 el porcentaje de mujeres sale del <em>censo</em> del puesto —quién está habilitado—, no de quién se presentó a votar. Las mujeres votan algo más que los hombres, así que el dato subestima levemente su peso real.</li>
+    </ul>
+    <div class="ojo"><b>La regla.</b> Si una cifra no se puede acompañar de su cota y de la lista de lo que supone, no se publica. Preferimos un rango incómodo a un número redondo que no aguanta que lo empujen.</div>
+  </section>
+
+  <section class="paso-metodo" id="falta">
+    <div class="paso-num">08 · Qué falta acá</div>
+    <h2>La edad, en su tarjeta.</h2>
+    <p>La tarjeta 07 muestra hoy sexo y peso rural porque las dos salen de fuentes ya publicadas, puesto por puesto. La edad necesita un archivo más: la composición etaria de los votantes de cada puesto, que existe —es la tabla de sufragantes por edad, agregada de mesa a puesto— pero todavía no está publicada en la fuente que lee esta página.</p>
+    <p>Cuando esté, la tarjeta la muestra sola, sin tocar una línea de código: el mismo promedio ponderado por sus votos que hoy se hace con el sexo, en cuatro grupos —18-25, 26-40, 41-60 y 61+—. Y la estimación de <em>cómo votó cada grupo por usted</em>, con cotas, es el paso siguiente: para una candidatura local, con decenas o cientos de puestos, las cotas son más anchas que en una presidencial de trece mil, y eso también hay que decirlo cuando llegue.</p>
+    <p>Mientras tanto, la tarjeta dice que falta. Estimar la edad con el promedio del municipio y presentarla como suya sería exactamente el error que esta página entera explica.</p>
+  </section>
+
+  <div class="cierre">
+    <h2>Vuelva a su perfil.</h2>
+    <p>El número de su tarjeta ya viene con su comparación contra el municipio; ahora sabe qué hay detrás de él y, sobre todo, qué no le puede pedir.</p>
+    <a href="candidato-360.html?abrir=1">← Volver al CRM</a>
+  </div>
+</div></main>
+
+</body>
+</html>

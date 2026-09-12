@@ -3041,7 +3041,7 @@ function mostrarPerfil() {
       <li><b>${pct1(P.urbano)}</b> en la cabecera.${P.especial ? ` Otros ${P.especial.toLocaleString('es-CO')} votos están en puestos especiales (cárceles y censo consolidado), que no son ni lo uno ni lo otro.` : ''}</li>
     </ul>
     ${edad}
-    <p class="puntaje-nota">Fuente: censo electoral por puesto de la Registraduría (PUESTOS_GEOREF, columnas de mujeres y hombres) y la zona electoral de cada mesa. Cubre el ${pct1(P.cobertura)} de su votación: ${P.sinCoordenada ? `${P.sinCoordenada.toLocaleString('es-CO')} votos están en puestos sin censo publicado` : 'todos sus puestos tienen censo publicado'}.</p>`;
+    <p class="puntaje-nota">Fuente: censo electoral por puesto de la Registraduría (PUESTOS_GEOREF, columnas de mujeres y hombres) y la zona electoral de cada mesa. Cubre el ${pct1(P.cobertura)} de su votación: ${P.sinCoordenada ? `${P.sinCoordenada.toLocaleString('es-CO')} votos están en puestos sin censo publicado` : 'todos sus puestos tienen censo publicado'}. <a class="enlace-boton" href="candidato-360-perfil.html">Cómo se lee esto sin violar el secreto del voto →</a></p>`;
   $('introModal').classList.add('open');
 }
 
