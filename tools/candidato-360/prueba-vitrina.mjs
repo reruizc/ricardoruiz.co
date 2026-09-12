@@ -55,10 +55,10 @@ r.avisoRuta = (await p.textContent('#candidateRoute .c360-vitrina p')).slice(0, 
 r.botonAntesDeResponder = await p.evaluate(() => document.getElementById('abrirCRM').offsetParent === null);
 await p.evaluate(() => { document.querySelector('input[name="corporationRoute"][value="same"]').checked = true; toggleCorporationChoice({ animar: true }); });
 await p.waitForTimeout(400);
-r.botonCRM = await p.textContent('#candidateRoute button.next');
+r.botonCRM = await p.textContent('#abrirCRM');
 await p.screenshot({ path: '/tmp/c360-anon-candidato.png' });
 // Abrir el CRM sí topa con el muro
-await p.click('#candidateRoute button.next');
+await p.click('#abrirCRM');
 await p.waitForTimeout(300);
 r.muroAlAbrirCRM = await p.evaluate(() => document.getElementById('c360Paywall').classList.contains('open'));
 r.noEntroAlCRM = await p.evaluate(() => document.getElementById('crm').classList.contains('hidden'));

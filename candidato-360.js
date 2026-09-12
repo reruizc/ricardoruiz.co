@@ -343,7 +343,9 @@ function aplicarGateRuta() {
   const form = document.querySelector('#candidateRoute form'); if (!form) return;
   const bloqueado = SESSION.listo && !SESSION.acceso;
   let aviso = form.querySelector(':scope > .c360-vitrina');
-  const boton = form.querySelector('button.next');
+  /* Por id, no por clase: en el pie hay dos botones «next» —continuar y abrir
+     el CRM— y el primero se quedaba con la etiqueta del segundo. */
+  const boton = $('abrirCRM');
   if (boton) boton.textContent = bloqueado ? 'Activar y abrir el CRM →' : 'Abrir CRM de campaña →';
   if (!bloqueado) return aviso?.remove();
   if (!aviso) {
@@ -785,7 +787,8 @@ function irAPaso(nombre, { animar = false } = {}) {
   const sinPreguntaDeRuta = document.querySelector('.route-option[data-route="same"]')?.classList.contains('hidden');
   $('pasoAtras').classList.toggle('hidden', pasos.indexOf(pasoRuta) <= (sinPreguntaDeRuta ? 1 : 0));
   $('abrirCRM').classList.toggle('hidden', pasoRuta !== 'partido');
-  if (pasoRuta !== 'lugar') ocultarMapaDepto();
+  $('continuarLugar').classList.toggle('hidden', pasoRuta !== 'lugar');
+  if (pasoRuta === 'lugar') { pintarMapaDepto(nombreDepartamentoElegido()); refrescarContinuar(); } else ocultarMapaDepto();
   const [titulo, copy] = PASO_COPY[pasoRuta] || PASO_COPY.ruta;
   $('rutaTitulo').textContent = titulo; $('rutaCopy').textContent = copy;
   if (animar) document.querySelector('#candidateRoute .search-box')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -806,8 +809,6 @@ function pasoAnterior() {
    encendido sí. Se dibuja en SVG con la misma capa que alimenta el
    desplegable —ya está en caché— y se queda un par de segundos antes de pasar
    a lo que sigue, que es lo que dura mirar un mapa y decir «sí, ese es».   */
-const MAPA_PAUSA = 1900;
-let pausaMapa = 0;
 function proyectarDepartamentos(geo, ancho, alto) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const recorre = c => { if (typeof c[0] === 'number') { x0 = Math.min(x0, c[0]); x1 = Math.max(x1, c[0]); y0 = Math.min(y0, c[1]); y1 = Math.max(y1, c[1]); } else c.forEach(recorre); };
@@ -825,7 +826,7 @@ function caminoDeGeometria(geom, proy) {
 }
 function ocultarMapaDepto(id = 'mapaDepto') { $(id)?.classList.add('hidden'); }
 async function pintarMapaDepto(nombre, id = 'mapaDepto') {
-  const caja = $(id), lienzo = $(id + 'Lienzo'); if (!caja || !lienzo || !nombre) return;
+  const caja = $(id), lienzo = $(id + 'Lienzo'); if (!caja || !lienzo) return;
   try {
     const geo = await fetchJSON(`${S3}/mapas-2026/DEPARTAMENTOS2.json`);
     const W = 300, H = 330, proy = proyectarDepartamentos(geo, W, H), objetivo = normalizedText(nombre);
@@ -833,17 +834,23 @@ async function pintarMapaDepto(nombre, id = 'mapaDepto') {
       const suyo = normalizedText(f.properties?.name || '') === objetivo;
       return `<path d="${caminoDeGeometria(f.geometry, proy)}" class="${suyo ? 'depto-elegido' : 'depto'}"></path>`;
     }).join('');
-    lienzo.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Mapa de Colombia con ${escHtml(nombre)} resaltado">${partes}</svg>`;
-    $(id + 'Pie').textContent = nombre;
+    lienzo.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${nombre ? `Mapa de Colombia con ${escHtml(nombre)} resaltado` : 'Mapa de Colombia'}">${partes}</svg>`;
+    $(id + 'Pie').textContent = nombre || 'Elija el departamento';
+    caja.classList.toggle('sin-elegir', !nombre);
     caja.classList.remove('hidden');
-    pausaMapa = Date.now() + MAPA_PAUSA;
   } catch (e) { ocultarMapaDepto(); }
 }
-/* El departamento se elige, se ve en el mapa y solo entonces sigue el camino. */
+function nombreDepartamentoElegido() { const sel = $('campaignDepartment'); return sel?.value ? (sel.options[sel.selectedIndex]?.text || '') : ''; }
+/* El departamento se elige y se enciende en el mapa; de ahí en adelante manda
+   la persona: el botón de continuar se habilita cuando el territorio está
+   completo, pero no salta solo. */
 async function elegirDepartamento() {
-  const sel = $('campaignDepartment'), nombre = sel.options[sel.selectedIndex]?.text || '';
-  if (sel.value) await pintarMapaDepto(nombre); else ocultarMapaDepto();
+  await pintarMapaDepto(nombreDepartamentoElegido());
   return loadCampaignMunicipalities();
+}
+function refrescarContinuar() {
+  const boton = $('continuarLugar'); if (!boton) return;
+  boton.disabled = !territorioListo($('otherCorporation').value);
 }
 /* Lo mismo en el wizard de candidatura nueva, que pregunta el departamento
    igual y merece la misma confirmación. */
@@ -851,13 +858,8 @@ function mapaDeptoNuevo() {
   const sel = $('department'), nombre = sel?.options[sel.selectedIndex]?.text || '';
   if (sel?.value) pintarMapaDepto(nombre, 'mapaDeptoNuevo'); else ocultarMapaDepto('mapaDeptoNuevo');
 }
-/* Cuando el territorio queda completo —departamento, municipio y, si es JAL,
-   la localidad— la tarjeta pasa sola a la última pregunta, con el mapa a la
-   vista el tiempo que dura mirarlo. */
-function territorioResuelto() {
-  if (pasoRuta !== 'lugar' || !territorioListo($('otherCorporation').value)) return;
-  setTimeout(() => { if (pasoRuta === 'lugar' && territorioListo($('otherCorporation').value)) irAPaso('partido', { animar: true }); }, Math.max(0, pausaMapa - Date.now()));
-}
+/* Cada cambio del territorio decide si ya se puede continuar. */
+function territorioResuelto() { refrescarContinuar(); }
 const historicCorporationPicker = createCorporationPicker('Nueva corporación', '', (key, card) => { $('otherCorporation').value = key; updateCampaignTerritory(); avanzarPaso('lugar', card); });
 historicCorporationPicker.id = 'historicCorporationPicker';
 $('otherCorporationField').after(historicCorporationPicker);
@@ -889,7 +891,10 @@ function partidoVigente() {
 function updateCampaignTerritory() {
   const corp = $('otherCorporation').value, municipal = CORP_MUNICIPAL.includes(corp), jal = corp === 'jal';
   refrescarPartidoCampana();
-  $('campaignMunicipalityField').classList.toggle('hidden', !municipal); $('campaignLocalityField').classList.toggle('hidden', !jal);
+  /* Sin departamento no hay municipio que ofrecer: el desplegable en «Primero
+     seleccione departamento» es una pregunta que no se puede responder. */
+  $('campaignMunicipalityField').classList.toggle('hidden', !municipal || !$('campaignDepartment').value);
+  $('campaignLocalityField').classList.toggle('hidden', !jal || !$('campaignMunicipality').value);
   if (!municipal) $('campaignMunicipalityNota').classList.add('hidden');
   $('campaignDepartment').required = municipal || CORP_DEPARTAMENTAL.includes(corp); $('campaignMunicipality').required = municipal; $('campaignLocality').required = jal;
   if ($('campaignDepartment').value && municipal) loadCampaignMunicipalities();
@@ -925,8 +930,11 @@ let municipalitiesByDepartment = {};
 async function loadCampaignMunicipalities() {
   const dep = $('campaignDepartment').value;
   refrescarPartidoCampana();                 /* otro departamento, otro catálogo de partidos */
-  if (!dep) return;
+  if (!dep) { $('campaignMunicipalityField').classList.add('hidden'); return refrescarContinuar(); }
   $('campaignLocality').innerHTML = '<option value="">Primero seleccione municipio</option>';
+  /* Ya hay departamento: la pregunta del municipio tiene sentido y aparece
+     —salvo que el departamento tenga uno solo, que lo decide municipioImplicito. */
+  if (CORP_MUNICIPAL.includes($('otherCorporation').value)) $('campaignMunicipalityField').classList.remove('hidden');
   const municipios = await cargarMunicipios($('campaignMunicipality'), dep, `crm-${dep}`);
   if (municipioImplicito($('campaignMunicipality'), $('campaignMunicipalityField'), $('campaignMunicipalityNota'), municipios)) loadCampaignLocalities();
   territorioResuelto();
@@ -940,8 +948,10 @@ async function cargarLocalidades(select, status, depNombre, munNombre) {
   } catch (e) { select.innerHTML = '<option value="">No se pudieron cargar las comunas o localidades</option>'; status.textContent = 'La fuente territorial no está disponible en este momento.'; }
 }
 async function loadCampaignLocalities() {
-  territorioResuelto();                 /* elegir municipio ya pasa a la última pregunta */
-  if ($('otherCorporation').value !== 'jal' || !$('campaignMunicipality').value) return;
+  const jal = $('otherCorporation').value === 'jal', hayMunicipio = Boolean($('campaignMunicipality').value);
+  $('campaignLocalityField').classList.toggle('hidden', !jal || !hayMunicipio);
+  territorioResuelto();
+  if (!jal || !hayMunicipio) return;
   await cargarLocalidades($('campaignLocality'), $('campaignLocalityStatus'), $('campaignDepartment').options[$('campaignDepartment').selectedIndex].text, $('campaignMunicipality').value);
 }
 function campaignTerritory(corp) {
@@ -1285,6 +1295,11 @@ const CORP_CON_LUGAR = {
   asamblea: l => `la Asamblea de ${l}`, gobernacion: l => `la Gobernación de ${l}`,
   camara: l => `la Cámara por ${l}`, senado: () => 'el Senado', presidencial: () => 'la consulta presidencial', otra: l => l || 'una elección',
 };
+/* «a el Concejo» no existe: en español es «al Concejo». */
+function aEl(frase) { return String(frase || '').replace(/^el\s/, ''); }
+function aCorp(tipo, lugar) { const n = nombreDeCorp(tipo, lugar); return n.startsWith('el ') ? `al ${aEl(n)}` : `a ${n}`; }
+/* Ni «Bogotá, D.C..»: si el nombre ya termina en punto, no se le pone otro. */
+function punto(frase) { return /\.$/.test(frase) ? frase : frase + '.'; }
 function nombreDeCorp(tipo, lugar) { const f = CORP_CON_LUGAR[tipo] || CORP_CON_LUGAR.otra; return lugar ? f(lugar) : (tipo === 'senado' || tipo === 'presidencial' ? f() : { jal: 'la JAL', concejo: 'el Concejo', alcaldia: 'la Alcaldía', asamblea: 'la Asamblea', gobernacion: 'la Gobernación', camara: 'la Cámara' }[tipo] || 'una elección'); }
 function haceCuanto(año) {
   const n = 2027 - Number(año || 0);
@@ -1317,18 +1332,30 @@ const FRASES_BLOQUE = {
     p => `Con ${p} el mensaje lo pone usted: no hay un bloque que lo defina de antemano, y eso también es una ventaja.`,
   ],
 };
+/* El salto se cuenta distinto si además CAMBIA DE TERRITORIO —una edil de
+   Teusaquillo que se lanza al Concejo de Leticia no está dando el mismo paso
+   que si se lanzara al de Bogotá— y si el destino es una ciudad grande o un
+   municipio pequeño, donde «la ciudad entera» no significa nada. */
 const FRASES_SALTO = {
-  misma: () => 'Repetir es la forma más barata de crecer: ya sabe dónde están sus votos y el mapa se los muestra.',
-  'jal>concejo': () => 'De la localidad a la ciudad entera: el salto es grande, y por eso la meta se reparte por donde vota su partido.',
-  'jal>alcaldia': () => 'De la localidad a la ciudad entera, y de una curul al primer puesto: el mapa cambia de escala.',
+  misma: c => c.mudanza
+    ? `Y se muda: de ${c.lugarViejo} a ${c.lugarNuevo}. La corporación la conoce; el territorio es nuevo y su votación anterior no cuenta ahí.`
+    : 'Repetir es la forma más barata de crecer: ya sabe dónde están sus votos y el mapa se los muestra.',
+  'jal>concejo': c => c.esCiudad
+    ? 'De la localidad a la ciudad entera: el salto es grande, y por eso la meta se reparte por donde vota su partido.'
+    : `De una localidad a todo ${c.lugarNuevo}: es otra escala y otro censo, así que la meta sale de lo que costó una curul allá.`,
+  'jal>alcaldia': c => c.esCiudad
+    ? 'De la localidad a la ciudad entera, y de una curul al primer puesto: el mapa cambia de escala.'
+    : `De una localidad a la Alcaldía de ${c.lugarNuevo}: ya no es sumar para una curul, es ganar.`,
   'concejo>alcaldia': () => 'Del Concejo a la Alcaldía se pasa de sumar a ganar: ya no es una curul, es el primer puesto.',
   'concejo>asamblea': () => 'Del municipio al departamento: la meta ya no vive en una ciudad sino en todas.',
   'concejo>gobernacion': () => 'Del Concejo a la Gobernación: de una curul en una ciudad al primer puesto del departamento.',
   'alcaldia>gobernacion': () => 'De la Alcaldía a la Gobernación: la misma pregunta —ganar— en un territorio mucho más grande.',
   'asamblea>gobernacion': () => 'De la Asamblea a la Gobernación: del voto por lista al voto por nombre.',
-  'congreso>territorial': () => 'Del Congreso al territorio: la votación de entonces está repartida por todo el departamento y la meta ahora vive en un solo lugar.',
+  'congreso>territorial': c => `Del Congreso al territorio: su votación de entonces está regada por todo el departamento y la meta ahora vive en ${c.lugarNuevo || 'un solo lugar'}`,
   'presidencial>territorial': () => 'De una campaña nacional a una local: los votos de entonces no son suyos, pero el músculo sí.',
-  otra: () => 'Cambiar de corporación cambia la pregunta: la meta se calcula contra la elección de 2023 de ESA corporación en ESE lugar.',
+  otra: c => c.mudanza
+    ? `Cambia de corporación y de territorio: la meta se calcula contra la elección de 2023 de ESA corporación en ${c.lugarNuevo}`
+    : 'Cambiar de corporación cambia la pregunta: la meta se calcula contra la elección de 2023 de ESA corporación en ese lugar.',
 };
 function tipoDeSalto(desde, hacia) {
   if (desde === hacia) return 'misma';
@@ -1343,15 +1370,21 @@ function fraseDePartida({ candidate, corpKey, territory, campana }) {
   const destino = nombreDeCorp(corpKey, lugarNuevo);
   const cuando = haceCuanto(hist.año);
   const apertura = n >= 2
-    ? `¡${n} candidaturas en el historial (${[...new Set(candidate.history.map(candidateYear).filter(Boolean))].sort((a, b) => a - b).join(', ')})! La última fue a ${nombreDeCorp(hist.tipo, hist.lugar)}${cuando ? ` ${cuando}` : ''}.`
-    : `¡Vimos que se lanzó a ${nombreDeCorp(hist.tipo, hist.lugar)}${cuando ? ` ${cuando}` : ''}!`;
-  const ahora = `Ahora vamos por ${destino}.`;
+    ? punto(`¡${n} candidaturas en el historial (${[...new Set(candidate.history.map(candidateYear).filter(Boolean))].sort((a, b) => a - b).join(', ')})! La última fue ${aCorp(hist.tipo, hist.lugar)}${cuando ? ` ${cuando}` : ''}`)
+    : `¡Vimos que se lanzó ${aCorp(hist.tipo, hist.lugar)}${cuando ? ` ${cuando}` : ''}!`;
+  const ahora = punto(`Ahora vamos por ${destino}`);
+  /* ¿Se muda? El territorio de la campaña contra el de su última elección. */
+  const mudanza = Boolean(lugarNuevo) && Boolean(hist.lugar) && normalizedText(lugarNuevo) !== normalizedText(hist.lugar);
   const partido = String(campana?.partido || candidate?.partido || '').trim();
   const bloque = partido ? PartidosBloques.bloqueDeCandidatura(partido, candidate?.nombre || '') : 'sc';
   const partidoBonito = partido.replace(/^(PARTIDO|MOVIMIENTO)\s+(POLÍTICO\s+)?/i, '').split(' ').map(w => w.length > 3 ? NOMBRE_BONITO(w) : w.toLowerCase()).join(' ').replace(/^(\w)/, c => c.toUpperCase());
   const cambioDePartido = partido && candidate?.partido && normalizedText(partido) !== normalizedText(candidate.partido);
-  const conQuien = partido ? elegir(FRASES_BLOQUE[bloque] || FRASES_BLOQUE.sc, candidate?.nombre)(partidoBonito) + (cambioDePartido ? ` Es un aval nuevo: el mapa conserva su votación, la huella del partido cambia.` : '') : '';
-  const salto = FRASES_SALTO[tipoDeSalto(hist.tipo, corpKey)]();
+  const avalNuevo = !cambioDePartido ? ''
+    : mudanza ? ' Es un aval nuevo, y en territorio nuevo: la huella que cuenta es la de ese partido allá.'
+    : ' Es un aval nuevo: el mapa conserva su votación, la huella del partido cambia.';
+  const conQuien = partido ? elegir(FRASES_BLOQUE[bloque] || FRASES_BLOQUE.sc, candidate?.nombre)(partidoBonito) + avalNuevo : '';
+  const contexto = { lugarViejo: hist.lugar, lugarNuevo, mudanza, esCiudad: Boolean(cityLayerFor(lugarNuevo)) };
+  const salto = punto(FRASES_SALTO[tipoDeSalto(hist.tipo, corpKey)](contexto));
   return [apertura, ahora, salto, conQuien].filter(Boolean).join(' ');
 }
 
@@ -2627,7 +2660,7 @@ async function renderBarriosForArea(key) {
    único que importa a esa escala: dónde está la gente que ya votó por usted.
    Lo usan el nivel «Puestos» de los municipios sin comunas y el respaldo de
    las ciudades cuya capa barrial no cargó. */
-async function pintarPuestos(mesas, donde, meta = 0) {
+async function pintarPuestos(mesas, donde, meta = 0, { censo = false } = {}) {
   let places = {}; try { places = await puestosPorBarrio(); } catch (e) {}
   const historical = {}, points = {};
   mesas.forEach(m => {
@@ -2635,9 +2668,11 @@ async function pintarPuestos(mesas, donde, meta = 0) {
     historical[name] = (historical[name] || 0) + Number(m.v || 0);
     if (place && Number.isFinite(place.lat) && Number.isFinite(place.lng)) points[name] = place;
   });
-  const values = crmMapMode === 'proyectado' && meta ? distributeVotes(historical, meta) : historical;
+  const proyectando = crmMapMode === 'proyectado' && Boolean(meta);
+  const values = proyectando ? distributeVotes(historical, meta) : historical;
   const max = Math.max(1, ...Object.values(values));
-  renderMapBreakdown(values, Object.fromEntries(Object.keys(values).map(name => [name, name])), `${crmMapMode === 'proyectado' && meta ? 'Meta proyectada' : 'Votos'} por puesto de votación`);
+  const que = proyectando ? 'Meta proyectada' : censo ? 'Censo electoral' : 'Votos';
+  renderMapBreakdown(values, Object.fromEntries(Object.keys(values).map(name => [name, name])), `${que} por puesto de votación`);
   if (crmBarrioLayer) crmLeafletMap.removeLayer(crmBarrioLayer);
   ponerBasemap('crm-basemap-tenue');
   if (crmMapLayer && crmMapState?.rotado) crmLeafletMap.removeLayer(crmMapLayer);
@@ -2646,12 +2681,14 @@ async function pintarPuestos(mesas, donde, meta = 0) {
   crmBarrioLayer = L.featureGroup(Object.entries(points).map(([name, point]) => {
     const v = Number(values[name] || 0);
     return L.circleMarker([point.lat, point.lng], { radius: 5 + Math.round(9 * Math.sqrt(v / max)), color: '#fff', weight: 1.2, fillColor: MAP_COLOR(v / max), fillOpacity: .92 })
-      .bindTooltip(`<strong>${escHtml(name)}</strong><br>${v.toLocaleString('es-CO')} ${crmMapMode === 'proyectado' && meta ? 'votos proyectados' : 'votos'}`, { sticky: true });
+      .bindTooltip(`<strong>${escHtml(name)}</strong><br>${v.toLocaleString('es-CO')} ${proyectando ? 'votos proyectados' : censo ? 'personas habilitadas' : 'votos'}`, { sticky: true });
   })).addTo(crmLeafletMap);
   const conCoordenada = Object.keys(points).length;
   encuadrar(crmBarrioLayer, 40);
   $('crmMapNote').innerHTML = `Puestos de votación de ${escHtml(donde)}, en su coordenada y agrupados por el barrio que les asigna la Registraduría. `
-    + (conCoordenada ? 'El tamaño del punto es la votación.' : 'Ninguno de sus puestos tiene coordenada publicada, así que en el mapa no aparecen; el desglose de la derecha sí los lista.')
+    + (conCoordenada
+      ? (proyectando ? 'El tamaño del punto es la meta que le toca a cada puesto.' : censo ? 'El tamaño del punto es el censo electoral: cuánta gente vota ahí. Usted todavía no tiene votos en este territorio.' : 'El tamaño del punto es la votación.')
+      : 'Ninguno de sus puestos tiene coordenada publicada, así que en el mapa no aparecen; el desglose de la derecha sí los lista.')
     + (Object.keys(places).length ? '' : ' La fuente de puestos no respondió.');
 }
 
@@ -2750,7 +2787,9 @@ function nivelesMunicipio() {
     if (crmBarrioLayer) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
     aplicarBasemap(false); crmMapLayer.setStyle({ fillOpacity: .94 });
     encuadrar(crmMapLayer, 15);
-    $('crmMapNote').textContent = `Votación histórica concentrada en ${MAPA_MUNICIPAL.nombre}. Abra «Puestos» para ver dónde está, puesto por puesto.` + notaColorPartido();
+    $('crmMapNote').textContent = (MAPA_MUNICIPAL.censo
+      ? `${MAPA_MUNICIPAL.nombre} es el territorio de su candidatura. Abra «Puestos» para ver dónde vota la gente, puesto por puesto.`
+      : `Votación histórica concentrada en ${MAPA_MUNICIPAL.nombre}. Abra «Puestos» para ver dónde está, puesto por puesto.`) + notaColorPartido();
     marcar('municipio');
   });
   controls.querySelector('[data-level="puestos"]').addEventListener('click', async () => {
@@ -2758,7 +2797,7 @@ function nivelesMunicipio() {
     /* A escala de puestos el municipio llena la pantalla: el polígono pasa a
        contorno para que se vea el callejero y los puntos, no un bloque de color. */
     crmMapLayer.setStyle({ fillOpacity: .08 });
-    await pintarPuestos(MAPA_MUNICIPAL.mesas, MAPA_MUNICIPAL.nombre, meta);
+    await pintarPuestos(MAPA_MUNICIPAL.mesas, MAPA_MUNICIPAL.nombre, meta, { censo: Boolean(MAPA_MUNICIPAL.censo) });
     marcar('puestos');
   });
 }
@@ -2791,13 +2830,43 @@ function refreshMapLevels() {
   setMapLevel(state.focusKey ? 'barrio' : 'localidad');
 }
 /* Punto de entrada del mapa histórico. */
+/* Si la campaña se muda a un territorio donde su historial no tiene un solo
+   voto —de la JAL de Teusaquillo al Concejo de Leticia—, el mapa de su
+   votación anterior no informa nada sobre la nueva: lo útil es ver el
+   territorio al que aspira, con sus puestos. */
 async function loadHistoricalMap(candidate) {
   electionViewRecords = []; electionViewSnapshots = new Map(); electionViewActive = ''; $('crmMapToggles')?.remove(); crmMapState = null; recorteActivo = null;
+  /* Con la campaña mudada a otro territorio, las vistas por año sobran: todas
+     muestran votaciones que no cuentan donde ahora compite. */
+  if (alcanceObjetivo() && !(await historialEnObjetivo(candidate))) { await renderTerritorioDeCampana(); return; }
   const records = electionViewHistory(candidate);
   if (records.length < 2) { await renderSingleElection(candidate); ensureCRMMapToggles(); refreshMapLevels(); return; }
   electionViewRecords = records; electionViewActive = records[records.length - 1].year;
   await showElectionYear(records[records.length - 1], { restoreToggles: false });
   renderElectionViewToggles();
+}
+/* El territorio de la campaña cuando el historial está en otra parte: el mismo
+   mapa que ve una candidatura nueva, más los puestos de votación del municipio
+   —dimensionados por censo, que es lo único honesto cuando no hay votos
+   propios— para que el nivel «Puestos» tenga qué mostrar. */
+async function renderTerritorioDeCampana() {
+  /* La campaña que manda es la del formulario —es la que acaba de responder la
+     persona—; CAMPANA_ACTUAL es el respaldo para cuando se vuelve al CRM. */
+  const corp = $('otherCorporation').value || CAMPANA_ACTUAL?.corp || corporacionHistorica(crmCandidate) || 'concejo';
+  const c = alcanceObjetivo() ? campanaActual(corp) : (CAMPANA_ACTUAL || campanaActual(corp));
+  $('crmMapPanelNum').textContent = '01 · Mapa del territorio de campaña';
+  /* Los niveles del mapa anterior no sirven acá hasta saber si hay puestos. */
+  $('crmMap')?.querySelector('.crm-map-levels')?.remove();
+  await renderTerritorioObjetivo(c);
+  MAPA_MUNICIPAL = null;
+  if (!CORP_MUNICIPAL.includes(c.corp) || !c.municipio) return;
+  try {
+    const codigo = codigoMunicipioObjetivo(); if (!codigo) return;
+    const puestos = await puestosPorBarrio(), prefijo = `${String(c.departamento || '').padStart(2, '0')}${String(codigo).padStart(3, '0')}`;
+    const mesas = Object.entries(puestos).filter(([code]) => code.slice(0, 5) === prefijo)
+      .map(([code, p]) => ({ dep: code.slice(0, 2), mun: code.slice(2, 5), zon: code.slice(5, 7), pue: code.slice(7, 9), pueNom: p.barrio, v: p.censo }));
+    if (mesas.length) { MAPA_MUNICIPAL = { mesas, nombre: c.municipio, censo: true }; refreshMapLevels(); }
+  } catch (e) { /* sin puestos, queda el polígono del municipio */ }
 }
 /* Territorio objetivo de una candidatura NUEVA: no hay votos que pintar; se
    muestra dónde va a competir, con la unidad elegida resaltada. */

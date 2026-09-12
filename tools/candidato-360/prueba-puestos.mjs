@@ -9,9 +9,11 @@
    Y en las ciudades con comunas, el tercer nivel se llama por lo que hay:
    «Barrio» donde hay cartografía, «Puestos» donde no.
 
-   De paso: si la campaña nueva es en Bogotá y el historial no tiene un solo
-   voto allá (Daniel Carvalho: Cámara Antioquia → Concejo de Bogotá), el mapa
-   no puede ser un Bogotá vacío; se queda donde estuvo la votación.
+   De paso: si la campaña se muda a un territorio donde el historial no tiene
+   un solo voto (La Ceja → Concejo de Bogotá), el mapa del historial no dice
+   nada de la nueva campaña. Se muestra el TERRITORIO al que aspira, y sus
+   puestos dimensionados por censo —lo único honesto cuando todavía no hay
+   votos propios ahí—.
 
      node tools/candidato-360/prueba-puestos.mjs                               */
 const { chromium } = await import('playwright')
@@ -25,8 +27,16 @@ const leafletJS = await readFile(LEAFLET + '/leaflet.js', 'utf8'), leafletCSS = 
 const ANTIOQUIA = { type: 'FeatureCollection', features: [
   { type: 'Feature', properties: { mpio_cnmbr: 'LA CEJA', mun_elec: '021' }, geometry: { type: 'Polygon', coordinates: [[[-75.47, 5.98], [-75.40, 5.98], [-75.40, 6.05], [-75.47, 6.05], [-75.47, 5.98]]] } },
 ] };
+/* Bogotá como municipio (uno solo) y por localidades, para el territorio nuevo. */
+const BOGOTA_MUN = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { mpio_cnmbr: 'BOGOTÁ, D.C.', mun_elec: '001' }, geometry: { type: 'Polygon', coordinates: [[[-74.2, 4.5], [-74.0, 4.5], [-74.0, 4.8], [-74.2, 4.8], [-74.2, 4.5]]] } }] };
+const BOGOTA = { type: 'FeatureCollection', features: [
+  { type: 'Feature', properties: { LocCodigo: '17', LocNombre: 'LA CANDELARIA' }, geometry: { type: 'Polygon', coordinates: [[[-74.09, 4.58], [-74.06, 4.58], [-74.06, 4.61], [-74.09, 4.61], [-74.09, 4.58]]] } },
+  { type: 'Feature', properties: { LocCodigo: '03', LocNombre: 'SANTA FE' }, geometry: { type: 'Polygon', coordinates: [[[-74.09, 4.61], [-74.06, 4.61], [-74.06, 4.64], [-74.09, 4.64], [-74.09, 4.61]]] } },
+] };
 const fila = (code, barrio, lat, lng) => { const r = new Array(16).fill(''); r[1] = code; r[7] = barrio; r[9] = String(lat); r[10] = String(lng); r[13] = '900'; r[14] = '800'; return r.join(';'); };
-const PUESTOS = ['CABECERA', fila('010210101', 'CENTRO', 6.03, -75.43), fila('010210102', 'SAN CAYETANO', 6.02, -75.44), fila('010210103', 'FATIMA', 6.01, -75.42)].join('\n');
+const PUESTOS = ['CABECERA', fila('010210101', 'CENTRO', 6.03, -75.43), fila('010210102', 'SAN CAYETANO', 6.02, -75.44), fila('010210103', 'FATIMA', 6.01, -75.42),
+  /* Dos puestos de Bogotá para el mapa del territorio nuevo. */
+  fila('160010101', 'LAS NIEVES', 4.60, -74.07), fila('160010102', 'LA CANDELARIA', 4.59, -74.08)].join('\n');
 const MESAS = [
   { dep: '01', mun: '021', zon: '01', pue: '01', com: '', comNom: '', munNom: 'LA CEJA', pueNom: 'CENTRO', v: 5000 },
   { dep: '01', mun: '021', zon: '01', pue: '02', com: '', comNom: '', munNom: 'LA CEJA', pueNom: 'SAN CAYETANO', v: 2000 },
@@ -43,6 +53,8 @@ await p.route('**', async route => {
   if (u.includes('leaflet.min.css')) return route.fulfill({ status: 200, contentType: 'text/css', body: leafletCSS });
   if (u.includes('tile.openstreetmap.org')) return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#eee"/></svg>' });
   if (u.includes('Departamentos-mps/01.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ANTIOQUIA) });
+  if (u.includes('BOG-LOCALIDADX.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(BOGOTA) });
+  if (u.includes('Departamentos-mps/16.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(BOGOTA_MUN) });
   if (u.includes('PUESTOS_GEOREF.csv')) return route.fulfill({ status: 200, contentType: 'text/csv', body: PUESTOS });
   if (u.endsWith('/cand-la-ceja.json')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ mesas: MESAS }) });
   if (u.includes('/c360/')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, acceso: true, fuente: 'admin', vinculo: null, email: 'reruizc@gmail.com' }) });
@@ -85,11 +97,17 @@ await p.evaluate(() => {
   document.querySelector('input[name="corporationRoute"][value="other"]').checked = true;
   document.getElementById('otherCorporation').value = 'concejo';
   document.getElementById('campaignDepartment').innerHTML = '<option value="16">BOGOTÁ D.C.</option>'; document.getElementById('campaignDepartment').value = '16';
-  document.getElementById('campaignMunicipality').innerHTML = '<option value="BOGOTÁ, D.C.">BOGOTÁ, D.C.</option>'; document.getElementById('campaignMunicipality').value = 'BOGOTÁ, D.C.';
 });
+/* Los municipios se cargan como en la página, para que el código electoral del
+   municipio destino se pueda resolver. */
+await p.evaluate(() => loadCampaignMunicipalities());
+await p.waitForTimeout(500);
 await p.evaluate(() => loadHistoricalMap(crmCandidate));
 await p.waitForTimeout(1200);
-r.bogota = await p.evaluate(() => ({ titulo: document.getElementById('crmMapTitle').textContent, nota: document.getElementById('crmMapNote').textContent, votos: document.getElementById('crmMapVotes').textContent, niveles: [...document.querySelectorAll('.crm-map-levels [data-level]')].map(b => b.textContent.trim()), recorte: recorteActivo && { sinVotos: recorteActivo.sinVotos, fuera: recorteActivo.mesasFuera } }));
+r.bogota = await p.evaluate(() => ({ titulo: document.getElementById('crmMapTitle').textContent, nota: document.getElementById('crmMapNote').textContent, panel: document.getElementById('crmMapPanelNum').textContent, niveles: [...document.querySelectorAll('.crm-map-levels [data-level]')].map(b => b.textContent.trim()), filas: [...document.querySelectorAll('#crmBreakdown .crm-breakdown-item')].map(x => x.textContent.replace(/\s+/g, ' ').trim()) }));
+await p.evaluate(() => document.querySelector('.crm-map-levels [data-level="puestos"]')?.click());
+await p.waitForTimeout(800);
+r.bogotaPuestos = await p.evaluate(() => ({ puntos: crmBarrioLayer ? crmBarrioLayer.getLayers().length : 0, titulo: document.querySelector('#crmBreakdown h4')?.textContent || '', nota: document.getElementById('crmMapNote').textContent }));
 await p.screenshot({ path: SP + '/puestos-bogota-sin-votos.png' });
 await b.close();
 
@@ -102,8 +120,8 @@ const pruebas = [
   ['y la nota dice que son puestos y no barrios', /Puestos de votación de LA CEJA/.test(r.puestos.nota) && /tamaño del punto/i.test(r.puestos.nota)],
   ['«Municipio» devuelve el polígono y quita los puntos', r.vuelta.puntos === null && r.vuelta.activo === 'municipio' && r.vuelta.poligono === true],
   ['en las ciudades con comunas la etiqueta va según haya cartografía', r.etiquetas.pereira && r.etiquetas.ibague && r.etiquetas.bogota && !r.etiquetas.otra],
-  ['si la campaña es en Bogotá pero no hay votos allá, el mapa se queda en La Ceja', /LA CEJA/.test(r.bogota.titulo) && r.bogota.votos === '8.440 votos' && r.bogota.niveles.join('|') === 'Municipio|Puestos'],
-  ['y la nota lo dice, en vez de «quedaron por fuera 8.440 votos»', /no tiene mesas en BOGOTÁ, D\.C\./.test(r.bogota.nota) && !/quedaron por fuera/.test(r.bogota.nota) && r.bogota.recorte?.sinVotos === true],
+  ['si la campaña se muda a donde no hay votos, el mapa es el territorio NUEVO', /territorio de campaña/i.test(r.bogota.titulo) && /territorio de campaña/i.test(r.bogota.panel) && r.bogota.filas.some(f => /CANDELARIA/i.test(f))],
+  ['y ese municipio trae sus puestos, dimensionados por censo', r.bogota.niveles.join('|') === 'Municipio|Puestos' && r.bogotaPuestos.puntos === 2 && /Censo electoral por puesto/.test(r.bogotaPuestos.titulo) && /censo electoral/i.test(r.bogotaPuestos.nota)],
   ['sin errores de JavaScript', errores.length === 0],
 ];
 for (const [t, ok] of pruebas) console.log(`${ok ? '✓' : '✗'} ${t}`);

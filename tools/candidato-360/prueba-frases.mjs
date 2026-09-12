@@ -23,12 +23,18 @@ r.misma = await frase({ candidate: { nombre: 'RICARDO ESTEBAN RUIZ CASTRO', corp
 r.izquierda = await frase({ candidate: { nombre: 'ALGUIEN', corp: 'CONCEJO · MEDELLIN · 2023', partido: 'PARTIDO ALIANZA VERDE' }, corpKey: 'alcaldia', territory: 'MEDELLÍN · Antioquia', campana: { partido: 'MOVIMIENTO POLÍTICO PACTO HISTÓRICO' } });
 r.derecha = await frase({ candidate: { nombre: 'OTRA PERSONA', corp: 'CONCEJO · MEDELLIN · 2023', partido: 'PARTIDO CENTRO DEMOCRÁTICO' }, corpKey: 'alcaldia', territory: 'MEDELLÍN · Antioquia', campana: { partido: 'PARTIDO CENTRO DEMOCRÁTICO' } });
 r.congreso = await frase({ candidate: { nombre: 'DANIEL CARVALHO MEJIA', corp: 'CÁMARA · ANTIOQUIA · 2022', partido: 'COALICIÓN CENTRO ESPERANZA', history: [{ corp: 'CÁMARA · ANTIOQUIA · 2022' }, { corp: 'CONCEJO · MEDELLIN · 2019' }, { corp: 'CONCEJO · MEDELLIN · 2015' }] }, corpKey: 'concejo', territory: 'BOGOTÁ, D.C. · Bogotá D.C.', campana: { partido: 'PARTIDO ALIANZA VERDE' } });
+/* El caso que lo delató: de una JAL de Bogotá a un concejo de Amazonas. La
+   frase no puede hablar de «la ciudad entera» ni hacer como si no se hubiera
+   mudado. */
+r.mudanza = await frase({ candidate: { nombre: 'RICARDO ESTEBAN RUIZ CASTRO', corp: 'JAL · TEUSAQUILLO · BOGOTÁ D.C. · 2015', partido: 'PARTIDO CAMBIO RADICAL' }, corpKey: 'concejo', territory: 'LETICIA · Amazonas', campana: { partido: 'PARTIDO ALIANZA VERDE' } });
+r.mismaCorpOtroLugar = await frase({ candidate: { nombre: 'OTRA', corp: 'CONCEJO · MEDELLIN · 2023', partido: 'CREEMOS' }, corpKey: 'concejo', territory: 'CALI · Valle del Cauca', campana: { partido: 'CREEMOS' } });
 r.senado = await frase({ candidate: { nombre: 'X', corp: 'SENADO · 2026', partido: 'PARTIDO LIBERAL COLOMBIANO' }, corpKey: 'gobernacion', territory: 'Antioquia', campana: { partido: 'PARTIDO LIBERAL COLOMBIANO' } });
 r.estable = (await frase({ candidate: { nombre: 'ALGUIEN', corp: 'CONCEJO · MEDELLIN · 2023', partido: 'PARTIDO ALIANZA VERDE' }, corpKey: 'concejo', territory: '', campana: { partido: 'PARTIDO ALIANZA VERDE' } })) === (await frase({ candidate: { nombre: 'ALGUIEN', corp: 'CONCEJO · MEDELLIN · 2023', partido: 'PARTIDO ALIANZA VERDE' }, corpKey: 'concejo', territory: '', campana: { partido: 'PARTIDO ALIANZA VERDE' } }));
 await b.close();
 
 const pruebas = [
   ['dice cuánto hace y a qué se lanzó, sin leer la base de datos', /Vimos que se lanzó a la JAL de Teusaquillo hace 12 años!/.test(r.ricardo) && !/JAL · TEUSAQUILLO/.test(r.ricardo)],
+  ['habla en español: «al Concejo», no «a el Concejo», y sin puntos dobles', /se lanzó al Concejo de Medellin/.test(r.mismaCorpOtroLugar) && !/ a el /.test(r.congreso) && !/\.\./.test(r.congreso)],
   ['y a dónde va ahora, con el lugar bonito', /Ahora vamos por el Concejo de Bogotá, D\.C\./.test(r.ricardo)],
   ['el salto de la JAL al Concejo tiene su frase', /De la localidad a la ciudad entera/.test(r.ricardo)],
   ['repetir corporación tiene la suya', /Repetir es la forma más barata/.test(r.misma) && /Ahora vamos por la JAL de Teusaquillo/.test(r.misma)],
@@ -36,7 +42,10 @@ const pruebas = [
   ['…y derecha', /orden y resultados|firmeza y con obra/.test(r.derecha) && /Centro Democrático/.test(r.derecha)],
   ['un aval nuevo se nota', /aval nuevo/.test(r.izquierda) && !/aval nuevo/.test(r.derecha)],
   ['con varias candidaturas cuenta cuántas y parte de la última', /3 candidaturas en el historial \(2015, 2019, 2022\)/.test(r.congreso) && /la Cámara por Antioquia hace 5 años/.test(r.congreso) && /Del Congreso al territorio/.test(r.congreso)],
-  ['el Senado del año pasado', /el Senado el año pasado/.test(r.senado) && /Gobernación de Antioquia/.test(r.senado)],
+  ['el Senado del año pasado', /al Senado el año pasado/.test(r.senado) && /Gobernación de Antioquia/.test(r.senado)],
+  ['de Bogotá a Leticia no habla de «la ciudad entera»', /De una localidad a todo Leticia/.test(r.mudanza) && !/ciudad entera/.test(r.mudanza)],
+  ['y dice a dónde va, que es otro municipio', /Ahora vamos por el Concejo de Leticia/.test(r.mudanza)],
+  ['repetir corporación en otra ciudad se cuenta como mudanza', /se muda: de Medellin a Cali/.test(r.mismaCorpOtroLugar) && !/forma más barata/.test(r.mismaCorpOtroLugar)],
   ['la frase no cambia entre recargas', r.estable === true],
   ['sin errores de JavaScript', errores.length === 0],
 ];

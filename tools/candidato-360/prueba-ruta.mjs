@@ -46,7 +46,12 @@ await p.waitForFunction(() => document.getElementById('department').options.leng
 /* Qué tarjeta se ve: exactamente un paso visible, cuál es, y el copy de la izquierda. */
 const estado = () => p.evaluate(() => {
   const visibles = [...document.querySelectorAll('#candidateRoute .paso')].filter(el => !el.classList.contains('hidden')).map(el => el.dataset.paso);
-  return { visibles, paso: pasoRuta, atras: !document.getElementById('pasoAtras').classList.contains('hidden'), titulo: document.getElementById('rutaTitulo').textContent, nombre: document.getElementById('routeName').textContent, ruta: document.querySelector('input[name="corporationRoute"]:checked')?.value || null };
+  const cont = document.getElementById('continuarLugar');
+  return { visibles, paso: pasoRuta, atras: !document.getElementById('pasoAtras').classList.contains('hidden'), titulo: document.getElementById('rutaTitulo').textContent, nombre: document.getElementById('routeName').textContent, ruta: document.querySelector('input[name="corporationRoute"]:checked')?.value || null,
+    continuar: cont.classList.contains('hidden') ? null : !cont.disabled,
+    municipio: !document.getElementById('campaignMunicipalityField').classList.contains('hidden'),
+    mapa: !document.getElementById('mapaDepto').classList.contains('hidden') && document.querySelectorAll('#mapaDeptoLienzo path').length,
+    encendidos: document.querySelectorAll('#mapaDeptoLienzo .depto-elegido').length };
 });
 const elegirRuta = async valor => { await p.evaluate(v => { document.querySelector(`input[name="corporationRoute"][value="${v}"]`).checked = true; toggleCorporationChoice({ animar: true }); }, valor); await p.waitForTimeout(700); };
 const CONCEJAL = { nombre: 'ALGUIEN CON HISTORIAL', slug: 'CONC2023-16-1-1-1', corp: 'CONCEJO · BOGOTÁ D.C. · 2023', circunscripcion: 'BOGOTÁ D.C.', partido: 'PARTIDO X', votos: 900 };
@@ -82,8 +87,8 @@ await p.selectOption('#campaignDepartment', '01'); await p.waitForTimeout(600);
 r.conDepartamento = await estado();
 r.mapa = await p.evaluate(() => ({ visible: !document.getElementById('mapaDepto').classList.contains('hidden'), elegidos: document.querySelectorAll('#mapaDeptoLienzo .depto-elegido').length, total: document.querySelectorAll('#mapaDeptoLienzo path').length, pie: document.getElementById('mapaDeptoPie').textContent, dibujado: (document.querySelector('#mapaDeptoLienzo .depto-elegido')?.getAttribute('d') || '').length }));
 await p.selectOption('#campaignMunicipality', 'MEDELLÍN'); await p.waitForTimeout(600);
-r.antesDeLaPausa = await estado();          /* el mapa se deja ver antes de pasar */
-await p.waitForTimeout(1800);
+r.listoParaContinuar = await estado();      /* completo el territorio, pero no salta solo */
+await p.click('#continuarLugar'); await p.waitForTimeout(500);
 r.conMunicipio = await estado();
 r.botonVisible = await p.$eval('#abrirCRM', el => el.offsetParent !== null);
 await p.mouse.move(0, 0);          /* el ratón queda sobre «Atrás» tras el clic y el hover cambia el color */
@@ -107,10 +112,12 @@ r.municipioIntacto = await p.inputValue('#campaignMunicipality');
 /* 8 · La JAL además exige comuna o localidad antes de pasar. */
 await p.evaluate(() => { pasoRuta = 'corporacion'; historicCorporationPicker.querySelector('[data-corporation="jal"]').click(); });
 await p.waitForTimeout(500);
-await p.selectOption('#campaignDepartment', '16'); await p.waitForTimeout(2600);
+await p.selectOption('#campaignDepartment', '16'); await p.waitForTimeout(900);
 r.jalSinLocalidad = await estado();
 await p.evaluate(() => { const s = document.getElementById('campaignLocality'); s.value = s.options[1]?.value || ''; territorioResuelto(); });
-await p.waitForTimeout(500);
+await p.waitForTimeout(400);
+r.jalListo = await estado();
+await p.click('#continuarLugar'); await p.waitForTimeout(500);
 r.jalConLocalidad = await estado();
 
 /* 9 · Sin historial territorial (Senado) se entra directo a «¿a cuál se lanza?», sin «Atrás» hacia una pregunta que no se hizo. */
@@ -135,13 +142,16 @@ const pruebas = [
   ['«otra corporación» cambia a «¿a cuál se lanza?»', solo(r.otra, 'corporacion') && r.otra.atras && /cuál/i.test(r.otra.titulo)],
   ['elegida la corporación, la tarjeta pasa al territorio', solo(r.conCorporacion, 'lugar') && /dónde/i.test(r.conCorporacion.titulo)],
   ['con departamento pero sin municipio se queda en el territorio', solo(r.conDepartamento, 'lugar')],
-  ['completo el territorio, pasa al partido con el botón del CRM', solo(r.conMunicipio, 'partido') && r.botonVisible],
+  ['«Continuar» lleva a la pregunta del partido, con el botón del CRM', solo(r.conMunicipio, 'partido') && r.botonVisible],
+  ['el mapa está desde que se abre la pregunta, todavía sin departamento', r.conCorporacion.mapa === 2 && r.conCorporacion.encendidos === 0],
+  ['y no se pregunta el municipio antes que el departamento', r.conCorporacion.municipio === false],
   ['al elegir departamento se enciende ese departamento en el mapa de Colombia', r.mapa.visible && r.mapa.elegidos === 1 && r.mapa.total === 2 && r.mapa.dibujado > 20 && /Antioquia/i.test(r.mapa.pie)],
-  ['y el mapa se deja ver un momento antes de pasar de tarjeta', solo(r.antesDeLaPausa, 'lugar')],
+  ['ahí sí aparece el municipio, y «Continuar» espera a que esté completo', r.conDepartamento.municipio === true && r.conDepartamento.continuar === false],
+  ['con el territorio completo el botón se habilita, pero no salta solo', r.listoParaContinuar.continuar === true && solo(r.listoParaContinuar, 'lugar')],
   ['«Atrás» y «Abrir CRM» viven juntos en el pie, y Atrás va en salmón', r.pieJuntos.juntos && r.pieJuntos.visible && r.pieJuntos.esSalmon && r.pieJuntos.distintoDelAzul],
   ['el mapa no se queda colgado en las otras tarjetas', r.mapaFuera === true],
   ['atrás desde el partido devuelve al territorio sin perder lo elegido', solo(r.atrasDesdePartido, 'lugar') && r.municipioIntacto === 'MEDELLÍN'],
-  ['la JAL espera a la comuna o localidad', solo(r.jalSinLocalidad, 'lugar') && solo(r.jalConLocalidad, 'partido')],
+  ['la JAL espera a la comuna o localidad para dejar continuar', r.jalSinLocalidad.continuar === false && r.jalListo.continuar === true && solo(r.jalConLocalidad, 'partido')],
   ['sin historial territorial se entra directo a «¿a cuál se lanza?», sin Atrás', solo(r.senador, 'corporacion') && !r.senador.atras && r.senador.ruta === 'other'],
   ['quien vuelve con campaña guardada cae en la última pregunta, respondida', solo(r.precargada, 'partido') && r.precargadaMunicipio === 'MEDELLÍN'],
   ['sin errores de JavaScript', errores.length === 0],

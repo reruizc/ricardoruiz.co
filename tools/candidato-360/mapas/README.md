@@ -16,11 +16,14 @@ niveles son solo dos, «Municipio | Puestos» (`nivelesMunicipio`): antes se ve�
 el polígono del municipio y no había forma de bajar. A escala de puestos el
 polígono pasa a contorno y entra el callejero atenuado.
 
-Cuando la campaña nueva se ubica en un territorio donde el historial no tiene
-**ni un voto** (un representante de Antioquia al Concejo de Bogotá), el recorte
-territorial no se aplica: el mapa se queda donde estuvo la votación y la nota lo
-dice (`recorteActivo.sinVotos`). Recortar dejaba un Bogotá vacío con «quedaron
-por fuera 37.111 votos».
+Cuando la campaña se muda a un territorio donde el historial no tiene **ni un
+voto** (de la JAL de Teusaquillo al Concejo de Leticia), el mapa del historial
+no dice nada de la campaña nueva: se muestra el **territorio al que aspira**
+(`renderTerritorioDeCampana`) con sus puestos de votación dimensionados por
+**censo electoral**, que es lo único honesto cuando todavía no hay votos
+propios ahí. El panel pasa a llamarse «Mapa del territorio de campaña» y las
+vistas por año desaparecen: todas mostrarían votaciones que no cuentan donde
+ahora compite.
 
 Los botones de nivel son los que **cambian el dibujo**. En un mapa de ciudad no
 hay «Municipio»: mostraba exactamente lo mismo que «Comuna» —la ciudad entera
