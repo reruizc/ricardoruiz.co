@@ -788,6 +788,7 @@ function irAPaso(nombre, { animar = false } = {}) {
   $('pasoAtras').classList.toggle('hidden', pasos.indexOf(pasoRuta) <= (sinPreguntaDeRuta ? 1 : 0));
   $('abrirCRM').classList.toggle('hidden', pasoRuta !== 'partido');
   $('continuarLugar').classList.toggle('hidden', pasoRuta !== 'lugar');
+  if (pasoRuta === 'partido') prepararPasoPartido();
   if (pasoRuta === 'lugar') { pintarMapaDepto(nombreDepartamentoElegido()); refrescarContinuar(); } else ocultarMapaDepto();
   const [titulo, copy] = PASO_COPY[pasoRuta] || PASO_COPY.ruta;
   $('rutaTitulo').textContent = titulo; $('rutaCopy').textContent = copy;
@@ -886,6 +887,7 @@ function refrescarPartidoCampana() { pintarEstadoPartido({ input: 'campaignParty
    elección: la mitad de las candidaturas territoriales cambia de aval entre
    una elección y la siguiente. Manda lo que la persona escribió. */
 function partidoVigente() {
+  if (CAMPANA_ACTUAL?.avales === 'firmas') return '';
   return String(CAMPANA_ACTUAL?.partido || $('campaignParty')?.value || '').trim() || crmCandidate?.partido || '';
 }
 function updateCampaignTerritory() {
@@ -970,7 +972,9 @@ function currentTargetTerritory() {
 /* Lo que se guarda como campaña en el vínculo (editable). */
 function campanaActual(corpKey) {
   const isOther = document.querySelector('input[name="corporationRoute"]:checked')?.value === 'other';
-  return { corp: corpKey, partido: String($('campaignParty')?.value || '').trim() || crmCandidate?.partido || '', ruta: isOther ? 'other' : 'same', departamento: isOther ? $('campaignDepartment').value : '', departamentoNombre: isOther ? ($('campaignDepartment').options[$('campaignDepartment').selectedIndex]?.text || '') : '', municipio: isOther ? $('campaignMunicipality').value : '', localidad: isOther ? $('campaignLocality').value : '' };
+  const firmas = CORP_UNINOMINAL.includes(corpKey) && avalVigente() === 'firmas';
+  return { corp: corpKey, avales: firmas ? 'firmas' : 'partido', espectro: firmas ? espectroVigente() : '',
+    partido: firmas ? '' : (String($('campaignParty')?.value || '').trim() || crmCandidate?.partido || ''), ruta: isOther ? 'other' : 'same', departamento: isOther ? $('campaignDepartment').value : '', departamentoNombre: isOther ? ($('campaignDepartment').options[$('campaignDepartment').selectedIndex]?.text || '') : '', municipio: isOther ? $('campaignMunicipality').value : '', localidad: isOther ? $('campaignLocality').value : '' };
 }
 /* Rellena la ruta con la campaña guardada (al volver con vínculo). */
 async function precargarCampana(campana) {
@@ -987,6 +991,152 @@ async function precargarCampana(campana) {
     if (campana.corp === 'jal' && campana.municipio) { await loadCampaignLocalities(); $('campaignLocality').value = campana.localidad || ''; }
   }
   irAPaso('partido');                     /* quien vuelve cae en la última pregunta, ya respondida */
+}
+
+/* ─── 6 ter. Aval: con partido o por firmas ──────────────────────────────────
+   A la Alcaldía y a la Gobernación se llega de dos maneras y las dos son
+   normales: con el aval de un partido o por firmas, como grupo significativo
+   de ciudadanos. Antes la página solo sabía preguntar por el partido, y quien
+   iba por firmas tenía que escribir algo que no existía.
+
+   Por firmas no hay huella de partido que seguir, así que se pregunta lo único
+   que de verdad orienta la recolección: DÓNDE SE UBICA en el espectro. Con eso
+   el reparto usa la huella del bloque ideológico —el mismo diccionario que
+   pinta los mapas— y la tarjeta de firmas dice en qué comunas o municipios
+   están los votos de esa familia política, que es donde una firma cuesta menos
+   trabajo. El espectro no es una etiqueta que le ponemos: es la que la persona
+   se pone, y se puede cambiar. */
+const ESPECTRO = [
+  ['izq', 'Izquierda'],
+  ['ci', 'Centro-izquierda'],
+  ['c', 'Centro'],
+  ['cd', 'Centro-derecha'],
+  ['d', 'Derecha'],
+];
+const CORP_UNINOMINAL = ['alcaldia', 'gobernacion'];
+function corpDeLaRuta() {
+  const isOther = document.querySelector('input[name="corporationRoute"]:checked')?.value === 'other';
+  return isOther ? $('otherCorporation').value : (corporacionHistorica(crmCandidate) || '');
+}
+function avalVigente() { return document.querySelector('input[name="avalRuta"]:checked')?.value || 'partido'; }
+function espectroVigente() { return $('espectro')?.querySelector('[aria-checked="true"]')?.dataset.bloque || ''; }
+/* El bloque con el que se reparte: el que la persona eligió si va por firmas,
+   y si no el que le corresponde a su partido. */
+function bloqueVigente() {
+  if (CAMPANA_ACTUAL?.avales === 'firmas' || (!CAMPANA_ACTUAL && avalVigente() === 'firmas')) return CAMPANA_ACTUAL?.espectro || espectroVigente() || '';
+  return '';
+}
+function pintarEspectro() {
+  const caja = $('espectro'); if (!caja || caja.dataset.listo === '1') return;
+  caja.dataset.listo = '1';
+  caja.innerHTML = ESPECTRO.map(([id, label]) => {
+    const color = window.PartidosBloques?.BLOQUE_COLOR?.[id] || 'var(--green)';
+    return `<button type="button" class="espectro-op" role="radio" aria-checked="false" data-bloque="${id}" style="--bloque:${color}"><i></i><b>${label}</b></button>`;
+  }).join('');
+  caja.addEventListener('click', e => {
+    const boton = e.target.closest('[data-bloque]'); if (!boton) return;
+    caja.querySelectorAll('[data-bloque]').forEach(b => b.setAttribute('aria-checked', String(b === boton)));
+    salto(boton);
+    refrescarContinuarPartido();
+  });
+}
+function marcarEspectro(bloque) {
+  pintarEspectro();
+  $('espectro')?.querySelectorAll('[data-bloque]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.bloque === bloque)));
+}
+/* La pregunta del aval solo aplica a los cargos uninominales: a un concejo o a
+   una asamblea se llega por lista, y una lista siempre tiene organización. */
+function elegirAval({ animar = false } = {}) {
+  const firmas = avalVigente() === 'firmas';
+  if (animar) salto(document.querySelector(`input[name="avalRuta"]:checked`)?.closest('.route-option'));
+  revelar($('espectroField'), firmas, animar);
+  revelar($('campaignPartyField'), !firmas, animar);
+  revelar($('vitrinaPartidos'), !firmas && vitrinaTienePartidos(), animar);
+  if (firmas) pintarEspectro(); else refrescarPartidoCampana();
+  if (pasoRuta === 'partido' && firmas) { $('rutaTitulo').textContent = '¿Dónde se ubica?'; $('rutaCopy').textContent = 'Por firmas no hay partido cuya huella seguir. Con el espectro buscamos dónde votan los partidos de su familia: ahí es donde las firmas se recogen más rápido.'; }
+  else if (pasoRuta === 'partido') { const [t, c] = PASO_COPY.partido; $('rutaTitulo').textContent = t; $('rutaCopy').textContent = c; }
+  refrescarContinuarPartido();
+}
+function revelar(el, visible, animar) {
+  if (!el) return;
+  const estaba = !el.classList.contains('hidden');
+  el.classList.toggle('hidden', !visible);
+  if (visible && !estaba && animar) { el.classList.add('paso-entra'); el.addEventListener('animationend', () => el.classList.remove('paso-entra'), { once: true }); }
+}
+/* Por firmas hace falta el espectro para poder decir dónde recogerlas. */
+function refrescarContinuarPartido() {
+  const boton = $('abrirCRM'); if (!boton) return;
+  boton.disabled = avalVigente() === 'firmas' && !espectroVigente();
+}
+function prepararPasoPartido() {
+  const uninominal = CORP_UNINOMINAL.includes(corpDeLaRuta());
+  revelar($('avalOpciones'), uninominal, false);
+  if (!uninominal) {
+    document.querySelectorAll('input[name="avalRuta"]').forEach(r => { r.checked = r.value === 'partido'; });
+  }
+  elegirAval();
+  montarVitrinaPartidos();
+}
+
+/* ─── 6 quáter. La vitrina de partidos ───────────────────────────────────────
+   Un municipio colombiano tiene 9 organizaciones en promedio inscritas al
+   concejo (mediana 9, máximo 23 en 2023): eso cabe en una rejilla y no hace
+   falta escribirlo. Donde hay logos se muestran como una vitrina —se elige
+   con el ojo, no con el teclado— y a la derecha queda la ficha de lo elegido.
+   El campo de texto sigue ahí para lo que no está: una coalición que se
+   inscribe ahora no existe en ningún catálogo. */
+/* Cuántas caben: un municipio tiene 9,3 organizaciones inscritas al concejo en
+   promedio (mediana 9; el p90 es 15 y el máximo medido en 2023 fue 23), así que
+   16 tarjetas cubren el caso real sin volverse un muro. El catálogo del
+   departamento trae más —listas de JAL, de Cámara, el mismo partido escrito de
+   cuatro formas—: se deduplica por logo, que es lo que el ojo distingue, y se
+   corta por fuerza. Lo que quede fuera se escribe. */
+const VITRINA_MINIMO = 4, VITRINA_MAXIMO = 16;
+let VITRINA = [];
+function vitrinaTienePartidos() { return VITRINA.length >= VITRINA_MINIMO; }
+async function montarVitrinaPartidos() {
+  const caja = $('vitrinaPartidos'), rejilla = $('vitrinaRejilla'); if (!caja || !rejilla) return;
+  const dep = departamentoDeCampana();
+  VITRINA = [];
+  try {
+    const [catalogo] = await Promise.all([cargarPartidos(dep), cargarLogos(dep)]);
+    const conLogo = partidosElegibles(catalogo).filter(o => logoDePartido(o[0], dep));
+    const vistos = new Set();
+    VITRINA = rankearPartidos(conLogo, '', 60)
+      .filter(o => { const logo = logoDePartido(o[0], dep); if (!logo || vistos.has(logo)) return false; vistos.add(logo); return true; })
+      .slice(0, VITRINA_MAXIMO);
+  } catch (e) { VITRINA = []; }
+  if (!vitrinaTienePartidos() || avalVigente() === 'firmas') { caja.classList.add('hidden'); return; }
+  rejilla.innerHTML = VITRINA.map((o, i) => `<button type="button" class="vitrina-op" data-i="${i}" title="${escHtml(o[0])}">${imgLogo(o[0], dep)}<small>${escHtml(nombreCortoPartido(o[0]))}</small></button>`).join('');
+  caja.classList.remove('hidden');
+  if (!rejilla.dataset.listo) {
+    rejilla.dataset.listo = '1';
+    rejilla.addEventListener('click', e => {
+      const boton = e.target.closest('[data-i]'); if (!boton) return;
+      const o = VITRINA[Number(boton.dataset.i)]; if (!o) return;
+      $('campaignParty').value = o[0];
+      rejilla.querySelectorAll('[data-i]').forEach(b => b.classList.toggle('elegido', b === boton));
+      salto(boton);
+      fichaVitrina(o);
+      refrescarPartidoCampana();
+    });
+  }
+  const escrito = String($('campaignParty')?.value || '').trim();
+  const yaElegido = VITRINA.findIndex(o => normalizedText(o[0]) === normalizedText(escrito));
+  if (yaElegido >= 0) { rejilla.querySelectorAll('[data-i]')[yaElegido]?.classList.add('elegido'); fichaVitrina(VITRINA[yaElegido]); }
+  else fichaVitrina(null);
+}
+/* «MOVIMIENTO POLÍTICO PACTO HISTÓRICO» no cabe debajo de un logo. */
+function nombreCortoPartido(nombre) {
+  return String(nombre).replace(/^(PARTIDO|MOVIMIENTO)\s+(POLÍTICO|POLITICO)?\s*/i, '').replace(/\s*[-–]\s*.*$/, '').trim() || nombre;
+}
+function fichaVitrina(o) {
+  const ficha = $('vitrinaFicha'); if (!ficha) return;
+  if (!o) { ficha.innerHTML = '<p class="vitrina-vacia">Elija una organización para ver su fuerza en el territorio, o escríbala abajo si no está.</p>'; return; }
+  const dep = departamentoDeCampana(), bloque = window.PartidosBloques?.bloqueDePartido?.(o[0]) || 'sc';
+  ficha.innerHTML = `${imgLogo(o[0], dep)}<h4>${escHtml(o[0])}</h4>`
+    + `<p class="vitrina-respaldo">${escHtml(respaldoPartido(o))}</p>`
+    + `<p class="vitrina-bloque"><span style="background:${window.PartidosBloques?.BLOQUE_COLOR?.[bloque] || 'var(--green)'}"></span>${escHtml(window.PartidosBloques?.BLOQUE_LABEL?.[bloque] || 'Sin clasificar')}</p>`;
 }
 
 /* ─── 7. Candidatura nueva: wizard ───────────────────────────────────────── */
@@ -1509,6 +1659,7 @@ async function launchCRM(event) {
   pintarEscucha();
   pintarArquetipos();
   pintarPerfil();
+  pintarFirmas();
   loadHistoricalMap(crmCandidate);
   renderCRMProfilePhoto(crmCandidate);
   pintarPuntaje(crmCandidate);
@@ -1536,6 +1687,7 @@ async function abrirCRMNuevo() {
   pintarEscucha();
   pintarArquetipos();
   pintarPerfil();
+  pintarFirmas();
   renderTerritorioObjetivo(c);
   pintarMeta(await VoteTarget.estimate({ corp: c.corp, territory: lugar, baseUrl: S3, partido: n.partido || '', departamento: c.departamento || '' }));
 }
@@ -1799,7 +1951,14 @@ function huellaParticipacion(porArea) {
 /* La cascada de la base. Un partido cuenta como «con masa» si aparece en al
    menos el 60 % de las áreas y pesa ≥ 1 % de los válidos: por debajo de eso su
    huella es ruido de dos o tres candidatos, no un patrón del territorio. */
-function baseDestino({ porArea, partido, nombreCandidato }) {
+function baseDestino({ porArea, partido, nombreCandidato, bloqueFirmas }) {
+  /* Por firmas no hay partido: manda el bloque que la persona eligió. */
+  if (bloqueFirmas) {
+    const hb = huellaBloque(porArea, bloqueFirmas);
+    if (hb.huella && hb.votos > 0) return { capa: 'firmas', etiqueta: PartidosBloques.BLOQUE_LABEL[bloqueFirmas] || bloqueFirmas, bloque: bloqueFirmas, proporciones: proporciones(hb.huella) };
+    const part = proporciones(huellaParticipacion(porArea));
+    return part ? { capa: 'participacion', etiqueta: 'participación', proporciones: part } : null;
+  }
   const partes = PartidosBloques.partesDeCoalicion(partido || '');
   const totalValidos = Object.values(porArea || {}).reduce((s, d) => s + (d?.partidos || []).reduce((t, [, v]) => t + (Number(v) || 0), 0), 0);
   const hp = huellaPartido(porArea, partes);
@@ -1942,7 +2101,7 @@ function repartoSaltoCiudad(state, goal) {
   const llaves = Object.keys(state.namesByArea || {});
   const porArea = emparejarAreas(s.porArea, llaves, state.namesByArea);
   if (Object.keys(porArea).length < 2) return null;
-  const base = baseDestino({ porArea, partido: partidoVigente(), nombreCandidato: crmCandidate?.nombre });
+  const base = baseDestino({ porArea, partido: partidoVigente(), nombreCandidato: crmCandidate?.nombre, bloqueFirmas: bloqueVigente() });
   if (!base) return null;
   const origen = Object.keys(state.votesByArea || {}).filter(k => Number(state.votesByArea[k] || 0) > 0);
   const reparto = repartoSalto({ meta: goal, propio: state.votesByArea, origen, base, arraigo: s.arraigo });
@@ -1959,7 +2118,7 @@ async function pintarProyeccionDepartamental(goal) {
     const nameOf = f => f.properties.mpio_cnmbr || 'Municipio';
     const nombres = Object.fromEntries(geoData.features.map(f => [normalizedText(nameOf(f)), nameOf(f)]));
     const porArea = emparejarAreas(s.porArea, Object.keys(nombres), nombres);
-    const base = baseDestino({ porArea, partido: partidoVigente(), nombreCandidato: crmCandidate?.nombre });
+    const base = baseDestino({ porArea, partido: partidoVigente(), nombreCandidato: crmCandidate?.nombre, bloqueFirmas: bloqueVigente() });
     if (!base) return false;
     const origenNombre = normalizedText(String(crmCandidate?.corp || '').split('·')[1] || crmCandidate?.circunscripcion || '');
     const origen = Object.keys(nombres).filter(k => k === origenNombre || (origenNombre && k.includes(origenNombre)));
@@ -1993,7 +2152,9 @@ let crmMapMode = 'total', crmMapState = null;
 const RAMPA_POR_DEFECTO = ['#b7d9bf', '#79b987', '#3e8a5b', '#174f35'];
 let RAMPA_MAPA = RAMPA_POR_DEFECTO;
 function fijarRampaMapa(partido, nombreCandidato) {
-  RAMPA_MAPA = (window.PartidosBloques?.rampaDePartido?.(partido, nombreCandidato)) || RAMPA_POR_DEFECTO;
+  const bloque = bloqueVigente(), colorBloque = bloque && window.PartidosBloques?.BLOQUE_COLOR?.[bloque];
+  RAMPA_MAPA = (colorBloque && window.PartidosBloques?.rampaDeColor?.(colorBloque))
+    || (window.PartidosBloques?.rampaDePartido?.(partido, nombreCandidato)) || RAMPA_POR_DEFECTO;
   /* Las barras del desglose van del mismo color que el mapa: son el mismo dato
      leído de otra forma, y verlas en verde al lado de un mapa azul confunde. */
   document.getElementById('crm')?.style.setProperty('--partido', RAMPA_MAPA[2]);
@@ -3167,6 +3328,101 @@ function mostrarPerfil() {
     </ul>
     ${edad}
     <p class="puntaje-nota">Fuente: censo electoral por puesto de la Registraduría (PUESTOS_GEOREF, columnas de mujeres y hombres) y la zona electoral de cada mesa. Cubre el ${pct1(P.cobertura)} de su votación: ${P.sinCoordenada ? `${P.sinCoordenada.toLocaleString('es-CO')} votos están en puestos sin censo publicado` : 'todos sus puestos tienen censo publicado'}. <a class="enlace-boton" href="candidato-360-perfil.html">Cómo se lee esto sin violar el secreto del voto →</a></p>`;
+  $('introModal').classList.add('open');
+}
+
+/* ─── 9 quáter. Dónde recoger las firmas ─────────────────────────────────────
+   Quien va por firmas no tiene partido cuya huella seguir, pero sí tiene una
+   familia política: la que él mismo eligió en el espectro. Los votos de esa
+   familia en el territorio dicen dónde una firma cuesta menos trabajo —donde
+   ya hay gente que piensa parecido— y esa es toda la promesa de esta tarjeta:
+   no predice apoyo, ordena la logística.
+
+   El requisito legal se estima con la regla del artículo 9 de la Ley 130 de
+   1994: el 20 % del censo electoral dividido por los cargos a proveer (uno,
+   en alcaldía y gobernación), con el tope de 50.000 firmas que la misma norma
+   fija. Se muestra como ESTIMACIÓN y se dice que la cifra exacta la resuelve
+   la Registraduría, porque el censo de corte y las reformas la mueven.       */
+const FIRMAS_FRACCION = .2, FIRMAS_TOPE = 50000;
+function requisitoDeFirmas(censo) {
+  const crudo = Math.ceil(Number(censo || 0) * FIRMAS_FRACCION);
+  return { crudo, exigido: Math.min(crudo, FIRMAS_TOPE), topeAplica: crudo > FIRMAS_TOPE };
+}
+/* El censo del territorio de la candidatura, sumando los puestos publicados. */
+async function censoDelTerritorio(campana) {
+  const puestos = await puestosPorBarrio();
+  const dep = String(campana?.departamento || '').padStart(2, '0');
+  const mun = CORP_MUNICIPAL.includes(campana?.corp) ? String(codigoMunicipioObjetivo() || '').padStart(3, '0') : '';
+  const prefijo = mun ? `${dep}${mun}` : dep;
+  let censo = 0, n = 0;
+  Object.entries(puestos).forEach(([code, p]) => { if (code.slice(0, prefijo.length) === prefijo) { censo += Number(p.censo || 0); n++; } });
+  return { censo, puestos: n };
+}
+let FIRMAS_ACTUAL = null;
+async function lecturaFirmas(campana) {
+  const bloque = campana?.espectro; if (!bloque) return null;
+  const mesas = await mesasDelHistorial();
+  const unidad = CORP_MUNICIPAL.includes(campana.corp) ? 'localidad' : 'municipio';
+  const [territorio, rd] = await Promise.all([
+    censoDelTerritorio(campana),
+    resultadosDestino(unidad, mesas.length ? mesas : [{ dep: campana.departamento, mun: codigoMunicipioObjetivo() }], campana).catch(() => null),
+  ]);
+  const req = requisitoDeFirmas(territorio.censo);
+  const hb = rd ? huellaBloque(rd.porArea, bloque) : { huella: null };
+  const props = hb.huella ? proporciones(hb.huella) : null;
+  const reparto = props ? distributeVotes(hb.huella, req.exigido) : null;
+  const nombres = rd?.porArea || {};
+  const filas = reparto
+    ? Object.entries(reparto).map(([area, firmas]) => ({ area, nombre: nombres[area]?.nombre || nombres[area]?.comuna || area, firmas, votos: hb.huella[area] || 0 }))
+      .filter(f => f.firmas > 0).sort((a, b) => b.firmas - a.firmas)
+    : [];
+  FIRMAS_ACTUAL = { bloque, req, territorio, filas, unidad, campana, cobertura: hb.cobertura || 0 };
+  return FIRMAS_ACTUAL;
+}
+async function pintarFirmas() {
+  const card = $('crmFirmas'); if (!card) return;
+  const campana = CAMPANA_ACTUAL;
+  const firmas = campana?.avales === 'firmas';
+  card.classList.toggle('hidden', !firmas);
+  if (!firmas) { FIRMAS_ACTUAL = null; return; }
+  $('crmFirmasBtn').disabled = true;
+  $('crmFirmasTitulo').textContent = 'Calculando cuántas firmas y dónde…';
+  $('crmFirmasCopy').textContent = 'Cruzando el censo del territorio con los votos de su familia política.';
+  try {
+    const L = await lecturaFirmas(campana); if (!L) throw new Error('sin espectro');
+    const etiqueta = window.PartidosBloques?.BLOQUE_LABEL?.[L.bloque] || 'su familia política';
+    $('crmFirmasTitulo').textContent = `Necesita unas ${L.req.exigido.toLocaleString('es-CO')} firmas.`;
+    $('crmFirmasCopy').textContent = L.filas.length
+      ? `El ${Math.round(FIRMAS_FRACCION * 100)} % del censo de su territorio (${L.territorio.censo.toLocaleString('es-CO')} personas)${L.req.topeAplica ? `, con el tope legal de ${FIRMAS_TOPE.toLocaleString('es-CO')}` : ''}. Repartidas por donde vota ${etiqueta.toLowerCase()}: ${L.filas.slice(0, 3).map(f => f.nombre).join(', ')} concentran ${Math.round(L.filas.slice(0, 3).reduce((s, f) => s + f.firmas, 0) / L.req.exigido * 100)} % de la meta.`
+      : `El ${Math.round(FIRMAS_FRACCION * 100)} % del censo de su territorio (${L.territorio.censo.toLocaleString('es-CO')} personas)${L.req.topeAplica ? `, con el tope legal de ${FIRMAS_TOPE.toLocaleString('es-CO')}` : ''}. Todavía no podemos repartirlas: no hay resultados de esa familia política en este territorio.`;
+    $('crmFirmasDato').textContent = L.req.exigido.toLocaleString('es-CO');
+    $('crmFirmasSub').textContent = 'firmas estimadas';
+    $('crmFirmasBtn').disabled = false;
+  } catch (e) {
+    $('crmFirmasTitulo').textContent = 'Todavía no podemos estimar sus firmas.';
+    $('crmFirmasCopy').textContent = 'Falta el censo del territorio o los resultados de su familia política. Vuelva a abrir el CRM en un momento.';
+    $('crmFirmasDato').textContent = '—'; $('crmFirmasSub').textContent = 'sin datos suficientes';
+  }
+}
+function mostrarFirmas() {
+  const L = FIRMAS_ACTUAL; if (!L) return;
+  const etiqueta = window.PartidosBloques?.BLOQUE_LABEL?.[L.bloque] || 'su familia política';
+  const unidad = L.unidad === 'localidad' ? 'comuna o localidad' : 'municipio';
+  const max = Math.max(1, ...L.filas.map(f => f.firmas));
+  $('introModalKicker').textContent = 'Candidato 360 · recolección de firmas';
+  $('introModalTitle').textContent = `Dónde recoger sus ${L.req.exigido.toLocaleString('es-CO')} firmas`;
+  $('introModalText').innerHTML = `
+    <p>Por firmas no hay huella de partido que seguir, así que se usa la de <b>${escHtml(etiqueta.toLowerCase())}</b> —la familia que usted eligió— en las últimas elecciones de este territorio. No predice que esa gente lo apoye: dice dónde hay más personas a las que la conversación les suena, que es donde una firma cuesta menos trabajo.</p>
+    <p style="margin-bottom:8px"><b>Cuántas</b></p>
+    <ul class="puntaje-escala">
+      <li><b>${L.territorio.censo.toLocaleString('es-CO')}</b> personas en el censo electoral de su territorio, sumando los ${L.territorio.puestos.toLocaleString('es-CO')} puestos de votación publicados.</li>
+      <li><b>${L.req.crudo.toLocaleString('es-CO')}</b> es el ${Math.round(FIRMAS_FRACCION * 100)} % de ese censo, que es la regla del artículo 9 de la Ley 130 de 1994 para un cargo uninominal.</li>
+      ${L.req.topeAplica ? `<li><b>${FIRMAS_TOPE.toLocaleString('es-CO')}</b> es el tope que fija la misma norma: por grande que sea el territorio, no se exigen más.</li>` : ''}
+    </ul>
+    <p style="margin-bottom:8px"><b>Dónde, ${unidad} por ${unidad}</b></p>
+    ${L.filas.length ? `<ul class="arq-lista">${L.filas.slice(0, 12).map(f => `<li><span class="arq-punto" style="background:${window.PartidosBloques?.BLOQUE_COLOR?.[L.bloque] || 'var(--green)'}"></span><b>${f.firmas.toLocaleString('es-CO')}</b> ${escHtml(f.nombre)}<em>${Math.round(f.firmas / max * 100)} %</em></li>`).join('')}</ul>`
+      : '<p>No hay resultados de esa familia política en este territorio, así que no repartimos nada: preferimos no inventar un plan de recolección.</p>'}
+    <p class="puntaje-nota">La cifra es una <b>estimación</b>: el censo de corte y las resoluciones de la Registraduría mueven el número exacto, y conviene confirmarlo con ellos antes de imprimir formularios. El reparto sale de los votos de ${escHtml(etiqueta.toLowerCase())} en la última elección comparable de este territorio, no de una encuesta.</p>`;
   $('introModal').classList.add('open');
 }
 
