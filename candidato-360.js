@@ -749,48 +749,73 @@ function salto(el) {
   el.classList.add('salta');
   el.addEventListener('animationend', () => el.classList.remove('salta'), { once: true });
 }
-/* ── La ruta, de a una pregunta ──────────────────────────────────────────────
-   Antes el formulario mostraba todo de una: corporación, territorio y partido,
-   con la mitad de los campos deshabilitados. Ahora cada respuesta abre la
-   siguiente pregunta —y solo la siguiente—, que es como se llena un formulario
-   en papel. El estado manda: si alguien borra el municipio, la pregunta del
-   partido se vuelve a cerrar. */
-function revelarPaso(el, visible, animar) {
-  if (!el) return false;
-  const estaba = !el.classList.contains('hidden');
-  el.classList.toggle('hidden', !visible);
-  if (!visible || estaba) return false;
-  if (animar) { el.classList.add('paso-entra'); el.addEventListener('animationend', () => el.classList.remove('paso-entra'), { once: true }); }
-  return true;
-}
+/* ── La ruta, una pregunta por tarjeta ───────────────────────────────────────
+   El paso 2 mostraba todo de una: corporación, territorio y partido, con la
+   mitad de los campos deshabilitados esperando a que alguien adivinara el
+   orden. Ahora funciona como la búsqueda del nombre: la tarjeta hace UNA
+   pregunta y, al responderla, CAMBIA por la siguiente. El nombre de la persona
+   se queda arriba, que es lo que da continuidad.
+
+     misma corporación  →  partido
+     otra corporación   →  cuál  →  dónde será  →  partido
+
+   El camino de vuelta existe («← Atrás»): una pregunta a la vez solo funciona
+   si se puede desandar. Y el copy de la izquierda dice en cuál va, para que
+   los cuatro pasos no se sientan la misma pantalla. */
+const PASO_COPY = {
+  ruta: ['Definamos su próxima corporación.', 'Si cambia de corporación, ubique la candidatura: el territorio no tiene por qué ser el mismo de su elección anterior.'],
+  corporacion: ['¿A cuál se lanza?', 'Las cinco corporaciones territoriales que se eligen en octubre de 2027.'],
+  lugar: ['¿Dónde será la candidatura?', 'El territorio decide contra qué votación se mide su meta y qué mapa abre el CRM.'],
+  partido: ['¿Con qué partido se lanza?', 'No tiene por qué ser el de su última elección: la mitad de las candidaturas territoriales cambia de aval de una elección a la siguiente.'],
+};
+let pasoRuta = 'ruta';
+function rutaEsOtra() { return document.querySelector('input[name="corporationRoute"]:checked')?.value === 'other'; }
+function pasosDeLaRuta() { return rutaEsOtra() ? ['ruta', 'corporacion', 'lugar', 'partido'] : ['ruta', 'partido']; }
 function territorioListo(corp) { return corp ? campaignTerritory(corp) !== null : false; }
-function pasosRuta({ animar = false } = {}) {
-  const ruta = document.querySelector('input[name="corporationRoute"]:checked')?.value || '';
-  const otra = ruta === 'other', corp = otra ? $('otherCorporation').value : '';
-  const nuevos = [
-    revelarPaso(historicCorporationPicker, otra, animar),
-    revelarPaso($('campaignPlace'), otra && Boolean(corp), animar),
-    revelarPaso($('campaignPartyField'), ruta === 'same' || (otra && territorioListo(corp)), animar),
-  ];
-  revelarPaso($('abrirCRM'), !$('campaignPartyField').classList.contains('hidden'), animar);
-  /* Si la pregunta nueva quedó fuera de la ventana, se acerca sola: nada peor
-     que un formulario que «no hizo nada» porque lo que cambió está más abajo. */
-  if (animar && nuevos.some(Boolean)) {
-    const ultimo = [$('campaignPartyField'), $('campaignPlace'), historicCorporationPicker].find(el => el && !el.classList.contains('hidden'));
-    ultimo?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
+function irAPaso(nombre, { animar = false } = {}) {
+  const pasos = pasosDeLaRuta();
+  pasoRuta = pasos.includes(nombre) ? nombre : 'ruta';
+  document.querySelectorAll('#candidateRoute .paso').forEach(el => {
+    const activo = el.dataset.paso === pasoRuta;
+    el.classList.toggle('hidden', !activo);
+    if (activo && animar) { el.classList.add('paso-entra'); el.addEventListener('animationend', () => el.classList.remove('paso-entra'), { once: true }); }
+  });
+  /* «Atrás» no lleva a una pregunta que no se hizo: a quien no tiene historial
+     territorial nunca se le preguntó «¿la misma corporación?». */
+  const sinPreguntaDeRuta = document.querySelector('.route-option[data-route="same"]')?.classList.contains('hidden');
+  $('pasoAtras').classList.toggle('hidden', pasos.indexOf(pasoRuta) <= (sinPreguntaDeRuta ? 1 : 0));
+  const [titulo, copy] = PASO_COPY[pasoRuta] || PASO_COPY.ruta;
+  $('rutaTitulo').textContent = titulo; $('rutaCopy').textContent = copy;
+  if (animar) document.querySelector('#candidateRoute .search-box')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
-const historicCorporationPicker = createCorporationPicker('Nueva corporación', '', (key, card) => { $('otherCorporation').value = key; salto(card); updateCampaignTerritory({ animar: true }); });
-historicCorporationPicker.id = 'historicCorporationPicker'; historicCorporationPicker.classList.add('hidden');
+/* Responder y pasar: primero el brinco sobre lo que se acaba de elegir y, con
+   él todavía a la vista, la tarjeta cambia de pregunta. */
+function avanzarPaso(nombre, elemento) {
+  salto(elemento);
+  setTimeout(() => irAPaso(nombre, { animar: true }), elemento ? 260 : 0);
+}
+function pasoAnterior() {
+  const pasos = pasosDeLaRuta();
+  irAPaso(pasos[Math.max(pasos.indexOf(pasoRuta) - 1, 0)], { animar: true });
+}
+/* Cuando el territorio queda completo —departamento, municipio y, si es JAL,
+   la localidad— la tarjeta pasa sola a la última pregunta. */
+function territorioResuelto() {
+  if (pasoRuta === 'lugar' && territorioListo($('otherCorporation').value)) irAPaso('partido', { animar: true });
+}
+const historicCorporationPicker = createCorporationPicker('Nueva corporación', '', (key, card) => { $('otherCorporation').value = key; updateCampaignTerritory(); avanzarPaso('lugar', card); });
+historicCorporationPicker.id = 'historicCorporationPicker';
 $('otherCorporationField').after(historicCorporationPicker);
 function toggleCorporationChoice(opciones = {}) {
   const elegido = document.querySelector('input[name="corporationRoute"]:checked');
   const isOther = elegido?.value === 'other';
   $('otherCorporation').disabled = !isOther;
-  if (opciones.animar) salto(elegido?.closest('.route-option'));
-  if (isOther) updateCampaignTerritory(opciones);
-  else pasosRuta(opciones);
+  if (isOther) updateCampaignTerritory();
   refrescarPartidoCampana();
+  if (!elegido) return irAPaso('ruta');
+  const siguiente = isOther ? 'corporacion' : 'partido';
+  if (opciones.animar) avanzarPaso(siguiente, elegido.closest('.route-option'));
+  else irAPaso(opciones.paso || siguiente);
 }
 /* El departamento que filtra el catálogo de partidos de la ruta: el elegido
    para 2027 si cambia de corporación, y si no el de su candidatura anterior. */
@@ -806,14 +831,13 @@ function refrescarPartidoCampana() { pintarEstadoPartido({ input: 'campaignParty
 function partidoVigente() {
   return String(CAMPANA_ACTUAL?.partido || $('campaignParty')?.value || '').trim() || crmCandidate?.partido || '';
 }
-function updateCampaignTerritory(opciones = {}) {
+function updateCampaignTerritory() {
   const corp = $('otherCorporation').value, municipal = CORP_MUNICIPAL.includes(corp), jal = corp === 'jal';
   refrescarPartidoCampana();
   $('campaignMunicipalityField').classList.toggle('hidden', !municipal); $('campaignLocalityField').classList.toggle('hidden', !jal);
   if (!municipal) $('campaignMunicipalityNota').classList.add('hidden');
   $('campaignDepartment').required = municipal || CORP_DEPARTAMENTAL.includes(corp); $('campaignMunicipality').required = municipal; $('campaignLocality').required = jal;
   if ($('campaignDepartment').value && municipal) loadCampaignMunicipalities();
-  pasosRuta(opciones);
 }
 async function cargarMunicipios(select, dep, cacheKey) {
   select.innerHTML = '<option value="">Cargando municipios…</option>';
@@ -850,7 +874,7 @@ async function loadCampaignMunicipalities() {
   $('campaignLocality').innerHTML = '<option value="">Primero seleccione municipio</option>';
   const municipios = await cargarMunicipios($('campaignMunicipality'), dep, `crm-${dep}`);
   if (municipioImplicito($('campaignMunicipality'), $('campaignMunicipalityField'), $('campaignMunicipalityNota'), municipios)) loadCampaignLocalities();
-  pasosRuta({ animar: true });
+  territorioResuelto();
 }
 async function cargarLocalidades(select, status, depNombre, munNombre) {
   select.innerHTML = '<option value="">Cargando comunas o localidades…</option>'; status.textContent = '';
@@ -861,10 +885,9 @@ async function cargarLocalidades(select, status, depNombre, munNombre) {
   } catch (e) { select.innerHTML = '<option value="">No se pudieron cargar las comunas o localidades</option>'; status.textContent = 'La fuente territorial no está disponible en este momento.'; }
 }
 async function loadCampaignLocalities() {
-  pasosRuta({ animar: true });          /* elegir municipio ya abre la pregunta que sigue */
+  territorioResuelto();                 /* elegir municipio ya pasa a la última pregunta */
   if ($('otherCorporation').value !== 'jal' || !$('campaignMunicipality').value) return;
   await cargarLocalidades($('campaignLocality'), $('campaignLocalityStatus'), $('campaignDepartment').options[$('campaignDepartment').selectedIndex].text, $('campaignMunicipality').value);
-  pasosRuta();
 }
 function campaignTerritory(corp) {
   if (document.querySelector('input[name="corporationRoute"]:checked')?.value !== 'other') return '';
@@ -893,13 +916,12 @@ async function precargarCampana(campana) {
   toggleCorporationChoice();
   if (!isOther) return;
   $('otherCorporation').value = campana.corp; marcarCard(historicCorporationPicker, campana.corp); updateCampaignTerritory();
-  pasosRuta();
   if (campana.departamento) {
     $('campaignDepartment').value = campana.departamento;
     if (CORP_MUNICIPAL.includes(campana.corp)) { await loadCampaignMunicipalities(); $('campaignMunicipality').value = campana.municipio || ''; }
     if (campana.corp === 'jal' && campana.municipio) { await loadCampaignLocalities(); $('campaignLocality').value = campana.localidad || ''; }
   }
-  pasosRuta();                            /* quien vuelve ve su ruta completa, sin re-responder */
+  irAPaso('partido');                     /* quien vuelve cae en la última pregunta, ya respondida */
 }
 
 /* ─── 7. Candidatura nueva: wizard ───────────────────────────────────────── */
@@ -1183,6 +1205,100 @@ async function createNew(e) {
   abrirCRMNuevo();
 }
 
+/* ─── 7 ter. El punto de partida, dicho como se dice ────────────────────────
+   «Partimos de JAL · TEUSAQUILLO · BOGOTÁ D.C. · 2015 y PARTIDO CAMBIO
+   RADICAL» es un registro de base de datos leído en voz alta. La tarjeta que
+   abre el CRM es el primer saludo de la herramienta y tiene que sonar a
+   alguien que miró el historial: cuánto hace, a qué se lanzó, a dónde va
+   ahora y con quién. Es un banco de frases, no una plantilla: la corporación
+   de destino y el bloque ideológico del partido eligen cada tramo. La frase
+   se elige por el nombre —no al azar— para que no cambie en cada recarga.   */
+const NOMBRE_BONITO = s => String(s || '').toLowerCase().replace(/(^|[\s(\-·])([a-záéíóúñü])/g, (m, a, b) => a + b.toUpperCase())
+  .replace(/\b(De|Del|La|Las|Los|Y|El)\b/g, w => w.toLowerCase()).replace(/^(\w)/, c => c.toUpperCase()).replace(/D\.c\./i, 'D.C.');
+/* «CONCEJO · MEDELLIN · 2019» → { tipo: 'concejo', lugar: 'Medellín', año: 2019 } */
+function leerCorpHistorica(corp) {
+  const partes = String(corp || '').split('·').map(x => x.trim()).filter(Boolean);
+  const año = candidateYear({ corp }), t = normalizedText(partes[0] || '');
+  const tipo = t.includes('JAL') ? 'jal' : t.includes('CONCEJO') ? 'concejo' : t.includes('ALCALD') ? 'alcaldia' : t.includes('ASAMBLEA') ? 'asamblea' : t.includes('GOBERN') ? 'gobernacion'
+    : t.includes('CAMARA') ? 'camara' : t.includes('SENADO') ? 'senado' : t.includes('PRESID') || t.includes('CONSULTA') ? 'presidencial' : 'otra';
+  const lugar = NOMBRE_BONITO(partes.slice(1).find(x => !/^\d{4}$/.test(x)) || '');
+  return { tipo, lugar, año };
+}
+const CORP_CON_LUGAR = {
+  jal: l => `la JAL de ${l}`, concejo: l => `el Concejo de ${l}`, alcaldia: l => `la Alcaldía de ${l}`,
+  asamblea: l => `la Asamblea de ${l}`, gobernacion: l => `la Gobernación de ${l}`,
+  camara: l => `la Cámara por ${l}`, senado: () => 'el Senado', presidencial: () => 'la consulta presidencial', otra: l => l || 'una elección',
+};
+function nombreDeCorp(tipo, lugar) { const f = CORP_CON_LUGAR[tipo] || CORP_CON_LUGAR.otra; return lugar ? f(lugar) : (tipo === 'senado' || tipo === 'presidencial' ? f() : { jal: 'la JAL', concejo: 'el Concejo', alcaldia: 'la Alcaldía', asamblea: 'la Asamblea', gobernacion: 'la Gobernación', camara: 'la Cámara' }[tipo] || 'una elección'); }
+function haceCuanto(año) {
+  const n = 2027 - Number(año || 0);
+  if (!año || n <= 0) return '';
+  return n === 1 ? 'el año pasado' : `hace ${n} años`;
+}
+/* Una frase por bloque, de varias posibles: la elige el nombre, no el azar. */
+const FRASES_BLOQUE = {
+  izq: [
+    p => `Con ${p} la conversación es de derechos y de barrio: la meta vive donde la gente le pide más al Estado.`,
+    p => `${p} gana en la calle y en la organización: cada puesto de votación es una reunión que ya debería estar agendada.`,
+  ],
+  ci: [
+    p => `Con ${p} el voto es de cambio con cabeza: se gana explicando, y explicando bien.`,
+    p => `${p} vive del votante que quiere que las cosas cambien sin que se rompan; ahí está su meta.`,
+  ],
+  c: [
+    p => `El centro no se arrastra, se convence: con ${p} la meta se consigue puesto por puesto.`,
+    p => `Con ${p} el reto es el de siempre en el centro: que el votante indeciso decida por usted.`,
+  ],
+  cd: [
+    p => `Con ${p} el mensaje es gestión: obras, orden y resultados que se puedan mostrar.`,
+    p => `${p} habla de que las cosas funcionen; la meta está donde la gente ya está cansada de que no.`,
+  ],
+  d: [
+    p => `Con ${p} el mensaje es orden y resultados: la meta vive donde la gente pide autoridad que cumpla.`,
+    p => `${p} convence con firmeza y con obra: los votos están donde el barrio quiere sentirse seguro.`,
+  ],
+  sc: [
+    p => `Con ${p} el mensaje lo pone usted: no hay un bloque que lo defina de antemano, y eso también es una ventaja.`,
+  ],
+};
+const FRASES_SALTO = {
+  misma: () => 'Repetir es la forma más barata de crecer: ya sabe dónde están sus votos y el mapa se los muestra.',
+  'jal>concejo': () => 'De la localidad a la ciudad entera: el salto es grande, y por eso la meta se reparte por donde vota su partido.',
+  'jal>alcaldia': () => 'De la localidad a la ciudad entera, y de una curul al primer puesto: el mapa cambia de escala.',
+  'concejo>alcaldia': () => 'Del Concejo a la Alcaldía se pasa de sumar a ganar: ya no es una curul, es el primer puesto.',
+  'concejo>asamblea': () => 'Del municipio al departamento: la meta ya no vive en una ciudad sino en todas.',
+  'concejo>gobernacion': () => 'Del Concejo a la Gobernación: de una curul en una ciudad al primer puesto del departamento.',
+  'alcaldia>gobernacion': () => 'De la Alcaldía a la Gobernación: la misma pregunta —ganar— en un territorio mucho más grande.',
+  'asamblea>gobernacion': () => 'De la Asamblea a la Gobernación: del voto por lista al voto por nombre.',
+  'congreso>territorial': () => 'Del Congreso al territorio: la votación de entonces está repartida por todo el departamento y la meta ahora vive en un solo lugar.',
+  'presidencial>territorial': () => 'De una campaña nacional a una local: los votos de entonces no son suyos, pero el músculo sí.',
+  otra: () => 'Cambiar de corporación cambia la pregunta: la meta se calcula contra la elección de 2023 de ESA corporación en ESE lugar.',
+};
+function tipoDeSalto(desde, hacia) {
+  if (desde === hacia) return 'misma';
+  if (desde === 'camara' || desde === 'senado') return 'congreso>territorial';
+  if (desde === 'presidencial') return 'presidencial>territorial';
+  return FRASES_SALTO[`${desde}>${hacia}`] ? `${desde}>${hacia}` : 'otra';
+}
+function elegir(lista, semilla) { let h = 0; for (const c of String(semilla || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0; return lista[h % lista.length]; }
+function fraseDePartida({ candidate, corpKey, territory, campana }) {
+  const hist = leerCorpHistorica(candidate?.corp), n = candidate?.history?.length || 0;
+  const lugarNuevo = NOMBRE_BONITO(String(territory || '').split('·')[0].trim()) || hist.lugar;
+  const destino = nombreDeCorp(corpKey, lugarNuevo);
+  const cuando = haceCuanto(hist.año);
+  const apertura = n >= 2
+    ? `¡${n} candidaturas en el historial (${[...new Set(candidate.history.map(candidateYear).filter(Boolean))].sort((a, b) => a - b).join(', ')})! La última fue a ${nombreDeCorp(hist.tipo, hist.lugar)}${cuando ? ` ${cuando}` : ''}.`
+    : `¡Vimos que se lanzó a ${nombreDeCorp(hist.tipo, hist.lugar)}${cuando ? ` ${cuando}` : ''}!`;
+  const ahora = `Ahora vamos por ${destino}.`;
+  const partido = String(campana?.partido || candidate?.partido || '').trim();
+  const bloque = partido ? PartidosBloques.bloqueDeCandidatura(partido, candidate?.nombre || '') : 'sc';
+  const partidoBonito = partido.replace(/^(PARTIDO|MOVIMIENTO)\s+(POLÍTICO\s+)?/i, '').split(' ').map(w => w.length > 3 ? NOMBRE_BONITO(w) : w.toLowerCase()).join(' ').replace(/^(\w)/, c => c.toUpperCase());
+  const cambioDePartido = partido && candidate?.partido && normalizedText(partido) !== normalizedText(candidate.partido);
+  const conQuien = partido ? elegir(FRASES_BLOQUE[bloque] || FRASES_BLOQUE.sc, candidate?.nombre)(partidoBonito) + (cambioDePartido ? ` Es un aval nuevo: el mapa conserva su votación, la huella del partido cambia.` : '') : '';
+  const salto = FRASES_SALTO[tipoDeSalto(hist.tipo, corpKey)]();
+  return [apertura, ahora, salto, conQuien].filter(Boolean).join(' ');
+}
+
 /* ─── 8. CRM: apertura, meta de votos y foto ─────────────────────────────── */
 /* La meta depende del PARTIDO: no cuesta lo mismo entrar de décimo en una
    lista grande que arrastrar una lista pequeña. Va el aval con el que se
@@ -1278,10 +1394,10 @@ async function launchCRM(event) {
   if (!crmCandidate) return;
   if (!SESSION.acceso) return abrirPaywall();
   const isOther = document.querySelector('input[name="corporationRoute"]:checked')?.value === 'other';
-  if (isOther && !$('otherCorporation').value) { historicCorporationPicker.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  if (isOther && !$('otherCorporation').value) return irAPaso('corporacion', { animar: true });
   const corpKey = isOther ? $('otherCorporation').value : corporacionHistorica(crmCandidate) || 'concejo';
   const corporation = CRM_CORPORATIONS[corpKey], territory = campaignTerritory(corpKey);
-  if (territory === null) { $('campaignPlace').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('campaignDepartment').focus({ preventScroll: true }); return; }
+  if (territory === null) { irAPaso('lugar', { animar: true }); $('campaignDepartment').focus({ preventScroll: true }); return; }
   const campana = campanaActual(corpKey);
   if (PRUEBAS) vinculoLocal({ tipo: 'historial', candidato: { id: crmCandidate.id, nombre: crmCandidate.nombre, slugs: (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean), corp: crmCandidate.corp, partido: crmCandidate.partido, circunscripcion: crmCandidate.circunscripcion }, campana });
   else if (!SESSION.vinculo) {
@@ -1296,9 +1412,7 @@ async function launchCRM(event) {
   $('crmBack').textContent = '← Cambiar corporación'; $('crmBack').onclick = () => showScreen('candidateRoute');
   $('crmInitials').textContent = initials(crmCandidate.nombre); $('crmName').textContent = crmCandidate.nombre;
   $('crmTarget').textContent = `Candidatura 2027 · ${corporation}${territory ? ` · ${territory}` : ''}`;
-  $('crmContext').textContent = crmCandidate.history?.length
-    ? `Integramos ${crmCandidate.history.length} candidaturas de la misma persona (${[...new Set(crmCandidate.history.map(candidateYear).filter(Boolean))].sort((a, b) => a - b).join(', ')}). El CRM conserva todo su historial; el mapa toma la elección más reciente como referencia territorial para no mezclar votaciones de años diferentes.`
-    : `Partimos de ${crmCandidate.corp || 'su historial electoral'}${crmCandidate.partido ? ` y ${crmCandidate.partido}` : ''}. El mapa conserva la votación histórica; la nueva campaña queda ubicada en ${territory || 'su territorio electoral anterior'}${campana.partido && normalizedText(campana.partido) !== normalizedText(crmCandidate.partido || '') ? ` y se inscribe con ${campana.partido}` : ''}.`;
+  $('crmContext').textContent = fraseDePartida({ candidate: crmCandidate, corpKey, territory, campana });
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Mapa de historial electoral';
   showScreen('crm');

@@ -1,16 +1,16 @@
-/* prueba-ruta.mjs — la ruta se responde de a una pregunta.
+/* prueba-ruta.mjs — la ruta hace una pregunta por tarjeta.
    ------------------------------------------------------------------
    El paso 2 mostraba todo a la vez: corporación, territorio y partido, con la
    mitad de los campos deshabilitados esperando a que alguien adivinara el
-   orden. Ahora cada respuesta abre la siguiente pregunta —y solo la
-   siguiente—, y lo que se acaba de elegir brinca dos veces para acusar recibo.
+   orden. Ahora funciona como la búsqueda del nombre: la tarjeta hace UNA
+   pregunta y al responderla cambia por la siguiente; lo elegido brinca dos
+   veces antes del cambio y el nombre de la persona se queda arriba.
 
-     misma corporación  → partido
-     otra corporación   → nueva corporación → dónde será → partido
+     misma corporación  →  partido
+     otra corporación   →  cuál  →  dónde será  →  partido
 
-   El estado manda: si se borra el municipio, la pregunta del partido se
-   vuelve a cerrar. Y quien vuelve con una campaña guardada la ve completa,
-   sin volver a responder.
+   Hay «← Atrás», el copy de la izquierda dice en qué paso va, y quien vuelve
+   con campaña guardada cae en la última pregunta, ya respondida.
 
      node tools/candidato-360/prueba-ruta.mjs                                 */
 const { chromium } = await import('playwright')
@@ -37,103 +37,96 @@ await p.route('**', async route => {
 });
 await p.addInitScript(() => { localStorage.setItem('rr-token', 't'); localStorage.setItem('rr-user', JSON.stringify({ email: 'reruizc@gmail.com' })); });
 await p.goto('file://' + process.cwd() + '/candidato-360.html');
-await p.waitForFunction(() => typeof window.pasosRuta === 'function');
+await p.waitForFunction(() => typeof window.irAPaso === 'function');
 await p.waitForFunction(() => document.getElementById('department').options.length > 1);
 
+/* Qué tarjeta se ve: exactamente un paso visible, cuál es, y el copy de la izquierda. */
 const estado = () => p.evaluate(() => {
-  const oculto = id => document.getElementById(id).classList.contains('hidden');
-  return {
-    ruta: document.querySelector('input[name="corporationRoute"]:checked')?.value || null,
-    corporacion: !historicCorporationPicker.classList.contains('hidden'),
-    lugar: !oculto('campaignPlace'),
-    partido: !oculto('campaignPartyField'),
-    boton: !oculto('abrirCRM'),
-  };
+  const visibles = [...document.querySelectorAll('#candidateRoute .paso')].filter(el => !el.classList.contains('hidden')).map(el => el.dataset.paso);
+  return { visibles, paso: pasoRuta, atras: !document.getElementById('pasoAtras').classList.contains('hidden'), titulo: document.getElementById('rutaTitulo').textContent, nombre: document.getElementById('routeName').textContent, ruta: document.querySelector('input[name="corporationRoute"]:checked')?.value || null };
 });
-const elegirRuta = async valor => { await p.evaluate(v => { document.querySelector(`input[name="corporationRoute"][value="${v}"]`).checked = true; toggleCorporationChoice({ animar: true }); }, valor); await p.waitForTimeout(250); };
+const elegirRuta = async valor => { await p.evaluate(v => { document.querySelector(`input[name="corporationRoute"][value="${v}"]`).checked = true; toggleCorporationChoice({ animar: true }); }, valor); await p.waitForTimeout(700); };
 const CONCEJAL = { nombre: 'ALGUIEN CON HISTORIAL', slug: 'CONC2023-16-1-1-1', corp: 'CONCEJO · BOGOTÁ D.C. · 2023', circunscripcion: 'BOGOTÁ D.C.', partido: 'PARTIDO X', votos: 900 };
 
 const r = {};
-/* 1 · Al abrir, una sola pregunta. */
+/* 1 · Al abrir, la tarjeta hace una sola pregunta. */
 await p.evaluate(c => abrirRutaCandidato(c), CONCEJAL);
 await p.waitForTimeout(300);
 r.alAbrir = await estado();
 
-/* 2 · «La misma corporación» salta a la pregunta del partido. */
-await elegirRuta('same');
+/* 2 · «La misma corporación»: brinca y la tarjeta CAMBIA a la del partido. */
+r.saltoEnLaOpcion = await p.evaluate(() => { document.querySelector('input[name="corporationRoute"][value="same"]').checked = true; toggleCorporationChoice({ animar: true }); return document.querySelector('.route-option[data-route="same"]').classList.contains('salta'); });
+r.antesDelCambio = await estado();          /* con el brinco todavía a la vista, sigue la pregunta */
+await p.waitForTimeout(700);
 r.misma = await estado();
-r.saltoEnLaOpcion = await p.evaluate(() => {
-  document.querySelector('input[name="corporationRoute"][value="same"]').checked = true;
-  toggleCorporationChoice({ animar: true });
-  return document.querySelector('.route-option[data-route="same"]').classList.contains('salta');
-});
 
-/* 3 · «Otra corporación» abre SOLO la nueva corporación. */
+/* 3 · «← Atrás» vuelve a la pregunta de la ruta. */
+await p.click('#pasoAtras'); await p.waitForTimeout(400);
+r.atras = await estado();
+
+/* 4 · «Otra corporación»: la tarjeta pasa a «¿a cuál se lanza?». */
 await elegirRuta('other');
 r.otra = await estado();
+await p.locator('#candidateRoute .flow-grid').screenshot({ path: SP + '/ruta-corporacion.png' });
 
-/* 4 · Elegida la corporación, aparece el territorio; el partido espera. */
+/* 5 · Elegida la corporación, la tarjeta pasa al territorio. */
 await p.evaluate(() => historicCorporationPicker.querySelector('[data-corporation="concejo"]').click());
-await p.waitForTimeout(300);
+await p.waitForTimeout(700);
 r.conCorporacion = await estado();
-r.saltoEnLaTarjeta = await p.evaluate(() => { const c = historicCorporationPicker.querySelector('[data-corporation="alcaldia"]'); c.click(); return c.classList.contains('salta'); });
-await p.evaluate(() => historicCorporationPicker.querySelector('[data-corporation="concejo"]').click());
-await p.waitForTimeout(200);
 
-await p.locator('#candidateRoute .flow-grid').screenshot({ path: SP + '/ruta-pasos.png' });
-/* 5 · Departamento y municipio completan el territorio y abren el partido. */
-await p.selectOption('#campaignDepartment', '01');
-await p.waitForTimeout(400);
+/* 6 · Departamento + municipio completan el territorio y la tarjeta pasa al partido. */
+await p.selectOption('#campaignDepartment', '01'); await p.waitForTimeout(500);
 r.conDepartamento = await estado();
-await p.selectOption('#campaignMunicipality', 'MEDELLÍN');
-await p.waitForTimeout(400);
+await p.selectOption('#campaignMunicipality', 'MEDELLÍN'); await p.waitForTimeout(500);
 r.conMunicipio = await estado();
+r.botonVisible = await p.$eval('#abrirCRM', el => el.offsetParent !== null);
 
-/* 6 · Y si se borra el municipio, la pregunta del partido se vuelve a cerrar. */
-await p.evaluate(() => { document.getElementById('campaignMunicipality').value = ''; loadCampaignLocalities(); });
-await p.waitForTimeout(300);
-r.sinMunicipio = await estado();
+/* 7 · Atrás desde el partido devuelve al territorio, con lo elegido intacto. */
+await p.click('#pasoAtras'); await p.waitForTimeout(400);
+r.atrasDesdePartido = await estado();
+r.municipioIntacto = await p.inputValue('#campaignMunicipality');
 
-/* 7 · La JAL además exige comuna o localidad. */
-await p.evaluate(() => historicCorporationPicker.querySelector('[data-corporation="jal"]').click());
-await p.waitForTimeout(200);
-await p.selectOption('#campaignDepartment', '16');
-await p.waitForTimeout(600);
+/* 8 · La JAL además exige comuna o localidad antes de pasar. */
+await p.evaluate(() => { pasoRuta = 'corporacion'; historicCorporationPicker.querySelector('[data-corporation="jal"]').click(); });
+await p.waitForTimeout(500);
+await p.selectOption('#campaignDepartment', '16'); await p.waitForTimeout(700);
 r.jalSinLocalidad = await estado();
-await p.evaluate(() => { const s = document.getElementById('campaignLocality'); s.value = s.options[1]?.value || ''; pasosRuta({ animar: true }); });
-await p.waitForTimeout(300);
+await p.evaluate(() => { const s = document.getElementById('campaignLocality'); s.value = s.options[1]?.value || ''; territorioResuelto(); });
+await p.waitForTimeout(500);
 r.jalConLocalidad = await estado();
 
-/* 8 · Sin historial territorial (Senado) la única ruta se marca sola. */
+/* 9 · Sin historial territorial (Senado) se entra directo a «¿a cuál se lanza?», sin «Atrás» hacia una pregunta que no se hizo. */
 await p.evaluate(() => abrirRutaCandidato({ nombre: 'SENADOR SIN TERRITORIO', slug: 'CON2022-S-11-1', corp: 'SENADO · 2022', circunscripcion: 'NACIONAL', partido: 'PARTIDO Y', votos: 40000 }));
 await p.waitForTimeout(300);
 r.senador = await estado();
-r.opcionMismaOculta = await p.evaluate(() => document.querySelector('.route-option[data-route="same"]').classList.contains('hidden'));
 
-/* 9 · Quien vuelve con campaña guardada la ve completa, sin re-responder. */
+/* 10 · Quien vuelve con campaña guardada cae en la última pregunta. */
 await p.evaluate(async c => { abrirRutaCandidato(c); await precargarCampana({ corp: 'concejo', ruta: 'other', departamento: '01', municipio: 'MEDELLÍN', partido: 'PARTIDO Z' }); }, CONCEJAL);
-await p.waitForTimeout(700);
+await p.waitForTimeout(800);
 r.precargada = await estado();
+r.precargadaMunicipio = await p.inputValue('#campaignMunicipality');
 await b.close();
 
+const solo = (e, paso) => e.visibles.length === 1 && e.visibles[0] === paso && e.paso === paso;
 const pruebas = [
-  ['al abrir la ruta solo está la primera pregunta', !r.alAbrir.ruta && !r.alAbrir.corporacion && !r.alAbrir.lugar && !r.alAbrir.partido && !r.alAbrir.boton],
-  ['«la misma corporación» abre el partido, y nada de territorio', r.misma.partido && r.misma.boton && !r.misma.lugar && !r.misma.corporacion],
-  ['la opción elegida brinca', r.saltoEnLaOpcion === true],
-  ['«otra corporación» abre SOLO la nueva corporación', r.otra.corporacion && !r.otra.lugar && !r.otra.partido && !r.otra.boton],
-  ['elegir la corporación abre el territorio, no el partido', r.conCorporacion.lugar && !r.conCorporacion.partido],
-  ['la tarjeta de corporación también brinca', r.saltoEnLaTarjeta === true],
-  ['con departamento pero sin municipio el partido sigue cerrado', r.conDepartamento.lugar && !r.conDepartamento.partido],
-  ['completo el territorio, aparecen partido y botón', r.conMunicipio.partido && r.conMunicipio.boton],
-  ['si se borra el municipio, el partido se vuelve a cerrar', !r.sinMunicipio.partido && !r.sinMunicipio.boton],
-  ['la JAL espera a la comuna o localidad', !r.jalSinLocalidad.partido && r.jalConLocalidad.partido],
-  ['sin historial territorial, «otra corporación» viene marcada', r.senador.ruta === 'other' && r.senador.corporacion && r.opcionMismaOculta],
-  ['quien vuelve con campaña guardada la ve completa', r.precargada.corporacion && r.precargada.lugar && r.precargada.partido && r.precargada.boton],
+  ['al abrir, la tarjeta hace una sola pregunta: la corporación', solo(r.alAbrir, 'ruta') && !r.alAbrir.atras && !r.alAbrir.ruta],
+  ['la opción elegida brinca y, mientras brinca, la tarjeta sigue ahí', r.saltoEnLaOpcion === true && solo(r.antesDelCambio, 'ruta')],
+  ['«la misma corporación» cambia la tarjeta por la del partido', solo(r.misma, 'partido') && /partido/i.test(r.misma.titulo)],
+  ['el nombre de la persona se queda arriba', r.misma.nombre === 'ALGUIEN CON HISTORIAL'],
+  ['«← Atrás» vuelve a la pregunta anterior', solo(r.atras, 'ruta')],
+  ['«otra corporación» cambia a «¿a cuál se lanza?»', solo(r.otra, 'corporacion') && r.otra.atras && /cuál/i.test(r.otra.titulo)],
+  ['elegida la corporación, la tarjeta pasa al territorio', solo(r.conCorporacion, 'lugar') && /dónde/i.test(r.conCorporacion.titulo)],
+  ['con departamento pero sin municipio se queda en el territorio', solo(r.conDepartamento, 'lugar')],
+  ['completo el territorio, pasa al partido con el botón del CRM', solo(r.conMunicipio, 'partido') && r.botonVisible],
+  ['atrás desde el partido devuelve al territorio sin perder lo elegido', solo(r.atrasDesdePartido, 'lugar') && r.municipioIntacto === 'MEDELLÍN'],
+  ['la JAL espera a la comuna o localidad', solo(r.jalSinLocalidad, 'lugar') && solo(r.jalConLocalidad, 'partido')],
+  ['sin historial territorial se entra directo a «¿a cuál se lanza?», sin Atrás', solo(r.senador, 'corporacion') && !r.senador.atras && r.senador.ruta === 'other'],
+  ['quien vuelve con campaña guardada cae en la última pregunta, respondida', solo(r.precargada, 'partido') && r.precargadaMunicipio === 'MEDELLÍN'],
   ['sin errores de JavaScript', errores.length === 0],
 ];
 for (const [t, ok] of pruebas) console.log(`${ok ? '✓' : '✗'} ${t}`);
 if (errores.length) console.log(errores.slice(0, 3));
 const f = pruebas.filter(([, ok]) => !ok).length;
-if (f) console.log(JSON.stringify(r, null, 1).slice(0, 2200));
+if (f) console.log(JSON.stringify(r, null, 1).slice(0, 2600));
 console.log(f ? `\n${f} fallaron` : `\n${pruebas.length} de ${pruebas.length} pasaron`);
 process.exit(f ? 1 : 0);

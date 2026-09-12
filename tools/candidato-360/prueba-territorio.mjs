@@ -93,6 +93,7 @@ await p.evaluate(() => {
   toggleCorporationChoice();
   document.getElementById('otherCorporation').value = 'alcaldia';
   updateCampaignTerritory();
+  irAPaso('lugar');                     /* la ruta va por tarjetas: esta es la del territorio */
 });
 await p.selectOption('#campaignDepartment', { label: 'Bogotá D.C.' });
 await p.evaluate(() => loadCampaignMunicipalities());
@@ -104,6 +105,7 @@ revisar('en la ruta con historial pasa lo mismo',
    nombre normalizado — el distrito es municipio y departamento a la vez. */
 revisar('el territorio se guarda igual, y sin repetir Bogotá',
   (await p.evaluate(() => campaignTerritory('alcaldia'))) === 'BOGOTÁ, D.C.');
+await p.evaluate(() => irAPaso('lugar'));
 await p.selectOption('#campaignDepartment', { label: 'Antioquia' });
 await p.evaluate(() => loadCampaignMunicipalities());
 await p.waitForFunction(() => !document.getElementById('campaignMunicipalityField').classList.contains('hidden'));
@@ -112,13 +114,17 @@ revisar('sin errores de JavaScript', errores.length === 0);
 
 /* Dos capturas para revisar a ojo: la pregunta con Bogotá y con Antioquia. */
 const SALIDA = process.env.SALIDA_PRUEBA || '/tmp';
+await p.evaluate(() => irAPaso('lugar'));
 await p.selectOption('#campaignDepartment', { label: 'Bogotá D.C.' });
 await p.evaluate(() => loadCampaignMunicipalities());
 await p.waitForFunction(() => document.getElementById('campaignMunicipalityField').classList.contains('hidden'));
+await p.evaluate(() => irAPaso('lugar'));
 await p.locator('#campaignPlace').screenshot({ path: SALIDA + '/territorio-bogota.png' });
+await p.evaluate(() => irAPaso('lugar'));
 await p.selectOption('#campaignDepartment', { label: 'Antioquia' });
 await p.evaluate(() => loadCampaignMunicipalities());
 await p.waitForFunction(() => !document.getElementById('campaignMunicipalityField').classList.contains('hidden'));
+await p.evaluate(() => irAPaso('lugar'));
 await p.locator('#campaignPlace').screenshot({ path: SALIDA + '/territorio-antioquia.png' });
 await b.close();
 console.log();

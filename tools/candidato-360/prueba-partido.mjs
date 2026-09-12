@@ -53,10 +53,10 @@ await p.evaluate(() => abrirRutaCandidato({
   circunscripcion: 'BARRIOS UNIDOS · BOGOTÁ D.C.', partido: 'NUEVO LIBERALISMO- AGRUPACION POLITICA EN MARCHA', votos: 709,
 }));
 await p.waitForTimeout(500);
-/* La ruta pregunta de a una: hasta que no se elige corporación no hay campo
-   de partido. Se responde «la misma» y sigue la prueba. */
-r.partidoOculto = await p.evaluate(() => document.getElementById('campaignPartyField').classList.contains('hidden'));
-await p.evaluate(() => { document.querySelector('input[name="corporationRoute"][value="same"]').checked = true; toggleCorporationChoice({ animar: true }); });
+/* La ruta va por tarjetas: la primera pregunta la corporación y hasta
+   responderla no hay campo de partido. Se responde «la misma» y sigue. */
+r.partidoOculto = await p.evaluate(() => document.getElementById('campaignParty').offsetParent === null);
+await p.evaluate(() => { document.querySelector('input[name="corporationRoute"][value="same"]').checked = true; toggleCorporationChoice(); });
 await p.waitForTimeout(400);
 r.precargado = await p.inputValue('#campaignParty');
 r.hayCampo = await p.evaluate(() => !!document.getElementById('campaignParty') && !document.querySelector('#campaignPartyField select'));
@@ -151,6 +151,7 @@ r.antioquia = await p.evaluate(async () => {
   document.querySelector('input[name="corporationRoute"][value="other"]').checked = true;
   toggleCorporationChoice();
   document.getElementById('otherCorporation').value = 'asamblea';
+  irAPaso('lugar');
   document.getElementById('campaignDepartment').value = '01';
   await loadCampaignMunicipalities().catch(() => {});
   await new Promise(r => setTimeout(r, 400));

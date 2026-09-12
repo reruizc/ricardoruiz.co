@@ -52,7 +52,7 @@ r.nombreEnPantalla = await p.textContent('#routeName');
 r.historialEnPantalla = await p.textContent('#routeHistory');
 r.avisoRuta = (await p.textContent('#candidateRoute .c360-vitrina p')).slice(0, 60);
 /* La ruta se responde de a una pregunta: el botón del CRM aparece con la primera. */
-r.botonAntesDeResponder = await p.evaluate(() => document.getElementById('abrirCRM').classList.contains('hidden'));
+r.botonAntesDeResponder = await p.evaluate(() => document.getElementById('abrirCRM').offsetParent === null);
 await p.evaluate(() => { document.querySelector('input[name="corporationRoute"][value="same"]').checked = true; toggleCorporationChoice({ animar: true }); });
 await p.waitForTimeout(400);
 r.botonCRM = await p.textContent('#candidateRoute button.next');
