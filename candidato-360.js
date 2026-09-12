@@ -784,6 +784,8 @@ function irAPaso(nombre, { animar = false } = {}) {
      territorial nunca se le preguntó «¿la misma corporación?». */
   const sinPreguntaDeRuta = document.querySelector('.route-option[data-route="same"]')?.classList.contains('hidden');
   $('pasoAtras').classList.toggle('hidden', pasos.indexOf(pasoRuta) <= (sinPreguntaDeRuta ? 1 : 0));
+  $('abrirCRM').classList.toggle('hidden', pasoRuta !== 'partido');
+  if (pasoRuta !== 'lugar') ocultarMapaDepto();
   const [titulo, copy] = PASO_COPY[pasoRuta] || PASO_COPY.ruta;
   $('rutaTitulo').textContent = titulo; $('rutaCopy').textContent = copy;
   if (animar) document.querySelector('#candidateRoute .search-box')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -798,10 +800,63 @@ function pasoAnterior() {
   const pasos = pasosDeLaRuta();
   irAPaso(pasos[Math.max(pasos.indexOf(pasoRuta) - 1, 0)], { animar: true });
 }
+/* ── El mapa del departamento ────────────────────────────────────────────────
+   Elegir «Boyacá» en un desplegable de 33 no confirma nada: los nombres se
+   parecen y nadie revisa dos veces. Un mapa de Colombia con SU departamento
+   encendido sí. Se dibuja en SVG con la misma capa que alimenta el
+   desplegable —ya está en caché— y se queda un par de segundos antes de pasar
+   a lo que sigue, que es lo que dura mirar un mapa y decir «sí, ese es».   */
+const MAPA_PAUSA = 1900;
+let pausaMapa = 0;
+function proyectarDepartamentos(geo, ancho, alto) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const recorre = c => { if (typeof c[0] === 'number') { x0 = Math.min(x0, c[0]); x1 = Math.max(x1, c[0]); y0 = Math.min(y0, c[1]); y1 = Math.max(y1, c[1]); } else c.forEach(recorre); };
+  (geo.features || []).forEach(f => f.geometry?.coordinates && recorre(f.geometry.coordinates));
+  /* Colombia va de -4° a 13° de latitud: a esa distancia del ecuador la
+     corrección de Mercator no se nota, así que basta con escalar igual en los
+     dos ejes y centrar. Estirarla para llenar la caja la deformaría. */
+  const escala = Math.min(ancho / (x1 - x0), alto / (y1 - y0)) * .96;
+  const dx = (ancho - (x1 - x0) * escala) / 2, dy = (alto - (y1 - y0) * escala) / 2;
+  return ([lng, lat]) => [((lng - x0) * escala + dx).toFixed(1), ((y1 - lat) * escala + dy).toFixed(1)];
+}
+function caminoDeGeometria(geom, proy) {
+  const anillos = geom?.type === 'Polygon' ? geom.coordinates : geom?.type === 'MultiPolygon' ? geom.coordinates.flat() : [];
+  return anillos.map(anillo => 'M' + anillo.map(proy).map(p => p.join(' ')).join('L') + 'Z').join('');
+}
+function ocultarMapaDepto(id = 'mapaDepto') { $(id)?.classList.add('hidden'); }
+async function pintarMapaDepto(nombre, id = 'mapaDepto') {
+  const caja = $(id), lienzo = $(id + 'Lienzo'); if (!caja || !lienzo || !nombre) return;
+  try {
+    const geo = await fetchJSON(`${S3}/mapas-2026/DEPARTAMENTOS2.json`);
+    const W = 300, H = 330, proy = proyectarDepartamentos(geo, W, H), objetivo = normalizedText(nombre);
+    const partes = (geo.features || []).map(f => {
+      const suyo = normalizedText(f.properties?.name || '') === objetivo;
+      return `<path d="${caminoDeGeometria(f.geometry, proy)}" class="${suyo ? 'depto-elegido' : 'depto'}"></path>`;
+    }).join('');
+    lienzo.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Mapa de Colombia con ${escHtml(nombre)} resaltado">${partes}</svg>`;
+    $(id + 'Pie').textContent = nombre;
+    caja.classList.remove('hidden');
+    pausaMapa = Date.now() + MAPA_PAUSA;
+  } catch (e) { ocultarMapaDepto(); }
+}
+/* El departamento se elige, se ve en el mapa y solo entonces sigue el camino. */
+async function elegirDepartamento() {
+  const sel = $('campaignDepartment'), nombre = sel.options[sel.selectedIndex]?.text || '';
+  if (sel.value) await pintarMapaDepto(nombre); else ocultarMapaDepto();
+  return loadCampaignMunicipalities();
+}
+/* Lo mismo en el wizard de candidatura nueva, que pregunta el departamento
+   igual y merece la misma confirmación. */
+function mapaDeptoNuevo() {
+  const sel = $('department'), nombre = sel?.options[sel.selectedIndex]?.text || '';
+  if (sel?.value) pintarMapaDepto(nombre, 'mapaDeptoNuevo'); else ocultarMapaDepto('mapaDeptoNuevo');
+}
 /* Cuando el territorio queda completo —departamento, municipio y, si es JAL,
-   la localidad— la tarjeta pasa sola a la última pregunta. */
+   la localidad— la tarjeta pasa sola a la última pregunta, con el mapa a la
+   vista el tiempo que dura mirarlo. */
 function territorioResuelto() {
-  if (pasoRuta === 'lugar' && territorioListo($('otherCorporation').value)) irAPaso('partido', { animar: true });
+  if (pasoRuta !== 'lugar' || !territorioListo($('otherCorporation').value)) return;
+  setTimeout(() => { if (pasoRuta === 'lugar' && territorioListo($('otherCorporation').value)) irAPaso('partido', { animar: true }); }, Math.max(0, pausaMapa - Date.now()));
 }
 const historicCorporationPicker = createCorporationPicker('Nueva corporación', '', (key, card) => { $('otherCorporation').value = key; updateCampaignTerritory(); avanzarPaso('lugar', card); });
 historicCorporationPicker.id = 'historicCorporationPicker';
@@ -946,6 +1001,7 @@ async function loadMunicipalities() {
 async function loadLocalities() { await cargarLocalidades($('locality'), $('localityStatus'), $('department').options[$('department').selectedIndex].text, $('municipality').value); }
 function updateTerritory() {
   const election = $('election').value, municipal = MUNICIPAL_ELECTIONS.includes(election);
+  mapaDeptoNuevo();
   pintarEstadoPartido({ input: 'party', estado: 'partyStatus', departamento: () => $('department').value });
   $('municipalityField').classList.toggle('hidden', !municipal); $('localityField').classList.toggle('hidden', election !== 'jal');
   if (!municipal) $('municipalityNota').classList.add('hidden');

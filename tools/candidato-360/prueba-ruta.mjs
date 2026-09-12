@@ -17,7 +17,10 @@ const { chromium } = await import('playwright')
   .catch(() => import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs'));
 const SP = process.env.SALIDA_PRUEBA || '/tmp';
 
-const DEPARTAMENTOS = { type: 'FeatureCollection', features: ['Antioquia', 'Distrito Capital de Bogotá'].map(name => ({ type: 'Feature', properties: { name }, geometry: null })) };
+/* Dos departamentos con geometría de verdad (cajas): el mapita tiene que
+   dibujarlos y encender el elegido. */
+const caja = (name, [x0, y0, x1, y1]) => ({ type: 'Feature', properties: { name }, geometry: { type: 'Polygon', coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] } });
+const DEPARTAMENTOS = { type: 'FeatureCollection', features: [caja('Antioquia', [-77, 5.4, -74, 8.9]), caja('Distrito Capital de Bogotá', [-74.3, 3.7, -73.9, 4.9])] };
 const muns = nombres => ({ type: 'FeatureCollection', features: nombres.map(mpio_cnmbr => ({ type: 'Feature', properties: { mpio_cnmbr }, geometry: null })) });
 const MUNICIPIOS = { '16': muns(['BOGOTÁ, D.C.']), '01': muns(['MEDELLÍN', 'ENVIGADO', 'BELLO']) };
 const CSV = ['cabecera'].concat(['TEUSAQUILLO', 'SUBA'].map(l => [0, 1, 2, 3, 4, 'BOGOTA D.C.', 'BOGOTÁ, D.C.', 7, 8, 9, l].join(';'))).join('\n');
@@ -75,11 +78,26 @@ await p.waitForTimeout(700);
 r.conCorporacion = await estado();
 
 /* 6 · Departamento + municipio completan el territorio y la tarjeta pasa al partido. */
-await p.selectOption('#campaignDepartment', '01'); await p.waitForTimeout(500);
+await p.selectOption('#campaignDepartment', '01'); await p.waitForTimeout(600);
 r.conDepartamento = await estado();
-await p.selectOption('#campaignMunicipality', 'MEDELLÍN'); await p.waitForTimeout(500);
+r.mapa = await p.evaluate(() => ({ visible: !document.getElementById('mapaDepto').classList.contains('hidden'), elegidos: document.querySelectorAll('#mapaDeptoLienzo .depto-elegido').length, total: document.querySelectorAll('#mapaDeptoLienzo path').length, pie: document.getElementById('mapaDeptoPie').textContent, dibujado: (document.querySelector('#mapaDeptoLienzo .depto-elegido')?.getAttribute('d') || '').length }));
+await p.selectOption('#campaignMunicipality', 'MEDELLÍN'); await p.waitForTimeout(600);
+r.antesDeLaPausa = await estado();          /* el mapa se deja ver antes de pasar */
+await p.waitForTimeout(1800);
 r.conMunicipio = await estado();
 r.botonVisible = await p.$eval('#abrirCRM', el => el.offsetParent !== null);
+await p.mouse.move(0, 0);          /* el ratón queda sobre «Atrás» tras el clic y el hover cambia el color */
+r.pieJuntos = await p.evaluate(() => {
+  const a = document.getElementById('pasoAtras'), b = document.getElementById('abrirCRM');
+  /* El salmón de la casa, sea cual sea su hex: lo que importa es que NO sea el
+     mismo azul del botón de seguir. */
+  const hex = getComputedStyle(document.documentElement).getPropertyValue('--coral').trim();
+  const aColor = getComputedStyle(a).backgroundColor, bColor = getComputedStyle(b).backgroundColor;
+  const d = document.createElement('div'); d.style.color = hex; document.body.append(d);
+  const salmon = getComputedStyle(d).color; d.remove();
+  return { juntos: a.parentElement === b.parentElement, visible: a.offsetParent !== null, esSalmon: aColor === salmon, distintoDelAzul: aColor !== bColor };
+});
+r.mapaFuera = await p.evaluate(() => document.getElementById('mapaDepto').classList.contains('hidden'));
 
 /* 7 · Atrás desde el partido devuelve al territorio, con lo elegido intacto. */
 await p.click('#pasoAtras'); await p.waitForTimeout(400);
@@ -89,7 +107,7 @@ r.municipioIntacto = await p.inputValue('#campaignMunicipality');
 /* 8 · La JAL además exige comuna o localidad antes de pasar. */
 await p.evaluate(() => { pasoRuta = 'corporacion'; historicCorporationPicker.querySelector('[data-corporation="jal"]').click(); });
 await p.waitForTimeout(500);
-await p.selectOption('#campaignDepartment', '16'); await p.waitForTimeout(700);
+await p.selectOption('#campaignDepartment', '16'); await p.waitForTimeout(2600);
 r.jalSinLocalidad = await estado();
 await p.evaluate(() => { const s = document.getElementById('campaignLocality'); s.value = s.options[1]?.value || ''; territorioResuelto(); });
 await p.waitForTimeout(500);
@@ -118,6 +136,10 @@ const pruebas = [
   ['elegida la corporación, la tarjeta pasa al territorio', solo(r.conCorporacion, 'lugar') && /dónde/i.test(r.conCorporacion.titulo)],
   ['con departamento pero sin municipio se queda en el territorio', solo(r.conDepartamento, 'lugar')],
   ['completo el territorio, pasa al partido con el botón del CRM', solo(r.conMunicipio, 'partido') && r.botonVisible],
+  ['al elegir departamento se enciende ese departamento en el mapa de Colombia', r.mapa.visible && r.mapa.elegidos === 1 && r.mapa.total === 2 && r.mapa.dibujado > 20 && /Antioquia/i.test(r.mapa.pie)],
+  ['y el mapa se deja ver un momento antes de pasar de tarjeta', solo(r.antesDeLaPausa, 'lugar')],
+  ['«Atrás» y «Abrir CRM» viven juntos en el pie, y Atrás va en salmón', r.pieJuntos.juntos && r.pieJuntos.visible && r.pieJuntos.esSalmon && r.pieJuntos.distintoDelAzul],
+  ['el mapa no se queda colgado en las otras tarjetas', r.mapaFuera === true],
   ['atrás desde el partido devuelve al territorio sin perder lo elegido', solo(r.atrasDesdePartido, 'lugar') && r.municipioIntacto === 'MEDELLÍN'],
   ['la JAL espera a la comuna o localidad', solo(r.jalSinLocalidad, 'lugar') && solo(r.jalConLocalidad, 'partido')],
   ['sin historial territorial se entra directo a «¿a cuál se lanza?», sin Atrás', solo(r.senador, 'corporacion') && !r.senador.atras && r.senador.ruta === 'other'],
