@@ -53,6 +53,11 @@ await p.evaluate(() => abrirRutaCandidato({
   circunscripcion: 'BARRIOS UNIDOS · BOGOTÁ D.C.', partido: 'NUEVO LIBERALISMO- AGRUPACION POLITICA EN MARCHA', votos: 709,
 }));
 await p.waitForTimeout(500);
+/* La ruta pregunta de a una: hasta que no se elige corporación no hay campo
+   de partido. Se responde «la misma» y sigue la prueba. */
+r.partidoOculto = await p.evaluate(() => document.getElementById('campaignPartyField').classList.contains('hidden'));
+await p.evaluate(() => { document.querySelector('input[name="corporationRoute"][value="same"]').checked = true; toggleCorporationChoice({ animar: true }); });
+await p.waitForTimeout(400);
 r.precargado = await p.inputValue('#campaignParty');
 r.hayCampo = await p.evaluate(() => !!document.getElementById('campaignParty') && !document.querySelector('#campaignPartyField select'));
 r.depDeducido = await p.evaluate(() => departamentoDeCampana());
@@ -121,6 +126,26 @@ r.notaLibre = await p.textContent('#campaignPartyStatus');
 r.vigente = await p.evaluate(() => partidoVigente());
 r.campana = await p.evaluate(() => campanaActual('concejo'));
 
+/* ── El logo del partido ─────────────────────────────────────────────────────
+   El manifiesto se pide por HTTP y esta prueba corre sobre file://: lo que
+   importa es el pintado, así que el catálogo se siembra a mano con UN logo que
+   carga (un PNG en línea) y otro que no existe. El que no existe se borra solo
+   —de eso se trata el onerror—, y así nunca hay un cuadro roto. */
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+await p.evaluate(png => LOGOS_PARTIDOS.set('16', new Map([
+  [normalizedText('PARTIDO ALIANZA VERDE'), png],
+  [normalizedText('PARTIDO LIBERAL COLOMBIANO'), 'candidato-360-data/logos-partidos/16/no-existe-todavia.png'],
+])), PNG);
+await p.fill('#campaignParty', 'partido');
+await p.waitForTimeout(600);
+r.logos = await p.evaluate(() => ({
+  sugerencias: [...document.querySelectorAll('#campaignPartyLista .sugerencia')].map(s => ({ nombre: s.querySelector('b').textContent, logo: Boolean(s.querySelector('img.logo-partido')) })),
+  rotos: document.querySelectorAll('#campaignPartyLista img.logo-partido:not([src^="data:"])').length,
+}));
+await p.fill('#campaignParty', 'PARTIDO ALIANZA VERDE');
+await p.waitForTimeout(600);
+r.logos.enLaNota = await p.evaluate(() => Boolean(document.querySelector('#campaignPartyStatus img.logo-partido')));
+
 /* ── El departamento filtra de verdad ────────────────────────────────────── */
 r.antioquia = await p.evaluate(async () => {
   document.querySelector('input[name="corporationRoute"][value="other"]').checked = true;
@@ -156,6 +181,11 @@ await b.close();
 
 const pruebas = [
   ['el partido de la ruta es un campo de escribir, no un desplegable', r.hayCampo === true],
+  ['el partido no se pregunta antes que la corporación', r.partidoOculto === true],
+  ['la sugerencia lleva el logo del partido que sí lo tiene', r.logos.sugerencias.some(x => /ALIANZA VERDE/.test(x.nombre) && x.logo)],
+  ['y no inventa uno para los que no', r.logos.sugerencias.some(x => !/ALIANZA VERDE/.test(x.nombre) && !x.logo)],
+  ['el partido escrito muestra su logo en la nota', r.logos.enLaNota === true],
+  ['un archivo que todavía no exista se borra solo: nunca un cuadro roto', r.logos.rotos === 0 && r.logos.sugerencias.some(x => /LIBERAL/.test(x.nombre) && !x.logo)],
   ['viene precargado con el de su última elección', /NUEVO LIBERALISMO/.test(r.precargado)],
   ['pero se puede cambiar: el departamento sale del historial', r.depDeducido === '16'],
   ['al escribir sugiere organizaciones de ese departamento', r.sugerencias.length > 0 && r.sugerencias.some(x => /ALIANZA VERDE/i.test(x))],

@@ -469,7 +469,7 @@ function respaldoPartido([, cand, votos]) {
 }
 /* Un autocompletado sencillo y accesible: flechas, Enter, Escape y clic.
    `fuente()` devuelve la lista vigente; el campo NUNCA obliga a elegir de ella. */
-function montarSugeridor({ input, lista, fuente, alElegir }) {
+function montarSugeridor({ input, lista, fuente, alElegir, logo }) {
   const caja = $(input), menu = $(lista); if (!caja || !menu) return;
   if (caja.dataset.sugeridor === '1') return;
   caja.dataset.sugeridor = '1';
@@ -477,7 +477,7 @@ function montarSugeridor({ input, lista, fuente, alElegir }) {
   let opciones = [], activo = -1;
   const cerrar = () => { menu.classList.add('hidden'); menu.innerHTML = ''; activo = -1; caja.setAttribute('aria-expanded', 'false'); };
   const pintar = () => {
-    menu.innerHTML = opciones.map((o, i) => `<button type="button" class="sugerencia${i === activo ? ' activa' : ''}" data-i="${i}"><b>${escHtml(o[0])}</b><small>${escHtml(respaldoPartido(o))}</small></button>`).join('');
+    menu.innerHTML = opciones.map((o, i) => `<button type="button" class="sugerencia${i === activo ? ' activa' : ''}" data-i="${i}">${logo?.(o[0]) || ''}<span><b>${escHtml(o[0])}</b><small>${escHtml(respaldoPartido(o))}</small></span></button>`).join('');
     menu.classList.toggle('hidden', !opciones.length); caja.setAttribute('aria-expanded', String(Boolean(opciones.length)));
   };
   const elegir = i => { const o = opciones[i]; if (!o) return; caja.value = o[0]; cerrar(); alElegir?.(o[0]); };
@@ -495,21 +495,52 @@ function montarSugeridor({ input, lista, fuente, alElegir }) {
   menu.addEventListener('mousedown', e => { const boton = e.target.closest('[data-i]'); if (boton) { e.preventDefault(); elegir(Number(boton.dataset.i)); } });
 }
 /* Conecta un campo de partido con el departamento que lo filtra. */
+/* ── Logos de partido ────────────────────────────────────────────────────────
+   Un nombre en mayúsculas no se reconoce; el logo sí. Cada ciudad tiene su
+   carpeta —se empezó por Bogotá— y su `index.json` lista SOLO los archivos que
+   existen, así que mientras falten no hay imágenes rotas ni peticiones de más:
+   simplemente no aparece el logo. Lo mantiene tools/candidato-360/logos. */
+const LOGOS_PARTIDOS = new Map(), logosPendientes = new Map();
+function cargarLogos(dep) {
+  const key = String(dep || '').padStart(2, '0');
+  if (!/^\d{2}$/.test(key)) return Promise.resolve(null);
+  /* `fetch` puede fallar ANTES de devolver promesa (un file:// abierto a mano,
+     una CSP): si eso escapa, se lleva por delante al sugeridor de partidos, que
+     es lo único importante de este campo. */
+  if (!logosPendientes.has(key)) logosPendientes.set(key, Promise.resolve()
+    .then(() => fetch(`candidato-360-data/logos-partidos/${key}/index.json`))
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null)
+    .then(d => {
+      /* Un manifiesto vacío o caído no borra lo que ya se tenga cargado. */
+      if (d?.logos?.length) LOGOS_PARTIDOS.set(key, new Map(d.logos.map(l => [normalizedText(l.nombre), `candidato-360-data/logos-partidos/${key}/${l.archivo}`])));
+      else if (!LOGOS_PARTIDOS.has(key)) LOGOS_PARTIDOS.set(key, new Map());
+      return LOGOS_PARTIDOS.get(key);
+    }));
+  return logosPendientes.get(key);
+}
+function logoDePartido(nombre, dep) { return LOGOS_PARTIDOS.get(String(dep || '').padStart(2, '0'))?.get(normalizedText(nombre)) || ''; }
+function imgLogo(nombre, dep) {
+  const src = logoDePartido(nombre, dep);
+  /* Si el archivo desaparece, la etiqueta se borra sola: nunca un cuadro roto. */
+  return src ? `<img class="logo-partido" src="${escHtml(src)}" alt="" loading="lazy" onerror="this.remove()">` : '';
+}
 function montarCampoPartido({ input, lista, estado, departamento }) {
-  montarSugeridor({ input, lista, fuente: () => cargarPartidos(departamento()), alElegir: () => pintarEstadoPartido({ input, estado, departamento }) });
+  montarSugeridor({ input, lista, fuente: () => { cargarLogos(departamento()); return cargarPartidos(departamento()); }, logo: nombre => imgLogo(nombre, departamento()), alElegir: () => pintarEstadoPartido({ input, estado, departamento }) });
   pintarEstadoPartido({ input, estado, departamento });
 }
 async function pintarEstadoPartido({ input, estado, departamento }) {
   const nota = $(estado); if (!nota) return;
   const dep = departamento();
   if (!dep) { nota.textContent = 'Seleccione primero el departamento y le sugerimos las organizaciones que inscribieron candidatura allí.'; return; }
-  const catalogo = partidosElegibles(await cargarPartidos(dep)), nombre = nombreDepartamento(dep);
+  const [catalogoCrudo] = await Promise.all([cargarPartidos(dep), cargarLogos(dep)]);
+  const catalogo = partidosElegibles(catalogoCrudo), nombre = nombreDepartamento(dep);
   if (!catalogo.length) { nota.textContent = 'No pudimos cargar el catálogo de ese departamento: escriba el nombre y lo tomamos como está.'; return; }
   const escrito = String($(input)?.value || '').trim();
   const enCatalogo = escrito && catalogo.some(([n]) => normalizedText(n) === normalizedText(escrito));
-  nota.textContent = escrito && !enCatalogo
-    ? `No aparece en ${nombre} ni en las territoriales de 2023 ni en la Cámara de 2026. Lo tomamos como está: puede ser una organización nueva o una coalición que se inscribe ahora.`
-    : `${catalogo.length} organizaciones con votación en ${nombre}: las que inscribieron candidatura en las territoriales de 2023 y las que sacaron votos a la Cámara en 2026. Escriba y le sugerimos; también puede escribir una que no esté.`;
+  nota.innerHTML = imgLogo(escrito, dep) + (escrito && !enCatalogo
+    ? `No aparece en ${escHtml(nombre)} ni en las territoriales de 2023 ni en la Cámara de 2026. Lo tomamos como está: puede ser una organización nueva o una coalición que se inscribe ahora.`
+    : `${catalogo.length} organizaciones con votación en ${escHtml(nombre)}: las que inscribieron candidatura en las territoriales de 2023 y las que sacaron votos a la Cámara en 2026. Escriba y le sugerimos; también puede escribir una que no esté.`);
 }
 function nombreDepartamento(dep) {
   const hit = Object.entries(DEP_CODES).find(([, code]) => code === String(dep).padStart(2, '0'));
@@ -628,9 +659,20 @@ function searchCandidateImmediate(query) {
   if (!items.length) { $('searchResults').insertAdjacentHTML('beforeend', `<div class="empty">${historicalBaseReady ? 'Aún no encontramos una coincidencia.' : 'El índice está llegando; pruebe de nuevo en unos segundos.'}</div>`); return; }
   candidateProfiles.clear();
   const shown = new Set, profiles = items.map(candidateProfile).filter(p => { if (shown.has(p.id)) return false; shown.add(p.id); candidateProfiles.set(p.id, p); return true; });
-  $('searchResults').insertAdjacentHTML('beforeend', profiles.map(c => `<div class="result" role="button" tabindex="0" data-profile="${escHtml(c.id)}" onclick="openHistoricCandidate(this.dataset.profile)" onkeydown="if(event.key==='Enter')openHistoricCandidate(this.dataset.profile)"><div class="result-main"><span class="avatar">${escHtml(initials(c.nombre))}</span><span><b>${escHtml(c.nombre)}</b><small>${escHtml(c.historyLabel || `${c.corp || 'Historial electoral'} · ${c.partido || 'Sin partido registrado'}`)}${c.votos ? ` · ${Number(c.votos).toLocaleString('es-CO')} votos` : ''}</small></span></div><span class="tag">${SESSION.acceso ? 'Continuar' : 'Activar'}</span></div>`).join(''));
+  $('searchResults').insertAdjacentHTML('beforeend', profiles.map(c => `<div class="result" role="button" tabindex="0" data-profile="${escHtml(c.id)}" onclick="elegirResultado(this)" onkeydown="if(event.key==='Enter')elegirResultado(this)"><div class="result-main"><span class="avatar">${escHtml(initials(c.nombre))}</span><span><b>${escHtml(c.nombre)}</b><small>${escHtml(c.historyLabel || `${c.corp || 'Historial electoral'} · ${c.partido || 'Sin partido registrado'}`)}${c.votos ? ` · ${Number(c.votos).toLocaleString('es-CO')} votos` : ''}</small></span></div><span class="tag">${SESSION.acceso ? 'Continuar' : 'Activar'}</span></div>`).join(''));
   if (note) note.textContent = historicalLocalDone ? `${historicalIndex.length.toLocaleString('es-CO')} candidaturas disponibles.` : 'Resultados parciales: seguimos incorporando concejos y JAL.';
   if (rank.total > items.length) $('searchResults').insertAdjacentHTML('beforeend', `<p class="search-note search-more">${items.length} de ${rank.total.toLocaleString('es-CO')} coincidencias · agregue un apellido para afinar.</p>`);
+}
+/* El clic en un resultado no cambia de pantalla de una: la tarjeta brinca
+   primero. Son 320 ms que confirman CUÁL de los homónimos se eligió —el error
+   más caro de esta pantalla es entrar al candidato equivocado— y de paso tapan
+   el trabajo de armar el perfil. */
+function elegirResultado(el) {
+  if (!el || el.dataset.abriendo === '1') return;
+  el.dataset.abriendo = '1';
+  document.querySelectorAll('#searchResults .result').forEach(r => r.classList.toggle('elegido', r === el));
+  salto(el);
+  setTimeout(() => { el.dataset.abriendo = ''; openHistoricCandidate(el.dataset.profile); }, 320);
 }
 function openHistoricCandidate(id) {
   /* Sin acceso también se entra: ver su nombre y sus candidaturas es
@@ -655,7 +697,12 @@ function abrirRutaCandidato(profile) {
   sameOpt.classList.toggle('hidden', !sameCorp);
   $('sameCorporationLabel').textContent = sameCorp ? CRM_CORPORATIONS[sameCorp] : 'No aplica';
   campaignDeptOptions();
-  document.querySelector(`input[name="corporationRoute"][value="${sameCorp ? 'same' : 'other'}"]`).checked = true;
+  /* Sin historial territorial la única ruta posible es «otra corporación», así
+     que se marca sola; con historial no se preselecciona nada: la primera
+     pregunta es la que manda y el resto aparece cuando se responda. */
+  document.querySelectorAll('input[name="corporationRoute"]').forEach(r => { r.checked = !sameCorp && r.value === 'other'; });
+  $('otherCorporation').value = ''; marcarCard(historicCorporationPicker, '');
+  if ($('campaignParty')) $('campaignParty').value = profile.partido || '';
   toggleCorporationChoice();
   aplicarGateRuta();
   showScreen('candidateRoute');
@@ -684,22 +731,65 @@ function corporationCards(selected, onSelect) {
   CORPORATION_CARDS.forEach(([key, title, description]) => {
     const card = document.createElement('button'); card.type = 'button'; card.className = `corporation-card${selected === key ? ' is-selected' : ''}`; card.dataset.corporation = key;
     card.innerHTML = `<b>${title}</b><small>${description}</small>`;
-    card.addEventListener('click', () => { onSelect(key); grid.querySelectorAll('.corporation-card').forEach(item => item.classList.toggle('is-selected', item === card)); });
+    card.addEventListener('click', () => { onSelect(key, card); grid.querySelectorAll('.corporation-card').forEach(item => item.classList.toggle('is-selected', item === card)); });
     grid.append(card);
   });
   return grid;
 }
 function createCorporationPicker(label, selected, onSelect) { const picker = document.createElement('div'); picker.className = 'corporation-picker'; picker.innerHTML = `<label>${label}</label>`; picker.append(corporationCards(selected, onSelect)); return picker; }
 function marcarCard(picker, key) { picker?.querySelectorAll('.corporation-card').forEach(c => c.classList.toggle('is-selected', c.dataset.corporation === key)); }
-const historicCorporationPicker = createCorporationPicker('Nueva corporación', '', key => { $('otherCorporation').value = key; updateCampaignTerritory(); });
+/* ── El salto ────────────────────────────────────────────────────────────────
+   Elegir algo en esta página abre otra pregunta más abajo, y sin un acuse el
+   cambio pasa desapercibido: la persona no sabe si su clic entró. Dos brincos
+   cortos sobre lo que acaba de elegir lo dicen sin una sola palabra. Con
+   `prefers-reduced-motion` la animación no corre (lo apaga el CSS). */
+function salto(el) {
+  if (!el) return;
+  el.classList.remove('salta'); void el.offsetWidth;   /* reinicia la animación si se repite el clic */
+  el.classList.add('salta');
+  el.addEventListener('animationend', () => el.classList.remove('salta'), { once: true });
+}
+/* ── La ruta, de a una pregunta ──────────────────────────────────────────────
+   Antes el formulario mostraba todo de una: corporación, territorio y partido,
+   con la mitad de los campos deshabilitados. Ahora cada respuesta abre la
+   siguiente pregunta —y solo la siguiente—, que es como se llena un formulario
+   en papel. El estado manda: si alguien borra el municipio, la pregunta del
+   partido se vuelve a cerrar. */
+function revelarPaso(el, visible, animar) {
+  if (!el) return false;
+  const estaba = !el.classList.contains('hidden');
+  el.classList.toggle('hidden', !visible);
+  if (!visible || estaba) return false;
+  if (animar) { el.classList.add('paso-entra'); el.addEventListener('animationend', () => el.classList.remove('paso-entra'), { once: true }); }
+  return true;
+}
+function territorioListo(corp) { return corp ? campaignTerritory(corp) !== null : false; }
+function pasosRuta({ animar = false } = {}) {
+  const ruta = document.querySelector('input[name="corporationRoute"]:checked')?.value || '';
+  const otra = ruta === 'other', corp = otra ? $('otherCorporation').value : '';
+  const nuevos = [
+    revelarPaso(historicCorporationPicker, otra, animar),
+    revelarPaso($('campaignPlace'), otra && Boolean(corp), animar),
+    revelarPaso($('campaignPartyField'), ruta === 'same' || (otra && territorioListo(corp)), animar),
+  ];
+  revelarPaso($('abrirCRM'), !$('campaignPartyField').classList.contains('hidden'), animar);
+  /* Si la pregunta nueva quedó fuera de la ventana, se acerca sola: nada peor
+     que un formulario que «no hizo nada» porque lo que cambió está más abajo. */
+  if (animar && nuevos.some(Boolean)) {
+    const ultimo = [$('campaignPartyField'), $('campaignPlace'), historicCorporationPicker].find(el => el && !el.classList.contains('hidden'));
+    ultimo?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+const historicCorporationPicker = createCorporationPicker('Nueva corporación', '', (key, card) => { $('otherCorporation').value = key; salto(card); updateCampaignTerritory({ animar: true }); });
 historicCorporationPicker.id = 'historicCorporationPicker'; historicCorporationPicker.classList.add('hidden');
 $('otherCorporationField').after(historicCorporationPicker);
-function toggleCorporationChoice() {
-  const isOther = document.querySelector('input[name="corporationRoute"]:checked')?.value === 'other';
+function toggleCorporationChoice(opciones = {}) {
+  const elegido = document.querySelector('input[name="corporationRoute"]:checked');
+  const isOther = elegido?.value === 'other';
   $('otherCorporation').disabled = !isOther;
-  historicCorporationPicker.classList.toggle('hidden', !isOther);
-  $('campaignPlace').classList.toggle('hidden', !isOther);
-  if (isOther) updateCampaignTerritory();
+  if (opciones.animar) salto(elegido?.closest('.route-option'));
+  if (isOther) updateCampaignTerritory(opciones);
+  else pasosRuta(opciones);
   refrescarPartidoCampana();
 }
 /* El departamento que filtra el catálogo de partidos de la ruta: el elegido
@@ -716,13 +806,14 @@ function refrescarPartidoCampana() { pintarEstadoPartido({ input: 'campaignParty
 function partidoVigente() {
   return String(CAMPANA_ACTUAL?.partido || $('campaignParty')?.value || '').trim() || crmCandidate?.partido || '';
 }
-function updateCampaignTerritory() {
+function updateCampaignTerritory(opciones = {}) {
   const corp = $('otherCorporation').value, municipal = CORP_MUNICIPAL.includes(corp), jal = corp === 'jal';
   refrescarPartidoCampana();
   $('campaignMunicipalityField').classList.toggle('hidden', !municipal); $('campaignLocalityField').classList.toggle('hidden', !jal);
   if (!municipal) $('campaignMunicipalityNota').classList.add('hidden');
   $('campaignDepartment').required = municipal || CORP_DEPARTAMENTAL.includes(corp); $('campaignMunicipality').required = municipal; $('campaignLocality').required = jal;
   if ($('campaignDepartment').value && municipal) loadCampaignMunicipalities();
+  pasosRuta(opciones);
 }
 async function cargarMunicipios(select, dep, cacheKey) {
   select.innerHTML = '<option value="">Cargando municipios…</option>';
@@ -759,6 +850,7 @@ async function loadCampaignMunicipalities() {
   $('campaignLocality').innerHTML = '<option value="">Primero seleccione municipio</option>';
   const municipios = await cargarMunicipios($('campaignMunicipality'), dep, `crm-${dep}`);
   if (municipioImplicito($('campaignMunicipality'), $('campaignMunicipalityField'), $('campaignMunicipalityNota'), municipios)) loadCampaignLocalities();
+  pasosRuta({ animar: true });
 }
 async function cargarLocalidades(select, status, depNombre, munNombre) {
   select.innerHTML = '<option value="">Cargando comunas o localidades…</option>'; status.textContent = '';
@@ -769,11 +861,13 @@ async function cargarLocalidades(select, status, depNombre, munNombre) {
   } catch (e) { select.innerHTML = '<option value="">No se pudieron cargar las comunas o localidades</option>'; status.textContent = 'La fuente territorial no está disponible en este momento.'; }
 }
 async function loadCampaignLocalities() {
+  pasosRuta({ animar: true });          /* elegir municipio ya abre la pregunta que sigue */
   if ($('otherCorporation').value !== 'jal' || !$('campaignMunicipality').value) return;
   await cargarLocalidades($('campaignLocality'), $('campaignLocalityStatus'), $('campaignDepartment').options[$('campaignDepartment').selectedIndex].text, $('campaignMunicipality').value);
+  pasosRuta();
 }
 function campaignTerritory(corp) {
-  if (document.querySelector('input[name="corporationRoute"]:checked').value !== 'other') return '';
+  if (document.querySelector('input[name="corporationRoute"]:checked')?.value !== 'other') return '';
   const dep = $('campaignDepartment').options[$('campaignDepartment').selectedIndex]?.text || '', mun = $('campaignMunicipality').value, local = $('campaignLocality').value;
   if (!$('campaignDepartment').value || (CORP_MUNICIPAL.includes(corp) && !mun) || (corp === 'jal' && !local)) return null;
   const seen = new Set;
@@ -799,11 +893,13 @@ async function precargarCampana(campana) {
   toggleCorporationChoice();
   if (!isOther) return;
   $('otherCorporation').value = campana.corp; marcarCard(historicCorporationPicker, campana.corp); updateCampaignTerritory();
+  pasosRuta();
   if (campana.departamento) {
     $('campaignDepartment').value = campana.departamento;
     if (CORP_MUNICIPAL.includes(campana.corp)) { await loadCampaignMunicipalities(); $('campaignMunicipality').value = campana.municipio || ''; }
     if (campana.corp === 'jal' && campana.municipio) { await loadCampaignLocalities(); $('campaignLocality').value = campana.localidad || ''; }
   }
+  pasosRuta();                            /* quien vuelve ve su ruta completa, sin re-responder */
 }
 
 /* ─── 7. Candidatura nueva: wizard ───────────────────────────────────────── */
@@ -1181,7 +1277,7 @@ async function launchCRM(event) {
   event?.preventDefault();
   if (!crmCandidate) return;
   if (!SESSION.acceso) return abrirPaywall();
-  const isOther = document.querySelector('input[name="corporationRoute"]:checked').value === 'other';
+  const isOther = document.querySelector('input[name="corporationRoute"]:checked')?.value === 'other';
   if (isOther && !$('otherCorporation').value) { historicCorporationPicker.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
   const corpKey = isOther ? $('otherCorporation').value : corporacionHistorica(crmCandidate) || 'concejo';
   const corporation = CRM_CORPORATIONS[corpKey], territory = campaignTerritory(corpKey);

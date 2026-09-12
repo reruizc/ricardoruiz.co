@@ -45,12 +45,16 @@ r.avisoVitrina = (await p.textContent('#existing .c360-vitrina p')).slice(0, 70)
 await p.screenshot({ path: '/tmp/c360-anon-busqueda.png' });
 // Seleccionar un candidato: debe ENTRAR, no rebotar contra el modal
 await p.locator('#searchResults .result').first().click();
-await p.waitForTimeout(200);
+await p.waitForTimeout(600);            /* la tarjeta brinca 320 ms antes de abrir */
 r.pantalla = await p.evaluate(() => [...document.querySelectorAll('.screen')].filter(s => !s.classList.contains('hidden')).map(s => s.id));
 r.paywallAbierto = await p.evaluate(() => document.getElementById('c360Paywall').classList.contains('open'));
 r.nombreEnPantalla = await p.textContent('#routeName');
 r.historialEnPantalla = await p.textContent('#routeHistory');
 r.avisoRuta = (await p.textContent('#candidateRoute .c360-vitrina p')).slice(0, 60);
+/* La ruta se responde de a una pregunta: el botón del CRM aparece con la primera. */
+r.botonAntesDeResponder = await p.evaluate(() => document.getElementById('abrirCRM').classList.contains('hidden'));
+await p.evaluate(() => { document.querySelector('input[name="corporationRoute"][value="same"]').checked = true; toggleCorporationChoice({ animar: true }); });
+await p.waitForTimeout(400);
 r.botonCRM = await p.textContent('#candidateRoute button.next');
 await p.screenshot({ path: '/tmp/c360-anon-candidato.png' });
 // Abrir el CRM sí topa con el muro
@@ -70,6 +74,7 @@ const pruebas = [
   ['se ve su nombre y su historial', /RICARDO ESTEBAN RUIZ/.test(r.nombreEnPantalla) && /2 candidaturas/.test(r.historialEnPantalla)],
   ['la pantalla avisa que el CRM pide acceso', /hasta acá puede llegar sin cuenta/.test(r.avisoRuta)],
   ['el botón dice lo que va a pasar', r.botonCRM.includes('Activar')],
+  ['y no aparece hasta responder a qué corporación se lanza', r.botonAntesDeResponder === true],
   ['abrir el CRM sí topa con el muro', r.muroAlAbrirCRM === true],
   ['y no se entra al CRM', r.noEntroAlCRM === true],
   ['sin errores de JavaScript', errores.length === 0],

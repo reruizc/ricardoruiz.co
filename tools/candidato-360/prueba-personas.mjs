@@ -43,7 +43,7 @@ r.slugs = await p.evaluate(() => ['CON2022-C-1-203-109', 'CONC2019-16-1-1-1', 'A
 /* Abrir la tarjeta unificada: el historial trae las tres y la última manda. */
 await busca('daniel carva');
 await p.locator('#searchResults .result').first().click();
-await p.waitForTimeout(200);
+await p.waitForTimeout(600);            /* la tarjeta brinca antes de abrir la ficha */
 r.ruta = await p.evaluate(() => ({ nombre: document.getElementById('routeName').textContent, historial: document.getElementById('routeHistory').textContent, corp: crmCandidate.corp, n: crmCandidate.history?.length }));
 await b.close();
 
