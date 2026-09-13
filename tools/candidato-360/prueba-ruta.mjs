@@ -21,8 +21,15 @@ const SP = process.env.SALIDA_PRUEBA || '/tmp';
    dibujarlos y encender el elegido. */
 const caja = (name, [x0, y0, x1, y1]) => ({ type: 'Feature', properties: { name }, geometry: { type: 'Polygon', coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] } });
 const DEPARTAMENTOS = { type: 'FeatureCollection', features: [caja('Antioquia', [-77, 5.4, -74, 8.9]), caja('Distrito Capital de Bogotá', [-74.3, 3.7, -73.9, 4.9])] };
-const muns = nombres => ({ type: 'FeatureCollection', features: nombres.map(mpio_cnmbr => ({ type: 'Feature', properties: { mpio_cnmbr }, geometry: null })) });
-const MUNICIPIOS = { '16': muns(['BOGOTÁ, D.C.']), '01': muns(['MEDELLÍN', 'ENVIGADO', 'BELLO']) };
+/* Y los municipios de cada uno con geometría y código Divipola: el mapa hace
+   drill down (la silueta del departamento y el municipio encendido) y la
+   capital —código 001— encabeza el desplegable. */
+const muni = (nombre, mpio_ccdgo, [x0, y0, x1, y1]) => ({ type: 'Feature', properties: { mpio_cnmbr: nombre, mpio_ccdgo }, geometry: { type: 'Polygon', coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] } });
+const coleccion = features => ({ type: 'FeatureCollection', features });
+const MUNICIPIOS = {
+  '16': coleccion([muni('BOGOTÁ, D.C.', '001', [-74.3, 3.7, -73.9, 4.9])]),
+  '01': coleccion([muni('BELLO', '088', [-75.6, 6.3, -75.4, 6.5]), muni('ENVIGADO', '266', [-75.6, 6.0, -75.4, 6.2]), muni('MEDELLÍN', '001', [-75.7, 6.2, -75.5, 6.4])]),
+};
 const CSV = ['cabecera'].concat(['TEUSAQUILLO', 'SUBA'].map(l => [0, 1, 2, 3, 4, 'BOGOTA D.C.', 'BOGOTÁ, D.C.', 7, 8, 9, l].join(';'))).join('\n');
 
 const b = await chromium.launch();
@@ -53,6 +60,7 @@ const estado = () => p.evaluate(() => {
     mapa: !document.getElementById('mapaDepto').classList.contains('hidden') && document.querySelectorAll('#mapaDeptoLienzo path').length,
     encendidos: document.querySelectorAll('#mapaDeptoLienzo .depto-elegido').length };
 });
+const mapaDepto = () => p.evaluate(() => ({ visible: !document.getElementById('mapaDepto').classList.contains('hidden'), elegidos: document.querySelectorAll('#mapaDeptoLienzo .depto-elegido').length, total: document.querySelectorAll('#mapaDeptoLienzo path').length, pie: document.getElementById('mapaDeptoPie').textContent, dibujado: (document.querySelector('#mapaDeptoLienzo .depto-elegido')?.getAttribute('d') || '').length }));
 const elegirRuta = async valor => { await p.evaluate(v => { document.querySelector(`input[name="corporationRoute"][value="${v}"]`).checked = true; toggleCorporationChoice({ animar: true }); }, valor); await p.waitForTimeout(700); };
 const CONCEJAL = { nombre: 'ALGUIEN CON HISTORIAL', slug: 'CONC2023-16-1-1-1', corp: 'CONCEJO · BOGOTÁ D.C. · 2023', circunscripcion: 'BOGOTÁ D.C.', partido: 'PARTIDO X', votos: 900 };
 
@@ -85,8 +93,10 @@ r.conCorporacion = await estado();
 /* 6 · Departamento + municipio completan el territorio y la tarjeta pasa al partido. */
 await p.selectOption('#campaignDepartment', '01'); await p.waitForTimeout(600);
 r.conDepartamento = await estado();
-r.mapa = await p.evaluate(() => ({ visible: !document.getElementById('mapaDepto').classList.contains('hidden'), elegidos: document.querySelectorAll('#mapaDeptoLienzo .depto-elegido').length, total: document.querySelectorAll('#mapaDeptoLienzo path').length, pie: document.getElementById('mapaDeptoPie').textContent, dibujado: (document.querySelector('#mapaDeptoLienzo .depto-elegido')?.getAttribute('d') || '').length }));
+r.mapa = await mapaDepto();
+r.ordenMunicipios = await p.$$eval('#campaignMunicipality option', os => os.map(o => o.value));
 await p.selectOption('#campaignMunicipality', 'MEDELLÍN'); await p.waitForTimeout(600);
+r.mapaMunicipio = await mapaDepto();
 r.listoParaContinuar = await estado();      /* completo el territorio, pero no salta solo */
 await p.click('#continuarLugar'); await p.waitForTimeout(500);
 r.conMunicipio = await estado();
@@ -130,6 +140,14 @@ await p.evaluate(async c => { abrirRutaCandidato(c); await precargarCampana({ co
 await p.waitForTimeout(800);
 r.precargada = await estado();
 r.precargadaMunicipio = await p.inputValue('#campaignMunicipality');
+
+/* 11 · Tocar un municipio en el mapa es responder el desplegable. */
+await p.evaluate(() => irAPaso('lugar')); await p.waitForTimeout(500);
+await p.evaluate(() => document.querySelector('#mapaDeptoLienzo path[data-parte="BELLO"]').dispatchEvent(new MouseEvent('click', { bubbles: true })));
+await p.waitForTimeout(500);
+r.tocado = await p.inputValue('#campaignMunicipality');
+r.mapaTocado = await mapaDepto();
+await p.locator('#candidateRoute .flow-grid').screenshot({ path: SP + '/ruta-lugar-mapa.png' });
 await b.close();
 
 const solo = (e, paso) => e.visibles.length === 1 && e.visibles[0] === paso && e.paso === paso;
@@ -145,7 +163,10 @@ const pruebas = [
   ['«Continuar» lleva a la pregunta del partido, con el botón del CRM', solo(r.conMunicipio, 'partido') && r.botonVisible],
   ['el mapa está desde que se abre la pregunta, todavía sin departamento', r.conCorporacion.mapa === 2 && r.conCorporacion.encendidos === 0],
   ['y no se pregunta el municipio antes que el departamento', r.conCorporacion.municipio === false],
-  ['al elegir departamento se enciende ese departamento en el mapa de Colombia', r.mapa.visible && r.mapa.elegidos === 1 && r.mapa.total === 2 && r.mapa.dibujado > 20 && /Antioquia/i.test(r.mapa.pie)],
+  ['al elegir departamento el mapa pasa a la silueta de ese departamento', r.mapa.visible && r.mapa.total === 3 && r.mapa.elegidos === 3 && r.mapa.dibujado > 20 && /Antioquia/i.test(r.mapa.pie)],
+  ['al elegir el municipio la luz se queda en uno solo', r.mapaMunicipio.total === 3 && r.mapaMunicipio.elegidos === 1 && /MEDELL/i.test(r.mapaMunicipio.pie) && /Antioquia/i.test(r.mapaMunicipio.pie)],
+  ['la capital del departamento encabeza el desplegable de municipios', r.ordenMunicipios[1] === 'MEDELLÍN'],
+  ['tocar un municipio en el mapa lo elige', r.tocado === 'BELLO' && r.mapaTocado.elegidos === 1 && /BELLO/i.test(r.mapaTocado.pie)],
   ['ahí sí aparece el municipio, y «Continuar» espera a que esté completo', r.conDepartamento.municipio === true && r.conDepartamento.continuar === false],
   ['con el territorio completo el botón se habilita, pero no salta solo', r.listoParaContinuar.continuar === true && solo(r.listoParaContinuar, 'lugar')],
   ['«Atrás» y «Abrir CRM» viven juntos en el pie, y Atrás va en salmón', r.pieJuntos.juntos && r.pieJuntos.visible && r.pieJuntos.esSalmon && r.pieJuntos.distintoDelAzul],

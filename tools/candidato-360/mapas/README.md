@@ -153,6 +153,41 @@ mapa se dibujaba **encima** de las fichas. `.crm-map` lleva `isolation:isolate`
 para encerrarlos y los modales suben a `z-index:1200`. Cualquiera de las dos
 cosas basta; están las dos porque el costo es cero y el síntoma es feo.
 
+## El otro mapa: el del lugar de la candidatura
+
+El CRM tiene el mapa grande; la pregunta «¿dónde será la candidatura?» tiene el
+chiquito, al lado del desplegable. No es decoración: elegir «Boyacá» entre 33
+nombres parecidos no confirma nada, y ese es el dato del que cuelgan la meta, el
+briefing y el mapa del CRM.
+
+Baja por la misma escalera de la pregunta (`pintarMapaDepto`):
+
+| Estado | Qué se dibuja | Capa |
+|---|---|---|
+| Sin departamento | Colombia entera, apagada | `DEPARTAMENTOS2.json` |
+| Con departamento | **Solo ese departamento**, encendido, con sus municipios | `Departamentos-mps/<cod>.json` |
+| Con municipio | El departamento en gris y el municipio encendido | la misma |
+
+La capa municipal es la que ya llena el desplegable de municipios, así que el
+drill down no cuesta una descarga más; el lienzo recuerda qué capa tiene puesta
+(`data-capa`) y al cambiar de municipio solo mueve la luz en vez de redibujar
+125 polígonos. Como los municipios están dibujados, se pueden **tocar**: el
+clic elige ese municipio en el desplegable, que es la otra manera de contestar
+la pregunta. Si la capa municipal falla, el mapa no desaparece: vuelve al de
+Colombia con el departamento encendido.
+
+El encuadre se adapta a la figura (Atlántico es ancho, el Chocó largo) con el
+mismo factor de escala en los dos ejes —a la latitud de Colombia la corrección
+de Mercator no se nota y estirar deformaría—, limitado para que la tarjeta no se
+desfigure. Y en el desplegable la **capital encabeza la lista**: la Divipola la
+marca con el código de municipio `001`, así que la regla sale del dato y no de
+una tabla de 33 capitales.
+
+El mismo mapa vive en el wizard de candidatura nueva, en su paso del territorio.
+Ahí hay una trampa: `montarWizardNuevo` **mueve** los campos a sus pasos y borra
+la rejilla original, así que un campo que no esté en esa lista desaparece (fue
+justo lo que le pasó a este mapa). `prueba-wizard.mjs` lo vigila.
+
 ## Pruebas
 
 ```
@@ -161,6 +196,7 @@ node tools/candidato-360/prueba-ciudades.mjs    # Medellín: encuadre, barrios, 
 node tools/candidato-360/prueba-salto-crm.mjs   # el salto de corporación en el mapa (13)
 node tools/candidato-360/prueba-barrios-voronoi.mjs  # los barrios aproximados de Ibagué y Montería (14)
 node tools/candidato-360/prueba-colores.mjs     # la rampa según el partido (10)
+node tools/candidato-360/prueba-ruta.mjs        # el mapa del lugar: drill down, clic y capital (24)
 ```
 
 Las tres necesitan Leaflet en disco:

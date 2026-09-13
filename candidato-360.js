@@ -789,7 +789,7 @@ function irAPaso(nombre, { animar = false } = {}) {
   $('abrirCRM').classList.toggle('hidden', pasoRuta !== 'partido');
   $('continuarLugar').classList.toggle('hidden', pasoRuta !== 'lugar');
   if (pasoRuta === 'partido') prepararPasoPartido();
-  if (pasoRuta === 'lugar') { pintarMapaDepto(nombreDepartamentoElegido()); refrescarContinuar(); } else ocultarMapaDepto();
+  if (pasoRuta === 'lugar') { mapaDeptoRuta(); refrescarContinuar(); } else ocultarMapaDepto();
   const [titulo, copy] = PASO_COPY[pasoRuta] || PASO_COPY.ruta;
   $('rutaTitulo').textContent = titulo; $('rutaCopy').textContent = copy;
   if (animar) document.querySelector('#candidateRoute .search-box')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -804,60 +804,124 @@ function pasoAnterior() {
   const pasos = pasosDeLaRuta();
   irAPaso(pasos[Math.max(pasos.indexOf(pasoRuta) - 1, 0)], { animar: true });
 }
-/* ── El mapa del departamento ────────────────────────────────────────────────
+/* ── El mapa del lugar, con drill down ───────────────────────────────────────
    Elegir «Boyacá» en un desplegable de 33 no confirma nada: los nombres se
-   parecen y nadie revisa dos veces. Un mapa de Colombia con SU departamento
-   encendido sí. Se dibuja en SVG con la misma capa que alimenta el
-   desplegable —ya está en caché— y se queda un par de segundos antes de pasar
-   a lo que sigue, que es lo que dura mirar un mapa y decir «sí, ese es».   */
-function proyectarDepartamentos(geo, ancho, alto) {
+   parecen y nadie revisa dos veces. El mapa sí, y sigue la misma escalera de
+   la pregunta:
+
+     sin departamento  →  Colombia apagada: falta elegir
+     con departamento  →  SOLO ese departamento, encendido y con sus municipios
+     con municipio     →  el departamento en gris y el municipio encendido
+
+   La capa municipal es la MISMA que llena el desplegable de municipios
+   (`Departamentos-mps/<cod>.json`, ya en caché), así que el drill down no
+   cuesta una descarga más. Y como los municipios están dibujados, se pueden
+   tocar: al hacerlo se elige ese municipio en el desplegable.              */
+function proyectarMapa(geo, ancho) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const recorre = c => { if (typeof c[0] === 'number') { x0 = Math.min(x0, c[0]); x1 = Math.max(x1, c[0]); y0 = Math.min(y0, c[1]); y1 = Math.max(y1, c[1]); } else c.forEach(recorre); };
   (geo.features || []).forEach(f => f.geometry?.coordinates && recorre(f.geometry.coordinates));
   /* Colombia va de -4° a 13° de latitud: a esa distancia del ecuador la
      corrección de Mercator no se nota, así que basta con escalar igual en los
-     dos ejes y centrar. Estirarla para llenar la caja la deformaría. */
+     dos ejes y centrar. Estirarla para llenar la caja la deformaría.
+     La caja, en cambio, sí se adapta a la figura: Atlántico es ancho y el
+     Chocó es largo, y con un alto fijo cualquiera de los dos quedaba nadando
+     en un marco vacío. El recorte se limita para que la tarjeta no se
+     desfigure con un departamento muy alargado. */
+  const alto = Math.round(Math.min(Math.max(ancho * (y1 - y0) / (x1 - x0), ancho * .62), ancho * 1.35));
   const escala = Math.min(ancho / (x1 - x0), alto / (y1 - y0)) * .96;
   const dx = (ancho - (x1 - x0) * escala) / 2, dy = (alto - (y1 - y0) * escala) / 2;
-  return ([lng, lat]) => [((lng - x0) * escala + dx).toFixed(1), ((y1 - lat) * escala + dy).toFixed(1)];
+  const proy = ([lng, lat]) => [((lng - x0) * escala + dx).toFixed(1), ((y1 - lat) * escala + dy).toFixed(1)];
+  return { proy, ancho, alto };
 }
 function caminoDeGeometria(geom, proy) {
   const anillos = geom?.type === 'Polygon' ? geom.coordinates : geom?.type === 'MultiPolygon' ? geom.coordinates.flat() : [];
-  return anillos.map(anillo => 'M' + anillo.map(proy).map(p => p.join(' ')).join('L') + 'Z').join('');
+  /* Un municipio trae miles de vértices y el mapita mide 300px: los puntos que
+     caen en el mismo décimo de píxel se dibujarían uno encima de otro. */
+  return anillos.map(anillo => {
+    const puntos = []; let previo = '';
+    anillo.forEach(c => { const punto = proy(c).join(' '); if (punto !== previo) { puntos.push(punto); previo = punto; } });
+    return puntos.length > 2 ? 'M' + puntos.join('L') + 'Z' : '';
+  }).join('');
 }
 function ocultarMapaDepto(id = 'mapaDepto') { $(id)?.classList.add('hidden'); }
-async function pintarMapaDepto(nombre, id = 'mapaDepto') {
+/* Redibujar 125 municipios cada vez que cambia el desplegable sería tirar el
+   trabajo hecho: el lienzo recuerda qué capa tiene puesta (`data-capa`) y, si
+   es la misma, solo cambia de sitio la luz. */
+async function pintarMapaDepto({ id = 'mapaDepto', codigo = '', nombre = '', municipio = '', select = '' } = {}) {
   const caja = $(id), lienzo = $(id + 'Lienzo'); if (!caja || !lienzo) return;
   try {
-    const geo = await fetchJSON(`${S3}/mapas-2026/DEPARTAMENTOS2.json`);
-    const W = 300, H = 330, proy = proyectarDepartamentos(geo, W, H), objetivo = normalizedText(nombre);
-    const partes = (geo.features || []).map(f => {
-      const suyo = normalizedText(f.properties?.name || '') === objetivo;
-      return `<path d="${caminoDeGeometria(f.geometry, proy)}" class="${suyo ? 'depto-elegido' : 'depto'}"></path>`;
-    }).join('');
-    lienzo.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${nombre ? `Mapa de Colombia con ${escHtml(nombre)} resaltado` : 'Mapa de Colombia'}">${partes}</svg>`;
-    $(id + 'Pie').textContent = nombre || 'Elija el departamento';
+    const capa = codigo || 'pais';
+    if (lienzo.dataset.capa !== capa) {
+      const geo = await fetchJSON(`${S3}/mapas-2026/${codigo ? `Departamentos-mps/${codigo}` : 'DEPARTAMENTOS2'}.json`);
+      const { proy, ancho: W, alto: H } = proyectarMapa(geo, 300);
+      const partes = (geo.features || []).map(f => {
+        const parte = String((codigo ? f.properties?.mpio_cnmbr : f.properties?.name) || '');
+        return `<path d="${caminoDeGeometria(f.geometry, proy)}" data-parte="${escHtml(parte)}" class="${codigo ? 'muni' : 'depto'}"><title>${escHtml(parte)}</title></path>`;
+      }).join('');
+      lienzo.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escHtml(nombre ? (codigo ? `Mapa de ${nombre} por municipios` : `Mapa de Colombia con ${nombre} resaltado`) : 'Mapa de Colombia')}">${partes}</svg>`;
+      lienzo.dataset.capa = capa;
+    }
+    lienzo.dataset.select = select;
+    /* Con departamento pero sin municipio se enciende el departamento entero:
+       la silueta ES la respuesta a la pregunta que ya se contestó. */
+    const objetivo = normalizedText(codigo ? municipio : nombre), todo = Boolean(codigo) && !municipio;
+    let encendidos = 0;
+    lienzo.querySelectorAll('path').forEach(path => {
+      const suyo = todo || (objetivo && normalizedText(path.dataset.parte) === objetivo);
+      path.classList.toggle('depto-elegido', Boolean(suyo));
+      if (suyo) encendidos++;
+    });
+    const partes = lienzo.querySelectorAll('path').length;
+    const pista = codigo && !municipio && partes > 1 ? 'Toque su municipio' : '';
+    /* Bogotá es distrito y departamento: «BOGOTÁ, D.C. · Bogotá D.C.» sobra. */
+    const repetido = normalizedText(municipio) === normalizedText(nombre);
+    $(id + 'Pie').innerHTML = escHtml(municipio && !repetido ? `${municipio} · ${nombre}` : (nombre || 'Elija el departamento')) + (pista ? `<small>${pista}</small>` : '');
     caja.classList.toggle('sin-elegir', !nombre);
+    caja.classList.toggle('es-municipal', Boolean(codigo) && Boolean(select));
     caja.classList.remove('hidden');
-  } catch (e) { ocultarMapaDepto(); }
+    return encendidos;
+  } catch (e) {
+    /* Si la capa municipal no está, el mapa no desaparece: vuelve al de
+       Colombia con el departamento encendido, que es lo que había antes. */
+    if (codigo) { lienzo.dataset.capa = ''; return pintarMapaDepto({ id, nombre, select: '' }); }
+    ocultarMapaDepto(id);
+  }
 }
+/* El mapa de la tarjeta del lugar y el del wizard preguntan lo mismo en dos
+   formularios distintos: cada uno sabe de dónde leer su territorio. */
+function mapaDeptoRuta() {
+  const sel = $('campaignDepartment'), municipal = CORP_MUNICIPAL.includes($('otherCorporation').value);
+  return pintarMapaDepto({ id: 'mapaDepto', codigo: sel?.value || '', nombre: nombreDepartamentoElegido(),
+    municipio: municipal ? ($('campaignMunicipality')?.value || '') : '', select: municipal ? 'campaignMunicipality' : '' });
+}
+function mapaDeptoNuevo() {
+  const sel = $('department'); if (!sel?.value) return ocultarMapaDepto('mapaDeptoNuevo');
+  const municipal = MUNICIPAL_ELECTIONS.includes($('election').value);
+  return pintarMapaDepto({ id: 'mapaDeptoNuevo', codigo: sel.value, nombre: sel.options[sel.selectedIndex]?.text || '',
+    municipio: municipal ? ($('municipality')?.value || '') : '', select: municipal ? 'municipality' : '' });
+}
+/* Tocar un municipio en el mapa es responder el desplegable: el mapa no es un
+   adorno al lado de la pregunta, es la otra manera de contestarla. */
+document.addEventListener('click', evento => {
+  const path = evento.target.closest?.('.mapa-depto.es-municipal .muni'); if (!path) return;
+  const select = $(path.closest('.mapa-depto-lienzo')?.dataset.select || ''); if (!select) return;
+  const opcion = [...select.options].find(o => o.value && normalizedText(o.value) === normalizedText(path.dataset.parte));
+  if (!opcion || select.value === opcion.value) return;
+  select.value = opcion.value;
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+});
 function nombreDepartamentoElegido() { const sel = $('campaignDepartment'); return sel?.value ? (sel.options[sel.selectedIndex]?.text || '') : ''; }
 /* El departamento se elige y se enciende en el mapa; de ahí en adelante manda
    la persona: el botón de continuar se habilita cuando el territorio está
    completo, pero no salta solo. */
 async function elegirDepartamento() {
-  await pintarMapaDepto(nombreDepartamentoElegido());
-  return loadCampaignMunicipalities();
+  await loadCampaignMunicipalities();   /* el catálogo limpia el municipio viejo antes de que el mapa lo lea */
+  return mapaDeptoRuta();
 }
 function refrescarContinuar() {
   const boton = $('continuarLugar'); if (!boton) return;
   boton.disabled = !territorioListo($('otherCorporation').value);
-}
-/* Lo mismo en el wizard de candidatura nueva, que pregunta el departamento
-   igual y merece la misma confirmación. */
-function mapaDeptoNuevo() {
-  const sel = $('department'), nombre = sel?.options[sel.selectedIndex]?.text || '';
-  if (sel?.value) pintarMapaDepto(nombre, 'mapaDeptoNuevo'); else ocultarMapaDepto('mapaDeptoNuevo');
 }
 /* Cada cambio del territorio decide si ya se puede continuar. */
 function territorioResuelto() { refrescarContinuar(); }
@@ -907,8 +971,14 @@ async function cargarMunicipios(select, dep, cacheKey) {
     const data = await fetchJSON(`${S3}/mapas-2026/Departamentos-mps/${dep}.json`);
     municipalitiesByDepartment[cacheKey] = data;
     const municipalities = [...new Set(data.features.map(f => f.properties.mpio_cnmbr).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
-    select.innerHTML = optionList(municipalities, 'Seleccione municipio o distrito');
-    return municipalities;
+    /* La capital encabeza la lista: concentra las candidaturas del
+       departamento y es la que más se busca. No hace falta una tabla de 33
+       capitales —la Divipola las marca con el código de municipio 001— así que
+       la regla la decide el DATO y no un `if` por departamento. */
+    const capital = data.features.find(f => String(f.properties?.mpio_ccdgo || '') === '001')?.properties?.mpio_cnmbr || '';
+    const orden = [...municipalities.filter(m => m === capital), ...municipalities.filter(m => m !== capital)];
+    select.innerHTML = optionList(orden, 'Seleccione municipio o distrito');
+    return orden;
   } catch (e) { select.innerHTML = '<option value="">No se pudieron cargar los municipios</option>'; return []; }
 }
 /* Un departamento con UN solo municipio no tiene nada que preguntar: Bogotá
@@ -950,6 +1020,7 @@ async function cargarLocalidades(select, status, depNombre, munNombre) {
   } catch (e) { select.innerHTML = '<option value="">No se pudieron cargar las comunas o localidades</option>'; status.textContent = 'La fuente territorial no está disponible en este momento.'; }
 }
 async function loadCampaignLocalities() {
+  mapaDeptoRuta();                           /* el municipio elegido se enciende en el mapa */
   const jal = $('otherCorporation').value === 'jal', hayMunicipio = Boolean($('campaignMunicipality').value);
   $('campaignLocalityField').classList.toggle('hidden', !jal || !hayMunicipio);
   territorioResuelto();
@@ -1169,7 +1240,7 @@ function updateTerritory() {
   if (municipal && $('department').value) loadMunicipalities(); else $('municipality').innerHTML = '<option value="">Primero seleccione departamento</option>';
   if (election !== 'jal') $('locality').innerHTML = '<option value="">Primero seleccione municipio</option>';
 }
-function updateLocality() { if ($('election').value === 'jal' && $('municipality').value) loadLocalities(); }
+function updateLocality() { mapaDeptoNuevo(); if ($('election').value === 'jal' && $('municipality').value) loadLocalities(); }
 function togglePublicName() { $('publicNameField').classList.toggle('hidden', !$('publicFigure').checked); $('publicName').required = $('publicFigure').checked; }
 /* ─── 7 bis. Identidad pública: redes sociales y su validación ───────────────
    Hasta acá el paso 2 preguntaba un mote y seguía de largo: la escucha de la
@@ -1346,7 +1417,7 @@ const NEW_STEPS_TOTAL = 6;
 function montarWizardNuevo() {
   const form = document.querySelector('#new form'); if (!form) return;
   const findField = id => $(id)?.closest('.field');
-  const fields = { name: findField('newName'), pub: findField('publicFigure'), pubName: $('publicNameField'), redes: $('redesField'), election: findField('election'), department: findField('department'), municipality: findField('municipality'), locality: findField('locality'), partyMode: findField('partyMode'), partyExisting: $('partyExisting'), partyNew: $('partyNew'), goal: findField('goal') };
+  const fields = { name: findField('newName'), pub: findField('publicFigure'), pubName: $('publicNameField'), redes: $('redesField'), election: findField('election'), department: findField('department'), municipality: findField('municipality'), locality: findField('locality'), mapa: $('mapaDeptoNuevo')?.closest('.field'), partyMode: findField('partyMode'), partyExisting: $('partyExisting'), partyNew: $('partyNew'), goal: findField('goal') };
   const formGrid = form.querySelector('.form-grid'), originalSubmit = form.querySelector('[type="submit"]');
   const wizard = document.createElement('div'); wizard.className = 'new-wizard'; formGrid.before(wizard);
   Object.values(fields).forEach(f => f?.remove()); formGrid.remove(); originalSubmit.remove();
@@ -1354,7 +1425,10 @@ function montarWizardNuevo() {
     { title: '¿Cómo aparecerá en campaña?', copy: 'Empecemos por su nombre completo.', fields: [fields.name] },
     { title: '¿Dónde puede encontrarlo la gente?', copy: 'Su nombre público y sus redes. Buscamos cada cuenta y la validamos antes de montar la escucha sobre ella.', fields: [fields.pub, fields.pubName, fields.redes], redes: true },
     { title: '¿A qué corporación aspira?', copy: 'La corporación define el territorio y la lectura electoral que activaremos.', fields: [fields.election], cards: true },
-    { title: '¿Dónde será la candidatura?', copy: 'Ubique el territorio en el que va a competir.', fields: [fields.department, fields.municipality, fields.locality] },
+    /* El mapa viaja con la pregunta del territorio: si se queda en la rejilla
+       original lo borra el `formGrid.remove()` de abajo y el wizard pierde la
+       confirmación que sí tiene la ruta. */
+    { title: '¿Dónde será la candidatura?', copy: 'Ubique el territorio en el que va a competir.', fields: [fields.department, fields.municipality, fields.locality, fields.mapa] },
     { title: '¿Con qué partido o movimiento?', copy: 'Puede vincular una organización existente o preparar una nueva.', fields: [fields.partyMode, fields.partyExisting, fields.partyNew] },
     { title: '¿Cuál es el primer objetivo?', copy: 'Con esto cerraremos su punto de partida.', fields: [fields.goal], final: true }
   ];
