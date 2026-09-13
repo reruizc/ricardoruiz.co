@@ -95,6 +95,9 @@ await p.selectOption('#campaignDepartment', '01'); await p.waitForTimeout(600);
 r.conDepartamento = await estado();
 r.mapa = await mapaDepto();
 r.ordenMunicipios = await p.$$eval('#campaignMunicipality option', os => os.map(o => o.value));
+/* El valor es la llave contra la Divipola y se queda como viene; lo que cambia
+   es la etiqueta, para no leer «Antioquia» al lado de «MEDELLÍN». */
+r.etiquetaMunicipio = await p.$$eval('#campaignMunicipality option', os => os.slice(1, 2).map(o => [o.value, o.textContent])[0]);
 await p.selectOption('#campaignMunicipality', 'MEDELLÍN'); await p.waitForTimeout(600);
 r.mapaMunicipio = await mapaDepto();
 r.listoParaContinuar = await estado();      /* completo el territorio, pero no salta solo */
@@ -124,6 +127,7 @@ await p.evaluate(() => { pasoRuta = 'corporacion'; historicCorporationPicker.que
 await p.waitForTimeout(500);
 await p.selectOption('#campaignDepartment', '16'); await p.waitForTimeout(900);
 r.jalSinLocalidad = await estado();
+r.etiquetasLocalidad = await p.$$eval('#campaignLocality option', os => os.slice(1).map(o => [o.value, o.textContent]));
 await p.evaluate(() => { const s = document.getElementById('campaignLocality'); s.value = s.options[1]?.value || ''; territorioResuelto(); });
 await p.waitForTimeout(400);
 r.jalListo = await estado();
@@ -166,6 +170,8 @@ const pruebas = [
   ['al elegir departamento el mapa pasa a la silueta de ese departamento', r.mapa.visible && r.mapa.total === 3 && r.mapa.elegidos === 3 && r.mapa.dibujado > 20 && /Antioquia/i.test(r.mapa.pie)],
   ['al elegir el municipio la luz se queda en uno solo', r.mapaMunicipio.total === 3 && r.mapaMunicipio.elegidos === 1 && /MEDELL/i.test(r.mapaMunicipio.pie) && /Antioquia/i.test(r.mapaMunicipio.pie)],
   ['la capital del departamento encabeza el desplegable de municipios', r.ordenMunicipios[1] === 'MEDELLÍN'],
+  ['los municipios se muestran en tipo oración, pero el valor no cambia', JSON.stringify(r.etiquetaMunicipio) === '["MEDELLÍN","Medellín"]'],
+  ['y las comunas o localidades también', JSON.stringify(r.etiquetasLocalidad) === '[["SUBA","Suba"],["TEUSAQUILLO","Teusaquillo"]]'],
   ['tocar un municipio en el mapa lo elige', r.tocado === 'BELLO' && r.mapaTocado.elegidos === 1 && /BELLO/i.test(r.mapaTocado.pie)],
   ['ahí sí aparece el municipio, y «Continuar» espera a que esté completo', r.conDepartamento.municipio === true && r.conDepartamento.continuar === false],
   ['con el territorio completo el botón se habilita, pero no salta solo', r.listoParaContinuar.continuar === true && solo(r.listoParaContinuar, 'lugar')],

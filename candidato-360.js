@@ -857,7 +857,7 @@ async function pintarMapaDepto({ id = 'mapaDepto', codigo = '', nombre = '', mun
       const { proy, ancho: W, alto: H } = proyectarMapa(geo, 300);
       const partes = (geo.features || []).map(f => {
         const parte = String((codigo ? f.properties?.mpio_cnmbr : f.properties?.name) || '');
-        return `<path d="${caminoDeGeometria(f.geometry, proy)}" data-parte="${escHtml(parte)}" class="${codigo ? 'muni' : 'depto'}"><title>${escHtml(parte)}</title></path>`;
+        return `<path d="${caminoDeGeometria(f.geometry, proy)}" data-parte="${escHtml(parte)}" class="${codigo ? 'muni' : 'depto'}"><title>${escHtml(NOMBRE_BONITO(parte))}</title></path>`;
       }).join('');
       lienzo.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escHtml(nombre ? (codigo ? `Mapa de ${nombre} por municipios` : `Mapa de Colombia con ${nombre} resaltado`) : 'Mapa de Colombia')}">${partes}</svg>`;
       lienzo.dataset.capa = capa;
@@ -876,7 +876,7 @@ async function pintarMapaDepto({ id = 'mapaDepto', codigo = '', nombre = '', mun
     const pista = codigo && !municipio && partes > 1 ? 'Toque su municipio' : '';
     /* Bogotá es distrito y departamento: «BOGOTÁ, D.C. · Bogotá D.C.» sobra. */
     const repetido = normalizedText(municipio) === normalizedText(nombre);
-    $(id + 'Pie').innerHTML = escHtml(municipio && !repetido ? `${municipio} · ${nombre}` : (nombre || 'Elija el departamento')) + (pista ? `<small>${pista}</small>` : '');
+    $(id + 'Pie').innerHTML = escHtml(municipio && !repetido ? `${NOMBRE_BONITO(municipio)} · ${nombre}` : (nombre || 'Elija el departamento')) + (pista ? `<small>${pista}</small>` : '');
     caja.classList.toggle('sin-elegir', !nombre);
     caja.classList.toggle('es-municipal', Boolean(codigo) && Boolean(select));
     caja.classList.remove('hidden');
@@ -977,7 +977,7 @@ async function cargarMunicipios(select, dep, cacheKey) {
        la regla la decide el DATO y no un `if` por departamento. */
     const capital = data.features.find(f => String(f.properties?.mpio_ccdgo || '') === '001')?.properties?.mpio_cnmbr || '';
     const orden = [...municipalities.filter(m => m === capital), ...municipalities.filter(m => m !== capital)];
-    select.innerHTML = optionList(orden, 'Seleccione municipio o distrito');
+    select.innerHTML = optionList(orden.map(m => ({ value: m, label: NOMBRE_BONITO(m) })), 'Seleccione municipio o distrito');
     return orden;
   } catch (e) { select.innerHTML = '<option value="">No se pudieron cargar los municipios</option>'; return []; }
 }
@@ -994,7 +994,7 @@ function municipioImplicito(select, field, nota, municipios) {
   if (unico) select.value = municipios[0];
   if (nota) {
     nota.classList.toggle('hidden', !unico);
-    nota.textContent = unico ? `${municipios[0]} es el único municipio del departamento: la candidatura queda ubicada ahí.` : '';
+    nota.textContent = unico ? `${NOMBRE_BONITO(municipios[0])} es el único municipio del departamento: la candidatura queda ubicada ahí.` : '';
   }
   return unico;
 }
@@ -1015,7 +1015,7 @@ async function cargarLocalidades(select, status, depNombre, munNombre) {
   select.innerHTML = '<option value="">Cargando comunas o localidades…</option>'; status.textContent = '';
   try {
     const localities = await localidadesDe(depNombre, munNombre);
-    select.innerHTML = optionList(localities, 'Seleccione comuna o localidad');
+    select.innerHTML = optionList(localities.map(l => ({ value: l, label: NOMBRE_BONITO(l) })), 'Seleccione comuna o localidad');
     status.textContent = localities.length ? `${localities.length} comunas o localidades disponibles.` : 'No hay una división local disponible para este municipio en la fuente actual.';
   } catch (e) { select.innerHTML = '<option value="">No se pudieron cargar las comunas o localidades</option>'; status.textContent = 'La fuente territorial no está disponible en este momento.'; }
 }
@@ -1032,7 +1032,7 @@ function campaignTerritory(corp) {
   const dep = $('campaignDepartment').options[$('campaignDepartment').selectedIndex]?.text || '', mun = $('campaignMunicipality').value, local = $('campaignLocality').value;
   if (!$('campaignDepartment').value || (CORP_MUNICIPAL.includes(corp) && !mun) || (corp === 'jal' && !local)) return null;
   const seen = new Set;
-  return [local, mun, dep].filter(Boolean).filter(place => { const key = normalizedText(place); if (seen.has(key)) return false; seen.add(key); return true; }).join(' · ');
+  return [local, mun, dep].filter(Boolean).filter(place => { const key = normalizedText(place); if (seen.has(key)) return false; seen.add(key); return true; }).map(NOMBRE_BONITO).join(' · ');
 }
 function currentTargetTerritory() {
   const isOther = document.querySelector('input[name="corporationRoute"]:checked')?.value === 'other';
@@ -1503,8 +1503,16 @@ async function createNew(e) {
    ahora y con quién. Es un banco de frases, no una plantilla: la corporación
    de destino y el bloque ideológico del partido eligen cada tramo. La frase
    se elige por el nombre —no al azar— para que no cambie en cada recarga.   */
+/* La Registraduría escribe los lugares en mayúscula sostenida ("MEDELLÍN",
+   "BOGOTÁ, D.C.", "COMUNA 11 LAURELES") y los departamentos llegan en tipo
+   oración: en la misma línea quedaba «Concejo · MEDELLÍN · Antioquia», con la
+   mitad gritando. Esto es SOLO cómo se muestra: lo que se guarda y lo que se
+   compara sigue siendo el nombre original, que es la llave contra la Divipola. */
 const NOMBRE_BONITO = s => String(s || '').toLowerCase().replace(/(^|[\s(\-·])([a-záéíóúñü])/g, (m, a, b) => a + b.toUpperCase())
-  .replace(/\b(De|Del|La|Las|Los|Y|El)\b/g, w => w.toLowerCase()).replace(/^(\w)/, c => c.toUpperCase()).replace(/D\.c\./i, 'D.C.');
+  .replace(/\b(De|Del|La|Las|Los|Y|El)\b/g, w => w.toLowerCase()).replace(/^(\w)/, c => c.toUpperCase())
+  /* Las siglas con punto se quedan como son: los puestos de votación se llaman
+     "I.E. SAN JOSÉ" y "E.S.E. HOSPITAL", y «I.e.» no es un nombre. */
+  .replace(/\b(?:[a-záéíóúñüA-ZÁÉÍÓÚÑÜ]\.){2,}/g, sigla => sigla.toUpperCase());
 /* «CONCEJO · MEDELLIN · 2019» → { tipo: 'concejo', lugar: 'Medellín', año: 2019 } */
 function leerCorpHistorica(corp) {
   const partes = String(corp || '').split('·').map(x => x.trim()).filter(Boolean);
@@ -1746,7 +1754,7 @@ async function launchCRM(event) {
 async function abrirCRMNuevo() {
   const n = NUEVO; if (!n) return;
   crmCandidate = null;
-  const c = n.campana, lugar = [c.localidad, c.municipio, c.departamentoNombre].filter(Boolean).join(' · ');
+  const c = n.campana, lugar = [c.localidad, c.municipio, c.departamentoNombre].filter(Boolean).map(NOMBRE_BONITO).join(' · ');
   $('crmBack').textContent = '← Inicio'; $('crmBack').onclick = () => showScreen('intro');
   $('crmInitials').textContent = initials(n.nombre); $('crmName').textContent = n.nombre;
   $('crmTarget').textContent = `Candidatura 2027 · ${CRM_CORPORATIONS[c.corp]} · ${lugar}`;
@@ -2204,7 +2212,7 @@ async function pintarProyeccionDepartamental(goal) {
     crearMapa([4.6, -74.1], 5); aplicarBasemap(false);
     crmMapLayer = L.geoJSON(geoData, {
       style: f => { const k = normalizedText(nameOf(f)), v = reparto[k] || 0; return { color: '#fff', weight: origen.includes(k) ? 2 : 1, fillColor: MAP_COLOR(v / max), fillOpacity: origen.includes(k) ? .9 : .78 }; },
-      onEachFeature: (f, layer) => { const k = normalizedText(nameOf(f)); layer.bindTooltip(`<strong>${nameOf(f)}</strong><br>${(reparto[k] || 0).toLocaleString('es-CO')} votos proyectados`, { sticky: true }); }
+      onEachFeature: (f, layer) => { const k = normalizedText(nameOf(f)); layer.bindTooltip(`<strong>${NOMBRE_BONITO(nameOf(f))}</strong><br>${(reparto[k] || 0).toLocaleString('es-CO')} votos proyectados`, { sticky: true }); }
     }).addTo(crmLeafletMap);
     encuadrar(crmMapLayer, 24);
     renderMapBreakdown(reparto, nombres, `Meta proyectada por municipio`);
@@ -2386,7 +2394,7 @@ function projectedVotesByArea() {
 }
 function renderMapBreakdown(votesByArea, namesByArea, title) {
   const rows = Object.entries(votesByArea).map(([key, value]) => ({ key, name: namesByArea[key] || key, value: Number(value) || 0 })).filter(row => row.value > 0).sort((a, b) => b.value - a.value), max = Math.max(1, ...rows.map(row => row.value));
-  $('crmBreakdown').innerHTML = `<h4 id="crmBreakdownTitle">${title}</h4>` + (rows.length ? rows.map(row => `<button class="crm-breakdown-item" type="button" data-area-key="${escHtml(row.key)}" onclick="openMapAreaFromBreakdown(this.dataset.areaKey)"><span class="crm-breakdown-row"><b>${escHtml(row.name)}</b><span>${row.value.toLocaleString('es-CO')}</span></span><span class="crm-breakdown-bar"><i style="width:${Math.max(3, Math.round(row.value / max * 100))}%"></i></span></button>`).join('') : '<p class="helper">No hay votos desagregados disponibles.</p>');
+  $('crmBreakdown').innerHTML = `<h4 id="crmBreakdownTitle">${title}</h4>` + (rows.length ? rows.map(row => `<button class="crm-breakdown-item" type="button" data-area-key="${escHtml(row.key)}" onclick="openMapAreaFromBreakdown(this.dataset.areaKey)"><span class="crm-breakdown-row"><b>${escHtml(NOMBRE_BONITO(row.name))}</b><span>${row.value.toLocaleString('es-CO')}</span></span><span class="crm-breakdown-bar"><i style="width:${Math.max(3, Math.round(row.value / max * 100))}%"></i></span></button>`).join('') : '<p class="helper">No hay votos desagregados disponibles.</p>');
 }
 /* TOTAL / PROYECTADO: solo cuando la candidatura tiene UNA elección; con varias
    mandan los toggles por año (que también traen PROYECTADO). */
@@ -2421,7 +2429,7 @@ function refreshCRMMapMode() {
   crmMapLayer.eachLayer(layer => {
     const key = state.config.code(layer.feature.properties), observed = Number(state.votesByArea[key] || 0), proj = Number(projected[key] || 0), value = Number(values[key] || 0);
     layer.setStyle({ fillColor: MAP_COLOR(value / max), fillOpacity: key === state.targetKey ? .78 : .38 });
-    layer.bindTooltip(`<strong>${state.config.name(layer.feature.properties)}</strong><br>${(crmMapMode === 'proyectado' ? proj : observed).toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : 'votos'}`, { sticky: true });
+    layer.bindTooltip(`<strong>${NOMBRE_BONITO(state.config.name(layer.feature.properties))}</strong><br>${(crmMapMode === 'proyectado' ? proj : observed).toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : 'votos'}`, { sticky: true });
   });
   $('crmMapNote').textContent = (crmMapMode === 'proyectado' ? (SALTO_ACTUAL?.base ? notaSalto(SALTO_ACTUAL.base) + ` Haga clic en una ${state.config.title} para ver su detalle.` : `Meta total distribuida proporcionalmente a la votación histórica. Haga clic en una ${state.config.title} para ver su detalle.`) : `Votación total histórica. Haga clic en una ${state.config.title} para ver el detalle y su meta proyectada.`) + notaRecorte();
   if (state.focusKey) renderBarriosForArea(state.focusKey);
@@ -2509,7 +2517,7 @@ async function renderGenericMap(candidate) {
     votesByArea = { [municipalCode]: total }; namesByArea = { [municipalCode]: municipalName };
     MAPA_MUNICIPAL = { mesas, nombre: municipalName };
     featureCode = p => String(p.mun_elec || p.mun_electoral || '').replace(/^0+/, ''); featureName = p => p.mpio_cnmbr || municipalName;
-    $('crmMapTitle').textContent = `¿Dónde estuvo su votación en ${municipalName}?`; detailNote = 'Votación histórica concentrada en este municipio; la nueva campaña puede ubicarse en otro territorio.'; breakdownTitle = 'Votos en el municipio';
+    $('crmMapTitle').textContent = `¿Dónde estuvo su votación en ${NOMBRE_BONITO(municipalName)}?`; detailNote = 'Votación histórica concentrada en este municipio; la nueva campaña puede ubicarse en otro territorio.'; breakdownTitle = 'Votos en el municipio';
   } else {
     geoData = await fetchJSON(`${S3}/mapas-2026/DEPARTAMENTOS2.json`);
     mesas.forEach(m => { const key = String(m.dep || '').replace(/^0+/, '') || '0'; votesByArea[key] = (votesByArea[key] || 0) + Number(m.v || 0); namesByArea[key] = m.depNom || `Departamento ${key}`; });
@@ -2520,7 +2528,7 @@ async function renderGenericMap(candidate) {
   const max = Math.max(1, ...Object.values(votesByArea));
   renderMapBreakdown(votesByArea, namesByArea, breakdownTitle);
   crearMapa([4.6, -74.1], 5); aplicarBasemap(false);
-  crmMapLayer = L.geoJSON(geoData, { style: f => ({ color: '#fff', weight: 1, fillColor: MAP_COLOR((votesByArea[featureCode(f.properties)] || 0) / max), fillOpacity: .94 }), onEachFeature: (f, layer) => layer.bindTooltip(`<strong>${featureName(f.properties)}</strong><br>${(votesByArea[featureCode(f.properties)] || 0).toLocaleString('es-CO')} votos`, { sticky: true }) }).addTo(crmLeafletMap);
+  crmMapLayer = L.geoJSON(geoData, { style: f => ({ color: '#fff', weight: 1, fillColor: MAP_COLOR((votesByArea[featureCode(f.properties)] || 0) / max), fillOpacity: .94 }), onEachFeature: (f, layer) => layer.bindTooltip(`<strong>${NOMBRE_BONITO(featureName(f.properties))}</strong><br>${(votesByArea[featureCode(f.properties)] || 0).toLocaleString('es-CO')} votos`, { sticky: true }) }).addTo(crmLeafletMap);
   encuadrar(crmMapLayer, 15);
   $('crmMapVotes').textContent = `${total.toLocaleString('es-CO')} votos`; $('crmMapNote').textContent = detailNote + notaRecorte() + notaColorPartido();
 }
@@ -2776,7 +2784,7 @@ function pintarBarrios(geo, values, codeOf, nameOf, nota) {
   const max = Math.max(1, ...Object.values(values));
   crmBarrioLayer = L.geoJSON(geo, {
     style: f => { const votes = values[codeOf(f)] || 0; return { fillColor: MAP_COLOR(votes / max), fillOpacity: votes ? .62 : .12, color: 'rgba(16,34,56,.55)', weight: .7 }; },
-    onEachFeature: (f, layer) => { const votes = Number(values[codeOf(f)] || 0); layer.bindTooltip(`<strong>${nameOf(f)}</strong><br>${votes.toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : 'votos'}`, { sticky: true }); layer.on('mouseover', () => layer.setStyle({ weight: 1.5, color: '#fff' })); layer.on('mouseout', () => crmBarrioLayer.resetStyle(layer)); }
+    onEachFeature: (f, layer) => { const votes = Number(values[codeOf(f)] || 0); layer.bindTooltip(`<strong>${NOMBRE_BONITO(nameOf(f))}</strong><br>${votes.toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : 'votos'}`, { sticky: true }); layer.on('mouseover', () => layer.setStyle({ weight: 1.5, color: '#fff' })); layer.on('mouseout', () => crmBarrioLayer.resetStyle(layer)); }
   }).addTo(crmLeafletMap);
   encuadrar(crmBarrioLayer, 20);
   $('crmMapNote').innerHTML = nota;
@@ -3124,11 +3132,11 @@ async function renderTerritorioObjetivo(c) {
     }
     crearMapa([4.6, -74.1], 5); aplicarBasemap(rotate);
     let targetLayer = null, n = 0;
-    crmMapLayer = L.geoJSON(geoData, { style: f => ({ color: '#fff', weight: isTarget(f) ? 2 : 1, fillColor: isTarget(f) ? '#3e8a5b' : '#d8dfd7', fillOpacity: isTarget(f) ? .82 : .5 }), onEachFeature: (f, layer) => { layer.bindTooltip(`<strong>${nameOf(f)}</strong>`, { sticky: true }); if (isTarget(f)) { n++; if (!targetLayer) targetLayer = layer; } } }).addTo(crmLeafletMap);
+    crmMapLayer = L.geoJSON(geoData, { style: f => ({ color: '#fff', weight: isTarget(f) ? 2 : 1, fillColor: isTarget(f) ? '#3e8a5b' : '#d8dfd7', fillOpacity: isTarget(f) ? .82 : .5 }), onEachFeature: (f, layer) => { layer.bindTooltip(`<strong>${NOMBRE_BONITO(nameOf(f))}</strong>`, { sticky: true }); if (isTarget(f)) { n++; if (!targetLayer) targetLayer = layer; } } }).addTo(crmLeafletMap);
     const capaEncuadre = CORP_DEPARTAMENTAL.includes(c.corp) || n > 1 ? crmMapLayer : (targetLayer || crmMapLayer);
     encuadrarBounds(capaEncuadre === crmMapLayer && rotate ? boundsSin(crmMapLayer, ES_SUMAPAZ) : capaEncuadre.getBounds(), 24);
     filas = geoData.features.map(nameOf).sort((a, b) => a.localeCompare(b, 'es'));
-    $('crmBreakdown').innerHTML = `<h4>${CORP_DEPARTAMENTAL.includes(c.corp) ? `Municipios de ${c.departamentoNombre}` : `${unidad === 'municipio' ? 'Municipios' : unidad === 'comuna' ? 'Comunas' : 'Localidades'} en el mapa`}</h4>` + filas.map(nm => `<div class="crm-breakdown-item static${normalizedText(nm) === (c.corp === 'jal' ? loc : muni) ? ' is-target' : ''}"><span class="crm-breakdown-row"><b>${escHtml(nm)}</b></span></div>`).join('');
+    $('crmBreakdown').innerHTML = `<h4>${CORP_DEPARTAMENTAL.includes(c.corp) ? `Municipios de ${c.departamentoNombre}` : `${unidad === 'municipio' ? 'Municipios' : unidad === 'comuna' ? 'Comunas' : 'Localidades'} en el mapa`}</h4>` + filas.map(nm => `<div class="crm-breakdown-item static${normalizedText(nm) === (c.corp === 'jal' ? loc : muni) ? ' is-target' : ''}"><span class="crm-breakdown-row"><b>${escHtml(NOMBRE_BONITO(nm))}</b></span></div>`).join('');
     $('crmMapNote').textContent = CORP_DEPARTAMENTAL.includes(c.corp) ? `La circunscripción es todo ${c.departamentoNombre}: ${filas.length} municipios.` : `En verde, el territorio al que aspira. Sin historial propio no hay votos que distribuir; la meta de la derecha sale de los resultados de 2023 en ese territorio.`;
   } catch (e) {
     $('crmMap').innerHTML = '<div style="padding:28px;color:#667068">No fue posible cargar el territorio en este momento.</div>'; crmLeafletMap = null; crmMapLayer = null; crmTileLayer = null;

@@ -115,7 +115,7 @@ const pruebas = [
   ['un municipio sin comunas trae los niveles Municipio y Puestos', r.niveles.join('|') === 'Municipio|Puestos' && r.activo === 'municipio'],
   ['«Puestos» pinta cada puesto en su coordenada', r.puestos.puntos === 3 && r.puestos.activo === 'puestos'],
   ['el tamaño del punto es la votación', r.puestos.radios[0] > r.puestos.radios[1] && r.puestos.radios[1] > r.puestos.radios[2]],
-  ['el desglose lista los puestos por barrio, de mayor a menor', /CENTRO/.test(r.puestos.filas[0] || '') && /5.000/.test(r.puestos.filas[0] || '') && r.puestos.filas.length === 3 && /puesto de votación/i.test(r.puestos.titulo)],
+  ['el desglose lista los puestos por barrio, de mayor a menor', /Centro/.test(r.puestos.filas[0] || '') && /5.000/.test(r.puestos.filas[0] || '') && r.puestos.filas.length === 3 && /puesto de votación/i.test(r.puestos.titulo)],
   ['con callejero debajo, que a esa escala hace falta', r.puestos.callejero === true],
   ['y la nota dice que son puestos y no barrios', /Puestos de votación de LA CEJA/.test(r.puestos.nota) && /tamaño del punto/i.test(r.puestos.nota)],
   ['«Municipio» devuelve el polígono y quita los puntos', r.vuelta.puntos === null && r.vuelta.activo === 'municipio' && r.vuelta.poligono === true],

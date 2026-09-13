@@ -183,6 +183,22 @@ desfigure. Y en el desplegable la **capital encabeza la lista**: la Divipola la
 marca con el código de municipio `001`, así que la regla sale del dato y no de
 una tabla de 33 capitales.
 
+## Los nombres de lugar, en tipo oración
+
+La Registraduría escribe los lugares gritando —«MEDELLÍN», «BOGOTÁ, D.C.»,
+«COMUNA 11 LAURELES»— y los departamentos llegan en tipo oración, así que en la
+misma línea quedaba «Concejo · MEDELLÍN · Antioquia», con la mitad en mayúscula
+sostenida. `NOMBRE_BONITO` (y su gemelo `lugar` en `candidato-360-panel.js`) los
+muestra en tipo oración, con las preposiciones en minúscula («San Andrés de
+Sotavento») y **respetando las siglas con punto**, porque los puestos de
+votación se llaman «I.E. SAN JOSÉ» y «I.e.» no es un nombre.
+
+Es solo presentación: el `value` de los desplegables, lo que se guarda en el
+vínculo y lo que se compara siguen siendo el nombre original, que es la llave
+contra la Divipola. Por eso la prueba mira las dos cosas —etiqueta bonita,
+valor intacto—. Lo que NO se toca es el historial del candidato (`corp`), que
+es el registro tal como vino.
+
 El mismo mapa vive en el wizard de candidatura nueva, en su paso del territorio.
 Ahí hay una trampa: `montarWizardNuevo` **mueve** los campos a sus pasos y borra
 la rejilla original, así que un campo que no esté en esa lista desaparece (fue

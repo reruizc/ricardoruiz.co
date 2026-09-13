@@ -74,7 +74,7 @@ await p.evaluate(() => { document.getElementById('election').value = 'jal'; upda
 await p.waitForFunction(() => document.getElementById('locality').options.length > 1);
 revisar('JAL de Bogotá: sin municipio pero CON localidad',
   (await oculto('#municipalityField')) && !(await oculto('#localityField')) &&
-  JSON.stringify(await p.$$eval('#locality option', n => n.slice(1).map(o => o.textContent))) === '["CHAPINERO","SUBA","TEUSAQUILLO"]');
+  JSON.stringify(await p.$$eval('#locality option', n => n.slice(1).map(o => o.textContent))) === '["Chapinero","Suba","Teusaquillo"]');
 
 await p.selectOption('#department', { label: 'Antioquia' });
 await p.evaluate(() => { document.getElementById('election').value = 'concejo'; updateTerritory(); });
@@ -104,7 +104,7 @@ revisar('en la ruta con historial pasa lo mismo',
    «BOGOTÁ, D.C. · Bogotá D.C.» porque campaignTerritory ya deduplicaba por
    nombre normalizado — el distrito es municipio y departamento a la vez. */
 revisar('el territorio se guarda igual, y sin repetir Bogotá',
-  (await p.evaluate(() => campaignTerritory('alcaldia'))) === 'BOGOTÁ, D.C.');
+  (await p.evaluate(() => campaignTerritory('alcaldia'))) === 'Bogotá, D.C.');
 await p.evaluate(() => irAPaso('lugar'));
 await p.selectOption('#campaignDepartment', { label: 'Antioquia' });
 await p.evaluate(() => loadCampaignMunicipalities());

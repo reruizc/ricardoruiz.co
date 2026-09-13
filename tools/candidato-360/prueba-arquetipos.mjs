@@ -140,7 +140,7 @@ await b.close();
 const pruebas = [
   ['un concejal de Medellín ve el mapa por comunas, no el municipio entero', r.mapa.unidad === 'comuna' && /Medell/i.test(r.mapa.titulo)],
   ['los niveles son los que cambian el dibujo: sin «Municipio»', r.mapa.niveles.join('|') === 'Comuna|Barrio' && r.mapa.activo === 'localidad'],
-  ['un corregimiento (17-21 en la Registraduría) cae en su polígono del DAP', r.mapa.pintadas.includes('60') && r.mapa.filas.some(f => /SAN CRISTOBAL/.test(f))],
+  ['un corregimiento (17-21 en la Registraduría) cae en su polígono del DAP', r.mapa.pintadas.includes('60') && r.mapa.filas.some(f => /San Cristobal/.test(f))],
   ['la zona 90 no arma una comuna fantasma ni una fila sin nombre', r.mapa.filas.length === 2 && !r.mapa.filas.some(f => /undefined|^90$/.test(f))],
   ['la tarjeta de arquetipos nombra el arquetipo donde vive su voto', /protección y orden cotidiano/i.test(r.arq.titulo) && r.arq.dato === '57 %' && r.arq.boton && !r.arq.apagada],
   ['y dice en cuántas comunas está', /2 comunas/.test(r.arq.copy)],

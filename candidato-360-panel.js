@@ -46,12 +46,22 @@
     return d;
   }
 
+  /* Los lugares llegan de la Registraduría gritando ("MEDELLÍN", "COMUNA 11
+     LAURELES") y el departamento en tipo oración: en la misma línea quedaba
+     «Ana Pérez · TEUSAQUILLO · BOGOTÁ, D.C. · Bogotá D.C.». Solo cambia cómo se
+     MUESTRAN; lo que se consulta sigue siendo el nombre original. */
+  const MENUDAS = /\b(De|Del|La|Las|Los|Y|El|En)\b/g;
+  function lugar(nombre) {
+    return String(nombre || '').toLowerCase().replace(/(^|[\s(\-·])([a-záéíóúñü])/g, (m, a, b) => a + b.toUpperCase())
+      .replace(MENUDAS, w => w.toLowerCase()).replace(/^(\w)/, c => c.toUpperCase())
+      .replace(/\b(?:[a-záéíóúñüA-ZÁÉÍÓÚÑÜ]\.){2,}/g, sigla => sigla.toUpperCase());
+  }
   /* El territorio se arma con lo que el vínculo guardó de la campaña: es lo que
      hace que la lectura sea de SU municipio y no del país entero. */
   function territorio(v = SESION.vinculo) {
     const c = v?.campana; if (!c) return { texto: '', partes: [] };
     const partes = [c.localidad, c.municipio, c.departamentoNombre].filter(Boolean);
-    return { texto: partes.join(' · '), partes, municipio: c.municipio || c.departamentoNombre || '', localidad: c.localidad || '' };
+    return { texto: partes.map(lugar).join(' · '), partes, municipio: c.municipio || c.departamentoNombre || '', localidad: c.localidad || '' };
   }
   function nombreCandidatura(v = SESION.vinculo) {
     if (!v) return '';
@@ -275,6 +285,6 @@
     return r;
   }
 
-  global.C360Panel = { SESION, api, caudal, arrancar, guardarEscucha, territorio, nombreCandidatura, nombrePublico, muro, $, esc, num,
+  global.C360Panel = { SESION, api, caudal, arrancar, guardarEscucha, territorio, lugar, nombreCandidatura, nombrePublico, muro, $, esc, num,
     territorioDe, consultasTerritorio, consultasNacionales, agruparPorCobertura, terminosLocales, esAdmin, soltarVinculo, terminosPersona, puntajeLocal, mencionaPersona, oracion, norm, toks };
 })(window);

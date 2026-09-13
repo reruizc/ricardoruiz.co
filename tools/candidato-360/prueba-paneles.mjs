@@ -141,7 +141,7 @@ for (const [caso, opts, espera] of [
 {
   const porIdea = q => titulares(/acueducto/.test(q) ? 12 : /seguridad/.test(q) ? 40 : 0);
   const { b, p, errores, consultas, guardados } = await abrir('candidato-360-medios.html', { medios: porIdea });
-  revisar('medios muestra la candidatura y su territorio', /Alejandra Palacio/.test(await p.textContent('#panelCandidatura')) && /TEUSAQUILLO/.test(await p.textContent('#panelCandidatura')));
+  revisar('medios muestra la candidatura y su territorio', /Alejandra Palacio/.test(await p.textContent('#panelCandidatura')) && /Teusaquillo/.test(await p.textContent('#panelCandidatura')));
   await p.fill('#idea-0', 'acueducto veredal');
   await p.fill('#idea-1', 'seguridad en el comercio');
   await p.fill('#idea-2', 'parque de la 45');
