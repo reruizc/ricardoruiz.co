@@ -145,6 +145,16 @@ r.logos = await p.evaluate(() => ({
 await p.fill('#campaignParty', 'PARTIDO ALIANZA VERDE');
 await p.waitForTimeout(600);
 r.logos.enLaNota = await p.evaluate(() => Boolean(document.querySelector('#campaignPartyStatus img.logo-partido')));
+/* El logo es de la organización, no del departamento: el mismo Alianza Verde
+   en Antioquia. Y si algún día Antioquia trae el suyo, ese manda. */
+r.logoBase = await p.evaluate(() => {
+  const deBogota = logoDePartido('PARTIDO ALIANZA VERDE', '16');
+  const enAntioquia = logoDePartido('PARTIDO ALIANZA VERDE', '01');
+  LOGOS_PARTIDOS.set('01', new Map([[normalizedText('PARTIDO ALIANZA VERDE'), 'propio-de-antioquia.png']]));
+  const conPropio = logoDePartido('PARTIDO ALIANZA VERDE', '01');
+  LOGOS_PARTIDOS.delete('01');
+  return { hereda: enAntioquia === deBogota && Boolean(deBogota), mandaElPropio: conPropio === 'propio-de-antioquia.png' };
+});
 
 /* ── El departamento filtra de verdad ────────────────────────────────────── */
 r.antioquia = await p.evaluate(async () => {
@@ -181,6 +191,7 @@ await p.screenshot({ path: SP + '/partido-wizard.png' });
 await b.close();
 
 const pruebas = [
+  ['el logo de una organización vale en todo el país, y el del departamento manda', r.logoBase.hereda && r.logoBase.mandaElPropio],
   ['el partido de la ruta es un campo de escribir, no un desplegable', r.hayCampo === true],
   ['el partido no se pregunta antes que la corporación', r.partidoOculto === true],
   ['la sugerencia lleva el logo del partido que sí lo tiene', r.logos.sugerencias.some(x => /ALIANZA VERDE/.test(x.nombre) && x.logo)],

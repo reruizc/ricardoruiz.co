@@ -342,7 +342,13 @@ function aplicarGateExistente() {
 function aplicarGateRuta() {
   const form = document.querySelector('#candidateRoute form'); if (!form) return;
   const bloqueado = SESSION.listo && !SESSION.acceso;
-  let aviso = form.querySelector(':scope > .c360-vitrina');
+  /* El aviso se busca por id y en TODO el formulario. Buscarlo como hijo
+     directo dejó de funcionar cuando los botones se mudaron al pie: se
+     insertaba con `boton.before()`, o sea DENTRO de `.paso-pie`, la búsqueda no
+     lo encontraba y cada llamada al gate agregaba otro —tres avisos iguales
+     apilados entre los botones—. Ahora el aviso va ARRIBA del pie, que es
+     donde se lee antes de decidir, y siempre es el mismo. */
+  let aviso = form.querySelector('#avisoGateRuta');
   /* Por id, no por clase: en el pie hay dos botones «next» —continuar y abrir
      el CRM— y el primero se quedaba con la etiqueta del segundo. */
   const boton = $('abrirCRM');
@@ -350,8 +356,9 @@ function aplicarGateRuta() {
   if (!bloqueado) return aviso?.remove();
   if (!aviso) {
     aviso = document.createElement('div');
+    aviso.id = 'avisoGateRuta';
     aviso.className = 'c360-vitrina';
-    boton?.before(aviso);
+    (form.querySelector('.paso-pie') || boton)?.before(aviso);
   }
   aviso.innerHTML = `<p>Este es su historial y hasta acá puede llegar sin cuenta. El CRM —mapa por puesto de votación, meta de votos y briefing cada tres días— se abre con el acceso activo, y deja su cuenta vinculada a <b>este candidato</b>.</p><button type="button" onclick="abrirPaywall()">Ver qué incluye</button>`;
 }
@@ -503,9 +510,20 @@ function montarSugeridor({ input, lista, fuente, alElegir, logo }) {
    existen, así que mientras falten no hay imágenes rotas ni peticiones de más:
    simplemente no aparece el logo. Lo mantiene tools/candidato-360/logos. */
 const LOGOS_PARTIDOS = new Map(), logosPendientes = new Map();
+/* Un logo es de la ORGANIZACIÓN, no del departamento: el Partido Liberal se ve
+   igual en Antioquia que en Bogotá. La carpeta está partida por departamento
+   porque así se armó el repositorio y porque ahí viven los movimientos locales
+   («Bogotá entre todos»), pero hoy solo existe la de Bogotá. Así que esa hace
+   de catálogo BASE para todo el país y el departamento propio manda sobre ella
+   cuando exista. Sin esto, fuera de Bogotá la vitrina se quedaba vacía y la
+   pregunta del partido volvía a ser un campo de texto en blanco. */
+const LOGOS_BASE = '16';
 function cargarLogos(dep) {
   const key = String(dep || '').padStart(2, '0');
-  if (!/^\d{2}$/.test(key)) return Promise.resolve(null);
+  const suyos = /^\d{2}$/.test(key) && key !== LOGOS_BASE ? [manifiestoLogos(key)] : [];
+  return Promise.all([...suyos, manifiestoLogos(LOGOS_BASE)]).then(([primero]) => primero);
+}
+function manifiestoLogos(key) {
   /* `fetch` puede fallar ANTES de devolver promesa (un file:// abierto a mano,
      una CSP): si eso escapa, se lleva por delante al sugeridor de partidos, que
      es lo único importante de este campo. */
@@ -521,7 +539,10 @@ function cargarLogos(dep) {
     }));
   return logosPendientes.get(key);
 }
-function logoDePartido(nombre, dep) { return LOGOS_PARTIDOS.get(String(dep || '').padStart(2, '0'))?.get(normalizedText(nombre)) || ''; }
+function logoDePartido(nombre, dep) {
+  const clave = normalizedText(nombre), key = String(dep || '').padStart(2, '0');
+  return LOGOS_PARTIDOS.get(key)?.get(clave) || LOGOS_PARTIDOS.get(LOGOS_BASE)?.get(clave) || '';
+}
 function imgLogo(nombre, dep) {
   const src = logoDePartido(nombre, dep);
   /* Si el archivo desaparece, la etiqueta se borra sola: nunca un cuadro roto. */

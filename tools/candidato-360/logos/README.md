@@ -17,6 +17,22 @@ candidato-360-data/logos-partidos/<dep>/<slug>.png   ← los archivos
 `candidato-360-data/partidos/<dep>.js`. **Bogotá D.C. es `16`** y es por donde
 se empezó: 37 organizaciones con votación en la ciudad.
 
+## Bogotá hace de catálogo nacional
+
+Un logo es de la **organización**, no del departamento: el Partido Liberal se ve
+igual en Antioquia que en Bogotá. La carpeta está partida por departamento
+porque ahí viven también los movimientos locales («Bogotá entre todos», «Lara
+Bogotá»), pero mientras solo exista la de Bogotá esa sirve de **base para todo
+el país**: `logoDePartido(nombre, dep)` busca primero en el departamento y
+después en `16`. El día que Antioquia tenga la suya, la suya manda.
+
+Quien decide qué organizaciones se ven es el catálogo del departamento
+(`partidos/<dep>.js`), no la carpeta de logos: en Antioquia salen las que
+inscribieron candidatura allá y tienen logo, y los movimientos bogotanos no
+aparecen porque no están en ese catálogo. Sin esta herencia, fuera de Bogotá la
+vitrina se quedaba vacía y la pregunta del partido volvía a ser un campo de
+texto en blanco.
+
 ## Cuando lleguen logos nuevos
 
 ```
