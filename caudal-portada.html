@@ -12,7 +12,7 @@
   <link rel="preload" as="image" href="caudalxcauce/img/mapa-rio-azul.webp" />
   <link rel="stylesheet" href="caudal-public.css?v=20260905-2" />
 
-<link rel="stylesheet" href="caudal-ui.css?v=20260907b" />
+<link rel="stylesheet" href="caudal-ui.css?v=20260913a" />
   <script>
     if(new URLSearchParams(location.search).get('comprar')==='1'||location.hash==='#acceso')
       location.replace('caudal-pricing.html'+location.search);
@@ -380,6 +380,17 @@
       const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
       /* las dos cámaras escriben la fecha distinto (2026/08/26 vs 2026-08-25) */
       const ymd=v=>{const m=String(v||'').match(/(\d{4})[-/](\d{2})[-/](\d{2})/);return m?{y:+m[1],m:+m[2],d:+m[3],k:m[1]+m[2]+m[3]}:null;};
+      /* ⚠️⚠️ ESTE SITIO ES PARA COLOMBIA Y LAS MARCAS DE TIEMPO VIENEN EN UTC.
+         La corrida de la tarde del cron (19:30–20:15 CO) cae ya en el día
+         SIGUIENTE en UTC, así que leer el string con ymd() hacía que a las 8 de
+         la noche del 13 la portada anunciara «Señales revisadas el 14 de
+         septiembre» —una fecha que en Colombia no había llegado— y además nunca
+         dijera «revisadas hoy» en esa franja, que es el mensaje más fuerte.
+         Pasa todas las noches, no es un caso raro. Colombia no tiene horario de
+         verano, así que UTC-5 es constante. */
+      const HOY_K=new Date(Date.now()-5*3600e3).toISOString().slice(0,10).replace(/-/g,'');
+      const enBogota=v=>{const t=/([Zz]|[+-]\d{2}:?\d{2})$/.test(String(v||''))?Date.parse(v):NaN;
+        return Number.isNaN(t)?ymd(v):ymd(new Date(t-5*3600e3).toISOString());};
       const enLetras=f=>f?`${f.d} de ${MESES[f.m-1]} de ${f.y}`:'';
       const S3PDF='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo';
       /* cortar en frontera de palabra: un título partido a media palabra
@@ -393,7 +404,7 @@
          conservando siglas (S.A.S, EPS, ANLA) y dejando en pie lo que ya venía
          mezclado. Nombres cortos (≤6 palabras) van en Mayúscula Inicial por
          palabra, que es como se escribe un nombre propio. */
-      const SIGLAS=new Set(['SAS','LTDA','EPS','IPS','ESE','EPM','ANLA','DIAN','SIC','INVIMA','SECOP','ICBF','SENA','DNP','DANE','UGPP','ONU','EEUU','TIC','IVA','PL','PAL','CP','KV','MW','FOMAG','CAFAM','ANI','ANH','ANM','CREG','CRC','CRA','UPC','POS','PBS','ADRES','SFC','CGR','PGN','FNC','EPSI','MWAC','MWP','STN','CNE']);
+      const SIGLAS=new Set(['SAS','LTDA','EPS','IPS','ESE','EPM','ANLA','DIAN','SIC','INVIMA','SECOP','ICBF','SENA','DNP','DANE','UGPP','ONU','EEUU','TIC','IVA','PL','PAL','CP','KV','MW','FOMAG','CAFAM','ANI','ANH','ANM','CREG','CRC','CRA','UPC','POS','PBS','ADRES','SFC','CGR','PGN','FNC','EPSI','MWAC','MWP','STN','CNE','RNEC']);
       const oracion=(t,nombre)=>{
         t=String(t||'').replace(/^["“”']+|["“”']+$/g,'').trim(); if(!t) return t;
         const letras=t.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g,''); if(!letras) return t;
@@ -418,11 +429,12 @@
         const u=items[0];
 
         /* el sello: cuándo se leyó el feed, no "tiempo real" */
-        const leido=ymd(feed.actualizado);
+        const leido=enBogota(feed.actualizado);
         const stamp=document.getElementById('liveStamp');
         if(stamp&&leido){
-          const hoy=new Date(), esHoy=leido.y===hoy.getFullYear()&&leido.m===hoy.getMonth()+1&&leido.d===hoy.getDate();
-          stamp.textContent=esHoy?'Señales revisadas hoy — CO':`Señales revisadas el ${enLetras(leido)} — CO`;
+          // el sello dice «— CO»: el «hoy» es el de Bogotá, no el del reloj del visitante
+          stamp.textContent=leido.k===HOY_K?'Señales revisadas hoy — CO'
+                                           :`Señales revisadas el ${enLetras(leido)} — CO`;
         }
 
         if(!u) return;
@@ -479,7 +491,18 @@
          una pagina para gremios y empresas un nombre propio no dice nada del
          riesgo del sector. Si no hay ninguna, se muestra la primera igual. */
       const ES_ORG=/(\bs\.? ?a\.? ?s\b|\bltda\b|\bs\.? ?a\b|\be\.? ?s\.? ?p\b|\be\.? ?p\.? ?s\b|\bi\.? ?p\.? ?s\b|consorcio|uni[oó]n temporal|fundaci|corporaci|cooperativa|compa[ñn][ií]a|inversiones|\bbanco\b|seguros|\bcia\b)/i;
-      const eligeSancion=d=>{const r=(d.recientes||[]).filter(x=>x.fecha);
+      /* ⚠️⚠️ Y solo lo que YA OCURRIÓ. El registro llega ordenado por fecha, así
+         que un año mal digitado en la FUENTE encabeza la lista y se lleva la
+         portada: el 13-sep-2026 la tarjeta anunciaba una multa «en firme el 20
+         de octubre de 2026» —una fecha que no había llegado— porque la RNEC
+         registró en SECOP como 2026 una resolución que su propio número fecha
+         en 2025 («RESOLUCION No. 0206 DEL 20 OCTUBRE DE 2025»). Era UN registro
+         entre 80.537 y estaba de primero en la landing comercial.
+         El dato NO se corrige río arriba —eso sería inventar, y en el buscador
+         esa sanción tiene que existir tal como la publicó la entidad—: lo que no
+         se puede es afirmar en pasado algo que todavía no pasa. */
+      const yaOcurrio=x=>{const f=ymd(x.fecha); return !!f && f.k<=HOY_K;};
+      const eligeSancion=d=>{const r=(d.recientes||[]).filter(yaOcurrio);
         return r.find(x=>ES_ORG.test(x.sancionado||''))||r[0]||null;};
       /* ⚠️ `motivo` no siempre es un motivo: en SECOP es el codigo del contrato
          ("MENOR CUANTIA 005 DE 2025") y en la Junta de Contadores un radicado.
