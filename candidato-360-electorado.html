@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Cómo es y cómo vota el electorado del territorio donde están sus votos: sexo, edad, campo y ciudad, familias políticas y la votación que le falta.">
+<title>El electorado de su votación · Candidato 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- ⚠️ Al tocar candidato-360.css, candidato-360-panel.js o candidato-360-electorado.js hay que bumpear su ?v= acá y en las otras páginas del panel. -->
+<link rel="stylesheet" href="candidato-360.css?v=20260922">
+<style>
+/* El chasis del panel, igual que en medios y redes. */
+.panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
+.panel-hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:30px}
+/* El h1 de la casa tiene max-width:9ch (está pensado para la portada): acá el
+   titular es una frase, así que se le devuelve el ancho. */
+.panel-hero h1{font:800 clamp(30px,4.4vw,46px)/1.06 var(--display);letter-spacing:-.02em;margin:8px 0 10px;color:var(--ink);max-width:24ch;text-wrap:balance}
+.panel-hero p{margin:0;max-width:62ch;font-size:15px;line-height:1.6;color:var(--muted)}
+.panel-candidatura{display:inline-block;margin-top:14px;font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--green);border:1px solid rgba(20,124,112,.32);padding:6px 10px}
+.panel-nota{margin-top:24px;font-size:12.5px;line-height:1.55;color:var(--muted)}
+.hidden{display:none}
+.elec-seccion{margin-bottom:16px}
+.elec-seccion h3{font-size:24px;margin:6px 0 6px}
+.elec-seccion>p{color:var(--muted);font-size:14px;line-height:1.6;margin:0 0 20px;max-width:70ch}
+/* Las dos figuras del sexo: el tamaño ES el dato, y el número va al lado. */
+.figuras{display:flex;gap:clamp(18px,4vw,46px);align-items:flex-end;flex-wrap:wrap;margin-bottom:18px}
+.figura{display:flex;align-items:flex-end;gap:14px}
+.figura svg{display:block;flex:0 0 auto}
+.figura b{display:block;font:800 clamp(30px,4vw,44px)/1 var(--display);letter-spacing:-.03em;color:var(--ink)}
+.figura span{display:block;font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.figura.mujer svg{color:var(--green)}
+.figura.hombre svg{color:#7d93a8}
+.figura.campo svg{color:#8a6d3b}
+.figura.ciudad svg{color:var(--forest)}
+/* Una barra comparada: arriba su votación, abajo el municipio. */
+.comparada{display:grid;grid-template-columns:120px minmax(0,1fr) 74px;gap:10px;align-items:center;margin:0 0 9px;font-size:13px}
+.comparada .et{color:var(--muted);font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.comparada .pista{height:14px;background:#e8ece9;position:relative;overflow:hidden}
+.comparada .pista i{display:block;height:100%;background:var(--green)}
+.comparada.suya .pista i{background:var(--forest)}
+.comparada .val{text-align:right;font:600 13px var(--mono);color:var(--ink)}
+.banda{display:grid;grid-template-columns:44px 110px minmax(0,1fr);gap:12px;align-items:center;margin-bottom:12px}
+.banda .ico{color:var(--forest);display:grid;place-items:center}
+.banda b{font:700 15px var(--display)}
+.banda small{display:block;color:var(--muted);font-size:11.5px}
+.banda .barras{display:grid;gap:4px}
+.banda .barras i{display:block;height:11px;background:var(--forest)}
+.banda .barras i.municipio{background:#c9d6cd}
+.leyenda{display:flex;gap:18px;flex-wrap:wrap;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 0}
+.leyenda span{display:flex;align-items:center;gap:7px}
+.leyenda i{width:12px;height:12px;display:block;background:var(--forest)}
+.leyenda i.municipio{background:#c9d6cd}
+/* El territorio, en cifras grandes. */
+.cifras{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.cifra{background:var(--cream);padding:18px}
+.cifra b{display:block;font:800 28px/1 var(--display);letter-spacing:-.02em}
+.cifra span{display:block;font-size:12px;color:var(--muted);margin-top:6px;line-height:1.45}
+/* Cómo vota el territorio: una barra apilada por familias. */
+.familias{display:flex;height:26px;margin:6px 0 16px;border:1px solid var(--line)}
+.familias i{display:block;height:100%}
+.familia-fila{display:grid;grid-template-columns:14px minmax(0,1fr) 62px 86px;gap:11px;align-items:center;padding:9px 0;border-top:1px solid var(--line);font-size:13.5px}
+.familia-fila:first-of-type{border-top:0}
+.familia-fila .punto{width:12px;height:12px;border-radius:50%}
+.familia-fila .pct{text-align:right;font:600 13px var(--mono)}
+.familia-fila .votos{text-align:right;font:11px var(--mono);color:var(--muted)}
+.familia-fila em{font-style:normal;color:var(--green);font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-left:8px}
+.objetivo{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-top:6px}
+.objetivo .caja{border:1px solid var(--line);background:var(--cream);padding:18px}
+.objetivo .caja.meta{background:var(--forest);color:#fff;border-color:var(--forest)}
+.objetivo .caja.meta span,.objetivo .caja.meta small{color:#cbd6ce}
+.objetivo b{display:block;font:800 26px/1 var(--display)}
+.objetivo span{display:block;font-size:12px;color:var(--muted);margin-top:6px}
+.objetivo small{display:block;margin-top:10px;font-size:12px;line-height:1.5;color:var(--muted)}
+.falta{margin-top:16px;border-left:3px solid var(--coral);background:var(--cream);padding:14px 16px;font-size:13.5px;line-height:1.6;color:var(--muted)}
+.falta b{color:var(--ink)}
+@media(max-width:640px){.comparada{grid-template-columns:92px minmax(0,1fr) 62px}.banda{grid-template-columns:36px 92px minmax(0,1fr)}}
+</style>
+</head>
+<body>
+<nav class="topbar"><div class="nav-left"><a href="candidato-360.html?abrir=1" class="nav-planes">← CRM</a><div class="nav-auth" id="navAuth"></div></div><div class="nav-right"><a class="brand" href="index.html"><span class="mark"><i></i><i></i><i></i><i></i></span><b>Ricardo<span>.</span>Ruiz</b></a></div></nav>
+
+<!-- Las figuras: una sola vez, y cada sección las usa. Dibujadas acá y no como
+     imágenes para que tomen el color de la casa y no pesen nada. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="ico-mujer" viewBox="0 0 40 80"><circle cx="20" cy="12" r="9" fill="currentColor"/><path d="M20 23c7 0 11 5 12.5 12l5 26h-11l-1.5 19h-10L13.5 61h-11l5-26C9 28 13 23 20 23z" fill="currentColor"/></symbol>
+  <symbol id="ico-hombre" viewBox="0 0 40 80"><circle cx="20" cy="12" r="9" fill="currentColor"/><path d="M11 23h18c3.3 0 6 2.7 6 6v22h-8v29h-6V51h-2v29h-6V51H5V29c0-3.3 2.7-6 6-6z" fill="currentColor"/></symbol>
+  <symbol id="ico-joven" viewBox="0 0 40 56"><circle cx="20" cy="9" r="7" fill="currentColor"/><path d="M13 18h14c3 0 5 2 5 5v13h-6v20h-12V36H9V23c0-3 2-5 4-5z" fill="currentColor"/><path d="M26 20h5v14h-5z" fill="currentColor" opacity=".55"/></symbol>
+  <symbol id="ico-adulto" viewBox="0 0 40 56"><circle cx="20" cy="9" r="7" fill="currentColor"/><path d="M12 18h16c3 0 5 2 5 5v14h-5v19h-16V37H7V23c0-3 2-5 5-5z" fill="currentColor"/></symbol>
+  <symbol id="ico-mayor" viewBox="0 0 40 56"><circle cx="18" cy="9" r="7" fill="currentColor"/><path d="M11 18h13c3 0 5 2 5 5v13h-5v20H11V36H6V23c0-3 2-5 5-5z" fill="currentColor"/><path d="M31 22h3v34h-3z" fill="currentColor" opacity=".6"/></symbol>
+  <symbol id="ico-ciudad" viewBox="0 0 56 48"><path d="M4 46V20l12-8 12 8v26z" fill="currentColor"/><path d="M30 46V26h10v20z" fill="currentColor" opacity=".75"/><path d="M42 46V32h10v14z" fill="currentColor" opacity=".5"/><path d="M12 30h8v8h-8z" fill="var(--cream)"/></symbol>
+  <symbol id="ico-campo" viewBox="0 0 56 48"><path d="M0 46c8-14 14-20 20-20s10 6 16 14c4-6 8-10 12-10s8 6 8 16z" fill="currentColor"/><circle cx="14" cy="12" r="7" fill="currentColor" opacity=".55"/><path d="M40 46V28" stroke="currentColor" stroke-width="3"/></symbol>
+</defs></svg>
+
+<main class="app-shell"><div class="panel-shell">
+  <header class="panel-hero">
+    <div class="kicker">Candidato 360 · panel 07</div>
+    <h1>El electorado de su votación.</h1>
+    <p>El voto es secreto: <b>nadie</b> puede decir quién votó por usted. Lo que sí se puede es describir el <b>electorado de los puestos donde están sus votos</b>, ponderado por cuántos sacó en cada uno, y compararlo con el territorio entero. Es una lectura del terreno, no de sus votantes — y de ahí sale la única pregunta que importa: a qué electorado le falta llegar.</p>
+    <span class="panel-candidatura" id="panelCandidatura"></span>
+  </header>
+
+  <div id="panelMuro" class="hidden"></div>
+  <div id="panelCuerpo">
+    <div id="elecCargando" class="panel"><p class="helper" style="margin:0">Leyendo el censo de sus puestos de votación…</p></div>
+    <div id="elecAnalisis" class="hidden"></div>
+    <p class="panel-nota" id="elecNota"></p>
+  </div>
+</div></main>
+
+<script src="platform-config.js"></script>
+<script src="data-client.js"></script>
+<script src="partidos-bloques.js?v=20260922"></script>
+<script src="candidato-360-electorado.js?v=20260922"></script>
+<script src="candidato-360-panel.js?v=20260922"></script>
+<script>
+(async function () {
+  const P = window.C360Panel, E = window.C360Electorado, $ = P.$, esc = P.esc;
+  const pct = x => x == null ? '—' : `${(x * 100).toFixed(1).replace('.', ',')} %`;
+  const num = x => Number(x || 0).toLocaleString('es-CO');
+  const ico = (id, alto) => `<svg width="${alto * 0.5}" height="${alto}" aria-hidden="true"><use href="#ico-${id}"></use></svg>`;
+  const LABEL = PartidosBloques.BLOQUE_LABEL, COLOR = PartidosBloques.BLOQUE_COLOR, ORDEN = PartidosBloques.BLOQUE_ORDER;
+  /* Las bandas del censo por edad llegan como «18-25»: la figura que les toca. */
+  const FIGURA_EDAD = { '18-25': ['joven', 'Primeros votos'], '26-40': ['adulto', 'Hogar en formación'], '41-60': ['adulto', 'Edad de mayor participación'], '61+': ['mayor', 'Voto más constante'] };
+
+  function barraComparada(etiqueta, suyo, territorio) {
+    return `<div class="comparada suya"><span class="et">${esc(etiqueta)}</span><span class="pista"><i style="width:${Math.max(1, (suyo || 0) * 100)}%"></i></span><span class="val">${pct(suyo)}</span></div>
+      <div class="comparada"><span class="et">El territorio</span><span class="pista"><i style="width:${Math.max(1, (territorio || 0) * 100)}%"></i></span><span class="val">${pct(territorio)}</span></div>`;
+  }
+
+  function seccionSexo(p) {
+    const dif = p.mujeresMunicipio == null ? null : p.mujeres - p.mujeresMunicipio;
+    const lectura = dif == null ? 'No hay censo del territorio para comparar.'
+      : Math.abs(dif) < .005 ? 'Su votación está donde el electorado se reparte igual que en el resto del territorio: por sexo, no hay sesgo que explotar.'
+      : dif > 0 ? `Sus puestos tienen <b>${pct(Math.abs(dif))}</b> más mujeres que el territorio entero. No significa que voten por usted: significa que su voto está donde ellas están.`
+      : `Sus puestos tienen <b>${pct(Math.abs(dif))}</b> menos mujeres que el territorio entero, o sea que su votación se apoya en puestos más masculinos que el promedio.`;
+    return `<section class="panel elec-seccion">
+      <span class="panel-num">01 · Sexo</span>
+      <h3>Dónde están sus votos, quién vive ahí.</h3>
+      <p>El censo electoral de cada puesto trae cuántas mujeres y cuántos hombres pueden votar en él. Ponderado por su votación, así queda el electorado de los suyos.</p>
+      <div class="figuras">
+        <div class="figura mujer">${ico('mujer', 96)}<div><b>${pct(p.mujeres)}</b><span>Mujeres</span></div></div>
+        <div class="figura hombre">${ico('hombre', 96)}<div><b>${pct(p.mujeres == null ? null : 1 - p.mujeres)}</b><span>Hombres</span></div></div>
+      </div>
+      ${barraComparada('Sus puestos', p.mujeres, p.mujeresMunicipio)}
+      <p class="falta">${lectura}</p>
+    </section>`;
+  }
+
+  function seccionEdad(p, obj) {
+    if (!p.edad) return `<section class="panel elec-seccion">
+      <span class="panel-num">02 · Edad</span>
+      <h3>Todavía no.</h3>
+      <p>El censo por edad existe puesto por puesto, pero no está publicado en la fuente que lee esta página. En cuanto se publique, esta sección aparece sola, con las mismas cuatro bandas y la misma comparación. Preferimos decirlo a estimar la edad con el promedio del municipio y presentarla como suya.</p>
+      <div class="figuras" style="opacity:.35">${ico('joven', 70)}${ico('adulto', 70)}${ico('mayor', 70)}</div>
+    </section>`;
+    const filas = p.edad.bandas.map((banda, i) => {
+      const [figura, nota] = FIGURA_EDAD[banda] || ['adulto', ''];
+      const suyo = p.edad.reparto[i], terr = p.edadMunicipio?.reparto?.[i];
+      const max = Math.max(...p.edad.reparto, ...(p.edadMunicipio?.reparto || [0]));
+      return `<div class="banda"><span class="ico">${ico(figura, 42)}</span>
+        <span><b>${banda} años</b><small>${esc(nota)}</small></span>
+        <span class="barras"><i style="width:${Math.max(2, suyo / max * 100)}%" title="Sus puestos: ${pct(suyo)}"></i>${terr == null ? '' : `<i class="municipio" style="width:${Math.max(2, terr / max * 100)}%" title="El territorio: ${pct(terr)}"></i>`}</span></div>`;
+    }).join('');
+    const mayor = p.edad.reparto.indexOf(Math.max(...p.edad.reparto));
+    return `<section class="panel elec-seccion">
+      <span class="panel-num">02 · Edad</span>
+      <h3>La banda que más pesa: ${esc(p.edad.bandas[mayor])} años.</h3>
+      <p>Composición etaria del censo de sus puestos, ponderada por su votación, contra la del territorio entero. Cubre el ${pct(p.edad.cobertura)} de sus votos.</p>
+      ${filas}
+      <div class="leyenda"><span><i></i>Sus puestos</span><span><i class="municipio"></i>El territorio</span></div>
+      ${obj?.edad ? `<p class="falta">Los votos que le faltan se parecen al territorio: el objetivo mueve su banda más fuerte de <b>${pct(p.edad.reparto[mayor])}</b> a <b>${pct(obj.edad[mayor])}</b>.</p>` : ''}
+    </section>`;
+  }
+
+  function seccionTerritorio(p, ideo, lugar) {
+    const especial = p.especial ? `<p class="falta">Otros <b>${num(p.especial)}</b> votos suyos están en puestos especiales —cárceles y censo consolidado—, que no son ni campo ni ciudad y por eso no entran en el reparto de arriba.</p>` : '';
+    return `<section class="panel elec-seccion">
+      <span class="panel-num">03 · Campo y ciudad</span>
+      <h3>Su votación es ${p.rural >= .5 ? 'rural' : p.rural >= .15 ? 'mixta, con una pata rural' : 'urbana'}.</h3>
+      <p>La zona electoral 99 es la rural de cada municipio. Acá se compara qué parte de <b>su votación</b> está en el campo contra qué parte del <b>censo del territorio</b> vive en él.</p>
+      <div class="figuras">
+        <div class="figura ciudad">${ico('ciudad', 80)}<div><b>${pct(p.urbano)}</b><span>En la cabecera</span></div></div>
+        <div class="figura campo">${ico('campo', 80)}<div><b>${pct(p.rural)}</b><span>En puestos rurales</span></div></div>
+      </div>
+      ${barraComparada('Sus votos rurales', p.rural, p.ruralMunicipio)}
+      ${especial}
+      ${ideo ? `<div class="cifras" style="margin-top:20px">
+        <div class="cifra"><b>${num(ideo.potencial)}</b><span>personas habilitadas para votar en ${esc(lugar)}</span></div>
+        ${ideo.votantes ? `<div class="cifra"><b>${pct(ideo.votantes / ideo.potencial)}</b><span>votaron en 2023 (${num(ideo.votantes)} personas)</span></div>` : ''}
+        <div class="cifra"><b>${num(p.votos)}</b><span>votos suyos, el ${ideo.votantes ? pct(p.votos / ideo.votantes) : '—'} de quienes votaron</span></div>
+      </div>` : ''}
+    </section>`;
+  }
+
+  function seccionFamilias(ideo, familia, familiaPrevia, lugar) {
+    if (!ideo) return '';
+    const vivos = ORDEN.filter(b => ideo.porBloque[b] > 0);
+    const barra = vivos.map(b => `<i style="flex:${ideo.porBloque[b]};background:${COLOR[b]}" title="${esc(LABEL[b])}"></i>`).join('');
+    const filas = vivos.slice().sort((a, b) => ideo.porBloque[b] - ideo.porBloque[a]).map(b => `<div class="familia-fila">
+      <span class="punto" style="background:${COLOR[b]}"></span>
+      <span>${esc(LABEL[b])}${b === familia ? '<em>su familia</em>' : ''}${b === familiaPrevia && b !== familia ? '<em>su aval anterior</em>' : ''}</span>
+      <span class="pct">${pct(ideo.porBloque[b] / ideo.total)}</span><span class="votos">${num(ideo.porBloque[b])} votos</span></div>`).join('');
+    const sin = ideo.sinLinea?.length ? `<p class="falta"><b>Sin línea nacional</b> acá: ${ideo.sinLinea.slice(0, 3).map(x => `${esc(P.lugar(x.nombre))} (${num(x.votos)})`).join(', ')}${ideo.sinLinea.length > 3 ? ` y ${ideo.sinLinea.length - 3} más` : ''}. ${ideo.sinLinea.some(x => x.aval) ? 'Los partidos que prestan aval —ASI, MAIS, AICO— no entran en una familia porque sus candidatos vienen de todas: de las 848 personas con rastro que se lanzaron con ASI en 2023, el bloque más repetido reúne apenas el 35 %.' : 'Son movimientos regionales sin equivalente nacional; los que dejan rastro suficiente sí quedan clasificados.'}</p>` : '';
+    return `<section class="panel elec-seccion">
+      <span class="panel-num">04 · Familias políticas</span>
+      <h3>Cómo vota ${esc(lugar)}.</h3>
+      <p>La Asamblea de 2023 es la única elección que baja a todos los municipios del país con el voto por partido, así que de ahí sale la historia ideológica del territorio, con cada organización —partido, coalición o movimiento regional— puesta en su familia.</p>
+      <div class="familias">${barra}</div>
+      ${filas}
+      ${sin}
+    </section>`;
+  }
+
+  function seccionObjetivo(p, obj, ideo, familia, lugar) {
+    if (!obj) return `<section class="panel elec-seccion"><span class="panel-num">05 · La votación que debería buscar</span>
+      <h3>Falta la meta.</h3>
+      <p>El objetivo se calcula contra su meta de votos, y esta candidatura todavía no la tiene guardada. Abra el CRM una vez y vuelva: la meta se guarda sola.</p></section>`;
+    const suyos = ideo && familia && familia !== 'sc' ? (ideo.porBloque[familia] || 0) : 0;
+    return `<section class="panel elec-seccion">
+      <span class="panel-num">05 · La votación que debería buscar</span>
+      <h3>Los votos que le faltan no se parecen a los que tiene.</h3>
+      <p>Los que ya tiene son los de sus puestos. Los que le faltan salen del territorio entero, así que el electorado objetivo es el promedio de los dos, pesado por cuántos votos pone cada uno.</p>
+      <div class="objetivo">
+        <div class="caja"><b>${num(obj.base)}</b><span>votos suyos hoy en este territorio</span><small>${obj.mismoTerritorio ? 'Su historial es de acá: esa base cuenta.' : 'Su historial es de otro territorio, así que acá empieza en cero.'}</small></div>
+        <div class="caja"><b>${num(obj.faltan)}</b><span>votos por conseguir</span><small>${suyos ? `${esc(LABEL[familia])} sumó ${num(suyos)} votos acá en 2023: ${suyos >= obj.faltan ? `le alcanzaría con ${pct(obj.faltan / suyos)} de esa familia.` : 'no alcanza sola, así que parte tiene que venir de otras familias o de quien no votó.'}` : 'Sin familia política definida todavía para esta campaña.'}</small></div>
+        <div class="caja meta"><b>${num(obj.meta)}</b><span>meta de votos</span><small>La del CRM, calculada contra la elección comparable de 2023 en ${esc(lugar)}.</small></div>
+      </div>
+      <div style="margin-top:22px">
+        <div class="comparada suya"><span class="et">Mujeres · hoy</span><span class="pista"><i style="width:${(p.mujeres || 0) * 100}%"></i></span><span class="val">${pct(p.mujeres)}</span></div>
+        <div class="comparada"><span class="et">Mujeres · objetivo</span><span class="pista"><i style="width:${(obj.mujeres || 0) * 100}%"></i></span><span class="val">${pct(obj.mujeres)}</span></div>
+        <div class="comparada suya" style="margin-top:14px"><span class="et">Rural · hoy</span><span class="pista"><i style="width:${Math.max(1, (p.rural || 0) * 100)}%"></i></span><span class="val">${pct(p.rural)}</span></div>
+        <div class="comparada"><span class="et">Rural · objetivo</span><span class="pista"><i style="width:${Math.max(1, (obj.rural || 0) * 100)}%"></i></span><span class="val">${pct(obj.rural)}</span></div>
+      </div>
+    </section>`;
+  }
+
+  if (!(await P.arrancar('candidato-360-electorado.html'))) return;
+  const v = P.SESION.vinculo, campana = v?.campana || {};
+  try {
+    const slugs = v?.tipo === 'historial' ? (v.candidato?.slugs || []) : [];
+    const mesas = await E.mesasDe(slugs);
+    const municipio = await E.codigoMunicipio(campana.departamento, campana.municipio);
+    const [p, ideo] = await Promise.all([
+      E.perfil(mesas),
+      E.ideologia({ departamento: campana.departamento, municipio }).catch(() => null),
+    ]);
+    const lugar = P.lugar(ideo?.nombre || campana.municipio || campana.departamentoNombre || 'su territorio');
+    const familia = campana.avales === 'firmas' ? (campana.espectro || '') : (campana.partido ? PartidosBloques.bloqueDeOrganizacion(campana.partido) : '');
+    const familiaPrevia = v?.candidato?.partido ? PartidosBloques.bloqueDeOrganizacion(v.candidato.partido) : '';
+    const mismoTerritorio = Boolean(p.municipio) && (!municipio || `${String(campana.departamento || '').padStart(2, '0')}${String(municipio).padStart(3, '0')}` === p.municipio);
+    const obj = E.objetivo(p, campana.meta, { mismoTerritorio });
+    $('elecCargando').classList.add('hidden');
+    const analisis = $('elecAnalisis');
+    if (!p.votos || p.mujeres === null) {
+      analisis.innerHTML = `<section class="panel elec-seccion"><span class="panel-num">Perfil del votante</span>
+        <h3>Todavía no hay perfil para esta candidatura.</h3>
+        <p>${slugs.length ? 'Los puestos de su votación no tienen censo publicado, así que preferimos no estimar un perfil que no podemos sostener.' : 'Esta es una candidatura nueva: sin votos propios no hay puestos que describir. Cuando tenga una elección detrás, esta página se llena sola.'}</p></section>`
+        + seccionFamilias(ideo, familia, familiaPrevia, lugar);
+    } else {
+      analisis.innerHTML = seccionSexo(p) + seccionEdad(p, obj) + seccionTerritorio(p, ideo, lugar)
+        + seccionFamilias(ideo, familia, familiaPrevia, lugar) + seccionObjetivo(p, obj, ideo, familia, lugar);
+    }
+    analisis.classList.remove('hidden');
+    $('elecNota').innerHTML = `Fuente: censo electoral por puesto de la Registraduría (PUESTOS_GEOREF, columnas de mujeres y hombres), la zona electoral de cada mesa y los resultados de la Asamblea 2023. Cubre el ${pct(p.cobertura)} de su votación${p.sinCoordenada ? `: ${num(p.sinCoordenada)} votos están en puestos sin censo publicado` : ''}. <a class="enlace-boton" href="candidato-360-perfil.html">Cómo se lee esto sin violar el secreto del voto →</a>`;
+  } catch (e) {
+    $('elecCargando').innerHTML = '<p class="helper" style="margin:0">No se pudo leer el censo de sus puestos en este momento. Vuelva a intentarlo en un rato: la fuente es un archivo de la Registraduría que a veces no responde.</p>';
+  }
+})();
+</script>
+</body>
+</html>

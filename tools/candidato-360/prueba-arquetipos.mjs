@@ -116,7 +116,7 @@ r.mapa = await p.evaluate(() => ({ titulo: document.getElementById('crmMapTitle'
 await p.evaluate(() => Promise.all([pintarArquetipos(), pintarPerfil()]));
 await p.waitForTimeout(600);
 r.arq = await p.evaluate(() => ({ titulo: document.getElementById('crmArqTitulo').textContent, copy: document.getElementById('crmArqCopy').textContent, dato: document.getElementById('crmArqDato').textContent, apagada: document.getElementById('crmArquetipos').classList.contains('module-apagado'), boton: !document.getElementById('crmArqBtn').disabled }));
-r.perfil = await p.evaluate(() => ({ titulo: document.getElementById('crmPerfilTitulo').textContent, copy: document.getElementById('crmPerfilCopy').textContent, dato: document.getElementById('crmPerfilDato').textContent, boton: !document.getElementById('crmPerfilBtn').disabled }));
+r.perfil = await p.evaluate(() => ({ titulo: document.getElementById('crmPerfilTitulo').textContent, copy: document.getElementById('crmPerfilCopy').textContent, dato: document.getElementById('crmPerfilDato').textContent, boton: Boolean(document.getElementById('crmPerfilBtn')) }));
 await p.screenshot({ path: SP + '/tarjetas-territorio.png', fullPage: true });
 
 /* 3 · Los modales. */
@@ -124,10 +124,10 @@ await p.evaluate(() => mostrarArquetipos());
 await p.waitForTimeout(300);
 r.modalArq = await p.evaluate(() => ({ titulo: document.getElementById('introModalTitle').textContent, texto: document.getElementById('introModalText').textContent.replace(/\s+/g, ' '), barras: document.querySelectorAll('#introModalText .arq-barra').length, abierto: document.getElementById('introModal').classList.contains('open') }));
 await p.screenshot({ path: SP + '/modal-arquetipos.png' });
-await p.evaluate(() => { closeIntroModal(); mostrarPerfil(); });
-await p.waitForTimeout(300);
-r.modalPerfil = await p.evaluate(() => ({ titulo: document.getElementById('introModalTitle').textContent, texto: document.getElementById('introModalText').textContent.replace(/\s+/g, ' ') }));
-await p.screenshot({ path: SP + '/modal-perfil.png' });
+await p.evaluate(() => closeIntroModal());
+/* La 07 ya no abre modal: su botón lleva a la página de análisis, que tiene
+   sitio para las figuras y se prueba en prueba-perfil.mjs. */
+r.enlacePerfil = await p.evaluate(() => document.getElementById('crmPerfilBtn').getAttribute('href'));
 
 /* 4 · Fuera de Medellín la tarjeta de arquetipos se apaga y lo dice. */
 await p.evaluate(() => { closeIntroModal(); window.datosCandidatura = async () => ({ mesas: [{ dep: '05', mun: '001', zon: '01', pue: '01', munNom: 'TUNJA', v: 500 }] }); crmCandidate = { ...crmCandidate, circunscripcion: 'TUNJA (BOYACA)' }; return pintarArquetipos(); });
@@ -147,10 +147,10 @@ const pruebas = [
   ['el modal reparte sus votos por arquetipo, hoy y en 2027', r.modalArq.barras === 2 && /57 % Protección y orden cotidiano/.test(r.modalArq.texto) && /29 % Castigo/.test(r.modalArq.texto)],
   ['el ajuste a mano de 2027 manda sobre el proyectado tendencial', /Continuidad con gestión/.test(r.modalArq.texto)],
   ['con las comunas y los barrios de su votación', /Doce de Octubre/.test(r.modalArq.texto) && /Pedregal/.test(r.modalArq.texto) && /La Loma/.test(r.modalArq.texto)],
+  ['la tarjeta de perfil lleva a la página del electorado', r.enlacePerfil === 'candidato-360-electorado.html'],
   ['la tarjeta de perfil pondera el censo de sus puestos por sus votos', r.perfil.dato === '56,5 %' && r.perfil.boton],
   ['y compara contra el municipio, no contra el aire', /54,7 %|1,8 %|más mujeres que el promedio del municipio/.test(r.perfil.copy)],
   ['el peso rural sale de la zona 99', /13,3 % de sus votos están en puestos rurales/.test(r.perfil.copy) && /5,2 % del censo del municipio/.test(r.perfil.copy)],
-  ['el modal de perfil dice que el voto es secreto y qué falta para la edad', /nadie.{0,40}puede decir quién votó por usted/i.test(r.modalPerfil.texto) && /Edad/.test(r.modalPerfil.texto) && /no está publicado/.test(r.modalPerfil.texto)],
   ['fuera de Medellín la tarjeta se apaga y dice por qué', /solo Medellín/i.test(r.fuera.titulo) && r.fuera.apagada && !r.fuera.boton],
   ['sin errores de JavaScript', errores.length === 0],
 ];

@@ -63,4 +63,22 @@ por puesto de la Registraduría + deriva DANE 2022→2026, con raking IPF a los
 votantes reales de 2026). El JSON publicable son cuatro bandas por puesto
 —18-25, 26-40, 41-60 y 61+— y pesa ~700 KB.
 
-La prueba es `tools/candidato-360/prueba-perfil.mjs` (13).
+## Dónde vive cada cosa
+
+| Archivo | Qué hace |
+|---|---|
+| `candidato-360-electorado.js` | **las cuentas**: perfil del censo de sus puestos, ideología del territorio y votación objetivo |
+| `candidato-360.js` (tarjeta 07) | el resumen de una línea y el botón |
+| `candidato-360-electorado.html` | el análisis completo, con figuras y gráficos |
+
+Las cuentas están en un módulo aparte porque las usan las dos pantallas: si la
+tarjeta y la página dieran números distintos, ninguna serviría. El módulo
+devuelve **datos**, no texto; cómo se escriben los nombres (tipo oración) y los
+porcentajes es cosa de cada pantalla.
+
+La página resuelve el JSON mesa a mesa de cada candidatura **desde el slug**
+(`ALC2023-…` → `alcaldia-2023/…`) en vez de bajar los índices completos: son 40
+MB para averiguar una URL que el propio slug ya contiene.
+
+La prueba es `tools/candidato-360/prueba-perfil.mjs` (16), que abre la página
+con todo lo remoto simulado.

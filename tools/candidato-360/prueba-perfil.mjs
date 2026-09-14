@@ -1,135 +1,128 @@
-/* prueba-perfil.mjs — la tarjeta 07 y las tres lecturas del electorado.
+/* prueba-perfil.mjs — el electorado de una candidatura, en su propia página.
    ------------------------------------------------------------------
-   La tarjeta decía cómo es el electorado donde están sus votos (sexo del censo
-   y peso rural). Faltaban las tres que pidió Ricardo y que son las que sirven
-   para decidir:
+   La tarjeta 07 del CRM resume («su voto es urbano: 56 % de mujeres») y el
+   análisis vive en candidato-360-electorado.html, que tiene sitio para las
+   figuras y las cinco lecturas:
 
-     · el TERRITORIO completo —censo, participación, sexo, rural—, que es el
-       tablero en el que juega y no solo su pedazo;
-     · cómo VOTA ese territorio por familias políticas, con la Asamblea 2023,
-       que es la única elección que baja a todos los municipios del país;
-     · la votación que DEBERÍA BUSCAR: los votos que le faltan para la meta no
-       se parecen a su base —esos ya los tiene— sino al territorio del que los
-       va a sacar, así que el perfil objetivo es el promedio de los dos pesado
-       por cuántos votos pone cada uno.
+     01 sexo · 02 edad · 03 campo y ciudad · 04 familias políticas ·
+     05 la votación que debería buscar
 
-   Todo remoto va simulado: tres puestos, un municipio, tres partidos.
+   Las cuentas las hace candidato-360-electorado.js, compartido con el CRM: si
+   la página y la tarjeta dieran números distintos, ninguna serviría.
+
+   Lo que se comprueba acá:
+     · el perfil es el del CENSO de sus puestos, ponderado por sus votos, y se
+       compara con el territorio entero;
+     · sin el archivo de edad publicado la sección lo dice en vez de estimar;
+     · las familias políticas resuelven coaliciones y movimientos regionales, y
+       lo que queda sin línea sale con nombre propio;
+     · el objetivo separa lo que ya tiene de lo que le falta y mezcla los dos
+       perfiles, pesados por sus votos;
+     · sin meta guardada, la página lo dice y no se rompe.
+
+   Todo lo remoto va simulado: tres puestos, un municipio, cinco organizaciones.
 
      node tools/candidato-360/prueba-perfil.mjs                               */
 const { chromium } = await import('playwright')
   .catch(() => import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs'));
 const SP = process.env.SALIDA_PRUEBA || '/tmp';
 
-const DEPARTAMENTOS = { type: 'FeatureCollection', features: ['Antioquia', 'Distrito Capital de Bogotá'].map(name => ({ type: 'Feature', properties: { name }, geometry: null })) };
-const MUNICIPIOS = { '01': { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { mpio_cnmbr: 'LA CEJA', mun_elec: '163', mpio_ccdgo: '376' }, geometry: null }] } };
-/* Tres puestos de 1.000 personas cada uno: el municipio queda en 50 % de
-   mujeres y 33,3 % de censo rural (la zona 99). */
+/* Tres puestos de 1.000 personas: el municipio queda en 50 % de mujeres y
+   33,3 % de censo rural (la zona 99). */
 const fila = (code, barrio, mujeres, hombres) => { const r = new Array(16).fill(''); r[1] = code; r[7] = barrio; r[9] = '6.02'; r[10] = '-75.43'; r[13] = String(mujeres); r[14] = String(hombres); return r.join(';'); };
-const PUESTOS = ['CABECERA',
-  fila('011630101', 'CENTRO', 600, 400),
-  fila('011630102', 'SAN CAYETANO', 400, 600),
-  fila('011639901', 'LA MIEL', 500, 500),
-].join('\n');
+const PUESTOS = ['CABECERA', fila('011630101', 'CENTRO', 600, 400), fila('011630102', 'SAN CAYETANO', 400, 600), fila('011639901', 'LA MIEL', 500, 500)].join('\n');
 /* Sus votos: 800 en Centro (60 % mujeres) y 200 en San Cayetano (40 %), nada
    en el puesto rural → 56 % de mujeres y 0 % rural. */
-const MESAS = [
+const MESAS = { mesas: [
   { dep: '01', mun: '163', zon: '01', pue: '01', munNom: 'LA CEJA', v: 800 },
   { dep: '01', mun: '163', zon: '01', pue: '02', munNom: 'LA CEJA', v: 200 },
-];
+] };
 /* La Asamblea 2023 del municipio: derecha 500, izquierda 300 (Pacto 200 +
-   Renace 100), centro-derecha 100 (Cambio Radical - MIRA) y 100 sin línea. */
+   Renace 100, que es de la tabla medida), centro-derecha 100 (una coalición
+   que se resuelve por sus partes) y 100 sin línea (un aval que se presta). */
 const ASAMBLEA = { key: '01', name: 'ANTIOQUIA', nivel: 'municipio', comunas: { '163': {
   name: 'LA CEJA', validos: 1000, votantes: 1800, potencial: 3000, mesas: 9,
-  /* Una coalición (se resuelve por sus partes), un movimiento regional de la
-     tabla medida y un aval sin línea: los tres casos que dejaban gris el 22 %
-     de los votos del país. */
   partidos: [['PARTIDO CENTRO DEMOCRÁTICO', 500], ['MOVIMIENTO POLÍTICO PACTO HISTÓRICO', 200], ['CAMBIO RADICAL - MIRA', 100], ['RENACE', 100], ['PARTIDO ALIANZA SOCIAL INDEPENDIENTE "ASI"', 100]],
 } }, totals: { validos: 1000, potencial: 3000 } };
+const MUNICIPIOS = { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { mpio_cnmbr: 'LA CEJA', mun_elec: '163' }, geometry: null }] };
+const CAMPANA = { corp: 'alcaldia', avales: 'firmas', espectro: 'd', departamento: '01', departamentoNombre: 'Antioquia', municipio: 'LA CEJA', meta: 5000 };
+const VINCULO = { tipo: 'historial', candidato: { nombre: 'CARLOS MARIO BEDOYA MORENO', slugs: ['ALC2023-01-163-1'], partido: 'MOVIMIENTO POLÍTICO PACTO HISTÓRICO' }, campana: CAMPANA };
 
-const b = await chromium.launch();
-const p = await b.newPage({ viewport: { width: 1300, height: 1100 } });
-const errores = []; p.on('pageerror', e => errores.push(e.message));
-const json = x => ({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
-await p.route('**', route => {
-  const u = route.request().url();
-  if (u.startsWith('file://')) return route.continue();
-  if (u.includes('DEPARTAMENTOS2.json')) return route.fulfill(json(DEPARTAMENTOS));
-  const mps = u.match(/Departamentos-mps\/(\d+)\.json/);
-  if (mps) return MUNICIPIOS[mps[1]] ? route.fulfill(json(MUNICIPIOS[mps[1]])) : route.fulfill({ status: 404, body: '' });
-  if (u.includes('asamblea-2023/dep/01.json')) return route.fulfill(json(ASAMBLEA));
-  if (u.includes('PUESTOS_GEOREF.csv')) return route.fulfill({ status: 200, contentType: 'text/csv', body: PUESTOS });
-  if (u.includes('stub.test/cand.json')) return route.fulfill(json({ mesas: MESAS }));
-  if (u.includes('/c360/')) return route.fulfill(json({ ok: true, acceso: true, fuente: 'admin', vinculo: null }));
-  return route.fulfill({ status: 404, body: '' });
-});
-await p.addInitScript(() => { localStorage.setItem('rr-token', 't'); localStorage.setItem('rr-user', JSON.stringify({ email: 'reruizc@gmail.com' })); });
-await p.goto('file://' + process.cwd() + '/candidato-360.html');
-await p.waitForFunction(() => typeof window.pintarPerfil === 'function');
-await p.waitForFunction(() => document.getElementById('department').options.length > 1);
+async function abrir({ vinculo = VINCULO, acceso = true } = {}) {
+  const b = await chromium.launch();
+  const p = await b.newPage({ viewport: { width: 1280, height: 1200 } });
+  const errores = []; p.on('pageerror', e => errores.push(e.message));
+  const json = x => ({ status: 200, contentType: 'application/json', body: JSON.stringify(x) });
+  await p.route('**', route => {
+    const u = route.request().url();
+    if (u.startsWith('file://')) return route.continue();
+    if (u.includes('/c360/me')) return route.fulfill(json({ ok: true, acceso, fuente: 'plan', vinculo, email: 'a@b.co', plan: 'c360' }));
+    if (u.includes('PUESTOS_GEOREF.csv')) return route.fulfill({ status: 200, contentType: 'text/csv', body: PUESTOS });
+    if (u.includes('CENSO_EDAD_PUESTO.json')) return route.fulfill({ status: 404, body: '' });
+    if (u.includes('asamblea-2023/dep/01.json')) return route.fulfill(json(ASAMBLEA));
+    if (u.includes('Departamentos-mps/01.json')) return route.fulfill(json(MUNICIPIOS));
+    if (u.includes('alcaldia-2023/ALC2023-01-163-1.json')) return route.fulfill(json(MESAS));
+    return route.fulfill({ status: 404, body: '' });
+  });
+  await p.addInitScript(() => { localStorage.setItem('rr-token', 't'); localStorage.setItem('rr-user', JSON.stringify({ email: 'a@b.co' })); });
+  await p.goto('file://' + process.cwd() + '/candidato-360-electorado.html');
+  await p.waitForFunction(() => !document.getElementById('elecAnalisis').classList.contains('hidden') || !document.getElementById('panelMuro').classList.contains('hidden'), null, { timeout: 15000 }).catch(() => {});
+  return { b, p, errores };
+}
 
-const CAND = { nombre: 'CARLOS MARIO BEDOYA MORENO', corp: 'ALCALDÍA · LA CEJA · 2023', circunscripcion: 'LA CEJA (ANTIOQUIA)',
-  partido: 'MOVIMIENTO POLÍTICO PACTO HISTÓRICO', votos: 1000, slug: 'ALC2023-1-163-1', dataUrl: 'https://stub.test/cand.json' };
 const r = {};
-/* La campaña: alcaldía de La Ceja, por firmas, ubicado en la derecha. */
-await p.evaluate(c => abrirRutaCandidato(c), CAND);
-await p.evaluate(async () => {
-  document.querySelector('input[name="corporationRoute"][value="other"]').checked = true; toggleCorporationChoice();
-  document.getElementById('otherCorporation').value = 'alcaldia'; updateCampaignTerritory();
-  document.getElementById('campaignDepartment').value = '01';
-  await loadCampaignMunicipalities();
-  document.getElementById('campaignMunicipality').value = 'LA CEJA';
-  irAPaso('partido');
-  document.querySelector('input[name="avalRuta"][value="firmas"]').checked = true; elegirAval();
-  document.querySelector('.espectro-op[data-bloque="d"]').click();
-});
-await p.waitForTimeout(400);
-r.bloques = await p.evaluate(() => ({ renace: PartidosBloques.bloqueDeOrganizacion('RENACE'), cordoba: PartidosBloques.bloqueDeOrganizacion('CORDOBA FLORECE'), coalicion: PartidosBloques.bloqueDeOrganizacion('CAMBIO RADICAL - MIRA'), asi: PartidosBloques.bloqueDeOrganizacion('PARTIDO ALIANZA SOCIAL INDEPENDIENTE "ASI"') }));
-r.ideologia = await p.evaluate(async () => {
-  const i = await ideologiaDelTerritorio({ corp: 'alcaldia', departamento: '01' }, '01163');
-  return { nombre: i.nombre, potencial: i.potencial, votantes: i.votantes, total: i.total, porBloque: i.porBloque, ambito: i.ambito, sinLinea: i.sinLinea };
-});
-await p.evaluate(async () => {
-  crmCandidate = { nombre: 'CARLOS MARIO BEDOYA MORENO', corp: 'ALCALDÍA · LA CEJA · 2023', partido: 'MOVIMIENTO POLÍTICO PACTO HISTÓRICO', dataUrl: 'https://stub.test/cand.json' };
-  CAMPANA_ACTUAL = campanaActual('alcaldia');
-  META_ACTUAL = { target: 5000 };
-  await pintarPerfil();
-});
-await p.waitForTimeout(600);
-r.tarjeta = await p.evaluate(() => ({ titulo: document.getElementById('crmPerfilTitulo').textContent, dato: document.getElementById('crmPerfilDato').textContent, boton: !document.getElementById('crmPerfilBtn').disabled }));
-r.perfil = await p.evaluate(() => ({ mujeres: PERFIL_ACTUAL.mujeres, rural: PERFIL_ACTUAL.rural, mujeresMunicipio: PERFIL_ACTUAL.mujeresMunicipio, ruralMunicipio: PERFIL_ACTUAL.ruralMunicipio, familia: PERFIL_ACTUAL.familia, familiaPrevia: PERFIL_ACTUAL.familiaPrevia }));
-r.objetivo = await p.evaluate(() => objetivoDelPerfil(PERFIL_ACTUAL, 5000, CAMPANA_ACTUAL));
-await p.evaluate(() => mostrarPerfil());
-await p.waitForTimeout(300);
-r.modal = await p.evaluate(() => document.getElementById('introModalText').textContent.replace(/\s+/g, ' '));
-await p.locator('#introModal').screenshot({ path: SP + '/perfil-territorio.png' });
-/* Sin meta todavía —las tarjetas se pintan antes que la estimación— la ficha
-   no puede quedar rota: simplemente no muestra el objetivo. */
-r.sinMeta = await p.evaluate(() => { META_ACTUAL = null; const html = territorioYFamilia(PERFIL_ACTUAL); return { html, tieneTerritorio: /El territorio/.test(html), tieneObjetivo: /debería buscar/.test(html) }; });
-await b.close();
+{
+  const { b, p, errores } = await abrir();
+  r.errores = errores;
+  r.texto = (await p.textContent('#elecAnalisis')).replace(/\s+/g, ' ');
+  r.nota = (await p.textContent('#elecNota')).replace(/\s+/g, ' ');
+  r.secciones = await p.$$eval('#elecAnalisis .panel-num', n => n.map(x => x.textContent.trim()));
+  r.figuras = await p.$$eval('#elecAnalisis .figura svg use', n => n.map(x => x.getAttribute('href')));
+  r.familias = await p.$$eval('#elecAnalisis .familia-fila', n => n.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+  /* Las mismas cuentas que hace el CRM, pedidas directamente al módulo. */
+  r.cuentas = await p.evaluate(async () => {
+    const E = window.C360Electorado;
+    const perfil = await E.perfil([{ dep: '01', mun: '163', zon: '01', pue: '01', v: 800 }, { dep: '01', mun: '163', zon: '01', pue: '02', v: 200 }]);
+    return { mujeres: perfil.mujeres, rural: perfil.rural, mujeresMunicipio: perfil.mujeresMunicipio, ruralMunicipio: perfil.ruralMunicipio,
+      objetivo: E.objetivo(perfil, 5000, { mismoTerritorio: true }),
+      urlAlcaldia: E.urlCandidatura('ALC2023-01-163-1'), urlConcejo: E.urlCandidatura('CONC2023-16-1-1-1'), urlCongreso: E.urlCandidatura('CON2022-C-11-1') };
+  });
+  await p.screenshot({ path: SP + '/electorado.png', fullPage: true });
+  await b.close();
+}
+{ /* Sin meta guardada la página lo dice, no se cae. */
+  const { b, p } = await abrir({ vinculo: { ...VINCULO, campana: { ...CAMPANA, meta: 0 } } });
+  r.sinMeta = (await p.textContent('#elecAnalisis')).replace(/\s+/g, ' ');
+  await b.close();
+}
+{ /* Sin candidatura abierta, el panel pide abrirla en vez de mostrarse vacío. */
+  const { b, p } = await abrir({ vinculo: null });
+  r.sinVinculo = (await p.textContent('#panelMuro')).replace(/\s+/g, ' ');
+  await b.close();
+}
 
 const casi = (a, b, t = .002) => Math.abs(a - b) < t;
 const pruebas = [
-  ['la ideología del territorio sale de la Asamblea 2023 del municipio', r.ideologia.ambito === 'municipio' && r.ideologia.nombre === 'La Ceja' && r.ideologia.total === 1000],
-  ['y agrupa los partidos en familias políticas', r.ideologia.porBloque.d === 500 && r.ideologia.porBloque.izq === 300],
-  ['una coalición vale lo que valen sus partes', r.ideologia.porBloque.cd === 100],
-  ['un movimiento regional entra por el rastro de sus candidatos', r.bloques.renace === 'izq' && r.bloques.cordoba === 'c'],
-  ['y un aval que se presta a todos se queda sin línea, con nombre propio', r.ideologia.porBloque.sc === 100 && r.ideologia.sinLinea[0].aval === true && /ASI/i.test(r.ideologia.sinLinea[0].nombre)],
-  ['la ficha dice cuáles son y por qué no tienen familia', /Sin línea nacional/.test(r.modal) && /prestan aval/.test(r.modal) && /36 %|35 %/.test(r.modal)],
-  ['el perfil de sus votos sigue siendo el de sus puestos', casi(r.perfil.mujeres, .56) && casi(r.perfil.rural, 0)],
-  ['y el del municipio, el de TODOS sus puestos', casi(r.perfil.mujeresMunicipio, .5) && casi(r.perfil.ruralMunicipio, 1 / 3)],
-  ['la familia es la que eligió en el espectro, no la de su aval anterior', r.perfil.familia === 'd' && r.perfil.familiaPrevia === 'izq'],
-  ['el objetivo separa lo que ya tiene de lo que le falta', r.objetivo.meta === 5000 && r.objetivo.base === 1000 && r.objetivo.faltan === 4000 && r.objetivo.mismoTerritorio],
-  ['y mezcla los dos perfiles pesados por sus votos', casi(r.objetivo.mujeres, (1000 * .56 + 4000 * .5) / 5000) && casi(r.objetivo.rural, (4000 / 3) / 5000)],
-  ['la ficha muestra el censo del territorio y su participación', /3.000 personas habilitadas en La Ceja/.test(r.modal) && /1.800/.test(r.modal) && /60,0 % de participación/.test(r.modal)],
-  ['y cómo vota, con su familia marcada', /Cómo vota La Ceja/.test(r.modal) && /50,0 % Derecha · su familia/.test(r.modal) && /30,0 % Izquierda · su aval anterior/.test(r.modal)],
-  ['y qué votación debería buscar, con la cuenta a la vista', /debería buscar/.test(r.modal) && /le faltan 4.000/.test(r.modal) && /no alcanza sola/.test(r.modal)],
-  ['sin meta todavía, la ficha no se rompe: muestra el territorio y calla el objetivo', r.sinMeta.tieneTerritorio && !r.sinMeta.tieneObjetivo],
-  ['la tarjeta sigue resumiendo el perfil de sus puestos', /56,0 %/.test(r.tarjeta.dato) && r.tarjeta.boton],
-  ['sin errores de JavaScript', errores.length === 0],
+  ['la página arma las cinco lecturas', r.secciones.join(' | ') === '01 · Sexo | 02 · Edad | 03 · Campo y ciudad | 04 · Familias políticas | 05 · La votación que debería buscar'],
+  ['el perfil es el del censo de sus puestos, ponderado por sus votos', casi(r.cuentas.mujeres, .56) && casi(r.cuentas.rural, 0)],
+  ['y se compara con el territorio entero', casi(r.cuentas.mujeresMunicipio, .5) && casi(r.cuentas.ruralMunicipio, 1 / 3)],
+  ['el sexo sale con sus dos figuras', r.figuras.includes('#ico-mujer') && r.figuras.includes('#ico-hombre') && /56,0 %/.test(r.texto)],
+  ['campo y ciudad también', r.figuras.includes('#ico-ciudad') && r.figuras.includes('#ico-campo') && /33,3 %/.test(r.texto)],
+  ['sin el archivo de edad publicado, se dice en vez de estimar', /Todavía no/.test(r.texto) && /no está publicado/.test(r.texto)],
+  ['las familias resuelven coalición y movimiento regional', r.familias.some(f => /Derecha.*su familia.*50,0 %/.test(f)) && r.familias.some(f => /Centro-derecha 10,0 %/.test(f)) && r.familias.some(f => /Izquierda.*su aval anterior.*30,0 %/.test(f))],
+  ['lo que queda sin línea sale con nombre propio y explicación', /Sin línea nacional acá: Partido Alianza Social Independiente "ASI" \(100\)/.test(r.texto) && /prestan aval/.test(r.texto)],
+  ['el objetivo separa lo que tiene de lo que le falta', r.cuentas.objetivo.base === 1000 && r.cuentas.objetivo.faltan === 4000 && /4\.000\s*votos por conseguir/.test(r.texto)],
+  ['y mezcla los dos perfiles pesados por sus votos', casi(r.cuentas.objetivo.mujeres, (1000 * .56 + 4000 * .5) / 5000) && casi(r.cuentas.objetivo.rural, (4000 / 3) / 5000)],
+  ['dice si su familia política alcanza para lo que falta', /Derecha sumó 500 votos acá en 2023: no alcanza sola/.test(r.texto)],
+  ['el JSON de cada candidatura se resuelve por el slug, sin bajar los índices', /alcaldia-2023\/ALC2023-01-163-1\.json$/.test(r.cuentas.urlAlcaldia) && /concejo-2023\//.test(r.cuentas.urlConcejo) && /congreso-2022\//.test(r.cuentas.urlCongreso)],
+  ['la nota dice de dónde sale todo y qué parte cubre', /PUESTOS_GEOREF/.test(r.nota) && /Asamblea 2023/.test(r.nota) && /100,0 %/.test(r.nota)],
+  ['sin meta guardada lo dice y no se rompe', /Falta la meta/.test(r.sinMeta) && /Sexo/.test(r.sinMeta)],
+  ['sin candidatura abierta, el panel pide abrirla', /candidatura/.test(r.sinVinculo)],
+  ['sin errores de JavaScript', r.errores.length === 0],
 ];
 for (const [t, ok] of pruebas) console.log(`${ok ? '✓' : '✗'} ${t}`);
-if (errores.length) console.log(errores.slice(0, 3));
+if (r.errores.length) console.log(r.errores.slice(0, 3));
 const f = pruebas.filter(([, ok]) => !ok).length;
-if (f) console.log(JSON.stringify(r, null, 1).slice(0, 2800));
+if (f) console.log(JSON.stringify(r, null, 1).slice(0, 3000));
 console.log(f ? `\n${f} fallaron` : `\n${pruebas.length} de ${pruebas.length} pasaron`);
 process.exit(f ? 1 : 0);
