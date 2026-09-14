@@ -39,7 +39,8 @@ const MESAS = { mesas: [
 ] };
 /* La Asamblea 2023 del municipio: derecha 500, izquierda 300 (Pacto 200 +
    Renace 100, que es de la tabla medida), centro-derecha 100 (una coalición
-   que se resuelve por sus partes) y 100 sin línea (un aval que se presta). */
+   que se resuelve por sus partes) y centro-izquierda 100 de la ASI, que tiene
+   familia como partido pero presta su aval: eso se advierte aparte. */
 const ASAMBLEA = { key: '01', name: 'ANTIOQUIA', nivel: 'municipio', comunas: { '163': {
   name: 'LA CEJA', validos: 1000, votantes: 1800, potencial: 3000, mesas: 9,
   partidos: [['PARTIDO CENTRO DEMOCRÁTICO', 500], ['MOVIMIENTO POLÍTICO PACTO HISTÓRICO', 200], ['CAMBIO RADICAL - MIRA', 100], ['RENACE', 100], ['PARTIDO ALIANZA SOCIAL INDEPENDIENTE "ASI"', 100]],
@@ -110,7 +111,8 @@ const pruebas = [
   ['campo y ciudad también', r.figuras.includes('#ico-ciudad') && r.figuras.includes('#ico-campo') && /33,3 %/.test(r.texto)],
   ['sin el archivo de edad publicado, se dice en vez de estimar', /Todavía no/.test(r.texto) && /no está publicado/.test(r.texto)],
   ['las familias resuelven coalición y movimiento regional', r.familias.some(f => /Derecha.*su familia.*50,0 %/.test(f)) && r.familias.some(f => /Centro-derecha 10,0 %/.test(f)) && r.familias.some(f => /Izquierda.*su aval anterior.*30,0 %/.test(f))],
-  ['lo que queda sin línea sale con nombre propio y explicación', /Sin línea nacional acá: Partido Alianza Social Independiente "ASI" \(100\)/.test(r.texto) && /prestan aval/.test(r.texto)],
+  ['los étnicos entran por la línea del partido', r.familias.some(f => /Centro-izquierda 10,0 %/.test(f))],
+  ['pero se advierte que ese aval se presta', /Aval prestado: Partido Alianza Social Independiente "ASI" \(100, Centro-izquierda\)/.test(r.texto) && /35 %/.test(r.texto)],
   ['el objetivo separa lo que tiene de lo que le falta', r.cuentas.objetivo.base === 1000 && r.cuentas.objetivo.faltan === 4000 && /4\.000\s*votos por conseguir/.test(r.texto)],
   ['y mezcla los dos perfiles pesados por sus votos', casi(r.cuentas.objetivo.mujeres, (1000 * .56 + 4000 * .5) / 5000) && casi(r.cuentas.objetivo.rural, (4000 / 3) / 5000)],
   ['dice si su familia política alcanza para lo que falta', /Derecha sumó 500 votos acá en 2023: no alcanza sola/.test(r.texto)],

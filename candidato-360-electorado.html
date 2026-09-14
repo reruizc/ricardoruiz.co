@@ -200,7 +200,11 @@
       <span class="punto" style="background:${COLOR[b]}"></span>
       <span>${esc(LABEL[b])}${b === familia ? '<em>su familia</em>' : ''}${b === familiaPrevia && b !== familia ? '<em>su aval anterior</em>' : ''}</span>
       <span class="pct">${pct(ideo.porBloque[b] / ideo.total)}</span><span class="votos">${num(ideo.porBloque[b])} votos</span></div>`).join('');
-    const sin = ideo.sinLinea?.length ? `<p class="falta"><b>Sin línea nacional</b> acá: ${ideo.sinLinea.slice(0, 3).map(x => `${esc(P.lugar(x.nombre))} (${num(x.votos)})`).join(', ')}${ideo.sinLinea.length > 3 ? ` y ${ideo.sinLinea.length - 3} más` : ''}. ${ideo.sinLinea.some(x => x.aval) ? 'Los partidos que prestan aval —ASI, MAIS, AICO— no entran en una familia porque sus candidatos vienen de todas: de las 848 personas con rastro que se lanzaron con ASI en 2023, el bloque más repetido reúne apenas el 35 %.' : 'Son movimientos regionales sin equivalente nacional; los que dejan rastro suficiente sí quedan clasificados.'}</p>` : '';
+    const sin = ideo.sinLinea?.length ? `<p class="falta"><b>Sin línea nacional</b> acá: ${ideo.sinLinea.slice(0, 3).map(x => `${esc(P.lugar(x.nombre))} (${num(x.votos)})`).join(', ')}${ideo.sinLinea.length > 3 ? ` y ${ideo.sinLinea.length - 3} más` : ''}. Son movimientos regionales sin equivalente nacional; los que dejan rastro suficiente en otras elecciones sí quedan clasificados.</p>` : '';
+    /* El partido tiene línea, pero presta el aval: en un municipio la lista que
+       lo llevó puede venir de otra familia. Conviene saberlo antes de leer la
+       barra como si fuera una encuesta. */
+    const prestado = ideo.avales?.length ? `<p class="falta"><b>Aval prestado:</b> ${ideo.avales.slice(0, 3).map(x => `${esc(P.lugar(x.nombre))} (${num(x.votos)}, ${esc(LABEL[x.bloque])})`).join(', ')} ${ideo.avales.length > 1 ? 'entran' : 'entra'} en su familia por la línea del partido, pero ${ideo.avales.length > 1 ? 'son avales' : 'es un aval'} que se presta: de las 848 personas con rastro que se lanzaron con la ASI en 2023, el bloque más repetido entre sus otras candidaturas reúne apenas el 35 %. La lista de este municipio puede venir de cualquier lado.</p>` : '';
     return `<section class="panel elec-seccion">
       <span class="panel-num">04 · Familias políticas</span>
       <h3>Cómo vota ${esc(lugar)}.</h3>
@@ -208,6 +212,7 @@
       <div class="familias">${barra}</div>
       ${filas}
       ${sin}
+      ${prestado}
     </section>`;
   }
 

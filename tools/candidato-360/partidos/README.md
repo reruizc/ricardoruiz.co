@@ -145,14 +145,28 @@ más repetido entre sus **otros** avales. Entra a `MOVIMIENTO_LOCAL` la
 organización con **≥ 5 personas con rastro** y **≥ 60 % de acuerdo**; lo demás se
 queda gris, que es más honesto que rellenar.
 
-### El hallazgo: hay avales sin línea
+### Los étnicos, y la letra pequeña
 
-De las **848 personas** con rastro que se lanzaron con ASI en 2023, el bloque más
-repetido reúne apenas el **35 %** —MAIS 31 %, AICO 34 %, «Independientes» 30 %—:
-sus candidatos vienen repartidos de todas las familias. No es que no los hayamos
-mirado, es que **no tienen línea**, y por eso la etiqueta del bloque `sc` dejó de
+ASI, MAIS y AICO estaban sin bloque «por convención». Ahora entran por la
+identidad del **partido** —MAIS nació del movimiento indígena y su bancada vota
+con la izquierda; AICO y la ASI vienen del mismo tronco alternativo y se
+comportan como centro-izquierda—, no por sus avales.
+
+La letra pequeña no se borra, porque está medida: los tres **prestan su aval**.
+
+### El hallazgo: hay avales que se prestan
+
+De las **848 personas** con rastro que se lanzaron con la ASI en 2023, el bloque
+más repetido entre sus **otras** candidaturas reúne apenas el **35 %** —MAIS
+31 %, AICO 34 %, «Independientes» 30 %—: las listas que llevan esos avales
+vienen de todas las familias. Por eso `esAvalAmplio` los marca y la ficha del
+electorado lo advierte cuando uno pesa en el territorio: el partido tiene línea,
+la lista del municipio puede no seguirla.
+
+«Independientes» no es una organización sino la etiqueta de los resultados para
+lo que no es partido: esa se queda sin bloque.
+
+Resultado: de 22,3 % a **9,1 %** de votos sin familia, sin reclasificar ni una
+sola organización que ya tuviera una. La etiqueta del bloque `sc` dejó de
 llamarse «sin clasificar» y ahora es «sin línea nacional», con los nombres a la
-vista en la ficha del perfil.
-
-Resultado: de 22,3 % a **13,2 %** de votos sin bloque, sin reclasificar ni una
-sola organización que ya tuviera familia.
+vista en la página del electorado.

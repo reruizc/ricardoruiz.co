@@ -113,17 +113,20 @@
     const fuente = area || r?.totals; if (!fuente) return null;
     const organizaciones = fuente.partidos || fuente.top_partidos || [];
     const PB = global.PartidosBloques;
-    const porBloque = {}; let total = 0; const sinLinea = [];
+    const porBloque = {}; let total = 0; const sinLinea = [], avales = [];
     organizaciones.forEach(([nombre, v]) => {
       const b = PB?.bloqueDeOrganizacion?.(nombre) || 'sc', n = Number(v) || 0;
       porBloque[b] = (porBloque[b] || 0) + n; total += n;
-      if (b === 'sc' && n > 0) sinLinea.push({ nombre, votos: n, aval: Boolean(PB?.esAvalSinLinea?.(nombre)) });
+      if (b === 'sc' && n > 0) sinLinea.push({ nombre, votos: n, aval: Boolean(PB?.esAvalAmplio?.(nombre)) });
+      /* Avales que se prestan: tienen familia como partido, pero la lista que
+         los llevó en ESTE municipio puede venir de otra. Se advierte. */
+      else if (n > 0 && PB?.esAvalAmplio?.(nombre)) avales.push({ nombre, votos: n, bloque: b });
     });
     if (!total) return null;
-    sinLinea.sort((a, b) => b.votos - a.votos);
+    sinLinea.sort((a, b) => b.votos - a.votos); avales.sort((a, b) => b.votos - a.votos);
     return { nombre: (area ? fuente.name : r.name) || '', ambito: area ? 'municipio' : 'departamento',
       potencial: Number(fuente.potencial || 0), votantes: Number(fuente.votantes || 0), validos: Number(fuente.validos || 0),
-      porBloque, total, sinLinea, organizaciones: organizaciones.slice(0, 10) };
+      porBloque, total, sinLinea, avales, organizaciones: organizaciones.slice(0, 10) };
   }
 
   /* ── El electorado que le falta ──────────────────────────────────────────

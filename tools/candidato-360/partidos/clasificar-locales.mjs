@@ -109,7 +109,7 @@ for (const [org, personas] of candidatos2023) {
 }
 filas.sort((a, b) => b.votos - a.votos);
 
-const pasan = filas.filter(f => f.votos >= MIN_VOTOS && f.conRastro >= MIN_PERSONAS && f.acuerdo >= MIN_ACUERDO && !PB.esAvalSinLinea(f.org));
+const pasan = filas.filter(f => f.votos >= MIN_VOTOS && f.conRastro >= MIN_PERSONAS && f.acuerdo >= MIN_ACUERDO && !PB.esAvalAmplio(f.org));
 console.log(`\n/* Para MOVIMIENTO_LOCAL (≥${MIN_VOTOS} votos, ≥${MIN_PERSONAS} personas con rastro, ≥${Math.round(MIN_ACUERDO * 100)} % de acuerdo) */`);
 for (const f of pasan) console.log(`  '${f.org}': '${f.bloque}',`.padEnd(56) + `// ${f.votos.toLocaleString('es-CO')} votos · ${Math.round(f.acuerdo * 100)} % de ${f.conRastro}`);
 
