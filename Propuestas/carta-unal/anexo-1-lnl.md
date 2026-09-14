@@ -1,23 +1,21 @@
-# Anexo · Hoja de ruta (versión pública, por fases)
+# Anexo 1 · Hoja de ruta
 ## Laboratorio de Nuevos Liderazgos (LNL) — Universidad Nacional de Colombia
 
-*Versión pública de la hoja de ruta que acompaña la carta abierta al rector, organizada por fases en lugar de fechas internas de trámite.*
+*Primero de los dos anexos que acompañan la carta del 8 de septiembre de 2026 al rector y a DINARA. Detalla el qué, el cómo, los tiempos y lo que se solicita para poner en marcha la propuesta.*
 
 ---
 
 ### 1. Qué es y por qué ahora
 
-El LNL forma, desde la Universidad Nacional, el criterio para tomar decisiones complejas: esas que dependen de muchas variables a la vez y rara vez tienen una respuesta obvia. Ese criterio se construye en dos capas —la formación humanística y académica que ya da la universidad, y el manejo de herramientas de inteligencia artificial e innovación que hoy casi ningún programa enseña. No es un curso más de estadística ni un diplomado en IA: es un lugar donde estudiantes de cualquier facultad enfrentan un problema real —con datos, con método y con alguien del otro lado esperando resultados— y practican esa doble capa con un caso concreto, público o privado según el reto que llegue ese semestre. Y como ese trabajo siempre ocurre en equipo, con un cliente real y una fecha encima, en el camino se forjan las habilidades que ninguna materia entrega por separado: comunicar con claridad, colaborar, negociar y sostener el rumbo cuando el problema todavía está mal definido.
+El LNL forma, desde la Universidad Nacional, el criterio para tomar decisiones complejas: esas que dependen de muchas variables a la vez y rara vez tienen una respuesta obvia. Ese criterio se construye en dos capas —la formación humanística y académica que ya da la universidad, y el manejo de herramientas de inteligencia artificial e innovación que hoy casi ningún programa enseña. No es un curso más de estadística ni un diplomado en IA: es un lugar donde estudiantes de cualquier facultad enfrentan un problema real —con datos, con método y con alguien del otro lado esperando resultados— y practican esa doble capa con un caso concreto, público o privado según el reto que llegue ese semestre.
 
-La oportunidad tiene urgencia. Si el aval llega pronto, la cohorte piloto arranca en la Fase 2 de este mismo ciclo y presenta resultados al cierre de la Fase 4. Esperar más de lo necesario significa perder el momentum del semestre en curso y arrancar en el siguiente.
+La oportunidad tiene fecha, y esa fecha la fija el calendario académico, no las ganas de nadie. El semestre 2026-II ya está corriendo: no alcanza para una cohorte completa. Lo que sí cabe en lo que queda del año es el trámite de creación, la convocatoria y el marco de uso responsable de IA —que no depende de que haya estudiantes matriculados—. Si el aval llega en las próximas tres semanas, la primera cohorte queda seleccionada antes de que termine 2026, trabaja durante 2027-I y presenta resultados en junio de 2027. Cada mes de demora empuja el ciclo entero un semestre, no unas semanas: si la convocatoria se pasa de noviembre, la primera cohorte ya no es la de 2027-I sino la de 2027-II, y el laboratorio nace después de que este equipo rectoral termine su periodo.
 
 ### 2. Lo que conecta
 
 A un lado están los estudiantes, sobre todo de ciencias humanas y sociales: llegan con criterio y capacidad de análisis, y salen sin haber tocado casi nada de esto —uso ético de la inteligencia artificial, automatización de flujos de trabajo, investigación asistida por IA, o cómo convertir un análisis en un producto que una empresa pueda usar. No es que no puedan aprenderlo. Es que nadie se los está enseñando dentro de su propia carrera.
 
 Al otro lado están los gremios y las empresas. Necesitan gente joven a la que puedan formar durante un año sin que eso sea un lujo, pero que llegue ya sabiendo integrar IA en procesos reales, no solo usarla como buscador. Es un perfil que hoy escasea en el mercado colombiano, y las empresas lo están buscando activamente.
-
-Y lo que más les cuesta encontrar no es la destreza técnica sola. Un analista que no sabe explicarle un hallazgo a quien decide, que no aguanta el trabajo en equipo o que se paraliza ante un problema mal planteado, no rinde por bueno que sea con las herramientas. Esas habilidades blandas —comunicar, colaborar, negociar, presentarle a alguien que va a tomar una decisión con lo que uno le diga— se ganan haciendo, y el laboratorio las cultiva a la fuerza: cada cohorte defiende su trabajo ante la entidad que lo pidió, con gente esperando y un plazo que no se mueve.
 
 El laboratorio es el puente entre esas dos orillas. A la universidad le da ocupación productiva para sus estudiantes y visibilidad frente al sector empresarial. A los gremios les da talento entrenado antes de que la competencia llegue a él. Y al estudiante le da una ventaja de entrada al mercado laboral, en un momento de la vida en que tener algo qué hacer —y un ingreso propio— cambia una trayectoria. Tres beneficios distintos, verificables cada uno por separado: ese es el argumento que conviene llevar a la reunión.
 
@@ -37,25 +35,40 @@ Transversal, no una facultad más. Es cierto que convoca a estudiantes de pregra
 
 Cada reto recorre la misma disciplina, así cambie el cliente: entender el problema con datos y no con intuición, plantear alternativas reales en vez de una sola salida obvia, decidir con un criterio explícito, medir después si funcionó. Cuando el reto viene del sector público, esa disciplina toma la forma que ya usan los laboratorios de política pública serios —de la tradición de Bardach a la práctica de CEPAL—, que es donde el equipo fundador tiene más trayectoria y por eso es el primer track en arrancar. Cuando el reto viene de una empresa o un gremio, la lógica de fondo es la misma; cambian el vocabulario y el tipo de entregable. La política pública es un track del laboratorio, no todo el laboratorio.
 
-### 6. Fases de implementación
+### 6. Cronograma — de la presentación a la primera cohorte
 
-El plan avanza en cinco fases. No lleva fechas de trámite interno —esas se acuerdan con la Rectoría— sino la secuencia lógica de cómo el laboratorio pasa de propuesta a práctica sostenida:
+La carta y sus dos anexos se presentan hoy, martes 8 de septiembre de 2026. Lo que sigue asume que el trámite institucional toma su tiempo —tres semanas, no una— y fija la primera meta visible el 29 de septiembre:
 
-| Fase | Qué pasa | Qué queda |
+| Fecha | Qué pasa | Qué queda |
 |---|---|---|
-| Fase 1 — Aval y convocatoria | Presentación de la propuesta a la Rectoría, trámite institucional (aval, anclaje en una vicerrectoría, comité académico) y convocatoria abierta —no solo a estudiantes: también a gremios, empresas y una eventual universidad aliada | El laboratorio deja de ser una propuesta y pasa a ser un espacio con nombre, comité y convocatoria activa |
-| Fase 2 — Selección y marco de IA | Selección de la cohorte piloto (30–40 estudiantes), construcción y publicación del marco de uso responsable de IA —ético, ambiental, académico— y primeras conversaciones con las entidades y empresas interesadas | Cohorte confirmada y primer producto público del laboratorio ya circulando |
-| Fase 3 — Trabajo de campo | La cohorte trabaja los retos reales —de una entidad pública y, si el gremio lo trae a tiempo, también de una empresa—, con entregas parciales periódicas | Avance verificable, no solo un producto al final |
-| Fase 4 — Entrega y Demo Day | Entrega de los documentos de política, publicación del tablero de datos abierto y Demo Day: la cohorte presenta junto a sus aliados públicos y, si se concretaron, privados | Productos concretos, públicos y citables; para varios estudiantes, la primera conversación seria de contratación |
-| Fase 5 — Consolidación | Segunda cohorte, más convenios, alianza universitaria si se concreta, proyectos que escalan vía las corporaciones de innovación de la universidad | El laboratorio deja de ser un piloto y se vuelve una práctica sostenida |
+| Mar 8 sep 2026 | Presentación de la carta y los dos anexos a la Rectoría y a DINARA | El rector, el director y sus equipos tienen los tres documentos sobre la mesa |
+| 9 – 26 sep | Trámite institucional: aval, anclaje en una vicerrectoría, primer llamado a profesores para el comité académico | Decisión formal de crear el LNL |
+| 29 sep (meta) | Convocatoria abierta —no solo a estudiantes: también a gremios y empresas que quieran traer un reto, y a una eventual universidad aliada | El laboratorio deja de ser una propuesta y pasa a ser un espacio con nombre y tres puertas abiertas: academia, sector público y sector privado |
+| Octubre | Selección de la cohorte piloto (30–40 estudiantes) y primeras conversaciones con las entidades y empresas interesadas | Cohorte confirmada, convenios en negociación con al menos un aliado público |
+| Oct – nov | Construcción del marco de uso responsable de IA —ético, ambiental, académico—, con el comité académico | Primer producto público del laboratorio, sin depender de que haya cohorte en aula |
+| 1 dic (meta) | Publicación del marco | La Nacional es la primera universidad colombiana con una postura propia y citable sobre uso de IA |
+| Feb – may 2027 (2027-I) | La cohorte trabaja retos reales —de una entidad pública y, si el gremio lo trae a tiempo, también de una empresa—, con entregas parciales cada tres semanas | Avance verificable, no solo un producto al final |
+| Mayo 2027 | Entrega de los documentos de política y publicación del tablero de datos abierto | Productos concretos, públicos y citables |
+| Junio 2027 | Demo Day: la cohorte presenta junto a sus aliados públicos y, si se concretaron, privados | Cierre con medios y, para varios estudiantes, la primera conversación seria de contratación |
+| 2027-II en adelante | Segunda cohorte, más convenios, alianza universitaria si se concreta, proyectos que escalan vía las corporaciones de innovación | Consolidación |
+
+Hay una asimetría deliberada en este cronograma: el marco de uso responsable de IA sale en 2026 y la cohorte trabaja en 2027. No es un accidente de calendario, es un orden de prioridades. El marco no necesita estudiantes matriculados ni convenios firmados —lo redacta el comité académico— y es lo único de esta propuesta que otra universidad podría publicar primero.
+
+### 6.1 El primer reto puede ser de la casa
+
+Conseguir el primer convenio externo es la parte más lenta de armar un laboratorio, y es la que no depende de nosotros. Hay una salida que evita esa espera: **que el primer reto de la cohorte piloto sea el Ensayo Nacional del Anexo 2** —el simulacro abierto de la prueba de admisión—, con la Dirección Nacional de Admisiones y DINARA como contraparte.
+
+Tiene tres ventajas sobre esperar a un aliado de afuera. El cliente ya existe y es la propia Universidad, así que no hay que negociar un convenio marco para arrancar. El problema es real, medible y le importa a la institución: cuántos aspirantes llegan mejor preparados y de qué colegios vienen. Y el resultado es público y citable desde el primer semestre, que es exactamente lo que un laboratorio nuevo necesita mostrar para que el segundo convenio —ese sí externo— sea fácil de firmar.
+
+No es excluyente: el reto público de afuera puede correr en paralelo si la conversación con una entidad avanza a tiempo. Pero si no avanza, el laboratorio no se queda quieto esperando.
 
 ### 7. Variables que pueden mover el plan
 
-Dos cosas pueden correr o estirar estas fases, y conviene decirlas de una vez.
+Dos cosas pueden correr o estirar este cronograma, y conviene decirlas de una vez.
 
-La primera es el ritmo propio de una universidad pública: los trámites de aval y anclaje institucional casi nunca son instantáneos, y no tiene sentido fingir que sí. La Fase 1 puede tomar más o menos tiempo del estimado; si se alarga, lo que hay que proteger no es una fecha exacta sino el interés de los gremios y las empresas que ya muestren disposición a participar. Ese es el reloj que de verdad no perdona.
+La primera es el ritmo propio de una universidad pública: los trámites de aval y anclaje institucional casi nunca son instantáneos, y no tiene sentido fingir que sí. La meta del 29 de septiembre asume que el trámite no pasa de tres semanas; si se pasa, lo que hay que proteger no es la fecha exacta sino dos cosas: el interés de los gremios y las empresas que ya muestren disposición a participar, y el corte de noviembre. Después de noviembre no queda margen para seleccionar una cohorte que empiece en 2027-I, y el laboratorio se corre un semestre entero.
 
-La segunda es la posibilidad de hacer esto en alianza con otra universidad. Puede acelerar el arranque, si esa universidad ya tiene convenios activos con gremios o recursos que sumar. O puede complicarlo, si hay que coordinar dos gobiernos académicos antes de convocar. Por eso no se fija todavía a qué fase entra: se deja como una opción que se activa en cuanto haya claridad, sin que eso bloquee arrancar con la Nacional sola.
+La segunda es la posibilidad de hacer esto en alianza con otra universidad. Puede acelerar el arranque, si esa universidad ya tiene convenios activos con gremios o recursos que sumar. O puede complicarlo, si hay que coordinar dos gobiernos académicos antes de convocar. Por eso no se fija todavía en el cronograma: se deja como una opción que se activa en cuanto haya claridad, sin que eso bloquee arrancar con la Nacional sola.
 
 ### 8. Los entregables ancla del primer año
 
@@ -63,11 +76,11 @@ Uno, una cohorte piloto: 30 a 40 estudiantes de distintas facultades, un semestr
 
 Dos, un marco propio de uso responsable de inteligencia artificial —ético, ambiental y académico— que fije la postura de la universidad frente al tema. No depende de que un convenio externo esté firmado, así que puede salir antes que los otros tres. Se mide con que exista, se publique, y que la propia universidad lo use puertas adentro antes de ofrecérselo a nadie más.
 
-Tres, un reto real con una entidad pública —alcaldía, gobernación, ministerio o una agencia como el DNP— y, en la medida en que la convocatoria a gremios avance a tiempo, un segundo reto con una empresa o un gremio. No hace falta que los dos arranquen en la misma fase: el público puede ir primero y el privado sumarse en la segunda cohorte si la primera queda corta de tiempo.
+Tres, un reto real con una entidad pública —alcaldía, gobernación, ministerio o una agencia como el DNP, o la propia Dirección Nacional de Admisiones con el Ensayo Nacional del Anexo 2— y, en la medida en que la convocatoria a gremios avance a tiempo, un segundo reto con una empresa o un gremio. No hace falta que los dos arranquen el mismo mes: el público puede ir primero y el privado sumarse en la segunda cohorte si el primer semestre queda corto de tiempo.
 
 Cuatro, un tablero de datos abierto sobre un tema de país, construido por la propia cohorte, que sigue en línea después de que el semestre termina. No es un ejercicio de clase que se archiva: es un bien público que cualquiera puede consultar y que funciona como vitrina del laboratorio hacia afuera.
 
-Los cuatro se presentan juntos en el Demo Day de cierre —el marco, si todo va bien, ya lleva tiempo publicado.
+Los cuatro se presentan juntos en el Demo Day de junio de 2027 —el marco, si todo va bien, ya lleva medio año publicado.
 
 ### 9. Gobernanza
 
@@ -91,10 +104,10 @@ El tercero es depender de un solo gobierno de turno, sea el de la universidad o 
 
 ### 13. Lo que se pide a la Rectoría
 
-1. Aval institucional y acto de creación del Laboratorio de Nuevos Liderazgos, en el menor tiempo posible dentro de la Fase 1.
+1. Aval institucional y acto de creación del Laboratorio de Nuevos Liderazgos, en un plazo que no se estire más allá de tres semanas desde esta presentación —esto es, antes del 29 de septiembre de 2026.
 2. Anclaje en una vicerrectoría que garantice su carácter transversal.
 3. Un comité académico con profesores de distintas facultades, con una silla consultiva para gremios o sector productivo.
-4. Apertura de la convocatoria —a estudiantes, gremios y empresas— al cierre de la Fase 1.
+4. Apertura de la convocatoria —a estudiantes, gremios y empresas— con meta el 29 de septiembre, para que la cohorte piloto quede seleccionada antes de que termine 2026.
 5. Una semilla mínima —espacio, coordinación, dotación— para arrancar la cohorte piloto.
-6. Un convenio marco que permita recibir retos reales de entidades públicas y privadas desde el inicio.
+6. Un convenio marco que permita recibir retos reales de entidades públicas y privadas desde el inicio, y —si la Rectoría lo estima— el aval para que el primer reto sea el Ensayo Nacional del Anexo 2, con la Dirección Nacional de Admisiones y DINARA como contraparte.
 7. Un mandato explícito para que el comité académico redacte el marco de uso responsable de IA, con respaldo de la oficina jurídica y de comunicaciones antes de publicarlo.
