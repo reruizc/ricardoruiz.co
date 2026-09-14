@@ -45,22 +45,34 @@ r.avisoVitrina = (await p.textContent('#existing .c360-vitrina p')).slice(0, 70)
 await p.screenshot({ path: '/tmp/c360-anon-busqueda.png' });
 // Seleccionar un candidato: debe ENTRAR, no rebotar contra el modal
 await p.locator('#searchResults .result').first().click();
-await p.waitForTimeout(200);
+await p.waitForTimeout(600);            /* la tarjeta brinca 320 ms antes de abrir */
 r.pantalla = await p.evaluate(() => [...document.querySelectorAll('.screen')].filter(s => !s.classList.contains('hidden')).map(s => s.id));
 r.paywallAbierto = await p.evaluate(() => document.getElementById('c360Paywall').classList.contains('open'));
 r.nombreEnPantalla = await p.textContent('#routeName');
 r.historialEnPantalla = await p.textContent('#routeHistory');
 r.avisoRuta = (await p.textContent('#candidateRoute .c360-vitrina p')).slice(0, 60);
-r.botonCRM = await p.textContent('#candidateRoute button.next');
+/* El gate se aplica en cada paso de la ruta: el aviso tiene que ser SIEMPRE el
+   mismo y vivir encima del pie, no apilarse entre los botones. */
+r.avisosRuta = await p.evaluate(() => {
+  aplicarGateRuta(); aplicarGateRuta();
+  const avisos = [...document.querySelectorAll('#candidateRoute .c360-vitrina')];
+  return { cuantos: avisos.length, enElPie: avisos.some(a => a.closest('.paso-pie')) };
+});
+/* La ruta se responde de a una pregunta: el botón del CRM aparece con la primera. */
+r.botonAntesDeResponder = await p.evaluate(() => document.getElementById('abrirCRM').offsetParent === null);
+await p.evaluate(() => { document.querySelector('input[name="corporationRoute"][value="same"]').checked = true; toggleCorporationChoice({ animar: true }); });
+await p.waitForTimeout(400);
+r.botonCRM = await p.textContent('#abrirCRM');
 await p.screenshot({ path: '/tmp/c360-anon-candidato.png' });
 // Abrir el CRM sí topa con el muro
-await p.click('#candidateRoute button.next');
+await p.click('#abrirCRM');
 await p.waitForTimeout(300);
 r.muroAlAbrirCRM = await p.evaluate(() => document.getElementById('c360Paywall').classList.contains('open'));
 r.noEntroAlCRM = await p.evaluate(() => document.getElementById('crm').classList.contains('hidden'));
 await b.close();
 
 const pruebas = [
+  ['el aviso del CRM aparece una sola vez, encima de los botones', r.avisosRuta.cuantos === 1 && !r.avisosRuta.enElPie],
   ['la búsqueda muestra los nombres', r.resultados.length >= 1 && /RICARDO ESTEBAN RUIZ/.test(r.resultados[0])],
   ['los resultados están nítidos y son clicables', r.nitidos === true],
   ['ya no hay muro encima de la búsqueda', r.sinMuroEncima === true],
@@ -70,6 +82,7 @@ const pruebas = [
   ['se ve su nombre y su historial', /RICARDO ESTEBAN RUIZ/.test(r.nombreEnPantalla) && /2 candidaturas/.test(r.historialEnPantalla)],
   ['la pantalla avisa que el CRM pide acceso', /hasta acá puede llegar sin cuenta/.test(r.avisoRuta)],
   ['el botón dice lo que va a pasar', r.botonCRM.includes('Activar')],
+  ['y no aparece hasta responder a qué corporación se lanza', r.botonAntesDeResponder === true],
   ['abrir el CRM sí topa con el muro', r.muroAlAbrirCRM === true],
   ['y no se entra al CRM', r.noEntroAlCRM === true],
   ['sin errores de JavaScript', errores.length === 0],

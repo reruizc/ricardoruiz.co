@@ -12,11 +12,27 @@ busca esa cuenta y dice si parece ser la suya.
 > llave a un paso del navegador sería regalarla. Acá queda el contrato que
 > consume la página y la prueba del wizard.
 
+> **Dónde vive el frontend (sep-2026).** Los paneles de prensa y de redes se
+> fusionaron en **`candidato-360-escucha.html`** (tarjeta 04 del CRM, «Escucha
+> social»); `candidato-360-medios.html` y `candidato-360-redes.html` quedaron
+> como redirección. Esa página **pregunta al abrir** si la candidatura tiene
+> perfiles en X, TikTok e Instagram, y de ahí sale el mismo `POST /c360/redes`
+> que describe este documento.
+>
+> ⚠️ **Validar una cuenta no es escucharla, y hoy solo existe lo primero.** La
+> captura de publicaciones —lo que cada cuenta publica y lo que le responden—
+> no está montada: la página lo declara en vez de mostrar cifras. El punto de
+> enchufe es uno solo, `pintarCaptura()` en `candidato-360-escucha.html`, con
+> el detalle de qué actores y qué costo esperar. Para el recolector, el
+> precedente completo está en `tools/radar-mujer-medios/` (`collect_social.py`
+> + `social.json`), pero ojo: **ese usa actores de hashtag y acá hacen falta de
+> perfil.**
+
 ## Qué hace, en orden
 
 | Paso | Fuente | Qué aporta |
 |---|---|---|
-| **1. Sondeo** | El endpoint público de cada red: el widget «Follow» de X (`cdn.syndication.twimg.com`), el **oEmbed** de TikTok y los metadatos `og:` del perfil de Instagram | Lo único que dice si la cuenta **existe** y con qué nombre. Sin llaves ni sesión |
+| **1. Sondeo** | El endpoint público de cada red: el widget «Follow» de X (`cdn.syndication.twimg.com`), el **oEmbed** de TikTok y los metadatos `og:` del perfil de Instagram. Si alguno no concluye, **Apify** de respaldo (ver abajo) | Lo único que dice si la cuenta **existe** y con qué nombre |
 | **2. Señales abiertas** | Google News RSS con el nombre y el nombre público (12 meses) | Si esa persona ya aparece en prensa y con qué rol — sirve para detectar el homónimo |
 | **3. Veredicto** | DeepSeek V4 Flash | Lee **solo** lo anterior y devuelve, red por red, `confirmado · probable · dudoso · no_encontrado · no_verificable` con una frase de por qué |
 
@@ -26,6 +42,48 @@ desde la página los mata CORS. El resultado se guarda 7 días en KV
 aparece o cambia de nombre es otra pregunta, y no puede contestarla el cache de
 ayer. Tope de **40 validaciones por cuenta y por día**: una validación cuesta
 una llamada al modelo.
+
+## El respaldo de Apify
+
+Los sondeos de X e Instagram viven de endpoints que las plataformas no prometen
+mantener. Cuando uno se cierra, la respuesta honesta es «no pude comprobarlo»:
+cierta, pero inútil para quien está armando su campaña. Ahí entra Apify —
+mantener el acceso a las redes es su negocio, no el nuestro.
+
+Es **respaldo, no primera llamada**, y solo se dispara cuando el sondeo directo
+queda en `bloqueado` o `error`. Si la red contestó —exista la cuenta o no—, la
+pregunta ya está resuelta y no hay nada que comprar. Por eso el oEmbed de TikTok
+(que es el endpoint oficial de incrustación, gratis y sin llave) casi nunca
+llega a costar un peso.
+
+| Red | Actor por defecto | Costo aproximado por consulta |
+|---|---|---|
+| Instagram | `apify/instagram-profile-scraper` | ~US$0,0016–0,0026 |
+| TikTok | `clockworks/tiktok-profile-scraper` | ~US$0,0001 |
+| X | `apidojo/twitter-user-scraper` | ~US$0,017 |
+
+Con el cache de 7 días y el tope de 40 validaciones por cuenta y día, un
+candidato que valida sus tres redes cuesta unos dos centavos de dólar.
+
+Se enciende con un secreto y se apaga quitándolo:
+
+```bash
+npx wrangler secret put APIFY_TOKEN
+```
+
+Sin `APIFY_TOKEN` el respaldo no existe y todo se comporta como antes. Los
+actores se cambian sin tocar código con `APIFY_ACTOR_INSTAGRAM`,
+`APIFY_ACTOR_TIKTOK` y `APIFY_ACTOR_X` (el catálogo de Apify se mueve seguido);
+el lector de la respuesta busca los nombres de campo usuales
+(`fullName`/`nickName`/`authorMeta`…) en vez de casar un esquema exacto.
+
+**Un dataset vacío de Apify NO significa que la cuenta no existe.** Puede ser
+eso o el actor caído, y confundirlos haría que la página le dijera a alguien que
+su cuenta no existe. Solo un error explícito del actor («not found») confirma la
+ausencia; lo demás queda en «no pude comprobarlo». Cuando el respaldo tampoco
+concluye se conserva el motivo del sondeo directo y se añade por qué falló el
+respaldo. En pantalla, un perfil resuelto por Apify lo dice: «comprobado vía
+Apify».
 
 ## Las dos reglas que sostienen esto
 
@@ -90,9 +148,10 @@ tiene y el KV `RR_STORE` que ya está bindeado.
 ## Probar
 
 ```bash
-node tools/candidato-360/redes/prueba-wizard.mjs   # el paso 2 de la página, con el worker stubbeado (17 comprobaciones)
+node tools/candidato-360/redes/prueba-wizard.mjs   # el paso 2 del wizard, con el worker stubbeado (17 comprobaciones)
+node tools/candidato-360/prueba-paneles.mjs        # los paneles 04 y 05 (22)
 # en rr-auth:
-node test/c360-redes.test.mjs                      # sondeos, RSS, sellado de veredictos y cache (32, sin red ni DeepSeek)
+node test/c360-redes.test.mjs                      # sondeos, respaldo de Apify, RSS, sellado, cache y escucha (53, sin red ni DeepSeek)
 npx wrangler dev --local                           # y contra 127.0.0.1:8788, con una sesión sembrada en el KV local:
 #   npx wrangler kv key put --local --binding RR_STORE "sessions:tok" '{"email":"…","plan":"premium"}'
 ```
@@ -104,6 +163,61 @@ npx wrangler dev --local                           # y contra 127.0.0.1:8788, co
 > cambió de forma. El de Instagram es el más frágil de los tres — si empieza a
 > devolver siempre `Sin comprobar`, es que el muro de login se cerró más y toca
 > cambiar de fuente, no que las cuentas no existan.
+
+## Dónde se usa
+
+| Sitio | Qué hace |
+|---|---|
+| Paso 2 del wizard de candidatura nueva (`candidato-360.html`) | Marca las redes y valida antes de construir el punto de partida |
+| **Panel 05 · `candidato-360-redes.html`** | La misma validación, ya con la candidatura abierta: precarga lo guardado, revalida y guarda |
+| **Panel 04 · `candidato-360-medios.html`** | No usa `/c360/redes`. Abre leyendo la prensa del territorio **a la escala de la corporación** (localidad para JAL, municipio para Concejo y Alcaldía, departamento para Asamblea y Gobernación) y guarda acá las tres ideas de campaña, que son la capa personal encima de esa lectura |
+
+Los dos paneles son HTML propios (con `candidato-360-panel.js` de chasis) y no
+acordeones del CRM: son dos preguntas con ritmos distintos —una se abre para
+leer, la otra para configurar—.
+
+## La lectura del territorio (panel 04)
+
+Las consultas y el puntaje son un **puerto fiel** de
+`tools/candidato-360/briefing/motor.py` (`territorio_de`, `prensa`,
+`puntaje_local`), portado a JS en `candidato-360-panel.js`. Esa es la fuente de
+verdad: si allá cambian las reglas, hay que cambiarlas acá — y al revés.
+
+Se duplica a propósito. El briefing corre en Python en GitHub Actions y el panel
+en el navegador; unificarlos hoy significaría reescribir un motor que funciona.
+Lo que se gana duplicando **con fidelidad** es que lo que el candidato ve en
+pantalla sea exactamente lo que le llega al correo cada tres días: una lectura
+que contradiga al briefing valdría menos que no tenerla.
+
+| Corporación | Escala | Consultas |
+|---|---|---|
+| JAL | Localidad | `"Localidad" Ciudad` · `"Alcaldía de Ciudad"` · `"Concejo de Ciudad"` |
+| Concejo · Alcaldía | Municipio | `"Alcaldía de X"` · `"Concejo de X"` · `"X"` (en Bogotá se omite: el nombre solo trae de todo) |
+| Asamblea · Gobernación | Departamento | `"Depto"` · `"Gobernación de Depto"` · `"Asamblea de Depto"` |
+
+Más el nombre de la candidatura, cuyos titulares van en su propio bloque y de
+primero. Cada titular recibe un puntaje: +3 si nombra la localidad, +2 si nombra
+un actor institucional (alcaldía, concejo, obra, presupuesto, licitación…), +1
+si nombra el lugar. En Bogotá, Medellín, Cali, Barranquilla y Cartagena se exige
+≥2, porque el nombre de la ciudad aparece en cualquier cosa. Clima, loterías,
+horóscopos, pico y placa y vacantes salen por regex.
+
+## Lo que se guarda · `POST /c360/escucha`
+
+Las cuentas y las ideas viven en el vínculo, bajo `escucha`, y NO dentro de
+`campana` (no dependen de la corporación ni del territorio) ni dentro de
+`nuevo` (una candidatura con historial también tiene redes).
+
+```jsonc
+{ "redes": { "perfiles": [{ "red": "tiktok", "handle": "laprofe", "veredicto": "confirmado", "confianza": 88, "nombrePerfil": "Alejandra Palacio" }],
+             "validadoEn": "…", "modelo": "deepseek-v4-flash", "resumen": "…" },
+  "ideas": ["acueducto veredal", "seguridad en el comercio", "parque de la 45"] }
+```
+
+Se **fusiona campo a campo**: guardar las ideas desde el panel de medios no
+borra las redes que guardó el de redes. Y `validado` no lo decide el cliente —
+lo es si algún perfil trae un veredicto de verdad, así que un frontend viejo no
+puede sellar lo que nadie comprobó.
 
 ## El muro, y dónde cae
 

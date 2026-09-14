@@ -55,6 +55,9 @@ await p.click('.new-wizard-step[data-step="0"] .wizard-next');
 await p.check('#publicFigure');
 await p.fill('#publicName', 'La Profe');
 r.tituloPaso2 = await p.textContent('.new-wizard-step[data-step="1"] h3');
+/* El mapa del territorio viaja con su pregunta al armar los pasos: si se
+   queda en la rejilla original, el wizard lo borra y nadie lo nota. */
+r.mapaEnSuPaso = await p.evaluate(() => document.getElementById('mapaDeptoNuevo')?.closest('.new-wizard-step')?.dataset.step || null);
 r.filas = await p.$$eval('.red-row', n => n.map(x => x.dataset.red));
 r.inputBloqueado = await p.$eval('#red-tiktok', i => i.disabled);
 await p.click('.red-row[data-red="tiktok"] .red-chip');
@@ -125,6 +128,7 @@ const pruebas = [
   ['en modo pruebas NO se escribe en el worker', r.escriturasAlWorker.length === 0],
   ['el vínculo queda solo en memoria', r.vinculoLocal?.local === true],
   ['el CRM dice con qué identidad va a escuchar', /Escucharemos/.test(r.contextoCRM)],
+  ['el mapa del territorio sobrevive al armado de pasos', r.mapaEnSuPaso === '3'],
   ['sin errores de JavaScript', limpios.length === 0],
 ];
 for (const [titulo, ok] of pruebas) console.log(`${ok ? '✓' : '✗'} ${titulo}`);
