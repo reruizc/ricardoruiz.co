@@ -1,12 +1,17 @@
-/* prueba-paneles.mjs — los paneles 04 (medios) y 05 (redes), sin red.
+/* prueba-paneles.mjs — el panel 04 (escucha social), sin red.
    ------------------------------------------------------------------
-   Son dos HTML propios que trabajan sobre el vínculo de la cuenta. Acá se
+   Un HTML propio que trabaja sobre el vínculo de la cuenta y reúne las dos
+   mitades de la escucha: la prensa abierta y las cuentas de redes. Acá se
    simula el worker: /c360/me devuelve una candidatura con territorio, la
    acción `medios` del proxy de Caudal devuelve titulares y /c360/redes un
    veredicto. Se comprueba lo que puede romperse de verdad:
 
-     · sin sesión, sin acceso o sin candidatura, cada panel dice qué falta en
+     · sin sesión, sin acceso o sin candidatura, el panel dice qué falta en
        vez de mostrarse vacío,
+     · al abrir pregunta por las redes, y no lo vuelve a preguntar a quien ya
+       contestó —ni a quien tiene cuentas guardadas, ni a quien dijo que no—,
+     · decir «todavía no tengo» no cierra la puerta ni frena la prensa,
+     · la captura de publicaciones se declara apagada en vez de inventar cifras,
      · medios consulta la idea ENTRE COMILLAS y con el territorio (sin eso,
        «seguridad» trae el país entero) y ordena por conversación,
      · una idea sin titulares no se esconde: se dice que la agenda está libre,
@@ -27,7 +32,7 @@ const VINCULO = {
 const titulares = n => ({ n, por_medio: [{ medio: 'El Espectador' }, { medio: 'Semana' }],
   resultados: Array.from({ length: Math.min(n, 6) }, (_, i) => ({ titulo: `Titular ${i + 1}`, url: 'https://x.co/' + i, medio: 'El Espectador', fecha: '2026-09-0' + (i + 1) })) });
 
-async function abrir(pagina, { sesion = true, acceso = true, vinculo = VINCULO, medios = null, redes = null, alGuardar = null } = {}) {
+async function abrir(pagina, { sesion = true, acceso = true, vinculo = VINCULO, medios = null, redes = null, alGuardar = null, verRedes = false } = {}) {
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1280, height: 1000 } });
   const errores = [], consultas = [], guardados = [];
@@ -60,6 +65,12 @@ async function abrir(pagina, { sesion = true, acceso = true, vinculo = VINCULO, 
   await p.goto('file://' + process.cwd() + '/' + pagina);
   await p.waitForFunction(() => !!window.C360Panel);
   await p.waitForTimeout(400);
+  /* El bloque de cuentas arranca cerrado detrás de la pregunta: quien viene a
+     probarlo tiene que contestar que sí, igual que un candidato. */
+  if (verRedes && await p.$('#arranqueSi')) {
+    await p.click('#arranqueSi');
+    await p.waitForSelector('#panelRedes:not(.hidden)');
+  }
   return { b, p, errores, consultas, guardados };
 }
 
@@ -72,10 +83,10 @@ for (const [caso, opts, espera] of [
   ['sin acceso', { acceso: false }, /no tiene acceso/],
   ['sin candidatura', { vinculo: null }, /candidatura abierta/],
 ]) {
-  const { b, p } = await abrir('candidato-360-medios.html', opts);
+  const { b, p } = await abrir('candidato-360-escucha.html', opts);
   const muro = await p.textContent('#panelMuro');
   const cuerpoOculto = await p.$eval('#panelCuerpo', e => e.classList.contains('hidden'));
-  revisar(`medios ${caso}: dice qué falta y no muestra el panel`, espera.test(muro) && cuerpoOculto);
+  revisar(`${caso}: dice qué falta y no muestra el panel`, espera.test(muro) && cuerpoOculto);
   await b.close();
 }
 
@@ -93,7 +104,7 @@ for (const [caso, opts, espera] of [
   ];
   for (const [titulo, campana, espera] of casos) {
     const v = Object.assign(JSON.parse(JSON.stringify(VINCULO)), { campana });
-    const { b, p, consultas } = await abrir('candidato-360-medios.html', { vinculo: v, medios: () => titulares(6) });
+    const { b, p, consultas } = await abrir('candidato-360-escucha.html', { vinculo: v, medios: () => titulares(6) });
     await p.waitForSelector('#territorioLectura .tema');
     const qs = consultas.map(c => c.query);
     revisar(`${titulo}: se lee a la escala correcta`,
@@ -113,7 +124,7 @@ for (const [caso, opts, espera] of [
     { titulo: 'Alejandra Palacio Restrepo lanza su candidatura', url: 'https://x.co/f', medio: 'Semana', fecha: '2026-09-06' },
   ] });
   const v = Object.assign(JSON.parse(JSON.stringify(VINCULO)), { campana: { corp: 'concejo', departamentoNombre: 'Boyacá', municipio: 'TUNJA' } });
-  const { b, p, errores } = await abrir('candidato-360-medios.html', { vinculo: v, medios: conRuido });
+  const { b, p, errores } = await abrir('candidato-360-escucha.html', { vinculo: v, medios: conRuido });
   await p.waitForSelector('#territorioLectura .tema');
   const titulares_ = await p.$$eval('#territorioLectura .tema-titulares li a', n => n.map(x => x.textContent));
   revisar('el clima, la lotería y lo ajeno al territorio no entran',
@@ -125,12 +136,12 @@ for (const [caso, opts, espera] of [
   revisar('un titular que lo nombra va en su propio bloque, antes del territorio',
     /nombra a usted/.test(bloques[0] || '') && /Tunja/.test(bloques[1] || ''));
   revisar('territorio sin errores de JavaScript', errores.length === 0);
-  await p.screenshot({ path: (process.env.SALIDA_PRUEBA || '/tmp') + '/panel-medios-territorio.png', fullPage: true });
+  await p.screenshot({ path: (process.env.SALIDA_PRUEBA || '/tmp') + '/panel-escucha-territorio.png', fullPage: true });
   await b.close();
 }
 {
   const v = Object.assign(JSON.parse(JSON.stringify(VINCULO)), { campana: { corp: 'concejo', departamentoNombre: 'Boyacá', municipio: 'TUNJA' } });
-  const { b, p } = await abrir('candidato-360-medios.html', { vinculo: v, medios: () => titulares(0) });
+  const { b, p } = await abrir('candidato-360-escucha.html', { vinculo: v, medios: () => titulares(0) });
   await p.waitForSelector('#territorioLectura .tema.vacio');
   revisar('sin titulares se explica por qué, en vez de dejar el bloque vacío',
     /no publicó nada/.test(await p.textContent('#territorioLectura .tema.vacio')));
@@ -140,13 +151,16 @@ for (const [caso, opts, espera] of [
 /* ── Medios ────────────────────────────────────────────────────────────── */
 {
   const porIdea = q => titulares(/acueducto/.test(q) ? 12 : /seguridad/.test(q) ? 40 : 0);
-  const { b, p, errores, consultas, guardados } = await abrir('candidato-360-medios.html', { medios: porIdea });
-  revisar('medios muestra la candidatura y su territorio', /Alejandra Palacio/.test(await p.textContent('#panelCandidatura')) && /Teusaquillo/.test(await p.textContent('#panelCandidatura')));
+  const { b, p, errores, consultas, guardados } = await abrir('candidato-360-escucha.html', { medios: porIdea });
+  revisar('la escucha muestra la candidatura y su territorio', /Alejandra Palacio/.test(await p.textContent('#panelCandidatura')) && /Teusaquillo/.test(await p.textContent('#panelCandidatura')));
   await p.fill('#idea-0', 'acueducto veredal');
   await p.fill('#idea-1', 'seguridad en el comercio');
   await p.fill('#idea-2', 'parque de la 45');
   await p.click('#btnLeer');
-  await p.waitForSelector('.tema');
+  /* `.tema` a secas ya lo satisfacen las tarjetas del territorio: hay que
+     esperar las de la lectura de ideas o el assert corre contra una lista
+     vacía. */
+  await p.waitForSelector('#lectura .tema');
   const deIdeas = consultas.filter(c => /acueducto|seguridad en el comercio|parque de la 45/i.test(c.query));
   revisar('consulta cada idea entre comillas y con el territorio',
     deIdeas.length === 3 && deIdeas.every(c => c.action === 'medios' && /^"/.test(c.query) && c.query.includes('TEUSAQUILLO')));
@@ -157,17 +171,69 @@ for (const [caso, opts, espera] of [
     /no está en la agenda/.test(await p.textContent('#lectura .tema.vacio')));
   revisar('las ideas se guardan', guardados.some(g => JSON.stringify(g.ideas) === '["acueducto veredal","seguridad en el comercio","parque de la 45"]'));
   revisar('cita la fuente y su ventana', /Google News/.test(await p.textContent('.panel-nota')) && /30 días/.test(await p.textContent('.panel-nota')));
-  revisar('medios sin errores de JavaScript', errores.length === 0);
-  await p.screenshot({ path: (process.env.SALIDA_PRUEBA || '/tmp') + '/panel-medios.png', fullPage: true });
+  revisar('la prensa sin errores de JavaScript', errores.length === 0);
+  await p.screenshot({ path: (process.env.SALIDA_PRUEBA || '/tmp') + '/panel-escucha-prensa.png', fullPage: true });
   await b.close();
 }
 {
-  const { b, p, guardados } = await abrir('candidato-360-medios.html', { medios: 'falla' });
+  const { b, p, guardados } = await abrir('candidato-360-escucha.html', { medios: 'falla' });
   await p.fill('#idea-0', 'acueducto veredal');
   await p.click('#btnLeer');
-  await p.waitForSelector('.panel-error');
+  await p.waitForSelector('#lectura .panel-error');
   revisar('si la prensa se cae, se dice y las ideas quedan guardadas igual',
     /no respondió/.test(await p.textContent('.panel-error')) && guardados.some(g => g.ideas?.length === 1));
+  await b.close();
+}
+
+/* ── El arranque: la pregunta de redes ─────────────────────────────────── */
+{
+  const { b, p } = await abrir('candidato-360-escucha.html', { medios: () => titulares(4) });
+  revisar('al abrir, pregunta si tiene perfiles en redes',
+    /perfiles en redes sociales/.test(await p.textContent('#arranque')) && await p.$eval('#panelRedes', e => e.classList.contains('hidden')));
+  revisar('la pregunta nombra las tres redes', /X/.test(await p.textContent('.arranque-redes')) && /TikTok/.test(await p.textContent('.arranque-redes')) && /Instagram/.test(await p.textContent('.arranque-redes')));
+  /* La prensa es la mitad que funciona sin configurar nada: no puede quedarse
+     esperando a que conteste lo de las redes. */
+  await p.waitForSelector('#territorioLectura .tema');
+  revisar('la prensa no espera a que conteste lo de las redes', (await p.$$('#territorioLectura .tema')).length > 0);
+  await p.click('#arranqueSi');
+  await p.waitForSelector('#panelRedes:not(.hidden)');
+  revisar('decir que sí abre el bloque de cuentas', (await p.$$('.red-row')).length === 3);
+  await b.close();
+}
+{
+  const { b, p } = await abrir('candidato-360-escucha.html');
+  await p.click('#arranqueNo');
+  await p.waitForSelector('#arranqueAbrir');
+  revisar('decir que no deja el bloque cerrado pero no cierra la puerta',
+    await p.$eval('#panelRedes', e => e.classList.contains('hidden')) && /Conectar mis redes/.test(await p.textContent('#arranqueAbrir')));
+  await p.reload();
+  await p.waitForFunction(() => !!window.C360Panel);
+  await p.waitForTimeout(400);
+  revisar('y no se lo vuelve a preguntar', !(await p.$('#arranqueSi')) && !!(await p.$('#arranqueAbrir')));
+  await p.click('#arranqueAbrir');
+  await p.waitForSelector('#panelRedes:not(.hidden)');
+  revisar('pero puede conectarlas cuando quiera', (await p.$$('.red-row')).length === 3);
+  await b.close();
+}
+{
+  const conRedes = JSON.parse(JSON.stringify(VINCULO));
+  conRedes.escucha = { redes: { validado: true, validadoEn: '2026-09-01T00:00:00Z', perfiles: [{ red: 'x', handle: 'apalacio', veredicto: 'confirmado', confianza: 90 }] } };
+  const { b, p } = await abrir('candidato-360-escucha.html', { vinculo: conRedes });
+  revisar('a quien ya tiene cuentas no se le pregunta nada',
+    await p.$eval('#arranque', e => e.classList.contains('hidden')) && !(await p.$eval('#panelRedes', e => e.classList.contains('hidden'))));
+  revisar('y el estado no dice «sin validar» sobre cuentas ya validadas', /validadas/.test(await p.textContent('#redesEstado')));
+  /* Lo que no está conectado se declara: una cifra inventada acá decide qué
+     dice la campaña y por dónde. */
+  revisar('la captura de publicaciones se declara apagada',
+    /Captura no conectada/.test(await p.textContent('#captura')) && /todavía no está montada/.test(await p.textContent('#captura')));
+  const cifras = (await p.textContent('#captura')).match(/\d[\d.,]*\s*(publicaciones|menciones|seguidores|interacciones)/i);
+  revisar('y no inventa ninguna métrica de redes', cifras === null);
+  await b.close();
+}
+{
+  const { b, p } = await abrir('candidato-360-escucha.html', { verRedes: true });
+  revisar('sin cuentas, la captura dice que no hay de dónde escuchar',
+    /Sin cuentas/.test(await p.textContent('#captura')) && /empieza por saber cuáles son sus cuentas/.test(await p.textContent('#captura')));
   await b.close();
 }
 
@@ -176,22 +242,22 @@ for (const [caso, opts, espera] of [
   const validacion = { ok: true, modelo: 'deepseek-v4-flash', generado_en: '2026-09-08T04:00:00Z', cache_hit: false,
     resumen: 'La identidad que vamos a escuchar es @laprofe en TikTok.', riesgo_homonimo: '', alertas: [], titulares: [],
     perfiles: [{ red: 'tiktok', handle: 'laprofe', url: 'https://www.tiktok.com/@laprofe', veredicto: 'confirmado', confianza: 88, sondeo: 'ok', nombre_perfil: 'Alejandra Palacio', motivo: 'El nombre coincide.' }] };
-  const { b, p, errores, guardados } = await abrir('candidato-360-redes.html', { redes: validacion });
+  const { b, p, errores, guardados } = await abrir('candidato-360-escucha.html', { redes: validacion, verRedes: true });
   await p.click('.red-row[data-red="tiktok"] .red-chip');
   await p.fill('#red-tiktok', 'https://www.tiktok.com/@laprofe?lang=es');
   await p.click('#redesBuscar');
   await p.waitForSelector('.red-ficha');
-  revisar('redes limpia la URL pegada antes de validar', (await p.inputValue('#red-tiktok')) === 'laprofe');
+  revisar('limpia la URL pegada antes de validar', (await p.inputValue('#red-tiktok')) === 'laprofe');
   revisar('pinta el veredicto con su sello', /Confirmado/.test(await p.textContent('.red-sello')));
   revisar('guarda el veredicto en la candidatura',
     guardados.some(g => g.redes?.perfiles?.[0]?.veredicto === 'confirmado' && g.redes.modelo === 'deepseek-v4-flash'));
   revisar('y lo dice', /Guardado/.test(await p.textContent('#redesGuardado')));
-  revisar('redes sin errores de JavaScript', errores.length === 0);
-  await p.screenshot({ path: (process.env.SALIDA_PRUEBA || '/tmp') + '/panel-redes.png', fullPage: true });
+  revisar('las redes sin errores de JavaScript', errores.length === 0);
+  await p.screenshot({ path: (process.env.SALIDA_PRUEBA || '/tmp') + '/panel-escucha-redes.png', fullPage: true });
   await b.close();
 }
 {
-  const { b, p, guardados } = await abrir('candidato-360-redes.html');   // /c360/redes caído
+  const { b, p, guardados } = await abrir('candidato-360-escucha.html', { verRedes: true });   // /c360/redes caído
   await p.click('.red-row[data-red="x"] .red-chip');
   await p.fill('#red-x', '@apalacio');
   await p.click('#redesBuscar');
@@ -206,8 +272,8 @@ for (const [caso, opts, espera] of [
 {
   const conRedes = JSON.parse(JSON.stringify(VINCULO));
   conRedes.escucha = { redes: { validado: true, validadoEn: '2026-09-01T00:00:00Z', perfiles: [{ red: 'instagram', handle: 'la.profe', veredicto: 'probable', confianza: 70 }] }, ideas: ['acueducto veredal'] };
-  const { b, p } = await abrir('candidato-360-redes.html', { vinculo: conRedes });
-  revisar('redes precarga lo que ya estaba guardado',
+  const { b, p } = await abrir('candidato-360-escucha.html', { vinculo: conRedes });
+  revisar('precarga las cuentas ya guardadas',
     (await p.inputValue('#red-instagram')) === 'la.profe' && (await p.$eval('.red-row[data-red="instagram"]', e => e.classList.contains('on'))));
   revisar('y lo dice con su fecha', /2026-09-01/.test(await p.textContent('#redesGuardado')));
   await b.close();
@@ -215,9 +281,9 @@ for (const [caso, opts, espera] of [
 {
   const conIdeas = JSON.parse(JSON.stringify(VINCULO));
   conIdeas.escucha = { ideas: ['acueducto veredal', 'seguridad'] };
-  const { b, p } = await abrir('candidato-360-medios.html', { vinculo: conIdeas, medios: () => titulares(5) });
-  await p.waitForSelector('.tema');
-  revisar('medios precarga las ideas guardadas y lee de una', (await p.inputValue('#idea-0')) === 'acueducto veredal' && (await p.$$('#lectura .tema')).length === 2);
+  const { b, p } = await abrir('candidato-360-escucha.html', { vinculo: conIdeas, medios: () => titulares(5) });
+  await p.waitForSelector('#lectura .tema');
+  revisar('precarga las ideas guardadas y lee de una', (await p.inputValue('#idea-0')) === 'acueducto veredal' && (await p.$$('#lectura .tema')).length === 2);
   await b.close();
 }
 

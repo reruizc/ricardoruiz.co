@@ -12,6 +12,22 @@ busca esa cuenta y dice si parece ser la suya.
 > llave a un paso del navegador sería regalarla. Acá queda el contrato que
 > consume la página y la prueba del wizard.
 
+> **Dónde vive el frontend (sep-2026).** Los paneles de prensa y de redes se
+> fusionaron en **`candidato-360-escucha.html`** (tarjeta 04 del CRM, «Escucha
+> social»); `candidato-360-medios.html` y `candidato-360-redes.html` quedaron
+> como redirección. Esa página **pregunta al abrir** si la candidatura tiene
+> perfiles en X, TikTok e Instagram, y de ahí sale el mismo `POST /c360/redes`
+> que describe este documento.
+>
+> ⚠️ **Validar una cuenta no es escucharla, y hoy solo existe lo primero.** La
+> captura de publicaciones —lo que cada cuenta publica y lo que le responden—
+> no está montada: la página lo declara en vez de mostrar cifras. El punto de
+> enchufe es uno solo, `pintarCaptura()` en `candidato-360-escucha.html`, con
+> el detalle de qué actores y qué costo esperar. Para el recolector, el
+> precedente completo está en `tools/radar-mujer-medios/` (`collect_social.py`
+> + `social.json`), pero ojo: **ese usa actores de hashtag y acá hacen falta de
+> perfil.**
+
 ## Qué hace, en orden
 
 | Paso | Fuente | Qué aporta |

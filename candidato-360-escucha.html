@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Escucha social de su campaña: la prensa abierta de su territorio y las cuentas de sus redes, en una sola lectura.">
+<title>Escucha social · Candidato 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- ⚠️ Al tocar candidato-360.css o candidato-360-panel.js hay que bumpear su ?v= acá y en los demás paneles. -->
+<link rel="stylesheet" href="candidato-360.css?v=20260922">
+<style>
+/* Lo propio de este panel; el resto lo pone candidato-360.css (las fichas de
+   red y sus veredictos ya viven allá: el paso 2 del wizard usa las mismas). */
+.panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
+.panel-hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:30px}
+.panel-hero h1{font:800 clamp(30px,4.4vw,46px)/1.06 var(--display);letter-spacing:-.02em;margin:8px 0 10px;color:var(--ink)}
+.panel-hero p{margin:0;max-width:62ch;font-size:15px;line-height:1.6;color:var(--muted)}
+.panel-candidatura{display:inline-block;margin-top:14px;font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--green);border:1px solid rgba(20,124,112,.32);padding:6px 10px}
+.nav-salir{text-decoration:none;display:inline-block}
+.hidden{display:none}
+/* La pregunta de arranque: ocupa la página hasta que se responda. */
+.arranque{border-left:3px solid var(--green)}
+.arranque h3{margin:6px 0 4px;font:800 clamp(21px,2.6vw,27px)/1.15 var(--display);letter-spacing:-.01em;color:var(--ink)}
+.arranque-botones{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
+.arranque-redes{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.arranque-redes span{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);background:var(--cream);padding:6px 10px}
+/* Prensa: las tarjetas de tema, iguales a las que traía el panel de noticias. */
+.ideas{display:grid;gap:12px;margin:18px 0 20px}
+.idea-row{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:center}
+.idea-row span{font:800 15px var(--sans);color:var(--green)}
+.idea-row input{width:100%;box-sizing:border-box;border:0;border-bottom:1px solid var(--line);background:transparent;padding:11px 0;font:15px var(--sans);color:var(--ink)}
+.idea-row input:focus{outline:0;border-bottom-color:var(--green)}
+.idea-acciones{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.idea-btn{border:1px solid var(--forest);background:var(--forest);color:#fff;padding:12px 18px;font:700 13px var(--sans);cursor:pointer}
+.idea-btn:disabled{opacity:.35;cursor:default}
+.idea-estado{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lectura{display:grid;gap:16px;margin-top:26px}
+.tema{border:1px solid var(--line);background:#fff;padding:18px 20px}
+.tema-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.tema-top h3{margin:0;font:700 19px var(--sans);color:var(--ink);flex:1 1 240px}
+.tema-cifra{font:800 26px var(--sans);letter-spacing:-.02em;color:var(--green);line-height:1}
+.tema-cifra small{display:block;font:500 10px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.tema-lectura{margin:8px 0 14px;font-size:14px;line-height:1.55;color:var(--muted)}
+.tema-lectura b{color:var(--ink)}
+.tema-titulares{margin:0;padding:0;list-style:none;display:grid;gap:9px}
+.tema-titulares li{border-top:1px solid var(--line);padding-top:9px;font-size:13.5px;line-height:1.45}
+.tema-titulares a{color:var(--ink);text-decoration:none}
+.tema-titulares a:hover{text-decoration:underline}
+.tema-titulares small{display:block;margin-top:3px;font:500 10px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.tema.vacio .tema-cifra{color:var(--muted)}
+.tema-orden{font:600 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--coral);border:1px solid rgba(239,112,93,.4);padding:3px 7px}
+.panel-nota{margin-top:26px;border-left:3px solid var(--green);background:var(--cream);padding:13px 16px;font-size:13px;line-height:1.55;color:var(--muted)}
+.panel-error{border-left:3px solid var(--coral);background:rgba(239,112,93,.08);padding:13px 16px;font-size:14px;line-height:1.5;color:var(--ink);margin-top:18px}
+.guardado{margin-top:18px;border-left:3px solid var(--green);background:var(--cream);padding:13px 16px;font-size:13.5px;line-height:1.55;color:var(--muted)}
+.guardado b{color:var(--ink)}
+/* La captura de publicaciones: hoy apagada, y se dice. */
+.captura{border:1px dashed var(--line);background:var(--cream);padding:18px 20px;margin-top:18px}
+.captura-sello{display:inline-block;font:600 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#a5710f;border:1px solid rgba(201,138,30,.45);padding:4px 8px}
+.captura h4{margin:12px 0 6px;font:700 16px var(--sans);color:var(--ink)}
+.captura p{margin:0 0 10px;font-size:13.5px;line-height:1.55;color:var(--muted)}
+.captura ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.6;color:var(--muted)}
+.captura ul b{color:var(--ink)}
+.cuentas-lista{display:grid;gap:9px;margin:14px 0 0}
+.seccion-titulo{margin:34px 0 0;padding-top:26px;border-top:1px solid var(--line)}
+.seccion-titulo .panel-num{display:block}
+.seccion-titulo h2{margin:8px 0 6px;font:800 clamp(22px,3vw,30px)/1.1 var(--display);letter-spacing:-.015em;color:var(--ink)}
+.seccion-titulo p{margin:0;max-width:62ch;font-size:14px;line-height:1.6;color:var(--muted)}
+</style>
+</head>
+<body>
+<nav class="topbar"><div class="nav-left"><a href="candidato-360.html?abrir=1" class="nav-planes">← CRM</a><div class="nav-auth" id="navAuth"></div></div><div class="nav-right"><a class="brand" href="index.html"><span class="mark"><i></i><i></i><i></i><i></i></span><b>Ricardo<span>.</span>Ruiz</b></a></div></nav>
+
+<main class="app-shell"><div class="panel-shell">
+  <header class="panel-hero">
+    <div class="kicker">Candidato 360 · panel 04</div>
+    <h1>Escucha social.</h1>
+    <p>Lo que se publica sobre usted, su territorio y sus temas: la prensa abierta que indexa Google News y sus propias cuentas de redes, leídas en un solo sitio. Mide lo que se <b>publica</b>, no lo que la gente piensa: un tema puede estar vivo en la calle y mudo en los medios.</p>
+    <span class="panel-candidatura" id="panelCandidatura"></span>
+  </header>
+
+  <div id="panelMuro" class="hidden"></div>
+
+  <div id="panelCuerpo">
+
+    <!-- ── La pregunta de arranque ───────────────────────────────────────────
+         Sale solo la primera vez: si la candidatura ya tiene cuentas guardadas,
+         preguntar otra vez lo que ya se respondió es hacerle perder el tiempo. -->
+    <section class="panel arranque hidden" id="arranque">
+      <span class="panel-num">Antes de empezar</span>
+      <h3>¿Tiene perfiles en redes sociales?</h3>
+      <p class="helper">X, TikTok e Instagram. Si los tiene, buscamos cada usuario en su red y comprobamos que sea el suyo antes de montar la escucha: un homónimo o una cuenta vieja arruinan la lectura. Si todavía no tiene, la escucha de prensa funciona igual y puede conectarlas cuando quiera.</p>
+      <div class="arranque-redes"><span>X</span><span>TikTok</span><span>Instagram</span></div>
+      <div class="arranque-botones">
+        <button type="button" class="redes-btn" id="arranqueSi">Sí, estas son mis cuentas</button>
+        <button type="button" class="wall-btn" id="arranqueNo">Todavía no tengo</button>
+      </div>
+    </section>
+
+    <!-- ── Sus cuentas ─────────────────────────────────────────────────────── -->
+    <section class="panel hidden" id="panelRedes">
+      <span class="panel-num">Sus cuentas</span>
+      <h3 style="margin:6px 0 4px">¿En qué redes está?</h3>
+      <p class="helper">Marque las que use y escriba el usuario. Puede pegar la dirección completa del perfil: la limpiamos.</p>
+      <div class="redes-grid" id="redesGrid"></div>
+      <div class="redes-acciones">
+        <button type="button" class="redes-btn" id="redesBuscar">Buscar y validar</button>
+        <button type="button" class="wall-btn" id="redesGuardar">Guardar sin validar</button>
+        <span class="redes-estado" id="redesEstado">Marque una red y escriba su usuario</span>
+      </div>
+      <div class="redes-resultado hidden" id="redesResultado"></div>
+      <div class="guardado hidden" id="redesGuardado"></div>
+
+      <!-- La captura de publicaciones. Hoy no está conectada y se dice; lo que
+           se muestra arriba (las cuentas y su veredicto) sí es dato real. -->
+      <div class="captura" id="captura"></div>
+    </section>
+
+    <!-- ── La prensa ───────────────────────────────────────────────────────── -->
+    <div class="seccion-titulo">
+      <span class="panel-num">La prensa</span>
+      <h2 id="territorioTitulo">Cargando…</h2>
+      <p id="territorioEscala"></p>
+    </div>
+    <section class="panel" id="panelTerritorio" style="margin-top:18px">
+      <div class="panel-head"><div><span class="panel-num">La conversación de su territorio</span><h3 style="margin:6px 0 4px">Lo que se está publicando</h3></div><button type="button" class="wall-btn" id="territorioRecargar">Actualizar</button></div>
+      <div id="territorioLectura"></div>
+    </section>
+
+    <section class="panel" id="panelIdeas" style="margin-top:16px">
+      <span class="panel-num">Sus tres ideas de campaña</span>
+      <h3 style="margin:6px 0 4px">¿Y de qué va a hablar usted?</h3>
+      <p class="helper">Escriba hasta tres ideas en las palabras que usa la gente, no en las del programa. Buscamos cada una en la prensa de su territorio y le decimos cuál tiene conversación abierta.</p>
+      <div class="ideas" id="ideas"></div>
+      <div class="idea-acciones">
+        <button type="button" class="idea-btn" id="btnLeer">Leer la conversación</button>
+        <span class="idea-estado" id="estadoIdeas">Sin ideas guardadas</span>
+      </div>
+    </section>
+    <div class="lectura" id="lectura"></div>
+
+    <p class="panel-nota">Esta página reúne las dos mitades de la escucha: la prensa abierta —Google News, ventana de 30 días, consultada con su territorio y sus ideas— y sus cuentas de redes, buscadas y validadas una a una. Lo que queda guardado en la candidatura son sus usuarios y sus ideas; el briefing de cada tres días usa lo mismo para filtrar lo que le llega al correo.</p>
+  </div>
+</div></main>
+
+<script src="platform-config.js"></script>
+<script src="data-client.js"></script>
+<script src="candidato-360-panel.js?v=20260922"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.C360Panel, $ = P.$, esc = P.esc, num = P.num;
+  const VENTANA = 30;          /* días · la misma ventana del briefing */
+  const MAX_IDEAS = 3;
+  /* Que dijo «todavía no tengo» se recuerda por dispositivo: el vínculo solo
+     guarda cuentas e ideas, y agregarle un campo obliga a tocar el worker, que
+     es compartido. Lo peor que pasa si se abre en otro computador es que la
+     pregunta vuelva a salir; conectar las cuentas sí viaja con la cuenta. */
+  const SIN_REDES = 'c360-escucha-sin-redes';
+
+  /* ═══ 1 · Sus cuentas ═════════════════════════════════════════════════════ */
+
+  const REDES = [
+    { key: 'x', nombre: 'X', detalle: 'antes Twitter', ph: '@usuario' },
+    { key: 'tiktok', nombre: 'TikTok', detalle: 'video corto', ph: '@usuario' },
+    { key: 'instagram', nombre: 'Instagram', detalle: 'perfil público', ph: 'usuario' }
+  ];
+  const VEREDICTOS = {
+    confirmado: { etiqueta: 'Confirmado', clase: 'ok' },
+    probable: { etiqueta: 'Probable', clase: 'ok' },
+    dudoso: { etiqueta: 'Dudoso', clase: 'warn' },
+    no_encontrado: { etiqueta: 'Sin cuenta', clase: 'bad' },
+    no_verificable: { etiqueta: 'Sin comprobar', clase: 'warn' },
+    sin_validar: { etiqueta: 'Sin validar', clase: 'warn' }
+  };
+  let validacion = null, cargando = false;
+  /* Lo que ya venía validado del vínculo: sin esto la línea de estado decía
+     «sin validar» al lado del aviso que dice «validadas el 1 de septiembre». */
+  let firmaGuardada = '', guardadasValidadas = false;
+
+  /* Misma limpieza que el worker, para que la firma del cache coincida. */
+  const limpiar = v => String(v || '').trim()
+    .replace(/^https?:\/\//i, '').replace(/^www\./i, '')
+    .replace(/^(x|twitter|tiktok|instagram)\.com\//i, '')
+    .split(/[?#]/)[0].split('/')[0].replace(/^@+/, '').trim();
+
+  function montar(guardadas) {
+    $('redesGrid').innerHTML = REDES.map(r => {
+      const prev = guardadas.find(p => p.red === r.key);
+      return `<div class="red-row${prev ? ' on' : ''}" data-red="${r.key}">
+        <button type="button" class="red-chip" data-chip="${r.key}" aria-pressed="${prev ? 'true' : 'false'}"><i></i><b>${esc(r.nombre)}</b><small>${esc(r.detalle)}</small></button>
+        <input class="red-handle" id="red-${r.key}" placeholder="${esc(r.ph)}" autocomplete="off" ${prev ? '' : 'disabled'} value="${esc(prev?.handle || '')}">
+      </div>`;
+    }).join('');
+    $('redesGrid').querySelectorAll('[data-chip]').forEach(b => b.addEventListener('click', () => alternar(b.dataset.chip)));
+    $('redesGrid').querySelectorAll('.red-handle').forEach(i => i.addEventListener('input', tocadas));
+    estado();
+  }
+  function alternar(key) {
+    const row = document.querySelector(`.red-row[data-red="${key}"]`);
+    const activa = row.classList.toggle('on');
+    row.querySelector('.red-chip').setAttribute('aria-pressed', String(activa));
+    const input = row.querySelector('.red-handle');
+    input.disabled = !activa;
+    if (activa) input.focus({ preventScroll: true }); else input.value = '';
+    tocadas();
+  }
+  const elegidas = () => REDES.map(r => ({ red: r.key, handle: limpiar($(`red-${r.key}`)?.value) }))
+    .filter(r => document.querySelector(`.red-row[data-red="${r.red}"]`)?.classList.contains('on') && r.handle);
+  const firma = () => elegidas().map(r => `${r.red}:${r.handle.toLowerCase()}`).join(',');
+  function tocadas() {
+    if (validacion && validacion.firma !== firma()) { validacion = null; $('redesResultado').classList.add('hidden'); }
+    estado();
+  }
+  function estado() {
+    const n = elegidas().length;
+    $('redesBuscar').disabled = cargando || !n;
+    $('redesGuardar').disabled = cargando || !n;
+    $('redesBuscar').textContent = cargando ? 'Buscando…' : validacion ? 'Volver a validar' : 'Buscar y validar';
+    const est = $('redesEstado');
+    est.className = 'redes-estado' + (validacion || (n && guardadasValidadas && firmaGuardada === firma()) ? ' ok' : '');
+    est.textContent = cargando ? 'Consultando cada red y leyendo señales abiertas…'
+      : validacion ? `Validado · ${validacion.perfiles.length} ${validacion.perfiles.length === 1 ? 'perfil' : 'perfiles'}`
+      : n ? (guardadasValidadas && firmaGuardada === firma()
+          ? `${n} ${n === 1 ? 'red' : 'redes'} · validadas`
+          : `${n} ${n === 1 ? 'red marcada' : 'redes marcadas'} · sin validar`)
+        : 'Marque una red y escriba su usuario';
+  }
+
+  function pintarValidacion(d) {
+    const fichas = d.perfiles.map(p => {
+      const v = VEREDICTOS[p.veredicto] || VEREDICTOS.no_verificable, def = REDES.find(x => x.key === p.red) || { nombre: p.red };
+      const datos = [p.nombre_perfil ? `perfil a nombre de <b>${esc(p.nombre_perfil)}</b>` : '', p.seguidores != null ? `${esc(String(p.seguidores))} seguidores` : '', p.verificada ? 'cuenta verificada por la plataforma' : '', p.fuente === 'apify' ? 'comprobado vía Apify' : ''].filter(Boolean).join(' · ');
+      return `<div class="red-ficha ${v.clase}">
+        <div class="red-ficha-top"><b>${esc(def.nombre)}</b><a href="${esc(p.url)}" target="_blank" rel="noopener">@${esc(p.handle)}</a><span class="red-sello">${v.etiqueta}${p.confianza ? ` · ${p.confianza}%` : ''}</span></div>
+        ${datos ? `<p class="red-ficha-datos">${datos}</p>` : ''}
+        <p class="red-ficha-motivo">${esc(p.motivo || '')}</p></div>`;
+    }).join('');
+    const homonimo = d.riesgo_homonimo ? `<p class="redes-homonimo"><b>Cuidado con el homónimo:</b> ${esc(d.riesgo_homonimo)}</p>` : '';
+    const alertas = (d.alertas || []).length ? `<ul class="redes-alertas">${d.alertas.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '';
+    const prensa = (d.titulares || []).length ? `<details class="redes-prensa"><summary>${d.titulares.length} titulares abiertos con ese nombre</summary><ul>${d.titulares.map(t => `<li><a href="${esc(t.link)}" target="_blank" rel="noopener">${esc(t.titulo)}</a>${t.medio ? ` · ${esc(t.medio)}` : ''}</li>`).join('')}</ul></details>` : '';
+    $('redesResultado').classList.remove('hidden');
+    $('redesResultado').innerHTML = `${d.resumen ? `<p class="redes-resumen">${esc(d.resumen)}</p>` : ''}${fichas}${homonimo}${alertas}${prensa}<p class="redes-pie">${esc(d.modelo || 'DeepSeek')} leyó lo que respondió cada red${d.cache_hit ? ' (respuesta guardada de una consulta reciente)' : ''}. Si algún veredicto no cuadra, corrija el usuario y vuelva a validar.</p>`;
+  }
+  function fallo(r) {
+    const motivo = r.status === 404 ? 'La ruta de validación todavía no está publicada en el servidor.'
+      : r.status === 429 ? 'Se agotó el cupo de validaciones de hoy.'
+      : r.status === 0 ? 'No hubo conexión con el servidor.'
+      : `El servidor respondió ${esc(String(r.status))}.`;
+    $('redesResultado').classList.remove('hidden');
+    $('redesResultado').innerHTML = `<div class="redes-fallo"><b>No se pudo validar.</b><p>${motivo}</p><p class="redes-fallo-salida">Puede guardarlas <b>sin validar</b>: quedan tal como las escribió y marcadas como no comprobadas.</p></div>`;
+  }
+
+  async function guardar(perfiles, meta) {
+    const r = await P.guardarEscucha({ redes: Object.assign({ perfiles }, meta || {}) });
+    const caja = $('redesGuardado');
+    caja.classList.remove('hidden');
+    if (!r.ok) { caja.innerHTML = `<b>No se pudo guardar.</b> ${esc(r.data?.error || `El servidor respondió ${r.status}`)}. Vuelva a intentar; sus usuarios siguen escritos acá.`; return false; }
+    const g = r.data.vinculo?.escucha?.redes;
+    caja.innerHTML = `<b>Guardado.</b> La campaña escuchará ${esc((g?.perfiles || perfiles).map(p => `@${p.handle}`).join(', '))}${g?.validado ? ', con los veredictos de esta validación.' : ', marcadas como no validadas.'}`;
+    guardadasValidadas = !!g?.validado;
+    firmaGuardada = (g?.perfiles || perfiles).map(p => `${p.red}:${String(p.handle).toLowerCase()}`).join(',');
+    pintarCaptura(g?.perfiles || perfiles);
+    return true;
+  }
+
+  async function validar() {
+    const redes = elegidas(); if (!redes.length) return;
+    redes.forEach(r => { const i = $(`red-${r.red}`); if (i && i.value !== r.handle) i.value = r.handle; });
+    const f = firma();
+    cargando = true; estado();
+    $('redesResultado').classList.remove('hidden');
+    $('redesResultado').innerHTML = `<div class="redes-cargando"><i></i><span>Buscando @${esc(redes.map(r => r.handle).join(', @'))} y cruzando con la prensa abierta…</span></div>`;
+    const t = P.territorio();
+    let r;
+    try {
+      r = await P.api('/c360/redes', { method: 'POST', body: JSON.stringify({
+        nombre: P.nombreCandidatura(), alias: P.nombrePublico(), territorio: t.texto, redes }) });
+    } catch (e) { r = { status: 0, ok: false, data: {} }; }
+    cargando = false;
+    if (!r.ok || !Array.isArray(r.data?.perfiles)) { fallo(r); estado(); return; }
+    validacion = Object.assign({}, r.data, { firma: f });
+    pintarValidacion(validacion);
+    estado();
+    await guardar(validacion.perfiles.map(p => ({ red: p.red, handle: p.handle, veredicto: p.veredicto, confianza: p.confianza, nombrePerfil: p.nombre_perfil })),
+      { validadoEn: validacion.generado_en, modelo: validacion.modelo, resumen: validacion.resumen });
+  }
+
+  /* ═══ 2 · La captura de publicaciones ══════════════════════════════════════
+     ⚠️ ESTE ES EL ÚNICO PUNTO DE ENCHUFE DE APIFY. Hoy no hay recolector:
+     `/c360/redes` comprueba que la cuenta sea suya y ahí se detiene. Traer lo
+     que cada cuenta publica —y lo que le responden— se hace con Apify, con
+     actores de PERFIL, no de hashtag (apify/instagram-profile-scraper,
+     clockworks/tiktok-profile-scraper, apidojo/twitter-user-scraper). El
+     precedente completo, con su mapeo a un esquema común, está en
+     tools/radar-mujer-medios/{collect_social.py,social.json}; el fallback está
+     descrito en tools/candidato-360/redes/README.md.
+     Cuando exista la ruta, acá se agrega la llamada —algo como
+     P.api('/c360/escucha/posts', …) sobre los handles ya validados— y se pinta
+     debajo de estas fichas. Ojo con el costo: el actor de X cuesta ~US$0,017
+     por consulta, dos órdenes de magnitud sobre TikTok, así que el presupuesto
+     de una escucha recurrente depende casi por completo de cuánto se consulte X.
+     Mientras tanto esta página NO muestra ninguna cifra de redes. Un número
+     inventado acá es peor que un espacio vacío: con esto se decide qué dice la
+     campaña y por dónde. */
+  function pintarCaptura(perfiles) {
+    const cap = $('captura');
+    if (!cap) return;
+    const lista = (perfiles || []).filter(p => p && p.handle);
+    if (!lista.length) {
+      cap.innerHTML = `<span class="captura-sello">Sin cuentas</span>
+        <h4>La escucha de redes empieza por saber cuáles son sus cuentas</h4>
+        <p>Marque arriba las redes donde esté y escriba su usuario. Sin eso no hay de dónde escuchar: la prensa de más abajo funciona igual, pero lo que se publica en sus perfiles no.</p>`;
+      return;
+    }
+    const validadas = lista.filter(p => p.veredicto && p.veredicto !== 'sin_validar' && p.veredicto !== 'no_encontrado');
+    cap.innerHTML = `<span class="captura-sello">Captura no conectada</span>
+      <h4>Lo que se publica en sus cuentas</h4>
+      <p>Validar una cuenta dice que es suya. Traer lo que publica es otra cosa, y esa conexión <b>todavía no está montada</b>: se hace con un recolector que cobra por cuenta raspada. Cuando esté, acá va, ${lista.length === 1 ? 'por esa cuenta' : `por cada una de sus ${num(lista.length)} cuentas`}:</p>
+      <ul>
+        <li><b>Lo que publicó</b> en la ventana, y cuánto rindió cada publicación.</li>
+        <li><b>Quién lo menciona</b> sin etiquetarlo: la conversación que pasa a su lado.</li>
+        <li><b>Qué cuentas amplifican</b> lo suyo, que es distinto de quién lo sigue.</li>
+      </ul>
+      <p style="margin-top:10px">${validadas.length
+        ? `Listas para escuchar: ${esc(validadas.map(p => `@${p.handle}`).join(', '))}.`
+        : 'Ninguna de sus cuentas está validada todavía: valídelas arriba para que la escucha no se monte sobre un perfil que no es.'}</p>`;
+  }
+
+  /* ═══ 3 · La prensa ═══════════════════════════════════════════════════════ */
+
+  let ideasGuardadas = [];
+
+  function pintarIdeas() {
+    $('ideas').innerHTML = Array.from({ length: MAX_IDEAS }, (_, i) => `<div class="idea-row">
+      <span>${i + 1}</span>
+      <input id="idea-${i}" maxlength="120" autocomplete="off" placeholder="${i === 0 ? 'Ej. acueducto veredal' : i === 1 ? 'Ej. seguridad en el comercio' : 'Ej. recuperar el parque de la 45'}" value="${esc(ideasGuardadas[i] || '')}">
+    </div>`).join('');
+    pintarEstadoIdeas();
+    for (let i = 0; i < MAX_IDEAS; i++) $(`idea-${i}`).addEventListener('input', pintarEstadoIdeas);
+  }
+  const ideasEscritas = () => Array.from({ length: MAX_IDEAS }, (_, i) => ($(`idea-${i}`)?.value || '').trim()).filter(Boolean);
+  function pintarEstadoIdeas() {
+    const n = ideasEscritas().length;
+    $('btnLeer').disabled = !n;
+    $('estadoIdeas').textContent = n ? `${n} ${n === 1 ? 'idea' : 'ideas'} · se guardan al leer` : 'Escriba al menos una idea';
+  }
+
+  /* La consulta es la idea ENTRE COMILLAS más el territorio: sin las comillas
+     Google News devuelve cada palabra suelta y «seguridad» trae el país entero.
+     Sin el territorio, la conversación no es la suya. */
+  function consulta(idea, t) {
+    const lugar = t.localidad || t.municipio || '';
+    return `"${idea}"${lugar ? ` ${lugar}` : ''}`;
+  }
+
+  function tarjeta(idea, datos, esLider) {
+    const res = (datos?.resultados || []).slice(0, 5);
+    const n = Number(datos?.n || 0);
+    const medios = [...new Set((datos?.por_medio || []).map(m => m.medio).filter(Boolean))].slice(0, 4);
+    const lectura = !n
+      ? 'Nadie está publicando sobre esto en su territorio. Eso también es información: o el tema no está en la agenda —y entrar es suyo—, o la agenda lo llama de otra manera; pruebe con las palabras que usa la gente, no con las del programa.'
+      : `<b>${num(n)} ${n === 1 ? 'titular' : 'titulares'}</b> en los últimos ${VENTANA} días${medios.length ? `, en ${esc(medios.join(', '))}${medios.length >= 4 ? ' y otros' : ''}` : ''}. ${esLider ? 'Es su idea con más conversación abierta: es la que puede disputar desde mañana.' : 'Hay conversación; entre a ella con lo que ya se está diciendo.'}`;
+    return `<article class="tema${n ? '' : ' vacio'}">
+      <div class="tema-top">
+        <h3>${esc(idea)}</h3>
+        ${esLider && n ? '<span class="tema-orden">Más conversación</span>' : ''}
+        <span class="tema-cifra">${num(n)}<small>titulares · ${VENTANA} días</small></span>
+      </div>
+      <p class="tema-lectura">${lectura}</p>
+      ${res.length ? `<ul class="tema-titulares">${res.map(r => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.titulo)}</a><small>${esc(r.medio || 'medio sin identificar')}${r.fecha ? ` · ${esc(String(r.fecha).slice(0, 10))}` : ''}</small></li>`).join('')}</ul>` : ''}
+    </article>`;
+  }
+
+  async function leer() {
+    const ideas = ideasEscritas();
+    if (!ideas.length) return;
+    const t = P.territorio();
+    $('btnLeer').disabled = true;
+    $('estadoIdeas').textContent = 'Buscando…';
+    $('lectura').innerHTML = `<div class="redes-cargando"><i></i><span>Buscando en la prensa abierta ${esc(ideas.length === 1 ? 'su idea' : `sus ${ideas.length} ideas`)}${t.texto ? ` en ${esc(P.lugar(t.municipio) || t.texto)}` : ''}…</span></div>`;
+    /* Las ideas se guardan aunque la búsqueda se caiga: son suyas, no del
+       resultado. */
+    P.guardarEscucha({ ideas }).catch(() => {});
+    ideasGuardadas = ideas;
+    const respuestas = await Promise.all(ideas.map(idea =>
+      P.caudal({ action: 'medios', query: consulta(idea, t), dias: VENTANA }).catch(e => ({ _error: String(e.message || e) }))));
+    const caidas = respuestas.filter(r => r._error);
+    if (caidas.length === respuestas.length) {
+      $('lectura').innerHTML = `<div class="panel-error"><b>La fuente de prensa no respondió.</b> ${esc(caidas[0]._error)} Sus ideas quedaron guardadas; vuelva a intentar en un minuto.</div>`;
+      $('btnLeer').disabled = false; pintarEstadoIdeas();
+      return;
+    }
+    const conteos = respuestas.map(r => Number(r?.n || 0));
+    const lider = conteos.indexOf(Math.max(...conteos));
+    const orden = ideas.map((idea, i) => ({ idea, datos: respuestas[i], n: conteos[i], lider: i === lider && conteos[i] > 0 }))
+      .sort((a, b) => b.n - a.n);
+    $('lectura').innerHTML = orden.map(o => o.datos?._error
+      ? `<div class="panel-error"><b>${esc(o.idea)}</b> — no se pudo consultar: ${esc(o.datos._error)}</div>`
+      : tarjeta(o.idea, o.datos, o.lider)).join('')
+      + `<p class="panel-nota">Fuente: prensa abierta indexada por Google News, ventana de ${VENTANA} días, consultada con su idea entre comillas y su territorio. Cuenta lo que se PUBLICA, no lo que la gente piensa: un tema sin titulares puede estar vivo en la calle y mudo en los medios. Sus ideas quedan guardadas en la candidatura y el briefing las usa para filtrar.</p>`;
+    $('btnLeer').disabled = false;
+    $('estadoIdeas').textContent = `${ideas.length} ${ideas.length === 1 ? 'idea guardada' : 'ideas guardadas'}`;
+  }
+
+  /* ── La conversación del territorio ────────────────────────────────────────
+     No pide nada: la escala sale de la corporación a la que aspira y el lugar
+     sale del vínculo. Las consultas y el puntaje son los MISMOS del briefing
+     (candidato-360-panel.js los porta de motor.py), para que lo que se ve acá
+     sea lo que llega al correo. */
+  function bloqueNacional(grupos) {
+    if (!grupos.length) return '';
+    const fila = g => `<li><a href="${esc(g.titular.url)}" target="_blank" rel="noopener">${esc(g.titular.titulo)}</a>`
+      + `<small>${esc(g.titular.medio || 'medio sin identificar')}${g.titular.fecha ? ` · ${esc(String(g.titular.fecha).slice(0, 10))}` : ''}`
+      + (g.medios > 1 ? ` · <b>${num(g.medios)} medios lo publicaron</b>` : ' · un solo medio') + `</small></li>`;
+    return `<article class="tema">
+      <div class="tema-top"><h3>De lo que habla el país</h3><span class="tema-cifra">${grupos.length}<small>historias · ${VENTANA} días</small></span></div>
+      <p class="tema-lectura">Las historias nacionales que <b>más medios distintos</b> publicaron. No es un ranking que alguien nos pase: se cuenta cuántos medios cubren la misma historia, que es lo que la vuelve conversación de todos.</p>
+      <ul class="tema-titulares">${grupos.map(fila).join('')}</ul></article>`;
+  }
+
+  function pintarTerritorio(t, usted, nacional, territorio, fallos, consultas) {
+    const linea = it => `<li><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.titulo)}</a><small>${esc(it.medio || 'medio sin identificar')}${it.fecha ? ` · ${esc(String(it.fecha).slice(0, 10))}` : ''}</small></li>`;
+    const bloques = [];
+    if (usted.length) bloques.push(`<article class="tema">
+      <div class="tema-top"><h3>Lo que lo nombra a usted</h3><span class="tema-cifra">${num(usted.length)}<small>titulares · ${VENTANA} días</small></span></div>
+      <p class="tema-lectura">Titulares que traen su nombre y un apellido. <b>Léalos primero</b>: son los que ya circulan con usted adentro.</p>
+      <ul class="tema-titulares">${usted.slice(0, 6).map(linea).join('')}</ul></article>`);
+    bloques.push(bloqueNacional(nacional));
+    bloques.push(territorio.length ? `<article class="tema">
+      <div class="tema-top"><h3>Lo que pasa en ${esc(t.etiqueta)}</h3><span class="tema-cifra">${num(territorio.length)}<small>titulares · ${VENTANA} días</small></span></div>
+      <p class="tema-lectura">Ordenados por qué tanto le tocan al territorio: primero los que nombran su ${t.corp === 'jal' ? 'localidad' : 'lugar'} y a quien lo gobierna, después el resto. Los titulares de clima, loterías y vacantes salen por filtro.</p>
+      <ul class="tema-titulares">${territorio.slice(0, 10).map(linea).join('')}</ul></article>`
+      : `<article class="tema vacio">
+      <div class="tema-top"><h3>Lo que pasa en ${esc(t.etiqueta)}</h3><span class="tema-cifra">0<small>titulares · ${VENTANA} días</small></span></div>
+      <p class="tema-lectura">${fallos >= consultas ? 'La fuente de prensa no respondió; vuelva a intentar en un minuto.' : 'La prensa indexada no publicó nada sobre su territorio en la ventana. En municipios pequeños es lo normal: la conversación existe, pero no pasa por medios que Google News indexe. Ahí el radar que sirve es el de contratos y normas del briefing, no el de titulares.'}</p></article>`);
+    $('territorioLectura').innerHTML = bloques.filter(Boolean).join('');
+  }
+
+  async function leerTerritorio() {
+    const t = P.territorioDe();
+    $('territorioTitulo').textContent = t.etiqueta ? `¿De qué se está hablando, y qué se dice en ${t.etiqueta}?` : '¿De qué se está hablando?';
+    $('territorioEscala').innerHTML = `Primero la agenda del país, la que todo el mundo comenta. Después su territorio, a escala de <b>${esc(t.departamental ? 'departamento' : t.corp === 'jal' ? 'localidad' : 'municipio')}</b> porque aspira a ${esc(t.corpLabel)}${t.etiqueta ? `: la conversación de <b>${esc(t.etiqueta)}</b>, más ${esc(t.entidad)} y ${esc(t.cuerpo)}` : ''}.`;
+    const consultas = P.consultasTerritorio(t);
+    if (!consultas.length) { $('territorioLectura').innerHTML = '<div class="panel-error">Su candidatura todavía no tiene territorio guardado; ábrala en el CRM y escoja dónde se lanza.</div>'; return; }
+    $('territorioRecargar').disabled = true;
+    $('territorioLectura').innerHTML = `<div class="redes-cargando"><i></i><span>Leyendo la prensa de ${esc(t.etiqueta || 'su territorio')}…</span></div>`;
+    /* También se busca su nombre: un titular que lo nombra no compite con los
+       del territorio, va aparte y de primero. */
+    const personas = P.terminosPersona();
+    const nombres = [P.nombreCandidatura(), P.nombrePublico()].filter(n => P.toks(n, 3).length >= 2).map(n => `"${n}"`);
+    const nacionales = P.consultasNacionales();
+    const todas = consultas.concat(nombres, nacionales);
+    const rs = await Promise.all(todas.map(q => P.caudal({ action: 'medios', query: q, dias: VENTANA }).catch(() => ({ _error: true }))));
+    const locales = P.terminosLocales(t), vistos = new Set(), usted = [], territorio = [], pais = [];
+    let fallos = 0;
+    rs.forEach((d, i) => {
+      if (d?._error) { fallos++; return; }
+      const esNacional = i >= consultas.length + nombres.length;
+      for (const r of (d?.resultados || [])) {
+        const titulo = r.titulo || '', k = P.norm(titulo).slice(0, 90);
+        if (!k) continue;
+        const item = { titulo, medio: r.medio || '', url: r.url || '', fecha: r.fecha || '' };
+        /* El top nacional se agrupa por cobertura, así que necesita los
+           titulares REPETIDOS entre medios: esos duplicados son justamente la
+           señal. Los otros dos bloques sí se quedan con uno de cada uno. */
+        if (esNacional) { pais.push(item); continue; }
+        if (vistos.has(k)) continue;
+        vistos.add(k);
+        if (P.mencionaPersona(titulo, personas)) { usted.push(item); continue; }
+        const pts = P.puntajeLocal(titulo, t, locales);
+        if (pts) territorio.push({ ...item, pts });
+      }
+    });
+    /* Lo que ya salió como suyo o como local no se repite arriba: en el bloque
+       del país estorba, y abajo es donde le sirve. */
+    const nacional = P.agruparPorCobertura(pais.filter(it => !vistos.has(P.norm(it.titulo).slice(0, 90)) && !P.mencionaPersona(it.titulo, personas) && !P.puntajeLocal(it.titulo, t, locales))).slice(0, 3);
+    usted.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    territorio.sort((a, b) => (b.pts - a.pts) || String(b.fecha).localeCompare(String(a.fecha)));
+    pintarTerritorio(t, usted, nacional, territorio, fallos, todas.length);
+    $('territorioRecargar').disabled = false;
+  }
+
+  /* ═══ 4 · El arranque ══════════════════════════════════════════════════════ */
+
+  function abrirRedes(foco) {
+    $('arranque').classList.add('hidden');
+    $('panelRedes').classList.remove('hidden');
+    if (foco) {
+      $('panelRedes').scrollIntoView({ behavior: 'instant', block: 'start' });
+      const primero = $('redesGrid').querySelector('.red-row.on .red-handle') || $('redesGrid').querySelector('.red-chip');
+      if (primero) primero.focus({ preventScroll: true });
+    }
+  }
+  /* Dijo que no tiene: no se le vuelve a preguntar, pero no se le cierra la
+     puerta —una campaña abre cuentas a mitad de camino todo el tiempo—. */
+  function sinRedes() {
+    try { localStorage.setItem(SIN_REDES, '1'); } catch {}
+    $('panelRedes').classList.add('hidden');
+    $('arranque').classList.remove('hidden');
+    $('arranque').innerHTML = `<span class="panel-num">Sus redes</span>
+      <h3>Sin cuentas conectadas</h3>
+      <p class="helper">La escucha de prensa de más abajo funciona igual. El día que abra una cuenta —o si ya tenía una y prefiere conectarla ahora— la validamos y entra a la escucha.</p>
+      <div class="arranque-botones"><button type="button" class="wall-btn" id="arranqueAbrir">Conectar mis redes</button></div>`;
+    $('arranqueAbrir').addEventListener('click', () => {
+      try { localStorage.removeItem(SIN_REDES); } catch {}
+      abrirRedes(true);
+    });
+  }
+
+  (async function init() {
+    if (!(await P.arrancar('candidato-360-escucha.html'))) return;
+    const e = P.SESION.vinculo?.escucha || {};
+    const guardadas = e.redes?.perfiles || [];
+    ideasGuardadas = e.ideas || [];
+
+    guardadasValidadas = !!e.redes?.validado;
+    firmaGuardada = guardadas.map(p => `${p.red}:${String(p.handle).toLowerCase()}`).join(',');
+    montar(guardadas);
+    pintarCaptura(guardadas);
+    pintarIdeas();
+    $('redesBuscar').addEventListener('click', validar);
+    $('redesGuardar').addEventListener('click', () => guardar(elegidas().map(r => Object.assign({}, r, { veredicto: 'sin_validar' }))));
+    $('btnLeer').addEventListener('click', leer);
+    $('territorioRecargar').addEventListener('click', leerTerritorio);
+    $('arranqueSi').addEventListener('click', () => { try { localStorage.removeItem(SIN_REDES); } catch {} abrirRedes(true); });
+    $('arranqueNo').addEventListener('click', sinRedes);
+
+    /* La pregunta sale solo si hace falta: con cuentas guardadas ya está
+       respondida, y si dijo que no tiene, tampoco se repite. */
+    let omitido = false;
+    try { omitido = localStorage.getItem(SIN_REDES) === '1'; } catch {}
+    if (guardadas.length) {
+      abrirRedes(false);
+      $('redesGuardado').classList.remove('hidden');
+      $('redesGuardado').innerHTML = `<b>Ya tiene cuentas guardadas:</b> ${esc(guardadas.map(p => `@${p.handle}`).join(', '))}${e.redes?.validado ? ` · validadas${e.redes.validadoEn ? ` el ${esc(String(e.redes.validadoEn).slice(0, 10))}` : ''}.` : ' · sin validar.'}`;
+    } else if (omitido) {
+      sinRedes();
+    } else {
+      $('arranque').classList.remove('hidden');
+    }
+
+    /* La prensa no espera a que conteste lo de las redes: es la mitad que
+       funciona sin configurar nada. */
+    leerTerritorio();
+    if (ideasGuardadas.length) { $('estadoIdeas').textContent = `${ideasGuardadas.length} ${ideasGuardadas.length === 1 ? 'idea guardada' : 'ideas guardadas'}`; leer(); }
+  })();
+})();
+</script>
+</body>
+</html>

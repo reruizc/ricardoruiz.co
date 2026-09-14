@@ -15,9 +15,10 @@ entrar; con esto, cada tres días el candidato recibe en su correo lo que pasó 
 | **La plata** | SECOP II (acción `contratacion`) con `orden_entidad: Territorial`, `departamento` y `query` = municipio | Sin el filtro territorial salían la UNP o la Fuerza Aérea solo por estar ubicadas en Bogotá. Para una JAL se consulta además la **localidad**: la Alcaldía Local firma contratos propios y van primero |
 | **Las reglas** | Normativa del Ejecutivo (acción `ejecutivo`) con el municipio y el departamento | Ventana de 30 días (el dataset de Presidencia es mensual). Si no hay nada, la sección **no aparece** |
 
-En el panel 04 el orden es: lo que lo nombra a usted, la agenda del país y
-después su territorio. Lo que ya salió como suyo o como local no se repite
-arriba: en el bloque del país estorba y abajo es donde sirve.
+En el panel 04 (la escucha social) el orden es: lo que lo nombra a usted, la
+agenda del país y después su territorio. Lo que ya salió como suyo o como
+local no se repite arriba: en el bloque del país estorba y abajo es donde
+sirve.
 
 Y el pie recuerda la **meta de votos** que calculó `VoteTarget` en el CRM (la
 guarda el frontend en `campana.meta`).

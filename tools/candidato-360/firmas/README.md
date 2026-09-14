@@ -1,4 +1,4 @@
-# Candidato 360 · aval por firmas (tarjeta 08)
+# Candidato 360 · aval por firmas (tarjeta 07)
 
 A la **Alcaldía** y a la **Gobernación** se llega de dos maneras y las dos son
 normales: con el aval de un partido o **por firmas**, como grupo significativo

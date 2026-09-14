@@ -1,4 +1,5 @@
-/* prueba-medios-nacional.mjs — el panel 04 con el país arriba y la ciudad abajo.
+/* prueba-medios-nacional.mjs — la prensa de la escucha, con el país arriba
+   y la ciudad abajo.
    ------------------------------------------------------------------
    La página completa, sin red: prensa simulada, vínculo simulado. Comprueba el
    orden de los tres bloques, que el top del país tenga tres historias y diga
@@ -48,7 +49,7 @@ await p.route('**', async route => {
   return route.abort();
 });
 await p.addInitScript(() => { localStorage.setItem('rr-token', 't'); localStorage.setItem('rr-user', JSON.stringify({ email: 'reruizc@gmail.com' })); });
-await p.goto('file://' + process.cwd() + '/candidato-360-medios.html');
+await p.goto('file://' + process.cwd() + '/candidato-360-escucha.html');
 await p.waitForSelector('#territorioLectura .tema', { timeout: 20000 });
 await p.waitForTimeout(500);
 

@@ -1,4 +1,4 @@
-# Candidato 360 · perfil del votante (tarjeta 07)
+# Candidato 360 · perfil del votante (tarjeta 06)
 
 El voto es secreto: **nadie** puede decir quién votó por una persona. Lo que sí
 se puede es describir el **electorado de los puestos donde están sus votos**,

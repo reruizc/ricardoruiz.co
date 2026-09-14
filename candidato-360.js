@@ -225,15 +225,26 @@ function guardarMeta(target) {
   if (Number(SESSION.vinculo.campana?.meta || 0) === Number(target)) return;
   guardarCampana({ ...c, meta: target });
 }
-/* Paneles 04 y 05: viven en su propio HTML (candidato-360-medios.html y
-   candidato-360-redes.html) y lo que el CRM muestra es solo el estado de lo
-   que esas páginas guardaron en el vínculo. */
+/* Panel 04: vive en su propio HTML (candidato-360-escucha.html) y lo que el
+   CRM muestra es solo el estado de lo que esa página guardó en el vínculo. Son
+   las dos mitades de la escucha —las ideas con las que se lee la prensa y las
+   cuentas de redes—, así que la tarjeta dice cuál de las dos falta: «3 ideas»
+   a secas dejaba creer que ya estaba todo configurado. */
 function pintarEscucha() {
   const e = SESSION.vinculo?.escucha || {};
   const ideas = e.ideas?.length || 0, perfiles = e.redes?.perfiles?.length || 0;
-  const medios = $('crmMediosEstado'), redes = $('crmRedesEstado');
-  if (medios) medios.textContent = ideas ? `${ideas} ${ideas === 1 ? 'idea' : 'ideas'}` : 'Sin ideas';
-  if (redes) redes.textContent = perfiles ? `${perfiles} ${perfiles === 1 ? 'cuenta' : 'cuentas'}${e.redes.validado ? ' · validadas' : ' · sin validar'}` : 'Sin cuentas';
+  const dato = $('crmEscuchaEstado'), sub = $('crmEscuchaSub');
+  if (!dato) return;
+  const partes = [];
+  if (ideas) partes.push(`${ideas} ${ideas === 1 ? 'idea' : 'ideas'}`);
+  if (perfiles) partes.push(`${perfiles} ${perfiles === 1 ? 'cuenta' : 'cuentas'}`);
+  dato.textContent = partes.length ? partes.join(' · ') : 'Sin configurar';
+  if (!sub) return;
+  const una = perfiles === 1;
+  sub.textContent = !partes.length ? 'ideas y cuentas guardadas'
+    : !perfiles ? 'sin cuentas conectadas'
+    : !ideas ? (e.redes.validado ? `${una ? 'cuenta validada' : 'cuentas validadas'} · sin ideas` : `${una ? 'cuenta' : 'cuentas'} sin validar`)
+    : (e.redes.validado ? `ideas y ${una ? 'cuenta validada' : 'cuentas validadas'}` : `${una ? 'cuenta' : 'cuentas'} sin validar`);
 }
 /* Interruptor del briefing (panel 03 del CRM). El estado vive en el vínculo. */
 function pintarBriefing() {

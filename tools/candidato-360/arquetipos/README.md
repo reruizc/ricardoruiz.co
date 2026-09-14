@@ -1,11 +1,11 @@
-# Candidato 360 · arquetipos del territorio (tarjeta 06)
+# Candidato 360 · arquetipos del territorio (tarjeta 05)
 
 El Proyecto DC reconstruyó, barrio por barrio en Medellín, **qué emoción ordena
 el voto**: protección y orden, continuidad, supervivencia, castigo o
 pertenencia. La reconstrucción usa Alcaldía, Concejo y JAL de 2015, 2019 y 2023,
 y proyecta 2027. El tablero completo es `proyecto-dc/arquetipos.html`.
 
-La tarjeta 06 del CRM no repite ese tablero: lo **cruza con la votación de la
+La tarjeta 05 del CRM no repite ese tablero: lo **cruza con la votación de la
 persona**. La pregunta no es «cómo es Medellín» sino «en qué clase de barrio
 están sus votos».
 

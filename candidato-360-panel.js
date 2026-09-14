@@ -1,18 +1,22 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   CANDIDATO 360 · chasis de los paneles (medios y redes)
+   CANDIDATO 360 · chasis de los paneles
    ───────────────────────────────────────────────────────────────────────────
-   Lo que candidato-360-medios.html y candidato-360-redes.html necesitan por
-   igual y no pertenece a ninguna de las dos: sesión, acceso, el vínculo de la
-   cuenta (de ahí salen el nombre y el territorio de la campaña), el helper
-   contra el worker y el encabezado.
+   Lo que los paneles necesitan por igual y no pertenece a ninguno: sesión,
+   acceso, el vínculo de la cuenta (de ahí salen el nombre y el territorio de
+   la campaña), el helper contra el worker y el encabezado.
 
-   Cada panel es su propio HTML a propósito. Son dos preguntas distintas —«qué
-   dice la prensa de lo suyo» y «cuáles son sus cuentas»— con su propio ritmo:
-   una se abre para leer y la otra para configurar. Meterlas en el CRM las
-   habría convertido en dos acordeones más de una página que ya es larga.
+   Cada panel es su propio HTML a propósito. Meterlos en el CRM los habría
+   convertido en acordeones de una página que ya es larga.
 
-   ⚠️ Al tocar este archivo hay que bumpear su ?v= en los dos HTML, o el
-   navegador sirve la copia vieja sin dar ningún error.
+   Los paneles de prensa y de redes eran dos —candidato-360-medios.html y
+   candidato-360-redes.html— y se fusionaron en candidato-360-escucha.html: son
+   la misma pregunta vista por sus dos mitades, «qué se dice de usted», y
+   partida obligaba a mirar en dos sitios lo que se lee junto. Los dos archivos
+   viejos quedaron como redirección.
+
+   ⚠️ Al tocar este archivo hay que bumpear su ?v= en los HTML que lo cargan
+   (hoy solo candidato-360-escucha.html), o el navegador sirve la copia vieja
+   sin dar ningún error.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function (global) {
   'use strict';
