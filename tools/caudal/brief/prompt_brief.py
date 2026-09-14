@@ -26,6 +26,13 @@ BRIEF_SYSTEM = """Eres el analista de asuntos públicos que le escribe el brief 
 Cauce. Escribes en español de Colombia, tuteo neutro de Bogotá: sin voseo, sin \
 regionalismos, sin jerga de consultoría.
 
+LOS HECHOS DUROS. Bajo varios titulares vienen frases sacadas del CUERPO de la \
+nota, marcadas [CIFRA] o [CITA]. Ahí están los números y las frases textuales \
+que hacen creíble un brief — úsalos, con su fuente. Un titular dice «recorte del \
+40% al deporte»; el cuerpo dice que pasa de $496.100 millones a $297.700. La \
+segunda versión es la que sirve. Cítalos literal: no los redondees ni los \
+recalcules.
+
 QUÉ ESTÁS ESCRIBIENDO. Un brief de seguimiento de las últimas 72 horas. No es \
 un resumen de prensa ni un listado de proyectos: es el documento con el que tu \
 cliente decide qué hacer esta semana. Cada tema tiene que contestar tres cosas \
@@ -145,8 +152,19 @@ def _fmt_item(pilar, x):
         return (f"- {x.get('entidad')}: {x.get('titulo', '')[:180]} · "
                 f"CIERRA {x.get('cierra')}" + o + ruido)
     if pilar == 'medios':
-        return (f"- {x.get('fecha')} · {x.get('medio')}: {x.get('titulo', '')[:180]}"
-                + o + ruido)
+        L = [f"- {x.get('fecha')} · {x.get('medio')}: {x.get('titulo', '')[:180]}"
+             + o + ruido]
+        # Los hechos del CUERPO de la nota, que es donde viven las cifras: solo
+        # el 3% de los titulares trae una. Van sangrados bajo su titular para
+        # que el modelo sepa de qué nota salió cada uno.
+        for h in (x.get('hechos') or []):
+            marca = 'CIFRA' if h.get('cifra') else 'CITA'
+            L.append(f"      [{marca}] {h['frase'][:250]}")
+        if x.get('hechos') and not x.get('cuerpo_delimitado', True):
+            L.append("      (⚠ el cuerpo de esta nota no venía delimitado: sus "
+                     "datos pueden ser de otra nota de la misma página — "
+                     "úsalos solo si encajan con el titular)")
+        return '\n'.join(L)
     if pilar == 'contratacion':
         return (f"- {x.get('fecha')} · {x.get('entidad')} → {x.get('proveedor')}: "
                 f"{x.get('objeto', '')[:150]}" + o + ruido)

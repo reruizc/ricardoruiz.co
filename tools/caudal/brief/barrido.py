@@ -81,7 +81,15 @@ def get(url, timeout=40):
 _DOM_EXTRANJERO = ('.ar', '.mx', '.cl', '.pe', '.uy', '.py', '.bo', '.ec',
                    '.ve', '.es', '.gt', '.cr', '.pa', '.do', '.hn', '.sv', '.ni')
 _PISTAS_EXTRANJERO = ('milei', 'sheinbaum', 'kicillof', 'casa rosada', 'psoe',
-                      'pvem', 'boric', 'bukele', 'maduro', 'lula', 'bolsonaro')
+                      'pvem', 'boric', 'bukele', 'maduro', 'lula', 'bolsonaro',
+                      # ⚠️ El país en el titular también cuenta. Sin esto entró
+                      # «IED en Argentina cae 73%» —de un medio sin dominio
+                      # extranjero y sin político reconocible— y sus cifras
+                      # argentinas quedaron en la evidencia del brief colombiano.
+                      'argentina', 'méxico', 'mexico', 'chile', 'perú', 'peru',
+                      'bolivia', 'venezuela', 'ecuador', 'uruguay', 'paraguay',
+                      'brasil', 'españa', 'espana', 'honduras', 'guatemala',
+                      'el salvador', 'nicaragua', 'panamá', 'panama')
 
 
 def _es_extranjero(medio, titulo):
@@ -416,7 +424,10 @@ def barrer(p, dias, desde):
             'nombre', 'tipo', 'que_hace', 'lector', 'decisiones', 'lineas',
             'jurisdicciones', 'fuera_de_alcance', 'interlocutores', 'relojes',
             'no_interesa', 'temas', 'comision', 'sector_sanciones')},
-        'ventana': {'desde': desde, 'hasta': hoy, 'dias_prensa': dias},
+        'ventana': {'desde': desde, 'hasta': hoy, 'dias_prensa': dias,
+                    # La hora del corte va en el documento: un brief de 72 horas
+                    # sin hora de cierre no se puede auditar contra la fuente.
+                    'corte': datetime.datetime.now().strftime('%H:%M')},
         'kpis': radar.get('kpis') or {},
         'evidencia': ev,
         'cobertura': cobertura,
@@ -488,6 +499,9 @@ def main():
     ap.add_argument('--dias', type=int, default=3,
                     help='ventana del brief en días (default 3 = 72 horas)')
     ap.add_argument('--desde', help='YYYY-MM-DD (default: hace --dias)')
+    ap.add_argument('--corte', help='hora del corte HH:MM (default: ahora). El '
+                                    'brief la publica: sin hora de cierre no se '
+                                    'puede auditar contra la fuente.')
     ap.add_argument('--json', help='guardar la evidencia cruda acá')
     ap.add_argument('--texto', help='guardar el resumen legible acá')
     a = ap.parse_args()
@@ -504,6 +518,8 @@ def main():
     desde = a.desde or (datetime.date.today()
                         - datetime.timedelta(days=a.dias)).isoformat()
     b = barrer(p, a.dias, desde)
+    if a.corte:
+        b['ventana']['corte'] = a.corte
     txt = resumen_texto(b)
     print(txt)
     if a.json:

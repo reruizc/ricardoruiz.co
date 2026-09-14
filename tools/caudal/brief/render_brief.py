@@ -36,13 +36,28 @@ def fecha_larga(f):
         return str(f or '')
 
 
+def hora_legible(h):
+    """«08:50» → «8:50 a. m.», que es como se escribe en el documento."""
+    try:
+        hh, mm = str(h).split(':')[:2]
+        hh = int(hh)
+        suf = 'a. m.' if hh < 12 else 'p. m.'
+        h12 = hh if 1 <= hh <= 12 else (hh - 12 if hh > 12 else 12)
+        return f'{h12}:{mm} {suf}'
+    except Exception:                                            # noqa: BLE001
+        return str(h)
+
+
 def construir_html(b):
     meta = b.get('_meta') or {}
     v = meta.get('ventana') or {}
     cliente = meta.get('cliente') or 'Cliente'
     horas = (v.get('dias_prensa') or 3) * 24
+    corte = v.get('corte')
     ventana_txt = (f"Ventana {fecha_larga(v.get('desde'))} – "
-                   f"{fecha_larga(v.get('hasta'))} · últimas {horas} horas · Colombia")
+                   f"{fecha_larga(v.get('hasta'))} · últimas {horas} horas"
+                   + (f" · corte a las {hora_legible(corte)}" if corte else '')
+                   + " · Colombia")
 
     top = f"""
 <div class="top">
