@@ -205,11 +205,13 @@ Luego (los corre su dueño, no este script):
   python3 tools/caudal/supers/build_s3.py
 """
 import argparse
+import datetime
 import html
 import hashlib
 import json
 import re
 import subprocess
+import tempfile
 import sys
 import time
 import unicodedata
@@ -234,6 +236,20 @@ UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
 PAGINA = 20         # tamaño fijo del servidor en las dos colas (trampa ③)
 MAX_PAGES = 40      # cota dura: la categoría más grande (1.407) son 71 páginas… ver COTA
 PAUSA = 0.35        # cortesía con el portal
+
+# ⚠️⚠️ CAÍDA PARCIAL DEL ÍNDICE (sep-2026) — la segunda forma del mismo fallo.
+# La copia buena de más abajo solo se disparaba con CERO exacto, y el 8-sep el
+# portal no devolvió cero: la categoría Resoluciones pasó a declarar
+# `totalArticulos = 4` donde venía declarando 481 (verificado contra el portal,
+# no supuesto). Tres actos cosechados no son cero, así que la guarda no entró,
+# se publicaron 256 actos en vez de 734, el consolidado cayó bajo su piso y el
+# pilar Regulatorio ENTERO dejó de subir cinco corridas seguidas sin que nada
+# fallara —que es lo peor—. Publicar 3 donde ayer había 481 tampoco es un dato:
+# es una caída, y se trata igual.
+CAIDA_FRACCION   = 0.2   # se cosechó <20% de lo anterior → el índice se cayó
+CAIDA_MIN_PREV   = 20    # por debajo de esto no se juzga: en una categoría de 4
+                         # actos perder 3 es ruido del portal, no una caída
+CAIDA_AVISO_DIAS = 30    # una copia buena que dura un mes ya no es un bache
 
 # --- taxonomía del buscador interno (leída de los onclick, ago-2026) ---------
 # `cosechar` = ¿vale la pena recorrerla? El EMISOR no se decide acá sino por fila
@@ -589,6 +605,16 @@ def parse_nodo_proyecto(h, url):
 
 # ------------------------------------------------------------------- cosecha
 
+def _dias_desde(fecha):
+    """Días entre hoy y una fecha del raw ('YYYY-MM-DD', con o sin hora).
+    Devuelve None si no se puede leer: un aviso no puede tumbar la cosecha."""
+    try:
+        d = datetime.date.fromisoformat(str(fecha)[:10])
+    except (TypeError, ValueError):
+        return None
+    return (datetime.date.today() - d).days
+
+
 def _registro_normativa(fila, cat_id, irregular=False):
     cat = CATEGORIAS[cat_id]
     iso, anio = _fecha_de_texto(fila['titulo'])
@@ -741,6 +767,7 @@ def fetch(solo=None, max_pages=MAX_PAGES):
                 print(f'    ⚠ {cat["nombre"]}: cosechadas {len(filas)} de {total} '
                       f'que declara el portal (faltan {falta})')
                 incompletas[cat['nombre']] = dict(cosechadas=len(filas), portal=total)
+            ini = len(regs)   # dónde empieza esta categoría, para el dedup
             n_ok = n_irr = 0
             for f in filas:
                 em = _emisor(f['titulo'], cat_id)
@@ -757,13 +784,24 @@ def fetch(solo=None, max_pages=MAX_PAGES):
                     ambiguas.append((cat['nombre'], f['titulo']))
             print(f'    {cat["nombre"]:<32} {len(filas):>4} filas → {n_ok:>4} propias '
                   f'({n_irr} de título irregular) · portal dice {total if total is not None else "?"}')
-            if n_ok == 0 and prev_norm.get(cat_id):
-                conservados = prev_norm[cat_id]
-                regs.extend(conservados)
-                caidas[cat['nombre']] = len(conservados)
-                print(f'    ⚠⚠ {cat["nombre"]}: el portal devolvió CERO y la corrida '
-                      f'anterior tenía {len(conservados)} actos → se conservan '
-                      f'(última copia buena, desde {prev_desde})', file=sys.stderr)
+            prev_cat = prev_norm.get(cat_id) or []
+            # cae por CERO (el caso del 4-sep) o por desplome (el del 8-sep)
+            cayo = bool(prev_cat) and (
+                n_ok == 0
+                or (len(prev_cat) >= CAIDA_MIN_PREV
+                    and n_ok < len(prev_cat) * CAIDA_FRACCION))
+            if cayo:
+                # se CONSERVA lo cosechado hoy y se le suma lo que falta de la
+                # copia buena, cruzado por _id: reemplazar a secas perdería un
+                # acto que el portal acabe de publicar en medio de la caída.
+                vistos = {r['_id'] for r in regs[ini:]}
+                faltan = [r for r in prev_cat if r['_id'] not in vistos]
+                regs.extend(faltan)
+                caidas[cat['nombre']] = len(faltan)
+                print(f'    ⚠⚠ {cat["nombre"]}: el portal devolvió {n_ok} actos '
+                      f'donde la corrida anterior tenía {len(prev_cat)} → se '
+                      f'recuperan {len(faltan)} de la última copia buena '
+                      f'(desde {prev_desde})', file=sys.stderr)
         if ajenas:
             print(f'    ajenas descartadas dentro de lo recorrido: {dict(ajenas)}')
         if irregulares:
@@ -849,13 +887,21 @@ def fetch(solo=None, max_pages=MAX_PAGES):
             fecha=time.strftime('%Y-%m-%d %H:%M:%S'),
             desde=prev_desde,
             categorias=caidas,
-            nota=('El buscador interno del portal devolvió CERO en estas categorías; '
-                  'sus actos son los de la última cosecha buena. Se reemplazan solos '
-                  'cuando el portal vuelva a responder.'),
+            nota=('El buscador interno del portal devolvió CERO o una fracción '
+                  'minúscula de lo que traía en estas categorías; los actos que '
+                  'faltaban son los de la última cosecha buena. Se reemplazan '
+                  'solos cuando el portal vuelva a responder.'),
         )
-        print(f'\n  ⚠⚠ cola B CAÍDA en {len(caidas)} categorías: se publica la última '
-              f'copia buena ({sum(caidas.values())} actos, desde {prev_desde})',
+        print(f'\n  ⚠⚠ cola B CAÍDA en {len(caidas)} categorías: se recupera de la '
+              f'última copia buena ({sum(caidas.values())} actos, desde {prev_desde})',
               file=sys.stderr)
+        # una copia buena que se vuelve permanente deja de ser un bache y pasa a
+        # ser un dato viejo que nadie está mirando: se grita, no se decide nada.
+        dias = _dias_desde(prev_desde)
+        if dias is not None and dias >= CAIDA_AVISO_DIAS:
+            print(f'  ⚠⚠⚠ la cola B lleva {dias} días caída. Revisar si el portal '
+                  f'cambió de sitio o de estructura — la copia buena ya no es un '
+                  f'bache, es el dato que se está publicando.', file=sys.stderr)
     # si la corrida fue parcial (--solo), no pisamos lo que ya había de la otra cola
     if solo and OUT_JSON.exists():
         prev = json.loads(OUT_JSON.read_text(encoding='utf-8'))
@@ -1058,17 +1104,148 @@ def test():
     return 0 if ok else 1
 
 
+# ── rescate desde el consolidado ya publicado ────────────────────────────────
+S3_SLIM = 's3://caudal-legislativo/metadata/sanciones.jsonl'
+# el slim guarda el rótulo legible, no el id de categoría → mapeo inverso
+CAT_POR_ROTULO = {
+    'circular externa': '1256465',
+    'circular basica juridica': '1256466',
+    'resolucion': '1256464',   # ⚠ 'Estructura' rotula igual: se declara abajo
+}
+
+
+def rescatar(archivo=None, aplicar=False):
+    """Rearma la cola B desde `sanciones.jsonl` publicado en S3.
+
+    ⚠️⚠️ ESTO EXISTE PORQUE LA COPIA BUENA NO RESUCITA LO YA PERDIDO. La guarda
+    de arriba evita que una caída del portal borre normas, pero si el raw ya se
+    pisó varias corridas seguidas —lo que pasó del 8 al 13-sep-2026, cuando la
+    caída fue parcial y la guarda no entró— la corrida anterior tampoco las
+    tiene y no hay de dónde sacarlas. Sí las tiene el consolidado publicado en
+    S3, que es justamente el que dejó de actualizarse: el último bueno.
+
+    El 6-sep esto se hizo A MANO; queda como modo del harvester para que el
+    próximo rescate no vuelva a ser un script de usar y tirar.
+
+    Solo AÑADE lo que falta, cruzado por `_id`. Nunca pisa un acto cosechado hoy.
+
+    Fidelidad: título, descripción, fecha, url, tipo y número salen exactos del
+    slim o se rederivan con las mismas funciones de la cosecha. Se pierden el
+    tamaño del PDF (el slim no lo lleva) y la distinción Resoluciones/Estructura
+    (comparten rótulo); los motivos que el slim recortó a 280 se cuentan aparte.
+    """
+    tmp = None
+    if not archivo:
+        tmp = Path(tempfile.gettempdir()) / 'caudal-sanciones-rescate.jsonl'
+        if not tmp.exists():
+            print(f'· bajando {S3_SLIM} …')
+            r = subprocess.run(['aws', 's3', 'cp', S3_SLIM, str(tmp), '--no-progress'],
+                               capture_output=True, text=True)
+            if r.returncode:
+                sys.exit(f'no se pudo bajar el consolidado: {r.stderr.strip()[:300]}')
+        else:
+            print(f'· reusando {tmp} (bórralo para volver a bajarlo)')
+        archivo = tmp
+    archivo = Path(archivo)
+    if not archivo.exists():
+        sys.exit(f'no existe {archivo}')
+
+    rescatados, truncados, ambiguo_estructura, saltados = [], 0, 0, Counter()
+    for ln in archivo.read_text(encoding='utf-8', errors='replace').split('\n'):
+        if 'supersociedades' not in ln:
+            continue
+        try:
+            r = json.loads(ln)
+        except ValueError:
+            continue
+        if r.get('fuente') != 'supersociedades':
+            continue
+        rot = (r.get('tipo') or '').strip()
+        if rot.lower().startswith('proyecto de'):
+            continue                      # cola A: se cosecha bien, no hace falta
+        cat_id = CAT_POR_ROTULO.get(_norm(rot))
+        if not cat_id:
+            saltados[rot or '—'] += 1
+            continue
+        if cat_id == '1256464':
+            ambiguo_estructura += 1
+        titulo = (r.get('resolucion') or '').strip()
+        desc = (r.get('motivo') or '').strip()
+        if not titulo:
+            saltados['sin título'] += 1
+            continue
+        if len(desc) >= 280:
+            truncados += 1
+        fila = dict(titulo=titulo, descripcion=desc,
+                    url=(r.get('url') or '').strip(), tamano=None)
+        irr = (_emisor(titulo, cat_id) == 'propia_irregular')
+        reg = _registro_normativa(fila, cat_id, irregular=irr)
+        # el slim SÍ trae la fecha ya normalizada; el título no siempre la deja leer
+        if not reg.get('fecha') and r.get('fecha'):
+            reg['fecha'] = r['fecha']
+            reg['anio'] = int(str(r['fecha'])[:4]) if str(r['fecha'])[:4].isdigit() else None
+        rescatados.append(reg)
+
+    prev = json.loads(OUT_JSON.read_text(encoding='utf-8')) if OUT_JSON.exists() else {}
+    regs = prev.get('registros', [])
+    vistos = {x.get('_id') for x in regs}
+    faltan = [x for x in rescatados if x['_id'] not in vistos]
+    coinciden = len(rescatados) - len(faltan)
+
+    print(f'\n· {len(rescatados)} normas leídas del consolidado publicado')
+    print(f'  {coinciden} ya están en el raw (los _id coinciden → el método casa)')
+    print(f'  {len(faltan)} FALTAN y se recuperarían')
+    if saltados:
+        print(f'  rótulos no mapeados (no se tocan): {dict(saltados)}')
+    print(f'  · motivos que el slim recortó a 280: {truncados}')
+    print(f'  · sin distinguir Resoluciones/Estructura: {ambiguo_estructura} '
+          f'(todas quedan como Resoluciones)')
+    print('  por categoría ', dict(Counter(x['categoria'] for x in faltan)))
+
+    if not faltan:
+        print('\n→ nada que recuperar.')
+        return prev
+    if not aplicar:
+        print('\n→ ENSAYO: no se escribió nada. Repite con --aplicar.')
+        return prev
+
+    prev['registros'] = regs + faltan
+    prev['_recuperado_de_s3'] = dict(
+        fecha=time.strftime('%Y-%m-%d %H:%M:%S'),
+        objeto=S3_SLIM,
+        n=len(faltan),
+        motivos_truncados_a_280=truncados,
+        nota=('El portal vació estas categorías y el raw se pisó varias corridas '
+              'seguidas, así que la corrida anterior tampoco las tenía. Se '
+              'rearmaron desde el consolidado publicado con las mismas funciones '
+              'de la cosecha (_emisor, _registro_normativa). Fidelidad: título, '
+              'descripción, fecha, url, tipo y número exactos; motivo recortado a '
+              f'280 en {truncados} actos; tamaño del PDF perdido; categoría '
+              'Resoluciones/Estructura no distinguible (todas como Resoluciones). '
+              'Se reemplazan solos cuando el portal vuelva.'),
+    )
+    OUT_JSON.write_text(json.dumps(prev, ensure_ascii=False, indent=1), encoding='utf-8')
+    print(f'\n→ {OUT_JSON.relative_to(REPO)}  ({len(prev["registros"])} registros)')
+    _resumen(prev['registros'])
+    return prev
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[1])
-    ap.add_argument('cmd', choices=['probe', 'fetch', 'test'])
+    ap.add_argument('cmd', choices=['probe', 'fetch', 'test', 'rescatar'])
     ap.add_argument('--solo', choices=['normativa', 'proyectos'],
                     help='cosecha una sola cola (conserva la otra en disco)')
     ap.add_argument('--max-pages', type=int, default=MAX_PAGES)
+    ap.add_argument('--archivo', help='rescatar: consolidado local en vez de bajarlo de S3')
+    ap.add_argument('--aplicar', action='store_true',
+                    help='rescatar: escribe el raw (sin esto es un ensayo)')
     a = ap.parse_args()
     if a.cmd == 'probe':
         probe()
     elif a.cmd == 'fetch':
         fetch(solo=a.solo, max_pages=a.max_pages)
+    elif a.cmd == 'rescatar':
+        rescatar(archivo=a.archivo, aplicar=a.aplicar)
     else:
         sys.exit(test())
 
