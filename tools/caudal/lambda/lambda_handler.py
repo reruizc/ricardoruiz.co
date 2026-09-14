@@ -106,7 +106,7 @@ def _vocab_empresa(emps, ampliar=False):
     return out
 
 BUCKET = os.environ.get('CAUDAL_BUCKET', 'caudal-legislativo')
-PROMPT_VERSION = 'v10'           # bumpear para invalidar cache de síntesis (v10: plan de acción)
+PROMPT_VERSION = 'v11'           # bumpear para invalidar cache de síntesis (v11: ficha del cliente)
 CACHE_PREFIX = 'analisis-cache/'
 HTTP_TIMEOUT = 55
 
@@ -2704,8 +2704,11 @@ LECTURA_LOCK_TTL = 70
 # acá y no en el frontend porque los temas de cada sector viven acá: duplicar la
 # tabla en JS sería tener dos verdades sobre qué es "trabajo y pensiones".
 #
-# Solo se sugieren sectores tipo gremio: los de tipo empresa (DiDi, Binance) son
-# prospectos con nombre y no se le ofrecen a un visitante.
+# Solo se sugieren sectores genéricos: los presets de CLIENTE REAL (DiDi,
+# Binance, Cauce) son prospectos con nombre propio y no se le ofrecen a un
+# visitante. El filtro va por la marca `cliente` del preset y NO por
+# `tipo == 'empresa'`, que era lo que había: Cauce es de tipo 'consultora' y con
+# el criterio viejo se habría empezado a sugerir sola en la búsqueda pública.
 _SECT_STOP = frozenset((
     'de','del','la','el','los','las','y','o','en','para','por','con','sin','que',
     'una','uno','un','al','se','su','sus','ley','proyecto','reforma','nueva','nuevo',
@@ -2743,7 +2746,7 @@ def _sect_idx():
     if _SECT_IDX is None:
         secs, freq = [], {}
         for s in caudal_core.SECTORES_CLIENTE:
-            if s.get('tipo') == 'empresa':
+            if s.get('cliente') or s.get('tipo') == 'empresa':
                 continue
             pal = {}
             for tema in (s.get('temas') or []):
@@ -2808,12 +2811,69 @@ def _lectura_cliente_key(s, kpis):
     Incluye temas y vigiladas porque con un perfil por cliente `s['k']` es
     siempre 'perfil' y dos gremios distintos compartirían el briefing.
     """
+    # ⚠️ La FICHA entra a la firma. Sin ella, corregir «quién lee esto» o agregar
+    # una línea de negocio no cambiaba la llave y el cliente seguía recibiendo la
+    # lectura vieja — un editor que no surte efecto y no dice por qué.
     firma = '|'.join([s.get('k', ''), s.get('nombre', ''),
                       ','.join(sorted(s.get('temas', []))),
                       ','.join(sorted(s.get('empresas_keys', []))),
-                      s.get('sector_sanciones', '')])
+                      s.get('sector_sanciones', ''),
+                      _hash24(_ficha_bloque(s))])
     return _hash24(PROMPT_VERSION + '|cliente|' + firma + '|' + str(kpis['n_radar'])
                    + '|' + str(kpis['alto']) + '|' + str(kpis['en_tramite']))
+
+
+def _ficha_bloque(s):
+    """La FICHA del cliente, en el formato en que el modelo la puede usar.
+
+    Es la diferencia entre un listado y un briefing. El radar dice QUÉ se movió;
+    la ficha dice QUIÉN lo está leyendo, y sin eso ninguna lectura puede
+    responder «por qué me importa a mí». Los dos briefs que se escribieron a
+    mano —Binance y Cauce— salieron buenos porque quien los escribió tenía esto
+    en la cabeza; acá se lo damos escrito al modelo.
+
+    Devuelve '' cuando la ficha está vacía: un encabezado con seis renglones en
+    blanco le enseña al modelo que ese contexto no importa.
+    """
+    L = []
+    if s.get('que_hace'):
+        L.append('QUÉ HACE: ' + s['que_hace'])
+    if s.get('lector'):
+        L.append('QUIÉN LEE ESTO Y QUÉ HACE CON ÉL: ' + s['lector'])
+    if s.get('decisiones'):
+        L.append('DECISIONES QUE TOMA CON ESTE BRIEFING (el cierre de cada punto '
+                 'tiene que servirle a una de ellas): '
+                 + ' · '.join(s['decisiones']))
+    if s.get('lineas'):
+        # Una empresa multi-negocio no tiene UNA comisión. Decir la línea en vez
+        # de la comisión es lo que hace que el briefing hable de negocios.
+        L.append('LÍNEAS DE NEGOCIO — úsalas para ubicar cada señal en el negocio '
+                 'que toca: '
+                 + ' · '.join(f"{l['nombre']}"
+                              + (f" (Comisión {l['comision']})" if l.get('comision') else '')
+                              for l in s['lineas']))
+    if s.get('interlocutores'):
+        L.append('SUS INTERLOCUTORES: ' + ', '.join(s['interlocutores']))
+    if s.get('relojes'):
+        L.append('SUS PLAZOS PROPIOS — mide lo que pasó contra estos relojes: '
+                 + ' · '.join(s['relojes']))
+    if s.get('no_interesa'):
+        L.append('NO LE INTERESA (si una señal es solo de esto, no la subas de '
+                 'nivel ni la pongas de titular): ' + ', '.join(s['no_interesa']))
+    if s.get('competencia'):
+        L.append('SU COMPETENCIA: '
+                 + ', '.join(e['nombre'] if isinstance(e, dict) else str(e)
+                             for e in s['competencia']))
+    if s.get('fuera_de_alcance'):
+        # Decirlo es parte del producto: el cliente declara seis jurisdicciones
+        # y Caudal tiene fuentes de una. Callarlo deja que asuma las seis.
+        L.append('FUERA DEL ALCANCE DE CAUDAL — el cliente opera también en '
+                 + ', '.join(s['fuera_de_alcance'])
+                 + ', y de esos países NO tenemos fuentes. Nunca digas ni '
+                   'insinúes que no pasó nada allá: no lo sabemos.')
+    if not L:
+        return ''
+    return 'FICHA DEL CLIENTE\n' + '\n'.join('  · ' + x for x in L) + '\n\n'
 
 
 def _lectura_cliente_prompt(s, senales, kpis):
@@ -2874,7 +2934,8 @@ def _lectura_cliente_prompt(s, senales, kpis):
     vigiladas = ', '.join(e['nombre'] for e in s.get('empresas', []))
     quien = (f"Cliente: {s['nombre']}" if s.get('k') == 'perfil'
              else f"Cliente: sector {s['nombre']}")
-    user = (quien
+    user = (_ficha_bloque(s)
+            + quien
             + (f" (sus proyectos suelen ir a la Comisión {s['comision']})" if s.get('comision') else '')
             + ".\n"
             + (f"Temas que vigila: {', '.join(s.get('temas', []))}.\n" if s.get('temas') else '')

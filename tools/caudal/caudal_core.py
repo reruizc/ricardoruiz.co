@@ -345,9 +345,30 @@ SECTORES_CLIENTE = [
     # Laboral, Ride-hailing y CX. Por eso `lineas`: preguntarle a DiDi "¿cuál es
     # tu comisión?" es la pregunta equivocada — tiene cuatro, una por negocio.
     {'k': 'didi', 'nombre': 'DiDi', 'tipo': 'empresa', 'comision': 'Sexta',
-     'sector_sanciones': 'transporte',
+     'sector_sanciones': 'transporte', 'cliente': True,
      'descripcion': 'Movilidad por plataforma, reparto y pagos. Su regulación no vive '
                     'en una sola comisión: cada línea de negocio tiene la suya.',
+     'que_hace': 'Plataforma de movilidad, reparto y pagos. En Colombia opera sin una '
+                 'ley propia de transporte por plataformas: su exposición se reparte '
+                 'entre el vacío regulatorio de la movilidad, la relación con '
+                 'conductores y repartidores, el tratamiento tributario de la '
+                 'intermediación y el manejo de datos de usuarios.',
+     'lector': 'Equipo de asuntos públicos y legal de la operación colombiana. Lee para '
+               'decidir si un proyecto exige posición pública, si conviene moverlo por '
+               'gremio y qué le toca a cada línea de negocio.',
+     'decisiones': ['Si fijar posición pública sobre un proyecto de movilidad',
+                    'Si comentar un proyecto de norma en consulta',
+                    'Si pedir audiencia en comisión y con qué ponente',
+                    'Qué ajustar en producto o cumplimiento antes de que la regla exista'],
+     'jurisdicciones': ['Colombia'],
+     'interlocutores': ['Ministerio de Transporte', 'Supertransporte',
+                        'Superintendencia de Industria y Comercio', 'DIAN',
+                        'Ministerio del Trabajo', 'Alcaldías de las ciudades grandes'],
+     'relojes': ['Legislatura: del 20 de julio al 20 de junio',
+                 'Reforma laboral y su reglamentación',
+                 'Decretos de movilidad de las alcaldías grandes'],
+     'no_interesa': ['Transporte de carga y logística pesada',
+                     'Transporte aéreo', 'Infraestructura vial y concesiones'],
      'empresas_keys': ['didi'],
      'competencia': ['uber', 'rappi', 'cabify'],
      'lineas': [
@@ -371,9 +392,34 @@ SECTORES_CLIENTE = [
     # "de los seis países cubro uno" que dejar que el cliente asuma que los seis
     # están vigilados.
     {'k': 'binance', 'nombre': 'Binance', 'tipo': 'empresa', 'comision': 'Tercera',
-     'sector_sanciones': 'financiero',
+     'sector_sanciones': 'financiero', 'cliente': True,
      'descripcion': 'Exchange de criptoactivos. El seguimiento de Cauce es regional; '
                     'Caudal cubre hoy el tramo colombiano.',
+     'que_hace': 'Exchange de criptoactivos: compra, venta y custodia para usuarios '
+                 'minoristas e institucionales. En Colombia no existe todavía un marco '
+                 'propio para proveedores de servicios de activos virtuales, así que su '
+                 'exposición vive en tres frentes prestados: supervisión financiera, '
+                 'prevención de lavado y tratamiento tributario.',
+     'lector': 'Equipo regional de asuntos públicos. Lee para saber qué cambió para la '
+               'operación colombiana y qué señales del vecindario conviene anticipar; '
+               'el brief le habla a la empresa —pasó esto, le pega por esto, esto es lo '
+               'que hay que mirar—, nunca a su cocina interna.',
+     'decisiones': ['Si comentar un proyecto de norma o un decreto en consulta',
+                    'Si pedir audiencia o sumarse a una posición de gremio',
+                    'Cómo responder públicamente cuando el supervisor habla del sector',
+                    'Qué ajustar en cumplimiento antes de que la regla sea exigible'],
+     # Los seis de la matriz de priorización. Colombia es el único con fuentes en
+     # Caudal: los otros cinco salen declarados en `fuera_de_alcance`.
+     'jurisdicciones': ['Colombia', 'Venezuela', 'Perú', 'Bolivia', 'El Salvador',
+                        'República Dominicana'],
+     'interlocutores': ['Superintendencia Financiera', 'UIAF', 'DIAN',
+                        'Superintendencia de Industria y Comercio',
+                        'Banco de la República', 'Supersociedades'],
+     'relojes': ['Declaración anual de renta y sus plazos DIAN',
+                 'Legislatura: del 20 de julio al 20 de junio',
+                 'Evaluación de Colombia en GAFILAT'],
+     'no_interesa': ['Banca tradicional de nicho sin efecto en el marco de activos virtuales',
+                     'Seguros', 'Pensiones'],
      'empresas_keys': ['binance'],
      'competencia': ['coinbase', 'bitso', 'buda', 'kraken', 'okx'],
      'fuera_de_alcance': ['Venezuela', 'Perú', 'Bolivia', 'El Salvador',
@@ -391,6 +437,55 @@ SECTORES_CLIENTE = [
      ],
      'temas': ['criptoactivos y activos virtuales', 'sector financiero', 'tributario',
                'proteccion al consumidor', 'datos personales / habeas data']},
+
+    # Cauce · la casa. Su brief es el único que NO le habla a un cliente final
+    # sino a los socios, como su analista: es el insumo verificado del Horóscopo
+    # semanal que ellos publican. La ficha sale del brief del 7 de septiembre de
+    # 2026, que se escribió a mano — sus cuatro áreas de práctica, su entregable
+    # y sus relojes son los que ese documento ya usaba para ordenar los ítems.
+    {'k': 'cauce', 'nombre': 'Cauce', 'tipo': 'consultora', 'comision': '',
+     'sector_sanciones': '', 'cliente': True,
+     'descripcion': 'Consultora de asuntos públicos. El brief es el insumo de su '
+                    'Horóscopo semanal, no una alerta para un cliente final.',
+     'que_hace': 'Consultora de asuntos públicos que acompaña a empresas y gremios en '
+                 'cuatro frentes: navegación política y regulatoria, inception '
+                 'electoral, negociación y gestión de acuerdos, y aterrizaje de '
+                 'compañías extranjeras en la región. Publica cada semana un Horóscopo '
+                 'político con tres lecturas: la presidencial, la política y la '
+                 'constelación ministerial.',
+     'lector': 'Los socios de la firma, leyendo a su propio analista — no un cliente '
+               'final. Cada ítem tiene que decir qué pasó, por qué le importa a la '
+               'práctica y a qué tipo de cliente, y qué hacer con eso. El editorial lo '
+               'ponen ellos: el brief aporta los hechos verificados, no la opinión.',
+     'decisiones': ['Qué entra al Horóscopo de la semana y con qué lectura',
+                    'A qué cliente mandarle una alerta estratégica y con qué fechas',
+                    'Qué mapa de actores o matriz de riesgo hay que actualizar',
+                    'Qué argumento nuevo entra a los guiones de negociación'],
+     'jurisdicciones': ['Colombia'],
+     'interlocutores': ['Congreso de la República', 'Ministerio del Interior',
+                        'Ministerio de Hacienda', 'DNP', 'Consejo de Estado',
+                        'Corte Constitucional', 'Superintendencias'],
+     'relojes': ['Presupuesto: monto antes del 15 de septiembre, primer debate antes '
+                 'del 25, plenarias antes del 20 de octubre',
+                 'Legislatura: del 20 de julio al 20 de junio',
+                 'Horóscopo semanal: cierre los lunes por la mañana',
+                 'Elecciones territoriales de octubre de 2027'],
+     'no_interesa': ['Farándula y deportes',
+                     'Nombramientos de rutina sin efecto en la agenda',
+                     'Contratación menor sin relevancia política'],
+     'lineas': [
+         {'nombre': 'Navegación política y regulatoria', 'comision': '',
+          'temas': ['presupuesto general de la nacion', 'reforma tributaria']},
+         {'nombre': 'Negociación y gestión de acuerdos', 'comision': 'Primera',
+          'temas': ['consulta previa', 'protesta social']},
+         {'nombre': 'Inception electoral', 'comision': 'Primera',
+          'temas': ['reforma electoral']},
+         {'nombre': 'Landing LATAM', 'comision': 'Segunda',
+          'temas': ['inversion extranjera']},
+     ],
+     'temas': ['presupuesto general de la nacion', 'reforma tributaria',
+               'consulta previa', 'protesta social', 'reforma electoral',
+               'inversion extranjera', 'reforma pensional', 'reforma a la salud']},
 
     # ── sectores genéricos (demo y plantilla de arranque) ──────────────────
     {'k': 'salud', 'nombre': 'Salud', 'tipo': 'gremio', 'comision': 'Séptima',
@@ -573,17 +668,199 @@ def buscar_empresas(q, limit=20):
     return out
 
 
+# --- La FICHA del cliente ---------------------------------------------------
+# El radar sabe QUÉ vigila un cliente (temas y empresas). La ficha responde
+# QUIÉN ES, que es lo que separa un listado de un briefing: los dos briefs que
+# se escribieron a mano —Binance y Cauce— salieron buenos porque quien los
+# escribió sabía que Binance mira seis países y que Cauce publica un Horóscopo
+# semanal. Nada de eso estaba en el perfil, así que el modelo no podía saberlo.
+#
+# ⚠️ Parte de esto YA EXISTÍA y se estaba perdiendo: los presets de DiDi y
+# Binance traen `lineas`, `competencia` y `fuera_de_alcance`, y el asistente del
+# editor pregunta `tipo`, `lineas` y `alcance` — pero ninguno de esos campos
+# estaba en CAMPOS_PERFIL ni en el /save del worker, así que el perfil guardado
+# los descartaba sin decir una palabra. Es el mismo modo de falla ya documentado
+# con `ESTADO REGISTRO` en los acopios y con `origen` en el registro de Cámara:
+# un campo que nadie lee no da error, simplemente no existe.
+TIPOS_CLIENTE = ('empresa', 'holding', 'gremio', 'entidad', 'consultora')
+
+# Campos de texto libre: campo → tope de caracteres.
+FICHA_TEXTO = {
+    # Qué hace la organización. Es el contexto que el modelo no puede inferir de
+    # una lista de temas: «exchange de criptoactivos» y «consultora de asuntos
+    # públicos» vigilan cosas parecidas y necesitan briefings opuestos.
+    'que_hace': 700,
+    # Quién lee el brief y qué hace con él. Fija el registro y el cierre de cada
+    # ítem: un gerente de cumplimiento quiere saber qué revisar; unos socios de
+    # consultoría quieren saber qué contarle a SUS clientes.
+    'lector': 400,
+}
+
+# Campos de lista: campo → (máximo de ítems, máximo de caracteres por ítem).
+FICHA_LISTAS = {
+    # Las decisiones que el cliente toma con esto. Es lo que convierte «pasó
+    # esto» en «haz esto»: sin ellas el brief describe y no recomienda.
+    'decisiones': (6, 160),
+    # Dónde opera. Las fuentes de Caudal son colombianas, así que todo lo que no
+    # sea Colombia sale declarado como fuera de alcance (ver `fuera_de_alcance`
+    # en la salida) en vez de dejar que el cliente asuma que está cubierto.
+    'jurisdicciones': (12, 60),
+    # Los relojes propios del cliente: plazos estructurales que se repiten y con
+    # los que hay que medir todo lo demás (el monto del presupuesto el 15 de
+    # septiembre, la vigencia tarifaria, el arranque de la legislatura).
+    'relojes': (8, 160),
+    # Exclusiones explícitas. El triaje las necesita tanto como los temas: sin
+    # ellas, un cliente de salud recibe cada proyecto que diga «salud mental de
+    # los médicos» y deja de abrir el correo.
+    'no_interesa': (10, 120),
+    # Entidades y reguladores que le importan de verdad, con nombre. Es a quién
+    # mira el cliente cuando pregunta «¿y qué dijo el supervisor?».
+    'interlocutores': (12, 80),
+}
+
+
+def _ficha_texto(p, avisos):
+    """Los campos de prosa de la ficha, recortados a su tope."""
+    out = {}
+    for campo, tope in FICHA_TEXTO.items():
+        v = p.get(campo)
+        if v is None or v == '':
+            out[campo] = ''
+            continue
+        if isinstance(v, (list, tuple)):
+            # tolerar que llegue como lista de frases: unirlas es más útil que
+            # descartarlas, y el aviso deja constancia de que se tocó.
+            v = ' '.join(str(x) for x in v)
+            avisos.append(f'«{campo}» llegó como lista y se unió en un solo texto')
+        elif not isinstance(v, str):
+            avisos.append(f'«{campo}» tiene que ser texto y llegó como '
+                          f'{type(v).__name__}; se ignoró')
+            out[campo] = ''
+            continue
+        out[campo] = re.sub(r'\s+', ' ', v).strip()[:tope]
+    return out
+
+
+def _ficha_listas(p, avisos):
+    """Las listas de la ficha, saneadas: sin vacíos, sin repetidos, con tope."""
+    out = {}
+    for campo, (max_items, max_len) in FICHA_LISTAS.items():
+        vals, vistos = [], set()
+        for raw in _lista_de(p.get(campo), campo, avisos)[:max_items * 2]:
+            s = re.sub(r'\s+', ' ', str(raw or '')).strip()[:max_len]
+            # 2 caracteres no describen nada, pero una jurisdicción sí puede ser
+            # corta («EE. UU.» ya pasa; «CO» no describe y se cae aquí).
+            if len(s) < 3:
+                continue
+            k = _norm(s)
+            if k in vistos:
+                continue
+            vistos.add(k)
+            vals.append(s)
+            if len(vals) >= max_items:
+                break
+        out[campo] = vals
+    return out
+
+
+# Colombia escrita de las formas en que la gente la escribe. Se usa para derivar
+# `fuera_de_alcance`: no para adivinar países, solo para reconocer el único que
+# Caudal sí cubre.
+_JUR_COLOMBIA = {'colombia', 'co', 'col', 'nacional', 'territorio nacional',
+                 'republica de colombia'}
+
+FICHA_MAX_LINEAS = 8
+
+
+def _ficha_lineas(p, avisos):
+    """Las líneas de negocio, normalizadas a `{nombre, comision, temas}`.
+
+    Tolera las dos formas que ya circulan: el preset las trae como diccionario
+    con su comisión y sus temas, y el editor del navegador las manda como texto
+    suelto. Descartar cualquiera de las dos rompería a un cliente existente.
+
+    Una línea es lo que evita la pregunta equivocada. A DiDi no se le puede
+    preguntar «¿cuál es tu comisión?»: sus proyectos caen en cuatro (Sexta para
+    movilidad, Primera para datos, Tercera para impuestos, Séptima para
+    laboral), y esa separación es la que hace que el brief hable de negocios y
+    no de comisiones.
+    """
+    out, vistos = [], set()
+    for raw in _lista_de(p.get('lineas'), 'lineas', avisos)[:FICHA_MAX_LINEAS * 2]:
+        if isinstance(raw, dict):
+            nombre = str(raw.get('nombre') or '').strip()
+            com = str(raw.get('comision') or '').strip()
+            temas_l = [re.sub(r'\s+', ' ', str(t or '')).strip()[:PERFIL_MAX_TEMA_LEN]
+                       for t in (raw.get('temas') or [])
+                       if len(str(t or '').strip()) >= 3][:6]
+        else:
+            nombre, com, temas_l = str(raw or '').strip(), '', []
+        nombre = re.sub(r'\s+', ' ', nombre)[:80]
+        if len(nombre) < 3:
+            continue
+        k = _norm(nombre)
+        if k in vistos:
+            continue
+        vistos.add(k)
+        if com and com not in COMISIONES_REF:
+            avisos.append(f'la comisión «{com}» de la línea «{nombre}» no existe; '
+                          f'se ignoró')
+            com = ''
+        out.append({'nombre': nombre, 'comision': com, 'temas': temas_l})
+        if len(out) >= FICHA_MAX_LINEAS:
+            break
+    return out
+
+
+def ficha_completitud(perfil):
+    """Cuánto de la ficha está llena, y qué falta — en ese orden de valor.
+
+    Se devuelve con el perfil para que la UI pueda pedir lo que falta sin
+    obligar a llenarlo todo de una: la ficha se completa con el cliente al
+    frente, no en el formulario de registro.
+    """
+    faltan = []
+    for campo, etiqueta in (('que_hace', 'qué hace'),
+                            ('lector', 'quién lee el brief'),
+                            ('decisiones', 'qué decide con esto'),
+                            ('lineas', 'líneas de negocio'),
+                            ('jurisdicciones', 'dónde opera'),
+                            ('interlocutores', 'sus interlocutores'),
+                            ('relojes', 'sus plazos propios'),
+                            ('no_interesa', 'qué no le interesa')):
+        if not perfil.get(campo):
+            faltan.append(etiqueta)
+    total = 8
+    return {'llenos': total - len(faltan), 'total': total, 'faltan': faltan,
+            # el brief empieza a sonar a cliente con las tres primeras; el resto
+            # afina. Es un umbral declarado, no una nota de corte.
+            'sirve_para_brief': bool(perfil.get('que_hace')
+                                     and perfil.get('lector')
+                                     and perfil.get('decisiones'))}
+
+
 # Campos que el perfil entiende. Todo lo demás que llegue en el dict se
 # reporta en `avisos`: un perfil que trae `empresas_keys` en vez de `empresas`
 # respondía 200 con el radar vacío de vigiladas y sin decir una palabra —
 # el mismo silencio que `descartes` ya evita cuando la empresa no existe.
-CAMPOS_PERFIL = {'nombre', 'descripcion', 'temas', 'empresas',
-                 'sector_sanciones', 'comision'}
+CAMPOS_PERFIL = ({'nombre', 'descripcion', 'temas', 'empresas',
+                  'sector_sanciones', 'comision',
+                  # la ficha: quién es el cliente, no solo qué vigila
+                  'tipo', 'lineas', 'competencia'}
+                 | set(FICHA_TEXTO) | set(FICHA_LISTAS))
 # nombres equivocados que hemos visto (o que son un typo obvio) → el campo real
 _ALIAS_CAMPO = {
     'empresas_keys': 'empresas', 'empresa': 'empresas', 'vigiladas': 'empresas',
     'empresas_vigiladas': 'empresas', 'tema': 'temas', 'temas_usados': 'temas',
     'sector': 'sector_sanciones', 'comisión': 'comision', 'name': 'nombre',
+    # campos de la ficha con el nombre que sale natural al escribirlos
+    'alcance': 'jurisdicciones', 'paises': 'jurisdicciones',
+    'países': 'jurisdicciones', 'jurisdiccion': 'jurisdicciones',
+    'linea': 'lineas', 'líneas': 'lineas', 'negocios': 'lineas',
+    'competidores': 'competencia', 'contexto': 'que_hace',
+    'quien_lee': 'lector', 'audiencia': 'lector', 'plazos': 'relojes',
+    'excluir': 'no_interesa', 'exclusiones': 'no_interesa',
+    'reguladores': 'interlocutores', 'entidades': 'interlocutores',
 }
 # los que el propio perfil guardado arrastra: no son un error del cliente, son
 # metadatos del KV o la salida ya normalizada. No se avisan.
@@ -667,6 +944,35 @@ def normalizar_perfil(p):
         if len(emps) >= PERFIL_MAX_EMPRESAS:
             break
 
+    # La COMPETENCIA se resuelve contra el diccionario igual que las vigiladas,
+    # pero se guarda aparte: para una empresa, «a quién vigilo» y «contra quién
+    # compito» son la misma lista en el radar (entran las dos por el Sur) y dos
+    # cosas distintas en la ficha — el brief tiene que poder decir «tu
+    # competidor» sin llamarle vigilada a Uber en la ficha de DiDi.
+    comp, vistas_c = [], set()
+    for raw in _lista_de(p.get('competencia'), 'competencia',
+                         avisos)[:PERFIL_MAX_EMPRESAS * 2]:
+        if isinstance(raw, dict):
+            raw = raw.get('k') or raw.get('nombre') or ''
+        key = _norm(str(raw or '')).strip()
+        e = idx.get(key)
+        if not e:
+            if key:
+                descartes.append(str(raw))
+            continue
+        if e['k'] in vistas_c:
+            continue
+        vistas_c.add(e['k'])
+        comp.append({'k': e['k'], 'nombre': e['nombre'], 'tipo': e['tipo'],
+                     'sector': e['sector']})
+        if len(comp) >= PERFIL_MAX_EMPRESAS:
+            break
+
+    tipo = str(p.get('tipo') or '').strip().lower()
+    if tipo and tipo not in TIPOS_CLIENTE:
+        avisos.append(f'«{tipo}» no es una clase de cliente conocida; se ignoró')
+        tipo = ''
+
     ss = str(p.get('sector_sanciones') or '').strip().lower()
     if ss and ss not in _SANCION_SECTOR_KEYS:
         descartes.append(f'sector de sanciones «{ss}»')
@@ -677,7 +983,7 @@ def normalizar_perfil(p):
             avisos.append(f'la comisión «{com}» no existe; se ignoró')
         com = ''
 
-    return {
+    out = {
         'k': 'perfil',
         'nombre': (str(p.get('nombre') or '').strip() or 'Perfil sin nombre')[:80],
         'descripcion': str(p.get('descripcion') or '').strip()[:400],
@@ -688,22 +994,60 @@ def normalizar_perfil(p):
         'empresas_keys': [e['k'] for e in emps],
         'sector_sanciones': ss,
         'comision': com,
+        # ── la ficha ──────────────────────────────────────────────────────
+        'tipo': tipo,
+        'competencia': comp,
+        'competencia_keys': [e['k'] for e in comp],
+        'lineas': _ficha_lineas(p, avisos),
         'descartes': descartes,
         'avisos': avisos,
     }
+    out.update(_ficha_texto(p, avisos))
+    out.update(_ficha_listas(p, avisos))
+    # Lo que el cliente declara y Caudal NO cubre, dicho por su nombre. Se
+    # DERIVA de `jurisdicciones` en vez de pedirse aparte: las fuentes son
+    # colombianas y esa es una propiedad del producto, no del cliente. Binance
+    # declara seis países y esto responde «de los seis cubro uno», que es
+    # preferible a dejar que el cliente asuma que los seis están vigilados.
+    out['fuera_de_alcance'] = [j for j in out['jurisdicciones']
+                               if _norm(j) not in _JUR_COLOMBIA]
+    out['ficha'] = ficha_completitud(out)
+    return out
 
 
 def perfil_desde_sector(k):
-    """Un preset convertido en perfil editable — la plantilla de arranque."""
+    """Un preset convertido en perfil editable — la plantilla de arranque.
+
+    ⚠️ Pasa por `normalizar_perfil` con la FICHA COMPLETA, no solo con temas y
+    comisión. Antes copiaba cinco campos y dejaba atrás `lineas`, `competencia`
+    y la ficha entera: abrir la plantilla de DiDi daba un perfil sin sus cuatro
+    líneas de negocio, que es justamente lo que esa plantilla tiene de valioso.
+    """
     s = sector_cliente(k)
     if not s:
         return None
-    p = normalizar_perfil({'nombre': s['nombre'], 'temas': list(s['temas']),
-                           'descripcion': s.get('descripcion', ''),
-                           'sector_sanciones': s.get('sector_sanciones', ''),
-                           'comision': s.get('comision', '')})
+    base = {'nombre': s['nombre'], 'temas': list(s['temas']),
+            'descripcion': s.get('descripcion', ''),
+            'sector_sanciones': s.get('sector_sanciones', ''),
+            'comision': s.get('comision', ''),
+            'tipo': s.get('tipo', ''),
+            'lineas': list(s.get('lineas') or []),
+            'competencia': list(s.get('competencia') or [])}
+    for campo in list(FICHA_TEXTO) + list(FICHA_LISTAS):
+        if s.get(campo):
+            base[campo] = s[campo]
+    # `fuera_de_alcance` del preset se escribía a mano y la ficha lo deriva de
+    # `jurisdicciones`: si el preset solo trae el primero, se reconstruye el
+    # segundo para no perder el dato.
+    if s.get('fuera_de_alcance') and not base.get('jurisdicciones'):
+        base['jurisdicciones'] = ['Colombia'] + list(s['fuera_de_alcance'])
+    p = normalizar_perfil(base)
     p['k'] = k
     p['desde_preset'] = k
+    # Un preset de CLIENTE REAL lleva nombre propio de un prospecto. Viaja
+    # marcado para que la UI no lo ofrezca como «sector de muestra» a cualquiera
+    # que abra el editor — es la misma razón por la que no aparece en los chips.
+    p['cliente'] = bool(s.get('cliente'))
     return p
 
 
