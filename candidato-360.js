@@ -2076,7 +2076,7 @@ function huellaBloque(porArea, bloque) {
   const huella = {}; let areasCon = 0, votos = 0;
   for (const [area, d] of Object.entries(porArea || {})) {
     let v = 0;
-    for (const [nombre, n] of (d?.partidos || [])) if (PartidosBloques.bloqueDePartido(nombre) === bloque) v += Number(n) || 0;
+    for (const [nombre, n] of (d?.partidos || [])) if (PartidosBloques.bloqueDeOrganizacion(nombre) === bloque) v += Number(n) || 0;
     huella[area] = v; votos += v; if (v > 0) areasCon++;
   }
   const n = Object.keys(porArea || {}).length;
@@ -3429,22 +3429,26 @@ async function ideologiaDelTerritorio(campana, municipio) {
   const area = munKey ? r?.comunas?.[munKey] : null;
   const fuente = area || r?.totals; if (!fuente) return null;
   const partidos = fuente.partidos || fuente.top_partidos || [];
-  const porBloque = {}; let total = 0;
+  const porBloque = {}; let total = 0; const sinLinea = [];
   partidos.forEach(([nombre, v]) => {
-    const b = window.PartidosBloques?.bloqueDePartido?.(nombre) || 'sc', n = Number(v) || 0;
+    const b = window.PartidosBloques?.bloqueDeOrganizacion?.(nombre) || 'sc', n = Number(v) || 0;
     porBloque[b] = (porBloque[b] || 0) + n; total += n;
+    /* Lo que queda sin bloque se muestra con nombre y apellido: «sin línea» no
+       puede ser una caja negra del 13 % de los votos. */
+    if (b === 'sc' && n > 0) sinLinea.push({ nombre: NOMBRE_BONITO(nombre), votos: n, aval: Boolean(window.PartidosBloques?.esAvalSinLinea?.(nombre)) });
   });
   if (!total) return null;
+  sinLinea.sort((a, b) => b.votos - a.votos);
   return { nombre: NOMBRE_BONITO(area ? (fuente.name || '') : (r.name || '')), ambito: area ? 'municipio' : 'departamento',
     potencial: Number(fuente.potencial || 0), votantes: Number(fuente.votantes || 0), validos: Number(fuente.validos || 0),
-    porBloque, total, partidos: partidos.slice(0, 8) };
+    porBloque, total, sinLinea, partidos: partidos.slice(0, 8) };
 }
 /* La familia política de ESTA campaña: la que eligió en el espectro si va por
    firmas, la de su partido si va con aval. */
 function familiaDeLaCampana(campana) {
   if (campana?.avales === 'firmas') return campana.espectro || '';
   const partido = String(campana?.partido || partidoVigente() || '').trim();
-  return partido ? (window.PartidosBloques?.bloqueDePartido?.(partido) || 'sc') : '';
+  return partido ? (window.PartidosBloques?.bloqueDeOrganizacion?.(partido) || 'sc') : '';
 }
 /* El electorado que TIENE contra el que NECESITA. Los votos que le faltan no
    se parecen a su base —esos ya los tiene—: se parecen al territorio del que
@@ -3473,7 +3477,7 @@ async function pintarPerfil() {
        perfil sigue valiendo por sí solo. */
     P.ideo = await ideologiaDelTerritorio(CAMPANA_ACTUAL, P.municipio).catch(() => null);
     P.familia = familiaDeLaCampana(CAMPANA_ACTUAL);
-    P.familiaPrevia = crmCandidate?.partido ? (window.PartidosBloques?.bloqueDePartido?.(crmCandidate.partido) || 'sc') : '';
+    P.familiaPrevia = crmCandidate?.partido ? (window.PartidosBloques?.bloqueDeOrganizacion?.(crmCandidate.partido) || 'sc') : '';
     PERFIL_ACTUAL = P;
     const dif = P.mujeresMunicipio === null ? null : P.mujeres - P.mujeresMunicipio;
     const sesgo = dif === null || Math.abs(dif) < .005 ? 'igual que el promedio del municipio' : dif > 0 ? `${pct1(Math.abs(dif))} más mujeres que el promedio del municipio` : `${pct1(Math.abs(dif))} menos mujeres que el promedio del municipio`;
@@ -3511,7 +3515,7 @@ function territorioYFamilia(P) {
     <p style="margin-bottom:8px"><b>Cómo vota ${escHtml(lugar)}</b></p>
     <div class="arq-barra">${ORDEN.filter(b => ideo.porBloque[b] > 0).map(b => `<i style="flex:${ideo.porBloque[b]};background:${COLOR[b] || 'var(--green)'}" title="${escHtml(LABEL[b] || b)}"></i>`).join('')}</div>
     <ul class="arq-lista">${ORDEN.filter(b => ideo.porBloque[b] > 0).sort((a, b) => ideo.porBloque[b] - ideo.porBloque[a]).map(b => `<li><span class="arq-punto" style="background:${COLOR[b] || 'var(--green)'}"></span><b>${pct1(ideo.porBloque[b] / ideo.total)}</b> ${escHtml(LABEL[b] || b)}${b === suya ? ' · su familia' : ''}${b === P.familiaPrevia && b !== suya ? ' · su aval anterior' : ''}<em>${ideo.porBloque[b].toLocaleString('es-CO')}</em></li>`).join('')}</ul>
-    <p class="puntaje-nota" style="margin-bottom:14px">Asamblea de 2023 en ${escHtml(lugar)}: es la única elección que baja a todos los municipios del país con el voto por partido. «Sin clasificar» son los movimientos locales y las coaliciones que no caben en una familia nacional, que en un municipio pequeño pesan tanto como los partidos.</p>` : '';
+    <p class="puntaje-nota" style="margin-bottom:14px">Asamblea de 2023 en ${escHtml(lugar)}: es la única elección que baja a todos los municipios del país con el voto por partido. ${ideo.sinLinea?.length ? `<b>Sin línea nacional</b> acá: ${ideo.sinLinea.slice(0, 3).map(x => `${escHtml(x.nombre)} (${x.votos.toLocaleString('es-CO')})`).join(', ')}${ideo.sinLinea.length > 3 ? ` y ${ideo.sinLinea.length - 3} más` : ''}. ${ideo.sinLinea.some(x => x.aval) ? 'Los partidos que prestan aval —ASI, MAIS, AICO— no entran en una familia porque sus candidatos vienen de todas: lo medimos, y ninguna reúne más del 36 %.' : 'Son movimientos regionales sin equivalente nacional.'}` : 'Cada organización entra en su familia: las coaliciones por sus partidos y los movimientos regionales por el rastro de sus candidatos.'}</p>` : '';
   const objetivo = obj ? `
     <p style="margin-bottom:8px"><b>La votación que debería buscar</b></p>
     <ul class="puntaje-escala">

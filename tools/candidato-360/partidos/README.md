@@ -116,3 +116,43 @@ dice y se guarda como está. El partido de la campaña viaja en `campana.partido
 node tools/candidato-360/prueba-partido.mjs     # el campo, el filtro, las coaliciones y el reparto (21)
 node test/c360-campana.test.mjs                 # en rr-auth: que el worker no bote el partido (11)
 ```
+
+## De qué familia es cada organización
+
+La lectura ideológica de un territorio usa `partidos-bloques.js`, que estaba
+hecho para **partidos nacionales**. Con eso, el **22,3 %** de los votos de la
+Asamblea 2023 quedaba «sin clasificar», que en un tablero de familias políticas
+es no haber leído. Tres cosas distintas se escondían ahí:
+
+| Qué era | Cómo se resuelve | Ejemplo |
+|---|---|---|
+| **Coaliciones** escritas como un solo nombre | por sus partes (`bloqueDeOrganizacion`), con el núcleo del nombre para que «CAMBIO RADICAL» calce con «PARTIDO CAMBIO RADICAL» | CAMBIO RADICAL - MIRA → centro-derecha |
+| **Movimientos regionales** cuyo nombre no dice nada | se **mide** de dónde vienen sus candidatos | Renace → izquierda |
+| **Avales que se prestan** | se quedan sin bloque, y la interfaz dice por qué | ASI, MAIS, AICO |
+
+Faltaban además dos partidos nacionales en la tabla —MIRA y Colombia Justa
+Libres—, que son justo los que más aparecen dentro de coaliciones.
+
+### Medir un movimiento regional
+
+```
+NODE_USE_ENV_PROXY=1 node tools/candidato-360/partidos/clasificar-locales.mjs
+```
+
+Toma los candidatos que se lanzaron con ese aval en 2023, los busca en las otras
+elecciones del índice (2011-2023, cinco corporaciones) y se queda con el bloque
+más repetido entre sus **otros** avales. Entra a `MOVIMIENTO_LOCAL` la
+organización con **≥ 5 personas con rastro** y **≥ 60 % de acuerdo**; lo demás se
+queda gris, que es más honesto que rellenar.
+
+### El hallazgo: hay avales sin línea
+
+De las **848 personas** con rastro que se lanzaron con ASI en 2023, el bloque más
+repetido reúne apenas el **35 %** —MAIS 31 %, AICO 34 %, «Independientes» 30 %—:
+sus candidatos vienen repartidos de todas las familias. No es que no los hayamos
+mirado, es que **no tienen línea**, y por eso la etiqueta del bloque `sc` dejó de
+llamarse «sin clasificar» y ahora es «sin línea nacional», con los nombres a la
+vista en la ficha del perfil.
+
+Resultado: de 22,3 % a **13,2 %** de votos sin bloque, sin reclasificar ni una
+sola organización que ya tuviera familia.

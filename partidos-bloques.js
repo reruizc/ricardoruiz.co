@@ -17,7 +17,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 (function (global) {
   'use strict';
-  const BLOQUE_LABEL = { izq: 'Izquierda', ci: 'Centro-izquierda', c: 'Centro', cd: 'Centro-derecha', d: 'Derecha', sc: 'Sin clasificar' };
+  const BLOQUE_LABEL = { izq: 'Izquierda', ci: 'Centro-izquierda', c: 'Centro', cd: 'Centro-derecha', d: 'Derecha', sc: 'Sin línea nacional' };
   const BLOQUE_ORDER = ['izq', 'ci', 'c', 'cd', 'd', 'sc'];
   const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
 
@@ -59,11 +59,40 @@
   'PARTIDO CENTRO DEMOCRATICO': 'd',
   'PARTIDO POLITICO CREEMOS': 'd',
   'NUEVA FUERZA DEMOCRATICA': 'd',
-  // étnicos/indígenas: por convención sc (no encaja en eje izq-der nacional)
+  // partidos que faltaban y que aparecen sobre todo dentro de coaliciones
+  'PARTIDO POLITICO MIRA': 'cd',           // conservadurismo social, sin adscripción de gobierno
+  'PARTIDO COLOMBIA JUSTA LIBRES': 'd',    // confesional evangélico
+  'PARTIDO UNITARIO': 'c',
+  // étnicos/indígenas y avales de alquiler: sin línea, y MEDIDO (ver abajo)
   'MOVIMIENTO ALTERNATIVO INDIGENA Y SOCIAL "MAIS"': 'sc',
   'MOVIMIENTO AUTORIDADES INDIGENAS DE COLOMBIA "AICO"': 'sc',
   'PARTIDO ALIANZA SOCIAL INDEPENDIENTE "ASI"': 'sc',
 };
+
+  /* ── Movimientos y coaliciones REGIONALES ──────────────────────────────────
+     No están en ninguna tabla nacional y su nombre no dice nada: «Córdoba
+     Florece», «Renace», «Antioquia te pertenece». El bloque no se adivina, se
+     MIDE: se toman los candidatos que se lanzaron con ese aval en 2023 y se
+     mira con qué partidos —ya clasificados— se han lanzado esas mismas
+     personas en las otras nueve elecciones del índice. Entra a la tabla la
+     organización en la que al menos 5 personas dejan rastro y 6 de cada 10
+     apuntan al mismo bloque. El método y la tabla completa:
+     tools/candidato-360/partidos/clasificar-locales.mjs                      */
+  const MOVIMIENTO_LOCAL = {
+    'CORDOBA FLORECE': 'c',                       // 109.850 votos · 60 % de 5 personas
+    'RENACE': 'izq',                              //  61.353 votos · 77 % de 13
+    'COALICION ANTIOQUIA TE PERTENECE': 'cd',     //  29.497 votos · 73 % de 11
+    'INDEPENDIENTES CON UNIDAD': 'c',             //  26.471 votos · 67 % de 6
+    'COALICION POR CASANARE': 'ci',               //  33.785 votos · 71 % de 7
+  };
+  /* ── Avales sin línea ─────────────────────────────────────────────────────
+     ASI, MAIS, AICO e «Independientes» prestan su aval a cualquiera, y eso no
+     es una opinión: de las 848 personas con rastro que se lanzaron con ASI en
+     2023, el bloque más repetido reúne apenas el 35 % —MAIS 31 %, AICO 34 %,
+     Independientes 30 %—, es decir, sus candidatos vienen repartidos de todos
+     lados. Ponerles una etiqueta ideológica sería inventarla, así que se
+     quedan sin bloque y la interfaz dice por qué. */
+  const AVAL_SIN_LINEA = ['ALIANZA SOCIAL INDEPENDIENTE', 'MAIS', 'AICO', 'AUTORIDADES INDIGENAS', 'INDEPENDIENTES'];
 
   const CAND_BLOQUE_OVERRIDE = [
   // izquierda
@@ -105,6 +134,15 @@
 
   /* Un partido → su bloque. Acepta el nombre como venga (mayúsculas, tildes,
      espacios dobles). Devuelve 'sc' si no está en la lista. */
+  /* Las palabras que NO identifican a nadie: «PARTIDO», «MOVIMIENTO», «DE»…
+     Quitarlas deja el núcleo, que es lo que de verdad nombra a la
+     organización: «PARTIDO CAMBIO RADICAL» y «CAMBIO RADICAL» son la misma. */
+  const ESTRUCTURALES = new Set(['PARTIDO', 'PARTIDOS', 'MOVIMIENTO', 'POLITICO', 'POLITICA', 'COALICION', 'ACUERDO', 'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'Y', 'POR', 'EN', 'SU']);
+  /* Y las que identifican a demasiados: con «COLOMBIA» sola no se resuelve
+     nada, y sin esta guarda «COLOMBIA JUSTA LIBRES» calzaría con «PARTIDO
+     LIBERAL COLOMBIANO». */
+  const GENERICAS = new Set(['COLOMBIA', 'COLOMBIANO', 'COLOMBIANA', 'NACIONAL', 'ALIANZA', 'UNIDOS', 'PUEBLO', 'CIUDADANOS', 'POPULAR', 'SOCIAL']);
+  function nucleo(nombre) { return norm(nombre).split(/[^A-ZÑ0-9]+/).filter(w => w && !ESTRUCTURALES.has(w)); }
   function bloqueDePartido(partido) {
     const n = norm(partido).replace(/\s+/g, ' ');
     if (PARTIDO_BLOQUE[n]) return PARTIDO_BLOQUE[n];
@@ -113,8 +151,54 @@
     /* Coincidencia por contenido: "PARTIDO ALIANZA VERDE" dentro de
        "PARTIDO ALIANZA VERDE - EN MARCHA". */
     const parcial = Object.keys(PARTIDO_BLOQUE).find(k => { const kk = norm(k); return kk.length > 8 && n.includes(kk); });
-    return parcial ? PARTIDO_BLOQUE[parcial] : 'sc';
+    if (parcial) return PARTIDO_BLOQUE[parcial];
+    /* Por núcleo, en los dos sentidos. Sin esto «CAMBIO RADICAL - MIRA» no
+       resolvía ninguna de sus dos partes —la tabla las tiene con el «PARTIDO»
+       delante— y media coalición del país se quedaba sin bloque. Se exige una
+       palabra propia (ni estructural ni genérica) para no casar por «Colombia».
+       Sin espacios además, que «PACTOHISTORICO» existe en los resultados. */
+    const nn = nucleo(partido); if (!nn.length) return 'sc';
+    const sinEspacios = nn.join('');
+    let mejor = null;
+    for (const k of Object.keys(PARTIDO_BLOQUE)) {
+      const kk = nucleo(k); if (!kk.length) continue;
+      const igual = kk.length === nn.length && kk.every(w => nn.includes(w));
+      const contenido = kk.every(w => nn.includes(w)) || nn.every(w => kk.includes(w));
+      const pegado = !contenido && kk.join('') === sinEspacios;
+      if (!contenido && !pegado) continue;
+      const comun = kk.filter(w => nn.includes(w));
+      /* Con el núcleo igual basta («MIRA» es el Partido MIRA). Si uno está
+         CONTENIDO en el otro hay que exigir más: «MOVIMIENTO NUEVO Y
+         DESCONOCIDO» no puede volverse Nuevo Liberalismo por la palabra
+         «nuevo». Se pide una palabra larga y propia —«RENACIENTE»,
+         «LIBERAL»— o dos palabras en común. */
+      const propio = igual || pegado
+        ? kk.some(w => w.length >= 4 && !GENERICAS.has(w))
+        : comun.filter(w => !GENERICAS.has(w)).length >= 2 || comun.some(w => w.length >= 6 && !GENERICAS.has(w));
+      if (!propio) continue;
+      const distancia = Math.abs(kk.length - nn.length);
+      if (!mejor || distancia < mejor.distancia) mejor = { bloque: PARTIDO_BLOQUE[k], distancia };
+    }
+    return mejor ? mejor.bloque : 'sc';
   }
+  /* El bloque de una ORGANIZACIÓN tal como aparece en unos resultados: puede
+     ser un partido, una coalición de varios o un movimiento regional. Es lo
+     que se usa para leer un territorio; `bloqueDePartido` sigue siendo la
+     pregunta simple por un partido. */
+  function bloqueDeOrganizacion(nombre) {
+    const directo = bloqueDePartido(nombre);
+    if (directo !== 'sc') return directo;
+    const local = MOVIMIENTO_LOCAL[norm(nombre).replace(/[^A-ZÑ0-9 ]/g, '').replace(/\s+/g, ' ').trim()];
+    if (local) return local;
+    /* Una coalición vale lo que valen sus partes: el bloque más repetido. */
+    const bloques = partesDeCoalicion(nombre).map(bloqueDePartido).filter(b => b !== 'sc');
+    if (!bloques.length) return 'sc';
+    const cuenta = {}; bloques.forEach(b => { cuenta[b] = (cuenta[b] || 0) + 1; });
+    return Object.entries(cuenta).sort((a, b) => b[1] - a[1])[0][0];
+  }
+  /* «Sin línea» no es lo mismo que «no lo hemos mirado»: estos prestan el aval
+     y sus candidatos vienen de todos los bloques. La interfaz lo dice así. */
+  function esAvalSinLinea(nombre) { const n = norm(nombre); return AVAL_SIN_LINEA.some(a => n.includes(a)); }
   /* Una coalición es varios partidos en un solo nombre: "NUEVO LIBERALISMO -
      AGRUPACION POLITICA EN MARCHA". Se parte por los separadores usuales y se
      devuelven las partes que tienen sentido como partido. */
@@ -265,5 +349,5 @@
     return base ? rampaDeColor(base) : null;
   }
 
-  global.PartidosBloques = { BLOQUE_LABEL, BLOQUE_ORDER, PARTIDO_BLOQUE, CAND_BLOQUE_OVERRIDE, PARTIDO_COLOR, BLOQUE_COLOR, SIN_VOTOS, L_PASOS, bloqueDePartido, partesDeCoalicion, bloqueDeCandidatura, colorDePartido, rampaDeColor, rampaDePartido, norm };
+  global.PartidosBloques = { BLOQUE_LABEL, BLOQUE_ORDER, PARTIDO_BLOQUE, CAND_BLOQUE_OVERRIDE, PARTIDO_COLOR, BLOQUE_COLOR, SIN_VOTOS, L_PASOS, MOVIMIENTO_LOCAL, bloqueDePartido, bloqueDeOrganizacion, esAvalSinLinea, partesDeCoalicion, bloqueDeCandidatura, colorDePartido, rampaDeColor, rampaDePartido, norm };
 })(typeof window !== 'undefined' ? window : globalThis);
