@@ -13,6 +13,7 @@ import argparse
 import html
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -36,6 +37,47 @@ def fecha_larga(f):
         return str(f or '')
 
 
+DIAS = ('lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo')
+
+
+def fecha_agenda(x):
+    """La fila de la agenda, con el día de la semana CALCULADO.
+
+    ⚠️⚠️ El día de la semana NO lo escribe el modelo. Pasó y llegó al PDF: el
+    brief del 14 de septiembre decía «Lunes 15» y «Martes 16» cuando el 15 era
+    martes y el 16 miércoles — el patrón venía copiado del brief de la semana
+    anterior, donde sí calzaba. Es el error más barato de cometer y el más caro
+    de que lo vea un cliente: si el día de la semana está mal, toda fecha del
+    documento queda bajo sospecha. Con `iso` en la evidencia, el día se deriva
+    aquí y es imposible equivocarlo; sin `iso` se publica el texto tal cual,
+    porque inventar una fecha sería peor.
+    """
+    iso = (x.get('iso') or '').strip()
+    txt = (x.get('cuando') or '').strip()
+    if not iso:
+        return txt
+    try:
+        import datetime
+        d = datetime.date.fromisoformat(iso[:10])
+    except Exception:                                            # noqa: BLE001
+        return txt
+    dia = DIAS[d.weekday()]
+    larga = f'{dia.capitalize()} {d.day} de {MESES[d.month - 1]}'
+    # si el texto del modelo trae un rango o una aclaración, se conserva
+    if txt and not re.match(r'^\s*(?:' + '|'.join(DIAS) + r')\b', txt, re.I):
+        return f'{larga} · {txt}' if len(txt) < 40 else larga
+    return larga
+
+
+def fecha_corta(f):
+    """«11 de septiembre», sin el año: lo lleva la fecha de cierre al lado."""
+    try:
+        _, m, d = str(f)[:10].split('-')
+        return f'{int(d)} de {MESES[int(m) - 1]}'
+    except Exception:                                            # noqa: BLE001
+        return str(f or '')
+
+
 def hora_legible(h):
     """«08:50» → «8:50 a. m.», que es como se escribe en el documento."""
     try:
@@ -54,10 +96,19 @@ def construir_html(b):
     cliente = meta.get('cliente') or 'Cliente'
     horas = (v.get('dias_prensa') or 3) * 24
     corte = v.get('corte')
-    ventana_txt = (f"Ventana {fecha_larga(v.get('desde'))} – "
-                   f"{fecha_larga(v.get('hasta'))} · últimas {horas} horas"
-                   + (f" · corte a las {hora_legible(corte)}" if corte else '')
-                   + " · Colombia")
+    # ⚠️ El alcance no es siempre «Colombia»: un cliente regional lee el mismo
+    # documento y decir Colombia a secas le sugiere que eso es todo lo que se
+    # miró. Sale de la ficha, y lo que está fuera de cobertura va declarado en
+    # «qué no se movió», no escondido en el pie.
+    fuera = (meta.get('fuera_de_alcance') or [])
+    alcance = 'Colombia y región' if fuera else 'Colombia'
+    # La banda del hero va a UNA línea: con dos, el salto cae en mitad del
+    # alcance («… · COLOMBIA / Y REGIÓN») y se lee como si el documento se
+    # hubiera cortado. Se escriben los meses en corto y sin repetir el año.
+    ventana_txt = (f"{fecha_corta(v.get('desde'))} – {fecha_larga(v.get('hasta'))}"
+                   f" · últimas {horas} horas"
+                   + (f" · corte {hora_legible(corte)}" if corte else '')
+                   + f" · {alcance}")
 
     top = f"""
 <div class="top">
@@ -124,9 +175,14 @@ def construir_html(b):
 
     # agenda
     if b.get('agenda'):
-        filas = ''.join(f'<tr><td>{e(x.get("cuando"))}</td>'
+        # Ordenada por fecha: una agenda desordenada obliga al lector a
+        # reconstruir el calendario, que es justo el trabajo que le quita.
+        # Lo que no trae fecha (un rango, «esta semana») va al final.
+        ag = sorted(b['agenda'],
+                    key=lambda x: (x.get('iso') or '9999-12-31', x.get('cuando') or ''))
+        filas = ''.join(f'<tr><td>{e(fecha_agenda(x))}</td>'
                         f'<td class="q">{e(x.get("que"))}</td></tr>'
-                        for x in b['agenda'])
+                        for x in ag)
         L.append(f'<h3 class="sec">Agenda de lo que viene</h3>'
                  f'<table class="ag">{filas}</table>')
 
