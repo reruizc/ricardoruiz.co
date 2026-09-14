@@ -150,13 +150,14 @@
     if(!HAS_SESSION){
       // La entrada pública de esta plataforma es su portada, no la página raíz.
       nl.innerHTML='<a href="caudal-portada.html" class="e-btn-back" id="navBack">← Caudal</a>'
-                 + '<a href="login.html?next=caudal.html" class="e-btn-logout nav-login" style="text-decoration:none">Iniciar sesión</a>';
+                 + '<a href="login.html?next=caudal-mi.html" class="e-btn-logout nav-login" style="text-decoration:none">Iniciar sesión</a>';
       pintarBack();
       return;
     }
     // La entrada de Caudal siempre es su propia portada; el dashboard no debe
     // interrumpir la navegación entre la explicación del producto y el panel.
     nl.innerHTML='<a href="caudal-portada.html" class="e-btn-back" id="navBack">← Caudal</a>'
+               + '<a href="caudal-mi.html" class="e-btn-back">Mi Caudal</a>'
                + (ACCESO?'<span class="priv-badge">Cliente</span>':'')
                + '<button class="e-btn-logout" id="navLogout" type="button">Salir</button>';
     const lo=document.getElementById('navLogout'); if(lo) lo.onclick=toLogin;

@@ -13,18 +13,19 @@
           : currentLang==='cn' ? {free:'免费',basic:'基础版',analysis:'分析版',full:'完整版',pro:'Pro',premium:'Premium'}
           : currentLang==='br' ? {free:'Free',basic:'Básico',analysis:'Análise',full:'Completo',pro:'Pro',premium:'Premium'}
           : {free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo',pro:'Pro',premium:'Premium'};
-        const perfilLabel = currentLang==='us'?'My dashboard':currentLang==='cn'?'我的面板':currentLang==='br'?'Meu painel':'Mi panel';
+        const perfilLabel = currentLang==='us'?'My dashboard':currentLang==='cn'?'我的面板':currentLang==='br'?'Meu painel':'Mi Caudal';
         const logoutLabel = currentLang==='us'?'Log out':currentLang==='cn'?'退出':currentLang==='br'?'Sair':'Salir';
         area.dataset.loggedIn='1';
         area.innerHTML=`
-          <a href="dashboard.html" class="e-btn-profile">${perfilLabel}</a>
+          <a href="caudal-mi.html" class="e-btn-profile">${perfilLabel}</a>
           <button class="e-btn-logout" onclick="logOut()">${logoutLabel}</button>`;
       } else {
         delete area.dataset.loggedIn;
         const loginLabel = currentLang==='us'?'Log in':currentLang==='cn'?'登录':currentLang==='br'?'Entrar':'Iniciar sesión';
         const registerLabel = currentLang==='us'?'Sign up':currentLang==='cn'?'注册':currentLang==='br'?'Cadastrar':'Registrarme';
         area.innerHTML=`
-          <a href="login.html?next=caudal.html" class="e-btn-login">${loginLabel}</a>`;
+          <a href="login.html?next=caudal-mi.html" class="e-btn-login">${loginLabel}</a>
+          <a href="register.html?next=caudal-mi.html" class="e-btn-register">${registerLabel}</a>`;
       }
     }
     async function logOut(){

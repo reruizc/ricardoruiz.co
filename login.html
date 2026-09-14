@@ -758,6 +758,12 @@
       return d;
     }
 
+    // Conserva el destino de Caudal también al pasar de login a registro.
+    // Los demás productos mantienen su flujo de elección de plan.
+    if (destinoTrasLogin().split('?')[0] === 'caudal-mi.html') {
+      document.getElementById('register-link').href = 'register.html?next=caudal-mi.html';
+    }
+
     document.getElementById('loginForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       const t = i18n[currentLang] || i18n.co;
@@ -893,7 +899,7 @@
         await fetch('https://rr-auth.reruizc.workers.dev/auth/magic', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email, next: destinoTrasLogin() === 'caudal-mi.html' ? 'caudal-mi.html' : undefined }),
         });
         btn.textContent = currentLang === 'us' ? '✓ Link sent — check your email' : '✓ Enlace enviado — revisa tu correo';
       } catch {

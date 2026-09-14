@@ -290,7 +290,13 @@
   // es peor que mostrar la lista.
   async function pfAutoAbrir(){
     if(!PF_LIST.length) return false;
-    const ult=pfUltimoLeer();
+    const pedido=new URLSearchParams(location.search).get('perfil');
+    if(pedido&&!PF_LIST.some(p=>p.perfilId===pedido)){
+      const box=document.getElementById('cli-body');
+      if(box) box.innerHTML='<div class="cob-note">Ese perfil no está disponible en tu cuenta. Selecciona uno de tus perfiles arriba.</div>';
+      return false;
+    }
+    const ult=(pedido&&PF_LIST.some(p=>p.perfilId===pedido))?pedido:pfUltimoLeer();
     const cual=(ult&&PF_LIST.some(p=>p.perfilId===ult))?ult:(PF_LIST.length===1?PF_LIST[0].perfilId:'');
     if(!cual){
       // varios clientes y ninguno marcado: NO se elige por el usuario — abrir el
@@ -317,6 +323,10 @@
     const bar=document.getElementById('cli-perfiles'); if(!bar) return;
     if(IS_GUEST){
       bar.innerHTML='<span class="pf-lbl">Perfiles de cliente</span><span class="cob-note" style="margin:0">Entra con tu cuenta para guardar los temas y las empresas de un cliente.</span>';
+      return;
+    }
+    if(!ACCESO){
+      bar.innerHTML='<a class="chip add" href="caudal-mi.html">Mi contexto sectorial →</a><span class="cob-note" style="margin:0">Los perfiles de organización requieren acceso personalizado.</span>';
       return;
     }
     let h='<span class="pf-lbl">Perfiles de cliente</span>';
@@ -1082,8 +1092,8 @@
     const body=document.getElementById('cli-body'); if(!body) return;
     body.innerHTML=`<div class="muro-blk">
       <div class="muro-t">Ya viste los ${ROSA_ANON_MAX} sectores de esta semana.</div>
-      <div class="muro-d">Crear una cuenta es gratis y abre los 15 sectores, la lectura del analista y el brief de 72 horas. Los que ya abriste siguen disponibles.</div>
-      <a class="muro-btn" href="register.html?next=${encodeURIComponent('caudal.html#cliente')}">Crear cuenta gratis →</a>
+      <div class="muro-d">Crear una cuenta es gratis y permite guardar tu contexto y consultar los sectores. El análisis empresarial requiere acceso personalizado.</div>
+      <a class="muro-btn" href="register.html?next=${encodeURIComponent('caudal-mi.html')}">Crear cuenta gratis →</a>
     </div>`;
   }
 
@@ -1408,6 +1418,11 @@
   async function cliLoad(arg){
     const mine=++_cliSeq;
     cliLecturaStop();
+    if(!HAS_SESSION && !IS_GUEST){
+      const box=document.getElementById('cli-body');
+      if(box) box.innerHTML='<div class="cob-note">Crea tu cuenta para guardar tu contexto y consultar tu sector. <a href="register.html?next=caudal-mi.html">Registrarme →</a> · <a href="login.html?next=caudal-mi.html">Iniciar sesión</a></div>';
+      return;
+    }
     const esPerfil=!!(arg&&arg.perfil);
     // el cupo se cobra ANTES de pedir nada: si no hay, ni se llama a la Lambda
     if(!esPerfil && arg && arg.sector && !rosaConsumir(arg.sector)){
@@ -1423,7 +1438,10 @@
       ? {action:'cliente',lectura:true,
          perfil:{nombre:p.nombre,descripcion:p.descripcion||'',temas:p.temas||[],
                  empresas:p.empresas||[],sector_sanciones:p.sector_sanciones||'',
-                 comision:p.comision||''}}
+                 comision:p.comision||'', tipo:p.tipo||'', lineas:p.lineas||[],
+                 competencia:p.competencia||[], que_hace:p.que_hace||'', lector:p.lector||'',
+                 decisiones:p.decisiones||[], jurisdicciones:p.jurisdicciones||[],
+                 interlocutores:p.interlocutores||[], relojes:p.relojes||[], no_interesa:p.no_interesa||[]}}
       : {action:'cliente',lectura:true,sector:arg.sector};
     const body=document.getElementById('cli-body');
     const quien=esPerfil?('de '+esc(p.nombre||'tu cliente')):'del sector';
