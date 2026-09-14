@@ -87,12 +87,18 @@ def construir_html(b):
     for i, t in enumerate(b.get('temas') or [], 1):
         # la urgencia decide el color del bloque, igual que en el brief manual
         cls = 'item urg' if t.get('urgencia') == 'alta' else 'item med'
-        area = (f' · <span class="area">{e(t["linea"])}</span>'
-                if t.get('linea') else '')
+        # ⚠️ El encabezado del brief manual es «NN · TEMA · ÁREA», tres partes.
+        # Si el rótulo ya nombra la línea, repetirla da «06 · Landing LATAM ·
+        # inversión · LANDING LATAM», que es lo que salió la primera vez.
+        rot = (t.get('rotulo') or '').strip()
+        lin = (t.get('linea') or '').strip()
+        repetida = lin and lin.lower() in rot.lower()
+        area = (f' · <span class="area">{e(lin)}</span>'
+                if lin and not repetida else '')
         parr = ''.join(f'<p>{e(x)}</p>' for x in (t.get('parrafos') or []))
         L.append(f"""
 <div class="{cls}">
-  <div class="num">{i:02d} · {e(t.get('rotulo', ''))}{area}</div>
+  <div class="num">{i:02d} · {e(rot)}{area}</div>
   <h2>{e(t.get('titulo', ''))}</h2>
   {parr}
   <div class="porque"><span class="et">Por qué le importa a {e(cliente)}</span>

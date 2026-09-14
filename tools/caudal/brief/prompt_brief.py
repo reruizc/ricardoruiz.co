@@ -19,6 +19,7 @@ riguroso con la diferencia entre lo que se movió, lo que sigue vigente sin
 moverse, y lo que no sabemos porque el registro va atrasado. Un brief que
 presenta lo viejo como nuevo se quema en la segunda entrega.
 """
+import re
 
 # ── el sistema: quién escribe, para quién y con qué reglas ─────────────────
 BRIEF_SYSTEM = """Eres el analista de asuntos públicos que le escribe el brief a un cliente de \
@@ -161,6 +162,47 @@ TOPES = {'congreso': 30, 'congreso_frente': 14, 'regulatorio': 25,
          'ejecutivo': 20, 'sucop': 20, 'medios': 70, 'contratacion': 12,
          'agenda': 12}
 
+# ⚠️⚠️ El recorte de prensa NO puede ser «los primeros N»: solo el 3% de los
+# titulares trae una cifra (medido sobre los 152 del barrido de Cauce), así que
+# tomar por orden de llegada bota justo lo poco que tiene dato duro. Pasó y se
+# midió: el titular con los «$634,9 billones» del Presupuesto —LA cifra de ese
+# frente, y una de las que sostienen el brief del 7 de septiembre— quedó en la
+# posición 105 de 152 y nunca llegó al modelo. El brief salió con una sola cifra
+# en todo el documento contra las trece del escrito a mano.
+_CIFRA = re.compile(r'\$\s?[\d.,]+|\b\d{1,3}(?:\.\d{3})+\b|\b\d+(?:,\d+)?\s?%')
+
+
+def _valor_titular(x):
+    """Cuánto aporta un titular. Mayor es mejor; se ordena descendente.
+
+    No reordena la lista final —la cronología se conserva— sino que decide QUÉ
+    sobrevive al recorte cuando hay más titulares que cupo.
+    """
+    t = x.get('titulo') or ''
+    v = 0
+    if _CIFRA.search(t):
+        v += 3                      # una cifra es lo más escaso y lo más útil
+    if '«' in t or '"' in t or '“' in t:
+        v += 2                      # una cita textual da la frase que se repite
+    if x.get('_origen', '').startswith('interlocutor'):
+        v += 2                      # lo que dijo su supervisor pesa más
+    if x.get('_origen', '').startswith('empresa'):
+        v += 2                      # y lo que se dice de una vigilada, también
+    if x.get('_ruido'):
+        v -= 4                      # ruido declarado por el cliente
+    return v
+
+
+def _recorte(pilar, xs, tope):
+    """Los `tope` ítems más útiles, devueltos en su orden original."""
+    if len(xs) <= tope:
+        return xs
+    if pilar != 'medios':
+        return xs[:tope]
+    orden = sorted(range(len(xs)),
+                   key=lambda i: (-_valor_titular(xs[i]), i))[:tope]
+    return [xs[i] for i in sorted(orden)]
+
 TITULOS = {
     'congreso': 'CONGRESO · lo que se movió en la ventana',
     'congreso_frente': 'CONGRESO · vigente pero SIN movimiento en la ventana '
@@ -203,7 +245,7 @@ def armar_mensaje(b):
             L.append("  (sin ítems en la ventana"
                      + (f"; el registro llega hasta {f})" if f else ")"))
             continue
-        for x in xs[:TOPES.get(pilar, 20)]:
+        for x in _recorte(pilar, xs, TOPES.get(pilar, 20)):
             L.append('  ' + _fmt_item(pilar, x))
         if len(xs) > TOPES.get(pilar, 20):
             L.append(f"  … y {len(xs) - TOPES.get(pilar, 20)} más del mismo pilar")
