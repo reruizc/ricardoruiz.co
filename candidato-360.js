@@ -2498,6 +2498,11 @@ const datosCandidaturaCache = new Map();
 function alcanceObjetivo() {
   const target = currentTargetTerritory(); if (!target?.corporation) return null;
   const departamento = String($('campaignDepartment').value || '').replace(/^0+/, '');
+  /* La JAL se elige por LOCALIDAD, no por municipio. Sin este nivel, un edil
+     de Teusaquillo que se lanza por Tunjuelito «seguía en alcance» —las dos
+     son Bogotá— y el mapa proyectaba toda su meta en Teusaquillo, o sea en el
+     territorio que acaba de dejar y donde su votación anterior no cuenta. */
+  if (target.corporation === 'jal' && target.locality) return { tipo: 'localidad', departamento, municipio: codigoMunicipioObjetivo(), municipioNombre: target.municipality, localidad: target.locality, departamentoNombre: target.department };
   if (CORP_MUNICIPAL.includes(target.corporation) && target.municipality) return { tipo: 'municipio', departamento, municipio: codigoMunicipioObjetivo(), municipioNombre: target.municipality, departamentoNombre: target.department };
   if (CORP_DEPARTAMENTAL.includes(target.corporation) && target.department) return { tipo: 'departamento', departamento, departamentoNombre: target.department };
   return null;
@@ -2512,8 +2517,13 @@ function mesaEnAlcance(mesa, alcance) {
   const dep = String(mesa.dep || '').replace(/^0+/, ''), mun = String(mesa.mun || '').replace(/^0+/, '');
   if (alcance.departamento && dep && dep !== alcance.departamento) return false;
   if (alcance.tipo === 'departamento') return alcance.departamento ? Boolean(dep) : normalizedText(mesa.depNom || '') === alcance.departamentoNombre;
-  if (alcance.municipio) return mun === alcance.municipio;
-  return normalizedText(mesa.munNom || '') === alcance.municipioNombre;
+  const enMunicipio = alcance.municipio ? mun === alcance.municipio : normalizedText(mesa.munNom || '') === alcance.municipioNombre;
+  if (alcance.tipo !== 'localidad') return enMunicipio;
+  /* La localidad de la mesa viene como «13LOCALIDAD 13 TEUSAQUILLO» o
+     «14COMUNA 14 EL POBLADO»: se compara por el nombre pelado. */
+  if (!enMunicipio) return false;
+  const suya = normalizedText(cortoLocal(nombreLocal(mesa))), objetivo = normalizedText(cortoLocal(alcance.localidad));
+  return Boolean(suya) && Boolean(objetivo) && suya === objetivo;
 }
 async function datosCandidatura(candidate) {
   const url = candidate?.dataUrl || '';
@@ -2532,7 +2542,10 @@ async function datosCandidatura(candidate) {
   return { ...data, mesas: recorteActivo.sinVotos ? mesas : dentro, recorte: recorteActivo };
 }
 function lugarDelAlcance(recorte = recorteActivo) {
-  return recorte?.alcance?.tipo === 'municipio' ? ($('campaignMunicipality').value || 'el municipio') : ($('campaignDepartment').options[$('campaignDepartment').selectedIndex]?.text || 'el departamento');
+  const tipo = recorte?.alcance?.tipo;
+  if (tipo === 'localidad') return NOMBRE_BONITO($('campaignLocality').value || '') || 'la localidad';
+  if (tipo === 'municipio') return NOMBRE_BONITO($('campaignMunicipality').value || '') || 'el municipio';
+  return $('campaignDepartment').options[$('campaignDepartment').selectedIndex]?.text || 'el departamento';
 }
 function notaRecorte(recorte = recorteActivo) {
   if (!recorte || !recorte.mesasFuera) return '';
@@ -3154,9 +3167,12 @@ async function renderTerritorioDeCampana() {
   try {
     const codigo = codigoMunicipioObjetivo(); if (!codigo) return;
     const puestos = await puestosPorBarrio(), prefijo = `${String(c.departamento || '').padStart(2, '0')}${String(codigo).padStart(3, '0')}`;
-    const mesas = Object.entries(puestos).filter(([code]) => code.slice(0, 5) === prefijo)
+    /* Una JAL compite en UNA localidad: mostrarle los puestos de toda la
+       ciudad sería ofrecerle un territorio que no es el suyo. */
+    const loc = c.corp === 'jal' ? normalizedText(cortoLocal(c.localidad)) : '';
+    const mesas = Object.entries(puestos).filter(([code, p]) => code.slice(0, 5) === prefijo && (!loc || normalizedText(cortoLocal(p.mesa?.comNom || '')) === loc))
       .map(([code, p]) => ({ dep: code.slice(0, 2), mun: code.slice(2, 5), zon: code.slice(5, 7), pue: code.slice(7, 9), pueNom: p.barrio, v: p.censo }));
-    if (mesas.length) { MAPA_MUNICIPAL = { mesas, nombre: c.municipio, censo: true }; refreshMapLevels(); }
+    if (mesas.length) { MAPA_MUNICIPAL = { mesas, nombre: loc ? c.localidad : c.municipio, censo: true }; refreshMapLevels(); }
   } catch (e) { /* sin puestos, queda el polígono del municipio */ }
 }
 /* Territorio objetivo de una candidatura NUEVA: no hay votos que pintar; se
@@ -3218,7 +3234,9 @@ async function mesasDelHistorial() { try { return (await datosCandidatura(crmCan
 const codigoMunicipio = mesa => `${String(mesa.dep || '').padStart(2, '0')}${String(mesa.mun || '').padStart(3, '0')}`;
 function municipioDeCampana() {
   const a = alcanceObjetivo();
-  return a?.tipo === 'municipio' && a.municipio ? `${String(a.departamento).padStart(2, '0')}${String(a.municipio).padStart(3, '0')}` : '';
+  /* Una JAL también compite dentro de un municipio: su alcance es la localidad
+     y el municipio sigue siendo el de los arquetipos. */
+  return (a?.tipo === 'municipio' || a?.tipo === 'localidad') && a.municipio ? `${String(a.departamento).padStart(2, '0')}${String(a.municipio).padStart(3, '0')}` : '';
 }
 function municipioMayoritario(mesas) { return C360Electorado.municipioMayoritario(mesas); }
 /* Los archivos del Proyecto DC (≈ 560 KB) se piden UNA vez y solo si la
