@@ -190,6 +190,9 @@
       if(tb&&PF_DRAFT){ PF_DRAFT.tipo=tb.dataset.tipo; pfRenderEdit(); return; }
       const rl=t.closest('[data-rmlinea]');
       if(rl&&PF_DRAFT){ PF_DRAFT.lineas.splice(+rl.dataset.rmlinea,1); pfRenderTags(); return; }
+      const rf=t.closest('[data-rmficha]');
+      if(rf&&PF_DRAFT){ const [campo,i]=rf.dataset.rmficha.split(':');
+        (PF_DRAFT[campo]||[]).splice(+i,1); pfRenderTags(); return; }
       if(t.closest('#pf-save')){ pfGuardar(); return; }
       if(t.closest('#pf-cancel')){ pfCerrarEdit(); return; }
       if(t.closest('#pf-del')){ pfBorrar(); return; }
@@ -213,7 +216,17 @@
         if(v.length<3) return pfMsg('Ponle un nombre reconocible a la línea.');
         if((PF_DRAFT.lineas||[]).length>=8) return pfMsg('Máximo 8 líneas de negocio.');
         PF_DRAFT.lineas=PF_DRAFT.lineas||[];
-        if(!PF_DRAFT.lineas.some(x=>x.toLowerCase()===v.toLowerCase())) PF_DRAFT.lineas.push(v);
+        if(!PF_DRAFT.lineas.some(x=>pfLineaNombre(x).toLowerCase()===v.toLowerCase())) PF_DRAFT.lineas.push({nombre:v,comision:'',temas:[]});
+        inp.value=''; pfMsg(''); pfRenderTags();
+      } else if(inp.id&&inp.id.indexOf('pf-fin-')===0){
+        e.preventDefault();
+        if(!PF_DRAFT) return;
+        const campo=inp.id.slice(7), def=PF_FICHA_LST.find(f=>f[0]===campo);
+        const v=(inp.value||'').replace(/\s+/g,' ').trim();
+        if(v.length<3) return pfMsg('Escríbelo con al menos 3 letras.');
+        PF_DRAFT[campo]=PF_DRAFT[campo]||[];
+        if(def&&PF_DRAFT[campo].length>=def[2]) return pfMsg('Máximo '+def[2]+'.');
+        if(!PF_DRAFT[campo].some(x=>x.toLowerCase()===v.toLowerCase())) PF_DRAFT[campo].push(v);
         inp.value=''; pfMsg(''); pfRenderTags();
       } else if(inp.id==='pf-tema-in'){
         e.preventDefault();
@@ -325,11 +338,17 @@
   // por eso los presets no se borraron: son las plantillas.
   function pfNuevo(desdePreset){
     const pl=desdePreset&&PF_META&&(PF_META.plantillas||[]).find(x=>x.k===desdePreset);
-    PF_DRAFT=pl?{perfilId:null,nombre:pl.nombre,descripcion:'',temas:pl.temas.slice(),
-                 empresas:[],sector_sanciones:pl.sector_sanciones||'',comision:pl.comision||'',
-                 tipo:pl.tipo||'empresa',alcance:'colombia',lineas:(pl.lineas||[]).map(l=>l.nombre||l)}
-               :{perfilId:null,nombre:'',descripcion:'',temas:[],empresas:[],sector_sanciones:'',comision:'',
-                 tipo:'',alcance:'colombia',lineas:[]};
+    const vacio={que_hace:'',lector:'',decisiones:[],jurisdicciones:[],interlocutores:[],relojes:[],no_interesa:[]};
+    const dePl=pl?Object.assign({},vacio,{que_hace:pl.que_hace||'',lector:pl.lector||'',
+                 decisiones:(pl.decisiones||[]).slice(),jurisdicciones:(pl.jurisdicciones||[]).slice(),
+                 interlocutores:(pl.interlocutores||[]).slice(),relojes:(pl.relojes||[]).slice(),
+                 no_interesa:(pl.no_interesa||[]).slice()}):vacio;
+    PF_DRAFT=pl?Object.assign({perfilId:null,nombre:pl.nombre,descripcion:pl.descripcion||'',temas:pl.temas.slice(),
+                 empresas:(pl.empresas_keys||[]).slice(),competencia:(pl.competencia_keys||[]).slice(),
+                 sector_sanciones:pl.sector_sanciones||'',comision:pl.comision||'',
+                 tipo:pl.tipo||'empresa',lineas:pfLineasNorm(pl.lineas)},dePl)
+               :Object.assign({perfilId:null,nombre:'',descripcion:'',temas:[],empresas:[],competencia:[],
+                 sector_sanciones:'',comision:'',tipo:'',lineas:[]},vacio);
     PF_WIZARD_STEP=1;
     pfRenderWizard();
   }
@@ -337,6 +356,22 @@
     const vals=(PF_DRAFT&&PF_DRAFT[kind])||[];
     const empty=kind==='temas'?'Aún no agregas temas.':'Aún no agregas empresas.';
     return vals.length?vals.map((x,i)=>`<span class="chip on">${esc(x)} <button type="button" class="x" data-wizrm="${kind}:${i}" aria-label="Quitar ${esc(x)}">×</button></span>`).join(''):`<span class="cob-note" style="margin:0">${empty}</span>`;
+  }
+  /* El asistente de registro. Ocho pasos, y los dos nuevos —qué hace, quién lo
+     lee y qué decide— son los que hacen que el brief suene a ESTE cliente: sin
+     ellos el análisis describe señales y no puede cerrar en una recomendación.
+     El resto de la ficha (interlocutores, relojes, exclusiones) se completa
+     después en Editar, con el cliente al frente: pedir catorce campos en el
+     registro es la forma más rápida de que nadie termine el registro. */
+  const PF_WIZ_PASOS=8;
+  function pfWizardJur(){
+    const d=PF_DRAFT, otros=(d.jurisdicciones||[]).filter(x=>x.toLowerCase()!=='colombia');
+    const soloCo=!otros.length;
+    return `<div class="pf-f"><label>¿Dónde opera?</label><div class="pf-scope-cards">
+      <button type="button" class="pf-scope-card${soloCo?' on':''}" data-wizscope="colombia"><b>Solo Colombia</b><small>Todo lo que vigila ocurre en el país.</small></button>
+      <button type="button" class="pf-scope-card${!soloCo?' on':''}" data-wizscope="latam"><b>Colombia y otros países</b><small>Opera también fuera y quiere que quede declarado.</small></button>
+    </div>${soloCo?'':`<input id="pf-wiz-jur" maxlength="60" placeholder="agrega un país y Enter — p. ej. «Perú»" autocomplete="off"><div class="pf-tags">${pfWizardTags('jurisdicciones')}</div>`}
+    <div class="hint">Las fuentes de Caudal son colombianas. Lo que declares fuera de Colombia queda marcado como <b>fuera de alcance</b> en el análisis, en vez de dejar que el cliente asuma que lo estamos vigilando.</div></div>`;
   }
   function pfRenderWizard(){
     if(!PF_DRAFT) return;
@@ -348,23 +383,55 @@
       <button type="button" class="pf-type-card${d.tipo==='gremio'?' on':''}" data-wiztipo="gremio"><img src="imagenes/caudal-territorial.jpg" alt=""><span>Un gremio</span><small>Una asociación que representa empresas.</small></button>
     </div></div>`;
     if(step===2) body=`<div class="pf-f"><label>¿Cómo se llama?</label><input id="pf-wiz-nombre" maxlength="80" placeholder="Asobancaria, Grupo Nutresa, EPM…" value="${esc(d.nombre)}" autofocus><div class="pf-dict-status" id="pf-dict-status">Escribe el nombre para comprobarlo en el diccionario de Caudal.</div></div>`;
-    if(step===3) body=`<div class="pf-f"><label>¿Qué tema le importa seguir?</label><input id="pf-wiz-tema" maxlength="80" placeholder="p. ej. reforma pensional"><div class="hint">Escríbelo como aparecería en una ley y presiona <b>Enter</b> para añadirlo. Repite para sumar más temas.</div><div class="pf-tags">${pfWizardTags('temas')}</div></div>`;
-    if(step===4) body=`<div class="pf-f pf-ac"><label>${d.tipo==='gremio'?'¿Qué empresa quiere vigilar?':'¿Qué competidor quiere seguir?'}</label><input id="pf-wiz-emp" maxlength="60" placeholder="escribe al menos 2 letras" autocomplete="off"><div class="hint">Opcional. Te sugerimos coincidencias del diccionario: selecciona una y repite la búsqueda para añadir todos los competidores que quieras.</div><div class="pf-sug" id="pf-sug" hidden></div><div class="pf-tags">${pfWizardTags('empresas')}</div></div>`;
-    if(step===5) body=`<div class="pf-f"><label>¿Dónde debe seguirlo?</label><div class="pf-scope-cards"><button type="button" class="pf-scope-card${d.alcance==='colombia'?' on':''}" data-wizscope="colombia"><b>Solo Colombia</b><small>Seguimiento de redes, normas y regulación del país.</small></button><button type="button" class="pf-scope-card${d.alcance==='latam'?' on':''}" data-wizscope="latam"><b>Latinoamérica</b><small>Señala un seguimiento regional para el equipo.</small></button></div><div class="hint">Hoy las fuentes automáticas de Caudal son colombianas; la selección regional queda identificada en el perfil para su seguimiento analítico.</div></div>`;
-    if(step===6) body=`<div class="pf-f"><label>Listo para crear el perfil</label><div class="pf-wizard-copy"><b>${esc(d.nombre||'Este perfil')}</b> seguirá ${d.temas.length?esc(d.temas.join(', ')):'los temas que agregues'}${d.empresas.length?' y '+esc(d.empresas.length)+' empresa(s)':''}, con alcance ${d.alcance==='latam'?'regional latinoamericano':'Colombia'}. Podrás completar líneas de negocio, sector y comisión después desde Editar.</div></div>`;
+    if(step===3) body=`<div class="pf-f"><label>¿A qué se dedica y por dónde le llega la regulación?</label>
+      <textarea id="pf-wiz-quehace" maxlength="700" rows="4" placeholder="p. ej. «Plataforma de movilidad y reparto. No hay ley propia de transporte por plataformas, así que su exposición se reparte entre movilidad, relación con conductores, tributario y datos.»" autofocus>${esc(d.que_hace||'')}</textarea>
+      <div class="hint">Dos o tres frases. Es el contexto que ninguna lista de temas puede dar: sin esto el análisis sabe qué se movió, pero no por qué le importa a este cliente en particular.</div></div>`;
+    if(step===4) body=`<div class="pf-f"><label>¿Qué tema le importa seguir?</label><input id="pf-wiz-tema" maxlength="80" placeholder="p. ej. reforma pensional"><div class="hint">Escríbelo como aparecería en una ley y presiona <b>Enter</b> para añadirlo. Repite para sumar más temas.</div><div class="pf-tags">${pfWizardTags('temas')}</div></div>`;
+    if(step===5) body=`<div class="pf-f pf-ac"><label>${d.tipo==='gremio'?'¿Qué empresa quiere vigilar?':'¿Qué competidor quiere seguir?'}</label><input id="pf-wiz-emp" maxlength="60" placeholder="escribe al menos 2 letras" autocomplete="off"><div class="hint">Opcional. Te sugerimos coincidencias del diccionario: selecciona una y repite la búsqueda para añadir todos los competidores que quieras.</div><div class="pf-sug" id="pf-sug" hidden></div><div class="pf-tags">${pfWizardTags('empresas')}</div></div>`;
+    if(step===6) body=`<div class="pf-f"><label>¿Quién va a leer esto?</label>
+      <input id="pf-wiz-lector" maxlength="400" placeholder="p. ej. «el equipo de asuntos públicos de la operación en Colombia»" value="${esc(d.lector||'')}" autofocus>
+      <div class="hint">Fija el tono y el cierre de cada punto: a un gerente de cumplimiento se le dice qué revisar; a unos socios de consultoría, qué contarle a sus clientes.</div></div>
+      <div class="pf-f"><label>¿Qué decide con este brief?</label>
+      <input id="pf-wiz-dec" maxlength="160" placeholder="una decisión y Enter — p. ej. «si comentar un proyecto en consulta»">
+      <div class="hint">Es lo que convierte «pasó esto» en «haz esto». Sin decisiones el brief describe y no recomienda.</div>
+      <div class="pf-tags">${pfWizardTags('decisiones')}</div></div>`;
+    if(step===7) body=pfWizardJur();
+    if(step===8){
+      const fuera=(d.jurisdicciones||[]).filter(x=>x.toLowerCase()!=='colombia');
+      body=`<div class="pf-f"><label>Listo para crear el perfil</label><div class="pf-wizard-copy"><b>${esc(d.nombre||'Este perfil')}</b> seguirá ${d.temas.length?esc(d.temas.join(', ')):'los temas que agregues'}${d.empresas.length?' y '+esc(String(d.empresas.length))+' empresa(s)':''}.${fuera.length?` Opera también en ${esc(fuera.join(', '))}: eso queda declarado como fuera del alcance de las fuentes.`:''} ${(d.que_hace&&d.lector&&(d.decisiones||[]).length)?'La ficha ya alcanza para escribir un brief a su medida.':'Puedes completar el resto de la ficha —interlocutores, plazos propios y exclusiones— después desde Editar.'}</div></div>`;
+    }
     modalCard.dataset.pfWizard='1';
-    modalCard.innerHTML=`<div class="pf-wizard"><button class="modal-close" type="button" id="pf-wiz-close">✕</button><div class="pf-wizard-step">Nuevo perfil · ${step} de 6</div><h2>${step===1?'Empecemos por el cliente':step===2?'Identifiquémoslo':step===3?'Definamos su agenda':step===4?'Miremos alrededor':step===5?'Definamos el alcance':'Revisa el perfil'}</h2><div class="pf-wizard-copy">${step===1?'Elige la estructura que mejor representa al cliente.':step===2?'Comprobamos en el momento si ya existe en el diccionario de Caudal.':step===3?'Una pregunta a la vez: añade los temas que sí mueven su aguja.':step===4?'Esta pregunta es opcional; puedes saltarla.':step===5?'Define el territorio para el seguimiento.':'Puedes editar los detalles cuando quieras.'}</div>${body}<div class="pf-acts"><button class="btn-g" type="button" id="pf-wiz-back" ${step===1?'hidden':''}>← Atrás</button><span class="pf-msg" id="pf-msg"></span><button class="btn-t" type="button" id="pf-wiz-next">${step===6?'Crear perfil':'Continuar →'}</button></div></div>`;
+    const titulos=['','Empecemos por el cliente','Identifiquémoslo','¿A qué se dedica?','Definamos su agenda','Miremos alrededor','¿Para quién es el brief?','Definamos el alcance','Revisa el perfil'];
+    const bajadas=['','Elige la estructura que mejor representa al cliente.','Comprobamos en el momento si ya existe en el diccionario de Caudal.','Con esto el análisis deja de describir señales y empieza a explicar qué le pega a este cliente.','Una pregunta a la vez: añade los temas que sí mueven su aguja.','Esta pregunta es opcional; puedes saltarla.','Quién lo lee y qué decide con él: de ahí sale el cierre de cada punto.','Define el territorio para el seguimiento.','Puedes editar los detalles cuando quieras.'];
+    modalCard.innerHTML=`<div class="pf-wizard"><button class="modal-close" type="button" id="pf-wiz-close">✕</button><div class="pf-wizard-step">Nuevo perfil · ${step} de ${PF_WIZ_PASOS}</div><h2>${titulos[step]}</h2><div class="pf-wizard-copy">${bajadas[step]}</div>${body}<div class="pf-acts"><button class="btn-g" type="button" id="pf-wiz-back" ${step===1?'hidden':''}>← Atrás</button><span class="pf-msg" id="pf-msg"></span><button class="btn-t" type="button" id="pf-wiz-next">${step===PF_WIZ_PASOS?'Crear perfil':'Continuar →'}</button></div></div>`;
     modal.classList.add('on');
     document.getElementById('pf-wiz-close').onclick=()=>cerrar();
     const back=document.getElementById('pf-wiz-back'); if(back) back.onclick=()=>{ PF_WIZARD_STEP--; pfRenderWizard(); };
     document.querySelectorAll('[data-wiztipo]').forEach(b=>b.onclick=()=>{ d.tipo=b.dataset.wiztipo; pfRenderWizard(); });
-    document.querySelectorAll('[data-wizscope]').forEach(b=>b.onclick=()=>{ d.alcance=b.dataset.wizscope; pfRenderWizard(); });
+    document.querySelectorAll('[data-wizscope]').forEach(b=>b.onclick=()=>{
+      // «Solo Colombia» borra los otros países a propósito: dejarlos escondidos
+      // detrás de un botón que dice lo contrario haría que el análisis declarara
+      // fuera de alcance países que el cliente ya quitó.
+      d.jurisdicciones=b.dataset.wizscope==='colombia'?['Colombia']
+        :(d.jurisdicciones&&d.jurisdicciones.length?d.jurisdicciones.slice():['Colombia']);
+      pfRenderWizard();
+    });
     document.querySelectorAll('[data-wizrm]').forEach(b=>b.onclick=()=>{ const [kind,i]=b.dataset.wizrm.split(':'); d[kind].splice(+i,1); pfRenderWizard(); });
     const next=document.getElementById('pf-wiz-next'); if(next) next.onclick=()=>pfWizardNext();
     const name=document.getElementById('pf-wiz-nombre'); if(name){ name.oninput=()=>{ clearTimeout(PF_WIZARD_TIMER); PF_WIZARD_TIMER=setTimeout(()=>pfWizardCheckName(name.value),280); }; if(name.value.trim()) pfWizardCheckName(name.value); }
     const topic=document.getElementById('pf-wiz-tema'); if(topic) topic.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); pfWizardAddTopic(); } };
+    const dec=document.getElementById('pf-wiz-dec'); if(dec) dec.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); pfWizardAddLista(dec,'decisiones',6); } };
+    const jur=document.getElementById('pf-wiz-jur'); if(jur) jur.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); pfWizardAddLista(jur,'jurisdicciones',12); } };
     const emp=document.getElementById('pf-wiz-emp'); if(emp){ emp.oninput=()=>pfSugerir(emp.value); emp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); const first=document.querySelector('#pf-sug [data-pfemp]'); if(first) first.click(); } }; }
     document.querySelectorAll('#pf-sug [data-pfemp]').forEach(x=>x.onclick=()=>{ if(!d.empresas.includes(x.dataset.pfemp)) d.empresas.push(x.dataset.pfemp); pfRenderWizard(); });
+  }
+  function pfWizardAddLista(inp,campo,max){
+    const v=(inp&&inp.value||'').replace(/\s+/g,' ').trim();
+    if(v.length<3) return pfMsg('Escríbelo con al menos 3 letras.');
+    PF_DRAFT[campo]=PF_DRAFT[campo]||[];
+    if(PF_DRAFT[campo].length>=max) return pfMsg('Máximo '+max+'.');
+    if(!PF_DRAFT[campo].some(x=>x.toLowerCase()===v.toLowerCase())) PF_DRAFT[campo].push(v);
+    pfRenderWizard();
   }
   function pfWizardAddTopic(){
     const inp=document.getElementById('pf-wiz-tema'), v=(inp&&inp.value||'').replace(/\s+/g,' ').trim();
@@ -385,17 +452,37 @@
     }catch(e){ if(mine===PF_WIZARD_LOOKUP){ status.className='pf-dict-status'; status.textContent='No pudimos comprobar el diccionario ahora; puedes continuar.'; } }
   }
   function pfWizardNext(){
-    if(PF_WIZARD_STEP===1&&!PF_DRAFT.tipo) return pfMsg('Elige empresa, holding o gremio.');
-    if(PF_WIZARD_STEP===2){ const n=document.getElementById('pf-wiz-nombre'); PF_DRAFT.nombre=(n&&n.value||'').trim(); if(!PF_DRAFT.nombre) return pfMsg('Ponle un nombre al perfil.'); }
-    if(PF_WIZARD_STEP===3){ const inp=document.getElementById('pf-wiz-tema'); if(inp&&inp.value.trim()) pfWizardAddTopic(); if(!PF_DRAFT.temas.length) return pfMsg('Agrega al menos un tema.'); }
-    if(PF_WIZARD_STEP===6){ pfGuardar({wizard:true}); return; }
+    const paso=PF_WIZARD_STEP, val=id=>{const e=document.getElementById(id); return (e&&e.value||'').trim();};
+    if(paso===1&&!PF_DRAFT.tipo) return pfMsg('Elige empresa, holding o gremio.');
+    if(paso===2){ PF_DRAFT.nombre=val('pf-wiz-nombre'); if(!PF_DRAFT.nombre) return pfMsg('Ponle un nombre al perfil.'); }
+    // «Qué hace» y «quién lo lee» se piden, no se exigen: un campo obligatorio
+    // más es un registro que se abandona. Lo que falte lo dice después el
+    // indicador de la ficha en Editar.
+    if(paso===3) PF_DRAFT.que_hace=val('pf-wiz-quehace').replace(/\s+/g,' ');
+    if(paso===4){ const inp=document.getElementById('pf-wiz-tema'); if(inp&&inp.value.trim()) pfWizardAddTopic(); if(!PF_DRAFT.temas.length) return pfMsg('Agrega al menos un tema.'); }
+    if(paso===6){
+      PF_DRAFT.lector=val('pf-wiz-lector');
+      const dec=document.getElementById('pf-wiz-dec');
+      if(dec&&dec.value.trim()) pfWizardAddLista(dec,'decisiones',6);
+    }
+    if(paso===7){
+      const jur=document.getElementById('pf-wiz-jur');
+      if(jur&&jur.value.trim()) return pfWizardAddLista(jur,'jurisdicciones',12);
+      if(!(PF_DRAFT.jurisdicciones||[]).length) PF_DRAFT.jurisdicciones=['Colombia'];
+    }
+    if(paso===PF_WIZ_PASOS){ pfGuardar({wizard:true}); return; }
     PF_WIZARD_STEP++; pfRenderWizard();
   }
   function pfEditar(p){
     PF_DRAFT={perfilId:p.perfilId,nombre:p.nombre||'',descripcion:p.descripcion||'',
               temas:(p.temas||[]).slice(),empresas:(p.empresas||[]).slice(),
+              competencia:(p.competencia||[]).map(x=>(x&&typeof x==='object')?x.k:x).filter(Boolean),
               sector_sanciones:p.sector_sanciones||'',comision:p.comision||'',
-              tipo:p.tipo||'empresa',lineas:(p.lineas||[]).slice(),
+              tipo:p.tipo||'empresa',lineas:pfLineasNorm(p.lineas),
+              que_hace:p.que_hace||'',lector:p.lector||'',
+              decisiones:(p.decisiones||[]).slice(),jurisdicciones:(p.jurisdicciones||[]).slice(),
+              interlocutores:(p.interlocutores||[]).slice(),relojes:(p.relojes||[]).slice(),
+              no_interesa:(p.no_interesa||[]).slice(),
               alertas:p.alertas||{activo:false}};
     pfRenderEdit();
   }
@@ -407,9 +494,16 @@
     const secs=(PF_META&&PF_META.sectores_sanciones)||[];
     const coms=(PF_META&&PF_META.comisiones)||[];
     const plans=(PF_META&&PF_META.plantillas)||[];
+    /* Los presets de CLIENTE REAL llevan nombre propio de un prospecto. Se
+       ocultaban de los chips de sector (CLI_CLIENTES) y REAPARECÍAN acá como
+       plantillas para cualquiera que abriera el editor — la misma fuga, por la
+       otra puerta. El filtro va por la marca `cliente` del preset, que es una
+       sola verdad, y no por una segunda lista que se desincroniza. */
+    const plansVis=esEquipo()?plans:plans.filter(p=>!p.cliente);
     // Empresa por defecto: es el caso más común y evita que el primer campo que
     // ve el usuario sea la pregunta equivocada («qué vigila» a una empresa).
     const esEmp = d.tipo!=='gremio';
+    const est = pfFichaEstado(d);
     el.hidden=false;
     el.innerHTML=`
       <div class="pf-grid">
@@ -441,6 +535,17 @@
             : 'Las empresas del gremio, o las que sigue de cerca. Del diccionario de Caudal: en el Congreso se traducen a su tema (nadie legisla «Uber», legisla «plataformas»); en sanciones, contratación y prensa se buscan por su nombre propio.'}</div>
           <div class="pf-sug" id="pf-sug" hidden></div>
           <div class="pf-tags" id="pf-emps"></div></div>
+        <div class="pf-f full pf-ficha-head"><label>Ficha del cliente · ${est.llenos} de ${est.total}</label>
+          <div class="hint">${est.base
+            ? 'La ficha está lista para escribir un brief: el análisis puede decir <b>por qué le importa a este cliente</b> y no solo qué pasó.'
+            : 'Con lo que hay, el análisis describe señales. Completa <b>qué hace</b>, <b>quién lo lee</b> y <b>qué decide</b> y empieza a sonar a briefing de este cliente.'}</div></div>
+        ${PF_FICHA_TXT.map(f=>`<div class="pf-f full"><label>${esc(f[1])}</label>
+          <textarea id="pf-f-${f[0]}" maxlength="${f[3]}" rows="3" placeholder="${esc(f[4])}">${esc(d[f[0]]||'')}</textarea>
+          <div class="hint">${f[2]}</div></div>`).join('')}
+        ${PF_FICHA_LST.map(f=>`<div class="pf-f full"><label>${esc(f[1])} · máx ${f[2]}</label>
+          <input id="pf-fin-${f[0]}" type="text" maxlength="160" placeholder="${esc(f[3])}" />
+          <div class="hint">${f[4]}</div>
+          <div class="pf-tags" id="pf-f-${f[0]}"></div></div>`).join('')}
         <div class="pf-f"><label>Sector de sanciones</label>
           <select id="pf-sec"><option value="">— ninguno —</option>${secs.map(s=>{
             /* el conteo de SANCIONES solo no describe la fuente: la ANLA tiene
@@ -457,7 +562,7 @@
         <button class="btn-t" id="pf-save">${d.perfilId?'Guardar cambios':'Crear perfil'}</button>
         <button class="btn-g" id="pf-cancel">Cancelar</button>
         ${d.perfilId?'<button class="btn-g danger" id="pf-del">Borrar</button>':''}
-        ${(!d.perfilId&&plans.length)?`<span class="pf-lbl" style="margin-left:.5rem">plantilla</span>`+plans.map(p=>`<span class="chip" data-pftpl="${esc(p.k)}">${esc(p.nombre)}</span>`).join(''):''}
+        ${(!d.perfilId&&plansVis.length)?`<span class="pf-lbl" style="margin-left:.5rem">plantilla</span>`+plansVis.map(p=>`<span class="chip" data-pftpl="${esc(p.k)}">${esc(p.nombre)}</span>`).join(''):''}
         <span class="pf-msg" id="pf-msg"></span>
       </div>`;
     pfRenderTags();
@@ -510,13 +615,50 @@
     const t=document.getElementById('pf-temas'), e=document.getElementById('pf-emps');
     if(t) t.innerHTML=d.temas.length?d.temas.map((x,i)=>`<span class="chip on">${esc(x)}<span class="x" data-rmtema="${i}">×</span></span>`).join(''):'<span class="cob-note" style="margin:0">Sin temas.</span>';
     const li=document.getElementById('pf-lineas');
-    if(li) li.innerHTML=(d.lineas||[]).length?d.lineas.map((x,i)=>`<span class="chip on">${esc(x)}<span class="x" data-rmlinea="${i}">×</span></span>`).join(''):'<span class="cob-note" style="margin:0">Sin líneas — se rastrea como un solo negocio.</span>';
+    if(li) li.innerHTML=(d.lineas||[]).length?d.lineas.map((x,i)=>`<span class="chip on">${esc(pfLineaNombre(x))}${x&&x.comision?` <span class="pf-lbl">C. ${esc(x.comision)}</span>`:''}<span class="x" data-rmlinea="${i}">×</span></span>`).join(''):'<span class="cob-note" style="margin:0">Sin líneas — se rastrea como un solo negocio.</span>';
+    PF_FICHA_LST.forEach(function(f){ const el=document.getElementById('pf-f-'+f[0]); if(el) el.innerHTML=pfFichaTags(f[0]); });
     if(e) e.innerHTML=d.empresas.length?d.empresas.map((x,i)=>`<span class="chip on">${esc(x)}<span class="x" data-rmemp="${i}">×</span></span>`).join(''):'<span class="cob-note" style="margin:0">Sin empresas vigiladas.</span>';
     // Un aviso de validación («tema de menos de 3 letras», «máximo N temas»)
     // se quedaba en pantalla después de que el usuario ya había corregido, y
     // hace leer como error un formulario que está sano. Cualquier cambio en
     // los tags lo retira.
     pfMsg('');
+  }
+  /* ---------- la FICHA del cliente ----------
+     El radar sabe QUÉ vigila un cliente; la ficha dice QUIÉN ES, que es lo que
+     separa un listado de un briefing. Los campos viajan al worker y de ahí al
+     prompt de la Rosa: sin ellos el modelo no puede responder «por qué me
+     importa a mí» y termina describiendo señales.
+     ⚠️ `tipo`, `lineas` y `alcance` YA se preguntaban acá y el /save del worker
+     los descartaba en silencio — seis pasos de asistente para guardar tres. */
+  const PF_FICHA_TXT=[
+    ['que_hace','¿Qué hace esta organización?','A qué se dedica y por dónde le llega la regulación. Es el contexto que ninguna lista de temas puede dar: un exchange de cripto y una consultora de asuntos públicos vigilan cosas parecidas y necesitan briefings opuestos.',700,'p. ej. «Plataforma de movilidad y reparto. No hay ley propia de transporte por plataformas, así que su exposición se reparte entre movilidad, relación con conductores, tributario y datos.»'],
+    ['lector','¿Quién lee el brief y qué hace con él?','Fija el tono y el cierre de cada punto: un gerente de cumplimiento quiere saber qué revisar; unos socios de consultoría, qué contarle a sus propios clientes.',400,'p. ej. «El equipo de asuntos públicos de la operación en Colombia.»']];
+  const PF_FICHA_LST=[
+    ['decisiones','¿Qué decide con este brief?',6,'una decisión y Enter — p. ej. «si comentar un proyecto en consulta»','Lo que convierte «pasó esto» en «haz esto». Sin esto el brief describe y no recomienda.'],
+    ['jurisdicciones','¿Dónde opera?',12,'un país o región y Enter — p. ej. «Colombia»','Las fuentes de Caudal son colombianas: lo que declares fuera de Colombia queda marcado como fuera de alcance, en vez de dejar que el cliente asuma que lo vigilamos.'],
+    ['interlocutores','¿Con quién habla?',12,'una entidad y Enter — p. ej. «Superfinanciera»','Los reguladores y entidades que le importan de verdad. Es a quién mira cuando pregunta «¿y qué dijo el supervisor?».'],
+    ['relojes','¿Qué plazos propios tiene?',8,'un plazo y Enter — p. ej. «monto del presupuesto: 15 de septiembre»','Los relojes con los que mide todo lo demás. El brief los usa para decir si algo llega tarde o a tiempo.'],
+    ['no_interesa','¿Qué NO le interesa?',10,'un tema a excluir y Enter — p. ej. «farándula»','Tan importante como los temas: sin exclusiones el correo se llena de ruido y se deja de abrir.']];
+  function pfLineaNombre(x){ return (x&&typeof x==='object')?(x.nombre||''):String(x||''); }
+  /* Las líneas se guardan como objeto {nombre, comision, temas}: aplanarlas a
+     texto —como se hacía al abrir una plantilla— botaba la comisión de cada
+     línea, que es justo lo que hace útil la plantilla de DiDi. */
+  function pfLineasNorm(v){
+    return (v||[]).map(x=>(x&&typeof x==='object')
+      ?{nombre:String(x.nombre||''),comision:x.comision||'',temas:(x.temas||[]).slice()}
+      :{nombre:String(x||''),comision:'',temas:[]}).filter(x=>x.nombre.trim());
+  }
+  function pfFichaTags(campo){
+    const v=(PF_DRAFT&&PF_DRAFT[campo])||[];
+    return v.length?v.map((x,i)=>`<span class="chip on">${esc(x)}<span class="x" data-rmficha="${campo}:${i}">×</span></span>`).join('')
+                   :'<span class="cob-note" style="margin:0">Sin definir.</span>';
+  }
+  function pfFichaEstado(d){
+    const campos=['que_hace','lector','decisiones','lineas','jurisdicciones','interlocutores','relojes','no_interesa'];
+    const llenos=campos.filter(c=>(d[c]||[]).length||(typeof d[c]==='string'&&d[c].trim())).length;
+    const base=d.que_hace&&d.lector&&(d.decisiones||[]).length;
+    return {llenos:llenos,total:campos.length,base:!!base};
   }
   function pfMsg(txt,okc){ const m=document.getElementById('pf-msg'); if(m){ m.className='pf-msg'+(okc?' okmsg':''); m.textContent=txt||''; } }
   function pfLeerForm(){
@@ -525,6 +667,12 @@
     const n=document.getElementById('pf-nombre'), de=document.getElementById('pf-desc'), s=document.getElementById('pf-sec'), c=document.getElementById('pf-com');
     if(n) d.nombre=n.value.trim(); if(de) d.descripcion=de.value.trim();
     if(s) d.sector_sanciones=s.value; if(c) d.comision=c.value;
+    // la ficha: los textos se leen del DOM; las listas ya viven en el draft
+    // (se agregan con Enter) y no tienen campo que leer.
+    PF_FICHA_TXT.forEach(function(f){
+      const el=document.getElementById('pf-f-'+f[0]);
+      if(el) d[f[0]]=el.value.replace(/\s+/g,' ').trim();
+    });
   }
   async function pfGuardar(opts){
     pfLeerForm(); const d=PF_DRAFT; if(!d) return;
