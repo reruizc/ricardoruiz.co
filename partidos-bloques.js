@@ -63,10 +63,17 @@
   'PARTIDO POLITICO MIRA': 'cd',           // conservadurismo social, sin adscripción de gobierno
   'PARTIDO COLOMBIA JUSTA LIBRES': 'd',    // confesional evangélico
   'PARTIDO UNITARIO': 'c',
-  // étnicos/indígenas y avales de alquiler: sin línea, y MEDIDO (ver abajo)
-  'MOVIMIENTO ALTERNATIVO INDIGENA Y SOCIAL "MAIS"': 'sc',
-  'MOVIMIENTO AUTORIDADES INDIGENAS DE COLOMBIA "AICO"': 'sc',
-  'PARTIDO ALIANZA SOCIAL INDEPENDIENTE "ASI"': 'sc',
+  /* Étnicos e indígenas. Estaban en `sc` por convención («no encajan en el eje
+     izquierda-derecha nacional») y ahora se clasifican por la identidad del
+     PARTIDO —su origen y su bancada—, no por sus avales: MAIS nació del
+     movimiento indígena y su bancada vota con la izquierda; AICO y la ASI
+     vienen del mismo tronco alternativo y se comportan como centro-izquierda.
+     Ojo con la letra pequeña, que está medida y no se borra: los tres prestan
+     su aval, así que en un territorio concreto sus candidatos pueden venir de
+     cualquier familia (ver AVAL_AMPLIO). La ficha lo dice cuando pesan. */
+  'MOVIMIENTO ALTERNATIVO INDIGENA Y SOCIAL "MAIS"': 'izq',
+  'MOVIMIENTO AUTORIDADES INDIGENAS DE COLOMBIA "AICO"': 'ci',
+  'PARTIDO ALIANZA SOCIAL INDEPENDIENTE "ASI"': 'ci',
 };
 
   /* ── Movimientos y coaliciones REGIONALES ──────────────────────────────────
@@ -85,14 +92,17 @@
     'INDEPENDIENTES CON UNIDAD': 'c',             //  26.471 votos · 67 % de 6
     'COALICION POR CASANARE': 'ci',               //  33.785 votos · 71 % de 7
   };
-  /* ── Avales sin línea ─────────────────────────────────────────────────────
-     ASI, MAIS, AICO e «Independientes» prestan su aval a cualquiera, y eso no
-     es una opinión: de las 848 personas con rastro que se lanzaron con ASI en
-     2023, el bloque más repetido reúne apenas el 35 % —MAIS 31 %, AICO 34 %,
-     Independientes 30 %—, es decir, sus candidatos vienen repartidos de todos
-     lados. Ponerles una etiqueta ideológica sería inventarla, así que se
-     quedan sin bloque y la interfaz dice por qué. */
-  const AVAL_SIN_LINEA = ['ALIANZA SOCIAL INDEPENDIENTE', 'MAIS', 'AICO', 'AUTORIDADES INDIGENAS', 'INDEPENDIENTES'];
+  /* ── Avales amplios ───────────────────────────────────────────────────────
+     Estos prestan su aval a cualquiera, y eso no es una opinión: de las 848
+     personas con rastro que se lanzaron con la ASI en 2023, el bloque más
+     repetido entre sus OTRAS candidaturas reúne apenas el 35 % —MAIS 31 %,
+     AICO 34 %, «Independientes» 30 %—, es decir, sus candidatos vienen
+     repartidos de todas las familias. El partido tiene línea (arriba); la
+     lista que lleva su aval en un municipio puede no tenerla, y la ficha del
+     electorado lo advierte cuando uno de estos pesa en el territorio.
+     «Independientes» no es una organización sino la etiqueta de los resultados
+     para lo que no es partido: esa se queda sin bloque. */
+  const AVAL_AMPLIO = ['ALIANZA SOCIAL INDEPENDIENTE', 'MAIS', 'AICO', 'AUTORIDADES INDIGENAS', 'INDEPENDIENTES'];
 
   const CAND_BLOQUE_OVERRIDE = [
   // izquierda
@@ -196,9 +206,9 @@
     const cuenta = {}; bloques.forEach(b => { cuenta[b] = (cuenta[b] || 0) + 1; });
     return Object.entries(cuenta).sort((a, b) => b[1] - a[1])[0][0];
   }
-  /* «Sin línea» no es lo mismo que «no lo hemos mirado»: estos prestan el aval
-     y sus candidatos vienen de todos los bloques. La interfaz lo dice así. */
-  function esAvalSinLinea(nombre) { const n = norm(nombre); return AVAL_SIN_LINEA.some(a => n.includes(a)); }
+  /* Un aval amplio tiene línea como partido, pero la presta: quien quiera leer
+     el territorio con cuidado necesita saberlo. */
+  function esAvalAmplio(nombre) { const n = norm(nombre); return AVAL_AMPLIO.some(a => n.includes(a)); }
   /* Una coalición es varios partidos en un solo nombre: "NUEVO LIBERALISMO -
      AGRUPACION POLITICA EN MARCHA". Se parte por los separadores usuales y se
      devuelven las partes que tienen sentido como partido. */
@@ -349,5 +359,5 @@
     return base ? rampaDeColor(base) : null;
   }
 
-  global.PartidosBloques = { BLOQUE_LABEL, BLOQUE_ORDER, PARTIDO_BLOQUE, CAND_BLOQUE_OVERRIDE, PARTIDO_COLOR, BLOQUE_COLOR, SIN_VOTOS, L_PASOS, MOVIMIENTO_LOCAL, bloqueDePartido, bloqueDeOrganizacion, esAvalSinLinea, partesDeCoalicion, bloqueDeCandidatura, colorDePartido, rampaDeColor, rampaDePartido, norm };
+  global.PartidosBloques = { BLOQUE_LABEL, BLOQUE_ORDER, PARTIDO_BLOQUE, CAND_BLOQUE_OVERRIDE, PARTIDO_COLOR, BLOQUE_COLOR, SIN_VOTOS, L_PASOS, MOVIMIENTO_LOCAL, bloqueDePartido, bloqueDeOrganizacion, esAvalAmplio, partesDeCoalicion, bloqueDeCandidatura, colorDePartido, rampaDeColor, rampaDePartido, norm };
 })(typeof window !== 'undefined' ? window : globalThis);
