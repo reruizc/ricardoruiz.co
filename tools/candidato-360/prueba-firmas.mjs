@@ -15,7 +15,12 @@ const { chromium } = await import('playwright')
 const SP = process.env.SALIDA_PRUEBA || '/tmp';
 
 const DEPARTAMENTOS = { type: 'FeatureCollection', features: ['Antioquia', 'Distrito Capital de Bogotá'].map(name => ({ type: 'Feature', properties: { name }, geometry: null })) };
-const MUNICIPIOS = { '16': { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { mpio_cnmbr: 'BOGOTÁ, D.C.', mun_elec: '001' }, geometry: null }] } };
+const MUNICIPIOS = {
+  '16': { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { mpio_cnmbr: 'BOGOTÁ, D.C.', mun_elec: '001' }, geometry: null }] },
+  /* Antioquia trae un municipio de los otros: los que NO tienen resultados por
+     comuna, que son el 95 % del país. */
+  '01': { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { mpio_cnmbr: 'LA CEJA', mun_elec: '163' }, geometry: null }] },
+};
 /* Concejo de Bogotá 2023 por localidad: dos partidos de centro-izquierda y uno
    de derecha, repartidos distinto entre dos localidades. */
 const CONCEJO = { data: { '16-001': { comunas: {
@@ -24,7 +29,9 @@ const CONCEJO = { data: { '16-001': { comunas: {
 } } } };
 /* PUESTOS_GEOREF: censo por puesto, que es de donde sale el requisito legal. */
 const fila = (code, barrio, mujeres, hombres) => { const r = new Array(16).fill(''); r[1] = code; r[7] = barrio; r[9] = '4.7'; r[10] = '-74.07'; r[13] = String(mujeres); r[14] = String(hombres); return r.join(';'); };
-const PUESTOS = ['CABECERA', fila('160010101', 'SUBA', 60000, 55000), fila('160010102', 'CIUDAD BOLIVAR', 45000, 40000)].join('\n');
+const PUESTOS = ['CABECERA', fila('160010101', 'SUBA', 60000, 55000), fila('160010102', 'CIUDAD BOLIVAR', 45000, 40000),
+  /* La Ceja: 30.000 de censo repartido en tres puestos, uno de ellos sin barrio. */
+  fila('011630101', 'CENTRO', 9000, 6000), fila('011630102', 'SAN CAYETANO', 5000, 5000), fila('011639901', 'NO APLICA', 3000, 2000)].join('\n');
 
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1300, height: 1000 } });
@@ -90,6 +97,23 @@ r.modal = await p.evaluate(() => ({ titulo: document.getElementById('introModalT
 await p.screenshot({ path: SP + '/firmas-modal.png' });
 r.color = await p.evaluate(() => { closeIntroModal(); fijarRampaMapa(partidoVigente(), crmCandidate?.nombre); return { rampa: RAMPA_MAPA[2], bloque: bloqueVigente(), partido: partidoVigente() }; });
 
+/* ── 3 bis · Un municipio sin resultados por comuna: el plan B es el censo ── */
+r.sinComunas = await p.evaluate(async () => {
+  document.getElementById('campaignDepartment').value = '01';
+  await loadCampaignMunicipalities();
+  document.getElementById('campaignMunicipality').value = 'LA CEJA';
+  META_ACTUAL = { target: 5000 };          /* meta más chica que las firmas */
+  CAMPANA_ACTUAL = campanaActual('alcaldia');
+  await pintarFirmas();
+  const L = FIRMAS_ACTUAL;
+  mostrarFirmas();
+  const texto = document.getElementById('introModalText').textContent.replace(/\s+/g, ' ');
+  closeIntroModal();
+  return { base: L.base, censo: L.territorio.censo, exigido: L.req.exigido,
+    filas: L.filas.map(f => [f.nombre, f.firmas]),
+    copy: document.getElementById('crmFirmasCopy').textContent, texto };
+});
+
 /* ── 4 · Con partido, la tarjeta de firmas no existe ──────────────────────── */
 r.conPartido = await p.evaluate(async () => {
   document.querySelector('input[name="avalRuta"][value="partido"]').checked = true; elegirAval();
@@ -111,7 +135,10 @@ const pruebas = [
   ['la campaña guarda el aval y el espectro, y se queda sin partido', r.conEspectro.campana.avales === 'firmas' && r.conEspectro.campana.espectro === 'ci' && r.conEspectro.campana.partido === ''],
   ['la tarjeta 08 estima las firmas con el 20 % del censo del territorio', r.tarjeta.visible && /40.000 firmas/.test(r.tarjeta.titulo) && r.tarjeta.dato === '40.000' && r.tarjeta.boton],
   ['y las reparte por donde vota esa familia política', /SUBA/i.test(r.tarjeta.copy) && /concentran \d+ % de la meta/.test(r.tarjeta.copy)],
-  ['el modal muestra el censo, la regla y el reparto comuna por comuna', /200.000 personas en el censo/.test(r.modal.texto) && /Ley 130 de 1994/.test(r.modal.texto) && /32.000 SUBA/.test(r.modal.texto)],
+  ['el modal muestra el censo, la regla y el reparto comuna por comuna', /200.000 personas en el censo/.test(r.modal.texto) && /Ley 130 de 1994/.test(r.modal.texto) && /32.000 Suba/.test(r.modal.texto)],
+  ['sin resultados por comuna, reparte por censo de los puestos en vez de rendirse', r.sinComunas.base === 'censo' && r.sinComunas.censo === 30000 && r.sinComunas.exigido === 6000 && /censo de los puestos/.test(r.sinComunas.copy)],
+  ['y ese reparto sigue el censo de cada puesto', JSON.stringify(r.sinComunas.filas) === JSON.stringify([['Centro', 3000], ['San Cayetano', 2000], ['Sin barrio identificado', 1000]])],
+  ['cuando piden más firmas que votos para ganar, la tarjeta lo dice', /más firmas que los 5.000 votos/.test(r.sinComunas.copy) && /No es un error del cálculo/.test(r.sinComunas.texto)],
   ['y dice que es una estimación, no la cifra de la Registraduría', /estimación/i.test(r.modal.texto) && /Registradur/.test(r.modal.texto)],
   ['el mapa toma el color del bloque elegido, no el de un partido', r.color.bloque === 'ci' && r.color.partido === '' && /^#/.test(r.color.rampa)],
   ['con partido, la tarjeta de firmas desaparece', r.conPartido.oculta === true && r.conPartido.bloque === '' && /ALIANZA VERDE/.test(r.conPartido.partido)],

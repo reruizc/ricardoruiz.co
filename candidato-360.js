@@ -1529,11 +1529,14 @@ async function createNew(e) {
    oración: en la misma línea quedaba «Concejo · MEDELLÍN · Antioquia», con la
    mitad gritando. Esto es SOLO cómo se muestra: lo que se guarda y lo que se
    compara sigue siendo el nombre original, que es la llave contra la Divipola. */
-const NOMBRE_BONITO = s => String(s || '').toLowerCase().replace(/(^|[\s(\-·])([a-záéíóúñü])/g, (m, a, b) => a + b.toUpperCase())
+const NOMBRE_BONITO = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase().replace(/(^|[\s(\-·])([a-záéíóúñü])/g, (m, a, b) => a + b.toUpperCase())
   .replace(/\b(De|Del|La|Las|Los|Y|El)\b/g, w => w.toLowerCase()).replace(/^(\w)/, c => c.toUpperCase())
   /* Las siglas con punto se quedan como son: los puestos de votación se llaman
      "I.E. SAN JOSÉ" y "E.S.E. HOSPITAL", y «I.e.» no es un nombre. */
-  .replace(/\b(?:[a-záéíóúñüA-ZÁÉÍÓÚÑÜ]\.){2,}/g, sigla => sigla.toUpperCase());
+  .replace(/\b(?:[a-záéíóúñüA-ZÁÉÍÓÚÑÜ]\.){2,}/g, sigla => sigla.toUpperCase())
+  /* Y la sigla entre comillas también: los partidos se llaman «MOVIMIENTO
+     ALTERNATIVO INDÍGENA Y SOCIAL "MAIS"», y «"mais"» no es nadie. */
+  .replace(/"([a-záéíóúñü]{2,6})"/g, (m, w) => `"${w.toUpperCase()}"`);
 /* «CONCEJO · MEDELLIN · 2019» → { tipo: 'concejo', lugar: 'Medellín', año: 2019 } */
 function leerCorpHistorica(corp) {
   const partes = String(corp || '').split('·').map(x => x.trim()).filter(Boolean);
@@ -1610,6 +1613,26 @@ const FRASES_SALTO = {
     ? `Cambia de corporación y de territorio: la meta se calcula contra la elección de 2023 de ESA corporación en ${c.lugarNuevo}`
     : 'Cambiar de corporación cambia la pregunta: la meta se calcula contra la elección de 2023 de ESA corporación en ese lugar.',
 };
+/* Por firmas NO hay partido del que hablar: la familia la eligió la persona en
+   el espectro. Antes la frase agarraba el aval VIEJO —«con Alternativo Indígena
+   y Social el mensaje lo pone usted»— y lo presentaba como si fuera el de esta
+   campaña: exactamente lo contrario de lo que la persona acababa de responder.
+   Acá se dice de dónde viene, que va sin aval, y qué significa la familia que
+   eligió para lo único que cambia de verdad: recoger firmas antes de votos. */
+const FAMILIA_CON_ARTICULO = { izq: 'la izquierda', ci: 'el centro-izquierda', c: 'el centro', cd: 'el centro-derecha', d: 'la derecha', sc: 'su familia política' };
+const FRASES_FIRMAS = {
+  izq: [f => `va por firmas y se ubica en ${f}: sin aval no hay maquinaria prestada, y las firmas salen más rápido donde esa familia ya tiene conversación.`,
+        f => `va por firmas desde ${f}: la estructura la arma usted, así que el primer mapa no es el de los votos sino el de dónde recogerlas.`],
+  ci: [f => `va por firmas desde ${f}: el aval no lo respalda nadie, pero tampoco lo amarra nadie, y eso en campaña se nota.`,
+       f => `va por firmas y se ubica en ${f}: las firmas se recogen donde esa familia ya vota, que es donde menos hay que explicar.`],
+  c: [f => `va por firmas desde ${f}: sin etiqueta que lo defina, el mensaje es suyo entero; el costo es que la estructura también.`,
+      f => `va por firmas y se ubica en ${f}: el centro no tiene una base cautiva, así que la recolección manda más que nunca.`],
+  cd: [f => `va por firmas desde ${f}: sin aval, pero con una familia que en este territorio ya tiene dónde apoyarse.`,
+       f => `va por firmas y se ubica en ${f}: las firmas se buscan donde esa familia votó en 2023, que es el trabajo menos costoso.`],
+  d: [f => `va por firmas desde ${f}: nadie le pone el mensaje, y la recolección se apoya en donde esa familia ya es fuerte.`,
+      f => `va por firmas y se ubica en ${f}: sin aval la campaña empieza antes —primero las firmas, después los votos—.`],
+  sc: [() => 'va por firmas: sin aval de partido, la recolección es la primera campaña y por eso tiene su propia tarjeta.'],
+};
 function tipoDeSalto(desde, hacia) {
   if (desde === hacia) return 'misma';
   if (desde === 'camara' || desde === 'senado') return 'congreso>territorial';
@@ -1628,14 +1651,23 @@ function fraseDePartida({ candidate, corpKey, territory, campana }) {
   const ahora = punto(`Ahora vamos por ${destino}`);
   /* ¿Se muda? El territorio de la campaña contra el de su última elección. */
   const mudanza = Boolean(lugarNuevo) && Boolean(hist.lugar) && normalizedText(lugarNuevo) !== normalizedText(hist.lugar);
-  const partido = String(campana?.partido || candidate?.partido || '').trim();
+  const porFirmas = campana?.avales === 'firmas';
+  const bonito = nombre => String(nombre || '').replace(/^(PARTIDO|MOVIMIENTO)\s+(POLÍTICO\s+)?/i, '').split(' ').map(w => w.length > 3 ? NOMBRE_BONITO(w) : w.toLowerCase()).join(' ').replace(/^(\w)/, c => c.toUpperCase());
+  const partido = porFirmas ? '' : String(campana?.partido || candidate?.partido || '').trim();
   const bloque = partido ? PartidosBloques.bloqueDeCandidatura(partido, candidate?.nombre || '') : 'sc';
-  const partidoBonito = partido.replace(/^(PARTIDO|MOVIMIENTO)\s+(POLÍTICO\s+)?/i, '').split(' ').map(w => w.length > 3 ? NOMBRE_BONITO(w) : w.toLowerCase()).join(' ').replace(/^(\w)/, c => c.toUpperCase());
+  const partidoBonito = bonito(partido);
   const cambioDePartido = partido && candidate?.partido && normalizedText(partido) !== normalizedText(candidate.partido);
   const avalNuevo = !cambioDePartido ? ''
     : mudanza ? ' Es un aval nuevo, y en territorio nuevo: la huella que cuenta es la de ese partido allá.'
     : ' Es un aval nuevo: el mapa conserva su votación, la huella del partido cambia.';
-  const conQuien = partido ? elegir(FRASES_BLOQUE[bloque] || FRASES_BLOQUE.sc, candidate?.nombre)(partidoBonito) + avalNuevo : '';
+  let conQuien = partido ? elegir(FRASES_BLOQUE[bloque] || FRASES_BLOQUE.sc, candidate?.nombre)(partidoBonito) + avalNuevo : '';
+  if (porFirmas) {
+    const espectro = campana?.espectro || 'sc';
+    const familia = FAMILIA_CON_ARTICULO[espectro] || FAMILIA_CON_ARTICULO.sc;
+    const viene = candidate?.partido ? `Viene de ${bonito(candidate.partido)}, pero esta vez ` : '';
+    const frase = viene + elegir(FRASES_FIRMAS[espectro] || FRASES_FIRMAS.sc, candidate?.nombre)(familia);
+    conQuien = punto(frase.charAt(0).toUpperCase() + frase.slice(1));
+  }
   const contexto = { lugarViejo: hist.lugar, lugarNuevo, mudanza, esCiudad: Boolean(cityLayerFor(lugarNuevo)) };
   const salto = punto(FRASES_SALTO[tipoDeSalto(hist.tipo, corpKey)](contexto));
   return [apertura, ahora, salto, conQuien].filter(Boolean).join(' ');
@@ -1654,6 +1686,8 @@ let META_ACTUAL = null;
 function pintarMeta(estimate) {
   META_ACTUAL = estimate || null;
   if (estimate.target) { $('crmVoteNumber').textContent = estimate.target.toLocaleString('es-CO'); $('crmVoteTarget').textContent = `Meta inicial: ${estimate.target.toLocaleString('es-CO')} votos`; guardarMeta(estimate.target); }
+  /* Con la meta ya en mano, la tarjeta de firmas puede compararse con ella. */
+  if (FIRMAS_ACTUAL && $('crmFirmasCopy')) $('crmFirmasCopy').textContent = textoFirmas(FIRMAS_ACTUAL);
   else { $('crmVoteNumber').textContent = '—'; $('crmVoteTarget').textContent = 'Meta pendiente de referencia territorial'; }
   $('crmVoteFormula').textContent = estimate.formula;
   /* La ⓘ solo aparece cuando hay una meta que explicar: junto a un guion no
@@ -3379,6 +3413,52 @@ async function perfilDelVotante() {
     edad: conEdad ? { bandas, reparto: edadVotos.map(x => x / conEdad), cobertura: conEdad / votos, fuente: edad?.fuente || '' } : null
   };
 }
+/* ── Cómo vota el territorio ─────────────────────────────────────────────────
+   El perfil dice cómo ES el electorado donde están sus votos. Falta la otra
+   mitad, que es la que decide una campaña: cómo VOTA ese territorio. La
+   Asamblea de 2023 es la única elección que baja a TODOS los municipios del
+   país con el voto por partido —el concejo por comuna existe en once
+   ciudades—, y cada partido tiene bloque en partidos-bloques.js. Con eso el
+   territorio se describe por familias políticas y no por partidos sueltos,
+   que es como se piensa una candidatura. */
+async function ideologiaDelTerritorio(campana, municipio) {
+  const dep = String(campana?.departamento || municipio?.slice(0, 2) || '').padStart(2, '0');
+  if (!/^\d{2}$/.test(dep) || dep === '00') return null;
+  const r = await fetchJSON(`${S3}/asamblea-2023/dep/${dep}.json`);
+  const munKey = CORP_MUNICIPAL.includes(campana?.corp) ? String(codigoMunicipioObjetivo() || municipio?.slice(2, 5) || '').padStart(3, '0') : '';
+  const area = munKey ? r?.comunas?.[munKey] : null;
+  const fuente = area || r?.totals; if (!fuente) return null;
+  const partidos = fuente.partidos || fuente.top_partidos || [];
+  const porBloque = {}; let total = 0;
+  partidos.forEach(([nombre, v]) => {
+    const b = window.PartidosBloques?.bloqueDePartido?.(nombre) || 'sc', n = Number(v) || 0;
+    porBloque[b] = (porBloque[b] || 0) + n; total += n;
+  });
+  if (!total) return null;
+  return { nombre: NOMBRE_BONITO(area ? (fuente.name || '') : (r.name || '')), ambito: area ? 'municipio' : 'departamento',
+    potencial: Number(fuente.potencial || 0), votantes: Number(fuente.votantes || 0), validos: Number(fuente.validos || 0),
+    porBloque, total, partidos: partidos.slice(0, 8) };
+}
+/* La familia política de ESTA campaña: la que eligió en el espectro si va por
+   firmas, la de su partido si va con aval. */
+function familiaDeLaCampana(campana) {
+  if (campana?.avales === 'firmas') return campana.espectro || '';
+  const partido = String(campana?.partido || partidoVigente() || '').trim();
+  return partido ? (window.PartidosBloques?.bloqueDePartido?.(partido) || 'sc') : '';
+}
+/* El electorado que TIENE contra el que NECESITA. Los votos que le faltan no
+   se parecen a su base —esos ya los tiene—: se parecen al territorio del que
+   los va a sacar. Por eso el perfil objetivo es el promedio de los dos,
+   pesado por cuántos votos pone cada uno. */
+function objetivoDelPerfil(P, meta, campana) {
+  const m = Number(meta || 0); if (!m || !P) return null;
+  const munCampana = `${String(campana?.departamento || '').padStart(2, '0')}${String(codigoMunicipioObjetivo() || '').padStart(3, '0')}`;
+  const mismoTerritorio = Boolean(P.municipio) && (munCampana === P.municipio || !codigoMunicipioObjetivo());
+  const base = mismoTerritorio ? Math.min(Number(P.votos || 0), m) : 0;
+  const faltan = Math.max(0, m - base);
+  const mezcla = (suyo, terr) => (suyo == null || terr == null) ? null : (base * suyo + faltan * terr) / m;
+  return { meta: m, base, faltan, mismoTerritorio, mujeres: mezcla(P.mujeres, P.mujeresMunicipio), rural: mezcla(P.rural, P.ruralMunicipio) };
+}
 let PERFIL_ACTUAL = null;
 const pct1 = x => `${(x * 100).toFixed(1).replace('.', ',')} %`;
 async function pintarPerfil() {
@@ -3389,6 +3469,11 @@ async function pintarPerfil() {
   try {
     const P = await perfilDelVotante();
     if (!P.votos || P.mujeres === null) throw new Error('sin censo');
+    /* La ideología del territorio es un extra: si la fuente no responde, el
+       perfil sigue valiendo por sí solo. */
+    P.ideo = await ideologiaDelTerritorio(CAMPANA_ACTUAL, P.municipio).catch(() => null);
+    P.familia = familiaDeLaCampana(CAMPANA_ACTUAL);
+    P.familiaPrevia = crmCandidate?.partido ? (window.PartidosBloques?.bloqueDePartido?.(crmCandidate.partido) || 'sc') : '';
     PERFIL_ACTUAL = P;
     const dif = P.mujeresMunicipio === null ? null : P.mujeres - P.mujeresMunicipio;
     const sesgo = dif === null || Math.abs(dif) < .005 ? 'igual que el promedio del municipio' : dif > 0 ? `${pct1(Math.abs(dif))} más mujeres que el promedio del municipio` : `${pct1(Math.abs(dif))} menos mujeres que el promedio del municipio`;
@@ -3403,6 +3488,38 @@ async function pintarPerfil() {
     $('crmPerfilCopy').textContent = 'Los puestos de su votación no tienen censo publicado, así que preferimos no estimar un perfil que no podemos sostener.';
     $('crmPerfilDato').textContent = '—'; $('crmPerfilSub').textContent = 'sin censo por puesto';
   }
+}
+/* Las tres lecturas que faltaban en la tarjeta: cómo es el territorio entero,
+   cómo vota (por familias políticas) y cuál es el electorado que le toca
+   buscar, que no es el que ya tiene. */
+function territorioYFamilia(P) {
+  /* El objetivo se calcula acá y no al cargar la tarjeta porque la meta de
+     votos llega después: al abrir la ficha ya existe. */
+  const ideo = P.ideo, obj = objetivoDelPerfil(P, META_ACTUAL?.target, CAMPANA_ACTUAL);
+  const LABEL = window.PartidosBloques?.BLOQUE_LABEL || {}, COLOR = window.PartidosBloques?.BLOQUE_COLOR || {};
+  const ORDEN = (window.PartidosBloques?.BLOQUE_ORDER || ['izq', 'ci', 'c', 'cd', 'd', 'sc']);
+  const lugar = ideo?.nombre || 'su territorio';
+  const territorio = ideo ? `
+    <p style="margin-bottom:8px"><b>El territorio</b></p>
+    <ul class="puntaje-escala">
+      <li><b>${ideo.potencial.toLocaleString('es-CO')}</b> personas habilitadas en ${escHtml(lugar)}${ideo.votantes && ideo.potencial ? `, de las que votaron <b>${ideo.votantes.toLocaleString('es-CO')}</b> en 2023 (${pct1(ideo.votantes / ideo.potencial)} de participación)` : ''}.</li>
+      ${P.mujeresMunicipio === null && P.ruralMunicipio === null ? '' : `<li>${P.mujeresMunicipio === null ? '' : `<b>${pct1(P.mujeresMunicipio)}</b> de mujeres`}${P.mujeresMunicipio !== null && P.ruralMunicipio !== null ? ' · ' : ''}${P.ruralMunicipio === null ? '' : `<b>${pct1(P.ruralMunicipio)}</b> del censo en puestos rurales`}. Es el electorado completo, no el suyo.</li>`}
+    </ul>` : '';
+  const suya = P.familia && P.familia !== 'sc' ? P.familia : '';
+  const votosFamilia = suya && ideo ? (ideo.porBloque[suya] || 0) : 0;
+  const ideologia = ideo ? `
+    <p style="margin-bottom:8px"><b>Cómo vota ${escHtml(lugar)}</b></p>
+    <div class="arq-barra">${ORDEN.filter(b => ideo.porBloque[b] > 0).map(b => `<i style="flex:${ideo.porBloque[b]};background:${COLOR[b] || 'var(--green)'}" title="${escHtml(LABEL[b] || b)}"></i>`).join('')}</div>
+    <ul class="arq-lista">${ORDEN.filter(b => ideo.porBloque[b] > 0).sort((a, b) => ideo.porBloque[b] - ideo.porBloque[a]).map(b => `<li><span class="arq-punto" style="background:${COLOR[b] || 'var(--green)'}"></span><b>${pct1(ideo.porBloque[b] / ideo.total)}</b> ${escHtml(LABEL[b] || b)}${b === suya ? ' · su familia' : ''}${b === P.familiaPrevia && b !== suya ? ' · su aval anterior' : ''}<em>${ideo.porBloque[b].toLocaleString('es-CO')}</em></li>`).join('')}</ul>
+    <p class="puntaje-nota" style="margin-bottom:14px">Asamblea de 2023 en ${escHtml(lugar)}: es la única elección que baja a todos los municipios del país con el voto por partido. «Sin clasificar» son los movimientos locales y las coaliciones que no caben en una familia nacional, que en un municipio pequeño pesan tanto como los partidos.</p>` : '';
+  const objetivo = obj ? `
+    <p style="margin-bottom:8px"><b>La votación que debería buscar</b></p>
+    <ul class="puntaje-escala">
+      <li>Su meta son <b>${obj.meta.toLocaleString('es-CO')}</b> votos. ${obj.base ? `<b>${obj.base.toLocaleString('es-CO')}</b> ya los sacó en este territorio, así que le faltan <b>${obj.faltan.toLocaleString('es-CO')}</b>` : `Su historial no es de este territorio: los <b>${obj.faltan.toLocaleString('es-CO')}</b> están todos por construir`}.</li>
+      ${votosFamilia && ideo ? `<li>${escHtml(LABEL[suya] || 'Su familia')} sumó <b>${votosFamilia.toLocaleString('es-CO')}</b> votos acá en 2023 (${pct1(votosFamilia / ideo.total)}): ${votosFamilia >= obj.faltan ? `le alcanzaría con ${pct1(obj.faltan / votosFamilia)} de esa familia` : 'no alcanza sola, así que parte de su meta tiene que venir de otras familias o de quien no votó'}.</li>` : ''}
+      ${obj.mujeres === null && obj.rural === null ? '' : `<li>Los votos que le faltan se parecen al territorio, no a su base de hoy: el electorado objetivo queda en <b>${obj.mujeres === null ? '—' : pct1(obj.mujeres)}</b> de mujeres y <b>${obj.rural === null ? '—' : pct1(obj.rural)}</b> rural, contra ${pct1(P.mujeres)} y ${pct1(P.rural)} de los puestos donde hoy tiene sus votos.</li>`}
+    </ul>` : '';
+  return territorio + ideologia + objetivo;
 }
 function mostrarPerfil() {
   const P = PERFIL_ACTUAL; if (!P) return;
@@ -3430,6 +3547,7 @@ function mostrarPerfil() {
       <li><b>${pct1(P.urbano)}</b> en la cabecera.${P.especial ? ` Otros ${P.especial.toLocaleString('es-CO')} votos están en puestos especiales (cárceles y censo consolidado), que no son ni lo uno ni lo otro.` : ''}</li>
     </ul>
     ${edad}
+    ${territorioYFamilia(P)}
     <p class="puntaje-nota">Fuente: censo electoral por puesto de la Registraduría (PUESTOS_GEOREF, columnas de mujeres y hombres) y la zona electoral de cada mesa. Cubre el ${pct1(P.cobertura)} de su votación: ${P.sinCoordenada ? `${P.sinCoordenada.toLocaleString('es-CO')} votos están en puestos sin censo publicado` : 'todos sus puestos tienen censo publicado'}. <a class="enlace-boton" href="candidato-360-perfil.html">Cómo se lee esto sin violar el secreto del voto →</a></p>`;
   $('introModal').classList.add('open');
 }
@@ -3458,29 +3576,81 @@ async function censoDelTerritorio(campana) {
   const mun = CORP_MUNICIPAL.includes(campana?.corp) ? String(codigoMunicipioObjetivo() || '').padStart(3, '0') : '';
   const prefijo = mun ? `${dep}${mun}` : dep;
   let censo = 0, n = 0;
-  Object.entries(puestos).forEach(([code, p]) => { if (code.slice(0, prefijo.length) === prefijo) { censo += Number(p.censo || 0); n++; } });
-  return { censo, puestos: n };
+  /* El censo por sector sirve de plan B para el reparto: dice dónde está la
+     gente aunque no se sepa cómo votó. */
+  const porSector = {};
+  Object.entries(puestos).forEach(([code, p]) => {
+    if (code.slice(0, prefijo.length) !== prefijo) return;
+    censo += Number(p.censo || 0); n++;
+    /* La columna BARRIO trae «NO APLICA» en los puestos que no están en un
+       barrio (cárceles, censo consolidado, veredas sin nombre): eso no es un
+       sector al que se pueda mandar a alguien a recoger firmas. */
+    const crudo = String(p.barrio || '').trim();
+    const nombre = !crudo || /^(NO APLICA|N\/?A|SIN INFORMACION)$/i.test(crudo) ? 'Sin barrio identificado' : NOMBRE_BONITO(crudo);
+    porSector[nombre] = (porSector[nombre] || 0) + Number(p.censo || 0);
+  });
+  return { censo, puestos: n, porSector };
+}
+/* La pregunta que deja la tarjeta es inevitable: «¿más firmas que votos para
+   ganar?». En un municipio pequeño, sí — la ley pide el 20 % del censo y el
+   tope de 50.000 solo alivia a las ciudades grandes—, así que se dice en vez
+   de dejar al usuario pensando que el número está mal. */
+function comparaConLaMeta(exigido) {
+  const meta = Number(META_ACTUAL?.target || 0); if (!meta || !exigido) return '';
+  const razon = exigido / meta;
+  if (exigido > meta) return ` Son más firmas que los ${meta.toLocaleString('es-CO')} votos de su meta: en municipios pequeños inscribirse por firmas cuesta más que ganar.`;
+  if (razon >= .85) return ` Es casi tanto como los ${meta.toLocaleString('es-CO')} votos de su meta.`;
+  if (razon <= .5) return ` Es menos de la mitad de los ${meta.toLocaleString('es-CO')} votos de su meta.`;
+  return ` Es el ${Math.round(razon * 100)} % de los ${meta.toLocaleString('es-CO')} votos de su meta.`;
 }
 let FIRMAS_ACTUAL = null;
 async function lecturaFirmas(campana) {
   const bloque = campana?.espectro; if (!bloque) return null;
-  const mesas = await mesasDelHistorial();
   const unidad = CORP_MUNICIPAL.includes(campana.corp) ? 'localidad' : 'municipio';
+  /* Las firmas se recogen donde va a ser la CANDIDATURA, no donde fue la
+     anterior: quien se muda de ciudad tenía el reparto en la ciudad vieja,
+     porque la huella se buscaba con las mesas de su historial. El territorio
+     de la campaña manda, y el historial solo entra si no hay campaña. */
+  const delTerritorio = { dep: String(campana?.departamento || ''), mun: String(codigoMunicipioObjetivo() || '') };
+  const mesas = delTerritorio.dep ? [delTerritorio] : await mesasDelHistorial();
   const [territorio, rd] = await Promise.all([
     censoDelTerritorio(campana),
-    resultadosDestino(unidad, mesas.length ? mesas : [{ dep: campana.departamento, mun: codigoMunicipioObjetivo() }], campana).catch(() => null),
+    (mesas.length ? resultadosDestino(unidad, mesas, campana) : Promise.resolve(null)).catch(() => null),
   ]);
   const req = requisitoDeFirmas(territorio.censo);
   const hb = rd ? huellaBloque(rd.porArea, bloque) : { huella: null };
   const props = hb.huella ? proporciones(hb.huella) : null;
   const reparto = props ? distributeVotes(hb.huella, req.exigido) : null;
   const nombres = rd?.porArea || {};
-  const filas = reparto
-    ? Object.entries(reparto).map(([area, firmas]) => ({ area, nombre: nombres[area]?.nombre || nombres[area]?.comuna || area, firmas, votos: hb.huella[area] || 0 }))
+  let base = 'bloque';
+  let filas = reparto
+    ? Object.entries(reparto).map(([area, firmas]) => ({ area, nombre: NOMBRE_BONITO(nombres[area]?.name || nombres[area]?.nombre || nombres[area]?.comuna || area), firmas, votos: hb.huella[area] || 0 }))
       .filter(f => f.firmas > 0).sort((a, b) => b.firmas - a.firmas)
     : [];
-  FIRMAS_ACTUAL = { bloque, req, territorio, filas, unidad, campana, cobertura: hb.cobertura || 0 };
+  /* Los resultados de concejo solo bajan a comuna en once ciudades: en La Ceja
+     —y en el 95 % de los municipios— no hay huella de familia por área. Antes
+     la tarjeta se rendía ahí («no podemos repartirlas»), que es dejar sin plan
+     justo a quien más lo necesita. El plan B no inventa afinidad: reparte por
+     CENSO de los puestos, que es dónde está la gente, y lo dice. */
+  if (!filas.length && territorio.porSector && Object.keys(territorio.porSector).length) {
+    const porCenso = distributeVotes(territorio.porSector, req.exigido);
+    filas = Object.entries(porCenso).map(([nombre, firmas]) => ({ area: nombre, nombre, firmas, censo: territorio.porSector[nombre] || 0 }))
+      .filter(f => f.firmas > 0).sort((a, b) => b.firmas - a.firmas);
+    base = filas.length ? 'censo' : base;
+  }
+  FIRMAS_ACTUAL = { bloque, req, territorio, filas, unidad, campana, base, cobertura: hb.cobertura || 0 };
   return FIRMAS_ACTUAL;
+}
+/* El copy se arma aparte porque la meta de votos llega DESPUÉS de las
+   tarjetas (es una estimación con su propia consulta): cuando aterriza, la
+   comparación se vuelve a escribir en vez de quedarse sin ella. */
+function textoFirmas(L) {
+  const etiqueta = window.PartidosBloques?.BLOQUE_LABEL?.[L.bloque] || 'su familia política';
+  const cuanto = `El ${Math.round(FIRMAS_FRACCION * 100)} % del censo de su territorio (${L.territorio.censo.toLocaleString('es-CO')} personas)${L.req.topeAplica ? `, con el tope legal de ${FIRMAS_TOPE.toLocaleString('es-CO')}` : ''}.`;
+  const cabeza = L.filas.slice(0, 3), peso = Math.round(cabeza.reduce((t, f) => t + f.firmas, 0) / L.req.exigido * 100);
+  return `${cuanto}${comparaConLaMeta(L.req.exigido)} ${!L.filas.length ? 'Todavía no podemos repartirlas por falta de datos del territorio.'
+    : L.base === 'censo' ? `Repartidas por el censo de los puestos —acá los resultados no bajan de la cabecera municipal—: ${cabeza.map(f => f.nombre).join(', ')} concentran ${peso} %.`
+    : `Repartidas por donde vota ${etiqueta.toLowerCase()}: ${cabeza.map(f => f.nombre).join(', ')} concentran ${peso} % de la meta.`}`;
 }
 async function pintarFirmas() {
   const card = $('crmFirmas'); if (!card) return;
@@ -3495,9 +3665,7 @@ async function pintarFirmas() {
     const L = await lecturaFirmas(campana); if (!L) throw new Error('sin espectro');
     const etiqueta = window.PartidosBloques?.BLOQUE_LABEL?.[L.bloque] || 'su familia política';
     $('crmFirmasTitulo').textContent = `Necesita unas ${L.req.exigido.toLocaleString('es-CO')} firmas.`;
-    $('crmFirmasCopy').textContent = L.filas.length
-      ? `El ${Math.round(FIRMAS_FRACCION * 100)} % del censo de su territorio (${L.territorio.censo.toLocaleString('es-CO')} personas)${L.req.topeAplica ? `, con el tope legal de ${FIRMAS_TOPE.toLocaleString('es-CO')}` : ''}. Repartidas por donde vota ${etiqueta.toLowerCase()}: ${L.filas.slice(0, 3).map(f => f.nombre).join(', ')} concentran ${Math.round(L.filas.slice(0, 3).reduce((s, f) => s + f.firmas, 0) / L.req.exigido * 100)} % de la meta.`
-      : `El ${Math.round(FIRMAS_FRACCION * 100)} % del censo de su territorio (${L.territorio.censo.toLocaleString('es-CO')} personas)${L.req.topeAplica ? `, con el tope legal de ${FIRMAS_TOPE.toLocaleString('es-CO')}` : ''}. Todavía no podemos repartirlas: no hay resultados de esa familia política en este territorio.`;
+    $('crmFirmasCopy').textContent = textoFirmas(L);
     $('crmFirmasDato').textContent = L.req.exigido.toLocaleString('es-CO');
     $('crmFirmasSub').textContent = 'firmas estimadas';
     $('crmFirmasBtn').disabled = false;
@@ -3515,17 +3683,20 @@ function mostrarFirmas() {
   $('introModalKicker').textContent = 'Candidato 360 · recolección de firmas';
   $('introModalTitle').textContent = `Dónde recoger sus ${L.req.exigido.toLocaleString('es-CO')} firmas`;
   $('introModalText').innerHTML = `
-    <p>Por firmas no hay huella de partido que seguir, así que se usa la de <b>${escHtml(etiqueta.toLowerCase())}</b> —la familia que usted eligió— en las últimas elecciones de este territorio. No predice que esa gente lo apoye: dice dónde hay más personas a las que la conversación les suena, que es donde una firma cuesta menos trabajo.</p>
+    <p>${L.base === 'censo'
+      ? `En este territorio los resultados de 2023 no bajan de la cabecera municipal, así que no hay huella de <b>${escHtml(etiqueta.toLowerCase())}</b> por área. El reparto se hace entonces por <b>censo electoral de cada puesto</b>: no dice dónde hay afinidad, dice dónde hay gente, que para recoger firmas es la mitad del problema.`
+      : `Por firmas no hay huella de partido que seguir, así que se usa la de <b>${escHtml(etiqueta.toLowerCase())}</b> —la familia que usted eligió— en las últimas elecciones de este territorio. No predice que esa gente lo apoye: dice dónde hay más personas a las que la conversación les suena, que es donde una firma cuesta menos trabajo.`}</p>
     <p style="margin-bottom:8px"><b>Cuántas</b></p>
     <ul class="puntaje-escala">
       <li><b>${L.territorio.censo.toLocaleString('es-CO')}</b> personas en el censo electoral de su territorio, sumando los ${L.territorio.puestos.toLocaleString('es-CO')} puestos de votación publicados.</li>
       <li><b>${L.req.crudo.toLocaleString('es-CO')}</b> es el ${Math.round(FIRMAS_FRACCION * 100)} % de ese censo, que es la regla del artículo 9 de la Ley 130 de 1994 para un cargo uninominal.</li>
       ${L.req.topeAplica ? `<li><b>${FIRMAS_TOPE.toLocaleString('es-CO')}</b> es el tope que fija la misma norma: por grande que sea el territorio, no se exigen más.</li>` : ''}
+      ${META_ACTUAL?.target ? `<li><b>${Number(META_ACTUAL.target).toLocaleString('es-CO')}</b> son los votos de su meta para ganar. ${L.req.exigido > META_ACTUAL.target ? 'Sí: le piden <b>más firmas que votos</b>. No es un error del cálculo — es la regla: el 20 % del censo se aplica igual en un municipio de 55.000 habilitados que en uno de 500.000, y el tope de 50.000 solo alivia a las ciudades grandes.' : 'Las firmas son el primer filtro; los votos, el segundo.'}</li>` : ''}
     </ul>
-    <p style="margin-bottom:8px"><b>Dónde, ${unidad} por ${unidad}</b></p>
+    <p style="margin-bottom:8px"><b>Dónde, ${L.base === 'censo' ? 'puesto por puesto' : `${unidad} por ${unidad}`}</b></p>
     ${L.filas.length ? `<ul class="arq-lista">${L.filas.slice(0, 12).map(f => `<li><span class="arq-punto" style="background:${window.PartidosBloques?.BLOQUE_COLOR?.[L.bloque] || 'var(--green)'}"></span><b>${f.firmas.toLocaleString('es-CO')}</b> ${escHtml(f.nombre)}<em>${Math.round(f.firmas / max * 100)} %</em></li>`).join('')}</ul>`
       : '<p>No hay resultados de esa familia política en este territorio, así que no repartimos nada: preferimos no inventar un plan de recolección.</p>'}
-    <p class="puntaje-nota">La cifra es una <b>estimación</b>: el censo de corte y las resoluciones de la Registraduría mueven el número exacto, y conviene confirmarlo con ellos antes de imprimir formularios. El reparto sale de los votos de ${escHtml(etiqueta.toLowerCase())} en la última elección comparable de este territorio, no de una encuesta.</p>`;
+    <p class="puntaje-nota">La cifra es una <b>estimación</b>: el censo de corte y las resoluciones de la Registraduría mueven el número exacto, y conviene confirmarlo con ellos antes de imprimir formularios. El reparto sale ${L.base === 'censo' ? 'del censo electoral de cada puesto publicado por la Registraduría' : `de los votos de ${escHtml(etiqueta.toLowerCase())} en la última elección comparable de este territorio`}, no de una encuesta.</p>`;
   $('introModal').classList.add('open');
 }
 

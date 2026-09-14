@@ -58,3 +58,28 @@ ciudad basta agregar sus logos y correr
 `tools/candidato-360/logos/construir.mjs <dep>`.
 
 La prueba es `tools/candidato-360/prueba-firmas.mjs`.
+
+## Cuando el territorio no tiene resultados por comuna
+
+Los resultados de concejo bajan a comuna en **once ciudades**; en el resto del
+país —el 95 % de los municipios— no hay huella de una familia política por área,
+y la tarjeta se rendía ahí («todavía no podemos repartirlas»), que es dejar sin
+plan justo a quien más lo necesita. Ahora hay plan B: el reparto se hace por
+**censo electoral de cada puesto**, y se dice. No es lo mismo y no se disfraza —
+el censo no mide afinidad, mide dónde hay gente—, pero para una recolección eso
+ya es la mitad del problema. Los puestos cuya columna BARRIO dice «NO APLICA»
+(cárceles, censo consolidado) se agrupan como «Sin barrio identificado»: no son
+un sitio al que se pueda mandar a alguien con un formulario.
+
+La huella se busca en el territorio de la **campaña**, no en el del historial:
+quien se muda de ciudad tenía el reparto de firmas en la ciudad vieja.
+
+## Más firmas que votos
+
+En un municipio pequeño el requisito puede ser **mayor que la votación con la
+que se gana**: La Ceja pide 11.003 firmas (20 % de 55.015) y la alcaldía se ganó
+en 2023 con 10.213 votos. No es un error del cálculo, es la regla: el 20 % se
+aplica igual en un municipio de 55.000 habilitados que en uno de 500.000, y el
+tope de 50.000 solo alivia a las ciudades grandes. La tarjeta lo compara con la
+meta y lo dice con todas las letras, porque el número solo deja pensando que
+algo está mal.

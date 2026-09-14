@@ -11,6 +11,42 @@ con esas palabras: es una lectura del terreno, no de sus votantes.
 | **Sexo** | `PUESTOS_GEOREF.csv`, columnas MUJERES y HOMBRES (censo electoral por puesto) | publicado |
 | **Rural / urbano** | zona electoral de cada mesa: `99` es la zona rural del municipio; `90` y `98` (censo consolidado y cárceles) no son ni lo uno ni lo otro | publicado |
 | **Edad** | `CENSO_EDAD_PUESTO.json` (lo produce `construir-edad.mjs`) | **falta subirlo** |
+| **El territorio** | el censo de TODOS los puestos del municipio + `asamblea-2023/dep/<dep>.json` (potencial y votantes) | publicado |
+| **Cómo vota el territorio** | `asamblea-2023/dep/<dep>.json`, con cada partido puesto en su familia por `partidos-bloques.js` | publicado |
+| **La que debería buscar** | la meta de votos (tarjeta 02) contra su base de hoy | publicado |
+
+## Las tres lecturas que decide una campaña
+
+Describir el electorado de sus puestos responde «cómo es el terreno donde ya
+tengo votos». Faltaban las tres que se usan para decidir:
+
+1. **El territorio.** El censo completo del municipio, su participación en 2023
+   y su composición: el tablero entero, no el pedazo que ya ocupa.
+2. **Cómo vota.** La Asamblea de 2023 es la única elección que baja a **todos**
+   los municipios del país con el voto por partido —el concejo por comuna existe
+   en once ciudades—, así que de ahí sale la historia ideológica del territorio,
+   agrupada en familias (`PartidosBloques.bloqueDePartido`). Se marcan dos: la
+   familia de ESTA campaña —el espectro que eligió si va por firmas, el bloque
+   de su partido si va con aval— y la de su aval anterior, cuando son distintas.
+   «Sin clasificar» son los movimientos locales y las coaliciones, que en un
+   municipio pequeño pesan tanto como los partidos nacionales.
+3. **La que debería buscar.** Los votos que le faltan para la meta **no se
+   parecen a su base** —esos ya los tiene—: se parecen al territorio del que los
+   va a sacar. Por eso el perfil objetivo es el promedio de los dos, pesado por
+   cuántos votos pone cada uno:
+
+   ```
+   objetivo = (base × perfil de sus puestos + faltantes × perfil del municipio) / meta
+   ```
+
+   Con eso la ficha dice cuántos votos ya tiene en ese territorio, cuántos le
+   faltan, cuánto pesa su familia política ahí y si le alcanza sola. Quien se
+   muda de territorio empieza en cero: su votación anterior no cuenta donde no
+   la sacó.
+
+El objetivo se calcula **al abrir la ficha** y no al pintar la tarjeta, porque
+la meta de votos llega después (es una estimación con su propia consulta). Si
+todavía no está, la ficha muestra el territorio y calla el objetivo.
 
 Mientras el archivo de edad no esté en
 `congreso-2026/output/mapas-2026/CENSO_EDAD_PUESTO.json`, el modal dice que
@@ -26,3 +62,5 @@ node tools/candidato-360/perfil/construir-edad.mjs \
 por puesto de la Registraduría + deriva DANE 2022→2026, con raking IPF a los
 votantes reales de 2026). El JSON publicable son cuatro bandas por puesto
 —18-25, 26-40, 41-60 y 61+— y pesa ~700 KB.
+
+La prueba es `tools/candidato-360/prueba-perfil.mjs` (13).
