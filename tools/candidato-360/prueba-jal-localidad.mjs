@@ -1,21 +1,25 @@
 /* prueba-jal-localidad.mjs — la JAL se elige por localidad, no por ciudad.
    ------------------------------------------------------------------
    El caso que lo motivó: un edil de Teusaquillo (JAL 2015) simula lanzarse a
-   la JAL de Tunjuelito con otro partido, y el mapa le proyectaba la meta en
-   TEUSAQUILLO. El recorte territorial solo bajaba hasta el municipio y las dos
-   localidades son el mismo municipio —Bogotá—, así que su historial «seguía en
-   alcance»: el CRM le pintaba la meta sobre el territorio que acaba de dejar,
-   donde en 2027 su votación anterior no cuenta un solo voto.
+   la JAL de Tunjuelito y el modo «Proyectado» le ponía la meta en TEUSAQUILLO.
+   El recorte territorial solo bajaba hasta el municipio y las dos localidades
+   son el mismo municipio —Bogotá—, así que su historial «seguía en alcance»:
+   el CRM le pintaba la meta sobre el territorio que acaba de dejar, donde en
+   2027 su votación anterior no cuenta un solo voto.
 
-   Acá se comprueba que el alcance baja al nivel que decide la elección:
+   Lo que se comprueba acá:
 
-     · el alcance de una JAL es la LOCALIDAD, con su municipio adentro;
-     · una mesa de Teusaquillo queda fuera del alcance de Tunjuelito, aunque
-       las dos sean Bogotá;
-     · sin votos dentro, el mapa deja de ser el historial y pasa a ser el
-       territorio nuevo, con Tunjuelito resaltado y sus puestos —el censo es
-       lo único honesto cuando todavía no hay votos propios ahí—;
-     · quedarse en la misma localidad NO es mudanza: ahí el historial manda.
+     · el alcance de una JAL es la LOCALIDAD, con su municipio adentro, y una
+       mesa de Teusaquillo queda fuera del alcance de Tunjuelito aunque las dos
+       sean Bogotá;
+     · mudarse de localidad NO es mudarse de ciudad: el mapa sigue siendo el de
+       Bogotá por localidades —«Total» tiene que poder mostrar los votos que sí
+       existen, los de Teusaquillo— y sus niveles son Localidad y Barrio, nunca
+       «Municipio», que en Bogotá no existe;
+     · «Proyectado» lleva la meta COMPLETA a Tunjuelito: a una JAL se entra por
+       una sola localidad, así que no hay nada que repartir;
+     · mudarse de CIUDAD sí cambia el mapa por el territorio nuevo, y ahí el
+       primer nivel también se llama por la unidad que se dibuja.
 
      node tools/candidato-360/prueba-jal-localidad.mjs                        */
 const { chromium } = await import('playwright')
@@ -36,7 +40,7 @@ const BOGOTA_MUN = { type: 'FeatureCollection', features: [{ type: 'Feature', pr
 /* COMUNAS_DATA.csv: departamento en la 6, municipio en la 7, localidad en la 11. */
 const COMUNAS = ['cabecera'].concat(['TEUSAQUILLO', 'TUNJUELITO', 'SUBA'].map(l =>
   [0, 1, 2, 3, 4, 'BOGOTA D.C.', 'BOGOTÁ, D.C.', 7, 8, 9, l].join(';'))).join('\n');
-/* PUESTOS_GEOREF: el código en la 2, el barrio en la 8, la localidad en la 13,
+/* PUESTOS_GEOREF: código en la 2, barrio en la 8, localidad en la 13,
    mujeres y hombres en la 14 y 15. Dos puestos por localidad. */
 const puesto = (code, barrio, localidad, lat, lng) => { const r = new Array(16).fill(''); r[1] = code; r[7] = barrio; r[9] = String(lat); r[10] = String(lng); r[12] = localidad; r[13] = '900'; r[14] = '800'; return r.join(';'); };
 const PUESTOS = ['CABECERA',
@@ -50,6 +54,7 @@ const MESAS = { mesas: [
   { dep: '16', depNom: 'BOGOTÁ D.C.', mun: '001', munNom: 'BOGOTÁ D.C.', zon: '13', pue: '01', pueNom: 'GALERÍAS', com: '13', comNom: 'TEUSAQUILLO', v: 1200 },
   { dep: '16', depNom: 'BOGOTÁ D.C.', mun: '001', munNom: 'BOGOTÁ D.C.', zon: '13', pue: '02', pueNom: 'PALERMO', com: '13', comNom: 'TEUSAQUILLO', v: 680 },
 ] };
+const META = 2400;
 
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1280, height: 1000 } });
@@ -72,13 +77,13 @@ await p.addInitScript(() => { localStorage.setItem('rr-token', 't'); localStorag
 await p.goto('file://' + process.cwd() + '/candidato-360.html');
 await p.waitForFunction(() => typeof window.loadHistoricalMap === 'function' && typeof window.L === 'object');
 
-await p.evaluate(() => {
+await p.evaluate(meta => {
   crmCandidate = { nombre: 'RICARDO RUIZ', corp: 'JAL · TEUSAQUILLO · BOGOTÁ D.C. · 2015', circunscripcion: 'TEUSAQUILLO · BOGOTÁ D.C.', partido: 'Alianza Verde', votos: 1880, slug: 'JAL2015-16-1-13-1', dataUrl: 'https://stub.test/jal-teusaquillo.json' };
-  showScreen('crm'); document.getElementById('crmVoteNumber').textContent = '2.400';
+  showScreen('crm'); document.getElementById('crmVoteNumber').textContent = meta.toLocaleString('es-CO');
   document.querySelector('input[name="corporationRoute"][value="other"]').checked = true;
   document.getElementById('otherCorporation').value = 'jal';
   document.getElementById('campaignDepartment').innerHTML = '<option value="16">Bogotá D.C.</option>'; document.getElementById('campaignDepartment').value = '16';
-});
+}, META);
 /* Los municipios se cargan como en la página, para resolver el código electoral. */
 await p.evaluate(() => loadCampaignMunicipalities());
 await p.waitForTimeout(400);
@@ -86,7 +91,6 @@ await p.evaluate(() => { document.getElementById('campaignMunicipality').value =
 await p.waitForTimeout(400);
 
 const r = {};
-r.localidades = await p.$$eval('#campaignLocality option', os => os.slice(1).map(o => o.value));
 await p.evaluate(() => { document.getElementById('campaignLocality').value = 'TUNJUELITO'; });
 r.alcance = await p.evaluate(() => alcanceObjetivo());
 r.mesas = await p.evaluate(() => {
@@ -96,28 +100,40 @@ r.mesas = await p.evaluate(() => {
     prefijada: mesaEnAlcance({ dep: '16', mun: '001', comNom: '06LOCALIDAD 06 TUNJUELITO' }, a),
     otroMunicipio: mesaEnAlcance({ dep: '01', mun: '001', comNom: 'TUNJUELITO' }, a) };
 });
-/* El recorte se mira antes de pintar: el mapa del territorio nuevo lo limpia
-   —ya no hay historial que recortar— y con él se iría la explicación. */
+/* El recorte se mira aparte: dice que su historial no está en Tunjuelito sin
+   que eso signifique borrarlo del mapa. */
 r.recorte = await p.evaluate(async () => { const rec = (await datosCandidatura(crmCandidate)).recorte; return { sinVotos: rec.sinVotos, fuera: rec.mesasFuera, dentro: rec.votosDentro, lugar: lugarDelAlcance(rec), nota: notaRecorte(rec) }; });
+
 await p.evaluate(() => { datosCandidaturaCache.clear(); return loadHistoricalMap(crmCandidate); });
 await p.waitForTimeout(1400);
-r.mudanza = await p.evaluate(() => ({
+r.total = await p.evaluate(() => ({
   titulo: document.getElementById('crmMapTitle').textContent, panel: document.getElementById('crmMapPanelNum').textContent,
-  destacada: [...document.querySelectorAll('#crmBreakdown .crm-breakdown-item.is-target')].map(x => x.textContent.trim()),
-  niveles: [...document.querySelectorAll('.crm-map-levels [data-level]')].map(b => b.textContent.trim()),
-  municipio: municipioDeCampana(),
-}));
-await p.evaluate(() => document.querySelector('.crm-map-levels [data-level="puestos"]')?.click());
-await p.waitForTimeout(900);
-r.puestos = await p.evaluate(() => ({ puntos: crmBarrioLayer ? crmBarrioLayer.getLayers().length : 0,
+  niveles: [...document.querySelectorAll('.crm-map-levels [data-level]')].map(x => x.textContent.trim()),
+  votos: crmMapState?.votesByArea, desglose: document.getElementById('crmBreakdownTitle')?.textContent,
   filas: [...document.querySelectorAll('#crmBreakdown .crm-breakdown-item')].map(x => x.textContent.replace(/\s+/g, ' ').trim()),
-  nota: document.getElementById('crmMapNote').textContent }));
-await p.screenshot({ path: SP + '/jal-tunjuelito.png' });
+  nota: document.getElementById('crmMapNote').textContent, modos: [...document.querySelectorAll('#crmMapToggles [data-mode]')].map(x => x.textContent.trim()),
+}));
+await p.screenshot({ path: SP + '/jal-total-teusaquillo.png' });
+r.proy = await p.evaluate(() => { crmMapMode = 'proyectado'; refreshCRMMapMode(); return {
+  reparto: projectedVotesByArea(), desglose: document.getElementById('crmBreakdownTitle')?.textContent,
+  filas: [...document.querySelectorAll('#crmBreakdown .crm-breakdown-item')].map(x => x.textContent.replace(/\s+/g, ' ').trim()),
+  nota: document.getElementById('crmMapNote').textContent }; });
+await p.screenshot({ path: SP + '/jal-proyectado-tunjuelito.png' });
 
-/* Control: si se queda en Teusaquillo no hay mudanza y manda el historial. */
-await p.evaluate(async () => { document.getElementById('campaignLocality').value = 'TEUSAQUILLO'; datosCandidaturaCache.clear(); await loadHistoricalMap(crmCandidate); });
-await p.waitForTimeout(1400);
-r.misma = await p.evaluate(() => ({ sinVotos: recorteActivo?.sinVotos, fuera: recorteActivo?.mesasFuera, dentro: recorteActivo?.votosDentro, titulo: document.getElementById('crmMapTitle').textContent }));
+/* Control 1: quedarse en Teusaquillo no cambia nada —la meta ya estaba ahí—. */
+r.misma = await p.evaluate(async () => { document.getElementById('campaignLocality').value = 'TEUSAQUILLO'; datosCandidaturaCache.clear();
+  const rec = (await datosCandidatura(crmCandidate)).recorte; crmMapMode = 'proyectado'; refreshCRMMapMode();
+  return { sinVotos: rec.sinVotos, dentro: rec.votosDentro, reparto: projectedVotesByArea() }; });
+/* Control 2: mudarse de CIUDAD sí cambia el mapa por el territorio nuevo, y el
+   primer nivel se llama por la unidad que se dibuja —en Bogotá, localidad—. */
+r.ciudad = await p.evaluate(async () => {
+  crmCandidate = { ...crmCandidate, corp: 'CONCEJO · LA CEJA · ANTIOQUIA · 2019', circunscripcion: 'LA CEJA (ANTIOQUIA)' };
+  document.getElementById('otherCorporation').value = 'concejo';
+  document.getElementById('campaignLocality').value = '';
+  datosCandidaturaCache.clear(); window.datosCandidatura = async () => ({ mesas: [{ dep: '01', mun: '021', zon: '01', pue: '01', munNom: 'LA CEJA', v: 900 }], recorte: { sinVotos: true } });
+  await loadHistoricalMap(crmCandidate);
+  return { titulo: document.getElementById('crmMapTitle').textContent, niveles: [...document.querySelectorAll('.crm-map-levels [data-level]')].map(x => x.textContent.trim()) };
+});
 await b.close();
 
 const pruebas = [
@@ -125,19 +141,21 @@ const pruebas = [
   ['una mesa de Teusaquillo queda FUERA del alcance de Tunjuelito', r.mesas.suya === false],
   ['y una de Tunjuelito queda dentro, venga pelada o con el código pegado', r.mesas.nueva === true && r.mesas.prefijada === true],
   ['el municipio sigue mandando: Tunjuelito de otro departamento no cuenta', r.mesas.otroMunicipio === false],
-  ['mudarse de localidad deja el historial sin votos en el territorio nuevo', r.recorte.sinVotos === true && r.recorte.fuera === 2 && r.recorte.dentro === 0],
-  ['así que el mapa pasa a ser el territorio de campaña, no el historial', /territorio de campaña/i.test(r.mudanza.titulo) && /territorio de campaña/i.test(r.mudanza.panel)],
-  ['con Tunjuelito resaltado —y solo Tunjuelito—', r.mudanza.destacada.length === 1 && /Tunjuelito/i.test(r.mudanza.destacada[0])],
-  ['y la explicación nombra la localidad, no el municipio', /Tunjuelito/.test(r.recorte.lugar) && !/Bogot/i.test(r.recorte.lugar) && /no tiene mesas en Tunjuelito/.test(r.recorte.nota)],
-  ['los arquetipos siguen sabiendo en qué municipio compite', r.mudanza.municipio === '16001'],
-  ['los puestos son los de SU localidad, no los de toda la ciudad', r.mudanza.niveles.includes('Puestos') && r.puestos.puntos === 2 && r.puestos.filas.some(f => /Venecia/i.test(f)) && !r.puestos.filas.some(f => /Galerías|Palermo/i.test(f))],
-  ['y se dicen por censo, que es lo que hay sin votos propios', /censo electoral/i.test(r.puestos.nota)],
-  ['quedarse en la misma localidad no es mudanza: manda el historial', r.misma.sinVotos === false && r.misma.fuera === 0 && r.misma.dentro === 1880 && !/territorio de campaña/i.test(r.misma.titulo)],
+  ['el recorte sabe que su historial no está en Tunjuelito', r.recorte.sinVotos === true && r.recorte.fuera === 2 && r.recorte.dentro === 0 && /no tiene mesas en Tunjuelito/.test(r.recorte.nota) && !/Bogot/i.test(r.recorte.lugar)],
+  ['pero mudarse de localidad no borra el mapa: sigue siendo Bogotá', /votación en Bogotá/i.test(r.total.titulo) && !/territorio de campaña/i.test(r.total.panel)],
+  ['con los niveles de una ciudad: Localidad y Barrio, nunca Municipio', r.total.niveles.join('|') === 'Localidad|Barrio'],
+  ['y «Total» muestra los votos que sí existen, los de Teusaquillo', r.total.votos['13'] === 1880 && /Votos por localidad/.test(r.total.desglose) && r.total.filas.some(f => /Teusaquillo\s*1\.880/.test(f))],
+  ['«Proyectado» lleva la meta COMPLETA a Tunjuelito', r.proy.reparto['06'] === META && !r.proy.reparto['13']],
+  ['y el desglose deja Teusaquillo en cero', /Meta proyectada por localidad/.test(r.proy.desglose) && r.proy.filas.length === 1 && /Tunjuelito\s*2\.400/.test(r.proy.filas[0])],
+  ['la nota dice por qué no reparte: a una JAL se entra por una sola', /una sola localidad/.test(r.proy.nota) && /Tunjuelito/.test(r.proy.nota) && !/proporcionalmente/.test(r.proy.nota)],
+  ['quedarse en la misma localidad no es mudanza y la meta no se mueve', r.misma.sinVotos === false && r.misma.dentro === 1880 && r.misma.reparto['13'] === META],
+  ['mudarse de CIUDAD sí cambia el mapa por el territorio nuevo', /territorio de campaña/i.test(r.ciudad.titulo)],
+  ['y ahí el primer nivel también se llama por su unidad, no «Municipio»', r.ciudad.niveles.join('|') === 'Localidad|Puestos'],
   ['sin errores de JavaScript', errores.length === 0],
 ];
 for (const [t, ok] of pruebas) console.log(`${ok ? '✓' : '✗'} ${t}`);
 if (errores.length) console.log(errores.slice(0, 3));
 const f = pruebas.filter(([, ok]) => !ok).length;
-if (f) console.log(JSON.stringify(r, null, 1).slice(0, 2200));
+if (f) console.log(JSON.stringify(r, null, 1).slice(0, 2600));
 console.log(f ? `\n${f} fallaron` : `\n${pruebas.length} de ${pruebas.length} pasaron`);
 process.exit(f ? 1 : 0);

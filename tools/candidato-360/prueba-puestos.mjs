@@ -87,7 +87,7 @@ r.puestos = await p.evaluate(() => ({
   activo: document.querySelector('.crm-map-levels .active')?.dataset.level,
 }));
 await p.screenshot({ path: SP + '/puestos-la-ceja.png' });
-await p.evaluate(() => document.querySelector('.crm-map-levels [data-level="municipio"]').click());
+await p.evaluate(() => document.querySelector('.crm-map-levels [data-level="territorio"]').click());
 await p.waitForTimeout(500);
 r.vuelta = await p.evaluate(() => ({ puntos: crmBarrioLayer, activo: document.querySelector('.crm-map-levels .active')?.dataset.level, poligono: crmLeafletMap.hasLayer(crmMapLayer) }));
 /* La etiqueta del tercer nivel en las ciudades con comunas. */
@@ -112,16 +112,18 @@ await p.screenshot({ path: SP + '/puestos-bogota-sin-votos.png' });
 await b.close();
 
 const pruebas = [
-  ['un municipio sin comunas trae los niveles Municipio y Puestos', r.niveles.join('|') === 'Municipio|Puestos' && r.activo === 'municipio'],
+  ['un municipio sin comunas trae los niveles Municipio y Puestos', r.niveles.join('|') === 'Municipio|Puestos' && r.activo === 'territorio'],
   ['«Puestos» pinta cada puesto en su coordenada', r.puestos.puntos === 3 && r.puestos.activo === 'puestos'],
   ['el tamaño del punto es la votación', r.puestos.radios[0] > r.puestos.radios[1] && r.puestos.radios[1] > r.puestos.radios[2]],
   ['el desglose lista los puestos por barrio, de mayor a menor', /Centro/.test(r.puestos.filas[0] || '') && /5.000/.test(r.puestos.filas[0] || '') && r.puestos.filas.length === 3 && /puesto de votación/i.test(r.puestos.titulo)],
   ['con callejero debajo, que a esa escala hace falta', r.puestos.callejero === true],
   ['y la nota dice que son puestos y no barrios', /Puestos de votación de LA CEJA/.test(r.puestos.nota) && /tamaño del punto/i.test(r.puestos.nota)],
-  ['«Municipio» devuelve el polígono y quita los puntos', r.vuelta.puntos === null && r.vuelta.activo === 'municipio' && r.vuelta.poligono === true],
+  ['«Municipio» devuelve el polígono y quita los puntos', r.vuelta.puntos === null && r.vuelta.activo === 'territorio' && r.vuelta.poligono === true],
   ['en las ciudades con comunas la etiqueta va según haya cartografía', r.etiquetas.pereira && r.etiquetas.ibague && r.etiquetas.bogota && !r.etiquetas.otra],
   ['si la campaña se muda a donde no hay votos, el mapa es el territorio NUEVO', /territorio de campaña/i.test(r.bogota.titulo) && /territorio de campaña/i.test(r.bogota.panel) && r.bogota.filas.some(f => /CANDELARIA/i.test(f))],
-  ['y ese municipio trae sus puestos, dimensionados por censo', r.bogota.niveles.join('|') === 'Municipio|Puestos' && r.bogotaPuestos.puntos === 2 && /Censo electoral por puesto/.test(r.bogotaPuestos.titulo) && /censo electoral/i.test(r.bogotaPuestos.nota)],
+  /* En Bogotá no hay municipios: lo que se dibuja son localidades y el botón
+     se llama como lo que está en el mapa. */
+  ['y ese territorio trae sus puestos, dimensionados por censo', r.bogota.niveles.join('|') === 'Localidad|Puestos' && r.bogotaPuestos.puntos === 2 && /Censo electoral por puesto/.test(r.bogotaPuestos.titulo) && /censo electoral/i.test(r.bogotaPuestos.nota)],
   ['sin errores de JavaScript', errores.length === 0],
 ];
 for (const [t, ok] of pruebas) console.log(`${ok ? '✓' : '✗'} ${t}`);
