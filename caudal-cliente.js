@@ -1533,5 +1533,9 @@
      `briefWire`/`briefDescargar` se exponen para soporte y verificación: la
      barra del brief solo aparece cuando la lectura aterriza, y sin esto no
      hay forma de probar el PDF si el modelo está lento. */
-  Object.assign(window, { cliInit, pfLoadList, briefWire, briefDescargar, rosaCupo, cliLoad });
+  // La búsqueda universal lee los perfiles para ofrecer «leer para este cliente».
+  // Se expone una COPIA de solo lectura: nadie de afuera debe poder reasignar
+  // PF_LIST y dejar la Rosa con otra lista.
+  const pfListaPerfiles=()=>PF_LIST.map(p=>({perfilId:p.perfilId, nombre:p.nombre}));
+  Object.assign(window, { cliInit, pfLoadList, briefWire, briefDescargar, rosaCupo, cliLoad, pfListaPerfiles });
 })();

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-<link href="caudal-base.css?v=20260913a" rel="stylesheet" />
+<link href="caudal-base.css?v=20260914-hilo" rel="stylesheet" />
 <link rel="stylesheet" href="caudal-ui.css?v=20260913a" />
 <script>
   /* Contratación dejó de ser una vista de acá (sep-2026) y tiene página propia.
@@ -328,7 +328,7 @@
      ⚠️ Al tocar cualquiera hay que bumpear su ?v= en las DOS páginas. -->
 <script src="caudal-pilares.js?v=20260907c"></script>
 <script src="caudal-contratacion.js?v=20260907"></script>
-<script src="caudal-cliente.js?v=20260914-mi"></script>
+<script src="caudal-cliente.js?v=20260914-hilo"></script>
 <script src="caudal-votos.js?v=20260907"></script>
 <script>
 (function(){
@@ -664,6 +664,16 @@
   const UNI_TABS=[['congreso','Congreso'],['regulatorio','Regulatorio'],['sucop','Consulta pública'],
                   ['ejecutivo','Ejecutivo'],['contratacion','Contratación'],['medios','Medios']];
   let _uniSeq=0, _uniData={};
+  /* ── La conversación (sep-14-2026 · pedido de Pablo: «un Mr. Spock») ──────
+     Antes cada búsqueda era de un solo tiro: al final solo había «Hacer una
+     nueva pregunta», que borraba todo, y el prompt no sabía ni lo que se había
+     preguntado antes ni quién preguntaba. Ahora:
+       · _uniHist   turnos ya contestados [{q, l}], para el hilo y el prompt.
+       · _uniCtx    la EVIDENCIA de este tema. Un seguimiento («¿y eso cómo nos
+                    afecta?») reusa la misma: buscar esa frase en los seis pilares
+                    traería basura. Un tema nuevo es una búsqueda nueva.
+       · _uniActual la pregunta que se está contestando ahora. */
+  let _uniHist=[], _uniCtx=null, _uniActual='', _uniFuentes=null, _uniFaltaron=0;
   // aviso de «la respuesta ya está pintada» para la oferta de rehacer con el
   // Congreso; lo setea cada búsqueda y lo dispara uniPintarRespuesta
   let _uniOnResp=null;
@@ -772,6 +782,7 @@
     query=(query||'').trim(); if(!query) return;
     const mine=++_uniSeq;
     _uniOnResp=null;
+    _uniHist=[]; _uniCtx=null; _uniActual=query;
     showView('buscar');
     const uq=document.getElementById('uq'); if(uq) uq.value=query;
     const box=document.getElementById('uni-results');
@@ -953,9 +964,12 @@
     el.innerHTML=blk('Hallazgo',l.hallazgo)+blk('Por qué importa',l.veredicto)
       || '<div class="cob-note">Sin resumen disponible para este tema.</div>';
   }
-  function uniResumenFallback(msg,agotada){
+  function uniResumenFallback(msg,agotada,destino){
     uniLoader.stop();
-    const el=document.getElementById('uni-summary-body'); if(!el) return;
+    // `destino`: en un seguimiento el error va en el hueco del turno nuevo, no
+    // sobre toda la conversación — un fallo en la tercera pregunta no puede
+    // borrar las dos primeras respuestas.
+    const el=destino||document.getElementById('uni-summary-body'); if(!el) return;
     const registrado=HAS_SESSION;
     if(msg){ el.innerHTML=`<div class="cob-note">${esc(msg)}</div>`; return; }
     // Se le acabó la cuota gratuita: el muro dice exactamente qué pasó y cuál
@@ -1044,9 +1058,68 @@
     while((m=re.exec(t))){ out+=esc(t.slice(last,m.index)); out+='('+m[1].split(/\s*(?:[,;]|\by\b)\s*/).map(c=>uniRefHTML(c,map)).join(', ')+')'; last=re.lastIndex; }
     return out+esc(t.slice(last));
   }
-  function uniPintarRespuesta(l,fuentesUsadas,nFaltaron){
+  // El perfil con el que se lee la búsqueda. Tiene llave PROPIA a propósito:
+  // escoger «sin cliente» acá no puede cambiar qué cliente abre la Rosa.
+  // ⚠️ Esto solo PROPONE un perfilId: el worker lo carga del KV y lo descarta si
+  // la cuenta no es su dueña o no tiene acceso. Por eso el aviso «Leída para X»
+  // se pinta con lo que la Lambda DICE que usó, nunca con lo que aquí se pidió.
+  function uniEmail(){ try{ return (JSON.parse(localStorage.getItem('rr-user')||'null')||{}).email||'anon'; }catch(e){ return 'anon'; } }
+  function uniListaPerfiles(){ return (typeof pfListaPerfiles==='function')?(pfListaPerfiles()||[]):[]; }
+  // Orden: (1) lo que escogió en la búsqueda · (2) el perfil de SU organización
+  // —quien trabaja en Cauce busca, por defecto, para Cauce; el último cliente que
+  // abrió en la Rosa puede ser un prospecto de demostración— · (3) el último de la
+  // Rosa · (4) el único que tenga. Con varios y ninguna señal, lectura general.
+  const uniNorm=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  function uniPerfilId(){
+    if(!ACCESO||IS_GUEST) return '';
+    const lista=uniListaPerfiles();
+    let elegido='', ult='', org='';
+    try{ elegido=localStorage.getItem('caudal-busca-perfil:'+uniEmail())||''; }catch(e){}
+    if(elegido==='ninguno') return '';
+    if(elegido&&(!lista.length||lista.some(p=>p.perfilId===elegido))) return elegido;
+    try{ org=uniNorm((JSON.parse(localStorage.getItem('rr-user')||'null')||{}).org); }catch(e){}
+    const propio=org&&lista.find(p=>uniNorm(p.nombre)===org);
+    if(propio) return propio.perfilId;
+    try{ ult=localStorage.getItem('caudal-perfil-ult:'+uniEmail())||''; }catch(e){}
+    if(ult&&(!lista.length||lista.some(p=>p.perfilId===ult))) return ult;
+    return lista.length===1?lista[0].perfilId:'';
+  }
+  // Turno ya contestado, en versión compacta para el hilo.
+  function uniTurnoHTML(t,map){
+    return `<div class="uni-turno"><div class="uni-turno-q">Preguntaste · «${esc(t.q)}»</div>
+      <div class="uni-turno-r">${uniTexto(t.l.respuesta||'',map)}</div>
+      ${t.l.accion?`<div class="uni-turno-a"><b>Qué hacer:</b> ${uniTexto(t.l.accion,map)}</div>`:''}</div>`;
+  }
+  // Lo que viaja al prompt de cada turno anterior: la respuesta y la acción, que
+  // es lo que un seguimiento suele retomar («¿y eso cuándo?», «¿con quién?»).
+  function uniHistorialPrompt(){
+    return _uniHist.map(t=>({q:t.q, r:[t.l.respuesta||'', t.l.accion?('Qué hacer: '+t.l.accion):''].filter(Boolean).join(' ')}));
+  }
+  function uniPreguntar(q, reformular){
+    q=String(q||'').trim(); if(!q||!_uniCtx) return;
+    if(!reformular){
+      // el turno que está en pantalla pasa al hilo antes de preguntar lo nuevo
+      if(_uniUltima) _uniHist.push(_uniUltima);
+      _uniActual=q;
+    }
+    _uniUltima=null;
+    const mine=_uniSeq;
+    const map=uniRefMap();
+    const el=document.getElementById('uni-summary-body'); if(!el) return;
+    const rc=document.getElementById('uni-recalc'); if(rc) rc.innerHTML='';
+    el.innerHTML=`${_uniHist.map(t=>uniTurnoHTML(t,map)).join('')}
+      <div class="uni-turno-q" style="margin-top:.9rem">${_uniHist.length?'Preguntaste':'Pregunta'} · «${esc(_uniActual)}»</div>
+      <div id="uni-slot"></div>`;
+    const slot=document.getElementById('uni-slot');
+    uniLoader.mount(slot, _uniHist.length?'Pensando la respuesta sobre la misma evidencia…':'Rehaciendo la respuesta…', true);
+    uniLoadRespuesta(_uniActual, mine, _uniFuentes, _uniFaltaron, {slot, historial:uniHistorialPrompt(), ctx:_uniCtx});
+  }
+  let _uniUltima=null;
+  function uniPintarRespuesta(l,fuentesUsadas,nFaltaron,meta){
+    meta=meta||{};
     uniLoader.stop();
     const el=document.getElementById('uni-summary-body'); if(!el) return;
+    _uniUltima={q:_uniActual, l};
     const map=uniRefMap();
     const cz=l.certeza||{}; const CC={alta:'var(--green)',media:'var(--amber)',baja:'var(--red)'};
     const chip=cz.nivel?`<span class="ichip" style="display:inline-block;width:auto;padding:.12rem .5rem;font-size:.62rem;color:${CC[cz.nivel]||'inherit'};border-color:${CC[cz.nivel]||'inherit'}55" title="${esc(cz.por_que||'')}">certeza ${esc(cz.nivel)}</span>`:'';
@@ -1061,12 +1134,37 @@
     const alcance=(nFaltaron>0&&fuentesUsadas&&fuentesUsadas.length)
       ? `<div class="cob-note" style="margin:.5rem 0 .2rem">Escrita con ${fuentesUsadas.length} de ${fuentesUsadas.length+nFaltaron} fuentes —${esc(fuentesUsadas.join(', '))}—; las demás no alcanzaron a entrar. Lo que trajeron está abajo, en sus tarjetas.</div>`
       : '';
-    const aviso=`<div class="uni-aviso">Esta es una <b>lectura general</b> a partir de nuestras fuentes de datos. Si quieres un análisis personalizado en tu sector, visita <a id="uni-aviso-rosa">la Rosa de los Vientos</a>; si necesitas el análisis desde tu empresa, <a href="mailto:hola@ricardoruiz.co?subject=${encodeURIComponent('Caudal · análisis desde mi empresa')}">habla con nosotros</a>.</div>`;
-    el.innerHTML=`${aviso}${alcance}<div class="blk"><div class="t" style="font-size:1.02rem;line-height:1.55">${uniTexto(l.respuesta||'',map)} ${chip}</div>${cz.por_que?`<div class="cob-note" style="margin-top:.3rem">${uniTexto(cz.por_que,map)}</div>`:''}</div>
+    // Con cliente, el aviso dice PARA QUIÉN se leyó (lo que la Lambda confirma
+    // que usó). Sin cliente, sigue el aviso de lectura general.
+    const lista=ACCESO&&!IS_GUEST?uniListaPerfiles():[];
+    const sel=lista.length?`<select class="uni-cli-sel" id="uni-cli-sel" aria-label="Cliente con el que se lee">
+        ${lista.map(p=>`<option value="${esc(p.perfilId)}"${meta.cliente&&p.nombre===meta.cliente?' selected':''}>${esc(p.nombre)}</option>`).join('')}
+        <option value="ninguno"${meta.cliente?'':' selected'}>Sin cliente · lectura general</option></select>`:'';
+    const aviso=meta.cliente
+      ? `<div class="uni-aviso uni-aviso-cli">◈ Leída para <b>${esc(meta.cliente)}</b>, con su ficha: lo que hace, las decisiones que toma, sus interlocutores y sus plazos. ${sel?`<span class="uni-cli-cambio">Leer para ${sel}</span>`:''}</div>`
+      : (ACCESO&&lista.length
+        ? `<div class="uni-aviso">Esta es una <b>lectura general</b>. Para leerla desde un cliente: ${sel}</div>`
+        : `<div class="uni-aviso">Esta es una <b>lectura general</b> a partir de nuestras fuentes de datos. Si quieres un análisis personalizado en tu sector, visita <a id="uni-aviso-rosa">la Rosa de los Vientos</a>; si necesitas el análisis desde tu empresa, <a href="mailto:hola@ricardoruiz.co?subject=${encodeURIComponent('Caudal · análisis desde mi empresa')}">habla con nosotros</a>.</div>`);
+    const hilo=_uniHist.map(t=>uniTurnoHTML(t,map)).join('');
+    const etiqueta=_uniHist.length?`<div class="uni-turno-q" style="margin-top:.9rem">Preguntaste · «${esc(_uniActual)}»</div>`:'';
+    const seguir=`<form class="uni-seguir" id="uni-seguir" autocomplete="off">
+        <input id="uni-seguir-q" type="text" maxlength="300" placeholder="${meta.cliente?`Pregunta sobre esto — ¿qué implica para ${esc(meta.cliente)}? ¿con quién hablar?`:'Pregunta sobre esta respuesta — ¿qué implica? ¿qué sigue?'}" aria-label="Pregunta de seguimiento" />
+        <button type="submit">Preguntar</button>
+        <div class="uni-seguir-nota">Usa la misma evidencia de esta búsqueda${_uniHist.length?` · ${_uniHist.length+1} preguntas en esta conversación`:''}. Para un tema nuevo, busca arriba.</div>
+      </form>`;
+    el.innerHTML=`${aviso}${alcance}${hilo}${etiqueta}<div class="blk"><div class="t" style="font-size:1.02rem;line-height:1.55">${uniTexto(l.respuesta||'',map)} ${chip}</div>${cz.por_que?`<div class="cob-note" style="margin-top:.3rem">${uniTexto(cz.por_que,map)}</div>`:''}</div>
       ${(l.transversales||[]).length?`<div class="blk"><div class="h">Lo clave para informar</div>${li(l.transversales)}</div>`:''}
-      ${blk('Qué está vivo en el Estado',l.en_tramite)}${blk('Qué dice la prensa',l.prensa)}${blk('Qué hacer',l.accion)}${fu}`;
+      ${blk('Qué está vivo en el Estado',l.en_tramite)}${blk('Qué dice la prensa',l.prensa)}${blk('Qué hacer',l.accion)}${fu}${seguir}`;
     const rosa=document.getElementById('uni-aviso-rosa'); if(rosa) rosa.onclick=()=>showView('cliente');
-    if(_uniOnResp) _uniOnResp();
+    const f=document.getElementById('uni-seguir');
+    if(f) f.onsubmit=e=>{ e.preventDefault(); const q=document.getElementById('uni-seguir-q').value; uniPreguntar(q,false); };
+    const s2=document.getElementById('uni-cli-sel');
+    if(s2) s2.onchange=()=>{
+      try{ localStorage.setItem('caudal-busca-perfil:'+uniEmail(), s2.value); }catch(e){}
+      uniPreguntar(_uniActual,true);   // la misma pregunta, leída para otro
+    };
+    // «Rehacer con el Congreso» solo tiene sentido en la primera pregunta
+    if(_uniOnResp&&!_uniHist.length) _uniOnResp();
   }
   // Tope del sondeo. Sube de 90 a 120 s porque ahora puede haber un
   // re-disparo de por medio (fallo + reintento del modelo).
@@ -1087,16 +1185,28 @@
   const plazoDe=k=>k==='congreso'?UNI_ESPERA_CONGRESO:UNI_ESPERA_MS;
   // Piso duro: con menos de esto no se contesta aunque venza el plazo.
   const UNI_MIN_FUENTES=4;
-  function uniLoadRespuesta(query, mine, fuentesUsadas, nFaltaron){
+  function uniLoadRespuesta(query, mine, fuentesUsadas, nFaltaron, opts){
     // Ya no se corta por ACCESO: el anónimo tiene una pregunta de muestra y la
     // cuenta registrada tres por semana. Quién tiene cupo lo sabe el worker, que
     // es donde vive el contador — acá solo se pinta lo que responda.
-    call({action:'respuesta',query,contexto:uniContexto()}).then(d=>{
+    opts=opts||{};
+    // la evidencia del tema se congela en la primera pregunta y la reusan los
+    // seguimientos; así lo que el modelo cita sigue casando con las tarjetas
+    const contexto=opts.ctx||uniContexto();
+    _uniCtx=contexto; _uniFuentes=fuentesUsadas; _uniFaltaron=nFaltaron;
+    const falla=(m,d)=>uniResumenFallback(m,d,opts.slot||null);
+    const pedido={action:'respuesta',query,contexto};
+    const pid=uniPerfilId(); if(pid) pedido.perfilId=pid;
+    if(opts.historial&&opts.historial.length) pedido.historial=opts.historial;
+    let cliente='';
+    const pintar=l=>uniPintarRespuesta(l,fuentesUsadas,nFaltaron,{cliente});
+    call(pedido).then(d=>{
       if(mine!==_uniSeq) return;
-      if(d&&d.error==='sin_cuota') return uniResumenFallback(null,d);
-      if(d&&d.error==='accion_restringida') return uniResumenFallback();
-      if(d&&d.estado==='lista'&&d.lectura) return uniPintarRespuesta(d.lectura,fuentesUsadas,nFaltaron);
-      if(!d||!d.key) return uniResumenFallback('No se pudo preparar la respuesta.');
+      if(d&&d.cliente) cliente=d.cliente;
+      if(d&&d.error==='sin_cuota') return falla(null,d);
+      if(d&&d.error==='accion_restringida') return falla();
+      if(d&&d.estado==='lista'&&d.lectura) return pintar(d.lectura);
+      if(!d||!d.key) return falla('No se pudo preparar la respuesta.');
       const key=d.key, t0=Date.now(); let disparos=0, ultErr='';
       // ⚠️ El disparo suele morir en el gateway a los 30 s y no pasa nada: la
       // Lambda termina y deja la respuesta en el caché. Pero si la generación
@@ -1108,7 +1218,7 @@
       const disparar=()=>{ disparos++; call({action:'respuesta-lectura',key}).catch(()=>{}); };
       const tick=()=>call({action:'respuesta-lectura',key,solo_cache:true}).then(x=>{
         if(mine!==_uniSeq) return;
-        if(x&&x.estado==='lista'&&x.lectura) return uniPintarRespuesta(x.lectura,fuentesUsadas,nFaltaron);
+        if(x&&x.estado==='lista'&&x.lectura) return pintar(x.lectura);
         if(x&&x.ultimo_error) ultErr=x.ultimo_error;
         if(x&&x.reintentar&&disparos<3) disparar();
         // Cadencia por tramos. Un sondeo cuesta 0,13-0,43 s y la generación
@@ -1118,13 +1228,13 @@
         // el navegador se entera (1,75 s de media, sobre un total de ~25 s).
         // Ahora se espera 8 s antes del primero y luego se pregunta seguido.
         if(Date.now()-t0<UNI_RESP_MAX) setTimeout(tick, Date.now()-t0<14000?1400:2200);
-        else uniResumenFallback(ultErr
-          ? 'El modelo no alcanzó a redactar la respuesta. Vuelve a buscar: el segundo intento suele salir.'
-          : 'La respuesta tardó más de lo normal. Vuelve a buscar en un momento.');
-      }).catch(()=>uniResumenFallback('No se pudo consultar la respuesta.'));
+        else falla(ultErr
+          ? 'El modelo no alcanzó a redactar la respuesta. Vuelve a preguntar: el segundo intento suele salir.'
+          : 'La respuesta tardó más de lo normal. Vuelve a preguntar en un momento.');
+      }).catch(()=>falla('No se pudo consultar la respuesta.'));
       disparar();
       setTimeout(tick,8000);
-    }).catch(()=>uniResumenFallback('No se pudo preparar la respuesta.'));
+    }).catch(()=>falla('No se pudo preparar la respuesta.'));
   }
   // Cámara(s) de radicación junto al estado (pedido de Ricardo, sep-2026): los
   // dos números = cruzó de cámara («Cámara · Senado»); uno solo = se quedó donde

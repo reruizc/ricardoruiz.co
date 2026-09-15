@@ -2226,8 +2226,21 @@ RESP_SYSTEM = (
     "cortas con lo clave para informar a una organización), en_tramite (qué está "
     "vivo en el Estado sobre esto, o vacío), prensa (qué dice la prensa, o vacío), "
     "accion (una recomendación concreta y prudente, o vacío), fuentes (lista de "
-    "{pilar, ref} tomados LITERALMENTE de la evidencia que usaste)."
+    "{pilar, ref} tomados LITERALMENTE de la evidencia que usaste). "
+    "(6) Si te entregan la FICHA DEL CLIENTE, lees la evidencia desde ese cliente: "
+    "`respuesta`, `transversales` y `accion` dicen por qué le importa a ÉL, conectado "
+    "con sus decisiones, sus interlocutores y sus plazos; si la evidencia no le toca, "
+    "lo dices sin forzar el vínculo; y no inventas nada de su negocio que no esté en la "
+    "ficha. (7) Si hay CONVERSACIÓN PREVIA, la pregunta puede ser de seguimiento: "
+    "interprétala en ese contexto (\u00ab¿y eso cómo me afecta?\u00bb se refiere a lo "
+    "anterior), no repitas lo ya dicho y contesta solo lo nuevo; la evidencia es la "
+    "misma y la regla (2) sigue valiendo."
 )
+
+# Versión propia de la respuesta: al cambiar su prompt o su formato se invalida SOLO
+# este caché. Subir PROMPT_VERSION tiraría también el de tema y el de la Rosa.
+RESP_VER = 'r2'   # r2: ficha del cliente + conversación previa
+RESP_HIST_MAX = 3  # turnos previos que entran al prompt; más no mejora y encarece
 
 
 def _resp_contexto(query, ctx):
@@ -2280,20 +2293,72 @@ def _resp_contexto(query, ctx):
     return '\n'.join(L)
 
 
-def _respuesta_pedir(query, ctx):
-    """Deja el prompt en caché; devuelve (key, respuesta_hecha_o_None)."""
+def _resp_cliente(perfil):
+    """(nombre, bloque) de la ficha del cliente que pregunta, o ('', '').
+
+    Reusa `normalizar_perfil` + `_ficha_bloque`, los MISMOS que arman la lectura
+    de la Rosa: la búsqueda y el radar tienen que ver al cliente igual, o una
+    pantalla diría cosas que la otra no sabe."""
+    if not isinstance(perfil, dict) or not perfil:
+        return '', ''
+    try:
+        n = caudal_core.normalizar_perfil(perfil)
+    except Exception:
+        return '', ''
+    L = [f"CLIENTE QUE PREGUNTA: {n['nombre']}"]
+    if n.get('descripcion'):
+        L.append('DESCRIPCIÓN: ' + n['descripcion'])
+    if n.get('temas'):
+        L.append('TEMAS QUE VIGILA: ' + ', '.join(n['temas']))
+    fb = _ficha_bloque(n)
+    if fb:
+        L.append(fb)
+    return n['nombre'], '\n'.join(L)
+
+
+def _resp_historial(hist):
+    """Los últimos turnos de la conversación, acotados, como texto para el prompt.
+
+    Llega del navegador: se recorta aquí y no se confía en el tamaño que mande."""
+    if not isinstance(hist, list):
+        return ''
+    turnos = [t for t in hist if isinstance(t, dict) and str(t.get('q') or '').strip()]
+    L = []
+    for i, t in enumerate(turnos[-RESP_HIST_MAX:], 1):
+        q = str(t.get('q') or '').replace('\n', ' ').strip()[:300]
+        r = str(t.get('r') or '').replace('\n', ' ').strip()[:700]
+        L.append(f"  {i}. PREGUNTÓ: «{q}»" + (f"\n     SE LE RESPONDIÓ: {r}" if r else ''))
+    return '\n'.join(L)
+
+
+def _respuesta_pedir(query, ctx, perfil=None, historial=None):
+    """Deja el prompt en caché; devuelve (key, respuesta_hecha_o_None, cliente).
+
+    La llave incluye la ficha y la conversación: la misma pregunta sobre la misma
+    evidencia NO tiene la misma respuesta para Cauce que para DiDi, ni como primera
+    pregunta que como seguimiento. Sin eso el caché le serviría a uno la lectura
+    del otro."""
     evidencia = _resp_contexto(query, ctx)
-    key = _hash24(PROMPT_VERSION + '|resp|' + query.strip().lower() + '|' + _hash24(evidencia))
+    cliente, ficha = _resp_cliente(perfil)
+    hist = _resp_historial(historial)
+    key = _hash24(PROMPT_VERSION + '|' + RESP_VER + '|resp|' + query.strip().lower() + '|'
+                  + _hash24(evidencia) + '|' + _hash24(ficha) + '|' + _hash24(hist))
     hecha = _cache_get('resp-' + key)
     if hecha:
-        return key, hecha
-    user = (f"PREGUNTA del cliente: «{query.strip()}»\n\nEVIDENCIA encontrada por Caudal "
-            f"(cita los ref entre corchetes tal cual):\n{evidencia}\n\n"
-            "Contesta en JSON según las reglas. Si la evidencia no responde la pregunta "
-            "concreta (por ejemplo, una fecha que nadie ha fijado), dilo en `respuesta` y "
-            "pon certeza baja: eso es más útil que rellenar.")
-    _cache_put('resp-in-' + key, {'user': user, 'query': query})
-    return key, None
+        return key, hecha, cliente
+    partes = []
+    if ficha:
+        partes.append('QUIÉN PREGUNTA (lee la evidencia desde este cliente):\n' + ficha)
+    if hist:
+        partes.append('CONVERSACIÓN PREVIA (la pregunta de abajo puede ser de seguimiento):\n' + hist)
+    partes.append(f"PREGUNTA del cliente: «{query.strip()}»")
+    partes.append("EVIDENCIA encontrada por Caudal (cita los ref entre corchetes tal cual):\n"
+                  + evidencia)
+    partes.append("Contesta en JSON según las reglas. Si la evidencia no responde la pregunta "
+                  "concreta (por ejemplo, una fecha que nadie ha fijado), dilo en `respuesta` y "
+                  "pon certeza baja: eso es más útil que rellenar.")
+    _cache_put('resp-in-' + key, {'user': '\n\n'.join(partes), 'query': query, 'cliente': cliente})
+    return key, None, cliente
 
 
 def _respuesta_generar(key):
@@ -5223,10 +5288,16 @@ def handler(event, context):
         q = str(body.get('query') or '').strip()
         if not q:
             return _resp(400, {'error': 'falta query'})
-        key, hecha = _respuesta_pedir(q, body.get('contexto'))
+        # La ficha es personalización, que es lo que se cobra: sin credencial se
+        # ignora aunque venga en el cuerpo. El worker ya la quita a quien no tiene
+        # acceso; esto es la segunda capa para quien llame a la Lambda directo.
+        perfil = body.get('perfil') if autorizado else None
+        key, hecha, cliente = _respuesta_pedir(q, body.get('contexto'), perfil,
+                                               body.get('historial'))
+        extra = {'cliente': cliente} if cliente else {}
         if hecha:
-            return _resp(200, {'estado': 'lista', 'lectura': hecha, 'key': key})
-        return _resp(200, {'estado': 'pendiente', 'key': key})
+            return _resp(200, {'estado': 'lista', 'lectura': hecha, 'key': key, **extra})
+        return _resp(200, {'estado': 'pendiente', 'key': key, **extra})
 
     if action == 'respuesta-lectura':
         # disparar / sondear — gemela de tema-lectura
