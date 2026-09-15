@@ -271,7 +271,7 @@
     const next = encodeURIComponent(pagina);
     if (!SESION.token) return muro('Este panel trabaja sobre <b>su</b> candidatura, así que primero hay que saber quién es.', `<a class="wall-btn primary" href="login.html?next=${next}">Iniciar sesión</a>`), false;
     if (!SESION.acceso) return muro('Su cuenta todavía no tiene acceso a Candidato 360.', `<a class="wall-btn primary" href="candidato-360.html?comprar=1">Ver qué incluye</a>`), false;
-    if (!SESION.vinculo) return muro('Su cuenta todavía no tiene una candidatura abierta: los paneles se arman sobre su territorio y su nombre.', `<a class="wall-btn primary" href="candidato-360.html">Abrir mi candidatura</a>`), false;
+    if (!SESION.vinculo) return muro('Su cuenta todavía no tiene una candidatura abierta: los paneles se arman sobre su territorio y su nombre.', `<a class="wall-btn primary" href="candidato-360.html?abrir=1">Abrir mi candidatura</a>`), false;
     const cab = $('panelCandidatura');
     if (cab) {
       const t = territorio();

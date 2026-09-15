@@ -2257,6 +2257,25 @@ function repartoSaltoCiudad(state, goal) {
   s.base = base;
   return reparto;
 }
+/* Mudanza de localidad dentro de la misma ciudad. No es un salto de
+   corporación —sigue siendo una JAL— pero sí de territorio, y el reparto
+   proporcional de siempre dejaba la meta sobre la localidad ANTERIOR: al edil
+   de Teusaquillo que se lanza por Tunjuelito le pintaba sus 2.400 votos en
+   Teusaquillo, donde en 2027 no se le cuenta ni uno.
+
+   Acá no hay nada que repartir: a una JAL se entra por UNA localidad, así que
+   la meta entera cae en la suya. Vale también para el que se queda donde
+   estaba —toda su votación ya estaba ahí—, de modo que la regla es una sola. */
+let MUDANZA_LOCAL = null;
+function repartoMudanzaLocal(state, goal) {
+  const alcance = alcanceObjetivo();
+  if (alcance?.tipo !== 'localidad' || !state?.namesByArea) return null;
+  const objetivo = normalizedText(cortoLocal(alcance.localidad)); if (!objetivo) return null;
+  const llave = Object.keys(state.namesByArea).find(k => normalizedText(cortoLocal(state.namesByArea[k])) === objetivo);
+  if (!llave) return null;
+  MUDANZA_LOCAL = state.namesByArea[llave];
+  return { [llave]: goal };
+}
 /* Geometría de municipio: pinta el departamento con el reparto. */
 async function pintarProyeccionDepartamental(goal) {
   const s = SALTO_ACTUAL; if (!s || s.tipo.unidad !== 'municipio') return false;
@@ -2437,8 +2456,10 @@ function projectedVotesByArea() {
   /* Con salto de corporación la meta no puede caer donde cayó el historial:
      se reparte con la huella del destino (sección 8 ter). Si el salto no se
      pudo preparar, se conserva el reparto proporcional de siempre. */
+  MUDANZA_LOCAL = null;
   const salto = crmMapState ? repartoSaltoCiudad(crmMapState, goal) : null;
-  return salto || distributeVotes(crmMapState?.votesByArea || {}, goal);
+  if (salto) return salto;
+  return (crmMapState ? repartoMudanzaLocal(crmMapState, goal) : null) || distributeVotes(crmMapState?.votesByArea || {}, goal);
 }
 function renderMapBreakdown(votesByArea, namesByArea, title) {
   const rows = Object.entries(votesByArea).map(([key, value]) => ({ key, name: namesByArea[key] || key, value: Number(value) || 0 })).filter(row => row.value > 0).sort((a, b) => b.value - a.value), max = Math.max(1, ...rows.map(row => row.value));
@@ -2479,7 +2500,7 @@ function refreshCRMMapMode() {
     layer.setStyle({ fillColor: MAP_COLOR(value / max), fillOpacity: key === state.targetKey ? .78 : .38 });
     layer.bindTooltip(`<strong>${NOMBRE_BONITO(state.config.name(layer.feature.properties))}</strong><br>${(crmMapMode === 'proyectado' ? proj : observed).toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : 'votos'}`, { sticky: true });
   });
-  $('crmMapNote').textContent = (crmMapMode === 'proyectado' ? (SALTO_ACTUAL?.base ? notaSalto(SALTO_ACTUAL.base) + ` Haga clic en una ${state.config.title} para ver su detalle.` : `Meta total distribuida proporcionalmente a la votación histórica. Haga clic en una ${state.config.title} para ver su detalle.`) : `Votación total histórica. Haga clic en una ${state.config.title} para ver el detalle y su meta proyectada.`) + notaRecorte();
+  $('crmMapNote').textContent = (crmMapMode === 'proyectado' ? (SALTO_ACTUAL?.base ? notaSalto(SALTO_ACTUAL.base) + ` Haga clic en una ${state.config.title} para ver su detalle.` : MUDANZA_LOCAL ? `A la Junta administradora local se entra por una sola ${state.config.title}: la meta completa se juega en ${NOMBRE_BONITO(MUDANZA_LOCAL)}, no en la ${state.config.title} donde votó antes.` : `Meta total distribuida proporcionalmente a la votación histórica. Haga clic en una ${state.config.title} para ver su detalle.`) : `Votación total histórica. Haga clic en una ${state.config.title} para ver el detalle y su meta proyectada.`) + (crmMapMode === 'proyectado' && MUDANZA_LOCAL ? '' : notaRecorte());
   if (state.focusKey) renderBarriosForArea(state.focusKey);
 }
 function showCRMMapDetail(layer) { const state = crmMapState; if (!state) return; layer.openTooltip(); renderBarriosForArea(state.config.code(layer.feature.properties)); setMapLevel('barrio'); }
@@ -2557,6 +2578,21 @@ function notaRecorte(recorte = recorteActivo) {
    mapa va por el territorio nuevo (Bogotá, Cali) o por donde estuvo la votación. */
 async function historialEnObjetivo(candidate) {
   try { return !(await datosCandidatura(candidate)).recorte?.sinVotos; } catch (e) { return true; }
+}
+/* Pero mudarse de LOCALIDAD no es mudarse de ciudad. Un edil que pasa de
+   Teusaquillo a Tunjuelito sigue en Bogotá: su votación anterior existe, está
+   dibujada en este mismo mapa y «Total» tiene que poder mostrarla. Cambiar el
+   mapa entero por el territorio nuevo —como se hace cuando alguien de La Ceja
+   se lanza al Concejo de Bogotá— le borraba el historial de la pantalla.
+   La pregunta para eso es la CIUDAD, un nivel por encima del alcance. */
+async function historialEnCiudad(candidate) {
+  const alcance = alcanceObjetivo(); if (!alcance) return true;
+  if (alcance.tipo !== 'localidad') return historialEnObjetivo(candidate);
+  const ciudad = { ...alcance, tipo: 'municipio' };
+  try {
+    const mesas = (await datosCandidatura(candidate)).mesas || [];
+    return mesas.some(mesa => mesaEnAlcance(mesa, ciudad) && Number(mesa.v || 0) > 0);
+  } catch (e) { return true; }
 }
 
 /* Mapa genérico: por departamento (nacional), o el municipio recortado del
@@ -3081,20 +3117,28 @@ function ciudadTieneBarrios(state) {
 }
 /* Niveles para un municipio sin comunas: no hay barrio que abrir, pero sí
    puestos. Lo que se ve en La Ceja, en Sabaneta, en el 90 % del país. */
+const UNIDAD_NIVEL = { localidad: 'Localidad', comuna: 'Comuna', municipio: 'Municipio' };
 function nivelesMunicipio() {
   const mapEl = $('crmMap'); if (!mapEl || !MAPA_MUNICIPAL || !crmMapLayer) return;
+  /* «Municipio» no vale en Bogotá, donde lo que se dibuja son localidades, ni
+     en Medellín, donde son comunas: el botón se llama como la unidad que
+     realmente está en el mapa. */
+  const etiqueta = UNIDAD_NIVEL[MAPA_MUNICIPAL.unidad] || 'Municipio';
   const controls = document.createElement('div'); controls.className = 'crm-map-levels';
-  controls.innerHTML = '<button type="button" class="crm-map-level active" data-level="municipio">Municipio</button><button type="button" class="crm-map-level" data-level="puestos">Puestos</button>';
+  controls.innerHTML = `<button type="button" class="crm-map-level active" data-level="territorio">${etiqueta}</button><button type="button" class="crm-map-level" data-level="puestos">Puestos</button>`;
   mapEl.append(controls);
   const marcar = level => controls.querySelectorAll('[data-level]').forEach(b => b.classList.toggle('active', b.dataset.level === level));
-  controls.querySelector('[data-level="municipio"]').addEventListener('click', () => {
+  controls.querySelector('[data-level="territorio"]').addEventListener('click', () => {
     if (crmBarrioLayer) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
-    aplicarBasemap(false); crmMapLayer.setStyle({ fillOpacity: .94 });
-    encuadrar(crmMapLayer, 15);
+    /* La capa de Bogotá va rotada: un callejero sin rotar debajo la contradice
+       (Soacha aparecía al norte). Volver al territorio tiene que devolver el
+       mapa como lo dejó renderTerritorioObjetivo, encuadre incluido. */
+    aplicarBasemap(Boolean(MAPA_MUNICIPAL.rotado)); crmMapLayer.setStyle({ fillOpacity: .94 });
+    if (MAPA_MUNICIPAL.encuadre) encuadrarBounds(MAPA_MUNICIPAL.encuadre, 24); else encuadrar(crmMapLayer, 15);
     $('crmMapNote').textContent = (MAPA_MUNICIPAL.censo
       ? `${MAPA_MUNICIPAL.nombre} es el territorio de su candidatura. Abra «Puestos» para ver dónde vota la gente, puesto por puesto.`
       : `Votación histórica concentrada en ${MAPA_MUNICIPAL.nombre}. Abra «Puestos» para ver dónde está, puesto por puesto.`) + notaColorPartido();
-    marcar('municipio');
+    marcar('territorio');
   });
   controls.querySelector('[data-level="puestos"]').addEventListener('click', async () => {
     const meta = crmMapMode === 'proyectado' ? Number(String($('crmVoteNumber').textContent || '').replace(/\D/g, '')) : 0;
@@ -3142,7 +3186,7 @@ async function loadHistoricalMap(candidate) {
   electionViewRecords = []; electionViewSnapshots = new Map(); electionViewActive = ''; $('crmMapToggles')?.remove(); crmMapState = null; recorteActivo = null;
   /* Con la campaña mudada a otro territorio, las vistas por año sobran: todas
      muestran votaciones que no cuentan donde ahora compite. */
-  if (alcanceObjetivo() && !(await historialEnObjetivo(candidate))) { await renderTerritorioDeCampana(); return; }
+  if (alcanceObjetivo() && !(await historialEnCiudad(candidate))) { await renderTerritorioDeCampana(); return; }
   const records = electionViewHistory(candidate);
   if (records.length < 2) { await renderSingleElection(candidate); ensureCRMMapToggles(); refreshMapLevels(); return; }
   electionViewRecords = records; electionViewActive = records[records.length - 1].year;
@@ -3161,7 +3205,7 @@ async function renderTerritorioDeCampana() {
   $('crmMapPanelNum').textContent = '01 · Mapa del territorio de campaña';
   /* Los niveles del mapa anterior no sirven acá hasta saber si hay puestos. */
   $('crmMap')?.querySelector('.crm-map-levels')?.remove();
-  await renderTerritorioObjetivo(c);
+  const vista = await renderTerritorioObjetivo(c);
   MAPA_MUNICIPAL = null;
   if (!CORP_MUNICIPAL.includes(c.corp) || !c.municipio) return;
   try {
@@ -3172,7 +3216,7 @@ async function renderTerritorioDeCampana() {
     const loc = c.corp === 'jal' ? normalizedText(cortoLocal(c.localidad)) : '';
     const mesas = Object.entries(puestos).filter(([code, p]) => code.slice(0, 5) === prefijo && (!loc || normalizedText(cortoLocal(p.mesa?.comNom || '')) === loc))
       .map(([code, p]) => ({ dep: code.slice(0, 2), mun: code.slice(2, 5), zon: code.slice(5, 7), pue: code.slice(7, 9), pueNom: p.barrio, v: p.censo }));
-    if (mesas.length) { MAPA_MUNICIPAL = { mesas, nombre: loc ? c.localidad : c.municipio, censo: true }; refreshMapLevels(); }
+    if (mesas.length) { MAPA_MUNICIPAL = { mesas, nombre: loc ? c.localidad : c.municipio, censo: true, unidad: vista?.unidad || 'municipio', rotado: Boolean(vista?.rotado), encuadre: vista?.encuadre || null }; refreshMapLevels(); }
   } catch (e) { /* sin puestos, queda el polígono del municipio */ }
 }
 /* Territorio objetivo de una candidatura NUEVA: no hay votos que pintar; se
@@ -3202,6 +3246,9 @@ async function renderTerritorioObjetivo(c) {
     filas = geoData.features.map(nameOf).sort((a, b) => a.localeCompare(b, 'es'));
     $('crmBreakdown').innerHTML = `<h4>${CORP_DEPARTAMENTAL.includes(c.corp) ? `Municipios de ${c.departamentoNombre}` : `${unidad === 'municipio' ? 'Municipios' : unidad === 'comuna' ? 'Comunas' : 'Localidades'} en el mapa`}</h4>` + filas.map(nm => `<div class="crm-breakdown-item static${normalizedText(nm) === (c.corp === 'jal' ? loc : muni) ? ' is-target' : ''}"><span class="crm-breakdown-row"><b>${escHtml(NOMBRE_BONITO(nm))}</b></span></div>`).join('');
     $('crmMapNote').textContent = CORP_DEPARTAMENTAL.includes(c.corp) ? `La circunscripción es todo ${c.departamentoNombre}: ${filas.length} municipios.` : `En verde, el territorio al que aspira. Sin historial propio no hay votos que distribuir; la meta de la derecha sale de los resultados de 2023 en ese territorio.`;
+    /* Qué unidad quedó dibujada y si va rotada: los niveles del mapa se
+       nombran con eso, y volver al primero tiene que rehacer este encuadre. */
+    return { unidad, rotado: rotate, encuadre: capaEncuadre === crmMapLayer && rotate ? boundsSin(crmMapLayer, ES_SUMAPAZ) : capaEncuadre.getBounds() };
   } catch (e) {
     $('crmMap').innerHTML = '<div style="padding:28px;color:#667068">No fue posible cargar el territorio en este momento.</div>'; crmLeafletMap = null; crmMapLayer = null; crmTileLayer = null;
     $('crmBreakdown').innerHTML = '<p class="helper">No fue posible cargar el territorio.</p>'; $('crmMapNote').textContent = 'La fuente cartográfica no respondió.';
@@ -3572,7 +3619,11 @@ function mostrarFirmas() {
        cierra al conocer la sesión; con la cuenta lista se abre directo. */
     clearInterval(strategyMessageTimer);
     $('preload').classList.remove('active');
-    if (SESSION.vinculo && new URLSearchParams(location.search).get('abrir') === '1') abrirVinculo();
+    /* «Abrir mi candidatura» desde un panel (escucha, electorado) llega con
+       ?abrir=1. Con vínculo se abre el CRM directo; SIN vínculo la respuesta
+       no es la portada —desde la que el botón parece no haber hecho nada— sino
+       la búsqueda, que es donde una candidatura se abre de verdad. */
+    if (new URLSearchParams(location.search).get('abrir') === '1') { if (SESSION.vinculo) abrirVinculo(); else beginHistorical(); }
   });
   setTimeout(() => { clearInterval(strategyMessageTimer); $('preload').classList.remove('active'); }, 6000);   /* red de seguridad si el worker no responde */
 })();
