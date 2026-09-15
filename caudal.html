@@ -1070,6 +1070,11 @@
   // abrió en la Rosa puede ser un prospecto de demostración— · (3) el último de la
   // Rosa · (4) el único que tenga. Con varios y ninguna señal, lectura general.
   const uniNorm=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+  // La razón social de la cuenta trae la forma societaria y el perfil casi nunca:
+  // Pablo se registró como «CAUCE SAS» y el perfil se llama «Cauce». Se quita al
+  // final, y solo como palabra completa (una empresa que se llame «Sasaima» no
+  // pierde nada).
+  const uniOrg=t=>uniNorm(t).replace(/(\s+(s\s*a\s*s|s\s*a|ltda|limitada|s\s*en\s*c|e\s*u|sas|sa|inc|llc|corp))+$/,'').trim();
   function uniPerfilId(){
     if(!ACCESO||IS_GUEST) return '';
     const lista=uniListaPerfiles();
@@ -1077,8 +1082,8 @@
     try{ elegido=localStorage.getItem('caudal-busca-perfil:'+uniEmail())||''; }catch(e){}
     if(elegido==='ninguno') return '';
     if(elegido&&(!lista.length||lista.some(p=>p.perfilId===elegido))) return elegido;
-    try{ org=uniNorm((JSON.parse(localStorage.getItem('rr-user')||'null')||{}).org); }catch(e){}
-    const propio=org&&lista.find(p=>uniNorm(p.nombre)===org);
+    try{ org=uniOrg((JSON.parse(localStorage.getItem('rr-user')||'null')||{}).org); }catch(e){}
+    const propio=org&&lista.find(p=>uniOrg(p.nombre)===org);
     if(propio) return propio.perfilId;
     try{ ult=localStorage.getItem('caudal-perfil-ult:'+uniEmail())||''; }catch(e){}
     if(ult&&(!lista.length||lista.some(p=>p.perfilId===ult))) return ult;
