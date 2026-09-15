@@ -207,7 +207,7 @@ prueba-mapa (15)        Bogotá: ventana urbana, callejero, censo
 prueba-arquetipos (15)  las tarjetas 06 y 07
 prueba-vitrina (14)     lo que ve un visitante sin cuenta
 prueba-puestos (11)     el nivel de puestos y su desglose
-prueba-jal-localidad (13) la JAL se elige por localidad, no por ciudad
+prueba-jal-localidad (15) la JAL se elige por localidad, no por ciudad
 …y otras once (ciudades, colores, salto, territorio, paneles, wizard, nacional)
 ```
 

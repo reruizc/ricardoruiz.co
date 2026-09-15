@@ -78,15 +78,19 @@ const fallos = [];
 const revisar = (t, ok) => { console.log((ok ? '✓ ' : '✗ ') + t); if (!ok) fallos.push(t); };
 
 /* ── Los muros ─────────────────────────────────────────────────────────── */
-for (const [caso, opts, espera] of [
-  ['sin sesión', { sesion: false }, /quién es/],
-  ['sin acceso', { acceso: false }, /no tiene acceso/],
-  ['sin candidatura', { vinculo: null }, /candidatura abierta/],
+for (const [caso, opts, espera, destino] of [
+  ['sin sesión', { sesion: false }, /quién es/, /login\.html/],
+  ['sin acceso', { acceso: false }, /no tiene acceso/, /comprar=1/],
+  /* El botón tiene que llevar a donde se abre una candidatura —la búsqueda—,
+     no a la portada: desde ahí parecía que no hubiera hecho nada. */
+  ['sin candidatura', { vinculo: null }, /candidatura abierta/, /abrir=1/],
 ]) {
   const { b, p } = await abrir('candidato-360-escucha.html', opts);
   const muro = await p.textContent('#panelMuro');
+  const boton = await p.getAttribute('#panelMuro a.wall-btn', 'href');
   const cuerpoOculto = await p.$eval('#panelCuerpo', e => e.classList.contains('hidden'));
   revisar(`${caso}: dice qué falta y no muestra el panel`, espera.test(muro) && cuerpoOculto);
+  revisar(`${caso}: y el botón lleva a donde se resuelve`, destino.test(boton || ''));
   await b.close();
 }
 
