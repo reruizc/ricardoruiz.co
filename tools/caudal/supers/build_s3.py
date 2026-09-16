@@ -151,6 +151,26 @@ def slim(rec):
     }
 
 
+def _cobertura(recs, sanc):
+    """Hasta qué fecha llega el registro, por pilar completo y por sanciones.
+
+    Descarta lo fechado en el futuro: un acto con fecha de 2028 no es cobertura,
+    es un error de la fuente. Se cuenta cuántos son en vez de callarlos — si el
+    número crece, hay un mapeo roto en algún harvester.
+    """
+    hoy = datetime.date.today().isoformat()
+    f_todo = sorted(r['fecha'] for r in recs if r['fecha'] and r['fecha'] <= hoy)
+    f_sanc = sorted(r['fecha'] for r in sanc if r['fecha'] and r['fecha'] <= hoy)
+    futuras = Counter(r['fuente_nombre'] for r in recs if r['fecha'] and r['fecha'] > hoy)
+    return {
+        'calculada': hoy,
+        'hasta': f_todo[-1] if f_todo else '',
+        'hasta_sanciones': f_sanc[-1] if f_sanc else '',
+        'n_futuras': sum(futuras.values()),
+        'futuras_por_fuente': [{'fuente': f, 'n': n} for f, n in futuras.most_common()],
+    }
+
+
 def main():
     src = DIST / 'sanciones.jsonl'
     # split('\n') literal — NO .splitlines(): un texto con U+0085/U+2028/U+2029
@@ -194,6 +214,20 @@ def main():
             'total_cop': round(sum(con_monto)), 'max_cop': round(max(con_monto)) if con_monto else 0,
         },
         'rango_fechas': [fechas[0], fechas[-1]] if fechas else ['', ''],
+        # ⚠️⚠️ COBERTURA REAL DEL PILAR — no confundir con `rango_fechas`, que
+        # (a) se calcula solo sobre SANCIONES y (b) tiene el tope contaminado
+        # por fechas futuras. Medido el 16-sep-2026: 7 registros con fecha
+        # posterior a hoy —uno en 2028— casi todos de SECOP II, y los siete se
+        # colaban entre los 15 `recientes`. Quien pregunte «¿hasta dónde llega
+        # el registro?» tiene que recibir ESTO.
+        #
+        # Existe porque el brief del 15-sep le dijo a Cauce que el registro
+        # regulatorio arrastraba cuatro meses de rezago. Era falso: el registro
+        # estaba al día (2.042 actos posteriores a mayo), y ese 13-may era la
+        # fecha del acto más reciente que le CASÓ a su consulta. El barrido
+        # reportaba el alcance de su búsqueda como si fuera el de la fuente,
+        # porque no tenía de dónde sacar el dato bueno. De acá lo saca.
+        'cobertura': _cobertura(recs, sanc),
         'recientes': recientes,
         'fuentes': sorted({r['fuente_nombre'] for r in recs if r['fuente_nombre']}),
     }

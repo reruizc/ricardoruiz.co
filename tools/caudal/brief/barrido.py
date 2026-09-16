@@ -159,6 +159,18 @@ def plan_de_consultas(p, dias):
             jobs.append((f'regulatorio::entidad::{ent}',
                          {'action': 'sanciones', 'query': ent, 'tipo_acto': 'todo'}))
 
+    # Cobertura del pilar regulatorio: hasta qué fecha llega el registro. Va en
+    # un job PROPIO, igual que la del Ejecutivo, y por la misma razón que esa.
+    # ⚠️⚠️ Antes se deducía del máximo de lo que CASÓ con las consultas del
+    # cliente, y eso no es la cobertura de la fuente sino el alcance de la
+    # búsqueda. El brief del 15-sep le dijo a Cauce que el registro arrastraba
+    # «cuatro meses de rezago» y que nada posterior a mayo estaba verificado:
+    # falso —había 2.042 actos posteriores a mayo, el último del 14-sep—; el
+    # 13-may era la fecha del acto más nuevo que le casaba a *sus* siete
+    # consultas. Un pilar que se declara roto cuando está al día es peor que
+    # uno callado: el cliente concluye que el producto no sirve.
+    jobs.append(('regulatorio::cobertura', {'action': 'sanciones'}))
+
     # Ejecutivo y consultas públicas · por tema. SUCOP importa por el plazo:
     # una consulta abierta se cuenta en días, no en meses.
     for t in temas[:8]:
@@ -251,9 +263,15 @@ def barrer(p, dias, desde):
 
     cobertura = {}
 
+    hoy_iso = datetime.date.today().isoformat()
+
     def marcar_cobertura(pilar, fecha):
+        # ⚠️ Nada fechado por delante de hoy puede subir la cobertura: hay
+        # registros con fecha futura en el regulatorio (SECOP II, uno en 2028) y
+        # basta con que uno case una consulta para que el brief declarara que la
+        # fuente llega hasta 2028. Prometer el futuro es peor que el rezago.
         f = iso(fecha)
-        if f and f > cobertura.get(pilar, ''):
+        if f and f <= hoy_iso and f > cobertura.get(pilar, ''):
             cobertura[pilar] = f
 
     def add(pilar, llave, item, origen):
@@ -293,6 +311,16 @@ def barrer(p, dias, desde):
                     'fecha': f,
                 }, 'radicado de la ventana')
             continue
+        if clave == 'regulatorio::cobertura':
+            # `cobertura.hasta` lo calcula build_s3.py sobre TODO el pilar y sin
+            # fechas futuras. `rango_fechas` NO sirve acá: se calcula solo sobre
+            # sanciones y su tope viene contaminado (medido: 7 registros por
+            # delante de hoy, uno en 2028). Si un día falta el campo, mejor no
+            # declarar cobertura que declarar una inventada.
+            cob = (d.get('cobertura') or {}).get('hasta') or ''
+            if cob:
+                cobertura['regulatorio'] = cob
+            continue
         if clave == 'ejecutivo::cobertura':
             # ⚠️ `rango_fechas` es una LISTA [desde, hasta], no un objeto.
             rango = d.get('rango_fechas') or []
@@ -327,6 +355,9 @@ def barrer(p, dias, desde):
                     add('congreso_frente', llave, item, origen)
         elif pilar == 'regulatorio':
             for x in (d.get('resultados') or []):
+                # red de seguridad, no la fuente de verdad: si el job de
+                # cobertura falló, esto al menos da un piso. `marcar_cobertura`
+                # solo sube, así que nunca rebaja la cifra buena.
                 marcar_cobertura('regulatorio', x.get('fecha'))
                 if iso(x.get('fecha')) < desde:
                     continue
