@@ -28,7 +28,12 @@ es material de cliente y el repo es público).
 import os
 from weasyprint import HTML
 
-ROOT = "/Users/ricardoruiz/ricardoruiz.co"
+# ⚠️ La raíz SALE DEL ARCHIVO, no se escribe a mano. Estaba fija en
+# "/Users/ricardoruiz/ricardoruiz.co", y fuera de esa Mac —el brief se programa
+# en GitHub Actions— el logo, el papel y las fuentes Helvetica se resolvían a
+# rutas inexistentes. WeasyPrint no falla por eso: omite el recurso y sigue, así
+# que el PDF habría salido sin logo y con otra tipografía sin que nadie lo notara.
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 OUT = os.path.join(ROOT, "caudalxcauce", "Binance", "Brief-Binance-2026-08-10.pdf")
 
 FDIR = os.path.join(ROOT, "fonts")
