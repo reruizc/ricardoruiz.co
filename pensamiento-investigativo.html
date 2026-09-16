@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="es" id="htmlRoot">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pensamiento investigativo · Ricardo.Ruiz</title>
+<meta name="description" content="Introducción a la programación para ciencia política, periodismo y humanidades: qué gana una pregunta cuando el procedimiento se escribe, qué cambia de verdad con la IA y cómo hacer el primer proyecto en una tarde." />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper:#1a1610; --paper-2:#221d15; --paper-3:#2a241b;
+  --ink:#f4f3ef; --ink-2:#b8b1a0; --ink-3:#807a6c;
+  --rule:#f4f3ef1c; --rule-strong:#f4f3ef38;
+  --accent:#d96a50; --accent-2:#e08266;
+  --accent-soft:#d96a5018; --accent-tint:#d96a5036;
+  --gold:#d6a83a; --on-accent:#14110a;
+  --green:#6fa07a; --amber:#d6a83a; --danger:#d96a50;
+  --sans:'Familjen Grotesk',system-ui,sans-serif;
+  --italic:'Petrona',Georgia,serif;
+  --mono:'Space Mono',ui-monospace,monospace;
+  --display:'Syne',sans-serif;
+}
+body.day-mode {
+  --paper:#f4f3ef; --paper-2:#ecebe5; --paper-3:#e0ddd2;
+  --ink:#14110a; --ink-2:#5a5448; --ink-3:#948e80;
+  --rule:#14110a1f; --rule-strong:#14110a40;
+  --accent:#8a1e16; --accent-2:#a02a20;
+  --accent-soft:#8a1e161a; --accent-tint:#8a1e1633;
+  --gold:#8a6a1a; --on-accent:#f4f3ef;
+  --green:#3f6b49; --amber:#8a6a1a; --danger:#8a1e16;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--paper); color:var(--ink); font-family:var(--sans); font-size:17px; line-height:1.55; min-height:100vh; overflow-x:hidden; cursor:none; transition:background .35s, color .35s; }
+a { color:inherit; text-decoration:none; }
+button { font:inherit; color:inherit; background:none; border:none; cursor:none; }
+::selection { background:var(--accent); color:var(--on-accent); }
+body.day-mode::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:0; background-image:radial-gradient(rgba(20,17,10,.035) 1px, transparent 1.4px); background-size:4px 4px; opacity:.9; mix-blend-mode:multiply; }
+.cursor { position:fixed; width:12px; height:12px; background:var(--accent); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .15s, background .2s; transform:translate(-50%,-50%); }
+.cursor-ring { position:fixed; width:36px; height:36px; border:1.5px solid var(--accent); border-radius:50%; pointer-events:none; z-index:9998; transition:transform .35s, opacity .3s; transform:translate(-50%,-50%); opacity:.4; }
+@media (hover:none) { body { cursor:auto; } button, a { cursor:pointer; } .cursor, .cursor-ring { display:none; } }
+
+/* Barra de avance de lectura */
+.progress { position:fixed; top:0; left:0; height:2px; background:var(--accent); width:0; z-index:100; transition:width .1s linear; }
+
+/* Topbar */
+.topbar { position:sticky; top:0; z-index:60; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:1.5rem; padding:1rem 1.75rem; background:var(--paper); border-bottom:1px solid var(--rule); backdrop-filter:blur(8px); }
+.topbar-left,.topbar-center,.topbar-right { display:flex; align-items:center; gap:1.1rem; }
+.topbar-right { justify-content:flex-end; }
+.btn-back { display:inline-flex; align-items:center; gap:.55rem; font-family:var(--sans); font-size:14px; font-weight:500; letter-spacing:.04em; padding:.5rem .9rem; border:1px solid var(--rule-strong); transition:background .2s, border-color .2s; }
+.btn-back:hover { background:var(--paper-2); border-color:var(--ink); }
+.theme-btn { font-family:var(--mono); font-size:12px; font-weight:700; color:var(--ink-2); padding:.45rem .8rem; border:1px solid var(--rule-strong); transition:color .2s, border-color .2s; }
+.theme-btn:hover { color:var(--ink); border-color:var(--ink); }
+.logo-link { display:inline-flex; align-items:center; gap:.55rem; opacity:.9; }
+.logo-link:hover { opacity:1; }
+.logo-bars { display:flex; align-items:flex-end; gap:3px; height:20px; }
+.logo-bar { width:5px; background:var(--accent); border-radius:1px 1px 0 0; opacity:.9; }
+.logo-text { font-family:var(--display); font-weight:800; font-size:clamp(1.05rem,2vw,1.4rem); letter-spacing:-.03em; line-height:1; }
+.logo-text span { color:var(--accent); }
+
+.page { position:relative; z-index:1; max-width:980px; width:100%; margin:0 auto; padding:2.4rem 1.75rem 5rem; }
+@media (max-width:720px) { .page { padding:1.6rem 1.1rem 3rem; } .topbar { grid-template-columns:1fr auto; padding:.85rem 1rem; } .topbar-center { display:none; } .topbar-right .logo-link { display:none; } }
+.crumb { font-family:var(--mono); font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); margin-bottom:1.8rem; }
+.crumb a { color:var(--ink-3); transition:color .2s; }
+.crumb a:hover { color:var(--accent); }
+.crumb .sep { margin:0 .55rem; opacity:.55; }
+
+/* Portada */
+.welcome { padding:1.2rem 0 2.2rem; border-bottom:1px solid var(--rule); margin-bottom:2.6rem; }
+.eyebrow { font-family:var(--mono); font-size:12px; letter-spacing:.22em; text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:1.4rem; }
+.welcome-title { font-family:var(--sans); font-weight:700; font-size:clamp(2rem,5.4vw,3.2rem); letter-spacing:-.025em; line-height:1.08; max-width:22ch; margin:0 0 1.4rem; }
+.welcome-title em { font-family:var(--italic); font-style:italic; font-weight:400; color:var(--accent); }
+.welcome-sub { font-family:var(--sans); font-size:clamp(1rem,1.5vw,1.16rem); line-height:1.6; color:var(--ink-2); max-width:58ch; }
+.welcome-meta { font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin-top:1.8rem; display:flex; gap:1.4rem; flex-wrap:wrap; }
+
+/* Índice */
+.toc { background:var(--paper-2); border:1px solid var(--rule); padding:1.3rem 1.5rem; margin-bottom:3rem; }
+.toc h3 { font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3); font-weight:400; margin-bottom:.9rem; }
+.toc ol { list-style:none; display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:.15rem 1.6rem; }
+.toc a { display:flex; gap:.7rem; padding:.34rem 0; font-size:.94rem; color:var(--ink-2); transition:color .2s; align-items:baseline; }
+.toc a:hover { color:var(--accent); }
+.toc .n { font-family:var(--mono); font-size:11px; color:var(--ink-3); }
+
+/* Secciones */
+section.block { margin-bottom:3.4rem; scroll-margin-top:90px; }
+.section-head { display:flex; align-items:baseline; gap:.8rem; margin-bottom:1rem; flex-wrap:wrap; }
+.section-head h2 { font-family:var(--sans); font-weight:700; font-size:clamp(1.35rem,2.6vw,1.7rem); letter-spacing:-.015em; }
+.section-head .num { font-family:var(--mono); font-size:.72rem; letter-spacing:.14em; color:var(--accent); font-weight:700; }
+.section-desc { font-family:var(--italic); font-style:italic; font-size:1.06rem; line-height:1.6; color:var(--ink-2); max-width:62ch; margin-bottom:1.5rem; }
+p.body { max-width:66ch; margin-bottom:1.1rem; color:var(--ink); font-size:1.02rem; }
+p.body b, li b { color:var(--accent); font-weight:600; }
+p.body em, li em { font-family:var(--italic); font-style:italic; color:var(--ink-2); }
+ul.body, ol.body { max-width:66ch; margin:0 0 1.2rem 1.15rem; }
+ul.body li, ol.body li { margin-bottom:.55rem; font-size:1.01rem; }
+
+/* Cita / remate */
+.pull { border-left:3px solid var(--accent); background:var(--accent-soft); padding:1.15rem 1.5rem; margin:1.8rem 0; max-width:64ch; }
+.pull p { font-family:var(--italic); font-style:italic; font-size:1.12rem; line-height:1.5; color:var(--ink); }
+.note { background:var(--paper-2); border:1px solid var(--rule); border-left:3px solid var(--gold); padding:1rem 1.3rem; margin:1.5rem 0; max-width:66ch; }
+.note .tag { font-family:var(--mono); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); font-weight:700; display:block; margin-bottom:.45rem; }
+.note p { font-size:.96rem; line-height:1.55; color:var(--ink-2); }
+.note p b { color:var(--ink); font-weight:600; }
+
+/* Tarjetas */
+.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:.9rem; margin:1.6rem 0; }
+.card { background:var(--paper-2); border:1px solid var(--rule); padding:1.15rem 1.25rem; transition:border-color .2s, background .2s; }
+.card:hover { border-color:var(--accent-tint); background:var(--paper-3); }
+.card .k { font-family:var(--mono); font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:700; display:block; margin-bottom:.55rem; }
+.card h4 { font-family:var(--sans); font-size:1.02rem; font-weight:600; margin-bottom:.45rem; letter-spacing:-.01em; }
+.card p { font-size:.93rem; line-height:1.5; color:var(--ink-2); }
+
+/* Dos columnas sí/no */
+.duo { display:grid; grid-template-columns:1fr 1fr; gap:.9rem; margin:1.6rem 0; }
+@media (max-width:640px) { .duo { grid-template-columns:1fr; } }
+.duo > div { background:var(--paper-2); border:1px solid var(--rule); padding:1.2rem 1.35rem; }
+.duo .si { border-top:2px solid var(--green); }
+.duo .no { border-top:2px solid var(--danger); }
+.duo h4 { font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; margin-bottom:.9rem; font-weight:700; }
+.duo .si h4 { color:var(--green); }
+.duo .no h4 { color:var(--danger); }
+.duo ul { list-style:none; }
+.duo li { font-size:.94rem; line-height:1.5; color:var(--ink-2); padding-left:1.1rem; position:relative; margin-bottom:.7rem; }
+.duo li::before { position:absolute; left:0; font-family:var(--mono); font-size:.9rem; }
+.duo .si li::before { content:"+"; color:var(--green); }
+.duo .no li::before { content:"−"; color:var(--danger); }
+.duo li b { color:var(--ink); font-weight:600; }
+
+/* Código */
+.code { position:relative; background:var(--paper-2); border:1px solid var(--rule-strong); margin:1.3rem 0; max-width:74ch; }
+.code-head { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.55rem .9rem; border-bottom:1px solid var(--rule); font-family:var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); }
+.code-copy { font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); transition:color .2s; }
+.code-copy:hover { color:var(--accent); }
+.code pre { padding:1rem 1.1rem; overflow-x:auto; }
+.code code { font-family:var(--mono); font-size:12.6px; line-height:1.75; color:var(--ink-2); white-space:pre; }
+.code .c { color:var(--ink-3); font-style:italic; }
+.code .kw { color:var(--accent); }
+.code .st { color:var(--green); }
+.code .fn { color:var(--gold); }
+.code .nu { color:var(--ink); }
+
+/* Pestañas */
+.tabs { display:flex; gap:.35rem; margin-bottom:1.2rem; flex-wrap:wrap; }
+.tab { font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; padding:.6rem 1rem; border:1px solid var(--rule-strong); color:var(--ink-3); transition:all .2s; }
+.tab:hover { color:var(--ink); border-color:var(--ink-3); }
+.tab.active { color:var(--ink); background:var(--accent-soft); border-color:var(--accent); }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; animation:fade .25s ease; }
+@keyframes fade { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+/* Ficha de caso */
+.caso { display:grid; grid-template-columns:auto 1fr; gap:.55rem 1.1rem; margin-bottom:1.3rem; max-width:70ch; }
+.caso dt { font-family:var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); padding-top:.2rem; white-space:nowrap; }
+.caso dd { font-size:.98rem; line-height:1.5; color:var(--ink); }
+.caso dd b { color:var(--accent); font-weight:600; }
+@media (max-width:560px) { .caso { grid-template-columns:1fr; gap:.15rem; } .caso dd { margin-bottom:.7rem; } }
+
+/* Diagrama */
+.figura { margin:1.8rem 0; }
+.figura svg { width:100%; height:auto; display:block; }
+.figura figcaption { font-family:var(--mono); font-size:11px; letter-spacing:.06em; color:var(--ink-3); margin-top:.9rem; line-height:1.6; max-width:62ch; }
+
+/* Lista de verificación */
+.check { list-style:none; max-width:66ch; margin:1.4rem 0; }
+.check li { position:relative; padding:.75rem 0 .75rem 2.3rem; border-bottom:1px solid var(--rule); font-size:.99rem; line-height:1.5; color:var(--ink-2); }
+.check li::before { content:attr(data-n); position:absolute; left:0; top:.78rem; font-family:var(--mono); font-size:11px; color:var(--accent); font-weight:700; }
+.check li b { color:var(--ink); font-weight:600; }
+
+/* Enlaces al lab */
+.lab-links { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:.7rem; margin-top:1.4rem; }
+.lab-link { display:flex; flex-direction:column; gap:.3rem; padding:1rem 1.15rem; background:var(--paper-2); border:1px solid var(--rule); border-left:2px solid var(--gold); transition:background .2s, border-color .2s; }
+.lab-link:hover { background:var(--paper-3); border-left-color:var(--accent); }
+.lab-link b { font-size:.97rem; font-weight:600; }
+.lab-link span { font-size:.88rem; color:var(--ink-3); line-height:1.45; }
+
+.cierre { border-top:1px solid var(--rule-strong); padding-top:2.2rem; margin-top:1rem; }
+.firma { font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; color:var(--ink-3); margin-top:2.4rem; line-height:1.9; }
+.firma a { color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav class="topbar">
+  <div class="topbar-left">
+    <a href="analisis-estructural.html" class="btn-back"><span>←</span> Volver al lab</a>
+  </div>
+  <div class="topbar-center">
+    <span class="eyebrow" style="margin:0;font-size:11px">Lab · Método</span>
+  </div>
+  <div class="topbar-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+    <a href="index.html" class="logo-link">
+      <div class="logo-bars">
+        <div class="logo-bar" style="height:20px"></div>
+        <div class="logo-bar" style="height:15px"></div>
+        <div class="logo-bar" style="height:9px"></div>
+        <div class="logo-bar" style="height:4px"></div>
+      </div>
+      <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+    </a>
+  </div>
+</nav>
+
+<main class="page">
+  <div class="crumb">
+    <a href="index.html">Inicio</a> <span class="sep">/</span>
+    <a href="analisis-estructural.html">Laboratorio de Políticas</a> <span class="sep">/</span>
+    <span>Pensamiento investigativo</span>
+  </div>
+
+  <header class="welcome">
+    <div class="eyebrow">Introducción · Programación para ciencias sociales</div>
+    <h1 class="welcome-title">Pensar como investigador, <em>escribir como programador.</em></h1>
+    <p class="welcome-sub">Programar no es un requisito técnico que se le añadió a la ciencia política, al periodismo o a las humanidades. Es escribir el razonamiento en un lugar donde otro pueda discutirlo. Esta página es la introducción: qué gana una pregunta cuando el procedimiento se escribe, qué cambia de verdad con la inteligencia artificial y cómo hacer el primer proyecto en una tarde.</p>
+    <div class="welcome-meta">
+      <span>Lectura · 15 minutos</span>
+      <span>Sin requisitos previos</span>
+      <span>Ejemplos en Python</span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <h3>En esta página</h3>
+    <ol>
+      <li><a href="#malentendido"><span class="n">00</span> El malentendido</a></li>
+      <li><a href="#escribir"><span class="n">01</span> Lo que cambia al escribir el procedimiento</a></li>
+      <li><a href="#ciclo"><span class="n">02</span> El ciclo, que no es una línea</a></li>
+      <li><a href="#oficios"><span class="n">03</span> Tres oficios, el mismo método</a></li>
+      <li><a href="#piezas"><span class="n">04</span> Cinco piezas y ya puede trabajar</a></li>
+      <li><a href="#ia"><span class="n">05</span> La IA, sin misticismo</a></li>
+      <li><a href="#errores"><span class="n">06</span> Los errores que cuestan</a></li>
+      <li><a href="#tarde"><span class="n">07</span> Un primer proyecto, esta tarde</a></li>
+    </ol>
+  </nav>
+
+  <!-- 00 ─────────────────────────────────────────────────────────────── -->
+  <section class="block" id="malentendido">
+    <div class="section-head"><span class="num">00</span><h2>El malentendido</h2></div>
+    <p class="section-desc">Casi nadie deja de programar por las matemáticas. Se deja de programar por una frase que se dijo a los diecisiete años y nunca se revisó: «yo soy de letras».</p>
+
+    <p class="body">Hay dos cosas distintas que se llaman igual. Una es la <b>ingeniería de software</b>: construir productos que no se caigan, con miles de usuarios, pruebas, servidores y gente de guardia. Esa es una profesión y toma años.</p>
+    <p class="body">La otra es la <b>notación de un procedimiento</b>: escribir, paso por paso y sin ambigüedad, lo que usted quiere que se haga con unos datos. Eso no es una profesión. Es una forma de escribir, y usted ya la practica.</p>
+    <p class="body">Cuando un historiador fija los criterios para incluir un documento en su corpus, cuando una socióloga define el libro de códigos con el que va a clasificar cuarenta entrevistas, cuando un periodista decide qué cuenta como «contrato sospechoso» antes de mirar la base —los tres escribieron un algoritmo. En prosa, con notas al pie y advertencias, pero un algoritmo: una regla que otra persona podría seguir y llegar a lo mismo.</p>
+
+    <div class="pull">
+      <p>Si usted puede explicarle a un auxiliar cómo contar algo, ya escribió el programa. Lo que falta es la notación.</p>
+    </div>
+
+    <p class="body">Lo que sigue no es un curso de programación —para eso hay cursos, y buenos—. Es el mapa de por qué vale la pena, escrito desde el lugar donde de verdad se nota: cuando hay que sostener un hallazgo delante de alguien que quiere tumbarlo.</p>
+  </section>
+
+  <!-- 01 ─────────────────────────────────────────────────────────────── -->
+  <section class="block" id="escribir">
+    <div class="section-head"><span class="num">01</span><h2>Lo que cambia cuando el procedimiento se escribe</h2></div>
+    <p class="section-desc">Cuatro cosas, y ninguna de ellas es «ahorrar tiempo». El tiempo, al principio, se pierde.</p>
+
+    <div class="cards">
+      <div class="card">
+        <span class="k">Primero</span>
+        <h4>Obliga a definir</h4>
+        <p>La prosa tolera «los partidos de derecha». El código no: exige una lista. Y al pedir la lista aparece la pregunta que la prosa escondía —¿dónde va una coalición?, ¿dónde va un movimiento regional que no dice nada en su nombre?—.</p>
+      </div>
+      <div class="card">
+        <span class="k">Segundo</span>
+        <h4>Se puede repetir</h4>
+        <p>Un resultado que no se puede volver a correr es una anécdota con notas al pie. Si el dato se actualiza el martes, el procedimiento escrito se vuelve a ejecutar; el de la hoja de cálculo hay que rehacerlo de memoria.</p>
+      </div>
+      <div class="card">
+        <span class="k">Tercero</span>
+        <h4>Escala sin cambiar de método</h4>
+        <p>Treinta casos o treinta mil: el mismo script. Eso cambia qué preguntas se atreve uno a hacer. Muchas preguntas buenas no se hacían porque contar a mano era imposible, no porque no importaran.</p>
+      </div>
+      <div class="card">
+        <span class="k">Cuarto</span>
+        <h4>Deja rastro del error</h4>
+        <p>Cuando se equivoque —y se va a equivocar— va a poder señalar la línea. En un análisis hecho a mano el error no tiene domicilio: se descubre al final, contradiciendo todo, sin saber dónde entró.</p>
+      </div>
+    </div>
+
+    <p class="body">Vale la pena detenerse en el primero, que es el que menos se menciona y el que más pesa. Clasificar los partidos colombianos por familia ideológica parece trivial hasta que hay que hacerlo: el Centro Democrático es fácil, el Pacto Histórico es fácil, pero «CAMBIO RADICAL - MIRA» es una coalición y «Córdoba Florece» no dice absolutamente nada sobre su ideología. Mientras el análisis está en prosa, esos casos se resuelven con un «y otros movimientos». Cuando hay que escribir la regla, ese «y otros» resulta ser <b>casi la cuarta parte de los votos</b>, y un cuarto en gris no es un matiz: es no haber leído.</p>
+    <p class="body">El código no creó ese problema. Lo hizo visible y obligó a tomar una decisión —resolver las coaliciones por sus partes, medir los movimientos regionales por el rastro de sus candidatos en otras elecciones, y dejar declarado lo que no alcanza el corte—. Esa decisión ahora está escrita, se puede citar y se puede discutir.</p>
+
+    <div class="note">
+      <span class="tag">El punto que casi siempre se pierde</span>
+      <p>Escribir el procedimiento <b>no lo vuelve a usted más acertado</b>. Lo vuelve más específico. Y ser específico es exactamente lo que le permite a otra persona demostrarle que se equivocó. Ese es el valor: no la certeza, sino la posibilidad de ser refutado.</p>
+    </div>
+  </section>
+
+  <!-- 02 ─────────────────────────────────────────────────────────────── -->
+  <section class="block" id="ciclo">
+    <div class="section-head"><span class="num">02</span><h2>El ciclo, que no es una línea</h2></div>
+    <p class="section-desc">Los manuales lo dibujan como una flecha. En la práctica se devuelve tres veces, y la mayoría de esas devoluciones ocurren porque el dato le contestó algo que no esperaba.</p>
+
+    <figure class="figura">
+      <svg viewBox="0 0 900 300" role="img" aria-labelledby="ciclo-t">
+        <title id="ciclo-t">Ciclo de la investigación: pregunta, dato, procedimiento, evidencia y relato, con dos retornos</title>
+        <defs>
+          <marker id="fl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+          <marker id="fl2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g font-family="Familjen Grotesk, sans-serif">
+          <!-- la franja del tiempo real, encima de las dos etapas que se lo comen -->
+          <g>
+            <rect x="193" y="28" width="337" height="4" fill="var(--gold)" opacity=".8"/>
+            <text x="361" y="20" font-size="10.5" font-family="Space Mono, monospace" fill="var(--gold)" text-anchor="middle">aquí se va el 70 % del tiempo</text>
+          </g>
+          <!-- nodos: los dos extremos son los que ve el lector -->
+          <g>
+            <rect x="8"   y="70" width="152" height="62" fill="var(--paper-2)" stroke="var(--accent)" stroke-width="1.5"/>
+            <rect x="193" y="70" width="152" height="62" fill="var(--paper-2)" stroke="var(--rule-strong)"/>
+            <rect x="378" y="70" width="152" height="62" fill="var(--paper-2)" stroke="var(--rule-strong)"/>
+            <rect x="563" y="70" width="152" height="62" fill="var(--paper-2)" stroke="var(--rule-strong)"/>
+            <rect x="740" y="70" width="152" height="62" fill="var(--paper-2)" stroke="var(--accent)" stroke-width="1.5"/>
+          </g>
+          <g font-size="15" font-weight="600" fill="var(--ink)" text-anchor="middle">
+            <text x="84"  y="97">Pregunta</text>
+            <text x="269" y="97">Dato</text>
+            <text x="454" y="97">Procedimiento</text>
+            <text x="639" y="97">Evidencia</text>
+            <text x="816" y="97">Relato</text>
+          </g>
+          <g font-size="11" font-family="Space Mono, monospace" fill="var(--ink-3)" text-anchor="middle">
+            <text x="84"  y="118">¿qué quiero saber?</text>
+            <text x="269" y="118">¿quién lo registró?</text>
+            <text x="454" y="118">¿con qué regla?</text>
+            <text x="639" y="118">¿qué salió?</text>
+            <text x="816" y="118">¿a quién le sirve?</text>
+          </g>
+          <!-- el camino que se cuenta -->
+          <g stroke="var(--accent)" stroke-width="1.5" fill="none" color="var(--accent)" marker-end="url(#fl)">
+            <path d="M162,101 L188,101"/>
+            <path d="M347,101 L373,101"/>
+            <path d="M532,101 L558,101"/>
+            <path d="M717,101 L735,101"/>
+          </g>
+          <!-- y el que no: cada retorno con su rótulo debajo de su propio arco -->
+          <g stroke="var(--ink-3)" stroke-width="1.2" fill="none" stroke-dasharray="5 5" color="var(--ink-3)" marker-end="url(#fl2)" opacity=".85">
+            <path d="M454,134 C454,172 269,172 269,138"/>
+            <path d="M639,134 C639,244 84,244 84,138"/>
+          </g>
+          <g font-size="10.5" font-family="Space Mono, monospace" fill="var(--ink-3)" text-anchor="middle">
+            <text x="361" y="190">el dato no dice lo que usted creía</text>
+            <text x="361" y="272">la respuesta cambia la pregunta</text>
+          </g>
+        </g>
+      </svg>
+      <figcaption>Enmarcadas, las dos etapas que el lector ve: la pregunta y el relato. Las flechas punteadas son las que nadie cuenta en la metodología y todas las investigaciones tienen.</figcaption>
+    </figure>
+
+    <p class="body">Dos advertencias que los cursos omiten y que conviene oír antes de empezar:</p>
+    <ul class="body">
+      <li><b>Limpiar los datos es el trabajo.</b> Nombres escritos de seis maneras, fechas en tres formatos, tildes que aparecen y desaparecen, celdas combinadas en un Excel oficial. No es un preámbulo del análisis: es el análisis, y ahí es donde se toman las decisiones que después el resultado hereda.</li>
+      <li><b>El relato no es el adorno del final.</b> Un hallazgo que nadie entiende no existe. La gráfica, el título y los tres párrafos que la acompañan son parte del método, no un empaque que se le pone encima.</li>
+    </ul>
+  </section>
+
+  <!-- 03 ─────────────────────────────────────────────────────────────── -->
+  <section class="block" id="oficios">
+    <div class="section-head"><span class="num">03</span><h2>Tres oficios, el mismo método</h2></div>
+    <p class="section-desc">Cambia la fuente y cambia la pregunta. El procedimiento —definir, contar, comparar, declarar lo que quedó por fuera— es el mismo en los tres.</p>
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" role="tab" data-tab="cp">Ciencia política</button>
+      <button class="tab" role="tab" data-tab="per">Periodismo</button>
+      <button class="tab" role="tab" data-tab="hum">Humanidades</button>
+    </div>
+
+    <div class="tab-panel active" id="tab-cp">
+      <dl class="caso">
+        <dt>Pregunta</dt><dd>¿Los concejales que se cambian de partido <b>pierden votos</b> en la siguiente elección?</dd>
+        <dt>Dato</dt><dd>Resultados por candidato de dos elecciones consecutivas, publicados por la autoridad electoral.</dd>
+        <dt>La trampa</dt><dd>Para saber si «la misma persona» sacó menos votos hay que <b>identificar a la misma persona</b> en dos archivos distintos. Y hay tres «María Fernanda Gómez Rodríguez» en el mismo departamento.</dd>
+        <dt>Evidencia</dt><dd>Una distribución de la variación de votos, con los casos ambiguos separados y contados, no escondidos.</dd>
+      </dl>
+      <div class="code">
+        <div class="code-head"><span>python · pandas</span><button class="code-copy" onclick="copiarCodigo(this)">copiar</button></div>
+<pre><code><span class="c"># La decisión está en la línea 4, no en el gráfico del final:</span>
+<span class="c"># qué significa "la misma persona". Todo lo demás se hereda de ahí.</span>
+<span class="kw">import</span> pandas <span class="kw">as</span> pd
+
+<span class="kw">def</span> <span class="fn">llave</span>(nombre, cedula, departamento):
+    <span class="st">"""Si hay cédula, manda la cédula. Si no, el nombre normalizado
+    dentro del departamento —y eso deja homónimos que hay que contar."""</span>
+    <span class="kw">if</span> pd.notna(cedula):
+        <span class="kw">return</span> <span class="st">f"C:{cedula}"</span>
+    <span class="kw">return</span> <span class="st">f"N:{departamento}:{normalizar(nombre)}"</span>
+
+a = pd.read_csv(<span class="st">"concejo_2019.csv"</span>)
+b = pd.read_csv(<span class="st">"concejo_2023.csv"</span>)
+<span class="kw">for</span> d <span class="kw">in</span> (a, b):
+    d[<span class="st">"llave"</span>] = d.apply(<span class="kw">lambda</span> r: llave(r.nombre, r.cedula, r.dep), axis=<span class="nu">1</span>)
+
+<span class="c"># Antes de cruzar: ¿cuántas llaves están repetidas? Eso son homónimos</span>
+<span class="c"># o personas que se lanzaron dos veces. Si no lo mira, el cruce miente.</span>
+sospechosos = a[a.llave.duplicated(keep=<span class="kw">False</span>)]
+<span class="fn">print</span>(<span class="st">f"revisar a mano: {len(sospechosos)} de {len(a)}"</span>)
+
+panel = a.merge(b, on=<span class="st">"llave"</span>, suffixes=(<span class="st">"_19"</span>, <span class="st">"_23"</span>))
+panel[<span class="st">"cambio"</span>] = panel.votos_23 / panel.votos_19 - <span class="nu">1</span>
+panel[<span class="st">"se_movio"</span>] = panel.partido_19 != panel.partido_23
+
+<span class="fn">print</span>(panel.groupby(<span class="st">"se_movio"</span>).cambio.median())</code></pre>
+      </div>
+      <p class="body">Fíjese dónde está el argumento del artículo: no en <code style="font-family:var(--mono);font-size:.86em;color:var(--accent)">groupby</code>, que es una línea que cualquiera copia, sino en la definición de <em>llave</em> y en el conteo de sospechosos. Ahí es donde un evaluador va a pegar, y con razón.</p>
+    </div>
+
+    <div class="tab-panel" id="tab-per">
+      <dl class="caso">
+        <dt>Pregunta</dt><dd>¿A quién le contrata este municipio, y <b>cuánto se concentra</b> en pocas manos?</dd>
+        <dt>Dato</dt><dd>La base abierta de contratación pública. Un CSV grande, sucio y aburrido, que es donde suelen estar las historias.</dd>
+        <dt>La trampa</dt><dd>El mismo proveedor aparece como «CONSTRUCTORA ANDINA SAS», «Constructora Andina S.A.S.» y «CONST. ANDINA». Si agrupa por nombre, la concentración desaparece. Hay que agrupar por <b>identificación tributaria</b>.</dd>
+        <dt>Evidencia</dt><dd>El porcentaje del presupuesto que se llevan los cinco primeros. Si son tres de cada cuatro pesos, ahí hay nota —y todavía falta preguntar por qué—.</dd>
+      </dl>
+      <div class="code">
+        <div class="code-head"><span>python · pandas</span><button class="code-copy" onclick="copiarCodigo(this)">copiar</button></div>
+<pre><code><span class="kw">import</span> pandas <span class="kw">as</span> pd
+
+c = pd.read_csv(<span class="st">"contratos.csv"</span>)
+c = c[c.municipio == <span class="st">"TUNJA"</span>]
+
+<span class="c"># Agrupar por NIT, nunca por razón social: el nombre se escribe</span>
+<span class="c"># de seis formas y cada forma parece un proveedor distinto.</span>
+porProveedor = (c.groupby(<span class="st">"nit"</span>)
+                 .agg(valor=(<span class="st">"valor"</span>, <span class="st">"sum"</span>),
+                      contratos=(<span class="st">"valor"</span>, <span class="st">"size"</span>),
+                      nombre=(<span class="st">"proveedor"</span>, <span class="st">"first"</span>))
+                 .sort_values(<span class="st">"valor"</span>, ascending=<span class="kw">False</span>))
+
+top5 = porProveedor.head(<span class="nu">5</span>).valor.sum() / porProveedor.valor.sum()
+<span class="fn">print</span>(<span class="st">f"los 5 primeros se llevan el {top5:.1%} del total"</span>)
+
+<span class="c"># Y el control que salva de publicar un error: ¿cuánta plata</span>
+<span class="c"># se quedó sin NIT? Si es mucha, el porcentaje de arriba no vale.</span>
+sinNit = c[c.nit.isna()].valor.sum() / c.valor.sum()
+<span class="fn">print</span>(<span class="st">f"sin identificar: {sinNit:.1%}"</span>)</code></pre>
+      </div>
+      <p class="body">Ese último bloque es la diferencia entre una nota y una rectificación. <b>El dato que falta no es cero</b>: si el 30 % de los contratos no tiene identificación del proveedor, la concentración que usted calculó es sobre el 70 % restante, y el titular tiene que decirlo.</p>
+    </div>
+
+    <div class="tab-panel" id="tab-hum">
+      <dl class="caso">
+        <dt>Pregunta</dt><dd>¿En qué momento la prensa colombiana dejó de decir <em>«la violencia»</em> y empezó a decir <b>«el conflicto armado»</b>?</dd>
+        <dt>Dato</dt><dd>Un corpus de prensa digitalizada. Puede ser un archivo institucional, o mil PDF que usted mismo convirtió a texto.</dd>
+        <dt>La trampa</dt><dd>Si un año hay diez mil notas y otro hay mil, contar apariciones absolutas mide el tamaño del archivo, no el cambio de lenguaje. Hay que <b>normalizar por volumen</b>.</dd>
+        <dt>Evidencia</dt><dd>Dos curvas que se cruzan. La fecha del cruce no es un adorno: es una afirmación histórica, fechada y discutible.</dd>
+      </dl>
+      <div class="code">
+        <div class="code-head"><span>python</span><button class="code-copy" onclick="copiarCodigo(this)">copiar</button></div>
+<pre><code><span class="kw">import</span> re, collections, pandas <span class="kw">as</span> pd
+
+TERMINOS = {
+    <span class="st">"violencia"</span>: <span class="st">r"\bla violencia\b"</span>,
+    <span class="st">"conflicto"</span>: <span class="st">r"\bconflicto armado\b"</span>,
+}
+
+filas = []
+<span class="kw">for</span> nota <span class="kw">in</span> corpus:                      <span class="c"># cada nota: {año, texto}</span>
+    t = nota[<span class="st">"texto"</span>].lower()
+    fila = {<span class="st">"anio"</span>: nota[<span class="st">"anio"</span>], <span class="st">"palabras"</span>: <span class="fn">len</span>(t.split())}
+    <span class="kw">for</span> k, patron <span class="kw">in</span> TERMINOS.items():
+        fila[k] = <span class="fn">len</span>(re.findall(patron, t))
+    filas.append(fila)
+
+d = pd.DataFrame(filas).groupby(<span class="st">"anio"</span>).sum()
+
+<span class="c"># Frecuencia por cada 100.000 palabras: así 1985 y 2005 son comparables</span>
+<span class="c"># aunque el archivo de un año sea diez veces más grande que el del otro.</span>
+<span class="kw">for</span> k <span class="kw">in</span> TERMINOS:
+    d[k + <span class="st">"_norm"</span>] = d[k] / d.palabras * <span class="nu">100_000</span>
+
+d[[<span class="st">"violencia_norm"</span>, <span class="st">"conflicto_norm"</span>]].plot()</code></pre>
+      </div>
+      <p class="body">Nadie está diciendo que contar palabras reemplace leer. El conteo dice <em>dónde</em> mirar: le entrega tres años en los que algo pasó, y entonces usted va y lee esas notas con el oficio de siempre. La computadora hace el rastreo; la interpretación no se delega.</p>
+    </div>
+  </section>
+
+  <!-- 04 ─────────────────────────────────────────────────────────────── -->
+  <section class="block" id="piezas">
+    <div class="section-head"><span class="num">04</span><h2>Cinco piezas y ya puede trabajar</h2></div>
+    <p class="section-desc">El 90 % de la investigación social con datos se hace con esto. No hace falta más para empezar, y casi nunca hace falta más para terminar.</p>
+
+    <ul class="check">
+      <li data-n="01"><b>Un cuaderno.</b> Google Colab corre en el navegador, no se instala nada y guarda solo. Escriba una celda, apriete play, vea el resultado debajo. Ese ciclo de dos segundos es lo que hace que se aprenda.</li>
+      <li data-n="02"><b>Una tabla.</b> <code style="font-family:var(--mono);font-size:.86em;color:var(--accent)">pandas</code> es Excel sin mouse: filas, columnas, filtros. Si entiende una tabla dinámica, ya entiende el 70 % de pandas.</li>
+      <li data-n="03"><b>Filtrar y agrupar.</b> «Quédese solo con estos» y «cuénteme por grupo». Con esas dos operaciones se responden más preguntas de las que parece.</li>
+      <li data-n="04"><b>Una gráfica.</b> Una línea de código para verla usted; una herramienta de publicación para que la vea el lector. No son la misma gráfica y confundirlas cuesta lectores.</li>
+      <li data-n="05"><b>Un texto.</b> Qué preguntó, qué hizo, qué encontró, qué no puede afirmar. Los cuatro, siempre. El cuarto es el que da credibilidad.</li>
+    </ul>
+
+    <div class="code">
+      <div class="code-head"><span>el primer programa útil de su vida</span><button class="code-copy" onclick="copiarCodigo(this)">copiar</button></div>
+<pre><code><span class="kw">import</span> pandas <span class="kw">as</span> pd
+
+d = pd.read_csv(<span class="st">"mis_datos.csv"</span>)
+
+<span class="fn">print</span>(<span class="fn">len</span>(d), <span class="st">"filas"</span>)      <span class="c"># ¿cuántas entraron?</span>
+<span class="fn">print</span>(d.columns.tolist())    <span class="c"># ¿qué trae?</span>
+<span class="fn">print</span>(d.isna().sum())        <span class="c"># ¿qué falta, y dónde?</span>
+<span class="fn">print</span>(d.head())              <span class="c"># ¿esto se parece a lo que creo que es?</span></code></pre>
+    </div>
+    <p class="body">Esas cuatro líneas no producen ningún hallazgo y son, de lejos, las más importantes de la página. La mayoría de los errores publicados se habrían evitado con la tercera.</p>
+  </section>
+
+  <!-- 05 ─────────────────────────────────────────────────────────────── -->
+  <section class="block" id="ia">
+    <div class="section-head"><span class="num">05</span><h2>La IA, sin misticismo</h2></div>
+    <p class="section-desc">Lo importante no es que escriba código. Es que borró el peaje que mantenía a los humanistas afuera.</p>
+
+    <p class="body">Hasta hace poco, entre «quiero contar cuántos concejales cambiaron de partido» y «sé escribir eso» había un semestre de sintaxis: comillas, indentación, mensajes de error en inglés que no decían nada. Ese peaje no enseñaba a investigar; solo filtraba por paciencia y por tiempo libre. Hoy esa distancia es una frase bien hecha.</p>
+    <p class="body">Eso es genuinamente grande, y conviene decir por qué: <b>cambia qué preguntas se hacen</b>. Cuando probar una idea costaba tres días, uno solo probaba las ideas de las que ya estaba bastante seguro. Cuando cuesta diez minutos, uno prueba las dudas —y las dudas son mejores preguntas que las certezas—.</p>
+    <p class="body">Ahora, lo que <em>no</em> cambió: la pregunta sigue siendo suya, los datos siguen siendo suyos y la verificación sigue siendo suya. La IA es un asistente rapidísimo y sin criterio propio sobre su tema.</p>
+
+    <div class="duo">
+      <div class="si">
+        <h4>Lo que hace bien</h4>
+        <ul>
+          <li><b>Traducir una intención a código.</b> «Agrúpame por municipio y sácame la mediana» sale correcto casi siempre.</li>
+          <li><b>Explicar un error.</b> Pegue el mensaje completo y pregunte qué significa. Es el mejor uso y el más subestimado.</li>
+          <li><b>Proponer un camino.</b> «Quiero comparar estos dos corpus, ¿qué enfoques hay?» — le da el mapa, usted escoge.</li>
+          <li><b>El 80 % aburrido.</b> Normalizar nombres, convertir fechas, leer treinta archivos de una carpeta.</li>
+          <li><b>Documentar y criticar.</b> «Léete este código y dime qué supuestos está haciendo sin decirlo.»</li>
+        </ul>
+      </div>
+      <div class="no">
+        <h4>Lo que hace mal</h4>
+        <ul>
+          <li><b>Inventa con total seguridad.</b> Cifras, citas, artículos de ley, nombres de columnas que no existen. No le avisa: se lo dice con el mismo tono que lo cierto.</li>
+          <li><b>Le da la razón.</b> Está entrenada para ser útil y eso la vuelve complaciente. Es la peor propiedad posible en alguien que debería revisarle el trabajo.</li>
+          <li><b>No sabe si sus datos están mal.</b> Procesa con perfecta obediencia una columna con la coma en el lugar equivocado.</li>
+          <li><b>No conoce su caso.</b> No sabe que en Colombia hay dos sistemas de códigos de municipio y que mezclarlos le daña el mapa.</li>
+          <li><b>Prefiere responder a decir «no sé».</b> Ante una pregunta sin respuesta disponible, produce una plausible.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="pull">
+      <p>La IA puede escribir el código. La verificación no se delega —y la firma del artículo es suya, no de la máquina—.</p>
+    </div>
+
+    <p class="body">La regla práctica es simple: <b>úsela para el cómo, nunca para el qué</b>. «¿Cómo agrupo esta tabla por año?» es una pregunta excelente. «¿Cuántos concejales cambiaron de partido en 2023?» es una pregunta pésima —para eso están los datos, y si la IA le contesta con una cifra, esa cifra es sospechosa hasta que usted la reproduzca—.</p>
+
+    <ul class="check">
+      <li data-n="01"><b>Cuente antes y después.</b> Entraron 12.400 filas, salieron 11.980. ¿Dónde se fueron las 420? Un cruce que pierde datos en silencio es el error más común y el más caro.</li>
+      <li data-n="02"><b>Verifique tres casos a mano.</b> Escoja tres filas del resultado y compruébelas contra la fuente original. Tres. Toma diez minutos y ha salvado carreras.</li>
+      <li data-n="03"><b>Pida la contra.</b> «¿Qué tendría que ser cierto para que este resultado estuviera mal?» Es la pregunta que rompe la complacencia, y funciona igual con la IA que con usted mismo.</li>
+      <li data-n="04"><b>Abra toda fuente citada.</b> Si le dio un artículo, un fallo o una cifra oficial, ábralo. Si no existe, acaba de aprender algo importante sobre la conversación entera.</li>
+      <li data-n="05"><b>Guarde el prompt junto al código.</b> Lo que le pidió es parte del método. Dentro de seis meses, cuando alguien pregunte por qué el umbral quedó en 5 %, el prompt es la respuesta.</li>
+    </ul>
+
+    <div class="note">
+      <span class="tag">Una distinción que evita disgustos</span>
+      <p>Aprender <b>con</b> IA no es lo mismo que depender de ella. Si cada vez que copia un bloque lo lee y lo entiende antes de correrlo, está aprendiendo rápido. Si lo pega sin leerlo, está construyendo algo que no puede defender —y en investigación, lo que no puede defender no lo puede publicar—.</p>
+    </div>
+  </section>
+
+  <!-- 06 ─────────────────────────────────────────────────────────────── -->
+  <section class="block" id="errores">
+    <div class="section-head"><span class="num">06</span><h2>Los errores que cuestan</h2></div>
+    <p class="section-desc">No son errores de programación. Son errores de razonamiento que el código ejecuta con obediencia perfecta y a gran velocidad.</p>
+
+    <div class="cards">
+      <div class="card">
+        <span class="k">Identidad</span>
+        <h4>El homónimo</h4>
+        <p>Dos personas con el mismo nombre se vuelven una sola, o una persona que firma de dos maneras se vuelve dos. Todo análisis de trayectorias descansa sobre esto y casi nadie lo declara.</p>
+      </div>
+      <div class="card">
+        <span class="k">Escala</span>
+        <h4>La falacia ecológica</h4>
+        <p>Un barrio votó 60 % por un candidato y tiene 60 % de mujeres. De ahí <em>no</em> se sigue que las mujeres votaron por él. El agregado no le dice qué hizo el individuo.</p>
+      </div>
+      <div class="card">
+        <span class="k">Aritmética</span>
+        <h4>El denominador ausente</h4>
+        <p>«Creció 300 %» puede ser de uno a cuatro. Toda cifra relativa necesita su base al lado, y toda comparación entre territorios necesita per cápita.</p>
+      </div>
+      <div class="card">
+        <span class="k">Inferencia</span>
+        <h4>La correlación disfrazada</h4>
+        <p>Dos series que suben juntas normalmente suben por una tercera cosa. El código correlaciona cualquier par de columnas sin preguntarle si tiene sentido.</p>
+      </div>
+      <div class="card">
+        <span class="k">Vacíos</span>
+        <h4>El dato que falta no es cero</h4>
+        <p>Un municipio que no reportó homicidios no tuvo cero homicidios: no reportó. Convertir vacíos en ceros inventa hallazgos donde solo hay silencio administrativo.</p>
+      </div>
+      <div class="card">
+        <span class="k">Autoría</span>
+        <h4>La abdicación</h4>
+        <p>«Lo dijo el modelo» no es un argumento. Un método es responsabilidad de quien lo firma, y la herramienta —hoja de cálculo, script o IA— nunca es coautora.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 ─────────────────────────────────────────────────────────────── -->
+  <section class="block" id="tarde">
+    <div class="section-head"><span class="num">07</span><h2>Un primer proyecto, esta tarde</h2></div>
+    <p class="section-desc">No empiece por aprender Python. Empiece por una pregunta que le importe y déjese arrastrar por ella: se aprende el triple y no se abandona en la semana dos.</p>
+
+    <ul class="check">
+      <li data-n="01"><b>Escoja una pregunta pequeña y suya.</b> De su municipio, de su tesis, de su fuente. «¿Cuánto se gastó mi alcaldía en publicidad el año pasado?» sirve perfectamente. Que sea pequeña es una virtud, no una limitación.</li>
+      <li data-n="02"><b>Consiga el archivo.</b> Datos abiertos, el portal de la entidad, un derecho de petición. Si le llega en PDF, también sirve —y ya aprendió que a veces el dato existe pero no está disponible, que es un hallazgo en sí mismo—.</li>
+      <li data-n="03"><b>Ábralo y descríbalo.</b> Las cuatro líneas de la sección 04. Cuántas filas, qué columnas, qué falta. Todavía no analice nada.</li>
+      <li data-n="04"><b>Haga una sola cuenta.</b> Una suma, un promedio, un conteo por grupo. Una. Si le dio un número raro, celébrelo: acaba de encontrar o un error suyo o una historia.</li>
+      <li data-n="05"><b>Verifique tres casos a mano.</b> Sí, otra vez. Es el paso que la gente se salta y el que separa el trabajo publicable del resto.</li>
+      <li data-n="06"><b>Escriba tres párrafos y una gráfica.</b> Qué preguntó, qué hizo, qué encontró —y un cuarto párrafo corto con lo que <em>no</em> puede afirmar—. Eso ya es investigación con datos. El resto es más de lo mismo, con más práctica.</li>
+    </ul>
+
+    <div class="note">
+      <span class="tag">Sobre el punto 06</span>
+      <p>El párrafo de lo que no puede afirmar parece una debilidad y es lo contrario. <b>Declarar el límite es lo que vuelve creíble lo que sí afirmó</b>: le dice al lector que usted miró los bordes de su propio trabajo antes que él.</p>
+    </div>
+
+    <div class="cierre">
+      <p class="body" style="font-size:1.08rem">Programar no lo va a volver más inteligente, ni más riguroso por decreto, ni le va a dar la razón. Lo va a volver <b>discutible</b>: alguien va a poder tomar su procedimiento, correrlo de nuevo y decirle exactamente en qué línea se equivocó. Eso es más difícil, es más incómodo y es, casi siempre, lo único que separa una opinión bien escrita de un hallazgo.</p>
+    </div>
+
+    <h3 style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin:2.6rem 0 .2rem">Seguir en el laboratorio</h3>
+    <div class="lab-links">
+      <a class="lab-link" href="problema-publico.html"><b>Problema público →</b><span>Enunciar bien la pregunta antes de tocar un dato: evidencia, alternativas, criterios.</span></a>
+      <a class="lab-link" href="analisis-estructural.html"><b>Análisis estructural →</b><span>Qué variables mueven el sistema: MicMac, DEMATEL e ISM sobre su propia matriz.</span></a>
+      <a class="lab-link" href="mactor.html"><b>Análisis de actores →</b><span>Quién tiene poder sobre esas variables, con quién se alía y contra quién.</span></a>
+      <a class="lab-link" href="comunicar.html"><b>Comunicar la política →</b><span>El último paso del ciclo: audiencias, mensaje, encuadre y canales.</span></a>
+    </div>
+
+    <p class="firma">Ricardo Ruiz · Laboratorio de Políticas<br>
+    ¿Le sirvió, le falta algo o está en desacuerdo? <a href="index.html">Escríbame</a>.</p>
+  </section>
+</main>
+
+<script>
+/* ── Tema (compartido con los demás módulos del lab) ── */
+function autoTheme() {
+  const saved = localStorage.getItem('rr-theme');
+  if (saved === 'day') { document.body.classList.add('day-mode'); themeBtnLabel(true); return; }
+  if (saved === 'night') { themeBtnLabel(false); return; }
+  const h = new Date().getHours();
+  if (h >= 6 && h < 19) { document.body.classList.add('day-mode'); themeBtnLabel(true); }
+  else themeBtnLabel(false);
+}
+function themeBtnLabel(isDay) {
+  const b = document.getElementById('theme-btn');
+  if (b) b.textContent = isDay ? '☾ Modo noche' : '☀ Modo día';
+}
+function toggleTheme() {
+  const isDay = document.body.classList.toggle('day-mode');
+  localStorage.setItem('rr-theme', isDay ? 'day' : 'night');
+  themeBtnLabel(isDay);
+}
+
+/* ── Cursor de la casa ── */
+let cursorX = innerWidth / 2, cursorY = innerHeight / 2, ringX = cursorX, ringY = cursorY;
+function setupCursor() {
+  const c = document.getElementById('cursor'), r = document.getElementById('cursorRing');
+  if (!c || !r || matchMedia('(hover:none)').matches) return;
+  addEventListener('mousemove', e => { cursorX = e.clientX; cursorY = e.clientY; });
+  (function tick() {
+    c.style.transform = `translate(${cursorX - 6}px, ${cursorY - 6}px)`;
+    ringX += (cursorX - ringX) * .15; ringY += (cursorY - ringY) * .15;
+    r.style.transform = `translate(${ringX - 18}px, ${ringY - 18}px)`;
+    requestAnimationFrame(tick);
+  })();
+  document.addEventListener('mouseover', e => {
+    const t = e.target;
+    if (t && t.tagName && t.closest('a, button')) { c.style.width = c.style.height = '20px'; r.style.opacity = '0'; }
+    else { c.style.width = c.style.height = '12px'; r.style.opacity = '.4'; }
+  });
+}
+
+/* ── Avance de lectura ── */
+function setupProgress() {
+  const bar = document.getElementById('progress');
+  const pintar = () => {
+    const alto = document.documentElement.scrollHeight - innerHeight;
+    bar.style.width = (alto > 0 ? Math.min(100, scrollY / alto * 100) : 0) + '%';
+  };
+  addEventListener('scroll', pintar, { passive: true });
+  addEventListener('resize', pintar);
+  pintar();
+}
+
+/* ── Pestañas de los tres oficios ── */
+function setupTabs() {
+  const tabs = [...document.querySelectorAll('.tab')];
+  tabs.forEach(t => t.addEventListener('click', () => {
+    tabs.forEach(x => x.classList.toggle('active', x === t));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + t.dataset.tab));
+  }));
+}
+
+/* ── Copiar un bloque de código ── */
+function copiarCodigo(boton) {
+  const codigo = boton.closest('.code').querySelector('code').innerText;
+  navigator.clipboard.writeText(codigo).then(() => {
+    boton.textContent = 'copiado ✓';
+    setTimeout(() => { boton.textContent = 'copiar'; }, 1800);
+  }).catch(() => { boton.textContent = 'no se pudo'; });
+}
+
+autoTheme(); setupCursor(); setupProgress(); setupTabs();
+</script>
+</body>
+</html>
