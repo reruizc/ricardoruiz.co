@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
 """
-El brief, de punta a punta: barrido → Opus 5 → JSON → PDF.
+El brief, de punta a punta: barrido → Claude Fable 5.1 → JSON → PDF.
 
   python3 tools/caudal/brief/brief.py cauce                  # barre y escribe
   python3 tools/caudal/brief/brief.py cauce --barrido b.json # reusa un barrido
   python3 tools/caudal/brief/brief.py cauce --solo-prompt    # imprime y no gasta
   python3 tools/caudal/brief/brief.py cauce --modelo claude-sonnet-5
 
-MODELO. Claude Opus 5 por defecto (decisión de Ricardo, 13-sep-2026): el brief
-es bajo volumen y alto valor, y es lo que el cliente ve. La extracción de hechos
-—que sí es volumen— se queda en el modelo barato. Medido sobre el barrido real
-de Cauce, un brief son ~25k tokens de entrada y ~4k de salida: unos 700 pesos
-por brief, ~5.300 al mes por cuenta a siete briefs y medio.
+MODELO. Claude Fable 5.1 por defecto (decisión de Ricardo, 16-sep-2026): el brief
+es bajo volumen y alto valor, y es lo que el cliente ve; una sola corrección de
+analista cuesta más que la diferencia de modelo. La extracción de hechos —que sí
+es volumen— se queda en el modelo barato. Medido el 16-sep sobre el barrido real
+de Cauce: 14.109 tokens de entrada y 12.748 de salida (3.961 de razonamiento, que
+se cobra como salida) = USD 0,78 ≈ 2.335 pesos por brief, ~17.800 al mes por
+cuenta a siete briefs y medio. El mismo brief con Claude Opus 5 costó la mitad
+(USD 0,38) y tardó casi el doble (4:50 contra 2:40).
 
-CREDENCIAL. `ANTHROPIC_API_KEY` en el entorno. La Lambda de Caudal tiene su
+CREDENCIAL. `ANTHROPIC_API_KEY`, buscada en este orden: el entorno y, si no
+está, `~/.config/caudal/anthropic.env` (chmod 600, fuera del repo — el mismo
+patrón del motor de alertas). ⚠️ Una llave de API NUNCA va al repo, que es
+público, ni a un archivo del proyecto. La Lambda de Caudal tiene su
 propio switch de modelo por variable de entorno y no se toca desde acá: este
 generador corre fuera, como el motor de alertas, porque una generación de brief
 no cabe en los 30 segundos del API Gateway y no tiene por qué caber.
@@ -31,7 +37,7 @@ import barrido as barrido_mod                                    # noqa: E402
 import caudal_core                                               # noqa: E402
 from prompt_brief import BRIEF_SYSTEM, armar_mensaje             # noqa: E402
 
-MODELO = 'claude-opus-5'
+MODELO = 'claude-fable-5-1'
 # Un brief son ~3.500 tokens de salida; 16.000 deja margen sin rozar el techo de
 # tiempo de una petición sin streaming.
 MAX_TOKENS = 16000
@@ -39,14 +45,31 @@ MAX_TOKENS = 16000
 # la propuesta comercial. Sirve para reportar el costo real de cada corrida.
 PRECIO = {'claude-opus-5': (5.0, 25.0), 'claude-sonnet-5': (2.0, 10.0),
           'claude-fable-5-1': (10.0, 50.0)}
-COP_USD = 4000
+COP_USD = 3000
+
+
+ENV_FILE = os.path.expanduser('~/.config/caudal/anthropic.env')
+
+
+def llave():
+    """La llave, del entorno o del archivo de configuración. Nunca del repo."""
+    key = os.environ.get('ANTHROPIC_API_KEY', '').strip()
+    if key:
+        return key
+    if os.path.exists(ENV_FILE):
+        for linea in open(ENV_FILE, encoding='utf-8'):
+            linea = linea.strip()
+            if linea.startswith('#') or '=' not in linea:
+                continue
+            k, v = linea.split('=', 1)
+            if k.strip() == 'ANTHROPIC_API_KEY':
+                return v.strip().strip('"').strip("'")
+    sys.exit(f'falta ANTHROPIC_API_KEY: ponla en el entorno o en {ENV_FILE}')
 
 
 def generar(system, user, modelo=MODELO, max_tokens=MAX_TOKENS):
     """Una llamada a la API de Anthropic. Devuelve (json, uso)."""
-    key = os.environ.get('ANTHROPIC_API_KEY')
-    if not key:
-        sys.exit('falta ANTHROPIC_API_KEY en el entorno')
+    key = llave()
     body = json.dumps({
         'model': modelo, 'max_tokens': max_tokens, 'system': system,
         # Pensar antes de escribir es justo lo que este trabajo necesita: el
@@ -78,6 +101,31 @@ def costo(uso, modelo):
     return usd, usd * COP_USD
 
 
+def probar(modelo=MODELO):
+    """Verifica credencial, modelo y tarifa con la llamada más barata posible."""
+    key = llave()
+    print(f'llave: {key[:11]}…{key[-4:]} · {len(key)} caracteres')
+    body = json.dumps({'model': modelo, 'max_tokens': 16,
+                       'messages': [{'role': 'user', 'content': 'Responde OK.'}]}).encode()
+    req = urllib.request.Request(
+        'https://api.anthropic.com/v1/messages', data=body,
+        headers={'Content-Type': 'application/json', 'x-api-key': key,
+                 'anthropic-version': '2023-06-01'})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            d = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        detalle = e.read().decode('utf-8', 'replace')[:400]
+        sys.exit(f'HTTP {e.code} — {detalle}')
+    uso = d.get('usage', {})
+    usd, cop = costo(uso, modelo)
+    txt = ''.join(b.get('text', '') for b in d.get('content', []) if b.get('type') == 'text')
+    print(f"modelo {d.get('model')} · respondió: {txt.strip()[:40]!r}")
+    print(f"entrada {uso.get('input_tokens', 0)} · salida {uso.get('output_tokens', 0)}"
+          f" · USD {usd:.5f} · COP {cop:.1f}")
+    print('listo: la llave sirve y el modelo responde.')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('sector', nargs='?', help='preset (cauce, binance, didi…)')
@@ -87,8 +135,13 @@ def main():
     ap.add_argument('--modelo', default=MODELO)
     ap.add_argument('--solo-prompt', action='store_true',
                     help='imprime el mensaje y no llama al modelo')
+    ap.add_argument('--probar', action='store_true',
+                    help='una llamada mínima para verificar la llave y el modelo')
     ap.add_argument('--out', help='guardar el JSON del brief acá')
     a = ap.parse_args()
+
+    if a.probar:
+        return probar(a.modelo)
 
     if a.barrido:
         b = json.load(open(a.barrido, encoding='utf-8'))

@@ -64,6 +64,14 @@ todavía no lo publican. Nunca las confundas y nunca afirmes que «no hubo» alg
 cuando el registro va atrasado: escribe hasta cuándo llega el registro. Esa \
 sección es parte del producto, no una disculpa.
 
+LAS REDES. La sección REDES trae lo que se publicó en X sobre los temas del \
+cliente en el último día, ordenado por interacción. Cada publicación es la \
+OPINIÓN de quien la escribe, no un hecho: atribúyela siempre a su @usuario, \
+nunca uses una cifra o una acusación de un tuit como si estuviera verificada, y \
+no la conviertas en tema propio salvo que tenga tracción real o que la prensa o \
+el registro oficial digan lo mismo. Sirve para lo que la prensa no da: el tono, \
+quién está moviendo la conversación y cuánto eco tiene.
+
 LO QUE ESTÁ FUERA DE ALCANCE. Si el cliente opera en países donde no tenemos \
 fuentes, no digas ni insinúes que allá no pasó nada: no lo sabemos, y hay que \
 decirlo con esas palabras.
@@ -171,6 +179,11 @@ def _fmt_item(pilar, x):
                      "datos pueden ser de otra nota de la misma página — "
                      "úsalos solo si encajan con el titular)")
         return '\n'.join(L)
+    if pilar == 'redes':
+        return (f"- {(x.get('fecha') or '')[:10]} · @{x.get('autor')} "
+                f"({x.get('seguidores', 0)} seguidores · {x.get('likes', 0)} me gusta · "
+                f"{x.get('rts', 0)} reposts) sobre «{x.get('tema')}»: "
+                f"{(x.get('texto') or '').replace(chr(10), ' ')[:260]}")
     if pilar == 'contratacion':
         return (f"- {x.get('fecha')} · {x.get('entidad')} → {x.get('proveedor')}: "
                 f"{x.get('objeto', '')[:150]}" + o + ruido)
@@ -184,7 +197,7 @@ def _fmt_item(pilar, x):
 # es contexto, no noticia, y dejarlo crecer haría que el brief hablara de 2012.
 TOPES = {'congreso': 30, 'congreso_frente': 14, 'regulatorio': 25,
          'ejecutivo': 20, 'sucop': 20, 'medios': 70, 'contratacion': 12,
-         'agenda': 12}
+         'agenda': 12, 'redes': 24}
 
 # ⚠️⚠️ El recorte de prensa NO puede ser «los primeros N»: solo el 3% de los
 # titulares trae una cifra (medido sobre los 152 del barrido de Cauce), así que
@@ -235,6 +248,8 @@ TITULOS = {
     'ejecutivo': 'EJECUTIVO · normativa en la ventana',
     'sucop': 'CONSULTA PÚBLICA DE NORMAS · abiertas, con su fecha de cierre',
     'medios': 'PRENSA · titulares de la ventana',
+    'redes': 'REDES · lo más movido en X sobre sus temas en el último día '
+             '(opinión de quien publica, NO hechos verificados)',
     'contratacion': 'CONTRATACIÓN · contratos de sus vigiladas',
     'agenda': 'AGENDA · lo que viene (órdenes del día ya publicadas)',
 }

@@ -2667,8 +2667,11 @@ CLIENTE_SYSTEM = (
     "las otras tres y di qué ventana se abre o se cierra. Si el trámite va bien "
     "pero el ambiente está caldeado, dilo; si algo se ve muerto y hay ventana, "
     "dilo. No inventes hechos: interpreta los que te di.\n"
-    "  · este   — la CONVERSACIÓN. Qué se está diciendo en la prensa, en qué "
-    "tono y quién lo dice.\n"
+    "  · este   — la CONVERSACIÓN. Qué se está diciendo en la prensa y en redes "
+    "(X), en qué tono y quién lo dice. Una publicación de redes es la OPINIÓN "
+    "de quien la escribe: atribúyela siempre a su @usuario y nunca la "
+    "presentes como un hecho verificado. Lo que vale es la tracción (quién la "
+    "movió, cuánto) y si la prensa dice lo mismo o no.\n"
     "  · sur    — la COMPETENCIA. Qué les está pasando a las empresas que el "
     "cliente vigila. Nómbralas.\n"
     "  · oeste  — el ESTADO. Qué está produciendo el Congreso y las "
@@ -2710,7 +2713,7 @@ LECTURA_MAX_SENALES = 26
 #                           pilar que venga: si sancionan a tu competidor eso es
 #                           noticia de competencia, no "regulatorio" a secas
 #   Oeste  · el Estado    → Congreso y superintendencias sobre TU tema
-CARD_POR_TIPO = {'contratacion': 'norte', 'medios': 'este',
+CARD_POR_TIPO = {'contratacion': 'norte', 'medios': 'este', 'redes': 'este',
                  'congreso': 'oeste', 'regulatorio': 'oeste'}
 CARD_LBL = {'norte': 'NORTE · oportunidad', 'este': 'ESTE · conversación',
             'sur': 'SUR · competencia',    'oeste': 'OESTE · Estado'}
@@ -2870,6 +2873,85 @@ def _sector_sugerido(query):
             'por_que': mejor_por, 'puntaje': mejor_pts}
 
 
+# ── Redes · la escucha diaria por perfil (tools/caudal/redes/escucha_perfil.py) ──
+# La recolección corre FUERA de la Lambda (una vez al día, X vía Apify) y deja
+# `metadata/escucha/<slug del perfil>.json`. Acá solo se lee y se convierte en
+# señales del rumbo Oriente. Tres guardas, las tres por un caso concreto:
+#   · el archivo tiene que ser del MISMO cliente: se exige que al menos la mitad
+#     de los temas escuchados estén en la ficha. Un perfil de otro cliente que se
+#     llame igual no hereda la conversación ajena.
+#   · más de 3 días sin recolección → no se muestra como conversación de hoy; se
+#     declara vieja en los KPI.
+#   · solo entran publicaciones que se sabe que son de Colombia cuando la ficha
+#     solo mira Colombia: sin ubicación puede ser Argentina o México.
+REDES_MAX = 8
+REDES_POR_TEMA = 2
+REDES_VIEJA_DIAS = 3
+
+
+def _slug_escucha(nombre):
+    t = _unicodedata.normalize('NFD', str(nombre or '').lower())
+    t = ''.join(c for c in t if _unicodedata.category(c) != 'Mn')
+    return re.sub(r'[^a-z0-9]+', '-', t).strip('-')
+
+
+def _redes_para_perfil(s):
+    """(señales, meta) de la escucha de X del perfil. Nunca lanza."""
+    meta = {'estado': 'sin_escucha', 'n': 0, 'n_colombia': 0, 'generado': None}
+    slug = _slug_escucha(s.get('nombre'))
+    if not slug:
+        return [], meta
+    try:
+        d = _get_json(f'metadata/escucha/{slug}.json')
+    except Exception:
+        return [], meta
+    fold = lambda x: _unicodedata.normalize('NFD', str(x).lower()).encode('ascii', 'ignore').decode()  # noqa: E731
+    temas_ficha = {fold(t) for t in (s.get('temas') or [])}
+    temas_esc = [c['tema'] for c in (d.get('consultas') or []) if not c.get('identidad')]
+    if temas_esc and sum(1 for t in temas_esc if fold(t) in temas_ficha) * 2 < len(temas_esc):
+        meta['estado'] = 'otro_perfil'
+        return [], meta
+    meta.update(generado=d.get('generado'), n=d.get('n', 0),
+                n_colombia=sum((t.get('n_colombia') or 0) for t in (d.get('por_tema') or {}).values()))
+    try:
+        gen = datetime.datetime.fromisoformat(str(d.get('generado'))[:19])
+        if (datetime.datetime.now() - gen).days > REDES_VIEJA_DIAS:
+            meta['estado'] = 'vieja'
+            return [], meta
+    except (TypeError, ValueError):
+        pass
+    solo_co = d.get('solo_colombia', True)
+    pubs = []
+    for tema, t in (d.get('por_tema') or {}).items():
+        buenas = [p for p in (t.get('top') or []) if not solo_co or p.get('pais') == 'co']
+        for p in buenas[:REDES_POR_TEMA]:
+            pubs.append((tema, p))
+    vistos, out = set(), []
+    for tema, p in sorted(pubs, key=lambda tp: -(tp[1].get('interaccion') or 0)):
+        if p.get('id') in vistos:
+            continue
+        vistos.add(p.get('id'))
+        inter, seg = p.get('interaccion') or 0, p.get('seguidores') or 0
+        nivel = ('alto' if inter >= 1000 or (seg >= 500000 and inter >= 100)
+                 else 'medio' if inter >= 50 else 'bajo')
+        texto = re.sub(r'\s+', ' ', p.get('texto') or '').strip()
+        out.append({'tipo': 'redes', 'red': 'X', 'tema': tema,
+                    'autor': p.get('autor'), 'nombre': p.get('nombre'), 'seguidores': seg,
+                    'verificada': bool(p.get('verificada')),
+                    'titulo': texto[:180], 'texto': texto[:400], 'url': p.get('url'),
+                    'fecha': (p.get('fecha') or '')[:10], 'likes': p.get('likes') or 0,
+                    'rts': p.get('rts') or 0, 'respuestas': p.get('respuestas') or 0,
+                    'interaccion': inter, 'nivel': nivel,
+                    'accion': (f'Conversación con tracción en X sobre {tema} — evaluar si pide vocería o respuesta'
+                               if nivel == 'alto' else
+                               f'Conversación en X sobre {tema} — seguimiento' if nivel == 'medio' else
+                               f'Mención en X sobre {tema} — monitoreo pasivo')})
+        if len(out) >= REDES_MAX:
+            break
+    meta['estado'] = 'ok' if out else 'sin_colombianas'
+    return out, meta
+
+
 def _lectura_cliente_key(s, kpis):
     """Firma de la lectura: mismo perfil + mismo radar = misma lectura.
 
@@ -2989,6 +3071,11 @@ def _lectura_cliente_prompt(s, senales, kpis):
         elif x['tipo'] == 'medios':
             lines.append(f"- [PRENSA · prioridad {x['nivel']}{vig}] {x.get('fecha', '')} "
                          f"{x.get('medio', '')}: {x['titulo'][:90]}")
+        elif x['tipo'] == 'redes':
+            lines.append(f"- [REDES · X · prioridad {x['nivel']}] {x.get('fecha', '')} "
+                         f"@{x.get('autor', '')} ({x.get('seguidores', 0)} seguidores · "
+                         f"{x.get('likes', 0)} me gusta · {x.get('rts', 0)} reposts) sobre "
+                         f"«{x.get('tema', '')}»: {x.get('texto', '')[:170]}")
         elif x['tipo'] == 'contratacion':
             lines.append(f"- [CONTRATACIÓN · prioridad {x['nivel']}{vig}] {x.get('fecha', '')} "
                          f"{x.get('entidad', '')} → {x.get('proveedor', '')}: "
@@ -3013,7 +3100,10 @@ def _lectura_cliente_prompt(s, senales, kpis):
             + (f" · {kpis['n_sanciones_sector']} sanciones registradas del sector"
                if kpis.get('n_sanciones_sector') else '')
             + (f" · {kpis['n_medios_sector']} titulares de prensa recientes del sector"
-               if kpis.get('n_medios_sector') else '') + ".\n\n"
+               if kpis.get('n_medios_sector') else '')
+            + (f" · {kpis['n_redes']} publicaciones en X sobre sus temas en el último día "
+               f"({kpis.get('n_redes_colombia', 0)} identificadas como colombianas)"
+               if kpis.get('n_redes') else '') + ".\n\n"
             # Sin este recuento el modelo no puede distinguir "esta dirección no
             # trajo nada" de "no me la mandaste", y termina callándose el punto
             # en vez de reportar la quietud, que es justo lo que hay que decir.
@@ -5145,7 +5235,12 @@ def handler(event, context):
         # cliente, "sancionaron a tu vigilada" tiene que leerse antes que
         # "sancionaron a alguien de tu sector".
         reg, med, con = reg_vig + reg, med_vig + med, con_vig + con
-        senales = rc['senales'] + reg + med + con
+        try:
+            red, red_meta = _redes_para_perfil(s)
+        except Exception as e:
+            print(f'[cliente] redes FAIL: {type(e).__name__}: {e}')
+            red, red_meta = [], {'estado': 'error', 'n': 0, 'n_colombia': 0, 'generado': None}
+        senales = rc['senales'] + reg + med + con + red
         n_vig = sum(1 for x in senales if x.get('vigilada'))
         kpis = {'n_radar': len(senales),
                 'alto': sum(1 for x in senales if x['nivel'] == 'alto'),
@@ -5160,7 +5255,12 @@ def handler(event, context):
                 'n_contratos_vigiladas': n_con_vig,
                 # articulado: cuántas señales del Congreso traen "qué cambia" y
                 # cuántas de ésas le aplican al sector/vigiladas del cliente
-                'n_con_articulado': n_art, 'n_te_aplica': n_aplica}
+                'n_con_articulado': n_art, 'n_te_aplica': n_aplica,
+                # redes: lo recolectado ayer en X sobre los temas de la ficha.
+                # `redes_estado` distingue «no hay escucha contratada» de «la
+                # escucha está vieja» y de «trajo pero nada colombiano».
+                'n_redes': red_meta.get('n', 0), 'n_redes_colombia': red_meta.get('n_colombia', 0),
+                'redes_estado': red_meta.get('estado'), 'redes_generado': red_meta.get('generado')}
         # Cada señal sabe a qué punto pertenece y si se movió en 72 h. Va sobre
         # `senales` (la lista unificada) y sobre los bloques por pilar, que son
         # los mismos objetos: el frontend lee `card`/`mov` de cualquiera de las dos.
@@ -5197,7 +5297,7 @@ def handler(event, context):
                            'contratacion_generica_omitida': con_generica_muda,
                            'descartes': s.get('descartes', [])},
                'congreso': rc['senales'], 'regulatorio': reg, 'medios': med,
-               'contratacion': con, 'kpis': kpis, 'sectores': sectores}
+               'contratacion': con, 'redes': red, 'kpis': kpis, 'sectores': sectores}
         out['cliente']['avisos'] = s.get('avisos', [])
         # `lectura:true` YA NO significa "espérame la síntesis": significa
         # "prepárala". El radar tiene que salir siempre rápido (medido:

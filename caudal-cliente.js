@@ -784,6 +784,16 @@
         <div class="sig-title">${apTag}${vt}${esc(shortTitle(x.titulo).slice(0,120))}</div>
         <div class="sig-tags">${tags}</div>${imp}${art}<div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
+    if(x.tipo==='redes'){
+      // Una publicación es la opinión de quien la escribe: se muestra QUIÉN la
+      // dijo y CUÁNTO se movió, que es lo que la vuelve señal y no ruido.
+      const n=v=>Number(v||0).toLocaleString('es-CO');
+      const tags=[`${esc(x.red||'X')} · @${esc(x.autor||'')}`, x.seguidores?`${n(x.seguidores)} seguidores`:'',
+                  `♥ ${n(x.likes)} · ↻ ${n(x.rts)}`, x.tema?esc(x.tema):'', x.fecha?esc(x.fecha):''].filter(Boolean).join(' · ');
+      return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">«${esc(x.titulo)}${(x.texto||'').length>(x.titulo||'').length?'…':''}»</a></div>
+        <div class="sig-tags">${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
+    }
     if(x.tipo==='medios'){
       const tags=[x.medio?esc(x.medio):'', x.alcance==='regional'?'Regional':'Nacional', x.fecha?esc(x.fecha):''].filter(Boolean).join(' · ');
       return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
@@ -825,6 +835,14 @@
       : '<div class="cli-reg-none">El regulador de este sector todavía no es fuente de Caudal — las entidades entran por etapas. Si tu exposición es ambiental (licenciamiento, seguimiento, sanción), el sector <b>Ambiente</b> ya trae el expediente completo de la ANLA.</div>';
     if(pilar==='contratacion') return con.length?`<div class="sig-list">${con.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin contratación reciente para los temas de este sector.</div>';
     if(pilar==='medios') return medios.length?`<div class="sig-list">${medios.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin cobertura de prensa reciente para este sector.</div>';
+    if(pilar==='redes'){
+      const redes=d.redes||[], k=d.kpis||{};
+      const nota=`<div class="cob-note" style="margin-bottom:.6rem">Recogido en X${k.redes_generado?' el '+esc(String(k.redes_generado).slice(0,10)):''}: <b>${fmt(k.n_redes||0)}</b> publicaciones sobre los temas del perfil, <b>${fmt(k.n_redes_colombia||0)}</b> identificadas como colombianas. Aquí van las de más interacción. Cada una es la opinión de quien la escribe, no un hecho verificado.</div>`;
+      if(redes.length) return nota+`<div class="sig-list">${redes.map(cliSigCard).join('')}</div>`;
+      return `<div class="cli-reg-none">${k.redes_estado==='vieja'?'La última recolección de redes tiene más de tres días: no se muestra como conversación de hoy.'
+        :k.redes_estado==='sin_colombianas'?'La recolección de redes no trajo publicaciones identificadas como colombianas.'
+        :'Este perfil todavía no tiene escucha de redes activa.'}</div>`;
+    }
     return '';
   }
   function cliRender(d){
@@ -898,6 +916,7 @@
         <span class="chip" data-p="regulatorio">Regulatorio <b>${reg.length}</b></span>
         <span class="chip" data-p="contratacion">Contratación <b>${con.length}</b></span>
         <span class="chip" data-p="medios">Prensa <b>${medios.length}</b></span>
+        ${(d.redes&&d.redes.length)||(k.redes_estado&&k.redes_estado!=='sin_escucha')?`<span class="chip" data-p="redes">Redes · X <b>${(d.redes||[]).length}</b></span>`:''}
       </div>
       <div id="cli-detalle" style="margin-top:1rem"></div>
 
@@ -1133,7 +1152,7 @@
   // Fuente del PDF: el orden de la Rosa (N · E · S · O), no el de la respuesta.
   const BRIEF_CARD=[['norte','NORTE · oportunidades'],['este','ORIENTE · conversación'],
                     ['sur','SUR · competencia'],['oeste','OCCIDENTE · Estado']];
-  const BRIEF_FUENTE={congreso:'Congreso',regulatorio:'Regulatorio',medios:'Prensa',
+  const BRIEF_FUENTE={congreso:'Congreso',regulatorio:'Regulatorio',medios:'Prensa',redes:'Redes · X',
                       contratacion:'Contratación',ejecutivo:'Ejecutivo',sucop:'Consulta pública'};
   // ⚠️ La URL va como ENLACE, nunca como texto. Medido en el primer brief: una
   // sola nota de prensa de Google News ocupaba CINCO LÍNEAS de base64 —
@@ -1147,6 +1166,7 @@
   function briefEtiquetaEnlace(x){
     const u=(x.url||'').trim(); if(!u) return '';
     if(/news\.google\./i.test(u)) return 'Abrir la nota' + (x.medio?` en ${x.medio}`:'');
+    if(x.tipo==='redes') return 'Ver la publicación en X';
     try{ return 'Ver el documento en ' + new URL(u).hostname.replace(/^www\./,''); }
     catch(e){ return 'Ver el documento'; }
   }
@@ -1192,7 +1212,8 @@
   }
   function briefSenalTexto(x){
     const meta=[BRIEF_FUENTE[x.tipo]||x.tipo, x.fecha||'', x.vigilada?('vigilada: '+x.vigilada):'',
-                x.entidad||x.medio||x.comision||''].filter(Boolean).join(' · ');
+                x.entidad||x.medio||x.comision||(x.autor?'@'+x.autor:''),
+                x.tipo==='redes'?`${Number(x.likes||0).toLocaleString('es-CO')} me gusta`:''].filter(Boolean).join(' · ');
     return {tit:briefTitulo(x.titulo).slice(0,190), meta,
             accion:(x.accion||'').trim(), url:(x.url||'').trim(),
             enlace:briefEtiquetaEnlace(x), nivel:x.nivel||''};
@@ -1201,7 +1222,7 @@
     const d=_CLI_LAST; if(!d) return null;
     const cl=d.cliente||{}, k=d.kpis||{};
     const todas=[].concat(d.congreso||[],d.regulatorio||[],d.medios||[],
-                          d.contratacion||[],d.ejecutivo||[],d.sucop||[]);
+                          d.contratacion||[],d.ejecutivo||[],d.sucop||[],d.redes||[]);
     // `mov` lo marca la Lambda contra su propio reloj: no se recalcula acá para
     // que el PDF y la pantalla no puedan discrepar por la zona horaria del
     // navegador de quien descarga.

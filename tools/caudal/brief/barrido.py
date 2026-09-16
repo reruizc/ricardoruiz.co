@@ -241,6 +241,58 @@ def _ruidoso(texto, exclusiones):
     return [x for x in exclusiones if x.lower() in t]
 
 
+REDES_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'Bases de datos',
+                         'leyes-senado', 'redes', 'escucha')
+REDES_POR_TEMA = 4
+REDES_TOPE = 24
+
+
+def redes_escucha(p):
+    """La escucha diaria de X del perfil (tools/caudal/redes/escucha_perfil.py).
+
+    Lee la recolección más reciente del disco —corre en la misma máquina que el
+    barrido— y, si no está, la de S3. Devuelve (publicaciones, fecha de corte).
+    Solo entran las identificadas como colombianas cuando el perfil solo mira
+    Colombia: sin ubicación, una publicación sobre «reforma pensional» puede
+    ser de Chile o de México. Nunca lanza.
+    """
+    import re
+    import subprocess
+    import unicodedata
+    nombre = unicodedata.normalize('NFD', str(p.get('nombre') or '').lower())
+    slug = re.sub(r'[^a-z0-9]+', '-', ''.join(c for c in nombre
+                                               if unicodedata.category(c) != 'Mn')).strip('-')
+    d = None
+    carpeta = os.path.join(REDES_DIR, slug)
+    try:
+        ultimos = sorted(x for x in os.listdir(carpeta) if x.endswith('.json'))
+        if ultimos:
+            d = json.load(open(os.path.join(carpeta, ultimos[-1]), encoding='utf-8'))
+    except OSError:
+        pass
+    if d is None:
+        try:
+            r = subprocess.run(['aws', 's3', 'cp', f's3://caudal-legislativo/metadata/escucha/{slug}.json', '-'],
+                               capture_output=True, text=True, timeout=60)
+            d = json.loads(r.stdout) if r.returncode == 0 else None
+        except Exception:                                        # noqa: BLE001
+            d = None
+    if not d:
+        return [], None
+    solo_co = d.get('solo_colombia', True)
+    pubs = []
+    for tema, t in (d.get('por_tema') or {}).items():
+        buenas = [x for x in (t.get('top') or []) if not solo_co or x.get('pais') == 'co']
+        for x in buenas[:REDES_POR_TEMA]:
+            pubs.append(dict(x, tema=tema))
+    vistos, out = set(), []
+    for x in sorted(pubs, key=lambda x: -(x.get('interaccion') or 0)):
+        if x.get('id') not in vistos:
+            vistos.add(x.get('id'))
+            out.append(x)
+    return out[:REDES_TOPE], (d.get('generado') or '')[:10]
+
+
 def barrer(p, dias, desde):
     """Corre el plan y devuelve la evidencia agrupada por pilar."""
     jobs = plan_de_consultas(p, dias)
@@ -448,6 +500,10 @@ def barrer(p, dias, desde):
             'proyectos': [(x.get('numero') or x.get('num'), (x.get('titulo') or '')[:90])
                           for x in (s.get('proyectos') or [])][:6],
         })
+
+    ev['redes'], corte_redes = redes_escucha(p)
+    if corte_redes:
+        cobertura['redes'] = corte_redes
 
     radar = crudo.get('radar') or {}
     return {
