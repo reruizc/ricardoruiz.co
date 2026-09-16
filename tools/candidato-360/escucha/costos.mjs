@@ -115,14 +115,18 @@ console.log(pad('', 40) + pad('COSTO', 12, 'der') + pad('PRECIO', 12, 'der') + p
 console.log('─'.repeat(84));
 const solo = red => posts.find(f => f.red === red);
 const con = red => [solo(red), comentarios.find(f => f.red === red)];
+/* Los precios de LISTA del brief (candidato-360-brief.html): los de una JAL
+   en la ciudad más pequeña que la tiene. El brief los escala por corporación
+   y tamaño del territorio; el costo de Apify escala menos que eso, así que el
+   margen de acá es el peor caso. */
 const oferta = [
-  ['Una red, solo posts (X)', 59000, costo([solo('x')])],
-  ['Una red, posts + comentarios (X)', 99000, costo(con('x'))],
-  ['Escucha completa, solo posts', 149000, costo(posts)],
-  ['Escucha completa + comentarios', 219000, costo([...posts, ...comentarios])],
-  ['C360 + escucha completa, 1 lectura/día', 249000, costo(posts) / 2 + INFRA / 2],
-  ['C360 + escucha completa, 2 lecturas/día', 299000, costo(posts)],
-  ['C360 + escucha + comentarios, 2/día', 379000, costo([...posts, ...comentarios])],
+  ['Añadido · escucha, 1 lectura/día', 100000, costo(posts) / 2 + INFRA / 2],
+  ['Añadido · escucha, 2 lecturas/día', 150000, costo(posts)],
+  ['Añadido · sentimiento (sobre la escucha)', 130000, costo(comentarios) - INFRA],
+  ['Solo escucha · una red (X)', 100000, costo([solo('x')])],
+  ['Solo escucha · una red con sentimiento (X)', 160000, costo(con('x'))],
+  ['Solo escucha · completa', 250000, costo(posts)],
+  ['Solo escucha · completa con sentimiento', 350000, costo([...posts, ...comentarios])],
 ];
 for (const [nombre, cop, usd] of oferta) { const c = usd * TRM; console.log(pad(nombre, 40) + pad(fmtCOP(c), 12, 'der') + pad(fmtCOP(cop), 12, 'der') + pad(fmtCOP(cop - c), 12, 'der') + pad((cop / c).toFixed(1) + '×', 8, 'der')); }
 console.log('');
