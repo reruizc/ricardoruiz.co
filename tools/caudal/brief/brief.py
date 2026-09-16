@@ -38,9 +38,12 @@ import caudal_core                                               # noqa: E402
 from prompt_brief import BRIEF_SYSTEM, armar_mensaje             # noqa: E402
 
 MODELO = 'claude-fable-5-1'
-# Un brief son ~3.500 tokens de salida; 16.000 deja margen sin rozar el techo de
-# tiempo de una petición sin streaming.
-MAX_TOKENS = 16000
+# ⚠️ El techo cubre el TEXTO y el RAZONAMIENTO previo, que también es salida.
+# Con 16.000 el brief de Cauce del 16-sep se cortó a mitad del JSON en cuanto la
+# evidencia sumó las redes (medido antes: 12.748 de salida, 3.961 de razonar).
+# 32.000 deja el doble de margen; sin streaming la petición sigue por debajo del
+# timeout de 600 s (medido: 2 min 40 s).
+MAX_TOKENS = 32000
 # Tarifas Anthropic al 13-sep-2026, USD por millón de tokens, y la tasa que usa
 # la propuesta comercial. Sirve para reportar el costo real de cada corrida.
 PRECIO = {'claude-opus-5': (5.0, 25.0), 'claude-sonnet-5': (2.0, 10.0),
@@ -84,6 +87,10 @@ def generar(system, user, modelo=MODELO, max_tokens=MAX_TOKENS):
                  'anthropic-version': '2023-06-01'})
     with urllib.request.urlopen(req, timeout=600) as r:
         d = json.loads(r.read())
+    if d.get('stop_reason') == 'max_tokens':
+        u = d.get('usage', {})
+        sys.exit(f"el modelo llegó al techo de {max_tokens} tokens antes de cerrar el JSON "
+                 f"(salida {u.get('output_tokens')}): súbelo en MAX_TOKENS o recorta la evidencia")
     if d.get('stop_reason') == 'refusal':
         sys.exit('el modelo declinó la petición: '
                  + json.dumps(d.get('stop_details') or {}, ensure_ascii=False))
