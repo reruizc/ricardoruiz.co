@@ -26,7 +26,7 @@
 import { writeFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { REDES, plan, perfilDeVinculo, cargarVinculo } from './perfil.mjs';
+import { REDES, COMENTARIOS, plan, planComentarios, referenciaDePost, perfilDeVinculo, cargarVinculo, PRECIOS_REFERENCIA, PRECIOS_REFERENCIA_COMENTARIOS } from './perfil.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const API = 'https://api.apify.com/v2';
@@ -34,6 +34,9 @@ const args = Object.fromEntries(process.argv.slice(2).map(a => { const m = a.mat
 const GASTAR = Boolean(args.gastar);
 const TOPE = args.tope ? Number(args.tope) : null;      /* null = el de perfil.mjs */
 const SOLO = args.red ? String(args.red).split(',') : null;
+/* --capa=posts mide solo la 1; --capa=comentarios exige la 1 igual (necesita
+   los posts para saber cuáles seguir) pero solo reporta la 2; sin bandera, las dos. */
+const CAPA = String(args.capa || 'todo');
 const ESPERA_MAX = Number(args.espera || 300) * 1000;   /* 5 minutos por actor */
 
 /* El perfil sale del vínculo: el de --vinculo=archivo.json (la respuesta de
@@ -93,9 +96,8 @@ async function api(ruta, opciones = {}) {
   return cuerpo.data ?? cuerpo;
 }
 
-async function correr(red, entrada) {
-  const r = REDES[red];
-  const run = await api(`/acts/${rutaActor(r.actor)}/runs`, { method: 'POST', body: JSON.stringify(entrada) });
+async function correr(actor, entrada) {
+  const run = await api(`/acts/${rutaActor(actor)}/runs`, { method: 'POST', body: JSON.stringify(entrada) });
   const inicio = Date.now();
   let estado = run;
   while (['READY', 'RUNNING'].includes(estado.status)) {
@@ -109,17 +111,28 @@ async function correr(red, entrada) {
 
 /* ── Lo que se va a correr ────────────────────────────────────────────────── */
 const todas = plan(PERFIL), filas = todas.filter(f => !f.motivo && (!SOLO || SOLO.includes(f.red)));
+const filasCom = planComentarios(PERFIL, todas).filter(f => !f.motivo && (!SOLO || SOLO.includes(f.red)));
 console.log(`\n═══ MEDICIÓN · ${PERFIL.candidato} ═══`);
 console.log(esEjemplo ? `Vínculo de EJEMPLO (${path.relative(process.cwd(), rutaVinculo)}). Para medir a un candidato real: --vinculo=su-vinculo.json`
                       : `Vínculo: ${path.relative(process.cwd(), rutaVinculo)}`);
 console.log(`Temas: ${PERFIL.temas.length ? PERFIL.temas.map(t => `«${t}»`).join(' · ') : '— (el candidato no los ha escrito)'}   Escalas: ${PERFIL.escalas.join(' y ')}`);
 for (const f of todas.filter(f => f.motivo)) console.log(`  · ${f.etiqueta} no se mide: ${f.motivo}`);
 console.log('');
+console.log('CAPA 1 · POSTS');
 console.log(pad('RED', 11) + pad('ACTOR', 58) + pad('CONS.', 7, 'der') + pad('TOPE', 6, 'der') + pad('PEDIDOS', 9, 'der'));
 console.log('─'.repeat(91));
 for (const f of filas) {
   const tope = TOPE ?? f.tope;
   console.log(pad(f.red, 11) + pad(corto(f.actor, 56), 58) + pad(f.consultas.length, 7, 'der') + pad(tope, 6, 'der') + pad(f.consultas.length * tope, 9, 'der'));
+}
+if (CAPA !== 'posts') {
+  console.log('\nCAPA 2 · COMENTARIOS  (de los posts con más reacción que traiga la capa 1)');
+  console.log(pad('RED', 11) + pad('ACTOR', 58) + pad('POSTS', 7, 'der') + pad('TOPE', 6, 'der') + pad('PEDIDOS', 9, 'der'));
+  console.log('─'.repeat(91));
+  for (const f of filasCom) {
+    const tope = TOPE ? Math.min(TOPE, f.tope) : f.tope;
+    console.log(pad(f.red, 11) + pad(corto(f.actor, 56), 58) + pad(f.posts, 7, 'der') + pad(tope, 6, 'der') + pad(f.posts * tope, 9, 'der'));
+  }
 }
 
 if (!GASTAR) {
@@ -140,45 +153,77 @@ if (!GASTAR) {
 }
 
 /* ── Medir ───────────────────────────────────────────────────────────────── */
-const medidos = {}, detalle = [];
-for (const f of filas) {
-  const tope = TOPE ?? f.tope;
-  const entrada = REDES[f.red].input(f.consultas, tope);
-  process.stdout.write(`\n▸ ${f.etiqueta} (${f.actor})… `);
+/* Una corrida medida: qué cobró Apify, cuántos ítems y qué campos traen. Los
+   campos se imprimen porque son lo que decide si de un actor salen métricas,
+   comentarios o solo texto —y eso no se adivina, se mira. */
+async function medirUna({ capa, red, etiqueta, actor, entrada, pedidos }) {
+  process.stdout.write(`\n▸ ${etiqueta} · ${capa} (${actor})… `);
   try {
-    const { estado, items } = await correr(f.red, entrada);
+    const { estado, items } = await correr(actor, entrada);
     const costos = camposUSD(estado);
     /* El total que cobra Apify por la corrida: el campo más completo que
        exista. Si ninguno existe, se dice, no se estima. */
     const total = costos.usageTotalUsd ?? costos['stats.usageTotalUsd'] ?? Math.max(0, ...Object.values(costos));
-    const n = items.length;
-    const porMil = n ? total / n * 1000 : null;
-    console.log(`${estado.status} · ${n} resultados · ${usd(total)}`);
+    const n = items.length, porMil = n ? total / n * 1000 : null;
+    console.log(`${estado.status} · ${n} de ${pedidos} pedidos · ${usd(total)}`);
     for (const [k, v] of Object.entries(costos)) console.log(`     ${pad(k, 34)} ${usd(v)}`);
-    if (!n) console.log(`     ⚠ cero resultados NO es «no hay conversación»: puede ser el actor caído, el input con otro nombre de campo o la consulta vacía. Revise antes de concluir.`);
-    if (porMil != null) medidos[f.red] = { base: Number(porMil.toFixed(4)), medidoEn: new Date().toISOString(), actor: f.actor, muestra: n, cobrado: total };
-    detalle.push({ red: f.red, etiqueta: f.etiqueta, actor: f.actor, n, total, porMil, estado: estado.status, consultas: f.consultas.length, tope });
+    if (n) console.log(`     campos: ${Object.keys(items[0]).slice(0, 24).join(', ')}${Object.keys(items[0]).length > 24 ? ', …' : ''}`);
+    else console.log(`     ⚠ cero resultados NO es «no hay conversación»: puede ser el actor caído, el input con otro nombre de campo o la consulta vacía. Revise antes de concluir.`);
+    return { capa, red, etiqueta, actor, n, total, porMil, estado: estado.status, items };
   } catch (e) {
     console.log(`FALLÓ · ${e.message}`);
-    detalle.push({ red: f.red, etiqueta: f.etiqueta, actor: f.actor, error: e.message });
+    return { capa, red, etiqueta, actor, error: e.message, items: [] };
   }
 }
 
-/* ── Resultado ───────────────────────────────────────────────────────────── */
-console.log(`\n═══ PRECIO REAL POR RED ═══`);
-console.log(pad('RED', 12) + pad('RESULTADOS', 12, 'der') + pad('COBRADO', 12, 'der') + pad('US$/1.000', 12, 'der') + pad('vs REFERENCIA', 16, 'der'));
-console.log('─'.repeat(64));
-const { PRECIOS_REFERENCIA } = await import('./perfil.mjs');
-for (const d of detalle) {
-  if (d.error) { console.log(pad(d.red, 12) + pad('—', 12, 'der') + pad('—', 12, 'der') + pad('—', 12, 'der') + pad(d.error.slice(0, 15), 16, 'der')); continue; }
-  const ref = PRECIOS_REFERENCIA[d.red]?.base;
-  const dif = d.porMil != null && ref ? `${d.porMil > ref ? '+' : ''}${Math.round((d.porMil / ref - 1) * 100)} %` : '—';
-  console.log(pad(d.red, 12) + pad(d.n, 12, 'der') + pad(usd(d.total), 12, 'der') + pad(d.porMil != null ? usd(d.porMil) : '—', 12, 'der') + pad(dif, 16, 'der'));
+const medidos = {}, medidosCom = {}, detalle = [];
+const sello = (r, medida) => { if (r.porMil != null) medida[r.red] = { base: Number(r.porMil.toFixed(4)), medidoEn: new Date().toISOString(), actor: r.actor, muestra: r.n, cobrado: r.total }; };
+
+/* Capa 1 · posts */
+const postsPorRed = {};
+for (const f of filas) {
+  const tope = TOPE ?? f.tope;
+  const r = await medirUna({ capa: 'posts', red: f.red, etiqueta: f.etiqueta, actor: f.actor, entrada: REDES[f.red].input(f.consultas, tope), pedidos: f.consultas.length * tope });
+  postsPorRed[f.red] = r.items; if (CAPA !== 'comentarios') { sello(r, medidos); detalle.push(r); }
 }
 
-if (Object.keys(medidos).length) {
+/* Capa 2 · comentarios, de los posts con más reacción de la capa 1. Si ningún
+   ítem trae URL con un nombre de campo conocido, no hay cómo seguirlos y se
+   dice con los campos que sí vinieron, para añadir el nombre a referenciaDePost. */
+if (CAPA !== 'posts') for (const f of filasCom) {
+  const refs = (postsPorRed[f.red] || []).map(referenciaDePost).filter(Boolean).sort((a, b) => b.reaccion - a.reaccion);
+  const elegidos = refs.slice(0, f.posts);
+  if (!elegidos.length) {
+    const muestra = (postsPorRed[f.red] || [])[0];
+    console.log(`\n▸ ${f.etiqueta} · comentarios: sin posts que seguir${muestra ? ` (ningún campo de URL conocido; vinieron: ${Object.keys(muestra).slice(0, 12).join(', ')})` : ' (la capa 1 no trajo nada)'}`);
+    detalle.push({ capa: 'comentarios', red: f.red, etiqueta: f.etiqueta, actor: f.actor, error: 'sin posts que seguir' });
+    continue;
+  }
+  const tope = TOPE ? Math.min(TOPE, f.tope) : f.tope;
+  const r = await medirUna({ capa: 'comentarios', red: f.red, etiqueta: f.etiqueta, actor: f.actor, entrada: COMENTARIOS[f.red].input(elegidos, tope), pedidos: elegidos.length * tope });
+  sello(r, medidosCom); detalle.push(r);
+}
+
+/* ── Resultado ───────────────────────────────────────────────────────────── */
+console.log(`\n═══ PRECIO REAL POR RED Y CAPA ═══`);
+console.log(pad('CAPA', 13) + pad('RED', 12) + pad('RESULTADOS', 12, 'der') + pad('COBRADO', 12, 'der') + pad('US$/1.000', 12, 'der') + pad('vs REFERENCIA', 16, 'der'));
+console.log('─'.repeat(77));
+for (const d of detalle) {
+  if (d.error) { console.log(pad(d.capa, 13) + pad(d.red, 12) + pad('—', 12, 'der') + pad('—', 12, 'der') + pad('—', 12, 'der') + pad(d.error.slice(0, 15), 16, 'der')); continue; }
+  const ref = (d.capa === 'comentarios' ? PRECIOS_REFERENCIA_COMENTARIOS : PRECIOS_REFERENCIA)[d.red]?.base;
+  const dif = d.porMil != null && ref ? `${d.porMil > ref ? '+' : ''}${Math.round((d.porMil / ref - 1) * 100)} %` : '—';
+  console.log(pad(d.capa, 13) + pad(d.red, 12) + pad(d.n, 12, 'der') + pad(usd(d.total), 12, 'der') + pad(d.porMil != null ? usd(d.porMil) : '—', 12, 'der') + pad(dif, 16, 'der'));
+}
+
+/* Se conserva lo ya medido en otras corridas: medir solo Facebook hoy no
+   borra lo que X midió ayer. */
+if (Object.keys(medidos).length || Object.keys(medidosCom).length) {
   const destino = path.join(AQUI, 'precios-medidos.json');
-  await writeFile(destino, JSON.stringify({ _doc: 'US$ por 1.000 resultados, MEDIDOS contra Apify. Lo escribe medir.mjs y lo prefiere costos.mjs sobre los precios de referencia.', medidos }, null, 2));
+  let previo = {}; try { previo = JSON.parse(await readFile(destino, 'utf8')); } catch {}
+  await writeFile(destino, JSON.stringify({
+    _doc: 'US$ por 1.000 resultados, MEDIDOS contra Apify. Lo escribe medir.mjs y lo prefiere costos.mjs sobre los precios de referencia. `medidos` es la capa de posts; `comentarios`, la de comentarios.',
+    medidos: { ...(previo.medidos || {}), ...medidos }, comentarios: { ...(previo.comentarios || {}), ...medidosCom },
+  }, null, 2));
   console.log(`\nEscrito ${path.relative(process.cwd(), destino)} · ahora corra:  node tools/candidato-360/escucha/costos.mjs`);
 }
 console.log(`\nOjo: esto midió UNA corrida. El mes son ${PERFIL.corridasDia * PERFIL.dias}.\n`);

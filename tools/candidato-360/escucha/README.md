@@ -76,6 +76,27 @@ añada a la tabla. Es el único pedazo del perfil que no sale solo del vínculo,
 la salida honesta a largo plazo es preguntarle al candidato qué páginas locales
 sigue —él las conoce mejor que nosotros—.
 
+## Dos capas, dentro del mismo módulo
+
+| Capa | Qué trae | Cómo | Se cobra |
+|---|---|---|---|
+| **1 · Posts** | *lo que se dice*: de qué se habla, quién, cuánto rinde | búsqueda por palabra (X), hashtag (Instagram, TikTok), páginas (Facebook) | base |
+| **2 · Comentarios** | *lo que se siente*: postura, tono, quién amplifica | las respuestas a los `postsPorCorrida` posts con más reacción de cada red, más los propios | escalón aparte |
+
+El sentimiento no vive en los posts: el post de la Alcaldía es neutro por
+definición, la opinión está debajo. Pero raspar comentarios es otro actor y
+otro precio —más que las cuatro redes de posts juntas—, así que es una capa
+**aparte**: se mide aparte (`--capa=posts|comentarios|todo`), se cuesta aparte
+y aparece como su propio escalón en «Qué cobrar». El análisis (postura, tema,
+tono) lo hace el modelo sobre lo que llegue de las dos capas y cuesta menos de
+un dólar al mes: Apify es el 97 % de la factura, con o sin comentarios.
+
+En la salida del medidor, cada actor imprime **los campos que devuelve** en la
+primera corrida. Es lo que dice si de ahí salen métricas, URLs para seguir los
+comentarios o solo texto; no se adivina. Si un actor de posts no trae una URL
+con un nombre conocido, la capa 2 lo dice y muestra los campos que sí
+vinieron, para añadir el nombre a `referenciaDePost`.
+
 ## Las tres cosas que hay que saber antes de mirar la tabla
 
 - **La palanca es el tope, no el modelo.** Apify cobra por resultado entregado:

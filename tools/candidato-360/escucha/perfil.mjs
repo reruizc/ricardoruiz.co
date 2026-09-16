@@ -112,6 +112,45 @@ export const REDES = {
   },
 };
 
+/* ── Capa 2 · los comentarios ─────────────────────────────────────────────
+   El sentimiento no vive en los posts, vive en los comentarios: el post de la
+   Alcaldía diciendo «inauguramos el parque» es neutro por definición; los 140
+   comentarios debajo son la opinión de la localidad. Pero raspar comentarios
+   es otro actor y otro precio —más que las cuatro redes de posts juntas—, así
+   que es una CAPA APARTE: se mide aparte, se cuesta aparte y se cobra aparte.
+
+   No se raspan todos: por corrida y por red, los comentarios de los
+   `postsPorCorrida` posts con más reacción (y de los propios del candidato, si
+   tiene la cuenta). En X las respuestas SON tweets y salen con el mismo actor
+   buscando por conversación; en las otras tres es un actor de comentarios.
+
+   ⚠️ Los nombres de campo del input son los usuales de cada actor y pueden
+   variar: un input con otro nombre falla con un error explícito del actor,
+   que medir.mjs muestra tal cual.                                            */
+export const COMENTARIOS = {
+  postsPorCorrida: 3, tope: 30,
+  x:         { actor: 'kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest', modo: 'respuestas (son tweets)',
+               input: (posts, tope) => ({ searchTerms: posts.map(p => `conversation_id:${p.id}`), maxItems: posts.length * tope, sort: 'Latest' }) },
+  instagram: { actor: 'apify/instagram-comment-scraper', modo: 'comentarios del post',
+               input: (posts, tope) => ({ directUrls: posts.map(p => p.url), resultsLimit: tope }) },
+  tiktok:    { actor: 'clockworks/tiktok-comments-scraper', modo: 'comentarios del video',
+               input: (posts, tope) => ({ postURLs: posts.map(p => p.url), commentsPerPost: tope }) },
+  facebook:  { actor: 'apify/facebook-comments-scraper', modo: 'comentarios del post',
+               input: (posts, tope) => ({ startUrls: posts.map(p => ({ url: p.url })), resultsLimit: tope }) },
+};
+
+/* De un ítem de posts, lo que la capa de comentarios necesita: la URL, el id y
+   una medida de reacción para escoger los que más conversación tienen. Los
+   nombres de campo varían por actor; se prueban los usuales y, si ninguno
+   aparece, el ítem no se puede seguir y se dice. */
+export function referenciaDePost(item) {
+  const url = item.url || item.webVideoUrl || item.postUrl || item.twitterUrl || item.link || '';
+  const id = item.id || item.tweetId || item.postId || (url.match(/status\/(\d+)/) || [])[1] || '';
+  const reaccion = ['likeCount', 'likesCount', 'diggCount', 'likes', 'reactionsCount', 'favorite_count'].map(k => Number(item[k])).find(n => !Number.isNaN(n)) ?? 0;
+  const comentarios = ['replyCount', 'commentsCount', 'commentCount', 'comments'].map(k => Number(item[k])).find(n => !Number.isNaN(n)) ?? null;
+  return url ? { url, id, reaccion, comentarios } : null;
+}
+
 /* Los precios de referencia, por si todavía no se ha medido. Son de páginas de
    terceros (sep-2026) porque apify.com no es alcanzable desde el entorno donde
    se escribió esto: sirven para dimensionar, NO para fijar tarifa. En cuanto
@@ -121,6 +160,14 @@ export const PRECIOS_REFERENCIA = {
   instagram: { bajo: 0.30, base: 0.50, alto: 0.80, fuente: '~0,50/1K posts' },
   tiktok:    { bajo: 0.30, base: 0.50, alto: 0.80, fuente: '~0,50/1K posts' },
   facebook:  { bajo: 0.70, base: 0.89, alto: 2.00, fuente: 'dami_studio 0,70 · getanyapi 0,89 · alfalfa 2,00' },
+};
+/* Comentarios: los actores que vimos rondan US$1 por 1.000; en X las
+   respuestas son tweets y cuestan lo que los tweets. */
+export const PRECIOS_REFERENCIA_COMENTARIOS = {
+  x:         { bajo: 0.15, base: 0.25, alto: 0.40, fuente: 'mismo actor que los posts' },
+  instagram: { bajo: 0.50, base: 1.00, alto: 2.00, fuente: '~1,00/1K comentarios' },
+  tiktok:    { bajo: 0.50, base: 1.00, alto: 2.00, fuente: '~1,00/1K comentarios' },
+  facebook:  { bajo: 0.50, base: 1.00, alto: 2.00, fuente: '~1,00/1K comentarios' },
 };
 
 /* Cuántos resultados pide UNA corrida de cada red con este perfil. Una red sin
@@ -134,6 +181,18 @@ export function plan(perfil) {
       : red === 'facebook' && !consultas.length ? `sin páginas verificadas para ${perfil.territorio.etiqueta}` : '';
     return { red, etiqueta: r.etiqueta, modo: r.modo, actor: r.actor, consultas, tope: r.tope, propio, motivo,
       porCorrida: motivo ? 0 : consultas.length * r.tope + propio };
+  });
+}
+
+/* La capa 2 solo existe donde la capa 1 trajo posts: sin posts no hay de
+   dónde sacar comentarios. Los posts propios entran además de los N con más
+   reacción, si el candidato tiene la cuenta en esa red. */
+export function planComentarios(perfil, planPosts = plan(perfil)) {
+  return planPosts.map(f => {
+    const c = COMENTARIOS[f.red];
+    const posts = f.motivo ? 0 : COMENTARIOS.postsPorCorrida + (perfil.cuentas?.[f.red] ? 1 : 0);
+    return { red: f.red, etiqueta: f.etiqueta, modo: c.modo, actor: c.actor, posts, tope: COMENTARIOS.tope,
+      motivo: f.motivo ? `sin posts de ${f.etiqueta}, no hay comentarios que leer` : '', porCorrida: posts * COMENTARIOS.tope };
   });
 }
 
