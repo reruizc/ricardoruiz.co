@@ -883,6 +883,7 @@
         <div id="cli-lectura-body"></div>
         <div class="brief-bar" id="cli-brief-bar" hidden>
           <button type="button" class="brief-btn" id="cli-brief-btn">↓ Brief de 72 horas (.pdf)</button>
+          <button type="button" class="brief-btn sec" id="cli-brief-word" hidden>↓ Borrador editable (.docx)</button>
           <span class="brief-nota" id="cli-brief-nota"></span>
         </div>
       </div>
@@ -1162,6 +1163,33 @@
     const may=(letras.match(/[A-ZÁÉÍÓÚÜÑ]/g)||[]).length;
     return may/letras.length>=0.7 ? shortTitle(v) : v;
   }
+  /* Los textos que el PDF y el Word tienen que decir IGUAL viven acá: los que
+     declaran ventana, fuentes y alcance. Escritos por separado en cada
+     exportable, uno envejece y el cliente termina con dos versiones del mismo
+     brief que no dicen lo mismo del método. */
+  function briefBajada(D){
+    return `Barrido de las últimas ${D.dias*24} horas sobre el Congreso, el Ejecutivo, los reguladores, `
+      +`la consulta pública de normas, la contratación del Estado y la prensa. `
+      +`${D.nMov} señal${D.nMov===1?'':'es'} con movimiento, de ${D.nTotal} vigentes para este perfil, ordenadas por los `
+      +`cuatro rumbos de la Rosa de los Vientos.`;
+  }
+  function briefVentana(D){
+    const hoy=new Date(), desde=new Date(hoy.getTime()-D.dias*864e5);
+    const f=d=>d.toLocaleDateString('es-CO',{day:'numeric',month:'long'});
+    return `Ventana ${f(desde)} a ${f(hoy)} de ${hoy.getFullYear()} · corte `
+      +`${hoy.toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})} · Colombia`;
+  }
+  const BRIEF_QUIETO='Revisado en la ventana; sin novedad.';
+  const BRIEF_CONGRESO='Los proyectos de ley no entran como movimiento: el índice guarda el año de radicación, no el día. Van en el radar completo de la plataforma.';
+  const BRIEF_MARCA='Caudal · módulo de inteligencia regulatoria de Cauce.';
+  function briefPie(D){ return [
+    ['Fuentes.','Registro de proyectos de ley del Senado y la Cámara; normativa de Presidencia; consulta pública de proyectos de norma del DNP (SUCOP); registro regulatorio de 12 fuentes; providencias de la Corte Constitucional; contratos y procesos del Estado (SECOP); prensa nacional y regional. Cada señal enlaza el acto o la nota que la respalda.'],
+    ['Ventana.',`Últimas ${D.dias*24} horas, con corte al momento de la descarga.`],
+    ['Alcance.','Insumo de monitoreo. Análisis asistido por IA sobre datos oficiales; el criterio experto es del analista.']]; }
+  function briefSlug(D){
+    return String(D.nombre).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+      .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'perfil';
+  }
   function briefSenalTexto(x){
     const meta=[BRIEF_FUENTE[x.tipo]||x.tipo, x.fecha||'', x.vigilada?('vigilada: '+x.vigilada):'',
                 x.entidad||x.medio||x.comision||''].filter(Boolean).join(' · ');
@@ -1258,15 +1286,10 @@
     doc.setFont('helvetica','bold'); doc.setFontSize(19); doc.setTextColor(...TINTA);
     doc.splitTextToSize(tit,AN).forEach((l,i)=>{ salto(26); doc.setTextColor(...(i?AZUL:TINTA)); doc.text(l,M,y); y+=25; });
     y+=6;
-    parrafo(`Barrido de las últimas ${D.dias*24} horas sobre el Congreso, el Ejecutivo, los reguladores, `
-      +`la consulta pública de normas, la contratación del Estado y la prensa. `
-      +`${D.nMov} señal${D.nMov===1?'':'es'} con movimiento, de ${D.nTotal} vigentes para este perfil, ordenadas por los `
-      +`cuatro rumbos de la Rosa de los Vientos.`,{size:9.5,color:[70,78,90],gap:8});
+    parrafo(briefBajada(D),{size:9.5,color:[70,78,90],gap:8});
     const hoy=new Date();
-    const desde=new Date(hoy.getTime()-D.dias*864e5);
-    const f=d=>d.toLocaleDateString('es-CO',{day:'numeric',month:'long'});
     doc.setDrawColor(214,219,226); doc.line(M,y,W-M,y); y+=12;
-    eyebrow(`Ventana ${f(desde)} a ${f(hoy)} de ${hoy.getFullYear()} · corte ${hoy.toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})} · Colombia`,GRIS,{size:7,gap:16});
+    eyebrow(briefVentana(D),GRIS,{size:7,gap:16});
 
     // ── LECTURA DEL ANALISTA ────────────────────────────────────────────
     const L=D.lectura||{};
@@ -1358,7 +1381,7 @@
       doc.setFont('helvetica','bold'); doc.setFontSize(8.6); doc.setTextColor(...TINTA);
       doc.text(nom,M,y);
       doc.setFont('helvetica','normal'); doc.setTextColor(...GRIS);
-      doc.splitTextToSize('Revisado en la ventana; sin novedad.',AN-172).forEach((l,i)=>{
+      doc.splitTextToSize(BRIEF_QUIETO,AN-172).forEach((l,i)=>{
         doc.text(l,M+172,y+i*12);
       });
       y+=20;
@@ -1367,7 +1390,7 @@
     doc.setFont('helvetica','bold'); doc.setFontSize(8.6); doc.setTextColor(...TINTA);
     doc.text('Congreso · fecha',M,y);
     doc.setFont('helvetica','normal'); doc.setTextColor(...GRIS);
-    doc.splitTextToSize('Los proyectos de ley no entran como movimiento: el índice guarda el año de radicación, no el día. Van en el radar completo de la plataforma.',AN-172).forEach((l,i)=>{ doc.text(l,M+172,y+i*12); });
+    doc.splitTextToSize(BRIEF_CONGRESO,AN-172).forEach((l,i)=>{ doc.text(l,M+172,y+i*12); });
     y+=32;
 
     // ── PIE METODOLÓGICO ────────────────────────────────────────────────
@@ -1382,11 +1405,9 @@
       ls.forEach((l,i)=>{ doc.text(l, i?M:M+w, y+i*10.5); });
       y+=ls.length*10.5+5;
     };
-    pie('Fuentes.','Registro de proyectos de ley del Senado y la Cámara; normativa de Presidencia; consulta pública de proyectos de norma del DNP (SUCOP); registro regulatorio de 12 fuentes; providencias de la Corte Constitucional; contratos y procesos del Estado (SECOP); prensa nacional y regional. Cada señal enlaza el acto o la nota que la respalda.');
-    pie('Ventana.',`Últimas ${D.dias*24} horas, con corte al momento de la descarga.`);
-    pie('Alcance.','Insumo de monitoreo. Análisis asistido por IA sobre datos oficiales; el criterio experto es del analista.');
+    briefPie(D).forEach(([lb,tx])=>pie(lb,tx));
     doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...GRIS);
-    doc.text('Caudal · módulo de inteligencia regulatoria de Cauce.',M,y);
+    doc.text(BRIEF_MARCA,M,y);
 
     // ── PAGINACIÓN (al final: solo ahora se sabe el total) ──────────────
     const tot=doc.internal.getNumberOfPages();
@@ -1396,18 +1417,294 @@
       doc.text(`${D.nombre} · brief de ${D.dias*24} h`,M,H-30);
       doc.text(`${i} / ${tot}`,W-M,H-30,{align:'right'});
     }
-    const slug=String(D.nombre).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
-      .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40)||'perfil';
-    doc.save(`caudal-brief-72h-${slug}-${hoy.toISOString().slice(0,10)}.pdf`);
+    doc.save(`caudal-brief-72h-${briefSlug(D)}-${hoy.toISOString().slice(0,10)}.pdf`);
     if(btn){ btn.disabled=false; btn.textContent=txtPrev; }
+  }
+
+  /* ── EL MISMO BRIEF, EN WORD ──────────────────────────────────────────
+     El PDF es el entregable: se manda tal cual y se ve igual en cualquier
+     pantalla. El .docx es la MATERIA PRIMA — el analista lo abre, corta lo que
+     no aplica, le suma lo que sabe del cliente y lo firma con su membrete.
+     Por eso no lo ve todo el mundo: quien paga Caudal recibe el documento
+     terminado, y el equipo de Cauce recibe además el borrador editable.
+
+     ⚠️ Es un gate de PRODUCTO, no de seguridad. El brief se arma entero en el
+     navegador con datos que ya están en pantalla, así que del otro lado no hay
+     nada que proteger: esconder el botón es exactamente lo que corresponde, y
+     presentarlo como un control de acceso sería engañarse.
+
+     ⚠️ Se escribe un .docx REAL (OOXML dentro de un zip), no un .html con
+     extensión .doc. Ese truco abre en Word pero avisa que «el formato no
+     coincide con la extensión», y un documento que el cliente de Cauce va a
+     reenviar con su nombre encima no puede abrir con una advertencia.
+
+     ⚠️ El zip va SIN COMPRIMIR (método 0, «stored»). Un brief son decenas de
+     KB: traerse un deflate al navegador para ahorrar 30 KB es peor negocio que
+     los 30 KB. El formato lo admite y Word lo abre igual. */
+  // Quién puede llevarse el borrador editable. NO es la lista EQUIPO de arriba
+  // —esa decide quién ve los prospectos con nombre— y no se fundieron a
+  // propósito: son dos permisos distintos, y mezclarlos haría que ampliar uno
+  // ampliara el otro sin que nadie lo note.
+  const BRIEF_EDITABLE=['reruizc@gmail.com','pablo@cauce.co','diego@cauce.co'];
+  function briefPuedeEditable(){
+    try{ const u=JSON.parse(localStorage.getItem('rr-user')||'null');
+      return !!(u && BRIEF_EDITABLE.includes(String(u.email||'').toLowerCase().trim()));
+    }catch(e){ return false; }
+  }
+
+  // ── zip mínimo (solo «stored») ────────────────────────────────────────
+  const _CRCTAB=(()=>{ const t=new Uint32Array(256);
+    for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c>>>0; }
+    return t; })();
+  function _crc32(b){ let c=0xFFFFFFFF;
+    for(let i=0;i<b.length;i++) c=_CRCTAB[(c^b[i])&0xFF]^(c>>>8);
+    return (c^0xFFFFFFFF)>>>0; }
+  // La fecha de los archivos va FIJA (1-ene-2026): con la del reloj, dos
+  // descargas del mismo brief darían archivos distintos byte a byte y dejarían
+  // de poder compararse. Word no la mira.
+  function zipStored(files){
+    const enc=new TextEncoder(), FECHA=23585, HORA=0, locales=[], central=[];
+    let off=0;
+    files.forEach(f=>{
+      const nom=enc.encode(f.nombre), dat=enc.encode(f.texto), crc=_crc32(dat);
+      const h=new Uint8Array(30+nom.length), v=new DataView(h.buffer);
+      v.setUint32(0,0x04034b50,true); v.setUint16(4,20,true);
+      v.setUint16(6,0x0800,true);            // bit 11: los nombres van en UTF-8
+      v.setUint16(8,0,true);                 // método 0 = sin comprimir
+      v.setUint16(10,HORA,true); v.setUint16(12,FECHA,true);
+      v.setUint32(14,crc,true); v.setUint32(18,dat.length,true); v.setUint32(22,dat.length,true);
+      v.setUint16(26,nom.length,true); v.setUint16(28,0,true);
+      h.set(nom,30);
+      const c=new Uint8Array(46+nom.length), w=new DataView(c.buffer);
+      w.setUint32(0,0x02014b50,true); w.setUint16(4,20,true); w.setUint16(6,20,true);
+      w.setUint16(8,0x0800,true); w.setUint16(10,0,true);
+      w.setUint16(12,HORA,true); w.setUint16(14,FECHA,true);
+      w.setUint32(16,crc,true); w.setUint32(20,dat.length,true); w.setUint32(24,dat.length,true);
+      w.setUint16(28,nom.length,true); w.setUint32(42,off,true);
+      c.set(nom,46);
+      locales.push(h,dat); central.push(c); off+=h.length+dat.length;
+    });
+    const largoCentral=central.reduce((a,x)=>a+x.length,0);
+    const fin=new Uint8Array(22), z=new DataView(fin.buffer);
+    z.setUint32(0,0x06054b50,true);
+    z.setUint16(8,files.length,true); z.setUint16(10,files.length,true);
+    z.setUint32(12,largoCentral,true); z.setUint32(16,off,true);
+    const todo=locales.concat(central,[fin]);
+    const out=new Uint8Array(todo.reduce((a,x)=>a+x.length,0));
+    let p=0; todo.forEach(x=>{ out.set(x,p); p+=x.length; });
+    return out;
+  }
+
+  // ── helpers de OOXML ──────────────────────────────────────────────────
+  // Los caracteres de control no son XML válido: un título con uno adentro
+  // —pasa con los títulos raspados— dejaría el .docx irreparable en Word.
+  const wEsc=s=>String(s==null?'':s)
+    .replace(/[ --]/g,'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const W_NS='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+           + 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  /* Tamaños en medios puntos (sz) y espaciados en veinteavos de punto (twips).
+     ⚠️ El ORDEN de los hijos de w:rPr y w:pPr no es decorativo: el esquema de
+     OOXML lo fija (b, caps, color, spacing, sz, u · y pBdr, tabs, spacing, ind)
+     y Word puede declarar el documento ilegible si llegan en otro orden. */
+  function wRun(txt,o){
+    o=o||{}; const p=[];
+    if(o.b) p.push('<w:b/>');
+    if(o.caps) p.push('<w:caps/>');
+    if(o.color) p.push(`<w:color w:val="${o.color}"/>`);
+    if(o.letra) p.push(`<w:spacing w:val="${o.letra}"/>`);
+    if(o.size) p.push(`<w:sz w:val="${o.size}"/><w:szCs w:val="${o.size}"/>`);
+    if(o.u) p.push('<w:u w:val="single"/>');
+    return `<w:r>${p.length?`<w:rPr>${p.join('')}</w:rPr>`:''}`
+         + `<w:t xml:space="preserve">${wEsc(txt)}</w:t></w:r>`;
+  }
+  function wPar(cont,o){
+    o=o||{}; const p=[];
+    if(o.linea) p.push('<w:pBdr><w:bottom w:val="single" w:sz="4" w:space="4" w:color="D6DBE2"/></w:pBdr>');
+    if(o.tab) p.push(`<w:tabs><w:tab w:val="right" w:pos="${o.tab}"/></w:tabs>`);
+    if(o.before!=null||o.after!=null)
+      p.push(`<w:spacing${o.before!=null?` w:before="${o.before}"`:''}${o.after!=null?` w:after="${o.after}"`:''}/>`);
+    if(o.ind) p.push(`<w:ind w:left="${o.ind}"/>`);
+    return `<w:p>${p.length?`<w:pPr>${p.join('')}</w:pPr>`:''}${cont||''}</w:p>`;
+  }
+  const wTxt=(t,o)=>wPar(wRun(t,o),o);
+  // Las cajas del PDF (fondo + barra lateral de color) se hacen con una tabla
+  // de una celda: encadenar párrafos sombreados deja franjas blancas en los
+  // espacios entre uno y otro, que es justo lo que no se quiere.
+  function wCaja(cuerpo,o){
+    o=o||{};
+    return '<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>'
+      + (o.barra?`<w:tblBorders><w:left w:val="single" w:sz="18" w:space="0" w:color="${o.barra}"/></w:tblBorders>`:'')
+      + '<w:tblCellMar><w:top w:w="160" w:type="dxa"/><w:left w:w="200" w:type="dxa"/>'
+      + '<w:bottom w:w="160" w:type="dxa"/><w:right w:w="200" w:type="dxa"/></w:tblCellMar>'
+      + '</w:tblPr><w:tblGrid><w:gridCol w:w="10160"/></w:tblGrid>'
+      + '<w:tr><w:tc><w:tcPr><w:tcW w:w="5000" w:type="pct"/>'
+      + (o.fondo?`<w:shd w:val="clear" w:color="auto" w:fill="${o.fondo}"/>`:'')
+      + `</w:tcPr>${cuerpo}</w:tc></w:tr></w:tbl>`;
+  }
+
+  /* Arma el .docx con el MISMO contenido y el mismo orden del PDF. Si uno de
+     los dos cambia de estructura, el otro tiene que cambiar con él: son el
+     mismo documento en dos formatos, no dos informes distintos. */
+  function briefDocxBytes(D){
+    const L=D.lectura||{}, plan=(L.plan&&L.plan.length)?L.plan:[];
+    const AZUL='3D6EB8', TINTA='1A2028', GRIS='6E7885', PROSA='464E5A';
+    const ACENTO={norte:'B07C20', este:'3D6EB8', sur:'963A34', oeste:'2E654E'};
+    const rels=[], O=[];
+    const enlace=(txt,url)=>{
+      const id='rIdL'+(rels.length+1);
+      rels.push(`<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${wEsc(url)}" TargetMode="External"/>`);
+      return `<w:hyperlink r:id="${id}">${wRun(txt,{size:16,color:AZUL,u:1})}</w:hyperlink>`;
+    };
+    const rotulo=(t,col,o)=>wTxt(t,Object.assign({b:1,size:14,color:col||GRIS,caps:1,letra:14},o||{}));
+
+    // titular y bajada
+    const tit=L.titular||`Lo que se movió en ${D.nombre} en las últimas ${D.dias*24} horas`;
+    O.push(wTxt(tit,{b:1,size:38,color:TINTA,after:140}));
+    O.push(wTxt(briefBajada(D),{size:19,color:PROSA,after:160}));
+    O.push(wPar('',{linea:1,after:120}));
+    O.push(rotulo(briefVentana(D),GRIS,{after:240}));
+
+    // la lectura del analista
+    if(L.titular||L.lo_que_importa||plan.length){
+      const uno=plan[0]||null, c=[];
+      c.push(rotulo('La lectura del analista',AZUL,{after:100}));
+      if(L.lo_que_importa) c.push(wTxt(L.lo_que_importa,{size:19,color:TINTA,after:uno?160:0}));
+      if(uno){
+        c.push(rotulo('Si solo hay tiempo para una cosa',AZUL,{size:13,after:70}));
+        c.push(wTxt(`${uno.accion||''}${uno.por_que?' '+uno.por_que:''}`,{size:18,color:TINTA,after:0}));
+      }
+      O.push(wCaja(c.join(''),{barra:AZUL,fondo:'F3F4FA'}));
+      O.push(wTxt('',{size:12,after:0}));   // Word exige un párrafo entre dos tablas
+    }
+
+    // los cuatro rumbos
+    let nSec=0;
+    BRIEF_CARD.forEach(([k,nom])=>{
+      const lista=D.porCard[k]||[], txt=(L[k]||'').trim();
+      if(!lista.length && !txt) return;     // los quietos van al bloque final
+      nSec++;
+      const col=ACENTO[k]||AZUL, c=[];
+      c.push(rotulo(`${String(nSec).padStart(2,'0')} · ${nom} · ${lista.length?`${lista.length} en ${D.dias*24} h`:'sin movimiento'}`,col,{after:110}));
+      if(txt) c.push(wTxt(txt,{b:1,size:19,color:TINTA,after:160}));
+      lista.forEach((x,i)=>{
+        const s=briefSenalTexto(x), ultima=i===lista.length-1;
+        c.push(wTxt(s.tit,{b:1,size:19,color:TINTA,after:40}));
+        if(s.meta) c.push(wTxt(s.meta,{size:15,color:GRIS,after:40}));
+        if(s.accion) c.push(wTxt(s.accion,{size:17,color:PROSA,after:40}));
+        if(s.url&&s.enlace) c.push(wPar(enlace(s.enlace,s.url),{after:ultima?0:180}));
+        else if(!ultima) c.push(wTxt('',{size:2,after:100}));
+      });
+      O.push(wCaja(c.join(''),{barra:col,fondo:'FAF9F6'}));
+      O.push(wTxt('',{size:12,after:0}));
+    });
+
+    // plan de acción
+    if(plan.length>1){
+      O.push(wPar('',{linea:1,after:140}));
+      O.push(rotulo('Plan de acción',AZUL,{after:140}));
+      plan.forEach((p,i)=>{
+        O.push(wTxt(`${i+1}. ${p.accion||''}`,{b:1,size:20,color:TINTA,after:50}));
+        if(p.por_que) O.push(wTxt(p.por_que,{size:18,color:TINTA,ind:320,after:40}));
+        const m=[p.plazo,p.responsable].filter(Boolean).join(' · ');
+        if(m) O.push(wTxt(m,{size:16,color:GRIS,ind:320,after:40}));
+        if(p.preparar) O.push(wTxt('Preparar: '+p.preparar,{size:17,color:PROSA,ind:320,after:160}));
+      });
+    }
+
+    // qué no se movió — el bloque que separa un informe de un listado
+    O.push(wPar('',{linea:1,after:140}));
+    O.push(rotulo('Qué no se movió — verificado, no asumido',TINTA,{after:140}));
+    BRIEF_CARD.filter(([k])=>!(D.porCard[k]||[]).length).forEach(([,nom])=>{
+      O.push(wPar(wRun(nom+' · ',{b:1,size:17,color:TINTA})+wRun(BRIEF_QUIETO,{size:17,color:GRIS}),{after:60}));
+    });
+    O.push(wPar(wRun('Congreso · fecha · ',{b:1,size:17,color:TINTA})+wRun(BRIEF_CONGRESO,{size:17,color:GRIS}),{after:240}));
+
+    // pie metodológico
+    O.push(wPar('',{linea:1,after:120}));
+    briefPie(D).forEach(([lb,tx])=>{
+      O.push(wPar(wRun(lb+' ',{b:1,size:16,color:TINTA})+wRun(tx,{size:16,color:GRIS}),{after:80}));
+    });
+    O.push(wTxt(BRIEF_MARCA,{size:15,color:GRIS,after:0}));
+
+    const sect='<w:sectPr>'
+      + '<w:headerReference w:type="default" r:id="rIdHdr"/>'
+      + '<w:footerReference w:type="default" r:id="rIdFtr"/>'
+      + '<w:pgSz w:w="12240" w:h="15840"/>'
+      + '<w:pgMar w:top="1500" w:right="1040" w:bottom="1100" w:left="1040" w:header="620" w:footer="560" w:gutter="0"/>'
+      + '</w:sectPr>';
+    const XML='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    const doc=`${XML}<w:document ${W_NS}><w:body>${O.join('')}${sect}</w:body></w:document>`;
+    const hdr=`${XML}<w:hdr ${W_NS}>`
+      + wPar(wRun('CAUDAL × CAUCE',{b:1,size:24,color:TINTA})
+            +'<w:r><w:tab/></w:r>'
+            +wRun(`Brief de 72 horas · ${D.cabecera}`,{size:14,color:GRIS,caps:1,letra:10}),
+            {tab:10160,linea:1,after:60})
+      + '</w:hdr>';
+    const pg=n=>`<w:fldSimple w:instr=" ${n} ">${wRun('1',{size:14,color:GRIS})}</w:fldSimple>`;
+    const ftr=`${XML}<w:ftr ${W_NS}>`
+      + wPar(wRun(`${D.nombre} · brief de ${D.dias*24} h`,{size:14,color:GRIS})
+            +'<w:r><w:tab/></w:r>'+pg('PAGE')+wRun(' / ',{size:14,color:GRIS})+pg('NUMPAGES'),
+            {tab:10160,after:0})
+      + '</w:ftr>';
+    // Arial y no Helvetica: es la que existe en Windows, en Mac y en Google
+    // Docs. Poner una fuente que el lector no tenga la sustituye sin avisar, y
+    // el documento le llega al cliente con otra tipografía.
+    const styles=`${XML}<w:styles ${W_NS}><w:docDefaults>`
+      + '<w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>'
+      + '<w:sz w:val="19"/><w:szCs w:val="19"/></w:rPr></w:rPrDefault>'
+      + '<w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault>'
+      + '</w:docDefaults></w:styles>';
+    const R='http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
+    return zipStored([
+      {nombre:'[Content_Types].xml', texto:`${XML}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">`
+        + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        + '<Default Extension="xml" ContentType="application/xml"/>'
+        + '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        + '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
+        + '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>'
+        + '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>'
+        + '</Types>'},
+      {nombre:'_rels/.rels', texto:`${XML}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`
+        + `<Relationship Id="rId1" Type="${R}officeDocument" Target="word/document.xml"/></Relationships>`},
+      {nombre:'word/document.xml', texto:doc},
+      {nombre:'word/styles.xml', texto:styles},
+      {nombre:'word/header1.xml', texto:hdr},
+      {nombre:'word/footer1.xml', texto:ftr},
+      {nombre:'word/_rels/document.xml.rels', texto:`${XML}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`
+        + `<Relationship Id="rIdSty" Type="${R}styles" Target="styles.xml"/>`
+        + `<Relationship Id="rIdHdr" Type="${R}header" Target="header1.xml"/>`
+        + `<Relationship Id="rIdFtr" Type="${R}footer" Target="footer1.xml"/>`
+        + rels.join('') + '</Relationships>'}
+    ]);
+  }
+
+  function briefDescargarWord(){
+    const btn=document.getElementById('cli-brief-word');
+    const D=briefDatos(); if(!D) return;
+    const prev=btn?btn.textContent:'';
+    if(btn){ btn.disabled=true; btn.textContent='Armando el borrador…'; }
+    try{
+      const bytes=briefDocxBytes(D);
+      const url=URL.createObjectURL(new Blob([bytes],
+        {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+      const a=document.createElement('a');
+      a.href=url; a.download=`caudal-brief-72h-${briefSlug(D)}-${new Date().toISOString().slice(0,10)}.docx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),4000);
+    }catch(e){ alert('No se pudo armar el documento de Word. Reintenta.'); }
+    if(btn){ btn.disabled=false; btn.textContent=prev; }
   }
   function briefWire(){
     const bar=document.getElementById('cli-brief-bar'), btn=document.getElementById('cli-brief-btn'),
+          word=document.getElementById('cli-brief-word'),
           nota=document.getElementById('cli-brief-nota');
     if(!bar||!btn) return;
     const D=briefDatos(); if(!D) return;
     bar.hidden=false;
     btn.onclick=briefDescargar;
+    // El .docx solo para el equipo que reescribe el brief antes de mandarlo.
+    if(word){ word.hidden=!briefPuedeEditable(); word.onclick=briefDescargarWord; }
     nota.textContent=D.nMov
       ? `${D.nMov} señal${D.nMov===1?'':'es'} con movimiento en ${D.dias*24} h · el resto queda en el radar`
       : `Sin movimiento en ${D.dias*24} h — el brief lo dice y trae el estado de los cuatro rumbos`;
