@@ -14,13 +14,32 @@
 
 export const PERFIL = {
   candidato: 'JAL · Tunjuelito · Bogotá D.C.',
-  temas: ['seguridad en el comercio', 'parque de la 45'],
+  /* Los dos temas de la agenda REAL de la localidad, no ejemplos: el hurto al
+     comercio (131 casos en 2023, según la Secretaría de Seguridad, sobre 2.713
+     hurtos a personas) y el río Tunjuelo, que se desborda cada invierno. Son
+     el punto de partida; los del candidato se ponen con --temas y sin tocar
+     este archivo. */
+  temas: ['hurto al comercio', 'río Tunjuelo'],
   ciudad: 'Bogotá',
   localidad: 'Tunjuelito',
-  cuentas: { x: 'ricardoruizco', instagram: 'ricardoruizco', tiktok: 'ricardoruizco', facebook: 'ricardoruizco' },
+  cuentas: { x: '', instagram: '', tiktok: '', facebook: '' },
   corridasDia: 2,
   dias: 30,
 };
+
+/* Overrides por bandera, para no editar código cada vez que cambia un tema:
+     --temas="hurto al comercio|Portal Tunal"   --localidad=Kennedy
+     --paginas="https://facebook.com/a|https://facebook.com/b"                */
+export function perfilDesde(args = {}) {
+  const partes = v => String(v).split('|').map(x => x.trim()).filter(Boolean);
+  const p = { ...PERFIL };
+  if (args.temas) p.temas = partes(args.temas);
+  if (args.ciudad) p.ciudad = String(args.ciudad);
+  if (args.localidad) p.localidad = String(args.localidad);
+  if (args.candidato) p.candidato = String(args.candidato);
+  if (args.paginas) p.paginas = partes(args.paginas);
+  return p;
+}
 
 /* Cuántos resultados se piden por consulta. ESTA es la palanca del costo:
    Apify cobra por resultado entregado, así que el gasto es
@@ -52,15 +71,19 @@ export const REDES = {
   facebook: {
     etiqueta: 'Facebook', modo: 'páginas seguidas', tope: 15, propio: 10,
     actor: 'apify/facebook-posts-scraper',
-    /* Facebook no busca por palabra: se siguen páginas. Estas son las del
-       territorio, y son las que hay que revisar antes de medir. */
-    consultas: () => [
-      'https://www.facebook.com/AlcaldiaTunjuelito',
-      'https://www.facebook.com/Bogota',
+    /* Facebook no busca por palabra: se siguen páginas. Estos seis handles
+       están comprobados uno por uno (sep-2026) porque una URL inventada NO
+       falla: el actor corre, no encuentra nada y cobra igual. Cuatro de los
+       seis que se pusieron de memoria la primera vez estaban mal —era
+       «Bogota» y no «AlcaldiaBogota», «CanalCapital» y no
+       «CanalCapitalOficial»—, así que acá no se adivina ninguno. */
+    consultas: p => p?.paginas?.length ? p.paginas : [
+      'https://www.facebook.com/AlcaldiaLocalTunjuelito',   /* la alcaldía de SU localidad */
+      'https://www.facebook.com/LocalidadTujuelito',        /* el handle trae el error de tipeo de ellos */
+      'https://www.facebook.com/AlcaldiaBogota',
       'https://www.facebook.com/ConcejoDeBogota',
-      'https://www.facebook.com/CanalCapital',
-      'https://www.facebook.com/BogotaTransMilenio',
-      'https://www.facebook.com/SecretariaGobiernoBogota',
+      'https://www.facebook.com/CanalCapitalOficial',
+      'https://www.facebook.com/TransMilenio',
     ],
     input: (qs, tope) => ({ startUrls: qs.map(url => ({ url })), resultsLimit: tope }),
     campoTexto: 'text',

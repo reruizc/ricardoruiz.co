@@ -23,10 +23,10 @@
    La primera vez conviene `--tope=10`: mide el precio por resultado igual y
    gasta una décima parte. Los topes de producción viven en perfil.mjs.       */
 
-import { writeFile } from 'node:fs/promises';
+import { writeFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PERFIL, REDES, plan } from './perfil.mjs';
+import { REDES, plan, perfilDesde } from './perfil.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const API = 'https://api.apify.com/v2';
@@ -36,8 +36,27 @@ const TOPE = args.tope ? Number(args.tope) : null;      /* null = el de perfil.m
 const SOLO = args.red ? String(args.red).split(',') : null;
 const ESPERA_MAX = Number(args.espera || 300) * 1000;   /* 5 minutos por actor */
 
-const TOKEN = process.env.APIFY_TOKEN;
-if (GASTAR && !TOKEN) { console.error('Falta APIFY_TOKEN en el entorno. `export APIFY_TOKEN=...` — nunca lo escriba en el repo.'); process.exit(1); }
+const PERFIL = perfilDesde(args);
+
+/* El token sale del entorno o de un .env en la raíz del repo, que ya está en
+   .gitignore. Nunca se imprime: un token en la consola termina en un
+   pantallazo, y un pantallazo termina en un chat. */
+async function tokenDeEnv() {
+  try {
+    const txt = await readFile(path.join(AQUI, '..', '..', '..', '.env'), 'utf8');
+    return (txt.match(/^\s*APIFY_TOKEN\s*=\s*["']?([^"'\s#]+)/m) || [])[1] || null;
+  } catch { return null; }
+}
+const TOKEN = process.env.APIFY_TOKEN || await tokenDeEnv();
+if (GASTAR && !TOKEN) {
+  console.error(`\nFalta el token de Apify. Dos formas, las dos en SU terminal (nunca en el repo ni en un chat):
+
+  1) para esta sesión:      export APIFY_TOKEN=apify_api_xxx
+  2) para que quede puesto:  echo 'APIFY_TOKEN=apify_api_xxx' >> .env      (.env ya está en .gitignore)
+
+El token se saca en Apify → Settings → API & Integrations → Personal API token.\n`);
+  process.exit(1);
+}
 
 const usd = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 const pad = (s, n, d = 'izq') => d === 'izq' ? String(s).padEnd(n) : String(s).padStart(n);
@@ -96,9 +115,19 @@ for (const f of filas) {
 }
 
 if (!GASTAR) {
+  /* Lo que de verdad se va a preguntar, palabra por palabra. Una URL de
+     Facebook mal escrita NO falla: el actor corre, no encuentra nada y cobra
+     igual. Por eso se leen antes de gastar y no después. */
+  console.log('\nLas consultas, tal como saldrían:');
+  for (const f of filas) {
+    console.log(`\n  ${f.etiqueta} · ${f.modo}`);
+    for (const q of f.consultas) console.log(`    ${q}`);
+  }
   console.log(`\nEnsayo: no se llamó a Apify y no se gastó un peso.`);
-  console.log(`Para medir de verdad:  APIFY_TOKEN=... node ${path.relative(process.cwd(), fileURLToPath(import.meta.url))} --gastar --tope=10`);
-  console.log(`Revise antes las páginas de Facebook en perfil.mjs: si una no existe, ese actor cobra por nada.\n`);
+  console.log(`\n  Cambiar los temas sin tocar código:`);
+  console.log(`    node ${path.relative(process.cwd(), fileURLToPath(import.meta.url))} --temas="hurto al comercio|Portal Tunal"`);
+  console.log(`\n  Medir de verdad (empiece por --tope=10: mide igual y gasta la décima parte):`);
+  console.log(`    node ${path.relative(process.cwd(), fileURLToPath(import.meta.url))} --gastar --tope=10\n`);
   process.exit(0);
 }
 

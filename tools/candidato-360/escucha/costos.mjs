@@ -15,10 +15,11 @@
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PERFIL, PRECIOS_REFERENCIA, plan } from './perfil.mjs';
+import { PRECIOS_REFERENCIA, plan, perfilDesde } from './perfil.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const args = Object.fromEntries(process.argv.slice(2).map(a => { const m = a.match(/^--([^=]+)=(.*)$/); return m ? [m[1], Number(m[2])] : [a.replace(/^--/, ''), true]; }));
+const PERFIL = perfilDesde(args);
 const TRM = args.trm || 3109.30;                          /* Banco de la República · 15-sep-2026 */
 const CORRIDAS_DIA = args.corridas || PERFIL.corridasDia;
 const DIAS = args.dias || PERFIL.dias;
