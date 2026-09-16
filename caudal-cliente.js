@@ -925,6 +925,7 @@
         <b>cómo va cada frente</b>, se haya movido o no — el registro que un equipo
         suele llevar a mano en un Excel y que se desactualiza solo.</div>
       <div id="cli-tablero"><button class="tb-btn" id="tb-load">Abrir el expediente →</button></div>`;
+    briefFableCargar();
   }
 
   // ── EXPEDIENTE DEL CLIENTE ───────────────────────────────────────────────
@@ -1716,16 +1717,65 @@
     }catch(e){ alert('No se pudo armar el documento de Word. Reintenta.'); }
     if(btn){ btn.disabled=false; btn.textContent=prev; }
   }
+  /* ── EL BRIEF DE FABLE ────────────────────────────────────────────────────
+     Si el perfil tiene brief publicado (tools/caudal/brief/publicar_brief.py,
+     lunes y jueves), el botón entrega ESE documento —escrito con Claude Fable
+     5.1 sobre el barrido completo, con redes— y no el que se arma aquí con la
+     lectura del radar. Si no tiene, todo sigue como antes: el brief de 72 h se
+     compone en el navegador.
+     ⚠️ Los enlaces firmados duran 15 minutos, así que se piden de nuevo al hacer
+     clic: el que llegó al cargar el radar puede estar vencido si la pestaña
+     quedó abierta.
+     ⚠️ `_BRIEF_FABLE.perfilId` se compara contra el perfil activo: cambiar de
+     cliente mientras la respuesta viaja no puede dejar el brief de otro. */
+  let _BRIEF_FABLE=null, _briefFableSeq=0;
+  const BRIEF_BTN_TXT={pdf:'↓ Brief de 72 horas (.pdf)', docx:'↓ Borrador editable (.docx)'};
+  const briefFechaLarga=f=>{ try{ const [a,m,d]=String(f).slice(0,10).split('-').map(Number);
+    return new Date(a,m-1,d).toLocaleDateString('es-CO',{day:'numeric',month:'long'}); }catch(e){ return f||''; } };
+  async function briefFableCargar(){
+    const pid=PF_ACTIVE&&PF_ACTIVE.perfilId, mine=++_briefFableSeq;
+    _BRIEF_FABLE=null;
+    if(!pid||IS_GUEST) return;
+    let r=null;
+    try{ r=await call({action:'brief-perfil',perfilId:pid}); }catch(e){ r=null; }
+    if(mine!==_briefFableSeq||!PF_ACTIVE||PF_ACTIVE.perfilId!==pid) return;
+    _BRIEF_FABLE=(r&&r.disponible&&r.pdf)?Object.assign({perfilId:pid},r):null;
+    if(_BRIEF_FABLE) briefWire();
+  }
+  async function briefFableBajar(tipo){
+    const btn=document.getElementById(tipo==='docx'?'cli-brief-word':'cli-brief-btn');
+    const pid=_BRIEF_FABLE&&_BRIEF_FABLE.perfilId; if(!pid) return;
+    const prev=btn?btn.textContent:'';
+    if(btn){ btn.disabled=true; btn.textContent='Preparando la descarga…'; }
+    try{
+      const r=await call({action:'brief-perfil',perfilId:pid});
+      const url=r&&r.disponible&&r[tipo];
+      if(!url) throw new Error('sin enlace');
+      window.location.href=url;
+    }catch(e){ alert('No se pudo descargar el brief. Reintenta en un momento.'); }
+    if(btn){ btn.disabled=false; btn.textContent=prev; }
+  }
   function briefWire(){
     const bar=document.getElementById('cli-brief-bar'), btn=document.getElementById('cli-brief-btn'),
           word=document.getElementById('cli-brief-word'),
           nota=document.getElementById('cli-brief-nota');
     if(!bar||!btn) return;
+    const F=(_BRIEF_FABLE&&PF_ACTIVE&&_BRIEF_FABLE.perfilId===PF_ACTIVE.perfilId)?_BRIEF_FABLE:null;
+    if(F){
+      bar.hidden=false;
+      const dia=briefFechaLarga(F.fecha);
+      btn.textContent=`↓ Brief del ${dia} (.pdf)`;
+      btn.onclick=()=>briefFableBajar('pdf');
+      if(word){ word.hidden=!briefPuedeEditable()||!F.docx; word.textContent=`↓ Borrador editable del ${dia} (.docx)`; word.onclick=()=>briefFableBajar('docx'); }
+      nota.textContent=`Escrito con Claude Fable 5.1 sobre Congreso, Estado, prensa y redes · corte ${dia}${F.corte?' '+F.corte:''} · se renueva lunes y jueves`;
+      return;
+    }
     const D=briefDatos(); if(!D) return;
     bar.hidden=false;
+    btn.textContent=BRIEF_BTN_TXT.pdf;
     btn.onclick=briefDescargar;
     // El .docx solo para el equipo que reescribe el brief antes de mandarlo.
-    if(word){ word.hidden=!briefPuedeEditable(); word.onclick=briefDescargarWord; }
+    if(word){ word.hidden=!briefPuedeEditable(); word.textContent=BRIEF_BTN_TXT.docx; word.onclick=briefDescargarWord; }
     nota.textContent=D.nMov
       ? `${D.nMov} señal${D.nMov===1?'':'es'} con movimiento en ${D.dias*24} h · el resto queda en el radar`
       : `Sin movimiento en ${D.dias*24} h — el brief lo dice y trae el estado de los cuatro rumbos`;

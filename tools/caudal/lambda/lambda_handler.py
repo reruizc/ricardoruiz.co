@@ -2952,6 +2952,45 @@ def _redes_para_perfil(s):
     return out, meta
 
 
+# ── El brief de Fable para el botón de la Rosa ─────────────────────────────
+# Lo genera y publica tools/caudal/brief/publicar_brief.py (lunes y jueves) en
+# metadata/briefs/. Acá solo se entrega: `index.json` dice qué brief le toca a
+# cada perfil y se responde con enlaces firmados de vida corta. El id del perfil
+# es aleatorio y solo lo tiene el navegador de su dueño; además la acción está en
+# ACCIONES_CARAS, así que sin acceso a Caudal ni siquiera se llega hasta acá.
+_BRIEF_INDEX = {'t': 0, 'd': None}
+BRIEF_INDEX_TTL = 300
+
+
+def _brief_index():
+    if _BRIEF_INDEX['d'] is None or _time.time() - _BRIEF_INDEX['t'] > BRIEF_INDEX_TTL:
+        try:
+            _BRIEF_INDEX['d'] = _get_json('metadata/briefs/index.json')
+        except Exception:
+            _BRIEF_INDEX['d'] = {'perfiles': {}}
+        _BRIEF_INDEX['t'] = _time.time()
+    return _BRIEF_INDEX['d']
+
+
+def _brief_perfil(body):
+    pid = str(body.get('perfilId') or '')
+    if not re.match(r'^[a-f0-9]{8,32}$', pid):
+        return {'ok': True, 'disponible': False}
+    e = (_brief_index().get('perfiles') or {}).get(pid)
+    if not e or not e.get('pdf'):
+        return {'ok': True, 'disponible': False}
+    nombre = e['pdf'].rsplit('/', 1)[-1]
+    out = {'ok': True, 'disponible': True, 'cliente': e.get('cliente'), 'fecha': e.get('fecha'),
+           'corte': e.get('corte'), 'generado': e.get('generado'), 'modelo': e.get('modelo'),
+           'titular': e.get('titular'),
+           'pdf': _presign(f"metadata/briefs/{e['pdf']}", nombre, expires=900)}
+    if e.get('docx'):
+        out['docx'] = _presign(f"metadata/briefs/{e['docx']}", e['docx'].rsplit('/', 1)[-1], expires=900)
+    if not out['pdf']:
+        return {'ok': True, 'disponible': False}
+    return out
+
+
 def _lectura_cliente_key(s, kpis):
     """Firma de la lectura: mismo perfil + mismo radar = misma lectura.
 
@@ -4153,7 +4192,9 @@ def _buscar_agregados(hits):
                 embudo[i] += 1
     return {'n_total': len(hits), 'por_res': por_res, 'embudo': embudo}
 
-ACCIONES_CARAS = frozenset({'gaceta', 'contexto', 'cliente-lectura', 'tema-lectura', 'respuesta-lectura'})
+ACCIONES_CARAS = frozenset({'gaceta', 'contexto', 'cliente-lectura', 'tema-lectura', 'respuesta-lectura',
+                            # el brief de Fable es entregable pagado: solo con acceso
+                            'brief-perfil'})
 
 
 def _con_credencial(event):
@@ -5316,6 +5357,9 @@ def handler(event, context):
                 _cache_put('cliente-in-' + lkey,
                            {'user': _lectura_cliente_prompt(s, senales, kpis)})
         return _resp(200, out)
+
+    if action == 'brief-perfil':
+        return _resp(200, _brief_perfil(body))
 
     if action == 'cliente-lectura':
         # el briefing del radar, aparte. Dos modos:
