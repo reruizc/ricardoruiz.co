@@ -15,14 +15,18 @@
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PRECIOS_REFERENCIA, plan, perfilDesde } from './perfil.mjs';
+import { PRECIOS_REFERENCIA, plan, perfilDeVinculo, cargarVinculo } from './perfil.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
-const args = Object.fromEntries(process.argv.slice(2).map(a => { const m = a.match(/^--([^=]+)=(.*)$/); return m ? [m[1], Number(m[2])] : [a.replace(/^--/, ''), true]; }));
-const PERFIL = perfilDesde(args);
-const TRM = args.trm || 3109.30;                          /* Banco de la República · 15-sep-2026 */
-const CORRIDAS_DIA = args.corridas || PERFIL.corridasDia;
-const DIAS = args.dias || PERFIL.dias;
+/* Las banderas se guardan como texto; lo numérico se convierte donde se usa.
+   Convertir todo a número hacía que --temas="a|b" llegara como NaN y se
+   ignorara sin avisar. */
+const args = Object.fromEntries(process.argv.slice(2).map(a => { const m = a.match(/^--([^=]+)=(.*)$/); return m ? [m[1], m[2]] : [a.replace(/^--/, ''), true]; }));
+const { vinculo, ruta: rutaVinculo, esEjemplo } = cargarVinculo(args);
+const PERFIL = perfilDeVinculo(vinculo, args);
+const TRM = Number(args.trm) || 3109.30;                          /* Banco de la República · 15-sep-2026 */
+const CORRIDAS_DIA = Number(args.corridas) || PERFIL.corridasDia;
+const DIAS = Number(args.dias) || PERFIL.dias;
 const CORRIDAS = CORRIDAS_DIA * DIAS;
 
 /* DeepSeek V4 Flash, tarifa FUERA DE PICO (US$ por millón de tokens). El pico
@@ -55,7 +59,9 @@ const costoModelo = (itemsMes * MODELO.tokensPorItem) / 1e6 * MODELO.entrada
   + (MODELO.salidaPorCorrida * CORRIDAS) / 1e6 * MODELO.salida;
 
 console.log(`\n═══ ESCUCHA SOCIAL · costo por candidato y mes ═══`);
-console.log(`${PERFIL.candidato} · ${PERFIL.temas.length} temas · ${PERFIL.ciudad} + ${PERFIL.localidad} · ${CORRIDAS_DIA} lecturas/día × ${DIAS} días = ${CORRIDAS} corridas`);
+console.log(`${PERFIL.candidato} · ${PERFIL.temas.length} temas · ${PERFIL.escalas.join(' + ')} · ${CORRIDAS_DIA} lecturas/día × ${DIAS} días = ${CORRIDAS} corridas`);
+if (esEjemplo) console.log(`Vínculo de EJEMPLO (${path.relative(process.cwd(), rutaVinculo)}); para un candidato real, --vinculo=su-vinculo.json`);
+for (const f of plan(PERFIL).filter(f => f.motivo)) console.log(`  · ${f.etiqueta} no cuenta: ${f.motivo}`);
 console.log(hayMedidos
   ? `Precios MEDIDOS contra Apify (${Object.keys(MEDIDOS).join(', ')}); el resto, de referencia.\n`
   : `⚠ Precios DE REFERENCIA (páginas de terceros, sep-2026). Corra medir.mjs antes de fijar tarifa.\n`);

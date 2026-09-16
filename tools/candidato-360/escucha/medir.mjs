@@ -26,7 +26,7 @@
 import { writeFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { REDES, plan, perfilDesde } from './perfil.mjs';
+import { REDES, plan, perfilDeVinculo, cargarVinculo } from './perfil.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const API = 'https://api.apify.com/v2';
@@ -36,7 +36,11 @@ const TOPE = args.tope ? Number(args.tope) : null;      /* null = el de perfil.m
 const SOLO = args.red ? String(args.red).split(',') : null;
 const ESPERA_MAX = Number(args.espera || 300) * 1000;   /* 5 minutos por actor */
 
-const PERFIL = perfilDesde(args);
+/* El perfil sale del vínculo: el de --vinculo=archivo.json (la respuesta de
+   /c360/me → vinculo, o el mismo JSON que guarda el worker) o, sin él, el de
+   ejemplo. --temas y --paginas siguen sirviendo para probar sin editar nada. */
+const { vinculo, ruta: rutaVinculo, esEjemplo } = cargarVinculo(args);
+const PERFIL = perfilDeVinculo(vinculo, args);
 
 /* El token sale del entorno o de un .env en la raíz del repo, que ya está en
    .gitignore. Nunca se imprime: un token en la consola termina en un
@@ -104,9 +108,13 @@ async function correr(red, entrada) {
 }
 
 /* ── Lo que se va a correr ────────────────────────────────────────────────── */
-const filas = plan(PERFIL).filter(f => !SOLO || SOLO.includes(f.red));
+const todas = plan(PERFIL), filas = todas.filter(f => !f.motivo && (!SOLO || SOLO.includes(f.red)));
 console.log(`\n═══ MEDICIÓN · ${PERFIL.candidato} ═══`);
-console.log(`Temas: ${PERFIL.temas.map(t => `«${t}»`).join(' · ')}   Escalas: ${PERFIL.ciudad} y ${PERFIL.localidad}\n`);
+console.log(esEjemplo ? `Vínculo de EJEMPLO (${path.relative(process.cwd(), rutaVinculo)}). Para medir a un candidato real: --vinculo=su-vinculo.json`
+                      : `Vínculo: ${path.relative(process.cwd(), rutaVinculo)}`);
+console.log(`Temas: ${PERFIL.temas.length ? PERFIL.temas.map(t => `«${t}»`).join(' · ') : '— (el candidato no los ha escrito)'}   Escalas: ${PERFIL.escalas.join(' y ')}`);
+for (const f of todas.filter(f => f.motivo)) console.log(`  · ${f.etiqueta} no se mide: ${f.motivo}`);
+console.log('');
 console.log(pad('RED', 11) + pad('ACTOR', 58) + pad('CONS.', 7, 'der') + pad('TOPE', 6, 'der') + pad('PEDIDOS', 9, 'der'));
 console.log('─'.repeat(91));
 for (const f of filas) {
