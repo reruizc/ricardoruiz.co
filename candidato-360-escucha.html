@@ -60,6 +60,32 @@
 .captura p{margin:0 0 10px;font-size:13.5px;line-height:1.55;color:var(--muted)}
 .captura ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.6;color:var(--muted)}
 .captura ul b{color:var(--ink)}
+/* La captura encendida: una tarjeta por red, con estado propio. */
+.captura.viva{border-style:solid}
+.captura-cab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.captura-cab small{font:500 11px var(--mono);color:var(--muted)}
+.captura-sello.ok{color:var(--green);border-color:rgba(26,112,73,.45)}
+.captura-sello.mal{color:#a83a2b;border-color:rgba(168,58,43,.45)}
+.captura-redes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:6px}
+.cap-red{border:1px solid var(--line);background:var(--paper);padding:14px 16px;min-width:0}
+.cap-red h5{margin:0 0 2px;font:800 15px var(--display);letter-spacing:-.02em;color:var(--ink)}
+.cap-red .cap-modo{font:500 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.cap-red .cap-cifras{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0 10px}
+.cap-red .cap-cifras b{display:block;font:700 20px var(--display);color:var(--forest);line-height:1}
+.cap-red .cap-cifras small{font-size:10.5px;color:var(--muted)}
+.cap-red p{margin:0 0 8px;font-size:12.5px;line-height:1.5;color:var(--muted)}
+.cap-red p.cap-motivo{color:#7a4a12;background:#fbf1de;padding:8px 10px;border-left:3px solid #c98a1e}
+.cap-red ul{margin:0;padding-left:16px;font-size:12.5px;line-height:1.5;color:var(--muted)}
+.cap-red li b{color:var(--ink);font-weight:600}
+.cap-red li small{color:var(--muted)}
+.cap-postura{display:flex;height:8px;overflow:hidden;margin:8px 0 4px;background:var(--line)}
+.cap-postura i{display:block;height:100%}
+.cap-postura .pf{background:var(--green)} .cap-postura .pc{background:var(--coral)} .cap-postura .pn{background:#b9c4bc} .cap-postura .pa{background:#7a1f12}
+.cap-leyenda{display:flex;gap:10px;flex-wrap:wrap;font:500 10px var(--mono);color:var(--muted);margin-bottom:8px}
+.cap-leyenda i{display:inline-block;width:8px;height:8px;margin-right:4px;vertical-align:middle}
+.cap-cita{border-left:2px solid var(--line);padding:4px 10px;margin:6px 0;font-size:12.5px;color:var(--ink);font-style:italic}
+.cap-cita small{display:block;font-style:normal;color:var(--muted);font-size:11px;margin-top:2px}
+.captura-pie{margin-top:12px;font-size:12px;color:var(--muted);line-height:1.5}
 .cuentas-lista{display:grid;gap:9px;margin:14px 0 0}
 .seccion-titulo{margin:34px 0 0;padding-top:26px;border-top:1px solid var(--line)}
 .seccion-titulo .panel-num{display:block}
@@ -259,7 +285,7 @@
     caja.innerHTML = `<b>Guardado.</b> La campaña escuchará ${esc((g?.perfiles || perfiles).map(p => `@${p.handle}`).join(', '))}${g?.validado ? ', con los veredictos de esta validación.' : ', marcadas como no validadas.'}`;
     guardadasValidadas = !!g?.validado;
     firmaGuardada = (g?.perfiles || perfiles).map(p => `${p.red}:${String(p.handle).toLowerCase()}`).join(',');
-    pintarCaptura(g?.perfiles || perfiles);
+    pintarCaptura(g?.perfiles || perfiles, capturaActual);
     return true;
   }
 
@@ -302,28 +328,97 @@
      Mientras tanto esta página NO muestra ninguna cifra de redes. Un número
      inventado acá es peor que un espacio vacío: con esto se decide qué dice la
      campaña y por dónde. */
-  function pintarCaptura(perfiles) {
+  /* ── La captura ────────────────────────────────────────────────────────────
+     APAGADA hasta que se decida encenderla: con CAPTURA_ENCENDIDA en false la
+     página ni siquiera pregunta por ella y todo se ve como hasta hoy. Para
+     verla antes de encenderla: ?captura=1 (o #captura) en la URL. Encenderla
+     de verdad son tres cosas, en este orden: el recolector corriendo dos veces
+     al día (tools/candidato-360/escucha/capturar.mjs), el worker sirviendo
+     GET /c360/captura, y esta constante en true. */
+  const CAPTURA_ENCENDIDA = false;
+  const capturaForzada = () => /[?&]captura=1\b/.test(location.search) || location.hash === '#captura';
+
+  const CAP_REDES = [
+    { key: 'x', nombre: 'X', modo: 'búsqueda por palabra' },
+    { key: 'instagram', nombre: 'Instagram', modo: 'hashtags' },
+    { key: 'tiktok', nombre: 'TikTok', modo: 'hashtags' },
+    { key: 'facebook', nombre: 'Facebook', modo: 'páginas de su territorio' },
+  ];
+  const POSTURAS = [['a_favor', 'a favor', 'pf'], ['en_contra', 'en contra', 'pc'], ['neutro', 'neutro', 'pn'], ['ataque', 'ataque', 'pa']];
+  const cuando = iso => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
+  const lista = (filas, vacio) => filas.length
+    ? `<ul>${filas.slice(0, 3).map(f => `<li><b>${esc((f.texto || '').slice(0, 110))}${(f.texto || '').length > 110 ? '…' : ''}</b>${f.autor ? ` <small>· @${esc(f.autor)}</small>` : ''}${f.reaccion ? ` <small>· ${num(f.reaccion)} reacciones</small>` : ''}</li>`).join('')}</ul>`
+    : `<p>${vacio}</p>`;
+
+  function tarjetaRed(def, r, perfiles) {
+    const cuenta = (perfiles || []).find(p => p.red === def.key && p.handle);
+    if (!r) return `<article class="cap-red"><h5>${def.nombre}</h5><div class="cap-modo">${def.modo}</div><p class="cap-motivo">Esta red no vino en la lectura.</p></article>`;
+    if (r.estado === 'sin_temas') return `<article class="cap-red"><h5>${def.nombre}</h5><div class="cap-modo">${def.modo}</div><p class="cap-motivo">Falta escribir sus ideas de campaña más abajo: sin ellas no hay qué buscar.</p></article>`;
+    if (r.estado === 'sin_datos' || r.estado === 'error') return `<article class="cap-red"><h5>${def.nombre}</h5><div class="cap-modo">${def.modo}</div><p class="cap-motivo"><b>Sin lectura esta vez.</b> ${esc(r.motivo || '')} Eso no significa que no haya conversación.</p></article>`;
+    const c = r.comentarios, total = c ? POSTURAS.reduce((s, [k]) => s + (c.postura?.[k] || 0), 0) : 0;
+    const postura = c && c.n
+      ? `<p style="margin-top:10px"><b style="color:var(--ink)">Lo que se siente</b> · ${num(c.n)} comentarios bajo ${num(c.posts || 0)} publicaciones${c.clasificados ? '' : ' (sin clasificar)'}</p>` +
+        (total ? `<div class="cap-postura">${POSTURAS.map(([k, , cl]) => `<i class="${cl}" style="width:${(c.postura[k] || 0) / total * 100}%"></i>`).join('')}</div>
+        <div class="cap-leyenda">${POSTURAS.map(([k, l, cl]) => `<span><i class="${cl}"></i>${l} ${Math.round((c.postura[k] || 0) / total * 100)} %</span>`).join('')}</div>` : '') +
+        (c.citas || []).map(q => `<div class="cap-cita">«${esc(q.texto.slice(0, 160))}${q.texto.length > 160 ? '…' : ''}»<small>${esc(q.postura.replace('_', ' '))}${q.autor ? ` · @${esc(q.autor)}` : ''}</small></div>`).join('')
+      : c?.motivo ? `<p class="cap-motivo" style="margin-top:10px">Comentarios: ${esc(c.motivo)}</p>` : '';
+    const paginas = def.key === 'facebook' && r.paginas?.length ? `<p>Páginas seguidas: ${r.paginas.map(u => `<small>${esc(u.replace(/^https?:\/\/(www\.)?facebook\.com\//, ''))}</small>`).join(', ')}</p>` : '';
+    return `<article class="cap-red">
+      <h5>${def.nombre}${r.handle ? ` <small style="font:500 11px var(--mono);color:var(--muted)">@${esc(r.handle)}</small>` : ''}</h5>
+      <div class="cap-modo">${def.modo}</div>
+      <div class="cap-cifras"><span><b>${num(r.publicados.length)}</b><small>publicó</small></span><span><b>${num(r.menciones.length)}</b><small>lo mencionan</small></span><span><b>${num(r.amplifican.length)}</b><small>amplifican</small></span></div>
+      ${paginas}
+      <p><b style="color:var(--ink)">Lo que se dice</b></p>
+      ${lista(r.menciones, cuenta || def.key === 'facebook' ? 'Nadie lo mencionó en esta ventana. Eso también es dato.' : 'Sin cuenta validada: solo se leyeron sus temas.')}
+      ${r.amplifican.length ? `<p style="margin-top:8px"><b style="color:var(--ink)">Quién amplifica</b> · ${r.amplifican.slice(0, 4).map(a => `@${esc(a.autor)}${a.veces > 1 ? ` ×${a.veces}` : ''}`).join(', ')}</p>` : ''}
+      ${postura}
+    </article>`;
+  }
+
+  function pintarCaptura(perfiles, captura) {
     const cap = $('captura');
     if (!cap) return;
-    const lista = (perfiles || []).filter(p => p && p.handle);
-    if (!lista.length) {
+    const lista_ = (perfiles || []).filter(p => p && p.handle);
+    /* Encendida y con lectura: las cuatro redes, cada una con su estado. */
+    if (captura?.encendida && captura.redes) {
+      cap.classList.add('viva');
+      const costo = captura.costo ? ` · esta lectura costó US$${(Number(captura.costo.apifyUsd || 0) + Number(captura.costo.modeloUsd || 0)).toFixed(2)}` : '';
+      cap.innerHTML = `<div class="captura-cab"><span class="captura-sello ok">Escucha encendida</span><small>Última lectura: ${esc(cuando(captura.generadoEn))}${captura.vinculo?.escalas?.length ? ` · ${esc(captura.vinculo.escalas.join(' y '))}` : ''}${esc(costo)}</small></div>
+        <h4>Lo que se dice y lo que se siente, red por red</h4>
+        <div class="captura-redes">${CAP_REDES.map(d => tarjetaRed(d, captura.redes[d.key], lista_)).join('')}</div>
+        <p class="captura-pie">Dos lecturas al día, sobre sus ${captura.vinculo?.temas?.length ? `${num(captura.vinculo.temas.length)} ideas` : 'ideas'} y su territorio. <b>Los comentarios no son la localidad:</b> son quienes comentan, y el modelo se equivoca con el sarcasmo. Por eso cada cifra va con sus citas: léalas antes de decidir nada con el porcentaje.</p>`;
+      return;
+    }
+    cap.classList.remove('viva');
+    if (!lista_.length) {
       cap.innerHTML = `<span class="captura-sello">Sin cuentas</span>
         <h4>La escucha de redes empieza por saber cuáles son sus cuentas</h4>
         <p>Marque arriba las redes donde esté y escriba su usuario. Sin eso no hay de dónde escuchar: la prensa de más abajo funciona igual, pero lo que se publica en sus perfiles no.</p>`;
       return;
     }
-    const validadas = lista.filter(p => p.veredicto && p.veredicto !== 'sin_validar' && p.veredicto !== 'no_encontrado');
+    const validadas = lista_.filter(p => p.veredicto && p.veredicto !== 'sin_validar' && p.veredicto !== 'no_encontrado');
     cap.innerHTML = `<span class="captura-sello">Captura no conectada</span>
       <h4>Lo que se publica en sus cuentas</h4>
-      <p>Validar una cuenta dice que es suya. Traer lo que publica es otra cosa, y esa conexión <b>todavía no está montada</b>: se hace con un recolector que cobra por cuenta raspada. Cuando esté, acá va, ${lista.length === 1 ? 'por esa cuenta' : `por cada una de sus ${num(lista.length)} cuentas`}:</p>
+      <p>Validar una cuenta dice que es suya. Traer lo que publica es otra cosa, y esa conexión <b>todavía no está encendida</b>: se hace con un recolector que cobra por cuenta raspada. Cuando esté, acá va, ${lista_.length === 1 ? 'por esa cuenta' : `por cada una de sus ${num(lista_.length)} cuentas`} y por las páginas de su territorio:</p>
       <ul>
         <li><b>Lo que publicó</b> en la ventana, y cuánto rindió cada publicación.</li>
         <li><b>Quién lo menciona</b> sin etiquetarlo: la conversación que pasa a su lado.</li>
         <li><b>Qué cuentas amplifican</b> lo suyo, que es distinto de quién lo sigue.</li>
+        <li><b>Lo que se siente</b> en los comentarios: a favor, en contra, neutro o ataque, con las citas.</li>
       </ul>
       <p style="margin-top:10px">${validadas.length
         ? `Listas para escuchar: ${esc(validadas.map(p => `@${p.handle}`).join(', '))}.`
         : 'Ninguna de sus cuentas está validada todavía: valídelas arriba para que la escucha no se monte sobre un perfil que no es.'}</p>`;
+  }
+
+  /* Pide la última lectura al worker solo si la captura está encendida (o
+     forzada para verla). Un 404 es «la ruta no existe todavía» y se pinta
+     como apagada, no como error. */
+  let capturaActual = null;
+  async function cargarCaptura() {
+    if (!(CAPTURA_ENCENDIDA || capturaForzada())) return null;
+    try { const r = await P.api('/c360/captura'); capturaActual = r.ok && r.data?.encendida ? r.data : null; } catch { capturaActual = null; }
+    return capturaActual;
   }
 
   /* ═══ 3 · La prensa ═══════════════════════════════════════════════════════ */
@@ -517,6 +612,7 @@
     firmaGuardada = guardadas.map(p => `${p.red}:${String(p.handle).toLowerCase()}`).join(',');
     montar(guardadas);
     pintarCaptura(guardadas);
+    cargarCaptura().then(c => { if (c) pintarCaptura(guardadas, c); });
     pintarIdeas();
     $('redesBuscar').addEventListener('click', validar);
     $('redesGuardar').addEventListener('click', () => guardar(elegidas().map(r => Object.assign({}, r, { veredicto: 'sin_validar' }))));

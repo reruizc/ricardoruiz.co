@@ -229,7 +229,9 @@ for (const [caso, opts, espera, destino] of [
   /* Lo que no está conectado se declara: una cifra inventada acá decide qué
      dice la campaña y por dónde. */
   revisar('la captura de publicaciones se declara apagada',
-    /Captura no conectada/.test(await p.textContent('#captura')) && /todavía no está montada/.test(await p.textContent('#captura')));
+    /* Antes decía «no está montada»; ahora está montada y APAGADA, y el texto
+       lo dice así. Lo que no cambia: sin lectura, ninguna cifra. */
+    /Captura no conectada/.test(await p.textContent('#captura')) && /todavía no está encendida/.test(await p.textContent('#captura')));
   const cifras = (await p.textContent('#captura')).match(/\d[\d.,]*\s*(publicaciones|menciones|seguidores|interacciones)/i);
   revisar('y no inventa ninguna métrica de redes', cifras === null);
   await b.close();
