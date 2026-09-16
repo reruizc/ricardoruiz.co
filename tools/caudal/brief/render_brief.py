@@ -237,6 +237,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('json', help='el brief en JSON')
     ap.add_argument('--out', help='ruta del PDF')
+    # El PDF es el entregable; el .docx es la materia prima que el analista
+    # reescribe antes de mandarla. Va detrás de una bandera porque no todo brief
+    # se va a reescribir, y un archivo de más en la carpeta del cliente invita a
+    # mandar el borrador por equivocación.
+    ap.add_argument('--docx', action='store_true',
+                    help='además del PDF, el borrador editable en Word')
+    ap.add_argument('--solo-docx', action='store_true',
+                    help='solo el .docx, sin volver a componer el PDF')
     a = ap.parse_args()
     b = json.load(open(a.json, encoding='utf-8'))
     meta = b.get('_meta') or {}
@@ -244,8 +252,14 @@ def main():
         ROOT, 'caudalxcauce', (meta.get('cliente') or 'Cliente'),
         f"Brief-{(meta.get('cliente') or 'Cliente')}-"
         f"{(meta.get('ventana') or {}).get('hasta', '')}.pdf")
-    motor = render(construir_html(b), out)
-    print(f'OK ({motor}) · {out} · {os.path.getsize(out) / 1024:.0f} KB')
+    if not a.solo_docx:
+        motor = render(construir_html(b), out)
+        print(f'OK ({motor}) · {out} · {os.path.getsize(out) / 1024:.0f} KB')
+    if a.docx or a.solo_docx:
+        import docx_brief
+        dout = os.path.splitext(out)[0] + '.docx'
+        docx_brief.escribir(b, sys.modules[__name__], dout)
+        print(f'OK (docx) · {dout} · {os.path.getsize(dout) / 1024:.0f} KB')
 
 
 if __name__ == '__main__':
