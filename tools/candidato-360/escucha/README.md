@@ -9,6 +9,9 @@ escribe. Tres archivos:
 | `ejemplo-vinculo.json` | Un vínculo con la forma que guarda el worker, para correr todo sin una cuenta real. Los dos temas que trae son de la agenda real de Tunjuelito, pero en producción salen del panel, no de acá. |
 | `medir.mjs` | Corre el perfil contra Apify **una vez** y le pregunta qué cobró. Escribe `precios-medidos.json`. |
 | `costos.mjs` | El modelo: volumen, costo marginal, el escalón del plan y el precio sugerido. Prefiere los precios medidos; si no hay, avisa que está estimando. |
+| `apify.mjs` | El cliente de Apify que comparten medidor y recolector: token desde el entorno o `.env`, errores con el mensaje de Apify tal cual, costo leído de la respuesta. |
+| `capturar.mjs` | **El recolector.** Una lectura completa: las dos capas por Apify, postura/tema/tono con el modelo, y la captura escrita con el contrato que pinta el panel. Sin `--gastar` solo dice qué haría. |
+| `ejemplo-captura.json` | Una captura de mentiras con el contrato de abajo, para probar el panel sin gastar (`prueba-captura.mjs`). |
 
 ## El perfil no se escribe: sale del vínculo
 
@@ -109,6 +112,58 @@ vinieron, para añadir el nombre a `referenciaDePost`.
   TikTok buscan por hashtag —que no es lo mismo— y Facebook solo trae las
   páginas que uno ya eligió seguir. A escala de localidad eso importa más que
   el precio: se puede vender «escucha de su localidad» en X, no en las cuatro.
+
+## La captura en el panel: montada y APAGADA
+
+`candidato-360-escucha.html` ya sabe pintar una lectura de las cuatro redes en
+«Lo que se publica en sus cuentas»: por red, lo que publicó, quién lo menciona,
+quién amplifica y —capa 2— la postura de los comentarios como barra con sus
+citas. Cada red trae su estado: `ok`, `sin_datos` (con motivo: cero no es cero
+conversación), `sin_temas`, `error`. Facebook muestra las páginas que sigue.
+
+Está apagada a propósito: `CAPTURA_ENCENDIDA = false` en la página hace que ni
+siquiera pregunte por la lectura, y todo se ve como hasta hoy. Para verla antes
+de encenderla, `candidato-360-escucha.html?captura=1` (o `#captura`).
+
+**Encenderla son tres cosas, en este orden:**
+
+1. **El recolector corriendo dos veces al día** con `APIFY_TOKEN` y
+   `DEEPSEEK_API_KEY` como secretos —el patrón es el de
+   `.github/workflows/candidato-360-briefing.yml`: a las 6 a. m. y 6 p. m. de
+   Bogotá (11:00 y 23:00 UTC, fuera del pico de DeepSeek)—, un vínculo por
+   cliente con escucha contratada: `capturar.mjs --vinculo=… --gastar --salida=…`.
+2. **El worker sirviendo `GET /c360/captura`** para la sesión: la última captura
+   del vínculo de esa cuenta, o `{ ok:true, encendida:false }` si no hay. Un 404
+   también vale: la página lo pinta como apagada, no como error.
+3. `CAPTURA_ENCENDIDA = true` en la página.
+
+Lo que falta del lado del worker y no de acá: aceptar `facebook` en
+`POST /c360/redes` (hoy valida X, TikTok e Instagram) para que el candidato
+pueda registrar su página; mientras tanto Facebook entra por las páginas del
+territorio, que es su modo real.
+
+## Contrato · `GET /c360/captura`
+
+```jsonc
+{ "ok": true, "encendida": true, "generadoEn": "2026-09-16T11:02:00Z", "modelo": "deepseek-v4-flash",
+  "vinculo": { "candidato": "Junta Administradora Local · Tunjuelito · Bogotá", "nombre": "…", "temas": ["…"], "escalas": ["Tunjuelito", "Bogotá"] },
+  "costo": { "apifyUsd": 0.21, "modeloUsd": 0.004 },       // lo que costó ESTA lectura
+  "redes": {
+    "x": { "estado": "ok" | "sin_datos" | "sin_temas" | "error", "motivo": "", "modo": "búsqueda por palabra", "handle": "…",
+           "publicados": [{ "texto", "autor", "fecha", "url", "reaccion", "comentarios" }],   // lo suyo, por reacción
+           "menciones":  [ /* misma ficha */ ],                                              // lo de otros sobre sus temas o su nombre
+           "amplifican": [{ "autor", "veces", "alcance" }],
+           "temas": { "<tema>": n },
+           "comentarios": null | { "n", "posts", "clasificados", "postura": { "a_favor", "en_contra", "neutro", "ataque" },
+                                   "tono": { … }, "temas": { … }, "citas": [{ "texto", "postura", "autor", "url" }], "motivo"? } },
+    "instagram": { … }, "tiktok": { … },
+    "facebook": { …, "paginas": ["https://www.facebook.com/…"] }
+  } }
+```
+
+`ejemplo-captura.json` es una instancia completa. Reglas: una red que no
+respondió sale `sin_datos` con motivo; la postura nunca viaja sin `citas`; el
+panel dice que los comentarios no son la localidad.
 
 ## Cuándo volver acá
 

@@ -24,12 +24,12 @@
    gasta una décima parte. Los topes de producción viven en perfil.mjs.       */
 
 import { writeFile, readFile } from 'node:fs/promises';
+import { tokenApify, AYUDA_TOKEN, clienteApify } from './apify.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REDES, COMENTARIOS, plan, planComentarios, referenciaDePost, perfilDeVinculo, cargarVinculo, PRECIOS_REFERENCIA, PRECIOS_REFERENCIA_COMENTARIOS } from './perfil.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
-const API = 'https://api.apify.com/v2';
 const args = Object.fromEntries(process.argv.slice(2).map(a => { const m = a.match(/^--([^=]+)=(.*)$/); return m ? [m[1], m[2]] : [a.replace(/^--/, ''), true]; }));
 const GASTAR = Boolean(args.gastar);
 const TOPE = args.tope ? Number(args.tope) : null;      /* null = el de perfil.mjs */
@@ -45,69 +45,13 @@ const ESPERA_MAX = Number(args.espera || 300) * 1000;   /* 5 minutos por actor *
 const { vinculo, ruta: rutaVinculo, esEjemplo } = cargarVinculo(args);
 const PERFIL = perfilDeVinculo(vinculo, args);
 
-/* El token sale del entorno o de un .env en la raíz del repo, que ya está en
-   .gitignore. Nunca se imprime: un token en la consola termina en un
-   pantallazo, y un pantallazo termina en un chat. */
-async function tokenDeEnv() {
-  try {
-    const txt = await readFile(path.join(AQUI, '..', '..', '..', '.env'), 'utf8');
-    return (txt.match(/^\s*APIFY_TOKEN\s*=\s*["']?([^"'\s#]+)/m) || [])[1] || null;
-  } catch { return null; }
-}
-const TOKEN = process.env.APIFY_TOKEN || await tokenDeEnv();
-if (GASTAR && !TOKEN) {
-  console.error(`\nFalta el token de Apify. Dos formas, las dos en SU terminal (nunca en el repo ni en un chat):
-
-  1) para esta sesión:      export APIFY_TOKEN=apify_api_xxx
-  2) para que quede puesto:  echo 'APIFY_TOKEN=apify_api_xxx' >> .env      (.env ya está en .gitignore)
-
-El token se saca en Apify → Settings → API & Integrations → Personal API token.\n`);
-  process.exit(1);
-}
+const TOKEN = await tokenApify();
+if (GASTAR && !TOKEN) { console.error('\n' + AYUDA_TOKEN + '\n'); process.exit(1); }
+const apify = GASTAR ? clienteApify(TOKEN, { esperaMax: ESPERA_MAX }) : null;
 
 const usd = n => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 const pad = (s, n, d = 'izq') => d === 'izq' ? String(s).padEnd(n) : String(s).padStart(n);
-const dormir = ms => new Promise(r => setTimeout(r, ms));
 const corto = (s, n) => String(s).length <= n ? s : String(s).slice(0, n - 1) + '…';
-
-/* Apify identifica al actor con ~ en vez de / en la URL. */
-const rutaActor = actor => actor.replace('/', '~');
-
-/* Todo campo numérico cuyo nombre hable de dólares, venga donde venga. No se
-   escoge uno de antemano: si Apify renombró el campo, se ve en la tabla. */
-function camposUSD(obj, prefijo = '', salida = {}) {
-  if (!obj || typeof obj !== 'object') return salida;
-  for (const [k, v] of Object.entries(obj)) {
-    const ruta = prefijo ? `${prefijo}.${k}` : k;
-    if (typeof v === 'number' && /usd/i.test(k)) salida[ruta] = v;
-    else if (v && typeof v === 'object' && Object.keys(salida).length < 40) camposUSD(v, ruta, salida);
-  }
-  return salida;
-}
-
-async function api(ruta, opciones = {}) {
-  const url = `${API}${ruta}${ruta.includes('?') ? '&' : '?'}token=${encodeURIComponent(TOKEN)}`;
-  const r = await fetch(url, { ...opciones, headers: { 'content-type': 'application/json', ...(opciones.headers || {}) } });
-  const txt = await r.text();
-  let cuerpo; try { cuerpo = JSON.parse(txt); } catch { cuerpo = { crudo: txt.slice(0, 400) }; }
-  /* El mensaje de Apify se muestra tal cual: «actor not found» y «insufficient
-     credit» piden cosas distintas y confundirlos hace perder una tarde. */
-  if (!r.ok) throw new Error(`HTTP ${r.status} · ${cuerpo?.error?.message || cuerpo?.crudo || ruta.split('?')[0]}`);
-  return cuerpo.data ?? cuerpo;
-}
-
-async function correr(actor, entrada) {
-  const run = await api(`/acts/${rutaActor(actor)}/runs`, { method: 'POST', body: JSON.stringify(entrada) });
-  const inicio = Date.now();
-  let estado = run;
-  while (['READY', 'RUNNING'].includes(estado.status)) {
-    if (Date.now() - inicio > ESPERA_MAX) { await api(`/actor-runs/${run.id}/abort`, { method: 'POST' }).catch(() => {}); throw new Error(`se pasó de ${ESPERA_MAX / 1000}s y se abortó`); }
-    await dormir(4000);
-    estado = await api(`/actor-runs/${run.id}`);
-  }
-  const items = await api(`/datasets/${estado.defaultDatasetId}/items?clean=true&limit=1000`).catch(() => []);
-  return { estado, items: Array.isArray(items) ? items : [] };
-}
 
 /* ── Lo que se va a correr ────────────────────────────────────────────────── */
 const todas = plan(PERFIL), filas = todas.filter(f => !f.motivo && (!SOLO || SOLO.includes(f.red)));
@@ -159,11 +103,9 @@ if (!GASTAR) {
 async function medirUna({ capa, red, etiqueta, actor, entrada, pedidos }) {
   process.stdout.write(`\n▸ ${etiqueta} · ${capa} (${actor})… `);
   try {
-    const { estado, items } = await correr(actor, entrada);
-    const costos = camposUSD(estado);
     /* El total que cobra Apify por la corrida: el campo más completo que
        exista. Si ninguno existe, se dice, no se estima. */
-    const total = costos.usageTotalUsd ?? costos['stats.usageTotalUsd'] ?? Math.max(0, ...Object.values(costos));
+    const { estado, items, costos, cobrado: total } = await apify.correr(actor, entrada);
     const n = items.length, porMil = n ? total / n * 1000 : null;
     console.log(`${estado.status} · ${n} de ${pedidos} pedidos · ${usd(total)}`);
     for (const [k, v] of Object.entries(costos)) console.log(`     ${pad(k, 34)} ${usd(v)}`);
