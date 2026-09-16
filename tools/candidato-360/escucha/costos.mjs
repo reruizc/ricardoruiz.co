@@ -122,7 +122,7 @@ const con = red => [solo(red), comentarios.find(f => f.red === red)];
 const oferta = [
   ['Añadido · escucha, 1 lectura/día', 100000, costo(posts) / 2 + INFRA / 2],
   ['Añadido · escucha, 2 lecturas/día', 150000, costo(posts)],
-  ['Añadido · sentimiento (sobre la escucha)', 100000, costo(comentarios) - INFRA],
+  ['Añadido · sentimiento (sobre la escucha)', 130000, costo(comentarios) - INFRA],
   ['Solo escucha · una red (X)', 100000, costo([solo('x')])],
   ['Solo escucha · una red con sentimiento (X)', 160000, costo(con('x'))],
   ['Solo escucha · completa', 250000, costo(posts)],
