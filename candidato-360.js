@@ -1006,7 +1006,7 @@ function refrescarPartidoCampana() { pintarEstadoPartido({ input: 'campaignParty
    elección: la mitad de las candidaturas territoriales cambia de aval entre
    una elección y la siguiente. Manda lo que la persona escribió. */
 function partidoVigente() {
-  if (CAMPANA_ACTUAL?.avales === 'firmas') return '';
+  if (sinPartido(CAMPANA_ACTUAL?.avales)) return '';
   return String(CAMPANA_ACTUAL?.partido || $('campaignParty')?.value || '').trim() || crmCandidate?.partido || '';
 }
 function updateCampaignTerritory() {
@@ -1098,9 +1098,10 @@ function currentTargetTerritory() {
 /* Lo que se guarda como campaña en el vínculo (editable). */
 function campanaActual(corpKey) {
   const isOther = document.querySelector('input[name="corporationRoute"]:checked')?.value === 'other';
-  const firmas = CORP_UNINOMINAL.includes(corpKey) && avalVigente() === 'firmas';
-  return { corp: corpKey, avales: firmas ? 'firmas' : 'partido', espectro: firmas ? espectroVigente() : '',
-    partido: firmas ? '' : (String($('campaignParty')?.value || '').trim() || crmCandidate?.partido || ''), ruta: isOther ? 'other' : 'same', departamento: isOther ? $('campaignDepartment').value : '', departamentoNombre: isOther ? ($('campaignDepartment').options[$('campaignDepartment').selectedIndex]?.text || '') : '', municipio: isOther ? $('campaignMunicipality').value : '', localidad: isOther ? $('campaignLocality').value : '' };
+  const aval = avalVigente();
+  const firmas = CORP_UNINOMINAL.includes(corpKey) && aval === 'firmas', indeciso = aval === 'indeciso';
+  return { corp: corpKey, avales: firmas ? 'firmas' : indeciso ? 'indeciso' : 'partido', espectro: firmas || indeciso ? espectroVigente() : '',
+    partido: firmas || indeciso ? '' : (String($('campaignParty')?.value || '').trim() || crmCandidate?.partido || ''), ruta: isOther ? 'other' : 'same', departamento: isOther ? $('campaignDepartment').value : '', departamentoNombre: isOther ? ($('campaignDepartment').options[$('campaignDepartment').selectedIndex]?.text || '') : '', municipio: isOther ? $('campaignMunicipality').value : '', localidad: isOther ? $('campaignLocality').value : '' };
 }
 /* Rellena la ruta con la campaña guardada (al volver con vínculo). */
 async function precargarCampana(campana) {
@@ -1108,6 +1109,9 @@ async function precargarCampana(campana) {
   const isOther = campana.ruta === 'other' || !corporacionHistorica(crmCandidate);
   document.querySelector(`input[name="corporationRoute"][value="${isOther ? 'other' : 'same'}"]`).checked = true;
   if (campana.partido && $('campaignParty')) $('campaignParty').value = campana.partido;
+  /* Quien volvió sin partido —por firmas o sin decidirse— vuelve con su
+     espectro puesto, no con la pregunta en blanco. */
+  if (sinPartido(campana.avales)) { const r = document.querySelector(`input[name="avalRuta"][value="${campana.avales}"]`); if (r) r.checked = true; marcarEspectro(campana.espectro || ''); }
   toggleCorporationChoice();
   if (!isOther) return;
   $('otherCorporation').value = campana.corp; marcarCard(historicCorporationPicker, campana.corp); updateCampaignTerritory();
@@ -1145,11 +1149,14 @@ function corpDeLaRuta() {
   return isOther ? $('otherCorporation').value : (corporacionHistorica(crmCandidate) || '');
 }
 function avalVigente() { return document.querySelector('input[name="avalRuta"]:checked')?.value || 'partido'; }
+/* Por firmas o sin decidirse: no hay partido, hay familia política. Todo lo
+   que se calcula con la huella del partido se calcula con la del bloque. */
+function sinPartido(aval) { return aval === 'firmas' || aval === 'indeciso'; }
 function espectroVigente() { return $('espectro')?.querySelector('[aria-checked="true"]')?.dataset.bloque || ''; }
 /* El bloque con el que se reparte: el que la persona eligió si va por firmas,
    y si no el que le corresponde a su partido. */
 function bloqueVigente() {
-  if (CAMPANA_ACTUAL?.avales === 'firmas' || (!CAMPANA_ACTUAL && avalVigente() === 'firmas')) return CAMPANA_ACTUAL?.espectro || espectroVigente() || '';
+  if (sinPartido(CAMPANA_ACTUAL?.avales) || (!CAMPANA_ACTUAL && sinPartido(avalVigente()))) return CAMPANA_ACTUAL?.espectro || espectroVigente() || '';
   return '';
 }
 function pintarEspectro() {
@@ -1173,13 +1180,14 @@ function marcarEspectro(bloque) {
 /* La pregunta del aval solo aplica a los cargos uninominales: a un concejo o a
    una asamblea se llega por lista, y una lista siempre tiene organización. */
 function elegirAval({ animar = false } = {}) {
-  const firmas = avalVigente() === 'firmas';
+  const aval = avalVigente(), firmas = aval === 'firmas', indeciso = aval === 'indeciso', espectro = sinPartido(aval);
   if (animar) salto(document.querySelector(`input[name="avalRuta"]:checked`)?.closest('.route-option'));
-  revelar($('espectroField'), firmas, animar);
-  revelar($('campaignPartyField'), !firmas, animar);
-  revelar($('vitrinaPartidos'), !firmas && vitrinaTienePartidos(), animar);
-  if (firmas) pintarEspectro(); else refrescarPartidoCampana();
+  revelar($('espectroField'), espectro, animar);
+  revelar($('campaignPartyField'), !espectro, animar);
+  revelar($('vitrinaPartidos'), !espectro && vitrinaTienePartidos(), animar);
+  if (espectro) pintarEspectro(); else refrescarPartidoCampana();
   if (pasoRuta === 'partido' && firmas) { $('rutaTitulo').textContent = '¿Dónde se ubica?'; $('rutaCopy').textContent = 'Por firmas no hay partido cuya huella seguir. Con el espectro buscamos dónde votan los partidos de su familia: ahí es donde las firmas se recogen más rápido.'; }
+  else if (pasoRuta === 'partido' && indeciso) { $('rutaTitulo').textContent = '¿Dónde se siente mejor ideológicamente?'; $('rutaCopy').textContent = 'Todavía no tiene partido y queda más de un año de campaña. Con su familia política se calcula todo —la meta, el mapa proyectado, el electorado— y el partido se pone cuando lo tenga, desde el CRM.'; }
   else if (pasoRuta === 'partido') { const [t, c] = PASO_COPY.partido; $('rutaTitulo').textContent = t; $('rutaCopy').textContent = c; }
   refrescarContinuarPartido();
 }
@@ -1192,12 +1200,24 @@ function revelar(el, visible, animar) {
 /* Por firmas hace falta el espectro para poder decir dónde recogerlas. */
 function refrescarContinuarPartido() {
   const boton = $('abrirCRM'); if (!boton) return;
-  boton.disabled = avalVigente() === 'firmas' && !espectroVigente();
+  boton.disabled = sinPartido(avalVigente()) && !espectroVigente();
+}
+/* «Ya tengo partido político»: desde el CRM se vuelve al paso del partido con
+   «con un partido» marcado; al abrir el CRM de nuevo la campaña se guarda con
+   el partido y todo se recalcula con su huella. */
+function definirPartido() {
+  showScreen('candidateRoute');
+  const r = document.querySelector('input[name="avalRuta"][value="partido"]'); if (r) r.checked = true;
+  irAPaso('partido', { animar: true });
+  $('campaignParty')?.focus({ preventScroll: true });
 }
 function prepararPasoPartido() {
+  /* Las firmas son de los cargos uninominales; «no me he decidido» es de
+     cualquiera: a una lista también se llega con partido por definir. */
   const uninominal = CORP_UNINOMINAL.includes(corpDeLaRuta());
-  revelar($('avalOpciones'), uninominal, false);
-  if (!uninominal) {
+  revelar($('avalOpciones'), true, false);
+  document.querySelector('.route-option[data-aval="firmas"]')?.classList.toggle('hidden', !uninominal);
+  if (!uninominal && avalVigente() === 'firmas') {
     document.querySelectorAll('input[name="avalRuta"]').forEach(r => { r.checked = r.value === 'partido'; });
   }
   elegirAval();
@@ -1685,9 +1705,9 @@ function fraseDePartida({ candidate, corpKey, territory, campana }) {
   const ahora = punto(`Ahora vamos por ${destino}`);
   /* ¿Se muda? El territorio de la campaña contra el de su última elección. */
   const mudanza = Boolean(lugarNuevo) && Boolean(hist.lugar) && normalizedText(lugarNuevo) !== normalizedText(hist.lugar);
-  const porFirmas = campana?.avales === 'firmas';
+  const porFirmas = campana?.avales === 'firmas', indeciso = campana?.avales === 'indeciso';
   const bonito = nombre => String(nombre || '').replace(/^(PARTIDO|MOVIMIENTO)\s+(POLÍTICO\s+)?/i, '').split(' ').map(w => w.length > 3 ? NOMBRE_BONITO(w) : w.toLowerCase()).join(' ').replace(/^(\w)/, c => c.toUpperCase());
-  const partido = porFirmas ? '' : String(campana?.partido || candidate?.partido || '').trim();
+  const partido = porFirmas || indeciso ? '' : String(campana?.partido || candidate?.partido || '').trim();
   const bloque = partido ? PartidosBloques.bloqueDeCandidatura(partido, candidate?.nombre || '') : 'sc';
   const partidoBonito = bonito(partido);
   const cambioDePartido = partido && candidate?.partido && normalizedText(partido) !== normalizedText(candidate.partido);
@@ -1701,6 +1721,12 @@ function fraseDePartida({ candidate, corpKey, territory, campana }) {
     const viene = candidate?.partido ? `Viene de ${bonito(candidate.partido)}, pero esta vez ` : '';
     const frase = viene + elegir(FRASES_FIRMAS[espectro] || FRASES_FIRMAS.sc, candidate?.nombre)(familia);
     conQuien = punto(frase.charAt(0).toUpperCase() + frase.slice(1));
+  }
+  if (indeciso) {
+    const espectro = campana?.espectro || 'sc';
+    const familia = FAMILIA_CON_ARTICULO[espectro] || FAMILIA_CON_ARTICULO.sc;
+    const viene = candidate?.partido ? `Viene de ${bonito(candidate.partido)} y ` : '';
+    conQuien = punto(`${viene ? viene + 'todavía' : 'Todavía'} no tiene partido: se lanza desde ${familia}, y con esa familia se calcula todo mientras lo define. Cuando lo tenga, se pone en el CRM y el mapa cambia a la huella de ese partido`);
   }
   const contexto = { lugarViejo: hist.lugar, lugarNuevo, mudanza, esCiudad: Boolean(cityLayerFor(lugarNuevo)) };
   const salto = punto(FRASES_SALTO[tipoDeSalto(hist.tipo, corpKey)](contexto));
@@ -1823,6 +1849,7 @@ async function launchCRM(event) {
   $('crmInitials').textContent = initials(crmCandidate.nombre); $('crmName').textContent = crmCandidate.nombre;
   $('crmTarget').textContent = `Candidatura 2027 · ${corporation}${territory ? ` · ${territory}` : ''}`;
   $('crmContext').textContent = fraseDePartida({ candidate: crmCandidate, corpKey, territory, campana });
+  $('crmPartidoPendiente')?.classList.toggle('hidden', campana.avales !== 'indeciso');
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Mapa de historial electoral';
   showScreen('crm');
