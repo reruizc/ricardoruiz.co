@@ -60,7 +60,10 @@ const r = {};
 await p.evaluate(c => abrirRutaCandidato(c), CAND);
 await p.evaluate(() => { document.querySelector('input[name="corporationRoute"][value="other"]').checked = true; toggleCorporationChoice(); document.getElementById('otherCorporation').value = 'concejo'; updateCampaignTerritory(); irAPaso('partido'); });
 await p.waitForTimeout(500);
-r.concejo = await p.evaluate(() => !document.getElementById('avalOpciones').classList.contains('hidden'));
+/* Desde que existe «no me he decidido» el aval se pregunta en todas las
+   corporaciones; lo que sigue siendo de los uninominales es la opción de
+   firmas, que es lo que acá se mide. */
+r.concejo = await p.evaluate(() => !document.querySelector('.route-option[data-aval="firmas"]').classList.contains('hidden'));
 await p.evaluate(() => { document.getElementById('otherCorporation').value = 'alcaldia'; updateCampaignTerritory(); irAPaso('partido'); });
 await p.waitForTimeout(500);
 r.alcaldia = await p.evaluate(() => !document.getElementById('avalOpciones').classList.contains('hidden'));
@@ -127,7 +130,7 @@ await b.close();
    Huella de centro-izquierda (Alianza Verde): Suba 40.000 · Ciudad Bolívar 10.000
    → 4 de cada 5 firmas en Suba: 32.000 y 8.000, que es lo que revisa el modal. */
 const pruebas = [
-  ['a un concejo no se le pregunta el aval: las listas siempre tienen partido', r.concejo === false],
+  ['a un concejo no se le ofrecen firmas: las listas siempre tienen organización', r.concejo === false],
   ['a la alcaldía sí: con partido o por firmas', r.alcaldia === true],
   ['por firmas se pregunta el espectro, no el partido', r.firmas.espectro && !r.firmas.campoPartido && r.firmas.opciones.join('|') === 'Izquierda|Centro-izquierda|Centro|Centro-derecha|Derecha'],
   ['y el título de la izquierda deja de hablar de partidos', /Dónde se ubica/i.test(r.firmas.titulo)],
