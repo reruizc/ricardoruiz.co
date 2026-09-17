@@ -1159,8 +1159,10 @@ function bloqueVigente() {
   if (sinPartido(CAMPANA_ACTUAL?.avales) || (!CAMPANA_ACTUAL && sinPartido(avalVigente()))) return CAMPANA_ACTUAL?.espectro || espectroVigente() || '';
   return '';
 }
-function pintarEspectro() {
-  const caja = $('espectro'); if (!caja || caja.dataset.listo === '1') return;
+/* El mismo espectro sirve en la ruta con historial (#espectro) y en el wizard
+   de candidatura nueva (#espectroNuevo): una sola forma de pintarlo. */
+function pintarEspectroEn(caja, alCambiar) {
+  if (!caja || caja.dataset.listo === '1') return;
   caja.dataset.listo = '1';
   caja.innerHTML = ESPECTRO.map(([id, label]) => {
     const color = window.PartidosBloques?.BLOQUE_COLOR?.[id] || 'var(--green)';
@@ -1170,9 +1172,11 @@ function pintarEspectro() {
     const boton = e.target.closest('[data-bloque]'); if (!boton) return;
     caja.querySelectorAll('[data-bloque]').forEach(b => b.setAttribute('aria-checked', String(b === boton)));
     salto(boton);
-    refrescarContinuarPartido();
+    alCambiar?.();
   });
 }
+function pintarEspectro() { pintarEspectroEn($('espectro'), refrescarContinuarPartido); }
+function espectroNuevoVigente() { return $('espectroNuevo')?.querySelector('[aria-checked="true"]')?.dataset.bloque || ''; }
 function marcarEspectro(bloque) {
   pintarEspectro();
   $('espectro')?.querySelectorAll('[data-bloque]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.bloque === bloque)));
@@ -1205,11 +1209,34 @@ function refrescarContinuarPartido() {
 /* «Ya tengo partido político»: desde el CRM se vuelve al paso del partido con
    «con un partido» marcado; al abrir el CRM de nuevo la campaña se guarda con
    el partido y todo se recalcula con su huella. */
-function definirPartido() {
+async function definirPartido() {
+  /* Candidatura nueva: el partido se define en el wizard, en su paso. Quien
+     vuelve de otra sesión trae el formulario vacío, así que se rellena desde
+     lo guardado antes de saltar al paso. */
+  if (!crmCandidate && NUEVO) {
+    await precargarNuevo(NUEVO);
+    showScreen('new');
+    $('partyMode').value = 'existing'; toggleParty();
+    window.showNewWizardStep?.(4);
+    $('party')?.focus({ preventScroll: true });
+    return;
+  }
   showScreen('candidateRoute');
   const r = document.querySelector('input[name="avalRuta"][value="partido"]'); if (r) r.checked = true;
   irAPaso('partido', { animar: true });
   $('campaignParty')?.focus({ preventScroll: true });
+}
+async function precargarNuevo(n) {
+  const c = n.campana || {};
+  if ($('newName') && !$('newName').value) $('newName').value = n.nombre || '';
+  if ($('publicFigure')) { $('publicFigure').checked = Boolean(n.publico); togglePublicName(); if (n.nombrePublico) $('publicName').value = n.nombrePublico; }
+  if ($('goal') && n.objetivo) $('goal').value = n.objetivo;
+  if (c.corp && $('election').value !== c.corp) { $('election').value = c.corp; updateTerritory(); }
+  if (c.departamento && $('department').value !== c.departamento) {
+    $('department').value = c.departamento;
+    if (MUNICIPAL_ELECTIONS.includes(c.corp)) { await Promise.resolve(loadMunicipalities()); $('municipality').value = c.municipio || ''; }
+    if (c.corp === 'jal' && c.municipio) { await Promise.resolve(loadLocalities()); $('locality').value = c.localidad || ''; }
+  }
 }
 function prepararPasoPartido() {
   /* Las firmas son de los cargos uninominales; «no me he decidido» es de
@@ -1485,14 +1512,21 @@ function redesParaGuardar() {
   };
 }
 
-function toggleParty() { const isNew = $('partyMode').value === 'new'; $('partyExisting').classList.toggle('hidden', isNew); $('partyNew').classList.toggle('hidden', !isNew); $('party').required = !isNew; $('partyName').required = isNew; }
+/* Tres respuestas: un partido que existe, uno por constituir, o ninguno
+   todavía —y entonces el espectro, con el que se calcula todo mientras tanto—. */
+function toggleParty() {
+  const modo = $('partyMode').value, isNew = modo === 'new', indeciso = modo === 'indeciso';
+  $('partyExisting').classList.toggle('hidden', isNew || indeciso); $('partyNew').classList.toggle('hidden', !isNew); $('partyEspectro')?.classList.toggle('hidden', !indeciso);
+  $('party').required = !isNew && !indeciso; $('partyName').required = isNew;
+  if (indeciso) pintarEspectroEn($('espectroNuevo'));
+}
 /* Una pregunta a la vez. Los campos se MUEVEN, no se recrean, para conservar
    validaciones y datos ya cargados. */
 const NEW_STEPS_TOTAL = 6;
 function montarWizardNuevo() {
   const form = document.querySelector('#new form'); if (!form) return;
   const findField = id => $(id)?.closest('.field');
-  const fields = { name: findField('newName'), pub: findField('publicFigure'), pubName: $('publicNameField'), redes: $('redesField'), election: findField('election'), department: findField('department'), municipality: findField('municipality'), locality: findField('locality'), mapa: $('mapaDeptoNuevo')?.closest('.field'), partyMode: findField('partyMode'), partyExisting: $('partyExisting'), partyNew: $('partyNew'), goal: findField('goal') };
+  const fields = { name: findField('newName'), pub: findField('publicFigure'), pubName: $('publicNameField'), redes: $('redesField'), election: findField('election'), department: findField('department'), municipality: findField('municipality'), locality: findField('locality'), mapa: $('mapaDeptoNuevo')?.closest('.field'), partyMode: findField('partyMode'), partyExisting: $('partyExisting'), partyNew: $('partyNew'), partyEspectro: $('partyEspectro'), goal: findField('goal') };
   const formGrid = form.querySelector('.form-grid'), originalSubmit = form.querySelector('[type="submit"]');
   const wizard = document.createElement('div'); wizard.className = 'new-wizard'; formGrid.before(wizard);
   Object.values(fields).forEach(f => f?.remove()); formGrid.remove(); originalSubmit.remove();
@@ -1504,7 +1538,7 @@ function montarWizardNuevo() {
        original lo borra el `formGrid.remove()` de abajo y el wizard pierde la
        confirmación que sí tiene la ruta. */
     { title: '¿Dónde será la candidatura?', copy: 'Ubique el territorio en el que va a competir.', fields: [fields.department, fields.municipality, fields.locality, fields.mapa] },
-    { title: '¿Con qué partido o movimiento?', copy: 'Puede vincular una organización existente o preparar una nueva.', fields: [fields.partyMode, fields.partyExisting, fields.partyNew] },
+    { title: '¿Con qué partido o movimiento?', copy: 'Puede vincular una organización existente o preparar una nueva.', fields: [fields.partyMode, fields.partyExisting, fields.partyNew, fields.partyEspectro] },
     { title: '¿Cuál es el primer objetivo?', copy: 'Con esto cerraremos su punto de partida.', fields: [fields.goal], final: true }
   ];
   const electionSelect = fields.election.querySelector('#election'); fields.election.id = 'electionField'; electionSelect.value = '';
@@ -1538,6 +1572,8 @@ function montarWizardNuevo() {
     }
     const required = steps[index].fields.flatMap(f => f ? [...f.querySelectorAll('input,select')] : []).filter(input => input.required && !input.closest('.hidden'));
     const invalid = required.find(input => !input.checkValidity()); if (invalid) { invalid.reportValidity(); return; }
+    /* Sin partido, el espectro no es opcional: es con lo que se calcula todo. */
+    if (steps[index].fields.includes(fields.partyEspectro) && $('partyMode').value === 'indeciso' && !espectroNuevoVigente()) { $('espectroNuevo').classList.add('shake'); setTimeout(() => $('espectroNuevo').classList.remove('shake'), 500); return; }
     showNewWizardStep(index + 1);
   }
   window.showNewWizardStep = showNewWizardStep;
@@ -1548,11 +1584,16 @@ async function createNew(e) {
   e.preventDefault();
   if (!SESSION.acceso) return abrirPaywall();
   const dep = $('department'), depNombre = dep.options[dep.selectedIndex]?.text || '';
-  const nuevo = { nombre: $('newName').value.trim(), publico: $('publicFigure').checked, nombrePublico: $('publicName').value.trim(), partido: $('partyMode').value === 'new' ? $('partyName').value.trim() : $('party').value, partidoNuevo: $('partyMode').value === 'new', objetivo: $('goal').value, redes: redesParaGuardar() };
-  const campana = { corp: $('election').value, ruta: 'other', departamento: dep.value, departamentoNombre: depNombre, municipio: MUNICIPAL_ELECTIONS.includes($('election').value) ? $('municipality').value : '', localidad: $('election').value === 'jal' ? $('locality').value : '' };
+  const modo = $('partyMode').value, indeciso = modo === 'indeciso';
+  if (indeciso && !espectroNuevoVigente()) { window.showNewWizardStep?.(4); return; }
+  const nuevo = { nombre: $('newName').value.trim(), publico: $('publicFigure').checked, nombrePublico: $('publicName').value.trim(), partido: indeciso ? '' : modo === 'new' ? $('partyName').value.trim() : $('party').value, partidoNuevo: modo === 'new', objetivo: $('goal').value, redes: redesParaGuardar() };
+  /* El partido va también en la campaña: es lo que /c360/campana sabe guardar
+     cuando quien no se había decidido lo define desde el CRM. */
+  const campana = { corp: $('election').value, ruta: 'other', avales: indeciso ? 'indeciso' : 'partido', espectro: indeciso ? espectroNuevoVigente() : '', partido: nuevo.partido, departamento: dep.value, departamentoNombre: depNombre, municipio: MUNICIPAL_ELECTIONS.includes($('election').value) ? $('municipality').value : '', localidad: $('election').value === 'jal' ? $('locality').value : '' };
   if (!nuevo.nombre || !campana.corp || !campana.departamento) return;
   if (PRUEBAS) vinculoLocal({ tipo: 'nuevo', nuevo, campana });
-  else if (!SESSION.vinculo) {
+  else if (SESSION.vinculo) guardarCampana(campana);   /* quien vuelve a definir el partido */
+  else {
     const sigue = await confirmarVinculo(nuevo.nombre, `${CRM_CORPORATIONS[campana.corp]} · ${[campana.localidad, campana.municipio, depNombre].filter(Boolean).join(' · ')}`);
     if (!sigue) return;
     const r = await guardarVinculo({ tipo: 'nuevo', nuevo, campana });
@@ -1871,10 +1912,12 @@ async function abrirCRMNuevo() {
   const n = NUEVO; if (!n) return;
   crmCandidate = null;
   const c = n.campana, lugar = [c.localidad, c.municipio, c.departamentoNombre].filter(Boolean).map(NOMBRE_BONITO).join(' · ');
+  const indeciso = c.avales === 'indeciso', partido = indeciso ? '' : (n.partido || c.partido || '');
   $('crmBack').textContent = '← Inicio'; $('crmBack').onclick = () => showScreen('intro');
   $('crmInitials').textContent = initials(n.nombre); $('crmName').textContent = n.nombre;
   $('crmTarget').textContent = `Candidatura 2027 · ${CRM_CORPORATIONS[c.corp]} · ${lugar}`;
-  $('crmContext').textContent = `Candidatura nueva${n.partido ? ` con ${n.partido}${n.partidoNuevo ? ' (movimiento por constituir)' : ''}` : ''}. Sin historial propio, el punto de partida es el territorio: la referencia son los resultados de 2023 en ${lugar}.${n.objetivo ? ` Primer objetivo: ${n.objetivo.toLowerCase()}.` : ''}${textoRedesCRM(n.redes)}`;
+  $('crmContext').textContent = `Candidatura nueva${indeciso ? `, todavía sin partido: se lanza desde ${FAMILIA_CON_ARTICULO[c.espectro] || FAMILIA_CON_ARTICULO.sc}, y con esa familia se calcula todo mientras lo define` : partido ? ` con ${partido}${n.partidoNuevo ? ' (movimiento por constituir)' : ''}` : ''}. Sin historial propio, el punto de partida es el territorio: la referencia son los resultados de 2023 en ${lugar}.${n.objetivo ? ` Primer objetivo: ${n.objetivo.toLowerCase()}.` : ''}${textoRedesCRM(n.redes)}`;
+  $('crmPartidoPendiente')?.classList.toggle('hidden', !indeciso);
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Territorio de campaña';
   document.getElementById('crmProfilePhoto')?.remove(); document.getElementById('crmProfilePhotoMissing')?.remove(); $('crmInitials').classList.remove('crm-avatar-hidden');
