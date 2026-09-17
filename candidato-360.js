@@ -1787,9 +1787,12 @@ let META_ACTUAL = null;
 function pintarMeta(estimate) {
   META_ACTUAL = estimate || null;
   if (estimate.target) { $('crmVoteNumber').textContent = estimate.target.toLocaleString('es-CO'); $('crmVoteTarget').textContent = `Meta inicial: ${estimate.target.toLocaleString('es-CO')} votos`; guardarMeta(estimate.target); }
-  /* Con la meta ya en mano, la tarjeta de firmas puede compararse con ella. */
-  if (FIRMAS_ACTUAL && $('crmFirmasCopy')) $('crmFirmasCopy').textContent = textoFirmas(FIRMAS_ACTUAL);
   else { $('crmVoteNumber').textContent = '—'; $('crmVoteTarget').textContent = 'Meta pendiente de referencia territorial'; }
+  /* Con la meta ya en mano, la tarjeta de firmas puede compararse con ella.
+     (Este refresco estuvo colgado del if de arriba como su else: sin firmas,
+     la meta se pintaba y acto seguido se borraba con «—», y el mapa
+     proyectado caía al reparto del historial.) */
+  if (FIRMAS_ACTUAL && $('crmFirmasCopy')) $('crmFirmasCopy').textContent = textoFirmas(FIRMAS_ACTUAL);
   $('crmVoteFormula').textContent = estimate.formula;
   /* La ⓘ solo aparece cuando hay una meta que explicar: junto a un guion no
      explica nada, y el propio panel ya dice que falta la referencia. */
@@ -2735,7 +2738,13 @@ const ES_SUMAPAZ = f => String(f?.properties?.LocCodigo || '') === '20';
    fuera —el sur de Usme y Ciudad Bolívar, Sumapaz— se sigue dibujando,
    desbordado por la derecha del mapa rotado. En coordenadas reales; se rota
    igual que la capa. */
-const BOGOTA_VENTANA_URBANA = { sur: 4.49, norte: 4.837, oeste: -74.224, este: -73.987 };
+/* La ventana va de la punta de Usaquén (norte) hasta pasada la parte rural
+   de Usme y Ciudad Bolívar (sur), con una tajada de Sumapaz: antes cortaba
+   en 4,49 y lo rural se dibujaba FUERA del encuadre, hacia la derecha, con la
+   holgura vacía al norte —el mapa se veía tirado a la derecha—. Con la
+   rotación, norte es izquierda y sur es derecha; la proporción 0,615 × 0,305
+   es la de la caja del mapa, así que no sobra a ningún lado. */
+const BOGOTA_VENTANA_URBANA = { sur: 4.23, norte: 4.845, oeste: -74.28, este: -73.975 };
 function encuadreBogota() {
   const { sur, norte, oeste, este } = BOGOTA_VENTANA_URBANA;
   const esquinas = [[oeste, sur], [este, sur], [oeste, norte], [este, norte]].map(c => rotateGeoJSON90Left({ features: [{ geometry: { type: 'Polygon', coordinates: [[c]] } }] }).features[0].geometry.coordinates[0][0]);

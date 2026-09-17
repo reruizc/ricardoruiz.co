@@ -73,6 +73,10 @@ await p.evaluate(async () => { document.getElementById('campaignDepartment').val
 await p.evaluate(async () => { PRUEBAS = true; SESSION.acceso = true; await launchCRM(); });
 await p.waitForTimeout(600);
 r.crm = await p.evaluate(() => ({ pantalla: !document.getElementById('crm').classList.contains('hidden'), boton: !document.getElementById('crmPartidoPendiente').classList.contains('hidden'), firmas: document.getElementById('crmFirmas').classList.contains('hidden'), avales: CAMPANA_ACTUAL?.avales, bloque: bloqueVigente(), partidoVigente: partidoVigente(), contexto: document.getElementById('crmContext').textContent }));
+/* La meta pintada tiene que QUEDARSE pintada aunque no haya firmas: el refresco
+   de la tarjeta de firmas la borraba con «—» y el mapa proyectado caía al
+   reparto del historial. */
+r.meta = await p.evaluate(() => { pintarMeta({ target: 6770, formula: 'de prueba', detalle: {} }); return { numero: document.getElementById('crmVoteNumber').textContent, titulo: document.getElementById('crmVoteTarget').textContent, firmasVisible: !document.getElementById('crmFirmas').classList.contains('hidden') }; });
 await p.evaluate(() => definirPartido());
 await p.waitForTimeout(400);
 r.definir = await p.evaluate(() => ({ pantalla: !document.getElementById('candidateRoute').classList.contains('hidden'), aval: avalVigente(), partido: !document.getElementById('campaignPartyField').classList.contains('hidden'), espectro: document.getElementById('espectroField').classList.contains('hidden') }));
@@ -98,6 +102,7 @@ const pruebas = [
   ['el botón vuelve al paso del partido con «con un partido» marcado', r.definir.pantalla && r.definir.aval === 'partido' && r.definir.partido && r.definir.espectro],
   ['al volver con la campaña guardada el espectro viene puesto', r.precarga.aval === 'indeciso' && r.precarga.espectro === 'ci'],
   ['en la alcaldía están las tres opciones', r.alcaldia.firmas && r.alcaldia.indeciso],
+  ['la meta pintada se queda pintada aunque no haya tarjeta de firmas', r.meta.numero === '6.770' && /6\.770 votos/.test(r.meta.titulo) && !r.meta.firmasVisible],
   ['sin errores de JavaScript', errores.length === 0],
 ];
 for (const [t, ok] of pruebas) console.log(`${ok ? '✓' : '✗'} ${t}`);
