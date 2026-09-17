@@ -107,7 +107,13 @@ MAX_LOG=$((20 * 1024 * 1024))
 tam=$(stat -f%z "$LOG" 2>/dev/null || stat -c%s "$LOG" 2>/dev/null || echo 0)   # BSD || GNU
 [ "$tam" -gt "$MAX_LOG" ] && mv -f "$LOG" "$LOG.1"
 
-: > "$REG"                                   # el registro es de ESTA corrida
+# El registro es de ESTA corrida, pero el de la anterior se guarda antes de
+# truncarlo: cuando una etapa falla de madrugada, su motivo y sus últimas líneas
+# viven acá en forma leíble por máquina, y truncar sin más se las llevaba a la
+# mañana siguiente, justo cuando alguien iba a mirarlas. Mismo patrón que el
+# rotado del log de arriba. Nadie lee el `.1`: está para el humano que llega tarde.
+[ -s "$REG" ] && cp -f "$REG" "$REG.1"
+: > "$REG"
 INICIO=$(date -u +%Y-%m-%dT%H:%M:%SZ)       # para saber si estado.json es de esta corrida
 DEADLINE=$(( $(date +%s) + TOPE_HORAS * 3600 ))
 etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$DEADLINE" "$@"; }
