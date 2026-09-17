@@ -18,6 +18,9 @@ const errores = []; p.on('pageerror', e => errores.push(e.message));
 await p.route('**', route => {
   const u = route.request().url();
   if (u.startsWith('file://')) return route.continue();
+  /* Sin sesión la página no llama /c360/me: el correo de soporte le llega por
+     /c360/planes, que es lo que ve un visitante anónimo. */
+  if (u.includes('/c360/planes')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, configurado: false, soporte: 'soporte@ejemplo.co' }) });
   if (u.includes('/c360/me')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, acceso: false, fuente: 'ninguno', vinculo: null, soporte: 'soporte@ejemplo.co' }) });
   return route.fulfill({ status: 404, body: '' });
 });
