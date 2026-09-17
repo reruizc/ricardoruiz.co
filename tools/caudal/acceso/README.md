@@ -97,18 +97,22 @@ Los tres caminos de acceso a Caudal quedan separados a propósito:
 - **link de invitado** (`caudal-guest:` + `/caudal/guest`) — socio sin cuenta,
   por `?acceso=<token>`. Sigue vivo y sin cambios.
 
-## Pendiente: cablear el frontend
+## El frontend ya está cableado (hecho · sep-2026)
 
-`caudal.html` **todavía usa su lista `ALLOWED` hardcodeada** — el cambio del
-frontend va aparte, a propósito. Mientras no se cablee, otorgar acceso por CLI
-**no abre la puerta todavía**. Lo que falta ahí es reemplazar el chequeo local
-por una llamada a `/caudal/acceso/me` con el bearer de la sesión, y mandar a
-`dashboard.html` cuando responda `acceso:false`.
+Esto fue pendiente un tiempo y ya no lo es: el chasis consulta
+`/caudal/acceso/me` con el bearer de la sesión (`caudal-base.js`) y manda a
+`dashboard.html` cuando responde `acceso:false`. **Otorgar por CLI abre la
+puerta de verdad**, sin tocar código.
 
-Los dos correos no-admin que estaban en esa lista (`diego@cauce.co` y
-`nuevagemela@gmail.com`) **ya quedaron sembrados en KV**, para que el día del
-corte nadie pierda el acceso que ya tenía. No hubo alta nueva: es la misma
-gente que hoy entra por el HTML.
+De la lista hardcodeada queda `EMERGENCIA`, que **no es la whitelist**: solo
+entra en juego si el worker no responde, y está para que una caída no deje a
+Ricardo y a los socios por fuera de su propia plataforma. Agregar gente ahí ya
+no sirve — hay que otorgar por CLI.
+
+Los dos correos no-admin que estaban en la lista vieja (`diego@cauce.co` y
+`nuevagemela@gmail.com`) **quedaron sembrados en KV** antes del corte, para que
+nadie perdiera el acceso que ya tenía. No hubo alta nueva: es la misma gente
+que entraba por el HTML.
 
 ## Desplegar el worker
 

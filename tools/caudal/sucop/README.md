@@ -130,10 +130,11 @@ Salida local (gitignored): `Bases de datos/leyes-senado/sucop/{raw,dist}/`
 
 ## Pendientes
 
-- **Refresco diario**: el harvester es barato (~8 requests, ~100 s) y la fuente se
-  mueve todos los días hábiles. Debe entrar a `tools/leyes-senado/run_diario.sh`
-  como etapa propia (`sucop_fetch` → `sucop_build` → `aws s3 cp`), y al catálogo de
-  `tools/caudal/salud/catalogo.py` en clase **`diario`** (26 h / 50 h). Sin eso, un
+- ✅ **Refresco diario — HECHO (sep-2026).** Está en `tools/leyes-senado/run_diario.sh`
+  con etapas propias (`sucop_fetch` → `sucop_build` → `sucop_upload_jsonl` /
+  `sucop_upload_stats`) y las dos llaves están en `tools/caudal/salud/catalogo.py`
+  en clase **`diario`** (26 h / 50 h). Era imprescindible: el harvester es barato
+  (~8 requests, ~100 s), la fuente se mueve todos los días hábiles y un
   `estado_consulta` viejo miente por definición.
 - **Los documentos del proceso** (~13.900 dentro de las carpetas: borrador de
   articulado, memoria justificativa, AIN, respuesta a comentarios) quedan **on
