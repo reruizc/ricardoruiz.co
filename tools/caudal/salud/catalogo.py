@@ -86,6 +86,28 @@ def archivos(leg=None):
              min_bytes=2_000, campo_fecha=None,
              productor='run_diario.sh · harvest_camara.py + build_diario_camara_s3.py --upload',
              consumidor='acción `radicados` (Cámara)'),
+        # Los dos manifiestos de arriba se re-suben en CADA corrida aunque la
+        # cosecha no haya traído nada, así que su LastModified siempre es de hoy.
+        # Del 15 al 17-sep-2026 el harvester del Senado murió 4 corridas seguidas
+        # sin escribir snapshot y este chequeo dio 29/29. El sello es un JSON de
+        # <1 KB que el builder sube al lado, y `visto_max` es el último día en
+        # que el harvester VIO la lista del registro. Es un día sin hora, así que
+        # se lee como medianoche: con la cosecha de esta corrida buena da 9-21 h
+        # (ok); si falló una, 33-45 h (aviso, umbral 26); a la tercera, >50 (error).
+        # OJO: `visto_max` y no `presentacion_max` — el Congreso tiene silencios
+        # legítimos (9-14 sep sin un radicado en Senado; los recesos) y una alarma
+        # sobre la fecha de presentación sonaría sin que nada esté roto.
+        dict(bucket=BUCKET_PRIV, key=f'metadata/pl-radicados-{leg}.meta.json', clase='diario',
+             min_bytes=100, campo_fecha='visto_max',
+             productor='run_diario.sh · build_diario_s3.py --upload (meta_radicados.py)',
+             consumidor='nadie: es el sello de frescura POR DENTRO de pl-radicados (Senado)',
+             nota='Si este vence y el manifiesto no, `senado_radicados` no está escribiendo '
+                  'snapshot: mirar esa etapa en cron.log, no la subida.'),
+        dict(bucket=BUCKET_PRIV, key=f'metadata/pl-radicados-camara-{leg}.meta.json', clase='diario',
+             min_bytes=100, campo_fecha='visto_max',
+             productor='run_diario.sh · build_diario_camara_s3.py --upload (meta_radicados.py)',
+             consumidor='nadie: es el sello de frescura POR DENTRO de pl-radicados (Cámara)',
+             nota='Ídem, para `camara_radicados`.'),
         dict(bucket=BUCKET_PRIV, key='metadata/secop-stats.json', clase='diario',
              min_bytes=15_000, campo_fecha='generado',
              productor='run_diario.sh · harvest_secop.py fetch+build + aws s3 cp',

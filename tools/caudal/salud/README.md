@@ -76,6 +76,13 @@ no error: el pipeline nuestro puede estar impecable y el tercero caído.
 
 - Si agregas un archivo a `metadata/`, agrégalo también a `catalogo.archivos()`
   con su clase. Lo que no está en el catálogo, no se vigila.
+- **Un archivo que se re-sube en cada corrida no se puede juzgar por su
+  `LastModified`.** Si es JSON chico, dale `campo_fecha`. Si es grande o JSONL
+  (los `pl-radicados-*`), el builder sube al lado un **sello** `….meta.json` de
+  <1 KB y se vigila ese (`tools/leyes-senado/meta_radicados.py`). El campo tiene
+  que medir si NOSOTROS estamos mirando (`visto_max`), no si la fuente publica
+  (`presentacion_max`): la fuente tiene silencios legítimos. Salió de que del 15
+  al 17-sep-2026 el Senado murió 4 corridas seguidas con la frescura en 29/29.
 - Los `min_bytes` son ~40-50% del tamaño real de ago-2026. Si un archivo crece
   mucho, súbelos; si un archivo legítimamente encoge, bájalos antes de que el
   chequeo grite.

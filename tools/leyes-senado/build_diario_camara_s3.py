@@ -41,6 +41,8 @@ BUCKET = 'caudal-legislativo'
 sys.path.insert(0, str(REPO / 'tools' / 'caudal' / 'actas'))
 from resolver_gaceta import resolver_gaceta   # noqa: E402
 from descargar_gaceta import descargar        # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import meta_radicados                         # noqa: E402
 
 
 def slug(txt):
@@ -138,10 +140,13 @@ def main():
     with meta_path.open('w', encoding='utf-8') as fh:
         for r in recs:
             fh.write(json.dumps(r, ensure_ascii=False) + '\n')
+    # sello de frescura por dentro (ver meta_radicados.py)
+    sello_path = meta_radicados.escribir(recs, meta_path, 'camara', leg)
 
     cmds = [
         f'aws s3 cp "{meta_path}" "s3://{BUCKET}/metadata/pl-radicados-camara-{leg}.jsonl" '
         f'--content-type application/x-ndjson',
+        meta_radicados.cmd_subida(sello_path, BUCKET),      # DESPUÉS del manifiesto
         f'aws s3 sync "{base / "textos"}/" "s3://{BUCKET}/radicados-camara-pdf/{leg}/" '
         f'--content-type application/pdf --exclude "*" --include "*.pdf"',
         f'aws s3 sync "{base / "textos-txt"}/" "s3://{BUCKET}/radicados-camara-texto/{leg}/" '
