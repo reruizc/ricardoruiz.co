@@ -194,7 +194,7 @@ Tres que conviene conocer antes de tocar nada:
   una: `node tools/candidato-360/prueba-ruta.mjs`.
 - **Git**: mensajes que cuentan la decisión, no el diff.
 
-### Las pruebas (24 suites)
+### Las pruebas (26 suites)
 
 ```
 prueba-ruta (26)        la ruta paso a paso, el mapa del lugar, la capital
@@ -208,6 +208,8 @@ prueba-arquetipos (15)  las tarjetas 06 y 07
 prueba-vitrina (14)     lo que ve un visitante sin cuenta
 prueba-puestos (11)     el nivel de puestos y su desglose
 prueba-jal-localidad (15) la JAL se elige por localidad, no por ciudad
+prueba-captura (13)     la captura de redes, apagada y forzada
+prueba-pais (7)         el selector de país en la portada
 …y otras once (ciudades, colores, salto, territorio, paneles, wizard, nacional)
 ```
 
