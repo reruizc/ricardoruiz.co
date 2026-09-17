@@ -9,6 +9,10 @@ Regla al cerrar uno: se tacha acá **y** en su README, con fecha. Un pendiente
 que el código ya resolvió pero el doc sigue anunciando es peor que no tenerlo
 escrito — ver «Vencidos» al final.
 
+Los números son **identificadores estables**: se citan en commits y en encargos,
+así que uno nuevo se agrega al final de su sección con el siguiente número libre
+y nunca se renumera el resto. Por eso no van en orden dentro de la tabla.
+
 ## Operación e infraestructura
 
 | # | Pendiente | Fuente | Qué falta exactamente | Depende de |
@@ -32,6 +36,7 @@ escrito — ver «Vencidos» al final.
 | 12 | **Extender el reencuadre regulatorio a las demás supers** | `supers/README.md:292` | Solo Supersalud aporta actos no-sancionatorios. SIC, Supertransporte y Superfinanciera publican circulares y resoluciones que caben en el mismo esquema con `tipo_acto` |
 | 13 | **Doctrina y conceptos de la DIAN** | `supers/harvest_dian.py:66` y `:118` | Resoluciones y circulares ya entran; los **conceptos** viven en otro backend (`type=Doctrine`) y no están cosechados |
 | 14 | **SUCOP · documentos y estados sin traducir** | `sucop/README.md:131` | Los ~13.900 documentos del proceso quedan **on demand**, igual que las gacetas (decisión, no bug). Y 17 procesos cargan un estado que la tabla oficial de SUCOP no traduce: se conserva la etiqueta cruda en `estado_fuente` en vez de inventar el mapeo |
+| 17 | **Encender el pilar Redes** | `redes/harvest_redes.py` (docstring) · `redes/cuentas.json` | No es una cosecha huérfana: está **en pausa deliberada** desde ago-2026 — la fuente queda cableada y no se le paga a Apify hasta la salida al público. Los dos candados son a propósito: sin `APIFY_TOKEN` hace dry-run y sale rc=0, y la cadencia mensual vive en un plist que se instala aparte, fuera de `run_diario.sh`. Para encenderlo faltan dos cosas concretas: **curar `cuentas.json`** —hoy son las 12 cuentas de oficio (Presidencia, MinHacienda, MinSalud, Supersalud…), no las de los clientes activos; el propio archivo lo pide— e **instalar el disparador**, que hoy no existe ni en la Mac (el plist no está cargado) ni en `ec2/crontab`. Costo al encender: ~500 items al mes ≈ centavos de USD, con `MAX_POR_CUENTA=40` como techo duro que no se sube sin mirar la factura | Una decisión, no un arreglo: el disparador es la salida al público |
 
 ## Modelo y analítica
 
