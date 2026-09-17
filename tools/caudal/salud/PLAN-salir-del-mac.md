@@ -1,6 +1,6 @@
 # Sacar el cron de Caudal del Mac — evaluación y recomendación
 
-**Estado: documento de decisión. Nada de esto está implementado.**
+**Estado: documento de decisión.** La migración sigue pendiente; el §5 (quién vigila al vigilante) ya está implementado.
 Escrito ago-2026, con el pipeline corriendo en el Mac vía launchd 2×/día.
 
 ---
@@ -140,8 +140,41 @@ local sigue en el Mac; a lo sumo hay que re-`rsync` en sentido contrario.
 ## 5. Quién vigila al vigilante
 
 Una vez fuera del Mac, `check.py` corre en la misma instancia — con lo cual, si
-la instancia se cae, nadie lo dice. El cierre correcto es que la **alerta** viva
-en otro lado (Lambda + EventBridge leyendo `estado.json` desde S3, o el worker de
-Cloudflare que ya existe). Eso es de la otra conversación; lo que hace falta de
-este lado es publicar `estado.json` a S3 al final de cada corrida — una línea de
-`aws s3 cp` en `run_diario.sh` el día que se decida el canal.
+la instancia se cae, nadie lo dice. **Resuelto (sep-2026), y ya aplica al Mac de
+hoy, no solo a la instancia de mañana:**
+
+1. **Publicar.** Al final de cada corrida `run_diario.sh` sube dos archivos:
+   - `diario/estado.json` → `s3://caudal-legislativo/metadata/estado.json`
+     (privado, completo), solo si es de ESTA corrida;
+   - `diario/latido.json` → `s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/caudal-latido.json`
+     (público, reducido: `ts`, estado, rc de salud, nombres de las etapas
+     fallidas y conteos). Lo arma `latido.py`.
+
+   La subida **no depende del rc de `check.py`** (1 y 2 son justo los días que
+   importan) y **no es una etapa**: el registro de etapas lo juzga `check.py`,
+   que ya corrió; el que juzga esta subida es el vigilante de afuera, y una
+   subida fallida se ve igual que una máquina caída — como tiene que verse. Si
+   `check.py` se rompió y no dejó estado.json de esta corrida, el latido sale
+   igual, marcado error, y el estado viejo no se sube como si fuera de hoy.
+
+2. **Vigilar desde afuera.** El cron trigger del worker `rr-auth` (Cloudflare,
+   otra infraestructura que AWS) lee el latido cada hora (`caudalVigia`) y
+   escribe a reruizc@gmail.com si pasa de **26 h (aviso)** o **50 h (error)** —
+   los umbrales de la clase `diario` — o si la corrida publicó error. Guarda en
+   KV el `ts` del último latido que vio: si el archivo desaparece o S3 no
+   responde, sigue midiendo desde ahí, y si nunca vio uno también es error. Un
+   problema que sigue igual se recuerda una vez al día; al volver a `ok` avisa
+   que se recuperó.
+
+   Se eligió el worker y no Lambda + EventBridge porque crear reglas de
+   EventBridge exige admin (`ricardo-mac-cli` no tiene `events:*`, lo mismo que
+   tiene trabado el trigger de `DEPLOY-en-vivo.md` §4), porque el worker ya tiene
+   Resend, y porque un vigilante en la **misma cuenta de AWS** se cae con lo
+   vigilado ante un problema de cuenta o región. El precio es el latido público:
+   el worker no tiene credenciales de AWS para leer el bucket privado.
+
+   Probar sin esperar: `GET /caudal/vigia?simular=viejo|error|nada[&ts=ISO][&enviar=1]`
+   con la cabecera `X-Caudal-Service` (ver `LEEME.md` de `rr-auth`).
+
+   ⚠ `check.py` **no** vigila `caudal-latido.json` ni `metadata/estado.json` en
+   `catalogo.py`, a propósito: el chequeo vigilándose a sí mismo no detecta nada.
