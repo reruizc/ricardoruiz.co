@@ -115,13 +115,36 @@ Base pública: `https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.c
 
 | Ruta | Qué trae |
 |---|---|
-| `<corp>-<año>/index-*.json` | Índice de candidaturas (nombre, slug, corporación, partido, votos). |
+| `<corp>-<año>/index-*.json` | Índice de candidaturas (nombre, slug, corporación, partido, votos) y, desde 2026-09, `listas[]` por circunscripción: `lista` (voto solo por el partido), `personal`, `total` y `cerrada`. Sin eso una lista cerrada no existe en el reparto de curules: ver §regenerar. |
 | `<corp>-<año>/<slug>.json` | Una candidatura mesa a mesa (`mesas[]` con dep, mun, zona, puesto, votos). |
 | `mapas-2026/DEPARTAMENTOS2.json` | Colombia por departamentos. |
 | `mapas-2026/Departamentos-mps/<dep>.json` | Un departamento por municipios (trae `mun_elec`, el código **electoral**, y `mpio_cnmbr`). |
 | `mapas-2026/Ciudades-COM-LOC/` | Comunas y localidades de las ciudades con cartografía. |
 | `mapas-2026/PUESTOS_GEOREF.csv` | Cada puesto de votación: coordenada, barrio, comuna y **censo por sexo**. |
 | `mapas-2026/CENSO_EDAD_PUESTO.json` | Censo por edad y puesto. **Todavía no publicado**; ver §8. |
+
+#### Regenerar los datos de 2023 (el voto de lista)
+
+Los índices que están hoy en S3 se construyeron descartando la fila `COD_CAN=0`
+del archivo de la Registraduría, que es **el voto solo por la lista** y, en una
+lista cerrada, todo su voto. Con eso el Pacto Histórico no existía en el Concejo
+de Bogotá y sus 7 curules se les repartían a las demás listas. Los generadores
+ya lo corrigen; falta volver a correrlos:
+
+```
+bash tools/analisis-candidato/regenerar_2023.sh          # genera y verifica
+bash tools/analisis-candidato/regenerar_2023.sh --subir  # y sube a S3
+```
+
+Necesita los CSV crudos en `Bases de datos/` (`FINAL SUBIDA GCS/GCS_2023TER.csv`,
+`GCS_2023JAL.csv` y `PUESTOS_GEOREF.csv`): son varios GB, no están en el repo ni
+en S3. `verificar_listas_2023.py` es la prueba de aceptación: cuadra cada lista
+con sus candidatos y exige que el reparto de Bogotá dé la composición real del
+cabildo 2024-2027. Si no pasa, el script no sube nada.
+
+Mientras tanto `vote-target.js` usa `LISTAS_VERIFICADAS`, una tabla con el
+escrutinio de Bogotá. En cuanto el índice traiga `listas`, manda el índice y esa
+tabla se puede quitar.
 | `asamblea-2023/dep/<dep>.json` | Resultados de asamblea por **municipio**: la única elección que baja a todos los municipios del país con voto por partido. |
 | `concejo-2023/resultados-concejo-2023.json` | Concejo por **comuna**, solo en once ciudades. |
 | `candidato-360-data/` (en el repo) | Logos de partido, barrios aproximados, catálogos por departamento y los Excel de homónimos. |
