@@ -134,6 +134,7 @@ def flush_depto(dde, muns, pot, depN, munN, pueN, index_rows):
             'validos': m['validos'], 'blanco': m['blanco'], 'nulos': m['nulos'],
             'votantes': votantes, 'potencial': potm, 'mesas': len(m['mesas']),
             'partidos': [[p, v] for p, v in mparties],
+            'listas': [[p, v] for p, v in sorted(m['listas'].items(), key=lambda kv: -kv[1])],
             'cands': cand_list,
         }
         tot_val += m['validos']; tot_bl += m['blanco']; tot_pot += potm
@@ -216,7 +217,7 @@ def main():
             m = muns.get(mme)
             if m is None:
                 m = muns[mme] = {'validos': 0, 'blanco': 0, 'nulos': 0, 'mesas': set(),
-                                 'parties': {}, 'cands': {}, 'puestos': {}}
+                                 'parties': {}, 'cands': {}, 'puestos': {}, 'listas': {}}
             m['mesas'].add((zz, pp, ms))
             pk = f'{zz}-{pp}'
             p = m['puestos'].get(pk)
@@ -229,25 +230,29 @@ def main():
             if mm is None:
                 mm = p['mesas'][ms] = {'validos': 0, 'blanco': 0, 'nulos': 0, 'cands': {}}
             can = row[C_CAN].strip()
-            if can == '0':                      # fila de partido (encabezado)
-                continue
             if can == '996':
                 m['blanco'] += v; p['blanco'] += v; mm['blanco'] += v
             elif can in SPECIAL:
                 m['nulos'] += v; p['nulos'] += v; mm['nulos'] += v
             else:
+                # can == '0' = voto SOLO POR LA LISTA: válido y del partido,
+                # aunque no sea de ningún candidato (en lista cerrada, todo su
+                # voto). Ignorarlo subestimaba los válidos y la participación.
                 m['validos'] += v; p['validos'] += v; mm['validos'] += v
                 par = row[C_PAR].strip()
                 party = (row[C_DESPAR] or '').strip() or 'SIN PARTIDO'
-                nom = strip(row[C_DESCAN]) or f'CAND {can}'
-                ck = (par, can, nom)
                 m['parties'][party] = m['parties'].get(party, 0) + v
-                cc = m['cands'].get(ck)
-                if cc is None:
-                    cc = m['cands'][ck] = {'nom': nom, 'par_name': party, 'v': 0}
-                cc['v'] += v
-                p['cands'][ck] = p['cands'].get(ck, 0) + v
-                mm['cands'][ck] = mm['cands'].get(ck, 0) + v
+                if can == '0':
+                    m['listas'][party] = m['listas'].get(party, 0) + v
+                else:
+                    nom = strip(row[C_DESCAN]) or f'CAND {can}'
+                    ck = (par, can, nom)
+                    cc = m['cands'].get(ck)
+                    if cc is None:
+                        cc = m['cands'][ck] = {'nom': nom, 'par_name': party, 'v': 0}
+                    cc['v'] += v
+                    p['cands'][ck] = p['cands'].get(ck, 0) + v
+                    mm['cands'][ck] = mm['cands'].get(ck, 0) + v
             n += 1
     if cur is not None:
         flush_depto(cur, muns, pot, depN, munN, pueN, index_rows)
@@ -255,7 +260,7 @@ def main():
     index_rows.sort(key=lambda r: -r['validos'])
     idx = os.path.join(OUT_DIR, 'resultados-asamblea-2023.json')
     with open(idx, 'w', encoding='utf-8') as f:
-        json.dump({'v': '2026-07-27', 'eleccion': 'Asamblea Departamental 2023',
+        json.dump({'v': '2026-09-17', 'eleccion': 'Asamblea Departamental 2023',
                    'cities': index_rows}, f, ensure_ascii=False, separators=(',', ':'))
 
     def dirsize(p):

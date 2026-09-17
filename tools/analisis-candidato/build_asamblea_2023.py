@@ -46,6 +46,10 @@ DEP_NAMES = {
     '72': 'VICHADA',
 }
 SPECIAL_CAN = {'0', '996', '997', '998', '999'}  # partido/blanco/nulos/no-marcados
+# COD_CAN '0' es la fila de la LISTA (voto solo por el partido y, en lista
+# cerrada, todo su voto). No es un candidato, pero cuenta para el umbral y la
+# cifra repartidora: se agrega aparte, por (departamento, partido).
+CAN_LISTA = '0'
 
 # Correcciones de nombre mal digitado en la fuente RNEC (slug → nombre correcto).
 # Vacío por ahora: los nombres se dejan tal cual los trae la Registraduría.
@@ -86,12 +90,25 @@ def main():
 
     # candidato (dde,par,can) → {meta, votos, mesas[]}
     cands = {}
+    listas = {}          # (dde, par) → {partido, votos}
     n = 0
     with open(SRC, encoding='utf-8', errors='replace') as f:
         for row in csv.DictReader(f, delimiter=';'):
             if row.get('COD_COR') != '2':
                 continue
             can = row['COD_CAN']
+            if can == CAN_LISTA:
+                try:
+                    vl = int(row['NUM_VOT'] or 0)
+                except ValueError:
+                    vl = 0
+                if vl > 0:
+                    kl = (row['COD_DDE'].strip(), row['COD_PAR'].strip())
+                    l = listas.get(kl)
+                    if l is None:
+                        l = listas[kl] = {'partido': (row['DES_PAR'] or '').strip() or f'PARTIDO {kl[1]}', 'votos': 0}
+                    l['votos'] += vl
+                continue
             if can in SPECIAL_CAN:
                 continue
             try:
@@ -151,11 +168,27 @@ def main():
             'partido': c['partido'], 'votos': c['votos'],
         })
 
+    # Una fila por lista: voto de lista, voto personal y si es cerrada.
+    personales = {}
+    for (dde, par, _can), c in cands.items():
+        personales[(dde, par)] = personales.get((dde, par), 0) + c['votos']
+    listas_out = []
+    for (dde, par), l in listas.items():
+        personal = personales.get((dde, par), 0)
+        listas_out.append({
+            'circunscripcion': DEP_NAMES.get(dde.zfill(2), f'DEP {dde}'), 'partido': l['partido'],
+            'lista': l['votos'], 'personal': personal,
+            'total': l['votos'] + personal, 'cerrada': personal == 0,
+        })
+    listas_out.sort(key=lambda x: -x['total'])
+
     index.sort(key=lambda x: -x['votos'])
     idx_path = os.path.join(OUT_DIR, 'index-asamblea-2023.json')
     with open(idx_path, 'w', encoding='utf-8') as f:
-        json.dump({'v': '2026-07-14', 'eleccion': 'Asamblea Departamental 2023',
-                   'candidatos': index}, f, ensure_ascii=False, separators=(',', ':'))
+        json.dump({'v': '2026-09-17', 'eleccion': 'Asamblea Departamental 2023',
+                   'candidatos': index, 'listas': listas_out},
+                  f, ensure_ascii=False, separators=(',', ':'))
+    print(f'{len(listas_out):,} listas ({sum(1 for l in listas_out if l["cerrada"]):,} cerradas)')
 
     print(f'→ {len(index):,} JSONs de candidato · {total_bytes/1e6:.0f} MB total')
     print(f'→ index-asamblea-2023.json ({os.path.getsize(idx_path)//1024} KB)')

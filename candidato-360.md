@@ -105,7 +105,7 @@ votante, 08 recolección de firmas (solo si va por firmas).
 | `partidos-bloques.js` | **Un solo diccionario** partido/coalición/movimiento → familia ideológica (izq, ci, c, cd, d, sc). Lo usan el mapa de alcaldías y Candidato 360: dos diccionarios serían dos opiniones. |
 | `candidato-360-electorado.js` | Las cuentas del electorado (perfil del censo, ideología del territorio, votación objetivo). Compartido por la tarjeta 07 y su página: si cada pantalla calculara por su lado, darían cifras distintas sobre lo mismo. Devuelve **datos**, no texto. |
 | `candidato-360-panel.js` | El chasis de los paneles: sesión, vínculo, muro, territorio y helpers de formato. |
-| `vote-target.js` | La meta de votos: referencia territorial, censo, participación y margen. |
+| `vote-target.js` | La meta de votos: referencia territorial, censo, participación y margen. Reparte las curules como el art. 263 (umbral, cifra repartidora) contando el **voto de lista** y las **listas cerradas**, y reservando la curul del estatuto de oposición en concejos y asambleas. Sin partido la referencia no es el piso de la corporación sino lo que costó entrar por una lista típica, o por una de la familia política elegida. |
 | `partidos-bloques.js` + `candidato-360-data/partidos/<dep>.js` | Catálogo de organizaciones por departamento para el sugeridor. |
 | `data-client.js`, `platform-config.js` | Dónde viven los datos públicos y la API privada. Ningún secreto en el navegador: este repo es público. |
 
@@ -194,13 +194,14 @@ Tres que conviene conocer antes de tocar nada:
   una: `node tools/candidato-360/prueba-ruta.mjs`.
 - **Git**: mensajes que cuentan la decisión, no el diff.
 
-### Las pruebas (26 suites)
+### Las pruebas (27 suites)
 
 ```
 prueba-ruta (26)        la ruta paso a paso, el mapa del lugar, la capital
 prueba-perfil (17)      la página del electorado y sus cinco lecturas
 prueba-partido (27)     sugeridor, logos, filtro por departamento
-prueba-meta (29)        la meta de votos en sus escenarios
+prueba-meta (31)        la meta de votos en sus escenarios
+prueba-listas (15)      voto de lista, listas cerradas y curul de oposición
 prueba-firmas (16)      cuántas firmas y dónde
 prueba-frases (18)      el banco de frases del punto de partida
 prueba-mapa (15)        Bogotá: ventana urbana, callejero, censo
