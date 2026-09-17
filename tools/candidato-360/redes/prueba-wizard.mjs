@@ -49,7 +49,7 @@ await p.waitForTimeout(600);
 const r = {};
 r.modoPruebas = await p.evaluate(() => PRUEBAS);
 r.avisoPruebas = (await p.textContent('#introVinculo')).slice(0, 60);
-await p.click('#intro .choice-panel button:nth-of-type(2)');
+await p.click('#paisPaso [data-pais="co"]'); await p.click('#rutaNueva');
 await p.fill('#newName', 'Alejandra Palacio Restrepo');
 await p.click('.new-wizard-step[data-step="0"] .wizard-next');
 await p.check('#publicFigure');

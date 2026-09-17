@@ -23,7 +23,7 @@ await p.goto('file://' + process.cwd() + '/candidato-360.html');
 await p.waitForFunction(() => typeof window.aplicarGateExistente === 'function');
 await p.waitForTimeout(300);
 await p.evaluate(() => { SESSION.listo = true; SESSION.acceso = false; aplicarGate(); });
-await p.click('#intro .choice-panel button:nth-of-type(1)');
+await p.click('#paisPaso [data-pais="co"]'); await p.click('#rutaHistorial');
 // El índice viene de S3 (bloqueado acá): se siembran tres candidaturas reales de forma.
 await p.evaluate(() => {
   appendHistorical([

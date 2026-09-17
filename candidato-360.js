@@ -274,45 +274,27 @@ async function toggleBriefing() {
 }
 
 /* ─── 3 ter. El país ────────────────────────────────────────────────────────
-   Colombia es el producto: índice electoral, mapas, censo, todo. Ecuador y
-   Paraguay son lo que viene, y la portada lo dice con su fecha en vez de
-   ofrecer una búsqueda que no encontraría a nadie. La elección se recuerda por
-   dispositivo y viaja en ?pais=, para mandar el enlace ya puesto en el país. */
-const PAISES = {
-  co: { nombre: 'Colombia', activo: true },
-  ec: { nombre: 'Ecuador', fecha: 'Seccionales · 29 de noviembre de 2026', eleccion: 'alcaldes, concejales, prefectos y vocales parroquiales de los 221 cantones',
-        datos: 'los resultados del CNE por parroquia y la cartografía del INEC' },
-  py: { nombre: 'Paraguay', fecha: 'Municipales · 4 de octubre de 2026', eleccion: 'intendentes y juntas municipales de los 262 distritos y Asunción',
-        datos: 'los resultados del TSJE' },
-};
-let PAIS = 'co';
+   Primer paso del cuadro «Comencemos»: Colombia, Ecuador o Paraguay, con su
+   bandera. Los módulos son los mismos en los tres; lo que cambia son los datos
+   electorales y la cartografía, y eso se irá acomodando por país. La elección
+   se recuerda por dispositivo y ?pais= manda sobre lo recordado. */
+const PAISES = { co: { nombre: 'Colombia', bandera: '🇨🇴' }, ec: { nombre: 'Ecuador', bandera: '🇪🇨' }, py: { nombre: 'Paraguay', bandera: '🇵🇾' } };
+let PAIS = null;
 function paisInicial() {
   const q = new URLSearchParams(location.search).get('pais');
   if (q && PAISES[q]) return q;
   try { const g = localStorage.getItem('c360-pais'); if (g && PAISES[g]) return g; } catch {}
-  return 'co';
+  return null;
 }
 function elegirPais(codigo) {
   if (!PAISES[codigo]) return;
   PAIS = codigo;
   try { localStorage.setItem('c360-pais', codigo); } catch {}
-  document.querySelectorAll('#paisSelector .pais').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.pais === codigo)));
-  const p = PAISES[codigo], aviso = $('paisAviso');
-  document.querySelectorAll('#choicePanel .choice').forEach(b => b.classList.toggle('hidden', !p.activo));
-  $('choiceCopy')?.classList.toggle('hidden', !p.activo);
-  if (p.activo) { $('choiceTitulo').textContent = '¿Cuál es su punto de partida?'; aviso.classList.add('hidden'); aviso.innerHTML = ''; return; }
-  $('choiceTitulo').textContent = `Candidato 360 llega a ${p.nombre}.`;
-  const correo = SESSION?.soporte ? `mailto:${SESSION.soporte}?subject=${encodeURIComponent(`Candidato 360 en ${p.nombre}`)}&body=${encodeURIComponent(`Hola Ricardo, me interesa Candidato 360 para una candidatura en ${p.nombre}.`)}` : 'index.html';
-  aviso.innerHTML = `<span class="pais-fecha">${escHtml(p.fecha)}</span>
-    <p>Se eligen <b>${escHtml(p.eleccion)}</b>. Estamos preparando la plataforma con ${escHtml(p.datos)}: el mapa de su territorio, la meta de votos y la escucha social sobre sus temas, como en Colombia.</p>
-    <p>Si tiene una candidatura en ${escHtml(p.nombre)}, hablemos antes de que empiece la campaña.</p>
-    <a class="wall-btn" href="${correo}">Quiero Candidato 360 en ${escHtml(p.nombre)} →</a>`;
-  aviso.classList.remove('hidden');
+  $('paisNombre').textContent = PAISES[codigo].nombre; $('paisBandera').textContent = PAISES[codigo].bandera;
+  $('paisPaso').classList.add('hidden'); $('partidaPaso').classList.remove('hidden');
 }
-function montarPais() {
-  document.querySelectorAll('#paisSelector .pais').forEach(b => b.addEventListener('click', () => elegirPais(b.dataset.pais)));
-  elegirPais(paisInicial());
-}
+function cambiarPais() { $('partidaPaso').classList.add('hidden'); $('paisPaso').classList.remove('hidden'); }
+function montarPais() { const p = paisInicial(); if (p) elegirPais(p); }
 
 /* ─── 3 bis. Modo pruebas (cuenta de administración) ─────────────────────────
    «Una cuenta = un candidato» es una regla del PRODUCTO: existe para que un
@@ -3661,9 +3643,6 @@ function mostrarFirmas() {
        cierra al conocer la sesión; con la cuenta lista se abre directo. */
     clearInterval(strategyMessageTimer);
     $('preload').classList.remove('active');
-    /* El aviso de Ecuador o Paraguay se pintó antes de conocer la sesión: se
-       vuelve a pintar para que el botón escriba al soporte que dijo el worker. */
-    if (!PAISES[PAIS].activo) elegirPais(PAIS);
     /* «Abrir mi candidatura» desde un panel (escucha, electorado) llega con
        ?abrir=1. Con vínculo se abre el CRM directo; SIN vínculo la respuesta
        no es la portada —desde la que el botón parece no haber hecho nada— sino
