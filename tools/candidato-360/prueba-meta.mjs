@@ -19,9 +19,12 @@ const { chromium } = await import('playwright')
   .catch(() => import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs'));
 const SP = process.env.SALIDA_PRUEBA || '/tmp';
 
-/* Un Concejo de Bogotá de mentiras: 3 listas × 3 candidatos = 3 curules. */
+/* Un Concejo de Bogotá de mentiras: 3 listas × 3 candidatos = 3 curules, de
+   las cuales 1 es del estatuto de oposición → 2 se reparten por cifra
+   repartidora. `listas: []` dice que este índice YA trae el voto de lista (acá
+   ninguno), para que no se use la tabla de listas verificadas a mano. */
 const lista = (partido, votos) => votos.map((v, i) => ({ nombre: `${partido} ${i + 1}`, slug: `${partido}-${i}`, corp: 'CONCEJO · BOGOTÁ D.C. · 2023', circunscripcion: 'BOGOTÁ D.C.', partido, votos: v }));
-const INDICE = { candidatos: [...lista('PARTIDO A', [9000, 5000, 1000]), ...lista('PARTIDO B', [6000, 3000, 500]), ...lista('PARTIDO C', [2000, 800, 100])] };
+const INDICE = { listas: [], candidatos: [...lista('PARTIDO A', [9000, 5000, 1000]), ...lista('PARTIDO B', [6000, 3000, 500]), ...lista('PARTIDO C', [2000, 800, 100])] };
 const RESULTADOS = { cities: [{ key: '16-001', name: 'BOGOTÁ', dep: 'BOGOTÁ D.C.', potencial: 100000 }],
   data: { '16-001': { comunas: { '13': { name: 'TEUSAQUILLO', votantes: 20000, validos: 19000, partidos: [['PARTIDO A', 9000]] }, '11': { name: 'SUBA', votantes: 30000, validos: 29000, partidos: [['PARTIDO A', 12000]] } } } } };
 
@@ -33,8 +36,8 @@ const CAMARA = { por_circunscripcion: { TERRITORIAL: { votval: 27400, partidos: 
    los índices reales: la circunscripción de la Asamblea es el departamento y
    la de la JAL es «LOCALIDAD · CIUDAD». Dos listas y tres curules cada una. */
 const listaEn = (circ, partido, votos) => votos.map((v, i) => ({ nombre: `${partido} ${i + 1}`, slug: `${partido}-${i}`, circunscripcion: circ, partido, votos: v }));
-const INDICE_ASAMBLEA = { candidatos: [...listaEn('CUNDINAMARCA', 'PARTIDO CAMBIO RADICAL', [40000, 20000, 8000]), ...listaEn('CUNDINAMARCA', 'CENTRO DEMOCRATICO Y SALVACION NACIONAL', [25000, 9000, 3000]), ...listaEn('BOYACÁ', 'PARTIDO LIBERAL COLOMBIANO', [30000, 15000, 5000])] };
-const INDICE_JAL = { candidatos: [...listaEn('SUBA · BOGOTÁ D.C.', 'NUEVO LIBERALISMO- AGRUPACION POLITICA EN MARCHA', [9000, 4000, 1500]), ...listaEn('SUBA · BOGOTÁ D.C.', 'PARTIDO ALIANZA VERDE', [7000, 2500, 900]), ...listaEn('USAQUÉN · BOGOTÁ D.C.', 'PARTIDO ALIANZA VERDE', [5000, 2000, 700])] };
+const INDICE_ASAMBLEA = { listas: [], candidatos: [...listaEn('CUNDINAMARCA', 'PARTIDO CAMBIO RADICAL', [40000, 20000, 8000]), ...listaEn('CUNDINAMARCA', 'CENTRO DEMOCRATICO Y SALVACION NACIONAL', [25000, 9000, 3000]), ...listaEn('BOYACÁ', 'PARTIDO LIBERAL COLOMBIANO', [30000, 15000, 5000])] };
+const INDICE_JAL = { listas: [], candidatos: [...listaEn('SUBA · BOGOTÁ D.C.', 'NUEVO LIBERALISMO- AGRUPACION POLITICA EN MARCHA', [9000, 4000, 1500]), ...listaEn('SUBA · BOGOTÁ D.C.', 'PARTIDO ALIANZA VERDE', [7000, 2500, 900]), ...listaEn('USAQUÉN · BOGOTÁ D.C.', 'PARTIDO ALIANZA VERDE', [5000, 2000, 700])] };
 
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
@@ -75,8 +78,10 @@ r.ficha = await p.evaluate(() => ({ abierta: document.getElementById('introModal
 await p.screenshot({ path: SP + '/meta-ficha.png' });
 
 /* ── La meta según el partido ────────────────────────────────────────── */
-/* No cuesta lo mismo entrar de segundo en la lista A (5.000) que arrastrar la
-   lista C, que no ganó curul (a su cabeza le tocan 6.600). */
+/* 3 curules, una del estatuto de oposición → 2 por cifra repartidora, que se
+   lleva la A (9.000) y la B (6.000); cifra = 9.500. No cuesta lo mismo entrar
+   de primero en la lista A (9.000) que arrastrar la lista C, que no ganó curul
+   (a su cabeza le tocan 8.600). */
 r.porPartido = {};
 for (const partido of ['PARTIDO A', 'PARTIDO C', 'MOVIMIENTO SALVACIÓN NACIONAL', 'PARTIDO INEXISTENTE']) {
   r.porPartido[partido] = await p.evaluate(async partido => {
@@ -96,7 +101,7 @@ r.asamblea = {};
 for (const partido of [null, 'PARTIDO CAMBIO RADICAL', 'MOVIMIENTO SALVACIÓN NACIONAL']) {
   r.asamblea[String(partido)] = await p.evaluate(async partido => {
     const e = await VoteTarget.estimate({ corp: 'asamblea', territory: 'Cundinamarca', baseUrl: 'https://stub/output', partido, departamento: '15' });
-    return { target: e.target, ref: e.detalle.referencia?.votos, tipo: e.detalle.partido?.tipo, k: e.detalle.partido?.k, lista: e.detalle.partido?.lista?.nombre, territorio: e.detalle.territorio };
+    return { target: e.target, ref: e.detalle.referencia?.votos, tipoRef: e.detalle.referencia?.tipo, piso: e.detalle.referencia?.piso, reparto: e.detalle.reparto, tipo: e.detalle.partido?.tipo, k: e.detalle.partido?.k, lista: e.detalle.partido?.lista?.nombre, territorio: e.detalle.territorio };
   }, partido);
 }
 /* Suba: 3 curules; Nuevo Liberalismo (14.500) 2 y Alianza Verde (10.400) 1.
@@ -105,7 +110,7 @@ r.jal = {};
 for (const partido of [null, 'PARTIDO NUEVO LIBERALISMO', 'PARTIDO ALIANZA VERDE']) {
   r.jal[String(partido)] = await p.evaluate(async partido => {
     const e = await VoteTarget.estimate({ corp: 'jal', territory: 'SUBA · BOGOTÁ, D.C. · Bogotá D.C.', baseUrl: 'https://stub/output', partido, departamento: '16' });
-    return { target: e.target, ref: e.detalle.referencia?.votos, tipo: e.detalle.partido?.tipo, k: e.detalle.partido?.k, lista: e.detalle.partido?.lista?.nombre, total: e.detalle.partido?.lista?.total, territorio: e.detalle.territorio };
+    return { target: e.target, ref: e.detalle.referencia?.votos, tipoRef: e.detalle.referencia?.tipo, piso: e.detalle.referencia?.piso, reparto: e.detalle.reparto, tipo: e.detalle.partido?.tipo, k: e.detalle.partido?.k, lista: e.detalle.partido?.lista?.nombre, total: e.detalle.partido?.lista?.total, territorio: e.detalle.territorio };
   }, partido);
 }
 
@@ -142,23 +147,25 @@ const pruebas = [
   ['explica el censo, la participación y el margen competitivo', /censo electoral/i.test(r.ficha.texto) && /participación/i.test(r.ficha.texto) && /margen competitivo/i.test(r.ficha.texto)],
   ['dice que redondea hacia arriba y por qué', /redondeamos hacia arriba/i.test(r.ficha.texto)],
   ['explica por qué la meta cae donde cae en el mapa', /misma proporción en que ya votaron por usted/i.test(r.ficha.texto)],
-  ['con partido, la meta es la de SU lista: entrar de 2 en la lista A cuesta 5.000, no el piso',
-    r.porPartido['PARTIDO A'].tipo === 'lista-con-curul' && r.porPartido['PARTIDO A'].k === 2 && r.porPartido['PARTIDO A'].ref.votos === 5000 && r.porPartido['PARTIDO A'].ref.piso === 5000],
-  ['y la ficha lo cuenta: entrar de 2 en la lista, y el piso de la corporación aparte',
-    /entrar de 2 en la lista de PARTIDO A/.test(r.porPartido['PARTIDO A'].texto) && /piso de la corporación/.test(r.porPartido['PARTIDO A'].texto)],
-  ['una lista sin curul tiene que jalarse hasta la cifra repartidora: 6.600 para la C',
-    r.porPartido['PARTIDO C'].tipo === 'lista-sin-curul' && r.porPartido['PARTIDO C'].ref.votos === 6600 && r.porPartido['PARTIDO C'].target === Math.ceil(6600 * d.censo.factor * d.participacion.factor * (1 + d.margen) / 10) * 10 && /jalar la lista/i.test(r.porPartido['PARTIDO C'].texto) && /cifra repartidora fue 7.500/.test(r.porPartido['PARTIDO C'].texto)],
+  ['con partido, la meta es la de SU lista: entrar de 1 en la lista A cuesta 9.000, no el piso',
+    r.porPartido['PARTIDO A'].tipo === 'lista-con-curul' && r.porPartido['PARTIDO A'].k === 1 && r.porPartido['PARTIDO A'].ref.votos === 9000 && r.porPartido['PARTIDO A'].ref.piso === 6000],
+  ['y la ficha lo cuenta: entrar de 1 en la lista, y el piso de la corporación aparte',
+    /entrar de 1 en la lista de PARTIDO A/.test(r.porPartido['PARTIDO A'].texto) && /piso de la corporación/.test(r.porPartido['PARTIDO A'].texto)],
+  ['una lista sin curul tiene que jalarse hasta la cifra repartidora: 8.600 para la C',
+    r.porPartido['PARTIDO C'].tipo === 'lista-sin-curul' && r.porPartido['PARTIDO C'].ref.votos === 8600 && r.porPartido['PARTIDO C'].target === Math.ceil(8600 * d.censo.factor * d.participacion.factor * (1 + d.margen) / 10) * 10 && /jalar la lista/i.test(r.porPartido['PARTIDO C'].texto) && /cifra repartidora fue 9.500/.test(r.porPartido['PARTIDO C'].texto)],
   ['un partido sin lista en 2023 se estima con su Cámara de 2026',
     r.porPartido['MOVIMIENTO SALVACIÓN NACIONAL'].tipo === 'proxy-camara' && r.porPartido['MOVIMIENTO SALVACIÓN NACIONAL'].ref.votos > 5000 && /Cámara de 2026/.test(r.porPartido['MOVIMIENTO SALVACIÓN NACIONAL'].texto)],
-  ['y uno sin ningún dato cae al piso de la corporación, diciéndolo',
+  ['y uno sin ningún dato cae a la referencia sin partido, diciéndolo',
     r.porPartido['PARTIDO INEXISTENTE'].tipo === 'sin-dato' && r.porPartido['PARTIDO INEXISTENTE'].target === r.estimate.target && /no hay lista en esta corporación en 2023 ni votación a Cámara/.test(r.porPartido['PARTIDO INEXISTENTE'].texto)],
   ['la frase corta de la meta también nombra el partido', /con PARTIDO C: llevar a la lista/.test(r.porPartido['PARTIDO C'].formula)],
-  ['Asamblea: el piso de la corporación es la curul más barata (20.000)', r.asamblea['null'].ref === 20000 && r.asamblea['null'].territorio === 'CUNDINAMARCA'],
-  ['Asamblea: entrar de 2 por Cambio Radical cuesta 20.000, no el piso', r.asamblea['PARTIDO CAMBIO RADICAL'].tipo === 'lista-con-curul' && r.asamblea['PARTIDO CAMBIO RADICAL'].k === 2 && r.asamblea['PARTIDO CAMBIO RADICAL'].ref === 20000],
+  ['Asamblea: una curul es del estatuto de oposición, así que se reparten 2 de 3', r.asamblea['null'].reparto.curules === 3 && r.asamblea['null'].reparto.porRepartidora === 2 && r.asamblea['null'].reparto.oposicion === 1],
+  ['Asamblea: sin partido la referencia es la lista típica (32.500), con el piso aparte (25.000)', r.asamblea['null'].tipoRef === 'mediana-listas' && r.asamblea['null'].ref === 32500 && r.asamblea['null'].piso === 25000 && r.asamblea['null'].territorio === 'CUNDINAMARCA'],
+  ['Asamblea: entrar de 1 por Cambio Radical cuesta 40.000, no el piso', r.asamblea['PARTIDO CAMBIO RADICAL'].tipo === 'lista-con-curul' && r.asamblea['PARTIDO CAMBIO RADICAL'].k === 1 && r.asamblea['PARTIDO CAMBIO RADICAL'].ref === 40000],
   ['Asamblea: Salvación Nacional encuentra su lista bajo el nombre de la coalición y debe encabezarla: 25.000', r.asamblea['MOVIMIENTO SALVACIÓN NACIONAL'].tipo === 'lista-con-curul' && /SALVACION NACIONAL/.test(r.asamblea['MOVIMIENTO SALVACIÓN NACIONAL'].lista) && r.asamblea['MOVIMIENTO SALVACIÓN NACIONAL'].k === 1 && r.asamblea['MOVIMIENTO SALVACIÓN NACIONAL'].ref === 25000],
   ['JAL: la localidad se resuelve sola y la lista de Usaquén no se mezcla', r.jal['null'].territorio === 'SUBA · BOGOTÁ D.C.' && r.jal['PARTIDO ALIANZA VERDE'].total === 10400],
+  ['JAL: no hay curul de oposición, se reparten las 3', r.jal['null'].reparto.curules === 3 && r.jal['null'].reparto.porRepartidora === 3 && r.jal['null'].reparto.oposicion === 0],
   ['JAL: Nuevo Liberalismo se encuentra en «NUEVO LIBERALISMO- AGRUPACION…» y entra de 2 con 4.000', r.jal['PARTIDO NUEVO LIBERALISMO'].k === 2 && r.jal['PARTIDO NUEVO LIBERALISMO'].ref === 4000 && /AGRUPACION/.test(r.jal['PARTIDO NUEVO LIBERALISMO'].lista)],
-  ['JAL: por la Alianza Verde hay que ser primero: 7.000, no el piso de 4.000', r.jal['PARTIDO ALIANZA VERDE'].k === 1 && r.jal['PARTIDO ALIANZA VERDE'].ref === 7000 && r.jal['null'].ref === 4000],
+  ['JAL: por la Alianza Verde hay que ser primero: 7.000, y el piso de 4.000 no es la meta', r.jal['PARTIDO ALIANZA VERDE'].k === 1 && r.jal['PARTIDO ALIANZA VERDE'].ref === 7000 && r.jal['null'].ref === 5500 && r.jal['null'].piso === 4000],
   ['con salto, esa explicación pasa a ser la del salto', /Salto de Junta administradora local a Concejo/.test(r.conSalto) && /2,4 veces/.test(r.conSalto)],
   ['sin referencia no hay número', r.sinMeta.numero === '—'],
   ['ni ⓘ que prometa una explicación', r.sinMeta.ocultas === true],

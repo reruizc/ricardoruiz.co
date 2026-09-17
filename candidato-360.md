@@ -105,7 +105,7 @@ votante, 08 recolección de firmas (solo si va por firmas).
 | `partidos-bloques.js` | **Un solo diccionario** partido/coalición/movimiento → familia ideológica (izq, ci, c, cd, d, sc). Lo usan el mapa de alcaldías y Candidato 360: dos diccionarios serían dos opiniones. |
 | `candidato-360-electorado.js` | Las cuentas del electorado (perfil del censo, ideología del territorio, votación objetivo). Compartido por la tarjeta 07 y su página: si cada pantalla calculara por su lado, darían cifras distintas sobre lo mismo. Devuelve **datos**, no texto. |
 | `candidato-360-panel.js` | El chasis de los paneles: sesión, vínculo, muro, territorio y helpers de formato. |
-| `vote-target.js` | La meta de votos: referencia territorial, censo, participación y margen. |
+| `vote-target.js` | La meta de votos: referencia territorial, censo, participación y margen. Reparte las curules como el art. 263 (umbral, cifra repartidora) contando el **voto de lista** y las **listas cerradas**, y reservando la curul del estatuto de oposición en concejos y asambleas. Sin partido la referencia no es el piso de la corporación sino lo que costó entrar por una lista típica, o por una de la familia política elegida. |
 | `partidos-bloques.js` + `candidato-360-data/partidos/<dep>.js` | Catálogo de organizaciones por departamento para el sugeridor. |
 | `data-client.js`, `platform-config.js` | Dónde viven los datos públicos y la API privada. Ningún secreto en el navegador: este repo es público. |
 
@@ -115,13 +115,36 @@ Base pública: `https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.c
 
 | Ruta | Qué trae |
 |---|---|
-| `<corp>-<año>/index-*.json` | Índice de candidaturas (nombre, slug, corporación, partido, votos). |
+| `<corp>-<año>/index-*.json` | Índice de candidaturas (nombre, slug, corporación, partido, votos) y, desde 2026-09, `listas[]` por circunscripción: `lista` (voto solo por el partido), `personal`, `total` y `cerrada`. Sin eso una lista cerrada no existe en el reparto de curules: ver §regenerar. |
 | `<corp>-<año>/<slug>.json` | Una candidatura mesa a mesa (`mesas[]` con dep, mun, zona, puesto, votos). |
 | `mapas-2026/DEPARTAMENTOS2.json` | Colombia por departamentos. |
 | `mapas-2026/Departamentos-mps/<dep>.json` | Un departamento por municipios (trae `mun_elec`, el código **electoral**, y `mpio_cnmbr`). |
 | `mapas-2026/Ciudades-COM-LOC/` | Comunas y localidades de las ciudades con cartografía. |
 | `mapas-2026/PUESTOS_GEOREF.csv` | Cada puesto de votación: coordenada, barrio, comuna y **censo por sexo**. |
 | `mapas-2026/CENSO_EDAD_PUESTO.json` | Censo por edad y puesto. **Todavía no publicado**; ver §8. |
+
+#### Regenerar los datos de 2023 (el voto de lista)
+
+Los índices que están hoy en S3 se construyeron descartando la fila `COD_CAN=0`
+del archivo de la Registraduría, que es **el voto solo por la lista** y, en una
+lista cerrada, todo su voto. Con eso el Pacto Histórico no existía en el Concejo
+de Bogotá y sus 7 curules se les repartían a las demás listas. Los generadores
+ya lo corrigen; falta volver a correrlos:
+
+```
+bash tools/analisis-candidato/regenerar_2023.sh          # genera y verifica
+bash tools/analisis-candidato/regenerar_2023.sh --subir  # y sube a S3
+```
+
+Necesita los CSV crudos en `Bases de datos/` (`FINAL SUBIDA GCS/GCS_2023TER.csv`,
+`GCS_2023JAL.csv` y `PUESTOS_GEOREF.csv`): son varios GB, no están en el repo ni
+en S3. `verificar_listas_2023.py` es la prueba de aceptación: cuadra cada lista
+con sus candidatos y exige que el reparto de Bogotá dé la composición real del
+cabildo 2024-2027. Si no pasa, el script no sube nada.
+
+Mientras tanto `vote-target.js` usa `LISTAS_VERIFICADAS`, una tabla con el
+escrutinio de Bogotá. En cuanto el índice traiga `listas`, manda el índice y esa
+tabla se puede quitar.
 | `asamblea-2023/dep/<dep>.json` | Resultados de asamblea por **municipio**: la única elección que baja a todos los municipios del país con voto por partido. |
 | `concejo-2023/resultados-concejo-2023.json` | Concejo por **comuna**, solo en once ciudades. |
 | `candidato-360-data/` (en el repo) | Logos de partido, barrios aproximados, catálogos por departamento y los Excel de homónimos. |
@@ -194,13 +217,14 @@ Tres que conviene conocer antes de tocar nada:
   una: `node tools/candidato-360/prueba-ruta.mjs`.
 - **Git**: mensajes que cuentan la decisión, no el diff.
 
-### Las pruebas (26 suites)
+### Las pruebas (27 suites)
 
 ```
 prueba-ruta (26)        la ruta paso a paso, el mapa del lugar, la capital
 prueba-perfil (17)      la página del electorado y sus cinco lecturas
 prueba-partido (27)     sugeridor, logos, filtro por departamento
-prueba-meta (29)        la meta de votos en sus escenarios
+prueba-meta (31)        la meta de votos en sus escenarios
+prueba-listas (15)      voto de lista, listas cerradas y curul de oposición
 prueba-firmas (16)      cuántas firmas y dónde
 prueba-frases (18)      el banco de frases del punto de partida
 prueba-mapa (15)        Bogotá: ventana urbana, callejero, censo

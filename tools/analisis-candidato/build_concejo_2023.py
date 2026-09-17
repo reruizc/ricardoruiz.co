@@ -52,6 +52,11 @@ DEP_NAMES = {
     '56': 'SAN ANDRÉS', '60': 'AMAZONAS', '64': 'PUTUMAYO', '68': 'VAUPÉS',
     '72': 'VICHADA', '88': 'EXTERIOR', '16': 'BOGOTÁ D.C.',
 }
+# COD_CAN: '0' es la fila de la LISTA (voto solo por el partido y, en lista
+# cerrada, TODO su voto); 996 blanco, 997-999 nulos/no marcados. La fila de
+# lista NO es un candidato, pero su votación sí cuenta para el umbral y la
+# cifra repartidora: se agrega aparte, por (municipio, partido).
+CAN_LISTA = '0'
 SPECIAL_CAN = {'0', '996', '997', '998', '999'}
 
 # Columnas GCS (0-based) tras split(';')
@@ -108,6 +113,26 @@ def fmt(x):
     return f'{x:,}'.replace(',', '.')
 
 
+def flush_listas(listas, cands, munNames, out):
+    """Una fila por LISTA del municipio: su voto de lista, sus votos personales
+    y si es cerrada (sin voto preferente). Es lo que necesita el reparto por
+    cifra repartidora; sin esto una lista cerrada no existe."""
+    personales = {}
+    for (dde, mme, par, _can), c in cands.items():
+        personales[(dde, mme, par)] = personales.get((dde, mme, par), 0) + c['votos']
+    for (dde, mme, par), l in listas.items():
+        dd = dde.zfill(2); mm = mme.zfill(3)
+        depNom = DEP_NAMES.get(dd, f'DEP {dd}')
+        munNom = 'BOGOTÁ D.C.' if dd == '16' else munNames.get(f'{dd}{mm}', f'MUN {mm}')
+        circ = munNom if munNom == depNom else f'{munNom} ({depNom})'
+        personal = personales.get((dde, mme, par), 0)
+        out.append({
+            'circunscripcion': circ, 'partido': l['partido'],
+            'lista': l['votos'], 'personal': personal,
+            'total': l['votos'] + personal, 'cerrada': personal == 0,
+        })
+
+
 def flush_group(cands, by9, munNames, index):
     """Escribe los JSONs de un municipio y agrega sus entradas al índice."""
     for (dde, mme, par, can), c in cands.items():
@@ -150,7 +175,9 @@ def main():
     ensure_sorted()
 
     index = []
+    listas_out = []
     cands = {}
+    listas = {}
     cur_group = None   # (dde, mme)
     n_rows = 0
     with open(SORTED, encoding='utf-8', errors='replace', newline='') as f:
@@ -158,7 +185,7 @@ def main():
             if len(row) < 16:
                 continue
             can = row[C_CAN]
-            if can in SPECIAL_CAN:
+            if can in SPECIAL_CAN and can != CAN_LISTA:
                 continue
             try:
                 v = int(row[C_VOT] or 0)
@@ -172,9 +199,19 @@ def main():
             if grp != cur_group:
                 if cur_group is not None:
                     flush_group(cands, by9, munNames, index)
+                    flush_listas(listas, cands, munNames, listas_out)
                     cands = {}
+                    listas = {}
                 cur_group = grp
             par = row[C_PAR].strip()
+            if can == CAN_LISTA:
+                l = listas.get((dde, mme, par))
+                if l is None:
+                    l = listas[(dde, mme, par)] = {
+                        'partido': (row[C_DESPAR] or '').strip() or f'PARTIDO {par}', 'votos': 0}
+                l['votos'] += v
+                n_rows += 1
+                continue
             key = (dde, mme, par, can)
             c = cands.get(key)
             if c is None:
@@ -196,12 +233,17 @@ def main():
             n_rows += 1
     if cur_group is not None:
         flush_group(cands, by9, munNames, index)
+        flush_listas(listas, cands, munNames, listas_out)
 
     index.sort(key=lambda x: -x['votos'])
+    listas_out.sort(key=lambda x: -x['total'])
     idx_path = os.path.join(OUT_DIR, 'index-concejo-2023.json')
     with open(idx_path, 'w', encoding='utf-8') as f:
-        json.dump({'v': '2026-07-26', 'eleccion': 'Concejo Municipal 2023',
-                   'candidatos': index}, f, ensure_ascii=False, separators=(',', ':'))
+        json.dump({'v': '2026-09-17', 'eleccion': 'Concejo Municipal 2023',
+                   'candidatos': index, 'listas': listas_out},
+                  f, ensure_ascii=False, separators=(',', ':'))
+    cerradas = [l for l in listas_out if l['cerrada']]
+    print(f'{len(listas_out):,} listas ({len(cerradas):,} cerradas)')
 
     print(f'{n_rows:,} filas mesa-candidato · {len(index):,} candidatos')
     print(f'→ index-concejo-2023.json ({os.path.getsize(idx_path)//1024} KB)')
