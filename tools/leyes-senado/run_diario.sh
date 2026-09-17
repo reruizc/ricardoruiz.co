@@ -31,6 +31,7 @@
 #   supers_verifica           verificar_consolidado.py    piso por fuente ANTES de publicar
 #   supers_upload_*           aws s3 cp                   dist/s3/ → metadata/
 #   salud                     tools/caudal/salud/check.py frescura en S3 + ping a la Lambda
+#   (publicar, no es etapa)   tools/caudal/salud/latido.py  estado.json → S3 privado + latido → S3 público
 #
 # Tres cosas que este script garantiza y que antes no:
 #   · una sola corrida a la vez (candado). Dos corridas en paralelo contra
@@ -57,6 +58,14 @@ LOG="$DIARIO/cron.log"
 LOCK="$DIARIO/.run_diario.lock"
 REG="$DIARIO/.etapas.jsonl"
 ESTADO="$DIARIO/estado.json"
+LATIDO="$DIARIO/latido.json"
+
+# A dónde se publica el estado. El completo va al bucket PRIVADO (lleva llaves del
+# bucket y el detalle de la Lambda); el latido reducido, al prefijo público que ya
+# cubre la bucket policy, porque su lector —el vigilante del worker rr-auth— no
+# tiene credenciales de AWS. Ver tools/caudal/salud/latido.py.
+S3_ESTADO="s3://caudal-legislativo/metadata/estado.json"
+S3_LATIDO="s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/caudal-latido.json"
 
 # Tope de la corrida entera. Con dos disparos separados 11,5 h, una corrida que
 # pase de 4 h ya es una corrida colgada: las etapas que falten se omiten y se
@@ -99,6 +108,7 @@ tam=$(stat -f%z "$LOG" 2>/dev/null || stat -c%s "$LOG" 2>/dev/null || echo 0)   
 [ "$tam" -gt "$MAX_LOG" ] && mv -f "$LOG" "$LOG.1"
 
 : > "$REG"                                   # el registro es de ESTA corrida
+INICIO=$(date -u +%Y-%m-%dT%H:%M:%SZ)       # para saber si estado.json es de esta corrida
 DEADLINE=$(( $(date +%s) + TOPE_HORAS * 3600 ))
 etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$DEADLINE" "$@"; }
 
@@ -522,6 +532,48 @@ print('· OMITIDAS : ' + (', '.join(omit) if omit else 'ninguna'))
 if lentas:
     print('· lentas   : ' + ', '.join(lentas))
 PY
+
+  # ── publicar el estado (para que la alerta viva FUERA de esta máquina) ──
+  # Sin esto, si la máquina se cae nadie lo dice: el chequeo corre acá mismo.
+  # Tres decisiones:
+  #   · NO depende de rc_salud. check.py sale 1 en aviso y 2 en error, que son
+  #     justo los días en que el estado más importa publicarlo.
+  #   · NO es una etapa. `etapa.py` sirve para que check.py juzgue lo que corrió,
+  #     y check.py ya corrió: el registro de esta subida no lo leería nadie (el
+  #     .etapas.jsonl se trunca al empezar la siguiente corrida). Quien juzga esta
+  #     subida es el vigilante de afuera, y la juzga por lo único que no miente:
+  #     si el latido deja de envejecer bien. Una subida fallida se ve igual que una
+  #     máquina caída, que es exactamente como tiene que verse.
+  #   · El latido se publica SIEMPRE que se llegue hasta acá, aunque check.py se
+  #     haya roto y no haya estado.json de esta corrida: en ese caso sale como
+  #     error, y el estado.json viejo NO se sube como si fuera de hoy.
+  echo "--- publicar: estado.json (privado) + latido (público) ---"
+  python3 tools/caudal/salud/latido.py --estado "$ESTADO" --etapas "$REG" \
+          --inicio "$INICIO" --rc-salud "$rc_salud" --out "$LATIDO"
+  rc_lat=$?
+  if [ $rc_lat -ne 0 ] && [ $rc_lat -ne 10 ]; then
+    # latido.py se rompió: igual sale un latido, mínimo y a mano. Un vigilante
+    # que se queda sin latido por un bug nuestro tardaría 26 h en gritar.
+    printf '{"v":1,"ts":"%s","corrida_inicio":"%s","estado":"error","rc_salud":%s,"motivo":"latido.py se rompió (rc=%s): ver cron.log"}' \
+           "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$INICIO" "${rc_salud:-null}" "$rc_lat" > "$LATIDO"
+  fi
+  # Timeouts del propio CLI: sin `timeout` en macOS, una subida colgada no puede
+  # dejar tomado el candado hasta la siguiente corrida.
+  S3OPT="--cli-connect-timeout 20 --cli-read-timeout 60"
+  if [ $rc_lat -eq 0 ]; then
+    # shellcheck disable=SC2086
+    aws s3 cp "$ESTADO" "$S3_ESTADO" $S3OPT \
+        --content-type "application/json" --cache-control "no-cache" \
+      && echo "· estado.json → $S3_ESTADO" \
+      || echo "✗ no pude subir estado.json (el vigilante lo va a notar por el latido)"
+  else
+    echo "· estado.json NO se sube: no es de esta corrida (latido rc=$rc_lat)"
+  fi
+  # shellcheck disable=SC2086
+  aws s3 cp "$LATIDO" "$S3_LATIDO" $S3OPT \
+      --content-type "application/json" --cache-control "no-cache" \
+    && echo "· latido → $S3_LATIDO" \
+    || echo "✗ no pude subir el latido: afuera esto se va a ver como máquina caída"
 
   echo "═════════ fin $(date '+%H:%M:%S') · salud=$rc_salud (0 ok · 1 aviso · 2 error · 3 el chequeo se rompió) ═════════"
 } >> "$LOG" 2>&1

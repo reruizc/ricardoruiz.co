@@ -8,6 +8,7 @@ que paga.
 | `catalogo.py` | **la parte opinable**: qué archivo tiene que estar fresco, con qué umbral y por qué; qué acciones de la Lambda tienen que responder y con qué forma |
 | `check.py` | aplica el catálogo → escribe `Bases de datos/leyes-senado/diario/estado.json` |
 | `etapa.py` | corre UNA etapa del cron con timeout y deja constancia (lo usa `run_diario.sh`) |
+| `latido.py` | arma el **latido** público y reducido de `estado.json`, que `run_diario.sh` sube a S3 para el vigilante de afuera |
 | `PLAN-salir-del-mac.md` | evaluación y recomendación para dejar de depender del portátil |
 
 ## Uso
@@ -33,6 +34,20 @@ Códigos de salida, para no tener que parsear nada:
 `run_diario.sh` lo llama al final de cada corrida con `--etapas`, y así
 `estado.json` queda con las tres capas: **qué corrió**, **qué tan fresco está el
 dato** y **si la Lambda responde**.
+
+## Quién avisa si esto no corre
+
+`check.py` corre en la misma máquina que el cron, así que no puede avisar de su
+propia caída. Al final de cada corrida `run_diario.sh` publica `estado.json` al
+bucket privado (`metadata/estado.json`) y el **latido** al prefijo público
+(`congreso-2026/output/legislativo/caudal-latido.json`), sin mirar el rc del
+chequeo. El cron trigger del worker `rr-auth` lo lee cada hora y escribe a
+reruizc@gmail.com si pasa de 26 h / 50 h o si la corrida terminó en error; si el
+latido desaparece sigue midiendo desde el último que vio. Detalle y por qué así:
+`PLAN-salir-del-mac.md` §5.
+
+Ninguno de los dos archivos está en `catalogo.py`, a propósito: el chequeo
+vigilándose a sí mismo no detecta nada.
 
 ## Qué chequea, en concreto
 
