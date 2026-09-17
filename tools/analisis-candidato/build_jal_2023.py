@@ -46,6 +46,10 @@ DEP_NAMES = {
     '56': 'SAN ANDRÉS', '60': 'AMAZONAS', '64': 'PUTUMAYO', '68': 'VAUPÉS',
     '72': 'VICHADA', '88': 'EXTERIOR', '16': 'BOGOTÁ D.C.',
 }
+# COD_CAN '0' es la fila de la LISTA (voto solo por el partido y, en lista
+# cerrada, todo su voto): no es un candidato, pero cuenta para el umbral y la
+# cifra repartidora, así que se agrega aparte.
+CAN_LISTA = '0'
 SPECIAL_CAN = {'0', '996', '997', '998', '999'}
 C_CAN, C_VOT, C_DDE, C_MME, C_ZZ, C_PP = 13, 15, 6, 7, 8, 9
 C_MS, C_PAR, C_DESPAR, C_DESCAN = 10, 11, 12, 14
@@ -103,6 +107,30 @@ def fmt(x):
     return f'{x:,}'.replace(',', '.')
 
 
+def flush_listas(listas, cands, by9, munNames, out):
+    """Una fila por LISTA y JAL: voto de lista, voto personal y si es cerrada.
+    La circunscripción es «COMUNA/LOCALIDAD · MUNICIPIO», como la del
+    candidato, porque la JAL se elige por comuna, no por municipio."""
+    personales, circs = {}, {}
+    for (dde, mme, par, can, _n), c in cands.items():
+        comNom = clean_com(max(c['comVotes'].items(), key=lambda kv: kv[1])[0]) if c['comVotes'] else 'LOCAL'
+        dd = dde.zfill(2); mm = mme.zfill(3)
+        munNom = 'BOGOTÁ D.C.' if dd == '16' else munNames.get(f'{dd}{mm}', c['munNom'] or f'MUN {mm}')
+        k = (dde, mme, par, comNom)
+        personales[k] = personales.get(k, 0) + c['votos']
+        circs[k] = f'{comNom} · {munNom}'
+    for (dde, mme, par, comNom), l in listas.items():
+        dd = dde.zfill(2); mm = mme.zfill(3)
+        munNom = 'BOGOTÁ D.C.' if dd == '16' else munNames.get(f'{dd}{mm}', f'MUN {mm}')
+        k = (dde, mme, par, comNom)
+        personal = personales.get(k, 0)
+        out.append({
+            'circunscripcion': circs.get(k, f'{comNom} · {munNom}'), 'partido': l['partido'],
+            'lista': l['votos'], 'personal': personal,
+            'total': l['votos'] + personal, 'cerrada': personal == 0,
+        })
+
+
 def flush_group(cands, by9, munNames, index):
     for (dde, mme, par, can, nkey), c in cands.items():
         dd = dde.zfill(2); mm = mme.zfill(3)
@@ -148,7 +176,9 @@ def main():
     ensure_sorted()
 
     index = []
+    listas_out = []
     cands = {}
+    listas = {}
     cur_group = None
     n_rows = 0
     with open(SORTED, encoding='utf-8', errors='replace', newline='') as f:
@@ -156,7 +186,7 @@ def main():
             if len(row) < 16:
                 continue
             can = row[C_CAN]
-            if can in SPECIAL_CAN:
+            if can in SPECIAL_CAN and can != CAN_LISTA:
                 continue
             try:
                 v = int(row[C_VOT] or 0)
@@ -169,9 +199,23 @@ def main():
             if grp != cur_group:
                 if cur_group is not None:
                     flush_group(cands, by9, munNames, index)
+                    flush_listas(listas, cands, by9, munNames, listas_out)
                     cands = {}
+                    listas = {}
                 cur_group = grp
             par = row[C_PAR].strip()
+            if can == CAN_LISTA:
+                zz0 = (row[C_ZZ] or '').strip().zfill(2)
+                pp0 = (row[C_PP] or '').strip().zfill(2)
+                g0 = by9.get(f'{dde.zfill(2)}{mme.zfill(3)}{zz0}{pp0}')
+                comNom = clean_com(g0[3]) if g0 else 'LOCAL'
+                l = listas.get((dde, mme, par, comNom))
+                if l is None:
+                    l = listas[(dde, mme, par, comNom)] = {
+                        'partido': (row[C_DESPAR] or '').strip() or f'PARTIDO {par}', 'votos': 0}
+                l['votos'] += v
+                n_rows += 1
+                continue
             nombre = strip(row[C_DESCAN]) or f'CANDIDATO {can}'
             key = (dde, mme, par, can, nombre)
             zz = (row[C_ZZ] or '').strip().zfill(2)
@@ -195,12 +239,16 @@ def main():
             n_rows += 1
     if cur_group is not None:
         flush_group(cands, by9, munNames, index)
+        flush_listas(listas, cands, by9, munNames, listas_out)
 
     index.sort(key=lambda x: -x['votos'])
+    listas_out.sort(key=lambda x: -x['total'])
     idx_path = os.path.join(OUT_DIR, 'index-jal-2023.json')
     with open(idx_path, 'w', encoding='utf-8') as f:
-        json.dump({'v': '2026-07-26', 'eleccion': 'JAL (Ediles) 2023',
-                   'candidatos': index}, f, ensure_ascii=False, separators=(',', ':'))
+        json.dump({'v': '2026-09-17', 'eleccion': 'JAL (Ediles) 2023',
+                   'candidatos': index, 'listas': listas_out},
+                  f, ensure_ascii=False, separators=(',', ':'))
+    print(f'{len(listas_out):,} listas ({sum(1 for l in listas_out if l["cerrada"]):,} cerradas)')
 
     print(f'{n_rows:,} filas mesa-candidato · {len(index):,} candidatos')
     print(f'→ index-jal-2023.json ({os.path.getsize(idx_path)//1024} KB)')

@@ -38,6 +38,38 @@
     { corp: 'jal', territory: ['TEUSAQUILLO', 'BOGOTA'], seats: 9, cutoff: 1114 },
   ];
 
+  /* Art. 25 de la Ley 1909 de 2018 (estatuto de oposición): quien queda de
+     segundo a la alcaldía o a la gobernación tiene derecho a una curul en el
+     concejo o en la asamblea, y esa curul sale del número fijo de la
+     corporación, no se suma. Por cifra repartidora se reparten n − 1 (en
+     Bogotá 2023: 44 de 45; la otra fue de Oviedo). Las JAL no tienen esa
+     figura. */
+  const CURUL_OPOSICION = { concejo: true, asamblea: true };
+
+  /* Votos DE LISTA que el índice todavía no trae. La Registraduría registra
+     aparte el voto «solo por la lista» y, en las listas cerradas, TODO el voto
+     de la lista (código de candidato 0); los índices por candidato los
+     dejaron por fuera, así que una lista cerrada desaparecía del reparto y
+     sus curules se les regalaban a las demás (en Bogotá 2023 el Pacto
+     Histórico, 376.733 votos y 7 curules, no existía). Los build_*_2023.py
+     ya emiten `listas` en el índice; mientras esa versión no esté en S3, acá
+     van los totales de escrutinio verificados a mano: `total` es la votación
+     completa de la lista y el voto de lista se deduce restando lo que suman
+     sus candidatos. `cerrada`: sin voto personal. */
+  const LISTAS_VERIFICADAS = [
+    { corp: 'concejo', territory: ['BOGOTA'], fuente: 'escrutinio 2023', listas: [
+      { partido: 'PARTIDO ALIANZA VERDE', total: 419884 },
+      { partido: 'NUEVO LIBERALISMO EN MARCHA', total: 401187 },
+      { partido: 'PACTO HISTÓRICO', total: 376733, cerrada: true },
+      { partido: 'PARTIDO CENTRO DEMOCRÁTICO', total: 358140 },
+      { partido: 'PARTIDO LIBERAL COLOMBIANO', total: 296637 },
+      { partido: 'PARTIDO CAMBIO RADICAL - PARTIDO MIRA - PARTIDO DE LA U', total: 217085 },
+      { partido: 'LIDERAZGO AMPLIO DE RENOVACIÓN AVANZADA DE BTÁ "LARA BOGOTÁ"', total: 138445 },
+      { partido: 'PARTIDO CONSERVADOR - PARTIDO COLOMBIA JUSTA LIBRES', total: 85834 },
+      { partido: 'BOGOTÁ MÁS FUERTE', total: 52581 },
+    ] },
+  ];
+
   const cache = new Map();
   const CENSUS_GROWTH_2023_2027 = 0.014;
   const PARTICIPATION_UPLIFT = 0.01;
@@ -121,44 +153,121 @@
     return Math.max(0, ...parties.map(party => party.candidates.length));
   }
 
+  function listasVerificadas(corp, territory) {
+    const key = normalize(territory);
+    const hit = LISTAS_VERIFICADAS.find(reference =>
+      reference.corp === corp && reference.territory.every(part => key.includes(normalize(part))));
+    return hit ? hit.listas : [];
+  }
+  /* Los votos de lista de una circunscripción: los del índice (`listas`, con
+     el voto solo-lista ya separado por el pipeline) y, si el índice todavía
+     no los trae, los verificados a mano. */
+  function listasDe(index, corp, label) {
+    /* Si el índice ya declara `listas`, manda él aunque para esta
+       circunscripción venga vacío: la tabla a mano es solo para los índices
+       viejos, que no traían el voto de lista. */
+    if (Array.isArray(index.listas)) return index.listas.filter(lista => normalize(lista.circunscripcion) === normalize(label));
+    return listasVerificadas(corp, label);
+  }
+  /* Cada lista vale su voto personal MÁS su voto de lista. Una lista que
+     solo tiene voto de lista es cerrada: sus curules cuentan en el reparto,
+     pero nadie entró por ella con votos propios. */
+  function mezclarListas(parties, listas) {
+    const porNombre = new Map(parties.map(party => [normalize(party.name), party]));
+    parties.forEach(party => { party.personal = party.votes; party.lista = 0; party.cerrada = false; });
+    (listas || []).forEach(lista => {
+      let party = porNombre.get(normalize(lista.partido));
+      if (!party) {
+        party = { name: lista.partido, candidates: [], votes: 0, personal: 0, lista: 0, cerrada: false };
+        parties.push(party);
+        porNombre.set(normalize(lista.partido), party);
+      }
+      const soloLista = lista.lista != null
+        ? Number(lista.lista) || 0
+        : Math.max(0, (Number(lista.total) || 0) - party.personal);
+      party.lista += soloLista;
+      party.votes = party.personal + party.lista;
+      if (lista.cerrada || !party.candidates.length) party.cerrada = true;
+    });
+    return parties;
+  }
+
   /* Art. 263: umbral del 50% del cuociente electoral y cifra repartidora.
      El índice trae una fila por candidato y permite inferir las curules por el
-     tamaño máximo de las listas inscritas en cada circunscripción. */
-  function reconstructedCutoff(rows) {
-    const parties = groupByParty(rows);
+     tamaño máximo de las listas inscritas en cada circunscripción. Encima de
+     los candidatos van los votos de lista (`listas`), el voto en blanco
+     cuenta para el umbral y en concejos y asambleas una curul se reserva al
+     estatuto de oposición. Además del piso (la curul más barata) se devuelve
+     el último elegido de CADA lista: lo que costó entrar por cada una. */
+  function reconstructedCutoff(rows, opts) {
+    const { corp = '', listas = [], blanco = 0 } = opts || {};
+    const parties = mezclarListas(groupByParty(rows), listas);
     const seats = inferSeats(parties);
     if (seats < 2) {
       const observed = rows.map(candidate => Number(candidate.votos || 0)).filter(votes => votes > 0).sort((a, b) => a - b);
       return observed.length ? { cutoff: observed[0], seats: null, sparse: true } : null;
     }
+    const oposicion = CURUL_OPOSICION[corp] ? 1 : 0;
+    const seatsRepartidora = Math.max(1, seats - oposicion);
     const validVotes = parties.reduce((sum, party) => sum + party.votes, 0);
-    const threshold = validVotes / seats / 2;
+    const threshold = (validVotes + (Number(blanco) || 0)) / seats / 2;
     let eligible = parties.filter(party => party.votes >= threshold);
     if (!eligible.length) eligible = parties;
 
     const quotients = [];
     eligible.forEach(party => {
-      for (let divisor = 1; divisor <= seats; divisor += 1) {
+      for (let divisor = 1; divisor <= seatsRepartidora; divisor += 1) {
         quotients.push({ party, value: party.votes / divisor });
       }
     });
     quotients.sort((a, b) => b.value - a.value);
     const allocations = new Map();
-    quotients.slice(0, seats).forEach(item => {
+    quotients.slice(0, seatsRepartidora).forEach(item => {
       allocations.set(item.party.name, (allocations.get(item.party.name) || 0) + 1);
     });
 
-    const elected = [];
+    const elected = [], ultimos = [], cerradas = [];
     eligible.forEach(party => {
-      elected.push(...party.candidates.slice(0, allocations.get(party.name) || 0));
+      const k = allocations.get(party.name) || 0;
+      if (!k) return;
+      if (party.cerrada) { cerradas.push({ partido: party.name, k, total: party.votes }); return; }
+      const suyos = party.candidates.slice(0, k);
+      elected.push(...suyos);
+      const ultimo = suyos[suyos.length - 1];
+      if (ultimo) ultimos.push({ partido: party.name, k, votos: Number(ultimo.votos || 0), nombre: ultimo.nombre || '', total: party.votes });
     });
     elected.sort((a, b) => Number(a.votos || 0) - Number(b.votos || 0));
-    if (!elected.length) return null;
+    if (!elected.length && !cerradas.length) return null;
     /* cifra repartidora = el cociente más bajo que alcanzó curul: lo que una
        LISTA necesita para una curul. Se devuelve todo lo reconstruido porque
        la meta por partido se calcula encima de esto. */
-    const cifra = quotients[Math.min(seats, quotients.length) - 1].value;
-    return { cutoff: Number(elected[0].votos || 0), seats, validVotes, parties, allocations, cifra, threshold };
+    const cifra = quotients[Math.min(seatsRepartidora, quotients.length) - 1].value;
+    const cutoff = elected.length ? Number(elected[0].votos || 0) : 0;
+    return { cutoff, seats, seatsRepartidora, oposicion, validVotes, parties, allocations, cifra, threshold, ultimos, cerradas, conListas: listas.length > 0 };
+  }
+
+  /* Sin partido (por firmas o sin decidirse) no hay lista por la que entrar,
+     y el piso de la corporación engaña: en Bogotá 2023 la curul más barata
+     fue el octavo de una lista de 400.000 votos. Lo que cuesta entrar por una
+     lista típica es la mediana de los últimos elegidos de cada lista con
+     curul; con familia política, la mediana de las listas de esa familia. */
+  function medianaCentral(xs) {
+    const s = xs.filter(Number.isFinite).sort((a, b) => a - b);
+    if (!s.length) return null;
+    const m = s.length / 2;
+    return s.length % 2 ? s[(s.length - 1) / 2] : (s[m - 1] + s[m]) / 2;
+  }
+  function referenciaSinPartido(reconstructed, bloque) {
+    const { ultimos = [], cutoff, cifra } = reconstructed;
+    /* Si todas las curules fueron de listas cerradas no hay voto personal que
+       mirar: lo que se sabe es lo que le costó a una lista cada curul. */
+    if (!ultimos.length) return cifra ? { tipo: 'cifra-repartidora', votos: Math.round(cifra), piso: cutoff } : { tipo: 'curul-reconstruida', votos: cutoff };
+    const PB = global.PartidosBloques;
+    if (bloque && PB && typeof PB.bloqueDeOrganizacion === 'function') {
+      const suyos = ultimos.filter(u => PB.bloqueDeOrganizacion(u.partido) === bloque);
+      if (suyos.length) return { tipo: 'mediana-bloque', votos: Math.round(medianaCentral(suyos.map(u => u.votos))), bloque, listas: suyos.length, piso: cutoff };
+    }
+    return { tipo: 'mediana-listas', votos: Math.round(medianaCentral(ultimos.map(u => u.votos))), listas: ultimos.length, piso: cutoff };
   }
 
   /* ── La meta según el partido ───────────────────────────────────────────
@@ -205,6 +314,13 @@
     const entera = v => Math.max(1, Math.round(v));
     if (lista) {
       const k = allocations.get(lista.name) || 0, top = Number(lista.candidates[0] && lista.candidates[0].votos || 0);
+      /* Lista cerrada: no hay voto personal y entrar depende del renglón.
+         Cada curul le costó a la lista la cifra repartidora; como meta
+         personal se toma lo que costó entrar por una lista abierta típica. */
+      if (lista.cerrada) {
+        const tipica = referenciaSinPartido(reconstructed, null);
+        return { tipo: 'lista-cerrada', votos: entera(tipica.votos || cifra), k, lista: { nombre: lista.name, total: lista.votes, candidatos: 0 }, cifra: entera(cifra), porCurul: entera(cifra) };
+      }
       if (k >= 1) {
         const ultimo = lista.candidates[k - 1];
         return { tipo: 'lista-con-curul', votos: entera(ultimo.votos), k, lista: { nombre: lista.name, total: lista.votes, candidatos: lista.candidates.length, cabeza: top, ultimoNombre: ultimo.nombre || '' }, cifra: entera(cifra) };
@@ -270,23 +386,25 @@
           return key.includes(wanted) || wanted.includes(key);
         });
         return unit && unit.potencial && unit.votantes
-          ? { potential: Number(unit.potencial), voters: Number(unit.votantes) }
+          ? { potential: Number(unit.potencial), voters: Number(unit.votantes), blanco: Number(unit.blanco || 0) }
           : null;
       }
       if (corp === 'concejo') {
         const scope = results.data && results.data[city.key];
-        const voters = Object.values((scope && scope.comunas) || {})
-          .reduce((sum, item) => sum + Number(item.votantes || 0), 0);
+        const unidades = Object.values((scope && scope.comunas) || {});
+        const voters = unidades.reduce((sum, item) => sum + Number(item.votantes || 0), 0);
+        const blanco = unidades.reduce((sum, item) => sum + Number(item.blanco || 0), 0);
         return city.potencial && voters
-          ? { potential: Number(city.potencial), voters }
+          ? { potential: Number(city.potencial), voters, blanco }
           : null;
       }
       if (corp === 'asamblea') {
         const detail = await json(`${baseUrl}/asamblea-2023/dep/${city.key}.json`);
         const units = Object.values((detail && detail.comunas) || {});
         const voters = units.reduce((sum, item) => sum + Number(item.votantes || 0), 0);
+        const blanco = units.reduce((sum, item) => sum + Number(item.blanco || 0), 0);
         const potential = Number(detail && detail.totals && detail.totals.potencial || city.potencial || 0);
-        return potential && voters ? { potential, voters } : null;
+        return potential && voters ? { potential, voters, blanco } : null;
       }
     } catch (error) {
       return null;
@@ -316,13 +434,14 @@
   /* El MISMO cálculo, pero desarmado en piezas nombradas. `formula` lo cuenta
      en una línea; esto deja que la interfaz lo explique paso a paso sin volver
      a calcular nada (y sin que las dos versiones se puedan desincronizar). */
-  function detalleDe({ corp, source, label, referencia, metrics, projected, target }) {
+  function detalleDe({ corp, source, label, referencia, metrics, projected, target, reparto }) {
     return {
       corporacion: source.label,
       corporacionClave: corp,
       territorio: label,
       uninominal: !source.multiSeat,
       referencia: referencia,
+      reparto: reparto || null,
       censo: {
         potencial: metrics && metrics.potential ? Number(metrics.potential) : null,
         crecimiento: CENSUS_GROWTH_2023_2027,
@@ -355,7 +474,7 @@
     return `${census} × ${participation} × margen competitivo ${Math.round(COMPETITIVE_MARGIN * 100)}%`;
   }
 
-  async function estimate({ corp, territory, baseUrl, partido, departamento }) {
+  async function estimate({ corp, territory, baseUrl, partido, departamento, bloque }) {
     const source = CORPORATIONS[corp];
     if (!source || !territory) return { target: null, formula: 'Seleccione una corporación y un territorio para calcular la meta.', detalle: { falla: 'sin-territorio' } };
     try {
@@ -379,18 +498,29 @@
         };
       }
 
+      /* El umbral del art. 263 se cuenta sobre los votos válidos, que
+         incluyen el voto en blanco; por eso las métricas se piden ANTES de
+         reconstruir. */
+      const metrics = await metricsPromise;
       const verified = verifiedCutoff(corp, match.label);
-      const reconstructed = reconstructedCutoff(match.rows);
+      const listas = listasDe(index, corp, match.label);
+      const reconstructed = reconstructedCutoff(match.rows, { corp, listas, blanco: metrics && metrics.blanco });
       const reference = verified || reconstructed;
-      if (!reference || !reference.cutoff) throw new Error('No fue posible reconstruir la última curul');
+      if (!reference || (!reference.cutoff && !reference.cifra)) throw new Error('No fue posible reconstruir la última curul');
       /* La meta por partido solo se calcula sobre la reconstrucción completa
          (con curules por lista); el corte verificado a mano sigue siendo el
          piso de la corporación. */
       const camara = partido && reconstructed && !reconstructed.sparse && !listaDelPartido(reconstructed.parties, partido) ? await camaraDepartamento(baseUrl, departamento) : null;
       const porPartido = partido ? referenciaPorPartido({ reconstructed, partido, camara }) : null;
       const usaPartido = Boolean(porPartido && porPartido.votos > 0);
-      const referenceVotes = usaPartido ? porPartido.votos : Number(reference.cutoff);
-      const metrics = await metricsPromise;
+      /* Sin partido, el piso de la corporación es engañoso: lo paga siempre
+         la lista más grande, cuyo último elegido entra barato de arrastre.
+         La referencia es la lista típica (o la típica de su familia). */
+      const tipica = usaPartido || !reconstructed || reconstructed.sparse
+        ? null
+        : referenciaSinPartido(reconstructed, bloque);
+      const usaTipica = Boolean(tipica && tipica.votos > 0 && tipica.tipo !== 'curul-reconstruida');
+      const referenceVotes = usaPartido ? porPartido.votos : usaTipica ? tipica.votos : Number(reference.cutoff);
       const projected = projection(referenceVotes, metrics);
       const target = roundTarget(projected.target);
       const method = verified
@@ -401,18 +531,35 @@
       const seatsText = reference.seats ? `; ${reference.seats} curules` : '';
       const textoPartido = !usaPartido ? '' : porPartido.tipo === 'lista-con-curul'
         ? `entrar de ${porPartido.k} en la lista de ${porPartido.lista.nombre}, que en 2023 ganó ${porPartido.k} curul${porPartido.k === 1 ? '' : 'es'} y cuyo último elegido sacó ${porPartido.votos.toLocaleString('es-CO')} votos`
+        : porPartido.tipo === 'lista-cerrada'
+          ? `entrar por la lista CERRADA de ${porPartido.lista.nombre}, que en 2023 ganó ${porPartido.k} curul${porPartido.k === 1 ? '' : 'es'} sin voto preferente: lo que se negocia es el renglón, y cada curul le costó ${porPartido.porCurul.toLocaleString('es-CO')} votos de lista`
         : porPartido.tipo === 'lista-sin-curul'
           ? `llevar a la lista de ${porPartido.lista.nombre} hasta la cifra repartidora (${porPartido.cifra.toLocaleString('es-CO')}): sumó ${porPartido.lista.total.toLocaleString('es-CO')} y a quien la encabece le tocan ${porPartido.votos.toLocaleString('es-CO')}`
           : `una lista estimada con la Cámara de 2026 (${porPartido.camara.totalEstimado.toLocaleString('es-CO')} votos al tamaño de esta corporación), que ${porPartido.k ? `arrastraría ${porPartido.k} curul${porPartido.k === 1 ? '' : 'es'}` : 'no alcanzaría la cifra repartidora'}: ${porPartido.votos.toLocaleString('es-CO')} votos personales`;
+      const textoTipica = !usaTipica ? '' : tipica.tipo === 'cifra-repartidora'
+        ? `la cifra repartidora de 2023 (${tipica.votos.toLocaleString('es-CO')} votos por curul): todas las curules fueron de listas cerradas, así que no hay voto personal con el que comparar`
+        : tipica.tipo === 'mediana-bloque'
+        ? `lo que costó entrar por una lista de su familia política en 2023 (mediana de ${tipica.listas} lista${tipica.listas === 1 ? '' : 's'}: ${tipica.votos.toLocaleString('es-CO')} votos)`
+        : `lo que costó entrar por una lista típica en 2023 (mediana del último elegido de las ${tipica.listas} listas con curul: ${tipica.votos.toLocaleString('es-CO')} votos)`;
       return {
         target,
         formula: usaPartido
           ? `Meta para ${source.label} en ${match.label} con ${partido}: ${textoPartido} × ${projectionText(projected, metrics)}. La última curul de la corporación (${Number(reference.cutoff).toLocaleString('es-CO')} votos) es solo el piso.`
-          : `Meta para ${source.label} en ${match.label}: ${method} en 2023 (${Number(reference.cutoff).toLocaleString('es-CO')} votos${seatsText}) × ${projectionText(projected, metrics)}.`,
+          : usaTipica
+            ? `Meta para ${source.label} en ${match.label}: ${textoTipica} × ${projectionText(projected, metrics)}. La última curul de la corporación (${Number(reference.cutoff).toLocaleString('es-CO')} votos${seatsText}) es solo el piso.`
+            : `Meta para ${source.label} en ${match.label}: ${method} en 2023 (${Number(reference.cutoff).toLocaleString('es-CO')} votos${seatsText}) × ${projectionText(projected, metrics)}.`,
         detalle: Object.assign(detalleDe({ corp, source, label: match.label, metrics, projected, target,
           referencia: usaPartido
             ? { tipo: 'partido', votos: referenceVotes, curules: reference.seats || null, validos: reference.validVotes || null, piso: Number(reference.cutoff), pisoTipo: verified ? 'curul-verificada' : reference.sparse ? 'piso-observado' : 'curul-reconstruida' }
-            : { tipo: verified ? 'curul-verificada' : reference.sparse ? 'piso-observado' : 'curul-reconstruida', votos: Number(reference.cutoff), curules: reference.seats || null, validos: reference.validVotes || null } }),
+            : usaTipica
+              ? { tipo: tipica.tipo, votos: referenceVotes, curules: reference.seats || null, validos: reference.validVotes || null, piso: Number(reference.cutoff), listas: tipica.listas, bloque: tipica.bloque || null }
+              : { tipo: verified ? 'curul-verificada' : reference.sparse ? 'piso-observado' : 'curul-reconstruida', votos: Number(reference.cutoff), curules: reference.seats || null, validos: reference.validVotes || null },
+          reparto: reconstructed && !reconstructed.sparse ? {
+            curules: reconstructed.seats, porRepartidora: reconstructed.seatsRepartidora, oposicion: reconstructed.oposicion,
+            cifra: Math.round(reconstructed.cifra), umbral: Math.round(reconstructed.threshold), conListas: reconstructed.conListas,
+            listas: (reconstructed.ultimos || []).map(u => ({ partido: u.partido, k: u.k, votos: u.votos, nombre: u.nombre, total: u.total })),
+            cerradas: reconstructed.cerradas || [],
+          } : null }),
           { partido: partido ? Object.assign({ nombre: partido }, porPartido || { tipo: 'sin-dato', votos: 0 }) : null }),
       };
     } catch (error) {

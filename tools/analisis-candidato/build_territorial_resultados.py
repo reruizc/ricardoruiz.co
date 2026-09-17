@@ -147,24 +147,30 @@ def main():
             c = cd.get(comC)
             if c is None:
                 c = cd[comC] = {'validos': 0, 'blanco': 0, 'nulos': 0,
-                                'mesas': set(), 'parties': {}, 'cands': {}, 'partyOf': {}}
+                                'mesas': set(), 'parties': {}, 'cands': {},
+                                'partyOf': {}, 'listas': {}}
             ms = (row[C_MS] or '').strip().zfill(3)
             c['mesas'].add((zz, pp, ms))
-            if can == '0':                 # fila de partido (encabezado) — ignorar
-                continue
             if can == '996':
                 c['blanco'] += v
             elif can in SPECIAL:
                 c['nulos'] += v
             else:
+                # can == '0' es el voto SOLO POR LA LISTA (y, en lista cerrada,
+                # todo su voto). Es un voto válido por ese partido aunque no sea
+                # de ningún candidato: ignorarlo dejaba fuera el ~30 % de los
+                # válidos y borraba del mapa a las listas cerradas.
                 c['validos'] += v
                 par = row[C_PAR].strip()
                 party = (row[C_DESPAR] or '').strip() or 'SIN PARTIDO'
                 c['parties'][party] = c['parties'].get(party, 0) + v
                 c['partyOf'][par] = party
-                nom = strip(row[C_DESCAN]) or f'CAND {can}'
-                ck = (par, can, nom)
-                c['cands'][ck] = c['cands'].get(ck, 0) + v
+                if can == '0':
+                    c['listas'][party] = c['listas'].get(party, 0) + v
+                else:
+                    nom = strip(row[C_DESCAN]) or f'CAND {can}'
+                    ck = (par, can, nom)
+                    c['cands'][ck] = c['cands'].get(ck, 0) + v
             n += 1
 
     out_cities = []
@@ -192,6 +198,7 @@ def main():
                 'validos': c['validos'], 'blanco': c['blanco'], 'nulos': c['nulos'],
                 'votantes': votantes, 'potencial': potc, 'mesas': len(c['mesas']),
                 'partidos': [[p, vv] for p, vv in parties],   # ganador = partidos[0]
+                'listas': [[p, vv] for p, vv in sorted(c['listas'].items(), key=lambda kv: -kv[1])],
                 'cands': cand_list,                            # top edil = cands[0]
             }
             tot_val += c['validos']; tot_bl += c['blanco']; tot_pot += potc
@@ -214,7 +221,7 @@ def main():
     out_cities.sort(key=lambda x: -x['validos'])
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', encoding='utf-8') as f:
-        json.dump({'v': '2026-07-26', 'eleccion': CFG['eleccion'],
+        json.dump({'v': '2026-09-17', 'eleccion': CFG['eleccion'],
                    'cities': out_cities, 'data': out_data},
                   f, ensure_ascii=False, separators=(',', ':'))
     print(f'{n:,} filas · {len(out_cities)} ciudades → {OUT}')
