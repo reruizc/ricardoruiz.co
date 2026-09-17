@@ -43,6 +43,33 @@ Notas de campo (2026-07-22):
     ("laRepública"). Para nombres usar SIEMPRE el campo `autor` del
     encabezado, nunca el OCR.
 
+Notas de campo (2026-09-17 · cuatro corridas seguidas muertas por timeout):
+  · ⚠⚠ EL BAN DE CADA CORRIDA NOS LO PROVOCÁBAMOS NOSOTROS. El radicado de
+    119/26 (Sistema General de Participaciones) pesa **218 MB**. A los ~0,5 MB/s
+    que da el servidor no cabe en `--max-time 180`: curl lo cortaba a medio
+    bajar, se reintentaba 4 veces, y esos ~100 MB tirados disparaban el ban por
+    VOLUMEN. Pasó en 76 corridas seguidas (31-jul → 17-sep): la ficha siguiente
+    a 119/26 era siempre la primera «sin respuesta», y las 42 de después
+    (120/26-161/26) solo se refrescaban la rara corrida sin ban (1 de las
+    últimas 45). Por eso `MAX_PDF_MB`: se pregunta el tamaño antes de bajar.
+  · HEAD no sirve para preguntar el tamaño: el WAF responde 403 a HEAD sobre
+    CUALQUIER PDF, exista o no. Un GET con `Range: 0-0` sí responde 206 y trae
+    el total en Content-Range.
+  · El ban cambió de forma: antes cerraba la conexión al instante (exit 52);
+    ahora la retiene ~11 s antes de cerrarla. Con 3 intentos por ficha son
+    ~45 s por ficha fallida, no ~12 → el mismo ban que antes costaba 8 min de
+    reloj ahora cuesta 18, y la corrida dejó de caber en los 2700 s de la etapa.
+  · El 15-sep la lista pasó a venir DESCENDENTE (lo más nuevo primero).
+  · Una corrida matada por timeout NO guardaba nada: el snapshot se escribía
+    solo al final. Y como `cambio_url` compara contra ese snapshot congelado,
+    cada corrida re-bajaba los mismos PDFs → mismo ban → misma muerte. No se
+    curaba solo. Por eso ahora hay PRESUPUESTO interno: antes de que la etapa
+    la mate, deja de pedir, conserva lo que no alcanzó y ESCRIBE lo avanzado.
+  · Ante un ban ya no se sigue golpeando ficha por ficha (eran 60-120
+    peticiones inútiles contra un WAF que ya nos había cerrado la puerta): a la
+    segunda ficha seguida sin respuesta se espera `BAN_ESPERA` y se retoma
+    desde la primera que falló. Menos peticiones y las fichas sí se traen.
+
 Uso:
   python3 tools/leyes-senado/harvest_diario.py                      # legislatura por defecto
   python3 tools/leyes-senado/harvest_diario.py --legislatura 2025-2026
@@ -77,6 +104,34 @@ LEG_DEFAULT = '2026-2027'
 DELAY_META = 3.0      # s entre detalles
 DELAY_PDF = 6.0       # s entre descargas de PDF
 MAX_PDF_POR_CORRIDA = 20
+
+# Tope de tamaño de un PDF. Con --max-time 180 y los ~0,5 MB/s medidos (25,1 MB
+# en 47 s) el techo físico ronda los 90 MB; lo más grande que ha bajado entero
+# son 77,3 MB (126/26). Los 218 MB de 119/26 no bajaron en 76 corridas ×
+# 4 intentos, y cada intento era un ban. Lo que pase del tope se anota y se
+# baja a mano UNA vez, desde un navegador (el WAF no banea a Chrome).
+MAX_PDF_MB = 100
+
+# La etapa del cron mata a los 2700 s. Se deja de pedir a los 2400: los 300 de
+# margen cubren la peor petición en vuelo (un detalle son 3 × 60 s + 9 s de
+# pausas = 189 s) más escribir snapshot y reporte.
+PRESUPUESTO_S = 2400
+MARGEN_S = 120
+
+# Ban: a la 2ª ficha SEGUIDA sin respuesta se deja de insistir. Una sola puede
+# ser el parpadeo normal del IIS (medido: una respuesta vacía aislada y la
+# siguiente petición bien). El ban dura ~10 min según la nota de arriba y hasta
+# 18 medidos el 16-sep; 600 s × 2 esperas cubre ambos y cabe en el presupuesto
+# (247 fichas × ~3,5 s ≈ 865 s + 1200 s = 2065 s < 2400 s).
+RACHA_BAN = 2
+BAN_ESPERA = 600
+MAX_ESPERAS = 2
+
+# rc de «corrida parcial»: escribió el snapshot pero dejó fichas sin refrescar.
+# Distinto de 0 a propósito: el vigilante tiene que enterarse, y distinto de 1
+# para que en el log no se confunda con un traceback. 75 = EX_TEMPFAIL.
+RC_PARCIAL = 75
+MAX_FALLIDOS_OK = 5
 
 # <button ... id='textoRadicadoBtn' data-link='https://…pdf'>  (comillas simples en el HTML)
 RE_TEXTO_RADICADO = re.compile(
@@ -137,12 +192,29 @@ def fetch_detalle(rec_id):
     return det
 
 
-def descargar_pdf(url, dst, retries=4):
+def tamano_remoto(url):
+    """Bytes del archivo según el servidor, o None si no lo dice.
+
+    GET de UN byte (`Range: 0-0`) y se lee el total del Content-Range. No es
+    HEAD porque el WAF responde 403 a HEAD sobre cualquier PDF (ver notas)."""
+    safe = urllib.parse.quote(url, safe=':/?=&%')
+    r = subprocess.run(['/usr/bin/curl', '-s', '-A', UA, '-r', '0-0', '--max-time', '30',
+                        '-o', '/dev/null', '-D', '-', safe], capture_output=True)
+    m = re.search(rb'content-range:\s*bytes\s+\d+-\d+/(\d+)', r.stdout or b'', re.I)
+    return int(m.group(1)) if m else None
+
+
+def descargar_pdf(url, dst, retries=4, limite=None):
     """Baja el PDF validando magic bytes. El IIS del Senado devuelve páginas
-    de error con HTTP 200, así que el código de estado no sirve de garantía."""
+    de error con HTTP 200, así que el código de estado no sirve de garantía.
+    `limite` (epoch): pasado ese instante no se intenta más, y ningún intento
+    puede durar más de lo que falta."""
     safe = urllib.parse.quote(url, safe=':/?=&%')
     for intento in range(retries):
-        blob = curl(safe, timeout=180, binary=True, retries=1)
+        falta = (limite - time.time()) if limite else 180
+        if falta < 30:
+            break
+        blob = curl(safe, timeout=int(min(180, falta)), binary=True, retries=1)
         if blob[:4] == b'%PDF':
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_bytes(blob)
@@ -178,9 +250,15 @@ def diff(prev, cur):
         if old is None:
             nuevos.append(rec)
             continue
-        if old.get('_detalle_ok') is False:
-            continue     # la versión anterior quedó incompleta por un corte:
-                         # esto es reparación del dato, no movimiento real
+        if old.get('_detalle_ok') is False and not old.get('fecha_de_presentacion'):
+            continue     # la versión anterior es SOLO la fila de la lista (el
+                         # detalle nunca llegó): llenarla es reparación del
+                         # dato, no movimiento real. OJO: si trae
+                         # fecha_de_presentacion es una ficha completa que se
+                         # CONSERVÓ durante un ban — vieja, pero entera — y lo
+                         # que cambió desde entonces sí es movimiento. Sin esta
+                         # distinción, el trámite de las 42 fichas que el ban
+                         # congelaba a diario se perdía sin dejar rastro.
         deltas = {c: {'antes': old.get(c, ''), 'ahora': rec.get(c, '')}
                   for c in CAMPOS_VIGILADOS
                   if (old.get(c) or '') != (rec.get(c) or '')}
@@ -230,7 +308,20 @@ def main():
     ap.add_argument('--delay', type=float, default=DELAY_META, help='pausa entre detalles (s)')
     ap.add_argument('--max-pdf', type=int, default=MAX_PDF_POR_CORRIDA,
                     help='tope de PDFs por corrida (el resto queda para mañana)')
+    ap.add_argument('--max-pdf-mb', type=float, default=MAX_PDF_MB,
+                    help='un PDF más pesado que esto no se baja: se anota para bajarlo a mano')
+    ap.add_argument('--presupuesto', type=int, default=PRESUPUESTO_S,
+                    help='segundos tras los cuales deja de pedir y escribe lo avanzado')
     args = ap.parse_args()
+
+    # Con la salida entubada (etapa.py) Python la guarda en bloque: si la etapa
+    # moría, las líneas de stdout se perdían y las de stderr salían antes que
+    # ellas. Al leer el log no había forma de reconstruir el orden.
+    sys.stdout.reconfigure(line_buffering=True)
+
+    t0 = time.time()
+    limite = t0 + args.presupuesto
+    hora = lambda: time.strftime('%H:%M:%S')             # noqa: E731
 
     leg = args.legislatura
     hoy = dt.date.today().isoformat()
@@ -242,11 +333,46 @@ def main():
     lista = fetch_lista(leg)
     print(f'· lista: {len(lista)} proyectos')
     if not lista:
+        if prev:
+            # Antes salía con 0 y «nada que hacer»: una corrida sin red (el Mac
+            # despertando) o en pleno ban quedaba registrada como exitosa.
+            print(f'  ✗ la lista llegó vacía y ya había {len(prev)} proyectos: eso es '
+                  f'red o WAF, no una legislatura sin radicados', file=sys.stderr)
+            return 1
         print('  nada que hacer (¿la legislatura aún no arranca?)')
-        return
+        return 0
 
-    cur, sin_pdf, pdf_bajados, pospuestos, fallidos = {}, [], 0, [], []
-    for i, r in enumerate(lista, 1):
+    cur, nota = {}, {}          # nota[pid] = banderas para el resumen final
+    pdf_bajados = 0
+
+    def conservar(r, motivo):
+        """Sin detalle fresco: se queda lo que había (o la fila de la lista)."""
+        pid = str(r['id'])
+        anterior = prev.get(pid, {})
+        det = dict(anterior) if anterior else dict(r)
+        det.setdefault('texto_radicado_url', '')
+        det['_detalle_ok'] = False
+        det['_id'] = pid
+        det['_visto'] = hoy                  # sí vino en la lista de hoy
+        for k in ('numero_senado', 'numero_camara', 'comision', 'estado', 'autor'):
+            det.setdefault(k, r.get(k, ''))
+        cur[pid] = det
+        nota[pid] = {'fallido': motivo, 'num': det.get('numero_senado', pid)}
+        _marcar_sin_pdf(pid, det)
+
+    def _rutas(det, pid):
+        nombre = f"PL-{slug(det.get('numero_senado','') or pid)}"
+        return base / 'textos' / f'{nombre}.pdf', base / 'textos-txt' / f'{nombre}.txt'
+
+    def _marcar_sin_pdf(pid, det):
+        pdf_path, _ = _rutas(det, pid)
+        hay = pdf_path.exists() and pdf_path.stat().st_size > 1000
+        # "sin PDF" = no hay archivo local utilizable (independiente de por qué)
+        nota[pid]['sin_pdf'] = not hay and not det.get('_pdf_local')
+
+    def procesar(i, r):
+        """Una ficha: detalle + (si toca) PDF. Devuelve False si no hubo detalle."""
+        nonlocal pdf_bajados
         pid = str(r['id'])
         anterior = prev.get(pid, {})
         det = fetch_detalle(pid)
@@ -254,47 +380,62 @@ def main():
             # El WAF nos cortó o el detalle no respondió. NO pisar lo que ya
             # teníamos con un registro vacío (eso generaría deltas falsos
             # mañana); se conserva el anterior y se reintenta en la próxima.
-            fallidos.append(r.get('numero_senado', pid))
-            print(f'  ! detalle {pid} sin respuesta — conservo lo anterior', file=sys.stderr)
-            det = dict(anterior) if anterior else dict(r)
-            det.setdefault('texto_radicado_url', '')
-            det['_detalle_ok'] = False
-        else:
-            det['_detalle_ok'] = True
+            # Tampoco se intenta el PDF: si el detalle no responde, el PDF
+            # tampoco, y son hasta 4 peticiones más contra un WAF ya cerrado.
+            print(f'  ! {hora()} detalle {pid} sin respuesta — conservo lo anterior',
+                  file=sys.stderr)
+            conservar(r, 'sin respuesta')
+            return False
+        det['_detalle_ok'] = True
         det['_id'] = pid
         det['_visto'] = hoy
         for k in ('numero_senado', 'numero_camara', 'comision', 'estado', 'autor'):
             det.setdefault(k, r.get(k, ''))
+        nota[pid] = {'num': det.get('numero_senado', pid)}
+        tag = f'  [{i + 1:>3}/{len(lista)}] {det.get("numero_senado","?"):>8}  '
 
         # PDF del texto radicado
         url = det.get('texto_radicado_url') or ''
-        nombre = f"PL-{slug(det.get('numero_senado','') or pid)}"
-        pdf_path = base / 'textos' / f'{nombre}.pdf'
-        txt_path = base / 'textos-txt' / f'{nombre}.txt'
+        pdf_path, txt_path = _rutas(det, pid)
         hay = pdf_path.exists() and pdf_path.stat().st_size > 1000
         if url and not args.no_pdf:
             # OJO: solo cuenta como "cambió la URL" si YA teníamos un registro
             # previo. Sin esta guarda, la primera corrida (prev vacío) creía que
             # los 25 PDFs habían cambiado y los re-bajaba todos → ráfaga → ban.
             cambio_url = bool(anterior) and url != (anterior.get('texto_radicado_url') or '')
-            if (args.repdf or not hay or cambio_url) and pdf_bajados >= args.max_pdf:
+            toca = args.repdf or not hay or cambio_url
+            grande = anterior.get('_pdf_grande_mb') if not cambio_url else None
+            if toca and grande and not args.repdf:
+                # ya se sabe que no cabe: ni una petición más por este archivo
+                det['_pdf_grande_mb'] = grande
+                nota[pid]['grande'] = grande
+            elif toca and pdf_bajados >= args.max_pdf:
                 # tope anti-ban: lo que sobra se baja en la corrida siguiente
-                pospuestos.append(det.get('numero_senado', pid))
-            elif args.repdf or not hay or cambio_url:
+                nota[pid]['pospuesto'] = True
+            elif toca and time.time() > limite - MARGEN_S:
+                nota[pid]['pospuesto'] = True            # sin tiempo: mañana
+            elif toca:
                 if pdf_bajados:
                     time.sleep(DELAY_PDF)
-                ok, size = descargar_pdf(url, pdf_path)
                 pdf_bajados += 1
-                if ok:
-                    capa = extraer_texto(pdf_path, txt_path)
-                    det['_pdf_local'] = str(pdf_path.relative_to(REPO))
-                    det['_pdf_bytes'] = size
-                    det['_pdf_capa'] = capa
-                    print(f'  [{i:>3}/{len(lista)}] {det.get("numero_senado","?"):>8}  '
-                          f'PDF {size/1e6:.1f} MB · {capa}')
+                size_remoto = tamano_remoto(url)
+                if size_remoto and size_remoto > args.max_pdf_mb * 1e6:
+                    mb = round(size_remoto / 1e6, 1)
+                    det['_pdf_grande_mb'] = mb
+                    nota[pid]['grande'] = mb
+                    print(f'{tag}PDF de {mb} MB: pasa el tope de {args.max_pdf_mb:g} MB, '
+                          f'NO se baja (bajarlo a mano)', file=sys.stderr)
                 else:
-                    print(f'  [{i:>3}/{len(lista)}] {det.get("numero_senado","?"):>8}  '
-                          f'PDF FALLÓ tras reintentos', file=sys.stderr)
+                    time.sleep(1.5)                      # respiro tras la sonda de tamaño
+                    ok, size = descargar_pdf(url, pdf_path, limite=limite + MARGEN_S)
+                    if ok:
+                        capa = extraer_texto(pdf_path, txt_path)
+                        det['_pdf_local'] = str(pdf_path.relative_to(REPO))
+                        det['_pdf_bytes'] = size
+                        det['_pdf_capa'] = capa
+                        print(f'{tag}PDF {size/1e6:.1f} MB · {capa}')
+                    else:
+                        print(f'{tag}PDF FALLÓ tras reintentos ({hora()})', file=sys.stderr)
             elif hay:
                 det['_pdf_local'] = anterior.get('_pdf_local', str(pdf_path.relative_to(REPO)))
                 det['_pdf_bytes'] = anterior.get('_pdf_bytes', pdf_path.stat().st_size)
@@ -302,17 +443,49 @@ def main():
                 if not (txt_path.exists() and txt_path.stat().st_size):
                     det['_pdf_capa'] = extraer_texto(pdf_path, txt_path)
 
-        # "sin PDF" = no hay archivo local utilizable (independiente de por qué)
-        if not hay and not det.get('_pdf_local'):
-            sin_pdf.append(det.get('numero_senado', pid))
-
         cur[pid] = det
+        _marcar_sin_pdf(pid, det)
+        return True
+
+    i, racha, esperas, corte = 0, [], 0, ''
+    while i < len(lista):
+        if time.time() > limite:
+            corte = f'se acabó el presupuesto de {args.presupuesto} s'
+            break
+        if procesar(i, lista[i]):
+            racha = []
+        else:
+            racha.append(i)
+            if len(racha) >= RACHA_BAN:
+                cabe = limite - time.time() > BAN_ESPERA + MARGEN_S
+                if esperas < MAX_ESPERAS and cabe:
+                    esperas += 1
+                    print(f'  ‖ {hora()} {len(racha)} fichas seguidas sin respuesta: es el ban. '
+                          f'Espero {BAN_ESPERA} s sin tocar el servidor y retomo desde '
+                          f'{lista[racha[0]].get("numero_senado", "?")} '
+                          f'(espera {esperas}/{MAX_ESPERAS})', file=sys.stderr)
+                    time.sleep(BAN_ESPERA)
+                    i, racha = racha[0], []
+                    continue
+                corte = ('el ban sigue tras las esperas' if esperas >= MAX_ESPERAS
+                         else 'ban sin tiempo para esperarlo')
+                i += 1
+                break
+        i += 1
         time.sleep(args.delay)
+
+    if corte:
+        print(f'  ‖ {hora()} corto acá: {corte}. Conservo las {len(lista) - i} fichas que no '
+              f'alcancé y escribo lo avanzado', file=sys.stderr)
+        for r in lista[i:]:
+            conservar(r, 'no alcancé')
 
     nuevos, cambios = diff(prev, cur)
 
     base.mkdir(parents=True, exist_ok=True)
-    snap_path.write_text(json.dumps(cur, ensure_ascii=False, indent=1), encoding='utf-8')
+    tmp = snap_path.with_suffix('.json.tmp')             # escritura atómica: si nos
+    tmp.write_text(json.dumps(cur, ensure_ascii=False, indent=1), encoding='utf-8')
+    tmp.replace(snap_path)                               # matan acá, queda el anterior
     with (base / 'proyectos.jsonl').open('w', encoding='utf-8') as fh:
         for pid in sorted(cur, key=lambda x: int(x)):
             fh.write(json.dumps(cur[pid], ensure_ascii=False) + '\n')
@@ -321,17 +494,30 @@ def main():
     escribir_reporte(nov / f'{hoy}.md', nov / f'{hoy}.json',
                      leg, nuevos, cambios, len(cur), hoy)
 
+    de = lambda clave: [n['num'] for n in nota.values() if n.get(clave)]   # noqa: E731
+    fallidos, pospuestos, sin_pdf = de('fallido'), de('pospuesto'), de('sin_pdf')
+    grandes = [f"{n['num']} ({n['grande']} MB)" for n in nota.values() if n.get('grande')]
+
     print(f'\n· nuevos: {len(nuevos)} · con movimiento: {len(cambios)} · total: {len(cur)}')
-    print(f'· PDFs bajados en esta corrida: {pdf_bajados}')
+    print(f'· PDFs bajados en esta corrida: {pdf_bajados} · esperas por ban: {esperas} · '
+          f'{time.time() - t0:.0f} s')
     if fallidos:
-        print(f'· detalle sin respuesta (reintentar): {", ".join(fallidos)}')
+        print(f'· fichas sin refrescar (reintentar): {", ".join(fallidos)}')
     if pospuestos:
-        print(f'· pospuestos por el tope anti-ban ({args.max_pdf}): {", ".join(pospuestos)}')
+        print(f'· PDF pospuestos (tope de {args.max_pdf} o de tiempo): {", ".join(pospuestos)}')
+    if grandes:
+        print(f'· PDF demasiado grandes, bajar A MANO: {", ".join(grandes)}')
     if sin_pdf:
         print(f'· sin PDF: {", ".join(sin_pdf)}')
     print(f'· snapshot  → {snap_path.relative_to(REPO)}')
     print(f'· novedades → {(nov / f"{hoy}.md").relative_to(REPO)}')
 
+    if corte or len(fallidos) > MAX_FALLIDOS_OK:
+        print(f'  ✗ corrida PARCIAL: {len(fallidos)} de {len(lista)} fichas sin refrescar'
+              f'{" · " + corte if corte else ""}. Lo avanzado quedó escrito.', file=sys.stderr)
+        return RC_PARCIAL
+    return 0
+
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
