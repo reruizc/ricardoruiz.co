@@ -19,7 +19,7 @@ await p.goto('file://' + process.cwd() + '/candidato-360.html');
 await p.waitForFunction(() => typeof window.aplicarGateExistente === 'function');
 await p.waitForTimeout(300);
 await p.evaluate(() => { SESSION.listo = true; SESSION.acceso = true; aplicarGate(); });
-await p.click('#intro .choice-panel button:nth-of-type(1)');
+await p.click('#paisPaso [data-pais="co"]'); await p.click('#rutaHistorial');
 await p.evaluate(() => {
   appendHistorical([
     { nombre: 'DANIEL CARVALHO MEJIA', slug: 'CON2022-C-1-203-109', corp: 'CÁMARA · ANTIOQUIA · 2022', partido: 'COALICIÓN CENTRO ESPERANZA', votos: 37111, circunscripcion: 'ANTIOQUIA', source: 'con2022' },

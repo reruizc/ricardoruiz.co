@@ -56,7 +56,7 @@ revisar('Bogotá encabeza la lista de departamentos', orden[1] === 'Bogotá D.C.
 revisar('el resto sigue alfabético', JSON.stringify(orden.slice(2)) === JSON.stringify(['Amazonas', 'Antioquia', 'Boyacá', 'Vichada']));
 
 /* ── Wizard de candidatura nueva ────────────────────────────────────────── */
-await p.click('#intro .choice-panel button:nth-of-type(2)');
+await p.click('#paisPaso [data-pais="co"]'); await p.click('#rutaNueva');
 await p.evaluate(() => showNewWizardStep(3));
 await p.evaluate(() => { document.getElementById('election').value = 'concejo'; updateTerritory(); });
 await p.selectOption('#department', { label: 'Bogotá D.C.' });
