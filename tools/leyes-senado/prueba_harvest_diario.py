@@ -186,6 +186,18 @@ _, cambios = hd.diff(prev, cur)
 ok([c['id'] for c in cambios] == ['1'],
    'ficha completa conservada → movimiento · fila de lista que se completa → silencio')
 
+print('\nH · lo que ayer quedó sin refrescar va primero, aunque sea lo más viejo')
+m = Mundo(n=40, previos=40)
+base = hd.OUT / '2026-2027' / 'proyectos.json'
+snap = json.loads(base.read_text())
+for i in (100, 101, 102):                       # los tres más viejos (van al final de la lista)
+    snap[str(i)]['_detalle_ok'] = False
+base.write_text(json.dumps(snap))
+rc, snap = m.corre('--no-pdf')
+ok(sorted(m.pedidos['detalle'][:3]) == [100, 101, 102], 'las 3 pendientes se piden antes que nada')
+ok(m.pedidos['detalle'][3] == 139, 'y después sigue el orden del registro (lo nuevo primero)')
+ok(len(set(m.pedidos['detalle'])) == 40, 'ninguna se pide dos veces')
+
 print()
 if FALLAS:
     print(f'✗ {len(FALLAS)} fallas')

@@ -342,7 +342,21 @@ def main():
         print('  nada que hacer (¿la legislatura aún no arranca?)')
         return 0
 
+    # La lista llega de lo más nuevo a lo más viejo y el presupuesto puede
+    # cortarla antes del final (17-sep-2026: el servidor a ~9,5 s por ficha
+    # dejó 88 sin refrescar). Si siempre se arranca por arriba, las que sobran
+    # hoy son las mismas que sobran mañana. Por eso van primero las que la
+    # corrida anterior no alcanzó o no le respondieron, y después el resto en
+    # el orden del registro (lo nuevo primero). Una ficha que se quedó sin
+    # refrescar dos veces seguidas es señal de algo más que el presupuesto.
+    pendientes = [r for r in lista if prev.get(str(r['id']), {}).get('_detalle_ok') is False]
+    if pendientes:
+        vistos = {str(r['id']) for r in pendientes}
+        lista = pendientes + [r for r in lista if str(r['id']) not in vistos]
+        print(f'· {len(pendientes)} fichas sin refrescar en la corrida anterior van primero')
+
     cur, nota = {}, {}          # nota[pid] = banderas para el resumen final
+    t_det, n_det = 0.0, 0       # para reportar cuánto tarda el servidor por ficha
     pdf_bajados = 0
 
     def conservar(r, motivo):
@@ -375,7 +389,11 @@ def main():
         nonlocal pdf_bajados
         pid = str(r['id'])
         anterior = prev.get(pid, {})
+        nonlocal t_det, n_det
+        t1 = time.time()
         det = fetch_detalle(pid)
+        t_det += time.time() - t1
+        n_det += 1
         if det is None:
             # El WAF nos cortó o el detalle no respondió. NO pisar lo que ya
             # teníamos con un registro vacío (eso generaría deltas falsos
@@ -500,7 +518,7 @@ def main():
 
     print(f'\n· nuevos: {len(nuevos)} · con movimiento: {len(cambios)} · total: {len(cur)}')
     print(f'· PDFs bajados en esta corrida: {pdf_bajados} · esperas por ban: {esperas} · '
-          f'{time.time() - t0:.0f} s')
+          f'{time.time() - t0:.0f} s · el servidor tardó {t_det / max(1, n_det):.1f} s por ficha')
     if fallidos:
         print(f'· fichas sin refrescar (reintentar): {", ".join(fallidos)}')
     if pospuestos:
