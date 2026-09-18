@@ -198,6 +198,27 @@ ok(sorted(m.pedidos['detalle'][:3]) == [100, 101, 102], 'las 3 pendientes se pid
 ok(m.pedidos['detalle'][3] == 139, 'y después sigue el orden del registro (lo nuevo primero)')
 ok(len(set(m.pedidos['detalle'])) == 40, 'ninguna se pide dos veces')
 
+print('\nI · dos corridas el mismo día: la segunda no pisa lo que reportó la primera')
+m = Mundo()                                     # 4 conocidos + 2 nuevos
+m.corre()
+n1 = m.novedades()
+ok(len(n1['nuevos']) == 2, 'la primera reporta 2 nuevos')
+m.estado[100] = 'CON PONENTE'                   # movimiento nuevo para la segunda
+rc, snap = m.corre()
+n2 = m.novedades()
+ok(len(n2['nuevos']) == 2, 'la segunda conserva los 2 nuevos de la primera')
+ok(any(c['id'] == '100' for c in n2['cambios']), 'y suma el movimiento propio')
+p1 = {'nuevos': [], 'cambios': [{'id': '7', 'numero_senado': '7/26', 'titulo': 't',
+                                  'deltas': {'estado': {'antes': 'A', 'ahora': 'B'}}}]}
+c2 = [{'id': '7', 'numero_senado': '7/26', 'titulo': 't',
+       'deltas': {'estado': {'antes': 'B', 'ahora': 'C'}, 'comision': {'antes': '', 'ahora': 'X'}}}]
+_, fund = hd.fundir_novedades(p1, [], c2)
+ok(fund[0]['deltas']['estado'] == {'antes': 'A', 'ahora': 'C'} and 'comision' in fund[0]['deltas'],
+   'los deltas se encadenan: antes de la mañana, ahora de la noche')
+_, fund = hd.fundir_novedades(p1, [], [{'id': '7', 'numero_senado': '7/26', 'titulo': 't',
+                                         'deltas': {'estado': {'antes': 'B', 'ahora': 'A'}}}])
+ok(fund == [], 'un campo que vuelve a su valor original no es movimiento')
+
 print()
 if FALLAS:
     print(f'✗ {len(FALLAS)} fallas')

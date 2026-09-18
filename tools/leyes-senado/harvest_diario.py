@@ -268,7 +268,48 @@ def diff(prev, cur):
     return nuevos, cambios
 
 
+def fundir_novedades(previas, nuevos, cambios):
+    """Une las novedades de HOY con las de una corrida anterior del mismo día.
+
+    El cron corre dos veces al día y las dos escriben `novedades/{hoy}.json`:
+    la de la noche PISABA a la de la mañana, y como el diff es contra el
+    snapshot que la mañana ya dejó escrito, lo que la mañana reportó como nuevo
+    no vuelve a salir. El motor de alertas lee ese archivo por fecha → los
+    radicados de la mañana no se alertaban nunca. Se vio el 17-sep-2026: una
+    corrida a mano a las 23:48 borró los 13 nuevos de la de las 19:30.
+
+    Nuevos: unión por id (gana la versión más reciente). Cambios: por id, los
+    deltas se encadenan campo a campo — `antes` de la primera corrida, `ahora`
+    de la última — y si con eso un campo vuelve a su valor original, se cae."""
+    if not previas:
+        return nuevos, cambios
+    idn = {r.get('_id') or r.get('id') for r in nuevos}
+    nuevos = [r for r in previas.get('nuevos', []) if (r.get('_id') or r.get('id')) not in idn] + nuevos
+    por_id = {c['id']: c for c in previas.get('cambios', [])}
+    for c in cambios:
+        viejo = por_id.get(c['id'])
+        if viejo is None:
+            por_id[c['id']] = c
+            continue
+        deltas = dict(viejo['deltas'])
+        for campo, d in c['deltas'].items():
+            antes = deltas[campo]['antes'] if campo in deltas else d['antes']
+            if (antes or '') == (d['ahora'] or ''):
+                deltas.pop(campo, None)
+            else:
+                deltas[campo] = {'antes': antes, 'ahora': d['ahora']}
+        por_id[c['id']] = dict(c, deltas=deltas)
+    cambios = [c for c in por_id.values() if c['deltas']]
+    return nuevos, cambios
+
+
 def escribir_reporte(dest_md, dest_json, leg, nuevos, cambios, total, fecha):
+    if dest_json.exists():
+        try:
+            previas = json.loads(dest_json.read_text(encoding='utf-8'))
+        except Exception:
+            previas = None
+        nuevos, cambios = fundir_novedades(previas, nuevos, cambios)
     payload = {'fecha': fecha, 'legislatura': leg, 'total_en_legislatura': total,
                'nuevos': nuevos, 'cambios': cambios}
     dest_json.parent.mkdir(parents=True, exist_ok=True)
