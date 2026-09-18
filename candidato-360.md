@@ -153,7 +153,19 @@ sobra.
 
 Lo que falta subir a S3 son los índices y los agregados: los agregados corrigen
 además la participación, que hoy sale baja porque los válidos no contaban el
-voto de lista (Bogotá 2023: 38,9 % en S3 contra 51,6 % ya corregido).
+voto de lista (Bogotá 2023: 38,9 % en S3 contra 51,6 % ya corregido), y hacen
+que los totales por partido incluyan el voto solo-lista, como en las cifras
+publicadas.
+
+La subida necesita credenciales de escritura en el bucket, que no están en el
+entorno de trabajo remoto. Se hace desde la máquina con `aws` configurado:
+
+```
+bash tools/analisis-candidato/regenerar_2023.sh --solo-indice --subir
+```
+
+Los JSON por candidato no cambian con esto, así que no hay que resubir los
+94 mil.
 
 `--solo-indice` reconstruye solo los índices, sin reescribir los 94 mil JSON por
 candidato, que no cambian.
