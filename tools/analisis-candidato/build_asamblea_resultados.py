@@ -37,9 +37,14 @@ SORTED = os.path.join(SCRATCH, 'asamblea_2023_sorted.csv')
 
 COD_COR = '2'
 SPECIAL = {'996', '997', '998', '999'}
-C_COR = 2
-C_CAN, C_VOT, C_DDE, C_MME, C_ZZ, C_PP = 13, 15, 6, 7, 8, 9
-C_MS, C_PAR, C_DESPAR, C_DESCAN = 10, 11, 12, 14
+# Columnas por NOMBRE: el archivo territorial trae 19 columnas, no 16.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gcs_columnas import columnas                                    # noqa: E402
+_C = columnas(SRC)
+C_COR = _C['COD_COR']
+C_CAN, C_VOT, C_DDE, C_MME, C_ZZ, C_PP = _C['COD_CAN'], _C['NUM_VOT'], _C['COD_DDE'], _C['COD_MME'], _C['COD_ZZ'], _C['COD_PP']
+C_MS, C_PAR, C_DESPAR, C_DESCAN = _C['DES_MS'], _C['COD_PAR'], _C['DES_PAR'], _C['DES_CAN']
+C_ANCHO = _C['_ancho']
 BOGOTA = '16'          # Distrito Capital: sin asamblea
 
 
@@ -82,8 +87,8 @@ def ensure_sorted():
     os.makedirs(SCRATCH, exist_ok=True)
     print(f'· filtrando GCS_2023TER (COD_COR={COD_COR}) y ordenando…')
     with open(SORTED, 'wb') as out:
-        p1 = subprocess.Popen(['awk', '-F;', f'NR>1 && $3=="{COD_COR}"', SRC], stdout=subprocess.PIPE)
-        p2 = subprocess.Popen(['sort', '-t;', '-k7,7', '-k8,8', '-S', '1G'],
+        p1 = subprocess.Popen(['awk', '-F;', f'NR>1 && ${C_COR + 1}=="{COD_COR}"', SRC], stdout=subprocess.PIPE)
+        p2 = subprocess.Popen(['sort', '-t;', f'-k{C_DDE + 1},{C_DDE + 1}', f'-k{C_MME + 1},{C_MME + 1}', '-S', '1G'],
                               stdin=p1.stdout, stdout=out,
                               env={**os.environ, 'LC_ALL': 'C', 'TMPDIR': SCRATCH})
         p1.stdout.close()
@@ -192,7 +197,7 @@ def main():
     n = 0
     with open(SORTED, encoding='utf-8', errors='replace', newline='') as f:
         for row in csv.reader(f, delimiter=';'):   # el temporal viene SIN encabezado
-            if len(row) < 16:
+            if len(row) < C_ANCHO:
                 continue
             if row[C_COR].strip() != COD_COR:
                 continue

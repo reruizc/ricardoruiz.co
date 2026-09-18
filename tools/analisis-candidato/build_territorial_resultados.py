@@ -71,9 +71,14 @@ CITIES = {
     ('52', '001'): ('VILLAVICENCIO', 'META',               'comuna'),
 }
 SPECIAL = {'996', '997', '998', '999'}   # blanco, nulos, no-marcados, no-marcados
-C_COR = 2
-C_CAN, C_VOT, C_DDE, C_MME, C_ZZ, C_PP = 13, 15, 6, 7, 8, 9
-C_MS, C_PAR, C_DESPAR, C_DESCAN = 10, 11, 12, 14
+# Columnas por NOMBRE: el archivo territorial trae 19 columnas y el de JAL 16.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gcs_columnas import columnas                                    # noqa: E402
+_C = columnas(SRC)
+C_COR = _C['COD_COR']
+C_CAN, C_VOT, C_DDE, C_MME, C_ZZ, C_PP = _C['COD_CAN'], _C['NUM_VOT'], _C['COD_DDE'], _C['COD_MME'], _C['COD_ZZ'], _C['COD_PP']
+C_MS, C_PAR, C_DESPAR, C_DESCAN = _C['DES_MS'], _C['COD_PAR'], _C['DES_PAR'], _C['DES_CAN']
+C_ANCHO = _C['_ancho']
 
 
 def strip(s):
@@ -81,7 +86,9 @@ def strip(s):
 
 
 def clean_com(comN):
-    c = re.sub(r'^\d+', '', (comN or '').strip()).strip()
+    # Espacios internos colapsados: el georef trae nombres con doble espacio
+    # ('COMUNA  5') que si no partirían la misma comuna en dos.
+    c = re.sub(r'\s+', ' ', re.sub(r'^\d+', '', (comN or '').strip())).strip()
     return c or 'ND'
 
 
@@ -125,7 +132,7 @@ def main():
         rd = csv.reader(f, delimiter=';')
         next(rd, None)  # header
         for row in rd:
-            if len(row) < 16:
+            if len(row) < C_ANCHO:
                 continue
             if row[C_COR].strip() != CFG['cor']:   # GCS_2023TER mezcla las 4 corporaciones
                 continue

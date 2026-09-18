@@ -24,6 +24,9 @@ import vm from 'node:vm';
 
 const ctx = { console, URL, setTimeout };
 ctx.window = ctx;
+/* El sitio sirve el voto de lista de todo el país aparte, mientras los índices
+   de S3 no lo traigan. */
+ctx.LISTAS_2023_URL = 'listas-de-prueba';
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync('partidos-bloques.js', 'utf8'), ctx);
 vm.runInContext(fs.readFileSync('vote-target.js', 'utf8'), ctx);
@@ -51,10 +54,19 @@ const INDICE_VIEJO = { candidatos: CANDIDATOS };
 const RESULTADOS = { cities: [{ key: '99-001', name: 'CIUDAD DE PRUEBA', dep: 'PRUEBA', potencial: 200000 }],
   data: { '99-001': { comunas: { '01': { name: 'UNA', votantes: 80000, validos: 76000, blanco: 4000 } } } } };
 
+/* El archivo compacto del sitio: los mismos números, sin los candidatos, con
+   los nombres internados. Acá trae la misma ciudad que `LISTAS`, para poder
+   comprobar que por los dos caminos se llega al mismo reparto. */
+const PAIS = { v: 'prueba', corps: { concejo: {
+  circ: ['CIUDAD DE PRUEBA'],
+  part: ['PARTIDO CONSERVADOR COLOMBIANO', 'PARTIDO ALIANZA VERDE', 'PACTO HISTÓRICO'],
+  listas: [[0, 0, 6000, 30000, 0], [0, 1, 2000, 12000, 0], [0, 2, 26000, 0, 1]],
+} } };
 ctx.fetch = async url => {
-  const body = url.includes('index-concejo') ? (url.includes('/viejo/') ? INDICE_VIEJO : INDICE)
-    : url.includes('resultados-concejo') ? RESULTADOS
-      : null;
+  const body = url === 'listas-de-prueba' ? PAIS
+    : url.includes('index-concejo') ? (url.includes('/viejo/') ? INDICE_VIEJO : INDICE)
+      : url.includes('resultados-concejo') ? RESULTADOS
+        : null;
   return body ? { ok: true, json: async () => body } : { ok: false, status: 404, json: async () => ({}) };
 };
 
@@ -66,12 +78,13 @@ const conGrande = await estimar({ partido: 'PARTIDO CONSERVADOR COLOMBIANO' });
 const conMediana = await estimar({ partido: 'PARTIDO ALIANZA VERDE' });
 const famDerecha = await estimar({ bloque: 'cd' });
 const famCentroIzq = await estimar({ bloque: 'ci' });
-/* El mismo cálculo contra el índice de hoy (sin `listas`). Va por otra URL
-   porque VoteTarget memoiza cada fuente por su dirección. */
-const sinListas = await estimar({ baseUrl: 'https://stub/viejo/output' });
+/* El mismo cálculo contra el índice de hoy (sin `listas`), que es el que cae al
+   archivo del sitio. Va por otra URL porque VoteTarget memoiza cada fuente por
+   su dirección. */
+const porElArchivo = await estimar({ baseUrl: 'https://stub/viejo/output' });
 
 const R = sinPartido.detalle.referencia, rep = sinPartido.detalle.reparto;
-const cerradaRef = conCerrada.detalle.partido, viejoRep = sinListas.detalle.reparto;
+const cerradaRef = conCerrada.detalle.partido, archivoRep = porElArchivo.detalle.reparto;
 const listasDe = r => (r.detalle.reparto.listas || []).map(l => `${l.partido}=${l.votos}(${l.k})`).sort().join(' ');
 
 const pruebas = [
@@ -96,14 +109,14 @@ const pruebas = [
   ['por la lista grande hay que entrar de 2: 9.000', conGrande.detalle.partido.tipo === 'lista-con-curul' && conGrande.detalle.partido.k === 2 && conGrande.detalle.referencia.votos === 9000],
   ['por la mediana hay que ser primero: 7.000', conMediana.detalle.partido.k === 1 && conMediana.detalle.referencia.votos === 7000],
   ['el voto en blanco cuenta para el umbral del 50 % del cuociente', rep.umbral === Math.round((36000 + 14000 + 26000 + 4000) / 5 / 2)],
-  ['sin `listas` en el índice, el reparto se hace solo con el voto personal y lo dice',
-    viejoRep.conListas === false && viejoRep.cerradas.length === 0],
-  ['y entonces la lista cerrada desaparece: sus curules se van a las abiertas',
-    listasDe(sinListas) !== listasDe(sinPartido)],
+  ['sin `listas` en el índice, el voto de lista se toma del archivo del sitio',
+    archivoRep.conListas === true && archivoRep.cerradas.length === 1 && archivoRep.cerradas[0].partido === 'PACTO HISTÓRICO'],
+  ['y por ese camino el reparto es el mismo que con el índice completo',
+    listasDe(porElArchivo) === listasDe(sinPartido) && porElArchivo.target === sinPartido.target],
 ];
 
 for (const [t, ok] of pruebas) console.log(`${ok ? '✓' : '✗'} ${t}`);
 const f = pruebas.filter(([, ok]) => !ok).length;
-if (f) console.log(JSON.stringify({ R, rep, cerradaRef, viejoRep, famDerecha: famDerecha.detalle.referencia, famCentroIzq: famCentroIzq.detalle.referencia }, null, 1).slice(0, 2000));
+if (f) console.log(JSON.stringify({ R, rep, cerradaRef, archivoRep, famDerecha: famDerecha.detalle.referencia, famCentroIzq: famCentroIzq.detalle.referencia }, null, 1).slice(0, 2000));
 console.log(f ? `\n${f} fallaron` : `\n${pruebas.length} de ${pruebas.length} pasaron`);
 process.exit(f ? 1 : 0);
