@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mapa de fuerzas · Ministerio de Vivienda · Ricardo Ruiz</title>
+  <meta name="description" content="Quién tiene poder sobre el Ministerio de Vivienda, Ciudad y Territorio en el cuatrienio 2026-2030: gremios, empresas, banca, entidades del sector, comisiones del Congreso, territorio y contrapesos. Mapa de actores con influencia y dependencia." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css" />
+  <style>
+    /* ── componentes propios de esta página (prefijo mf-) ─────────────────
+       El nav, la tipografía y las variables de color vienen de
+       legislativo-base.css; acá solo vive lo que no existe allá. */
+    .mf-wrap{max-width:1180px;margin:0 auto;padding:0 1.4rem}
+    .mf-anchors{display:flex;flex-wrap:wrap;gap:.5rem;margin:1.6rem auto 2.4rem;max-width:1180px;padding:0 1.4rem}
+    .mf-anchors a{font-size:.74rem;letter-spacing:.04em;text-transform:uppercase;color:var(--gray);
+      border:1px solid var(--border);border-radius:999px;padding:.42rem .82rem;text-decoration:none;transition:.18s}
+    .mf-anchors a:hover{color:var(--white);border-color:var(--blue);background:rgba(0,71,255,.12)}
+
+    .mf-sec{max-width:1180px;margin:0 auto 4.2rem;padding:0 1.4rem}
+    .mf-head{display:flex;align-items:baseline;gap:1rem;border-bottom:1px solid var(--border);padding-bottom:.7rem;margin-bottom:1.6rem}
+    .mf-head h2{font-family:'Syne',sans-serif;font-weight:800;font-size:1.55rem;letter-spacing:-.01em;margin:0}
+    .mf-head .mf-num{font-family:'Syne',sans-serif;color:var(--blue);font-size:.9rem;font-weight:700;letter-spacing:.06em}
+    .mf-head .mf-meta{margin-left:auto;font-size:.72rem;color:var(--gray);letter-spacing:.05em;text-transform:uppercase}
+    .mf-lead{color:rgba(244,243,239,.78);font-size:1rem;line-height:1.65;max-width:75ch;margin:0 0 1.4rem}
+    .mf-lead b{color:var(--white)}
+
+    .mf-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.1rem}
+    .mf-box{background:var(--card-bg2);border:1px solid var(--card-border);border-radius:14px;padding:1.2rem 1.25rem}
+    .mf-box h3{font-family:'Syne',sans-serif;font-size:.95rem;margin:0 0 .7rem;letter-spacing:.01em}
+    .mf-box.si h3{color:var(--green)} .mf-box.no h3{color:var(--red)}
+    .mf-box ul{margin:0;padding-left:1.05rem}
+    .mf-box li{font-size:.88rem;line-height:1.55;color:rgba(244,243,239,.75);margin-bottom:.5rem}
+    .mf-box li b{color:var(--white);font-weight:600}
+
+    /* plano influencia × dependencia */
+    .mf-plot-wrap{background:var(--card-bg2);border:1px solid var(--card-border);border-radius:16px;padding:1rem}
+    .mf-plot{width:100%;height:auto;display:block;touch-action:none}
+    .mf-ax{font-size:10px;fill:rgba(244,243,239,.45);letter-spacing:.06em;text-transform:uppercase}
+    .mf-dot{cursor:pointer;transition:.15s}
+    .mf-dot:hover circle{stroke:#fff;stroke-width:1.6}
+    .mf-dlab{font-size:9.5px;fill:rgba(244,243,239,.72);pointer-events:none}
+    .mf-quads{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.5rem .9rem;margin:.9rem 0 .2rem}
+    .mf-quads div{font-size:.74rem;line-height:1.5;color:var(--gray)}
+    .mf-quads b{color:var(--white);font-family:'Syne',sans-serif;font-size:.76rem;display:block}
+    .mf-legend{display:flex;flex-wrap:wrap;gap:.45rem;margin:.9rem 0 0}
+    .mf-leg{display:inline-flex;align-items:center;gap:.38rem;font-size:.72rem;color:var(--gray);
+      border:1px solid var(--border);border-radius:999px;padding:.3rem .7rem;cursor:pointer;transition:.15s}
+    .mf-leg:hover{color:var(--white)}
+    .mf-leg.off{opacity:.35}
+    .mf-leg i{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+    /* fichas de actor */
+    .mf-bloque{margin-top:2.2rem}
+    .mf-bloque-h{display:flex;align-items:center;gap:.7rem;margin:0 0 1rem}
+    .mf-bloque-h i{width:11px;height:11px;border-radius:3px;display:inline-block}
+    .mf-bloque-h h3{font-family:'Syne',sans-serif;font-size:1.1rem;margin:0}
+    .mf-bloque-h span{font-size:.78rem;color:var(--gray)}
+    .mf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:1rem}
+    .mf-card{background:var(--card-bg2);border:1px solid var(--card-border);border-radius:14px;
+      padding:1.05rem 1.1rem;display:flex;flex-direction:column;gap:.62rem;transition:.18s}
+    .mf-card:hover{border-color:rgba(255,255,255,.2);transform:translateY(-2px)}
+    .mf-card-top{display:flex;align-items:flex-start;gap:.6rem}
+    .mf-card-name{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;line-height:1.25;flex:1}
+    .mf-pos{font-size:.62rem;letter-spacing:.07em;text-transform:uppercase;border-radius:999px;
+      padding:.24rem .55rem;white-space:nowrap;border:1px solid}
+    .mf-pos.aliado{color:var(--green);border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.08)}
+    .mf-pos.condicional{color:var(--amber);border-color:rgba(224,160,58,.4);background:rgba(224,160,58,.08)}
+    .mf-pos.arbitro{color:var(--cyan);border-color:rgba(34,211,238,.35);background:rgba(34,211,238,.08)}
+    .mf-pos.opositor{color:var(--red);border-color:rgba(209,88,78,.4);background:rgba(209,88,78,.08)}
+    .mf-poder{display:flex;gap:3px;align-items:center;font-size:.66rem;color:var(--gray);letter-spacing:.05em}
+    .mf-poder u{width:16px;height:4px;border-radius:2px;background:rgba(255,255,255,.14);display:inline-block}
+    .mf-poder u.on{background:var(--blue-light)}
+    .mf-l{font-size:.85rem;line-height:1.55;color:rgba(244,243,239,.72);margin:0}
+    .mf-l b{color:var(--white);font-weight:600}
+    /* dentro de una ficha, el <b> es el rótulo del campo, no énfasis */
+    .mf-card .mf-l b{display:block;font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;
+      color:var(--gray);margin-bottom:.15rem}
+
+    /* tablas de congreso */
+    .mf-table{width:100%;border-collapse:collapse;font-size:.84rem}
+    .mf-table th{text-align:left;font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;color:var(--gray);
+      font-weight:500;padding:.55rem .6rem;border-bottom:1px solid var(--border)}
+    .mf-table td{padding:.6rem;border-bottom:1px solid rgba(255,255,255,.045);color:rgba(244,243,239,.8);vertical-align:top}
+    .mf-table tr:hover td{background:rgba(255,255,255,.02)}
+    .mf-table .mf-key{color:var(--white);font-weight:600}
+    .mf-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .mf-bar{display:flex;height:9px;border-radius:5px;overflow:hidden;margin:.45rem 0 .2rem;min-width:180px}
+    .mf-bar span{display:block;height:100%}
+    .mf-barleg{font-size:.7rem;color:var(--gray)}
+
+    /* línea de tiempo */
+    .mf-time{position:relative;padding-left:1.4rem;margin-top:1.2rem}
+    .mf-time:before{content:'';position:absolute;left:4px;top:6px;bottom:6px;width:1px;background:var(--border)}
+    .mf-ev{position:relative;margin-bottom:1.25rem}
+    .mf-ev:before{content:'';position:absolute;left:-1.4rem;top:5px;width:9px;height:9px;border-radius:50%;
+      background:var(--blue);box-shadow:0 0 0 3px rgba(0,71,255,.18)}
+    .mf-ev.ya:before{background:var(--amber);box-shadow:0 0 0 3px rgba(224,160,58,.18)}
+    .mf-ev-d{font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--amber);margin-bottom:.2rem}
+    .mf-ev-t{font-family:'Syne',sans-serif;font-weight:700;font-size:.97rem;margin-bottom:.25rem}
+    .mf-ev-p{font-size:.86rem;line-height:1.55;color:rgba(244,243,239,.7);margin:0;max-width:72ch}
+
+    .mf-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.8rem;margin:1.2rem 0}
+    .mf-kpi{background:var(--card-bg2);border:1px solid var(--card-border);border-radius:12px;padding:.95rem 1rem}
+    .mf-kpi b{display:block;font-family:'Syne',sans-serif;font-size:1.5rem;color:var(--white);line-height:1.1}
+    .mf-kpi span{font-size:.74rem;color:var(--gray);line-height:1.4;display:block;margin-top:.3rem}
+
+    .mf-riesgo{border-left:2px solid var(--red);padding-left:1rem;margin-bottom:1.3rem}
+    .mf-riesgo h4{font-family:'Syne',sans-serif;font-size:.97rem;margin:0 0 .3rem}
+    .mf-riesgo p{font-size:.86rem;line-height:1.55;color:rgba(244,243,239,.7);margin:0;max-width:74ch}
+    .mf-mov{counter-increment:mv;position:relative;padding-left:2.6rem;margin-bottom:1.4rem}
+    .mf-mov:before{content:counter(mv,decimal-leading-zero);position:absolute;left:0;top:0;
+      font-family:'Syne',sans-serif;font-weight:800;color:var(--blue);font-size:1.05rem}
+    .mf-movs{counter-reset:mv}
+    .mf-mov h4{font-family:'Syne',sans-serif;font-size:.99rem;margin:0 0 .3rem}
+    .mf-mov p{font-size:.86rem;line-height:1.55;color:rgba(244,243,239,.7);margin:0;max-width:74ch}
+
+    .mf-note{background:rgba(0,71,255,.06);border:1px solid rgba(0,71,255,.22);border-radius:12px;
+      padding:1rem 1.15rem;font-size:.84rem;line-height:1.6;color:rgba(244,243,239,.72)}
+    .mf-note b{color:var(--white)}
+    .mf-note a{color:var(--blue-light)}
+    .mf-foot{max-width:1180px;margin:0 auto 5rem;padding:0 1.4rem;font-size:.78rem;color:var(--gray);line-height:1.65}
+    @media(max-width:640px){
+      .mf-head h2{font-size:1.25rem}
+      .mf-head .mf-meta{display:none}
+      .mf-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="legislativo.html" class="e-btn-back" id="nav-back-btn">← Volver</a>
+      <a href="pricing.html" class="e-btn-planes" id="nav-planes">Planes &amp; Precios</a>
+      <span class="nav-page-tag">Mapa de fuerzas</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">Análisis de actores · septiembre de 2026</div>
+    <h1 class="page-title">El mapa de fuerzas del Ministerio de Vivienda</h1>
+    <p class="page-sub">Quién le puede mover el piso a quien ocupe la cartera de <strong>Vivienda, Ciudad y Territorio</strong> en el cuatrienio 2026-2030: gremios, constructoras, banca, empresas de agua, las entidades del propio sector, las comisiones del Congreso que acaban de quedar conformadas y los contrapesos de control. Es un mapa <strong>del cargo, no de la persona</strong>: los datos duros salen de nuestra base del Congreso 2026-2030 y del PGN 2027; las posiciones y el poder son heurística declarada.</p>
+  </div>
+
+  <nav class="mf-anchors">
+    <a href="#perimetro">01 · El perímetro</a>
+    <a href="#plano">02 · Influencia y dependencia</a>
+    <a href="#actores">03 · Los seis bloques</a>
+    <a href="#congreso">04 · El Congreso real</a>
+    <a href="#reloj">05 · El reloj</a>
+    <a href="#riesgos">06 · Dónde se cae</a>
+    <a href="#movimientos">07 · Movimientos de arranque</a>
+    <a href="#metodo">08 · Método y fuentes</a>
+  </nav>
+
+  <!-- ═══ 01 · PERÍMETRO ═══════════════════════════════════════════════ -->
+  <section class="mf-sec" id="perimetro">
+    <div class="mf-head"><span class="mf-num">— 01</span><h2>El perímetro: qué decide de verdad</h2><span class="mf-meta">Arquitectura del sector</span></div>
+    <p class="mf-lead">Antes de mapear actores hay que aceptar una incomodidad: <b>el Ministerio de Vivienda es la cartera con más expectativa pública y menos palancas propias</b>. No pone el cupo fiscal, no habilita suelo, no fija la tasa de interés, no expide licencias y no construye. Es, sobre todo, un ordenador de subsidios y un regulador de agua. Además son <b>dos ministerios en uno</b>: el viceministerio de Vivienda —el que sale en titulares— y el de Agua y Saneamiento Básico, que se lleva buena parte del presupuesto, del riesgo fiscal y del pleito con las regiones, y casi nunca de la conversación.</p>
+    <div class="mf-split">
+      <div class="mf-box si">
+        <h3>Lo que sí controla</h3>
+        <ul>
+          <li><b>El calendario y el bolsillo del subsidio.</b> Fonvivienda ordena el gasto: cuántos cupos, cuándo se abren, con qué criterio de focalización y en qué territorios.</li>
+          <li><b>La cobertura de tasa.</b> El mecanismo que vuelve pagable la cuota. Decidir a qué segmento va es decidir qué se construye.</li>
+          <li><b>La regulación tarifaria del agua</b>, vía CRA: metodologías que fijan lo que paga cada hogar del país.</li>
+          <li><b>La plata del agua:</b> política de los Planes Departamentales de Agua, viabilización de proyectos y ventanilla de recursos.</li>
+          <li><b>La norma:</b> reglamento de construcción sismo-resistente, licenciamiento, estándares de urbanismo y la reglamentación de la ley de vivienda y hábitat.</li>
+          <li><b>El Fondo Nacional del Ahorro</b> y las juntas del sector: crédito, cesantías y burocracia negociable.</li>
+        </ul>
+      </div>
+      <div class="mf-box no">
+        <h3>Lo que no controla (y lo determina)</h3>
+        <ul>
+          <li><b>El cupo.</b> Hacienda y el DNP deciden cuánta plata y a qué ritmo sale. Sin PAC no hay programa.</li>
+          <li><b>El suelo.</b> Lo deciden los POT, los planes parciales y las curadurías municipales. El ministro no habilita un metro cuadrado.</li>
+          <li><b>La tasa de interés.</b> Banco de la República y el apetito de la banca hipotecaria.</li>
+          <li><b>La oferta.</b> Si las constructoras se salen del segmento social, el subsidio se queda sin dónde usarse.</li>
+          <li><b>La conexión de servicios.</b> Sin acueducto y alcantarillado no hay licencia ni escritura: eso lo deciden las empresas de servicios y sus dueños políticos.</li>
+          <li><b>La métrica del éxito.</b> El déficit habitacional lo mide el DANE; el mercado lo mide el gremio con sus propios datos.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="mf-lead" style="margin-top:1.4rem">Consecuencia directa para la estrategia: <b>es un ministerio de alta dependencia y baja autonomía</b>. Su poder no está en mandar sino en convocar, y su capital político se gasta rápido cuando el subsidio se agota a mitad de año o cuando una obra de acueducto aparece en un informe de la Contraloría.</p>
+  </section>
+
+  <!-- ═══ 02 · PLANO ═══════════════════════════════════════════════════ -->
+  <section class="mf-sec" id="plano">
+    <div class="mf-head"><span class="mf-num">— 02</span><h2>Influencia sobre el ministerio × dependencia del ministerio</h2><span class="mf-meta">Heurística declarada</span></div>
+    <p class="mf-lead">Cada actor está ubicado por dos preguntas: <b>¿cuánto puede afectar la agenda del ministro?</b> (eje vertical) y <b>¿cuánto depende de las decisiones del ministerio?</b> (eje horizontal). La lectura útil no son los puntos sino los cuadrantes: arriba a la izquierda están los que mandan sin necesitar nada —ahí no se negocia, se cumple—; arriba a la derecha, los socios de conflicto, que es donde se juega el cuatrienio.</p>
+    <div class="mf-plot-wrap">
+      <svg class="mf-plot" id="mf-plot" viewBox="0 0 980 700" role="img" aria-label="Plano de influencia y dependencia de los actores del sector vivienda"></svg>
+      <div class="mf-quads">
+        <div><b>↖ Dominantes</b> Mandan y no necesitan nada del ministerio. No se negocia con ellos: se cumple.</div>
+        <div><b>↗ De enlace</b> Mucho poder y mucho interés. Aquí se juega el cuatrienio.</div>
+        <div><b>↙ Autónomos</b> Ni bloquean ni dependen. Casi nadie: este sector le importa a todo el mundo.</div>
+        <div><b>↘ Dependientes</b> Ejecutan lo que el ministerio decida.</div>
+      </div>
+      <div class="mf-legend" id="mf-legend"></div>
+      <div class="mf-barleg" style="margin-top:.6rem">Clic en un bloque para aislarlo. El tamaño del punto es el poder relativo (1 a 5). El eje vertical arranca en 20 porque ningún actor del sector queda por debajo.</div>
+    </div>
+  </section>
+
+  <!-- ═══ 03 · ACTORES ═════════════════════════════════════════════════ -->
+  <section class="mf-sec" id="actores">
+    <div class="mf-head"><span class="mf-num">— 03</span><h2>Los seis bloques</h2><span class="mf-meta">Qué quiere · qué puede hacer · con qué se le paga</span></div>
+    <p class="mf-lead">Treinta y cinco actores agrupados por bloque. Para cada uno: lo que persigue, el daño o el beneficio que puede causarle al ministerio, y la palanca concreta que el ministro tiene para negociar. La etiqueta de posición (<b>aliado</b>, <b>condicional</b>, <b>árbitro</b>, <b>opositor</b>) describe el punto de partida esperable, no una lealtad fija: casi todo el mapa es condicional, que es justo lo que lo vuelve trabajable.</p>
+    <div id="mf-bloques"></div>
+  </section>
+
+  <!-- ═══ 04 · CONGRESO ════════════════════════════════════════════════ -->
+  <section class="mf-sec" id="congreso">
+    <div class="mf-head"><span class="mf-num">— 04</span><h2>El Congreso real, no el del organigrama</h2><span class="mf-meta">Datos propios · 18-sep-2026</span></div>
+    <p class="mf-lead">El ministro de Vivienda no tiene una comisión: tiene cuatro frentes. <b>La Séptima</b> es su comisión temática (vivienda comparte célula con salud, trabajo y seguridad social, los dos temas que se van a comer la agenda). <b>La Sexta</b> es donde vive la mitad olvidada del ministerio: servicios públicos domiciliarios, o sea agua y alcantarillado. <b>Las Terceras y Cuartas</b> deciden el presupuesto y tramitarán el Plan Nacional de Desarrollo. Y <b>la Quinta</b> aparece cada vez que el tema es tierra, ambiente o licencias.</p>
+
+    <div class="mf-scroll">
+      <table class="mf-table">
+        <thead><tr><th>Comisión</th><th>Por qué le importa al ministro</th><th>Presidencia Senado</th><th>Presidencia Cámara</th><th>Integrantes</th></tr></thead>
+        <tbody id="mf-com"></tbody>
+      </table>
+    </div>
+
+    <div class="mf-split" style="margin-top:1.6rem">
+      <div class="mf-box">
+        <h3>La aritmética de la Séptima</h3>
+        <p class="mf-l" style="margin-bottom:.8rem">Senado: 14 integrantes. Cámara: 21. En las dos células el <b>Pacto Histórico es la primera minoría</b> (3 de 14 y 5 de 21) mientras la <b>mesa directiva quedó en el Centro Democrático</b> en ambas. Traducción operativa: el ministro tiene quién le agende los debates, y tiene un contradictor organizado con derecho a citar a control político desde el primer día.</p>
+        <div id="mf-sep-bars"></div>
+      </div>
+      <div class="mf-box">
+        <h3>La aritmética de la Sexta (el frente del agua)</h3>
+        <p class="mf-l" style="margin-bottom:.8rem">Senado: 13. Cámara: 20. La presidencia del Senado quedó en <b>Ahora Colombia (MIRA)</b>, una bancada que históricamente trabaja tarifas y usuarios de servicios públicos. Es buena noticia técnica y mala noticia política: cualquier ajuste tarifario de la CRA tendrá auditor permanente.</p>
+        <div id="mf-sex-bars"></div>
+      </div>
+    </div>
+
+    <div class="mf-note" style="margin-top:1.4rem">
+      <b>La foto completa del Congreso 2026-2030:</b> Senado de 103 curules —Pacto Histórico 25, Centro Democrático 17, Liberal 13, Alianza por Colombia 11, Conservador 10, La U 8, Cambio Radical 7, Ahora Colombia 5, Salvación Nacional 4, indígenas 2, más la curul de oposición— y Cámara de 182, con Pacto 42, Centro Democrático 31, Liberal 24, Conservador 19, La U 13, Cambio Radical 11, las 16 curules de paz y el resto en coaliciones regionales. Ninguna bancada de gobierno alcanza sola: <b>las mayorías de vivienda y agua se arman con Liberal, Conservador, La U y Cambio Radical</b>, que son exactamente las bancadas con demanda territorial de obras de acueducto y cupos de vivienda. Ese es el precio de la agenda, y conviene fijarlo con reglas públicas antes que en la mesa de cada debate. Detalle por comisión en <a href="legislativo-comisiones.html">Comisiones</a> y <a href="legislativo-congresistas.html">Quién es quién</a>.
+    </div>
+  </section>
+
+  <!-- ═══ 05 · RELOJ ═══════════════════════════════════════════════════ -->
+  <section class="mf-sec" id="reloj">
+    <div class="mf-head"><span class="mf-num">— 05</span><h2>El reloj manda más que los aliados</h2><span class="mf-meta">Caudal · 1990-2026</span></div>
+    <p class="mf-lead">De nuestra base del histórico legislativo salen cuatro números que deberían gobernar la estrategia de cualquier ministro que llegue con ideas de ley:</p>
+    <div class="mf-kpis">
+      <div class="mf-kpi"><b>1 de cada 4</b><span>proyectos radicados desde 1990 termina en ley (2.509 de 9.919)</span></div>
+      <div class="mf-kpi"><b>2.804</b><span>proyectos muertos por vencimiento de términos: más que los que se volvieron ley</span></div>
+      <div class="mf-kpi"><b>53 % → 21 %</b><span>probabilidad de que un proyecto se debata si abre el orden del día, frente a estar de cuarto en adelante</span></div>
+      <div class="mf-kpi"><b>181 días</b><span>espera mediana hasta el primer debate</span></div>
+    </div>
+    <p class="mf-lead">La conclusión es dura y es útil: <b>en el Congreso colombiano no pierde el que tiene malos argumentos, pierde el que no controla el orden del día</b>. Para un ministro eso significa que la relación clave no es con la bancada de gobierno en abstracto, sino con quien preside la comisión y arma la agenda semanal. Y que la ventana real del cuatrienio son sus dos primeros años: en el año 4 la mortandad legislativa sube a 34,7 %.</p>
+    <div class="mf-time">
+      <div class="mf-ev ya">
+        <div class="mf-ev-d">Ahora · septiembre-octubre de 2026</div>
+        <div class="mf-ev-t">Presupuesto General 2027 en comisiones económicas</div>
+        <p class="mf-ev-p">Es la primera prueba y ya está corriendo. En el proyecto, la cartera aparece con <b>$6,65 billones frente a los $5,53 billones liquidados en 2026</b> (+20 %), y la reformulación casi no movió esa cifra. Ojo con la lectura: el tamaño de la sección no es el tamaño de la política —hay recursos afines en fondos y otras entidades—, y el Congreso debe expedir el presupuesto antes del 20 de octubre. Detalle en <a href="pgn-2027.html" style="color:var(--blue-light)">PGN 2027</a>.</p>
+      </div>
+      <div class="mf-ev">
+        <div class="mf-ev-d">16 de diciembre de 2026</div>
+        <div class="mf-ev-t">Cierre de la primera mitad de la legislatura</div>
+        <p class="mf-ev-p">Todo lo que no tenga ponente designado y orden del día antes de diciembre entra a competir en marzo con la agenda de un año preelectoral.</p>
+      </div>
+      <div class="mf-ev">
+        <div class="mf-ev-d">A más tardar el 7 de febrero de 2027</div>
+        <div class="mf-ev-t">Plan Nacional de Desarrollo 2027-2030</div>
+        <p class="mf-ev-p">La pelea de fondo del cuatrienio. Va a comisiones económicas conjuntas —Terceras y Cuartas de ambas cámaras— y define metas, programas y plata plurianual de vivienda y agua. Quien no escriba su capítulo, lo escriben otros: el capítulo de hábitat se negocia con el DNP meses antes de que el texto llegue al Congreso.</p>
+      </div>
+      <div class="mf-ev">
+        <div class="mf-ev-d">Octubre de 2027</div>
+        <div class="mf-ev-t">Elecciones territoriales</div>
+        <p class="mf-ev-p">Alcaldes y gobernadores actuales salen el 31 de diciembre de 2027. Todo convenio con ciudades y departamentos —suelo, PDA, macroproyectos— se firma y se arranca en 2026-2027 o espera a 2028 con contrapartes nuevas. Es el argumento más fuerte para apurar los acuerdos con Bogotá, Medellín, Cali, Barranquilla y Cartagena este año.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 06 · RIESGOS ═════════════════════════════════════════════════ -->
+  <section class="mf-sec" id="riesgos">
+    <div class="mf-head"><span class="mf-num">— 06</span><h2>Los cinco frentes donde se cae un ministro de Vivienda</h2><span class="mf-meta">Lectura de riesgo</span></div>
+    <div class="mf-riesgo">
+      <h4>1 · El cupo de subsidios agotado a mitad de año</h4>
+      <p>Es el accidente clásico: la demanda se come la asignación antes de tiempo, quedan hogares con promesa firmada sin subsidio y el gremio convierte la fila en crisis nacional en 48 horas. Se previene con calendario público de asignación por trimestre y por región, no con comunicados.</p>
+    </div>
+    <div class="mf-riesgo">
+      <h4>2 · La tarifa de agua</h4>
+      <p>Una metodología tarifaria es técnica hasta que llega al recibo. El aumento del alcantarillado en una ciudad grande puede producir más costo político que toda la política de vivienda junta, y tiene auditor natural en la Comisión Sexta y en los vocales de control.</p>
+    </div>
+    <div class="mf-riesgo">
+      <h4>3 · Las obras inconclusas de agua</h4>
+      <p>El pasivo histórico del sector: acueductos y plantas contratados, pagados y sin operar en municipios pequeños. Es material de informe de Contraloría y de titular, y cae sobre el ministro de turno aunque el contrato sea de dos gobiernos atrás. Conviene inventariarlo y publicarlo antes de que lo publique otro.</p>
+    </div>
+    <div class="mf-riesgo">
+      <h4>4 · El proyecto parado con compradores adentro</h4>
+      <p>Cuando una constructora entra en dificultades, la plata está en un patrimonio autónomo y los hogares quedan en el aire. El ministerio no es responsable jurídico y es responsable político. La defensa es preventiva: información pública sobre avance de obra y fiducia.</p>
+    </div>
+    <div class="mf-riesgo">
+      <h4>5 · La ocupación informal y la reubicación por riesgo</h4>
+      <p>Cada temporada de lluvias produce emergencia, y cada emergencia produce una promesa de vivienda que el ministerio no puede cumplir en el tiempo que la gente necesita. La coordinación con la unidad de gestión del riesgo y con las alcaldías tiene que estar montada antes, no durante.</p>
+    </div>
+  </section>
+
+  <!-- ═══ 07 · MOVIMIENTOS ═════════════════════════════════════════════ -->
+  <section class="mf-sec" id="movimientos">
+    <div class="mf-head"><span class="mf-num">— 07</span><h2>Seis movimientos de arranque</h2><span class="mf-meta">Recomendación</span></div>
+    <div class="mf-movs">
+      <div class="mf-mov">
+        <h4>Cerrar el número con Hacienda antes de discutirlo con el gremio</h4>
+        <p>La conversación con Camacol sobre cupos solo sirve si detrás hay PAC. Primero se asegura el flujo de caja y el calendario de asignación; después se anuncia. El orden inverso produce anuncios que el propio ministerio incumple.</p>
+      </div>
+      <div class="mf-mov">
+        <h4>Tratar el agua como la mitad del ministerio que es</h4>
+        <p>Nombrar un interlocutor visible para agua y saneamiento, con agenda propia en la Comisión Sexta y con los departamentos. Es donde está el riesgo fiscal, el pleito regional y —si se hace bien— el resultado más medible del cuatrienio.</p>
+      </div>
+      <div class="mf-mov">
+        <h4>Firmar el suelo con las cinco ciudades este año</h4>
+        <p>El mercado formal se concentra en cinco ciudades y sus alcaldes terminan en diciembre de 2027. Convenios de habilitación de suelo, planes parciales y trámite de licencias se negocian ahora, con contrapartes que todavía tienen dos presupuestos por delante.</p>
+      </div>
+      <div class="mf-mov">
+        <h4>Disputar la métrica</h4>
+        <p>Si la única cifra del sector es la del gremio, el termómetro lo calibra el gremio. Publicar un tablero propio y verificable —asignación, desembolso, iniciaciones, conexiones de agua, tiempos de licencia— y sostenerlo mes a mes. La credibilidad de un ministerio se construye con serie de tiempo, no con eventos.</p>
+      </div>
+      <div class="mf-mov">
+        <h4>Escoger una sola ley, y escogerla ya</h4>
+        <p>Con 181 días de espera mediana al primer debate y dos años de ventana útil, el ministerio alcanza a empujar bien un proyecto, no cinco. Todo lo demás debería salir por decreto, resolución o regulación de la CRA, que además no depende del orden del día de nadie.</p>
+      </div>
+      <div class="mf-mov">
+        <h4>Llegar primero a la oposición</h4>
+        <p>El Pacto Histórico es primera minoría en la Séptima y en la Sexta, y tiene derecho a citación. Es mejor un debate de control político preparado, con datos entregados de antemano, que uno ganado con quórum. El costo de no ir es un titular; el de ir bien preparado es una tarde.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 08 · MÉTODO ══════════════════════════════════════════════════ -->
+  <section class="mf-sec" id="metodo">
+    <div class="mf-head"><span class="mf-num">— 08</span><h2>Método, fuentes y advertencias</h2><span class="mf-meta">Qué es dato y qué es opinión</span></div>
+    <div class="mf-split">
+      <div class="mf-box si">
+        <h3>Esto es dato verificable</h3>
+        <ul>
+          <li><b>Composición del Congreso 2026-2030</b> y de cada comisión constitucional, con mesas directivas elegidas el 29 de julio de 2026 (Sexta de Cámara, el 12 de agosto). Fuente: nuestra base de electos y de comisiones, publicada en <a href="legislativo-comisiones.html" style="color:var(--blue-light)">legislativo-comisiones</a>.</li>
+          <li><b>Cifras del PGN 2027</b> para la cartera: $6,65 billones en el proyecto frente a $5,53 billones liquidados en 2026. Fuente: <a href="pgn-2027.html" style="color:var(--blue-light)">pgn-2027</a>.</li>
+          <li><b>Estadísticas legislativas</b> (proyectos radicados, leyes, archivo por vencimiento de términos, probabilidad de debate según el orden del día, espera mediana al primer debate). Fuente: Caudal, base propia del histórico 1990-2026.</li>
+        </ul>
+      </div>
+      <div class="mf-box no">
+        <h3>Esto es heurística, y se puede discutir</h3>
+        <ul>
+          <li><b>La posición de cada actor</b> (aliado, condicional, árbitro, opositor) y su <b>poder de 1 a 5</b>: son juicios de analista sobre el punto de partida esperable, no una medición.</li>
+          <li><b>Las coordenadas del plano</b> influencia × dependencia: sirven para ordenar la conversación estratégica, no para calcular nada.</li>
+          <li><b>No se nombran voceros gremiales ni empresariales.</b> Nuestro registro de voceros guarda el cargo, no la persona, porque las personas rotan: ver <a href="caudal-voceros.html" style="color:var(--blue-light)">voceros</a>. Lo mismo aplica al titular de la cartera: este mapa describe la silla.</li>
+          <li><b>La lista de empresas es ilustrativa</b> de los tipos de actor relevantes (constructoras de escala nacional, materiales, banca hipotecaria, empresas de acueducto), no un ranking ni una lista exhaustiva.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="mf-foot">
+    Mapa de actores del sector vivienda, ciudad y territorio · Colombia 2026-2030. Preparado con la base legislativa Caudal y los datos electorales de ricardoruiz.co. Última revisión: 18 de septiembre de 2026.
+  </div>
+
+  <script src="legislativo-base.js?v=20260903"></script>
+  <script src="platform-config.js"></script>
+  <script>
+  'use strict';
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     ACTORES — una sola fuente para las fichas y para el plano.
+     inf = influencia sobre la agenda del ministerio (0-100)
+     dep = dependencia del actor frente a decisiones del ministerio (0-100)
+     poder = 1-5 (peso relativo en el sistema)
+     Todo esto es heurística declarada; ver sección 08.
+     ═══════════════════════════════════════════════════════════════════════ */
+  const BLOQUES=[
+    {key:'gob',  nombre:'Gobierno y caja',            color:'#0047FF', nota:'Los que deciden sin que se note'},
+    {key:'sect', nombre:'Entidades del sector',       color:'#3d6fff', nota:'La casa propia: lo que el ministro sí manda'},
+    {key:'grem', nombre:'Gremios',                    color:'#e0a03a', nota:'Los que fijan el relato del sector'},
+    {key:'emp',  nombre:'Empresas y capital',         color:'#f97316', nota:'Los que ejecutan, o no'},
+    {key:'cong', nombre:'Congreso',                   color:'#22d3ee', nota:'Presupuesto, plan y control político'},
+    {key:'terr', nombre:'Territorio',                 color:'#4ade80', nota:'Donde está el suelo y la obra'},
+    {key:'soc',  nombre:'Sociedad, control y relato', color:'#d1584e', nota:'Los que cobran la cuenta'}
+  ];
+
+  const ACTORES=[
+    /* ── gobierno y caja ─────────────────────────────────────────────── */
+    {b:'gob',n:'Presidencia de la República',pos:'condicional',p:5,inf:96,dep:22,
+     q:'Resultados visibles y rápidos: casas entregadas, agua conectada, ninguna crisis. La vivienda compite con seguridad y economía por el espacio de agenda.',
+     c:'Cambiar al ministro, mover el programa bandera a otra cartera o anunciar por encima del ministerio.',
+     l:'Convertirse en la cartera que entrega cifras verificables a tiempo. Un ministerio que no genera sorpresas gana autonomía.'},
+    {b:'gob',n:'Ministerio de Hacienda',pos:'arbitro',p:5,inf:98,dep:12,
+     q:'Cumplir la regla fiscal y proteger la caja. Toda promesa de vivienda es, para Hacienda, gasto con vigencias futuras.',
+     c:'Aplazar el PAC, recortar el cupo de subsidios en la ejecución o no avalar vigencias futuras: sin firma de Hacienda no hay programa plurianual.',
+     l:'Presentar la vivienda como política contracíclica y de formalización del empleo, con retorno tributario medible, no como gasto social.'},
+    {b:'gob',n:'DNP',pos:'condicional',p:4,inf:82,dep:30,
+     q:'Coherencia del Plan Nacional de Desarrollo y control de las metas de todo el gobierno.',
+     c:'Escribir el capítulo de hábitat y agua sin el ministerio, o fijarle metas que no puede cumplir con su presupuesto.',
+     l:'Llegar con el capítulo redactado, con metas y línea base propias, antes de que arranque la discusión del Plan.'},
+    {b:'gob',n:'Prosperidad Social y Sisbén',pos:'condicional',p:3,inf:58,dep:34,
+     q:'Que la focalización social sea una sola y la maneje el sistema de transferencias.',
+     c:'Definir quién es elegible: quien controla la lista de hogares controla el subsidio.',
+     l:'Cruce de bases con reglas públicas y auditables, y una regla de priorización pactada por escrito.'},
+    {b:'gob',n:'Ministerios de Ambiente, Agricultura y Transporte',pos:'condicional',p:3,inf:52,dep:38,
+     q:'Licencias ambientales, vivienda rural y la infraestructura que vuelve urbanizable un terreno.',
+     c:'Frenar proyectos por trámite ambiental o dejar la vivienda rural en tierra de nadie entre dos carteras.',
+     l:'Mesas conjuntas por proyecto grande, con tiempos comprometidos, en vez de coordinación general.'},
+    /* ── entidades del sector ────────────────────────────────────────── */
+    {b:'sect',n:'Fonvivienda',pos:'aliado',p:4,inf:40,dep:92,
+     q:'Ejecutar sin caerse: ordenar el gasto de subsidios con reglas claras.',
+     c:'Si se atasca la operación, el anuncio del ministro se vuelve un trámite incumplido.',
+     l:'Es del ministerio: lo que se puede cambiar por decisión propia, en semanas.'},
+    {b:'sect',n:'Fondo Nacional del Ahorro',pos:'condicional',p:3,inf:46,dep:70,
+     q:'Colocar crédito, crecer en afiliados y sostener su propia independencia gerencial.',
+     c:'Su presidencia y su junta son moneda política; un escándalo ahí golpea a la cartera entera.',
+     l:'Alinear su producto de crédito con la política de subsidio: es la única banca que el ministerio puede instruir.'},
+    {b:'sect',n:'CRA · regulación de agua',pos:'arbitro',p:4,inf:66,dep:52,
+     q:'Metodologías tarifarias técnicamente defendibles y suficiencia financiera de los prestadores.',
+     c:'Una metodología nueva puede subir el recibo en ciudades enteras y volverse debate de control político.',
+     l:'Es parte del sector: se puede fijar la agenda regulatoria y su calendario, con socialización previa.'},
+    {b:'sect',n:'Superservicios',pos:'arbitro',p:3,inf:56,dep:30,
+     q:'Vigilar prestadores y usar la toma de posesión cuando toca.',
+     c:'Intervenir una empresa de acueducto es una decisión técnica con consecuencias políticas inmediatas en la región.',
+     l:'Coordinar tiempos y relato antes de cada intervención grande.'},
+    {b:'sect',n:'Findeter y banca de desarrollo',pos:'aliado',p:3,inf:44,dep:56,
+     q:'Colocar crédito en municipios para acueducto, alcantarillado y equipamiento urbano.',
+     c:'Sin estructuración financiera, los proyectos de agua se quedan en diseño.',
+     l:'Cofinanciación y estructuración: la ventanilla que convierte una promesa en obra contratada.'},
+    /* ── gremios ─────────────────────────────────────────────────────── */
+    {b:'grem',n:'Camacol',pos:'condicional',p:5,inf:90,dep:74,
+     q:'Cupos de subsidio asignados temprano y sin interrupción, reglas estables, licencias más rápidas y cobertura de tasa para sostener la demanda.',
+     c:'Fija el relato del sector con sus propias cifras de lanzamientos, ventas e iniciaciones, mide al ministro mes a mes y convierte un cupo agotado en crisis nacional en 48 horas.',
+     l:'El calendario de asignación y la reglamentación de trámites. Anunciar con el gremio, no contra él; pero sin dejarle el termómetro.'},
+    {b:'grem',n:'Camacol regionales',pos:'condicional',p:3,inf:58,dep:66,
+     q:'Suelo habilitado, planes parciales desatascados y curadurías que respondan, ciudad por ciudad.',
+     c:'Trasladar el conflicto de suelo a la alcaldía y dejar al ministerio sin proyectos donde aplicar el subsidio.',
+     l:'Convenios tripartitos ministerio-alcaldía-gremio con metas de suelo y de tiempos de licencia.'},
+    {b:'grem',n:'Asobancaria',pos:'condicional',p:4,inf:78,dep:44,
+     q:'Cartera hipotecaria sana, riesgo acotado y reglas de cobertura predecibles. Además, todo lo que la discusión tributaria le haga al sector financiero.',
+     c:'Sin banca no hay desembolso: el subsidio es inútil si el crédito no acompaña al hogar de ingresos bajos.',
+     l:'Cobertura de tasa y garantías: son el instrumento que hace rentable prestarle a quien el banco no le prestaría.'},
+    {b:'grem',n:'Fedelonjas',pos:'condicional',p:3,inf:52,dep:40,
+     q:'Reglas estables de avalúo, arriendo y propiedad horizontal.',
+     c:'Cualquier señal de control a los cánones de arriendo lo vuelve opositor duro y ruidoso.',
+     l:'Meterlos en el diseño del arriendo social en vez de regularlos por encima.'},
+    {b:'grem',n:'Andesco',pos:'condicional',p:4,inf:74,dep:56,
+     q:'Suficiencia tarifaria, pago oportuno de subsidios cruzados y marco regulatorio previsible para las empresas de servicios.',
+     c:'Es el gremio que pesa en la mitad del ministerio que nadie mira; puede bloquear una metodología tarifaria con argumento técnico y regional.',
+     l:'La agenda de la CRA y el giro oportuno de los subsidios de estratos bajos.'},
+    {b:'grem',n:'Acodal y firmas de ingeniería',pos:'aliado',p:2,inf:38,dep:58,
+     q:'Proyectos de agua y saneamiento estructurados, con estándar técnico y contratación continua.',
+     c:'Poco daño directo; mucho valor como fuente técnica independiente.',
+     l:'Convertirlos en el control de calidad público de los proyectos de agua.'},
+    {b:'grem',n:'Cajas de compensación',pos:'aliado',p:3,inf:50,dep:52,
+     q:'Administrar subsidio familiar de vivienda y sostener su papel en los hogares formales.',
+     c:'Operan con base propia de afiliados y capacidad regional; si no coordinan, duplican subsidio y confunden al hogar.',
+     l:'Convenio de operación conjunta: dan alcance territorial que el ministerio no tiene.'},
+    {b:'grem',n:'ANDI · cemento, acero y acabados',pos:'aliado',p:3,inf:46,dep:48,
+     q:'Demanda sostenida de materiales; la construcción es su cliente.',
+     c:'Sus despachos son termómetro adelantado del sector: una caída se lee antes que en cualquier estadística oficial.',
+     l:'Aliado natural para defender el presupuesto de vivienda como política industrial y de empleo.'},
+    {b:'grem',n:'Ingenieros, arquitectos y curadores',pos:'arbitro',p:2,inf:42,dep:44,
+     q:'Norma técnica actualizada y reglas de licenciamiento claras.',
+     c:'El cuello de botella real del sector está en la licencia, y ahí el ministerio depende de un cuerpo profesional descentralizado.',
+     l:'Actualización normativa y digitalización del trámite: una reforma de bajo costo y alto efecto.'},
+    {b:'grem',n:'Asocapitales y Federación de Municipios',pos:'condicional',p:3,inf:60,dep:62,
+     q:'Recursos y autonomía: cofinanciación de agua, vivienda y equipamiento sin condiciones que no pueden cumplir.',
+     c:'Vocería nacional de los alcaldes; pueden convertir una regla de cofinanciación en pelea con todo el país.',
+     l:'Reglas de distribución objetivas y publicadas: quitan discrecionalidad y quitan pelea.'},
+    /* ── empresas ────────────────────────────────────────────────────── */
+    {b:'emp',n:'Constructoras de escala nacional',pos:'condicional',p:4,inf:72,dep:76,
+     q:'Rotación de inventario, financiación y certeza sobre el subsidio con el que el comprador firma.',
+     c:'Salirse del segmento social. Si no hay oferta VIS, no hay dónde aplicar el subsidio y el programa se vuelve un anuncio.',
+     l:'Certeza del desembolso y tiempos de escrituración: lo que ellos necesitan es previsibilidad, más que plata.'},
+    {b:'emp',n:'Banca hipotecaria',pos:'condicional',p:4,inf:80,dep:40,
+     q:'Colocar crédito con riesgo controlado; leasing habitacional y cartera titularizable.',
+     c:'Endurecer el perfil de aprobación y dejar por fuera al hogar objetivo del programa, sin que nadie lo anuncie.',
+     l:'Coberturas, garantías y titularización: el ministerio no presta, pero sí cambia el precio del riesgo.'},
+    {b:'emp',n:'Materiales de construcción',pos:'aliado',p:3,inf:44,dep:50,
+     q:'Volumen y precio. Son el primer eslabón que siente la desaceleración.',
+     c:'Poco poder de bloqueo, mucha capacidad de señalar la caída antes que nadie.',
+     l:'Alianza de datos para anticipar el ciclo del sector.'},
+    {b:'emp',n:'Fiduciarias y patrimonios autónomos',pos:'arbitro',p:3,inf:50,dep:46,
+     q:'Administrar los recursos de los proyectos con riesgo legal acotado.',
+     c:'Ahí está la plata de los compradores: cuando un proyecto se para, el escándalo nace en la fiducia y termina en el ministerio.',
+     l:'Estándares de información pública sobre avance de obra y uso de recursos.'},
+    {b:'emp',n:'Empresas de acueducto y alcantarillado',pos:'condicional',p:4,inf:76,dep:58,
+     q:'Tarifa suficiente, inversión financiable y, en las grandes, autonomía frente al nivel nacional.',
+     c:'Sin capacidad de conexión no hay licencia ni escritura: pueden frenar de hecho la vivienda nueva de una ciudad entera. Las más grandes tienen dueño político propio.',
+     l:'Cofinanciación de obras de expansión y reglas tarifarias: se negocia con el alcalde tanto como con el gerente.'},
+    /* ── congreso ────────────────────────────────────────────────────── */
+    {b:'cong',n:'Comisiones Terceras y Cuartas',pos:'arbitro',p:5,inf:88,dep:26,
+     q:'Presupuesto con destinación visible en sus regiones y protagonismo en el trámite del Plan.',
+     c:'Recortar o recomponer la sección del ministerio, y condicionar el Plan Nacional de Desarrollo.',
+     l:'Presupuesto regionalizado y proyectos de agua estructurados: es la moneda de curso legal.'},
+    {b:'cong',n:'Comisión Séptima',pos:'condicional',p:4,inf:70,dep:34,
+     q:'Agenda propia en salud, trabajo y pensiones; la vivienda compite por espacio dentro de su propia comisión.',
+     c:'Control político, citaciones y archivo por reloj de cualquier proyecto del sector.',
+     l:'Mesas directivas afines en Senado y Cámara, y agenda pactada con ponentes desde el primer trimestre.'},
+    {b:'cong',n:'Comisión Sexta',pos:'condicional',p:4,inf:66,dep:32,
+     q:'Servicios públicos domiciliarios: tarifas, calidad y subsidios. Su presidencia en Senado la tiene una bancada con tradición en defensa del usuario.',
+     c:'Volver cada ajuste tarifario un debate nacional y frenar la agenda regulatoria del agua.',
+     l:'Transparencia tarifaria anticipada: llevarles la metodología antes de expedirla, no después.'},
+    {b:'cong',n:'Bancada del Pacto Histórico',pos:'opositor',p:4,inf:64,dep:20,
+     q:'Defender los programas del gobierno anterior y marcar contraste en subsidio, arriendo y derecho a la vivienda.',
+     c:'Es primera minoría en la Séptima y en la Sexta: cita, debate y fija narrativa aunque no gane votaciones.',
+     l:'Información entregada antes del debate y trato institucional. No se convence, pero se desactiva el titular.'},
+    /* ── territorio ──────────────────────────────────────────────────── */
+    {b:'terr',n:'Alcaldías de las grandes ciudades',pos:'condicional',p:5,inf:86,dep:54,
+     q:'Suelo, renovación urbana y plata nacional para sus proyectos, sin perder el control del POT.',
+     c:'El ministerio no habilita suelo: sin POT, planes parciales y curadurías, el subsidio no encuentra dónde aterrizar.',
+     l:'Cofinanciación y macroproyectos: es el único instrumento que compra decisiones de suelo. El reloj corre: salen en diciembre de 2027.'},
+    {b:'terr',n:'Gobernaciones y Planes de Agua',pos:'condicional',p:4,inf:64,dep:72,
+     q:'Recursos de agua y saneamiento y manejo del esquema departamental.',
+     c:'Son el eslabón donde se acumulan las obras inconclusas que después firma como responsable el ministro de turno.',
+     l:'Viabilización de proyectos y control de giros: aquí la palanca del ministerio es real y grande.'},
+    /* ── sociedad y control ──────────────────────────────────────────── */
+    {b:'soc',n:'Corte Constitucional',pos:'arbitro',p:5,inf:84,dep:8,
+     q:'Vivienda digna, mínimo vital de agua y no regresividad de los derechos sociales.',
+     c:'Puede reescribir de un fallo las reglas de focalización o de corte de servicio, sin negociación posible.',
+     l:'Ninguna: se anticipa con diseño jurídico cuidadoso, no se negocia.'},
+    {b:'soc',n:'Contraloría, Procuraduría y Fiscalía',pos:'arbitro',p:4,inf:78,dep:14,
+     q:'Hallazgos sobre subsidios mal asignados y obras de agua pagadas y sin operar.',
+     c:'Un informe puede costar el cargo. El pasivo de obras inconclusas del sector agua es un riesgo heredado, no creado.',
+     l:'Autorreporte: inventariar y publicar el pasivo antes de que lo publique el órgano de control.'},
+    {b:'soc',n:'Organizaciones de vivienda popular y usuarios',pos:'condicional',p:3,inf:54,dep:64,
+     q:'Acceso efectivo al subsidio, mejoramiento de barrio, y tarifas de agua que se puedan pagar.',
+     c:'La protesta por tarifas y por incumplimiento de entregas escala más rápido que cualquier debate técnico.',
+     l:'Mejoramiento de vivienda y de barrio: entrega resultados visibles en meses y no depende de suelo nuevo.'},
+    {b:'soc',n:'DANE, medios y datos del sector',pos:'arbitro',p:4,inf:72,dep:18,
+     q:'Medir déficit habitacional, licencias, precios y cobertura de agua.',
+     c:'Quien fija la métrica fija el juicio: si la cifra pública del sector es la del gremio, el ministerio queda evaluado por su contraparte.',
+     l:'Tablero propio, verificable y sostenido en el tiempo, con la misma serie publicada mes a mes.'}
+  ];
+
+  /* ═══ fichas por bloque ═══════════════════════════════════════════════ */
+  function renderBloques(){
+    const cont=document.getElementById('mf-bloques');
+    cont.innerHTML=BLOQUES.map(function(b){
+      const lista=ACTORES.filter(function(a){return a.b===b.key;});
+      if(!lista.length) return '';
+      const cards=lista.map(function(a){
+        let barras='';
+        for(let i=1;i<=5;i++) barras+='<u class="'+(i<=a.p?'on':'')+'"></u>';
+        return '<article class="mf-card">'
+          +'<div class="mf-card-top"><div class="mf-card-name">'+a.n+'</div>'
+          +'<span class="mf-pos '+a.pos+'">'+a.pos+'</span></div>'
+          +'<div class="mf-poder">Poder '+barras+'</div>'
+          +'<p class="mf-l"><b>Qué quiere</b>'+a.q+'</p>'
+          +'<p class="mf-l"><b>Qué le puede hacer al ministerio</b>'+a.c+'</p>'
+          +'<p class="mf-l"><b>Con qué se negocia</b>'+a.l+'</p>'
+          +'</article>';
+      }).join('');
+      return '<div class="mf-bloque"><div class="mf-bloque-h"><i style="background:'+b.color+'"></i>'
+        +'<h3>'+b.nombre+'</h3><span>'+b.nota+' · '+lista.length+' actores</span></div>'
+        +'<div class="mf-grid">'+cards+'</div></div>';
+    }).join('');
+  }
+
+  /* ═══ plano influencia × dependencia ══════════════════════════════════ */
+  const OFF=new Set();
+  function renderPlano(){
+    const svg=document.getElementById('mf-plot');
+    const W=980,H=560,ml=132,mr=132,mt=26,mb=50;
+    const x=function(v){return ml+(v/100)*(W-ml-mr);};
+    /* el eje vertical arranca en 20: ningún actor del sector baja de ahí y
+       dejar el tramo vacío solo estiraba el dibujo. La cruz sigue en 50. */
+    const y=function(v){return H-mb-((v-20)/80)*(H-mt-mb);};
+    let s='';
+    /* cuadrantes */
+    s+='<rect x="'+ml+'" y="'+mt+'" width="'+(W-ml-mr)+'" height="'+(H-mt-mb)+'" fill="rgba(255,255,255,.015)" rx="8"/>';
+    s+='<line x1="'+x(50)+'" y1="'+mt+'" x2="'+x(50)+'" y2="'+(H-mb)+'" stroke="rgba(255,255,255,.12)" stroke-dasharray="4 5"/>';
+    s+='<line x1="'+ml+'" y1="'+y(50)+'" x2="'+(W-mr)+'" y2="'+y(50)+'" stroke="rgba(255,255,255,.12)" stroke-dasharray="4 5"/>';
+    /* ejes */
+    s+='<text class="mf-ax" x="'+((ml+W-mr)/2)+'" y="'+(H-16)+'" text-anchor="middle">Dependencia del ministerio →</text>';
+    s+='<text class="mf-ax" transform="translate(22,'+((mt+H-mb)/2)+') rotate(-90)" text-anchor="middle">Influencia sobre la agenda →</text>';
+
+    /* puntos, con las etiquetas empujadas hacia afuera y separadas en vertical
+       para que no se pisen: dos columnas de texto (izquierda y derecha) y un
+       barrido de arriba a abajo que corre la etiqueta si queda muy cerca de la
+       anterior de su misma columna. */
+    const vis=ACTORES.filter(function(a){return !OFF.has(a.b);})
+      .map(function(a){
+        const px=x(a.dep), py=y(a.inf);
+        return {a:a,px:px,py:py,r:4.5+a.p*1.7,lado:(a.dep<50?'izq':'der')};
+      })
+      .sort(function(p,q){return p.py-q.py;});
+    const ultima={izq:-99,der:-99};
+    vis.forEach(function(d){
+      const min=d.py; let ly=Math.max(min,ultima[d.lado]+11.5);
+      ultima[d.lado]=ly; d.ly=ly;
+    });
+    vis.forEach(function(d){
+      const a=d.a, b=BLOQUES.find(function(z){return z.key===a.b;});
+      const anchor=d.lado==='izq'?'end':'start';
+      const lx=d.lado==='izq'?d.px-d.r-7:d.px+d.r+7;
+      const corto=a.n.length>26?a.n.slice(0,25)+'…':a.n;
+      /* si la etiqueta bajó, una guía la conecta con su punto */
+      let guia='';
+      if(Math.abs(d.ly-d.py)>4) guia='<path d="M'+(d.lado==='izq'?d.px-d.r-2:d.px+d.r+2)+' '+d.py
+        +' L'+lx+' '+(d.ly-3)+'" stroke="'+b.color+'" stroke-opacity=".35" fill="none" stroke-width=".8"/>';
+      s+='<g class="mf-dot"><title>'+a.n+' · influencia '+a.inf+' · dependencia '+a.dep+'</title>'+guia
+        +'<circle cx="'+d.px+'" cy="'+d.py+'" r="'+d.r+'" fill="'+b.color+'" fill-opacity=".55" stroke="'+b.color+'" stroke-width="1.2"/>'
+        +'<text class="mf-dlab" x="'+lx+'" y="'+(d.ly)+'" text-anchor="'+anchor+'">'+corto+'</text></g>';
+    });
+    svg.setAttribute('viewBox','0 0 '+W+' '+H);
+    svg.innerHTML=s;
+  }
+  function renderLeyenda(){
+    const el=document.getElementById('mf-legend');
+    el.innerHTML=BLOQUES.map(function(b){
+      return '<span class="mf-leg'+(OFF.has(b.key)?' off':'')+'" data-k="'+b.key+'"><i style="background:'+b.color+'"></i>'+b.nombre+'</span>';
+    }).join('');
+    el.querySelectorAll('.mf-leg').forEach(function(n){
+      n.onclick=function(){
+        const k=n.dataset.k;
+        if(OFF.has(k)) OFF.delete(k); else OFF.add(k);
+        if(OFF.size===BLOQUES.length) OFF.clear();
+        renderLeyenda(); renderPlano();
+      };
+    });
+  }
+
+  /* ═══ comisiones ══════════════════════════════════════════════════════
+     Snapshot de nuestra base (18-sep-2026). Mesas elegidas el 29-jul-2026;
+     la Sexta de Cámara, el 12-ago-2026.
+     ═══════════════════════════════════════════════════════════════════════ */
+  const COM=[
+    {n:'Séptima',por:'Es su comisión temática: vivienda comparte célula con salud, trabajo y seguridad social.',
+     sen:'Andrés Eduardo Forero · Centro Democrático',cam:'Juan Felipe Corzo · Centro Democrático',int:'14 Senado · 21 Cámara'},
+    {n:'Sexta',por:'Servicios públicos domiciliarios: aquí vive el viceministerio de Agua y Saneamiento.',
+     sen:'Carlos Eduardo Guevara · Ahora Colombia (MIRA)',cam:'Hernando González · coalición CR-CJL-Liga',int:'13 Senado · 20 Cámara'},
+    {n:'Tercera',por:'Hacienda, impuestos y banca: el marco fiscal y el crédito hipotecario.',
+     sen:'Sara Jimena Castellanos · Salvación Nacional',cam:'Alfredo «Ape» Cuello · Conservador',int:'15 Senado · 31 Cámara'},
+    {n:'Cuarta',por:'Presupuesto y control fiscal: la sección del ministerio se define acá.',
+     sen:'Diela Liliana Benavides · Conservador',cam:'Alexánder Bermúdez Lasso · Liberal',int:'15 Senado · 29 Cámara'},
+    {n:'Quinta',por:'Tierras, ambiente y recursos naturales: suelo, licencias y agua como recurso.',
+     sen:'Juan Fernando Espinal · Centro Democrático',cam:'Julio Roberto Salazar · Conservador',int:'13 Senado · 22 Cámara'}
+  ];
+  function renderCom(){
+    document.getElementById('mf-com').innerHTML=COM.map(function(c){
+      return '<tr><td class="mf-key">'+c.n+'</td><td>'+c.por+'</td><td>'+c.sen+'</td><td>'+c.cam+'</td><td>'+c.int+'</td></tr>';
+    }).join('');
+  }
+
+  /* composición por bancada de las dos comisiones clave */
+  const COLOR_P={'Pacto Histórico':'#6B2D8B','Centro Democrático':'#0088BB','Liberal':'#C8102E',
+    'Conservador':'#003580','La U':'#F7941D','Cambio Radical':'#E91E8C','Alianza por Colombia':'#4CAF50',
+    'Ahora Colombia (MIRA)':'#1A3FC4','Verde':'#4CAF50','Otros y coaliciones':'#8494a0'};
+  const CELULAS={
+    'mf-sep-bars':[
+      {t:'Séptima · Senado (14)',d:[['Pacto Histórico',3],['Centro Democrático',3],['Liberal',2],['Conservador',1],['La U',1],['Cambio Radical',1],['Alianza por Colombia',1],['Ahora Colombia (MIRA)',1],['Otros y coaliciones',1]]},
+      {t:'Séptima · Cámara (21)',d:[['Pacto Histórico',5],['Liberal',3],['Centro Democrático',3],['Conservador',2],['La U',2],['Cambio Radical',1],['Verde',1],['Otros y coaliciones',4]]}
+    ],
+    'mf-sex-bars':[
+      {t:'Sexta · Senado (13)',d:[['Pacto Histórico',3],['Centro Democrático',2],['Ahora Colombia (MIRA)',2],['Alianza por Colombia',2],['Liberal',1],['Conservador',1],['La U',1],['Cambio Radical',1]]},
+      {t:'Sexta · Cámara (20)',d:[['Pacto Histórico',5],['Liberal',3],['Centro Democrático',2],['Conservador',1],['La U',1],['Verde',1],['Otros y coaliciones',7]]}
+    ]
+  };
+  function renderCelulas(){
+    Object.keys(CELULAS).forEach(function(id){
+      document.getElementById(id).innerHTML=CELULAS[id].map(function(c){
+        const tot=c.d.reduce(function(s,r){return s+r[1];},0);
+        const barra=c.d.map(function(r){
+          return '<span title="'+r[0]+': '+r[1]+'" style="width:'+(r[1]/tot*100)+'%;background:'+(COLOR_P[r[0]]||'#8494a0')+'"></span>';
+        }).join('');
+        const leg=c.d.map(function(r){return r[0]+' '+r[1];}).join(' · ');
+        return '<div style="margin-bottom:.9rem"><div class="mf-barleg" style="color:var(--white);font-size:.76rem">'+c.t+'</div>'
+          +'<div class="mf-bar">'+barra+'</div><div class="mf-barleg">'+leg+'</div></div>';
+      }).join('');
+    });
+  }
+
+  renderBloques(); renderLeyenda(); renderPlano(); renderCom(); renderCelulas();
+  window.addEventListener('resize',function(){ renderPlano(); });
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>
