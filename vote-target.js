@@ -46,29 +46,40 @@
      figura. */
   const CURUL_OPOSICION = { concejo: true, asamblea: true };
 
-  /* Votos DE LISTA que el índice todavía no trae. La Registraduría registra
-     aparte el voto «solo por la lista» y, en las listas cerradas, TODO el voto
-     de la lista (código de candidato 0); los índices por candidato los
-     dejaron por fuera, así que una lista cerrada desaparecía del reparto y
-     sus curules se les regalaban a las demás (en Bogotá 2023 el Pacto
-     Histórico, 376.733 votos y 7 curules, no existía). Los build_*_2023.py
-     ya emiten `listas` en el índice; mientras esa versión no esté en S3, acá
-     van los totales de escrutinio verificados a mano: `total` es la votación
-     completa de la lista y el voto de lista se deduce restando lo que suman
-     sus candidatos. `cerrada`: sin voto personal. */
-  const LISTAS_VERIFICADAS = [
-    { corp: 'concejo', territory: ['BOGOTA'], fuente: 'escrutinio 2023', listas: [
-      { partido: 'PARTIDO ALIANZA VERDE', total: 419884 },
-      { partido: 'NUEVO LIBERALISMO EN MARCHA', total: 401187 },
-      { partido: 'PACTO HISTÓRICO', total: 376733, cerrada: true },
-      { partido: 'PARTIDO CENTRO DEMOCRÁTICO', total: 358140 },
-      { partido: 'PARTIDO LIBERAL COLOMBIANO', total: 296637 },
-      { partido: 'PARTIDO CAMBIO RADICAL - PARTIDO MIRA - PARTIDO DE LA U', total: 217085 },
-      { partido: 'LIDERAZGO AMPLIO DE RENOVACIÓN AVANZADA DE BTÁ "LARA BOGOTÁ"', total: 138445 },
-      { partido: 'PARTIDO CONSERVADOR - PARTIDO COLOMBIA JUSTA LIBRES', total: 85834 },
-      { partido: 'BOGOTÁ MÁS FUERTE', total: 52581 },
-    ] },
-  ];
+  /* Votos DE LISTA. La Registraduría registra aparte el voto «solo por la
+     lista» y, en las listas cerradas, TODO el voto de la lista (fila con
+     código de candidato 0). Los índices por candidato lo dejaban por fuera,
+     así que una lista cerrada desaparecía del reparto y sus curules se les
+     regalaban a las demás: en el Concejo de Bogotá 2023 eso era el Pacto
+     Histórico, 376.733 votos y 7 curules, y en todo el país 888 listas
+     cerradas en concejo y 629 en JAL.
+
+     Lo correcto es que el índice traiga `listas`, y los build_*_2023.py ya lo
+     emiten. Mientras esos índices no estén en S3, el sitio sirve el mismo dato
+     extraído aparte (`listas-2023.json`, unos cientos de KB: los mismos
+     números sin los candidatos). Se pide una sola vez y solo cuando hace
+     falta. */
+  const LISTAS_URL = global.LISTAS_2023_URL || 'candidato-360-data/listas-2023.json';
+  let listasPais = null;
+  function listasDelPais() {
+    if (!listasPais) {
+      listasPais = fetch(LISTAS_URL)
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          const out = new Map();
+          Object.entries((d && d.corps) || {}).forEach(([corp, c]) => {
+            (c.listas || []).forEach(([ic, ip, lista, personal, cerrada]) => {
+              const k = `${corp}|${normalize(c.circ[ic])}`;
+              if (!out.has(k)) out.set(k, []);
+              out.get(k).push({ partido: c.part[ip], lista, personal, total: lista + personal, cerrada: Boolean(cerrada) });
+            });
+          });
+          return out;
+        })
+        .catch(() => new Map());
+    }
+    return listasPais;
+  }
 
   const cache = new Map();
   const CENSUS_GROWTH_2023_2027 = 0.014;
@@ -153,21 +164,13 @@
     return Math.max(0, ...parties.map(party => party.candidates.length));
   }
 
-  function listasVerificadas(corp, territory) {
-    const key = normalize(territory);
-    const hit = LISTAS_VERIFICADAS.find(reference =>
-      reference.corp === corp && reference.territory.every(part => key.includes(normalize(part))));
-    return hit ? hit.listas : [];
-  }
-  /* Los votos de lista de una circunscripción: los del índice (`listas`, con
-     el voto solo-lista ya separado por el pipeline) y, si el índice todavía
-     no los trae, los verificados a mano. */
-  function listasDe(index, corp, label) {
-    /* Si el índice ya declara `listas`, manda él aunque para esta
-       circunscripción venga vacío: la tabla a mano es solo para los índices
-       viejos, que no traían el voto de lista. */
+  /* Los votos de lista de una circunscripción: los del índice si ya los trae
+     —manda él aunque para esta circunscripción venga vacío— y si no, los del
+     archivo que sirve el sitio. */
+  async function listasDe(index, corp, label) {
     if (Array.isArray(index.listas)) return index.listas.filter(lista => normalize(lista.circunscripcion) === normalize(label));
-    return listasVerificadas(corp, label);
+    const pais = await listasDelPais();
+    return pais.get(`${corp}|${normalize(label)}`) || [];
   }
   /* Cada lista vale su voto personal MÁS su voto de lista. Una lista que
      solo tiene voto de lista es cerrada: sus curules cuentan en el reparto,
@@ -503,7 +506,7 @@
          reconstruir. */
       const metrics = await metricsPromise;
       const verified = verifiedCutoff(corp, match.label);
-      const listas = listasDe(index, corp, match.label);
+      const listas = await listasDe(index, corp, match.label);
       const reconstructed = reconstructedCutoff(match.rows, { corp, listas, blanco: metrics && metrics.blanco });
       const reference = verified || reconstructed;
       if (!reference || (!reference.cutoff && !reference.cifra)) throw new Error('No fue posible reconstruir la última curul');

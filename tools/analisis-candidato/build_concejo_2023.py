@@ -30,6 +30,10 @@ Subida a S3 (manual, luz verde del usuario):
 """
 import csv, json, os, subprocess, sys, unicodedata
 
+# El índice cambia mucho más seguido que los JSON por candidato (que son 94 mil
+# y pesan varios GB). Con --solo-indice se reconstruye solo el índice.
+SOLO_INDICE = '--solo-indice' in sys.argv
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BD   = os.path.join(ROOT, 'Bases de datos')
 SRC  = os.path.join(BD, 'FINAL SUBIDA GCS', 'GCS_2023TER.csv')
@@ -59,9 +63,13 @@ DEP_NAMES = {
 CAN_LISTA = '0'
 SPECIAL_CAN = {'0', '996', '997', '998', '999'}
 
-# Columnas GCS (0-based) tras split(';')
-C_COR, C_DDE, C_MME, C_ZZ, C_PP = 2, 6, 7, 8, 9
-C_MS, C_PAR, C_DESPAR, C_CAN, C_DESCAN, C_VOT = 10, 11, 12, 13, 14, 15
+# Columnas por NOMBRE: el archivo territorial trae 19 columnas y el de JAL 16.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gcs_columnas import columnas                                    # noqa: E402
+_C = columnas(SRC)
+C_COR, C_DDE, C_MME, C_ZZ, C_PP = _C['COD_COR'], _C['COD_DDE'], _C['COD_MME'], _C['COD_ZZ'], _C['COD_PP']
+C_MS, C_PAR, C_DESPAR, C_CAN, C_DESCAN, C_VOT = _C['DES_MS'], _C['COD_PAR'], _C['DES_PAR'], _C['COD_CAN'], _C['DES_CAN'], _C['NUM_VOT']
+C_ANCHO = _C['_ancho']
 
 
 def strip(s):
@@ -95,11 +103,11 @@ def ensure_sorted():
     os.makedirs(SCRATCH, exist_ok=True)
     print('· extrayendo COD_COR=4 y ordenando por (dde,mme)…')
     # awk extrae; sort agrupa por depto(k7) y municipio(k8). String-sort agrupa OK.
-    awk = ["awk", "-F;", 'NR>1 && $3=="%s"' % COD_COR_CONCEJO, SRC]
+    awk = ["awk", "-F;", 'NR>1 && $%d=="%s"' % (C_COR + 1, COD_COR_CONCEJO), SRC]
     with open(SORTED, 'wb') as out:
         p1 = subprocess.Popen(awk, stdout=subprocess.PIPE)
         p2 = subprocess.Popen(
-            ["sort", "-t;", "-k7,7", "-k8,8", "-S", "1G"],
+            ["sort", "-t;", f"-k{C_DDE + 1},{C_DDE + 1}", f"-k{C_MME + 1},{C_MME + 1}", "-S", "1G"],
             stdin=p1.stdout, stdout=out,
             env={**os.environ, "LC_ALL": "C", "TMPDIR": SCRATCH})
         p1.stdout.close()
@@ -159,8 +167,9 @@ def flush_group(cands, by9, munNames, index):
             'circunscripcion': circ, 'partido': c['partido'],
             'votos': c['votos'], 'mesas': mesas,
         }
-        with open(os.path.join(OUT_DIR, f'{slug}.json'), 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+        if not SOLO_INDICE:
+            with open(os.path.join(OUT_DIR, f'{slug}.json'), 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
         index.append({
             'slug': slug, 'nombre': c['nombre'],
             'corp': f'CONCEJO · {munNom} · 2023', 'circunscripcion': circ,
@@ -182,7 +191,7 @@ def main():
     n_rows = 0
     with open(SORTED, encoding='utf-8', errors='replace', newline='') as f:
         for row in csv.reader(f, delimiter=';'):
-            if len(row) < 16:
+            if len(row) < C_ANCHO:
                 continue
             can = row[C_CAN]
             if can in SPECIAL_CAN and can != CAN_LISTA:
