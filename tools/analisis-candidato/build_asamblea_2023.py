@@ -45,6 +45,8 @@ DEP_NAMES = {
     '56': 'SAN ANDRÉS', '60': 'AMAZONAS', '64': 'PUTUMAYO', '68': 'VAUPÉS',
     '72': 'VICHADA',
 }
+# --solo-indice reconstruye solo el índice, sin reescribir los JSON por candidato.
+SOLO_INDICE = '--solo-indice' in sys.argv
 SPECIAL_CAN = {'0', '996', '997', '998', '999'}  # partido/blanco/nulos/no-marcados
 # COD_CAN '0' es la fila de la LISTA (voto solo por el partido y, en lista
 # cerrada, todo su voto). No es un candidato, pero cuenta para el umbral y la
@@ -158,10 +160,11 @@ def main():
             'circunscripcion': depNom, 'partido': c['partido'],
             'votos': c['votos'], 'mesas': c['mesas'],
         }
-        path = os.path.join(OUT_DIR, f'{slug}.json')
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
-        total_bytes += os.path.getsize(path)
+        if not SOLO_INDICE:
+            path = os.path.join(OUT_DIR, f'{slug}.json')
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+            total_bytes += os.path.getsize(path)
         index.append({
             'slug': slug, 'nombre': nombre,
             'corp': f'ASAMBLEA · {depNom} · 2023', 'circunscripcion': depNom,

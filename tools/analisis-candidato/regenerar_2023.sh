@@ -22,7 +22,16 @@ RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BD="$RAIZ/Bases de datos"
 TOOLS="$RAIZ/tools/analisis-candidato"
 SUBIR=0
-[[ "${1:-}" == "--subir" ]] && SUBIR=1
+SOLO_INDICE=""
+for a in "$@"; do
+  case "$a" in
+    --subir) SUBIR=1 ;;
+    # Los JSON por candidato (94 mil, varios GB) no cambian cuando lo que se
+    # corrige es el índice: con esto no se reescriben ni hay que resubirlos.
+    --solo-indice) SOLO_INDICE="--solo-indice" ;;
+    *) echo "opción desconocida: $a"; exit 2 ;;
+  esac
+done
 
 faltan=0
 for f in "FINAL SUBIDA GCS/GCS_2023TER.csv" "FINAL SUBIDA GCS/GCS_2023JAL.csv" "PUESTOS_GEOREF.csv"; do
@@ -30,8 +39,14 @@ for f in "FINAL SUBIDA GCS/GCS_2023TER.csv" "FINAL SUBIDA GCS/GCS_2023JAL.csv" "
 done
 if [[ $faltan -eq 1 ]]; then
   echo
-  echo "Esos CSV son la fuente cruda de la Registraduría. Sin ellos no hay nada"
-  echo "que regenerar: los índices derivados no traen el voto de lista."
+  echo "Son los archivos crudos de la Registraduría, mesa a mesa. Están en S3,"
+  echo "que es de donde los sirve la página de descargas:"
+  echo
+  echo "  B=https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/DESCARGAS/raw"
+  echo "  mkdir -p \"$BD/FINAL SUBIDA GCS\""
+  echo "  curl -o \"$BD/FINAL SUBIDA GCS/GCS_2023TER.csv\" \"\$B/territoriales/2023/GCS_2023TER.csv\"   # 2,6 GB"
+  echo "  curl -o \"$BD/FINAL SUBIDA GCS/GCS_2023JAL.csv\" \"\$B/jal/2023/GCS_2023JAL.csv\"             # 270 MB"
+  echo "  curl -o \"$BD/PUESTOS_GEOREF.csv\" \"https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/PUESTOS_GEOREF.csv\""
   exit 1
 fi
 
@@ -43,9 +58,9 @@ echo
 
 cd "$RAIZ"
 for paso in \
-  "índice de concejo:build_concejo_2023.py" \
-  "índice de JAL:build_jal_2023.py" \
-  "índice de asamblea:build_asamblea_2023.py" \
+  "índice de concejo:build_concejo_2023.py $SOLO_INDICE" \
+  "índice de JAL:build_jal_2023.py $SOLO_INDICE" \
+  "índice de asamblea:build_asamblea_2023.py $SOLO_INDICE" \
   "agregado de JAL:build_territorial_resultados.py jal" \
   "agregado de concejo:build_territorial_resultados.py concejo" \
   "agregado de asamblea:build_asamblea_resultados.py" ; do
@@ -68,17 +83,29 @@ echo
 
 S3="s3://elecciones-2026/ricardoruiz.co/congreso-2026/output"
 OPTS=(--recursive --content-type "application/json" --cache-control "public, max-age=300")
-subidas=(
-  "$BD/output_concejo_2023/:$S3/concejo-2023/"
-  "$BD/output_jal_2023/:$S3/jal-2023/"
-  "$BD/output_asamblea_2023/:$S3/asamblea-2023/"
-)
+if [[ -n "$SOLO_INDICE" ]]; then
+  # Solo cambiaron los índices: subir únicamente esos tres archivos.
+  OPTS=(--content-type "application/json" --cache-control "public, max-age=300")
+  subidas=(
+    "$BD/output_concejo_2023/index-concejo-2023.json:$S3/concejo-2023/index-concejo-2023.json"
+    "$BD/output_jal_2023/index-jal-2023.json:$S3/jal-2023/index-jal-2023.json"
+    "$BD/output_asamblea_2023/index-asamblea-2023.json:$S3/asamblea-2023/index-asamblea-2023.json"
+    "$BD/output_concejo_2023/resultados-concejo-2023.json:$S3/concejo-2023/resultados-concejo-2023.json"
+    "$BD/output_jal_2023/resultados-jal-2023.json:$S3/jal-2023/resultados-jal-2023.json"
+  )
+else
+  subidas=(
+    "$BD/output_concejo_2023/:$S3/concejo-2023/"
+    "$BD/output_jal_2023/:$S3/jal-2023/"
+    "$BD/output_asamblea_2023/:$S3/asamblea-2023/"
+  )
+fi
 if [[ $SUBIR -eq 1 ]]; then
   echo "══ subiendo a S3"
   for s in "${subidas[@]}"; do aws s3 cp "${s%%:*}" "${s#*:}" "${OPTS[@]}"; done
   echo
-  echo "Listo. Ya se puede quitar LISTAS_VERIFICADAS de vote-target.js: el"
-  echo "índice manda sobre esa tabla en cuanto trae «listas»."
+  echo "Listo. El índice manda sobre candidato-360-data/listas-2023.json en cuanto"
+  echo "trae «listas», así que ese archivo ya sobra y se puede quitar del repo."
 else
   echo "══ para subir (revise primero la verificación de arriba)"
   for s in "${subidas[@]}"; do echo "aws s3 cp \"${s%%:*}\" \"${s#*:}\" ${OPTS[*]}"; done

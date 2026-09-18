@@ -120,7 +120,8 @@ Base pública: `https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.c
 | `mapas-2026/DEPARTAMENTOS2.json` | Colombia por departamentos. |
 | `mapas-2026/Departamentos-mps/<dep>.json` | Un departamento por municipios (trae `mun_elec`, el código **electoral**, y `mpio_cnmbr`). |
 | `mapas-2026/Ciudades-COM-LOC/` | Comunas y localidades de las ciudades con cartografía. |
-| `mapas-2026/PUESTOS_GEOREF.csv` | Cada puesto de votación: coordenada, barrio, comuna y **censo por sexo**. |
+| `mapas-2026/PUESTOS_GEOREF.csv` | Cada puesto de votación: coordenada, barrio, comuna y **censo por sexo**. El nombre de comuna viene con variantes («CIUDAD BOLÍVAR» y «CIUDAD BOLIVAR», «COMUNA 7 NORESTE» y «COMUNA 7 NOR ESTE»): los generadores las unifican, si no una JAL sale partida en dos. |
+| `DESCARGAS/raw/<corp>/<año>/GCS_*.csv` | Los archivos crudos de la Registraduría, mesa a mesa. De ahí salen todos los índices. |
 | `mapas-2026/CENSO_EDAD_PUESTO.json` | Censo por edad y puesto. **Todavía no publicado**; ver §8. |
 
 #### Regenerar los datos de 2023 (el voto de lista)
@@ -142,9 +143,24 @@ en S3. `verificar_listas_2023.py` es la prueba de aceptación: cuadra cada lista
 con sus candidatos y exige que el reparto de Bogotá dé la composición real del
 cabildo 2024-2027. Si no pasa, el script no sube nada.
 
-Mientras tanto `vote-target.js` usa `LISTAS_VERIFICADAS`, una tabla con el
-escrutinio de Bogotá. En cuanto el índice traiga `listas`, manda el índice y esa
-tabla se puede quitar.
+Los generadores ya se corrieron una vez sobre los CSV de S3 y el resultado está
+verificado: en todo el país hay **888 listas cerradas en concejo, 591 en JAL y
+48 en asamblea**, y el reparto de Bogotá reproduce el cabildo real. De ahí salió
+`candidato-360-data/listas-2023.json` (336 KB), que es el mismo voto de lista
+sin los candidatos y que `vote-target.js` lee mientras los índices de S3 no lo
+traigan. En cuanto el índice traiga `listas`, manda el índice y ese archivo
+sobra.
+
+Lo que falta subir a S3 son los índices y los agregados: los agregados corrigen
+además la participación, que hoy sale baja porque los válidos no contaban el
+voto de lista (Bogotá 2023: 38,9 % en S3 contra 51,6 % ya corregido).
+
+`--solo-indice` reconstruye solo los índices, sin reescribir los 94 mil JSON por
+candidato, que no cambian.
+
+`gcs_columnas.py` resuelve las columnas por nombre: el GCS territorial trae 19
+columnas y el de JAL 16, y leerlas por posición fija tomaba `DES_DDE` como
+código de municipio sin fallar, solo produciendo basura.
 | `asamblea-2023/dep/<dep>.json` | Resultados de asamblea por **municipio**: la única elección que baja a todos los municipios del país con voto por partido. |
 | `concejo-2023/resultados-concejo-2023.json` | Concejo por **comuna**, solo en once ciudades. |
 | `candidato-360-data/` (en el repo) | Logos de partido, barrios aproximados, catálogos por departamento y los Excel de homónimos. |

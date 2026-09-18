@@ -24,7 +24,7 @@ Subida a S3 (manual, luz verde del usuario):
     "s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/jal-2023/" \
     --recursive --content-type "application/json" --cache-control "public, max-age=300"
 """
-import csv, hashlib, json, os, re, subprocess, sys, unicodedata
+import collections, csv, hashlib, json, os, re, subprocess, sys, unicodedata
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BD   = os.path.join(ROOT, 'Bases de datos')
@@ -50,9 +50,18 @@ DEP_NAMES = {
 # cerrada, todo su voto): no es un candidato, pero cuenta para el umbral y la
 # cifra repartidora, así que se agrega aparte.
 CAN_LISTA = '0'
+# El índice cambia mucho más seguido que los JSON por candidato: --solo-indice
+# reconstruye solo el índice.
+SOLO_INDICE = '--solo-indice' in sys.argv
 SPECIAL_CAN = {'0', '996', '997', '998', '999'}
-C_CAN, C_VOT, C_DDE, C_MME, C_ZZ, C_PP = 13, 15, 6, 7, 8, 9
-C_MS, C_PAR, C_DESPAR, C_DESCAN = 10, 11, 12, 14
+# Columnas por NOMBRE: no todos los GCS traen el mismo número de columnas.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gcs_columnas import columnas                                    # noqa: E402
+_C = columnas(SRC)
+C_COR, C_CAN, C_VOT = _C['COD_COR'], _C['COD_CAN'], _C['NUM_VOT']
+C_DDE, C_MME, C_ZZ, C_PP = _C['COD_DDE'], _C['COD_MME'], _C['COD_ZZ'], _C['COD_PP']
+C_MS, C_PAR, C_DESPAR, C_DESCAN = _C['DES_MS'], _C['COD_PAR'], _C['DES_PAR'], _C['DES_CAN']
+C_ANCHO = _C['_ancho']
 
 
 def strip(s):
@@ -60,13 +69,32 @@ def strip(s):
 
 
 def clean_com(comN):
-    """'01COMUNA 1 POPULAR' → 'COMUNA 1 POPULAR' · '16USAQUEN' → 'USAQUEN'."""
-    c = re.sub(r'^\d+', '', (comN or '').strip()).strip()
+    """'01COMUNA 1 POPULAR' → 'COMUNA 1 POPULAR' · '16USAQUEN' → 'USAQUEN'.
+
+    Los espacios internos se colapsan: el georef trae 191 puestos con doble
+    espacio ('COMUNA  5'), y sin esto la misma comuna salía con dos nombres y
+    su JAL quedaba partida en dos circunscripciones —cada una con la mitad de
+    las listas, así que el reparto de curules daba cualquier cosa."""
+    c = re.sub(r'\s+', ' ', re.sub(r'^\d+', '', (comN or '').strip())).strip()
     return c or 'LOCAL'
 
 
+def clave_com(nombre):
+    """Llave para decidir si dos nombres son la MISMA comuna: sin tildes, sin
+    espacios y sin puntuación. El georef escribe la misma localidad de varias
+    maneras —'CIUDAD BOLÍVAR' y 'CIUDAD BOLIVAR', 'COMUNA 7 NORESTE' y
+    'COMUNA 7 NOR ESTE'— y cada variante se llevaba parte de los votos."""
+    n = unicodedata.normalize('NFD', nombre or '').encode('ascii', 'ignore').decode().upper()
+    return ''.join(c for c in n if c.isalnum())
+
+
 def load_georef():
+    """Además de leer el georef, unifica el nombre de cada comuna: dentro de un
+    municipio, todas las variantes de un mismo nombre quedan con la grafía más
+    frecuente. Sin esto una JAL sale partida en dos circunscripciones, cada una
+    con parte de las listas, y el reparto de curules da cualquier cosa."""
     by9, muns = {}, {}
+    variantes = {}   # (dd, mmm, clave) → Counter de grafías
     with open(GEOREF, encoding='utf-8-sig') as f:
         for row in csv.DictReader(f, delimiter=';'):
             code = (row.get('CÓDIGO COMPLETO') or '').strip()
@@ -80,6 +108,15 @@ def load_georef():
                 comC, comN = '000', 'NACIONAL'
             by9[code] = (mun, pue, comC or '000', comN or 'NACIONAL')
             muns.setdefault(code[:5], mun)
+            k = (code[:2], code[2:5], clave_com(clean_com(comN)))
+            variantes.setdefault(k, collections.Counter())[comN] += 1
+    canon = {k: c.most_common(1)[0][0] for k, c in variantes.items()}
+    unificadas = sum(1 for c in variantes.values() if len(c) > 1)
+    for code, (mun, pue, comC, comN) in by9.items():
+        k = (code[:2], code[2:5], clave_com(clean_com(comN)))
+        by9[code] = (mun, pue, comC, canon.get(k, comN))
+    if unificadas:
+        print(f'· {unificadas} comunas tenían el nombre escrito de varias formas: unificadas')
     return by9, muns
 
 
@@ -93,7 +130,7 @@ def ensure_sorted():
     with open(SORTED, 'wb') as out:
         p1 = subprocess.Popen(awk, stdout=subprocess.PIPE)
         p2 = subprocess.Popen(
-            ["sort", "-t;", "-k7,7", "-k8,8", "-S", "1G"],
+            ["sort", "-t;", f"-k{C_DDE + 1},{C_DDE + 1}", f"-k{C_MME + 1},{C_MME + 1}", "-S", "1G"],
             stdin=p1.stdout, stdout=out,
             env={**os.environ, "LC_ALL": "C", "TMPDIR": SCRATCH})
         p1.stdout.close()
@@ -160,8 +197,9 @@ def flush_group(cands, by9, munNames, index):
             'circunscripcion': circ, 'partido': c['partido'],
             'votos': c['votos'], 'mesas': mesas,
         }
-        with open(os.path.join(OUT_DIR, f'{slug}.json'), 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+        if not SOLO_INDICE:
+            with open(os.path.join(OUT_DIR, f'{slug}.json'), 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
         index.append({
             'slug': slug, 'nombre': c['nombre'],
             'corp': f'JAL · {comNom} · {munNom} · 2023', 'circunscripcion': circ,
@@ -183,7 +221,7 @@ def main():
     n_rows = 0
     with open(SORTED, encoding='utf-8', errors='replace', newline='') as f:
         for row in csv.reader(f, delimiter=';'):
-            if len(row) < 16:
+            if len(row) < C_ANCHO:
                 continue
             can = row[C_CAN]
             if can in SPECIAL_CAN and can != CAN_LISTA:
