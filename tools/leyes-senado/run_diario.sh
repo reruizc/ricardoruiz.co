@@ -123,7 +123,14 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
   echo "═════════ $(date '+%Y-%m-%d %H:%M:%S %z') · run_diario (pid $$) ═════════"
 
   # ── radicados · Senado (leyes.senado.gov.co · el host con WAF) ──
-  etapa --nombre senado_radicados --critica --timeout 2700 \
+  # 3700 y no 2700 (18-sep-2026): el WAF corta a los ~11 min de actividad
+  # (~85 peticiones) y suelta en ≤10 — medido igual en 4 corridas seguidas. Con
+  # el ritmo embebido (3 s por ficha + ~5 s del servidor) cada ventana da ~80
+  # fichas, y las 254 de la legislatura exigen TRES ventanas: 11+10+11+10+11 =
+  # 53 min ≈ 3200 s. En 2700 cabían dos (~160 fichas) y la etapa salía parcial
+  # (rc=75) en cada corrida. El harvester deja de pedir a los 3400 (su
+  # PRESUPUESTO_S) y escribe; los 300 de margen son la peor petición en vuelo.
+  etapa --nombre senado_radicados --critica --timeout 3700 \
         --desc "radicados del Senado (lista → detalle → PDF → texto)" \
         -- python3 tools/leyes-senado/harvest_diario.py
 

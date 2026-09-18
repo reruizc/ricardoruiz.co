@@ -2,7 +2,7 @@
 """Pruebas de harvest_diario.py SIN tocar leyes.senado.gov.co.
 
 Todo lo que sale a la red está sustituido y el reloj es falso (un `sleep` lo
-adelanta), así que los 2400 s de presupuesto y los 600 s de espera por ban se
+adelanta), así que los 3400 s de presupuesto y los 600 s de espera por ban se
 prueban en milisegundos. Existe porque el harvester solo se puede probar de
 verdad contra un WAF que castiga las pruebas: cada escenario de acá es una
 falla que ya ocurrió en producción (ver las notas de campo del 17-sep-2026).
@@ -167,7 +167,7 @@ t_ini = m.t
 rc, snap = m.corre('--no-pdf')
 ok(rc == hd.RC_PARCIAL, 'sale parcial')
 ok(len(snap) == 40, 'snapshot escrito')
-ok(m.t - t_ini < 2700, f'termina en {m.t - t_ini:.0f} s de reloj: antes de que la etapa la mate a los 2700')
+ok(m.t - t_ini < 3700, f'termina en {m.t - t_ini:.0f} s de reloj: antes de que la etapa la mate a los 3700')
 
 print('\nF · lista vacía con snapshot previo: es falla, no «nada que hacer»')
 m = Mundo()

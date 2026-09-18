@@ -112,17 +112,21 @@ MAX_PDF_POR_CORRIDA = 20
 # baja a mano UNA vez, desde un navegador (el WAF no banea a Chrome).
 MAX_PDF_MB = 100
 
-# La etapa del cron mata a los 2700 s. Se deja de pedir a los 2400: los 300 de
+# La etapa del cron mata a los 3700 s. Se deja de pedir a los 3400: los 300 de
 # margen cubren la peor petición en vuelo (un detalle son 3 × 60 s + 9 s de
-# pausas = 189 s) más escribir snapshot y reporte.
-PRESUPUESTO_S = 2400
+# pausas = 189 s) más escribir snapshot y reporte. ¿Por qué 3400 y no 2400
+# (18-sep-2026)? El WAF corta a los ~11 min de actividad (~85 peticiones) y
+# suelta en ≤10, medido igual en 4 corridas seguidas: cada ventana da ~80
+# fichas y las 254 de la legislatura piden TRES ventanas, 11+10+11+10+11 =
+# 53 min ≈ 3200 s. Con 2400 cabían dos y la corrida salía parcial siempre.
+PRESUPUESTO_S = 3400
 MARGEN_S = 120
 
 # Ban: a la 2ª ficha SEGUIDA sin respuesta se deja de insistir. Una sola puede
 # ser el parpadeo normal del IIS (medido: una respuesta vacía aislada y la
 # siguiente petición bien). El ban dura ~10 min según la nota de arriba y hasta
 # 18 medidos el 16-sep; 600 s × 2 esperas cubre ambos y cabe en el presupuesto
-# (247 fichas × ~3,5 s ≈ 865 s + 1200 s = 2065 s < 2400 s).
+# (254 fichas × ~8 s ≈ 2030 s + 1200 s = 3230 s < 3400 s).
 RACHA_BAN = 2
 BAN_ESPERA = 600
 MAX_ESPERAS = 2
