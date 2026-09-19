@@ -394,7 +394,7 @@ function aplicarGateRuta() {
     aviso.className = 'c360-vitrina';
     (form.querySelector('.paso-pie') || boton)?.before(aviso);
   }
-  aviso.innerHTML = `<p>Sin cuenta puede ver el CRM en vista previa: mapa, historial, proyección y meta de votos. El detalle por barrio y los módulos —briefing, escucha, arquetipos, perfil del votante— se abren con el acceso activo, que deja su cuenta vinculada a <b>este candidato</b>.</p><button type="button" onclick="abrirPaywall()">Ver qué incluye</button>`;
+  aviso.innerHTML = `<p>Sin cuenta puede ver el CRM en vista previa: mapa, historial, proyección y meta de votos. El detalle por barrio y los módulos —briefing, escucha, arquetipos, perfil del votante— se abren con el acceso activo, que deja su cuenta vinculada a <b>este candidato</b>.</p>`;
 }
 function aplicarGateNuevo() {
   const box = document.querySelector('#new .search-box'); if (!box) return;
