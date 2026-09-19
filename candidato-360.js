@@ -289,7 +289,7 @@ function copyBriefing() {
     : bloque === 'd' || bloque === 'cd'
       ? `${con}, cercano al gobierno nacional, le va a tocar defender lo que llegue a su territorio y explicar lo que no: el briefing le da los dos lados antes que a sus rivales.`
       : bloque === 'c'
-        ? `${con} se compite con argumentos, y el argumento es el dato: el briefing se lo pone en la mano antes de cada debate.`
+        ? `${con}, se compite con argumentos y el argumento es el dato: el briefing se lo pone en la mano antes de cada debate.`
         : `${con}, la información es la ventaja que nadie le puede quitar: lo que otros se enteran por rumor, usted lo lee con fuente y fecha.`;
   return `${base} ${linea} Se activa con un clic y el primero sale en la próxima corrida.`;
 }
@@ -1914,6 +1914,8 @@ function pintarEscenario() {
   $('crmVoteNumber').textContent = votos.toLocaleString('es-CO');
   $('crmVoteTarget').textContent = `Meta ${META_ESCENARIO === 'probable' ? 'inicial' : META_ESCENARIO}: ${votos.toLocaleString('es-CO')} votos`;
   $('crmVoteFormula').textContent = esc ? mensajeMeta(META_ESCENARIO, e.detalle) : e.formula;
+  const rotulo = document.querySelector('.crm-vote-target .metric small');
+  if (rotulo) rotulo.textContent = META_ESCENARIO === 'probable' ? 'votos objetivo inicial' : `votos · escenario ${META_ESCENARIO}`;
   const caja = $('crmMetaEscenarios');
   if (caja) {
     if (!caja.dataset.listo) {
@@ -2084,7 +2086,7 @@ function candadoDetalle() {
   if (!on || ocultos <= 0) return tapa?.remove();
   if (!tapa) { tapa = document.createElement('div'); tapa.className = 'vitrina-tapa'; mapEl.append(tapa); }
   const esPuesto = detalle && crmBarrioLayer instanceof L.FeatureGroup && !(crmBarrioLayer instanceof L.GeoJSON);
-  const unidad = detalle ? (esPuesto ? 'puesto de votación' : 'barrio') : (crmMapState?.geometriaDestino || SALTO_ACTUAL?.tipo?.unidad === 'municipio' ? 'municipio' : (crmMapState?.config?.title || 'localidad'));
+  const unidad = detalle ? (esPuesto ? 'puesto de votación' : 'barrio') : (PROYECCION_DEPTAL || crmMapState?.geometriaDestino ? 'municipio' : (crmMapState?.config?.title || 'localidad'));
   const plural = { 'puesto de votación': 'puestos de votación', barrio: 'barrios', municipio: 'municipios', localidad: 'localidades', comuna: 'comunas' }[unidad] || unidad + 's';
   const que = ocultos === 1 ? unidad : plural;
   tapa.innerHTML = `<div class="c360-wall-card"><span class="kicker">🔒 ${detalle ? 'Detalle' : 'Meta proyectada'} por ${escHtml(unidad)}</span><p>Le mostramos ${top.size === 1 ? 'el' : 'los'} <b>${top.size}</b> con más ${detalle ? 'votos' : 'meta'}. ${ocultos === 1 ? 'Queda' : 'Quedan'} <b>${ocultos.toLocaleString('es-CO')} ${escHtml(que)}</b> más, con ${detalle ? 'su votación y la meta repartida' : 'la meta repartida'}, que se abren con un plan activo.</p><button type="button" onclick="abrirPaywall()">Ver los planes</button></div>`;
@@ -2141,6 +2143,7 @@ async function launchCRM(event) {
   pintarPuntaje(crmCandidate);
   await prepararSalto(corpKey, campana);
   pintarMeta(await estimateVoteTarget(corpKey, territory));
+  if (SALTO_ACTUAL?.tipo?.unidad === 'municipio') ensureCRMMapToggles();
   if (SALTO_ACTUAL && crmMapMode === 'proyectado') refreshCRMMapMode();
 }
 /* CRM de una candidatura nueva: sin historial, el punto de partida es el
@@ -2376,7 +2379,20 @@ function mostrarPuntajeInfo() {
 
    Toda la lógica es pura (entra un objeto, sale un objeto) para poderla probar
    sin mapa y sin red: prueba-salto.mjs. */
-const SALTOS = { 'jal>concejo': 'localidad', 'concejo>asamblea': 'municipio', 'alcaldia>gobernacion': 'municipio', 'concejo>gobernacion': 'municipio', 'alcaldia>asamblea': 'municipio' };
+/* ⚠️ Todo salto entre corporaciones DISTINTAS tiene que estar acá. Sin su
+   entrada, `tipoSalto` devuelve null y la meta cae al reparto proporcional de
+   siempre, que la deja ENTERA sobre el territorio de origen: un edil de
+   Teusaquillo que se lanza a la Alcaldía de Bogotá veía 1,5 millones de votos
+   en Teusaquillo y cero en las otras 19 localidades (sep-2026). Solo tienen
+   estudio de arraigo tres (`saltos-arraigo.json`); el resto va sin bono.
+   Unidad: `localidad` cuando el destino es una ciudad (las 11 con resultados
+   por comuna); `municipio` cuando el destino es el departamento. */
+const SALTOS = {
+  'jal>concejo': 'localidad', 'jal>alcaldia': 'localidad', 'concejo>alcaldia': 'localidad', 'alcaldia>concejo': 'localidad',
+  'asamblea>concejo': 'localidad', 'asamblea>alcaldia': 'localidad', 'gobernacion>concejo': 'localidad', 'gobernacion>alcaldia': 'localidad',
+  'jal>asamblea': 'municipio', 'jal>gobernacion': 'municipio', 'concejo>asamblea': 'municipio', 'concejo>gobernacion': 'municipio',
+  'alcaldia>asamblea': 'municipio', 'alcaldia>gobernacion': 'municipio', 'asamblea>gobernacion': 'municipio', 'gobernacion>asamblea': 'municipio',
+};
 const ARRAIGO_N_MINIMO = 5;   /* con menos casos, una mediana es una anécdota */
 function tipoSalto(corpOrigen, corpDestino) {
   const k = `${corpOrigen}>${corpDestino}`;
@@ -2508,6 +2524,9 @@ function repartoSalto({ meta, propio, origen, base, arraigo }) {
      capa de municipios del departamento con el reparto; en «Total» vuelve el
      mapa histórico. */
 let SALTO_ACTUAL = null;
+/* true mientras el mapa muestra la proyección departamental (que puede pintarse
+   sin `crmMapState`, cuando el historial no toca el destino). */
+let PROYECCION_DEPTAL = false;
 /* El estudio de saltos viaja CON el sitio (lo produce
    tools/candidato-360/saltos/estudio.mjs y queda versionado en el repo: son
    22 KB). La copia en S3 existe para poder refrescarlo sin desplegar, y por
@@ -2523,8 +2542,12 @@ function tablaArraigo() {
    {área: {name, partidos, votantes}} que espera baseDestino. */
 async function resultadosDestino(unidad, mesas, campana) {
   if (unidad === 'localidad') {
-    const m = mesas?.[0]; if (!m) return null;
-    const key = `${String(m.dep || '').padStart(2, '0')}-${String(m.mun || '').padStart(3, '0')}`;
+    /* La ciudad es la de la CAMPAÑA, no la de la primera mesa: quien viene de
+       otro municipio (o de una asamblea) tiene sus mesas en otra parte. */
+    const m = mesas?.[0], depC = String(campana?.departamento || '').replace(/^0+/, ''), munC = codigoMunicipioObjetivo();
+    const dep = depC || String(m?.dep || ''), mun = munC || String(m?.mun || '');
+    if (!dep || !mun) return null;
+    const key = `${dep.padStart(2, '0')}-${mun.padStart(3, '0')}`;
     const r = await fetchJSON(`${S3}/concejo-2023/resultados-concejo-2023.json`);
     const comunas = r?.data?.[key]?.comunas; if (!comunas) return null;
     return { porArea: comunas, key };
@@ -2620,7 +2643,10 @@ async function pintarProyeccionDepartamental(goal) {
     const base = baseDestino({ porArea, partido: partidoVigente(), nombreCandidato: crmCandidate?.nombre, bloqueFirmas: bloqueVigente() });
     if (!base) return false;
     const origenNombre = normalizedText(String(crmCandidate?.corp || '').split('·')[1] || crmCandidate?.circunscripcion || '');
-    const origen = Object.keys(nombres).filter(k => k === origenNombre || (origenNombre && k.includes(origenNombre)));
+    /* Con origen departamental (diputado, gobernador) no hay UN municipio de
+       origen: el «·ANTIOQUIA·» del corp casaría con cualquier municipio que se
+       llame como el departamento (Bolívar, en el Cauca). Va todo a la base. */
+    const origen = CORP_DEPARTAMENTAL.includes(s.corpOrigen) ? [] : Object.keys(nombres).filter(k => k === origenNombre || (origenNombre && k.includes(origenNombre)));
     const propio = Object.fromEntries(origen.map(k => [k, Number(crmCandidate?.votos || 1)]));
     const reparto = repartoSalto({ meta: goal, propio, origen, base, arraigo: s.arraigo });
     if (!reparto) return false;
@@ -2632,6 +2658,7 @@ async function pintarProyeccionDepartamental(goal) {
       onEachFeature: (f, layer) => { const k = normalizedText(nameOf(f)); layer._vitrinaCode = k; layer.bindTooltip(`<strong>${NOMBRE_BONITO(nameOf(f))}</strong><br>${(reparto[k] || 0).toLocaleString('es-CO')} votos proyectados`, { sticky: true }); }
     }).addTo(crmLeafletMap);
     encuadrar(crmMapLayer, 24);
+    PROYECCION_DEPTAL = true;
     renderMapBreakdown(reparto, nombres, `Meta proyectada por municipio`);
     $('crmMapTitle').textContent = `¿Dónde buscar los votos en ${s.campana?.departamentoNombre || 'el departamento'}?`;
     $('crmMapVotes').textContent = `${goal.toLocaleString('es-CO')} votos · meta`;
@@ -2815,15 +2842,22 @@ function tituloMapa(modo = crmMapMode) {
   return modo === 'proyectado' ? `¿Dónde debería estar su votación${donde ? ` en ${donde}` : ''}?` : `¿Dónde estuvo su votación${donde ? ` en ${donde}` : ''}?`;
 }
 function refreshCRMMapMode() {
-  const state = crmMapState; if (!state || !crmMapLayer) return;
-  if (state.tituloLugar) $('crmMapTitle').textContent = tituloMapa();
+  const state = crmMapState, saltoDeptal = SALTO_ACTUAL?.tipo?.unidad === 'municipio';
+  /* Sin estado NO hay mapa histórico que repintar… salvo en el salto a
+     departamento, donde el historial puede estar entero fuera del destino (un
+     edil de Bogotá que se lanza a la Gobernación de Cundinamarca): ahí el
+     mapa es el del territorio de campaña, sin estado, y «Proyectado» tiene
+     que poder pintar igual los municipios con la meta repartida. */
+  if (!saltoDeptal && (!state || !crmMapLayer)) return;
+  if (state?.tituloLugar) $('crmMapTitle').textContent = tituloMapa();
   /* Salto a escala de departamento: «Proyectado» pinta los municipios del
-     destino; «Total» devuelve el mapa histórico de la ciudad. */
-  if (SALTO_ACTUAL?.tipo.unidad === 'municipio') {
+     destino; «Total» devuelve el mapa histórico (o el territorio de campaña). */
+  if (saltoDeptal) {
     const goal = Number(String($('crmVoteNumber').textContent || '').replace(/\D/g, ''));
     document.querySelectorAll('#crmMapToggles .map-toggle[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === crmMapMode));
-    if (crmMapMode === 'proyectado') { pintarProyeccionDepartamental(goal); return; }
-    if (state.geometriaDestino) { loadHistoricalMap(crmCandidate); return; }
+    if (crmMapMode === 'proyectado') { if (goal) pintarProyeccionDepartamental(goal); return; }
+    if (PROYECCION_DEPTAL || state?.geometriaDestino) { loadHistoricalMap(crmCandidate); return; }
+    if (!state) return;
   }
   const projected = projectedVotesByArea(), values = crmMapMode === 'proyectado' ? projected : state.votesByArea, max = Math.max(1, ...Object.values(values));
   renderMapBreakdown(values, state.namesByArea, crmMapMode === 'proyectado' ? `Meta proyectada por ${state.config.title}` : `Votos por ${state.config.title}`);
@@ -3526,7 +3560,7 @@ function refreshMapLevels() {
    votación anterior no informa nada sobre la nueva: lo útil es ver el
    territorio al que aspira, con sus puestos. */
 async function loadHistoricalMap(candidate) {
-  electionViewRecords = []; electionViewSnapshots = new Map(); electionViewActive = ''; $('crmMapToggles')?.remove(); crmMapState = null; recorteActivo = null;
+  electionViewRecords = []; electionViewSnapshots = new Map(); electionViewActive = ''; $('crmMapToggles')?.remove(); crmMapState = null; recorteActivo = null; PROYECCION_DEPTAL = false;
   /* Con la campaña mudada a otro territorio, las vistas por año sobran: todas
      muestran votaciones que no cuentan donde ahora compite. */
   if (alcanceObjetivo() && !(await historialEnCiudad(candidate))) { await renderTerritorioDeCampana(); return; }
@@ -3549,6 +3583,9 @@ async function renderTerritorioDeCampana() {
   /* Los niveles del mapa anterior no sirven acá hasta saber si hay puestos. */
   $('crmMap')?.querySelector('.crm-map-levels')?.remove();
   const vista = await renderTerritorioObjetivo(c);
+  /* Con salto a departamento hay algo que proyectar aunque no haya historial
+     acá: los toggles TOTAL / PROYECTADO tienen que existir. */
+  if (SALTO_ACTUAL?.tipo?.unidad === 'municipio') ensureCRMMapToggles();
   MAPA_MUNICIPAL = null;
   if (!CORP_MUNICIPAL.includes(c.corp) || !c.municipio) return;
   try {
