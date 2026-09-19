@@ -368,7 +368,7 @@ function aplicarGateExistente() {
     aviso.className = 'c360-vitrina';
     box.querySelector('.search-row')?.after(aviso);
   }
-  aviso.innerHTML = `<p>Búsquese: su historial está acá y lo puede abrir para ver de qué candidaturas hablamos. Con él se arma el CRM de campaña, que puede ver en vista previa; el detalle por barrio y los módulos se abren con el acceso. Cada cuenta se vincula a <b>un solo candidato</b>.</p><button type="button" onclick="abrirPaywall()">Activar mi candidatura</button>`;
+  aviso.innerHTML = `<p>Búsquese: su historial está acá y lo puede abrir para ver de qué candidaturas hablamos. Con él se arma el CRM de campaña, que puede ver en vista previa; el detalle por barrio y los módulos se abren con el acceso. Cada cuenta se vincula a <b>un solo candidato</b>.</p>`;
 }
 /* La pantalla del candidato se ve completa; lo que se anuncia es que el CRM
    —lo que se cobra— pide acceso. Anunciarlo ACÁ y no al final evita que
