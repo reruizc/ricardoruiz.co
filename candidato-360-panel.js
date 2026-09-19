@@ -240,10 +240,12 @@
     'MINUTO30', 'MINUTO 30', 'CONFIDENCIAL COLOMBIA', 'CONTAGIO RADIO', 'PACIFISTA', 'EL UNICORNIO', 'CAMBIO', 'LOS DANIELES', 'AGENDA PROPIA',
     'EL CUARTO MOSQUETERO', 'LA NUEVA PRENSA', 'PUBLIMETRO', 'CANAL TRECE', 'ALPONIENTE', 'AL PONIENTE', 'LA ORIGINAL', 'ANALISIS URBANO'];
   function tipoMedio(medio) {
-    const n = ' ' + norm(medio) + ' ';
-    if (!n.trim()) return 'otro';
-    if (MEDIOS_ALTERNATIVOS.some(m => n.includes(' ' + norm(m) + ' ') || n.includes(norm(m)))) return 'alternativo';
-    if (MEDIOS_TRADICIONALES.some(m => n.includes(' ' + norm(m) + ' ') || n.includes(norm(m)))) return 'tradicional';
+    /* Google News trae unos por nombre («La República») y otros por dominio
+       («LaRepublica.co»): se compara también sin espacios. */
+    const n = norm(medio); if (!n) return 'otro';
+    const pegado = n.replace(/ /g, ''), calza = m => n.includes(norm(m)) || pegado.includes(norm(m).replace(/ /g, ''));
+    if (MEDIOS_ALTERNATIVOS.some(calza)) return 'alternativo';
+    if (MEDIOS_TRADICIONALES.some(calza)) return 'tradicional';
     return 'otro';
   }
   /* Cómo se llama la escala del territorio en la boca del candidato: la JAL

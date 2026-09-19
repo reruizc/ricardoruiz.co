@@ -9,6 +9,9 @@ funcionan en Caudal (Lambda caudal-analiza), leyendo el territorio del vínculo:
 
   · La conversación · prensa nacional y regional del municipio o la localidad,
     separada entre lo que NOMBRA al candidato y lo que habla del territorio.
+    Lo que el candidato marcó en el panel de escucha (`escucha.preferencias`)
+    manda: clase de medio (tradicionales / alternativos), escala (territorio
+    y/o país) y sus temas (las ideas, si marcó «de una causa»).
   · La plata · contratos firmados por entidades de su municipio (SECOP II),
     los más grandes de la ventana, con el total.
   · Las reglas · normativa nacional del Ejecutivo que menciona su territorio.
@@ -59,6 +62,8 @@ VENTANA_MAX_DIAS = 10                     # si un vínculo lleva mucho sin enví
 VENTANA_NORMATIVA_DIAS = 30               # el dataset de Presidencia es mensual
 TOPE_PRENSA_USTED = 5
 TOPE_PRENSA_TERRITORIO = 8
+TOPE_PRENSA_PAIS = 3                      # historias nacionales, por cobertura entre medios
+TOPE_TEMAS = 3                            # titulares por cada idea de campaña
 TOPE_CONTRATOS = 8
 TOPE_NORMAS = 5
 MAX_VISTO_POR_SECCION = 300
@@ -106,7 +111,11 @@ def oracion(s):
     letras = [c for c in s if c.isalpha()]
     if letras and sum(c.isupper() for c in letras) / len(letras) < .7:
         return s
-    return s[:1].upper() + s[1:].lower()
+    # Cada palabra con su mayúscula («Barrios Unidos»), salvo las menudas.
+    menudas = {'de', 'del', 'la', 'las', 'los', 'y', 'el', 'en'}
+    out = re.sub(r'(^|[\s(\-·/])([a-záéíóúñü])', lambda m: m.group(1) + m.group(2).upper(), s.lower())
+    out = re.sub(r'\b(De|Del|La|Las|Los|Y|El|En)\b', lambda m: m.group(1).lower(), out)
+    return out[:1].upper() + out[1:]
 
 
 _SIGLAS = {'SA', 'SAS', 'ESE', 'ESP', 'EICE', 'IDU', 'IDRD', 'UNP', 'DIAN', 'ICBF', 'SENA', 'ANI', 'ANLA', 'IDT', 'IDPAC', 'DADEP', 'UAESP', 'EAAB', 'ETB', 'CENAC', 'FONCEP', 'IPES', 'ICA', 'INS', 'EPM', 'EMCALI', 'UPS', 'IPS', 'EPS', 'UT', 'LTDA', 'EU', 'CTA', 'ESAL'}
@@ -289,18 +298,116 @@ def puntaje_local(titulo, t, locales):
     return p if (p >= 2 or not grande) else 0
 
 
+# ─── lo que quiere escuchar ─────────────────────────────────────────────────
+# PUERTO FIEL de candidato-360-panel.js (`tipoMedio`, `agruparPorCobertura`) y
+# de las dos preguntas de candidato-360-escucha.html. Lo que el candidato marcó
+# en el panel es lo que le llega al correo; si allá cambian las reglas, cambian
+# acá — y al revés.
+PREF_MEDIOS = ('tradicionales', 'alternativos', 'causa', 'territorio', 'nacional')
+CONSULTAS_NACIONALES = ['"Colombia"', '"Gobierno Nacional"', '"Congreso de la República"']
+_MEDIOS_TRADICIONALES = ['EL TIEMPO', 'EL ESPECTADOR', 'SEMANA', 'CARACOL', 'RCN', 'BLU RADIO', 'LA FM', 'W RADIO', 'PORTAFOLIO', 'LA REPUBLICA',
+    'EL COLOMBIANO', 'EL PAIS', 'EL HERALDO', 'EL UNIVERSAL', 'VANGUARDIA', 'LA OPINION', 'EL NUEVO SIGLO', 'EL NUEVO DIA', 'LA PATRIA', 'EL PILON',
+    'DIARIO DEL MAGDALENA', 'DIARIO DEL HUILA', 'DIARIO DEL SUR', 'LA CRONICA', 'EL MERIDIANO', 'DIARIO OCCIDENTE', 'EL DIARIO', 'Q HUBO', 'QHUBO', 'ADN',
+    'CITY TV', 'CITYTV', 'CANAL 1', 'CANAL UNO', 'TELEANTIOQUIA', 'TELECARIBE', 'TELEPACIFICO', 'TELEMEDELLIN', 'CANAL CAPITAL', 'EXTRA', 'EL INFORMADOR',
+    'LA NACION', 'EL PERIODICO', 'DINERO', 'VALORA ANALITIK', 'NOTICIAS UNO', 'RED MAS', 'CM&', 'CMI']
+_MEDIOS_ALTERNATIVOS = ['LA SILLA VACIA', 'LAS2ORILLAS', 'LAS 2 ORILLAS', 'CUESTION PUBLICA', 'VORAGINE', 'CEROSETENTA', '070', 'MUTANTE', 'PARES',
+    'PAZ Y RECONCILIACION', 'RUTAS DEL CONFLICTO', 'COLOMBIACHECK', 'COLOMBIA CHECK', 'LA LIGA CONTRA EL SILENCIO', 'RAZON PUBLICA', 'KIENYKE', 'PULZO',
+    'INFOBAE', 'VERDAD ABIERTA', 'CONSONANTE', 'BAUDO', 'MANIFIESTA', 'VOLCANICAS', 'LA COLA DE RATA', 'HACEMOS MEMORIA', 'PERIFERIA', 'DE LA URBE',
+    'MINUTO30', 'MINUTO 30', 'CONFIDENCIAL COLOMBIA', 'CONTAGIO RADIO', 'PACIFISTA', 'EL UNICORNIO', 'CAMBIO', 'LOS DANIELES', 'AGENDA PROPIA',
+    'EL CUARTO MOSQUETERO', 'LA NUEVA PRENSA', 'PUBLIMETRO', 'CANAL TRECE', 'ALPONIENTE', 'AL PONIENTE', 'LA ORIGINAL', 'ANALISIS URBANO']
+
+
+def tipo_medio(medio):
+    """tradicional · alternativo · otro. Lo desconocido NO se descarta: la prensa
+    regional chica —la que importa en un municipio— no está en ninguna lista."""
+    # Google News trae unos por nombre («La República») y otros por dominio
+    # («LaRepublica.co»): se compara también sin espacios.
+    n = norm(medio)
+    if not n:
+        return 'otro'
+    pegado = n.replace(' ', '')
+    calza = lambda m: norm(m) in n or norm(m).replace(' ', '') in pegado
+    if any(calza(m) for m in _MEDIOS_ALTERNATIVOS):
+        return 'alternativo'
+    if any(calza(m) for m in _MEDIOS_TRADICIONALES):
+        return 'tradicional'
+    return 'otro'
+
+
+def preferencias_de(v):
+    """Las dos preguntas del panel de escucha, con el mismo comportamiento que
+    allá: sin marcar nada, solo el territorio (y sus ideas, si las escribió);
+    marcada una sola clase de medio, se filtra; las dos o ninguna, entra todo."""
+    esc = v.get('escucha') or {}
+    pref = esc.get('preferencias') or {}
+    medios = [m for m in (pref.get('medios') or []) if m in PREF_MEDIOS]
+    ideas = [str(i).strip() for i in (esc.get('ideas') or []) if str(i).strip()][:3]
+    if not medios:
+        medios = ['territorio'] + (['causa'] if ideas else [])
+    escala_t = 'territorio' in medios or 'nacional' not in medios
+    return {'medios': medios, 'ideas': ideas if 'causa' in medios else [], 'territorio': escala_t,
+            'nacional': 'nacional' in medios, 'tipos': [m for m in ('tradicionales', 'alternativos') if m in medios]}
+
+
+def pasa_tipo(prefs, medio):
+    if len(prefs['tipos']) != 1:
+        return True
+    tm = tipo_medio(medio)
+    return tm == 'otro' or (tm == 'tradicional' if prefs['tipos'][0] == 'tradicionales' else tm == 'alternativo')
+
+
+_VACIAS = {'PARA', 'POR', 'CON', 'LOS', 'LAS', 'DEL', 'QUE', 'UNA', 'UNO', 'SUS', 'ESTE', 'ESTA', 'ESTOS', 'ESTAS', 'COMO', 'MAS', 'PERO', 'SOBRE',
+           'ENTRE', 'DESDE', 'HASTA', 'TRAS', 'ANTE', 'SEGUN', 'SOLO', 'HOY', 'ASI', 'FUE', 'SER', 'SON', 'HAY', 'VAN', 'TIENE'}
+
+
+def _clave(titulo):
+    # seis letras por palabra: «sanciona», «sancionó» y «sancionada» son la misma historia
+    return {w[:6] for w in toks(titulo, 5) if w not in _VACIAS}
+
+
+def _parecido(a, b):
+    if not a or not b:
+        return 0
+    return sum(1 for w in a if w in b) / min(len(a), len(b))
+
+
+def agrupar_por_cobertura(items, umbral=0.45):
+    """Agrupa titulares que cuentan la MISMA historia y ordena por cuántos medios
+    distintos la publicaron: esa es la definición operativa de «de lo que
+    habla todo el mundo». Se compara contra cada titular del grupo, no contra
+    la unión de sus palabras (que se diluye y deja fuera al cuarto medio)."""
+    grupos = []
+    for it in items:
+        k = _clave(it['titulo'])
+        if len(k) < 2:
+            continue
+        g = next((x for x in grupos if any(_parecido(c, k) >= umbral for c in x['claves'])), None)
+        if g:
+            g['items'].append(it); g['claves'].append(k)
+        else:
+            grupos.append({'claves': [k], 'items': [it]})
+    out = []
+    for g in grupos:
+        medios = {norm(x['medio']) for x in g['items'] if x.get('medio')}
+        ordenados = sorted(g['items'], key=lambda x: x['fecha'], reverse=True)
+        out.append({'titular': ordenados[0], 'medios': len(medios), 'titulares': len(g['items'])})
+    return sorted(out, key=lambda g: (g['medios'], g['titulares'], g['titular']['fecha']), reverse=True)
+
+
 # ─── fuentes ────────────────────────────────────────────────────────────────
-def prensa(v, t, dias, visto):
+def prensa(v, t, dias, visto, prefs=None):
+    prefs = prefs or preferencias_de(v)
     consultas = []
-    if t['departamental']:
-        consultas += [f'"{t["dep_nombre"]}"', f'"{t["entidad"]}"', f'"{t["cuerpo"]}"']
-    else:
-        base = 'Bogotá' if t['es_bogota'] else t['mun_limpio']
-        if t['corp'] == 'jal' and t['loc']:
-            consultas.append(f'"{oracion(t["loc"])}" {base}')
-        consultas += [f'"{t["entidad"]}"', f'"{t["cuerpo"]}"']
-        if not t['es_bogota']:
-            consultas.append(f'"{base}"')
+    base = t['dep_nombre'] if t['departamental'] else ('Bogotá' if t['es_bogota'] else t['mun_limpio'])
+    if prefs['territorio']:
+        if t['departamental']:
+            consultas += [f'"{t["dep_nombre"]}"', f'"{t["entidad"]}"', f'"{t["cuerpo"]}"']
+        else:
+            if t['corp'] == 'jal' and t['loc']:
+                consultas.append(f'"{oracion(t["loc"])}" {base}')
+            consultas += [f'"{t["entidad"]}"', f'"{t["cuerpo"]}"']
+            if not t['es_bogota']:
+                consultas.append(f'"{base}"')
     for n in (v.get('nombre'), v.get('nombrePublico')):
         if n and len(toks(n, 3)) >= 2:
             consultas.append(f'"{n}"')
@@ -317,7 +424,7 @@ def prensa(v, t, dias, visto):
         for r in d.get('resultados') or []:
             titulo = r.get('titulo') or ''
             k = norm(titulo)[:90]
-            if not k or k in seen:
+            if not k or k in seen or not pasa_tipo(prefs, r.get('medio') or ''):
                 continue
             seen.add(k)
             hid = h('p', k)
@@ -334,8 +441,63 @@ def prensa(v, t, dias, visto):
                     territorio.append(item)
     usted.sort(key=lambda x: x['fecha'], reverse=True)
     territorio.sort(key=lambda x: (x['pts'], x['fecha']), reverse=True)
-    return {'usted': usted[:TOPE_PRENSA_USTED], 'territorio': territorio[:TOPE_PRENSA_TERRITORIO],
-            'n_usted': len(usted), 'n_territorio': len(territorio), 'fallos': fallos, 'consultas': len(consultas)}
+
+    # De lo que habla el país: se conservan los titulares REPETIDOS entre medios
+    # (esa repetición es la señal) y se agrupan por cobertura.
+    pais, n_consultas = [], len(consultas)
+    if prefs['nacional']:
+        crudos = []
+        for q in CONSULTAS_NACIONALES:
+            n_consultas += 1
+            d = api({'action': 'medios', 'query': q, 'dias': dias}, timeout=60)
+            if not d or d.get('error'):
+                fallos += 1
+                continue
+            for r in d.get('resultados') or []:
+                titulo = r.get('titulo') or ''
+                k = norm(titulo)[:90]
+                if not k or k in seen or not pasa_tipo(prefs, r.get('medio') or ''):
+                    continue
+                if menciona_persona(titulo, personas) or puntaje_local(titulo, t, locales):
+                    continue
+                crudos.append({'titulo': titulo, 'medio': r.get('medio') or '', 'url': r.get('url') or '', 'fecha': r.get('fecha') or ''})
+        for g in agrupar_por_cobertura(crudos):
+            it = g['titular']
+            hid = h('p', norm(it['titulo'])[:90])
+            if hid in vistos:
+                continue
+            pais.append(dict(it, id=hid, medios=g['medios'], alcance=''))
+            if len(pais) >= TOPE_PRENSA_PAIS:
+                break
+
+    # Sus temas: cada idea ENTRE COMILLAS más el lugar, igual que el panel.
+    temas = []
+    lugar = oracion(t['loc']) if (t['corp'] == 'jal' and t['loc']) else base
+    for idea in prefs['ideas']:
+        n_consultas += 1
+        d = api({'action': 'medios', 'query': f'"{idea}"' + (f' {lugar}' if lugar else ''), 'dias': dias}, timeout=60)
+        if not d or d.get('error'):
+            fallos += 1
+            temas.append({'idea': idea, 'n': 0, 'items': [], 'fallo': True})
+            continue
+        items = []
+        for r in d.get('resultados') or []:
+            titulo = r.get('titulo') or ''
+            k = norm(titulo)[:90]
+            if not k or k in seen or not pasa_tipo(prefs, r.get('medio') or ''):
+                continue
+            seen.add(k)
+            hid = h('p', k)
+            if hid in vistos:
+                continue
+            items.append({'id': hid, 'titulo': titulo, 'medio': r.get('medio') or '', 'alcance': r.get('alcance') or '',
+                          'url': r.get('url') or '', 'fecha': r.get('fecha') or ''})
+        items.sort(key=lambda x: x['fecha'], reverse=True)
+        temas.append({'idea': idea, 'n': len(items), 'items': items[:TOPE_TEMAS], 'fallo': False})
+
+    return {'usted': usted[:TOPE_PRENSA_USTED], 'territorio': territorio[:TOPE_PRENSA_TERRITORIO], 'pais': pais, 'temas': temas,
+            'n_usted': len(usted), 'n_territorio': len(territorio), 'fallos': fallos, 'consultas': n_consultas,
+            'escala_territorio': prefs['territorio'], 'tipos': prefs['tipos']}
 
 
 def contratos(v, t, desde, visto):
@@ -448,12 +610,28 @@ def render(v, t, P, C, N, desde, hasta, primera):
     nota_n = ('La fuente de normativa no respondió en esta corrida.' if N['fallo'] else
               ('' if N['items'] else f'Ninguna norma del Ejecutivo de los últimos {VENTANA_NORMATIVA_DIAS} días menciona su territorio.'))
 
+    filas_p = [_fila(p['titulo'], f'{e(p["medio"])} · {e(p["fecha"])}' + (f' · <b>{p["medios"]} medios lo publicaron</b>' if p.get('medios', 0) > 1 else ''), p['url']) for p in P.get('pais') or []]
+    filas_x = [(tema, [_fila(p['titulo'], f'{e(p["medio"])} · {e(p["fecha"])}', p['url']) for p in tema['items']]) for tema in (P.get('temas') or [])]
+    sello_tipo = ' (solo medios tradicionales)' if P.get('tipos') == ['tradicionales'] else (' (solo medios alternativos)' if P.get('tipos') == ['alternativos'] else '')
+
+    contador = [0]
+    def _num():
+        contador[0] += 1
+        return f'{contador[0]:02d}'
     prensa_html = ''
     if filas_u:
-        prensa_html += _bloque('01', 'La conversación · sobre usted', f'{len(filas_u)} titular{"es" if len(filas_u) != 1 else ""} lo nombra{"n" if len(filas_u) != 1 else ""}', filas_u)
-    prensa_html += _bloque('01' if not filas_u else '02', f'La conversación · {t["etiqueta"]}', 'Lo que se publicó de su territorio', filas_t, nota_p if not filas_t else extra_p)
-    num_c = '03' if filas_u else '02'
-    num_n = '04' if filas_u else '03'
+        prensa_html += _bloque(_num(), 'La conversación · sobre usted', f'{len(filas_u)} titular{"es" if len(filas_u) != 1 else ""} lo nombra{"n" if len(filas_u) != 1 else ""}', filas_u)
+    if filas_p:
+        prensa_html += _bloque(_num(), 'La conversación · el país', 'De lo que habla todo el mundo', filas_p, 'Las historias que más medios distintos publicaron' + sello_tipo + '.')
+    if P.get('escala_territorio', True):
+        prensa_html += _bloque(_num(), f'La conversación · {t["etiqueta"]}', 'Lo que se publicó de su territorio' + sello_tipo, filas_t, nota_p if not filas_t else extra_p)
+    for tema, filas in filas_x:
+        nota_x = ('La fuente de prensa no respondió para este tema.' if tema.get('fallo') else
+                  (f'Nadie publicó sobre esto en {t["etiqueta"]} en estos días. Eso también es dato: o el tema no está en la agenda, o la agenda lo llama de otra manera.' if not filas else
+                   (f'{tema["n"]} titulares en total; se muestran los más recientes.' if tema['n'] > len(filas) else '')))
+        prensa_html += _bloque(_num(), 'Sus temas · ' + recortar(tema['idea'], 60), f'Lo que se dice de «{recortar(tema["idea"], 50)}»', filas, nota_x)
+    num_c = _num()
+    num_n = _num()
     meta_html = f'<p style="font-size:12px;color:{MUTED};margin:6px 0 0;">Meta de campaña: <b style="color:{INK};">{t["meta"]:,}</b> votos.</p>'.replace(',', '.') if t['meta'] else ''
     primera_html = (f'<div style="border-left:3px solid {CORAL};padding:10px 14px;background:#fff4f1;font-size:13px;line-height:1.5;margin:0 0 24px;">'
                     f'Este es su primer briefing. A partir de ahora llega cada {CADENCIA_DIAS} días con lo nuevo de {e(t["etiqueta"])}; lo que ya vio no se repite.</div>') if primera else ''
@@ -479,8 +657,13 @@ def render(v, t, P, C, N, desde, hasta, primera):
     lineas = [f'CANDIDATO 360 · BRIEFING · {t["corp_label"]} · {t["etiqueta"]}', f'{nombre} · del {rango} · faltan {faltan} días para la elección', '']
     if filas_u:
         lineas.append('SOBRE USTED'); lineas += [f'- {p["titulo"]} ({p["medio"]}, {p["fecha"]}) {p["url"]}' for p in P['usted']]; lineas.append('')
-    lineas.append(f'LA CONVERSACIÓN · {t["etiqueta"]}')
-    lineas += [f'- {p["titulo"]} ({p["medio"]}, {p["fecha"]}) {p["url"]}' for p in P['territorio']] or [f'  {nota_p or extra_p}']
+    if filas_p:
+        lineas.append('DE LO QUE HABLA EL PAÍS'); lineas += [f'- {p["titulo"]} ({p["medio"]}, {p["fecha"]}, {p.get("medios", 1)} medios) {p["url"]}' for p in P['pais']]; lineas.append('')
+    if P.get('escala_territorio', True):
+        lineas.append(f'LA CONVERSACIÓN · {t["etiqueta"]}')
+        lineas += [f'- {p["titulo"]} ({p["medio"]}, {p["fecha"]}) {p["url"]}' for p in P['territorio']] or [f'  {nota_p or extra_p}']
+    for tema in (P.get('temas') or []):
+        lineas += ['', f'SUS TEMAS · {tema["idea"]}'] + ([f'- {p["titulo"]} ({p["medio"]}, {p["fecha"]}) {p["url"]}' for p in tema['items']] or ['  sin titulares en estos días'])
     lineas += ['', f'LA PLATA · {nota_c}']
     lineas = [l for l in lineas]
     lineas += [f'- {cop(c["valor"])} · {c["entidad"]} · {recortar(c["objeto"], 120)} ({c["fecha"]}) {c["url"]}' for c in C['items']]
@@ -489,7 +672,7 @@ def render(v, t, P, C, N, desde, hasta, primera):
     lineas += ['', f'Abrir mi CRM: {SITIO}', f'Soporte: {SOPORTE}']
     texto = '\n'.join(lineas)
 
-    n_items = len(filas_u) + len(filas_t) + len(filas_c) + len(filas_n)
+    n_items = len(filas_u) + len(filas_t) + len(filas_c) + len(filas_n) + len(filas_p) + sum(len(f) for _, f in filas_x)
     if filas_u:
         asunto = f'{corto}, lo nombraron {len(filas_u)} {"vez" if len(filas_u) == 1 else "veces"} · briefing de {t["etiqueta"]}'
     elif filas_c and C['n']:
@@ -530,10 +713,12 @@ def procesar(v, args):
     desde = hoy - dt.timedelta(days=dias)
     print(f'· {etiqueta}: ventana {dias} días ({desde} → {hoy}){" · primera vez" if primera else ""}')
 
-    P = prensa(v, t, dias, visto)
+    prefs = preferencias_de(v)
+    print(f'   escucha: {" · ".join(prefs["medios"])}' + (f' · ideas: {" | ".join(prefs["ideas"])}' if prefs['ideas'] else ''))
+    P = prensa(v, t, dias, visto, prefs)
     C = contratos(v, t, desde.isoformat(), visto)
     N = normativa(v, t, visto)
-    print(f'   prensa {len(P["usted"])}+{len(P["territorio"])} (de {P["n_usted"]}+{P["n_territorio"]}, {P["fallos"]}/{P["consultas"]} fallos) · contratos {len(C["items"])} de {C["n"]} ({cop(C["valor"])}) · normas {len(N["items"])}')
+    print(f'   prensa {len(P["usted"])}+{len(P["territorio"])}+{len(P["pais"])} país+{sum(len(x["items"]) for x in P["temas"])} temas (de {P["n_usted"]}+{P["n_territorio"]}, {P["fallos"]}/{P["consultas"]} fallos) · contratos {len(C["items"])} de {C["n"]} ({cop(C["valor"])}) · normas {len(N["items"])}')
 
     asunto, html, texto, n_items = render(v, t, P, C, N, desde, hoy, primera)
     if args.guardar_html:
@@ -556,7 +741,7 @@ def procesar(v, args):
     print(f'   ✓ enviado a {r.get("para")} · {r.get("id") or ""} · asunto: {asunto}')
 
     nuevo_visto = {
-        'prensa': (list(visto.get('prensa') or []) + [p['id'] for p in P['usted'] + P['territorio']])[-MAX_VISTO_POR_SECCION:],
+        'prensa': (list(visto.get('prensa') or []) + [p['id'] for p in P['usted'] + P['territorio'] + P['pais'] + [i for x in P['temas'] for i in x['items']]])[-MAX_VISTO_POR_SECCION:],
         'contratos': (list(visto.get('contratos') or []) + [c['id'] for c in C['items']])[-MAX_VISTO_POR_SECCION:],
         'normas': (list(visto.get('normas') or []) + [n['id'] for n in N['items']])[-MAX_VISTO_POR_SECCION:],
     }

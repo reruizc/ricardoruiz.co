@@ -82,3 +82,16 @@ vínculos, 37 s, sin fallos de fuente.
   propio concejo cuando exista esa fuente (módulo de proyectos de acuerdo).
 - No hay lectura del analista (LLM) todavía: el briefing es dato ordenado. Es
   la evolución natural cuando el módulo de arquetipos exista.
+
+## Lo que el candidato marcó en la escucha manda (sep-2026)
+
+El inventario del worker trae `escucha` (`ideas`, `preferencias`, `redes`) y
+`preferencias_de(v)` lo traduce a la lectura: **clase de medio** (solo
+tradicionales / solo alternativos / todo; `tipo_medio` es el mismo puerto de
+`candidato-360-panel.js`, lo desconocido no se descarta), **escala** (territorio
+y/o país; el bloque «De lo que habla el país» agrupa por cobertura entre
+medios, `agrupar_por_cobertura`) y **sus temas** (cada idea entre comillas más
+el lugar, si marcó «de una causa»). Sin preferencias: solo el territorio, más
+las ideas si las escribió. Probar sin worker:
+`python3 motor.py --inventario prueba.json --dry-run --forzar --guardar-html /tmp/b`.
+
