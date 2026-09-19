@@ -5,9 +5,9 @@
 <meta name="description" content="Escucha social de su campaña: la prensa abierta de su territorio y las cuentas de sus redes, en una sola lectura.">
 <title>Escucha social · Candidato 360</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 <!-- ⚠️ Al tocar candidato-360.css o candidato-360-panel.js hay que bumpear su ?v= acá y en los demás paneles. -->
-<link rel="stylesheet" href="candidato-360.css?v=20260926">
+<link rel="stylesheet" href="candidato-360.css?v=20260919b">
 <style>
 /* Lo propio de este panel; el resto lo pone candidato-360.css (las fichas de
    red y sus veredictos ya viven allá: el paso 2 del wizard usa las mismas). */
@@ -15,6 +15,7 @@
 .panel-hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:30px}
 .panel-hero h1{font:800 clamp(30px,4.4vw,46px)/1.06 var(--display);letter-spacing:-.02em;margin:8px 0 10px;color:var(--ink)}
 .panel-hero p{margin:0;max-width:62ch;font-size:15px;line-height:1.6;color:var(--muted)}
+.panel-candidatura:empty{display:none}
 .panel-candidatura{display:inline-block;margin-top:14px;font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--green);border:1px solid rgba(20,124,112,.32);padding:6px 10px}
 .nav-salir{text-decoration:none;display:inline-block}
 .hidden{display:none}
@@ -22,8 +23,18 @@
 .arranque{border-left:3px solid var(--green)}
 .arranque h3{margin:6px 0 4px;font:800 clamp(21px,2.6vw,27px)/1.15 var(--display);letter-spacing:-.01em;color:var(--ink)}
 .arranque-botones{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
-.arranque-redes{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
-.arranque-redes span{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);background:var(--cream);padding:6px 10px}
+.arranque h3+.helper{max-width:66ch}
+.pref-chips{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+.pref-chip{display:grid;grid-template-columns:16px 1fr;grid-template-rows:auto auto;column-gap:9px;align-items:center;text-align:left;border:1px solid var(--line);background:#fff;padding:10px 13px;cursor:pointer;min-width:190px;max-width:290px}
+.pref-chip i{grid-row:1/3;width:16px;height:16px;border:1px solid var(--muted);display:block}
+.pref-chip b{font:700 14px var(--sans);color:var(--ink)}
+.pref-chip small{font-size:11.5px;color:var(--muted);line-height:1.3}
+.pref-chip[aria-pressed="true"]{border-color:var(--green);background:rgba(185,222,210,.3)}
+.pref-chip[aria-pressed="true"] i{background:var(--green);border-color:var(--green);box-shadow:inset 0 0 0 2px var(--cream)}
+.pref-resumen{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;font-size:13px;color:var(--muted)}
+.pref-resumen b{color:var(--ink)}
+.pref-resumen .enlace-boton{border:0;background:none;padding:0;color:var(--green);font:600 12px var(--sans);cursor:pointer;text-decoration:underline}
+.fuentes-linea{margin:8px 0 0;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 /* Prensa: las tarjetas de tema, iguales a las que traía el panel de noticias. */
 .ideas{display:grid;gap:12px;margin:18px 0 20px}
 .idea-row{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:center}
@@ -112,15 +123,19 @@
          Sale solo la primera vez: si la candidatura ya tiene cuentas guardadas,
          preguntar otra vez lo que ya se respondió es hacerle perder el tiempo. -->
     <section class="panel arranque hidden" id="arranque">
-      <span class="panel-num">Antes de empezar</span>
-      <h3>¿Tiene perfiles en redes sociales?</h3>
-      <p class="helper">X, TikTok e Instagram. Si los tiene, buscamos cada usuario en su red y comprobamos que sea el suyo antes de montar la escucha: un homónimo o una cuenta vieja arruinan la lectura. Si todavía no tiene, la escucha de prensa funciona igual y puede conectarlas cuando quiera.</p>
-      <div class="arranque-redes"><span>X</span><span>TikTok</span><span>Instagram</span></div>
+      <span class="panel-num">Antes de empezar · dos preguntas</span>
+      <h3>¿Qué redes sociales quiere aprovechar?</h3>
+      <p class="helper">Marque todas las que use. Con esto sabemos qué cuentas validar y qué conectar a la captura de publicaciones. Si todavía no tiene ninguna, déjelo en blanco: la prensa funciona igual.</p>
+      <div class="pref-chips" id="prefRedes"></div>
+      <h3 style="margin-top:28px">¿Qué medios quiere escuchar?</h3>
+      <p class="helper">Puede marcar varios. Con esto armamos la lectura de Google News: qué clase de medios entran y a qué escala se busca.</p>
+      <div class="pref-chips" id="prefMedios"></div>
       <div class="arranque-botones">
-        <button type="button" class="redes-btn" id="arranqueSi">Sí, estas son mis cuentas</button>
-        <button type="button" class="wall-btn" id="arranqueNo">Todavía no tengo</button>
+        <button type="button" class="redes-btn" id="prefGuardar" disabled>Preparar mi escucha</button>
+        <span class="redes-estado" id="prefEstado">Marque al menos un tipo de medio</span>
       </div>
     </section>
+    <div class="pref-resumen hidden" id="prefResumen"></div>
 
     <!-- ── Sus cuentas ─────────────────────────────────────────────────────── -->
     <section class="panel hidden" id="panelRedes">
@@ -146,6 +161,7 @@
       <span class="panel-num">La prensa</span>
       <h2 id="territorioTitulo">Cargando…</h2>
       <p id="territorioEscala"></p>
+      <p class="fuentes-linea hidden" id="fuentesLinea"></p>
     </div>
     <section class="panel" id="panelTerritorio" style="margin-top:18px">
       <div class="panel-head"><div><span class="panel-num">La conversación de su territorio</span><h3 style="margin:6px 0 4px">Lo que se está publicando</h3></div><button type="button" class="wall-btn" id="territorioRecargar">Actualizar</button></div>
@@ -170,7 +186,7 @@
 
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
-<script src="candidato-360-panel.js?v=20260924"></script>
+<script src="candidato-360-panel.js?v=20260919a"></script>
 <script>
 (function () {
   'use strict';
@@ -183,13 +199,97 @@
      pregunta vuelva a salir; conectar las cuentas sí viaja con la cuenta. */
   const SIN_REDES = 'c360-escucha-sin-redes';
 
+  /* ═══ 0 · Lo que quiere escuchar ══════════════════════════════════════════
+     Dos preguntas al entrar: qué redes aprovecha (decide qué cuentas se
+     validan y qué se conecta a la captura) y qué medios quiere (decide cómo se
+     arma la lectura de Google News). Viajan con la candidatura cuando el
+     worker las acepta (`escucha.preferencias`); mientras tanto quedan por
+     cuenta en este navegador, que es suficiente para configurar el panel. */
+  const PREF_REDES = [['facebook', 'Facebook', 'página o perfil'], ['x', 'X', 'antes Twitter'], ['instagram', 'Instagram', 'perfil público'], ['tiktok', 'TikTok', 'video corto']];
+  const prefMedios = t => [
+    ['tradicionales', 'Medios tradicionales', 'El Tiempo, Semana, Caracol, RCN, El Colombiano, El Heraldo…'],
+    ['alternativos', 'Medios alternativos', 'La Silla Vacía, Cuestión Pública, Vorágine, Las2orillas…'],
+    ['causa', 'De una causa o tema específico', 'sus ideas de campaña, buscadas en la prensa'],
+    ['territorio', `Noticias de mi ${P.escalaLabel(t)}`, t.etiqueta ? `lo que se publica sobre ${t.etiqueta}` : 'lo que se publica sobre su territorio'],
+    ['nacional', 'Noticias nacionales', 'de lo que habla el país'],
+  ];
+  const PREFS_KEY = () => `c360-escucha-prefs:${String(P.SESION.user?.email || '').toLowerCase()}`;
+  let PREFS = null;
+  const limpiaPrefs = p => ({ redes: (p?.redes || []).filter(r => PREF_REDES.some(x => x[0] === r)), medios: (p?.medios || []).filter(m => ['tradicionales', 'alternativos', 'causa', 'territorio', 'nacional'].includes(m)) });
+  function prefsGuardadas() {
+    const v = P.SESION.vinculo?.escucha?.preferencias;
+    if (v && (v.redes?.length || v.medios?.length)) return limpiaPrefs(v);
+    try { const l = JSON.parse(localStorage.getItem(PREFS_KEY()) || 'null'); if (l) return limpiaPrefs(l); } catch {}
+    return null;
+  }
+  async function guardarPrefs(p) {
+    PREFS = limpiaPrefs(p);
+    try { localStorage.setItem(PREFS_KEY(), JSON.stringify(PREFS)); } catch {}
+    /* Se manda con las ideas que ya había: un worker que todavía no conoce
+       `preferencias` responde bien a `ideas` y simplemente ignora el resto. */
+    P.guardarEscucha({ preferencias: PREFS, ideas: ideasGuardadas }).catch(() => {});
+  }
+  const quiere = k => Boolean(PREFS?.medios?.includes(k));
+  /* La escala que se busca: la que marcó; si solo marcó clases de medio, las
+     dos escalas, filtradas por clase. */
+  const escalas = () => { const t = quiere('territorio'), n = quiere('nacional'); return { territorio: t || (!t && !n), nacional: n || (!t && !n) }; };
+  const tipos = () => ['tradicionales', 'alternativos'].filter(quiere);
+  const pasaTipo = medio => { const ts = tipos(); if (!ts.length || ts.length === 2) return true; const tm = P.tipoMedio(medio); return tm === 'otro' || (ts[0] === 'tradicionales' ? tm === 'tradicional' : tm === 'alternativo'); };
+
+  function chip(id, nombre, detalle, on) { return `<button type="button" class="pref-chip" data-pref="${esc(id)}" aria-pressed="${on ? 'true' : 'false'}"><i></i><b>${esc(nombre)}</b><small>${esc(detalle)}</small></button>`; }
+  function pintarCuestionario() {
+    const t = P.territorioDe(), p = PREFS || { redes: [], medios: [] };
+    $('prefRedes').innerHTML = PREF_REDES.map(([id, n, d]) => chip(id, n, d, p.redes.includes(id))).join('');
+    $('prefMedios').innerHTML = prefMedios(t).map(([id, n, d]) => chip(id, n, d, p.medios.includes(id))).join('');
+    const estado = () => {
+      const nm = $('prefMedios').querySelectorAll('[aria-pressed="true"]').length, nr = $('prefRedes').querySelectorAll('[aria-pressed="true"]').length;
+      $('prefGuardar').disabled = !nm;
+      $('prefEstado').textContent = nm ? `${nr ? `${nr} ${nr === 1 ? 'red' : 'redes'} · ` : 'sin redes · '}${nm} ${nm === 1 ? 'tipo de medio' : 'tipos de medio'}` : 'Marque al menos un tipo de medio';
+    };
+    $('arranque').querySelectorAll('.pref-chip').forEach(b => b.addEventListener('click', () => { b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); estado(); }));
+    estado();
+    $('arranque').classList.remove('hidden');
+    $('prefResumen').classList.add('hidden');
+  }
+  function pintarResumenPrefs() {
+    const t = P.territorioDe(), p = PREFS;
+    const redes = p.redes.map(r => PREF_REDES.find(x => x[0] === r)?.[1]).filter(Boolean);
+    const medios = p.medios.map(m => prefMedios(t).find(x => x[0] === m)?.[1].toLowerCase()).filter(Boolean);
+    $('prefResumen').innerHTML = `<span>Escucha configurada: <b>${redes.length ? esc(redes.join(', ')) : 'sin redes'}</b> · <b>${esc(medios.join(' · '))}</b>.</span><button type="button" class="enlace-boton" id="prefEditar">Cambiar lo que escucho</button>`;
+    $('prefResumen').classList.remove('hidden');
+    $('prefEditar').addEventListener('click', pintarCuestionario);
+  }
+  /* Aplica las preferencias a la página: qué cuentas se piden, qué bloques de
+     prensa se pintan y con qué medios. */
+  function aplicarPrefs(guardadas) {
+    $('arranque').classList.add('hidden');
+    pintarResumenPrefs();
+    const t = P.territorioDe();
+    if (PREFS.redes.length) { montar(guardadas); $('panelRedes').classList.remove('hidden'); }
+    else $('panelRedes').classList.add('hidden');
+    const causa = quiere('causa') || ideasGuardadas.length > 0;
+    $('panelIdeas').classList.toggle('hidden', !causa);
+    if (!causa) $('lectura').innerHTML = '';
+    const ts = tipos();
+    const fuentes = [ts.length === 1 ? (ts[0] === 'tradicionales' ? 'solo medios tradicionales' : 'solo medios alternativos') : 'medios tradicionales y alternativos',
+      escalas().territorio ? `noticias de ${t.etiqueta || 'su territorio'}` : '', escalas().nacional ? 'noticias nacionales' : ''].filter(Boolean);
+    $('fuentesLinea').textContent = `Fuentes · ${fuentes.join(' · ')}`;
+    $('fuentesLinea').classList.remove('hidden');
+  }
+
   /* ═══ 1 · Sus cuentas ═════════════════════════════════════════════════════ */
 
-  const REDES = [
+  /* Facebook no tiene sondeo en el worker (`/c360/redes` valida X, TikTok e
+     Instagram): su usuario se guarda tal cual, sin validar, y la captura lo
+     lee por páginas del territorio. */
+  const REDES_TODAS = [
+    { key: 'facebook', nombre: 'Facebook', detalle: 'página o perfil', ph: 'usuario o página', sinValidar: true },
     { key: 'x', nombre: 'X', detalle: 'antes Twitter', ph: '@usuario' },
     { key: 'tiktok', nombre: 'TikTok', detalle: 'video corto', ph: '@usuario' },
     { key: 'instagram', nombre: 'Instagram', detalle: 'perfil público', ph: 'usuario' }
   ];
+  /* Solo las redes que dijo que aprovecha; sin preferencias, las tres validables. */
+  let REDES = REDES_TODAS.filter(r => !r.sinValidar);
   const VEREDICTOS = {
     confirmado: { etiqueta: 'Confirmado', clase: 'ok' },
     probable: { etiqueta: 'Probable', clase: 'ok' },
@@ -206,10 +306,11 @@
   /* Misma limpieza que el worker, para que la firma del cache coincida. */
   const limpiar = v => String(v || '').trim()
     .replace(/^https?:\/\//i, '').replace(/^www\./i, '')
-    .replace(/^(x|twitter|tiktok|instagram)\.com\//i, '')
+    .replace(/^(x|twitter|tiktok|instagram|facebook|m\.facebook)\.com\//i, '')
     .split(/[?#]/)[0].split('/')[0].replace(/^@+/, '').trim();
 
   function montar(guardadas) {
+    REDES = REDES_TODAS.filter(r => !PREFS || PREFS.redes.includes(r.key));
     $('redesGrid').innerHTML = REDES.map(r => {
       const prev = guardadas.find(p => p.red === r.key);
       return `<div class="red-row${prev ? ' on' : ''}" data-red="${r.key}">
@@ -290,7 +391,8 @@
   }
 
   async function validar() {
-    const redes = elegidas(); if (!redes.length) return;
+    const todas = elegidas(), redes = todas.filter(r => !REDES_TODAS.find(x => x.key === r.red)?.sinValidar), sinSondeo = todas.filter(r => REDES_TODAS.find(x => x.key === r.red)?.sinValidar);
+    if (!redes.length) { if (sinSondeo.length) guardar(sinSondeo.map(r => Object.assign({}, r, { veredicto: 'sin_validar' }))); return; }
     redes.forEach(r => { const i = $(`red-${r.red}`); if (i && i.value !== r.handle) i.value = r.handle; });
     const f = firma();
     cargando = true; estado();
@@ -307,7 +409,8 @@
     validacion = Object.assign({}, r.data, { firma: f });
     pintarValidacion(validacion);
     estado();
-    await guardar(validacion.perfiles.map(p => ({ red: p.red, handle: p.handle, veredicto: p.veredicto, confianza: p.confianza, nombrePerfil: p.nombre_perfil })),
+    await guardar(validacion.perfiles.map(p => ({ red: p.red, handle: p.handle, veredicto: p.veredicto, confianza: p.confianza, nombrePerfil: p.nombre_perfil }))
+      .concat(sinSondeo.map(r => Object.assign({}, r, { veredicto: 'sin_validar' }))),
       { validadoEn: validacion.generado_en, modelo: validacion.modelo, resumen: validacion.resumen });
   }
 
@@ -449,8 +552,9 @@
   }
 
   function tarjeta(idea, datos, esLider) {
-    const res = (datos?.resultados || []).slice(0, 5);
-    const n = Number(datos?.n || 0);
+    const todos = (datos?.resultados || []).filter(r => pasaTipo(r.medio || ''));
+    const res = todos.slice(0, 5);
+    const n = tipos().length === 1 ? todos.length : Number(datos?.n || 0);
     const medios = [...new Set((datos?.por_medio || []).map(m => m.medio).filter(Boolean))].slice(0, 4);
     const lectura = !n
       ? 'Nadie está publicando sobre esto en su territorio. Eso también es información: o el tema no está en la agenda —y entrar es suyo—, o la agenda lo llama de otra manera; pruebe con las palabras que usa la gente, no con las del programa.'
@@ -513,7 +617,7 @@
       <ul class="tema-titulares">${grupos.map(fila).join('')}</ul></article>`;
   }
 
-  function pintarTerritorio(t, usted, nacional, territorio, fallos, consultas) {
+  function pintarTerritorio(t, usted, nacional, territorio, fallos, consultas, esc_ = { territorio: true, nacional: true }) {
     const linea = it => `<li><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.titulo)}</a><small>${esc(it.medio || 'medio sin identificar')}${it.fecha ? ` · ${esc(String(it.fecha).slice(0, 10))}` : ''}</small></li>`;
     const bloques = [];
     if (usted.length) bloques.push(`<article class="tema">
@@ -521,7 +625,7 @@
       <p class="tema-lectura">Titulares que traen su nombre y un apellido. <b>Léalos primero</b>: son los que ya circulan con usted adentro.</p>
       <ul class="tema-titulares">${usted.slice(0, 6).map(linea).join('')}</ul></article>`);
     bloques.push(bloqueNacional(nacional));
-    bloques.push(territorio.length ? `<article class="tema">
+    if (esc_.territorio) bloques.push(territorio.length ? `<article class="tema">
       <div class="tema-top"><h3>Lo que pasa en ${esc(t.etiqueta)}</h3><span class="tema-cifra">${num(territorio.length)}<small>titulares · ${VENTANA} días</small></span></div>
       <p class="tema-lectura">Ordenados por qué tanto le tocan al territorio: primero los que nombran su ${t.corp === 'jal' ? 'localidad' : 'lugar'} y a quien lo gobierna, después el resto. Los titulares de clima, loterías y vacantes salen por filtro.</p>
       <ul class="tema-titulares">${territorio.slice(0, 10).map(linea).join('')}</ul></article>`
@@ -534,7 +638,9 @@
   async function leerTerritorio() {
     const t = P.territorioDe();
     $('territorioTitulo').textContent = t.etiqueta ? `¿De qué se está hablando, y qué se dice en ${t.etiqueta}?` : '¿De qué se está hablando?';
-    $('territorioEscala').innerHTML = `Primero la agenda del país, la que todo el mundo comenta. Después su territorio, a escala de <b>${esc(t.departamental ? 'departamento' : t.corp === 'jal' ? 'localidad' : 'municipio')}</b> porque aspira a ${esc(t.corpLabel)}${t.etiqueta ? `: la conversación de <b>${esc(t.etiqueta)}</b>, más ${esc(t.entidad)} y ${esc(t.cuerpo)}` : ''}.`;
+    const e_ = escalas();
+    $('territorioEscala').innerHTML = (e_.nacional ? 'Primero la agenda del país, la que todo el mundo comenta. ' : '')
+      + (e_.territorio ? `${e_.nacional ? 'Después' : 'Lo suyo es'} su territorio, a escala de <b>${esc(t.departamental ? 'departamento' : t.corp === 'jal' ? 'localidad' : 'municipio')}</b> porque aspira a ${esc(t.corpLabel)}${t.etiqueta ? `: la conversación de <b>${esc(t.etiqueta)}</b>, más ${esc(t.entidad)} y ${esc(t.cuerpo)}` : ''}.` : '');
     const consultas = P.consultasTerritorio(t);
     if (!consultas.length) { $('territorioLectura').innerHTML = '<div class="panel-error">Su candidatura todavía no tiene territorio guardado; ábrala en el CRM y escoja dónde se lanza.</div>'; return; }
     $('territorioRecargar').disabled = true;
@@ -543,17 +649,20 @@
        del territorio, va aparte y de primero. */
     const personas = P.terminosPersona();
     const nombres = [P.nombreCandidatura(), P.nombrePublico()].filter(n => P.toks(n, 3).length >= 2).map(n => `"${n}"`);
-    const nacionales = P.consultasNacionales();
-    const todas = consultas.concat(nombres, nacionales);
+    const esc_ = escalas();
+    const nacionales = esc_.nacional ? P.consultasNacionales() : [];
+    const consultasT = esc_.territorio ? consultas : [];
+    const todas = consultasT.concat(nombres, nacionales);
     const rs = await Promise.all(todas.map(q => P.caudal({ action: 'medios', query: q, dias: VENTANA }).catch(() => ({ _error: true }))));
     const locales = P.terminosLocales(t), vistos = new Set(), usted = [], territorio = [], pais = [];
     let fallos = 0;
     rs.forEach((d, i) => {
       if (d?._error) { fallos++; return; }
-      const esNacional = i >= consultas.length + nombres.length;
+      const esNacional = i >= consultasT.length + nombres.length;
       for (const r of (d?.resultados || [])) {
         const titulo = r.titulo || '', k = P.norm(titulo).slice(0, 90);
         if (!k) continue;
+        if (!pasaTipo(r.medio || '')) continue;
         const item = { titulo, medio: r.medio || '', url: r.url || '', fecha: r.fecha || '' };
         /* El top nacional se agrupa por cobertura, así que necesita los
            titulares REPETIDOS entre medios: esos duplicados son justamente la
@@ -571,7 +680,7 @@
     const nacional = P.agruparPorCobertura(pais.filter(it => !vistos.has(P.norm(it.titulo).slice(0, 90)) && !P.mencionaPersona(it.titulo, personas) && !P.puntajeLocal(it.titulo, t, locales))).slice(0, 3);
     usted.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
     territorio.sort((a, b) => (b.pts - a.pts) || String(b.fecha).localeCompare(String(a.fecha)));
-    pintarTerritorio(t, usted, nacional, territorio, fallos, todas.length);
+    pintarTerritorio(t, usted, esc_.nacional ? nacional : [], territorio, fallos, todas.length, esc_);
     $('territorioRecargar').disabled = false;
   }
 
@@ -598,7 +707,7 @@
       <div class="arranque-botones"><button type="button" class="wall-btn" id="arranqueAbrir">Conectar mis redes</button></div>`;
     $('arranqueAbrir').addEventListener('click', () => {
       try { localStorage.removeItem(SIN_REDES); } catch {}
-      abrirRedes(true);
+      pintarCuestionario();
     });
   }
 
@@ -618,27 +727,34 @@
     $('redesGuardar').addEventListener('click', () => guardar(elegidas().map(r => Object.assign({}, r, { veredicto: 'sin_validar' }))));
     $('btnLeer').addEventListener('click', leer);
     $('territorioRecargar').addEventListener('click', leerTerritorio);
-    $('arranqueSi').addEventListener('click', () => { try { localStorage.removeItem(SIN_REDES); } catch {} abrirRedes(true); });
-    $('arranqueNo').addEventListener('click', sinRedes);
-
-    /* La pregunta sale solo si hace falta: con cuentas guardadas ya está
-       respondida, y si dijo que no tiene, tampoco se repite. */
-    let omitido = false;
-    try { omitido = localStorage.getItem(SIN_REDES) === '1'; } catch {}
+    $('prefGuardar').addEventListener('click', async () => {
+      const p = { redes: [...$('prefRedes').querySelectorAll('[aria-pressed="true"]')].map(b => b.dataset.pref), medios: [...$('prefMedios').querySelectorAll('[aria-pressed="true"]')].map(b => b.dataset.pref) };
+      await guardarPrefs(p);
+      aplicarPrefs(guardadas);
+      leerTerritorio();
+      if (quiere('causa') && ideasGuardadas.length) leer();
+      if (PREFS.redes.length) abrirRedes(!guardadas.length);
+    });
     if (guardadas.length) {
-      abrirRedes(false);
       $('redesGuardado').classList.remove('hidden');
       $('redesGuardado').innerHTML = `<b>Ya tiene cuentas guardadas:</b> ${esc(guardadas.map(p => `@${p.handle}`).join(', '))}${e.redes?.validado ? ` · validadas${e.redes.validadoEn ? ` el ${esc(String(e.redes.validadoEn).slice(0, 10))}` : ''}.` : ' · sin validar.'}`;
-    } else if (omitido) {
-      sinRedes();
-    } else {
-      $('arranque').classList.remove('hidden');
     }
 
-    /* La prensa no espera a que conteste lo de las redes: es la mitad que
-       funciona sin configurar nada. */
-    leerTerritorio();
-    if (ideasGuardadas.length) { $('estadoIdeas').textContent = `${ideasGuardadas.length} ${ideasGuardadas.length === 1 ? 'idea guardada' : 'ideas guardadas'}`; leer(); }
+    /* Las dos preguntas salen hasta que se respondan; con cuentas guardadas de
+       antes del cuestionario se dan por respondidas con esas redes y la
+       lectura completa, y se pueden cambiar desde el resumen. */
+    PREFS = prefsGuardadas() || (guardadas.length ? { redes: [...new Set(guardadas.map(p => p.red))], medios: ['tradicionales', 'alternativos', 'causa', 'territorio', 'nacional'] } : null);
+    if (PREFS) {
+      aplicarPrefs(guardadas);
+      leerTerritorio();
+      if (ideasGuardadas.length) { $('estadoIdeas').textContent = `${ideasGuardadas.length} ${ideasGuardadas.length === 1 ? 'idea guardada' : 'ideas guardadas'}`; if (quiere('causa')) leer(); }
+    } else {
+      pintarCuestionario();
+      $('panelRedes').classList.add('hidden');
+      $('panelIdeas').classList.add('hidden');
+      $('territorioTitulo').textContent = 'Responda las dos preguntas de arriba y armamos su lectura.';
+      $('territorioEscala').textContent = '';
+    }
   })();
 })();
 </script>

@@ -104,7 +104,9 @@
     const t = String(s ?? '').replace(/\s+/g, ' ').trim();
     const letras = [...t].filter(c => /[a-zá-úñ]/i.test(c));
     if (!letras.length || letras.filter(c => c === c.toUpperCase()).length / letras.length < .7) return t;
-    return t.slice(0, 1).toUpperCase() + t.slice(1).toLowerCase();
+    /* Cada palabra con su mayúscula —«Barrios Unidos», no «Barrios unidos»—
+       salvo las menudas, que van en minúscula salvo al inicio. */
+    return t.toLowerCase().replace(/(^|[\s(\-·/])([a-záéíóúñü])/g, (m, a, b) => a + b.toUpperCase()).replace(MENUDAS, w => w.toLowerCase()).replace(/^(\w)/, c => c.toUpperCase());
   }
 
   function territorioDe(v = SESION.vinculo) {
@@ -222,6 +224,39 @@
     return personas.some(tk => tk.filter(x => n.includes(x)).length >= 2);
   }
 
+  /* ── Tradicionales y alternativos ──────────────────────────────────────────
+     Google News no dice qué clase de medio es cada uno; lo decidimos por
+     nombre, con dos listas curadas a mano. Lo que no está en ninguna es
+     «otro» y NO se descarta: la prensa regional pequeña —que es justo la que
+     importa en un municipio— casi nunca está en una lista nacional. */
+  const MEDIOS_TRADICIONALES = ['EL TIEMPO', 'EL ESPECTADOR', 'SEMANA', 'CARACOL', 'RCN', 'BLU RADIO', 'LA FM', 'W RADIO', 'PORTAFOLIO', 'LA REPUBLICA',
+    'EL COLOMBIANO', 'EL PAIS', 'EL HERALDO', 'EL UNIVERSAL', 'VANGUARDIA', 'LA OPINION', 'EL NUEVO SIGLO', 'EL NUEVO DIA', 'LA PATRIA', 'EL PILON',
+    'DIARIO DEL MAGDALENA', 'DIARIO DEL HUILA', 'DIARIO DEL SUR', 'LA CRONICA', 'EL MERIDIANO', 'DIARIO OCCIDENTE', 'EL DIARIO', 'Q HUBO', 'QHUBO', 'ADN',
+    'CITY TV', 'CITYTV', 'CANAL 1', 'CANAL UNO', 'TELEANTIOQUIA', 'TELECARIBE', 'TELEPACIFICO', 'TELEMEDELLIN', 'CANAL CAPITAL', 'EXTRA', 'EL INFORMADOR',
+    'LA NACION', 'EL PERIODICO', 'DINERO', 'VALORA ANALITIK', 'NOTICIAS UNO', 'RED MAS', 'CM&', 'CMI'];
+  const MEDIOS_ALTERNATIVOS = ['LA SILLA VACIA', 'LAS2ORILLAS', 'LAS 2 ORILLAS', 'CUESTION PUBLICA', 'VORAGINE', 'CEROSETENTA', '070', 'MUTANTE', 'PARES',
+    'PAZ Y RECONCILIACION', 'RUTAS DEL CONFLICTO', 'COLOMBIACHECK', 'COLOMBIA CHECK', 'LA LIGA CONTRA EL SILENCIO', 'RAZON PUBLICA', 'KIENYKE', 'PULZO',
+    'INFOBAE', 'VERDAD ABIERTA', 'CONSONANTE', 'BAUDO', 'MANIFIESTA', 'VOLCANICAS', 'LA COLA DE RATA', 'HACEMOS MEMORIA', 'PERIFERIA', 'DE LA URBE',
+    'MINUTO30', 'MINUTO 30', 'CONFIDENCIAL COLOMBIA', 'CONTAGIO RADIO', 'PACIFISTA', 'EL UNICORNIO', 'CAMBIO', 'LOS DANIELES', 'AGENDA PROPIA',
+    'EL CUARTO MOSQUETERO', 'LA NUEVA PRENSA', 'PUBLIMETRO', 'CANAL TRECE', 'ALPONIENTE', 'AL PONIENTE', 'LA ORIGINAL', 'ANALISIS URBANO'];
+  function tipoMedio(medio) {
+    const n = ' ' + norm(medio) + ' ';
+    if (!n.trim()) return 'otro';
+    if (MEDIOS_ALTERNATIVOS.some(m => n.includes(' ' + norm(m) + ' ') || n.includes(norm(m)))) return 'alternativo';
+    if (MEDIOS_TRADICIONALES.some(m => n.includes(' ' + norm(m) + ' ') || n.includes(norm(m)))) return 'tradicional';
+    return 'otro';
+  }
+  /* Cómo se llama la escala del territorio en la boca del candidato: la JAL
+     habla de su localidad (o comuna), el concejo de su ciudad, la asamblea de
+     su región. Es la etiqueta de la pregunta «Noticias de mi …». */
+  function escalaLabel(t) {
+    if (t.corp === 'jal') return t.esBogota ? 'localidad' : 'comuna';
+    if (t.corp === 'concejo') return 'ciudad o municipio';
+    if (t.corp === 'alcaldia') return 'municipio o ciudad';
+    if (t.departamental) return 'región';
+    return 'territorio';
+  }
+
   function pintarNav(pagina) {
     const nav = $('navAuth'); if (!nav) return;
     const next = encodeURIComponent(pagina);
@@ -292,5 +327,6 @@
   }
 
   global.C360Panel = { SESION, api, caudal, arrancar, guardarEscucha, territorio, lugar, nombreCandidatura, nombrePublico, muro, $, esc, num,
-    territorioDe, consultasTerritorio, consultasNacionales, agruparPorCobertura, terminosLocales, esAdmin, soltarVinculo, terminosPersona, puntajeLocal, mencionaPersona, oracion, norm, toks };
+    territorioDe, consultasTerritorio, consultasNacionales, agruparPorCobertura, terminosLocales, esAdmin, soltarVinculo, terminosPersona, puntajeLocal, mencionaPersona, oracion, norm, toks,
+    tipoMedio, escalaLabel };
 })(window);
