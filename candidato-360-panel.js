@@ -66,7 +66,10 @@
      hace que la lectura sea de SU municipio y no del país entero. */
   function territorio(v = SESION.vinculo) {
     const c = v?.campana; if (!c) return { texto: '', partes: [] };
-    const partes = [c.localidad, c.municipio, c.departamentoNombre].filter(Boolean);
+    /* Sin repetir el lugar: Bogotá es municipio y departamento a la vez y salía
+       «Bogotá, D.C. · Bogotá D.C.». */
+    const vistos = new Set(), partes = [c.localidad, c.municipio, c.departamentoNombre].filter(Boolean)
+      .filter(x => { const k = norm(x).replace(/\bD C\b/g, '').trim(); if (vistos.has(k)) return false; vistos.add(k); return true; });
     return { texto: partes.map(lugar).join(' · '), partes, municipio: c.municipio || c.departamentoNombre || '', localidad: c.localidad || '' };
   }
   function nombreCandidatura(v = SESION.vinculo) {
@@ -290,6 +293,22 @@
     if (!r.ok) { alert(`No se pudo soltar: ${r.data?.error || r.status}`); return; }
     location.reload();
   }
+  /* ── Modo pruebas ────────────────────────────────────────────────────────
+     La cuenta de administración no escribe vínculos en el worker: la
+     candidatura que abre en candidato-360.html vive en sessionStorage de la
+     pestaña (`c360-vinculo-pruebas`, la misma llave de allá). Sin leerla acá,
+     los paneles decían «su cuenta no tiene candidatura» justo a quien está
+     probando el producto. Manda sobre el vínculo real de la cuenta, igual que
+     en el CRM; lo que se guarda (ideas, preferencias, cuentas) vuelve a esa
+     copia, no al servidor. */
+  const VINCULO_LOCAL_KEY = 'c360-vinculo-pruebas';
+  function leerVinculoLocal() {
+    try { const v = JSON.parse(sessionStorage.getItem(VINCULO_LOCAL_KEY) || localStorage.getItem(VINCULO_LOCAL_KEY) || 'null'); return v && v.local && v.tipo ? v : null; } catch { return null; }
+  }
+  function persistirVinculoLocal() {
+    if (!SESION.vinculo?.local) return;
+    try { const j = JSON.stringify(SESION.vinculo); sessionStorage.setItem(VINCULO_LOCAL_KEY, j); localStorage.setItem(VINCULO_LOCAL_KEY, j); } catch {}
+  }
   async function arrancar(pagina) {
     try { SESION.token = localStorage.getItem('rr-token') || null; SESION.user = JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch {}
     if (SESION.token) {
@@ -304,6 +323,7 @@
         } else SESION.error = r.data?.error || `HTTP ${r.status}`;
       } catch (e) { SESION.error = String(e); }
     }
+    if (SESION.token && esAdmin()) { const local = leerVinculoLocal(); if (local) SESION.vinculo = local; }
     pintarNav(pagina);
     const next = encodeURIComponent(pagina);
     if (!SESION.token) return muro('Este panel trabaja sobre <b>su</b> candidatura, así que primero hay que saber quién es.', `<a class="wall-btn primary" href="login.html?next=${next}">Iniciar sesión</a>`), false;
@@ -317,12 +337,21 @@
          atada a una candidatura vieja, es la que se ve acá. Por eso el botón
          para soltarla vive también en esta cabecera. */
       cab.innerHTML = `<b>${esc(nombreCandidatura())}</b>${t.texto ? ` · ${esc(t.texto)}` : ''}` +
-        (esAdmin() ? ` <button type="button" class="soltar-vinculo" onclick="C360Panel.soltarVinculo()">soltar</button>` : '');
+        (SESION.vinculo.local ? ' · modo pruebas: lo que configure queda en esta pestaña' : '') +
+        (esAdmin() && !SESION.vinculo.local ? ` <button type="button" class="soltar-vinculo" onclick="C360Panel.soltarVinculo()">soltar</button>` : '');
     }
     return true;
   }
 
   async function guardarEscucha(datos) {
+    if (SESION.vinculo?.local) {
+      const e = Object.assign({}, SESION.vinculo.escucha || {});
+      if (datos.ideas) e.ideas = datos.ideas;
+      if (datos.preferencias) e.preferencias = datos.preferencias;
+      if (datos.redes) e.redes = Object.assign({ validado: (datos.redes.perfiles || []).some(p => p.veredicto && p.veredicto !== 'sin_validar') }, datos.redes);
+      SESION.vinculo.escucha = e; persistirVinculoLocal();
+      return { status: 200, ok: true, data: { ok: true, vinculo: SESION.vinculo, local: true } };
+    }
     const r = await api('/c360/escucha', { method: 'POST', body: JSON.stringify(datos) });
     if (r.ok && r.data?.vinculo) SESION.vinculo = r.data.vinculo;
     return r;

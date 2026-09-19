@@ -371,10 +371,13 @@ const VINCULO_LOCAL_KEY = 'c360-vinculo-pruebas';
 function vinculoLocal(payload) { SESSION.vinculo = Object.assign({ local: true }, payload); persistirVinculoLocal(); }
 function persistirVinculoLocal() {
   if (!SESSION.vinculo?.local) return;
-  try { sessionStorage.setItem(VINCULO_LOCAL_KEY, JSON.stringify(SESSION.vinculo)); } catch {}
+  /* También en localStorage: quien escribe la URL de un panel en otra pestaña
+     (lo normal al probar) no tiene el sessionStorage de esta. La de sesión
+     manda si existe; la local es el respaldo. */
+  try { const j = JSON.stringify(SESSION.vinculo); sessionStorage.setItem(VINCULO_LOCAL_KEY, j); localStorage.setItem(VINCULO_LOCAL_KEY, j); } catch {}
 }
 function leerVinculoLocal() {
-  try { const v = JSON.parse(sessionStorage.getItem(VINCULO_LOCAL_KEY) || 'null'); return v && v.local && v.tipo ? v : null; } catch { return null; }
+  try { const v = JSON.parse(sessionStorage.getItem(VINCULO_LOCAL_KEY) || localStorage.getItem(VINCULO_LOCAL_KEY) || 'null'); return v && v.local && v.tipo ? v : null; } catch { return null; }
 }
 /* El vínculo real de la cuenta de administración estorba para probar: las
    páginas de medios y redes lo leen del servidor, no del modo pruebas. Esto
