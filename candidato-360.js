@@ -368,7 +368,7 @@ function aplicarGateExistente() {
     aviso.className = 'c360-vitrina';
     box.querySelector('.search-row')?.after(aviso);
   }
-  aviso.innerHTML = `<p>Búsquese: su historial está acá y lo puede abrir para ver de qué candidaturas hablamos. Lo que necesita acceso es el CRM que se construye con él — mapa, meta de votos y briefing. Cada cuenta se vincula a <b>un solo candidato</b>.</p><button type="button" onclick="abrirPaywall()">Activar mi candidatura</button>`;
+  aviso.innerHTML = `<p>Búsquese: su historial está acá y lo puede abrir para ver de qué candidaturas hablamos. Con él se arma el CRM de campaña, que puede ver en vista previa; el detalle por barrio y los módulos se abren con el acceso. Cada cuenta se vincula a <b>un solo candidato</b>.</p><button type="button" onclick="abrirPaywall()">Activar mi candidatura</button>`;
 }
 /* La pantalla del candidato se ve completa; lo que se anuncia es que el CRM
    —lo que se cobra— pide acceso. Anunciarlo ACÁ y no al final evita que
@@ -386,7 +386,7 @@ function aplicarGateRuta() {
   /* Por id, no por clase: en el pie hay dos botones «next» —continuar y abrir
      el CRM— y el primero se quedaba con la etiqueta del segundo. */
   const boton = $('abrirCRM');
-  if (boton) boton.textContent = bloqueado ? 'Activar y abrir el CRM →' : 'Abrir CRM de campaña →';
+  if (boton) boton.textContent = bloqueado ? 'Ver el CRM de campaña →' : 'Abrir CRM de campaña →';
   if (!bloqueado) return aviso?.remove();
   if (!aviso) {
     aviso = document.createElement('div');
@@ -394,7 +394,7 @@ function aplicarGateRuta() {
     aviso.className = 'c360-vitrina';
     (form.querySelector('.paso-pie') || boton)?.before(aviso);
   }
-  aviso.innerHTML = `<p>Este es su historial y hasta acá puede llegar sin cuenta. El CRM —mapa por puesto de votación, meta de votos y briefing cada tres días— se abre con el acceso activo, y deja su cuenta vinculada a <b>este candidato</b>.</p><button type="button" onclick="abrirPaywall()">Ver qué incluye</button>`;
+  aviso.innerHTML = `<p>Sin cuenta puede ver el CRM en vista previa: mapa, historial, proyección y meta de votos. El detalle por barrio y los módulos —briefing, escucha, arquetipos, perfil del votante— se abren con el acceso activo, que deja su cuenta vinculada a <b>este candidato</b>.</p><button type="button" onclick="abrirPaywall()">Ver qué incluye</button>`;
 }
 function aplicarGateNuevo() {
   const box = document.querySelector('#new .search-box'); if (!box) return;
@@ -1885,17 +1885,64 @@ function vinculoCoincide(profile) {
   const propios = (profile.history?.length ? profile.history : [profile]).map(c => c.slug).filter(Boolean);
   return propios.some(s => slugs.has(s)) || (v.candidato?.id && v.candidato.id === profile.id);
 }
+/* ─── Vitrina del CRM ────────────────────────────────────────────────────────
+   Sin acceso, el CRM SÍ abre: mapa, historial por año, promedio, proyección y
+   meta de votos. Es lo que convence. Lo que se cobra se ve pero no se usa: el
+   detalle por barrio o puesto sale borroso con su candado, y los módulos
+   (briefing, escucha, arquetipos, perfil, firmas) abren el paywall al tocar
+   su botón. Nada se vincula ni se guarda en el worker: el vínculo —la única
+   decisión irreversible— sigue pasando solo con el acceso activo. */
+let CRM_VITRINA = false;
+function pintarVitrina() {
+  const crm = $('crm'); if (!crm) return;
+  crm.classList.toggle('en-vitrina', CRM_VITRINA);
+  let banda = $('crmVitrinaBanda');
+  if (!CRM_VITRINA) { banda?.remove(); candadoDetalle(); return; }
+  if (!banda) {
+    banda = document.createElement('div'); banda.id = 'crmVitrinaBanda'; banda.className = 'c360-vitrina crm-vitrina-banda';
+    crm.querySelector('.dash-head')?.after(banda);
+  }
+  banda.innerHTML = `<p><b>Vista previa.</b> Esto es lo que ve su campaña: el historial, la proyección y la meta. El detalle por barrio y los módulos se abren con el acceso activo, que deja su cuenta vinculada a <b>este candidato</b>.</p><button type="button" onclick="abrirPaywall()">Activar mi candidatura</button>`;
+  candadoDetalle();
+}
+/* El detalle (barrios o puestos) existe cuando crmBarrioLayer está en el mapa.
+   Se pinta igual —así se nota cuántos barrios hay y dónde— pero borroso y sin
+   tooltips; el desglose de la derecha también. */
+function candadoDetalle() {
+  const mapEl = $('crmMap'), desglose = $('crmBreakdown'); if (!mapEl) return;
+  const on = CRM_VITRINA && Boolean(crmBarrioLayer && crmLeafletMap?.hasLayer(crmBarrioLayer));
+  mapEl.classList.toggle('vitrina-lock', on); desglose?.classList.toggle('vitrina-lock', on);
+  let tapa = mapEl.querySelector(':scope > .vitrina-tapa');
+  if (!on) return tapa?.remove();
+  if (!tapa) { tapa = document.createElement('div'); tapa.className = 'vitrina-tapa'; mapEl.append(tapa); }
+  const n = crmBarrioLayer.getLayers().length, esPuesto = crmBarrioLayer instanceof L.FeatureGroup && !(crmBarrioLayer instanceof L.GeoJSON);
+  const que = esPuesto ? (n === 1 ? 'puesto de votación' : 'puestos de votación') : (n === 1 ? 'barrio' : 'barrios');
+  tapa.innerHTML = `<div class="c360-wall-card"><span class="kicker">🔒 Detalle por ${esPuesto ? 'puesto' : 'barrio'}</span><p>Tenemos <b>${n.toLocaleString('es-CO')} ${que}</b> con su votación y la meta repartida. Se abren con el acceso a Candidato 360.</p><button type="button" onclick="abrirPaywall()">Activar mi candidatura</button></div>`;
+}
+/* Cualquier botón o enlace de un módulo abre el paywall en vitrina. Captura,
+   para ganarle a los onclick y a los href de cada tarjeta. La meta (02) y el
+   enlace al método no son módulos cobrados: pasan. */
+document.addEventListener('click', e => {
+  if (!CRM_VITRINA) return;
+  const el = e.target.closest('#crm .crm-grid .module:not(.crm-vote-target) :is(button, a, input)');
+  if (!el || el.classList.contains('enlace-boton') || el.classList.contains('meta-i')) return;
+  e.preventDefault(); e.stopPropagation();
+  const modulo = el.closest('.module')?.querySelector('.panel-num')?.textContent.replace(/^\d+\s*·\s*/, '') || 'Este módulo';
+  abrirPaywall(`${modulo} se abre con el acceso a Candidato 360.`);
+}, true);
+
 async function launchCRM(event) {
   event?.preventDefault();
   if (!crmCandidate) return;
-  if (!SESSION.acceso) return abrirPaywall();
+  CRM_VITRINA = SESSION.listo && !SESSION.acceso;
   const isOther = document.querySelector('input[name="corporationRoute"]:checked')?.value === 'other';
   if (isOther && !$('otherCorporation').value) return irAPaso('corporacion', { animar: true });
   const corpKey = isOther ? $('otherCorporation').value : corporacionHistorica(crmCandidate) || 'concejo';
   const corporation = CRM_CORPORATIONS[corpKey], territory = campaignTerritory(corpKey);
   if (territory === null) { irAPaso('lugar', { animar: true }); $('campaignDepartment').focus({ preventScroll: true }); return; }
   const campana = campanaActual(corpKey);
-  if (PRUEBAS) vinculoLocal({ tipo: 'historial', candidato: { id: crmCandidate.id, nombre: crmCandidate.nombre, slugs: (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean), corp: crmCandidate.corp, partido: crmCandidate.partido, circunscripcion: crmCandidate.circunscripcion }, campana });
+  if (CRM_VITRINA) { /* vista previa: nada se guarda ni se vincula */ }
+  else if (PRUEBAS) vinculoLocal({ tipo: 'historial', candidato: { id: crmCandidate.id, nombre: crmCandidate.nombre, slugs: (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean), corp: crmCandidate.corp, partido: crmCandidate.partido, circunscripcion: crmCandidate.circunscripcion }, campana });
   else if (!SESSION.vinculo) {
     const sigue = await confirmarVinculo(crmCandidate.nombre, `${corporation}${territory ? ` · ${territory}` : ''}`);
     if (!sigue) return;
@@ -1913,6 +1960,7 @@ async function launchCRM(event) {
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Mapa de historial electoral';
   showScreen('crm');
+  pintarVitrina();
   pintarBriefing();
   pintarEscucha();
   pintarArquetipos();
@@ -1942,7 +1990,9 @@ async function abrirCRMNuevo() {
   document.getElementById('crmProfilePhoto')?.remove(); document.getElementById('crmProfilePhotoMissing')?.remove(); $('crmInitials').classList.remove('crm-avatar-hidden');
   $('crmPuntaje').innerHTML = ''; $('crmPuntaje').classList.add('hidden'); PUNTAJE_ACTUAL = null;   /* sin historial no hay puntaje: un cero ahí sería una calificación, no un dato */
   CAMPANA_ACTUAL = c;
+  CRM_VITRINA = false;
   showScreen('crm');
+  pintarVitrina();
   pintarBriefing();
   pintarEscucha();
   pintarArquetipos();
@@ -2454,7 +2504,7 @@ function crearMapa(center, zoom) {
      hay un factor 2: Bogotá quedaba en zoom 11 ocupando la mitad del marco,
      con Kennedy y Bosa diminutas y el resto vacío. Con zoom fraccionario el
      encuadre es exacto. */
-  if (!crmLeafletMap) { mapEl.innerHTML = ''; crmLeafletMap = L.map(mapEl, { zoomControl: false, attributionControl: true, zoomSnap: 0.1, scrollWheelZoom: false, dragging: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false }).setView(center, zoom); }
+  if (!crmLeafletMap) { mapEl.innerHTML = ''; crmLeafletMap = L.map(mapEl, { zoomControl: false, attributionControl: true, zoomSnap: 0.1, scrollWheelZoom: false, dragging: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false }).setView(center, zoom); crmLeafletMap.on('layeradd layerremove', () => setTimeout(candadoDetalle, 0)); }
   else { crmLeafletMap.invalidateSize(); if (crmMapLayer) { crmLeafletMap.removeLayer(crmMapLayer); crmMapLayer = null; } }
   if (crmBarrioLayer) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
   mapEl.querySelector('.crm-territory-notice')?.remove();
