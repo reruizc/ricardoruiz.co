@@ -17,8 +17,15 @@
 (function (global) {
   'use strict';
 
-  // Public data is served through CloudFront, not directly from the S3 origin.
-  const S3 = global.RRData.publicUrl('congreso-2026/output');
+  // Los datos públicos se resuelven con data-client.js (RRData). Si una página
+  // carga este archivo SIN platform-config.js + data-client.js, NO se revienta:
+  // cae al prefijo público de siempre. Sin esta red, un solo <script> olvidado
+  // tumbaba el registro entero (pasó del 26-ago al 19-sep-2026 en endoso,
+  // analisis-candidato, comparar, brujula, curul-360 y congresistas).
+  const S3_FALLBACK = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const S3 = (global.RRData && typeof global.RRData.publicUrl === 'function')
+    ? global.RRData.publicUrl('congreso-2026/output')
+    : (console.warn('[cand-index] RRData no está cargado; uso el prefijo público directo.'), S3_FALLBACK);
 
   // Cada fuente vive en `${S3}/${dir}/`: el índice es `${dir}/${indexFile}` y
   // cada candidato es `${dir}/${slug}.json`. `list(raw)` extrae el array de
