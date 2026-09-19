@@ -231,7 +231,7 @@ let CAMPANA_ACTUAL = null;
 async function guardarCampana(campana) {
   if (!SESSION.vinculo) return;
   CAMPANA_ACTUAL = campana;
-  if (SESSION.vinculo.local) { SESSION.vinculo.campana = campana; return; }
+  if (SESSION.vinculo.local) { SESSION.vinculo.campana = campana; persistirVinculoLocal(); return; }
   try { const r = await apiC360('/c360/campana', { method: 'POST', body: JSON.stringify({ campana }) }); if (r.ok) SESSION.vinculo = r.data.vinculo; } catch {}
 }
 /* La meta la calcula VoteTarget en el navegador; se guarda en la campaña para
@@ -311,7 +311,7 @@ async function toggleBriefing() {
   const on = !!SESSION.vinculo.briefing?.activo, correo = ($('crmBriefingCorreo')?.value || '').trim();
   /* Con vínculo local no hay a quién avisarle: el interruptor se mueve para
      poder ver el panel, y se dice que no queda encendido de verdad. */
-  if (SESSION.vinculo.local) { SESSION.vinculo.briefing = { activo: !on, correo, envios: 0 }; pintarBriefing(); $('crmBriefingSub').textContent = 'modo pruebas: el interruptor no se guardó en el servidor'; return; }
+  if (SESSION.vinculo.local) { SESSION.vinculo.briefing = { activo: !on, correo, envios: 0 }; persistirVinculoLocal(); pintarBriefing(); $('crmBriefingSub').textContent = 'modo pruebas: el interruptor no se guardó en el servidor'; return; }
   const btn = $('crmBriefingBtn'); btn.disabled = true;
   try {
     const r = await apiC360('/c360/briefing', { method: 'POST', body: JSON.stringify({ activo: !on, correo }) });
@@ -361,8 +361,21 @@ function resolverModoPruebas() {
      no da acceso a nada del worker, que sigue decidiendo por su cuenta. */
   if (PRUEBAS) SESSION.acceso = true;
 }
-/* Vínculo de mentiras, solo en memoria: el CRM necesita uno para pintarse. */
-function vinculoLocal(payload) { SESSION.vinculo = Object.assign({ local: true }, payload); }
+/* Vínculo de mentiras: el CRM necesita uno para pintarse. Vive en memoria y
+   además en sessionStorage de la pestaña, porque los paneles (escucha,
+   electorado) son otras páginas: al volver con «← CRM» (?abrir=1) la memoria
+   ya no existe y, sin esta copia, el modo pruebas caía a la búsqueda en vez de
+   reabrir la candidatura que se estaba mirando. sessionStorage y no
+   localStorage: muere con la pestaña, que es lo que dura una prueba. */
+const VINCULO_LOCAL_KEY = 'c360-vinculo-pruebas';
+function vinculoLocal(payload) { SESSION.vinculo = Object.assign({ local: true }, payload); persistirVinculoLocal(); }
+function persistirVinculoLocal() {
+  if (!SESSION.vinculo?.local) return;
+  try { sessionStorage.setItem(VINCULO_LOCAL_KEY, JSON.stringify(SESSION.vinculo)); } catch {}
+}
+function leerVinculoLocal() {
+  try { const v = JSON.parse(sessionStorage.getItem(VINCULO_LOCAL_KEY) || 'null'); return v && v.local && v.tipo ? v : null; } catch { return null; }
+}
 /* El vínculo real de la cuenta de administración estorba para probar: las
    páginas de medios y redes lo leen del servidor, no del modo pruebas. Esto
    llama a la ruta de soporte que ya existe (DELETE /c360/admin/vinculo), que
@@ -4005,7 +4018,13 @@ function mostrarFirmas() {
        ?abrir=1. Con vínculo se abre el CRM directo; SIN vínculo la respuesta
        no es la portada —desde la que el botón parece no haber hecho nada— sino
        la búsqueda, que es donde una candidatura se abre de verdad. */
-    if (new URLSearchParams(location.search).get('abrir') === '1') { if (SESSION.vinculo) abrirVinculo(); else beginHistorical(); }
+    if (new URLSearchParams(location.search).get('abrir') === '1') {
+      /* En modo pruebas manda la candidatura que se estaba mirando en esta
+         pestaña, no el vínculo real de la cuenta de administración. */
+      const local = PRUEBAS && leerVinculoLocal();
+      if (local) SESSION.vinculo = local;
+      if (SESSION.vinculo) abrirVinculo(); else beginHistorical();
+    }
   });
   setTimeout(() => { clearInterval(strategyMessageTimer); $('preload').classList.remove('active'); }, 6000);   /* red de seguridad si el worker no responde */
 })();
