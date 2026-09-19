@@ -85,6 +85,7 @@ votante, 08 recolección de firmas (solo si va por firmas).
 | **Nombres de lugar en tipo oración** | La Registraduría escribe «MEDELLÍN» y los departamentos llegan «Antioquia»: media línea gritando. Solo cambia la presentación; el valor guardado sigue siendo el original, que es la llave contra la Divipola. |
 | **Logos de partido** en la elección del aval | Un nombre en mayúsculas no se reconoce; el logo sí. |
 | **La meta en tres escenarios** (inminente · probable · posible), no un número | Un candidato no sabe si 21.000 es mucho o poco. Los tres salen de la misma proyección (censo × participación) y van **de menor a mayor esfuerzo**: *inminente* (rojo) es lo que ya casi pasa con el trabajo mínimo —el piso de la corporación sin margen, o empatar al ganador en un cargo uninominal—; *probable* (amarillo) es nuestra medición, la que se guarda como meta por defecto; *posible* (verde) es lo que exige un gran trabajo: la cifra repartidora con el margen, con la que la lista gana una curul solo con los votos propios (sin reparto, referencia × 1,15). La fórmula NO va en la tarjeta —ahí va un mensaje que motive— sino en la ⓘ. El escenario elegido vive en `localStorage['c360-meta-escenario']` y **su número es el que se guarda en `campana.meta`** (el worker no conoce el escenario: `_c360NormalizarCampana` botaría un campo nuevo). Código: `META_ESCENARIOS` · `escenariosDe` · `mensajeMeta` · `elegirEscenario`. |
+| **El electorado en tres paneles: perfiles · lectura · mapa** (`candidato-360-electorado.html`, 19-sep-2026) | La página vieja era una lista de secciones que nadie usaba para decidir. Ahora responde una sola pregunta: *¿a qué perfil de votante le hablo y dónde?* **Panel 01**: seis perfiles sexo × edad (H/M × 18-30 · 31-50 · 51+) con un índice **rinde** = peso del perfil entre quienes votan en las unidades donde la familia política de la campaña sacó más votos en 2023 ÷ su peso en el territorio entero; los tres más altos van marcados como viables. **Panel 02**: lectura del perfil elegido, sus cinco unidades donde más *le pega* y una sugerencia de canal por edad, rotulada como criterio de oficio y no como dato. **Panel 03**: el mapa del territorio (localidades en Bogotá, comunas en las 14 ciudades con cartografía, municipios si la corporación es departamental, puestos como círculos en el resto) coloreado por **le pega** = (concentración del perfil ÷ territorio) × (voto de la familia ÷ su promedio); lo ≥ ×1,15 **parpadea**. En Bogotá y Cali un clic baja a los barrios (mismos `.js` de `candidato-360-data/`, sin rotar y con callejero). Fuentes: `PERFIL_SEXO_EDAD_PUESTO.json` + `resultados-concejo-2023.json` (ciudades) · `asamblea-2023/dep/<dep>.json` (departamento) · `asamblea-2023/mun/<dep>-<mun>.json` (puestos, coordenadas del georef). ⚠️ **Si la familia exacta no tiene lista en el territorio se mide con sus vecinas del espectro** (`VECINAS` en `candidato-360-electorado.js`) y la página lo dice: el centro-derecha no existe en el Concejo de Bogotá 2023 porque Cambio Radical y La U quedan en el centro. ⚠️ El índice *rinde* sale cerca de ×1,00 en ciudades grandes con familias amplias (medido: 0,99-1,02 en Bogotá con cd+c+d); lo que discrimina es el mapa por unidad, no el ranking nacional de perfiles. ⚠️ Bogotá usa la misma ventana fija del CRM (`ventana` en `CIUDADES`): con Sumapaz en el encuadre, las 19 localidades urbanas quedaban en una uña. Las lecturas viejas (sexo, edad, campo/ciudad, familias, objetivo) siguen debajo, plegadas. |
 | **El copy del briefing vende, por corporación y familia** | Apagado, el panel 03 no describe el producto: lo vende con un párrafo por corporación (`BRIEFING_COPY_CORP`, con el territorio de la campaña) y una frase por familia política (`copyBriefing`: izq/ci como oposición al gobierno nacional, d/cd como cercanos a él, centro con el argumento del dato, firmas o sin línea con la información como ventaja). Encendido vuelve al copy descriptivo. ⚠️ Asume presidente de derecha en 2026-2030; si cambia el mapa político hay que reescribir las frases. |
 
 ## 5. Arquitectura
@@ -124,7 +125,8 @@ Base pública: `https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.c
 | `mapas-2026/Ciudades-COM-LOC/` | Comunas y localidades de las ciudades con cartografía. |
 | `mapas-2026/PUESTOS_GEOREF.csv` | Cada puesto de votación: coordenada, barrio, comuna y **censo por sexo**. El nombre de comuna viene con variantes («CIUDAD BOLÍVAR» y «CIUDAD BOLIVAR», «COMUNA 7 NORESTE» y «COMUNA 7 NOR ESTE»): los generadores las unifican, si no una JAL sale partida en dos. |
 | `DESCARGAS/raw/<corp>/<año>/GCS_*.csv` | Los archivos crudos de la Registraduría, mesa a mesa. De ahí salen todos los índices. |
-| `mapas-2026/CENSO_EDAD_PUESTO.json` | Censo por edad y puesto. **Todavía no publicado**; ver §8. |
+| `mapas-2026/CENSO_EDAD_PUESTO.json` | Censo por edad y puesto (cuatro bandas). Publicado el 19-sep-2026 con `construir-edad.mjs`. |
+| `mapas-2026/PERFIL_SEXO_EDAD_PUESTO.json` | **Sexo × edad por puesto** (H/M × 18-30 · 31-50 · 51+): sufragantes de la 1V de 2022 (`Edadygenero` de la Registraduría). Lo produce `tools/candidato-360/perfil/construir-sexo-edad.py`. Es lo que arma los perfiles de votante de la página del electorado. |
 
 #### Regenerar los datos de 2023 (el voto de lista)
 
@@ -269,12 +271,12 @@ prueba-pais (7)         el selector de país en la portada
 
 ## 8. Frentes abiertos
 
-1. **`CENSO_EDAD_PUESTO.json` sin publicar.** Es lo único que separa a la
-   sección de edad de existir. Se arma local y se sube:
+1. ~~`CENSO_EDAD_PUESTO.json` sin publicar~~ **Publicado (19-sep-2026)**, junto con
+   `PERFIL_SEXO_EDAD_PUESTO.json`. Regenerar los dos:
    ```
-   python3 tools/edad-1v-2026/build_w26.py
    node tools/candidato-360/perfil/construir-edad.mjs --w26="Bases de datos/output_edad_1v/w26-puesto.csv"
-   aws s3 cp CENSO_EDAD_PUESTO.json s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/mapas-2026/CENSO_EDAD_PUESTO.json --content-type application/json --cache-control max-age=3600
+   python3 tools/candidato-360/perfil/construir-sexo-edad.py
+   aws s3 cp <archivo> s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/mapas-2026/<archivo> --content-type application/json --cache-control "public, max-age=3600"
    ```
 2. **Homónimos.** 131 casos en Antioquia y 83 en Bogotá esperan revisión
    humana (`candidato-360-data/homonimos/`). Con eso se corrige la unificación

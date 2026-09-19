@@ -49,6 +49,104 @@
     return edadPromise;
   }
 
+  /* ── El cruce SEXO × EDAD de quien vota en cada puesto ───────────────────
+     Sufragantes de la 1V de 2022 por sexo y tres grupos de edad (18-30,
+     31-50, 51+), agregados a puesto. Es lo que arma los «perfiles de votante»
+     de la página del electorado: mujer joven, hombre mayor… Lo produce
+     tools/candidato-360/perfil/construir-sexo-edad.py y vive en S3. */
+  let sexoEdadPromise = null;
+  function sexoEdad() {
+    if (!sexoEdadPromise) sexoEdadPromise = fetch(`${S3}/mapas-2026/PERFIL_SEXO_EDAD_PUESTO.json`).then(r => r.ok ? r.json() : null).catch(() => null);
+    return sexoEdadPromise;
+  }
+  /* Las seis celdas, en el orden del archivo: H 18-30 · H 31-50 · H 51+ ·
+     M 18-30 · M 31-50 · M 51+. Los nombres son los de una campaña, no los de
+     una tabla del DANE. */
+  const PERFILES = [
+    { i: 0, sexo: 'H', edad: '18-30', nombre: 'Hombres jóvenes', corto: 'hombres de 18 a 30', figura: 'joven' },
+    { i: 1, sexo: 'H', edad: '31-50', nombre: 'Hombres adultos', corto: 'hombres de 31 a 50', figura: 'adulto' },
+    { i: 2, sexo: 'H', edad: '51+',   nombre: 'Hombres mayores', corto: 'hombres de 51 o más', figura: 'mayor' },
+    { i: 3, sexo: 'M', edad: '18-30', nombre: 'Mujeres jóvenes', corto: 'mujeres de 18 a 30', figura: 'joven' },
+    { i: 4, sexo: 'M', edad: '31-50', nombre: 'Mujeres adultas', corto: 'mujeres de 31 a 50', figura: 'adulto' },
+    { i: 5, sexo: 'M', edad: '51+',   nombre: 'Mujeres mayores', corto: 'mujeres de 51 o más', figura: 'mayor' },
+  ];
+  const suma6 = (a, b) => a.map((x, i) => x + (b?.[i] || 0));
+  const shares = v => { const t = v.reduce((s, x) => s + x, 0); return t ? v.map(x => x / t) : null; };
+  /* Votos de una familia política en un puesto, leyendo el JSON mesa a mesa
+     de una corporación de 2023: v = [[índiceCandidato, votos]], cands[i] =
+     [nombre, índicePartido], partidos[j] = [nombre, votos]. */
+  /* `familia` puede ser una clave ('cd') o un Set de claves: cuando la familia
+     exacta no tiene lista en el territorio (el centro-derecha en el Concejo de
+     Bogotá 2023, donde Cambio Radical y La U quedan en el centro), se mide con
+     sus vecinas del espectro y la página lo declara. */
+  const VECINAS = { izq: ['izq', 'ci'], ci: ['ci', 'izq', 'c'], c: ['c', 'ci', 'cd'], cd: ['cd', 'c', 'd'], d: ['d', 'cd'] };
+  const setFamilia = f => f instanceof Set ? f : new Set([f]);
+  function votosFamilia(v, cands, partidos, familia) {
+    const PB = global.PartidosBloques, fam = setFamilia(familia); let propios = 0, total = 0;
+    (v || []).forEach(([ci, n]) => {
+      const nombre = partidos?.[cands?.[ci]?.[1]]?.[0]; if (!nombre) return;
+      total += n; if (fam.has(PB?.bloqueDeOrganizacion?.(nombre) || 'sc')) propios += n;
+    });
+    return { propios, total };
+  }
+  function votosFamiliaPartidos(partidos, familia) {
+    const PB = global.PartidosBloques, fam = setFamilia(familia); let propios = 0, total = 0;
+    (partidos || []).forEach(([nombre, n]) => { total += Number(n) || 0; if (fam.has(PB?.bloqueDeOrganizacion?.(nombre) || 'sc')) propios += Number(n) || 0; });
+    return { propios, total };
+  }
+  /* Cuánto rinde cada perfil para una familia: el peso del perfil donde la
+     familia saca votos, contra su peso en todo el territorio. 1,20 = «donde
+     su familia vota, ese grupo pesa un 20 % más que en el promedio». Y por
+     unidad (comuna, barrio, municipio), «dónde le pega» cada perfil:
+     concentración del perfil × fuerza relativa de la familia. */
+  function perfiles(unidades) {
+    const conDato = unidades.filter(u => u.comp && u.total > 0);
+    const compTerr = shares(conDato.reduce((acc, u) => suma6(acc, u.comp), [0, 0, 0, 0, 0, 0]));
+    const famTerr = conDato.reduce((s, u) => s + u.propios, 0) / Math.max(1, conDato.reduce((s, u) => s + u.total, 0));
+    if (!compTerr || !famTerr) return null;
+    const indice = PERFILES.map(p => {
+      let num = 0, den = 0;
+      conDato.forEach(u => { const sh = shares(u.comp); if (!sh) return; num += u.propios * sh[p.i]; den += u.propios; });
+      return den ? (num / den) / compTerr[p.i] : 1;
+    });
+    const pega = unidades.map(u => {
+      const sh = u.comp ? shares(u.comp) : null; if (!sh || !u.total) return null;
+      const fam = (u.propios / u.total) / famTerr;
+      return PERFILES.map(p => ({ conc: sh[p.i] / compTerr[p.i], fam, pega: (sh[p.i] / compTerr[p.i]) * fam, share: sh[p.i] }));
+    });
+    return { compTerr, famTerr, indice, pega };
+  }
+
+  /* ── Las ciudades con cartografía por comuna o localidad ─────────────────
+     Mismas capas que el CRM (CITY_JAL_LAYERS en candidato-360.js); el código
+     de comuna del georef coincide con las llaves de resultados-concejo-2023.
+     Medellín: la Registraduría numera los corregimientos 17-21 y el DAP 50-90. */
+  const MDE_CORR = { '17': '70', '18': '80', '19': '50', '20': '60', '21': '90' };
+  const CIUDADES = [
+    { match: ['BOGOTA'], path: 'BOG-LOCALIDADX.json', unidad: 'localidad', code: p => String(p.LocCodigo || '').padStart(2, '0'), name: p => p.LocNombre || 'Localidad', rotate: true, barrios: 'bogota', ventana: { sur: 4.23, norte: 4.845, oeste: -74.28, este: -73.975 } },
+    { match: ['MEDELLIN'], path: 'MEDELLINX.json', unidad: 'comuna', code: p => String(p.CODIGO || '').padStart(2, '0'), name: p => p.NOMBRE || p.IDENTIFICACION || 'Comuna', dataKey: c => MDE_CORR[c] || c },
+    { match: ['CALI'], path: 'CALIX.json', unidad: 'comuna', code: p => String(p.comuna || '').padStart(2, '0'), name: p => p.nombre || 'Comuna', barrios: 'cali' },
+    { match: ['PEREIRA'], path: 'PEREIRAX.json', unidad: 'comuna', code: p => String(p.Comuna || ''), name: p => p.Comuna || 'Comuna', porNombre: true },
+    { match: ['IBAGUE'], path: 'IBAGUEX.json', unidad: 'comuna', code: p => String(p.COMUNAS || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.COMUNAS || 'Comuna' },
+    { match: ['BARRANQUILLA'], path: 'BARRANQUILLAX.json', unidad: 'localidad', code: p => ({ 4: '01', 2: '02', 1: '03', 3: '04', 5: '05' })[Number(p.id)] || '', name: p => p.nombre || 'Localidad' },
+    { match: ['MONTERIA'], path: 'MONTERIAX.json', unidad: 'comuna', code: p => String(p.CC_COMUNA || '').padStart(2, '0'), name: p => p.NMG || 'Comuna' },
+    { match: ['MANIZALES'], path: 'MANIZALESX.json', unidad: 'comuna', code: p => String(p.ID_COMUNA || '').padStart(2, '0'), name: p => p.NOMBRES_CO || 'Comuna' },
+    { match: ['BUCARAMANGA'], path: 'BUCARAMANGAX.json', unidad: 'comuna', code: p => String(p.COD_COMUNA || '').padStart(2, '0'), name: p => p.NOMBRE_COM || 'Comuna' },
+    { match: ['CUCUTA'], path: 'CUCUTAX.json', unidad: 'comuna', code: p => { const n = String(p.Comuna ?? '').replace(/\D/g, ''); return (!n || n === '0' ? '6' : n).padStart(2, '0'); }, name: p => `Comuna ${Number(String(p.Comuna ?? '').replace(/\D/g, '')) || 6}` },
+    { match: ['NEIVA'], path: 'NEIVAX.json', unidad: 'comuna', code: p => String(p.comuna || '').replace(/\D/g, '').padStart(2, '0'), name: p => String(p.comuna || 'Comuna').replace(/\s+/g, ' ') },
+    { match: ['POPAYAN'], path: 'POPAYANX.json', unidad: 'comuna', code: p => String(p.COMUNAS || p.ACAD_TEXT || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.COMUNAS || 'Comuna' },
+    { match: ['SINCELEJO'], path: 'SINCELEJOX.json', unidad: 'comuna', code: p => String(p.Nombre || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.Nombre || 'Comuna' },
+    { match: ['VILLAVICENCIO'], path: 'VILLAVICENCIOX.json', unidad: 'comuna', code: p => String(p.Comuna || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.Comuna || 'Comuna' },
+  ];
+  const normTexto = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+  function ciudadDe(nombre) { const c = normTexto(nombre); return CIUDADES.find(x => x.match.some(m => c.includes(m))) || null; }
+  /* Bogotá se dibuja girada 90° a la izquierda (convención del proyecto). */
+  function rotar90(geoData) {
+    const cx = -74.08, cy = 4.65, rot = ([lon, lat]) => [cx - (lat - cy), cy + (lon - cx)];
+    const geom = g => g.type === 'Polygon' ? { ...g, coordinates: g.coordinates.map(r => r.map(rot)) } : g.type === 'MultiPolygon' ? { ...g, coordinates: g.coordinates.map(pg => pg.map(r => r.map(rot))) } : g;
+    return { ...geoData, features: geoData.features.map(f => ({ ...f, geometry: geom(f.geometry) })) };
+  }
+
   const codigoPuesto = m => `${String(m.dep || '').padStart(2, '0')}${String(m.mun || '').padStart(3, '0')}${String(m.zon || '').padStart(2, '0')}${String(m.pue || '').padStart(2, '0')}`;
   const ZONA_ESPECIAL = new Set(['90', '98']);   /* censo consolidado y cárceles: ni rural ni urbano */
 
@@ -180,5 +278,5 @@
     return codigo === undefined ? '' : String(codigo);
   }
 
-  global.C360Electorado = { perfil, ideologia, objetivo, puestos, censoEdad, codigoPuesto, municipioMayoritario, urlCandidatura, mesasDe, codigoMunicipio, ZONA_ESPECIAL };
+  global.C360Electorado = { perfil, ideologia, objetivo, puestos, censoEdad, sexoEdad, PERFILES, perfiles, VECINAS, votosFamilia, votosFamiliaPartidos, shares, suma6, CIUDADES, ciudadDe, rotar90, json, codigoPuesto, municipioMayoritario, urlCandidatura, mesasDe, codigoMunicipio, ZONA_ESPECIAL };
 })(window);
