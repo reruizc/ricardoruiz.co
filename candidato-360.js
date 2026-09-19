@@ -162,19 +162,35 @@ function textoPrecio() {
   if (p.mensual) return `$${Number(p.mensual).toLocaleString('es-CO')} COP al mes`;
   return 'Precio por confirmar';
 }
+/* Los tres planes son las «tres formas frecuentes de armarlo» del brief
+   comercial (candidato-360-brief.html#precios). El precio queda «Por definir»
+   hasta que Ricardo fije la cifra base por corporación; lo que sí decide el
+   modal es el siguiente paso: sin cuenta → registrarse (y volver acá con el
+   plan elegido); con cuenta → el pago si está configurado, o el correo. */
+const C360_PLANES_UI = [
+  { id: 'esencial', nombre: 'Esencial', desc: 'La base y el briefing en el correo. Para arrancar con el territorio claro y la meta puesta.', incluye: ['Historial mesa a mesa, recortado al territorio', 'Mapa por localidad, comuna y barrio', 'Meta de votos y electorado', 'Briefing cada 3 días en su correo'] },
+  { id: 'escucha', nombre: 'Con escucha diaria', destacado: true, desc: 'La base, el briefing y la escucha social dos veces al día en las cuatro redes. El más elegido.', incluye: ['Todo lo del Esencial', 'Escucha social · X, Instagram, TikTok y Facebook', 'Dos lecturas al día sobre sus ideas y su nombre'] },
+  { id: 'completo', nombre: 'Completo', desc: 'La campaña entera leída y planeada desde un solo lugar.', incluye: ['Todo lo de Con escucha diaria', 'Sentimiento en los comentarios', 'Endoso, estrategia y acciones de campaña', 'Arquetipos del territorio (hoy, Medellín)'] },
+];
 function abrirPaywall(motivo) {
   const modal = $('c360Paywall'); if (!modal) return;
-  const next = encodeURIComponent(`${PAGINA}?comprar=1`);
   const configurado = Boolean(SESSION.planes?.configurado && SESSION.planes?.links?.mensual);
-  const mailto = `mailto:${SESSION.soporte}?subject=${encodeURIComponent('Acceso a Candidato 360')}&body=${encodeURIComponent(`Hola Ricardo, quiero activar Candidato 360${SESSION.user?.email ? ` para la cuenta ${SESSION.user.email}` : ''}.`)}`;
-  $('c360PaywallMotivo').textContent = motivo || 'Para abrir su candidatura necesita una cuenta con acceso a Candidato 360.';
-  $('c360PaywallPrecio').textContent = textoPrecio();
-  let botones = '';
-  if (!SESSION.token) botones = `<a class="wall-btn primary" href="register.html?next=${next}">Crear cuenta</a><a class="wall-btn" href="login.html?next=${next}">Ya tengo cuenta</a>`;
-  else if (configurado) botones = `<button type="button" class="wall-btn primary" onclick="iniciarPago()">Activar por ${escHtml(textoPrecio())}</button><a class="wall-btn" href="${mailto}">Escribir a soporte</a>`;
-  else botones = `<a class="wall-btn primary" href="${mailto}">Solicitar acceso por correo</a>`;
-  $('c360PaywallBotones').innerHTML = botones;
+  const elegido = new URLSearchParams(location.search).get('plan') || (() => { try { return localStorage.getItem('c360-plan'); } catch { return ''; } })();
+  $('c360PaywallMotivo').textContent = motivo || 'El detalle por barrio y los módulos se abren con un plan activo. Elija uno y su cuenta queda vinculada a este candidato.';
+  $('c360PaywallPlanes').innerHTML = C360_PLANES_UI.map(pl => `<div class="c360-plan${pl.destacado ? ' destacado' : ''}${pl.id === elegido ? ' elegido' : ''}"><h3>${escHtml(pl.nombre)}</h3><div class="c360-plan-precio">Por definir<small> /mes</small></div><p>${escHtml(pl.desc)}</p><ul class="c360-lista">${pl.incluye.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul><button type="button" class="wall-btn primary" onclick="elegirPlan('${pl.id}')">${SESSION.token ? 'Elegir este plan' : 'Crear cuenta y elegir'}</button></div>`).join('');
+  const next = encodeURIComponent(`${PAGINA}?comprar=1${elegido ? `&plan=${elegido}` : ''}`);
+  $('c360PaywallBotones').innerHTML = SESSION.token
+    ? (configurado ? '' : `<span class="helper" style="margin:0">Mientras se define el precio, la activación se pide por correo: al elegir un plan se abre el mensaje.</span>`)
+    : `<span class="helper" style="margin:0">¿Ya tiene cuenta en ricardoruiz.co? <a href="login.html?next=${next}">Inicie sesión</a> y elija el plan desde acá.</span>`;
   modal.classList.add('open');
+}
+function elegirPlan(id) {
+  const plan = C360_PLANES_UI.find(p => p.id === id); if (!plan) return;
+  try { localStorage.setItem('c360-plan', id); } catch {}
+  if (!SESSION.token) { location.href = `register.html?next=${encodeURIComponent(`${PAGINA}?comprar=1&plan=${id}`)}`; return; }
+  if (SESSION.planes?.configurado && SESSION.planes?.links?.mensual) return iniciarPago();
+  const cuerpo = `Hola Ricardo, quiero activar Candidato 360 con el plan ${plan.nombre}${SESSION.user?.email ? ` para la cuenta ${SESSION.user.email}` : ''}${crmCandidate?.nombre ? ` (candidatura: ${crmCandidate.nombre})` : ''}.`;
+  location.href = `mailto:${SESSION.soporte}?subject=${encodeURIComponent(`Candidato 360 · plan ${plan.nombre}`)}&body=${encodeURIComponent(cuerpo)}`;
 }
 function cerrarPaywall() { $('c360Paywall')?.classList.remove('open'); }
 $('c360Paywall')?.addEventListener('click', e => { if (e.target === $('c360Paywall')) cerrarPaywall(); });
@@ -343,7 +359,7 @@ function aplicarGate() {
   aplicarGateExistente();
   aplicarGateRuta();
   aplicarGateNuevo();
-  if (new URLSearchParams(location.search).get('comprar') === '1' && SESSION.listo && !SESSION.acceso) { history.replaceState(null, '', PAGINA); abrirPaywall(SESSION.token ? 'Su cuenta ya existe. Falta activar el acceso a Candidato 360.' : ''); }
+  if (new URLSearchParams(location.search).get('comprar') === '1' && SESSION.listo && !SESSION.acceso) { abrirPaywall(SESSION.token ? 'Su cuenta ya existe. Falta elegir el plan de Candidato 360.' : ''); history.replaceState(null, '', PAGINA); }
 }
 function muro(contenedor, texto) {
   if (!contenedor) return;
@@ -1908,16 +1924,28 @@ function pintarVitrina() {
 /* El detalle (barrios o puestos) existe cuando crmBarrioLayer está en el mapa.
    Se pinta igual —así se nota cuántos barrios hay y dónde— pero borroso y sin
    tooltips; el desglose de la derecha también. */
+const VITRINA_MUESTRA = 3;
+/* Los N con más votos, para dejarlos ver en la vitrina. */
+function vitrinaTop(values, n = VITRINA_MUESTRA) {
+  return new Set(Object.entries(values).filter(([, v]) => Number(v) > 0).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, n).map(([k]) => k));
+}
 function candadoDetalle() {
   const mapEl = $('crmMap'), desglose = $('crmBreakdown'); if (!mapEl) return;
   const on = CRM_VITRINA && Boolean(crmBarrioLayer && crmLeafletMap?.hasLayer(crmBarrioLayer));
   mapEl.classList.toggle('vitrina-lock', on); desglose?.classList.toggle('vitrina-lock', on);
+  /* Se borra polígono por polígono (y fila por fila), no la capa entera: los
+     tres con más votos quedan nítidos, con su tooltip, para que se vea qué
+     hay detrás. Un mapa entero borroso no vende nada. */
+  const top = (on && crmBarrioLayer._vitrinaTop) || new Set();
+  crmBarrioLayer?.eachLayer(l => { const el = l.getElement?.(); if (el) el.classList.toggle('vitrina-blur', on && !top.has(l._vitrinaCode)); });
+  desglose?.querySelectorAll('.crm-breakdown-item').forEach(b => b.classList.toggle('vitrina-blur', on && !top.has(b.dataset.areaKey)));
   let tapa = mapEl.querySelector(':scope > .vitrina-tapa');
-  if (!on) return tapa?.remove();
+  const n = on ? crmBarrioLayer.getLayers().length : 0, ocultos = n - [...crmBarrioLayer?.getLayers() || []].filter(l => top.has(l._vitrinaCode)).length;
+  if (!on || ocultos <= 0) return tapa?.remove();
   if (!tapa) { tapa = document.createElement('div'); tapa.className = 'vitrina-tapa'; mapEl.append(tapa); }
-  const n = crmBarrioLayer.getLayers().length, esPuesto = crmBarrioLayer instanceof L.FeatureGroup && !(crmBarrioLayer instanceof L.GeoJSON);
-  const que = esPuesto ? (n === 1 ? 'puesto de votación' : 'puestos de votación') : (n === 1 ? 'barrio' : 'barrios');
-  tapa.innerHTML = `<div class="c360-wall-card"><span class="kicker">🔒 Detalle por ${esPuesto ? 'puesto' : 'barrio'}</span><p>Tenemos <b>${n.toLocaleString('es-CO')} ${que}</b> con su votación y la meta repartida. Se abren con el acceso a Candidato 360.</p><button type="button" onclick="abrirPaywall()">Activar mi candidatura</button></div>`;
+  const esPuesto = crmBarrioLayer instanceof L.FeatureGroup && !(crmBarrioLayer instanceof L.GeoJSON);
+  const que = esPuesto ? (ocultos === 1 ? 'puesto de votación' : 'puestos de votación') : (ocultos === 1 ? 'barrio' : 'barrios');
+  tapa.innerHTML = `<div class="c360-wall-card"><span class="kicker">🔒 Detalle por ${esPuesto ? 'puesto' : 'barrio'}</span><p>Le mostramos los <b>${top.size}</b> con más votos. ${ocultos === 1 ? 'Queda' : 'Quedan'} <b>${ocultos.toLocaleString('es-CO')} ${que}</b> más, con su votación y la meta repartida, que se abren con un plan activo.</p><button type="button" onclick="abrirPaywall()">Ver los planes</button></div>`;
 }
 /* Cualquier botón o enlace de un módulo abre el paywall en vitrina. Captura,
    para ganarle a los onclick y a los href de cada tarjeta. La meta (02) y el
@@ -3049,8 +3077,10 @@ function pintarBarrios(geo, values, codeOf, nameOf, nota) {
   const max = Math.max(1, ...Object.values(values));
   crmBarrioLayer = L.geoJSON(geo, {
     style: f => { const votes = values[codeOf(f)] || 0; return { fillColor: MAP_COLOR(votes / max), fillOpacity: votes ? .62 : .12, color: 'rgba(16,34,56,.55)', weight: .7 }; },
-    onEachFeature: (f, layer) => { const votes = Number(values[codeOf(f)] || 0); layer.bindTooltip(`<strong>${NOMBRE_BONITO(nameOf(f))}</strong><br>${votes.toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : 'votos'}`, { sticky: true }); layer.on('mouseover', () => layer.setStyle({ weight: 1.5, color: '#fff' })); layer.on('mouseout', () => crmBarrioLayer.resetStyle(layer)); }
-  }).addTo(crmLeafletMap);
+    onEachFeature: (f, layer) => { layer._vitrinaCode = codeOf(f); const votes = Number(values[codeOf(f)] || 0); layer.bindTooltip(`<strong>${NOMBRE_BONITO(nameOf(f))}</strong><br>${votes.toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : 'votos'}`, { sticky: true }); layer.on('mouseover', () => layer.setStyle({ weight: 1.5, color: '#fff' })); layer.on('mouseout', () => crmBarrioLayer.resetStyle(layer)); }
+  });
+  crmBarrioLayer._vitrinaTop = vitrinaTop(values);
+  crmBarrioLayer.addTo(crmLeafletMap);
   encuadrar(crmBarrioLayer, 20);
   $('crmMapNote').innerHTML = nota;
 }
@@ -3188,9 +3218,11 @@ async function pintarPuestos(mesas, donde, meta = 0, { censo = false } = {}) {
      callejero un círculo pequeño y claro se pierde. */
   crmBarrioLayer = L.featureGroup(Object.entries(points).map(([name, point]) => {
     const v = Number(values[name] || 0);
-    return L.circleMarker([point.lat, point.lng], { radius: 5 + Math.round(9 * Math.sqrt(v / max)), color: '#fff', weight: 1.2, fillColor: MAP_COLOR(v / max), fillOpacity: .92 })
-      .bindTooltip(`<strong>${escHtml(name)}</strong><br>${v.toLocaleString('es-CO')} ${proyectando ? 'votos proyectados' : censo ? 'personas habilitadas' : 'votos'}`, { sticky: true });
-  })).addTo(crmLeafletMap);
+    return Object.assign(L.circleMarker([point.lat, point.lng], { radius: 5 + Math.round(9 * Math.sqrt(v / max)), color: '#fff', weight: 1.2, fillColor: MAP_COLOR(v / max), fillOpacity: .92 })
+      .bindTooltip(`<strong>${escHtml(name)}</strong><br>${v.toLocaleString('es-CO')} ${proyectando ? 'votos proyectados' : censo ? 'personas habilitadas' : 'votos'}`, { sticky: true }), { _vitrinaCode: name });
+  }));
+  crmBarrioLayer._vitrinaTop = vitrinaTop(values);
+  crmBarrioLayer.addTo(crmLeafletMap);
   const conCoordenada = Object.keys(points).length;
   encuadrar(crmBarrioLayer, 40);
   $('crmMapNote').innerHTML = `Puestos de votación de ${escHtml(donde)}, en su coordenada y agrupados por el barrio que les asigna la Registraduría. `
