@@ -826,8 +826,8 @@ function corporacionHistorica(candidate) {
 function campaignDeptOptions() { $('campaignDepartment').innerHTML = $('department').innerHTML; $('campaignDepartment').value = ''; }
 const CORPORATION_CARDS = [
   ['jal', 'Junta Administradora Local', 'Decisiones desde la localidad.'],
-  ['concejo', 'Concejo Municipal', 'Representación local.'],
-  ['alcaldia', 'Alcaldía Municipal', 'Gestión de la ciudad.'],
+  ['concejo', 'Concejo Distrital o Municipal', 'Representación local.'],
+  ['alcaldia', 'Alcaldía Distrital o Municipal', 'Gestión de la ciudad.'],
   ['asamblea', 'Asamblea Departamental', 'Control y visión regional.'],
   ['gobernacion', 'Gobernación', 'Liderazgo para todo el territorio.']
 ];
