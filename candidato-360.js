@@ -1835,23 +1835,24 @@ let META_ACTUAL = null;
 /* Tres escenarios sobre la MISMA proyección (censo × participación), para que
    el candidato se haga una idea de la escala sin creer que la meta es un
    número exacto. La medición nuestra es «probable»; los otros dos son las dos
-   orillas de esa misma cuenta:
-   · posible   (verde)    → el piso: alguien entró con eso en 2023 (última curul
-                            de la corporación) o, en un cargo uninominal,
-                            empatar la votación ganadora. Sin margen.
-   · probable  (amarillo) → lo que costó entrar por una lista típica (o la
-                            suya), más el margen competitivo del 3 %.
-   · inminente (rojo)     → la cifra repartidora con el mismo margen: con esos
-                            votos PROPIOS la lista gana una curul aunque nadie
-                            más sume, y quien los pone va de primero. Si no hay
-                            reparto (uninominal o fuente incompleta), un 15 %
-                            por encima del probable. */
+   orillas de esa misma cuenta, de menor a mayor esfuerzo:
+   · inminente (rojo)     → lo que ya casi pasa con el trabajo mínimo: el piso
+                            (alguien entró con eso en 2023, última curul de la
+                            corporación) o, en un cargo uninominal, empatar la
+                            votación ganadora. Sin margen.
+   · probable  (amarillo) → un trabajo normal: lo que costó entrar por una lista
+                            típica (o la suya), más el margen competitivo del 3 %.
+   · posible   (verde)    → un gran trabajo: la cifra repartidora con el mismo
+                            margen. Con esos votos PROPIOS la lista gana una
+                            curul aunque nadie más sume, y quien los pone va de
+                            primero. Sin reparto (uninominal o fuente
+                            incompleta), un 15 % por encima del probable. */
 const META_ESCENARIOS = [
   { id: 'inminente', label: 'Inminente', color: '#e0533f' },
   { id: 'probable',  label: 'Probable',  color: '#f2c14e' },
   { id: 'posible',   label: 'Posible',   color: '#4ade80' },
 ];
-const META_MARGEN_INMINENTE = 0.15;
+const META_MARGEN_POSIBLE = 0.15;
 let META_ESCENARIO = (() => { try { return localStorage.getItem('c360-meta-escenario') || 'probable'; } catch { return 'probable'; } })();
 if (!META_ESCENARIOS.some(e => e.id === META_ESCENARIO)) META_ESCENARIO = 'probable';
 /* Mismo redondeo de VoteTarget: hacia arriba, al paso que corresponde. */
@@ -1860,19 +1861,19 @@ function escenariosDe(d) {
   if (!d || d.falla || !d.objetivo) return null;
   const f = (d.censo?.factor || 1) * (d.participacion?.factor || 1), R = d.referencia || {}, rep = d.reparto;
   const probable = d.objetivo;
-  /* Posible: el piso de la corporación cuando la referencia fue una lista; si
-     la referencia YA es la última curul, la misma cuenta sin margen. */
-  const basePosible = R.piso && R.piso > 0 && R.piso < R.votos ? R.piso : R.votos;
-  let posible = redondearMeta(basePosible * f);
-  let inminente = rep && rep.cifra > 0 ? redondearMeta(rep.cifra * f * (1 + d.margen)) : 0;
-  const tipoInminente = inminente ? 'cifra' : 'margen';
-  if (!inminente || inminente <= probable) inminente = redondearMeta(R.votos * f * (1 + META_MARGEN_INMINENTE));
-  if (posible > probable) posible = probable;
-  if (inminente < probable) inminente = probable;
+  /* Inminente: el piso de la corporación cuando la referencia fue una lista;
+     si la referencia YA es la última curul, la misma cuenta sin margen. */
+  const baseInminente = R.piso && R.piso > 0 && R.piso < R.votos ? R.piso : R.votos;
+  let inminente = redondearMeta(baseInminente * f);
+  let posible = rep && rep.cifra > 0 ? redondearMeta(rep.cifra * f * (1 + d.margen)) : 0;
+  const conCifra = posible > probable;
+  if (!conCifra) posible = redondearMeta(R.votos * f * (1 + META_MARGEN_POSIBLE));
+  if (inminente > probable) inminente = probable;
+  if (posible < probable) posible = probable;
   return {
-    posible:   { votos: posible,   base: basePosible, tipo: d.uninominal ? 'empate' : (basePosible === R.piso ? 'piso' : 'sin-margen') },
+    inminente: { votos: inminente, base: baseInminente, tipo: d.uninominal ? 'empate' : (baseInminente === R.piso ? 'piso' : 'sin-margen') },
     probable:  { votos: probable,  base: R.votos, tipo: 'medicion' },
-    inminente: { votos: inminente, base: tipoInminente === 'cifra' && inminente > probable ? rep.cifra : R.votos, tipo: tipoInminente === 'cifra' && inminente > probable ? 'cifra' : 'margen' },
+    posible:   { votos: posible,   base: conCifra ? rep.cifra : R.votos, tipo: conCifra ? 'cifra' : 'margen' },
   };
 }
 /* El mensaje de la tarjeta: motivación con los pies en 2023, no la fórmula
@@ -1881,13 +1882,13 @@ function mensajeMeta(esc, d) {
   const lugar = d?.territorio ? ` en ${NOMBRE_BONITO(d.territorio)}` : '';
   const corp = d?.corporacion ? corpConArticulo(d.corporacionClave, d.corporacion, 0) : 'a la corporación';
   if (d?.uninominal) {
-    return esc === 'inminente' ? `Con esta votación no hay noche larga: es ganar${lugar} con aire, sin depender de cómo se reparta el resto. Es la cifra para la que se construye un equipo, no la que se espera.`
-      : esc === 'posible' ? `Con esto empata a quien ganó${lugar} en 2023. Es el punto donde la elección se decide voto a voto: se puede, pero no hay margen para un mal día.`
-      : `Nuestra medición hoy: lo que sacó quien ganó${lugar} en 2023, puesto en 2027 con un margen encima. Cada uno de esos votos ya existió; la campaña es ir a buscarlos otra vez.`;
+    return esc === 'inminente' ? `Con esto empata a quien ganó${lugar} en 2023: es lo que se consigue con el trabajo mínimo de una campaña seria. Ya está en la pelea, pero todavía no la gana.`
+      : esc === 'posible' ? `Con esta votación no hay noche larga: es ganar${lugar} con aire, sin depender de cómo se reparta el resto. Es la cifra para la que se construye un gran equipo, y es alcanzable: con un gran trabajo.`
+      : `Nuestra medición hoy: lo que sacó quien ganó${lugar} en 2023, puesto en 2027 con un margen encima. Cada uno de esos votos ya existió; con un trabajo normal, la campaña es ir a buscarlos otra vez.`;
   }
-  return esc === 'inminente' ? `Con estos votos propios la curul es suya sin depender de la lista: usted la arrastra. Es la meta que se fija quien no quiere esperar el escrutinio con el corazón en la mano.`
-    : esc === 'posible' ? `Alguien entró ${corp}${lugar} con esta votación en 2023. Es la puerta estrecha: se pasa, pero depende de que a su lista también le vaya bien. Buen piso, mala meta.`
-    : `Nuestra medición hoy: lo que costó entrar ${corp}${lugar} en 2023, traído a 2027. Todos esos votos ya se dieron una vez; la campaña es demostrar que esta vez son para usted.`;
+  return esc === 'inminente' ? `Alguien entró ${corp}${lugar} con esta votación en 2023: es lo que casi seguro consigue con el trabajo mínimo, si su lista acompaña. Es el piso del que se arranca, no la meta con la que se llega.`
+    : esc === 'posible' ? `Con estos votos propios la curul es suya sin depender de la lista: usted la arrastra. Es lo que consigue un gran trabajo, y es lo que separa a quien entra de quien manda en la lista.`
+    : `Nuestra medición hoy: lo que costó entrar ${corp}${lugar} en 2023, traído a 2027. Todos esos votos ya se dieron una vez; con un trabajo normal, la campaña es demostrar que esta vez son para usted.`;
 }
 function pintarMeta(estimate) {
   META_ACTUAL = estimate || null;
@@ -2005,15 +2006,15 @@ function mostrarMetaInfo() {
     `<li><b>${veces(1 + d.margen)}</b> · margen competitivo: ${Math.round(d.margen * 100)} % por encima del corte. Empatar con la última curul no la gana; hay que pasarla.</li>`
   ].join('');
   const esc = escenariosDe(d), cual = esc?.[META_ESCENARIO];
-  const notaEsc = x => x.tipo === 'medicion' ? 'nuestra medición: la referencia de 2023 con el margen competitivo'
-    : x.tipo === 'piso' ? `el piso de la corporación (${fmt(x.base)} votos, la última curul de 2023) puesto en 2027, sin margen: con eso alguien entró, pero de arrastre`
-    : x.tipo === 'empate' ? `empatar la votación ganadora de 2023 (${fmt(x.base)}) puesta en 2027, sin margen`
-    : x.tipo === 'sin-margen' ? 'la misma referencia sin el margen competitivo: empatar el corte'
-    : x.tipo === 'cifra' ? `la cifra repartidora de 2023 (${fmt(x.base)} votos por curul) puesta en 2027 con el margen: con esos votos propios su lista gana una curul aunque nadie más sume, y quien los pone va de primero`
-    : `la referencia con un margen del ${Math.round(META_MARGEN_INMINENTE * 100)} % en vez del 3 %: cubre que entren más listas o suba la cifra repartidora`;
+  const notaEsc = x => x.tipo === 'medicion' ? 'un trabajo normal. Nuestra medición: la referencia de 2023 con el margen competitivo'
+    : x.tipo === 'piso' ? `el trabajo mínimo. El piso de la corporación (${fmt(x.base)} votos, la última curul de 2023) puesto en 2027, sin margen: con eso alguien entró, pero de arrastre`
+    : x.tipo === 'empate' ? `el trabajo mínimo. Empatar la votación ganadora de 2023 (${fmt(x.base)}) puesta en 2027, sin margen`
+    : x.tipo === 'sin-margen' ? 'el trabajo mínimo. La misma referencia sin el margen competitivo: empatar el corte'
+    : x.tipo === 'cifra' ? `un gran trabajo. La cifra repartidora de 2023 (${fmt(x.base)} votos por curul) puesta en 2027 con el margen: con esos votos propios su lista gana una curul aunque nadie más sume, y quien los pone va de primero`
+    : `un gran trabajo. La referencia con un margen del ${Math.round(META_MARGEN_POSIBLE * 100)} % en vez del 3 %: cubre que entren más listas o suba la cifra repartidora`;
   const escenariosHtml = !esc ? '' : `<p style="margin-bottom:8px"><b>Tres escenarios, una misma cuenta</b></p>
     <ul class="puntaje-escala meta-esc-lista">${META_ESCENARIOS.map(x => `<li${x.id === META_ESCENARIO ? ' class="vigente"' : ''}><b>${fmt(esc[x.id].votos)}</b> · <i class="meta-esc-dot" style="--esc:${x.color}"></i><b class="meta-esc-nombre">${x.label}</b>${x.id === META_ESCENARIO ? ' (el que está en la tarjeta)' : ''} · ${notaEsc(esc[x.id])}.</li>`).join('')}</ul>
-    <p class="puntaje-nota">Los tres salen de la misma proyección de censo y participación; solo cambia el punto de partida. El escenario se escoge en la tarjeta y el mapa proyectado se reparte con el que esté elegido.</p>`;
+    <p class="puntaje-nota">De menor a mayor esfuerzo: inminente es lo que ya casi pasa, probable lo que exige una campaña normal y posible lo que exige una grande. Los tres salen de la misma proyección de censo y participación; solo cambia el punto de partida. El escenario se escoge en la tarjeta y el mapa proyectado se reparte con el que esté elegido.</p>`;
   $('introModalTitle').textContent = `Su meta: ${(cual ? cual.votos : d.objetivo).toLocaleString('es-CO')} votos`;
   $('introModalText').innerHTML = `
     <p class="puntaje-nota" style="margin-top:0">${escHtml(e.formula)}</p>
