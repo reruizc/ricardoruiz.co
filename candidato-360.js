@@ -263,9 +263,41 @@ function pintarEscucha() {
     : (e.redes.validado ? `ideas y ${una ? 'cuenta validada' : 'cuentas validadas'}` : `${una ? 'cuenta' : 'cuentas'} sin validar`);
 }
 /* Interruptor del briefing (panel 03 del CRM). El estado vive en el vínculo. */
+/* El copy del panel 03 vende el briefing según a qué se lanza y con quién:
+   no es lo mismo lo que necesita saber cada tres días quien aspira a una JAL
+   con un partido de oposición que quien va por una gobernación con el aval
+   del gobierno. Cuando ya está encendido, la tarjeta vuelve a describir lo
+   que manda. */
+const BRIEFING_COPY_CORP = {
+  jal: t => `Una JAL se gana cuadra por cuadra${t ? ` en ${t}` : ''}: la obra que la alcaldía local contrató y no ha empezado, la nota de prensa que nombra su zona, el acuerdo del Concejo que le cambia la vida a sus vecinos. Ellos van a preguntarle; el briefing hace que usted ya tenga la respuesta.`,
+  concejo: t => `Un concejal se hace en el control político${t ? `, y en ${t}` : ', y'} eso empieza antes de la elección: qué contrató la alcaldía, con quién y por cuánto; qué obra se anunció y no llegó; qué norma nacional le mueve el presupuesto al municipio. Cada tres días, sin tener que buscarlo.`,
+  alcaldia: t => `Quien aspira a la alcaldía${t ? ` de ${t}` : ''} tiene que hablar de la ciudad mejor que quien la gobierna: cada contrato firmado, cada titular regional, cada decreto nacional que le cambia el juego, en su correo y listo para el discurso.`,
+  asamblea: t => `La asamblea se gana municipio por municipio${t ? ` en ${t}` : ''}: el briefing le sigue la prensa del departamento, los contratos de la gobernación y de las alcaldías, y las normas que tocan las regalías y la inversión regional. Usted llega a cada pueblo sabiendo qué pasó ahí esta semana.`,
+  gobernacion: t => `Para gobernar${t ? ` ${t}` : ' un departamento'} hay que conocerlo mejor que el gobernador saliente: qué contrató, qué titula la prensa regional y qué decide la Nación sobre el territorio. Cada tres días, para que ningún alcalde ni ningún periodista sepa algo antes que usted.`,
+};
+function copyBriefing() {
+  const c = CAMPANA_ACTUAL || SESSION.vinculo?.campana || {};
+  const corp = c.corp || crmCandidate?.corp || 'concejo';
+  const lugar = NOMBRE_BONITO(corp === 'jal' ? (c.localidad || c.municipio) : CORP_MUNICIPAL.includes(corp) ? c.municipio : c.departamentoNombre) || (META_ACTUAL?.detalle?.territorio || '');
+  const base = (BRIEFING_COPY_CORP[corp] || BRIEFING_COPY_CORP.concejo)(lugar);
+  const partido = sinPartido(c.avales) ? '' : (c.partido || crmCandidate?.partido || '');
+  const bloque = partido ? (window.PartidosBloques?.bloqueDeCandidatura?.(partido, crmCandidate?.nombre || '') || 'sc') : (c.espectro || 'sc');
+  const familia = FAMILIA_CON_ARTICULO[bloque] || FAMILIA_CON_ARTICULO.sc;
+  const con = partido ? `Con el aval de ${NOMBRE_BONITO(partido)}` : c.avales === 'firmas' ? 'Por firmas, sin la maquinaria de un partido detrás' : `Desde ${familia}`;
+  const linea = bloque === 'izq' || bloque === 'ci'
+    ? `${con}, con el gobierno nacional en la otra orilla, cada contrato y cada decreto que aterrice en su territorio es una pregunta que solo usted va a estar listo para hacer.`
+    : bloque === 'd' || bloque === 'cd'
+      ? `${con}, cercano al gobierno nacional, le va a tocar defender lo que llegue a su territorio y explicar lo que no: el briefing le da los dos lados antes que a sus rivales.`
+      : bloque === 'c'
+        ? `${con} se compite con argumentos, y el argumento es el dato: el briefing se lo pone en la mano antes de cada debate.`
+        : `${con}, la información es la ventaja que nadie le puede quitar: lo que otros se enteran por rumor, usted lo lee con fuente y fecha.`;
+  return `${base} ${linea} Se activa con un clic y el primero sale en la próxima corrida.`;
+}
 function pintarBriefing() {
   const b = SESSION.vinculo?.briefing || null, btn = $('crmBriefingBtn'), est = $('crmBriefingEstado'), sub = $('crmBriefingSub'), inp = $('crmBriefingCorreo');
   if (!btn) return;
+  const copy = $('crmBriefingCopy');
+  if (copy) copy.textContent = b && b.activo ? 'Cada tres días: la prensa que nombra a su territorio y a usted, los contratos que firmó su municipio y las normas nacionales que lo tocan.' : copyBriefing();
   if (inp && !inp.value) inp.value = b?.correo || SESSION.user?.email || '';
   const on = !!(b && b.activo);
   btn.textContent = on ? 'Apagar briefing' : 'Activar briefing'; btn.classList.toggle('on', on);
@@ -1800,19 +1832,109 @@ async function estimateVoteTarget(corp, territory) {
   return VoteTarget.estimate({ corp, territory: territory || crmCandidate?.circunscripcion || '', baseUrl: S3, partido: partidoVigente(), departamento, bloque: bloqueVigente() });
 }
 let META_ACTUAL = null;
+/* Tres escenarios sobre la MISMA proyección (censo × participación), para que
+   el candidato se haga una idea de la escala sin creer que la meta es un
+   número exacto. La medición nuestra es «probable»; los otros dos son las dos
+   orillas de esa misma cuenta:
+   · posible   (verde)    → el piso: alguien entró con eso en 2023 (última curul
+                            de la corporación) o, en un cargo uninominal,
+                            empatar la votación ganadora. Sin margen.
+   · probable  (amarillo) → lo que costó entrar por una lista típica (o la
+                            suya), más el margen competitivo del 3 %.
+   · inminente (rojo)     → la cifra repartidora con el mismo margen: con esos
+                            votos PROPIOS la lista gana una curul aunque nadie
+                            más sume, y quien los pone va de primero. Si no hay
+                            reparto (uninominal o fuente incompleta), un 15 %
+                            por encima del probable. */
+const META_ESCENARIOS = [
+  { id: 'inminente', label: 'Inminente', color: '#e0533f' },
+  { id: 'probable',  label: 'Probable',  color: '#f2c14e' },
+  { id: 'posible',   label: 'Posible',   color: '#4ade80' },
+];
+const META_MARGEN_INMINENTE = 0.15;
+let META_ESCENARIO = (() => { try { return localStorage.getItem('c360-meta-escenario') || 'probable'; } catch { return 'probable'; } })();
+if (!META_ESCENARIOS.some(e => e.id === META_ESCENARIO)) META_ESCENARIO = 'probable';
+/* Mismo redondeo de VoteTarget: hacia arriba, al paso que corresponde. */
+function redondearMeta(v) { const paso = v < 10000 ? 10 : v < 100000 ? 100 : 1000; return Math.ceil(v / paso) * paso; }
+function escenariosDe(d) {
+  if (!d || d.falla || !d.objetivo) return null;
+  const f = (d.censo?.factor || 1) * (d.participacion?.factor || 1), R = d.referencia || {}, rep = d.reparto;
+  const probable = d.objetivo;
+  /* Posible: el piso de la corporación cuando la referencia fue una lista; si
+     la referencia YA es la última curul, la misma cuenta sin margen. */
+  const basePosible = R.piso && R.piso > 0 && R.piso < R.votos ? R.piso : R.votos;
+  let posible = redondearMeta(basePosible * f);
+  let inminente = rep && rep.cifra > 0 ? redondearMeta(rep.cifra * f * (1 + d.margen)) : 0;
+  const tipoInminente = inminente ? 'cifra' : 'margen';
+  if (!inminente || inminente <= probable) inminente = redondearMeta(R.votos * f * (1 + META_MARGEN_INMINENTE));
+  if (posible > probable) posible = probable;
+  if (inminente < probable) inminente = probable;
+  return {
+    posible:   { votos: posible,   base: basePosible, tipo: d.uninominal ? 'empate' : (basePosible === R.piso ? 'piso' : 'sin-margen') },
+    probable:  { votos: probable,  base: R.votos, tipo: 'medicion' },
+    inminente: { votos: inminente, base: tipoInminente === 'cifra' && inminente > probable ? rep.cifra : R.votos, tipo: tipoInminente === 'cifra' && inminente > probable ? 'cifra' : 'margen' },
+  };
+}
+/* El mensaje de la tarjeta: motivación con los pies en 2023, no la fórmula
+   (la fórmula vive en la ⓘ). Cambia con el escenario elegido. */
+function mensajeMeta(esc, d) {
+  const lugar = d?.territorio ? ` en ${NOMBRE_BONITO(d.territorio)}` : '';
+  const corp = d?.corporacion ? corpConArticulo(d.corporacionClave, d.corporacion, 0) : 'a la corporación';
+  if (d?.uninominal) {
+    return esc === 'inminente' ? `Con esta votación no hay noche larga: es ganar${lugar} con aire, sin depender de cómo se reparta el resto. Es la cifra para la que se construye un equipo, no la que se espera.`
+      : esc === 'posible' ? `Con esto empata a quien ganó${lugar} en 2023. Es el punto donde la elección se decide voto a voto: se puede, pero no hay margen para un mal día.`
+      : `Nuestra medición hoy: lo que sacó quien ganó${lugar} en 2023, puesto en 2027 con un margen encima. Cada uno de esos votos ya existió; la campaña es ir a buscarlos otra vez.`;
+  }
+  return esc === 'inminente' ? `Con estos votos propios la curul es suya sin depender de la lista: usted la arrastra. Es la meta que se fija quien no quiere esperar el escrutinio con el corazón en la mano.`
+    : esc === 'posible' ? `Alguien entró ${corp}${lugar} con esta votación en 2023. Es la puerta estrecha: se pasa, pero depende de que a su lista también le vaya bien. Buen piso, mala meta.`
+    : `Nuestra medición hoy: lo que costó entrar ${corp}${lugar} en 2023, traído a 2027. Todos esos votos ya se dieron una vez; la campaña es demostrar que esta vez son para usted.`;
+}
 function pintarMeta(estimate) {
   META_ACTUAL = estimate || null;
-  if (estimate.target) { $('crmVoteNumber').textContent = estimate.target.toLocaleString('es-CO'); $('crmVoteTarget').textContent = `Meta inicial: ${estimate.target.toLocaleString('es-CO')} votos`; guardarMeta(estimate.target); }
-  else { $('crmVoteNumber').textContent = '—'; $('crmVoteTarget').textContent = 'Meta pendiente de referencia territorial'; }
+  const esc = escenariosDe(estimate?.detalle);
+  if (estimate.target) { pintarEscenario(); }
+  else { $('crmVoteNumber').textContent = '—'; $('crmVoteTarget').textContent = 'Meta pendiente de referencia territorial'; $('crmVoteFormula').textContent = estimate.formula; }
   /* Con la meta ya en mano, la tarjeta de firmas puede compararse con ella.
      (Este refresco estuvo colgado del if de arriba como su else: sin firmas,
      la meta se pintaba y acto seguido se borraba con «—», y el mapa
      proyectado caía al reparto del historial.) */
   if (FIRMAS_ACTUAL && $('crmFirmasCopy')) $('crmFirmasCopy').textContent = textoFirmas(FIRMAS_ACTUAL);
-  $('crmVoteFormula').textContent = estimate.formula;
+  /* Los escenarios solo tienen sentido con una meta que explicar. */
+  $('crmMetaEscenarios')?.classList.toggle('hidden', !esc);
   /* La ⓘ solo aparece cuando hay una meta que explicar: junto a un guion no
      explica nada, y el propio panel ya dice que falta la referencia. */
   document.querySelectorAll('.meta-i').forEach(b => b.classList.toggle('hidden', !(estimate.target && estimate.detalle)));
+}
+/* Pinta el escenario vigente sobre META_ACTUAL: número, título, mensaje y
+   toggles. Es lo que se repite al cambiar de escenario sin recalcular nada. */
+function pintarEscenario() {
+  const e = META_ACTUAL; if (!e?.target) return;
+  const esc = escenariosDe(e.detalle), cur = esc?.[META_ESCENARIO];
+  const votos = cur ? cur.votos : e.target;
+  $('crmVoteNumber').textContent = votos.toLocaleString('es-CO');
+  $('crmVoteTarget').textContent = `Meta ${META_ESCENARIO === 'probable' ? 'inicial' : META_ESCENARIO}: ${votos.toLocaleString('es-CO')} votos`;
+  $('crmVoteFormula').textContent = esc ? mensajeMeta(META_ESCENARIO, e.detalle) : e.formula;
+  const caja = $('crmMetaEscenarios');
+  if (caja) {
+    if (!caja.dataset.listo) {
+      caja.dataset.listo = '1';
+      caja.innerHTML = META_ESCENARIOS.map(x => `<button type="button" class="meta-esc" role="radio" aria-checked="false" data-esc="${x.id}" style="--esc:${x.color}" onclick="elegirEscenario('${x.id}')"><i></i>${x.label}<b></b></button>`).join('');
+    }
+    caja.querySelectorAll('.meta-esc').forEach(b => {
+      b.setAttribute('aria-checked', String(b.dataset.esc === META_ESCENARIO));
+      b.querySelector('b').textContent = esc ? esc[b.dataset.esc].votos.toLocaleString('es-CO') : '';
+    });
+  }
+  guardarMeta(votos);
+}
+function elegirEscenario(id) {
+  if (!META_ESCENARIOS.some(e => e.id === id) || id === META_ESCENARIO) return;
+  META_ESCENARIO = id;
+  try { localStorage.setItem('c360-meta-escenario', id); } catch {}
+  pintarEscenario();
+  if (FIRMAS_ACTUAL && $('crmFirmasCopy')) $('crmFirmasCopy').textContent = textoFirmas(FIRMAS_ACTUAL);
+  /* El mapa proyectado reparte lo que diga el número: hay que repintarlo. */
+  if (crmMapMode === 'proyectado' && typeof refreshCRMMapMode === 'function') refreshCRMMapMode();
 }
 /* Cómo se reparte la meta sobre el mapa, en una frase. Es la otra mitad de la
    pregunta «por qué proyectan esa votación»: de dónde sale el número y por qué
@@ -1880,8 +2002,20 @@ function mostrarMetaInfo() {
       : `<li><b>× 1,000</b> · participación: sin dato de censo y votantes para ese territorio la dejamos estable, sin inventar un alza.</li>`,
     `<li><b>${veces(1 + d.margen)}</b> · margen competitivo: ${Math.round(d.margen * 100)} % por encima del corte. Empatar con la última curul no la gana; hay que pasarla.</li>`
   ].join('');
-  $('introModalTitle').textContent = `Su meta: ${d.objetivo.toLocaleString('es-CO')} votos`;
+  const esc = escenariosDe(d), cual = esc?.[META_ESCENARIO];
+  const notaEsc = x => x.tipo === 'medicion' ? 'nuestra medición: la referencia de 2023 con el margen competitivo'
+    : x.tipo === 'piso' ? `el piso de la corporación (${fmt(x.base)} votos, la última curul de 2023) puesto en 2027, sin margen: con eso alguien entró, pero de arrastre`
+    : x.tipo === 'empate' ? `empatar la votación ganadora de 2023 (${fmt(x.base)}) puesta en 2027, sin margen`
+    : x.tipo === 'sin-margen' ? 'la misma referencia sin el margen competitivo: empatar el corte'
+    : x.tipo === 'cifra' ? `la cifra repartidora de 2023 (${fmt(x.base)} votos por curul) puesta en 2027 con el margen: con esos votos propios su lista gana una curul aunque nadie más sume, y quien los pone va de primero`
+    : `la referencia con un margen del ${Math.round(META_MARGEN_INMINENTE * 100)} % en vez del 3 %: cubre que entren más listas o suba la cifra repartidora`;
+  const escenariosHtml = !esc ? '' : `<p style="margin-bottom:8px"><b>Tres escenarios, una misma cuenta</b></p>
+    <ul class="puntaje-escala meta-esc-lista">${META_ESCENARIOS.map(x => `<li${x.id === META_ESCENARIO ? ' class="vigente"' : ''}><b>${fmt(esc[x.id].votos)}</b> · <i class="meta-esc-dot" style="--esc:${x.color}"></i><b class="meta-esc-nombre">${x.label}</b>${x.id === META_ESCENARIO ? ' (el que está en la tarjeta)' : ''} · ${notaEsc(esc[x.id])}.</li>`).join('')}</ul>
+    <p class="puntaje-nota">Los tres salen de la misma proyección de censo y participación; solo cambia el punto de partida. El escenario se escoge en la tarjeta y el mapa proyectado se reparte con el que esté elegido.</p>`;
+  $('introModalTitle').textContent = `Su meta: ${(cual ? cual.votos : d.objetivo).toLocaleString('es-CO')} votos`;
   $('introModalText').innerHTML = `
+    <p class="puntaje-nota" style="margin-top:0">${escHtml(e.formula)}</p>
+    ${escenariosHtml}
     <p>No es un pronóstico de cuántos votos va a sacar. Es <b>cuántos hacen falta</b>: lo que costó entrar ${escHtml(corpConArticulo(d.corporacionClave, d.corporacion))} de ${escHtml(d.territorio)} en 2023${R.tipo === 'partido' ? ` <b>por la lista de ${escHtml(P.nombre)}</b>` : ''}, puesto en 2027.${R.tipo === 'partido' ? ' No cuesta lo mismo entrar de décimo en una lista grande que arrastrar una lista pequeña.' : ''}</p>
     ${sinPartido}
     <p style="margin-bottom:8px"><b>De dónde parte</b></p>
@@ -1930,22 +2064,30 @@ function vitrinaTop(values, n = VITRINA_MUESTRA) {
   return new Set(Object.entries(values).filter(([, v]) => Number(v) > 0).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, n).map(([k]) => k));
 }
 function candadoDetalle() {
-  const mapEl = $('crmMap'), desglose = $('crmBreakdown'); if (!mapEl) return;
-  const on = CRM_VITRINA && Boolean(crmBarrioLayer && crmLeafletMap?.hasLayer(crmBarrioLayer));
+  const mapEl = $('crmMap'), desglose = $('crmBreakdown'); if (!mapEl || !crmLeafletMap) return;
+  /* Dos cosas se tapan: el DETALLE (barrios o puestos, en cualquier modo) y la
+     PROYECCIÓN del nivel de arriba (localidades, comunas o municipios en
+     «Proyectado»). El historial en «Total» es dato público y se ve entero. */
+  const detalle = Boolean(crmBarrioLayer && crmLeafletMap.hasLayer(crmBarrioLayer));
+  const proyectado = !detalle && crmMapMode === 'proyectado' && Boolean(crmMapLayer && crmLeafletMap.hasLayer(crmMapLayer));
+  const on = CRM_VITRINA && (detalle || proyectado), capa = detalle ? crmBarrioLayer : crmMapLayer;
   mapEl.classList.toggle('vitrina-lock', on); desglose?.classList.toggle('vitrina-lock', on);
-  /* Se borra polígono por polígono (y fila por fila), no la capa entera: los
-     tres con más votos quedan nítidos, con su tooltip, para que se vea qué
-     hay detrás. Un mapa entero borroso no vende nada. */
-  const top = (on && crmBarrioLayer._vitrinaTop) || new Set();
-  crmBarrioLayer?.eachLayer(l => { const el = l.getElement?.(); if (el) el.classList.toggle('vitrina-blur', on && !top.has(l._vitrinaCode)); });
-  desglose?.querySelectorAll('.crm-breakdown-item').forEach(b => b.classList.toggle('vitrina-blur', on && !top.has(b.dataset.areaKey)));
+  /* Los N con más votos salen del propio desglose, que ya viene ordenado de
+     mayor a menor: así la regla es la misma para barrios, puestos, localidades
+     y municipios. Se borra pieza por pieza, no la capa entera. */
+  const items = [...(desglose?.querySelectorAll('.crm-breakdown-item') || [])];
+  const top = new Set(items.slice(0, VITRINA_MUESTRA).map(b => b.dataset.areaKey));
+  [crmMapLayer, crmBarrioLayer].forEach(c => c?.eachLayer(l => { const el = l.getElement?.(); if (el) el.classList.toggle('vitrina-blur', on && c === capa && !top.has(l._vitrinaCode)); }));
+  items.forEach((b, i) => b.classList.toggle('vitrina-blur', on && i >= VITRINA_MUESTRA));
   let tapa = mapEl.querySelector(':scope > .vitrina-tapa');
-  const n = on ? crmBarrioLayer.getLayers().length : 0, ocultos = n - [...crmBarrioLayer?.getLayers() || []].filter(l => top.has(l._vitrinaCode)).length;
+  const ocultos = on ? capa.getLayers().filter(l => !top.has(l._vitrinaCode)).length : 0;
   if (!on || ocultos <= 0) return tapa?.remove();
   if (!tapa) { tapa = document.createElement('div'); tapa.className = 'vitrina-tapa'; mapEl.append(tapa); }
-  const esPuesto = crmBarrioLayer instanceof L.FeatureGroup && !(crmBarrioLayer instanceof L.GeoJSON);
-  const que = esPuesto ? (ocultos === 1 ? 'puesto de votación' : 'puestos de votación') : (ocultos === 1 ? 'barrio' : 'barrios');
-  tapa.innerHTML = `<div class="c360-wall-card"><span class="kicker">🔒 Detalle por ${esPuesto ? 'puesto' : 'barrio'}</span><p>Le mostramos los <b>${top.size}</b> con más votos. ${ocultos === 1 ? 'Queda' : 'Quedan'} <b>${ocultos.toLocaleString('es-CO')} ${que}</b> más, con su votación y la meta repartida, que se abren con un plan activo.</p><button type="button" onclick="abrirPaywall()">Ver los planes</button></div>`;
+  const esPuesto = detalle && crmBarrioLayer instanceof L.FeatureGroup && !(crmBarrioLayer instanceof L.GeoJSON);
+  const unidad = detalle ? (esPuesto ? 'puesto de votación' : 'barrio') : (crmMapState?.geometriaDestino || SALTO_ACTUAL?.tipo?.unidad === 'municipio' ? 'municipio' : (crmMapState?.config?.title || 'localidad'));
+  const plural = { 'puesto de votación': 'puestos de votación', barrio: 'barrios', municipio: 'municipios', localidad: 'localidades', comuna: 'comunas' }[unidad] || unidad + 's';
+  const que = ocultos === 1 ? unidad : plural;
+  tapa.innerHTML = `<div class="c360-wall-card"><span class="kicker">🔒 ${detalle ? 'Detalle' : 'Meta proyectada'} por ${escHtml(unidad)}</span><p>Le mostramos ${top.size === 1 ? 'el' : 'los'} <b>${top.size}</b> con más ${detalle ? 'votos' : 'meta'}. ${ocultos === 1 ? 'Queda' : 'Quedan'} <b>${ocultos.toLocaleString('es-CO')} ${escHtml(que)}</b> más, con ${detalle ? 'su votación y la meta repartida' : 'la meta repartida'}, que se abren con un plan activo.</p><button type="button" onclick="abrirPaywall()">Ver los planes</button></div>`;
 }
 /* Cualquier botón o enlace de un módulo abre el paywall en vitrina. Captura,
    para ganarle a los onclick y a los href de cada tarjeta. La meta (02) y el
@@ -2487,7 +2629,7 @@ async function pintarProyeccionDepartamental(goal) {
     crearMapa([4.6, -74.1], 5); aplicarBasemap(false);
     crmMapLayer = L.geoJSON(geoData, {
       style: f => { const k = normalizedText(nameOf(f)), v = reparto[k] || 0; return { color: '#fff', weight: origen.includes(k) ? 2 : 1, fillColor: MAP_COLOR(v / max), fillOpacity: origen.includes(k) ? .9 : .78 }; },
-      onEachFeature: (f, layer) => { const k = normalizedText(nameOf(f)); layer.bindTooltip(`<strong>${NOMBRE_BONITO(nameOf(f))}</strong><br>${(reparto[k] || 0).toLocaleString('es-CO')} votos proyectados`, { sticky: true }); }
+      onEachFeature: (f, layer) => { const k = normalizedText(nameOf(f)); layer._vitrinaCode = k; layer.bindTooltip(`<strong>${NOMBRE_BONITO(nameOf(f))}</strong><br>${(reparto[k] || 0).toLocaleString('es-CO')} votos proyectados`, { sticky: true }); }
     }).addTo(crmLeafletMap);
     encuadrar(crmMapLayer, 24);
     renderMapBreakdown(reparto, nombres, `Meta proyectada por municipio`);
@@ -2654,6 +2796,7 @@ function projectedVotesByArea() {
 function renderMapBreakdown(votesByArea, namesByArea, title) {
   const rows = Object.entries(votesByArea).map(([key, value]) => ({ key, name: namesByArea[key] || key, value: Number(value) || 0 })).filter(row => row.value > 0).sort((a, b) => b.value - a.value), max = Math.max(1, ...rows.map(row => row.value));
   $('crmBreakdown').innerHTML = `<h4 id="crmBreakdownTitle">${title}</h4>` + (rows.length ? rows.map(row => `<button class="crm-breakdown-item" type="button" data-area-key="${escHtml(row.key)}" onclick="openMapAreaFromBreakdown(this.dataset.areaKey)"><span class="crm-breakdown-row"><b>${escHtml(NOMBRE_BONITO(row.name))}</b><span>${row.value.toLocaleString('es-CO')}</span></span><span class="crm-breakdown-bar"><i style="width:${Math.max(3, Math.round(row.value / max * 100))}%"></i></span></button>`).join('') : '<p class="helper">No hay votos desagregados disponibles.</p>');
+  setTimeout(candadoDetalle, 0);
 }
 /* TOTAL / PROYECTADO: solo cuando la candidatura tiene UNA elección; con varias
    mandan los toggles por año (que también traen PROYECTADO). */
@@ -2815,7 +2958,7 @@ async function renderGenericMap(candidate) {
   const max = Math.max(1, ...Object.values(votesByArea));
   renderMapBreakdown(votesByArea, namesByArea, breakdownTitle);
   crearMapa([4.6, -74.1], 5); aplicarBasemap(false);
-  crmMapLayer = L.geoJSON(geoData, { style: f => ({ color: '#fff', weight: 1, fillColor: MAP_COLOR((votesByArea[featureCode(f.properties)] || 0) / max), fillOpacity: .94 }), onEachFeature: (f, layer) => layer.bindTooltip(`<strong>${NOMBRE_BONITO(featureName(f.properties))}</strong><br>${(votesByArea[featureCode(f.properties)] || 0).toLocaleString('es-CO')} votos`, { sticky: true }) }).addTo(crmLeafletMap);
+  crmMapLayer = L.geoJSON(geoData, { style: f => ({ color: '#fff', weight: 1, fillColor: MAP_COLOR((votesByArea[featureCode(f.properties)] || 0) / max), fillOpacity: .94 }), onEachFeature: (f, layer) => { layer._vitrinaCode = featureCode(f.properties); layer.bindTooltip(`<strong>${NOMBRE_BONITO(featureName(f.properties))}</strong><br>${(votesByArea[featureCode(f.properties)] || 0).toLocaleString('es-CO')} votos`, { sticky: true }); } }).addTo(crmLeafletMap);
   encuadrar(crmMapLayer, 15);
   $('crmMapVotes').textContent = `${total.toLocaleString('es-CO')} votos`; $('crmMapNote').textContent = detailNote + notaRecorte() + notaColorPartido();
 }
@@ -2886,7 +3029,7 @@ function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea,
   let targetLayer = null;
   crmMapLayer = L.geoJSON(geoData, {
     style: f => { const key = config.code(f.properties); return { color: '#fff', weight: key === targetKey ? 2 : 1, fillColor: MAP_COLOR((votesByArea[key] || 0) / max), fillOpacity: key === targetKey ? .78 : .42 }; },
-    onEachFeature: (f, layer) => { if (config.code(f.properties) === targetKey) targetLayer = layer; layer.on('click', () => showCRMMapDetail(layer)); }
+    onEachFeature: (f, layer) => { layer._vitrinaCode = config.code(f.properties); if (config.code(f.properties) === targetKey) targetLayer = layer; layer.on('click', () => showCRMMapDetail(layer)); }
   }).addTo(crmLeafletMap);
   refreshCRMMapMode();
   encuadrarBounds(fitTarget && targetLayer ? targetLayer.getBounds() : encuadre || boundsDeVotos(crmMapLayer, config, votesByArea, fueraDelEncuadre), 24);
