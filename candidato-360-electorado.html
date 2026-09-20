@@ -175,7 +175,7 @@
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
 <script src="partidos-bloques.js?v=20260922"></script>
-<script src="candidato-360-electorado.js?v=20260919c"></script>
+<script src="candidato-360-electorado.js?v=20260920"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <script>
 (async function () {
@@ -316,7 +316,7 @@
 
 
   /* ═══ Los tres paneles ═══════════════════════════════════════════════════ */
-  const ST = { perfil: null, famLabel: '', famSet: null, ampliada: false, modo: '', unidades: [], ref: null, cfg: null, geo: null, dep: '', mun3: '', familia: '', lugar: '', nivel: 'unidades', unidadAbierta: null, capa: null, tiles: null, mapa: null, barrios: null };
+  const ST = { perfil: null, famLabel: '', famSet: null, ampliada: false, modo: '', unidades: [], ref: null, cfg: null, geo: null, dep: '', mun3: '', familia: '', lugar: '', nivel: 'unidades', unidadAbierta: null, capa: null, tiles: null, mapa: null, barrios: null, barriosTodos: null };
   function compDe(se, codes) { return codes.reduce((acc, c) => se.puestos[c] ? E.suma6(acc, se.puestos[c]) : acc, [0, 0, 0, 0, 0, 0]); }
   /* Concentración del perfil × fuerza de la familia, contra la referencia
      del territorio entero (la ciudad o el departamento), también a escala de
@@ -390,7 +390,7 @@
     const unidades = enBarrios ? ST.barrios.unidades : ST.unidades, ref = ST.ref, geo = enBarrios ? ST.barrios.geo : ST.geo;
     const porCodigo = new Map(unidades.map((u, j) => [u.geoCode || u.code, { u, x: enBarrios ? pegaDe(u, ref, k) : ref.pega[j]?.[k] }]));
     if (geo) {
-      if (enBarrios) ST.tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa);
+      if (enBarrios && !ST.cfg?.rotate) ST.tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa);
       const cfg = enBarrios ? ST.barrios.cfg : ST.cfg;
       ST.capa = L.geoJSON(geo, {
         style: f => { const o = porCodigo.get(cfg.code(f.properties)); const pega = o?.x?.pega; return { color: '#fff', weight: 1, fillColor: colorPega(pega, base), fillOpacity: opacPega(pega), className: pega >= PEGA_FUERTE ? 'pega-on' : '' }; },
@@ -428,18 +428,23 @@
     }, 0);
     $('mapaLeyenda').innerHTML = `<span><i style="background:${base};opacity:.88"></i>le pega fuerte (≥ ${veces(PEGA_FUERTE)}) · parpadea</span><span><i style="background:${base};opacity:.42"></i>le pega (1,00-1,15)</span><span><i style="background:#cdd8d0"></i>parejo</span><span><i style="background:#e6ebe6"></i>flojo (&lt; 0,85)</span>`;
     pintarBarra();
-    const unidadTxt = enBarrios ? `barrios de ${P.lugar(ST.unidadAbierta.name)}` : sinArticulo(unidadPlural());
-    $('tpMapaTitulo').textContent = `${p.nombre}: dónde le pegan, por ${unidadTxt}.`;
-    $('mapaNota').innerHTML = `Cada ${esc(enBarrios ? 'barrio' : unidadSingular())} se colorea por <b>le pega</b> = (peso de ${esc(p.corto)} entre quienes votan ahí ÷ su peso en ${esc(ST.lugar)}) × (voto de ${esc(ST.famLabel.toLowerCase())} en 2023 ahí ÷ su promedio en ${esc(ST.lugar)}). Quién vota: sufragantes de la primera vuelta de 2022 por sexo y edad, agregados por puesto (Registraduría). Voto por familia: ${ST.modo === 'municipio' ? 'Asamblea 2023' : ST.modo === 'puesto' ? 'Asamblea 2023, puesto por puesto' : 'Concejo 2023'}, con cada partido en su familia.${ST.cfg?.barrios && !enBarrios ? ` <b>Haga clic en una ${esc(unidadSingular())}</b> para bajar a sus barrios.` : ''}${ST.modo === 'puesto' ? ' Este municipio no tiene cartografía por comuna, así que el mapa muestra los puestos de votación.' : ''}`;
+    const unidadTxt = enBarrios ? `barrios de ${P.lugar(ST.unidadAbierta ? ST.unidadAbierta.name : ST.lugar)}` : sinArticulo(unidadPlural());
+    $('tpMapaTitulo').textContent = `${p.nombre}: dónde le pegan, por ${unidadTxt}`.replace(/\.?$/, '.');
+    $('mapaNota').innerHTML = `Cada ${esc(enBarrios ? 'barrio' : unidadSingular())} se colorea por <b>le pega</b> = (peso de ${esc(p.corto)} entre quienes votan ahí ÷ su peso en ${esc(ST.lugar)}) × (voto de ${esc(ST.famLabel.toLowerCase())} en 2023 ahí ÷ su promedio en ${esc(ST.lugar)}). Quién vota: sufragantes de la primera vuelta de 2022 por sexo y edad, agregados por puesto (Registraduría). Voto por familia: ${ST.modo === 'municipio' ? 'Asamblea 2023' : ST.modo === 'puesto' ? 'Asamblea 2023, puesto por puesto' : 'Concejo 2023'}, con cada partido en su familia.${ST.cfg?.barrios && !enBarrios ? ` <b>Haga clic en una ${esc(unidadSingular())}</b> para bajar a sus barrios.` : ''}${enBarrios && !ST.unidadAbierta && ST.barrios?.faltan ? ` ${ST.barrios.faltan} ${ST.barrios.faltan === 1 ? esc(unidadSingular()) + ' no tiene' : esc(sinArticulo(unidadPlural())) + ' no tienen'} cartografía por barrio y ${ST.barrios.faltan === 1 ? 'queda' : 'quedan'} fuera del mapa.` : ''}${enBarrios && ST.unidadAbierta ? ' <b>Vuelva a «Barrios»</b> para ver la ciudad entera.' : ''}${ST.modo === 'puesto' ? ' Este municipio no tiene cartografía por comuna, así que el mapa muestra los puestos de votación.' : ''}`;
   }
   function pintarBarra() {
     const b = $('mapaBarra'), enBarrios = ST.nivel === 'barrios';
+    /* «Barrios» es la ciudad entera, aunque se venga del drill de una
+       localidad: si abriera solo la última visitada, no habría forma de ver
+       Bogotá completa barrio por barrio. Para volver a una está el mapa. */
+    const enUna = enBarrios && ST.unidadAbierta;
     b.innerHTML = `<button type="button" class="mapa-toggle ${enBarrios ? '' : 'active'}" data-nivel="unidades">${esc(sinArticulo(unidadPlural()))}</button>
-      <button type="button" class="mapa-toggle ${enBarrios ? 'active' : ''}" data-nivel="barrios" ${ST.cfg?.barrios ? '' : 'disabled'} title="${ST.cfg?.barrios ? 'Haga clic en una ' + unidadSingular() + ' del mapa' : 'Barrios: solo Bogotá y Cali'}">Barrios${ST.unidadAbierta ? ` · ${esc(P.lugar(ST.unidadAbierta.name))}` : ''}</button>
-      ${enBarrios ? `<button type="button" class="volver" data-nivel="unidades">← volver a ${esc(ST.lugar)}</button>` : ''}`;
-    b.querySelectorAll('[data-nivel]').forEach(x => x.addEventListener('click', () => {
-      if (x.dataset.nivel === 'barrios') { if (ST.barrios) { ST.nivel = 'barrios'; pintarMapa(); } return; }
-      ST.nivel = 'unidades'; pintarMapa();
+      <button type="button" class="mapa-toggle ${enBarrios && !enUna ? 'active' : ''}" data-nivel="barrios" ${ST.cfg?.barrios ? '' : 'disabled'} title="${ST.cfg?.barrios ? 'Todos los barrios de ' + ST.lugar : 'Barrios: solo Bogotá y Cali'}">Barrios</button>
+      ${enUna ? `<span class="mapa-toggle active">Barrios · ${esc(P.lugar(ST.unidadAbierta.name))}</span>` : ''}
+      ${enBarrios ? `<button type="button" class="volver" data-nivel="unidades">← volver a ${esc(sinArticulo(unidadPlural()))}</button>` : ''}`;
+    b.querySelectorAll('button[data-nivel]').forEach(x => x.addEventListener('click', () => {
+      if (x.dataset.nivel === 'barrios') return abrirBarrios(null);
+      ST.nivel = 'unidades'; ST.unidadAbierta = null; pintarMapa();
     }));
   }
   /* ── Barrios (Bogotá y Cali) ─────────────────────────────────────────── */
@@ -448,35 +453,69 @@
     if (!scriptCache.has(src)) scriptCache.set(src, new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => no(new Error(src)); document.head.appendChild(s); }));
     return scriptCache.get(src);
   }
+  /* El botón «Barrios» muestra la CIUDAD ENTERA; el clic en una localidad o
+     comuna del mapa baja a la suya. Son dos lecturas distintas y las dos
+     hacen falta: la primera responde «dónde le pega en Bogotá, barrio por
+     barrio» y la segunda sirve para recorrer un territorio concreto.
+     La cartografía barrial viene partida por localidad (19 archivos en
+     `candidato-360-data/bogota-barrios/`), así que la ciudad entera se arma
+     uniendo esas partes, no bajando los 6,5 MB del catastral de S3. */
+  async function barriosDe(lista) {
+    const ciudad = ST.cfg.barrios, se = await E.sexoEdad();
+    await cargarScript(`candidato-360-data/${ciudad}-puesto-barrio.js`);
+    const dic = (ciudad === 'bogota' ? window.Candidato360BogotaPuestoBarrio : window.Candidato360CaliPuestoBarrio) || {};
+    const cfg = ciudad === 'bogota'
+      ? { code: p => String(p.codigo || ''), name: p => p.nombre || 'Barrio' }
+      : { code: p => String(p.barrio || ''), name: p => p.barrio || 'Barrio' };
+    const barrioDe = ciudad === 'bogota'
+      ? pu => dic[pu.code] || ''
+      : pu => dic[ST.dep + ST.mun3 + pu.code.replace('-', '')]?.barrio || '';
+
+    /* Una localidad sin cartografía o sin datos no puede tumbar el mapa de la
+       ciudad: se cuenta aparte y el resto se pinta. Sumapaz, por ejemplo, no
+       tiene archivo de barrios. */
+    const partes = await Promise.all(lista.map(async u => {
+      const [d] = await Promise.all([
+        E.json(`${S3}/concejo-2023/comuna/${ST.dep}-${ST.mun3}-${u.code}.json`).catch(() => null),
+        cargarScript(`candidato-360-data/${ciudad}-barrios/${u.code}.js`).catch(() => null),
+      ]);
+      const reg = ciudad === 'bogota' ? window.Candidato360BogotaBarrios : window.Candidato360CaliBarrios;
+      return { u, d, geo: reg?.[u.code] || null };
+    }));
+    const buenas = partes.filter(x => x.geo && x.d);
+    if (!buenas.length) throw new Error('sin cartografía');
+
+    /* Bogotá se mira rotada 90° a la izquierda en todo el producto: la ciudad
+       es alta y angosta y la caja del mapa es apaisada, así que sin rotar cabe
+       por el alto y queda diminuta. Los barrios tienen que ir en la misma
+       orientación que las localidades o cambiar de nivel desorienta. */
+    const crudo = { type: 'FeatureCollection', features: buenas.flatMap(x => x.geo.features || []) };
+    const geo = ST.cfg.rotate ? E.rotar90(crudo) : crudo;
+    const nombres = new Map(geo.features.map(f => [cfg.code(f.properties), cfg.name(f.properties)]));
+    const porBarrio = new Map();
+    buenas.forEach(({ d }) => (d.puestos || []).forEach(pu => {
+      const b = barrioDe(pu); if (!b) return;
+      const code9 = ST.dep + ST.mun3 + pu.code.replace('-', ''), f = E.votosFamilia(pu.v, d.cands, d.partidos, ST.famSet);
+      const acc = porBarrio.get(b) || { code: b, geoCode: b, name: nombres.get(b) || b, propios: 0, total: 0, comp: [0, 0, 0, 0, 0, 0], puestos: 0 };
+      acc.propios += f.propios; acc.total += f.total; acc.comp = E.suma6(acc.comp, se?.puestos?.[code9]); acc.puestos++;
+      porBarrio.set(b, acc);
+    }));
+    return { geo, cfg, unidades: [...porBarrio.values()], faltan: partes.length - buenas.length };
+  }
+
+  /* `u` = una unidad para bajar a sus barrios; sin `u`, la ciudad entera. */
   async function abrirBarrios(u) {
-    const ciudad = ST.cfg.barrios, code = u.code;
-    $('mapaNota').textContent = `Bajando a los barrios de ${P.lugar(u.name)}…`;
+    const donde = u ? P.lugar(u.name) : ST.lugar;
+    if (!u && ST.barriosTodos) { ST.barrios = ST.barriosTodos; ST.unidadAbierta = null; ST.nivel = 'barrios'; return pintarMapa(); }
+    $('mapaNota').textContent = u ? `Bajando a los barrios de ${donde}…`
+      : `Cargando los barrios de ${donde}: son ${ST.unidades.length} ${sinArticulo(unidadPlural())}, puede tardar un momento…`;
     try {
-      const [d, se] = await Promise.all([E.json(`${S3}/concejo-2023/comuna/${ST.dep}-${ST.mun3}-${code}.json`), E.sexoEdad()]);
-      let geo, cfg, barrioDe;
-      if (ciudad === 'bogota') {
-        await Promise.all([cargarScript('candidato-360-data/bogota-puesto-barrio.js'), cargarScript(`candidato-360-data/bogota-barrios/${code}.js`)]);
-        geo = window.Candidato360BogotaBarrios?.[code]; const dic = window.Candidato360BogotaPuestoBarrio || {};
-        cfg = { code: p => String(p.codigo || ''), name: p => p.nombre || 'Barrio' }; barrioDe = pu => dic[pu.code] || '';
-      } else {
-        await Promise.all([cargarScript('candidato-360-data/cali-puesto-barrio.js'), cargarScript(`candidato-360-data/cali-barrios/${code}.js`)]);
-        geo = window.Candidato360CaliBarrios?.[code]; const dic = window.Candidato360CaliPuestoBarrio || {};
-        cfg = { code: p => String(p.barrio || ''), name: p => p.barrio || 'Barrio' }; barrioDe = pu => dic[ST.dep + ST.mun3 + pu.code.replace('-', '')]?.barrio || '';
-      }
-      if (!geo) throw new Error('sin cartografía');
-      const nombreDe = b => { const f = geo.features.find(x => cfg.code(x.properties) === b); return f ? cfg.name(f.properties) : b; };
-      const porBarrio = new Map();
-      (d.puestos || []).forEach(pu => {
-        const b = barrioDe(pu); if (!b) return;
-        const code9 = ST.dep + ST.mun3 + pu.code.replace('-', ''), f = E.votosFamilia(pu.v, d.cands, d.partidos, ST.famSet);
-        const acc = porBarrio.get(b) || { code: b, geoCode: b, name: nombreDe(b), propios: 0, total: 0, comp: [0, 0, 0, 0, 0, 0], puestos: 0 };
-        acc.propios += f.propios; acc.total += f.total; acc.comp = E.suma6(acc.comp, se?.puestos?.[code9]); acc.puestos++;
-        porBarrio.set(b, acc);
-      });
-      ST.barrios = { geo, cfg, unidades: [...porBarrio.values()] }; ST.unidadAbierta = u; ST.nivel = 'barrios';
+      const r = await barriosDe(u ? [u] : ST.unidades);
+      if (!u) ST.barriosTodos = r;
+      ST.barrios = r; ST.unidadAbierta = u || null; ST.nivel = 'barrios';
       pintarMapa();
     } catch (e) {
-      $('mapaNota').textContent = `No se pudo bajar a los barrios de ${P.lugar(u.name)}: ${e.message}.`;
+      $('mapaNota').textContent = `No se pudieron cargar los barrios de ${donde}: ${e.message}.`;
     }
   }
 
@@ -490,7 +529,7 @@
     const [lugares, se] = await Promise.all([E.puestos(), E.sexoEdad()]);
     if (!se) return aviso('El cruce de sexo y edad por puesto no respondió. Vuelva a intentarlo en un momento.');
     const puestosDe = pred => Object.keys(lugares).filter(pred);
-    ST.familia = familia; ST.dep = dep; ST.cfg = null; ST.geo = null; ST.barrios = null; ST.unidadAbierta = null; ST.nivel = 'unidades';
+    ST.familia = familia; ST.dep = dep; ST.cfg = null; ST.geo = null; ST.barrios = null; ST.barriosTodos = null; ST.unidadAbierta = null; ST.nivel = 'unidades';
     ST.famSet = new Set([familia]); ST.famLabel = LABEL[familia]; ST.ampliada = false;
     const armarUnidades = async () => {
     if (corpDep) {
