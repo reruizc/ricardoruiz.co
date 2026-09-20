@@ -147,19 +147,17 @@ en S3. `verificar_listas_2023.py` es la prueba de aceptación: cuadra cada lista
 con sus candidatos y exige que el reparto de Bogotá dé la composición real del
 cabildo 2024-2027. Si no pasa, el script no sube nada.
 
-Los generadores ya se corrieron una vez sobre los CSV de S3 y el resultado está
-verificado: en todo el país hay **888 listas cerradas en concejo, 591 en JAL y
-48 en asamblea**, y el reparto de Bogotá reproduce el cabildo real. De ahí salió
-`candidato-360-data/listas-2023.json` (336 KB), que es el mismo voto de lista
-sin los candidatos y que `vote-target.js` lee mientras los índices de S3 no lo
-traigan. En cuanto el índice traiga `listas`, manda el índice y ese archivo
-sobra.
+**Hecho.** Los índices de S3 ya traen `listas`, subidos por el workflow el
+2026-09-20. En todo el país hay **888 listas cerradas en concejo, 591 en JAL y
+48 en asamblea**, el reparto de Bogotá reproduce el cabildo real y la
+participación quedó corregida (Bogotá 2023: 51,6 % donde antes decía 38,9 %).
 
-Lo que falta subir a S3 son los índices y los agregados: los agregados corrigen
-además la participación, que hoy sale baja porque los válidos no contaban el
-voto de lista (Bogotá 2023: 38,9 % en S3 contra 51,6 % ya corregido), y hacen
-que los totales por partido incluyan el voto solo-lista, como en las cifras
-publicadas.
+`vote-target.js` conserva el respaldo de leer el voto de lista de un archivo
+aparte (`LISTAS_2023_URL`) por si alguna vez se sirve un índice viejo, pero ya
+no hay archivo que leer: `candidato-360-data/listas-2023.json` se borró cuando
+dejó de hacer falta.
+
+Para volver a hacerlo (otra elección, o una corrección), el camino está montado:
 
 La subida necesita credenciales de escritura en el bucket, que el entorno de
 trabajo remoto no tiene: ahí las variables `AWS_*` están tomadas por el proxy de
