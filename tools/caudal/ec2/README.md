@@ -117,6 +117,73 @@ encendida sin nada**: sin repo, sin crontab, carga 0.00 (~USD 9 gastados,
 llave SSH y gestionada por SSM** (perfil `CaudalRunner`), así que se opera con
 `aws ssm send-command`, no con `ssh`. O se usa para la Fase 1, o se apaga.
 
+## Fase 1 · la partición NO es «lo que no tiene WAF»
+
+⚠️⚠️ **El plan decía «mover las etapas sin WAF» y eso no se puede hacer así.** Las
+etapas no son independientes: **comparten carpetas de estado en disco**, y una
+familia partida en dos máquinas trabaja con datos a medias. Medido script por
+script (20-sep-2026):
+
+| etapas | grupo · estado compartido | WAF dentro |
+|---|---|---|
+| 19 | legislativo · `actas/` `diario/` `diario-camara/` `gacetas/` `en-vivo/` | **senado_radicados** |
+| 11 | regulatorio · `supers/` | **banrep_fetch** |
+| 6 | sucop · `sucop/` (temas_* también lee de ahí) | — |
+| 3 | secop · `secop/` | — |
+| 3 | ejecutivo · sin estado | — |
+| 1 | `red_lista` · sin estado | — |
+
+Los dos hosts con WAF caen en **grupos distintos**, y los dos son grandes. Casos
+concretos de por qué no se puede partir dentro de un grupo:
+
+- `supers_consolida` junta las 12 fuentes del pilar Regulatorio desde `supers/`.
+  Si `banrep_fetch` cosecha en el Mac y el consolidado corre en la EC2, **el
+  consolidado no ve lo del BanRep**: sale incompleto y `supers_verifica` lo tumba.
+- `dataset_build` y `texto_index` leen `diario/` (Senado) **y** `diario-camara/`
+  (Cámara) del disco. Partir Senado y Cámara obliga a sincronizar en cada corrida.
+- `senado_radicados` también escribe en `actas/`, que es de donde comen
+  `ordenes_*`, `bloqueo_*` y `citaciones_*`.
+
+### La partición que sí funciona
+
+**El BanRep se muda con su grupo.** La Fase 0 lo respalda: desde la EC2 dio 5/6
+con cero captchas, mejor que el Mac. Queda:
+
+```
+Mac   19 etapas   todo lo legislativo (se queda el WAF del Senado)
+      CAUDAL_ETAPAS="red_lista,senado_*,camara_*,ordenes_*,bloqueo_*,citaciones_*,dataset_*,texto_index,en_vivo,ritmo"
+
+EC2   24 etapas   regulatorio + sucop + secop + ejecutivo
+      CAUDAL_ETAPAS="red_lista,banrep_fetch,anla_*,dian_*,uiaf_*,supersociedades_*,supers_*,sucop_*,temas_*,secop_*,ejecutivo_*"
+      CAUDAL_PUBLICA=no
+```
+
+**Estado a sincronizar: ~1 GB** (`supers/` 824 MB + `sucop/` + `secop/`), no los
+14 GB del árbol completo. Eso cabe de sobra en los 21 GB libres de la instancia.
+
+### Quién publica el latido
+
+**Solo el Mac** (`CAUDAL_PUBLICA=si`, que es el default). No es arbitrario:
+`check.py` no juzga únicamente las etapas que corrieron ahí, también mide la
+**frescura de los 31 archivos de S3**, incluidos los que sube la EC2. Así que el
+latido del Mac vigila el producto entero: si la EC2 deja de subir
+`sanciones.jsonl` o `sucop.jsonl`, esos archivos envejecen y el Mac lo reporta.
+**Cero cambios en el worker `rr-auth`.** La EC2 escribe igual su `estado.json`
+local, que es lo que se mira al depurarla.
+
+### El mecanismo
+
+`run_diario.sh` acepta `CAUDAL_ETAPAS` (lista con comodines; `!` excluye) y
+`CAUDAL_PUBLICA`. Sin ellas corre todo y publica, que es como corre el Mac hoy.
+Pruebas: `bash tools/caudal/ec2/prueba-selector-etapas.sh` — verifican que la
+partición **cubre todas las etapas, que ninguna queda sin dueño y que ninguna
+corre en las dos** (salvo `red_lista`, que sí debe correr en ambas).
+
+⚠️ Cazado por esas pruebas: `for pat in $CAUDAL_ETAPAS` sin comillas hace
+**expansión de rutas** además de word splitting, y como `run_diario.sh` hace
+`cd $REPO`, un patrón como `*` se expandía contra los archivos del repo. De ahí
+el `set -f` dentro de `_le_toca`.
+
 ## Lo que hago yo después (con el DNS)
 
 1. **Estado y secretos.** `tools/caudal/ec2/sync-estado.sh ec2-user@DNS` (~8 GB,

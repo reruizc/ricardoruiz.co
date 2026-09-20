@@ -117,7 +117,72 @@ tam=$(stat -f%z "$LOG" 2>/dev/null || stat -c%s "$LOG" 2>/dev/null || echo 0)   
 : > "$REG"
 INICIO=$(date -u +%Y-%m-%dT%H:%M:%SZ)       # para saber si estado.json es de esta corrida
 DEADLINE=$(( $(date +%s) + TOPE_HORAS * 3600 ))
-etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$DEADLINE" "$@"; }
+# ── qué etapas corre ESTA máquina ───────────────────────────────────────────
+# Fase 1 de la migración (20-sep-2026): el pipeline vive en dos sitios. La EC2
+# corre las 58 etapas sin WAF y el Mac se queda con las 2 que sí lo tienen
+# (senado_radicados y banrep_fetch, medido en la Fase 0 del piloto).
+#
+#   CAUDAL_ETAPAS=""                → todas (lo de siempre; es el default)
+#   CAUDAL_ETAPAS="senado_*,banrep_fetch"   → solo esas
+#   CAUDAL_ETAPAS="!senado_*,!banrep_fetch" → todas MENOS esas
+#
+# Una etapa que no le toca a esta máquina NO se registra: así el estado.json de
+# cada una habla solo de su trabajo, en vez de llenarse de 58 «omitidas» que
+# dirían que algo se saltó cuando en realidad lo corrió la otra máquina.
+CAUDAL_ETAPAS="${CAUDAL_ETAPAS:-}"
+
+# ¿Esta máquina publica el estado y el latido? En Fase 1 SOLO uno de los dos
+# sitios debe hacerlo, o se pisan el mismo objeto de S3 y el vigilante lee una
+# corrida a medias creyendo que es toda.
+#
+# Lo publica el MAC, y no es arbitrario: `check.py` no juzga solo las etapas que
+# corrieron acá, también mide la FRESCURA de los 31 archivos de S3 — incluidos
+# los que sube la EC2. Así que el latido del Mac vigila el producto entero: si la
+# EC2 deja de subir en-vivo.json o ritmo-legislaturas.json, esos archivos
+# envejecen y el Mac lo reporta. Cero cambios en el worker rr-auth.
+# La EC2 igual escribe su estado.json local, que es lo que se mira al depurarla.
+CAUDAL_PUBLICA="${CAUDAL_PUBLICA:-si}"
+_le_toca() {                      # $1 = nombre de la etapa
+  [ -z "$CAUDAL_ETAPAS" ] && return 0
+  local n="$1" pat hay_pos=0 casa=0 excluida=0 reglob=0 r=0
+  # ⚠ `for pat in $VAR` hace word splitting (lo que queremos) pero TAMBIÉN
+  # expansión de rutas: con CAUDAL_ETAPAS='*' el patrón se expandía contra los
+  # archivos del repo —run_diario hace `cd $REPO`— y dejaba de casar nada. Lo
+  # cazó prueba-selector-etapas.sh. De ahí el noglob, y el único `return` al
+  # final: saliendo desde dentro del bucle, el `set +f` no se ejecutaba.
+  case $- in *f*) ;; *) reglob=1; set -f;; esac
+  local IFS=','
+  for pat in $CAUDAL_ETAPAS; do
+    pat="${pat#"${pat%%[![:space:]]*}"}"; pat="${pat%"${pat##*[![:space:]]}"}"
+    [ -z "$pat" ] && continue
+    if [ "${pat#!}" != "$pat" ]; then
+      # shellcheck disable=SC2254
+      case "$n" in ${pat#!}) excluida=1;; esac
+    else
+      hay_pos=1
+      # shellcheck disable=SC2254
+      case "$n" in $pat) casa=1;; esac
+    fi
+  done
+  [ "$reglob" = 1 ] && set +f
+  if [ "$excluida" = 1 ]; then r=1                 # una exclusión manda sobre todo
+  elif [ "$hay_pos" = 1 ] && [ "$casa" = 0 ]; then r=1
+  fi
+  return $r
+}
+
+etapa() {
+  local nombre="" i=1
+  # el nombre viene como `--nombre X`; se busca sin consumir el resto de args
+  for arg in "$@"; do
+    [ "$arg" = "--nombre" ] && { eval "nombre=\${$((i+1))}"; break; }
+    i=$((i+1))
+  done
+  if [ -n "$nombre" ] && ! _le_toca "$nombre"; then
+    return 0
+  fi
+  python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$DEADLINE" "$@"
+}
 
 {
   echo ""
@@ -598,6 +663,11 @@ PY
   #   · El latido se publica SIEMPRE que se llegue hasta acá, aunque check.py se
   #     haya roto y no haya estado.json de esta corrida: en ese caso sale como
   #     error, y el estado.json viejo NO se sube como si fuera de hoy.
+  if [ "$CAUDAL_PUBLICA" != "si" ]; then
+    echo "--- publicar: NO (CAUDAL_PUBLICA=$CAUDAL_PUBLICA) · el estado queda local en $ESTADO ---"
+    echo "═════════ fin $(date '+%H:%M:%S') · salud=$rc_salud · sin publicar (lo hace la otra máquina) ═════════"
+    exit 0
+  fi
   echo "--- publicar: estado.json (privado) + latido (público) ---"
   python3 tools/caudal/salud/latido.py --estado "$ESTADO" --etapas "$REG" \
           --inicio "$INICIO" --rc-salud "$rc_salud" --out "$LATIDO"
