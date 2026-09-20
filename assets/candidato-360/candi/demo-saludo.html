@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Candi · Llegar y saludar</title>
+<link rel="stylesheet" href="candi-saludo.css?v=3">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f0e8;color:#173f2c;font:16px/1.6 system-ui,sans-serif}main{max-width:960px;margin:60px auto;padding:24px}h1{font-size:clamp(32px,6vw,58px);line-height:1.1;margin:12px 0}p{max-width:650px}.eyebrow{font-size:12px;letter-spacing:.15em;text-transform:uppercase}.demo{border:1px solid #173f2c33;border-radius:24px;overflow:hidden;margin:28px 0;background:#fffdf8}.candi-stage{height:360px}.stage-label{position:absolute;top:22px;left:24px;font-size:14px;opacity:.65}.controls{border-top:1px solid #173f2c22;padding:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}button,select{font:inherit;border:1px solid #173f2c44;border-radius:10px;padding:9px 14px;background:transparent;color:inherit;cursor:pointer}button.primary{background:#173f2c;color:white}label{display:flex;gap:10px;align-items:center}input{accent-color:#173f2c;flex:1;min-width:120px}output{font-variant-numeric:tabular-nums;font-size:13px}body.dark .candi-stage{background:#15251f;color:#fff}small{display:block;opacity:.7}a{color:inherit}
+</style>
+<main><div class="eyebrow">Candidato 360 · Estudio de movimiento 01</div><h1>Hola, soy Candi.</h1><p>Entra caminando, te mira y levanta la pata. Reproduce el saludo o recorre las poses para revisar el movimiento.</p>
+<div class="demo"><div id="stage" class="candi-stage"><span class="stage-label">Llegar y saludar · prototipo por fotogramas</span></div><div class="controls"><button id="play" class="primary">Reproducir saludo</button><button id="pause">Pausar</button><label>Velocidad <select id="speed"><option value="1">Normal</option><option value=".5">Lenta</option></select></label><button id="theme">Fondo oscuro</button><input id="timeline" aria-label="Posición de la animación" type="range" min="0" max="3200" value="3200" step="10"><output id="time">3,20 s</output></div></div>
+<p id="status" role="status">Cargando imágenes…</p><small>Versión de prueba con 20 poses. La caminata y el giro aún muestran saltos entre fotogramas; falta pulir la continuidad y los bordes del pelaje. Esta demo termina con la pata levantada: sentarse será el siguiente clip. Respeta la preferencia de movimiento reducido.</small><p><a href="README.md">Guía para integrar con Claude</a> · <a href="candi-saludo-atlas-v2-20.png">Ver atlas</a></p></main>
+<script src="candi-saludo.js?v=3"></script><script>
+const stage=document.querySelector('#stage'), candi=new CandiSaludo(stage), timeline=document.querySelector('#timeline'), status=document.querySelector('#status');
+stage.addEventListener('candi:frame',e=>{timeline.value=e.detail.time;document.querySelector('#time').textContent=(e.detail.time/1000).toFixed(2)+' s';});
+stage.addEventListener('candi:complete',()=>status.textContent='Saludo terminado.');
+document.querySelector('#play').onclick=()=>{status.textContent='Reproduciendo saludo…';candi.play({speed:Number(document.querySelector('#speed').value)}).catch(e=>status.textContent=e.message);};
+document.querySelector('#pause').onclick=()=>{candi.pause();status.textContent='En pausa.';};
+timeline.oninput=()=>{candi.pause();candi.seek(Number(timeline.value));status.textContent='Revisión de poses.';};
+document.querySelector('#theme').onclick=e=>{document.body.classList.toggle('dark');e.target.textContent=document.body.classList.contains('dark')?'Fondo claro':'Fondo oscuro';};
+candi.ready.then(()=>status.textContent='Lista para saludar.').catch(e=>status.textContent=e.message);
+</script></html>
