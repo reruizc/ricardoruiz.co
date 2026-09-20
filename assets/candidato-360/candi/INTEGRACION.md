@@ -31,10 +31,11 @@ calcula ni las inventa.
 1. **La guía** (`VISTAS` en `candidato-360-candi.js`) es texto nuestro, una
    entrada por pantalla. Está **siempre**: sin sesión, sin red, sin modelo y sin
    el atlas. Es la versión accesible de lo que la mascota representa.
-2. **Las preguntas escritas** van a `POST /c360/candi`. Piden sesión (el modelo
-   cuesta y la cuota es por cuenta, 40 al día). Si falta la sesión, la clave o
-   la ruta, Candi **dice cuál de las tres falta**; nunca rellena el hueco con
-   una respuesta inventada y atribuida al modelo.
+2. **Las preguntas escritas** van a `POST /c360/candi` (**desplegada el
+   20-sep-2026**; sin sesión responde 401). Piden sesión: el modelo cuesta y la
+   cuota es por cuenta, 40 al día. Si falta la sesión, la clave o la ruta, Candi
+   **dice cuál de las tres falta**; nunca rellena el hueco con una respuesta
+   inventada y atribuida al modelo.
 
 ## La regla del saludo
 
