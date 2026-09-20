@@ -217,6 +217,30 @@ CAUDAL_ETAPAS=!banrep_fetch,!anla_*,!dian_*,!uiaf_*,!supersociedades_*,!supers_*
 Rollback: `crontab -r` en la EC2 y quitar `CAUDAL_ETAPAS` del plist. El Mac
 vuelve solo a correrlo todo, porque sin la variable corre las 44 etapas.
 
+### Switch hecho · 20-sep-2026 13:20
+
+Primera corrida real de la EC2 con el reparto puesto: **21 etapas, 15m33s,
+`FALLARON: ninguna · PARCIALES: ninguna · OMITIDAS: ninguna`**, y sus 6 objetos
+en S3 (`sanciones.jsonl` 82 MB, `sanciones-stats`, `sucop.jsonl`, `sucop-stats`,
+`secop-stats`, `normativa.jsonl`). No publicó latido, como debe ser.
+
+Tres cosas que hubo que corregir al aplicarlo, por si se repite en otra máquina:
+
+- **El repo de la EC2 estaba en el commit anterior**, sin `_le_toca`. Con el
+  selector ausente, `CAUDAL_ETAPAS` no filtra nada y habría corrido las 44.
+  Siempre `git pull` **antes** de instalar el crontab.
+- **SSM corre como `root`, no como `ubuntu`** — el `HOME` del crontab se ajusta.
+- El estado sincronizado llegó con el **uid 501 del Mac**; `chown -R root:root`.
+
+⚠️ **La EC2 cierra con `salud=2` y eso es esperado, no un fallo.** Su `check.py`
+intenta medir la frescura de `en-vivo.json`, `ritmo-legislaturas.json` y
+`ordenes-vigentes.json`, que viven en `elecciones-2026`, y el rol `CaudalRunner`
+no puede **listar** ese bucket. No importa: esa máquina tiene `CAUDAL_PUBLICA=no`,
+así que ese veredicto no sale de su disco, y el latido lo publica el Mac, que sí
+los ve. Si algún día molesta al depurar, se quita ampliando el rol con
+`iam-policy-caudal-cron.json` (necesita perfil admin). Su Lambda sí responde:
+**14/14 acciones ok** desde la EC2.
+
 ### El mecanismo
 
 `run_diario.sh` acepta `CAUDAL_ETAPAS` (lista con comodines; `!` excluye) y
