@@ -10,7 +10,8 @@ con esas palabras: es una lectura del terreno, no de sus votantes.
 |---|---|---|
 | **Sexo** | `PUESTOS_GEOREF.csv`, columnas MUJERES y HOMBRES (censo electoral por puesto) | publicado |
 | **Rural / urbano** | zona electoral de cada mesa: `99` es la zona rural del municipio; `90` y `98` (censo consolidado y cárceles) no son ni lo uno ni lo otro | publicado |
-| **Edad** | `CENSO_EDAD_PUESTO.json` (lo produce `construir-edad.mjs`) | **falta subirlo** |
+| **Edad** | `CENSO_EDAD_PUESTO.json` (lo produce `construir-edad.mjs`) | publicado (19-sep-2026) |
+| **Sexo × edad** | `PERFIL_SEXO_EDAD_PUESTO.json` (lo produce `construir-sexo-edad.py`) | publicado (19-sep-2026) |
 | **El territorio** | el censo de TODOS los puestos del municipio + `asamblea-2023/dep/<dep>.json` (potencial y votantes) | publicado |
 | **Cómo vota el territorio** | `asamblea-2023/dep/<dep>.json`, con cada partido puesto en su familia por `partidos-bloques.js` | publicado |
 | **La que debería buscar** | la meta de votos (tarjeta 02) contra su base de hoy | publicado |
@@ -48,10 +49,11 @@ El objetivo se calcula **al abrir la ficha** y no al pintar la tarjeta, porque
 la meta de votos llega después (es una estimación con su propia consulta). Si
 todavía no está, la ficha muestra el territorio y calla el objetivo.
 
-Mientras el archivo de edad no esté en
-`congreso-2026/output/mapas-2026/CENSO_EDAD_PUESTO.json`, el modal dice que
-falta en vez de estimar la edad con el promedio del municipio y presentarla como
-suya. En cuanto esté, la tarjeta lo lee sola:
+El archivo de edad ya está en
+`congreso-2026/output/mapas-2026/CENSO_EDAD_PUESTO.json` (13.239 puestos, bandas
+18-25 · 26-40 · 41-60 · 61+). Si algún día no estuviera, el modal dice que falta
+en vez de estimar la edad con el promedio del municipio y presentarla como suya.
+Para regenerarlo:
 
 ```
 node tools/candidato-360/perfil/construir-edad.mjs \
