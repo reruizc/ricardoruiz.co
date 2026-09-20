@@ -53,14 +53,16 @@ jobs:
       - name: Instalar boto3
         run: pip install --quiet boto3
 
-      # El disco de / es chico para un CSV de 2,6 GB más su temporal ordenado.
-      # RUNNER_TEMP vive en el disco grande, así que «Bases de datos» va allá.
+      # El CSV territorial pesa 2,6 GB y su temporal ordenado otros 1,4: el
+      # runner trae ~86 GB libres, así que van en el propio árbol de trabajo.
+      # (Nada de enlazar «Bases de datos» a otro disco: esa carpeta YA existe en
+      # el repo, así que `ln -s` crearía el enlace dentro y curl se queda sin
+      # dónde escribir.)
       - name: Preparar disco
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/bd/FINAL SUBIDA GCS" "$RUNNER_TEMP/scratch"
-          ln -s "$RUNNER_TEMP/bd" "Bases de datos"
-          df -h / "$RUNNER_TEMP" | sed 's/^/  /'
+          mkdir -p "Bases de datos/FINAL SUBIDA GCS" "$RUNNER_TEMP/scratch"
+          df -h . | sed 's/^/  /'
 
       - name: Bajar los CSV crudos de la Registraduría
         run: |
@@ -95,8 +97,8 @@ jobs:
       - name: Verificar
         run: python3 tools/analisis-candidato/verificar_listas_2023.py
 
-      # «Bases de datos» es un enlace simbólico al disco grande y el subidor de
-      # artefactos no lo sigue: se copia a una carpeta real (unos 73 MB).
+      # Se copia aparte para dejar fuera los JSON por candidato: son 94 mil y no
+      # cambian, así que el artefacto pesa unos 73 MB y no varios GB.
       - name: Reunir lo generado
         run: |
           set -euo pipefail
