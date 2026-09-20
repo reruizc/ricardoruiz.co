@@ -405,7 +405,11 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
   # ⚠ La SIC (harvest_sic_circulares.py) queda FUERA a propósito: son ~800
   # peticiones (~21 min) para un registro que se mueve ~13 actos al año. Se
   # corre a mano cuando haga falta; meterla acá sería gastar 42 min diarios.
-  etapa --nombre banrep_fetch --timeout 600 \
+  # --rc-aviso 75: www.banrep.gov.co está detrás de Radware Bot Manager y tumba
+  # una petición suelta cada tanto. Cuando eso pasa el harvester conserva la copia
+  # en disco —los compendios cambiarios cambian cada años, no a diario— y sale
+  # con 75. Si la copia pasa de 7 días sale con 1 y entonces sí es falla.
+  etapa --nombre banrep_fetch --timeout 600 --rc-aviso 75 \
         --desc "BanRep · Junta Directiva y régimen cambiario (incremental)" \
         -- python3 tools/caudal/supers/harvest_banrep.py fetch
 

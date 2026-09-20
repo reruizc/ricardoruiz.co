@@ -257,6 +257,45 @@ fuente y si `normalize` la listó.
   petición (art. 69 CPACA), verificado leyendo los PDFs. Ni el portal, ni su
   buscador, ni Socrata publican un registro sancionatorio.
 
+## El WAF del BanRep (y cómo se le pasa)
+
+`www.banrep.gov.co` está detrás de **Radware Bot Manager** (PerfDrive, antes
+ShieldSquare). Hasta agosto bastaba con mandar el juego completo de headers de
+navegador; **desde el 5-sep-2026 dejó de bastar** y la etapa pasó de 0 fallos en
+42 corridas a 9 en 30 (30 %).
+
+Lo que faltaba eran las **cookies**. El bot manager pone `__uzma/__uzmb/__uzmc/
+__uzmd/__uzme/__uzmf/uzmx`, y sin `-b` cada petición llega como una sesión nueva
+desde cero — exactamente el patrón que castiga. Medido alternando estrictamente
+la misma URL, para descartar el sesgo de orden:
+
+| | ok | captcha |
+|---|---|---|
+| sin frasco de cookies | **0 de 5** | 5 |
+| con frasco de cookies | **3 de 5** | 0 |
+
+Sobre todas las pruebas del día: **8 % → 69 %**, y con el frasco ya caliente,
+11-12 de 13. El captcha **trae** las cookies buenas, así que el primer golpe paga
+la entrada y el reintento pasa; por eso el frasco se guarda entre corridas
+(`raw/banrep-cookies.txt`, fuera del repo) y por eso 3 intentos alcanzan.
+
+Detalles que ya se probaron y conviene no repetir:
+
+- **HTTP/1.1 no ayuda.** Una primera tanda dio 5/5 contra 3/5 de HTTP/2 y parecía
+  la solución; con 8 muestras más se dio vuelta (8/8 para h2). Acumulado 11/13 vs
+  12/13: no hay diferencia. Era ruido.
+- **No hay «peaje de primera petición»** que se pueda pagar por adelantado con un
+  calentamiento: los timeouts son ~25-30 % por petición y caen al azar.
+- **La respuesta es bimodal**: 0,55-1,41 s o silencio hasta agotar el tope. Por
+  eso el timeout es de 12 s y no de 60 — no hay respuestas lentas que cortar.
+- **Una URL caída ya no mata la cosecha.** Las dos del bloque cambiario se bajan
+  por separado y, si el WAF tumba una, se conserva la copia en disco (esos
+  compendios cambian cada años, no a diario) y la etapa sale con **75**, que el
+  cron declara como aviso. Si lo conservado pasa de **7 días**, sale con 1 y sí
+  suena: ahí el WAF dejó de ser un tropiezo y es un muro.
+
+Pruebas: `python3 tools/caudal/supers/prueba_banrep.py` (no toca la red).
+
 ## Cómo agregar una fuente
 
 **Vía 1 (Socrata):** una entrada en `fuentes.json.fuentes` con `via:1`,

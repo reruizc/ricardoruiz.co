@@ -45,10 +45,38 @@ DOS BLOQUES, complementarios:
 
 WAF: www.banrep.gov.co está detrás de Radware/ShieldSquare (PerfDrive). Un
 curl pelado —incluso con User-Agent de Chrome— es redirigido a
-validate.perfdrive.com y NO ve el sitio. Pasa con el JUEGO COMPLETO de headers
-de navegador (Accept, Accept-Language, sec-ch-ua, Sec-Fetch-*,
-Upgrade-Insecure-Requests): ver HEADERS. Si algún día deja de pasar, el
-síntoma es inconfundible (la respuesta trae 'perfdrive' y ~16 KB).
+validate.perfdrive.com y NO ve el sitio. Hacía falta el JUEGO COMPLETO de
+headers de navegador (Accept, Accept-Language, sec-ch-ua, Sec-Fetch-*,
+Upgrade-Insecure-Requests): ver HEADERS. El síntoma de bloqueo es
+inconfundible: la respuesta trae 'perfdrive' y ~6 KB con
+'<title>Radware Bot Manager Captcha</title>'.
+
+  · ⚠⚠ DESDE EL 5-SEP-2026 LOS HEADERS SOLOS YA NO ALCANZAN. La etapa pasó de
+    0 fallos en 42 corridas (agosto) a 9 en 30 (30 %). Medido el 19-sep con los
+    headers exactos de acá: 0 de 6 peticiones traían la página. Y no era una URL
+    rota —fallaba una u otra al azar, nunca la misma— así que no había nada que
+    reparar en el parseo.
+  · LO QUE FALTABA ERAN LAS COOKIES. El bot manager pone `__uzma/__uzmb/__uzmc/
+    __uzmd/__uzme/__uzmf/uzmx` y sin `-b` cada petición llega como una sesión
+    nueva desde cero, que es exactamente el patrón que castiga. Medido
+    alternando estrictamente la MISMA url para descartar el sesgo de orden:
+    **sin frasco 0 de 5 (los 5 captcha) · con frasco 3 de 5 y NINGÚN captcha**.
+    Sobre todas las pruebas del día: 8 % → 69 %.
+  · El captcha TRAE las cookies buenas, así que el primer golpe paga la entrada
+    y el reintento pasa. Por eso el frasco se guarda entre corridas (llega
+    caliente) y por eso 3 intentos alcanzan: lo que quedó con frasco no son
+    captchas sino timeouts sueltos, y 0,31³ ≈ 3 % de que fallen los tres.
+  · Si los TRES intentos dan captcha, el frasco se tira: esa identidad quedó
+    quemada y reusarla mañana solo repite el bloqueo.
+  · El timeout bajó de 60 s a 12. La respuesta de este host es BIMODAL: de 13
+    respuestas buenas medidas, ninguna pasó de 1,4 s (0,55-1,41), y los fallos
+    agotan el tope exacto. No hay respuestas lentas que un timeout corto pueda
+    cortar: hay respuesta o hay silencio. Con 60 s, tres intentos se comían 200 s
+    de la etapa (medido: `banrep_fetch rc=1 · 200s`); con 12 el peor caso son 42.
+  · Los timeouts que quedan son ~25-30 % POR PETICIÓN y aleatorios —no es que una
+    url esté rota, ni hay un peaje de primera petición que se pueda pagar por
+    adelantado con un calentamiento—. El reintento los salva: en una traza típica
+    de 6 peticiones, 2 hacen timeout y las 2 pasan al segundo intento en 0,6 s.
 
 Descartadas y por qué:
   · vía 1 (Socrata): el BanRep publica 5 datasets en datos.gov.co y son TODOS
@@ -93,6 +121,16 @@ SUP = REPO / 'Bases de datos' / 'leyes-senado' / 'supers'
 RAW = SUP / 'raw'
 PAGES = RAW / 'banrep-pages'
 OUT_JSON = RAW / 'banrep-normatividad.json'
+# Frasco de cookies del bot manager, a propósito PERSISTENTE entre corridas: es
+# lo único que hace que Radware nos deje pasar (ver la nota del WAF).
+COOKIES = RAW / 'banrep-cookies.txt'
+
+# Cuando el WAF tumba UNA de las tres peticiones, la copia en disco sigue
+# sirviendo: los compendios cambiarios cambian cada varios años, no a diario.
+# Así que se conserva y la corrida sale parcial (75) en vez de morir entera.
+# Pasada esta antigüedad ya no es tolerable y vuelve a ser falla.
+RC_PARCIAL = 75
+DIAS_TOLERADOS = 7
 
 BASE = 'https://www.banrep.gov.co'
 NOVEDADES = BASE + '/es/normatividad'
@@ -131,18 +169,32 @@ REF_NUM = re.compile(
 
 
 # --------------------------------------------------------------------- http
-def curl(url, timeout=60, retries=3):
-    cmd = ['/usr/bin/curl', '-sk', '-m', str(timeout), '-A', UA, '--compressed', '-L']
+def curl(url, timeout=12, retries=3, guarda_cookies=True):
+    """GET con el frasco de cookies del WAF. Ver la nota de arriba: sin `-b` el
+    bot manager nos ve como una sesión nueva en cada petición y devuelve captcha.
+
+    `guarda_cookies=False` para las peticiones en paralelo de --full: curl
+    reescribe el archivo entero al terminar, y varios curl escribiendo a la vez
+    se pisan las cookies unos a otros. Leerlas (`-b`) sí es seguro siempre.
+    """
+    COOKIES.parent.mkdir(parents=True, exist_ok=True)
+    cmd = ['/usr/bin/curl', '-sk', '-m', str(timeout), '-A', UA, '--compressed', '-L',
+           '-b', str(COOKIES)]              # si no existe, curl no manda nada y sigue
+    if guarda_cookies:
+        cmd += ['-c', str(COOKIES)]
     for h in HEADERS:
         cmd += ['-H', h]
     cmd.append(url)
-    last = None
+    last, captchas = None, 0
     for i in range(retries):
         try:
             r = subprocess.run(cmd, capture_output=True, timeout=timeout + 15)
             body = r.stdout.decode('utf-8', errors='replace')
             if r.returncode == 0 and body:
                 if 'perfdrive' in body[:4000].lower() and len(body) < 40000:
+                    # El captcha TRAE las cookies buenas: por eso el reintento
+                    # suele pasar. El primer golpe paga la entrada.
+                    captchas += 1
                     last = RuntimeError('WAF: bloqueado por PerfDrive/ShieldSquare')
                 else:
                     return body
@@ -151,7 +203,51 @@ def curl(url, timeout=60, retries=3):
         except subprocess.TimeoutExpired:
             last = RuntimeError('timeout')
         time.sleep(2.0 * (i + 1))
+    # Captcha en TODOS los intentos: la identidad del frasco está quemada y
+    # reusarla mañana solo repite el bloqueo. Se tira y se empieza de cero.
+    if captchas == retries and guarda_cookies:
+        COOKIES.unlink(missing_ok=True)
+        print('  ! cookies quemadas (captcha en los 3 intentos): frasco vaciado',
+              file=sys.stderr)
     raise last
+
+
+def veredicto_cambiario(fallos):
+    """0 si se refrescó todo · 75 si se conservó algo · 1 si lo conservado es rancio."""
+    if not fallos:
+        print('  cambiario: compendio DCIP-83 vigente + compendios históricos ok')
+        return 0
+    rancios = [f for f in fallos if f['dias'] > DIAS_TOLERADOS]
+    if rancios:
+        for f in rancios:
+            print(f'  ✗ «{f["que"]}» lleva {f["dias"]:.1f} días sin refrescar '
+                  f'(tope {DIAS_TOLERADOS}): el WAF dejó de ser un tropiezo y es un muro',
+                  file=sys.stderr)
+        return 1
+    print(f'  ✗ cambiario PARCIAL: {len(fallos)} de 2 sin refrescar, conservo lo anterior. '
+          f'El resto de la cosecha quedó al día.', file=sys.stderr)
+    return RC_PARCIAL
+
+
+def baja_a_disco(url, destino, etiqueta, fallos):
+    """Baja `url` a `destino`. Si el WAF no deja, conserva lo que ya había.
+
+    Antes cualquiera de las tres peticiones del bloque cambiario mataba la etapa
+    entera por excepción, incluso habiendo funcionado las otras dos (19-sep-2026:
+    `banrep_fetch rc=1 · 200s`, con el DCIP ya bajado y en disco). Sin copia
+    previa sí se propaga: ahí no hay nada que conservar.
+    """
+    try:
+        destino.write_text(curl(url), encoding='utf-8')
+        return True
+    except RuntimeError as e:
+        if not destino.exists():
+            raise
+        dias = (time.time() - destino.stat().st_mtime) / 86400
+        fallos.append({'que': etiqueta, 'por': str(e), 'dias': dias})
+        print(f'  ! {etiqueta}: {e} — conservo la copia de hace {dias:.1f} días',
+              file=sys.stderr)
+        return False
 
 
 def _txt(s):
@@ -315,7 +411,10 @@ def fetch(full=False, workers=3):
         faltan = [p for p in range(last + 1)]
         print(f'  --full: re-bajando {len(faltan)} páginas con {workers} obreros')
         def one(p):
-            _page_path(p).write_text(curl(f'{NOVEDADES}?page={p}'), encoding='utf-8')
+            # guarda_cookies=False: varios curl escribiendo el mismo frasco a la
+            # vez se pisan. Leerlo alcanza, que es lo que hace pasar el WAF.
+            _page_path(p).write_text(
+                curl(f'{NOVEDADES}?page={p}', guarda_cookies=False), encoding='utf-8')
             return p
         ok = err = 0
         with ThreadPoolExecutor(max_workers=workers) as ex:
@@ -351,10 +450,13 @@ def fetch(full=False, workers=3):
         else:
             print(f'  novedades: recorridas todas. {nuevos} actos nuevos')
 
-    # bloque cambiario: siempre fresco, son 3 peticiones
-    (RAW / 'banrep-compendio-dcip.html').write_text(curl(COMPENDIO_DCIP), encoding='utf-8')
-    (RAW / 'banrep-compendios-hist.html').write_text(curl(COMPENDIOS_HIST), encoding='utf-8')
-    print('  cambiario: compendio DCIP-83 vigente + compendios históricos ok')
+    # bloque cambiario: 2 peticiones, cada una tolerante por separado
+    fallos = []
+    baja_a_disco(COMPENDIO_DCIP, RAW / 'banrep-compendio-dcip.html',
+                 'compendio DCIP-83 vigente', fallos)
+    baja_a_disco(COMPENDIOS_HIST, RAW / 'banrep-compendios-hist.html',
+                 'compendios históricos', fallos)
+    return veredicto_cambiario(fallos)
 
 
 # -------------------------------------------------------------------- build
@@ -506,7 +608,7 @@ def main():
     if a.cmd == 'test':
         test()
     elif a.cmd == 'fetch':
-        fetch(full=a.full, workers=a.workers)
+        return fetch(full=a.full, workers=a.workers) or 0
     elif a.cmd == 'build':
         build(); stats()
     else:
