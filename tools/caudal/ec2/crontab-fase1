@@ -1,0 +1,29 @@
+# Crontab de la EC2 en FASE 1 (20-sep-2026). El pipeline vive en dos sitios:
+# acá corren las 22 etapas SIN estado legislativo; el Mac se queda con las otras
+# 22, que comparten actas/ diario/ diario-camara/ gacetas/ con el WAF del Senado.
+# Por qué esta partición y no "lo que no tiene WAF": ver README.md, sección Fase 1.
+#
+# Instalar:  crontab tools/caudal/ec2/crontab-fase1
+# Quitar:    crontab -r        (y el Mac vuelve solo a correrlo todo)
+CRON_TZ=America/Bogota
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+CAUDAL_REPO=/srv/caudal/ricardoruiz.co
+HOME=/home/ubuntu
+
+# Las 22 de esta máquina. red_lista va en las DOS: cada una necesita saber si
+# tiene red antes de arrancar.
+CAUDAL_ETAPAS=red_lista,banrep_fetch,anla_*,dian_*,uiaf_*,supersociedades_*,supers_*,sucop_*,secop_*,ejecutivo_*
+# NO publica estado ni latido: lo hace el Mac, cuyo check.py mide la frescura de
+# los 31 archivos de S3 —incluidos los que sube esta máquina— y así vigila el
+# producto entero sin que haya que tocar el worker rr-auth.
+CAUDAL_PUBLICA=no
+
+# Mismas horas que el Mac, 20 min antes: así lo que esta máquina sube a S3 ya
+# está arriba cuando el chequeo de salud del Mac mide su frescura.
+40 7  * * * /bin/bash /srv/caudal/ricardoruiz.co/tools/leyes-senado/run_diario.sh
+10 19 * * * /bin/bash /srv/caudal/ricardoruiz.co/tools/leyes-senado/run_diario.sh
+
+# el repo se actualiza solo: lo que se pushea a main llega acá sin scp
+30 7  * * * cd /srv/caudal/ricardoruiz.co && git pull -q --ff-only origin main
+0  19 * * * cd /srv/caudal/ricardoruiz.co && git pull -q --ff-only origin main

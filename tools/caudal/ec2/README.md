@@ -171,6 +171,52 @@ latido del Mac vigila el producto entero: si la EC2 deja de subir
 **Cero cambios en el worker `rr-auth`.** La EC2 escribe igual su `estado.json`
 local, que es lo que se mira al depurarla.
 
+### Estado del despliegue (20-sep-2026)
+
+Hecho y verificado **sin tocar producción**:
+
+- Instancia preparada: swap de 2 GB (tenía 1,8 GB de RAM y **cero** swap),
+  `pypdf` + `openpyxl`, repo clonado, zona horaria Bogotá, 21 GB libres.
+- Estado sincronizado vía S3 (no hay llave SSH): `supers/` + `sucop/` + `secop/`,
+  **835 MB → 120 MB comprimidos**.
+- Etapas corridas a mano en la EC2, **sin subir nada**:
+
+```
+sucop_fetch        rc=0 · 3.994 carpetas
+sucop_build        rc=0 · 3.984 procesos
+supers_consolida   rc=0
+supers_verifica    rc=0 · "80.770 actos · 7.333 sanciones · 17 fuentes,
+                           ninguna por debajo de su piso"
+supers_build_s3    rc=0 · 7.333 sanciones, COP 17,5 billones
+ejecutivo_fetch    rc=0 · 12.030 filas
+ejecutivo_build    rc=0
+RAM durante todo:  1.359 MB libres · 16 MB de swap  → la memoria no es problema
+```
+
+Los 7.333 y los 12.030 **coinciden con lo que reporta la Lambda desde el Mac**,
+así que el estado que viajó es el bueno.
+
+⚠️⚠️ **Al sincronizar desde macOS: `COPYFILE_DISABLE=1 tar …`**. Sin eso el tar
+mete un `._archivo` por cada archivo —los AppleDouble de los xattrs— que en macOS
+son invisibles y en Linux son archivos de verdad: **se colaron 3.655** y
+`supers_verifica` los leyó como fuentes fantasma («hay raw en disco pero NO salió
+en el consolidado»). Se borran con
+`find … -name '._*' -delete`, pero es mejor no crearlos.
+
+**Falta solo el switch**, que tiene que ser simultáneo en las dos máquinas o
+ambas suben los mismos objetos a S3 y cosechan dos veces las mismas fuentes
+(el BanRep tiene WAF: dos ráfagas es peor que una):
+
+```bash
+# en la EC2
+crontab /srv/caudal/ricardoruiz.co/tools/caudal/ec2/crontab-fase1
+# en el Mac: añadir al plist de co.ricardoruiz.leyes-diario
+CAUDAL_ETAPAS=!banrep_fetch,!anla_*,!dian_*,!uiaf_*,!supersociedades_*,!supers_*,!sucop_*,!secop_*,!ejecutivo_*
+```
+
+Rollback: `crontab -r` en la EC2 y quitar `CAUDAL_ETAPAS` del plist. El Mac
+vuelve solo a correrlo todo, porque sin la variable corre las 44 etapas.
+
 ### El mecanismo
 
 `run_diario.sh` acepta `CAUDAL_ETAPAS` (lista con comodines; `!` excluye) y
