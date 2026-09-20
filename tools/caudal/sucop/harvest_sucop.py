@@ -127,24 +127,66 @@ def _norm(s):
     return re.sub(r'\s+', ' ', s).strip()
 
 
-def curl_json(url, timeout=120):
+# Qué significa cada código de salida de curl, para que el correo de la alerta
+# diga si el problema fue NUESTRA red o el servidor del DNP. Sin esto el aviso
+# decía «curl rc=6» y había que ir a buscar la tabla.
+CURL_RC = {
+    6: 'no pude resolver el nombre del host (DNS) — casi siempre es ESTA máquina sin red',
+    7: 'no pude conectarme al host — red local o el servidor abajo',
+    28: 'el servidor no respondió a tiempo',
+    35: 'falló el saludo TLS',
+    52: 'el servidor cerró la conexión sin responder nada',
+    56: 'se cortó la conexión a media descarga',
+}
+# Errores que no tiene sentido reintentar: la petición está mal hecha y va a
+# estar igual de mal dentro de cinco segundos.
+FIJOS = ('sharepoint:',)
+ESPERAS = (5, 15, 45)      # backoff; cubre al Mac recién despertado sin red
+
+
+def _una_vez(url, timeout):
     cmd = ['/usr/bin/curl', '-s', '-A', UA,
            '-H', 'Accept: application/json;odata=nometadata',
            '--max-time', str(timeout), url]
     try:
         r = subprocess.run(cmd, capture_output=True, timeout=timeout + 15)
     except subprocess.TimeoutExpired:
-        return None, 'timeout'
+        return None, 'timeout: curl no volvió ni después del margen'
     if r.returncode != 0:
-        return None, f'curl rc={r.returncode}'
+        detalle = CURL_RC.get(r.returncode, 'ver `man curl`, sección EXIT CODES')
+        return None, f'curl rc={r.returncode} ({detalle})'
     try:
         d = json.loads(r.stdout.decode('utf-8', errors='replace'))
     except json.JSONDecodeError as e:
-        return None, f'json: {e}'
+        cuerpo = r.stdout.decode('utf-8', errors='replace')[:80].replace('\n', ' ')
+        return None, f'json: {e} · llegaron {len(r.stdout)} bytes que empiezan por «{cuerpo}»'
     if isinstance(d, dict) and 'odata.error' in d:
         msg = d['odata.error'].get('message', {})
         return None, 'sharepoint: ' + str(msg.get('value', msg))[:160]
     return d, None
+
+
+def curl_json(url, timeout=120, intentos=len(ESPERAS) + 1):
+    """GET con reintentos. SUCOP era el ÚNICO harvester sin ellos.
+
+    Los tres fallos de producción (sep-2026) fueron todos transitorios y de tres
+    clases distintas —DNS caído con el Mac recién despierto, una respuesta que no
+    era JSON, y un timeout—, y cada uno abortó la cosecha entera al primer golpe.
+    El endpoint no es caprichoso: medido, responde en 12-16 s de forma estable.
+    Las esperas crecen (5, 15, 45 s) porque el caso del Mac sin red no se arregla
+    en dos segundos.
+    """
+    for i in range(intentos):
+        d, err = _una_vez(url, timeout)
+        if err is None:
+            return d, None
+        if err.startswith(FIJOS) or i == intentos - 1:
+            return None, err
+        espera = ESPERAS[min(i, len(ESPERAS) - 1)]
+        print(f'      intento {i + 1}/{intentos}: {err} · reintento en {espera} s',
+              file=sys.stderr)
+        time.sleep(espera)
+    return None, 'sin intentos'
 
 
 def _url_pagina(skip):
@@ -174,6 +216,15 @@ def fetch(reuse=False):
         data, err = curl_json(_url_pagina(skip))
         if err:
             print(f'  !   pág {pagina}: {err}', file=sys.stderr)
+            # De quién fue la culpa. Importa porque la etapa NO sube nada cuando
+            # falla (el dato de SUCOP vence: un jsonl de ayer diría que siguen
+            # abiertas consultas ya cerradas), así que el correo que llega tiene
+            # que dejar claro si hay que mirar esta máquina o el DNP.
+            culpa = ('la red de ESTA máquina' if 'rc=6' in err or 'rc=7' in err
+                     else 'el servidor del DNP')
+            print(f'  ✗ cosecha abortada tras {pagina} página(s) buenas de ~8 · '
+                  f'apunta a {culpa}. No se sube nada: en S3 queda el de ayer, y '
+                  f'este pilar es el único cuyo dato vence.', file=sys.stderr)
             return None
         rows = data.get('value', []) if isinstance(data, dict) else []
         dest.write_text(json.dumps(rows, ensure_ascii=False), encoding='utf-8')

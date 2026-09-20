@@ -109,6 +109,40 @@ buena parte procesos territoriales (alcaldías, gobernaciones) con títulos gen�
 que el tesauro no toca; siguen siendo hallables por texto libre. Una fuente flaca
 declarada es útil; una inflada quema al cliente.
 
+## Cuando la cosecha falla (y por qué acá no se degrada)
+
+Este era el **único harvester del pilar sin reintentos**: `curl_json` pegaba una
+vez y, si fallaba, `fetch` abortaba la cosecha entera con `return None`. Los tres
+`rc=1` de sep-2026 (3 de 74 corridas, 4 %) fueron todos transitorios y de tres
+clases distintas:
+
+| fecha | error | qué era |
+|---|---|---|
+| 11-sep | `curl rc=6` | DNS — **esta máquina** sin red (en la misma corrida falló también la subida a S3) |
+| 17-sep | `json: Expecting value` | el servidor devolvió algo que no era JSON |
+| 19-sep | `curl rc=28` | el servidor no respondió a tiempo |
+
+Ahora hay **4 intentos con esperas de 5, 15 y 45 s**. Crecen así a propósito: el
+caso del Mac recién despierto sin red no se arregla en dos segundos. Un error de
+la propia API (`sharepoint:`) **no** se reintenta — la petición está mal hecha y
+va a estar igual de mal dentro de 45 s. El endpoint en sí no es caprichoso:
+medido, responde en **12-16 s por página**, estable, y la cosecha completa (8
+páginas, ~3.990 carpetas) toma ~100 s.
+
+⚠️ **Lo que NO se hizo, a propósito: degradar.** En los otros pilares una cosecha
+a medias se conserva y la etapa sale con 75 (aviso, sin correo). Acá **no**: el
+dato de SUCOP es el único que **vence**. Un `sucop.jsonl` de hace una semana no
+es "un poco viejo", es falso — las consultas que dice abiertas ya cerraron. Por
+eso la política del cron sigue siendo no subir nada si la cosecha falló, dejar el
+de ayer en S3, y dejar que su antigüedad la delate el chequeo de salud. **El
+correo acá está justificado y no hay que silenciarlo.**
+
+Lo que sí mejoró es el mensaje: los códigos de curl vienen traducidos y el fallo
+dice si apunta a la red de esta máquina o al servidor del DNP, que es lo que uno
+necesita saber al abrir el correo.
+
+Pruebas sin red: `python3 tools/caudal/sucop/prueba_sucop.py`.
+
 ## Uso
 
 ```bash
