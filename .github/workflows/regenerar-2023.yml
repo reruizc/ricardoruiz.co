@@ -1,0 +1,146 @@
+name: Regenerar índices de 2023
+
+# Vuelve a construir los índices y agregados territoriales de 2023 desde los
+# CSV crudos de la Registraduría y los sube a S3.
+#
+# Existe porque esos índices se construyeron descartando la fila COD_CAN=0, que
+# es el voto SOLO POR LA LISTA (y, en una lista cerrada, todo su voto). Sin eso
+# una lista cerrada no existe en el reparto de curules: en el Concejo de Bogotá
+# 2023 el Pacto Histórico, con 376.733 votos y 7 curules, desaparecía y esas
+# curules se les repartían a las demás listas. En todo el país son 888 listas
+# cerradas en concejo, 591 en JAL y 48 en asamblea.
+#
+# Corre acá, y no en el entorno de trabajo, porque así la credencial de S3 vive
+# en los secretos del repositorio y no pasa por ninguna otra máquina.
+#
+# Necesita dos secretos (Settings → Secrets and variables → Actions):
+#   RR_S3_KEY_ID · RR_S3_SECRET
+# de un usuario IAM que SOLO pueda PutObject sobre
+#   arn:aws:s3:::elecciones-2026/ricardoruiz.co/congreso-2026/output/{concejo,jal,asamblea}-2023/*
+#
+# Los CSV crudos (2,9 GB) se bajan de S3 en cada corrida: son públicos, los
+# sirve la misma página de descargas.
+on:
+  workflow_dispatch:
+    inputs:
+      solo_indice:
+        description: 'Solo los índices y agregados (no reescribe los 94 mil JSON por candidato, que no cambian)'
+        type: boolean
+        default: true
+      seco:
+        description: 'Simular: genera y verifica, pero no sube nada'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: regenerar-2023
+  cancel-in-progress: false
+
+jobs:
+  regenerar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar boto3
+        run: pip install --quiet boto3
+
+      # El disco de / es chico para un CSV de 2,6 GB más su temporal ordenado.
+      # RUNNER_TEMP vive en el disco grande, así que «Bases de datos» va allá.
+      - name: Preparar disco
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bd/FINAL SUBIDA GCS" "$RUNNER_TEMP/scratch"
+          ln -s "$RUNNER_TEMP/bd" "Bases de datos"
+          df -h / "$RUNNER_TEMP" | sed 's/^/  /'
+
+      - name: Bajar los CSV crudos de la Registraduría
+        run: |
+          set -euo pipefail
+          B=https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co
+          curl -sSfL --retry 3 --retry-delay 5 -o "Bases de datos/FINAL SUBIDA GCS/GCS_2023TER.csv" \
+            "$B/DESCARGAS/raw/territoriales/2023/GCS_2023TER.csv"
+          curl -sSfL --retry 3 --retry-delay 5 -o "Bases de datos/FINAL SUBIDA GCS/GCS_2023JAL.csv" \
+            "$B/DESCARGAS/raw/jal/2023/GCS_2023JAL.csv"
+          curl -sSfL --retry 3 --retry-delay 5 -o "Bases de datos/PUESTOS_GEOREF.csv" \
+            "$B/congreso-2026/output/mapas-2026/PUESTOS_GEOREF.csv"
+          ls -la "Bases de datos/FINAL SUBIDA GCS" | sed 's/^/  /'
+
+      - name: Generar
+        env:
+          SCRATCH_DIR: ${{ runner.temp }}/scratch
+          SOLO: ${{ inputs.solo_indice && '--solo-indice' || '' }}
+        run: |
+          set -euo pipefail
+          T=tools/analisis-candidato
+          for paso in "índice de concejo:build_concejo_2023.py $SOLO" \
+                      "índice de JAL:build_jal_2023.py $SOLO" \
+                      "índice de asamblea:build_asamblea_2023.py $SOLO" \
+                      "agregado de JAL:build_territorial_resultados.py jal" \
+                      "agregado de concejo:build_territorial_resultados.py concejo" \
+                      "agregado de asamblea:build_asamblea_resultados.py"; do
+            echo "══ ${paso%%:*}"
+            python3 $T/${paso#*:}
+          done
+          rm -rf "$SCRATCH_DIR"   # los temporales ordenados pesan varios GB
+
+      - name: Verificar
+        run: python3 tools/analisis-candidato/verificar_listas_2023.py
+
+      # «Bases de datos» es un enlace simbólico al disco grande y el subidor de
+      # artefactos no lo sigue: se copia a una carpeta real (unos 73 MB).
+      - name: Reunir lo generado
+        run: |
+          set -euo pipefail
+          for c in concejo jal asamblea; do
+            [ -d "Bases de datos/output_${c}_2023" ] || continue
+            mkdir -p "salida/output_${c}_2023"
+            cp -r "Bases de datos/output_${c}_2023/." "salida/output_${c}_2023/"
+          done
+          # Los JSON por candidato no se suben como artefacto: son 94 mil y no
+          # cambian. Los paréntesis importan: sin ellos -delete solo aplicaría
+          # al último -o y se borraría de más… o de menos.
+          find salida \( -name 'CONC2023-*.json' -o -name 'JAL2023-*.json' -o -name 'ASAM2023-*.json' \) -delete
+          du -sh salida | sed 's/^/  /'
+          find salida -type f | wc -l | xargs echo '  archivos:'
+
+      # Queda descargable aunque la subida falle: así la corrida nunca se pierde.
+      - name: Guardar lo generado
+        uses: actions/upload-artifact@v4
+        with:
+          name: indices-2023
+          retention-days: 14
+          path: salida/
+
+      - name: Subir a S3
+        if: ${{ !inputs.seco }}
+        env:
+          RR_S3_KEY_ID: ${{ secrets.RR_S3_KEY_ID }}
+          RR_S3_SECRET: ${{ secrets.RR_S3_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RR_S3_KEY_ID:-}" ] || [ -z "${RR_S3_SECRET:-}" ]; then
+            echo "✗ Faltan los secretos RR_S3_KEY_ID y RR_S3_SECRET del repositorio."
+            echo "  Lo generado quedó como artefacto de esta corrida, así que no se perdió."
+            exit 1
+          fi
+          python3 tools/analisis-candidato/subir_2023.py --sin-verificar
+
+      - name: Extraer el voto de lista para el sitio
+        run: |
+          set -euo pipefail
+          python3 tools/analisis-candidato/extraer_listas.py --salida listas-2023.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: listas-2023
+          retention-days: 14
+          path: listas-2023.json
