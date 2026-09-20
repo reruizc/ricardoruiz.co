@@ -81,12 +81,18 @@
      sus vecinas del espectro y la página lo declara. */
   const VECINAS = { izq: ['izq', 'ci'], ci: ['ci', 'izq', 'c'], c: ['c', 'ci', 'cd'], cd: ['cd', 'c', 'd'], d: ['d', 'cd'] };
   const setFamilia = f => f instanceof Set ? f : new Set([f]);
-  function votosFamilia(v, cands, partidos, familia) {
+  /* `listas` es el voto SOLO POR LA LISTA (el logo), que no tiene candidato y
+     va indexado por partido. Sin él, una lista cerrada vale cero: el Pacto
+     Histórico sacó 376.644 votos en el Concejo de Bogotá 2023 y todos fueron
+     así, de modo que el mapa de la izquierda bogotana salía vacío. */
+  function votosFamilia(v, cands, partidos, familia, listas) {
     const PB = global.PartidosBloques, fam = setFamilia(familia); let propios = 0, total = 0;
-    (v || []).forEach(([ci, n]) => {
-      const nombre = partidos?.[cands?.[ci]?.[1]]?.[0]; if (!nombre) return;
+    const sumar = (nombre, n) => {
+      if (!nombre) return;
       total += n; if (fam.has(PB?.bloqueDeOrganizacion?.(nombre) || 'sc')) propios += n;
-    });
+    };
+    (v || []).forEach(([ci, n]) => sumar(partidos?.[cands?.[ci]?.[1]]?.[0], n));
+    (listas || []).forEach(([pi, n]) => sumar(partidos?.[pi]?.[0], n));
     return { propios, total };
   }
   function votosFamiliaPartidos(partidos, familia) {
@@ -129,6 +135,15 @@
     { match: ['PEREIRA'], path: 'PEREIRAX.json', unidad: 'comuna', code: p => String(p.Comuna || ''), name: p => p.Comuna || 'Comuna', porNombre: true },
     { match: ['IBAGUE'], path: 'IBAGUEX.json', unidad: 'comuna', code: p => String(p.COMUNAS || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.COMUNAS || 'Comuna' },
     { match: ['BARRANQUILLA'], path: 'BARRANQUILLAX.json', unidad: 'localidad', code: p => ({ 4: '01', 2: '02', 1: '03', 3: '04', 5: '05' })[Number(p.id)] || '', name: p => p.nombre || 'Localidad' },
+    /* Cartagena se divide en 15 Unidades Comuneras de Gobierno más la 20, que
+       agrupa los corregimientos y las islas. El georef solo le pone las 3
+       localidades, así que la UCG de cada puesto la resuelve por PIP
+       build_cartagena_ucg.py; acá va la capa ya disuelta.
+       ⚠️ Lleva ventana fija por lo mismo que Bogotá: la UCG 20 llega hasta
+       Isla Fuerte, a 100 km al sur, y encuadrar por ella deja el casco urbano
+       8 veces más pequeño de lo que cabe. Las islas siguen en el mapa; hay
+       que alejar para verlas. */
+    { match: ['CARTAGENA'], path: 'CARTAGENA-UCG.json', unidad: 'comuna', code: p => String(p.CODIGO || ''), name: p => p.NOMBRE || 'UCG', ventana: { sur: 10.275, norte: 10.47, oeste: -75.58, este: -75.415 } },
     { match: ['MONTERIA'], path: 'MONTERIAX.json', unidad: 'comuna', code: p => String(p.CC_COMUNA || '').padStart(2, '0'), name: p => p.NMG || 'Comuna' },
     { match: ['MANIZALES'], path: 'MANIZALESX.json', unidad: 'comuna', code: p => String(p.ID_COMUNA || '').padStart(2, '0'), name: p => p.NOMBRES_CO || 'Comuna' },
     { match: ['BUCARAMANGA'], path: 'BUCARAMANGAX.json', unidad: 'comuna', code: p => String(p.COD_COMUNA || '').padStart(2, '0'), name: p => p.NOMBRE_COM || 'Comuna' },

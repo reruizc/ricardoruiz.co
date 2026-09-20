@@ -66,8 +66,19 @@ CITIES = {
     ('16', '001'): 'BOGOTÁ D.C.', ('01', '001'): 'MEDELLÍN', ('31', '001'): 'CALI',
     ('27', '001'): 'BUCARAMANGA', ('25', '001'): 'CÚCUTA', ('29', '001'): 'IBAGUÉ',
     ('09', '001'): 'MANIZALES', ('13', '001'): 'MONTERÍA', ('19', '001'): 'NEIVA',
-    ('11', '001'): 'POPAYÁN', ('52', '001'): 'VILLAVICENCIO',
+    ('11', '001'): 'POPAYÁN', ('52', '001'): 'VILLAVICENCIO', ('05', '001'): 'CARTAGENA',
 }
+# ⚠️ Cartagena no se resuelve como las demás: el georef solo le pone sus 3
+# LOCALIDADES en «CÓDIGO COMUNA», y tres unidades no son un mapa. Su división
+# operativa son las 15 Unidades Comuneras de Gobierno más la 20, que agrupa los
+# corregimientos y las islas. Ese mapa puesto → UCG lo produce
+# `build_cartagena_ucg.py` (PIP contra los barrios, con su cascada) y se lee de
+# archivo para no tener la misma cuenta en dos builders.
+COMUNA_EXTERNA = {
+    ('05', '001'): os.path.join(BD, 'output_hvp', 'cartagena-puesto-ucg.json'),
+}
+# Cómo se llama la unidad cuando el nombre no viene del georef.
+COM_LABEL = {('05', '001'): 'UCG'}
 # Ciudades con GeoJSON de barrio → mapa de barrios (PIP). url + candidatos a campo nombre.
 BARRIO_GEO = {
     ('16', '001'): f'{GEO_S3}/BOG-BARRIOS-CATASTRALES.json',
@@ -77,6 +88,7 @@ BARRIO_GEO = {
     ('25', '001'): f'{GEO_S3}/CUCUTA-BARRIOS.json',
     ('09', '001'): f'{GEO_S3}/MANIZALES-BARRIOS.json',
     ('11', '001'): f'{GEO_S3}/POPAYAN-BARRIOS.json',
+    ('05', '001'): f'{GEO_S3}/CARTAGENA-BARRIOS.json',
 }
 # Polígonos de comuna/localidad — LOS MISMOS del mapa superior (CITY_GEO del HTML).
 # Se usan para saber a qué comuna pertenece cada barrio (PIP de su centroide).
@@ -89,6 +101,7 @@ COMUNA_GEO = {
     ('09', '001'): (f'{GEO_S3}/MANIZALESX.json',     lambda p: p.get('ID_COMUNA')),
     ('11', '001'): (f'{GEO_S3}/POPAYANX.json',
                     lambda p: p.get('ACAD_TEXT') if p.get('ACAD_TEXT') is not None else p.get('COMUNAS')),
+    ('05', '001'): (f'{GEO_S3}/CARTAGENAX.json', lambda p: p.get('UCG')),
 }
 NAME_FIELDS = ['nombre', 'NOMBRE', 'barrio', 'BARRIO', 'BARRIOS', 'Barrio', 'NOMBRE_BAR', 'name', 'NOM_BARRIO']
 SPECIAL = {'996', '997', '998', '999'}
@@ -103,7 +116,7 @@ def ensure_sorted():
     Sale SIN encabezado (`awk NR>1`), igual que el de build_jal_2023.py: el loop
     de abajo NO debe saltarse la primera línea. Para las corporaciones que viven
     en GCS_2023TER (4 corporaciones intercaladas, 1,96 GB) se filtra por COD_COR
-    y por las 11 ciudades del tablero, así el temporal baja de GB a decenas de MB.
+    y por las 12 ciudades del tablero, así el temporal baja de GB a decenas de MB.
     """
     if os.path.exists(SORTED) and os.path.getsize(SORTED) > 0:
         print(f'· usando temporal ya ordenado: {SORTED}')
@@ -325,13 +338,19 @@ def flush_city(cands, key_city, pip, index_rows, fill_ctx=None):
         def vlist(cvotes):
             return sorted(([cidx[k], v] for k, v in cvotes.items()), key=lambda x: -x[1])
 
+        # El voto de lista no tiene candidato, así que va indexado por PARTIDO.
+        # Sale aparte de `v` para que nadie lo confunda con un voto nominal.
+        def llist(lvotes):
+            return sorted(([pidx[p], v] for p, v in lvotes.items() if p in pidx),
+                          key=lambda x: -x[1])
+
         # barrios (por feat PIP si hay; si no, por nombre georef)
         barrios_out = []
         for bkey, b in sorted(cd['barrios'].items(), key=lambda kv: -kv[1]['validos']):
             barrios_out.append({
                 'name': b['name'], 'feat': b['feat'],
                 'validos': b['validos'], 'blanco': b['blanco'], 'nulos': b['nulos'],
-                'v': vlist(b['cands']),
+                'v': vlist(b['cands']), 'l': llist(b['listas']),
             })
         # relleno de vecino: barrios de ESTA comuna sin puesto propio (sin datos).
         # Heredan el ganador del barrio CON DATO más cercano de la misma comuna.
@@ -356,19 +375,20 @@ def flush_city(cands, key_city, pip, index_rows, fill_ctx=None):
         # puestos + mesas
         puestos_out = []
         for pk, p in sorted(cd['puestos'].items(), key=lambda kv: -kv[1]['validos']):
-            mesas = [[m, mm['validos'], vlist(mm['cands'])]
+            mesas = [[m, mm['validos'], vlist(mm['cands']), llist(mm['listas'])]
                      for m, mm in sorted(p['mesas'].items())]
             puestos_out.append({
                 'code': pk, 'nombre': p['nombre'], 'barrio': p['barrio'],
                 'lat': p['lat'], 'lon': p['lon'],
                 'validos': p['validos'], 'blanco': p['blanco'], 'nulos': p['nulos'],
-                'v': vlist(p['cands']), 'mesas': mesas,
+                'v': vlist(p['cands']), 'l': llist(p['listas']), 'mesas': mesas,
             })
         out = {
             'dde': dde, 'mme': mme, 'comuna': comC, 'name': cd['name'],
             'has_barrio_map': pip is not None,
             'partidos': [[p, v] for p, v in parties],
             'cands': cands_out,
+            'listas': [[p, v] for p, v in sorted(cd['listas'].items(), key=lambda kv: -kv[1])],
             'totals': {'validos': cd['validos'], 'blanco': cd['blanco'], 'nulos': cd['nulos']},
             'barrios': barrios_out, 'fills': fills_out, 'puestos': puestos_out,
         }
@@ -383,7 +403,27 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     ensure_sorted()
     georef = load_georef()
-    print(f'GEOREF (11 ciudades): {len(georef)} puestos')
+    print(f'GEOREF ({len(CITIES)} ciudades): {len(georef)} puestos')
+
+    # Donde el georef no trae la unidad buena, la comuna del puesto viene de un
+    # archivo aparte. Hoy es Cartagena: el georef solo le pone sus 3 localidades
+    # y su división operativa son las 15 UCG más la 20 rural. Ese mapa lo genera
+    # `build_cartagena_ucg.py` y lo leen TAMBIÉN los resultados agregados, para
+    # que la misma cuenta no viva en dos sitios.
+    for keyc, ruta in COMUNA_EXTERNA.items():
+        if not os.path.exists(ruta):
+            print(f'· ⚠ sin {os.path.basename(ruta)}: {CITIES[keyc]} se queda sin comuna '
+                  f'(corra build_cartagena_ucg.py)')
+            continue
+        with open(ruta, encoding='utf-8') as fh:
+            mapa = json.load(fh)
+        ok = 0
+        for pcode, gi in georef.items():
+            if (pcode[:2], pcode[2:5]) != keyc:
+                continue
+            gi['comC'] = mapa.get(pcode, 'ND')
+            ok += gi['comC'] != 'ND'
+        print(f'· comuna externa en {CITIES[keyc]}: {ok} puestos ubicados')
 
     # PIP por ciudad (una sola vez): asigna barrio a cada pcode de esa ciudad
     pip_by_city = {}
@@ -427,7 +467,7 @@ def main():
         c = cd_map.get(comC)
         if c is None:
             c = cd_map[comC] = {'name': name, 'validos': 0, 'blanco': 0, 'nulos': 0,
-                                'parties': {}, 'cands': {}, 'barrios': {}, 'puestos': {}}
+                                'parties': {}, 'listas': {}, 'cands': {}, 'barrios': {}, 'puestos': {}}
         return c
 
     with open(SORTED, encoding='utf-8', errors='replace', newline='') as f:
@@ -464,7 +504,8 @@ def main():
             c = comuna(cands, comC, clean_com(''))   # name se fija abajo con georef comuna
             # nombre de comuna: usar el de resultados (número); dejamos genérico
             if c['name'] == 'ND' or not c['name']:
-                c['name'] = f'COMUNA {int(comC)}' if comC.isdigit() else comC
+                rotulo = COM_LABEL.get(keyc, 'COMUNA')
+                c['name'] = f'{rotulo} {int(comC)}' if comC.isdigit() else comC
             ms = (row[C_MS] or '').strip().zfill(3)
             # totales de puesto (incluye blanco/nulos para participación local)
             pk = f'{zz}-{pp}'
@@ -476,18 +517,17 @@ def main():
                     'nombre': gi['pueNom'] if gi else f'PUESTO {zz}-{pp}',
                     'barrio': barrio_label, 'feat': fi,
                     'lat': gi['lat'] if gi else None, 'lon': gi['lon'] if gi else None,
-                    'validos': 0, 'blanco': 0, 'nulos': 0, 'cands': {}, 'mesas': {}}
+                    'validos': 0, 'blanco': 0, 'nulos': 0, 'cands': {}, 'listas': {}, 'mesas': {}}
             mm = p['mesas'].get(ms)
             if mm is None:
-                mm = p['mesas'][ms] = {'validos': 0, 'blanco': 0, 'nulos': 0, 'cands': {}}
+                mm = p['mesas'][ms] = {'validos': 0, 'blanco': 0, 'nulos': 0, 'cands': {}, 'listas': {}}
             # barrio bucket (por feat si hay PIP, si no por nombre)
             bkey = p['feat'] if p['feat'] is not None else strip(p['barrio'])
             b = c['barrios'].get(bkey)
             if b is None:
                 b = c['barrios'][bkey] = {'name': p['barrio'], 'feat': p['feat'],
-                                          'validos': 0, 'blanco': 0, 'nulos': 0, 'cands': {}}
-            if can == '0':
-                continue
+                                          'validos': 0, 'blanco': 0, 'nulos': 0,
+                                          'cands': {}, 'listas': {}}
             if can == '996':
                 c['blanco'] += v; p['blanco'] += v; mm['blanco'] += v; b['blanco'] += v
             elif can in SPECIAL:
@@ -496,9 +536,21 @@ def main():
                 c['validos'] += v; p['validos'] += v; mm['validos'] += v; b['validos'] += v
                 par = row[C_PAR].strip()
                 party = (row[C_DESPAR] or '').strip() or 'SIN PARTIDO'
+                add(c['parties'], party, v)
+                # ⚠️ `can == '0'` es el voto SOLO POR LA LISTA (el logo), y en
+                # lista cerrada es TODO el voto del partido. Descartarlo dejaba
+                # al Pacto Histórico —la lista más votada del Concejo de Bogotá
+                # 2023, con 381.804 votos— en CERO en el mapa de familias
+                # políticas, y se comía el 6-7 % de los válidos en el resto.
+                # Es voto válido de ese partido aunque no sea de nadie, así que
+                # va a `listas` y no a `cands`: no hay candidato que nombrar.
+                # Misma convención que build_territorial_resultados.py.
+                if can == '0':
+                    add(c['listas'], party, v); add(p['listas'], party, v)
+                    add(mm['listas'], party, v); add(b['listas'], party, v)
+                    continue
                 nom = strip(row[C_DESCAN]) or f'CAND {can}'
                 ck = (par, can, nom)
-                add(c['parties'], party, v)
                 cc = c['cands'].get(ck)
                 if cc is None:
                     cc = c['cands'][ck] = {'nom': nom, 'par_name': party, 'v': 0}

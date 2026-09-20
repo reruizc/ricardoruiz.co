@@ -69,7 +69,17 @@ CITIES = {
     ('19', '001'): ('NEIVA',         'HUILA',              'comuna'),
     ('11', '001'): ('POPAYÁN',       'CAUCA',              'comuna'),
     ('52', '001'): ('VILLAVICENCIO', 'META',               'comuna'),
+    ('05', '001'): ('CARTAGENA',     'BOLÍVAR',            'comuna'),
 }
+# Cartagena no tiene su unidad en el georef —ahí solo van sus 3 localidades— y
+# su división operativa son las 15 UCG más la 20 rural. El mapa puesto → UCG lo
+# produce build_cartagena_ucg.py y lo comparte con el detalle por comuna, para
+# que la misma cuenta no viva en dos builders.
+COMUNA_EXTERNA = {
+    ('05', '001'): os.path.join(BD, 'output_hvp', 'cartagena-puesto-ucg.json'),
+}
+# Cómo se llama la unidad de las ciudades resueltas por archivo externo.
+COM_LABEL = {('05', '001'): 'UCG'}
 SPECIAL = {'996', '997', '998', '999'}   # blanco, nulos, no-marcados, no-marcados
 # Columnas por NOMBRE: el archivo territorial trae 19 columnas y el de JAL 16.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -95,6 +105,13 @@ def clean_com(comN):
 def load_georef():
     """(dd,mm,zz,pp) → comCode · potencial por (dd,mm,comCode)."""
     by9 = {}
+    _EXTERNA = {}
+    for keyc, ruta in COMUNA_EXTERNA.items():
+        if os.path.exists(ruta):
+            with open(ruta, encoding='utf-8') as fh:
+                _EXTERNA[keyc] = json.load(fh)
+        else:
+            print(f'· ⚠ sin {os.path.basename(ruta)}: esa ciudad se queda sin comuna')
     pot = {}   # (dd,mm,comCode) → censo (M+H)
     comN = {}  # (dd,mm,comCode) → nombre limpio
     keys = {f'{dd}{mm}' for (dd, mm) in [(d.zfill(2), m.zfill(3)) for (d, m) in CITIES]}
@@ -107,6 +124,15 @@ def load_georef():
             name = (row.get('NOMBRE COMUNA') or '').strip()
             if comC.upper() in ('NULL', ''):
                 comC = 'ND'
+            keyc = (code[:2], code[2:5])
+            ext = _EXTERNA.get(keyc)
+            if ext is not None:
+                comC = ext.get(code, 'ND')
+                # El nombre del georef es el de la LOCALIDAD y ya no corresponde
+                # a esta unidad: las 16 UCG de Cartagena caen dentro de solo 3
+                # localidades, así que dejarlo repetía «LOC. 3 INDUSTRIAL DE LA
+                # BAHÍA» en cinco comunas distintas.
+                name = f"{COM_LABEL.get(keyc, 'COMUNA')} {int(comC)}" if comC.isdigit() else ''
             by9[code] = comC
             k = (code[:2], code[2:5], comC)
             try:
