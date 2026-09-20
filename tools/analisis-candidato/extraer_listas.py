@@ -65,7 +65,9 @@ def main():
 
     if not out['corps']:
         sys.exit('no se extrajo nada: ¿corrió regenerar_2023.sh?')
-    os.makedirs(os.path.dirname(args.salida), exist_ok=True)
+    carpeta = os.path.dirname(args.salida)
+    if carpeta:                      # os.makedirs('') revienta: una ruta sin
+        os.makedirs(carpeta, exist_ok=True)   # carpeta ya está donde toca.
     with open(args.salida, 'w', encoding='utf-8') as f:
         json.dump(out, f, ensure_ascii=False, separators=(',', ':'))
     print(f'\n→ {args.salida} ({os.path.getsize(args.salida) / 1024:.0f} KB · {total:,} listas)')
