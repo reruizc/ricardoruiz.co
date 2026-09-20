@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="En cuántos puestos tiene que poner testigo el día de la elección, en cuáles, y qué se va a encontrar cada uno cuando llegue.">
+<title>El día de la elección · Candidato 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<!-- ⚠️ Al tocar candidato-360.css, candidato-360-panel.js o candidato-360-diad.js hay que bumpear su ?v= acá y en las otras páginas del panel. -->
+<link rel="stylesheet" href="candidato-360.css?v=20260926">
+<style>
+/* El chasis del panel, igual que en electorado, medios y redes. */
+.panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
+.panel-hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:30px}
+.panel-hero h1{font:800 clamp(30px,4.4vw,46px)/1.06 var(--display);letter-spacing:-.02em;margin:8px 0 10px;color:var(--ink);max-width:24ch;text-wrap:balance}
+.panel-hero p{margin:0;max-width:64ch;font-size:15px;line-height:1.6;color:var(--muted)}
+.panel-candidatura:empty{display:none}
+.panel-candidatura{display:inline-block;margin-top:14px;font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--green);border:1px solid rgba(20,124,112,.32);padding:6px 10px}
+.panel-nota{margin-top:24px;font-size:12.5px;line-height:1.55;color:var(--muted)}
+.hidden{display:none}
+
+/* ── El control: cuántos testigos consigue ───────────────────────────── */
+.dd-cifra{display:flex;flex-wrap:wrap;gap:clamp(18px,4vw,44px);align-items:flex-end;margin:20px 0 8px}
+.dd-cifra b{display:block;font:800 clamp(40px,7vw,64px)/1 var(--display);letter-spacing:-.03em;color:var(--ink)}
+.dd-cifra span{display:block;font-size:13px;color:var(--muted);margin-top:4px;max-width:22ch}
+.dd-cifra .verde b{color:var(--green)}
+.dd-barra{height:12px;background:rgba(20,124,112,.12);border:1px solid var(--line);margin:18px 0 6px;position:relative;overflow:hidden}
+.dd-barra i{display:block;height:100%;background:var(--green);transition:width .18s ease}
+.dd-rango{width:100%;margin:10px 0 4px;accent-color:var(--green)}
+.dd-atajos{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.dd-atajo{font:500 12px var(--mono);padding:7px 12px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.dd-atajo:hover{border-color:var(--green);color:var(--green)}
+.dd-atajo[aria-pressed="true"]{border-color:var(--green);color:var(--green);background:rgba(20,124,112,.08)}
+
+/* ── Los avisos ──────────────────────────────────────────────────────── */
+.dd-avisos{display:grid;gap:12px;margin-top:6px}
+.dd-aviso{border:1px solid var(--line);border-left:3px solid var(--amber,#c88a2e);padding:14px 16px}
+.dd-aviso h4{margin:0 0 5px;font:700 15px/1.3 var(--display);color:var(--ink)}
+.dd-aviso h4 em{font-style:normal;color:var(--amber,#c88a2e)}
+.dd-aviso p{margin:0;font-size:13.5px;line-height:1.55;color:var(--muted)}
+
+/* ── La tabla de puestos ─────────────────────────────────────────────── */
+.dd-tabla-caja{overflow-x:auto;margin-top:6px;border:1px solid var(--line)}
+table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px}
+.dd-tabla th{text-align:left;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;background:rgba(0,0,0,.02)}
+.dd-tabla td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.dd-tabla tr:last-child td{border-bottom:0}
+.dd-tabla tr.fuera{opacity:.42}
+.dd-tabla .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dd-tabla .rango{font:600 12px var(--mono);color:var(--muted)}
+.dd-tabla .puesto b{display:block;font-weight:700;color:var(--ink)}
+.dd-tabla .puesto small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.dd-marcas{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.dd-marca{font:500 10.5px var(--mono);letter-spacing:.04em;padding:2px 6px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.dd-marca.mal{border-color:rgba(200,138,46,.5);color:var(--amber,#c88a2e)}
+.dd-corte td{padding:0;border-bottom:2px solid var(--green)}
+.dd-corte-et{font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--green);padding:8px 12px 6px;display:block}
+
+.dd-acciones{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.dd-privacidad{margin-top:18px;border:1px solid var(--line);padding:14px 16px;font-size:13px;line-height:1.6;color:var(--muted)}
+.dd-privacidad b{color:var(--ink)}
+@media print{
+  .panel-hero p,.dd-acciones,.dd-rango,.dd-atajos,.dd-privacidad,nav,.panel-candidatura{display:none!important}
+  .dd-tabla tr.fuera{display:none}
+  .dd-tabla-caja{overflow:visible;border:0}
+  table.dd-tabla{min-width:0;font-size:11px}
+}
+</style>
+</head>
+<body>
+<main class="app-shell"><div class="panel-shell">
+  <header class="panel-hero">
+    <div class="kicker">Candidato 360 · panel 09</div>
+    <h1>El día de la elección.</h1>
+    <p>Un testigo en cada puesto no le alcanza a nadie. Lo que sí se puede saber es <b>en cuáles</b> están sus votos, cuántos necesita para cubrir la parte que le importa, y <b>qué se va a encontrar cada testigo cuando llegue</b>: si hay señal para reportar, si hay dónde publicar el E‑14, cuántas mesas le tocan. Sale de su votación anterior y de la hoja de vida que la Registraduría levanta de cada puesto.</p>
+    <span class="panel-candidatura" id="panelCandidatura"></span>
+  </header>
+  <div id="panelMuro" class="hidden"></div>
+  <div id="panelCuerpo">
+    <div id="ddCargando" class="panel"><p class="helper" style="margin:0">Cruzando su votación con la hoja de vida de los puestos…</p></div>
+    <div id="ddAviso" class="hidden"></div>
+    <div id="ddCuerpo" class="hidden">
+
+      <section class="panel" id="ddPlan">
+        <span class="panel-num">01 · Cuánta gente necesita</span>
+        <h3 id="ddPlanTitulo">Su plan de cobertura.</h3>
+        <p id="ddPlanCopy"></p>
+        <div class="dd-cifra">
+          <div><b id="ddTestigos">—</b><span>testigos de puesto</span></div>
+          <div class="verde"><b id="ddShare">—</b><span id="ddShareSub">de su votación queda cubierta</span></div>
+          <div><b id="ddMesas">—</b><span id="ddMesasSub">mesas, si quisiera testigo en cada una</span></div>
+        </div>
+        <div class="dd-barra"><i id="ddBarra" style="width:0"></i></div>
+        <input class="dd-rango" type="range" id="ddRango" min="1" max="10" value="1" aria-label="Cuántos testigos de puesto puede poner">
+        <div class="dd-atajos" id="ddAtajos"></div>
+      </section>
+
+      <section class="panel" id="ddAvisosSec">
+        <span class="panel-num">02 · Qué se va a encontrar</span>
+        <h3>Lo que hay que resolver antes del domingo.</h3>
+        <p id="ddAvisosCopy"></p>
+        <div class="dd-avisos" id="ddAvisos"></div>
+      </section>
+
+      <section class="panel" id="ddTablaSec">
+        <span class="panel-num">03 · En cuáles</span>
+        <h3>Sus puestos, del que más pesa al que menos.</h3>
+        <p id="ddTablaCopy"></p>
+        <div class="dd-tabla-caja"><table class="dd-tabla"><thead><tr>
+          <th>#</th><th>Puesto</th><th class="num">Mesas</th><th class="num">Votos suyos</th><th class="num">% acum.</th>
+        </tr></thead><tbody id="ddFilas"></tbody></table></div>
+        <div class="dd-acciones">
+          <button type="button" class="solid" id="ddCsv">Descargar el plan (Excel)</button>
+          <button type="button" class="ghost" id="ddImprimir">Imprimir la lista</button>
+        </div>
+        <div class="dd-privacidad">
+          <b>Acá no se le pide ni un dato de su equipo.</b> El archivo baja con la columna
+          «Testigo» en blanco: los nombres los pone usted, en su computador, en su archivo.
+          No los guardamos ni los vemos. Lo que esta página calcula sale de su votación
+          publicada y del registro público de los puestos.
+        </div>
+      </section>
+
+    </div>
+    <p class="panel-nota" id="ddNota"></p>
+  </div>
+</div></main>
+<script src="platform-config.js"></script>
+<script src="data-client.js"></script>
+<script src="candidato-360-electorado.js?v=20260919c"></script>
+<script src="candidato-360-diad.js?v=20260920"></script>
+<script src="candidato-360-panel.js?v=20260919d"></script>
+<script>
+(async function () {
+  const P = window.C360Panel, E = window.C360Electorado, D = window.C360DiaD, $ = P.$, esc = P.esc;
+  const num = x => Number(x || 0).toLocaleString('es-CO');
+  const pct0 = x => `${Math.round((x || 0) * 100)} %`;
+  const ACC = ['Sin dificultad', 'Acceso medio', 'Acceso alto', 'Acceso extremo'];
+  let PLAN = null, SEL = 1;
+
+  /* Los atajos son la pregunta al revés — «quiero cubrir el 70 %, ¿cuánta
+     gente consigo?» —, que es como de verdad se piensa el problema. */
+  const ATAJOS = [.5, .7, .9, 1];
+
+  function marcas(p) {
+    if (p.sinFicha) return '<span class="dd-marca">sin hoja de vida publicada</span>';
+    const h = p.hvp, m = [];
+    if (!h.mov) m.push(['mal', 'sin señal móvil']);
+    if (!h.net) m.push(['mal', 'sin internet']);
+    if (!h.e14) m.push(['mal', 'sin dónde publicar E-14']);
+    if (h.ord) m.push(['mal', 'orden público']);
+    if (h.acc >= 2) m.push(['mal', ACC[h.acc].toLowerCase()]);
+    if (!h.dis) m.push(['mal', 'no accesible']);
+    if (h.abr) m.push(['', `abre: ${h.abr.toLowerCase()}`]);
+    return m.slice(0, 5).map(([c, t]) => `<span class="dd-marca ${c}">${esc(t)}</span>`).join('');
+  }
+
+  function pintar() {
+    const c = D.cobertura(PLAN, SEL);
+    $('ddTestigos').textContent = num(c.testigos);
+    $('ddShare').textContent = pct0(c.share);
+    $('ddMesas').textContent = num(c.mesas);
+    $('ddBarra').style.width = `${Math.max(1, c.share * 100)}%`;
+    $('ddRango').value = String(SEL);
+    [...$('ddAtajos').children].forEach(b => b.setAttribute('aria-pressed',
+      String(Number(b.dataset.n) === SEL)));
+
+    /* Los avisos ──────────────────────────────────────────────────────── */
+    const av = D.alertas(c);
+    $('ddAvisosCopy').innerHTML = av.length
+      ? `Sobre los <b>${num(c.testigos)}</b> puestos que va a cubrir. Todo esto lo declaró el registrador del municipio en enero de 2026, cuando levantó la hoja de vida de cada puesto.`
+      : 'Sobre los puestos que va a cubrir no hay nada que advertir: todos tienen señal, internet y dónde publicar el acta.';
+    $('ddAvisos').innerHTML = av.map(a => `<div class="dd-aviso">
+      <h4><em>${num(a.n)} de ${num(a.de)}</em> ${esc(a.titulo)}</h4>
+      <p>${esc(a.que)}</p></div>`).join('');
+
+    /* La tabla: se ven todos, pero lo que queda fuera del plan va apagado.
+       Ocultarlo escondería que la cola existe y es larga. */
+    const corte = c.testigos;
+    $('ddFilas').innerHTML = PLAN.puestos.slice(0, Math.max(corte + 25, 60)).map((p, i) => {
+      const fila = `<tr class="${i < corte ? '' : 'fuera'}">
+        <td class="rango">${p.rango}</td>
+        <td class="puesto"><b>${esc(p.nombre || 'Puesto ' + p.code)}</b>
+          <small>${esc([p.direccion, p.barrio || p.comuna, p.munNom].filter(Boolean).join(' · ') || p.code)}</small>
+          <span class="dd-marcas">${marcas(p)}</span></td>
+        <td class="num">${num(p.mesas)}</td>
+        <td class="num">${num(p.votos)}</td>
+        <td class="num">${pct0(p.cobertura)}</td></tr>`;
+      return i + 1 === corte && corte < PLAN.puestos.length
+        ? fila + `<tr class="dd-corte"><td colspan="5"><span class="dd-corte-et">hasta aquí llega con ${num(corte)} testigo${corte === 1 ? '' : 's'} · lo de abajo queda sin cubrir</span></td></tr>`
+        : fila;
+    }).join('');
+  }
+
+  function armarControles() {
+    const n = PLAN.puestos.length;
+    const r = $('ddRango'); r.min = '1'; r.max = String(n);
+    r.addEventListener('input', () => { SEL = Number(r.value) || 1; pintar(); });
+    $('ddAtajos').innerHTML = ATAJOS.map(o => {
+      const k = D.testigosPara(PLAN, o);
+      return `<button type="button" class="dd-atajo" data-n="${k}" aria-pressed="false">cubrir el ${Math.round(o * 100)} % · ${num(k)} testigo${k === 1 ? '' : 's'}</button>`;
+    }).join('');
+    $('ddAtajos').addEventListener('click', e => {
+      const b = e.target.closest('.dd-atajo'); if (!b) return;
+      SEL = Number(b.dataset.n) || 1; pintar();
+    });
+    $('ddCsv').addEventListener('click', () => {
+      const c = D.cobertura(PLAN, SEL);
+      const blob = new Blob([D.csv(c)], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `plan-dia-de-eleccion-${c.testigos}-puestos.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    });
+    $('ddImprimir').addEventListener('click', () => window.print());
+  }
+
+  function aviso(html) {
+    $('ddCuerpo').classList.add('hidden');
+    const a = $('ddAviso');
+    a.innerHTML = `<section class="panel"><span class="panel-num">El día de la elección</span><h3>Todavía no.</h3><p>${html}</p></section>`;
+    a.classList.remove('hidden');
+  }
+
+  async function armar(v) {
+    const slugs = v?.tipo === 'historial' ? (v.candidato?.slugs || []) : [];
+    if (!slugs.length) {
+      return aviso('Esta es una candidatura nueva: sin una elección detrás no hay votos que priorizar, y priorizar al azar sería peor que no hacerlo. Cuando tenga una votación propia, este panel se arma solo. Mientras tanto, la hoja de vida de los puestos de su territorio sí existe y la vamos a traer acá.');
+    }
+    const mesas = await E.mesasDe(slugs);
+    const hvp = await D.hvpDe(mesas);
+    PLAN = D.plan(mesas, hvp);
+    if (!PLAN.puestos.length) return aviso('No encontramos votos suyos por puesto en la fuente publicada.');
+
+    SEL = D.testigosPara(PLAN, .7);
+    $('ddPlanCopy').innerHTML = `Su votación está repartida en <b>${num(PLAN.puestos.length)}</b> puestos. No pesan igual: mueva el control y vea hasta dónde llega con la gente que de verdad consiga.`;
+    $('ddTablaCopy').innerHTML = `Ordenados por los votos que usted sacó ahí. Lo que quede por debajo de la línea es lo que se queda sin testigo con el número que eligió arriba.`;
+    armarControles();
+    pintar();
+    $('ddCuerpo').classList.remove('hidden');
+    const sinFicha = PLAN.puestos.length - PLAN.conFicha;
+    $('ddNota').innerHTML = `Fuente: su votación mesa a mesa publicada por la Registraduría y la <b>hoja de vida del puesto</b> del Divipole 2026, levantada por el registrador de cada municipio con corte al 27 de enero de 2026. Puede haber cambiado desde entonces: es la planeación de la Registraduría, no una garantía.` +
+      (sinFicha ? ` ${num(sinFicha)} de sus puestos no tienen hoja de vida publicada y salen sin ficha, no con ficha inventada.` : '');
+  }
+
+  window.C360DiaDPagina = { armar, plan: () => PLAN };   /* para depurar y para las pruebas */
+  if (!(await P.arrancar('candidato-360-diad.html'))) return;
+  try { await armar(P.SESION.vinculo); }
+  catch (e) { aviso(`No se pudo armar el plan: ${esc(e.message || e)}.`); }
+  $('ddCargando').classList.add('hidden');
+})();
+</script>
+</body>
+</html>

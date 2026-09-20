@@ -2155,6 +2155,7 @@ async function launchCRM(event) {
   pintarEscucha();
   pintarArquetipos();
   pintarPerfil();
+  pintarDiaD();
   pintarFirmas();
   pintarEndoso();
   loadHistoricalMap(crmCandidate);
@@ -2189,6 +2190,7 @@ async function abrirCRMNuevo() {
   pintarEscucha();
   pintarArquetipos();
   pintarPerfil();
+  pintarDiaD();
   pintarFirmas();
   pintarEndoso();
   renderTerritorioObjetivo(c);
@@ -3831,6 +3833,32 @@ function mostrarArquetipos() {
 async function perfilDelVotante() { return C360Electorado.perfil(await mesasDelHistorial()); }
 let PERFIL_ACTUAL = null;
 const pct1 = x => `${(x * 100).toFixed(1).replace('.', ',')} %`;
+/* ── 09 · El día de la elección ───────────────────────────────────────────
+   La tarjeta adelanta la cifra que resuelve el panel: con cuánta gente cubre
+   el 70 % de su votación. El plan completo vive en candidato-360-diad.html.
+   Ojo: acá no se pide ni se guarda un dato del equipo del candidato — los
+   nombres de sus testigos son su base de datos, no la nuestra. */
+async function pintarDiaD() {
+  const card = $('crmDiaD'); if (!card || !window.C360DiaD) return;
+  const D = window.C360DiaD;
+  try {
+    const mesas = await mesasDelHistorial();
+    if (!mesas.length) throw new Error('sin historial');
+    const plan = D.plan(mesas, await D.hvpDe(mesas));
+    if (!plan.puestos.length) throw new Error('sin puestos');
+    const n = D.testigosPara(plan, .7), c = D.cobertura(plan, n);
+    const av = D.alertas(c), peor = av[0];
+    $('crmDiaDTitulo').textContent = `Con ${n.toLocaleString('es-CO')} testigo${n === 1 ? '' : 's'} cubre el 70 % de su votación.`;
+    $('crmDiaDCopy').textContent = `Sus votos están repartidos en ${plan.puestos.length.toLocaleString('es-CO')} puestos y no pesan igual: los ${n.toLocaleString('es-CO')} primeros suman ${c.mesas.toLocaleString('es-CO')} mesas.` +
+      (peor ? ` De esos, ${peor.n.toLocaleString('es-CO')} están ${peor.titulo}.` : '');
+    $('crmDiaDDato').textContent = n.toLocaleString('es-CO');
+    $('crmDiaDSub').textContent = 'testigos para el 70 %';
+  } catch (e) {
+    $('crmDiaDTitulo').textContent = 'Todavía no hay plan para esta candidatura.';
+    $('crmDiaDCopy').textContent = 'Sin una elección detrás no hay votos que priorizar, y priorizar al azar sería peor que no hacerlo. La hoja de vida de los puestos de su territorio sí existe y la va a encontrar en el panel.';
+    $('crmDiaDDato').textContent = '—'; $('crmDiaDSub').textContent = 'sin votación previa';
+  }
+}
 async function pintarPerfil() {
   const card = $('crmPerfil'); if (!card) return;
   PERFIL_ACTUAL = null;
