@@ -70,6 +70,26 @@ Notas de campo (2026-09-17 · cuatro corridas seguidas muertas por timeout):
     segunda ficha seguida sin respuesta se espera `BAN_ESPERA` y se retoma
     desde la primera que falló. Menos peticiones y las fichas sí se traen.
 
+Notas de campo (2026-09-20 · el correo de alarma cada 12 h):
+  · ⚠ LA PARCIAL NO ERA LA FALLA: la falla era llamarla falla. `etapa.py` hacía
+    `estado = 'ok' if rc == 0 else 'error'`, así que el rc=75 que este script
+    elige a propósito —«quedé a medias pero conservé el dato y escribí»— llegaba
+    al vigilante como si fuera un traceback, y mandaba correo en cada corrida.
+    Ahora el cron declara `--rc-aviso 75` y esa parcial se registra como «warn»:
+    queda dicha en el estado y en el latido, pero no despierta a nadie.
+  · El criterio de alarma dejó de ser «¿alcanzó a refrescarlas todas?». Esa meta
+    caduca sola: la legislatura crece ~3 proyectos/día (76 el 23-jul → 254 el
+    19-sep → ~500 para diciembre), así que llegará el punto en que ninguna
+    corrida cierre la pasada completa y eso NO significa que nada funcione. Lo
+    que importa es «¿se cierra el CICLO en un día?»: con dos corridas diarias y
+    rotación (lo que no alcanzó va primero), basta con refrescar la mitad en
+    cada una. Pasando de ahí, rc=1 y el correo sí sale. Ver FRACCION_GRAVE.
+  · Medido sobre 44 días de novedades: de las ~11,6 fichas que se mueven al día,
+    el 88 % del movimiento (estado, comisión, título, autor) ya se ve en la
+    LISTA, que es UNA petición de 0,9 s. Solo el 12 % —ponentes, fechas de
+    debate, ~1 ficha al día— exige el detalle. Ahí está el margen para no tener
+    que pasar por las 254 fichas cada vez; no está hecho todavía.
+
 Uso:
   python3 tools/leyes-senado/harvest_diario.py                      # legislatura por defecto
   python3 tools/leyes-senado/harvest_diario.py --legislatura 2025-2026
@@ -79,6 +99,7 @@ Uso:
 import argparse
 import datetime as dt
 import json
+import os
 import re
 import subprocess
 import sys
@@ -112,14 +133,26 @@ MAX_PDF_POR_CORRIDA = 20
 # baja a mano UNA vez, desde un navegador (el WAF no banea a Chrome).
 MAX_PDF_MB = 100
 
-# La etapa del cron mata a los 3700 s. Se deja de pedir a los 3400: los 300 de
-# margen cubren la peor petición en vuelo (un detalle son 3 × 60 s + 9 s de
-# pausas = 189 s) más escribir snapshot y reporte. ¿Por qué 3400 y no 2400
-# (18-sep-2026)? El WAF corta a los ~11 min de actividad (~85 peticiones) y
-# suelta en ≤10, medido igual en 4 corridas seguidas: cada ventana da ~80
-# fichas y las 254 de la legislatura piden TRES ventanas, 11+10+11+10+11 =
-# 53 min ≈ 3200 s. Con 2400 cabían dos y la corrida salía parcial siempre.
-PRESUPUESTO_S = 3400
+# PRESUPUESTO (20-sep-2026). Ya no es una constante suelta: es un TECHO, y lo
+# que se usa de verdad sale del tiempo que la etapa tiene (`CAUDAL_ETAPA_TOPE_S`,
+# que exporta etapa.py ya descontado el deadline global y la reserva de las
+# etapas siguientes). Antes era 3400 a secas y se desactualizaba solo: cada vez
+# que el cron cambiaba el --timeout había que acordarse de mover también esto.
+#
+# ¿Por qué 5400 de techo? El throughput medido en 5 corridas es de 3,3 a 5,0
+# fichas/min contando los castigos del WAF (el WAF corta a los ~11 min de
+# actividad y suelta en ≤10, así que cada ventana da ~80 fichas). Las 254 de hoy
+# piden entre 3.050 y 4.620 s; 5400 las cubre con holgura y todavía cabe en el
+# tope de 4 h de la corrida, que en un día normal deja 150 min libres.
+#
+# ⚠ Es un techo con fecha de vencimiento: la legislatura crece ~3 proyectos/día
+# (76 el 23-jul → 254 el 19-sep), así que hacia diciembre ni 5400 alcanzarán
+# para una pasada completa. No es grave y NO hay que seguir subiéndolo: el
+# harvester rota (lo que no alcanzó va primero en la corrida siguiente) y con
+# dos corridas al día el ciclo se cierra igual. Lo que importa vigilar no es
+# "¿cerró la pasada?" sino "¿se cierra el ciclo en un día?" — ver FRACCION_GRAVE.
+PRESUPUESTO_S = 5400        # techo
+MARGEN_ETAPA_S = 300        # lo que se le deja a la etapa por encima del presupuesto
 MARGEN_S = 120
 
 # Ban: a la 2ª ficha SEGUIDA sin respuesta se deja de insistir. Una sola puede
@@ -136,6 +169,14 @@ MAX_ESPERAS = 2
 # para que en el log no se confunda con un traceback. 75 = EX_TEMPFAIL.
 RC_PARCIAL = 75
 MAX_FALLIDOS_OK = 5
+
+# Cuándo una parcial deja de ser rutina y merece despertar a alguien. El criterio
+# NO es "¿alcanzó a refrescarlas todas?" (eso deja de pasar solo, por el simple
+# crecimiento de la legislatura) sino "¿se cierra el ciclo en un día?": con dos
+# corridas diarias, si cada una refresca al menos la mitad, en 24 h no queda
+# ninguna ficha sin mirar. Pasando de ahí sí hay riesgo de servir dato viejo, y
+# ahí el rc vuelve a ser 1 → falla de verdad → correo del vigilante.
+FRACCION_GRAVE = 0.5
 
 # <button ... id='textoRadicadoBtn' data-link='https://…pdf'>  (comillas simples en el HTML)
 RE_TEXTO_RADICADO = re.compile(
@@ -168,6 +209,27 @@ def curl(url, post=None, timeout=60, binary=False, retries=3, delay=1.5):
             return r.stdout if binary else r.stdout.decode('utf-8', errors='replace')
         time.sleep(delay * (intento + 1))
     return b'' if binary else ''
+
+
+def presupuesto_efectivo(pedido):
+    """Segundos que esta corrida se permite pedir.
+
+    Si lo dan por bandera, manda. Si no, se deriva del tope REAL de la etapa
+    (`CAUDAL_ETAPA_TOPE_S`, que etapa.py exporta ya descontados el deadline
+    global de la corrida y la reserva de las etapas siguientes) menos el margen
+    de la peor petición en vuelo. Así el harvester se ajusta solo al tiempo que
+    de verdad tiene: si la corrida arrancó tarde, pide menos en vez de hacer que
+    la maten a media petición y dejar sin correr a las etapas de después.
+    """
+    if pedido:
+        return pedido
+    try:
+        tope = int(os.environ.get('CAUDAL_ETAPA_TOPE_S') or 0)
+    except ValueError:
+        tope = 0
+    if tope <= 0:
+        return PRESUPUESTO_S                    # a mano, fuera del cron
+    return max(60, min(PRESUPUESTO_S, tope - MARGEN_ETAPA_S))
 
 
 def slug(txt):
@@ -355,9 +417,12 @@ def main():
                     help='tope de PDFs por corrida (el resto queda para mañana)')
     ap.add_argument('--max-pdf-mb', type=float, default=MAX_PDF_MB,
                     help='un PDF más pesado que esto no se baja: se anota para bajarlo a mano')
-    ap.add_argument('--presupuesto', type=int, default=PRESUPUESTO_S,
-                    help='segundos tras los cuales deja de pedir y escribe lo avanzado')
+    ap.add_argument('--presupuesto', type=int, default=None,
+                    help='segundos tras los cuales deja de pedir y escribe lo avanzado '
+                         f'(por defecto: el tope de la etapa menos {MARGEN_ETAPA_S} s, '
+                         f'con techo de {PRESUPUESTO_S})')
     args = ap.parse_args()
+    args.presupuesto = presupuesto_efectivo(args.presupuesto)
 
     # Con la salida entubada (etapa.py) Python la guarda en bloque: si la etapa
     # moría, las líneas de stdout se perdían y las de stderr salían antes que
@@ -366,6 +431,9 @@ def main():
 
     t0 = time.time()
     limite = t0 + args.presupuesto
+    print(f'· presupuesto de esta corrida: {args.presupuesto} s'
+          + (f' (tope de la etapa: {os.environ["CAUDAL_ETAPA_TOPE_S"]} s)'
+             if os.environ.get('CAUDAL_ETAPA_TOPE_S') else ' (fuera del cron)'))
     hora = lambda: time.strftime('%H:%M:%S')             # noqa: E731
 
     leg = args.legislatura
@@ -576,8 +644,20 @@ def main():
     print(f'· novedades → {(nov / f"{hoy}.md").relative_to(REPO)}')
 
     if corte or len(fallidos) > MAX_FALLIDOS_OK:
+        grave = len(fallidos) > FRACCION_GRAVE * max(1, len(lista))
         print(f'  ✗ corrida PARCIAL: {len(fallidos)} de {len(lista)} fichas sin refrescar'
               f'{" · " + corte if corte else ""}. Lo avanzado quedó escrito.', file=sys.stderr)
+        if grave:
+            # Más de la mitad sin mirar: dos corridas al día ya no alcanzan para
+            # pasar por todas, así que el cliente puede estar viendo dato viejo.
+            # Esto sí es falla y tiene que sonar.
+            print(f'  ✗✗ y eso es MÁS DE LA MITAD: con dos corridas al día el ciclo no '
+                  f'cierra y hay fichas que llevarán más de un día sin refrescar.',
+                  file=sys.stderr)
+            return 1
+        # Parcial de rutina: la próxima corrida arranca por las que quedaron.
+        print(f'  · las {len(fallidos)} que faltan van primero en la corrida siguiente: '
+              f'el ciclo se cierra igual.', file=sys.stderr)
         return RC_PARCIAL
     return 0
 

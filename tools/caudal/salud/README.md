@@ -9,6 +9,7 @@ que paga.
 | `check.py` | aplica el catálogo → escribe `Bases de datos/leyes-senado/diario/estado.json` |
 | `etapa.py` | corre UNA etapa del cron con timeout y deja constancia (lo usa `run_diario.sh`) |
 | `latido.py` | arma el **latido** público y reducido de `estado.json`, que `run_diario.sh` sube a S3 para el vigilante de afuera |
+| `prueba_etapa.py` | pruebas de `etapa.py` (veredicto, reserva, tope al hijo) — no tocan la red |
 | `PLAN-salir-del-mac.md` | evaluación y recomendación para dejar de depender del portátil |
 
 ## Uso
@@ -34,6 +35,34 @@ Códigos de salida, para no tener que parsear nada:
 `run_diario.sh` lo llama al final de cada corrida con `--etapas`, y así
 `estado.json` queda con las tres capas: **qué corrió**, **qué tan fresco está el
 dato** y **si la Lambda responde**.
+
+## Cuándo una etapa es «falla» y cuándo solo es «parcial»
+
+`etapa.py` marca `ok` si el rc es 0 y `error` si no. Con una excepción: los
+códigos que el cron declara en `--rc-aviso` se registran como **`warn`**, y eso
+cambia dos cosas — `check.py` los pone en `avisaron` (no en `fallaron`) y el
+vigilante de afuera **no manda correo**, porque solo mira `estado == "error"`.
+
+Es para la degradación PREVISTA: un script que hizo su trabajo, quedó a medias y
+lo dejó dicho. Hoy la usa una sola etapa:
+
+```
+etapa --nombre senado_radicados --rc-aviso 75 ...
+```
+
+El harvester del Senado sale con 75 cuando no alcanzó a refrescar todas las
+fichas: conserva el dato anterior y pone las que faltaron de primeras en la
+corrida siguiente, así que el ciclo se cierra igual. Si la parcial es GRAVE
+—más de la mitad sin refrescar, o sea que dos corridas al día ya no alcanzan—
+el propio harvester sale con 1 y entonces sí es falla y sí suena.
+
+La regla para agregar otro `--rc-aviso`: el rc tiene que **elegirlo el script**
+a sabiendas, y el script tiene que dejar el dato utilizable. Un rc que salga de
+un traceback, de un `curl` o del timeout no califica (de hecho una etapa colgada
+se registra como `error` aunque su 124 esté declarado).
+
+⚠ Candidata pendiente: `sucop_fetch` sale con 1 cuando una página de las ~8
+falla, aunque el resto sirva y el build siga adelante. Hoy manda correo por eso.
 
 ## Quién avisa si esto no corre
 

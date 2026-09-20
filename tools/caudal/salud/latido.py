@@ -95,6 +95,7 @@ def main():
         lat.update(
             estado=est.get('estado', 'error'),
             etapas_fallidas=list(c.get('fallaron') or []),
+            etapas_parciales=list(c.get('avisaron') or []),
             n_etapas=c.get('n'), n_fallo=c.get('n_fallo'), n_omitida=c.get('n_omitida'),
             frescura={k: fr.get(k) for k in ('estado', 'n', 'n_aviso', 'n_error')},
             **{'lambda': {k: la.get(k) for k in ('estado', 'n', 'n_aviso', 'n_error')}},
@@ -102,6 +103,11 @@ def main():
         partes = []
         if lat['etapas_fallidas']:
             partes.append('falló ' + ', '.join(lat['etapas_fallidas'][:6]))
+        # Una etapa parcial NO dispara correo (el vigilante solo mira `estado ==
+        # "error"`), pero tiene que quedar dicha: si no, el latido de una corrida
+        # a medias se leía igual que el de una corrida redonda.
+        if lat['etapas_parciales']:
+            partes.append('parcial en ' + ', '.join(lat['etapas_parciales'][:6]))
         if fr.get('n_error'):
             partes.append(f'{fr["n_error"]} archivo(s) de S3 viejos o rotos')
         if fr.get('errores_de_consulta'):

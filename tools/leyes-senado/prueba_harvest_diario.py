@@ -154,20 +154,24 @@ m = Mundo(n=40, previos=30)
 t_ban = m.t + 30
 m.ban = lambda t: t >= t_ban
 rc, snap = m.corre('--no-pdf')
-ok(rc == hd.RC_PARCIAL, f'sale con {hd.RC_PARCIAL} (parcial), no con 0')
+ok(rc == 1, 'sale con 1: deja MÁS DE LA MITAD sin refrescar, eso ya no es rutina sino falla')
 ok(len(snap) == 40, 'el snapshot se escribe con los 40: los nuevos entran aunque sea con la fila de la lista')
 ok(len(m.pedidos['detalle']) < 40, f'no golpea ficha por ficha ({len(m.pedidos["detalle"])} peticiones de detalle)')
 ok(snap['100']['estado'] == 'PENDIENTE' and snap['100'].get('fecha_de_presentacion'),
    'lo conservado es la ficha completa anterior')
 
 print('\nE · servidor arrastrándose: se acaba el presupuesto y aun así guarda')
-m = Mundo(n=40, previos=30)
+# 80 fichas a 100 s: pide ~54 y deja ~26 (un tercio). Es la parcial de RUTINA —
+# se corta por tiempo, no por ban, y la próxima corrida arranca por las que
+# quedaron. Con 40 fichas ya no servía de prueba: desde que el techo subió a
+# 5400 s le sobraba presupuesto para terminarlas todas.
+m = Mundo(n=80, previos=70)
 m.seg_detalle = 100
 t_ini = m.t
 rc, snap = m.corre('--no-pdf')
-ok(rc == hd.RC_PARCIAL, 'sale parcial')
-ok(len(snap) == 40, 'snapshot escrito')
-ok(m.t - t_ini < 3700, f'termina en {m.t - t_ini:.0f} s de reloj: antes de que la etapa la mate a los 3700')
+ok(rc == hd.RC_PARCIAL, f'sale con {hd.RC_PARCIAL} (parcial de rutina, menos de la mitad sin refrescar)')
+ok(len(snap) == 80, 'snapshot escrito')
+ok(m.t - t_ini < 5700, f'termina en {m.t - t_ini:.0f} s de reloj: antes de que la etapa la mate a los 5700')
 
 print('\nF · lista vacía con snapshot previo: es falla, no «nada que hacer»')
 m = Mundo()
@@ -218,6 +222,37 @@ ok(fund[0]['deltas']['estado'] == {'antes': 'A', 'ahora': 'C'} and 'comision' in
 _, fund = hd.fundir_novedades(p1, [], [{'id': '7', 'numero_senado': '7/26', 'titulo': 't',
                                          'deltas': {'estado': {'antes': 'B', 'ahora': 'A'}}}])
 ok(fund == [], 'un campo que vuelve a su valor original no es movimiento')
+
+print('\nJ · el presupuesto sale del tope que le pasa la etapa, no de una constante')
+import os as _os                                          # noqa: E402
+_antes = _os.environ.pop('CAUDAL_ETAPA_TOPE_S', None)
+ok(hd.presupuesto_efectivo(None) == hd.PRESUPUESTO_S,
+   f'sin la variable (corrida a mano) usa el techo, {hd.PRESUPUESTO_S} s')
+_os.environ['CAUDAL_ETAPA_TOPE_S'] = '1800'
+ok(hd.presupuesto_efectivo(None) == 1800 - hd.MARGEN_ETAPA_S,
+   f'etapa corta: pide {1800 - hd.MARGEN_ETAPA_S} s y le deja {hd.MARGEN_ETAPA_S} a la petición en vuelo')
+_os.environ['CAUDAL_ETAPA_TOPE_S'] = '99999'
+ok(hd.presupuesto_efectivo(None) == hd.PRESUPUESTO_S,
+   'etapa larguísima: el techo manda, no se desboca')
+ok(hd.presupuesto_efectivo(1234) == 1234, '--presupuesto explícito gana siempre')
+_os.environ['CAUDAL_ETAPA_TOPE_S'] = 'basura'
+ok(hd.presupuesto_efectivo(None) == hd.PRESUPUESTO_S, 'una variable corrupta no tumba la corrida')
+if _antes is None:
+    _os.environ.pop('CAUDAL_ETAPA_TOPE_S', None)
+else:
+    _os.environ['CAUDAL_ETAPA_TOPE_S'] = _antes
+
+print('\nK · la frontera entre parcial de rutina y falla de verdad')
+# Mismo escenario que E pero con el presupuesto recortado a mano, para caer a
+# cada lado del 50 %. Es la regla que decide si el vigilante manda correo.
+m = Mundo(n=80, previos=70)
+m.seg_detalle = 100
+rc, _ = m.corre('--no-pdf', '--presupuesto', '5000')      # ~50 de 80 → 30 sin refrescar (37 %)
+ok(rc == hd.RC_PARCIAL, f'37 % sin refrescar → {hd.RC_PARCIAL}: rutina, el ciclo cierra en la corrida siguiente')
+m = Mundo(n=80, previos=70)
+m.seg_detalle = 100
+rc, _ = m.corre('--no-pdf', '--presupuesto', '2000')      # ~20 de 80 → 60 sin refrescar (75 %)
+ok(rc == 1, '75 % sin refrescar → 1: dos corridas al día ya no alcanzan, eso sí es falla')
 
 print()
 if FALLAS:

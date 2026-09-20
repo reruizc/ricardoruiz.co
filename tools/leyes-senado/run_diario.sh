@@ -123,14 +123,26 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
   echo "═════════ $(date '+%Y-%m-%d %H:%M:%S %z') · run_diario (pid $$) ═════════"
 
   # ── radicados · Senado (leyes.senado.gov.co · el host con WAF) ──
-  # 3700 y no 2700 (18-sep-2026): el WAF corta a los ~11 min de actividad
-  # (~85 peticiones) y suelta en ≤10 — medido igual en 4 corridas seguidas. Con
-  # el ritmo embebido (3 s por ficha + ~5 s del servidor) cada ventana da ~80
-  # fichas, y las 254 de la legislatura exigen TRES ventanas: 11+10+11+10+11 =
-  # 53 min ≈ 3200 s. En 2700 cabían dos (~160 fichas) y la etapa salía parcial
-  # (rc=75) en cada corrida. El harvester deja de pedir a los 3400 (su
-  # PRESUPUESTO_S) y escribe; los 300 de margen son la peor petición en vuelo.
-  etapa --nombre senado_radicados --critica --timeout 3700 \
+  # El WAF corta a los ~11 min de actividad (~85 peticiones) y suelta en ≤10, así
+  # que cada ventana da ~80 fichas. Medido en 5 corridas, el throughput efectivo
+  # (ya contando los castigos) es de 3,3 a 5,0 fichas/min: las 254 de hoy piden
+  # entre 3.050 y 4.620 s. Con 3700 salía parcial (rc=75) SIEMPRE.
+  #
+  # 5700 y --reserva 3600 (20-sep-2026). El harvester ya no lleva su presupuesto
+  # escrito a mano: lo deriva del tope que etapa.py le pasa, que es este --timeout
+  # recortado por lo que quede del deadline global menos la reserva. La reserva
+  # son 60 min para las otras 59 etapas, que en corridas normales tardan 22-40
+  # min; senado_radicados es la PRIMERA de la fila y sin ese freno podía estirarse
+  # hasta el tope de 4 h y dejarlas a todas sin correr.
+  #
+  # --rc-aviso 75: la corrida parcial es degradación prevista, no falla. El
+  # harvester conserva el dato anterior de lo que no alcanzó y lo pone primero en
+  # la corrida siguiente, así que el ciclo se cierra igual. Si pasa de la mitad
+  # sin refrescar sale con 1 (falla de verdad) y el vigilante sí avisa.
+  # --minimo 2100: con menos de 35 min no alcanza ni para dos ventanas del WAF, y
+  # una cosecha así de corta se reportaría como grave. Mejor omitirla y decirlo.
+  etapa --nombre senado_radicados --critica --timeout 5700 --reserva 3600 \
+        --minimo 2100 --rc-aviso 75 \
         --desc "radicados del Senado (lista → detalle → PDF → texto)" \
         -- python3 tools/leyes-senado/harvest_diario.py
 
@@ -521,7 +533,7 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
   # lo único que queda, y tiene que decir QUÉ falló, no cuántas fallaron.
   python3 - "$REG" <<'PY'
 import json, sys
-fall, omit, lentas = [], [], []
+fall, avisa, omit, lentas = [], [], [], []
 try:
     lineas = open(sys.argv[1], encoding='utf-8').read().split('\n')
 except Exception as e:
@@ -536,11 +548,14 @@ for ln in lineas:
     n = r.get('nombre', '?')
     if r.get('estado') == 'error':
         fall.append(f'{n} ({r.get("motivo") or "rc=" + str(r.get("rc"))})')
+    elif r.get('estado') == 'warn':
+        avisa.append(f'{n} ({r.get("motivo") or "rc=" + str(r.get("rc"))})')
     elif r.get('estado') == 'omitida':
         omit.append(n)
     if (r.get('duracion_s') or 0) > 900:
         lentas.append(f'{n} {r["duracion_s"]:.0f}s')
 print('· FALLARON : ' + ('; '.join(fall) if fall else 'ninguna'))
+print('· PARCIALES: ' + ('; '.join(avisa) if avisa else 'ninguna'))
 print('· OMITIDAS : ' + (', '.join(omit) if omit else 'ninguna'))
 if lentas:
     print('· lentas   : ' + ', '.join(lentas))
