@@ -11,14 +11,16 @@
      —sin sesión, sin red y sin modelo— y es la versión accesible de lo que
      dice la mascota. La mascota es decorativa: si el atlas no carga, no se
      pierde ni una palabra.
-   · Las PREGUNTAS escritas van al worker (POST /c360/candi), que llama a
-     DeepSeek con la clave del servidor. Si no hay sesión, cuota o clave, se
-     dice exactamente eso: nunca se inventa una respuesta y se le atribuye al
-     modelo.
+   · Las PREGUNTAS escritas van al worker (POST /c360/candi), que llama al
+     modelo con la clave del servidor. Si no hay sesión, cuota o clave, se dice
+     exactamente eso: nunca se inventa una respuesta y se la atribuye a nadie.
 
-   La animación (assets/candidato-360/candi/candi-saludo.js) se reproduce UNA
-   vez por apertura del asistente. No se repite con cada respuesta, con cada
-   render del CRM ni al cambiar de pestaña del navegador.
+   Candi ENTRA SOLA al cargar la página (una vez), se presenta en un globo y se
+   queda quieta en su pose final. Abrir el panel ya no la hace caminar otra vez:
+   ya está ahí. El reposo animado todavía no existe.
+
+   Habla de TÚ. El resto del producto habla de usted a propósito —es la voz
+   seria de la plataforma— y ella es la voz cercana; son dos cosas distintas.
    ═══════════════════════════════════════════════════════════════════════════ */
 (() => {
   'use strict';
@@ -28,43 +30,42 @@
 
   /* Estados de animación que existen HOY. El worker valida contra su propia
      copia; ésta es la del cliente. `saludo` es la entrada y solo la dispara la
-     apertura del panel, así que un `saludo` pedido por el modelo se ignora:
-     la regla «una vez por apertura» manda sobre lo que pida el modelo.
+     carga de la página, así que un `saludo` pedido por el modelo se ignora.
      Cuando existan los clips, acá entran `sit_down` e `idle_seated`. */
-  const ESTADOS = { saludo: { clip: 'enter_greet', soloAlAbrir: true } };
+  const ESTADOS = { saludo: { clip: 'enter_greet', soloAlEntrar: true } };
 
   /* ─── La guía por vista ──────────────────────────────────────────────────
      Una entrada por pantalla de candidato-360.html. `chips` son preguntas
      sugeridas: rellenan el campo, no se envían solas. */
   const VISTAS = {
     intro: {
-      titulo: 'Está en la portada',
-      texto: 'Acá se decide por dónde entrar: si ya fue candidato, buscamos su historial electoral y lo conectamos con la campaña de 2027; si es su primera candidatura, armamos el punto de partida desde el territorio.',
+      titulo: 'Estás en la portada',
+      texto: 'Acá se decide por dónde entrar: si ya fuiste candidato, buscamos tu historial electoral y lo conectamos con la campaña de 2027; si es tu primera candidatura, armamos el punto de partida desde el territorio.',
       chips: ['¿Qué diferencia hay entre las dos rutas?', '¿Qué necesito para empezar?']
     },
     existing: {
-      titulo: 'Búsqueda de su historial',
-      texto: 'Escriba su nombre completo. Buscamos en todas las elecciones que tenemos cargadas —Congreso, asambleas, concejos, JAL, alcaldías y gobernaciones— y le mostramos cada candidatura con su votación. Si aparece varias veces, es la misma persona en años distintos.',
+      titulo: 'Búsqueda de tu historial',
+      texto: 'Escribe tu nombre completo. Buscamos en todas las elecciones que tenemos cargadas —Congreso, asambleas, concejos, JAL, alcaldías y gobernaciones— y te mostramos cada candidatura con su votación. Si apareces varias veces, es la misma persona en años distintos.',
       chips: ['No me encuentro, ¿qué hago?', '¿Qué elecciones tienen cargadas?']
     },
     candidateRoute: {
-      titulo: 'Su campaña de 2027',
-      texto: 'Acá define a qué corporación se lanza y dónde. Si cambia de corporación, el territorio cambia con ella: su meta y su mapa se recalculan con esa nueva escala, no con la de su elección anterior.',
+      titulo: 'Tu campaña de 2027',
+      texto: 'Acá defines a qué corporación te lanzas y dónde. Si cambias de corporación, el territorio cambia con ella: tu meta y tu mapa se recalculan con esa nueva escala, no con la de tu elección anterior.',
       chips: ['¿Puedo cambiar de corporación?', '¿Qué pasa si todavía no tengo partido?']
     },
     new: {
       titulo: 'Candidatura nueva',
-      texto: 'Sin historial propio, el punto de partida es el territorio: tomamos los resultados de 2023 en el lugar al que aspira y sobre eso se calcula la meta. Puede dejar el partido pendiente y elegir por ahora su familia política.',
+      texto: 'Sin historial propio, el punto de partida es el territorio: tomamos los resultados de 2023 en el lugar al que aspiras y sobre eso se calcula la meta. Puedes dejar el partido pendiente y elegir por ahora tu familia política.',
       chips: ['¿Por qué me piden las redes?', '¿Puedo seguir sin partido?']
     },
     crm: {
-      titulo: 'Su CRM de campaña',
-      texto: 'Arriba, el mapa de dónde estuvo su votación y la meta que necesita. Abajo, los módulos: briefing cada tres días, escucha social, arquetipos del territorio, perfil del votante, endoso de aliados y el plan del día de la elección.',
+      titulo: 'Tu CRM de campaña',
+      texto: 'Arriba, el mapa de dónde estuvo tu votación y la meta que necesitas. Abajo, los módulos: briefing cada tres días, escucha social, arquetipos del territorio, perfil del votante, endoso de aliados y el plan del día de la elección.',
       chips: ['¿De dónde sale mi meta de votos?', '¿Qué hace el briefing?', '¿Para qué sirve el día de la elección?']
     }
   };
-  const SIN_SESION = 'Para preguntarme por escrito necesito que inicie sesión; así sé de qué campaña estamos hablando. La guía de esta pantalla no depende de eso.';
-  const SIN_VISTA = { titulo: 'Candidato 360', texto: 'Le voy diciendo qué hace cada parte de la plataforma. Pregúnteme por lo que esté mirando.', chips: [] };
+  const SIN_VISTA = { titulo: 'Candidato 360', texto: 'Te voy diciendo qué hace cada parte de la plataforma. Pregúntame por lo que estés mirando.', chips: [] };
+  const SIN_SESION = 'Para preguntarme por escrito necesito que inicies sesión; así sé de qué campaña estamos hablando. La guía de esta pantalla no depende de eso.';
 
   /* ─── Lo que Candi sabe de la vista: se lee del DOM, no del estado interno.
      Así nunca le dice al usuario algo distinto de lo que tiene en pantalla. */
@@ -84,10 +85,24 @@
     return ctx;
   }
 
+  /* El primer nombre, SOLO para saludar en el navegador: no viaja al modelo.
+     Se busca donde ya esté (candidatura abierta, wizard, vínculo de la cuenta);
+     si no hay ninguno, el saludo va sin nombre y ya. */
+  function primerNombre() {
+    let n = '';
+    try { n = crmCandidate?.nombre || ''; } catch {}
+    if (!n) { try { n = NUEVO?.nombre || ''; } catch {} }
+    if (!n) { try { n = SESSION?.vinculo?.candidato?.nombre || SESSION?.vinculo?.nuevo?.nombre || ''; } catch {} }
+    const p = String(n).trim().split(/\s+/)[0] || '';
+    if (p.length < 2 || /\d/.test(p)) return '';
+    /* El índice electoral guarda los nombres en MAYÚSCULAS. */
+    try { return NOMBRE_BONITO(p); } catch { return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase(); }
+  }
+
   /* ─── Andamiaje ──────────────────────────────────────────────────────── */
   const esc = s => String(s == null ? '' : s).replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
-  let dock, panel, escena, launcher, log, input, enviar, guia, chips, mascota = null;
-  let abierto = false, saludoHecho = false, enVuelo = false, vistaPintada = '';
+  let dock, panel, escena, launcher, globo, log, input, enviar, guia, chips, mascota = null;
+  let abierto = false, entroYa = false, enVuelo = false, vistaPintada = '';
   const historial = [];                                    /* {rol, texto} — se manda recortado */
 
   function montar() {
@@ -100,9 +115,9 @@
           <div>
             <div class="kicker">Candidato 360</div>
             <h2 id="candiTitulo">Candi</h2>
-            <p>Su guía de la plataforma. Le digo qué hace cada parte y dónde está cada cosa.</p>
+            <p>Tu guía de la plataforma. Te digo qué hace cada parte y dónde está cada cosa.</p>
           </div>
-          <button type="button" class="candi-min" id="candiMin" aria-label="Minimizar a Candi">–</button>
+          <button type="button" class="candi-min" id="candiMin" aria-label="Cerrar el panel de Candi">–</button>
         </header>
         <div class="candi-cuerpo">
           <div class="candi-guia" id="candiGuia"></div>
@@ -111,25 +126,32 @@
         </div>
         <div class="candi-pie">
           <form class="candi-form" id="candiForm">
-            <label class="hidden" for="candiInput">Pregúntele a Candi</label>
-            <input id="candiInput" type="text" autocomplete="off" maxlength="400" placeholder="¿Qué quiere saber de esta pantalla?">
+            <label class="hidden" for="candiInput">Pregúntale a Candi</label>
+            <input id="candiInput" type="text" autocomplete="off" maxlength="400" placeholder="¿Qué quieres saber de esta pantalla?">
             <button type="submit" id="candiEnviar">Enviar</button>
           </form>
-          <p class="candi-nota" id="candiNota">Candi explica la plataforma. Las cifras de su campaña salen de la página, no de ella.</p>
+          <p class="candi-nota" id="candiNota"></p>
         </div>
       </section>
-      <div class="candi-stage candi-escena" id="candiEscena" aria-hidden="true" hidden></div>
-      <button type="button" class="candi-launcher" id="candiLauncher" aria-expanded="false" aria-controls="candiPanel" aria-label="Abrir a Candi, su guía de la plataforma" title="Candi, su guía">
-        <span class="candi-cara" aria-hidden="true"></span><span class="candi-aviso" aria-hidden="true"></span>
+      <div class="candi-globo" id="candiGlobo" role="status" hidden>
+        <p id="candiGloboTexto"></p>
+        <button type="button" class="candi-globo-x" id="candiGloboX" aria-label="Cerrar el saludo de Candi">×</button>
+      </div>
+      <div class="candi-stage candi-escena" id="candiEscena" aria-hidden="true"></div>
+      <button type="button" class="candi-launcher" id="candiLauncher" aria-expanded="false" aria-controls="candiPanel">
+        <span class="candi-cara" aria-hidden="true"></span><span class="candi-launcher-txt">Pregúntame</span>
       </button>`;
     document.body.append(dock);
     panel = dock.querySelector('#candiPanel'); escena = dock.querySelector('#candiEscena');
     launcher = dock.querySelector('#candiLauncher'); log = dock.querySelector('#candiLog');
     input = dock.querySelector('#candiInput'); enviar = dock.querySelector('#candiEnviar');
     guia = dock.querySelector('#candiGuia'); chips = dock.querySelector('#candiChips');
+    globo = dock.querySelector('#candiGlobo');
 
-    launcher.addEventListener('click', () => abierto ? cerrar() : abrir());
+    launcher.addEventListener('click', () => abierto ? cerrar({ foco: true }) : abrir());
     dock.querySelector('#candiMin').addEventListener('click', () => cerrar({ foco: true }));
+    globo.querySelector('p').addEventListener('click', abrir);
+    globo.querySelector('#candiGloboX').addEventListener('click', e => { e.stopPropagation(); ocultarGlobo(); });
     dock.querySelector('#candiForm').addEventListener('submit', e => { e.preventDefault(); preguntar(input.value); });
     /* Escape cierra, pero solo si el foco está adentro: si hay un modal del
        CRM encima, la tecla es suya. */
@@ -160,46 +182,58 @@
   function pintarPie() {
     const nota = dock.querySelector('#candiNota');
     let hay = false; try { hay = Boolean(SESSION && SESSION.token); } catch {}
-    input.placeholder = hay ? '¿Qué quiere saber de esta pantalla?' : 'Inicie sesión para preguntarme';
+    input.placeholder = hay ? '¿Qué quieres saber de esta pantalla?' : 'Inicia sesión para preguntarme';
     nota.innerHTML = hay
-      ? 'Candi explica la plataforma. Las cifras de su campaña salen de la página, no de ella.'
-      : 'La guía de arriba funciona siempre. Para preguntas escritas, <a href="login.html?next=candidato-360.html">inicie sesión</a>.';
+      ? 'Mis respuestas escritas las redacta un modelo. Explico la plataforma; las cifras de tu campaña salen de la página, no de mí.'
+      : 'La guía de arriba funciona siempre. Para preguntas escritas, <a href="login.html?next=candidato-360.html">inicia sesión</a>.';
   }
+
+  /* ─── La entrada: una sola vez por carga de la página ────────────────────
+     Camina, saluda y se queda quieta en la pose final. El globo aparece cuando
+     termina de saludar; si la animación no llega a terminar (atlas caído, o una
+     pestaña que nunca se mostró), entra igual a los 4,5 s. */
+  function entrar() {
+    if (entroYa) return; entroYa = true;
+    if (typeof CandiSaludo !== 'function') { fallarAtlas('falta candi-saludo.js'); return mostrarGlobo(); }
+    mascota = new CandiSaludo(escena);
+    const red = setTimeout(mostrarGlobo, 4500);
+    escena.addEventListener('candi:complete', () => { clearTimeout(red); mostrarGlobo(); }, { once: true });
+    mascota.play().catch(e => { clearTimeout(red); fallarAtlas(e && e.message); mostrarGlobo(); });
+  }
+  function mostrarGlobo() {
+    if (abierto || globo.dataset.visto === '1') return;
+    const nombre = primerNombre();
+    globo.querySelector('#candiGloboTexto').textContent =
+      `${nombre ? `¡Hola, ${nombre}!` : '¡Hola!'} Soy Candi, tu guía por acá. Pregúntame lo que quieras de la pantalla en la que estés.`;
+    globo.hidden = false;
+    clearTimeout(mostrarGlobo._t);
+    mostrarGlobo._t = setTimeout(ocultarGlobo, 12000);   /* se presenta y se quita sola */
+  }
+  function ocultarGlobo() { globo.dataset.visto = '1'; globo.hidden = true; clearTimeout(mostrarGlobo._t); }
 
   /* ─── Abrir, cerrar, desmontar ───────────────────────────────────────── */
   function abrir() {
-    abierto = true;
-    dock.classList.add('abierto'); panel.hidden = false; escena.hidden = false;
+    abierto = true; ocultarGlobo();
+    dock.classList.add('abierto'); panel.hidden = false;
     launcher.setAttribute('aria-expanded', 'true');
-    launcher.setAttribute('aria-label', 'Minimizar a Candi');
     pintarGuia();
     pintarPie();
-    reproducirSaludo();
     setTimeout(() => input.focus({ preventScroll: true }), 60);
   }
   function cerrar({ foco = false } = {}) {
     abierto = false;
-    dock.classList.remove('abierto'); panel.hidden = true; escena.hidden = true;
+    dock.classList.remove('abierto'); panel.hidden = true;
     launcher.setAttribute('aria-expanded', 'false');
-    launcher.setAttribute('aria-label', 'Abrir a Candi, su guía de la plataforma');
-    mascota?.pause();                                   /* el asistente oculto no consume cuadros */
-    saludoHecho = false;                                /* «una vez por apertura»: la próxima vez vuelve a entrar */
     if (foco) launcher.focus();
+    /* Ojo: NO se llama pause() acá. Candi vive en la pantalla aunque el panel
+       esté cerrado, y el reproductor ya deja de avanzar cuando la pestaña se
+       oculta. Pausar acá congelaba la entrada a mitad de camino. */
   }
   function destruir() { mascota?.destroy(); mascota = null; }
 
-  /* Una instancia, un saludo por apertura. La escena ya está visible cuando se
-     llama: el reproductor mide el ancho del sprite para el recorrido. */
-  function reproducirSaludo() {
-    if (typeof CandiSaludo !== 'function') return fallarAtlas('No se pudo cargar la animación de Candi.');
-    if (!mascota) mascota = new CandiSaludo(escena);
-    if (saludoHecho) return;                            /* ya saludó en esta apertura del panel */
-    saludoHecho = true;
-    mascota.play().catch(e => fallarAtlas(e && e.message));
-  }
   /* La mascota es decorativa: si su imagen falla, el panel sigue completo. */
   function fallarAtlas(msg) {
-    escena.hidden = true; launcher.classList.add('sin-atlas');
+    escena.hidden = true; dock.classList.add('sin-atlas');
     console.warn('[Candi]', msg || 'atlas no disponible');
   }
 
@@ -226,16 +260,16 @@
     try {
       const r = await fetch(`${API}/c360/candi`, {
         method: 'POST',
-        headers: Object.assign({ 'Content-Type': 'application/json' }, token ? { Authorization: `Bearer ${token}` } : {}),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ pregunta: q, contexto: contexto(), historial: historial.slice(-6) })
       });
       let data = null; try { data = await r.json(); } catch {}
       esperando.remove();
       if (r.status === 401) return sinRespuesta(SIN_SESION, `<a href="login.html?next=candidato-360.html">Iniciar sesión</a>`);
-      if (r.status === 404) return sinRespuesta('Todavía no puedo responder preguntas escritas: falta desplegar mi conexión con el modelo. La guía de cada pantalla sí funciona.');
+      if (r.status === 404) return sinRespuesta('Todavía no puedo responder preguntas escritas: falta desplegar mi conexión. La guía de cada pantalla sí funciona.');
       if (r.status === 429) return sinRespuesta(data?.error || 'Por hoy se acabaron las preguntas de esta cuenta. La guía de cada pantalla sigue disponible.');
       if (!r.ok || !data || data.ok === false || !data.respuesta) return sinRespuesta(data?.error || `No pude responder (HTTP ${r.status}). La guía de cada pantalla sigue disponible.`);
-      burbuja('ella', parrafos(data.respuesta) + '<span class="candi-fuente">Respuesta generada · DeepSeek</span>');
+      burbuja('ella', parrafos(data.respuesta));
       historial.push({ rol: 'usuario', texto: q }, { rol: 'candi', texto: data.respuesta });
       aplicarEstado(data.estado);
     } catch (e) {
@@ -247,21 +281,21 @@
   function sinRespuesta(motivo, extra) { burbuja('falla', `<p>${esc(motivo)}</p>${extra ? `<p>${extra}</p>` : ''}`); }
 
   /* El modelo puede pedir un estado de animación; se valida contra ESTADOS y
-     se ignora lo que no exista o lo que rompa la regla de «saludar una vez». */
+     se ignora lo que no exista o lo que rompa la regla de entrar una sola vez. */
   function aplicarEstado(estado) {
     if (!estado) return;
     const e = ESTADOS[estado];
     if (!e) return console.warn('[Candi] estado no permitido:', estado);
-    if (e.soloAlAbrir) return;                          /* pendiente: sit_down / idle_seated */
+    if (e.soloAlEntrar) return;                         /* pendiente: sit_down / idle_seated */
   }
 
   /* ─── Arranque ───────────────────────────────────────────────────────────
      Candi entra cuando la pantalla de carga ya se fue: con el preload puesto
-     no hay nada que guiar. */
+     no hay nada que guiar, y su saludo se perdería detrás. */
   function arrancar() {
     montar();
     const preload = document.getElementById('preload');
-    const mostrar = () => { dock.hidden = false; };
+    const mostrar = () => { dock.hidden = false; entrar(); };
     if (!preload || !preload.classList.contains('active')) return mostrar();
     const obs = new MutationObserver(() => { if (!preload.classList.contains('active')) { obs.disconnect(); mostrar(); } });
     obs.observe(preload, { attributes: true, attributeFilter: ['class'] });
@@ -271,5 +305,5 @@
   else arrancar();
 
   /* Para depurar desde la consola; no es API pública. */
-  window.Candi = { abrir, cerrar, get mascota() { return mascota; }, contexto };
+  window.Candi = { abrir, cerrar, entrar, get mascota() { return mascota; }, contexto, primerNombre };
 })();

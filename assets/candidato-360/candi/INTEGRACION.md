@@ -39,11 +39,39 @@ calcula ni las inventa.
 
 ## La regla del saludo
 
-Se reproduce **una vez por apertura del panel**. No se repite al recibir una
-respuesta, al repintarse el CRM ni al cambiar de pantalla interna — eso último
-está probado: `showScreen()` cambia la guía y deja el reloj de la animación
-quieto. Al minimizar se llama `pause()`; en `pagehide`, `destroy()`. Hay una
-sola instancia.
+Candi **entra sola al cargar la página**, una vez: camina, saluda, se presenta
+en un globo y se queda quieta en su pose final. Abrir el panel **ya no la hace
+caminar otra vez** —ya está ahí— y tampoco lo hacen una respuesta, un repintado
+del CRM ni un cambio de pantalla interna. El globo se quita solo a los 12 s, o
+al tocarlo (abre el panel) o al cerrarlo con la ×.
+
+⚠️ **`cerrar()` NO llama `pause()`.** Antes sí, porque la mascota solo existía
+con el panel abierto; ahora vive en la pantalla y pausar ahí congelaba la
+entrada a mitad de camino si alguien abría y cerraba el panel mientras caminaba.
+El reproductor ya deja de avanzar cuando la pestaña se oculta, y `destroy()`
+sigue en `pagehide`.
+
+## El nombre y la voz
+
+Saluda por el **primer nombre** cuando lo sabe: lo busca en la candidatura
+abierta, en el wizard o en el vínculo de la cuenta, y lo pasa por
+`NOMBRE_BONITO` porque el índice electoral lo guarda en MAYÚSCULAS. Sin nombre,
+saluda sin nombre.
+
+⚠️ **Ese nombre NO viaja al modelo**: el saludo se arma en el navegador. El
+prompt incluso le prohíbe saludar por el nombre, porque no lo recibe y se lo
+inventaría. Si algún día se quiere que lo use en la conversación, hay que
+mandarlo en el contexto a propósito.
+
+Candi **habla de tú**. El resto del producto habla de usted y así se queda: esa
+es la voz seria de la plataforma y ella es la voz cercana. El prompt se lo dice
+explícito para que no se contagie de los textos que le llegan en el contexto.
+
+⚠️ Al cambiar el prompt hay que **subir `C360_CANDI_PROMPT_V`** (hoy `v2`), que
+entra al hash de la caché: si no, durante seis horas se siguen sirviendo las
+respuestas viejas. El paso de usted a tú fue exactamente ese caso.
+
+## Lo que todavía no existe
 
 ## Lo que todavía no existe
 
