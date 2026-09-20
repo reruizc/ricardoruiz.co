@@ -9,7 +9,9 @@ que paga.
 | `check.py` | aplica el catálogo → escribe `Bases de datos/leyes-senado/diario/estado.json` |
 | `etapa.py` | corre UNA etapa del cron con timeout y deja constancia (lo usa `run_diario.sh`) |
 | `latido.py` | arma el **latido** público y reducido de `estado.json`, que `run_diario.sh` sube a S3 para el vigilante de afuera |
+| `espera_red.py` | ¿esta máquina tiene red? Primera etapa de la corrida; espera hasta 4 min a que vuelva |
 | `prueba_etapa.py` | pruebas de `etapa.py` (veredicto, reserva, tope al hijo) — no tocan la red |
+| `prueba_espera_red.py` | pruebas de `espera_red.py` (curl y reloj sustituidos) |
 | `PLAN-salir-del-mac.md` | evaluación y recomendación para dejar de depender del portátil |
 
 ## Uso
@@ -35,6 +37,40 @@ Códigos de salida, para no tener que parsear nada:
 `run_diario.sh` lo llama al final de cada corrida con `--etapas`, y así
 `estado.json` queda con las tres capas: **qué corrió**, **qué tan fresco está el
 dato** y **si la Lambda responde**.
+
+## La primera etapa es preguntar si hay red
+
+`launchd` dispara la corrida a las 8:00 mientras el Mac todavía está despertando,
+y el wifi tarda en volver. Medido sobre 114 corridas del `cron.log`: **8 (7 %)
+arrancaron sin red, y 6 de esas 8 son de la mañana**. La peor —11-sep— dejó 38
+`Could not connect to the endpoint URL` y tumbó la corrida entera.
+
+Lo malo no era perder la corrida, era **cómo se reportaba**: fuente por fuente,
+como si el Estado colombiano se hubiera caído a la vez. `sucop_fetch` con
+`curl rc=6`, `secop_upload` sin poder hablar con S3, los manifiestos sin subir.
+Tres síntomas distintos para una sola causa que además se arregla sola en un par
+de minutos.
+
+Ahora `red_lista` va de primera y espera hasta **~4 min** (5, 10, 20, 30, 60, 60,
+60 s). Si la red vuelve, la corrida sigue como si nada y en el log queda dicho
+cuánto tardó. Si no vuelve, **se aborta antes de correr las 60 etapas
+condenadas**: sin red ninguna puede funcionar, y sesenta fallos en fila no dicen
+lo único cierto, que esta máquina está incomunicada.
+
+Dos decisiones que conviene no deshacer:
+
+- **Se consultan dos destinos** (S3 y un host neutro) y basta con que *uno*
+  responda. Si S3 está caído pero el otro contesta, **hay red** y lo de S3 es
+  asunto de las etapas que lo usan, no de este chequeo.
+- **Sin red no se avisa por correo, y está bien.** Sin red tampoco se puede
+  publicar el latido, así que no hay forma de gritar. El mecanismo que cubre esto
+  ya existe: si la corrida siguiente también falla, el latido pasa de 26 h y el
+  vigilante avisa por envejecimiento. Una corrida perdida de dos no es una
+  emergencia; dos seguidas sí.
+
+⚠️ Las esperas y el `--timeout 480` de la etapa están atados: el peor caso son
+373 s (245 de espera + 128 de sondeos). Si se tocan las esperas hay que mover ese
+timeout, y `prueba_espera_red.py` falla si dejan de cuadrar.
 
 ## Cuándo una etapa es «falla» y cuándo solo es «parcial»
 

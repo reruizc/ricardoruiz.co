@@ -17,6 +17,7 @@
 #   ordenes_senado_comisiones   ídem `buenas`             Cuarta/Quinta/Sexta
 #   ordenes_senado_plenaria     ídem `plenaria`           secretariasenado.gov.co
 #   secop_fetch/build/upload  harvest_secop.py            agregados de SECOP II
+#   red_lista                 salud/espera_red.py         ¿esta máquina tiene red? (el Mac despierta tarde)
 #   sucop_fetch/build/upload_*  harvest_sucop.py          consulta pública de normas (el dato que VENCE)
 #   bloqueo_build/upload      build_bloqueo_s3.py         índice de agendamientos
 #   citaciones_extrae/build/upload  harvest_citaciones.py  control político por congresista
@@ -121,6 +122,24 @@ etapa() { python3 "$REPO/tools/caudal/salud/etapa.py" --reg "$REG" --deadline "$
 {
   echo ""
   echo "═════════ $(date '+%Y-%m-%d %H:%M:%S %z') · run_diario (pid $$) ═════════"
+
+  # ── ¿hay red? ────────────────────────────────────────────────────────────
+  # 8 de 114 corridas del log (7 %) arrancaron SIN red, y 6 de esas 8 son de la
+  # mañana: launchd dispara a las 8:00 con el Mac todavía despertando. No es un
+  # fallo de ninguna fuente, pero se reportaba como si lo fuera y por triplicado
+  # —sucop con `curl rc=6`, secop_upload sin poder hablar con S3, los manifiestos
+  # sin subir—. El 11-sep dejó 38 «Could not connect to the endpoint URL».
+  # Espera hasta ~5 min a que vuelva; si no vuelve, no tiene sentido correr 60
+  # etapas que van a fallar todas. Ver tools/caudal/salud/espera_red.py.
+  # 480: las esperas suman 245 s y los sondeos hasta 128 más (ver espera_red.py).
+  etapa --nombre red_lista --critica --timeout 480 \
+        --desc "¿hay red? (launchd dispara con el Mac despertando)" \
+        -- python3 tools/caudal/salud/espera_red.py
+  rc_red=$?
+  if [ $rc_red -ne 0 ]; then
+    echo "═════════ fin $(date '+%H:%M:%S') · sin red: corrida abortada antes de empezar ═════════"
+    exit 0
+  fi
 
   # ── radicados · Senado (leyes.senado.gov.co · el host con WAF) ──
   # El WAF corta a los ~11 min de actividad (~85 peticiones) y suelta en ≤10, así
