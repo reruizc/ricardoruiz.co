@@ -74,11 +74,19 @@ CITIES = {
 # corregimientos y las islas. Ese mapa puesto → UCG lo produce
 # `build_cartagena_ucg.py` (PIP contra los barrios, con su cascada) y se lee de
 # archivo para no tener la misma cuenta en dos builders.
+# ⚠️⚠️ Va por CORPORACIÓN, no por ciudad: en JAL la unidad ES la
+# circunscripción, y las Juntas de Cartagena se eligen por LOCALIDAD, no por
+# UCG. Medido sobre los 347 candidatos de 2023: se reparten en tres bloques de
+# zonas —01-09, 10-15 y 16-22, más la 99 en las tres— que son exactamente sus
+# 3 localidades. Forzarles la UCG partiría cada Junta en cinco pedazos.
+# Para JAL, entonces, manda el «CÓDIGO COMUNA» del georef, que ahí sí es la
+# unidad correcta.
 COMUNA_EXTERNA = {
-    ('05', '001'): os.path.join(BD, 'output_hvp', 'cartagena-puesto-ucg.json'),
-}
+    'concejo': {('05', '001'): os.path.join(BD, 'output_hvp', 'cartagena-puesto-ucg.json')},
+    'jal': {},
+}.get(CORP, {})
 # Cómo se llama la unidad cuando el nombre no viene del georef.
-COM_LABEL = {('05', '001'): 'UCG'}
+COM_LABEL = {('05', '001'): 'UCG'} if CORP == 'concejo' else {}
 # Ciudades con GeoJSON de barrio → mapa de barrios (PIP). url + candidatos a campo nombre.
 BARRIO_GEO = {
     ('16', '001'): f'{GEO_S3}/BOG-BARRIOS-CATASTRALES.json',
@@ -537,8 +545,10 @@ def main():
                 par = row[C_PAR].strip()
                 party = (row[C_DESPAR] or '').strip() or 'SIN PARTIDO'
                 add(c['parties'], party, v)
-                # ⚠️ `can == '0'` es el voto SOLO POR LA LISTA (el logo), y en
-                # lista cerrada es TODO el voto del partido. Descartarlo dejaba
+                # ⚠️ `can == '0'` es el voto al PARTIDO, y lo es en los dos
+                # casos: en lista abierta, de quien marcó el logo y no eligió
+                # candidato; en lista cerrada, TODO el voto del partido, porque
+                # ahí no hay a quién marcar. Descartarlo dejaba
                 # al Pacto Histórico —la lista más votada del Concejo de Bogotá
                 # 2023, con 381.804 votos— en CERO en el mapa de familias
                 # políticas, y se comía el 6-7 % de los válidos en el resto.

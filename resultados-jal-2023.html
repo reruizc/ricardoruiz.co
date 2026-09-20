@@ -466,6 +466,8 @@
       '13-001':{geo:'MONTERIAX.json',      code:p=>parseInt(p.CC_COMUNA,10)},
       '19-001':{geo:'NEIVAX.json',         code:p=>parseInt(String(p.comuna).replace(/\D/g,''),10)},
       '11-001':{geo:'POPAYANX.json',       code:p=>parseInt(p.ACAD_TEXT!=null?p.ACAD_TEXT:String(p.COMUNAS).replace(/\D/g,''),10)},
+      // Cartagena elige sus JAL por LOCALIDAD (3), no por las 15 UCG.
+      '05-001':{geo:'CARTAGENA-LOCALIDADES.json',  code:p=>parseInt(p.CODIGO,10), ventana:{sur:10.275, norte:10.47, oeste:-75.58, este:-75.415}},
       '52-001':{geo:'VILLAVICENCIOX.json', code:p=>parseInt(String(p.Comuna).replace(/\D/g,''),10)},
     };
 
@@ -621,7 +623,15 @@
           lyr.on('click',()=>{ if(curByNum[num]) openComuna(num, true); });
         }
       }).addTo(map);
-      const fit=()=>{ if(!map)return; map.invalidateSize(); try{const b=layer.getBounds(); if(b.isValid()) map.fitBounds(b,{padding:[16,16]});}catch(e){} };
+      const fit=()=>{ if(!map)return; map.invalidateSize();
+        try{
+          /* Con ventana manda ella: Cartagena llega hasta Isla Fuerte, 100 km
+             al sur, y encuadrar por el contorno real deja el casco urbano 8
+             veces más pequeño. Las islas siguen en el mapa, hay que alejar. */
+          const w=cfg.ventana;
+          const b=w? L.latLngBounds([[w.sur,w.oeste],[w.norte,w.este]]) : layer.getBounds();
+          if(b.isValid()) map.fitBounds(b,{padding:[16,16]});
+        }catch(e){} };
       setTimeout(fit,60);
     }
 

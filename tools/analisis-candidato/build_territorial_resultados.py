@@ -75,11 +75,15 @@ CITIES = {
 # su división operativa son las 15 UCG más la 20 rural. El mapa puesto → UCG lo
 # produce build_cartagena_ucg.py y lo comparte con el detalle por comuna, para
 # que la misma cuenta no viva en dos builders.
+# ⚠️⚠️ Va por CORPORACIÓN: las JAL de Cartagena se eligen por LOCALIDAD, no por
+# UCG (medido sobre sus 347 candidatos de 2023: tres bloques de zonas que son
+# sus 3 localidades). Para JAL manda el «CÓDIGO COMUNA» del georef.
 COMUNA_EXTERNA = {
-    ('05', '001'): os.path.join(BD, 'output_hvp', 'cartagena-puesto-ucg.json'),
-}
+    'concejo': {('05', '001'): os.path.join(BD, 'output_hvp', 'cartagena-puesto-ucg.json')},
+    'jal': {},
+}.get(CORP, {})
 # Cómo se llama la unidad de las ciudades resueltas por archivo externo.
-COM_LABEL = {('05', '001'): 'UCG'}
+COM_LABEL = {('05', '001'): 'UCG'} if CORP == 'concejo' else {}
 SPECIAL = {'996', '997', '998', '999'}   # blanco, nulos, no-marcados, no-marcados
 # Columnas por NOMBRE: el archivo territorial trae 19 columnas y el de JAL 16.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

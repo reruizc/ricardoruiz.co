@@ -31,6 +31,13 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 BD = os.path.join(RAIZ, 'Bases de datos')
 SAL = os.path.join(BD, 'output_hvp', 'CARTAGENA-UCG.json')
 SAL_PUESTOS = os.path.join(BD, 'output_hvp', 'cartagena-puesto-ucg.json')
+SAL_LOC = os.path.join(BD, 'output_hvp', 'CARTAGENA-LOCALIDADES.json')
+# LH · LV · LI son las 3 localidades, y su número es el que usa el georef en
+# «CÓDIGO COMUNA». Hacen falta porque las JAL de Cartagena se eligen por
+# localidad, no por UCG.
+LOCS = {'LH': (1, 'Localidad 1 · Histórica y del Caribe Norte'),
+        'LV': (2, 'Localidad 2 · De la Virgen y Turística'),
+        'LI': (3, 'Localidad 3 · Industrial de la Bahía')}
 GEOREF = os.path.join(BD, 'PUESTOS_GEOREF.csv')
 # La UCG rural, a la que pertenecen por definición los puestos de zona 99.
 RURAL = 20
@@ -69,6 +76,30 @@ with open(SAL, 'w', encoding='utf-8') as f:
     json.dump({'type': 'FeatureCollection', 'features': feats}, f,
               ensure_ascii=False, separators=(',', ':'))
 print(f'{len(feats)} UCG · {os.path.getsize(SAL)/1024:.0f} KB → {SAL}')
+
+# ── las 3 localidades, para JAL ─────────────────────────────────────────────
+porloc = collections.defaultdict(list)
+for ft in geo['features']:
+    pr = ft.get('properties') or {}
+    if pr.get('LOC') in LOCS:
+        try:
+            g = shape(ft['geometry'])
+        except Exception:
+            continue
+        if not g.is_empty:
+            porloc[pr['LOC']].append(g.buffer(0))
+lfeats = []
+for sigla, (num, nombre) in sorted(LOCS.items(), key=lambda kv: kv[1][0]):
+    if sigla not in porloc:
+        continue
+    lfeats.append({'type': 'Feature',
+                   'properties': {'CODIGO': f'{num:02d}', 'LOC': sigla, 'NOMBRE': nombre,
+                                  'BARRIOS': len(porloc[sigla])},
+                   'geometry': mapping(unary_union(porloc[sigla]))})
+with open(SAL_LOC, 'w', encoding='utf-8') as f:
+    json.dump({'type': 'FeatureCollection', 'features': lfeats}, f,
+              ensure_ascii=False, separators=(',', ':'))
+print(f'{len(lfeats)} localidades · {os.path.getsize(SAL_LOC)/1024:.0f} KB → {SAL_LOC}')
 
 # ── puesto → UCG ────────────────────────────────────────────────────────────
 # Cascada: PIP exacto → zona 99 a la UCG rural → barrio vecino a menos de
