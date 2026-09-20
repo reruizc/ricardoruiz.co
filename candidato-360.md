@@ -161,8 +161,19 @@ voto de lista (Bogotá 2023: 38,9 % en S3 contra 51,6 % ya corregido), y hacen
 que los totales por partido incluyan el voto solo-lista, como en las cifras
 publicadas.
 
-La subida necesita credenciales de escritura en el bucket, que no están en el
-entorno de trabajo remoto. Se hace desde la máquina con `aws` configurado:
+La subida necesita credenciales de escritura en el bucket, que el entorno de
+trabajo remoto no tiene: ahí las variables `AWS_*` están tomadas por el proxy de
+red (`AWS_ACCESS_KEY_ID` vale literalmente «proxy…») y un PUT responde
+`InvalidAccessKeyId`. Hay dos caminos:
+
+**GitHub Actions** (la credencial vive en los secretos del repositorio y no pasa
+por ninguna otra máquina). El workflow «Regenerar índices de 2023» baja los CSV
+crudos, genera, verifica, guarda lo generado como artefacto y sube. Necesita los
+secretos `RR_S3_KEY_ID` y `RR_S3_SECRET` de un usuario IAM cuya política es
+`tools/analisis-candidato/politica-iam-subida.json`: solo `s3:PutObject` sobre
+los tres prefijos de 2023, sin borrado y sin tocar nada más del bucket.
+
+**Desde la máquina**, con `aws` configurado:
 
 ```
 bash tools/analisis-candidato/regenerar_2023.sh --solo-indice --subir
