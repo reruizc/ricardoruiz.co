@@ -64,6 +64,59 @@ arm64 → t4g.small → key `caudal-cron` → SG solo SSH desde tu IP → IAM pr
 `ec2-caudal-cron` → 50 GB → *Advanced details → User data* = el contenido de
 `user-data.sh`.
 
+## Fase 0 · RESULTADO (20-sep-2026): la IP de AWS **no** es el obstáculo
+
+Corrido desde `caudal-runner` (`13.221.66.8`, us-east-1) contra la Mac
+(`186.28.93.164`, residencial colombiana), **el mismo script en las dos a la vez**
+(`sondeo-waf.sh`), de madrugada.
+
+| | Mac (residencial CO) | EC2 (us-east-1) |
+|---|---|---|
+| Senado · home ×4 | 4/4 · 0,58-1,6 s | **4/4 · 0,28 s** |
+| Senado · API de la lista | 200 · 254 filas | 200 · **254 filas, idénticas** |
+| BanRep ×5-6 (método del harvester) | 3/5 ok · 0 captcha | **5/6 ok · 0 captcha** |
+
+**Va igual o mejor que la Mac**, y contra el Senado el doble de rápido (menos
+saltos hasta el datacenter). No hay bloqueo por reputación del bloque de IP, que
+era el riesgo que podía tumbar la migración entera.
+
+**La prueba que de verdad importaba — la ráfaga:**
+
+```
+ráfaga 1   110 peticiones en 6 min          →  110 ok, cero bans
+ráfaga 2   arrancada PEGADA a la anterior   →  ban en la petición 32
+                                               (~141 acumuladas), rc=52
+tras 10 min de reposo                       →  3/3 ok: el ban se levanta solo
+```
+
+`rc=52` («Empty reply from server») es **exactamente el síntoma que
+`harvest_diario.py` documenta para la Mac**. Conclusión: el WAF trata a la EC2
+**como a la Mac** — deja trabajar y corta por volumen acumulado, no por ser de
+datacenter. El umbral observado (~141) fue incluso más alto que los ~85
+documentados en la Mac.
+
+⚠️ **Lo que esto NO prueba**, para no estirarlo más de lo que da:
+
+- Es **una sesión de madrugada** (02:00-03:00 Bogotá), cuando el Senado tiene poco
+  tráfico. De día el WAF puede estar más sensible.
+- El umbral de ~141 es **una sola observación**, no una medida.
+- **No se corrió el harvester completo.** Lo probado es el comportamiento del WAF,
+  no el pipeline entero. El piloto largo de `piloto-waf.sh` (3-4 días en paralelo,
+  comparando novedades con la Mac) sigue siendo el paso que falta antes de la Fase 2.
+- La IP es la que tiene hoy esa instancia; sin IP elástica cambia al reiniciarla.
+
+⚠️⚠️ **El BanRep exige el juego COMPLETO de headers.** Probándolo solo con `-A`
+da captcha siempre y parece un bloqueo de IP que no existe — me pasó en este mismo
+piloto y casi lo reporto como hallazgo. `sondeo-waf.sh` ya los lleva.
+
+### Estado de la instancia al 20-sep
+
+`caudal-runner` (t4g.small arm64, `i-002d6e063def76d1b`) llevaba **22 días
+encendida sin nada**: sin repo, sin crontab, carga 0.00 (~USD 9 gastados,
+~USD 12/mes si sigue). No es la del procedimiento de arriba: es **Ubuntu, sin
+llave SSH y gestionada por SSM** (perfil `CaudalRunner`), así que se opera con
+`aws ssm send-command`, no con `ssh`. O se usa para la Fase 1, o se apaga.
+
 ## Lo que hago yo después (con el DNS)
 
 1. **Estado y secretos.** `tools/caudal/ec2/sync-estado.sh ec2-user@DNS` (~8 GB,
