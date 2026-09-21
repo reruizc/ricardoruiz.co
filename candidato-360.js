@@ -2178,8 +2178,11 @@ async function launchCRM(event) {
   loadHistoricalMap(crmCandidate);
   renderCRMProfilePhoto(crmCandidate);
   pintarPuntaje(crmCandidate);
-  await prepararSalto(corpKey, campana);
-  pintarMeta(await estimateVoteTarget(corpKey, territory));
+  window.Candi?.calculo?.(true);
+  try {
+    await prepararSalto(corpKey, campana);
+    pintarMeta(await estimateVoteTarget(corpKey, territory));
+  } finally { window.Candi?.calculo?.(false); }
   if (SALTO_ACTUAL?.tipo?.unidad === 'municipio') ensureCRMMapToggles();
   if (SALTO_ACTUAL && crmMapMode === 'proyectado') refreshCRMMapMode();
 }
@@ -2211,7 +2214,10 @@ async function abrirCRMNuevo() {
   pintarFirmas();
   pintarEndoso();
   renderTerritorioObjetivo(c);
-  pintarMeta(await VoteTarget.estimate({ corp: c.corp, territory: lugar, baseUrl: S3, partido: n.partido || '', departamento: c.departamento || '', bloque: bloqueVigente() }));
+  window.Candi?.calculo?.(true);
+  try {
+    pintarMeta(await VoteTarget.estimate({ corp: c.corp, territory: lugar, baseUrl: S3, partido: n.partido || '', departamento: c.departamento || '', bloque: bloqueVigente() }));
+  } finally { window.Candi?.calculo?.(false); }
 }
 /* Volver a la candidatura vinculada (al cargar o al intentar cambiarla). */
 async function abrirVinculo() {

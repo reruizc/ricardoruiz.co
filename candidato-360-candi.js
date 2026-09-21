@@ -228,15 +228,50 @@
     mascota.play().catch(e => { fallarAtlas(e && e.message); presentarse(); });
   }
   function mostrarGlobo() {
-    if (abierto || globo.dataset.visto === '1') return;
+    presentada = true;
+    if (abierto || globo.dataset.visto === '1') { if (calculando) avisarCalculo(); return; }
     const nombre = primerNombre();
+    /* Si la meta todavía se está calculando, el saludo lo dice de una vez: dos
+       globos seguidos se leerían como Candi hablando sola. */
     globo.querySelector('#candiGloboTexto').textContent =
-      `${nombre ? `¡Hola, ${nombre}!` : '¡Hola!'} Soy Candi, tu guía por acá. Pregúntame lo que quieras de la pantalla en la que estés.`;
+      `${nombre ? `¡Hola, ${nombre}!` : '¡Hola!'} Soy Candi, tu estratega de campaña. ` +
+      (calculando ? AVISO_CALCULO : 'Pregúntame lo que quieras de la pantalla en la que estés.');
+    globo.dataset.aviso = calculando ? 'calculo' : '';
     globo.hidden = false;
+    if (calculando) pensarYa();
     clearTimeout(mostrarGlobo._t);
     mostrarGlobo._t = setTimeout(ocultarGlobo, 12000);   /* se presenta y se quita sola */
   }
-  function ocultarGlobo() { globo.dataset.visto = '1'; globo.hidden = true; clearTimeout(mostrarGlobo._t); }
+  function ocultarGlobo() { globo.dataset.visto = '1'; globo.dataset.aviso = ''; globo.hidden = true; clearTimeout(mostrarGlobo._t); }
+
+  /* ─── Mientras se calcula la meta de votos ───────────────────────────────
+     La meta tarda (baja índices y reparte curules) y la tarjeta se queda en
+     «…». Candi piensa y avisa que se puede seguir explorando, para que la
+     espera no se lea como página colgada. Durante la entrada NO interrumpe:
+     el aviso va dentro del saludo. Con el panel abierto va como mensaje. El
+     clip de pensar es de 6 s y no se repite en bucle (sacaría y guardaría las
+     gafas en cada vuelta); el aviso sí se queda hasta que la meta aterriza. */
+  const AVISO_CALCULO = '¡Estamos calculando el número de votos! Ve explorando el resto de la página.';
+  let calculando = false, presentada = false;
+  function avisarCalculo() {
+    if (abierto) { burbuja('ella', `<p>${esc(AVISO_CALCULO)}</p>`); pensarYa(); return; }
+    globo.querySelector('#candiGloboTexto').textContent = AVISO_CALCULO;
+    globo.dataset.aviso = 'calculo';
+    globo.hidden = false;
+    clearTimeout(mostrarGlobo._t);
+    pensarYa();
+  }
+  function calculo(activo) {
+    activo = !!activo;
+    if (activo === calculando) return;
+    calculando = activo;
+    if (activo) { if (presentada) avisarCalculo(); return; }   /* si aún entra, lo dice el saludo */
+    if (globo && globo.dataset.aviso === 'calculo') {
+      globo.dataset.aviso = '';
+      clearTimeout(mostrarGlobo._t);
+      mostrarGlobo._t = setTimeout(ocultarGlobo, 1200);       /* lo alcanza a leer y se va */
+    }
+  }
 
   /* ─── Abrir, cerrar, desmontar ───────────────────────────────────────── */
   function abrir() {
@@ -342,13 +377,25 @@
   const PIENSA_EN = '#crmArqBtn, #crmFirmasBtn, #crmEndosoBtn, .meta-i';
   let ultimaVez = 0;
   function pensar() {
-    if (!mascota || typeof mascota.thinking !== 'function') return;
-    if (escena.dataset.estado !== 'idle_seated') return;         /* no interrumpe la entrada */
     const ahora = Date.now(); if (ahora - ultimaVez < 20000) return;
-    ultimaVez = ahora;
+    pensarYa();
+  }
+  /* Sin el tope de 20 s: lo usa el aviso de cálculo, que es un hecho y no un clic. */
+  function pensarYa() {
+    if (!mascota || typeof mascota.thinking !== 'function') return;
+    const estado = escena.dataset.estado;
+    if (estado === 'thinking') return;                             /* ya está en eso */
+    if (estado !== 'idle_seated') {                                /* no interrumpe la entrada */
+      if (!pensarYa._espera) {
+        pensarYa._espera = true;
+        escena.addEventListener('candi:complete', () => { pensarYa._espera = false; if (calculando) pensarYa(); }, { once: true });
+      }
+      return;
+    }
+    ultimaVez = Date.now();
     mascota.thinking().catch(e => console.warn('[Candi] pensando:', e && e.message));
   }
   document.addEventListener('click', e => { if (e.target.closest?.(PIENSA_EN)) pensar(); });
 
-  window.Candi = { abrir, cerrar, entrar, pensar, get mascota() { return mascota; }, contexto, primerNombre };
+  window.Candi = { abrir, cerrar, entrar, pensar, calculo, get mascota() { return mascota; }, contexto, primerNombre };
 })();
