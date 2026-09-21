@@ -225,7 +225,107 @@
     escena.addEventListener('candi:complete', () => { escena.dataset.estado = 'idle_seated'; });
     escena.addEventListener('candi:reaction-complete', () => { escena.dataset.estado = 'idle_seated'; });
     escena.addEventListener('candi:complete', presentarse);
+    escena.addEventListener('candi:complete', montarDescanso, { once: true });
     mascota.play().catch(e => { fallarAtlas(e && e.message); presentarse(); });
+  }
+
+  /* ─── El descanso con el hueso rosado ────────────────────────────────────
+     Tras 20 s sin actividad, estando atenta, Candi baja del dock, cruza la
+     pantalla, recoge su hueso con la boca y se echa (CandiBoneSequence, de
+     Astra). Corre en una TIRA del ancho de la ventana, no en el dock: el dock
+     mide 250 px y el recorrido tiene que ser de lado a lado. La tira es
+     transparente a los clics.
+     · Una sola perrita visible: el reproductor oculta la del dock mientras
+       camina, y al despertar se queda SENTADA Y ATENTA DONDE ESTÉ (una segunda
+       CandiAtletica en la tira), con la del dock escondida. Vuelve al dock al
+       abrir el panel o cuando tiene que reaccionar (pensar).
+     · No hay clip de regreso: si el siguiente descanso la encuentra ya junto
+       al hueso, salta directo a recogerlo; si quedó a mitad de camino, el
+       recorrido vuelve a empezar desde el dock.
+     · Con el panel abierto no descansa (se está leyendo una respuesta), ni con
+       la pantalla tan baja que el dock esconde la escena.
+     · La espera, la pestaña oculta, el movimiento reducido y la actividad los
+       maneja el propio reproductor; acá solo se limpia lo que se crea. */
+  const DESCANSO_MS = 20000;
+  const bajito = matchMedia('(max-height:520px)');
+  let tira = null, descanso = null, rincon = null;
+
+  function montarDescanso() {
+    if (descanso || !mascota || typeof CandiBoneSequence !== 'function') return;
+    tira = document.createElement('div');
+    tira.className = 'candi-bone-strip'; tira.setAttribute('aria-hidden', 'true');
+    document.body.append(tira);
+    ajustarSuelo();
+    descanso = new CandiBoneSequence(tira, { mascot: mascota, inactivityMs: DESCANSO_MS, activityTarget: document });
+    /* Arranca donde está la Candi del dock y con un tamaño parecido, para que
+       no se note el cambio de reproductor. El resto del encuadre (registro
+       vertical, recortes) es el de Astra, intacto. */
+    const layoutBase = descanso.layout.bind(descanso);
+    descanso.layout = () => {
+      const g = layoutBase();
+      const cs = getComputedStyle(mascota.sprite);
+      const sw = parseFloat(cs.width) || g.size, der = parseFloat(cs.right) || 0;
+      const size = Math.min(210, Math.max(100, sw * 1.1), Math.max(1, g.width - 24));
+      const izq = escena.getBoundingClientRect().right - der - sw - tira.getBoundingClientRect().left;
+      const start = Math.max(g.margin, Math.min(g.width - size - g.margin, izq + (sw - size) / 2));
+      return { ...g, size, start };
+    };
+    /* El reproductor escucha `candi:state` en SU escenario; la mascota lo emite en el dock. */
+    escena.addEventListener('candi:state', reenviarEstado);
+    tira.addEventListener('candi:bone-state', alDescanso);
+    tira.addEventListener('candi:bone-error', e => console.warn('[Candi] hueso:', e.detail?.message));
+    bajito.addEventListener('change', alCambiarAlto);
+    addEventListener('resize', alRedimensionar);
+    habilitarDescanso();
+  }
+  const reenviarEstado = e => tira?.dispatchEvent(new CustomEvent('candi:state', { detail: e.detail }));
+  function habilitarDescanso() { descanso?.enable(!abierto && !bajito.matches); }
+  function alCambiarAlto() { if (bajito.matches) volverAlDock(); habilitarDescanso(); ajustarSuelo(); }
+
+  /* La tira se apoya en la misma línea de suelo que la escena del dock. */
+  function ajustarSuelo() {
+    if (!tira || escena.hidden) return;
+    const r = escena.getBoundingClientRect();
+    if (!r.height) return;
+    tira.style.setProperty('--candi-suelo', Math.max(0, innerHeight - r.bottom) + 'px');
+  }
+  function alRedimensionar() {
+    ajustarSuelo();
+    if (!rincon) return;
+    const g = descanso.layout();                   /* girar el teléfono no la deja fuera */
+    rincon.x = Math.max(g.margin, Math.min(rincon.x, g.width - g.size - g.margin));
+    Object.assign(rincon.el.style, { left: rincon.x + 'px', width: g.size + 'px', height: g.size + 'px' });
+  }
+
+  function alDescanso(e) {
+    const st = e.detail?.state;
+    if (st === 'awake') return despertarDonde();
+    if (st === 'walk' && rincon) {
+      const g = descanso.layout(), junto = rincon.x <= g.end + 24;
+      quitarRincon();
+      if (junto) descanso.render(descanso.times.walk);   /* ya está junto al hueso: a recogerlo */
+    }
+  }
+  /* Al despertar, el reproductor devuelve la Candi del dock. Si ya se había
+     ido de su sitio, se sienta atenta ahí mismo y la del dock se esconde. */
+  function despertarDonde() {
+    const x = parseFloat(descanso.actor.style.left), size = parseFloat(descanso.actor.style.width);
+    if (!Number.isFinite(x) || !Number.isFinite(size) || abierto || bajito.matches) return;
+    if (Math.abs(x - descanso.layout().start) < 24) return;   /* no alcanzó a irse */
+    mascota.pause(); mascota.sprite.hidden = true;
+    const el = document.createElement('div');
+    el.className = 'candi-bone-atenta';
+    Object.assign(el.style, { left: x + 'px', width: size + 'px', height: size + 'px' });
+    tira.append(el);
+    rincon = { el, x, m: new CandiAtletica(el) };
+    rincon.m.idle().catch(() => {});
+  }
+  function quitarRincon() { if (!rincon) return; rincon.m.destroy(); rincon.el.remove(); rincon = null; }
+  function volverAlDock() {
+    if (descanso?.active) descanso.wake();
+    if (!rincon) return;
+    quitarRincon();
+    if (mascota) { mascota.sprite.hidden = false; mascota.idle().catch(() => {}); }
   }
   function mostrarGlobo() {
     presentada = true;
@@ -276,6 +376,7 @@
   /* ─── Abrir, cerrar, desmontar ───────────────────────────────────────── */
   function abrir() {
     abierto = true; ocultarGlobo();
+    habilitarDescanso(); volverAlDock();
     dock.classList.add('abierto'); panel.hidden = false;
     launcher.setAttribute('aria-expanded', 'true');
     pintarGuia();
@@ -287,11 +388,17 @@
     dock.classList.remove('abierto'); panel.hidden = true;
     launcher.setAttribute('aria-expanded', 'false');
     if (foco) launcher.focus();
+    habilitarDescanso();
     /* Ojo: NO se llama pause() acá. Candi vive en la pantalla aunque el panel
        esté cerrado, y el reproductor ya deja de avanzar cuando la pestaña se
        oculta. Pausar acá congelaba la entrada a mitad de camino. */
   }
-  function destruir() { mascota?.destroy(); mascota = null; }
+  function destruir() {
+    descanso?.destroy(); descanso = null; quitarRincon(); tira?.remove(); tira = null;
+    escena?.removeEventListener('candi:state', reenviarEstado);
+    bajito.removeEventListener('change', alCambiarAlto); removeEventListener('resize', alRedimensionar);
+    mascota?.destroy(); mascota = null;
+  }
 
   /* La mascota es decorativa: si su imagen falla, el panel sigue completo. */
   function fallarAtlas(msg) {
@@ -383,6 +490,7 @@
   /* Sin el tope de 20 s: lo usa el aviso de cálculo, que es un hecho y no un clic. */
   function pensarYa() {
     if (!mascota || typeof mascota.thinking !== 'function') return;
+    volverAlDock();                               /* para reaccionar vuelve a su sitio */
     const estado = escena.dataset.estado;
     if (estado === 'thinking') return;                             /* ya está en eso */
     if (estado !== 'idle_seated') {                                /* no interrumpe la entrada */
@@ -397,5 +505,5 @@
   }
   document.addEventListener('click', e => { if (e.target.closest?.(PIENSA_EN)) pensar(); });
 
-  window.Candi = { abrir, cerrar, entrar, pensar, calculo, get mascota() { return mascota; }, contexto, primerNombre };
+  window.Candi = { abrir, cerrar, entrar, pensar, calculo, get mascota() { return mascota; }, get descanso() { return descanso; }, contexto, primerNombre };
 })();

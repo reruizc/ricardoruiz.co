@@ -1,0 +1,25 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Candi · El hueso rosado</title>
+<link rel="stylesheet" href="candi-saludo.css?v=3"><link rel="stylesheet" href="candi-hueso.css?v=1">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f0e8;color:#173f2c;font:16px/1.5 system-ui,sans-serif}header,footer,.controls{padding:20px clamp(12px,4vw,48px)}h1{font-size:clamp(28px,4vw,48px);line-height:1.15;margin:12px 0}p{max-width:760px}small{opacity:.7}.stage-shell{width:100%;margin:auto;background:#fffdf8;border-block:1px solid #173f2c33;transition:none}.stage-shell.mobile{max-width:360px;border:1px solid #173f2c33}.candi-stage{height:300px;min-height:260px}.stage-label{position:absolute;inset:18px auto auto 18px;font-size:13px;opacity:.7}.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}button,select{font:inherit;color:inherit;border:1px solid #173f2c44;border-radius:10px;background:transparent;padding:9px 14px;cursor:pointer}button.primary{background:#173f2c;color:white}button:disabled{opacity:.45;cursor:wait}label{display:flex;gap:8px;align-items:center}input{accent-color:#173f2c}input[type=range]{min-width:140px;flex:1}output{font-size:13px;font-variant-numeric:tabular-nums}body.dark .stage-shell{background:#15251f;color:#fff}a{color:inherit}#status{min-height:1.5em}@media(max-width:480px){.candi-stage{height:240px;min-height:240px}}
+</style>
+<header><small>CANDI · INACTIVIDAD · 70 FOTOGRAMAS</small><h1>Un descanso con su hueso.</h1><p>Candi cruza hasta el otro lado, recoge el juguete rosado con la boca y se echa. El recorrido se adapta al ancho de la pantalla.</p></header>
+<div id="shell" class="stage-shell"><div id="stage" class="candi-stage"><span class="stage-label">24 caminar · 24 recoger · 22 echarse</span></div></div>
+<div class="controls" data-candi-bone-controls><button id="play" class="primary">Ir por el hueso</button><button id="pause">Pausar</button><button id="wake">Volver a atenta</button><button id="width">Probar ancho celular</button><button id="theme">Fondo oscuro</button><label><input id="auto" type="checkbox">Tras 45 s sin actividad</label><input id="timeline" type="range" min="0" max="10000" value="0" step="1" aria-label="Posición del recorrido" disabled><output id="time">0,00 s</output></div>
+<footer><p id="status" role="status">Lista para ir por su hueso.</p><small>La actividad fuera de los controles devuelve a Candi al reposo atento. En esta primera versión el regreso es inmediato; no incluye todavía una animación de levantarse y volver. Los fotogramas generados pueden variar ligeramente entre bloques.</small><p><a href="demo-saludo.html">Ver las otras animaciones</a> · <a href="HUESO-PARA-CLAUDE.md">Guía para Claude</a></p></footer>
+<script src="candi-atletica.js?v=3"></script><script src="candi-hueso.js?v=1"></script><script>
+const stage=document.querySelector('#stage'),mascot=new CandiAtletica(stage),bone=new CandiBoneSequence(stage,{mascot}),status=document.querySelector('#status'),timeline=document.querySelector('#timeline');
+const labels={walk:'Camina hacia el hueso…',pickup:'Recoge el hueso con la boca…',lie:'Se está echando…',resting:'Descansa con su hueso rosado.',awake:'Atenta de nuevo.'};
+stage.addEventListener('candi:bone-state',e=>status.textContent=labels[e.detail.state]||e.detail.state);
+stage.addEventListener('candi:bone-error',e=>status.textContent=e.detail.message);
+stage.addEventListener('candi:bone-frame',e=>{timeline.max=e.detail.duration;timeline.value=e.detail.time;timeline.disabled=false;document.querySelector('#time').textContent=(e.detail.time/1000).toFixed(2)+' s';});
+document.querySelector('#play').onclick=async()=>{status.textContent='Cargando secuencia…';try{await bone.play();if(bone.motion.matches)status.textContent='Movimiento reducido: Candi permanece atenta.';}catch(e){status.textContent=e.message;}};
+document.querySelector('#pause').onclick=()=>{bone.pause();status.textContent='En pausa.';};
+document.querySelector('#wake').onclick=()=>bone.wake();
+document.querySelector('#auto').onchange=e=>{bone.enable(e.target.checked);status.textContent=e.target.checked?'Activada: después de 45 s sin actividad.':'Inactividad automática desactivada.';};
+document.querySelector('#width').onclick=e=>{document.querySelector('#shell').classList.toggle('mobile');e.target.textContent=document.querySelector('#shell').classList.contains('mobile')?'Usar todo el ancho':'Probar ancho celular';};
+document.querySelector('#theme').onclick=e=>{document.body.classList.toggle('dark');e.target.textContent=document.body.classList.contains('dark')?'Fondo claro':'Fondo oscuro';};
+timeline.oninput=()=>{if(!bone.active)return;bone.pause();bone.render(Number(timeline.value));};
+mascot.ready.then(()=>mascot.idle()).catch(e=>status.textContent=e.message);
+addEventListener('pagehide',()=>{bone.destroy();mascot.destroy();});
+</script></html>
