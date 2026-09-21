@@ -15,9 +15,9 @@
      modelo con la clave del servidor. Si no hay sesión, cuota o clave, se dice
      exactamente eso: nunca se inventa una respuesta y se la atribuye a nadie.
 
-   Candi ENTRA SOLA al cargar la página (una vez), se presenta en un globo y se
-   queda quieta en su pose final. Abrir el panel ya no la hace caminar otra vez:
-   ya está ahí. El reposo animado todavía no existe.
+   Candi ENTRA SOLA al cargar la página (una vez): llega, saluda, se sienta y
+   se queda atenta con la cola en un bucle suave (v3 atlética). Abrir o cerrar
+   el panel no la hace saludar otra vez: ya está ahí.
 
    Habla de TÚ. El resto del producto habla de usted a propósito —es la voz
    seria de la plataforma— y ella es la voz cercana; son dos cosas distintas.
@@ -25,13 +25,18 @@
 (() => {
   'use strict';
   const BASE = 'assets/candidato-360/candi/';
-  const ATLAS = BASE + 'candi-saludo-atlas-v2-20.webp';   /* 561 KB contra 2,0 MB del PNG; ver candi-saludo.js */
+  /* La miniatura del botón: la pose SENTADA de la v3 atlética. Las
+     coordenadas de la v2 no sirven — es otro atlas y otra grilla. Índice 8 de
+     una grilla 4×4 = columna 0, fila 2 → posición 0% 66,6667%. */
+  const ATLAS = BASE + 'candi-sentarse-atenta-v3.webp';
   const API = (() => { try { return AUTH_API; } catch { return 'https://rr-auth.reruizc.workers.dev'; } })();
 
-  /* Estados de animación que existen HOY. El worker valida contra su propia
-     copia; ésta es la del cliente. `saludo` es la entrada y solo la dispara la
-     carga de la página, así que un `saludo` pedido por el modelo se ignora.
-     Cuando existan los clips, acá entran `sit_down` e `idle_seated`. */
+  /* Estados que el MODELO puede pedir. El worker valida contra su propia copia;
+     ésta es la del cliente. `saludo` es la entrada y solo la dispara la carga
+     de la página, así que un `saludo` pedido por el modelo se ignora.
+     `sit_down` e `idle_seated` ya existen, pero son la secuencia local de la
+     entrada y no se le piden al modelo: por eso no están acá. La reacción
+     `curious` tampoco — está pendiente de documentar y no se conecta aún. */
   const ESTADOS = { saludo: { clip: 'enter_greet', soloAlEntrar: true } };
 
   /* ─── La guía por vista ──────────────────────────────────────────────────
@@ -189,16 +194,35 @@
   }
 
   /* ─── La entrada: una sola vez por carga de la página ────────────────────
-     Camina, saluda y se queda quieta en la pose final. El globo aparece cuando
-     termina de saludar; si la animación no llega a terminar (atlas caído, o una
-     pestaña que nunca se mostró), entra igual a los 4,5 s. */
+     Llega, saluda, se sienta y queda atenta con la cola en bucle suave
+     (CandiAtletica, v3). El globo aparece al TERMINAR EL SALUDO, igual que con
+     la v2 — y ojo, eso ya no es `candi:complete`: en la v3 ese evento llega a
+     los 4,8 s, cuando ya se sentó, así que colgarse de él retrasaba el globo
+     1,6 s sin que nadie lo decidiera. El fin del saludo es el paso a
+     `sit_down`. Si la animación no avanza (atlas caído, pestaña que nunca se
+     mostró), el globo entra igual a los 5 s. */
   function entrar() {
     if (entroYa) return; entroYa = true;
-    if (typeof CandiSaludo !== 'function') { fallarAtlas('falta candi-saludo.js'); return mostrarGlobo(); }
-    mascota = new CandiSaludo(escena);
-    const red = setTimeout(mostrarGlobo, 4500);
-    escena.addEventListener('candi:complete', () => { clearTimeout(red); mostrarGlobo(); }, { once: true });
-    mascota.play().catch(e => { clearTimeout(red); fallarAtlas(e && e.message); mostrarGlobo(); });
+    if (typeof CandiAtletica !== 'function') { fallarAtlas('falta candi-atletica.js'); return mostrarGlobo(); }
+    mascota = new CandiAtletica(escena);
+    /* Dos señales, y gana la primera. Con animación, `sit_down` (3,2 s) llega
+       antes que `candi:complete` (4,8 s). Con MOVIMIENTO REDUCIDO el reproductor
+       salta directo al reposo y emite `candi:complete` sin pasar nunca por
+       `sit_down`: colgarse solo de `sit_down` dejaba el globo esperando los 5 s
+       del respaldo justo a quien no tiene ninguna animación que esperar. */
+    let listo = false;
+    const red = setTimeout(() => presentarse(), 5000);
+    const alEstado = e => { if (e.detail?.state === 'sit_down') presentarse(); };
+    function presentarse() {
+      if (listo) return; listo = true;
+      clearTimeout(red);
+      escena.removeEventListener('candi:state', alEstado);
+      escena.removeEventListener('candi:complete', presentarse);
+      mostrarGlobo();
+    }
+    escena.addEventListener('candi:state', alEstado);
+    escena.addEventListener('candi:complete', presentarse);
+    mascota.play().catch(e => { fallarAtlas(e && e.message); presentarse(); });
   }
   function mostrarGlobo() {
     if (abierto || globo.dataset.visto === '1') return;
