@@ -53,7 +53,11 @@ DEP_NAMES = {
     '56': 'SAN ANDRÉS', '60': 'AMAZONAS', '64': 'PUTUMAYO', '68': 'VAUPÉS',
     '72': 'VICHADA', '16': 'BOGOTÁ D.C.', '88': 'EXTERIOR',
 }
-SPECIAL_CAN = {'0', '996', '997', '998', '999'}
+# ⚠️ El 0 NO va acá: es el voto al PARTIDO, no un voto especial. En lista
+# abierta es de quien marcó el logo sin elegir candidato; en lista CERRADA es
+# TODO el voto del partido, y descartarlo lo borraba del mapa — el Pacto
+# Histórico al Senado 2022 son 2.880.254 votos, todos al logo.
+SPECIAL_CAN = {'996', '997', '998', '999'}
 
 # (COD_COR, COD_CIR) → (prefijo de slug, etiqueta de corporación, ¿nacional?)
 SCOPES = {
@@ -90,11 +94,16 @@ def load_georef():
 
 def main():
     limit = int(sys.argv[sys.argv.index('--limit') + 1]) if '--limit' in sys.argv else None
+    # `--solo-indice` rehace el índice sin tocar los miles de JSON por
+    # candidato. El voto de lista vive solo en el índice, así que corregirlo
+    # son tres archivos de ~60 KB y no 6.573 de varios GB.
+    solo_indice = '--solo-indice' in sys.argv
     os.makedirs(OUT_DIR, exist_ok=True)
     by9, munNames = load_georef()
     print(f'GEOREF: {len(by9)} puestos · {len(munNames)} muns', flush=True)
 
     cands = {}
+    listas = {}      # (pref, dde, par) → voto SOLO por la lista
     n = 0
     with open(SRC, encoding='utf-8', errors='replace') as f:
         for row in csv.DictReader(f, delimiter=';'):
@@ -113,6 +122,15 @@ def main():
                 continue
             dde = (row.get('COD_DDE') or '').strip()
             par = (row.get('COD_PAR') or '').strip()
+            if can == '0':
+                kl = (pref, '' if nacional else dde, par)
+                l = listas.get(kl)
+                if l is None:
+                    l = listas[kl] = {
+                        'partido': (row.get('DES_PAR') or '').strip() or f'PARTIDO {par}',
+                        'nacional': nacional, 'dd': dde.zfill(2), 'votos': 0}
+                l['votos'] += v
+                continue
             dd = dde.zfill(2)
             mm = (row.get('COD_MME') or '').strip().zfill(3)
             zz = (row.get('COD_ZZ') or '').strip().zfill(2)
@@ -157,20 +175,38 @@ def main():
             'circunscripcion': circ, 'partido': c['partido'],
             'votos': c['votos'], 'mesas': c['mesas'],
         }
-        path = os.path.join(OUT_DIR, f'{slug}.json')
-        with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
-        total_bytes += os.path.getsize(path)
+        if not solo_indice:
+            path = os.path.join(OUT_DIR, f'{slug}.json')
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+            total_bytes += os.path.getsize(path)
         index.append({
             'slug': slug, 'nombre': c['nombre'],
             'corp': f'{corp_full} · 2018', 'circunscripcion': circ,
             'partido': c['partido'], 'votos': c['votos'],
         })
 
+    # Una fila por lista: su voto al logo, el personal de sus candidatos y si es
+    # cerrada. Es lo que necesita el reparto por cifra repartidora, y el mismo
+    # shape que ya traen los índices de 2023.
+    personales = {}
+    for (pref, dde, par, _can), c in cands.items():
+        personales[(pref, dde, par)] = personales.get((pref, dde, par), 0) + c['votos']
+    listas_out = []
+    for (pref, dde, par), l in listas.items():
+        personal = personales.get((pref, dde, par), 0)
+        listas_out.append({
+            'circunscripcion': 'NACIONAL' if l['nacional'] else DEP_NAMES.get(l['dd'], f'DEP {l["dd"]}'),
+            'partido': l['partido'], 'lista': l['votos'], 'personal': personal,
+            'total': l['votos'] + personal, 'cerrada': personal == 0,
+        })
+    listas_out.sort(key=lambda x: -x['total'])
+
     index.sort(key=lambda x: -x['votos'])
     idx_path = os.path.join(OUT_DIR, 'index-congreso-2018.json')
     with open(idx_path, 'w', encoding='utf-8') as f:
-        json.dump({'v': '2018-2022', 'n': len(index), 'candidatos': index},
+        json.dump({'v': '2018-2022', 'n': len(index),
+                   'candidatos': index, 'listas': listas_out},
                   f, ensure_ascii=False, separators=(',', ':'))
     print(f'{len(index):,} candidatos · {total_bytes/1024/1024:.0f} MB → {OUT_DIR}', flush=True)
     print(f'índice → {idx_path}', flush=True)

@@ -124,7 +124,9 @@ DEP_NAMES = {
     '56': 'SAN ANDRÉS', '60': 'AMAZONAS', '64': 'PUTUMAYO', '68': 'VAUPÉS',
     '72': 'VICHADA', '88': 'EXTERIOR', '16': 'BOGOTÁ D.C.',
 }
-SPECIAL_CAN = {'0', '996', '997', '998', '999'}
+# ⚠️ El 0 NO va acá: es el voto al PARTIDO. En lista abierta es de quien marcó
+# el logo sin elegir candidato; en lista CERRADA es TODO el voto del partido.
+SPECIAL_CAN = {'996', '997', '998', '999'}
 
 
 def strip(s):
@@ -183,8 +185,9 @@ def fmt(x):
     return f'{x:,}'.replace(',', '.')
 
 
-def flush_group(cfg, cands, by9, munNames, index, out_dir):
+def flush_group(cfg, cands, by9, munNames, index, out_dir, listas=None, listas_out=None, solo_indice=False):
     anio, scope = cfg['anio'], cfg['scope']
+    circ_de_grupo = {}
     for key, c in cands.items():
         if scope == 'dep':
             dde, par, can = key
@@ -238,18 +241,42 @@ def flush_group(cfg, cands, by9, munNames, index, out_dir):
             'nombre': c['nombre'], 'corp': corp, 'circunscripcion': circ,
             'partido': c['partido'], 'votos': c['votos'], 'mesas': mesas,
         }
-        with open(os.path.join(out_dir, f'{slug}.json'), 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+        if not solo_indice:
+            with open(os.path.join(out_dir, f'{slug}.json'), 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
         index.append({
             'slug': slug, 'nombre': c['nombre'], 'corp': corpIdx,
             'circunscripcion': circ, 'partido': c['partido'], 'votos': c['votos'],
         })
+        if listas_out is not None:
+            gk = (dde, par) if scope == 'dep' else (dde, mme, par)
+            circ_de_grupo.setdefault(gk[:-1], circ)
+
+    # Una fila por lista del grupo: su voto al logo, el personal de sus
+    # candidatos y si es cerrada. Mismo shape que los índices de 2023.
+    if listas:
+        # La llave del voto personal es la misma que la de la lista: el grupo
+        # (departamento, o departamento+municipio) más el partido.
+        personales = {}
+        for key, c in cands.items():
+            gk = (key[0], key[1]) if scope == 'dep' else (key[0], key[1], key[2])
+            personales[gk] = personales.get(gk, 0) + c['votos']
+        for gk, l in listas.items():
+            personal = personales.get(gk, 0)
+            listas_out.append({
+                'circunscripcion': circ_de_grupo.get(gk[:-1], l['circ']), 'partido': l['partido'],
+                'lista': l['votos'], 'personal': personal,
+                'total': l['votos'] + personal, 'cerrada': personal == 0,
+            })
 
 
 def main():
     if len(sys.argv) < 2 or sys.argv[1] not in CFG:
         sys.exit(f'uso: build_territorial_candidatos.py <{"|".join(CFG)}>')
     clave = sys.argv[1]
+    # Rehace el índice sin reescribir los miles de JSON por candidato: el voto
+    # de lista vive solo en el índice.
+    solo_indice = '--solo-indice' in sys.argv
     cfg = CFG[clave]
     L = cfg['layout']
     scope = cfg['scope']
@@ -263,6 +290,8 @@ def main():
 
     index = []
     cands = {}
+    listas = {}
+    listas_out = []
     cur_group = None
     n_rows = 0
     with open(sorted_path, encoding='utf-8', errors='replace', newline='') as f:
@@ -283,10 +312,24 @@ def main():
             grp = dde if scope == 'dep' else (dde, mme)
             if grp != cur_group:
                 if cur_group is not None:
-                    flush_group(cfg, cands, by9, munNames, index, out_dir)
+                    flush_group(cfg, cands, by9, munNames, index, out_dir,
+                                listas, listas_out, solo_indice)
                     cands = {}
+                    listas = {}
                 cur_group = grp
             par = row[L['PAR']].strip()
+            if can == '0':
+                # El voto al logo. En JAL su circunscripción es la comuna, que
+                # sale del georef por puesto y no de la fila, así que ahí se
+                # omite: ver build_jal_2023.py, que sí la resuelve.
+                if scope != 'local':
+                    gk = (dde, par) if scope == 'dep' else (dde, mme, par)
+                    l = listas.get(gk)
+                    if l is None:
+                        l = listas[gk] = {'partido': strip(row[L['DESPAR']]) or f'PARTIDO {par}',
+                                          'circ': '', 'votos': 0}
+                    l['votos'] += v
+                continue
             if scope == 'dep':
                 key = (dde, par, can)
             elif scope == 'mun':
@@ -317,13 +360,15 @@ def main():
             c['mesas'].append((mme, zz, pp, ms, v))
             n_rows += 1
     if cur_group is not None:
-        flush_group(cfg, cands, by9, munNames, index, out_dir)
+        flush_group(cfg, cands, by9, munNames, index, out_dir,
+                    listas, listas_out, solo_indice)
 
     index.sort(key=lambda x: -x['votos'])
     idx_path = os.path.join(out_dir, f"index-{cfg['dir']}.json")
     with open(idx_path, 'w', encoding='utf-8') as f:
         json.dump({'v': '2026-07-30', 'eleccion': cfg['eleccion'],
-                   'candidatos': index}, f, ensure_ascii=False, separators=(',', ':'))
+                   'candidatos': index, 'listas': listas_out},
+                  f, ensure_ascii=False, separators=(',', ':'))
 
     print(f'{n_rows:,} filas mesa-candidato · {len(index):,} candidatos')
     print(f'→ {idx_path} ({os.path.getsize(idx_path)//1024} KB)')
