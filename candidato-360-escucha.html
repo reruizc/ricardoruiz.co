@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 <!-- ⚠️ Al tocar candidato-360.css o candidato-360-panel.js hay que bumpear su ?v= acá y en los demás paneles. -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="candidato-360.css?v=20260919b">
 <style>
 /* Lo propio de este panel; el resto lo pone candidato-360.css (las fichas de
@@ -102,6 +103,78 @@
 .seccion-titulo .panel-num{display:block}
 .seccion-titulo h2{margin:8px 0 6px;font:800 clamp(22px,3vw,30px)/1.1 var(--display);letter-spacing:-.015em;color:var(--ink)}
 .seccion-titulo p{margin:0;max-width:62ch;font-size:14px;line-height:1.6;color:var(--muted)}
+/* ── Saliencia mediática (candidato-360-saliencia.js) ─────────────────── */
+.sal-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.sal-pills{display:flex;gap:6px;flex-wrap:wrap}
+.sal-pill{border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 12px;font:600 12.5px var(--sans);cursor:pointer}
+.sal-pill small{font:500 10px var(--mono);color:var(--muted);margin-left:6px}
+.sal-pill[aria-pressed="true"]{background:var(--forest);border-color:var(--forest);color:#fff}.sal-pill[aria-pressed="true"] small{color:#cbd6ce}
+.sal-meta{font:500 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sal-sintesis{border-left:3px solid var(--coral);background:#fff;padding:14px 18px;font-size:14.5px;line-height:1.62;color:var(--ink);margin-bottom:16px}
+.sal-sintesis small{display:block;margin-top:6px;font:500 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sal-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.sal-card{border:1px solid var(--line);background:#fff;padding:16px 18px;min-width:0}
+.sal-card.ancha{grid-column:1/-1}
+.sal-card h4{margin:0 0 3px;font:700 16px var(--sans);color:var(--ink)}
+.sal-card .sal-sub{margin:0 0 12px;font-size:12.5px;line-height:1.5;color:var(--muted)}
+.sal-fila{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) auto;gap:10px;align-items:center;padding:5px 0;cursor:pointer;font-size:13px}
+.sal-fila:hover .sal-nom{color:var(--green)}
+.sal-fila.on .sal-nom{color:var(--green);font-weight:700}
+.sal-nom{display:flex;align-items:center;min-width:0;color:var(--ink)}.sal-nom>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.sal-nom>.sal-sube,.sal-nom>.sal-usted,.sal-nom>.sal-tipo{flex:none}
+.sal-bar{height:7px;background:#e6e9e4}.sal-bar i{display:block;height:100%;background:var(--green)}
+.sal-num{font:500 11px var(--mono);color:var(--muted);white-space:nowrap}
+.sal-sube{font:600 9.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--coral);padding:2px 5px;margin-left:6px;vertical-align:1px}
+.sal-usted{font:600 9.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--green);border:1px solid var(--green);padding:1px 4px;margin-left:6px}
+.sal-tipo{font:500 9.5px var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-left:6px}
+.sal-nube{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;line-height:1.15}
+.sal-nube button{border:0;background:none;padding:0;cursor:pointer;color:var(--forest);font-family:var(--sans);font-weight:700;letter-spacing:-.01em}
+.sal-nube button:hover,.sal-nube button.on{color:var(--coral)}
+.sal-ritmo{display:flex;align-items:flex-end;gap:2px;height:74px;border-bottom:1px solid var(--line)}
+.sal-ritmo i{flex:1;background:var(--green);min-height:1px;opacity:.85}
+.sal-ritmo i.sem{background:var(--coral)}
+.sal-eje{display:flex;justify-content:space-between;font:500 10px var(--mono);color:var(--muted);margin-top:4px}
+.sal-enc{display:flex;height:12px;margin:14px 0 6px;background:#e6e9e4}.sal-enc i{display:block;height:100%}
+.sal-enc-ley{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted)}.sal-enc-ley b{color:var(--ink)}
+.sal-enc-ley span:before{content:'';display:inline-block;width:9px;height:9px;margin-right:5px;background:var(--c)}
+.sal-arq{display:grid;gap:10px}
+.sal-arq-fila{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:14px;align-items:start;border-top:1px solid var(--line);padding-top:10px}
+.sal-arq-fila:first-child{border-top:0;padding-top:0}
+.sal-arq-fila b.nom{display:flex;align-items:center;gap:8px;font:700 14.5px var(--sans);color:var(--ink)}
+.sal-arq-fila b.nom:before{content:'';width:10px;height:10px;border-radius:50%;background:var(--c);flex:none}
+.sal-arq-fila p{margin:4px 0 0;font-size:12.5px;line-height:1.5;color:var(--muted)}.sal-arq-fila p b{color:var(--ink)}
+.sal-arq-bar{height:8px;background:#e6e9e4;margin-top:6px}.sal-arq-bar i{display:block;height:100%;background:var(--c)}
+.sal-arq-cifra{text-align:right;font:800 20px var(--sans);color:var(--ink);line-height:1}.sal-arq-cifra small{display:block;font:500 9.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.sal-arq-aviso{margin:0 0 12px;padding:10px 12px;background:var(--cream);border:1px dashed var(--line);font-size:12.5px;line-height:1.5;color:var(--muted)}
+.sal-jugada{margin-top:12px;padding:12px 14px;background:var(--forest);color:#fff;font-size:13.5px;line-height:1.55}.sal-jugada b{color:var(--mint)}
+.sal-filtro{margin-top:14px}
+.sal-filtro-chip{display:inline-flex;gap:8px;align-items:center;font:600 12px var(--sans);background:var(--mint);color:var(--ink);padding:6px 10px;margin-bottom:10px}
+.sal-filtro-chip button{border:0;background:none;cursor:pointer;font-size:15px;line-height:1;color:var(--ink)}
+.sal-vacio{font-size:13px;color:var(--muted)}
+.sal-geo{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;align-items:start}
+.sal-mapa{height:440px;background:#e5eadf;border:1px solid var(--line)}
+.sal-mapa .leaflet-container{height:100%;background:#e5eadf}
+@keyframes salPega{0%,100%{fill-opacity:.85}50%{fill-opacity:.25}}
+.leaflet-interactive.sal-on{animation:salPega 1.5s ease-in-out infinite}
+.leaflet-tooltip.tp{font:13px var(--sans);background:rgba(23,37,28,.96);color:#fff;border:0;border-radius:0;padding:8px 10px;max-width:260px;white-space:normal}
+.leaflet-tooltip.tp:before{display:none}
+.sal-geo-ley{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--muted)}
+.sal-geo-ley i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px}
+.sal-lugar-tipo{font:500 9.5px var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-left:6px}
+.sal-ia{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.sal-ia h5{margin:0 0 4px;font:700 15px var(--sans);color:var(--ink)}
+.sal-ia-pills{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.sal-ia-pills button{border:1px solid var(--line);background:#fff;padding:7px 11px;font:600 12.5px var(--sans);cursor:pointer;color:var(--ink);display:inline-flex;gap:7px;align-items:center}
+.sal-ia-pills button:before{content:'';width:9px;height:9px;border-radius:50%;background:var(--c)}
+.sal-ia-pills button[aria-pressed="true"]{border-color:var(--c);box-shadow:inset 0 -3px 0 var(--c)}
+.sal-ia-out{border-left:3px solid var(--c,var(--green));background:#fff;padding:14px 16px;font-size:14px;line-height:1.6;color:var(--ink)}
+.sal-ia-out .et{display:block;font:500 10px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:12px 0 4px}
+.sal-ia-out .et:first-child{margin-top:0}
+.sal-ia-out ol,.sal-ia-out ul{margin:0;padding-left:20px}.sal-ia-out li{margin:3px 0}
+.sal-ia-out blockquote{margin:0;padding:8px 12px;background:var(--cream);font:600 15px var(--sans)}
+.sal-ia-out .ev{font-size:12.5px;color:var(--muted)}.sal-ia-out .ev a{color:var(--ink)}
+.sal-ia-pie{margin-top:8px;font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+@media(max-width:760px){.sal-geo{grid-template-columns:1fr}.sal-mapa{height:340px}}
+@media(max-width:760px){.sal-grid{grid-template-columns:1fr}.sal-arq-fila{grid-template-columns:1fr}.sal-arq-cifra{text-align:left}}
 </style>
 </head>
 <body>
@@ -168,6 +241,33 @@
       <div id="territorioLectura"></div>
     </section>
 
+    <!-- ── Saliencia mediática ─────────────────────────────────────────────
+         La lectura analítica de TODO lo que se trajo arriba (su nombre, su
+         territorio, el país y sus ideas). Hermana de la saliencia de Proyecto
+         DC; la calcula candidato-360-saliencia.js en el navegador. -->
+    <div class="seccion-titulo hidden" id="salSeccion">
+      <span class="panel-num">Saliencia mediática</span>
+      <h2>¿Qué domina la conversación, y a quién le habla?</h2>
+      <p>Los mismos titulares de arriba, leídos juntos: de qué temas se habla, a quién nombran, quién los publica, con qué tono y cómo se mueve en el mes. Al final, qué arquetipo de votante activa esa agenda. Toque un tema, un nombre o una palabra para ver sus titulares.</p>
+    </div>
+    <section class="panel hidden" id="panelSaliencia" style="margin-top:18px">
+      <div class="sal-head"><div class="sal-pills" id="salCorpus"></div><span class="sal-meta" id="salMeta"></span></div>
+      <div class="sal-sintesis" id="salSintesis"></div>
+      <div class="sal-grid">
+        <article class="sal-card"><h4>De qué se habla</h4><p class="sal-sub">Titulares que tocan cada tema. Uno puede tocar varios.</p><div id="salTemas"></div></article>
+        <article class="sal-card"><h4>A quién nombran</h4><p class="sal-sub">Personas e instituciones que aparecen en dos o más titulares, sin la alcaldía ni el concejo que ya van en la búsqueda. Detectado por nombres propios: es aproximado.</p><div id="salActores"></div></article>
+        <article class="sal-card"><h4>Las palabras que más se repiten</h4><p class="sal-sub">Sin palabras vacías, sin el nombre del lugar ni los nombres de arriba.</p><div class="sal-nube" id="salNube"></div></article>
+        <article class="sal-card"><h4>Quién lo publica</h4><p class="sal-sub">Los medios con más titulares en esta lectura.</p><div id="salMedios"></div></article>
+        <article class="sal-card ancha"><h4>El ritmo y el tono</h4><p class="sal-sub">Titulares por día en los últimos 30 días (en coral, la última semana) y el encuadre del vocabulario: conflicto —denuncia, crisis, protesta— contra gestión —anuncia, inaugura, entrega—.</p><div id="salRitmo"></div></article>
+        <article class="sal-card ancha" id="salGeoCard"><h4 id="salGeoTitulo">Dónde pasa lo que se publica</h4><p class="sal-sub" id="salGeoSub">Los lugares de su territorio que nombran los titulares. Parpadea todo lugar con al menos un titular; tóquelo para ver cuáles.</p>
+          <div class="sal-geo"><div class="sal-mapa" id="salMapa"></div><div><div id="salLugares"><p class="sal-vacio">Buscando los lugares de su territorio en los titulares…</p></div></div></div>
+          <p class="sal-sub" id="salGeoNota" style="margin:10px 0 0"></p></article>
+        <article class="sal-card ancha"><h4>A qué votante le habla esta agenda</h4><p class="sal-sub">Las cinco familias de arquetipos y cuánto las mueve cada tema. La sintonía (de 1 a 5) sube cuando se publica mucho sobre lo que a esa familia le importa.</p><div id="salArquetipos"></div>
+          <div class="sal-ia" id="salIA"><h5>Qué hacer, según el votante</h5><p class="sal-sub">Una lectura táctica escrita por un modelo de lenguaje a partir de estos mismos titulares, con los ojos de una familia de arquetipos. Solo puede apoyarse en titulares que existan: los que usa quedan citados abajo.</p><div class="sal-ia-pills" id="salIAPills"></div><div id="salIAOut"></div></div></article>
+      </div>
+      <div class="sal-filtro" id="salFiltro"></div>
+    </section>
+
     <section class="panel" id="panelIdeas" style="margin-top:16px">
       <span class="panel-num">Sus tres ideas de campaña</span>
       <h3 style="margin:6px 0 4px">¿Y de qué va a hablar usted?</h3>
@@ -187,6 +287,11 @@
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="candidato-360-electorado.js?v=20260920d"></script>
+<script src="candidato-360-geoprensa.js?v=20260920"></script>
+<script src="candidato-360-arquetipos.js?v=20260920"></script>
+<script src="candidato-360-saliencia.js?v=20260920"></script>
 <script>
 (function () {
   'use strict';
@@ -589,6 +694,10 @@
       $('btnLeer').disabled = false; pintarEstadoIdeas();
       return;
     }
+    /* Lo que trajeron sus ideas también entra a la saliencia: es conversación
+       de su territorio, buscada con sus palabras. */
+    CORPUS.ideas = respuestas.flatMap(r => (r?.resultados || []).filter(x => pasaTipo(x.medio || '')).map(x => ({ titulo: x.titulo || '', medio: x.medio || '', url: x.url || '', fecha: x.fecha || '' })));
+    pintarSaliencia();
     const conteos = respuestas.map(r => Number(r?.n || 0));
     const lider = conteos.indexOf(Math.max(...conteos));
     const orden = ideas.map((idea, i) => ({ idea, datos: respuestas[i], n: conteos[i], lider: i === lider && conteos[i] > 0 }))
@@ -681,7 +790,283 @@
     usted.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
     territorio.sort((a, b) => (b.pts - a.pts) || String(b.fecha).localeCompare(String(a.fecha)));
     pintarTerritorio(t, usted, esc_.nacional ? nacional : [], territorio, fallos, todas.length, esc_);
+    CORPUS.usted = usted; CORPUS.territorio = territorio; CORPUS.pais = esc_.nacional ? pais.filter(it => !P.mencionaPersona(it.titulo, personas)) : [];
+    pintarSaliencia();
     $('territorioRecargar').disabled = false;
+  }
+
+  /* ═══ 3b · Saliencia mediática ════════════════════════════════════════════
+     Lee junto lo que las lecturas de arriba ya trajeron. No hace consultas
+     propias: si las hiciera, lo que se analiza y lo que se lista arriba
+     podrían no ser lo mismo. */
+  const S = window.C360Saliencia, A = window.C360Arquetipos;
+  const CORPUS = { usted: [], territorio: [], pais: [], ideas: [] };
+  let salVista = 'territorio', salFiltro = null, salUltimo = null;
+  const pct = x => `${Math.round(x * 100)}%`;
+  const unicos = lista => { const v = new Set(); return lista.filter(it => { const k = P.norm(it.titulo).slice(0, 90); if (!k || v.has(k)) return false; v.add(k); return true; }); };
+  function corpusDe(vista) {
+    const local = CORPUS.usted.concat(CORPUS.territorio, CORPUS.ideas);
+    return unicos(vista === 'territorio' ? local : vista === 'pais' ? CORPUS.pais : local.concat(CORPUS.pais));
+  }
+  function fila(nombre, n, max, total, extra, datos) {
+    return `<div class="sal-fila${salFiltro && salFiltro.clave === datos ? ' on' : ''}" data-f="${esc(datos)}" role="button" tabindex="0"><span class="sal-nom" title="${esc(nombre)}"><span>${esc(nombre)}</span>${extra || ''}</span><span class="sal-bar"><i style="width:${(n / Math.max(1, max) * 100).toFixed(1)}%"></i></span><span class="sal-num">${num(n)} · ${pct(n / Math.max(1, total))}</span></div>`;
+  }
+  function sintesis(a, t, sint, arqT) {
+    if (!a.N) return 'Todavía no hay titulares para leer en esta vista.';
+    const lugarTxt = salVista === 'pais' ? 'la agenda nacional' : `la conversación de ${esc(t.etiqueta || 'su territorio')}`;
+    const [t1, t2, t3] = a.temas;
+    const partes = [`De <b>${num(a.N)} titulares</b> en ${VENTANA} días, ${lugarTxt} la domina <b>${esc(t1 ? t1.corto : 'ningún tema claro')}</b>${t1 ? ` (${pct(t1.pct)})` : ''}${t2 ? `, seguida de ${esc(t2.corto)}${t3 ? ` y ${esc(t3.corto)}` : ''}` : ''}.`];
+    if (a.subiendo.length) partes.push(`Lo que más sube esta semana: <b>${esc(a.subiendo[0].corto)}</b>.`);
+    const e = a.encuadre, dur = e.conflicto + e.mixto, suave = e.gestion + e.mixto;
+    /* «Mayormente» solo si pasa de la mitad; si no, se dice cuál pesa más
+       entre los titulares con tono marcado, que es lo que se puede afirmar. */
+    const mayor = (x, y, nom, que) => x / a.N > 0.5 ? `El tono es mayormente de <b>${nom}</b>: ${pct(x / a.N)} de los titulares ${que}.`
+      : `Entre los titulares con tono marcado pesa más el de <b>${nom}</b> (${pct(x / a.N)} del total ${que}, contra ${pct(y / a.N)} del tono contrario).`;
+    partes.push(dur > suave * 1.4 ? mayor(dur, suave, 'conflicto', 'habla de denuncia, crisis o protesta')
+      : suave > dur * 1.4 ? mayor(suave, dur, 'gestión', 'habla de anuncios, entregas u obras')
+      : 'El tono está repartido entre conflicto y gestión.');
+    const top = a.actores.find(x => !x.usted);
+    if (top) partes.push(`El más nombrado es <b>${esc(top.actor)}</b> (${num(top.n)} titulares).`);
+    if (salVista !== 'pais') {
+      const yo = CORPUS.usted.length;
+      partes.push(yo ? `Usted aparece en <b>${num(yo)}</b> ${yo === 1 ? 'titular' : 'titulares'}.` : 'Usted todavía no aparece en ningún titular: la conversación existe sin usted adentro.');
+    }
+    if (sint[0]?.indice) partes.push(`Por su vocabulario, esta agenda le habla sobre todo al votante de <b>${esc(sint[0].familia.nombre.toLowerCase())}</b>${arqT?.pesos?.[sint[0].familia.slug] ? `, que es el ${pct(arqT.pesos[sint[0].familia.slug])} del electorado proyectado de ${esc(arqT.territorio.nombre)}` : ''}.`);
+    return partes.join(' ');
+  }
+  function pintarArquetipos(a, t, sint, arqT) {
+    const pesos = arqT?.pesos || null;
+    const aviso = salVista === 'pais'
+      ? `<p class="sal-arq-aviso">En la agenda nacional la sintonía va sin ponderar: el reparto de arquetipos es de un electorado territorial, y aquí se lee al país entero.</p>`
+      : pesos
+      ? `<p class="sal-arq-aviso">Con el reparto de arquetipos de <b>${esc(arqT.territorio.nombre)}</b> (${esc(arqT.territorio.fuente)}). Es un modelo ecológico sobre voto barrial, no una encuesta.</p>`
+      : `<p class="sal-arq-aviso">Los arquetipos de <b>${esc(t.etiqueta || 'su territorio')}</b> todavía no están construidos. La sintonía usa el perfil de cada familia —el modelo de referencia, construido en Medellín— sin saber cuánto pesa cada una en su electorado. Cuando construyamos los de su territorio, esta tarjeta los toma sola y pondera por su electorado.</p>`;
+    if (!a.temas.length) return aviso + '<p class="sal-vacio">Sin temas clasificados en esta vista.</p>';
+    const filas = sint.map(x => {
+      const f = x.familia, w = pesos?.[f.slug];
+      return `<div class="sal-arq-fila" style="--c:${f.color}"><div><b class="nom">${esc(f.nombre)}</b>
+        <p>${x.activa ? `En esta agenda lo activa <b>${esc(x.activa.corto)}</b>.` : ''} ${x.hueco.length ? `La prensa casi no habla de <b>${esc(x.hueco.join(' ni de '))}</b>, que es lo que más lo mueve.` : ''}</p>
+        <p>Se le habla en tono ${esc(f.tono.toLowerCase())}. Lo desmoviliza: ${esc(f.desmoviliza.toLowerCase())}.</p>
+        <div class="sal-arq-bar"><i style="width:${Math.max(0, (x.indice - 1) / 4 * 100).toFixed(1)}%"></i></div></div>
+        <div class="sal-arq-cifra">${x.indice.toFixed(1)}<small>sintonía · de 5</small>${w != null ? `<span style="display:block;margin-top:10px">${pct(w)}<small>de su electorado</small></span>` : ''}</div></div>`;
+    }).join('');
+    /* La jugada: el hueco de la familia que más pesa (o, sin pesos, de la que
+       menos sintonía tiene con lo que se publica). Es aritmética sobre lo
+       publicado, no una recomendación de estrategia. */
+    const base = pesos ? sint.slice().sort((p, q) => (pesos[q.familia.slug] || 0) - (pesos[p.familia.slug] || 0)).find(x => x.hueco.length) : sint.slice().reverse().find(x => x.hueco.length);
+    const jugada = base ? `<div class="sal-jugada">Espacio abierto: <b>${esc(base.hueco[0])}</b> mueve mucho al votante de ${esc(base.familia.nombre.toLowerCase())}${pesos?.[base.familia.slug] ? ` (${pct(pesos[base.familia.slug])} del electorado)` : ''} y hoy casi nadie lo está publicando. Es un tema que puede ocupar sin competir con la agenda que ya existe.</div>` : '';
+    return aviso + `<div class="sal-arq">${filas}</div>` + jugada;
+  }
+  function pintarFiltro(a) {
+    const caja = $('salFiltro');
+    if (!salFiltro) { caja.innerHTML = ''; return; }
+    const lista = a.filas.filter(salFiltro.test).sort((p, q) => String(q.fecha).localeCompare(String(p.fecha)));
+    caja.innerHTML = `<span class="sal-filtro-chip">${esc(salFiltro.etiqueta)} · ${num(lista.length)} titulares <button type="button" id="salQuitar" aria-label="Quitar filtro">×</button></span>`
+      + (lista.length ? `<ul class="tema-titulares">${lista.slice(0, 25).map(it => `<li><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.titulo)}</a><small>${esc(it.medio || 'medio sin identificar')}${it.fecha ? ` · ${esc(String(it.fecha).slice(0, 10))}` : ''}</small></li>`).join('')}</ul>` : '<p class="sal-vacio">Ningún titular.</p>');
+    $('salQuitar').addEventListener('click', () => { salFiltro = null; pintarSaliencia(); });
+  }
+  async function pintarSaliencia() {
+    const t = P.territorioDe(), vistas = [['territorio', 'Su territorio'], ['pais', 'El país'], ['todo', 'Todo']]
+      .map(([k, n]) => [k, n, corpusDe(k).length]).filter(([k, , c]) => c || k === 'territorio');
+    const total = corpusDe('todo').length;
+    $('salSeccion').classList.toggle('hidden', !total); $('panelSaliencia').classList.toggle('hidden', !total);
+    if (!total) return;
+    if (!vistas.some(v => v[0] === salVista)) salVista = vistas[0][0];
+    $('salCorpus').innerHTML = vistas.map(([k, n, c]) => `<button type="button" class="sal-pill" data-v="${k}" aria-pressed="${k === salVista}">${esc(n)}<small>${num(c)}</small></button>`).join('');
+    $('salCorpus').querySelectorAll('.sal-pill').forEach(b => b.addEventListener('click', () => { salVista = b.dataset.v; salFiltro = null; pintarSaliencia(); }));
+    const items = corpusDe(salVista);
+    const a = S.analizar(items, { locales: P.terminosLocales(t), persona: P.terminosPersona(), ventana: VENTANA, anclas: [t.entidad, t.cuerpo] });
+    salUltimo = a;
+    const nMedios = a.medios.length;
+    $('salMeta').textContent = `${num(a.N)} titulares · ${num(nMedios)} medios · ${VENTANA} días`;
+    const sint = S.sintonia(a, A.FAMILIAS);
+    /* En «Todo» se pondera igual que en el territorio: la mayoría de lo que
+       mira ese electorado sigue siendo lo suyo. En «El país», no. */
+    const arqT = salVista === 'pais' ? null : await A.deTerritorio(t);
+    if (salUltimo !== a) return; /* llegó otra lectura mientras cargaban los arquetipos */
+    $('salSintesis').innerHTML = sintesis(a, t, sint, arqT) + (a.N < 10 ? '<small>Pocos titulares: léalo como indicio, no como tendencia.</small>' : '');
+
+    const maxT = a.temas[0]?.n || 1;
+    $('salTemas').innerHTML = a.temas.length ? a.temas.map(x => fila(x.nombre, x.n, maxT, a.N, a.subiendo.some(s => s.id === x.id) ? '<span class="sal-sube">sube</span>' : '', `tema:${x.id}`)).join('')
+      + (a.sinTema ? `<p class="sal-sub" style="margin:8px 0 0">${num(a.sinTema)} titulares (${pct(a.sinTema / a.N)}) no caen en ningún tema del diccionario.</p>` : '') : '<p class="sal-vacio">Sin temas clasificados.</p>';
+    const maxA = a.actores[0]?.n || 1;
+    $('salActores').innerHTML = a.actores.length ? a.actores.map((x, i) => fila(x.actor, x.n, maxA, a.N, x.usted ? '<span class="sal-usted">usted</span>' : '', `actor:${i}`)).join('') : '<p class="sal-vacio">Nadie aparece en más de un titular.</p>';
+    const maxN = a.nube[0]?.n || 1, minN = a.nube[a.nube.length - 1]?.n || 1;
+    $('salNube').innerHTML = a.nube.length ? a.nube.map(w => { const k = (w.n - minN) / Math.max(1, maxN - minN); return `<button type="button" data-f="palabra:${esc(w.r)}" class="${salFiltro?.clave === `palabra:${w.r}` ? 'on' : ''}" style="font-size:${(13 + k * 19).toFixed(1)}px;opacity:${(.55 + k * .45).toFixed(2)}" title="${num(w.n)} titulares">${esc(w.w)}</button>`; }).join('') : '<p class="sal-vacio">Muy pocos titulares para una nube.</p>';
+    const maxM = a.medios[0]?.n || 1, TIPO = { tradicional: 'tradicional', alternativo: 'alternativo' };
+    $('salMedios').innerHTML = a.medios.slice(0, 10).map(m => fila(m.medio, m.n, maxM, a.N, TIPO[P.tipoMedio(m.medio)] ? `<span class="sal-tipo">${TIPO[P.tipoMedio(m.medio)]}</span>` : '', `medio:${m.medio}`)).join('');
+
+    const maxD = Math.max(1, ...a.serie), e = a.encuadre, N = Math.max(1, a.N);
+    const seg = (k, c) => e[k] ? `<i style="width:${(e[k] / N * 100).toFixed(1)}%;background:${c}" title="${num(e[k])}"></i>` : '';
+    $('salRitmo').innerHTML = `<div class="sal-ritmo">${a.serie.map((n, i) => `<i class="${i >= a.serie.length - 7 ? 'sem' : ''}" style="height:${(n / maxD * 100).toFixed(1)}%" title="${num(n)} titulares"></i>`).join('')}</div>
+      <div class="sal-eje"><span>hace ${VENTANA} días</span><span>pico: ${num(Math.max(...a.serie))} en un día</span><span>hoy</span></div>
+      <div class="sal-enc">${seg('conflicto', 'var(--coral)')}${seg('mixto', '#e7b3a6')}${seg('gestion', 'var(--green)')}${seg('neutro', '#d4d9d2')}</div>
+      <div class="sal-enc-ley"><span style="--c:var(--coral)">Conflicto <b>${pct(e.conflicto / N)}</b></span><span style="--c:#e7b3a6">Mixto <b>${pct(e.mixto / N)}</b></span><span style="--c:var(--green)">Gestión <b>${pct(e.gestion / N)}</b></span><span style="--c:#d4d9d2">Sin marca <b>${pct(e.neutro / N)}</b></span></div>`;
+    $('salArquetipos').innerHTML = pintarArquetipos(a, t, sint, salVista === 'pais' ? null : arqT);
+
+    /* Filtros: tocar una fila o una palabra lista sus titulares abajo. */
+    const armar = clave => {
+      const [tipo, v] = [clave.slice(0, clave.indexOf(':')), clave.slice(clave.indexOf(':') + 1)];
+      if (tipo === 'tema') return { clave, etiqueta: S.TEMAS.find(x => x.id === v)?.nombre || v, test: f => f._temas.includes(v) };
+      if (tipo === 'actor') { const x = a.actores[Number(v)]; const idx = new Set(x.idx); return { clave, etiqueta: x.actor, test: f => idx.has(a.filas.indexOf(f)) }; }
+      if (tipo === 'medio') return { clave, etiqueta: v, test: f => (f.medio || 'Sin identificar').trim() === v };
+      if (tipo === 'palabra') { const w = a.nube.find(x => x.r === v); return { clave, etiqueta: `«${w ? w.w : v}»`, test: f => f._n.includes(' ' + v) }; }
+    };
+    salArmar = armar;
+    enganchar($('panelSaliencia'));
+    /* Los filtros de lugar se arman con el cruce territorial, que llega después:
+       esos se conservan tal cual (su prueba va por el titular, no por índice). */
+    if (salFiltro && !salFiltro.clave.startsWith('geo')) salFiltro = armar(salFiltro.clave) || null;
+    pintarFiltro(a);
+    pintarIA(a, t, sint);
+    pintarGeo(a, t);
+  }
+  let salArmar = () => null;
+  function alternarFiltro(clave, armado) {
+    salFiltro = salFiltro?.clave === clave ? null : (armado || salArmar(clave));
+    pintarSaliencia().then(() => { if (salFiltro) $('salFiltro').scrollIntoView({ behavior: 'instant', block: 'nearest' }); });
+  }
+  function enganchar(raiz) {
+    raiz.querySelectorAll('[data-f]').forEach(el => {
+      if (el.dataset.enganchado) return; el.dataset.enganchado = '1';
+      const ir = () => alternarFiltro(el.dataset.f, el.dataset.f.startsWith('geo') ? filtroGeo(el.dataset.f) : null);
+      el.addEventListener('click', ir);
+      el.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ir(); } });
+    });
+  }
+
+  /* ── Dónde pasa lo que se publica (candidato-360-geoprensa.js) ──────────
+     El mapa es el mismo de la página de sexo y edad: las mismas capas de
+     localidad, comuna o municipio, y el mismo parpadeo para lo que importa. */
+  const G = window.C360GeoPrensa;
+  let salMapa = null, salCapa = null, salGeoUlt = null;
+  const rot90 = (lat, lng) => { const cx = -74.08, cy = 4.65; return [cy + (lng - cx), cx - (lat - cy)]; };
+  function filtroGeo(clave) {
+    const cr = salGeoUlt?.cr, a = salGeoUlt?.a; if (!cr || !a) return null;
+    let idx = [], etiqueta = '';
+    if (clave.startsWith('geou:')) { const u = cr.unidades.get(clave.slice(5)); if (!u) return null; idx = u.idx; etiqueta = `${[...u.nombres][0] || 'Lugar'} y sus barrios`; }
+    else { const l = cr.lugares.find(x => `${x.tipo}:${x.k}` === clave.slice(4)); if (!l) return null; idx = l.idx; etiqueta = P.lugar(l.nombre); }
+    const titulos = new Set(idx.map(i => a.filas[i]._n));
+    return { clave, etiqueta, test: f => titulos.has(f._n) };
+  }
+  async function pintarGeo(a, t) {
+    let g = null;
+    try { g = await G.gaceta(P.SESION.vinculo?.campana || {}, t); } catch (e) { console.warn('geoprensa', e); }
+    if (salUltimo !== a) return;
+    if (!g) { $('salLugares').innerHTML = '<p class="sal-vacio">No se pudo armar el mapa de su territorio: la campaña no tiene departamento guardado o la capa no respondió.</p>'; return; }
+    const cr = G.cruzar(a.filas, g);
+    salGeoUlt = { g, cr, a };
+    const [uSing, uPl] = g.unidadLabel;
+    $('salGeoTitulo').textContent = `Dónde pasa lo que se publica en ${P.lugar(g.lugar)}`;
+    $('salGeoSub').textContent = g.modo === 'ciudad'
+      ? `Las ${uPl} y los barrios que nombran los titulares. Parpadea todo lugar con al menos un titular: la ${uSing} más intensa es la más nombrada, y los puntos son barrios. Toque uno para ver sus titulares.`
+      : g.modo === 'depto' ? 'Los municipios del departamento que nombran los titulares. Parpadea todo municipio con al menos un titular; tóquelo para ver cuáles.'
+      : `Los municipios vecinos del departamento y los barrios y veredas de ${P.lugar(g.lugar)} que nombran los titulares. Su municipio va con borde verde. Parpadea todo lugar con al menos un titular.`;
+    const tipoTxt = x => x.tipo === 'unidad' ? uSing : (g.modo === 'municipio' ? 'barrio o vereda' : 'barrio');
+    const nomUnidad = new Map((g.geo.features || []).map(f => [g.code(f.properties), g.name(f.properties)]));
+    const maxL = cr.lugares[0]?.n || 1;
+    $('salLugares').innerHTML = cr.lugares.length
+      ? cr.lugares.slice(0, 16).map(l => fila(P.lugar(l.nombre), l.n, maxL, a.N,
+          `<span class="sal-lugar-tipo">${esc(tipoTxt(l))}${l.tipo === 'lugar' && g.modo === 'ciudad' && nomUnidad.get(l.unidad) ? ` · ${esc(P.lugar(G.limpiarUnidad(nomUnidad.get(l.unidad))))}` : ''}</span>`, `geo:${l.tipo}:${l.k}`)).join('')
+      : `<p class="sal-vacio">Ningún titular de esta lectura nombra una ${esc(uSing)} ni un barrio de ${esc(P.lugar(g.lugar))}. La prensa habla de la ciudad en general, no de sus lugares.</p>`;
+    enganchar($('salLugares'));
+    $('salGeoNota').innerHTML = `<b>${num(cr.conLugar)} de ${num(a.N)}</b> titulares (${pct(cr.conLugar / Math.max(1, a.N))}) nombran un lugar de ${esc(P.lugar(g.lugar))}. Es búsqueda de nombres en el titular, no la ubicación de la noticia: cuenta que el lugar aparece, no que la nota trate de él. Para no confundir: los nombres comunes («Centro», «La Paz») no se buscan; un barrio solo cuenta si el titular también nombra la ciudad o una de sus ${esc(uPl)}, o si lleva «barrio», «sector» o «vereda» delante; y un nombre de una sola palabra tiene que ir en mayúscula (aun así, al inicio del titular puede colarse alguno). Los barrios salen del georef de puestos de votación y se ubican en el punto medio de sus puestos.`;
+    pintarMapaGeo(g, cr, a);
+  }
+  function pintarMapaGeo(g, cr, a) {
+    if (!window.L) return;
+    if (!salMapa) { salMapa = L.map('salMapa', { zoomControl: true, attributionControl: false, scrollWheelZoom: false, zoomSnap: .25, zoomDelta: .5 }); salMapa.setView([4.6, -74.1], 6); }
+    if (salCapa) { salMapa.removeLayer(salCapa); salCapa = null; }
+    const maxU = Math.max(1, ...[...cr.unidades.values()].map(u => u.n));
+    const titularesDe = idx => idx.slice(0, 3).map(i => `· ${esc(a.filas[i].titulo)}`).join('<br>');
+    const poligonos = L.geoJSON(g.geo, {
+      style: f => {
+        const code = g.code(f.properties), u = cr.unidades.get(code), propia = g.propia && code === g.propia;
+        return { color: propia ? '#1a7049' : '#fff', weight: propia ? 3 : 1, fillColor: u ? '#ee745e' : '#eef0ea', fillOpacity: u ? .3 + .55 * u.n / maxU : .7, className: u ? 'sal-on' : '' };
+      },
+      onEachFeature: (f, layer) => {
+        const code = g.code(f.properties), u = cr.unidades.get(code), nom = P.lugar(G.limpiarUnidad(g.name(f.properties)) || g.name(f.properties));
+        layer.bindTooltip(u ? `<b>${esc(nom)}</b><br>${num(u.n)} ${u.n === 1 ? 'titular' : 'titulares'}<br><small>${titularesDe(u.idx)}</small>` : `<b>${esc(nom)}</b><br>Sin titulares`, { sticky: true, className: 'tp' });
+        if (u) layer.on('click', () => alternarFiltro(`geou:${code}`, filtroGeo(`geou:${code}`)));
+      }
+    });
+    const puntos = cr.lugares.filter(l => l.tipo === 'lugar' && Number.isFinite(l.lat)).map(l => {
+      const ll = g.rotate ? rot90(l.lat, l.lng) : [l.lat, l.lng];
+      return L.circleMarker(ll, { radius: 4 + Math.sqrt(l.n) * 3, color: '#fff', weight: 1.5, fillColor: '#173f2c', fillOpacity: .85, className: 'sal-on' })
+        .bindTooltip(`<b>${esc(P.lugar(l.nombre))}</b> · barrio<br>${num(l.n)} ${l.n === 1 ? 'titular' : 'titulares'}<br><small>${titularesDe(l.idx)}</small>`, { sticky: true, className: 'tp' })
+        .on('click', () => alternarFiltro(`geo:${l.tipo}:${l.k}`, filtroGeo(`geo:${l.tipo}:${l.k}`)));
+    });
+    salCapa = L.featureGroup([poligonos, ...puntos]).addTo(salMapa);
+    /* Leaflet mide el contenedor al crearse: reencuadrar después del layout.
+       Bogotá usa la ventana fija del CRM (Sumapaz dejaría la ciudad en una
+       esquina), girada como su capa. */
+    setTimeout(() => {
+      salMapa.invalidateSize();
+      let b = null;
+      if (g.ventana) {
+        const w = g.ventana, esquinas = [[w.sur, w.oeste], [w.sur, w.este], [w.norte, w.oeste], [w.norte, w.este]].map(([la, lo]) => g.rotate ? rot90(la, lo) : [la, lo]);
+        b = L.latLngBounds(esquinas);
+      }
+      if (!b || !b.isValid()) b = poligonos.getBounds();
+      if (b && b.isValid()) salMapa.fitBounds(b, { padding: [8, 8], animate: false });
+    }, 0);
+  }
+
+  /* ── Qué hacer, según el votante (POST /c360/escucha/lectura) ───────────
+     La lectura la escribe DeepSeek en el worker con los titulares numerados;
+     el modelo tiene que citar en cuáles se apoya y el servidor descarta los
+     números que no existen. Se pide a mano (cuesta y tiene cupo diario) y se
+     guarda en memoria por familia y lectura. */
+  const salIACache = new Map();
+  let salIASlug = null;
+  function iaTitulares(a) { return a.filas.slice().sort((p, q) => String(q.fecha).localeCompare(String(p.fecha))).slice(0, 45); }
+  const iaLlave = (slug, a) => `${slug}|${salVista}|${a.N}|${a.filas[0]?._n || ''}`;
+  function pintarIA(a, t, sint) {
+    $('salIAPills').innerHTML = sint.map(x => `<button type="button" data-slug="${x.familia.slug}" style="--c:${x.familia.color}" aria-pressed="${x.familia.slug === salIASlug}">${esc(x.familia.nombre)}</button>`).join('');
+    $('salIAPills').querySelectorAll('button').forEach(b => b.addEventListener('click', () => pedirIA(b.dataset.slug, a, t)));
+    if (!salIASlug) { $('salIAOut').innerHTML = '<p class="sal-vacio">Elija una familia y se la escribimos. Tarda unos diez segundos.</p>'; return; }
+    const hecho = salIACache.get(iaLlave(salIASlug, a));
+    if (hecho) pintarIAOut(hecho.d, hecho.tits);
+    else $('salIAOut').innerHTML = `<p class="sal-vacio">La lectura anterior era de otros titulares. <button type="button" class="enlace-boton" id="salIARehacer">Pedirla con esta vista</button></p>`, $('salIARehacer')?.addEventListener('click', () => pedirIA(salIASlug, a, t));
+  }
+  async function pedirIA(slug, a, t) {
+    salIASlug = slug;
+    $('salIAPills').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.slug === slug)));
+    const fam = A.FAMILIAS.find(f => f.slug === slug), llave = iaLlave(slug, a);
+    if (salIACache.has(llave)) { const h = salIACache.get(llave); return pintarIAOut(h.d, h.tits); }
+    const tits = iaTitulares(a);
+    $('salIAOut').innerHTML = `<div class="redes-cargando"><i></i><span>Leyendo ${num(tits.length)} titulares con los ojos del votante de ${esc(fam.nombre.toLowerCase())}…</span></div>`;
+    const geo = salGeoUlt?.a === a ? salGeoUlt.cr.lugares.slice(0, 10).map(l => ({ nombre: P.lugar(l.nombre), n: l.n })) : [];
+    let r;
+    try {
+      r = await P.api('/c360/escucha/lectura', { method: 'POST', body: JSON.stringify({
+        familia: slug, vista: salVista, territorio: `${t.corpLabel} · ${t.etiqueta || ''}`,
+        resumen: { N: a.N, dias: VENTANA, temas: a.temas.map(x => ({ nombre: x.nombre, n: x.n, pct: x.pct })), subiendo: a.subiendo.map(x => x.nombre), encuadre: a.encuadre,
+          actores: a.actores.map(x => ({ actor: x.actor, n: x.n })), lugares: geo, usted: salVista === 'pais' ? 0 : CORPUS.usted.length },
+        titulares: tits.map(x => ({ titulo: x.titulo, medio: x.medio, fecha: String(x.fecha || '').slice(0, 10) })) }) });
+    } catch { r = { status: 0, ok: false, data: {} }; }
+    if (salIASlug !== slug) return;
+    if (!r.ok) {
+      const motivo = r.status === 401 ? 'Hay que iniciar sesión para pedir la lectura.' : r.status === 403 ? 'Esta cuenta no tiene acceso a Candidato 360.'
+        : r.status === 404 ? 'La ruta de la lectura todavía no está publicada en el servidor.' : r.status === 0 ? 'No hubo conexión con el servidor.' : (r.data?.error || `El servidor respondió ${r.status}.`);
+      $('salIAOut').innerHTML = `<div class="panel-error"><b>No salió la lectura.</b> ${esc(motivo)}</div>`;
+      return;
+    }
+    salIACache.set(llave, { d: r.data, tits });
+    pintarIAOut(r.data, tits);
+  }
+  function pintarIAOut(d, tits) {
+    const fam = A.FAMILIAS.find(f => f.slug === d.familia) || A.FAMILIAS[0];
+    const lista = (xs, tag) => xs?.length ? `<${tag}>${xs.map(x => `<li>${esc(x)}</li>`).join('')}</${tag}>` : '';
+    const ev = (d.evidencia || []).filter(n => tits[n - 1]);
+    $('salIAOut').innerHTML = `<div class="sal-ia-out" style="--c:${fam.color}">
+      <span class="et">Lectura · ${esc(fam.nombre)}</span><p style="margin:0">${esc(d.lectura)}</p>
+      ${d.acciones?.length ? `<span class="et">Acciones</span>${lista(d.acciones, 'ol')}` : ''}
+      ${d.riesgos?.length ? `<span class="et">Lo que lo desmovilizaría</span>${lista(d.riesgos, 'ul')}` : ''}
+      ${d.temas_a_ocupar?.length ? `<span class="et">Temas que la agenda descuida</span>${lista(d.temas_a_ocupar, 'ul')}` : ''}
+      ${d.mensaje_sugerido ? `<span class="et">Mensaje sugerido</span><blockquote>${esc(d.mensaje_sugerido)}</blockquote>` : ''}
+      <span class="et">Titulares en que se apoya</span>${ev.length ? `<ul class="ev">${ev.map(n => `<li>[${n}] <a href="${esc(tits[n - 1].url)}" target="_blank" rel="noopener">${esc(tits[n - 1].titulo)}</a> · ${esc(tits[n - 1].medio || '')}</li>`).join('')}</ul>` : '<p class="ev">No citó titulares: léalo como orientación general, no como lectura de su prensa.</p>'}
+    </div><p class="sal-ia-pie">Escrito por un modelo de lenguaje sobre ${num(tits.length)} titulares · los números entre paréntesis son esos titulares · sugiere, no decide${d.cache ? ' · lectura guardada de hace menos de 6 horas' : ''}</p>`;
   }
 
   /* ═══ 4 · El arranque ══════════════════════════════════════════════════════ */
