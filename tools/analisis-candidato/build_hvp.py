@@ -121,6 +121,16 @@ def _clave_comuna(s):
 CODIGO = re.compile(r'\d{7}[0-9A-Z]{2}\Z')
 
 
+# Normalización de «comuna · municipio» COMPARTIDA con vote-target.js
+# (`llaveCircunscripcion`): mayúsculas, sin tildes, sin el número de comuna
+# pegado al inicio, y todo lo que no sea letra o dígito colapsado a un espacio.
+# Si cambia aquí, cambia allá, o las curules dejan de casar en silencio.
+def _llave(s):
+    s = str(s or '').upper().translate(str.maketrans('ÁÉÍÓÚÜÑ', 'AEIOUUN'))
+    s = re.sub(r'^\d+', '', s.strip())
+    return re.sub(r'[^A-Z0-9]+', ' ', s).strip()
+
+
 ACCESO = {'Sin Dificultad': 0, 'Media': 1, 'Alta': 2, 'Extrema': 3}
 ESTADO = {'Bueno': 0, 'Regular': 1, 'Malo': 2, 'En Remodelación': 3}
 
@@ -221,6 +231,38 @@ def main():
         with open(os.path.join(SALIDA, 'dep', f'{dep}.json'), 'w', encoding='utf-8') as fh:
             json.dump({'v': '2026-01-27', 'dep': dep, 'p': p}, fh,
                       ensure_ascii=False, separators=(',', ':'))
+
+    # ── Curules OFICIALES de cada JAL ────────────────────────────────────
+    # La HVP trae, por puesto, las curules de la Junta de su comuna o
+    # corregimiento (col 23) y el acuerdo que las fija. vote-target.js las
+    # INFERÍA por la lista más larga inscrita, que falla donde ningún partido
+    # inscribe la lista completa: en Bogotá, Sumapaz daba 5 en vez de 7 y
+    # Rafael Uribe Uribe 10 en vez de 11. Llave = la misma normalización que usa
+    # vote-target.js sobre «COMUNA · MUNICIPIO» del índice de JAL.
+    votos_cur = collections.defaultdict(collections.Counter)
+    for cod, f in hvp.items():
+        c = _int(f.get(23))
+        if c <= 0:
+            continue
+        # ⚠️ En Bogotá el georef guarda la LOCALIDAD en la columna MUNICIPIO:
+        # sin forzarlo, la llave salía «SUBA|SUBA» y no casaba con ninguna de
+        # sus 20 Juntas. Mismo gotcha que build_jal_2023.py.
+        mun = 'BOGOTA D.C.' if cod[:5] == '16001' else f.get(4)
+        clave = f'{_llave(f.get(13))}|{_llave(mun)}'
+        if clave != '|':
+            votos_cur[clave][c] += 1
+    curules_jal, ambiguas = {}, []
+    for clave, cnt in votos_cur.items():
+        (val, n), *resto = cnt.most_common()
+        # Un municipio homónimo en otro departamento, o una comuna con dos
+        # cifras, no se resuelve adivinando: se omite y cae a la inferencia.
+        if resto and resto[0][1] * 3 > n:
+            ambiguas.append(clave); continue
+        curules_jal[clave] = val
+    with open(os.path.join(SALIDA, 'curules-jal.json'), 'w', encoding='utf-8') as fh:
+        json.dump({'v': '2026-01-27', 'fuente': 'RNEC · hoja de vida del puesto',
+                   'curules': curules_jal}, fh, ensure_ascii=False, separators=(',', ':'))
+    print(f'curules de JAL: {len(curules_jal)} juntas · {len(ambiguas)} ambiguas omitidas')
 
     indice = {'v': '2026-01-27',
               'fuente': 'RNEC · Divipole 2026 + hoja de vida del puesto al 27-ene-2026',

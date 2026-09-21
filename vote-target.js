@@ -164,6 +164,31 @@
     return Math.max(0, ...parties.map(party => party.candidates.length));
   }
 
+  /* Curules OFICIALES de cada JAL, de la hoja de vida del puesto (RNEC).
+     `inferSeats` las deduce por la lista más larga inscrita, y en las JAL eso
+     falla muchísimo: medido sobre 578 Juntas, se equivocaba en 374 (65 %). En
+     Pitalito, Palmira o Arjona inscribían un solo candidato por partido y la
+     inferencia daba 1 curul donde hay 9, con lo que el reparto ni se hacía.
+     En Bogotá acertaba 18 de 20: fallaba en Sumapaz (5 en vez de 7) y Rafael
+     Uribe Uribe (10 en vez de 11). Si la Junta no está en el archivo, o el
+     archivo no responde, se vuelve a la inferencia de siempre. */
+  let curulesJalPromesa = null;
+  function curulesJal(baseUrl) {
+    if (!curulesJalPromesa) curulesJalPromesa = json(`${baseUrl}/hvp/curules-jal.json`).then(d => d.curules || {}).catch(() => ({}));
+    return curulesJalPromesa;
+  }
+  /* «COMUNA · MUNICIPIO» → llave. Es la MISMA normalización que `_llave` de
+     tools/analisis-candidato/build_hvp.py: si una cambia sin la otra, las
+     curules dejan de casar en silencio y todo vuelve a la inferencia. */
+  function llaveParte(s) {
+    return String(s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .trim().replace(/^\d+/, '').replace(/[^A-Z0-9]+/g, ' ').trim();
+  }
+  function llaveCircunscripcion(label) {
+    const [com, ...resto] = String(label || '').split('·');
+    return `${llaveParte(com)}|${llaveParte(resto.join('·'))}`;
+  }
+
   /* Los votos de lista de una circunscripción: los del índice si ya los trae
      —manda él aunque para esta circunscripción venga vacío— y si no, los del
      archivo que sirve el sitio. */
@@ -205,7 +230,8 @@
   function reconstructedCutoff(rows, opts) {
     const { corp = '', listas = [], blanco = 0 } = opts || {};
     const parties = mezclarListas(groupByParty(rows), listas);
-    const seats = inferSeats(parties);
+    const oficiales = Number(opts && opts.curules) || 0;
+    const seats = oficiales >= 2 ? oficiales : inferSeats(parties);
     if (seats < 2) {
       const observed = rows.map(candidate => Number(candidate.votos || 0)).filter(votes => votes > 0).sort((a, b) => a - b);
       return observed.length ? { cutoff: observed[0], seats: null, sparse: true } : null;
@@ -246,7 +272,7 @@
        la meta por partido se calcula encima de esto. */
     const cifra = quotients[Math.min(seatsRepartidora, quotients.length) - 1].value;
     const cutoff = elected.length ? Number(elected[0].votos || 0) : 0;
-    return { cutoff, seats, seatsRepartidora, oposicion, validVotes, parties, allocations, cifra, threshold, ultimos, cerradas, conListas: listas.length > 0 };
+    return { cutoff, seats, seatsRepartidora, oposicion, validVotes, parties, allocations, cifra, threshold, ultimos, cerradas, conListas: listas.length > 0, curulesOficiales: oficiales >= 2 };
   }
 
   /* Sin partido (por firmas o sin decidirse) no hay lista por la que entrar,
@@ -507,7 +533,8 @@
       const metrics = await metricsPromise;
       const verified = verifiedCutoff(corp, match.label);
       const listas = await listasDe(index, corp, match.label);
-      const reconstructed = reconstructedCutoff(match.rows, { corp, listas, blanco: metrics && metrics.blanco });
+      const curules = corp === 'jal' ? (await curulesJal(baseUrl))[llaveCircunscripcion(match.label)] : null;
+      const reconstructed = reconstructedCutoff(match.rows, { corp, listas, blanco: metrics && metrics.blanco, curules });
       const reference = verified || reconstructed;
       if (!reference || (!reference.cutoff && !reference.cifra)) throw new Error('No fue posible reconstruir la última curul');
       /* La meta por partido solo se calcula sobre la reconstrucción completa
@@ -559,7 +586,7 @@
               : { tipo: verified ? 'curul-verificada' : reference.sparse ? 'piso-observado' : 'curul-reconstruida', votos: Number(reference.cutoff), curules: reference.seats || null, validos: reference.validVotes || null },
           reparto: reconstructed && !reconstructed.sparse ? {
             curules: reconstructed.seats, porRepartidora: reconstructed.seatsRepartidora, oposicion: reconstructed.oposicion,
-            cifra: Math.round(reconstructed.cifra), umbral: Math.round(reconstructed.threshold), conListas: reconstructed.conListas,
+            cifra: Math.round(reconstructed.cifra), umbral: Math.round(reconstructed.threshold), conListas: reconstructed.conListas, curulesOficiales: !!reconstructed.curulesOficiales,
             listas: (reconstructed.ultimos || []).map(u => ({ partido: u.partido, k: u.k, votos: u.votos, nombre: u.nombre, total: u.total })),
             cerradas: reconstructed.cerradas || [],
           } : null }),
