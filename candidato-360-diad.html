@@ -53,6 +53,7 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
 .dd-tabla .puesto small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
 .dd-marcas{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
 .dd-marca{font:500 10.5px var(--mono);letter-spacing:.04em;padding:2px 6px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.dd-marca.bien{border-color:rgba(31,122,96,.45);color:var(--forest,#173f2c)}
 .dd-marca.mal{border-color:rgba(200,138,46,.5);color:var(--amber,#c88a2e)}
 .dd-corte td{padding:0;border-bottom:2px solid var(--green)}
 .dd-corte-et{font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--green);padding:8px 12px 6px;display:block}
@@ -73,7 +74,7 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
   <header class="panel-hero">
     <div class="kicker">Candidato 360 · panel 09</div>
     <h1>El día de la elección.</h1>
-    <p>Un testigo en cada puesto no le alcanza a nadie. Lo que sí se puede saber es <b>en cuáles</b> están sus votos, cuántos necesita para cubrir la parte que le importa, y <b>qué se va a encontrar cada testigo cuando llegue</b>: si hay señal para reportar, si hay dónde publicar el E‑14, cuántas mesas le tocan. Sale de su votación anterior y de la hoja de vida que la Registraduría levanta de cada puesto.</p>
+    <p>Un testigo en cada puesto no le alcanza a nadie. Lo que sí se puede saber es <b>en cuáles</b> están sus votos, cuántos necesita para cubrir la parte que le importa, y <b>qué se va a encontrar cada testigo cuando llegue</b>: si hay señal para reportar, si hay dónde publicar el E‑14, cuántas mesas le tocan. Sale de su votación anterior —o, si se lanza a otra corporación, de la de su familia política en ese territorio— y de la hoja de vida que la Registraduría levanta de cada puesto.</p>
     <span class="panel-candidatura" id="panelCandidatura"></span>
   </header>
   <div id="panelMuro" class="hidden"></div>
@@ -108,7 +109,7 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
         <h3>Sus puestos, del que más pesa al que menos.</h3>
         <p id="ddTablaCopy"></p>
         <div class="dd-tabla-caja"><table class="dd-tabla"><thead><tr>
-          <th>#</th><th>Puesto</th><th class="num">Mesas</th><th class="num">Votos suyos</th><th class="num">% acum.</th>
+          <th>#</th><th>Puesto</th><th class="num">Mesas</th><th class="num" id="ddColVotos">Votos suyos</th><th class="num">% acum.</th>
         </tr></thead><tbody id="ddFilas"></tbody></table></div>
         <div class="dd-acciones">
           <button type="button" class="solid" id="ddCsv">Descargar el plan (Excel)</button>
@@ -128,8 +129,9 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
 </div></main>
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
+<script src="partidos-bloques.js?v=20260922"></script>
 <script src="candidato-360-electorado.js?v=20260920d"></script>
-<script src="candidato-360-diad.js?v=20260920"></script>
+<script src="candidato-360-diad.js?v=20260921"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <script>
 (async function () {
@@ -137,7 +139,7 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
   const num = x => Number(x || 0).toLocaleString('es-CO');
   const pct0 = x => `${Math.round((x || 0) * 100)} %`;
   const ACC = ['Sin dificultad', 'Acceso medio', 'Acceso alto', 'Acceso extremo'];
-  let PLAN = null, SEL = 1;
+  let PLAN = null, SEL = 1, FUENTE = null;
 
   /* Los atajos son la pregunta al revés — «quiero cubrir el 70 %, ¿cuánta
      gente consigo?» —, que es como de verdad se piensa el problema. */
@@ -153,6 +155,8 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
     if (h.acc >= 2) m.push(['mal', ACC[h.acc].toLowerCase()]);
     if (!h.dis) m.push(['mal', 'no accesible']);
     if (h.abr) m.push(['', `abre: ${h.abr.toLowerCase()}`]);
+    const suyos = FUENTE?.suyosPorPuesto?.get(p.code);
+    if (suyos) m.unshift(['bien', `aquí sacó ${num(suyos)} voto${suyos === 1 ? '' : 's'} antes`]);
     return m.slice(0, 5).map(([c, t]) => `<span class="dd-marca ${c}">${esc(t)}</span>`).join('');
   }
 
@@ -207,7 +211,7 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
     });
     $('ddCsv').addEventListener('click', () => {
       const c = D.cobertura(PLAN, SEL);
-      const blob = new Blob([D.csv(c)], { type: 'text/csv;charset=utf-8' });
+      const blob = new Blob([D.csv(c, FUENTE?.etiqueta)], { type: 'text/csv;charset=utf-8' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `plan-dia-de-eleccion-${c.testigos}-puestos.csv`;
@@ -226,26 +230,37 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
 
   async function armar(v) {
     const slugs = v?.tipo === 'historial' ? (v.candidato?.slugs || []) : [];
-    if (!slugs.length) {
-      return aviso('Esta es una candidatura nueva: sin una elección detrás no hay votos que priorizar, y priorizar al azar sería peor que no hacerlo. Cuando tenga una votación propia, este panel se arma solo. Mientras tanto, la hoja de vida de los puestos de su territorio sí existe y la vamos a traer acá.');
+    FUENTE = await D.fuente({ slugs, campana: v?.campana || {} });
+    if (!FUENTE.mesas.length) {
+      return aviso(slugs.length
+        ? 'No encontramos votos por puesto en el territorio al que se lanza, ni suyos ni de su familia política en 2023.'
+        : 'Todavía no sabemos a qué corporación ni en qué territorio se lanza: defínalo en el CRM y este panel se arma solo.');
     }
-    const mesas = await E.mesasDe(slugs);
-    const hvp = await D.hvpDe(mesas);
-    PLAN = D.plan(mesas, hvp);
-    if (!PLAN.puestos.length) return aviso('No encontramos votos suyos por puesto en la fuente publicada.');
+    const hvp = await D.hvpDe(FUENTE.mesas);
+    PLAN = D.plan(FUENTE.mesas, hvp);
+    if (!PLAN.puestos.length) return aviso('No encontramos votos por puesto en la fuente publicada.');
 
     SEL = D.testigosPara(PLAN, .7);
-    $('ddPlanCopy').innerHTML = `Su votación está repartida en <b>${num(PLAN.puestos.length)}</b> puestos. No pesan igual: mueva el control y vea hasta dónde llega con la gente que de verdad consiga.`;
-    $('ddTablaCopy').innerHTML = `Ordenados por los votos que usted sacó ahí. Lo que quede por debajo de la línea es lo que se queda sin testigo con el número que eligió arriba.`;
+    const n = num(PLAN.puestos.length), T = FUENTE.modo === 'territorio';
+    $('ddColVotos').textContent = T ? (FUENTE.familia ? 'Votos de su familia 2023' : 'Votos válidos 2023') : 'Votos suyos';
+    $('ddShareSub').textContent = T ? 'de esos votos queda cubierta' : 'de su votación queda cubierta';
+    const sinSuyos = !FUENTE.suyosPorPuesto?.size ? '' : ` Donde usted ya sacó votos, el puesto lo dice.`;
+    $('ddPlanCopy').innerHTML = T
+      ? `Para ${esc(FUENTE.corpTexto)}${FUENTE.lugar ? ` de ${esc(P.lugar(FUENTE.lugar))}` : ''} sus testigos cuidan los votos de su lista en <b>${n}</b> puestos, no solo donde usted sacó votos antes. Sin una votación suya en esta corporación, se ordenan por lo que sacó <b>${esc(FUENTE.famTexto)}</b> en ${esc(FUENTE.fuenteTexto)}: es el mejor mapa público de dónde van a estar sus votos.${sinSuyos}`
+      : `Su votación está repartida en <b>${n}</b> puestos. No pesan igual: mueva el control y vea hasta dónde llega con la gente que de verdad consiga.`;
+    $('ddTablaCopy').innerHTML = T
+      ? `Ordenados por los votos de ${esc(FUENTE.famTexto)} en cada puesto. Lo que quede por debajo de la línea es lo que se queda sin testigo con el número que eligió arriba.`
+      : `Ordenados por los votos que usted sacó ahí. Lo que quede por debajo de la línea es lo que se queda sin testigo con el número que eligió arriba.`;
     armarControles();
     pintar();
     $('ddCuerpo').classList.remove('hidden');
     const sinFicha = PLAN.puestos.length - PLAN.conFicha;
-    $('ddNota').innerHTML = `Fuente: su votación mesa a mesa publicada por la Registraduría y la <b>hoja de vida del puesto</b> del Divipole 2026, levantada por el registrador de cada municipio con corte al 27 de enero de 2026. Puede haber cambiado desde entonces: es la planeación de la Registraduría, no una garantía.` +
-      (sinFicha ? ` ${num(sinFicha)} de sus puestos no tienen hoja de vida publicada y salen sin ficha, no con ficha inventada.` : '');
+    const notaT = T ? ` La prioridad sale ${esc(FUENTE.fuenteTexto).replace(/^el /, 'del ').replace(/^la /, 'de la ')}, puesto a puesto${FUENTE.proxy ? ` (no hay resultados por puesto de ${esc(FUENTE.corpTexto)} en su territorio, así que se usa esa elección como referencia)` : ''}${FUENTE.ampliada ? `; su familia no tuvo lista propia ahí, así que se mide con sus vecinas del espectro` : ''}${FUENTE.faltan ? `; ${num(FUENTE.faltan)} zona(s) no respondieron y faltan en la lista` : ''}.` : '';
+    $('ddNota').innerHTML = `Fuente: ${T ? 'la votación de 2023 por puesto publicada por la Registraduría' : 'su votación mesa a mesa publicada por la Registraduría'} y la <b>hoja de vida del puesto</b> del Divipole 2026, levantada por el registrador de cada municipio con corte al 27 de enero de 2026. Puede haber cambiado desde entonces: es la planeación de la Registraduría, no una garantía.` + notaT +
+      (sinFicha ? (sinFicha === 1 ? ' Un puesto no tiene hoja de vida publicada y sale sin ficha, no con ficha inventada.' : ` ${num(sinFicha)} de los puestos no tienen hoja de vida publicada y salen sin ficha, no con ficha inventada.`) : '');
   }
 
-  window.C360DiaDPagina = { armar, plan: () => PLAN };   /* para depurar y para las pruebas */
+  window.C360DiaDPagina = { armar, plan: () => PLAN, fuente: () => FUENTE };   /* para depurar y para las pruebas */
   if (!(await P.arrancar('candidato-360-diad.html'))) return;
   try { await armar(P.SESION.vinculo); }
   catch (e) { aviso(`No se pudo armar el plan: ${esc(e.message || e)}.`); }

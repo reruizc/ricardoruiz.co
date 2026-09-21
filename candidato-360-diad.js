@@ -138,9 +138,9 @@
   /* ── El plan, en texto plano, para que se lo lleve ───────────────────── */
   /* Sale con una columna «Testigo» VACÍA a propósito: ese nombre lo pone él
      en su archivo, no acá. */
-  function csv(seleccion) {
+  function csv(seleccion, etiqueta = 'Votos suyos') {
     const cab = ['#', 'Testigo', 'Codigo', 'Puesto', 'Direccion', 'Barrio', 'Municipio',
-      'Mesas', 'Censo', 'Votos suyos 2023', '% de su votacion', '% acumulado',
+      'Mesas', 'Censo', etiqueta, '% del total', '% acumulado',
       'Senal movil', 'Internet', 'Publica E-14', 'Transmision', 'Accesible', 'Bajo techo',
       'Banos', 'Dificultad de acceso', 'Orden publico', 'Quien abre'];
     const si = v => v == null ? '' : (v ? 'Si' : 'No');
@@ -157,5 +157,137 @@
     return '﻿' + [cab, ...filas].map(f => f.map(esc).join(';')).join('\r\n');
   }
 
-  global.C360DiaD = { hvpDe, plan, cobertura, testigosPara, alertas, csv, codigoPuesto, AVISOS, json, S3 };
+  /* ── De dónde sale el plan ────────────────────────────────────────────
+     Los testigos cuidan los votos de la candidatura QUE VIENE, no los de la
+     anterior. Quien fue a la JAL de Teusaquillo y ahora va al Concejo de
+     Bogotá compite en las 20 localidades: armarle el plan con sus 24 puestos
+     de la JAL era planear la elección equivocada.
+     · «propio»: su votación, solo de candidaturas a ESA MISMA corporación y
+       dentro del territorio al que va. Es lo mejor que hay cuando existe.
+     · «territorio»: si no la hay, los puestos de toda la circunscripción,
+       ordenados por los votos que sacó SU FAMILIA POLÍTICA en 2023. En una
+       corporación de lista, el testigo cuida los votos de la lista entera;
+       dónde vota la familia es el mejor mapa público de dónde van a estar.
+       Sus votos de antes se marcan en el puesto, sin mezclarlos en la cifra.
+     Fuente por destino: Concejo y JAL de las ciudades con detalle por comuna
+     (concejo-2023 / jal-2023); Alcaldía, con el Concejo de su ciudad; el
+     resto de municipios y las corporaciones departamentales, con la
+     Asamblea 2023, la única que baja a todos los puestos del país. */
+  const CORP_DE_SLUG = [[/^JAL\d{4}/, 'jal'], [/^CONC\d{4}/, 'concejo'], [/^ALC\d{4}/, 'alcaldia'],
+    [/^ASAM\d{4}/, 'asamblea'], [/^GOB\d{4}/, 'gobernacion']];
+  const corpDeSlug = sl => (CORP_DE_SLUG.find(([re]) => re.test(String(sl || ''))) || [])[1] || '';
+  const DEPARTAMENTAL = ['asamblea', 'gobernacion'];
+  const pad2 = x => pad(x, 2), pad3 = x => pad(x, 3);
+  const normTexto = x => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase()
+    .replace(/^\s*(LOC(ALIDAD)?\.?|COMUNA)?\s*\d+\s*/, '').replace(/[^A-Z0-9]+/g, ' ').trim();
+  const NOMBRE_CORP = { concejo: 'el Concejo', alcaldia: 'la Alcaldía', jal: 'la JAL', asamblea: 'la Asamblea', gobernacion: 'la Gobernación' };
+  const CON_ARTICULO = { izq: 'la izquierda', ci: 'el centro-izquierda', c: 'el centro', cd: 'el centro-derecha', d: 'la derecha' };
+
+  function familiaDe(campana) {
+    const PB = global.PartidosBloques; if (!PB) return '';
+    const f = campana.avales === 'firmas' || campana.avales === 'indeciso' ? (campana.espectro || '')
+      : (campana.partido ? PB.bloqueDeOrganizacion(campana.partido) : '');
+    return f === 'sc' ? '' : f;
+  }
+  async function enTandas(tareas, n = 6) {
+    const out = []; let i = 0;
+    await Promise.all(Array.from({ length: n }, async () => { while (i < tareas.length) { const k = i++; out[k] = await tareas[k]().catch(() => null); } }));
+    return out;
+  }
+
+  /* Los puestos de la circunscripción, con los votos de 2023 por partido. */
+  async function puestosDestino(campana) {
+    const E = global.C360Electorado, dep = pad2(campana.departamento), corp = campana.corp;
+    if (!dep || dep === '00') return null;
+    if (DEPARTAMENTAL.includes(corp)) {
+      const r = await json(`${S3}/asamblea-2023/dep/${dep}.json`);
+      const muns = Object.keys(r.comunas || {}).map(pad3);
+      const partes = await enTandas(muns.map(m => () => json(`${S3}/asamblea-2023/mun/${dep}-${m}.json`)));
+      return { fuente: 'asamblea', lugar: r.name || campana.departamentoNombre || '',
+        archivos: partes.filter(Boolean).map(d => ({ d, mun: pad3(d.mme) })) , faltan: partes.filter(x => !x).length };
+    }
+    const mun3 = pad3(await E.codigoMunicipio(dep, campana.municipio).catch(() => ''));
+    if (!mun3 || mun3 === '000') return null;
+    const key = `${dep}-${mun3}`;
+    const porComuna = corp === 'jal' ? 'jal' : 'concejo';     /* alcaldía: el Concejo de su ciudad */
+    const res = await json(`${S3}/${porComuna}-2023/resultados-${porComuna}-2023.json`).catch(() => null);
+    const ciudad = res?.data?.[key];
+    if (ciudad) {
+      let comunas = Object.entries(ciudad.comunas || {}).filter(([c]) => !['90', '98', 'NULL', ''].includes(c));
+      if (corp === 'jal') {
+        const q = normTexto(campana.localidad);
+        const una = comunas.filter(([, d]) => normTexto(d.name) === q);
+        if (una.length) comunas = una;
+      }
+      const partes = await enTandas(comunas.map(([c]) => () => json(`${S3}/${porComuna}-2023/comuna/${key}-${c}.json`)));
+      /* El nombre de la unidad (Usaquén, Comuna 14…) sale del agregado: el
+         archivo por comuna trae un rótulo genérico («COMUNA 1»). */
+      const ciudadNom = (res.cities || []).find(x => x.key === key)?.name || campana.municipio || '';
+      return { fuente: porComuna, lugar: corp === 'jal' && comunas.length === 1 ? comunas[0][1].name : ciudadNom,
+        archivos: partes.map((d, i) => d && { d, mun: mun3, nombre: comunas[i][1].name }).filter(Boolean), faltan: partes.filter(x => !x).length };
+    }
+    const d = await json(`${S3}/asamblea-2023/mun/${key}.json`).catch(() => null);
+    return d ? { fuente: 'asamblea', lugar: d.name || campana.municipio || '', archivos: [{ d, mun: mun3 }], faltan: 0 } : null;
+  }
+
+  /* Votos por puesto de la familia (o de todos, si no hay familia), como
+     «mesas» sintéticas para reusar plan(). Si la familia no tuvo lista ahí
+     en 2023, se mide con sus vecinas del espectro y se declara. */
+  function mesasDeFamilia(destino, dep, famSet) {
+    const E = global.C360Electorado, mesas = [];
+    let propios = 0, total = 0;
+    destino.archivos.forEach(({ d, mun, nombre }) => (d.puestos || []).forEach(pu => {
+      const [zon, pue] = String(pu.code || '').split('-');
+      if (!zon || !pue || ['90', '98'].includes(zon)) return;
+      const f = E.votosFamilia(pu.v, d.cands, d.partidos, famSet || new Set(), pu.l);
+      const v = famSet ? f.propios : f.total;
+      propios += f.propios; total += f.total;
+      if (v > 0) mesas.push({ dep, mun, zon, pue, v, munNom: nombre || d.name || '' });
+    }));
+    return { mesas, peso: total ? propios / total : 0 };
+  }
+
+  async function fuente({ slugs = [], campana = {} } = {}) {
+    const E = global.C360Electorado;
+    const corp = campana.corp || '';
+    const suyas = await E.mesasDe(slugs);
+    const aqui = { dep: pad2(campana.departamento), mun: '' };
+    if (campana.municipio && !DEPARTAMENTAL.includes(corp)) aqui.mun = pad3(await E.codigoMunicipio(aqui.dep, campana.municipio).catch(() => ''));
+    const dentro = m => !campana.departamento || (pad2(m.dep) === aqui.dep && (!aqui.mun || pad3(m.mun) === aqui.mun));
+
+    /* «La misma corporación» o una candidatura previa a la misma corporación
+       en el mismo territorio: su votación manda. */
+    const mismas = slugs.filter(sl => corpDeSlug(sl) === corp);
+    if (campana.ruta === 'same' || (mismas.length && corp !== 'jal')) {
+      const mesas = campana.ruta === 'same' ? suyas : (await E.mesasDe(mismas)).filter(dentro);
+      if (mesas.length) return { modo: 'propio', mesas, etiqueta: 'Votos suyos', suyas: null };
+    }
+
+    const destino = await puestosDestino(campana);
+    if (!destino || !destino.archivos.length) return { modo: 'sin-dato', mesas: [] };
+    const dep = pad2(campana.departamento);
+    let familia = familiaDe(campana), famSet = familia ? new Set([familia]) : null, ampliada = false;
+    let r = mesasDeFamilia(destino, dep, famSet);
+    if (famSet && r.peso < .01 && E.VECINAS?.[familia]) {
+      famSet = new Set(E.VECINAS[familia]); ampliada = true;
+      r = mesasDeFamilia(destino, dep, famSet);
+    }
+    /* Sus votos de antes, por puesto, para marcarlos en la tabla. */
+    const suyosPorPuesto = new Map();
+    suyas.forEach(m => { const c = codigoPuesto(m), v = Number(m.v || 0); if (v) suyosPorPuesto.set(c, (suyosPorPuesto.get(c) || 0) + v); });
+    const PB = global.PartidosBloques;
+    const famTexto = !famSet ? 'todas las listas'
+      : ampliada ? [...famSet].map(f => (PB?.BLOQUE_LABEL?.[f] || f).toLowerCase()).join(' + ')
+      : (CON_ARTICULO[familia] || 'su familia política');
+    const corpFuente = destino.fuente === 'jal' ? 'la JAL' : destino.fuente === 'concejo' ? 'el Concejo' : 'la Asamblea';
+    return {
+      modo: 'territorio', mesas: r.mesas, suyosPorPuesto, familia, ampliada, famTexto,
+      corp, corpTexto: NOMBRE_CORP[corp] || 'su corporación', fuenteTexto: `${corpFuente} de 2023`,
+      proxy: (corp === 'alcaldia' && destino.fuente === 'concejo') || (destino.fuente === 'asamblea' && !DEPARTAMENTAL.includes(corp)),
+      lugar: destino.lugar, faltan: destino.faltan,
+      etiqueta: famSet ? 'Votos de su familia 2023' : 'Votos válidos 2023',
+    };
+  }
+
+  global.C360DiaD = { hvpDe, plan, cobertura, testigosPara, alertas, csv, codigoPuesto, AVISOS, json, S3, fuente, corpDeSlug };
 })(window);

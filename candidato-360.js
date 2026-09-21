@@ -3864,22 +3864,32 @@ const pct1 = x => `${(x * 100).toFixed(1).replace('.', ',')} %`;
 async function pintarDiaD() {
   const card = $('crmDiaD'); if (!card || !window.C360DiaD) return;
   const D = window.C360DiaD;
+  $('crmDiaDTitulo').textContent = 'Armando el plan de testigos…';
   try {
-    const mesas = await mesasDelHistorial();
-    if (!mesas.length) throw new Error('sin historial');
-    const plan = D.plan(mesas, await D.hvpDe(mesas));
+    /* La misma fuente que el panel 09: los testigos cuidan la candidatura que
+       viene, así que el plan sale del territorio y la corporación a los que se
+       lanza, no de la elección anterior. */
+    const slugs = crmCandidate ? (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean) : [];
+    const F = await D.fuente({ slugs, campana: CAMPANA_ACTUAL || {} });
+    if (!F.mesas.length) throw new Error('sin puestos');
+    const plan = D.plan(F.mesas, await D.hvpDe(F.mesas));
     if (!plan.puestos.length) throw new Error('sin puestos');
     const n = D.testigosPara(plan, .7), c = D.cobertura(plan, n);
-    const av = D.alertas(c), peor = av[0];
-    $('crmDiaDTitulo').textContent = `Con ${n.toLocaleString('es-CO')} testigo${n === 1 ? '' : 's'} cubre el 70 % de su votación.`;
-    $('crmDiaDCopy').textContent = `Sus votos están repartidos en ${plan.puestos.length.toLocaleString('es-CO')} puestos y no pesan igual: los ${n.toLocaleString('es-CO')} primeros suman ${c.mesas.toLocaleString('es-CO')} mesas.` +
-      (peor ? ` De esos, ${peor.n.toLocaleString('es-CO')} están ${peor.titulo}.` : '');
-    $('crmDiaDDato').textContent = n.toLocaleString('es-CO');
+    const av = D.alertas(c), peor = av[0], N = x => x.toLocaleString('es-CO');
+    const T = F.modo === 'territorio';
+    $('crmDiaDTitulo').textContent = T
+      ? `Con ${N(n)} testigo${n === 1 ? '' : 's'} cubre el 70 % de los votos de ${F.famTexto}.`
+      : `Con ${N(n)} testigo${n === 1 ? '' : 's'} cubre el 70 % de su votación.`;
+    $('crmDiaDCopy').textContent = (T
+      ? `Para ${F.corpTexto} sus testigos cuidan la lista en ${N(plan.puestos.length)} puestos. Los ${N(n)} primeros, según ${F.fuenteTexto}, suman ${N(c.mesas)} mesas.`
+      : `Sus votos están repartidos en ${N(plan.puestos.length)} puestos y no pesan igual: los ${N(n)} primeros suman ${N(c.mesas)} mesas.`) +
+      (peor ? ` De esos, ${N(peor.n)} están ${peor.titulo}.` : '');
+    $('crmDiaDDato').textContent = N(n);
     $('crmDiaDSub').textContent = 'testigos para el 70 %';
   } catch (e) {
     $('crmDiaDTitulo').textContent = 'Todavía no hay plan para esta candidatura.';
-    $('crmDiaDCopy').textContent = 'Sin una elección detrás no hay votos que priorizar, y priorizar al azar sería peor que no hacerlo. La hoja de vida de los puestos de su territorio sí existe y la va a encontrar en el panel.';
-    $('crmDiaDDato').textContent = '—'; $('crmDiaDSub').textContent = 'sin votación previa';
+    $('crmDiaDCopy').textContent = 'Sin votos por puesto en el territorio al que se lanza no hay qué priorizar, y priorizar al azar sería peor que no hacerlo. La hoja de vida de los puestos sí existe y la va a encontrar en el panel.';
+    $('crmDiaDDato').textContent = '—'; $('crmDiaDSub').textContent = 'sin votos por puesto';
   }
 }
 async function pintarPerfil() {
