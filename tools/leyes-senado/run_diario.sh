@@ -576,8 +576,22 @@ etapa() {
         --desc "normativa de Presidencia · Socrata" \
         -- python3 tools/caudal/ejecutivo/harvest_decretos.py fetch
   rc_ej=$?
+  # Diario Oficial (Imprenta Nacional): el dataset de Presidencia es MENSUAL y
+  # el 21-sep iba en el 28-ago — el brief de Cauce no vio los decretos de la
+  # emergencia por el sismo. El Diario Oficial rellena ese mes (Socrata manda
+  # cuando tiene la norma). Ventana de 10 días para recoger ediciones
+  # extraordinarias tardías; lo ya leído sale del caché de texto. NO bloquea:
+  # si falla, el build usa el último raw/diario_oficial.json bueno y la
+  # cobertura que ve el brief se queda honestamente en su última fecha leída.
   if [ $rc_ej -eq 0 ]; then
-    etapa --nombre ejecutivo_build --timeout 300 --desc "raw → normativa.jsonl + stats" \
+    etapa --nombre ejecutivo_diario_oficial --timeout 1800 \
+          --desc "decretos y leyes del Diario Oficial · últimos 10 días" \
+          -- python3 tools/caudal/ejecutivo/harvest_diario_oficial.py fetch --dias 10
+  else
+    etapa --nombre ejecutivo_diario_oficial --omitida "el fetch de Socrata falló (rc=$rc_ej)"
+  fi
+  if [ $rc_ej -eq 0 ]; then
+    etapa --nombre ejecutivo_build --timeout 300 --desc "raw → normativa.jsonl + stats (+ Diario Oficial)" \
           -- python3 tools/caudal/ejecutivo/harvest_decretos.py build
     rc_ej=$?
   else

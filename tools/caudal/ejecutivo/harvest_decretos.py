@@ -40,6 +40,7 @@ REPO = HERE.parents[2]
 OUT = REPO / 'Bases de datos' / 'leyes-senado' / 'ejecutivo'
 RAW = OUT / 'raw'
 DIST = OUT / 'dist'
+DO_RAW = RAW / 'diario_oficial.json'   # lo escribe harvest_diario_oficial.py
 
 SOCRATA_DOMAIN = 'www.datos.gov.co'
 SOCRATA_ID = '88h2-dykw'
@@ -127,9 +128,7 @@ def slim(row):
     # Sin tildes: el 70% de los blobs las traía y «declaracion» no encontraba
     # «declaración». Se pliega acá y no en la consulta porque plegar en caliente
     # cuesta segundos por petición (medido en el pilar Regulatorio).
-    blob = ''.join(c for c in unicodedata.normalize(
-        'NFD', ' '.join(x for x in (titulo, desc) if x).lower())
-        if unicodedata.category(c) != 'Mn')
+    blob = _blob(titulo, desc)
     return {
         'tipo': tipo,
         'numero': numero,
@@ -138,8 +137,55 @@ def slim(row):
         'titulo': titulo or '—',
         'descripcion': desc,
         'url': url,          # PDF oficial (texto completo on-demand)
+        'fuente': 'presidencia',
         'q': blob,           # blob de búsqueda (substring en la Lambda)
     }
+
+
+def _blob(*partes):
+    return ''.join(c for c in unicodedata.normalize(
+        'NFD', ' '.join(x for x in partes if x).lower())
+        if unicodedata.category(c) != 'Mn')
+
+
+def _llave(r):
+    return (r.get('tipo') or '', str(r.get('numero') or '').lstrip('0'), r.get('anio') or '')
+
+
+def fusionar(recs):
+    """Socrata (Presidencia) + Diario Oficial, dedup por (tipo, número, año).
+
+    Socrata MANDA cuando tiene la norma: su descripción es la limpia y su `url`
+    es el PDF permanente de Presidencia. El Diario Oficial solo rellena lo que
+    Socrata aún no trae — que es justo el mes de rezago del dataset. Devuelve
+    (registros, meta) con la cobertura de cada fuente por separado.
+    """
+    meta = {'diario_oficial': None, 'agregadas': 0, 'ya_en_socrata': 0}
+    if not DO_RAW.exists():
+        return recs, meta
+    try:
+        do = json.loads(DO_RAW.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"  ! diario oficial ilegible ({e}): se publica solo Socrata", file=sys.stderr)
+        return recs, meta
+    ya = {_llave(r) for r in recs if r.get('numero')}
+    out = list(recs)
+    for r in do.get('normas', []):
+        if _llave(r) in ya:
+            meta['ya_en_socrata'] += 1
+            continue
+        fila = {k: v for k, v in r.items()}
+        fila['q'] = _blob(fila.get('titulo'), fila.get('descripcion'))
+        out.append(fila)
+        ya.add(_llave(r))
+        meta['agregadas'] += 1
+    meta['diario_oficial'] = {
+        'cobertura': do.get('cobertura') or {},
+        'generado': do.get('generado', ''),
+        'ediciones': len(do.get('ediciones') or []),
+        'fallidas': len(do.get('fallidas') or []),
+    }
+    return out, meta
 
 
 def build():
@@ -149,7 +195,9 @@ def build():
         print("no hay raw; corre 'fetch' primero", file=sys.stderr)
         sys.exit(1)
     rows = json.loads(raw.read_text(encoding='utf-8'))
-    recs = [slim(r) for r in rows]
+    socrata = [slim(r) for r in rows]
+    socrata_hasta = max((r['fecha'] for r in socrata if r['fecha']), default='')
+    recs, fus = fusionar(socrata)
     DIST.mkdir(parents=True, exist_ok=True)
 
     with (DIST / 'normativa.jsonl').open('w', encoding='utf-8') as fh:
@@ -165,23 +213,54 @@ def build():
     for r in recientes:
         r.pop('q', None)
 
+    hoy = datetime.date.today().isoformat()
+    do_meta = fus['diario_oficial']
+    do_hasta = ((do_meta or {}).get('cobertura') or {}).get('hasta', '')
+    # La cobertura del pilar es hasta dónde se LEYÓ, no la norma más nueva: un
+    # domingo sin decretos no atrasa el registro. Socrata no publica fecha de
+    # corte, así que su cobertura es su norma más reciente; la del Diario
+    # Oficial es su edición más reciente leída. Manda la mayor, nunca en el futuro.
+    cob_hasta = min(max(socrata_hasta, do_hasta), hoy)
     stats = {
         'total': len(recs),
         'con_pdf': con_url,
         'por_tipo': [{'tipo': t, 'n': n} for t, n in por_tipo.most_common()],
         'por_anio': dict(sorted(por_anio.items())),
-        'rango_fechas': [fechas[0], fechas[-1]] if fechas else ['', ''],
+        # ⚠️ el brief lee rango_fechas[-1] como cobertura: va la COMBINADA
+        'rango_fechas': [fechas[0], max(fechas[-1] if fechas else '', cob_hasta)]
+                        if fechas else ['', ''],
+        'cobertura': {
+            'hasta': cob_hasta,
+            'socrata': socrata_hasta,
+            'diario_oficial': do_hasta,
+            'rezago_socrata_dias': ((datetime.date.fromisoformat(hoy)
+                                     - datetime.date.fromisoformat(socrata_hasta)).days
+                                    if socrata_hasta else None),
+            'desde_diario_oficial': fus['agregadas'],
+        },
         'recientes': recientes,
         'fuente': {
             'id': SOCRATA_ID, 'nombre': FUENTE_NOMBRE,
             'url': f'https://{SOCRATA_DOMAIN}/resource/{SOCRATA_ID}.json',
-            'frecuencia': FRECUENCIA,
+            # con el Diario Oficial al día, el pilar es diario aunque Socrata no
+            'frecuencia': 'Diaria' if do_hasta else FRECUENCIA,
         },
+        'fuentes': [
+            {'id': SOCRATA_ID, 'nombre': FUENTE_NOMBRE, 'frecuencia': FRECUENCIA,
+             'hasta': socrata_hasta},
+        ] + ([{'id': 'diario_oficial', 'nombre': 'Diario Oficial · Imprenta Nacional',
+               'frecuencia': 'Diaria', 'hasta': do_hasta,
+               'normas_agregadas': fus['agregadas'],
+               'ediciones': do_meta.get('ediciones'),
+               'ediciones_fallidas': do_meta.get('fallidas')}] if do_meta else []),
     }
     (DIST / 'stats.json').write_text(
         json.dumps(stats, ensure_ascii=False, indent=1), encoding='utf-8')
 
     print(f"slim: {len(recs)} normas -> {(DIST / 'normativa.jsonl').relative_to(REPO)}")
+    print(f"socrata hasta {socrata_hasta or '—'} · diario oficial hasta {do_hasta or '—'}"
+          f" · +{fus['agregadas']} normas del Diario Oficial ({fus['ya_en_socrata']} ya estaban)"
+          f" · cobertura {cob_hasta}")
     print(f"con PDF: {con_url}/{len(recs)}   ·   rango: {stats['rango_fechas']}")
     for t, n in por_tipo.most_common():
         print(f"  {t:26s} {n:>6d}")

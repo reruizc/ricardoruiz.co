@@ -160,8 +160,11 @@ def _fmt_item(pilar, x):
                 f"{x.get('destinatario')}: {x.get('motivo', '')[:220]}"
                 + (f" ({x['resolucion']})" if x.get('resolucion') else '') + o + ruido)
     if pilar == 'ejecutivo':
-        return (f"- {x.get('fecha')} · {x.get('tipo')}: "
-                f"{x.get('descripcion') or x.get('titulo', '')}"[:240] + o + ruido)
+        # el título lleva el NÚMERO («DECRETO No. 1382 DEL 9 DE SEPTIEMBRE…»):
+        # sin él el brief solo puede decir «un decreto», que no se puede citar
+        do = f" · {x['diario_oficial']}" if x.get('diario_oficial') else ''
+        return (f"- {x.get('fecha')} · {x.get('titulo') or x.get('tipo')}: "
+                f"{x.get('descripcion') or ''}"[:300] + do + o + ruido)
     if pilar == 'sucop':
         return (f"- {x.get('entidad')}: {x.get('titulo', '')[:180]} · "
                 f"CIERRA {x.get('cierra')}" + o + ruido)
@@ -274,15 +277,25 @@ def armar_mensaje(b):
     L.append("\nHASTA DÓNDE LLEGA CADA REGISTRO (úsalo para «qué no se movió»; "
              "un pilar vacío con registro atrasado NO es lo mismo que quietud):")
     for pilar, f in sorted(cob.items()):
-        L.append(f"  · {pilar}: el registro llega hasta {f}")
+        if f and f < v['desde']:
+            L.append(f"  · {pilar}: el registro llega solo hasta {f} — ATRASADO, no cubre "
+                     f"la ventana. Prohibido decir que no hubo movimiento en este pilar: "
+                     f"di que el registro llega hasta {f} y que lo posterior no está verificado.")
+        else:
+            L.append(f"  · {pilar}: el registro llega hasta {f}")
 
     for pilar, titulo in TITULOS.items():
         xs = ev.get(pilar) or []
         L.append(f"\n### {titulo} · {len(xs)}")
         if not xs:
             f = cob.get(pilar)
-            L.append("  (sin ítems en la ventana"
-                     + (f"; el registro llega hasta {f})" if f else ")"))
+            if f and f < v['desde']:
+                L.append(f"  (SIN DATO: el registro llega solo hasta {f}, antes de que "
+                         f"empiece la ventana. Esto NO significa que no haya habido "
+                         f"movimiento: significa que no lo sabemos)")
+            else:
+                L.append("  (sin ítems en la ventana"
+                         + (f"; el registro llega hasta {f})" if f else ")"))
             continue
         for x in _recorte(pilar, xs, TOPES.get(pilar, 20)):
             L.append('  ' + _fmt_item(pilar, x))

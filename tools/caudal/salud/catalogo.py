@@ -149,15 +149,18 @@ def archivos(leg=None):
              nota='Cloud autónomo del Mac; `v` detecta feed viejo y cada corrida verifica de nuevo el objeto público.'),
 
         # ─────────── periódicos, sin cron ───────────
-        dict(bucket=BUCKET_PRIV, key='metadata/normativa.jsonl', clase='mensual',
+        # Diario desde sep-2026: Presidencia (Socrata) sigue siendo mensual, pero
+        # el Diario Oficial rellena el mes de rezago y el cron sube ambos 2x/día.
+        # La fecha real de cobertura va en stats `cobertura.hasta` (la lee el brief).
+        dict(bucket=BUCKET_PRIV, key='metadata/normativa.jsonl', clase='diario',
              min_bytes=3_000_000,
-             productor='harvest_decretos.py (manual)',
+             productor='run_diario.sh · harvest_decretos.py fetch/build + harvest_diario_oficial.py',
              consumidor='acción `ejecutivo`',
-             nota='La fuente (Presidencia en datos.gov.co) publica MENSUAL. 45 días = ya se saltó un ciclo.'),
-        dict(bucket=BUCKET_PRIV, key='metadata/normativa-stats.json', clase='mensual',
+             nota='Socrata es MENSUAL; el Diario Oficial (diario) rellena lo que aún no trae.'),
+        dict(bucket=BUCKET_PRIV, key='metadata/normativa-stats.json', clase='diario',
              min_bytes=3_000, campo_fecha=None,
-             productor='harvest_decretos.py build (manual)',
-             consumidor='acción `ejecutivo` (landing)'),
+             productor='run_diario.sh · harvest_decretos.py build',
+             consumidor='acción `ejecutivo` (landing) + brief (`cobertura.hasta`)'),
         # El pilar Regulatorio dejó de ser manual: desde ago-2026 el cron refresca
         # la Gaceta Ambiental de la ANLA 2x/día y vuelve a consolidar las 12
         # fuentes, así que estos dos se re-suben en cada corrida. Con clase

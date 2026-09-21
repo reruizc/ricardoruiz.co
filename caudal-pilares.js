@@ -162,21 +162,28 @@
     return `<div class="sanc">
       <div class="sanc-top">${name}<span class="sanc-fecha">${esc(r.fecha||'')}</span></div>
       ${desc?`<div class="sanc-motivo">${esc(desc)}</div>`:''}
-      <div class="sanc-tags"><span class="doc-badge pal">${esc(ejeSing(r.tipo))}</span>${href?` · <a href="${esc(href)}" target="_blank" rel="noopener" style="color:var(--ink3)">texto oficial ↗</a>`:''}</div>
+      <div class="sanc-tags"><span class="doc-badge pal">${esc(ejeSing(r.tipo))}</span>${r.legislativo?' · decreto legislativo':''}${href?` · <a href="${esc(href)}" target="_blank" rel="noopener" style="color:var(--ink3)">texto oficial ↗</a>`:ejePub(r)}</div>
     </div>`;
+  }
+  // Norma que Presidencia aún no sube a su registro mensual: se cita la edición
+  // del Diario Oficial donde salió (su PDF es de sesión, no hay enlace estable).
+  function ejePub(r){
+    const p=r.publicacion; if(!p||!p.edicion) return '';
+    return ` · <span style="color:var(--ink3)">Diario Oficial ${esc(p.edicion)} · ${esc(p.fecha||'')}${p.pagina?' · pág. '+esc(String(p.pagina)):''}</span>`;
   }
   function ejeRenderLanding(s){
     const el=document.getElementById('eje-landing'); if(!el||!s) return;
     const dec=((s.por_tipo||[]).find(x=>x.tipo==='DECRETOS')||{}).n||0;
     const rango=s.rango_fechas&&s.rango_fechas[0]?`${s.rango_fechas[0].slice(0,4)}–${s.rango_fechas[1].slice(0,4)}`:'—';
     const frec=(s.fuente||{}).frecuencia||'—';
+    const cob=(s.cobertura||{}).hasta||'';
     el.innerHTML=`
       <div class="land-h">La normativa del Ejecutivo en números · Presidencia de la República</div>
       <div class="kpis">
         <div class="kpi"><div class="n">${fmt(dec)}</div><div class="l">Decretos</div></div>
         <div class="kpi"><div class="n">${fmt(s.total)}</div><div class="l">Normas en total</div></div>
         <div class="kpi"><div class="n">${rango}</div><div class="l">Periodo</div></div>
-        <div class="kpi"><div class="n" style="color:var(--teal)">${esc(frec)}</div><div class="l">Actualización</div></div>
+        <div class="kpi"><div class="n" style="color:var(--teal)">${esc(frec)}</div><div class="l">Actualización${cob?' · al '+esc(cob):''}</div></div>
       </div>
       <div class="reg-sectors-grid">
         ${(s.por_tipo||[]).filter(x=>x.n>=5).map(x=>`<div class="sec-card" data-tipo="${esc(x.tipo)}"><div class="n">${fmt(x.n)}</div><div class="l">${esc(ejeTitle(x.tipo))}</div></div>`).join('')}

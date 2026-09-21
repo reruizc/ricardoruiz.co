@@ -374,10 +374,19 @@ def barrer(p, dias, desde):
                 cobertura['regulatorio'] = cob
             continue
         if clave == 'ejecutivo::cobertura':
-            # ⚠️ `rango_fechas` es una LISTA [desde, hasta], no un objeto.
-            rango = d.get('rango_fechas') or []
-            cobertura['ejecutivo'] = (rango[-1] if isinstance(rango, list) and rango
-                                      else (d.get('recientes') or [{}])[0].get('fecha', ''))
+            # `cobertura.hasta` es la COMBINADA (Presidencia en Socrata, que va
+            # con un mes de rezago, + el Diario Oficial, que es diario) y la
+            # calcula harvest_decretos.py build. El 21-sep el brief de Cauce no
+            # vio los decretos de la emergencia porque solo existía Socrata y su
+            # corte era el 28-ago. Si falta el campo (stats viejo), cae a
+            # `rango_fechas`, que ⚠️ es una LISTA [desde, hasta], no un objeto.
+            cob = (d.get('cobertura') or {}).get('hasta') or ''
+            if not cob:
+                rango = d.get('rango_fechas') or []
+                cob = (rango[-1] if isinstance(rango, list) and rango
+                       else (d.get('recientes') or [{}])[0].get('fecha', ''))
+            if cob:
+                cobertura['ejecutivo'] = min(cob, hoy_iso)
             continue
         if isinstance(d, dict) and d.get('error'):
             ev['errores'].append({'consulta': clave, 'error': d['error']})
@@ -431,11 +440,15 @@ def barrer(p, dias, desde):
                     ev['_eje_ultima'] = iso(x.get('fecha'))
                 if iso(x.get('fecha')) < desde:
                     continue
+                pub = x.get('publicacion') or {}
                 add('ejecutivo', str(x.get('titulo', ''))[:80], {
                     'fecha': iso(x.get('fecha')), 'tipo': x.get('tipo', ''),
                     'titulo': x.get('titulo', ''),
                     'descripcion': (x.get('descripcion') or '')[:300],
                     'url': x.get('url', ''),
+                    # sin PDF de Presidencia todavía: la cita es la edición
+                    'diario_oficial': (f"Diario Oficial {pub['edicion']} del {pub.get('fecha', '')}"
+                                       if pub.get('edicion') else ''),
                 }, origen)
         elif pilar == 'sucop':
             # ⚠️ Las consultas por TEMA traen el histórico completo, con cierres
@@ -537,7 +550,12 @@ def resumen_texto(b):
         ruido = sum(1 for x in xs if x.get('_ruido'))
         extra = ""
         cob = (b.get('cobertura') or {}).get(pilar)
-        if not xs and cob:
+        if not xs and cob and cob < v['desde']:
+            # El registro ni siquiera llega al inicio de la ventana: un cero acá
+            # es ignorancia, no quietud.
+            extra = (f" · ⚠ REGISTRO ATRASADO: llega solo hasta {cob}, antes de la "
+                     f"ventana — NO se puede afirmar que no hubo movimiento")
+        elif not xs and cob:
             # Esto es lo que separa «no se movió nada» de «no lo han publicado»:
             # sin la fecha, un pilar vacío se lee como quietud del país.
             extra = (f" · sin novedades en la ventana; el registro llega hasta "
