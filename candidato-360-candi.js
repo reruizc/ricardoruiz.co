@@ -69,14 +69,34 @@
       chips: ['¿De dónde sale mi meta de votos?', '¿Qué hace el briefing?', '¿Para qué sirve el día de la elección?']
     }
   };
+  /* Las páginas de módulo no tienen `.screen`: se identifican con
+     <body data-candi-vista="…">. Van en esta misma tabla y en el worker. */
+  VISTAS.electorado = {
+    titulo: 'El electorado de tu votación',
+    texto: 'Aquí ves quién vive donde está tu votación: sexo, edad y si es urbana o rural, contra el promedio de tu territorio. Arriba, los perfiles que más te rinden; el mapa se ilumina donde cada uno pesa más. La edad es una estimación del censo por puesto, no sale de cómo votó cada persona.',
+    chips: ['¿Qué significa que un perfil me rinda ×1,20?', '¿De dónde sale la edad?', '¿Por qué mi familia política se mide con otras?']
+  };
+  VISTAS.diad = {
+    titulo: 'El día de la elección',
+    texto: 'Aquí decides cuántos testigos necesitas y en qué puestos. Si te lanzas a otra corporación, los puestos son los de ese territorio, ordenados por los votos de tu familia política en 2023. Mueve el control para ver cuánto cubres, y revisa los avisos: señal, internet y dónde se publica el E-14.',
+    chips: ['¿Por qué me salen tantos puestos?', '¿Qué hago con un puesto sin señal?', '¿Cómo descargo el plan?']
+  };
   const SIN_VISTA = { titulo: 'Candidato 360', texto: 'Te voy diciendo qué hace cada parte de la plataforma. Pregúntame por lo que estés mirando.', chips: [] };
   const SIN_SESION = 'Para preguntarme por escrito necesito que inicies sesión; así sé de qué campaña estamos hablando. La guía de esta pantalla no depende de eso.';
+
+  /* La sesión: en el CRM es `SESSION`; en las páginas de módulo, la de
+     candidato-360-panel.js. Se lee a demanda, nunca se copia. */
+  function ses() {
+    try { if (typeof SESSION !== 'undefined' && SESSION) return SESSION; } catch {}
+    return window.C360Panel?.SESION || null;
+  }
+  const volverAca = () => `login.html?next=${encodeURIComponent(location.pathname.split('/').pop() || 'candidato-360.html')}`;
 
   /* ─── Lo que Candi sabe de la vista: se lee del DOM, no del estado interno.
      Así nunca le dice al usuario algo distinto de lo que tiene en pantalla. */
   function contexto() {
     const pantalla = document.querySelector('.screen:not(.hidden)');
-    const vista = pantalla?.id || '';
+    const vista = document.body?.dataset?.candiVista || pantalla?.id || '';
     const ctx = { vista };
     const txt = id => document.getElementById(id)?.textContent?.trim() || '';
     if (vista === 'crm') {
@@ -86,7 +106,7 @@
     }
     const paso = pantalla?.querySelector('.paso:not(.hidden)[data-paso]');
     if (paso) ctx.paso = paso.dataset.paso;
-    try { ctx.sesion = Boolean(SESSION && SESSION.token); ctx.acceso = Boolean(SESSION && SESSION.acceso); } catch { ctx.sesion = false; ctx.acceso = false; }
+    const S = ses(); ctx.sesion = Boolean(S?.token); ctx.acceso = Boolean(S?.acceso);
     return ctx;
   }
 
@@ -97,7 +117,7 @@
     let n = '';
     try { n = crmCandidate?.nombre || ''; } catch {}
     if (!n) { try { n = NUEVO?.nombre || ''; } catch {} }
-    if (!n) { try { n = SESSION?.vinculo?.candidato?.nombre || SESSION?.vinculo?.nuevo?.nombre || ''; } catch {} }
+    if (!n) { const v = ses()?.vinculo; n = v?.candidato?.nombre || v?.nuevo?.nombre || ''; }
     const p = String(n).trim().split(/\s+/)[0] || '';
     if (p.length < 2 || /\d/.test(p)) return '';
     /* El índice electoral guarda los nombres en MAYÚSCULAS. */
@@ -186,11 +206,11 @@
   /* El pie no promete lo que no hay: sin sesión, solo la guía escrita. */
   function pintarPie() {
     const nota = dock.querySelector('#candiNota');
-    let hay = false; try { hay = Boolean(SESSION && SESSION.token); } catch {}
+    const hay = Boolean(ses()?.token);
     input.placeholder = hay ? '¿Qué quieres saber de esta pantalla?' : 'Inicia sesión para preguntarme';
     nota.innerHTML = hay
       ? 'Mis respuestas escritas las redacta un modelo. Explico la plataforma; las cifras de tu campaña salen de la página, no de mí.'
-      : 'La guía de arriba funciona siempre. Para preguntas escritas, <a href="login.html?next=candidato-360.html">inicia sesión</a>.';
+      : `La guía de arriba funciona siempre. Para preguntas escritas, <a href="${volverAca()}">inicia sesión</a>.`;
   }
 
   /* ─── La entrada: una sola vez por carga de la página ────────────────────
@@ -335,7 +355,7 @@
        globos seguidos se leerían como Candi hablando sola. */
     globo.querySelector('#candiGloboTexto').textContent =
       `${nombre ? `¡Hola, ${nombre}!` : '¡Hola!'} Soy Candi, tu estratega de campaña. ` +
-      (calculando ? AVISO_CALCULO : 'Pregúntame lo que quieras de la pantalla en la que estés.');
+      (calculando ? avisoActual : 'Pregúntame lo que quieras de la pantalla en la que estés.');
     globo.dataset.aviso = calculando ? 'calculo' : '';
     globo.hidden = false;
     if (calculando) pensarYa();
@@ -352,17 +372,20 @@
      clip de pensar es de 6 s y no se repite en bucle (sacaría y guardaría las
      gafas en cada vuelta); el aviso sí se queda hasta que la meta aterriza. */
   const AVISO_CALCULO = '¡Estamos calculando el número de votos! Ve explorando el resto de la página.';
-  let calculando = false, presentada = false;
+  let calculando = false, presentada = false, avisoActual = AVISO_CALCULO;
   function avisarCalculo() {
-    if (abierto) { burbuja('ella', `<p>${esc(AVISO_CALCULO)}</p>`); pensarYa(); return; }
-    globo.querySelector('#candiGloboTexto').textContent = AVISO_CALCULO;
+    if (abierto) { burbuja('ella', `<p>${esc(avisoActual)}</p>`); pensarYa(); return; }
+    globo.querySelector('#candiGloboTexto').textContent = avisoActual;
     globo.dataset.aviso = 'calculo';
     globo.hidden = false;
     clearTimeout(mostrarGlobo._t);
     pensarYa();
   }
-  function calculo(activo) {
+  /* `texto` deja que cada página diga qué está calculando (el panel 09 arma
+     el plan de testigos, no la meta). */
+  function calculo(activo, texto) {
     activo = !!activo;
+    if (activo) avisoActual = texto || AVISO_CALCULO;
     if (activo === calculando) return;
     calculando = activo;
     if (activo) { if (presentada) avisarCalculo(); return; }   /* si aún entra, lo dice el saludo */
@@ -418,12 +441,12 @@
   async function preguntar(texto) {
     const q = String(texto || '').trim();
     if (!q || enVuelo) return;
-    let token = null; try { token = SESSION?.token || null; } catch {}
+    const token = ses()?.token || null;
     input.value = '';
     burbuja('yo', parrafos(q));
     /* Sin sesión no hay a quién cobrarle la pregunta: se dice acá y no se
        gasta un viaje al worker para que él responda lo mismo con un 401. */
-    if (!token) return sinRespuesta(SIN_SESION, `<a href="login.html?next=candidato-360.html">Iniciar sesión</a>`);
+    if (!token) return sinRespuesta(SIN_SESION, `<a href="${volverAca()}">Iniciar sesión</a>`);
     enVuelo = true; enviar.disabled = true;
     const esperando = burbuja('ella', '<span class="candi-puntos" role="status" aria-label="Candi está pensando"><i></i><i></i><i></i></span>');
     try {
@@ -434,7 +457,7 @@
       });
       let data = null; try { data = await r.json(); } catch {}
       esperando.remove();
-      if (r.status === 401) return sinRespuesta(SIN_SESION, `<a href="login.html?next=candidato-360.html">Iniciar sesión</a>`);
+      if (r.status === 401) return sinRespuesta(SIN_SESION, `<a href="${volverAca()}">Iniciar sesión</a>`);
       if (r.status === 404) return sinRespuesta('Todavía no puedo responder preguntas escritas: falta desplegar mi conexión. La guía de cada pantalla sí funciona.');
       if (r.status === 429) return sinRespuesta(data?.error || 'Por hoy se acabaron las preguntas de esta cuenta. La guía de cada pantalla sigue disponible.');
       if (!r.ok || !data || data.ok === false || !data.respuesta) return sinRespuesta(data?.error || `No pude responder (HTTP ${r.status}). La guía de cada pantalla sigue disponible.`);

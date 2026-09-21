@@ -46,10 +46,14 @@ eq('saludo permitido', mod.C360_CANDI_ESTADOS.has('saludo'), true);
 eq('sit_down todavía no', mod.C360_CANDI_ESTADOS.has('sit_down'), false);
 eq('basura no', mod.C360_CANDI_ESTADOS.has('bailar'), false);
 // 6. Las cinco vistas del HTML están cubiertas
-const enHtml = [...fs.readFileSync('/Users/ricardoruiz/ricardoruiz.co/candidato-360.html','utf8').matchAll(/class="[^"]*screen[^"]*" id="([a-zA-Z]+)"/g)].map(m=>m[1]).sort();
+const enHtml = [...fs.readFileSync('/Users/ricardoruiz/ricardoruiz.co/candidato-360.html','utf8').matchAll(/class="[^"]*screen[^"]*" id="([a-zA-Z]+)"/g)].map(m=>m[1])
+  // Las páginas de módulo que cargan a Candi se identifican con <body data-candi-vista>.
+  .concat(fs.readdirSync('/Users/ricardoruiz/ricardoruiz.co').filter(f=>/^candidato-360-.*\.html$/.test(f))
+    .map(f=>fs.readFileSync('/Users/ricardoruiz/ricardoruiz.co/'+f,'utf8').match(/<body data-candi-vista="([a-z]+)"/)?.[1]).filter(Boolean)).sort();
 const enWorker = Object.keys(new Function(src.match(/const C360_CANDI_VISTAS = \{[\s\S]*?\n\};/)[0]+'\nreturn C360_CANDI_VISTAS;')()).sort();
 eq('vistas worker == pantallas html', enWorker, enHtml);
-const enFront = Object.keys(new Function(fs.readFileSync('/Users/ricardoruiz/ricardoruiz.co/candidato-360-candi.js','utf8').match(/const VISTAS = \{[\s\S]*?\n  \};/)[0].replace(/;$/,'')+'\nreturn VISTAS;')()).sort();
+const candiSrc = fs.readFileSync('/Users/ricardoruiz/ricardoruiz.co/candidato-360-candi.js','utf8');
+const enFront = Object.keys(new Function(candiSrc.match(/const VISTAS = \{[\s\S]*?\n  \};/)[0].replace(/;$/,'')+'\n'+[...candiSrc.matchAll(/\n  VISTAS\.[a-z]+ = \{[\s\S]*?\n  \};/g)].map(m=>m[0]).join('\n')+'\nreturn VISTAS;')()).sort();
 eq('vistas frontend == pantallas html', enFront, enHtml);
 console.log(fallos ? `\n${fallos} fallo(s)` : '\nTodo pasa.');
 process.exit(fallos?1:0);
