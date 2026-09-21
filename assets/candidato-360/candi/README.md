@@ -1,3 +1,5 @@
+> **Actualización vigente: Candi atlética v3.** Nuevas proporciones y clips de sentarse/atenta disponibles en la demo. Lee `ATLETICA-V3-PARA-CLAUDE.md` antes de integrar. Lo que sigue conserva el historial de v1/v2 y sus pendientes antiguos. La integración de producto existente sigue en v2 hasta que Claude la sustituya.
+
 > **Versión vigente: v2 de 20 poses.** Abre `demo-saludo.html`. El reproductor y CSS usan `candi-saludo-atlas-v2-20.png` (1402 × 1122, transparente, cuadrícula 5 × 4). Duración: 3,2 s; ocho poses de caminata, cuatro de frenada/giro y ocho de elevación/saludo. Son veinte poses, no veinte fps. El clip de sentarse sigue pendiente. Las notas de v1 más abajo se conservan como historial y no describen el atlas vigente.
 >
 > **Para Claude:** copia el contenido de `PROMPT-PARA-CLAUDE.md`. Prompt visual exacto de la v2: `prompt-atlas-v2-20.txt`, generado con image_gen integrado.

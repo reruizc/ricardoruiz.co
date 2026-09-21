@@ -221,6 +221,9 @@
       mostrarGlobo();
     }
     escena.addEventListener('candi:state', alEstado);
+    escena.addEventListener('candi:state', e => { escena.dataset.estado = e.detail?.state || ''; });
+    escena.addEventListener('candi:complete', () => { escena.dataset.estado = 'idle_seated'; });
+    escena.addEventListener('candi:reaction-complete', () => { escena.dataset.estado = 'idle_seated'; });
     escena.addEventListener('candi:complete', presentarse);
     mascota.play().catch(e => { fallarAtlas(e && e.message); presentarse(); });
   }
@@ -329,5 +332,23 @@
   else arrancar();
 
   /* Para depurar desde la consola; no es API pública. */
-  window.Candi = { abrir, cerrar, entrar, get mascota() { return mascota; }, contexto, primerNombre };
+  /* ─── Pensando: al abrir un módulo que calcula ───────────────────────────
+     Saca las gafas, mira arriba, se le prende el bombillo y vuelve a quedar
+     atenta (6 s, v3). Solo con los módulos que abren su cálculo EN la página
+     —arquetipos, firmas, endoso y el «por qué» de la meta—: los que llevan a
+     otra página la cortarían a la mitad. Nunca durante la entrada, y como
+     mucho una vez cada 20 s: una mascota que piensa a cada clic deja de decir
+     algo. `curious` sigue sin conectar: no está decidido cuándo va. */
+  const PIENSA_EN = '#crmArqBtn, #crmFirmasBtn, #crmEndosoBtn, .meta-i';
+  let ultimaVez = 0;
+  function pensar() {
+    if (!mascota || typeof mascota.thinking !== 'function') return;
+    if (escena.dataset.estado !== 'idle_seated') return;         /* no interrumpe la entrada */
+    const ahora = Date.now(); if (ahora - ultimaVez < 20000) return;
+    ultimaVez = ahora;
+    mascota.thinking().catch(e => console.warn('[Candi] pensando:', e && e.message));
+  }
+  document.addEventListener('click', e => { if (e.target.closest?.(PIENSA_EN)) pensar(); });
+
+  window.Candi = { abrir, cerrar, entrar, pensar, get mascota() { return mascota; }, contexto, primerNombre };
 })();

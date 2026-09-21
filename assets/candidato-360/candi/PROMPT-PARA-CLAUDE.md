@@ -1,3 +1,5 @@
+> **Actualización vigente: Candi atlética v3.** Nuevas proporciones y clips de sentarse/atenta disponibles en la demo. Lee `ATLETICA-V3-PARA-CLAUDE.md` antes de integrar. Lo que sigue conserva el historial de v1/v2 y sus pendientes antiguos. La integración de producto existente sigue en v2 hasta que Claude la sustituya.
+
 # Integrar Candi en Candidato 360
 
 Empieza a integrar a Candi, mi asistente perrita, en `candidato-360.html`. El diseño elegido es 3D suave, basado en Luna. Los archivos están en `assets/candidato-360/candi/`. Lee primero las instrucciones del repositorio y revisa la arquitectura actual para integrarla sin interferir con el CRM.
