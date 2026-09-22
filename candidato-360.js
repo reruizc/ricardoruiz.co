@@ -291,7 +291,10 @@ function copyBriefing() {
       : bloque === 'c'
         ? `${con}, se compite con argumentos y el argumento es el dato: el briefing se lo pone en la mano antes de cada debate.`
         : `${con}, la información es la ventaja que nadie le puede quitar: lo que otros se enteran por rumor, usted lo lee con fuente y fecha.`;
-  return `${base} ${linea} Se activa con un clic y el primero sale en la próxima corrida.`;
+  const reg = crmCandidate ? regionDeCampana(crmCandidate, c) : { dep: c.departamento, municipio: c.municipio };
+  const tema = window.C360Frases?.tema(reg) || '';
+  const enTema = tema ? ` Ahí lo que más pesa es ${tema}: el briefing lo sigue por usted.` : '';
+  return `${base}${enTema} ${linea} Se activa con un clic y el primero sale en la próxima corrida.`;
 }
 function pintarBriefing() {
   const b = SESSION.vinculo?.briefing || null, btn = $('crmBriefingBtn'), est = $('crmBriefingEstado'), sub = $('crmBriefingSub'), inp = $('crmBriefingCorreo');
@@ -1799,6 +1802,25 @@ function tipoDeSalto(desde, hacia) {
   return FRASES_SALTO[`${desde}>${hacia}`] ? `${desde}>${hacia}` : 'otra';
 }
 function elegir(lista, semilla) { let h = 0; for (const c of String(semilla || '')) h = (h * 31 + c.charCodeAt(0)) >>> 0; return lista[h % lista.length]; }
+/* Dónde compite la candidatura, para el diccionario regional
+   (candidato-360-frases.js): el territorio de la campaña si lo eligió, y si
+   no («la misma corporación»), el de su última elección. */
+function regionDeCampana(candidate, campana) {
+  const dep = campana?.departamento || departamentoDeCandidatura(candidate);
+  const partes = String(candidate?.circunscripcion || '').split('·').map(x => x.trim()).filter(Boolean);
+  const municipio = campana?.municipio || (CORP_MUNICIPAL.includes(campana?.corp || '') || campana?.corp === 'jal' || !campana?.corp ? partes[partes.length - 1] : '') || '';
+  return { dep, municipio };
+}
+/* La frase medida (cifras de 2023) llega después: necesita bajar un JSON. Se
+   agrega al párrafo solo si sigue siendo la misma candidatura en pantalla. */
+async function agregarDatoRegional(el, { dep, municipio, bloque, partido }) {
+  const F = window.C360Frases; if (!el || !F) return;
+  const antes = el.textContent;
+  let codigoMunicipio = '';
+  try { if (municipio && dep && dep !== '16') codigoMunicipio = await C360Electorado.codigoMunicipio(dep, municipio); } catch {}
+  const d = await F.dato({ dep, municipio, codigoMunicipio, bloque, partido }).catch(() => '');
+  if (d && el.textContent === antes) el.textContent = `${antes} ${d}`;
+}
 function fraseDePartida({ candidate, corpKey, territory, campana }) {
   const hist = leerCorpHistorica(candidate?.corp), n = candidate?.history?.length || 0;
   const lugarNuevo = NOMBRE_BONITO(String(territory || '').split('·')[0].trim()) || hist.lugar;
@@ -1819,7 +1841,11 @@ function fraseDePartida({ candidate, corpKey, territory, campana }) {
   const avalNuevo = !cambioDePartido ? ''
     : mudanza ? ' Es un aval nuevo, y en territorio nuevo: la huella que cuenta es la de ese partido allá.'
     : ' Es un aval nuevo: el mapa conserva su votación, la huella del partido cambia.';
-  let conQuien = partido ? elegir(FRASES_BLOQUE[bloque] || FRASES_BLOQUE.sc, candidate?.nombre)(partidoBonito) + avalNuevo : '';
+  const reg = regionDeCampana(candidate, campana);
+  /* Con partido: primero cómo se ubica ESE partido (si está en el
+     diccionario), si no, la frase de su familia. */
+  const identidad = partido ? window.C360Frases?.partido(partido) : '';
+  let conQuien = partido ? (identidad ? punto(identidad.charAt(0).toUpperCase() + identidad.slice(1)) : elegir(FRASES_BLOQUE[bloque] || FRASES_BLOQUE.sc, candidate?.nombre)(partidoBonito)) + avalNuevo : '';
   if (porFirmas) {
     const espectro = campana?.espectro || 'sc';
     const familia = FAMILIA_CON_ARTICULO[espectro] || FAMILIA_CON_ARTICULO.sc;
@@ -1835,7 +1861,10 @@ function fraseDePartida({ candidate, corpKey, territory, campana }) {
   }
   const contexto = { lugarViejo: hist.lugar, lugarNuevo, mudanza, esCiudad: Boolean(cityLayerFor(lugarNuevo)) };
   const salto = punto(FRASES_SALTO[tipoDeSalto(hist.tipo, corpKey)](contexto));
-  return [apertura, ahora, salto, conQuien].filter(Boolean).join(' ');
+  /* Y lo que significa esa familia EN ESTE territorio: la lectura regional. */
+  const familiaRegion = partido ? bloque : (campana?.espectro || '');
+  const regional = window.C360Frases?.linea({ ...reg, bloque: familiaRegion }) || '';
+  return [apertura, ahora, salto, conQuien, regional].filter(Boolean).join(' ');
 }
 
 /* ─── 8. CRM: apertura, meta de votos y foto ─────────────────────────────── */
@@ -2163,6 +2192,11 @@ async function launchCRM(event) {
   $('crmInitials').textContent = initials(crmCandidate.nombre); $('crmName').textContent = crmCandidate.nombre;
   $('crmTarget').textContent = `Candidatura 2027 · ${corporation}${territory ? ` · ${territory}` : ''}`;
   $('crmContext').textContent = fraseDePartida({ candidate: crmCandidate, corpKey, territory, campana });
+  {
+    const partidoCtx = sinPartido(campana.avales) ? '' : String(campana.partido || crmCandidate.partido || '');
+    const bloqueCtx = partidoCtx ? PartidosBloques.bloqueDeCandidatura(partidoCtx, crmCandidate.nombre || '') : (campana.espectro || '');
+    agregarDatoRegional($('crmContext'), { ...regionDeCampana(crmCandidate, campana), bloque: bloqueCtx, partido: partidoCtx });
+  }
   $('crmPartidoPendiente')?.classList.toggle('hidden', campana.avales !== 'indeciso');
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Mapa de historial electoral';
@@ -2197,6 +2231,14 @@ async function abrirCRMNuevo() {
   $('crmInitials').textContent = initials(n.nombre); $('crmName').textContent = n.nombre;
   $('crmTarget').textContent = `Candidatura 2027 · ${CRM_CORPORATIONS[c.corp]} · ${lugar}`;
   $('crmContext').textContent = `Candidatura nueva${indeciso ? `, todavía sin partido: se lanza desde ${FAMILIA_CON_ARTICULO[c.espectro] || FAMILIA_CON_ARTICULO.sc}, y con esa familia se calcula todo mientras lo define` : partido ? ` con ${partido}${n.partidoNuevo ? ' (movimiento por constituir)' : ''}` : ''}. Sin historial propio, el punto de partida es el territorio: la referencia son los resultados de 2023 en ${lugar}.${n.objetivo ? ` Primer objetivo: ${n.objetivo.toLowerCase()}.` : ''}${textoRedesCRM(n.redes)}`;
+  {
+    const bloqueN = partido ? PartidosBloques.bloqueDeCandidatura(partido, n.nombre || '') : (c.espectro || '');
+    const identidad = partido ? window.C360Frases?.partido(partido) : '';
+    const regional = window.C360Frases?.linea({ dep: c.departamento, municipio: c.municipio, bloque: bloqueN }) || '';
+    const extra = [identidad ? `${identidad.charAt(0).toUpperCase()}${identidad.slice(1)}.` : '', regional].filter(Boolean).join(' ');
+    if (extra) $('crmContext').textContent += ` ${extra}`;
+    agregarDatoRegional($('crmContext'), { dep: c.departamento, municipio: c.municipio, bloque: bloqueN, partido });
+  }
   $('crmPartidoPendiente')?.classList.toggle('hidden', !indeciso);
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Territorio de campaña';
