@@ -60,7 +60,11 @@
       .replace(MENUDAS, w => w.toLowerCase()).replace(/^(\w)/, c => c.toUpperCase())
       .replace(/\b(?:[a-záéíóúñüA-ZÁÉÍÓÚÑÜ]\.){2,}/g, sigla => sigla.toUpperCase())
       /* Y la sigla entre comillas: los partidos se llaman «… "MAIS"». */
-      .replace(/"([a-záéíóúñü]{2,6})"/g, (m, w) => `"${w.toUpperCase()}"`);
+      .replace(/"([a-záéíóúñü]{2,6})"/g, (m, w) => `"${w.toUpperCase()}"`)
+      /* Siglas sin punto: la unidad de Cartagena se llama UCG, y «Ucg 5» no es
+         nada. Van enumeradas —«tres letras en mayúscula es sigla» dejaría USME
+         y BOSA gritando—. */
+      .replace(/\b(Ucg|Jal)\b/g, w => w.toUpperCase());
   }
   /* El territorio se arma con lo que el vínculo guardó de la campaña: es lo que
      hace que la lectura sea de SU municipio y no del país entero. */

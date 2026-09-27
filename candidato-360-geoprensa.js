@@ -177,10 +177,23 @@
     if (!scripts.has(src)) scripts.set(src, new Promise((ok, no) => { const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = () => no(new Error(src)); document.head.appendChild(el); }));
     return scripts.get(src);
   }
+  /* Las unidades en que viene partida la cartografía de cada ciudad. Cartagena
+     va por Unidad Comunera de Gobierno: las 15 urbanas más la 20, que agrupa
+     corregimientos e islas y por eso NO es una secuencia. */
+  const PARTES = {
+    bogota: Array.from({ length: 19 }, (_, i) => pad(i + 1, 2)),
+    cali: Array.from({ length: 22 }, (_, i) => pad(i + 1, 2)),
+    cartagena: Array.from({ length: 15 }, (_, i) => pad(i + 1, 2)).concat('20'),
+  };
+  const REGISTRO = {
+    bogota: () => global.Candidato360BogotaBarrios,
+    cali: () => global.Candidato360CaliBarrios,
+    cartagena: () => global.Candidato360CartagenaBarrios,
+  };
   async function barriosCatastrales(ciudad, poner) {
-    const partes = ciudad === 'bogota' ? Array.from({ length: 19 }, (_, i) => pad(i + 1, 2)) : Array.from({ length: 22 }, (_, i) => pad(i + 1, 2));
+    const partes = PARTES[ciudad] || [];
     await Promise.all(partes.map(c => cargarScript(`candidato-360-data/${ciudad}-barrios/${c}.js`).catch(() => null)));
-    const dic = ciudad === 'bogota' ? global.Candidato360BogotaBarrios : global.Candidato360CaliBarrios;
+    const dic = REGISTRO[ciudad]?.();
     for (const [unidad, fc] of Object.entries(dic || {})) {
       for (const f of fc.features || []) {
         const nom = ciudad === 'bogota' ? f.properties.nombre : String(f.properties.barrio || '').replace(/^Sector\s+/i, '');

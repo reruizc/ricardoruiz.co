@@ -1698,7 +1698,12 @@ const NOMBRE_BONITO = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCa
   .replace(/\b(?:[a-záéíóúñüA-ZÁÉÍÓÚÑÜ]\.){2,}/g, sigla => sigla.toUpperCase())
   /* Y la sigla entre comillas también: los partidos se llaman «MOVIMIENTO
      ALTERNATIVO INDÍGENA Y SOCIAL "MAIS"», y «"mais"» no es nadie. */
-  .replace(/"([a-záéíóúñü]{2,6})"/g, (m, w) => `"${w.toUpperCase()}"`);
+  .replace(/"([a-záéíóúñü]{2,6})"/g, (m, w) => `"${w.toUpperCase()}"`)
+  /* Siglas SIN punto que el producto usa como nombre propio: la unidad de
+     Cartagena se llama UCG y «Ucg 5» no es nada. Van una a una a propósito:
+     una regla de «tres letras en mayúscula es sigla» dejaría USME y BOSA
+     gritando. */
+  .replace(/\b(Ucg|Jal)\b/g, w => w.toUpperCase());
 /* «CONCEJO · MEDELLIN · 2019» → { tipo: 'concejo', lugar: 'Medellín', año: 2019 } */
 function leerCorpHistorica(corp) {
   const partes = String(corp || '').split('·').map(x => x.trim()).filter(Boolean);
@@ -3108,6 +3113,8 @@ function encuadreBogota() {
   const esquinas = [[oeste, sur], [este, sur], [oeste, norte], [este, norte]].map(c => rotateGeoJSON90Left({ features: [{ geometry: { type: 'Polygon', coordinates: [[c]] } }] }).features[0].geometry.coordinates[0][0]);
   return L.latLngBounds(esquinas.map(([lon, lat]) => [lat, lon]));
 }
+/* Una ventana fija (sur/norte/oeste/este) como bounds de Leaflet. */
+function ventanaBounds({ sur, norte, oeste, este }) { return L.latLngBounds([[sur, oeste], [norte, este]]); }
 const CITY_JAL_LAYERS = [
   { match: ['BOGOTA'], path: 'BOG-LOCALIDADX.json', title: 'localidad', code: p => String(p.LocCodigo || '').padStart(2, '0'), name: p => p.LocNombre || 'Localidad', rotate: true },
   /* La Registraduría numera los corregimientos de Medellín del 17 al 21 y la
@@ -3121,6 +3128,18 @@ const CITY_JAL_LAYERS = [
   { match: ['IBAGUE'], path: 'IBAGUEX.json', title: 'comuna', code: p => String(p.COMUNAS || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.COMUNAS || 'Comuna' },
   { match: ['BARRANQUILLA'], path: 'BARRANQUILLAX.json', title: 'localidad', code: p => ({ 4: '01', 2: '02', 1: '03', 3: '04', 5: '05' })[Number(p.id)] || '', name: p => p.nombre || 'Localidad' },
   { match: ['MONTERIA'], path: 'MONTERIAX.json', title: 'comuna', code: p => String(p.CC_COMUNA || '').padStart(2, '0'), name: p => p.NMG || 'Comuna' },
+  /* Cartagena son 15 Unidades Comuneras de Gobierno más la 20, que agrupa los
+     corregimientos y las islas. Dos cosas la separan del resto:
+     ⚠️ El georef solo le pone las 3 LOCALIDADES, así que `com` vale 01, 02 o 03
+     y leer de ahí la unidad mandaría la ciudad entera a tres de dieciséis —y
+     encima a las tres primeras UCG, que existen—. La unidad sale del
+     diccionario de puestos (`prepare` lo carga antes de agregar).
+     ⚠️ Lleva ventana urbana fija por lo mismo que Bogotá: la UCG 20 llega
+     hasta Isla Fuerte, 100 km al sur. Las islas siguen dibujadas; hay que
+     alejar para verlas. */
+  { match: ['CARTAGENA'], path: 'CARTAGENA-UCG.json', title: 'unidad comunera', nivel: 'UCG', code: p => String(p.CODIGO || ''), name: p => p.NOMBRE || 'UCG',
+    prepare: () => cartagenaPuestoBarrio(), nombreDeCapa: true, mesaKey: m => window.Candidato360CartagenaPuestoBarrio?.[electoralPlaceCode(m)]?.comuna || '',
+    ventana: { sur: 10.275, norte: 10.47, oeste: -75.58, este: -75.415 } },
   { match: ['MANIZALES'], path: 'MANIZALESX.json', title: 'comuna', code: p => String(p.ID_COMUNA || '').padStart(2, '0'), name: p => p.NOMBRES_CO || 'Comuna' },
   /* Las otras seis capitales con cartografía por comuna (las mismas de
      veleta.html). El código de comuna viene escrito de seis maneras distintas
@@ -3172,14 +3191,24 @@ async function ciudadDeLaCandidatura(candidate) {
 async function renderCiudadMap(candidate, ciudad) {
   const { config, mesas } = ciudad || await ciudadDeLaCandidatura(candidate) || {};
   if (!config) throw new Error('Ciudad sin capa local');
+  /* Una ciudad cuya unidad no está en la mesa (Cartagena) carga su diccionario
+     ANTES de agregar: con `mesaKey` sin dato, los votos no caen en ninguna
+     unidad y el mapa sale vacío sin dar error. */
+  if (config.prepare) await config.prepare();
   let geoData = await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/${config.path}`); if (config.rotate) geoData = rotateGeoJSON90Left(geoData);
   const { votesByArea, namesByArea } = agregarPorArea(mesas, m => config.mesaKey ? config.mesaKey(m) : claveLocal(m));
+  /* ⚠️ En Cartagena el nombre NO puede salir de la mesa: el georef le pone la
+     LOCALIDAD («Loc. 2 la Virgen y Turística») y el mapa dibuja UCG, así que
+     el desglose rotulaba cinco unidades distintas con el mismo nombre. Donde
+     la unidad viene de un archivo externo manda el nombre del polígono. */
+  if (config.nombreDeCapa) Object.keys(namesByArea).forEach(k => delete namesByArea[k]);
   /* La Registraduría escribe la comuna como «06COMUNA 6 DOCE DE OCTUBRE»: el
      código pegado al nombre. En el desglose sobra. */
   Object.keys(namesByArea).forEach(k => { if (namesByArea[k]) namesByArea[k] = String(namesByArea[k]).replace(/^\d+\s*/, ''); else delete namesByArea[k]; });
   const total = mesas.reduce((sum, m) => sum + Number(m.v || 0), 0) || Number(candidate.votos) || 0, targetKey = Object.entries(votesByArea).sort((a, b) => b[1] - a[1])[0]?.[0];
   const esJal = String(candidate.corp || '').toUpperCase().startsWith('JAL'), lugar = mesas.find(m => m.munNom)?.munNom || '';
   pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city: normalizedText(lugar), rotate: config.rotate, lugar,
+    encuadre: config.ventana ? ventanaBounds(config.ventana) : null,
     note: esJal
       ? `Distribución por ${config.title} de su candidatura JAL. Haga clic en una ${config.title} para ver el detalle por barrio.`
       : `Distribución por ${config.title} en ${lugar || 'la ciudad'}. Haga clic en una ${config.title} para ver el detalle por barrio.`,
@@ -3228,8 +3257,18 @@ async function renderSingleElection(candidate) {
 
 /* Barrios: polígonos locales (Bogotá y Cali) o puestos georreferenciados. */
 function loadCandidateMapScript(src) { return new Promise((resolve, reject) => { const script = document.createElement('script'); script.src = src; script.async = true; script.onload = resolve; script.onerror = () => reject(new Error(`No se pudo cargar ${src}`)); document.head.appendChild(script); }); }
-let bogotaPuestoBarrioPromise = null, caliPuestoBarrioPromise = null;
-const bogotaBarriosPorLocalidad = new Map(), caliBarriosPorComuna = new Map();
+let bogotaPuestoBarrioPromise = null;
+const bogotaBarriosPorLocalidad = new Map();
+/* Ciudades con cartografía barrial en el repo Y diccionario puesto→barrio.
+   Cali y Cartagena comparten forma de dato ({barrio, comuna} por puesto y
+   `properties.barrio` en el polígono), así que comparten camino: una entrada
+   más acá basta para sumar una ciudad. Bogotá va aparte porque su diccionario
+   es {zona-puesto: código catastral}, otra llave y otro nombre. */
+const BARRIOS_DIC = {
+  CALI: { carpeta: 'cali-barrios', dic: 'cali-puesto-barrio.js', diccionario: () => window.Candidato360CaliPuestoBarrio, registro: () => window.Candidato360CaliBarrios, unidad: 'comuna' },
+  CARTAGENA: { carpeta: 'cartagena-barrios', dic: 'cartagena-puesto-barrio.js', diccionario: () => window.Candidato360CartagenaPuestoBarrio, registro: () => window.Candidato360CartagenaBarrios, unidad: 'unidad comunera' },
+};
+const dicPuestoBarrio = new Map(), geoBarrialPorUnidad = new Map();
 /* ⚠️ Los polígonos de barrio van SIN rotar. La ciudad se dibuja rotada 90°
    (convención del proyecto: Bogotá es larga de norte a sur y así cabe en el
    panel), pero a escala de barrio entra el callejero real de OpenStreetMap
@@ -3242,11 +3281,20 @@ async function bogotaBarrios(localityCode) {
   if (!bogotaBarriosPorLocalidad.has(key)) bogotaBarriosPorLocalidad.set(key, (window.Candidato360BogotaBarrios?.[key] ? Promise.resolve() : loadCandidateMapScript(`candidato-360-data/bogota-barrios/${key}.js`)).then(() => { const geo = window.Candidato360BogotaBarrios?.[key]; if (!geo) throw new Error(`Sin cartografía barrial para la localidad ${key}`); return geo; }));
   return Promise.all([bogotaPuestoBarrioPromise, bogotaBarriosPorLocalidad.get(key)]);
 }
-async function caliBarrios(comunaCode) {
-  const key = String(comunaCode || '').padStart(2, '0');
-  if (!caliPuestoBarrioPromise) caliPuestoBarrioPromise = window.Candidato360CaliPuestoBarrio ? Promise.resolve(window.Candidato360CaliPuestoBarrio) : loadCandidateMapScript('candidato-360-data/cali-puesto-barrio.js').then(() => window.Candidato360CaliPuestoBarrio);
-  if (!caliBarriosPorComuna.has(key)) caliBarriosPorComuna.set(key, (window.Candidato360CaliBarrios?.[key] ? Promise.resolve() : loadCandidateMapScript(`candidato-360-data/cali-barrios/${key}.js`)).then(() => { const geo = window.Candidato360CaliBarrios?.[key]; if (!geo) throw new Error(`Sin cartografía barrial para la comuna ${key}`); return geo; }));
-  return Promise.all([caliPuestoBarrioPromise, caliBarriosPorComuna.get(key)]);
+/* El diccionario de puestos de una ciudad, una sola vez por sesión. */
+function puestoBarrioDe(ciudad) {
+  const cfg = BARRIOS_DIC[ciudad]; if (!cfg) return Promise.resolve(null);
+  if (!dicPuestoBarrio.has(ciudad)) dicPuestoBarrio.set(ciudad, cfg.diccionario() ? Promise.resolve(cfg.diccionario()) : loadCandidateMapScript(`candidato-360-data/${cfg.dic}`).then(() => cfg.diccionario()));
+  return dicPuestoBarrio.get(ciudad);
+}
+/* Se llama diferido desde la capa de Cartagena (`prepare`), que se declara
+   antes que esto: nombrarlo directo allá rompe el arranque del archivo. */
+const cartagenaPuestoBarrio = () => puestoBarrioDe('CARTAGENA');
+/* Los barrios de UNA unidad (comuna o unidad comunera) y el diccionario. */
+async function barriosPorDiccionario(ciudad, unidadCode) {
+  const cfg = BARRIOS_DIC[ciudad], key = String(unidadCode || '').padStart(2, '0'), llave = `${ciudad}:${key}`;
+  if (!geoBarrialPorUnidad.has(llave)) geoBarrialPorUnidad.set(llave, (cfg.registro()?.[key] ? Promise.resolve() : loadCandidateMapScript(`candidato-360-data/${cfg.carpeta}/${key}.js`)).then(() => { const geo = cfg.registro()?.[key]; if (!geo) throw new Error(`Sin cartografía barrial para la ${cfg.unidad} ${key}`); return geo; }));
+  return Promise.all([puestoBarrioDe(ciudad), geoBarrialPorUnidad.get(llave)]);
 }
 /* ─── Barrios de las demás ciudades ──────────────────────────────────────────
    Bogotá y Cali traen cartografía barrial partida por localidad/comuna y un
@@ -3365,8 +3413,9 @@ async function censoBarrialBogota(localidad, puestoBarrio, code6) {
   });
   return out;
 }
-async function censoBarrialCali(comuna, puestoBarrio) {
-  const places = await puestosPorBarrio(), out = {}, c = String(comuna).padStart(2, '0');
+/* Censo por barrio de una unidad, para las ciudades con diccionario. */
+async function censoBarrialDic(unidad, puestoBarrio) {
+  const places = await puestosPorBarrio(), out = {}, c = String(unidad).padStart(2, '0');
   Object.entries(puestoBarrio || {}).forEach(([code, info]) => {
     if (String(info?.comuna || '').padStart(2, '0') !== c || !info?.barrio) return;
     const censo = places[code]?.censo || 0;
@@ -3403,14 +3452,15 @@ async function renderBarriosForArea(key) {
   const titulo = `${crmMapMode === 'proyectado' ? 'Meta proyectada' : 'Votos totales'} por barrio`;
   const conValores = historical => crmMapMode === 'proyectado' ? distributeVotes(historical, localGoal) : historical;
   $('crmBreakdown').innerHTML = '<h4>Votos por barrio</h4><p class="helper">Cargando polígonos y resultados barriales…</p>';
-  if (state.city === 'CALI') {
+  const dicCiudad = BARRIOS_DIC[state.city];
+  if (dicCiudad) {
     try {
-      const [puestoBarrio, geo] = await caliBarrios(key), historical = {};
+      const [puestoBarrio, geo] = await barriosPorDiccionario(state.city, key), historical = {};
       mesas.forEach(m => { const barrio = puestoBarrio[electoralPlaceCode(m)]?.barrio; if (barrio) historical[barrio] = (historical[barrio] || 0) + Number(m.v || 0); });
-      const { values, base } = await valoresBarriales(historical, localGoal, () => censoBarrialCali(key, puestoBarrio));
+      const { values, base } = await valoresBarriales(historical, localGoal, () => censoBarrialDic(key, puestoBarrio));
       renderMapBreakdown(values, Object.fromEntries(geo.features.map(f => [f.properties.barrio, f.properties.barrio])), tituloBarrial(base));
-      return pintarBarrios(geo, values, f => f.properties.barrio, f => f.properties.barrio, notaBarrial(state.namesByArea[key] || `la comuna ${key}`, base));
-    } catch (e) { $('crmBreakdown').innerHTML = '<h4>Votos por barrio</h4><p class="helper">No fue posible cargar los polígonos barriales de esta comuna.</p>'; return; }
+      return pintarBarrios(geo, values, f => f.properties.barrio, f => f.properties.barrio, notaBarrial(state.namesByArea[key] || `la ${dicCiudad.unidad} ${key}`, base));
+    } catch (e) { $('crmBreakdown').innerHTML = `<h4>Votos por barrio</h4><p class="helper">No fue posible cargar los polígonos barriales de esta ${dicCiudad.unidad}.</p>`; return; }
   }
   /* Bogotá se reconoce por la capa que está pintada, no por las mesas: con un
      salto de corporación la meta cae en localidades donde la persona nunca
@@ -3577,7 +3627,7 @@ function setMapLevel(level) {
    detalle que no existe. */
 function ciudadTieneBarrios(state) {
   const city = String(state?.city || '');
-  return city.startsWith('BOGOTA') || city === 'CALI' || Boolean(cityBarrioLayerFor(city));
+  return city.startsWith('BOGOTA') || Boolean(BARRIOS_DIC[city]) || Boolean(cityBarrioLayerFor(city));
 }
 /* Niveles para un municipio sin comunas: no hay barrio que abrir, pero sí
    puestos. Lo que se ve en La Ceja, en Sabaneta, en el 90 % del país. */
@@ -3617,7 +3667,10 @@ function refreshMapLevels() {
   const mapEl = $('crmMap'); if (!mapEl) return;
   mapEl.querySelector('.crm-map-levels')?.remove();
   const state = crmMapState; if (!state?.config) return nivelesMunicipio();
-  const localLabel = state.config.title === 'comuna' ? 'Comuna' : 'Localidad';
+  /* El rótulo del botón lo puede fijar la capa: en Cartagena la unidad se
+     llama «unidad comunera» y en el mapa se rotula UCG, que es como la nombra
+     el Distrito y lo único que cabe en el botón. */
+  const localLabel = state.config.nivel || (state.config.title === 'comuna' ? 'Comuna' : 'Localidad');
   const detalle = ciudadTieneBarrios(state) ? 'Barrio' : 'Puestos';
   /* Sin «Municipio»: cuando el mapa ES la ciudad, ese botón mostraba lo mismo
      que «Comuna» —la ciudad entera dividida— y dejaba la alcaldía de Medellín

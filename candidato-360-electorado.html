@@ -178,7 +178,7 @@
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
 <script src="partidos-bloques.js?v=20260922"></script>
-<script src="candidato-360-electorado.js?v=20260920d"></script>
+<script src="candidato-360-electorado.js?v=20260927"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
 <script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
@@ -467,16 +467,25 @@
      La cartografía barrial viene partida por localidad (19 archivos en
      `candidato-360-data/bogota-barrios/`), así que la ciudad entera se arma
      uniendo esas partes, no bajando los 6,5 MB del catastral de S3. */
+  /* Cali y Cartagena comparten forma de dato —{barrio, comuna} por puesto y
+     `properties.barrio` en el polígono—, así que comparten camino; Bogotá va
+     aparte porque su diccionario es {zona-puesto: código catastral}. Sumar una
+     ciudad es una entrada más acá y su carpeta en candidato-360-data/. */
+  const BARRIOS = {
+    bogota: { reg: () => window.Candidato360BogotaBarrios, dic: () => window.Candidato360BogotaPuestoBarrio,
+      cfg: { code: p => String(p.codigo || ''), name: p => p.nombre || 'Barrio' },
+      barrioDe: (dic, pu) => dic[pu.code] || '' },
+    cali: { reg: () => window.Candidato360CaliBarrios, dic: () => window.Candidato360CaliPuestoBarrio,
+      cfg: { code: p => String(p.barrio || ''), name: p => p.barrio || 'Barrio' },
+      barrioDe: (dic, pu) => dic[ST.dep + ST.mun3 + pu.code.replace('-', '')]?.barrio || '' },
+    cartagena: { reg: () => window.Candidato360CartagenaBarrios, dic: () => window.Candidato360CartagenaPuestoBarrio,
+      cfg: { code: p => String(p.barrio || ''), name: p => p.barrio || 'Barrio' },
+      barrioDe: (dic, pu) => dic[ST.dep + ST.mun3 + pu.code.replace('-', '')]?.barrio || '' },
+  };
   async function barriosDe(lista) {
-    const ciudad = ST.cfg.barrios, se = await E.sexoEdad();
+    const ciudad = ST.cfg.barrios, mapa = BARRIOS[ciudad], se = await E.sexoEdad();
     await cargarScript(`candidato-360-data/${ciudad}-puesto-barrio.js`);
-    const dic = (ciudad === 'bogota' ? window.Candidato360BogotaPuestoBarrio : window.Candidato360CaliPuestoBarrio) || {};
-    const cfg = ciudad === 'bogota'
-      ? { code: p => String(p.codigo || ''), name: p => p.nombre || 'Barrio' }
-      : { code: p => String(p.barrio || ''), name: p => p.barrio || 'Barrio' };
-    const barrioDe = ciudad === 'bogota'
-      ? pu => dic[pu.code] || ''
-      : pu => dic[ST.dep + ST.mun3 + pu.code.replace('-', '')]?.barrio || '';
+    const dic = mapa.dic() || {}, cfg = mapa.cfg, barrioDe = pu => mapa.barrioDe(dic, pu);
 
     /* Una localidad sin cartografía o sin datos no puede tumbar el mapa de la
        ciudad: se cuenta aparte y el resto se pinta. Sumapaz, por ejemplo, no
@@ -486,8 +495,7 @@
         E.json(`${S3}/concejo-2023/comuna/${ST.dep}-${ST.mun3}-${u.code}.json`).catch(() => null),
         cargarScript(`candidato-360-data/${ciudad}-barrios/${u.code}.js`).catch(() => null),
       ]);
-      const reg = ciudad === 'bogota' ? window.Candidato360BogotaBarrios : window.Candidato360CaliBarrios;
-      return { u, d, geo: reg?.[u.code] || null };
+      return { u, d, geo: mapa.reg()?.[u.code] || null };
     }));
     const buenas = partes.filter(x => x.geo && x.d);
     if (!buenas.length) throw new Error('sin cartografía');
