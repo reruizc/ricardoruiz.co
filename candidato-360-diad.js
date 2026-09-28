@@ -318,5 +318,7 @@
     };
   }
 
-  global.C360DiaD = { hvpDe, plan, cobertura, testigosPara, alertas, csv, codigoPuesto, AVISOS, json, S3, fuente, corpDeSlug };
+  /* `puestosDestino` también lo usa la tarjeta de contendientes: son los mismos
+     archivos de 2023 por comuna o municipio, con todos los candidatos por puesto. */
+  global.C360DiaD = { hvpDe, plan, cobertura, testigosPara, alertas, csv, codigoPuesto, AVISOS, json, S3, fuente, corpDeSlug, puestosDestino };
 })(window);

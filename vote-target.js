@@ -297,7 +297,10 @@
        la meta por partido se calcula encima de esto. */
     const cifra = quotients[Math.min(seatsRepartidora, quotients.length) - 1].value;
     const cutoff = elected.length ? Number(elected[0].votos || 0) : 0;
-    return { cutoff, seats, seatsRepartidora, oposicion, validVotes, parties, allocations, cifra, threshold, ultimos, cerradas, conListas: listas.length > 0, curulesOficiales: oficiales >= 2 };
+    /* `electos` (de menor a mayor votación) lo usa la tarjeta de contendientes
+       para decir quién ganó la curul en 2023: sale de ESTE reparto para que la
+       meta y los rivales hablen de las mismas curules. */
+    return { cutoff, seats, seatsRepartidora, oposicion, validVotes, parties, allocations, cifra, threshold, ultimos, cerradas, electos: elected, conListas: listas.length > 0, curulesOficiales: oficiales >= 2 };
   }
 
   /* Sin partido (por firmas o sin decidirse) no hay lista por la que entrar,
@@ -337,7 +340,13 @@
        · si el partido no corrió en 2023 en esa corporación, su fuerza se
          estima con la Cámara de 2026 en el departamento, escalada al tamaño
          de la corporación, y de ahí se deduce si arrastraría curul. */
-  const ESTRUCTURALES = new Set(['PARTIDO', 'PARTIDOS', 'MOVIMIENTO', 'POLITICO', 'POLITICA', 'COALICION', 'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'Y']);
+  /* «AGRUPACION» es forma jurídica como «PARTIDO» (sep-2026, decisión P9 del
+     plan de contendientes): «AGRUPACIÓN POLÍTICA EN MARCHA» no encontraba las
+     listas en que corrió en coalición («NUEVO LIBERALISMO EN MARCHA»). Medido
+     sobre los catálogos × las circunscripciones de 2023: 14 encuentran lista
+     donde no había (11 concejos, 3 JAL) y ninguna cambia de lista. «EN» NO va
+     acá: con ella «Gente en Movimiento» caía en el Partido de la U (756 pares). */
+  const ESTRUCTURALES = new Set(['PARTIDO', 'PARTIDOS', 'MOVIMIENTO', 'POLITICO', 'POLITICA', 'COALICION', 'AGRUPACION', 'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'Y']);
   const palabras = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9Ñ]+/g, ' ').trim().split(' ').filter(Boolean);
   const nucleo = s => palabras(s).filter(w => !ESTRUCTURALES.has(w));
   function listaDelPartido(parties, partido) {
@@ -626,5 +635,28 @@
     }
   }
 
-  global.VoteTarget = { estimate };
+  /* El reparto de 2023 de una circunscripción, por el MISMO camino de
+     `estimate` (índice → filas por código → votos de lista → curules de JAL →
+     blanco para el umbral), para quien necesita las curules y no la meta: la
+     tarjeta de contendientes. No toca `estimate`: si alguien cambia ese camino
+     allá, prueba-contendientes.mjs compara las dos cosas. En alcaldía y
+     gobernación devuelve el ganador (no hay reparto). */
+  async function reparto({ corp, territory, baseUrl, codigo }) {
+    const source = CORPORATIONS[corp];
+    if (!source || !territory) return null;
+    const index = await json(`${baseUrl}/${source.index}`);
+    const match = filasPorCodigo(index.candidatos || [], corp, codigo, territory) || resolveTerritoryRows(index.candidatos || [], territory);
+    if (!match || !match.rows.length) return null;
+    if (!source.multiSeat) {
+      const rows = [...match.rows].sort((a, b) => Number(b.votos || 0) - Number(a.votos || 0));
+      return { label: match.label, rows, uninominal: true, ganador: rows[0] || null, electos: rows[0] ? [rows[0]] : [] };
+    }
+    const metrics = await participationReference(corp, match.label, baseUrl, source);
+    const listas = await listasDe(index, corp, match.label);
+    const curules = corp === 'jal' ? (await curulesJal(baseUrl))[llaveCircunscripcion(match.label)] : null;
+    const r = reconstructedCutoff(match.rows, { corp, listas, blanco: metrics && metrics.blanco, curules });
+    return r ? Object.assign({ label: match.label, rows: match.rows, uninominal: false }, r) : null;
+  }
+
+  global.VoteTarget = { estimate, reparto, listaDelPartido };
 })(window);
