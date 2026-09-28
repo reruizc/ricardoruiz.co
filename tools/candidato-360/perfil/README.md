@@ -8,10 +8,11 @@ con esas palabras: es una lectura del terreno, no de sus votantes.
 
 | Dimensión | Fuente | Estado |
 |---|---|---|
-| **Sexo** | `PUESTOS_GEOREF.csv`, columnas MUJERES y HOMBRES (censo electoral por puesto) | publicado |
+| **Sexo** | `CENSO_PUESTO_2026.json` (censo del Congreso 2026, Registraduría) — antes PUESTOS_GEOREF, un corte viejo de 38,6 M | publicado (27-sep-2026) |
 | **Rural / urbano** | zona electoral de cada mesa: `99` es la zona rural del municipio; `90` y `98` (censo consolidado y cárceles) no son ni lo uno ni lo otro | publicado |
-| **Edad** | `CENSO_EDAD_PUESTO.json` (lo produce `construir-edad.mjs`) | publicado (19-sep-2026) |
-| **Sexo × edad** | `PERFIL_SEXO_EDAD_PUESTO.json` (lo produce `construir-sexo-edad.py`) | publicado (19-sep-2026) |
+| **Edad** | `CENSO_PUESTO_2026.json`: diez rangos OBSERVADOS, mostrados en 3 grupos (18-30 · 31-60 · más de 60) | publicado (27-sep-2026) |
+| **Sexo × edad** | `CENSO_PUESTO_2026.json`: estimado con raking (forma de los sufragantes 2022, totales del censo 2026) | publicado (27-sep-2026) |
+| **Cambio 2023 → 2026** | `CENSO_PUESTO_2026.json` (censo de las territoriales 2023, cruzado por código y nombre) | publicado (27-sep-2026) |
 | **El territorio** | el censo de TODOS los puestos del municipio + `asamblea-2023/dep/<dep>.json` (potencial y votantes) | publicado |
 | **Cómo vota el territorio** | `asamblea-2023/dep/<dep>.json`, con cada partido puesto en su familia por `partidos-bloques.js` | publicado |
 | **La que debería buscar** | la meta de votos (tarjeta 02) contra su base de hoy | publicado |
@@ -49,7 +50,9 @@ El objetivo se calcula **al abrir la ficha** y no al pintar la tarjeta, porque
 la meta de votos llega después (es una estimación con su propia consulta). Si
 todavía no está, la ficha muestra el territorio y calla el objetivo.
 
-El archivo de edad ya está en
+**Desde el 27-sep-2026 todo sale de `CENSO_PUESTO_2026.json`** (`construir-censo-2026.py`, ver su docstring). Lo de abajo es historia: `construir-edad.mjs` y `construir-sexo-edad.py` quedan como referencia.
+
+El archivo de edad viejo está en
 `congreso-2026/output/mapas-2026/CENSO_EDAD_PUESTO.json` (13.239 puestos, bandas
 18-25 · 26-40 · 41-60 · 61+). Si algún día no estuviera, el modal dice que falta
 en vez de estimar la edad con el promedio del municipio y presentarla como suya.

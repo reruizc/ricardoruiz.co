@@ -73,8 +73,12 @@
      <body data-candi-vista="…">. Van en esta misma tabla y en el worker. */
   VISTAS.electorado = {
     titulo: 'El electorado de tu votación',
-    texto: 'Aquí ves quién vive donde está tu votación: sexo, edad y si es urbana o rural, contra el promedio de tu territorio. Arriba, los perfiles que más te rinden; el mapa se ilumina donde cada uno pesa más. La edad es una estimación del censo por puesto, no sale de cómo votó cada persona.',
-    chips: ['¿Qué significa que un perfil me rinda ×1,20?', '¿De dónde sale la edad?', '¿Por qué mi familia política se mide con otras?']
+    texto: 'Aquí ves quién puede votar donde está tu votación: sexo, edad y si es urbana o rural, contra el promedio de tu territorio. Arriba, los perfiles que más te rinden; el mapa se ilumina donde cada uno pesa más. El sexo y la edad son el censo electoral de 2026 tal como lo publica la Registraduría; el cruce de los dos, para armar los perfiles, es una estimación.',
+    /* El saludo de esta página explica la decisión de fondo: describir a quien
+       PUEDE votar y no a quien votó. Cifras de participación: preconteo 2026
+       (58 % en primera vuelta, 63,6 % en segunda) y segunda vuelta 2022 (58 %). */
+    saludo: 'Aquí te muestro a quien PUEDE votar, no solo a quien votó la última vez. ¿Por qué? Porque la participación viene subiendo: en la segunda vuelta de 2026 votó el 64 % del censo, casi seis puntos más que en la primera y más que en 2022. El electorado de 2027 no va a ser el mismo que votó antes.',
+    chips: ['¿Por qué quién puede votar y no quién votó?', '¿Qué significa que un perfil me rinda ×1,20?', '¿Dónde creció el censo?']
   };
   VISTAS.diad = {
     titulo: 'El día de la elección',
@@ -355,12 +359,26 @@
        globos seguidos se leerían como Candi hablando sola. */
     globo.querySelector('#candiGloboTexto').textContent =
       `${nombre ? `¡Hola, ${nombre}!` : '¡Hola!'} Soy Candi, tu estratega de campaña. ` +
-      (calculando ? avisoActual : 'Pregúntame lo que quieras de la pantalla en la que estés.');
+      (calculando ? avisoActual : (saludoDeVista() ? (saludoDicho = true, saludoDeVista()) : 'Pregúntame lo que quieras de la pantalla en la que estés.'));
     globo.dataset.aviso = calculando ? 'calculo' : '';
     globo.hidden = false;
     if (calculando) pensarYa();
     clearTimeout(mostrarGlobo._t);
-    mostrarGlobo._t = setTimeout(ocultarGlobo, 12000);   /* se presenta y se quita sola */
+    mostrarGlobo._t = setTimeout(ocultarGlobo, saludoDicho ? 22000 : 12000);   /* se presenta y se quita sola */
+  }
+  /* Algunas páginas traen un saludo propio que explica una decisión de fondo
+     (el electorado: por qué se describe a quien puede votar). Si la página
+     arranca calculando, el saludo va DESPUÉS del aviso de cálculo, no se pierde. */
+  let saludoDicho = false;
+  function saludoDeVista() { return VISTAS[document.body?.dataset?.candiVista || '']?.saludo || ''; }
+  function decirSaludoDeVista() {
+    if (saludoDicho || abierto || !saludoDeVista()) return false;
+    saludoDicho = true;
+    globo.querySelector('#candiGloboTexto').textContent = saludoDeVista();
+    globo.dataset.aviso = ''; globo.dataset.visto = ''; globo.hidden = false;
+    clearTimeout(mostrarGlobo._t);
+    mostrarGlobo._t = setTimeout(ocultarGlobo, 22000);
+    return true;
   }
   function ocultarGlobo() { globo.dataset.visto = '1'; globo.dataset.aviso = ''; globo.hidden = true; clearTimeout(mostrarGlobo._t); }
 
@@ -389,6 +407,7 @@
     if (activo === calculando) return;
     calculando = activo;
     if (activo) { if (presentada) avisarCalculo(); return; }   /* si aún entra, lo dice el saludo */
+    if (globo && presentada && decirSaludoDeVista()) return;
     if (globo && globo.dataset.aviso === 'calculo') {
       globo.dataset.aviso = '';
       clearTimeout(mostrarGlobo._t);

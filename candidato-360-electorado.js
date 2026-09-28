@@ -23,53 +23,121 @@
     return cache.get(url);
   }
 
+  /* ── QUIÉN PUEDE VOTAR en cada puesto (sep-2026) ───────────────────────
+     El censo electoral del Congreso 2026 que publica la Registraduría, puesto
+     por puesto: sexo y diez rangos de edad OBSERVADOS, más el cruce sexo ×
+     edad (estimado con raking sobre la forma de 2022) y el censo de 2023 para
+     comparar. Lo produce tools/candidato-360/perfil/construir-censo-2026.py.
+     Se describe a quien PUEDE votar y no a quien votó en 2022 a propósito: la
+     participación viene subiendo (58 % en la primera vuelta de 2026, 64 % en
+     la segunda) y el electorado de 2027 no va a ser el que votó antes.
+     Fila: [potencial, mujeres, hombres, 10 bandas, 6 celdas H/M × 18-30 ·
+     31-60 · 61+, bloque, censo2023, cruce2023]. Sin exterior. */
+  let censoPromise = null;
+  function censo2026() {
+    if (!censoPromise) censoPromise = fetch(`${S3}/mapas-2026/CENSO_PUESTO_2026.json`).then(r => r.ok ? r.json() : null).catch(() => null);
+    return censoPromise;
+  }
+  const BANDAS_EDAD = ['18-20', '21-25', '26-30', '31-35', '36-40', '41-45', '46-50', '51-55', '56-60', '61+'];
+  /* Los tres grupos que se muestran de entrada; los diez rangos, al desglosar.
+     «Adultos mayores» es más de 60, el corte de la ley colombiana. */
+  const GRUPOS_EDAD = [
+    { clave: 'jovenes', nombre: 'Jóvenes', rango: '18 a 30', bandas: [0, 1, 2], figura: 'joven' },
+    { clave: 'adultos', nombre: 'Adultos', rango: '31 a 60', bandas: [3, 4, 5, 6, 7, 8], figura: 'adulto' },
+    { clave: 'mayores', nombre: 'Adultos mayores', rango: 'más de 60', bandas: [9], figura: 'mayor' },
+  ];
+  const agruparEdad = bandas => GRUPOS_EDAD.map(g => g.bandas.reduce((s, i) => s + (bandas[i] || 0), 0));
+
   /* ── El censo por puesto de votación ─────────────────────────────────────
-     Columnas de PUESTOS_GEOREF: 1 código completo (dep+mun+zona+puesto),
-     7 barrio, 9/10 lat/lng, 13/14 mujeres/hombres — la suma es el censo. */
+     Las coordenadas, el barrio y la comuna salen de PUESTOS_GEOREF (columnas
+     1 código, 7 barrio, 9/10 lat/lng, 11/12 comuna, 18 nombre). El CENSO ya
+     no: sus columnas 13/14 son un corte viejo de 38,6 millones, 2,65 millones
+     por debajo del oficial. Manda el censo de 2026; solo si no respondiera se
+     cae al del georef, y `fuenteCenso` lo dice. */
   let puestosPromise = null;
   function puestos() {
-    if (!puestosPromise) puestosPromise = fetch(`${S3}/mapas-2026/PUESTOS_GEOREF.csv`).then(r => r.ok ? r.text() : Promise.reject(new Error('sin PUESTOS_GEOREF'))).then(raw => {
-      const lookup = {};
+    if (!puestosPromise) puestosPromise = Promise.all([
+      fetch(`${S3}/mapas-2026/PUESTOS_GEOREF.csv`).then(r => r.ok ? r.text() : Promise.reject(new Error('sin PUESTOS_GEOREF'))),
+      censo2026(),
+    ]).then(([raw, C]) => {
+      const lookup = {}, filas = C?.puestos || {};
       raw.split(/\r?\n/).slice(1).forEach(line => {
         const row = line.split(';'), code = String(row[1] || ''), barrio = row[7];
         if (!code || !barrio) return;
         const mesa = { dep: code.slice(0, 2), mun: code.slice(2, 5), zon: code.slice(5, 7), pue: code.slice(7, 9), com: String(row[11] || ''), comNom: String(row[12] || '') };
-        const mujeres = Number(row[13]) || 0, hombres = Number(row[14]) || 0;
-        lookup[code] = { barrio, lat: Number(row[9]), lng: Number(row[10]), censo: mujeres + hombres, mujeres, hombres, mesa };
+        const f = filas[code];
+        const mujeres = f ? f[1] : Number(row[13]) || 0, hombres = f ? f[2] : Number(row[14]) || 0;
+        lookup[code] = { barrio, nombre: String(row[18] || '').trim(), lat: Number(row[9]), lng: Number(row[10]), censo: f ? f[0] : mujeres + hombres, mujeres, hombres, mesa, fuenteCenso: f ? 'censo-2026' : 'georef' };
       });
       return lookup;
     }).catch(e => { puestosPromise = null; throw e; });
     return puestosPromise;
   }
-  /* La edad vive en un archivo aparte que puede no estar publicado todavía:
-     que falte no puede tumbar el resto de la lectura. */
+  /* La edad por puesto: los diez rangos observados del censo de 2026. Que el
+     archivo falte no puede tumbar el resto de la lectura. */
   let edadPromise = null;
   function censoEdad() {
-    if (!edadPromise) edadPromise = fetch(`${S3}/mapas-2026/CENSO_EDAD_PUESTO.json`).then(r => r.ok ? r.json() : null).catch(() => null);
+    if (!edadPromise) edadPromise = censo2026().then(C => {
+      if (!C?.puestos) return null;
+      const puestos = {}, bloques = {};
+      Object.entries(C.puestos).forEach(([k, f]) => { puestos[k] = f.slice(3, 13); if (f[19] >= 0) bloques[k] = f[19]; });
+      return { bandas: BANDAS_EDAD, puestos, bloques, fuente: 'Censo electoral por puesto del Congreso 2026 (Registraduría).' };
+    });
     return edadPromise;
   }
 
-  /* ── El cruce SEXO × EDAD de quien vota en cada puesto ───────────────────
-     Sufragantes de la 1V de 2022 por sexo y tres grupos de edad (18-30,
-     31-50, 51+), agregados a puesto. Es lo que arma los «perfiles de votante»
-     de la página del electorado: mujer joven, hombre mayor… Lo produce
-     tools/candidato-360/perfil/construir-sexo-edad.py y vive en S3. */
+  /* ── El cruce SEXO × EDAD de quien puede votar en cada puesto ────────────
+     Es lo que arma los «perfiles de votante» de la página del electorado. La
+     Registraduría publica sexo y edad por separado, así que el cruce es una
+     ESTIMACIÓN: la forma sale de los sufragantes de 2022 de ese puesto y los
+     totales del censo de 2026. La página lo dice. */
   let sexoEdadPromise = null;
   function sexoEdad() {
-    if (!sexoEdadPromise) sexoEdadPromise = fetch(`${S3}/mapas-2026/PERFIL_SEXO_EDAD_PUESTO.json`).then(r => r.ok ? r.json() : null).catch(() => null);
+    if (!sexoEdadPromise) sexoEdadPromise = censo2026().then(C => {
+      if (!C?.puestos) return null;
+      const puestos = {};
+      Object.entries(C.puestos).forEach(([k, f]) => { puestos[k] = f.slice(13, 19); });
+      return { sexos: ['H', 'M'], edades: ['18-30', '31-60', '61+'], puestos, fuente: C.fuente };
+    });
     return sexoEdadPromise;
   }
-  /* Las seis celdas, en el orden del archivo: H 18-30 · H 31-50 · H 51+ ·
-     M 18-30 · M 31-50 · M 51+. Los nombres son los de una campaña, no los de
+  /* Las seis celdas, en el orden del archivo: H 18-30 · H 31-60 · H 61+ ·
+     M 18-30 · M 31-60 · M 61+. Los nombres son los de una campaña, no los de
      una tabla del DANE. */
   const PERFILES = [
     { i: 0, sexo: 'H', edad: '18-30', nombre: 'Hombres jóvenes', corto: 'hombres de 18 a 30', figura: 'joven' },
-    { i: 1, sexo: 'H', edad: '31-50', nombre: 'Hombres adultos', corto: 'hombres de 31 a 50', figura: 'adulto' },
-    { i: 2, sexo: 'H', edad: '51+',   nombre: 'Hombres mayores', corto: 'hombres de 51 o más', figura: 'mayor' },
+    { i: 1, sexo: 'H', edad: '31-60', nombre: 'Hombres adultos', corto: 'hombres de 31 a 60', figura: 'adulto' },
+    { i: 2, sexo: 'H', edad: '61+',   nombre: 'Hombres mayores', corto: 'hombres de más de 60', figura: 'mayor' },
     { i: 3, sexo: 'M', edad: '18-30', nombre: 'Mujeres jóvenes', corto: 'mujeres de 18 a 30', figura: 'joven' },
-    { i: 4, sexo: 'M', edad: '31-50', nombre: 'Mujeres adultas', corto: 'mujeres de 31 a 50', figura: 'adulto' },
-    { i: 5, sexo: 'M', edad: '51+',   nombre: 'Mujeres mayores', corto: 'mujeres de 51 o más', figura: 'mayor' },
+    { i: 4, sexo: 'M', edad: '31-60', nombre: 'Mujeres adultas', corto: 'mujeres de 31 a 60', figura: 'adulto' },
+    { i: 5, sexo: 'M', edad: '61+',   nombre: 'Mujeres mayores', corto: 'mujeres de más de 60', figura: 'mayor' },
   ];
+
+  /* ── Cómo cambió el censo de 2023 a 2026 ─────────────────────────────────
+     Lo que decide una estrategia de inscripción de cédulas. Cuidado con leerlo
+     puesto a puesto: entre las dos elecciones la Registraduría abrió puestos,
+     cerró otros y movió mesas, así que un puesto puede crecer porque le
+     trasladaron gente. El número firme es el del territorio entero; los
+     puestos van con esa advertencia. `prefijo` = dep (2) o dep+mun (5). */
+  async function cambioCenso(prefijo) {
+    const [C, lugares] = await Promise.all([censo2026(), puestos().catch(() => ({}))]);
+    if (!C?.puestos || !prefijo) return null;
+    let hoy = 0, antes = 0, nuevos = 0, censoNuevos = 0, jovenes = 0;
+    const comparables = [];
+    Object.entries(C.puestos).forEach(([k, f]) => {
+      if (!k.startsWith(prefijo)) return;
+      hoy += f[0]; jovenes += f[3];
+      if (f[20] >= 0) { antes += f[20]; comparables.push({ code: k, hoy: f[0], antes: f[20], renumerado: f[21] === 2, nombre: lugares[k]?.nombre || '', barrio: lugares[k]?.barrio || '' }); }
+      else { nuevos++; censoNuevos += f[0]; }
+    });
+    let cerrados = 0, censoCerrados = 0;
+    Object.entries(C.cerrados2023 || {}).forEach(([m, [n, c]]) => { if (m.startsWith(prefijo)) { cerrados += n; censoCerrados += c; } });
+    const antesTotal = antes + censoCerrados;
+    if (!hoy || !antesTotal) return null;
+    const crecen = comparables.filter(x => x.antes >= 300).map(x => ({ ...x, delta: x.hoy - x.antes, tasa: x.hoy / x.antes - 1 })).sort((a, b) => b.delta - a.delta);
+    return { hoy, antes: antesTotal, crecimiento: hoy / antesTotal - 1, nuevos, censoNuevos, cerrados, censoCerrados,
+      primeros: jovenes, top: crecen.slice(0, 8), crecieronFuerte: crecen.filter(x => x.tasa >= .3).length, comparables: comparables.length };
+  }
   const suma6 = (a, b) => a.map((x, i) => x + (b?.[i] || 0));
   const shares = v => { const t = v.reduce((s, x) => s + x, 0); return t ? v.map(x => x / t) : null; };
   /* Votos de una familia política en un puesto, leyendo el JSON mesa a mesa
@@ -176,6 +244,8 @@
     const municipio = municipioMayoritario(mesas);
     let votos = 0, conCenso = 0, mujeres = 0, rural = 0, urbano = 0, especial = 0, sinCoordenada = 0;
     const bandas = edad?.bandas || [], edadVotos = bandas.map(() => 0); let conEdad = 0;
+    /* Votos en puestos con «bloque de edad»: la página lo declara si pesan. */
+    let enBloque = 0; const bloquePuestos = new Map();
     (mesas || []).forEach(m => {
       const v = Number(m.v || 0); if (!v) return;
       votos += v;
@@ -185,6 +255,8 @@
       if (p && p.mujeres + p.hombres > 0) { conCenso += v; mujeres += v * p.mujeres / (p.mujeres + p.hombres); } else sinCoordenada += v;
       const e = edad?.puestos?.[code];
       if (e) { const tot = e.reduce((s, x) => s + Number(x || 0), 0); if (tot > 0) { conEdad += v; e.forEach((x, i) => { edadVotos[i] += v * Number(x || 0) / tot; }); } }
+      const b = edad?.bloques?.[code];
+      if (b != null) { enBloque += v; const q = bloquePuestos.get(code) || { code, banda: bandas[b], votos: 0, nombre: p?.nombre || '', barrio: p?.barrio || '' }; q.votos += v; bloquePuestos.set(code, q); }
     });
     /* El municipio entero, para comparar: el censo de TODOS sus puestos. */
     let munM = 0, munT = 0, munRural = 0, munCenso = 0;
@@ -202,8 +274,9 @@
       mujeres: conCenso ? mujeres / conCenso : null, cobertura: votos ? conCenso / votos : 0, sinCoordenada,
       mujeresMunicipio: munT ? munM / munT : null, ruralMunicipio: munCenso ? munRural / munCenso : null, censoMunicipio: munCenso,
       rural: votos ? rural / votos : 0, urbano: votos ? urbano / votos : 0, especial,
-      edad: conEdad ? { bandas, reparto: edadVotos.map(x => x / conEdad), cobertura: conEdad / votos, fuente: edad?.fuente || '' } : null,
-      edadMunicipio: munConEdad ? { bandas, reparto: edadMunicipio.map(x => x / munConEdad) } : null,
+      edad: conEdad ? { bandas, reparto: edadVotos.map(x => x / conEdad), grupos: agruparEdad(edadVotos.map(x => x / conEdad)), cobertura: conEdad / votos, fuente: edad?.fuente || '' } : null,
+      edadMunicipio: munConEdad ? { bandas, reparto: edadMunicipio.map(x => x / munConEdad), grupos: agruparEdad(edadMunicipio.map(x => x / munConEdad)) } : null,
+      bloque: votos && enBloque ? { votos: enBloque, peso: enBloque / votos, puestos: [...bloquePuestos.values()].sort((a, b) => b.votos - a.votos) } : null,
     };
   }
   function municipioMayoritario(mesas) {
@@ -254,9 +327,10 @@
     const faltan = Math.max(0, m - base);
     const mezcla = (suyo, terr) => (suyo == null || terr == null) ? null : (base * suyo + faltan * terr) / m;
     const mezclaBandas = (suyo, terr) => (!suyo || !terr) ? null : suyo.map((x, i) => (base * x + faltan * terr[i]) / m);
+    const edad = mezclaBandas(p.edad?.reparto, p.edadMunicipio?.reparto);
     return { meta: m, base, faltan, mismoTerritorio,
       mujeres: mezcla(p.mujeres, p.mujeresMunicipio), rural: mezcla(p.rural, p.ruralMunicipio),
-      edad: mezclaBandas(p.edad?.reparto, p.edadMunicipio?.reparto) };
+      edad, edadGrupos: edad ? agruparEdad(edad) : null };
   }
 
   /* ── Las mesas de una candidatura ────────────────────────────────────────
@@ -293,5 +367,5 @@
     return codigo === undefined ? '' : String(codigo);
   }
 
-  global.C360Electorado = { perfil, ideologia, objetivo, puestos, censoEdad, sexoEdad, PERFILES, perfiles, VECINAS, votosFamilia, votosFamiliaPartidos, shares, suma6, CIUDADES, ciudadDe, rotar90, json, codigoPuesto, municipioMayoritario, urlCandidatura, mesasDe, codigoMunicipio, ZONA_ESPECIAL };
+  global.C360Electorado = { perfil, ideologia, objetivo, puestos, censoEdad, sexoEdad, censo2026, cambioCenso, BANDAS_EDAD, GRUPOS_EDAD, agruparEdad, PERFILES, perfiles, VECINAS, votosFamilia, votosFamiliaPartidos, shares, suma6, CIUDADES, ciudadDe, rotar90, json, codigoPuesto, municipioMayoritario, urlCandidatura, mesasDe, codigoMunicipio, ZONA_ESPECIAL };
 })(window);

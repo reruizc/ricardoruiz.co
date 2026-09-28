@@ -50,6 +50,11 @@
 .banda .barras{display:grid;gap:4px}
 .banda .barras i{display:block;height:11px;background:var(--forest)}
 .banda .barras i.municipio{background:#c9d6cd}
+.banda .barras em{font:500 11px var(--mono);color:var(--muted);font-style:normal}
+.desglose{margin:6px 0 4px}.desglose summary{cursor:pointer;font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--green);padding:8px 0}
+.desglose .banda{grid-template-columns:0 110px minmax(0,1fr)}
+.nota-bloque{display:block;margin-top:10px;border-left:3px solid var(--coral);padding:8px 12px;background:var(--cream);font-size:12.5px;line-height:1.55}
+ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.crecen li{margin-bottom:8px}ol.crecen small{color:var(--muted)}
 .leyenda{display:flex;gap:18px;flex-wrap:wrap;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 0 0}
 .leyenda span{display:flex;align-items:center;gap:7px}
 .leyenda i{width:12px;height:12px;display:block;background:var(--forest)}
@@ -151,12 +156,12 @@
   <header class="panel-hero">
     <div class="kicker">Candidato 360 · panel 07</div>
     <h1>El electorado de su votación.</h1>
-    <p>El voto es secreto: <b>nadie</b> puede decir quién votó por usted. Lo que sí se puede es describir <b>quién vota en cada puesto</b> —sexo y edad— y cruzarlo con <b>dónde saca votos su familia política</b>. De ahí salen los perfiles de votante que mejor le rinden y el mapa de dónde pesan más. Es una lectura del terreno, no de sus votantes.</p>
+    <p>El voto es secreto: <b>nadie</b> puede decir quién votó por usted. Lo que sí se puede es describir <b>quién puede votar en cada puesto</b> —sexo y edad, con el censo electoral de 2026— y cruzarlo con <b>dónde saca votos su familia política</b>. De ahí salen los perfiles de votante que mejor le rinden y el mapa de dónde pesan más. Es una lectura del terreno, no de sus votantes.</p>
     <span class="panel-candidatura" id="panelCandidatura"></span>
   </header>
   <div id="panelMuro" class="hidden"></div>
   <div id="panelCuerpo">
-    <div id="elecCargando" class="panel"><p class="helper" style="margin:0">Leyendo quién vota en los puestos de su territorio…</p></div>
+    <div id="elecCargando" class="panel"><p class="helper" style="margin:0">Leyendo quién puede votar en los puestos de su territorio…</p></div>
     <div id="elecTres" class="tres hidden">
       <div class="tres-col">
         <section class="panel" id="tpPerfiles"><span class="panel-num">01 · Perfiles de votante</span><h3 id="tpPerfilesTitulo">Los que mejor le rinden.</h3><p id="tpPerfilesCopy"></p><div class="perfil-lista" id="perfilLista"></div></section>
@@ -170,7 +175,7 @@
       </section>
     </div>
     <div id="elecAviso" class="hidden"></div>
-    <details class="fondo" id="elecFondo"><summary>Las lecturas de fondo: sexo, edad, campo y ciudad, familias y la votación objetivo</summary><div id="elecAnalisis"></div></details>
+    <details class="fondo" id="elecFondo"><summary>Las lecturas de fondo: sexo, edad, campo y ciudad, familias, la votación objetivo y dónde creció el censo</summary><div id="elecAnalisis"></div></details>
     <p class="panel-nota" id="elecNota"></p>
   </div>
 </div></main>
@@ -178,12 +183,12 @@
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
 <script src="partidos-bloques.js?v=20260922"></script>
-<script src="candidato-360-electorado.js?v=20260927"></script>
+<script src="candidato-360-electorado.js?v=20260927b"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
 <script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
 <script src="assets/candidato-360/candi/candi-hueso.js?v=1"></script>
-<script src="candidato-360-candi.js?v=20260921d"></script>
+<script src="candidato-360-candi.js?v=20260927"></script>
 <script>
 (async function () {
   const P = window.C360Panel, E = window.C360Electorado, $ = P.$, esc = P.esc;
@@ -201,8 +206,8 @@
      dato: por eso va aparte y rotulada como tal. */
   const CANAL = {
     '18-30': 'Es el grupo que menos vota y el que más se mueve por redes: TikTok, Instagram y WhatsApp de amigos, en la noche. Un mensaje que no se pueda compartir en 15 segundos no le llega.',
-    '31-50': 'Es el grupo del hogar y el trabajo: Facebook, WhatsApp de padres de familia y de conjunto, radio en el carro. Los temas que mueven son empleo, movilidad, colegio y seguridad del barrio.',
-    '51+':   'Es el grupo que más vota y el más constante: radio en la mañana, televisión regional, la parroquia, la junta de acción comunal y la visita en persona. Desconfía de lo que solo existe en una pantalla.',
+    '31-60': 'Es el grupo del hogar y el trabajo: Facebook, WhatsApp de padres de familia y de conjunto, radio en el carro. Los temas que mueven son empleo, movilidad, colegio y seguridad del barrio.',
+    '61+':   'Es el grupo que más vota y el más constante: radio en la mañana, televisión regional, la parroquia, la junta de acción comunal y la visita en persona. Desconfía de lo que solo existe en una pantalla.',
   };
   function barraComparada(etiqueta, suyo, territorio) {
     return `<div class="comparada suya"><span class="et">${esc(etiqueta)}</span><span class="pista"><i style="width:${Math.max(1, (suyo || 0) * 100)}%"></i></span><span class="val">${pct(suyo)}</span></div>
@@ -218,7 +223,7 @@
     return `<section class="panel elec-seccion">
       <span class="panel-num">01 · Sexo</span>
       <h3>Dónde están sus votos, quién vive ahí.</h3>
-      <p>El censo electoral de cada puesto trae cuántas mujeres y cuántos hombres pueden votar en él. Ponderado por su votación, así queda el electorado de los suyos.</p>
+      <p>El censo electoral de 2026 trae, puesto por puesto, cuántas mujeres y cuántos hombres pueden votar en él. Ponderado por su votación, así queda el electorado de los suyos.</p>
       <div class="figuras">
         <div class="figura mujer">${ico('mujer', 96)}<div><b>${pct(p.mujeres)}</b><span>Mujeres</span></div></div>
         <div class="figura hombre">${ico('hombre', 96)}<div><b>${pct(p.mujeres == null ? null : 1 - p.mujeres)}</b><span>Hombres</span></div></div>
@@ -228,29 +233,60 @@
     </section>`;
   }
 
+  /* La edad se muestra en TRES grupos —jóvenes, adultos y adultos mayores— y
+     se desglosa en los diez rangos del censo solo si la persona lo pide. */
+  function filasEdad(etiquetas, suyo, terr, figuras) {
+    const max = Math.max(...suyo, ...(terr || [0]));
+    return etiquetas.map((et, i) => `<div class="banda"><span class="ico">${figuras ? ico(figuras[i], 42) : ''}</span>
+        <span><b>${esc(et[0])}</b><small>${esc(et[1])}</small></span>
+        <span class="barras"><i style="width:${Math.max(2, suyo[i] / max * 100)}%" title="Sus puestos: ${pct(suyo[i])}"></i>${terr ? `<i class="municipio" style="width:${Math.max(2, terr[i] / max * 100)}%" title="El territorio: ${pct(terr[i])}"></i>` : ''}<em>${pct(suyo[i])}${terr ? ` · ${pct(terr[i])}` : ''}</em></span></div>`).join('');
+  }
+  /* «Bloque de edad»: puestos donde un solo rango pesa 2,5 veces o más lo que
+     pesa en su municipio. Pasa sobre todo en las ciudades grandes (Bogotá y
+     Medellín a la cabeza) y la nota solo sale donde de verdad pesa. */
+  function notaBloques(b, lugar) {
+    return `<span class="nota-bloque"><b>Nota metodológica.</b> En ${num(b.puestos)} ${b.puestos === 1 ? 'puesto' : 'puestos'} de ${esc(lugar)} —el ${pct0(b.peso)} de su censo— un solo rango de edad pesa dos veces y media o más de lo que pesa en el municipio. Así viene el censo de la Registraduría, no es un cálculo nuestro: es la gente que quedó inscrita en ese puesto. Ahí la edad describe a esos inscritos más que al barrio.</span>`;
+  }
   function seccionEdad(p, obj) {
     if (!p.edad) return `<section class="panel elec-seccion">
       <span class="panel-num">02 · Edad</span>
       <h3>Todavía no.</h3>
-      <p>El censo por edad existe puesto por puesto, pero no está publicado en la fuente que lee esta página. En cuanto se publique, esta sección aparece sola, con las mismas cuatro bandas y la misma comparación. Preferimos decirlo a estimar la edad con el promedio del municipio y presentarla como suya.</p>
+      <p>El censo por edad de sus puestos no respondió. En cuanto responda, esta sección aparece sola. Preferimos decirlo a estimar la edad con el promedio del municipio y presentarla como suya.</p>
       <div class="figuras" style="opacity:.35">${ico('joven', 70)}${ico('adulto', 70)}${ico('mayor', 70)}</div>
     </section>`;
-    const filas = p.edad.bandas.map((banda, i) => {
-      const [figura, nota] = FIGURA_EDAD[banda] || ['adulto', ''];
-      const suyo = p.edad.reparto[i], terr = p.edadMunicipio?.reparto?.[i];
-      const max = Math.max(...p.edad.reparto, ...(p.edadMunicipio?.reparto || [0]));
-      return `<div class="banda"><span class="ico">${ico(figura, 42)}</span>
-        <span><b>${banda} años</b><small>${esc(nota)}</small></span>
-        <span class="barras"><i style="width:${Math.max(2, suyo / max * 100)}%" title="Sus puestos: ${pct(suyo)}"></i>${terr == null ? '' : `<i class="municipio" style="width:${Math.max(2, terr / max * 100)}%" title="El territorio: ${pct(terr)}"></i>`}</span></div>`;
-    }).join('');
-    const mayor = p.edad.reparto.indexOf(Math.max(...p.edad.reparto));
+    const G = E.GRUPOS_EDAD, grupos = p.edad.grupos, gTerr = p.edadMunicipio?.grupos || null;
+    const mayor = grupos.indexOf(Math.max(...grupos));
+    const detalle = filasEdad(p.edad.bandas.map(b => [b === '61+' ? 'Más de 60' : `${b} años`, '']), p.edad.reparto, p.edadMunicipio?.reparto || null, null);
+    const bloque = p.bloque && p.bloque.peso >= .03
+      ? `<p class="falta"><b>Nota metodológica.</b> El ${pct(p.bloque.peso)} de sus votos está en ${num(p.bloque.puestos.length)} ${p.bloque.puestos.length === 1 ? 'puesto' : 'puestos'} donde un solo rango de edad pesa dos veces y media o más de lo que pesa en el municipio${p.bloque.puestos[0]?.nombre ? ` (el de más votos suyos: <b>${esc(P.lugar(p.bloque.puestos[0].nombre))}</b>, con el rango de ${esc(p.bloque.puestos[0].banda)} años)` : ''}. Así viene el censo de la Registraduría, no es un cálculo nuestro: ahí la edad describe a quienes quedaron inscritos en ese puesto más que al barrio.</p>` : '';
     return `<section class="panel elec-seccion">
       <span class="panel-num">02 · Edad</span>
-      <h3>La banda que más pesa: ${esc(p.edad.bandas[mayor])} años.</h3>
-      <p>Composición etaria del censo de sus puestos, ponderada por su votación, contra la del territorio entero. Cubre el ${pct(p.edad.cobertura)} de sus votos.</p>
-      ${filas}
+      <h3>El grupo que más pesa: ${esc(G[mayor].nombre.toLowerCase())}.</h3>
+      <p>Quién puede votar en sus puestos, por edad, ponderado por su votación, contra el territorio entero. Es el censo de 2026 tal como lo publica la Registraduría, no una estimación. Cubre el ${pct(p.edad.cobertura)} de sus votos.</p>
+      ${filasEdad(G.map(g => [g.nombre, `${g.rango} años`]), grupos, gTerr, G.map(g => g.figura))}
       <div class="leyenda"><span><i></i>Sus puestos</span><span><i class="municipio"></i>El territorio</span></div>
-      ${obj?.edad ? `<p class="falta">Los votos que le faltan se parecen al territorio: el objetivo mueve su banda más fuerte de <b>${pct(p.edad.reparto[mayor])}</b> a <b>${pct(obj.edad[mayor])}</b>.</p>` : ''}
+      <details class="desglose"><summary>Ver los diez rangos de edad</summary>${detalle}</details>
+      ${obj?.edadGrupos && Math.abs(obj.edadGrupos[mayor] - grupos[mayor]) >= .005 ? `<p class="falta">Los votos que le faltan se parecen al territorio: el objetivo mueve a ${esc(G[mayor].nombre.toLowerCase())} de <b>${pct(grupos[mayor])}</b> a <b>${pct(obj.edadGrupos[mayor])}</b>.</p>` : ''}
+      ${bloque}
+    </section>`;
+  }
+
+  /* ── Cómo cambió el censo de 2023 a 2026 ─────────────────────────────── */
+  function seccionCambio(c, lugar) {
+    if (!c) return '';
+    const sube = c.crecimiento >= 0;
+    const lista = c.top.filter(x => x.delta > 0).slice(0, 6).map(x => `<li><b>${esc(P.lugar(x.nombre || x.code))}</b>${x.barrio && x.barrio !== 'sin georreferenciar' ? ` · ${esc(P.lugar(x.barrio))}` : ''}<br><small>${num(x.antes)} → ${num(x.hoy)} electores (${x.delta > 0 ? '+' : ''}${num(x.delta)} · ${pct0(x.tasa)})${x.renumerado ? ' · cambió de código' : ''}</small></li>`).join('');
+    return `<section class="panel elec-seccion">
+      <span class="panel-num">06 · Dónde creció el censo</span>
+      <h3>${esc(lugar)} ${sube ? 'ganó' : 'perdió'} ${num(Math.abs(c.hoy - c.antes))} electores desde 2023.</h3>
+      <p>Censo electoral de las territoriales de 2023 contra el del Congreso de 2026, puesto por puesto. Es la pista de dónde se inscribieron cédulas: ahí hay gente que no estaba en el censo de la última elección local.</p>
+      <div class="cifras">
+        <div class="cifra"><b>${num(c.antes)}</b><span>podían votar en 2023</span></div>
+        <div class="cifra"><b>${num(c.hoy)}</b><span>pueden votar en 2026 (${sube ? '+' : ''}${pct(c.crecimiento)})</span></div>
+        <div class="cifra"><b>${num(c.primeros)}</b><span>tienen entre 18 y 20 años: en 2023 muchos todavía no podían votar</span></div>
+      </div>
+      ${lista ? `<p style="margin-top:18px"><b>Los puestos que más crecieron</b></p><ol class="crecen">${lista}</ol>` : ''}
+      <p class="falta"><b>Cómo leerlo.</b> El número firme es el del territorio entero. Puesto por puesto hay que tener cuidado: entre las dos elecciones la Registraduría abrió ${num(c.nuevos)} ${c.nuevos === 1 ? 'puesto' : 'puestos'} aquí (${num(c.censoNuevos)} electores) y cerró o renumeró ${num(c.cerrados)} (${num(c.censoCerrados)} en 2023), así que un puesto puede crecer porque le trasladaron mesas de otro, no porque llegara gente nueva.</p>
     </section>`;
   }
 
@@ -347,14 +383,14 @@
     $('perfilLista').innerHTML = orden.map(({ p, idx, peso }, k) => `<label class="perfil-card ${p.sexo === 'M' ? 'mujer' : ''} ${p.i === ST.perfil ? 'sel' : ''} ${k === 0 ? 'ganador' : ''}">
       <input type="radio" name="perfil" value="${p.i}" ${p.i === ST.perfil ? 'checked' : ''}>
       <span class="figs">${ico(p.sexo === 'M' ? 'mujer' : 'hombre', 40)}${ico(p.figura, 30)}</span>
-      <span><b>${esc(p.nombre)}</b><small>${pct0(peso)} de quienes votan en ${esc(ST.lugar)}</small></span>
+      <span><b>${esc(p.nombre)}</b><small>${pct0(peso)} de quienes pueden votar en ${esc(ST.lugar)}</small></span>
       <span class="idx">${veces(idx)}<small>rinde</small></span>
       ${viables.has(p.i) ? `<span class="viable">${k === 0 ? 'el más viable' : 'viable'}</span>` : ''}
     </label>`).join('');
     $('perfilLista').querySelectorAll('input').forEach(r => r.addEventListener('change', () => elegirPerfil(Number(r.value))));
     const top = orden[0];
     $('tpPerfilesTitulo').textContent = `${top.p.nombre}: ${veces(top.idx)} donde vota ${ST.famLabel.toLowerCase()}.`;
-    $('tpPerfilesCopy').innerHTML = `Seis perfiles de sexo y edad. <b>Rinde</b> compara cuánto pesa cada uno en ${esc(unidadPlural())} donde <b>${esc(ST.famLabel.toLowerCase())}</b> sacó más votos en 2023 contra lo que pesa en ${esc(ST.lugar)} entero: ×1,20 es «un 20 % más». Los tres de arriba son los más viables. Elija uno y el mapa se ilumina donde le pega.${ST.ampliada ? ` <b>Ojo:</b> ${esc(LABEL[ST.familia].toLowerCase())} no tuvo lista propia en ${esc(ST.lugar)} en 2023, así que se mide con sus vecinas del espectro (${esc(ST.famLabel)}).` : ''}`;
+    $('tpPerfilesCopy').innerHTML = `Seis perfiles de sexo y edad de quienes pueden votar. <b>Rinde</b> compara cuánto pesa cada uno en ${esc(unidadPlural())} donde <b>${esc(ST.famLabel.toLowerCase())}</b> sacó más votos en 2023 contra lo que pesa en ${esc(ST.lugar)} entero: ×1,20 es «un 20 % más». Los tres de arriba son los más viables. Elija uno y el mapa se ilumina donde le pega.${ST.ampliada ? ` <b>Ojo:</b> ${esc(LABEL[ST.familia].toLowerCase())} no tuvo lista propia en ${esc(ST.lugar)} en 2023, así que se mide con sus vecinas del espectro (${esc(ST.famLabel)}).` : ''}${ST.bloques ? notaBloques(ST.bloques, ST.lugar) : ''}`;
   }
   function topUnidades(n) {
     const k = ST.perfil;
@@ -369,10 +405,10 @@
       : `Es un perfil que <b>le juega en contra</b>: donde ${familia} vota pesa ${veces(idx)} lo que pesa en ${esc(ST.lugar)}. Llegarle exige salir de su zona de confort, y el mapa dice por dónde.`;
     const unidadTxt = fuertes === 1 ? unidadSingular() : sinArticulo(unidadPlural());
     $('lectura').innerHTML = `<span class="kicker">${esc(p.nombre)} · ${p.sexo === 'M' ? 'mujeres' : 'hombres'} de ${esc(p.edad.replace('+', ' o más'))}</span>
-      <span class="grande">${pct0(peso)} de quienes votan</span>
-      <p>${esc(p.nombre)} son el <b>${pct(peso)}</b> de quienes votan en ${esc(ST.lugar)}. ${lectura}</p>
+      <span class="grande">${pct0(peso)} de quienes pueden votar</span>
+      <p>${esc(p.nombre)} son el <b>${pct(peso)}</b> de quienes pueden votar en ${esc(ST.lugar)}. ${lectura}</p>
       <p><b>Dónde le pegan.</b> ${fuertes ? `En <b>${fuertes}</b> ${esc(unidadTxt)} el perfil pesa más que en el territorio <i>y</i> ${familia} vota mejor que su promedio: ahí un mensaje para ${esc(p.corto)} cae en terreno abonado. Parpadean en el mapa.` : `Ninguna ${esc(unidadSingular())} junta las dos cosas —el perfil concentrado y ${familia} fuerte— con claridad. El mapa muestra dónde se acerca.`}</p>
-      ${top.length ? `<ol>${top.map(o => `<li><b>${esc(P.lugar(o.u.name))}</b><span class="pega-tag" style="background:${color}">${veces(o.x.pega)}</span><br><small>${esc(p.nombre.toLowerCase())}: ${pct(o.x.share)} de quienes votan · ${familia}: ${veces(o.x.fam)} su promedio</small></li>`).join('')}</ol>` : ''}
+      ${top.length ? `<ol>${top.map(o => `<li><b>${esc(P.lugar(o.u.name))}</b><span class="pega-tag" style="background:${color}">${veces(o.x.pega)}</span><br><small>${esc(p.nombre.toLowerCase())}: ${pct(o.x.share)} de quienes pueden votar · ${familia}: ${veces(o.x.fam)} su promedio</small></li>`).join('')}</ol>` : ''}
       <div class="canal"><b>Cómo llegarle.</b> ${esc(CANAL[p.edad])} <i>(sugerencia de oficio, no un dato de esta candidatura)</i></div>`;
   }
   function elegirPerfil(i) { ST.perfil = i; pintarPerfiles(); pintarLectura(); pintarMapa(); }
@@ -388,7 +424,7 @@
   }
   function limpiarMapa() { if (ST.capa) { ST.mapa.removeLayer(ST.capa); ST.capa = null; } if (ST.tiles) { ST.mapa.removeLayer(ST.tiles); ST.tiles = null; } }
   function tooltip(u, x, p) {
-    return `<b>${esc(P.lugar(u.name))}</b><br>${esc(p.nombre)}: ${pct(x?.share)} de quienes votan (${x ? veces(x.conc) : '—'} el territorio)<br>${esc(ST.famLabel)}: ${u.total ? pct(u.propios / u.total) : '—'} (${x ? veces(x.fam) : '—'} su promedio)<br><b>Le pega ${x ? veces(x.pega) : '—'}</b>${x && x.pega >= PEGA_FUERTE ? ' · fuerte' : ''}`;
+    return `<b>${esc(P.lugar(u.name))}</b><br>${esc(p.nombre)}: ${pct(x?.share)} de quienes pueden votar (${x ? veces(x.conc) : '—'} el territorio)<br>${esc(ST.famLabel)}: ${u.total ? pct(u.propios / u.total) : '—'} (${x ? veces(x.fam) : '—'} su promedio)<br><b>Le pega ${x ? veces(x.pega) : '—'}</b>${x && x.pega >= PEGA_FUERTE ? ' · fuerte' : ''}`;
   }
   function pintarMapa() {
     const mapa = asegurarMapa(), k = ST.perfil, p = E.PERFILES[k], base = COLOR[ST.familia];
@@ -437,7 +473,7 @@
     pintarBarra();
     const unidadTxt = enBarrios ? `barrios de ${P.lugar(ST.unidadAbierta ? ST.unidadAbierta.name : ST.lugar)}` : sinArticulo(unidadPlural());
     $('tpMapaTitulo').textContent = `${p.nombre}: dónde le pegan, por ${unidadTxt}`.replace(/\.?$/, '.');
-    $('mapaNota').innerHTML = `Cada ${esc(enBarrios ? 'barrio' : unidadSingular())} se colorea por <b>le pega</b> = (peso de ${esc(p.corto)} entre quienes votan ahí ÷ su peso en ${esc(ST.lugar)}) × (voto de ${esc(ST.famLabel.toLowerCase())} en 2023 ahí ÷ su promedio en ${esc(ST.lugar)}). Quién vota: sufragantes de la primera vuelta de 2022 por sexo y edad, agregados por puesto (Registraduría). Voto por familia: ${ST.modo === 'municipio' ? 'Asamblea 2023' : ST.modo === 'puesto' ? 'Asamblea 2023, puesto por puesto' : 'Concejo 2023'}, con cada partido en su familia.${ST.cfg?.barrios && !enBarrios ? ` <b>Haga clic en una ${esc(unidadSingular())}</b> para bajar a sus barrios.` : ''}${enBarrios && !ST.unidadAbierta && ST.barrios?.faltan ? ` ${ST.barrios.faltan} ${ST.barrios.faltan === 1 ? esc(unidadSingular()) + ' no tiene' : esc(sinArticulo(unidadPlural())) + ' no tienen'} cartografía por barrio y ${ST.barrios.faltan === 1 ? 'queda' : 'quedan'} fuera del mapa.` : ''}${enBarrios && ST.unidadAbierta ? ' <b>Vuelva a «Barrios»</b> para ver la ciudad entera.' : ''}${ST.modo === 'puesto' ? ' Este municipio no tiene cartografía por comuna, así que el mapa muestra los puestos de votación.' : ''}`;
+    $('mapaNota').innerHTML = `Cada ${esc(enBarrios ? 'barrio' : unidadSingular())} se colorea por <b>le pega</b> = (peso de ${esc(p.corto)} entre quienes pueden votar ahí ÷ su peso en ${esc(ST.lugar)}) × (voto de ${esc(ST.famLabel.toLowerCase())} en 2023 ahí ÷ su promedio en ${esc(ST.lugar)}). Quién puede votar: censo electoral de 2026 por puesto (Registraduría); el cruce sexo × edad se estima, porque la Registraduría publica el sexo y la edad por separado. Voto por familia: ${ST.modo === 'municipio' ? 'Asamblea 2023' : ST.modo === 'puesto' ? 'Asamblea 2023, puesto por puesto' : 'Concejo 2023'}, con cada partido en su familia.${ST.cfg?.barrios && !enBarrios ? ` <b>Haga clic en una ${esc(unidadSingular())}</b> para bajar a sus barrios.` : ''}${enBarrios && !ST.unidadAbierta && ST.barrios?.faltan ? ` ${ST.barrios.faltan} ${ST.barrios.faltan === 1 ? esc(unidadSingular()) + ' no tiene' : esc(sinArticulo(unidadPlural())) + ' no tienen'} cartografía por barrio y ${ST.barrios.faltan === 1 ? 'queda' : 'quedan'} fuera del mapa.` : ''}${enBarrios && ST.unidadAbierta ? ' <b>Vuelva a «Barrios»</b> para ver la ciudad entera.' : ''}${ST.modo === 'puesto' ? ' Este municipio no tiene cartografía por comuna, así que el mapa muestra los puestos de votación.' : ''}`;
   }
   function pintarBarra() {
     const b = $('mapaBarra'), enBarrios = ST.nivel === 'barrios';
@@ -587,6 +623,11 @@
       await armarUnidades(); ST.ref = E.perfiles(ST.unidades);
     }
     if (!ST.ref) return aviso(`No hay suficiente dato de sexo y edad en los puestos de ${esc(ST.lugar)} para armar los perfiles.`);
+    /* Nota de bloques de edad: solo donde pesan (≥ 5 % del censo del territorio). */
+    const edad = await E.censoEdad(), pref = dep + (ST.modo === 'municipio' ? '' : ST.mun3);
+    let enBloque = 0, nBloque = 0, censoTerr = 0;
+    Object.entries(lugares).forEach(([k, g]) => { if (!k.startsWith(pref)) return; censoTerr += g.censo; if (edad?.bloques?.[k] != null) { enBloque += g.censo; nBloque++; } });
+    ST.bloques = censoTerr && enBloque / censoTerr >= .05 ? { puestos: nBloque, peso: enBloque / censoTerr } : null;
     ST.perfil = E.PERFILES.map((p, k) => [ST.ref.indice[k], p.i]).sort((a, b) => b[0] - a[0])[0][1];
     $('elecTres').classList.remove('hidden');
     pintarPerfiles(); pintarLectura(); pintarMapa();
@@ -599,7 +640,9 @@
     const slugs = v?.tipo === 'historial' ? (v.candidato?.slugs || []) : [];
     const mesas = await E.mesasDe(slugs);
     const municipio = await E.codigoMunicipio(campana.departamento, campana.municipio);
-    const [p, ideo] = await Promise.all([E.perfil(mesas), E.ideologia({ departamento: campana.departamento, municipio }).catch(() => null)]);
+    const corpDep = ['asamblea', 'gobernacion'].includes(campana.corp);
+    const prefijo = pad2(campana.departamento) + (corpDep || !municipio ? '' : pad3(municipio));
+    const [p, ideo, cambio] = await Promise.all([E.perfil(mesas), E.ideologia({ departamento: campana.departamento, municipio }).catch(() => null), E.cambioCenso(prefijo).catch(() => null)]);
     const lugar = P.lugar(ideo?.nombre || campana.municipio || campana.departamentoNombre || 'su territorio');
     const familia = familiaDe(campana);
     const familiaPrevia = v?.candidato?.partido ? PartidosBloques.bloqueDeOrganizacion(v.candidato.partido) : '';
@@ -610,12 +653,12 @@
       analisis.innerHTML = `<section class="panel elec-seccion"><span class="panel-num">Perfil del votante</span>
         <h3>Todavía no hay perfil para esta candidatura.</h3>
         <p>${slugs.length ? 'Los puestos de su votación no tienen censo publicado, así que preferimos no estimar un perfil que no podemos sostener.' : 'Esta es una candidatura nueva: sin votos propios no hay puestos que describir. Cuando tenga una elección detrás, esta página se llena sola.'}</p></section>`
-        + seccionFamilias(ideo, familia, familiaPrevia, lugar);
+        + seccionFamilias(ideo, familia, familiaPrevia, lugar) + seccionCambio(cambio, lugar);
     } else {
       analisis.innerHTML = seccionSexo(p) + seccionEdad(p, obj) + seccionTerritorio(p, ideo, lugar)
-        + seccionFamilias(ideo, familia, familiaPrevia, lugar) + seccionObjetivo(p, obj, ideo, familia, lugar);
+        + seccionFamilias(ideo, familia, familiaPrevia, lugar) + seccionObjetivo(p, obj, ideo, familia, lugar) + seccionCambio(cambio, lugar);
     }
-    $('elecNota').innerHTML = `Fuente: censo electoral por puesto de la Registraduría (PUESTOS_GEOREF, columnas de mujeres y hombres), sufragantes de 2022 por sexo y edad, la zona electoral de cada mesa y los resultados de Concejo y Asamblea 2023. Cubre el ${pct(p.cobertura)} de su votación${p.sinCoordenada ? `: ${num(p.sinCoordenada)} votos están en puestos sin censo publicado` : ''}. <a class="enlace-boton" href="candidato-360-perfil.html">Cómo se lee esto sin violar el secreto del voto →</a>`;
+    $('elecNota').innerHTML = `Fuente: censo electoral por puesto del Congreso 2026 (Registraduría), con sexo y diez rangos de edad; el cruce sexo × edad de los perfiles se estima con la forma de los sufragantes de 2022 ajustada a los totales de 2026; el censo de 2023 para ver dónde creció; la zona electoral de cada mesa y los resultados de Concejo y Asamblea 2023. Cubre el ${pct(p.cobertura)} de su votación${p.sinCoordenada ? `: ${num(p.sinCoordenada)} votos están en puestos sin censo publicado` : ''}. <a class="enlace-boton" href="candidato-360-perfil.html">Cómo se lee esto sin violar el secreto del voto →</a>`;
   }
   async function armar(v) {
     try { await armarPerfiles(v); } catch (e) { aviso(`No se pudieron armar los perfiles: ${esc(e.message || e)}.`); }
