@@ -32,24 +32,125 @@ RUTA = '/caudal/briefs/enviar'
 UA = 'caudal-briefs/1.0 (+ricardoruiz.co)'
 
 
+MESES = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+         'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre')
+# Colores del PDF, para que el correo y el adjunto se lean como la misma pieza.
+TINTA, GRIS, AZUL, PAPEL, LINEA = '#0b0d11', '#5a6070', '#2b5672', '#fbfaf8', '#e2e5ea'
+URGENCIA = {'alta': ('#d9480f', 'Urgente'), 'media': ('#2b5672', 'Atento'),
+            'baja': ('#6b7280', 'Para saber')}
+
+
+def _fecha_larga(iso):
+    try:
+        a, m, d = (int(x) for x in str(iso)[:10].split('-'))
+        return f"{d} de {MESES[m - 1]}"
+    except (ValueError, IndexError):
+        return str(iso or '')
+
+
+def momento(iso):
+    """«Inicio de la semana» el lunes, «Cierre de la semana» el viernes."""
+    import datetime
+    try:
+        dia = datetime.date.fromisoformat(str(iso)[:10]).isoweekday()
+    except ValueError:
+        return 'Lo de estos días'
+    return {1: 'Inicio de la semana', 5: 'Cierre de la semana'}.get(dia, 'Lo de estos días')
+
+
+def asunto(b):
+    meta = b.get('_meta') or {}
+    hasta = (meta.get('ventana') or {}).get('hasta', '')
+    return f"Caudal · {momento(hasta)} · {meta.get('cliente', 'cliente')} · {_fecha_larga(hasta)}"
+
+
 def cuerpo_html(b):
-    """El correo lleva lo mínimo para decidir si abrir ya: titular, la acción de
-    «si solo hay tiempo para una cosa» y el recordatorio de que es un borrador."""
+    """El correo que acompaña al brief, con el formato de un boletín: saludo,
+    portada con la lectura de la ventana, las cifras en un vistazo, los temas en
+    una línea cada uno y lo que viene. Lo largo va en los adjuntos.
+
+    ⚠️ Solo tablas y estilos en línea: Gmail y Outlook ignoran <style>, flexbox y
+    grid, y un correo que se ve roto en el teléfono del cliente no se lee. Sin
+    imágenes: no hay dónde alojarlas con URL pública desde el workflow, y una
+    imagen rota arriba de todo es peor que ninguna.
+    """
     meta = b.get('_meta') or {}
     v = meta.get('ventana') or {}
+    cliente = meta.get('cliente') or 'equipo'
     lec = b.get('lectura') or {}
+    temas = b.get('temas') or []
+    agenda = [x for x in (b.get('agenda') or []) if x.get('que')][:4]
     una = lec.get('si_solo_hay_tiempo') or ''
-    e = lambda s: html.escape(str(s or ''))
-    return f"""<div style="font-family:Arial,sans-serif;max-width:620px;color:#0b0d11;line-height:1.5">
-<p style="font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#5a6070;margin:0 0 6px">
-Brief de {e(meta.get('cliente'))} · {e(v.get('desde'))} a {e(v.get('hasta'))}</p>
-<h2 style="font-size:19px;margin:0 0 14px">{e(b.get('titular'))}</h2>
-{f'<p style="margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#2b5672"><b>Si solo hay tiempo para una cosa</b></p><p style="margin:0 0 16px">{e(una)}</p>' if una else ''}
-<p style="margin:0 0 6px">Adjuntos: el <b>PDF</b> para leerlo y el <b>Word</b> para reescribirlo.</p>
-<p style="margin:16px 0 0;padding:10px 12px;background:#fbf9f2;border-left:3px solid #8a6d1c;font-size:13px">
-Es un <b>borrador para revisión</b>. Revísalo antes de mandarlo al cliente:
-lo escribió un modelo sobre el barrido de Caudal.</p>
-</div>"""
+    e = lambda x: html.escape(str(x or ''))
+    n_alta = sum(1 for t in temas if t.get('urgencia') == 'alta')
+
+    def cifra(n, rotulo, color=AZUL):
+        return (f'<td align="center" width="33%" style="padding:0 6px">'
+                f'<div style="background:{color};color:#fff;border-radius:10px;'
+                f'padding:10px 4px;font-size:22px;font-weight:bold">{n}</div>'
+                f'<div style="font-size:12px;color:{GRIS};padding-top:6px">{rotulo}</div></td>')
+
+    cifras = (cifra(len(temas), 'temas') + cifra(n_alta, 'urgentes', '#d9480f')
+              + cifra(len(b.get('agenda') or []), 'fechas por venir'))
+
+    filas_temas = ''
+    for t in temas:
+        color, rot = URGENCIA.get(t.get('urgencia'), URGENCIA['baja'])
+        filas_temas += (
+            f'<tr><td style="padding:10px 0;border-top:1px solid {LINEA}">'
+            f'<span style="font-size:11px;font-weight:bold;letter-spacing:.06em;'
+            f'text-transform:uppercase;color:{color}">{e(rot)} · {e(t.get("rotulo"))}</span><br>'
+            f'<span style="font-size:15px;color:{TINTA}">{e(t.get("titulo"))}</span></td></tr>')
+
+    filas_agenda = ''.join(
+        f'<tr><td style="padding:6px 12px 6px 0;font-size:13px;font-weight:bold;'
+        f'color:{AZUL};white-space:nowrap;vertical-align:top">{e(_fecha_larga(x.get("iso")))}</td>'
+        f'<td style="padding:6px 0;font-size:14px;color:{TINTA}">{e(x.get("que"))}</td></tr>'
+        for x in agenda)
+
+    parrafo = (lec.get('parrafos') or [''])[0]
+    return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#f1f2f4">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f2f4">
+<tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:#ffffff;border-radius:14px;font-family:Helvetica,Arial,sans-serif;color:{TINTA};line-height:1.5">
+
+<tr><td style="padding:26px 28px 6px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:{GRIS}">
+<b style="color:{TINTA}">Caudal</b> &nbsp;×&nbsp; {e(cliente)}</td></tr>
+
+<tr><td style="padding:4px 28px 0">
+<div style="font-size:30px;font-weight:bold;color:{TINTA}">¡Hola, {e(cliente)}!</div>
+<div style="font-size:17px;font-style:italic;color:{AZUL};padding-top:2px">{e(momento(v.get('hasta')))}</div>
+</td></tr>
+
+<tr><td style="padding:18px 28px 0">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{TINTA};border-radius:12px">
+<tr><td style="padding:24px 24px 26px">
+<div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9fb6c8">
+Del {e(_fecha_larga(v.get('desde')))} al {e(_fecha_larga(v.get('hasta')))}</div>
+<div style="font-size:22px;font-weight:bold;color:#ffffff;line-height:1.3;padding-top:8px">{e(lec.get('titulo') or b.get('titular'))}</div>
+</td></tr></table></td></tr>
+
+<tr><td style="padding:22px 22px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>{cifras}</tr></table></td></tr>
+
+<tr><td style="padding:18px 28px 0;font-size:15px">{e(parrafo)}</td></tr>
+
+{f'<tr><td style="padding:18px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{PAPEL};border-left:4px solid {AZUL};border-radius:6px"><tr><td style="padding:14px 16px"><div style="font-size:11px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;color:{AZUL}">Si solo tienes tiempo para una cosa</div><div style="font-size:15px;padding-top:4px">{e(una)}</div></td></tr></table></td></tr>' if una else ''}
+
+<tr><td style="padding:26px 28px 0;font-size:19px;font-weight:bold">Los temas de la semana</td></tr>
+<tr><td style="padding:6px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{filas_temas}</table></td></tr>
+
+{f'<tr><td style="padding:24px 28px 0;font-size:19px;font-weight:bold">Lo que viene</td></tr><tr><td style="padding:6px 28px 0"><table role="presentation" cellpadding="0" cellspacing="0">{filas_agenda}</table></td></tr>' if filas_agenda else ''}
+
+<tr><td style="padding:24px 28px 0;font-size:14px;color:{GRIS}">
+El brief completo va adjunto: el <b style="color:{TINTA}">PDF</b> para leerlo y el
+<b style="color:{TINTA}">Word</b> para reescribirlo.</td></tr>
+
+<tr><td style="padding:16px 28px 28px">
+<div style="padding:10px 12px;background:#fbf9f2;border-left:3px solid #8a6d1c;font-size:12px;color:{GRIS}">
+Es un <b>borrador para revisión</b>: lo escribió un modelo sobre el barrido de Caudal.
+Revísalo antes de mandarlo a un cliente.</div></td></tr>
+
+</table></td></tr></table></body></html>"""
 
 
 def main():
@@ -77,7 +178,7 @@ def main():
 
     hasta = (meta.get('ventana') or {}).get('hasta', '')
     payload = {
-        'asunto': f"Caudal · Brief de 72 horas · {meta.get('cliente', 'cliente')} · {hasta}",
+        'asunto': asunto(b),
         'html': cuerpo_html(b),
         'para': para,
         'etiqueta': f"brief-{(meta.get('cliente') or 'cliente').lower()}-{hasta}",
