@@ -62,7 +62,11 @@ LO QUE NO SABEMOS SE DICE. Cada pilar trae hasta qué fecha llega su registro. U
 pilar sin novedades puede significar dos cosas opuestas: que no pasó nada, o que \
 todavía no lo publican. Nunca las confundas y nunca afirmes que «no hubo» algo \
 cuando el registro va atrasado: escribe hasta cuándo llega el registro. Esa \
-sección es parte del producto, no una disculpa.
+sección es parte del producto, no una disculpa. Y distingue QUIÉN está atrasado: \
+si el pilar dice que lo revisamos hoy pero la fuente oficial no ha publicado, el \
+hueco es de la fuente (el Senado, la Cámara, el regulador), no nuestro — dilo \
+así, porque el lector no puede saberlo y sin esa precisión lo lee como una falla \
+de este servicio.
 
 LAS REDES. La sección REDES trae lo que se publicó en X sobre los temas del \
 cliente en el último día, ordenado por interacción. Cada publicación es la \
@@ -276,8 +280,19 @@ def armar_mensaje(b):
 
     L.append("\nHASTA DÓNDE LLEGA CADA REGISTRO (úsalo para «qué no se movió»; "
              "un pilar vacío con registro atrasado NO es lo mismo que quietud):")
+    rev = b.get('revision') or {}
     for pilar, f in sorted(cob.items()):
-        if f and f < v['desde']:
+        if f and f < v['desde'] and rev.get(pilar, '') >= v['hasta']:
+            # Revisamos hoy y la FUENTE no ha publicado nada después: el hueco
+            # es del Senado/Cámara, no nuestro, y el brief tiene que decirlo así.
+            L.append(f"  · {pilar}: REVISADO el {rev[pilar]}, pero Senado y Cámara no han "
+                     f"publicado radicados posteriores al {f}. El retraso es de la fuente "
+                     f"oficial, NO de nuestro registro: di que las fuentes oficiales no han "
+                     f"publicado radicaciones desde el {f} y que lo radicado después (si lo "
+                     f"reporta la prensa) aún no aparece en el registro oficial. Nunca "
+                     f"escribas «nuestros registros llegan hasta…» ni «los registros de "
+                     f"Congreso llegan solo hasta…». Tampoco digas que no hubo movimiento.")
+        elif f and f < v['desde']:
             L.append(f"  · {pilar}: el registro llega solo hasta {f} — ATRASADO, no cubre "
                      f"la ventana. Prohibido decir que no hubo movimiento en este pilar: "
                      f"di que el registro llega hasta {f} y que lo posterior no está verificado.")
@@ -289,7 +304,12 @@ def armar_mensaje(b):
         L.append(f"\n### {titulo} · {len(xs)}")
         if not xs:
             f = cob.get(pilar)
-            if f and f < v['desde']:
+            if f and f < v['desde'] and rev.get(pilar, '') >= v['hasta']:
+                L.append(f"  (SIN RADICADOS PUBLICADOS: revisado el {rev[pilar]}; las "
+                         f"fuentes oficiales no publican radicaciones desde el {f}. No "
+                         f"significa que no se haya radicado nada: significa que el "
+                         f"Senado y la Cámara no lo han publicado)")
+            elif f and f < v['desde']:
                 L.append(f"  (SIN DATO: el registro llega solo hasta {f}, antes de que "
                          f"empiece la ventana. Esto NO significa que no haya habido "
                          f"movimiento: significa que no lo sabemos)")

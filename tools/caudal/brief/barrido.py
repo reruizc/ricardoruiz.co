@@ -305,6 +305,23 @@ def barrer(p, dias, desde):
     except Exception as e:                                       # noqa: BLE001
         crudo['agenda'] = {'error': str(e)[:120]}
 
+    # Cuándo REVISAMOS el Congreso, que no es lo mismo que hasta dónde llega el
+    # registro. La cobertura del pilar es la fecha del radicado más reciente, así
+    # que si el Senado deja de publicar (pasó del 23 al 28-sep-2026: su propia
+    # API seguía en 263 proyectos) el brief decía «los registros de Congreso
+    # llegan solo hasta el 23» y se leía como atraso nuestro. El latido del
+    # rastreo diario es público y dice cuándo corrió por última vez.
+    revision = {}
+    try:
+        lat = get(S3 + 'caudal-latido.json')
+        ts = lat.get('ts') or ''
+        caidas = set(lat.get('etapas_fallidas') or [])
+        if ts and not caidas & {'senado_radicados', 'camara_radicados'}:
+            dt = datetime.datetime.fromisoformat(ts.replace('Z', '+00:00'))
+            revision['congreso'] = (dt - datetime.timedelta(hours=5)).date().isoformat()
+    except Exception:                                            # noqa: BLE001
+        pass
+
     hoy = datetime.date.today().isoformat()
     excl = list(p.get('no_interesa') or [])
     solo_colombia = not (p.get('fuera_de_alcance') or [])
@@ -531,6 +548,7 @@ def barrer(p, dias, desde):
         'kpis': radar.get('kpis') or {},
         'evidencia': ev,
         'cobertura': cobertura,
+        'revision': revision,
         'n_consultas': len(jobs),
     }
 
@@ -550,7 +568,11 @@ def resumen_texto(b):
         ruido = sum(1 for x in xs if x.get('_ruido'))
         extra = ""
         cob = (b.get('cobertura') or {}).get(pilar)
-        if not xs and cob and cob < v['desde']:
+        rev = (b.get('revision') or {}).get(pilar, '')
+        if not xs and cob and cob < v['desde'] and rev >= v['hasta']:
+            extra = (f" · revisado el {rev}; la FUENTE no publica radicados desde "
+                     f"{cob} — el hueco es del Senado/Cámara, no nuestro")
+        elif not xs and cob and cob < v['desde']:
             # El registro ni siquiera llega al inicio de la ventana: un cero acá
             # es ignorancia, no quietud.
             extra = (f" · ⚠ REGISTRO ATRASADO: llega solo hasta {cob}, antes de la "
