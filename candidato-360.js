@@ -4645,7 +4645,10 @@ async function endosoEvaluar() {
   const alcance = await endosoAlcance();
   let propio = null;
   if (crmCandidate) { try { propio = await mesasDelHistorial(); } catch { propio = null; } }
-  return E360.evaluar(ENDOSO.aliados, { alcance, lugar: endosoLugar(alcance), enAlcance: mesaEnAlcance, areaDe: endosoArea, propio });
+  /* La corporación de la campaña: de sus válidos de 2023 sale el electorado
+     de cada puesto, para no contar dos veces a quien votó por dos aliados. */
+  const corpCampana = currentTargetTerritory()?.corporation || CAMPANA_ACTUAL?.corp || SESSION.vinculo?.campana?.corp || corporacionHistorica(crmCandidate);
+  return E360.evaluar(ENDOSO.aliados, { alcance, lugar: endosoLugar(alcance), enAlcance: mesaEnAlcance, areaDe: endosoArea, propio, corpCampana });
 }
 async function pintarEndoso() {
   const card = $('crmEndoso'); if (!card) return;
@@ -4668,7 +4671,7 @@ async function pintarEndoso() {
     /* Un rango, no una cifra: la retención del voto propio varía mucho entre
        personas, y un solo número escondería esa dispersión. */
     $('crmEndosoTitulo').textContent = L.bajo === L.alto ? `Sus aliados le pueden pasar hasta ${cifra(L.total)} votos.` : `Sus aliados le pueden pasar entre ${cifra(L.bajo)} y ${cifra(L.alto)} votos.`;
-    $('crmEndosoCopy').textContent = `${n === 1 ? 'Su aliado tiene' : `Sus ${n} aliados tienen`} ${cifra(L.techo)} votos en ${L.lugar}${meta ? `; el punto medio es el ${Math.round(L.total / meta * 100)} % de su meta` : ''}. ${medidos ? `${medidos} ${medidos === 1 ? 'tasa sale medida' : 'tasas salen medidas'} con a quién apoyaron antes.` : 'Diga a quién apoyó cada uno para medir su tasa: hoy se estima con lo que conserva cada uno de su propio voto.'}`;
+    $('crmEndosoCopy').textContent = `${n === 1 ? 'Su aliado tiene' : `Sus ${n} aliados tienen`} ${cifra(L.techo)} votos en ${L.lugar}${meta ? `; el punto medio es el ${Math.round(L.total / meta * 100)} % de su meta` : ''}${L.dobleConteo > 0 ? `, sin contar dos veces a quien votó por más de uno` : ''}. ${medidos ? `${medidos} ${medidos === 1 ? 'tasa sale medida' : 'tasas salen medidas'} con a quién apoyaron antes.` : 'Diga a quién apoyó cada uno para medir su tasa: hoy se estima con lo que conserva cada uno de su propio voto.'}`;
     $('crmEndosoDato').textContent = L.total.toLocaleString('es-CO');
     $('crmEndosoSub').textContent = `votos, punto medio · ${n} ${n === 1 ? 'aliado' : 'aliados'}`;
   } catch (e) {

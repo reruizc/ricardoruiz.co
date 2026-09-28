@@ -97,6 +97,13 @@
       </div>
     </section>
 
+    <section class="panel hidden" id="enSolapeSec">
+      <span class="panel-num">04 · Dónde se pisan</span>
+      <h3>Qué aliados trabajan los mismos puestos.</h3>
+      <p id="enSolapeCopy"></p>
+      <ul class="arq-lista" id="enSolapes"></ul>
+    </section>
+
     <p class="puntaje-nota panel-nota" id="enNota"></p>
   </div>
 </div></main>
@@ -106,7 +113,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="partidos-bloques.js?v=20260922"></script>
 <script src="candidato-360-electorado.js?v=20260927b"></script>
-<script src="candidato-360-endoso.js?v=20260928d"></script>
+<script src="candidato-360-endoso.js?v=20260928e"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
 <script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
@@ -220,7 +227,7 @@
     if (!ST.aliados.length) {
       ST.lectura = null;
       lista.innerHTML = '<p class="helper">Todavía no hay aliados. Búsquelos por nombre arriba.</p>';
-      ['enTotalSec', 'enMapaSec'].forEach(id => $(id).classList.add('hidden'));
+      ['enTotalSec', 'enMapaSec', 'enSolapeSec'].forEach(id => $(id).classList.add('hidden'));
       $('enNota').innerHTML = nota(null);
       return;
     }
@@ -228,12 +235,12 @@
     window.Candi?.calculo?.(true, '¡Estoy midiendo a tus aliados, mesa por mesa!');
     let L;
     try {
-      L = await E.evaluar(ST.aliados, { alcance: ST.alcance, lugar: ST.lugar, enAlcance: E.enAlcance, areaDe: (m, a) => P.lugar(E.areaDe(m, a)), propio: ST.propio });
+      L = await E.evaluar(ST.aliados, { alcance: ST.alcance, lugar: ST.lugar, enAlcance: E.enAlcance, areaDe: (m, a) => P.lugar(E.areaDe(m, a)), propio: ST.propio, corpCampana: ST.corp });
     } catch (e) { lista.innerHTML = '<p class="helper">No pudimos leer la votación de sus aliados. Intente de nuevo.</p>'; return; }
     finally { window.Candi?.calculo?.(false); }
     if (turno !== ST.turno) return;   /* llegó otro cambio mientras calculaba */
     ST.lectura = L;
-    pintarFichas(L); pintarTotal(L); pintarMapa(L);
+    pintarFichas(L); pintarTotal(L); pintarMapa(L); pintarSolapes(L);
     $('enNota').innerHTML = nota(L);
   }
 
@@ -279,7 +286,25 @@
     const medidos = L.filas.filter(f => f.fuente === 'medida' || f.fuente === 'regresion').length, conReg = L.filas.filter(f => f.fuente === 'regresion').length;
     $('enTotalCopy').innerHTML = (medidos ? `${medidos === 1 ? 'Una tasa sale medida' : `${medidos} tasas salen medidas`} con a quién apoyaron antes${conReg ? ` (${conReg === medidos ? (conReg === 1 ? 'con' : 'todas con') : `${conReg} con`} regresión puesto a puesto)` : ''}.` : 'Ninguna tasa está medida con a quién apoyaron antes.')
       + (sinMedir ? ` ${sinMedir === 1 ? 'Un aliado se estima' : `${sinMedir} aliados se estiman`} con lo que conserva de su propio voto quien repite en su corporación: es lo más que podría mover.` : '')
-      + ' El rango sale de cuánto varía esa retención entre personas: el extremo bajo es el cuarto que menos conserva, el alto el que más.';
+      + ' El rango sale de cuánto varía esa retención entre personas: el extremo bajo es el cuarto que menos conserva, el alto el que más.'
+      + (L.filas.filter(f => !f.error && f.terr).length > 1 ? dobleTexto(L) : '');
+  }
+
+  /* Lo que se descontó por votar por dos aliados, y el extremo opuesto. */
+  function dobleTexto(L) {
+    const base = L.denominador ? '' : ' No tenemos el electorado de 2023 de su corporación, así que en los puestos compartidos se suma.';
+    return `<br><br><b>Sin contar dos veces.</b> Sumando a cada aliado por separado serían ${num(L.suma.total)}; ${L.dobleConteo > 0 ? `${num(L.dobleConteo)} votos se descuentan` : 'no hay nada que descontar'} porque votan en los mismos puestos y parte de esa gente votó por los dos. Ese descuento supone que sus votantes son gente distinta; si en cada puesto fueran los mismos —lo probable cuando los aliados son de la misma corriente—, el punto medio bajaría a <b>${num(L.siSeRepiten)}</b>. La tabla de abajo dice qué aliados se pisan.${base}`;
+  }
+
+  /* ── Dónde se pisan ───────────────────────────────────────────────────── */
+  function pintarSolapes(L) {
+    const pares = E.solapes(L), sec = $('enSolapeSec');
+    if (!pares.length) { sec.classList.add('hidden'); return; }
+    sec.classList.remove('hidden');
+    const nom = i => esc(P.lugar(L.filas[i].al.nombre));
+    $('enSolapes').innerHTML = pares.slice(0, 15).map(x => `<li><span class="arq-punto" style="background:${x.coincidencia >= .6 ? '#c88a2e' : 'var(--green)'}"></span><b>${pct0(x.coincidencia)}</b> ${nom(x.i)} <span style="color:var(--muted)">y</span> ${nom(x.j)}<em>${num(x.puestos)} puestos</em></li>`).join('');
+    const fuertes = pares.filter(x => x.coincidencia >= .6).length;
+    $('enSolapeCopy').innerHTML = `Para cada par, qué parte de los votos del más chico cae en puestos donde el otro también saca votos. ${fuertes ? `<b>${num(fuertes)} ${fuertes === 1 ? 'par se pisa' : 'pares se pisan'}</b> en más del 60 %: ahí sumarlos es contar dos veces a buena parte de la misma gente, y conviene que trabajen territorios distintos.` : 'Ningún par se pisa en más del 60 %: sus territorios se complementan.'} Es geografía, no votantes: dice dónde puede haber doble conteo, no cuánto lo hay.`;
   }
 
   /* ── El mapa: los puestos con endoso ───────────────────────────────── */
@@ -305,7 +330,7 @@
       const partes = Object.entries(p.porAliado).sort((a, b) => b[1] - a[1]), dom = Number(partes[0][0]);
       const detalle = partes.slice(0, 3).map(([i, v]) => `${esc(P.lugar(L.filas[i].al.nombre))}: ${num(Math.round(v))}`).join('<br>');
       return window.L.circleMarker([g.lat, g.lng], { radius: 3 + 15 * Math.sqrt(p.total / tope), color: '#fff', weight: 1, fillColor: colorDe(dom), fillOpacity: .78 })
-        .bindTooltip(`<b>${esc(P.lugar(g.nombre || p.nombre))}</b><br>${esc(P.lugar(g.barrio || p.comNom || p.munNom))}<br>Hasta <b>${num(Math.round(p.total))}</b> votos de endoso<br>${detalle}`, { sticky: true, className: 'tp' });
+        .bindTooltip(`<b>${esc(P.lugar(g.nombre || p.nombre))}</b><br>${esc(P.lugar(g.barrio || p.comNom || p.munNom))}<br><b>${num(Math.round(p.total))}</b> votos de endoso (punto medio)${p.aliados > 1 ? `, ya sin contar dos veces a quien votó por ${p.aliados === 2 ? 'los dos' : `varios de sus ${p.aliados} aliados`}` : ''}<br>${detalle}`, { sticky: true, className: 'tp' });
     })).addTo(ST.mapa);
     const sin = puestos.length - conPunto.length;
     $('enMapaCopy').textContent = `Cada círculo es un puesto de votación: el tamaño es cuánto le pueden pasar ahí y el color, qué aliado pesa más.${sin ? ` ${num(sin)} puesto${sin === 1 ? '' : 's'} sin coordenada publicada no ${sin === 1 ? 'aparece' : 'aparecen'} en el mapa, pero sí ${sin === 1 ? 'cuenta' : 'cuentan'} en las cifras.` : ''}`;
@@ -326,7 +351,7 @@
 
   function nota(L) {
     const supuesto = L?.filas.some(f => f.fuente === 'supuesto');
-    return `<b>Es una estimación, y es un techo.</b> La tasa medida es la del método de endoso de la plataforma: la suma, mesa por mesa, de lo que el aliado y la persona que apoyó pudieron compartir. Dice cuánto electorado cabía en común, no cuánto se pasó; por eso queda como techo. Cuando tenemos los votos válidos de cada puesto en las dos elecciones, el centro del rango sale de una regresión puesto a puesto (incluidos los puestos donde el aliado no sacó votos), que estima qué parte de sus votantes votó por la persona que apoyó. Mide votantes compartidos, no convencidos: si los dos son de la misma corriente, parte de esa cifra es afinidad y no endoso. Encima va el tiempo: nadie le pasa a otro más de lo que conservaría de su propio voto si se lanzara él mismo, y eso lo medimos con las personas que repitieron en la misma corporación entre 2011 y 2023 (o en el Congreso entre 2014 y 2022), puesto por puesto. Quien repite suele ser a quien le fue bien, así que esa retención es generosa: es un techo, no un promedio. No le sumamos el crecimiento del censo a 2027 porque la retención ya se midió con el electorado de cada año. Si son elecciones distintas se compara por puesto, porque las mesas se rearman con cada censo; si compitieron en el mismo tarjetón no hay nada que medir, porque nadie pudo votar por los dos. Los votos son los de la última elección de cada aliado y solo cuentan los que caen en ${esc(ST.lugar).replace(/\.?$/, '.')} Si dos aliados trabajan los mismos barrios, sus votos se pueden estar contando dos veces.${supuesto ? ` Donde no hay medición usamos un <b>supuesto del ${Math.round(E.SUPUESTO * 100)} %</b>: cámbielo por el suyo.` : ''} La lista de aliados vive en este navegador: no la guardamos en el servidor.`;
+    return `<b>Es una estimación, y es un techo.</b> La tasa medida es la del método de endoso de la plataforma: la suma, mesa por mesa, de lo que el aliado y la persona que apoyó pudieron compartir. Dice cuánto electorado cabía en común, no cuánto se pasó; por eso queda como techo. Cuando tenemos los votos válidos de cada puesto en las dos elecciones, el centro del rango sale de una regresión puesto a puesto (incluidos los puestos donde el aliado no sacó votos), que estima qué parte de sus votantes votó por la persona que apoyó. Mide votantes compartidos, no convencidos: si los dos son de la misma corriente, parte de esa cifra es afinidad y no endoso. Encima va el tiempo: nadie le pasa a otro más de lo que conservaría de su propio voto si se lanzara él mismo, y eso lo medimos con las personas que repitieron en la misma corporación entre 2011 y 2023 (o en el Congreso entre 2014 y 2022), puesto por puesto. Quien repite suele ser a quien le fue bien, así que esa retención es generosa: es un techo, no un promedio. No le sumamos el crecimiento del censo a 2027 porque la retención ya se midió con el electorado de cada año. Si son elecciones distintas se compara por puesto, porque las mesas se rearman con cada censo; si compitieron en el mismo tarjetón no hay nada que medir, porque nadie pudo votar por los dos. Los votos son los de la última elección de cada aliado y solo cuentan los que caen en ${esc(ST.lugar).replace(/\.?$/, '.')} Si dos aliados trabajan los mismos puestos, no se suman: en cada puesto se combinan contra el electorado de su corporación en 2023, suponiendo que alcanzan a gente distinta; si son de la misma corriente el solape real es mayor, y por eso el total dice también cuánto quedaría si fueran los mismos votantes.${supuesto ? ` Donde no hay medición usamos un <b>supuesto del ${Math.round(E.SUPUESTO * 100)} %</b>: cámbielo por el suyo.` : ''} La lista de aliados vive en este navegador: no la guardamos en el servidor.`;
   }
 
   window.EN = A;
@@ -339,6 +364,7 @@
   ST.clave = E.clave(P.SESION.user?.email, E.candidaturaId(v));
   ST.aliados = E.cargar(ST.clave);
   ST.meta = Number(v?.campana?.meta || 0);
+  ST.corp = v?.campana?.corp || E.corpHistorica(v?.candidato);
   const slugs = v?.tipo === 'historial' ? (v.candidato?.slugs || []) : [];
   /* Sus mesas: las de su última candidatura, como en el CRM (ahí se mide el
      solape con lo que ya tiene y, en «la misma corporación», el territorio). */

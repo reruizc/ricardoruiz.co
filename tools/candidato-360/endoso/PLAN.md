@@ -95,7 +95,7 @@ suman menos que por separado; dos de barrios distintos suman casi completo.
 | 2 ✅ | Panel `candidato-360-endoso.html` con los excandidatos: ficha por aliado, mapa de sus votos en el territorio, tasa con su método, total. La tarjeta 08 pasa a enlace (como 06 y 09); se retira el modal. | **hecho 27-sep-2026** |
 | 3 ✅ | D3 calibración de retención → reemplaza el 30 %. Rango piso/probable/techo. Crecimiento 2027 (decidido no sumarlo, ver bitácora). | **hecho 27-sep-2026** |
 | 4 ✅ | D1 totales por puesto (2023 primero) → regresión ecológica en la fórmula A. | **hecho 28-sep-2026** |
-| 5 | Unión probabilística por puesto + mapa combinado + matriz de solape entre aliados. | sin doble conteo |
+| 5 ✅ | Unión probabilística por puesto + mapa combinado + matriz de solape entre aliados. | **hecho 28-sep-2026** |
 | 6 | Líder de zona: selector de zona en el mapa, sobre-rendimiento, DiD, «maneja N votos» contrastado. | fórmula B |
 | 7 | Integración: % de la meta por escalón, puestos donde el endoso cierra la brecha → Día D, CSV, entrada en `VISTAS` de Candi + `C360_CANDI_VISTAS` del worker, `candidato-360.md`. | cierre |
 
@@ -217,6 +217,27 @@ baja de 137.205 a 116.819.
 
 Pendiente de esta línea: Congreso 2026 (la fuente `endoso`) y presidenciales no
 tienen totales por puesto todavía; sus pares siguen con Σ min + retención.
+
+**Fase 5 (28-sep-2026).** Los aliados ya no se suman: en cada puesto se combinan
+`V · (1 − Π (1 − e_i / V))`, con V = los válidos 2023 de la corporación de la
+campaña (`corpCampana`, que el CRM y el panel sacan de la campaña guardada; el
+archivo es el mismo `totales-puesto/` de la fase 4). Se aplica a los tres niveles
+del rango; el mapa y «dónde se concentra» salen de la unión, con la parte de cada
+aliado en proporción. `solapes()` da, para cada par, qué parte de los votos del
+más chico cae en puestos del otro (Σ min ÷ min de los dos totales).
+
+⚠️ **Lo que se midió y hay que tener presente:** la unión con votantes
+independientes corrige POCO — en el caso de control de 6 aliados de Bogotá,
+1.488 votos de 116.819 (1,3 %) — porque cada aliado aporta poco frente a los
+3.000-5.000 válidos de un puesto. La geografía, en cambio, se pisa mucho: los dos
+ediles de Suba 2023 coinciden en un 94 %. Si los aliados son de la misma
+corriente sus votantes son en buena parte los mismos y el solape real es mucho
+mayor que el de la unión. Por eso la lectura trae `siSeRepiten` —si en cada
+puesto los votantes fueran los mismos, solo cuenta el aliado más fuerte— y el
+panel dice los dos extremos juntos (4 aliados: sumados 47.286, unión 46.913, si
+se repiten 36.851). No se endureció la fórmula a ciegas: medir el solape de
+votantes entre dos aliados es otra regresión (aliado i contra aliado j) y queda
+como mejora posible.
 
 ## Decisiones abiertas (de Ricardo)
 

@@ -114,6 +114,27 @@ ok(E.corpRetencion({ corp: 'CÁMARA · ANTIOQUIA · 2022' }) === 'camara' && E.c
   ok(L4.filas[0].fuente === 'regresion' && cerca(L4.filas[0].tasa, .5) && cerca(L4.filas[0].tasaBaja, .2), 'la regresión entra al rango acotada por la retención (60 % → 50 % a 8 años; piso 20 %)');
 }
 
+/* Sin contar dos veces (fase 5): la unión por puesto con números conocidos. */
+{
+  const M2 = (pue, v) => ({ dep: '16', mun: '001', zon: '01', pue, mesa: '1', v, pueNom: 'P' + pue, comNom: '01USAQUEN' });
+  const D = { a: [M2('01', 300), M2('02', 200)], b: [M2('01', 300)], c: [M2('03', 100)] };
+  const den = { [E.codigoPuesto(M2('01'))]: [1000, 1100, 10], [E.codigoPuesto(M2('02'))]: [1000, 1100, 10] };
+  const al = u => ({ slug: u, nombre: u, corp: 'JAL · 2023', dataUrl: u, manual: 100 });
+  const opts = { alcance, enAlcance, mesasDe: async u => D[u], totalesDe: async () => den, corpCampana: 'concejo', areaDe: m => m.pueNom };
+  const U = await E.evaluar([al('a'), al('b'), al('c')], opts);
+  const p1 = U.puestos.find(p => p.nombre === 'P01');
+  ok(cerca(p1.total, 1000 * (1 - .7 * .7)) && p1.aliados === 2, `dos aliados de 300 en un puesto de 1.000 votantes: 510, no 600 (${p1.total})`);
+  ok(U.total === 510 + 200 + 100 && U.suma.total === 900 && U.dobleConteo === 90, `el puesto de un solo aliado suma completo; el doble conteo evitado es 90 (${U.total} de ${U.suma.total})`);
+  ok(U.sinDenominador.puestos === 0 && U.denominador === 'concejo-2023', 'el electorado sale de los válidos 2023 de la corporación de la campaña');
+  ok(U.siSeRepiten === 300 + 200 + 100, 'si los votantes se repitieran en cada puesto, solo cuenta el aliado más fuerte de cada uno (600)');
+  ok(cerca(Object.values(p1.porAliado).reduce((t, x) => t + x, 0), p1.total), 'lo de cada aliado en un puesto suma la unión (para el mapa)');
+  ok(U.areas[0].nombre === 'P01' && U.areas[0].v === 510, 'dónde se concentra, ya sin doble conteo');
+  const S = await E.evaluar([al('a'), al('b'), al('c')], { ...opts, totalesDe: async () => ({}) });
+  ok(S.total === 900 && S.sinDenominador.puestos === 1, 'sin el electorado del puesto se suma, y se cuenta cuántos puestos quedaron así');
+  const sol = E.solapes(U);
+  ok(sol[0].i === 0 && sol[0].j === 1 && cerca(sol[0].coincidencia, 1) && sol.find(x => x.j === 2).coincidencia === 0, 'solape: el aliado b vive entero dentro de la huella de a; c no comparte puestos');
+}
+
 /* El territorio desde la campaña guardada (lo que usa el panel). */
 const codigo = async (dep, nombre) => ({ 'BOGOTÁ, D.C.': '001', 'LA CEJA': '021' }[nombre] || '');
 let al = await E.alcanceDe({ campana: { corp: 'asamblea', ruta: 'other', departamento: '01', departamentoNombre: 'Antioquia' } });
@@ -166,9 +187,12 @@ if (!process.argv.includes('--sin-red')) {
     const Lr = await E.evaluar([
       { ...ROJAS, apoyo: BAENA }, { ...RAMIREZ, apoyo: BAENA }, { ...ABIS, apoyo: GALAN },
       { ...FORERO, apoyo: ABIS }, { ...SEPUL, manual: 12 }, { ...BRICENO },
-    ], { alcance: { tipo: 'municipio', departamento: '16', municipio: '1' }, enAlcance, propio });
+    ], { alcance: { tipo: 'municipio', departamento: '16', municipio: '1' }, enAlcance, propio, corpCampana: 'concejo' });
     const f = Lr.filas;
-    ok(Lr.bajo === 68008 && Lr.total === 116819 && Lr.alto === 167888 && Lr.techo === 207208, `real · entre 68.008 y 167.888, punto medio 116.819, de 207.208 (${Lr.bajo} · ${Lr.total} · ${Lr.alto} de ${Lr.techo})`);
+    ok(Lr.bajo === 67581 && Lr.total === 115331 && Lr.alto === 164590 && Lr.suma.total === 116819 && Lr.dobleConteo === 1488, `real · sin doble conteo: entre 67.581 y 164.590, punto medio 115.331 (sumados eran 116.819) (${Lr.bajo} · ${Lr.total} · ${Lr.alto})`);
+    ok(Lr.denominador === 'concejo-2023' && Lr.sinDenominador.puestos === 0 && Lr.puestos.length === 950, 'real · el electorado de los 950 puestos sale del Concejo 2023');
+    const sol = E.solapes(Lr);
+    ok(sol[0].i === 1 && sol[0].j === 4 && Math.abs(sol[0].coincidencia - .941) < .001, 'real · los dos ediles de Suba 2023 son el par que más se pisa (94 %)');
     ok(f[0].fuente === 'regresion' && f[0].reg.n === 86 && f[0].estAlto === 8117 && f[0].est === 5670, 'real · JAL Suba 2019 → Concejo 2023: la regresión (89 %) queda acotada por la retención de un edil a 8 años; techo Σ min');
     ok(f[1].fuente === 'regresion' && Math.abs(f[1].reg.tau - .425) < .001 && f[1].est === 5168 && f[1].estAlto === 8291, 'real · JAL Suba 2023 → Concejo 2023: la regresión da 42,5 % (Σ min decía 68 %)');
     ok(!f[2].par.valida && f[2].fuente === 'regresion' && Math.abs(f[2].reg.tau - .377) < .001 && f[2].reg.alfa > f[2].reg.tau, 'real · concejal → Galán: Σ min saturado, pero la regresión sí mide (38 %, y el resto de Bogotá votó más por Galán que sus votantes)');

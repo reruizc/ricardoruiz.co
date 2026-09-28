@@ -212,7 +212,10 @@
        propio     mesas del historial del candidato, para medir el solape
        mesasDe    url → Promise<mesas>; por defecto el fetch con caché
        retencion  otra tabla de retención (las pruebas); por defecto la medida
-       totalesDe  nombre → Promise<{puesto: [válidos, votantes, blanco]}>; las pruebas */
+       totalesDe  nombre → Promise<{puesto: [válidos, votantes, blanco]}>; las pruebas
+       corpCampana la corporación a la que se lanza (jal, concejo, alcaldia,
+                   asamblea, gobernacion): de ahí sale el electorado de cada
+                   puesto para no contar dos veces a los aliados */
   async function evaluar(aliados, opts = {}) {
     const { alcance = null, lugar = 'su territorio', enAlcance, areaDe, mesasDe = mesas } = opts;
     const propio = opts.propio ? agrupar(opts.propio, llavePuesto) : null;
@@ -230,7 +233,7 @@
     }));
     const medidas = filas.filter(f => f.par?.valida).map(f => f.par.tasa).sort((a, b) => a - b), nM = medidas.length;
     const mediana = !nM ? null : nM % 2 ? medidas[(nM - 1) / 2] : (medidas[nM / 2 - 1] + medidas[nM / 2]) / 2;
-    let total = 0, bajo = 0, alto = 0, techo = 0; const porArea = {};
+    let techo = 0; const sumas = [0, 0, 0];
     filas.forEach(f => {
       if (f.error) return;
       f.ret = retencionDe(f.al, opts.retencion || RETENCION);
@@ -250,14 +253,79 @@
       else { r = [SUPUESTO, SUPUESTO, SUPUESTO]; f.fuente = 'supuesto'; }
       [f.tasaBaja, f.tasa, f.tasaAlta] = r;
       f.estBajo = Math.round(f.terr * r[0]); f.est = Math.round(f.terr * r[1]); f.estAlto = Math.round(f.terr * r[2]);
-      total += f.est; bajo += f.estBajo; alto += f.estAlto; techo += f.terr;
-      if (areaDe) f.dentro.forEach(m => {
-        const area = areaDe(m, alcance);
-        if (area) porArea[area] = (porArea[area] || 0) + Number(m.v || 0) * f.tasa;
+      sumas[0] += f.estBajo; sumas[1] += f.est; sumas[2] += f.estAlto; techo += f.terr;
+    });
+
+    /* ── Sin contar dos veces (fase 5) ───────────────────────────────────
+       Dos aliados que trabajan el mismo puesto no le pasan la suma de los
+       dos: parte de quienes votaron por uno también votaron por el otro. Por
+       puesto, con V = el electorado del puesto, lo que llega es
+           V · (1 − Π (1 − e_i / V))
+       la probabilidad de que un votante sea alcanzado por al menos uno,
+       suponiendo que alcanzan a gente independiente. Con aportes chicos frente
+       a V es casi la suma; con dos aliados fuertes en el mismo puesto, bastante
+       menos. Si los dos son de la misma corriente el solape real es MAYOR que
+       este, así que la unión sigue siendo generosa.
+       V son los votos válidos de 2023 de la corporación a la que se lanza la
+       campaña (totales-puesto/{corp}-2023.json). Sin ese dato, en ese puesto
+       se suma, y se cuenta cuántos votos quedaron así. */
+    let den = null;
+    if (opts.corpCampana) { try { den = await (opts.totalesDe || totales)(`${opts.corpCampana}-2023`); } catch { den = null; } }
+    const porK = new Map();
+    filas.forEach((f, i) => {
+      if (f.error || !f.terr) return;
+      f.dentro.forEach(m => {
+        const v = Number(m.v || 0); if (!v) return;
+        const k = codigoPuesto(m);
+        if (!porK.has(k)) porK.set(k, { code: k, nombre: m.pueNom || '', munNom: m.munNom || '', comNom: nombreLocal(m), area: areaDe ? areaDe(m, alcance) : '', votos: 0, e: {} });
+        const p = porK.get(k); p.votos += v;
+        const e = p.e[i] || (p.e[i] = [0, 0, 0]); e[0] += v * f.tasaBaja; e[1] += v * f.tasa; e[2] += v * f.tasaAlta;
       });
     });
+    /* El extremo opuesto, para decirlo junto: si en cada puesto los votantes de
+       los aliados fueran LOS MISMOS, solo contaría el aporte del más fuerte. La
+       unión supone lo contrario (gente independiente); la verdad está entre los
+       dos, más cerca de este cuando los aliados son de la misma corriente. */
+    const union = [0, 0, 0], porArea = {}; let sinDen = 0, votosSinDen = 0, siSeRepiten = 0;
+    const puestos = [...porK.values()].map(p => {
+      const V = den?.[p.code]?.[0] || 0, aportes = Object.values(p.e);
+      const u = [0, 1, 2].map(l => {
+        const s = aportes.reduce((t, e) => t + e[l], 0);
+        if (!V || aportes.length === 1) return s;
+        return V * (1 - aportes.reduce((t, e) => t * (1 - Math.min(1, e[l] / V)), 1));
+      });
+      if (!V && aportes.length > 1) { sinDen++; votosSinDen += u[1]; }
+      siSeRepiten += Math.max(...aportes.map(e => e[1]));
+      u.forEach((x, l) => { union[l] += x; });
+      if (p.area) porArea[p.area] = (porArea[p.area] || 0) + u[1];
+      /* porAliado en la escala de la unión: cada uno con su parte proporcional. */
+      const sMed = aportes.reduce((t, e) => t + e[1], 0) || 1, porAliado = {};
+      Object.entries(p.e).forEach(([i, e]) => { porAliado[i] = e[1] / sMed * u[1]; });
+      return { code: p.code, nombre: p.nombre, munNom: p.munNom, comNom: p.comNom, votos: p.votos, V, total: u[1], bajo: u[0], alto: u[2], suma: aportes.reduce((t, e) => t + e[1], 0), aliados: aportes.length, porAliado };
+    }).sort((a, b) => b.total - a.total);
     const areas = Object.entries(porArea).map(([nombre, v]) => ({ nombre, v: Math.round(v) })).filter(a => a.v > 0).sort((a, b) => b.v - a.v);
-    return { alcance, lugar, filas, total, bajo, alto, techo, mediana, nMedidas: nM, areas };
+    const [bajo, total, alto] = union.map(Math.round);
+    return { alcance, lugar, filas, total, bajo, alto, techo, mediana, nMedidas: nM, areas, puestos,
+      suma: { bajo: sumas[0], total: sumas[1], alto: sumas[2] }, dobleConteo: sumas[1] - total, siSeRepiten: Math.round(siSeRepiten),
+      denominador: den ? `${opts.corpCampana}-2023` : null, sinDenominador: { puestos: sinDen, votos: Math.round(votosSinDen) } };
+  }
+
+  /* ── Cuánto se pisan dos aliados ───────────────────────────────────────
+     Para cada par: qué parte de los votos del más chico cae en puestos donde
+     el otro también saca votos, Σ min(a, b) ÷ min(Σa, Σb), dentro del
+     territorio. 100 % = el chico vive dentro de la huella del grande; 0 % =
+     no comparten un solo puesto. Es geografía, no votantes: dice dónde puede
+     haber doble conteo, no cuánto lo hay. */
+  function solapes(lectura) {
+    const fs = (lectura?.filas || []).map((f, i) => ({ f, i })).filter(({ f }) => !f.error && f.terr > 0);
+    const por = fs.map(({ f }) => agrupar(f.dentro, codigoPuesto));
+    const out = [];
+    for (let a = 0; a < fs.length; a++) for (let b = a + 1; b < fs.length; b++) {
+      const A = por[a], B = por[b]; let m = 0, puestos = 0;
+      Object.entries(A).forEach(([k, v]) => { const w = B[k] || 0; if (w) { m += Math.min(v, w); puestos++; } });
+      out.push({ i: fs[a].i, j: fs[b].i, coincidencia: m / Math.min(fs[a].f.terr, fs[b].f.terr), puestos });
+    }
+    return out.sort((x, y) => y.coincidencia - x.coincidencia);
   }
 
   /* ── El territorio de la campaña ───────────────────────────────────────
@@ -341,6 +409,7 @@
   const pad = (v, n) => String(v || '').replace(/\D/g, '').padStart(n, '0');
   const codigoPuesto = m => pad(m.dep, 2) + pad(m.mun, 3) + pad(m.zon, 2) + String(m.pue == null ? '' : m.pue).trim().toUpperCase().padStart(2, '0');
   function porPuesto(lectura) {
+    if (lectura?.puestos) return lectura.puestos;   /* ya viene con la unión (fase 5) */
     const o = new Map();
     (lectura?.filas || []).forEach((f, i) => {
       if (f.error || !f.tasa) return;
@@ -376,6 +445,6 @@
     transferencia: 'elecciones distintas: transferencia entre fechas, comparada por puesto',
   };
 
-  global.C360Endoso = { SUPUESTO, SATURACION, MAX, FUENTE, CLASE, anio, corp, clase, ficha, mesas, suma, llavePuesto, llaveMesa, agrupar, medirPar, regresion, eleccionDe, evaluar, retencionDe, corpRetencion, RETENCION,
+  global.C360Endoso = { SUPUESTO, SATURACION, MAX, FUENTE, CLASE, anio, corp, clase, ficha, mesas, suma, llavePuesto, llaveMesa, agrupar, medirPar, regresion, eleccionDe, evaluar, solapes, retencionDe, corpRetencion, RETENCION,
     enAlcance, areaDe, corpHistorica, municipioMayoritario, alcanceDe, codigoPuesto, porPuesto, clave, candidaturaId, cargar, guardar };
 })(typeof window !== 'undefined' ? window : globalThis);
