@@ -211,7 +211,7 @@
        Isla Fuerte, a 100 km al sur, y encuadrar por ella deja el casco urbano
        8 veces más pequeño de lo que cabe. Las islas siguen en el mapa; hay
        que alejar para verlas. */
-    { match: ['CARTAGENA'], path: 'CARTAGENA-UCG.json', unidad: 'comuna', code: p => String(p.CODIGO || ''), name: p => p.NOMBRE || 'UCG', barrios: 'cartagena', ventana: { sur: 10.275, norte: 10.47, oeste: -75.58, este: -75.415 } },
+    { match: ['CARTAGENA'], path: 'CARTAGENA-UCG.json', unidad: 'comuna', code: p => String(p.CODIGO || ''), name: p => p.NOMBRE || 'UCG', barrios: 'cartagena', ventana: { sur: 10.275, norte: 10.47, oeste: -75.58, este: -75.415 }, ventanaBarrios: true, localidades: 'CARTAGENA-LOCALIDADES.json', rotuloUnidad: 'UCG' },
     { match: ['MONTERIA'], path: 'MONTERIAX.json', unidad: 'comuna', code: p => String(p.CC_COMUNA || '').padStart(2, '0'), name: p => p.NMG || 'Comuna' },
     { match: ['MANIZALES'], path: 'MANIZALESX.json', unidad: 'comuna', code: p => String(p.ID_COMUNA || '').padStart(2, '0'), name: p => p.NOMBRES_CO || 'Comuna' },
     { match: ['BUCARAMANGA'], path: 'BUCARAMANGAX.json', unidad: 'comuna', code: p => String(p.COD_COMUNA || '').padStart(2, '0'), name: p => p.NOMBRE_COM || 'Comuna' },

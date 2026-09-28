@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="candidato-360-candi.css?v=20260921d">
 <style>
 /* El chasis del panel, igual que en medios y redes. */
-.panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
+.panel-shell{max-width:1320px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
 .panel-hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:30px}
 /* El h1 de la casa tiene max-width:9ch (está pensado para la portada): acá el
    titular es una frase, así que se le devuelve el ancho. */
@@ -134,6 +134,24 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
 .leaflet-tooltip.tp b{font-family:var(--display)}
 .leaflet-tooltip.tp:before{display:none}
 .fondo{margin-top:26px}
+/* ── La barra de control ─────────────────────────────────────────────────── */
+.elec-control{background:#fffdf8;border:1px solid var(--line);margin:0 0 16px;padding:12px 14px 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.kpi{background:#fffdf8;padding:10px 12px;min-width:0}
+.kpi b{display:block;font:800 22px/1.05 var(--display);letter-spacing:-.02em;color:var(--ink);white-space:nowrap}
+.kpi span{display:block;font:500 9.5px/1.35 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-top:5px}
+.kpi small{display:block;font-size:11px;color:var(--muted);margin-top:3px}
+.kpi.sube b{color:var(--forest)}.kpi.baja b{color:#b4543f}
+.tabs{display:flex;gap:2px;overflow-x:auto;margin-top:10px;scrollbar-width:none}
+.tabs button{flex:none;border:0;border-bottom:3px solid transparent;background:none;padding:10px 12px 9px;font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);cursor:pointer}
+.tabs button.active{color:var(--ink);border-bottom-color:var(--coral)}
+.tabs button:hover{color:var(--ink)}
+[data-tab].oculto{display:none}
+.mapa-fila{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 8px}
+.mapa-fila .rot{font:600 9.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);min-width:64px}
+.mapa-toggle.capa{border-color:var(--line);color:var(--ink)}
+.mapa-toggle.capa.active{background:var(--forest);border-color:var(--forest);color:#fff}
+
 .fondo>summary{cursor:pointer;font:600 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--green);padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:16px;list-style:none}
 .fondo>summary::-webkit-details-marker{display:none}
 .fondo>summary:before{content:'+ ';}
@@ -159,10 +177,15 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     <p>El voto es secreto: <b>nadie</b> puede decir quién votó por usted. Lo que sí se puede es describir <b>quién puede votar en cada puesto</b> —sexo y edad, con el censo electoral de 2026— y cruzarlo con <b>dónde saca votos su familia política</b>. De ahí salen los perfiles de votante que mejor le rinden y el mapa de dónde pesan más. Es una lectura del terreno, no de sus votantes.</p>
     <span class="panel-candidatura" id="panelCandidatura"></span>
   </header>
+  <!-- La barra de control: el territorio en cifras y las pestañas de lectura. -->
+  <div class="elec-control hidden" id="elecControl">
+    <div class="kpis" id="elecKpis"></div>
+    <nav class="tabs" id="elecTabs" aria-label="Lecturas del electorado"></nav>
+  </div>
   <div id="panelMuro" class="hidden"></div>
   <div id="panelCuerpo">
     <div id="elecCargando" class="panel"><p class="helper" style="margin:0">Leyendo quién puede votar en los puestos de su territorio…</p></div>
-    <div id="elecTres" class="tres hidden">
+    <div id="elecTres" class="tres hidden" data-tab="mapa">
       <div class="tres-col">
         <section class="panel" id="tpPerfiles"><span class="panel-num">01 · Perfiles de votante</span><h3 id="tpPerfilesTitulo">Los que mejor le rinden.</h3><p id="tpPerfilesCopy"></p><div class="perfil-lista" id="perfilLista"></div></section>
         <section class="panel" id="tpLectura"><span class="panel-num">02 · Lectura</span><div class="lectura" id="lectura"></div></section>
@@ -174,8 +197,8 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
         <p class="mapa-nota" id="mapaNota"></p>
       </section>
     </div>
-    <div id="elecAviso" class="hidden"></div>
-    <details class="fondo" id="elecFondo"><summary>Las lecturas de fondo: sexo, edad, campo y ciudad, familias, la votación objetivo y dónde creció el censo</summary><div id="elecAnalisis"></div></details>
+    <div id="elecAviso" class="hidden" data-tab="mapa"></div>
+    <div id="elecAnalisis"></div>
     <p class="panel-nota" id="elecNota"></p>
   </div>
 </div></main>
@@ -183,7 +206,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
 <script src="partidos-bloques.js?v=20260922"></script>
-<script src="candidato-360-electorado.js?v=20260927b"></script>
+<script src="candidato-360-electorado.js?v=20260928"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
 <script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
@@ -359,7 +382,59 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
 
 
   /* ═══ Los tres paneles ═══════════════════════════════════════════════════ */
-  const ST = { perfil: null, famLabel: '', famSet: null, ampliada: false, modo: '', unidades: [], ref: null, cfg: null, geo: null, dep: '', mun3: '', familia: '', lugar: '', nivel: 'unidades', unidadAbierta: null, capa: null, tiles: null, mapa: null, barrios: null, barriosTodos: null };
+  const ST = { C: null, se: null, lugares: null, metrica: 'pega', loc: null, tab: 'mapa', perfil: null, famLabel: '', famSet: null, ampliada: false, modo: '', unidades: [], ref: null, cfg: null, geo: null, dep: '', mun3: '', familia: '', lugar: '', nivel: 'unidades', unidadAbierta: null, capa: null, tiles: null, mapa: null, barrios: null, barriosTodos: null };
+  /* Quién puede votar en un conjunto de puestos: censo, sexo, los tres grupos
+     de edad y el cambio desde 2023 (solo en puestos que se pueden comparar). */
+  function metricas(codes) {
+    const Pz = ST.C?.puestos || {}; const m = { censo: 0, muj: 0, hom: 0, g: [0, 0, 0], p26c: 0, p23c: 0, nuevos: 0, bloq: 0 };
+    (codes || []).forEach(k => {
+      const f = Pz[k]; if (!f) return;
+      m.censo += f[0]; m.muj += f[1]; m.hom += f[2];
+      E.agruparEdad(f.slice(3, 13)).forEach((x, i) => { m.g[i] += x; });
+      if (f[20] >= 0) { m.p26c += f[0]; m.p23c += f[20]; } else m.nuevos++;
+      if (f[19] >= 0) m.bloq += f[0];
+    });
+    return m;
+  }
+  /* Qué pinta el mapa. «Le pega» es el cruce perfil × familia; el resto
+     describe el territorio: quién puede votar, cómo cambió y cómo votó. */
+  const METRICAS = {
+    pega:        { boton: 'Le pega', titulo: '' },
+    censo:       { boton: 'Censo', titulo: 'Quién puede votar', nota: 'Cuántas personas pueden votar en cada zona (censo electoral de 2026).' },
+    mujeres:     { boton: 'Mujeres', titulo: 'Peso de las mujeres en el censo', nota: 'Porcentaje de mujeres entre quienes pueden votar.' },
+    jovenes:     { boton: 'Jóvenes', titulo: 'Peso de los jóvenes (18 a 30)', nota: 'Porcentaje de personas de 18 a 30 años entre quienes pueden votar.' },
+    mayores:     { boton: 'Adultos mayores', titulo: 'Peso de los adultos mayores (más de 60)', nota: 'Porcentaje de personas de más de 60 años entre quienes pueden votar.' },
+    crecimiento: { boton: 'Crecimiento 2023-26', titulo: 'Cómo cambió el censo desde 2023', nota: 'Cambio del censo entre las territoriales de 2023 y el Congreso de 2026, solo en los puestos que existen en las dos elecciones: un puesto nuevo o renumerado no entra, porque compararlo diría que creció lo que en realidad se trasladó.' },
+    familia:     { boton: 'Su familia 2023', titulo: 'Dónde votó su familia política en 2023', nota: 'Porcentaje de los votos válidos que sacó su familia política en 2023.' },
+  };
+  function valorMetrica(u, x, metrica = ST.metrica) {
+    const m = u.m, gt = m ? m.g[0] + m.g[1] + m.g[2] : 0;
+    switch (metrica) {
+      case 'pega': return x?.pega ?? null;
+      case 'censo': return m?.censo || null;
+      case 'mujeres': return m && m.muj + m.hom ? m.muj / (m.muj + m.hom) : null;
+      case 'jovenes': return gt ? m.g[0] / gt : null;
+      case 'mayores': return gt ? m.g[2] / gt : null;
+      case 'crecimiento': return m && m.p23c >= 300 ? m.p26c / m.p23c - 1 : null;
+      case 'familia': return u.total ? u.propios / u.total : null;
+    }
+    return null;
+  }
+  const fmtMetrica = (v, metrica = ST.metrica) => v == null ? '—' : metrica === 'censo' ? num(v) : metrica === 'pega' ? veces(v) : metrica === 'crecimiento' ? `${v >= 0 ? '+' : ''}${pct(v)}` : pct(v);
+  const RAMPA = ['#e7eee8', '#bfd5c5', '#87b59c', '#4c8a6b', '#1d5840'];
+  const DIVERGE = [[-Infinity, -.05, '#c9674f'], [-.05, 0, '#efc3b5'], [0, .05, '#dfe9e0'], [.05, .15, '#87b59c'], [.15, Infinity, '#1d5840']];
+  /* Cinco clases por cuantiles (las zonas se reparten parejo entre colores);
+     el crecimiento usa cortes fijos a ambos lados de cero. */
+  function escalaDe(vals, metrica = ST.metrica) {
+    if (metrica === 'crecimiento') return { color: v => v == null ? '#eef0ea' : DIVERGE.find(([a, b]) => v >= a && v < b)[2],
+      leyenda: DIVERGE.map(([a, b, c]) => [c, a === -Infinity ? `baja más de 5 %` : b === Infinity ? `sube más de 15 %` : `${a >= 0 ? '+' : ''}${pct0(a)} a ${b > 0 ? '+' : ''}${pct0(b)}`]) };
+    const ord = vals.filter(v => v != null && Number.isFinite(v)).sort((a, b) => a - b);
+    if (!ord.length) return { color: () => '#eef0ea', leyenda: [] };
+    const q = f => ord[Math.min(ord.length - 1, Math.floor(f * ord.length))], cortes = [q(.2), q(.4), q(.6), q(.8)];
+    const clase = v => cortes.filter(c => v >= c).length;
+    return { color: v => v == null ? '#eef0ea' : RAMPA[clase(v)],
+      leyenda: RAMPA.map((c, i) => [c, i === 0 ? `hasta ${fmtMetrica(cortes[0], metrica)}` : i === 4 ? `más de ${fmtMetrica(cortes[3], metrica)}` : `${fmtMetrica(cortes[i - 1], metrica)} a ${fmtMetrica(cortes[i], metrica)}`]) };
+  }
   function compDe(se, codes) { return codes.reduce((acc, c) => se.puestos[c] ? E.suma6(acc, se.puestos[c]) : acc, [0, 0, 0, 0, 0, 0]); }
   /* Concentración del perfil × fuerza de la familia, contra la referencia
      del territorio entero (la ciudad o el departamento), también a escala de
@@ -424,44 +499,65 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
   }
   function limpiarMapa() { if (ST.capa) { ST.mapa.removeLayer(ST.capa); ST.capa = null; } if (ST.tiles) { ST.mapa.removeLayer(ST.tiles); ST.tiles = null; } }
   function tooltip(u, x, p) {
-    return `<b>${esc(P.lugar(u.name))}</b><br>${esc(p.nombre)}: ${pct(x?.share)} de quienes pueden votar (${x ? veces(x.conc) : '—'} el territorio)<br>${esc(ST.famLabel)}: ${u.total ? pct(u.propios / u.total) : '—'} (${x ? veces(x.fam) : '—'} su promedio)<br><b>Le pega ${x ? veces(x.pega) : '—'}</b>${x && x.pega >= PEGA_FUERTE ? ' · fuerte' : ''}`;
+    const m = u.m, gt = m ? m.g[0] + m.g[1] + m.g[2] : 0, cr = valorMetrica(u, x, 'crecimiento');
+    return `<b>${esc(P.lugar(u.name))}</b>`
+      + (m?.censo ? `<br>${num(m.censo)} pueden votar · ${pct0(m.muj / (m.muj + m.hom))} mujeres<br>jóvenes ${pct0(m.g[0] / gt)} · adultos ${pct0(m.g[1] / gt)} · mayores ${pct0(m.g[2] / gt)}` : '')
+      + (cr != null ? `<br>Censo 2023 → 2026: ${cr >= 0 ? '+' : ''}${pct(cr)}` : '')
+      + `<br>${esc(ST.famLabel)} 2023: ${u.total ? pct(u.propios / u.total) : '—'}${x ? ` (${veces(x.fam)} su promedio)` : ''}`
+      + (x ? `<br>${esc(p.nombre)}: ${pct(x.share)} (${veces(x.conc)} el territorio) · <b>le pega ${veces(x.pega)}</b>${x.pega >= PEGA_FUERTE ? ' · fuerte' : ''}` : '');
+  }
+  /* La capa que se está mirando: las unidades de la ciudad (o municipios),
+     las localidades (Cartagena) o los barrios. */
+  function capaActual() {
+    if (ST.nivel === 'barrios' && ST.barrios) return { tipo: 'barrio', unidades: ST.barrios.unidades, geo: ST.barrios.geo, cfg: ST.barrios.cfg };
+    if (ST.nivel === 'localidad' && ST.loc) return { tipo: 'localidad', unidades: ST.loc.unidades, geo: ST.loc.geo, cfg: ST.loc.cfg };
+    return { tipo: 'unidad', unidades: ST.unidades, geo: ST.geo, cfg: ST.cfg };
+  }
+  function nombreEscala(tipo) {
+    if (tipo === 'barrio') return `barrios de ${P.lugar(ST.unidadAbierta ? ST.unidadAbierta.name : ST.lugar)}`;
+    if (tipo === 'localidad') return 'localidades';
+    return ST.cfg?.rotuloUnidad || sinArticulo(unidadPlural());
   }
   function pintarMapa() {
-    const mapa = asegurarMapa(), k = ST.perfil, p = E.PERFILES[k], base = COLOR[ST.familia];
+    const mapa = asegurarMapa(), k = ST.perfil, p = E.PERFILES[k], base = COLOR[ST.familia], metrica = ST.metrica;
     limpiarMapa();
-    const enBarrios = ST.nivel === 'barrios' && ST.barrios;
-    const unidades = enBarrios ? ST.barrios.unidades : ST.unidades, ref = ST.ref, geo = enBarrios ? ST.barrios.geo : ST.geo;
-    const porCodigo = new Map(unidades.map((u, j) => [u.geoCode || u.code, { u, x: enBarrios ? pegaDe(u, ref, k) : ref.pega[j]?.[k] }]));
-    if (geo) {
-      if (enBarrios && !ST.cfg?.rotate) ST.tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa);
-      const cfg = enBarrios ? ST.barrios.cfg : ST.cfg;
-      ST.capa = L.geoJSON(geo, {
-        style: f => { const o = porCodigo.get(cfg.code(f.properties)); const pega = o?.x?.pega; return { color: '#fff', weight: 1, fillColor: colorPega(pega, base), fillOpacity: opacPega(pega), className: pega >= PEGA_FUERTE ? 'pega-on' : '' }; },
+    const C = capaActual(), ref = ST.ref;
+    const xs = C.unidades.map((u, j) => C.tipo === 'unidad' ? ref.pega[j]?.[k] : pegaDe(u, ref, k));
+    const esc_ = escalaDe(C.unidades.map((u, j) => valorMetrica(u, xs[j])));
+    const estilo = (u, x) => {
+      if (metrica === 'pega') { const pega = x?.pega; return { fillColor: colorPega(pega, base), fillOpacity: opacPega(pega), className: pega >= PEGA_FUERTE ? 'pega-on' : '' }; }
+      const v = valorMetrica(u, x); return { fillColor: esc_.color(v), fillOpacity: v == null ? .45 : .85, className: '' };
+    };
+    const porCodigo = new Map(C.unidades.map((u, j) => [u.geoCode || u.code, { u, x: xs[j] }]));
+    if (C.geo) {
+      if (C.tipo === 'barrio' && !ST.cfg?.rotate) ST.tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa);
+      ST.capa = L.geoJSON(C.geo, {
+        style: f => { const o = porCodigo.get(C.cfg.code(f.properties)); return { color: '#fff', weight: 1, ...(o ? estilo(o.u, o.x) : { fillColor: '#eef0ea', fillOpacity: .45 }) }; },
         onEachFeature: (f, layer) => {
-          const o = porCodigo.get(cfg.code(f.properties));
-          layer.bindTooltip(o ? tooltip(o.u, o.x, p) : `<b>${esc(P.lugar(cfg.name(f.properties)))}</b><br>Sin dato`, { sticky: true, className: 'tp' });
-          if (!enBarrios && ST.cfg?.barrios && o) layer.on('click', () => abrirBarrios(o.u));
+          const o = porCodigo.get(C.cfg.code(f.properties));
+          layer.bindTooltip(o ? tooltip(o.u, o.x, p) : `<b>${esc(P.lugar(C.cfg.name(f.properties)))}</b><br>Sin dato`, { sticky: true, className: 'tp' });
+          if (C.tipo === 'unidad' && ST.cfg?.barrios && o) layer.on('click', () => abrirBarrios(o.u));
         }
       }).addTo(mapa);
     } else {
       /* Sin cartografía de comuna: los puestos, como círculos. */
       ST.tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa);
-      ST.capa = L.featureGroup(unidades.filter(u => Number.isFinite(u.lat)).map((u, j) => {
-        const x = ref.pega[j]?.[k], pega = x?.pega;
-        return L.circleMarker([u.lat, u.lng], { radius: Math.max(5, Math.min(18, Math.sqrt(u.total || 1) / 6)), color: '#fff', weight: 1, fillColor: colorPega(pega, base), fillOpacity: opacPega(pega), className: pega >= PEGA_FUERTE ? 'pega-on' : '' }).bindTooltip(tooltip(u, x, p), { sticky: true, className: 'tp' });
+      ST.capa = L.featureGroup(C.unidades.map((u, j) => [u, j]).filter(([u]) => Number.isFinite(u.lat)).map(([u, j]) => {
+        const e = estilo(u, xs[j]);
+        return L.circleMarker([u.lat, u.lng], { radius: Math.max(5, Math.min(18, Math.sqrt(u.m?.censo || u.total || 1) / 6)), color: '#fff', weight: 1, ...e }).bindTooltip(tooltip(u, xs[j], p), { sticky: true, className: 'tp' });
       })).addTo(mapa);
     }
     /* Leaflet mide el contenedor al crearse; en una rejilla que todavía no
-       tiene ancho encuadra mal. Reencuadrar después del layout. */
-    /* Sumapaz es la mitad del área de Bogotá y casi no tiene votantes: si
-       entra al encuadre, las 19 localidades urbanas quedan en una esquina. */
+       tiene ancho encuadra mal. Reencuadrar después del layout.
+       La ventana urbana fija (Bogotá, Cartagena) manda sobre el bounds real:
+       Sumapaz, o la UCG 20 hasta Isla Fuerte, dejarían la ciudad en una uña.
+       En barrios solo la usa quien la pide (Cartagena: sus barrios incluyen
+       las islas); la cartografía barrial de Bogotá ya viene sin Sumapaz. */
     setTimeout(() => {
       mapa.invalidateSize();
       let b = null;
-      /* Bogotá tiene ventana fija (la misma del CRM): Sumapaz es la mitad del
-         área y casi no tiene votantes, y el sur rural de Usme y Ciudad
-         Bolívar dejaría las 19 localidades urbanas en una uña. */
-      if (!enBarrios && ST.cfg?.ventana) {
+      const usaVentana = ST.cfg?.ventana && (C.tipo !== 'barrio' || (ST.cfg.ventanaBarrios && !ST.unidadAbierta));
+      if (usaVentana) {
         const w = ST.cfg.ventana, cx = -74.08, cy = 4.65, rot = ([lon, lat]) => [cx - (lat - cy), cy + (lon - cx)];
         const esquinas = [[w.oeste, w.sur], [w.este, w.sur], [w.oeste, w.norte], [w.este, w.norte]].map(c => ST.cfg.rotate ? rot(c) : c);
         b = L.latLngBounds(esquinas.map(([lon, lat]) => [lat, lon]));
@@ -469,26 +565,57 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
       if (!b || !b.isValid()) b = ST.capa?.getBounds?.();
       if (b && b.isValid()) mapa.fitBounds(b, { padding: [10, 10], animate: false });
     }, 0);
-    $('mapaLeyenda').innerHTML = `<span><i style="background:${base};opacity:.88"></i>le pega fuerte (≥ ${veces(PEGA_FUERTE)}) · parpadea</span><span><i style="background:${base};opacity:.42"></i>le pega (1,00-1,15)</span><span><i style="background:#cdd8d0"></i>parejo</span><span><i style="background:#e6ebe6"></i>flojo (&lt; 0,85)</span>`;
+    $('mapaLeyenda').innerHTML = metrica === 'pega'
+      ? `<span><i style="background:${base};opacity:.88"></i>le pega fuerte (≥ ${veces(PEGA_FUERTE)}) · parpadea</span><span><i style="background:${base};opacity:.42"></i>le pega (1,00-1,15)</span><span><i style="background:#cdd8d0"></i>parejo</span><span><i style="background:#e6ebe6"></i>flojo (&lt; 0,85)</span>`
+      : esc_.leyenda.map(([c, t]) => `<span><i style="background:${c}"></i>${esc(t)}</span>`).join('') + '<span><i style="background:#eef0ea"></i>sin dato</span>';
     pintarBarra();
-    const unidadTxt = enBarrios ? `barrios de ${P.lugar(ST.unidadAbierta ? ST.unidadAbierta.name : ST.lugar)}` : sinArticulo(unidadPlural());
-    $('tpMapaTitulo').textContent = `${p.nombre}: dónde le pegan, por ${unidadTxt}`.replace(/\.?$/, '.');
-    $('mapaNota').innerHTML = `Cada ${esc(enBarrios ? 'barrio' : unidadSingular())} se colorea por <b>le pega</b> = (peso de ${esc(p.corto)} entre quienes pueden votar ahí ÷ su peso en ${esc(ST.lugar)}) × (voto de ${esc(ST.famLabel.toLowerCase())} en 2023 ahí ÷ su promedio en ${esc(ST.lugar)}). Quién puede votar: censo electoral de 2026 por puesto (Registraduría); el cruce sexo × edad se estima, porque la Registraduría publica el sexo y la edad por separado. Voto por familia: ${ST.modo === 'municipio' ? 'Asamblea 2023' : ST.modo === 'puesto' ? 'Asamblea 2023, puesto por puesto' : 'Concejo 2023'}, con cada partido en su familia.${ST.cfg?.barrios && !enBarrios ? ` <b>Haga clic en una ${esc(unidadSingular())}</b> para bajar a sus barrios.` : ''}${enBarrios && !ST.unidadAbierta && ST.barrios?.faltan ? ` ${ST.barrios.faltan} ${ST.barrios.faltan === 1 ? esc(unidadSingular()) + ' no tiene' : esc(sinArticulo(unidadPlural())) + ' no tienen'} cartografía por barrio y ${ST.barrios.faltan === 1 ? 'queda' : 'quedan'} fuera del mapa.` : ''}${enBarrios && ST.unidadAbierta ? ' <b>Vuelva a «Barrios»</b> para ver la ciudad entera.' : ''}${ST.modo === 'puesto' ? ' Este municipio no tiene cartografía por comuna, así que el mapa muestra los puestos de votación.' : ''}`;
+    const unidadTxt = nombreEscala(C.tipo);
+    $('tpMapaTitulo').textContent = (metrica === 'pega' ? `${p.nombre}: dónde le pegan, por ${unidadTxt}` : `${METRICAS[metrica].titulo}, por ${unidadTxt}`).replace(/\.?$/, '.');
+    const extra = `${ST.cfg?.barrios && C.tipo === 'unidad' ? ` <b>Haga clic en una ${esc(ST.cfg.rotuloUnidad || unidadSingular())}</b> para bajar a sus barrios.` : ''}${C.tipo === 'barrio' && !ST.unidadAbierta && ST.barrios?.faltan ? ` ${ST.barrios.faltan} ${ST.barrios.faltan === 1 ? esc(unidadSingular()) + ' no tiene' : esc(sinArticulo(unidadPlural())) + ' no tienen'} cartografía por barrio y ${ST.barrios.faltan === 1 ? 'queda' : 'quedan'} fuera del mapa.` : ''}${C.tipo === 'barrio' && ST.unidadAbierta ? ' <b>Vuelva a «Barrios»</b> para ver la ciudad entera.' : ''}${ST.modo === 'puesto' ? ' Este municipio no tiene cartografía por comuna, así que el mapa muestra los puestos de votación.' : ''}`;
+    $('mapaNota').innerHTML = (metrica === 'pega'
+      ? `Cada zona se colorea por <b>le pega</b> = (peso de ${esc(p.corto)} entre quienes pueden votar ahí ÷ su peso en ${esc(ST.lugar)}) × (voto de ${esc(ST.famLabel.toLowerCase())} en 2023 ahí ÷ su promedio en ${esc(ST.lugar)}). Quién puede votar: censo electoral de 2026 por puesto (Registraduría); el cruce sexo × edad se estima, porque la Registraduría publica el sexo y la edad por separado. Voto por familia: ${ST.modo === 'municipio' ? 'Asamblea 2023' : ST.modo === 'puesto' ? 'Asamblea 2023, puesto por puesto' : 'Concejo 2023'}, con cada partido en su familia.`
+      : `${esc(METRICAS[metrica].nota)} Los colores reparten las zonas en cinco grupos del mismo tamaño${metrica === 'crecimiento' ? ', salvo el crecimiento, que usa cortes fijos' : ''}. Pase el cursor por una zona para ver todo lo que se sabe de ella.`) + extra;
   }
   function pintarBarra() {
-    const b = $('mapaBarra'), enBarrios = ST.nivel === 'barrios';
-    /* «Barrios» es la ciudad entera, aunque se venga del drill de una
-       localidad: si abriera solo la última visitada, no habría forma de ver
-       Bogotá completa barrio por barrio. Para volver a una está el mapa. */
-    const enUna = enBarrios && ST.unidadAbierta;
-    b.innerHTML = `<button type="button" class="mapa-toggle ${enBarrios ? '' : 'active'}" data-nivel="unidades">${esc(sinArticulo(unidadPlural()))}</button>
-      <button type="button" class="mapa-toggle ${enBarrios && !enUna ? 'active' : ''}" data-nivel="barrios" ${ST.cfg?.barrios ? '' : 'disabled'} title="${ST.cfg?.barrios ? 'Todos los barrios de ' + ST.lugar : 'Barrios: solo Bogotá y Cali'}">Barrios</button>
-      ${enUna ? `<span class="mapa-toggle active">Barrios · ${esc(P.lugar(ST.unidadAbierta.name))}</span>` : ''}
-      ${enBarrios ? `<button type="button" class="volver" data-nivel="unidades">← volver a ${esc(sinArticulo(unidadPlural()))}</button>` : ''}`;
+    const b = $('mapaBarra'), n = ST.nivel, enUna = n === 'barrios' && ST.unidadAbierta;
+    const escalas = [];
+    if (ST.cfg?.localidades) escalas.push(['localidad', 'Localidades']);
+    escalas.push(['unidades', ST.cfg?.rotuloUnidad || sinArticulo(unidadPlural())]);
+    if (ST.cfg?.barrios) escalas.push(['barrios', 'Barrios']);
+    b.innerHTML = `<div class="mapa-fila"><span class="rot">Escala</span>${escalas.map(([k, t]) => `<button type="button" class="mapa-toggle ${n === k && !(k === 'barrios' && enUna) ? 'active' : ''}" data-nivel="${k}">${esc(t)}</button>`).join('')}${enUna ? `<span class="mapa-toggle active">Barrios · ${esc(P.lugar(ST.unidadAbierta.name))}</span>` : ''}</div>
+      <div class="mapa-fila"><span class="rot">Qué pinta</span>${Object.entries(METRICAS).map(([k, m]) => `<button type="button" class="mapa-toggle capa ${ST.metrica === k ? 'active' : ''}" data-metrica="${k}">${esc(m.boton)}</button>`).join('')}</div>`;
     b.querySelectorAll('button[data-nivel]').forEach(x => x.addEventListener('click', () => {
       if (x.dataset.nivel === 'barrios') return abrirBarrios(null);
+      if (x.dataset.nivel === 'localidad') return abrirLocalidades();
       ST.nivel = 'unidades'; ST.unidadAbierta = null; pintarMapa();
     }));
+    b.querySelectorAll('button[data-metrica]').forEach(x => x.addEventListener('click', () => { ST.metrica = x.dataset.metrica; pintarMapa(); }));
+  }
+  /* ── Localidades (Cartagena) ─────────────────────────────────────────── */
+  /* Las JAL de Cartagena se eligen por localidad y el Concejo se lee por UCG.
+     El voto de 2023 por localidad no existe como archivo: se arma sumando los
+     puestos del detalle por UCG según la localidad de cada puesto. */
+  async function abrirLocalidades() {
+    try {
+      if (!ST.loc) {
+        $('mapaNota').textContent = 'Armando las localidades a partir de los puestos…';
+        const dic = window.Candidato360CartagenaPuestoBarrio || {};
+        const cfg = { code: p => String(p.CODIGO || ''), name: p => p.NOMBRE || 'Localidad' };
+        const geo = await E.json(`${S3}/mapas-2026/Ciudades-COM-LOC/${ST.cfg.localidades}`);
+        const nombres = new Map(geo.features.map(f => [cfg.code(f.properties), cfg.name(f.properties)]));
+        const partes = await Promise.all(ST.unidades.map(u => E.json(`${S3}/concejo-2023/comuna/${ST.dep}-${ST.mun3}-${u.code}.json`).catch(() => null)));
+        const acc = new Map();
+        partes.filter(Boolean).forEach(d => (d.puestos || []).forEach(pu => {
+          const code9 = ST.dep + ST.mun3 + pu.code.replace('-', ''), loc = dic[code9]?.loc; if (!loc) return;
+          const f = E.votosFamilia(pu.v, d.cands, d.partidos, ST.famSet, pu.l);
+          const a = acc.get(loc) || { code: loc, geoCode: loc, name: nombres.get(loc) || `Localidad ${loc}`, propios: 0, total: 0, comp: [0, 0, 0, 0, 0, 0], codes: [] };
+          a.propios += f.propios; a.total += f.total; a.comp = E.suma6(a.comp, ST.se?.puestos?.[code9]); a.codes.push(code9); acc.set(loc, a);
+        }));
+        const unidades = [...acc.values()]; unidades.forEach(u => { u.m = metricas(u.codes); });
+        ST.loc = { geo, cfg, unidades };
+      }
+      ST.nivel = 'localidad'; ST.unidadAbierta = null; pintarMapa();
+    } catch (e) { $('mapaNota').textContent = `No se pudieron armar las localidades: ${e.message}.`; }
   }
   /* ── Barrios (Bogotá y Cali) ─────────────────────────────────────────── */
   const scriptCache = new Map();
@@ -547,11 +674,12 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     buenas.forEach(({ d }) => (d.puestos || []).forEach(pu => {
       const b = barrioDe(pu); if (!b) return;
       const code9 = ST.dep + ST.mun3 + pu.code.replace('-', ''), f = E.votosFamilia(pu.v, d.cands, d.partidos, ST.famSet, pu.l);
-      const acc = porBarrio.get(b) || { code: b, geoCode: b, name: nombres.get(b) || b, propios: 0, total: 0, comp: [0, 0, 0, 0, 0, 0], puestos: 0 };
-      acc.propios += f.propios; acc.total += f.total; acc.comp = E.suma6(acc.comp, se?.puestos?.[code9]); acc.puestos++;
+      const acc = porBarrio.get(b) || { code: b, geoCode: b, name: nombres.get(b) || b, propios: 0, total: 0, comp: [0, 0, 0, 0, 0, 0], puestos: 0, codes: [] };
+      acc.propios += f.propios; acc.total += f.total; acc.comp = E.suma6(acc.comp, se?.puestos?.[code9]); acc.puestos++; acc.codes.push(code9);
       porBarrio.set(b, acc);
     }));
-    return { geo, cfg, unidades: [...porBarrio.values()], faltan: partes.length - buenas.length };
+    const unidades = [...porBarrio.values()]; unidades.forEach(u => { u.m = metricas(u.codes); });
+    return { geo, cfg, unidades, faltan: partes.length - buenas.length };
   }
 
   /* `u` = una unidad para bajar a sus barrios; sin `u`, la ciudad entera. */
@@ -577,7 +705,8 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     const dep = pad2(campana.departamento), corpDep = ['asamblea', 'gobernacion'].includes(campana.corp);
     if (!familia || familia === 'sc') return aviso('Sin una familia política no hay contra qué medir los perfiles: elija partido o espectro en el CRM y vuelva.');
     if (!dep || dep === '00') return aviso('La campaña no tiene territorio definido: abra el CRM, elija corporación y lugar, y vuelva.');
-    const [lugares, se] = await Promise.all([E.puestos(), E.sexoEdad()]);
+    const [lugares, se, C] = await Promise.all([E.puestos(), E.sexoEdad(), E.censo2026()]);
+    ST.C = C; ST.se = se; ST.lugares = lugares; ST.loc = null;
     if (!se) return aviso('El cruce de sexo y edad por puesto no respondió. Vuelva a intentarlo en un momento.');
     const puestosDe = pred => Object.keys(lugares).filter(pred);
     ST.familia = familia; ST.dep = dep; ST.cfg = null; ST.geo = null; ST.barrios = null; ST.barriosTodos = null; ST.unidadAbierta = null; ST.nivel = 'unidades';
@@ -588,7 +717,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
       ST.geo = await E.json(`${S3}/mapas-2026/Departamentos-mps/${dep}.json`);
       ST.modo = 'municipio'; ST.lugar = P.lugar(r.name || campana.departamentoNombre || 'su departamento');
       ST.cfg = { code: p => pad3(p.mun_elec ?? p.mun_electoral), name: p => p.mpio_cnmbr || 'Municipio' };
-      ST.unidades = Object.entries(r.comunas || {}).map(([m, d]) => ({ code: pad3(m), name: d.name, ...E.votosFamiliaPartidos(d.partidos, ST.famSet), comp: compDe(se, puestosDe(c => c.startsWith(dep + pad3(m)))) }));
+      ST.unidades = Object.entries(r.comunas || {}).map(([m, d]) => { const codes = puestosDe(c => c.startsWith(dep + pad3(m))); return { code: pad3(m), name: d.name, ...E.votosFamiliaPartidos(d.partidos, ST.famSet), comp: compDe(se, codes), codes, m: metricas(codes) }; });
     } else {
       const cfg = E.ciudadDe(campana.municipio);
       let mun3 = pad3(await E.codigoMunicipio(campana.departamento, campana.municipio).catch(() => ''));
@@ -597,9 +726,21 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
       if (cfg && key) {
         mun3 = key.slice(3); ST.mun3 = mun3; ST.cfg = cfg; ST.modo = cfg.unidad; ST.lugar = P.lugar(campana.municipio);
         let geo = await E.json(`${S3}/mapas-2026/Ciudades-COM-LOC/${cfg.path}`); if (cfg.rotate) geo = E.rotar90(geo); ST.geo = geo;
-        ST.unidades = Object.entries(res.data[key].comunas || {}).filter(([c]) => !['90', '98', 'NULL', ''].includes(c)).map(([c, d]) => ({
-          code: c, geoCode: cfg.porNombre ? normTexto(String(d.name || '').replace(/^\d+\s*COMUNA\s*/i, '')) : (cfg.dataKey ? cfg.dataKey(c) : c), name: d.name,
-          ...E.votosFamiliaPartidos(d.partidos, ST.famSet), comp: compDe(se, puestosDe(k => k.startsWith(dep + mun3) && lugares[k].mesa.com === c)) }));
+        /* ⚠️ En Cartagena la comuna del georef es la LOCALIDAD (01/02/03), no la
+           UCG: leída de ahí, las 16 UCG recibían el censo de tres y el mapa
+           pintaba dos. La UCG de cada puesto sale del diccionario puesto→barrio,
+           el mismo del CRM; el nombre de la unidad, del polígono. */
+        let unidadDe = k => lugares[k].mesa.com;
+        if (cfg.barrios === 'cartagena') {
+          await cargarScript('candidato-360-data/cartagena-puesto-barrio.js');
+          const dic = window.Candidato360CartagenaPuestoBarrio || {};
+          unidadDe = k => dic[k]?.comuna || '';
+        }
+        const nombreGeo = new Map(geo.features.map(f => [cfg.code(f.properties), cfg.name(f.properties)]));
+        ST.unidades = Object.entries(res.data[key].comunas || {}).filter(([c]) => !['90', '98', 'NULL', ''].includes(c)).map(([c, d]) => {
+          const codes = puestosDe(k => k.startsWith(dep + mun3) && unidadDe(k) === c), geoCode = cfg.porNombre ? normTexto(String(d.name || '').replace(/^\d+\s*COMUNA\s*/i, '')) : (cfg.dataKey ? cfg.dataKey(c) : c);
+          return { code: c, geoCode, name: cfg.rotuloUnidad ? (nombreGeo.get(geoCode) || d.name) : d.name,
+            ...E.votosFamiliaPartidos(d.partidos, ST.famSet), comp: compDe(se, codes), codes, m: metricas(codes) }; });
         if (cfg.porNombre) ST.cfg = Object.assign({}, cfg, { code: p => normTexto(cfg.code(p)) });
       } else {
         if (!mun3 || mun3 === '000') return aviso(`No encontramos el código de ${esc(P.lugar(campana.municipio))} para leer sus resultados.`);
@@ -608,7 +749,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
         ST.mun3 = mun3; ST.modo = 'puesto'; ST.lugar = P.lugar(r.name || campana.municipio);
         /* El JSON municipal de la Asamblea no trae coordenadas: salen del
            georef (PUESTOS_GEOREF), que es la misma fuente del censo. */
-        ST.unidades = (r.puestos || []).map(pu => { const code9 = dep + mun3 + pu.code.replace('-', ''), g = lugares[code9]; return g && Number.isFinite(g.lat) && Number.isFinite(g.lng) ? { code: code9, name: `${pu.nombre}${g.barrio && g.barrio !== 'sin georreferenciar' ? ` · ${g.barrio}` : ''}`, ...E.votosFamilia(pu.v, r.cands, r.partidos, ST.famSet, pu.l), comp: se.puestos[code9] || null, lat: g.lat, lng: g.lng } : null; }).filter(Boolean);
+        ST.unidades = (r.puestos || []).map(pu => { const code9 = dep + mun3 + pu.code.replace('-', ''), g = lugares[code9]; return g && Number.isFinite(g.lat) && Number.isFinite(g.lng) ? { code: code9, name: `${pu.nombre}${g.barrio && g.barrio !== 'sin georreferenciar' ? ` · ${g.barrio}` : ''}`, ...E.votosFamilia(pu.v, r.cands, r.partidos, ST.famSet, pu.l), comp: se.puestos[code9] || null, lat: g.lat, lng: g.lng, codes: [code9], m: metricas([code9]) } : null; }).filter(Boolean);
       }
     }
     };
@@ -653,12 +794,50 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
       analisis.innerHTML = `<section class="panel elec-seccion"><span class="panel-num">Perfil del votante</span>
         <h3>Todavía no hay perfil para esta candidatura.</h3>
         <p>${slugs.length ? 'Los puestos de su votación no tienen censo publicado, así que preferimos no estimar un perfil que no podemos sostener.' : 'Esta es una candidatura nueva: sin votos propios no hay puestos que describir. Cuando tenga una elección detrás, esta página se llena sola.'}</p></section>`
-        + seccionFamilias(ideo, familia, familiaPrevia, lugar) + seccionCambio(cambio, lugar);
+        + tab('familias', seccionFamilias(ideo, familia, familiaPrevia, lugar)) + tab('crecimiento', seccionCambio(cambio, lugar));
     } else {
-      analisis.innerHTML = seccionSexo(p) + seccionEdad(p, obj) + seccionTerritorio(p, ideo, lugar)
-        + seccionFamilias(ideo, familia, familiaPrevia, lugar) + seccionObjetivo(p, obj, ideo, familia, lugar) + seccionCambio(cambio, lugar);
+      analisis.innerHTML = tab('sexo', seccionSexo(p)) + tab('edad', seccionEdad(p, obj)) + tab('campo', seccionTerritorio(p, ideo, lugar))
+        + tab('familias', seccionFamilias(ideo, familia, familiaPrevia, lugar)) + tab('objetivo', seccionObjetivo(p, obj, ideo, familia, lugar)) + tab('crecimiento', seccionCambio(cambio, lugar));
     }
+    pintarKpis(prefijo, cambio, lugar);
+    pintarTabs();
     $('elecNota').innerHTML = `Fuente: censo electoral por puesto del Congreso 2026 (Registraduría), con sexo y diez rangos de edad; el cruce sexo × edad de los perfiles se estima con la forma de los sufragantes de 2022 ajustada a los totales de 2026; el censo de 2023 para ver dónde creció; la zona electoral de cada mesa y los resultados de Concejo y Asamblea 2023. Cubre el ${pct(p.cobertura)} de su votación${p.sinCoordenada ? `: ${num(p.sinCoordenada)} votos están en puestos sin censo publicado` : ''}. <a class="enlace-boton" href="candidato-360-perfil.html">Cómo se lee esto sin violar el secreto del voto →</a>`;
+  }
+  /* ── Las pestañas: cada lectura a la vista sin enterrarla en un desplegable. ── */
+  const tab = (id, html) => html ? `<div data-tab="${id}">${html}</div>` : '';
+  const TABS = [['mapa', 'Mapa y perfiles'], ['sexo', 'Sexo'], ['edad', 'Edad'], ['campo', 'Campo y ciudad'], ['familias', 'Familias políticas'], ['objetivo', 'Votación objetivo'], ['crecimiento', 'Crecimiento del censo'], ['todo', 'Todo']];
+  function pintarTabs() {
+    const hay = new Set([...document.querySelectorAll('#panelCuerpo [data-tab]')].map(x => x.dataset.tab));
+    const lista = TABS.filter(([id]) => id === 'todo' || hay.has(id));
+    $('elecTabs').innerHTML = lista.map(([id, t]) => `<button type="button" data-ir="${id}" class="${ST.tab === id ? 'active' : ''}">${esc(t)}</button>`).join('');
+    $('elecTabs').querySelectorAll('button').forEach(b => b.addEventListener('click', () => irA(b.dataset.ir)));
+    irA(hay.has(ST.tab) || ST.tab === 'todo' ? ST.tab : 'mapa');
+  }
+  function irA(id) {
+    ST.tab = id;
+    $('elecTabs').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.ir === id));
+    document.querySelectorAll('#panelCuerpo [data-tab]').forEach(x => x.classList.toggle('oculto', id !== 'todo' && x.dataset.tab !== id));
+    if ((id === 'mapa' || id === 'todo') && ST.mapa) setTimeout(() => { ST.mapa.invalidateSize(); }, 0);
+  }
+  /* ── El territorio en cifras, arriba ─────────────────────────────────── */
+  function pintarKpis(prefijo, cambio, lugar) {
+    const Pz = ST.C?.puestos; if (!Pz || !prefijo) return;
+    const m = metricas(Object.keys(Pz).filter(k => k.startsWith(prefijo)));
+    if (!m.censo) return;
+    let b18 = 0; Object.entries(Pz).forEach(([k, f]) => { if (k.startsWith(prefijo)) b18 += f[3]; });
+    const gt = m.g[0] + m.g[1] + m.g[2];
+    const k = (valor, rotulo, nota, cls = '') => `<div class="kpi ${cls}"><b>${valor}</b><span>${esc(rotulo)}</span>${nota ? `<small>${nota}</small>` : ''}</div>`;
+    $('elecKpis').innerHTML = [
+      k(num(m.censo), `Pueden votar en ${lugar}`, 'censo 2026'),
+      k(pct0(m.muj / (m.muj + m.hom)), 'Mujeres', `${num(m.muj)}`),
+      k(pct0(m.g[0] / gt), 'Jóvenes · 18 a 30', `${num(m.g[0])}`),
+      k(pct0(m.g[1] / gt), 'Adultos · 31 a 60', `${num(m.g[1])}`),
+      k(pct0(m.g[2] / gt), 'Adultos mayores', `${num(m.g[2])} · más de 60`),
+      k(num(b18), 'Tienen 18 a 20 años', 'muchos no votaban en 2023'),
+      cambio ? k(`${cambio.crecimiento >= 0 ? '+' : ''}${pct(cambio.crecimiento)}`, 'Censo 2023 → 2026', `${cambio.crecimiento >= 0 ? '+' : ''}${num(cambio.hoy - cambio.antes)} electores`, cambio.crecimiento >= 0 ? 'sube' : 'baja') : '',
+      ST.ref ? k(pct0(ST.ref.famTerr), `${ST.famLabel} en 2023`, 'de los votos válidos') : '',
+    ].join('');
+    $('elecControl').classList.remove('hidden');
   }
   async function armar(v) {
     try { await armarPerfiles(v); } catch (e) { aviso(`No se pudieron armar los perfiles: ${esc(e.message || e)}.`); }
