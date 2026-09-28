@@ -4451,50 +4451,18 @@ function mostrarFirmas() {
 }
 
 /* ─── 9 bis. Endoso de aliados ───────────────────────────────────────────────
-   El candidato suma líderes o excandidatos que lo van a apoyar y la card
-   estima cuántos votos le pueden pasar. Reusa el método de endoso-2026.html:
-   Σ min(aliado, apoyado) mesa por mesa sobre los votos del aliado.
-
-   Tres reglas que NO hay que aflojar:
-   1. Los votos del aliado se recortan al territorio de la campaña con la misma
-      regla del mapa (código electoral, no nombre). Un concejal de Medellín que
-      apoya a alguien al Concejo de Bogotá no le pasa ni un voto.
-   2. La tasa solo se MIDE si se dice a quién apoyó antes el aliado, y el par
-      tiene que ser medible: mismo tarjetón = nadie pudo votar por los dos, y
-      si el apoyado lo supera en casi todas las mesas, min(A, B) es siempre A
-      y la cifra da ~100 % sin separar nada. En esos casos se dice y no se usa.
-   3. Σ min es una COTA SUPERIOR: dice cuánto electorado pudieron compartir,
-      no cuánto compartieron. Por eso todo se presenta como «hasta».
-   Sin medición la tasa es la mediana de los aliados medidos o, si no hay
-   ninguno, un supuesto editable que queda rotulado como supuesto. Los aliados
-   viven en localStorage (por cuenta y candidatura): no cambian el vínculo. */
-const ENDOSO_SUPUESTO = .3, ENDOSO_SATURACION = .95, ENDOSO_MAX = 25;
-const endosoMesasCache = new Map();
+   El cálculo vive en candidato-360-endoso.js (window.C360Endoso), el mismo que
+   usa el panel candidato-360-endoso.html: la tarjeta y el panel no pueden dar
+   cifras distintas. Acá queda solo lo que depende del CRM —el territorio de la
+   campaña, cómo se nombran sus áreas— y la interfaz del modal. */
+const E360 = window.C360Endoso;
 let ENDOSO = { aliados: [], lectura: null, buscarPara: null, calculando: false };
 function endosoKey() {
-  const quien = String(SESSION.user?.email || 'anon').toLowerCase();
   const cand = crmCandidate?.id || (NUEVO?.nombre ? `nuevo-${normalizedText(NUEVO.nombre)}` : 'sin-candidatura');
-  return `c360-aliados:${quien}:${cand}`;
+  return E360.clave(SESSION.user?.email, cand);
 }
-function endosoCargar() { try { ENDOSO.aliados = JSON.parse(localStorage.getItem(endosoKey()) || '[]').slice(0, ENDOSO_MAX); } catch { ENDOSO.aliados = []; } }
-function endosoGuardar() { try { localStorage.setItem(endosoKey(), JSON.stringify(ENDOSO.aliados)); } catch { /* sin almacenamiento: la lista vive mientras dure la pestaña */ } }
-function endosoMesas(url) {
-  if (!url) return Promise.reject(new Error('Candidatura sin archivo de datos'));
-  if (!endosoMesasCache.has(url)) endosoMesasCache.set(url, fetch(url).then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))).then(d => d.mesas || []).catch(e => { endosoMesasCache.delete(url); throw e; }));
-  return endosoMesasCache.get(url);
-}
-const endosoSuma = mesas => mesas.reduce((s, m) => s + Number(m.v || 0), 0);
-const endosoPuesto = m => `${String(m.dep || '').padStart(2, '0')}|${String(m.mun || '').padStart(3, '0')}|${String(m.zon || '').padStart(2, '0')}|${String(m.pue || '').padStart(2, '0')}`;
-const endosoMesa = m => `${endosoPuesto(m)}|${m.mesa ?? ''}`;
-function endosoAgrupar(mesas, llave) { const o = {}; mesas.forEach(m => { const k = llave(m); o[k] = (o[k] || 0) + Number(m.v || 0); }); return o; }
-/* Qué candidatura es, sin el lugar: «CONCEJO · BOGOTÁ · 2023» → «CONCEJO». */
-function endosoCorp(c) { return normalizedText(String(c?.corp || '').split('·')[0]); }
-function endosoClase(a, b) {
-  const ya = candidateYear(a), yb = candidateYear(b);
-  if (ya && yb && ya !== yb) return 'transferencia';
-  if (endosoCorp(a) && endosoCorp(a) === endosoCorp(b)) return 'mismo';
-  return 'cota';
-}
+function endosoCargar() { ENDOSO.aliados = E360.cargar(endosoKey()); }
+function endosoGuardar() { E360.guardar(endosoKey(), ENDOSO.aliados); }
 /* El territorio contra el que se recorta. En la ruta «otra corporación» es el
    que eligió; en la candidatura nueva, el de su campaña; en «la misma
    corporación», el de su última candidatura (donde está la mayoría de su voto). */
@@ -4525,58 +4493,18 @@ function endosoLugar(alcance) {
   if (alcance.tipo === 'localidad') return NOMBRE_BONITO(cortoLocal(alcance.localidad)) || 'la localidad';
   return NOMBRE_BONITO(alcance.municipioNombre || $('campaignMunicipality')?.value || CAMPANA_ACTUAL?.municipio || '') || 'el municipio';
 }
-/* El par aliado → a quién apoyó, con el método de endoso-2026: universo = los
-   departamentos donde los dos tienen votos; unidad = mesa si es la misma
-   jornada, puesto si son años distintos (las mesas se rearman con el censo). */
-async function endosoMedirPar(aliado) {
-  const clase = endosoClase(aliado, aliado.apoyo);
-  if (clase === 'mismo') return { clase, valida: false, motivo: 'compitieron en el mismo tarjetón: nadie pudo votar por los dos, así que no hay endoso que medir' };
-  const [ma, mb] = await Promise.all([endosoMesas(aliado.dataUrl), endosoMesas(aliado.apoyo.dataUrl)]);
-  const llave = clase === 'transferencia' ? endosoPuesto : endosoMesa;
-  const A = endosoAgrupar(ma, llave), B = endosoAgrupar(mb, llave);
-  const depsA = new Set(Object.keys(A).map(k => k.slice(0, 2))), depsB = new Set(Object.keys(B).map(k => k.slice(0, 2)));
-  let sumA = 0, sumMin = 0, cubiertos = 0, comunes = 0;
-  Object.entries(A).forEach(([k, a]) => {
-    if (!a || !depsB.has(k.slice(0, 2))) return;
-    const b = B[k] || 0; sumA += a; sumMin += Math.min(a, b);
-    if (b > 0) comunes++;
-    if (b >= a) cubiertos += a;
-  });
-  if (!sumA || ![...depsA].some(d => depsB.has(d))) return { clase, valida: false, motivo: 'no compartieron territorio: no hay mesas donde los dos tengan votos' };
-  const tasa = sumMin / sumA, saturado = cubiertos / sumA >= ENDOSO_SATURACION;
-  if (saturado) return { clase, tasa, comunes, valida: false, motivo: `el apoyado le sacó más votos en casi todas sus ${clase === 'transferencia' ? 'puestos' : 'mesas'}, así que la coincidencia da ~${Math.round(tasa * 100)} % sin decir cuánto le pasó` };
-  return { clase, tasa, comunes, valida: true };
+/* Dónde se concentra el endoso: municipios en una campaña departamental,
+   puestos en una JAL, localidades o comunas en lo municipal. */
+function endosoArea(m, alcance) {
+  if (alcance?.tipo === 'departamento') return NOMBRE_BONITO(m.munNom || '');
+  if (alcance?.tipo === 'localidad') return NOMBRE_BONITO(m.pueNom || '');
+  return NOMBRE_BONITO(cortoLocal(nombreLocal(m)) || m.pueNom || '');
 }
 async function endosoEvaluar() {
   const alcance = await endosoAlcance();
   let propio = null;
-  if (crmCandidate) { try { propio = endosoAgrupar(await mesasDelHistorial(), endosoPuesto); } catch { propio = null; } }
-  const filas = await Promise.all(ENDOSO.aliados.map(async al => {
-    try {
-      const mesas = await endosoMesas(al.dataUrl), dentro = alcance ? mesas.filter(m => mesaEnAlcance(m, alcance)) : mesas;
-      const fila = { al, total: endosoSuma(mesas), terr: endosoSuma(dentro), dentro, par: null };
-      if (al.apoyo) { try { fila.par = await endosoMedirPar(al); } catch (e) { fila.par = { valida: false, motivo: 'no se pudo leer la votación de a quién apoyó' }; } }
-      if (propio && fila.terr) { const pa = endosoAgrupar(dentro, endosoPuesto); let s = 0; Object.entries(pa).forEach(([k, v]) => { s += Math.min(v, propio[k] || 0); }); fila.solape = s / fila.terr; }
-      return fila;
-    } catch (e) { return { al, error: true }; }
-  }));
-  const medidas = filas.filter(f => f.par?.valida).map(f => f.par.tasa).sort((a, b) => a - b);
-  const mediana = medidas.length ? medidas[Math.floor((medidas.length - 1) / 2)] : null;
-  let total = 0, techo = 0; const porArea = {};
-  filas.forEach(f => {
-    if (f.error) return;
-    if (f.par?.valida) { f.tasa = f.par.tasa; f.fuente = 'medida'; }
-    else if (Number.isFinite(f.al.manual)) { f.tasa = f.al.manual / 100; f.fuente = 'suya'; }
-    else if (mediana !== null) { f.tasa = mediana; f.fuente = 'mediana'; }
-    else { f.tasa = ENDOSO_SUPUESTO; f.fuente = 'supuesto'; }
-    f.est = Math.round(f.terr * f.tasa); total += f.est; techo += f.terr;
-    f.dentro.forEach(m => {
-      const area = alcance?.tipo === 'departamento' ? NOMBRE_BONITO(m.munNom || '') : alcance?.tipo === 'localidad' ? NOMBRE_BONITO(m.pueNom || '') : NOMBRE_BONITO(cortoLocal(nombreLocal(m)) || m.pueNom || '');
-      if (area) porArea[area] = (porArea[area] || 0) + Number(m.v || 0) * f.tasa;
-    });
-  });
-  const areas = Object.entries(porArea).map(([nombre, v]) => ({ nombre, v: Math.round(v) })).filter(a => a.v > 0).sort((a, b) => b.v - a.v);
-  return { alcance, lugar: endosoLugar(alcance), filas, total, techo, mediana, nMedidas: medidas.length, areas };
+  if (crmCandidate) { try { propio = await mesasDelHistorial(); } catch { propio = null; } }
+  return E360.evaluar(ENDOSO.aliados, { alcance, lugar: endosoLugar(alcance), enAlcance: mesaEnAlcance, areaDe: endosoArea, propio });
 }
 async function pintarEndoso() {
   const card = $('crmEndoso'); if (!card) return;
@@ -4618,17 +4546,16 @@ function endosoBuscar(q) {
     + (rank.total > rank.items.length ? `<p class="helper">${rank.items.length} de ${rank.total.toLocaleString('es-CO')} · agregue un apellido para afinar.</p>` : '');
   caja.querySelectorAll('.endoso-res').forEach(b => b.onclick = () => endosoElegir(rank.items.find(c => c.slug === b.dataset.slug)));
 }
-function endosoFicha(c) { return { slug: c.slug, nombre: c.nombre, corp: c.corp || '', partido: c.partido || '', votos: Number(c.votos || 0), dataUrl: c.dataUrl || CandRegistry.dataUrlFor(c.slug) }; }
 function endosoElegir(c) {
   if (!c) return;
   const i = ENDOSO.buscarPara;
   if (i !== null && ENDOSO.aliados[i]) {
     if (c.slug === ENDOSO.aliados[i].slug) return alert('Esa es la misma candidatura del aliado: elija a la persona que apoyó.');
-    ENDOSO.aliados[i].apoyo = endosoFicha(c);
+    ENDOSO.aliados[i].apoyo = E360.ficha(c, CandRegistry.dataUrlFor);
   } else {
     if (ENDOSO.aliados.some(a => a.slug === c.slug)) return alert('Ese aliado ya está en la lista.');
-    if (ENDOSO.aliados.length >= ENDOSO_MAX) return alert(`Por ahora se pueden sumar hasta ${ENDOSO_MAX} aliados.`);
-    ENDOSO.aliados.push({ ...endosoFicha(c), apoyo: null, manual: null });
+    if (ENDOSO.aliados.length >= E360.MAX) return alert(`Por ahora se pueden sumar hasta ${E360.MAX} aliados.`);
+    ENDOSO.aliados.push({ ...E360.ficha(c, CandRegistry.dataUrlFor), apoyo: null, manual: null });
   }
   ENDOSO.buscarPara = null; endosoGuardar();
   $('endosoBuscar').value = ''; $('endosoResultados').innerHTML = '';
@@ -4642,16 +4569,6 @@ function endosoTasaManual(i, valor) {
   const v = String(valor).trim() === '' ? null : Math.max(0, Math.min(100, Number(valor)));
   al.manual = Number.isFinite(v) ? v : null; endosoGuardar(); pintarModalEndoso();
 }
-const ENDOSO_FUENTE = {
-  medida: 'medida con a quién apoyó',
-  suya: 'tasa que usted escribió',
-  mediana: 'mediana de sus aliados medidos',
-  supuesto: 'supuesto: escriba el suyo o mida el par',
-};
-const ENDOSO_CLASE = {
-  cota: 'misma jornada, tarjetón distinto: cota superior',
-  transferencia: 'elecciones distintas: transferencia entre fechas, comparada por puesto',
-};
 async function pintarModalEndoso() {
   const i = ENDOSO.buscarPara, para = i !== null ? ENDOSO.aliados[i] : null;
   $('endosoBuscarLabel').textContent = para ? `¿A quién apoyó ${para.nombre} antes?` : 'Sumar un líder o excandidato';
@@ -4667,12 +4584,12 @@ async function pintarModalEndoso() {
     if (f.error) return `<div class="endoso-fila"><div class="endoso-fila-top"><b>${escHtml(al.nombre)}</b><button type="button" class="endoso-x" onclick="endosoQuitar(${k})" aria-label="Quitar">×</button></div><p class="helper">No pudimos leer la votación de esta candidatura.</p></div>`;
     const par = f.par;
     const apoyo = al.apoyo
-      ? `<div class="endoso-apoyo">Apoyó a <b>${escHtml(al.apoyo.nombre)}</b> <small>${escHtml(endosoRotuloCand(al.apoyo))}</small> <button type="button" class="enlace-boton" onclick="endosoQuitarApoyo(${k})">cambiar</button>${par?.valida ? `<span class="endoso-medida">coincidieron en el <b>${Math.round(par.tasa * 100)} %</b> de sus votos · ${escHtml(ENDOSO_CLASE[par.clase] || '')}</span>` : `<span class="endoso-aviso">No se usa: ${escHtml(par?.motivo || 'sin datos')}.</span>`}</div>`
+      ? `<div class="endoso-apoyo">Apoyó a <b>${escHtml(al.apoyo.nombre)}</b> <small>${escHtml(endosoRotuloCand(al.apoyo))}</small> <button type="button" class="enlace-boton" onclick="endosoQuitarApoyo(${k})">cambiar</button>${par?.valida ? `<span class="endoso-medida">coincidieron en el <b>${Math.round(par.tasa * 100)} %</b> de sus votos · ${escHtml(E360.CLASE[par.clase] || '')}</span>` : `<span class="endoso-aviso">No se usa: ${escHtml(par?.motivo || 'sin datos')}.</span>`}</div>`
       : `<button type="button" class="enlace-boton" onclick="endosoApoyoDe(${k})">+ ¿A quién apoyó antes? (mide la tasa)</button>`;
     const fuera = f.total - f.terr;
     return `<div class="endoso-fila">
       <div class="endoso-fila-top"><div><b>${escHtml(al.nombre)}</b><small>${escHtml(endosoRotuloCand(al))}</small></div><button type="button" class="endoso-x" onclick="endosoQuitar(${k})" aria-label="Quitar ${escHtml(al.nombre)}">×</button></div>
-      <div class="endoso-cifras"><span><b>${f.terr.toLocaleString('es-CO')}</b> votos en ${escHtml(L.lugar)}${fuera > 0 ? ` <small>(${fuera.toLocaleString('es-CO')} fuera, no cuentan)</small>` : ''}</span><span>× <label class="endoso-tasa"><input type="number" min="0" max="100" step="1" value="${Math.round(f.tasa * 100)}" onchange="endosoTasaManual(${k}, this.value)" ${f.fuente === 'medida' ? 'disabled' : ''}> %</label> <small>${escHtml(ENDOSO_FUENTE[f.fuente])}</small></span><span>= <b class="endoso-est">${f.est.toLocaleString('es-CO')}</b></span></div>
+      <div class="endoso-cifras"><span><b>${f.terr.toLocaleString('es-CO')}</b> votos en ${escHtml(L.lugar)}${fuera > 0 ? ` <small>(${fuera.toLocaleString('es-CO')} fuera, no cuentan)</small>` : ''}</span><span>× <label class="endoso-tasa"><input type="number" min="0" max="100" step="1" value="${Math.round(f.tasa * 100)}" onchange="endosoTasaManual(${k}, this.value)" ${f.fuente === 'medida' ? 'disabled' : ''}> %</label> <small>${escHtml(E360.FUENTE[f.fuente])}</small></span><span>= <b class="endoso-est">${f.est.toLocaleString('es-CO')}</b></span></div>
       ${apoyo}
       ${Number.isFinite(f.solape) && f.solape > .05 ? `<p class="helper">Hasta el ${Math.round(f.solape * 100)} % de sus votos está en puestos donde usted ya saca votos: parte de ese endoso puede ser voto que ya tiene.</p>` : ''}
     </div>`;
@@ -4680,7 +4597,7 @@ async function pintarModalEndoso() {
   const meta = Number(META_ACTUAL?.target || 0), max = Math.max(1, ...L.areas.map(a => a.v));
   resumen.innerHTML = `<div class="endoso-total"><div><span class="kicker">Endoso estimado</span><strong>hasta ${L.total.toLocaleString('es-CO')}</strong><small>votos, de ${L.techo.toLocaleString('es-CO')} que sus aliados sacaron en ${escHtml(L.lugar)}${meta ? ` · ${Math.round(L.total / meta * 100)} % de su meta de ${meta.toLocaleString('es-CO')}` : ''}</small></div></div>
     ${L.areas.length ? `<p style="margin:14px 0 6px"><b>Dónde se concentra</b></p><ul class="arq-lista">${L.areas.slice(0, 8).map(a => `<li><span class="arq-punto" style="background:var(--green)"></span><b>${a.v.toLocaleString('es-CO')}</b> ${escHtml(a.nombre)}<em>${Math.round(a.v / max * 100)} %</em></li>`).join('')}</ul>` : ''}
-    <p class="puntaje-nota">Es una <b>estimación, y es un techo</b>. La tasa medida es la del método de endoso de la plataforma: la suma, mesa por mesa, de lo que el aliado y su apoyado pudieron compartir; dice cuánto electorado cabía en común, no cuánto se pasó. Los votos son los de su última elección y en ${escHtml(L.lugar)}; si dos aliados trabajan los mismos barrios, sus votos se pueden estar contando dos veces. ${L.filas.some(f => f.fuente === 'supuesto') ? `Donde no hay medición usamos un <b>supuesto del ${Math.round(ENDOSO_SUPUESTO * 100)} %</b>: cámbielo por el suyo.` : ''}</p>`;
+    <p class="puntaje-nota">Es una <b>estimación, y es un techo</b>. La tasa medida es la del método de endoso de la plataforma: la suma, mesa por mesa, de lo que el aliado y su apoyado pudieron compartir; dice cuánto electorado cabía en común, no cuánto se pasó. Los votos son los de su última elección y en ${escHtml(L.lugar)}; si dos aliados trabajan los mismos barrios, sus votos se pueden estar contando dos veces. ${L.filas.some(f => f.fuente === 'supuesto') ? `Donde no hay medición usamos un <b>supuesto del ${Math.round(E360.SUPUESTO * 100)} %</b>: cámbielo por el suyo.` : ''}</p>`;
 }
 
 /* ─── 10. Arranque ───────────────────────────────────────────────────────── */

@@ -107,6 +107,7 @@ votante, 08 recolección de firmas (solo si va por firmas).
 | `cand-index.js` | El índice de candidaturas: baja las fuentes de S3, normaliza nombres, agrupa personas y resuelve `slug → URL` del JSON mesa a mesa. |
 | `partidos-bloques.js` | **Un solo diccionario** partido/coalición/movimiento → familia ideológica (izq, ci, c, cd, d, sc). Lo usan el mapa de alcaldías y Candidato 360: dos diccionarios serían dos opiniones. |
 | `candidato-360-electorado.js` | Las cuentas del electorado (perfil del censo, ideología del territorio, votación objetivo). Compartido por la tarjeta 07 y su página: si cada pantalla calculara por su lado, darían cifras distintas sobre lo mismo. Devuelve **datos**, no texto. |
+| `candidato-360-endoso.js` | El endoso de aliados (`window.C360Endoso`): recorta los votos del aliado al territorio, mide la tasa contra a quién apoyó y suma. Lo usan la tarjeta 08 y su panel; no conoce el CRM ni el DOM (el recorte y el nombre de las zonas se le pasan). Prueba: `node tools/candidato-360/prueba-endoso.mjs` (`--sin-red` para solo la lógica). |
 | `candidato-360-panel.js` | El chasis de los paneles: sesión, vínculo, muro, territorio y helpers de formato. |
 | `vote-target.js` | La meta de votos: referencia territorial, censo, participación y margen. Reparte las curules como el art. 263 (umbral, cifra repartidora) contando el **voto de lista** y las **listas cerradas**, y reservando la curul del estatuto de oposición en concejos y asambleas. Sin partido la referencia no es el piso de la corporación sino lo que costó entrar por una lista típica, o por una de la familia política elegida. |
 | `partidos-bloques.js` + `candidato-360-data/partidos/<dep>.js` | Catálogo de organizaciones por departamento para el sugeridor. |
@@ -216,6 +217,7 @@ Cada una tiene su README en `tools/candidato-360/<tema>/`:
 | **firmas** | Cuántas firmas y dónde recogerlas | `firmas/` |
 | **perfil** | El electorado: sexo, edad, campo y ciudad, y la votación objetivo | `perfil/` |
 | **arquetipos** | Qué mueve el voto en cada barrio (Medellín, Proyecto DC) | `arquetipos/` |
+| **endoso** | Cuántos votos le pueden pasar sus aliados (excandidatos y líderes de zona) | `endoso/PLAN.md` |
 | **barrios-voronoi** | Barrios aproximados donde no hay cartografía oficial | `barrios-voronoi/` |
 | **logos** | Los logos de partido y su manifiesto | `logos/` |
 | **briefing / redes** | El correo cada tres días y la validación de cuentas | `briefing/`, `redes/` |
