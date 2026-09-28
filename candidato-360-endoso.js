@@ -203,6 +203,92 @@
     return { ...base, tau: Math.min(1, Math.max(0, tau)), valida: true };
   }
 
+  /* ── El líder de zona (fase 6) ─────────────────────────────────────────
+     Una persona sin candidatura propia —una junta de acción comunal, una
+     iglesia, una organización— que dice tener votos en unos puestos. No hay
+     votación suya que leer, así que se mide lo que dejó: en los puestos de su
+     zona, cuánto sacó la candidatura que apoyó contra lo que habría sacado
+     votando como el resto de su comuna (o de su municipio, si la comuna no
+     tiene con qué comparar):
+         esperado = válidos de la zona × participación del apoyado afuera
+         efecto   = votos del apoyado en la zona − esperado
+     El error sale de cuánto varía esa participación entre los puestos de
+     comparación. Sin a quién apoyó, lo único que hay es lo que el usuario dice
+     que el líder «maneja»: entra rotulado como declarado y se contrasta con
+     cuánta gente votó en esos puestos.
+
+     ⚠️ El nombre del líder es un dato de un tercero: vive solo en el navegador
+     (decisión de Ricardo, 28-sep-2026). Lo que se guarda de la zona son
+     códigos de puesto, que son públicos. */
+  const MIN_COMPARACION = 8;
+  /* La comuna de cada puesto sale del georef (C360Electorado.puestos()). El
+     CRM y el panel la sacan con ESTA función: si cada uno armara la suya, un
+     líder daría cifras distintas en la tarjeta y en el panel. */
+  const comunaDesde = georef => code => { const g = georef?.[code]; return g ? `${g.mesa?.dep || ''}${g.mesa?.mun || ''}|${g.mesa?.com || g.mesa?.comNom || ''}` : ''; };
+  const hacerMesa = (code, extra = {}) => ({ dep: code.slice(0, 2), mun: code.slice(2, 5), zon: code.slice(5, 7), pue: code.slice(7), mesa: '', ...extra });
+  async function medirLider(lider, opts = {}) {
+    const leer = opts.mesasDe || mesas, leerTotales = opts.totalesDe || totales, comunaDe = opts.comunaDe;
+    const zona = (lider?.zona || []).map(z => z.code);
+    if (!zona.length) return { valida: false, motivo: 'no tiene puestos marcados' };
+    if (!lider.apoyo) return { valida: false, motivo: 'sin la candidatura que apoyó no hay qué medir' };
+    const eb = eleccionDe(lider.apoyo);
+    if (!eb) return { valida: false, motivo: 'no tenemos los totales por puesto de esa elección' };
+    let mb, TB;
+    try { [mb, TB] = await Promise.all([leer(lider.apoyo.dataUrl), leerTotales(eb.totales)]); }
+    catch { return { valida: false, motivo: 'no se pudo leer la votación de la candidatura que apoyó' }; }
+    const B = {}; mb.forEach(m => { const k = codigoPuesto(m); B[k] = (B[k] || 0) + Number(m.v || 0); });
+    const ambB = new Set(mb.filter(m => Number(m.v) > 0).map(m => ambitoDe(m, eb.escala)));
+    const enTarjeton = k => ambB.has(ambitoCodigo(k, eb.escala));
+    /* Dos razones distintas para que un puesto marcado no cuente, y se dicen
+       por separado: el mapa de puestos es de 2026, así que hay puestos que no
+       existían en esa elección; y hay puestos donde la candidatura apoyada no
+       estaba en el tarjetón (un edil de otra localidad). */
+    const sinEleccion = zona.filter(k => !(TB[k]?.[0] > 0)).length;
+    const fueraTarjeton = zona.filter(k => TB[k]?.[0] > 0 && !enTarjeton(k)).length;
+    const Z = zona.filter(k => TB[k]?.[0] > 0 && enTarjeton(k));
+    if (!Z.length) return { valida: false, sinEleccion, fueraTarjeton, motivo: fueraTarjeton ? 'en esos puestos la candidatura que apoyó no estaba en el tarjetón' : 'esos puestos no existían en esa elección' };
+    const enZona = new Set(Z), muns = new Set(Z.map(k => k.slice(0, 5)));
+    const afuera = Object.keys(TB).filter(k => !enZona.has(k) && muns.has(k.slice(0, 5)) && TB[k][0] > 0 && enTarjeton(k));
+    let C = afuera, base = 'municipio';
+    if (comunaDe) {
+      const comunas = new Set(Z.map(comunaDe).filter(Boolean));
+      const misma = afuera.filter(k => comunas.has(comunaDe(k)));
+      if (misma.length >= MIN_COMPARACION) { C = misma; base = 'comuna'; }
+    }
+    if (C.length < MIN_COMPARACION) return { valida: false, motivo: `solo ${C.length} puestos para comparar alrededor de su zona` };
+    const W = C.reduce((t, k) => t + TB[k][0], 0), shareC = C.reduce((t, k) => t + (B[k] || 0), 0) / W;
+    const var_ = C.reduce((t, k) => t + TB[k][0] * ((B[k] || 0) / TB[k][0] - shareC) ** 2, 0) / W;
+    const porPuesto = {}; let obs = 0, esperado = 0, v2 = 0;
+    Z.forEach(k => { const o = B[k] || 0, e = TB[k][0] * shareC; obs += o; esperado += e; porPuesto[k] = o - e; v2 += TB[k][0] ** 2; });
+    const validosZona = Z.reduce((t, k) => t + TB[k][0], 0);
+    return { valida: true, obs, esperado, efecto: obs - esperado, error: Math.sqrt(var_ * v2), base, nZona: Z.length, nComparacion: C.length,
+      sinEleccion, fueraTarjeton, shareZ: obs / validosZona, shareC, validosZona, porPuesto, anio: anio(lider.apoyo) };
+  }
+  /* La fila de un líder, con la forma de la de un excandidato: sus «votos en
+     el territorio» son el efecto medido (o lo declarado), repartido en los
+     puestos donde se notó. Así pasa igual por la unión, el mapa y los solapes. */
+  function filaLider(al, m, den) {
+    const zona = al.zona || [], nombres = Object.fromEntries(zona.map(z => [z.code, z]));
+    const mesaDe = (k, v) => hacerMesa(k, { v, pueNom: nombres[k]?.nombre || '', comNom: nombres[k]?.comNom || '', munNom: nombres[k]?.munNom || '' });
+    const votosZona = den ? zona.reduce((t, z) => t + (den[z.code]?.[0] || 0), 0) : 0;
+    const fila = { al, lider: m, votosZona };
+    if (m?.valida && m.efecto > 0) {
+      /* Se reparte donde el apoyado sacó MÁS de lo esperado, y se escala para
+         que sume el efecto neto de la zona. */
+      const pos = Object.entries(m.porPuesto).filter(([, x]) => x > 0), P = pos.reduce((t, [, x]) => t + x, 0);
+      fila.dentro = pos.map(([k, x]) => mesaDe(k, x * m.efecto / P));
+      fila.origen = 'medido';
+    } else if (Number.isFinite(al.declarado) && al.declarado > 0) {
+      /* Lo declarado se reparte por el tamaño de cada puesto. */
+      const pesos = zona.map(z => [z.code, den?.[z.code]?.[0] || 1]), P = pesos.reduce((t, [, x]) => t + x, 0);
+      fila.dentro = pesos.map(([k, x]) => mesaDe(k, al.declarado * x / P));
+      fila.origen = 'declarado';
+    } else { fila.dentro = []; fila.origen = m?.valida ? 'sin-efecto' : 'sin-dato'; }
+    fila.terr = fila.total = fila.dentro.reduce((t, x) => t + x.v, 0);
+    if (Number.isFinite(al.declarado) && al.declarado > 0 && votosZona) fila.declaradoParte = al.declarado / votosZona;
+    return fila;
+  }
+
   /* ── La lectura completa ───────────────────────────────────────────────
      opts:
        alcance    el territorio de la campaña (o null: sin recorte)
@@ -219,8 +305,17 @@
   async function evaluar(aliados, opts = {}) {
     const { alcance = null, lugar = 'su territorio', enAlcance, areaDe, mesasDe = mesas } = opts;
     const propio = opts.propio ? agrupar(opts.propio, llavePuesto) : null;
+    let den = null;
+    if (opts.corpCampana) { try { den = await (opts.totalesDe || totales)(`${opts.corpCampana}-2023`); } catch { den = null; } }
     const filas = await Promise.all((aliados || []).map(async al => {
       try {
+        if (al.tipo === 'lider') {
+          let m = null;
+          try { m = await medirLider(al, { mesasDe, totalesDe: opts.totalesDe, comunaDe: opts.comunaDe }); } catch { m = { valida: false, motivo: 'no se pudo medir' }; }
+          const fila = filaLider(al, m, den);
+          if (propio && fila.terr) { const pa = agrupar(fila.dentro, llavePuesto); let s = 0; Object.entries(pa).forEach(([k, v]) => { s += Math.min(v, propio[k] || 0); }); fila.solape = s / fila.terr; }
+          return fila;
+        }
         const ms = await mesasDe(al.dataUrl), dentro = alcance && enAlcance ? ms.filter(m => enAlcance(m, alcance)) : ms;
         const fila = { al, total: suma(ms), terr: suma(dentro), dentro, par: null };
         if (al.apoyo) {
@@ -236,9 +331,20 @@
     let techo = 0; const sumas = [0, 0, 0];
     filas.forEach(f => {
       if (f.error) return;
-      f.ret = retencionDe(f.al, opts.retencion || RETENCION);
+      /* El líder no tiene corporación propia: su desgaste es el de todas, a la
+         distancia desde la elección en la que se midió. Lo declarado es de hoy
+         y no se desgasta, pero tampoco se mide: queda rotulado. */
+      f.ret = f.al.tipo !== 'lider' ? retencionDe(f.al, opts.retencion || RETENCION)
+        : f.lider?.anio ? retencionDe({ corp: `LÍDER · ${f.lider.anio}` }, opts.retencion || RETENCION) : null;
       let r;
       if (Number.isFinite(f.al.manual)) { const t = f.al.manual / 100; r = [t, t, t]; f.fuente = 'suya'; }
+      else if (f.al.tipo === 'lider') {
+        if (f.origen === 'medido') {
+          const q = f.ret?.q || [1, 1, 1], piso = Math.max(0, f.lider.efecto - 1.96 * f.lider.error) / f.lider.efecto;
+          r = [q[0] * piso, q[1], q[2]]; f.fuente = 'lider';
+        } else if (f.origen === 'sin-efecto') { r = [0, 0, 0]; f.fuente = 'lider'; }
+        else { r = [1, 1, 1]; f.fuente = f.origen === 'declarado' ? 'declarado' : 'sin-dato'; }
+      }
       else if (f.reg?.valida) {
         /* La regresión da el centro y el piso (menos 1,96 errores); el techo
            sigue siendo Σ min si el par se pudo medir, y todo queda acotado
@@ -269,8 +375,6 @@
        V son los votos válidos de 2023 de la corporación a la que se lanza la
        campaña (totales-puesto/{corp}-2023.json). Sin ese dato, en ese puesto
        se suma, y se cuenta cuántos votos quedaron así. */
-    let den = null;
-    if (opts.corpCampana) { try { den = await (opts.totalesDe || totales)(`${opts.corpCampana}-2023`); } catch { den = null; } }
     const porK = new Map();
     filas.forEach((f, i) => {
       if (f.error || !f.terr) return;
@@ -305,7 +409,7 @@
     }).sort((a, b) => b.total - a.total);
     const areas = Object.entries(porArea).map(([nombre, v]) => ({ nombre, v: Math.round(v) })).filter(a => a.v > 0).sort((a, b) => b.v - a.v);
     const [bajo, total, alto] = union.map(Math.round);
-    return { alcance, lugar, filas, total, bajo, alto, techo, mediana, nMedidas: nM, areas, puestos,
+    return { alcance, lugar, filas, total, bajo, alto, techo: Math.round(techo), mediana, nMedidas: nM, areas, puestos,
       suma: { bajo: sumas[0], total: sumas[1], alto: sumas[2] }, dobleConteo: sumas[1] - total, siSeRepiten: Math.round(siSeRepiten),
       denominador: den ? `${opts.corpCampana}-2023` : null, sinDenominador: { puestos: sinDen, votos: Math.round(votosSinDen) } };
   }
@@ -438,6 +542,9 @@
     suya: 'tasa que usted escribió',
     retencion: 'lo que conserva de su propio voto: diga a quién apoyó para medirla',
     regresion: 'estimada puesto a puesto con a quién apoyó',
+    lider: 'lo que rindió de más quien apoyó en su zona',
+    declarado: 'lo que usted dice que maneja, sin medir',
+    'sin-dato': 'sin medir: diga a quién apoyó o cuántos votos maneja',
     supuesto: 'supuesto: escriba el suyo o mida el par',
   };
   const CLASE = {
@@ -445,6 +552,6 @@
     transferencia: 'elecciones distintas: transferencia entre fechas, comparada por puesto',
   };
 
-  global.C360Endoso = { SUPUESTO, SATURACION, MAX, FUENTE, CLASE, anio, corp, clase, ficha, mesas, suma, llavePuesto, llaveMesa, agrupar, medirPar, regresion, eleccionDe, evaluar, solapes, retencionDe, corpRetencion, RETENCION,
+  global.C360Endoso = { SUPUESTO, SATURACION, MAX, FUENTE, CLASE, anio, corp, clase, ficha, mesas, suma, llavePuesto, llaveMesa, agrupar, medirPar, regresion, eleccionDe, medirLider, comunaDesde, totales, evaluar, solapes, retencionDe, corpRetencion, RETENCION,
     enAlcance, areaDe, corpHistorica, municipioMayoritario, alcanceDe, codigoPuesto, porPuesto, clave, candidaturaId, cargar, guardar };
 })(typeof window !== 'undefined' ? window : globalThis);

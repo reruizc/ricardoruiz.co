@@ -87,8 +87,8 @@
   };
   VISTAS.endoso = {
     titulo: 'Endoso de aliados',
-    texto: 'Aquí sumas a los excandidatos que te van a apoyar. Solo cuentan sus votos en el territorio donde compites. Si me dices a quién apoyó cada uno antes, mido qué tanto coincidió su votación con la de esa persona, mesa por mesa, y con eso estimo cuánto te pueden pasar. Es un techo, no una promesa.',
-    chips: ['¿Por qué dice «hasta»?', '¿Qué pasa si no sé a quién apoyó?', '¿Por qué no cuentan todos sus votos?']
+    texto: 'Aquí sumas a quienes te van a apoyar: excandidatos, con su votación, y líderes sin candidatura propia, marcando en el mapa los puestos donde trabajan. Si me dices a quién apoyó cada uno antes, mido cuánto rindió esa persona donde ellos estaban. Solo cuentan los votos del territorio donde compites, y todo sale en rango: es un techo, no una promesa. Los nombres de tus líderes se quedan en tu navegador; no los guardamos en ningún servidor.',
+    chips: ['¿Por qué sale en rango?', '¿Cómo mides a un líder sin candidatura?', '¿Dónde queda el nombre de mis líderes?']
   };
   const SIN_VISTA = { titulo: 'Candidato 360', texto: 'Te voy diciendo qué hace cada parte de la plataforma. Pregúntame por lo que estés mirando.', chips: [] };
   const SIN_SESION = 'Para preguntarme por escrito necesito que inicies sesión; así sé de qué campaña estamos hablando. La guía de esta pantalla no depende de eso.';
@@ -420,6 +420,22 @@
     }
   }
 
+  /* ─── Que una página diga algo puntual ───────────────────────────────────
+     Para avisos que dan tranquilidad en el momento en que importan (el
+     endoso: dónde queda el nombre de un líder que se acaba de sumar). Con el
+     panel abierto va como mensaje; con un cálculo en curso no interrumpe: el
+     aviso del cálculo manda y la página lo puede volver a pedir al terminar. */
+  function decir(texto, ms = 16000) {
+    if (!globo || !texto) return false;
+    if (abierto) { burbuja('ella', `<p>${esc(texto)}</p>`); return true; }
+    if (calculando) return false;
+    globo.querySelector('#candiGloboTexto').textContent = texto;
+    globo.dataset.aviso = ''; globo.dataset.visto = ''; globo.hidden = false;
+    clearTimeout(mostrarGlobo._t);
+    mostrarGlobo._t = setTimeout(ocultarGlobo, ms);
+    return true;
+  }
+
   /* ─── Abrir, cerrar, desmontar ───────────────────────────────────────── */
   function abrir() {
     abierto = true; ocultarGlobo();
@@ -552,5 +568,5 @@
   }
   document.addEventListener('click', e => { if (e.target.closest?.(PIENSA_EN)) pensar(); });
 
-  window.Candi = { abrir, cerrar, entrar, pensar, calculo, get mascota() { return mascota; }, get descanso() { return descanso; }, contexto, primerNombre };
+  window.Candi = { abrir, cerrar, entrar, pensar, calculo, decir, get mascota() { return mascota; }, get descanso() { return descanso; }, contexto, primerNombre };
 })();

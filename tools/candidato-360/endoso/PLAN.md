@@ -96,7 +96,7 @@ suman menos que por separado; dos de barrios distintos suman casi completo.
 | 3 ✅ | D3 calibración de retención → reemplaza el 30 %. Rango piso/probable/techo. Crecimiento 2027 (decidido no sumarlo, ver bitácora). | **hecho 27-sep-2026** |
 | 4 ✅ | D1 totales por puesto (2023 primero) → regresión ecológica en la fórmula A. | **hecho 28-sep-2026** |
 | 5 ✅ | Unión probabilística por puesto + mapa combinado + matriz de solape entre aliados. | **hecho 28-sep-2026** |
-| 6 | Líder de zona: selector de zona en el mapa, sobre-rendimiento, DiD, «maneja N votos» contrastado. | fórmula B |
+| 6 ✅ | Líder de zona: selector de zona en el mapa, sobre-rendimiento, «maneja N votos» contrastado (DiD queda pendiente, ver bitácora). | **hecho 28-sep-2026** |
 | 7 | Integración: % de la meta por escalón, puestos donde el endoso cierra la brecha → Día D, CSV, entrada en `VISTAS` de Candi + `C360_CANDI_VISTAS` del worker, `candidato-360.md`. | cierre |
 
 ## Bitácora
@@ -239,12 +239,48 @@ se repiten 36.851). No se endureció la fórmula a ciegas: medir el solape de
 votantes entre dos aliados es otra regresión (aliado i contra aliado j) y queda
 como mejora posible.
 
+**Fase 6 (28-sep-2026).** El líder de zona sin candidatura propia:
+`{tipo:'lider', nombre, zona:[{code, nombre, comNom, munNom}], apoyo, declarado}`
+en la misma lista del navegador. En el panel se arma con un formulario: nombre,
+a quién apoyó (el buscador de siempre), la zona en un mapa (tocar puestos o sumar
+una localidad o comuna entera) y cuántos votos dice manejar.
+
+`medirLider`: en sus puestos, los votos de quien apoyó contra lo esperado si su
+zona votara como el resto de su COMUNA (≥ 8 puestos para comparar; si no, el
+municipio), con los totales por puesto de la fase 4. Error por la variación de
+esa participación entre los puestos de comparación. El efecto se reparte en los
+puestos donde el apoyado sacó de más y entra como un aliado más: retención de
+todas las corporaciones a su distancia, unión de la fase 5, mapa y solapes. Lo
+declarado entra solo si no hay medición, rotulado, y se contrasta con los votos
+válidos 2023 de esos puestos (aviso por encima del 30 %).
+
+⚠️ La comuna de cada puesto sale del georef con `comunaDesde` del motor: el CRM y
+el panel la usan igual (si cada uno armara la suya, el mismo líder daría cifras
+distintas). Verificado en el navegador: tarjeta y panel dan 872 · 1.893 · 2.514
+para el mismo líder.
+⚠️ El georef escribe la misma localidad de dos formas («CIUDAD BOLIVAR» y
+«CIUDAD BOLÍVAR», «CANDELARIA» y «LA CANDELARIA»): el selector las agrupa por
+nombre pelado y no ofrece NULL, cárceles ni puesto censo. Bogotá: 20 opciones.
+⚠️ El mapa de puestos es de 2026: marcar Suba entera trae 15 puestos que no
+existían en 2023; se dicen aparte de los puestos donde el apoyado no estaba en
+el tarjetón, que son otra cosa.
+
+Caso real: un líder de toda Suba que apoyó a Baena (Concejo 2023): sacó 9.812
+votos en 99 puestos donde, votando como el resto de Bogotá, habría sacado 6.869
+→ 2.943 de más (± 848) → endoso entre 872 y 2.514. Ojo: con la localidad entera
+no queda comuna para comparar y se compara con toda la ciudad, así que ese
+«efecto» incluye cuánto le va mejor a Baena en Suba por sí mismo; con una zona
+chica dentro de la comuna la comparación es más limpia.
+
+Pendiente de esta fase: la diferencia en diferencias (el cambio del apoyado en
+la zona entre dos elecciones, menos el de afuera) necesita votos por PARTIDO y
+puesto, que `totales-puesto/` todavía no trae.
+
 ## Decisiones abiertas (de Ricardo)
 
-1. **Datos de terceros**: el líder de zona es una persona privada. Por la regla del
-   Día D (no custodiamos datos del equipo del candidato), la propuesta es que su
-   nombre viva solo en el navegador y el servidor, si algún día guarda aliados,
-   guarde solo slugs de candidaturas públicas y zonas. ¿De acuerdo?
+1. ~~**Datos de terceros**~~ **Decidido (Ricardo, 28-sep-2026): el nombre del
+   líder vive solo en el navegador.** Candi lo dice al guardar cada líder, para
+   dar tranquilidad en el momento en que importa.
 2. ¿El panel entra en el plan base o solo en «Completo»? (hoy la card dice
    «Endoso, estrategia y acciones de campaña» en Completo).
 3. En vitrina (sin acceso): ¿se deja sumar un aliado de muestra con el detalle

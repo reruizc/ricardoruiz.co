@@ -4648,7 +4648,9 @@ async function endosoEvaluar() {
   /* La corporación de la campaña: de sus válidos de 2023 sale el electorado
      de cada puesto, para no contar dos veces a quien votó por dos aliados. */
   const corpCampana = currentTargetTerritory()?.corporation || CAMPANA_ACTUAL?.corp || SESSION.vinculo?.campana?.corp || corporacionHistorica(crmCandidate);
-  return E360.evaluar(ENDOSO.aliados, { alcance, lugar: endosoLugar(alcance), enAlcance: mesaEnAlcance, areaDe: endosoArea, propio, corpCampana });
+  /* Un líder de zona se compara con el resto de su comuna, que sale del georef. */
+  const comunaDe = ENDOSO.aliados.some(a => a.tipo === 'lider') ? E360.comunaDesde(await C360Electorado.puestos().catch(() => null)) : null;
+  return E360.evaluar(ENDOSO.aliados, { alcance, lugar: endosoLugar(alcance), enAlcance: mesaEnAlcance, areaDe: endosoArea, propio, corpCampana, comunaDe });
 }
 async function pintarEndoso() {
   const card = $('crmEndoso'); if (!card) return;
@@ -4667,7 +4669,7 @@ async function pintarEndoso() {
     const L = ENDOSO.lectura = await endosoEvaluar();
     const meta = Number(META_ACTUAL?.target || 0);
     const cifra = x => x.toLocaleString('es-CO');
-    const medidos = L.filas.filter(f => f.fuente === 'medida' || f.fuente === 'regresion').length;
+    const medidos = L.filas.filter(f => f.fuente === 'medida' || f.fuente === 'regresion' || (f.fuente === 'lider' && f.origen === 'medido')).length;
     /* Un rango, no una cifra: la retención del voto propio varía mucho entre
        personas, y un solo número escondería esa dispersión. */
     $('crmEndosoTitulo').textContent = L.bajo === L.alto ? `Sus aliados le pueden pasar hasta ${cifra(L.total)} votos.` : `Sus aliados le pueden pasar entre ${cifra(L.bajo)} y ${cifra(L.alto)} votos.`;

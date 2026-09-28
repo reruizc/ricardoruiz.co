@@ -135,6 +135,36 @@ ok(E.corpRetencion({ corp: 'CÁMARA · ANTIOQUIA · 2022' }) === 'camara' && E.c
   ok(sol[0].i === 0 && sol[0].j === 1 && cerca(sol[0].coincidencia, 1) && sol.find(x => x.j === 2).coincidencia === 0, 'solape: el aliado b vive entero dentro de la huella de a; c no comparte puestos');
 }
 
+/* El líder de zona (fase 6): la candidatura que apoyó saca 10 % en su
+   comuna y 30 % en los dos puestos del líder → 400 votos de más. */
+{
+  const TB = {}, mB = [], comuna = {};
+  for (let i = 0; i < 40; i++) {
+    const zon = i < 20 ? '01' : '02', pue = String(i).padStart(2, '0'), k = E.codigoPuesto({ dep: '16', mun: '001', zon, pue });
+    TB[k] = [1000, 1100, 10]; comuna[k] = zon;
+    mB.push({ dep: '16', mun: '001', zon, pue, mesa: '1', v: (i === 0 || i === 1) ? 300 : 100 });
+  }
+  const zona = ['00', '01'].map(pue => ({ code: E.codigoPuesto({ dep: '16', mun: '001', zon: '01', pue }), nombre: 'Colegio ' + pue, comNom: 'USAQUEN' }));
+  const apoyo = { slug: 'CONC2023-16-1-9-9', nombre: 'APOYADO', corp: 'CONCEJO · BOGOTÁ · 2023', dataUrl: 'B' };
+  const lider = { tipo: 'lider', id: 'l1', nombre: 'Doña Rosa', zona, apoyo, declarado: null, manual: null };
+  const o = { mesasDe: async () => mB, totalesDe: async () => TB, comunaDe: k => comuna[k] };
+  const m = await E.medirLider(lider, o);
+  ok(m.valida && cerca(m.efecto, 400) && m.base === 'comuna' && m.nComparacion === 18 && cerca(m.error, 0), `líder: 600 votos donde se esperaban 200 → efecto de 400, comparando con su comuna (${m.efecto})`);
+  ok((await E.medirLider(lider, { ...o, comunaDe: null })).base === 'municipio', 'líder: sin comunas, se compara con el municipio');
+  const L6 = await E.evaluar([lider], { alcance, enAlcance, ...o, retencion: RET, corpCampana: 'concejo' });
+  const f6 = L6.filas[0];
+  ok(f6.fuente === 'lider' && f6.terr === 400 && f6.est === 260 && f6.estAlto === 360 && f6.ret.medida === 4, `líder: el efecto se desgasta como cualquier base a 4 años (${f6.estBajo} · ${f6.est} · ${f6.estAlto})`);
+  ok(L6.puestos.length === 2 && cerca(L6.puestos.reduce((t, p) => t + p.total, 0), 260), 'líder: su endoso se reparte en sus puestos y pasa por la unión');
+  const dec = { ...lider, apoyo: null, declarado: 500 };
+  const L7 = await E.evaluar([dec], { alcance, enAlcance, ...o, retencion: RET, corpCampana: 'concejo' });
+  ok(L7.filas[0].fuente === 'declarado' && L7.total === 500 && cerca(L7.filas[0].declaradoParte, .25), 'líder que solo declara 500: entra rotulado y es el 25 % de los que votaron en sus puestos');
+  const L8 = await E.evaluar([{ ...lider, apoyo: null }], { alcance, enAlcance, ...o, retencion: RET });
+  ok(L8.filas[0].fuente === 'sin-dato' && L8.total === 0, 'líder sin apoyo ni cifra: no se inventa nada');
+  const mB2 = mB.map(x => ({ ...x, v: 100 }));
+  const L9 = await E.evaluar([lider], { alcance, enAlcance, ...o, mesasDe: async () => mB2, retencion: RET });
+  ok(L9.filas[0].fuente === 'lider' && L9.filas[0].lider.efecto === 0 && L9.total === 0, 'líder medido sin efecto: cero, y se dice');
+}
+
 /* El territorio desde la campaña guardada (lo que usa el panel). */
 const codigo = async (dep, nombre) => ({ 'BOGOTÁ, D.C.': '001', 'LA CEJA': '021' }[nombre] || '');
 let al = await E.alcanceDe({ campana: { corp: 'asamblea', ruta: 'other', departamento: '01', departamentoNombre: 'Antioquia' } });
