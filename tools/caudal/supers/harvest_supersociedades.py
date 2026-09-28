@@ -785,9 +785,16 @@ def fetch(solo=None, max_pages=MAX_PAGES):
             print(f'    {cat["nombre"]:<32} {len(filas):>4} filas → {n_ok:>4} propias '
                   f'({n_irr} de título irregular) · portal dice {total if total is not None else "?"}')
             prev_cat = prev_norm.get(cat_id) or []
-            # cae por CERO (el caso del 4-sep) o por desplome (el del 8-sep)
+            # cae por CERO (el caso del 4-sep), por desplome (el del 8-sep) o
+            # queda CORTA frente a lo que el propio portal declara (25-28 sep:
+            # desde la EC2 el portal dejaba sin responder páginas distintas en
+            # cada corrida, se cosechaban 391 de 485 resoluciones, el raw se
+            # sobrescribía con eso y el pilar Regulatorio entero dejó de subir
+            # tres días). Un acto que no bajó hoy no dejó de existir: se suma el
+            # de la corrida anterior, y la cosecha completa lo reemplaza sola.
+            corta = total is not None and len(filas) < total
             cayo = bool(prev_cat) and (
-                n_ok == 0
+                n_ok == 0 or corta
                 or (len(prev_cat) >= CAIDA_MIN_PREV
                     and n_ok < len(prev_cat) * CAIDA_FRACCION))
             if cayo:
