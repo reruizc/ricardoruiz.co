@@ -220,7 +220,7 @@ Cada una tiene su README en `tools/candidato-360/<tema>/`:
 | **firmas** | Cuántas firmas y dónde recogerlas | `firmas/` |
 | **perfil** | El electorado: sexo, edad, campo y ciudad, y la votación objetivo | `perfil/` |
 | **arquetipos** | Qué mueve el voto en cada barrio (Medellín, Proyecto DC) | `arquetipos/` |
-| **endoso** | Cuántos votos le pueden pasar sus aliados (excandidatos y líderes de zona) | `endoso/PLAN.md` |
+| **endoso** | Cuántos votos le pueden pasar sus aliados (excandidatos y líderes de zona). La retención del voto propio se mide con `endoso/calibrar.mjs`, que reescribe la tabla del motor | `endoso/PLAN.md` |
 | **barrios-voronoi** | Barrios aproximados donde no hay cartografía oficial | `barrios-voronoi/` |
 | **logos** | Los logos de partido y su manifiesto | `logos/` |
 | **briefing / redes** | El correo cada tres días y la validación de cuentas | `briefing/`, `redes/` |

@@ -4,7 +4,15 @@
    4, 8 o 12 años después, ¿qué parte de su votación anterior sigue ahí, puesto
    por puesto?
 
-     retención = Σ_puesto min(votos antes, votos después) ÷ Σ votos antes
+     retención = Σ_puesto min(votos antes, votos después × e) ÷ Σ votos antes
+                 con e = min(1, total antes ÷ total después)
+
+   Si la persona CRECIÓ, su segunda votación se lleva al tamaño de la primera
+   antes de comparar (e < 1): lo que queda es cuánto se parece el mapa de su
+   voto, no su crecimiento, que es mérito de su campaña y no se le puede pasar
+   a nadie. Sin esa escala la suma de mínimos se satura —quien repite a la
+   alcaldía suele crecer tanto que la retención daba 99,8 %—. Si DECRECIÓ, la
+   pérdida sí cuenta (e = 1).
 
    Es la misma suma de mínimos del endoso (candidato-360-endoso.js, medirPar),
    medida contra sí misma. Por eso sirve de techo para el endoso de un aliado:
@@ -133,9 +141,10 @@ function medir(ambito, ma, mb) {
     const enLugar = E.suma(mb.filter(m => llave(m) === lugar));
     if (enLugar / totB < MIN_EN_AMBITO) return null;   /* homónimo de otro lugar, o se mudó */
   }
-  const A = E.agrupar(ma, E.llavePuesto), B = E.agrupar(mb, E.llavePuesto);
-  let sumMin = 0; Object.entries(A).forEach(([k, a]) => { sumMin += Math.min(a, B[k] || 0); });
-  return { dep, mun, retencion: sumMin / totA, gap: totB / totA };
+  const A = E.agrupar(ma, E.llavePuesto), B = E.agrupar(mb, E.llavePuesto), escala = Math.min(1, totA / totB);
+  let sumMin = 0, sumCruda = 0;
+  Object.entries(A).forEach(([k, a]) => { sumMin += Math.min(a, (B[k] || 0) * escala); sumCruda += Math.min(a, B[k] || 0); });
+  return { dep, mun, retencion: sumMin / totA, cruda: sumCruda / totA, gap: totB / totA };
 }
 
 const casos = [];
@@ -152,7 +161,7 @@ for (const [corp, C] of Object.entries(CORPS)) {
     const med = await enLotes(pares, async ({ k, a, b }) => {
       const [ma, mb] = await Promise.all([mesasDe(a), mesasDe(b)]);
       const m = medir(C.ambito, ma, mb); if (!m) return null;
-      return { corp, anoA: y, anoB: y2, gap_anos: g, persona: k, dep: m.dep, municipio: m.mun, votosA: Number(a.votos) || E.suma(ma), votosB: Number(b.votos) || E.suma(mb), retencion: m.retencion, crecimiento: m.gap };
+      return { corp, anoA: y, anoB: y2, gap_anos: g, persona: k, dep: m.dep, municipio: m.mun, votosA: Number(a.votos) || E.suma(ma), votosB: Number(b.votos) || E.suma(mb), retencion: m.retencion, cruda: m.cruda, crecimiento: m.gap };
     });
     const v = med.filter(Boolean); console.log(`    ${v.length} válidos`); casos.push(...v);
   }
@@ -175,13 +184,16 @@ tabla._todas = {};
 for (const g of [...new Set(casos.map(c => c.gap_anos))].sort((a, b) => a - b)) tabla._todas[g] = resumen(casos.filter(c => c.gap_anos === g));
 
 await mkdir(SALIDA, { recursive: true });
-await writeFile(path.join(SALIDA, 'endoso-calibracion.json'), JSON.stringify({ _generado: new Date().toISOString().slice(0, 10), _metodo: 'retención = Σ_puesto min(votos Y, votos Y+g) ÷ Σ votos Y, misma persona y misma corporación; cuartiles por corporación y distancia en años', ...tabla }, null, 1));
-const cols = ['corp', 'anoA', 'anoB', 'gap_anos', 'persona', 'dep', 'municipio', 'votosA', 'votosB', 'retencion', 'crecimiento'];
+await writeFile(path.join(SALIDA, 'endoso-calibracion.json'), JSON.stringify({ _generado: new Date().toISOString().slice(0, 10), _metodo: 'retención = Σ_puesto min(votos Y, votos Y+g × min(1, total Y ÷ total Y+g)) ÷ Σ votos Y, misma persona y misma corporación; cuartiles por corporación y distancia en años', ...tabla }, null, 1));
+const cols = ['corp', 'anoA', 'anoB', 'gap_anos', 'persona', 'dep', 'municipio', 'votosA', 'votosB', 'retencion', 'cruda', 'crecimiento'];
 const csv = v => v == null ? '' : /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
 await writeFile(path.join(SALIDA, 'endoso-casos.csv'), [cols.join(','), ...casos.map(c => cols.map(k => csv(typeof c[k] === 'number' ? +c[k].toFixed(4) : c[k])).join(','))].join('\n') + '\n');
 
 console.log('\n═══ Retención (p25 · mediana · p75, n)');
-for (const [corp, t] of Object.entries(tabla)) for (const [g, r] of Object.entries(t)) console.log(`  ${corp.padEnd(12)} ${String(g).padStart(2)} años: ${r.p25} · ${r.p50} · ${r.p75}  (n=${r.n})`);
+for (const [corp, t] of Object.entries(tabla)) for (const [g, r] of Object.entries(t)) {
+  const cs = corp === '_todas' ? casos.filter(c => c.gap_anos === Number(g)) : casos.filter(c => c.corp === corp && c.gap_anos === Number(g));
+  console.log(`  ${corp.padEnd(12)} ${String(g).padStart(2)} años: ${r.p25} · ${r.p50} · ${r.p75}  (n=${r.n}) · sin escala: ${cuantil(cs.map(c => c.cruda), .5)}`);
+}
 console.log('\n═══ Por departamento (Concejo, 4 años) · mediana y n');
 const c4 = casos.filter(c => c.corp === 'concejo' && c.gap_anos === 4);
 for (const d of [...new Set(c4.map(c => c.dep))].sort()) { const r = resumen(c4.filter(c => c.dep === d)); if (r.n >= 8) console.log(`  dep ${d}: ${r.p50} (n=${r.n})`); }

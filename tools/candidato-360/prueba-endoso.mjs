@@ -55,17 +55,38 @@ ok(!par.valida && /no compartieron/.test(par.motivo), 'sin departamento en comú
 
 const alcance = { tipo: 'municipio', departamento: '16', municipio: '1' };
 const enAlcance = (m, a) => String(Number(m.dep)) === a.departamento && String(Number(m.mun)) === a.municipio;
-let L = await E.evaluar([{ ...C('conFuera', 'JAL · SUBA · 2023'), manual: null }], { alcance, enAlcance, mesasDe: leer });
-ok(L.filas[0].terr === 70 && L.filas[0].total === 100 && L.filas[0].fuente === 'supuesto' && L.total === 21, 'recorte al territorio + supuesto del 30 % (70 × 30 % = 21)');
+/* Una tabla de retención de prueba: el motor recibe la suya para que estos
+   casos no dependan de lo que salga de calibrar.mjs. [p25, mediana, p75, n] */
+const RET = { jal: { 4: [.4, .6, .9, 90], 8: [.2, .5, .8, 60] }, concejo: { 4: [.5, .7, .95, 90] }, _todas: { 4: [.45, .65, .9, 500], 8: [.3, .55, .8, 300], 12: [.2, .45, .85, 100] } };
+const base = { alcance, enAlcance, mesasDe: leer, retencion: RET };
+let L = await E.evaluar([{ ...C('conFuera', 'JAL · SUBA · 2023'), manual: null }], { ...base, retencion: {} });
+ok(L.filas[0].terr === 70 && L.filas[0].total === 100 && L.filas[0].fuente === 'supuesto' && L.total === 21, 'sin tabla de retención: recorte al territorio + supuesto del 30 % (70 × 30 % = 21)');
+L = await E.evaluar([{ ...C('conFuera', 'JAL · SUBA · 2023'), manual: null }], base);
+ok(L.filas[0].fuente === 'retencion' && L.bajo === 28 && L.total === 42 && L.alto === 63, `sin par: la retención de un edil a 4 años da el rango (${L.bajo} · ${L.total} · ${L.alto})`);
+L = await E.evaluar([{ ...C('conFuera', 'JAL · SUBA · 2019'), manual: null }], base);
+ok(L.filas[0].ret.medida === 8 && L.total === 35, 'una candidatura de 2019 llega a 2027 con 8 años de desgaste');
+L = await E.evaluar([{ ...C('conFuera', 'JAL · SUBA · 2015'), manual: null }], base);
+ok(L.filas[0].ret.propia === false && L.filas[0].ret.medida === 12, 'sin casos propios a 12 años: la de todas las corporaciones');
+L = await E.evaluar([{ ...C('conFuera', 'PRESIDENCIA · 2022'), manual: null }], base);
+ok(L.filas[0].ret.propia === false && L.filas[0].ret.medida === 4, 'presidencia no tiene quien repita: la de todas, a la distancia más cercana');
 L = await E.evaluar([
   { ...C('aliado2019', 'JAL · SUBA · 2019'), apoyo: C('apoyado2023', 'CONCEJO · 2023') },
   { ...C('conFuera', 'JAL · SUBA · 2023'), manual: 50 },
   { ...C('mismaJornada', 'JAL · SUBA · 2023') },
-], { alcance, enAlcance, mesasDe: leer, propio: DATOS.aliado2019, areaDe: m => m.pueNom });
-ok(L.filas.map(f => f.fuente).join() === 'medida,suya,mediana', 'orden de fuentes: medida → escrita → mediana');
-ok(L.total === Math.round(200 * .8) + 35 + Math.round(540 * .8), `total = Σ estimados (${L.total})`);
+], { ...base, propio: DATOS.aliado2019, areaDe: m => m.pueNom });
+ok(L.filas.map(f => f.fuente).join() === 'medida,suya,retencion', 'orden de fuentes: medida → escrita → retención');
+ok(L.filas[0].tasaBaja === .2 && L.filas[0].tasa === .5 && L.filas[0].tasaAlta === .8, 'con par medido (80 %) el rango lo acota la retención a 8 años: min(80 %, 20 · 50 · 80 %)');
+ok(L.filas[1].estBajo === 35 && L.filas[1].estAlto === 35, 'la tasa escrita no tiene rango');
+ok(L.total === 100 + 35 + Math.round(540 * .6) && L.bajo === 40 + 35 + Math.round(540 * .4) && L.alto === 160 + 35 + Math.round(540 * .9), `total, bajo y alto = Σ de cada aliado (${L.bajo} · ${L.total} · ${L.alto})`);
 ok(cerca(L.filas[2].solape, (40 + 100) / 540), 'solape con el voto propio, por puesto');
 ok(L.areas[0].nombre === 'P02', 'dónde se concentra: el área con más endoso primero');
+ok(E.corpRetencion({ corp: 'CÁMARA · ANTIOQUIA · 2022' }) === 'camara' && E.corpRetencion({ corp: 'SENADO' }) === 'senado' && E.corpRetencion({ corp: 'CONSULTA · PACTO · 2022' }) === '', 'la corporación de la retención sale del corp');
+{
+  /* La mediana de las tasas medidas: con un número par, el promedio de las
+     dos del medio (antes tomaba la menor). */
+  const cuatro = await E.evaluar([0, 1].map(i => ({ ...C('aliado2019', 'JAL · SUBA · 2019'), slug: 'x' + i, apoyo: C(i ? 'mismaJornada' : 'apoyado2023', i ? 'CONCEJO · 2019' : 'CONCEJO · 2023') })), base);
+  ok(cerca(cuatro.mediana, (.7 + .8) / 2), `mediana con dos medidas = promedio (${cuatro.mediana})`);
+}
 
 /* El territorio desde la campaña guardada (lo que usa el panel). */
 const codigo = async (dep, nombre) => ({ 'BOGOTÁ, D.C.': '001', 'LA CEJA': '021' }[nombre] || '');
@@ -121,13 +142,12 @@ if (!process.argv.includes('--sin-red')) {
       { ...FORERO, apoyo: ABIS }, { ...SEPUL, manual: 12 }, { ...BRICENO },
     ], { alcance: { tipo: 'municipio', departamento: '16', municipio: '1' }, enAlcance, propio });
     const f = Lr.filas;
-    ok(Lr.total === 135894 && Lr.techo === 207208, `real · total 135.894 de 207.208 (${Lr.total} de ${Lr.techo})`);
-    ok(f[0].fuente === 'medida' && f[0].par.clase === 'transferencia' && f[0].est === 8117, 'real · JAL Suba 2019 → Concejo 2023: transferencia medida, 8.117');
-    ok(f[1].fuente === 'medida' && f[1].par.clase === 'cota' && f[1].est === 8291, 'real · JAL Suba 2023 → Concejo 2023: cota medida, 8.291');
-    ok(!f[2].par.valida && f[2].par.clase === 'cota' && f[2].fuente === 'mediana', 'real · concejal → Galán: saturado, cae a la mediana');
+    ok(Lr.bajo === 86976 && Lr.total === 137205 && Lr.alto === 167888 && Lr.techo === 207208, `real · entre 86.976 y 167.888, punto medio 137.205, de 207.208 (${Lr.bajo} · ${Lr.total} · ${Lr.alto} de ${Lr.techo})`);
+    ok(f[0].fuente === 'medida' && f[0].par.clase === 'transferencia' && f[0].estAlto === 8117 && f[0].est === 5670 && f[0].ret.medida === 8, 'real · JAL Suba 2019 → Concejo 2023: la tasa medida (74 %) queda de techo y la acota la retención de un edil a 8 años');
+    ok(f[1].fuente === 'medida' && f[1].par.clase === 'cota' && f[1].estAlto === 8291 && f[1].est === 7980, 'real · JAL Suba 2023 → Concejo 2023: cota medida (68 %), acotada a 4 años');
+    ok(!f[2].par.valida && f[2].fuente === 'retencion' && f[2].ret.corp === 'concejo', 'real · concejal → Galán: saturado, se estima con la retención de un concejal');
     ok(!f[3].par.valida && f[3].par.clase === 'mismo', 'real · concejal → concejal: mismo tarjetón');
-    ok(f[4].fuente === 'suya' && f[4].est === 1273, 'real · tasa escrita 12 % → 1.273');
-    ok(cerca(Lr.mediana, f[1].par.tasa), 'real · la mediana de dos medidas es la menor (convención del motor)');
+    ok(f[4].fuente === 'suya' && f[4].est === 1273 && f[4].estBajo === 1273, 'real · tasa escrita 12 % → 1.273, sin rango');
     const suba = { tipo: 'localidad', departamento: '16', municipio: '1', localidad: 'SUBA' }, reales = (await E.mesas(BRICENO.dataUrl)).concat(propio);
     ok(reales.every(m => globalThis.__crmEnAlcance(m, suba) === E.enAlcance(m, suba)), `real · recorte a Suba idéntico al del CRM en ${reales.length.toLocaleString('es-CO')} mesas`);
     const Ls = await E.evaluar([{ ...BRICENO }], { alcance: suba, enAlcance: E.enAlcance, mesasDe: E.mesas });

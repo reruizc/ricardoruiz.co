@@ -40,7 +40,8 @@
 
   const SUPUESTO = .3, SATURACION = .95, MAX = 25;
   /* RETENCION:inicio */
-  const RETENCION = {};
+  /* Generado por tools/candidato-360/endoso/calibrar.mjs el 2026-09-28: [p25, mediana, p75, n] por corporación y años de distancia. No editar a mano: volver a correr el script. */
+  const RETENCION = {"jal":{"4":[0.308,0.656,0.829,1198],"8":[0.087,0.516,0.766,796],"12":[0,0.384,0.689,398]},"concejo":{"4":[0.467,0.705,0.866,1178],"8":[0.362,0.65,0.856,772],"12":[0.257,0.555,0.787,379]},"alcaldia":{"4":[0.662,0.89,0.957,1190],"8":[0.365,0.744,0.915,784],"12":[0.23,0.684,0.897,390]},"asamblea":{"4":[0.429,0.56,0.664,1198],"8":[0.326,0.463,0.566,586],"12":[0.221,0.377,0.491,168]},"gobernacion":{"4":[0.545,0.726,0.805,39],"8":[0.253,0.62,0.695,21],"12":[0.219,0.427,0.467,3]},"camara":{"4":[0.432,0.575,0.676,308],"8":[0.331,0.49,0.566,75]},"senado":{"4":[0.134,0.268,0.476,256],"8":[0.091,0.144,0.314,53]},"_todas":{"4":[0.416,0.643,0.854,5367],"8":[0.282,0.552,0.804,3087],"12":[0.155,0.483,0.781,1338]}};
   /* RETENCION:fin */
 
   /* ── Identidad de una candidatura ─────────────────────────────────────── */
@@ -63,8 +64,8 @@
   /* ── La retención de un aliado ─────────────────────────────────────────
      La corporación sale del corp («CÁMARA · ANTIOQUIA · 2022» → camara) y la
      distancia, de su año hasta 2027, llevada a la más cercana medida (una
-     candidatura de 2022 cae en la de 4 años). Con menos de 20 casos propios
-     se usa la de todas las corporaciones juntas: presidencia y consultas no
+     candidatura de 2022 cae en la de 4 años). Con menos de 20 casos propios,
+     o sin una distancia propia cercana, se usa la de todas las corporaciones juntas: presidencia y consultas no
      tienen personas que repitan, y la gobernación a 12 años tiene tres. */
   const AÑO_ELECCION = 2027, MIN_CASOS = 20;
   function corpRetencion(c) {
@@ -83,10 +84,13 @@
     if (!ks.length) return null;
     return ks.sort((a, b) => Math.abs(a - g) - Math.abs(b - g) || a - b)[0];
   }
-  function retencionDe(c) {
+  function retencionDe(c, T = RETENCION) {
     const a = anio(c), g = a ? Math.max(1, AÑO_ELECCION - a) : 4, cp = corpRetencion(c);
-    let k = cercana(RETENCION[cp], g), tabla = RETENCION[cp], propia = true;
-    if (k == null) { k = cercana(RETENCION._todas, g); tabla = RETENCION._todas; propia = false; }
+    /* La propia solo si midió una distancia parecida (±2 años: el Congreso
+       de 2022 está a 5 de 2027 y se midió a 4). Un edil de 2015 está a 12, y
+       usar la de 8 porque es la única que hay subestimaría el desgaste. */
+    let k = cercana(T[cp], g), tabla = T[cp], propia = true;
+    if (k == null || Math.abs(k - g) > 2) { k = cercana(T._todas, g); tabla = T._todas; propia = false; }
     if (k == null) return null;
     const [p25, p50, p75, n] = tabla[k];
     return { q: [p25, p50, p75], corp: propia ? cp : '', anos: g, medida: k, n, propia };
@@ -136,7 +140,8 @@
        enAlcance  (mesa, alcance) → bool; el recorte por código electoral
        areaDe     (mesa, alcance) → nombre del área donde se concentra
        propio     mesas del historial del candidato, para medir el solape
-       mesasDe    url → Promise<mesas>; por defecto el fetch con caché */
+       mesasDe    url → Promise<mesas>; por defecto el fetch con caché
+       retencion  otra tabla de retención (las pruebas); por defecto la medida */
   async function evaluar(aliados, opts = {}) {
     const { alcance = null, lugar = 'su territorio', enAlcance, areaDe, mesasDe = mesas } = opts;
     const propio = opts.propio ? agrupar(opts.propio, llavePuesto) : null;
@@ -154,7 +159,7 @@
     let total = 0, bajo = 0, alto = 0, techo = 0; const porArea = {};
     filas.forEach(f => {
       if (f.error) return;
-      f.ret = retencionDe(f.al);
+      f.ret = retencionDe(f.al, opts.retencion || RETENCION);
       let r;
       if (Number.isFinite(f.al.manual)) { const t = f.al.manual / 100; r = [t, t, t]; f.fuente = 'suya'; }
       else if (f.par?.valida && f.ret) { r = f.ret.q.map(q => Math.min(f.par.tasa, q)); f.fuente = 'medida'; }

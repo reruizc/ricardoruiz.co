@@ -93,7 +93,7 @@ suman menos que por separado; dos de barrios distintos suman casi completo.
 |---|---|---|
 | 1 ✅ | Extraer el motor a `candidato-360-endoso.js` (`window.C360Endoso`), sin cambiar cifras. La tarjeta 08 lo usa. Prueba en Node con JSON reales (`prueba-endoso.mjs`). | **hecho 27-sep-2026** |
 | 2 ✅ | Panel `candidato-360-endoso.html` con los excandidatos: ficha por aliado, mapa de sus votos en el territorio, tasa con su método, total. La tarjeta 08 pasa a enlace (como 06 y 09); se retira el modal. | **hecho 27-sep-2026** |
-| 3 | D3 calibración de retención → reemplaza el 30 %. Rango piso/probable/techo. Crecimiento 2027. | fórmula A v2 |
+| 3 ✅ | D3 calibración de retención → reemplaza el 30 %. Rango piso/probable/techo. Crecimiento 2027 (decidido no sumarlo, ver bitácora). | **hecho 27-sep-2026** |
 | 4 | D1 totales por puesto (2023 primero) → regresión ecológica en la fórmula A. | fórmula A v3 |
 | 5 | Unión probabilística por puesto + mapa combinado + matriz de solape entre aliados. | sin doble conteo |
 | 6 | Líder de zona: selector de zona en el mapa, sobre-rendimiento, DiD, «maneja N votos» contrastado. | fórmula B |
@@ -141,6 +141,47 @@ corporación» (cifras idénticas a la prueba) y JAL de Suba por «otra
 corporación» (el concejal Briceño baja de 49.894 a sus 11.237 votos en Suba).
 Sin desborde a 375 px. Candi tiene la vista `endoso` en el frontend; en el
 worker (`C360_CANDI_VISTAS`) está escrita pero **sin desplegar**.
+
+**Fase 3 (27-sep-2026).** El 30 % supuesto se reemplazó por la **retención**:
+cuánto de su propio voto conserva, puesto por puesto, la misma persona que se
+relanza a la misma corporación 4, 8 o 12 años después
+(`tools/candidato-360/endoso/calibrar.mjs`, ~9.800 personas 2011-2023 y
+Congreso 2014-2022, 400 pares por corporación y par de años). Si la persona
+creció, su segunda votación se escala al tamaño de la primera antes de comparar:
+sin eso la suma de mínimos se saturaba (alcaldía daba 99 %) y medía el mérito de
+su campaña, que no se transfiere. El script reescribe el bloque RETENCION del
+motor entre sus marcas: no se edita a mano.
+
+| Mediana (p25–p75) | 4 años | 8 años | 12 años |
+|---|---|---|---|
+| JAL | 66 % (31–83) | 52 % (9–77) | 38 % (0–69) |
+| Concejo | 71 % (47–87) | 65 % (36–86) | 56 % (26–79) |
+| Alcaldía | 89 % (66–96) | 74 % (37–92) | 68 % (23–90) |
+| Asamblea | 56 % (43–66) | 46 % (33–57) | 38 % (22–49) |
+| Cámara | 58 % (43–68) | 49 % (33–57) | — |
+| Senado | 27 % (13–48) | 14 % (9–31) | — |
+
+Cómo entra: con par medido, `min(tasa medida, retención)` en p25 · mediana ·
+p75; sin par, la retención sola; con tasa escrita, esa sin rango. La
+corporación propia solo si tiene ≥ 20 casos a ±2 años de la distancia del
+aliado a 2027; si no, la de todas juntas (presidencia, consultas, gobernación a
+12 años). La mediana de las tasas medidas ahora promedia las dos del medio y ya
+no se aplica a los aliados sin medir.
+
+Tres límites que el panel declara: (1) quien repite suele ser a quien le fue
+bien, así que la retención es generosa —un techo, no un promedio—; (2) en
+alcaldía el voto cubre todo el municipio y su mapa casi no cambia, así que ahí
+el techo es flojo; (3) no se suma el crecimiento del censo a 2027 porque la
+retención ya se midió con el electorado de cada año. Por departamento (Concejo,
+4 años) no hay anomalías: Atlántico da 73 %, así que el cambio de códigos de
+puesto de Barranquilla no se nota en el agregado.
+
+Caso de control (Bogotá, 3 aliados, medido con los dos motores): pasa de «hasta 46.247» a «entre 25.529 y
+52.598, punto medio 42.118».
+
+⚠️ El commit `602e3a46` de otra sesión se llevó una versión intermedia del
+motor y del calibrador (tabla vacía): entre ese commit y el de la fase 3, los
+aliados sin medir usaron el 30 % y no la mediana. Sin efecto después.
 
 ## Decisiones abiertas (de Ricardo)
 
