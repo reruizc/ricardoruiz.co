@@ -42,6 +42,10 @@ SAL_DIC = os.path.join(RAIZ, 'candidato-360-data', 'cartagena-puesto-barrio.js')
 TOPE_M = 1000
 
 MINUS = {'DE', 'DEL', 'LA', 'LAS', 'LOS', 'Y', 'EL', 'EN'}
+# Sigla de localidad del catastro → código de CARTAGENA-LOCALIDADES.json. Las
+# JAL de Cartagena se eligen por LOCALIDAD, no por UCG, así que el mapa del
+# CRM necesita las dos llaves en cada barrio y en cada puesto.
+LOC_CODIGO = {'LH': '01', 'LV': '02', 'LI': '03'}
 
 
 def bonito(nombre):
@@ -82,7 +86,7 @@ with open(UCG_PUESTOS, encoding='utf-8') as f:
 # Las propiedades quedan como las de Cali (`barrio` + `comuna`): el frontend
 # las lee con el mismo código y no hace falta una tercera variante.
 porucg = collections.defaultdict(list)
-figuras, nombres_fig, ucgs_fig, por_nombre = [], [], [], {}
+figuras, nombres_fig, ucgs_fig, locs_fig, por_nombre = [], [], [], [], {}
 for ft in geo['features']:
     pr = ft.get('properties') or {}
     if pr.get('UCG') is None:
@@ -91,8 +95,9 @@ for ft in geo['features']:
     nombre = bonito(pr.get('NOMBRE'))
     if not nombre:
         continue
+    loc = LOC_CODIGO.get(pr.get('LOC'), '')
     porucg[ucg].append({'type': 'Feature',
-                        'properties': {'barrio': nombre, 'comuna': ucg},
+                        'properties': {'barrio': nombre, 'comuna': ucg, 'loc': loc},
                         'geometry': ft['geometry']})
     try:
         g = shape(ft['geometry']).buffer(0)
@@ -103,6 +108,7 @@ for ft in geo['features']:
     figuras.append(g)
     nombres_fig.append(nombre)
     ucgs_fig.append(ucg)
+    locs_fig.append(loc)
     por_nombre.setdefault(norm(pr.get('NOMBRE')), (nombre, ucg))
 
 os.makedirs(SAL_DIR, exist_ok=True)
@@ -164,6 +170,11 @@ with open(GEOREF, encoding='utf-8-sig') as f:
         valor = {'comuna': ucg or ''}
         if barrio:
             valor['barrio'] = barrio
+        loc_geo = (row.get('CÓDIGO COMUNA') or '').strip().zfill(2)
+        loc_barrio = next((l for n, l in zip(nombres_fig, locs_fig) if n == barrio), '') if barrio else ''
+        valor['loc'] = loc_geo if loc_geo in LOC_CODIGO.values() else loc_barrio
+        if barrio and loc_barrio and valor['loc'] != loc_barrio:
+            cuenta['loc-difiere'] += 1
         dic[code] = valor
 
 with open(SAL_DIC, 'w', encoding='utf-8') as f:

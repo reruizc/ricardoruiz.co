@@ -1692,7 +1692,10 @@ async function createNew(e) {
    mitad gritando. Esto es SOLO cómo se muestra: lo que se guarda y lo que se
    compara sigue siendo el nombre original, que es la llave contra la Divipola. */
 const NOMBRE_BONITO = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase().replace(/(^|[\s(\-·])([a-záéíóúñü])/g, (m, a, b) => a + b.toUpperCase())
-  .replace(/\b(De|Del|La|Las|Los|Y|El)\b/g, w => w.toLowerCase()).replace(/^(\w)/, c => c.toUpperCase())
+  .replace(/\b(De|Del|La|Las|Los|Y|E|El)\b/g, w => w.toLowerCase()).replace(/^(\w)/, c => c.toUpperCase())
+  /* Tras «·», «:» o «,» empieza otro nombre: «UCG 12 · El Socorro» y
+     «Bayunca, La Boquilla», no «· el Socorro» ni «, la Boquilla». */
+  .replace(/([·:,]\s*)([a-záéíóúñü])/g, (m, a, b) => a + b.toUpperCase())
   /* Las siglas con punto se quedan como son: los puestos de votación se llaman
      "I.E. SAN JOSÉ" y "E.S.E. HOSPITAL", y «I.e.» no es un nombre. */
   .replace(/\b(?:[a-záéíóúñüA-ZÁÉÍÓÚÑÜ]\.){2,}/g, sigla => sigla.toUpperCase())
@@ -2148,10 +2151,10 @@ function candadoDetalle() {
      y municipios. Se borra pieza por pieza, no la capa entera. */
   const items = [...(desglose?.querySelectorAll('.crm-breakdown-item') || [])];
   const top = new Set(items.slice(0, VITRINA_MUESTRA).map(b => b.dataset.areaKey));
-  [crmMapLayer, crmBarrioLayer].forEach(c => c?.eachLayer(l => { const el = l.getElement?.(); if (el) el.classList.toggle('vitrina-blur', on && c === capa && !top.has(l._vitrinaCode)); }));
+  [crmMapLayer, crmBarrioLayer].forEach(c => c?.eachLayer(l => { if (l._contorno) return; const el = l.getElement?.(); if (el) el.classList.toggle('vitrina-blur', on && c === capa && !top.has(l._vitrinaCode)); }));
   items.forEach((b, i) => b.classList.toggle('vitrina-blur', on && i >= VITRINA_MUESTRA));
   let tapa = mapEl.querySelector(':scope > .vitrina-tapa');
-  const ocultos = on ? capa.getLayers().filter(l => !top.has(l._vitrinaCode)).length : 0;
+  const ocultos = on ? capa.getLayers().filter(l => !l._contorno && !top.has(l._vitrinaCode)).length : 0;
   if (!on || ocultos <= 0) return tapa?.remove();
   if (!tapa) { tapa = document.createElement('div'); tapa.className = 'vitrina-tapa'; mapEl.append(tapa); }
   const esPuesto = detalle && crmBarrioLayer instanceof L.FeatureGroup && !(crmBarrioLayer instanceof L.GeoJSON);
@@ -2930,7 +2933,7 @@ function ensureCRMMapToggles() {
    fuera votación pasada. */
 function tituloMapa(modo = crmMapMode) {
   const state = crmMapState; if (!state) return '';
-  const donde = state.tituloLugar || '';
+  const donde = NOMBRE_BONITO(state.tituloLugar || '');
   return modo === 'proyectado' ? `¿Dónde debería estar su votación${donde ? ` en ${donde}` : ''}?` : `¿Dónde estuvo su votación${donde ? ` en ${donde}` : ''}?`;
 }
 function refreshCRMMapMode() {
@@ -3115,6 +3118,32 @@ function encuadreBogota() {
 }
 /* Una ventana fija (sur/norte/oeste/este) como bounds de Leaflet. */
 function ventanaBounds({ sur, norte, oeste, este }) { return L.latLngBounds([[sur, oeste], [norte, este]]); }
+/* Cartagena se lee a DOS escalas, y las dos son legítimas:
+   · 3 LOCALIDADES — la circunscripción de sus Juntas Administradoras Locales.
+   · 16 Unidades Comuneras de Gobierno (15 urbanas + la 20, rural e insular),
+     como el Distrito parte la ciudad y la escala a la que un concejo o una
+     alcaldía leen su votación. No tienen nombre oficial; la capa las rotula
+     con sus barrios de más electores (build_cartagena_ucg.py).
+   ⚠️ El georef solo le pone las 3 localidades, así que la unidad de la mesa
+   sale del diccionario de puestos (`prepare` lo carga antes de agregar): leer
+   la UCG de `com` mandaría la ciudad entera a tres unidades de dieciséis.
+   ⚠️ Ventana urbana fija por lo mismo que Bogotá: la UCG 20 llega hasta Isla
+   Fuerte, 100 km al sur. Las islas siguen dibujadas; hay que alejar. */
+const numeroDe = s => String(s || '').match(/\d+/)?.[0]?.padStart(2, '0') || '';
+const CARTAGENA_VENTANA = { sur: 10.275, norte: 10.47, oeste: -75.58, este: -75.415 };
+const cartagenaDic = () => window.Candidato360CartagenaPuestoBarrio;
+const CARTAGENA_CAPAS = {
+  localidad: { clave: 'localidad', match: ['CARTAGENA'], path: 'CARTAGENA-LOCALIDADES.json', title: 'localidad', nivel: 'Localidad', code: p => String(p.CODIGO || ''), name: p => p.NOMBRE || 'Localidad',
+    prepare: () => cartagenaPuestoBarrio(), nombreDeCapa: true, mesaKey: m => cartagenaDic()?.[electoralPlaceCode(m)]?.loc || '',
+    unidadBarrio: p => p.loc || '', unidadEsArchivo: false, ventana: CARTAGENA_VENTANA,
+    /* El formulario trae «LOC. 1 HISTORICA Y DEL CARIBE» y el polígono
+       «Localidad 1 · Histórica y del Caribe Norte»: casan por número. */
+    casaLocalidad: (p, elegida) => Boolean(numeroDe(elegida)) && numeroDe(p.CODIGO) === numeroDe(elegida) },
+  ucg: { clave: 'ucg', match: ['CARTAGENA'], path: 'CARTAGENA-UCG.json', title: 'unidad comunera', nivel: 'UCG', code: p => String(p.CODIGO || ''), name: p => p.NOMBRE || 'UCG',
+    prepare: () => cartagenaPuestoBarrio(), nombreDeCapa: true, mesaKey: m => cartagenaDic()?.[electoralPlaceCode(m)]?.comuna || '',
+    unidadBarrio: p => p.comuna || '', ventana: CARTAGENA_VENTANA },
+};
+Object.values(CARTAGENA_CAPAS).forEach(c => { c.familia = CARTAGENA_CAPAS; });
 const CITY_JAL_LAYERS = [
   { match: ['BOGOTA'], path: 'BOG-LOCALIDADX.json', title: 'localidad', code: p => String(p.LocCodigo || '').padStart(2, '0'), name: p => p.LocNombre || 'Localidad', rotate: true },
   /* La Registraduría numera los corregimientos de Medellín del 17 al 21 y la
@@ -3128,18 +3157,7 @@ const CITY_JAL_LAYERS = [
   { match: ['IBAGUE'], path: 'IBAGUEX.json', title: 'comuna', code: p => String(p.COMUNAS || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.COMUNAS || 'Comuna' },
   { match: ['BARRANQUILLA'], path: 'BARRANQUILLAX.json', title: 'localidad', code: p => ({ 4: '01', 2: '02', 1: '03', 3: '04', 5: '05' })[Number(p.id)] || '', name: p => p.nombre || 'Localidad' },
   { match: ['MONTERIA'], path: 'MONTERIAX.json', title: 'comuna', code: p => String(p.CC_COMUNA || '').padStart(2, '0'), name: p => p.NMG || 'Comuna' },
-  /* Cartagena son 15 Unidades Comuneras de Gobierno más la 20, que agrupa los
-     corregimientos y las islas. Dos cosas la separan del resto:
-     ⚠️ El georef solo le pone las 3 LOCALIDADES, así que `com` vale 01, 02 o 03
-     y leer de ahí la unidad mandaría la ciudad entera a tres de dieciséis —y
-     encima a las tres primeras UCG, que existen—. La unidad sale del
-     diccionario de puestos (`prepare` lo carga antes de agregar).
-     ⚠️ Lleva ventana urbana fija por lo mismo que Bogotá: la UCG 20 llega
-     hasta Isla Fuerte, 100 km al sur. Las islas siguen dibujadas; hay que
-     alejar para verlas. */
-  { match: ['CARTAGENA'], path: 'CARTAGENA-UCG.json', title: 'unidad comunera', nivel: 'UCG', code: p => String(p.CODIGO || ''), name: p => p.NOMBRE || 'UCG',
-    prepare: () => cartagenaPuestoBarrio(), nombreDeCapa: true, mesaKey: m => window.Candidato360CartagenaPuestoBarrio?.[electoralPlaceCode(m)]?.comuna || '',
-    ventana: { sur: 10.275, norte: 10.47, oeste: -75.58, este: -75.415 } },
+  CARTAGENA_CAPAS.ucg,
   { match: ['MANIZALES'], path: 'MANIZALESX.json', title: 'comuna', code: p => String(p.ID_COMUNA || '').padStart(2, '0'), name: p => p.NOMBRES_CO || 'Comuna' },
   /* Las otras seis capitales con cartografía por comuna (las mismas de
      veleta.html). El código de comuna viene escrito de seis maneras distintas
@@ -3154,16 +3172,26 @@ const CITY_JAL_LAYERS = [
   { match: ['SINCELEJO'], path: 'SINCELEJOX.json', title: 'comuna', code: p => String(p.Nombre || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.Nombre || 'Comuna' },
   { match: ['VILLAVICENCIO'], path: 'VILLAVICENCIOX.json', title: 'comuna', code: p => String(p.Comuna || '').replace(/\D/g, '').padStart(2, '0'), name: p => p.Comuna || 'Comuna' }
 ];
-function cityLayerFor(nombre) { const city = normalizedText(nombre); return CITY_JAL_LAYERS.find(item => item.match.some(name => city.includes(name))) || null; }
+/* Una ciudad con varias escalas (Cartagena) abre en la que la persona eligió
+   en el mapa; si no ha elegido, en la de su corporación: la JAL se elige por
+   localidad, el Concejo y la Alcaldía se leen por UCG. */
+const CAPA_ELEGIDA = {};
+function cityLayerFor(nombre, { jal = false } = {}) {
+  const city = normalizedText(nombre);
+  const base = CITY_JAL_LAYERS.find(item => item.match.some(name => city.includes(name))) || null;
+  if (!base?.familia) return base;
+  return base.familia[CAPA_ELEGIDA[base.match[0]]] || (jal ? base.familia.localidad : null) || base;
+}
+const esJalCandidatura = candidate => String(candidate?.corp || '').toUpperCase().startsWith('JAL') || currentTargetTerritory()?.corporation === 'jal';
 /* Pinta una ciudad por comuna/localidad con el estado compartido de los mapas
    de ciudad (toggles, detalle por barrio, niveles). */
-function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city, rotate, lugar, title, note, center, zoom, fitTarget, fueraDelEncuadre, encuadre }) {
+function pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city, rotate, lugar, title, note, center, zoom, fitTarget, fueraDelEncuadre, encuadre, candidato }) {
   completaNombres(geoData, config.code, config.name, namesByArea);
   const max = Math.max(1, ...Object.values(votesByArea));
   crmMapMode = 'total';
   const m0 = mesas[0] || {};
   fijarRampaMapa(partidoVigente(), crmCandidate?.nombre);
-  crmMapState = { city, ciudad: `${String(m0.dep || '').padStart(2, '0')}${String(m0.mun || '').padStart(3, '0')}`, config, geoData, votesByArea, namesByArea, mesas, total, max, targetKey, focusKey: null, rotado: Boolean(rotate), tituloLugar: lugar || '', encuadre: encuadre || null, fueraDelEncuadre: fueraDelEncuadre || null };
+  crmMapState = { city, ciudad: `${String(m0.dep || '').padStart(2, '0')}${String(m0.mun || '').padStart(3, '0')}`, config, geoData, votesByArea, namesByArea, mesas, total, max, targetKey, focusKey: null, rotado: Boolean(rotate), tituloLugar: lugar || '', encuadre: encuadre || null, fueraDelEncuadre: fueraDelEncuadre || null, candidato: candidato || null };
   $('crmMapTitle').textContent = lugar ? tituloMapa('total') : title; ensureCRMMapToggles();
   crearMapa(center || [4.6, -74.1], zoom || 5); aplicarBasemap(Boolean(rotate));
   let targetLayer = null;
@@ -3185,7 +3213,7 @@ async function ciudadDeLaCandidatura(candidate) {
   const mesas = (await datosCandidatura(candidate)).mesas || [];
   const municipios = new Set(mesas.filter(m => Number(m.v || 0)).map(m => `${m.dep}-${m.mun}`));
   if (municipios.size !== 1) return null;
-  const config = cityLayerFor(mesas.find(m => m.munNom)?.munNom || candidate.circunscripcion);
+  const config = cityLayerFor(mesas.find(m => m.munNom)?.munNom || candidate.circunscripcion, { jal: esJalCandidatura(candidate) });
   return config ? { config, mesas } : null;
 }
 async function renderCiudadMap(candidate, ciudad) {
@@ -3207,7 +3235,7 @@ async function renderCiudadMap(candidate, ciudad) {
   Object.keys(namesByArea).forEach(k => { if (namesByArea[k]) namesByArea[k] = String(namesByArea[k]).replace(/^\d+\s*/, ''); else delete namesByArea[k]; });
   const total = mesas.reduce((sum, m) => sum + Number(m.v || 0), 0) || Number(candidate.votos) || 0, targetKey = Object.entries(votesByArea).sort((a, b) => b[1] - a[1])[0]?.[0];
   const esJal = String(candidate.corp || '').toUpperCase().startsWith('JAL'), lugar = mesas.find(m => m.munNom)?.munNom || '';
-  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city: normalizedText(lugar), rotate: config.rotate, lugar,
+  pintarCiudad({ geoData, config, mesas, total, votesByArea, namesByArea, targetKey, city: normalizedText(lugar), rotate: config.rotate, lugar, candidato: candidate,
     encuadre: config.ventana ? ventanaBounds(config.ventana) : null,
     note: esJal
       ? `Distribución por ${config.title} de su candidatura JAL. Haga clic en una ${config.title} para ver el detalle por barrio.`
@@ -3265,8 +3293,10 @@ const bogotaBarriosPorLocalidad = new Map();
    más acá basta para sumar una ciudad. Bogotá va aparte porque su diccionario
    es {zona-puesto: código catastral}, otra llave y otro nombre. */
 const BARRIOS_DIC = {
-  CALI: { carpeta: 'cali-barrios', dic: 'cali-puesto-barrio.js', diccionario: () => window.Candidato360CaliPuestoBarrio, registro: () => window.Candidato360CaliBarrios, unidad: 'comuna' },
-  CARTAGENA: { carpeta: 'cartagena-barrios', dic: 'cartagena-puesto-barrio.js', diccionario: () => window.Candidato360CartagenaPuestoBarrio, registro: () => window.Candidato360CartagenaBarrios, unidad: 'unidad comunera' },
+  CALI: { carpeta: 'cali-barrios', dic: 'cali-puesto-barrio.js', diccionario: () => window.Candidato360CaliPuestoBarrio, registro: () => window.Candidato360CaliBarrios, unidad: 'comuna',
+    archivos: Array.from({ length: 22 }, (_, i) => String(i + 1).padStart(2, '0')) },
+  CARTAGENA: { carpeta: 'cartagena-barrios', dic: 'cartagena-puesto-barrio.js', diccionario: () => window.Candidato360CartagenaPuestoBarrio, registro: () => window.Candidato360CartagenaBarrios, unidad: 'unidad comunera', v: '20260927',
+    archivos: Array.from({ length: 15 }, (_, i) => String(i + 1).padStart(2, '0')).concat('20') },
 };
 const dicPuestoBarrio = new Map(), geoBarrialPorUnidad = new Map();
 /* ⚠️ Los polígonos de barrio van SIN rotar. La ciudad se dibuja rotada 90°
@@ -3284,7 +3314,7 @@ async function bogotaBarrios(localityCode) {
 /* El diccionario de puestos de una ciudad, una sola vez por sesión. */
 function puestoBarrioDe(ciudad) {
   const cfg = BARRIOS_DIC[ciudad]; if (!cfg) return Promise.resolve(null);
-  if (!dicPuestoBarrio.has(ciudad)) dicPuestoBarrio.set(ciudad, cfg.diccionario() ? Promise.resolve(cfg.diccionario()) : loadCandidateMapScript(`candidato-360-data/${cfg.dic}`).then(() => cfg.diccionario()));
+  if (!dicPuestoBarrio.has(ciudad)) dicPuestoBarrio.set(ciudad, cfg.diccionario() ? Promise.resolve(cfg.diccionario()) : loadCandidateMapScript(`candidato-360-data/${cfg.dic}${cfg.v ? `?v=${cfg.v}` : ''}`).then(() => cfg.diccionario()));
   return dicPuestoBarrio.get(ciudad);
 }
 /* Se llama diferido desde la capa de Cartagena (`prepare`), que se declara
@@ -3293,7 +3323,7 @@ const cartagenaPuestoBarrio = () => puestoBarrioDe('CARTAGENA');
 /* Los barrios de UNA unidad (comuna o unidad comunera) y el diccionario. */
 async function barriosPorDiccionario(ciudad, unidadCode) {
   const cfg = BARRIOS_DIC[ciudad], key = String(unidadCode || '').padStart(2, '0'), llave = `${ciudad}:${key}`;
-  if (!geoBarrialPorUnidad.has(llave)) geoBarrialPorUnidad.set(llave, (cfg.registro()?.[key] ? Promise.resolve() : loadCandidateMapScript(`candidato-360-data/${cfg.carpeta}/${key}.js`)).then(() => { const geo = cfg.registro()?.[key]; if (!geo) throw new Error(`Sin cartografía barrial para la ${cfg.unidad} ${key}`); return geo; }));
+  if (!geoBarrialPorUnidad.has(llave)) geoBarrialPorUnidad.set(llave, (cfg.registro()?.[key] ? Promise.resolve() : loadCandidateMapScript(`candidato-360-data/${cfg.carpeta}/${key}.js${cfg.v ? `?v=${cfg.v}` : ''}`)).then(() => { const geo = cfg.registro()?.[key]; if (!geo) throw new Error(`Sin cartografía barrial para la ${cfg.unidad} ${key}`); return geo; }));
   return Promise.all([puestoBarrioDe(ciudad), geoBarrialPorUnidad.get(llave)]);
 }
 /* ─── Barrios de las demás ciudades ──────────────────────────────────────────
@@ -3382,19 +3412,84 @@ function cargarBarriosCiudad(cfg) {
    relleno baja de opacidad para que las carreras se lean por debajo. Mientras
    dura esta vista se esconde la capa de localidades: rotada sobre un
    callejero sin rotar, contradice cada calle que hay debajo. */
-function pintarBarrios(geo, values, codeOf, nameOf, nota) {
+/* Los límites de las unidades (localidades, comunas, UCG) sobre la vista de
+   barrios: sin relleno y sin clics, solo para que se sepa dónde termina cada
+   una. La abierta va gruesa. Bogotá se dibuja rotada 90° y los barrios van en
+   coordenadas reales, así que sus localidades se des-rotan para calzar. */
+function desrotarGeoJSON(geoData) {
+  const cx = -74.08, cy = 4.65, back = ([x, y]) => [cx + (y - cy), cy - (x - cx)];
+  const geometry = g => g.type === 'Polygon' ? { ...g, coordinates: g.coordinates.map(r => r.map(back)) } : g.type === 'MultiPolygon' ? { ...g, coordinates: g.coordinates.map(p => p.map(r => r.map(back))) } : g;
+  return { ...geoData, features: geoData.features.map(f => ({ ...f, geometry: geometry(f.geometry) })) };
+}
+function contornoUnidades(state, key) {
+  if (!state?.geoData) return null;
+  if (state.rotado && !state.geoSinRotar) state.geoSinRotar = desrotarGeoJSON(state.geoData);
+  const geo = state.rotado ? state.geoSinRotar : state.geoData;
+  const capa = L.geoJSON(geo, { interactive: false, style: f => { const foco = state.config.code(f.properties) === key; return { fill: false, color: '#173f2c', weight: foco ? 3.2 : 1.1, opacity: foco ? .95 : .5 }; } });
+  capa._contorno = true;
+  return capa;
+}
+/* Una ventana fija recorta el encuadre de una unidad que se sale de la
+   ciudad: la UCG 20 de Cartagena llega a Isla Fuerte, 100 km al sur. */
+function recortarAVentana(bounds, ventana) {
+  if (!ventana || !bounds?.isValid()) return bounds;
+  const s = Math.max(ventana.sur, bounds.getSouth()), n = Math.min(ventana.norte, bounds.getNorth()), o = Math.max(ventana.oeste, bounds.getWest()), e = Math.min(ventana.este, bounds.getEast());
+  return s < n && o < e ? L.latLngBounds([[s, o], [n, e]]) : ventanaBounds(ventana);
+}
+/* ── Barrios de la ciudad entera ─────────────────────────────────────────────
+   Al abrir una localidad o comuna el mapa pasa a escala de BARRIO EN TODA LA
+   CIUDAD, con una sola escala de color y la unidad abierta marcada con un
+   borde grueso. Antes se pintaban solo los barrios de esa unidad y alrededor
+   quedaban las demás comunas con su color de votos —otra escala con la misma
+   rampa— o el callejero en gris, y no se sabía qué se comparaba con qué. El
+   desglose de la derecha sigue siendo el de la unidad abierta. */
+async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = true } = {}) {
+  const historical = {};
+  state.mesas.forEach(m => { const b = fuente.barrioDeMesa(m); if (b) historical[b] = (historical[b] || 0) + Number(m.v || 0); });
+  const unidadDe = {}; features.forEach(f => { unidadDe[f.properties._k] = f.properties._u; });
+  let values = historical, baseFoco = 'historial';
+  if (crmMapMode === 'proyectado') {
+    /* La meta de cada unidad se reparte entre SUS barrios: por la votación
+       propia si la hay, si no por el censo electoral (valoresBarriales). */
+    const metas = projectedVotesByArea(); values = {};
+    let censo = null;
+    const censoDe = u => async () => { if (!censo) censo = await fuente.censo(); return Object.fromEntries(Object.entries(censo).filter(([k]) => unidadDe[k] === u)); };
+    for (const u of new Set(features.map(f => f.properties._u).filter(Boolean))) {
+      const hist = Object.fromEntries(Object.entries(historical).filter(([k]) => unidadDe[k] === u));
+      const r = await valoresBarriales(hist, Number(metas[u] || 0), censoDe(u));
+      Object.assign(values, r.values);
+      if (u === key) baseFoco = r.base;
+    }
+  }
+  if (crmMapState !== state || state.focusKey !== key) return;
+  const foco = features.filter(f => f.properties._u === key);
+  const valoresFoco = Object.fromEntries(foco.map(f => [f.properties._k, Number(values[f.properties._k] || 0)]).filter(([, v]) => v > 0));
+  renderMapBreakdown(valoresFoco, Object.fromEntries(foco.map(f => [f.properties._k, f.properties._n])), tituloBarrial(baseFoco));
+  const max = Math.max(1, ...features.map(f => Number(values[f.properties._k] || 0)));
   if (crmBarrioLayer) crmLeafletMap.removeLayer(crmBarrioLayer);
   ponerBasemap('crm-basemap-tenue');
-  if (crmMapLayer && crmMapState?.rotado) crmLeafletMap.removeLayer(crmMapLayer);   /* se saca del mapa, no del grupo: sus capas siguen ahí */
-  const max = Math.max(1, ...Object.values(values));
-  crmBarrioLayer = L.geoJSON(geo, {
-    style: f => { const votes = values[codeOf(f)] || 0; return { fillColor: MAP_COLOR(votes / max), fillOpacity: votes ? .62 : .12, color: 'rgba(16,34,56,.55)', weight: .7 }; },
-    onEachFeature: (f, layer) => { layer._vitrinaCode = codeOf(f); const votes = Number(values[codeOf(f)] || 0); layer.bindTooltip(`<strong>${NOMBRE_BONITO(nameOf(f))}</strong><br>${votes.toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : 'votos'}`, { sticky: true }); layer.on('mouseover', () => layer.setStyle({ weight: 1.5, color: '#fff' })); layer.on('mouseout', () => crmBarrioLayer.resetStyle(layer)); }
+  if (crmMapLayer) crmLeafletMap.removeLayer(crmMapLayer);   /* se saca del mapa, no del grupo: vuelve al subir de nivel */
+  const estilo = f => { const v = Number(values[f.properties._k] || 0), enFoco = f.properties._u === key; return { fillColor: MAP_COLOR(v / max), fillOpacity: v ? .62 : .1, color: enFoco ? 'rgba(16,34,56,.7)' : 'rgba(16,34,56,.3)', weight: enFoco ? .9 : .5 }; };
+  crmBarrioLayer = L.geoJSON({ type: 'FeatureCollection', features }, {
+    style: estilo,
+    onEachFeature: (f, layer) => {
+      const k = f.properties._k, u = f.properties._u, v = Number(values[k] || 0);
+      layer._vitrinaCode = k;
+      layer.bindTooltip(`<strong>${NOMBRE_BONITO(f.properties._n)}</strong>${u && state.namesByArea[u] ? `<br><span style="opacity:.7">${escHtml(NOMBRE_BONITO(state.namesByArea[u]))}</span>` : ''}<br>${v.toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : 'votos'}`, { sticky: true });
+      layer.on('mouseover', () => layer.setStyle({ weight: 1.5, color: '#fff' }));
+      layer.on('mouseout', () => layer.setStyle(estilo(f)));
+      /* Tocar un barrio de otra zona abre esa zona, sin mover el encuadre:
+         la persona ya está mirando donde quiere mirar. */
+      if (u && u !== key) layer.on('click', () => { renderBarriosForArea(u, { encuadre: false }); setMapLevel('barrio'); });
+    }
   });
-  crmBarrioLayer._vitrinaTop = vitrinaTop(values);
+  const contorno = contornoUnidades(state, key); if (contorno) crmBarrioLayer.addLayer(contorno);
+  crmBarrioLayer._vitrinaTop = vitrinaTop(valoresFoco);
   crmBarrioLayer.addTo(crmLeafletMap);
-  encuadrar(crmBarrioLayer, 20);
-  $('crmMapNote').innerHTML = nota;
+  if (encuadre && foco.length) encuadrarBounds(recortarAVentana(L.geoJSON({ type: 'FeatureCollection', features: foco }).getBounds(), state.config.ventana), 20);
+  const donde = fuente.donde(key, foco);
+  $('crmMapNote').innerHTML = notaBarrial(donde, baseFoco) + ` Se ve toda la ciudad por barrio, con una sola escala de color; el borde grueso marca ${escHtml(NOMBRE_BONITO(donde))}. Toque un barrio de otra zona para abrirla.` + (fuente.aviso ? ` ${fuente.aviso}` : '');
+  setTimeout(candadoDetalle, 0);
 }
 /* ── La meta a escala de barrio ──────────────────────────────────────────────
    Repartir la meta de una localidad entre sus barrios necesita un peso. Si la
@@ -3404,25 +3499,6 @@ function pintarBarrios(geo, values, codeOf, nameOf, nota) {
    No dice dónde la quieren; dice dónde hay gente que vota, que es la única
    pregunta que los datos pueden contestar ahí. La nota del mapa lo aclara,
    porque un mapa de censo leído como un mapa de apoyo miente. */
-async function censoBarrialBogota(localidad, puestoBarrio, code6) {
-  const places = await puestosPorBarrio(), out = {};
-  Object.entries(puestoBarrio || {}).forEach(([zonaPuesto, barrio]) => {
-    if (!String(zonaPuesto).startsWith(`${localidad}-`)) return;
-    const censo = places[`16001${String(zonaPuesto).replace('-', '')}`]?.censo || 0;
-    if (censo) out[code6(barrio)] = (out[code6(barrio)] || 0) + censo;
-  });
-  return out;
-}
-/* Censo por barrio de una unidad, para las ciudades con diccionario. */
-async function censoBarrialDic(unidad, puestoBarrio) {
-  const places = await puestosPorBarrio(), out = {}, c = String(unidad).padStart(2, '0');
-  Object.entries(puestoBarrio || {}).forEach(([code, info]) => {
-    if (String(info?.comuna || '').padStart(2, '0') !== c || !info?.barrio) return;
-    const censo = places[code]?.censo || 0;
-    if (censo) out[info.barrio] = (out[info.barrio] || 0) + censo;
-  });
-  return out;
-}
 async function valoresBarriales(historical, localGoal, censoDe) {
   if (crmMapMode !== 'proyectado') return { values: historical, base: 'historial' };
   if (Object.values(historical).some(v => v > 0)) return { values: distributeVotes(historical, localGoal), base: 'historial' };
@@ -3445,62 +3521,105 @@ function notaBarrial(donde, base) {
   if (base === 'sin-meta') return `${cabeza} Esta zona no recibe meta en la proyección.`;
   return `${cabeza} No se pudo repartir la meta por barrio: el censo por puesto de votación no respondió.`;
 }
-async function renderBarriosForArea(key) {
-  const state = crmMapState; if (!state) return;
-  state.focusKey = key;
-  const mesas = state.mesas.filter(m => (state.config.mesaKey ? state.config.mesaKey(m) : claveLocal(m)) === key), localGoal = Number(projectedVotesByArea()[key] || 0);
-  const titulo = `${crmMapMode === 'proyectado' ? 'Meta proyectada' : 'Votos totales'} por barrio`;
-  const conValores = historical => crmMapMode === 'proyectado' ? distributeVotes(historical, localGoal) : historical;
-  $('crmBreakdown').innerHTML = '<h4>Votos por barrio</h4><p class="helper">Cargando polígonos y resultados barriales…</p>';
-  const dicCiudad = BARRIOS_DIC[state.city];
-  if (dicCiudad) {
-    try {
-      const [puestoBarrio, geo] = await barriosPorDiccionario(state.city, key), historical = {};
-      mesas.forEach(m => { const barrio = puestoBarrio[electoralPlaceCode(m)]?.barrio; if (barrio) historical[barrio] = (historical[barrio] || 0) + Number(m.v || 0); });
-      const { values, base } = await valoresBarriales(historical, localGoal, () => censoBarrialDic(key, puestoBarrio));
-      renderMapBreakdown(values, Object.fromEntries(geo.features.map(f => [f.properties.barrio, f.properties.barrio])), tituloBarrial(base));
-      return pintarBarrios(geo, values, f => f.properties.barrio, f => f.properties.barrio, notaBarrial(state.namesByArea[key] || `la ${dicCiudad.unidad} ${key}`, base));
-    } catch (e) { $('crmBreakdown').innerHTML = `<h4>Votos por barrio</h4><p class="helper">No fue posible cargar los polígonos barriales de esta ${dicCiudad.unidad}.</p>`; return; }
+/* De dónde salen los barrios de una ciudad. Tres caminos, una sola forma:
+   cada polígono sale con `_k` (su llave), `_u` (la unidad del nivel que se
+   está viendo) y `_n` (su nombre), y cada mesa se ubica en un `_k`.
+   · Diccionario (Cali, Cartagena): polígonos partidos por comuna/UCG y un
+     diccionario puesto→barrio hecho a mano.
+   · Bogotá: polígonos por localidad y diccionario zona-puesto→código catastral.
+   · Capa de ciudad entera (Medellín, Pereira…): el puesto se ubica por
+     COORDENADA y el barrio toma la unidad de la mayoría de sus puestos. */
+let barriosTok = 0;
+const code6 = v => String(v).padStart(6, '0');
+function fuenteBarrial(state) {
+  const dic = BARRIOS_DIC[state.city];
+  if (dic) {
+    const unidadDe = state.config.unidadBarrio || (p => p.comuna || '');
+    const llave = d => d?.barrio ? `${d.comuna}|${d.barrio}` : '';
+    let pb = null;
+    return {
+      archivos: dic.archivos,
+      /* Los archivos van por comuna/UCG: si esa es la unidad abierta se pinta
+         primero y el resto llega después. A escala de localidad (Cartagena)
+         una localidad junta varias UCG, así que se carga todo de una. */
+      primero: key => state.config.unidadEsArchivo === false ? dic.archivos : [String(key).padStart(2, '0')],
+      prep: async () => { pb = await puestoBarrioDe(state.city); },
+      cargar: async a => { const [, geo] = await barriosPorDiccionario(state.city, a); return geo.features.map(f => ({ ...f, properties: { ...f.properties, _k: llave(f.properties), _u: unidadDe(f.properties), _n: f.properties.barrio } })); },
+      barrioDeMesa: m => llave(pb?.[electoralPlaceCode(m)]),
+      censo: async () => { const places = await puestosPorBarrio(), out = {}; Object.entries(pb || {}).forEach(([code, d]) => { const k = llave(d), c = places[code]?.censo || 0; if (k && c) out[k] = (out[k] || 0) + c; }); return out; },
+      donde: key => state.namesByArea[key] || `la ${state.config.title} ${key}`,
+    };
   }
   /* Bogotá se reconoce por la capa que está pintada, no por las mesas: con un
      salto de corporación la meta cae en localidades donde la persona nunca
-     tuvo una mesa, y mirar las mesas mandaba esas localidades al camino
-     genérico de puestos de votación. */
+     tuvo una mesa. */
   if (String(state.city || '').startsWith('BOGOTA') || state.mesas.some(m => String(m.dep) === '16')) {
-    try {
-      const [puestoBarrio, geo] = await bogotaBarrios(key), historical = {}, code6 = v => String(v).padStart(6, '0');
-      mesas.forEach(m => { const barrio = puestoBarrio[`${String(m.zon || '').padStart(2, '0')}-${String(m.pue || '').padStart(2, '0')}`]; if (barrio) historical[code6(barrio)] = (historical[code6(barrio)] || 0) + Number(m.v || 0); });
-      const { values, base } = await valoresBarriales(historical, localGoal, () => censoBarrialBogota(key, puestoBarrio, code6));
-      renderMapBreakdown(values, Object.fromEntries(geo.features.map(f => [code6(f.properties.codigo), f.properties.nombre])), tituloBarrial(base));
-      return pintarBarrios(geo, values, f => code6(f.properties.codigo), f => f.properties.nombre, notaBarrial(geo.features[0]?.properties.loc_nombre || 'la localidad', base));
-    } catch (e) { /* sin polígono → puestos */ }
+    let pb = null;
+    return {
+      /* Sumapaz (20) no tiene cartografía barrial: su archivo no existe. */
+      archivos: Array.from({ length: 19 }, (_, i) => String(i + 1).padStart(2, '0')),
+      primero: key => [String(key).padStart(2, '0')],
+      prep: async () => {},
+      cargar: async a => { const [dicc, geo] = await bogotaBarrios(a); pb = dicc; return geo.features.map(f => ({ ...f, properties: { ...f.properties, _k: code6(f.properties.codigo), _u: a, _n: f.properties.nombre } })); },
+      barrioDeMesa: m => { const b = pb?.[`${String(m.zon || '').padStart(2, '0')}-${String(m.pue || '').padStart(2, '0')}`]; return b ? code6(b) : ''; },
+      censo: async () => { const places = await puestosPorBarrio(), out = {}; Object.entries(pb || {}).forEach(([zp, b]) => { const c = places[`16001${String(zp).replace('-', '')}`]?.censo || 0; if (c) out[code6(b)] = (out[code6(b)] || 0) + c; }); return out; },
+      donde: (key, foco) => foco?.[0]?.properties.loc_nombre || state.namesByArea[key] || 'la localidad',
+    };
   }
-  /* Las demás ciudades con cartografía barrial: el puesto se ubica por
-     coordenada dentro del polígono, y se dibujan solo los barrios de la
-     comuna que se abrió. */
-  const capaBarrios = cityBarrioLayerFor(state.city);
-  if (capaBarrios) {
+  const capa = cityBarrioLayerFor(state.city);
+  if (capa) {
+    const ciudad = state.ciudad || `${String(state.mesas[0]?.dep || '').padStart(2, '0')}${String(state.mesas[0]?.mun || '').padStart(3, '0')}`;
+    const llaveDe = m => (state.config.mesaKey ? state.config.mesaKey(m) : claveLocal(m));
+    let data = null, places = null; const barrioPorPuesto = new Map(), unidadDeBarrio = {};
+    return {
+      archivos: ['*'], primero: () => ['*'],
+      prep: async () => {
+        if (data) return;
+        [data, places] = await Promise.all([cargarBarriosCiudad(capa), puestosPorBarrio()]);
+        const conteo = {};
+        for (const [code, p] of Object.entries(places)) {
+          if (!code.startsWith(ciudad) || !p.mesa) continue;
+          const b = barrioDelPunto(data.indice, p.lng, p.lat); if (!b) continue;
+          barrioPorPuesto.set(code, b);
+          const u = llaveDe(p.mesa); if (u) (conteo[b] ||= {})[u] = (conteo[b][u] || 0) + (p.censo || 1);
+        }
+        Object.entries(conteo).forEach(([b, us]) => { unidadDeBarrio[b] = Object.entries(us).sort((x, y) => y[1] - x[1])[0][0]; });
+      },
+      cargar: async () => data.geo.features.map(f => { const k = capa.code(f.properties); return { ...f, properties: { ...f.properties, _k: k, _u: unidadDeBarrio[k] || '', _n: capa.name(f.properties) } }; }),
+      barrioDeMesa: m => barrioPorPuesto.get(electoralPlaceCode(m)) || '',
+      censo: async () => { const out = {}; for (const [code, b] of barrioPorPuesto) { const c = places[code]?.censo || 0; if (c) out[b] = (out[b] || 0) + c; } return out; },
+      donde: key => state.namesByArea[key] || `la ${state.config.title} ${key}`,
+      aviso: capa.aviso || '',
+    };
+  }
+  return null;
+}
+async function renderBarriosForArea(key, { encuadre = true } = {}) {
+  const state = crmMapState; if (!state) return;
+  state.focusKey = key;
+  const tok = ++barriosTok;
+  $('crmBreakdown').innerHTML = '<h4>Votos por barrio</h4><p class="helper">Cargando polígonos y resultados barriales…</p>';
+  const fuente = fuenteBarrial(state);
+  if (fuente) {
     try {
-      const [{ geo, indice }, places] = await Promise.all([cargarBarriosCiudad(capaBarrios), puestosPorBarrio()]);
-      const llaveDe = m => (state.config.mesaKey ? state.config.mesaKey(m) : claveLocal(m));
-      const ciudad = state.ciudad || `${String(state.mesas[0]?.dep || '').padStart(2, '0')}${String(state.mesas[0]?.mun || '').padStart(3, '0')}`;
-      /* Todos los puestos de esa comuna, tenga o no votos ahí: los suyos dan el
-         mapa de votación y el resto da el censo con el que se reparte la meta. */
-      const deLaComuna = Object.entries(places).filter(([code, p]) => code.startsWith(ciudad) && p.mesa && llaveDe(p.mesa) === key);
-      const barrioPorPuesto = new Map(deLaComuna.map(([code, p]) => [code, barrioDelPunto(indice, p.lng, p.lat)]));
-      const dentro = new Set([...barrioPorPuesto.values()].filter(Boolean));
-      if (dentro.size) {
-        const historical = {};
-        mesas.forEach(m => { const b = barrioPorPuesto.get(electoralPlaceCode(m)); if (b) historical[b] = (historical[b] || 0) + Number(m.v || 0); });
-        const censoDe = () => { const out = {}; for (const [code, p] of deLaComuna) { const b = barrioPorPuesto.get(code); if (b && p.censo) out[b] = (out[b] || 0) + p.censo; } return out; };
-        const { values, base } = await valoresBarriales(historical, localGoal, censoDe);
-        const recorte = { type: 'FeatureCollection', features: geo.features.filter(f => dentro.has(capaBarrios.code(f.properties))) };
-        const nombres = Object.fromEntries(recorte.features.map(f => [capaBarrios.code(f.properties), capaBarrios.name(f.properties)]));
-        renderMapBreakdown(values, nombres, tituloBarrial(base));
-        return pintarBarrios(recorte, values, f => capaBarrios.code(f.properties), f => capaBarrios.name(f.properties), notaBarrial(state.namesByArea[key] || `la ${state.config.title} ${key}`, base) + (capaBarrios.aviso ? ` ${capaBarrios.aviso}` : ''));
+      await fuente.prep();
+      const primero = fuente.primero(key), resto = fuente.archivos.filter(a => !primero.includes(a));
+      const lote = lista => Promise.all(lista.map(a => fuente.cargar(a).catch(() => []))).then(x => x.flat());
+      const features = await lote(primero);
+      if (tok !== barriosTok) return;
+      if (features.some(f => f.properties._u === key)) {
+        await pintarCiudadBarrios(state, fuente, features, key, { encuadre });
+        /* El resto de la ciudad llega después y se repinta sin mover la vista. */
+        if (resto.length) {
+          const mas = await lote(resto);
+          if (tok === barriosTok) await pintarCiudadBarrios(state, fuente, features.concat(mas), key, { encuadre: false });
+        }
+        return;
       }
     } catch (e) { /* sin cartografía barrial → puestos */ }
   }
+  if (tok !== barriosTok) return;
+  const mesas = state.mesas.filter(m => (state.config.mesaKey ? state.config.mesaKey(m) : claveLocal(m)) === key), localGoal = Number(projectedVotesByArea()[key] || 0);
   const layer = crmMapLayer?.getLayers().find(item => state.config.code(item.feature.properties) === key);
   return pintarPuestos(mesas, layer ? state.config.name(layer.feature.properties) : `la ${state.config.title}`, localGoal);
 }
@@ -3527,7 +3646,9 @@ async function pintarPuestos(mesas, donde, meta = 0, { censo = false } = {}) {
   renderMapBreakdown(values, Object.fromEntries(Object.keys(values).map(name => [name, name])), `${que} por puesto de votación`);
   if (crmBarrioLayer) crmLeafletMap.removeLayer(crmBarrioLayer);
   ponerBasemap('crm-basemap-tenue');
-  if (crmMapLayer && crmMapState?.rotado) crmLeafletMap.removeLayer(crmMapLayer);
+  /* Dentro de una ciudad se sacan las comunas pintadas (otra escala con la
+     misma rampa, confundía) y queda solo su borde. */
+  if (crmMapLayer && crmMapState) crmLeafletMap.removeLayer(crmMapLayer);
   /* El tamaño del punto lleva la magnitud, no solo el color: sobre el
      callejero un círculo pequeño y claro se pierde. */
   crmBarrioLayer = L.featureGroup(Object.entries(points).map(([name, point]) => {
@@ -3535,6 +3656,7 @@ async function pintarPuestos(mesas, donde, meta = 0, { censo = false } = {}) {
     return Object.assign(L.circleMarker([point.lat, point.lng], { radius: 5 + Math.round(9 * Math.sqrt(v / max)), color: '#fff', weight: 1.2, fillColor: MAP_COLOR(v / max), fillOpacity: .92 })
       .bindTooltip(`<strong>${escHtml(name)}</strong><br>${v.toLocaleString('es-CO')} ${proyectando ? 'votos proyectados' : censo ? 'personas habilitadas' : 'votos'}`, { sticky: true }), { _vitrinaCode: name });
   }));
+  const contornoPuestos = crmMapState ? contornoUnidades(crmMapState, crmMapState.focusKey) : null; if (contornoPuestos) crmBarrioLayer.addLayer(contornoPuestos);
   crmBarrioLayer._vitrinaTop = vitrinaTop(values);
   crmBarrioLayer.addTo(crmLeafletMap);
   const conCoordenada = Object.keys(points).length;
@@ -3605,6 +3727,7 @@ async function showElectionAverage(projected = false) {
   crmMapState = { ...reference, votesByArea, total: Object.values(votesByArea).reduce((sum, v) => sum + Number(v || 0), 0), max: Math.max(1, ...Object.values(votesByArea)), targetKey: null, focusKey: null };
   crmMapMode = projected ? 'proyectado' : 'total'; electionViewActive = projected ? 'projected' : 'average';
   if (crmBarrioLayer) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
+  if (crmMapLayer && !crmLeafletMap.hasLayer(crmMapLayer)) { crmMapLayer.addTo(crmLeafletMap); aplicarBasemap(Boolean(crmMapState?.rotado)); }
   electionViewStyleMap();
   $('crmMapNote').textContent = projected ? 'Meta distribuida desde el promedio de las elecciones comparables.' : 'Promedio simple de las elecciones comparables en esta entidad territorial.';
   renderElectionViewToggles(); refreshMapLevels();
@@ -3618,7 +3741,7 @@ async function showElectionView(view) {
    ciudad (crmMapState); sobre el genérico por departamento se retiran. */
 function setMapLevel(level) {
   const controls = $('crmMap')?.querySelector('.crm-map-levels'); if (!controls) return;
-  controls.querySelectorAll('[data-level]').forEach(b => b.classList.toggle('active', b.dataset.level === level));
+  controls.querySelectorAll('[data-level]').forEach(b => b.classList.toggle('active', b.dataset.level === level && (!b.dataset.capa || b.dataset.capa === crmMapState?.config?.clave)));
   const barrio = controls.querySelector('[data-level="barrio"]'); if (barrio) barrio.disabled = !crmMapState?.focusKey;
 }
 /* ¿Esta ciudad tiene cartografía barrial? Bogotá y Cali la traen curada; el
@@ -3676,8 +3799,12 @@ function refreshMapLevels() {
      que «Comuna» —la ciudad entera dividida— y dejaba la alcaldía de Medellín
      abriendo en un nivel que no existe. Los niveles son los que de verdad
      cambian el dibujo. */
+  /* Una ciudad con varias escalas (Cartagena: Localidad y UCG) muestra un
+     botón por escala; el resto, uno solo con el nombre de su unidad. */
+  const familia = state.config.familia;
+  const unidades = familia ? Object.values(familia).map(c => `<button type="button" class="crm-map-level" data-level="localidad" data-capa="${c.clave}">${c.nivel}</button>`).join('') : `<button type="button" class="crm-map-level" data-level="localidad">${localLabel}</button>`;
   const controls = document.createElement('div'); controls.className = 'crm-map-levels';
-  controls.innerHTML = `<button type="button" class="crm-map-level" data-level="localidad">${localLabel}</button><button type="button" class="crm-map-level" data-level="barrio" disabled>${detalle}</button>`;
+  controls.innerHTML = `${unidades}<button type="button" class="crm-map-level" data-level="barrio" disabled>${detalle}</button>`;
   mapEl.append(controls);
   /* Volver a la ciudad deshace lo del barrio: sin callejero (la capa de
      Bogotá va rotada) y con las localidades de vuelta en el mapa. */
@@ -3690,9 +3817,27 @@ function refreshMapLevels() {
     encuadrarBounds(crmMapState.encuadre || boundsDeVotos(crmMapLayer, crmMapState.config, crmMapState.votesByArea, crmMapState.fueraDelEncuadre), 24);
     setMapLevel(level);
   };
-  controls.querySelector('[data-level="localidad"]').addEventListener('click', () => volver('localidad'));
+  controls.querySelectorAll('[data-level="localidad"]').forEach(b => b.addEventListener('click', () => {
+    if (familia && b.dataset.capa !== crmMapState?.config?.clave) return cambiarCapaCiudad(familia[b.dataset.capa]);
+    volver('localidad');
+  }));
   controls.querySelector('[data-level="barrio"]').addEventListener('click', () => { if (crmMapState?.focusKey) { renderBarriosForArea(crmMapState.focusKey); setMapLevel('barrio'); } });
   setMapLevel(state.focusKey ? 'barrio' : 'localidad');
+}
+/* Cambia la escala de la ciudad (Cartagena: localidad ↔ UCG) y la recuerda
+   para las demás vistas —años, promedio— de esta sesión. */
+async function cambiarCapaCiudad(config) {
+  const state = crmMapState; if (!state?.candidato || !config) return;
+  CAPA_ELEGIDA[config.match[0]] = config.clave;
+  const modo = crmMapMode;
+  if (crmBarrioLayer) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
+  await renderCiudadMap(state.candidato, { config, mesas: state.mesas });
+  /* Los años ya vistos quedaron guardados con la escala anterior: el
+     promedio no puede mezclar localidades con UCG. */
+  electionViewSnapshots = new Map();
+  if (/^\d{4}$/.test(electionViewActive)) captureElectionSnapshot(electionViewActive);
+  if (modo === 'proyectado') { crmMapMode = 'proyectado'; refreshCRMMapMode(); }
+  refreshMapLevels();
 }
 /* Punto de entrada del mapa histórico. */
 /* Si la campaña se muda a un territorio donde su historial no tiene un solo
@@ -3751,9 +3896,9 @@ async function renderTerritorioObjetivo(c) {
       const src = rotateGeoJSON90Left(await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`)); rotate = true; unidad = 'localidad';
       geoData = src;   /* Sumapaz entra al dibujo; el encuadre la deja fuera (ES_SUMAPAZ) */
       nameOf = f => f.properties.LocNombre || 'Localidad'; isTarget = f => c.corp !== 'jal' || normalizedText(f.properties.LocNombre) === normalizedText(cortoLocal(c.localidad));
-    } else if (CORP_MUNICIPAL.includes(c.corp) && c.corp === 'jal' && cityLayerFor(c.municipio)) {
-      const cfg = cityLayerFor(c.municipio); let src = await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/${cfg.path}`); if (cfg.rotate) { src = rotateGeoJSON90Left(src); rotate = true; }
-      geoData = src; unidad = cfg.title; nameOf = f => cfg.name(f.properties); isTarget = f => { const n = normalizedText(cfg.name(f.properties)), corto = normalizedText(cortoLocal(c.localidad)); return n === loc || (corto && (n === corto || n.includes(corto) || corto.includes(n))); };
+    } else if (CORP_MUNICIPAL.includes(c.corp) && c.corp === 'jal' && cityLayerFor(c.municipio, { jal: true })) {
+      const cfg = cityLayerFor(c.municipio, { jal: true }); let src = await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/${cfg.path}`); if (cfg.rotate) { src = rotateGeoJSON90Left(src); rotate = true; }
+      geoData = src; unidad = cfg.title; nameOf = f => cfg.name(f.properties); isTarget = f => { if (cfg.casaLocalidad) return cfg.casaLocalidad(f.properties, c.localidad); const n = normalizedText(cfg.name(f.properties)), corto = normalizedText(cortoLocal(c.localidad)); return n === loc || (corto && (n === corto || n.includes(corto) || corto.includes(n))); };
     } else {
       geoData = await fetchJSON(`${S3}/mapas-2026/Departamentos-mps/${dep}.json`);
       nameOf = f => f.properties.mpio_cnmbr || 'Municipio'; isTarget = f => CORP_DEPARTAMENTAL.includes(c.corp) || normalizedText(f.properties.mpio_cnmbr) === muni;

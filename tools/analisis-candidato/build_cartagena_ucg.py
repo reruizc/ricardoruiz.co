@@ -62,12 +62,31 @@ for ft in geo['features']:
     grupos[int(u)].append(g.buffer(0))      # buffer(0) limpia auto-intersecciones
     locs.setdefault(int(u), p.get('LOC'))
 
+# Las UCG NO tienen nombre oficial: el Acuerdo 159 de 2014 las numera y así
+# las usa todo el mundo, Cartagena Cómo Vamos incluido. «UCG 7» no le dice a
+# nadie dónde queda, así que se rotulan con sus barrios de más electores (censo
+# electoral de los puestos que caen en cada barrio, COMUNAS_DATA). Los sectores
+# de Olaya Herrera se agrupan en uno solo: son partes del mismo barrio. Si
+# cambia la regla, cambiar acá: la capa la leen el CRM, el panel del
+# electorado, Veleta y Oportunidad.
+UCG_BARRIOS = {
+    1: 'Crespo, Centro y Manga', 2: 'Torices y Pie del Cerro',
+    3: 'Daniel Lemaitre y San Francisco', 4: 'Alcibia, La Esperanza y La María',
+    5: 'Tesca y Olaya Herrera', 6: 'El Pozón, Olaya Herrera y Colombiatón',
+    7: 'Las Gaviotas, Los Alpes y Las Palmeras', 8: 'El Country, Zaragocilla y Escallón Villa',
+    9: 'Amberes, Piedra de Bolívar y Armenia', 10: 'El Bosque, Alto Bosque y Bosquecito',
+    11: 'Veinte de Julio Sur y Arroz Barato', 12: 'El Socorro, Blas de Lezo y Almirante Colón',
+    13: 'Ternera, San José de los Campanos y La Carolina', 14: 'San Fernando, Nelson Mandela y Rossedal',
+    15: 'La Consolata y San Pedro Mártir',
+    20: 'rural e insular: Pasacaballos, Bayunca, La Boquilla y Bocachica',
+}
+
 feats = []
 for u in sorted(grupos):
     fusion = unary_union(grupos[u])
     feats.append({'type': 'Feature',
                   'properties': {'UCG': u, 'CODIGO': f'{u:02d}',
-                                 'NOMBRE': f'UCG {u}' if u != 20 else 'UCG 20 · rural e insular',
+                                 'NOMBRE': f'UCG {u} · {UCG_BARRIOS[u]}' if u in UCG_BARRIOS else f'UCG {u}',
                                  'LOC': locs.get(u), 'BARRIOS': len(grupos[u])},
                   'geometry': mapping(fusion)})
 
