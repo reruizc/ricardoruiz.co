@@ -22,6 +22,7 @@ import argparse
 import base64
 import html
 import json
+import re
 import os
 import sys
 import urllib.error
@@ -40,12 +41,43 @@ URGENCIA = {'alta': ('#d9480f', 'Urgente'), 'media': ('#2b5672', 'Atento'),
             'baja': ('#6b7280', 'Para saber')}
 
 
-def _fecha_larga(iso):
+def _fecha_larga(iso, relativa=False):
+    """«28 de septiembre», o «hoy» / «ayer» / «mañana» con `relativa`.
+
+    Lo relativo se calcula contra el día en que SE MANDA el correo, no contra la
+    fecha del brief: el lunes se revisa y puede salir el martes, y un «hoy»
+    atado a la fecha del brief ya sería mentira.
+    """
+    import datetime
     try:
-        a, m, d = (int(x) for x in str(iso)[:10].split('-'))
-        return f"{d} de {MESES[m - 1]}"
-    except (ValueError, IndexError):
+        f = datetime.date.fromisoformat(str(iso)[:10])
+    except ValueError:
         return str(iso or '')
+    if relativa:
+        dif = (f - datetime.date.today()).days
+        if dif in (-1, 0, 1):
+            return ('ayer', 'hoy', 'mañana')[dif + 1]
+    return f"{f.day} de {MESES[f.month - 1]}"
+
+
+_ISO = re.compile(r'(\(?)\b(?:([Ee]l|[Dd]el|[Aa]l)\s+)?(\d{4}-\d{2}-\d{2})\b(\)?)')
+
+
+def _fechas_en_texto(txt):
+    """El brief escribe «El 2026-09-28 el presidente…», que en el PDF se audita
+    pero en un correo se lee como un formulario. Pasa a «Hoy el presidente…»."""
+    def cambiar(m):
+        par, art, iso, cierre = m.groups()
+        # Con «del»/«al» la fecha va escrita: «antes del 27» pasado a relativo
+        # daría «antes de ayer», que en español significa anteayer.
+        relativa = not (art and art.lower() in ('del', 'al'))
+        fecha = _fecha_larga(iso, relativa=relativa)
+        if fecha in ('hoy', 'ayer', 'mañana'):
+            if art and art[0].isupper():
+                fecha = fecha[0].upper() + fecha[1:]
+            return f"{par}{fecha}{cierre}"
+        return f"{par}{art + ' ' if art else ''}{fecha}{cierre}"
+    return _ISO.sub(cambiar, str(txt or ''))
 
 
 def momento(iso):
@@ -78,11 +110,13 @@ def cuerpo_html(b):
     v = meta.get('ventana') or {}
     cliente = meta.get('cliente') or 'equipo'
     lec = b.get('lectura') or {}
-    temas = b.get('temas') or []
+    temas_todos = b.get('temas') or []
+    temas = temas_todos[:3]     # los tres primeros: el resto está en el PDF
     agenda = [x for x in (b.get('agenda') or []) if x.get('que')][:4]
     una = lec.get('si_solo_hay_tiempo') or ''
-    e = lambda x: html.escape(str(x or ''))
-    n_alta = sum(1 for t in temas if t.get('urgencia') == 'alta')
+    e = lambda x: html.escape(_fechas_en_texto(x))
+    n_alta = sum(1 for t in temas_todos if t.get('urgencia') == 'alta')
+    img = meta.get('imagen') or {}
 
     def cifra(n, rotulo, color=AZUL):
         return (f'<td align="center" width="33%" style="padding:0 6px">'
@@ -90,7 +124,7 @@ def cuerpo_html(b):
                 f'padding:10px 4px;font-size:22px;font-weight:bold">{n}</div>'
                 f'<div style="font-size:12px;color:{GRIS};padding-top:6px">{rotulo}</div></td>')
 
-    cifras = (cifra(len(temas), 'temas') + cifra(n_alta, 'urgentes', '#d9480f')
+    cifras = (cifra(len(temas_todos), 'temas') + cifra(n_alta, 'urgentes', '#d9480f')
               + cifra(len(b.get('agenda') or []), 'fechas por venir'))
 
     filas_temas = ''
@@ -104,11 +138,22 @@ def cuerpo_html(b):
 
     filas_agenda = ''.join(
         f'<tr><td style="padding:6px 12px 6px 0;font-size:13px;font-weight:bold;'
-        f'color:{AZUL};white-space:nowrap;vertical-align:top">{e(_fecha_larga(x.get("iso")))}</td>'
+        f'color:{AZUL};white-space:nowrap;vertical-align:top">{e(_fecha_larga(x.get("iso"), relativa=True).capitalize())}</td>'
         f'<td style="padding:6px 0;font-size:14px;color:{TINTA}">{e(x.get("que"))}</td></tr>'
         for x in agenda)
 
     parrafo = (lec.get('parrafos') or [''])[0]
+    # La foto va ENLAZADA desde el servidor del medio, no copiada, con su
+    # crédito debajo. Ver imagen_prensa.py sobre derechos.
+    foto = credito = ''
+    if img.get('src'):
+        foto = (f'<tr><td style="padding:0;font-size:0;line-height:0">'
+                f'<img src="{html.escape(img["src"])}" width="564" alt="{html.escape(img.get("titulo", ""))}" '
+                f'style="display:block;width:100%;max-width:564px;height:auto;border-radius:12px 12px 0 0">'
+                f'</td></tr>')
+        credito = (f'<div style="font-size:11px;color:{GRIS};padding-top:6px">Foto: '
+                   f'{html.escape(img.get("medio", ""))} · <a href="{html.escape(img.get("enlace", ""))}" '
+                   f'style="color:{GRIS}">{html.escape((img.get("titulo") or "")[:90])}</a></div>')
     return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#f1f2f4">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f2f4">
 <tr><td align="center" style="padding:24px 12px">
@@ -124,17 +169,17 @@ def cuerpo_html(b):
 
 <tr><td style="padding:18px 28px 0">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{TINTA};border-radius:12px">
-<tr><td style="padding:24px 24px 26px">
+{foto}<tr><td style="padding:22px 24px 24px">
 <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9fb6c8">
 Del {e(_fecha_larga(v.get('desde')))} al {e(_fecha_larga(v.get('hasta')))}</div>
 <div style="font-size:22px;font-weight:bold;color:#ffffff;line-height:1.3;padding-top:8px">{e(lec.get('titulo') or b.get('titular'))}</div>
-</td></tr></table></td></tr>
+</td></tr></table>{credito}</td></tr>
 
 <tr><td style="padding:22px 22px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>{cifras}</tr></table></td></tr>
 
-<tr><td style="padding:18px 28px 0;font-size:15px">{e(parrafo)}</td></tr>
-
 {f'<tr><td style="padding:18px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{PAPEL};border-left:4px solid {AZUL};border-radius:6px"><tr><td style="padding:14px 16px"><div style="font-size:11px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;color:{AZUL}">Si solo tienes tiempo para una cosa</div><div style="font-size:15px;padding-top:4px">{e(una)}</div></td></tr></table></td></tr>' if una else ''}
+
+<tr><td style="padding:18px 28px 0;font-size:15px">{e(parrafo)}</td></tr>
 
 <tr><td style="padding:26px 28px 0;font-size:19px;font-weight:bold">Los temas de la semana</td></tr>
 <tr><td style="padding:6px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{filas_temas}</table></td></tr>

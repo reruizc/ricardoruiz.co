@@ -179,6 +179,13 @@ def main():
         'modelo': a.modelo, 'generado': datetime.datetime.now().isoformat(timespec='seconds'),
         'uso': uso, 'cobertura': b.get('cobertura'),
     }
+    # La foto de portada del correo. Se elige acá, y no al mandar, porque acá
+    # está la prensa del barrido y así la foto queda a la vista al revisar.
+    from imagen_prensa import elegir
+    imagen = elegir(brief, (b.get('evidencia') or {}).get('medios') or [])
+    if imagen:
+        brief['_meta']['imagen'] = imagen
+        print(f"[foto de portada: {imagen['medio']} · {imagen['titulo'][:70]}]")
     out = a.out or f"brief-{(b['perfil'].get('nombre') or 'cliente').lower()}-{b['ventana']['hasta']}.json"
     json.dump(brief, open(out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     usd, cop = costo(uso, a.modelo)
