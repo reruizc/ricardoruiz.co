@@ -3514,6 +3514,32 @@ function recortarAVentana(bounds, ventana) {
    quedaban las demás comunas con su color de votos —otra escala con la misma
    rampa— o el callejero en gris, y no se sabía qué se comparaba con qué. El
    desglose de la derecha sigue siendo el de la unidad abierta. */
+/* ── Barrios sin puesto propio: el color del vecino más cercano ────────────
+   Un barrio sin puesto de votación no tiene votos ni censo propios, y en el
+   mapa quedaba como un hueco (en Cartagena, 138 de 213). Se pinta con el valor
+   del barrio CON puesto más cercano por centroide, punteado y translúcido, y
+   nunca entra al desglose ni a un total. Mismo criterio que la página del
+   electorado y los tableros de 2023. Tope de 3 km: más lejos queda sin dato. */
+const RELLENO_MAX_KM = 3;
+function centroideBarrio(g) {
+  const anillos = g?.type === 'Polygon' ? [g.coordinates[0]] : g?.type === 'MultiPolygon' ? g.coordinates.map(pg => pg[0]) : [];
+  let x = 0, y = 0, n = 0;
+  anillos.forEach(r => r.forEach(([lon, lat]) => { x += lon; y += lat; n++; }));
+  return n ? [x / n, y / n] : null;
+}
+function rellenosBarrios(features, conPuesto) {
+  const con = [], sin = [];
+  features.forEach(f => { const c = centroideBarrio(f.geometry), k = f.properties._k; if (!c || !k) return; (conPuesto.has(k) ? con : sin).push({ k, c, n: f.properties._n }); });
+  const out = new Map();
+  sin.forEach(b => {
+    if (out.has(b.k)) return;
+    let mejor = null, d2 = Infinity;
+    con.forEach(o => { const dx = (o.c[0] - b.c[0]) * Math.cos(b.c[1] * Math.PI / 180), dy = o.c[1] - b.c[1], d = dx * dx + dy * dy; if (d < d2) { d2 = d; mejor = o; } });
+    const km = Math.sqrt(d2) * 111.32;
+    if (mejor && km <= RELLENO_MAX_KM) out.set(b.k, { de: mejor.k, nombre: mejor.n, km });
+  });
+  return out;
+}
 async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = true } = {}) {
   /* key '*' = la ciudad entera por barrio, sin una unidad abierta: es el
      nivel «Barrio» cuando se pide sin haber tocado antes una localidad. */
@@ -3542,6 +3568,10 @@ async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = tr
        manda la votación (propia o de la familia) si alguna zona la tuvo. */
     if (todo) { const b = bases.includes('historial') ? 'historial' : bases.includes('censo') ? 'censo' : bases[0]; if (b) baseFoco = familia && b === 'historial' ? 'familia' : b; }
   }
+  /* Qué barrios tienen puesto: los que tienen censo o votos propios. */
+  const censoBarrio = await fuente.censo().catch(() => ({}));
+  const conPuesto = new Set([...Object.keys(censoBarrio).filter(k => censoBarrio[k] > 0), ...Object.keys(historical)]);
+  const relleno = rellenosBarrios(features, conPuesto);
   if (crmMapState !== state || state.focusKey !== key) return;
   const foco = todo ? features : features.filter(f => f.properties._u === key);
   const valoresFoco = Object.fromEntries(foco.map(f => [f.properties._k, Number(values[f.properties._k] || 0)]).filter(([, v]) => v > 0));
@@ -3550,13 +3580,22 @@ async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = tr
   if (crmBarrioLayer) crmLeafletMap.removeLayer(crmBarrioLayer);
   ponerBasemap('crm-basemap-tenue');
   if (crmMapLayer) crmLeafletMap.removeLayer(crmMapLayer);   /* se saca del mapa, no del grupo: vuelve al subir de nivel */
-  const estilo = f => { const v = Number(values[f.properties._k] || 0), enFoco = !todo && f.properties._u === key; return { fillColor: MAP_COLOR(v / max), fillOpacity: v ? .62 : .1, color: enFoco ? 'rgba(16,34,56,.7)' : 'rgba(16,34,56,.3)', weight: enFoco ? .9 : .5 }; };
+  const estilo = f => {
+    const k = f.properties._k, enFoco = !todo && f.properties._u === key, r = !conPuesto.has(k) && relleno.get(k);
+    if (r) { const v = Number(values[r.de] || 0); return { fillColor: MAP_COLOR(v / max), fillOpacity: v ? .3 : .08, color: 'rgba(16,34,56,.5)', weight: enFoco ? .9 : .6, dashArray: '3 3' }; }
+    const v = Number(values[k] || 0); return { fillColor: MAP_COLOR(v / max), fillOpacity: v ? .62 : .1, color: enFoco ? 'rgba(16,34,56,.7)' : 'rgba(16,34,56,.3)', weight: enFoco ? .9 : .5, dashArray: null };
+  };
   crmBarrioLayer = L.geoJSON({ type: 'FeatureCollection', features }, {
     style: estilo,
     onEachFeature: (f, layer) => {
-      const k = f.properties._k, u = f.properties._u, v = Number(values[k] || 0);
+      const k = f.properties._k, u = f.properties._u, v = Number(values[k] || 0), r = !conPuesto.has(k) && relleno.get(k);
       layer._vitrinaCode = k;
-      layer.bindTooltip(`<strong>${NOMBRE_BONITO(f.properties._n)}</strong>${u && state.namesByArea[u] ? `<br><span style="opacity:.7">${escHtml(NOMBRE_BONITO(state.namesByArea[u]))}</span>` : ''}<br>${v.toLocaleString('es-CO')} ${crmMapMode === 'proyectado' ? 'votos proyectados' : state.censo ? 'personas habilitadas' : 'votos'}`, { sticky: true });
+      const unidad = u && state.namesByArea[u] ? `<br><span style="opacity:.7">${escHtml(NOMBRE_BONITO(state.namesByArea[u]))}</span>` : '';
+      const que = crmMapMode === 'proyectado' ? 'votos proyectados' : state.censo ? 'personas habilitadas' : 'votos';
+      layer.bindTooltip(r
+        ? `<strong>${NOMBRE_BONITO(f.properties._n)}</strong>${unidad}<br>Sin puesto de votación propio: toma el color de <b>${escHtml(NOMBRE_BONITO(r.nombre))}</b>, el barrio con puesto más cercano (${r.km < 1 ? `${Math.round(r.km * 1000)} m` : `${r.km.toFixed(1).replace('.', ',')} km`}), que tiene ${Number(values[r.de] || 0).toLocaleString('es-CO')} ${que}. Es un color inferido: no suma a ningún total.`
+        : !conPuesto.has(k) ? `<strong>${NOMBRE_BONITO(f.properties._n)}</strong>${unidad}<br>Sin puesto de votación propio ni barrio con puesto a menos de ${RELLENO_MAX_KM} km.`
+        : `<strong>${NOMBRE_BONITO(f.properties._n)}</strong>${unidad}<br>${v.toLocaleString('es-CO')} ${que}`, { sticky: true });
       layer.on('mouseover', () => layer.setStyle({ weight: 1.5, color: '#fff' }));
       layer.on('mouseout', () => layer.setStyle(estilo(f)));
       /* Tocar un barrio de otra zona abre esa zona, sin mover el encuadre:
@@ -3571,7 +3610,10 @@ async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = tr
   const donde = todo ? (NOMBRE_BONITO(state.tituloLugar || '') || 'la ciudad') : fuente.donde(key, foco);
   $('crmMapNote').innerHTML = notaBarrial(donde, baseFoco) + (todo
     ? ` Toda la ciudad por barrio, con una sola escala de color; el borde marca cada ${escHtml(state.config.title)}. Toque un barrio para abrir su zona.`
-    : ` Se ve toda la ciudad por barrio, con una sola escala de color; el borde grueso marca ${escHtml(NOMBRE_BONITO(donde))}. Toque un barrio de otra zona para abrirla.`) + (fuente.aviso ? ` ${fuente.aviso}` : '');
+    : ` Se ve toda la ciudad por barrio, con una sola escala de color; el borde grueso marca ${escHtml(NOMBRE_BONITO(donde))}. Toque un barrio de otra zona para abrirla.`)
+    + (() => { const n = new Set(features.filter(f => !conPuesto.has(f.properties._k) && relleno.has(f.properties._k)).map(f => f.properties._k)).size;
+        return n ? ` Los ${n.toLocaleString('es-CO')} barrios punteados no tienen puesto de votación propio: toman el color del barrio con puesto más cercano (a menos de ${RELLENO_MAX_KM} km). Ese color es inferido y no entra al desglose.` : ''; })()
+    + (fuente.aviso ? ` ${fuente.aviso}` : '');
   setTimeout(candadoDetalle, 0);
 }
 /* ── La meta a escala de barrio ──────────────────────────────────────────────
