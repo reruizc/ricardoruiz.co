@@ -19,9 +19,18 @@
       si el apoyado lo supera en casi todas las mesas, min(A, B) es siempre A
       y la cifra da ~100 % sin separar nada. En esos casos se dice y no se usa.
    3. Σ min es una COTA SUPERIOR: dice cuánto electorado pudieron compartir,
-      no cuánto compartieron. Por eso todo se presenta como «hasta».
-   Sin medición la tasa es la mediana de los aliados medidos o, si no hay
-   ninguno, un supuesto editable que queda rotulado como supuesto.
+      no cuánto compartieron. Por eso todo se presenta como techo.
+
+   Y el tiempo (fase 3): un aliado no le pasa a otro más de lo que conservaría
+   de su propio voto si se lanzara él mismo. Eso se MIDE: la RETENCIÓN, cuánto
+   de su votación conserva, puesto por puesto, la misma persona que repite en
+   la misma corporación 4, 8 o 12 años después (tools/candidato-360/endoso/
+   calibrar.mjs). Con sus cuartiles sale el rango de cada aliado:
+     con par medido  →  min(tasa medida, retención)   en p25 · mediana · p75
+     sin par         →  la retención sola             (reemplaza el 30 % fijo)
+     tasa escrita    →  la que escribió el usuario, sin rango
+   No se le suma el crecimiento del censo a 2027: la retención ya se midió con
+   el electorado de cada año, y sumarlo lo contaría dos veces.
 
    Sin dependencias del CRM ni del DOM: se prueba en Node con
    tools/candidato-360/prueba-endoso.mjs.
@@ -30,6 +39,9 @@
   'use strict';
 
   const SUPUESTO = .3, SATURACION = .95, MAX = 25;
+  /* RETENCION:inicio */
+  const RETENCION = {};
+  /* RETENCION:fin */
 
   /* ── Identidad de una candidatura ─────────────────────────────────────── */
   const normalizar = v => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -47,6 +59,38 @@
   }
   /* Lo que se guarda de cada aliado y de a quién apoyó. */
   const ficha = (c, dataUrlFor) => ({ slug: c.slug, nombre: c.nombre, corp: c.corp || '', partido: c.partido || '', votos: Number(c.votos || 0), dataUrl: c.dataUrl || (dataUrlFor ? dataUrlFor(c.slug) : '') });
+
+  /* ── La retención de un aliado ─────────────────────────────────────────
+     La corporación sale del corp («CÁMARA · ANTIOQUIA · 2022» → camara) y la
+     distancia, de su año hasta 2027, llevada a la más cercana medida (una
+     candidatura de 2022 cae en la de 4 años). Con menos de 20 casos propios
+     se usa la de todas las corporaciones juntas: presidencia y consultas no
+     tienen personas que repitan, y la gobernación a 12 años tiene tres. */
+  const AÑO_ELECCION = 2027, MIN_CASOS = 20;
+  function corpRetencion(c) {
+    const t = normalizar(String(c?.corp || '').split('·')[0]);
+    if (/^JAL|ADMINISTRADORA/.test(t)) return 'jal';
+    if (t.startsWith('CONCEJO')) return 'concejo';
+    if (t.startsWith('ALCALD')) return 'alcaldia';
+    if (t.startsWith('ASAMBLEA')) return 'asamblea';
+    if (t.startsWith('GOBERN')) return 'gobernacion';
+    if (t.startsWith('CAMARA')) return 'camara';
+    if (t.startsWith('SENADO')) return 'senado';
+    return '';
+  }
+  function cercana(tabla, g) {
+    const ks = Object.keys(tabla || {}).map(Number).filter(k => (tabla[k]?.[3] || 0) >= MIN_CASOS);
+    if (!ks.length) return null;
+    return ks.sort((a, b) => Math.abs(a - g) - Math.abs(b - g) || a - b)[0];
+  }
+  function retencionDe(c) {
+    const a = anio(c), g = a ? Math.max(1, AÑO_ELECCION - a) : 4, cp = corpRetencion(c);
+    let k = cercana(RETENCION[cp], g), tabla = RETENCION[cp], propia = true;
+    if (k == null) { k = cercana(RETENCION._todas, g); tabla = RETENCION._todas; propia = false; }
+    if (k == null) return null;
+    const [p25, p50, p75, n] = tabla[k];
+    return { q: [p25, p50, p75], corp: propia ? cp : '', anos: g, medida: k, n, propia };
+  }
 
   /* ── Mesas ───────────────────────────────────────────────────────────── */
   const cache = new Map();
@@ -105,23 +149,28 @@
         return fila;
       } catch (e) { return { al, error: true }; }
     }));
-    const medidas = filas.filter(f => f.par?.valida).map(f => f.par.tasa).sort((a, b) => a - b);
-    const mediana = medidas.length ? medidas[Math.floor((medidas.length - 1) / 2)] : null;
-    let total = 0, techo = 0; const porArea = {};
+    const medidas = filas.filter(f => f.par?.valida).map(f => f.par.tasa).sort((a, b) => a - b), nM = medidas.length;
+    const mediana = !nM ? null : nM % 2 ? medidas[(nM - 1) / 2] : (medidas[nM / 2 - 1] + medidas[nM / 2]) / 2;
+    let total = 0, bajo = 0, alto = 0, techo = 0; const porArea = {};
     filas.forEach(f => {
       if (f.error) return;
-      if (f.par?.valida) { f.tasa = f.par.tasa; f.fuente = 'medida'; }
-      else if (Number.isFinite(f.al.manual)) { f.tasa = f.al.manual / 100; f.fuente = 'suya'; }
-      else if (mediana !== null) { f.tasa = mediana; f.fuente = 'mediana'; }
-      else { f.tasa = SUPUESTO; f.fuente = 'supuesto'; }
-      f.est = Math.round(f.terr * f.tasa); total += f.est; techo += f.terr;
+      f.ret = retencionDe(f.al);
+      let r;
+      if (Number.isFinite(f.al.manual)) { const t = f.al.manual / 100; r = [t, t, t]; f.fuente = 'suya'; }
+      else if (f.par?.valida && f.ret) { r = f.ret.q.map(q => Math.min(f.par.tasa, q)); f.fuente = 'medida'; }
+      else if (f.par?.valida) { r = [f.par.tasa, f.par.tasa, f.par.tasa]; f.fuente = 'medida'; }
+      else if (f.ret) { r = f.ret.q.slice(); f.fuente = 'retencion'; }
+      else { r = [SUPUESTO, SUPUESTO, SUPUESTO]; f.fuente = 'supuesto'; }
+      [f.tasaBaja, f.tasa, f.tasaAlta] = r;
+      f.estBajo = Math.round(f.terr * r[0]); f.est = Math.round(f.terr * r[1]); f.estAlto = Math.round(f.terr * r[2]);
+      total += f.est; bajo += f.estBajo; alto += f.estAlto; techo += f.terr;
       if (areaDe) f.dentro.forEach(m => {
         const area = areaDe(m, alcance);
         if (area) porArea[area] = (porArea[area] || 0) + Number(m.v || 0) * f.tasa;
       });
     });
     const areas = Object.entries(porArea).map(([nombre, v]) => ({ nombre, v: Math.round(v) })).filter(a => a.v > 0).sort((a, b) => b.v - a.v);
-    return { alcance, lugar, filas, total, techo, mediana, nMedidas: medidas.length, areas };
+    return { alcance, lugar, filas, total, bajo, alto, techo, mediana, nMedidas: nM, areas };
   }
 
   /* ── El territorio de la campaña ───────────────────────────────────────
@@ -231,7 +280,7 @@
   const FUENTE = {
     medida: 'medida con a quién apoyó',
     suya: 'tasa que usted escribió',
-    mediana: 'mediana de sus aliados medidos',
+    retencion: 'lo que conserva de su propio voto: diga a quién apoyó para medirla',
     supuesto: 'supuesto: escriba el suyo o mida el par',
   };
   const CLASE = {
@@ -239,6 +288,6 @@
     transferencia: 'elecciones distintas: transferencia entre fechas, comparada por puesto',
   };
 
-  global.C360Endoso = { SUPUESTO, SATURACION, MAX, FUENTE, CLASE, anio, corp, clase, ficha, mesas, suma, llavePuesto, llaveMesa, agrupar, medirPar, evaluar,
+  global.C360Endoso = { SUPUESTO, SATURACION, MAX, FUENTE, CLASE, anio, corp, clase, ficha, mesas, suma, llavePuesto, llaveMesa, agrupar, medirPar, evaluar, retencionDe, corpRetencion, RETENCION,
     enAlcance, areaDe, corpHistorica, municipioMayoritario, alcanceDe, codigoPuesto, porPuesto, clave, candidaturaId, cargar, guardar };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -70,3 +70,7 @@ Como en los otros clips, los fotogramas generados pueden variar ligeramente en t
 Corrección de continuidad en el reproductor: los índices 20–23 del atlas aún pierden las gafas; durante esos cuatro intervalos se mantiene el índice19 (bombillo encendido con gafas). La secuencia conserva 30 intervalos y seis segundos, pero reutiliza esa pose para evitar parpadeos de las gafas.
 
 Encuadre de pensando: la cuadrícula visual no registró filas uniformes. El reproductor usa inicios Y `[0,226,445,690,936]` y alturas `[226,219,245,246,209]` sobre un PNG de 1374 × 1145; conservarlos para evitar cortar patas y bombillo.
+
+## Inactividad: hueso rosado
+
+La extensión `candi-hueso.js` añade 24 poses de caminar, 24 de recoger y 22 de echarse. Ver `HUESO-PARA-CLAUDE.md` y `demo-hueso.html` para el escenario ancho, temporizador y cancelación. No requiere cambiar esta clase ni el worker.
