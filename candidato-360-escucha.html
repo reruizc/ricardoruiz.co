@@ -290,8 +290,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="candidato-360-electorado.js?v=20260927b"></script>
 <script src="candidato-360-geoprensa.js?v=20260927"></script>
-<script src="candidato-360-arquetipos.js?v=20260920"></script>
-<script src="candidato-360-saliencia.js?v=20260920"></script>
+<script src="candidato-360-arquetipos.js?v=20260928"></script>
+<script src="candidato-360-saliencia.js?v=20260928"></script>
 <script>
 (function () {
   'use strict';
@@ -834,19 +834,21 @@
     if (sint[0]?.indice) partes.push(`Por su vocabulario, esta agenda le habla sobre todo al votante de <b>${esc(sint[0].familia.nombre.toLowerCase())}</b>${arqT?.pesos?.[sint[0].familia.slug] ? `, que es el ${pct(arqT.pesos[sint[0].familia.slug])} del electorado proyectado de ${esc(arqT.territorio.nombre)}` : ''}.`);
     return partes.join(' ');
   }
-  function pintarArquetipos(a, t, sint, arqT) {
+  function pintarArquetipos(a, t, sint, arqT, arqT0) {
     const pesos = arqT?.pesos || null;
-    const aviso = salVista === 'pais'
+    const propia = arqT0?.familias ? `<p class="sal-arq-aviso">Son los <b>${arqT0.familias.length} arquetipos de ${esc(arqT0.territorio.nombre)}</b>, no las cinco familias de referencia. Qué tema mueve a cada uno sale de las palancas temáticas de la cartografía; donde no las calificó, se completó leyendo su ficha, y así lo marca cada fila.</p>` : '';
+    const aviso = propia + (salVista === 'pais'
       ? `<p class="sal-arq-aviso">En la agenda nacional la sintonía va sin ponderar: el reparto de arquetipos es de un electorado territorial, y aquí se lee al país entero.</p>`
       : pesos
       ? `<p class="sal-arq-aviso">Con el reparto de arquetipos de <b>${esc(arqT.territorio.nombre)}</b> (${esc(arqT.territorio.fuente)}). Es un modelo ecológico sobre voto barrial, no una encuesta.</p>`
-      : `<p class="sal-arq-aviso">Los arquetipos de <b>${esc(t.etiqueta || 'su territorio')}</b> todavía no están construidos. La sintonía usa el perfil de cada familia —el modelo de referencia, construido en Medellín— sin saber cuánto pesa cada una en su electorado. Cuando construyamos los de su territorio, esta tarjeta los toma sola y pondera por su electorado.</p>`;
+      : `<p class="sal-arq-aviso">Los arquetipos de <b>${esc(t.etiqueta || 'su territorio')}</b> todavía no están construidos. La sintonía usa el perfil de cada familia —el modelo de referencia, construido en Medellín— sin saber cuánto pesa cada una en su electorado. Cuando construyamos los de su territorio, esta tarjeta los toma sola y pondera por su electorado.</p>`);
     if (!a.temas.length) return aviso + '<p class="sal-vacio">Sin temas clasificados en esta vista.</p>';
     const filas = sint.map(x => {
       const f = x.familia, w = pesos?.[f.slug];
       return `<div class="sal-arq-fila" style="--c:${f.color}"><div><b class="nom">${esc(f.nombre)}</b>
         <p>${x.activa ? `En esta agenda lo activa <b>${esc(x.activa.corto)}</b>.` : ''} ${x.hueco.length ? `La prensa casi no habla de <b>${esc(x.hueco.join(' ni de '))}</b>, que es lo que más lo mueve.` : ''}</p>
-        <p>Se le habla en tono ${esc(f.tono.toLowerCase())}. Lo desmoviliza: ${esc(f.desmoviliza.toLowerCase())}.</p>
+        <p>${f.tono ? `Se le habla en tono ${esc(f.tono.toLowerCase())}. Lo desmoviliza: ${esc(f.desmoviliza.toLowerCase())}.` : `${esc(f.decide)} Se enciende con ${esc(String(f.sube || '').replace(/\.$/, '').toLowerCase())}.`}</p>
+        ${x.activa && f.sensNury && !f.sensNury.includes(x.activa.id) ? `<p class="sal-sub" style="margin:4px 0 0">El peso de ${esc(x.activa.corto)} para este arquetipo es inferido de su ficha, no calificado en la cartografía.</p>` : ''}
         <div class="sal-arq-bar"><i style="width:${Math.max(0, (x.indice - 1) / 4 * 100).toFixed(1)}%"></i></div></div>
         <div class="sal-arq-cifra">${x.indice.toFixed(1)}<small>sintonía · de 5</small>${w != null ? `<span style="display:block;margin-top:10px">${pct(w)}<small>de su electorado</small></span>` : ''}</div></div>`;
     }).join('');
@@ -879,11 +881,16 @@
     salUltimo = a;
     const nMedios = a.medios.length;
     $('salMeta').textContent = `${num(a.N)} titulares · ${num(nMedios)} medios · ${VENTANA} días`;
-    const sint = S.sintonia(a, A.FAMILIAS);
-    /* En «Todo» se pondera igual que en el territorio: la mayoría de lo que
-       mira ese electorado sigue siendo lo suyo. En «El país», no. */
-    const arqT = salVista === 'pais' ? null : await A.deTerritorio(t);
+    /* Un territorio con taxonomía propia (Cartagena: ocho arquetipos) se lee
+       con SUS familias en las tres vistas —son la lente de ese electorado—;
+       el reparto de pesos solo se aplica fuera de «El país». En «Todo» se
+       pondera igual que en el territorio: la mayoría de lo que mira ese
+       electorado sigue siendo lo suyo. */
+    const arqT0 = await A.deTerritorio(t);
     if (salUltimo !== a) return; /* llegó otra lectura mientras cargaban los arquetipos */
+    salFams = arqT0?.familias || A.FAMILIAS;
+    const sint = S.sintonia(a, salFams);
+    const arqT = salVista === 'pais' ? null : arqT0;
     $('salSintesis').innerHTML = sintesis(a, t, sint, arqT) + (a.N < 10 ? '<small>Pocos titulares: léalo como indicio, no como tendencia.</small>' : '');
 
     const maxT = a.temas[0]?.n || 1;
@@ -902,7 +909,7 @@
       <div class="sal-eje"><span>hace ${VENTANA} días</span><span>pico: ${num(Math.max(...a.serie))} en un día</span><span>hoy</span></div>
       <div class="sal-enc">${seg('conflicto', 'var(--coral)')}${seg('mixto', '#e7b3a6')}${seg('gestion', 'var(--green)')}${seg('neutro', '#d4d9d2')}</div>
       <div class="sal-enc-ley"><span style="--c:var(--coral)">Conflicto <b>${pct(e.conflicto / N)}</b></span><span style="--c:#e7b3a6">Mixto <b>${pct(e.mixto / N)}</b></span><span style="--c:var(--green)">Gestión <b>${pct(e.gestion / N)}</b></span><span style="--c:#d4d9d2">Sin marca <b>${pct(e.neutro / N)}</b></span></div>`;
-    $('salArquetipos').innerHTML = pintarArquetipos(a, t, sint, salVista === 'pais' ? null : arqT);
+    $('salArquetipos').innerHTML = pintarArquetipos(a, t, sint, arqT, arqT0);
 
     /* Filtros: tocar una fila o una palabra lista sus titulares abajo. */
     const armar = clave => {
@@ -922,6 +929,9 @@
     pintarGeo(a, t);
   }
   let salArmar = () => null;
+  /* Las familias con que se está leyendo: las cinco de referencia o las del
+     territorio si tiene taxonomía propia. Las usa también la lectura con IA. */
+  let salFams = window.C360Arquetipos?.FAMILIAS || [];
   function alternarFiltro(clave, armado) {
     salFiltro = salFiltro?.clave === clave ? null : (armado || salArmar(clave));
     pintarSaliencia().then(() => { if (salFiltro) $('salFiltro').scrollIntoView({ behavior: 'instant', block: 'nearest' }); });
@@ -1032,7 +1042,7 @@
   async function pedirIA(slug, a, t) {
     salIASlug = slug;
     $('salIAPills').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.slug === slug)));
-    const fam = A.FAMILIAS.find(f => f.slug === slug), llave = iaLlave(slug, a);
+    const fam = salFams.find(f => f.slug === slug), llave = iaLlave(slug, a);
     if (salIACache.has(llave)) { const h = salIACache.get(llave); return pintarIAOut(h.d, h.tits); }
     const tits = iaTitulares(a);
     $('salIAOut').innerHTML = `<div class="redes-cargando"><i></i><span>Leyendo ${num(tits.length)} titulares con los ojos del votante de ${esc(fam.nombre.toLowerCase())}…</span></div>`;
@@ -1056,7 +1066,7 @@
     pintarIAOut(r.data, tits);
   }
   function pintarIAOut(d, tits) {
-    const fam = A.FAMILIAS.find(f => f.slug === d.familia) || A.FAMILIAS[0];
+    const fam = salFams.find(f => f.slug === d.familia) || salFams[0];
     const lista = (xs, tag) => xs?.length ? `<${tag}>${xs.map(x => `<li>${esc(x)}</li>`).join('')}</${tag}>` : '';
     const ev = (d.evidencia || []).filter(n => tits[n - 1]);
     $('salIAOut').innerHTML = `<div class="sal-ia-out" style="--c:${fam.color}">

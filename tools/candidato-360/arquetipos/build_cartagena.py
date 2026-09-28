@@ -73,6 +73,94 @@ TARJETA = {
 }
 
 
+# ── Sensibilidad por tema de agenda (para la escucha de medios y redes) ──
+# Las llaves son los temas que clasifica candidato-360-saliencia.js (TEMAS).
+# Sale de las «palancas temáticas (1-5)» que Nury escribió para cada arquetipo
+# en el INTEGRADO (sección 5), traducidas a esos temas:
+#   seguridad → seguridad · transparencia → corrupcion · empleo, turismo,
+#   costo de vida → empleo · agua, servicios públicos, conectividad → servicios ·
+#   movilidad, transporte (también marítimo), vías → movilidad ·
+#   salud/educación → salud_educacion · cumplimiento, derechos territoriales,
+#   presencia → participacion · identidad, juventud → cultura · ambiente → ambiente ·
+#   vivienda, espacio público, gestión administrativa, POT → vivienda.
+# Lo que Nury NO calificó se completa en 2-3 leyendo su ficha (rasgos, sesgos,
+# cómo decide). `SENS_NURY` marca qué temas son literalmente de ella, para que la
+# página pueda distinguir el dato de la inferencia. Si Nury corrige una palanca,
+# se corrige aquí.
+SENS = {
+    # Seguridad 5 · Movilidad 5 · Servicios 4 · Turismo/espacio público 4 · Transparencia 3
+    'guardian-funcional': dict(seguridad=5, movilidad=5, servicios=4, vivienda=4, corrupcion=3,
+                               empleo=3, cultura=3, salud_educacion=2, participacion=2, ambiente=2),
+    # Transparencia 5 · Gestión administrativa 5 · Seguridad 4 · Movilidad 4 · Servicios 4
+    'gestor-vigilante': dict(corrupcion=5, vivienda=4, seguridad=4, movilidad=4, servicios=4,
+                             participacion=3, empleo=3, salud_educacion=3, cultura=2, ambiente=2),
+    # Servicios 5 · Seguridad 5 · Transporte 4 · Empleo 4 · Vivienda 4
+    'pragmatico-servicios': dict(servicios=5, seguridad=5, movilidad=4, empleo=4, vivienda=4,
+                                 salud_educacion=3, participacion=3, corrupcion=2, cultura=2, ambiente=2),
+    # Empleo 5 · Seguridad 5 · Vivienda 4 · Transparencia 4 · Servicios 4
+    'protesta-resolutiva': dict(empleo=5, seguridad=5, vivienda=4, corrupcion=4, servicios=4,
+                                movilidad=3, salud_educacion=3, participacion=3, cultura=3, ambiente=2),
+    # Agua 5 · Derechos territoriales 5 · Ambiente 5 · Empleo local 4 · Turismo inclusivo 4
+    'defensor-territorial': dict(servicios=5, vivienda=5, ambiente=5, empleo=4, participacion=4,
+                                 cultura=4, salud_educacion=3, seguridad=2, corrupcion=2, movilidad=2),
+    # Agua 5 · Transporte marítimo 5 · Salud/educación 4 · Turismo 4 · Conectividad 4
+    'guardian-insular': dict(servicios=5, movilidad=5, salud_educacion=4, empleo=4,
+                             participacion=4, cultura=4, ambiente=3, corrupcion=3, vivienda=3, seguridad=2),
+    # Empleo 5 · Movilidad 4 · Seguridad 4 · Ambiente 4 · Servicios 3
+    'productivo-pragmatico': dict(empleo=5, movilidad=4, seguridad=4, ambiente=4, servicios=3,
+                                  salud_educacion=3, vivienda=3, corrupcion=2, participacion=2, cultura=2),
+    # Cumplimiento 5 · Seguridad 4 · Vías barriales 4 · Servicios 4 · Oportunidades juveniles 4
+    'mediador-comunitario': dict(participacion=5, seguridad=4, movilidad=4, servicios=4, cultura=4,
+                                 empleo=3, corrupcion=3, salud_educacion=3, vivienda=3, ambiente=2),
+}
+SENS_NURY = {
+    'guardian-funcional': ['seguridad', 'movilidad', 'servicios', 'vivienda', 'corrupcion'],
+    'gestor-vigilante': ['corrupcion', 'vivienda', 'seguridad', 'movilidad', 'servicios'],
+    'pragmatico-servicios': ['servicios', 'seguridad', 'movilidad', 'empleo', 'vivienda'],
+    'protesta-resolutiva': ['empleo', 'seguridad', 'vivienda', 'corrupcion', 'servicios'],
+    'defensor-territorial': ['servicios', 'vivienda', 'ambiente', 'empleo'],
+    'guardian-insular': ['servicios', 'movilidad', 'salud_educacion', 'empleo'],
+    'productivo-pragmatico': ['empleo', 'movilidad', 'seguridad', 'ambiente', 'servicios'],
+    'mediador-comunitario': ['participacion', 'seguridad', 'movilidad', 'servicios', 'cultura'],
+}
+TEMAS_VALIDOS = {'seguridad', 'corrupcion', 'empleo', 'servicios', 'movilidad', 'salud_educacion',
+                 'participacion', 'cultura', 'ambiente', 'vivienda'}
+
+
+def leer_integrado():
+    """Las fichas 2027 de la sección 5 del INTEGRADO: perfil, cómo decide,
+    sesgos, cinco palancas emocionales, cinco temáticas y barrios representativos."""
+    import zipfile
+    m = sorted(glob.glob(str(INSUMOS / 'INTEGRADO CARTAGENA.docx')))
+    if not m:
+        print('  ⚠ sin INTEGRADO: las fichas salen sin cómo decide ni palancas temáticas')
+        return {}
+    x = zipfile.ZipFile(m[0]).read('word/document.xml').decode('utf-8')
+    ps = [p for p in (re.sub(r'<[^>]+>', '', q).strip() for q in re.findall(r'<w:p[ >].*?</w:p>', x, flags=re.S)) if p]
+    campos = {'Cómo decide el voto': 'decide', 'Sesgos emocionales y cognitivos': 'sesgos',
+              'Palancas emocionales (1–5)': 'palancas', 'Palancas temáticas (1–5)': 'tematicas',
+              'Barrios más representativos': 'representativos', 'Edades dominantes': 'edades'}
+    out = {}
+    for i, p in enumerate(ps):
+        mm = re.match(r'^5\.\d+\.\s+(.+)$', p)
+        if not mm or mm.group(1) not in SLUG:
+            continue
+        slug, f = SLUG[mm.group(1)], {}
+        sint = re.sub(r'^Síntesis del arquetipo\.\s*', '', ps[i + 1])
+        corte = re.search(r'\s(?!Cartagena\b)([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\b', sint[1:])
+        f['perfil'] = sint[corte.start() + 2:].strip() if corte else ''
+        for j in range(i + 2, min(i + 40, len(ps) - 1)):
+            if re.match(r'^5\.\d+\.', ps[j]):
+                break
+            if ps[j] in campos:
+                f[campos[ps[j]]] = ps[j + 1]
+        for k in ('palancas', 'tematicas'):
+            f[k] = [[n.strip(), int(v)] for n, v in re.findall(r'([^·]+?)\s+(\d)/5', f.get(k, ''))]
+        f['edades'] = re.sub(r'\s*años$', '', f.get('edades', ''))
+        out[slug] = f
+    return out
+
+
 def norm(s):
     s = unicodedata.normalize('NFD', str(s or ''))
     s = ''.join(c for c in s if unicodedata.category(c) != 'Mn')
@@ -108,6 +196,20 @@ def main():
         familias[slug] = dict(nombre=r[0], familia_fuente=r[1], emocion=r[2], rasgos=r[3],
                               sube=r[4], baja=r[5], **TARJETA[slug])
     assert len(familias) == 8, familias.keys()
+    integ = leer_integrado()
+    for slug, f in familias.items():
+        extra = integ.get(slug, {})
+        if extra.get('palancas'):
+            f['palancas'] = extra['palancas']      # las cinco del informe; la tarjeta muestra tres
+        for k in ('perfil', 'decide', 'sesgos', 'tematicas', 'representativos'):
+            if extra.get(k):
+                f[k] = extra[k]
+        if extra.get('edades') and extra['edades'] != f['edades']:
+            print(f'  ⚠ {slug}: edades de la tarjeta {f["edades"]} ≠ informe {extra["edades"]}')
+        assert set(SENS[slug]) <= TEMAS_VALIDOS, slug
+        f['sens'] = SENS[slug]
+        f['sens_nury'] = SENS_NURY[slug]
+    print(f'  fichas con informe integrado: {sum(1 for f in familias.values() if f.get("decide"))} de 8')
 
     # ── ciudad ──
     ciudad = {a: {} for a in AÑOS}

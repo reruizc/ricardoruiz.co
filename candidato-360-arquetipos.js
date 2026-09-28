@@ -14,7 +14,8 @@
       habla. Esto sirve en CUALQUIER territorio.
 
    2. `TERRITORIOS` — cuánto pesa cada familia en un electorado concreto. Hoy
-      solo existe Medellín (proyección 2027 por barrio). **Para sumar un
+      Medellín y Cartagena (proyección 2027 por barrio); Cartagena además trae
+      sus propias ocho familias. **Para sumar un
       territorio nuevo basta una entrada acá**: el panel de escucha la toma
       sola y pasa de «perfil de referencia» a «agenda ponderada por su
       electorado». Sin entrada, el panel lo dice en vez de suponer un reparto.
@@ -76,7 +77,32 @@
   /* Cada territorio: cómo reconocerlo desde el territorio de la candidatura
      (`calza`) y de dónde sale el peso de cada familia (`cargar`, que devuelve
      `{ slug: fracción }` sumando ~1). */
+  const S3_CTG = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/Proyecto+DC/arquetipos-cartagena';
+
   const TERRITORIOS = [
+    /* Cartagena trae su PROPIA taxonomía: ocho arquetipos de Nury, no las
+       cinco familias de arriba. Por eso `cargar` devuelve también `familias`,
+       y el panel de escucha usa esas en vez de FAMILIAS. La sensibilidad por
+       tema sale de las palancas temáticas de Nury (tools/candidato-360/
+       arquetipos/build_cartagena.py, `SENS`); `sensNury` dice qué temas
+       calificó ella y cuáles se completaron leyendo su ficha.
+       ⚠️ «Cartagena del Chairá» (Caquetá) NO calza: el nombre es exacto. */
+    {
+      id: 'cartagena', nombre: 'Cartagena',
+      fuente: 'Simulación 2027 por barrio · cartografía emocional de Cartagena de Nury Astrid',
+      calza: t => !t.departamental && /^CARTAGENA( DE INDIAS)?$/.test(norm(t.munLimpio || t.base)) && (!t.depNombre || norm(t.depNombre) === 'BOLIVAR'),
+      cargar: async () => {
+        const r = await fetch(`${S3_CTG}/arquetipos-cartagena.json?v=20260928`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const d = await r.json();
+        const familias = (d.orden || Object.keys(d.familias)).map(slug => {
+          const f = d.familias[slug];
+          return { slug, color: f.color, nombre: f.nombre, largo: f.nombre, tagline: f.lema, sens: f.sens || {}, sensNury: f.sens_nury || [],
+            emocion: f.emocion, decide: f.decide || '', sube: f.sube || '', baja: f.baja || '', perfil: f.perfil || '', palancas: f.palancas || [], tematicas: f.tematicas || [] };
+        });
+        return { pesos: { ...(d.ciudad_share?.['2027'] || {}) }, familias };
+      },
+    },
     {
       id: 'medellin', nombre: 'Medellín',
       fuente: 'Proyección 2027 por barrio · cartografía emocional de Medellín 2015-2027',
@@ -93,13 +119,18 @@
 
   const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
 
-  /* Devuelve `{ territorio, pesos }` o null si el territorio todavía no tiene
+  /* Devuelve `{ territorio, pesos, familias }` (familias = null si el
+     territorio usa las cinco de arriba) o null si el territorio todavía no tiene
      arquetipos construidos. Se cachea por sesión. */
   const cache = new Map();
   async function deTerritorio(t) {
     const def = TERRITORIOS.find(x => { try { return x.calza(t); } catch { return false; } });
     if (!def) return null;
-    if (!cache.has(def.id)) cache.set(def.id, def.cargar().then(pesos => ({ territorio: def, pesos })).catch(() => null));
+    /* `cargar` devuelve los pesos solos, o `{ pesos, familias }` cuando el
+       territorio tiene su propia taxonomía. */
+    if (!cache.has(def.id)) cache.set(def.id, def.cargar().then(r => (r && r.pesos && typeof r.pesos === 'object' && !Array.isArray(r.pesos) && r.familias)
+      ? { territorio: def, pesos: r.pesos, familias: r.familias }
+      : { territorio: def, pesos: r, familias: null }).catch(() => null));
     return cache.get(def.id);
   }
 

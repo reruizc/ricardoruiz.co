@@ -4179,7 +4179,7 @@ async function lecturaArquetipos() {
    nombres de Nury son los mismos 211 de la capa (verificado al construir). */
 const CARTAGENA = '05001';
 const ARQ_CTG_BASE = RRData.publicUrl('bases+de+datos/Proyecto+DC/arquetipos-cartagena');
-const ARQ_CTG_URL = `${ARQ_CTG_BASE}/arquetipos-cartagena.json?v=20260927`;
+const ARQ_CTG_URL = `${ARQ_CTG_BASE}/arquetipos-cartagena.json?v=20260928`;
 const normBarrio = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
 let arqCtgPromise = null;
 function datosArquetiposCartagena() {
@@ -4298,7 +4298,9 @@ function fichaArquetipoCartagena(L, id) {
     <div>
       <p style="margin:0 0 6px"><b style="color:${f.color}">${escHtml(f.nombre)}</b> · ${escHtml(f.lema)}</p>
       <p style="margin:0 0 6px">La emoción que lo ordena: <b>${escHtml(emocionArq(f))}</b>. ${escHtml(f.rasgos)}</p>
+      ${f.decide ? `<p style="margin:0 0 6px">Cómo decide el voto: ${escHtml(f.decide)}</p>` : ''}
       <p style="margin:0 0 6px">Palancas emocionales: ${f.palancas.map(([n, v]) => `${escHtml(n)} <b>${v}/5</b>`).join(' · ')} · edades ${escHtml(f.edades)} años.</p>
+      ${f.tematicas?.length ? `<p style="margin:0 0 6px">Temas que lo mueven: ${f.tematicas.map(([n, v]) => `${escHtml(n)} <b>${v}/5</b>`).join(' · ')}.</p>` : ''}
       <p style="margin:0 0 6px"><b>Se enciende con</b> ${escHtml(f.sube.replace(/\.$/, '').toLowerCase())}. <b>Se calma con</b> ${escHtml(f.baja.replace(/\.$/, '').toLowerCase())}.</p>
     </div></div>`;
 }
