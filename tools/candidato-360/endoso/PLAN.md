@@ -92,7 +92,7 @@ suman menos que por separado; dos de barrios distintos suman casi completo.
 | # | Qué | Sale |
 |---|---|---|
 | 1 ✅ | Extraer el motor a `candidato-360-endoso.js` (`window.C360Endoso`), sin cambiar cifras. La tarjeta 08 lo usa. Prueba en Node con JSON reales (`prueba-endoso.mjs`). | **hecho 27-sep-2026** |
-| 2 | Panel `candidato-360-endoso.html` con los excandidatos: ficha por aliado, mapa de sus votos en el territorio, tasa con su método, total. La tarjeta 08 pasa a enlace (como 06 y 09); se retira el modal. | panel v1 |
+| 2 ✅ | Panel `candidato-360-endoso.html` con los excandidatos: ficha por aliado, mapa de sus votos en el territorio, tasa con su método, total. La tarjeta 08 pasa a enlace (como 06 y 09); se retira el modal. | **hecho 27-sep-2026** |
 | 3 | D3 calibración de retención → reemplaza el 30 %. Rango piso/probable/techo. Crecimiento 2027. | fórmula A v2 |
 | 4 | D1 totales por puesto (2023 primero) → regresión ecológica en la fórmula A. | fórmula A v3 |
 | 5 | Unión probabilística por puesto + mapa combinado + matriz de solape entre aliados. | sin doble conteo |
@@ -115,6 +115,32 @@ Cosas vistas al pasar, sin tocar (cambiarían cifras, van a la fase 3):
   (`floor((n−1)/2)`), no el promedio.
 - En «Dónde se concentra» aparecen áreas tipo «Puesto 11-00» con pocos votos:
   mesas sin comuna que caen al nombre del puesto.
+
+**Fase 2 (27-sep-2026).** Panel `candidato-360-endoso.html`: búsqueda sobre el
+índice completo (439.015 candidaturas, con las de su departamento primero),
+fichas por aliado con la tasa y su método, total contra la meta guardada en
+`campana.meta`, mapa de puestos (tamaño = endoso, color = aliado que más pesa;
+se encuadra sobre el 95 % del endoso) y desglose por localidad/comuna/municipio.
+La tarjeta 08 pasa a enlace y el modal se retiró.
+
+El motor ganó lo que el panel necesitaba sin el CRM: `alcanceDe` (el territorio
+desde la campaña guardada, con el municipio por **código electoral** vía
+`C360Electorado.codigoMunicipio`), `enAlcance` (puerto de `mesaEnAlcance`),
+`areaDe`, `porPuesto` y `candidaturaId`. El CRM ahora resuelve el territorio con
+`alcanceDe` cuando el formulario no lo tiene, lo que corrige dos cosas de paso:
+la candidatura nueva buscaba el municipio por NOMBRE (el formulario escribe
+«Cartagena de Indias» y la Registraduría «CARTAGENA») y la ruta «otra
+corporación» sin formulario caía a su votación anterior en vez de a la campaña.
+
+⚠️ `enAlcance` duplica `mesaEnAlcance` a propósito (el panel no carga el CRM).
+`prueba-endoso.mjs` extrae la del CRM y las compara en 24 casos sintéticos y
+26.801 mesas reales: si alguien cambia una sin la otra, falla.
+
+Verificado en el navegador con dos campañas: Concejo de Bogotá por «la misma
+corporación» (cifras idénticas a la prueba) y JAL de Suba por «otra
+corporación» (el concejal Briceño baja de 49.894 a sus 11.237 votos en Suba).
+Sin desborde a 375 px. Candi tiene la vista `endoso` en el frontend; en el
+worker (`C360_CANDI_VISTAS`) está escrita pero **sin desplegar**.
 
 ## Decisiones abiertas (de Ricardo)
 

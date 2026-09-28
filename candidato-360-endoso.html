@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Cuántos votos le pueden pasar sus aliados en el territorio donde compite, medido con lo que le pasaron antes a quien apoyaron.">
+<title>Endoso de aliados · Candidato 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<!-- ⚠️ Al tocar candidato-360.css, candidato-360-panel.js o candidato-360-endoso.js hay que bumpear su ?v= acá y en las otras páginas que los cargan. -->
+<link rel="stylesheet" href="candidato-360.css?v=20260926">
+<link rel="stylesheet" href="assets/candidato-360/candi/candi-saludo.css?v=3">
+<link rel="stylesheet" href="assets/candidato-360/candi/candi-hueso.css?v=1">
+<link rel="stylesheet" href="candidato-360-candi.css?v=20260921d">
+<style>
+/* El chasis del panel, igual que en electorado y Día D. */
+.panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
+.panel-hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:30px}
+.panel-hero h1{font:800 clamp(30px,4.4vw,46px)/1.06 var(--display);letter-spacing:-.02em;margin:8px 0 10px;color:var(--ink);max-width:24ch;text-wrap:balance}
+.panel-hero p{margin:0;max-width:64ch;font-size:15px;line-height:1.6;color:var(--muted)}
+.panel-candidatura:empty{display:none}
+.panel-candidatura{display:inline-block;margin-top:14px;font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--green);border:1px solid rgba(20,124,112,.32);padding:6px 10px}
+.panel-nota{margin-top:24px;font-size:12.5px;line-height:1.55;color:var(--muted)}
+.hidden{display:none}
+
+/* ── El total ─────────────────────────────────────────────────────────── */
+.en-cifra{display:flex;flex-wrap:wrap;gap:clamp(18px,4vw,44px);align-items:flex-end;margin:18px 0 6px}
+.en-cifra b{display:block;font:800 clamp(40px,7vw,64px)/1 var(--display);letter-spacing:-.03em;color:var(--ink)}
+.en-cifra .verde b{color:var(--green)}
+.en-cifra span{display:block;font-size:13px;color:var(--muted);margin-top:4px;max-width:24ch}
+.en-barra{height:12px;background:rgba(20,124,112,.12);border:1px solid var(--line);margin:16px 0 4px;overflow:hidden}
+.en-barra i{display:block;height:100%;background:var(--green)}
+.en-barra-et{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+
+/* ── La búsqueda ──────────────────────────────────────────────────────── */
+.en-estado{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:6px 0 0}
+.en-para{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:rgba(20,124,112,.07);border:1px solid rgba(20,124,112,.3);padding:8px 12px;margin:0 0 10px;font-size:13.5px}
+.en-color{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+
+/* ── El mapa ──────────────────────────────────────────────────────────── */
+.en-mapa-caja{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;margin-top:10px}
+.en-mapa{height:440px;border:1px solid var(--line);background:#e5eadf}
+.en-mapa .leaflet-tile-pane{filter:grayscale(.85) saturate(.5) brightness(1.06)}
+.en-mapa .leaflet-control-attribution{font-size:9px;background:rgba(244,240,232,.75)}
+.leaflet-tooltip.tp{font:13px var(--sans);background:rgba(23,37,28,.96);color:#fff;border:0;border-radius:0;padding:8px 10px;max-width:260px;white-space:normal}
+.leaflet-tooltip.tp b{font-family:var(--display)}
+.leaflet-tooltip.tp:before{display:none}
+.en-leyenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 0;font-size:12.5px;color:var(--muted)}
+@media (max-width:820px){.en-mapa-caja{grid-template-columns:1fr}.en-mapa{height:360px}}
+</style>
+</head>
+<body data-candi-vista="endoso">
+<nav class="topbar"><div class="nav-left"><a href="candidato-360.html?abrir=1" class="nav-planes">← CRM</a><div class="nav-auth" id="navAuth"></div></div><div class="nav-right"><a class="brand" href="index.html"><span class="mark"><i></i><i></i><i></i><i></i></span><b>Ricardo<span>.</span>Ruiz</b></a></div></nav>
+<main class="app-shell"><div class="panel-shell">
+  <header class="panel-hero">
+    <div class="kicker">Candidato 360 · panel 08</div>
+    <h1>Endoso de aliados.</h1>
+    <p>Un aliado no le pasa todos sus votos: le pasa una parte, y solo la que está <b>en el territorio donde usted compite</b>. Busque a los excandidatos que lo van a apoyar. Si dice a quién apoyaron antes, medimos, mesa por mesa, qué tanto coincidió su votación con la de esa persona, y usamos esa tasa para estimar lo que le pueden pasar a usted.</p>
+    <span class="panel-candidatura" id="panelCandidatura"></span>
+  </header>
+  <div id="panelMuro" class="hidden"></div>
+  <div id="panelCuerpo" class="c360-endoso">
+
+    <section class="panel" id="enAliadosSec">
+      <span class="panel-num">01 · Sus aliados</span>
+      <h3 id="enBuscarTitulo">Sume a quien lo va a apoyar.</h3>
+      <p id="enBuscarCopy">Sirve cualquier candidatura con resultados desde 2010: Congreso, Asamblea, Concejo, JAL, alcaldías y gobernaciones. Primero salen las de su departamento.</p>
+      <div id="enPara" class="en-para hidden"></div>
+      <div class="endoso-buscar"><input id="enBuscar" type="search" autocomplete="off" placeholder="Nombre y apellido" aria-label="Buscar una candidatura"></div>
+      <p class="en-estado" id="enIndice">Cargando el índice electoral…</p>
+      <div id="enResultados" class="endoso-resultados"></div>
+      <div id="enLista" class="endoso-lista"></div>
+      <p class="helper" style="margin-top:6px">Por ahora se suman excandidatos. Los líderes sin candidatura propia (una junta de acción comunal, una iglesia, una organización) llegan en una próxima versión, midiendo cuánto rindió su candidato en su zona.</p>
+    </section>
+
+    <section class="panel hidden" id="enTotalSec">
+      <span class="panel-num">02 · Cuánto le pueden pasar</span>
+      <h3 id="enTotalTitulo">El endoso estimado.</h3>
+      <div class="en-cifra">
+        <div class="verde"><b id="enTotal">—</b><span>votos, como techo</span></div>
+        <div><b id="enTecho">—</b><span id="enTechoSub">votos de sus aliados en su territorio</span></div>
+        <div id="enMetaCaja"><b id="enMeta">—</b><span id="enMetaSub">de su meta</span></div>
+      </div>
+      <div class="en-barra hidden" id="enBarraCaja"><i id="enBarra" style="width:0"></i></div>
+      <span class="en-barra-et hidden" id="enBarraEt"></span>
+      <p id="enTotalCopy" style="margin-top:14px"></p>
+    </section>
+
+    <section class="panel hidden" id="enMapaSec">
+      <span class="panel-num">03 · Dónde</span>
+      <h3 id="enMapaTitulo">Dónde está ese endoso.</h3>
+      <p id="enMapaCopy">Cada círculo es un puesto de votación: el tamaño es cuánto le pueden pasar ahí y el color, qué aliado pesa más.</p>
+      <div class="en-mapa-caja">
+        <div><div class="en-mapa" id="enMapa"></div><div class="en-leyenda" id="enLeyenda"></div></div>
+        <div><p style="margin:0 0 6px"><b id="enAreasTitulo">Dónde se concentra</b></p><ul class="arq-lista" id="enAreas"></ul></div>
+      </div>
+    </section>
+
+    <p class="puntaje-nota panel-nota" id="enNota"></p>
+  </div>
+</div></main>
+<script src="platform-config.js"></script>
+<script src="data-client.js"></script>
+<script src="cand-index.js?v=20260919"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="partidos-bloques.js?v=20260922"></script>
+<script src="candidato-360-electorado.js?v=20260927b"></script>
+<script src="candidato-360-endoso.js?v=20260927b"></script>
+<script src="candidato-360-panel.js?v=20260919d"></script>
+<!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
+<script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
+<script src="assets/candidato-360/candi/candi-hueso.js?v=1"></script>
+<script src="candidato-360-candi.js?v=20260927b"></script>
+<script>
+(async function () {
+  const P = window.C360Panel, E = window.C360Endoso, EL = window.C360Electorado, $ = P.$, esc = P.esc;
+  const num = x => Number(x || 0).toLocaleString('es-CO');
+  const pct0 = x => `${Math.round((x || 0) * 100)} %`;
+  /* Un color por aliado, en el orden en que se suman. Pocos y bien
+     distinguibles: con más de ocho aliados se repiten, y el tooltip manda. */
+  const COLORES = ['#1f7a60', '#ee745e', '#3b6fb6', '#c88a2e', '#7c4dab', '#2a9aa6', '#b23a5b', '#5d7a2a'];
+  const colorDe = i => COLORES[i % COLORES.length];
+
+  const ST = { v: null, clave: '', aliados: [], alcance: null, lugar: 'su territorio', propio: null, meta: 0, lectura: null, para: null, indice: [], indiceListo: false, mapa: null, capa: null, georef: null, turno: 0 };
+
+  /* ── La lista, en el navegador ─────────────────────────────────────────
+     La misma llave que la tarjeta 08 del CRM: lo que se suma acá aparece
+     allá. */
+  function guardar() { E.guardar(ST.clave, ST.aliados); }
+
+  function rotulo(c) { return `${c.corp || 'Candidatura'}${c.partido ? ` · ${c.partido}` : ''}`; }
+  /* El departamento de una candidatura TERRITORIAL sale del slug
+     («CONC2023-16-1-…», «CON2022-C-05-…»). Las nacionales (Senado, presidencia,
+     consultas) no tienen: no se adivina. */
+  function depDelSlug(slug) {
+    const s = String(slug || '');
+    let m = s.match(/^(?:ASAM|CONC|JAL|ALC|GOB)\d{4}-(\d{1,2})-/); if (m) return String(Number(m[1]));
+    m = s.match(/^CON\d{4}-C-(\d{1,2})-/); return m ? String(Number(m[1])) : '';
+  }
+
+  /* ── Buscar ────────────────────────────────────────────────────────── */
+  let temporizador = null;
+  function buscar(q) {
+    const caja = $('enResultados'); q = String(q || '').trim();
+    if (q.length < 2) { caja.innerHTML = ''; return; }
+    if (!ST.indice.length) { caja.innerHTML = '<p class="helper">El índice electoral todavía está llegando; pruebe de nuevo en unos segundos.</p>'; return; }
+    /* Se pide de más y se reordena: a igual relevancia, primero lo de su
+       departamento, que es lo único que le puede sumar votos. */
+    const r = CandRegistry.acRank(q, ST.indice, 40), dep = ST.alcance?.departamento || '';
+    const items = dep ? r.items.map((c, i) => ({ c, i, casa: depDelSlug(c.slug) === dep })).sort((a, b) => (b.casa - a.casa) || (a.i - b.i)).map(x => x.c) : r.items;
+    const vista = items.slice(0, 8);
+    if (!vista.length) { caja.innerHTML = `<p class="helper">${ST.indiceListo ? 'Sin coincidencias.' : 'Sin coincidencias por ahora: seguimos cargando concejos y JAL.'}</p>`; return; }
+    caja.innerHTML = vista.map(c => `<button type="button" class="endoso-res" data-slug="${esc(c.slug)}"><b>${esc(c.nombre)}</b><small>${esc(rotulo(c))}${c.votos ? ` · ${num(c.votos)} votos` : ''}</small></button>`).join('')
+      + (r.total > vista.length ? `<p class="helper">${vista.length} de ${num(r.total)} · agregue un apellido para afinar.</p>` : '');
+    caja.querySelectorAll('.endoso-res').forEach(b => b.onclick = () => elegir(vista.find(c => c.slug === b.dataset.slug)));
+  }
+  function elegir(c) {
+    if (!c) return;
+    const i = ST.para;
+    if (i !== null && ST.aliados[i]) {
+      if (c.slug === ST.aliados[i].slug) return alert('Esa es la misma candidatura del aliado: elija a la persona que apoyó.');
+      ST.aliados[i].apoyo = E.ficha(c, CandRegistry.dataUrlFor);
+    } else {
+      if (ST.aliados.some(a => a.slug === c.slug)) return alert('Ese aliado ya está en la lista.');
+      if (ST.aliados.length >= E.MAX) return alert(`Por ahora se pueden sumar hasta ${E.MAX} aliados.`);
+      ST.aliados.push({ ...E.ficha(c, CandRegistry.dataUrlFor), apoyo: null, manual: null });
+    }
+    ST.para = null; guardar();
+    $('enBuscar').value = ''; $('enResultados').innerHTML = '';
+    pintarModo(); calcular();
+  }
+  function pintarModo() {
+    const al = ST.para !== null ? ST.aliados[ST.para] : null, caja = $('enPara');
+    $('enBuscar').placeholder = al ? 'Nombre de la candidatura que apoyó' : 'Nombre y apellido';
+    if (!al) { caja.classList.add('hidden'); caja.innerHTML = ''; return; }
+    caja.innerHTML = `<span>¿A quién apoyó <b>${esc(al.nombre)}</b> antes? Búsquelo abajo.</span><button type="button" class="enlace-boton" id="enCancelar">cancelar</button>`;
+    caja.classList.remove('hidden');
+    $('enCancelar').onclick = () => { ST.para = null; pintarModo(); buscar(''); };
+  }
+
+  /* Las acciones de cada ficha: se exponen para los onclick del HTML pintado. */
+  const A = {
+    apoyo(i) { ST.para = i; pintarModo(); const inp = $('enBuscar'); inp.value = ''; inp.focus(); inp.scrollIntoView({ behavior: 'instant', block: 'center' }); },
+    quitar(i) { ST.aliados.splice(i, 1); if (ST.para === i) ST.para = null; guardar(); pintarModo(); calcular(); },
+    quitarApoyo(i) { if (ST.aliados[i]) { ST.aliados[i].apoyo = null; guardar(); calcular(); } },
+    tasa(i, valor) {
+      const al = ST.aliados[i]; if (!al) return;
+      const v = String(valor).trim() === '' ? null : Math.max(0, Math.min(100, Number(valor)));
+      al.manual = Number.isFinite(v) ? v : null; guardar(); calcular();
+    },
+  };
+
+  /* ── Calcular y pintar ─────────────────────────────────────────────── */
+  async function calcular() {
+    const turno = ++ST.turno;
+    const lista = $('enLista');
+    if (!ST.aliados.length) {
+      ST.lectura = null;
+      lista.innerHTML = '<p class="helper">Todavía no hay aliados. Búsquelos por nombre arriba.</p>';
+      ['enTotalSec', 'enMapaSec'].forEach(id => $(id).classList.add('hidden'));
+      $('enNota').innerHTML = nota(null);
+      return;
+    }
+    lista.innerHTML = '<p class="helper">Leyendo la votación de sus aliados, mesa por mesa…</p>';
+    window.Candi?.calculo?.(true, '¡Estoy midiendo a tus aliados, mesa por mesa!');
+    let L;
+    try {
+      L = await E.evaluar(ST.aliados, { alcance: ST.alcance, lugar: ST.lugar, enAlcance: E.enAlcance, areaDe: (m, a) => P.lugar(E.areaDe(m, a)), propio: ST.propio });
+    } catch (e) { lista.innerHTML = '<p class="helper">No pudimos leer la votación de sus aliados. Intente de nuevo.</p>'; return; }
+    finally { window.Candi?.calculo?.(false); }
+    if (turno !== ST.turno) return;   /* llegó otro cambio mientras calculaba */
+    ST.lectura = L;
+    pintarFichas(L); pintarTotal(L); pintarMapa(L);
+    $('enNota').innerHTML = nota(L);
+  }
+
+  function pintarFichas(L) {
+    $('enLista').innerHTML = L.filas.map((f, k) => {
+      const al = f.al, punto = `<span class="en-color" style="background:${colorDe(k)}"></span>`;
+      if (f.error) return `<div class="endoso-fila"><div class="endoso-fila-top"><b>${punto}${esc(al.nombre)}</b><button type="button" class="endoso-x" onclick="EN.quitar(${k})" aria-label="Quitar">×</button></div><p class="helper">No pudimos leer la votación de esta candidatura.</p></div>`;
+      const par = f.par;
+      const apoyo = al.apoyo
+        ? `<div class="endoso-apoyo">Apoyó a <b>${esc(al.apoyo.nombre)}</b> <small>${esc(rotulo(al.apoyo))}</small> <button type="button" class="enlace-boton" onclick="EN.quitarApoyo(${k})">cambiar</button>${par?.valida ? `<span class="endoso-medida">coincidieron en el <b>${pct0(par.tasa)}</b> de sus votos · ${esc(E.CLASE[par.clase] || '')}</span>` : `<span class="endoso-aviso">No se usa: ${esc(par?.motivo || 'sin datos')}.</span>`}</div>`
+        : `<button type="button" class="enlace-boton" onclick="EN.apoyo(${k})">+ ¿A quién apoyó antes? (mide la tasa)</button>`;
+      const fuera = f.total - f.terr;
+      return `<div class="endoso-fila">
+        <div class="endoso-fila-top"><div><b>${punto}${esc(al.nombre)}</b><small>${esc(rotulo(al))}</small></div><button type="button" class="endoso-x" onclick="EN.quitar(${k})" aria-label="Quitar a ${esc(al.nombre)}">×</button></div>
+        <div class="endoso-cifras"><span><b>${num(f.terr)}</b> votos en ${esc(L.lugar)}${fuera > 0 ? ` <small>(${num(fuera)} fuera, no cuentan)</small>` : ''}</span><span>× <label class="endoso-tasa"><input type="number" min="0" max="100" step="1" value="${Math.round(f.tasa * 100)}" onchange="EN.tasa(${k}, this.value)" ${f.fuente === 'medida' ? 'disabled' : ''} aria-label="Tasa de ${esc(al.nombre)}"> %</label> <small>${esc(E.FUENTE[f.fuente])}</small></span><span>= <b class="endoso-est">${num(f.est)}</b></span></div>
+        ${apoyo}
+        ${f.terr === 0 && f.total > 0 ? `<p class="helper">Ninguno de sus votos cae en ${esc(L.lugar)}: aquí no le suma.</p>` : ''}
+        ${Number.isFinite(f.solape) && f.solape > .05 ? `<p class="helper">Hasta el ${pct0(f.solape)} de sus votos está en puestos donde usted ya saca votos: parte de ese endoso puede ser voto que ya tiene.</p>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  function pintarTotal(L) {
+    $('enTotalSec').classList.remove('hidden');
+    $('enTotal').textContent = num(L.total);
+    $('enTecho').textContent = num(L.techo);
+    $('enTechoSub').textContent = `votos de sus aliados en ${L.lugar}`;
+    const meta = ST.meta;
+    $('enMetaCaja').classList.toggle('hidden', !meta);
+    ['enBarraCaja', 'enBarraEt'].forEach(id => $(id).classList.toggle('hidden', !meta));
+    if (meta) {
+      const parte = L.total / meta;
+      $('enMeta').textContent = pct0(parte);
+      $('enMetaSub').textContent = `de su meta de ${num(meta)} votos`;
+      $('enBarra').style.width = `${Math.min(100, Math.max(1, parte * 100))}%`;
+      $('enBarraEt').textContent = parte >= 1 ? 'el endoso estimado supera la meta: revise si los aliados se pisan' : `faltarían ${num(meta - L.total)} votos si todo el endoso llegara`;
+    }
+    const n = ST.aliados.length;
+    $('enTotalTitulo').textContent = `${n === 1 ? 'Su aliado le puede' : `Sus ${n} aliados le pueden`} pasar hasta ${num(L.total)} votos.`;
+    $('enTotalCopy').innerHTML = L.nMedidas
+      ? `${L.nMedidas === 1 ? 'Una tasa sale medida' : `${L.nMedidas} tasas salen medidas`} con a quién apoyaron antes${L.mediana !== null && L.filas.some(f => f.fuente === 'mediana') ? `; a los que no tienen medición se les aplica la mediana, <b>${pct0(L.mediana)}</b>` : ''}.`
+      : 'Ninguna tasa está medida todavía: diga a quién apoyó cada aliado y la cifra deja de ser un supuesto.';
+  }
+
+  /* ── El mapa: los puestos con endoso ───────────────────────────────── */
+  async function pintarMapa(L) {
+    const puestos = E.porPuesto(L), sec = $('enMapaSec');
+    if (!puestos.length) { sec.classList.add('hidden'); return; }
+    sec.classList.remove('hidden');
+    const max = Math.max(1, ...L.areas.map(a => a.v));
+    $('enAreasTitulo').textContent = ST.alcance?.tipo === 'departamento' ? 'Por municipio' : ST.alcance?.tipo === 'localidad' ? 'Por puesto' : 'Por localidad o comuna';
+    $('enAreas').innerHTML = L.areas.slice(0, 12).map(a => `<li><span class="arq-punto" style="background:var(--green)"></span><b>${num(a.v)}</b> ${esc(a.nombre)}<em>${Math.round(a.v / max * 100)} %</em></li>`).join('');
+    $('enLeyenda').innerHTML = L.filas.map((f, k) => f.error ? '' : `<span><span class="en-color" style="background:${colorDe(k)}"></span>${esc(P.lugar(f.al.nombre))}</span>`).join('');
+
+    if (!ST.georef) { try { ST.georef = await EL.puestos(); } catch { ST.georef = {}; } }
+    if (!ST.mapa) {
+      ST.mapa = window.L.map('enMapa', { scrollWheelZoom: false, zoomSnap: .25, zoomDelta: .5 });
+      window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(ST.mapa);
+      ST.mapa.setView([4.65, -74.1], 6);
+    }
+    if (ST.capa) { ST.mapa.removeLayer(ST.capa); ST.capa = null; }
+    const conPunto = puestos.map(p => ({ p, g: ST.georef[p.code] })).filter(x => x.g && Number.isFinite(x.g.lat) && Number.isFinite(x.g.lng) && x.g.lat);
+    const tope = Math.max(1, ...conPunto.map(x => x.p.total));
+    ST.capa = window.L.featureGroup(conPunto.map(({ p, g }) => {
+      const partes = Object.entries(p.porAliado).sort((a, b) => b[1] - a[1]), dom = Number(partes[0][0]);
+      const detalle = partes.slice(0, 3).map(([i, v]) => `${esc(P.lugar(L.filas[i].al.nombre))}: ${num(Math.round(v))}`).join('<br>');
+      return window.L.circleMarker([g.lat, g.lng], { radius: 3 + 15 * Math.sqrt(p.total / tope), color: '#fff', weight: 1, fillColor: colorDe(dom), fillOpacity: .78 })
+        .bindTooltip(`<b>${esc(P.lugar(g.nombre || p.nombre))}</b><br>${esc(P.lugar(g.barrio || p.comNom || p.munNom))}<br>Hasta <b>${num(Math.round(p.total))}</b> votos de endoso<br>${detalle}`, { sticky: true, className: 'tp' });
+    })).addTo(ST.mapa);
+    const sin = puestos.length - conPunto.length;
+    $('enMapaCopy').textContent = `Cada círculo es un puesto de votación: el tamaño es cuánto le pueden pasar ahí y el color, qué aliado pesa más.${sin ? ` ${num(sin)} puesto${sin === 1 ? '' : 's'} sin coordenada publicada no ${sin === 1 ? 'aparece' : 'aparecen'} en el mapa, pero sí ${sin === 1 ? 'cuenta' : 'cuentan'} en las cifras.` : ''}`;
+    /* Leaflet mide el contenedor al crearse; reencuadrar después del layout
+       (setTimeout, no requestAnimationFrame: se congela con la pestaña oculta). */
+    setTimeout(() => {
+      ST.mapa.invalidateSize();
+      /* Se encuadra sobre los puestos que suman el 95 % del endoso: un puesto
+         suelto de Sumapaz o de un corregimiento lejano, con tres votos,
+         dejaba la ciudad del tamaño de una uña. Siguen en el mapa; hay que
+         alejar para verlos. */
+      const orden = conPunto.slice().sort((a, b) => b.p.total - a.p.total), meta95 = .95 * orden.reduce((s, x) => s + x.p.total, 0);
+      let acum = 0; const nucleo = orden.filter(x => { const dentro = acum < meta95; acum += x.p.total; return dentro; });
+      const b = window.L.latLngBounds(nucleo.map(x => [x.g.lat, x.g.lng]));
+      if (b.isValid()) ST.mapa.fitBounds(b, { padding: [16, 16], maxZoom: 15, animate: false });
+    }, 0);
+  }
+
+  function nota(L) {
+    const supuesto = L?.filas.some(f => f.fuente === 'supuesto');
+    return `<b>Es una estimación, y es un techo.</b> La tasa medida es la del método de endoso de la plataforma: la suma, mesa por mesa, de lo que el aliado y la persona que apoyó pudieron compartir. Dice cuánto electorado cabía en común, no cuánto se pasó. Si son elecciones distintas se compara por puesto, porque las mesas se rearman con cada censo; si compitieron en el mismo tarjetón no hay nada que medir, porque nadie pudo votar por los dos. Los votos son los de la última elección de cada aliado y solo cuentan los que caen en ${esc(ST.lugar).replace(/\.?$/, '.')} Si dos aliados trabajan los mismos barrios, sus votos se pueden estar contando dos veces.${supuesto ? ` Donde no hay medición usamos un <b>supuesto del ${Math.round(E.SUPUESTO * 100)} %</b>: cámbielo por el suyo.` : ''} La lista de aliados vive en este navegador: no la guardamos en el servidor.`;
+  }
+
+  window.EN = A;
+  window.C360EndosoPagina = { lectura: () => ST.lectura, estado: () => ST, calcular };   /* para depurar y para las pruebas */
+
+  if (!(await P.arrancar('candidato-360-endoso.html'))) return;
+
+  /* ── El territorio y la lista ──────────────────────────────────────── */
+  const v = ST.v = P.SESION.vinculo;
+  ST.clave = E.clave(P.SESION.user?.email, E.candidaturaId(v));
+  ST.aliados = E.cargar(ST.clave);
+  ST.meta = Number(v?.campana?.meta || 0);
+  const slugs = v?.tipo === 'historial' ? (v.candidato?.slugs || []) : [];
+  /* Sus mesas: las de su última candidatura, como en el CRM (ahí se mide el
+     solape con lo que ya tiene y, en «la misma corporación», el territorio). */
+  if (slugs[0]) { try { ST.propio = await E.mesas(EL.urlCandidatura(slugs[0])); } catch { ST.propio = null; } }
+  ST.alcance = await E.alcanceDe({ campana: v?.campana || {}, corpHistorica: E.corpHistorica(v?.candidato), mesasPropias: ST.propio, codigoMunicipio: EL.codigoMunicipio });
+  const t = P.territorio(v);
+  ST.lugar = ST.alcance?.nombre ? P.lugar(ST.alcance.nombre) : (t.texto || 'su territorio');
+  if (!ST.alcance) $('enBuscarCopy').innerHTML += ' <b>Todavía no sabemos en qué territorio compite</b>: defínalo en el CRM, o los votos de sus aliados cuentan completos.';
+
+  $('enBuscar').addEventListener('input', e => { clearTimeout(temporizador); temporizador = setTimeout(() => buscar(e.target.value), 90); });
+  calcular();
+
+  /* El índice se apila a medida que llega cada fuente; concejos y JAL, que
+     pesan más, van detrás sin frenar la búsqueda de lo demás. */
+  const pintarIndice = () => { $('enIndice').textContent = ST.indiceListo ? `${num(ST.indice.length)} candidaturas para buscar` : `${num(ST.indice.length)} candidaturas cargadas · faltan concejos y JAL`; };
+  const apilar = lista => { ST.indice.push(...lista); pintarIndice(); const q = $('enBuscar').value; if (q.trim().length >= 2) buscar(q); };
+  await Promise.allSettled([
+    CandRegistry.load({ includeParties: false, onSource: apilar }),
+    CandRegistry.loadLocal({ includeParties: false, onSource: apilar }),
+  ]);
+  ST.indiceListo = true; pintarIndice();
+})();
+</script>
+</body>
+</html>

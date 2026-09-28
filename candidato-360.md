@@ -98,6 +98,7 @@ votante, 08 recolección de firmas (solo si va por firmas).
 | `candidato-360-medios.html` | Panel 04: sus tres ideas contra la prensa de su territorio. |
 | `candidato-360-redes.html` | Panel 05: sus cuentas, buscadas y validadas. |
 | `candidato-360-electorado.html` | Panel 07: el análisis del electorado, con figuras y gráficos. |
+| `candidato-360-endoso.html` | Panel 08: endoso de aliados. Suma excandidatos, mide su tasa contra a quién apoyaron, recorta sus votos al territorio y los pinta por puesto. La lista vive en el navegador (misma llave que la tarjeta 08). |
 | `candidato-360-perfil.html` | El método: cómo se lee un electorado sin violar el secreto del voto. |
 
 ### Módulos compartidos

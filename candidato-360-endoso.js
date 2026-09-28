@@ -124,11 +124,107 @@
     return { alcance, lugar, filas, total, techo, mediana, nMedidas: medidas.length, areas };
   }
 
+  /* ── El territorio de la campaña ───────────────────────────────────────
+     ⚠️ `enAlcance` es un PUERTO FIEL de mesaEnAlcance de candidato-360.js (el
+     recorte del mapa). El CRM usa la suya y el panel esta: si una cambia sin
+     la otra, la tarjeta y el panel dejan de dar la misma cifra y nada falla.
+     prueba-endoso.mjs las compara sobre mesas reales. */
+  const COM_NOM_NULO = new Set(['NACIONAL', 'NULL', 'SN', '']);
+  const nombreLocal = m => { const n = String(m.comNom || '').trim(); return COM_NOM_NULO.has(n.toUpperCase()) ? '' : n; };
+  const nombreLocalidad = raw => String(raw || '').replace(/^\d{2}(?=\S)/, '').replace(/\s+/g, ' ').trim().replace(/^LOCALIDAD\s*\d+\s+/i, '');
+  const cortoLocal = raw => nombreLocalidad(raw).replace(/^(COMUNA|COM|CORREGIMIENTO|CORREG\.?|CORRE\.?)\s*\d*\s*/i, '').trim();
+  function enAlcance(mesa, alcance) {
+    const dep = String(mesa.dep || '').replace(/^0+/, ''), mun = String(mesa.mun || '').replace(/^0+/, '');
+    if (alcance.departamento && dep && dep !== alcance.departamento) return false;
+    if (alcance.tipo === 'departamento') return alcance.departamento ? Boolean(dep) : normalizar(mesa.depNom || '') === alcance.departamentoNombre;
+    const enMunicipio = alcance.municipio ? mun === alcance.municipio : normalizar(mesa.munNom || '') === alcance.municipioNombre;
+    if (alcance.tipo !== 'localidad') return enMunicipio;
+    if (!enMunicipio) return false;
+    const suya = normalizar(cortoLocal(nombreLocal(mesa))), objetivo = normalizar(cortoLocal(alcance.localidad));
+    return Boolean(suya) && Boolean(objetivo) && suya === objetivo;
+  }
+  /* Dónde se concentra, sin maquillar: municipios en una campaña
+     departamental, puestos en una JAL, localidades o comunas en lo municipal.
+     El nombre bonito lo pone quien pinta. */
+  function areaDe(m, alcance) {
+    if (alcance?.tipo === 'departamento') return m.munNom || '';
+    if (alcance?.tipo === 'localidad') return m.pueNom || '';
+    return cortoLocal(nombreLocal(m)) || m.pueNom || '';
+  }
+  const DEPARTAMENTAL = ['asamblea', 'gobernacion'];
+  function corpHistorica(c) {
+    const first = String(c?.corp || '').split('·')[0].trim().toLowerCase();
+    if (first.includes('jal') || first.includes('administradora')) return 'jal';
+    if (first.includes('concejo')) return 'concejo';
+    if (first.includes('alcald')) return 'alcaldia';
+    if (first.includes('asamblea')) return 'asamblea';
+    if (first.includes('gobern')) return 'gobernacion';
+    return '';
+  }
+  function municipioMayoritario(ms) {
+    const votos = {};
+    (ms || []).forEach(m => { const k = `${String(m.dep || '').padStart(2, '0')}${String(m.mun || '').padStart(3, '0')}`; if (k !== '00000') votos[k] = (votos[k] || 0) + Number(m.v || 0); });
+    return Object.entries(votos).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  }
+  /* El territorio contra el que se recorta, desde lo que guardó la campaña.
+     Con territorio propio (otra corporación, candidatura nueva) manda ese —y
+     el municipio va por CÓDIGO ELECTORAL, que `codigoMunicipio` traduce del
+     nombre: el formulario escribe «Cartagena de Indias» y la Registraduría
+     «CARTAGENA»—. En «la misma corporación» es el de su última candidatura,
+     donde está la mayoría de su voto. `nombre` es solo para mostrar. */
+  async function alcanceDe({ campana = {}, corpHistorica: corpHist = '', mesasPropias = null, codigoMunicipio = null } = {}) {
+    const c = campana || {};
+    const dep = String(c.departamento || '').replace(/^0+/, ''), corp = c.corp || corpHist || '';
+    if (c.ruta !== 'same' && dep && corp) {
+      if (DEPARTAMENTAL.includes(corp)) return { tipo: 'departamento', departamento: dep, nombre: c.departamentoNombre || '' };
+      if (!c.municipio) return { tipo: 'departamento', departamento: dep, nombre: c.departamentoNombre || '' };
+      let mun = '';
+      if (codigoMunicipio) { try { mun = String(await codigoMunicipio(dep, c.municipio) || '').replace(/^0+/, ''); } catch { mun = ''; } }
+      const base = { departamento: dep, municipio: mun, municipioNombre: normalizar(c.municipio) };
+      if (corp === 'jal' && c.localidad) return { tipo: 'localidad', ...base, localidad: c.localidad, nombre: cortoLocal(c.localidad) };
+      return { tipo: 'municipio', ...base, nombre: c.municipio };
+    }
+    const mm = municipioMayoritario(mesasPropias); if (!mm) return null;
+    const depM = String(Number(mm.slice(0, 2))), mun = String(Number(mm.slice(2)));
+    const deAqui = (mesasPropias || []).filter(m => `${String(m.dep || '').padStart(2, '0')}${String(m.mun || '').padStart(3, '0')}` === mm);
+    if (DEPARTAMENTAL.includes(corp)) return { tipo: 'departamento', departamento: depM, nombre: deAqui[0]?.depNom || '' };
+    if (corp === 'jal') {
+      const porLocal = {}; (mesasPropias || []).forEach(m => { const n = nombreLocal(m); if (n) porLocal[n] = (porLocal[n] || 0) + Number(m.v || 0); });
+      const loc = Object.entries(porLocal).sort((x, y) => y[1] - x[1])[0]?.[0];
+      if (loc) return { tipo: 'localidad', departamento: depM, municipio: mun, localidad: loc, nombre: cortoLocal(loc) };
+    }
+    return { tipo: 'municipio', departamento: depM, municipio: mun, nombre: deAqui[0]?.munNom || '' };
+  }
+
+  /* ── El endoso por puesto ──────────────────────────────────────────────
+     Reparte lo estimado de cada aliado en los puestos donde tiene sus votos
+     (votos del puesto × su tasa). Para el mapa y el desglose; la suma por
+     aliado puede diferir en ±1 del estimado por el redondeo. El código es el
+     de la hoja de vida del puesto: la letra de los dos últimos caracteres se
+     conserva (187 puestos del país la llevan). */
+  const pad = (v, n) => String(v || '').replace(/\D/g, '').padStart(n, '0');
+  const codigoPuesto = m => pad(m.dep, 2) + pad(m.mun, 3) + pad(m.zon, 2) + String(m.pue == null ? '' : m.pue).trim().toUpperCase().padStart(2, '0');
+  function porPuesto(lectura) {
+    const o = new Map();
+    (lectura?.filas || []).forEach((f, i) => {
+      if (f.error || !f.tasa) return;
+      f.dentro.forEach(m => {
+        const k = codigoPuesto(m), v = Number(m.v || 0) * f.tasa; if (!v) return;
+        if (!o.has(k)) o.set(k, { code: k, nombre: m.pueNom || '', munNom: m.munNom || '', comNom: nombreLocal(m), total: 0, votos: 0, porAliado: {} });
+        const p = o.get(k); p.total += v; p.votos += Number(m.v || 0); p.porAliado[i] = (p.porAliado[i] || 0) + v;
+      });
+    });
+    return [...o.values()].sort((a, b) => b.total - a.total);
+  }
+
   /* ── Lista de aliados ──────────────────────────────────────────────────
      Vive en el navegador, por cuenta y candidatura: no cambia el vínculo, y
      el nombre de un líder de zona es un dato de un tercero que no tenemos
      por qué custodiar. */
   const clave = (correo, candidatura) => `c360-aliados:${String(correo || 'anon').toLowerCase()}:${candidatura || 'sin-candidatura'}`;
+  /* La misma candidatura que usa el CRM (crmCandidate.id o «nuevo-NOMBRE»):
+     así la tarjeta y el panel leen la misma lista. */
+  const candidaturaId = v => v?.tipo === 'nuevo' ? `nuevo-${normalizar(v.nuevo?.nombre || '')}` : (v?.candidato?.id || '');
   function cargar(k) { try { return JSON.parse(global.localStorage.getItem(k) || '[]').slice(0, MAX); } catch { return []; } }
   function guardar(k, lista) { try { global.localStorage.setItem(k, JSON.stringify(lista)); } catch { /* sin almacenamiento: la lista vive mientras dure la pestaña */ } }
 
@@ -143,5 +239,6 @@
     transferencia: 'elecciones distintas: transferencia entre fechas, comparada por puesto',
   };
 
-  global.C360Endoso = { SUPUESTO, SATURACION, MAX, FUENTE, CLASE, anio, corp, clase, ficha, mesas, suma, llavePuesto, llaveMesa, agrupar, medirPar, evaluar, clave, cargar, guardar };
+  global.C360Endoso = { SUPUESTO, SATURACION, MAX, FUENTE, CLASE, anio, corp, clase, ficha, mesas, suma, llavePuesto, llaveMesa, agrupar, medirPar, evaluar,
+    enAlcance, areaDe, corpHistorica, municipioMayoritario, alcanceDe, codigoPuesto, porPuesto, clave, candidaturaId, cargar, guardar };
 })(typeof window !== 'undefined' ? window : globalThis);

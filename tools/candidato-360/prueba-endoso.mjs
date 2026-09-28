@@ -67,6 +67,41 @@ ok(L.total === Math.round(200 * .8) + 35 + Math.round(540 * .8), `total = Σ est
 ok(cerca(L.filas[2].solape, (40 + 100) / 540), 'solape con el voto propio, por puesto');
 ok(L.areas[0].nombre === 'P02', 'dónde se concentra: el área con más endoso primero');
 
+/* El territorio desde la campaña guardada (lo que usa el panel). */
+const codigo = async (dep, nombre) => ({ 'BOGOTÁ, D.C.': '001', 'LA CEJA': '021' }[nombre] || '');
+let al = await E.alcanceDe({ campana: { corp: 'asamblea', ruta: 'other', departamento: '01', departamentoNombre: 'Antioquia' } });
+ok(al.tipo === 'departamento' && al.departamento === '1', 'asamblea → departamento, sin ceros a la izquierda');
+al = await E.alcanceDe({ campana: { corp: 'jal', ruta: 'other', departamento: '16', municipio: 'BOGOTÁ, D.C.', localidad: 'SUBA' }, codigoMunicipio: codigo });
+ok(al.tipo === 'localidad' && al.municipio === '1' && al.nombre === 'SUBA', 'JAL → localidad, municipio por código electoral');
+al = await E.alcanceDe({ campana: { corp: 'concejo', ruta: 'other', departamento: '01', municipio: 'LA CEJA' }, codigoMunicipio: codigo });
+ok(al.tipo === 'municipio' && al.municipio === '21', 'concejo → municipio por código');
+al = await E.alcanceDe({ campana: { corp: 'concejo', ruta: 'same' }, corpHistorica: 'jal', mesasPropias: [M('01', '001', 5, { comNom: '11SUBA' }), M('02', '001', 50, { comNom: '13TEUSAQUILLO' })] });
+ok(al.tipo === 'municipio' && al.departamento === '16' && al.municipio === '1', '«la misma corporación» → el municipio donde tiene más votos');
+al = await E.alcanceDe({ campana: {}, corpHistorica: 'jal', mesasPropias: [M('01', '001', 5, { comNom: '11SUBA' }), M('02', '001', 50, { comNom: '13TEUSAQUILLO' })] });
+ok(al.tipo === 'localidad' && al.localidad === '13TEUSAQUILLO' && al.nombre === 'TEUSAQUILLO', 'JAL sin campaña → la localidad donde tiene más votos');
+ok(await E.alcanceDe({ campana: {} }) === null, 'sin campaña ni votos → sin recorte');
+ok(E.enAlcance(M('01', '001', 1, { comNom: '13TEUSAQUILLO' }), { tipo: 'localidad', departamento: '16', municipio: '1', localidad: 'TEUSAQUILLO' }) && !E.enAlcance(M('01', '001', 1, { comNom: '11SUBA' }), { tipo: 'localidad', departamento: '16', municipio: '1', localidad: 'TEUSAQUILLO' }), 'recorte por localidad, por el nombre pelado');
+ok(E.codigoPuesto({ dep: '1', mun: '1', zon: '99', pue: 'a1' }) === '0100199A1', 'código de puesto: la letra se conserva');
+ok(E.candidaturaId({ tipo: 'nuevo', nuevo: { nombre: 'Ana Pérez' } }) === 'nuevo-ANAPEREZ' && E.candidaturaId({ tipo: 'historial', candidato: { id: 'persona-x' } }) === 'persona-x', 'la llave de la lista es la misma del CRM');
+const pp = E.porPuesto(L);
+ok(Math.abs(pp.reduce((s, p) => s + p.total, 0) - L.filas.reduce((s, f) => s + f.terr * f.tasa, 0)) < 1e-6, 'por puesto: reparte exactamente lo estimado');
+
+/* ⚠️ El motor lleva un puerto de mesaEnAlcance del CRM: si alguien cambia una
+   sin la otra, la tarjeta y el panel dejan de coincidir. Se comparan las dos
+   sobre mesas de verdad y varios alcances. */
+{
+  const src = await readFile(new URL('candidato-360.js', RAIZ), 'utf8');
+  const trozo = nombre => { const i = src.indexOf(`function ${nombre}(`); let d = 0; for (let k = src.indexOf('{', i); k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && !--d) return src.slice(i, k + 1); } };
+  const crm = vm.createContext({});
+  vm.runInContext(`const COM_NOM_NULO = new Set(['NACIONAL', 'NULL', 'SN', '']);\n${['normalizedText', 'nombreLocal', 'nombreLocalidad', 'cortoLocal', 'mesaEnAlcance'].map(trozo).join('\n')}\nglobalThis.f = mesaEnAlcance;`, crm);
+  globalThis.__mesasPrueba = [M('01', '001', 1, { comNom: '13LOCALIDAD 13 TEUSAQUILLO' }), M('01', '001', 1, { comNom: 'NACIONAL' }), M('02', '001', 1, { comNom: '14COMUNA 14 EL POBLADO', dep: '01', mun: '001' }), { dep: '05', mun: '001', munNom: 'CARTAGENA', depNom: 'BOLÍVAR', v: 1 }];
+  const alcances = [{ tipo: 'departamento', departamento: '16' }, { tipo: 'departamento', departamentoNombre: 'BOLIVAR' }, { tipo: 'municipio', departamento: '5', municipio: '1' }, { tipo: 'municipio', departamento: '5', municipio: '', municipioNombre: 'CARTAGENA' }, { tipo: 'localidad', departamento: '16', municipio: '1', localidad: 'TEUSAQUILLO' }, { tipo: 'localidad', departamento: '1', municipio: '1', localidad: 'EL POBLADO' }];
+  let distintos = 0;
+  for (const a of alcances) for (const m of globalThis.__mesasPrueba) if (crm.f(m, a) !== E.enAlcance(m, a)) distintos++;
+  globalThis.__crmEnAlcance = crm.f;
+  ok(distintos === 0, `el recorte del motor es el mismo del CRM (${alcances.length * globalThis.__mesasPrueba.length} casos)`);
+}
+
 /* ── 2. Reales (S3) ────────────────────────────────────────────────────── */
 if (!process.argv.includes('--sin-red')) {
   const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
@@ -93,6 +128,10 @@ if (!process.argv.includes('--sin-red')) {
     ok(!f[3].par.valida && f[3].par.clase === 'mismo', 'real · concejal → concejal: mismo tarjetón');
     ok(f[4].fuente === 'suya' && f[4].est === 1273, 'real · tasa escrita 12 % → 1.273');
     ok(cerca(Lr.mediana, f[1].par.tasa), 'real · la mediana de dos medidas es la menor (convención del motor)');
+    const suba = { tipo: 'localidad', departamento: '16', municipio: '1', localidad: 'SUBA' }, reales = (await E.mesas(BRICENO.dataUrl)).concat(propio);
+    ok(reales.every(m => globalThis.__crmEnAlcance(m, suba) === E.enAlcance(m, suba)), `real · recorte a Suba idéntico al del CRM en ${reales.length.toLocaleString('es-CO')} mesas`);
+    const Ls = await E.evaluar([{ ...BRICENO }], { alcance: suba, enAlcance: E.enAlcance, mesasDe: E.mesas });
+    ok(Ls.filas[0].terr === 11237, `real · el concejal Briceño tiene 11.237 votos en Suba (${Ls.filas[0].terr})`);
   } catch (e) {
     ok(false, `real · no se pudo leer S3 (${e.message}); correr con --sin-red para solo la lógica`);
   }

@@ -85,6 +85,11 @@
     texto: 'Aquí decides cuántos testigos necesitas y en qué puestos. Si te lanzas a otra corporación, los puestos son los de ese territorio, ordenados por los votos de tu familia política en 2023. Mueve el control para ver cuánto cubres, y revisa los avisos: señal, internet y dónde se publica el E-14.',
     chips: ['¿Por qué me salen tantos puestos?', '¿Qué hago con un puesto sin señal?', '¿Cómo descargo el plan?']
   };
+  VISTAS.endoso = {
+    titulo: 'Endoso de aliados',
+    texto: 'Aquí sumas a los excandidatos que te van a apoyar. Solo cuentan sus votos en el territorio donde compites. Si me dices a quién apoyó cada uno antes, mido qué tanto coincidió su votación con la de esa persona, mesa por mesa, y con eso estimo cuánto te pueden pasar. Es un techo, no una promesa.',
+    chips: ['¿Por qué dice «hasta»?', '¿Qué pasa si no sé a quién apoyó?', '¿Por qué no cuentan todos sus votos?']
+  };
   const SIN_VISTA = { titulo: 'Candidato 360', texto: 'Te voy diciendo qué hace cada parte de la plataforma. Pregúntame por lo que estés mirando.', chips: [] };
   const SIN_SESION = 'Para preguntarme por escrito necesito que inicies sesión; así sé de qué campaña estamos hablando. La guía de esta pantalla no depende de eso.';
 
