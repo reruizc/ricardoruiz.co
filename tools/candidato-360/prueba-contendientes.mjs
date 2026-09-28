@@ -26,7 +26,7 @@ const ctx = vm.createContext({
   C360Electorado: { codigoMunicipio: async () => '001' },
 });
 ctx.window = ctx;
-for (const f of ['partidos-bloques.js', 'cand-index.js', 'vote-target.js', 'candidato-360-endoso.js', 'candidato-360-diad.js', 'candidato-360-contendientes.js'])
+for (const f of ['partidos-bloques.js', 'cand-index.js', 'legislativo-electos.js', 'vote-target.js', 'candidato-360-endoso.js', 'candidato-360-diad.js', 'candidato-360-contendientes.js'])
   vm.runInContext(await readFile(new URL(f, RAIZ), 'utf8'), ctx, { filename: f });
 const K = ctx.C360Contendientes, VT = ctx.VoteTarget, EN = ctx.C360Endoso;
 
@@ -103,6 +103,16 @@ const M = (pue, v) => ({ dep: '16', mun: '001', zon: '12', pue, mesa: '001', v, 
 const DM = K.matrizDesdeMesas([{ entrada: { nombre: 'A B C', partido: 'X' }, mesas: [M('01', 5), M('01', 7), M('02', 3), { ...M('03', 9), zon: '90' }] }], { '160011201': [500], '160011202': [300] }, null);
 ok(DM.porCand.get('A B C|X').total === 15 && DM.validos.get('160011201') === 500 && DM.origen === 'archivos', 'sin matriz: se arma desde los archivos, sin la zona 90, con los válidos de totales-puesto');
 
+const cc = K.completarCampana({ corp: 'jal', ruta: 'same' }, { tipo: 'localidad', departamento: '16', municipio: '1', localidad: 'BARRIOS UNIDOS' }, [M('01', 5)].map(m => ({ ...m, munNom: 'BOGOTÁ D.C.', depNom: 'BOGOTÁ D.C.' })));
+ok(cc.departamento === '16' && cc.municipio === 'BOGOTÁ D.C.' && cc.localidad === 'BARRIOS UNIDOS' && cc.ruta === 'same', '«la misma corporación» sin territorio: se completa desde el alcance y el nombre de sus mesas');
+ok(K.completarCampana({ corp: 'concejo', departamento: '05', municipio: 'X' }, { departamento: '16' }, []).departamento === '05', 'con territorio guardado no se toca');
+const svgV = K.planoSVG(L, { vitrina: true }), svgT = K.planoSVG(L, {});
+const nombres = svg => (svg.match(/class="k-nombre"/g) || []).length, titulos = svg => (svg.match(/<title>/g) || []).length;
+ok(nombres(svgV) === L.vitrina.length && titulos(svgV) === L.vitrina.length && /vitrina-blur/.test(svgV), `vitrina: solo ${L.vitrina.length} nombres y ${L.vitrina.length} títulos en el SVG; los demás, borrosos y sin texto`);
+ok(!L.rivales.filter(r => !L.vitrina.includes(r.key)).some(r => svgV.includes(K.corto(r.nombre))), 'vitrina: el nombre de los demás no está en el texto del SVG');
+ok(nombres(svgT) === Math.min(K.TOP_PLANO, L.plano.length) && !/vitrina-blur/.test(svgT), 'con acceso: nombres de los del plano, nada borroso');
+ok(!/amenaza/i.test(svgT + Object.values(K.AVISO_TXT).join(' ') + Object.values(K.NIVEL_TXT).join(' ') + Object.values(K.MARCA_TXT).join(' ')), 'la palabra «amenaza» no aparece en ningún texto del motor');
+
 /* ── 2. Casos reales ───────────────────────────────────────────────────── */
 if (!process.argv.includes('--sin-red')) {
   try {
@@ -115,13 +125,16 @@ if (!process.argv.includes('--sin-red')) {
     const usuario = { nombre: NOMBRE, slugs: [SLUG] };
     const conPartido = c => Array.from(c.porCand.values());
 
-    /* 2a · JAL de Barrios Unidos, se relanza. */
-    const cJ = { corp: 'jal', ruta: 'same', departamento: '16', municipio: 'BOGOTÁ D.C.', localidad: 'BARRIOS UNIDOS', avales: 'partido', partido: 'NUEVO LIBERALISMO- AGRUPACION POLITICA EN MARCHA' };
+    /* 2a · JAL de Barrios Unidos, se relanza. «La misma corporación»: la
+       campaña guardada NO trae territorio (así la deja el CRM) y `leer` lo
+       completa desde sus mesas. Los congresistas los lee de ELECTOS, como en
+       la página. */
+    const cJ = { corp: 'jal', ruta: 'same', avales: 'partido', partido: 'NUEVO LIBERALISMO- AGRUPACION POLITICA EN MARCHA', departamento: '', municipio: '', localidad: '' };
     const aJ = await EN.alcanceDe({ campana: cJ, corpHistorica: 'jal', mesasPropias: propias });
-    const regJ = await registro('jal-2019', 'index-jal-2019.json');
     const metaJ = (await VT.estimate({ corp: 'jal', territory: 'BARRIOS UNIDOS · BOGOTÁ D.C.', baseUrl: S3, partido: cJ.partido, codigo: { dep: '16', mun: '1' } })).target;
-    const J = await K.cargar(cJ, { baseUrl: S3, alcance: aJ, mesasPropias: propias, slugsPropios: [SLUG], registro: regJ });
-    const LJ = K.evaluar({ ...J, familiaUsuario: K.familiaCampana(cJ), partidoCampana: cJ.partido, usuario, meta: metaJ, congresistas });
+    const LJ = await K.leer({ campana: cJ, slugs: [SLUG], mesasPropias: propias, alcance: aJ, meta: metaJ, usuario, baseUrl: S3 });
+    const J = { datos: LJ.datos, base: LJ.baseDatos, baseModo: LJ.baseModo, reparto: LJ.repartoCompleto };
+    ok(LJ.campana.departamento === '16' && LJ.campana.localidad === 'BARRIOS UNIDOS' && /BOGOT/.test(LJ.campana.municipio), `JAL · la campaña sin territorio se completa desde sus mesas (${LJ.campana.departamento} · ${LJ.campana.municipio} · ${LJ.campana.localidad})`);
     ok(aJ.tipo === 'localidad' && J.datos.origen === 'matriz' && J.datos.validos.size === 32, `JAL · territorio = localidad, matriz de 32 puestos (${J.datos.validos.size})`);
     ok(J.baseModo === 'propio' && J.base.total === 709, `JAL · base propia: sus 709 votos (${J.base?.total})`);
     const repJ = Object.fromEntries(J.reparto.allocations);
@@ -163,7 +176,14 @@ if (!process.argv.includes('--sin-red')) {
     ok(sb.length === 72 && sb.reduce((s, x) => s + x.total, 0) === 171499, `Concejo · H9: 72 sin bloque o aval amplio, 171.499 votos (${sb.length}, ${sb.reduce((s, x) => s + x.total, 0)})`);
     ok(LC.escalera.estado === 'abierta' && LC.escalera.k === 8 && LC.escalera.ultimo?.votos === 9280 && !LC.escalera.usted, `Concejo · escalera de NL: 8 curules, último elegido 9.280 (el índice oficial; la matriz por comuna da 9.153), usted no está en ella (${LC.escalera.ultimo?.votos})`);
     ok(LC.rivales.some(r => r.marcas.includes('congresista-2026') && r.partido.includes('CENTRO DEMOCR')), 'Concejo · H10: un concejal de 2023 hoy es representante, marcado');
-    ok(LC.plano.slice(0, 12).every(r => r.familia.bloque === 'ci'), `Concejo · H4: los 12 del plano son de centro-izquierda (${LC.plano.slice(0, 12).map(r => r.familia.bloque).join('')})`);
+    if (process.env.DEPURA) LC.plano.slice(0, 14).forEach((r, i) => console.log('   ', i + 1, r.familia.bloque, r.fuentes.join(''), r.corp, r.partido.slice(0, 30), r.votos, r.afinidad?.toFixed(2), r.presion.toFixed(3)));
+    const alc = LC.rivales.filter(r => r.marcas.includes('voto-uninominal'));
+    ok(alc.length > 0 && alc.every(r => !r.enIndice) && alc.filter(r => r.marcas.includes('en-ejercicio')).length === 1 && alc.find(r => r.marcas.includes('en-ejercicio')).votos > 1e6, `Concejo · quien viene de la alcaldía queda fuera del índice y el alcalde en ejercicio se marca (${alc.length} de alcaldía)`);
+    /* H4, corregido en la fase 2: sin los votos de alcaldía en el índice, entra
+       un concejal liberal (un paso, afinidad ×1,71). Lo que el hallazgo afirma
+       es que mandan la familia y las vecinas, y que los 9 primeros son de la suya. */
+    const top12 = LC.plano.slice(0, 12);
+    ok(top12.slice(0, 9).every(r => r.familia.bloque === 'ci') && top12.every(r => r.pasos != null && r.pasos <= 1), `Concejo · H4: los 9 primeros del plano son de centro-izquierda y los 12, a un paso o menos (${top12.map(r => r.familia.bloque).join(' ')})`);
     const cercC = todosC.filter(x => K.cercania('ci', K.familia(x.partido, x.nombre)) >= K.CERCANO).map(x => x.porPuesto);
     const m0C = K.disputa(C.base, { ...C.datos, listas: new Map() }, cercC, { umbral: false }).conteo;
     ok(m0C.fortaleza === 7 && m0C.disputa === 24 && m0C['sin-base'] === 912, `Concejo · mapa como en el plan: ${JSON.stringify(m0C)}`);

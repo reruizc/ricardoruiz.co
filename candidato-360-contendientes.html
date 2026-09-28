@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Contra quién compite su candidatura: sus rivales probables por familia política y por cuánto rinden en su base, y quién le compite dentro de su propia lista.">
+<title>Contendientes · Candidato 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<!-- ⚠️ Al tocar candidato-360.css, candidato-360-panel.js o candidato-360-contendientes.js hay que bumpear su ?v= acá y en las otras páginas que los cargan. -->
+<link rel="stylesheet" href="candidato-360.css?v=20260928p">
+<link rel="stylesheet" href="assets/candidato-360/candi/candi-saludo.css?v=3">
+<link rel="stylesheet" href="assets/candidato-360/candi/candi-hueso.css?v=1">
+<link rel="stylesheet" href="candidato-360-candi.css?v=20260921d">
+<style>
+/* El chasis del panel, igual que en electorado, endoso y Día D. */
+.panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
+.panel-hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:30px}
+.panel-hero h1{font:800 clamp(30px,4.4vw,46px)/1.06 var(--display);letter-spacing:-.02em;margin:8px 0 10px;color:var(--ink);max-width:24ch;text-wrap:balance}
+.panel-hero p{margin:0;max-width:64ch;font-size:15px;line-height:1.6;color:var(--muted)}
+.panel-candidatura:empty{display:none}
+.panel-candidatura{display:inline-block;margin-top:14px;font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--green);border:1px solid rgba(20,124,112,.32);padding:6px 10px}
+.panel-nota{margin-top:24px;font-size:12.5px;line-height:1.55;color:var(--muted)}
+.panel{margin-bottom:16px}
+.hidden{display:none}
+
+.k-estado{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:6px 0 0}
+.k-resumen{display:flex;flex-wrap:wrap;gap:clamp(18px,4vw,40px);align-items:flex-end;margin:10px 0 14px}
+.k-resumen b{display:block;font:800 clamp(30px,5vw,44px)/1 var(--display);letter-spacing:-.03em;color:var(--ink)}
+.k-resumen span{display:block;font-size:12.5px;color:var(--muted);margin-top:4px;max-width:22ch}
+.k-avisos p{border-left:3px solid var(--coral);padding:8px 12px;background:rgba(239,112,93,.07);font-size:13.5px;line-height:1.5;margin:0 0 10px}
+.k-leyenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 0;font-size:12.5px;color:var(--muted)}
+.k-leyenda i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+
+.k-esc{display:grid;grid-template-columns:34px minmax(0,1.3fr) minmax(0,2fr) 70px;gap:10px;align-items:center;margin:4px 0;font-size:13.5px}
+.k-esc .barra{height:12px;background:rgba(0,0,0,.05);border:1px solid var(--line);position:relative}
+.k-esc .barra i{position:absolute;inset:0 auto 0 0;background:var(--muted);opacity:.45}
+.k-esc.elegido .barra i{background:var(--green);opacity:.85}
+.k-esc.usted{font-weight:700}.k-esc.usted .barra i{background:var(--coral);opacity:.95}
+.k-esc small{color:var(--muted);font:500 11px var(--mono)}
+.k-esc .num{text-align:right;font-variant-numeric:tabular-nums}
+.k-corte{border-top:2px dashed var(--green);margin:6px 0;position:relative}
+.k-corte span{position:absolute;right:0;top:-9px;background:var(--cream);font:500 10.5px var(--mono);color:var(--green);padding:0 6px}
+
+table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px}
+.k-tabla th{text-align:left;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+.k-tabla th[aria-sort]{color:var(--ink)}
+.k-tabla td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.k-tabla tr[data-key]{cursor:pointer}.k-tabla tr[data-key]:hover{background:rgba(20,124,112,.05)}
+.k-tabla .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.k-tabla small{color:var(--muted)}
+.k-marca{font:500 10.5px var(--mono);letter-spacing:.03em;padding:2px 6px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;display:inline-block;margin:2px 4px 0 0}
+.k-nivel{font:600 11px var(--mono);white-space:nowrap}
+.k-nivel.alta{color:var(--coral)}.k-nivel.media{color:#b07a17}.k-nivel.baja{color:var(--muted)}
+.k-punto-f{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+
+.k-ficha{border:1px solid rgba(20,124,112,.35);background:#fff;padding:20px}
+.k-ficha h3{margin:4px 0 2px}
+.k-ficha h4{margin:18px 0 6px;font:700 15px var(--display)}
+.k-ficha ul{margin:0;padding-left:18px;font-size:14px;line-height:1.55}
+.k-ficha .dato{font:800 26px var(--display)}
+.k-cerrar{float:right;border:1px solid var(--line);background:none;padding:4px 10px;cursor:pointer;font:500 11px var(--mono)}
+</style>
+</head>
+<body data-candi-vista="contendientes">
+<nav class="topbar"><div class="nav-left"><a href="candidato-360.html?abrir=1" class="nav-planes">← CRM</a><div class="nav-auth" id="navAuth"></div></div><div class="nav-right"><a class="brand" href="index.html"><span class="mark"><i></i><i></i><i></i><i></i></span><b>Ricardo<span>.</span>Ruiz</b></a></div></nav>
+<main class="app-shell"><div class="panel-shell">
+  <header class="panel-hero">
+    <div class="kicker">Candidato 360 · panel 10</div>
+    <h1>Sus contendientes.</h1>
+    <p>Hasta la inscripción de 2027 nadie está inscrito: estos son sus <b>rivales probables</b>, sacados del registro electoral. Quién ganó la curul en 2023, quién compitió ahí con buena votación y quién tiene votos en su territorio de otra elección. Para cada uno: de qué familia política es y cuánto rinde en los puestos donde usted saca votos. Describimos puestos, no personas: nada aquí dice quién votó por quién.</p>
+    <span class="panel-candidatura" id="panelCandidatura"></span>
+  </header>
+  <div id="panelMuro" class="hidden"></div>
+  <div id="panelCuerpo">
+    <p class="k-estado" id="kEstado">Leyendo el registro electoral de su territorio…</p>
+
+    <section class="panel hidden" id="kPlanoSec">
+      <span class="panel-num">01 · El plano</span>
+      <h3 id="kPlanoTitulo">Contra quién compite.</h3>
+      <div class="k-resumen" id="kResumen"></div>
+      <div class="k-avisos" id="kAvisos"></div>
+      <div id="kPlano"></div>
+      <div class="k-leyenda" id="kLeyenda"></div>
+      <p class="helper" id="kPlanoNota">Toque un punto para abrir la ficha de ese rival.</p>
+    </section>
+
+    <section class="panel hidden" id="kFichaSec"><div class="k-ficha" id="kFicha"></div></section>
+
+    <section class="panel hidden" id="kEscaleraSec">
+      <span class="panel-num">02 · Dentro de su lista</span>
+      <h3 id="kEscaleraTitulo">Quién le compite en su propia lista.</h3>
+      <p id="kEscaleraCopy"></p>
+      <div id="kEscalera"></div>
+    </section>
+
+    <section class="panel hidden" id="kListaSec">
+      <span class="panel-num">03 · La lista completa</span>
+      <h3>Todos sus rivales probables.</h3>
+      <p id="kListaCopy"></p>
+      <div style="overflow-x:auto;border:1px solid var(--line)"><table class="k-tabla"><thead><tr>
+        <th data-orden="nombre">Nombre</th><th data-orden="fuente">De dónde sale</th><th data-orden="familia">Familia</th>
+        <th data-orden="afinidad" class="num">Afinidad</th><th data-orden="votos" class="num">Votos en el territorio</th><th data-orden="presion" aria-sort="descending">Presión</th>
+      </tr></thead><tbody id="kFilas"></tbody></table></div>
+    </section>
+
+    <p class="puntaje-nota panel-nota" id="kNota"></p>
+  </div>
+</div></main>
+<script src="platform-config.js"></script>
+<script src="data-client.js"></script>
+<script src="cand-index.js?v=20260919"></script>
+<script src="legislativo-electos.js"></script>
+<script src="vote-target.js?v=20260928"></script>
+<script src="partidos-bloques.js?v=20260922"></script>
+<script src="candidato-360-electorado.js?v=20260928"></script>
+<script src="candidato-360-diad.js?v=20260928h"></script>
+<script src="candidato-360-endoso.js?v=20260928g"></script>
+<script src="candidato-360-contendientes.js?v=20260928c"></script>
+<script src="candidato-360-panel.js?v=20260919d"></script>
+<!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
+<script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
+<script src="assets/candidato-360/candi/candi-hueso.js?v=1"></script>
+<script src="candidato-360-candi.js?v=20260928k"></script>
+<script>
+(async function () {
+  const P = window.C360Panel, K = window.C360Contendientes, E = window.C360Endoso, EL = window.C360Electorado, $ = P.$, esc = P.esc;
+  const num = x => Number(x || 0).toLocaleString('es-CO');
+  const x2 = a => a == null ? '—' : `×${a.toFixed(2).replace('.', ',')}`;
+  const PB = window.PartidosBloques;
+  const ST = { v: null, L: null, orden: 'presion', dir: -1, campana: null, alcance: null, territorio: '' };
+  window.C360ContendientesPagina = { lectura: () => ST.L, estado: () => ST };   /* para depurar y para las pruebas */
+
+  const familiaTxt = r => r.familia.sabemos ? (PB.BLOQUE_LABEL[r.familia.bloque] || r.familia.bloque) : (r.familia.amplio ? 'No sabemos · aval amplio' : 'No sabemos · sin línea nacional');
+  const colorDe = r => PB.BLOQUE_COLOR[r.familia.sabemos ? r.familia.bloque : 'sc'] || '#667068';
+
+  /* ── 01 · El plano ─────────────────────────────────────────────────── */
+  function pintarPlano() {
+    const L = ST.L, r = L.resumen;
+    $('kPlanoSec').classList.remove('hidden');
+    $('kResumen').innerHTML = `<div><b>${num(r.enIndice)}</b><span>rivales probables en el índice de presión</span></div>`
+      + ['alta', 'media', 'baja'].map(n => `<div><b>${num(r.niveles[n])}</b><span>${K.NIVEL_TXT[n].toLowerCase()}</span></div>`).join('')
+      + (r.noSabemos ? `<div><b>${num(r.noSabemos)}</b><span>de familia «no sabemos» (${num(r.noSabemosVotos)} votos)</span></div>` : '');
+    $('kAvisos').innerHTML = L.avisos.map(a => K.AVISO_TXT[a] ? `<p>${esc(a === 'base-familia' && L.familiaTexto ? K.AVISO_TXT[a].replace('su familia política', L.familiaTexto) : K.AVISO_TXT[a])}</p>` : '').join('')
+      + (!L.base ? '<p>Sin votos propios ni de su familia en este territorio no hay base contra la cual medir la afinidad: los rivales se ven sin eje territorial.</p>' : '');
+    $('kPlano').innerHTML = K.planoSVG(L, { clic: true });
+    $('kPlano').querySelectorAll('[data-key]').forEach(c => { c.addEventListener('click', () => abrirFicha(c.dataset.key)); c.addEventListener('keydown', e => { if (e.key === 'Enter') abrirFicha(c.dataset.key); }); });
+    const presentes = new Set(L.rivales.map(x => x.familia.sabemos ? x.familia.bloque : 'sc'));
+    $('kLeyenda').innerHTML = [...PB.BLOQUE_ORDER].filter(b => presentes.has(b)).map(b => `<span><i style="background:${PB.BLOQUE_COLOR[b]}"></i>${esc(b === 'sc' ? 'No sabemos' : PB.BLOQUE_LABEL[b])}</span>`).join('')
+      + '<span>Alto: cuánto rinde cada rival en los puestos de su base frente a todo el territorio (×1 igual) · tamaño: votos en el territorio · borde oscuro: presión alta · punteado: sin votos por puesto</span>';
+    $('kPlanoTitulo').textContent = L.corp === 'jal' ? 'Contra quién compite en su localidad.' : 'Contra quién compite.';
+  }
+
+  /* ── La ficha de un rival ───────────────────────────────────────────── */
+  function dondeSaca(r) {
+    if (!r.porPuesto || !ST.L.datos) return [];
+    const info = ST.L.datos.info, porUnidad = new Map(), porPuesto = ST.alcance?.tipo === 'localidad';
+    r.porPuesto.forEach((v, code) => { const i = info.get(code); const u = porPuesto ? (i?.nombre || `Puesto ${code.slice(5)}`) : (i?.unidad || i?.nombre || 'Sin nombre'); porUnidad.set(u, (porUnidad.get(u) || 0) + v); });
+    return [...porUnidad].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }
+  async function abrirFicha(key) {
+    const r = ST.L.rivales.find(x => x.key === key); if (!r) return;
+    const sec = $('kFichaSec'); sec.classList.remove('hidden');
+    const hist = r.entradas.slice().sort((a, b) => String(b.corp).localeCompare(String(a.corp)));
+    const donde = dondeSaca(r), totalR = r.votos || 1;
+    const lista = ST.L.escalera?.filas?.find(f => f.slug === r.slug);
+    $('kFicha').innerHTML = `<button type="button" class="k-cerrar" id="kCerrar">cerrar</button>
+      <span class="panel-num">Ficha</span><h3>${esc(P.lugar(r.nombre))}</h3>
+      <p style="margin:4px 0 0">${r.fuentes.map(f => `<span class="k-marca">${esc(K.FUENTE_TXT[f])}</span>`).join('')}${r.marcas.map(m => `<span class="k-marca">${esc(K.MARCA_TXT[m] || m)}</span>`).join('')}</p>
+      <h4>Frente a usted</h4>
+      <ul>
+        <li><b>Familia:</b> ${esc(familiaTxt(r))}${r.pasos != null ? ` · ${r.pasos === 0 ? 'la misma que la suya' : `a ${r.pasos} paso${r.pasos === 1 ? '' : 's'} de la suya`}` : ''}. La familia es la del partido, no la de la persona.</li>
+        <li><b>Afinidad:</b> ${r.afinidad == null ? 'sin votos por puesto para medirla' : `${x2(r.afinidad)} — ${esc(K.FRANJA_TXT[r.franja])}: en los puestos donde usted saca votos rinde ${r.afinidad >= 1 ? `${x2(r.afinidad)} de lo que rinde` : `${Math.round(r.afinidad * 100)} % de lo que rinde`} en todo el territorio`}.${r.correlacion != null ? ` Correlación puesto a puesto con su votación: ${r.correlacion.toFixed(2).replace('.', ',')}.` : ''}</li>
+        <li><b>${r.nivel ? esc(K.NIVEL_TXT[r.nivel]) : 'Fuera del índice'}</b>${r.nivel ? ` entre sus ${num(ST.L.resumen.enIndice)} rivales probables` : ''}.</li>
+        ${lista ? `<li><b>Va en su misma lista:</b> fue ${lista.puesto}.º en 2023${lista.elegido ? ', elegido' : ''}.</li>` : ''}
+      </ul>
+      <h4>Historial electoral</h4>
+      <ul>${hist.map(h => `<li>${esc(P.lugar(String(h.corp || '')))} · ${esc(P.lugar(String(h.partido || '')))} · <b>${num(h.votos)}</b> votos</li>`).join('')}</ul>
+      ${donde.length ? `<h4>Dónde saca sus votos en su territorio</h4><ul>${donde.map(([u, v]) => `<li>${esc(P.lugar(u))}: <b>${num(v)}</b> (${Math.round(v / totalR * 100)} %)</li>`).join('')}</ul>` : ''}
+      <div id="kFichaMeta"></div>
+      <p class="helper" style="margin-top:14px">Fuente: resultados de la Registraduría por mesa${r.anio ? ` (${r.anio})` : ''}, recortados a su territorio. Solo datos electorales públicos.</p>`;
+    $('kCerrar').onclick = () => sec.classList.add('hidden');
+    sec.scrollIntoView({ behavior: 'instant', block: 'start' });
+    /* La meta de SU lista, con la misma función de la suya: en lo plurinominal,
+       lo que costó entrar por su lista en 2023, traído a 2027. */
+    if (r.fuentes.some(f => f === 'A' || f === 'B') && !ST.L.reparto?.uninominal) {
+      $('kFichaMeta').innerHTML = '<p class="helper">Calculando la meta de su lista…</p>';
+      try {
+        const a = ST.alcance, e = await VoteTarget.estimate({ corp: ST.campana.corp, territory: K.territorioDe(a, ST.campana), baseUrl: K.S3 || undefined, partido: r.partido, codigo: a ? { dep: a.departamento, mun: a.municipio } : null });
+        $('kFichaMeta').innerHTML = e.target ? `<h4>La meta de su lista</h4><p><span class="dato">${num(e.target)}</span> votos: lo que costó entrar por ${esc(P.lugar(r.partido))} en 2023, traído a 2027 con la misma cuenta de su meta. Es la meta de la lista, no una cifra que esta persona se haya puesto.</p>` : '';
+      } catch { $('kFichaMeta').innerHTML = ''; }
+    }
+  }
+
+  /* ── 02 · La escalera ─────────────────────────────────────────────── */
+  function pintarEscalera() {
+    const e = ST.L.escalera, sec = $('kEscaleraSec');
+    if (!e || e.estado === 'uninominal') { sec.classList.add('hidden'); return; }
+    sec.classList.remove('hidden');
+    if (e.estado === 'sin-partido') { $('kEscaleraCopy').textContent = 'Va por firmas o todavía sin partido: no hay lista en la que competir por dentro. Cuando defina su aval en el CRM, aparece aquí.'; $('kEscalera').innerHTML = ''; return; }
+    if (e.estado === 'sin-lista') { $('kEscaleraCopy').textContent = `Su partido no tuvo lista en esta corporación y este territorio en 2023, así que no hay con quién compararlo por dentro.`; $('kEscalera').innerHTML = ''; return; }
+    if (e.estado === 'cerrada') { $('kEscaleraCopy').textContent = `Su lista fue cerrada en 2023 (${num(e.k)} curul${e.k === 1 ? '' : 'es'}): el orden lo pone el partido, así que no compite en votos con sus compañeros.`; $('kEscalera').innerHTML = ''; return; }
+    const filas = e.filas.slice(0, Math.max(12, (e.usted?.puesto || 0) + 2)), max = Math.max(1, ...filas.map(f => f.votos));
+    $('kEscaleraCopy').innerHTML = `En 2023 su lista (${esc(P.lugar(e.lista))}) ganó <b>${num(e.k)} curul${e.k === 1 ? '' : 'es'}</b>${e.ultimo ? ` y el último elegido sacó <b>${num(e.ultimo.votos)}</b> votos` : ''}. Con voto preferente, el rival que decide es el compañero de lista: entra quien más votos saque adentro.`
+      + (e.usted ? (e.usted.elegido ? ` Usted fue ${e.usted.puesto}.º y salió elegido.` : ` Usted fue <b>${e.usted.puesto}.º, a ${num(e.distancia)} votos</b> del último elegido.`) : ' Usted no estuvo en esa lista en 2023.');
+    $('kEscalera').innerHTML = filas.map((f, i) => (i === e.k && e.k ? `<div class="k-corte"><span>aquí se cortó en 2023</span></div>` : '')
+      + `<div class="k-esc${f.elegido ? ' elegido' : ''}${f.usted ? ' usted' : ''}"><small>${f.puesto}.º</small><span>${f.usted ? 'Usted' : esc(P.lugar(f.nombre))}</span><div class="barra"><i style="width:${(f.votos / max * 100).toFixed(1)}%"></i></div><span class="num">${num(f.votos)}</span></div>`).join('')
+      + (e.filas.length > filas.length ? `<p class="helper">y ${num(e.filas.length - filas.length)} más en la lista.</p>` : '');
+  }
+
+  /* ── 03 · La lista ─────────────────────────────────────────────────── */
+  const CLAVES = {
+    nombre: r => r.nombre, fuente: r => r.fuentes.join(''), familia: r => r.familia.sabemos ? String(K.ORDEN[r.familia.bloque] + 10) : 'z',
+    afinidad: r => r.afinidad ?? -1, votos: r => r.votos || 0, presion: r => r.enIndice ? r.presion : -1,
+  };
+  function pintarLista() {
+    const L = ST.L; $('kListaSec').classList.remove('hidden');
+    const k = CLAVES[ST.orden];
+    const filas = L.rivales.slice().sort((a, b) => { const x = k(a), y = k(b); return (typeof x === 'string' ? x.localeCompare(y, 'es') : x - y) * ST.dir; });
+    $('kFilas').innerHTML = filas.map(r => `<tr data-key="${esc(r.key)}"><td><span class="k-punto-f" style="background:${colorDe(r)}"></span><b>${esc(P.lugar(r.nombre))}</b><br><small>${esc(P.lugar(r.partido))}</small>${r.marcas.map(m => `<br><span class="k-marca">${esc(K.MARCA_TXT[m] || m)}</span>`).join('')}</td>
+      <td>${esc(K.sello(r))}</td><td>${esc(familiaTxt(r))}</td>
+      <td class="num">${x2(r.afinidad)}<br><small>${esc(K.FRANJA_TXT[r.franja])}</small></td><td class="num">${num(r.votos)}</td>
+      <td>${r.nivel ? `<span class="k-nivel ${r.nivel}">${esc(K.NIVEL_TXT[r.nivel])}</span>` : '<small>fuera del índice</small>'}</td></tr>`).join('');
+    $('kFilas').querySelectorAll('tr[data-key]').forEach(tr => tr.onclick = () => abrirFicha(tr.dataset.key));
+    document.querySelectorAll('.k-tabla th').forEach(th => { th.toggleAttribute('aria-sort', th.dataset.orden === ST.orden); if (th.dataset.orden === ST.orden) th.setAttribute('aria-sort', ST.dir < 0 ? 'descending' : 'ascending'); });
+    const c = L.rivales.filter(r => r.fuentes.includes('C')).length;
+    $('kListaCopy').textContent = `${num(L.rivales.length)} rivales probables: ${num(L.rivales.filter(r => r.fuentes.includes('A')).length)} ganaron la curul en 2023, los demás compitieron aquí con al menos la mitad de lo que sacó el último elegido de su lista${c ? `, y ${num(c)} tienen votos aquí de otra elección` : ''}. Toque una fila para abrir la ficha.`;
+  }
+  document.querySelectorAll('.k-tabla th').forEach(th => th.addEventListener('click', () => {
+    if (!ST.L) return; const o = th.dataset.orden;
+    ST.dir = ST.orden === o ? -ST.dir : (o === 'nombre' || o === 'fuente' || o === 'familia' ? 1 : -1); ST.orden = o; pintarLista();
+  }));
+
+  function nota() {
+    const L = ST.L, r = L.resumen;
+    return `<b>Rivales probables, no inscritos.</b> Salen del registro electoral de la Registraduría: quien ganó la curul en 2023 (reparto reconstruido con el art. 263, el mismo de su meta: ${r && L.reparto?.curules ? `${num(L.reparto.curules)} curules` : 'sin reparto'}), quien compitió aquí en 2023 con al menos la mitad de lo que sacó el último elegido de su lista (en alcaldía y gobernación, el 20 % del ganador), y quien tiene votos enteros dentro de su territorio de otra elección${L.corp === 'jal' ? '' : ' (el Senado, o la Cámara de un departamento para un concejo municipal, todavía no entran: exigen recortar cada archivo)'}. `
+      + `La <b>familia</b> es la del partido con el que compitió, del diccionario de la plataforma; los avales amplios (ASI, MAIS, AICO) y los movimientos sin línea nacional van a «no sabemos», nunca al centro. `
+      + `La <b>afinidad</b> compara cuánto saca cada rival en los puestos donde usted saca votos contra lo que saca en todo el territorio: ×1 es igual, ×2 el doble; entre ×0,85 y ×1,15 cuenta como mismo terreno. Describe puestos, no personas: no dice quién votó por quién. `
+      + `La <b>presión</b> es una heurística declarada: cercanía de familia (1 la misma, 0,6 a un paso, 0,25 a dos, 0,1 a tres, 0,4 si no sabemos) × afinidad (tope ×2) × tamaño (sus votos frente a su meta). Se publica en tres niveles, por tercios dentro de su territorio, no como número. `
+      + `Quien hoy es congresista (2026-2030) y quien ganó una alcaldía o gobernación en 2023 (no puede reelegirse) siguen en la lista pero no en el índice. `
+      + `${r ? `Cubre ${num(r.puestos)} puestos de su territorio y ${num(r.validos)} votos válidos de 2023${r.origen === 'matriz' ? '; la matriz por puesto pierde cerca del 1 % de los votos (puestos de 2023 que ya no están en el georef)' : ''}.` : ''} La prensa sobre cada rival y la revisión mensual llegan en la siguiente versión.`;
+  }
+
+  if (!(await P.arrancar('candidato-360-contendientes.html'))) return;
+
+  /* ── Lo que necesita el motor, desde el vínculo ───────────────────────
+     Las mismas entradas que usa la tarjeta 10 del CRM: la campaña, sus
+     candidaturas, sus mesas, el territorio y la meta probable. */
+  const v = ST.v = P.SESION.vinculo, correo = P.SESION.user?.email;
+  try {
+    const prev = await E.prepararDesdeVinculo(v, correo, EL);
+    const slugs = v?.tipo === 'historial' ? (v.candidato?.slugs || []) : [];
+    ST.campana = Object.assign({}, v?.campana || {}, { corp: v?.campana?.corp || prev.corpCampana });
+    ST.alcance = prev.alcance;
+    const esc_ = E.cargarEscalones(prev.claveMeta);
+    const meta = esc_?.probable || prev.metaGuardada || 0;
+    $('kEstado').textContent = 'Leyendo el registro electoral de su territorio (2019 y 2023)…';
+    ST.L = await K.leer({ campana: ST.campana, slugs, mesasPropias: prev.propio, alcance: ST.alcance, meta,
+      usuario: { nombre: P.nombreCandidatura(v), slugs } });
+    $('kEstado').textContent = `Calculado con el registro electoral de la Registraduría${meta ? ` y su meta probable de ${num(meta)} votos` : ' (sin meta guardada: el tamaño pesa por los votos de cada rival)'}.`;
+    ST.campana = ST.L.campana || ST.campana;   /* con el territorio completado, que es el que usa la meta de la ficha */
+    pintarPlano(); pintarEscalera(); pintarLista();
+    $('kNota').innerHTML = nota();
+  } catch (e) {
+    console.error(e);
+    $('kEstado').textContent = 'No pudimos leer el registro de su territorio. Vuelva a intentar en un momento.';
+  }
+})();
+</script>
+</body>
+</html>

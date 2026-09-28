@@ -65,7 +65,7 @@
     },
     crm: {
       titulo: 'Tu CRM de campaña',
-      texto: 'Arriba, el mapa de dónde estuvo tu votación y la meta que necesitas. Abajo, los módulos: briefing cada tres días, escucha social, arquetipos del territorio, perfil del votante, endoso de aliados y el plan del día de la elección.',
+      texto: 'Arriba, el mapa de dónde estuvo tu votación y la meta que necesitas. Abajo, los módulos: briefing cada tres días, escucha social, arquetipos del territorio, perfil del votante, endoso de aliados, el plan del día de la elección y tus contendientes.',
       chips: ['¿De dónde sale mi meta de votos?', '¿Qué hace el briefing?', '¿Para qué sirve el día de la elección?']
     }
   };
@@ -89,6 +89,11 @@
     titulo: 'Endoso de aliados',
     texto: 'Aquí sumas a quienes te van a apoyar: excandidatos, con su votación, y líderes sin candidatura propia, marcando en el mapa los puestos donde trabajan. Si me dices a quién apoyó cada uno antes, mido cuánto rindió esa persona donde ellos estaban. Solo cuentan los votos del territorio donde compites, y todo sale en rango: es un techo, no una promesa. Los nombres de tus líderes se quedan en tu navegador; no los guardamos en ningún servidor.',
     chips: ['¿Por qué sale en rango?', '¿Cómo mides a un líder sin candidatura?', '¿Dónde queda el nombre de mis líderes?']
+  };
+  VISTAS.contendientes = {
+    titulo: 'Tus contendientes',
+    texto: 'Aquí ves contra quién compites. Son rivales probables, no inscritos: quien ganó la curul en 2023, quien compitió aquí con buena votación y quien tiene votos en tu territorio de otra elección. El plano cruza su familia política con cuánto rinde cada uno en los puestos donde tú sacas votos. Si vas en lista abierta, abajo está quién te compite dentro de tu propia lista.',
+    chips: ['¿Qué quiere decir la afinidad?', '¿Por qué hay rivales en «no sabemos»?', '¿Cómo se calcula la presión?']
   };
   const SIN_VISTA = { titulo: 'Candidato 360', texto: 'Te voy diciendo qué hace cada parte de la plataforma. Pregúntame por lo que estés mirando.', chips: [] };
   const SIN_SESION = 'Para preguntarme por escrito necesito que inicies sesión; así sé de qué campaña estamos hablando. La guía de esta pantalla no depende de eso.';

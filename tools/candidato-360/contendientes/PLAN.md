@@ -14,7 +14,7 @@ Responde tres preguntas, en este orden:
 3. **¿Qué se movió desde el mes pasado?** Quién entró, quién cambió de aval,
    quién apareció en prensa (la revisión mensual).
 
-Estado: **fase 1 hecha y verificada contra S3 (28-sep-2026)** —ver la bitácora al final—. Las cifras de abajo salen de una
+Estado: **fases 1 y 2 hechas (28-sep-2026)** —ver la bitácora al final—. Las cifras de abajo salen de una
 medición hecha el 28-sep-2026 sobre los archivos de S3 que se citan; en la fase
 1 quedan fijadas en `prueba-contendientes.mjs`, como las del endoso.
 
@@ -523,7 +523,7 @@ lista · frente a usted · en prensa.
 | # | Qué | Sale |
 |---|---|---|
 | 1 | **Motor** `candidato-360-contendientes.js` sin DOM: fuentes A-C desde el registro, unión por persona, eje X, eje Y con las tres bases, burbuja, presión, escalera. Helper `electos` en `vote-target.js` sin cambiar cifras. Solo con las matrices que ya existen (11 ciudades + asamblea) y el JSON de cada rival donde no. `prueba-contendientes.mjs` con las cifras de §0 fijadas. | **hecho 28-sep-2026** |
-| 2 | **Panel** con el plano, la escalera, la lista y la ficha (sin prensa). Tarjeta 10 como enlace. Vitrina. Candi (frontend + worker). | panel en producción |
+| 2 | **Panel** con el plano, la escalera, la lista y la ficha (sin prensa). Tarjeta 10 como enlace. Vitrina. Candi (frontend + worker). | **hecho 28-sep-2026** (sin desplegar) |
 | 3 | **Mapa de disputa** con las dos capas, sobre las capas del CRM. | sección 03 |
 | 4 | **D1** `build_matriz_puesto.py`: concejo y JAL fuera de las 11 ciudades, alcaldía, gobernación; después 2019. | todo el país sin bajar cientos de JSON |
 | 5 | **Prensa y revisión mensual**: ficha con titulares, worker (KV + 4 rutas), cron, pestaña de administración, «qué se movió». Agregar a mano. | revisión del 1 de cada mes |
@@ -683,3 +683,59 @@ En la JAL, 8 de 32 puestos quedan en «muy pocos votos para leer» (menos de 200
 válidos o menos de 5 votos suyos): con 709 votos repartidos en 31 puestos, la
 cuarta parte de su base está en puestos donde la categoría sería ruido. Al pintar
 (fase 3) conviene agregar esos puestos a su barrio antes de clasificar, como dice §4.1.
+
+**Fase 2 (28-sep-2026) · panel, tarjeta 10, vitrina y Candi.**
+
+- **`candidato-360-contendientes.html`** (panel 10): 01 el plano (con resumen por
+  niveles, avisos y leyenda), la ficha al tocar un punto o una fila (frente a usted,
+  historial, dónde saca sus votos, la meta de su lista con `VoteTarget.estimate`),
+  02 la escalera dentro de su lista, 03 la tabla ordenable y la nota de método.
+  Usa el chasis `C360Panel` (muro sin acceso o sin vínculo).
+- **Tarjeta 10 en el CRM** (`pintarContendientes`, sección «9 ter» de
+  `candidato-360.js`): mini plano con los tres de más presión, conteo y niveles.
+  Se llama DESPUÉS de la meta (la presión usa el escalón probable). En vitrina,
+  los demás puntos van borrosos y **sin nombre ni título en el DOM**, y el botón
+  lo intercepta el paywall como a los demás módulos.
+- **El motor ganó lo que las dos pantallas comparten**, para que den lo mismo:
+  `leer` (orquesta todo con las mismas entradas), `registroC` (baja solo los índices
+  de la fuente C que pueden caber en el territorio y deja sus filas), `planoSVG`
+  (el dibujo, como texto SVG sin DOM), `completarCampana` y los textos (`sello`,
+  `AVISO_TXT`, `MARCA_TXT`…). `candidato-360.css` trae el estilo del plano, con
+  rótulos cortos de columna en pantallas angostas.
+- **Candi**: vista `contendientes` en el frontend y en `C360_CANDI_VISTAS` del
+  worker (y la del CRM menciona el módulo 10). **Worker sin desplegar**, como el
+  endoso: `src/index.js` de `rr-auth` tiene además cambios de otras sesiones.
+
+Tres cosas que salieron al construir y que cambian cifras o reglas:
+
+1. **«La misma corporación» guarda la campaña SIN territorio.** El CRM deja
+   departamento, municipio y localidad vacíos; sin arreglo, el motor no encontraba la
+   matriz y caía al modo lento. `completarCampana` lo completa desde el alcance y el
+   nombre de sus mesas. La prueba real de la JAL corre ahora así.
+2. **Votos a alcaldía o gobernación no entran al índice de una corporación de lista.**
+   Por la fuente C entraba el alcalde de Bogotá 2.º al plano del Concejo con 1,5
+   millones de votos. Ahora quien viene de alcaldía o gobernación queda en la lista con
+   la marca «sus votos son de alcaldía o gobernación», fuera del índice, y el ganador
+   de 2023 lleva además «hoy ocupa ese cargo». En el Concejo de Bogotá son 7. Con eso el
+   plano cambia: entra al puesto 10 un concejal liberal (un paso, afinidad ×1,71), y
+   H4 queda como «los 9 primeros son de centro-izquierda y los 12 están a un paso o
+   menos».
+3. **La fuente C ya no baja el archivo de quien ya es rival por 2023**: su historial
+   entra con los votos del índice. Tope de 20 personas nuevas. La prueba real bajó de
+   2 min 20 s a 51 s. Y si una parte de la matriz no llega, el aviso
+   «matriz incompleta» lo dice; si no llega nada, `leer` falla en vez de pintar cero
+   rivales.
+
+Pruebas: `prueba-contendientes.mjs` (57 sin red + 23 reales) y la nueva
+`prueba-contendientes-panel.mjs` (Playwright, 24 casos): rivales por fuente, la
+persona única sin bajar su archivo viejo, escalera, plano, tabla ordenable, ficha con
+la meta de su lista, «amenaza» ausente, 375 px sin desborde, muro sin acceso, y la
+tarjeta del CRM en vitrina con **el mismo conteo y los mismos niveles que el panel**.
+Pasan también `prueba-candi`, `prueba-meta` (31/31), `prueba-listas` (15/15) y
+`prueba-endoso --sin-red`. **`prueba-vitrina` y `prueba-paneles` fallan, pero ya
+fallaban en el commit anterior** (verificado en un worktree): la primera espera un
+«Abrir CRM» habilitado sin aval marcado, la segunda un bloque de la escucha. Son
+pruebas viejas, fuera de este módulo.
+
+Playwright se instaló de forma global en la Mac M5 (`npm i -g playwright`); las
+suites lo encuentran con `PLAYWRIGHT_PATH=/opt/homebrew/lib/node_modules/playwright/index.mjs`.

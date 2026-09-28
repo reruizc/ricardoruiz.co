@@ -41,8 +41,10 @@
   const MIN_VALIDOS_PUESTO = 200, MIN_VOTOS_BASE = 5;
   const MIN_BASE = { votos: 30, puestos: 3 };
   const TOP_PLANO = 12, VITRINA = 3;
-  const MAX_OTRAS = 40;                    /* rivales de otras elecciones cuyo archivo se baja */
-  const AVISO_PAREJO = .8;                 /* ≥ 80 % de los rivales en la franja → territorio parejo */
+  const MAX_OTRAS = 20;                    /* personas NUEVAS de otras elecciones cuyo archivo se baja */
+  const AVISO_PAREJO = .8;
+  const UNINOMINALES = ['alcaldia', 'gobernacion'], UNINOMINAL_SLUG = /^(ALC|GOB)\d{4}-/;
+  const FUERA_DEL_INDICE = new Set(['titular-no-reelegible', 'congresista-2026', 'voto-uninominal', 'en-ejercicio']);                 /* ≥ 80 % de los rivales en la franja → territorio parejo */
 
   const S3_FALLBACK = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
   const S3 = (global.RRData && typeof global.RRData.publicUrl === 'function') ? global.RRData.publicUrl('congreso-2026/output') : S3_FALLBACK;
@@ -328,6 +330,15 @@
       añadir(o.entrada, ['C'], o.porPuesto || null, o.total);
     });
 
+    /* Quien ganó en 2023 una alcaldía o gobernación de su territorio (fuente
+       C) hoy ocupa ese cargo: el más votado de su elección entre los que llegan. */
+    const enEjercicio = new Set(), mejor = new Map();
+    (ctx.otras || []).forEach(o => {
+      const p = String(o.entrada.slug || '').split('-'); if (!/^(ALC|GOB)2023$/.test(p[0])) return;
+      const k = p.slice(0, p[0].startsWith('ALC') ? 3 : 2).join('-'), x = mejor.get(k);   /* ALC2023-dep-mun · GOB2023-dep */
+      if (!x || o.total > x.total) mejor.set(k, o);
+    });
+    mejor.forEach(o => enEjercicio.add(o.entrada.slug));
     const rivales = [...porPersona.values()].map(r => {
       const e = r.actual, fam = familia(e.partido, e.nombre);
       const af = r.porPuesto ? afinidad(ctx.base, r.porPuesto, r.votos, datos, VAL) : null;
@@ -337,7 +348,14 @@
       if (esCongresista(e.nombre, ctx.congresistas)) marcas.push('congresista-2026');
       const partidos = new Set(r.entradas.map(x => norm(x.partido)));
       if (partidos.size > 1) marcas.push('cambio-de-partido');
-      const enIndice = !marcas.includes('titular-no-reelegible') && !marcas.includes('congresista-2026');
+      /* Votos a alcaldía o gobernación en una corporación de lista: miden otra
+         cosa (un cargo ejecutivo, con toda la ciudad votando por dos o tres
+         nombres) y no se comparan con el voto preferente. Medido: sin esta
+         regla el alcalde de Bogotá entraba 2.º al plano del Concejo con 1,5
+         millones de votos. Quedan en la lista, fuera del índice. */
+      if (!UNINOMINALES.includes(ctx.corp) && UNINOMINAL_SLUG.test(e.slug || '')) marcas.push('voto-uninominal');
+      if (enEjercicio.has(e.slug)) marcas.push('en-ejercicio');
+      const enIndice = !marcas.some(m => FUERA_DEL_INDICE.has(m));
       return {
         key: r.key, nombre: e.nombre, partido: e.partido || '', slug: e.slug, corp: e.corp || '', anio: anio(e),
         familia: fam, pasos: fu && fam.sabemos ? pasos(fu, fam.bloque) : null, cercania: cer,
@@ -373,6 +391,7 @@
     if (!fu) avisos.push('sin-familia');
     if (ctx.baseModo === 'familia') avisos.push('base-familia');
     if (datos.origen === 'archivos') avisos.push('sin-voto-de-lista');
+    if (datos.faltan) avisos.push('matriz-incompleta');
     return {
       rivales, plano: rivales.filter(r => r.enIndice).slice(0, TOP_PLANO),
       vitrina: rivales.filter(r => r.enIndice).slice(0, VITRINA).map(r => r.key),
@@ -457,7 +476,7 @@
     let datos = null;
     if (CON_MATRIZ.includes(corp)) {
       const destino = await (deps.puestosDestino || global.C360DiaD?.puestosDestino)?.(campana).catch(() => null);
-      if (destino && destino.fuente === corp && destino.archivos.length) datos = matrizDesdeArchivos(destino.archivos);
+      if (destino && destino.fuente === corp && destino.archivos.length) { datos = matrizDesdeArchivos(destino.archivos); datos.faltan = destino.faltan || 0; }
     }
     if (!datos) {
       const filas = (rep?.rows || []).filter(r => Number(r.votos || 0) > 0);
@@ -466,19 +485,25 @@
       datos = matrizDesdeMesas(partes.filter(Boolean), tot, dentro);
     }
 
-    /* Fuente C. */
+    /* Fuente C. Sus votos ya están enteros en el territorio (candidatasOtras),
+       así que el umbral se aplica sin bajar nada. Y quien ya es rival por su
+       candidatura de 2023 (A o B) no necesita su archivo viejo: su historial
+       entra con los votos del índice y manda la de 2023. Solo se bajan los
+       archivos de las personas NUEVAS, que son las que mueven el plano. */
     const excluir = new Set((rep?.rows || []).map(r => r.slug));
     let otras = [];
-    const ref = fuentesDelReparto(rep).referencia;
+    const F0 = fuentesDelReparto(rep), ref = F0.referencia;
     if (ref) {
-      const cand = candidatasOtras(deps.registro, alcance, corp, excluir).filter(c => Number(c.votos || 0) >= ref)
-        .sort((a, b) => b.votos - a.votos).slice(0, MAX_OTRAS);
-      const partes = await enTandas(cand.map(c => () => leerMesas(urlDe(c)).then(mesas => ({ c, mesas }))));
+      const de2023 = new Set((rep?.rows || []).filter(r => F0.porSlug.has(r.slug)).map(llavePersona).filter(k => !k.startsWith('slug:')));
+      const pasan = candidatasOtras(deps.registro, alcance, corp, excluir).filter(c => Number(c.votos || 0) >= ref);
+      const conocidas = pasan.filter(c => de2023.has(llavePersona(c)));
+      const nuevas = pasan.filter(c => !de2023.has(llavePersona(c))).sort((a, b) => b.votos - a.votos).slice(0, MAX_OTRAS);
+      const partes = await enTandas(nuevas.map(c => () => leerMesas(urlDe(c)).then(mesas => ({ c, mesas }))));
       otras = partes.filter(Boolean).map(({ c, mesas }) => {
         const pp = new Map(); let total = 0;
         mesas.forEach(m => { if (dentro && !dentro(m)) return; const v = Number(m.v || 0); if (!v) return; const k = codigoPuesto(m); pp.set(k, (pp.get(k) || 0) + v); total += v; });
         return { entrada: c, porPuesto: pp, total };
-      });
+      }).concat(conocidas.map(c => ({ entrada: c, porPuesto: null, total: Number(c.votos || 0) })));
     }
 
     /* La base: la propia recortada; si no alcanza, la de su familia. */
@@ -491,10 +516,150 @@
     return { corp, reparto: rep, datos, base, baseModo, otras, alcance };
   }
 
+  /* ── Los índices de la fuente C ───────────────────────────────────────
+     Solo los que pueden traer candidaturas enteras dentro del territorio
+     (candidatasOtras filtra por código). Se bajan una vez por página y se
+     quedan solo las filas del territorio: un índice de concejos pesa 20 MB en
+     claro y de él sirven unos cientos de filas. */
+  const INDICES_C = {
+    jal: ['jal-2019', 'jal-2015'],
+    concejo: ['concejo-2019', 'alcaldia-2023', 'alcaldia-2019', 'jal-2023'],
+    alcaldia: ['alcaldia-2019', 'concejo-2023', 'concejo-2019'],
+    asamblea: ['asamblea-2019', 'gobernacion-2023', 'congreso-2022'],
+    gobernacion: ['gobernacion-2019', 'asamblea-2023', 'congreso-2022'],
+  };
+  async function registroC(corp, alcance, baseUrl = S3) {
+    if (!alcance) return [];
+    const dirs = (INDICES_C[corp] || []).slice();
+    /* Bogotá es municipio y departamento: su Cámara cabe entera en el concejo. */
+    if (['concejo', 'alcaldia'].includes(corp) && String(Number(alcance.departamento)) === '16') dirs.push('congreso-2022');
+    const partes = await enTandas(dirs.map(dir => () => jsonDe(`${baseUrl}/${dir}/index-${dir}.json`)
+      .then(d => (Array.isArray(d) ? d : d.candidatos || []).map(c => ({ ...c, dataUrl: `${baseUrl}/${dir}/${c.slug}.json` })))), 3);
+    return candidatasOtras(partes.filter(Boolean).flat(), alcance, corp, new Set());
+  }
+  /* Los 285 congresistas 2026-2030 de legislativo-electos.js, si la página lo
+     cargó (su `const ELECTOS` vive en el ámbito global de los scripts). */
+  function congresistas() {
+    try { return typeof ELECTOS !== 'undefined' ? ELECTOS.map(e => e.nombre) : []; } catch { return []; }
+  }
+
+  /* ── Leer: todo, desde lo que sabe quien llama ─────────────────────────
+     El CRM y el panel llaman ESTA función con las mismas entradas (campaña,
+     slugs, mesas propias, territorio, meta probable): así la tarjeta 10 y el
+     panel dan las mismas cifras. Si la base propia no alcanza, la de su
+     familia política con la misma cuenta del Día D (C360DiaD.fuente). */
+  /* «La misma corporación» guarda la campaña SIN territorio (el CRM lo deja
+     vacío: el territorio es el de su última candidatura). La matriz y la base
+     de la familia lo necesitan por nombre y código, así que se completa desde
+     el alcance y sus mesas: el municipio por el nombre que traen las mesas,
+     que es el que la cartografía traduce a código electoral. */
+  function completarCampana(campana = {}, alcance, mesasPropias) {
+    if (campana.departamento || !alcance) return campana;
+    const E = global.C360Endoso;
+    const mesa = (mesasPropias || []).find(m => E ? E.enAlcance(m, alcance) : true) || {};
+    return Object.assign({}, campana, {
+      departamento: pad(alcance.departamento, 2), departamentoNombre: campana.departamentoNombre || mesa.depNom || '',
+      municipio: alcance.tipo === 'departamento' ? '' : (mesa.munNom || alcance.nombre || ''),
+      localidad: alcance.tipo === 'localidad' ? alcance.localidad : '',
+    });
+  }
+  async function leer({ campana = {}, slugs = [], mesasPropias = null, alcance = null, meta = 0, usuario = {}, baseUrl = S3, registro = null } = {}) {
+    campana = completarCampana(campana, alcance, mesasPropias);
+    const reg = registro || await registroC(campana.corp, alcance, baseUrl).catch(() => []);
+    const cargado = await cargar(campana, { baseUrl, alcance, mesasPropias, slugsPropios: slugs, registro: reg });
+    if (!cargado.base && global.C360DiaD?.fuente) {
+      const F = await global.C360DiaD.fuente({ slugs, campana }).catch(() => null);
+      if (F && F.modo === 'territorio' && F.mesas.length) {
+        const b = baseDesdeMesas(F.mesas, cargado.datos, null);
+        if (baseSuficiente(b)) { cargado.base = b; cargado.baseModo = 'familia'; cargado.familiaTexto = F.famTexto || ''; }
+      }
+    }
+    const L = evaluar({ ...cargado, familiaUsuario: familiaCampana(campana), partidoCampana: campana.avales === 'partido' || !campana.avales ? (campana.partido || '') : '',
+      usuario, meta, congresistas: congresistas() });
+    L.familiaTexto = cargado.familiaTexto || '';
+    L.alcance = alcance; L.corp = campana.corp || '';
+    /* Sin un solo puesto leído no hay lectura: que quien llama lo diga, en vez
+       de pintar «cero rivales» como si fuera un dato. */
+    if (!cargado.datos.validos.size) throw new Error('No se pudieron leer los resultados de su territorio');
+    L.datos = cargado.datos; L.baseDatos = cargado.base; L.campana = campana; L.repartoCompleto = cargado.reparto;
+    return L;
+  }
+
+  /* ── Textos compartidos ────────────────────────────────────────────── */
+  const FUENTE_TXT = { A: 'Ganó la curul en 2023', B: 'Compitió aquí en 2023', C: 'Tiene votos aquí de otra elección' };
+  const FUENTE_TITULAR = 'Ganó en 2023 · no puede reelegirse';
+  function sello(r) {
+    if (r.marcas.includes('titular-no-reelegible')) return FUENTE_TITULAR;
+    const f = r.fuentes[0]; return FUENTE_TXT[f] ? `${FUENTE_TXT[f]}${f === 'C' && r.anio ? ` (${r.corp.split('·')[0].trim().toLowerCase()} ${r.anio})` : ''}` : '';
+  }
+  const FRANJA_TXT = { alta: 'rinde más en su base', 'mismo-terreno': 'mismo terreno', baja: 'rinde menos en su base', 'sin-dato': 'sin votos por puesto' };
+  const NIVEL_TXT = { alta: 'Presión alta', media: 'Presión media', baja: 'Presión baja' };
+  const MARCA_TXT = { 'congresista-2026': 'Hoy es congresista (2026-2030)', 'titular-no-reelegible': 'No puede reelegirse (C.P. arts. 303 y 314)', 'cambio-de-partido': 'Compitió por otro partido antes', 'voto-uninominal': 'Sus votos son de alcaldía o gobernación: no se comparan con los de una lista', 'en-ejercicio': 'Hoy ocupa ese cargo (elegido en 2023)' };
+  const AVISO_TXT = {
+    'territorio-parejo': 'En este territorio todos compiten por los mismos puestos: casi ningún rival rinde en su base distinto de como rinde en el resto. Lo que los separa es la lista y la familia política, no el territorio.',
+    'base-familia': 'Todavía no tiene votos propios en este territorio, así que la afinidad se mide contra los votos de su familia política en 2023.',
+    'sin-familia': 'Sin partido ni espectro definidos no hay eje ideológico: la cercanía de todos cuenta como «no sabemos».',
+    'matriz-incompleta': 'No pudimos leer una parte de los resultados de su territorio: faltan puestos en esta lectura. Vuelva a cargar la página.',
+    'sin-voto-de-lista': 'Aquí no tenemos la matriz de 2023 por puesto: los votos de cada rival salen de su propio archivo y no incluyen el voto solo por la lista.',
+  };
+  const corto = n => { const w = String(n || '').split(/\s+/).filter(Boolean); const bonito = x => x.charAt(0) + x.slice(1).toLowerCase(); return w.length >= 3 ? `${bonito(w[0])} ${bonito(w[w.length >= 4 ? 2 : 1])}` : w.map(bonito).join(' '); };
+  const escSvg = s => String(s ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+
+  /* ── El plano (PLAN §3) ────────────────────────────────────────────────
+     SVG en texto, sin DOM: la tarjeta y el panel pintan el mismo dibujo.
+     X = familia (cinco columnas) y una franja aparte para «no sabemos»;
+     Y = afinidad en escala logarítmica FIJA (0,25 a 4, no se estira para
+     inventar diferencias), con la franja «mismo terreno». Burbuja = votos en
+     el territorio. `vitrina` deja nítidos solo los primeros y a los demás los
+     pinta sin nombre ni título: el texto no llega al DOM. */
+  const ROTULO_CORTO = { izq: 'Izq.', ci: 'C-izq.', c: 'Centro', cd: 'C-der.', d: 'Der.' };
+  function planoSVG(L, { ancho = 640, alto = 380, etiquetas = TOP_PLANO, vitrina = false, clic = false } = {}) {
+    const PB = global.PartidosBloques, col = PB?.BLOQUE_COLOR || {};
+    const m = { i: 44, d: 12, a: 14, b: 34 }, franjaNS = 34;   /* la leyenda va en HTML: dentro del SVG se cortaba en pantallas angostas */
+    const W = ancho - m.i - m.d, H = alto - m.a - m.b - franjaNS;
+    const orden = ['izq', 'ci', 'c', 'cd', 'd'], cw = W / orden.length;
+    const yDe = a => { const l = Math.log2(Math.min(4, Math.max(.25, a))); return m.a + H / 2 - (l / 2) * (H / 2); };
+    const hash = s => { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return (h % 1000) / 1000; };
+    const visibles = new Set((vitrina ? L.vitrina : L.plano.slice(0, etiquetas).map(r => r.key)));
+    const lista = L.rivales.filter(r => r.enIndice || r.marcas.includes('congresista-2026'));
+    const maxV = Math.max(1, ...lista.map(r => r.votos || 0));
+    const partes = [];
+    partes.push(`<svg class="k-plano" viewBox="0 0 ${ancho} ${alto}" role="img" aria-label="Plano de contendientes: familia política contra afinidad territorial">`);
+    orden.forEach((b, k) => {
+      const x = m.i + k * cw;
+      if (b === L.familiaUsuario) partes.push(`<rect x="${x}" y="${m.a}" width="${cw}" height="${H}" class="k-usted"/><text x="${x + cw / 2}" y="${m.a + 12}" class="k-usted-t" text-anchor="middle">usted</text>`);
+      /* Dos rótulos: el largo y el corto, que el CSS alterna en pantallas angostas. */
+      partes.push(`<text x="${x + cw / 2}" y="${m.a + H + 16}" text-anchor="middle" class="k-eje k-largo">${escSvg(PB?.BLOQUE_LABEL?.[b] || b)}</text><text x="${x + cw / 2}" y="${m.a + H + 16}" text-anchor="middle" class="k-eje k-corto">${ROTULO_CORTO[b]}</text>`);
+    });
+    const y1 = yDe(MISMO_TERRENO[1]), y0 = yDe(MISMO_TERRENO[0]);
+    partes.push(`<rect x="${m.i}" y="${y1}" width="${W}" height="${y0 - y1}" class="k-franja"/>`);
+    [[4, '×4'], [2, '×2'], [1, '×1'], [.5, '×½'], [.25, '×¼']].forEach(([v, t]) => partes.push(`<text x="${m.i - 6}" y="${yDe(v) + 4}" text-anchor="end" class="k-eje">${t}</text>`));
+    partes.push(`<text x="${m.i + W - 4}" y="${y1 - 4}" text-anchor="end" class="k-eje">mismo terreno</text>`);
+    const yNS = m.a + H + 28;
+    partes.push(`<rect x="${m.i}" y="${yNS}" width="${W}" height="${franjaNS - 6}" class="k-ns"/><text x="${m.i + 6}" y="${yNS + 17}" class="k-eje">No sabemos · aval amplio o sin línea nacional</text>`);
+    /* Se dibujan de menor a mayor presión: los importantes quedan encima. */
+    lista.slice().sort((a, b) => a.presion - b.presion).forEach(r => {
+      const rad = 3 + 13 * Math.sqrt((r.votos || 0) / maxV);
+      let x, y;
+      if (r.familia.sabemos && orden.includes(r.familia.bloque)) {
+        x = m.i + orden.indexOf(r.familia.bloque) * cw + cw * (.15 + .7 * hash(r.key));
+        y = r.afinidad == null ? yDe(1) : yDe(r.afinidad);
+      } else { x = m.i + 150 + (W - 170) * hash(r.key); y = yNS + (franjaNS - 6) / 2; }
+      const ve = visibles.has(r.key), color = col[r.familia.sabemos ? r.familia.bloque : 'sc'] || '#667068';
+      const cls = `k-punto${r.nivel ? ' n-' + r.nivel : ''}${r.afinidad == null ? ' sin-af' : ''}${vitrina && !ve ? ' vitrina-blur' : ''}`;
+      const titulo = vitrina && !ve ? '' : `<title>${escSvg(corto(r.nombre))} · ${escSvg(FRANJA_TXT[r.franja])}${r.afinidad != null ? ` (×${r.afinidad.toFixed(2).replace('.', ',')})` : ''} · ${Number(r.votos || 0).toLocaleString('es-CO')} votos</title>`;
+      partes.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(1)}" fill="${color}" class="${cls}"${clic && !(vitrina && !ve) ? ` data-key="${escSvg(r.key)}" tabindex="0"` : ''}>${titulo}</circle>`);
+      if (ve) partes.push(`<text x="${(x + rad + 3).toFixed(1)}" y="${(y + 4).toFixed(1)}" class="k-nombre">${escSvg(corto(r.nombre))}</text>`);
+    });
+    partes.push('</svg>');
+    return partes.join('');
+  }
+
   global.C360Contendientes = {
     ORDEN, CERCANIA_PASOS, CERCANIA_NO_SABEMOS, CERCANO, MISMO_TERRENO, UMBRAL_LISTA, UMBRAL_UNINOMINAL, MIN_VALIDOS_PUESTO, MIN_VOTOS_BASE, MIN_BASE, TOP_PLANO, VITRINA, MAX_OTRAS,
     familia, familiaCampana, pasos, cercania, llavePersona, esCongresista, codigoPuesto,
     matrizDesdeArchivos, matrizDesdeMesas, baseDesdeMesas, afinidad, correlacion, franja, presion, niveles, disputa,
     fuentesDelReparto, escalera, evaluar, candidatasOtras, territorioDe, cargar,
+    S3, INDICES_C, registroC, congresistas, completarCampana, leer, planoSVG, sello, corto, FUENTE_TXT, FRANJA_TXT, NIVEL_TXT, MARCA_TXT, AVISO_TXT,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

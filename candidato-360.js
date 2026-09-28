@@ -2263,6 +2263,7 @@ async function launchCRM(event) {
     await prepararSalto(corpKey, campana);
     pintarMeta(await estimateVoteTarget(corpKey, territory));
   } finally { window.Candi?.calculo?.(false); }
+  pintarContendientes();   /* después de la meta: la presión usa el escalón probable */
   if (SALTO_ACTUAL?.tipo?.unidad === 'municipio') ensureCRMMapToggles();
   if (SALTO_ACTUAL && crmMapMode === 'proyectado') refreshCRMMapMode();
 }
@@ -2307,6 +2308,7 @@ async function abrirCRMNuevo() {
     const munCodigo = c.municipio ? await C360Electorado.codigoMunicipio(c.departamento, c.municipio).catch(() => '') : '';
     pintarMeta(await VoteTarget.estimate({ corp: c.corp, territory: lugar, baseUrl: S3, partido: n.partido || '', departamento: c.departamento || '', bloque: bloqueVigente(), codigo: { dep: c.departamento, mun: munCodigo } }));
   } finally { window.Candi?.calculo?.(false); }
+  pintarContendientes();
 }
 /* Volver a la candidatura vinculada (al cargar o al intentar cambiarla). */
 async function abrirVinculo() {
@@ -4683,6 +4685,48 @@ async function pintarEndoso() {
   } catch (e) {
     $('crmEndosoTitulo').textContent = 'No pudimos calcular el endoso todavía.';
     $('crmEndosoDato').textContent = '—'; $('crmEndosoSub').textContent = 'vuelva a intentar en un momento';
+  }
+}
+/* ─── 9 ter. Contendientes (tarjeta 10) ─────────────────────────────────────
+   El cálculo vive en candidato-360-contendientes.js (window.C360Contendientes);
+   el panel candidato-360-contendientes.html llama la misma `leer` con las
+   mismas entradas —campaña, candidaturas, mesas, territorio y el escalón
+   probable de la meta—, así que las dos pantallas dan las mismas cifras.
+   En vitrina el plano deja nítidos los tres de más presión (su historial ya
+   es público en el índice) y a los demás los pinta sin nombre. */
+let CONT_TURNO = 0;
+async function pintarContendientes() {
+  const card = $('crmContendientes'), K = window.C360Contendientes; if (!card || !K) return;
+  const turno = ++CONT_TURNO;
+  $('crmContTitulo').textContent = 'Buscando a sus rivales probables…';
+  $('crmContDato').textContent = '…'; $('crmContSub').textContent = 'leyendo el registro'; $('crmContPlano').innerHTML = '';
+  try {
+    const campana = CAMPANA_ACTUAL || SESSION.vinculo?.campana || {};
+    const corp = currentTargetTerritory()?.corporation || campana.corp || corporacionHistorica(crmCandidate);
+    const alcance = await endosoAlcance();
+    const slugs = crmCandidate ? (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean) : [];
+    const propias = crmCandidate ? await mesasDelHistorial() : null;
+    const meta = escenariosDe(META_ACTUAL?.detalle)?.probable?.votos || Number(META_ACTUAL?.target || 0);
+    const L = await K.leer({ campana: { ...campana, corp }, slugs, mesasPropias: propias, alcance, meta, usuario: { nombre: crmCandidate?.nombre || NUEVO?.nombre || '', slugs } });
+    if (turno !== CONT_TURNO) return;
+    const r = L.resumen, N = x => Number(x || 0).toLocaleString('es-CO'), top = L.plano.slice(0, 3);
+    if (!r.enIndice) throw new Error('sin rivales');
+    $('crmContTitulo').textContent = `${N(r.enIndice)} rivales probables${corp === 'jal' ? ' en su localidad' : ''}.`;
+    const esc = L.escalera;
+    const nombres = top.map(x => NOMBRE_BONITO(K.corto(x.nombre)));
+    $('crmContCopy').textContent = `Los de más presión: ${nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}` : nombres[0]}. En el plano, su familia política contra cuánto rinde cada uno en los puestos donde usted saca votos.`
+      + (L.avisos.includes('territorio-parejo') ? ' En su territorio todos compiten por los mismos puestos: lo que los separa es la lista y la familia.' : '')
+      + (esc?.usted && !esc.usted.elegido && esc.distancia != null ? ` En su lista de 2023 quedó ${esc.usted.puesto}.º, a ${N(esc.distancia)} votos del último elegido.` : '');
+    $('crmContPlano').innerHTML = K.planoSVG(L, { ancho: 520, alto: 300, etiquetas: 3, vitrina: CRM_VITRINA });
+    $('crmContDato').textContent = N(r.enIndice);
+    $('crmContSub').textContent = `presión alta ${N(r.niveles.alta)} · media ${N(r.niveles.media)} · baja ${N(r.niveles.baja)}`;
+  } catch (e) {
+    if (turno !== CONT_TURNO) return;
+    /* Una falla de red no es «no hay registro»: se dice distinto. */
+    if (/No se pudieron leer/.test(e?.message || '')) { $('crmContTitulo').textContent = 'No pudimos leer el registro de su territorio.'; $('crmContCopy').textContent = 'Vuelva a cargar la página en un momento.'; $('crmContDato').textContent = '—'; $('crmContSub').textContent = 'sin conexión con los datos'; return; }
+    $('crmContTitulo').textContent = 'Todavía no hay rivales que mostrar.';
+    $('crmContCopy').textContent = 'Sin resultados de 2023 en la corporación y el territorio a los que se lanza no hay registro del cual sacar rivales probables. Cuando se inscriban las candidaturas de 2027, aparecen.';
+    $('crmContDato').textContent = '—'; $('crmContSub').textContent = 'sin registro comparable';
   }
 }
 /* ─── 10. Arranque ───────────────────────────────────────────────────────── */
