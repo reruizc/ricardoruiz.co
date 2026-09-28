@@ -634,15 +634,37 @@ function manifiestoLogos(key) {
     .catch(() => null)
     .then(d => {
       /* Un manifiesto vacío o caído no borra lo que ya se tenga cargado. */
-      if (d?.logos?.length) LOGOS_PARTIDOS.set(key, new Map(d.logos.map(l => [normalizedText(l.nombre), `candidato-360-data/logos-partidos/${key}/${l.archivo}`])));
+      if (d?.logos?.length) {
+        LOGOS_PARTIDOS.set(key, new Map(d.logos.map(l => [normalizedText(l.nombre), `candidato-360-data/logos-partidos/${key}/${l.archivo}`])));
+        const nucleos = new Map(); d.logos.forEach(l => { const n = nucleoLogo(l.nombre); if (n && !nucleos.has(n)) nucleos.set(n, `candidato-360-data/logos-partidos/${key}/${l.archivo}`); });
+        LOGOS_NUCLEO.set(key, nucleos);
+      }
       else if (!LOGOS_PARTIDOS.has(key)) LOGOS_PARTIDOS.set(key, new Map());
       return LOGOS_PARTIDOS.get(key);
     }));
   return logosPendientes.get(key);
 }
+/* Las listas a Cámara 2026 llevan el departamento en el nombre —«PACTO
+   HISTÓRICO BOLÍVAR», «…ANTIOQUIA», «…CÓRDOBA»: el Pacto en 13
+   departamentos— y el catálogo toma ese nombre porque es el vigente. Sin
+   quitarlo no casaban con su logo y la rejilla, que solo muestra lo que tiene
+   logo, dejaba al Pacto por fuera en todo el país menos Bogotá. Se compara el
+   núcleo: sin «PARTIDO/MOVIMIENTO POLÍTICO» delante y sin el departamento
+   al final. Solo el departamento EXACTO al final: «PACTO HISTÓRICO ALIANZA
+   VERDE» es una coalición y no puede heredar solo el logo del Pacto. */
+const COLAS_DEPARTAMENTO = [...new Set(Object.keys(DEP_CODES).flatMap(n => { const x = normPalabras(n); return [x, x.replace(/^(LA|EL) /, ''), x.replace(/^DISTRITO CAPITAL DE /, ''), x.replace(/ DEL CAUCA$/, ''), x.replace(/ Y PROVIDENCIA$/, '')]; }))].sort((a, b) => b.length - a.length);
+function nucleoLogo(nombre) {
+  let x = normPalabras(nombre).replace(/^(PARTIDO |MOVIMIENTO )?(POLITICO )?/, '');
+  const cola = COLAS_DEPARTAMENTO.find(c => x.endsWith(` ${c}`) && x.length > c.length + 5);
+  if (cola) x = x.slice(0, -cola.length - 1);
+  return x.split(' ').length >= 2 ? x : '';
+}
+const LOGOS_NUCLEO = new Map();
+function logoPorNucleo(key, nombre) { const n = nucleoLogo(nombre); return n ? LOGOS_NUCLEO.get(key)?.get(n) || '' : ''; }
 function logoDePartido(nombre, dep) {
   const clave = normalizedText(nombre), key = String(dep || '').padStart(2, '0');
-  return LOGOS_PARTIDOS.get(key)?.get(clave) || LOGOS_PARTIDOS.get(LOGOS_BASE)?.get(clave) || '';
+  return LOGOS_PARTIDOS.get(key)?.get(clave) || LOGOS_PARTIDOS.get(LOGOS_BASE)?.get(clave)
+    || logoPorNucleo(key, nombre) || logoPorNucleo(LOGOS_BASE, nombre) || '';
 }
 function imgLogo(nombre, dep) {
   const src = logoDePartido(nombre, dep);
@@ -1821,12 +1843,12 @@ function regionDeCampana(candidate, campana) {
 }
 /* La frase medida (cifras de 2023) llega después: necesita bajar un JSON. Se
    agrega al párrafo solo si sigue siendo la misma candidatura en pantalla. */
-async function agregarDatoRegional(el, { dep, municipio, bloque, partido }) {
+async function agregarDatoRegional(el, { dep, municipio, bloque, partido, corp }) {
   const F = window.C360Frases; if (!el || !F) return;
   const antes = el.textContent;
   let codigoMunicipio = '';
   try { if (municipio && dep && dep !== '16') codigoMunicipio = await C360Electorado.codigoMunicipio(dep, municipio); } catch {}
-  const d = await F.dato({ dep, municipio, codigoMunicipio, bloque, partido }).catch(() => '');
+  const d = await F.dato({ dep, municipio, codigoMunicipio, bloque, partido, corp }).catch(() => '');
   if (d && el.textContent === antes) el.textContent = `${antes} ${d}`;
 }
 function fraseDePartida({ candidate, corpKey, territory, campana }) {
@@ -1882,7 +1904,10 @@ function fraseDePartida({ candidate, corpKey, territory, campana }) {
    en 2023). */
 async function estimateVoteTarget(corp, territory) {
   const departamento = CAMPANA_ACTUAL?.departamento || departamentoDeCandidatura(crmCandidate);
-  return VoteTarget.estimate({ corp, territory: territory || crmCandidate?.circunscripcion || '', baseUrl: S3, partido: partidoVigente(), departamento, bloque: bloqueVigente() });
+  /* Con territorio elegido en el formulario va también su CÓDIGO: el nombre
+     del DANE no siempre casa con el de la Registraduría (vote-target.js). */
+  const codigo = territory ? { dep: $('campaignDepartment')?.value || departamento, mun: codigoMunicipioObjetivo() } : null;
+  return VoteTarget.estimate({ corp, territory: territory || crmCandidate?.circunscripcion || '', baseUrl: S3, partido: partidoVigente(), departamento, bloque: bloqueVigente(), codigo });
 }
 let META_ACTUAL = null;
 /* Cuatro escenarios sobre la MISMA proyección (censo × participación), de
@@ -2203,7 +2228,7 @@ async function launchCRM(event) {
   {
     const partidoCtx = sinPartido(campana.avales) ? '' : String(campana.partido || crmCandidate.partido || '');
     const bloqueCtx = partidoCtx ? PartidosBloques.bloqueDeCandidatura(partidoCtx, crmCandidate.nombre || '') : (campana.espectro || '');
-    agregarDatoRegional($('crmContext'), { ...regionDeCampana(crmCandidate, campana), bloque: bloqueCtx, partido: partidoCtx });
+    agregarDatoRegional($('crmContext'), { ...regionDeCampana(crmCandidate, campana), bloque: bloqueCtx, partido: partidoCtx, corp: campana?.corp || '' });
   }
   $('crmPartidoPendiente')?.classList.toggle('hidden', campana.avales !== 'indeciso');
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
@@ -2245,7 +2270,7 @@ async function abrirCRMNuevo() {
     const regional = window.C360Frases?.linea({ dep: c.departamento, municipio: c.municipio, bloque: bloqueN }) || '';
     const extra = [identidad ? `${identidad.charAt(0).toUpperCase()}${identidad.slice(1)}.` : '', regional].filter(Boolean).join(' ');
     if (extra) $('crmContext').textContent += ` ${extra}`;
-    agregarDatoRegional($('crmContext'), { dep: c.departamento, municipio: c.municipio, bloque: bloqueN, partido });
+    agregarDatoRegional($('crmContext'), { dep: c.departamento, municipio: c.municipio, bloque: bloqueN, partido, corp: c.corp });
   }
   $('crmPartidoPendiente')?.classList.toggle('hidden', !indeciso);
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
@@ -2266,7 +2291,8 @@ async function abrirCRMNuevo() {
   renderTerritorioObjetivo(c);
   window.Candi?.calculo?.(true);
   try {
-    pintarMeta(await VoteTarget.estimate({ corp: c.corp, territory: lugar, baseUrl: S3, partido: n.partido || '', departamento: c.departamento || '', bloque: bloqueVigente() }));
+    const munCodigo = c.municipio ? await C360Electorado.codigoMunicipio(c.departamento, c.municipio).catch(() => '') : '';
+    pintarMeta(await VoteTarget.estimate({ corp: c.corp, territory: lugar, baseUrl: S3, partido: n.partido || '', departamento: c.departamento || '', bloque: bloqueVigente(), codigo: { dep: c.departamento, mun: munCodigo } }));
   } finally { window.Candi?.calculo?.(false); }
 }
 /* Volver a la candidatura vinculada (al cargar o al intentar cambiarla). */

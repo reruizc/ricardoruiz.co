@@ -247,6 +247,27 @@
     return { mesas, peso: total ? propios / total : 0 };
   }
 
+  /* La Alcaldía se lee con el Concejo de su ciudad, que es lo que trae votos
+     por puesto Y por partido. Pero hay municipios donde una familia compitió
+     por la Alcaldía de 2023 sin lista al Concejo: medido, 14 para la izquierda
+     y 3 para el centro-izquierda. Cartagena es el más grande —56.893 votos de
+     Javier Julio Bejarano (Pacto) a la Alcaldía y 0 % de izquierda en el
+     Concejo—, y medir ahí con las vecinas del espectro armaba el plan de
+     alguien de izquierda con los puestos de ASI, Alianza Verde y Nuevo
+     Liberalismo. Si la familia tuvo candidato a la Alcaldía, mandan sus votos,
+     mesa por mesa: es la misma corporación a la que se lanza. */
+  async function familiaEnAlcaldia(familia, aqui) {
+    const PB = global.PartidosBloques, E = global.C360Electorado;
+    if (!PB || !familia || !aqui.mun) return null;
+    const idx = await json(`${S3}/alcaldia-2023/index-alcaldia-2023.json`).catch(() => null);
+    const pref = `ALC2023-${Number(aqui.dep)}-${Number(aqui.mun)}-`;
+    const suyos = (idx?.candidatos || []).filter(c => String(c.slug || '').startsWith(pref) && PB.bloqueDeCandidatura(c.partido || '', c.nombre || '') === familia);
+    if (!suyos.length) return null;
+    const mesas = (await E.mesasDe(suyos.map(c => c.slug)))
+      .filter(m => pad2(m.dep) === aqui.dep && pad3(m.mun) === aqui.mun && Number(m.v || 0) > 0 && !['90', '98'].includes(pad2(m.zon)));
+    return mesas.length ? { mesas, candidatos: suyos.map(c => c.nombre) } : null;
+  }
+
   async function fuente({ slugs = [], campana = {} } = {}) {
     const E = global.C360Electorado;
     const corp = campana.corp || '';
@@ -267,8 +288,12 @@
     if (!destino || !destino.archivos.length) return { modo: 'sin-dato', mesas: [] };
     const dep = pad2(campana.departamento);
     let familia = familiaDe(campana), famSet = familia ? new Set([familia]) : null, ampliada = false;
-    let r = mesasDeFamilia(destino, dep, famSet);
-    if (famSet && r.peso < .01 && E.VECINAS?.[familia]) {
+    let r = mesasDeFamilia(destino, dep, famSet), deAlcaldia = null;
+    if (famSet && r.peso < .01 && corp === 'alcaldia' && destino.fuente === 'concejo') {
+      deAlcaldia = await familiaEnAlcaldia(familia, aqui).catch(() => null);
+      if (deAlcaldia) r = { mesas: deAlcaldia.mesas, peso: 1 };
+    }
+    if (!deAlcaldia && famSet && r.peso < .01 && E.VECINAS?.[familia]) {
       famSet = new Set(E.VECINAS[familia]); ampliada = true;
       r = mesasDeFamilia(destino, dep, famSet);
     }
@@ -279,11 +304,13 @@
     const famTexto = !famSet ? 'todas las listas'
       : ampliada ? [...famSet].map(f => (PB?.BLOQUE_LABEL?.[f] || f).toLowerCase()).join(' + ')
       : (CON_ARTICULO[familia] || 'su familia política');
-    const corpFuente = destino.fuente === 'jal' ? 'la JAL' : destino.fuente === 'concejo' ? 'el Concejo' : 'la Asamblea';
+    const corpFuente = deAlcaldia ? 'la Alcaldía' : destino.fuente === 'jal' ? 'la JAL' : destino.fuente === 'concejo' ? 'el Concejo' : 'la Asamblea';
     return {
       modo: 'territorio', mesas: r.mesas, suyosPorPuesto, familia, ampliada, famTexto,
       corp, corpTexto: NOMBRE_CORP[corp] || 'su corporación', fuenteTexto: `${corpFuente} de 2023`,
-      proxy: (corp === 'alcaldia' && destino.fuente === 'concejo') || (destino.fuente === 'asamblea' && !DEPARTAMENTAL.includes(corp)),
+      proxy: !deAlcaldia && ((corp === 'alcaldia' && destino.fuente === 'concejo') || (destino.fuente === 'asamblea' && !DEPARTAMENTAL.includes(corp))),
+      /* Cuándo y con quién se reemplazó el Concejo: el panel lo declara. */
+      deAlcaldia: deAlcaldia ? deAlcaldia.candidatos : null,
       lugar: destino.lugar, faltan: destino.faltan,
       etiqueta: famSet ? 'Votos de su familia 2023' : 'Votos válidos 2023',
     };

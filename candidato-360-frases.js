@@ -443,7 +443,24 @@
     return { lista: Object.entries(t), lugar: r.name || '', eleccion: 'la Asamblea' };
   }
 
-  async function dato({ dep, municipio, codigoMunicipio, bloque, partido: nombre } = {}) {
+  /* El mejor candidato de una familia en la Alcaldía o la Gobernación de 2023
+     de ese territorio. Existe para no decirle a nadie que «su familia no tuvo
+     lista» cuando sí compitió por el cargo al que se lanza: en Cartagena la
+     izquierda no tuvo lista a la Asamblea ni al Concejo, pero Javier Julio
+     Bejarano (Pacto) quedó segundo a la Alcaldía con el 16 %. */
+  async function enElCargo({ corp, dep, codigoMunicipio, bloque }) {
+    if (!PB()?.bloqueDeCandidatura) return null;
+    const d = Number(String(dep || '').replace(/\D/g, '')), m = Number(codigoMunicipio || 0);
+    const pref = corp === 'alcaldia' ? (m ? `ALC2023-${d}-${m}-` : '') : corp === 'gobernacion' ? `GOB2023-${d}-` : '';
+    if (!pref || !d) return null;
+    const idx = await json(`${S3()}/${corp}-2023/index-${corp}-2023.json`).catch(() => null);
+    const todos = (idx?.candidatos || []).filter(c => String(c.slug || '').startsWith(pref)).sort((a, b) => b.votos - a.votos);
+    const total = todos.reduce((s, c) => s + Number(c.votos || 0), 0); if (!total) return null;
+    const i = todos.findIndex(c => PB().bloqueDeCandidatura(c.partido || '', c.nombre || '') === bloque);
+    return i >= 0 ? { nombre: todos[i].nombre, puesto: i + 1, share: todos[i].votos / total } : null;
+  }
+
+  async function dato({ dep, municipio, codigoMunicipio, bloque, partido: nombre, corp } = {}) {
     const P = await partidosDe({ dep, municipio, codigoMunicipio }); if (!P || !P.lista.length) return '';
     const total = P.lista.reduce((s, [, v]) => s + Number(v || 0), 0); if (!total) return '';
     /* El nombre bonito sale del diccionario (con tildes); el del JSON viene en
@@ -472,8 +489,20 @@
     const por = {}; P.lista.forEach(([n, v]) => { const b = PB().bloqueDeOrganizacion(n) || 'sc'; por[b] = (por[b] || 0) + Number(v || 0); });
     const propia = por[bloque] || 0;
     const rango = Object.entries(por).filter(([b]) => b !== 'sc').sort((a, b) => b[1] - a[1]).findIndex(([b]) => b === bloque) + 1;
-    /* Menos del 1 % no es un puesto en el ranking: es no haber tenido lista. */
-    if (propia / total < .01) return `En lo local, en 2023, ${donde}, ${LABEL[bloque]} casi no tuvo lista propia (menos del 1 % de los votos): aquí se empieza desde muy abajo, y la meta se mide con las familias vecinas.`;
+    /* Menos del 1 % no es un puesto en el ranking: es no haber tenido lista.
+       Pero si la campaña es a la Alcaldía o la Gobernación, antes de decirlo
+       se mira ese mismo cargo en 2023: la familia pudo competir ahí sin lista
+       a la corporación. ⚠️ La frase ya no dice que «la meta se mide con las
+       familias vecinas»: no era cierto para ningún cargo (la de un cargo
+       uninominal es el ganador de 2023; la de una lista, la lista típica). */
+    if (propia / total < .01) {
+      const cargo = await enElCargo({ corp, dep, codigoMunicipio, bloque }).catch(() => null);
+      if (cargo) {
+        const quien = String(cargo.nombre || '').toLowerCase().replace(/(^|[\s.-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+        return `En lo local, en 2023, ${donde}, ${LABEL[bloque]} casi no tuvo lista propia, pero sí compitió por ${corp === 'alcaldia' ? 'la Alcaldía' : 'la Gobernación'}: ${quien} quedó ${['', 'primero', 'segundo', 'tercero', 'cuarto', 'quinto'][cargo.puesto] || `${cargo.puesto}.º`} con el ${pct(cargo.share)} de los votos.`;
+      }
+      return `En lo local, en 2023, ${donde}, ${LABEL[bloque]} casi no tuvo lista propia (menos del 1 % de los votos): aquí se empieza desde muy abajo.`;
+    }
     return `En lo local, en 2023, ${donde}, ${LABEL[bloque]} sacó el ${pct(propia / total)} de los votos${rango ? ` y fue la ${orden(rango)} familia política` : ''}.`;
   }
 

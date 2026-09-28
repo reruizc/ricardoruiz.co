@@ -146,6 +146,31 @@
     return best;
   }
 
+  /* El territorio por CÓDIGO electoral, no por nombre. El formulario escribe
+     el municipio como el mapa del DANE («CARTAGENA DE INDIAS», «SANTIAGO DE
+     CALI», «SAN JOSÉ DE CÚCUTA») y la Registraduría como «CARTAGENA», «CALI»,
+     «CUCUTA». Medido en sep-2026 sobre los 1.100 municipios: por nombre, 29
+     se quedaban SIN meta y 3 recibían la de OTRO municipio —Arauca la de
+     Fortul, Sucre la de Sincé, Nariño la de Tumaco—, porque el municipio se
+     llama igual que su departamento y el desempate caía en el primero que
+     apareciera. El código viene en el slug de cada candidatura (el segundo
+     segmento es el departamento electoral, el tercero el municipio en las
+     corporaciones municipales). */
+  const MUNICIPALES = ['alcaldia', 'concejo', 'jal'];
+  function filasPorCodigo(candidates, corp, codigo, territory) {
+    const d = Number(codigo && codigo.dep || 0), m = Number(codigo && codigo.mun || 0);
+    const municipal = MUNICIPALES.includes(corp);
+    if (!d || (municipal && !m)) return null;
+    const rows = candidates.filter(c => { const p = String(c.slug || '').split('-'); return Number(p[1]) === d && (!municipal || Number(p[2]) === m); });
+    if (!rows.length) return null;
+    const etiquetas = [...new Set(rows.map(c => c.circunscripcion || ''))];
+    /* Una sola circunscripción (alcaldía, concejo, asamblea, gobernación): es
+       esa. Varias (las JAL de una ciudad): la localidad sí se elige por
+       nombre, pero solo entre las de ESE municipio. */
+    if (etiquetas.length === 1) return { rows, label: etiquetas[0], score: 2000 };
+    return resolveTerritoryRows(rows, territory);
+  }
+
   function groupByParty(rows) {
     const parties = new Map();
     rows.forEach(candidate => {
@@ -503,12 +528,12 @@
     return `${census} × ${participation} × margen competitivo ${Math.round(COMPETITIVE_MARGIN * 100)}%`;
   }
 
-  async function estimate({ corp, territory, baseUrl, partido, departamento, bloque }) {
+  async function estimate({ corp, territory, baseUrl, partido, departamento, bloque, codigo }) {
     const source = CORPORATIONS[corp];
     if (!source || !territory) return { target: null, formula: 'Seleccione una corporación y un territorio para calcular la meta.', detalle: { falla: 'sin-territorio' } };
     try {
       const index = await json(`${baseUrl}/${source.index}`);
-      const match = resolveTerritoryRows(index.candidatos || [], territory);
+      const match = filasPorCodigo(index.candidatos || [], corp, codigo, territory) || resolveTerritoryRows(index.candidatos || [], territory);
       if (!match || !match.rows.length) throw new Error('Territorio sin resultado comparable');
 
       const metricsPromise = participationReference(corp, match.label, baseUrl, source);
