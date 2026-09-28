@@ -138,9 +138,11 @@
   /* ── El plan, en texto plano, para que se lo lleve ───────────────────── */
   /* Sale con una columna «Testigo» VACÍA a propósito: ese nombre lo pone él
      en su archivo, no acá. */
-  function csv(seleccion, etiqueta = 'Votos suyos') {
+  /* `extra` agrega una columna por código de puesto (el endoso de sus aliados,
+     del panel 08). Sin ella el archivo es el de siempre. */
+  function csv(seleccion, etiqueta = 'Votos suyos', extra = null) {
     const cab = ['#', 'Testigo', 'Codigo', 'Puesto', 'Direccion', 'Barrio', 'Municipio',
-      'Mesas', 'Censo', etiqueta, '% del total', '% acumulado',
+      'Mesas', 'Censo', etiqueta, ...(extra ? [extra.titulo] : []), '% del total', '% acumulado',
       'Senal movil', 'Internet', 'Publica E-14', 'Transmision', 'Accesible', 'Bajo techo',
       'Banos', 'Dificultad de acceso', 'Orden publico', 'Quien abre'];
     const si = v => v == null ? '' : (v ? 'Si' : 'No');
@@ -148,7 +150,7 @@
     const filas = seleccion.puestos.map(p => {
       const h = p.hvp || {};
       return [p.rango, '', p.code, p.nombre, p.direccion, p.barrio, p.munNom,
-        p.mesas, h.ce ?? '', p.votos, (p.share * 100).toFixed(2).replace('.', ','),
+        p.mesas, h.ce ?? '', p.votos, ...(extra ? [extra.valores.get(p.code) ? Math.round(extra.valores.get(p.code)) : ''] : []), (p.share * 100).toFixed(2).replace('.', ','),
         (p.cobertura * 100).toFixed(2).replace('.', ','),
         si(h.mov), si(h.net), si(h.e14), si(h.tx), si(h.dis), si(h.tch),
         h.ban ?? '', p.sinFicha ? '' : (ACC[h.acc] || ''), si(h.ord), h.abr || ''];

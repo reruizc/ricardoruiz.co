@@ -15,7 +15,8 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const RAIZ = new URL('../../', import.meta.url);
-const ctx = vm.createContext({ fetch: globalThis.fetch, console });
+const almacen = new Map();
+const ctx = vm.createContext({ fetch: globalThis.fetch, console, localStorage: { getItem: k => almacen.get(k) ?? null, setItem: (k, v) => almacen.set(k, String(v)) } });
 vm.runInContext(await readFile(new URL('candidato-360-endoso.js', RAIZ), 'utf8'), ctx);
 const E = ctx.C360Endoso;
 
@@ -163,6 +164,19 @@ ok(E.corpRetencion({ corp: 'CÁMARA · ANTIOQUIA · 2022' }) === 'camara' && E.c
   const mB2 = mB.map(x => ({ ...x, v: 100 }));
   const L9 = await E.evaluar([lider], { alcance, enAlcance, ...o, mesasDe: async () => mB2, retencion: RET });
   ok(L9.filas[0].fuente === 'lider' && L9.filas[0].lider.efecto === 0 && L9.total === 0, 'líder medido sin efecto: cero, y se dice');
+}
+
+/* La meta escalón por escalón (fase 7). El CRM guarda los escalones con la
+   forma de escenariosDe ({votos}) y el panel los lee. */
+{
+  const k = E.claveMeta('Ana@X.co', 'persona-ana');
+  ok(k === 'c360-meta-escalones:ana@x.co:persona-ana', 'la llave de los escalones es por cuenta y candidatura, como la de la lista');
+  E.guardarEscalones(k, { inminente: { votos: 100 }, probable: { votos: 200 }, posible: { votos: 400 }, deseado: { votos: 1000 } }, 'posible');
+  const esc = E.cargarEscalones(k);
+  ok(esc.probable === 200 && esc.deseado === 1000 && esc.elegido === 'posible', 'los escalones van y vuelven del navegador');
+  const cob = E.coberturaMeta({ bajo: 50, total: 100, alto: 200 }, esc);
+  ok(cob.map(c => c.medio).join() === '1,0.5,0.25,0.1' && cob[2].elegido && cob[3].faltan === 900 && cob[0].alto === 2, 'cobertura de cada escalón, con el elegido marcado y lo que falta');
+  ok(E.cargarEscalones('no-existe') === null && E.coberturaMeta({ total: 1 }, null).length === 0, 'sin escalones no se inventan');
 }
 
 /* El territorio desde la campaña guardada (lo que usa el panel). */

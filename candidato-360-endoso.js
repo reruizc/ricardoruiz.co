@@ -537,6 +537,50 @@
   function cargar(k) { try { return JSON.parse(global.localStorage.getItem(k) || '[]').slice(0, MAX); } catch { return []; } }
   function guardar(k, lista) { try { global.localStorage.setItem(k, JSON.stringify(lista)); } catch { /* sin almacenamiento: la lista vive mientras dure la pestaña */ } }
 
+  /* ── La meta, escalón por escalón (fase 7) ─────────────────────────────
+     El CRM calcula los cuatro escalones de la meta (inminente, probable,
+     posible, deseado) al abrirse; el servidor guarda solo la cifra elegida.
+     Para que el panel no tenga que recalcular la meta —baja índices y reparte
+     curules— el CRM los deja en el navegador, con la misma llave de la lista
+     de aliados. Si no están (otro computador, CRM sin abrir), el panel cae a
+     la cifra guardada en la campaña. */
+  const ESCALONES = ['inminente', 'probable', 'posible', 'deseado'];
+  const claveMeta = (correo, candidatura) => `c360-meta-escalones:${String(correo || 'anon').toLowerCase()}:${candidatura || 'sin-candidatura'}`;
+  function guardarEscalones(k, esc, elegido) {
+    if (!esc) return;
+    const o = { elegido: ESCALONES.includes(elegido) ? elegido : 'probable', fecha: new Date().toISOString().slice(0, 10) };
+    ESCALONES.forEach(e => { o[e] = Math.round(Number(esc[e]?.votos ?? esc[e]) || 0); });
+    try { global.localStorage.setItem(k, JSON.stringify(o)); } catch { /* sin almacenamiento: el panel usa la meta guardada */ }
+  }
+  function cargarEscalones(k) { try { const o = JSON.parse(global.localStorage.getItem(k) || 'null'); return o && ESCALONES.some(e => o[e] > 0) ? o : null; } catch { return null; } }
+  /* Qué parte de cada escalón cubre el endoso, con los tres niveles del rango. */
+  function coberturaMeta(lectura, escalones) {
+    if (!lectura || !escalones) return [];
+    return ESCALONES.filter(e => escalones[e] > 0).map(e => {
+      const v = escalones[e];
+      return { escalon: e, votos: v, bajo: lectura.bajo / v, medio: lectura.total / v, alto: lectura.alto / v, faltan: Math.max(0, v - lectura.total), elegido: escalones.elegido === e };
+    });
+  }
+
+  /* ── Todo desde el vínculo ─────────────────────────────────────────────
+     Lo que necesita `evaluar` sale del vínculo de la cuenta: la lista (del
+     navegador), sus mesas, el territorio, la corporación de la campaña y la
+     comuna de cada puesto si hay líderes. El panel 08 y el plan del Día D lo
+     arman con ESTA función, para que el endoso que ve cada uno sea el mismo.
+     `EL` es C360Electorado (urlCandidatura, codigoMunicipio, puestos). */
+  async function prepararDesdeVinculo(v, correo, EL) {
+    const cand = candidaturaId(v), clave_ = clave(correo, cand), aliados = cargar(clave_);
+    const slugs = v?.tipo === 'historial' ? (v.candidato?.slugs || []) : [];
+    let propio = null;
+    if (slugs[0]) { try { propio = await mesas(EL.urlCandidatura(slugs[0])); } catch { propio = null; } }
+    const alcance = await alcanceDe({ campana: v?.campana || {}, corpHistorica: corpHistorica(v?.candidato), mesasPropias: propio, codigoMunicipio: EL.codigoMunicipio });
+    const corpCampana = v?.campana?.corp || corpHistorica(v?.candidato);
+    let georef = null;
+    if (aliados.some(a => a.tipo === 'lider')) { try { georef = await EL.puestos(); } catch { georef = null; } }
+    return { clave: clave_, claveMeta: claveMeta(correo, cand), aliados, propio, alcance, corpCampana, georef, comunaDe: georef ? comunaDesde(georef) : null,
+      metaGuardada: Number(v?.campana?.meta || 0) };
+  }
+
   const FUENTE = {
     medida: 'medida con a quién apoyó',
     suya: 'tasa que usted escribió',
@@ -553,5 +597,6 @@
   };
 
   global.C360Endoso = { SUPUESTO, SATURACION, MAX, FUENTE, CLASE, anio, corp, clase, ficha, mesas, suma, llavePuesto, llaveMesa, agrupar, medirPar, regresion, eleccionDe, medirLider, comunaDesde, totales, evaluar, solapes, retencionDe, corpRetencion, RETENCION,
-    enAlcance, areaDe, corpHistorica, municipioMayoritario, alcanceDe, codigoPuesto, porPuesto, clave, candidaturaId, cargar, guardar };
+    enAlcance, areaDe, corpHistorica, municipioMayoritario, alcanceDe, codigoPuesto, porPuesto, clave, candidaturaId, cargar, guardar,
+    ESCALONES, claveMeta, guardarEscalones, cargarEscalones, coberturaMeta, prepararDesdeVinculo };
 })(typeof window !== 'undefined' ? window : globalThis);

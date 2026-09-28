@@ -135,7 +135,8 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
 <script src="data-client.js"></script>
 <script src="partidos-bloques.js?v=20260922"></script>
 <script src="candidato-360-electorado.js?v=20260928"></script>
-<script src="candidato-360-diad.js?v=20260927"></script>
+<script src="candidato-360-diad.js?v=20260928f"></script>
+<script src="candidato-360-endoso.js?v=20260928g"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
 <script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
@@ -147,7 +148,7 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
   const num = x => Number(x || 0).toLocaleString('es-CO');
   const pct0 = x => `${Math.round((x || 0) * 100)} %`;
   const ACC = ['Sin dificultad', 'Acceso medio', 'Acceso alto', 'Acceso extremo'];
-  let PLAN = null, SEL = 1, FUENTE = null;
+  let PLAN = null, SEL = 1, FUENTE = null, ENDOSO = null;
 
   /* Los atajos son la pregunta al revés — «quiero cubrir el 70 %, ¿cuánta
      gente consigo?» —, que es como de verdad se piensa el problema. */
@@ -163,6 +164,8 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
     if (h.acc >= 2) m.push(['mal', ACC[h.acc].toLowerCase()]);
     if (!h.dis) m.push(['mal', 'no accesible']);
     if (h.abr) m.push(['', `abre: ${h.abr.toLowerCase()}`]);
+    const aliados = ENDOSO?.get(p.code);
+    if (aliados >= 1) m.unshift(['bien', `sus aliados: +${num(Math.round(aliados))}`]);
     const suyos = FUENTE?.suyosPorPuesto?.get(p.code);
     if (suyos) m.unshift(['bien', `aquí sacó ${num(suyos)} voto${suyos === 1 ? '' : 's'} antes`]);
     return m.slice(0, 5).map(([c, t]) => `<span class="dd-marca ${c}">${esc(t)}</span>`).join('');
@@ -219,7 +222,7 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
     });
     $('ddCsv').addEventListener('click', () => {
       const c = D.cobertura(PLAN, SEL);
-      const blob = new Blob([D.csv(c, FUENTE?.etiqueta)], { type: 'text/csv;charset=utf-8' });
+      const blob = new Blob([D.csv(c, FUENTE?.etiqueta, ENDOSO?.size ? { titulo: 'Endoso de sus aliados (punto medio)', valores: ENDOSO } : null)], { type: 'text/csv;charset=utf-8' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `plan-dia-de-eleccion-${c.testigos}-puestos.csv`;
@@ -259,6 +262,18 @@ table.dd-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13p
     $('ddTablaCopy').innerHTML = T
       ? `Ordenados por los votos de ${esc(FUENTE.famTexto)} en cada puesto. Lo que quede por debajo de la línea es lo que se queda sin testigo con el número que eligió arriba.`
       : `Ordenados por los votos que usted sacó ahí. Lo que quede por debajo de la línea es lo que se queda sin testigo con el número que eligió arriba.`;
+    /* El endoso de sus aliados (panel 08), con la misma cuenta del panel: dónde
+       le pueden pasar votos es también dónde conviene tener testigo. No cambia
+       el orden del plan; marca los puestos y va en una columna del archivo. */
+    try {
+      const ctx = await window.C360Endoso?.prepararDesdeVinculo(v, P.SESION.user?.email, E);
+      if (ctx?.aliados?.length) {
+        const L = await window.C360Endoso.evaluar(ctx.aliados, { alcance: ctx.alcance, enAlcance: window.C360Endoso.enAlcance, propio: ctx.propio, corpCampana: ctx.corpCampana, comunaDe: ctx.comunaDe });
+        ENDOSO = new Map((L.puestos || []).map(p => [p.code, p.total]));
+        const enPlan = PLAN.puestos.filter(p => ENDOSO.get(p.code) >= 1).length;
+        if (enPlan) $('ddPlanCopy').innerHTML += ` Sus aliados le pueden pasar votos en <b>${num(enPlan)}</b> de estos puestos: salen marcados.`;
+      }
+    } catch { ENDOSO = null; }
     armarControles();
     pintar();
     $('ddCuerpo').classList.remove('hidden');

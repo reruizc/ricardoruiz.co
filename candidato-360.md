@@ -100,7 +100,7 @@ votante, 08 recolección de firmas (solo si va por firmas).
 | `candidato-360-medios.html` | Panel 04: sus tres ideas contra la prensa de su territorio. |
 | `candidato-360-redes.html` | Panel 05: sus cuentas, buscadas y validadas. |
 | `candidato-360-electorado.html` | Panel 07: el análisis del electorado, con figuras y gráficos. |
-| `candidato-360-endoso.html` | Panel 08: endoso de aliados. Suma excandidatos (tasa contra a quién apoyaron) y líderes sin candidatura (zona marcada en el mapa, rendimiento de quien apoyaron contra su comuna), sin contar dos veces a quien votó por varios. La lista vive solo en el navegador —los nombres de los líderes son datos de terceros— y Candi lo dice al guardar. |
+| `candidato-360-endoso.html` | Panel 08: endoso de aliados. Suma excandidatos (tasa contra a quién apoyaron) y líderes sin candidatura (zona marcada en el mapa, rendimiento de quien apoyaron contra su comuna), sin contar dos veces a quien votó por varios. La lista vive solo en el navegador —los nombres de los líderes son datos de terceros— y Candi lo dice al guardar. Muestra cuánto cubre de cada escalón de la meta (el CRM deja los escalones en el navegador), dónde le suma votos nuevos y baja un CSV; el plan del Día D marca los puestos donde pesan los aliados. |
 | `candidato-360-perfil.html` | El método: cómo se lee un electorado sin violar el secreto del voto. |
 
 ### Módulos compartidos

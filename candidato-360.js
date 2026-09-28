@@ -2017,6 +2017,9 @@ function pintarEscenario() {
   const e = META_ACTUAL; if (!e?.target) return;
   const esc = escenariosDe(e.detalle), cur = esc?.[META_ESCENARIO];
   const votos = cur ? cur.votos : e.target;
+  /* Los cuatro escalones quedan en el navegador para el panel 08, que así no
+     tiene que recalcular la meta (el servidor guarda solo la cifra elegida). */
+  if (esc && window.C360Endoso) E360.guardarEscalones(E360.claveMeta(SESSION.user?.email, endosoCand()), esc, META_ESCENARIO);
   $('crmVoteNumber').textContent = votos.toLocaleString('es-CO');
   $('crmVoteTarget').textContent = `Meta ${META_ESCENARIO === 'probable' ? 'inicial' : META_ESCENARIO}: ${votos.toLocaleString('es-CO')} votos`;
   $('crmVoteFormula').textContent = esc ? mensajeMeta(META_ESCENARIO, e.detalle) : e.formula;
@@ -2040,6 +2043,7 @@ function elegirEscenario(id) {
   META_ESCENARIO = id;
   try { localStorage.setItem('c360-meta-escenario', id); } catch {}
   pintarEscenario();
+  if (ENDOSO.aliados.length) pintarEndoso();   /* el % de la meta de la tarjeta 08 es del escenario elegido */
   if (FIRMAS_ACTUAL && $('crmFirmasCopy')) $('crmFirmasCopy').textContent = textoFirmas(FIRMAS_ACTUAL);
   /* El mapa proyectado reparte lo que diga el número: hay que repintarlo. */
   if (crmMapMode === 'proyectado' && typeof refreshCRMMapMode === 'function') refreshCRMMapMode();
@@ -4618,10 +4622,10 @@ function mostrarFirmas() {
    campaña, cómo se nombran sus áreas— y la interfaz del modal. */
 const E360 = window.C360Endoso;
 let ENDOSO = { aliados: [], lectura: null };
-function endosoKey() {
-  const cand = crmCandidate?.id || (NUEVO?.nombre ? `nuevo-${normalizedText(NUEVO.nombre)}` : 'sin-candidatura');
-  return E360.clave(SESSION.user?.email, cand);
-}
+const endosoCand = () => crmCandidate?.id || (NUEVO?.nombre ? `nuevo-${normalizedText(NUEVO.nombre)}` : 'sin-candidatura');
+function endosoKey() { return E360.clave(SESSION.user?.email, endosoCand()); }
+/* La meta del escenario elegido (la tarjeta 02), no siempre la probable. */
+function endosoMeta() { return escenariosDe(META_ACTUAL?.detalle)?.[META_ESCENARIO]?.votos || Number(META_ACTUAL?.target || 0); }
 function endosoCargar() { ENDOSO.aliados = E360.cargar(endosoKey()); }
 function endosoGuardar() { E360.guardar(endosoKey(), ENDOSO.aliados); }
 /* El territorio contra el que se recorta: lo que esté puesto en el formulario
@@ -4667,7 +4671,7 @@ async function pintarEndoso() {
   $('crmEndosoDato').textContent = '…';
   try {
     const L = ENDOSO.lectura = await endosoEvaluar();
-    const meta = Number(META_ACTUAL?.target || 0);
+    const meta = endosoMeta();
     const cifra = x => x.toLocaleString('es-CO');
     const medidos = L.filas.filter(f => f.fuente === 'medida' || f.fuente === 'regresion' || (f.fuente === 'lider' && f.origen === 'medido')).length;
     /* Un rango, no una cifra: la retención del voto propio varía mucho entre

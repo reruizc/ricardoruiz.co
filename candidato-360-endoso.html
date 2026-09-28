@@ -46,6 +46,22 @@
 .leaflet-tooltip.tp{font:13px var(--sans);background:rgba(23,37,28,.96);color:#fff;border:0;border-radius:0;padding:8px 10px;max-width:260px;white-space:normal}
 .leaflet-tooltip.tp b{font-family:var(--display)}
 .leaflet-tooltip.tp:before{display:none}
+.en-esc{display:grid;grid-template-columns:110px 1fr 150px;gap:10px;align-items:center;margin:6px 0;font-size:13.5px}
+.en-esc b{font-weight:700}
+.en-esc-barra{position:relative;height:14px;background:rgba(0,0,0,.05);border:1px solid var(--line)}
+.en-esc-barra i{position:absolute;top:0;bottom:0;left:0}
+.en-esc-barra .rango{opacity:.28}
+.en-esc-barra .medio{opacity:.9}
+.en-esc small{color:var(--muted);font-size:12px}
+.en-esc.elegido{font-weight:600}
+@media (max-width:640px){.en-esc{grid-template-columns:90px 1fr;}.en-esc small{grid-column:2}}
+table.en-tabla{border-collapse:collapse;width:100%;min-width:560px;font-size:13px}
+.en-tabla th{text-align:left;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.en-tabla td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.en-tabla .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.en-tabla small{color:var(--muted)}
+.dd-marca{font:500 10.5px var(--mono);letter-spacing:.04em;padding:2px 6px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.dd-marca.bien{border-color:rgba(31,122,96,.45);color:var(--forest,#173f2c)}
 .en-leyenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin:10px 0 0;font-size:12.5px;color:var(--muted)}
 @media (max-width:820px){.en-mapa-caja{grid-template-columns:1fr}.en-mapa{height:360px}}
 
@@ -110,6 +126,11 @@
       </div>
       <div class="en-barra hidden" id="enBarraCaja"><i id="enBarra" style="width:0"></i></div>
       <span class="en-barra-et hidden" id="enBarraEt"></span>
+      <div id="enEscalones" class="hidden" style="margin-top:18px">
+        <p style="margin:0 0 8px"><b>Cuánto de cada escalón de su meta</b></p>
+        <div id="enEscalonesLista"></div>
+        <p class="helper" style="margin-top:6px" id="enEscalonesNota"></p>
+      </div>
       <p id="enTotalCopy" style="margin-top:14px"></p>
     </section>
 
@@ -130,6 +151,15 @@
       <ul class="arq-lista" id="enSolapes"></ul>
     </section>
 
+    <section class="panel hidden" id="enNuevosSec">
+      <span class="panel-num">05 · Dónde le suma votos nuevos</span>
+      <h3>Los puestos donde sus aliados pesan más.</h3>
+      <p id="enNuevosCopy"></p>
+      <div class="dd-tabla-caja" style="overflow-x:auto;border:1px solid var(--line)"><table class="en-tabla"><thead><tr><th>#</th><th>Puesto</th><th class="num">Endoso</th><th class="num">Votos suyos antes</th><th>Aliado que más pesa</th></tr></thead><tbody id="enNuevosFilas"></tbody></table></div>
+      <div class="en-acciones"><button type="button" class="solid" id="enCsv">Descargar todos los puestos (Excel)</button></div>
+      <p class="helper">El archivo se arma en su navegador y baja a su computador: no pasa por nuestros servidores. Por eso sí lleva el nombre de sus líderes.</p>
+    </section>
+
     <p class="puntaje-nota panel-nota" id="enNota"></p>
   </div>
 </div></main>
@@ -139,7 +169,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="partidos-bloques.js?v=20260922"></script>
 <script src="candidato-360-electorado.js?v=20260928"></script>
-<script src="candidato-360-endoso.js?v=20260928f"></script>
+<script src="candidato-360-endoso.js?v=20260928g"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
 <script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
@@ -367,7 +397,7 @@
     if (!ST.aliados.length) {
       ST.lectura = null;
       lista.innerHTML = '<p class="helper">Todavía no hay aliados. Búsquelos por nombre arriba.</p>';
-      ['enTotalSec', 'enMapaSec', 'enSolapeSec'].forEach(id => $(id).classList.add('hidden'));
+      ['enTotalSec', 'enMapaSec', 'enSolapeSec', 'enNuevosSec'].forEach(id => $(id).classList.add('hidden'));
       $('enNota').innerHTML = nota(null);
       return;
     }
@@ -381,7 +411,7 @@
     finally { window.Candi?.calculo?.(false); }
     if (turno !== ST.turno) return;   /* llegó otro cambio mientras calculaba */
     ST.lectura = L;
-    pintarFichas(L); pintarTotal(L); pintarMapa(L); pintarSolapes(L);
+    pintarFichas(L); pintarTotal(L); pintarEscalones(L); pintarMapa(L); pintarSolapes(L); pintarNuevos(L);
     $('enNota').innerHTML = nota(L);
   }
 
@@ -461,6 +491,63 @@
       + (L.filas.filter(f => !f.error && f.terr).length > 1 ? dobleTexto(L) : '');
   }
 
+  /* ── La meta, escalón por escalón ───────────────────────────────────── */
+  const COLOR_ESC = { inminente: '#e0533f', probable: '#f2c14e', posible: '#4ade80', deseado: '#a78bfa' };
+  const NOMBRE_ESC = { inminente: 'Inminente', probable: 'Probable', posible: 'Posible', deseado: 'Deseado' };
+  function pintarEscalones(L) {
+    const cob = E.coberturaMeta(L, ST.escalones), caja = $('enEscalones');
+    caja.classList.toggle('hidden', !cob.length);
+    if (!cob.length) return;
+    const ancho = x => `${Math.max(0, Math.min(100, x * 100)).toFixed(1)}%`;
+    $('enEscalonesLista').innerHTML = cob.map(c => `<div class="en-esc${c.elegido ? ' elegido' : ''}">
+      <span><b>${NOMBRE_ESC[c.escalon]}</b>${c.elegido ? ' ✓' : ''}<br><small>${num(c.votos)} votos</small></span>
+      <div class="en-esc-barra" title="entre ${pct0(c.bajo)} y ${pct0(c.alto)}"><i class="rango" style="width:${ancho(c.alto)};background:${COLOR_ESC[c.escalon]}"></i><i class="medio" style="width:${ancho(c.medio)};background:${COLOR_ESC[c.escalon]}"></i></div>
+      <small>${c.medio >= 1 ? 'lo cubre entero' : `cubre el ${pct0(c.medio)}`} (${pct0(c.bajo)}–${pct0(c.alto)})</small></div>`).join('');
+    const fecha = ST.escalones?.fecha ? ` Calculados en el CRM el ${ST.escalones.fecha.split('-').reverse().join('/')}.` : '';
+    $('enEscalonesNota').textContent = `La barra fuerte es el punto medio; la tenue, hasta dónde llega el extremo alto. ✓ es el escenario que eligió en la tarjeta de la meta.${fecha}`;
+  }
+
+  /* ── Dónde le suma votos nuevos ──────────────────────────────────────
+     El endoso vale más donde usted no tiene votos: ahí es gente nueva. Donde
+     ya saca votos, parte de lo que le pasan ya era suyo. */
+  function pintarNuevos(L) {
+    const sec = $('enNuevosSec'), puestos = L.puestos || [];
+    if (!puestos.length) { sec.classList.add('hidden'); return; }
+    sec.classList.remove('hidden');
+    const propio = ST.propio ? E.agrupar(ST.propio, E.codigoPuesto) : {};
+    ST.filasNuevos = puestos.map(p => ({ ...p, suyos: propio[p.code] || 0 }));
+    const nuevo = p => p.suyos < p.total, enNuevos = ST.filasNuevos.filter(nuevo).reduce((t, p) => t + p.total, 0);
+    $('enNuevosCopy').innerHTML = ST.propio
+      ? `El <b>${pct0(enNuevos / Math.max(1, L.total))}</b> del endoso cae en puestos donde usted sacó menos votos de los que le pueden pasar ahí: esos son votos nuevos, no los que ya tiene. Los puestos marcados «nuevo» son donde conviene que el aliado ponga la cara.`
+      : 'Ordenados por cuánto le pueden pasar sus aliados en cada puesto.';
+    const nom = i => esc(P.lugar(L.filas[i]?.al?.nombre || ''));
+    $('enNuevosFilas').innerHTML = ST.filasNuevos.slice(0, 25).map((p, j) => {
+      const top = Object.entries(p.porAliado).sort((a, b) => b[1] - a[1])[0];
+      const g = ST.georef?.[p.code];
+      return `<tr><td class="num">${j + 1}</td><td><b>${esc(P.lugar(g?.nombre || p.nombre || p.code))}</b><br><small>${esc(P.lugar(g?.barrio || p.comNom || p.munNom || ''))}</small></td>
+        <td class="num">${num(Math.round(p.total))}</td><td class="num">${ST.propio ? num(p.suyos) : '—'}</td><td>${top ? nom(top[0]) : ''}${ST.propio && nuevo(p) ? ' <span class="dd-marca bien">nuevo</span>' : ''}</td></tr>`;
+    }).join('');
+  }
+  /* El archivo se arma en el navegador y se baja al computador: no pasa por
+     ningún servidor, y por eso puede llevar el nombre de los líderes. */
+  function descargarCsv() {
+    const L = ST.lectura; if (!L?.puestos?.length) return;
+    const nom = i => L.filas[i]?.al?.nombre || '';
+    const cab = ['#', 'Codigo', 'Puesto', 'Barrio o comuna', 'Municipio', 'Endoso bajo', 'Endoso punto medio', 'Endoso alto', 'Aliados en el puesto', 'Aliado que mas pesa', 'Votos suyos antes'];
+    const propio = ST.propio ? E.agrupar(ST.propio, E.codigoPuesto) : {};
+    const filas = L.puestos.map((p, j) => {
+      const g = ST.georef?.[p.code], top = Object.entries(p.porAliado).sort((a, b) => b[1] - a[1])[0];
+      return [j + 1, p.code, g?.nombre || p.nombre, g?.barrio || p.comNom, p.munNom || g?.mesa?.munNom || '', Math.round(p.bajo), Math.round(p.total), Math.round(p.alto), p.aliados, top ? nom(top[0]) : '', ST.propio ? (propio[p.code] || 0) : ''];
+    });
+    const esc_ = v => { const x = String(v ?? ''); return /[";\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x; };
+    const texto = '\ufeff' + [cab, ...filas].map(f => f.map(esc_).join(';')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([texto], { type: 'text/csv;charset=utf-8' }));
+    a.download = `endoso-aliados-${L.puestos.length}-puestos.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
   /* Lo que se descontó por votar por dos aliados, y el extremo opuesto. */
   function dobleTexto(L) {
     const base = L.denominador ? '' : ' No tenemos el electorado de 2023 de su corporación, así que en los puestos compartidos se suma.';
@@ -532,19 +619,20 @@
 
   /* ── El territorio y la lista ──────────────────────────────────────── */
   const v = ST.v = P.SESION.vinculo;
-  ST.clave = E.clave(P.SESION.user?.email, E.candidaturaId(v));
-  ST.aliados = E.cargar(ST.clave);
-  ST.meta = Number(v?.campana?.meta || 0);
-  ST.corp = v?.campana?.corp || E.corpHistorica(v?.candidato);
-  const slugs = v?.tipo === 'historial' ? (v.candidato?.slugs || []) : [];
-  /* Sus mesas: las de su última candidatura, como en el CRM (ahí se mide el
-     solape con lo que ya tiene y, en «la misma corporación», el territorio). */
-  if (slugs[0]) { try { ST.propio = await E.mesas(EL.urlCandidatura(slugs[0])); } catch { ST.propio = null; } }
-  ST.alcance = await E.alcanceDe({ campana: v?.campana || {}, corpHistorica: E.corpHistorica(v?.candidato), mesasPropias: ST.propio, codigoMunicipio: EL.codigoMunicipio });
+  /* Lo mismo que arma el plan del Día D: la lista, sus mesas, el territorio y
+     la corporación salen de una sola función del motor. */
+  const ctx = await E.prepararDesdeVinculo(v, P.SESION.user?.email, EL);
+  Object.assign(ST, { clave: ctx.clave, aliados: ctx.aliados, propio: ctx.propio, alcance: ctx.alcance, corp: ctx.corpCampana });
+  if (ctx.georef) ST.georef = ctx.georef;
+  /* Los cuatro escalones de la meta los deja el CRM en este navegador; si no
+     están, la cifra guardada en la campaña. */
+  ST.escalones = E.cargarEscalones(ctx.claveMeta);
+  ST.meta = ST.escalones?.[ST.escalones.elegido] || ctx.metaGuardada;
   const t = P.territorio(v);
   ST.lugar = ST.alcance?.nombre ? P.lugar(ST.alcance.nombre) : (t.texto || 'su territorio');
   if (!ST.alcance) $('enBuscarCopy').innerHTML += ' <b>Todavía no sabemos en qué territorio compite</b>: defínalo en el CRM, o los votos de sus aliados cuentan completos.';
 
+  $('enCsv').addEventListener('click', descargarCsv);
   $('enNuevoLider').addEventListener('click', () => abrirLider(null));
   $('enLiderCancelar').addEventListener('click', cerrarLider);
   $('enLiderGuardar').addEventListener('click', guardarLider);

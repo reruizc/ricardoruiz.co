@@ -97,7 +97,7 @@ suman menos que por separado; dos de barrios distintos suman casi completo.
 | 4 ✅ | D1 totales por puesto (2023 primero) → regresión ecológica en la fórmula A. | **hecho 28-sep-2026** |
 | 5 ✅ | Unión probabilística por puesto + mapa combinado + matriz de solape entre aliados. | **hecho 28-sep-2026** |
 | 6 ✅ | Líder de zona: selector de zona en el mapa, sobre-rendimiento, «maneja N votos» contrastado (DiD queda pendiente, ver bitácora). | **hecho 28-sep-2026** |
-| 7 | Integración: % de la meta por escalón, puestos donde el endoso cierra la brecha → Día D, CSV, entrada en `VISTAS` de Candi + `C360_CANDI_VISTAS` del worker, `candidato-360.md`. | cierre |
+| 7 ✅ | Integración: % de la meta por escalón, puestos donde el endoso cierra la brecha → Día D, CSV, entrada en `VISTAS` de Candi + `C360_CANDI_VISTAS` del worker, `candidato-360.md`. | **hecho 28-sep-2026** |
 
 ## Bitácora
 
@@ -275,6 +275,45 @@ chica dentro de la comuna la comparación es más limpia.
 Pendiente de esta fase: la diferencia en diferencias (el cambio del apoyado en
 la zona entre dos elecciones, menos el de afuera) necesita votos por PARTIDO y
 puesto, que `totales-puesto/` todavía no trae.
+
+**Fase 7 (28-sep-2026).** Cierre de la integración:
+- **La meta por escalón.** El servidor guarda solo la cifra de la meta (el
+  normalizador de `/c360/campana` acepta `meta` y nada más), así que el CRM deja
+  los cuatro escalones en el navegador (`c360-meta-escalones:<correo>:<cand>`, la
+  misma forma de llave que la lista) cada vez que pinta la meta. El panel los
+  lee y muestra cuánto cubre el endoso de cada uno, con el rango y el escenario
+  elegido marcado; sin ellos cae a la meta guardada. La tarjeta 08 compara ahora
+  contra el escenario ELEGIDO (antes, siempre contra el probable) y se repinta al
+  cambiarlo.
+- **Votos nuevos.** Sección 05 del panel: los puestos donde los aliados pesan
+  más, con los votos que el candidato ya sacó ahí y la marca «nuevo» donde sacó
+  menos de lo que le pueden pasar. Caso de control: el 69 % del endoso cae en
+  puestos así.
+- **CSV** de todos los puestos (bajo · medio · alto, aliados, aliado que más
+  pesa, votos propios). Se arma en el navegador y baja al computador: no pasa
+  por el servidor, y por eso sí lleva el nombre de los líderes.
+- **Día D.** `prepararDesdeVinculo` (motor) arma la lectura igual que el panel;
+  el plan de testigos marca «sus aliados: +N» en cada puesto y el CSV del plan
+  gana la columna «Endoso de sus aliados (punto medio)». NO cambia el orden del
+  plan: el endoso orienta, la prioridad sigue siendo su votación o la de su
+  familia.
+- Candi: la vista `endoso` está en el frontend; su descripción en el worker
+  (`C360_CANDI_VISTAS`) está escrita pero SIN DESPLEGAR, junto con cambios de
+  otra sesión en `rr-auth`.
+
+Visto al pasar y dejado como tarea aparte: el normalizador de la campaña en el
+worker descarta `avales` y `espectro`, que el CRM y el Día D leen de vuelta.
+
+## Lo que queda (mejoras posibles, no pendientes del plan)
+
+1. Medir el solape de VOTANTES entre dos aliados con la regresión de la fase 4
+   (aliado i contra aliado j), para cerrar la brecha entre la unión con gente
+   independiente y el extremo «son los mismos votantes».
+2. Diferencia en diferencias para el líder: exige votos por partido y puesto en
+   `totales-puesto/`.
+3. Totales por puesto de Congreso 2026 (fuente `endoso`) y presidenciales, para
+   que esos aliados también tengan regresión.
+4. Desplegar la descripción de Candi en `rr-auth`.
 
 ## Decisiones abiertas (de Ricardo)
 
