@@ -508,6 +508,31 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
   }
   /* La capa que se está mirando: las unidades de la ciudad (o municipios),
      las localidades (Cartagena) o los barrios. */
+  /* ── Barrios sin puesto propio: el color del vecino más cercano ──────────
+     Un barrio sin puesto de votación no tiene dato propio (en Cartagena son
+     138 de 213). Se pinta con el valor del barrio CON dato más cercano por
+     centroide —mismo criterio del relleno de los tableros de 2023—, punteado y
+     translúcido, y nunca entra a un total ni a una lista. Tope de 3 km: más
+     lejos (islas, veredas) prefiere quedar sin dato a inventar un vecino. */
+  const RELLENO_MAX_KM = 3;
+  function centroide(g) {
+    const anillos = g?.type === 'Polygon' ? [g.coordinates[0]] : g?.type === 'MultiPolygon' ? g.coordinates.map(pg => pg[0]) : [];
+    let x = 0, y = 0, n = 0;
+    anillos.forEach(r => r.forEach(([lon, lat]) => { x += lon; y += lat; n++; }));
+    return n ? [x / n, y / n] : null;
+  }
+  function rellenos(geo, cfg, conDato) {
+    const con = [], sin = [];
+    geo.features.forEach(f => { const c = centroide(f.geometry), code = cfg.code(f.properties); if (!c) return; (conDato.has(code) ? con : sin).push({ code, c, name: cfg.name(f.properties) }); });
+    const out = new Map();
+    sin.forEach(b => {
+      let mejor = null, d2 = Infinity;
+      con.forEach(o => { const dx = (o.c[0] - b.c[0]) * Math.cos(b.c[1] * Math.PI / 180), dy = o.c[1] - b.c[1], d = dx * dx + dy * dy; if (d < d2) { d2 = d; mejor = o; } });
+      const km = Math.sqrt(d2) * 111.32;
+      if (mejor && km <= RELLENO_MAX_KM) out.set(b.code, { de: mejor.code, nombre: mejor.name, km });
+    });
+    return out;
+  }
   function capaActual() {
     if (ST.nivel === 'barrios' && ST.barrios) return { tipo: 'barrio', unidades: ST.barrios.unidades, geo: ST.barrios.geo, cfg: ST.barrios.cfg };
     if (ST.nivel === 'localidad' && ST.loc) return { tipo: 'localidad', unidades: ST.loc.unidades, geo: ST.loc.geo, cfg: ST.loc.cfg };
@@ -529,13 +554,18 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
       const v = valorMetrica(u, x); return { fillColor: esc_.color(v), fillOpacity: v == null ? .45 : .85, className: '' };
     };
     const porCodigo = new Map(C.unidades.map((u, j) => [u.geoCode || u.code, { u, x: xs[j] }]));
+    const relleno = C.tipo === 'barrio' && C.geo ? rellenos(C.geo, C.cfg, new Set(porCodigo.keys())) : new Map();
+    const estiloRelleno = r => { const o = porCodigo.get(r.de), e = estilo(o.u, o.x); return { color: 'rgba(23,37,28,.45)', weight: .8, dashArray: '3 3', fillColor: e.fillColor, fillOpacity: Math.min(.42, e.fillOpacity * .5), className: '' }; };
     if (C.geo) {
       if (C.tipo === 'barrio' && !ST.cfg?.rotate) ST.tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa);
       ST.capa = L.geoJSON(C.geo, {
-        style: f => { const o = porCodigo.get(C.cfg.code(f.properties)); return { color: '#fff', weight: 1, ...(o ? estilo(o.u, o.x) : { fillColor: '#eef0ea', fillOpacity: .45 }) }; },
+        style: f => { const code = C.cfg.code(f.properties), o = porCodigo.get(code), r = relleno.get(code); return o ? { color: '#fff', weight: 1, ...estilo(o.u, o.x) } : r ? estiloRelleno(r) : { color: '#fff', weight: 1, fillColor: '#eef0ea', fillOpacity: .45 }; },
         onEachFeature: (f, layer) => {
-          const o = porCodigo.get(C.cfg.code(f.properties));
-          layer.bindTooltip(o ? tooltip(o.u, o.x, p) : `<b>${esc(P.lugar(C.cfg.name(f.properties)))}</b><br>Sin dato`, { sticky: true, className: 'tp' });
+          const code = C.cfg.code(f.properties), o = porCodigo.get(code), r = relleno.get(code);
+          const vecino = r && porCodigo.get(r.de);
+          layer.bindTooltip(o ? tooltip(o.u, o.x, p)
+            : r ? `<b>${esc(P.lugar(C.cfg.name(f.properties)))}</b><br>Sin puesto de votación propio: toma el color de <b>${esc(P.lugar(r.nombre))}</b>, el barrio con dato más cercano (${r.km < 1 ? `${Math.round(r.km * 1000)} m` : `${r.km.toFixed(1).replace('.', ',')} km`}). Es un color inferido: no suma a ningún total.<br>${esc(METRICAS[metrica].boton)} del vecino: ${fmtMetrica(valorMetrica(vecino.u, vecino.x))}`
+            : `<b>${esc(P.lugar(C.cfg.name(f.properties)))}</b><br>Sin dato: no tiene puesto propio y ningún barrio con dato queda a menos de ${RELLENO_MAX_KM} km.`, { sticky: true, className: 'tp' });
           if (C.tipo === 'unidad' && ST.cfg?.barrios && o) layer.on('click', () => abrirBarrios(o.u));
         }
       }).addTo(mapa);
@@ -568,10 +598,12 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     $('mapaLeyenda').innerHTML = metrica === 'pega'
       ? `<span><i style="background:${base};opacity:.88"></i>le pega fuerte (≥ ${veces(PEGA_FUERTE)}) · parpadea</span><span><i style="background:${base};opacity:.42"></i>le pega (1,00-1,15)</span><span><i style="background:#cdd8d0"></i>parejo</span><span><i style="background:#e6ebe6"></i>flojo (&lt; 0,85)</span>`
       : esc_.leyenda.map(([c, t]) => `<span><i style="background:${c}"></i>${esc(t)}</span>`).join('') + '<span><i style="background:#eef0ea"></i>sin dato</span>';
+    if (relleno.size) $('mapaLeyenda').innerHTML += '<span><i style="background:#cfdcd3;opacity:.6;border:1px dashed rgba(23,37,28,.55)"></i>sin puesto propio · color del vecino</span>';
     pintarBarra();
     const unidadTxt = nombreEscala(C.tipo);
     $('tpMapaTitulo').textContent = (metrica === 'pega' ? `${p.nombre}: dónde le pegan, por ${unidadTxt}` : `${METRICAS[metrica].titulo}, por ${unidadTxt}`).replace(/\.?$/, '.');
-    const extra = `${ST.cfg?.barrios && C.tipo === 'unidad' ? ` <b>Haga clic en una ${esc(ST.cfg.rotuloUnidad || unidadSingular())}</b> para bajar a sus barrios.` : ''}${C.tipo === 'barrio' && !ST.unidadAbierta && ST.barrios?.faltan ? ` ${ST.barrios.faltan} ${ST.barrios.faltan === 1 ? esc(unidadSingular()) + ' no tiene' : esc(sinArticulo(unidadPlural())) + ' no tienen'} cartografía por barrio y ${ST.barrios.faltan === 1 ? 'queda' : 'quedan'} fuera del mapa.` : ''}${C.tipo === 'barrio' && ST.unidadAbierta ? ' <b>Vuelva a «Barrios»</b> para ver la ciudad entera.' : ''}${ST.modo === 'puesto' ? ' Este municipio no tiene cartografía por comuna, así que el mapa muestra los puestos de votación.' : ''}`;
+    const conDatoN = C.tipo === 'barrio' ? C.unidades.length : 0;
+    const extra = `${relleno.size ? ` <b>${num(conDatoN)} barrios tienen puesto de votación</b>; otros ${num(relleno.size)} no, y se pintan punteados con el color del barrio con dato más cercano (a menos de ${RELLENO_MAX_KM} km). Ese color es inferido: no entra a ningún total.` : ''}${ST.cfg?.barrios && C.tipo === 'unidad' ? ` <b>Haga clic en una ${esc(ST.cfg.rotuloUnidad || unidadSingular())}</b> para bajar a sus barrios.` : ''}${C.tipo === 'barrio' && !ST.unidadAbierta && ST.barrios?.faltan ? ` ${ST.barrios.faltan} ${ST.barrios.faltan === 1 ? esc(unidadSingular()) + ' no tiene' : esc(sinArticulo(unidadPlural())) + ' no tienen'} cartografía por barrio y ${ST.barrios.faltan === 1 ? 'queda' : 'quedan'} fuera del mapa.` : ''}${C.tipo === 'barrio' && ST.unidadAbierta ? ' <b>Vuelva a «Barrios»</b> para ver la ciudad entera.' : ''}${ST.modo === 'puesto' ? ' Este municipio no tiene cartografía por comuna, así que el mapa muestra los puestos de votación.' : ''}`;
     $('mapaNota').innerHTML = (metrica === 'pega'
       ? `Cada zona se colorea por <b>le pega</b> = (peso de ${esc(p.corto)} entre quienes pueden votar ahí ÷ su peso en ${esc(ST.lugar)}) × (voto de ${esc(ST.famLabel.toLowerCase())} en 2023 ahí ÷ su promedio en ${esc(ST.lugar)}). Quién puede votar: censo electoral de 2026 por puesto (Registraduría); el cruce sexo × edad se estima, porque la Registraduría publica el sexo y la edad por separado. Voto por familia: ${ST.modo === 'municipio' ? 'Asamblea 2023' : ST.modo === 'puesto' ? 'Asamblea 2023, puesto por puesto' : 'Concejo 2023'}, con cada partido en su familia.`
       : `${esc(METRICAS[metrica].nota)} Los colores reparten las zonas en cinco grupos del mismo tamaño${metrica === 'crecimiento' ? ', salvo el crecimiento, que usa cortes fijos' : ''}. Pase el cursor por una zona para ver todo lo que se sabe de ella.`) + extra;
