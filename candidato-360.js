@@ -2995,6 +2995,10 @@ function refreshCRMMapMode() {
      edil de Bogotá que se lanza a la Gobernación de Cundinamarca): ahí el
      mapa es el del territorio de campaña, sin estado, y «Proyectado» tiene
      que poder pintar igual los municipios con la meta repartida. */
+  if (DESTINO_FUERA && !saltoDeptal && !pintandoDestino) {
+    if (crmMapMode === 'proyectado' && !EN_DESTINO) { pintarDestino(); return; }
+    if (crmMapMode !== 'proyectado' && EN_DESTINO) { loadHistoricalMap(crmCandidate); return; }
+  }
   if (!saltoDeptal && (!state || !crmMapLayer)) return;
   if (state?.tituloLugar) $('crmMapTitle').textContent = tituloMapa();
   /* Salto a escala de departamento: «Proyectado» pinta los municipios del
@@ -3092,7 +3096,7 @@ function lugarDelAlcance(recorte = recorteActivo) {
 function notaRecorte(recorte = recorteActivo) {
   if (!recorte || !recorte.mesasFuera) return '';
   const donde = lugarDelAlcance(recorte);
-  if (recorte.sinVotos) return ` Su votación histórica no tiene mesas en ${donde}, así que el mapa la muestra donde estuvo; la campaña nueva se ubica en ${donde}.`;
+  if (recorte.sinVotos) return ` Su votación histórica no tiene mesas en ${donde}, así que «Total» la muestra donde estuvo; abra «Proyectado» para ver ${donde}, donde compite ahora.`;
   return ` Se muestran solo los votos en ${donde}: quedaron por fuera ${recorte.votosFuera.toLocaleString('es-CO')} votos en ${recorte.mesasFuera.toLocaleString('es-CO')} mesas de otros territorios, que no cuentan para esta candidatura.`;
 }
 /* ¿El historial tiene votos dentro del territorio objetivo? Decide si el
@@ -3328,7 +3332,9 @@ function isCaliElection(candidate) { return normalizedText(candidate?.circunscri
    antes eran cinco wrappers que se pisaban y el caso de Bogotá se saltaba los
    controles de nivel. */
 async function renderSingleElection(candidate) {
-  crmMapMode = 'total';
+  crmMapMode = 'total'; EN_DESTINO = false;
+  if (crmBarrioLayer && crmLeafletMap) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
+  $('crmMap')?.querySelector('.crm-territory-notice')?.remove();
   $('crmMapVotes').textContent = 'Cargando'; $('crmMapNote').textContent = 'Cargando distribución territorial desde el historial del candidato.';
   const isJal = String(candidate.corp || '').toUpperCase().startsWith('JAL');
   try {
@@ -3503,6 +3509,9 @@ function recortarAVentana(bounds, ventana) {
    rampa— o el callejero en gris, y no se sabía qué se comparaba con qué. El
    desglose de la derecha sigue siendo el de la unidad abierta. */
 async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = true } = {}) {
+  /* key '*' = la ciudad entera por barrio, sin una unidad abierta: es el
+     nivel «Barrio» cuando se pide sin haber tocado antes una localidad. */
+  const todo = key === '*';
   const historical = {};
   /* Sin votos propios, lo que reparte la meta por barrio es la huella de la
      familia (si la hay); el censo sigue siendo lo que se ve en «Total». */
@@ -3514,24 +3523,28 @@ async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = tr
     /* La meta de cada unidad se reparte entre SUS barrios: por la votación
        propia si la hay, si no por el censo electoral (valoresBarriales). */
     const metas = projectedVotesByArea(); values = {};
-    let censo = null;
+    let censo = null; const bases = [];
     const censoDe = u => async () => { if (!censo) censo = await fuente.censo(); return Object.fromEntries(Object.entries(censo).filter(([k]) => unidadDe[k] === u)); };
     for (const u of new Set(features.map(f => f.properties._u).filter(Boolean))) {
       const hist = Object.fromEntries(Object.entries(historical).filter(([k]) => unidadDe[k] === u));
       const r = await valoresBarriales(hist, Number(metas[u] || 0), censoDe(u));
       Object.assign(values, r.values);
       if (u === key) baseFoco = familia && r.base === 'historial' ? 'familia' : r.base;
+      if (Number(metas[u] || 0) > 0) bases.push(r.base);
     }
+    /* Con la ciudad entera no hay UNA unidad que diga de dónde sale el reparto:
+       manda la votación (propia o de la familia) si alguna zona la tuvo. */
+    if (todo) { const b = bases.includes('historial') ? 'historial' : bases.includes('censo') ? 'censo' : bases[0]; if (b) baseFoco = familia && b === 'historial' ? 'familia' : b; }
   }
   if (crmMapState !== state || state.focusKey !== key) return;
-  const foco = features.filter(f => f.properties._u === key);
+  const foco = todo ? features : features.filter(f => f.properties._u === key);
   const valoresFoco = Object.fromEntries(foco.map(f => [f.properties._k, Number(values[f.properties._k] || 0)]).filter(([, v]) => v > 0));
   renderMapBreakdown(valoresFoco, Object.fromEntries(foco.map(f => [f.properties._k, f.properties._n])), tituloBarrial(baseFoco));
   const max = Math.max(1, ...features.map(f => Number(values[f.properties._k] || 0)));
   if (crmBarrioLayer) crmLeafletMap.removeLayer(crmBarrioLayer);
   ponerBasemap('crm-basemap-tenue');
   if (crmMapLayer) crmLeafletMap.removeLayer(crmMapLayer);   /* se saca del mapa, no del grupo: vuelve al subir de nivel */
-  const estilo = f => { const v = Number(values[f.properties._k] || 0), enFoco = f.properties._u === key; return { fillColor: MAP_COLOR(v / max), fillOpacity: v ? .62 : .1, color: enFoco ? 'rgba(16,34,56,.7)' : 'rgba(16,34,56,.3)', weight: enFoco ? .9 : .5 }; };
+  const estilo = f => { const v = Number(values[f.properties._k] || 0), enFoco = !todo && f.properties._u === key; return { fillColor: MAP_COLOR(v / max), fillOpacity: v ? .62 : .1, color: enFoco ? 'rgba(16,34,56,.7)' : 'rgba(16,34,56,.3)', weight: enFoco ? .9 : .5 }; };
   crmBarrioLayer = L.geoJSON({ type: 'FeatureCollection', features }, {
     style: estilo,
     onEachFeature: (f, layer) => {
@@ -3545,12 +3558,14 @@ async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = tr
       if (u && u !== key) layer.on('click', () => { renderBarriosForArea(u, { encuadre: false }); setMapLevel('barrio'); });
     }
   });
-  const contorno = contornoUnidades(state, key); if (contorno) crmBarrioLayer.addLayer(contorno);
+  const contorno = contornoUnidades(state, todo ? null : key); if (contorno) crmBarrioLayer.addLayer(contorno);
   crmBarrioLayer._vitrinaTop = vitrinaTop(valoresFoco);
   crmBarrioLayer.addTo(crmLeafletMap);
   if (encuadre && foco.length) encuadrarBounds(recortarAVentana(L.geoJSON({ type: 'FeatureCollection', features: foco }).getBounds(), state.config.ventana), 20);
-  const donde = fuente.donde(key, foco);
-  $('crmMapNote').innerHTML = notaBarrial(donde, baseFoco) + ` Se ve toda la ciudad por barrio, con una sola escala de color; el borde grueso marca ${escHtml(NOMBRE_BONITO(donde))}. Toque un barrio de otra zona para abrirla.` + (fuente.aviso ? ` ${fuente.aviso}` : '');
+  const donde = todo ? (NOMBRE_BONITO(state.tituloLugar || '') || 'la ciudad') : fuente.donde(key, foco);
+  $('crmMapNote').innerHTML = notaBarrial(donde, baseFoco) + (todo
+    ? ` Toda la ciudad por barrio, con una sola escala de color; el borde marca cada ${escHtml(state.config.title)}. Toque un barrio para abrir su zona.`
+    : ` Se ve toda la ciudad por barrio, con una sola escala de color; el borde grueso marca ${escHtml(NOMBRE_BONITO(donde))}. Toque un barrio de otra zona para abrirla.`) + (fuente.aviso ? ` ${fuente.aviso}` : '');
   setTimeout(candadoDetalle, 0);
 }
 /* ── La meta a escala de barrio ──────────────────────────────────────────────
@@ -3666,11 +3681,11 @@ async function renderBarriosForArea(key, { encuadre = true } = {}) {
   if (fuente) {
     try {
       await fuente.prep();
-      const primero = fuente.primero(key), resto = fuente.archivos.filter(a => !primero.includes(a));
+      const primero = key === '*' ? fuente.archivos : fuente.primero(key), resto = fuente.archivos.filter(a => !primero.includes(a));
       const lote = lista => Promise.all(lista.map(a => fuente.cargar(a).catch(() => []))).then(x => x.flat());
       const features = await lote(primero);
       if (tok !== barriosTok) return;
-      if (features.some(f => f.properties._u === key)) {
+      if (key === '*' ? features.length : features.some(f => f.properties._u === key)) {
         await pintarCiudadBarrios(state, fuente, features, key, { encuadre });
         /* El resto de la ciudad llega después y se repinta sin mover la vista. */
         if (resto.length) {
@@ -3682,6 +3697,10 @@ async function renderBarriosForArea(key, { encuadre = true } = {}) {
     } catch (e) { /* sin cartografía barrial → puestos */ }
   }
   if (tok !== barriosTok) return;
+  if (key === '*') {
+    const metaCiudad = Object.values(projectedVotesByArea()).reduce((t, v) => t + Number(v || 0), 0);
+    return pintarPuestos(state.mesas, NOMBRE_BONITO(state.tituloLugar || '') || 'la ciudad', metaCiudad, { censo: Boolean(state.censo) });
+  }
   const mesas = state.mesas.filter(m => (state.config.mesaKey ? state.config.mesaKey(m) : claveLocal(m)) === key), localGoal = Number(projectedVotesByArea()[key] || 0);
   const layer = crmMapLayer?.getLayers().find(item => state.config.code(item.feature.properties) === key);
   return pintarPuestos(mesas, layer ? state.config.name(layer.feature.properties) : `la ${state.config.title}`, localGoal, { censo: Boolean(state.censo) });
@@ -3719,7 +3738,7 @@ async function pintarPuestos(mesas, donde, meta = 0, { censo = false } = {}) {
     return Object.assign(L.circleMarker([point.lat, point.lng], { radius: 5 + Math.round(9 * Math.sqrt(v / max)), color: '#fff', weight: 1.2, fillColor: MAP_COLOR(v / max), fillOpacity: .92 })
       .bindTooltip(`<strong>${escHtml(name)}</strong><br>${v.toLocaleString('es-CO')} ${proyectando ? 'votos proyectados' : censo ? 'personas habilitadas' : 'votos'}`, { sticky: true }), { _vitrinaCode: name });
   }));
-  const contornoPuestos = crmMapState ? contornoUnidades(crmMapState, crmMapState.focusKey) : null; if (contornoPuestos) crmBarrioLayer.addLayer(contornoPuestos);
+  const contornoPuestos = crmMapState ? contornoUnidades(crmMapState, crmMapState.focusKey === '*' ? null : crmMapState.focusKey) : null; if (contornoPuestos) crmBarrioLayer.addLayer(contornoPuestos);
   crmBarrioLayer._vitrinaTop = vitrinaTop(values);
   crmBarrioLayer.addTo(crmLeafletMap);
   const conCoordenada = Object.keys(points).length;
@@ -3781,6 +3800,8 @@ async function showElectionYear(record, { restoreToggles = true } = {}) {
   return true;
 }
 async function showElectionAverage(projected = false) {
+  /* Desde el mapa del destino, el promedio se pinta sobre la capa del historial. */
+  if (EN_DESTINO && electionViewRecords.length) { destinoTok++; await renderSingleElection(electionViewRecords[electionViewRecords.length - 1].candidate); }
   for (const record of electionViewRecords) { if (!electionViewSnapshots.has(record.year)) await showElectionYear(record, { restoreToggles: false }); }
   const snapshots = [...electionViewSnapshots.values()];
   if (!snapshots.length) { showTerritoryNotApplicable('PROMEDIO'); renderElectionViewToggles(); return; }
@@ -3796,6 +3817,7 @@ async function showElectionAverage(projected = false) {
   renderElectionViewToggles(); refreshMapLevels();
 }
 async function showElectionView(view) {
+  if (view === 'projected' && DESTINO_FUERA) { crmMapMode = 'proyectado'; return pintarDestino(); }
   if (view === 'average') return showElectionAverage(false);
   if (view === 'projected') return showElectionAverage(true);
   const record = electionViewRecords.find(item => item.year === view); if (record) return showElectionYear(record);
@@ -3805,7 +3827,7 @@ async function showElectionView(view) {
 function setMapLevel(level) {
   const controls = $('crmMap')?.querySelector('.crm-map-levels'); if (!controls) return;
   controls.querySelectorAll('[data-level]').forEach(b => b.classList.toggle('active', b.dataset.level === level && (!b.dataset.capa || b.dataset.capa === crmMapState?.config?.clave)));
-  const barrio = controls.querySelector('[data-level="barrio"]'); if (barrio) barrio.disabled = !crmMapState?.focusKey;
+  const barrio = controls.querySelector('[data-level="barrio"]'); if (barrio) barrio.disabled = !crmMapState?.config;
 }
 /* ¿Esta ciudad tiene cartografía barrial? Bogotá y Cali la traen curada; el
    resto, en CITY_BARRIO_LAYERS. Donde no hay, el último nivel no puede
@@ -3884,7 +3906,8 @@ function refreshMapLevels() {
     if (familia && b.dataset.capa !== crmMapState?.config?.clave) return cambiarCapaCiudad(familia[b.dataset.capa]);
     volver('localidad');
   }));
-  controls.querySelector('[data-level="barrio"]').addEventListener('click', () => { if (crmMapState?.focusKey) { renderBarriosForArea(crmMapState.focusKey); setMapLevel('barrio'); } });
+  /* Sin una localidad abierta, «Barrio» muestra la ciudad entera por barrio. */
+  controls.querySelector('[data-level="barrio"]').addEventListener('click', () => { if (crmMapState?.config) { renderBarriosForArea(crmMapState.focusKey || '*'); setMapLevel('barrio'); } });
   setMapLevel(state.focusKey ? 'barrio' : 'localidad');
 }
 /* Cambia la escala de la ciudad (Cartagena: localidad ↔ UCG) y la recuerda
@@ -3895,8 +3918,7 @@ async function cambiarCapaCiudad(config) {
     CAPA_ELEGIDA[config.match[0]] = config.clave;
     const modo = crmMapMode;
     if (crmBarrioLayer) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
-    await pintarTerritorioCiudad(state.territorio, config, state.mesas, state.proy);
-    if (modo === 'proyectado') { crmMapMode = 'proyectado'; refreshCRMMapMode(); }
+    await pintarTerritorioCiudad(state.territorio, config, state.mesas, state.proy, modo);
     return;
   }
   if (!state.candidato) return;
@@ -3913,14 +3935,23 @@ async function cambiarCapaCiudad(config) {
 }
 /* Punto de entrada del mapa histórico. */
 /* Si la campaña se muda a un territorio donde su historial no tiene un solo
-   voto —de la JAL de Teusaquillo al Concejo de Leticia—, el mapa de su
-   votación anterior no informa nada sobre la nueva: lo útil es ver el
-   territorio al que aspira, con sus puestos. */
+   voto —de la JAL de Teusaquillo a la Alcaldía de Cartagena—, son DOS mapas
+   distintos y no se reemplazan uno al otro (decisión de Ricardo, sep-2026):
+   «Total» (y cada año) es su votación histórica, donde de verdad estuvo;
+   «Proyectado» es el territorio al que aspira —Cartagena con sus escalas y
+   barrios— con la meta repartida. Antes el territorio nuevo tapaba el
+   historial y «Total» mostraba el censo de la ciudad destino. */
+let DESTINO_FUERA = null, EN_DESTINO = false, pintandoDestino = 0, destinoTok = 0;
+function campanaDestino() {
+  const corp = $('otherCorporation').value || CAMPANA_ACTUAL?.corp || corporacionHistorica(crmCandidate) || 'concejo';
+  return alcanceObjetivo() ? campanaActual(corp) : (CAMPANA_ACTUAL || campanaActual(corp));
+}
 async function loadHistoricalMap(candidate) {
   electionViewRecords = []; electionViewSnapshots = new Map(); electionViewActive = ''; $('crmMapToggles')?.remove(); crmMapState = null; recorteActivo = null; PROYECCION_DEPTAL = false;
-  /* Con la campaña mudada a otro territorio, las vistas por año sobran: todas
-     muestran votaciones que no cuentan donde ahora compite. */
-  if (alcanceObjetivo() && !(await historialEnCiudad(candidate))) { await renderTerritorioDeCampana(); return; }
+  EN_DESTINO = false; DESTINO_FUERA = null; destinoTok++;
+  if (crmBarrioLayer && crmLeafletMap) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
+  if (alcanceObjetivo() && !(await historialEnCiudad(candidate))) DESTINO_FUERA = campanaDestino();
+  $('crmMapPanelNum').textContent = '01 · Mapa de historial electoral';
   const records = electionViewHistory(candidate);
   if (records.length < 2) { await renderSingleElection(candidate); ensureCRMMapToggles(); refreshMapLevels(); return; }
   electionViewRecords = records; electionViewActive = records[records.length - 1].year;
@@ -3934,8 +3965,7 @@ async function loadHistoricalMap(candidate) {
 async function renderTerritorioDeCampana() {
   /* La campaña que manda es la del formulario —es la que acaba de responder la
      persona—; CAMPANA_ACTUAL es el respaldo para cuando se vuelve al CRM. */
-  const corp = $('otherCorporation').value || CAMPANA_ACTUAL?.corp || corporacionHistorica(crmCandidate) || 'concejo';
-  const c = alcanceObjetivo() ? campanaActual(corp) : (CAMPANA_ACTUAL || campanaActual(corp));
+  const c = campanaDestino();
   $('crmMapPanelNum').textContent = '01 · Mapa del territorio de campaña';
   /* Los niveles del mapa anterior no sirven acá hasta saber si hay puestos. */
   $('crmMap')?.querySelector('.crm-map-levels')?.remove();
@@ -3966,7 +3996,7 @@ async function renderTerritorioDeCampana() {
    la meta por donde votó su familia política en 2023 —la misma cuenta del
    Día D, que cae a la Alcaldía cuando la familia no tuvo lista al Concejo—.
    La JAL sigue en renderTerritorioObjetivo: compite en UNA localidad. */
-async function renderTerritorioCiudad(c) {
+async function renderTerritorioCiudad(c, modo = 'total') {
   if (!['concejo', 'alcaldia'].includes(c?.corp) || !c.municipio) return false;
   const config = cityLayerFor(c.municipio); if (!config) return false;
   /* cityLayerFor casa por «contiene»: CALIMA contiene CALI. Acá eso dibujaría
@@ -3985,7 +4015,7 @@ async function renderTerritorioCiudad(c) {
       .map(([, p]) => ({ ...p.mesa, munNom: c.municipio, pueNom: p.barrio, v: p.censo }));
     if (!mesas.length) return false;
     const proy = await proyeccionFamiliar(c, puestos);
-    await pintarTerritorioCiudad(c, config, mesas, proy);
+    await pintarTerritorioCiudad(c, config, mesas, proy, modo);
     return true;
   } catch (e) { return false; }
 }
@@ -3999,7 +4029,9 @@ async function proyeccionFamiliar(c, puestos) {
     return { mesas, famTexto: f.famTexto, fuenteTexto: f.fuenteTexto, ampliada: f.ampliada, deAlcaldia: f.deAlcaldia, familia: f.familia };
   } catch (e) { return null; }
 }
-async function pintarTerritorioCiudad(c, config, mesas, proy) {
+async function pintarTerritorioCiudad(c, config, mesas, proy, modo = 'total') {
+  pintandoDestino++;
+  try {
   if (config.prepare) await config.prepare();
   let geoData = await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/${config.path}`); if (config.rotate) geoData = rotateGeoJSON90Left(geoData);
   const { votesByArea, namesByArea } = agregarPorArea(mesas, m => config.mesaKey ? config.mesaKey(m) : claveLocal(m));
@@ -4010,8 +4042,33 @@ async function pintarTerritorioCiudad(c, config, mesas, proy) {
     encuadre: bogota ? encuadreBogota() : config.ventana ? ventanaBounds(config.ventana) : null, fueraDelEncuadre: bogota ? ES_SUMAPAZ : null, note: '' });
   Object.assign(crmMapState, { censo: true, territorio: c, proy });
   $('crmMapPanelNum').textContent = '01 · Mapa del territorio de campaña';
+  crmMapMode = modo;
   refreshCRMMapMode();
   refreshMapLevels();
+  } finally { pintandoDestino--; }
+}
+/* «Proyectado» con el historial fuera del destino: se dibuja el territorio al
+   que aspira. Las vistas por año se conservan para poder volver a ellas. */
+async function pintarDestino() {
+  const c = DESTINO_FUERA; if (!c) return;
+  EN_DESTINO = true; const tok = ++destinoTok;
+  const recs = electionViewRecords, snaps = electionViewSnapshots;
+  if (crmBarrioLayer && crmLeafletMap) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
+  $('crmMap')?.querySelector('.crm-territory-notice')?.remove();
+  MAPA_MUNICIPAL = null;
+  $('crmMapVotes').textContent = 'Cargando'; $('crmMapNote').textContent = 'Cargando el territorio de campaña…';
+  let ok = false;
+  if (SALTO_ACTUAL?.tipo?.unidad === 'municipio') {
+    const goal = Number(String($('crmVoteNumber').textContent || '').replace(/\D/g, ''));
+    ok = goal ? await pintarProyeccionDepartamental(goal) : false;
+  }
+  if (!ok) ok = await renderTerritorioCiudad(c, 'proyectado');
+  if (!ok) await renderTerritorioDeCampana();
+  if (tok !== destinoTok) return;
+  electionViewRecords = recs; electionViewSnapshots = snaps; crmMapMode = 'proyectado';
+  $('crmMapPanelNum').textContent = '01 · Mapa del territorio de campaña';
+  if (recs.length >= 2) { electionViewActive = 'projected'; renderElectionViewToggles(); }
+  else { ensureCRMMapToggles(); document.querySelectorAll('#crmMapToggles .map-toggle[data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === 'proyectado')); }
 }
 /* La meta repartida por la huella de la familia; si no la hay, por el censo. */
 function proyeccionTerritorio(state, goal) {
@@ -4023,10 +4080,11 @@ function proyeccionTerritorio(state, goal) {
 }
 function notaProyeccionTerritorio(state) {
   const p = state.proy;
-  if (state.proyBase !== 'familia' || !p) return `Usted no tiene votos en ${NOMBRE_BONITO(state.tituloLugar)}: la meta se reparte por el censo electoral de cada ${state.config.title}, que dice dónde hay gente que vota, no dónde lo apoyan.`;
+  const ver = DESTINO_FUERA ? ' Su votación anterior está en «Total».' : '';
+  if (state.proyBase !== 'familia' || !p) return `Usted no tiene votos en ${NOMBRE_BONITO(state.tituloLugar)}: la meta se reparte por el censo electoral de cada ${state.config.title}, que dice dónde hay gente que vota, no dónde lo apoyan.${ver}`;
   const alcaldia = p.deAlcaldia?.length ? ` —su familia no tuvo lista al Concejo en 2023 pero sí candidatura a la Alcaldía (${p.deAlcaldia.map(NOMBRE_BONITO).join(', ')}), y con esos votos se mide—` : '';
   const vecinas = p.ampliada ? ' (su familia casi no tuvo lista ahí, así que se mide con las vecinas del espectro)' : '';
-  return `Usted no tiene votos en ${NOMBRE_BONITO(state.tituloLugar)}: la meta se reparte según dónde votó ${p.famTexto} en ${p.fuenteTexto}${alcaldia}${vecinas}. Es la misma cuenta del Día D.`;
+  return `Usted no tiene votos en ${NOMBRE_BONITO(state.tituloLugar)}: la meta se reparte según dónde votó ${p.famTexto} en ${p.fuenteTexto}${alcaldia}${vecinas}. Es la misma cuenta del Día D.${ver}`;
 }
 /* Territorio objetivo de una candidatura NUEVA: no hay votos que pintar; se
    muestra dónde va a competir, con la unidad elegida resaltada. */
