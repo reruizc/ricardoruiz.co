@@ -24,6 +24,9 @@ import json, sys, re, os
 from collections import defaultdict
 import openpyxl
 
+# ⚠️ Cartagena NO va acá: su unidad es la UCG y el Divipole solo trae sus 3
+# localidades. La emite tools/build-cartagena-ciudad/build.py, que lee la UCG
+# de output_hvp/cartagena-puesto-ucg.json.
 CITIES = {
     'medellin':      {'depCod':'01', 'munCod':'001'},
     'bogota':        {'depCod':'16', 'munCod':'001'},

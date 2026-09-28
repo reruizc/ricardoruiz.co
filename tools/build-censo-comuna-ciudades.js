@@ -19,6 +19,9 @@ const fs = require('fs');
 const path = require('path');
 
 // Misma lista de CITIES que oportunidad.html. Code/mun electoral.
+// ⚠️ Cartagena NO va acá a propósito: su unidad es la UCG y este script
+// deriva la comuna del campo `comuna` del CSV, que para ella trae solo las 3
+// localidades. Su censo lo emite tools/build-cartagena-ciudad/build.py.
 const CITIES = {
   medellin:      { depCod:'01', munCod:'001' },
   bogota:        { depCod:'16', munCod:'001' },

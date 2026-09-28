@@ -687,7 +687,7 @@
     'nivel-mun':                 'free',     // drill desde depto a sus muns
     'candidato':                 'free',     // cambiar de candidato (1 switch anónimo gratis)
     'candidato-anonimo-agotado': 'free',     // alias: ya usaste tu cambio de muestra
-    'ciudades-comunas':          'pro',      // drill a las 14 ciudades a nivel comuna/UPL
+    'ciudades-comunas':          'pro',      // drill a las 15 ciudades a nivel comuna/UPL/UCG
     'toggle-scope':              'pro',      // toggle Local / Nacional
     'bog-barrios':               'premium',  // drill a barrios catastrales de Bogotá
     'mde-barrios':               'premium',  // drill a barrios de Medellín
@@ -702,7 +702,7 @@
     'nivel-mun':                 { title:'Abrir un departamento', desc:'Crea tu cuenta gratis para hacer drill a los municipios de cualquier departamento y ver el detalle por mun.' },
     'candidato':                 { title:'Cambia de candidato', desc:'Crea tu cuenta gratis para alternar libremente entre los tres candidatos del ponderador.' },
     'candidato-anonimo-agotado': { title:'Ya usaste tu cambio de muestra', desc:'Como invitado puedes ver dos candidatos: Cepeda (por defecto) y uno a tu elección. Crea tu cuenta gratis para alternar libremente entre los tres.' },
-    'ciudades-comunas':          { title:'Vista por ciudad (14 capitales)', desc:'El drilldown a comunas/UPL de Bogotá, Medellín, Cali, Barranquilla, Ibagué, Manizales, Pereira, Montería, Bucaramanga, Cúcuta, Neiva, Popayán, Sincelejo y Villavicencio está en Pro.' },
+    'ciudades-comunas':          { title:'Vista por ciudad (15 capitales)', desc:'El drilldown a comunas/UPL/UCG de Bogotá, Medellín, Cali, Barranquilla, Cartagena, Ibagué, Manizales, Pereira, Montería, Bucaramanga, Cúcuta, Neiva, Popayán, Sincelejo y Villavicencio está en Pro.' },
     'toggle-scope':              { title:'Comparar Local vs Nacional', desc:'Alterna la lectura del score: dentro del set local (UPL/comunas entre sí) o contra los ~1.100 municipios del país. Disponible en Pro.' },
     'bog-barrios':               { title:'Bogotá · barrios catastrales', desc:'El mapa por los 1.001 barrios catastrales de Bogotá, con herencia kNN de los barrios sin medición, está disponible en Premium.' },
     'mde-barrios':               { title:'Medellín · barrios', desc:'El mapa por los barrios oficiales de Medellín, con herencia kNN de los barrios sin medición, está disponible en Premium.' },
@@ -918,6 +918,13 @@
                 barrioProyKey:'comuna', barrioDrill:'mde' },
     '31-001': { key:'cali',         nombre:'Cali',         geoFile:'CALIX.json',           geoProp:'comuna',      geoName:'nombre',     rotate:false },
     '03-001': { key:'barranquilla', nombre:'Barranquilla', geoFile:'BARRANQUILLAX.json',   geoProp:'id',          geoName:'nombre',     rotate:false },
+    // Cartagena va por UCG (15 urbanas + la 20, rural e insular): el georef
+    // solo le pone sus 3 localidades y con tres polígonos no hay mapa.
+    // `ventana` es obligatoria acá — la UCG 20 llega hasta Isla Fuerte,
+    // 100 km al sur, y encuadrar por el bounds real deja el casco urbano
+    // 8 veces más pequeño (medido: 1,297° de alto contra 0,167°).
+    '05-001': { key:'cartagena',    nombre:'Cartagena',    geoFile:'CARTAGENA-UCG.json',   geoProp:'CODIGO',      geoName:'NOMBRE',     rotate:false, granLabel:'UCG',
+                ventana:{ sur:10.275, norte:10.47, oeste:-75.58, este:-75.415 } },
     '09-001': { key:'manizales',    nombre:'Manizales',    geoFile:'MANIZALESX.json',      geoProp:'ID_COMUNA',   geoName:'NOMBRES_CO', rotate:false },
     '24-001': { key:'pereira',      nombre:'Pereira',      geoFile:'PEREIRAX.json',        geoProp:null,          geoName:'Comuna',     rotate:false, byName:true },
     '29-001': { key:'ibague',        nombre:'Ibagué',        geoFile:'IBAGUEX.json',         geoProp:null,          geoName:'COMUNAS',    rotate:false, byNumber:true },
@@ -1925,7 +1932,7 @@
           }
         },
       }).addTo(STATE.map);
-      STATE.map.fitBounds(STATE.layer.getBounds(), { padding:[20,20] });
+      STATE.map.fitBounds(ventanaDe(cfg) || STATE.layer.getBounds(), { padding:[20,20] });
       const granLabel = cfg.granLabel || 'Comunas';
       document.getElementById('map-head-title').textContent = `${cfg.nombre} · ${granLabel}`;
       document.getElementById('map-back-btn').classList.add('show');
@@ -1938,6 +1945,22 @@
     } finally {
       showLoading(false);
     }
+  }
+
+  // El rótulo del nivel en prosa. Una sigla (UPL, UCG) se deja en mayúscula:
+  // bajarla a «ucg clave en Cartagena» la vuelve ilegible. Devuelve plural y
+  // singular, que en las siglas coinciden.
+  function granRotulo(cfg){
+    const raw = (cfg && cfg.granLabel) || 'Comunas';
+    const sigla = /^[A-ZÁÉÍÓÚÑ]{2,5}$/.test(raw);
+    return sigla ? { plural: raw, singular: raw }
+                 : { plural: raw.toLowerCase(), singular: raw.toLowerCase().replace(/s$/, '') };
+  }
+
+  // Ventana urbana fija de una ciudad cuyo bounds real no sirve para encuadrar.
+  function ventanaDe(cfg){
+    const v = cfg && cfg.ventana;
+    return v ? L.latLngBounds([v.sur, v.oeste], [v.norte, v.este]) : null;
   }
 
   /* ───────── Render barrios (drill desde UPL Bogotá) ───────── */
@@ -2371,7 +2394,7 @@
         score: r.score, __isComuna:true,
       }));
       const cfg = CITIES[STATE.cityActive];
-      const granLbl = (cfg && cfg.granLabel) ? cfg.granLabel.toLowerCase() : 'comunas';
+      const granLbl = granRotulo(cfg).plural;
       if (titleEl) titleEl.textContent = `Top ${TOP_N} · ${granLbl} clave en ${cfg ? cfg.nombre : 'la ciudad'}`;
       patchTop30Names(adapted);
       return;
@@ -2726,8 +2749,8 @@
     if (STATE.cityActive){
       const cfg = CITIES[STATE.cityActive];
       const arr = Object.values(STATE.scoreByComuna).slice().sort((a,b)=>b.score-a.score);
-      const granLbl = (cfg && cfg.granLabel) ? cfg.granLabel.toLowerCase() : 'comunas';
-      const unit = (granLbl === 'upl') ? 'UPL' : 'comuna';
+      const rot = granRotulo(cfg);
+      const granLbl = rot.plural, unit = rot.singular;
       return {
         items: arr, scope:`${cfg ? cfg.nombre : 'Ciudad'} · ${granLbl}`,
         level:'subloc', unitLabel:unit, unitPlural:granLbl, count: arr.length,
