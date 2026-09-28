@@ -4664,10 +4664,11 @@ async function pintarEndoso() {
     const L = ENDOSO.lectura = await endosoEvaluar();
     const meta = Number(META_ACTUAL?.target || 0);
     const cifra = x => x.toLocaleString('es-CO');
+    const medidos = L.filas.filter(f => f.fuente === 'medida' || f.fuente === 'regresion').length;
     /* Un rango, no una cifra: la retención del voto propio varía mucho entre
        personas, y un solo número escondería esa dispersión. */
     $('crmEndosoTitulo').textContent = L.bajo === L.alto ? `Sus aliados le pueden pasar hasta ${cifra(L.total)} votos.` : `Sus aliados le pueden pasar entre ${cifra(L.bajo)} y ${cifra(L.alto)} votos.`;
-    $('crmEndosoCopy').textContent = `${n === 1 ? 'Su aliado tiene' : `Sus ${n} aliados tienen`} ${cifra(L.techo)} votos en ${L.lugar}${meta ? `; el punto medio es el ${Math.round(L.total / meta * 100)} % de su meta` : ''}. ${L.nMedidas ? `${L.nMedidas} ${L.nMedidas === 1 ? 'tasa sale medida' : 'tasas salen medidas'} con a quién apoyaron antes.` : 'Diga a quién apoyó cada uno para medir su tasa: hoy se estima con lo que conserva cada uno de su propio voto.'}`;
+    $('crmEndosoCopy').textContent = `${n === 1 ? 'Su aliado tiene' : `Sus ${n} aliados tienen`} ${cifra(L.techo)} votos en ${L.lugar}${meta ? `; el punto medio es el ${Math.round(L.total / meta * 100)} % de su meta` : ''}. ${medidos ? `${medidos} ${medidos === 1 ? 'tasa sale medida' : 'tasas salen medidas'} con a quién apoyaron antes.` : 'Diga a quién apoyó cada uno para medir su tasa: hoy se estima con lo que conserva cada uno de su propio voto.'}`;
     $('crmEndosoDato').textContent = L.total.toLocaleString('es-CO');
     $('crmEndosoSub').textContent = `votos, punto medio · ${n} ${n === 1 ? 'aliado' : 'aliados'}`;
   } catch (e) {

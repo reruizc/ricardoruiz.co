@@ -88,6 +88,32 @@ ok(E.corpRetencion({ corp: 'CÁMARA · ANTIOQUIA · 2022' }) === 'camara' && E.c
   ok(cerca(cuatro.mediana, (.7 + .8) / 2), `mediana con dos medidas = promedio (${cuatro.mediana})`);
 }
 
+/* La regresión ecológica, con datos construidos para que la respuesta se
+   sepa de antemano: el apoyado saca α + β · (participación del aliado) en
+   cada puesto, así que α + β tiene que salir exacto. */
+{
+  const P = (zon, pue) => ({ dep: '16', mun: '001', zon, pue });
+  const TA = {}, TB = {}, mA = [], mB = [];
+  for (let i = 0; i < 40; i++) {
+    const zon = i < 30 ? '01' : '02', pue = String(i).padStart(2, '0'), x = (i % 10) / 20;   /* participación del aliado: 0 a 45 % */
+    const k = E.codigoPuesto(P(zon, pue)); TA[k] = [1000, 1100, 20]; TB[k] = [2000, 2200, 40];
+    if (x && zon === '01') mA.push({ ...P(zon, pue), mesa: '1', v: x * 1000 });   /* el edil solo está en el tarjetón de la zona 01 */
+    mB.push({ ...P(zon, pue), mesa: '1', v: (.1 + .5 * x) * 2000 });   /* α = 10 %, β = 50 % → τ = 60 % */
+  }
+  const leerM = async u => u === 'a' ? mA : mB, leerT = async n => n.startsWith('jal') ? TA : TB;
+  const Ali = { slug: 'JAL2019-16-1-1-1-aaaaaa', corp: 'JAL · SUBA · 2019', dataUrl: 'a', apoyo: { slug: 'CONC2023-16-1-1-1', corp: 'CONCEJO · BOGOTÁ · 2023', dataUrl: 'b' } };
+  const r = await E.regresion(Ali, { mesasDe: leerM, totalesDe: leerT });
+  ok(r.valida && cerca(r.tau, .6, 1e-9) && cerca(r.alfa, .1, 1e-9) && r.error < 1e-6, `regresión: recupera α + β exacto (τ ${(r.tau * 100).toFixed(1)} %, α ${(r.alfa * 100).toFixed(1)} %)`);
+  ok(r.n === 30, 'regresión: el edil solo cuenta en las zonas donde estaba en el tarjetón (30 de 40 puestos)');
+  ok(E.eleccionDe({ slug: 'CON2022-C-16-1-1' }).escala === 'dep' && E.eleccionDe({ slug: 'CON2022-S-1-1' }).totales === 'senado-2022' && E.eleccionDe({ slug: 'CONC2019-5-1-1-1' }).totales === 'concejo-2019' && E.eleccionDe({ slug: 'PRES2022-1V-1-1' }) === null, 'regresión: cada candidatura encuentra sus totales (CONC es concejo y CON es Congreso)');
+  ok((await E.regresion({ ...Ali, apoyo: { ...Ali.apoyo, slug: 'PRES2022-1V-1-1' } }, { mesasDe: leerM, totalesDe: leerT })).valida === false, 'regresión: sin totales de esa elección no se inventa');
+  ok(await E.regresion({ ...Ali, apoyo: { ...Ali, apoyo: null } }, { mesasDe: leerM, totalesDe: leerT }) === null, 'regresión: el mismo tarjetón no se mide');
+  const pocos = { ...Ali, apoyo: { ...Ali.apoyo } }; const TB2 = Object.fromEntries(Object.entries(TB).slice(0, 12));
+  ok((await E.regresion(pocos, { mesasDe: leerM, totalesDe: async n => n.startsWith('jal') ? TA : TB2 })).valida === false, 'regresión: con menos de 20 puestos no se estima');
+  const L4 = await E.evaluar([Ali], { alcance, enAlcance, mesasDe: leerM, totalesDe: leerT, retencion: RET });
+  ok(L4.filas[0].fuente === 'regresion' && cerca(L4.filas[0].tasa, .5) && cerca(L4.filas[0].tasaBaja, .2), 'la regresión entra al rango acotada por la retención (60 % → 50 % a 8 años; piso 20 %)');
+}
+
 /* El territorio desde la campaña guardada (lo que usa el panel). */
 const codigo = async (dep, nombre) => ({ 'BOGOTÁ, D.C.': '001', 'LA CEJA': '021' }[nombre] || '');
 let al = await E.alcanceDe({ campana: { corp: 'asamblea', ruta: 'other', departamento: '01', departamentoNombre: 'Antioquia' } });
@@ -142,10 +168,10 @@ if (!process.argv.includes('--sin-red')) {
       { ...FORERO, apoyo: ABIS }, { ...SEPUL, manual: 12 }, { ...BRICENO },
     ], { alcance: { tipo: 'municipio', departamento: '16', municipio: '1' }, enAlcance, propio });
     const f = Lr.filas;
-    ok(Lr.bajo === 86976 && Lr.total === 137205 && Lr.alto === 167888 && Lr.techo === 207208, `real · entre 86.976 y 167.888, punto medio 137.205, de 207.208 (${Lr.bajo} · ${Lr.total} · ${Lr.alto} de ${Lr.techo})`);
-    ok(f[0].fuente === 'medida' && f[0].par.clase === 'transferencia' && f[0].estAlto === 8117 && f[0].est === 5670 && f[0].ret.medida === 8, 'real · JAL Suba 2019 → Concejo 2023: la tasa medida (74 %) queda de techo y la acota la retención de un edil a 8 años');
-    ok(f[1].fuente === 'medida' && f[1].par.clase === 'cota' && f[1].estAlto === 8291 && f[1].est === 7980, 'real · JAL Suba 2023 → Concejo 2023: cota medida (68 %), acotada a 4 años');
-    ok(!f[2].par.valida && f[2].fuente === 'retencion' && f[2].ret.corp === 'concejo', 'real · concejal → Galán: saturado, se estima con la retención de un concejal');
+    ok(Lr.bajo === 68008 && Lr.total === 116819 && Lr.alto === 167888 && Lr.techo === 207208, `real · entre 68.008 y 167.888, punto medio 116.819, de 207.208 (${Lr.bajo} · ${Lr.total} · ${Lr.alto} de ${Lr.techo})`);
+    ok(f[0].fuente === 'regresion' && f[0].reg.n === 86 && f[0].estAlto === 8117 && f[0].est === 5670, 'real · JAL Suba 2019 → Concejo 2023: la regresión (89 %) queda acotada por la retención de un edil a 8 años; techo Σ min');
+    ok(f[1].fuente === 'regresion' && Math.abs(f[1].reg.tau - .425) < .001 && f[1].est === 5168 && f[1].estAlto === 8291, 'real · JAL Suba 2023 → Concejo 2023: la regresión da 42,5 % (Σ min decía 68 %)');
+    ok(!f[2].par.valida && f[2].fuente === 'regresion' && Math.abs(f[2].reg.tau - .377) < .001 && f[2].reg.alfa > f[2].reg.tau, 'real · concejal → Galán: Σ min saturado, pero la regresión sí mide (38 %, y el resto de Bogotá votó más por Galán que sus votantes)');
     ok(!f[3].par.valida && f[3].par.clase === 'mismo', 'real · concejal → concejal: mismo tarjetón');
     ok(f[4].fuente === 'suya' && f[4].est === 1273 && f[4].estBajo === 1273, 'real · tasa escrita 12 % → 1.273, sin rango');
     const suba = { tipo: 'localidad', departamento: '16', municipio: '1', localidad: 'SUBA' }, reales = (await E.mesas(BRICENO.dataUrl)).concat(propio);

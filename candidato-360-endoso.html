@@ -106,7 +106,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="partidos-bloques.js?v=20260922"></script>
 <script src="candidato-360-electorado.js?v=20260927b"></script>
-<script src="candidato-360-endoso.js?v=20260928c"></script>
+<script src="candidato-360-endoso.js?v=20260928d"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
 <script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
@@ -136,8 +136,20 @@
     const ret = r ? `quien repite como ${quien} conserva entre el ${pct0(r.q[0])} y el ${pct0(r.q[2])} de su voto ${r.medida} años después (mediana ${pct0(r.q[1])}, ${num(r.n)} casos${r.propia ? '' : ' de todas las corporaciones'})` : '';
     if (f.fuente === 'suya') return 'tasa que usted escribió';
     if (f.fuente === 'medida') return `medida con a quién apoyó; ${ret ? `acotada por el tiempo: ${ret}` : 'sin acotar'}`;
+    if (f.fuente === 'regresion') return `estimada puesto a puesto con a quién apoyó; ${ret ? `acotada por el tiempo: ${ret}` : 'sin acotar'}`;
     if (f.fuente === 'retencion') return `sin medir: ${ret}. Diga a quién apoyó para medirla`;
     return E.FUENTE[f.fuente] || '';
+  }
+  /* Lo que dice la regresión, con sus números y su comparación: si los
+     votantes del aliado se inclinaron MENOS que el resto por la persona que
+     apoyó, eso es lo primero que hay que saber. */
+  function regTexto(f) {
+    const r = f.reg; if (!r) return '';
+    const quien = esc(P.lugar(f.al.apoyo?.nombre || 'esa persona'));
+    if (!r.valida) return `<span class="endoso-aviso">Regresión: no se usa, ${esc(r.motivo)}.</span>`;
+    const menos = r.tau < r.alfa;
+    return `<span class="endoso-medida">Puesto a puesto (${num(r.n)} puestos): el <b>${pct0(r.tau)}</b> de sus votantes votó por ${quien} (± ${Math.round(1.96 * r.error * 100)} puntos), contra el ${pct0(r.alfa)} del resto.</span>`
+      + (menos ? `<span class="endoso-aviso">Sus votantes se inclinaron por ${quien} menos que el resto del electorado: su apoyo no se notó en las urnas.</span>` : '');
   }
   function rotulo(c) { return `${c.corp || 'Candidatura'}${c.partido ? ` · ${c.partido}` : ''}`; }
   /* El departamento de una candidatura TERRITORIAL sale del slug
@@ -231,7 +243,7 @@
       if (f.error) return `<div class="endoso-fila"><div class="endoso-fila-top"><b>${punto}${esc(al.nombre)}</b><button type="button" class="endoso-x" onclick="EN.quitar(${k})" aria-label="Quitar">×</button></div><p class="helper">No pudimos leer la votación de esta candidatura.</p></div>`;
       const par = f.par;
       const apoyo = al.apoyo
-        ? `<div class="endoso-apoyo">Apoyó a <b>${esc(al.apoyo.nombre)}</b> <small>${esc(rotulo(al.apoyo))}</small> <button type="button" class="enlace-boton" onclick="EN.quitarApoyo(${k})">cambiar</button>${par?.valida ? `<span class="endoso-medida">coincidieron en el <b>${pct0(par.tasa)}</b> de sus votos · ${esc(E.CLASE[par.clase] || '')}</span>` : `<span class="endoso-aviso">No se usa: ${esc(par?.motivo || 'sin datos')}.</span>`}</div>`
+        ? `<div class="endoso-apoyo">Apoyó a <b>${esc(al.apoyo.nombre)}</b> <small>${esc(rotulo(al.apoyo))}</small> <button type="button" class="enlace-boton" onclick="EN.quitarApoyo(${k})">cambiar</button>${regTexto(f)}${par?.valida ? `<span class="endoso-medida">Techo: coincidieron en el <b>${pct0(par.tasa)}</b> de sus votos · ${esc(E.CLASE[par.clase] || '')}</span>` : `<span class="endoso-aviso">Techo sin medir: ${esc(par?.motivo || 'sin datos')}.</span>`}</div>`
         : `<button type="button" class="enlace-boton" onclick="EN.apoyo(${k})">+ ¿A quién apoyó antes? (mide la tasa)</button>`;
       const fuera = f.total - f.terr;
       return `<div class="endoso-fila">
@@ -264,7 +276,8 @@
     const n = ST.aliados.length;
     $('enTotalTitulo').textContent = L.bajo === L.alto ? `${n === 1 ? 'Su aliado le puede' : `Sus ${n} aliados le pueden`} pasar hasta ${num(L.total)} votos.` : `${n === 1 ? 'Su aliado le puede' : `Sus ${n} aliados le pueden`} pasar entre ${num(L.bajo)} y ${num(L.alto)} votos.`;
     const sinMedir = L.filas.filter(f => f.fuente === 'retencion').length;
-    $('enTotalCopy').innerHTML = (L.nMedidas ? `${L.nMedidas === 1 ? 'Una tasa sale medida' : `${L.nMedidas} tasas salen medidas`} con a quién apoyaron antes.` : 'Ninguna tasa está medida con a quién apoyaron antes.')
+    const medidos = L.filas.filter(f => f.fuente === 'medida' || f.fuente === 'regresion').length, conReg = L.filas.filter(f => f.fuente === 'regresion').length;
+    $('enTotalCopy').innerHTML = (medidos ? `${medidos === 1 ? 'Una tasa sale medida' : `${medidos} tasas salen medidas`} con a quién apoyaron antes${conReg ? ` (${conReg === medidos ? (conReg === 1 ? 'con' : 'todas con') : `${conReg} con`} regresión puesto a puesto)` : ''}.` : 'Ninguna tasa está medida con a quién apoyaron antes.')
       + (sinMedir ? ` ${sinMedir === 1 ? 'Un aliado se estima' : `${sinMedir} aliados se estiman`} con lo que conserva de su propio voto quien repite en su corporación: es lo más que podría mover.` : '')
       + ' El rango sale de cuánto varía esa retención entre personas: el extremo bajo es el cuarto que menos conserva, el alto el que más.';
   }
@@ -313,7 +326,7 @@
 
   function nota(L) {
     const supuesto = L?.filas.some(f => f.fuente === 'supuesto');
-    return `<b>Es una estimación, y es un techo.</b> La tasa medida es la del método de endoso de la plataforma: la suma, mesa por mesa, de lo que el aliado y la persona que apoyó pudieron compartir. Dice cuánto electorado cabía en común, no cuánto se pasó. Encima va el tiempo: nadie le pasa a otro más de lo que conservaría de su propio voto si se lanzara él mismo, y eso lo medimos con las personas que repitieron en la misma corporación entre 2011 y 2023 (o en el Congreso entre 2014 y 2022), puesto por puesto. Quien repite suele ser a quien le fue bien, así que esa retención es generosa: es un techo, no un promedio. No le sumamos el crecimiento del censo a 2027 porque la retención ya se midió con el electorado de cada año. Si son elecciones distintas se compara por puesto, porque las mesas se rearman con cada censo; si compitieron en el mismo tarjetón no hay nada que medir, porque nadie pudo votar por los dos. Los votos son los de la última elección de cada aliado y solo cuentan los que caen en ${esc(ST.lugar).replace(/\.?$/, '.')} Si dos aliados trabajan los mismos barrios, sus votos se pueden estar contando dos veces.${supuesto ? ` Donde no hay medición usamos un <b>supuesto del ${Math.round(E.SUPUESTO * 100)} %</b>: cámbielo por el suyo.` : ''} La lista de aliados vive en este navegador: no la guardamos en el servidor.`;
+    return `<b>Es una estimación, y es un techo.</b> La tasa medida es la del método de endoso de la plataforma: la suma, mesa por mesa, de lo que el aliado y la persona que apoyó pudieron compartir. Dice cuánto electorado cabía en común, no cuánto se pasó; por eso queda como techo. Cuando tenemos los votos válidos de cada puesto en las dos elecciones, el centro del rango sale de una regresión puesto a puesto (incluidos los puestos donde el aliado no sacó votos), que estima qué parte de sus votantes votó por la persona que apoyó. Mide votantes compartidos, no convencidos: si los dos son de la misma corriente, parte de esa cifra es afinidad y no endoso. Encima va el tiempo: nadie le pasa a otro más de lo que conservaría de su propio voto si se lanzara él mismo, y eso lo medimos con las personas que repitieron en la misma corporación entre 2011 y 2023 (o en el Congreso entre 2014 y 2022), puesto por puesto. Quien repite suele ser a quien le fue bien, así que esa retención es generosa: es un techo, no un promedio. No le sumamos el crecimiento del censo a 2027 porque la retención ya se midió con el electorado de cada año. Si son elecciones distintas se compara por puesto, porque las mesas se rearman con cada censo; si compitieron en el mismo tarjetón no hay nada que medir, porque nadie pudo votar por los dos. Los votos son los de la última elección de cada aliado y solo cuentan los que caen en ${esc(ST.lugar).replace(/\.?$/, '.')} Si dos aliados trabajan los mismos barrios, sus votos se pueden estar contando dos veces.${supuesto ? ` Donde no hay medición usamos un <b>supuesto del ${Math.round(E.SUPUESTO * 100)} %</b>: cámbielo por el suyo.` : ''} La lista de aliados vive en este navegador: no la guardamos en el servidor.`;
   }
 
   window.EN = A;

@@ -125,6 +125,7 @@ Base pública: `https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.c
 | `<corp>-<año>/index-*.json` | Índice de candidaturas (nombre, slug, corporación, partido, votos) y, desde 2026-09, `listas[]` por circunscripción: `lista` (voto solo por el partido), `personal`, `total` y `cerrada`. Sin eso una lista cerrada no existe en el reparto de curules: ver §regenerar. |
 | `<corp>-<año>/<slug>.json` | Una candidatura mesa a mesa (`mesas[]` con dep, mun, zona, puesto, votos). |
 | `mapas-2026/DEPARTAMENTOS2.json` | Colombia por departamentos. |
+| `totales-puesto/<corp>-<año>.json` | Votos válidos, votantes y blanco por puesto de las 26 elecciones con candidaturas (2011-2023 y Congreso 2014-2022), comprimidos. Los usa la regresión del endoso; los genera `tools/candidato-360/endoso/build_totales_puesto.py`. |
 | `mapas-2026/Departamentos-mps/<dep>.json` | Un departamento por municipios (trae `mun_elec`, el código **electoral**, y `mpio_cnmbr`). |
 | `mapas-2026/Ciudades-COM-LOC/` | Comunas y localidades de las ciudades con cartografía. |
 | `mapas-2026/PUESTOS_GEOREF.csv` | Cada puesto de votación: coordenada, barrio, comuna y **censo por sexo**. El nombre de comuna viene con variantes («CIUDAD BOLÍVAR» y «CIUDAD BOLIVAR», «COMUNA 7 NORESTE» y «COMUNA 7 NOR ESTE»): los generadores las unifican, si no una JAL sale partida en dos. |

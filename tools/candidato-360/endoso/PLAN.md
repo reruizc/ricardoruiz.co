@@ -94,7 +94,7 @@ suman menos que por separado; dos de barrios distintos suman casi completo.
 | 1 ✅ | Extraer el motor a `candidato-360-endoso.js` (`window.C360Endoso`), sin cambiar cifras. La tarjeta 08 lo usa. Prueba en Node con JSON reales (`prueba-endoso.mjs`). | **hecho 27-sep-2026** |
 | 2 ✅ | Panel `candidato-360-endoso.html` con los excandidatos: ficha por aliado, mapa de sus votos en el territorio, tasa con su método, total. La tarjeta 08 pasa a enlace (como 06 y 09); se retira el modal. | **hecho 27-sep-2026** |
 | 3 ✅ | D3 calibración de retención → reemplaza el 30 %. Rango piso/probable/techo. Crecimiento 2027 (decidido no sumarlo, ver bitácora). | **hecho 27-sep-2026** |
-| 4 | D1 totales por puesto (2023 primero) → regresión ecológica en la fórmula A. | fórmula A v3 |
+| 4 ✅ | D1 totales por puesto (2023 primero) → regresión ecológica en la fórmula A. | **hecho 28-sep-2026** |
 | 5 | Unión probabilística por puesto + mapa combinado + matriz de solape entre aliados. | sin doble conteo |
 | 6 | Líder de zona: selector de zona en el mapa, sobre-rendimiento, DiD, «maneja N votos» contrastado. | fórmula B |
 | 7 | Integración: % de la meta por escalón, puestos donde el endoso cierra la brecha → Día D, CSV, entrada en `VISTAS` de Candi + `C360_CANDI_VISTAS` del worker, `candidato-360.md`. | cierre |
@@ -182,6 +182,41 @@ Caso de control (Bogotá, 3 aliados, medido con los dos motores): pasa de «hast
 ⚠️ El commit `602e3a46` de otra sesión se llevó una versión intermedia del
 motor y del calibrador (tabla vacía): entre ese commit y el de la fase 3, los
 aliados sin medir usaron el 30 % y no la mediana. Sin efecto después.
+
+**Fase 4 (28-sep-2026).** Dos piezas:
+
+1. **Totales por puesto** (`tools/candidato-360/endoso/build_totales_puesto.py`):
+   `[válidos, votantes, blanco]` por puesto para las 26 elecciones con
+   candidaturas en el registro — territoriales 2011 · 2015 · 2019 · 2023 (JAL,
+   Concejo, Alcaldía, Asamblea, Gobernación) y Senado/Cámara 2014 · 2018 · 2022.
+   Una pasada por GCS, ~2 minutos todo. En S3 comprimidos en
+   `congreso-2026/output/totales-puesto/{corp}-{año}.json` (~100 KB cada uno).
+   Validado: (a) 96 candidaturas de 8 elecciones, 36.000 puestos: todos casan con
+   su total y ninguno supera los válidos; (b) Concejo de Bogotá 2023 = 2.806.148
+   válidos, y 2.806.148 − 368.831 de blanco = 2.437.317, la cifra de la meta.
+   ⚠️ Esa cifra de la meta NO incluye el blanco; por ley sí es válido. Por eso el
+   archivo trae el blanco aparte. Los tres archivos que escriben distinto el texto
+   (2011, 2015 y JAL 2019) usan los mismos códigos 996/997/998.
+2. **Regresión ecológica** en el motor (`regresion`): participación del apoyado
+   contra la del aliado, puesto por puesto, ponderada por los válidos del
+   apoyado; α + β es qué parte de los votantes del aliado votó por el apoyado y α,
+   la del resto. El universo son los puestos donde LOS DOS estaban en el tarjetón
+   (JAL: la zona). Se descarta con menos de 20 puestos, fuera de [−5 %, 105 %] o
+   con error mayor a ± 29 puntos. Entra al rango así: centro = min(τ, retención
+   mediana), piso = min(τ − 1,96 errores, retención p25), techo = min(Σ min,
+   retención p75); Σ min queda solo como techo.
+
+Controles con datos reales: la misma persona (concejal de Bogotá 2019 → 2023)
+da 60 % ± 7,5, coherente con la retención de la fase 3; Galán 2019 → 2023 da
+123 % y se descarta (con candidatos grandes y parejos en toda la ciudad la
+regresión no separa). Un edil de Suba 2023 → un concejal: 42,5 % (Σ min decía
+68 %). Un concejal → Galán: Σ min estaba saturado y no medía; la regresión da
+38 %, contra 49 % del resto de Bogotá: sus votantes se inclinaron MENOS por Galán
+que el resto, y el panel lo avisa. Caso de control de 6 aliados: el punto medio
+baja de 137.205 a 116.819.
+
+Pendiente de esta línea: Congreso 2026 (la fuente `endoso`) y presidenciales no
+tienen totales por puesto todavía; sus pares siguen con Σ min + retención.
 
 ## Decisiones abiertas (de Ricardo)
 

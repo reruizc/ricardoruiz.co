@@ -133,6 +133,76 @@
     return { clase: cl, tasa, comunes, valida: true };
   }
 
+  /* ── La regresión ecológica (fase 4) ──────────────────────────────────
+     Σ min dice cuánto electorado PUDIERON compartir; la regresión estima
+     cuánto compartieron. Puesto por puesto, con la participación de cada uno
+     sobre los válidos de SU elección:
+         part_apoyado = α + β · part_aliado
+     α es cuánto del resto del electorado votó por el apoyado, y α + β, cuánto
+     de quienes votaron por el aliado lo hizo (Goodman). Los puestos donde el
+     aliado sacó cero votos cuentan: por eso hacen falta los totales por puesto
+     (tools/candidato-360/endoso/build_totales_puesto.py, en S3 en
+     totales-puesto/{corp}-{año}.json), que los archivos de candidatura no traen.
+
+     Dos cosas que no se negocian:
+     · El universo son los puestos donde LOS DOS estaban en el tarjetón: el
+       municipio (JAL: la zona, que en Bogotá es la localidad), el
+       departamento o el país según la corporación. Meter puestos donde uno de
+       los dos no existía pone ceros que no son de nadie.
+     · Mide votantes COMPARTIDOS, no convencidos: si el aliado y el apoyado
+       son de la misma corriente, parte de α + β es afinidad y no endoso. Es
+       mejor estimación central que Σ min, pero sigue sin ser causal. */
+  const S3_OUT = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+  const totalesCache = new Map();
+  function totales(nombre) {
+    if (!totalesCache.has(nombre)) totalesCache.set(nombre, fetch(`${S3_OUT}/totales-puesto/${nombre}.json`).then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))).then(d => d.puestos || {}).catch(e => { totalesCache.delete(nombre); throw e; }));
+    return totalesCache.get(nombre);
+  }
+  /* Qué archivo de totales es cada candidatura y a qué escala compite. El
+     orden importa: CONC es concejo y CON es Congreso. */
+  function eleccionDe(c) {
+    const s = String(c?.slug || '');
+    let m = s.match(/^(JAL|CONC|ALC|ASAM|GOB)(\d{4})-/);
+    if (m) return { totales: `${{ JAL: 'jal', CONC: 'concejo', ALC: 'alcaldia', ASAM: 'asamblea', GOB: 'gobernacion' }[m[1]]}-${m[2]}`, escala: { JAL: 'zona', CONC: 'mun', ALC: 'mun', ASAM: 'dep', GOB: 'dep' }[m[1]] };
+    m = s.match(/^CON(\d{4})-(SI|S|CA|CI|CE|CT|C)-/);
+    if (m) return { totales: `${m[2].startsWith('S') ? 'senado' : 'camara'}-${m[1]}`, escala: m[2] === 'C' ? 'dep' : 'nac' };
+    return null;
+  }
+  const ambitoDe = (m, escala) => escala === 'nac' ? '' : escala === 'dep' ? pad(m.dep, 2) : escala === 'mun' ? pad(m.dep, 2) + pad(m.mun, 3) : pad(m.dep, 2) + pad(m.mun, 3) + pad(m.zon, 2);
+  const ambitoCodigo = (k, escala) => escala === 'nac' ? '' : k.slice(0, escala === 'dep' ? 2 : escala === 'mun' ? 5 : 7);
+  const MIN_PUESTOS = 20, MAX_ERROR = .15;   /* ± 29 puntos con 1,96 errores */
+  async function regresion(aliado, opts = {}) {
+    const leer = opts.mesasDe || mesas, leerTotales = opts.totalesDe || totales;
+    if (clase(aliado, aliado.apoyo) === 'mismo') return null;
+    const ea = eleccionDe(aliado), eb = eleccionDe(aliado.apoyo);
+    if (!ea || !eb) return { valida: false, motivo: 'no tenemos los totales por puesto de esa elección' };
+    let ma, mb, TA, TB;
+    try { [ma, mb, TA, TB] = await Promise.all([leer(aliado.dataUrl), leer(aliado.apoyo.dataUrl), leerTotales(ea.totales), leerTotales(eb.totales)]); }
+    catch { return { valida: false, motivo: 'no se pudieron leer los totales por puesto' }; }
+    const ambA = new Set(ma.filter(m => Number(m.v) > 0).map(m => ambitoDe(m, ea.escala))), ambB = new Set(mb.filter(m => Number(m.v) > 0).map(m => ambitoDe(m, eb.escala)));
+    const A = {}, B = {}; ma.forEach(m => { const k = codigoPuesto(m); A[k] = (A[k] || 0) + Number(m.v || 0); }); mb.forEach(m => { const k = codigoPuesto(m); B[k] = (B[k] || 0) + Number(m.v || 0); });
+    const obs = [];
+    for (const k of Object.keys(TA)) {
+      const ta = TA[k], tb = TB[k];
+      if (!tb || !ta[0] || !tb[0] || !ambA.has(ambitoCodigo(k, ea.escala)) || !ambB.has(ambitoCodigo(k, eb.escala))) continue;
+      obs.push([(A[k] || 0) / ta[0], (B[k] || 0) / tb[0], tb[0]]);
+    }
+    const n = obs.length;
+    if (n < MIN_PUESTOS) return { valida: false, n, motivo: `solo ${n} puestos donde los dos estaban en el tarjetón: muy pocos para una regresión` };
+    /* Mínimos cuadrados ponderados por los válidos del apoyado. */
+    const W = obs.reduce((s, o) => s + o[2], 0), xm = obs.reduce((s, o) => s + o[0] * o[2], 0) / W, ym = obs.reduce((s, o) => s + o[1] * o[2], 0) / W;
+    let sxx = 0, sxy = 0; obs.forEach(([x, y, w]) => { sxx += w * (x - xm) ** 2; sxy += w * (x - xm) * (y - ym); });
+    if (!(sxx > 0)) return { valida: false, n, motivo: 'la votación del aliado no varía entre puestos: no hay con qué estimar' };
+    const beta = sxy / sxx, alfa = ym - beta * xm, tau = alfa + beta;
+    /* Error estándar de α + β = ȳ + β(1 − x̄), con los pesos llevados a media 1. */
+    const wm = W / n; let see = 0; obs.forEach(([x, y, w]) => { see += (w / wm) * (y - alfa - beta * x) ** 2; });
+    const s2 = see / (n - 2), varB = s2 / (sxx / wm), error = Math.sqrt(s2 / n + (1 - xm) ** 2 * varB);
+    const base = { n, alfa, beta, tau, error, xm, ym };
+    if (tau < -.05 || tau > 1.05) return { ...base, valida: false, motivo: `la regresión da ${Math.round(tau * 100)} %, fuera de lo posible: los dos votan en puestos que no se separan bien` };
+    if (error > MAX_ERROR) return { ...base, valida: false, motivo: `la estimación es muy imprecisa (± ${Math.round(1.96 * error * 100)} puntos)` };
+    return { ...base, tau: Math.min(1, Math.max(0, tau)), valida: true };
+  }
+
   /* ── La lectura completa ───────────────────────────────────────────────
      opts:
        alcance    el territorio de la campaña (o null: sin recorte)
@@ -141,7 +211,8 @@
        areaDe     (mesa, alcance) → nombre del área donde se concentra
        propio     mesas del historial del candidato, para medir el solape
        mesasDe    url → Promise<mesas>; por defecto el fetch con caché
-       retencion  otra tabla de retención (las pruebas); por defecto la medida */
+       retencion  otra tabla de retención (las pruebas); por defecto la medida
+       totalesDe  nombre → Promise<{puesto: [válidos, votantes, blanco]}>; las pruebas */
   async function evaluar(aliados, opts = {}) {
     const { alcance = null, lugar = 'su territorio', enAlcance, areaDe, mesasDe = mesas } = opts;
     const propio = opts.propio ? agrupar(opts.propio, llavePuesto) : null;
@@ -149,7 +220,10 @@
       try {
         const ms = await mesasDe(al.dataUrl), dentro = alcance && enAlcance ? ms.filter(m => enAlcance(m, alcance)) : ms;
         const fila = { al, total: suma(ms), terr: suma(dentro), dentro, par: null };
-        if (al.apoyo) { try { fila.par = await medirPar(al, { mesasDe }); } catch (e) { fila.par = { valida: false, motivo: 'no se pudo leer la votación de a quién apoyó' }; } }
+        if (al.apoyo) {
+          try { fila.par = await medirPar(al, { mesasDe }); } catch (e) { fila.par = { valida: false, motivo: 'no se pudo leer la votación de a quién apoyó' }; }
+          try { fila.reg = await regresion(al, { mesasDe, totalesDe: opts.totalesDe }); } catch (e) { fila.reg = { valida: false, motivo: 'no se pudo calcular la regresión' }; }
+        }
         if (propio && fila.terr) { const pa = agrupar(dentro, llavePuesto); let s = 0; Object.entries(pa).forEach(([k, v]) => { s += Math.min(v, propio[k] || 0); }); fila.solape = s / fila.terr; }
         return fila;
       } catch (e) { return { al, error: true }; }
@@ -162,6 +236,14 @@
       f.ret = retencionDe(f.al, opts.retencion || RETENCION);
       let r;
       if (Number.isFinite(f.al.manual)) { const t = f.al.manual / 100; r = [t, t, t]; f.fuente = 'suya'; }
+      else if (f.reg?.valida) {
+        /* La regresión da el centro y el piso (menos 1,96 errores); el techo
+           sigue siendo Σ min si el par se pudo medir, y todo queda acotado
+           por la retención de su nivel. */
+        const techoPar = f.par?.valida ? f.par.tasa : 1, q = f.ret?.q || [1, 1, 1];
+        r = [Math.min(Math.max(0, f.reg.tau - 1.96 * f.reg.error), q[0]), Math.min(f.reg.tau, q[1]), Math.min(techoPar, q[2])].sort((a, b) => a - b);
+        f.fuente = 'regresion';
+      }
       else if (f.par?.valida && f.ret) { r = f.ret.q.map(q => Math.min(f.par.tasa, q)); f.fuente = 'medida'; }
       else if (f.par?.valida) { r = [f.par.tasa, f.par.tasa, f.par.tasa]; f.fuente = 'medida'; }
       else if (f.ret) { r = f.ret.q.slice(); f.fuente = 'retencion'; }
@@ -286,6 +368,7 @@
     medida: 'medida con a quién apoyó',
     suya: 'tasa que usted escribió',
     retencion: 'lo que conserva de su propio voto: diga a quién apoyó para medirla',
+    regresion: 'estimada puesto a puesto con a quién apoyó',
     supuesto: 'supuesto: escriba el suyo o mida el par',
   };
   const CLASE = {
@@ -293,6 +376,6 @@
     transferencia: 'elecciones distintas: transferencia entre fechas, comparada por puesto',
   };
 
-  global.C360Endoso = { SUPUESTO, SATURACION, MAX, FUENTE, CLASE, anio, corp, clase, ficha, mesas, suma, llavePuesto, llaveMesa, agrupar, medirPar, evaluar, retencionDe, corpRetencion, RETENCION,
+  global.C360Endoso = { SUPUESTO, SATURACION, MAX, FUENTE, CLASE, anio, corp, clase, ficha, mesas, suma, llavePuesto, llaveMesa, agrupar, medirPar, regresion, eleccionDe, evaluar, retencionDe, corpRetencion, RETENCION,
     enAlcance, areaDe, corpHistorica, municipioMayoritario, alcanceDe, codigoPuesto, porPuesto, clave, candidaturaId, cargar, guardar };
 })(typeof window !== 'undefined' ? window : globalThis);
