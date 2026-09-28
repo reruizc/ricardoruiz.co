@@ -80,6 +80,12 @@ def _fechas_en_texto(txt):
     return _ISO.sub(cambiar, str(txt or ''))
 
 
+def _corto(txt, n):
+    """Recorta en la última palabra completa, no a mitad de una."""
+    txt = str(txt or '').strip()
+    return txt if len(txt) <= n else txt[:n].rsplit(' ', 1)[0].rstrip(',.;:') + '…'
+
+
 def momento(iso):
     """«Inicio de la semana» el lunes, «Cierre de la semana» el viernes."""
     import datetime
@@ -153,7 +159,7 @@ def cuerpo_html(b):
                 f'</td></tr>')
         credito = (f'<div style="font-size:11px;color:{GRIS};padding-top:6px">Foto: '
                    f'{html.escape(img.get("medio", ""))} · <a href="{html.escape(img.get("enlace", ""))}" '
-                   f'style="color:{GRIS}">{html.escape((img.get("titulo") or "")[:90])}</a></div>')
+                   f'style="color:{GRIS}">{html.escape(_corto(img.get("titulo"), 100))}</a></div>')
     return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#f1f2f4">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f2f4">
 <tr><td align="center" style="padding:24px 12px">
