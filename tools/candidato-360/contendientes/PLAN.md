@@ -14,7 +14,7 @@ Responde tres preguntas, en este orden:
 3. **¿Qué se movió desde el mes pasado?** Quién entró, quién cambió de aval,
    quién apareció en prensa (la revisión mensual).
 
-Estado: **fases 1 y 2 hechas (28-sep-2026)** —ver la bitácora al final—. Las cifras de abajo salen de una
+Estado: **fases 1, 2 y 3 hechas (28-sep-2026)** —ver la bitácora al final—. Las cifras de abajo salen de una
 medición hecha el 28-sep-2026 sobre los archivos de S3 que se citan; en la fase
 1 quedan fijadas en `prueba-contendientes.mjs`, como las del endoso.
 
@@ -524,7 +524,7 @@ lista · frente a usted · en prensa.
 |---|---|---|
 | 1 | **Motor** `candidato-360-contendientes.js` sin DOM: fuentes A-C desde el registro, unión por persona, eje X, eje Y con las tres bases, burbuja, presión, escalera. Helper `electos` en `vote-target.js` sin cambiar cifras. Solo con las matrices que ya existen (11 ciudades + asamblea) y el JSON de cada rival donde no. `prueba-contendientes.mjs` con las cifras de §0 fijadas. | **hecho 28-sep-2026** |
 | 2 | **Panel** con el plano, la escalera, la lista y la ficha (sin prensa). Tarjeta 10 como enlace. Vitrina. Candi (frontend + worker). | **hecho 28-sep-2026** (sin desplegar) |
-| 3 | **Mapa de disputa** con las dos capas, sobre las capas del CRM. | sección 03 |
+| 3 | **Mapa de disputa** con las dos capas, sobre las capas del CRM. | **hecho 28-sep-2026** |
 | 4 | **D1** `build_matriz_puesto.py`: concejo y JAL fuera de las 11 ciudades, alcaldía, gobernación; después 2019. | todo el país sin bajar cientos de JSON |
 | 5 | **Prensa y revisión mensual**: ficha con titulares, worker (KV + 4 rutas), cron, pestaña de administración, «qué se movió». Agregar a mano. | revisión del 1 de cada mes |
 | 6 | **Briefing**: sección «Sus contendientes» en el correo existente. | alertas |
@@ -726,7 +726,7 @@ Tres cosas que salieron al construir y que cambian cifras o reglas:
    «matriz incompleta» lo dice; si no llega nada, `leer` falla en vez de pintar cero
    rivales.
 
-Pruebas: `prueba-contendientes.mjs` (57 sin red + 23 reales) y la nueva
+Pruebas: `prueba-contendientes.mjs` (al cerrar la fase 2; conteo corregido en la fase 3) y la nueva
 `prueba-contendientes-panel.mjs` (Playwright, 24 casos): rivales por fuente, la
 persona única sin bajar su archivo viejo, escalera, plano, tabla ordenable, ficha con
 la meta de su lista, «amenaza» ausente, 375 px sin desborde, muro sin acceso, y la
@@ -739,3 +739,62 @@ pruebas viejas, fuera de este módulo.
 
 Playwright se instaló de forma global en la Mac M5 (`npm i -g playwright`); las
 suites lo encuentran con `PLAYWRIGHT_PATH=/opt/homebrew/lib/node_modules/playwright/index.mjs`.
+
+**Fase 3 (28-sep-2026) · el mapa de disputa.**
+
+- Sección **03 · Dónde se pelea** del panel (la tabla pasa a 04). Escalas según el
+  territorio: comunas o localidades (y UCG en Cartagena), barrios donde hay
+  diccionario puesto→barrio (Bogotá, Cali, Cartagena), municipios en lo
+  departamental y siempre puestos. Colores por categoría, nunca una rampa de votos de
+  nadie; el globo dice que describe el lugar y no a las personas; relleno de vecino
+  punteado para barrios sin puesto, fuera de todo conteo; ventana urbana fija en
+  Bogotá y Cartagena; Bogotá rotada en todas las escalas (como en el electorado, sin
+  callejero debajo). Al lado, el conteo por categoría y los puestos en disputa donde
+  saca más votos.
+- **Las dos capas**: si su base cubre menos de la mitad de los puestos (el salto), se
+  ofrece «Todo el territorio» —dónde rinden las listas de su familia y las vecinas,
+  en tres bandas— y el mapa **arranca ahí**; la lista de la derecha pasa a «donde más
+  rinden sus rivales cercanos». En la JAL no se ofrece.
+- **En el motor**: `categoria` (la regla, la misma para un puesto que para un barrio),
+  `disputaPorUnidad` (suma los puestos de cada unidad y clasifica la suma: dos puestos
+  chicos que por separado eran «muy pocos para leer» se leen juntos en su barrio),
+  `bandaRivales`, `centroide`/`rellenos` (puerto del relleno del electorado; queda una
+  copia allá). La matriz guarda ahora el código de comuna y de municipio de cada
+  puesto, así que en modo matriz el mapa no necesita el georef.
+- Revisado con datos reales en el navegador (JAL de Barrios Unidos, salto al Concejo
+  de Bogotá, un concejal de Cartagena, un diputado del Quindío) y en Node con un
+  concejal de Tunja (sin matriz).
+
+Cinco cosas que salieron al probar con datos reales:
+
+1. **Cartagena no cargaba.** Las mesas dicen «CARTAGENA» y la cartografía
+   «CARTAGENA DE INDIAS»: `puestosDestino` buscaba el municipio por nombre y no lo
+   hallaba. Ahora acepta `municipioCodigo` (`candidato-360-diad.js`, aditivo) y el
+   motor se lo pasa desde el alcance. Es la misma trampa que ya se había corregido en
+   la meta.
+2. **Todo el modo sin matriz estaba roto**: el motor pedía el archivo de cada rival
+   con `CandRegistry.dataUrlFor`, que sin el índice cargado cae a la carpeta del
+   Congreso (404). Ahora usa `C360Electorado.urlCandidatura`, que resuelve por el
+   slug. Tunja (sin matriz): 58 rivales en 10 s.
+3. **Abrir el Concejo de Bogotá bajaba 90 MB y tardaba un minuto.** Tres recortes:
+   la Cámara 2022 sale de la fuente C (archivos de ~2 MB y es raro que un
+   representante baje al concejo; entraría con una matriz propia, D1); no se bajan los
+   archivos de quien viene de alcaldía o gobernación (está fuera del índice); y el tope
+   de personas nuevas cuyo archivo se baja depende del origen —20 de JAL (~100 KB cada
+   uno), 6 del resto (~2 MB)—. Quien pasa del tope **sigue siendo rival**, sin votos
+   por puesto (la primera versión del recorte lo borraba: la JAL cayó de 38 a 28 y se
+   corrigió). El reparto, la matriz y los índices de la fuente C corren en paralelo.
+4. ⚠️⚠️ **Los índices de 2023 de JAL, concejo y asamblea están en S3 SIN comprimir**
+   (3,8 MB, 20,9 MB y 0,7 MB en claro), los tres que se regeneraron el 20-sep con el
+   voto de lista. `CLAUDE.md` exige re-comprimirlos al regenerar
+   (`tools/analisis-candidato/gzip_indices_s3.py --solo …`). No es de este módulo, pero
+   frena la meta del CRM, el buscador y esta tarjeta. **Hecho el 28-sep con visto
+   bueno de Ricardo**: 25,4 MB → 3,7 MB, verificado archivo por archivo; el respaldo
+   en claro quedó en `Bases de datos/indices-s3-backup/`.
+5. Los rótulos en sigla (UCG) ya no se bajan a minúscula en el mapa.
+
+Pruebas: `prueba-contendientes.mjs` = **42 sin red + 21 contra S3** (63), con las
+reglas del mapa por unidad y el relleno; `prueba-contendientes-panel.mjs` = **29**
+(Playwright), con el mapa de una JAL de Bogotá en barrios y en puestos. Leaflet se
+sirve sin red como en `prueba-mapa.mjs` (`LEAFLET_DIST`). ⚠️ Corrección: al cerrar la
+fase 2 escribí «57 sin red + 23 reales»; el conteo real era menor, mal contado a mano.

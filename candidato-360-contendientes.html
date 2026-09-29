@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 <!-- ⚠️ Al tocar candidato-360.css, candidato-360-panel.js o candidato-360-contendientes.js hay que bumpear su ?v= acá y en las otras páginas que los cargan. -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="candidato-360.css?v=20260928p">
 <link rel="stylesheet" href="assets/candidato-360/candi/candi-saludo.css?v=3">
 <link rel="stylesheet" href="assets/candidato-360/candi/candi-hueso.css?v=1">
@@ -60,6 +61,26 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
 .k-ficha ul{margin:0;padding-left:18px;font-size:14px;line-height:1.55}
 .k-ficha .dato{font:800 26px var(--display)}
 .k-cerrar{float:right;border:1px solid var(--line);background:none;padding:4px 10px;cursor:pointer;font:500 11px var(--mono)}
+
+/* ── 03 · El mapa de disputa ─────────────────────────────────────────── */
+.k-mapa-caja{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;margin-top:10px}
+.k-mapa{height:460px;border:1px solid var(--line);background:#eef0ea}
+.k-mapa .leaflet-tile-pane{filter:grayscale(.85) saturate(.5) brightness(1.06)}
+.leaflet-tooltip.tp{font:13px var(--sans);background:rgba(23,37,28,.96);color:#fff;border:0;border-radius:0;padding:8px 10px;max-width:280px;white-space:normal}
+.leaflet-tooltip.tp b{font-family:var(--display)}
+.leaflet-tooltip.tp:before{display:none}
+.k-barra{display:flex;flex-direction:column;gap:6px;margin:6px 0 4px}
+.k-fila{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.k-fila .rot{font:500 10.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-width:70px}
+.k-toggle{border:1px solid var(--line);background:#fff;padding:5px 10px;cursor:pointer;font:600 12.5px var(--sans)}
+.k-toggle.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.k-conteo{list-style:none;margin:0;padding:0;font-size:13.5px}
+.k-conteo li{display:flex;gap:8px;align-items:baseline;margin:5px 0}
+.k-conteo i{display:inline-block;width:12px;height:12px;flex:none;border:1px solid rgba(23,37,28,.25)}
+.k-conteo b{font-variant-numeric:tabular-nums;min-width:2.5em;text-align:right}
+.k-top{margin:12px 0 0;padding-left:18px;font-size:13.5px;line-height:1.5}
+.k-top small{color:var(--muted)}
+@media (max-width:820px){.k-mapa-caja{grid-template-columns:1fr}.k-mapa{height:380px}}
 </style>
 </head>
 <body data-candi-vista="contendientes">
@@ -94,8 +115,20 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
       <div id="kEscalera"></div>
     </section>
 
+    <section class="panel hidden" id="kMapaSec">
+      <span class="panel-num">03 · Dónde se pelea</span>
+      <h3 id="kMapaTitulo">Dónde se cruzan su base y la de sus rivales.</h3>
+      <p id="kMapaCopy"></p>
+      <div class="k-barra" id="kMapaBarra"></div>
+      <div class="k-mapa-caja">
+        <div class="k-mapa" id="kMapa"></div>
+        <div><ul class="k-conteo" id="kMapaConteo"></ul><p style="margin:14px 0 0"><b id="kTopTitulo">Los puestos en disputa</b></p><ol class="k-top" id="kTop"></ol></div>
+      </div>
+      <p class="helper" id="kMapaNota"></p>
+    </section>
+
     <section class="panel hidden" id="kListaSec">
-      <span class="panel-num">03 · La lista completa</span>
+      <span class="panel-num">04 · La lista completa</span>
       <h3>Todos sus rivales probables.</h3>
       <p id="kListaCopy"></p>
       <div style="overflow-x:auto;border:1px solid var(--line)"><table class="k-tabla"><thead><tr>
@@ -110,13 +143,14 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
 <script src="cand-index.js?v=20260919"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="legislativo-electos.js"></script>
 <script src="vote-target.js?v=20260928"></script>
 <script src="partidos-bloques.js?v=20260922"></script>
 <script src="candidato-360-electorado.js?v=20260928"></script>
-<script src="candidato-360-diad.js?v=20260928h"></script>
+<script src="candidato-360-diad.js?v=20260928i"></script>
 <script src="candidato-360-endoso.js?v=20260928g"></script>
-<script src="candidato-360-contendientes.js?v=20260928c"></script>
+<script src="candidato-360-contendientes.js?v=20260928e"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
 <script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
@@ -231,6 +265,190 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
     ST.dir = ST.orden === o ? -ST.dir : (o === 'nombre' || o === 'fuente' || o === 'familia' ? 1 : -1); ST.orden = o; pintarLista();
   }));
 
+  /* ── 03 · El mapa de disputa ─────────────────────────────────────────
+     Describe PUESTOS, nunca personas. Las categorías salen del motor
+     (disputa / disputaPorUnidad): el puesto, el barrio o la comuna se
+     clasifican con la misma regla sumando sus puestos. Colores categóricos a
+     propósito: una rampa de «votos del rival» invita a leer «aquí están sus
+     votantes». Las capas (comunas, localidades, barrios, municipios) son las
+     del CRM y de la página del electorado. */
+  const CAT = {
+    disputa: ['#ee745e', 'Disputa: rinden usted y sus rivales cercanos'],
+    fortaleza: ['#1f7a60', 'Fortaleza: usted rinde, ellos no'],
+    'terreno-rivales': ['#3b6fb6', 'Terreno de sus rivales: ellos rinden, usted no'],
+    'terreno-ajeno': ['#c9cfc8', 'Terreno ajeno: ni usted ni ellos'],
+    'sin-base': ['#eef0ea', 'Sin votos suyos'],
+    poco: ['#f7f3ea', 'Muy pocos votos para leer'],
+  };
+  const BANDA = { fuerte: ['#3b6fb6', 'Sus rivales cercanos rinden más que en el resto'], parejo: ['#9db4d6', 'Rinden como en el resto (mismo terreno)'], flojo: ['#e3e8ef', 'Rinden menos que en el resto'], 'sin-dato': ['#eef0ea', 'Sin dato'] };
+  const pad = (v, n) => String(v ?? '').replace(/\D/g, '').padStart(n, '0');
+  const normTexto = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const S3 = K.S3;
+  const BARRIOS = {
+    bogota: { dic: 'bogota-puesto-barrio.js', dicG: () => window.Candidato360BogotaPuestoBarrio, reg: () => window.Candidato360BogotaBarrios, carpeta: 'bogota-barrios',
+      barrioDe: (d, c) => d?.[`${c.slice(5, 7)}-${c.slice(7)}`] || '', parteDe: (d, c) => c.slice(5, 7), code: p => String(p.codigo || ''), name: p => p.nombre || 'Barrio' },
+    cali: { dic: 'cali-puesto-barrio.js', dicG: () => window.Candidato360CaliPuestoBarrio, reg: () => window.Candidato360CaliBarrios, carpeta: 'cali-barrios',
+      barrioDe: (d, c) => d?.[c]?.barrio || '', parteDe: (d, c) => d?.[c]?.comuna || '', code: p => String(p.barrio || ''), name: p => p.barrio || 'Barrio' },
+    cartagena: { dic: 'cartagena-puesto-barrio.js', dicG: () => window.Candidato360CartagenaPuestoBarrio, reg: () => window.Candidato360CartagenaBarrios, carpeta: 'cartagena-barrios', v: '20260927',
+      barrioDe: (d, c) => d?.[c]?.barrio || '', parteDe: (d, c) => d?.[c]?.comuna || '', code: p => String(p.barrio || ''), name: p => p.barrio || 'Barrio' },
+  };
+  const scripts = new Map();
+  const cargarScript = src => { if (!scripts.has(src)) scripts.set(src, new Promise((ok, no) => { const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = () => no(new Error(src)); document.head.appendChild(el); })); return scripts.get(src); };
+  const jsonDe = url => fetch(url).then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)));
+  const MP = { mapa: null, capa: null, tiles: null, nivel: '', vista: 'base', cfg: null, niveles: [], cache: {} };
+  const ROT = ([lon, lat]) => [-74.08 - (lat - 4.65), 4.65 + (lon - -74.08)];
+  const punto = (lat, lon) => MP.cfg?.rotate ? (([x, y]) => [y, x])(ROT([lon, lat])) : [lat, lon];
+
+  function nivelesDe() {
+    const L = ST.L, a = ST.alcance || {}, c = ST.campana || {};
+    if (a.tipo === 'departamento') return { niveles: ['municipios', 'puestos'], cfg: null };
+    const cfg = EL.ciudadDe(c.municipio || '');
+    const conCom = L.datos?.origen === 'matriz' && [...L.datos.info.values()].some(i => i.com);
+    const n = [];
+    if (cfg && conCom && a.tipo !== 'localidad') n.push('unidades');
+    if (cfg?.barrios && BARRIOS[cfg.barrios]) n.push('barrios');
+    n.push('puestos');
+    return { niveles: n, cfg };
+  }
+  const ROTULO_NIVEL = () => ({ unidades: MP.cfg?.rotuloUnidad || (MP.cfg?.unidad === 'localidad' ? 'Localidades' : 'Comunas'), barrios: 'Barrios', municipios: 'Municipios', puestos: 'Puestos' });
+
+  async function capaDe(nivel) {
+    if (MP.cache[nivel]) return MP.cache[nivel];
+    const L = ST.L, dep = pad(ST.alcance?.departamento, 2);
+    let r;
+    if (nivel === 'puestos') {
+      /* Coordenadas: las trae la matriz; si no (asamblea, archivos de cada
+         rival), las del georef de puestos, que es la misma fuente del censo. */
+      let geo = null;
+      if (L.mapa.puestos.some(p => !Number.isFinite(p.lat))) geo = await EL.puestos().catch(() => ({}));
+      const puntos = L.mapa.puestos.map(p => { const g = geo?.[p.code]; const lat = Number.isFinite(p.lat) ? p.lat : g?.lat, lon = Number.isFinite(p.lon) ? p.lon : g?.lng; return { ...p, lat, lon, nombre: p.nombre || g?.nombre || '', barrio: p.barrio || g?.barrio || '' }; });
+      r = { tipo: 'puestos', unidades: puntos, sinPunto: puntos.filter(p => !Number.isFinite(p.lat) || !p.lat).length };
+    } else if (nivel === 'municipios') {
+      const geo = await jsonDe(`${S3}/mapas-2026/Departamentos-mps/${dep}.json`);
+      const cfg = { code: p => pad(p.mun_elec ?? p.mun_electoral, 3), name: p => p.mpio_cnmbr || 'Municipio' };
+      const nombres = new Map(geo.features.map(f => [cfg.code(f.properties), cfg.name(f.properties)]));
+      const U = K.disputaPorUnidad(L.mapa, p => p.code.slice(2, 5), k => nombres.get(k) || `Municipio ${k}`);
+      r = { tipo: 'geo', geo, cfg, ...U };
+    } else if (nivel === 'unidades') {
+      const cfg = MP.cfg;
+      let geo = await jsonDe(`${S3}/mapas-2026/Ciudades-COM-LOC/${cfg.path}`); if (cfg.rotate) geo = EL.rotar90(geo);
+      const code = cfg.porNombre ? p => normTexto(cfg.code(p)) : cfg.code;
+      const nombres = new Map(geo.features.map(f => [code(f.properties), cfg.name(f.properties)]));
+      const clave = p => !p.com ? '' : cfg.porNombre ? normTexto(String(p.unidad || '').replace(/^\d+\s*COMUNA\s*/i, '')) : cfg.dataKey ? cfg.dataKey(pad(p.com, 2)) : pad(p.com, 2);
+      const U = K.disputaPorUnidad(L.mapa, clave, (k, p) => nombres.get(k) || p.unidad || k);
+      r = { tipo: 'geo', geo, cfg: { code, name: cfg.name }, ...U };
+    } else if (nivel === 'barrios') {
+      const B = BARRIOS[MP.cfg.barrios];
+      await cargarScript(`candidato-360-data/${B.dic}`);
+      const dic = B.dicG() || {};
+      const partes = [...new Set(L.mapa.puestos.filter(p => p.votos || p.rivales).map(p => B.parteDe(dic, p.code)).filter(Boolean))];
+      const cargadas = await Promise.all(partes.map(pt => cargarScript(`candidato-360-data/${B.carpeta}/${pt}.js${B.v ? `?v=${B.v}` : ''}`).then(() => B.reg()?.[pt] || null).catch(() => null)));
+      const crudo = { type: 'FeatureCollection', features: cargadas.filter(Boolean).flatMap(g => g.features || []) };
+      const geo = MP.cfg.rotate ? EL.rotar90(crudo) : crudo;
+      const nombres = new Map(geo.features.map(f => [B.code(f.properties), B.name(f.properties)]));
+      const U = K.disputaPorUnidad(L.mapa, p => { const b = B.barrioDe(dic, p.code); return b && nombres.has(b) ? b : ''; }, k => nombres.get(k) || k);
+      const relleno = K.rellenos(geo.features, B.code, B.name, new Set(U.unidades.map(u => u.key)));
+      r = { tipo: 'geo', geo, cfg: { code: B.code, name: B.name }, ...U, relleno, faltanPartes: partes.length - cargadas.filter(Boolean).length };
+    }
+    MP.cache[nivel] = r; return r;
+  }
+
+  const colorDe_ = u => MP.vista === 'territorio' ? BANDA[u.banda]?.[0] : CAT[u.cat]?.[0];
+  function tip(u) {
+    const nom = esc(P.lugar(u.name || u.nombre || 'Puesto'));
+    const xU = u.iU == null ? '—' : `${x2(u.iU)}`, xR = u.iR == null ? '—' : `${x2(u.iR)}`;
+    const cuerpo = MP.vista === 'territorio'
+      ? `Las listas de su familia y las vecinas rinden aquí <b>${xR}</b> lo que rinden en todo el territorio. ${esc(BANDA[u.banda]?.[1] || '')}.`
+      : `${esc(CAT[u.cat]?.[1] || '')}.<br>Usted rinde aquí ${xU} su promedio; su familia y las vecinas, ${xR} el suyo.`;
+    return `<b>${nom}</b>${u.barrio && MP.nivel === 'puestos' ? `<br>${esc(P.lugar(u.barrio))}` : ''}<br>${cuerpo}<br><small>${num(u.votos)} votos suyos · ${num(u.validos)} válidos de 2023${u.puestos > 1 ? ` · ${num(u.puestos)} puestos` : ''}</small><br><small>Describe el lugar, no a las personas: no dice quién votó por quién.</small>`;
+  }
+  async function pintarMapaDisputa() {
+    const sec = $('kMapaSec'), L = ST.L;
+    if (!L.mapa || !L.baseDatos) { sec.classList.add('hidden'); return; }
+    sec.classList.remove('hidden');
+    if (!MP.mapa) { MP.mapa = window.L.map('kMapa', { scrollWheelZoom: false, zoomSnap: .25, zoomDelta: .5 }); MP.mapa.setView([4.65, -74.1], 10); }
+    pintarBarra();
+    $('kMapaNota').textContent = 'Cargando la capa…';
+    let C;
+    try { C = await capaDe(MP.nivel); } catch (e) { $('kMapaNota').textContent = `No se pudo cargar esta escala: ${e.message}.`; return; }
+    if (MP.capa) { MP.mapa.removeLayer(MP.capa); MP.capa = null; }
+    if (MP.tiles) { MP.mapa.removeLayer(MP.tiles); MP.tiles = null; }
+    const W = window.L;
+    if (!MP.cfg?.rotate) MP.tiles = W.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(MP.mapa);
+    if (C.tipo === 'puestos') {
+      const tope = Math.max(1, ...C.unidades.map(p => p.validos));
+      MP.capa = W.featureGroup(C.unidades.filter(p => Number.isFinite(p.lat) && p.lat).map(p => W.circleMarker(punto(p.lat, p.lon), { radius: 3 + 9 * Math.sqrt(p.validos / tope), color: '#fff', weight: 1, fillColor: colorDe_(p), fillOpacity: p.cat === 'poco' && MP.vista === 'base' ? .5 : .88 }).bindTooltip(tip(p), { sticky: true, className: 'tp' }))).addTo(MP.mapa);
+    } else {
+      const porKey = new Map(C.unidades.map(u => [u.key, u]));
+      MP.capa = W.geoJSON(C.geo, {
+        style: f => { const k = C.cfg.code(f.properties), u = porKey.get(k), rr = C.relleno?.get(k), v = rr && porKey.get(rr.de);
+          return u ? { color: '#fff', weight: 1, fillColor: colorDe_(u), fillOpacity: .85 } : v ? { color: 'rgba(23,37,28,.45)', weight: .8, dashArray: '3 3', fillColor: colorDe_(v), fillOpacity: .38 } : { color: '#fff', weight: 1, fillColor: '#f1f1ec', fillOpacity: .5 }; },
+        onEachFeature: (f, layer) => { const k = C.cfg.code(f.properties), u = porKey.get(k), rr = C.relleno?.get(k);
+          layer.bindTooltip(u ? tip(u) : rr ? `<b>${esc(P.lugar(C.cfg.name(f.properties)))}</b><br>Sin puesto de votación propio: toma el color de <b>${esc(P.lugar(rr.nombre))}</b>, el barrio con dato más cercano (${rr.km < 1 ? `${Math.round(rr.km * 1000)} m` : `${rr.km.toFixed(1).replace('.', ',')} km`}). Es un color inferido: no suma a ningún total.` : `<b>${esc(P.lugar(C.cfg.name(f.properties)))}</b><br>Sin votos de 2023 en esta lectura.`, { sticky: true, className: 'tp' }); },
+      }).addTo(MP.mapa);
+    }
+    /* Leaflet mide el contenedor al crearse: reencuadrar después del layout
+       (setTimeout, no requestAnimationFrame: se congela con la pestaña oculta).
+       La ventana urbana fija de Bogotá y Cartagena manda sobre el bounds real
+       (Sumapaz y las islas dejarían la ciudad en una uña), salvo en barrios de
+       Bogotá, cuya cartografía ya viene sin Sumapaz. */
+    setTimeout(() => {
+      MP.mapa.invalidateSize();
+      let b = null;
+      const w = MP.cfg?.ventana, usa = w && (MP.nivel !== 'barrios' || MP.cfg.ventanaBarrios) && ST.alcance?.tipo !== 'localidad';
+      if (usa) { const es = [[w.oeste, w.sur], [w.este, w.sur], [w.oeste, w.norte], [w.este, w.norte]].map(c => MP.cfg.rotate ? ROT(c) : c); b = W.latLngBounds(es.map(([lon, lat]) => [lat, lon])); }
+      if (!b || !b.isValid()) b = MP.capa?.getBounds?.();
+      if (b && b.isValid()) MP.mapa.fitBounds(b, { padding: [10, 10], maxZoom: 16, animate: false });
+    }, 0);
+    /* El conteo, la lista y la nota. */
+    const lista = C.tipo === 'puestos' ? C.unidades : C.unidades;
+    const cuenta = {}; lista.forEach(u => { const k = MP.vista === 'territorio' ? u.banda : u.cat; cuenta[k] = (cuenta[k] || 0) + 1; });
+    /* Las siglas (UCG) no se bajan a minúscula: «por ucg» no es nada. */
+    const rot = ROTULO_NIVEL()[MP.nivel], unidadTxt = /^[A-ZÁÉÍÓÚÑ]{2,5}$/.test(rot) ? rot : rot.toLowerCase();
+    const DIC = MP.vista === 'territorio' ? BANDA : CAT;
+    $('kMapaConteo').innerHTML = Object.entries(DIC).filter(([k]) => cuenta[k]).map(([k, [c, t]]) => `<li><i style="background:${c}"></i><b>${num(cuenta[k])}</b><span>${esc(t)}</span></li>`).join('')
+      + (C.relleno?.size ? `<li><i style="background:#dfe3dc;border:1px dashed rgba(23,37,28,.55)"></i><b>${num(C.relleno.size)}</b><span>barrios sin puesto propio: color del vecino, no cuentan</span></li>` : '');
+    if (MP.vista === 'territorio') {
+      /* En la vista de todo el territorio la lista es la de ESA escala: dónde
+         rinden más sus rivales cercanos, fuera o dentro de su base. */
+      const top = lista.filter(u => u.iR != null && u.validos >= K.MIN_VALIDOS_PUESTO).sort((a, b) => b.iR - a.iR).slice(0, 10);
+      $('kTopTitulo').textContent = `Donde más rinden sus rivales cercanos (por ${unidadTxt.replace(/s$/, '')})`;
+      $('kTop').innerHTML = top.map(u => `<li><b>${esc(P.lugar(u.name || u.nombre || `Puesto ${String(u.code || '').slice(5)}`))}</b> <small>ellos ${x2(u.iR)} su promedio · ${num(u.validos)} válidos de 2023${u.votos ? ` · ${num(u.votos)} votos suyos` : ''}</small></li>`).join('');
+    } else {
+      const top = L.mapa.puestos.filter(p => p.cat === 'disputa').sort((a, b) => b.votos - a.votos).slice(0, 10);
+      $('kTopTitulo').textContent = top.length ? 'Los puestos en disputa donde usted saca más votos' : 'Ningún puesto en disputa';
+      $('kTop').innerHTML = top.map(p => `<li><b>${esc(P.lugar(p.nombre || `Puesto ${p.code.slice(5)}`))}</b> <small>${esc(P.lugar(p.barrio || p.unidad || ''))} · ${num(p.votos)} votos suyos · usted ${x2(p.iU)}, ellos ${x2(p.iR)}</small></li>`).join('');
+    }
+    const fam = ST.L.familiaUsuario ? (PB.BLOQUE_LABEL[ST.L.familiaUsuario] || '').toLowerCase() : '';
+    $('kMapaCopy').innerHTML = MP.vista === 'territorio'
+      ? `Todo el territorio, ${esc(unidadTxt)} por ${esc(unidadTxt.replace(/s$/, ''))}: dónde rinden las listas de ${esc(fam || 'su familia')} y de las vecinas del espectro frente a su promedio. Es el mapa de <b>adónde tendría que ir a disputar</b> fuera de su base.`
+      : `Por ${esc(unidadTxt.replace(/s$/, ''))}: dónde rinde usted (frente a su promedio) y dónde rinden las listas de ${esc(fam || 'su familia')} y las vecinas del espectro, con su voto de lista. Donde rinden los dos, se va a pelear el voto.`;
+    const omit = [];
+    if (C.sinPunto) omit.push(`${num(C.sinPunto)} puesto${C.sinPunto === 1 ? '' : 's'} sin coordenada publicada no ${C.sinPunto === 1 ? 'aparece' : 'aparecen'} en el mapa pero sí ${C.sinPunto === 1 ? 'cuenta' : 'cuentan'}`);
+    if (C.fuera) omit.push(`${num(C.fuera)} votos suyos en puestos que no se pudieron ubicar en ${esc(unidadTxt)}`);
+    if (C.faltanPartes) omit.push(`${num(C.faltanPartes)} parte${C.faltanPartes === 1 ? '' : 's'} de la cartografía barrial no ${C.faltanPartes === 1 ? 'cargó' : 'cargaron'}`);
+    $('kMapaNota').innerHTML = `Cada zona suma sus puestos y se clasifica con la misma regla: menos de ${num(K.MIN_VALIDOS_PUESTO)} votos válidos o menos de ${num(K.MIN_VOTOS_BASE)} votos suyos es «muy pocos para leer». Colores por categoría, no por cantidad de votos de nadie.${omit.length ? ` Queda por fuera: ${omit.join('; ')}.` : ''}`;
+  }
+  function pintarBarra() {
+    const R = ROTULO_NIVEL();
+    $('kMapaBarra').innerHTML = `<div class="k-fila"><span class="rot">Escala</span>${MP.niveles.map(n => `<button type="button" class="k-toggle${n === MP.nivel ? ' active' : ''}" data-nivel="${n}">${esc(R[n])}</button>`).join('')}</div>`
+      + (ST.L.mapa?.dosCapas ? `<div class="k-fila"><span class="rot">Qué pinta</span><button type="button" class="k-toggle${MP.vista === 'base' ? ' active' : ''}" data-vista="base">Su base contra sus rivales</button><button type="button" class="k-toggle${MP.vista === 'territorio' ? ' active' : ''}" data-vista="territorio">Todo el territorio</button></div>` : '');
+    $('kMapaBarra').querySelectorAll('[data-nivel]').forEach(b => b.onclick = () => { MP.nivel = b.dataset.nivel; pintarMapaDisputa(); });
+    $('kMapaBarra').querySelectorAll('[data-vista]').forEach(b => b.onclick = () => { MP.vista = b.dataset.vista; pintarMapaDisputa(); });
+  }
+  function prepararMapa() {
+    const { niveles, cfg } = nivelesDe();
+    MP.niveles = niveles; MP.cfg = cfg; MP.cache = {};
+    /* Arranca en la escala más fina que no sea el puesto suelto: la comuna o
+       el municipio; en una JAL, los barrios si hay cartografía. */
+    MP.nivel = niveles[0];
+    /* En un salto (su base cubre una parte chica del territorio) la lectura
+       útil de entrada es adónde tendría que ir: todo el territorio. */
+    MP.vista = ST.L.mapa?.dosCapas ? 'territorio' : 'base';
+    return pintarMapaDisputa();
+  }
+  window.C360ContendientesMapa = { estado: () => MP, capaDe };   /* para las pruebas */
+
   function nota() {
     const L = ST.L, r = L.resumen;
     return `<b>Rivales probables, no inscritos.</b> Salen del registro electoral de la Registraduría: quien ganó la curul en 2023 (reparto reconstruido con el art. 263, el mismo de su meta: ${r && L.reparto?.curules ? `${num(L.reparto.curules)} curules` : 'sin reparto'}), quien compitió aquí en 2023 con al menos la mitad de lo que sacó el último elegido de su lista (en alcaldía y gobernación, el 20 % del ganador), y quien tiene votos enteros dentro de su territorio de otra elección${L.corp === 'jal' ? '' : ' (el Senado, o la Cámara de un departamento para un concejo municipal, todavía no entran: exigen recortar cada archivo)'}. `
@@ -260,6 +478,7 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
     $('kEstado').textContent = `Calculado con el registro electoral de la Registraduría${meta ? ` y su meta probable de ${num(meta)} votos` : ' (sin meta guardada: el tamaño pesa por los votos de cada rival)'}.`;
     ST.campana = ST.L.campana || ST.campana;   /* con el territorio completado, que es el que usa la meta de la ficha */
     pintarPlano(); pintarEscalera(); pintarLista();
+    prepararMapa();
     $('kNota').innerHTML = nota();
   } catch (e) {
     console.error(e);

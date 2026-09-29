@@ -102,7 +102,7 @@ son 01-10, con 08 endoso, 09 Día D y 10 contendientes; ver `candidato-360.html`
 | `candidato-360-redes.html` | Panel 05: sus cuentas, buscadas y validadas. |
 | `candidato-360-electorado.html` | Panel 07: el análisis del electorado, con figuras y gráficos. |
 | `candidato-360-endoso.html` | Panel 08: endoso de aliados. Suma excandidatos (tasa contra a quién apoyaron) y líderes sin candidatura (zona marcada en el mapa, rendimiento de quien apoyaron contra su comuna), sin contar dos veces a quien votó por varios. La lista vive solo en el navegador —los nombres de los líderes son datos de terceros— y Candi lo dice al guardar. Muestra cuánto cubre de cada escalón de la meta (el CRM deja los escalones en el navegador), dónde le suma votos nuevos y baja un CSV; el plan del Día D marca los puestos donde pesan los aliados. |
-| `candidato-360-contendientes.html` | Panel 10: sus rivales probables hasta la inscripción de 2027. Plano de familia política contra afinidad territorial (cuánto rinde cada rival en los puestos de su base), la escalera dentro de su lista, la tabla y una ficha por rival con su historial y la meta de su lista. La tarjeta 10 del CRM pinta el mismo plano (en vitrina, solo los tres primeros con nombre). Plan en `tools/candidato-360/contendientes/PLAN.md`. |
+| `candidato-360-contendientes.html` | Panel 10: sus rivales probables hasta la inscripción de 2027. Plano de familia política contra afinidad territorial (cuánto rinde cada rival en los puestos de su base), la escalera dentro de su lista, el mapa de disputa (comunas, barrios, municipios o puestos, con la segunda capa de «todo el territorio» en un salto), la tabla y una ficha por rival con su historial y la meta de su lista. La tarjeta 10 del CRM pinta el mismo plano (en vitrina, solo los tres primeros con nombre). Plan en `tools/candidato-360/contendientes/PLAN.md`. |
 | `candidato-360-perfil.html` | El método: cómo se lee un electorado sin violar el secreto del voto. |
 
 ### Módulos compartidos
@@ -113,7 +113,7 @@ son 01-10, con 08 endoso, 09 Día D y 10 contendientes; ver `candidato-360.html`
 | `partidos-bloques.js` | **Un solo diccionario** partido/coalición/movimiento → familia ideológica (izq, ci, c, cd, d, sc). Lo usan el mapa de alcaldías y Candidato 360: dos diccionarios serían dos opiniones. |
 | `candidato-360-electorado.js` | Las cuentas del electorado (perfil del censo, ideología del territorio, votación objetivo). Compartido por la tarjeta 07 y su página: si cada pantalla calculara por su lado, darían cifras distintas sobre lo mismo. Devuelve **datos**, no texto. |
 | `candidato-360-endoso.js` | El endoso de aliados (`window.C360Endoso`): recorta los votos del aliado al territorio, mide la tasa contra a quién apoyó y suma. Lo usan la tarjeta 08 y su panel; no conoce el CRM ni el DOM (el recorte y el nombre de las zonas se le pasan). Prueba: `node tools/candidato-360/prueba-endoso.mjs` (`--sin-red` para solo la lógica). |
-| `candidato-360-contendientes.js` | Los contendientes (`window.C360Contendientes`, fases 1-2 de `tools/candidato-360/contendientes/PLAN.md`; lo usan la tarjeta 10 y su panel): rivales probables por fuente (A ganó la curul en 2023 · B compitió ahí · C tiene votos ahí de otra elección), familia política con la franja «no sabemos», afinidad territorial con su base, presión competitiva en tres niveles, la escalera dentro de su lista y el mapa de disputa por puesto. `leer` es la entrada única (tarjeta y panel la llaman con las mismas entradas), `cargar` hace la IO, `evaluar` el cálculo y `planoSVG` el dibujo, sin DOM. Usa `VoteTarget.reparto` (el mismo reparto de la meta) y `C360DiaD.puestosDestino`. Prueba: `node tools/candidato-360/prueba-contendientes.mjs` (`--sin-red` para solo la lógica). |
+| `candidato-360-contendientes.js` | Los contendientes (`window.C360Contendientes`, fases 1-3 de `tools/candidato-360/contendientes/PLAN.md`; lo usan la tarjeta 10 y su panel): rivales probables por fuente (A ganó la curul en 2023 · B compitió ahí · C tiene votos ahí de otra elección), familia política con la franja «no sabemos», afinidad territorial con su base, presión competitiva en tres niveles, la escalera dentro de su lista y el mapa de disputa por puesto. `leer` es la entrada única (tarjeta y panel la llaman con las mismas entradas), `cargar` hace la IO, `evaluar` el cálculo, `disputaPorUnidad` el mapa por barrio, comuna o municipio y `planoSVG` el dibujo, sin DOM. Usa `VoteTarget.reparto` (el mismo reparto de la meta) y `C360DiaD.puestosDestino`. Prueba: `node tools/candidato-360/prueba-contendientes.mjs` (`--sin-red` para solo la lógica). |
 | `candidato-360-panel.js` | El chasis de los paneles: sesión, vínculo, muro, territorio y helpers de formato. |
 | `vote-target.js` | La meta de votos: referencia territorial, censo, participación y margen. Reparte las curules como el art. 263 (umbral, cifra repartidora) contando el **voto de lista** y las **listas cerradas**, y reservando la curul del estatuto de oposición en concejos y asambleas. Sin partido la referencia no es el piso de la corporación sino lo que costó entrar por una lista típica, o por una de la familia política elegida. |
 | `partidos-bloques.js` + `candidato-360-data/partidos/<dep>.js` | Catálogo de organizaciones por departamento para el sugeridor. |
@@ -225,7 +225,8 @@ Cada una tiene su README en `tools/candidato-360/<tema>/`:
 | **perfil** | El electorado: sexo, edad, campo y ciudad, y la votación objetivo | `perfil/` |
 | **arquetipos** | Qué mueve el voto en cada barrio (Medellín, Proyecto DC) | `arquetipos/` |
 | **endoso** | Cuántos votos le pueden pasar sus aliados (excandidatos y líderes de zona). La retención del voto propio se mide con `endoso/calibrar.mjs`, que reescribe la tabla del motor | `endoso/PLAN.md` |
-| **contendientes** *(fases 1-2: motor, tarjeta 10 y panel)* | Contra quién compite (plano familia × afinidad territorial), dónde se pelea el voto (mapa de disputa por puesto), el rival dentro de la propia lista y la revisión mensual | `contendientes/PLAN.md` |
+| **contendientes** *(fases 1-3: motor, tarjeta 10, panel y mapa)* | Contra quién compite (plano familia × afinidad territorial), dónde se pelea el voto (mapa de disputa por puesto), el rival dentro de la propia lista y la revisión mensual | `contendientes/PLAN.md` |
+| **equipo** *(plan, sin construir)* | Cómo la meta se vuelve zonas, sub-metas y tareas de un equipo sin custodiar su base de contactos (cuentas solo para quien coordina; testigos y líderes fuera del servidor) | `equipo/PLAN.md` |
 | **barrios-voronoi** | Barrios aproximados donde no hay cartografía oficial | `barrios-voronoi/` |
 | **logos** | Los logos de partido y su manifiesto | `logos/` |
 | **briefing / redes** | El correo cada tres días y la validación de cuentas | `briefing/`, `redes/` |
@@ -276,8 +277,8 @@ prueba-perfil (17)      la página del electorado y sus cinco lecturas
 prueba-partido (27)     sugeridor, logos, filtro por departamento
 prueba-meta (31)        la meta de votos en sus escenarios
 prueba-listas (15)      voto de lista, listas cerradas y curul de oposición
-prueba-contendientes (80)  el motor de contendientes: 57 sintéticos + 23 contra S3; Node
-prueba-contendientes-panel (24) el panel 10 y la tarjeta 10 en vitrina, mismo conteo
+prueba-contendientes (63)  el motor de contendientes: 42 sin red + 21 contra S3; Node
+prueba-contendientes-panel (29) el panel 10 (con el mapa) y la tarjeta 10 en vitrina, mismo conteo
 prueba-firmas (16)      cuántas firmas y dónde
 prueba-frases (18)      el banco de frases del punto de partida
 prueba-mapa (15)        Bogotá: ventana urbana, callejero, censo

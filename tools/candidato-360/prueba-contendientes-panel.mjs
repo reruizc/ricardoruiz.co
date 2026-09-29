@@ -14,9 +14,14 @@
 
      node tools/candidato-360/prueba-contendientes-panel.mjs
      (PLAYWRIGHT_PATH=/opt/homebrew/lib/node_modules/playwright/index.mjs si
-     Playwright está instalado de forma global)                              */
+     Playwright está instalado de forma global; LEAFLET_DIST=<dist de leaflet>)                              */
 const { chromium } = await import('playwright')
   .catch(() => import(process.env.PLAYWRIGHT_PATH || '/opt/node22/lib/node_modules/playwright/index.mjs'));
+import { readFile } from 'node:fs/promises';
+/* Leaflet sin red, como en prueba-mapa.mjs: npm pack leaflet@1.9.4 && tar xzf
+   leaflet-1.9.4.tgz (deja package/dist/), o LEAFLET_DIST=<carpeta dist>. */
+const LEAFLET = process.env.LEAFLET_DIST || (await readFile('node_modules/leaflet/dist/leaflet.js', 'utf8').then(() => 'node_modules/leaflet/dist').catch(() => 'package/dist'));
+const leafletJS = await readFile(LEAFLET + '/leaflet.js', 'utf8'), leafletCSS = await readFile(LEAFLET + '/leaflet.css', 'utf8');
 
 const NL = 'NUEVO LIBERALISMO- AGRUPACION POLITICA EN MARCHA', VERDE = 'PARTIDO ALIANZA VERDE', CD = 'PARTIDO CENTRO DEMOCRÁTICO', ASI = 'PARTIDO ALIANZA SOCIAL INDEPENDIENTE "ASI"';
 const CIRC = 'BARRIOS UNIDOS · BOGOTÁ D.C.', CORP = `JAL · ${CIRC} · 2023`;
@@ -72,6 +77,8 @@ async function montar(page, { acceso = true } = {}) {
   await page.route('**', async route => {
     const u = route.request().url();
     if (u.startsWith('file://')) return route.continue();
+    if (u.includes('leaflet.min.js')) return route.fulfill({ status: 200, contentType: 'application/javascript', body: leafletJS });
+    if (u.includes('leaflet.min.css')) return route.fulfill({ status: 200, contentType: 'text/css', body: leafletCSS });
     if (u.includes('/c360/me')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(acceso ? { ok: true, acceso: true, fuente: 'plan', vinculo: VINCULO, email: 'prueba@ejemplo.co', plan: 'c360' } : { ok: true, acceso: false, fuente: 'ninguno', vinculo: null }) });
     const k = Object.keys(ARCHIVOS).find(x => u.split('?')[0].endsWith(x));
     if (k) { pedidos.push(k); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ARCHIVOS[k]) }); }
@@ -111,6 +118,18 @@ try {
   await p.click('#kFilas tr[data-key]');   /* orden por nombre: la primera es Ana, fuente A */
   await p.waitForFunction(() => /meta de su lista/i.test(document.getElementById('kFichaMeta').textContent), null, { timeout: 15000 }).catch(() => {});
   ok(/meta de su lista/i.test(await p.textContent('#kFichaMeta')), 'la ficha de una elegida trae la meta de su lista, con la misma cuenta de la meta propia');
+  /* Fase 3 · el mapa de disputa. La fixture es Barrios Unidos (localidad 12):
+     escalas barrios (diccionario real de candidato-360-data) y puestos. */
+  await p.waitForFunction(() => /Cada zona suma/.test(document.getElementById('kMapaNota')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
+  const M = await p.evaluate(() => { const E = C360ContendientesMapa.estado(); return { niveles: E.niveles, nivel: E.nivel, vista: E.vista, dos: C360ContendientesPagina.lectura().mapa.dosCapas }; });
+  ok(M.niveles.join() === 'barrios,puestos' && M.nivel === 'barrios' && M.vista === 'base' && !M.dos, `mapa: una JAL de Bogotá abre en barrios, con su base (${JSON.stringify(M)})`);
+  ok(await p.$$eval('#kMapa path.leaflet-interactive', x => x.length) > 0 && await p.$$eval('#kMapaConteo li', x => x.length) > 0, 'mapa: pinta los barrios y el conteo por categoría');
+  ok(!(await p.$('#kMapaBarra [data-vista]')), 'sin salto de corporación no se ofrece la segunda capa');
+  await p.click('#kMapaBarra [data-nivel="puestos"]');
+  await p.waitForFunction(() => document.querySelectorAll('#kMapa path.leaflet-interactive').length === 4, null, { timeout: 10000 }).catch(() => {});
+  ok(await p.$$eval('#kMapa path.leaflet-interactive', x => x.length) === 4, 'mapa: en puestos, un círculo por puesto (4)');
+  const tipMapa = await p.evaluate(() => { const l = Object.values(C360ContendientesMapa.estado().capa._layers)[0]; return l.getTooltip().getContent(); });
+  ok(/no dice quién votó por quién/.test(tipMapa), 'el globo del mapa dice que describe el lugar, no a las personas');
   ok(!/amenaza/i.test(await p.textContent('body')), 'la palabra «amenaza» no aparece en la página');
   ok(/Rivales probables, no inscritos/.test(await p.textContent('#kNota')), 'la nota dice que son rivales probables y de dónde salen');
   await p.setViewportSize({ width: 375, height: 800 });

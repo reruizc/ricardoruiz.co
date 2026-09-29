@@ -208,7 +208,10 @@
       return { fuente: 'asamblea', lugar: r.name || campana.departamentoNombre || '',
         archivos: partes.filter(Boolean).map(d => ({ d, mun: pad3(d.mme) })) , faltan: partes.filter(x => !x).length };
     }
-    const mun3 = pad3(await E.codigoMunicipio(dep, campana.municipio).catch(() => ''));
+    /* Con el código ya resuelto (la tarjeta de contendientes lo saca del
+       alcance) no se busca por nombre: las mesas dicen «CARTAGENA» y la
+       cartografía «CARTAGENA DE INDIAS», y por nombre no casaban. */
+    const mun3 = pad3(campana.municipioCodigo || await E.codigoMunicipio(dep, campana.municipio).catch(() => ''));
     if (!mun3 || mun3 === '000') return null;
     const key = `${dep}-${mun3}`;
     const porComuna = corp === 'jal' ? 'jal' : 'concejo';     /* alcaldía: el Concejo de su ciudad */

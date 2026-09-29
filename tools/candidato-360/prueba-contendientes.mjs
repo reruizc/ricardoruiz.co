@@ -113,6 +113,23 @@ ok(!L.rivales.filter(r => !L.vitrina.includes(r.key)).some(r => svgV.includes(K.
 ok(nombres(svgT) === Math.min(K.TOP_PLANO, L.plano.length) && !/vitrina-blur/.test(svgT), 'con acceso: nombres de los del plano, nada borroso');
 ok(!/amenaza/i.test(svgT + Object.values(K.AVISO_TXT).join(' ') + Object.values(K.NIVEL_TXT).join(' ') + Object.values(K.MARCA_TXT).join(' ')), 'la palabra «amenaza» no aparece en ningún texto del motor');
 
+/* Fase 3 · el mapa por unidad: se suman los puestos y se clasifica la suma. */
+const tot = { B: 300, RT: 1000, VAL: 4000 };
+ok(K.categoria({ b: 150, r: 300, val: 1000 }, tot).cat === 'disputa' && K.categoria({ b: 150, r: 100, val: 1000 }, tot).cat === 'fortaleza'
+  && K.categoria({ b: 20, r: 300, val: 1000 }, tot).cat === 'terreno-rivales' && K.categoria({ b: 20, r: 100, val: 1000 }, tot).cat === 'terreno-ajeno', 'las cuatro categorías de la regla');
+ok(K.categoria({ b: 150, r: 300, val: 150 }, tot).cat === 'poco' && K.categoria({ b: 3, r: 300, val: 1000 }, tot).cat === 'poco' && K.categoria({ b: 0, r: 300, val: 1000 }, tot).cat === 'sin-base', 'puesto chico o con pocos votos suyos: «poco»; sin votos suyos: «sin base»');
+ok(K.bandaRivales(1.2) === 'fuerte' && K.bandaRivales(1) === 'parejo' && K.bandaRivales(.5) === 'flojo' && K.bandaRivales(null) === 'sin-dato', 'la segunda capa: tres bandas con la franja del plano');
+const mapaS = { puestos: [{ code: 'P1', votos: 3, rivales: 40, validos: 150 }, { code: 'P2', votos: 4, rivales: 60, validos: 150 }, { code: 'P3', votos: 90, rivales: 100, validos: 1000 }, { code: 'P4', votos: 5, rivales: 5, validos: 500 }],
+  totales: { B: 102, RT: 205, VAL: 1800 }, umbral: true };
+const U = K.disputaPorUnidad(mapaS, p => ({ P1: 'A', P2: 'A', P3: 'B' })[p.code] || '', k => `Barrio ${k}`);
+const uA = U.unidades.find(u => u.key === 'A');
+ok(uA.votos === 7 && uA.validos === 300 && uA.puestos === 2 && uA.cat !== 'poco', 'dos puestos chicos se leen juntos en su barrio: 7 votos y 300 válidos ya no son «poco»');
+ok(U.fuera === 5 && U.unidades.length === 2, 'el puesto sin barrio queda por fuera y se cuenta, no se inventa');
+const cuadro = (x, y) => ({ type: 'Feature', properties: { b: `${x},${y}` }, geometry: { type: 'Polygon', coordinates: [[[x, y], [x + .001, y], [x + .001, y + .001], [x, y + .001], [x, y]]] } });
+const F3 = [cuadro(-74, 4.6), cuadro(-74.01, 4.6), cuadro(-74.2, 4.6)];
+const R3 = K.rellenos(F3, p => p.b, p => p.b, new Set(['-74,4.6']));
+ok(R3.get('-74.01,4.6')?.de === '-74,4.6' && !R3.has('-74.2,4.6'), 'relleno: el barrio sin dato toma al vecino a ~1 km; a más de 3 km queda sin dato');
+
 /* ── 2. Casos reales ───────────────────────────────────────────────────── */
 if (!process.argv.includes('--sin-red')) {
   try {

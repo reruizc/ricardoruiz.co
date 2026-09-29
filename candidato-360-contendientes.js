@@ -41,7 +41,8 @@
   const MIN_VALIDOS_PUESTO = 200, MIN_VOTOS_BASE = 5;
   const MIN_BASE = { votos: 30, puestos: 3 };
   const TOP_PLANO = 12, VITRINA = 3;
-  const MAX_OTRAS = 20;                    /* personas NUEVAS de otras elecciones cuyo archivo se baja */
+  const MAX_OTRAS = 6;                     /* personas NUEVAS de otras elecciones cuyo archivo se baja (las demás entran sin votos por puesto) */
+  const MAX_OTRAS_JAL = 20;                /* los archivos de JAL son chicos: se bajan más */
   const AVISO_PAREJO = .8;
   const UNINOMINALES = ['alcaldia', 'gobernacion'], UNINOMINAL_SLUG = /^(ALC|GOB)\d{4}-/;
   const FUERA_DEL_INDICE = new Set(['titular-no-reelegible', 'congresista-2026', 'voto-uninominal', 'en-ejercicio']);                 /* ≥ 80 % de los rivales en la franja → territorio parejo */
@@ -118,7 +119,9 @@
         if (!zon || !pue || ['90', '98'].includes(zon)) return;
         const code = dep2 + mun3 + pad(zon, 2) + String(pue).trim().toUpperCase().padStart(2, '0');
         validos.set(code, (validos.get(code) || 0) + Number(pu.validos || 0));
-        if (!info.has(code)) info.set(code, { nombre: pu.nombre || '', barrio: pu.barrio || '', unidad: nombre || d.name || '', lat: pu.lat, lon: pu.lon });
+        /* `com` es el código de la comuna o localidad del archivo (en Cartagena,
+           la UCG); `mun`, el municipio: con eso el mapa agrupa sin el georef. */
+        if (!info.has(code)) info.set(code, { nombre: pu.nombre || '', barrio: pu.barrio || '', unidad: nombre || d.name || '', lat: pu.lat, lon: pu.lon, com: d.comuna != null ? String(d.comuna) : '', mun: mun3 });
         (pu.v || []).forEach(([i, v]) => {
           const c = (d.cands || [])[i]; if (!c || !v) return;
           const k = llaveCand(c[0], partidos[c[1]]);
@@ -217,30 +220,79 @@
      Por puesto: i_U = su fuerza relativa, i_R = la de su familia y las vecinas
      (votos personales + votos de lista de sus partidos). Cuatro categorías y
      dos de «no se puede leer». La segunda capa (todo el territorio) es solo i_R. */
+  /* La regla de las cuatro categorías, la misma para un puesto que para un
+     barrio o una comuna (sumando sus puestos): así un puesto chico no decide
+     solo, y el mapa agregado dice lo mismo que la suma de sus partes. */
+  function categoria({ b, r, val }, { B, RT, VAL }, umbral = true) {
+    const iR = RT ? (r / val) / (RT / VAL) : null;
+    const iU = B ? (b / val) / (B / VAL) : null;
+    let cat;
+    if (umbral && val < MIN_VALIDOS_PUESTO) cat = 'poco';
+    else if (!b) cat = 'sin-base';
+    else if (umbral && b < MIN_VOTOS_BASE) cat = 'poco';
+    else if (iR == null) cat = iU >= 1 ? 'fortaleza' : 'terreno-ajeno';
+    else cat = iU >= 1 ? (iR >= 1 ? 'disputa' : 'fortaleza') : (iR >= 1 ? 'terreno-rivales' : 'terreno-ajeno');
+    return { cat, iU, iR };
+  }
+  /* La segunda capa (todo el territorio): dónde rinden sus rivales cercanos,
+     sin su base. Tres bandas con la misma franja del plano. */
+  const bandaRivales = iR => iR == null ? 'sin-dato' : iR >= MISMO_TERRENO[1] ? 'fuerte' : iR >= MISMO_TERRENO[0] ? 'parejo' : 'flojo';
   function disputa(base, datos, cercanos, opts = {}) {
     const umbral = opts.umbral !== false;
     const VAL = totalValidos(datos);
     const R = new Map(); let RT = 0;
     cercanos.forEach(pp => pp.forEach((v, code) => { if (datos.validos.get(code)) { R.set(code, (R.get(code) || 0) + v); RT += v; } }));
     const conteo = { fortaleza: 0, disputa: 0, 'terreno-rivales': 0, 'terreno-ajeno': 0, 'sin-base': 0, poco: 0 };
-    const puestos = [];
+    const puestos = [], tot = { B: base?.total || 0, RT, VAL };
     datos.validos.forEach((val, code) => {
-      const b = base?.porPuesto.get(code) || 0;
-      const iR = RT ? ((R.get(code) || 0) / val) / (RT / VAL) : null;
-      const iU = base?.total ? (b / val) / (base.total / VAL) : null;
-      let cat;
-      if (umbral && val < MIN_VALIDOS_PUESTO) cat = 'poco';
-      else if (!b) cat = 'sin-base';
-      else if (umbral && b < MIN_VOTOS_BASE) cat = 'poco';
-      else if (iR == null) cat = iU >= 1 ? 'fortaleza' : 'terreno-ajeno';
-      else cat = iU >= 1 ? (iR >= 1 ? 'disputa' : 'fortaleza') : (iR >= 1 ? 'terreno-rivales' : 'terreno-ajeno');
-      conteo[cat]++;
-      puestos.push({ code, cat, iU, iR, votos: b, validos: val, ...(datos.info.get(code) || {}) });
+      const b = base?.porPuesto.get(code) || 0, r = R.get(code) || 0;
+      const c = categoria({ b, r, val }, tot, umbral);
+      conteo[c.cat]++;
+      puestos.push({ code, ...c, banda: bandaRivales(c.iR), votos: b, rivales: r, validos: val, ...(datos.info.get(code) || {}) });
     });
     /* La segunda capa solo tiene sentido si la base cubre una parte chica del
        territorio (el salto de JAL a Concejo: 31 de 943 puestos). */
     const cobertura = datos.validos.size ? (base?.puestos || 0) / datos.validos.size : 0;
-    return { puestos, conteo, cobertura, dosCapas: cobertura < .5, rivalesVotos: RT };
+    return { puestos, conteo, cobertura, dosCapas: cobertura < .5, rivalesVotos: RT, totales: tot, umbral };
+  }
+  /* El mismo mapa por barrio, comuna o municipio: se suman los puestos de cada
+     unidad y se clasifica la suma con la misma regla. `claveDe(puesto)` dice a
+     qué unidad va cada puesto (o '' si a ninguna: no se inventa). */
+  function disputaPorUnidad(mapa, claveDe, nombreDe = k => k) {
+    if (!mapa) return { unidades: [], conteo: {}, fuera: 0 };
+    const acc = new Map(); let fuera = 0;
+    mapa.puestos.forEach(p => {
+      const k = claveDe(p); if (!k) { fuera += p.votos; return; }
+      if (!acc.has(k)) acc.set(k, { key: k, name: nombreDe(k, p), b: 0, r: 0, val: 0, puestos: 0, codes: [] });
+      const a = acc.get(k); a.b += p.votos; a.r += p.rivales; a.val += p.validos; a.puestos++; a.codes.push(p.code);
+    });
+    const conteo = { fortaleza: 0, disputa: 0, 'terreno-rivales': 0, 'terreno-ajeno': 0, 'sin-base': 0, poco: 0 };
+    const unidades = [...acc.values()].map(a => { const c = categoria(a, mapa.totales, mapa.umbral); conteo[c.cat]++; return { ...a, ...c, banda: bandaRivales(c.iR), votos: a.b, rivales: a.r, validos: a.val }; });
+    return { unidades, conteo, fuera };
+  }
+
+  /* ── Barrios sin puesto propio: el color del vecino más cercano ─────────
+     Mismo criterio de la página del electorado y de los tableros de 2023:
+     el barrio con dato más cercano por centroide, a menos de 3 km; más lejos
+     queda sin dato. Nunca entra a un total ni a una lista. */
+  const RELLENO_MAX_KM = 3;
+  function centroide(g) {
+    const anillos = g?.type === 'Polygon' ? [g.coordinates[0]] : g?.type === 'MultiPolygon' ? g.coordinates.map(pg => pg[0]) : [];
+    let x = 0, y = 0, n = 0;
+    anillos.forEach(r => r.forEach(([lon, lat]) => { x += lon; y += lat; n++; }));
+    return n ? [x / n, y / n] : null;
+  }
+  function rellenos(features, codeDe, nameDe, conDato, maxKm = RELLENO_MAX_KM) {
+    const con = [], sin = [];
+    (features || []).forEach(f => { const c = centroide(f.geometry), code = codeDe(f.properties); if (!c) return; (conDato.has(code) ? con : sin).push({ code, c, name: nameDe(f.properties) }); });
+    const out = new Map();
+    sin.forEach(b => {
+      let mejor = null, d2 = Infinity;
+      con.forEach(o => { const dx = (o.c[0] - b.c[0]) * Math.cos(b.c[1] * Math.PI / 180), dy = o.c[1] - b.c[1], d = dx * dx + dy * dy; if (d < d2) { d2 = d; mejor = o; } });
+      const km = Math.sqrt(d2) * 111.32;
+      if (mejor && km <= maxKm) out.set(b.code, { de: mejor.code, nombre: mejor.name, km });
+    });
+    return out;
   }
 
   /* ── Las fuentes A y B del reparto de 2023 ─────────────────────────────── */
@@ -469,15 +521,19 @@
     const E = global.C360Endoso;
     const dentro = deps.dentro || (alcance && E ? m => E.enAlcance(m, alcance) : null);
     const codigo = alcance ? { dep: alcance.departamento, mun: alcance.municipio } : null;
-    const rep = await global.VoteTarget.reparto({ corp, territory: territorioDe(alcance, campana), baseUrl, codigo }).catch(() => null);
-    const urlDe = c => c.dataUrl || (global.CandRegistry ? global.CandRegistry.dataUrlFor(c.slug) : `${baseUrl}/${c.slug}.json`);
+    /* El reparto y la matriz van en paralelo: cada uno baja lo suyo (el índice
+       de la corporación, los archivos por comuna) y en fila sumaban. */
+    const repP = global.VoteTarget.reparto({ corp, territory: territorioDe(alcance, campana), baseUrl, codigo }).catch(() => null);
+    const destinoP = CON_MATRIZ.includes(corp) ? Promise.resolve((deps.puestosDestino || global.C360DiaD?.puestosDestino)?.(campana)).catch(() => null) : Promise.resolve(null);
+    const [rep, destino] = await Promise.all([repP, destinoP]);
+    /* La URL por el slug con la regla del electorado (JAL2023 → jal-2023/…):
+       `CandRegistry.dataUrlFor` sin el índice cargado cae a la carpeta del
+       Congreso y daba 404 en todo el modo sin matriz. */
+    const urlDe = c => c.dataUrl || global.C360Electorado?.urlCandidatura?.(c.slug) || (global.CandRegistry ? global.CandRegistry.dataUrlFor(c.slug) : `${baseUrl}/${c.slug}.json`);
 
     /* La matriz, si existe para ESTA corporación. */
     let datos = null;
-    if (CON_MATRIZ.includes(corp)) {
-      const destino = await (deps.puestosDestino || global.C360DiaD?.puestosDestino)?.(campana).catch(() => null);
-      if (destino && destino.fuente === corp && destino.archivos.length) { datos = matrizDesdeArchivos(destino.archivos); datos.faltan = destino.faltan || 0; }
-    }
+    if (destino && destino.fuente === corp && destino.archivos.length) { datos = matrizDesdeArchivos(destino.archivos); datos.faltan = destino.faltan || 0; }
     if (!datos) {
       const filas = (rep?.rows || []).filter(r => Number(r.votos || 0) > 0);
       const partes = await enTandas(filas.map(r => () => leerMesas(urlDe(r)).then(mesas => ({ entrada: r, mesas }))));
@@ -495,9 +551,22 @@
     const F0 = fuentesDelReparto(rep), ref = F0.referencia;
     if (ref) {
       const de2023 = new Set((rep?.rows || []).filter(r => F0.porSlug.has(r.slug)).map(llavePersona).filter(k => !k.startsWith('slug:')));
-      const pasan = candidatasOtras(deps.registro, alcance, corp, excluir).filter(c => Number(c.votos || 0) >= ref);
+      /* `registro` puede llegar como promesa: `leer` lo pide en paralelo. */
+      const pasan = candidatasOtras(await deps.registro, alcance, corp, excluir).filter(c => Number(c.votos || 0) >= ref);
       const conocidas = pasan.filter(c => de2023.has(llavePersona(c)));
-      const nuevas = pasan.filter(c => !de2023.has(llavePersona(c))).sort((a, b) => b.votos - a.votos).slice(0, MAX_OTRAS);
+      /* Quien viene de alcaldía o gobernación queda fuera del índice en una
+         corporación de lista (ver evaluar): su archivo no se baja. El del
+         alcalde de Bogotá son 1,5 millones de votos mesa a mesa. */
+      const sinArchivo = c => !UNINOMINALES.includes(corp) && UNINOMINAL_SLUG.test(c.slug || '');
+      const candidatasNuevas = pasan.filter(c => !de2023.has(llavePersona(c)) && !sinArchivo(c)).sort((a, b) => b.votos - a.votos);
+      /* El tope depende de cuánto pesa el archivo: el de un edil ronda 100 KB
+         y el de un concejal de Bogotá 2 MB. Las que pasan del tope siguen
+         siendo rivales: entran sin votos por puesto (sin afinidad medida, que
+         la presión trata como neutra), no desaparecen. */
+      const esJal = c => /^JAL\d{4}-/.test(c.slug || '');
+      const nuevas = [...candidatasNuevas.filter(esJal).slice(0, MAX_OTRAS_JAL), ...candidatasNuevas.filter(c => !esJal(c)).slice(0, MAX_OTRAS)];
+      const bajadas = new Set(nuevas.map(c => c.slug));
+      conocidas.push(...pasan.filter(c => !de2023.has(llavePersona(c)) && sinArchivo(c)), ...candidatasNuevas.filter(c => !bajadas.has(c.slug)));
       const partes = await enTandas(nuevas.map(c => () => leerMesas(urlDe(c)).then(mesas => ({ c, mesas }))));
       otras = partes.filter(Boolean).map(({ c, mesas }) => {
         const pp = new Map(); let total = 0;
@@ -525,14 +594,17 @@
     jal: ['jal-2019', 'jal-2015'],
     concejo: ['concejo-2019', 'alcaldia-2023', 'alcaldia-2019', 'jal-2023'],
     alcaldia: ['alcaldia-2019', 'concejo-2023', 'concejo-2019'],
-    asamblea: ['asamblea-2019', 'gobernacion-2023', 'congreso-2022'],
-    gobernacion: ['gobernacion-2019', 'asamblea-2023', 'congreso-2022'],
+    asamblea: ['asamblea-2019', 'gobernacion-2023'],
+    gobernacion: ['gobernacion-2019', 'asamblea-2023'],
   };
+  /* ⚠️ La Cámara salió de la fuente C (fase 3, medido): sus archivos mesa a
+     mesa pesan ~2 MB cada uno en Bogotá y, con ellos, abrir el Concejo de
+     Bogotá bajaba 90 MB y tardaba un minuto. Es raro que un representante
+     baje al concejo o la asamblea; si hace falta, entra con una matriz propia
+     por circunscripción (D1 del plan), no archivo por archivo. */
   async function registroC(corp, alcance, baseUrl = S3) {
     if (!alcance) return [];
     const dirs = (INDICES_C[corp] || []).slice();
-    /* Bogotá es municipio y departamento: su Cámara cabe entera en el concejo. */
-    if (['concejo', 'alcaldia'].includes(corp) && String(Number(alcance.departamento)) === '16') dirs.push('congreso-2022');
     const partes = await enTandas(dirs.map(dir => () => jsonDe(`${baseUrl}/${dir}/index-${dir}.json`)
       .then(d => (Array.isArray(d) ? d : d.candidatos || []).map(c => ({ ...c, dataUrl: `${baseUrl}/${dir}/${c.slug}.json` })))), 3);
     return candidatasOtras(partes.filter(Boolean).flat(), alcance, corp, new Set());
@@ -554,18 +626,22 @@
      el alcance y sus mesas: el municipio por el nombre que traen las mesas,
      que es el que la cartografía traduce a código electoral. */
   function completarCampana(campana = {}, alcance, mesasPropias) {
-    if (campana.departamento || !alcance) return campana;
+    if (!alcance) return campana;
+    /* El código electoral del municipio va siempre que el alcance lo tenga: el
+       nombre no casa entre mesas y cartografía (Cartagena, Cali, Cúcuta). */
+    const conCodigo = alcance.municipio ? { municipioCodigo: pad(alcance.municipio, 3) } : {};
+    if (campana.departamento) return Object.assign({}, campana, conCodigo);
     const E = global.C360Endoso;
     const mesa = (mesasPropias || []).find(m => E ? E.enAlcance(m, alcance) : true) || {};
     return Object.assign({}, campana, {
       departamento: pad(alcance.departamento, 2), departamentoNombre: campana.departamentoNombre || mesa.depNom || '',
       municipio: alcance.tipo === 'departamento' ? '' : (mesa.munNom || alcance.nombre || ''),
       localidad: alcance.tipo === 'localidad' ? alcance.localidad : '',
-    });
+    }, conCodigo);
   }
   async function leer({ campana = {}, slugs = [], mesasPropias = null, alcance = null, meta = 0, usuario = {}, baseUrl = S3, registro = null } = {}) {
     campana = completarCampana(campana, alcance, mesasPropias);
-    const reg = registro || await registroC(campana.corp, alcance, baseUrl).catch(() => []);
+    const reg = registro || registroC(campana.corp, alcance, baseUrl).catch(() => []);   /* promesa: corre junto con el reparto y la matriz */
     const cargado = await cargar(campana, { baseUrl, alcance, mesasPropias, slugsPropios: slugs, registro: reg });
     if (!cargado.base && global.C360DiaD?.fuente) {
       const F = await global.C360DiaD.fuente({ slugs, campana }).catch(() => null);
@@ -656,10 +732,10 @@
   }
 
   global.C360Contendientes = {
-    ORDEN, CERCANIA_PASOS, CERCANIA_NO_SABEMOS, CERCANO, MISMO_TERRENO, UMBRAL_LISTA, UMBRAL_UNINOMINAL, MIN_VALIDOS_PUESTO, MIN_VOTOS_BASE, MIN_BASE, TOP_PLANO, VITRINA, MAX_OTRAS,
+    ORDEN, CERCANIA_PASOS, CERCANIA_NO_SABEMOS, CERCANO, MISMO_TERRENO, UMBRAL_LISTA, UMBRAL_UNINOMINAL, MIN_VALIDOS_PUESTO, MIN_VOTOS_BASE, MIN_BASE, TOP_PLANO, VITRINA, MAX_OTRAS, MAX_OTRAS_JAL,
     familia, familiaCampana, pasos, cercania, llavePersona, esCongresista, codigoPuesto,
     matrizDesdeArchivos, matrizDesdeMesas, baseDesdeMesas, afinidad, correlacion, franja, presion, niveles, disputa,
     fuentesDelReparto, escalera, evaluar, candidatasOtras, territorioDe, cargar,
-    S3, INDICES_C, registroC, congresistas, completarCampana, leer, planoSVG, sello, corto, FUENTE_TXT, FRANJA_TXT, NIVEL_TXT, MARCA_TXT, AVISO_TXT,
+    S3, INDICES_C, registroC, congresistas, completarCampana, leer, categoria, bandaRivales, disputaPorUnidad, centroide, rellenos, RELLENO_MAX_KM, planoSVG, sello, corto, FUENTE_TXT, FRANJA_TXT, NIVEL_TXT, MARCA_TXT, AVISO_TXT,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
