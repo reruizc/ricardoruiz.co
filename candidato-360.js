@@ -4340,8 +4340,21 @@ function accesoresMedellin(familias) {
     colorDe: id => familias?.arquetipos?.[id]?.color || '#6b7280',
   };
 }
-function ciudadDeArquetipos(mesas) {
-  const campana = municipioDeCampana(), mayor = municipioMayoritario(mesas);
+/* ⚠️ Una candidatura NUEVA no pasa por el formulario de la ruta con historial,
+   así que `municipioDeCampana()` —que lee ese formulario— sale vacío: Nury,
+   probando como candidata nueva a la Alcaldía de Cartagena, veía la tarjeta
+   apagada («Por ahora, Medellín y Cartagena»), porque sin votos propios
+   tampoco había municipio mayoritario (sep-29-2026). La campaña nueva vive en
+   CAMPANA_ACTUAL con el municipio por su nombre DANE («CARTAGENA DE INDIAS»),
+   que se traduce a código electoral con la capa municipal. */
+async function municipioDeCampanaNueva() {
+  const c = !crmCandidate ? CAMPANA_ACTUAL : null;
+  if (!c || !CORP_MUNICIPAL.includes(c.corp) || !c.municipio || !c.departamento) return '';
+  const mun = await C360Electorado.codigoMunicipio(c.departamento, c.municipio).catch(() => '');
+  return mun ? `${String(c.departamento).padStart(2, '0')}${String(mun).padStart(3, '0')}` : '';
+}
+function ciudadDeArquetipos(mesas, campanaNueva = '') {
+  const campana = municipioDeCampana() || campanaNueva, mayor = municipioMayoritario(mesas);
   if (campana === MEDELLIN || (!campana && mayor === MEDELLIN)) return 'medellin';
   if (campana === CARTAGENA || (!campana && mayor === CARTAGENA)) return 'cartagena';
   /* Campaña en otro lado pero votos en una de las dos: se lee donde están. */
@@ -4355,7 +4368,7 @@ async function pintarArquetipos() {
   const card = $('crmArquetipos'); if (!card) return;
   ARQUETIPOS_ACTUAL = null;
   const mesas = await mesasDelHistorial();
-  const ciudad = ciudadDeArquetipos(mesas);
+  const ciudad = ciudadDeArquetipos(mesas, await municipioDeCampanaNueva());
   $('crmArqBtn').disabled = true;
   if (!ciudad) {
     card.classList.add('module-apagado');
