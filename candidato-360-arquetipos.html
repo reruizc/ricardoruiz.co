@@ -25,6 +25,18 @@
 .hidden{display:none}
 #arqCuerpo > .panel{margin-bottom:16px}
 
+/* ── Las lentes: desde dónde se leen los arquetipos ──────────────────── */
+.aq-lentes{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 18px;padding:14px 16px;border:1px solid var(--line);background:rgba(255,255,255,.35)}
+.aq-lentes .rot{font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-right:6px}
+.aq-lente{font:600 13px var(--body,Manrope),sans-serif;padding:9px 14px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.aq-lente small{display:block;font:500 10.5px var(--mono);letter-spacing:.04em;color:var(--muted);margin-top:2px}
+.aq-lente[aria-pressed="true"]{border-color:var(--green);background:rgba(20,124,112,.08);box-shadow:inset 0 -3px 0 var(--green)}
+.aq-lente:disabled{opacity:.45;cursor:not-allowed}
+.aq-lentes p{flex-basis:100%;margin:6px 0 0;font-size:12.5px;line-height:1.5;color:var(--muted)}
+.aq-afin{margin:16px 0 0;padding:14px 16px;border:1px solid var(--line);border-left:4px solid var(--c,var(--green));font-size:14px;line-height:1.55}
+.aq-afin b.x{font:800 20px var(--display);color:var(--c,var(--green))}
+.aq-card .ratio{font:600 12px var(--mono);color:var(--ink);margin-top:6px;display:block}
+
 /* ── 01 · El que manda ───────────────────────────────────────────────── */
 .aq-manda{display:grid;grid-template-columns:minmax(0,240px) minmax(0,1fr);gap:clamp(18px,3vw,32px);align-items:start;margin-top:14px}
 .aq-manda img{width:100%;height:auto;display:block;border:1px solid var(--line)}
@@ -63,7 +75,20 @@
 .aq-leyenda span{display:inline-flex;align-items:center;gap:6px}
 .aq-leyenda i{width:12px;height:12px;display:inline-block}
 .aq-mapa-nota{margin:10px 0 0;font-size:12.5px;line-height:1.55;color:var(--muted)}
-.leaflet-tooltip.aq-tt{font:13px/1.45 Manrope,sans-serif;max-width:280px;white-space:normal}
+.leaflet-tooltip.aq-tt{font:600 12.5px/1.3 Manrope,sans-serif;white-space:nowrap;padding:5px 8px}
+/* El detalle NO va en el globo: con cinco renglones Leaflet lo apretaba a una
+   columna de dos palabras y no se leía. El globo dice nombre y arquetipo; la
+   ficha fija de la esquina trae todo lo demás. En el teléfono va debajo. */
+.aq-mapa-caja{position:relative}
+.aq-ficha{position:absolute;top:10px;right:10px;z-index:500;width:260px;max-height:calc(100% - 20px);overflow:auto;background:rgba(255,253,248,.97);border:1px solid var(--line);box-shadow:0 6px 18px rgba(16,34,28,.14);padding:12px 14px;font-size:13px;line-height:1.5;color:var(--ink)}
+.aq-ficha h5{margin:0 0 4px;font:700 15px/1.25 var(--display)}
+.aq-ficha .fila{display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding:5px 0;font-size:12.5px}
+.aq-ficha .fila span{color:var(--muted)}
+.aq-ficha .fila b{text-align:right}
+.aq-ficha .vacio{color:var(--muted);font-size:12.5px;margin:0}
+.aq-ficha .mez{display:flex;height:8px;margin:6px 0 4px;border:1px solid var(--line)}
+.aq-ficha .mez i{display:block;height:100%}
+@media(max-width:640px){.aq-ficha{position:static;width:auto;max-height:none;margin-top:8px;box-shadow:none}}
 
 /* ── 04 y 05 · Las tablas ────────────────────────────────────────────── */
 .aq-tabla-caja{overflow-x:auto;margin-top:8px;border:1px solid var(--line)}
@@ -102,6 +127,7 @@ table.aq-tabla{border-collapse:collapse;width:100%;min-width:620px;font-size:13p
     <div id="arqCargando" class="panel"><p class="helper" style="margin:0">Cruzando su votación con la cartografía emocional de los barrios…</p></div>
     <div id="arqAviso" class="hidden"></div>
     <div id="arqCuerpo" class="hidden">
+      <div class="aq-lentes" id="aqLentes"></div>
       <section class="panel" id="aqManda">
         <span class="panel-num">01 · El arquetipo que manda</span>
         <h3 id="aqMandaTitulo">—</h3>
@@ -121,7 +147,7 @@ table.aq-tabla{border-collapse:collapse;width:100%;min-width:620px;font-size:13p
         <span class="panel-num">03 · Barrio por barrio</span>
         <h3 id="aqMapaTitulo">El mapa de los arquetipos.</h3>
         <div class="aq-controles" id="aqControles"></div>
-        <div class="aq-mapa" id="aqMapa"></div>
+        <div class="aq-mapa-caja"><div class="aq-mapa" id="aqMapa"></div><div class="aq-ficha" id="aqFicha"></div></div>
         <div class="aq-leyenda" id="aqLeyenda"></div>
         <p class="aq-mapa-nota" id="aqMapaNota"></p>
       </section>
@@ -153,18 +179,28 @@ table.aq-tabla{border-collapse:collapse;width:100%;min-width:620px;font-size:13p
 <script src="data-client.js"></script>
 <script src="partidos-bloques.js?v=20260929"></script>
 <script src="candidato-360-electorado.js?v=20260929"></script>
-<script src="candidato-360-arq-lectura.js?v=20260929"></script>
+<script src="candidato-360-arq-lectura.js?v=20260929b"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
-<script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
-<script src="assets/candidato-360/candi/candi-hueso.js?v=1"></script>
-<script src="candidato-360-candi.js?v=20260929b"></script>
+<script src="assets/candidato-360/candi/candi-atletica.js?v=4"></script>
+<script src="assets/candidato-360/candi/candi-hueso.js?v=2"></script>
+<script src="candidato-360-candi.js?v=20260929c"></script>
 <script>
 (async function () {
   const P = window.C360Panel, E = window.C360Electorado, A = window.C360ArqLectura, $ = P.$, esc = P.esc;
+  const LABEL = window.PartidosBloques?.BLOQUE_LABEL || {};
   const num = x => Math.round(Number(x || 0)).toLocaleString('es-CO');
   const pct0 = x => `${Math.round((x || 0) * 100)} %`;
-  let L = null, ANO = '2023', VER = 'dominante', TODOS = false, MAPA = null, CAPA = null;
+  const veces = x => `×${Number(x || 0).toFixed(2).replace('.', ',')}`;
+  /* Tres lentes para la misma cartografía:
+       · propio  — sus votos (si tiene en la ciudad);
+       · partido — la huella de su partido o de su familia política;
+       · ciudad  — la ciudad entera, pesada por los votos de 2023 del estudio.
+     `L` es la lectura de la lente activa; `LC`, la de la ciudad, siempre a
+     mano porque la afinidad se mide contra ella. */
+  let L = null, LC = null, LENTE = 'ciudad', ANO = '2023', VER = 'dominante', TODOS = false, MAPA = null, CAPA = null;
+  const LENTES = {}, H = { huella: null };
+  let CIUDAD = '', CAMPANA = {};
   /* Cartagena: la UCG 20 llega hasta Isla Fuerte, 100 km al sur. Encuadrar por
      el bounds real deja el casco urbano del tamaño de una uña; se encuadra la
      ventana urbana, como en el CRM, y las islas siguen ahí si se aleja. */
@@ -175,6 +211,18 @@ table.aq-tabla{border-collapse:collapse;width:100%;min-width:620px;font-size:13p
   /* En Cartagena 2023 es una proyección retrospectiva y 2027 una simulación:
      se rotula siempre, no se presenta como dato observado. */
   const rotulo = ano => ctg() ? (ano === '2027' ? 'simulación' : 'proyección retrospectiva') : (ano === '2027' ? 'proyección ajustada' : 'lectura observada');
+  /* El nombre de la huella política, para las frases. */
+  function nombreHuella(h = H.huella) {
+    if (!h?.fuente) return '';
+    if (h.fuente === 'familia') return h.vecinas ? `${(LABEL[h.familia] || '').toLowerCase()} y sus vecinas del espectro` : `su familia política (${(LABEL[h.familia] || '').toLowerCase()})`;
+    return P.lugar(h.partido);
+  }
+  /* El vocabulario de cada lente: de quién son los votos que se leen. */
+  function voz() {
+    if (LENTE === 'propio') return { Voto: 'Su voto', votos: 'sus votos', de: 'su votación', unidad: 'Sus votos' };
+    if (LENTE === 'partido') { const n = nombreHuella(); return { Voto: `El voto de ${n}`, votos: `los votos de ${n}`, de: `la votación de ${n}`, unidad: H.huella?.fuente === 'camara' ? 'Votos a Cámara 2026' : 'Votos de su lado 2023' }; }
+    return { Voto: L.nombreCiudad, votos: 'los votos de la ciudad', de: 'la ciudad', unidad: 'Votos 2023' };
+  }
 
   function aviso(html) {
     $('arqCuerpo').classList.add('hidden');
@@ -183,16 +231,55 @@ table.aq-tabla{border-collapse:collapse;width:100%;min-width:620px;font-size:13p
     a.classList.remove('hidden');
   }
 
+  /* ── Las lentes ─────────────────────────────────────────────────────── */
+  function pintarLentes() {
+    const h = H.huella, op = [];
+    if (LENTES.propio) op.push(['propio', 'Sus votos', `${num(LENTES.propio.total)} votos ubicados`]);
+    op.push(['partido', h?.fuente === 'familia' ? 'Su familia política' : 'Su partido',
+      h?.fuente ? `${nombreHuella(h)}${h.fuente === 'camara' ? ' · Cámara 2026' : h.fuente === 'lista' ? ' · Concejo 2023' : ' · Concejo 2023'}` : (h ? 'sin huella en la ciudad' : 'cargando…')]);
+    op.push(['ciudad', `${LC?.nombreCiudad || 'La ciudad'} entera`, 'votos de 2023 por barrio']);
+    const nota = LENTE === 'partido' && h?.fuente
+      ? (h.fuente === 'lista' ? `Los votos de la lista de ${esc(P.lugar(h.partido))} al Concejo de ${esc(LC.nombreCiudad)} en 2023 (${pct0(h.share)} de los válidos), puesto por puesto.`
+        : h.fuente === 'camara' ? `${esc(P.lugar(h.partido))} no tuvo lista al Concejo de ${esc(LC.nombreCiudad)} en 2023 (o no llegó al 1 %), así que su huella es la de su lista a la <b>Cámara de 2026</b> en la ciudad (${pct0(h.share)} de los votos), puesto por puesto.`
+        : `${h.partido ? `${esc(P.lugar(h.partido))} no tiene lista con votos en ${esc(LC.nombreCiudad)} ni en 2023 ni a Cámara en 2026, así que se lee` : 'Se lee'} con ${esc(nombreHuella(h))}: los partidos de esa familia al Concejo 2023 (${pct0(h.share)} de los válidos).`)
+      : LENTE === 'ciudad' ? 'La ciudad entera, pesada por los votos de 2023 que el estudio le asigna a cada barrio: el terreno sobre el que compite.'
+      : LENTE === 'propio' ? 'Su votación mesa a mesa, ubicada en su barrio por el puesto de votación.' : '';
+    $('aqLentes').innerHTML = `<span class="rot">Leer desde</span>` + op.map(([k, t, sub]) => `<button type="button" class="aq-lente" data-lente="${k}" aria-pressed="${LENTE === k}" ${k === 'partido' && !h?.fuente ? 'disabled' : ''}>${esc(t)}<small>${esc(sub)}</small></button>`).join('') + (nota ? `<p>${nota}</p>` : '')
+      + (h && !h.fuente ? `<p>${h.partido || h.familia ? `No encontramos votos de ${esc(h.partido ? P.lugar(h.partido) : (LABEL[h.familia] || '').toLowerCase())} en ${esc(LC.nombreCiudad)} ni al Concejo 2023 ni a Cámara 2026.` : 'Su campaña todavía no tiene partido ni espectro: elíjalo en el CRM y aparece la lectura desde su lado político.'}</p>` : '');
+    $('aqLentes').querySelectorAll('[data-lente]').forEach(b => b.addEventListener('click', () => { if (!b.disabled) usarLente(b.dataset.lente); }));
+  }
+  function usarLente(k) {
+    if (!LENTES[k]) return;
+    LENTE = k; L = LENTES[k]; TODOS = false;
+    if (!(L.conVotos && LENTE !== 'ciudad')) VER = 'dominante';
+    pintarTodo();
+  }
+  function pintarTodo() { pintarLentes(); pintarManda(); pintarReparto(); pintarControles(); pintarMapa(); pintarTablas(); pintarTodos(); }
+
   /* ── 01 ─────────────────────────────────────────────────────────────── */
   function pintarManda() {
-    const top = A.principal(L), f = L.ficha(top.id), c = L.colorDe(top.id);
+    const V = voz(), top = A.principal(L), f = L.ficha(top.id), c = L.colorDe(top.id);
     const top27 = A.principal(L, '2027');
-    $('aqMandaTitulo').textContent = L.conVotos
-      ? `Su voto vive en barrios ${ctg() ? 'de arquetipo ' : 'de '}${f.nombre.toLowerCase()}.`
-      : `${L.nombreCiudad} vota desde ${ctg() ? 'el arquetipo ' : ''}${f.nombre.toLowerCase()}.`;
-    $('aqMandaCopy').innerHTML = L.conVotos
-      ? `De sus <b>${num(L.total)}</b> votos ubicados en barrios de ${esc(L.nombreCiudad)}, <b>${pct0(top.share)}</b> están en ese arquetipo.${top27 && top27.id !== top.id ? ` En 2027 el que más pesa pasa a ser <b>${esc(L.nombreDe(top27.id, '2027'))}</b> (${pct0(top27.share)}).` : ''}`
-      : `Todavía no tiene votos propios en ${esc(L.nombreCiudad)}, así que esto describe <b>la ciudad</b>, pesada por los votos de 2023 de cada barrio, no a usted. Cuando tenga una elección detrás, esta página se arma con sus votos.`;
+    const art = ctg() ? 'arquetipo ' : '';
+    $('aqMandaTitulo').textContent = LENTE === 'ciudad'
+      ? `${L.nombreCiudad} vota desde ${ctg() ? 'el arquetipo ' : ''}${f.nombre.toLowerCase()}.`
+      : `${V.Voto} vive en barrios de ${art}${f.nombre.toLowerCase()}.`;
+    let copy = LENTE === 'ciudad'
+      ? `La ciudad entera, pesada por los votos de 2023 de cada barrio.${!LENTES.propio ? ` Todavía no tiene votos propios en ${esc(L.nombreCiudad)}: cuando tenga una elección detrás, se suma la lectura desde sus votos.` : ''}`
+      : `De ${esc(V.votos)} ubicados en barrios de ${esc(L.nombreCiudad)} (<b>${num(L.total)}</b>), <b>${pct0(top.share)}</b> están en ese arquetipo.`;
+    if (top27 && top27.id !== top.id) copy += ` En 2027 el que más pesa pasa a ser <b>${esc(L.nombreDe(top27.id, '2027'))}</b> (${pct0(top27.share)}).`;
+    $('aqMandaCopy').innerHTML = copy;
+    /* El más afín: donde este voto pesa más que la ciudad. Con la lente de la
+       ciudad no hay contra qué comparar. */
+    let afin = '';
+    if (LENTE !== 'ciudad' && LC) {
+      const a = A.afinidad(L, LC)[0];
+      if (a && a.ratio >= 1.05) {
+        const fa = L.ficha(a.id);
+        afin = `<div class="aq-afin" style="--c:${L.colorDe(a.id)}"><b>El arquetipo más afín a ${esc(LENTE === 'partido' ? nombreHuella() : 'su votación')}: ${esc(fa.nombre)}</b> · <b class="x">${veces(a.ratio)}</b> lo que pesa en la ciudad (${pct0(a.share)} contra ${pct0(a.ciudad)}).
+          ${a.id === top.id ? 'Coincide con el que manda: es su base natural.' : `No es el que más pesa en ${esc(V.de)} —ese es ${esc(f.nombre.toLowerCase())}—, pero es donde ${LENTE === 'partido' ? 'su lado' : 'usted'} rinde por encima de la ciudad: es el territorio donde el mensaje ya tiene tierra abonada.`}</div>`;
+      } else if (a) afin = `<div class="aq-afin"><b>Ningún arquetipo se despega:</b> ${esc(V.de)} se reparte casi igual que la ciudad (el más alto, ${esc(L.nombreDe(a.id))}, pesa ${veces(a.ratio)} lo de la ciudad). No hay un nicho: se compite en toda la ciudad.</div>`;
+    }
     let cuerpo;
     if (ctg()) {
       cuerpo = `<p class="aq-lema">${esc(f.lema)}.</p>
@@ -209,8 +296,11 @@ table.aq-tabla{border-collapse:collapse;width:100%;min-width:620px;font-size:13p
         ${f.nombre27 && f.nombre27 !== f.nombre ? `<p class="aq-par"><em>Cómo evoluciona hacia 2027:</em> ${esc(f.nombre27)}.</p>` : ''}`;
     }
     $('aqMandaFicha').innerHTML = `<img src="${esc(f.escudo)}" alt="Tarjeta del arquetipo ${esc(f.nombre)}" loading="lazy" onerror="this.remove()">
-      <div><div class="aq-cifra"><div><b style="color:${c}">${pct0(top.share)}</b><span>${L.conVotos ? 'de sus votos, en este arquetipo' : 'del voto de la ciudad, en este arquetipo'}</span></div>
-      ${L.conVotos ? `<div><b>${num(L.filasBarrio.length)}</b><span>barrios con votos suyos</span></div>` : ''}</div>${cuerpo}</div>`;
+      <div><div class="aq-cifra"><div><b style="color:${c}">${pct0(top.share)}</b><span>${LENTE === 'ciudad' ? 'del voto de la ciudad, en este arquetipo' : `de ${esc(V.votos)}, en este arquetipo`}</span></div>
+      ${LENTE !== 'ciudad' ? `<div><b>${num(L.filasBarrio.length)}</b><span>barrios con votos</span></div>` : ''}</div>${cuerpo}</div>`;
+    $('aqMandaFicha').insertAdjacentHTML('afterend', '');
+    const prev = document.getElementById('aqAfin'); if (prev) prev.remove();
+    if (afin) $('aqMandaFicha').insertAdjacentHTML('afterend', `<div id="aqAfin">${afin}</div>`);
   }
   function palancas(titulo, lista, color) {
     if (!lista?.length) return '';
@@ -221,27 +311,30 @@ table.aq-tabla{border-collapse:collapse;width:100%;min-width:620px;font-size:13p
   function reparto(ano) {
     const filas = Object.entries(L.reparto[ano] || {}).sort((a, b) => b[1] - a[1]).filter(([, v]) => v / L.total >= .005);
     if (!filas.length) return '<p class="helper">Sin dato para este año.</p>';
+    const ref = LENTE !== 'ciudad' && LC ? id => { const c = (LC.reparto[ano]?.[id] || 0) / (LC.total || 1); return c ? ` · ciudad ${pct0(c)}` : ''; } : () => '';
     return `<div class="aq-barra">${filas.map(([id, v]) => `<i style="flex:${v};background:${L.colorDe(id)}" title="${esc(L.nombreDe(id, ano))}"></i>`).join('')}</div>
-      <ul class="aq-lista">${filas.map(([id, v]) => `<li><span class="pt" style="background:${L.colorDe(id)}"></span><b>${pct0(v / L.total)}</b><span>${esc(L.nombreDe(id, ano))}</span><em>${num(v)} ${L.conVotos ? 'votos' : ''}</em></li>`).join('')}</ul>`;
+      <ul class="aq-lista">${filas.map(([id, v]) => `<li><span class="pt" style="background:${L.colorDe(id)}"></span><b>${pct0(v / L.total)}</b><span>${esc(L.nombreDe(id, ano))}</span><em>${num(v)}${ref(id)}</em></li>`).join('')}</ul>`;
   }
   function pintarReparto() {
+    const V = voz();
     $('aqRot23').textContent = rotulo('2023'); $('aqRot27').textContent = rotulo('2027');
-    $('aqRepartoTitulo').textContent = L.conVotos ? 'Su voto, arquetipo por arquetipo.' : `${L.nombreCiudad}, arquetipo por arquetipo.`;
+    $('aqRepartoTitulo').textContent = `${V.Voto}, arquetipo por arquetipo.`;
     $('aqRepartoCopy').innerHTML = (ctg()
-      ? 'Cada barrio de Cartagena no tiene un solo arquetipo sino una <b>mezcla de los ocho</b>: sus votos se reparten con esa mezcla —un barrio que es 60 % protesta y 20 % productivo aporta a los dos—, no solo con el que manda.'
+      ? 'Cada barrio de Cartagena no tiene un solo arquetipo sino una <b>mezcla de los ocho</b>: los votos se reparten con esa mezcla —un barrio que es 60 % protesta y 20 % productivo aporta a los dos—, no solo con el que manda.'
       : 'Cada barrio de Medellín tiene un arquetipo: el voto del barrio entero va a ese. A la derecha, a dónde se mueve ese mismo voto con la proyección 2027.')
-      + (L.conVotos && L.sinDato ? ` ${num(L.sinDato)} de sus votos cayeron en barrios sin medición.` : '')
-      + (L.conVotos && L.votosCiudad > L.ubicados ? ` ${num(L.votosCiudad - L.ubicados)} están en puestos sin barrio asignado y no entran.` : '');
+      + (LENTE !== 'ciudad' ? ' Al lado de cada uno, lo que pesa en la ciudad: la diferencia es la afinidad.' : '')
+      + (LENTE !== 'ciudad' && L.sinDato ? ` ${num(L.sinDato)} votos cayeron en barrios sin medición.` : '')
+      + (LENTE !== 'ciudad' && L.votosCiudad > L.ubicados ? ` ${num(L.votosCiudad - L.ubicados)} están en puestos sin barrio asignado y no entran.` : '');
     $('aqRep23').innerHTML = reparto('2023'); $('aqRep27').innerHTML = reparto('2027');
   }
 
   /* ── 03 · El mapa ──────────────────────────────────────────────────────
-     Color = arquetipo dominante del barrio en el año elegido. Con votos
-     propios, la segunda vista pinta solo donde usted tiene votos, con la
-     intensidad de cuánto pesa ese barrio en su votación. */
+     Color = arquetipo dominante del barrio en el año elegido. Con una lente
+     de votos (los suyos o los de su lado), la segunda vista pinta solo donde
+     hay votos, con la intensidad de cuánto pesa ese barrio. */
   function pintarControles() {
     const ops = [['2023', `2023 · ${rotulo('2023')}`], ['2027', `2027 · ${rotulo('2027')}`]];
-    const vistas = L.conVotos ? [['dominante', 'Toda la ciudad'], ['suyos', 'Solo donde tiene votos']] : [];
+    const vistas = LENTE !== 'ciudad' ? [['dominante', 'Toda la ciudad'], ['suyos', LENTE === 'propio' ? 'Solo donde tiene votos' : 'Solo donde vota su lado']] : [];
     $('aqControles').innerHTML = `<span class="rot">Año</span>${ops.map(([k, t]) => `<button type="button" class="aq-tog" data-ano="${k}" aria-pressed="${ANO === k}">${esc(t)}</button>`).join('')}`
       + (vistas.length ? `<span class="rot" style="margin-left:12px">Qué pinta</span>${vistas.map(([k, t]) => `<button type="button" class="aq-tog" data-ver="${k}" aria-pressed="${VER === k}">${esc(t)}</button>`).join('')}` : '');
     $('aqControles').querySelectorAll('[data-ano]').forEach(b => b.addEventListener('click', () => { ANO = b.dataset.ano; pintarControles(); pintarMapa(); }));
@@ -254,6 +347,8 @@ table.aq-tabla{border-collapse:collapse;width:100%;min-width:620px;font-size:13p
       MAPA.setView([6.25, -75.57], 12);
     }
     if (CAPA) MAPA.removeLayer(CAPA);
+    fichaVacia();
+    const conVotos = LENTE !== 'ciudad';
     const maxSuyo = Math.max(1, ...L.filasBarrio.map(f => f.votos));
     const votosDe = new Map(L.filasBarrio.map(f => [f.code, f.votos]));
     const presentes = new Set();
@@ -262,14 +357,14 @@ table.aq-tabla{border-collapse:collapse;width:100%;min-width:620px;font-size:13p
         const code = L.codeDe(f.properties), dom = L.dominanteDe(code, ANO);
         if (dom) presentes.add(dom);
         const v = votosDe.get(code) || 0;
-        const suyos = VER === 'suyos' && L.conVotos;
-        const op = !dom ? .15 : suyos ? (v ? .25 + .65 * Math.sqrt(v / maxSuyo) : .06) : .72;
+        const op = !dom ? .15 : (VER === 'suyos' && conVotos) ? (v ? .25 + .65 * Math.sqrt(v / maxSuyo) : .06) : .72;
         return { color: '#ffffff', weight: .7, fillColor: dom ? L.colorDe(dom) : '#c9ccc4', fillOpacity: op };
       },
       onEachFeature: (f, layer) => {
-        const code = L.codeDe(f.properties), dom = L.dominanteDe(code, ANO), mez = L.mezclaDe(code, ANO), v = votosDe.get(code) || 0;
-        const mezTxt = mez ? Object.entries(mez).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id, p]) => `${esc(L.cortoDe(id))} ${pct0(p)}`).join(' · ') : '';
-        layer.bindTooltip(`<b>${esc(P.lugar(L.nombreGeo(f.properties)))}</b><br>${dom ? `Manda: ${esc(L.nombreDe(dom, ANO))}` : 'Sin arquetipo medido'}${mezTxt ? `<br>Mezcla: ${mezTxt}` : ''}${L.conVotos ? `<br>Sus votos acá: <b>${num(v)}</b>` : ''}`, { className: 'aq-tt', sticky: true });
+        const code = L.codeDe(f.properties), dom = L.dominanteDe(code, ANO);
+        layer.bindTooltip(`<b>${esc(P.lugar(L.nombreGeo(f.properties)))}</b> · ${dom ? esc(L.cortoDe(dom)) : 'sin medición'}`, { className: 'aq-tt', sticky: true });
+        const ver = () => fichaBarrio(f, votosDe.get(code) || 0, conVotos);
+        layer.on('mouseover', ver); layer.on('click', ver);
       },
     }).addTo(MAPA);
     /* Leaflet mide el contenedor al crearse; encuadrar después del layout. */
@@ -279,33 +374,47 @@ table.aq-tabla{border-collapse:collapse;width:100%;min-width:620px;font-size:13p
       if (v) MAPA.fitBounds(v, { animate: false }); else { const b = CAPA.getBounds(); if (b.isValid()) MAPA.fitBounds(b, { padding: [8, 8], animate: false }); }
     }, 0);
     $('aqLeyenda').innerHTML = L.ids.filter(id => presentes.has(id)).map(id => `<span><i style="background:${L.colorDe(id)}"></i>${esc(L.nombreDe(id, ANO))}</span>`).join('') + '<span><i style="background:#c9ccc4;opacity:.5"></i>sin medición</span>';
-    $('aqMapaTitulo').textContent = VER === 'suyos' && L.conVotos ? `Dónde están sus votos, por arquetipo (${ANO}).` : `El arquetipo que manda en cada barrio (${ANO}).`;
-    $('aqMapaNota').innerHTML = (VER === 'suyos' && L.conVotos
-      ? 'Color: el arquetipo dominante del barrio. Intensidad: cuánto pesa ese barrio en su votación; los barrios donde no sacó votos quedan casi en blanco.'
-      : 'Color: el arquetipo dominante del barrio.')
-      + (ctg() ? ' Pase el cursor para ver la mezcla: en Cartagena el dominante casi nunca es todo el barrio.' : ' Los corregimientos no están en el estudio y quedan en gris.')
-      + (ctg() ? ' El mapa abre sobre el casco urbano; las islas y la zona rural siguen ahí si aleja.' : '');
+    $('aqMapaTitulo').textContent = VER === 'suyos' && conVotos ? `Dónde están ${voz().votos}, por arquetipo (${ANO}).` : `El arquetipo que manda en cada barrio (${ANO}).`;
+    $('aqMapaNota').innerHTML = (VER === 'suyos' && conVotos
+      ? `Color: el arquetipo dominante del barrio. Intensidad: cuánto pesa ese barrio en ${esc(voz().de)}; donde no hay votos queda casi en blanco.`
+      : 'Color: el arquetipo dominante del barrio. El arquetipo es del barrio: es el mismo mapa en las tres lentes; lo que cambia es qué votos se leen encima.')
+      + (ctg() ? ' En la ficha de la esquina está la mezcla: en Cartagena el dominante casi nunca es todo el barrio. El mapa abre sobre el casco urbano; las islas y la zona rural siguen ahí si aleja.' : ' Los corregimientos no están en el estudio y quedan en gris.');
+  }
+
+  /* La ficha de la esquina: todo lo que se sabe del barrio bajo el cursor. */
+  function fichaVacia() { $('aqFicha').innerHTML = '<p class="vacio">Pase el cursor —o toque, en el teléfono— un barrio para ver su arquetipo, su mezcla y sus votos.</p>'; }
+  function fichaBarrio(f, v, conVotos) {
+    const code = L.codeDe(f.properties), dom = L.dominanteDe(code, ANO), mez = L.mezclaDe(code, ANO);
+    const b = ctg() ? L.D?.barrios?.[code] : L.barrios?.[code];
+    const unidad = ctg() ? b?.localidad : b?.comuna;
+    const riesgo = ctg() ? b?.volatilidad?.nivel : b?.proyeccion_2027?.nivel_riesgo;
+    const otro = L.dominanteDe(code, ANO === '2023' ? '2027' : '2023');
+    const mezOrden = mez ? Object.entries(mez).sort((a, c) => c[1] - a[1]) : [];
+    $('aqFicha').innerHTML = `<h5>${esc(P.lugar(L.nombreGeo(f.properties)))}</h5>${unidad ? `<div style="color:var(--muted);font-size:12px;margin-bottom:6px">${esc(P.lugar(unidad))}</div>` : ''}
+      ${dom ? `<div class="fila"><span>Manda (${ANO})</span><b><span class="aq-chip"><i style="background:${L.colorDe(dom)}"></i>${esc(L.cortoDe(dom))}</span></b></div>` : '<div class="fila"><span>Arquetipo</span><b>sin medición</b></div>'}
+      ${otro && otro !== dom ? `<div class="fila"><span>En ${ANO === '2023' ? '2027' : '2023'}</span><b>${esc(L.cortoDe(otro))}</b></div>` : ''}
+      ${mezOrden.length ? `<div class="mez">${mezOrden.map(([id, p]) => `<i style="flex:${p};background:${L.colorDe(id)}"></i>`).join('')}</div>${mezOrden.slice(0, 3).map(([id, p]) => `<div class="fila"><span>${esc(L.cortoDe(id))}</span><b>${pct0(p)}</b></div>`).join('')}` : ''}
+      ${conVotos ? `<div class="fila"><span>${esc(voz().unidad)} acá</span><b>${num(v)}</b></div>` : ''}
+      ${riesgo ? `<div class="fila"><span>${ctg() ? 'Volatilidad' : 'Riesgo de cambio'}</span><b>${esc(String(riesgo).toLowerCase())}</b></div>` : ''}
+      ${b && /heredado/i.test(b.tipo || '') ? '<div class="fila"><span>Sin puesto propio</span><b>lectura heredada</b></div>' : ''}`;
   }
 
   /* ── 04 y 05 · Las tablas ───────────────────────────────────────────── */
   function pintarTablas() {
-    const U = L.unidad, Ucap = U.charAt(0).toUpperCase() + U.slice(1);
+    const U = L.unidad, Ucap = U.charAt(0).toUpperCase() + U.slice(1), V = voz();
     $('aqUnidadNum').textContent = `04 · Por ${U}`;
     $('aqColUnidad').textContent = Ucap;
-    $('aqColVotos').textContent = L.conVotos ? 'Sus votos' : 'Votos 2023';
-    $('aqColVotosB').textContent = L.conVotos ? 'Sus votos' : 'Votos 2023';
-    $('aqUnidadCopy').textContent = L.conVotos
-      ? `Sus votos por ${U}, con el arquetipo que manda en cada una hoy y en 2027. Donde cambia, el mensaje que le sirvió en la última elección puede no servirle en la próxima.`
-      : `Las ${L.unidades} de ${L.nombreCiudad} por peso electoral, con el arquetipo que manda en cada una hoy y en 2027.`;
+    $('aqColVotos').textContent = V.unidad; $('aqColVotosB').textContent = V.unidad;
+    $('aqUnidadCopy').textContent = LENTE === 'ciudad'
+      ? `Las ${L.unidades} de ${L.nombreCiudad} por peso electoral, con el arquetipo que manda en cada una hoy y en 2027.`
+      : `${V.votos.charAt(0).toUpperCase() + V.votos.slice(1)} por ${U}, con el arquetipo que manda en cada una hoy y en 2027. Donde cambia, el mensaje que sirvió en la última elección puede no servir en la próxima.`;
     $('aqUnidades').innerHTML = L.filasComuna.map(f => `<tr><td>${esc(P.lugar(f.nombre))}</td><td class="num">${num(f.votos)}</td><td>${chip(f.a23)}</td><td>${chip(f.a27)}${f.a23 && f.a27 && f.a23 !== f.a27 ? '<span class="aq-marca">cambia</span>' : ''}</td></tr>`).join('');
     pintarBarrios();
   }
   function pintarBarrios() {
-    const filas = TODOS ? L.filasBarrio : L.filasBarrio.slice(0, 20);
-    $('aqBarriosTitulo').textContent = L.conVotos ? 'Sus barrios más fuertes.' : `Los barrios con más votos de ${L.nombreCiudad}.`;
-    $('aqBarriosCopy').innerHTML = L.conVotos
-      ? `Ordenados por sus votos. ${ctg() ? 'La volatilidad dice qué tan seguido ha cambiado de arquetipo ese barrio; «heredado» marca un barrio sin puesto propio, que toma la lectura del vecino.' : 'El riesgo de cambio es el que calcula el estudio para 2027.'}`
-      : `Ordenados por los votos de 2023 que el estudio le asigna a cada barrio.`;
+    const filas = TODOS ? L.filasBarrio : L.filasBarrio.slice(0, 20), V = voz();
+    $('aqBarriosTitulo').textContent = LENTE === 'propio' ? 'Sus barrios más fuertes.' : LENTE === 'partido' ? `Donde más vota ${nombreHuella()}.` : `Los barrios con más votos de ${L.nombreCiudad}.`;
+    $('aqBarriosCopy').innerHTML = `Ordenados por ${esc(V.votos)}${LENTE === 'ciudad' ? ' que el estudio le asigna a cada barrio en 2023' : ''}. ${ctg() ? 'La volatilidad dice qué tan seguido ha cambiado de arquetipo ese barrio; «heredado» marca un barrio sin puesto propio, que toma la lectura del vecino.' : 'El riesgo de cambio es el que calcula el estudio para 2027.'}`;
     const riesgo = f => f.riesgo ? `<span class="aq-marca">${ctg() ? 'volatilidad' : 'riesgo'} ${esc(String(f.riesgo).toLowerCase())}</span>` : '';
     $('aqBarrios').innerHTML = filas.map((f, i) => `<tr><td class="num">${i + 1}</td><td><b>${esc(P.lugar(f.nombre))}</b>${f.comuna ? `<small>${esc(P.lugar(f.comuna))}</small>` : ''}</td><td class="num">${num(f.votos)}</td><td>${chip(f.a23)}${riesgo(f)}${f.heredado ? '<span class="aq-marca">heredado</span>' : ''}</td><td>${chip(f.a27)}</td></tr>`).join('');
     const btn = $('aqMas');
@@ -315,39 +424,58 @@ table.aq-tabla{border-collapse:collapse;width:100%;min-width:620px;font-size:13p
 
   /* ── 06 · Todos los arquetipos ──────────────────────────────────────── */
   function pintarTodos() {
-    const top = A.principal(L)?.id;
-    $('aqTodosCopy').innerHTML = ctg()
-      ? 'Los ocho arquetipos de la cartografía emocional de Cartagena. <b>No son los de Medellín</b> y no se comparan con ellos: cada ciudad tiene los suyos. El porcentaje es el peso de cada uno en ' + (L.conVotos ? 'su votación' : 'la ciudad') + ' (2023).'
-      : 'Las cinco familias del estudio de Medellín, con el nombre que toma cada una hacia 2027. El porcentaje es su peso en ' + (L.conVotos ? 'su votación' : 'la ciudad') + ' (2023).';
+    const top = A.principal(L)?.id, afin = LENTE !== 'ciudad' && LC ? new Map(A.afinidad(L, LC).map(a => [a.id, a])) : new Map();
+    const shC = id => (LC?.reparto['2023'][id] || 0) / (LC?.total || 1);
+    $('aqTodosCopy').innerHTML = (ctg()
+      ? 'Los ocho arquetipos de la cartografía emocional de Cartagena. <b>No son los de Medellín</b> y no se comparan con ellos: cada ciudad tiene los suyos.'
+      : 'Las cinco familias del estudio de Medellín, con el nombre que toma cada una hacia 2027.')
+      + (LENTE === 'ciudad' ? ' El porcentaje es su peso en la ciudad (2023).' : ` Cada tarjeta dice cuánto pesa en ${esc(voz().de)} y en la ciudad; el número de abajo es la afinidad.`);
     $('aqTodos').innerHTML = L.ids.map(id => {
       const f = L.ficha(id); if (!f) return '';
-      const sh = (L.reparto['2023'][id] || 0) / (L.total || 1);
+      const sh = (L.reparto['2023'][id] || 0) / (L.total || 1), a = afin.get(id);
       const cuerpo = ctg()
         ? `<p>${esc(f.lema)}.</p><p><em>Emoción:</em> ${esc(f.emocion)}.</p>${f.sube ? `<p><em>Se enciende con</em> ${esc(String(f.sube).replace(/\.$/, '').toLowerCase())}.</p>` : ''}`
         : `<p>${esc(f.lema)}</p><p><em>Emoción:</em> ${esc(f.emocion)}.</p>${f.nombre27 ? `<p><em>Hacia 2027:</em> ${esc(f.nombre27)}.</p>` : ''}`;
-      return `<article class="aq-card ${id === top ? 'suyo' : ''}" style="--c:${L.colorDe(id)}"><span class="sh">${pct0(sh)} ${L.conVotos ? 'de su voto' : 'de la ciudad'}${id === top ? ' · el que manda' : ''}</span><h4>${esc(f.nombre)}</h4>${cuerpo}</article>`;
+      const cab = LENTE === 'ciudad' ? `${pct0(sh)} de la ciudad` : `${pct0(sh)} de ${LENTE === 'propio' ? 'su voto' : 'su lado'} · ${pct0(shC(id))} ciudad`;
+      const ratio = LENTE !== 'ciudad' && shC(id) ? `<span class="ratio">afinidad ${veces(sh / shC(id))}</span>` : '';
+      return `<article class="aq-card ${id === top ? 'suyo' : ''}" style="--c:${L.colorDe(id)}"><span class="sh">${cab}${id === top ? ' · el que manda' : ''}</span><h4>${esc(f.nombre)}</h4>${cuerpo}${ratio}</article>`;
     }).join('');
   }
 
   async function armar(v) {
-    const campana = v?.campana || {};
+    CAMPANA = v?.campana || {};
     const slugs = v?.tipo === 'historial' ? (v.candidato?.slugs || []) : [];
-    const [mesas, municipio] = await Promise.all([E.mesasDe(slugs), A.municipioDeCampana(campana)]);
-    const ciudad = A.ciudadDe(municipio, mesas);
-    if (!ciudad) return aviso('La cartografía emocional —qué mueve el voto en cada barrio— está reconstruida, por ahora, para <b>Medellín</b> y <b>Cartagena</b>. Su campaña y sus votos están en otra ciudad; cuando exista para la suya, esta página se arma sola.');
-    L = await A.leer(ciudad, mesas);
-    if (!A.principal(L)) return aviso(`No pudimos cruzar su votación con los barrios de ${esc(L.nombreCiudad)}.`);
+    const [mesas, municipio] = await Promise.all([E.mesasDe(slugs), A.municipioDeCampana(CAMPANA)]);
+    CIUDAD = A.ciudadDe(municipio, mesas);
+    if (!CIUDAD) return aviso('La cartografía emocional —qué mueve el voto en cada barrio— está reconstruida, por ahora, para <b>Medellín</b> y <b>Cartagena</b>. Su campaña y sus votos están en otra ciudad; cuando exista para la suya, esta página se arma sola.');
+    Object.keys(LENTES).forEach(k => delete LENTES[k]); H.huella = null;
+    const [Lc, Lp] = await Promise.all([A.leer(CIUDAD, []), A.leer(CIUDAD, mesas)]);
+    LC = LENTES.ciudad = Lc;
+    if (Lp.conVotos) LENTES.propio = Lp;
+    /* La huella política llega después (baja los detalles por comuna): la
+       página se pinta con lo que ya hay y la lente se enciende al llegar. */
+    LENTE = LENTES.propio ? 'propio' : 'ciudad'; L = LENTES[LENTE];
+    if (!A.principal(L)) return aviso(`No pudimos cruzar la votación con los barrios de ${esc(L.nombreCiudad)}.`);
     $('arqAviso').classList.add('hidden');
     $('arqCuerpo').classList.remove('hidden');
-    pintarManda(); pintarReparto(); pintarControles(); pintarMapa(); pintarTablas(); pintarTodos();
+    pintarTodo();
     $('aqMas').onclick = () => { TODOS = !TODOS; pintarBarrios(); };
     $('arqNota').innerHTML = (ctg()
       ? 'Fuente: cartografía emocional de Cartagena de Nury Astrid (211 barrios, 3 localidades, sep-2026), con la votación de Alcaldía, Concejo y JAL. <b>2015 es el ancla; 2019 y 2023 son proyecciones retrospectivas y 2027 es simulación</b>, no pronóstico.'
       : 'Fuente: Proyecto DC · cartografía emocional de Medellín (152 barrios, 16 comunas y 5 corregimientos), con Alcaldía, Concejo y JAL de 2015, 2019 y 2023 y la proyección 2027 ajustada.')
-      + ` ${L.conVotos ? 'Sus votos salen de su votación mesa a mesa publicada por la Registraduría, ubicados en su barrio por el puesto de votación.' : ''} El arquetipo es del <b>barrio</b>, no de sus votantes: dice en qué clase de territorio está una votación, no qué siente cada persona ni por quién va a votar.`;
+      + ' Los votos se ubican en su barrio por el puesto de votación. La huella de su partido sale de su lista al Concejo 2023 o, si no tuvo, a la Cámara 2026; si tampoco, de su familia política. El arquetipo es del <b>barrio</b>, no de sus votantes: dice en qué clase de territorio está una votación, no qué siente cada persona ni por quién va a votar.';
+    try {
+      H.huella = await A.huella(CIUDAD, CAMPANA);
+      if (H.huella?.fuente) {
+        LENTES.partido = await A.leer(CIUDAD, H.huella.mesas);
+        if (!LENTES.partido.conVotos) { delete LENTES.partido; H.huella = { ...H.huella, fuente: null }; }
+      }
+    } catch (e) { H.huella = { fuente: null, error: String(e) }; }
+    /* Sin votos propios, lo útil para quien arranca es leer desde su lado. */
+    if (!LENTES.propio && LENTES.partido) usarLente('partido'); else pintarLentes();
   }
 
-  window.C360ArquetiposPagina = { armar, lectura: () => L, mapa: () => MAPA };   /* para depurar y para las pruebas */
+  window.C360ArquetiposPagina = { armar, lectura: () => L, mapa: () => MAPA, lentes: () => LENTES, huella: () => H.huella, usarLente };   /* para depurar y para las pruebas */
   if (!(await P.arrancar('candidato-360-arquetipos.html'))) return;
   window.Candi?.calculo?.(true, '¡Estoy leyendo los barrios de tu territorio! Ve mirando el resto de la página.');
   try { await armar(P.SESION.vinculo); }

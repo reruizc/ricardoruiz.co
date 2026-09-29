@@ -269,25 +269,32 @@
   }
 
   /* ─── El descanso con el hueso rosado ────────────────────────────────────
-     Tras 20 s sin actividad, estando atenta, Candi baja del dock, cruza la
-     pantalla, recoge su hueso con la boca y se echa (CandiBoneSequence, de
+     Tras 20 s sin actividad, estando atenta, Candi cruza la pantalla de lado
+     a lado, recoge su hueso con la boca y se echa (CandiBoneSequence, de
      Astra). Corre en una TIRA del ancho de la ventana, no en el dock: el dock
      mide 250 px y el recorrido tiene que ser de lado a lado. La tira es
      transparente a los clics.
+     · Alterna (v2 del reproductor, 29-sep): derecha → izquierda → derecha…
+       El reproductor guarda `side` (el último lado completado) y, al acabar
+       echada, rearma la misma espera: el siguiente descanso sale DESDE DONDE
+       ESTÁ hacia el extremo contrario, sin pasar por el dock. El extremo
+       derecho es la casa (el dock vive pegado al borde derecho).
      · Una sola perrita visible: el reproductor oculta la del dock mientras
        camina, y al despertar se queda SENTADA Y ATENTA DONDE ESTÉ (una segunda
-       CandiAtletica en la tira), con la del dock escondida. Vuelve al dock al
-       abrir el panel o cuando tiene que reaccionar (pensar).
-     · No hay clip de regreso: si el siguiente descanso la encuentra ya junto
-       al hueso, salta directo a recogerlo; si quedó a mitad de camino, el
-       recorrido vuelve a empezar desde el dock.
-     · Con el panel abierto no descansa (se está leyendo una respuesta), ni con
-       la pantalla tan baja que el dock esconde la escena.
-     · La espera, la pestaña oculta, el movimiento reducido y la actividad los
-       maneja el propio reproductor; acá solo se limpia lo que se crea. */
+       CandiAtletica en la tira, `rincon`), con la del dock escondida. Si
+       despierta en su casa, vuelve la del dock. Vuelve al dock al abrir el
+       panel o cuando tiene que reaccionar (pensar, investigar).
+     · Con el panel abierto no descansa (se está leyendo una respuesta), ni
+       mientras piensa o investiga, ni con la pantalla tan baja que el dock
+       esconde la escena. Al volver a estar libre arranca una espera COMPLETA.
+     · UN solo temporizador: el del reproductor (`arm`). Acá no hay ninguno
+       propio; inhibir es `enable(false)` y soltar es `enable(true)`, que
+       rearma desde cero.
+     · La pestaña oculta, el movimiento reducido y la actividad los maneja el
+       propio reproductor; acá solo se limpia lo que se crea. */
   const DESCANSO_MS = 20000;
   const bajito = matchMedia('(max-height:520px)');
-  let tira = null, descanso = null, rincon = null;
+  let tira = null, descanso = null, rincon = null, origen = null;
 
   function montarDescanso() {
     if (descanso || !mascota || typeof CandiBoneSequence !== 'function') return;
@@ -296,18 +303,65 @@
     document.body.append(tira);
     ajustarSuelo();
     descanso = new CandiBoneSequence(tira, { mascot: mascota, inactivityMs: DESCANSO_MS, activityTarget: document });
-    /* Arranca donde está la Candi del dock y con un tamaño parecido, para que
-       no se note el cambio de reproductor. El resto del encuadre (registro
-       vertical, recortes) es el de Astra, intacto. */
+    /* Tres ajustes al reproductor de Astra, como propiedades de la instancia
+       (su código llama `this.layout()`, `this.play()` y `this.stop()`, así que
+       las toma). El resto —registro vertical, recortes, tiempos— es el suyo.
+
+       1) layout: el tamaño se parece al de la Candi del dock, para que no se
+          note el cambio de reproductor; el INICIO es donde está la Candi que se
+          ve (`origen`, que fija `play`) y el FIN es el extremo de `toSide`. El
+          extremo derecho es la casa y no `ancho − tamaño − margen`: quedan a
+          menos de 10 px, y así al despertar allá vuelve exactamente a su sitio. */
     const layoutBase = descanso.layout.bind(descanso);
     descanso.layout = () => {
       const g = layoutBase();
-      const cs = getComputedStyle(mascota.sprite);
+      const cs = getComputedStyle(mascota.sprite);   /* vale aunque el sprite esté oculto: es el CSS */
       const sw = parseFloat(cs.width) || g.size, der = parseFloat(cs.right) || 0;
       const size = Math.min(210, Math.max(100, sw * 1.1), Math.max(1, g.width - 24));
-      const izq = escena.getBoundingClientRect().right - der - sw - tira.getBoundingClientRect().left;
-      const start = Math.max(g.margin, Math.min(g.width - size - g.margin, izq + (sw - size) / 2));
-      return { ...g, size, start };
+      const izq = g.margin, tope = Math.max(g.margin, g.width - size - g.margin);
+      const acota = x => Math.max(izq, Math.min(tope, x));
+      /* Sin escena a la vista (pantalla baja: el CSS la esconde) su caja mide
+         cero y la «casa» caía en el borde IZQUIERDO; la casa es el derecho. */
+      const r = escena.getBoundingClientRect();
+      const casa = r.width ? acota(r.right - der - sw - tira.getBoundingClientRect().left + (sw - size) / 2) : tope;
+      const extremo = lado => lado === 'left' ? izq : casa;
+      const start = origen == null ? extremo(descanso.fromSide) : acota(origen);
+      return { ...g, size, start, end: extremo(descanso.toSide), casa, izq };
+    };
+    /* 2) play: antes de salir se anota dónde está la Candi visible. Si ya está
+          prácticamente en el extremo al que le tocaría ir (volvió al dock tras
+          un viaje a la derecha, o la despertaron llegando), se invierte el lado:
+          si no, caminaría en el sitio 1,4 s y dejaría el hueso bajo sus patas. */
+    const playBase = descanso.play.bind(descanso);
+    descanso.play = (...args) => {
+      /* ⚠️ El `change` de la media query puede llegar tarde (visto al girar
+         con la pestaña en segundo plano): si el temporizador se cumple con la
+         pantalla ya baja, se hace aquí lo que haría `alCambiarAlto`. */
+      if (bajito.matches) { alCambiarAlto(); return Promise.resolve(); }
+      origen = posicionVisible();
+      const g = descanso.layout(), destino = descanso.side === 'right' ? g.izq : g.casa;
+      if (Math.abs(origen - destino) < g.size / 2) descanso.side = descanso.side === 'right' ? 'left' : 'right';
+      return playBase(...args);
+    };
+    /* 3) stop: al restaurar, el reproductor corre el sprite al margen izquierdo
+          si el último lado fue la izquierda. Eso sirve en su demo, donde el
+          sprite y el recorrido comparten escenario; acá el sprite vive en el
+          dock (250 px) y ese `left` lo descuadraba ahí dentro. La posición en
+          la franja la pone `despertarDonde`. Y si hay una Candi sentada en la
+          franja, la del dock sigue escondida: nunca dos a la vez.
+          ⚠️ Y solo restaura si de verdad estaba en un recorrido: la
+          restauración hace `mascot.seek(4800)`, y `enable(false)` (abrir el
+          panel, mandar una pregunta, empezar un cálculo) pasa por acá aunque
+          no esté caminando. Medido: esa llamada pisaba la lupa recién
+          arrancada —la fase saltaba a `idle_seated` a mitad de la reacción—
+          y dejaba la puerta abierta a pensar y a investigar a la vez. */
+    const stopBase = descanso.stop.bind(descanso);
+    descanso.stop = (restore = true) => {
+      restore = restore && descanso.active;
+      stopBase(restore);
+      if (!restore || !mascota) return;
+      mascota.sprite.style.left = ''; mascota.sprite.style.right = '';
+      if (rincon) mascota.sprite.hidden = true;
     };
     /* El reproductor escucha `candi:state` en SU escenario; la mascota lo emite en el dock. */
     escena.addEventListener('candi:state', reenviarEstado);
@@ -317,8 +371,18 @@
     addEventListener('resize', alRedimensionar);
     habilitarDescanso();
   }
+  /* Dónde está la Candi que se ve, en coordenadas de la franja: sentada en la
+     franja, echada al final del viaje anterior, o en su casa. */
+  function posicionVisible() {
+    if (rincon) return rincon.x;
+    const x = parseFloat(descanso.actor.style.left);
+    if (descanso.active && !descanso.actor.hidden && Number.isFinite(x)) return x;
+    return descanso.layout().casa;
+  }
   const reenviarEstado = e => tira?.dispatchEvent(new CustomEvent('candi:state', { detail: e.detail }));
-  function habilitarDescanso() { descanso?.enable(!abierto && !bajito.matches); }
+  /* Libre = panel cerrado, pantalla con escena, sin pregunta en vuelo y sin
+     cálculo en curso (mientras investiga o piensa no se va por el hueso). */
+  function habilitarDescanso() { descanso?.enable(!abierto && !bajito.matches && !enVuelo && !calculando); }
   function alCambiarAlto() { if (bajito.matches) volverAlDock(); habilitarDescanso(); ajustarSuelo(); }
 
   /* La tira se apoya en la misma línea de suelo que la escena del dock. */
@@ -336,21 +400,22 @@
     Object.assign(rincon.el.style, { left: rincon.x + 'px', width: g.size + 'px', height: g.size + 'px' });
   }
 
+  /* Cuando el recorrido ya pinta su primer cuadro, la Candi sentada en la
+     franja (si la había) sobra: el actor sale desde su misma posición. Ya no
+     hay atajo «si está junto al hueso, a recogerlo»: el hueso ahora queda en
+     el extremo contrario, así que siempre camina. */
   function alDescanso(e) {
     const st = e.detail?.state;
     if (st === 'awake') return despertarDonde();
-    if (st === 'walk' && rincon) {
-      const g = descanso.layout(), junto = rincon.x <= g.end + 24;
-      quitarRincon();
-      if (junto) descanso.render(descanso.times.walk);   /* ya está junto al hueso: a recogerlo */
-    }
+    if (st === 'walk') quitarRincon();
   }
-  /* Al despertar, el reproductor devuelve la Candi del dock. Si ya se había
-     ido de su sitio, se sienta atenta ahí mismo y la del dock se esconde. */
+  /* Al despertar, el reproductor devuelve la Candi del dock. Si despertó
+     lejos de su casa, se sienta atenta ahí mismo y la del dock se esconde. */
   function despertarDonde() {
+    if (rincon) { mascota.pause(); return; }   /* la despertaron antes del primer paso: sigue donde estaba */
     const x = parseFloat(descanso.actor.style.left), size = parseFloat(descanso.actor.style.width);
     if (!Number.isFinite(x) || !Number.isFinite(size) || abierto || bajito.matches) return;
-    if (Math.abs(x - descanso.layout().start) < 24) return;   /* no alcanzó a irse */
+    if (Math.abs(x - descanso.layout().casa) < 32) return;    /* está (o quedó) en su casa */
     mascota.pause(); mascota.sprite.hidden = true;
     const el = document.createElement('div');
     el.className = 'candi-bone-atenta';
@@ -421,6 +486,7 @@
     if (activo) avisoActual = texto || AVISO_CALCULO;
     if (activo === calculando) return;
     calculando = activo;
+    habilitarDescanso();                     /* calculando no se va por el hueso; al terminar, espera completa */
     if (activo) { if (presentada) avisarCalculo(); return; }   /* si aún entra, lo dice el saludo */
     if (globo && presentada && decirSaludoDeVista()) return;
     if (globo && globo.dataset.aviso === 'calculo') {
@@ -498,6 +564,8 @@
        gasta un viaje al worker para que él responda lo mismo con un 401. */
     if (!token) return sinRespuesta(SIN_SESION, `<a href="${volverAca()}">Iniciar sesión</a>`);
     enVuelo = true; enviar.disabled = true;
+    habilitarDescanso();                     /* con una pregunta en vuelo no se va por el hueso */
+    investigar();                            /* esto SÍ es una consulta de verdad: la lupa */
     const esperando = burbuja('ella', '<span class="candi-puntos" role="status" aria-label="Candi está pensando"><i></i><i></i><i></i></span>');
     try {
       const r = await fetch(`${API}/c360/candi`, {
@@ -517,7 +585,7 @@
     } catch (e) {
       esperando.remove();
       sinRespuesta('No pude conectarme para responder eso. La guía de cada pantalla sigue disponible aquí arriba.');
-    } finally { enVuelo = false; enviar.disabled = false; input.focus({ preventScroll: true }); }
+    } finally { enVuelo = false; enviar.disabled = false; habilitarDescanso(); input.focus({ preventScroll: true }); }
   }
   /* Nunca se rellena el hueco con una respuesta inventada: se dice qué falta. */
   function sinRespuesta(motivo, extra) { burbuja('falla', `<p>${esc(motivo)}</p>${extra ? `<p>${extra}</p>` : ''}`); }
@@ -566,17 +634,51 @@
     volverAlDock();                               /* para reaccionar vuelve a su sitio */
     const estado = escena.dataset.estado;
     if (estado === 'thinking') return;                             /* ya está en eso */
-    if (estado !== 'idle_seated') {                                /* no interrumpe la entrada */
-      if (!pensarYa._espera) {
-        pensarYa._espera = true;
-        escena.addEventListener('candi:complete', () => { pensarYa._espera = false; if (calculando) pensarYa(); }, { once: true });
-      }
+    if (estado !== 'idle_seated') {             /* no interrumpe la entrada ni la lupa */
+      if (!pensarYa._espera) { pensarYa._espera = true; cuandoAtenta(() => { pensarYa._espera = false; if (calculando) pensarYa(); }); }
       return;
     }
     ultimaVez = Date.now();
     mascota.thinking().catch(e => console.warn('[Candi] pensando:', e && e.message));
   }
+
+  /* ─── Investigando: la lupa, para una consulta REAL de datos ─────────────
+     (v3 atlética, 29-sep: 24 poses, 4,8 s). Se dispara al mandar una pregunta
+     escrita al worker, que es la única consulta que Candi hace de verdad; la
+     espera habitual de los cálculos de la página sigue siendo `pensarYa`.
+     · Nunca las dos a la vez: si está pensando (o entrando), la lupa espera a
+       que vuelva a quedar atenta, y solo sale si la pregunta sigue en vuelo.
+     · Una lupa por pregunta, sin bucle: si el worker tarda más de 4,8 s,
+       vuelve a atenta y ahí se queda (repetirla sacaría y guardaría la lupa
+       en cada vuelta, como con las gafas).
+     · Si la respuesta llega ANTES de que termine, se la deja terminar: son
+       4,8 s y cortar la lupa a mitad de examen se lee como un salto del
+       dibujo. La respuesta ya está en el panel; la mascota es decorativa. Si
+       algún día hiciera falta cortarla, `mascota.idle()` la cancela. */
+  function investigar() {
+    if (!mascota || typeof mascota.investigating !== 'function') return;
+    volverAlDock();                               /* para reaccionar vuelve a su sitio */
+    const estado = escena.dataset.estado;
+    if (estado === 'investigating') return;                        /* ya está en eso */
+    if (estado !== 'idle_seated') {
+      if (!investigar._espera) { investigar._espera = true; cuandoAtenta(() => { investigar._espera = false; if (enVuelo) investigar(); }); }
+      return;
+    }
+    mascota.investigating().catch(e => console.warn('[Candi] investigando:', e && e.message));
+  }
+
+  /* Una sola vez, cuando vuelva a quedar sentada y atenta. ⚠️ No basta con
+     `candi:complete`: ese evento solo sale al terminar la ENTRADA (o de una,
+     con movimiento reducido). Tras una reacción la vuelta a atenta es
+     `idle()` desde 4,8 s, que no lo emite, y quien esperara solo ese evento
+     se quedaba colgado para siempre — y con él todo pensar posterior. */
+  function cuandoAtenta(fn) {
+    const hecho = () => { escena.removeEventListener('candi:state', alEstado); escena.removeEventListener('candi:complete', hecho); fn(); };
+    const alEstado = e => { if (e.detail?.state === 'idle_seated') hecho(); };
+    escena.addEventListener('candi:state', alEstado);
+    escena.addEventListener('candi:complete', hecho);
+  }
   document.addEventListener('click', e => { if (e.target.closest?.(PIENSA_EN)) pensar(); });
 
-  window.Candi = { abrir, cerrar, entrar, pensar, calculo, decir, get mascota() { return mascota; }, get descanso() { return descanso; }, contexto, primerNombre };
+  window.Candi = { abrir, cerrar, entrar, pensar, investigar, calculo, decir, get mascota() { return mascota; }, get descanso() { return descanso; }, contexto, primerNombre };
 })();

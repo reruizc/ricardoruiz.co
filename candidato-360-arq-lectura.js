@@ -207,11 +207,69 @@
     if (ciudad === 'medellin') return leerMedellin(mesas);
     return Promise.reject(new Error('sin cartografía emocional'));
   }
+  /* ── La huella de su PARTIDO o de su familia política en la ciudad ───────
+     Para leer los arquetipos desde donde vota su lado, no solo desde donde
+     votó usted o la ciudad entera. Misma cascada que el panel del electorado:
+       1. la LISTA del partido al Concejo 2023, puesto por puesto;
+       2. si no tuvo lista (o no llegó al 1 %), su lista a Cámara 2026 —la de
+          Oviedo en Bogotá o Cartagena no existía en 2023—;
+       3. la FAMILIA política (la del partido o el espectro que eligió), y si
+          no tuvo lista, sus vecinas del espectro.
+     Devuelve los votos como «mesas» por puesto, para leerlos con `leer()`
+     igual que una votación propia. */
+  const S3 = RR.publicUrl('congreso-2026/output');
+  const CIUDAD_COD = { cartagena: ['05', '001'], medellin: ['01', '001'] };
+  async function huella(ciudad, campana) {
+    const PB = global.PartidosBloques, EE = E(), c = campana || {};
+    const [dep, mun] = CIUDAD_COD[ciudad] || []; if (!dep) return null;
+    const partido = !['firmas', 'indeciso'].includes(c.avales) && c.partido ? c.partido : '';
+    const familia = partido ? PB.bloqueDeOrganizacion(partido) : (c.espectro || '');
+    const res = await json(`${S3}/concejo-2023/resultados-concejo-2023.json`).catch(() => null);
+    const comunas = Object.keys(res?.data?.[`${dep}-${mun}`]?.comunas || {}).filter(k => !['90', '98', 'NULL', ''].includes(k));
+    const docs = (await Promise.all(comunas.map(k => json(`${S3}/concejo-2023/comuna/${dep}-${mun}-${k}.json`).catch(() => null)))).filter(Boolean);
+    const puestos = [];
+    docs.forEach(d => (d.puestos || []).forEach(pu => puestos.push({ code: dep + mun + String(pu.code || '').replace('-', ''), pu, d })));
+    const medir2023 = pred => {
+      let p = 0, t = 0;
+      const filas = puestos.map(x => { const f = EE.votosFamilia(x.pu.v, x.d.cands, x.d.partidos, pred, x.pu.l); p += f.propios; t += f.total; return [x.code, f.propios]; });
+      return { share: t ? p / t : 0, votos: p, filas };
+    };
+    const aMesas = filas => filas.filter(([, v]) => v > 0).map(([code, v]) => ({ dep: code.slice(0, 2), mun: code.slice(2, 5), zon: code.slice(5, 7), pue: code.slice(7), v }));
+    if (partido) {
+      const pred = EE.calzaPartido(partido);
+      const m = medir2023(pred);
+      if (m.share >= .01) return { fuente: 'lista', partido, familia, share: m.share, votos: m.votos, mesas: aMesas(m.filas) };
+      const cam = await EE.camaraPuestos(dep).catch(() => null);
+      if (cam) {
+        const codes = Object.keys(cam.puestos || {}).filter(k => k.startsWith(dep + mun));
+        const tot = EE.votosCamara(cam, codes, () => true).total;
+        const filas = codes.map(k => [k, EE.votosCamara(cam, [k], pred).propios]);
+        const votos = filas.reduce((s, [, v]) => s + v, 0);
+        if (tot && votos / tot >= .01) return { fuente: 'camara', partido, familia, share: votos / tot, votos, mesas: aMesas(filas) };
+      }
+    }
+    if (familia && familia !== 'sc') {
+      let m = medir2023(new Set([familia])), vecinas = false;
+      if (m.share < .01 && EE.VECINAS?.[familia]) { m = medir2023(new Set(EE.VECINAS[familia])); vecinas = true; }
+      if (m.votos > 0) return { fuente: 'familia', partido, familia, vecinas, share: m.share, votos: m.votos, mesas: aMesas(m.filas) };
+    }
+    return { fuente: null, partido, familia };
+  }
+  /* El arquetipo más AFÍN a una huella: el que más pesa en ella comparado con
+     lo que pesa en la ciudad (×1,30 = «un 30 % más que en la ciudad»). Se
+     exige un 8 % del voto para que un arquetipo marginal no gane por azar:
+     con 5 %, en Cartagena ganaba el guardián insular del centro-derecha con
+     6 % contra 5 % de la ciudad, que es ruido y no un nicho. */
+  function afinidad(L, Lciudad, año = '2023') {
+    const sh = (X, id) => (X.reparto[año]?.[id] || 0) / (X.total || 1);
+    return (L.ids || []).map(id => ({ id, share: sh(L, id), ciudad: sh(Lciudad, id), ratio: sh(Lciudad, id) ? sh(L, id) / sh(Lciudad, id) : 0 }))
+      .filter(x => x.share >= .08).sort((a, b) => b.ratio - a.ratio);
+  }
   /* El arquetipo que más pesa en 2023 y su porcentaje. */
   function principal(L, año = '2023') {
     const top = Object.entries(L.reparto[año] || {}).sort((a, b) => b[1] - a[1])[0];
     return top ? { id: top[0], votos: top[1], share: L.total ? top[1] / L.total : 0 } : null;
   }
 
-  global.C360ArqLectura = { MEDELLIN, CARTAGENA, ciudadDe, municipioDeCampana, leer, principal, emocion, normBarrio };
+  global.C360ArqLectura = { MEDELLIN, CARTAGENA, ciudadDe, municipioDeCampana, leer, principal, huella, afinidad, emocion, normBarrio };
 })(window);

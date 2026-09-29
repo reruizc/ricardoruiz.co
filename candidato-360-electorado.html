@@ -130,7 +130,20 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
 .mapa-nota{font-size:12px;color:var(--muted);line-height:1.5;margin:10px 0 0}
 @keyframes pega{0%,100%{fill-opacity:.9}50%{fill-opacity:.28}}
 .leaflet-interactive.pega-on{animation:pega 1.5s ease-in-out infinite}
-.leaflet-tooltip.tp{font:13px var(--sans);background:rgba(23,37,28,.96);color:#fff;border:0;border-radius:0;padding:8px 10px;max-width:240px;white-space:normal}
+.leaflet-tooltip.tp{font:600 12.5px var(--sans);background:rgba(23,37,28,.96);color:#fff;border:0;border-radius:0;padding:5px 9px;white-space:nowrap}
+/* El detalle NO va en el globo: con siete renglones Leaflet lo apretaba a una
+   columna de dos palabras y no se leía (sep-2026). El globo dice nombre y el
+   valor de lo que se pinta; la ficha fija de la esquina trae todo lo demás.
+   En el teléfono va debajo del mapa. */
+.mapa-caja{position:relative}
+.mapa-ficha{position:absolute;top:10px;right:10px;z-index:500;width:270px;max-height:calc(100% - 20px);overflow:auto;background:rgba(255,253,248,.97);border:1px solid var(--line);box-shadow:0 6px 18px rgba(16,34,28,.14);padding:12px 14px;font-size:13px;line-height:1.5;color:var(--ink)}
+.mapa-ficha h5{margin:0 0 6px;font:700 15px/1.25 var(--display)}
+.mapa-ficha .fila{display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding:5px 0;font-size:12.5px}
+.mapa-ficha .fila span{color:var(--muted)}
+.mapa-ficha .fila b{text-align:right}
+.mapa-ficha .vacio,.mapa-ficha p{color:var(--muted);font-size:12.5px;margin:0}
+.mapa-ficha .fila.pega b{color:var(--green)}
+@media(max-width:640px){.mapa-ficha{position:static;width:auto;max-height:none;margin-top:8px;box-shadow:none}}
 .leaflet-tooltip.tp b{font-family:var(--display)}
 .leaflet-tooltip.tp:before{display:none}
 .fondo{margin-top:26px}
@@ -192,7 +205,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
       </div>
       <section class="panel tres-mapa" id="tpMapa"><span class="panel-num">03 · Dónde le pegan</span><h3 id="tpMapaTitulo">Su territorio.</h3>
         <div class="mapa-barra" id="mapaBarra"></div>
-        <div class="mapa" id="mapa"></div>
+        <div class="mapa-caja"><div class="mapa" id="mapa"></div><div class="mapa-ficha" id="mapaFicha"></div></div>
         <div class="mapa-leyenda" id="mapaLeyenda"></div>
         <p class="mapa-nota" id="mapaNota"></p>
       </section>
@@ -209,9 +222,9 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
 <script src="candidato-360-electorado.js?v=20260929"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
-<script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
-<script src="assets/candidato-360/candi/candi-hueso.js?v=1"></script>
-<script src="candidato-360-candi.js?v=20260929b"></script>
+<script src="assets/candidato-360/candi/candi-atletica.js?v=4"></script>
+<script src="assets/candidato-360/candi/candi-hueso.js?v=2"></script>
+<script src="candidato-360-candi.js?v=20260929c"></script>
 <script>
 (async function () {
   const P = window.C360Panel, E = window.C360Electorado, $ = P.$, esc = P.esc;
@@ -503,14 +516,22 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     return ST.mapa;
   }
   function limpiarMapa() { if (ST.capa) { ST.mapa.removeLayer(ST.capa); ST.capa = null; } if (ST.tiles) { ST.mapa.removeLayer(ST.tiles); ST.tiles = null; } }
-  function tooltip(u, x, p) {
-    const m = u.m, gt = m ? m.g[0] + m.g[1] + m.g[2] : 0, cr = valorMetrica(u, x, 'crecimiento');
-    return `<b>${esc(P.lugar(u.name))}</b>`
-      + (m?.censo ? `<br>${num(m.censo)} pueden votar · ${pct0(m.muj / (m.muj + m.hom))} mujeres<br>jóvenes ${pct0(m.g[0] / gt)} · adultos ${pct0(m.g[1] / gt)} · mayores ${pct0(m.g[2] / gt)}` : '')
-      + (cr != null ? `<br>Censo 2023 → 2026: ${cr >= 0 ? '+' : ''}${pct(cr)}` : '')
-      + `<br>${esc(ST.famLabel)} ${ST.cuando.slice(-4)}: ${u.total ? pct(u.propios / u.total) : '—'}${x ? ` (${veces(x.fam)} su promedio)` : ''}`
-      + (x ? `<br>${esc(p.nombre)}: ${pct(x.share)} (${veces(x.conc)} el territorio) · <b>le pega ${veces(x.pega)}</b>${x.pega >= PEGA_FUERTE ? ' · fuerte' : ''}` : '');
+  /* El globo: nombre y el valor de lo que pinta el mapa, en una línea. */
+  function tooltip(u, x) {
+    return `<b>${esc(P.lugar(u.name))}</b> · ${esc(METRICAS[ST.metrica].boton)} ${fmtMetrica(valorMetrica(u, x))}`;
   }
+  /* La ficha de la esquina: todo lo que se sabe de la zona bajo el cursor. */
+  const fila = (k, v, cls = '') => `<div class="fila ${cls}"><span>${k}</span><b>${v}</b></div>`;
+  function fichaVacia() { $('mapaFicha').innerHTML = '<p class="vacio">Pase el cursor por una zona —o tóquela, en el teléfono— para ver quién puede votar ahí, cómo votó su lado y cuánto le pega el perfil.</p>'; }
+  function fichaZona(u, x, p) {
+    const m = u.m, gt = m ? m.g[0] + m.g[1] + m.g[2] : 0, cr = valorMetrica(u, x, 'crecimiento');
+    $('mapaFicha').innerHTML = `<h5>${esc(P.lugar(u.name))}</h5>`
+      + (m?.censo ? fila('Pueden votar', num(m.censo)) + fila('Mujeres', pct0(m.muj / (m.muj + m.hom))) + fila('Jóvenes · adultos · mayores', `${pct0(m.g[0] / gt)} · ${pct0(m.g[1] / gt)} · ${pct0(m.g[2] / gt)}`) : '')
+      + (cr != null ? fila('Censo 2023 → 2026', `${cr >= 0 ? '+' : ''}${pct(cr)}`) : '')
+      + fila(`${esc(ST.famLabel)} ${ST.cuando.slice(-4)}`, `${u.total ? pct(u.propios / u.total) : '—'}${x ? ` · ${veces(x.fam)} su promedio` : ''}`)
+      + (x ? fila(esc(p.nombre), `${pct(x.share)} · ${veces(x.conc)} el territorio`) + fila('Le pega', `${veces(x.pega)}${x.pega >= PEGA_FUERTE ? ' · fuerte' : ''}`, 'pega') : '');
+  }
+  function fichaTexto(nombre, texto) { $('mapaFicha').innerHTML = `<h5>${esc(P.lugar(nombre))}</h5><p>${texto}</p>`; }
   /* La capa que se está mirando: las unidades de la ciudad (o municipios),
      las localidades (Cartagena) o los barrios. */
   /* ── Barrios sin puesto propio: el color del vecino más cercano ──────────
@@ -550,7 +571,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
   }
   function pintarMapa() {
     const mapa = asegurarMapa(), k = ST.perfil, p = E.PERFILES[k], base = ST.color, metrica = ST.metrica;
-    limpiarMapa();
+    limpiarMapa(); fichaVacia();
     const C = capaActual(), ref = ST.ref;
     const xs = C.unidades.map((u, j) => C.tipo === 'unidad' ? ref.pega[j]?.[k] : pegaDe(u, ref, k));
     const esc_ = escalaDe(C.unidades.map((u, j) => valorMetrica(u, xs[j])));
@@ -568,9 +589,14 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
         onEachFeature: (f, layer) => {
           const code = C.cfg.code(f.properties), o = porCodigo.get(code), r = relleno.get(code);
           const vecino = r && porCodigo.get(r.de);
-          layer.bindTooltip(o ? tooltip(o.u, o.x, p)
-            : r ? `<b>${esc(P.lugar(C.cfg.name(f.properties)))}</b><br>Sin puesto de votación propio: toma el color de <b>${esc(P.lugar(r.nombre))}</b>, el barrio con dato más cercano (${r.km < 1 ? `${Math.round(r.km * 1000)} m` : `${r.km.toFixed(1).replace('.', ',')} km`}). Es un color inferido: no suma a ningún total.<br>${esc(METRICAS[metrica].boton)} del vecino: ${fmtMetrica(valorMetrica(vecino.u, vecino.x))}`
-            : `<b>${esc(P.lugar(C.cfg.name(f.properties)))}</b><br>Sin dato: no tiene puesto propio y ningún barrio con dato queda a menos de ${RELLENO_MAX_KM} km.`, { sticky: true, className: 'tp' });
+          const nombre = C.cfg.name(f.properties);
+          layer.bindTooltip(o ? tooltip(o.u, o.x)
+            : r ? `<b>${esc(P.lugar(nombre))}</b> · color del vecino` : `<b>${esc(P.lugar(nombre))}</b> · sin dato`, { sticky: true, className: 'tp' });
+          const ver = () => o ? fichaZona(o.u, o.x, p)
+            : r ? fichaTexto(nombre, `Sin puesto de votación propio: toma el color de <b>${esc(P.lugar(r.nombre))}</b>, el barrio con dato más cercano (${r.km < 1 ? `${Math.round(r.km * 1000)} m` : `${r.km.toFixed(1).replace('.', ',')} km`}). Es un color inferido: no suma a ningún total. ${esc(METRICAS[metrica].boton)} del vecino: <b>${fmtMetrica(valorMetrica(vecino.u, vecino.x))}</b>.`)
+            : fichaTexto(nombre, `Sin dato: no tiene puesto propio y ningún barrio con dato queda a menos de ${RELLENO_MAX_KM} km.`);
+          layer.on('mouseover', ver);
+          if (!(C.tipo === 'unidad' && ST.cfg?.barrios && o)) layer.on('click', ver);
           if (C.tipo === 'unidad' && ST.cfg?.barrios && o) layer.on('click', () => abrirBarrios(o.u));
         }
       }).addTo(mapa);
@@ -579,7 +605,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
       ST.tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa);
       ST.capa = L.featureGroup(C.unidades.map((u, j) => [u, j]).filter(([u]) => Number.isFinite(u.lat)).map(([u, j]) => {
         const e = estilo(u, xs[j]);
-        return L.circleMarker([u.lat, u.lng], { radius: Math.max(5, Math.min(18, Math.sqrt(u.m?.censo || u.total || 1) / 6)), color: '#fff', weight: 1, ...e }).bindTooltip(tooltip(u, xs[j], p), { sticky: true, className: 'tp' });
+        return L.circleMarker([u.lat, u.lng], { radius: Math.max(5, Math.min(18, Math.sqrt(u.m?.censo || u.total || 1) / 6)), color: '#fff', weight: 1, ...e }).bindTooltip(tooltip(u, xs[j]), { sticky: true, className: 'tp' }).on('mouseover click', () => fichaZona(u, xs[j], p));
       })).addTo(mapa);
     }
     /* Leaflet mide el contenedor al crearse; en una rejilla que todavía no
