@@ -4187,13 +4187,9 @@ async function renderTerritorioObjetivo(c) {
      (columnas MUJERES/HOMBRES de PUESTOS_GEOREF) y rural/urbano de la zona
      electoral (99 = rural). La edad necesita el censo por edad por puesto, que
      todavía no está publicado: la tarjeta lo dice en vez de estimarlo.        */
-const ARQ_BASE = RRData.publicUrl('bases+de+datos/Proyecto+DC/arquetipos');
-const VOT27_URL = `${RRData.publicUrl('bases+de+datos/Proyecto+DC/votacion-arquetipo-2027')}/votacion-2027.json?v=20260528`;
-const MEDELLIN = '01001';
 /* Una candidatura nueva no tiene archivo de mesas y no por eso se rompen las
    tarjetas: se leen con cero votos y cada una decide qué mostrar. */
 async function mesasDelHistorial() { try { return (await datosCandidatura(crmCandidate)).mesas || []; } catch (e) { return []; } }
-const codigoMunicipio = mesa => `${String(mesa.dep || '').padStart(2, '0')}${String(mesa.mun || '').padStart(3, '0')}`;
 function municipioDeCampana() {
   const a = alcanceObjetivo();
   /* Una JAL también compite dentro de un municipio: su alcance es la localidad
@@ -4201,175 +4197,23 @@ function municipioDeCampana() {
   return (a?.tipo === 'municipio' || a?.tipo === 'localidad') && a.municipio ? `${String(a.departamento).padStart(2, '0')}${String(a.municipio).padStart(3, '0')}` : '';
 }
 function municipioMayoritario(mesas) { return C360Electorado.municipioMayoritario(mesas); }
-/* Los archivos del Proyecto DC (≈ 560 KB) se piden UNA vez y solo si la
-   candidatura toca Medellín. votacion-2027 trae el arquetipo ajustado a mano
-   por la socia: se aplica igual que en proyecto-dc/arquetipos.html para que
-   las dos páginas no digan cosas distintas del mismo barrio. */
-let arqPromise = null;
-function datosArquetipos() {
-  if (!arqPromise) arqPromise = Promise.all([
-    fetchJSON(`${ARQ_BASE}/arquetipos.json`),
-    fetchJSON(`${ARQ_BASE}/por-barrio.json`),
-    fetchJSON(`${ARQ_BASE}/por-comuna.json`),
-    fetchJSON(VOT27_URL).catch(() => null)
-  ]).then(([familias, barrios, comunas, vot27]) => {
-    Object.entries(vot27?.barrios || {}).forEach(([dap, v]) => {
-      const b = barrios[dap]; if (!b || !v.arquetipo_ajustado_2027) return;
-      b.proyeccion_2027 = { ...(b.proyeccion_2027 || {}), arquetipo_proy: v.arquetipo_ajustado_2027, arquetipo_alt: v.arquetipo_alterno_2027 || b.proyeccion_2027?.arquetipo_alt };
-    });
-    return { familias, barrios, comunas };
-  }).catch(e => { arqPromise = null; throw e; });
-  return arqPromise;
-}
-/* Votos de la candidatura repartidos por barrio (DAP) y por comuna de
-   Medellín. El puesto se ubica por coordenada en la capa barrial oficial —la
-   misma regla del mapa— y la comuna sale del propio polígono, no del nombre
-   que trae la mesa: «11COMUNA 11 LAURELES» contra «Laureles Estadio» no casa
-   por texto y sí por geometría. */
-async function votosArquetipoMedellin(mesas) {
-  const cfg = cityBarrioLayerFor('MEDELLIN');
-  const [capa, puestos] = await Promise.all([cargarBarriosCiudad(cfg), puestosPorBarrio()]);
-  const comunaDe = {};
-  (capa.geo.features || []).forEach(f => { const c = String(f.properties?.CODIGO || ''); if (c && f.properties?.COMUNA) comunaDe[c.slice(0, 2)] = f.properties.COMUNA; });
-  const porBarrio = {}, porComuna = {};
-  let votos = 0, ubicados = 0;
-  mesas.forEach(m => {
-    const v = Number(m.v || 0); if (!v || codigoMunicipio(m) !== MEDELLIN) return;
-    votos += v;
-    const p = puestos[electoralPlaceCode(m)]; if (!p) return;
-    const dap = barrioDelPunto(capa.indice, p.lng, p.lat); if (!dap) return;
-    ubicados += v;
-    porBarrio[dap] = (porBarrio[dap] || 0) + v;
-    const comuna = comunaDe[dap.slice(0, 2)]; if (comuna) porComuna[comuna] = (porComuna[comuna] || 0) + v;
-  });
-  return { porBarrio, porComuna, votos, ubicados };
-}
-/* La lectura completa: reparto de SUS votos por arquetipo en 2023 y en 2027,
-   comunas y barrios ordenados. Sin votos propios en la ciudad (una campaña
-   nueva en Medellín) se describe la ciudad con los votos de 2023 del propio
-   estudio, y la tarjeta lo dice. */
-async function lecturaArquetipos() {
-  const mesas = await mesasDelHistorial();
-  const { familias, barrios, comunas } = await datosArquetipos();
-  const propio = await votosArquetipoMedellin(mesas);
-  const conVotos = propio.ubicados > 0;
-  const pesos = conVotos ? propio.porBarrio : Object.fromEntries(Object.values(barrios).map(b => [b.dap, Number(b.proyeccion_2027?.votos_por_arquetipo ? Object.values(b.proyeccion_2027.votos_por_arquetipo).reduce((s, x) => s + Number(x || 0), 0) : 0)]));
-  const reparto = { '2023': {}, '2027': {} };
-  let total = 0, sinDato = 0;
-  Object.entries(pesos).forEach(([dap, v]) => {
-    if (!v) return; total += v;
-    const b = barrios[dap];
-    if (!b) { sinDato += v; return; }
-    const a23 = b.arquetipo?.['2023'], a27 = b.proyeccion_2027?.arquetipo_proy;
-    if (a23) reparto['2023'][a23] = (reparto['2023'][a23] || 0) + v;
-    if (a27) reparto['2027'][a27] = (reparto['2027'][a27] || 0) + v;
-  });
-  const orden = obj => Object.entries(obj).sort((a, b) => b[1] - a[1]);
-  const filasComuna = conVotos
-    ? orden(propio.porComuna).map(([nombre, v]) => ({ nombre, votos: v, a23: comunas[nombre]?.['2023']?.dominante, a27: comunas[nombre]?.['2027']?.dominante }))
-    : Object.entries(comunas).map(([nombre, c]) => ({ nombre, votos: Number(c['2023']?.votos_total || 0), a23: c['2023']?.dominante, a27: c['2027']?.dominante })).sort((a, b) => b.votos - a.votos);
-  const filasBarrio = orden(pesos).slice(0, 10).map(([dap, v]) => ({ dap, votos: v, nombre: barrios[dap]?.barrio || dap, comuna: barrios[dap]?.comuna || '', a23: barrios[dap]?.arquetipo?.['2023'], a27: barrios[dap]?.proyeccion_2027?.arquetipo_proy, riesgo: barrios[dap]?.proyeccion_2027?.nivel_riesgo }));
-  return { familias, conVotos, total, sinDato, reparto, filasComuna, filasBarrio, votosCiudad: propio.votos, ubicados: propio.ubicados };
-}
-/* ─── Cartagena: la cartografía emocional de Nury (sep-2026) ────────────────
-   No son las cinco familias de Medellín: son OCHO arquetipos construidos para
-   esta ciudad (guardián funcional, gestor vigilante, pragmático de servicios,
-   protesta resolutiva, defensor territorial, guardián insular,
-   productivo-pragmático y mediador comunitario). Y cada barrio no trae un
-   solo arquetipo sino una MEZCLA de los ocho, así que los votos se reparten
-   con esa mezcla y no con el dominante: un barrio 55 % protesta y 20 %
-   productivo aporta a los dos.
-   2015 es el ancla; 2019 y 2023 son proyecciones retrospectivas y 2027 es
-   simulación. El modal lo dice, porque no es lo mismo que un dato observado.
-   El barrio casa POR NOMBRE con el diccionario puesto→barrio del mapa: los 211
-   nombres de Nury son los mismos 211 de la capa (verificado al construir). */
-const CARTAGENA = '05001';
-const ARQ_CTG_BASE = RRData.publicUrl('bases+de+datos/Proyecto+DC/arquetipos-cartagena');
-const ARQ_CTG_URL = `${ARQ_CTG_BASE}/arquetipos-cartagena.json?v=20260928`;
-const normBarrio = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
-let arqCtgPromise = null;
-function datosArquetiposCartagena() {
-  if (!arqCtgPromise) arqCtgPromise = fetchJSON(ARQ_CTG_URL).catch(e => { arqCtgPromise = null; throw e; });
-  return arqCtgPromise;
-}
-async function lecturaArquetiposCartagena() {
-  const [mesas, D, dic] = await Promise.all([mesasDelHistorial(), datosArquetiposCartagena(), cartagenaPuestoBarrio()]);
-  const porBarrio = {};
-  let votos = 0, ubicados = 0;
-  mesas.forEach(m => {
-    const v = Number(m.v || 0); if (!v || codigoMunicipio(m) !== CARTAGENA) return;
-    votos += v;
-    const k = normBarrio(dic?.[electoralPlaceCode(m)]?.barrio); if (!k) return;
-    ubicados += v; porBarrio[k] = (porBarrio[k] || 0) + v;
-  });
-  const conVotos = ubicados > 0;
-  /* Sin votos propios en la ciudad se describe la ciudad con el volumen que
-     el propio estudio le asigna a cada barrio en 2023. */
-  const pesos = conVotos ? porBarrio : Object.fromEntries(Object.entries(D.barrios).map(([k, b]) => [k, Number(b.volumen?.['2023'] || 0)]));
-  const reparto = { '2023': {}, '2027': {} }, porLoc = {};
-  let total = 0, sinDato = 0;
-  Object.entries(pesos).forEach(([k, v]) => {
-    if (!v) return; total += v;
-    const b = D.barrios[k]; if (!b) { sinDato += v; return; }
-    const L = porLoc[b.localidad] || (porLoc[b.localidad] = { votos: 0, '2023': {}, '2027': {} });
-    L.votos += v;
-    ['2023', '2027'].forEach(a => Object.entries(b.mezcla[a] || {}).forEach(([id, p]) => {
-      reparto[a][id] = (reparto[a][id] || 0) + v * p;
-      L[a][id] = (L[a][id] || 0) + v * p;
-    }));
-  });
-  const top = o => Object.entries(o).sort((a, b) => b[1] - a[1])[0]?.[0];
-  const filasComuna = Object.entries(porLoc).sort((a, b) => b[1].votos - a[1].votos).map(([nombre, L]) => ({ nombre, votos: L.votos, a23: top(L['2023']), a27: top(L['2027']) }));
-  const filasBarrio = Object.entries(pesos).filter(([k, v]) => v && D.barrios[k]).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => {
-    const b = D.barrios[k];
-    return { votos: v, nombre: b.nombre, comuna: b.localidad, a23: b.dominante['2023'], a27: b.dominante['2027'], riesgo: b.volatilidad?.nivel, heredado: /heredado/i.test(b.tipo || '') };
-  });
-  const F = D.familias;
-  return {
-    ciudad: 'cartagena', D, conVotos, total, sinDato, reparto, filasComuna, filasBarrio, votosCiudad: votos, ubicados,
-    nombreDe: id => F[id]?.nombre || 'Sin dato', cortoDe: id => F[id]?.nombre || 'Sin dato', colorDe: id => F[id]?.color || '#6b7280',
-  };
-}
-/* Nury escribe la emoción con «+» («Malestar + búsqueda de solución»): en una frase va «y». */
-const emocionArq = f => String(f?.emocion || '').replace(/\s*\+\s*/g, ' y ').toLowerCase();
-/* Medellín: los nombres cambian entre la lectura 2015-2023 y la de 2027. */
-function accesoresMedellin(familias) {
-  return {
-    nombreDe: (id, año) => { const f = familias?.arquetipos?.[id]; return f ? (año === '2027' ? f.evol.nombre : f.base.nombre) : 'Sin dato'; },
-    cortoDe: id => familias?.arquetipos?.[id]?.label_corto || 'Sin dato',
-    colorDe: id => familias?.arquetipos?.[id]?.color || '#6b7280',
-  };
-}
 /* ⚠️ Una candidatura NUEVA no pasa por el formulario de la ruta con historial,
    así que `municipioDeCampana()` —que lee ese formulario— sale vacío: Nury,
    probando como candidata nueva a la Alcaldía de Cartagena, veía la tarjeta
    apagada («Por ahora, Medellín y Cartagena»), porque sin votos propios
-   tampoco había municipio mayoritario (sep-29-2026). La campaña nueva vive en
-   CAMPANA_ACTUAL con el municipio por su nombre DANE («CARTAGENA DE INDIAS»),
-   que se traduce a código electoral con la capa municipal. */
-async function municipioDeCampanaNueva() {
-  const c = !crmCandidate ? CAMPANA_ACTUAL : null;
-  if (!c || !CORP_MUNICIPAL.includes(c.corp) || !c.municipio || !c.departamento) return '';
-  const mun = await C360Electorado.codigoMunicipio(c.departamento, c.municipio).catch(() => '');
-  return mun ? `${String(c.departamento).padStart(2, '0')}${String(mun).padStart(3, '0')}` : '';
+   tampoco había municipio mayoritario (sep-29-2026). Sin candidato de
+   historial manda la campaña guardada (CAMPANA_ACTUAL). */
+async function municipioArquetipos() {
+  return municipioDeCampana() || (!crmCandidate ? await C360ArqLectura.municipioDeCampana(CAMPANA_ACTUAL) : '');
 }
-function ciudadDeArquetipos(mesas, campanaNueva = '') {
-  const campana = municipioDeCampana() || campanaNueva, mayor = municipioMayoritario(mesas);
-  if (campana === MEDELLIN || (!campana && mayor === MEDELLIN)) return 'medellin';
-  if (campana === CARTAGENA || (!campana && mayor === CARTAGENA)) return 'cartagena';
-  /* Campaña en otro lado pero votos en una de las dos: se lee donde están. */
-  if (mayor === MEDELLIN) return 'medellin';
-  if (mayor === CARTAGENA) return 'cartagena';
-  return null;
-}
-let ARQUETIPOS_ACTUAL = null;
-/* La tarjeta: titular con el arquetipo donde está la mayoría de sus votos. */
+/* La tarjeta 05: titular con el arquetipo donde está la mayoría de sus votos.
+   La lectura entera vive en candidato-360-arq-lectura.js y la página completa
+   en candidato-360-arquetipos.html; esto es solo el adelanto. */
 async function pintarArquetipos() {
   const card = $('crmArquetipos'); if (!card) return;
-  ARQUETIPOS_ACTUAL = null;
+  const A = window.C360ArqLectura;
   const mesas = await mesasDelHistorial();
-  const ciudad = ciudadDeArquetipos(mesas, await municipioDeCampanaNueva());
-  $('crmArqBtn').disabled = true;
+  const ciudad = A.ciudadDe(await municipioArquetipos(), mesas);
   if (!ciudad) {
     card.classList.add('module-apagado');
     $('crmArqTitulo').textContent = 'Por ahora, Medellín y Cartagena.';
@@ -4382,75 +4226,21 @@ async function pintarArquetipos() {
   $('crmArqTitulo').textContent = `Leyendo los barrios de ${nombreCiudad}…`;
   $('crmArqCopy').textContent = ciudad === 'cartagena' ? 'Cruzando su votación con los ocho arquetipos de la ciudad.' : 'Cruzando su votación con los cinco arquetipos del territorio.';
   try {
-    const L = ciudad === 'cartagena' ? await lecturaArquetiposCartagena() : await lecturaArquetipos().then(L => ({ ...L, ciudad: 'medellin', ...accesoresMedellin(L.familias) }));
-    ARQUETIPOS_ACTUAL = L;
-    const top = Object.entries(L.reparto['2023']).sort((a, b) => b[1] - a[1])[0];
+    const L = await A.leer(ciudad, mesas), top = A.principal(L);
     if (!top) throw new Error('sin cruce');
-    const [fam, votos] = top, pct = Math.round(votos / L.total * 100);
-    let nombre, lema;
-    if (ciudad === 'cartagena') { const f = L.D.familias[fam]; nombre = f.nombre; lema = `${f.lema}. La emoción que lo ordena: ${emocionArq(f)}.`; }
-    else { const base = L.familias.arquetipos[fam].base; nombre = base.nombre; lema = base.deseo; }
-    const unidades = ciudad === 'cartagena' ? (L.filasComuna.length === 1 ? 'una localidad' : `${L.filasComuna.length} localidades`) : `${L.filasComuna.length} comunas`;
-    $('crmArqTitulo').textContent = L.conVotos ? `Su voto vive en barrios de ${ciudad === 'cartagena' ? 'arquetipo ' : ''}${nombre.toLowerCase()}.` : `${nombreCiudad} vota desde ${ciudad === 'cartagena' ? 'el arquetipo ' : ''}${nombre.toLowerCase()}.`;
-    $('crmArqCopy').textContent = `${lema} ${L.conVotos ? `Es el arquetipo de ${pct} % de sus votos en la ciudad, repartidos en ${unidades}.` : `Es el arquetipo con más peso en la ciudad; cuando tenga votos propios acá la lectura se hace con ellos.`}`;
+    const f = L.ficha(top.id), pct = Math.round(top.share * 100);
+    const lema = ciudad === 'cartagena' ? `${f.lema}. La emoción que lo ordena: ${f.emocion}.` : f.lema;
+    const unidades = L.filasComuna.length === 1 ? `una ${L.unidad}` : `${L.filasComuna.length} ${L.unidades}`;
+    const art = ciudad === 'cartagena' ? 'el arquetipo ' : '';
+    $('crmArqTitulo').textContent = L.conVotos ? `Su voto vive en barrios de ${ciudad === 'cartagena' ? 'arquetipo ' : ''}${f.nombre.toLowerCase()}.` : `${nombreCiudad} vota desde ${art}${f.nombre.toLowerCase()}.`;
+    $('crmArqCopy').textContent = `${lema} ${L.conVotos ? `Es el arquetipo de ${pct} % de sus votos en la ciudad, repartidos en ${unidades}.` : 'Es el arquetipo con más peso en la ciudad; cuando tenga votos propios acá la lectura se hace con ellos.'}`;
     $('crmArqDato').textContent = `${pct} %`;
     $('crmArqSub').textContent = L.conVotos ? 'de sus votos, en ese arquetipo' : 'del voto de la ciudad';
-    $('crmArqBtn').disabled = false;
   } catch (e) {
     $('crmArqTitulo').textContent = 'No pudimos leer los arquetipos.';
     $('crmArqCopy').textContent = 'La fuente de la cartografía emocional no respondió. Vuelva a abrir el CRM en un momento.';
     $('crmArqDato').textContent = '—'; $('crmArqSub').textContent = 'fuente no disponible';
   }
-}
-function barraArquetipos(L, año) {
-  const filas = Object.entries(L.reparto[año]).sort((a, b) => b[1] - a[1]).filter(([, v]) => v / L.total >= 0.005);
-  if (!filas.length) return '';
-  return `<div class="arq-barra">${filas.map(([id, v]) => `<i style="flex:${v};background:${L.colorDe(id)}" title="${escHtml(L.nombreDe(id, año))}"></i>`).join('')}</div>
-    <ul class="arq-lista">${filas.map(([id, v]) => `<li><span class="arq-punto" style="background:${L.colorDe(id)}"></span><b>${Math.round(v / L.total * 100)} %</b> ${escHtml(L.nombreDe(id, año))}<em>${Math.round(v).toLocaleString('es-CO')} votos</em></li>`).join('')}</ul>`;
-}
-/* La ficha del arquetipo que pesa más en su voto: la tarjeta gráfica de Nury,
-   la emoción que lo mueve y qué le sube o le baja la saliencia. */
-function fichaArquetipoCartagena(L, id) {
-  const f = L.D.familias[id]; if (!f) return '';
-  return `<div class="arq-ficha">
-    <img src="${ARQ_CTG_BASE}/escudos/${id}.jpg" alt="Tarjeta del arquetipo ${escHtml(f.nombre)}" loading="lazy" onerror="this.remove()">
-    <div>
-      <p style="margin:0 0 6px"><b style="color:${f.color}">${escHtml(f.nombre)}</b> · ${escHtml(f.lema)}</p>
-      <p style="margin:0 0 6px">La emoción que lo ordena: <b>${escHtml(emocionArq(f))}</b>. ${escHtml(f.rasgos)}</p>
-      ${f.decide ? `<p style="margin:0 0 6px">Cómo decide el voto: ${escHtml(f.decide)}</p>` : ''}
-      <p style="margin:0 0 6px">Palancas emocionales: ${f.palancas.map(([n, v]) => `${escHtml(n)} <b>${v}/5</b>`).join(' · ')} · edades ${escHtml(f.edades)} años.</p>
-      ${f.tematicas?.length ? `<p style="margin:0 0 6px">Temas que lo mueven: ${f.tematicas.map(([n, v]) => `${escHtml(n)} <b>${v}/5</b>`).join(' · ')}.</p>` : ''}
-      <p style="margin:0 0 6px"><b>Se enciende con</b> ${escHtml(f.sube.replace(/\.$/, '').toLowerCase())}. <b>Se calma con</b> ${escHtml(f.baja.replace(/\.$/, '').toLowerCase())}.</p>
-    </div></div>`;
-}
-function mostrarArquetipos() {
-  const L = ARQUETIPOS_ACTUAL; if (!L) return;
-  const fam = id => escHtml(L.cortoDe(id));
-  const ctg = L.ciudad === 'cartagena', ciudad = ctg ? 'Cartagena' : 'Medellín';
-  const top = Object.entries(L.reparto['2023']).sort((a, b) => b[1] - a[1])[0]?.[0];
-  $('introModalKicker').textContent = 'Candidato 360 · arquetipos del territorio';
-  $('introModalTitle').textContent = L.conVotos ? '¿En qué clase de barrio está su voto?' : `Los arquetipos de ${ciudad}`;
-  const votosTxt = L.conVotos ? `Acá están sus <b>${Math.round(L.total).toLocaleString('es-CO')} votos</b> repartidos por esa lectura${L.sinDato ? `; ${Math.round(L.sinDato).toLocaleString('es-CO')} cayeron en barrios sin medición` : ''}${L.votosCiudad > L.ubicados ? `; ${Math.round(L.votosCiudad - L.ubicados).toLocaleString('es-CO')} están en puestos sin barrio asignado` : ''}.` : 'Todavía no tiene votos propios en la ciudad, así que esto es la ciudad, no usted.';
-  const intro = ctg
-    ? `<p>Cada barrio de Cartagena tiene una <b>mezcla de ocho arquetipos</b>: las emociones que ordenan su voto, reconstruidas con Alcaldía, Concejo y JAL. Sus votos se reparten con esa mezcla —un barrio que es 60 % protesta y 20 % productivo aporta a los dos—, no solo con el arquetipo que manda. ${votosTxt}</p>`
-    : `<p>Cada barrio de Medellín tiene un <b>arquetipo</b>: la emoción que ordena su voto, reconstruida con Alcaldía, Concejo y JAL de 2015, 2019 y 2023. ${votosTxt}</p>`;
-  const nota = ctg
-    ? `Fuente: cartografía emocional de Cartagena de Nury Astrid (211 barrios, 3 localidades, sep-2026). 2015 es el ancla; <b>2023 es una proyección retrospectiva</b> hecha con los resultados de ese año y <b>2027 es simulación</b>, no pronóstico. «Heredado» marca un barrio sin puesto propio, que toma la lectura del vecino. El arquetipo es del <b>barrio</b>, no de sus votantes: dice en qué clase de territorio está su votación, no qué siente cada persona que votó por usted.`
-    : `Fuente: Proyecto DC · cartografía emocional de Medellín (152 barrios, 21 comunas), con la proyección 2027 ajustada. El arquetipo es del <b>barrio</b>, no de sus votantes: dice en qué clase de territorio está su votación, no qué siente cada persona que votó por usted.`;
-  const riesgo = f => f.riesgo ? (ctg ? ` · volatilidad ${escHtml(String(f.riesgo).toLowerCase())}` : ` · riesgo de cambio ${escHtml(String(f.riesgo).toLowerCase())}`) : '';
-  $('introModalText').innerHTML = `
-    ${intro}
-    ${ctg && top ? fichaArquetipoCartagena(L, top) : ''}
-    <p style="margin-bottom:8px"><b>Su voto hoy (lectura 2023${ctg ? ', proyectada' : ''})</b></p>
-    ${barraArquetipos(L, '2023')}
-    <p style="margin-bottom:8px"><b>A dónde va ese mismo voto en 2027${ctg ? ' (simulación)' : ''}</b></p>
-    ${barraArquetipos(L, '2027')}
-    <p style="margin-bottom:8px"><b>Por ${ctg ? 'localidad' : 'comuna'}</b></p>
-    <ul class="puntaje-escala">${L.filasComuna.slice(0, 8).map(f => `<li><b>${Math.round(f.votos).toLocaleString('es-CO')}</b> ${escHtml(f.nombre)} · ${fam(f.a23)} → <b style="min-width:0;font-size:14px">${fam(f.a27)}</b> en 2027</li>`).join('')}</ul>
-    <p style="margin-bottom:8px"><b>Sus barrios más fuertes</b></p>
-    <ul class="puntaje-escala">${L.filasBarrio.slice(0, 6).map(f => `<li><b>${Math.round(f.votos).toLocaleString('es-CO')}</b> ${escHtml(f.nombre)}${f.comuna ? ` · ${escHtml(f.comuna)}` : ''} · ${fam(f.a23)}${riesgo(f)}${f.heredado ? ' · heredado' : ''}</li>`).join('')}</ul>
-    <p class="puntaje-nota">${nota}</p>`;
-  $('introModal').classList.add('open');
 }
 
 /* ── Perfil del votante ─────────────────────────────────────────────────────

@@ -80,6 +80,11 @@
     saludo: 'Aquí te muestro a quien PUEDE votar, no solo a quien votó la última vez. ¿Por qué? Porque la participación viene subiendo: en la segunda vuelta de 2026 votó el 64 % del censo, casi seis puntos más que en la primera y más que en 2022. El electorado de 2027 no va a ser el mismo que votó antes.',
     chips: ['¿Por qué quién puede votar y no quién votó?', '¿Qué significa que un perfil me rinda ×1,20?', '¿Dónde creció el censo?']
   };
+  VISTAS.arquetipos = {
+    titulo: 'Los arquetipos de tu territorio',
+    texto: 'Aquí ves qué mueve el voto en cada barrio donde están tus votos: el arquetipo que manda, cómo se reparte tu votación entre todos en 2023 y a dónde va en 2027, el mapa barrio por barrio y la ficha de cada arquetipo. Si todavía no tienes votos en la ciudad, lo que ves es la ciudad, no tú.',
+    chips: ['¿Qué es un arquetipo?', '¿Por qué 2027 es una simulación?', '¿Cómo le hablo al arquetipo que manda?']
+  };
   VISTAS.diad = {
     titulo: 'El día de la elección',
     texto: 'Aquí decides cuántos testigos necesitas y en qué puestos. Si te lanzas a otra corporación, los puestos son los de ese territorio, ordenados por los votos de tu familia política en 2023. Mueve el control para ver cuánto cubres, y revisa los avisos: señal, internet y dónde se publica el E-14.',

@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Qué mueve el voto en cada barrio donde la candidatura saca votos: el arquetipo que manda, cómo se reparte su votación y a dónde va en 2027.">
+<title>Arquetipos del territorio · Candidato 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<!-- ⚠️ Al tocar candidato-360.css, candidato-360-panel.js o candidato-360-arq-lectura.js hay que bumpear su ?v= acá, en candidato-360.html y en las otras páginas del panel. -->
+<link rel="stylesheet" href="candidato-360.css?v=20260926">
+<link rel="stylesheet" href="assets/candidato-360/candi/candi-saludo.css?v=3">
+<link rel="stylesheet" href="assets/candidato-360/candi/candi-hueso.css?v=1">
+<link rel="stylesheet" href="candidato-360-candi.css?v=20260921d">
+<style>
+/* El chasis del panel, igual que en electorado, Día D y endoso. */
+.panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
+.panel-hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:30px}
+.panel-hero h1{font:800 clamp(30px,4.4vw,46px)/1.06 var(--display);letter-spacing:-.02em;margin:8px 0 10px;color:var(--ink);max-width:24ch;text-wrap:balance}
+.panel-hero p{margin:0;max-width:64ch;font-size:15px;line-height:1.6;color:var(--muted)}
+.panel-candidatura:empty{display:none}
+.panel-candidatura{display:inline-block;margin-top:14px;font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--green);border:1px solid rgba(20,124,112,.32);padding:6px 10px}
+.panel-nota{margin-top:24px;font-size:12.5px;line-height:1.55;color:var(--muted)}
+.hidden{display:none}
+#arqCuerpo > .panel{margin-bottom:16px}
+
+/* ── 01 · El que manda ───────────────────────────────────────────────── */
+.aq-manda{display:grid;grid-template-columns:minmax(0,240px) minmax(0,1fr);gap:clamp(18px,3vw,32px);align-items:start;margin-top:14px}
+.aq-manda img{width:100%;height:auto;display:block;border:1px solid var(--line)}
+.aq-cifra{display:flex;flex-wrap:wrap;gap:clamp(16px,4vw,40px);margin:4px 0 14px}
+.aq-cifra b{display:block;font:800 clamp(38px,6vw,56px)/1 var(--display);letter-spacing:-.03em}
+.aq-cifra span{display:block;font-size:13px;color:var(--muted);margin-top:4px;max-width:24ch}
+.aq-lema{font:700 clamp(18px,2.2vw,22px)/1.3 var(--display);margin:0 0 10px;color:var(--ink)}
+.aq-par{margin:0 0 8px;font-size:14px;line-height:1.6;color:var(--ink)}
+.aq-par em{font-style:normal;color:var(--muted)}
+.aq-palancas{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px 18px;margin:12px 0 4px}
+.aq-palanca{font-size:12.5px;color:var(--muted)}
+.aq-palanca i{display:block;height:6px;background:rgba(0,0,0,.07);margin-top:4px}
+.aq-palanca i b{display:block;height:100%}
+@media(max-width:680px){.aq-manda{grid-template-columns:1fr}.aq-manda img{max-width:260px}}
+
+/* ── 02 · El reparto ─────────────────────────────────────────────────── */
+.aq-anos{display:grid;grid-template-columns:1fr 1fr;gap:clamp(16px,3vw,32px);margin-top:12px}
+.aq-anos h4{margin:0 0 8px;font:700 14px var(--display);color:var(--ink)}
+.aq-anos h4 small{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-left:6px}
+.aq-barra{display:flex;height:16px;border:1px solid var(--line);overflow:hidden;margin-bottom:10px}
+.aq-barra i{display:block;height:100%}
+.aq-lista{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.aq-lista li{display:grid;grid-template-columns:12px 52px 1fr auto;gap:8px;align-items:baseline;font-size:13px}
+.aq-lista .pt{width:10px;height:10px;border-radius:50%;align-self:center}
+.aq-lista b{font-variant-numeric:tabular-nums;text-align:right}
+.aq-lista em{font-style:normal;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+@media(max-width:720px){.aq-anos{grid-template-columns:1fr}}
+
+/* ── 03 · El mapa ────────────────────────────────────────────────────── */
+.aq-controles{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+.aq-controles .rot{font:500 11px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.aq-tog{font:500 12px var(--mono);padding:7px 12px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.aq-tog[aria-pressed="true"]{border-color:var(--green);color:var(--green);background:rgba(20,124,112,.08)}
+.aq-mapa{height:clamp(380px,58vh,560px);border:1px solid var(--line);background:#eef0ea}
+.aq-leyenda{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:12px;color:var(--muted)}
+.aq-leyenda span{display:inline-flex;align-items:center;gap:6px}
+.aq-leyenda i{width:12px;height:12px;display:inline-block}
+.aq-mapa-nota{margin:10px 0 0;font-size:12.5px;line-height:1.55;color:var(--muted)}
+.leaflet-tooltip.aq-tt{font:13px/1.45 Manrope,sans-serif;max-width:280px;white-space:normal}
+
+/* ── 04 y 05 · Las tablas ────────────────────────────────────────────── */
+.aq-tabla-caja{overflow-x:auto;margin-top:8px;border:1px solid var(--line)}
+table.aq-tabla{border-collapse:collapse;width:100%;min-width:620px;font-size:13px}
+.aq-tabla th{text-align:left;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;background:rgba(0,0,0,.02)}
+.aq-tabla td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.aq-tabla tr:last-child td{border-bottom:0}
+.aq-tabla .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.aq-tabla small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.aq-chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.aq-chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.aq-marca{font:500 10.5px var(--mono);letter-spacing:.04em;padding:2px 6px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;margin-left:4px}
+.aq-mas{margin-top:12px}
+
+/* ── 06 · Los arquetipos de la ciudad ────────────────────────────────── */
+.aq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:12px}
+.aq-card{border:1px solid var(--line);border-top:4px solid var(--c);padding:14px 16px;background:rgba(255,255,255,.35)}
+.aq-card h4{margin:0 0 4px;font:700 15px/1.3 var(--display);color:var(--ink)}
+.aq-card .sh{font:500 11px var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.aq-card p{margin:8px 0 0;font-size:13px;line-height:1.5;color:var(--ink)}
+.aq-card p em{font-style:normal;color:var(--muted)}
+.aq-card.suyo{box-shadow:0 0 0 2px var(--c) inset}
+</style>
+</head>
+<body data-candi-vista="arquetipos">
+<nav class="topbar"><div class="nav-left"><a href="candidato-360.html?abrir=1" class="nav-planes">← CRM</a><div class="nav-auth" id="navAuth"></div></div><div class="nav-right"><a class="brand" href="index.html"><span class="mark"><i></i><i></i><i></i><i></i></span><b>Ricardo<span>.</span>Ruiz</b></a></div></nav>
+<main class="app-shell"><div class="panel-shell">
+  <header class="panel-hero">
+    <div class="kicker">Candidato 360 · panel 05</div>
+    <h1>Los arquetipos de su territorio.</h1>
+    <p>Cada barrio vota desde una emoción: miedo a perder lo que tiene, ganas de castigar, necesidad de que le resuelvan lo básico, orgullo de su territorio. Esa emoción es el <b>arquetipo</b> del barrio, reconstruido con Alcaldía, Concejo y JAL de 2015, 2019 y 2023. Acá se cruza con <b>sus</b> votos: en qué clase de barrio vive su votación, cómo se reparte y hacia dónde se mueve en 2027. Por ahora hay cartografía emocional para Medellín y Cartagena.</p>
+    <span class="panel-candidatura" id="panelCandidatura"></span>
+  </header>
+  <div id="panelMuro" class="hidden"></div>
+  <div id="panelCuerpo">
+    <div id="arqCargando" class="panel"><p class="helper" style="margin:0">Cruzando su votación con la cartografía emocional de los barrios…</p></div>
+    <div id="arqAviso" class="hidden"></div>
+    <div id="arqCuerpo" class="hidden">
+      <section class="panel" id="aqManda">
+        <span class="panel-num">01 · El arquetipo que manda</span>
+        <h3 id="aqMandaTitulo">—</h3>
+        <p id="aqMandaCopy"></p>
+        <div class="aq-manda" id="aqMandaFicha"></div>
+      </section>
+      <section class="panel">
+        <span class="panel-num">02 · Cómo se reparte</span>
+        <h3 id="aqRepartoTitulo">Su voto, arquetipo por arquetipo.</h3>
+        <p id="aqRepartoCopy"></p>
+        <div class="aq-anos">
+          <div><h4>Hoy <small id="aqRot23">lectura 2023</small></h4><div id="aqRep23"></div></div>
+          <div><h4>En 2027 <small id="aqRot27">proyección</small></h4><div id="aqRep27"></div></div>
+        </div>
+      </section>
+      <section class="panel">
+        <span class="panel-num">03 · Barrio por barrio</span>
+        <h3 id="aqMapaTitulo">El mapa de los arquetipos.</h3>
+        <div class="aq-controles" id="aqControles"></div>
+        <div class="aq-mapa" id="aqMapa"></div>
+        <div class="aq-leyenda" id="aqLeyenda"></div>
+        <p class="aq-mapa-nota" id="aqMapaNota"></p>
+      </section>
+      <section class="panel">
+        <span class="panel-num" id="aqUnidadNum">04 · Por comuna</span>
+        <h3 id="aqUnidadTitulo">Dónde está y hacia dónde va.</h3>
+        <p id="aqUnidadCopy"></p>
+        <div class="aq-tabla-caja"><table class="aq-tabla"><thead><tr><th id="aqColUnidad">Comuna</th><th class="num" id="aqColVotos">Votos</th><th>Arquetipo 2023</th><th>Arquetipo 2027</th></tr></thead><tbody id="aqUnidades"></tbody></table></div>
+      </section>
+      <section class="panel">
+        <span class="panel-num">05 · Sus barrios</span>
+        <h3 id="aqBarriosTitulo">Sus barrios más fuertes.</h3>
+        <p id="aqBarriosCopy"></p>
+        <div class="aq-tabla-caja"><table class="aq-tabla"><thead><tr><th>#</th><th>Barrio</th><th class="num" id="aqColVotosB">Votos</th><th>Arquetipo 2023</th><th>Arquetipo 2027</th></tr></thead><tbody id="aqBarrios"></tbody></table></div>
+        <button type="button" class="ghost aq-mas hidden" id="aqMas">Ver todos los barrios</button>
+      </section>
+      <section class="panel">
+        <span class="panel-num">06 · Los arquetipos de la ciudad</span>
+        <h3 id="aqTodosTitulo">Todos, uno por uno.</h3>
+        <p id="aqTodosCopy"></p>
+        <div class="aq-grid" id="aqTodos"></div>
+      </section>
+    </div>
+    <p class="panel-nota" id="arqNota"></p>
+  </div>
+</div></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="platform-config.js"></script>
+<script src="data-client.js"></script>
+<script src="partidos-bloques.js?v=20260929"></script>
+<script src="candidato-360-electorado.js?v=20260929"></script>
+<script src="candidato-360-arq-lectura.js?v=20260929"></script>
+<script src="candidato-360-panel.js?v=20260919d"></script>
+<!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
+<script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
+<script src="assets/candidato-360/candi/candi-hueso.js?v=1"></script>
+<script src="candidato-360-candi.js?v=20260929b"></script>
+<script>
+(async function () {
+  const P = window.C360Panel, E = window.C360Electorado, A = window.C360ArqLectura, $ = P.$, esc = P.esc;
+  const num = x => Math.round(Number(x || 0)).toLocaleString('es-CO');
+  const pct0 = x => `${Math.round((x || 0) * 100)} %`;
+  let L = null, ANO = '2023', VER = 'dominante', TODOS = false, MAPA = null, CAPA = null;
+  /* Cartagena: la UCG 20 llega hasta Isla Fuerte, 100 km al sur. Encuadrar por
+     el bounds real deja el casco urbano del tamaño de una uña; se encuadra la
+     ventana urbana, como en el CRM, y las islas siguen ahí si se aleja. */
+  const VENTANA = { cartagena: [[10.275, -75.58], [10.47, -75.415]] };
+
+  const chip = id => id ? `<span class="aq-chip"><i style="background:${L.colorDe(id)}"></i>${esc(L.cortoDe(id))}</span>` : '<span class="aq-chip" style="color:var(--muted)">sin dato</span>';
+  const ctg = () => L.ciudad === 'cartagena';
+  /* En Cartagena 2023 es una proyección retrospectiva y 2027 una simulación:
+     se rotula siempre, no se presenta como dato observado. */
+  const rotulo = ano => ctg() ? (ano === '2027' ? 'simulación' : 'proyección retrospectiva') : (ano === '2027' ? 'proyección ajustada' : 'lectura observada');
+
+  function aviso(html) {
+    $('arqCuerpo').classList.add('hidden');
+    const a = $('arqAviso');
+    a.innerHTML = `<section class="panel"><span class="panel-num">Arquetipos del territorio</span><h3>Todavía no.</h3><p>${html}</p></section>`;
+    a.classList.remove('hidden');
+  }
+
+  /* ── 01 ─────────────────────────────────────────────────────────────── */
+  function pintarManda() {
+    const top = A.principal(L), f = L.ficha(top.id), c = L.colorDe(top.id);
+    const top27 = A.principal(L, '2027');
+    $('aqMandaTitulo').textContent = L.conVotos
+      ? `Su voto vive en barrios ${ctg() ? 'de arquetipo ' : 'de '}${f.nombre.toLowerCase()}.`
+      : `${L.nombreCiudad} vota desde ${ctg() ? 'el arquetipo ' : ''}${f.nombre.toLowerCase()}.`;
+    $('aqMandaCopy').innerHTML = L.conVotos
+      ? `De sus <b>${num(L.total)}</b> votos ubicados en barrios de ${esc(L.nombreCiudad)}, <b>${pct0(top.share)}</b> están en ese arquetipo.${top27 && top27.id !== top.id ? ` En 2027 el que más pesa pasa a ser <b>${esc(L.nombreDe(top27.id, '2027'))}</b> (${pct0(top27.share)}).` : ''}`
+      : `Todavía no tiene votos propios en ${esc(L.nombreCiudad)}, así que esto describe <b>la ciudad</b>, pesada por los votos de 2023 de cada barrio, no a usted. Cuando tenga una elección detrás, esta página se arma con sus votos.`;
+    let cuerpo;
+    if (ctg()) {
+      cuerpo = `<p class="aq-lema">${esc(f.lema)}.</p>
+        <p class="aq-par"><em>La emoción que lo ordena:</em> ${esc(f.emocion)}. ${esc(f.rasgos || '')}</p>
+        ${f.decide ? `<p class="aq-par"><em>Cómo decide el voto:</em> ${esc(f.decide)}</p>` : ''}
+        ${f.perfil ? `<p class="aq-par"><em>Quién es:</em> ${esc(f.perfil)}${f.edades ? ` · ${esc(f.edades)} años` : ''}.</p>` : ''}
+        <p class="aq-par"><em>Se enciende con</em> ${esc(String(f.sube || '').replace(/\.$/, '').toLowerCase())}. <em>Se calma con</em> ${esc(String(f.baja || '').replace(/\.$/, '').toLowerCase())}.</p>
+        ${palancas('Palancas emocionales', f.palancas, c)}${palancas('Temas que lo mueven', f.tematicas, c)}`;
+    } else {
+      cuerpo = `<p class="aq-lema">${esc(f.lema)}</p>
+        <p class="aq-par"><em>La emoción:</em> ${esc(f.emocion)}.</p>
+        ${f.miedo ? `<p class="aq-par"><em>A qué le teme:</em> ${esc(f.miedo)}</p>` : ''}
+        ${f.sesgo ? `<p class="aq-par"><em>El sesgo con el que lee la política:</em> ${esc(f.sesgo)}</p>` : ''}
+        ${f.nombre27 && f.nombre27 !== f.nombre ? `<p class="aq-par"><em>Cómo evoluciona hacia 2027:</em> ${esc(f.nombre27)}.</p>` : ''}`;
+    }
+    $('aqMandaFicha').innerHTML = `<img src="${esc(f.escudo)}" alt="Tarjeta del arquetipo ${esc(f.nombre)}" loading="lazy" onerror="this.remove()">
+      <div><div class="aq-cifra"><div><b style="color:${c}">${pct0(top.share)}</b><span>${L.conVotos ? 'de sus votos, en este arquetipo' : 'del voto de la ciudad, en este arquetipo'}</span></div>
+      ${L.conVotos ? `<div><b>${num(L.filasBarrio.length)}</b><span>barrios con votos suyos</span></div>` : ''}</div>${cuerpo}</div>`;
+  }
+  function palancas(titulo, lista, color) {
+    if (!lista?.length) return '';
+    return `<p class="aq-par" style="margin-top:12px"><em>${esc(titulo)} (1 a 5)</em></p><div class="aq-palancas">${lista.map(([n, v]) => `<div class="aq-palanca">${esc(n)} · <b>${v}</b><i><b style="width:${v * 20}%;background:${color}"></b></i></div>`).join('')}</div>`;
+  }
+
+  /* ── 02 ─────────────────────────────────────────────────────────────── */
+  function reparto(ano) {
+    const filas = Object.entries(L.reparto[ano] || {}).sort((a, b) => b[1] - a[1]).filter(([, v]) => v / L.total >= .005);
+    if (!filas.length) return '<p class="helper">Sin dato para este año.</p>';
+    return `<div class="aq-barra">${filas.map(([id, v]) => `<i style="flex:${v};background:${L.colorDe(id)}" title="${esc(L.nombreDe(id, ano))}"></i>`).join('')}</div>
+      <ul class="aq-lista">${filas.map(([id, v]) => `<li><span class="pt" style="background:${L.colorDe(id)}"></span><b>${pct0(v / L.total)}</b><span>${esc(L.nombreDe(id, ano))}</span><em>${num(v)} ${L.conVotos ? 'votos' : ''}</em></li>`).join('')}</ul>`;
+  }
+  function pintarReparto() {
+    $('aqRot23').textContent = rotulo('2023'); $('aqRot27').textContent = rotulo('2027');
+    $('aqRepartoTitulo').textContent = L.conVotos ? 'Su voto, arquetipo por arquetipo.' : `${L.nombreCiudad}, arquetipo por arquetipo.`;
+    $('aqRepartoCopy').innerHTML = (ctg()
+      ? 'Cada barrio de Cartagena no tiene un solo arquetipo sino una <b>mezcla de los ocho</b>: sus votos se reparten con esa mezcla —un barrio que es 60 % protesta y 20 % productivo aporta a los dos—, no solo con el que manda.'
+      : 'Cada barrio de Medellín tiene un arquetipo: el voto del barrio entero va a ese. A la derecha, a dónde se mueve ese mismo voto con la proyección 2027.')
+      + (L.conVotos && L.sinDato ? ` ${num(L.sinDato)} de sus votos cayeron en barrios sin medición.` : '')
+      + (L.conVotos && L.votosCiudad > L.ubicados ? ` ${num(L.votosCiudad - L.ubicados)} están en puestos sin barrio asignado y no entran.` : '');
+    $('aqRep23').innerHTML = reparto('2023'); $('aqRep27').innerHTML = reparto('2027');
+  }
+
+  /* ── 03 · El mapa ──────────────────────────────────────────────────────
+     Color = arquetipo dominante del barrio en el año elegido. Con votos
+     propios, la segunda vista pinta solo donde usted tiene votos, con la
+     intensidad de cuánto pesa ese barrio en su votación. */
+  function pintarControles() {
+    const ops = [['2023', `2023 · ${rotulo('2023')}`], ['2027', `2027 · ${rotulo('2027')}`]];
+    const vistas = L.conVotos ? [['dominante', 'Toda la ciudad'], ['suyos', 'Solo donde tiene votos']] : [];
+    $('aqControles').innerHTML = `<span class="rot">Año</span>${ops.map(([k, t]) => `<button type="button" class="aq-tog" data-ano="${k}" aria-pressed="${ANO === k}">${esc(t)}</button>`).join('')}`
+      + (vistas.length ? `<span class="rot" style="margin-left:12px">Qué pinta</span>${vistas.map(([k, t]) => `<button type="button" class="aq-tog" data-ver="${k}" aria-pressed="${VER === k}">${esc(t)}</button>`).join('')}` : '');
+    $('aqControles').querySelectorAll('[data-ano]').forEach(b => b.addEventListener('click', () => { ANO = b.dataset.ano; pintarControles(); pintarMapa(); }));
+    $('aqControles').querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => { VER = b.dataset.ver; pintarControles(); pintarMapa(); }));
+  }
+  function pintarMapa() {
+    if (!L.geo) { $('aqMapa').classList.add('hidden'); $('aqMapaNota').textContent = 'La cartografía de barrios no respondió; el resto de la página no depende de ella.'; return; }
+    if (!MAPA) {
+      MAPA = window.L.map('aqMapa', { zoomControl: true, attributionControl: false, scrollWheelZoom: false, zoomSnap: .25 });
+      MAPA.setView([6.25, -75.57], 12);
+    }
+    if (CAPA) MAPA.removeLayer(CAPA);
+    const maxSuyo = Math.max(1, ...L.filasBarrio.map(f => f.votos));
+    const votosDe = new Map(L.filasBarrio.map(f => [f.code, f.votos]));
+    const presentes = new Set();
+    CAPA = window.L.geoJSON(L.geo, {
+      style: f => {
+        const code = L.codeDe(f.properties), dom = L.dominanteDe(code, ANO);
+        if (dom) presentes.add(dom);
+        const v = votosDe.get(code) || 0;
+        const suyos = VER === 'suyos' && L.conVotos;
+        const op = !dom ? .15 : suyos ? (v ? .25 + .65 * Math.sqrt(v / maxSuyo) : .06) : .72;
+        return { color: '#ffffff', weight: .7, fillColor: dom ? L.colorDe(dom) : '#c9ccc4', fillOpacity: op };
+      },
+      onEachFeature: (f, layer) => {
+        const code = L.codeDe(f.properties), dom = L.dominanteDe(code, ANO), mez = L.mezclaDe(code, ANO), v = votosDe.get(code) || 0;
+        const mezTxt = mez ? Object.entries(mez).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id, p]) => `${esc(L.cortoDe(id))} ${pct0(p)}`).join(' · ') : '';
+        layer.bindTooltip(`<b>${esc(P.lugar(L.nombreGeo(f.properties)))}</b><br>${dom ? `Manda: ${esc(L.nombreDe(dom, ANO))}` : 'Sin arquetipo medido'}${mezTxt ? `<br>Mezcla: ${mezTxt}` : ''}${L.conVotos ? `<br>Sus votos acá: <b>${num(v)}</b>` : ''}`, { className: 'aq-tt', sticky: true });
+      },
+    }).addTo(MAPA);
+    /* Leaflet mide el contenedor al crearse; encuadrar después del layout. */
+    setTimeout(() => {
+      MAPA.invalidateSize();
+      const v = VENTANA[L.ciudad];
+      if (v) MAPA.fitBounds(v, { animate: false }); else { const b = CAPA.getBounds(); if (b.isValid()) MAPA.fitBounds(b, { padding: [8, 8], animate: false }); }
+    }, 0);
+    $('aqLeyenda').innerHTML = L.ids.filter(id => presentes.has(id)).map(id => `<span><i style="background:${L.colorDe(id)}"></i>${esc(L.nombreDe(id, ANO))}</span>`).join('') + '<span><i style="background:#c9ccc4;opacity:.5"></i>sin medición</span>';
+    $('aqMapaTitulo').textContent = VER === 'suyos' && L.conVotos ? `Dónde están sus votos, por arquetipo (${ANO}).` : `El arquetipo que manda en cada barrio (${ANO}).`;
+    $('aqMapaNota').innerHTML = (VER === 'suyos' && L.conVotos
+      ? 'Color: el arquetipo dominante del barrio. Intensidad: cuánto pesa ese barrio en su votación; los barrios donde no sacó votos quedan casi en blanco.'
+      : 'Color: el arquetipo dominante del barrio.')
+      + (ctg() ? ' Pase el cursor para ver la mezcla: en Cartagena el dominante casi nunca es todo el barrio.' : ' Los corregimientos no están en el estudio y quedan en gris.')
+      + (ctg() ? ' El mapa abre sobre el casco urbano; las islas y la zona rural siguen ahí si aleja.' : '');
+  }
+
+  /* ── 04 y 05 · Las tablas ───────────────────────────────────────────── */
+  function pintarTablas() {
+    const U = L.unidad, Ucap = U.charAt(0).toUpperCase() + U.slice(1);
+    $('aqUnidadNum').textContent = `04 · Por ${U}`;
+    $('aqColUnidad').textContent = Ucap;
+    $('aqColVotos').textContent = L.conVotos ? 'Sus votos' : 'Votos 2023';
+    $('aqColVotosB').textContent = L.conVotos ? 'Sus votos' : 'Votos 2023';
+    $('aqUnidadCopy').textContent = L.conVotos
+      ? `Sus votos por ${U}, con el arquetipo que manda en cada una hoy y en 2027. Donde cambia, el mensaje que le sirvió en la última elección puede no servirle en la próxima.`
+      : `Las ${L.unidades} de ${L.nombreCiudad} por peso electoral, con el arquetipo que manda en cada una hoy y en 2027.`;
+    $('aqUnidades').innerHTML = L.filasComuna.map(f => `<tr><td>${esc(P.lugar(f.nombre))}</td><td class="num">${num(f.votos)}</td><td>${chip(f.a23)}</td><td>${chip(f.a27)}${f.a23 && f.a27 && f.a23 !== f.a27 ? '<span class="aq-marca">cambia</span>' : ''}</td></tr>`).join('');
+    pintarBarrios();
+  }
+  function pintarBarrios() {
+    const filas = TODOS ? L.filasBarrio : L.filasBarrio.slice(0, 20);
+    $('aqBarriosTitulo').textContent = L.conVotos ? 'Sus barrios más fuertes.' : `Los barrios con más votos de ${L.nombreCiudad}.`;
+    $('aqBarriosCopy').innerHTML = L.conVotos
+      ? `Ordenados por sus votos. ${ctg() ? 'La volatilidad dice qué tan seguido ha cambiado de arquetipo ese barrio; «heredado» marca un barrio sin puesto propio, que toma la lectura del vecino.' : 'El riesgo de cambio es el que calcula el estudio para 2027.'}`
+      : `Ordenados por los votos de 2023 que el estudio le asigna a cada barrio.`;
+    const riesgo = f => f.riesgo ? `<span class="aq-marca">${ctg() ? 'volatilidad' : 'riesgo'} ${esc(String(f.riesgo).toLowerCase())}</span>` : '';
+    $('aqBarrios').innerHTML = filas.map((f, i) => `<tr><td class="num">${i + 1}</td><td><b>${esc(P.lugar(f.nombre))}</b>${f.comuna ? `<small>${esc(P.lugar(f.comuna))}</small>` : ''}</td><td class="num">${num(f.votos)}</td><td>${chip(f.a23)}${riesgo(f)}${f.heredado ? '<span class="aq-marca">heredado</span>' : ''}</td><td>${chip(f.a27)}</td></tr>`).join('');
+    const btn = $('aqMas');
+    btn.classList.toggle('hidden', L.filasBarrio.length <= 20);
+    btn.textContent = TODOS ? 'Ver solo los 20 primeros' : `Ver los ${num(L.filasBarrio.length)} barrios`;
+  }
+
+  /* ── 06 · Todos los arquetipos ──────────────────────────────────────── */
+  function pintarTodos() {
+    const top = A.principal(L)?.id;
+    $('aqTodosCopy').innerHTML = ctg()
+      ? 'Los ocho arquetipos de la cartografía emocional de Cartagena. <b>No son los de Medellín</b> y no se comparan con ellos: cada ciudad tiene los suyos. El porcentaje es el peso de cada uno en ' + (L.conVotos ? 'su votación' : 'la ciudad') + ' (2023).'
+      : 'Las cinco familias del estudio de Medellín, con el nombre que toma cada una hacia 2027. El porcentaje es su peso en ' + (L.conVotos ? 'su votación' : 'la ciudad') + ' (2023).';
+    $('aqTodos').innerHTML = L.ids.map(id => {
+      const f = L.ficha(id); if (!f) return '';
+      const sh = (L.reparto['2023'][id] || 0) / (L.total || 1);
+      const cuerpo = ctg()
+        ? `<p>${esc(f.lema)}.</p><p><em>Emoción:</em> ${esc(f.emocion)}.</p>${f.sube ? `<p><em>Se enciende con</em> ${esc(String(f.sube).replace(/\.$/, '').toLowerCase())}.</p>` : ''}`
+        : `<p>${esc(f.lema)}</p><p><em>Emoción:</em> ${esc(f.emocion)}.</p>${f.nombre27 ? `<p><em>Hacia 2027:</em> ${esc(f.nombre27)}.</p>` : ''}`;
+      return `<article class="aq-card ${id === top ? 'suyo' : ''}" style="--c:${L.colorDe(id)}"><span class="sh">${pct0(sh)} ${L.conVotos ? 'de su voto' : 'de la ciudad'}${id === top ? ' · el que manda' : ''}</span><h4>${esc(f.nombre)}</h4>${cuerpo}</article>`;
+    }).join('');
+  }
+
+  async function armar(v) {
+    const campana = v?.campana || {};
+    const slugs = v?.tipo === 'historial' ? (v.candidato?.slugs || []) : [];
+    const [mesas, municipio] = await Promise.all([E.mesasDe(slugs), A.municipioDeCampana(campana)]);
+    const ciudad = A.ciudadDe(municipio, mesas);
+    if (!ciudad) return aviso('La cartografía emocional —qué mueve el voto en cada barrio— está reconstruida, por ahora, para <b>Medellín</b> y <b>Cartagena</b>. Su campaña y sus votos están en otra ciudad; cuando exista para la suya, esta página se arma sola.');
+    L = await A.leer(ciudad, mesas);
+    if (!A.principal(L)) return aviso(`No pudimos cruzar su votación con los barrios de ${esc(L.nombreCiudad)}.`);
+    $('arqAviso').classList.add('hidden');
+    $('arqCuerpo').classList.remove('hidden');
+    pintarManda(); pintarReparto(); pintarControles(); pintarMapa(); pintarTablas(); pintarTodos();
+    $('aqMas').onclick = () => { TODOS = !TODOS; pintarBarrios(); };
+    $('arqNota').innerHTML = (ctg()
+      ? 'Fuente: cartografía emocional de Cartagena de Nury Astrid (211 barrios, 3 localidades, sep-2026), con la votación de Alcaldía, Concejo y JAL. <b>2015 es el ancla; 2019 y 2023 son proyecciones retrospectivas y 2027 es simulación</b>, no pronóstico.'
+      : 'Fuente: Proyecto DC · cartografía emocional de Medellín (152 barrios, 16 comunas y 5 corregimientos), con Alcaldía, Concejo y JAL de 2015, 2019 y 2023 y la proyección 2027 ajustada.')
+      + ` ${L.conVotos ? 'Sus votos salen de su votación mesa a mesa publicada por la Registraduría, ubicados en su barrio por el puesto de votación.' : ''} El arquetipo es del <b>barrio</b>, no de sus votantes: dice en qué clase de territorio está una votación, no qué siente cada persona ni por quién va a votar.`;
+  }
+
+  window.C360ArquetiposPagina = { armar, lectura: () => L, mapa: () => MAPA };   /* para depurar y para las pruebas */
+  if (!(await P.arrancar('candidato-360-arquetipos.html'))) return;
+  window.Candi?.calculo?.(true, '¡Estoy leyendo los barrios de tu territorio! Ve mirando el resto de la página.');
+  try { await armar(P.SESION.vinculo); }
+  catch (e) { aviso(`No se pudo leer la cartografía emocional: ${esc(e.message || e)}.`); }
+  finally { window.Candi?.calculo?.(false); }
+  $('arqCargando').classList.add('hidden');
+})();
+</script>
+</body>
+</html>
