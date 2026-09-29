@@ -17,14 +17,30 @@ import vm from 'node:vm';
 const RAIZ = new URL('../../', import.meta.url);
 const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
 const almacen = new Map();
+/* MATRIZ_LOCAL=1 lee la matriz nacional (fase 4) del disco en vez de S3:
+   sirve para verificar antes de subirla. */
+const MATRIZ_DIR = new URL('Bases de datos/output_matriz_puesto/', RAIZ);
+const MATRIZ_BASE = process.env.MATRIZ_LOCAL ? 'http://local-matriz' : null;
+const fetchPrueba = async (u, o) => {
+  if (String(u).startsWith('http://local-matriz/')) { try { return new Response(await readFile(new URL(String(u).slice(20), MATRIZ_DIR), 'utf8'), { status: 200 }); } catch { return new Response('{}', { status: 404 }); } }
+  return globalThis.fetch(u, o);
+};
 const ctx = vm.createContext({
-  fetch: globalThis.fetch, console: { log: console.log, warn: () => {}, error: console.error },
+  fetch: fetchPrueba, console: { log: console.log, warn: () => {}, error: console.error },
   localStorage: { getItem: k => almacen.get(k) ?? null, setItem: (k, v) => almacen.set(k, String(v)) },
   RRData: { publicUrl: p => `${S3.replace(/\/congreso-2026\/output$/, '')}/${p}` },
   /* El Día D pide el código electoral del municipio por nombre, desde la
      cartografía. Los dos casos son Bogotá: 001. */
   C360Electorado: { codigoMunicipio: async () => '001' },
 });
+/* La URL de cada candidatura sale de la regla del electorado real (sin ella el
+   modo por archivos caía a la carpeta del Congreso y daba 404). */
+{
+  const aux = vm.createContext({ console: { log() {}, warn() {}, error() {} }, fetch: () => Promise.reject(new Error('sin red')), RRData: ctx.RRData });
+  aux.window = aux;
+  vm.runInContext(await readFile(new URL('candidato-360-electorado.js', RAIZ), 'utf8'), aux, { filename: 'candidato-360-electorado.js' });
+  ctx.C360Electorado.urlCandidatura = aux.C360Electorado.urlCandidatura;
+}
 ctx.window = ctx;
 for (const f of ['partidos-bloques.js', 'cand-index.js', 'legislativo-electos.js', 'vote-target.js', 'candidato-360-endoso.js', 'candidato-360-diad.js', 'candidato-360-contendientes.js'])
   vm.runInContext(await readFile(new URL(f, RAIZ), 'utf8'), ctx, { filename: f });
@@ -36,7 +52,8 @@ const cerca = (a, b, eps = .005) => a != null && Math.abs(a - b) < eps;
 
 /* ── 1. Sintéticos ─────────────────────────────────────────────────────── */
 const V = new Map([['P1', 1000], ['P2', 1000], ['P3', 1000], ['P4', 1000]]);
-const datos = (cands, listas = new Map()) => ({ validos: V, info: new Map(), porCand: new Map(cands.map(c => [`${c.nombre}|${c.partido}`, c])), listas, origen: 'matriz' });
+ok(K.llaveCand('RAFAEL ANTONIO D´ACUNTI DE LA HOZ', 'X') === K.llaveCand('RAFAEL ANTONIO DACUNTI DE LA HOZ', 'X') && K.llaveCand('DUVAR ALEXIS PAZ ZUÐIGA', 'X') === K.llaveCand('DUVAR ALEXIS PAZ ZUIGA', 'X'), 'la llave de candidato es compacta: los nombres con caracteres rotos del crudo casan con el índice');
+const datos = (cands, listas = new Map()) => ({ validos: V, info: new Map(), porCand: new Map(cands.map(c => [K.llaveCand(c.nombre, c.partido), c])), listas, origen: 'matriz' });
 const pp = o => new Map(Object.entries(o));
 const base = { porPuesto: pp({ P1: 80, P2: 20 }), total: 100, puestos: 2 };
 const D0 = datos([]);
@@ -55,6 +72,7 @@ ok(K.familiaCampana({ avales: 'firmas', espectro: 'cd' }) === 'cd' && K.familiaC
 ok(cerca(K.presion({ cercania: 1, afinidad: 2, votos: 1000, meta: 1000 }), .5), 'presión = cercanía × afinidad/2 × votos/(votos+meta): 1 × 1 × 0,5');
 ok(K.presion({ cercania: 1, afinidad: 1, votos: 50000, meta: 1000 }) < 1 && K.presion({ cercania: 1, afinidad: 1, votos: 50000, meta: 1000 }) > K.presion({ cercania: 1, afinidad: 1, votos: 20000, meta: 1000 }), 'el tamaño no se satura: 50.000 pesa más que 20.000 aunque los dos pasen la meta');
 ok(cerca(K.presion({ cercania: 1, afinidad: 5, votos: 1, meta: 1 }), .5), 'la afinidad se acota en 2');
+ok(K.presion({ cercania: 1, afinidad: null, votos: 1000, meta: 1000 }) === K.presion({ cercania: 1, afinidad: 1, votos: 1000, meta: 1000 }), 'sin afinidad medida la presión usa la neutra (1), no el tope');
 
 ok(K.llavePersona({ nombre: 'JUAN CARLOS PEREZ GOMEZ', slug: 'a' }) === K.llavePersona({ nombre: 'Juan Carlos Pérez Gómez', slug: 'b' }), 'cuatro componentes con tildes distintas: la misma persona');
 ok(K.llavePersona({ nombre: 'JUAN PEREZ', slug: 'a' }) !== K.llavePersona({ nombre: 'JUAN PEREZ', slug: 'b' }), 'dos componentes no se funden (hay miles de «Juan Pérez»)');
@@ -101,7 +119,7 @@ ok(LU.rivales.some(r => r.slug === 's') && !LU.rivales.some(r => r.slug === 't')
 
 const M = (pue, v) => ({ dep: '16', mun: '001', zon: '12', pue, mesa: '001', v, comNom: 'BARRIOS UNIDOS', pueNom: 'P' });
 const DM = K.matrizDesdeMesas([{ entrada: { nombre: 'A B C', partido: 'X' }, mesas: [M('01', 5), M('01', 7), M('02', 3), { ...M('03', 9), zon: '90' }] }], { '160011201': [500], '160011202': [300] }, null);
-ok(DM.porCand.get('A B C|X').total === 15 && DM.validos.get('160011201') === 500 && DM.origen === 'archivos', 'sin matriz: se arma desde los archivos, sin la zona 90, con los válidos de totales-puesto');
+ok(DM.porCand.get(K.llaveCand('A B C', 'X')).total === 15 && DM.validos.get('160011201') === 500 && DM.origen === 'archivos', 'sin matriz: se arma desde los archivos, sin la zona 90, con los válidos de totales-puesto');
 
 const cc = K.completarCampana({ corp: 'jal', ruta: 'same' }, { tipo: 'localidad', departamento: '16', municipio: '1', localidad: 'BARRIOS UNIDOS' }, [M('01', 5)].map(m => ({ ...m, munNom: 'BOGOTÁ D.C.', depNom: 'BOGOTÁ D.C.' })));
 ok(cc.departamento === '16' && cc.municipio === 'BOGOTÁ D.C.' && cc.localidad === 'BARRIOS UNIDOS' && cc.ruta === 'same', '«la misma corporación» sin territorio: se completa desde el alcance y el nombre de sus mesas');
@@ -149,7 +167,7 @@ if (!process.argv.includes('--sin-red')) {
     const cJ = { corp: 'jal', ruta: 'same', avales: 'partido', partido: 'NUEVO LIBERALISMO- AGRUPACION POLITICA EN MARCHA', departamento: '', municipio: '', localidad: '' };
     const aJ = await EN.alcanceDe({ campana: cJ, corpHistorica: 'jal', mesasPropias: propias });
     const metaJ = (await VT.estimate({ corp: 'jal', territory: 'BARRIOS UNIDOS · BOGOTÁ D.C.', baseUrl: S3, partido: cJ.partido, codigo: { dep: '16', mun: '1' } })).target;
-    const LJ = await K.leer({ campana: cJ, slugs: [SLUG], mesasPropias: propias, alcance: aJ, meta: metaJ, usuario, baseUrl: S3 });
+    const LJ = await K.leer({ campana: cJ, slugs: [SLUG], mesasPropias: propias, alcance: aJ, meta: metaJ, usuario, baseUrl: S3, matrizBase: MATRIZ_BASE });
     const J = { datos: LJ.datos, base: LJ.baseDatos, baseModo: LJ.baseModo, reparto: LJ.repartoCompleto };
     ok(LJ.campana.departamento === '16' && LJ.campana.localidad === 'BARRIOS UNIDOS' && /BOGOT/.test(LJ.campana.municipio), `JAL · la campaña sin territorio se completa desde sus mesas (${LJ.campana.departamento} · ${LJ.campana.municipio} · ${LJ.campana.localidad})`);
     ok(aJ.tipo === 'localidad' && J.datos.origen === 'matriz' && J.datos.validos.size === 32, `JAL · territorio = localidad, matriz de 32 puestos (${J.datos.validos.size})`);
@@ -178,7 +196,7 @@ if (!process.argv.includes('--sin-red')) {
     const aC = await EN.alcanceDe({ campana: cC, corpHistorica: 'jal', mesasPropias: propias, codigoMunicipio: async () => '001' });
     const regC = [...await registro('concejo-2019', 'index-concejo-2019.json'), ...await registro('alcaldia-2023', 'index-alcaldia-2023.json'), ...await registro('jal-2023', 'index-jal-2023.json')];
     const estC = await VT.estimate({ corp: 'concejo', territory: 'BOGOTÁ D.C.', baseUrl: S3, partido: cC.partido, codigo: { dep: '16', mun: '1' } });
-    const C = await K.cargar(cC, { baseUrl: S3, alcance: aC, mesasPropias: propias, slugsPropios: [SLUG], registro: regC });
+    const C = await K.cargar(cC, { baseUrl: S3, alcance: aC, mesasPropias: propias, slugsPropios: [SLUG], registro: regC, matrizBase: MATRIZ_BASE });
     const LC = K.evaluar({ ...C, familiaUsuario: K.familiaCampana(cC), partidoCampana: cC.partido, usuario, meta: estC.target, congresistas });
     ok(C.datos.origen === 'matriz' && C.datos.validos.size === 943 && C.baseModo === 'salto', `Concejo · matriz de 943 puestos, base = su JAL (${C.datos.validos.size}, ${C.baseModo})`);
     const repC = Object.fromEntries(C.reparto.allocations);
@@ -206,6 +224,29 @@ if (!process.argv.includes('--sin-red')) {
     ok(m0C.fortaleza === 7 && m0C.disputa === 24 && m0C['sin-base'] === 912, `Concejo · mapa como en el plan: ${JSON.stringify(m0C)}`);
     ok(LC.mapa.dosCapas && !LJ.mapa.dosCapas, 'la segunda capa del mapa se ofrece en el salto y no en la JAL');
     console.log(`  Concejo · mapa del motor: ${JSON.stringify(LC.mapa.conteo)} · meta ${estC.target} · rivales ${LC.resumen.rivales} (${LC.resumen.enIndice} en el índice, fuente C: ${LC.rivales.filter(r => r.fuentes.includes('C')).length}) · niveles ${JSON.stringify(LC.resumen.niveles)}`);
+
+    /* 2c · Fase 4: la matriz nacional. Tunja no tiene archivos por comuna; su
+       concejo, su alcaldía y la gobernación del Quindío salen de la matriz, con
+       el voto de lista, y los rivales de 2019 del Concejo de Bogotá se leen de
+       la matriz de 2019 en vez de bajar el archivo de cada uno. */
+    const DIR = { CONC2023: 'concejo-2023', ASAM2023: 'asamblea-2023' };
+    const caso = async (slug, partido, corp, corpHist, extra = {}) => {
+      const ms = (await json(`${S3}/${DIR[slug.split('-')[0]]}/${slug}.json`)).mesas;
+      const camp = Object.assign({ corp, ruta: 'same', avales: 'partido', partido, departamento: '', municipio: '', localidad: '' }, extra);
+      const al = await EN.alcanceDe({ campana: camp, corpHistorica: corpHist, mesasPropias: ms, codigoMunicipio: async () => '001' });
+      return K.leer({ campana: camp, slugs: [slug], mesasPropias: ms, alcance: al, meta: 0, usuario: { slugs: [slug] }, baseUrl: S3, matrizBase: MATRIZ_BASE });
+    };
+    const T = await caso('CONC2023-7-1-4-6', 'PARTIDO ALIANZA VERDE', 'concejo', 'concejo');
+    ok(T.resumen.puestos === 24, `Tunja · concejo: sus 24 puestos (${T.datos.nacional ? 'matriz nacional' : 'archivo por candidata'})`);
+    if (!T.datos.nacional) console.log('  (la matriz nacional no está en S3: los casos de la fase 4 corren por el modo de respaldo; MATRIZ_LOCAL=1 los corre con la matriz del disco)');
+    else ok(T.datos.listas.size > 0 && !T.avisos.includes('sin-voto-de-lista'), 'Tunja · la matriz nacional trae el voto de lista');
+    const TA = await caso('CONC2023-7-1-4-6', 'PARTIDO ALIANZA VERDE', 'alcaldia', 'concejo', { ruta: 'other', departamento: '07', municipio: 'TUNJA' });
+    ok(TA.rivales.length > 0 && TA.rivales.every(r => r.afinidad != null), `Tunja · alcaldía: los ${TA.rivales.length} rivales con afinidad medida`);
+    const Q = await caso('ASAM2023-26-5334-51', 'PARTIDO CAMBIO RADICAL', 'gobernacion', 'asamblea', { ruta: 'other', departamento: '26', departamentoNombre: 'QUINDÍO' });
+    ok(Q.resumen.puestos > 100 && new Set([...Q.datos.validos.keys()].map(k => k.slice(2, 5))).size === 12, `Quindío · gobernación: el archivo del departamento trae los 12 municipios (${Q.resumen.puestos} puestos)`);
+    const conAf = LC.rivales.filter(r => r.fuentes.includes('C') && r.afinidad != null && /2019/.test(r.corp)).length;
+    console.log(`  Concejo de Bogotá · rivales de 2019 con afinidad medida: ${conAf}`);
+    if (T.datos.nacional) ok(conAf >= 20, `Concejo de Bogotá · ${conAf} rivales de 2019 con afinidad, leídos de la matriz de 2019 sin bajar su archivo`);
   } catch (e) {
     ok(false, `real · no se pudo leer S3 (${e.message}); correr con --sin-red para solo la lógica`);
     console.error(e);

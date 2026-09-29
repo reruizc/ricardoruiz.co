@@ -525,7 +525,7 @@ lista · frente a usted · en prensa.
 | 1 | **Motor** `candidato-360-contendientes.js` sin DOM: fuentes A-C desde el registro, unión por persona, eje X, eje Y con las tres bases, burbuja, presión, escalera. Helper `electos` en `vote-target.js` sin cambiar cifras. Solo con las matrices que ya existen (11 ciudades + asamblea) y el JSON de cada rival donde no. `prueba-contendientes.mjs` con las cifras de §0 fijadas. | **hecho 28-sep-2026** |
 | 2 | **Panel** con el plano, la escalera, la lista y la ficha (sin prensa). Tarjeta 10 como enlace. Vitrina. Candi (frontend + worker). | **hecho 28-sep-2026** (sin desplegar) |
 | 3 | **Mapa de disputa** con las dos capas, sobre las capas del CRM. | **hecho 28-sep-2026** |
-| 4 | **D1** `build_matriz_puesto.py`: concejo y JAL fuera de las 11 ciudades, alcaldía, gobernación; después 2019. | todo el país sin bajar cientos de JSON |
+| 4 | **D1** `build_matriz_puesto.py`: concejo, alcaldía y gobernación de 2023 en todo el país; 2019 con asamblea. La JAL fuera de las 11 ciudades queda por fuera (ver bitácora). | **hecho 28-sep-2026** (4.493 archivos en S3, comprimidos) |
 | 5 | **Prensa y revisión mensual**: ficha con titulares, worker (KV + 4 rutas), cron, pestaña de administración, «qué se movió». Agregar a mano. | revisión del 1 de cada mes |
 | 6 | **Briefing**: sección «Sus contendientes» en el correo existente. | alertas |
 | 7 | **Inscripción oficial 2027** (D3): los inscritos reemplazan a los probables; la tarjeta cambia de título. | cuando la RNEC publique |
@@ -798,3 +798,77 @@ reglas del mapa por unidad y el relleno; `prueba-contendientes-panel.mjs` = **29
 (Playwright), con el mapa de una JAL de Bogotá en barrios y en puestos. Leaflet se
 sirve sin red como en `prueba-mapa.mjs` (`LEAFLET_DIST`). ⚠️ Corrección: al cerrar la
 fase 2 escribí «57 sin red + 23 reales»; el conteo real era menor, mal contado a mano.
+
+**Fase 4 (28-sep-2026) · la matriz nacional (D1).**
+
+- `tools/candidato-360/contendientes/build_matriz_puesto.py`: una pasada por archivo
+  GCS (2011, 2015, 2019 y 2023 TER; los códigos de corporación cambian por año y
+  van en una tabla) y un JSON por circunscripción con los votos de TODAS las
+  candidaturas por puesto, en el MISMO formato de los archivos por comuna, más el
+  voto de lista (`l`). Concejo y alcaldía, un archivo por municipio
+  (`{dde}-{mme}.json`); gobernación y asamblea, uno por departamento
+  (`{dde}.json`) con el `mme` en cada puesto. Salida local en
+  `Bases de datos/output_matriz_puesto/{corp}-{año}/` (gitignored).
+- Generado: 2023 concejo (1.098 archivos · 16 MB en claro) · alcaldía (1.100 ·
+  4,8 MB) · gobernación (32 · 1,3 MB); 2019 concejo (1.099 · 14 MB) · alcaldía
+  (1.100 · 4,6 MB) · gobernación (32 · 1,1 MB) · asamblea (32 · 5,7 MB). 4.493
+  archivos. El más pesado, el Concejo de Bogotá: 1,7 MB en claro, **0,44 MB en
+  gzip** (contra 2 MB por concejal en el modo por archivos). La Asamblea 2023 no
+  va: ya existía por municipio (`asamblea-2023/mun`) y el motor la sigue leyendo de ahí.
+- **Validado al voto contra los índices, candidatura por candidatura**
+  (`--validar`): 2023 concejo 94.467 · alcaldía 5.719 · gobernación 222; 2019
+  concejo 89.250 · alcaldía 4.951 · gobernación 165 · asamblea 3.232. Cero
+  diferencias, cero sin casar.
+- **La JAL fuera de las 11 ciudades NO entra**: su circunscripción es la comuna, que
+  la fila de la Registraduría no trae (sale del georef por puesto) y que en 2019 y
+  antes ni siquiera casa con los códigos de 2026. Fuera de esas ciudades la JAL sigue
+  en el modo por archivos.
+- **En el motor**: `cargar` busca la matriz nacional cuando no hay archivos por
+  comuna (`datos.nacional = true`); la fuente C lee de la matriz de su elección a
+  todas las personas nuevas del mismo archivo (un archivo por municipio, sin contar
+  contra el tope de descargas) y solo baja el archivo de cada una si la matriz no
+  está. Si la matriz no responde (404, por ejemplo mientras no se sube), todo cae
+  al modo por archivos sin avisar nada distinto: los mismos rivales.
+
+Cuatro cosas que salieron al construirla:
+
+1. **Las zonas 90 y 98** (puesto censo y cárceles) no se escriben en la matriz, igual
+   que en los archivos por comuna; el builder las cuenta aparte (`fuera9098`) para
+   que la validación contra el índice cuadre al voto.
+2. **La identidad es el CÓDIGO partido-candidato, no el nombre.** En el crudo de 2019
+   el mismo código trae el nombre con caracteres rotos (`ZUÐIGA`, `D´ACUNTI`) y a
+   veces dos grafías; casar por nombre dejaba candidaturas sueltas. La matriz guarda
+   `par-can` en cada candidata y el motor casa por `codigoDeSlug(slug)`; el nombre
+   queda de respaldo con una llave compacta (solo letras y dígitos).
+3. ⚠️⚠️ **Un error de la fase 1: sin afinidad medida la presión usaba el TOPE, no la
+   neutra.** `presion` hacía `af == null ? 1 : min(2, af)/2`, o sea afinidad 2. El
+   comentario decía «neutra» y la cuenta decía «máxima». En el Concejo de Bogotá, los
+   concejales de 2019 que pasaban del tope de descargas —sin votos por puesto—
+   ocupaban 8 de los 12 primeros lugares del plano. Ahora es `min(2, af ?? 1)/2`, con
+   su prueba. Lo destapó comparar el plano con y sin matriz.
+4. **El total de un rival de la fuente C sale del índice**, no de la suma de la
+   matriz: la matriz no trae las zonas 90/98 y el total salía ~1,7 % más bajo que en
+   el modo por archivos. Ahora los dos modos dan el mismo número.
+
+Medido (motor con la matriz leída del disco): Tunja concejo 24 puestos con voto de
+lista; Tunja alcaldía, los 9 rivales con afinidad medida; Quindío gobernación, un
+archivo con los 12 municipios (123 puestos); Concejo de Bogotá, 117 rivales en los
+dos modos y el mismo plano en todo lo que ambos miden — con la matriz, 35 concejales
+de 2019 tienen afinidad medida contra 6 del modo por archivos (el tope de descargas
+deja al resto sin votos por puesto), y tres de ellos entran a los 12 primeros.
+
+Pruebas: `prueba-contendientes.mjs` = **44 sin red + 26 contra S3** (70); con
+`MATRIZ_LOCAL=1` lee la matriz del disco en vez de S3 (para verificar antes de subir
+una matriz regenerada). Si la matriz no está, los casos de Tunja y el Quindío pasan
+por el modo de respaldo, lo dicen y se saltan los dos chequeos que solo tienen
+sentido con ella. `prueba-contendientes-panel.mjs` = 29, sin cambios.
+⚠️ La prueba real cargaba un electorado simulado sin `urlCandidatura`, así que el
+modo por archivos daba 404 dentro de la prueba (en la página no): ahora toma esa
+regla del `candidato-360-electorado.js` real.
+
+**Subida el 28-sep-2026** con visto bueno de Ricardo: 4.493 archivos comprimidos
+(24 MB) en `congreso-2026/output/matriz-puesto/`, 1 min 43 s en una sola pasada
+recursiva (comprimir primero a una copia espejo y subirla con `--content-encoding
+gzip`; el bucle de un `aws s3 cp` por archivo del docstring tardaría más de una
+hora). Verificado: conteo 4.493 = 4.493, lectura anónima 200 y la prueba contra S3
+ya pasa por la matriz nacional.

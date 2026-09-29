@@ -52,7 +52,11 @@
 
   const pad = (v, n) => String(v ?? '').replace(/\D/g, '').padStart(n, '0');
   const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
-  const llaveCand = (nombre, partido) => `${norm(nombre)}|${norm(partido)}`;
+  /* Compacta, sin espacios ni signos: el crudo de la Registraduría trae
+     caracteres rotos en unos pocos nombres («ZUÐIGA», «D´ACUNTI») que el índice
+     escribe limpios («ZUIGA», «DACUNTI»). Con la llave compacta casan igual. */
+  const compacto = s => norm(s).replace(/[^A-Z0-9]/g, '');
+  const llaveCand = (nombre, partido) => `${compacto(nombre)}|${compacto(partido)}`;
   const mediana = xs => { const s = xs.filter(Number.isFinite).sort((a, b) => a - b); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
   const anio = c => Number(String(c?.corp || '').match(/20\d{2}/)?.[0] || (c?.source === 'endoso' ? 2026 : 0));
   /* Mismo código de puesto que el endoso y el Día D (la letra final se conserva). */
@@ -79,6 +83,23 @@
   function cercania(fu, famR) {
     const p = famR && famR.sabemos ? pasos(fu, famR.bloque) : null;
     return p == null ? CERCANIA_NO_SABEMOS : CERCANIA_PASOS[p];
+  }
+
+  /* «partido-candidato» desde el slug del índice: CONC/ALC traen
+     dep-mun-par-can; GOB/ASAM, dep-par-can. Es la llave de la matriz nacional. */
+  function codigoDeSlug(slug) {
+    const p = String(slug || '').split('-');
+    if (/^(CONC|ALC)\d{4}$/.test(p[0]) && p.length >= 5) return `${p[3]}-${p[4]}`;
+    if (/^(GOB|ASAM)\d{4}$/.test(p[0]) && p.length >= 4) return `${p[p.length - 2]}-${p[p.length - 1]}`;
+    return '';
+  }
+  /* El archivo de la matriz nacional donde está una candidatura (D1). */
+  const DIR_SLUG = { CONC: 'concejo', ALC: 'alcaldia', GOB: 'gobernacion', ASAM: 'asamblea' };
+  function matrizDeSlug(slug) {
+    const p = String(slug || '').split('-'), m = p[0].match(/^(CONC|ALC|GOB|ASAM)(\d{4})$/);
+    if (!m) return '';
+    const dir = `${DIR_SLUG[m[1]]}-${m[2]}`;
+    return m[1] === 'GOB' || m[1] === 'ASAM' ? `${dir}/${pad(p[1], 2)}.json` : `${dir}/${pad(p[1], 2)}-${pad(p[2], 3)}.json`;
   }
 
   /* ── Persona ───────────────────────────────────────────────────────────
@@ -109,14 +130,17 @@
          listas:  Map(partido → Map(code → votos solo por la lista)),
          origen: 'matriz' | 'archivos' } */
   function matrizDesdeArchivos(archivos) {
-    const validos = new Map(), info = new Map(), porCand = new Map(), listas = new Map();
+    const validos = new Map(), info = new Map(), porCand = new Map(), listas = new Map(), porCod = new Map();
     (archivos || []).forEach(({ d, mun, nombre }) => {
       if (!d) return;
-      const dep2 = pad(d.dde, 2), mun3 = pad(d.mme || mun, 3);
+      const dep2 = pad(d.dde, 2);
       const partidos = (d.partidos || []).map(p => p[0]);
       (d.puestos || []).forEach(pu => {
         const [zon, pue] = String(pu.code || '').split('-');
         if (!zon || !pue || ['90', '98'].includes(zon)) return;
+        /* En la matriz nacional de gobernación y asamblea el archivo es del
+           departamento y cada puesto trae su municipio. */
+        const mun3 = pad(pu.mme || d.mme || mun, 3);
         const code = dep2 + mun3 + pad(zon, 2) + String(pue).trim().toUpperCase().padStart(2, '0');
         validos.set(code, (validos.get(code) || 0) + Number(pu.validos || 0));
         /* `com` es el código de la comuna o localidad del archivo (en Cartagena,
@@ -127,6 +151,10 @@
           const k = llaveCand(c[0], partidos[c[1]]);
           if (!porCand.has(k)) porCand.set(k, { nombre: c[0], partido: partidos[c[1]] || '', porPuesto: new Map(), total: 0 });
           const x = porCand.get(k); x.porPuesto.set(code, (x.porPuesto.get(code) || 0) + v); x.total += v;
+          /* La matriz nacional trae el código «partido-candidato» del slug: se
+             casa por ahí antes que por nombre (el crudo repite códigos con
+             nombres distintos). Los archivos por comuna no lo traen. */
+          if (c[2] && !porCod.has(c[2])) porCod.set(c[2], x);
         });
         /* `l` apunta a `partidos`, no a `listas` (medido: el índice 4 son los
            8.060 votos del Pacto en Barrios Unidos). */
@@ -137,7 +165,7 @@
         });
       });
     });
-    return { validos, info, porCand, listas, origen: 'matriz' };
+    return { validos, info, porCand, listas, porCod, origen: 'matriz' };
   }
   /* Sin matriz (alcaldía, gobernación, concejo fuera de las 11 ciudades): los
      votos de cada rival salen de su archivo, recortados al territorio, y los
@@ -204,7 +232,9 @@
      no se satura (con min(1, votos/meta) todos los concejales pasaban la meta
      de una edilesa y el índice quedaba en cercanía × afinidad). */
   function presion({ cercania: cer, afinidad: af, votos, meta }) {
-    const a = af == null ? 1 : Math.min(AFINIDAD_TOPE, af) / AFINIDAD_TOPE;
+    /* Sin afinidad medida, la neutra (1), no el tope: hasta la fase 4 este
+       caso valía como afinidad 2 y los rivales sin archivo encabezaban el plano. */
+    const a = Math.min(AFINIDAD_TOPE, af == null ? 1 : af) / AFINIDAD_TOPE;
     const t = votos > 0 ? votos / (votos + Math.max(1, Number(meta) || 0)) : 0;
     return cer * a * t;
   }
@@ -372,7 +402,7 @@
     };
     (rep?.rows || []).forEach(row => {
       const f = F.porSlug.get(row.slug); if (!f || esUsuario(row)) return;
-      const x = datos.porCand.get(llaveCand(row.nombre, row.partido));
+      const x = (datos.porCod && datos.porCod.get(codigoDeSlug(row.slug))) || datos.porCand.get(llaveCand(row.nombre, row.partido));
       añadir(row, f, x ? x.porPuesto : null, x ? x.total : Number(row.votos || 0));
     });
     /* Fuente C: otras elecciones con votos en el territorio (ya recortados). */
@@ -534,6 +564,14 @@
     /* La matriz, si existe para ESTA corporación. */
     let datos = null;
     if (destino && destino.fuente === corp && destino.archivos.length) { datos = matrizDesdeArchivos(destino.archivos); datos.faltan = destino.faltan || 0; }
+    /* Sin archivos por comuna, la matriz nacional (D1, fase 4): un archivo por
+       municipio o departamento con todas las candidaturas de 2023. */
+    const matrizBase = deps.matrizBase || `${baseUrl}/matriz-puesto`;
+    if (!datos && alcance && alcance.tipo !== 'localidad' && ['concejo', 'alcaldia', 'gobernacion', 'asamblea'].includes(corp)) {
+      const clave = alcance.tipo === 'departamento' ? pad(alcance.departamento, 2) : `${pad(alcance.departamento, 2)}-${pad(alcance.municipio, 3)}`;
+      const d = await jsonDe(`${matrizBase}/${corp}-2023/${clave}.json`).catch(() => null);
+      if (d?.puestos?.length) { datos = matrizDesdeArchivos([{ d, mun: d.mme }]); datos.origen = 'matriz'; datos.nacional = true; }
+    }
     if (!datos) {
       const filas = (rep?.rows || []).filter(r => Number(r.votos || 0) > 0);
       const partes = await enTandas(filas.map(r => () => leerMesas(urlDe(r)).then(mesas => ({ entrada: r, mesas }))));
@@ -567,12 +605,38 @@
       const nuevas = [...candidatasNuevas.filter(esJal).slice(0, MAX_OTRAS_JAL), ...candidatasNuevas.filter(c => !esJal(c)).slice(0, MAX_OTRAS)];
       const bajadas = new Set(nuevas.map(c => c.slug));
       conocidas.push(...pasan.filter(c => !de2023.has(llavePersona(c)) && sinArchivo(c)), ...candidatasNuevas.filter(c => !bajadas.has(c.slug)));
-      const partes = await enTandas(nuevas.map(c => () => leerMesas(urlDe(c)).then(mesas => ({ c, mesas }))));
-      otras = partes.filter(Boolean).map(({ c, mesas }) => {
+      /* Primero la matriz nacional: un archivo por municipio trae a todas las
+         candidaturas de esa elección, así que las personas que estén ahí se
+         leen sin bajar su archivo y sin contar contra el tope. */
+      const desdeMatriz = [];
+      if (alcance && alcance.tipo !== 'localidad') {
+        const porArchivo = new Map();
+        [...candidatasNuevas].forEach(c => { const f = matrizDeSlug(c.slug); if (f) { if (!porArchivo.has(f)) porArchivo.set(f, []); porArchivo.get(f).push(c); } });
+        const leidos = await enTandas([...porArchivo.keys()].map(f => () => jsonDe(`${matrizBase}/${f}`).then(d => ({ f, d }))), 4);
+        leidos.filter(Boolean).forEach(({ f, d }) => {
+          const M = matrizDesdeArchivos([{ d, mun: d.mme }]);
+          porArchivo.get(f).forEach(c => {
+            const x = M.porCod.get(codigoDeSlug(c.slug)) || M.porCand.get(llaveCand(c.nombre, c.partido)); if (!x) return;
+            const pp = new Map(); let suma = 0;
+            x.porPuesto.forEach((v, code) => { if (dentro && !dentro({ dep: code.slice(0, 2), mun: code.slice(2, 5), zon: code.slice(5, 7), pue: code.slice(7) })) return; pp.set(code, v); suma += v; });
+            /* El total es el del índice, como en las fuentes A y B: su
+               circunscripción cabe entera en el territorio (candidatasOtras) y
+               la matriz no trae las zonas 90 y 98 (censo y cárceles). */
+            desdeMatriz.push({ entrada: c, porPuesto: pp, total: Number(c.votos || 0) || suma });
+          });
+        });
+      }
+      const yaLeidas = new Set(desdeMatriz.map(o => o.entrada.slug));
+      const pendientes = nuevas.filter(c => !yaLeidas.has(c.slug));
+      /* Las que el tope dejó sin archivo pero sí salieron de la matriz no van
+         a la lista de «sin votos por puesto». */
+      for (let i = conocidas.length - 1; i >= 0; i--) if (yaLeidas.has(conocidas[i].slug)) conocidas.splice(i, 1);
+      const partes = await enTandas(pendientes.map(c => () => leerMesas(urlDe(c)).then(mesas => ({ c, mesas }))));
+      otras = desdeMatriz.concat(partes.filter(Boolean).map(({ c, mesas }) => {
         const pp = new Map(); let total = 0;
         mesas.forEach(m => { if (dentro && !dentro(m)) return; const v = Number(m.v || 0); if (!v) return; const k = codigoPuesto(m); pp.set(k, (pp.get(k) || 0) + v); total += v; });
         return { entrada: c, porPuesto: pp, total };
-      }).concat(conocidas.map(c => ({ entrada: c, porPuesto: null, total: Number(c.votos || 0) })));
+      })).concat(conocidas.map(c => ({ entrada: c, porPuesto: null, total: Number(c.votos || 0) })));
     }
 
     /* La base: la propia recortada; si no alcanza, la de su familia. */
@@ -639,10 +703,10 @@
       localidad: alcance.tipo === 'localidad' ? alcance.localidad : '',
     }, conCodigo);
   }
-  async function leer({ campana = {}, slugs = [], mesasPropias = null, alcance = null, meta = 0, usuario = {}, baseUrl = S3, registro = null } = {}) {
+  async function leer({ campana = {}, slugs = [], mesasPropias = null, alcance = null, meta = 0, usuario = {}, baseUrl = S3, registro = null, matrizBase = null } = {}) {
     campana = completarCampana(campana, alcance, mesasPropias);
     const reg = registro || registroC(campana.corp, alcance, baseUrl).catch(() => []);   /* promesa: corre junto con el reparto y la matriz */
-    const cargado = await cargar(campana, { baseUrl, alcance, mesasPropias, slugsPropios: slugs, registro: reg });
+    const cargado = await cargar(campana, { baseUrl, alcance, mesasPropias, slugsPropios: slugs, registro: reg, matrizBase });
     if (!cargado.base && global.C360DiaD?.fuente) {
       const F = await global.C360DiaD.fuente({ slugs, campana }).catch(() => null);
       if (F && F.modo === 'territorio' && F.mesas.length) {
@@ -733,7 +797,7 @@
 
   global.C360Contendientes = {
     ORDEN, CERCANIA_PASOS, CERCANIA_NO_SABEMOS, CERCANO, MISMO_TERRENO, UMBRAL_LISTA, UMBRAL_UNINOMINAL, MIN_VALIDOS_PUESTO, MIN_VOTOS_BASE, MIN_BASE, TOP_PLANO, VITRINA, MAX_OTRAS, MAX_OTRAS_JAL,
-    familia, familiaCampana, pasos, cercania, llavePersona, esCongresista, codigoPuesto,
+    familia, familiaCampana, pasos, cercania, llavePersona, llaveCand, codigoDeSlug, matrizDeSlug, esCongresista, codigoPuesto,
     matrizDesdeArchivos, matrizDesdeMesas, baseDesdeMesas, afinidad, correlacion, franja, presion, niveles, disputa,
     fuentesDelReparto, escalera, evaluar, candidatasOtras, territorioDe, cargar,
     S3, INDICES_C, registroC, congresistas, completarCampana, leer, categoria, bandaRivales, disputaPorUnidad, centroide, rellenos, RELLENO_MAX_KM, planoSVG, sello, corto, FUENTE_TXT, FRANJA_TXT, NIVEL_TXT, MARCA_TXT, AVISO_TXT,
