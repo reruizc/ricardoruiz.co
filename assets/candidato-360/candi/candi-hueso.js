@@ -6,13 +6,14 @@
   class CandiBoneSequence {
     constructor(host,{mascot=null,inactivityMs=45000,activityTarget=document}={}){
       this.host=host;this.mascot=mascot;this.delay=Math.max(1000,inactivityMs);this.activityTarget=activityTarget;
+      this.side='right';this.fromSide='right';this.toSide='left';this.resting=false;
       this.active=false;this.enabled=false;this.destroyed=false;this.token=0;this.elapsed=0;this.phase='';
       this.actor=document.createElement('div');this.actor.className='candi-bone-actor';this.actor.setAttribute('aria-hidden','true');
       this.bone=document.createElement('img');this.bone.className='candi-bone-toy';this.bone.alt='';this.bone.setAttribute('aria-hidden','true');
       this.actor.hidden=true;this.bone.hidden=true;host.append(this.bone,this.actor);
       this.motion=matchMedia('(prefers-reduced-motion: reduce)');
       this.onActivity=e=>{if(e.target?.closest?.("[data-candi-bone-controls]"))return;if(this.active)this.wake();else this.arm();};
-      this.onVisibility=()=>{this.previous=null;clearTimeout(this.timer);if(!document.hidden&&!this.active)this.arm();};
+      this.onVisibility=()=>{this.previous=null;clearTimeout(this.timer);if(!document.hidden&&(!this.active||this.resting))this.arm();};
       this.onMotion=()=>{if(this.motion.matches)this.wake();else this.arm();};
       this.onMascotState=e=>{if(e.detail.state!=='idle_seated')clearTimeout(this.timer);else this.arm();};
       for(const type of ['pointerdown','pointermove','keydown','wheel','input'])activityTarget.addEventListener(type,this.onActivity,{passive:true});
@@ -22,7 +23,7 @@
     enable(value=true){this.enabled=Boolean(value);if(!this.enabled)this.wake();else this.arm();}
     arm(){
       clearTimeout(this.timer);
-      if(!this.enabled||this.active||this.destroyed||document.hidden||this.motion.matches)return;
+      if(!this.enabled||(this.active&&!this.resting)||this.destroyed||document.hidden||this.motion.matches)return;
       this.timer=setTimeout(()=>{
         if(this.mascot&&this.mascot.phase!=='idle_seated'){this.arm();return;}
         this.play().catch(error=>this.host.dispatchEvent(new CustomEvent('candi:bone-error',{detail:{message:error.message}})));
@@ -38,12 +39,13 @@
       const width=this.host.clientWidth;
       const size=Math.min(210,Math.max(100,width*.34),Math.max(1,width-24));
       const margin=Math.min(18,width*.04);
-      return {width,size,start:Math.max(margin,width-size-margin),end:margin,margin};
+      const left=margin,right=Math.max(margin,width-size-margin);
+      return {width,size,start:this.fromSide==='left'?left:right,end:this.fromSide==='left'?right:left,margin};
     }
     timing(){
       const g=this.layout();
       // A larger screen needs more walking time; it never changes frame count.
-      const travel=Math.round(Math.max(1400,Math.min(8000,(g.start-g.end)/140*1000)));
+      const travel=Math.round(Math.max(1400,Math.min(8000,Math.abs(g.start-g.end)/140*1000)));
       const walk=800+travel+400;
       return {walk,pickup:2400,lie:2200,total:walk+4600,travel};
     }
@@ -61,19 +63,20 @@
       else {clip='lie';frame=Math.min(21,Math.floor((this.elapsed-t.walk-t.pickup)/100));}
       const reg=registration[clip],row=Math.floor(frame/6),height=reg.heights[row];
       this.actor.style.width=g.size+'px';this.actor.style.height=(g.size*height/reg.cell)+'px';this.actor.style.left=x+'px';
-      this.actor.style.transform=`translateY(${(height-reg.bottoms[frame])*g.size/reg.cell}px)`;
+      this.actor.style.transform=`translateY(${(height-reg.bottoms[frame])*g.size/reg.cell}px) scaleX(${this.fromSide==='left'?-1:1})`;
       this.actor.style.backgroundImage=`url("${new URL(assets[clip],base).href}")`;
       this.actor.style.clipPath=clip==='pickup'?'inset(0 1% 0 7%)':'none';
       this.actor.style.backgroundSize=`600% ${reg.height/height*100}%`;this.actor.style.backgroundPosition=`${frame%6*20}% ${reg.tops[row]/(reg.height-height)*100}%`;
       this.bone.hidden=clip!=='walk';this.bone.src=new URL(assets.bone,base).href;
       this.bone.style.width=g.size*.26+'px';this.bone.style.height=g.size*.13+'px';
-      this.bone.style.left=(g.end+g.size*.02)+'px';this.bone.style.bottom='10px';
+      this.bone.style.left=(g.end+g.size*(this.fromSide==='left'?.72:.02))+'px';this.bone.style.bottom='10px';
       const phase=this.elapsed>=t.total?'resting':clip;
-      if(phase!==this.phase){this.phase=phase;this.host.dispatchEvent(new CustomEvent('candi:bone-state',{detail:{state:phase}}));}
+      if(phase!==this.phase){this.phase=phase;this.host.dispatchEvent(new CustomEvent('candi:bone-state',{detail:{state:phase,side:this.toSide}}));}
       this.host.dispatchEvent(new CustomEvent('candi:bone-frame',{detail:{time:this.elapsed,duration:t.total,clip,frame,x,size:g.size,width:g.width}}));
     }
     async play(){
       if(this.destroyed||this.motion.matches||this.host.clientWidth<1)return;
+      this.fromSide=this.side;this.toSide=this.side==='right'?'left':'right';
       this.stop(false);clearTimeout(this.timer);const token=this.token;this.active=true;
       try{await this.load();}catch(error){if(token===this.token)this.wake();throw error;}
       if(this.destroyed||token!==this.token)return;
@@ -83,13 +86,13 @@
         if(token!==this.token)return;
         if(!document.hidden){const dt=this.previous===null?0:Math.min(100,now-this.previous);this.previous=now;this.render(this.elapsed+dt);}else this.previous=null;
         if(this.elapsed<this.times.total)this.raf=requestAnimationFrame(tick);
-        else{this.raf=null;this.host.dispatchEvent(new CustomEvent('candi:bone-complete'));}
+        else{this.raf=null;this.side=this.toSide;this.resting=true;this.host.dispatchEvent(new CustomEvent('candi:bone-complete',{detail:{side:this.side}}));this.arm();}
       };this.raf=requestAnimationFrame(tick);
     }
-    pause(){this.token++;cancelAnimationFrame(this.raf);this.raf=null;this.previous=null;}
+    pause(){clearTimeout(this.timer);this.token++;cancelAnimationFrame(this.raf);this.raf=null;this.previous=null;}
     stop(restore=true){
-      this.token++;this.pause();this.active=false;this.actor.hidden=true;this.bone.hidden=true;
-      if(restore&&this.mascot){this.mascot.sprite.hidden=false;this.mascot.seek(4800);}
+      this.token++;this.pause();this.active=false;this.resting=false;this.actor.hidden=true;this.bone.hidden=true;
+      if(restore&&this.mascot){this.mascot.sprite.hidden=false;this.mascot.sprite.style.left=this.side==='left'?this.layout().margin+'px':'';this.mascot.sprite.style.right=this.side==='left'?'auto':'';this.mascot.seek(4800);}
     }
     wake(){
       const wasActive=this.active;this.stop();if(wasActive&&this.mascot&&!this.destroyed)this.mascot.idle().catch(()=>{});

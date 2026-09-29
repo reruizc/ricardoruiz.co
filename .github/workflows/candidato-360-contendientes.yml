@@ -1,0 +1,50 @@
+name: Candidato 360 · revisión de contendientes
+
+# El día 1 de cada mes a las 07:00 de Bogotá (12:00 UTC; Colombia no cambia de
+# hora). Para cada territorio con candidaturas activas lee la prensa del último
+# mes y deja propuestas en el worker rr-auth: lo que sale de prensa lo aprueba
+# una persona en admin-c360-contendientes.html; lo que no necesita revisión se
+# sella solo. Ver tools/candidato-360/contendientes/revisar.py.
+#
+# Necesita el secreto CAUDAL_ALERTAS_TOKEN (el mismo del briefing y de
+# mi-congreso-alertas.yml).
+on:
+  schedule:
+    - cron: '0 12 1 * *'
+  workflow_dispatch:
+    inputs:
+      seco:
+        description: 'Solo leer (no escribe propuestas ni sella)'
+        type: boolean
+        default: false
+      solo:
+        description: 'Un solo territorio (p. ej. concejo:16-001)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: candidato-360-contendientes
+  cancel-in-progress: false
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Revisar la prensa y proponer
+        env:
+          CAUDAL_ALERTAS_TOKEN: ${{ secrets.CAUDAL_ALERTAS_TOKEN }}
+        run: |
+          if [ -z "$CAUDAL_ALERTAS_TOKEN" ]; then
+            echo "::error::Falta el secreto CAUDAL_ALERTAS_TOKEN en el repositorio (Settings → Secrets → Actions)."
+            exit 1
+          fi
+          EXTRA=""
+          if [ "${{ inputs.seco }}" = "true" ]; then EXTRA="$EXTRA --seco"; fi
+          if [ -n "${{ inputs.solo }}" ]; then EXTRA="$EXTRA --solo ${{ inputs.solo }}"; fi
+          python3 tools/candidato-360/contendientes/revisar.py $EXTRA

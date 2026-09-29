@@ -49,6 +49,15 @@
   'PARTIDO DEMOCRATA COLOMBIANO': 'c',
   'PARTIDO POLITICO GENTE EN MOVIMIENTO': 'c',
   'PARTIDO ECOLOGISTA COLOMBIANO': 'c',
+  /* Juan Daniel Oviedo: la lista es de 2026 (Senado «con toda por Colombia»,
+     Cámara «con toda por Bogotá») y en 2023 fue su aspiración a la Alcaldía.
+     Centro: compitió en la consulta de la derecha pero su voto de primera
+     vuelta se fue en dos tercios a Cepeda y en un quinto a Fajardo (informe
+     1V 2026 del Pacto) — ni un bloque ni el otro. Sin esta entrada caía en
+     `sc` y el panel del electorado se quedaba sin contra qué medir. */
+  'LA LISTA DE OVIEDO': 'c',
+  'CON TODA POR BOGOTA': 'c',
+  'CON TODA POR COLOMBIA': 'c',
   // centro-derecha
   'PARTIDO CAMBIO RADICAL': 'cd',
   'PARTIDO CONSERVADOR COLOMBIANO': 'cd',

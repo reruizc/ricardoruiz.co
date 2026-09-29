@@ -20,7 +20,7 @@ Los PNG conservan los originales de image_gen integrado. WebP con alfa para serv
 ```js
 const descanso = new CandiBoneSequence(escenarioAncho, {
   mascot: mascotaAtletica,
-  inactivityMs: 45000,
+  inactivityMs: 20000,
   activityTarget: document
 });
 // Activar una vez que la mascota esté montada:
@@ -31,7 +31,7 @@ descanso.enable(true);
 ```
 
 - **El escenario debe abarcar el ancho disponible**, no el dock estrecho de la mascota. En la página principal se puede usar una franja fija inferior con `left:0; right:0`, altura suficiente para la mascota y `pointer-events:none`, respetando el área segura y controles inferiores del sitio. No colocar una capa opaca encima del CRM.
-- Mide `host.clientWidth`. Candi comienza dentro del borde derecho, el hueso dentro del izquierdo. Tamaño de mascota entre unos 100–210 px según ancho; no se espejan las manchas de la perrita.
+- Mide `host.clientWidth`. El primer recorrido comienza a la derecha y termina a la izquierda. Los siguientes alternan el destino. Tamaño de mascota entre unos 100–210 px según ancho. Para caminar a la derecha se refleja el sprite con scaleX(-1), incluidas sus manchas.
 - Los primeros ocho fotogramas la levantan y orientan; el ciclo de caminar se repite según distancia. Los últimos cuatro detienen los pasos. **70 poses fuente no significa 70 cuadros reproducidos exactamente:** un escritorio ancho requiere repetir pasos; en celular el recorrido dura menos.
 - El hueso independiente se muestra durante la caminata. Al empezar a recogerlo, se oculta y aparece el que ya forma parte del atlas, evitando duplicarlo cuando entra a la boca.
 - Luego se echa con el juguete entre las patas y permanece en la última pose, sin gastar un bucle de reproducción indefinido.
@@ -39,7 +39,7 @@ descanso.enable(true);
 
 ## Inactividad y cancelación
 
-La espera es configurable, 45 s por defecto. La demo la activa con una casilla; no se activa silenciosamente al abrir la demo. `enable(true)` la activa en el producto. Solo comienza automáticamente si `mascot.phase === 'idle_seated'`, la pestaña está visible y no se pidió movimiento reducido. Los cuatro recursos se cargan bajo demanda.
+La espera es configurable, 45 s por defecto. La demo usa 20 s, como la integración actual, y la activa con una casilla; no se activa silenciosamente al abrir la demo. `enable(true)` la activa en el producto. Solo comienza automáticamente si `mascot.phase === 'idle_seated'`, la pestaña está visible y no se pidió movimiento reducido. Los cuatro recursos se cargan bajo demanda.
 
 La actividad de puntero, teclado, entrada de texto o rueda reinicia la espera; si la secuencia está activa, vuelve a atenta. La reacción de «despertar» **es inmediata**, no hay aún un clip de levantarse y regresar desde el lado izquierdo. Es un límite explícito de esta entrega. La franja no captura clics.
 
@@ -66,6 +66,12 @@ Es un prototipo por poses generadas. Hay cambios pequeños de silueta y posició
 
 ## Verificación realizada
 
-`node assets/candidato-360/candi/test-hueso.cjs` comprueba límites a 280, 320, 360, 390, 768, 1440 y 2560 px; fin en reposo sin bucle; pausa en pestaña oculta; despertar por actividad; ciclo del temporizador; movimiento reducido y cancelación durante carga. También se revisó visualmente la demo en viewport de 390 px y en ancho de escritorio, con fondos claro y oscuro.
+`node assets/candidato-360/candi/test-hueso.cjs` comprueba límites a 280, 320, 360, 390, 768, 1440 y 2560 px; recorridos automáticos alternados; fin en reposo sin bucle; pausa en pestaña oculta; despertar por actividad; ciclo del temporizador; movimiento reducido y cancelación durante carga. También se revisó visualmente la demo en viewport de 390 px y en ancho de escritorio, con fondos claro y oscuro.
 
 El bloque recoger aplica `clip-path: inset(0 1% 0 7%)` para ocultar un resto de cola de la celda anterior en el borde izquierdo del atlas. Mantener ese recorte junto al registro vertical; no se modificaron los píxeles fuente.
+
+## Actualización 29-sep-2026
+
+Al quedar echada se rearma la misma espera y el próximo viaje va al extremo contrario. `side` conserva el último destino completado; `fromSide` y `toSide` describen el viaje. Los eventos de estado y fin incluyen `side`. Al despertar se restaura la mascota en el último extremo completado. No hay aún un clip específico para levantarse desde echada: se reutiliza la entrada de la caminata.
+
+Consultar `ACTUALIZACION-29-SEP-PARA-CLAUDE.md` antes de actualizar el producto: su adaptador de posición necesita ajustes para conservar esta alternancia.

@@ -5,7 +5,8 @@
     greeting: {file:'candi-saludo-atletica-v3.webp',cols:5,rows:4},
     seated: {file:'candi-sentarse-atenta-v3.webp',cols:4,rows:4},
     curious: {file:'candi-curiosa-atletica-v3.webp',cols:4,rows:3},
-    thinking: {file:'candi-pensando-atletica-v3.webp',cols:6,rows:5}
+    thinking: {file:'candi-pensando-atletica-v3.webp',cols:6,rows:5},
+    investigating: {file:'candi-investigando-atletica-v3.webp',cols:6,rows:4}
   };
   class CandiAtletica {
     constructor(host) {
@@ -33,7 +34,7 @@
         this.sprite.style.backgroundPosition=`${frame%6*20}% ${starts[row]/(1145-heights[row])*100}%`;
       }
       this.sprite.style.transform=`translateX(${offset}px)`;
-      this.sprite.style.clipPath=clipName==='greeting'?'inset(1.5%)':'none';
+      this.sprite.style.clipPath=clipName==='greeting'?'inset(1.5%)':clipName==='investigating'?'inset(2% 0 0)':'none';
     }
     seek(ms) {
       this.time=Math.max(0,Number(ms)||0); const t=this.time; let frame,phase;
@@ -71,8 +72,8 @@
       };this.raf=requestAnimationFrame(tick);
     }
     reactionFrame(kind,ms) {
-      const poses=kind==='curious'?[0,1,2,3,4,5,6,6,6,7,8,9,10,11]:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,19,19,19,19,24,25,26,27,28,29];
-      const duration=kind==='curious'?2800:6000;
+      const poses=kind==='investigating'?Array.from({length:24},(_,i)=>i):kind==='curious'?[0,1,2,3,4,5,6,6,6,7,8,9,10,11]:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,19,19,19,19,24,25,26,27,28,29];
+      const duration=kind==='curious'?2800:kind==='investigating'?4800:6000;
       const elapsed=Math.max(0,Math.min(duration,Number(ms)||0));
       const frame=poses[Math.min(poses.length-1,Math.floor(elapsed/200))];
       this.paint(kind,frame);
@@ -80,7 +81,7 @@
     }
     async reaction(kind,{speed=1}={}) {
       if(this.destroyed)return;
-      if(!['curious','thinking'].includes(kind))throw new Error('Reacción desconocida');
+      if(!['curious','thinking','investigating'].includes(kind))throw new Error('Reacción desconocida');
       this.pause();const token=this.token;
       if(this.motion.matches){this.seek(4800);return;}
       this.reactionLoads ||= {};
@@ -89,10 +90,10 @@
         img.src=new URL(clips[kind].file,base).href;
       });
       await this.reactionLoads[kind];if(token!==this.token||this.destroyed)return;
-      this.phase=kind;this.sprite.setAttribute('aria-label',kind==='curious'?'Candi inclina la cabeza con curiosidad':'Candi se pone gafas y un bombillo se ilumina');
+      this.phase=kind;this.sprite.setAttribute('aria-label',kind==='investigating'?'Candi examina con una lupa':kind==='curious'?'Candi inclina la cabeza con curiosidad':'Candi se pone gafas y un bombillo se ilumina');
       this.host.dispatchEvent(new CustomEvent('candi:state',{detail:{state:kind}}));
       let elapsed=0;this.previous=null;const rate=Number.isFinite(speed)&&speed>0?speed:1;
-      const duration=kind==='curious'?2800:6000;
+      const duration=kind==='curious'?2800:kind==='investigating'?4800:6000;
       const tick=now=>{
         if(token!==this.token)return;
         if(!document.hidden){elapsed+=(this.previous===null?0:Math.min(100,now-this.previous))*rate;this.previous=now;}else this.previous=null;
@@ -106,6 +107,7 @@
       };this.raf=requestAnimationFrame(tick);
     }
     curious(options={}){return this.reaction('curious',options);}
+    investigating(options={}){return this.reaction('investigating',options);}
     thinking(options={}){return this.reaction('thinking',options);}
     idle(options={}){return this.play({...options,from:4800});}
     pause(){this.token++;cancelAnimationFrame(this.raf);this.previous=null;}

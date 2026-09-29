@@ -45,7 +45,9 @@
   const MAX_OTRAS_JAL = 20;                /* los archivos de JAL son chicos: se bajan más */
   const AVISO_PAREJO = .8;
   const UNINOMINALES = ['alcaldia', 'gobernacion'], UNINOMINAL_SLUG = /^(ALC|GOB)\d{4}-/;
-  const FUERA_DEL_INDICE = new Set(['titular-no-reelegible', 'congresista-2026', 'voto-uninominal', 'en-ejercicio']);                 /* ≥ 80 % de los rivales en la franja → territorio parejo */
+  /* 'sin-datos-electorales': dicho en prensa o agregado a mano sin candidatura
+     en el registro. Está en la lista, no tiene con qué medirse. */
+  const FUERA_DEL_INDICE = new Set(['titular-no-reelegible', 'congresista-2026', 'voto-uninominal', 'en-ejercicio', 'sin-datos-electorales']);                 /* ≥ 80 % de los rivales en la franja → territorio parejo */
 
   const S3_FALLBACK = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
   const S3 = (global.RRData && typeof global.RRData.publicUrl === 'function') ? global.RRData.publicUrl('congreso-2026/output') : S3_FALLBACK;
@@ -408,7 +410,9 @@
     /* Fuente C: otras elecciones con votos en el territorio (ya recortados). */
     const refC = F.referencia;
     (ctx.otras || []).forEach(o => {
-      if (esUsuario(o.entrada) || !refC || o.total < refC) return;
+      if (esUsuario(o.entrada)) return;
+      if (o.fuente === 'E') { añadir(o.entrada, ['E'], o.porPuesto || null, o.total); return; }
+      if (!refC || o.total < refC) return;
       añadir(o.entrada, ['C'], o.porPuesto || null, o.total);
     });
 
@@ -416,7 +420,7 @@
        C) hoy ocupa ese cargo: el más votado de su elección entre los que llegan. */
     const enEjercicio = new Set(), mejor = new Map();
     (ctx.otras || []).forEach(o => {
-      const p = String(o.entrada.slug || '').split('-'); if (!/^(ALC|GOB)2023$/.test(p[0])) return;
+      const p = String(o.entrada.slug || '').split('-'); if (o.fuente === 'E' || !/^(ALC|GOB)2023$/.test(p[0])) return;
       const k = p.slice(0, p[0].startsWith('ALC') ? 3 : 2).join('-'), x = mejor.get(k);   /* ALC2023-dep-mun · GOB2023-dep */
       if (!x || o.total > x.total) mejor.set(k, o);
     });
@@ -441,12 +445,19 @@
       return {
         key: r.key, nombre: e.nombre, partido: e.partido || '', slug: e.slug, corp: e.corp || '', anio: anio(e),
         familia: fam, pasos: fu && fam.sabemos ? pasos(fu, fam.bloque) : null, cercania: cer,
-        fuentes: ['A', 'B', 'C'].filter(f => r.fuentes.has(f)), votos: r.votos,
+        fuentes: ['A', 'B', 'C', 'E'].filter(f => r.fuentes.has(f)), votos: r.votos,
         afinidad: af, franja: franja(af), correlacion: r.porPuesto ? correlacion(ctx.base, r.porPuesto, datos) : null,
         presion: presion({ cercania: cer, afinidad: af, votos: r.votos, meta: ctx.meta }),
         marcas, enIndice, porPuesto: r.porPuesto,
         entradas: r.entradas.map(x => ({ slug: x.slug, nombre: x.nombre, corp: x.corp, partido: x.partido, votos: x.votos })),
       };
+    });
+    /* Agregados a mano que no están en el registro: el nombre y nada más.
+       Viven solo en el navegador del usuario (PLAN §9.6) y no se miden. */
+    const yaEstan = new Set(rivales.map(r => norm(r.nombre)));
+    (ctx.agregadosLibres || []).forEach(a => {
+      const n = String(a?.nombre || '').trim(); if (!n || yaEstan.has(norm(n))) return;
+      yaEstan.add(norm(n)); rivales.push(sinDatos({ key: `mano:${norm(n)}`, nombre: n, partido: a.partido || '', fuentes: ['E'], familiaUsuario: fu }));
     });
     niveles(rivales);
     rivales.sort((a, b) => (b.enIndice - a.enIndice) || (b.presion - a.presion) || (b.votos - a.votos));
@@ -646,6 +657,20 @@
     else if (deps.mesasFamilia) { base = baseDesdeMesas(deps.mesasFamilia, datos, null); baseModo = baseSuficiente(base) ? 'familia' : null; }
     if (!baseModo) base = null;
 
+    /* Fuente E: los que agregó el usuario desde el registro. Entran aunque no
+       pasen el umbral (los puso él) y con sus votos recortados al territorio;
+       si su archivo no responde, entran sin votos por puesto. */
+    const agregados = (deps.agregados || []).filter(a => a && a.slug);
+    if (agregados.length) {
+      const partesE = await enTandas(agregados.map(a => () => leerMesas(urlDe(a)).then(mesas => ({ a, mesas })).catch(() => ({ a, mesas: null }))));
+      partesE.filter(Boolean).forEach(({ a, mesas }) => {
+        if (!mesas) { otras.push({ entrada: a, porPuesto: null, total: Number(a.votos || 0), fuente: 'E' }); return; }
+        const pp = new Map(); let total = 0;
+        mesas.forEach(m => { if (dentro && !dentro(m)) return; const v = Number(m.v || 0); if (!v) return; const k = codigoPuesto(m); pp.set(k, (pp.get(k) || 0) + v); total += v; });
+        otras.push({ entrada: a, porPuesto: pp.size ? pp : null, total, fuente: 'E' });
+      });
+    }
+
     return { corp, reparto: rep, datos, base, baseModo, otras, alcance };
   }
 
@@ -703,10 +728,10 @@
       localidad: alcance.tipo === 'localidad' ? alcance.localidad : '',
     }, conCodigo);
   }
-  async function leer({ campana = {}, slugs = [], mesasPropias = null, alcance = null, meta = 0, usuario = {}, baseUrl = S3, registro = null, matrizBase = null } = {}) {
+  async function leer({ campana = {}, slugs = [], mesasPropias = null, alcance = null, meta = 0, usuario = {}, baseUrl = S3, registro = null, matrizBase = null, agregados = [] } = {}) {
     campana = completarCampana(campana, alcance, mesasPropias);
     const reg = registro || registroC(campana.corp, alcance, baseUrl).catch(() => []);   /* promesa: corre junto con el reparto y la matriz */
-    const cargado = await cargar(campana, { baseUrl, alcance, mesasPropias, slugsPropios: slugs, registro: reg, matrizBase });
+    const cargado = await cargar(campana, { baseUrl, alcance, mesasPropias, slugsPropios: slugs, registro: reg, matrizBase, agregados });
     if (!cargado.base && global.C360DiaD?.fuente) {
       const F = await global.C360DiaD.fuente({ slugs, campana }).catch(() => null);
       if (F && F.modo === 'territorio' && F.mesas.length) {
@@ -715,7 +740,7 @@
       }
     }
     const L = evaluar({ ...cargado, familiaUsuario: familiaCampana(campana), partidoCampana: campana.avales === 'partido' || !campana.avales ? (campana.partido || '') : '',
-      usuario, meta, congresistas: congresistas() });
+      usuario, meta, congresistas: congresistas(), agregadosLibres: agregados.filter(a => a && !a.slug) });
     L.familiaTexto = cargado.familiaTexto || '';
     L.alcance = alcance; L.corp = campana.corp || '';
     /* Sin un solo puesto leído no hay lectura: que quien llama lo diga, en vez
@@ -725,16 +750,165 @@
     return L;
   }
 
+  /* Un rival sin datos electorales (fuente D o E fuera del registro): está en
+     la lista para que el usuario lo vea, fuera del índice y sin eje Y. */
+  function sinDatos({ key, nombre, partido = '', fuentes, familiaUsuario: fu = '' }) {
+    const fam = familia(partido, nombre);
+    return { key, nombre, partido, slug: '', corp: '', anio: 0, familia: fam, pasos: fu && fam.sabemos ? pasos(fu, fam.bloque) : null,
+      cercania: fu ? cercania(fu, fam) : CERCANIA_NO_SABEMOS, fuentes, votos: 0, afinidad: null, franja: 'sin-dato', correlacion: null,
+      presion: 0, marcas: ['sin-datos-electorales'], enIndice: false, porPuesto: null, entradas: [] };
+  }
+
+  /* ── Fase 5 · la prensa de cada rival (PLAN §7) ────────────────────────
+     Titulares LITERALES que lo nombran, sin resumen de modelo. Un titular
+     cuenta si trae dos componentes del nombre como palabras enteras (el mismo
+     criterio del briefing, pero sin casar dentro de otra palabra). Si trae
+     solo la forma corta (nombre + apellido) se marca «parcial»: puede ser un
+     homónimo, y la ficha lo dice. */
+  const DIAS_PRENSA = 180, MESES_PRENSA = 6, ULTIMOS_PRENSA = 5;
+  const TEMAS_SIN_CONTEO = new Set(['corrupcion']);   /* P8: titulares literales, sin etiqueta pegada al nombre */
+  const MENUDAS_NOMBRE = new Set(['DE', 'DEL', 'LA', 'LAS', 'LOS', 'Y', 'SAN', 'SANTA']);
+  const tokensNombre = n => norm(n).split(' ').filter(t => t.length >= 3 && !MENUDAS_NOMBRE.has(t));
+  /* Una mención PARCIAL (nombre y un apellido) tiene que ser un nombre
+     completo por sí sola: si viene pegada a otro nombre propio que no es suyo,
+     es otra persona. Medido: con «Carlos Fernando Galán Pachón» los 14
+     titulares de seis meses eran de «Luis Carlos Galán Sarmiento» (el juicio
+     por el magnicidio de su padre). Delante se admite un cargo («Concejal
+     Julián Forero») o un signo que corte. */
+  const ANTES_OK = new Set(['CONCEJAL', 'CONCEJALA', 'EXCONCEJAL', 'EXCONCEJALA', 'EDIL', 'EDILESA', 'ALCALDE', 'ALCALDESA', 'EXALCALDE', 'EXALCALDESA', 'GOBERNADOR', 'GOBERNADORA',
+    'DIPUTADO', 'DIPUTADA', 'SENADOR', 'SENADORA', 'REPRESENTANTE', 'CANDIDATO', 'CANDIDATA', 'PRECANDIDATO', 'PRECANDIDATA', 'EXSENADOR', 'EXSENADORA', 'LIDER', 'LIDERESA',
+    'VIDEO', 'HOY', 'EXCLUSIVA', 'ATENCION', 'OPINION', 'ENTREVISTA', 'POLEMICA', 'ASI']);
+  const palabrasTitulo = titulo => {
+    const out = [];
+    String(titulo || '').split(/\s+/).forEach(w => {
+      if (!/[A-Za-zÁÉÍÓÚÑÜáéíóúñü0-9]/.test(w)) { if (out.length) out[out.length - 1].corte = true; return; }
+      const limpio = w.replace(/^[«"“'‘(¿¡]+/, '');
+      out.push({ n: norm(limpio), mayus: /^[A-ZÁÉÍÓÚÑÜ]/.test(limpio), corte: /[,.:;!?)»"”’|]$/.test(w), antesCorte: limpio !== w });
+    });
+    return out;
+  };
+  function mencionaPersona(titulo, nombre) {
+    const tk = tokensNombre(nombre); if (tk.length < 2) return null;
+    const set = new Set(tk), P = palabrasTitulo(titulo);
+    const n = tk.filter(t => P.some(p => p.n === t)).length;
+    if (n < 2) return null;
+    if (n >= Math.min(3, tk.length)) return 'exacto';
+    /* Parcial: una racha contigua de ≥ 2 palabras suyas, sin otro nombre propio
+       pegado antes ni después. */
+    for (let i = 0; i < P.length; i++) {
+      if (!set.has(P[i].n)) continue;
+      let j = i; while (j + 1 < P.length && !P[j].corte && set.has(P[j + 1].n)) j++;
+      if (j === i) continue;
+      const a = P[i - 1], d = P[j + 1];
+      /* También al arranque del titular: «Luis Carlos Galán: …» es otra
+         persona. El costo es perder «Denuncian Julián Forero…» como mención
+         parcial; atribuirle a alguien los titulares de otro es peor. */
+      const antesMal = a && !a.corte && !P[i].antesCorte && a.mayus && !ANTES_OK.has(a.n);
+      const despuesMal = d && !P[j].corte && !d.antesCorte && d.mayus && !set.has(d.n);
+      if (!antesMal && !despuesMal) return 'parcial';
+      i = j;
+    }
+    return null;
+  }
+  /* Las consultas: el nombre completo entre comillas y, con cuatro palabras,
+     la forma corta con la que lo nombra la prensa (primer nombre + primer
+     apellido). Con tres no: «LUIS JOSE PAZ» daría «Luis José», dos nombres de
+     pila, y traería titulares de cualquiera. */
+  function consultasPrensa(nombre) {
+    const w = String(nombre || '').trim().split(/\s+/).filter(Boolean);
+    const q = [w.join(' ')];
+    if (w.length >= 4) q.push(`${w[0]} ${w[2]}`);
+    return [...new Set(q.filter(x => x.split(' ').length >= 2))].map(x => `"${x}"`);
+  }
+  const mesDe = f => String(f || '').slice(0, 7);
+  function prensaDe(items, nombre, hoy = new Date()) {
+    const vistos = new Set(), titulares = [];
+    (items || []).forEach(it => {
+      const k = norm(it.titulo).slice(0, 90), m = mencionaPersona(it.titulo, nombre);
+      if (!k || !m || vistos.has(k)) return;
+      vistos.add(k); titulares.push({ titulo: it.titulo, medio: it.medio || '', url: it.url || '', fecha: it.fecha || '', alcance: it.alcance || '', coincidencia: m });
+    });
+    titulares.sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    const d = new Date(hoy), meses = [];
+    for (let i = MESES_PRENSA - 1; i >= 0; i--) { const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - i, 1)); meses.push(x.toISOString().slice(0, 7)); }
+    const porMes = meses.map(mes => ({ mes, n: titulares.filter(t => mesDe(t.fecha) === mes).length }));
+    const S = global.C360Saliencia, temas = new Map();
+    if (S) titulares.forEach(t => S.temasDe(S.norm(t.titulo)).forEach(id => { if (!TEMAS_SIN_CONTEO.has(id)) temas.set(id, (temas.get(id) || 0) + 1); }));
+    const nombreTema = id => S?.TEMAS.find(t => t.id === id)?.nombre || id;
+    return { total: titulares.length, exactos: titulares.filter(t => t.coincidencia === 'exacto').length, porMes, ultimos: titulares.slice(0, ULTIMOS_PRENSA),
+      medios: new Set(titulares.map(t => norm(t.medio)).filter(Boolean)).size,
+      temas: [...temas].sort((a, b) => b[1] - a[1]).map(([id, n]) => ({ id, nombre: nombreTema(id), n })) };
+  }
+  /* La IO: `caudal` es la función que habla con /caudal/api (la del panel). */
+  async function buscarPrensa(nombre, { caudal, hoy } = {}) {
+    if (!caudal) throw new Error('Sin acceso a la prensa');
+    const res = await Promise.all(consultasPrensa(nombre).map(q => caudal({ action: 'medios', query: q, dias: DIAS_PRENSA }).then(d => d?.resultados || []).catch(() => null)));
+    if (res.every(r => r === null)) throw new Error('La búsqueda de prensa no respondió');
+    return prensaDe(res.filter(Boolean).flat(), nombre, hoy);
+  }
+
+  /* ── Fase 5 · la revisión mensual (PLAN §8) ───────────────────────────
+     La revisión es por TERRITORIO y corporación, no por cuenta: todas las
+     candidaturas al Concejo de Bogotá ven la misma. La llave del territorio
+     sale del alcance (códigos, no nombres) y es la misma que usa el worker. */
+  const slugTexto = s => norm(s).toLowerCase().replace(/\s+/g, '-');
+  function terrKey(corp, alcance) {
+    const a = alcance || {}, c = String(corp || '').toLowerCase();
+    if (!c || !a.departamento) return '';
+    if (a.tipo === 'departamento') return `${c}:${pad(a.departamento, 2)}`;
+    const base = `${c}:${pad(a.departamento, 2)}-${pad(a.municipio, 3)}`;
+    return a.tipo === 'localidad' && a.localidad ? `${base}:${slugTexto(a.localidad)}` : base;
+  }
+  const MESES_TXT = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const fechaLarga = iso => { const d = new Date(String(iso).slice(0, 10) + 'T12:00:00Z'); return isNaN(d) ? '' : `${d.getUTCDate()} de ${MESES_TXT[d.getUTCMonth()]} de ${d.getUTCFullYear()}`; };
+  /* La revisión corre el día 1 de cada mes: la próxima es el 1 del mes siguiente. */
+  function proximaRevision(hoy = new Date()) { const d = new Date(hoy); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toISOString().slice(0, 10); }
+  function cambiosTexto(c) {
+    if (!c) return '';
+    const p = [];
+    (c.entran || []).forEach(e => p.push(`entra ${P1(e.nombre)} (prensa, ${e.medios} medio${e.medios === 1 ? '' : 's'})`));
+    if (c.aval?.length) p.push(`${c.aval.length} cambió de aval`);
+    if (c.salen?.length) p.push(`${c.salen.length} ya no compite${c.salen.length === 1 ? '' : 'n'}`);
+    if (c.conTitulares) p.push(`${c.conTitulares} con titulares nuevos`);
+    return p.length ? `Desde la revisión anterior: ${p.join(' · ')}.` : 'Sin cambios desde la revisión anterior.';
+  }
+  const P1 = n => corto(n) || n;
+  /* Integra la revisión del territorio a la lectura: quien fue dicho en prensa
+     y ya es rival suma la fuente D; quien no, entra a la lista sin datos
+     electorales, fuera del índice. Muta L y devuelve el resumen para pintar. */
+  function integrarRevision(L, snap, hoy = new Date()) {
+    const out = { revisado: null, proxima: proximaRevision(hoy), linea: '', cambios: null };
+    if (!L || !snap || !snap.revisado) return out;
+    out.revisado = snap.revisado; out.cambios = snap.cambios || null; out.linea = cambiosTexto(snap.cambios);
+    /* La próxima sale de la más tardía entre hoy y la revisión: una revisión
+       del 1 de octubre vista el 30 de septiembre (reloj del usuario) no puede
+       decir «próxima: 1 de octubre». */
+    const rev = new Date(snap.revisado);
+    if (!isNaN(rev) && rev > new Date(hoy)) out.proxima = proximaRevision(rev);
+    const porNombre = new Map(L.rivales.map(r => [norm(r.nombre), r])), porKey = new Map(L.rivales.map(r => [r.key, r]));
+    (snap.lista || []).forEach(x => {
+      if (!x || !x.nombre) return;
+      const r = (x.k && porKey.get(x.k)) || porNombre.get(norm(x.nombre));
+      const pr = { medios: Number(x.medios || 0), titulares: (x.titulares || []).slice(0, ULTIMOS_PRENSA), aval: x.aval || '' };
+      if (r) { if (!r.fuentes.includes('D')) r.fuentes.push('D'); r.prensaRevision = pr; return; }
+      const nuevo = sinDatos({ key: `prensa:${norm(x.nombre)}`, nombre: x.nombre, partido: x.aval || '', fuentes: ['D'], familiaUsuario: L.familiaUsuario || '' });
+      nuevo.prensaRevision = pr; L.rivales.push(nuevo); porNombre.set(norm(x.nombre), nuevo);
+    });
+    return out;
+  }
+
   /* ── Textos compartidos ────────────────────────────────────────────── */
-  const FUENTE_TXT = { A: 'Ganó la curul en 2023', B: 'Compitió aquí en 2023', C: 'Tiene votos aquí de otra elección' };
+  const FUENTE_TXT = { A: 'Ganó la curul en 2023', B: 'Compitió aquí en 2023', C: 'Tiene votos aquí de otra elección', D: 'Dicho en prensa como aspirante', E: 'Lo agregó usted' };
   const FUENTE_TITULAR = 'Ganó en 2023 · no puede reelegirse';
   function sello(r) {
     if (r.marcas.includes('titular-no-reelegible')) return FUENTE_TITULAR;
-    const f = r.fuentes[0]; return FUENTE_TXT[f] ? `${FUENTE_TXT[f]}${f === 'C' && r.anio ? ` (${r.corp.split('·')[0].trim().toLowerCase()} ${r.anio})` : ''}` : '';
+    const f = r.fuentes[0];
+    if (f === 'D') return `Dicho en prensa · ${r.prensaRevision?.medios || 0} medio${r.prensaRevision?.medios === 1 ? '' : 's'}`;
+    return FUENTE_TXT[f] ? `${FUENTE_TXT[f]}${f === 'C' && r.anio ? ` (${r.corp.split('·')[0].trim().toLowerCase()} ${r.anio})` : ''}` : '';
   }
   const FRANJA_TXT = { alta: 'rinde más en su base', 'mismo-terreno': 'mismo terreno', baja: 'rinde menos en su base', 'sin-dato': 'sin votos por puesto' };
   const NIVEL_TXT = { alta: 'Presión alta', media: 'Presión media', baja: 'Presión baja' };
-  const MARCA_TXT = { 'congresista-2026': 'Hoy es congresista (2026-2030)', 'titular-no-reelegible': 'No puede reelegirse (C.P. arts. 303 y 314)', 'cambio-de-partido': 'Compitió por otro partido antes', 'voto-uninominal': 'Sus votos son de alcaldía o gobernación: no se comparan con los de una lista', 'en-ejercicio': 'Hoy ocupa ese cargo (elegido en 2023)' };
+  const MARCA_TXT = { 'congresista-2026': 'Hoy es congresista (2026-2030)', 'titular-no-reelegible': 'No puede reelegirse (C.P. arts. 303 y 314)', 'cambio-de-partido': 'Compitió por otro partido antes', 'voto-uninominal': 'Sus votos son de alcaldía o gobernación: no se comparan con los de una lista', 'en-ejercicio': 'Hoy ocupa ese cargo (elegido en 2023)', 'sin-datos-electorales': 'Sin candidaturas en el registro: no se puede medir' };
   const AVISO_TXT = {
     'territorio-parejo': 'En este territorio todos compiten por los mismos puestos: casi ningún rival rinde en su base distinto de como rinde en el resto. Lo que los separa es la lista y la familia política, no el territorio.',
     'base-familia': 'Todavía no tiene votos propios en este territorio, así que la afinidad se mide contra los votos de su familia política en 2023.',
@@ -801,5 +975,6 @@
     matrizDesdeArchivos, matrizDesdeMesas, baseDesdeMesas, afinidad, correlacion, franja, presion, niveles, disputa,
     fuentesDelReparto, escalera, evaluar, candidatasOtras, territorioDe, cargar,
     S3, INDICES_C, registroC, congresistas, completarCampana, leer, categoria, bandaRivales, disputaPorUnidad, centroide, rellenos, RELLENO_MAX_KM, planoSVG, sello, corto, FUENTE_TXT, FRANJA_TXT, NIVEL_TXT, MARCA_TXT, AVISO_TXT,
+    sinDatos, DIAS_PRENSA, MESES_PRENSA, mencionaPersona, consultasPrensa, prensaDe, buscarPrensa, terrKey, proximaRevision, fechaLarga, cambiosTexto, integrarRevision,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

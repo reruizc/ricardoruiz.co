@@ -526,7 +526,7 @@ lista · frente a usted · en prensa.
 | 2 | **Panel** con el plano, la escalera, la lista y la ficha (sin prensa). Tarjeta 10 como enlace. Vitrina. Candi (frontend + worker). | **hecho 28-sep-2026** (sin desplegar) |
 | 3 | **Mapa de disputa** con las dos capas, sobre las capas del CRM. | **hecho 28-sep-2026** |
 | 4 | **D1** `build_matriz_puesto.py`: concejo, alcaldía y gobernación de 2023 en todo el país; 2019 con asamblea. La JAL fuera de las 11 ciudades queda por fuera (ver bitácora). | **hecho 28-sep-2026** (4.493 archivos en S3, comprimidos) |
-| 5 | **Prensa y revisión mensual**: ficha con titulares, worker (KV + 4 rutas), cron, pestaña de administración, «qué se movió». Agregar a mano. | revisión del 1 de cada mes |
+| 5 | **Prensa y revisión mensual**: ficha con titulares, worker (KV + 7 rutas), cron, bandeja de administración, «qué se movió». Agregar a mano. | **hecho 29-sep-2026** (worker **sin desplegar**) |
 | 6 | **Briefing**: sección «Sus contendientes» en el correo existente. | alertas |
 | 7 | **Inscripción oficial 2027** (D3): los inscritos reemplazan a los probables; la tarjeta cambia de título. | cuando la RNEC publique |
 | 8 | *(opcional, P5 y P6)* contrafactual de 2023; cuentas oficiales de campaña. | solo si se decide |
@@ -872,3 +872,76 @@ recursiva (comprimir primero a una copia espejo y subirla con `--content-encodin
 gzip`; el bucle de un `aws s3 cp` por archivo del docstring tardaría más de una
 hora). Verificado: conteo 4.493 = 4.493, lectura anónima 200 y la prueba contra S3
 ya pasa por la matriz nacional.
+
+**Fase 5 (29-sep-2026) · la prensa de cada rival y la revisión mensual.**
+
+- **La ficha trae su prensa**: titulares de los últimos seis meses que lo nombran,
+  literales y con enlace, sin resumen de ningún modelo. Conteo por mes, los 5 más
+  recientes, cuántos medios, y los temas con los que aparece (sin contar
+  «corrupción y control», P8). Se buscan en el navegador por el proxy `/caudal/api`
+  (acción `medios`, 180 días) al abrir la ficha: `buscarPrensa` + `prensaDe` en el
+  motor, puros y probados.
+- **La revisión mensual** (§8): `tools/candidato-360/contendientes/revisar.py` en
+  GitHub Actions el día 1 (`candidato-360-contendientes.yml`). Pide al worker el
+  inventario de territorios, lee la prensa del mes y deja propuestas: **aspirante**
+  (nombre propio + vocabulario de aspiración + el territorio + el cargo, en ≥ 2
+  medios), **cambio de aval** (un rival conocido + vocabulario de adhesión) y
+  **titulares** (nuevos de un rival conocido, que se aprueban solos). Lo que no
+  espera a nadie se sella; si la prensa no respondió, NO se sella («sin cambios»
+  sobre algo que no se leyó sería mentir). Bandeja en `admin-c360-contendientes.html`
+  (tarjeta RR-ADMIN-004 del dashboard): aprobar, descartar —en un cambio de aval,
+  quien revisa escribe el partido nuevo— y sellar.
+- **El worker** (`rr-auth/src/c360-contendientes.js`, probado sin levantarlo en
+  `test/c360-contendientes.test.mjs`, 20 chequeos): la revisión es por territorio y
+  corporación (`terrKey`, la misma llave en el motor y en el worker). «Conocidos»
+  son los rivales que el panel ya calculó, nombres del registro (dato público,
+  P2); quien se agrega a mano sin registro nunca llega al servidor. Por la cuota
+  del KV (1.000 escrituras diarias para todo el sitio), el panel lo manda una vez al
+  día y el worker no escribe si nada cambió en el mes.
+- **En el panel**: arriba, «Revisado el … · próxima revisión: … · qué se movió» (o
+  «todavía sin revisión: la primera es el …»); quien la prensa nombró como aspirante
+  entra a la lista con la fuente **D**, sin datos electorales si no está en el
+  registro y fuera del índice; su ficha muestra los titulares de la revisión. La
+  tarjeta 10 del CRM suma la misma línea (en vitrina no se pide).
+- **Agregar a mano** (fuente **E**, sección 05): del registro (`CandRegistry.acRank`
+  sobre las fuentes base, y a pedido concejos y JAL) entra con sus votos recortados
+  al territorio aunque no pase el umbral; solo con el nombre queda en el navegador,
+  en la lista sin datos, fuera del índice.
+
+Cuatro cosas que salieron con prensa real:
+
+1. ⚠️⚠️ **Los 14 titulares de «Carlos Fernando Galán Pachón» eran de su padre.** La
+   forma corta «Carlos Galán» casaba dentro de «Luis Carlos Galán Sarmiento» (el
+   juicio por el magnicidio). Una mención parcial (nombre + un apellido) ahora solo
+   cuenta si no viene pegada a otro nombre propio que no sea suyo, antes o después;
+   delante se admite un cargo («Concejal Julián Forero») o un signo que corte. Con
+   la regla, Galán queda con 6 titulares, todos del alcalde. El costo: «Denuncian
+   Julián Forero…» ya no cuenta como parcial; atribuirle a alguien los titulares de
+   otra persona es peor. La misma regla está en el cron (Python) y en el panel (JS).
+2. **Con nombres de tres palabras no hay forma corta segura**: «LUIS JOSE PAZ» daba
+   «Luis José», dos nombres de pila. La forma corta solo se arma con cuatro palabras
+   (primer nombre y primer apellido).
+3. **«de Grupo Aval» salía como persona** (conector inicial y la palabra «aval» del
+   banco): el extractor quita conectores iniciales y tiene «Grupo», «Aval», «Banco»
+   como no-personas.
+4. **Al buscar la Gobernación del Valle salía una candidatura a la Alcaldía de Cali**:
+   el titular de un aspirante tiene que nombrar el cargo en disputa.
+
+Medido en seco contra la prensa real (29-sep, ventana de 31 días): Concejo de
+Bogotá con tres conocidos → 2 propuestas de titulares, cero aspirantes; Alcaldía de
+Tunja → nada. Con 90 días, los titulares de aspiración de Medellín y Cali traen los
+nombres en el CUERPO («estos son los posibles…»), no en el título: el extractor no
+los ve y eso se declara. Es lo que H5 anticipaba: en 2026 la revisión va a ser casi
+toda «sin cambios».
+
+Pruebas: `prueba-contendientes.mjs` = **63 sin red + 26 contra S3** (89);
+`prueba-contendientes-panel.mjs` = **40** (revisión simulada, prensa en la ficha con
+un titular de otra persona que no entra, agregar a mano, el aviso al worker una vez
+al día, vitrina sin revisión; `CAPTURAS=<carpeta>` guarda la página);
+`revisar.py --prueba` = 14; worker `test/c360-contendientes.test.mjs` = 20.
+
+**Pendiente de esta fase**: desplegar el worker (`rr-auth`, compartido: pide luz
+verde) — sin él, el panel dice «todavía sin revisión» y el cron falla en el
+inventario; y el secreto `CAUDAL_ALERTAS_TOKEN` en GitHub Actions (el mismo que
+ya falta para el briefing). Queda para después: «Avisar un cambio» del usuario
+(D4: renunció, ya no compite) y la corrección de un nombre dicho en prensa.

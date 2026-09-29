@@ -69,10 +69,22 @@ const ARCHIVOS = {
 const VINCULO = { tipo: 'historial', candidato: { nombre: USTED, slugs: [SLUG], corp: CORP, id: 'persona-usted' },
   campana: { corp: 'jal', ruta: 'same', avales: 'partido', partido: NL, departamento: '', municipio: '', localidad: '' } };
 
+/* Fase 5 · la revisión mensual del territorio, simulada: una aspirante dicha
+   en prensa y aprobada, y un mes con titulares nuevos. */
+const TERR = 'jal:16-001:barrios-unidos';
+const REVISION = { t: TERR, mes: '2026-10', revisado: '2026-10-01T12:00:00Z', anterior: '2026-09',
+  lista: [{ k: '', nombre: 'MARTA LUCIA RINCON PEREZ', aval: 'NUEVO LIBERALISMO', medios: 2, titulares: [{ titulo: 'Marta Lucía Rincón aspira a la JAL de Barrios Unidos', medio: 'El Tiempo', url: 'https://x.co/1', fecha: '2026-09-20' }] }],
+  cambios: { entran: [{ nombre: 'MARTA LUCIA RINCON PEREZ', medios: 2 }], aval: [], salen: [], conTitulares: 1 } };
+const hace = d => new Date(Date.now() - d * 864e5).toISOString().slice(0, 10);
+const PRENSA_ANA = [{ titulo: 'Ana María Ruiz pide más buses para Barrios Unidos', medio: 'El Tiempo', url: 'https://x.co/a', fecha: hace(5) },
+  { titulo: 'Edilesa Ana Ruiz, en el debate de seguridad', medio: 'Semana', url: 'https://x.co/b', fecha: hace(40) },
+  { titulo: 'Juicio: testigo habla de Luis Ana Ruiz Sarmiento', medio: 'Otro', url: 'https://x.co/c', fecha: hace(9) }];
+const conocidosPost = [], terrPedidos = [];
+
 let fallas = 0;
 const ok = (cond, msg) => { console.log(`${cond ? '✓' : '✗'} ${msg}`); if (!cond) fallas++; };
 const pedidos = [];
-async function montar(page, { acceso = true } = {}) {
+async function montar(page, { acceso = true, revision = REVISION } = {}) {
   await page.addInitScript(() => { localStorage.setItem('rr-token', 't-prueba'); localStorage.setItem('rr-user', JSON.stringify({ email: 'prueba@ejemplo.co', plan: 'c360' })); });
   await page.route('**', async route => {
     const u = route.request().url();
@@ -80,6 +92,9 @@ async function montar(page, { acceso = true } = {}) {
     if (u.includes('leaflet.min.js')) return route.fulfill({ status: 200, contentType: 'application/javascript', body: leafletJS });
     if (u.includes('leaflet.min.css')) return route.fulfill({ status: 200, contentType: 'text/css', body: leafletCSS });
     if (u.includes('/c360/me')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(acceso ? { ok: true, acceso: true, fuente: 'plan', vinculo: VINCULO, email: 'prueba@ejemplo.co', plan: 'c360' } : { ok: true, acceso: false, fuente: 'ninguno', vinculo: null }) });
+    if (u.includes('/c360/contendientes/conocidos')) { conocidosPost.push(JSON.parse(route.request().postData() || '{}')); return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true,"guardado":true}' }); }
+    if (u.includes('/c360/contendientes?')) { terrPedidos.push(new URL(u).searchParams.get('t')); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, version: revision }) }); }
+    if (u.includes('/caudal/api')) { const q = JSON.parse(route.request().postData() || '{}').query || ''; return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ resultados: /ANA/.test(q) ? PRENSA_ANA : [] }) }); }
     const k = Object.keys(ARCHIVOS).find(x => u.split('?')[0].endsWith(x));
     if (k) { pedidos.push(k); return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ARCHIVOS[k]) }); }
     if (/amazonaws\.com|workers\.dev/.test(u)) return route.fulfill({ status: 404, body: '{}' });
@@ -95,16 +110,25 @@ try {
   await montar(p);
   await p.goto('file://' + process.cwd() + '/candidato-360-contendientes.html');
   await p.waitForFunction(() => window.C360ContendientesPagina?.lectura() || /No pudimos/.test(document.getElementById('kEstado')?.textContent || ''), null, { timeout: 30000 });
-  const L = await p.evaluate(() => { const L = C360ContendientesPagina.lectura(); return L && { n: L.resumen.enIndice, niveles: L.resumen.niveles, rivales: L.rivales.map(r => ({ nombre: r.nombre, fuentes: r.fuentes, enIndice: r.enIndice, nivel: r.nivel })), esc: L.escalera && { estado: L.escalera.estado, puesto: L.escalera.usted?.puesto, distancia: L.escalera.distancia, k: L.escalera.k }, origen: L.resumen.origen, campana: L.campana }; });
+  const L = await p.evaluate(() => { const L = C360ContendientesPagina.lectura(); return L && { n: L.resumen.enIndice, niveles: L.resumen.niveles, rivales: L.rivales.map(r => ({ nombre: r.nombre, fuentes: r.fuentes, enIndice: r.enIndice, nivel: r.nivel, marcas: r.marcas })), esc: L.escalera && { estado: L.escalera.estado, puesto: L.escalera.usted?.puesto, distancia: L.escalera.distancia, k: L.escalera.k }, origen: L.resumen.origen, campana: L.campana }; });
+  const enPlano = (L?.rivales || []).filter(r => r.enIndice || r.marcas.includes('congresista-2026')).length;
   ok(!!L, `el panel lee la candidatura (${await p.textContent('#kEstado')})`);
   ok(L?.origen === 'matriz' && pedidos.includes('jal-2023/comuna/16-001-12.json') && L.campana.localidad === 'BARRIOS UNIDOS', 'la campaña de «la misma corporación» llega sin territorio y aun así se lee la matriz de su localidad');
   const nombres = (L?.rivales || []).map(r => r.nombre).sort().join(' | ');
-  ok(nombres === ['ANA MARIA RUIZ SOTO', 'DIEGO ANDRES GIL LARA', 'LUIS JOSE PAZ ROA', 'ROSA INES CANO MEJIA', 'VERA LUCIA MORA PAZ'].join(' | '), `rivales: los 3 elegidos, el de su lista con ≥ 50 % del último elegido y la de 2019 (${nombres})`);
+  ok(nombres === ['ANA MARIA RUIZ SOTO', 'DIEGO ANDRES GIL LARA', 'LUIS JOSE PAZ ROA', 'MARTA LUCIA RINCON PEREZ', 'ROSA INES CANO MEJIA', 'VERA LUCIA MORA PAZ'].join(' | '), `rivales: los 3 elegidos, el de su lista con ≥ 50 % del último elegido, la de 2019 y la dicha en prensa (${nombres})`);
+  /* Fase 5 · la revisión mensual */
+  ok(terrPedidos[0] === TERR, `la página pide la revisión de SU territorio (${terrPedidos[0]})`);
+  const rev = await p.textContent('#kRevision');
+  ok(/Revisado el 1 de octubre de 2026/.test(rev) && /entra Marta Rincon \(prensa, 2 medios\)/.test(rev) && /1 con titulares nuevos/.test(rev), `la revisión dice cuándo y qué se movió (${rev.trim().slice(0, 120)})`);
+  const marta = L?.rivales.find(r => r.nombre.startsWith('MARTA'));
+  ok(marta && marta.fuentes.join() === 'D' && !marta.enIndice, 'la dicha en prensa entra a la lista, fuera del índice');
+  ok(/Dicho en prensa · 2 medios/.test(await p.textContent('#kFilas')), 'y la tabla dice de dónde sale');
+  ok(conocidosPost.length === 1 && conocidosPost[0].t === TERR && conocidosPost[0].personas.length > 0 && conocidosPost[0].personas.every(x => x.slug && x.nombre), `le cuenta al worker sus rivales del registro, con slug (${conocidosPost[0]?.personas.length})`);
   ok(L?.rivales.find(r => r.nombre === 'ANA MARIA RUIZ SOTO')?.fuentes.join() === 'A,C', 'la elegida de 2023 que también compitió en 2019 es una sola persona, sin bajar su archivo viejo');
   ok(!pedidos.some(x => x.includes('ccc333')), 'no se bajó el archivo de 2019 de quien ya es rival por 2023');
   ok(!L?.rivales.some(r => r.nombre.startsWith('SAUL')), 'el de ASI (450 < 500) no pasa el umbral');
   ok(L?.esc?.estado === 'abierta' && L.esc.puesto === 3 && L.esc.distancia === 400 && L.esc.k === 1, `escalera: 3.ª de su lista, a 400 votos del último elegido (${JSON.stringify(L?.esc)})`);
-  ok(await p.$eval('#kPlano svg', s => s.querySelectorAll('circle.k-punto').length) === L?.rivales.length, 'el plano pinta un punto por rival');
+  ok(await p.$eval('#kPlano svg', s => s.querySelectorAll('circle.k-punto').length) === enPlano, 'el plano pinta un punto por rival del índice');
   ok(await p.$eval('#kPlano svg', s => !!s.querySelector('.k-usted') && /usted/.test(s.textContent)), 'la columna de su familia va marcada «usted»');
   ok(/3\.º, a 400 votos/.test(await p.textContent('#kEscaleraCopy')), 'la escalera lo dice en texto');
   ok(await p.$$eval('#kFilas tr', t => t.length) === L?.rivales.length, 'la tabla trae a todos los rivales');
@@ -118,6 +142,10 @@ try {
   await p.click('#kFilas tr[data-key]');   /* orden por nombre: la primera es Ana, fuente A */
   await p.waitForFunction(() => /meta de su lista/i.test(document.getElementById('kFichaMeta').textContent), null, { timeout: 15000 }).catch(() => {});
   ok(/meta de su lista/i.test(await p.textContent('#kFichaMeta')), 'la ficha de una elegida trae la meta de su lista, con la misma cuenta de la meta propia');
+  await p.waitForFunction(() => /titulares? en/.test(document.getElementById('kFichaPrensa')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
+  const prensa = await p.$eval('#kFichaPrensa', x => ({ texto: x.textContent, enlaces: [...x.querySelectorAll('a')].map(a => a.getAttribute('href')), rel: [...x.querySelectorAll('a')].every(a => /noopener/.test(a.rel)) }));
+  ok(/2 titulares en 2 medios/.test(prensa.texto) && prensa.enlaces.includes('https://x.co/a') && prensa.rel, `la ficha trae sus titulares literales con enlace (${prensa.texto.slice(0, 80)})`);
+  ok(!/Sarmiento/.test(prensa.texto) && /solo nombre y apellido/.test(prensa.texto), 'el titular de otra persona con su nombre corto no entra; la forma corta se marca');
   /* Fase 3 · el mapa de disputa. La fixture es Barrios Unidos (localidad 12):
      escalas barrios (diccionario real de candidato-360-data) y puestos. */
   await p.waitForFunction(() => /Cada zona suma/.test(document.getElementById('kMapaNota')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
@@ -130,11 +158,25 @@ try {
   ok(await p.$$eval('#kMapa path.leaflet-interactive', x => x.length) === 4, 'mapa: en puestos, un círculo por puesto (4)');
   const tipMapa = await p.evaluate(() => { const l = Object.values(C360ContendientesMapa.estado().capa._layers)[0]; return l.getTooltip().getContent(); });
   ok(/no dice quién votó por quién/.test(tipMapa), 'el globo del mapa dice que describe el lugar, no a las personas');
+  /* Fase 5 · agregar a mano, solo con el nombre: queda en este navegador. */
+  await p.fill('#kBuscar', 'Camila Torres Díaz');
+  await p.click('#kLibre');
+  await p.waitForFunction(() => /Camila Torres Díaz/.test(document.getElementById('kFilas').textContent), null, { timeout: 20000 }).catch(() => {});
+  ok(/Camila Torres Díaz/.test(await p.textContent('#kFilas')) && /Lo agregó usted/.test(await p.textContent('#kFilas')), 'agregada solo con el nombre: aparece en la lista, sellada «Lo agregó usted»');
+  ok(await p.evaluate(t => JSON.parse(localStorage.getItem(`c360-cont-agregados:prueba@ejemplo.co:${t}`) || '[]').some(a => a.nombre === 'Camila Torres Díaz' && !a.slug), TERR), 'y vive en el navegador, sin slug');
+  ok(conocidosPost.length === 1, 'recalcular el mismo día no vuelve a escribir en el worker');
+  /* CAPTURAS=<carpeta> guarda la página para revisarla a ojo. */
+  if (process.env.CAPTURAS) {
+    await p.click('#kFilas tr[data-key]');
+    await p.waitForFunction(() => /titulares? en/.test(document.getElementById('kFichaPrensa')?.textContent || ''), null, { timeout: 10000 }).catch(() => {});
+    await p.screenshot({ path: `${process.env.CAPTURAS}/contendientes-fase5.png`, fullPage: true });
+  }
   ok(!/amenaza/i.test(await p.textContent('body')), 'la palabra «amenaza» no aparece en la página');
   ok(/Rivales probables, no inscritos/.test(await p.textContent('#kNota')), 'la nota dice que son rivales probables y de dónde salen');
   await p.setViewportSize({ width: 375, height: 800 });
   await p.waitForTimeout(150);
   ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'sin desborde horizontal a 375 px');
+  if (process.env.CAPTURAS) await p.screenshot({ path: `${process.env.CAPTURAS}/contendientes-fase5-375.png`, fullPage: true });
   ok(!errores.length, `sin errores de página${errores.length ? `: ${errores.join(' · ')}` : ''}`);
   await p.close();
 
@@ -148,6 +190,7 @@ try {
 
   /* ── La tarjeta 10 en el CRM, en vitrina ───────────────────────────────── */
   const c = await b.newPage({ viewport: { width: 1280, height: 900 } });
+  const pedidosAntes = terrPedidos.length;
   await montar(c, { acceso: false });
   await c.goto('file://' + process.cwd() + '/candidato-360.html');
   await c.waitForFunction(() => typeof window.pintarContendientes === 'function' || typeof pintarContendientes === 'function');
@@ -162,7 +205,8 @@ try {
   const sub = await c.textContent('#crmContSub');
   ok(sub.includes(`alta ${L?.niveles.alta}`) && sub.includes(`baja ${L?.niveles.baja}`), `y los mismos niveles (${sub})`);
   const vit = await c.$eval('#crmContPlano svg', s => ({ nombres: s.querySelectorAll('.k-nombre').length, borrosos: s.querySelectorAll('.vitrina-blur').length, titulos: s.querySelectorAll('title').length, texto: s.textContent }));
-  ok(vit.nombres === 3 && vit.titulos === 3 && vit.borrosos === (L?.rivales.length || 0) - 3, `vitrina: 3 nombres nítidos y ${vit.borrosos} puntos borrosos sin texto`);
+  ok(vit.nombres === 3 && vit.titulos === 3 && vit.borrosos === enPlano - 3, `vitrina: 3 nombres nítidos y ${vit.borrosos} puntos borrosos sin texto`);
+  ok(!(await c.textContent('#crmContRevision')).trim() && terrPedidos.length === pedidosAntes, 'en vitrina la tarjeta no pide ni muestra la revisión mensual');
   const ocultos = (L?.rivales || []).map(r => r.nombre).filter(n => !/^(ANA|LUIS|VERA|DIEGO|ROSA)/.test(n));
   ok(!ocultos.some(n => vit.texto.includes(n)), 'el nombre de los borrosos no está en el DOM');
   const bloqueado = await c.evaluate(() => { const ev = new MouseEvent('click', { bubbles: true, cancelable: true }); document.getElementById('crmContBtn').dispatchEvent(ev); return ev.defaultPrevented; });

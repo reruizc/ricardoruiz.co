@@ -205,13 +205,13 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
-<script src="partidos-bloques.js?v=20260922"></script>
-<script src="candidato-360-electorado.js?v=20260928"></script>
+<script src="partidos-bloques.js?v=20260929"></script>
+<script src="candidato-360-electorado.js?v=20260929"></script>
 <script src="candidato-360-panel.js?v=20260919d"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
 <script src="assets/candidato-360/candi/candi-atletica.js?v=3"></script>
 <script src="assets/candidato-360/candi/candi-hueso.js?v=1"></script>
-<script src="candidato-360-candi.js?v=20260928k"></script>
+<script src="candidato-360-candi.js?v=20260929"></script>
 <script>
 (async function () {
   const P = window.C360Panel, E = window.C360Electorado, $ = P.$, esc = P.esc;
@@ -382,7 +382,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
 
 
   /* ═══ Los tres paneles ═══════════════════════════════════════════════════ */
-  const ST = { C: null, se: null, lugares: null, metrica: 'pega', loc: null, tab: 'mapa', perfil: null, famLabel: '', famSet: null, ampliada: false, modo: '', unidades: [], ref: null, cfg: null, geo: null, dep: '', mun3: '', familia: '', lugar: '', nivel: 'unidades', unidadAbierta: null, capa: null, tiles: null, mapa: null, barrios: null, barriosTodos: null };
+  const ST = { C: null, se: null, lugares: null, metrica: 'pega', loc: null, tab: 'mapa', perfil: null, famLabel: '', famTexto: '', famSet: null, fuente: '', cuando: 'en 2023', color: '', partido: '', historial: null, origenFamilia: '', cam: null, ampliada: false, modo: '', unidades: [], ref: null, cfg: null, geo: null, dep: '', mun3: '', familia: '', lugar: '', nivel: 'unidades', unidadAbierta: null, capa: null, tiles: null, mapa: null, barrios: null, barriosTodos: null };
   /* Quién puede votar en un conjunto de puestos: censo, sexo, los tres grupos
      de edad y el cambio desde 2023 (solo en puestos que se pueden comparar). */
   function metricas(codes) {
@@ -435,6 +435,11 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     return { color: v => v == null ? '#eef0ea' : RAMPA[clase(v)],
       leyenda: RAMPA.map((c, i) => [c, i === 0 ? `hasta ${fmtMetrica(cortes[0], metrica)}` : i === 4 ? `más de ${fmtMetrica(cortes[3], metrica)}` : `${fmtMetrica(cortes[i - 1], metrica)} a ${fmtMetrica(cortes[i], metrica)}`]) };
   }
+  /* Los votos de UN puesto con la medida vigente: de Cámara 2026 si esa es la
+     fuente, si no del detalle de 2023 que lo trae (`pu`, `d`). */
+  function votosPuesto(code9, pu, d) {
+    return ST.fuente === 'camara' ? E.votosCamara(ST.cam, [code9], ST.famSet) : E.votosFamilia(pu.v, d.cands, d.partidos, ST.famSet, pu.l);
+  }
   function compDe(se, codes) { return codes.reduce((acc, c) => se.puestos[c] ? E.suma6(acc, se.puestos[c]) : acc, [0, 0, 0, 0, 0, 0]); }
   /* Concentración del perfil × fuerza de la familia, contra la referencia
      del territorio entero (la ciudad o el departamento), también a escala de
@@ -464,8 +469,8 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     </label>`).join('');
     $('perfilLista').querySelectorAll('input').forEach(r => r.addEventListener('change', () => elegirPerfil(Number(r.value))));
     const top = orden[0];
-    $('tpPerfilesTitulo').textContent = `${top.p.nombre}: ${veces(top.idx)} donde vota ${ST.famLabel.toLowerCase()}.`;
-    $('tpPerfilesCopy').innerHTML = `Seis perfiles de sexo y edad de quienes pueden votar. <b>Rinde</b> compara cuánto pesa cada uno en ${esc(unidadPlural())} donde <b>${esc(ST.famLabel.toLowerCase())}</b> sacó más votos en 2023 contra lo que pesa en ${esc(ST.lugar)} entero: ×1,20 es «un 20 % más». Los tres de arriba son los más viables. Elija uno y el mapa se ilumina donde le pega.${ST.ampliada ? ` <b>Ojo:</b> ${esc(LABEL[ST.familia].toLowerCase())} no tuvo lista propia en ${esc(ST.lugar)} en 2023, así que se mide con sus vecinas del espectro (${esc(ST.famLabel)}).` : ''}${ST.bloques ? notaBloques(ST.bloques, ST.lugar) : ''}`;
+    $('tpPerfilesTitulo').textContent = `${top.p.nombre}: ${veces(top.idx)} donde vota ${ST.famTexto}.`;
+    $('tpPerfilesCopy').innerHTML = `Seis perfiles de sexo y edad de quienes pueden votar. <b>Rinde</b> compara cuánto pesa cada uno en ${esc(unidadPlural())} donde <b>${esc(ST.famTexto)}</b> sacó más votos ${esc(ST.cuando)} contra lo que pesa en ${esc(ST.lugar)} entero: ×1,20 es «un 20 % más». Los tres de arriba son los más viables. Elija uno y el mapa se ilumina donde le pega.${notaMedida()}${ST.bloques ? notaBloques(ST.bloques, ST.lugar) : ''}`;
   }
   function topUnidades(n) {
     const k = ST.perfil;
@@ -474,7 +479,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
   function pintarLectura() {
     const p = E.PERFILES[ST.perfil], k = ST.perfil, idx = ST.ref.indice[k], peso = ST.ref.compTerr[k];
     const top = topUnidades(5), fuertes = ST.unidades.filter((u, j) => (ST.ref.pega[j]?.[k]?.pega || 0) >= PEGA_FUERTE && u.total >= 200).length;
-    const familia = ST.famLabel.toLowerCase(), color = COLOR[ST.familia];
+    const familia = esc(ST.famTexto), color = ST.color;
     const lectura = idx >= 1.08 ? `Es un perfil que <b>le juega a favor</b>: donde ${familia} vota, pesa ${veces(idx)} lo que pesa en ${esc(ST.lugar)}. Hablarle es hablarle a su propia base.`
       : idx >= .95 ? `Es un perfil <b>parejo</b>: pesa casi lo mismo donde ${familia} vota que en el resto de ${esc(ST.lugar)}. No lo empuja ni lo frena; se gana con mensaje, no con territorio.`
       : `Es un perfil que <b>le juega en contra</b>: donde ${familia} vota pesa ${veces(idx)} lo que pesa en ${esc(ST.lugar)}. Llegarle exige salir de su zona de confort, y el mapa dice por dónde.`;
@@ -503,7 +508,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     return `<b>${esc(P.lugar(u.name))}</b>`
       + (m?.censo ? `<br>${num(m.censo)} pueden votar · ${pct0(m.muj / (m.muj + m.hom))} mujeres<br>jóvenes ${pct0(m.g[0] / gt)} · adultos ${pct0(m.g[1] / gt)} · mayores ${pct0(m.g[2] / gt)}` : '')
       + (cr != null ? `<br>Censo 2023 → 2026: ${cr >= 0 ? '+' : ''}${pct(cr)}` : '')
-      + `<br>${esc(ST.famLabel)} 2023: ${u.total ? pct(u.propios / u.total) : '—'}${x ? ` (${veces(x.fam)} su promedio)` : ''}`
+      + `<br>${esc(ST.famLabel)} ${ST.cuando.slice(-4)}: ${u.total ? pct(u.propios / u.total) : '—'}${x ? ` (${veces(x.fam)} su promedio)` : ''}`
       + (x ? `<br>${esc(p.nombre)}: ${pct(x.share)} (${veces(x.conc)} el territorio) · <b>le pega ${veces(x.pega)}</b>${x.pega >= PEGA_FUERTE ? ' · fuerte' : ''}` : '');
   }
   /* La capa que se está mirando: las unidades de la ciudad (o municipios),
@@ -544,7 +549,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     return ST.cfg?.rotuloUnidad || sinArticulo(unidadPlural());
   }
   function pintarMapa() {
-    const mapa = asegurarMapa(), k = ST.perfil, p = E.PERFILES[k], base = COLOR[ST.familia], metrica = ST.metrica;
+    const mapa = asegurarMapa(), k = ST.perfil, p = E.PERFILES[k], base = ST.color, metrica = ST.metrica;
     limpiarMapa();
     const C = capaActual(), ref = ST.ref;
     const xs = C.unidades.map((u, j) => C.tipo === 'unidad' ? ref.pega[j]?.[k] : pegaDe(u, ref, k));
@@ -605,7 +610,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     const conDatoN = C.tipo === 'barrio' ? C.unidades.length : 0;
     const extra = `${relleno.size ? ` <b>${num(conDatoN)} barrios tienen puesto de votación</b>; otros ${num(relleno.size)} no, y se pintan punteados con el color del barrio con dato más cercano (a menos de ${RELLENO_MAX_KM} km). Ese color es inferido: no entra a ningún total.` : ''}${ST.cfg?.barrios && C.tipo === 'unidad' ? ` <b>Haga clic en una ${esc(ST.cfg.rotuloUnidad || unidadSingular())}</b> para bajar a sus barrios.` : ''}${C.tipo === 'barrio' && !ST.unidadAbierta && ST.barrios?.faltan ? ` ${ST.barrios.faltan} ${ST.barrios.faltan === 1 ? esc(unidadSingular()) + ' no tiene' : esc(sinArticulo(unidadPlural())) + ' no tienen'} cartografía por barrio y ${ST.barrios.faltan === 1 ? 'queda' : 'quedan'} fuera del mapa.` : ''}${C.tipo === 'barrio' && ST.unidadAbierta ? ' <b>Vuelva a «Barrios»</b> para ver la ciudad entera.' : ''}${ST.modo === 'puesto' ? ' Este municipio no tiene cartografía por comuna, así que el mapa muestra los puestos de votación.' : ''}`;
     $('mapaNota').innerHTML = (metrica === 'pega'
-      ? `Cada zona se colorea por <b>le pega</b> = (peso de ${esc(p.corto)} entre quienes pueden votar ahí ÷ su peso en ${esc(ST.lugar)}) × (voto de ${esc(ST.famLabel.toLowerCase())} en 2023 ahí ÷ su promedio en ${esc(ST.lugar)}). Quién puede votar: censo electoral de 2026 por puesto (Registraduría); el cruce sexo × edad se estima, porque la Registraduría publica el sexo y la edad por separado. Voto por familia: ${ST.modo === 'municipio' ? 'Asamblea 2023' : ST.modo === 'puesto' ? 'Asamblea 2023, puesto por puesto' : 'Concejo 2023'}, con cada partido en su familia.`
+      ? `Cada zona se colorea por <b>le pega</b> = (peso de ${esc(p.corto)} entre quienes pueden votar ahí ÷ su peso en ${esc(ST.lugar)}) × (voto de ${esc(ST.famTexto)} ${esc(ST.cuando)} ahí ÷ su promedio en ${esc(ST.lugar)}). Quién puede votar: censo electoral de 2026 por puesto (Registraduría); el cruce sexo × edad se estima, porque la Registraduría publica el sexo y la edad por separado. Voto: ${textoFuente()}.`
       : `${esc(METRICAS[metrica].nota)} Los colores reparten las zonas en cinco grupos del mismo tamaño${metrica === 'crecimiento' ? ', salvo el crecimiento, que usa cortes fijos' : ''}. Pase el cursor por una zona para ver todo lo que se sabe de ella.`) + extra;
   }
   function pintarBarra() {
@@ -639,7 +644,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
         const acc = new Map();
         partes.filter(Boolean).forEach(d => (d.puestos || []).forEach(pu => {
           const code9 = ST.dep + ST.mun3 + pu.code.replace('-', ''), loc = dic[code9]?.loc; if (!loc) return;
-          const f = E.votosFamilia(pu.v, d.cands, d.partidos, ST.famSet, pu.l);
+          const f = votosPuesto(code9, pu, d);
           const a = acc.get(loc) || { code: loc, geoCode: loc, name: nombres.get(loc) || `Localidad ${loc}`, propios: 0, total: 0, comp: [0, 0, 0, 0, 0, 0], codes: [] };
           a.propios += f.propios; a.total += f.total; a.comp = E.suma6(a.comp, ST.se?.puestos?.[code9]); a.codes.push(code9); acc.set(loc, a);
         }));
@@ -705,7 +710,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     const porBarrio = new Map();
     buenas.forEach(({ d }) => (d.puestos || []).forEach(pu => {
       const b = barrioDe(pu); if (!b) return;
-      const code9 = ST.dep + ST.mun3 + pu.code.replace('-', ''), f = E.votosFamilia(pu.v, d.cands, d.partidos, ST.famSet, pu.l);
+      const code9 = ST.dep + ST.mun3 + pu.code.replace('-', ''), f = votosPuesto(code9, pu, d);
       const acc = porBarrio.get(b) || { code: b, geoCode: b, name: nombres.get(b) || b, propios: 0, total: 0, comp: [0, 0, 0, 0, 0, 0], puestos: 0, codes: [] };
       acc.propios += f.propios; acc.total += f.total; acc.comp = E.suma6(acc.comp, se?.puestos?.[code9]); acc.puestos++; acc.codes.push(code9);
       porBarrio.set(b, acc);
@@ -731,25 +736,59 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
   }
 
   /* ── Armar todo a partir del vínculo ─────────────────────────────────── */
+  /* El año de una candidatura sale del slug (JAL2023-…, CON2018-…); lo que no
+     trae año es endoso, o sea Congreso 2026. */
+  const anioSlug = s => { const m = String(s || '').match(/^[A-Z]+(\d{4})/); return m ? Number(m[1]) : 2026; };
+  /* La predilección de su historial desde 2018: con qué familia se ha lanzado.
+     Manda cuando la campaña no trae familia (un partido sin línea nacional) y
+     se declara cuando la de ahora no es la de antes. Los JSON de candidatura
+     los baja igual la lectura de fondo: misma caché, ninguna descarga extra. */
+  async function historialDesde2018(v) {
+    const slugs = v?.tipo === 'historial' ? (v.candidato?.slugs || []) : [];
+    const filas = (await Promise.all(slugs.filter(s => anioSlug(s) >= 2018).map(s => E.json(E.urlCandidatura(s))
+      .then(d => ({ anio: anioSlug(s), partido: d.partido || '', bloque: PartidosBloques.bloqueDeCandidatura(d.partido || '', d.nombre || '') }))
+      .catch(() => null)))).filter(f => f && f.partido).sort((x, y) => y.anio - x.anio);
+    const cuenta = {};
+    filas.filter(f => f.bloque !== 'sc').forEach(f => { const c = cuenta[f.bloque] || (cuenta[f.bloque] = { n: 0, ultimo: 0 }); c.n++; c.ultimo = Math.max(c.ultimo, f.anio); });
+    const bloque = Object.entries(cuenta).sort((x, y) => y[1].n - x[1].n || y[1].ultimo - x[1].ultimo)[0]?.[0] || '';
+    return { filas, bloque };
+  }
+  /* Con qué se mide «dónde saca votos», en cascada:
+       1. la LISTA de su partido en la misma corporación de 2023;
+       2. si no tuvo lista (o no llegó al 1 %), la de su partido a Cámara 2026
+          —la lista de Oviedo en Bogotá no existía en 2023—;
+       3. la FAMILIA política: la de su partido, la del espectro que eligió o,
+          si el partido no tiene línea nacional, la de su historial desde 2018;
+          y si esa familia no tuvo lista, sus vecinas del espectro.
+     Cada paso se declara en la página. */
   async function armarPerfiles(v) {
     const campana = v?.campana || {};
-    const familia = familiaDe(campana);
+    const partido = !['firmas', 'indeciso'].includes(campana.avales) && campana.partido ? campana.partido : '';
+    const histP = historialDesde2018(v).catch(() => ({ filas: [], bloque: '' }));
     const dep = pad2(campana.departamento), corpDep = ['asamblea', 'gobernacion'].includes(campana.corp);
-    if (!familia || familia === 'sc') return aviso('Sin una familia política no hay contra qué medir los perfiles: elija partido o espectro en el CRM y vuelva.');
     if (!dep || dep === '00') return aviso('La campaña no tiene territorio definido: abra el CRM, elija corporación y lugar, y vuelva.');
     const [lugares, se, C] = await Promise.all([E.puestos(), E.sexoEdad(), E.censo2026()]);
     ST.C = C; ST.se = se; ST.lugares = lugares; ST.loc = null;
     if (!se) return aviso('El cruce de sexo y edad por puesto no respondió. Vuelva a intentarlo en un momento.');
     const puestosDe = pred => Object.keys(lugares).filter(pred);
-    ST.familia = familia; ST.dep = dep; ST.cfg = null; ST.geo = null; ST.barrios = null; ST.barriosTodos = null; ST.unidadAbierta = null; ST.nivel = 'unidades';
-    ST.famSet = new Set([familia]); ST.famLabel = LABEL[familia]; ST.ampliada = false;
+    ST.dep = dep; ST.cfg = null; ST.geo = null; ST.barrios = null; ST.barriosTodos = null; ST.unidadAbierta = null; ST.nivel = 'unidades';
+    ST.ampliada = false; ST.cam = null; ST.historial = null; ST.partido = partido; ST.origenFamilia = ''; ST.familia = '';
+    const corpTxt = corpDep ? 'Asamblea' : 'Concejo';
+    /* `medida` es un Set de familias o una función nombre-de-lista → sí/no. */
+    const medirCon = (fuente, medida, rotulo, texto, color) => {
+      ST.fuente = fuente; ST.famSet = medida; ST.famLabel = rotulo; ST.famTexto = texto; ST.color = color;
+      ST.cuando = fuente === 'camara' ? 'a Cámara en 2026' : 'en 2023';
+    };
+    /* Los votos de una zona: de Cámara 2026 por sus puestos, o del archivo de
+       2023 que la describe. */
+    const votosUnidad = (codes, de2023) => ST.fuente === 'camara' ? E.votosCamara(ST.cam, codes, ST.famSet) : de2023();
     const armarUnidades = async () => {
     if (corpDep) {
       const r = await E.json(`${S3}/asamblea-2023/dep/${dep}.json`);
       ST.geo = await E.json(`${S3}/mapas-2026/Departamentos-mps/${dep}.json`);
       ST.modo = 'municipio'; ST.lugar = P.lugar(r.name || campana.departamentoNombre || 'su departamento');
       ST.cfg = { code: p => pad3(p.mun_elec ?? p.mun_electoral), name: p => p.mpio_cnmbr || 'Municipio' };
-      ST.unidades = Object.entries(r.comunas || {}).map(([m, d]) => { const codes = puestosDe(c => c.startsWith(dep + pad3(m))); return { code: pad3(m), name: d.name, ...E.votosFamiliaPartidos(d.partidos, ST.famSet), comp: compDe(se, codes), codes, m: metricas(codes) }; });
+      ST.unidades = Object.entries(r.comunas || {}).map(([m, d]) => { const codes = puestosDe(c => c.startsWith(dep + pad3(m))); return { code: pad3(m), name: d.name, ...votosUnidad(codes, () => E.votosFamiliaPartidos(d.partidos, ST.famSet)), comp: compDe(se, codes), codes, m: metricas(codes) }; });
     } else {
       const cfg = E.ciudadDe(campana.municipio);
       let mun3 = pad3(await E.codigoMunicipio(campana.departamento, campana.municipio).catch(() => ''));
@@ -772,38 +811,91 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
         ST.unidades = Object.entries(res.data[key].comunas || {}).filter(([c]) => !['90', '98', 'NULL', ''].includes(c)).map(([c, d]) => {
           const codes = puestosDe(k => k.startsWith(dep + mun3) && unidadDe(k) === c), geoCode = cfg.porNombre ? normTexto(String(d.name || '').replace(/^\d+\s*COMUNA\s*/i, '')) : (cfg.dataKey ? cfg.dataKey(c) : c);
           return { code: c, geoCode, name: cfg.rotuloUnidad ? (nombreGeo.get(geoCode) || d.name) : d.name,
-            ...E.votosFamiliaPartidos(d.partidos, ST.famSet), comp: compDe(se, codes), codes, m: metricas(codes) }; });
+            ...votosUnidad(codes, () => E.votosFamiliaPartidos(d.partidos, ST.famSet)), comp: compDe(se, codes), codes, m: metricas(codes) }; });
         if (cfg.porNombre) ST.cfg = Object.assign({}, cfg, { code: p => normTexto(cfg.code(p)) });
       } else {
-        if (!mun3 || mun3 === '000') return aviso(`No encontramos el código de ${esc(P.lugar(campana.municipio))} para leer sus resultados.`);
+        if (!mun3 || mun3 === '000') { aviso(`No encontramos el código de ${esc(P.lugar(campana.municipio))} para leer sus resultados.`); return false; }
         const r = await E.json(`${S3}/asamblea-2023/mun/${dep}-${mun3}.json`).catch(() => null);
-        if (!r) return aviso(`No hay resultados por puesto de 2023 publicados para ${esc(P.lugar(campana.municipio))}.`);
+        if (!r) { aviso(`No hay resultados por puesto de 2023 publicados para ${esc(P.lugar(campana.municipio))}.`); return false; }
         ST.mun3 = mun3; ST.modo = 'puesto'; ST.lugar = P.lugar(r.name || campana.municipio);
         /* El JSON municipal de la Asamblea no trae coordenadas: salen del
            georef (PUESTOS_GEOREF), que es la misma fuente del censo. */
-        ST.unidades = (r.puestos || []).map(pu => { const code9 = dep + mun3 + pu.code.replace('-', ''), g = lugares[code9]; return g && Number.isFinite(g.lat) && Number.isFinite(g.lng) ? { code: code9, name: `${pu.nombre}${g.barrio && g.barrio !== 'sin georreferenciar' ? ` · ${g.barrio}` : ''}`, ...E.votosFamilia(pu.v, r.cands, r.partidos, ST.famSet, pu.l), comp: se.puestos[code9] || null, lat: g.lat, lng: g.lng, codes: [code9], m: metricas([code9]) } : null; }).filter(Boolean);
+        ST.unidades = (r.puestos || []).map(pu => { const code9 = dep + mun3 + pu.code.replace('-', ''), g = lugares[code9]; return g && Number.isFinite(g.lat) && Number.isFinite(g.lng) ? { code: code9, name: `${pu.nombre}${g.barrio && g.barrio !== 'sin georreferenciar' ? ` · ${g.barrio}` : ''}`, ...votosUnidad([code9], () => E.votosFamilia(pu.v, r.cands, r.partidos, ST.famSet, pu.l)), comp: se.puestos[code9] || null, lat: g.lat, lng: g.lng, codes: [code9], m: metricas([code9]) } : null; }).filter(Boolean);
       }
     }
     };
-    await armarUnidades();
-    ST.ref = E.perfiles(ST.unidades);
-    /* Sin lista de esa familia en 2023 (o con una marginal), la referencia no
-       existe: se amplía a las familias vecinas del espectro y se declara. */
-    const marginal = !ST.ref || ST.ref.famTerr < .01;
-    if (marginal && E.VECINAS[familia]) {
-      ST.famSet = new Set(E.VECINAS[familia]); ST.ampliada = true;
-      ST.famLabel = E.VECINAS[familia].map(f => LABEL[f].toLowerCase()).join(' + ');
-      await armarUnidades(); ST.ref = E.perfiles(ST.unidades);
+    /* Una medida sirve si la lista o la familia pesa al menos el 1 % del
+       territorio: por debajo es el voto de dos o tres personas, no un patrón. */
+    const probar = async () => { if (await armarUnidades() === false) return null; ST.ref = E.perfiles(ST.unidades); return Boolean(ST.ref && ST.ref.famTerr >= .01); };
+    let listo = false;
+    if (partido) {
+      const pred = E.calzaPartido(partido), nombre = P.lugar(partido), color = PartidosBloques.colorDePartido?.(partido) || COLOR[PartidosBloques.bloqueDeOrganizacion(partido)] || COLOR.sc;
+      medirCon('lista', pred, nombre, nombre, color);
+      const r1 = await probar(); if (r1 === null) return;
+      listo = r1;
+      if (!listo) {
+        ST.cam = await E.camaraPuestos(dep).catch(() => null);
+        if (ST.cam) { medirCon('camara', pred, nombre, nombre, color); const r2 = await probar(); if (r2 === null) return; listo = r2; }
+      }
     }
+    if (!listo) {
+      let familia = familiaDe(campana), origen = partido ? 'partido' : 'espectro';
+      if (!familia || familia === 'sc') {
+        const h = await histP;
+        if (h.bloque) { familia = h.bloque; origen = 'historial'; }
+      }
+      if (!familia || familia === 'sc') {
+        return aviso(partido
+          ? `${esc(P.lugar(partido))} no tiene lista con votos en ${esc(ST.lugar || 'su territorio')} ni en el ${esc(corpTxt)} de 2023 ni en la Cámara de 2026, no está en ninguna familia política nacional, y su historial desde 2018 no deja una predilección. Elija en el CRM el espectro en el que se ubica y la página mide con esa familia.`
+          : 'Sin partido ni espectro no hay contra qué medir los perfiles, y su historial desde 2018 no deja una predilección: elija partido o espectro en el CRM y vuelva.');
+      }
+      ST.familia = familia; ST.origenFamilia = origen;
+      medirCon('familia', new Set([familia]), LABEL[familia], LABEL[familia].toLowerCase(), COLOR[familia]);
+      if (await probar() === null) return;
+      /* Sin lista de esa familia en 2023 (o con una marginal), la referencia no
+         existe: se amplía a las familias vecinas del espectro y se declara. */
+      if ((!ST.ref || ST.ref.famTerr < .01) && E.VECINAS[familia]) {
+        ST.ampliada = true;
+        const lbl = E.VECINAS[familia].map(f => LABEL[f].toLowerCase()).join(' + ');
+        medirCon('familia', new Set(E.VECINAS[familia]), lbl, lbl, COLOR[familia]);
+        if (await probar() === null) return;
+      }
+    } else ST.familia = PartidosBloques.bloqueDeOrganizacion(partido);
     if (!ST.ref) return aviso(`No hay suficiente dato de sexo y edad en los puestos de ${esc(ST.lugar)} para armar los perfiles.`);
+    ST.historial = await histP;
     /* Nota de bloques de edad: solo donde pesan (≥ 5 % del censo del territorio). */
     const edad = await E.censoEdad(), pref = dep + (ST.modo === 'municipio' ? '' : ST.mun3);
     let enBloque = 0, nBloque = 0, censoTerr = 0;
     Object.entries(lugares).forEach(([k, g]) => { if (!k.startsWith(pref)) return; censoTerr += g.censo; if (edad?.bloques?.[k] != null) { enBloque += g.censo; nBloque++; } });
     ST.bloques = censoTerr && enBloque / censoTerr >= .05 ? { puestos: nBloque, peso: enBloque / censoTerr } : null;
     ST.perfil = E.PERFILES.map((p, k) => [ST.ref.indice[k], p.i]).sort((a, b) => b[0] - a[0])[0][1];
+    METRICAS.familia.boton = ST.fuente === 'familia' ? `Su familia ${ST.cuando.slice(-4)}` : `Su lista ${ST.cuando.slice(-4)}`;
+    METRICAS.familia.titulo = `Dónde votó ${ST.fuente === 'familia' ? 'su familia política' : 'la lista de su partido'} ${ST.cuando}`;
+    METRICAS.familia.nota = `Porcentaje de los votos válidos que sacó ${ST.fuente === 'familia' ? 'su familia política' : esc(ST.famLabel)} ${ST.cuando}.`;
+    $('elecAviso').classList.add('hidden');
     $('elecTres').classList.remove('hidden');
     pintarPerfiles(); pintarLectura(); pintarMapa();
+  }
+  /* De dónde sale el voto que se mide, para la nota del mapa. */
+  function textoFuente() {
+    if (ST.fuente === 'camara') return `Cámara 2026, puesto por puesto, solo los votos de ${esc(ST.famLabel)}`;
+    const base = ST.modo === 'municipio' ? 'Asamblea 2023' : ST.modo === 'puesto' ? 'Asamblea 2023, puesto por puesto' : 'Concejo 2023';
+    return base + (ST.fuente === 'lista' ? `, solo los votos de ${esc(ST.famLabel)}` : ', con cada partido en su familia');
+  }
+  /* Qué se usó para medir, en una frase: se lee debajo del título de perfiles. */
+  function notaMedida() {
+    const h = ST.historial, lista = ST.fuente !== 'familia', corp = ST.modo === 'municipio' || ST.modo === 'puesto' ? 'Asamblea' : 'Concejo';
+    let t = '';
+    if (ST.fuente === 'camara') t = ` <b>Por qué Cámara 2026:</b> ${esc(ST.famLabel)} no tuvo lista en el ${corp} de ${esc(ST.lugar)} en 2023 (o no llegó al 1 %), así que su huella es la de su lista a la Cámara de 2026, puesto por puesto.`;
+    else if (ST.fuente === 'familia' && ST.ampliada) t = ` <b>Ojo:</b> ${esc(LABEL[ST.familia].toLowerCase())} no tuvo lista propia en ${esc(ST.lugar)} en 2023, así que se mide con sus vecinas del espectro (${esc(ST.famLabel)}).`;
+    if (ST.fuente === 'familia' && ST.partido) t += ` ${esc(P.lugar(ST.partido))} no tiene lista con votos acá ni en 2023 ni a Cámara en 2026, así que se mide con su familia política.`;
+    if (ST.fuente === 'familia' && ST.origenFamilia === 'historial') t += ` <b>La familia sale de su historial:</b> ${h.filas.map(f => `${f.anio}, ${esc(P.lugar(f.partido))}`).join(' · ')}.`;
+    /* Si antes se lanzó con otra familia, se dice: no cambia la medida, pero
+       sí de dónde puede venir voto que ya lo conoce. */
+    const ahora = lista ? PartidosBloques.bloqueDeOrganizacion(ST.partido) : ST.familia;
+    if (h?.bloque && ST.origenFamilia !== 'historial' && ahora && h.bloque !== ahora)
+      t += ` <b>Su historial va por otro lado:</b> desde 2018 se ha lanzado sobre todo desde ${esc(LABEL[h.bloque].toLowerCase())} (${h.filas.map(f => `${f.anio}, ${esc(P.lugar(f.partido))}`).join(' · ')}). Este mapa mide la lista con la que se lanza ahora, no ese voto que ya lo conoce.`;
+    return t;
   }
   function aviso(html) { $('elecTres').classList.add('hidden'); const a = $('elecAviso'); a.innerHTML = `<section class="panel elec-seccion"><span class="panel-num">Perfiles de votante</span><h3>Todavía no.</h3><p>${html}</p></section>`; a.classList.remove('hidden'); }
 
@@ -867,7 +959,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
       k(pct0(m.g[2] / gt), 'Adultos mayores', `${num(m.g[2])} · más de 60`),
       k(num(b18), 'Tienen 18 a 20 años', 'muchos no votaban en 2023'),
       cambio ? k(`${cambio.crecimiento >= 0 ? '+' : ''}${pct(cambio.crecimiento)}`, 'Censo 2023 → 2026', `${cambio.crecimiento >= 0 ? '+' : ''}${num(cambio.hoy - cambio.antes)} electores`, cambio.crecimiento >= 0 ? 'sube' : 'baja') : '',
-      ST.ref ? k(pct0(ST.ref.famTerr), `${ST.famLabel} en 2023`, 'de los votos válidos') : '',
+      ST.ref ? k(pct0(ST.ref.famTerr), `${ST.famLabel} ${ST.cuando}`, 'de los votos válidos') : '',
     ].join('');
     $('elecControl').classList.remove('hidden');
   }

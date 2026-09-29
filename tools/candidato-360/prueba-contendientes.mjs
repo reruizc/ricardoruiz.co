@@ -42,7 +42,7 @@ const ctx = vm.createContext({
   ctx.C360Electorado.urlCandidatura = aux.C360Electorado.urlCandidatura;
 }
 ctx.window = ctx;
-for (const f of ['partidos-bloques.js', 'cand-index.js', 'legislativo-electos.js', 'vote-target.js', 'candidato-360-endoso.js', 'candidato-360-diad.js', 'candidato-360-contendientes.js'])
+for (const f of ['partidos-bloques.js', 'cand-index.js', 'legislativo-electos.js', 'vote-target.js', 'candidato-360-saliencia.js', 'candidato-360-endoso.js', 'candidato-360-diad.js', 'candidato-360-contendientes.js'])
   vm.runInContext(await readFile(new URL(f, RAIZ), 'utf8'), ctx, { filename: f });
 const K = ctx.C360Contendientes, VT = ctx.VoteTarget, EN = ctx.C360Endoso;
 
@@ -147,6 +147,51 @@ const cuadro = (x, y) => ({ type: 'Feature', properties: { b: `${x},${y}` }, geo
 const F3 = [cuadro(-74, 4.6), cuadro(-74.01, 4.6), cuadro(-74.2, 4.6)];
 const R3 = K.rellenos(F3, p => p.b, p => p.b, new Set(['-74,4.6']));
 ok(R3.get('-74.01,4.6')?.de === '-74,4.6' && !R3.has('-74.2,4.6'), 'relleno: el barrio sin dato toma al vecino a ~1 km; a más de 3 km queda sin dato');
+
+/* Fase 5 · la prensa de cada rival: titulares literales, palabras enteras. */
+ok(K.mencionaPersona('Ana María Ruiz propone metro para el sur', 'ANA MARIA RUIZ SOTO') === 'exacto' && K.mencionaPersona('Ana Ruiz, concejal, pide debate', 'ANA MARIA RUIZ SOTO') === 'parcial', 'mención exacta (3 componentes) y parcial (nombre y apellido)');
+ok(K.mencionaPersona('Anamaría Ruizsoto abre tienda', 'ANA MARIA RUIZ SOTO') === null && K.mencionaPersona('Ruiz habló', 'ANA MARIA RUIZ SOTO') === null, 'no casa dentro de otra palabra ni con un apellido suelto');
+ok(K.mencionaPersona('Juicio por el magnicidio de Luis Carlos Galán se reanudó', 'CARLOS FERNANDO GALAN PACHON') === null && K.mencionaPersona('Reaparece testigo del caso Carlos Galán Sarmiento', 'CARLOS FERNANDO GALAN PACHON') === null
+  && K.mencionaPersona('Luis Carlos Galán: 37 años del magnicidio', 'CARLOS FERNANDO GALAN PACHON') === null, 'medido: «Luis Carlos Galán Sarmiento» no es «Carlos Fernando Galán Pachón» (otro nombre pegado antes o después)');
+ok(K.mencionaPersona('Alcalde Carlos Galán anuncia metro', 'CARLOS FERNANDO GALAN PACHON') === 'parcial' && K.mencionaPersona('Video | Concejal Julián Forero, herido en la vía', 'EDISON JULIAN FORERO CASTRO') === 'parcial'
+  && K.mencionaPersona('El alcalde Carlos Galán anuncia metro', 'CARLOS FERNANDO GALAN PACHON') === 'parcial', 'con un cargo delante o un signo que corta, la forma corta sí cuenta');
+ok(K.consultasPrensa('NATALIA SOPHIA PARRA ROJAS').join('|') === '"NATALIA SOPHIA PARRA ROJAS"|"NATALIA PARRA"' && K.consultasPrensa('LUIS JOSE PAZ').join('|') === '"LUIS JOSE PAZ"', 'consultas: nombre completo y, con cuatro palabras, la forma corta (con tres podrían ser dos nombres de pila)');
+const hoyP = new Date('2026-09-28T12:00:00Z');
+const itP = (titulo, medio, fecha) => ({ titulo, medio, url: 'https://x.co/' + encodeURIComponent(titulo), fecha });
+const PR = K.prensaDe([itP('Ana María Ruiz propone metro para el sur', 'El Tiempo', '2026-09-20'), itP('Ana María Ruiz propone metro para el sur', 'Semana', '2026-09-20'),
+  itP('Fiscalía abre investigación a Ana Ruiz por contrato', 'El Espectador', '2026-08-02'), itP('Ana Ruiz, en el debate de salud del hospital', 'Blu', '2026-04-10'),
+  itP('Nadie más: titular sin ella', 'X', '2026-09-01'), itP('Ana María Ruiz en 2025', 'Y', '2025-12-01')], 'ANA MARIA RUIZ SOTO', hoyP);
+ok(PR.total === 4 && PR.porMes.length === 6 && PR.porMes[5].mes === '2026-09' && PR.porMes[5].n === 1 && PR.porMes[0].mes === '2026-04', `seis meses, el mismo titular una vez, lo de antes de la ventana fuera del conteo por mes (${PR.total})`);
+ok(PR.ultimos[0].fecha === '2026-09-20' && PR.ultimos.length === 4 && PR.exactos === 2, 'los últimos, del más reciente al más viejo; 2 exactos y 2 solo con nombre y apellido');
+ok(!PR.temas.some(t => t.id === 'corrupcion') && PR.temas.some(t => t.id === 'salud_educacion'), 'P8: el tema «corrupción y control» no se cuenta; los demás sí');
+
+/* Fase 5 · la llave del territorio es la del worker (códigos, no nombres). */
+ok(K.terrKey('concejo', { tipo: 'municipio', departamento: '16', municipio: '1' }) === 'concejo:16-001' && K.terrKey('gobernacion', { tipo: 'departamento', departamento: '26' }) === 'gobernacion:26'
+  && K.terrKey('jal', { tipo: 'localidad', departamento: '16', municipio: '001', localidad: 'BARRIOS UNIDOS' }) === 'jal:16-001:barrios-unidos' && K.terrKey('concejo', null) === '', 'terrKey: concejo, gobernación, JAL y sin territorio');
+ok(K.proximaRevision(new Date('2026-12-15T12:00:00Z')) === '2027-01-01' && K.fechaLarga('2026-10-01T05:00:00Z') === '1 de octubre de 2026', 'la próxima revisión es el 1 del mes siguiente');
+ok(K.cambiosTexto({ entran: [{ nombre: 'MARTA LUCIA RINCON PEREZ', medios: 2 }], aval: [{}], salen: [], conTitulares: 3 }) === 'Desde la revisión anterior: entra Marta Rincon (prensa, 2 medios) · 1 cambió de aval · 3 con titulares nuevos.'
+  && K.cambiosTexto({ entran: [], aval: [], salen: [], conTitulares: 0 }) === 'Sin cambios desde la revisión anterior.', '«qué se movió» y «sin cambios»');
+
+/* Fase 5 · la revisión se integra a la lista: D suma a un rival conocido; un nombre nuevo entra sin datos, fuera del índice. */
+const LR = K.evaluar({ reparto: REP, datos: DT, base: baseU, baseModo: 'propio', familiaUsuario: 'ci', partidoCampana: 'PARTIDO ALIANZA VERDE',
+  usuario: { nombre: 'USTED CANDIDATA DE PRUEBA', slugs: ['u1'] }, meta: 400, otras: [otra], congresistas: [] });
+const enIndiceAntes = LR.resumen.enIndice, nAntes = LR.rivales.length;
+const info = K.integrarRevision(LR, { revisado: '2026-10-01T12:00:00Z', lista: [{ k: '', nombre: 'ANA MARIA RUIZ SOTO', medios: 2, titulares: [{ titulo: 't', medio: 'm' }] }, { nombre: 'MARTA LUCIA RINCON PEREZ', aval: 'NUEVO LIBERALISMO', medios: 3, titulares: [] }], cambios: { entran: [{ nombre: 'MARTA LUCIA RINCON PEREZ', medios: 3 }], aval: [], salen: [], conTitulares: 1 } }, new Date('2026-10-05T12:00:00Z'));
+const marta = LR.rivales.find(r => r.nombre.startsWith('MARTA'));
+ok(info.revisado && info.proxima === '2026-11-01' && /entra Marta Rincon/.test(info.linea), 'la revisión da la fecha, la próxima y lo que se movió');
+ok(LR.rivales.find(r => r.nombre.startsWith('ANA')).fuentes.includes('D') && LR.rivales.length === nAntes + 1, 'dicha en prensa y ya rival: suma la fuente D; la nueva entra a la lista');
+ok(marta && !marta.enIndice && marta.marcas.includes('sin-datos-electorales') && marta.familia.sabemos && K.sello(marta) === 'Dicho en prensa · 3 medios' && LR.resumen.enIndice === enIndiceAntes, 'la de prensa sin registro: sin datos, fuera del índice, con su aval como familia');
+ok(K.integrarRevision(LR, null).revisado === null, 'sin revisión todavía: lo dice, no inventa una fecha');
+ok(K.integrarRevision({ rivales: [] }, { revisado: '2026-10-01T12:00:00Z', lista: [] }, new Date('2026-09-30T20:00:00Z')).proxima === '2026-11-01', 'la próxima revisión sale de la revisión si va adelante del reloj del usuario');
+
+/* Fase 5 · agregados a mano (fuente E): del registro entran aunque no pasen el umbral; sin registro, solo el nombre. */
+const chica = { entrada: { nombre: 'TOMAS ANDRES VEGA LUNA', partido: 'PARTIDO LIBERAL COLOMBIANO', votos: 40, slug: 'e1', corp: 'CAMARA · X · 2022' }, porPuesto: pp({ P1: 40 }), total: 40, fuente: 'E' };
+const LE = K.evaluar({ reparto: REP, datos: DT, base: baseU, baseModo: 'propio', familiaUsuario: 'ci', partidoCampana: 'PARTIDO ALIANZA VERDE',
+  usuario: { nombre: 'USTED CANDIDATA DE PRUEBA', slugs: ['u1'] }, meta: 400, otras: [chica, { ...otra, fuente: undefined }], congresistas: [], agregadosLibres: [{ nombre: 'Camila Torres' }, { nombre: 'ANA MARIA RUIZ SOTO' }] });
+const tomas = LE.rivales.find(r => r.nombre.startsWith('TOMAS')), camila = LE.rivales.find(r => r.nombre === 'Camila Torres');
+ok(tomas && tomas.fuentes.join() === 'E' && tomas.afinidad != null && tomas.enIndice, 'fuente E del registro: 40 votos entran aunque no pasen el umbral, con afinidad medida');
+ok(camila && camila.fuentes.join() === 'E' && !camila.enIndice && camila.marcas.includes('sin-datos-electorales'), 'agregada solo con el nombre: en la lista, sin datos, fuera del índice');
+ok(LE.rivales.filter(r => r.nombre.startsWith('ANA') || r.nombre.startsWith('Ana')).length === 1, 'agregar a mano a quien ya es rival no lo duplica');
 
 /* ── 2. Casos reales ───────────────────────────────────────────────────── */
 if (!process.argv.includes('--sin-red')) {

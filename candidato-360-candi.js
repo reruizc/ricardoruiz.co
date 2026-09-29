@@ -92,8 +92,8 @@
   };
   VISTAS.contendientes = {
     titulo: 'Tus contendientes',
-    texto: 'Aquí ves contra quién compites. Son rivales probables, no inscritos: quien ganó la curul en 2023, quien compitió aquí con buena votación y quien tiene votos en tu territorio de otra elección. El plano cruza su familia política con cuánto rinde cada uno en los puestos donde tú sacas votos. Si vas en lista abierta, abajo está quién te compite dentro de tu propia lista.',
-    chips: ['¿Qué quiere decir la afinidad?', '¿Por qué hay rivales en «no sabemos»?', '¿Cómo se calcula la presión?']
+    texto: 'Aquí ves contra quién compites. Son rivales probables, no inscritos: quien ganó la curul en 2023, quien compitió aquí con buena votación y quien tiene votos en tu territorio de otra elección. El plano cruza su familia política con cuánto rinde cada uno en los puestos donde tú sacas votos. Si vas en lista abierta, abajo está quién te compite dentro de tu propia lista. Al abrir la ficha de un rival ves sus titulares de los últimos seis meses, literales y con enlace. Cada mes revisamos la prensa de tu territorio: a quien nombran como aspirante lo sumamos después de que una persona lo revisa. Y si falta alguien, lo puedes agregar tú.',
+    chips: ['¿Qué quiere decir la afinidad?', '¿Por qué hay rivales en «no sabemos»?', '¿Cómo se calcula la presión?', '¿Cómo funciona la revisión mensual?']
   };
   const SIN_VISTA = { titulo: 'Candidato 360', texto: 'Te voy diciendo qué hace cada parte de la plataforma. Pregúntame por lo que estés mirando.', chips: [] };
   const SIN_SESION = 'Para preguntarme por escrito necesito que inicies sesión; así sé de qué campaña estamos hablando. La guía de esta pantalla no depende de eso.';

@@ -19,20 +19,28 @@ function fixture(width=390){
 }
 (async()=>{
  const f=fixture();
- for(const width of [280,320,360,390,768,1440,2560]){
+ for(const direction of ['right','left'])for(const width of [280,320,360,390,768,1440,2560]){
+  f.seq.fromSide=direction;
   f.host.clientWidth=width;f.seq.times=f.seq.timing();
   for(let t=0;t<=f.seq.times.total;t+=73){f.seq.render(t);const x=parseFloat(f.seq.actor.style.left),s=parseFloat(f.seq.actor.style.width);assert(x>=0);assert(x+s<=width+.001);}
   f.seq.render(f.seq.times.total);assert.equal(f.seq.phase,'resting');assert.equal(f.seq.bone.hidden,true);
  }
- f.host.clientWidth=390;const starting=f.seq.play();assert.equal(f.images.length,4);f.images.forEach(img=>img.onload());await starting;
+ f.seq.fromSide='right';f.host.clientWidth=390;const starting=f.seq.play();assert.equal(f.images.length,4);f.images.forEach(img=>img.onload());await starting;
  assert.equal(f.mascot.sprite.hidden,true);assert.equal(f.seq.actor.hidden,false);
  f.document.hidden=true;f.seq.onVisibility();const before=f.seq.elapsed;f.step();assert.equal(f.seq.elapsed,before);
  f.document.hidden=false;f.seq.onVisibility();for(let n=0;n<180;n++)f.step();
  assert.equal(f.seq.phase,'resting');assert.equal(f.frames.size,0);assert.equal(f.events.filter(e=>e.type==='candi:bone-complete').length,1);
+ assert.equal(f.seq.side,'left');
+ f.seq.enable();assert.equal(f.timers.size,1);
+ const [timerId,callback]=[...f.timers.entries()][0];f.timers.delete(timerId);callback();await new Promise(setImmediate);
+ assert.equal(f.seq.fromSide,'left');assert.equal(f.seq.toSide,'right');
+ for(let n=0;n<180;n++)f.step();
+ assert.equal(f.seq.side,'right');assert.equal(f.seq.phase,'resting');assert.equal(f.timers.size,1);
+ assert.match(f.seq.actor.style.transform,/scaleX\(-1\)/);
  f.seq.onActivity({target:{closest:()=>null}});assert.equal(f.seq.active,false);assert.equal(f.mascot.sprite.hidden,false);
  f.seq.enable();assert.equal(f.timers.size,1);f.document.hidden=true;f.seq.onVisibility();assert.equal(f.timers.size,0);f.document.hidden=false;f.seq.onVisibility();assert.equal(f.timers.size,1);
  f.seq.destroy();assert.equal(f.frames.size,0);assert.equal(f.timers.size,0);
  const reduced=fixture();reduced.motion.matches=true;await reduced.seq.play();assert.equal(reduced.images.length,0);reduced.seq.enable();assert.equal(reduced.timers.size,0);reduced.seq.destroy();
  const pending=fixture();const promise=pending.seq.play();pending.seq.pause();pending.images.forEach(img=>img.onload());await promise;assert.equal(pending.seq.actor.hidden,true);assert.equal(pending.frames.size,0);pending.seq.destroy();
- console.log('OK: bounds at 7 widths, resting completion, hidden-tab pause, activity wake, timer lifecycle, reduced motion, cancellation during load.');
+ console.log('OK: bounds at 7 widths in both directions, automatic alternating trips, resting completion, hidden-tab pause, activity wake, timer lifecycle, reduced motion, cancellation during load.');
 })().catch(e=>{console.error(e);process.exitCode=1});

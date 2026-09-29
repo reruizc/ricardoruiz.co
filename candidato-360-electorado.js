@@ -149,23 +149,63 @@
      sus vecinas del espectro y la página lo declara. */
   const VECINAS = { izq: ['izq', 'ci'], ci: ['ci', 'izq', 'c'], c: ['c', 'ci', 'cd'], cd: ['cd', 'c', 'd'], d: ['d', 'cd'] };
   const setFamilia = f => f instanceof Set ? f : new Set([f]);
+  /* `familia` también puede ser una FUNCIÓN nombre → sí/no: así se mide la
+     huella de UN partido (su lista) con el mismo cálculo que la de una familia. */
+  const esDe = f => {
+    if (typeof f === 'function') return f;
+    const fam = setFamilia(f), PB = global.PartidosBloques;
+    return nombre => fam.has(PB?.bloqueDeOrganizacion?.(nombre) || 'sc');
+  };
+  /* ¿Esta lista es la del partido con el que se lanza? Mismo criterio que
+     `huellaPartido` del CRM: nombre igual, uno contenido en el otro, o todas
+     las palabras propias presentes —«NUEVO LIBERALISMO EN MARCHA» sí es huella
+     del Nuevo Liberalismo—. Una coalición cuenta por cualquiera de sus partes,
+     siempre que la parte tenga una palabra propia de 4+ letras: «MIRA» sola no
+     basta para reclamar «PARTIDO POLÍTICO MIRA», pero sí para la coalición. */
+  const ESTRUCT = new Set(['PARTIDO', 'MOVIMIENTO', 'POLITICO', 'POLITICA', 'COALICION', 'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'Y', 'POR', 'EN']);
+  const GENERICAS = new Set(['COLOMBIA', 'COLOMBIANO', 'COLOMBIANA', 'NACIONAL', 'ALIANZA', 'UNIDOS', 'PUEBLO', 'CIUDADANOS', 'POPULAR', 'SOCIAL', 'BOGOTA']);
+  const palabras = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().split(/[^A-ZÑ0-9]+/).filter(Boolean);
+  function calzaPartido(partido) {
+    const PB = global.PartidosBloques, entero = PB.norm(partido);
+    if (!entero) return () => false;
+    const nucleos = [partido, ...PB.partesDeCoalicion(partido)].map(x => palabras(x).filter(w => !ESTRUCT.has(w)))
+      .filter(nu => nu.some(w => w.length >= 4 && !GENERICAS.has(w)));
+    return nombre => {
+      const nn = PB.norm(nombre); if (!nn) return false;
+      if (nn === entero || (entero.length > 8 && nn.includes(entero)) || (nn.length > 8 && entero.includes(nn))) return true;
+      const ws = new Set(palabras(nombre));
+      return nucleos.some(nu => nu.every(w => ws.has(w)));
+    };
+  }
+  /* Cámara 2026, partido × puesto, un archivo por departamento
+     (tools/candidato-360/partidos/build_camara_puesto.py). Es la huella de los
+     partidos que en 2023 no tenían lista: la de Oviedo en Bogotá no existía y
+     sacó 74.131 votos a Cámara. */
+  const camaraPuestos = dep => json(`${S3}/camara/partidos-puesto/${String(dep).padStart(2, '0')}.json`);
+  /* Votos de lo que `pred` reconoce en unos puestos de ese archivo. */
+  function votosCamara(cam, codes, pred) {
+    const propiosIdx = new Set((cam?.partidos || []).map((n, i) => pred(n) ? i : -1).filter(i => i >= 0));
+    let propios = 0, total = 0;
+    (codes || []).forEach(c => (cam?.puestos?.[c] || []).forEach(([i, n]) => { total += n; if (propiosIdx.has(i)) propios += n; }));
+    return { propios, total };
+  }
   /* `listas` es el voto SOLO POR LA LISTA (el logo), que no tiene candidato y
      va indexado por partido. Sin él, una lista cerrada vale cero: el Pacto
      Histórico sacó 376.644 votos en el Concejo de Bogotá 2023 y todos fueron
      así, de modo que el mapa de la izquierda bogotana salía vacío. */
   function votosFamilia(v, cands, partidos, familia, listas) {
-    const PB = global.PartidosBloques, fam = setFamilia(familia); let propios = 0, total = 0;
+    const es = esDe(familia); let propios = 0, total = 0;
     const sumar = (nombre, n) => {
       if (!nombre) return;
-      total += n; if (fam.has(PB?.bloqueDeOrganizacion?.(nombre) || 'sc')) propios += n;
+      total += n; if (es(nombre)) propios += n;
     };
     (v || []).forEach(([ci, n]) => sumar(partidos?.[cands?.[ci]?.[1]]?.[0], n));
     (listas || []).forEach(([pi, n]) => sumar(partidos?.[pi]?.[0], n));
     return { propios, total };
   }
   function votosFamiliaPartidos(partidos, familia) {
-    const PB = global.PartidosBloques, fam = setFamilia(familia); let propios = 0, total = 0;
-    (partidos || []).forEach(([nombre, n]) => { total += Number(n) || 0; if (fam.has(PB?.bloqueDeOrganizacion?.(nombre) || 'sc')) propios += Number(n) || 0; });
+    const es = esDe(familia); let propios = 0, total = 0;
+    (partidos || []).forEach(([nombre, n]) => { total += Number(n) || 0; if (es(nombre)) propios += Number(n) || 0; });
     return { propios, total };
   }
   /* Cuánto rinde cada perfil para una familia: el peso del perfil donde la
@@ -367,5 +407,5 @@
     return codigo === undefined ? '' : String(codigo);
   }
 
-  global.C360Electorado = { perfil, ideologia, objetivo, puestos, censoEdad, sexoEdad, censo2026, cambioCenso, BANDAS_EDAD, GRUPOS_EDAD, agruparEdad, PERFILES, perfiles, VECINAS, votosFamilia, votosFamiliaPartidos, shares, suma6, CIUDADES, ciudadDe, rotar90, json, codigoPuesto, municipioMayoritario, urlCandidatura, mesasDe, codigoMunicipio, ZONA_ESPECIAL };
+  global.C360Electorado = { perfil, ideologia, objetivo, puestos, censoEdad, sexoEdad, censo2026, cambioCenso, BANDAS_EDAD, GRUPOS_EDAD, agruparEdad, PERFILES, perfiles, VECINAS, votosFamilia, votosFamiliaPartidos, calzaPartido, camaraPuestos, votosCamara, shares, suma6, CIUDADES, ciudadDe, rotar90, json, codigoPuesto, municipioMayoritario, urlCandidatura, mesasDe, codigoMunicipio, ZONA_ESPECIAL };
 })(window);

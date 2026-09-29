@@ -4741,7 +4741,7 @@ async function pintarContendientes() {
   const card = $('crmContendientes'), K = window.C360Contendientes; if (!card || !K) return;
   const turno = ++CONT_TURNO;
   $('crmContTitulo').textContent = 'Buscando a sus rivales probables…';
-  $('crmContDato').textContent = '…'; $('crmContSub').textContent = 'leyendo el registro'; $('crmContPlano').innerHTML = '';
+  $('crmContDato').textContent = '…'; $('crmContSub').textContent = 'leyendo el registro'; $('crmContPlano').innerHTML = ''; $('crmContRevision').textContent = '';
   try {
     const campana = CAMPANA_ACTUAL || SESSION.vinculo?.campana || {};
     const corp = currentTargetTerritory()?.corporation || campana.corp || corporacionHistorica(crmCandidate);
@@ -4762,6 +4762,17 @@ async function pintarContendientes() {
     $('crmContPlano').innerHTML = K.planoSVG(L, { ancho: 520, alto: 300, etiquetas: 3, vitrina: CRM_VITRINA });
     $('crmContDato').textContent = N(r.enIndice);
     $('crmContSub').textContent = `presión alta ${N(r.niveles.alta)} · media ${N(r.niveles.media)} · baja ${N(r.niveles.baja)}`;
+    /* La revisión mensual de prensa del territorio (fase 5). En vitrina no se
+       pide: es parte de lo que se cobra, y sin acceso el worker no la da. */
+    const t = K.terrKey(L.corp || corp, alcance);
+    if (!CRM_VITRINA && t) {
+      const rv = await apiC360(`/c360/contendientes?t=${encodeURIComponent(t)}`).catch(() => null);
+      if (turno !== CONT_TURNO) return;
+      const info = K.integrarRevision(L, rv && rv.ok ? rv.data.version : null);
+      $('crmContRevision').textContent = info.revisado
+        ? `Revisado el ${K.fechaLarga(info.revisado)} · próxima revisión: ${K.fechaLarga(info.proxima)}. ${info.linea}`
+        : `Revisión mensual de prensa: la primera es el ${K.fechaLarga(info.proxima)}.`;
+    }
   } catch (e) {
     if (turno !== CONT_TURNO) return;
     /* Una falla de red no es «no hay registro»: se dice distinto. */
