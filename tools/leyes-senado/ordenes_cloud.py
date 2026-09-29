@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Feed autónomo de próximas órdenes del día para AWS Lambda.
 
-Consulta únicamente los índices livianos de Cámara y Senado; no descarga ni
-procesa PDFs. Por eso cabe holgadamente en Lambda y no necesita el caché del
-pipeline del Mac. Publica el mismo ``ordenes-vigentes.json`` que consume
-``legislativo.html``.
+Consulta los índices de Cámara y Senado y lee los PDF oficiales de las agendas
+vigentes. Publica el mismo ``ordenes-vigentes.json`` que consume
+``legislativo.html``, enriquecido con los proyectos que aparecen en cada orden.
 """
 import datetime as dt
 import html
+import io
 import json
 import re
 import unicodedata
@@ -42,11 +42,24 @@ SEN_SCOPE = {'comision-cuarta': 'Comisión Cuarta',
 MESES = {'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5,
          'junio': 6, 'julio': 7, 'agosto': 8, 'septiembre': 9,
          'setiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12}
+PROJECT_RE = re.compile(
+    r'Proyecto\s+de\s+(Ley|Acto\s+Legislativo)(?:\s+Org[aá]nica)?'
+    r'[^0-9“\"]{0,45}(\d{1,4})\s+de\s+(2\s?0\s?\d\s?\d)'
+    r'(?:\s+(C[aá]mara|Senado))?.{0,180}?[“\"](.+?)[”\"]', re.I | re.S)
 
 
 def _plain(value):
     value = html.unescape(re.sub(r'<[^>]+>', ' ', str(value or '')))
     return re.sub(r'\s+', ' ', value).strip()
+
+
+def _pdf_plain(value):
+    """Limpia separaciones espurias observadas en fuentes embebidas de Cámara."""
+    value = _plain(value)
+    for bad, good in (('modifi ca', 'modifica'), ('pro cesos', 'procesos'),
+                      ('otra s', 'otras')):
+        value = value.replace(bad, good)
+    return value
 
 
 def _fold(value):
@@ -88,6 +101,65 @@ def _fecha(title, published=''):
     return ''
 
 
+def _fecha_fin(title, inicio):
+    """Fin inclusivo de una agenda semanal; para una sesión normal es inicio."""
+    text = _fold(title)
+    month_pat = '|'.join(MESES)
+    found = []
+    for day, month, year in re.findall(
+            r'\b(\d{1,2})\s+(?:de\s+)?(' + month_pat +
+            r')(?:\s+(?:de\s+)?)?(20\d{2})\b', text):
+        try:
+            found.append(dt.date(int(year), MESES[month], int(day)).isoformat())
+        except ValueError:
+            pass
+    return max(found) if found else inicio
+
+
+def _pdf_projects(url):
+    """Extrae los proyectos debatibles del PDF, sin incluir el anuncio futuro."""
+    if not url:
+        return []
+    blob = http(url, timeout=45, binary=True, retries=2)
+    if not blob or len(blob) > 20_000_000:
+        return []
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(blob), strict=False)
+        text = '\n'.join((page.extract_text() or '') for page in reader.pages[:12])
+    except Exception:
+        return []
+    # En comisiones el anuncio de la próxima sesión suele estar al final. En
+    # plenaria aparece antes de los proyectos del día, así que solo se recorta
+    # cuando queda después de la primera cita real.
+    first = PROJECT_RE.search(text)
+    if first:
+        # «Anuncio de proyecto: 16 septiembre» es un dato de cada proyecto
+        # (Senado Quinta), no la sección: con los dos puntos no se corta.
+        for marker in re.finditer(r'anuncio\s+de\s+proyectos?\b(?!\s*:)', text, re.I):
+            if marker.start() > first.start():
+                text = text[:marker.start()]
+                break
+    out, seen = [], set()
+    for match in PROJECT_RE.finditer(text):
+        kind, number, year, chamber, title = match.groups()
+        year = re.sub(r'\s+', '', year)
+        key = f'{int(number):03d}-{year}-{("AL" if "acto" in _fold(kind) else "PL")}'
+        if key in seen:
+            continue
+        seen.add(key)
+        title = _pdf_plain(title).strip(' “”.')
+        if len(title) < 12:
+            continue
+        out.append({'numero': f'{int(number):03d} de {year}' + (f' {chamber}' if chamber else ''),
+                    'titulo': title})
+    return out
+
+
+def _en_ventana(fecha, fecha_fin, desde, hasta):
+    return bool(fecha and fecha <= hasta and (fecha_fin or fecha) >= desde)
+
+
 def _pdf_from_wp(event):
     body = ((event.get('content') or {}).get('rendered') or '')
     urls = re.findall(r'(?:href|src)=["\']([^"\']+\.pdf[^"\']*)', body, re.I)
@@ -108,12 +180,15 @@ def _camara_scope(name, term, desde, hasta):
         title = _plain((event.get('title') or {}).get('rendered'))
         fecha = _fecha(title, (event.get('date') or '')[:10])
         url = _pdf_from_wp(event)
-        if fecha and desde <= fecha <= hasta and url:
+        fecha_fin = _fecha_fin(title, fecha)
+        if _en_ventana(fecha, fecha_fin, desde, hasta) and url:
+            projects = _pdf_projects(url)
             rows.append({'id': f"cam-{event.get('id')}", 'fecha': fecha,
+                         'fecha_fin': fecha_fin,
                          'publicado': (event.get('date') or '')[:10],
                          'corporacion': 'Cámara', 'ambito': CAM_NICE[name],
                          'titulo': title, 'url': url,
-                         'proyectos': [], 'n_proyectos': 0})
+                         'proyectos': projects, 'n_proyectos': len(projects)})
     return name, rows
 
 
@@ -127,8 +202,10 @@ def _sen_scope(doc):
 
 
 def _senado(desde, hasta):
-    raw = http(f'{SEN_DOCS}?format=json&view=documents&limit=100&offset=0',
-               timeout=45, retries=2)
+    # Sin orden explícito el índice devuelve documentos de 2019 y ninguna
+    # orden vigente entra, sin error: hay que pedirlo del más nuevo al más viejo.
+    raw = http(f'{SEN_DOCS}?format=json&view=documents&limit=100&offset=0'
+               '&sort=created_on&direction=desc', timeout=45, retries=2)
     docs = (json.loads(raw).get('entities') or [])
     rows = []
     for doc in docs:
@@ -138,12 +215,15 @@ def _senado(desde, hasta):
             continue
         fecha = _fecha(title, (doc.get('publish_date') or '')[:10])
         url = (((doc.get('links') or {}).get('file') or {}).get('href') or '').replace('http://', 'https://')
-        if fecha and desde <= fecha <= hasta and url:
+        fecha_fin = _fecha_fin(title, fecha)
+        if _en_ventana(fecha, fecha_fin, desde, hasta) and url:
+            projects = _pdf_projects(url)
             rows.append({'id': f"sen-{doc.get('id')}", 'fecha': fecha,
+                         'fecha_fin': fecha_fin,
                          'publicado': (doc.get('publish_date') or '')[:10],
                          'corporacion': 'Senado', 'ambito': ambito,
                          'titulo': title, 'url': url,
-                         'proyectos': [], 'n_proyectos': 0})
+                         'proyectos': projects, 'n_proyectos': len(projects)})
     return rows
 
 
@@ -158,12 +238,15 @@ def _senado_plenaria(desde, hasta):
             continue
         fecha = _fecha(title, (doc.get('publish_date') or '')[:10])
         url = (((doc.get('links') or {}).get('file') or {}).get('href') or '').replace('http://', 'https://')
-        if fecha and desde <= fecha <= hasta and url:
+        fecha_fin = _fecha_fin(title, fecha)
+        if _en_ventana(fecha, fecha_fin, desde, hasta) and url:
+            projects = _pdf_projects(url)
             rows.append({'id': f"sen-{doc.get('id')}", 'fecha': fecha,
+                         'fecha_fin': fecha_fin,
                          'publicado': (doc.get('publish_date') or '')[:10],
                          'corporacion': 'Senado', 'ambito': 'Plenaria de Senado',
                          'titulo': title, 'url': url,
-                         'proyectos': [], 'n_proyectos': 0})
+                         'proyectos': projects, 'n_proyectos': len(projects)})
     return rows
 
 
@@ -196,7 +279,7 @@ def build_ordenes(upload=True):
     best = {}
     for row in rows:
         key = (row['corporacion'], row['ambito'], row['fecha'])
-        if key not in best or row['publicado'] > best[key]['publicado']:
+        if key not in best or (row['publicado'], row['n_proyectos']) > (best[key]['publicado'], best[key]['n_proyectos']):
             best[key] = row
     rows = sorted(best.values(), key=lambda x: (x['fecha'], x['corporacion'], x['ambito']))
     result = {'v': now.isoformat(), 'desde': desde, 'hasta': hasta, 'n': len(rows),

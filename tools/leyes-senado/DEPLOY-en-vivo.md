@@ -8,8 +8,9 @@ proyectos de ley radicados en Senado + Cámara (legislatura 2026-2027).
 - **Handler:** `leyes_en_vivo.handler`
 - **Salida:** `s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/en-vivo.json`
   + PDFs en `…/legislativo/en-vivo/{senado,camara}/{NUMERO}.pdf`
-- **Segunda salida:** `ordenes-vigentes.json`, construida sin PDFs ni caché
-  local por `ordenes_cloud.py` cuando la invocación lleva `job=ordenes`.
+- **Segunda salida:** `ordenes-vigentes.json`, construida por
+  `ordenes_cloud.py` cuando la invocación lleva `job=ordenes`. Lee los PDF
+  vigentes con `pypdf` para incluir los proyectos de cada orden del día.
 - **Frontend:** ya lee ese JSON (`EN_VIVO_URL` en `legislativo.html`).
 
 ## Fuentes
