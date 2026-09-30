@@ -7,7 +7,6 @@
 <title>Jornada de cumpleaños · Ricardo</title>
 <meta property="og:title" content="Te convoco · sábado 3 de octubre, 7:30 p.m.">
 <meta property="og:description" content="Cena en casa para celebrar mi cumpleaños. Inscríbete y te llega la invitación.">
-<link rel="stylesheet" href="assets/candidato-360/candi/candi-saludo.css?v=3">
 <style>
 /* Acta electoral de fiesta: noche azul navy, tarjetón de papel, sello rosado, dorado de confeti. */
 @font-face{font-family:'HN';src:url(fonts/helveticaneue.woff2) format('woff2');font-weight:400}
@@ -36,9 +35,9 @@ h1 em{font-style:normal;color:var(--oro)}
 .dato{border:1px solid #ffffff26;border-radius:999px;padding:9px 16px;font-size:15px;background:#ffffff0a}
 .dato span{color:#9fb3de;margin-right:6px;font:11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase}
 .escenario{position:relative;min-height:330px}
-.escenario .candi-stage{position:absolute;inset:0;min-height:330px}
-.escenario .candi-sprite{width:300px;height:300px;right:0}
-.globo{position:absolute;right:170px;top:6px;background:var(--papel);color:var(--tinta);border-radius:18px 18px 4px 18px;padding:12px 16px;font-size:15px;max-width:230px;box-shadow:0 10px 30px #0006;opacity:0;transform:translateY(8px);transition:.4s}
+.luna-stage{position:absolute;inset:0;min-height:330px;overflow:hidden}
+.luna-sprite{position:absolute;bottom:0;right:10px;width:320px;height:320px;background-repeat:no-repeat;will-change:transform;pointer-events:none}
+.globo{position:absolute;right:250px;top:16px;background:var(--papel);color:var(--tinta);border-radius:18px 18px 4px 18px;padding:12px 16px;font-size:15px;max-width:230px;box-shadow:0 10px 30px #0006;opacity:0;transform:translateY(8px);transition:.4s}
 .globo.on{opacity:1;transform:none}
 .cuenta{display:flex;gap:18px;margin-top:26px;font-variant-numeric:tabular-nums}
 .cuenta div{text-align:left}
@@ -103,10 +102,10 @@ footer{margin-top:48px;text-align:center;font:12px/1.6 var(--mono);letter-spacin
 @media (max-width:820px){
   .hero,.grid{grid-template-columns:1fr}
   .hero{gap:0;margin-top:22px}
-  .escenario{min-height:200px;margin-top:4px}
-  .escenario .candi-stage{min-height:200px}
-  .escenario .candi-sprite{width:200px;height:200px;right:0}
-  .globo{right:auto;left:0;top:28px;max-width:52%;font-size:14px}
+  .escenario{min-height:220px;margin-top:4px}
+  .luna-stage{min-height:220px}
+  .luna-sprite{width:220px;height:220px;right:0}
+  .globo{right:auto;left:0;top:28px;max-width:50%;font-size:14px}
   .grid{margin-top:16px}
   .datos{gap:8px}.dato{padding:7px 13px;font-size:14px}
   .cuenta{margin-top:18px}
@@ -135,7 +134,7 @@ footer{margin-top:48px;text-align:center;font:12px/1.6 var(--mono);letter-spacin
       </div>
     </div>
     <div class="escenario">
-      <div id="luna" class="candi-stage" aria-label="Luna, la perrita de Ricardo"></div>
+      <div id="luna" class="luna-stage" aria-label="Luna, la perrita de Ricardo"></div>
       <div class="globo" id="globo">Hola, soy Luna. Hoy soy la jurado de votación.</div>
     </div>
   </section>
@@ -223,7 +222,7 @@ footer{margin-top:48px;text-align:center;font:12px/1.6 var(--mono);letter-spacin
   <footer>Cena en casa · Bogotá · 3 de octubre de 2026<br><a href="https://wa.me/573243036767?text=Ricardo%2C%20sobre%20la%20cena%20del%20s%C3%A1bado%3A%20" target="_blank" rel="noopener" style="color:var(--oro)">¿No puedes ir o tienes una duda? Escríbeme por WhatsApp</a></footer>
 </div>
 
-<script src="assets/candidato-360/candi/candi-atletica.js?v=4"></script>
+<script src="assets/cumple-2026/luna/luna-cumple.js?v=1"></script>
 <script>
 (() => {
   const API = 'https://rr-auth.reruizc.workers.dev';
@@ -237,11 +236,13 @@ footer{margin-top:48px;text-align:center;font:12px/1.6 var(--mono);letter-spacin
 
   // ── Luna ───────────────────────────────────────────────────────────
   let luna = null;
-  try { luna = new CandiAtletica($('#luna')); luna.play().catch(()=>{}); } catch {}
+  try { luna = new LunaCumple($('#luna')); luna.llegar().catch(()=>{}); window.LUNA = luna; } catch {}
   const globo = $('#globo');
   const decir = (txt, ms=5200) => { globo.textContent = txt; globo.classList.add('on'); clearTimeout(decir.t); decir.t = setTimeout(()=>globo.classList.remove('on'), ms); };
-  if (luna) $('#luna').addEventListener('candi:state', e => { if (e.detail.state === 'sit_down') decir('Hola, soy Luna. Hoy soy la jurado de votación.'); });
-  setTimeout(()=>{ if (!globo.classList.contains('on')) decir('Hola, soy Luna. Hoy soy la jurado de votación.'); }, 3600);
+  let saludo = false;
+  const saludar = () => { if (saludo) return; saludo = true; decir('Hola, soy Luna. Hoy soy la jurado de votación.'); };
+  if (luna) $('#luna').addEventListener('luna:state', e => { if (e.detail.state === 'saluda') saludar(); });
+  setTimeout(saludar, 4200);
 
   // Boletines de Luna: comenta lo que dice el escrutinio real, uno cada ~11 s.
   let ultimo = null, bi = 0;
@@ -359,7 +360,7 @@ footer{margin-top:48px;text-align:center;font:12px/1.6 var(--mono);letter-spacin
       try { await navigator.clipboard.writeText(txt); $('#copiar').textContent = 'copiada'; } catch { $('#copiar').textContent = txt; }
     };
     guardar('inscrito', '1');
-    try { luna && luna.play({from:0}); } catch {}
+    try { luna && luna.celebrar(); } catch {}
     decir('¡Voto registrado! Te espero en la puerta.', 6000);
     lluvia(260);
   }
