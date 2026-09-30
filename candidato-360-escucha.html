@@ -322,8 +322,11 @@
   let PREFS = null;
   const limpiaPrefs = p => ({ redes: (p?.redes || []).filter(r => PREF_REDES.some(x => x[0] === r)), medios: (p?.medios || []).filter(m => ['tradicionales', 'alternativos', 'causa', 'territorio', 'nacional'].includes(m)) });
   function prefsGuardadas() {
+    /* Solo cuenta como respondido si trae medios: el paso 2 de la candidatura
+       nueva guarda las redes que declaró (sin medios) y con eso el cuestionario
+       tiene que seguir saliendo, con esas redes ya marcadas (`prefsDelAlta`). */
     const v = P.SESION.vinculo?.escucha?.preferencias;
-    if (v && (v.redes?.length || v.medios?.length)) return limpiaPrefs(v);
+    if (v && v.medios?.length) return limpiaPrefs(v);
     try { const l = JSON.parse(localStorage.getItem(PREFS_KEY()) || 'null'); if (l) return limpiaPrefs(l); } catch {}
     return null;
   }
@@ -341,9 +344,10 @@
   const tipos = () => ['tradicionales', 'alternativos'].filter(quiere);
   const pasaTipo = medio => { const ts = tipos(); if (!ts.length || ts.length === 2) return true; const tm = P.tipoMedio(medio); return tm === 'otro' || (ts[0] === 'tradicionales' ? tm === 'tradicional' : tm === 'alternativo'); };
 
+  function prefsDelAlta() { const v = P.SESION.vinculo?.escucha?.preferencias; return v?.redes?.length ? limpiaPrefs(v) : null; }
   function chip(id, nombre, detalle, on) { return `<button type="button" class="pref-chip" data-pref="${esc(id)}" aria-pressed="${on ? 'true' : 'false'}"><i></i><b>${esc(nombre)}</b><small>${esc(detalle)}</small></button>`; }
   function pintarCuestionario() {
-    const t = P.territorioDe(), p = PREFS || { redes: [], medios: [] };
+    const t = P.territorioDe(), p = PREFS || prefsDelAlta() || { redes: [], medios: [] };
     $('prefRedes').innerHTML = PREF_REDES.map(([id, n, d]) => chip(id, n, d, p.redes.includes(id))).join('');
     $('prefMedios').innerHTML = prefMedios(t).map(([id, n, d]) => chip(id, n, d, p.medios.includes(id))).join('');
     const estado = () => {

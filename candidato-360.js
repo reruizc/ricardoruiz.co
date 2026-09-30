@@ -77,10 +77,33 @@ const canonical = value => String(value || '').normalize('NFD').replace(/[\u0300
 function nombreLocalidad(raw) { return String(raw || '').replace(/^\d{2}(?=\S)/, '').replace(/\s+/g, ' ').trim().replace(/^LOCALIDAD\s*\d+\s+/i, ''); }
 /* Para casar con el nombre del polígono: "COMUNA 14 EL POBLADO" → "EL POBLADO". */
 function cortoLocal(raw) { return nombreLocalidad(raw).replace(/^(COMUNA|COM|CORREGIMIENTO|CORREG\.?|CORRE\.?)\s*\d*\s*/i, '').trim(); }
+/* ¿Es el mismo municipio escrito por el DANE y por la Registraduría?
+   «SANTIAGODECALI»/«CALI» y «CARTAGENADEINDIAS»/«CARTAGENA» sí;
+   «CALIMA»/«CALI» no, aunque empiece igual. «CALIMADARIEN»/«CALIMA» sí: la
+   Registraduría a veces agrega el nombre viejo entre paréntesis. */
+function mismoMunicipio(a, b) {
+  if (a === b) return true;
+  const [largo, corto] = a.length >= b.length ? [a, b] : [b, a];
+  return largo.endsWith(corto) || largo.startsWith(corto + 'DE') || largo === corto + 'DC' || (largo.startsWith(corto) && a.length < b.length);
+}
 async function localidadesDe(depNombre, munNombre) {
   const rows = await comunasCSV();
-  const dep = canonical(depNombre), mun = canonical(munNombre);
-  return [...new Set(rows.filter(r => canonical(r[5]) === dep && canonical(r[6]) === mun).map(r => nombreLocalidad(r[10])).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+  const dep = canonical(depNombre), pedido = canonical(munNombre);
+  /* El formulario escribe el municipio como el mapa del DANE («SANTIAGO DE
+     CALI», «CARTAGENA DE INDIAS», «SAN JOSÉ DE CÚCUTA») y COMUNAS_DATA como la
+     Registraduría («CALI»…): sin este puente la JAL de esas ciudades salía sin
+     una sola comuna. Solo si no hay nombre exacto, y por inicio o final —con
+     «contiene», CALIMA pasaría por CALI—; gana el nombre más largo. */
+  /* Y el departamento viene recortado («VALLE», «NORTE DE SAN»): exacto si
+     existe, si no por inicio. */
+  const deps = new Set(rows.map(r => canonical(r[5])));
+  const depCsv = deps.has(dep) ? dep : [...deps].filter(d => d.length > 3 && dep.startsWith(d)).sort((a, b) => b.length - a.length)[0] || dep;
+  const delDepto = rows.filter(r => canonical(r[5]) === depCsv);
+  let mun = pedido;
+  if (!delDepto.some(r => canonical(r[6]) === pedido)) {
+    mun = [...new Set(delDepto.map(r => canonical(r[6])))].filter(m => m.length > 3 && mismoMunicipio(pedido, m)).sort((a, b) => b.length - a.length)[0] || pedido;
+  }
+  return [...new Set(delDepto.filter(r => canonical(r[6]) === mun).map(r => nombreLocalidad(r[10])).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
 }
 
 /* ─── 2. Pantallas y modales ─────────────────────────────────────────────── */
@@ -999,8 +1022,13 @@ function ocultarMapaDepto(id = 'mapaDepto') { $(id)?.classList.add('hidden'); }
 /* Redibujar 125 municipios cada vez que cambia el desplegable sería tirar el
    trabajo hecho: el lienzo recuerda qué capa tiene puesta (`data-capa`) y, si
    es la misma, solo cambia de sitio la luz. */
-async function pintarMapaDepto({ id = 'mapaDepto', codigo = '', nombre = '', municipio = '', select = '' } = {}) {
+async function pintarMapaDepto({ id = 'mapaDepto', codigo = '', nombre = '', municipio = '', select = '', selectDepto = '', local = null } = {}) {
   const caja = $(id), lienzo = $(id + 'Lienzo'); if (!caja || !lienzo) return;
+  /* Tercer escalón: la JAL se elige por comuna o localidad, así que con el
+     municipio ya contestado el mapa baja a la ciudad (si hay cartografía) y
+     las localidades se tocan igual que los municipios. Sin capa de ciudad se
+     queda en el municipio encendido, que es lo que había. */
+  if (codigo && municipio && local && await pintarMapaCiudad({ id, caja, lienzo, nombre, municipio, local })) return 1;
   try {
     const capa = codigo || 'pais';
     if (lienzo.dataset.capa !== capa) {
@@ -1014,6 +1042,7 @@ async function pintarMapaDepto({ id = 'mapaDepto', codigo = '', nombre = '', mun
       lienzo.dataset.capa = capa;
     }
     lienzo.dataset.select = select;
+    lienzo.dataset.selectDepto = codigo ? '' : selectDepto;
     /* Con departamento pero sin municipio se enciende el departamento entero:
        la silueta ES la respuesta a la pregunta que ya se contestó. */
     const objetivo = normalizedText(codigo ? municipio : nombre), todo = Boolean(codigo) && !municipio;
@@ -1024,40 +1053,111 @@ async function pintarMapaDepto({ id = 'mapaDepto', codigo = '', nombre = '', mun
       if (suyo) encendidos++;
     });
     const partes = lienzo.querySelectorAll('path').length;
-    const pista = codigo && !municipio && partes > 1 ? 'Toque su municipio' : '';
+    const pista = codigo && !municipio && partes > 1 ? 'Toque su municipio' : !codigo && selectDepto && !nombre ? 'Toque su departamento' : '';
     /* Bogotá es distrito y departamento: «BOGOTÁ, D.C. · Bogotá D.C.» sobra. */
     const repetido = normalizedText(municipio) === normalizedText(nombre);
     $(id + 'Pie').innerHTML = escHtml(municipio && !repetido ? `${NOMBRE_BONITO(municipio)} · ${nombre}` : (nombre || 'Elija el departamento')) + (pista ? `<small>${pista}</small>` : '');
     caja.classList.toggle('sin-elegir', !nombre);
     caja.classList.toggle('es-municipal', Boolean(codigo) && Boolean(select));
+    caja.classList.toggle('es-pais', !codigo && Boolean(selectDepto));
+    caja.classList.remove('es-local');
     caja.classList.remove('hidden');
     return encendidos;
   } catch (e) {
     /* Si la capa municipal no está, el mapa no desaparece: vuelve al de
        Colombia con el departamento encendido, que es lo que había antes. */
-    if (codigo) { lienzo.dataset.capa = ''; return pintarMapaDepto({ id, nombre, select: '' }); }
+    if (codigo) { lienzo.dataset.capa = ''; return pintarMapaDepto({ id, nombre, select: '', selectDepto }); }
     ocultarMapaDepto(id);
   }
+}
+/* ¿La opción del desplegable (COMUNAS_DATA: «COMUNA 14 EL POBLADO»,
+   «TEUSAQUILLO», «LOCALIDAD NO.4 NORTE CENTRO HI») es este polígono?
+   Manda el NOMBRE cuando los dos lados lo traen: el número no es confiable
+   entre fuentes (en Barranquilla la «localidad No. 4» de la Registraduría no
+   es el polígono 4). Solo si a uno le falta nombre («COMUNA 1» contra
+   «Comuna 1») se cruza por número, y ahí un corregimiento nunca casa con una
+   comuna: Ibagué, Manizales o Villavicencio numeran los dos del 1 en adelante. */
+const baseLocal = t => normalizedText(String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+  .replace(/\b(COMUNAS?|COM|CORREGIMIENTOS?|CORREG|CORR|COR|LOCALIDAD|LOC|NO|AREA|DE|DEL|LA|EL|LOS|LAS)\b\.?/g, ' ').replace(/\d+/g, ' '));
+const esCorregimiento = t => /^\s*(\d+\s*)?(CORR|COR\.|CORREG)/i.test(String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+function casaLocal(config, props, opcion) {
+  if (!opcion) return false;
+  if (config.casaLocalidad) return config.casaLocalidad(props, opcion);
+  const nombre = config.name(props), a = baseLocal(opcion), b = baseLocal(nombre);
+  /* Prefijo y no «contiene»: «ORIENTAL» cabe dentro de «NORORIENTAL» y son
+     comunas distintas de Bucaramanga; la Registraduría sí trunca por el final
+     («NORTE CENTRO HI» por «Norte - Centro Histórico»). */
+  if (a && b) return a === b || (a.length > 3 && b.length > 3 && (a.startsWith(b) || b.startsWith(a)));
+  if (esCorregimiento(opcion) !== esCorregimiento(nombre)) return false;
+  const codigo = String(config.code(props) || ''), nOpt = numeroDe(opcion), nCod = /^\d+$/.test(codigo) ? codigo.padStart(2, '0') : numeroDe(nombre);
+  return Boolean(nOpt && nCod) && nOpt === nCod;
+}
+async function pintarMapaCiudad({ id, caja, lienzo, nombre, municipio, local }) {
+  const config = cityLayerFor(municipio, { jal: true }); if (!config) return false;
+  /* cityLayerFor casa por «contiene» y CALIMA contiene CALI: acá se exige que
+     el nombre empiece o termine en la ciudad (mismo cuidado que el CRM). */
+  const mun = normalizedText(municipio);
+  if (!config.match.some(c => mismoMunicipio(mun, c))) return false;
+  try {
+    const capa = `ciudad:${config.path}`;
+    if (lienzo.dataset.capa !== capa) {
+      let geo = await fetchJSON(`${S3}/mapas-2026/Ciudades-COM-LOC/${config.path}`);
+      if (config.rotate) geo = rotateGeoJSON90Left(geo);
+      const { proy, ancho: W, alto: H } = proyectarMapa(geo, 300);
+      const partes = (geo.features || []).map((f, i) => {
+        const etiqueta = String(config.name(f.properties || {}) || '');
+        return `<path d="${caminoDeGeometria(f.geometry, proy)}" data-i="${i}" class="local"><title>${escHtml(NOMBRE_BONITO(etiqueta))}</title></path>`;
+      }).join('');
+      lienzo.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${escHtml(`Mapa de ${NOMBRE_BONITO(municipio)} por ${config.title === 'localidad' ? 'localidades' : 'comunas'}`)}">${partes}</svg>`;
+      lienzo._geo = geo; lienzo._config = config;
+      lienzo.dataset.capa = capa;
+    }
+    lienzo.dataset.select = local.select; lienzo.dataset.selectDepto = '';
+    const valor = $(local.select)?.value || '';
+    let encendidos = 0;
+    lienzo.querySelectorAll('path.local').forEach(path => {
+      const suyo = casaLocal(config, lienzo._geo.features[Number(path.dataset.i)]?.properties || {}, valor);
+      path.classList.toggle('depto-elegido', suyo);
+      if (suyo) encendidos++;
+    });
+    const unidad = config.title === 'localidad' ? 'localidad' : 'comuna';
+    const ciudad = normalizedText(municipio) === normalizedText(nombre) ? NOMBRE_BONITO(municipio) : `${NOMBRE_BONITO(municipio)} · ${nombre}`;
+    $(id + 'Pie').innerHTML = escHtml(valor ? `${NOMBRE_BONITO(cortoLocal(valor) || valor)} · ${NOMBRE_BONITO(municipio)}` : ciudad) + (valor ? '' : `<small>Toque su ${unidad}</small>`);
+    caja.classList.remove('sin-elegir', 'es-municipal', 'es-pais');
+    caja.classList.add('es-local');
+    caja.classList.remove('hidden');
+    return true;
+  } catch (e) { lienzo.dataset.capa = ''; return false; }
 }
 /* El mapa de la tarjeta del lugar y el del wizard preguntan lo mismo en dos
    formularios distintos: cada uno sabe de dónde leer su territorio. */
 function mapaDeptoRuta() {
-  const sel = $('campaignDepartment'), municipal = CORP_MUNICIPAL.includes($('otherCorporation').value);
+  const sel = $('campaignDepartment'), corp = $('otherCorporation').value, municipal = CORP_MUNICIPAL.includes(corp);
+  const municipio = municipal ? ($('campaignMunicipality')?.value || '') : '';
   return pintarMapaDepto({ id: 'mapaDepto', codigo: sel?.value || '', nombre: nombreDepartamentoElegido(),
-    municipio: municipal ? ($('campaignMunicipality')?.value || '') : '', select: municipal ? 'campaignMunicipality' : '' });
+    municipio, select: municipal ? 'campaignMunicipality' : '', selectDepto: 'campaignDepartment',
+    local: corp === 'jal' && municipio ? { select: 'campaignLocality' } : null });
 }
+/* El wizard de candidatura nueva sigue la misma escalera que la ruta con
+   historial: Colombia apagada → departamento → municipio → (JAL) localidad. */
 function mapaDeptoNuevo() {
-  const sel = $('department'); if (!sel?.value) return ocultarMapaDepto('mapaDeptoNuevo');
-  const municipal = MUNICIPAL_ELECTIONS.includes($('election').value);
-  return pintarMapaDepto({ id: 'mapaDeptoNuevo', codigo: sel.value, nombre: sel.options[sel.selectedIndex]?.text || '',
-    municipio: municipal ? ($('municipality')?.value || '') : '', select: municipal ? 'municipality' : '' });
+  const sel = $('department'), election = $('election').value, municipal = MUNICIPAL_ELECTIONS.includes(election);
+  const municipio = sel?.value && municipal ? ($('municipality')?.value || '') : '';
+  return pintarMapaDepto({ id: 'mapaDeptoNuevo', codigo: sel?.value || '', nombre: sel?.value ? (sel.options[sel.selectedIndex]?.text || '') : '',
+    municipio, select: municipal ? 'municipality' : '', selectDepto: 'department',
+    local: election === 'jal' && municipio ? { select: 'locality' } : null });
 }
 /* Tocar un municipio en el mapa es responder el desplegable: el mapa no es un
    adorno al lado de la pregunta, es la otra manera de contestarla. */
 document.addEventListener('click', evento => {
-  const path = evento.target.closest?.('.mapa-depto.es-municipal .muni'); if (!path) return;
-  const select = $(path.closest('.mapa-depto-lienzo')?.dataset.select || ''); if (!select) return;
-  const opcion = [...select.options].find(o => o.value && normalizedText(o.value) === normalizedText(path.dataset.parte));
+  const path = evento.target.closest?.('.mapa-depto.es-municipal .muni, .mapa-depto.es-pais .depto, .mapa-depto.es-local .local'); if (!path) return;
+  const lienzo = path.closest('.mapa-depto-lienzo'); if (!lienzo) return;
+  const esDepto = path.classList.contains('depto'), esLocal = path.classList.contains('local');
+  const select = $(esDepto ? lienzo.dataset.selectDepto || '' : lienzo.dataset.select || ''); if (!select) return;
+  /* Departamento: el polígono trae el nombre y el desplegable el código. */
+  const opcion = esDepto ? [...select.options].find(o => o.value && o.value === DEP_CODES[path.dataset.parte])
+    : esLocal ? [...select.options].find(o => o.value && casaLocal(lienzo._config, lienzo._geo?.features[Number(path.dataset.i)]?.properties || {}, o.value))
+    : [...select.options].find(o => o.value && normalizedText(o.value) === normalizedText(path.dataset.parte));
   if (!opcion || select.value === opcion.value) return;
   select.value = opcion.value;
   select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1435,186 +1535,80 @@ async function loadMunicipalities() {
   const municipios = await cargarMunicipios($('municipality'), dep, dep);
   /* Al fijarlo por código no hay evento `change`: la localidad se pide a mano. */
   if (municipioImplicito($('municipality'), $('municipalityField'), $('municipalityNota'), municipios)) updateLocality();
+  else mapaDeptoNuevo();   /* el mapa baja al departamento cuando ya están sus municipios */
 }
 async function loadLocalities() { await cargarLocalidades($('locality'), $('localityStatus'), $('department').options[$('department').selectedIndex].text, $('municipality').value); }
 function updateTerritory() {
-  const election = $('election').value, municipal = MUNICIPAL_ELECTIONS.includes(election);
-  mapaDeptoNuevo();
+  const election = $('election').value, municipal = MUNICIPAL_ELECTIONS.includes(election), dep = $('department').value;
   pintarEstadoPartido({ input: 'party', estado: 'partyStatus', departamento: () => $('department').value });
-  $('municipalityField').classList.toggle('hidden', !municipal); $('localityField').classList.toggle('hidden', election !== 'jal');
+  /* Misma regla que la ruta con historial: sin departamento no hay municipio
+     que ofrecer, y sin municipio no hay localidad. */
+  $('municipalityField').classList.toggle('hidden', !municipal || !dep); $('localityField').classList.add('hidden');
   if (!municipal) $('municipalityNota').classList.add('hidden');
   $('municipality').required = municipal; $('locality').required = election === 'jal';
-  if (municipal && $('department').value) loadMunicipalities(); else $('municipality').innerHTML = '<option value="">Primero seleccione departamento</option>';
-  if (election !== 'jal') $('locality').innerHTML = '<option value="">Primero seleccione municipio</option>';
+  $('locality').innerHTML = '<option value="">Primero seleccione municipio</option>';
+  if (municipal && dep) { $('municipality').innerHTML = '<option value="">Cargando municipios…</option>'; loadMunicipalities(); }
+  else $('municipality').innerHTML = '<option value="">Primero seleccione departamento</option>';
+  mapaDeptoNuevo();
 }
-function updateLocality() { mapaDeptoNuevo(); if ($('election').value === 'jal' && $('municipality').value) loadLocalities(); }
+function updateLocality() {
+  const jal = $('election').value === 'jal', hay = Boolean($('municipality').value);
+  $('localityField').classList.toggle('hidden', !jal || !hay);
+  mapaDeptoNuevo();
+  if (jal && hay) loadLocalities();
+}
 function togglePublicName() { $('publicNameField').classList.toggle('hidden', !$('publicFigure').checked); $('publicName').required = $('publicFigure').checked; }
-/* ─── 7 bis. Identidad pública: redes sociales y su validación ───────────────
-   Hasta acá el paso 2 preguntaba un mote y seguía de largo: la escucha de la
-   candidatura se armaba sobre un texto que nadie comprobó. Ahora la persona
-   marca en qué redes está, escribe el usuario y ANTES de construir el punto de
-   partida se valida: el worker (POST /c360/redes) sondea cada red por su
-   fuente pública y le pide a DeepSeek un veredicto SOBRE ESA EVIDENCIA.
-
-   Dos reglas del producto viven acá:
-   · La llave de DeepSeek no puede estar en el navegador — este repo es
-     público. Por eso el sondeo y el modelo viven en el worker (rr-auth ·
-     src/c360-redes.js). Contrato: tools/candidato-360/redes/README.md.
-   · Validar nunca bloquea. Si la red no deja comprobar (las tres bloquean
-     tráfico de servidor de a ratos) o el endpoint todavía no está desplegado,
-     el wizard sigue y la candidatura queda marcada «sin validar». Un candidato
-     no se puede quedar por fuera de su propia campaña porque X no contestó. */
+/* ─── 7 bis. Identidad pública: ¿tiene redes? ─────────────────────────────
+   El paso 2 pedía marcar cada red, escribir el usuario y validarlo antes de
+   seguir. Era demasiado para la segunda pregunta de alguien que apenas está
+   conociendo la plataforma (decisión de Ricardo, sep-30-2026): ahora solo se
+   pregunta SI tiene redes y, si dice que sí, CUÁLES. El usuario exacto de cada
+   cuenta —y su validación contra la red— se piden después, en el panel de
+   escucha social, que ya tiene ese flujo completo.
+   Lo marcado viaja como `escucha.preferencias.redes` del vínculo: así el panel
+   de escucha abre con esas redes ya marcadas en su cuestionario. */
 const REDES_DEFS = [
-  { key: 'x', nombre: 'X', detalle: 'antes Twitter', ph: '@usuario' },
-  { key: 'tiktok', nombre: 'TikTok', detalle: 'video corto', ph: '@usuario' },
-  { key: 'instagram', nombre: 'Instagram', detalle: 'perfil público', ph: 'usuario' }
+  { key: 'facebook', nombre: 'Facebook', detalle: 'página o perfil' },
+  { key: 'x', nombre: 'X', detalle: 'antes Twitter' },
+  { key: 'instagram', nombre: 'Instagram', detalle: 'perfil público' },
+  { key: 'tiktok', nombre: 'TikTok', detalle: 'video corto' }
 ];
-const VEREDICTOS = {
-  confirmado: { etiqueta: 'Confirmado', clase: 'ok' },
-  probable: { etiqueta: 'Probable', clase: 'ok' },
-  dudoso: { etiqueta: 'Dudoso', clase: 'warn' },
-  no_encontrado: { etiqueta: 'Sin cuenta', clase: 'bad' },
-  no_verificable: { etiqueta: 'Sin comprobar', clase: 'warn' }
-};
-let REDES_VALIDACION = null;   /* respuesta del worker + la firma que la produjo */
-let redesCargando = false, redesOmitir = false;
-
-/* El usuario pega la URL completa tan seguido como escribe el @. Misma
-   normalización que el worker, para que la firma del cache coincida. */
-function limpiarHandle(valor) {
-  return String(valor || '').trim()
-    .replace(/^https?:\/\//i, '').replace(/^www\./i, '')
-    .replace(/^(x|twitter|tiktok|instagram)\.com\//i, '')
-    .split(/[?#]/)[0].split('/')[0].replace(/^@+/, '').trim();
-}
+const nombreRed = key => (REDES_DEFS.find(d => d.key === key) || {}).nombre || key;
+let TIENE_REDES = '';   /* '' sin responder · 'si' · 'no' */
 function montarRedes() {
   const grid = $('redesGrid'); if (!grid) return;
-  grid.innerHTML = REDES_DEFS.map(r => `<div class="red-row" data-red="${r.key}">
-    <button type="button" class="red-chip" onclick="toggleRed('${r.key}')" aria-pressed="false"><i></i><b>${escHtml(r.nombre)}</b><small>${escHtml(r.detalle)}</small></button>
-    <input class="red-handle" id="red-${r.key}" placeholder="${escHtml(r.ph)}" autocomplete="off" disabled oninput="redesTocadas()">
-  </div>`).join('');
-  pintarEstadoRedes();
+  grid.innerHTML = REDES_DEFS.map(r => `<button type="button" class="red-chip" data-red="${r.key}" aria-pressed="false" onclick="toggleRed('${r.key}')"><i></i><b>${escHtml(r.nombre)}</b><small>${escHtml(r.detalle)}</small></button>`).join('');
+}
+function tieneRedes(valor) {
+  const antes = TIENE_REDES; TIENE_REDES = valor;
+  document.querySelectorAll('.redes-opcion').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tiene === valor)));
+  $('redesCuales').classList.toggle('hidden', valor !== 'si');
+  if (valor !== 'si') document.querySelectorAll('#redesGrid .red-chip').forEach(b => b.setAttribute('aria-pressed', 'false'));
+  /* Candi explica para qué sirven en el momento en que importa: cuando dice
+     que sí. Una sola vez por respuesta, no a cada clic. */
+  if (valor === 'si' && antes !== 'si') window.Candi?.decir?.('¡Buenísimo! Tus redes nos sirven para tres cosas: afinar tu huella, mejorar el cálculo electoral y montar la escucha social. Por ahora solo marca en cuáles estás; el usuario exacto de cada cuenta te lo pido más adelante.');
 }
 function toggleRed(key) {
-  const row = document.querySelector(`.red-row[data-red="${key}"]`); if (!row) return;
-  const activa = row.classList.toggle('on');
-  row.querySelector('.red-chip').setAttribute('aria-pressed', String(activa));
-  const input = row.querySelector('.red-handle');
-  input.disabled = !activa;
-  if (activa) input.focus({ preventScroll: true }); else input.value = '';
-  redesTocadas();
+  const b = document.querySelector(`#redesGrid .red-chip[data-red="${key}"]`); if (!b) return;
+  b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
 }
 function redesElegidas() {
-  return REDES_DEFS.map(r => ({ red: r.key, handle: limpiarHandle($(`red-${r.key}`)?.value) }))
-    .filter(r => document.querySelector(`.red-row[data-red="${r.red}"]`)?.classList.contains('on') && r.handle);
+  return TIENE_REDES === 'si' ? [...document.querySelectorAll('#redesGrid .red-chip[aria-pressed="true"]')].map(b => b.dataset.red) : [];
 }
-function firmaRedes() {
-  const n = ($('newName')?.value || '').trim().toLowerCase();
-  return `${n}|${($('publicName')?.value || '').trim().toLowerCase()}|` + redesElegidas().map(r => `${r.red}:${r.handle.toLowerCase()}`).join(',');
+/* El paso no se puede saltar sin contestar, y «sí» sin marcar ninguna es una
+   respuesta a medias. */
+function redesRespondidas() {
+  if (!TIENE_REDES) { const c = document.querySelector('.redes-si-no'); c?.classList.add('shake'); setTimeout(() => c?.classList.remove('shake'), 500); return false; }
+  if (TIENE_REDES === 'si' && !redesElegidas().length) { const g = $('redesGrid'); g?.classList.add('shake'); setTimeout(() => g?.classList.remove('shake'), 500); return false; }
+  return true;
 }
-/* Editar un usuario después de validar invalida el veredicto: si no, la
-   candidatura se guardaría con el sello de una cuenta que ya no es la escrita. */
-function redesTocadas() {
-  if (REDES_VALIDACION && REDES_VALIDACION.firma !== firmaRedes()) { REDES_VALIDACION = null; redesOmitir = false; $('redesResultado').classList.add('hidden'); }
-  pintarEstadoRedes();
-}
-function pintarEstadoRedes() {
-  const est = $('redesEstado'), btn = $('redesBuscar'); if (!est || !btn) return;
-  const n = redesElegidas().length;
-  btn.disabled = redesCargando || !n;
-  btn.textContent = redesCargando ? 'Buscando…' : (REDES_VALIDACION ? 'Volver a validar' : 'Buscar y validar');
-  est.className = 'redes-estado' + (REDES_VALIDACION ? ' ok' : '');
-  est.textContent = redesCargando ? 'Consultando cada red y leyendo señales abiertas…'
-    : REDES_VALIDACION ? `Validado · ${REDES_VALIDACION.perfiles.length} ${REDES_VALIDACION.perfiles.length === 1 ? 'perfil' : 'perfiles'}`
-    : n ? `${n} ${n === 1 ? 'red marcada' : 'redes marcadas'} · sin validar` : 'Marque una red y escriba su usuario';
-}
-async function validarRedes() {
-  const redes = redesElegidas(); if (!redes.length) return;
-  const nombre = ($('newName')?.value || '').trim();
-  if (nombre.length < 3) { $('newName')?.focus(); return avisoRedes('Escriba primero su nombre completo: sin él no hay con qué comparar el perfil.'); }
-  /* El usuario que se valida es el limpio: si pegó la URL, la casilla queda
-     con el @ que de verdad se va a guardar. */
-  redes.forEach(r => { const input = $(`red-${r.red}`); if (input && input.value !== r.handle) input.value = r.handle; });
-  const firma = firmaRedes();
-  redesCargando = true; pintarEstadoRedes();
-  $('redesResultado').classList.remove('hidden');
-  $('redesResultado').innerHTML = `<div class="redes-cargando"><i></i><span>Buscando @${escHtml(redes.map(r => r.handle).join(', @'))} en ${redes.length === 1 ? 'su red' : 'sus redes'} y cruzando con la prensa abierta…</span></div>`;
-  const dep = $('department'), territorio = [$('locality')?.value, $('municipality')?.value, dep?.options[dep.selectedIndex]?.text].filter(Boolean).join(' · ');
-  let r;
-  try {
-    r = await apiC360('/c360/redes', { method: 'POST', body: JSON.stringify({ nombre, alias: ($('publicName')?.value || '').trim(), corp: CRM_CORPORATIONS[$('election')?.value] || '', territorio, redes }) });
-  } catch (e) { r = { status: 0, ok: false, data: {} }; }
-  redesCargando = false;
-  if (!r.ok || !Array.isArray(r.data?.perfiles)) return pintarFalloRedes(r);
-  REDES_VALIDACION = Object.assign({}, r.data, { firma });
-  redesOmitir = false;
-  pintarValidacionRedes(REDES_VALIDACION);
-  pintarEstadoRedes();
-}
-/* El error se dice tal cual es. Un 404 acá no es «no encontramos su perfil»:
-   es que la ruta del worker todavía no existe, y confundir las dos cosas hace
-   que el candidato borre un usuario que estaba bien escrito. */
-function pintarFalloRedes(r) {
-  /* El worker manda un `detalle` en español para casi todo (nombre corto, sin
-     redes válidas, cuota del día, el modelo caído): se prefiere ese antes que
-     una frase nuestra que puede estar diciendo otra cosa. */
-  const motivo = r.status === 404 ? 'El buscador de redes todavía no está publicado en el servidor (falta la ruta <code>/c360/redes</code>).'
-    : r.status === 401 ? 'Su sesión venció. Vuelva a entrar y repita la validación.'
-    : r.status === 403 ? 'Su cuenta no tiene acceso a la validación de redes.'
-    : r.data?.detalle ? escHtml(String(r.data.detalle))
-    : r.status === 502 ? 'El modelo no contestó a tiempo. Vuelva a intentar en un minuto.'
-    : r.status === 0 ? 'No hubo conexión con el servidor.'
-    : `El servidor respondió ${escHtml(String(r.status))}${r.data?.error ? ` (${escHtml(String(r.data.error))})` : ''}.`;
-  $('redesResultado').innerHTML = `<div class="redes-fallo"><b>No se pudo validar.</b><p>${motivo}</p><p class="redes-fallo-salida">Puede seguir: la candidatura queda marcada <b>sin validar</b> y las redes se guardan tal como las escribió.</p></div>`;
-  redesOmitir = true;
-  pintarEstadoRedes();
-}
-function avisoRedes(texto) {
-  $('redesResultado').classList.remove('hidden');
-  $('redesResultado').innerHTML = `<div class="redes-fallo"><p>${escHtml(texto)}</p></div>`;
-}
-function pintarValidacionRedes(d) {
-  const fichas = d.perfiles.map(p => {
-    const v = VEREDICTOS[p.veredicto] || VEREDICTOS.no_verificable, def = REDES_DEFS.find(x => x.key === p.red) || { nombre: p.red };
-    const datos = [p.nombre_perfil ? `perfil a nombre de <b>${escHtml(p.nombre_perfil)}</b>` : '', p.seguidores != null ? `${escHtml(String(p.seguidores))} seguidores` : '', p.verificada ? 'cuenta verificada por la plataforma' : '', p.fuente === 'apify' ? 'comprobado vía Apify' : ''].filter(Boolean).join(' · ');
-    return `<div class="red-ficha ${v.clase}">
-      <div class="red-ficha-top"><b>${escHtml(def.nombre)}</b><a href="${escHtml(p.url)}" target="_blank" rel="noopener">@${escHtml(p.handle)}</a><span class="red-sello">${v.etiqueta}${p.confianza ? ` · ${p.confianza}%` : ''}</span></div>
-      ${datos ? `<p class="red-ficha-datos">${datos}</p>` : ''}
-      <p class="red-ficha-motivo">${escHtml(p.motivo || '')}</p></div>`;
-  }).join('');
-  const alertas = (d.alertas || []).length ? `<ul class="redes-alertas">${d.alertas.map(a => `<li>${escHtml(a)}</li>`).join('')}</ul>` : '';
-  const homonimo = d.riesgo_homonimo ? `<p class="redes-homonimo"><b>Cuidado con el homónimo:</b> ${escHtml(d.riesgo_homonimo)}</p>` : '';
-  const prensa = (d.titulares || []).length ? `<details class="redes-prensa"><summary>${d.titulares.length} titulares abiertos con ese nombre</summary><ul>${d.titulares.map(t => `<li><a href="${escHtml(t.link)}" target="_blank" rel="noopener">${escHtml(t.titulo)}</a>${t.medio ? ` · ${escHtml(t.medio)}` : ''}</li>`).join('')}</ul></details>` : '';
-  $('redesResultado').classList.remove('hidden');
-  $('redesResultado').innerHTML = `${d.resumen ? `<p class="redes-resumen">${escHtml(d.resumen)}</p>` : ''}${fichas}${homonimo}${alertas}${prensa}<p class="redes-pie">${escHtml(d.modelo || 'DeepSeek')} leyó lo que respondió cada red${d.cache_hit ? ' (respuesta guardada de una consulta reciente)' : ''}. Si algún veredicto no cuadra, corrija el usuario y vuelva a validar.</p>`;
-}
-/* Lo que se guarda en el vínculo: los usuarios y el sello con el que salieron.
-   Sin validación se guarda igual, pero marcado — el briefing necesita saber si
-   puede confiar en el perfil antes de escuchar en su nombre. */
-/* Una frase para el CRM: qué identidad quedó lista para escuchar. */
-function textoRedesCRM(redes) {
-  if (!redes || !redes.perfiles?.length) return '';
-  const buenos = redes.perfiles.filter(p => p.veredicto === 'confirmado' || p.veredicto === 'probable');
-  const lista = redes.perfiles.map(p => `@${p.handle} (${(REDES_DEFS.find(d => d.key === p.red) || {}).nombre || p.red})`).join(', ');
-  if (!redes.validado) return ` Escucharemos ${lista}: son las cuentas que usted escribió, todavía sin validar.`;
-  return buenos.length
-    ? ` Escucharemos ${buenos.map(p => `@${p.handle}`).join(', ')}: ${buenos.length === 1 ? 'la cuenta quedó validada' : 'las cuentas quedaron validadas'} contra la fuente pública de cada red.`
-    : ` Ninguna de las cuentas escritas (${lista}) pudo validarse; la escucha queda pendiente de confirmarlas.`;
-}
-function redesParaGuardar() {
-  const elegidas = redesElegidas();
-  if (!elegidas.length) return null;
-  const val = REDES_VALIDACION && REDES_VALIDACION.firma === firmaRedes() ? REDES_VALIDACION : null;
-  return {
-    validado: !!val,
-    validadoEn: val ? val.generado_en : null,
-    modelo: val ? val.modelo : null,
-    resumen: val ? val.resumen : '',
-    perfiles: elegidas.map(e => {
-      const p = val?.perfiles.find(x => x.red === e.red);
-      return { red: e.red, handle: e.handle, url: p?.url || `https://${e.red === 'x' ? 'x.com/' : e.red === 'tiktok' ? 'www.tiktok.com/@' : 'www.instagram.com/'}${e.handle}`, veredicto: p?.veredicto || 'sin_validar', confianza: p?.confianza || 0, nombrePerfil: p?.nombre_perfil || '' };
-    })
-  };
+/* Una frase para el CRM: qué redes declaró y qué falta. */
+function textoRedesCRM(n) {
+  const usa = n?.redesUsa || [];
+  if (n?.tieneRedes === 'no') return ' Todavía no tiene redes: la escucha social arranca con la prensa y las cuentas se suman cuando las abra.';
+  if (!usa.length) return '';
+  const lista = usa.map(nombreRed), texto = lista.length > 1 ? `${lista.slice(0, -1).join(', ')} y ${lista.at(-1)}` : lista[0];
+  return ` Está en ${texto}: el usuario de cada cuenta se pide en la escucha social.`;
 }
 
 /* Tres respuestas: un partido que existe, uno por constituir, o ninguno
@@ -1637,12 +1631,12 @@ function montarWizardNuevo() {
   Object.values(fields).forEach(f => f?.remove()); formGrid.remove(); originalSubmit.remove();
   const steps = [
     { title: '¿Cómo aparecerá en campaña?', copy: 'Empecemos por su nombre completo.', fields: [fields.name] },
-    { title: '¿Dónde puede encontrarlo la gente?', copy: 'Su nombre público y sus redes. Buscamos cada cuenta y la validamos antes de montar la escucha sobre ella.', fields: [fields.pub, fields.pubName, fields.redes], redes: true },
+    { title: '¿Dónde puede encontrarlo la gente?', copy: 'Su nombre público y si tiene redes sociales. Los usuarios de cada cuenta se los pedimos más adelante.', fields: [fields.pub, fields.pubName, fields.redes], redes: true },
     { title: '¿A qué corporación aspira?', copy: 'La corporación define el territorio y la lectura electoral que activaremos.', fields: [fields.election], cards: true },
     /* El mapa viaja con la pregunta del territorio: si se queda en la rejilla
        original lo borra el `formGrid.remove()` de abajo y el wizard pierde la
        confirmación que sí tiene la ruta. */
-    { title: '¿Dónde será la candidatura?', copy: 'Ubique el territorio en el que va a competir.', fields: [fields.department, fields.municipality, fields.locality, fields.mapa] },
+    { title: '¿Dónde será la candidatura?', copy: 'Ubique el territorio en el que va a competir.', fields: [fields.department, fields.municipality, fields.locality, fields.mapa], lugar: true },
     { title: '¿Con qué partido o movimiento?', copy: 'Puede vincular una organización existente o preparar una nueva.', fields: [fields.partyMode, fields.partyExisting, fields.partyNew, fields.partyEspectro] },
     { title: '¿Cuál es el primer objetivo?', copy: 'Con esto cerraremos su punto de partida.', fields: [fields.goal], final: true }
   ];
@@ -1651,7 +1645,14 @@ function montarWizardNuevo() {
   steps.forEach((def, index) => {
     const step = document.createElement('section'); step.className = `new-wizard-step${index === 0 ? ' active' : ''}`; step.dataset.step = index;
     step.innerHTML = `<div class="wizard-progress">${steps.map((_, p) => `<i class="${p <= index ? 'active' : ''}"></i>`).join('')}</div><h3>${def.title}</h3><p>${def.copy}</p>`;
-    def.fields.forEach(f => f && step.append(f));
+    if (def.lugar) {
+      /* Formulario y mapa lado a lado, como en la ruta con historial: el mapa
+         es la otra manera de contestar la misma pregunta. */
+      const grid = document.createElement('div'); grid.className = 'lugar-grid';
+      const campos = document.createElement('div'); campos.className = 'lugar-campos';
+      def.fields.filter(f => f && f !== fields.mapa).forEach(f => campos.append(f));
+      grid.append(campos); if (fields.mapa) grid.append(fields.mapa); step.append(grid);
+    } else def.fields.forEach(f => f && step.append(f));
     if (def.cards) { const picker = createCorporationPicker('Seleccione una corporación', '', key => { electionSelect.value = key; updateTerritory(); }); picker.id = 'newCorporationPicker'; step.append(picker); }
     const actions = document.createElement('div'); actions.className = 'wizard-actions';
     if (index) { const back = document.createElement('button'); back.type = 'button'; back.className = 'wizard-back'; back.textContent = '← Anterior'; back.addEventListener('click', () => showNewWizardStep(index - 1)); actions.append(back); }
@@ -1663,18 +1664,11 @@ function montarWizardNuevo() {
   function showNewWizardStep(index) {
     wizard.querySelectorAll('.new-wizard-step').forEach((s, p) => s.classList.toggle('active', p === index));
     const stepLabel = document.querySelector('#new .flow-top .step'); if (stepLabel) stepLabel.textContent = `Paso ${index + 1} de ${NEW_STEPS_TOTAL} · Candidatura nueva`;
+    if (steps[index].lugar) mapaDeptoNuevo();
   }
   function advanceNewWizard(index) {
     if (index === 2 && !electionSelect.value) { $('newCorporationPicker').classList.add('shake'); setTimeout(() => $('newCorporationPicker').classList.remove('shake'), 500); return; }
-    /* Identidad: si marcó redes y no las ha validado, se pide una vez. A la
-       segunda pasa igual — la validación informa, no es un peaje. */
-    if (steps[index].redes && redesElegidas().length && !redesOmitir && !(REDES_VALIDACION && REDES_VALIDACION.firma === firmaRedes())) {
-      redesOmitir = true;
-      $('redesResultado').classList.remove('hidden');
-      $('redesResultado').innerHTML = '<div class="redes-fallo"><b>Sus redes están sin validar.</b><p>Toque <b>Buscar y validar</b> para comprobar que esas cuentas son suyas. Si prefiere seguir, vuelva a tocar «Siguiente» y quedarán guardadas sin validar.</p></div>';
-      $('redesBuscar').classList.add('shake'); setTimeout(() => $('redesBuscar').classList.remove('shake'), 500);
-      return;
-    }
+    if (steps[index].redes && !redesRespondidas()) return;
     const required = steps[index].fields.flatMap(f => f ? [...f.querySelectorAll('input,select')] : []).filter(input => input.required && !input.closest('.hidden'));
     const invalid = required.find(input => !input.checkValidity()); if (invalid) { invalid.reportValidity(); return; }
     /* Sin partido, el espectro no es opcional: es con lo que se calcula todo. */
@@ -1691,7 +1685,7 @@ async function createNew(e) {
   const dep = $('department'), depNombre = dep.options[dep.selectedIndex]?.text || '';
   const modo = $('partyMode').value, indeciso = modo === 'indeciso';
   if (indeciso && !espectroNuevoVigente()) { window.showNewWizardStep?.(4); return; }
-  const nuevo = { nombre: $('newName').value.trim(), publico: $('publicFigure').checked, nombrePublico: $('publicName').value.trim(), partido: indeciso ? '' : modo === 'new' ? $('partyName').value.trim() : $('party').value, partidoNuevo: modo === 'new', objetivo: $('goal').value, redes: redesParaGuardar() };
+  const nuevo = { nombre: $('newName').value.trim(), publico: $('publicFigure').checked, nombrePublico: $('publicName').value.trim(), partido: indeciso ? '' : modo === 'new' ? $('partyName').value.trim() : $('party').value, partidoNuevo: modo === 'new', objetivo: $('goal').value, tieneRedes: TIENE_REDES, redesUsa: redesElegidas() };
   /* El partido va también en la campaña: es lo que /c360/campana sabe guardar
      cuando quien no se había decidido lo define desde el CRM. */
   const campana = { corp: $('election').value, ruta: 'other', avales: indeciso ? 'indeciso' : 'partido', espectro: indeciso ? espectroNuevoVigente() : '', partido: nuevo.partido, departamento: dep.value, departamentoNombre: depNombre, municipio: MUNICIPAL_ELECTIONS.includes($('election').value) ? $('municipality').value : '', localidad: $('election').value === 'jal' ? $('locality').value : '' };
@@ -1705,13 +1699,17 @@ async function createNew(e) {
     if (!r.ok) { if (r.existente) { alert(`Su cuenta ya está vinculada a ${vinculoDescripcion()}. Para cambiarla escriba a ${SESSION.soporte}.`); return abrirVinculo(); } if (r.sinAcceso) return abrirPaywall(); alert(`No se pudo guardar la candidatura: ${r.error}`); return; }
   }
   NUEVO = { ...nuevo, campana };
-  /* El vínculo solo guarda lo que su normalizador conoce; las redes tienen ruta
-     propia (/c360/escucha) porque las escriben también los paneles. */
-  if (nuevo.redes?.perfiles?.length && SESSION.vinculo && !SESSION.vinculo.local) {
-    const r = await apiC360('/c360/escucha', { method: 'POST', body: JSON.stringify({ redes: nuevo.redes }) });
-    if (r.ok && r.data?.vinculo) SESSION.vinculo = r.data.vinculo;
-  } else if (nuevo.redes?.perfiles?.length && SESSION.vinculo?.local) {
-    SESSION.vinculo.escucha = { redes: nuevo.redes };
+  /* El vínculo solo guarda lo que su normalizador conoce: las redes que
+     declaró van como preferencias de la escucha (/c360/escucha), que es donde
+     después se piden los usuarios. `medios` va vacío a propósito: esa pregunta
+     la hace el panel de escucha, y con él vacío el panel la sigue haciendo. */
+  if (nuevo.redesUsa.length) {
+    const preferencias = { redes: nuevo.redesUsa, medios: [] };
+    if (SESSION.vinculo?.local) { SESSION.vinculo.escucha = Object.assign({}, SESSION.vinculo.escucha || {}, { preferencias }); persistirVinculoLocal(); }
+    else if (SESSION.vinculo) {
+      const r = await apiC360('/c360/escucha', { method: 'POST', body: JSON.stringify({ preferencias }) }).catch(() => null);
+      if (r?.ok && r.data?.vinculo) SESSION.vinculo = r.data.vinculo;
+    }
   }
   abrirCRMNuevo();
 }
@@ -2284,7 +2282,7 @@ async function abrirCRMNuevo() {
   $('crmBack').textContent = '← Inicio'; $('crmBack').onclick = () => showScreen('intro');
   $('crmInitials').textContent = initials(n.nombre); $('crmName').textContent = n.nombre;
   $('crmTarget').textContent = `Candidatura 2027 · ${CRM_CORPORATIONS[c.corp]} · ${lugar}`;
-  $('crmContext').textContent = `Candidatura nueva${indeciso ? `, todavía sin partido: se lanza desde ${FAMILIA_CON_ARTICULO[c.espectro] || FAMILIA_CON_ARTICULO.sc}, y con esa familia se calcula todo mientras lo define` : partido ? ` con ${partido}${n.partidoNuevo ? ' (movimiento por constituir)' : ''}` : ''}. Sin historial propio, el punto de partida es el territorio: la referencia son los resultados de 2023 en ${lugar}.${n.objetivo ? ` Primer objetivo: ${n.objetivo.toLowerCase()}.` : ''}${textoRedesCRM(n.redes)}`;
+  $('crmContext').textContent = `Candidatura nueva${indeciso ? `, todavía sin partido: se lanza desde ${FAMILIA_CON_ARTICULO[c.espectro] || FAMILIA_CON_ARTICULO.sc}, y con esa familia se calcula todo mientras lo define` : partido ? ` con ${partido}${n.partidoNuevo ? ' (movimiento por constituir)' : ''}` : ''}. Sin historial propio, el punto de partida es el territorio: la referencia son los resultados de 2023 en ${lugar}.${n.objetivo ? ` Primer objetivo: ${n.objetivo.toLowerCase()}.` : ''}${textoRedesCRM(n)}`;
   {
     const bloqueN = partido ? PartidosBloques.bloqueDeCandidatura(partido, n.nombre || '') : (c.espectro || '');
     const identidad = partido ? window.C360Frases?.partido(partido) : '';
