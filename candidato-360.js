@@ -368,19 +368,26 @@ function resolverModoPruebas() {
    además en sessionStorage de la pestaña, porque los paneles (escucha,
    electorado) son otras páginas: al volver con «← CRM» (?abrir=1) la memoria
    ya no existe y, sin esta copia, el modo pruebas caía a la búsqueda en vez de
-   reabrir la candidatura que se estaba mirando. sessionStorage y no
-   localStorage: muere con la pestaña, que es lo que dura una prueba. */
+   reabrir la candidatura que se estaba mirando. Se guarda en sessionStorage
+   y en localStorage, y al leer manda localStorage (ver leerVinculoLocal). */
 const VINCULO_LOCAL_KEY = 'c360-vinculo-pruebas';
 function vinculoLocal(payload) { SESSION.vinculo = Object.assign({ local: true }, payload); persistirVinculoLocal(); }
 function persistirVinculoLocal() {
   if (!SESSION.vinculo?.local) return;
   /* También en localStorage: quien escribe la URL de un panel en otra pestaña
-     (lo normal al probar) no tiene el sessionStorage de esta. La de sesión
-     manda si existe; la local es el respaldo. */
+     (lo normal al probar) no tiene el sessionStorage de esta. Al leer manda
+     la de localStorage, que es siempre la última escrita. */
   try { const j = JSON.stringify(SESSION.vinculo); sessionStorage.setItem(VINCULO_LOCAL_KEY, j); localStorage.setItem(VINCULO_LOCAL_KEY, j); } catch {}
 }
+/* ⚠️ Manda la copia de localStorage, no la de la pestaña (sep-29-2026). Cada
+   apertura escribe en las dos, así que la de localStorage es SIEMPRE la más
+   reciente; la de sessionStorage puede ser vieja. Con la pestaña primero,
+   Nury creó su candidatura nueva a la Alcaldía de Cartagena y el panel de
+   arquetipos —abierto en una pestaña donde antes se probó a Fabio
+   Aristizábal— le seguía mostrando Medellín. Costo aceptado: quien pruebe
+   dos candidaturas a la vez en dos pestañas ve en los paneles la última. */
 function leerVinculoLocal() {
-  try { const v = JSON.parse(sessionStorage.getItem(VINCULO_LOCAL_KEY) || localStorage.getItem(VINCULO_LOCAL_KEY) || 'null'); return v && v.local && v.tipo ? v : null; } catch { return null; }
+  try { const v = JSON.parse(localStorage.getItem(VINCULO_LOCAL_KEY) || sessionStorage.getItem(VINCULO_LOCAL_KEY) || 'null'); return v && v.local && v.tipo ? v : null; } catch { return null; }
 }
 /* El vínculo real de la cuenta de administración estorba para probar: las
    páginas de medios y redes lo leen del servidor, no del modo pruebas. Esto

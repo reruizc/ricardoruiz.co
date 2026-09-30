@@ -306,8 +306,15 @@
      en el CRM; lo que se guarda (ideas, preferencias, cuentas) vuelve a esa
      copia, no al servidor. */
   const VINCULO_LOCAL_KEY = 'c360-vinculo-pruebas';
+  /* ⚠️ Manda la copia de localStorage, no la de la pestaña (sep-29-2026). Cada
+     apertura escribe en las dos, así que la de localStorage es SIEMPRE la más
+     reciente; la de sessionStorage puede ser vieja. Con la pestaña primero,
+     Nury creó su candidatura nueva a la Alcaldía de Cartagena y el panel de
+     arquetipos —abierto en una pestaña donde antes se probó a Fabio
+     Aristizábal— le seguía mostrando Medellín. Costo aceptado: quien pruebe
+     dos candidaturas a la vez en dos pestañas ve en los paneles la última. */
   function leerVinculoLocal() {
-    try { const v = JSON.parse(sessionStorage.getItem(VINCULO_LOCAL_KEY) || localStorage.getItem(VINCULO_LOCAL_KEY) || 'null'); return v && v.local && v.tipo ? v : null; } catch { return null; }
+    try { const v = JSON.parse(localStorage.getItem(VINCULO_LOCAL_KEY) || sessionStorage.getItem(VINCULO_LOCAL_KEY) || 'null'); return v && v.local && v.tipo ? v : null; } catch { return null; }
   }
   function persistirVinculoLocal() {
     if (!SESION.vinculo?.local) return;
