@@ -46,26 +46,31 @@
     intro: {
       titulo: 'Estás en la portada',
       texto: 'Acá se decide por dónde entrar: si ya fuiste candidato, buscamos tu historial electoral y lo conectamos con la campaña de 2027; si es tu primera candidatura, armamos el punto de partida desde el territorio.',
+      saludo: 'Un dato antes de escoger: aunque hayas sido candidato una sola vez, hace años o en otra corporación, entra por «ya me he lanzado». Con esa votación real el cálculo sale mucho más fino que partiendo de cero.',
       chips: ['¿Qué diferencia hay entre las dos rutas?', '¿Qué necesito para empezar?']
     },
     existing: {
       titulo: 'Búsqueda de tu historial',
       texto: 'Escribe tu nombre completo. Buscamos en todas las elecciones que tenemos cargadas —Congreso, asambleas, concejos, JAL, alcaldías y gobernaciones— y te mostramos cada candidatura con su votación. Si apareces varias veces, es la misma persona en años distintos.',
+      saludo: 'Escribe el nombre como quedó inscrito en la Registraduría, con los dos apellidos: así te separo de tus homónimos. Si tienes un nombre común, mira los votos y el municipio de cada resultado antes de escogerte.',
       chips: ['No me encuentro, ¿qué hago?', '¿Qué elecciones tienen cargadas?']
     },
     candidateRoute: {
       titulo: 'Tu campaña de 2027',
       texto: 'Acá defines a qué corporación te lanzas y dónde. Si cambias de corporación, el territorio cambia con ella: tu meta y tu mapa se recalculan con esa nueva escala, no con la de tu elección anterior.',
+      saludo: 'Si cambias de corporación, tu votación anterior no se pierde: la uso para ver dónde ya tienes gente, pero la meta la calculo con los resultados de 2023 del territorio nuevo. Y si todavía no tienes partido, escoge tu familia política: con eso alcanza para arrancar.',
       chips: ['¿Puedo cambiar de corporación?', '¿Qué pasa si todavía no tengo partido?']
     },
     new: {
       titulo: 'Candidatura nueva',
       texto: 'Sin historial propio, el punto de partida es el territorio: tomamos los resultados de 2023 en el lugar al que aspiras y sobre eso se calcula la meta. Puedes dejar el partido pendiente y elegir por ahora tu familia política.',
+      saludo: 'Son seis pasos cortos y nada es definitivo: el partido, el territorio y el objetivo se pueden cambiar después desde el CRM. Lo único que sí importa acertar es la corporación, porque de ahí sale la escala de todo lo demás.',
       chips: ['¿Por qué me piden las redes?', '¿Puedo seguir sin partido?']
     },
     crm: {
       titulo: 'Tu CRM de campaña',
       texto: 'Arriba, el mapa de dónde estuvo tu votación y la meta que necesitas. Abajo, los módulos: briefing cada tres días, escucha social, arquetipos del territorio, perfil del votante, endoso de aliados, el plan del día de la elección y tus contendientes.',
+      saludo: 'Este es tu tablero. Un orden que funciona: primero la meta y el mapa, para saber cuánto falta y dónde; después el electorado, para saber a quién hablarle; y ya con eso, el endoso y el día de la elección. El briefing enciéndelo hoy: llega solo, cada tres días.',
       chips: ['¿De dónde sale mi meta de votos?', '¿Qué hace el briefing?', '¿Para qué sirve el día de la elección?']
     }
   };
@@ -83,21 +88,25 @@
   VISTAS.arquetipos = {
     titulo: 'Los arquetipos de tu territorio',
     texto: 'Aquí ves qué mueve el voto en cada barrio donde están tus votos: el arquetipo que manda, cómo se reparte tu votación entre todos en 2023 y a dónde va en 2027, el mapa barrio por barrio y la ficha de cada arquetipo. Si todavía no tienes votos en la ciudad, lo que ves es la ciudad, no tú.',
+    saludo: 'Los arquetipos no son grupos de gente: son la emoción con la que un barrio decide el voto. Por eso el mismo barrio puede cambiar de arquetipo entre una elección y otra. Úsalos para decidir cómo hablar, no a quién.',
     chips: ['¿Qué es un arquetipo?', '¿Por qué 2027 es una simulación?', '¿Cómo le hablo al arquetipo que manda?']
   };
   VISTAS.diad = {
     titulo: 'El día de la elección',
     texto: 'Aquí decides cuántos testigos necesitas y en qué puestos. Si te lanzas a otra corporación, los puestos son los de ese territorio, ordenados por los votos de tu familia política en 2023. Mueve el control para ver cuánto cubres, y revisa los avisos: señal, internet y dónde se publica el E-14.',
+    saludo: 'La votación nunca se reparte pareja: unos pocos puestos juntan la mayor parte de los votos. Empieza por los que cubren el 70 % y mira cuántos de esos no tienen señal: ahí el testigo necesita un plan para reportar antes de que llegue el domingo.',
     chips: ['¿Por qué me salen tantos puestos?', '¿Qué hago con un puesto sin señal?', '¿Cómo descargo el plan?']
   };
   VISTAS.endoso = {
     titulo: 'Endoso de aliados',
     texto: 'Aquí sumas a quienes te van a apoyar: excandidatos, con su votación, y líderes sin candidatura propia, marcando en el mapa los puestos donde trabajan. Si me dices a quién apoyó cada uno antes, mido cuánto rindió esa persona donde ellos estaban. Solo cuentan los votos del territorio donde compites, y todo sale en rango: es un techo, no una promesa. Los nombres de tus líderes se quedan en tu navegador; no los guardamos en ningún servidor.',
+    saludo: 'Cuando sumes a alguien, fíjate en el rango y no en el número alto: un líder que sacó 2.000 votos hace ocho años no te trae 2.000 votos, y de esos, solo cuentan los del territorio donde compites. Lo útil es comparar aliados entre sí, no sumarlos a la meta.',
     chips: ['¿Por qué sale en rango?', '¿Cómo mides a un líder sin candidatura?', '¿Dónde queda el nombre de mis líderes?']
   };
   VISTAS.contendientes = {
     titulo: 'Tus contendientes',
     texto: 'Aquí ves contra quién compites. Son rivales probables, no inscritos: quien ganó la curul en 2023, quien compitió aquí con buena votación y quien tiene votos en tu territorio de otra elección. El plano cruza su familia política con cuánto rinde cada uno en los puestos donde tú sacas votos. Si vas en lista abierta, abajo está quién te compite dentro de tu propia lista. Al abrir la ficha de un rival ves sus titulares de los últimos seis meses, literales y con enlace. Cada mes revisamos la prensa de tu territorio: a quien nombran como aspirante lo sumamos después de que una persona lo revisa. Y si falta alguien, lo puedes agregar tú.',
+    saludo: 'Hasta que cierren las inscripciones, nadie es rival seguro: esto es un mapa de probables. El que más te quita votos no siempre es el que más votos tiene, sino el que los saca en tus mismos puestos. Y si vas en lista abierta, el rival de adentro pesa tanto como el de afuera.',
     chips: ['¿Qué quiere decir la afinidad?', '¿Por qué hay rivales en «no sabemos»?', '¿Cómo se calcula la presión?', '¿Cómo funciona la revisión mensual?']
   };
   const SIN_VISTA = { titulo: 'Candidato 360', texto: 'Te voy diciendo qué hace cada parte de la plataforma. Pregúntame por lo que estés mirando.', chips: [] };
@@ -147,6 +156,18 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
   let dock, panel, escena, launcher, globo, log, input, enviar, guia, chips, mascota = null;
   let abierto = false, entroYa = false, enVuelo = false, vistaPintada = '';
+  /* ─── La memoria de la sesión ──────────────────────────────────────────
+     Cada módulo es una página aparte, así que sin esto Candi entraba
+     caminando y decía «¡Hola! Soy Candi…» en cada clic del tablero (pedido de
+     Ricardo, 30-sep-2026). Ahora se presenta UNA vez por pestaña; en las demás
+     cargas ya está sentada y, si tiene algo que decir de esa pantalla, lo dice
+     una sola vez. sessionStorage y no localStorage a propósito: abrir la
+     plataforma otro día merece la entrada otra vez. */
+  const MEMORIA_KEY = 'candi-sesion-v1';
+  const memoria = (() => { try { return Object.assign({ presentada: false, dichas: [] }, JSON.parse(sessionStorage.getItem(MEMORIA_KEY) || '{}')); } catch { return { presentada: false, dichas: [] }; } })();
+  function recordar() { try { sessionStorage.setItem(MEMORIA_KEY, JSON.stringify(memoria)); } catch {} }
+  const yaDicha = v => memoria.dichas.includes(v);
+  function marcarDicha(v) { if (v && !yaDicha(v)) { memoria.dichas.push(v); recordar(); } }
   const historial = [];                                    /* {rol, texto} — se manda recortado */
 
   function montar() {
@@ -207,11 +228,30 @@
        Se observan las cinco pantallas y nada más: dentro del CRM, Leaflet
        cambia clases sin parar y un observador con subtree se dispararía
        miles de veces por sesión. */
-    const obsVista = new MutationObserver(() => { if (abierto) pintarGuia(); });
+    const obsVista = new MutationObserver(() => {
+      if (abierto) pintarGuia();
+      /* showScreen toca la clase de las cinco pantallas de una: un solo turno. */
+      if (!alCambiarVista._t) alCambiarVista._t = setTimeout(() => { alCambiarVista._t = 0; alCambiarVista(); }, 60);
+    });
     document.querySelectorAll('.screen').forEach(s => obsVista.observe(s, { attributes: true, attributeFilter: ['class'] }));
     window.addEventListener('pagehide', destruir, { once: true });
   }
 
+  /* Al cambiar de pantalla dentro de la misma página (portada → buscador →
+     ruta → CRM) Candi comenta la nueva, una vez por sesión. Volver a la
+     portada ya no la hace repetirse: si ya lo dijo, se queda callada. */
+  let vistaComentada = '';
+  function alCambiarVista() {
+    const v = contexto().vista;
+    if (v === vistaComentada) return;
+    vistaComentada = v;
+    if (!presentada || abierto || calculando) return;
+    const texto = VISTAS[v]?.saludo;
+    /* Un comentario de la pantalla anterior no se queda colgado sobre la nueva. */
+    if (!texto || yaDicha(v)) { if (!globo.hidden && globo.dataset.aviso !== 'calculo') ocultarGlobo(); return; }
+    marcarDicha(v);
+    decir(texto, 22000);
+  }
   function pintarGuia() {
     const v = contexto().vista;
     if (v === vistaPintada) return;
@@ -244,6 +284,18 @@
     if (entroYa) return; entroYa = true;
     if (typeof CandiAtletica !== 'function') { fallarAtlas('falta candi-atletica.js'); return mostrarGlobo(); }
     mascota = new CandiAtletica(escena);
+    escena.addEventListener('candi:state', e => { escena.dataset.estado = e.detail?.state || ''; });
+    escena.addEventListener('candi:reaction-complete', () => { escena.dataset.estado = 'idle_seated'; });
+    /* Ya se presentó en esta pestaña: aparece sentada y atenta, sin caminar.
+       `idle()` arranca en 4,8 s y no emite `candi:complete`, así que el
+       descanso y el globo se enganchan a mano. */
+    if (memoria.presentada) {
+      escena.dataset.estado = 'idle_seated';
+      mascota.idle().catch(e => fallarAtlas(e && e.message));
+      montarDescanso();
+      setTimeout(mostrarGlobo, 900);          /* que alcance a verse sentada antes de hablar */
+      return;
+    }
     /* Dos señales, y gana la primera. Con animación, `sit_down` (3,2 s) llega
        antes que `candi:complete` (4,8 s). Con MOVIMIENTO REDUCIDO el reproductor
        salta directo al reposo y emite `candi:complete` sin pasar nunca por
@@ -260,9 +312,7 @@
       mostrarGlobo();
     }
     escena.addEventListener('candi:state', alEstado);
-    escena.addEventListener('candi:state', e => { escena.dataset.estado = e.detail?.state || ''; });
     escena.addEventListener('candi:complete', () => { escena.dataset.estado = 'idle_seated'; });
-    escena.addEventListener('candi:reaction-complete', () => { escena.dataset.estado = 'idle_seated'; });
     escena.addEventListener('candi:complete', presentarse);
     escena.addEventListener('candi:complete', montarDescanso, { once: true });
     mascota.play().catch(e => { fallarAtlas(e && e.message); presentarse(); });
@@ -433,13 +483,24 @@
   }
   function mostrarGlobo() {
     presentada = true;
+    vistaComentada = contexto().vista;
     if (abierto || globo.dataset.visto === '1') { if (calculando) avisarCalculo(); return; }
-    const nombre = primerNombre();
-    /* Si la meta todavía se está calculando, el saludo lo dice de una vez: dos
-       globos seguidos se leerían como Candi hablando sola. */
-    globo.querySelector('#candiGloboTexto').textContent =
-      `${nombre ? `¡Hola, ${nombre}!` : '¡Hola!'} Soy Candi, tu estratega de campaña. ` +
-      (calculando ? avisoActual : (saludoDeVista() ? (saludoDicho = true, saludoDeVista()) : 'Pregúntame lo que quieras de la pantalla en la que estés.'));
+    const primera = !memoria.presentada;
+    const vista = saludoDeVista(), vistaId = contexto().vista;
+    let texto;
+    if (primera) {
+      const nombre = primerNombre();
+      /* Si la meta todavía se está calculando, el saludo lo dice de una vez: dos
+         globos seguidos se leerían como Candi hablando sola. */
+      texto = `${nombre ? `¡Hola, ${nombre}!` : '¡Hola!'} Soy Candi, tu estratega de campaña. ` +
+        (calculando ? avisoActual : (vista ? (saludoDicho = true, vista) : 'Pregúntame lo que quieras de la pantalla en la que estés.'));
+      memoria.presentada = true; if (vista && !calculando) marcarDicha(vistaId); recordar();
+    } else if (calculando) {
+      texto = avisoActual;
+    } else if (vista && !yaDicha(vistaId)) {
+      texto = vista; saludoDicho = true; marcarDicha(vistaId);
+    } else return;                            /* ya lo dijo: sentada y callada */
+    globo.querySelector('#candiGloboTexto').textContent = texto;
     globo.dataset.aviso = calculando ? 'calculo' : '';
     globo.hidden = false;
     if (calculando) pensarYa();
@@ -450,10 +511,10 @@
      (el electorado: por qué se describe a quien puede votar). Si la página
      arranca calculando, el saludo va DESPUÉS del aviso de cálculo, no se pierde. */
   let saludoDicho = false;
-  function saludoDeVista() { return VISTAS[document.body?.dataset?.candiVista || '']?.saludo || ''; }
+  function saludoDeVista() { return VISTAS[contexto().vista]?.saludo || ''; }
   function decirSaludoDeVista() {
-    if (saludoDicho || abierto || !saludoDeVista()) return false;
-    saludoDicho = true;
+    if (saludoDicho || abierto || !saludoDeVista() || yaDicha(contexto().vista)) return false;
+    saludoDicho = true; marcarDicha(contexto().vista);
     globo.querySelector('#candiGloboTexto').textContent = saludoDeVista();
     globo.dataset.aviso = ''; globo.dataset.visto = ''; globo.hidden = false;
     clearTimeout(mostrarGlobo._t);
