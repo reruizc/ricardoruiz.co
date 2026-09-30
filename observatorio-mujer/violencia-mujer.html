@@ -683,7 +683,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 
   <section class="module-hero">
     <div>
-      <div class="label">Policía Nacional · 2015–2024 · 8,8 millones de hechos</div>
+      <div class="label">Policía Nacional · 2015–ago 2026 · 10,4 millones de hechos</div>
       <h1>La violencia contra las mujeres,<br><em>municipio por municipio</em>.</h1>
     </div>
     <div>
@@ -699,7 +699,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
         </div>
         <div class="kpi">
           <div class="v" id="kpi-3">—</div>
-          <div class="l" id="kpi-3-l">Tasa 2024</div>
+          <div class="l" id="kpi-3-l">Tasa 2025</div>
         </div>
       </div>
     </div>
@@ -758,7 +758,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     <div class="grid-2">
       <div class="box">
         <div class="bt">Proporción de víctimas mujeres</div>
-        <div class="bs">2015–2024 · sobre hechos con sexo registrado</div>
+        <div class="bs">2015–2025 · sobre hechos con sexo registrado · 2026 aparte, contra el mismo tramo de 2025</div>
         <div id="brecha-bars"></div>
       </div>
       <div class="box">
@@ -950,7 +950,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 
   // ─── DATOS ────────────────────────────────────────────────────────
   // Bumpear al regenerar con tools/ponal/build_mujer.py
-  const DATA_V = '20260808';
+  const DATA_V = '20260930';
   const S3_OBS = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_observatorio_mujer';
   const S3_PON = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/ponal';
   // `?local=1` lee los JSON del repo en vez de S3 — sirve para verificar una
@@ -971,7 +971,12 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   // entre los primeros por tasa: si no se declara, un dato alto se lee como
   // ausente. Su cifra sí entra al ranking, que no depende del polígono.
   let SIN_POLIGONO = [];
-  const ANIOS_POB = [2018, 2019, 2020, 2021, 2022, 2023, 2024];
+  const ANIOS_POB = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026];
+  /* 2026 llega hasta agosto: no tiene tasa anual (ocho meses sobre la población
+     de un año entero parecería una caída) y no cierra ninguna tendencia. */
+  const esParcial = a => !!(META && META.anio_parcial && Number(a) === META.anio_parcial.anio);
+  const rotAnio = a => esParcial(a) ? `${a} · ${META.anio_parcial.etiqueta}` : String(a);
+  const ultCompleto = () => (META && META.anio_parcial) ? META.anio_parcial.ultimo_completo : NAC.anios[NAC.anios.length - 1];
 
   const STATE = { delito: 'violencia_intra', metric: 'tasa', anio: 'todos', dep: null, ciudad: null };
 
@@ -1020,7 +1025,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     // tasa: solo con población, que existe 2018-2024. En «todos» se usa el
     // último año disponible como denominador y se declara en la nota.
     if (!pobRec || !pobRec.f) return null;
-    const ip = todos ? ANIOS_POB.length - 1 : ANIOS_POB.indexOf(Number(STATE.anio));
+    const ip = todos ? ANIOS_POB.indexOf(ultCompleto()) : ANIOS_POB.indexOf(Number(STATE.anio));
     if (ip < 0) return null;
     const pob = pobRec.f[ip];
     if (!pob) return null;
@@ -1045,13 +1050,13 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     // Los años sin población (pre-2018) se apagan cuando la lectura es «tasa»:
     // dejarlos activos lleva a un mapa y un ranking vacíos, que es peor que no
     // ofrecer la opción. Con «casos» o «%» vuelven a estar disponibles.
-    const sinPob = a => STATE.metric === 'tasa' && Number(a) < ANIOS_POB[0];
+    const sinPob = a => STATE.metric === 'tasa' && (Number(a) < ANIOS_POB[0] || esParcial(a));
     const sa = document.getElementById('sel-anio');
     sa.innerHTML = `<button class="pill${STATE.anio === 'todos' ? ' active' : ''}" data-anio="todos">Todos</button>` +
       NAC.anios.map(a => {
         const off = sinPob(a);
         return `<button class="pill${String(STATE.anio) === String(a) ? ' active' : ''}${off ? ' off' : ''}"
-          data-anio="${a}"${off ? ' disabled title="Sin población municipal antes de 2018: no hay tasa"' : ''}>${a}</button>`;
+          data-anio="${a}"${off ? ` disabled title="${esParcial(a) ? '2026 va de enero a agosto: sin tasa anual' : 'Sin población municipal antes de 2018: no hay tasa'}"` : ''}>${rotAnio(a)}</button>`;
       }).join('');
   }
 
@@ -1064,7 +1069,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
       STATE.metric = b.dataset.metric;
       // al pasar a «tasa» desde un año sin población, mover a Todos en vez de
       // dejar la página en un estado que no puede dibujar nada
-      if (STATE.metric === 'tasa' && STATE.anio !== 'todos' && Number(STATE.anio) < ANIOS_POB[0]) {
+      if (STATE.metric === 'tasa' && STATE.anio !== 'todos' && (Number(STATE.anio) < ANIOS_POB[0] || esParcial(STATE.anio))) {
         STATE.anio = 'todos';
       }
     }
@@ -1293,18 +1298,31 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     document.getElementById('brecha-bars').innerHTML = barras(items);
 
     const d = NAC.delitos.violencia_intra;
-    const pct = d.f_anio.map((f, i) => {
+    /* la serie cierra en el último año COMPLETO; 2026 (ene-ago) va aparte,
+       contra el mismo tramo de 2025 */
+    const nU = NAC.anios.indexOf(ultCompleto()) + 1;
+    const pct = d.f_anio.slice(0, nU).map((f, i) => {
       const t = f + d.m_anio[i];
       return t ? 100 * f / t : null;
     });
-    linea('brecha-serie', pct, NAC.anios.map(a => String(a).slice(2)),
+    linea('brecha-serie', pct, NAC.anios.slice(0, nU).map(a => String(a).slice(2)),
       { zero: false, top: '% de víctimas que son mujeres' });
     const a0 = pct[0], a1 = pct[pct.length - 1];
-    const f0 = d.f_anio[0], f1 = d.f_anio[d.f_anio.length - 1];
+    const f0 = d.f_anio[0], f1 = d.f_anio[nU - 1];
+    let ytd = '';
+    if (META.anio_parcial && d.f_ytd) {
+      const iP = NAC.anios.indexOf(META.anio_parcial.anio);
+      const y0 = d.f_ytd[iP - 1], y1 = d.f_ytd[iP];
+      if (y0) {
+        const v = 100 * (y1 - y0) / y0;
+        ytd = ` <b>Enero a agosto de ${META.anio_parcial.anio}:</b> ${fmt(y1)} víctimas mujeres, ` +
+          `<span style="color:${v > 0 ? '#e0679a' : '#4ade80'}">${v > 0 ? '+' : ''}${fmt1(v)}%</span> frente al mismo tramo de ${META.anio_parcial.anio - 1} (${fmt(y0)}).`;
+      }
+    }
     document.getElementById('brecha-serie-note').innerHTML =
-      `De ${fmt1(a0)}% a ${fmt1(a1)}% de víctimas mujeres entre ${NAC.anios[0]} y ${NAC.anios[NAC.anios.length - 1]}. ` +
+      `De ${fmt1(a0)}% a ${fmt1(a1)}% de víctimas mujeres entre ${NAC.anios[0]} y ${ultCompleto()}. ` +
       `<b>Eso no es que baje la violencia contra ellas:</b> en cifras absolutas las víctimas mujeres pasaron de ` +
-      `${fmt(f0)} a ${fmt(f1)} al año. Sube todo; sube más el registro de hombres.`;
+      `${fmt(f0)} a ${fmt(f1)} al año. Sube todo; sube más el registro de hombres.` + ytd;
   }
 
   function pintarPerfil() {
@@ -1371,7 +1389,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     linea('fem-serie', f.serie, f.anios.map(a => String(a).slice(2)),
       { top: 'registros con artículo 104A' });
     document.getElementById('fem-serie-note').innerHTML =
-      `<b>2024 no tiene dato</b> —no está en cero—: el lote de ese año no trae el artículo penal en homicidios, así que no se puede saber cuántos se tipificaron.`;
+      `<b>2024, 2025 y 2026 no tienen dato</b> —no están en cero—: esos lotes no traen el artículo penal en homicidios, y la entrega SIEDCO de 2025-2026 tampoco trajo feminicidio como archivo aparte (se pidió; no llegó).`;
 
     document.getElementById('fem-deptos').innerHTML =
       barras(f.deptos.slice(0, 8).map(([, n, v]) => ({ n, v, t: fmt(v) })));
@@ -1425,11 +1443,12 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     document.getElementById('kpi-1-l').textContent = `Víctimas mujeres · ${dm.label.toLowerCase()}`;
     document.getElementById('kpi-2').innerHTML = `${fmt1(dm.pct_f)}<span class="of">%</span>`;
     document.getElementById('kpi-2-l').textContent = 'De las víctimas son mujeres';
-    const pn = POB.nacional_f[ANIOS_POB.length - 1];
-    const f24 = nd.f_anio[iAnio(2024)];
-    document.getElementById('kpi-3').textContent = dm.serie ? fmt1(100000 * f24 / pn) : '—';
+    const uc = ultCompleto();
+    const pn = POB.nacional_f[ANIOS_POB.indexOf(uc)];
+    const fUC = nd.f_anio[iAnio(uc)];
+    document.getElementById('kpi-3').textContent = dm.serie ? fmt1(100000 * fUC / pn) : '—';
     document.getElementById('kpi-3-l').textContent = dm.serie
-      ? 'Por 100.000 mujeres · 2024' : 'Sin serie por año';
+      ? `Por 100.000 mujeres · ${uc}` : 'Sin serie por año';
 
     // mapa
     const crumb = document.getElementById('crumb');
@@ -1453,7 +1472,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     const notas = [];
     if (STATE.metric === 'tasa') {
       notas.push(STATE.anio === 'todos'
-        ? 'La tasa acumulada 2015-2024 usa la población femenina de 2024 como denominador: sirve para comparar territorios entre sí, no para leerla como una tasa anual.'
+        ? `La tasa acumulada 2015-${META.anio_parcial ? 'ago ' + META.anio_parcial.anio : ultCompleto()} usa la población femenina de ${ultCompleto()} como denominador: sirve para comparar territorios entre sí, no para leerla como una tasa anual.`
         : (Number(STATE.anio) < 2018
           ? '⚠ No hay población municipal antes de 2018, así que este año no tiene tasa. Cambia a «Casos» o escoge 2018 en adelante.'
           : `Tasa sobre la población femenina proyectada por el DANE para ${STATE.anio}.`));

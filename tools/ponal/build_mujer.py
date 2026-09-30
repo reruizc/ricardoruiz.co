@@ -73,6 +73,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import csv
 
 from build_ponal import (  # noqa: E402  — fuente única de las constantes
+    ANIO_PARCIAL, MES_CORTE, DIC_BARRIO, clave_barrio,
     CANON, CIUDADES, CIUDADES_SOLO_BARRIO, BARRIO_NULO, DEPTOS,
     ANIOS, AIX, NA, MESES, DIAS, DIX, EDAD_LAB,
     VERTEDEROS, VERT_PESO, VERT_CAIDA, detectar_vertederos,
@@ -83,6 +84,7 @@ csv.field_size_limit(10 ** 9)
 
 RAIZ = Path(__file__).resolve().parents[2]
 SRC = RAIZ / "Bases de datos" / "PONAL" / "BD-PONAL-15-24.csv"
+SRC_2 = RAIZ / "Bases de datos" / "PONAL" / "BD-PONAL-25-26.csv"   # SIEDCO 2025 + 2026 ene-ago
 OUT = RAIZ / "Bases de datos" / "output_observatorio_mujer"
 
 # Delitos del módulo: los que tienen víctima-persona y el sexo lleno (≥97%).
@@ -141,26 +143,32 @@ def main():
         sys.exit(f"no encuentro {SRC}")
     OUT.mkdir(parents=True, exist_ok=True)
 
-    fh = SRC.open(encoding="utf-8-sig", newline="")
-    rd = csv.reader(fh, delimiter=";")
-    hdr = next(rd)
-    ix = {c: i for i, c in enumerate(hdr)}
-    ncol = len(hdr)
+    fuentes = [SRC] + ([SRC_2] if SRC_2.exists() else [])
     need = ["Nombre Delitos", "Cantidad", "Fecha", "Hora", "Día",
             "Hechos.CODIGO_DANE", "Hechos.MUNICIPIO_HECHO", "Hechos.ZONA",
             "Hechos.BARRIOS_HECHO", "Person.GENERO", "Person.EDAD",
             "Arma empleada", "Clase de sitio", "Conduc.MOVIL_AGRESOR",
             "ListaC.DESCRIPCION_CONDUCTA", "Estado Civil",
             "Person.GRADO_INSTRUCCION_PERSONA", "País de nacimiento"]
-    falta = [c for c in need if c not in ix]
-    if falta:
-        sys.exit(f"al CSV le faltan columnas: {falta}")
-    C = {c: ix[c] for c in need}
+
+    def filas_de(path):
+        """(C, ncol, row) de cada archivo con SU propio encabezado."""
+        with path.open(encoding="utf-8-sig", newline="") as fh:
+            rd = csv.reader(fh, delimiter=";")
+            hdr = next(rd)
+            ix = {c: i for i, c in enumerate(hdr)}
+            falta = [c for c in need if c not in ix]
+            if falta:
+                sys.exit(f"a {path.name} le faltan columnas: {falta}")
+            C = {c: ix[c] for c in need}
+            for row in rd:
+                yield C, len(hdr), row
     SUF = {d: re.compile(c["suf"]) for d, c in CIUDADES.items()}
 
     # ── acumuladores ───────────────────────────────────────────────────
     nac_sexo = defaultdict(int)        # (delito, sexo) -> n
     nac_sexo_anio = defaultdict(int)   # (delito, sexo, anio)
+    nac_ytd = defaultdict(int)         # (delito, sexo, anio) solo meses 1..MES_CORTE
     dep_sexo = defaultdict(int)        # (dep, delito, sexo)
     dep_sexo_anio = defaultdict(int)   # (dep, delito, sexo, anio)
     mun_sexo = defaultdict(int)        # (dane, delito, sexo)
@@ -204,7 +212,7 @@ def main():
     tot_delito = defaultdict(int)
     filas = 0
 
-    for row in rd:
+    for C, ncol, row in (x for p in fuentes for x in filas_de(p)):
         if len(row) < ncol:
             continue
         filas += 1
@@ -226,7 +234,11 @@ def main():
             yy = int(m.group(3))
             if yy in AIX:
                 anio = yy
-                f_mes_key = int(m.group(2)) - 1
+                # el perfil por mes solo con años completos (2026 va ene-ago)
+                f_mes_key = int(m.group(2)) - 1 if yy != ANIO_PARCIAL else None
+                if int(m.group(2)) <= MES_CORTE:
+                    _g = limpio(row[C["Person.GENERO"]]).upper()
+                    nac_ytd[(did, "F" if _g == "FEMENINO" else ("M" if _g == "MASCULINO" else ""), yy)] += q
             else:
                 f_mes_key = None
         else:
@@ -267,8 +279,10 @@ def main():
             b = row[C["Hechos.BARRIOS_HECHO"]].strip()
             if b and BARRIO_NULO not in b.upper():
                 mm = SUF[dane].search(b)
-                if mm:
-                    nom_b = b[:mm.start()].strip().upper()
+                nom_b = (b[:mm.start()] if mm else b).strip().upper()
+                # sin sufijo (entregas 2025-26): diccionario barrio → comuna
+                com = int(mm.group(1)) if mm else DIC_BARRIO.get(dane, {}).get(clave_barrio(nom_b))
+                if com is not None:
                     # vigilancia del vertedero: se mide SIEMPRE, se excluye solo
                     # a los confirmados (así el próximo lote delata al que siga)
                     ciu_bar[(dane, nom_b)] += q
@@ -277,7 +291,7 @@ def main():
                     if (dane, nom_b) in VERTEDEROS:
                         ciu_sin_com[dane] += q
                     else:
-                        ciu_sexo[(dane, int(mm.group(1)), did, sexo)] += q
+                        ciu_sexo[(dane, com, did, sexo)] += q
                 else:
                     ciu_sin_com[dane] += q
             else:
@@ -336,7 +350,6 @@ def main():
                     v = limpio(row[C[col]])
                     if v:
                         acc[v.upper()] += q
-    fh.close()
 
     # ── detector de vertederos nuevos ──────────────────────────────────
     sospechosos = detectar_vertederos(ciu_bar, ciu_bar_anio)
@@ -360,6 +373,9 @@ def main():
                 "m": nac_sexo.get((d, "M"), 0),
                 "f_anio": [nac_sexo_anio.get((d, "F", a), 0) for a in ANIOS],
                 "m_anio": [nac_sexo_anio.get((d, "M", a), 0) for a in ANIOS],
+                # mismo tramo (ene–MES_CORTE) de cada año: lo único comparable con 2026
+                "f_ytd": [nac_ytd.get((d, "F", a), 0) for a in ANIOS],
+                "m_ytd": [nac_ytd.get((d, "M", a), 0) for a in ANIOS],
                 "sin_anio_f": sin_anio.get((d, "F"), 0),
                 "sin_sexo": sin_sexo.get(d, 0),
                 "total": tot_delito.get(d, 0),
@@ -456,8 +472,10 @@ def main():
 
     # ── meta ───────────────────────────────────────────────────────────
     meta = {
-        "v": "2026-08-08",
-        "fuente": "Policía Nacional · comisión de delitos 2015-2024",
+        "v": "2026-09-30",
+        "fuente": "Policía Nacional · comisión de delitos 2015-2024 + SIEDCO 2025 y ene-ago 2026",
+        "anio_parcial": {"anio": ANIO_PARCIAL, "hasta_mes": MES_CORTE, "etiqueta": "ene–ago",
+                         "ultimo_completo": ANIO_PARCIAL - 1},
         "archivo": SRC.name,
         "anios": ANIOS,
         "delitos": [{"id": d, "label": lab,
@@ -492,9 +510,10 @@ def main():
                 "no el universo de feminicidios del país: 1.336 en nueve años está muy por "
                 "debajo de Medicina Legal y Fiscalía. El crecimiento de 2015 a 2021 recoge "
                 "sobre todo la adopción del tipo penal —la Ley 1761 es de julio de 2015— y "
-                "no debe leerse como un aumento de esa magnitud. 2024 no tiene dato: el "
-                "lote de ese año no trae el artículo penal en homicidios."),
-            "feminicidio_2024": "sin dato (el lote 2024 no trae artículo penal en homicidios)",
+                "no debe leerse como un aumento de esa magnitud. 2024, 2025 y 2026 no tienen "
+                "dato: esos lotes no traen el artículo penal en homicidios, y la entrega "
+                "SIEDCO de 2025-2026 tampoco trajo feminicidio como archivo aparte."),
+            "feminicidio_2024": "sin dato desde 2024 (los lotes 2024-2026 no traen artículo penal en homicidios)",
             "relacion_agresor": (
                 "La fuente NO registra la relación entre la víctima y el agresor. "
                 "El «móvil del agresor» describe cómo se movía (a pie, en moto), no si "
