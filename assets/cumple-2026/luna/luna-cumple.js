@@ -4,20 +4,22 @@
  * de su celda y en fiesta cada fila tiene el piso a otra altura. En vez de esperar
  * atlas corregidos, cada pose lleva su caja medida (bboxes-v1.json, alfa > 200) y
  * el reproductor la desplaza para que las patas queden siempre en la misma línea.
+ * Los WebP v2 salen de limpiar-atlas.py sobre los PNG v1 de Astra: quita de cada celda
+ * los pedazos de la perrita vecina (42 fragmentos) y recalcula el piso de cada pose.
  * Si un día Astra entrega atlas alineados, basta con vaciar BB.
  */
 (() => {
   const base = new URL('.', document.currentScript.src);
   const CLIPS = {
-    llegada: { file: 'luna-cumple-llegada-v1.webp', cols: 5, rows: 4, n: 20, ms: 160 },
-    fiesta:  { file: 'luna-cumple-fiesta-v1.webp',  cols: 4, rows: 4, n: 16, ms: 275 },
-    celebra: { file: 'luna-cumple-celebra-v1.webp', cols: 6, rows: 4, n: 24, ms: 200 },
+    llegada: { file: 'luna-cumple-llegada-v2.webp', cols: 5, rows: 4, n: 20, ms: 160 },
+    fiesta:  { file: 'luna-cumple-fiesta-v2.webp',  cols: 4, rows: 4, n: 16, ms: 275 },
+    celebra: { file: 'luna-cumple-celebra-v2.webp', cols: 6, rows: 4, n: 24, ms: 200 },
   };
   // Borde inferior de la figura en cada pose (fracción de la celda). Medido.
   const BB = {
-    llegada: [.99,.99,.99,.99,.99,.96,.97,.97,.98,.97,.93,.93,.99,.99,.99,.88,.88,.89,.90,.90],
-    fiesta:  [.97,.97,.97,.97,.95,.95,.95,.95,.90,.90,.90,.90,.86,.86,.86,.86],
-    celebra: [.98,.98,.98,.97,.98,.97,1,.94,.95,1,1,1,1,1,1,1,1,1,.86,.86,.86,.86,.86,.86],
+    llegada: [0.996,0.996,0.996,0.996,0.996,0.961,0.968,0.964,0.975,0.972,0.929,0.932,0.929,0.932,0.936,0.879,0.883,0.89,0.893,0.893],
+    fiesta: [0.971,0.971,0.971,0.971,0.946,0.946,0.946,0.946,0.901,0.901,0.901,0.901,0.857,0.857,0.857,0.857],
+    celebra: [0.977,0.977,0.977,0.973,0.977,0.973,0.945,0.945,0.949,0.945,0.973,0.965,0.871,0.871,0.875,0.871,0.875,0.879,0.863,0.863,0.863,0.863,0.863,0.863],
   };
   const PISO = .97; // a dónde se llevan las patas
 
@@ -45,7 +47,9 @@
       s.backgroundPosition = `${(frame % c.cols) * 100 / (c.cols - 1)}% ${Math.floor(frame / c.cols) * 100 / (c.rows - 1)}%`;
       const bajar = (PISO - (BB[name] ? BB[name][frame] : PISO)) * this.sprite.offsetHeight;
       s.transform = `translate(${dx}px, ${bajar.toFixed(1)}px)`;
-      s.clipPath = 'inset(1% 2%)'; // recorta lo que asoma de la celda vecina
+      // Los atlas v2 ya van sin los fragmentos de las celdas vecinas (limpiar-atlas.py);
+      // queda un recorte fino por el antialias del borde.
+      s.clipPath = 'inset(1% 2%)';
     }
     emit(state) { if (state !== this.state) { this.state = state; this.host.dispatchEvent(new CustomEvent('luna:state', { detail: { state } })); } }
     stop() { this.token++; cancelAnimationFrame(this.raf); }
