@@ -4,8 +4,8 @@
   <script defer src="/track.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>El mapa del delito · Policía 2015-2024 · Ricardo Ruiz</title>
-  <meta name="description" content="Dónde se denuncia cada delito en Colombia: del mapa nacional a los 1.111 municipios, con los 21 delitos de la Policía Nacional entre 2015 y 2024." />
+  <title>El mapa del delito · Policía 2015-2026 · Ricardo Ruiz</title>
+  <meta name="description" content="Dónde se denuncia cada delito en Colombia: del mapa nacional a los 1.111 municipios, con los 21 delitos de la Policía Nacional entre 2015 y agosto de 2026." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
@@ -107,7 +107,7 @@
   </nav>
 
   <div class="page-header compacta">
-    <div class="page-tag">Policía Nacional · 2015–2024</div>
+    <div class="page-tag">Policía Nacional · 2015–ago 2026</div>
     <h1 class="page-title">El mapa del delito</h1>
     <p class="page-sub">Escoge un delito y un año y mira dónde se denuncia. Haz clic en un departamento para bajar a sus municipios, y en <strong>Bogotá, Medellín o Cali</strong> para llegar a la comuna y al barrio. Los conteos son <strong>denuncias</strong>, no víctimas totales. Con un año de 2018 en adelante puedes pasar a <strong>tasa por 100.000 habitantes</strong>, que es lo que permite comparar territorios de distinto tamaño.</p>
   </div>
@@ -188,7 +188,13 @@
      no hay tasa posible: sumar diez años de hechos sobre la población de un
      año daría una cifra sin sentido. */
   const ANIO_POB_MIN=2018;
-  function hayTasa(){ return ST.anio!=='todos' && +ST.anio>=ANIO_POB_MIN; }
+  /* el año parcial (2026, ene–ago) tampoco: ocho meses de hechos sobre la
+     población de un año entero da una tasa que parece baja y no lo es */
+  const esParcial=a=>!!(ST.meta.anio_parcial&&+a===ST.meta.anio_parcial.anio);
+  const rotAnio=a=>esParcial(a)?`${a} · ${ST.meta.anio_parcial.etiqueta}`:String(a);
+  const rangoTodos=()=>{ const A=ST.meta.anios, ap=ST.meta.anio_parcial;
+    return ap?`${A[0]}–${ap.etiqueta.split('–')[1]} ${ap.anio}`:`${A[0]}–${A[A.length-1]}`; };
+  function hayTasa(){ return ST.anio!=='todos' && +ST.anio>=ANIO_POB_MIN && !esParcial(ST.anio); }
   function poblacionDe(clave,esNac){
     if(!ST.pob||!hayTasa()) return 0;
     const i=ST.pob.anios.indexOf(+ST.anio); if(i<0) return 0;
@@ -210,25 +216,25 @@
   function pintarFiltros(){
     const sel=document.getElementById('f-delito');
     sel.innerHTML=ST.meta.delitos.map(d=>
-      `<option value="${d.id}">${esc(d.label)}${d.solo_2024?' · solo 2024':''}</option>`).join('');
+      `<option value="${d.id}">${esc(d.label)}${d.desde>ST.meta.anios[0]?' · desde '+d.desde:''}</option>`).join('');
     sel.value=ST.delito;
     sel.onchange=()=>{ ST.delito=sel.value; sincronizarAnios(); pintar(); };
     pintarAnios();
   }
   function pintarAnios(){
     const d=ST.meta.delitos.find(x=>x.id===ST.delito)||{};
-    const anios=d.solo_2024?[2024]:ST.meta.anios;
+    const anios=ST.meta.anios.filter(a=>a>=(d.desde||0));
     document.getElementById('f-anios').innerHTML=
       `<button class="yr${ST.anio==='todos'?' on':''}" data-y="todos">Todos</button>`+
-      anios.map(a=>`<button class="yr${String(ST.anio)===String(a)?' on':''}" data-y="${a}">${a}</button>`).join('');
+      anios.map(a=>`<button class="yr${String(ST.anio)===String(a)?' on':''}" data-y="${a}" title="${esParcial(a)?'Enero a agosto: año incompleto':''}">${rotAnio(a)}</button>`).join('');
     document.querySelectorAll('#f-anios .yr').forEach(b=>b.onclick=()=>{
       ST.anio=b.dataset.y; pintarAnios(); pintar();
     });
   }
-  /* un delito que solo existe en 2024 no puede quedarse en un año que no tiene */
+  /* un delito cuya serie arranca en 2024 no puede quedarse en un año que no tiene */
   function sincronizarAnios(){
     const d=ST.meta.delitos.find(x=>x.id===ST.delito)||{};
-    if(d.solo_2024 && ST.anio!=='todos' && String(ST.anio)!=='2024') ST.anio='2024';
+    if(ST.anio!=='todos' && +ST.anio<(d.desde||0)) ST.anio=String(d.desde);
     pintarAnios();
   }
 
@@ -393,7 +399,7 @@
   /* ── panel ──────────────────────────────────────────────────── */
   function pintarPanel(filas,nv){
     const lab=(ST.meta.delitos.find(d=>d.id===ST.delito)||{}).label||'';
-    const per=ST.anio==='todos'?'2015–2024':ST.anio;
+    const per=ST.anio==='todos'?rangoTodos():rotAnio(ST.anio);
     const esTasa=ST.tasa&&hayTasa()&&nv!=='ciu';
     let titulo, total;
     if(nv==='nac'){ titulo='Total nacional'; total=filas.reduce((s,f)=>s+totalDe(ST.deps[f.k],ST.delito,ST.anio),0); }
@@ -450,7 +456,7 @@
       .filter(b=>b.v>0).sort((a,b)=>b.v-a.v).slice(0,30);
     const max=Math.max(1,...bs.map(b=>b.v));
     document.getElementById('bar-t').textContent=
-      `Barrios de ${ST.ciuIdx[ST.mun].n} · 2015–2024`;
+      `Barrios de ${ST.ciuIdx[ST.mun].n} · ${rangoTodos()}`;
     document.getElementById('bar').innerHTML=bs.length?bs.map((b,i)=>
       `<div class="rk-i" style="cursor:default">
          <span class="rk-p">${i+1}</span>
@@ -460,7 +466,7 @@
        </div>`).join('')
       :'<div style="font-size:.72rem;color:var(--gray)">Sin denuncias de este delito.</div>';
     document.getElementById('bar-n').textContent=
-      `El total por barrio es de los diez años juntos, no del año escogido arriba.`;
+      `El total por barrio es de todos los años juntos, no del año escogido arriba.`;
   }
 
   /* El botón de tasa se apaga solo donde la tasa no existe, y dice por qué en
@@ -473,7 +479,8 @@
     b.textContent=ST.tasa&&puede?'Tasa por 100.000 hab.':'Ver tasa por 100.000 hab.';
     n.textContent=puede?''
       : nv==='ciu' ? 'El DANE no publica población por comuna: dentro de la ciudad solo hay conteo.'
-      : ST.anio==='todos' ? 'Escoge un año para ver la tasa: sumar diez años de hechos sobre la población de uno solo no significa nada.'
+      : ST.anio==='todos' ? 'Escoge un año para ver la tasa: sumar varios años de hechos sobre la población de uno solo no significa nada.'
+      : esParcial(ST.anio) ? `${ST.anio} va de enero a agosto: una tasa sobre la población de todo el año daría una cifra engañosamente baja.`
       : `La proyección municipal del DANE arranca en ${ANIO_POB_MIN}; ${ST.anio} va en conteo.`;
   }
   function pintarLeyenda(max){
@@ -486,7 +493,19 @@
   function pintarAvisos(){
     const d=ST.meta.delitos.find(x=>x.id===ST.delito)||{};
     const av=[];
-    if(d.solo_2024) av.push(`<b>Solo 2024.</b> La Policía empezó a entregar este delito en ese lote, así que no tiene historia previa: no se puede leer como tendencia.`);
+    if(d.desde>ST.meta.anios[0]) av.push(`<b>Desde ${d.desde}.</b> La Policía empezó a entregar este delito en ese lote, así que no tiene historia anterior.`);
+    /* Dentro de la ciudad: cuánto del delito no se pudo ubicar en comuna ese
+       año. En 2025-2026 el «barrio pendiente por asignar» se disparó (Bogotá 51%
+       en 2026) y un mapa que no lo diga parece una caída del delito. */
+    if(ST.mun&&ST.ciu&&ST.muns&&ST.muns[ST.mun]){
+      const i=ST.anio==='todos'?-1:ST.meta.anios.indexOf(+ST.anio);
+      const tm=totalDe(ST.muns[ST.mun],ST.delito,ST.anio);
+      const tc=Object.values(ST.ciu.comunas||{}).reduce((s,c)=>{const d=(c.d||{})[ST.delito];
+        return s+(d?(i<0?d.t:(d.y[i]||0)):0);},0);
+      const sin=tm?1-tc/tm:0;
+      if(sin>=.15) av.push(`<b>${Math.round(100*sin)}% de estos hechos de ${esc(ST.ciuIdx[ST.mun].n)} no tiene ${esc(ST.ciuIdx[ST.mun].tipo)}.</b> Llegan con «barrio pendiente por asignar» o sin barrio, y quedan fuera del mapa de la ciudad (sí cuentan en el total municipal). Comparar ${esc(plural(ST.ciuIdx[ST.mun].tipo))} entre años con coberturas distintas engaña.`);
+    }
+    if(esParcial(ST.anio)) av.push(`<b>${ST.anio} va de enero a agosto.</b> No se compara con un año completo: para ver si subió o bajó, contrástalo con el mismo tramo de ${ST.anio-1} en «El histórico en cifras».`);
     if(d.sin_anio>0){
       const p=(100*d.sin_anio/d.total).toFixed(0);
       av.push(`<b>${p}% de estos hechos llegó sin año.</b> Traen mes y día de la semana, pero no el año. Cuentan en «Todos» y quedan fuera de cada año por separado — por eso la suma de los años da menos que el total.`);

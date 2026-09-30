@@ -41,7 +41,7 @@ XLSX = RAIZ / "Bases de datos" / "output_observatorio_mujer" / "PPED-AreaSexoEda
 NAC_NUEVO = RAIZ / "Bases de datos" / "PONAL" / "PPED-AreaNac-2018-2070.xlsx"
 OUT = RAIZ / "Bases de datos" / "output_ponal" / "poblacion.json"
 
-ANIOS = list(range(2018, 2025))          # lo que cubre el anexo y nos sirve
+ANIOS = list(range(2018, 2027))          # el anexo llega a 2042; se usa hasta el último año con delitos
 NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 HOJA = "PobMunicipalxÁreaSexoEdad"
 

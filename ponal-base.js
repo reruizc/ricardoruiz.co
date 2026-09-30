@@ -8,7 +8,10 @@
   /* El prefijo cuelga de congreso-2026/output porque la política del bucket
      ya lo cubre como público; un prefijo nuevo de primer nivel exigiría
      tocar la policy. Ver la sección de S3 en CLAUDE.md. */
-  const BASE=S3+'/ponal';
+  /* ?local=1 lee los JSON del repo (Bases de datos/output_ponal) para
+     verificar un build antes de subirlo a S3 */
+  const LOCAL=/[?&]local=1\b/.test(location.search);
+  const BASE=LOCAL?'Bases%20de%20datos/output_ponal':S3+'/ponal';
   const MAPAS=S3+'/mapas-2026';
   /* cache-buster por hora: los JSON se sirven con max-age corto, pero Safari
      es agresivo con JSON sin Cache-Control (mismo patrón de oportunidad.html) */

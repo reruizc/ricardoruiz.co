@@ -4,7 +4,7 @@
   <script defer src="/track.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>El histórico en cifras · Policía 2015-2024 · Ricardo Ruiz</title>
+  <title>El histórico en cifras · Policía 2015-2026 · Ricardo Ruiz</title>
   <meta name="description" content="Qué subió y qué bajó en diez años de denuncias a la Policía Nacional: tendencia por delito, hora del día, día de la semana y perfil de la víctima." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -120,9 +120,9 @@
   </nav>
 
   <div class="page-header compacta">
-    <div class="page-tag">Policía Nacional · 2015–2024</div>
+    <div class="page-tag">Policía Nacional · 2015–ago 2026</div>
     <h1 class="page-title">El histórico en cifras</h1>
-    <p class="page-sub">Diez años de denuncias, delito por delito. Qué creció y qué cayó, en qué mes y a qué hora ocurre, y a quién le pasa. Todo es <strong>denuncia registrada</strong>: si un delito sube, puede ser que ocurra más o que se denuncie más — y en varios casos es lo segundo.</p>
+    <p class="page-sub">Once años completos de denuncias, más lo que va de 2026, delito por delito. Qué creció y qué cayó, en qué mes y a qué hora ocurre, y a quién le pasa. Todo es <strong>denuncia registrada</strong>: si un delito sube, puede ser que ocurra más o que se denuncie más — y en varios casos es lo segundo.</p>
   </div>
 
   <div class="sec-bar">
@@ -132,8 +132,8 @@
 
   <div class="hs">
     <div class="sec">
-      <div class="sec-t">Qué subió y qué bajó, 2015 a 2024</div>
-      <div class="sec-s">Cada fila es un delito con su curva de diez años y el cambio entre las puntas. Los delitos que la Policía solo empezó a entregar en 2024 van al final, sin tendencia: <b>no tienen con qué compararse</b>.</div>
+      <div class="sec-t">Qué subió y qué bajó, 2015 a 2025 — y cómo va 2026</div>
+      <div class="sec-s">Cada fila es un delito con su curva de once años completos y el cambio entre las puntas. <b>2026 va de enero a agosto</b>, así que no se compara con años completos: las tres últimas columnas lo contrastan con el mismo tramo de 2025. Los delitos que la Policía empezó a entregar en 2024 van al final, con el cambio de 2024 a 2025.</div>
       <div class="scrollx"><table class="tt" id="tt"></table></div>
       <div class="warn" id="w-tend"></div>
     </div>
@@ -219,32 +219,46 @@
 
   function tabla(){
     const A=ST.meta.anios, P=ST.nac.por_anio;
+    /* La tendencia cierra en el último año COMPLETO. 2026 llega hasta agosto:
+       se lee aparte, contra el mismo tramo de 2025 (columna «ene–ago»). */
+    const ap=ST.meta.anio_parcial||{anio:null,ultimo_completo:A[A.length-1]};
+    const iUC=A.indexOf(ap.ultimo_completo);
+    const Y=(ST.nac.ytd||{}).por_delito||{};
     const filas=ST.meta.delitos.map(d=>{
-      const v=P[d.id]||[];
+      const serie=(P[d.id]||[]).slice(0,iUC+1);
+      const i0=Math.max(0,A.indexOf(d.desde||A[0]));
+      const v=serie.slice(i0);
       const ini=v[0]||0, fin=v[v.length-1]||0;
       const parcial=d.total?(d.sin_anio/d.total)>=UMBRAL_PARCIAL:false;
-      const pct=(!d.solo_2024&&ini)?Math.round(100*(fin-ini)/ini):null;
+      const pct=(ini&&v.length>1)?Math.round(100*(fin-ini)/ini):null;
       const cob=d.total?Math.round(100*(1-d.sin_anio/d.total)):100;
-      return {...d,v,ini,fin,pct,parcial,cob};
+      const y=Y[d.id]||[], ya=y[iUC]||0, yb=ap.anio?(y[iUC+1]||0):0;
+      const ypct=ya?Math.round(1000*(yb-ya)/ya)/10:null;
+      return {...d,v,ini,fin,pct,parcial,cob,ya,yb,ypct,nuevo:(d.desde||A[0])>A[0]};
     });
-    /* con tendencia primero, ordenados por volumen; los de 2024 al final */
-    filas.sort((a,b)=>(a.solo_2024-b.solo_2024)||(b.total-a.total));
+    /* con serie larga primero, ordenados por volumen; los que arrancan en 2024 al final */
+    filas.sort((a,b)=>(a.nuevo-b.nuevo)||(b.total-a.total));
+    const mesFin=['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][ap.hasta_mes||12];
+    const pc=(n,dec)=>`<span class="${n>0?'up':'dn'}">${n>0?'+':''}${String(dec?n.toFixed(1):n).replace('.',',')}%</span>`;
     document.getElementById('tt').innerHTML=
-      `<thead><tr><th>Delito</th><th>Total 2015–2024</th><th>${A[0]}</th><th>${A[A.length-1]}</th>
-        <th>Cambio</th><th>Curva</th></tr></thead><tbody>`+
+      `<thead><tr><th>Delito</th><th>Total ${A[0]}–${ap.anio?mesFin+' '+ap.anio:A[A.length-1]}</th><th>${A[0]}</th><th>${ap.ultimo_completo}</th>
+        <th>Cambio</th><th>Curva ${A[0]}–${ap.ultimo_completo}</th>`+
+        (ap.anio?`<th>Ene–${mesFin} ${ap.anio-1}</th><th>Ene–${mesFin} ${ap.anio}</th><th>Cambio</th>`:'')+
+        `</tr></thead><tbody>`+
       filas.map(f=>{
         const col=f.pct==null?'var(--gray)':(f.parcial?'#8a8f9c':(f.pct>0?'#d1584e':'#4ade80'));
         let cam;
         if(f.pct==null) cam='<span style="color:var(--gray)">—</span>';
         else if(f.parcial) cam=`<span class="parc" title="Calculado sobre el ${f.cob}% de los registros de este delito: al resto la fuente no le puso año.">${f.pct>0?'+':''}${f.pct}%<span class="q">?</span></span>`;
-        else cam=`<span class="${f.pct>0?'up':'dn'}">${f.pct>0?'+':''}${f.pct}%</span>`;
+        else cam=pc(f.pct)+(f.nuevo?` <span style="opacity:.5;font-size:.85em">(${f.desde}–${String(ap.ultimo_completo).slice(2)})</span>`:'');
         return `<tr${f.parcial?' class="pf"':''}>
-          <td>${esc(f.label)}${f.solo_2024?'<span class="badge">solo 2024</span>':''}${f.parcial?`<span class="badge gris">${f.cob}% con año</span>`:''}</td>
+          <td>${esc(f.label)}${f.nuevo?`<span class="badge">desde ${f.desde}</span>`:''}${f.parcial?`<span class="badge gris">${f.cob}% con año</span>`:''}</td>
           <td>${fmt(f.total)}</td>
-          <td>${f.solo_2024?'—':fmt(f.ini)}</td>
+          <td>${f.nuevo?'—':fmt(f.ini)}</td>
           <td>${fmt(f.fin)}</td>
           <td>${cam}</td>
-          <td style="text-align:right">${f.v.length?spark(f.v,col):''}</td></tr>`;
+          <td style="text-align:right">${f.v.length?spark(f.v,col):''}</td>`+
+          (ap.anio?`<td>${fmt(f.ya)}</td><td>${fmt(f.yb)}</td><td>${f.ypct==null?'—':pc(f.ypct,1)}</td>`:'')+`</tr>`;
       }).join('')+'</tbody>';
 
     const par=filas.filter(f=>f.parcial);
@@ -259,7 +273,11 @@
        <br><br><b>Por eso las columnas de año no suman el total:</b>
        ${fmt(ST.meta.calidad.sin_anio_total)} hechos
        (${String(ST.meta.calidad.sin_anio_pct).replace('.',',')}% del archivo) quedan fuera de
-       cualquier año concreto.`;
+       cualquier año concreto.
+       <br><br><b>Las dos últimas columnas sí son firmes para los tres</b>: las entregas de
+       2025 y 2026 traen fecha en todos los registros, así que el cambio de enero a
+       ${['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][(ST.meta.anio_parcial||{}).hasta_mes||12]}
+       compara lo mismo con lo mismo.`;
   }
 
   /* ── perfil por delito ──────────────────────────────────────── */
@@ -355,7 +373,7 @@
     lineaGenero(s,d);
 
     const av=[];
-    if(d.solo_2024) av.push('<b>Este delito solo existe en el lote de 2024</b>, así que su perfil describe ese año, no la década.');
+    if((d.desde||0)>ST.meta.anios[0]) av.push(`<b>Este delito existe desde el lote de ${d.desde}</b>, así que su perfil describe ${d.desde}–2026, no la década.`);
     if(d.sin_anio>0) av.push(`<b>${Math.round(100*d.sin_anio/d.total)}% de estos hechos llegó sin año</b>, pero sí con hora y día de la semana: el perfil de arriba los incluye.`);
     const w=document.getElementById('w-perfil');
     w.innerHTML=av.join('<br><br>'); w.style.display=av.length?'':'none';
@@ -370,7 +388,8 @@
   function lineaGenero(s,d){
     const G=(ST.nac.genero_anio||{})[s], box=document.getElementById('gen-wrap');
     if(!G||d.solo_2024){ box.style.display='none'; return; }
-    const A=ST.meta.anios;
+    const A=ST.meta.anios, ap=ST.meta.anio_parcial;
+    const ultA=ap&&A[A.length-1]===ap.anio?`${ap.anio} (${ap.etiqueta})`:A[A.length-1];
     const pct=A.map((_,i)=>{const m=G.M[i]||0,f=G.F[i]||0;return (m+f)?100*f/(m+f):null;});
     if(pct.every(v=>v==null)){ box.style.display='none'; return; }
     box.style.display='';
@@ -387,7 +406,7 @@
          <polyline points="${pts}" fill="none" stroke="#e0679a" stroke-width="2" stroke-linejoin="round"/>
          ${dots}
        </svg>
-       <div class="gen-ejex"><span>${A[0]}</span><span>${A[A.length-1]}</span></div>`;
+       <div class="gen-ejex"><span>${A[0]}</span><span>${ultA}</span></div>`;
     const dif=(ult-prim);
     document.getElementById('gen-txt').innerHTML=
       `En <b>${esc(d.label.toLowerCase())}</b> las mujeres pasaron de ser el `+
@@ -408,6 +427,11 @@
       (${String(c.sin_anio_pct).replace('.',',')}%). ${esc(c.nota_sin_anio)}</p>
       <p style="margin-bottom:.7rem"><b>El lote de 2024 venía con otros nombres de delito.</b>
       ${esc(c.nota_2024)} Sin unificarlos, 2024 habría dado cero en cada serie.</p>
+      <p style="margin-bottom:.7rem"><b>2025 y 2026 vienen de otra fuente.</b> Son las entregas del SIEDCO
+      a derechos de petición (2025 completo; 2026 de enero a agosto), un archivo por delito, que se unificaron
+      con los mismos nombres de delito que 2015-2024. Traen fecha en el 100% de los registros. <b>Feminicidio no
+      llegó</b> en ninguna de las dos, y los homicidios no traen el artículo del Código Penal, así que no se
+      puede separar.</p>
       <p style="margin-bottom:.7rem"><b>Bogotá venía dentro de Cundinamarca.</b> ${esc(c.nota_bogota)}</p>
       <p style="margin-bottom:.7rem"><b>La medianoche es, muchas veces, «no sé a qué hora».</b> La fuente
       escribe 00:00 cuando no conoce la hora del hecho. En homicidios ese valor es tan frecuente como

@@ -336,12 +336,14 @@
     <section class="hero">
       <div class="hero-label">Módulo 02 · Mapa de seguridad</div>
       <h1 class="hero-title">Comisión de delitos · <em>Medellín</em>.</h1>
-      <p class="hero-sub">19 tipologías de delito reportadas por la Policía Nacional. Filtra por tipología, mira la distribución territorial a nivel barrio/vereda, la tasa por 100k habitantes y la comparación con cifras nacionales.</p>
+      <p class="hero-sub">21 tipologías de delito reportadas por la Policía Nacional (SIEDCO, entregas por derecho de petición: 2025 completo y enero a agosto de 2026). Filtra por tipología, mira la distribución territorial a nivel barrio/vereda, la tasa por 100k habitantes y la comparación con cifras nacionales.</p>
       <div class="controls">
         <div class="ctrl-group">
           <div class="ctrl-label">Período</div>
-          <div class="pill-group">
-            <button class="pill active">Enero 2026</button>
+          <div class="pill-group" id="period-pills">
+            <button class="pill active" data-per="2026-01-08">Ene–ago 2026</button>
+            <button class="pill" data-per="2025-01-08">Ene–ago 2025</button>
+            <button class="pill" data-per="2025">2025 completo</button>
           </div>
         </div>
         <div class="ctrl-group">
@@ -427,8 +429,8 @@
     <section class="chart-card" style="margin-top:1rem">
       <div class="card-header">
         <div>
-          <div class="card-title">Serie diaria del mes</div>
-          <div class="card-sub">Total de incidentes por día</div>
+          <div class="card-title">Serie en el tiempo</div>
+          <div class="card-sub">Incidentes por semana (lunes a domingo) · la última semana incompleta no se dibuja</div>
         </div>
       </div>
       <div class="body">
@@ -474,7 +476,15 @@
 
     // ─── DATA ─────────────────────────────────────────────────────────
     const S3_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
-    const SEG_BASE = `${S3_BASE}/bases+de+datos/output_seguridad/2026-01`;
+    const SEG_ROOT = `${S3_BASE}/bases+de+datos/output_seguridad`;
+    const DATA_V = '20260930';
+    // Períodos publicados. `comparaCon` = mismo tramo del año anterior (el
+    // único cruce honesto: 2026 llega hasta agosto).
+    const PERIODS = {
+      '2026-01-08': { label: 'enero–agosto 2026', comparaCon: '2025-01-08' },
+      '2025-01-08': { label: 'enero–agosto 2025', comparaCon: null },
+      '2025':       { label: '2025 completo',     comparaCon: null },
+    };
     const BARRIOS_GEO_URL = `${S3_BASE}/bases+de+datos/proyecto-dc/geo/barrios-veredas-medellin.json`;
 
     const TIP_LABEL = {
@@ -497,6 +507,8 @@
       'secuestro': 'Secuestro',
       'terrorismo': 'Terrorismo',
       'violencia-intrafamiliar': 'Violencia intrafamiliar',
+      'hurto-ganado': 'Abigeato (hurto de ganado)',
+      'hurto-entidades-financieras': 'Hurto a entidades financieras',
     };
 
     let dataResumen = null, dataComuna = null, dataDia = null, dataHora = null;
@@ -504,15 +516,17 @@
     let geoCache = null;
     let map = null, mapLayer = null;
 
-    async function fetchAll(){
-      const [r, c, b, d, h] = await Promise.all([
-        fetch(`${SEG_BASE}/resumen.json`).then(r => r.json()),
-        fetch(`${SEG_BASE}/por-comuna.json`).then(r => r.json()),
-        fetch(`${SEG_BASE}/por-barrio.json`).then(r => r.json()),
-        fetch(`${SEG_BASE}/por-dia.json`).then(r => r.json()),
-        fetch(`${SEG_BASE}/por-hora.json`).then(r => r.json()),
-      ]);
+    let dataResumenPrev = null;
+    const _cache = {};
+    const getJ = (per, f) => fetch(`${SEG_ROOT}/${per}/${f}?v=${DATA_V}`).then(r => {
+      if (!r.ok) throw new Error(`${per}/${f}: HTTP ${r.status}`); return r.json(); });
+    async function fetchAll(per){
+      if (!_cache[per]) _cache[per] = Promise.all(
+        ['resumen','por-comuna','por-barrio','por-dia','por-hora'].map(f => getJ(per, `${f}.json`)));
+      const [r, c, b, d, h] = await _cache[per];
       dataResumen = r; dataComuna = c; dataBarrio = b; dataDia = d; dataHora = h;
+      const prev = PERIODS[per].comparaCon;
+      dataResumenPrev = prev ? await getJ(prev, 'resumen.json').catch(() => null) : null;
     }
 
     async function loadGeo(){
@@ -537,14 +551,14 @@
     }
 
     // ─── STATE ────────────────────────────────────────────────────────
-    const state = { tip: '__all__', metric: 'absoluto' };
+    const state = { tip: '__all__', metric: 'absoluto', per: '2026-01-08' };
 
     async function init(){
       attachCursorHovers();
       try {
-        await fetchAll();
+        await fetchAll(state.per);
       } catch (e) {
-        showError(`Error cargando datos. Verifica que estén públicos en S3 bajo bases+de+datos/output_seguridad/2026-01/. ${e.message}`);
+        showError(`Error cargando datos de ${state.per}. Verifica que estén públicos en S3 bajo bases+de+datos/output_seguridad/. ${e.message}`);
         return;
       }
 
@@ -563,6 +577,17 @@
           state.metric = p.dataset.metric;
           document.querySelectorAll('#metric-pills .pill').forEach(x => x.classList.remove('active'));
           p.classList.add('active');
+          render();
+        });
+      });
+
+      document.querySelectorAll('#period-pills .pill').forEach(p => {
+        p.addEventListener('click', async () => {
+          if (p.dataset.per === state.per) return;
+          document.querySelectorAll('#period-pills .pill').forEach(x => x.classList.remove('active'));
+          p.classList.add('active');
+          state.per = p.dataset.per;
+          try { await fetchAll(state.per); } catch (e) { showError(e.message); return; }
           render();
         });
       });
@@ -615,13 +640,27 @@
 
       const pob = (dataResumen.medellin.poblacion_estimada) || 0;
       const tasaMed = pob > 0 ? (medN / pob * 100000).toFixed(1) : '—';
+      const perLabel = PERIODS[state.per].label;
+      // Variación contra el mismo tramo del año anterior
+      let yoy = '';
+      if (dataResumenPrev){
+        const prevN = tip === '__all__' ? (dataResumenPrev.medellin.total || 0)
+                                        : (dataResumenPrev.medellin.por_tipologia[tip] || 0);
+        if (prevN > 0){
+          const d = (medN - prevN) / prevN * 100;
+          yoy = `<br/><strong style="color:${d > 0 ? '#e63946' : '#16a34a'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(1)}%</strong> vs ene–ago 2025 (${fmt(prevN)})`;
+        }
+      }
+      // Hechos sin comuna: «barrio pendiente por asignar» en la fuente
+      const sinCom = (dataComuna.OTROS && getValue(dataComuna.OTROS, tip)) || 0;
+      const sinComPct = medN > 0 ? sinCom / medN * 100 : 0;
 
       // SUMMARY
       document.getElementById('summary').innerHTML = `
         <div class="sum-card danger">
           <div class="sum-label">Incidentes en Medellín</div>
           <div class="sum-value-big danger">${fmt(medN)}</div>
-          <div class="sum-meta">${tipLabel} · enero 2026</div>
+          <div class="sum-meta">${tipLabel} · ${perLabel}${yoy}</div>
         </div>
         <div class="sum-card purple">
           <div class="sum-label">% del total nacional</div>
@@ -636,7 +675,7 @@
         <div class="sum-card">
           <div class="sum-label">Comuna con mayor tasa</div>
           <div class="sum-value-big">${worst.nombre.length > 14 ? worst.nombre.slice(0,12)+'…' : worst.nombre}</div>
-          <div class="sum-meta">${fmt(worst.total)} incidentes · <strong>${worst.tasa.toFixed(1)}/100k</strong></div>
+          <div class="sum-meta">${fmt(worst.total)} incidentes · <strong>${worst.tasa.toFixed(1)}/100k</strong><br/><span style="color:#b45309">${sinComPct.toFixed(0)}% de los hechos llega sin barrio ni comuna</span></div>
         </div>
       `;
 
@@ -846,12 +885,26 @@
       const padL = 36, padR = 12, padT = 14, padB = 32;
       const innerW = W - padL - padR, innerH = H - padT - padB;
 
-      const days = Object.keys(dataDia).sort();
-      if (!days.length){ svg.innerHTML = ''; return; }
-      const vals = days.map(d => {
-        const sc = dataDia[d];
-        return tip === '__all__' ? sc.total : (sc.por_tipologia[tip] || 0);
-      });
+      const dias = Object.keys(dataDia).sort();
+      if (!dias.length){ svg.innerHTML = ''; return; }
+      const valDia = d => { const sc = dataDia[d]; return tip === '__all__' ? sc.total : (sc.por_tipologia[tip] || 0); };
+      // Más de dos meses: se agrega por semana (lunes). 243 o 365 puntos
+      // diarios se leen como ruido y el patrón de fin de semana tapa la tendencia.
+      const semanal = dias.length > 62;
+      let days = dias, vals = dias.map(valDia);
+      if (semanal){
+        const acc = {};
+        dias.forEach(d => {
+          const f = new Date(d + 'T12:00:00'); const w = (f.getDay() + 6) % 7;
+          f.setDate(f.getDate() - w); const k = f.toISOString().slice(0,10);
+          acc[k] = (acc[k] || 0) + valDia(d);
+        });
+        days = Object.keys(acc).sort().filter(k => k >= dias[0]);
+        // la última semana incompleta se descarta: sumaría menos días
+        const ult = new Date(dias[dias.length-1] + 'T12:00:00');
+        if (ult.getDay() !== 0) days = days.slice(0, -1);
+        vals = days.map(k => acc[k]);
+      }
       const maxV = Math.max(...vals, 1);
       const stepX = innerW / Math.max(days.length - 1, 1);
 
@@ -870,15 +923,17 @@
       days.forEach((d, i) => {
         const x = padL + i * stepX;
         const y = padT + innerH - (vals[i] / maxV) * innerH;
-        dots += `<circle cx="${x}" cy="${y}" r="2.5" fill="#e63946"/>`;
+        dots += `<circle cx="${x}" cy="${y}" r="${semanal ? 1.8 : 2.5}" fill="#e63946"><title>${d}: ${fmt(vals[i])}</title></circle>`;
       });
 
       // x ticks (every 3 days)
       let ticks = '';
       days.forEach((d, i) => {
-        if (i % 3 === 0 || i === days.length-1){
+        const MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+        const cambiaMes = i === 0 || d.slice(5,7) !== days[i-1].slice(5,7);
+        if (semanal ? cambiaMes : (i % 3 === 0 || i === days.length-1)){
           const x = padL + i * stepX;
-          const lbl = d.slice(8); // day part
+          const lbl = semanal ? MES[+d.slice(5,7)-1] : d.slice(8);
           ticks += `<text x="${x}" y="${H - 12}" font-family="Space Mono" font-size="8" fill="currentColor" text-anchor="middle" opacity=".55">${lbl}</text>`;
         }
       });
@@ -893,7 +948,7 @@
         ${dots}
         ${ticks}
         ${yTicks}
-        <text x="${W/2}" y="${H - 2}" font-family="Space Mono" font-size="8" fill="currentColor" text-anchor="middle" opacity=".55">día del mes</text>
+        <text x="${W/2}" y="${H - 2}" font-family="Space Mono" font-size="8" fill="currentColor" text-anchor="middle" opacity=".55">${semanal ? 'hechos por semana' : 'día del mes'}</text>
       `;
     }
 

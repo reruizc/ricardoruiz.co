@@ -48,6 +48,8 @@ TIPOLOGIAS = [
     'hurto-bicicletas', 'hurto-celular', 'lesiones-en-at',
     'lesiones-personales', 'pirateria-terrestre', 'secuestro', 'terrorismo',
     'violencia-intrafamiliar',
+    # desde la entrega SIEDCO 2025 (sep-2026)
+    'hurto-ganado', 'hurto-entidades-financieras',
 ]
 
 # Comunas y corregimientos de Medellín (codes alineados con GeoJSON
@@ -92,6 +94,35 @@ def extract_comuna(desc: str) -> str:
     return 'OTROS'
 
 
+RE_SUFIJO = re.compile(r'C-(\d+)\s*$')
+sys.path.insert(0, str(Path(__file__).parent / 'ponal'))
+from build_ponal import DIC_BARRIO, clave_barrio  # noqa: E402
+DIC_MDE = DIC_BARRIO.get('05001', {})
+
+
+def comuna_de(barrio: str, desc: str) -> str:
+    """Comuna del hecho. ⚠️ En las entregas SIEDCO 2025-2026 el barrio
+    «BARRIO PENDIENTE POR ASIGNAR» llega con COMUNAS_ZONAS_DESCRIPCION =
+    «COMUNA No. 4 ARANJUEZ» en el 92% de los casos: es un valor por defecto,
+    no un hecho en Aranjuez (medido: 15.439 de 17.122 en ene-ago 2026, un
+    tercio de la ciudad). Por eso: pendiente → OTROS; si el barrio trae el
+    sufijo C-XX, manda el sufijo; solo si no, la descripción."""
+    b = (barrio or '').upper()
+    if 'PENDIENTE' in b:
+        return 'OTROS'
+    m = RE_SUFIJO.search(b)
+    if m:
+        n = int(m.group(1))
+        if 1 <= n <= 16:
+            return f'{n:02d}'
+    # sin sufijo: diccionario barrio → comuna (tools/ponal/diccionario_barrios.py),
+    # que además resuelve los corregimientos por su sigla (S.C., S.A.P., STA. E.)
+    n = DIC_MDE.get(clave_barrio(barrio))
+    if n is not None:
+        return f'{n:02d}' if n <= 16 else str(n)
+    return extract_comuna(desc)
+
+
 def process_csv(path: Path, tipologia: str, agg: dict) -> int:
     """Procesa un CSV y acumula en agg. Devuelve filas Medellín leídas."""
     rows_med = 0
@@ -112,7 +143,8 @@ def process_csv(path: Path, tipologia: str, agg: dict) -> int:
             agg['medellin']['por_tipologia'][tipologia] += qty
             agg['medellin']['total'] += qty
 
-            comuna = extract_comuna(row.get('COMUNAS_ZONAS_DESCRIPCION') or '')
+            comuna = comuna_de(row.get('BARRIOS_HECHO') or '',
+                               row.get('COMUNAS_ZONAS_DESCRIPCION') or '')
             agg['por_comuna'][comuna]['total'] += qty
             agg['por_comuna'][comuna]['por_tipologia'][tipologia] += qty
 

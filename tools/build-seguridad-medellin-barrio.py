@@ -43,6 +43,8 @@ TIPOLOGIAS = [
     "hurto-bicicletas", "hurto-celular", "lesiones-en-at",
     "lesiones-personales", "pirateria-terrestre", "secuestro", "terrorismo",
     "violencia-intrafamiliar",
+    # desde la entrega SIEDCO 2025 (sep-2026)
+    "hurto-ganado", "hurto-entidades-financieras",
 ]
 
 RE_C_SUFFIX = re.compile(r"\s*C-\d+\s*$", re.IGNORECASE)

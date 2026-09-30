@@ -64,6 +64,9 @@ csv.field_size_limit(10 ** 9)
 
 RAIZ = Path(__file__).resolve().parents[2]
 SRC = RAIZ / "Bases de datos" / "PONAL" / "BD-PONAL-15-24.csv"
+# Entregas SIEDCO por derecho de petición (2025 completo + 2026 ene-ago),
+# llevadas al mismo formato por tools/ponal/siedco_a_bd.py.
+SRC_2 = RAIZ / "Bases de datos" / "PONAL" / "BD-PONAL-25-26.csv"
 OUT = RAIZ / "Bases de datos" / "output_ponal"
 
 # ── delitos ────────────────────────────────────────────────────────────
@@ -96,6 +99,8 @@ DELITOS = [
     ("hurto_financieras", "Hurto a entidades financieras", ["HURTO ENTIDADES FINANCIERAS dic/Sheet1"]),
 ]
 SOLO_2024 = {"lesiones_at", "hurto_bicicletas", "hurto_ganado", "pirateria", "hurto_financieras"}
+# (desde la entrega 2025-2026 estos cinco ya tienen 2024 y 2025: su serie
+#  EMPIEZA en 2024, no es de un solo año → `desde: 2024` en el meta)
 
 DID = {d[0]: i for i, d in enumerate(DELITOS)}
 CANON = {}
@@ -150,6 +155,57 @@ CIUDADES_SOLO_BARRIO = {
     "52001": "Pasto", "47001": "Santa Marta", "63001": "Armenia", "20001": "Valledupar",
     "08758": "Soledad", "25754": "Soacha",
 }
+# ── respaldo: la comuna desde `COMUNAS_ZONAS_DESCRIPCION` ─────────────
+# ⚠️ En las entregas SIEDCO 2025-2026 el barrio de Bogotá dejó de traer el
+# sufijo de localidad (5,9% en 2025, 3,5% en 2026, contra 89,6% en 2015-2024),
+# pero la columna de comunas sí la trae: «UPZ No. 84 BOSA OCCIDENTAL E-7» o
+# «LOCALIDAD KENNEDY». Se usa SOLO cuando el barrio no trae sufijo y NUNCA con
+# el barrio pendiente: esos llegan estampados «UPZ No. 14 USAQUEN E-1» (Bogotá)
+# o «COMUNA No. 4 ARANJUEZ» (Medellín) — valor por defecto, no lugar del hecho.
+BOG_LOC = {"USAQUEN": 1, "CHAPINERO": 2, "SANTA FE": 3, "SAN CRISTOBAL": 4, "USME": 5,
+           "TUNJUELITO": 6, "BOSA": 7, "KENNEDY": 8, "FONTIBON": 9, "ENGATIVA": 10,
+           "SUBA": 11, "BARRIOS UNIDOS": 12, "TEUSAQUILLO": 13, "LOS MARTIRES": 14,
+           "MARTIRES": 14, "ANTONIO NARINO": 15, "PUENTE ARANDA": 16, "CANDELARIA": 17,
+           "LA CANDELARIA": 17, "RAFAEL URIBE URIBE": 18, "RAFAEL URIBE": 18,
+           "CIUDAD BOLIVAR": 19, "SUMAPAZ": 20}
+RE_DESC_E = re.compile(r"\bE-?\s?(\d{1,2})\s*$")
+RE_DESC_C = re.compile(r"COMUNA\s+No\.?\s*(\d{1,2})\b", re.I)
+
+
+#
+# ⚠️⚠️ MEDIDO contra la localidad histórica del mismo barrio (2015-2024, con
+# sufijo): la forma «… E-1» acierta solo el 29% — «PUENTE ARANDA» y
+# «TEUSAQUILLO» llegan como «UPZ No. 11 SAN CRISTOBAL NORTE E-1», las tres UPZ
+# de Usaquén (10, 11, 14) son valor por defecto. «LOCALIDAD X» acierta 86% y
+# E-2…E-20 entre 69% y 100%. Por eso: (1) primero la localidad que el MISMO
+# barrio tuvo con sufijo en la base histórica; (2) solo si no hay, la
+# descripción, descartando E-1. En Medellín la descripción no se usa (su
+# «COMUNA No. 4 ARANJUEZ» es el mismo valor por defecto): solo el histórico.
+def comuna_por_desc(dane, desc):
+    d = sin_tildes(desc or "").upper().strip()
+    if not d or dane != "11001":
+        return None
+    m = RE_DESC_E.search(d)
+    if m and 2 <= int(m.group(1)) <= 20:
+        return int(m.group(1))
+    if d.startswith("LOCALIDAD "):
+        return BOG_LOC.get(d[10:].strip())
+    return None
+
+
+# diccionario barrio → comuna (lo arma diccionario_barrios.py; si no existe,
+# el build sigue solo con el sufijo, como antes)
+_DIC = Path(__file__).parent / "barrio_comuna.json"
+DIC_BARRIO = ({d: v for d, v in json.loads(_DIC.read_text(encoding="utf-8"))["ciudades"].items()}
+              if _DIC.exists() else {})
+
+
+def clave_barrio(nom):
+    """Misma normalización que diccionario_barrios.clave()."""
+    s = re.sub(r"\s+", " ", sin_tildes(nom).upper()).strip()
+    return re.sub(r"^(BARRIO|B/|BR\.?|URB\.?|URBANIZACION)\s+", "", s)
+
+
 # marcador de nulo de la fuente: no es un barrio
 BARRIO_NULO = "PENDIENTE POR ASIGNAR"
 
@@ -216,7 +272,11 @@ def detectar_vertederos(bar, bar_anio, anios=None):
                       f"pico/último {caida:.0f}×. Revisar y agregar a VERTEDEROS.")
     return sospechosos
 
-ANIOS = list(range(2015, 2025))
+ANIOS = list(range(2015, 2027))
+# ⚠️ 2026 es PARCIAL (enero a agosto). Entra a ANIOS para que el mapa pueda
+# mostrarlo, pero ninguna tendencia puede cerrar en él: el último año completo
+# es 2025 y el comparativo honesto de 2026 es contra ene-ago 2025 (`ytd`).
+ANIO_PARCIAL, MES_CORTE = 2026, 8
 AIX = {a: i for i, a in enumerate(ANIOS)}
 NA = len(ANIOS)
 
@@ -273,17 +333,22 @@ def main():
         sys.exit(f"no encuentro {SRC}")
     OUT.mkdir(parents=True, exist_ok=True)
 
-    f = SRC.open(encoding="utf-8-sig", newline="")
-    rd = csv.reader(f, delimiter=";")
-    hdr = next(rd)
-    ix = {c: i for i, c in enumerate(hdr)}
-    ncol = len(hdr)
+    fuentes = [SRC] + ([SRC_2] if SRC_2.exists() else [])
     need = ["Nombre Delitos", "Cantidad", "Fecha", "Hora", "Día", "Hechos.CODIGO_DANE",
             "Hechos.MUNICIPIO_HECHO", "Hechos.ZONA", "Person.GENERO", "Person.EDAD",
-            "Arma empleada", "Clase de sitio"]
-    falta = [c for c in need if c not in ix]
-    if falta:
-        sys.exit(f"al CSV le faltan columnas: {falta}")
+            "Arma empleada", "Clase de sitio", "Hechos.COMUNAS_ZONAS_DESCRIPCION"]
+
+    def filas_de(path):
+        """Rinde (ix, ncol, row) de cada archivo con SU propio encabezado."""
+        with path.open(encoding="utf-8-sig", newline="") as fh:
+            rd = csv.reader(fh, delimiter=";")
+            hdr = next(rd)
+            ix = {c: i for i, c in enumerate(hdr)}
+            falta = [c for c in need if c not in ix]
+            if falta:
+                sys.exit(f"a {path.name} le faltan columnas: {falta}")
+            for row in rd:
+                yield ix, len(hdr), row
 
     # acumuladores
     nac_anio = defaultdict(int)      # (delito, anio) -> n
@@ -325,11 +390,12 @@ def main():
     total_delito = defaultdict(int)
     sin_anio = defaultdict(int)      # delito -> n sin año
     fuera_rango = defaultdict(int)   # anio -> n  (fechas fuera de 2015-2024)
+    nac_ytd = defaultdict(int)       # (delito, anio) solo meses 1..MES_CORTE
     sin_dane = 0
     etiquetas_nuevas = Counter()
     n = filas = 0
 
-    for row in rd:
+    for ix, ncol, row in (x for p in fuentes for x in filas_de(p)):
         n += 1
         if args.limite and n > args.limite:
             break
@@ -356,7 +422,12 @@ def main():
             dd, mm, yy = int(m.group(1)), int(m.group(2)), int(m.group(3))
             if yy in AIX and 1 <= mm <= 12:
                 anio = yy
-                nac_mes[(did, mm - 1)] += q
+                # el perfil por mes solo con años completos: con 2026 (ene-ago)
+                # adentro, enero-agosto tendrían un año más que sep-dic
+                if yy != ANIO_PARCIAL:
+                    nac_mes[(did, mm - 1)] += q
+                if mm <= MES_CORTE:
+                    nac_ytd[(did, yy)] += q
             else:
                 fuera_rango[yy] += q
         else:
@@ -452,8 +523,14 @@ def main():
                 rx = SUF.get(dane)
                 m = rx.search(b) if rx else None
                 com = int(m.group(1)) if m else None
-                # el nombre del barrio se guarda SIN el sufijo de comuna
                 nom = (b[:m.start()] if m else b).strip()
+                if com is None:
+                    # diccionario barrio → comuna (tools/ponal/diccionario_barrios.py):
+                    # sufijo histórico + catastro + corregimientos + correcciones manuales
+                    com = DIC_BARRIO.get(dane, {}).get(clave_barrio(nom))
+                    if com is None:
+                        com = comuna_por_desc(dane, row[ix["Hechos.COMUNAS_ZONAS_DESCRIPCION"]])
+                # (el nombre del barrio se guarda SIN el sufijo de comuna: `nom`)
                 # vigilancia del vertedero: se mide SIEMPRE, se excluye solo a
                 # los confirmados (así el próximo lote delata al que siga)
                 vert_bar[(dane, nom.upper())] += q
@@ -478,7 +555,6 @@ def main():
         if n % 1000000 == 0:
             print(f"  ... {n:,}", file=sys.stderr, flush=True)
 
-    f.close()
 
     # Una etiqueta desconocida significa que la Policía mandó un lote con otra
     # convención (ya pasó con 2024). Abortar es a propósito: si se dejara
@@ -496,7 +572,7 @@ def main():
         """[(delito, anio)] → lista de 10 enteros por delito, sin claves vacías."""
         out = {}
         for did, _l, _r in DELITOS:
-            v = [nac_anio.get((did, a), 0) for a in ANIOS]
+            v = [dd.get((did, a), 0) for a in ANIOS]
             if any(v):
                 out[did] = v
         return out
@@ -522,14 +598,17 @@ def main():
         return out
 
     meta = {
-        "v": "2026-08-07",
-        "fuente": "Policía Nacional · comisión de delitos 2015-2024",
-        "archivo": SRC.name,
+        "v": "2026-09-30",
+        "fuente": "Policía Nacional · comisión de delitos 2015-2024 + SIEDCO 2025 y ene-ago 2026",
+        "archivo": " + ".join(p.name for p in fuentes),
+        "anio_parcial": {"anio": ANIO_PARCIAL, "hasta_mes": MES_CORTE,
+                         "etiqueta": "ene–ago", "ultimo_completo": ANIO_PARCIAL - 1},
         "filas_csv": n,
         "hechos": filas,
         "anios": ANIOS,
         "delitos": [
-            {"id": i, "label": l, "solo_2024": i in SOLO_2024,
+            {"id": i, "label": l, "solo_2024": False,
+             "desde": 2024 if i in SOLO_2024 else ANIOS[0],
              "total": total_delito.get(i, 0), "sin_anio": sin_anio.get(i, 0)}
             for i, l, _r in DELITOS
         ],
@@ -565,6 +644,10 @@ def main():
     nacional = {
         "anios": ANIOS,
         "por_anio": serie(nac_anio),
+        # mismo tramo del año (ene–MES_CORTE) de todos los años: el único
+        # contra el que se puede leer 2026
+        "ytd": {"hasta_mes": MES_CORTE, "anios": ANIOS,
+                "por_delito": serie(nac_ytd)},
         "por_mes": porcat(nac_mes, list(range(12))),
         "por_dia": porcat(nac_dia, list(range(7))),
         "por_hora": porcat(nac_hora, list(range(24))),
