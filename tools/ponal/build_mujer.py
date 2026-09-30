@@ -73,7 +73,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import csv
 
 from build_ponal import (  # noqa: E402  — fuente única de las constantes
-    ANIO_PARCIAL, MES_CORTE, DIC_BARRIO, clave_barrio,
+    ANIO_PARCIAL, MES_CORTE, DIC_BARRIO, clave_barrio, comuna_por_desc,
     CANON, CIUDADES, CIUDADES_SOLO_BARRIO, BARRIO_NULO, DEPTOS,
     ANIOS, AIX, NA, MESES, DIAS, DIX, EDAD_LAB,
     VERTEDEROS, VERT_PESO, VERT_CAIDA, detectar_vertederos,
@@ -146,7 +146,7 @@ def main():
     fuentes = [SRC] + ([SRC_2] if SRC_2.exists() else [])
     need = ["Nombre Delitos", "Cantidad", "Fecha", "Hora", "Día",
             "Hechos.CODIGO_DANE", "Hechos.MUNICIPIO_HECHO", "Hechos.ZONA",
-            "Hechos.BARRIOS_HECHO", "Person.GENERO", "Person.EDAD",
+            "Hechos.BARRIOS_HECHO", "Hechos.COMUNAS_ZONAS_DESCRIPCION", "Person.GENERO", "Person.EDAD",
             "Arma empleada", "Clase de sitio", "Conduc.MOVIL_AGRESOR",
             "ListaC.DESCRIPCION_CONDUCTA", "Estado Civil",
             "Person.GRADO_INSTRUCCION_PERSONA", "País de nacimiento"]
@@ -282,6 +282,10 @@ def main():
                 nom_b = (b[:mm.start()] if mm else b).strip().upper()
                 # sin sufijo (entregas 2025-26): diccionario barrio → comuna
                 com = int(mm.group(1)) if mm else DIC_BARRIO.get(dane, {}).get(clave_barrio(nom_b))
+                if not mm:
+                    desc = comuna_por_desc(dane, row[C["Hechos.COMUNAS_ZONAS_DESCRIPCION"]])
+                    if desc is not None:
+                        com = desc
                 if com is not None:
                     # vigilancia del vertedero: se mide SIEMPRE, se excluye solo
                     # a los confirmados (así el próximo lote delata al que siga)

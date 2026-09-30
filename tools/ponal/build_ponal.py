@@ -528,8 +528,14 @@ def main():
                     # diccionario barrio → comuna (tools/ponal/diccionario_barrios.py):
                     # sufijo histórico + catastro + corregimientos + correcciones manuales
                     com = DIC_BARRIO.get(dane, {}).get(clave_barrio(nom))
-                    if com is None:
-                        com = comuna_por_desc(dane, row[ix["Hechos.COMUNAS_ZONAS_DESCRIPCION"]])
+                    # la descripción de ESTE hecho, cuando es válida, gana sobre el
+                    # diccionario: medido en homicidios de Bogotá ene-abr 2026 coinciden
+                    # en 271 de 286; los 15 que no son nombres que existen en dos
+                    # localidades (SAN FRANCISCO, DANUBIO, LOS MOLINOS) y ahí el
+                    # diccionario escoge una sola y se equivoca
+                    desc = comuna_por_desc(dane, row[ix["Hechos.COMUNAS_ZONAS_DESCRIPCION"]])
+                    if desc is not None:
+                        com = desc
                 # (el nombre del barrio se guarda SIN el sufijo de comuna: `nom`)
                 # vigilancia del vertedero: se mide SIEMPRE, se excluye solo a
                 # los confirmados (así el próximo lote delata al que siga)
