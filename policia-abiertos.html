@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Policía · Lo que el Estado publica · Ricardo Ruiz</title>
+  <meta name="description" content="Los datos abiertos de MinDefensa y la Policía en datos.gov.co, cruzados con la entrega de la Policía por derecho de petición: cómo se mata, cuántas armas se incautan, a quién capturan, masacres, feminicidio y Código de Policía." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="legislativo-base.css" />
+  <style>
+    .nav-page-tag{background:var(--amber);border-color:var(--amber)}
+    .hs{max-width:1080px;margin:0 auto 3rem;padding:0 2rem}
+    .sec{background:var(--card-bg);border:1px solid var(--card-border);padding:1.4rem 1.5rem;margin-bottom:14px;scroll-margin-top:80px}
+    .sec-n{font-size:.58rem;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);margin-bottom:.35rem}
+    .sec-t{font-family:var(--hn);font-weight:800;font-size:1.12rem;letter-spacing:-.02em;color:var(--white);margin-bottom:.3rem}
+    .sec-s{font-size:.78rem;color:var(--gray);line-height:1.68;margin-bottom:1.1rem;max-width:78ch}
+    .sec-s b,.lead b{color:var(--white);font-weight:600}
+    .lead{font-size:.86rem;color:rgba(255,255,255,.78);line-height:1.7;max-width:76ch;margin:.2rem 0 1rem}
+    .cob{display:flex;flex-wrap:wrap;gap:1.6rem;margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid var(--card-border)}
+    .cob-i b{display:block;font-family:var(--hn);font-weight:800;font-size:1.45rem;letter-spacing:-.03em;color:var(--white);line-height:1;font-variant-numeric:tabular-nums}
+    .cob-i span{display:block;font-size:.6rem;letter-spacing:.13em;text-transform:uppercase;color:var(--gray);margin-top:.35rem}
+    /* índice */
+    .toc{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+    .toc a{font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:var(--gray);border:1px solid rgba(255,255,255,.12);padding:.35rem .6rem;text-decoration:none;cursor:none}
+    .toc a:hover{color:var(--white);border-color:rgba(255,255,255,.4)}
+    /* controles */
+    .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .9rem;margin-bottom:1rem}
+    .ctl label{font-size:.58rem;letter-spacing:.13em;text-transform:uppercase;color:var(--gray)}
+    .pill{font-family:var(--hn);font-size:.68rem;padding:.32rem .6rem;background:none;border:1px solid rgba(255,255,255,.14);color:var(--gray);cursor:none;margin:0 3px 5px 0}
+    .pill.on{background:var(--amber);border-color:var(--amber);color:#1a1206;font-weight:700}
+    .pill:hover:not(.on){border-color:rgba(255,255,255,.4);color:var(--white)}
+    select.sel{max-width:100%;text-overflow:ellipsis;font-family:var(--hn);font-size:.74rem;background:#0d0f17;color:var(--white);border:1px solid rgba(255,255,255,.18);padding:.32rem .5rem;cursor:none}
+    /* gráficos */
+    .ch{width:100%;position:relative}
+    .ch svg{display:block;width:100%;height:auto;overflow:visible}
+    .ch text{font-family:var(--hn);fill:rgba(255,255,255,.55);font-size:10px}
+    .ch .ax{stroke:rgba(255,255,255,.12)}
+    .ch .gr{stroke:rgba(255,255,255,.05)}
+    .ch .hov{fill:transparent;cursor:none}
+    .leg{display:flex;flex-wrap:wrap;gap:.3rem 1rem;margin:.6rem 0 0;font-size:.68rem;color:rgba(255,255,255,.7)}
+    .leg i{display:inline-block;width:10px;height:10px;margin-right:.35rem;vertical-align:-1px}
+    .leg i.ln{height:3px;vertical-align:2px}
+    .tip{position:fixed;pointer-events:none;z-index:9000;background:rgba(6,8,16,.97);border:1px solid rgba(224,160,58,.45);color:#f4f3ef;font-family:var(--hn);font-size:.72rem;line-height:1.5;padding:.45rem .65rem;max-width:280px;display:none}
+    .tip b{color:var(--amber);font-weight:700}
+    .bars{display:flex;flex-direction:column;gap:.38rem}
+    .bar-i{display:grid;grid-template-columns:minmax(120px,38%) 1fr 70px;gap:.6rem;align-items:center;font-size:.72rem}
+    .bar-i .l{color:rgba(255,255,255,.72);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .bar-i .t{height:11px;background:var(--amber);opacity:.78;min-width:2px}
+    .bar-i .v{text-align:right;font-variant-numeric:tabular-nums;color:var(--white)}
+    .g2{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem}
+    .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.2rem}
+    .mini-t{font-size:.6rem;letter-spacing:.13em;text-transform:uppercase;color:var(--gray);margin-bottom:.7rem}
+    .warn{border-left:2px solid var(--amber);padding:.55rem .8rem;background:rgba(224,160,58,.07);font-size:.72rem;color:rgba(255,255,255,.76);line-height:1.62;margin-top:1rem}
+    .warn b{color:var(--amber)}
+    .nota{font-size:.66rem;color:var(--gray);line-height:1.6;margin-top:.7rem}
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:.2rem 0 1.1rem}
+    .kpi{border:1px solid var(--card-border);background:rgba(255,255,255,.025);padding:.8rem .9rem}
+    .kpi b{display:block;font-family:var(--hn);font-weight:800;font-size:1.35rem;letter-spacing:-.02em;color:var(--white);font-variant-numeric:tabular-nums;line-height:1.05}
+    .kpi span{display:block;font-size:.64rem;color:var(--gray);line-height:1.45;margin-top:.35rem}
+    .kpi.a b{color:var(--amber)} .kpi.r b{color:var(--red)}
+    /* tablas */
+    .tt{width:100%;border-collapse:collapse;font-size:.72rem}
+    .tt th{text-align:left;font-weight:400;color:var(--gray);padding:.42rem .5rem;font-size:.57rem;letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid var(--card-border)}
+    .tt td{padding:.48rem .5rem;border-bottom:1px solid rgba(255,255,255,.045);vertical-align:top;color:rgba(255,255,255,.8)}
+    .tt td.n,.tt th.n{text-align:right;font-variant-numeric:tabular-nums}
+    .tt tbody tr:hover{background:rgba(255,255,255,.03)}
+    .tt a{color:var(--amber);text-decoration:none} .tt a:hover{text-decoration:underline}
+    .tt .cols{font-size:.62rem;color:var(--gray);line-height:1.5}
+    .tt .cols code{word-break:break-all}
+    .ok{color:var(--green)} .no{color:var(--red)} .md{color:var(--amber)}
+    .scrollx{overflow-x:auto}
+    .tag{display:inline-block;font-size:.52rem;letter-spacing:.07em;text-transform:uppercase;padding:.08rem .34rem;margin-left:.3rem;border:1px solid rgba(255,255,255,.2);color:var(--gray)}
+    #map{height:520px;background:#070910;border:1px solid var(--card-border)}
+    .mp-2{display:grid;grid-template-columns:1.55fr 1fr;gap:1.2rem}
+    .leaflet-container{background:#070910!important}
+    .leaflet-tooltip{font-family:var(--hn)!important;font-size:.75rem!important;background:rgba(6,8,16,.97)!important;border:1px solid rgba(224,160,58,.45)!important;color:#f4f3ef!important;border-radius:0!important;padding:.4rem .6rem!important;box-shadow:none!important}
+    .leaflet-tooltip:before{display:none!important}
+    .rk{max-height:520px;overflow-y:auto}
+    code{font-family:ui-monospace,Menlo,monospace;font-size:.86em;color:#e9c98f;background:rgba(255,255,255,.04);padding:.05rem .3rem}
+    pre{font-family:ui-monospace,Menlo,monospace;font-size:.66rem;color:#e9c98f;background:rgba(255,255,255,.035);border:1px solid var(--card-border);padding:.8rem;overflow-x:auto;line-height:1.55;margin:.6rem 0}
+    .loading{font-size:.74rem;color:var(--gray);padding:2rem 0;text-align:center}
+    @media(max-width:860px){ .g2,.g3,.mp-2{grid-template-columns:1fr} #map{height:400px} .hs{padding:0 1rem} .sec{padding:1.1rem 1rem} }
+    @media(max-width:560px){ .bar-i{grid-template-columns:96px 1fr 58px} }
+  </style>
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <div class="tip" id="tip"></div>
+
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="policia.html" class="e-btn-back" id="nav-back-btn">← Policía</a>
+      <span class="nav-page-tag">Policía</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <div class="country-selector-wrap">
+        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+          <span id="countryBtnLabel">Colombia</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="country-dropdown" id="countryDropdown">
+          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          <div class="country-option" data-value="br" onclick="selectCountry(this)"><span class="country-check">✓</span> Brasil</div>
+          <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+        </div>
+      </div>
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">MinDefensa · DIJIN · datos.gov.co · cruzado con SIEDCO</div>
+    <h1 class="page-title">Lo que el Estado publica sobre el delito</h1>
+    <p class="page-sub">El Ministerio de Defensa y la Policía publican en <strong>datos.gov.co</strong> los mismos hechos que la Policía nos entrega por derecho de petición, con menos detalle pero <strong>al día</strong>, y con cosas que la entrega no trae: <strong>cómo se mató</strong> (sicariato, riña, grupo armado), <strong>feminicidio</strong>, <strong>capturas</strong>, <strong>armas incautadas</strong>, <strong>masacres</strong>, policías y soldados asesinados, y los comparendos del <strong>Código de Policía</strong>. Aquí están todos, cruzados con nuestra propia base.</p>
+    <div class="cob" id="cob"></div>
+  </div>
+
+  <div class="sec-bar">
+    <a href="policia.html" class="sec-back">← Todas las secciones</a>
+    <a href="policia-mapa.html" class="sec-back">El mapa del delito</a>
+    <a href="policia-historico.html" class="sec-back">El histórico en cifras</a>
+  </div>
+
+  <div class="hs" id="hs">
+    <nav class="toc" id="toc">
+      <a href="#s-fuentes">Las dos fuentes</a><a href="#s-cuadre">¿Cuadran?</a><a href="#s-pendiente">Barrio pendiente</a>
+      <a href="#s-modalidad">Cómo se mata</a><a href="#s-feminicidio">Feminicidio</a><a href="#s-armas">Armas</a>
+      <a href="#s-capturas">Capturas</a><a href="#s-masacres">Masacres y Fuerza Pública</a><a href="#s-mapa">Mapa</a>
+      <a href="#s-codigo">Código de Policía</a><a href="#s-nna">Niños y adolescentes</a><a href="#s-inventario">Los 127 conjuntos</a><a href="#s-consultar">Cómo consultarlos</a>
+    </nav>
+    <div class="loading" id="loading">Cargando las series de datos.gov.co…</div>
+    <div id="cuerpo" style="display:none">
+
+    <!-- 1 · fuentes -->
+    <div class="sec" id="s-fuentes">
+      <div class="sec-n">01 · Las dos fuentes</div>
+      <div class="sec-t">Un mismo registro, dos ventanas</div>
+      <div class="sec-s">La Policía guarda cada denuncia en <b>SIEDCO</b>. De ahí salen dos cosas: la extracción completa que nos entrega por derecho de petición —con barrio, hora, edad y sitio— y las tablas que MinDefensa y la DIJIN publican en datos.gov.co, más resumidas pero actualizadas cada mes. No compiten: una sirve para mirar adentro de la ciudad, la otra para tener el total al día y para lo que la entrega no trae.</div>
+      <div class="scrollx"><table class="tt" id="t-fuentes"></table></div>
+      <div class="warn">Las dos son <b>denuncia registrada</b>, no delito ocurrido. Donde la gente confía más en la Policía, o donde abrieron un canal nuevo para denunciar, el número sube sin que pase más.</div>
+    </div>
+
+    <!-- 2 · cuadre -->
+    <div class="sec" id="s-cuadre">
+      <div class="sec-n">02 · ¿Cuadran?</div>
+      <div class="sec-t">Mes a mes, las dos fuentes dan lo mismo</div>
+      <div class="sec-s">Cada línea es una fuente. Si se montan una encima de la otra, es la misma base. Donde se separan al final es porque datos.gov.co se actualiza el día 16 y los últimos días del mes todavía no habían entrado. <b>Escoge el delito y el lugar.</b></div>
+      <div class="ctl"><label>Delito</label><span id="p-cuadre"></span></div>
+      <div class="ctl"><label>Dónde</label><select class="sel" id="s-cuadre-geo"></select></div>
+      <div class="ch" id="c-cuadre"></div>
+      <div class="leg" id="l-cuadre"></div>
+      <div class="kpis" id="k-cuadre" style="margin-top:1rem"></div>
+    </div>
+
+    <!-- 3 · pendiente -->
+    <div class="sec" id="s-pendiente">
+      <div class="sec-n">03 · El barrio que dejó de llegar</div>
+      <div class="sec-t">El hecho está, pero ya no dice dónde pasó</div>
+      <div class="sec-s">Porcentaje de denuncias que la entrega SIEDCO trae con <b>«barrio pendiente por asignar»</b>. Como el total cuadra con datos.gov.co, el problema no es que falten hechos: es que perdieron la geografía dentro de la ciudad. En violencia intrafamiliar de Bogotá casi todo llega así desde octubre de 2025; en lesiones y delitos sexuales salta en abril de 2026. El homicidio, que se registra con un cuerpo, no tiene el problema.</div>
+      <div class="ctl"><label>Dónde</label><select class="sel" id="s-pend-geo"></select></div>
+      <div class="ch" id="c-pend"></div>
+      <div class="leg" id="l-pend"></div>
+      <div class="warn"><b>Qué se puede publicar y qué no.</b> La cifra de ciudad sigue firme en todos los delitos. Un mapa por localidad o por comuna de 2026 solo es confiable en homicidio; en violencia intrafamiliar, lesiones y delitos sexuales mostraría como «seguras» las zonas donde el barrio no se escribió.</div>
+    </div>
+
+    <!-- 4 · modalidad -->
+    <div class="sec" id="s-modalidad">
+      <div class="sec-n">04 · Cómo se mata</div>
+      <div class="sec-t">Sicariato, riñas y grupos armados, desde 2010</div>
+      <div class="sec-s">La entrega de la Policía dice con qué arma, pero no <b>por qué</b> mataron. MinDefensa sí publica la modalidad presunta de cada homicidio. Es la variable que separa el homicidio que puede atender la Policía de barrio (una riña, un atraco) del que viene de una estructura (sicariato, grupo armado). La fuente trae 72 modalidades; aquí van agrupadas en siete.</div>
+      <div class="ctl"><label>Dónde</label><select class="sel" id="s-mod-geo"></select>
+        <label>Ver</label><span><button class="pill on" data-m="pct">% del total</button><button class="pill" data-m="abs">número</button></span></div>
+      <div class="ch" id="c-mod"></div>
+      <div class="leg" id="l-mod"></div>
+      <div class="g2" style="margin-top:1.4rem">
+        <div><div class="mini-t" id="t-mod-ult">Modalidad en el último año</div><div class="bars" id="b-mod"></div></div>
+        <div><div class="mini-t" id="t-arma-ult">Con qué arma</div><div class="ch" id="c-arma"></div><div class="leg" id="l-arma"></div></div>
+      </div>
+      <div class="warn" id="w-mod"></div>
+    </div>
+
+    <!-- 5 · feminicidio -->
+    <div class="sec" id="s-feminicidio">
+      <div class="sec-n">05 · Feminicidio</div>
+      <div class="sec-t">El dato que la Policía no nos entrega</div>
+      <div class="sec-s">La entrega SIEDCO de 2025-2026 no trae el artículo del Código Penal en homicidios, así que no se puede separar el feminicidio (artículo 104A) del homicidio (103). datos.gov.co sí lo marca. Al lado va el total de <b>mujeres víctimas de homicidio</b>, que sí sale de nuestra base: el feminicidio es una parte de ese total, la que la Policía tipificó como tal.</div>
+      <div class="ch" id="c-fem"></div>
+      <div class="leg" id="l-fem"></div>
+      <div class="g2" style="margin-top:1.3rem">
+        <div><div class="mini-t">Por ciudad (feminicidios por año)</div><div class="scrollx"><table class="tt" id="t-fem"></table></div></div>
+        <div><div class="mini-t">Los departamentos con más casos, 2024 a 2026</div><div class="bars" id="b-fem"></div></div>
+      </div>
+      <div class="warn">La curva de 2015 a 2017 es la <b>adopción del tipo penal</b> (Ley 1761 de julio de 2015), no un aumento de casos. Y es el feminicidio <b>registrado por la Policía</b>: Medicina Legal y la Fiscalía cuentan más, porque tipifican después de investigar.</div>
+    </div>
+
+    <!-- 6 · armas -->
+    <div class="sec" id="s-armas">
+      <div class="sec-n">06 · Armas</div>
+      <div class="sec-t">Se incautan menos armas que en 2010, y la bala pesa más en el homicidio</div>
+      <div class="sec-s">Barras: armas de fuego incautadas cada año (DIJIN). Líneas: qué porcentaje de los homicidios y de los hurtos se cometió con arma de fuego. El homicidio viene de MinDefensa; los hurtos, de nuestra base SIEDCO. En las ciudades solo hay homicidio: el arma del hurto por ciudad no está en datos.gov.co.</div>
+      <div class="ctl"><label>Dónde</label><select class="sel" id="s-arm-geo"></select></div>
+      <div class="ch" id="c-arm"></div>
+      <div class="leg" id="l-arm"></div>
+      <div class="g2" style="margin-top:1.3rem">
+        <div><div class="mini-t">Qué armas se incautan (2025)</div><div class="bars" id="b-arm-clase"></div></div>
+        <div><div class="mini-t">Dónde se incautan (2025)</div><div class="bars" id="b-arm-dep"></div></div>
+      </div>
+      <div class="warn" id="w-arm"></div>
+    </div>
+
+    <!-- 7 · capturas -->
+    <div class="sec" id="s-capturas">
+      <div class="sec-n">07 · Capturas</div>
+      <div class="sec-t">A quién captura la Policía, y por qué</div>
+      <div class="sec-s">3,7 millones de capturas desde 2010, por municipio y por artículo del Código Penal. Es lo que la Policía <b>hace</b>, no lo que le denuncian. La comparación que importa es la de abajo: cuántas capturas por homicidio hay por cada homicidio.</div>
+      <div class="ctl"><label>Dónde</label><select class="sel" id="s-cap-geo"></select></div>
+      <div class="kpis" id="k-cap"></div>
+      <div class="g2">
+        <div><div class="mini-t">Capturas por año</div><div class="ch" id="c-cap"></div></div>
+        <div><div class="mini-t">Capturas por homicidio y homicidios</div><div class="ch" id="c-caphom"></div><div class="leg" id="l-caphom"></div></div>
+      </div>
+      <div class="ctl" style="margin-top:1.3rem"><label>Conducta</label><span id="p-capcond"></span></div>
+      <div class="bars" id="b-capcond"></div>
+      <div class="g2" style="margin-top:1.3rem">
+        <div><div class="mini-t">Género del capturado</div><div class="ch" id="c-capgen"></div><div class="leg" id="l-capgen"></div></div>
+        <div><div class="mini-t">Grupo etario del capturado</div><div class="ch" id="c-capeta"></div><div class="leg" id="l-capeta"></div></div>
+      </div>
+      <div class="warn">Una captura no es una condena, y la cuenta por homicidio no es «homicidios resueltos»: una persona capturada puede responder por un caso de otro año, y un homicidio puede llevar a varias capturas. Sirve como <b>indicador de esfuerzo</b>, no de eficacia judicial. El artículo 103 cubre el homicidio; el feminicidio (104A) va aparte.</div>
+    </div>
+
+    <!-- 8 · masacres y fuerza pública -->
+    <div class="sec" id="s-masacres">
+      <div class="sec-n">08 · Masacres y Fuerza Pública</div>
+      <div class="sec-t">La violencia que se mide en hechos colectivos</div>
+      <div class="sec-s">Una <b>masacre</b> es el asesinato de tres o más personas en un mismo hecho; es una categoría de seguimiento del Ministerio, no un delito del Código Penal. La <b>afectación de la Fuerza Pública</b> cuenta policías y militares heridos o asesinados.</div>
+      <div class="g2">
+        <div><div class="mini-t">Masacres por año</div><div class="ch" id="c-mas"></div><div class="leg" id="l-mas"></div></div>
+        <div><div class="mini-t">Policías y militares afectados por año</div><div class="ch" id="c-fp"></div><div class="leg" id="l-fp"></div></div>
+      </div>
+      <div class="g2" style="margin-top:1.3rem">
+        <div><div class="mini-t">Municipios con más víctimas de masacre, 2025-2026</div><div class="scrollx"><table class="tt" id="t-mas"></table></div></div>
+        <div><div class="mini-t">Departamentos con más afectación de la Fuerza Pública, 2025-2026</div><div class="scrollx"><table class="tt" id="t-fp"></table></div></div>
+      </div>
+    </div>
+
+    <!-- 9 · mapa -->
+    <div class="sec" id="s-mapa">
+      <div class="sec-n">09 · Mapa</div>
+      <div class="sec-t">Departamento por departamento</div>
+      <div class="sec-s">Escoge un indicador y un año. Con <b>tasa</b> se divide por la población del DANE (100.000 habitantes; 100.000 mujeres en feminicidio), que solo existe de 2018 en adelante. En 2026 los años van incompletos: la tasa se omite y el número es de enero a agosto.</div>
+      <div class="ctl"><label>Indicador</label><select class="sel" id="s-map-ind"></select>
+        <label>Año</label><select class="sel" id="s-map-anio"></select>
+        <span><button class="pill on" data-mm="abs">número</button><button class="pill" data-mm="tasa">tasa</button></span></div>
+      <div class="mp-2">
+        <div id="map"></div>
+        <div class="rk"><div class="mini-t" id="t-map-rk">Ranking</div><div class="bars" id="b-map-rk"></div></div>
+      </div>
+      <div class="nota" id="n-map"></div>
+    </div>
+
+    <!-- 10 · código -->
+    <div class="sec" id="s-codigo">
+      <div class="sec-n">10 · Código de Policía</div>
+      <div class="sec-t">Lo que la Policía sanciona en la calle</div>
+      <div class="sec-s">Comparendos y medidas correctivas de la Ley 1801 de 2016, por comportamiento. Son las tablas más grandes que publica la Policía y las menos ordenadas: no traen una fecha limpia, así que se leen como un <b>acumulado</b> y no como una serie.</div>
+      <div class="ctl"><label>Tabla</label><select class="sel" id="s-cod"></select>
+        <span><button class="pill on" data-cg="nac">todo el país</button><button class="pill" data-cg="bog">Bogotá</button></span></div>
+      <div class="kpis" id="k-cod"></div>
+      <div class="bars" id="b-cod"></div>
+      <div class="nota">Portar un arma cortopunzante encabeza el país. Es la otra cara del arma blanca, que está en cerca del 15% de los homicidios (sección 04).</div>
+    </div>
+
+    <!-- 11 · NNA -->
+    <div class="sec" id="s-nna">
+      <div class="sec-n">11 · Niños, niñas y adolescentes</div>
+      <div class="sec-t">Delitos contra menores de edad</div>
+      <div class="sec-s">Tabla de la Policía con los delitos cuya víctima es menor de 18 años, por artículo del Código Penal y por género. Hoy solo trae <b>2026</b> y no tiene código de municipio, así que no sirve para ver tendencia, pero sí para ver qué delitos concentran a los menores de edad como víctimas.</div>
+      <div class="g2">
+        <div><div class="mini-t" id="t-nna">Delitos más frecuentes</div><div class="bars" id="b-nna"></div></div>
+        <div><div class="mini-t">Por género de la víctima</div><div class="bars" id="b-nna-gen"></div><div class="nota" id="n-nna"></div></div>
+      </div>
+    </div>
+
+    <!-- 12 · inventario -->
+    <div class="sec" id="s-inventario">
+      <div class="sec-n">12 · Los conjuntos</div>
+      <div class="sec-t">Qué hay en datos.gov.co, uno por uno</div>
+      <div class="sec-s">De los <b>127</b> conjuntos con atribución de MinDefensa o la Policía, estos son los que sirven. Cada uno enlaza a su ficha. La fecha es la última vez que el conjunto recibió filas.</div>
+      <div class="ctl"><label>Grupo</label><span id="p-inv"></span></div>
+      <div class="scrollx"><table class="tt" id="t-inv"></table></div>
+    </div>
+
+    <!-- 13 · cómo consultar -->
+    <div class="sec" id="s-consultar">
+      <div class="sec-n">13 · Cómo consultarlos</div>
+      <div class="sec-t">Dos familias, dos maneras de preguntar</div>
+      <div class="sec-s">Todos se consultan por la API Socrata de datos.gov.co, sin clave. Pero los de MinDefensa y los de la DIJIN no guardan la fecha ni la cantidad del mismo modo, y la consulta que funciona en uno falla en el otro.</div>
+      <div class="scrollx"><table class="tt">
+        <thead><tr><th>Familia</th><th>Fecha</th><th>Cantidad</th><th>Corte</th><th>Municipio</th></tr></thead>
+        <tbody>
+          <tr><td><b style="color:var(--white)">MinDefensa</b></td><td>fecha real → <code>date_extract_y()</code></td><td>número → <code>sum()</code></td><td>31-ago-2026</td><td><code>cod_muni</code> (DANE, 5 dígitos)</td></tr>
+          <tr><td><b style="color:var(--white)">DIJIN / Policía</b></td><td>texto <code>dd/mm/aaaa</code> → <code>substring(fecha_hecho,7,4)</code></td><td>texto → <code>count(*)</code> o <code>sum(cantidad::number)</code></td><td>31-jul-2026</td><td><code>codigo_dane</code> (8 dígitos)</td></tr>
+        </tbody></table></div>
+<pre># MinDefensa · homicidios de Bogotá por año
+curl "https://www.datos.gov.co/resource/m8fd-ahd9.json?\$select=date_extract_y(fecha_hecho)%20as%20a,sum(cantidad)%20as%20n&amp;\$where=cod_muni='11001'&amp;\$group=a&amp;\$order=a"
+
+# DIJIN · capturas de Bogotá por año (fecha y cantidad vienen como texto)
+curl "https://www.datos.gov.co/resource/3jdh-nmwu.json?\$select=substring(fecha_hecho,7,4)%20as%20a,count(*)%20as%20n&amp;\$where=codigo_dane='11001000'&amp;\$group=a&amp;\$order=a"</pre>
+      <div class="warn">Pedir <code>date_extract_y</code> o <code>sum</code> sobre un campo de texto devuelve <b>type-mismatch</b>. Las consultas agregadas sobre capturas (3,7 millones de filas) tardan entre 30 y 120 segundos. Ninguno de estos conjuntos trae barrio, hora, día, edad exacta, sitio, cómo se movían víctima y agresor, ni marca y modelo del bien hurtado: para eso sigue haciendo falta el derecho de petición.</div>
+    </div>
+
+    </div><!-- /cuerpo -->
+  </div>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Policía · Lo que el Estado publica</span>
+    <a href="policia.html" class="e-btn-back" style="font-size:.62rem">← Policía</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script src="ponal-base.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+  /* ═════════════════════════ datos ═════════════════════════
+     mindefensa.json   ← tools/ponal/build_mindefensa.py (Socrata, agregado)
+     siedco-mes.json   ← tools/ponal/build_cruce_siedco.py (entrega SIEDCO 2025-26)
+     arma_anio.json    ← tools/ponal/arma_anio.py (SIEDCO 2015-2026, arma × año)
+     poblacion.json    ← tools/ponal/build_poblacion.py (DANE)                  */
+  const DATA_V='20260930';
+  const ST={};
+  const AMB='#e0a03a', RED='#d1584e', BLU='#3d6fff', GRN='#4ade80', CYA='#22d3ee', VIO='#a78bfa', GRY='rgba(255,255,255,.35)';
+  const PAL=['#e0a03a','#d1584e','#3d6fff','#22d3ee','#a78bfa','#4ade80','#f472b6','#94a3b8'];
+  const CIU_ORDEN=['11001','05001','76001','08001','13001','68001','54001','08758','25754','47001'];
+  const nf=n=>n==null||isNaN(n)?'—':Math.round(n).toLocaleString('es-CO');
+  const pf=(n,d=1)=>n==null||isNaN(n)?'—':n.toFixed(d).replace('.',',')+'%';
+  const nice=s=>String(s||'').toLowerCase().replace(/(^|\s|\/|\()([a-záéíóúñü])/g,(m,a,b)=>a+b.toUpperCase());
+  const MESES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const ym=s=>{const [a,m]=s.split('-');return MESES[+m-1]+' '+a.slice(2)};
+
+  async function J(nombre){
+    const r=await fetch(PONAL.BASE+'/'+nombre+'?v='+DATA_V);
+    if(!r.ok) throw new Error(nombre+' HTTP '+r.status);
+    return r.json();
+  }
+
+  /* ═════════════════════════ tooltip ═════════════════════════ */
+  const TIP=document.getElementById('tip');
+  function tipOn(e,html){ TIP.innerHTML=html; TIP.style.display='block'; tipMove(e); }
+  function tipMove(e){
+    const w=TIP.offsetWidth, x=e.clientX+14, y=e.clientY+14;
+    TIP.style.left=(x+w>innerWidth-8?e.clientX-w-14:x)+'px'; TIP.style.top=y+'px';
+  }
+  function tipOff(){ TIP.style.display='none'; }
+  /* Cada gráfico registra un array de textos por columna; un solo listener por
+     contenedor busca la columna más cercana en X — acertarle a un punto de 3px
+     con el mouse es imposible. */
+  function hoverCols(el,svg,xs,textos){
+    const r=()=>svg.getBoundingClientRect();
+    const vb=svg.viewBox.baseVal;
+    el.onmousemove=e=>{
+      const b=r(), xv=(e.clientX-b.left)*vb.width/b.width;
+      let k=0,d=1e9; xs.forEach((x,i)=>{const dd=Math.abs(x-xv); if(dd<d){d=dd;k=i}});
+      const g=svg.querySelector('.gl'); if(g){g.setAttribute('x1',xs[k]);g.setAttribute('x2',xs[k]);g.style.display='block'}
+      tipOn(e,textos[k]);
+    };
+    el.onmouseleave=()=>{tipOff(); const g=svg.querySelector('.gl'); if(g) g.style.display='none';};
+  }
+
+  /* ═════════════════════════ gráficos SVG ═════════════════════════
+     Sin librerías: el resto del hub tampoco las usa y así la página pesa poco. */
+  function ejeY(max,H,P,W,fmt){
+    let s='';
+    for(let i=0;i<=4;i++){
+      const v=max*i/4, y=P.t+(H-P.t-P.b)*(1-i/4);
+      s+=`<line class="gr" x1="${P.l}" x2="${W-P.r}" y1="${y}" y2="${y}"/><text x="${P.l-6}" y="${y+3}" text-anchor="end">${fmt(v)}</text>`;
+    }
+    return s;
+  }
+  function niceMax(v){ if(v<=0) return 1; const p=Math.pow(10,Math.floor(Math.log10(v))); const f=v/p; return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p; }
+  const fmtK=v=>v>=1e6?(v/1e6).toFixed(1).replace('.0','').replace('.',',')+' M':v>=1e4?Math.round(v/1e3)+' mil':v>=1e3?(v/1e3).toFixed(1).replace('.0','').replace('.',',')+' mil':Math.round(v);
+
+  /* líneas · series:[{name,color,values,dash,w}] · opts:{pct,partialFrom,yMax,H} */
+  function lineas(id,labels,series,opts={}){
+    const el=document.getElementById(id), W=760, H=opts.H||260, P={l:52,r:14,t:12,b:26};
+    const vals=series.flatMap(s=>s.values.filter(v=>v!=null));
+    const max=opts.yMax||niceMax(Math.max(...vals,opts.pct?1:1));
+    const xs=labels.map((_,i)=>P.l+(W-P.l-P.r)*(labels.length>1?i/(labels.length-1):.5));
+    const y=v=>P.t+(H-P.t-P.b)*(1-v/max);
+    const fy=opts.pct?(v=>Math.round(v)+'%'):fmtK;
+    let s=`<svg viewBox="0 0 ${W} ${H}">`+ejeY(max,H,P,W,fy);
+    const paso=Math.ceil(labels.length/14);
+    labels.forEach((l,i)=>{ if(i%paso===0||i===labels.length-1) s+=`<text x="${xs[i]}" y="${H-8}" text-anchor="middle">${l}</text>`; });
+    if(opts.partialFrom!=null){ const i=labels.indexOf(opts.partialFrom); if(i>=0) s+=`<rect x="${xs[i]-(xs[1]-xs[0])/2}" y="${P.t}" width="${W-P.r-xs[i]+(xs[1]-xs[0])/2}" height="${H-P.t-P.b}" fill="rgba(255,255,255,.035)"/>`; }
+    s+=`<line class="gl" x1="0" x2="0" y1="${P.t}" y2="${H-P.b}" stroke="rgba(255,255,255,.25)" style="display:none"/>`;
+    series.forEach(se=>{
+      let d='',on=false;
+      se.values.forEach((v,i)=>{ if(v==null){on=false;return} d+=(on?'L':'M')+xs[i].toFixed(1)+','+y(v).toFixed(1); on=true; });
+      s+=`<path d="${d}" fill="none" stroke="${se.color}" stroke-width="${se.w||2.2}" ${se.dash?`stroke-dasharray="${se.dash}"`:''} stroke-linejoin="round" stroke-linecap="round"/>`;
+      if(!se.dash && labels.length<=20) se.values.forEach((v,i)=>{ if(v!=null) s+=`<circle cx="${xs[i]}" cy="${y(v)}" r="2.6" fill="${se.color}"/>`; });
+    });
+    s+='</svg>';
+    el.innerHTML=s;
+    const tx=labels.map((l,i)=>`<b>${l}</b><br>`+series.map(se=>`<span style="color:${se.color}">●</span> ${se.name}: ${se.values[i]==null?'—':(opts.pct?pf(se.values[i]):nf(se.values[i]))}`).join('<br>'));
+    hoverCols(el,el.querySelector('svg'),xs,opts.tips||tx);
+  }
+  function leyenda(id,items){ document.getElementById(id).innerHTML=items.map(([n,c,ln])=>`<span><i class="${ln?'ln':''}" style="background:${c}"></i>${n}</span>`).join(''); }
+
+  /* barras apiladas por año · series:[{name,color,values}] · pct: normaliza a 100 */
+  function apiladas(id,labels,series,opts={}){
+    const el=document.getElementById(id), W=760, H=opts.H||270, P={l:52,r:14,t:12,b:26};
+    const tot=labels.map((_,i)=>series.reduce((a,s)=>a+(s.values[i]||0),0));
+    const max=opts.pct?100:niceMax(Math.max(...tot));
+    const bw=(W-P.l-P.r)/labels.length, xs=labels.map((_,i)=>P.l+bw*i+bw/2);
+    const y=v=>P.t+(H-P.t-P.b)*(1-v/max);
+    let s=`<svg viewBox="0 0 ${W} ${H}">`+ejeY(max,H,P,W,opts.pct?(v=>Math.round(v)+'%'):fmtK);
+    labels.forEach((l,i)=>{
+      let acc=0;
+      series.forEach(se=>{
+        const v=se.values[i]||0, vv=opts.pct?(tot[i]?100*v/tot[i]:0):v;
+        if(vv>0) s+=`<rect x="${(xs[i]-bw*.38).toFixed(1)}" width="${(bw*.76).toFixed(1)}" y="${y(acc+vv).toFixed(1)}" height="${(y(acc)-y(acc+vv)).toFixed(1)}" fill="${se.color}" ${opts.partial&&opts.partial.includes(l)?'opacity=".55"':''}/>`;
+        acc+=vv;
+      });
+      if(i%Math.ceil(labels.length/16)===0||i===labels.length-1) s+=`<text x="${xs[i]}" y="${H-8}" text-anchor="middle">${l}</text>`;
+    });
+    s+=`<line class="gl" x1="0" x2="0" y1="${P.t}" y2="${H-P.b}" stroke="rgba(255,255,255,.18)" style="display:none"/></svg>`;
+    el.innerHTML=s;
+    const tx=labels.map((l,i)=>`<b>${l}</b> · total ${nf(tot[i])}<br>`+series.filter(se=>se.values[i]).map(se=>`<span style="color:${se.color}">■</span> ${se.name}: ${nf(se.values[i])} (${pf(tot[i]?100*se.values[i]/tot[i]:0)})`).join('<br>'));
+    hoverCols(el,el.querySelector('svg'),xs,tx);
+  }
+
+  /* barras + líneas en % (eje derecho) — el gráfico de armas */
+  function barrasLineas(id,labels,barras,lineasS,opts={}){
+    const el=document.getElementById(id), W=760, H=opts.H||300, P={l:52,r:42,t:14,b:26};
+    const max=niceMax(Math.max(...barras.values.filter(v=>v!=null),1));
+    const bw=(W-P.l-P.r)/labels.length, xs=labels.map((_,i)=>P.l+bw*i+bw/2);
+    const y=v=>P.t+(H-P.t-P.b)*(1-v/max), yp=v=>P.t+(H-P.t-P.b)*(1-v/100);
+    let s=`<svg viewBox="0 0 ${W} ${H}">`+ejeY(max,H,P,W,fmtK);
+    for(let i=0;i<=4;i++) s+=`<text x="${W-P.r+6}" y="${P.t+(H-P.t-P.b)*(1-i/4)+3}">${i*25}%</text>`;
+    labels.forEach((l,i)=>{
+      const v=barras.values[i];
+      if(v!=null){
+        const par=opts.partial&&opts.partial.includes(l);
+        s+=`<rect x="${(xs[i]-bw*.36).toFixed(1)}" width="${(bw*.72).toFixed(1)}" y="${y(v).toFixed(1)}" height="${(y(0)-y(v)).toFixed(1)}" fill="${par?'none':barras.color}" stroke="${barras.color}" ${par?'stroke-dasharray="3 2"':''}/>`;
+      }
+      if(i%Math.ceil(labels.length/17)===0||i===labels.length-1) s+=`<text x="${xs[i]}" y="${H-8}" text-anchor="middle">${l}${opts.partial&&opts.partial.includes(l)?'*':''}</text>`;
+    });
+    s+=`<line class="gl" x1="0" x2="0" y1="${P.t}" y2="${H-P.b}" stroke="rgba(255,255,255,.2)" style="display:none"/>`;
+    lineasS.forEach(se=>{
+      let d='',on=false;
+      se.values.forEach((v,i)=>{ if(v==null){on=false;return} d+=(on?'L':'M')+xs[i].toFixed(1)+','+yp(v).toFixed(1); on=true; });
+      s+=`<path d="${d}" fill="none" stroke="${se.color}" stroke-width="${se.w||2.4}" ${se.dash?`stroke-dasharray="${se.dash}"`:''}/>`;
+      if(!se.dash) se.values.forEach((v,i)=>{ if(v!=null) s+=`<circle cx="${xs[i]}" cy="${yp(v)}" r="2.8" fill="${se.color}"/>`; });
+    });
+    el.innerHTML=s+'</svg>';
+    const tx=labels.map((l,i)=>`<b>${l}</b><br>${barras.name}: ${nf(barras.values[i])}<br>`+lineasS.map(se=>`<span style="color:${se.color}">●</span> ${se.name}: ${pf(se.values[i])}`).join('<br>'));
+    hoverCols(el,el.querySelector('svg'),xs,tx);
+  }
+
+  function barrasH(id,items,opts={}){
+    const max=Math.max(...items.map(i=>i.v),1);
+    document.getElementById(id).innerHTML=items.length?items.map(i=>`<div class="bar-i" title="${esc(i.full||i.l)}"><span class="l">${esc(i.l)}</span><span><span class="t" style="display:block;width:${(100*i.v/max).toFixed(1)}%;background:${i.c||opts.c||AMB}"></span></span><span class="v">${opts.fmt?opts.fmt(i.v):nf(i.v)}</span></div>`).join(''):'<div class="nota">Sin dato para esta selección.</div>';
+  }
+
+  /* ═════════════════════════ ayudas de series ═════════════════════════ */
+  const rango=(a,b)=>Array.from({length:b-a+1},(_,i)=>String(a+i));
+  const serie=(obj,anios)=>anios.map(a=>obj&&obj[a]!=null?+obj[a]:null);
+  const ciuNom=d=>ST.md.ciudades[d]||d;
+  function llenarGeo(sel,conNac=true,soloCon){
+    const ops=(conNac?[['nac','Todo el país']]:[]).concat(CIU_ORDEN.filter(d=>!soloCon||soloCon(d)).map(d=>[d,ciuNom(d)]));
+    sel.innerHTML=ops.map(([v,n])=>`<option value="${v}">${n}</option>`).join('');
+  }
+  const ANIO_PARCIAL='2026';
+
+  /* ═════════════════════════ 0 · franja ═════════════════════════ */
+  function franja(){
+    const md=ST.md, cap=md.capturas.anio, sc=Object.values(cap).reduce((a,v)=>a+v.c,0);
+    const hom=md.delitos.homicidios.anio;
+    document.getElementById('cob').innerHTML=[
+      ['127','conjuntos de MinDefensa y Policía'],
+      ['31 ago 2026','corte de MinDefensa'],
+      [(sc/1e6).toFixed(2).replace('.',',')+' M','capturas desde 2010'],
+      [Object.keys(hom)[0]+'–2026','serie de homicidio'],
+      [nf(Object.values(md.homicidio.feminicidio.anio).reduce((a,b)=>a+b,0)),'feminicidios registrados'],
+    ].map(([b,s])=>`<div class="cob-i"><b>${b}</b><span>${s}</span></div>`).join('');
+  }
+
+  /* ═════════════════════════ 1 · fuentes ═════════════════════════ */
+  function tablaFuentes(){
+    const F=[
+      ['Total de hechos por municipio y mes','ok','ok','Cuadran mes a mes (sección 02)'],
+      ['Al día','md:cada mes, con dos semanas de rezago','md:según la petición; la última llegó en septiembre con corte a agosto',''],
+      ['Barrio, hora, día de la semana','ok','no',''],
+      ['Edad exacta, estado civil, escolaridad, ocupación de la víctima','ok','md:grupo etario en las tablas DIJIN',''],
+      ['Clase de sitio, cómo se movía el agresor y la víctima','ok','no',''],
+      ['Marca y modelo del vehículo hurtado','ok','no','Celulares: no llega en ninguna de las dos'],
+      ['Arma empleada','ok','md:solo homicidio',''],
+      ['Modalidad del homicidio (sicariato, riña, grupo armado…)','no','ok','Sección 04'],
+      ['Feminicidio (artículo 104A)','no','ok','Sección 05'],
+      ['Capturas, armas incautadas, incautación de droga','no','ok','Secciones 06 y 07'],
+      ['Masacres y policías o militares afectados','no','ok','Sección 08'],
+      ['Comparendos del Código de Policía','no','ok','Sección 10'],
+    ];
+    const c=v=>{ if(v==='ok') return '<span class="ok">Sí</span>'; if(v==='no') return '<span class="no">No</span>'; const [,t]=v.split(':'); return `<span class="md">Parcial</span> <span class="cols">${t}</span>`; };
+    document.getElementById('t-fuentes').innerHTML=`<thead><tr><th>Qué</th><th>SIEDCO por derecho de petición</th><th>datos.gov.co (MinDefensa · DIJIN)</th><th>Nota</th></tr></thead><tbody>`+
+      F.map(([q,a,b,n])=>`<tr><td>${q}</td><td>${c(a)}</td><td>${c(b)}</td><td class="cols">${n}</td></tr>`).join('')+'</tbody>';
+  }
+
+  /* ═════════════════════════ 2 · cuadre ═════════════════════════ */
+  const CUADRE=[['homicidios','Homicidios'],['violencia_intra','Violencia intrafamiliar'],['lesiones','Lesiones'],['delitos_sexuales','Delitos sexuales'],
+    ['hurto_personas','Hurto a personas'],['extorsiones','Extorsión'],['hurto_comercios','Hurto a comercios'],['hurto_residencias','Hurto a residencias'],['del_informaticos','Informáticos'],['homicidios_at','Muertes en vías']];
+  ST.cuadre='homicidios';
+  function cuadre(){
+    const d=ST.cuadre, g=document.getElementById('s-cuadre-geo').value;
+    const md=ST.md.delitos[d], sm=ST.sm;
+    const a=g==='nac'?md.mes:(md.mes_ciudad[g]||{}), b=g==='nac'?(sm.nac[d]||{}):((sm.ciudad[g]||{})[d]||{});
+    const meses=[...new Set([...Object.keys(a),...Object.keys(b)])].filter(m=>m>='2025-01'&&m<='2026-08').sort();
+    const va=meses.map(m=>a[m]??null), vb=meses.map(m=>b[m]??null);
+    lineas('c-cuadre',meses.map(ym),[{name:'SIEDCO (derecho de petición)',color:AMB,values:vb,w:3.2},{name:'MinDefensa (datos.gov.co)',color:BLU,values:va,w:1.8,dash:'5 3'}]);
+    leyenda('l-cuadre',[['SIEDCO · nuestra entrega',AMB,1],['MinDefensa · datos.gov.co',BLU,1]]);
+    const dif=meses.map((m,i)=>va[i]!=null&&vb[i]!=null?vb[i]-va[i]:null).filter(x=>x!=null);
+    const cerr=meses.slice(0,-2).map((m,i)=>va[i]!=null&&vb[i]!=null?Math.abs(vb[i]-va[i]):null).filter(x=>x!=null);
+    const ta=va.reduce((s,v)=>s+(v||0),0), tb=vb.reduce((s,v)=>s+(v||0),0);
+    document.getElementById('k-cuadre').innerHTML=[
+      [nf(tb),'SIEDCO, ene 2025 a ago 2026'],[nf(ta),'MinDefensa, mismo tramo'],
+      [pf(ta?100*(tb-ta)/ta:0,2),'diferencia total'],[nf(cerr.length?Math.max(...cerr):0),'mayor diferencia en un mes, sin contar los dos últimos'],
+    ].map(([b,s],i)=>`<div class="kpi${i===2?' a':''}"><b>${b}</b><span>${s}</span></div>`).join('');
+  }
+
+  /* ═════════════════════════ 3 · pendiente ═════════════════════════ */
+  function pendiente(){
+    const g=document.getElementById('s-pend-geo').value, P=ST.sm.pendiente[g]||{};
+    const meses=Object.keys((P.homicidios||P.violencia_intra||{})).sort();
+    const D=[['violencia_intra','Violencia intrafamiliar',RED],['lesiones','Lesiones',AMB],['delitos_sexuales','Delitos sexuales',VIO],['hurto_personas','Hurto a personas',CYA],['homicidios','Homicidios',GRN]];
+    const se=D.map(([d,n,c])=>({name:n,color:c,values:meses.map(m=>{const x=(P[d]||{})[m];return x&&x[1]?100*x[0]/x[1]:null})}));
+    lineas('c-pend',meses.map(ym),se,{pct:true,yMax:100});
+    leyenda('l-pend',D.map(([,n,c])=>[n,c,1]));
+  }
+
+  /* ═════════════════════════ 4 · modalidad ═════════════════════════ */
+  /* La fuente trae 72 modalidades (siete clases de riña, una docena de
+     «enfrentamientos»…). Se agrupan en siete, y la regla queda escrita aquí
+     para que se pueda auditar. Las riñas dentro de la familia van con
+     violencia intrafamiliar, no con las riñas de calle. */
+  const FAMILIA_RX=/INTRAFAMILIAR|COMPA[ÑN]EROS PERMANENTES|ESPOSOS|HERMANOS|HIJO|POR EL PADRE/;
+  function grupoMod(k){
+    if(k==='SICARIATO') return 'Sicariato';
+    if(FAMILIA_RX.test(k)) return 'Familia o pareja';
+    if(/^RI[ÑN]A/.test(k)) return 'Riña';
+    if(/ATRACO|SECUESTRO AL PASO/.test(k)) return 'Atraco';
+    if(/GAO|AUTODEFENSAS|SUBVERSI|ENFRENTAMIENTO|BACRIM|TERRORISMO|FRANCOTIRADOR/.test(k)) return 'Grupos armados y enfrentamientos';
+    if(/POR ESTABLECER|NO REPORTADA|SIN DATO/.test(k)) return 'Por establecer';
+    return 'Otras';
+  }
+  const MOD_ORDEN=[['Sicariato',RED],['Grupos armados y enfrentamientos','#be185d'],['Riña',AMB],['Atraco',CYA],['Familia o pareja',VIO],['Otras','#475569'],['Por establecer','#334155']];
+  ST.modModo='pct';
+  function modalidad(){
+    const g=document.getElementById('s-mod-geo').value, H=ST.md.homicidio;
+    const M0=g==='nac'?H._modalidad_presunta:(H._modalidad_presunta_ciudad[g]||{});
+    const anios=rango(2010,2026);
+    const M={}; Object.entries(M0).forEach(([k,v])=>{const gg=grupoMod(k); M[gg]=M[gg]||{}; Object.entries(v).forEach(([y,n])=>M[gg][y]=(M[gg][y]||0)+(+n||0));});
+    const series=MOD_ORDEN.filter(([k])=>M[k]).map(([k,c])=>({name:k,color:c,values:anios.map(y=>M[k][y]||0)}));
+    apiladas('c-mod',anios,series,{pct:ST.modModo==='pct',partial:[ANIO_PARCIAL]});
+    leyenda('l-mod',series.map(s=>[s.name,s.color]));
+    const u=ANIO_PARCIAL, ul=series.map(s=>({l:s.name,v:s.values[anios.indexOf(u)],c:s.color})).filter(x=>x.v).sort((a,b)=>b.v-a.v);
+    const tu=ul.reduce((a,x)=>a+x.v,0);
+    document.getElementById('t-mod-ult').textContent='Modalidad en 2026 (enero a agosto) · '+(g==='nac'?'país':ciuNom(g));
+    barrasH('b-mod',ul.map(x=>({...x,l:x.l+' · '+pf(100*x.v/tu,0)})));
+    // arma
+    const A=g==='nac'?H.arma_medio:(H.arma_medio_ciudad[g]||{});
+    const grp=k=>/FUEGO/.test(k)?'Arma de fuego':/BLANCA|CORTO/.test(k)?'Arma blanca':/CONTUNDENTE/.test(k)?'Contundente':'Otra';
+    const AG={}; Object.entries(A).forEach(([k,v])=>{const gg=grp(k); AG[gg]=AG[gg]||{}; anios.forEach(y=>AG[gg][y]=(AG[gg][y]||0)+(+v[y]||0));});
+    const orden=[['Arma de fuego',RED],['Arma blanca',AMB],['Contundente',CYA],['Otra','#64748b']];
+    const sa=orden.filter(([k])=>AG[k]).map(([k,c])=>({name:k,color:c,values:anios.map(y=>{const t=Object.values(AG).reduce((a,o)=>a+(o[y]||0),0);return t?100*(AG[k][y]||0)/t:null})}));
+    lineas('c-arma',anios,sa,{pct:true,yMax:100,H:220,partialFrom:ANIO_PARCIAL});
+    leyenda('l-arma',orden.filter(([k])=>AG[k]).map(([k,c])=>[k,c,1]));
+    document.getElementById('t-arma-ult').textContent='Con qué arma · % de los homicidios';
+    const sic=(M['Sicariato']||{}), gao=(M['Grupos armados y enfrentamientos']||{})[u]||0;
+    const tu2=Object.values(M).reduce((a,v)=>a+(+v[u]||0),0);
+    document.getElementById('w-mod').innerHTML=g==='nac'
+      ?`En 2026 el sicariato explica el <b>${pf(100*(+sic[u]||0)/tu2,0)}</b> de los homicidios del país y los ataques de grupos armados y enfrentamientos el <b>${pf(100*gao/tu2,0)}</b>. La modalidad es <b>presunta</b>: la asigna la Policía al registrar el hecho, antes de que la Fiscalía investigue, y «por establecer» es lo que todavía no tiene una.`
+      :`En ${ciuNom(g)}, enero a agosto de 2026: sicariato <b>${pf(100*(+sic[u]||0)/(tu2||1),0)}</b>, grupos armados <b>${pf(100*gao/(tu2||1),0)}</b>. Riña y atraco son homicidios de calle y de convivencia; el sicariato es homicidio por encargo, ligado a economías ilegales.`;
+  }
+
+  /* ═════════════════════════ 5 · feminicidio ═════════════════════════ */
+  function feminicidio(){
+    const F=ST.md.homicidio.feminicidio, anios=rango(2015,2026), N=ST.nac;
+    const muj=N.genero_anio.homicidios.F, A0=N.anios.map(String);
+    lineas('c-fem',anios,[
+      {name:'Mujeres víctimas de homicidio (SIEDCO)',color:VIO,values:anios.map(a=>{const i=A0.indexOf(a);return i>=0?muj[i]:null})},
+      {name:'Feminicidios registrados (MinDefensa)',color:RED,values:serie(F.anio,anios),w:3}],{partialFrom:ANIO_PARCIAL,H:240});
+    leyenda('l-fem',[['Mujeres víctimas de homicidio · SIEDCO',VIO,1],['Feminicidio (artículo 104A) · MinDefensa',RED,1]]);
+    const ac=['2023','2024','2025','2026'];
+    document.getElementById('t-fem').innerHTML=`<thead><tr><th>Ciudad</th>${ac.map(a=>`<th class="n">${a}${a===ANIO_PARCIAL?'*':''}</th>`).join('')}</tr></thead><tbody>`+
+      CIU_ORDEN.map(d=>`<tr><td>${ciuNom(d)}</td>${ac.map(a=>`<td class="n">${nf((F.ciudad[d]||{})[a]||0)}</td>`).join('')}</tr>`).join('')+'</tbody>';
+    const dep=Object.entries(F.depto).map(([d,v])=>({l:(ST.pob.deptos[d]||{}).n||d,v:['2024','2025','2026'].reduce((s,a)=>s+(+v[a]||0),0)})).sort((a,b)=>b.v-a.v).slice(0,12);
+    barrasH('b-fem',dep,{c:RED});
+  }
+
+  /* ═════════════════════════ 6 · armas ═════════════════════════ */
+  function armas(){
+    const g=document.getElementById('s-arm-geo').value, A=ST.md.armas, H=ST.md.homicidio;
+    const anios=rango(2010,2026);
+    const bars=g==='nac'?anios.map(a=>A.anio[a]?A.anio[a].s:null):anios.map(a=>(A.ciudad[g]||{})[a]??null);
+    const AM=g==='nac'?H.arma_medio:(H.arma_medio_ciudad[g]||{});
+    const hom=anios.map(a=>{let t=0,f=0;Object.entries(AM).forEach(([k,v])=>{const n=+v[a]||0;t+=n;if(/FUEGO/.test(k))f+=n});return t?100*f/t:null});
+    const L=[{name:'Homicidios con arma de fuego',color:RED,values:hom,w:3}];
+    if(g==='nac'){
+      const AA=ST.aa, HT=['hurto_personas','hurto_comercios','hurto_residencias','hurto_motos','hurto_autos'];
+      const pct=(k,a)=>{const x=(AA[k]||{})[a]; if(!x) return null; const t=Object.values(x).reduce((s,v)=>s+v,0); return t?100*(x.fuego||0)/t:null};
+      L.push({name:'Hurto a personas con arma de fuego',color:BLU,values:anios.map(a=>pct('hurto_personas',a)),w:2.6});
+      L.push({name:'Cinco tipos de hurto juntos',color:BLU,dash:'5 4',w:1.6,values:anios.map(a=>{let t=0,f=0;HT.forEach(k=>{const x=(AA[k]||{})[a];if(x){t+=Object.values(x).reduce((s,v)=>s+v,0);f+=x.fuego||0}});return t?100*f/t:null})});
+      L.push({name:'Hurto de motos con arma de fuego',color:CYA,dash:'2 3',w:1.6,values:anios.map(a=>pct('hurto_motos',a))});
+    }
+    barrasLineas('c-arm',anios,{name:'Armas de fuego incautadas',color:'rgba(255,255,255,.22)',values:bars},L,{partial:[ANIO_PARCIAL]});
+    leyenda('l-arm',[['Armas incautadas (barras, eje izquierdo)','rgba(255,255,255,.3)'],...L.map(s=>[s.name+' (eje derecho)',s.color,1])]);
+    const cl=Object.entries(A.clase).map(([k,v])=>({l:nice(k),v:(v['2025']||{}).s||0})).filter(x=>x.v).sort((a,b)=>b.v-a.v).slice(0,10);
+    barrasH('b-arm-clase',cl,{c:'#94a3b8'});
+    barrasH('b-arm-dep',A.depto_2025.slice(0,12).map(x=>({l:nice(x.d),v:x.n})),{c:'#94a3b8'});
+    const a0=g==='nac'?(A.anio['2010']||{}).s:(A.ciudad[g]||{})['2010'], a1=g==='nac'?(A.anio['2025']||{}).s:(A.ciudad[g]||{})['2025'];
+    const h0=hom[0], h1=hom[anios.indexOf('2025')], hm=Math.min(...hom.slice(0,16).filter(v=>v!=null)), am=anios[hom.indexOf(hm)];
+    document.getElementById('w-arm').innerHTML=`${g==='nac'?'En el país':'En '+ciuNom(g)} se incautaron <b>${nf(a0)}</b> armas en 2010 y <b>${nf(a1)}</b> en 2025. El homicidio con arma de fuego pasó de <b>${pf(h0,0)}</b> a <b>${pf(h1,0)}</b>, con su punto más bajo en ${am} (${pf(hm,0)}).`+
+      (g==='nac'?` En el hurto pasa lo contrario: cada vez menos se roba con arma de fuego y más «sin arma» (raponazo, descuido, cosquilleo), en parte porque la denuncia virtual sumó casos menores.`:'')+
+      ` <b>Las dos series no prueban que una cause la otra</b>: entre 2015 y 2025 su correlación en el país es −0,57 con el homicidio y −0,3 con el hurto, y cambia de signo si se mira desde 2010. Una incautación mide esfuerzo policial, no cuántas armas circulan.`;
+  }
+
+  /* ═════════════════════════ 7 · capturas ═════════════════════════ */
+  ST.capCond='2026';
+  function capturas(){
+    const g=document.getElementById('s-cap-geo').value, C=ST.md.capturas, anios=rango(2010,2026);
+    const cap=g==='nac'?anios.map(a=>(C.anio[a]||{}).c??null):anios.map(a=>(C.ciudad[g]||{})[a]??null);
+    lineas('c-cap',anios,[{name:'Capturas',color:AMB,values:cap,w:2.6}],{partialFrom:ANIO_PARCIAL,H:220});
+    const ch=g==='nac'?anios.map(a=>C.homicidio_anio[a]??null):anios.map(a=>(C.homicidio_ciudad[g]||{})[a]??null);
+    const hm=g==='nac'?serie(ST.md.delitos.homicidios.anio,anios):serie(ST.md.delitos.homicidios.ciudad[g],anios);
+    lineas('c-caphom',anios,[{name:'Homicidios (MinDefensa)',color:RED,values:hm,w:2.4},{name:'Capturas por homicidio (art. 103)',color:AMB,values:ch,w:2.4}],{partialFrom:ANIO_PARCIAL,H:220});
+    leyenda('l-caphom',[['Homicidios',RED,1],['Capturas por homicidio',AMB,1]]);
+    const i25=anios.indexOf('2025'), i12=anios.indexOf('2012');
+    document.getElementById('k-cap').innerHTML=[
+      [nf(cap[i25]),'capturas en 2025'],[nf(cap[anios.length-1]),'capturas ene-jul 2026'],
+      [nf(ch[i25]),'capturas por homicidio en 2025'],
+      [hm[i25]?(ch[i25]/hm[i25]).toFixed(2).replace('.',','):'—','capturas por homicidio por cada homicidio (2025)'],
+      [hm[i12]?(ch[i12]/hm[i12]).toFixed(2).replace('.',','):'—','la misma razón en 2012'],
+    ].map(([b,s],i)=>`<div class="kpi${i===3?' a':''}"><b>${b}</b><span>${s}</span></div>`).join('');
+    const L=ST.capCond==='bog'?C.conducta_bogota_2026:C['conducta_'+ST.capCond];
+    barrasH('b-capcond',(L||[]).slice(0,15).map(x=>({l:x.k.replace(/^ART[IÍ]CULO\s*/i,'Art. ').replace(/\s+/g,' '),v:x.n,full:x.k})));
+    const G=C.genero, GE=C.grupo_etario, aa=rango(2010,2026);
+    const gk=Object.keys(G).sort((a,b)=>aa.reduce((s,y)=>s+((G[b][y]||{}).c||0),0)-aa.reduce((s,y)=>s+((G[a][y]||{}).c||0),0)).slice(0,3);
+    apiladas('c-capgen',aa,gk.map((k,i)=>({name:nice(k),color:[BLU,'#f472b6','#64748b'][i],values:aa.map(y=>(G[k][y]||{}).c||0)})),{pct:true,H:190,partial:[ANIO_PARCIAL]});
+    leyenda('l-capgen',gk.map((k,i)=>[nice(k),[BLU,'#f472b6','#64748b'][i]]));
+    const ek=Object.keys(GE).sort((a,b)=>aa.reduce((s,y)=>s+((GE[b][y]||{}).c||0),0)-aa.reduce((s,y)=>s+((GE[a][y]||{}).c||0),0)).slice(0,4);
+    apiladas('c-capeta',aa,ek.map((k,i)=>({name:nice(k),color:PAL[i],values:aa.map(y=>(GE[k][y]||{}).c||0)})),{pct:true,H:190,partial:[ANIO_PARCIAL]});
+    leyenda('l-capeta',ek.map((k,i)=>[nice(k),PAL[i]]));
+  }
+
+  /* ═════════════════════════ 8 · masacres y FP ═════════════════════════ */
+  function masacres(){
+    const M=ST.md.masacres, anios=Object.keys(M.anio).filter(a=>+a>=2010).sort();
+    lineas('c-mas',anios,[{name:'Víctimas',color:RED,values:anios.map(a=>M.anio[a].victimas),w:2.6},{name:'Casos',color:AMB,values:anios.map(a=>M.anio[a].casos)}],{partialFrom:ANIO_PARCIAL,H:220});
+    leyenda('l-mas',[['Víctimas',RED,1],['Casos',AMB,1]]);
+    const FP=ST.md.fuerza_publica, af=rango(2010,2026);
+    lineas('c-fp',af,[{name:'Heridos',color:AMB,values:serie(FP.anio.HERIDO,af)},{name:'Asesinados',color:RED,values:serie(FP.anio.ASESINADO,af),w:2.6}],{partialFrom:ANIO_PARCIAL,H:220});
+    leyenda('l-fp',[['Heridos',AMB,1],['Asesinados',RED,1]]);
+    document.getElementById('t-mas').innerHTML=`<thead><tr><th>Municipio</th><th class="n">Casos</th><th class="n">Víctimas</th></tr></thead><tbody>`+
+      M.top_mun_2025_26.slice(0,14).map(x=>`<tr><td>${nice(x.m)} <span class="cols">· ${nice(x.d)}</span></td><td class="n">${nf(x.casos)}</td><td class="n">${nf(x.victimas)}</td></tr>`).join('')+'</tbody>';
+    const fd=Object.values(FP.depto_2025_26).sort((a,b)=>(b.ASESINADO*10+b.HERIDO)-(a.ASESINADO*10+a.HERIDO)).slice(0,14);
+    document.getElementById('t-fp').innerHTML=`<thead><tr><th>Departamento</th><th class="n">Asesinados</th><th class="n">Heridos</th></tr></thead><tbody>`+
+      fd.map(x=>`<tr><td>${nice(x.d)}</td><td class="n">${nf(x.ASESINADO)}</td><td class="n">${nf(x.HERIDO)}</td></tr>`).join('')+'</tbody>';
+  }
+
+  /* ═════════════════════════ 9 · mapa ═════════════════════════ */
+  let map=null, capa=null, _bounds=null, _ro=null;
+  function indicadores(){
+    const md=ST.md, I=[];
+    const L={homicidios:'Homicidios',violencia_intra:'Violencia intrafamiliar',delitos_sexuales:'Delitos sexuales',lesiones:'Lesiones personales',hurto_personas:'Hurto a personas',extorsiones:'Extorsión',secuestros:'Secuestro',terrorismo:'Terrorismo',homicidios_at:'Muertes en vías',hurto_vehiculos:'Hurto de vehículos',del_informaticos:'Delitos informáticos'};
+    Object.entries(L).forEach(([k,n])=>{ if(md.delitos[k]) I.push({id:k,n,dep:md.delitos[k].depto}); });
+    I.push({id:'fem',n:'Feminicidio',dep:md.homicidio.feminicidio.depto,mujeres:true});
+    const mv={}; Object.entries(md.masacres.depto).forEach(([d,v])=>{mv[d]={};Object.entries(v).forEach(([a,x])=>mv[d][a]=x.victimas)});
+    I.push({id:'mas',n:'Víctimas de masacre',dep:mv});
+    const fp={}; Object.entries(md.fuerza_publica.depto).forEach(([d,v])=>fp[d]=v);
+    I.push({id:'fp',n:'Policías y militares afectados',dep:fp});
+    return I;
+  }
+  function initMapa(){
+    map=L.map('map',{zoomControl:true,attributionControl:false,scrollWheelZoom:false,zoomSnap:.25}).setView([4.6,-74.1],5);
+  }
+  function reencuadrar(){ if(!map||!_bounds) return; map.invalidateSize(false); map.fitBounds(_bounds,{padding:[10,10],animate:false}); }
+  async function mapa(){
+    const ind=ST.ind.find(x=>x.id===document.getElementById('s-map-ind').value);
+    const anio=document.getElementById('s-map-anio').value;
+    const tasaPosible=+anio>=2018 && anio!==ANIO_PARCIAL;
+    const modo=ST.mapModo==='tasa'&&tasaPosible?'tasa':'abs';
+    const pob=ST.pob, iA=pob.anios.indexOf(+anio);
+    const val={};
+    Object.entries(ind.dep).forEach(([d,v])=>{
+      const n=+v[anio]||0;
+      if(modo==='tasa'){ const p=(pob.deptos[d]||{})[ind.mujeres?'f':'p']; val[d]=p&&p[iA]?1e5*n/p[iA]:null; }
+      else val[d]=n;
+    });
+    const max=Math.max(...Object.values(val).filter(v=>v!=null),1);
+    if(!ST.geo) ST.geo=await PONAL.geoDeptos();
+    const byName={}; Object.entries(pob.deptos).forEach(([d,o])=>byName[PONAL.norm(o.n)]=d);
+    const res=nm=>PONAL.ALIAS[PONAL.norm(nm)]||byName[PONAL.norm(nm)];
+    if(!map) initMapa();
+    if(capa) map.removeLayer(capa);
+    PONAL.avisarSinMatch(ST.geo.features.map(f=>f.properties.name),res);
+    const fv=v=>modo==='tasa'?(v==null?'—':v.toFixed(1).replace('.',',')):nf(v);
+    capa=L.geoJSON(ST.geo,{style:f=>{const d=res(f.properties.name),v=val[d];return{color:'#060810',weight:.8,fillColor:PONAL.color(v,max),fillOpacity:.9}},
+      onEachFeature:(f,l)=>{const d=res(f.properties.name);l.bindTooltip(`<b>${(pob.deptos[d]||{}).n||f.properties.name}</b><br>${ind.n} ${anio}${anio===ANIO_PARCIAL?' (ene-ago)':''}<br>${fv(val[d])}${modo==='tasa'?(ind.mujeres?' por 100.000 mujeres':' por 100.000 hab.'):''}`,{sticky:true})}}).addTo(map);
+    if(!_bounds){ _bounds=capa.getBounds(); setTimeout(reencuadrar,0);
+      if(window.ResizeObserver){ let w=0; _ro=new ResizeObserver(es=>{const nw=Math.round(es[0].contentRect.width); if(nw&&nw!==w){w=nw;reencuadrar()}}); _ro.observe(document.getElementById('map')); } }
+    const rk=Object.entries(val).filter(([d,v])=>v!=null&&pob.deptos[d]).map(([d,v])=>({l:pob.deptos[d].n,v})).sort((a,b)=>b.v-a.v);
+    document.getElementById('t-map-rk').textContent=`${ind.n} · ${anio}${anio===ANIO_PARCIAL?' ene-ago':''} · ${modo==='tasa'?'tasa':'número'}`;
+    barrasH('b-map-rk',rk,{fmt:fv});
+    document.querySelectorAll('[data-mm="tasa"]').forEach(b=>{b.disabled=!tasaPosible; b.style.opacity=tasaPosible?1:.35;});
+    document.getElementById('n-map').innerHTML=(ST.mapModo==='tasa'&&!tasaPosible?'<b style="color:var(--amber)">Sin tasa para este año</b>: la población municipal del DANE arranca en 2018 y 2026 va incompleto. Se muestra el número. ':'')+
+      'Fuente: MinDefensa en datos.gov.co, por departamento del hecho; población DANE. San Andrés no tiene geometría en el mapa base, pero sí entra al ranking.';
+  }
+
+  /* ═════════════════════════ 10 · código ═════════════════════════ */
+  ST.codGeo='nac';
+  function codigo(){
+    const ds=document.getElementById('s-cod').value, C=ST.md.codigo_policia[ds];
+    /* una de las tablas trae una fila «TOTAL» que duplica la suma */
+    const sinTot=l=>(l||[]).filter(x=>String(x.k).toUpperCase()!=='TOTAL');
+    const L=sinTot(ST.codGeo==='bog'?C.top_bogota:C.top);
+    const filaT=(C.top||[]).find(x=>String(x.k).toUpperCase()==='TOTAL');
+    const total=filaT?filaT.n:C.total;
+    document.getElementById('k-cod').innerHTML=[[nf(total),'comparendos o medidas en la tabla'],[C.actualizado||'—','última actualización']].map(([b,s])=>`<div class="kpi"><b>${b}</b><span>${s}</span></div>`).join('');
+    barrasH('b-cod',(L||[]).slice(0,15).map(x=>({l:(x.k||'Sin dato').replace(/^Num\.\s*\d+\s*-\s*/,''),v:x.n,full:x.k})),{c:'#94a3b8'});
+  }
+
+  /* ═════════════════════════ 11 · NNA ═════════════════════════ */
+  function nna(){
+    const N=ST.md.nna, anios=[...new Set(Object.values(N.genero).flatMap(o=>Object.keys(o)))].sort();
+    const tot=Object.entries(N.delito).map(([k,v])=>({l:k.replace(/^ART[IÍ]CULO\s*/i,'Art. '),v:Object.values(v).reduce((a,b)=>a+b,0),full:k})).sort((a,b)=>b.v-a.v).slice(0,14);
+    document.getElementById('t-nna').textContent=`Delitos más frecuentes, ${anios[0]}–${anios[anios.length-1]}`;
+    barrasH('b-nna',tot,{c:VIO});
+    const gen=Object.entries(N.genero).map(([k,v])=>({l:nice(k),v:Object.values(v).reduce((a,b)=>a+b,0),c:/FEM/.test(k)?'#f472b6':BLU})).sort((a,b)=>b.v-a.v);
+    const tg=gen.reduce((a,x)=>a+x.v,0);
+    barrasH('b-nna-gen',gen.map(x=>({...x,l:x.l+' · '+pf(100*x.v/tg,0)})));
+    document.getElementById('n-nna').textContent=`${nf(tg)} registros en total. Las niñas y adolescentes mujeres son mayoría por el peso de los delitos sexuales.`;
+  }
+
+  /* ═════════════════════════ 12 · inventario ═════════════════════════ */
+  const GRUPOS={delitos:'Delitos (MinDefensa)',dijin:'Delitos con género y edad (DIJIN)',operativos:'Resultados operativos',codigo:'Código de Policía',victimas:'Víctimas especiales',otros:'Otros'};
+  ST.inv='todos';
+  function inventario(){
+    const I=ST.md.inventario.filter(x=>ST.inv==='todos'||x.grupo===ST.inv);
+    document.getElementById('t-inv').innerHTML=`<thead><tr><th>Conjunto</th><th>Grupo</th><th>Actualizado</th><th>Columnas</th></tr></thead><tbody>`+
+      I.map(x=>`<tr><td><a href="https://www.datos.gov.co/d/${x.id}" target="_blank" rel="noopener">${esc(x.que)}</a><br><span class="cols">${x.id}${x.nombre&&x.nombre!==x.que?' · '+esc(x.nombre):''}</span></td><td class="cols">${GRUPOS[x.grupo]}</td><td class="cols" style="white-space:nowrap">${x.actualizado||'—'}</td><td class="cols">${(x.columnas||[]).filter(c=>!c.startsWith(':')).map(c=>`<code>${esc(c)}</code>`).join(' ')}</td></tr>`).join('')+'</tbody>';
+  }
+
+  /* ═════════════════════════ cableado ═════════════════════════ */
+  function pills(cont,items,get,set){
+    const el=document.getElementById(cont);
+    el.innerHTML=items.map(([v,n])=>`<button class="pill${get()===v?' on':''}" data-v="${v}">${n}</button>`).join('');
+    el.onclick=e=>{const b=e.target.closest('button'); if(!b) return; set(b.dataset.v); el.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));};
+  }
+  function grupoPills(sel,attr,set){
+    document.querySelectorAll(sel).forEach(b=>b.onclick=()=>{ if(b.disabled) return; document.querySelectorAll(sel).forEach(x=>x.classList.toggle('on',x===b)); set(b.dataset[attr]); });
+  }
+
+  (async()=>{
+    try{
+      const [md,sm,aa,pob,nac]=await Promise.all([J('mindefensa.json'),J('siedco-mes.json'),J('arma_anio.json'),PONAL.poblacion(),PONAL.nacional()]);
+      Object.assign(ST,{md,sm,aa,pob,nac});
+      document.getElementById('loading').style.display='none';
+      document.getElementById('cuerpo').style.display='block';
+      franja(); tablaFuentes();
+      pills('p-cuadre',CUADRE,()=>ST.cuadre,v=>{ST.cuadre=v;cuadre()});
+      const gC=document.getElementById('s-cuadre-geo'); llenarGeo(gC); gC.onchange=cuadre; cuadre();
+      const gP=document.getElementById('s-pend-geo'); llenarGeo(gP,true,d=>sm.pendiente[d]); gP.value='11001'; gP.onchange=pendiente; pendiente();
+      const gM=document.getElementById('s-mod-geo'); llenarGeo(gM); gM.onchange=modalidad;
+      grupoPills('[data-m]','m',v=>{ST.modModo=v;modalidad()}); modalidad();
+      feminicidio();
+      const gA=document.getElementById('s-arm-geo'); llenarGeo(gA); gA.onchange=armas; armas();
+      const gK=document.getElementById('s-cap-geo'); llenarGeo(gK); gK.onchange=capturas;
+      pills('p-capcond',[['2026','País 2026 (ene-jul)'],['2025','País 2025'],['2024','País 2024'],['bog','Bogotá 2026']],()=>ST.capCond,v=>{ST.capCond=v;capturas()});
+      capturas();
+      masacres();
+      ST.ind=indicadores(); ST.mapModo='abs';
+      document.getElementById('s-map-ind').innerHTML=ST.ind.map(x=>`<option value="${x.id}">${x.n}</option>`).join('');
+      document.getElementById('s-map-anio').innerHTML=rango(2015,2026).reverse().map(a=>`<option value="${a}">${a}${a===ANIO_PARCIAL?' (ene-ago)':''}</option>`).join('');
+      document.getElementById('s-map-anio').value='2025';
+      document.getElementById('s-map-ind').onchange=mapa; document.getElementById('s-map-anio').onchange=mapa;
+      grupoPills('[data-mm]','mm',v=>{ST.mapModo=v;mapa()});
+      mapa();
+      const sC=document.getElementById('s-cod');
+      sC.innerHTML=Object.entries(md.codigo_policia).sort((a,b)=>String(b[1].actualizado).localeCompare(String(a[1].actualizado))).map(([k,v])=>`<option value="${k}">${esc((v.nombre||k).replace(/Código Nacional de Seguridad y Convivencia Ciudadana|Código de Seguridad y Convivencia Ciudadana/,'Código'))} · ${String(v.actualizado||'').slice(0,7)}</option>`).join('');
+      sC.onchange=codigo; grupoPills('[data-cg]','cg',v=>{ST.codGeo=v;codigo()}); codigo();
+      nna();
+      pills('p-inv',[['todos','Todos'],...Object.entries(GRUPOS)],()=>ST.inv,v=>{ST.inv=v;inventario()}); inventario();
+    }catch(e){
+      console.error(e);
+      document.getElementById('loading').textContent='No se pudieron cargar los datos ('+e.message+').';
+    }
+  })();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>
