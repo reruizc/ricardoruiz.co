@@ -231,9 +231,29 @@ def main():
 
     # ── volumen 2027 (escenario base) y sensibilidad ──
     eq27 = {norm(r[0]): round(float(r[12] or 0)) for r in filas(simu['03_Proyeccion_2027'], 1)}
-    sensi = {}
+    rango27 = {norm(r[0]): [round(float(r[11] or 0)), round(float(r[13] or 0))] for r in filas(simu['03_Proyeccion_2027'], 1)}
+    sensi, cerca = {}, {}
     for r in filas(sens['01_Sensibilidad_Barrio'], 1):
         sensi[norm(r[0])] = dict(indice=r4(r[13]), nivel=r[14], tendencia=r[15], lectura=r[16])
+        cerca[norm(r[0])] = dict(cluster=r[19], km=r4(r[18]) if isinstance(r[18], (int, float)) else None)
+
+    # ── evidencia electoral por barrio (hoja 02 del simulador) ──
+    # Para la ficha detallada del modo «Ver arquetipos»: qué tan concentrado
+    # votó el barrio en cada ciclo y cómo lo clasificó Nury. ⚠️ En un barrio
+    # «heredado» estos números son los de su barrio-fuente (`cluster`): la
+    # página lo dice, no los presenta como propios.
+    def n1(x):
+        return round(float(x), 1) if isinstance(x, (int, float)) else None
+    evid = {}
+    for r in filas(simu['02_Historico_2015_2026'], 1):
+        evid[norm(r[0])] = dict(
+            estructura={'2015': r[9], '2019': r[15], '2023': r[21], '2026': r[27]},
+            intensidad={'2015': r[10], '2019': r[16], '2023': r[22], '2026': r[28]},
+            # [Alcaldía, Concejo, JAL] el % del más votado; 2026 = [Presidencia 1V, Senado, Cámara]
+            concentracion={'2015': [n1(r[6]), n1(r[7]), n1(r[8])], '2019': [n1(r[12]), n1(r[13]), n1(r[14])],
+                           '2023': [n1(r[18]), n1(r[19]), n1(r[20])], '2026': [n1(r[24]), n1(r[25]), n1(r[26])]},
+            volumen_2026=round(float(r[23] or 0)), cambios_estructura=int(r[29] or 0),
+            continuidad=r[30], delta_intensidad=r[31])
 
     # ── barrios ──
     hdr = list(carto['01_Cartografia_Emocional'].iter_rows(values_only=True))[3]
@@ -253,8 +273,13 @@ def main():
             mezcla=mezcla,
             volatilidad=dict(media=r4(r[col['Volatilidad media']]), nivel=r[col['Nivel volatilidad']],
                              cambios=int(r[col['Cambios dominante']] or 0)),
-            volumen={**vol.get(k, {}), '2027_base': eq27.get(k)},
+            volumen={**vol.get(k, {}), '2027_base': eq27.get(k), '2027_rango': rango27.get(k)},
             sensibilidad=sensi.get(k),
+            familia_emocional=r[col['Familia emocional']],
+            pct_dominante={a: r4(r[col[f'% dominante {a}']]) for a in AÑOS},
+            trayectoria=r[col['Trayectoria']],
+            cercano=cerca.get(k),
+            evidencia=evid.get(k),
         )
         (agregados if r[2] == 'Agregado sin barrio' else barrios)[k] = b
 
@@ -271,7 +296,7 @@ def main():
         print('  ⚠ sin arquetipo:', faltan)
 
     out = dict(
-        v='2026-09-27',
+        v='2026-10-01',
         ciudad='Cartagena',
         fuente='Nury Astrid · cartografía emocional de Cartagena 2015-2027 (sep-2026)',
         naturaleza={'2015': 'ancla histórica', '2019': 'proyección retrospectiva',

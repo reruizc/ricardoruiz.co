@@ -92,7 +92,7 @@
       fuente: 'Simulación 2027 por barrio · cartografía emocional de Cartagena de Nury Astrid',
       calza: t => !t.departamental && /^CARTAGENA( DE INDIAS)?$/.test(norm(t.munLimpio || t.base)) && (!t.depNombre || norm(t.depNombre) === 'BOLIVAR'),
       cargar: async () => {
-        const r = await fetch(`${S3_CTG}/arquetipos-cartagena.json?v=20260928`);
+        const r = await fetch(`${S3_CTG}/arquetipos-cartagena.json?v=20261001`);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = await r.json();
         const familias = (d.orden || Object.keys(d.familias)).map(slug => {

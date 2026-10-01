@@ -27,7 +27,7 @@
   const ARQ_BASE = RR.publicUrl('bases+de+datos/Proyecto+DC/arquetipos');
   const VOT27_URL = `${RR.publicUrl('bases+de+datos/Proyecto+DC/votacion-arquetipo-2027')}/votacion-2027.json?v=20260528`;
   const ARQ_CTG_BASE = RR.publicUrl('bases+de+datos/Proyecto+DC/arquetipos-cartagena');
-  const ARQ_CTG_URL = `${ARQ_CTG_BASE}/arquetipos-cartagena.json?v=20260928`;
+  const ARQ_CTG_URL = `${ARQ_CTG_BASE}/arquetipos-cartagena.json?v=20261001`;
   const MDE_BARRIOS_URL = `${RR.publicUrl('bases+de+datos')}/MEDELLIN_BARRIOS_OFICIAL.json`;
   const CTG_BARRIOS_URL = `${RR.publicUrl('congreso-2026/output')}/mapas-2026/Ciudades-COM-LOC/CARTAGENAX.json`;
   /* El diccionario puesto→barrio de Cartagena es el mismo del CRM y del panel
