@@ -22,7 +22,8 @@
        arquetipo (completadas donde ella no calificó; ver `sens_nury`).
      · respuesta(barrio) crece con su volatilidad composicional: un barrio que
        ya se ha movido se mueve más. La palanca «Apertura al cambio» la escala.
-     · «Favorabilidad de la Alcaldía» es una regla nuestra, no de Nury.
+     · «Aprobación de la gestión del alcalde» arranca en la cifra medida (52 %,
+       Cartagena Cómo Vamos oct-2025); a quién mueve es regla nuestra, no de Nury.
      Sirve para COMPARAR escenarios, no para pronosticar.
 
    No toca nada de la lectura de siempre: recibe la lectura de Cartagena (`L`)
@@ -47,7 +48,11 @@
     { id: 'salud', tema: 'salud_educacion', sign: 1, label: 'Salud y educación', hint: '−5 deterioro · +5 mejora' },
     { id: 'participacion', tema: 'participacion', sign: 1, label: 'Cumplimiento y presencia institucional', hint: '−5 promesas incumplidas · +5 acuerdos cumplidos' },
     { id: 'cultura', tema: 'cultura', sign: 1, label: 'Reconocimiento del barrio', hint: '−5 invisibilización · +5 reconocimiento' },
-    { id: 'alcaldia', especial: true, label: 'Favorabilidad de la Alcaldía', hint: '−5 muy baja · +5 muy alta (regla nuestra)' },
+    /* ANCLADA a la cifra medida: el cero es la aprobación de hoy y cada paso
+       son 6 puntos (22 % a 82 %). Se ancla a la GESTIÓN (52 %) y no a la
+       imagen (74 %): la imagen es personal y la gestión es lo que premia o
+       castiga un barrio. Si sale una medición nueva, se cambia `ANCLA_ALCALDIA`. */
+    { id: 'alcaldia', especial: true, label: 'Aprobación de la gestión del alcalde', hint: '', ancla: true },
     { id: 'apertura', especial: true, label: 'Apertura al cambio', hint: '−5 los barrios se aferran · +5 todo se mueve' },
   ];
   /* Favorabilidad: arriba refuerza a quien premia la gestión que funciona y el
@@ -56,10 +61,16 @@
     mas: { 'pragmatico-servicios': .6, 'guardian-funcional': .5, 'mediador-comunitario': .5, 'productivo-pragmatico': .3 },
     menos: { 'protesta-resolutiva': .9, 'gestor-vigilante': .6, 'defensor-territorial': .3 },
   };
+  const ANCLA_ALCALDIA = {
+    valor: 52, paso: 6, imagen: 74,
+    fuente: 'Cartagena Cómo Vamos · Encuesta de Percepción Ciudadana 2025 (Cifras & Conceptos, campo 3-28 oct-2025, 1.071 encuestas, margen ±4,7 %)',
+    url: 'https://cartagenacomovamos.org/wp-content/uploads/2026/02/Encuesta-Percepcion-Ciudadana-Cartagena-2025vf.pdf',
+  };
+  const valorAlcaldia = v => ANCLA_ALCALDIA.valor + v * ANCLA_ALCALDIA.paso;
   const ESCENARIOS = [
     ['Crisis de agua y servicios', { servicios: -5, participacion: -3, alcaldia: -3 }],
     ['Ola de inseguridad', { seguridad: -5 }],
-    ['Escándalo en la Alcaldía', { corrupcion: -5, alcaldia: -4 }],
+    ['Escándalo en la Alcaldía', { corrupcion: -5, alcaldia: -3 }],
     ['Golpe económico', { empleo: -4, costo: 4 }],
     ['Temporada de lluvias', { ambiente: -4, movilidad: -2, servicios: -2 }],
     ['Gestión que se ve', { servicios: 3, movilidad: 3, seguridad: 2, alcaldia: 3 }],
@@ -238,8 +249,8 @@
         sh += (-pa.sign * v) * ((sens[pa.tema] || 2.5) - mediaSens(pa.tema));
       }
       const al = S.pal.alcaldia;
-      if (al > 0) sh += al * (ALCALDIA.mas[id] || 0) * 1.5;
-      if (al < 0) sh += -al * (ALCALDIA.menos[id] || 0) * 1.5;
+      if (al > 0) sh += al * (ALCALDIA.mas[id] || 0) * 2.4;
+      if (al < 0) sh += -al * (ALCALDIA.menos[id] || 0) * 2.4;
       const w = Math.max(p, .004) * Math.exp(K * resp * sh);
       out[id] = w; tot += w;
     }
@@ -267,8 +278,11 @@
     const l = L();
     if (!$('aqSimPalancas').dataset.listo) {
       $('aqSimPalancas').innerHTML = `<div class="aq-esc"><span class="rot">Escenarios</span>${ESCENARIOS.map(([t], i) => `<button type="button" class="aq-tog" data-esc="${i}">${esc(t)}</button>`).join('')}<button type="button" class="aq-tog" data-esc="reset">↻ Todo en cero</button></div>`
-        + PALANCAS.map(p => `<label class="aq-pal"><span class="aq-pal-n">${esc(p.label)}<b id="aqPalV-${p.id}">0</b></span><input type="range" min="-5" max="5" step="1" value="0" data-pal="${p.id}"><small>${esc(p.hint)}</small></label>`).join('');
+        + PALANCAS.map(p => `<label class="aq-pal${p.ancla ? ' aq-pal-ancla' : ''}"><span class="aq-pal-n">${esc(p.label)}<b id="aqPalV-${p.id}">0</b></span><input type="range" min="-5" max="5" step="1" value="0" data-pal="${p.id}"><small>${p.ancla
+          ? `Hoy: <b>${ANCLA_ALCALDIA.valor} %</b> la califica buena o muy buena (imagen favorable: ${ANCLA_ALCALDIA.imagen} %). Cada paso, ${ANCLA_ALCALDIA.paso} puntos: de ${valorAlcaldia(-5)} % a ${valorAlcaldia(5)} %. <a href="${ANCLA_ALCALDIA.url}" target="_blank" rel="noopener">Cartagena Cómo Vamos, oct-2025</a>.`
+          : esc(p.hint)}</small></label>`).join('');
       $('aqSimPalancas').dataset.listo = '1';
+      valoresPal();
       let t = null;
       $('aqSimPalancas').querySelectorAll('[data-pal]').forEach(inp => inp.addEventListener('input', () => {
         S.pal[inp.dataset.pal] = Number(inp.value); valoresPal();
@@ -289,7 +303,7 @@
     if (!M.sim) { M.sim = crearMapa('aqSimMapa'); encuadrar(M.sim); } else setTimeout(() => M.sim.invalidateSize(), 0);
     repintarSim();
   }
-  function valoresPal() { PALANCAS.forEach(p => { const v = S.pal[p.id], e = $(`aqPalV-${p.id}`); if (e) { e.textContent = v > 0 ? `+${v}` : String(v); e.classList.toggle('on', !!v); } }); }
+  function valoresPal() { PALANCAS.forEach(p => { const v = S.pal[p.id], e = $(`aqPalV-${p.id}`); if (e) { e.textContent = p.ancla ? `${valorAlcaldia(v)} %${v ? ` (${v > 0 ? '+' : '−'}${Math.abs(v * ANCLA_ALCALDIA.paso)})` : ''}` : v > 0 ? `+${v}` : String(v); e.classList.toggle('on', !!v); } }); }
 
   let RS = {};
   function repintarSim() {
@@ -362,5 +376,5 @@
     const h = location.hash;
     if (h === '#arquetipos') usarModo('ver'); else if (h === '#simulacion') usarModo('sim');
   }
-  global.C360ArqModos = { montar, usarModo, lenteCambio, simular, PALANCAS, estado: () => S, resultado: () => RS };
+  global.C360ArqModos = { ANCLA_ALCALDIA, montar, usarModo, lenteCambio, simular, PALANCAS, estado: () => S, resultado: () => RS };
 })(window);
