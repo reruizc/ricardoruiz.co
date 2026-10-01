@@ -72,6 +72,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import csv
 
+from fem_mindefensa import feminicidio as fem_mindefensa  # noqa: E402
 from build_ponal import (  # noqa: E402  — fuente única de las constantes
     ANIO_PARCIAL, MES_CORTE, DIC_BARRIO, clave_barrio, comuna_por_desc,
     CANON, CIUDADES, CIUDADES_SOLO_BARRIO, BARRIO_NULO, DEPTOS,
@@ -133,6 +134,38 @@ def top(cnt, n=TOP_CAT):
     """Los n valores más frecuentes + el resto agrupado, como en build_ponal."""
     items = sorted(cnt.items(), key=lambda kv: -kv[1])
     return {"top": items[:n], "otros": sum(v for _, v in items[n:])}
+
+
+def fem_md_bloque():
+    """Serie de feminicidio de MinDefensa en el formato del módulo (listas por
+    año alineadas con ANIOS). Si Socrata no responde, el módulo sigue sin ella
+    (la página cae a la serie propia 2015-2023 y lo declara)."""
+    try:
+        F = fem_mindefensa()
+    except Exception as e:  # noqa
+        print(f"  ⚠ feminicidio MinDefensa no disponible: {e}", file=sys.stderr)
+        return None
+    A = [str(a) for a in ANIOS]
+    ser = lambda o: [int(o.get(a, 0)) for a in A]
+    rec = ["2024", "2025", "2026"]
+    muns = []
+    for cod, v in F["mun"].items():
+        t = sum(v.get(a, 0) for a in rec)
+        if t:
+            muns.append([cod, F["mun_nom"].get(cod, cod), cod[:2], [v.get(a, 0) for a in rec]])
+    muns.sort(key=lambda x: -sum(x[3]))
+    grp = lambda k: ("Arma blanca" if "BLANCA" in k else "Arma de fuego" if "FUEGO" in k else
+                     "Contundente" if "CONTUNDENTE" in k else "Sin arma" if "SIN EMPLEO" in k else
+                     "No reportado" if "NO REPORTADO" in k else "Otra (asfixia, veneno, fuego…)")
+    arma = defaultdict(lambda: [0] * len(A))
+    for k, v in F["arma"].items():
+        for i, a in enumerate(A):
+            arma[grp(k)][i] += v.get(a, 0)
+    zona = {k: ser(v) for k, v in F["zona"].items()}
+    return {"fuente": F["fuente"], "corte": F["corte"], "serie": ser(F["anio"]),
+            "deptos": {d: ser(v) for d, v in F["depto"].items() if d in DEPTOS},
+            "muns_2024_2026": muns[:60], "mun_con_caso": len(F["mun"]),
+            "arma": dict(arma), "zona": zona, "mes": F["mes"]}
 
 
 def main():
@@ -414,6 +447,10 @@ def main():
                              key=lambda x: -x[2]),
             "muns": sorted(((k, bonito(mun_nom[k].most_common(1)[0][0]) if mun_nom.get(k) else k, n)
                             for k, n in fem_mun.items()), key=lambda x: -x[2])[:40],
+            # MinDefensa: la misma marca de feminicidio, hasta el último mes.
+            # Es la serie PRINCIPAL desde sep-2026; la propia (arriba) queda
+            # como control porque se corta en 2023.
+            "md": fem_md_bloque(),
         },
     }
 
@@ -514,10 +551,12 @@ def main():
                 "no el universo de feminicidios del país: 1.336 en nueve años está muy por "
                 "debajo de Medicina Legal y Fiscalía. El crecimiento de 2015 a 2021 recoge "
                 "sobre todo la adopción del tipo penal —la Ley 1761 es de julio de 2015— y "
-                "no debe leerse como un aumento de esa magnitud. 2024, 2025 y 2026 no tienen "
-                "dato: esos lotes no traen el artículo penal en homicidios, y la entrega "
-                "SIEDCO de 2025-2026 tampoco trajo feminicidio como archivo aparte."),
-            "feminicidio_2024": "sin dato desde 2024 (los lotes 2024-2026 no traen artículo penal en homicidios)",
+                "no debe leerse como un aumento de esa magnitud. Desde 2024 la base "
+                "propia no trae el artículo penal en homicidios, así que la serie "
+                "2015-2026 que se publica es la de MinDefensa en datos.gov.co, que marca "
+                "el feminicidio sobre el mismo registro. Las dos coinciden casi todos los "
+                "años; difieren en 2017 y en 2022-2023, y se muestran juntas."),
+            "feminicidio_2024": "2024-2026 desde MinDefensa (datos.gov.co); la base propia no trae el artículo penal desde 2024",
             "relacion_agresor": (
                 "La fuente NO registra la relación entre la víctima y el agresor. "
                 "El «móvil del agresor» describe cómo se movía (a pie, en moto), no si "

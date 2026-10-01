@@ -597,6 +597,11 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   .spark .ln { fill: none; stroke: var(--accent); stroke-width: 2; }
   .spark .ln2 { fill: none; stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 3 3; }
   .spark .dot { fill: var(--accent); }
+  .spark .dot2 { fill: var(--ink-3); }
+  .leg-fem { display:flex; flex-wrap:wrap; gap:.3rem 1rem; font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); margin-top:.4rem }
+  .leg-fem i { display:inline-block; width:14px; height:2px; vertical-align:3px; margin-right:.35rem; background:var(--accent) }
+  .leg-fem i.d { background:none; border-top:1.5px dashed var(--ink-3) }
+  @media (max-width: 760px) { .fem-kpis { grid-template-columns: 1fr 1fr !important; } }
   .spark .ax { stroke: var(--rule-strong); stroke-width: 1; }
   .spark text { font-family: var(--mono); font-size: 9px; fill: var(--ink-3); letter-spacing: .1em; }
 
@@ -821,7 +826,13 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     <div class="sect-head">
       <div class="n">03 · Feminicidio</div>
       <h2>El dato más pedido y el más <em>fácil de leer mal</em>.</h2>
-      <p class="dek">La Policía marca algunos homicidios con el artículo 104A. Son los que aparecen aquí. No son «los feminicidios de Colombia»: son los que este registro tipificó como tales, y son bastantes menos.</p>
+      <p class="dek">La Policía marca algunos homicidios con el artículo 104A. Son los que aparecen aquí. No son «los feminicidios de Colombia»: son los que este registro tipificó como tales, y son bastantes menos. Desde 2024 la serie viene de MinDefensa en datos.gov.co, que publica la misma marca hasta el último mes.</p>
+    </div>
+    <div class="kpi-strip fem-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.25rem">
+      <div class="kpi"><div class="v" id="fem-k1">—</div><div class="l" id="fem-k1-l">Feminicidios en 2025</div></div>
+      <div class="kpi"><div class="v" id="fem-k2">—</div><div class="l">Por millón de mujeres · 2025</div></div>
+      <div class="kpi"><div class="v" id="fem-k3">—</div><div class="l" id="fem-k3-l">Enero a agosto de 2026</div></div>
+      <div class="kpi"><div class="v" id="fem-k4">—</div><div class="l">Municipios con al menos un caso, 2015-2026</div></div>
     </div>
     <div class="warn-box">
       <div class="wt">Cómo se lee esta cifra</div>
@@ -831,27 +842,41 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     <div class="grid-2" style="margin-top:1.25rem">
       <div class="box">
         <div class="bt">Homicidios tipificados como feminicidio</div>
-        <div class="bs">2015–2023 · el registro, no el fenómeno</div>
+        <div class="bs" id="fem-serie-bs">2015–ago 2026 · el registro, no el fenómeno</div>
         <svg class="spark" id="fem-serie" viewBox="0 0 400 130" preserveAspectRatio="none"></svg>
         <p class="note" id="fem-serie-note"></p>
       </div>
       <div class="box">
         <div class="bt">Dónde</div>
-        <div class="bs">departamentos con más registros</div>
+        <div class="bs" id="fem-dep-bs">departamentos · 2024 a agosto de 2026</div>
+        <div style="margin:.4rem 0 .6rem"><button class="pill active" data-femdep="casos">Casos 2024-2026</button><button class="pill" data-femdep="tasa">Tasa 2025</button></div>
         <div id="fem-deptos"></div>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:1.25rem">
+      <div class="box">
+        <div class="bt">Municipios</div>
+        <div class="bs">los de más casos entre 2024 y agosto de 2026</div>
+        <div id="fem-muns"></div>
+      </div>
+      <div class="box">
+        <div class="bt">Con qué, desde 2024</div>
+        <div class="bs">arma registrada · MinDefensa</div>
+        <div id="fem-arma-md"></div>
+        <p class="note" id="fem-zona-note"></p>
       </div>
     </div>
     <div class="grid-3" style="margin-top:1.25rem">
       <div class="box">
-        <div class="bt">Edad</div><div class="bs">de la víctima</div>
+        <div class="bt">Edad</div><div class="bs">de la víctima · 2015-2023</div>
         <div id="fem-edad"></div>
       </div>
       <div class="box">
-        <div class="bt">Con qué</div><div class="bs">arma empleada</div>
+        <div class="bt">Con qué</div><div class="bs">arma empleada · 2015-2023</div>
         <div id="fem-arma"></div>
       </div>
       <div class="box">
-        <div class="bt">Dónde</div><div class="bs">clase de sitio</div>
+        <div class="bt">Dónde</div><div class="bs">clase de sitio · 2015-2023</div>
         <div id="fem-sitio"></div>
       </div>
     </div>
@@ -950,7 +975,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 
   // ─── DATOS ────────────────────────────────────────────────────────
   // Bumpear al regenerar con tools/ponal/build_mujer.py
-  const DATA_V = '20260930';
+  const DATA_V = '20260930b';
   const S3_OBS = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/output_observatorio_mujer';
   const S3_PON = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/ponal';
   // `?local=1` lee los JSON del repo en vez de S3 — sirve para verificar una
@@ -1276,13 +1301,16 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
     const W = 400, H = 130, P = { t: 10, r: 6, b: 20, l: 6 };
     const pts = serie.map((v, i) => ({ v, i })).filter(p => p.v != null);
     if (!pts.length) { svg.innerHTML = ''; return; }
-    const max = Math.max(...pts.map(p => p.v)) * 1.12 || 1;
+    const pts2 = (o.serie2 || []).map((v, i) => ({ v, i })).filter(p => p.v != null);
+    const max = Math.max(...pts.map(p => p.v), ...pts2.map(p => p.v)) * 1.12 || 1;
     const min = o.zero === false ? Math.min(...pts.map(p => p.v)) * .88 : 0;
     const x = i => P.l + (W - P.l - P.r) * (serie.length > 1 ? i / (serie.length - 1) : .5);
     const y = v => P.t + (H - P.t - P.b) * (1 - (v - min) / (max - min || 1));
     const d = pts.map((p, k) => `${k ? 'L' : 'M'}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
     svg.innerHTML =
       `<line class="ax" x1="${P.l}" y1="${H - P.b}" x2="${W - P.r}" y2="${H - P.b}"/>
+       ${pts2.length ? `<path class="ln2" d="${pts2.map((p, k) => `${k ? 'L' : 'M'}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}"/>` : ''}
+       ${o.parcialDesde != null ? `<rect x="${x(o.parcialDesde) - 6}" y="${P.t}" width="${W - P.r - x(o.parcialDesde) + 6}" height="${H - P.t - P.b}" fill="var(--accent-soft)"/>` : ''}
        <path class="ln" d="${d}"/>
        ${pts.map(p => `<circle class="dot" cx="${x(p.i).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="2.5"/>`).join('')}
        ${labels.map((l, i) => (i % (labels.length > 12 ? 3 : 2) === 0 || i === labels.length - 1)
@@ -1380,19 +1408,69 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   }
 
   function pintarFeminicidio() {
-    const f = NAC.feminicidio;
+    const f = NAC.feminicidio, md = f.md;
     document.getElementById('fem-warn-1').innerHTML = esc(META.avisos.feminicidio);
     document.getElementById('fem-warn-2').innerHTML =
-      `De los ${fmt(f.total)} registros, <strong>${fmt(f.sexo_registrado.F || 0)}</strong> tienen víctima mujer. ` +
-      `Los ${fmt(f.sexo_registrado.M || 0)} restantes están marcados con víctima hombre: es un error de codificación de la fuente, no una categoría.`;
+      `En la base propia (2015-2023), de los ${fmt(f.total)} registros <strong>${fmt(f.sexo_registrado.F || 0)}</strong> tienen víctima mujer; ` +
+      `los ${fmt(f.sexo_registrado.M || 0)} restantes están marcados con víctima hombre, un error de codificación de la fuente.`;
+    const A = f.anios, iP = META.anio_parcial ? A.indexOf(META.anio_parcial.anio) : -1;
+    if (!md) {
+      /* sin MinDefensa: la serie propia, cortada en 2023, como antes */
+      linea('fem-serie', f.serie, A.map(a => String(a).slice(2)), { top: 'registros con artículo 104A' });
+      document.getElementById('fem-serie-note').innerHTML = `<b>2024, 2025 y 2026 sin dato</b> en la base propia: esos lotes no traen el artículo penal.`;
+      document.getElementById('fem-serie-bs').textContent = '2015–2023 · el registro, no el fenómeno';
+    } else {
+      linea('fem-serie', md.serie, A.map(a => String(a).slice(2)),
+        { top: 'feminicidios registrados', serie2: f.serie, parcialDesde: iP >= 0 ? iP : null });
+      const meses = Object.keys(md.mes).sort(), ult = meses[meses.length - 1] || '';
+      const [ya, ym] = ult.split('-').map(Number);
+      const tramo = y => meses.filter(m => m.startsWith(String(y) + '-') && Number(m.slice(5)) <= ym).reduce((t, m) => t + md.mes[m], 0);
+      const y1 = tramo(ya), y0 = tramo(ya - 1), dv = y0 ? 100 * (y1 - y0) / y0 : null;
+      const MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      document.getElementById('fem-serie-note').innerHTML =
+        `<span class="leg-fem"><span><i></i>MinDefensa · datos.gov.co</span><span><i class="d"></i>Base propia (artículo 104A) · hasta 2023</span></span>` +
+        `De enero a ${MES[ym - 1]} de ${ya}: <b>${fmt(y1)}</b> feminicidios registrados, contra ${fmt(y0)} en el mismo tramo de ${ya - 1}` +
+        (dv == null ? '.' : ` (<b>${dv > 0 ? '+' : ''}${fmt1(dv)}%</b>).`) +
+        ` La franja marca el año incompleto. Las dos fuentes coinciden casi todos los años; se separan en 2017 y en 2022-2023, cuando MinDefensa marca más casos que la base propia.`;
+      const i25 = A.indexOf(2025), ip25 = ANIOS_POB.indexOf(2025);
+      document.getElementById('fem-k1').textContent = fmt(md.serie[i25]);
+      document.getElementById('fem-k2').textContent = fmt1(1e6 * md.serie[i25] / POB.nacional_f[ip25]);
+      document.getElementById('fem-k3').innerHTML = `${fmt(y1)}${dv == null ? '' : `<span class="of"> ${dv > 0 ? '+' : ''}${fmt1(dv)}%</span>`}`;
+      document.getElementById('fem-k3-l').textContent = `Enero a ${MES[ym - 1]} de ${ya} · frente a ${ya - 1}`;
+      document.getElementById('fem-k4').textContent = fmt(md.mun_con_caso);
 
-    linea('fem-serie', f.serie, f.anios.map(a => String(a).slice(2)),
-      { top: 'registros con artículo 104A' });
-    document.getElementById('fem-serie-note').innerHTML =
-      `<b>2024, 2025 y 2026 no tienen dato</b> —no están en cero—: esos lotes no traen el artículo penal en homicidios, y la entrega SIEDCO de 2025-2026 tampoco trajo feminicidio como archivo aparte (se pidió; no llegó).`;
+      const rec = [2024, 2025, 2026].map(a => A.indexOf(a));
+      const depItems = modo => Object.entries(md.deptos).map(([c, v]) => {
+        const nom = (DEP.deptos[c] || {}).n || c;
+        if (modo === 'tasa') {
+          const pf = ((POB.deptos || {})[c] || {}).f, p = pf ? pf[ip25] : null;
+          /* con 1 o 2 casos la tasa salta (San Andrés quedaba 2º con un solo caso) */
+          if ((v[i25] || 0) < 5) return { n: nom, v: 0 };
+          return { n: nom, v: p ? 1e5 * v[i25] / p : 0, t: p ? `${fmt1(1e5 * v[i25] / p)} · ${v[i25]} casos` : '—' };
+        }
+        const t = rec.reduce((s, i) => s + (v[i] || 0), 0);
+        return { n: nom, v: t, t: fmt(t) };
+      }).filter(x => x.v > 0).sort((a, b) => b.v - a.v).slice(0, 10);
+      const pintaDep = modo => {
+        document.getElementById('fem-deptos').innerHTML = barras(depItems(modo));
+        document.getElementById('fem-dep-bs').textContent = modo === 'tasa'
+          ? 'por 100.000 mujeres en 2025 · solo departamentos con 5 casos o más' : 'departamentos · 2024 a agosto de 2026';
+        document.querySelectorAll('[data-femdep]').forEach(b => b.classList.toggle('active', b.dataset.femdep === modo));
+      };
+      document.querySelectorAll('[data-femdep]').forEach(b => b.onclick = ev => { ev.stopPropagation(); pintaDep(b.dataset.femdep); });
+      pintaDep('casos');
 
-    document.getElementById('fem-deptos').innerHTML =
-      barras(f.deptos.slice(0, 8).map(([, n, v]) => ({ n, v, t: fmt(v) })));
+      const nomMun = (c, n) => (((POB.muns || {})[c] || {}).n) || n;
+      document.getElementById('fem-muns').innerHTML = barras(md.muns_2024_2026.slice(0, 10).map(([c, n, d, v]) => ({
+        n: d === '11' ? nomMun(c, n) : `${nomMun(c, n)} · ${(DEP.deptos[d] || {}).n || ''}`, v: v.reduce((a, b) => a + b, 0),
+        t: `${v[0]} · ${v[1]} · ${v[2]}` })));
+      const ar = Object.entries(md.arma).map(([k, v]) => [k, rec.reduce((s, i) => s + (v[i] || 0), 0)]).filter(x => x[1]).sort((a, b) => b[1] - a[1]);
+      const tar = ar.reduce((a, b) => a + b[1], 0) || 1;
+      document.getElementById('fem-arma-md').innerHTML = barras(ar.map(([k, v]) => ({ n: k, v, t: fmt1(100 * v / tar) + '%' })), 'g');
+      const zr = md.zona.RURAL ? rec.reduce((s, i) => s + (md.zona.RURAL[i] || 0), 0) : 0;
+      const zu = md.zona.URBANA ? rec.reduce((s, i) => s + (md.zona.URBANA[i] || 0), 0) : 0;
+      document.getElementById('fem-zona-note').innerHTML = `Municipios: casos de 2024 · 2025 · 2026 (ene-ago). <b>${fmt1(100 * zr / ((zr + zu) || 1))}%</b> de los feminicidios de 2024-2026 ocurrió en zona rural.`;
+    }
     const te = f.edad.reduce((a, b) => a + b, 0) || 1;
     document.getElementById('fem-edad').innerHTML =
       barras(EDAD_LAB.map((l, i) => ({ n: l, v: f.edad[i], t: fmt1(100 * f.edad[i] / te) + '%' })));
