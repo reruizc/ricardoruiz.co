@@ -152,6 +152,253 @@
     try { return NOMBRE_BONITO(p); } catch { return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase(); }
   }
 
+  /* ═══ LOS TEMAS: lo que Candi comenta según lo que escogiste (1-oct-2026) ══
+     El `saludo` de cada vista es uno y fijo. Los TEMAS dependen de la campaña
+     que la persona armó —corporación, partido o firmas, si cambia de
+     corporación, la ciudad— y de qué módulos existen para su territorio
+     (arquetipos solo en Medellín y Cartagena, barrios solo donde hay
+     cartografía, firmas solo en cargo uninominal por firmas).
+
+     Cada tema: { id, si(p) → ¿aplica?, texto(p), chip?, mod?, cambio? }
+       · `mod`    (solo CRM) selector de la tarjeta: Candi lo comenta cuando la
+                  persona se detiene en ella (≥60 % visible, 2,5 s).
+       · `cambio` se dice en cuanto la selección lo vuelve cierto (la ruta y el
+                  wizard): es la respuesta a lo que se acaba de escoger.
+       · sin los dos: tema general, sale solo un rato después del saludo.
+     Todos van además a la guía del panel («Para tu campaña») y, si traen
+     `chip`, a las preguntas sugeridas. Cada tema se dice UNA vez por pestaña.
+
+     ⚠️ Mismas reglas que la guía: ninguna cifra de la campaña sale de acá (las
+     da la página) y nada promete un resultado. Lo que se afirma del producto
+     tiene que ser cierto del producto: al cambiar un módulo, revisar su tema. */
+  const CORP_NOMBRE = { jal: 'la JAL', concejo: 'el Concejo', alcaldia: 'la Alcaldía', asamblea: 'la Asamblea', gobernacion: 'la Gobernación' };
+  const CIUDAD_NOMBRE = { BOGOTA: 'Bogotá', MEDELLIN: 'Medellín', CALI: 'Cali', CARTAGENA: 'Cartagena' };
+  const normT = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  function corpDeTexto(s) {
+    const t = normT(s);
+    if (/\bJAL\b|JUNTA ADMIN|\bEDIL/.test(t)) return 'jal';
+    if (/CONCEJO/.test(t)) return 'concejo';
+    if (/ALCALD/.test(t)) return 'alcaldia';
+    if (/ASAMBLEA/.test(t)) return 'asamblea';
+    if (/GOBERN/.test(t)) return 'gobernacion';
+    return '';
+  }
+  /* «Cali» va con límite de palabra: CALIMA contiene CALI (mismo gotcha del CRM). */
+  function ciudadDeTexto(s) {
+    const t = ' ' + normT(s) + ' ';
+    for (const c of ['BOGOTA', 'MEDELLIN', 'CARTAGENA']) if (t.includes(' ' + c + ' ') || t.includes(c)) return c;
+    return / CALI /.test(t) || t.includes('SANTIAGO DE CALI') ? 'CALI' : '';
+  }
+  const valor = id => document.getElementById(id)?.value || '';
+  const textoSel = id => { const s = document.getElementById(id); return s?.options?.[s.selectedIndex]?.value ? s.options[s.selectedIndex].text : ''; };
+  const marcado = n => document.querySelector(`input[name="${n}"]:checked`)?.value || '';
+
+  /* Lo que la persona escogió, leído a demanda de donde esté: el formulario
+     mientras lo llena, la campaña guardada después. Nunca se copia. */
+  function perfil() {
+    const S = ses(), v = S?.vinculo || null, ctx = contexto(), vista = ctx.vista;
+    let camp = null; try { camp = CAMPANA_ACTUAL || null; } catch {}
+    camp = camp || v?.campana || {};
+    let cand = null; try { cand = crmCandidate || null; } catch {}
+    let pais = ''; try { pais = PAIS || ''; } catch {}
+    const p = { vista, sesion: ctx.sesion, acceso: ctx.acceso, vitrina: !!ctx.vitrina, vinculada: !!v, pais,
+      corp: '', aval: '', partido: '', espectro: '', historial: false, salto: false, lugar: '', paso: ctx.paso || '' };
+
+    if (vista === 'candidateRoute') {
+      const ruta = marcado('corporationRoute');
+      const corpHist = corpDeTexto(document.getElementById('sameCorporationLabel')?.textContent || cand?.corp || '');
+      p.historial = true;
+      p.corp = ruta === 'other' ? valor('otherCorporation') : ruta === 'same' ? corpHist : '';
+      p.salto = ruta === 'other' && !!p.corp && p.corp !== corpHist;
+      p.aval = marcado('avalRuta');
+      p.partido = valor('campaignParty').trim();
+      p.lugar = [textoSel('campaignLocality'), textoSel('campaignMunicipality'), textoSel('campaignDepartment'), ruta === 'same' ? (cand?.corp || '') : ''].join(' ');
+    } else if (vista === 'new') {
+      p.corp = valor('election');
+      const modo = valor('partyMode');
+      p.aval = modo === 'indeciso' ? 'indeciso' : 'partido';
+      p.partido = modo === 'new' ? valor('partyName') : valor('party');
+      p.lugar = [textoSel('locality'), textoSel('municipality'), textoSel('department')].join(' ');
+    } else {
+      p.historial = v ? v.tipo !== 'nuevo' : !!cand;
+      const corpHist = corpDeTexto(v?.candidato?.corp || cand?.corp || '');
+      p.corp = camp.corp || corpDeTexto(ctx.campana || '') || corpHist;
+      p.salto = p.historial && camp.ruta === 'other' && !!corpHist && p.corp !== corpHist;
+      p.aval = camp.avales || '';
+      p.partido = camp.partido || (camp.avales && camp.avales !== 'partido' ? '' : (v?.candidato?.partido || cand?.partido || ''));
+      p.espectro = camp.espectro || '';
+      p.lugar = [camp.localidad, camp.municipio, camp.departamentoNombre, ctx.campana, camp.ruta === 'other' ? '' : (v?.candidato?.corp || cand?.corp || '')].filter(Boolean).join(' ');
+      p.briefing = !!v?.briefing?.activo;
+      p.escucha = !!(v?.escucha?.preferencias?.medios?.length || v?.escucha?.cuentas?.length);
+    }
+    p.uninominal = p.corp === 'alcaldia' || p.corp === 'gobernacion';
+    p.departamental = p.corp === 'asamblea' || p.corp === 'gobernacion';
+    p.lista = p.corp === 'concejo' || p.corp === 'asamblea' || p.corp === 'jal';
+    p.ciudad = p.departamental ? '' : ciudadDeTexto(p.lugar);
+    p.ciudadNombre = CIUDAD_NOMBRE[p.ciudad] || '';
+    p.cargo = CORP_NOMBRE[p.corp] || 'tu corporación';
+    p.arquetipos = p.ciudad === 'MEDELLIN' || p.ciudad === 'CARTAGENA';
+    p.barrios = !!p.ciudad;                       /* las cuatro con cartografía barrial en el CRM */
+    p.firmas = p.uninominal && p.aval === 'firmas';
+    p.sinPartido = p.aval === 'firmas' || p.aval === 'indeciso';
+    return p;
+  }
+
+  /* Los temas que se repiten en la ruta y en el wizard: dependen de lo mismo. */
+  const T_CORP = [
+    { id: 'uninominal', cambio: true, si: p => p.uninominal,
+      texto: p => `A ${p.cargo} gana una sola persona: tu meta no es una curul, es el ganador de 2023 traído a 2027. Por eso el partido no la mueve; lo que sí cambia es dónde buscas esos votos.`,
+      chip: '¿Por qué mi meta es el ganador de 2023?' },
+    { id: 'curules', cambio: true, si: p => p.corp === 'concejo' || p.corp === 'asamblea',
+      texto: p => `En ${p.cargo} se reparten curules por cifra repartidora: cuentan los votos de toda tu lista, no solo los tuyos. Por eso el partido sí mueve la meta.`,
+      chip: '¿Cómo se reparten las curules?' },
+    { id: 'jal', cambio: true, si: p => p.corp === 'jal',
+      texto: () => 'En la JAL compites en una sola localidad o comuna. Para la meta uso las curules oficiales de cada Junta; donde no las tengo, las infiero de la lista más larga inscrita en 2023 y te lo digo.',
+      chip: '¿Cuántas curules tiene mi Junta?' },
+    { id: 'departamental', cambio: true, si: p => p.departamental,
+      texto: () => 'Tu territorio es el departamento entero: en el tablero el mapa deja de ir por barrios y pasa a municipios.' },
+    { id: 'cartagena-jal', cambio: true, si: p => p.ciudad === 'CARTAGENA' && p.corp === 'jal',
+      texto: () => 'En Cartagena las Juntas se eligen por localidad, no por unidad comunera: son tres. En el mapa vas a poder cambiar de escala entre localidad, UCG y barrio.' },
+    { id: 'firmas', cambio: true, si: p => p.firmas,
+      texto: () => 'Por firmas te pido tu familia política porque las firmas se recogen más rápido donde esa familia vota. En el tablero se abre un módulo que te dice cuántas necesitas y en qué zonas cuesta menos.',
+      chip: '¿Dónde recojo las firmas?' },
+    { id: 'indeciso', cambio: true, si: p => p.aval === 'indeciso',
+      texto: () => 'Sin partido todavía, calculo todo con tu familia política: la meta, el mapa y el electorado. Cuando lo tengas, en el tablero hay un botón para ponerlo y todo se recalcula.' },
+    { id: 'partido', cambio: true, si: p => p.aval === 'partido' && !!p.partido && p.lista,
+      texto: () => 'Con tu partido mido dónde vota su lista. Si no tuvo lista aquí en 2023, uso su lista a Cámara de 2026; y si tampoco, su familia política. Siempre te digo con cuál medí.',
+      chip: '¿Con qué votos se mide mi partido?' }
+  ];
+
+  const TEMAS = {
+    intro: [
+      { id: 'vinculada', si: p => p.vinculada,
+        texto: () => 'Tu cuenta ya está vinculada a una candidatura: entres por donde entres, te llevo a ella. Cambiar de persona solo se hace escribiéndole a soporte; la corporación y el territorio sí los cambias tú.' },
+      { id: 'sin-sesion', si: p => !p.sesion,
+        texto: () => 'Puedes mirar la portada sin cuenta. Para buscarte y abrir tu tablero necesito que inicies sesión: así sé de qué campaña estamos hablando.' },
+      { id: 'vitrina-antes', si: p => p.sesion && !p.acceso,
+        texto: () => 'Aunque todavía no tengas plan, puedes abrir tu tablero en vista previa: ves el mapa, tu historial y la meta. El detalle por barrio y por puesto, y los módulos, se abren al activarlo.' },
+      { id: 'pais', si: p => p.pais === 'ec' || p.pais === 'py',
+        texto: () => 'Los módulos son los mismos en los tres países; lo que cambia son los datos electorales y la cartografía de cada uno.' }
+    ],
+    existing: [
+      { id: 'cobertura', si: () => true,
+        texto: () => 'Tengo concejos, asambleas, JAL, alcaldías y gobernaciones de 2011, 2015, 2019 y 2023, y Congreso desde 2014. Si tu candidatura es anterior, no va a aparecer.' },
+      { id: 'forma-corta', si: () => true,
+        texto: () => 'Si no te encuentras, prueba también con tu primer nombre y tu primer apellido: en algunas elecciones la Registraduría inscribe la forma corta del nombre.' }
+    ],
+    candidateRoute: [
+      { id: 'misma-territorial', si: p => p.paso === 'ruta',
+        texto: () => '«La misma corporación» solo te la ofrezco si tu última candidatura fue territorial. Si vienes del Senado, la Cámara o una consulta, escoge a cuál te lanzas.' },
+      { id: 'salto', cambio: true, si: p => p.salto,
+        texto: () => 'Cambias de corporación: tu votación anterior la uso para ver dónde ya tienes gente, pero la meta sale del territorio nuevo. Si tus votos venían de un territorio más grande, en el mapa solo cuento los que caen dentro del nuevo y te digo cuántos quedaron por fuera.',
+        chip: '¿Qué pasa con mis votos de antes?' },
+      ...T_CORP
+    ],
+    new: [
+      { id: 'nuevo-base', si: () => true,
+        texto: p => p.uninominal
+          ? `Sin historial propio, tu punto de partida es el territorio: los resultados de 2023 del lugar al que aspiras. Tu partido no cambia la meta de ${p.cargo}, pero sí dónde te conviene buscar votos.`
+          : 'Sin historial propio, tu punto de partida es el territorio: lo que sacó tu familia política ahí en 2023. Por eso el partido o el espectro importan tanto como el lugar.' },
+      ...T_CORP
+    ],
+    crm: [
+      { id: 'vitrina', si: p => p.vitrina,
+        texto: () => 'Estás en vista previa. Los tres lugares con más votos se ven nítidos; el resto del detalle y los módulos de abajo se abren al activar tu plan.' },
+      { id: 'pendiente-partido', si: p => p.aval === 'indeciso',
+        texto: () => 'Recuerda que estás midiendo con tu familia política. Cuando tengas partido, el botón de arriba lo pone y todo se recalcula con su huella.' },
+      { id: 'mapa-recorte', mod: '#crmMap', si: p => p.salto,
+        texto: () => 'Como cambias de corporación, el mapa es el del territorio nuevo: tus votos de antes solo cuentan si caen dentro de él, y si quedaron por fuera te lo digo debajo. «Proyectado» reparte tu meta por ese territorio.' },
+      { id: 'mapa-historial', mod: '#crmMap', si: p => p.historial && !p.salto,
+        texto: () => '«Total» es lo que sacaste; «Proyectado» reparte tu meta donde ya tienes gente. Toca una zona del mapa para bajar de nivel.' },
+      { id: 'mapa-censo', mod: '#crmMap', si: p => !p.historial && p.barrios && (p.corp === 'concejo' || p.corp === 'alcaldia'),
+        texto: p => `Sin votos propios en ${p.ciudadNombre}, «Total» te muestra el censo electoral —cuánta gente puede votar en cada zona— y «Proyectado», dónde sacó votos tu familia política en 2023.` },
+      { id: 'barrios', mod: '#crmMap', si: p => p.barrios && p.historial,
+        texto: p => `En ${p.ciudadNombre} puedo bajar hasta el barrio. Los barrios sin puesto propio salen punteados: toman el color del vecino más cercano y no suman a ningún total.` },
+      { id: 'meta-uninominal', mod: '.crm-vote-target', si: p => p.uninominal,
+        texto: p => `En ${p.cargo} gana uno solo, así que tu meta es el ganador de 2023 traído a 2027. La ⓘ te explica de dónde sale.` },
+      { id: 'meta-escalones', mod: '.crm-vote-target', si: p => p.lista,
+        texto: () => 'Los cuatro escalones van de menos a más esfuerzo. Inminente es la mitad del probable; posible es lo que costó la curul en una lista más exigente de 2023; deseado es ganarla solo con tus votos. El que escojas es el que guardo como meta.',
+        chip: '¿Qué escalón de la meta escojo?' },
+      { id: 'briefing', mod: '#crmBriefing', si: p => !p.briefing && !p.vitrina,
+        texto: p => `El briefing es lo único que trabaja sin que entres: cada tres días te llega la prensa de tu territorio, los contratos que firmó tu ${p.departamental ? 'departamento' : 'municipio'}${p.corp === 'jal' ? ' y tu Alcaldía Local' : ''} y las normas que lo tocan. Se enciende con un clic.` },
+      { id: 'escucha', mod: '#crmEscucha', si: p => !p.escucha,
+        texto: () => 'La escucha arranca con dos preguntas: qué redes usas y qué medios quieres leer. Antes de montarla compruebo que cada cuenta sea la tuya: un homónimo o una cuenta vieja arruinan la lectura.' },
+      { id: 'arq-medellin', mod: '#crmArquetipos', si: p => p.ciudad === 'MEDELLIN',
+        texto: () => 'En Medellín los arquetipos son cinco familias emocionales por barrio. No te dicen a quién hablarle sino cómo: el mismo mensaje se escucha distinto en un barrio de protección que en uno de castigo.' },
+      { id: 'arq-cartagena', mod: '#crmArquetipos', si: p => p.ciudad === 'CARTAGENA',
+        texto: () => 'Cartagena tiene ocho arquetipos propios, no los de Medellín, y cada barrio es una mezcla de ellos. Ojo: 2023 es proyección y 2027 es simulación.' },
+      { id: 'arq-no', mod: '#crmArquetipos', si: p => !p.arquetipos,
+        texto: () => 'Los arquetipos hoy existen para Medellín y Cartagena. Para tu territorio, lo que más te dice a quién hablarle es el perfil del votante, la tarjeta de al lado.' },
+      { id: 'electorado', mod: '#crmPerfil', si: () => true,
+        texto: p => `Ahí ves a quién puede votar, no solo a quién votó: el censo de 2026 por sexo y edad en tus puestos${p.sinPartido ? ', medido con tu familia política' : ''}. Empieza por los perfiles que salen marcados como viables.` },
+      { id: 'firmas-mod', mod: '#crmFirmas', si: p => p.firmas,
+        texto: () => 'Este módulo aparece porque vas por firmas: cuántas necesitas y en qué zonas cuesta menos recogerlas, según dónde vota tu familia política.' },
+      { id: 'endoso', mod: '#crmEndoso', si: () => true,
+        texto: () => 'Antes de sumar aliados, piensa a quién apoyó cada uno la vez pasada: con eso mido cuánto pasó de verdad. Los nombres de tus líderes se quedan en tu navegador.' },
+      { id: 'diad-territorio', mod: '#crmDiaD', si: p => p.salto || !p.historial,
+        texto: () => 'Como compites en un territorio donde no tienes votación propia, el plan de testigos se ordena con los votos de tu familia política en 2023, puesto por puesto.' },
+      { id: 'diad-propio', mod: '#crmDiaD', si: p => p.historial && !p.salto,
+        texto: () => 'Tu plan de testigos sale de tu propia votación: unos pocos puestos juntan la mayor parte. Mira cuántos de esos no tienen señal antes de contar testigos.' },
+      { id: 'cont-uninominal', mod: '#crmContendientes', si: p => p.uninominal,
+        texto: () => 'En un cargo de uno solo, el rival que más te quita no es el de más votos sino el que los saca en tus mismos puestos.' },
+      { id: 'cont-lista', mod: '#crmContendientes', si: p => p.lista,
+        texto: () => 'Si tu lista es abierta, en el módulo también vas a ver quién te compite dentro de tu propia lista: ese rival pesa tanto como el de afuera.' }
+    ],
+    electorado: [
+      { id: 'medida-familia', si: p => p.sinPartido,
+        texto: () => 'Como todavía no hay partido, mido «dónde sacas votos» con tu familia política; si esa familia no tuvo lista aquí, con sus vecinas del espectro. Arriba de los perfiles te digo con cuál.' },
+      { id: 'medida-partido', si: p => p.aval === 'partido' && !!p.partido,
+        texto: () => 'Mido con la lista de tu partido en 2023; si no tuvo, con su lista a Cámara de 2026; y si tampoco, con su familia. Arriba de los perfiles dice cuál usé.' },
+      { id: 'escala-cartagena', si: p => p.ciudad === 'CARTAGENA',
+        texto: () => 'En Cartagena puedes leerlo por localidad, por unidad comunera o por barrio: está en el selector de escala.' },
+      { id: 'barrios-clic', si: p => p.ciudad === 'BOGOTA' || p.ciudad === 'CALI',
+        texto: p => `En ${p.ciudadNombre}, al tocar una zona del mapa bajas a sus barrios.` },
+      { id: 'departamento', si: p => p.departamental,
+        texto: () => 'Como compites en todo el departamento, el mapa va por municipios.' },
+      { id: 'crecimiento', si: () => true, chip: '¿Dónde crecieron las cédulas?',
+        texto: () => 'La pestaña de crecimiento del censo es tu pista para inscribir cédulas: compara 2023 con 2026. Puesto por puesto léela con cuidado, porque se abrieron y cerraron puestos.' }
+    ],
+    arquetipos: [
+      { id: 'lentes', si: () => true,
+        texto: () => 'Arriba puedes cambiar la lente: tus votos, tu partido o la ciudad entera. El arquetipo «más afín» es el que pesa más en tu votación que en la ciudad, no el más grande.',
+        chip: '¿Qué quiere decir «más afín»?' },
+      { id: 'sin-votos', si: p => !p.historial || p.salto,
+        texto: () => 'Si todavía no tienes votos en la ciudad, abro con la lente de tu partido o tu familia: lo que ves es dónde está tu gente posible, no tus votantes.' },
+      { id: 'cartagena', si: p => p.ciudad === 'CARTAGENA',
+        texto: () => 'En Cartagena cada barrio es una mezcla de ocho arquetipos, así que tus votos se reparten entre varios. La ficha trae las palancas de cada uno: úsalas para escoger el tono.' },
+      { id: 'otra-ciudad', si: p => !p.arquetipos,
+        texto: () => 'Tu campaña no es en Medellín ni en Cartagena, que son las dos ciudades con arquetipos. Lo que ves acá es la ciudad, no tu territorio.' }
+    ],
+    diad: [
+      { id: 'fuente-territorio', si: p => p.salto || !p.historial,
+        texto: () => 'Como no tienes votación propia en este territorio, los puestos van ordenados por los votos de tu familia política en 2023. Tus votos de antes, si caen aquí, salen marcados aparte.' },
+      { id: 'departamento', si: p => p.departamental,
+        texto: () => 'Compites en el departamento, así que el plan cubre puestos de muchos municipios: fíjate en cuáles caen los primeros antes de repartir testigos.' },
+      { id: 'csv', si: () => true,
+        texto: () => 'El plan baja con la columna de testigo en blanco: los nombres los pones tú en tu archivo. Nunca los pedimos ni los guardamos.' }
+    ],
+    endoso: [
+      { id: 'lista', si: p => p.lista,
+        texto: () => 'Abajo está la escalera de tu propia lista: con voto preferente, tu compañero de lista también es tu rival.' },
+      { id: 'agregar', si: () => true,
+        texto: () => 'Si falta alguien que ya suena, agrégalo tú: desde el registro, con sus votos, o solo con el nombre, que se queda en tu navegador.' }
+    ]
+  };
+
+  /* Lo que viaja al modelo de lo escogido: solo categorías, nunca el nombre ni
+     el lugar exacto. Le basta para no responder del Concejo a quien se lanza
+     a la Gobernación. El worker valida contra sus propias listas. */
+  function seleccion() {
+    const p = perfil();
+    return { corp: p.corp, aval: p.aval, historial: p.historial, salto: p.salto, ciudad: p.ciudad,
+      arquetipos: p.arquetipos, firmas: p.firmas };
+  }
+  function temasDe(p = perfil()) {
+    return (TEMAS[p.vista] || []).filter(t => { try { return t.si(p); } catch { return false; } })
+      .map(t => ({ ...t, clave: `${p.vista}:${t.id}`, dicho: (() => { try { return t.texto(p); } catch { return ''; } })() }))
+      .filter(t => t.dicho);
+  }
+
   /* ─── Andamiaje ──────────────────────────────────────────────────────── */
   const esc = s => String(s == null ? '' : s).replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
   let dock, panel, escena, launcher, globo, log, input, enviar, guia, chips, mascota = null;
@@ -164,7 +411,8 @@
      una sola vez. sessionStorage y no localStorage a propósito: abrir la
      plataforma otro día merece la entrada otra vez. */
   const MEMORIA_KEY = 'candi-sesion-v1';
-  const memoria = (() => { try { return Object.assign({ presentada: false, dichas: [] }, JSON.parse(sessionStorage.getItem(MEMORIA_KEY) || '{}')); } catch { return { presentada: false, dichas: [] }; } })();
+  const memoria = (() => { try { return Object.assign({ presentada: false, dichas: [], temas: [] }, JSON.parse(sessionStorage.getItem(MEMORIA_KEY) || '{}')); } catch { return { presentada: false, dichas: [], temas: [] }; } })();
+  if (!Array.isArray(memoria.temas)) memoria.temas = [];
   function recordar() { try { sessionStorage.setItem(MEMORIA_KEY, JSON.stringify(memoria)); } catch {} }
   const yaDicha = v => memoria.dichas.includes(v);
   function marcarDicha(v) { if (v && !yaDicha(v)) { memoria.dichas.push(v); recordar(); } }
@@ -234,8 +482,16 @@
       if (!alCambiarVista._t) alCambiarVista._t = setTimeout(() => { alCambiarVista._t = 0; alCambiarVista(); }, 60);
     });
     document.querySelectorAll('.screen').forEach(s => obsVista.observe(s, { attributes: true, attributeFilter: ['class'] }));
+    /* Lo que se escoge en la ruta o el wizard: un turno por ráfaga de cambios. */
+    const enSeleccion = e => {
+      if (!e.target.closest?.('#candidateRoute, #new')) return;
+      clearTimeout(enSeleccion._t); enSeleccion._t = setTimeout(alCambiarSeleccion, 450);
+    };
+    document.addEventListener('change', enSeleccion);
+    relojGenerales = setInterval(tocaGeneral, 10000);
     window.addEventListener('pagehide', destruir, { once: true });
   }
+  let relojGenerales = 0;
 
   /* Al cambiar de pantalla dentro de la misma página (portada → buscador →
      ruta → CRM) Candi comenta la nueva, una vez por sesión. Volver a la
@@ -245,6 +501,7 @@
     const v = contexto().vista;
     if (v === vistaComentada) return;
     vistaComentada = v;
+    vigilarTarjetas();
     if (!presentada || abierto || calculando) return;
     const texto = VISTAS[v]?.saludo;
     /* Un comentario de la pantalla anterior no se queda colgado sobre la nueva. */
@@ -253,13 +510,73 @@
     decir(texto, 22000);
   }
   function pintarGuia() {
-    const v = contexto().vista;
-    if (v === vistaPintada) return;
-    vistaPintada = v;
-    const g = VISTAS[v] || SIN_VISTA;
-    guia.innerHTML = `<h3>${esc(g.titulo)}</h3><p>${esc(g.texto)}</p>`;
-    chips.innerHTML = (g.chips || []).map(c => `<button type="button" class="candi-chip">${esc(c)}</button>`).join('');
+    const p = perfil(), temas = temasDe(p);
+    const llave = p.vista + '|' + temas.map(t => t.id).join(',');
+    if (llave === vistaPintada) return;
+    vistaPintada = llave;
+    const g = VISTAS[p.vista] || SIN_VISTA;
+    /* «Para tu campaña»: lo mismo que Candi comenta en el globo, escrito y
+       siempre a la mano. Es la versión accesible de los comentarios. */
+    const lista = temas.slice(0, 5);
+    guia.innerHTML = `<h3>${esc(g.titulo)}</h3><p>${esc(g.texto)}</p>` +
+      (lista.length ? `<div class="candi-temas"><h4>Para tu campaña</h4><ul>${lista.map(t => `<li>${esc(t.dicho)}</li>`).join('')}</ul></div>` : '');
+    const sugeridas = [...new Set([...(g.chips || []), ...temas.map(t => t.chip).filter(Boolean)])].slice(0, 6);
+    chips.innerHTML = sugeridas.map(c => `<button type="button" class="candi-chip">${esc(c)}</button>`).join('');
     chips.querySelectorAll('.candi-chip').forEach(b => b.addEventListener('click', () => { input.value = b.textContent; input.focus(); }));
+  }
+
+  /* ─── Los comentarios: Candi dice los temas sola, sin que se le pregunte ──
+     Tres disparadores, y ninguno interrumpe: con el panel abierto, un cálculo
+     en curso o el globo ocupado, espera.
+       1. CAMBIO de selección en la ruta o el wizard → el tema que esa
+          selección acaba de volver cierto, de una (es la respuesta a lo que
+          se escogió; no espera turno).
+       2. En el CRM, detenerse en una TARJETA (≥60 % visible 2,5 s) → su tema.
+       3. Un tema general, ~30 s después de que se fue el último globo; como
+          mucho tres por carga. Más que eso sería una mascota que no se calla.
+     Cada tema, una vez por pestaña (`memoria.temas`). */
+  const PAUSA_ENTRE = 25000, MAX_GENERALES = 3;
+  let ultimoComentario = Date.now(), generalesDichos = 0;   /* el reloj arranca con la página: nada antes del saludo */
+  const temaDicho = t => memoria.temas.includes(t.clave);
+  function libre() { return presentada && !abierto && !calculando && globo && globo.hidden; }
+  function comentar(t) {
+    if (!t || temaDicho(t)) return false;
+    if (!decir(t.dicho, 20000)) return false;
+    memoria.temas.push(t.clave); recordar();
+    ultimoComentario = Date.now();
+    return true;
+  }
+  function alCambiarSeleccion() {
+    const p = perfil();
+    if (p.vista !== 'candidateRoute' && p.vista !== 'new') return;
+    if (abierto) pintarGuia();
+    if (!presentada || calculando) return;
+    const t = temasDe(p).find(x => x.cambio && !temaDicho(x));
+    if (t) comentar(t);
+  }
+  function tocaGeneral() {
+    if (!libre() || generalesDichos >= MAX_GENERALES) return;
+    if (Date.now() - ultimoComentario < PAUSA_ENTRE + 5000) return;
+    const t = temasDe().find(x => !x.mod && !temaDicho(x));
+    if (t && comentar(t)) generalesDichos++;
+  }
+  /* Las tarjetas del CRM: un observador por tarjeta con tema. Se arma cuando
+     el CRM aparece; antes sus tarjetas están ocultas y no hay qué observar. */
+  let obsTarjetas = null;
+  function vigilarTarjetas() {
+    if (obsTarjetas || typeof IntersectionObserver !== 'function' || contexto().vista !== 'crm') return;
+    const relojes = new Map();
+    obsTarjetas = new IntersectionObserver(entradas => entradas.forEach(e => {
+      clearTimeout(relojes.get(e.target));
+      if (!e.isIntersecting || e.intersectionRatio < .6) return;
+      relojes.set(e.target, setTimeout(() => {
+        if (!libre() || Date.now() - ultimoComentario < PAUSA_ENTRE || contexto().vista !== 'crm') return;
+        const t = temasDe().find(x => x.mod && (e.target.matches(x.mod) || e.target.querySelector(x.mod)) && !temaDicho(x));
+        if (t) comentar(t);
+      }, 2500));
+    }), { threshold: [0, .6] });
+    const selectores = [...new Set(TEMAS.crm.map(t => t.mod).filter(Boolean))];
+    document.querySelectorAll(selectores.join(',')).forEach(el => obsTarjetas.observe(el.closest('article') || el));
   }
 
   /* El pie no promete lo que no hay: sin sesión, solo la guía escrita. */
@@ -483,6 +800,7 @@
   }
   function mostrarGlobo() {
     presentada = true;
+    vigilarTarjetas();
     vistaComentada = contexto().vista;
     if (abierto || globo.dataset.visto === '1') { if (calculando) avisarCalculo(); return; }
     const primera = !memoria.presentada;
@@ -521,7 +839,7 @@
     mostrarGlobo._t = setTimeout(ocultarGlobo, 22000);
     return true;
   }
-  function ocultarGlobo() { globo.dataset.visto = '1'; globo.dataset.aviso = ''; globo.hidden = true; clearTimeout(mostrarGlobo._t); }
+  function ocultarGlobo() { ultimoComentario = Date.now(); globo.dataset.visto = '1'; globo.dataset.aviso = ''; globo.hidden = true; clearTimeout(mostrarGlobo._t); }
 
   /* ─── Mientras se calcula la meta de votos ───────────────────────────────
      La meta tarda (baja índices y reparte curules) y la tarjeta se queda en
@@ -594,6 +912,7 @@
        oculta. Pausar acá congelaba la entrada a mitad de camino. */
   }
   function destruir() {
+    clearInterval(relojGenerales); obsTarjetas?.disconnect();
     descanso?.destroy(); descanso = null; quitarRincon(); tira?.remove(); tira = null;
     escena?.removeEventListener('candi:state', reenviarEstado);
     bajito.removeEventListener('change', alCambiarAlto); removeEventListener('resize', alRedimensionar);
@@ -632,7 +951,7 @@
       const r = await fetch(`${API}/c360/candi`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ pregunta: q, contexto: contexto(), historial: historial.slice(-6) })
+        body: JSON.stringify({ pregunta: q, contexto: { ...contexto(), seleccion: seleccion() }, historial: historial.slice(-6) })
       });
       let data = null; try { data = await r.json(); } catch {}
       esperando.remove();
@@ -741,5 +1060,5 @@
   }
   document.addEventListener('click', e => { if (e.target.closest?.(PIENSA_EN)) pensar(); });
 
-  window.Candi = { abrir, cerrar, entrar, pensar, investigar, calculo, decir, get mascota() { return mascota; }, get descanso() { return descanso; }, contexto, primerNombre };
+  window.Candi = { abrir, cerrar, entrar, pensar, investigar, calculo, decir, perfil, temas: () => temasDe(), get mascota() { return mascota; }, get descanso() { return descanso; }, contexto, primerNombre };
 })();
