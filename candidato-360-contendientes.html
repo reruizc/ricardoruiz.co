@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="candidato-360.css?v=20260928p">
 <link rel="stylesheet" href="assets/candidato-360/candi/candi-saludo.css?v=3">
 <link rel="stylesheet" href="assets/candidato-360/candi/candi-hueso.css?v=1">
-<link rel="stylesheet" href="candidato-360-candi.css?v=20260921d">
+<link rel="stylesheet" href="candidato-360-candi.css?v=20261001a">
 <style>
 /* El chasis del panel, igual que en electorado, endoso y Día D. */
 .panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
@@ -64,6 +64,11 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
 
 /* ── 03 · El mapa de disputa ─────────────────────────────────────────── */
 .k-mapa-caja{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;margin-top:10px}
+/* Panel fijo arriba del mapa: reemplaza al tooltip, que no cabía junto al borde. Alto mínimo fijo para que el mapa no salte al pasar el cursor. */
+.k-info{min-height:78px;padding:9px 12px;margin-bottom:6px;background:rgba(23,37,28,.96);color:#fff;font:13px/1.4 var(--sans)}
+.k-info b{font-family:var(--display)}
+.k-info small{font-size:11.5px;opacity:.82}
+.k-info.vacio{background:#eef0ea;color:var(--muted,#5b6159);border:1px solid var(--line)}
 .k-mapa{height:460px;border:1px solid var(--line);background:#eef0ea}
 .k-mapa .leaflet-tile-pane{filter:grayscale(.85) saturate(.5) brightness(1.06)}
 /* Ancho FIJO: con solo max-width el tooltip se encoge al acercarse al borde del mapa y queda una columna de 2 palabras. */
@@ -140,7 +145,7 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
       <p id="kMapaCopy"></p>
       <div class="k-barra" id="kMapaBarra"></div>
       <div class="k-mapa-caja">
-        <div class="k-mapa" id="kMapa"></div>
+        <div class="k-mapa-col"><div class="k-info" id="kInfo" aria-live="polite"></div><div class="k-mapa" id="kMapa"></div></div>
         <div><ul class="k-conteo" id="kMapaConteo"></ul><p style="margin:14px 0 0"><b id="kTopTitulo">Los puestos en disputa</b></p><ol class="k-top" id="kTop"></ol></div>
       </div>
       <p class="helper" id="kMapaNota"></p>
@@ -185,7 +190,7 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
 <script src="assets/candidato-360/candi/candi-atletica.js?v=4"></script>
 <script src="assets/candidato-360/candi/candi-hueso.js?v=2"></script>
-<script src="candidato-360-candi.js?v=20260930a"></script>
+<script src="candidato-360-candi.js?v=20261001a"></script>
 <script>
 (async function () {
   const P = window.C360Panel, K = window.C360Contendientes, E = window.C360Endoso, EL = window.C360Electorado, $ = P.$, esc = P.esc;
@@ -388,13 +393,16 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
   }
 
   const colorDe_ = u => MP.vista === 'territorio' ? BANDA[u.banda]?.[0] : CAT[u.cat]?.[0];
+  function info(html) { const el = $('kInfo'); el.classList.remove('vacio'); el.innerHTML = html; }
+  function infoVacio() { const el = $('kInfo'); if (!el) return; el.classList.add('vacio');
+    el.innerHTML = 'Pase el cursor (o toque, en el teléfono) sobre una zona del mapa para ver su lectura.<br><small>Describe el lugar, no a las personas: no dice quién votó por quién.</small>'; }
   function tip(u) {
     const nom = esc(P.lugar(u.name || u.nombre || 'Puesto'));
     const xU = u.iU == null ? '—' : `${x2(u.iU)}`, xR = u.iR == null ? '—' : `${x2(u.iR)}`;
     const cuerpo = MP.vista === 'territorio'
       ? `Las listas de su familia y las vecinas rinden aquí <b>${xR}</b> lo que rinden en todo el territorio. ${esc(BANDA[u.banda]?.[1] || '')}.`
       : `${esc(CAT[u.cat]?.[1] || '')}.<br>Usted rinde aquí ${xU} su promedio; su familia y las vecinas, ${xR} el suyo.`;
-    return `<b>${nom}</b>${u.barrio && MP.nivel === 'puestos' ? `<br>${esc(P.lugar(u.barrio))}` : ''}<br>${cuerpo}<br><small>${num(u.votos)} votos suyos · ${num(u.validos)} válidos de 2023${u.puestos > 1 ? ` · ${num(u.puestos)} puestos` : ''}</small><br><small>Describe el lugar, no a las personas: no dice quién votó por quién.</small>`;
+    return `<b>${nom}</b>${u.barrio && MP.nivel === 'puestos' ? `<br>${esc(P.lugar(u.barrio))}` : ''}<br>${cuerpo}<br><small>${num(u.votos)} votos suyos · ${num(u.validos)} válidos de 2023${u.puestos > 1 ? ` · ${num(u.puestos)} puestos` : ''}</small>`;
   }
   async function pintarMapaDisputa() {
     const sec = $('kMapaSec'), L = ST.L;
@@ -406,19 +414,21 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
     let C;
     try { C = await capaDe(MP.nivel); } catch (e) { $('kMapaNota').textContent = `No se pudo cargar esta escala: ${e.message}.`; return; }
     if (MP.capa) { MP.mapa.removeLayer(MP.capa); MP.capa = null; }
+    infoVacio();
     if (MP.tiles) { MP.mapa.removeLayer(MP.tiles); MP.tiles = null; }
     const W = window.L;
     if (!MP.cfg?.rotate) MP.tiles = W.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(MP.mapa);
     if (C.tipo === 'puestos') {
       const tope = Math.max(1, ...C.unidades.map(p => p.validos));
-      MP.capa = W.featureGroup(C.unidades.filter(p => Number.isFinite(p.lat) && p.lat).map(p => W.circleMarker(punto(p.lat, p.lon), { radius: 3 + 9 * Math.sqrt(p.validos / tope), color: '#fff', weight: 1, fillColor: colorDe_(p), fillOpacity: p.cat === 'poco' && MP.vista === 'base' ? .5 : .88 }).bindTooltip(tip(p), { sticky: true, className: 'tp' }))).addTo(MP.mapa);
+      MP.capa = W.featureGroup(C.unidades.filter(p => Number.isFinite(p.lat) && p.lat).map(p => W.circleMarker(punto(p.lat, p.lon), { radius: 3 + 9 * Math.sqrt(p.validos / tope), color: '#fff', weight: 1, fillColor: colorDe_(p), fillOpacity: p.cat === 'poco' && MP.vista === 'base' ? .5 : .88 }).on('mouseover click', () => info(tip(p))).on('mouseout', infoVacio))).addTo(MP.mapa);
     } else {
       const porKey = new Map(C.unidades.map(u => [u.key, u]));
       MP.capa = W.geoJSON(C.geo, {
         style: f => { const k = C.cfg.code(f.properties), u = porKey.get(k), rr = C.relleno?.get(k), v = rr && porKey.get(rr.de);
           return u ? { color: '#fff', weight: 1, fillColor: colorDe_(u), fillOpacity: .85 } : v ? { color: 'rgba(23,37,28,.45)', weight: .8, dashArray: '3 3', fillColor: colorDe_(v), fillOpacity: .38 } : { color: '#fff', weight: 1, fillColor: '#f1f1ec', fillOpacity: .5 }; },
         onEachFeature: (f, layer) => { const k = C.cfg.code(f.properties), u = porKey.get(k), rr = C.relleno?.get(k);
-          layer.bindTooltip(u ? tip(u) : rr ? `<b>${esc(P.lugar(C.cfg.name(f.properties)))}</b><br>Sin puesto de votación propio: toma el color de <b>${esc(P.lugar(rr.nombre))}</b>, el barrio con dato más cercano (${rr.km < 1 ? `${Math.round(rr.km * 1000)} m` : `${rr.km.toFixed(1).replace('.', ',')} km`}). Es un color inferido: no suma a ningún total.` : `<b>${esc(P.lugar(C.cfg.name(f.properties)))}</b><br>Sin votos de 2023 en esta lectura.`, { sticky: true, className: 'tp' }); },
+          const h = u ? tip(u) : rr ? `<b>${esc(P.lugar(C.cfg.name(f.properties)))}</b><br>Sin puesto de votación propio: toma el color de <b>${esc(P.lugar(rr.nombre))}</b>, el barrio con dato más cercano (${rr.km < 1 ? `${Math.round(rr.km * 1000)} m` : `${rr.km.toFixed(1).replace('.', ',')} km`}). Es un color inferido: no suma a ningún total.` : `<b>${esc(P.lugar(C.cfg.name(f.properties)))}</b><br>Sin votos de 2023 en esta lectura.`;
+          layer.on('mouseover click', () => info(h)).on('mouseout', infoVacio); },
       }).addTo(MP.mapa);
     }
     /* Leaflet mide el contenedor al crearse: reencuadrar después del layout
