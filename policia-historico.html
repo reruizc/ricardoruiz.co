@@ -62,6 +62,10 @@
     .gen-txt{font-size:.78rem;color:rgba(255,255,255,.72);line-height:1.7}
     .gen-txt b{color:var(--white)}
     @media(max-width:820px){ .gen-2{grid-template-columns:1fr} }
+    .mod-leg{display:flex;flex-wrap:wrap;gap:.25rem .9rem;font-size:.66rem;color:rgba(255,255,255,.7);margin-top:.5rem}
+    .mod-leg i{display:inline-block;width:9px;height:9px;margin-right:.3rem;vertical-align:-1px}
+    #mod-chart svg{display:block;width:100%;height:auto}
+    #mod-chart text{font-family:var(--hn);font-size:8px;fill:rgba(255,255,255,.5)}
     @media(max-width:820px){ .g2,.g3{grid-template-columns:1fr} .bar-i{grid-template-columns:96px 1fr 54px} }
     /* En móvil la tabla mide 448px contra 375 de pantalla y lo que se sale son
        justo las dos columnas que importan: el cambio y la curva. Scrollear de
@@ -171,6 +175,13 @@
       <div class="g2" style="margin-top:1.2rem">
         <div><div class="mini-t" id="t-bien">Qué se llevaron</div><div id="c-bien"></div></div>
         <div><div class="mini-t">Dónde nació la víctima</div><div id="c-pais"></div><div class="sub-n" id="n-pais"></div></div>
+      </div>
+      <div id="mod-wrap" style="display:none;margin-top:1.4rem;padding-top:1.2rem;border-top:1px solid var(--card-border)">
+        <div class="mini-t">Por qué mataron · modalidad presunta, 2010–ago 2026</div>
+        <div id="mod-chart"></div>
+        <div class="mod-leg" id="mod-leg"></div>
+        <div class="gen-txt" id="mod-txt" style="margin-top:.8rem"></div>
+        <div class="sub-n">Fuente: MinDefensa en datos.gov.co (la entrega SIEDCO trae el arma, no la modalidad). La modalidad es <b>presunta</b>: la pone la Policía al registrar el hecho, antes de que la Fiscalía investigue. Las 72 modalidades de la fuente van agrupadas en siete. Por departamento y municipio, en <a href="policia-mapa.html" style="color:var(--amber)">el mapa del delito</a>.</div>
       </div>
       <div id="gen-wrap" style="display:none;margin-top:1.4rem;padding-top:1.2rem;border-top:1px solid var(--card-border)">
         <div class="mini-t">La brecha de género, año a año</div>
@@ -371,6 +382,7 @@
       (N.por_bien||{})[s] ? 'Qué se llevaron' : 'Qué se llevaron · no aplica a este delito';
     /* la brecha de género en el tiempo va aparte, con su propio gráfico */
     lineaGenero(s,d);
+    modalidad(s);
 
     const av=[];
     if((d.desde||0)>ST.meta.anios[0]) av.push(`<b>Este delito existe desde el lote de ${d.desde}</b>, así que su perfil describe ${d.desde}–2026, no la década.`);
@@ -417,6 +429,40 @@
       (d.sin_anio>0?' <span style="opacity:.6">Ojo: a este delito le falta el año en buena parte de sus registros, así que la línea se apoya en menos datos de los que parece.</span>':'');
   }
 
+  /* ── modalidad del homicidio (MinDefensa) ─────────────────────────
+     Barras apiladas al 100% por año. Solo con homicidios: es el único delito
+     para el que existe la variable. Best-effort: sin el JSON, no aparece. */
+  /* Quiebre de registro medido mes a mes y por departamento (sep-2026). */
+  const QUIEBRE_MOD='Desde enero de 2026 cambió cómo se registra la modalidad en algunas regiones: los «ataques de GAO» pasaron de 8% de los homicidios del país en diciembre de 2025 a 24% en enero de 2026, y el sicariato bajó en la misma proporción, sin que cambiara el total de homicidios. El salto se concentra en Antioquia (sicariato de 65% a 14%; grupos armados de 7% a 63%), Nariño, Cauca y Magdalena; en Bogotá, Atlántico, Sucre o Quindío no se movió. Es un cambio de clasificación, no un giro del conflicto que el dato pruebe: no compares 2026 con años anteriores en sicariato y grupos armados.';
+  const MOD_COL={sicariato:'#d1584e',armados:'#be185d',rina:'#e0a03a',atraco:'#22d3ee',familia:'#a78bfa',otras:'#475569',establecer:'#334155'};
+  function modalidad(s){
+    const box=document.getElementById('mod-wrap'), M=ST.mod;
+    if(s!=='homicidios'||!M){ box.style.display='none'; return; }
+    box.style.display='';
+    const A=M.anios, G=M.grupos, W=640, H=170, P={l:28,r:4,t:6,b:16};
+    const tot=A.map((_,i)=>G.reduce((t,g)=>t+((M.nac[g]||[])[i]||0),0));
+    const bw=(W-P.l-P.r)/A.length;
+    let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Modalidad del homicidio por año">`;
+    [0,50,100].forEach(v=>{const y=P.t+(H-P.t-P.b)*(1-v/100); svg+=`<line x1="${P.l}" x2="${W-P.r}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,.07)"/><text x="${P.l-4}" y="${y+3}" text-anchor="end">${v}%</text>`;});
+    A.forEach((a,i)=>{
+      let acc=0; const x=P.l+bw*i+bw*.12;
+      G.forEach(g=>{const v=(M.nac[g]||[])[i]||0, h=tot[i]?(H-P.t-P.b)*v/tot[i]:0;
+        if(h>0) svg+=`<rect x="${x.toFixed(1)}" width="${(bw*.76).toFixed(1)}" y="${(H-P.b-acc-h).toFixed(1)}" height="${h.toFixed(1)}" fill="${MOD_COL[g]}"${a===M.anio_parcial?' opacity=".6"':''}><title>${a}: ${M.label[g]} ${fmt(v)} (${(100*v/tot[i]).toFixed(1).replace('.',',')}%)</title></rect>`;
+        acc+=h;});
+      if(i%2===0||i===A.length-1) svg+=`<text x="${(x+bw*.38).toFixed(1)}" y="${H-4}" text-anchor="middle">${a===M.anio_parcial?a+'*':a}</text>`;
+    });
+    document.getElementById('mod-chart').innerHTML=svg+'</svg>';
+    document.getElementById('mod-leg').innerHTML=G.map(g=>`<span><i style="background:${MOD_COL[g]}"></i>${esc(M.label[g])}</span>`).join('')+`<span style="opacity:.6">* ${M.anio_parcial}: enero a agosto</span>`;
+    const pc=(g,a)=>{const i=A.indexOf(a);return tot[i]?100*((M.nac[g]||[])[i]||0)/tot[i]:0;};
+    const f1=v=>v.toFixed(0)+'%';
+    const uc=M.anio_parcial-1;
+    document.getElementById('mod-txt').innerHTML=
+      `El <b>sicariato</b> pasó de ser el ${f1(pc('sicariato',2010))} de los homicidios en 2010 al <b>${f1(pc('sicariato',uc))}</b> en ${uc}. `+
+      `Las <b>riñas</b>, del ${f1(pc('rina',2010))} al ${f1(pc('rina',uc))}. Los ataques de <b>grupos armados y enfrentamientos</b> pesan el ${f1(pc('armados',uc))} en ${uc} (${f1(pc('armados',2010))} en 2010). `+
+      `En ${M.anio_parcial}, de enero a agosto: sicariato ${f1(pc('sicariato',M.anio_parcial))}, grupos armados ${f1(pc('armados',M.anio_parcial))}, riña ${f1(pc('rina',M.anio_parcial))}.`+
+      `<div class="warn" style="margin-top:.8rem"><b>Ojo con 2026.</b> ${QUIEBRE_MOD}</div>`;
+  }
+
   function calidad(){
     const c=ST.meta.calidad, fr=Object.entries(c.fuera_de_rango||{});
     document.getElementById('calidad').innerHTML=`
@@ -453,6 +499,7 @@
     try{
       const [m,n]=await Promise.all([PONAL.meta(),PONAL.nacional()]);
       ST.meta=m; ST.nac=n;
+      try{ ST.mod=await PONAL.modalidad(); }catch(e){ console.warn('[PONAL] sin modalidad del homicidio'); }
       tabla(); pills(); perfil(); calidad();
     }catch(e){
       document.querySelector('.hs').innerHTML=

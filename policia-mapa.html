@@ -127,9 +127,14 @@
         <label class="flt-l">Año</label>
         <div class="yrs" id="f-anios"></div>
       </div>
+      <div class="flt-g" id="f-mod-g" style="display:none">
+        <label class="flt-l" for="f-mod">Modalidad</label>
+        <select id="f-mod"></select>
+      </div>
       <div class="flt-g">
         <label class="flt-l">Medida</label>
         <button class="yr" id="btn-tasa">Ver tasa por 100.000 hab.</button>
+        <button class="yr" id="btn-pct" style="display:none">Ver como % de los homicidios</button>
       </div>
     </div>
     <div class="tasa-nota" id="tasa-nota"></div>
@@ -172,7 +177,24 @@
   <script src="ponal-base.js"></script>
   <script>
   const ST={delito:'homicidios',anio:'todos',dep:null,mun:null,tasa:false,
-            meta:null,deps:null,muns:null,pob:null,ciuIdx:null,ciu:null};
+            meta:null,deps:null,muns:null,pob:null,ciuIdx:null,ciu:null,
+            mod:'todas',pct:false,MOD:null};
+  /* ── modalidad del homicidio ─────────────────────────────────────
+     Viene de MinDefensa (homicidio-modalidad.json), no de la entrega SIEDCO:
+     la entrega trae el arma pero no la modalidad. Las dos fuentes cuadran mes
+     a mes en el total, así que mezclarlas en el mismo mapa no cambia el
+     orden de magnitud; la página lo declara. Solo existe por departamento y
+     municipio: dentro de la ciudad (comunas) no hay modalidad. */
+  const PISO_PCT=10;
+  const QUIEBRE_MOD='Desde enero de 2026 cambió cómo se registra la modalidad en algunas regiones: los «ataques de GAO» pasaron de 8% de los homicidios del país en diciembre de 2025 a 24% en enero de 2026, y el sicariato bajó en la misma proporción, sin que cambiara el total de homicidios. El salto se concentra en Antioquia (sicariato de 65% a 14%; grupos armados de 7% a 63%), Nariño, Cauca y Magdalena; en Bogotá, Atlántico, Sucre o Quindío no se movió. Es un cambio de clasificación, no un giro del conflicto que el dato pruebe: no compares 2026 con años anteriores en sicariato y grupos armados.';
+  const conMod=()=>ST.delito==='homicidios'&&ST.mod!=='todas'&&ST.MOD;
+  function modDe(clave,esNac,grupo,anio){
+    const o=(esNac?ST.MOD.deptos:ST.MOD.muns)[clave]||{};
+    const A=ST.MOD.anios, sum=g=>{const v=o[g]; if(!v) return 0;
+      if(anio==='todos') return ST.meta.anios.reduce((s,a)=>s+(v[A.indexOf(a)]||0),0);
+      return v[A.indexOf(+anio)]||0;};
+    return grupo==='_tot'?ST.MOD.grupos.reduce((s,g)=>s+sum(g),0):sum(grupo);
+  }
   let map,capa;
 
   function totalDe(o,delito,anio){
@@ -203,12 +225,21 @@
   }
   /* valor que se pinta y se rankea: hechos, o hechos por 100.000 habitantes */
   function valorDe(o,clave,esNac){
+    if(conMod()){
+      const v=modDe(clave,esNac,ST.mod,ST.anio);
+      /* piso de 10 homicidios: con 1 o 2 casos el % salta a 100 y encabeza el ranking */
+      if(ST.pct){ const t=modDe(clave,esNac,'_tot',ST.anio); return t>=PISO_PCT?100*v/t:0; }
+      if(!ST.tasa||!hayTasa()) return v;
+      const p=poblacionDe(clave,esNac); return p?(v*1e5/p):0;
+    }
     const v=totalDe(o,ST.delito,ST.anio);
     if(!ST.tasa||!hayTasa()) return v;
     const p=poblacionDe(clave,esNac);
     return p?(v*1e5/p):0;
   }
-  const fmtV=v=>ST.tasa&&hayTasa()
+  const fmtV=v=>conMod()&&ST.pct
+    ? v.toLocaleString('es-CO',{maximumFractionDigits:1})+'%'
+    : ST.tasa&&hayTasa()
     ? v.toLocaleString('es-CO',{minimumFractionDigits:1,maximumFractionDigits:1})
     : fmt(Math.round(v));
 
@@ -218,8 +249,8 @@
     sel.innerHTML=ST.meta.delitos.map(d=>
       `<option value="${d.id}">${esc(d.label)}${d.desde>ST.meta.anios[0]?' · desde '+d.desde:''}</option>`).join('');
     sel.value=ST.delito;
-    sel.onchange=()=>{ ST.delito=sel.value; sincronizarAnios(); pintar(); };
-    pintarAnios();
+    sel.onchange=()=>{ ST.delito=sel.value; sincronizarAnios(); pintarMod(); pintar(); };
+    pintarAnios(); pintarMod();
   }
   function pintarAnios(){
     const d=ST.meta.delitos.find(x=>x.id===ST.delito)||{};
@@ -230,6 +261,21 @@
     document.querySelectorAll('#f-anios .yr').forEach(b=>b.onclick=()=>{
       ST.anio=b.dataset.y; pintarAnios(); pintar();
     });
+  }
+  function pintarMod(){
+    const g=document.getElementById('f-mod-g'), s=document.getElementById('f-mod'), bp=document.getElementById('btn-pct');
+    const ok=ST.delito==='homicidios'&&ST.MOD;
+    g.style.display=ok?'':'none';
+    if(!ok){ ST.mod='todas'; ST.pct=false; bp.style.display='none'; return; }
+    if(!s.options.length){
+      s.innerHTML='<option value="todas">Todas las modalidades</option>'+ST.MOD.grupos.map(k=>`<option value="${k}">${esc(ST.MOD.label[k])}</option>`).join('');
+      s.onchange=()=>{ ST.mod=s.value; if(ST.mod==='todas') ST.pct=false; pintarMod(); pintar(); };
+      bp.onclick=()=>{ ST.pct=!ST.pct; if(ST.pct) ST.tasa=false; pintarMod(); pintar(); };
+    }
+    s.value=ST.mod;
+    bp.style.display=ST.mod==='todas'?'none':'';
+    bp.classList.toggle('on',ST.pct);
+    bp.textContent=ST.pct?'% de los homicidios':'Ver como % de los homicidios';
   }
   /* un delito cuya serie arranca en 2024 no puede quedarse en un año que no tiene */
   function sincronizarAnios(){
@@ -402,8 +448,9 @@
     const per=ST.anio==='todos'?rangoTodos():rotAnio(ST.anio);
     const esTasa=ST.tasa&&hayTasa()&&nv!=='ciu';
     let titulo, total;
-    if(nv==='nac'){ titulo='Total nacional'; total=filas.reduce((s,f)=>s+totalDe(ST.deps[f.k],ST.delito,ST.anio),0); }
-    else if(nv==='dep'){ titulo=ST.deps[ST.dep].n; total=totalDe(ST.deps[ST.dep],ST.delito,ST.anio); }
+    const mod=conMod()&&nv!=='ciu';
+    if(nv==='nac'){ titulo='Total nacional'; total=mod?Object.keys(ST.deps).reduce((s,c)=>s+modDe(c,true,ST.mod,ST.anio),0):filas.reduce((s,f)=>s+totalDe(ST.deps[f.k],ST.delito,ST.anio),0); }
+    else if(nv==='dep'){ titulo=ST.deps[ST.dep].n; total=mod?modDe(ST.dep,true,ST.mod,ST.anio):totalDe(ST.deps[ST.dep],ST.delito,ST.anio); }
     else { titulo=ST.ciuIdx[ST.mun].n; total=filas.reduce((s,f)=>s+f.v,0); }
     document.getElementById('kpi-t').textContent=titulo+' · '+per;
     if(esTasa){
@@ -413,8 +460,11 @@
       const t=pob?(total*1e5/pob):0;
       document.getElementById('kpi-v').innerHTML=
         fmtV(t)+`<small>${esc(lab.toLowerCase())} por 100.000 hab.</small>`;
+    }else if(mod&&ST.pct){
+      const den=nv==='nac'?Object.keys(ST.deps).reduce((s,c)=>s+modDe(c,true,'_tot',ST.anio),0):modDe(ST.dep,true,'_tot',ST.anio);
+      document.getElementById('kpi-v').innerHTML=fmtV(den?100*total/den:0)+`<small>de los homicidios son ${esc(ST.MOD.label[ST.mod].toLowerCase())} · ${fmt(total)} casos</small>`;
     }else{
-      document.getElementById('kpi-v').innerHTML=fmt(total)+`<small>${esc(lab.toLowerCase())}</small>`;
+      document.getElementById('kpi-v').innerHTML=fmt(total)+`<small>${esc(mod?'homicidios · '+ST.MOD.label[ST.mod].toLowerCase():lab.toLowerCase())}</small>`;
     }
     document.getElementById('rk-t').textContent=
       nv==='nac'?'Departamentos':nv==='dep'?'Municipios':tCase(plural(ST.ciuIdx[ST.mun].tipo));
@@ -473,11 +523,12 @@
      vez de quedarse gris y mudo. */
   function pintarTasaBtn(nv){
     const b=document.getElementById('btn-tasa'), n=document.getElementById('tasa-nota');
-    const puede=hayTasa()&&nv!=='ciu';
+    const puede=hayTasa()&&nv!=='ciu'&&!(conMod()&&ST.pct);
     b.disabled=!puede;
     b.classList.toggle('on',ST.tasa&&puede);
     b.textContent=ST.tasa&&puede?'Tasa por 100.000 hab.':'Ver tasa por 100.000 hab.';
     n.textContent=puede?''
+      : (conMod()&&ST.pct&&nv!=='ciu') ? 'Con «% de los homicidios» la medida ya es un porcentaje: la tasa por habitante no aplica.'
       : nv==='ciu' ? 'El DANE no publica población por comuna: dentro de la ciudad solo hay conteo.'
       : ST.anio==='todos' ? 'Escoge un año para ver la tasa: sumar varios años de hechos sobre la población de uno solo no significa nada.'
       : esParcial(ST.anio) ? `${ST.anio} va de enero a agosto: una tasa sobre la población de todo el año daría una cifra engañosamente baja.`
@@ -486,7 +537,7 @@
   function pintarLeyenda(max){
     document.getElementById('leyenda').innerHTML=
       '<span>menos</span>'+PONAL.RAMPA.map(c=>`<i style="background:${c}"></i>`).join('')+
-      `<span>más — hasta ${fmt(max)}</span>`;
+      `<span>más — hasta ${fmtV(max)}</span>`;
   }
   /* Los avisos no son decorativos: sin ellos el mapa afirma cosas que el dato
      no sostiene (un delito sin año, o uno que solo existe en 2024). */
@@ -510,6 +561,13 @@
       const p=(100*d.sin_anio/d.total).toFixed(0);
       av.push(`<b>${p}% de estos hechos llegó sin año.</b> Traen mes y día de la semana, pero no el año. Cuentan en «Todos» y quedan fuera de cada año por separado — por eso la suma de los años da menos que el total.`);
     }
+    if(conMod()){
+      av.unshift(ST.mun
+        ? `<b>La modalidad no existe por ${esc(ST.ciuIdx[ST.mun].tipo)}.</b> MinDefensa la publica por municipio; dentro de la ciudad el mapa muestra todos los homicidios, sin filtrar.`
+        : `<b>Modalidad presunta, según MinDefensa (datos.gov.co).</b> La asigna la Policía al registrar el hecho, antes de que la Fiscalía investigue. ${ST.pct?'Con «%» se divide por los homicidios del mismo lugar y periodo, y solo se pintan los lugares con ${PISO_PCT} homicidios o más: con menos, un solo hecho mueve la cifra hasta el 100%.':'El total por modalidad sale de MinDefensa y no de la entrega SIEDCO; las dos cuadran mes a mes.'}`);
+    }
+    if(conMod()&&!ST.mun&&(ST.mod==='sicariato'||ST.mod==='armados')&&(ST.anio==='todos'||esParcial(ST.anio)))
+      av.unshift(`<b>Ojo con 2026.</b> ${QUIEBRE_MOD}`);
     const w=document.getElementById('warn');
     w.innerHTML=av.join('<br><br>'); w.style.display=av.length?'':'none';
   }
@@ -521,6 +579,8 @@
       ST.meta=m; ST.deps=dp.deptos; ST.muns=mu.muns; ST.ciuIdx=ci.ciudades;
       /* la población es best-effort: si no está, la página funciona en conteo */
       try{ ST.pob=await PONAL.poblacion(); }catch(e){ console.warn('[PONAL] sin población, solo conteo'); }
+      /* la modalidad también es best-effort: sin ella el filtro no aparece */
+      try{ ST.MOD=await PONAL.modalidad(); }catch(e){ console.warn('[PONAL] sin modalidad del homicidio'); }
       document.getElementById('btn-tasa').onclick=()=>{ ST.tasa=!ST.tasa; pintar(); };
       pintarFiltros(); initMapa(); await pintar();
     }catch(e){

@@ -32,6 +32,8 @@
   const nacional   =()=>j(BASE+'/nacional.json'+V(),'nacional');
   const deptos     =()=>j(BASE+'/deptos.json'+V(),'deptos');
   const municipios =()=>j(BASE+'/municipios.json'+V(),'muns');
+  /* modalidad presunta del homicidio (MinDefensa): la entrega SIEDCO no la trae */
+  const modalidad  =()=>j(BASE+'/homicidio-modalidad.json'+V(),'mod');
   const geoDeptos  =()=>j(MAPAS+'/DEPARTAMENTOS2.json','geo-dep');
   /* Los archivos municipales se llaman por código ELECTORAL, pero adentro
      cada municipio trae `mpio_cdpmp`, que es el DANE de 5 dígitos — el mismo
@@ -98,7 +100,7 @@
       geometry:{...x.geometry, coordinates:f(x.geometry.coordinates)}}))};
   }
 
-  window.PONAL={meta,nacional,deptos,municipios,poblacion,ciudades,ciudad,
+  window.PONAL={meta,nacional,deptos,municipios,modalidad,poblacion,ciudades,ciudad,
     geoDeptos,geoMuns,geoCiudad,rotar90,
     DANE_A_ELECTORAL,ALIAS,norm,color,RAMPA,conSerie,avisarSinMatch,BASE};
 })();

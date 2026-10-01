@@ -798,6 +798,8 @@ curl "https://www.datos.gov.co/resource/3jdh-nmwu.json?\$select=substring(fecha_
     if(/POR ESTABLECER|NO REPORTADA|SIN DATO/.test(k)) return 'Por establecer';
     return 'Otras';
   }
+  /* Quiebre de registro medido mes a mes y por departamento (sep-2026). */
+  const QUIEBRE_MOD='Desde enero de 2026 cambió cómo se registra la modalidad en algunas regiones: los «ataques de GAO» pasaron de 8% de los homicidios del país en diciembre de 2025 a 24% en enero de 2026, y el sicariato bajó en la misma proporción, sin que cambiara el total de homicidios. El salto se concentra en Antioquia (sicariato de 65% a 14%; grupos armados de 7% a 63%), Nariño, Cauca y Magdalena; en Bogotá, Atlántico, Sucre o Quindío no se movió. Es un cambio de clasificación, no un giro del conflicto que el dato pruebe: no compares 2026 con años anteriores en sicariato y grupos armados.';
   const MOD_ORDEN=[['Sicariato',RED],['Grupos armados y enfrentamientos','#be185d'],['Riña',AMB],['Atraco',CYA],['Familia o pareja',VIO],['Otras','#475569'],['Por establecer','#334155']];
   ST.modModo='pct';
   function modalidad(){
@@ -824,8 +826,8 @@ curl "https://www.datos.gov.co/resource/3jdh-nmwu.json?\$select=substring(fecha_
     const sic=(M['Sicariato']||{}), gao=(M['Grupos armados y enfrentamientos']||{})[u]||0;
     const tu2=Object.values(M).reduce((a,v)=>a+(+v[u]||0),0);
     document.getElementById('w-mod').innerHTML=g==='nac'
-      ?`En 2026 el sicariato explica el <b>${pf(100*(+sic[u]||0)/tu2,0)}</b> de los homicidios del país y los ataques de grupos armados y enfrentamientos el <b>${pf(100*gao/tu2,0)}</b>. La modalidad es <b>presunta</b>: la asigna la Policía al registrar el hecho, antes de que la Fiscalía investigue, y «por establecer» es lo que todavía no tiene una.`
-      :`En ${ciuNom(g)}, enero a agosto de 2026: sicariato <b>${pf(100*(+sic[u]||0)/(tu2||1),0)}</b>, grupos armados <b>${pf(100*gao/(tu2||1),0)}</b>. Riña y atraco son homicidios de calle y de convivencia; el sicariato es homicidio por encargo, ligado a economías ilegales.`;
+      ?`En 2026 el sicariato explica el <b>${pf(100*(+sic[u]||0)/tu2,0)}</b> de los homicidios del país y los ataques de grupos armados y enfrentamientos el <b>${pf(100*gao/tu2,0)}</b>. La modalidad es <b>presunta</b>: la asigna la Policía al registrar el hecho, antes de que la Fiscalía investigue, y «por establecer» es lo que todavía no tiene una.<br><br><b>Ojo con 2026.</b> ${QUIEBRE_MOD}`
+      :`En ${ciuNom(g)}, enero a agosto de 2026: sicariato <b>${pf(100*(+sic[u]||0)/(tu2||1),0)}</b>, grupos armados <b>${pf(100*gao/(tu2||1),0)}</b>. Riña y atraco son homicidios de calle y de convivencia; el sicariato es homicidio por encargo, ligado a economías ilegales.<br><br><b>Ojo con 2026.</b> ${QUIEBRE_MOD}`;
   }
 
   /* ═════════════════════════ 5 · feminicidio ═════════════════════════ */
