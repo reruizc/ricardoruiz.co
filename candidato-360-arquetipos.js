@@ -89,7 +89,7 @@
        ⚠️ «Cartagena del Chairá» (Caquetá) NO calza: el nombre es exacto. */
     {
       id: 'cartagena', nombre: 'Cartagena',
-      fuente: 'Simulación 2027 por barrio · cartografía emocional de Cartagena de Nury Astrid',
+      fuente: 'Simulación 2027 por barrio · cartografía emocional de Cartagena',
       calza: t => !t.departamental && /^CARTAGENA( DE INDIAS)?$/.test(norm(t.munLimpio || t.base)) && (!t.depNombre || norm(t.depNombre) === 'BOLIVAR'),
       cargar: async () => {
         const r = await fetch(`${S3_CTG}/arquetipos-cartagena.json?v=20261001`);
