@@ -6,6 +6,15 @@ El brief, de punta a punta: barrido → Claude Fable 5.1 → JSON → PDF.
   python3 tools/caudal/brief/brief.py cauce --barrido b.json # reusa un barrido
   python3 tools/caudal/brief/brief.py cauce --solo-prompt    # imprime y no gasta
   python3 tools/caudal/brief/brief.py cauce --modelo claude-sonnet-5
+  python3 tools/caudal/brief/brief.py cauce --tipo cierre    # el del viernes
+  python3 tools/caudal/brief/brief.py cauce --tipo cierre --anterior Brief-Cauce-2026-09-28.json
+
+DOS BRIEFS. El del LUNES abre la semana (lo que se movió en 72 horas y qué
+hacer). El del VIERNES la cierra: cómo terminaron los temas grandes del lunes,
+qué más pasó en la semana y en qué enfocarse el lunes (ver cierre.py). Con
+`--tipo auto` (el default) el viernes escribe el cierre si encuentra el brief que
+abrió la semana, y si no lo encuentra escribe el normal y lo dice: un cierre sin
+el lunes a la mano no tiene qué cerrar.
 
 MODELO. Claude Fable 5.1 por defecto (decisión de Ricardo, 16-sep-2026): el brief
 es bajo volumen y alto valor, y es lo que el cliente ve; una sola corrección de
@@ -35,7 +44,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import barrido as barrido_mod                                    # noqa: E402
 import caudal_core                                               # noqa: E402
-from prompt_brief import BRIEF_SYSTEM, armar_mensaje             # noqa: E402
+import cierre as cierre_mod                                      # noqa: E402
+from prompt_brief import (BRIEF_CIERRE_SYSTEM, BRIEF_SYSTEM,     # noqa: E402
+                          armar_mensaje, armar_mensaje_cierre)
 
 MODELO = 'claude-fable-5-1'
 # ⚠️ El techo cubre el TEXTO y el RAZONAMIENTO previo, que también es salida.
@@ -70,17 +81,21 @@ def llave():
     sys.exit(f'falta ANTHROPIC_API_KEY: ponla en el entorno o en {ENV_FILE}')
 
 
-def generar(system, user, modelo=MODELO, max_tokens=MAX_TOKENS):
-    """Una llamada a la API de Anthropic. Devuelve (json, uso)."""
+def generar(system, user, modelo=MODELO, max_tokens=MAX_TOKENS, pensar=True):
+    """Una llamada a la API de Anthropic. Devuelve (json, uso).
+
+    `pensar=False` es para las llamadas chicas y mecánicas (las búsquedas del
+    seguimiento del viernes): ahí razonar solo gasta.
+    """
     key = llave()
-    body = json.dumps({
-        'model': modelo, 'max_tokens': max_tokens, 'system': system,
+    cuerpo = {'model': modelo, 'max_tokens': max_tokens, 'system': system,
+              'messages': [{'role': 'user', 'content': user}]}
+    if pensar:
         # Pensar antes de escribir es justo lo que este trabajo necesita: el
         # brief exige elegir qué entra y qué no, no solo redactar.
-        'thinking': {'type': 'adaptive'},
-        'output_config': {'effort': 'high'},
-        'messages': [{'role': 'user', 'content': user}],
-    }).encode()
+        cuerpo['thinking'] = {'type': 'adaptive'}
+        cuerpo['output_config'] = {'effort': 'high'}
+    body = json.dumps(cuerpo).encode()
     req = urllib.request.Request(
         'https://api.anthropic.com/v1/messages', data=body,
         headers={'Content-Type': 'application/json', 'x-api-key': key,
@@ -99,6 +114,55 @@ def generar(system, user, modelo=MODELO, max_tokens=MAX_TOKENS):
     if txt.startswith('```'):
         txt = txt.split('```')[1].lstrip('json').strip()
     return json.loads(txt), d.get('usage', {})
+
+
+def decidir_tipo(tipo, hoy=None):
+    """`auto` → cierre los viernes, inicio el resto de los días."""
+    if tipo != 'auto':
+        return tipo
+    hoy = hoy or datetime.date.today()
+    return 'cierre' if hoy.isoweekday() == 5 else 'inicio'
+
+
+def depurar_cierre(brief, temas_lunes, hasta):
+    """Lo que el modelo no puede decidir por su cuenta en el cierre.
+
+    · El estado sale de la lista cerrada; uno desconocido pasa a «sin_dato».
+    · Cada tema del lunes tiene su entrada, en el orden del lunes. Si el modelo
+      se salta uno, entra marcado para revisión en vez de desaparecer: un tema
+      del lunes que el viernes no menciona se lee como olvido.
+    · La agenda es de lo que viene: lo fechado antes de hoy se cae.
+    Devuelve la lista de avisos para la consola.
+    """
+    avisos = []
+    por_n = {}
+    for x in brief.get('seguimiento') or []:
+        try:
+            n = int(x.get('n'))
+        except (TypeError, ValueError):
+            avisos.append(f"seguimiento sin número de tema: {str(x.get('titulo'))[:60]}")
+            continue
+        if x.get('estado') not in cierre_mod.ESTADOS:
+            avisos.append(f"tema {n}: estado «{x.get('estado')}» fuera de la lista → sin_dato")
+            x['estado'] = 'sin_dato'
+        x['n'] = n
+        por_n.setdefault(n, x)
+    seg = []
+    for t in temas_lunes:
+        x = por_n.get(t['n'])
+        if not x:
+            avisos.append(f"el modelo no cerró el tema {t['n']} ({t['rotulo']}): queda para revisión")
+            x = {'n': t['n'], 'estado': 'sin_dato',
+                 'titulo': 'El modelo no escribió el cierre de este tema: revisar a mano.',
+                 'parrafos': [], 'que_sigue': ''}
+        seg.append(x)
+    brief['seguimiento'] = seg
+    ag = brief.get('agenda') or []
+    brief['agenda'] = [x for x in ag if not x.get('iso') or x['iso'] >= hasta]
+    if len(brief['agenda']) < len(ag):
+        avisos.append(f"{len(ag) - len(brief['agenda'])} fechas de la agenda ya habían "
+                      f"pasado y se quitaron")
+    return avisos
 
 
 def costo(uso, modelo):
@@ -145,13 +209,21 @@ def main():
     ap.add_argument('--probar', action='store_true',
                     help='una llamada mínima para verificar la llave y el modelo')
     ap.add_argument('--out', help='guardar el JSON del brief acá')
+    ap.add_argument('--tipo', choices=('auto', 'inicio', 'cierre'), default='auto',
+                    help='inicio = 72 horas (lunes) · cierre = la semana (viernes) · '
+                         'auto = cierre los viernes')
+    ap.add_argument('--anterior', help='el JSON del brief que abrió la semana '
+                                       '(si no, se busca solo, local o en S3)')
+    ap.add_argument('--guardar-barrido', help='guardar la evidencia cruda acá')
     a = ap.parse_args()
 
     if a.probar:
         return probar(a.modelo)
 
+    tipo = decidir_tipo(a.tipo)
     if a.barrido:
         b = json.load(open(a.barrido, encoding='utf-8'))
+        p = b['perfil']
     else:
         if a.perfil:
             p = caudal_core.normalizar_perfil(
@@ -162,23 +234,72 @@ def main():
                 sys.exit(f'no existe el preset «{a.sector}»')
         else:
             sys.exit('dame un preset, --perfil o --barrido')
-        desde = (datetime.date.today()
-                 - datetime.timedelta(days=a.dias)).isoformat()
-        b = barrido_mod.barrer(p, a.dias, desde)
 
-    user = armar_mensaje(b)
+    # ── el cierre necesita el brief que abrió la semana ────────────────────
+    anterior = temas_lunes = None
+    uso_consultas = None
+    if tipo == 'cierre':
+        if a.anterior:
+            anterior, ruta_ant = json.load(open(a.anterior, encoding='utf-8')), a.anterior
+        else:
+            anterior, ruta_ant = cierre_mod.buscar_anterior(p.get('nombre'))
+        if not anterior:
+            if a.tipo == 'cierre':
+                sys.exit(f'no hay brief del lunes para cerrar: {ruta_ant}')
+            print(f'[cierre] {ruta_ant}. Escribo el brief normal de 72 horas.')
+            tipo = 'inicio'
+        else:
+            print(f'[cierre] cierro la semana del brief {ruta_ant}')
+            temas_lunes = cierre_mod.temas_a_seguir(anterior)
+            uso_consultas = cierre_mod.armar_consultas(temas_lunes, generar)
+            for t in temas_lunes:
+                print(f"  tema {t['n']} · {t['rotulo']}: {' · '.join(t['consultas'])}")
+
+    if not a.barrido:
+        if tipo == 'cierre':
+            desde, dias = cierre_mod.ventana(anterior)
+            extra = cierre_mod.jobs_seguimiento(temas_lunes, dias)
+            b = barrido_mod.barrer(p, dias, desde, extra=extra, agenda_desde=desde)
+        else:
+            desde = (datetime.date.today()
+                     - datetime.timedelta(days=a.dias)).isoformat()
+            b = barrido_mod.barrer(p, a.dias, desde)
+        if a.guardar_barrido:
+            json.dump(b, open(a.guardar_barrido, 'w', encoding='utf-8'),
+                      ensure_ascii=False, indent=1)
+            print(f'[barrido → {a.guardar_barrido}]')
+
+    if tipo == 'cierre':
+        system, user = BRIEF_CIERRE_SYSTEM, armar_mensaje_cierre(b, temas_lunes, anterior)
+    else:
+        system, user = BRIEF_SYSTEM, armar_mensaje(b)
     if a.solo_prompt:
         print(user)
-        print(f'\n[{len(user):,} caracteres · ~{len(user)//4:,} tokens de entrada]'
+        print(f'\n[{tipo} · {len(user):,} caracteres · ~{len(user)//4:,} tokens de entrada]'
               .replace(',', '.'))
         return
 
-    brief, uso = generar(BRIEF_SYSTEM, user, a.modelo)
+    brief, uso = generar(system, user, a.modelo)
     brief['_meta'] = {
+        'tipo': tipo,
         'cliente': b['perfil'].get('nombre'), 'ventana': b['ventana'],
         'modelo': a.modelo, 'generado': datetime.datetime.now().isoformat(timespec='seconds'),
         'uso': uso, 'cobertura': b.get('cobertura'),
     }
+    if tipo == 'cierre':
+        for aviso in depurar_cierre(brief, temas_lunes, b['ventana']['hasta']):
+            print(f'[cierre] ⚠ {aviso}')
+        # Lo que dijo el lunes viaja LITERAL: el documento lo cita de acá, no de
+        # una paráfrasis del modelo, para que el lector pueda comparar.
+        brief['_meta']['anterior'] = {
+            'fecha': ((anterior.get('_meta') or {}).get('ventana') or {}).get('hasta', ''),
+            'titular': anterior.get('titular', ''),
+            'temas': [{k: t[k] for k in ('n', 'rotulo', 'titulo', 'que_hacer',
+                                          'urgencia', 'consultas')}
+                      for t in temas_lunes],
+        }
+        if uso_consultas:
+            brief['_meta']['uso_consultas'] = uso_consultas
     # La foto de portada del correo. Se elige acá, y no al mandar, porque acá
     # está la prensa del barrido y así la foto queda a la vista al revisar.
     from imagen_prensa import elegir
@@ -189,7 +310,13 @@ def main():
     out = a.out or f"brief-{(b['perfil'].get('nombre') or 'cliente').lower()}-{b['ventana']['hasta']}.json"
     json.dump(brief, open(out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     usd, cop = costo(uso, a.modelo)
-    print(f"{brief.get('titular', '')}\n")
+    if uso_consultas:
+        u2, c2 = costo(uso_consultas, 'claude-sonnet-5')
+        usd, cop = usd + u2, cop + c2
+    print(f"[{tipo}] {brief.get('titular', '')}\n")
+    if tipo == 'cierre':
+        print('  ' + ' · '.join(f"tema {x['n']}: {cierre_mod.ESTADOS[x['estado']]}"
+                                for x in brief.get('seguimiento') or []))
     print(f"{len(brief.get('temas', []))} temas · {len(brief.get('agenda', []))} "
           f"en agenda · {len(brief.get('no_se_movio', []))} verificaciones")
     print(f"entrada {uso.get('input_tokens', 0):,} tokens · salida "

@@ -39,6 +39,11 @@ MESES = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
 TINTA, GRIS, AZUL, PAPEL, LINEA = '#0b0d11', '#5a6070', '#2b5672', '#fbfaf8', '#e2e5ea'
 URGENCIA = {'alta': ('#d9480f', 'Urgente'), 'media': ('#2b5672', 'Atento'),
             'baja': ('#6b7280', 'Para saber')}
+# Brief de cierre (viernes): cómo terminó cada tema del lunes. Mismos colores
+# que el PDF, para que el correo y el adjunto digan lo mismo de un vistazo.
+ESTADO = {'resuelto': ('#2b8a3e', 'Se resolvió'), 'avanzo': ('#2b5672', 'Avanzó'),
+          'complicado': ('#d9480f', 'Se complicó'), 'igual': ('#8a6d1c', 'Quedó igual'),
+          'sin_dato': ('#6b7280', 'Sin dato verificable')}
 
 
 def _fecha_larga(iso, relativa=False):
@@ -86,20 +91,30 @@ def _corto(txt, n):
     return txt if len(txt) <= n else txt[:n].rsplit(' ', 1)[0].rstrip(',.;:') + '…'
 
 
-def momento(iso):
-    """«Inicio de la semana» el lunes, «Cierre de la semana» el viernes."""
+def momento(iso, tipo=None):
+    """«Inicio de la semana» el lunes, «Cierre de la semana» el viernes.
+
+    Manda el TIPO del brief, no el día: si un viernes no apareció el brief del
+    lunes, brief.py escribe uno normal de 72 horas, y llamarlo «cierre» le
+    prometería al lector un balance que el documento no trae.
+    """
     import datetime
+    if tipo == 'cierre':
+        return 'Cierre de la semana'
     try:
         dia = datetime.date.fromisoformat(str(iso)[:10]).isoweekday()
     except ValueError:
         return 'Lo de estos días'
+    if tipo == 'inicio':
+        return 'Inicio de la semana' if dia == 1 else 'Lo de estos días'
     return {1: 'Inicio de la semana', 5: 'Cierre de la semana'}.get(dia, 'Lo de estos días')
 
 
 def asunto(b):
     meta = b.get('_meta') or {}
     hasta = (meta.get('ventana') or {}).get('hasta', '')
-    return f"Caudal · {momento(hasta)} · {meta.get('cliente', 'cliente')} · {_fecha_larga(hasta)}"
+    return (f"Caudal · {momento(hasta, meta.get('tipo'))} · {meta.get('cliente', 'cliente')}"
+            f" · {_fecha_larga(hasta)}")
 
 
 def cuerpo_html(b):
@@ -120,9 +135,19 @@ def cuerpo_html(b):
     temas = temas_todos[:3]     # los tres primeros: el resto está en el PDF
     agenda = [x for x in (b.get('agenda') or []) if x.get('que')][:4]
     una = lec.get('si_solo_hay_tiempo') or ''
+    if (b.get('_meta') or {}).get('tipo') == 'cierre':
+        lu_ = b.get('lunes') or {}
+        foco = (lu_.get('foco') or '').strip()
+        if foco and lu_.get('por_que') and foco[-1] not in '.!?…':
+            foco += '.'        # sin esto el foco y su porqué se leían como una frase
+        una = ' '.join(x for x in (foco, (lu_.get('por_que') or '').strip()) if x)
     e = lambda x: html.escape(_fechas_en_texto(x))
     n_alta = sum(1 for t in temas_todos if t.get('urgencia') == 'alta')
     img = meta.get('imagen') or {}
+    cierre = meta.get('tipo') == 'cierre'
+    seg = b.get('seguimiento') or []
+    lunes_por_n = {t.get('n'): t for t in ((meta.get('anterior') or {}).get('temas') or [])}
+    lu = b.get('lunes') or {}
 
     def cifra(n, rotulo, color=AZUL):
         return (f'<td align="center" width="33%" style="padding:0 6px">'
@@ -132,6 +157,10 @@ def cuerpo_html(b):
 
     cifras = (cifra(len(temas_todos), 'temas') + cifra(n_alta, 'urgentes', '#d9480f')
               + cifra(len(b.get('agenda') or []), 'fechas por venir'))
+    if cierre:
+        n_abiertos = sum(1 for x in seg if x.get('estado') in ('avanzo', 'complicado', 'igual'))
+        cifras = (cifra(len(seg), 'temas del lunes') + cifra(n_abiertos, 'siguen abiertos', '#d9480f')
+                  + cifra(len(b.get('agenda') or []), 'fechas por venir'))
 
     filas_temas = ''
     for t in temas:
@@ -141,6 +170,19 @@ def cuerpo_html(b):
             f'<span style="font-size:11px;font-weight:bold;letter-spacing:.06em;'
             f'text-transform:uppercase;color:{color}">{e(rot)} · {e(t.get("rotulo"))}</span><br>'
             f'<span style="font-size:15px;color:{TINTA}">{e(t.get("titulo"))}</span></td></tr>')
+
+    filas_seg = ''
+    for x in seg:
+        color, rot = ESTADO.get(x.get('estado'), ESTADO['sin_dato'])
+        lun = lunes_por_n.get(x.get('n')) or {}
+        filas_seg += (
+            f'<tr><td style="padding:10px 0;border-top:1px solid {LINEA}">'
+            f'<span style="display:inline-block;background:{color};color:#fff;font-size:11px;'
+            f'font-weight:bold;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;'
+            f'border-radius:4px">{e(rot)}</span> '
+            f'<span style="font-size:11px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;'
+            f'color:{GRIS}">{e(lun.get("rotulo"))}</span><br>'
+            f'<span style="font-size:15px;color:{TINTA}">{e(x.get("titulo"))}</span></td></tr>')
 
     filas_agenda = ''.join(
         f'<tr><td style="padding:6px 12px 6px 0;font-size:13px;font-weight:bold;'
@@ -170,7 +212,7 @@ def cuerpo_html(b):
 
 <tr><td style="padding:4px 28px 0">
 <div style="font-size:30px;font-weight:bold;color:{TINTA}">¡Hola, {e(cliente)}!</div>
-<div style="font-size:17px;font-style:italic;color:{AZUL};padding-top:2px">{e(momento(v.get('hasta')))}</div>
+<div style="font-size:17px;font-style:italic;color:{AZUL};padding-top:2px">{e(momento(v.get('hasta'), meta.get('tipo')))}</div>
 </td></tr>
 
 <tr><td style="padding:18px 28px 0">
@@ -183,14 +225,15 @@ Del {e(_fecha_larga(v.get('desde')))} al {e(_fecha_larga(v.get('hasta')))}</div>
 
 <tr><td style="padding:22px 22px 4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>{cifras}</tr></table></td></tr>
 
-{f'<tr><td style="padding:18px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{PAPEL};border-left:4px solid {AZUL};border-radius:6px"><tr><td style="padding:14px 16px"><div style="font-size:11px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;color:{AZUL}">Si solo tienes tiempo para una cosa</div><div style="font-size:15px;padding-top:4px">{e(una)}</div></td></tr></table></td></tr>' if una else ''}
+{f'<tr><td style="padding:18px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{PAPEL};border-left:4px solid {AZUL};border-radius:6px"><tr><td style="padding:14px 16px"><div style="font-size:11px;font-weight:bold;letter-spacing:.08em;text-transform:uppercase;color:{AZUL}">{"Para el lunes" if cierre else "Si solo tienes tiempo para una cosa"}</div><div style="font-size:15px;padding-top:4px">{e(una)}</div></td></tr></table></td></tr>' if una else ''}
 
 <tr><td style="padding:18px 28px 0;font-size:15px">{e(parrafo)}</td></tr>
 
-<tr><td style="padding:26px 28px 0;font-size:19px;font-weight:bold">Los temas de la semana</td></tr>
-<tr><td style="padding:6px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{filas_temas}</table></td></tr>
+{f'<tr><td style="padding:26px 28px 0;font-size:19px;font-weight:bold">Cómo terminaron los temas del lunes</td></tr><tr><td style="padding:6px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{filas_seg}</table></td></tr>' if filas_seg else ''}
 
-{f'<tr><td style="padding:24px 28px 0;font-size:19px;font-weight:bold">Lo que viene</td></tr><tr><td style="padding:6px 28px 0"><table role="presentation" cellpadding="0" cellspacing="0">{filas_agenda}</table></td></tr>' if filas_agenda else ''}
+{f'<tr><td style="padding:26px 28px 0;font-size:19px;font-weight:bold">{"Lo demás de la semana" if cierre else "Los temas de la semana"}</td></tr><tr><td style="padding:6px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{filas_temas}</table></td></tr>' if filas_temas else ''}
+
+{f'<tr><td style="padding:24px 28px 0;font-size:19px;font-weight:bold">{"Lo que viene la próxima semana" if cierre else "Lo que viene"}</td></tr><tr><td style="padding:6px 28px 0"><table role="presentation" cellpadding="0" cellspacing="0">{filas_agenda}</table></td></tr>' if filas_agenda else ''}
 
 <tr><td style="padding:24px 28px 0;font-size:14px;color:{GRIS}">
 El brief completo va adjunto: el <b style="color:{TINTA}">PDF</b> para leerlo y el

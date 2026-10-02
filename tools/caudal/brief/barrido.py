@@ -55,6 +55,11 @@ UA = 'caudal-brief/2.0 (+ricardoruiz.co)'
 CONCURRENCIA = 6
 # Tope de titulares por consulta de prensa (ver el bucle de medios).
 MEDIOS_POR_CONSULTA = 12
+# Las consultas de SEGUIMIENTO del brief de cierre (cómo terminaron los temas del
+# lunes) llevan un tope más alto: son pocas, están hechas a la medida del tema y
+# cubren cinco días en vez de tres. Con 12 se perdía justo el desenlace, que es
+# lo último que se publica y llega al final de la lista.
+SEGUIMIENTO_POR_CONSULTA = 20
 
 
 def post(payload, timeout=70):
@@ -262,21 +267,28 @@ def redes_escucha(p):
     nombre = unicodedata.normalize('NFD', str(p.get('nombre') or '').lower())
     slug = re.sub(r'[^a-z0-9]+', '-', ''.join(c for c in nombre
                                                if unicodedata.category(c) != 'Mn')).strip('-')
-    d = None
+    # ⚠️ Se leen LAS DOS copias y gana la más nueva. Antes la local ganaba
+    # siempre que existiera, y desde el 28-sep la escucha corre solo en GitHub:
+    # en esta Mac la carpeta quedó congelada y el barrido seguía leyendo la
+    # conversación del 28 con la de S3 al día (medido el 2-oct). En GitHub no
+    # hay copia local y no pasaba; en una corrida local sí, y sin avisar.
+    candidatas = []
     carpeta = os.path.join(REDES_DIR, slug)
     try:
         ultimos = sorted(x for x in os.listdir(carpeta) if x.endswith('.json'))
         if ultimos:
-            d = json.load(open(os.path.join(carpeta, ultimos[-1]), encoding='utf-8'))
-    except OSError:
+            candidatas.append(json.load(open(os.path.join(carpeta, ultimos[-1]),
+                                             encoding='utf-8')))
+    except (OSError, ValueError):
         pass
-    if d is None:
-        try:
-            r = subprocess.run(['aws', 's3', 'cp', f's3://caudal-legislativo/metadata/escucha/{slug}.json', '-'],
-                               capture_output=True, text=True, timeout=60)
-            d = json.loads(r.stdout) if r.returncode == 0 else None
-        except Exception:                                        # noqa: BLE001
-            d = None
+    try:
+        r = subprocess.run(['aws', 's3', 'cp', f's3://caudal-legislativo/metadata/escucha/{slug}.json', '-'],
+                           capture_output=True, text=True, timeout=60)
+        if r.returncode == 0:
+            candidatas.append(json.loads(r.stdout))
+    except Exception:                                            # noqa: BLE001
+        pass
+    d = max(candidatas, key=lambda x: str(x.get('generado') or ''), default=None)
     if not d:
         return [], None
     solo_co = d.get('solo_colombia', True)
@@ -293,9 +305,19 @@ def redes_escucha(p):
     return out[:REDES_TOPE], (d.get('generado') or '')[:10]
 
 
-def barrer(p, dias, desde):
-    """Corre el plan y devuelve la evidencia agrupada por pilar."""
-    jobs = plan_de_consultas(p, dias)
+def barrer(p, dias, desde, extra=None, agenda_desde=None):
+    """Corre el plan y devuelve la evidencia agrupada por pilar.
+
+    `extra` son consultas que se corren ANTES del plan derivado de la ficha (las
+    de seguimiento del brief de cierre). Van primero a propósito: la prensa se
+    deduplica por titular y la primera consulta que trae una nota se queda con
+    ella, así que una nota del desenlace queda marcada como seguimiento y no se
+    pierde entre los titulares del tema general.
+
+    `agenda_desde` abre la agenda hacia atrás: el brief de cierre necesita las
+    sesiones de la semana que acaba (qué se citó), no solo lo que viene.
+    """
+    jobs = list(extra or []) + plan_de_consultas(p, dias)
     with ThreadPoolExecutor(max_workers=CONCURRENCIA) as pool:
         res = list(pool.map(lambda kv: post(kv[1]), jobs))
     crudo = {k: d for (k, _), d in zip(jobs, res)}
@@ -488,7 +510,9 @@ def barrer(p, dias, desde):
         elif pilar == 'medios':
             # Tope por consulta: sin esto «presupuesto» aporta 300 titulares y
             # los demás temas del cliente desaparecen del brief por volumen.
-            for x in (d.get('resultados') or [])[:MEDIOS_POR_CONSULTA]:
+            tope = (SEGUIMIENTO_POR_CONSULTA if origen.startswith('seguimiento')
+                    else MEDIOS_POR_CONSULTA)
+            for x in (d.get('resultados') or [])[:tope]:
                 marcar_cobertura('medios', x.get('fecha'))
                 if iso(x.get('fecha')) < desde:
                     continue
@@ -515,16 +539,21 @@ def barrer(p, dias, desde):
                     'valor': x.get('valor'),
                 }, origen)
 
-    # Agenda: solo lo que viene, y solo si toca un tema del cliente.
+    # Agenda: solo lo que viene (o, en el cierre, también lo de la semana), y
+    # solo si toca un tema del cliente.
     o = crudo.get('agenda') or {}
     claves = [t.lower() for t in (p.get('temas') or [])]
+    piso_agenda = agenda_desde or hoy
     for s in (o.get('ordenes') or []):
-        if iso(s.get('fecha')) < hoy:
+        if iso(s.get('fecha')) < piso_agenda:
             continue
         txt = json.dumps(s, ensure_ascii=False).lower()
         if claves and not any(k.split()[0] in txt for k in claves):
             continue
         ev['agenda'].append({
+            # `ya_paso`: una sesión de esta semana dice qué estuvo en el orden del
+            # día, NO qué se votó. El prompt lo separa de lo que viene.
+            'ya_paso': iso(s.get('fecha')) < hoy,
             'fecha': iso(s.get('fecha')), 'corporacion': s.get('corporacion', ''),
             'ambito': s.get('ambito', ''),
             'proyectos': [(x.get('numero') or x.get('num'), (x.get('titulo') or '')[:90])

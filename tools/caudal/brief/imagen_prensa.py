@@ -85,10 +85,18 @@ def elegir(brief, medios, intentos=4):
     if os.environ.get('BRIEF_IMAGEN', '1') == '0':
         return None
     try:
-        temas = brief.get('temas') or []
-        if not temas or not medios:
+        # En el brief de cierre la portada es el desenlace del primer tema del
+        # lunes, no el primero de «lo demás de la semana».
+        seg = brief.get('seguimiento') or []
+        ant = ((brief.get('_meta') or {}).get('anterior') or {}).get('temas') or []
+        if seg:
+            rot = next((t.get('rotulo', '') for t in ant if t.get('n') == seg[0].get('n')), '')
+            principal = {'titulo': seg[0].get('titulo', ''), 'rotulo': rot}
+        else:
+            principal = (brief.get('temas') or [None])[0]
+        if not principal or not medios:
             return None
-        clave = _palabras(f"{temas[0].get('titulo', '')} {temas[0].get('rotulo', '')}")
+        clave = _palabras(f"{principal.get('titulo', '')} {principal.get('rotulo', '')}")
         cand = []
         for x in medios:
             n = len(clave & _palabras(x.get('titulo')))

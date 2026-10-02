@@ -41,6 +41,17 @@ OCRE = '8A6D1C'        # tema de urgencia media
 FONDO_LECTURA = 'F8F6FD'
 FONDO_URG = 'FDF7F4'
 FONDO_MED = 'FBF9F2'
+VERDE = '2B8A3E'       # cierre · tema resuelto
+GRIS3 = '9AA0AB'       # cierre · sin dato verificable
+FONDO_OK = 'F5FAF6'
+FONDO_GRIS = 'F7F8F9'
+FONDO_FOCO = 'F3F7FA'
+# Cierre de la semana: el color y el fondo de cada estado, igual que el PDF.
+ESTADO = {'resuelto': ('Se resolvió', VERDE, FONDO_OK),
+          'avanzo': ('Avanzó', AZUL, 'FDFDFC'),
+          'complicado': ('Se complicó', NARANJA, FONDO_URG),
+          'igual': ('Quedó igual', OCRE, FONDO_MED),
+          'sin_dato': ('Sin dato verificable', GRIS3, FONDO_GRIS)}
 
 # ancho útil en twips: carta (12240) menos los dos márgenes de 1040
 ANCHO = 10160
@@ -208,10 +219,13 @@ def construir(b, render):
     fuera = meta.get('fuera_de_alcance') or []
     alcance = 'Colombia y región' if fuera else 'Colombia'
     corte = v.get('corte')
+    cierre = meta.get('tipo') == 'cierre'
     ventana_txt = (f"{render.fecha_corta(v.get('desde'))} – "
                    f"{render.fecha_larga(v.get('hasta'))} · últimas {horas} horas"
                    + (f" · corte {render.hora_legible(corte)}" if corte else '')
                    + f" · {alcance}")
+    if cierre:
+        ventana_txt = render.ventana_cierre(v, bool(fuera))
 
     O = []
     # hero
@@ -223,7 +237,8 @@ def construir(b, render):
     # lectura de la ventana
     lec = b.get('lectura') or {}
     if lec:
-        c = [_rotulo(f'Lectura de estas {horas} horas', color=MORADO, after=90)]
+        c = [_rotulo('Balance de la semana' if cierre else f'Lectura de estas {horas} horas',
+                     color=MORADO, after=90)]
         if lec.get('titulo'):
             c.append(_txt(lec['titulo'], b=True, size=24, color=TINTA, after=110))
         for x in (lec.get('parrafos') or []):
@@ -234,6 +249,32 @@ def construir(b, render):
             c.append(_txt(lec['si_solo_hay_tiempo'], size=19, color=TINTA, after=0))
         O.append(_caja(''.join(c), barra=MORADO, fondo=FONDO_LECTURA))
         O.append(_txt('', size=12, after=0))
+
+    # cierre · cómo terminaron los temas del lunes
+    ant = meta.get('anterior') or {}
+    lunes_por_n = {t.get('n'): t for t in (ant.get('temas') or [])}
+    if cierre and b.get('seguimiento'):
+        O.append(_rotulo('Cómo terminaron los temas del lunes '
+                         + render.fecha_corta(ant.get('fecha')), color=GRIS, size=17, after=120))
+        for x in b['seguimiento']:
+            rot_est, col, fondo = ESTADO.get(x.get('estado'), ESTADO['sin_dato'])
+            lun = lunes_por_n.get(x.get('n')) or {}
+            c = [_rotulo(f"Tema {x.get('n')} del lunes · {lun.get('rotulo', '')} · {rot_est}",
+                         color=col, after=70)]
+            if lun.get('titulo'):
+                c.append(_par(_run('El lunes dijimos: ', b=True, size=16, color=GRIS)
+                              + _run(lun['titulo'], size=16, color=GRIS), after=90))
+            if x.get('titulo'):
+                c.append(_txt(x['titulo'], b=True, size=24, color=TINTA, after=110))
+            for p in (x.get('parrafos') or []):
+                c.append(_txt(p, size=19, color=TINTA, after=90))
+            if x.get('que_sigue'):
+                c.append(_rotulo('Qué queda abierto', color=AZUL, size=14, after=50))
+                c.append(_txt(x['que_sigue'], size=19, color=TINTA, after=0))
+            O.append(_caja(''.join(c), barra=col, fondo=fondo))
+            O.append(_txt('', size=12, after=0))
+        if b.get('temas'):
+            O.append(_rotulo('Lo demás de la semana', color=GRIS, size=17, after=120))
 
     # temas
     for i, t in enumerate(b.get('temas') or [], 1):
@@ -258,12 +299,27 @@ def construir(b, render):
                        fondo=FONDO_URG if alta else FONDO_MED))
         O.append(_txt('', size=12, after=0))
 
+    # cierre · para el lunes
+    lu = b.get('lunes') or {}
+    if cierre and lu.get('foco'):
+        c = [_rotulo('Para el lunes', color=AZUL, after=90),
+             _txt(lu['foco'], b=True, size=24, color=TINTA, after=110)]
+        if lu.get('por_que'):
+            c.append(_txt(lu['por_que'], size=19, color=TINTA, after=90))
+        if lu.get('preparar'):
+            c.append(_rotulo('Qué tener listo', color=AZUL, size=14, after=50))
+            for p in lu['preparar']:
+                c.append(_txt('• ' + p, size=19, color=TINTA, after=50, ind=200))
+        O.append(_caja(''.join(c), barra=AZUL, fondo=FONDO_FOCO))
+        O.append(_txt('', size=12, after=0))
+
     # agenda — ordenada por fecha, igual que el PDF
     if b.get('agenda'):
         ag = sorted(b['agenda'],
                     key=lambda x: (x.get('iso') or '9999-12-31', x.get('cuando') or ''))
         O.append(_par(linea=True, after=120))
-        O.append(_rotulo('Agenda de lo que viene', color=GRIS, size=17, after=120))
+        O.append(_rotulo('Lo que viene la próxima semana' if cierre else 'Agenda de lo que viene',
+                         color=GRIS, size=17, after=120))
         O.append(_tabla2([(render.fecha_agenda(x), x.get('que') or '') for x in ag]))
         O.append(_txt('', size=12, after=0))
 
@@ -274,7 +330,7 @@ def construir(b, render):
                          size=17, after=120))
         O.append(_tabla2([(x.get('fuente') or '', x.get('estado') or '')
                           for x in b['no_se_movio']],
-                         encabezado=('Fuente', 'En la ventana')))
+                         encabezado=('Fuente', 'En la semana' if cierre else 'En la ventana')))
         O.append(_txt('', size=12, after=0))
 
     # pie metodológico — el mismo texto del PDF
@@ -313,7 +369,8 @@ def construir(b, render):
              else _run('CAUDAL × CAUCE', b=True, size=24, color=TINTA))
     hdr = (XML + f'<w:hdr {NS}>'
            + _par(marca + '<w:r><w:tab/></w:r>'
-                  + _run(f'Brief de asuntos públicos · {cliente}', caps=True,
+                  + _run(f"{'Cierre de la semana' if cierre else 'Brief de asuntos públicos'} · {cliente}",
+                         caps=True,
                          letra=10, size=14, color=GRIS),
                   tab=ANCHO, linea=True, after=60)
            + '</w:hdr>')
