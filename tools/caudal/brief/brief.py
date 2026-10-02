@@ -37,6 +37,7 @@ import argparse
 import datetime
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 
@@ -114,6 +115,27 @@ def generar(system, user, modelo=MODELO, max_tokens=MAX_TOKENS, pensar=True):
     if txt.startswith('```'):
         txt = txt.split('```')[1].lstrip('json').strip()
     return json.loads(txt), d.get('usage', {})
+
+
+def publicado_hoy(cliente, hoy=None):
+    """El brief de este cliente que YA se publicó hoy en S3, o None.
+
+    Existe para respetar la revisión humana. El 2-oct-2026 se revisó y se mandó a
+    mano el cierre de la semana antes de que pasara la corrida programada, que
+    dispara con horas de retraso: sin esta guarda, la programada habría escrito
+    OTRO texto, sin revisar, encima del aprobado en S3 y en la Rosa. Solo frena a
+    la corrida PROGRAMADA: una lanzada a mano sí reescribe, porque es deliberada.
+    """
+    hoy = (hoy or datetime.date.today()).isoformat()
+    nombre = str(cliente or 'Cliente')
+    key = (f"{cierre_mod.S3_BRIEFS}/{cierre_mod.slug(nombre)}/"
+           f"Brief-{nombre.replace(' ', '-')}-{hoy}.json")
+    try:
+        r = subprocess.run(['aws', 's3', 'cp', key, '-'],
+                           capture_output=True, text=True, timeout=60)
+        return (json.loads(r.stdout), key) if r.returncode == 0 and r.stdout.strip() else None
+    except Exception:                                            # noqa: BLE001
+        return None
 
 
 def decidir_tipo(tipo, hoy=None):
@@ -234,6 +256,18 @@ def main():
                 sys.exit(f'no existe el preset «{a.sector}»')
         else:
             sys.exit('dame un preset, --perfil o --barrido')
+
+    # ── si hoy ya se publicó un brief revisado, la programada no escribe otro ──
+    if os.environ.get('GITHUB_EVENT_NAME') == 'schedule' and not a.solo_prompt:
+        ya = publicado_hoy(p.get('nombre'))
+        if ya:
+            brief_ya, key = ya
+            out = a.out or f"brief-{(p.get('nombre') or 'cliente').lower()}-hoy.json"
+            json.dump(brief_ya, open(out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+            print(f"[brief] ya hay un brief publicado hoy ({key}): lo reuso y NO escribo "
+                  f"otro, para no pisar el texto revisado. Para reescribirlo, lanza la "
+                  f"corrida a mano.\n[brief → {out}]")
+            return
 
     # ── el cierre necesita el brief que abrió la semana ────────────────────
     anterior = temas_lunes = None
