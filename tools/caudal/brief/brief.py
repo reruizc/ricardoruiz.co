@@ -267,6 +267,11 @@ def main():
             print(f"[brief] ya hay un brief publicado hoy ({key}): lo reuso y NO escribo "
                   f"otro, para no pisar el texto revisado. Para reescribirlo, lanza la "
                   f"corrida a mano.\n[brief → {out}]")
+            # El workflow lo lee para NO mandar la copia de revisión: ese brief ya
+            # se revisó (y casi siempre ya se mandó) a mano.
+            if os.environ.get('GITHUB_OUTPUT'):
+                with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+                    fh.write('reusado=true\n')
             return
 
     # ── el cierre necesita el brief que abrió la semana ────────────────────
