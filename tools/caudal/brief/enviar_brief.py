@@ -85,6 +85,17 @@ def _fechas_en_texto(txt):
     return _ISO.sub(cambiar, str(txt or ''))
 
 
+def _cuando(x):
+    """La fecha de una fila de la agenda. Sin `iso` (un rango, «la próxima
+    semana») va el texto del modelo: antes la celda salía vacía."""
+    if x.get('iso'):
+        return _fecha_larga(x['iso'], relativa=True).capitalize()
+    # Solo la primera cláusula: el modelo suele seguir con la fuente («la
+    # próxima semana, según Valora Analitik…»), que en una celda angosta sobra.
+    txt = re.split(r'[,;(]', x.get('cuando') or '')[0].strip() or 'Sin fecha'
+    return _corto(txt[0].upper() + txt[1:], 28)
+
+
 def _corto(txt, n):
     """Recorta en la última palabra completa, no a mitad de una."""
     txt = str(txt or '').strip()
@@ -186,7 +197,7 @@ def cuerpo_html(b):
 
     filas_agenda = ''.join(
         f'<tr><td style="padding:6px 12px 6px 0;font-size:13px;font-weight:bold;'
-        f'color:{AZUL};white-space:nowrap;vertical-align:top">{e(_fecha_larga(x.get("iso"), relativa=True).capitalize())}</td>'
+        f'color:{AZUL};white-space:nowrap;vertical-align:top">{e(_cuando(x))}</td>'
         f'<td style="padding:6px 0;font-size:14px;color:{TINTA}">{e(x.get("que"))}</td></tr>'
         for x in agenda)
 
