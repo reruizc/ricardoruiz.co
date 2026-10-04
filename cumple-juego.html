@@ -1,0 +1,716 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Kahoot polémico · Luna</title>
+<style>
+/* Juego de la Elección 33. Una página, dos modos:
+   ?pantalla=1  → la pantalla del TV (anfitrión: guarda la partida y cuenta puntos)
+   ?sala=1234   → el celular de cada invitado
+   La conexión es directa entre celulares y pantalla (WebRTC vía PeerJS), sin servidor propio. */
+@font-face{font-family:'HN';src:url(fonts/helveticaneue.woff2) format('woff2');font-weight:400}
+@font-face{font-family:'HN';src:url(fonts/helveticaneue-medium.woff2) format('woff2');font-weight:500}
+@font-face{font-family:'HN';src:url(fonts/helveticaneue-bold.woff2) format('woff2');font-weight:700}
+@font-face{font-family:'HN';src:url(fonts/helveticaneue-light.woff2) format('woff2');font-weight:300}
+:root{
+  --noche:#0a1733; --noche2:#12244d; --papel:#fffaf0; --tinta:#1c1840; --gris:#6f6a92;
+  --rosa:#ff5d8f; --azul:#4f7cff; --oro:#ffc145; --menta:#5fe0b7; --lila:#b9a6ff;
+  --sans:'HN','Helvetica Neue',Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,'SF Mono',Menlo,'Courier New',monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--noche)}
+body{margin:0;min-height:100vh;min-height:100svh;background:radial-gradient(1200px 600px at 80% -10%,#1d3f86 0%,transparent 60%),radial-gradient(900px 500px at -10% 110%,#16336b 0%,transparent 55%),var(--noche);color:#f3f7ff;font:16px/1.45 var(--sans);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+button{font-family:inherit}
+#confeti{position:fixed;inset:0;pointer-events:none;z-index:50}
+.oculto{display:none!important}
+.mono{font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase}
+
+/* ───────── Pantalla (TV) ───────── */
+.tv{display:grid;grid-template-columns:1fr 30vw;height:100vh;height:100svh;overflow:hidden}
+.tv-main{display:flex;flex-direction:column;padding:3.2vh 2.6vw 2.4vh;min-width:0;min-height:0}
+.tv-top{display:flex;justify-content:space-between;align-items:center;font:clamp(11px,1vw,16px)/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#a9bde6}
+.tv-top b{color:var(--oro);font-weight:400}
+.tv-body{flex:1;display:flex;flex-direction:column;min-height:0;margin-top:2.4vh}
+.tv-foot{display:flex;gap:1vw;align-items:center;justify-content:flex-end;margin-top:1.6vh}
+.tv-luna{position:relative;min-height:0}
+.luna-stage{position:absolute;left:0;right:0;bottom:0;height:62%}
+.luna-sprite{position:absolute;bottom:0;right:4%;width:min(28vw,58vh);height:min(28vw,58vh);background-repeat:no-repeat;will-change:transform;pointer-events:none}
+.globo{position:absolute;left:4%;right:6%;top:6vh;background:var(--papel);color:var(--tinta);border-radius:22px 22px 22px 6px;padding:2vh 1.4vw;font:500 clamp(15px,1.55vw,30px)/1.3 var(--sans);box-shadow:0 14px 40px #0007;opacity:0;transform:translateY(10px);transition:.35s}
+.globo.on{opacity:1;transform:none}
+.globo small{display:block;font:clamp(10px,.8vw,14px)/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--rosa);margin-bottom:.8vh}
+
+.btn{font:600 clamp(15px,1.2vw,22px)/1 var(--sans);border:0;border-radius:14px;padding:1.6vh 1.6vw;cursor:pointer;background:var(--oro);color:var(--tinta);transition:transform .15s,opacity .2s}
+.btn:hover{transform:translateY(-1px)}
+.btn:disabled{opacity:.4;cursor:default;transform:none}
+.btn.sec{background:#ffffff14;color:#dfe8ff}
+.btn:focus-visible{outline:3px solid var(--oro);outline-offset:3px}
+
+h1.tit{font-weight:700;font-size:clamp(34px,5vw,96px);line-height:.95;letter-spacing:-.035em;margin:0}
+h1.tit em{font-style:normal;color:var(--oro)}
+.lobby{display:grid;grid-template-columns:auto 1fr;gap:3vw;align-items:center;margin-top:3vh}
+.qr{background:#fff;border-radius:18px;padding:1.2vh;width:min(24vw,38vh);aspect-ratio:1;display:grid;place-items:center}
+.qr img{width:100%;height:100%;display:block}
+.sala-cod{font:700 clamp(40px,6vw,120px)/1 var(--sans);letter-spacing:.08em;color:var(--oro)}
+.sala-url{font:clamp(14px,1.4vw,26px)/1.35 var(--sans);color:#d3def5;margin-top:1.2vh;word-break:break-all}
+.sala-url b{color:#fff;font-weight:500}
+.roster{display:flex;flex-wrap:wrap;gap:.8vw;margin-top:3vh}
+.roster span{border:2px solid #ffffff22;border-radius:999px;padding:.9vh 1.2vw;font:500 clamp(14px,1.3vw,24px)/1 var(--sans);color:#8ea3cf}
+.roster span.on{background:var(--menta);border-color:var(--menta);color:var(--tinta)}
+.roster span.dormido{background:#ffffff10;border-color:#ffffff40;color:#dfe8ff}
+.modos{display:flex;gap:.6vw;align-items:center;margin-right:auto;font:clamp(11px,.9vw,15px)/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#9fb3de}
+.modos button{border:1.5px solid #ffffff33;background:transparent;color:#dfe8ff;border-radius:999px;padding:.8vh 1vw;cursor:pointer;font:clamp(12px,1vw,17px)/1 var(--sans)}
+.modos button[aria-pressed="true"]{background:#fff;color:var(--tinta);border-color:#fff}
+
+.q-head{display:flex;align-items:center;gap:1.4vw}
+.badge{border-radius:999px;padding:.9vh 1.2vw;font:clamp(11px,1vw,18px)/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;background:var(--rosa);color:#fff}
+.badge.dato{background:var(--azul)}.badge.quien{background:var(--lila);color:var(--tinta)}
+.q-num{font:clamp(11px,1vw,18px)/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#9fb3de}
+.reloj{margin-left:auto;position:relative;width:min(7vw,12vh);height:min(7vw,12vh)}
+.reloj svg{width:100%;height:100%;transform:rotate(-90deg)}
+.reloj b{position:absolute;inset:0;display:grid;place-items:center;font:700 clamp(22px,2.6vw,52px)/1 var(--sans);font-variant-numeric:tabular-nums}
+.q-texto{font-weight:700;font-size:clamp(26px,3.3vw,64px);line-height:1.08;letter-spacing:-.025em;margin:2.6vh 0 2.4vh;text-wrap:balance}
+.q-rev{font-size:clamp(20px,2.2vw,42px);margin:1.6vh 0 1.8vh}
+.ops{display:grid;grid-template-columns:1fr 1fr;gap:1.2vw;flex:1;min-height:0}
+.op{display:flex;align-items:center;gap:1.2vw;border-radius:18px;padding:2vh 1.6vw;font:600 clamp(18px,2vw,40px)/1.15 var(--sans);color:#fff}
+.op i{font-style:normal;font-size:1.1em;opacity:.9}
+.c0{background:var(--rosa)}.c1{background:var(--azul)}.c2{background:var(--oro);color:var(--tinta)}.c3{background:var(--menta);color:var(--tinta)}
+.nombres-q{display:grid;grid-template-columns:repeat(4,1fr);gap:1vw;align-content:start}
+.nombres-q span{background:#ffffff12;border:1.5px solid #ffffff22;border-radius:14px;padding:1.6vh 1vw;font:500 clamp(16px,1.6vw,30px)/1.1 var(--sans);text-align:center}
+.faltan{display:flex;flex-wrap:wrap;gap:.6vw;margin-top:2vh;align-items:center}
+.faltan .k{font:clamp(11px,1vw,18px)/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#9fb3de;margin-right:.6vw}
+.faltan span{border-radius:999px;padding:.6vh .9vw;font:clamp(13px,1.1vw,20px)/1 var(--sans);background:#ffffff10;color:#7f93bf}
+.faltan span.ya{background:var(--menta);color:var(--tinta)}
+
+.rev{display:grid;grid-template-columns:1.25fr 1fr;gap:2.6vw;flex:1;min-height:0}
+.barras{display:grid;gap:1.4vh;align-content:start}
+.barra{display:grid;grid-template-columns:1fr auto;gap:.6vh 1vw;font:500 clamp(15px,1.5vw,28px)/1.2 var(--sans);opacity:.55}
+.barra.gana{opacity:1}
+.barra .pista{grid-column:1/-1;height:min(3vh,26px);border-radius:10px;background:#ffffff12;overflow:hidden}
+.barra .pista i{display:block;height:100%;border-radius:10px;width:0;transition:width .9s cubic-bezier(.2,.8,.2,1)}
+.barra b{font-variant-numeric:tabular-nums}
+.barra.gana span::after{content:'  ✓';color:var(--menta)}
+.tabla{background:#ffffff0a;border:1px solid #ffffff1c;border-radius:20px;padding:2vh 1.4vw;min-height:0;overflow:hidden}
+.tabla h3{margin:0 0 1.2vh;font:clamp(11px,1vw,18px)/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#9fb3de;font-weight:400}
+.fila{display:grid;grid-template-columns:2.2em 1fr auto auto;gap:.8vw;align-items:center;padding:.85vh 0;border-bottom:1px dashed #ffffff1a;font:500 clamp(14px,1.35vw,26px)/1.1 var(--sans)}
+.fila .p{color:#9fb3de;font-variant-numeric:tabular-nums}
+.fila b{font-variant-numeric:tabular-nums}
+.fila .d{color:var(--menta);font:clamp(12px,1vw,19px)/1 var(--mono);min-width:4.5em;text-align:right}
+.fila:first-of-type{color:var(--oro)}
+
+.podio{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.6vw;align-items:end;flex:1;margin-top:2vh}
+.pod{text-align:center}
+.pod .n{font:700 clamp(22px,2.6vw,52px)/1.05 var(--sans);letter-spacing:-.02em;margin-bottom:1.2vh}
+.pod .pts{font:clamp(13px,1.2vw,22px)/1 var(--mono);color:#cfdcf7;margin-bottom:1.2vh}
+.pod .bloque{border-radius:18px 18px 0 0;display:grid;place-items:start center;padding-top:2vh;font:700 clamp(40px,5vw,100px)/1 var(--sans);color:var(--tinta)}
+.pod.p1 .bloque{height:34vh;background:var(--oro)}
+.pod.p2 .bloque{height:24vh;background:#dfe6f5}
+.pod.p3 .bloque{height:17vh;background:#e6a46b}
+.aviso{font:clamp(13px,1.1vw,20px)/1.4 var(--sans);color:#ffd0dc;background:#ff5d8f22;border:1px solid #ff5d8f66;border-radius:12px;padding:1vh 1vw;margin-top:1.4vh}
+
+/* ───────── Celular ───────── */
+.cel{max-width:560px;margin:0 auto;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;padding:max(16px,env(safe-area-inset-top)) 16px max(20px,env(safe-area-inset-bottom))}
+.cel-top{display:flex;justify-content:space-between;align-items:center;font:11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#a9bde6;min-height:22px}
+.cel-top b{color:var(--oro);font-weight:400}
+.cel-body{flex:1;display:flex;flex-direction:column;margin-top:18px}
+.cel h2{font-size:28px;line-height:1.1;letter-spacing:-.02em;margin:0 0 6px;text-wrap:balance}
+.cel p.sub{color:#c7d4f0;margin:0 0 16px}
+.grid-n{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.nb{border:0;border-radius:14px;padding:16px 12px;font:600 17px/1.15 var(--sans);background:var(--papel);color:var(--tinta);cursor:pointer;text-align:center}
+.nb:disabled{background:#ffffff14;color:#7f93bf;cursor:default}
+.nb small{display:block;font:400 11px/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-top:4px}
+.campo{display:block;width:100%;font:500 20px/1.3 var(--sans);color:var(--tinta);background:#fff;border:2px solid #e3d9c3;border-radius:14px;padding:14px 16px;outline:none}
+.fila-otro{display:flex;gap:8px;margin-top:12px}
+.fila-otro .campo{flex:1;font-size:17px;padding:12px 14px}
+.cbtn{border:0;border-radius:14px;padding:14px 18px;font:600 17px/1 var(--sans);background:var(--oro);color:var(--tinta);cursor:pointer}
+.err{color:#ff9db9;font-size:15px;min-height:1.2em;margin:10px 0 0}
+.tarjeta{background:#ffffff0d;border:1px solid #ffffff1f;border-radius:20px;padding:22px 20px;text-align:center}
+.tarjeta .big{font:700 46px/1 var(--sans);letter-spacing:-.02em;margin:6px 0}
+.tarjeta .ok{color:var(--menta)}.tarjeta .no{color:#ff9db9}
+.cel-q{font:600 19px/1.25 var(--sans);margin:0 0 14px;text-wrap:balance}
+.barrita{height:6px;border-radius:6px;background:#ffffff14;overflow:hidden;margin-bottom:14px}
+.barrita i{display:block;height:100%;background:var(--oro);width:100%}
+.ops-cel{display:grid;grid-template-columns:1fr;gap:10px;flex:1}
+.ob{border:0;border-radius:16px;padding:18px 16px;min-height:76px;font:600 19px/1.2 var(--sans);color:#fff;text-align:left;display:flex;align-items:center;gap:12px;cursor:pointer}
+.ob i{font-style:normal;font-size:22px}
+.ob:active{transform:scale(.98)}
+.nb-q{padding:18px 10px;font-size:18px}
+.mio{margin-top:auto;padding-top:18px;text-align:center;font:13px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:#9fb3de}
+.mio b{color:#fff;font-weight:400}
+.banda{position:fixed;left:0;right:0;top:0;background:#ff5d8f;color:#fff;text-align:center;font:600 14px/1 var(--sans);padding:10px;z-index:60}
+.link{background:none;border:0;color:#9fb3de;text-decoration:underline;font:14px var(--sans);cursor:pointer;padding:8px 0;margin-top:14px}
+
+@media (max-aspect-ratio:1/1){ /* pantalla vertical: apila */
+  .tv{grid-template-columns:1fr;grid-template-rows:1fr 30vh;height:auto;min-height:100vh}
+  .lobby,.rev{grid-template-columns:1fr}
+  .nombres-q{grid-template-columns:repeat(3,1fr)}
+}
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} #confeti{display:none} }
+</style>
+</head>
+<body>
+<canvas id="confeti" aria-hidden="true"></canvas>
+<div id="app"></div>
+
+<script src="assets/cumple-2026/luna/luna-cumple.js?v=3"></script>
+<script>
+(() => {
+'use strict';
+
+// ════════════════════════ Datos del juego ════════════════════════
+const NOMBRES = ['Angela','Abraham','Daniel','Doc Carlitos','Alvaro','Diego Garzón','Santiago','Juanita','Caro','Diego Benítez','Ricardo'];
+const PREF = 'rrcumple33-';           // id de la sala en el servidor de señalización de PeerJS
+const FORMAS = ['▲','◆','●','■'];
+
+// tipo: 'quien' (las opciones son los nombres de la mesa · gana la mayoría)
+//       'polemica' (opinión · gana la mayoría)
+//       'dato' (tiene respuesta correcta en ok)
+const PRINCIPAL = [
+  {tipo:'polemica', p:'Arranquemos suave. ¿Se habla de política en esta mesa?', op:['Sí, para eso vinimos','Nunca, es un cumpleaños','Solo después del tercer vino','Solo si gana mi candidato']},
+  {tipo:'quien', p:'¿Quién de la mesa llegaría tarde a su propio matrimonio?'},
+  {tipo:'dato', p:'Según la invitación, esta fiesta es la Elección 33. ¿En qué mesa votamos?', op:['Mesa 33','Mesa 305','Mesa 1993','Mesa 001'], ok:1, luna:'Mesa 305. Yo la leí. Ustedes, por lo visto, no todos.'},
+  {tipo:'polemica', p:'¿La arepa es colombiana o venezolana?', op:['Colombiana, obvio','Venezolana','De los dos','Pásenme otra y no peleemos']},
+  {tipo:'quien', p:'Si me dejan un fin de semana con alguien de esta mesa, ¿quién me cuida mejor?'},
+  {tipo:'dato', p:'Para los que oyen a Ricardo en la cena: ¿con qué código conoce la Registraduría a Antioquia?', op:['01','05','11','16'], ok:0, luna:'Es 01. El 05 es el del DANE. Si sabían eso, ya están igual de mal que Ricardo.'},
+  {tipo:'polemica', p:'¿Qué es peor?', op:['Audios de cinco minutos','Escribir «jajaja» sin reírse','Contestar «ok»','Llamar sin avisar']},
+  {tipo:'quien', p:'¿Quién de la mesa se lanza al Concejo en 2027?'},
+  {tipo:'dato', p:'¿Por cuántos votos, más o menos, se decidió la segunda vuelta de 2026?', op:['Unos 25.000','Unos 250.000','Cerca de un millón','Más de dos millones'], ok:1, luna:'Unos 250.000: menos de un punto. Foto finish.'},
+  {tipo:'polemica', p:'¿Piña en la pizza?', op:['Sí, sin vergüenza','Jamás','Solo si nadie me ve','Depende del vino']},
+  {tipo:'quien', p:'¿Quién sobrevive menos en un apocalipsis zombi?'},
+  {tipo:'dato', p:'¿Qué departamento decidió la segunda vuelta?', op:['Bogotá','Antioquia','Valle del Cauca','Atlántico'], ok:1, luna:'Antioquia: más de un millón de votos de ventaja. Cuatro veces el margen del país.'},
+  {tipo:'polemica', p:'¿Cuántos años aparenta Ricardo hoy?', op:['25, está divino','33, los que tiene','40, la política envejece','Depende de la luz']},
+  {tipo:'quien', p:'¿Quién va a ser el último en irse de esta fiesta?'},
+  {tipo:'dato', p:'¿En qué año nació Ricardo?', op:['1991','1992','1993','1994'], ok:2, luna:'1993. Mañana cumple 33. Yo cumplo menos, pero en años de perro le gano.'},
+];
+const EXTRA = [
+  {tipo:'quien', p:'¿Quién de la mesa contesta los WhatsApp tres días después?'},
+  {tipo:'polemica', p:'¿Cuál es el peor pecado en una cena?', op:['Llegar tarde','Llegar con las manos vacías','Hablar de política','Irse antes del postre']},
+  {tipo:'dato', p:'¿Qué participación hubo en la segunda vuelta de 2026?', op:['48 %','58 %','64 %','71 %'], ok:2, luna:'64 %. Seis puntos más que en primera vuelta. El 58 % era la primera, para los que cayeron.'},
+  {tipo:'quien', p:'¿Quién ganaría una elección en esta mesa?'},
+  {tipo:'polemica', p:'¿Ricardo debería tener un día al año sin hablar de elecciones?', op:['Sí, hoy','Imposible','No, es su lenguaje del amor','Que hable, pero con datos']},
+  {tipo:'quien', p:'¿Quién está haciendo trampa en este momento?'},
+];
+const CIERRE = {tipo:'polemica', p:'La última, y la más polémica: ¿quién manda en esta casa?', op:['Ricardo','Luna','El que tenga el control del TV','Nadie, esto es anarquía']};
+const MODOS = {
+  corta:  {txt:'Corta · 12',  lista:() => [...PRINCIPAL.slice(0,11), CIERRE]},
+  normal: {txt:'Normal · 16', lista:() => [...PRINCIPAL, CIERRE]},
+  larga:  {txt:'Larga · 22',  lista:() => [...PRINCIPAL, ...EXTRA, CIERRE]},
+};
+const ETIQ = {quien:'¿Quién de la mesa?', polemica:'Polémica', dato:'Dato de Ricardo'};
+
+// ════════════════════════ Utilidades ════════════════════════
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+const ls = {
+  get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch {} },
+  del(k){ try { localStorage.removeItem(k); } catch {} },
+};
+const qs = new URLSearchParams(location.search);
+const BASE = location.origin + location.pathname;
+
+function cargarPeer(){
+  if (window.Peer) return Promise.resolve();
+  const urls = ['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js','https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'];
+  return urls.reduce((p, u) => p.catch(() => new Promise((ok, no) => {
+    const s = document.createElement('script'); s.src = u; s.onload = ok; s.onerror = no; document.head.append(s);
+  })), Promise.reject()).catch(() => { throw new Error('No cargó la librería de conexión. Revisa el internet.'); });
+}
+
+// Confeti (mismo de la invitación)
+const cv = $('#confeti'), cx = cv.getContext('2d'); let piezas = [], anim = 0;
+const COL = ['#ffc145','#ff5d8f','#5fe0b7','#b9a6ff','#ffffff'];
+function tam(){ cv.width = innerWidth * devicePixelRatio; cv.height = innerHeight * devicePixelRatio; }
+addEventListener('resize', tam); tam();
+function lluvia(n){
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (let i = 0; i < n; i++) piezas.push({x:Math.random()*cv.width, y:-Math.random()*cv.height*.5, v:(1.5+Math.random()*3)*devicePixelRatio, a:Math.random()*6, g:.04+Math.random()*.08, w:(5+Math.random()*6)*devicePixelRatio, c:COL[i%COL.length]});
+  if (!anim) paso();
+}
+function paso(){
+  cx.clearRect(0,0,cv.width,cv.height);
+  piezas = piezas.filter(p => p.y < cv.height + 20);
+  piezas.forEach(p => { p.y += p.v; p.a += p.g; p.x += Math.sin(p.a)*1.2; cx.save(); cx.translate(p.x,p.y); cx.rotate(p.a); cx.fillStyle = p.c; cx.fillRect(-p.w/2,-p.w/4,p.w,p.w/2); cx.restore(); });
+  anim = piezas.length ? requestAnimationFrame(paso) : 0;
+}
+
+if (qs.has('pantalla')) pantalla(); else celular();
+
+// ═════════════════════════════════════════════════════════════════
+//  PANTALLA · la que va en el TV. Es la autoridad: guarda la partida.
+// ═════════════════════════════════════════════════════════════════
+function pantalla(){
+  const KEY = 'kh-pantalla-v1';
+  const nueva = () => ({sala:String(1000 + Math.floor(Math.random()*9000)), fase:'lobby', modo:'normal', lista:[], i:-1, t0:0, dur:0, op:[], jug:{}, extra:[], resp:{}, ult:null, ts:Date.now()});
+  let S = (() => { try { const s = JSON.parse(ls.get(KEY)); if (s && Date.now() - s.ts < 10*3600e3) return s; } catch {} return null; })() || nueva();
+  const guardar = () => { S.ts = Date.now(); ls.set(KEY, JSON.stringify(S)); };
+  const conns = new Map();   // id del peer remoto → {conn, nombre, visto}
+  let peer = null, red = 'conectando', intentos = 0, voz = ls.get('kh-voz') !== '0';
+  const urlSala = () => `${BASE}?sala=${S.sala}`;
+
+  document.title = 'Pantalla · Kahoot polémico de Luna';
+  $('#app').innerHTML = `
+    <div class="tv">
+      <main class="tv-main">
+        <div class="tv-top"><span>Kahoot polémico · Elección <b>33</b></span><span id="tv-red">conectando…</span></div>
+        <div class="tv-body" id="tv-body"></div>
+        <div class="tv-foot" id="tv-foot"></div>
+      </main>
+      <aside class="tv-luna">
+        <div class="globo" id="globo"><small>Luna pregunta</small><span id="globo-t"></span></div>
+        <div class="luna-stage" id="luna"></div>
+      </aside>
+    </div>`;
+
+  // ── Luna ──
+  let luna = null;
+  try { luna = new LunaCumple($('#luna')); luna.llegar().catch(()=>{}); } catch {}
+  let vozEs = null;
+  function elegirVoz(){
+    if (!('speechSynthesis' in window)) return;
+    const vs = speechSynthesis.getVoices();
+    vozEs = ['Paulina','Juan','Mónica','Google español de Estados Unidos','Google español'].map(n => vs.find(v => v.name.startsWith(n))).find(Boolean)
+         || ['es-CO','es-MX','es-US','es-419','es-ES'].map(l => vs.find(v => v.lang.replace('_','-') === l)).find(Boolean)
+         || vs.find(v => /^es/i.test(v.lang)) || null;
+  }
+  if ('speechSynthesis' in window) { speechSynthesis.onvoiceschanged = elegirVoz; elegirVoz(); }
+  function decir(txt, hablar = true, etiqueta = 'Luna'){
+    $('#globo-t').textContent = txt; $('#globo small').textContent = etiqueta; $('#globo').classList.add('on');
+    if (hablar && voz && 'speechSynthesis' in window) {
+      try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(txt.replace(/[«»]/g,'')); if (vozEs) u.voice = vozEs; u.lang = vozEs ? vozEs.lang : 'es-CO'; u.rate = 1.02; u.pitch = 1.2; speechSynthesis.speak(u); } catch {}
+    }
+  }
+  let ac = null;
+  function tono(f, d = .15, vol = .12, cuando = 0){
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const t = ac.currentTime + cuando; const o = ac.createOscillator(), g = ac.createGain(); o.type = 'triangle'; o.frequency.value = f; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d); } catch {}
+  }
+
+  // ── Jugadores ──
+  const roster = () => [...NOMBRES, ...S.extra];
+  const canon = n => roster().find(x => norm(x) === norm(n)) || String(n).replace(/\s+/g,' ').trim().slice(0, 22);
+  const enLinea = n => [...conns.values()].some(c => c.nombre === n && Date.now() - c.visto < 13000);
+  const ocupado = (n, dev) => S.jug[n] && S.jug[n].dev !== dev && enLinea(n);
+  const ranking = () => Object.entries(S.jug).map(([n,j]) => ({n, pts:j.pts})).sort((a,b) => b.pts - a.pts || a.n.localeCompare(b.n));
+  const jugadoresEnLinea = () => Object.keys(S.jug).filter(enLinea);
+
+  function est(n){
+    const rk = ranking(), j = S.jug[n] || {pts:0}, q = S.lista[S.i];
+    const m = {t:'est', fase:S.fase, nombre:n, pts:j.pts, pos:rk.findIndex(r => r.n === n) + 1, total:rk.length};
+    if ((S.fase === 'q' || S.fase === 'rev') && q) {
+      m.q = {i:S.i, n:S.lista.length, p:q.p, tipo:q.tipo, op:S.op};
+      m.ya = S.resp[n] ? S.resp[n].op : null;
+    }
+    if (S.fase === 'q') m.restante = Math.max(0, S.t0 + S.dur - Date.now());
+    if (S.fase === 'rev' && S.ult) { m.gan = S.ult.gan; m.delta = S.ult.deltas[n] || 0; }
+    if (S.fase === 'fin') m.podio = rk.slice(0, 3);
+    return m;
+  }
+  const nombresLibres = dev => roster().map(n => ({n, libre:!ocupado(n, dev), jugando:!!S.jug[n]}));
+  function enviar(c, m){ try { if (c.conn.open) c.conn.send(m); } catch {} }
+  function difundir(){
+    for (const c of conns.values()) enviar(c, c.nombre ? est(c.nombre) : {t:'nombres', lista:nombresLibres(c.dev)});
+  }
+
+  // ── Red ──
+  function abrirSala(){
+    red = 'conectando'; pintarRed();
+    try { if (peer) peer.destroy(); } catch {}
+    peer = new Peer(PREF + S.sala, {debug:1});
+    peer.on('open', () => { intentos = 0; red = 'ok'; pintarRed(); render(); });
+    peer.on('connection', conn => {
+      conn.on('open', () => { conns.set(conn.peer, {conn, nombre:null, dev:null, visto:Date.now()}); });
+      conn.on('data', d => mensaje(conn, d));
+      conn.on('close', () => { conns.delete(conn.peer); render(); });
+      conn.on('error', () => {});
+    });
+    peer.on('disconnected', () => { red = 'reconectando'; pintarRed(); setTimeout(() => { try { if (peer && !peer.destroyed) peer.reconnect(); } catch {} }, 1500); });
+    peer.on('error', e => {
+      if (e.type === 'unavailable-id') {
+        // La sala quedó tomada (recarga de la pantalla: el servidor tarda en soltarla).
+        red = 'liberando la sala…'; pintarRed();
+        if (++intentos > 12 && S.fase === 'lobby') { S.sala = String(1000 + Math.floor(Math.random()*9000)); guardar(); intentos = 0; }
+        setTimeout(abrirSala, 2500);
+      } else if (['network','server-error','socket-error','socket-closed'].includes(e.type)) {
+        red = 'sin conexión, reintentando'; pintarRed(); setTimeout(abrirSala, 3000);
+      }
+    });
+  }
+  function pintarRed(){
+    const n = jugadoresEnLinea().length;
+    $('#tv-red').textContent = red === 'ok' ? `Sala ${S.sala} · ${n} en línea` : red;
+  }
+
+  function mensaje(conn, d){
+    const c = conns.get(conn.peer); if (!c || !d || typeof d !== 'object') return;
+    c.visto = Date.now();
+    if (d.t === 'ping') { enviar(c, {t:'pong'}); return; }
+    if (d.t === 'hola') { c.dev = String(d.dev || '').slice(0, 40); enviar(c, {t:'nombres', lista:nombresLibres(c.dev)}); return; }
+    if (d.t === 'soy') {
+      const n = canon(d.nombre || ''); c.dev = String(d.dev || '').slice(0, 40);
+      if (n.length < 2) return;
+      if (ocupado(n, c.dev)) { enviar(c, {t:'ocupado', nombre:n}); return; }
+      if (!roster().includes(n)) S.extra.push(n);
+      for (const [id, o] of conns) if (id !== conn.peer && o.nombre === n) { o.nombre = null; enviar(o, {t:'fuera'}); }
+      const nuevo = !S.jug[n];
+      S.jug[n] = S.jug[n] || {pts:0}; S.jug[n].dev = c.dev; c.nombre = n;
+      guardar(); enviar(c, est(n)); difundir(); render();
+      if (nuevo && S.fase === 'lobby') decir(`¡Llegó ${n}! Ya van ${Object.keys(S.jug).length}.`, false);
+      return;
+    }
+    if (d.t === 'resp') {
+      const n = c.nombre;
+      if (!n || S.fase !== 'q' || d.i !== S.i || S.resp[n]) { if (n) enviar(c, est(n)); return; }
+      const op = +d.op; if (!(op >= 0 && op < S.op.length)) return;
+      S.resp[n] = {op, ms:Math.max(0, Date.now() - S.t0)};
+      guardar(); enviar(c, est(n)); pintarFaltan();
+      const enl = jugadoresEnLinea();
+      if (enl.length && enl.every(x => S.resp[x])) setTimeout(cerrar, 600);
+    }
+  }
+
+  // ── Flujo del juego ──
+  function empezar(){
+    if (!Object.keys(S.jug).length) return;
+    S.lista = MODOS[S.modo].lista(); for (const n in S.jug) S.jug[n].pts = 0;
+    lanzar(0);
+  }
+  function lanzar(i){
+    const q = S.lista[i];
+    S.i = i; S.fase = 'q'; S.resp = {}; S.ult = null;
+    S.op = q.tipo === 'quien' ? roster() : q.op;
+    S.dur = (q.tipo === 'quien' ? 25 : 20) * 1000; S.t0 = Date.now();
+    guardar(); difundir(); render();
+    decir(q.p, true, `Pregunta ${i + 1} de ${S.lista.length}`);
+    tono(660, .12); tono(880, .18, .12, .12);
+  }
+  function cerrar(){
+    if (S.fase !== 'q') return;
+    const q = S.lista[S.i], cuenta = S.op.map(() => 0);
+    Object.values(S.resp).forEach(r => cuenta[r.op]++);
+    let gan;
+    if (q.tipo === 'dato') gan = [q.ok];
+    else { const max = Math.max(0, ...cuenta); gan = max ? cuenta.map((v,k) => v === max ? k : -1).filter(k => k >= 0) : []; }
+    const deltas = {};
+    for (const [n, r] of Object.entries(S.resp)) {
+      if (!gan.includes(r.op)) continue;
+      const d = Math.round(1000 * (1 - Math.min(1, r.ms / S.dur) / 2));
+      deltas[n] = d; if (S.jug[n]) S.jug[n].pts += d;
+    }
+    S.ult = {cuenta, gan, deltas}; S.fase = 'rev';
+    guardar(); difundir(); render();
+    decir(comentario(q, cuenta, gan), true, 'Resultado');
+    tono(523, .14); tono(659, .14, .12, .12); tono(784, .3, .12, .24);
+  }
+  function comentario(q, cuenta, gan){
+    const total = cuenta.reduce((a,b) => a + b, 0);
+    if (!total) return 'Nadie respondió. ¿Están vivos? Ladren si me oyen.';
+    if (q.tipo === 'dato') {
+      const bien = cuenta[q.ok];
+      return (q.luna || `Era «${S.op[q.ok]}».`) + (bien === total ? ' ¡Todos acertaron!' : bien === 0 ? ' Nadie acertó.' : '');
+    }
+    const nombres = gan.map(k => S.op[k]);
+    if (q.tipo === 'quien') {
+      if (nombres.length > 1) return `Empate: ${nombres.join(' y ')}. La mesa no se pone de acuerdo.`;
+      const n = nombres[0], v = cuenta[gan[0]];
+      return `La mesa ha hablado: ${n}, con ${v} ${v === 1 ? 'voto' : 'votos'}.` + (S.resp[n] && S.resp[n].op === gan[0] ? ' Y se votó a sí mismo. Respeto.' : '');
+    }
+    if (nombres.length > 1) return `Empate entre «${nombres.join('» y «')}». Esta mesa está partida en dos.`;
+    const share = cuenta[gan[0]] / total;
+    return share >= .75 ? `Casi unanimidad: «${nombres[0]}».` : share > .5 ? `Ganó «${nombres[0]}», pero no fue fácil.` : `Ganó «${nombres[0]}» sin mayoría. Mesa dividida.`;
+  }
+  function siguiente(){
+    if (S.fase === 'lobby') return empezar();
+    if (S.fase === 'q') return cerrar();
+    if (S.fase === 'rev') return S.i + 1 < S.lista.length ? lanzar(S.i + 1) : terminar();
+  }
+  function terminar(){
+    S.fase = 'fin'; guardar(); difundir(); render();
+    const rk = ranking();
+    decir(rk.length ? `¡Ganó ${rk[0].n}, con ${rk[0].pts.toLocaleString('es-CO')} puntos! Feliz cumpleaños, Ricardo.` : 'Se acabó. Feliz cumpleaños, Ricardo.', true, 'Fin del juego');
+    lluvia(320); try { luna && luna.celebrar(); } catch {}
+  }
+  function reiniciar(){
+    if (!confirm('¿Empezar una partida nueva? Se borran los puntos (los jugadores siguen conectados).')) return;
+    for (const n in S.jug) S.jug[n].pts = 0;
+    S.fase = 'lobby'; S.i = -1; S.resp = {}; S.ult = null; S.lista = [];
+    guardar(); difundir(); render(); decir('Partida nueva. Todos en cero.', false);
+  }
+
+  // ── Dibujo ──
+  function render(){
+    pintarRed();
+    const body = $('#tv-body'), foot = $('#tv-foot'), q = S.lista[S.i];
+    if (S.fase === 'lobby') {
+      const unidos = Object.keys(S.jug).length;
+      body.innerHTML = `
+        <h1 class="tit">El Kahoot <em>polémico</em><br>de Luna.</h1>
+        <div class="lobby">
+          <div class="qr"><img alt="Código QR para entrar" src="https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=8&data=${encodeURIComponent(urlSala())}"></div>
+          <div>
+            <div class="mono" style="color:#9fb3de;font-size:clamp(11px,1vw,18px)">Escanea o entra a</div>
+            <div class="sala-url"><b>${esc(BASE.replace(/^https?:\/\//,''))}</b><br>y escribe la sala</div>
+            <div class="sala-cod">${S.sala}</div>
+          </div>
+        </div>
+        <div class="roster">${roster().map(n => `<span class="${S.jug[n] ? (enLinea(n) ? 'on' : 'dormido') : ''}">${esc(n)}</span>`).join('')}</div>
+        ${red !== 'ok' ? `<div class="aviso">La pantalla todavía no está conectada a la sala (${esc(red)}). Si sigue así, revisa el internet.</div>` : ''}`;
+      foot.innerHTML = `
+        <div class="modos">Partida ${Object.entries(MODOS).map(([k,m]) => `<button data-modo="${k}" aria-pressed="${S.modo === k}">${m.txt}</button>`).join('')}</div>
+        <button class="btn sec" id="b-voz">${voz ? 'Voz de Luna: sí' : 'Voz de Luna: no'}</button>
+        <button class="btn" id="b-sig" ${unidos ? '' : 'disabled'}>${unidos ? `Empezar con ${unidos}` : 'Esperando jugadores…'}</button>`;
+      foot.querySelectorAll('[data-modo]').forEach(b => b.onclick = () => { S.modo = b.dataset.modo; guardar(); render(); });
+      if (!$('#globo').classList.contains('on')) setTimeout(() => decir('Escaneen el código y escojan su nombre. Yo hago las preguntas.', false), 3500);
+    }
+    else if (S.fase === 'q') {
+      body.innerHTML = `
+        <div class="q-head"><span class="badge ${q.tipo}">${ETIQ[q.tipo]}</span><span class="q-num">Pregunta ${S.i + 1} de ${S.lista.length}</span>
+          <div class="reloj"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" fill="none" stroke="#ffffff18" stroke-width="5"/><circle id="r-arco" cx="22" cy="22" r="19" fill="none" stroke="var(--oro)" stroke-width="5" stroke-linecap="round" stroke-dasharray="119.4" stroke-dashoffset="0"/></svg><b id="r-num"></b></div></div>
+        <div class="q-texto">${esc(q.p)}</div>
+        ${q.tipo === 'quien'
+          ? `<div class="nombres-q">${S.op.map(n => `<span>${esc(n)}</span>`).join('')}</div>`
+          : `<div class="ops">${S.op.map((o,k) => `<div class="op c${k}"><i>${FORMAS[k]}</i>${esc(o)}</div>`).join('')}</div>`}
+        <div class="faltan" id="faltan"></div>`;
+      foot.innerHTML = `<button class="btn sec" id="b-fin">Terminar juego</button><button class="btn" id="b-sig">Cerrar respuestas</button>`;
+      pintarFaltan(); reloj();
+    }
+    else if (S.fase === 'rev') {
+      const u = S.ult, total = u.cuenta.reduce((a,b) => a + b, 0) || 1;
+      let filas = S.op.map((o,k) => ({o, k, v:u.cuenta[k]}));
+      if (q.tipo === 'quien') filas = filas.filter(f => f.v > 0).sort((a,b) => b.v - a.v).slice(0, 7);
+      const rk = ranking();
+      body.innerHTML = `
+        <div class="q-head"><span class="badge ${q.tipo}">${ETIQ[q.tipo]}</span><span class="q-num">Pregunta ${S.i + 1} de ${S.lista.length} · ${Object.keys(S.resp).length} respuestas</span></div>
+        <div class="q-texto q-rev">${esc(q.p)}</div>
+        <div class="rev">
+          <div class="barras">${filas.length ? filas.map(f => `
+            <div class="barra ${u.gan.includes(f.k) ? 'gana' : ''}"><span>${q.tipo === 'quien' ? '' : FORMAS[f.k] + ' '}${esc(f.o)}</span><b>${f.v}</b>
+              <div class="pista"><i class="${q.tipo === 'quien' ? 'c' + (f.k % 4) : 'c' + f.k}" data-w="${Math.round(100 * f.v / total)}"></i></div></div>`).join('') : '<p style="color:#9fb3de">Nadie votó.</p>'}
+          </div>
+          <div class="tabla"><h3>Tabla</h3>${rk.slice(0, 11).map((r,k) => `<div class="fila"><span class="p">${k + 1}º</span><span>${esc(r.n)}</span><span class="d">${u.deltas[r.n] ? '+' + u.deltas[r.n] : ''}</span><b>${r.pts.toLocaleString('es-CO')}</b></div>`).join('')}</div>
+        </div>`;
+      const ult = S.i + 1 >= S.lista.length;
+      foot.innerHTML = `<button class="btn sec" id="b-fin">Terminar juego</button><button class="btn" id="b-sig">${ult ? 'Ver el podio' : 'Siguiente pregunta'}</button>`;
+      setTimeout(() => body.querySelectorAll('.pista i').forEach(i => i.style.width = i.dataset.w + '%'), 80);
+    }
+    else if (S.fase === 'fin') {
+      const rk = ranking(), pos = [rk[1], rk[0], rk[2]], cl = ['p2','p1','p3'], num = [2,1,3];
+      body.innerHTML = `
+        <h1 class="tit">Resultado <em>oficial</em>.</h1>
+        <div class="podio">${pos.map((r,k) => r ? `<div class="pod ${cl[k]}"><div class="n">${esc(r.n)}</div><div class="pts">${r.pts.toLocaleString('es-CO')} pts</div><div class="bloque">${num[k]}</div></div>` : '<div></div>').join('')}</div>`;
+      foot.innerHTML = `<button class="btn sec" id="b-nueva">Partida nueva</button>`;
+      $('#b-nueva').onclick = reiniciar;
+    }
+    const bs = $('#b-sig'); if (bs) bs.onclick = siguiente;
+    const bf = $('#b-fin'); if (bf) bf.onclick = () => { if (confirm('¿Terminar el juego y ver el podio?')) { if (S.fase === 'q') cerrar(); terminar(); } };
+    const bv = $('#b-voz'); if (bv) bv.onclick = () => { voz = !voz; ls.set('kh-voz', voz ? '1' : '0'); render(); if (voz) decir('Hola, aquí estoy.'); };
+  }
+  function pintarFaltan(){
+    const el = $('#faltan'); if (!el) return;
+    const js = Object.keys(S.jug), n = Object.keys(S.resp).length;
+    el.innerHTML = `<span class="k">${n} de ${js.length} respondieron</span>` + js.map(x => `<span class="${S.resp[x] ? 'ya' : ''}">${esc(x)}</span>`).join('');
+  }
+  let ultSeg = -1;
+  function reloj(){
+    if (S.fase !== 'q') return;
+    const rest = Math.max(0, S.t0 + S.dur - Date.now()), seg = Math.ceil(rest / 1000);
+    const a = $('#r-arco'), b = $('#r-num');
+    if (a) { a.setAttribute('stroke-dashoffset', (119.4 * (1 - rest / S.dur)).toFixed(1)); a.setAttribute('stroke', seg <= 5 ? 'var(--rosa)' : 'var(--oro)'); }
+    if (b) b.textContent = seg;
+    if (seg !== ultSeg) { if (seg <= 5 && seg > 0) tono(seg === 1 ? 990 : 880, .06, .08); ultSeg = seg; }
+    if (rest <= 0) cerrar();
+  }
+  setInterval(() => { reloj(); pintarRed(); }, 250);
+  // Los jugadores que se duermen salen de "en línea" a los 13 s: repinto el lobby para que se vea.
+  setInterval(() => { if (S.fase === 'lobby') render(); }, 5000);
+
+  addEventListener('keydown', e => {
+    if (e.target.closest('input,textarea')) return;
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') { e.preventDefault(); const b = $('#b-sig'); if (b && !b.disabled) siguiente(); }
+  });
+  // Si la pantalla se recargó en mitad de una pregunta vencida, la cierro al arrancar.
+  render();
+  cargarPeer().then(abrirSala).catch(err => { red = err.message; pintarRed(); render(); });
+  window.KH = {S:() => S, conns, siguiente, nueva:() => { if (confirm('¿Sala nueva? Todos tendrán que volver a entrar.')) { ls.del(KEY); location.reload(); } }};
+}
+
+// ═════════════════════════════════════════════════════════════════
+//  CELULAR · cada invitado escoge su nombre y responde.
+// ═════════════════════════════════════════════════════════════════
+function celular(){
+  let sala = (qs.get('sala') || '').replace(/\D/g, '').slice(0, 4);
+  let dev = ls.get('kh-dev'); if (!dev) { dev = Math.random().toString(36).slice(2) + Date.now().toString(36); ls.set('kh-dev', dev); }
+  let nombre = null, lista = null, E = null, err = '', estadoRed = 'conectando', peer = null, conn = null, token = 0, visto = 0, timerQ = 0;
+
+  $('#app').innerHTML = `<div class="cel"><div class="cel-top"><span>Elección <b>33</b> · Luna</span><span id="c-sala"></span></div><div class="cel-body" id="c-body"></div></div><div class="banda oculto" id="banda">Reconectando con la pantalla…</div>`;
+  const body = $('#c-body');
+
+  if (!sala) return pedirSala();
+  arrancar();
+
+  function pedirSala(){
+    body.innerHTML = `
+      <h2>Entra al Kahoot de Luna</h2>
+      <p class="sub">Escribe el número de sala que aparece en el TV.</p>
+      <input class="campo" id="i-sala" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="1234" autocomplete="off" style="font-size:34px;text-align:center;letter-spacing:.2em">
+      <p class="err" id="e-sala"></p>
+      <button class="cbtn" id="b-sala" style="margin-top:6px">Entrar</button>
+      <button class="link" onclick="location.href='?pantalla=1'">Soy Ricardo: abrir la pantalla del TV</button>`;
+    const go = () => { const v = $('#i-sala').value.replace(/\D/g,''); if (v.length !== 4) { $('#e-sala').textContent = 'Son 4 números.'; return; } history.replaceState(null, '', `?sala=${v}`); sala = v; arrancar(); };
+    $('#b-sala').onclick = go; $('#i-sala').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    setTimeout(() => $('#i-sala').focus(), 50);
+  }
+
+  function arrancar(){
+    $('#c-sala').textContent = 'Sala ' + sala;
+    nombre = ls.get('kh-nombre-' + sala);
+    pintar();
+    cargarPeer().then(conectar).catch(e => { err = e.message; pintar(); });
+    setInterval(() => {
+      if (conn && conn.open) { try { conn.send({t:'ping'}); } catch {} }
+      if (Date.now() - visto > 12000 && estadoRed === 'ok') { estadoRed = 'perdida'; reconectar(); }
+      $('#banda').classList.toggle('oculto', estadoRed === 'ok' || !E);
+    }, 3500);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && !(conn && conn.open)) reconectar(); });
+  }
+  function reconectar(){ const t = ++token; setTimeout(() => { if (t === token) conectar(); }, 400); }
+  function conectar(){
+    const t = ++token;
+    try { if (conn) conn.close(); } catch {}
+    const abrirConn = () => {
+      if (t !== token) return;
+      conn = peer.connect(PREF + sala, {reliable:true});
+      conn.on('open', () => {
+        if (t !== token) return;
+        estadoRed = 'ok'; visto = Date.now();
+        conn.send({t:'hola', dev});
+        if (nombre) conn.send({t:'soy', nombre, dev});
+        $('#banda').classList.add('oculto');
+      });
+      conn.on('data', d => { if (t === token) recibir(d); });
+      conn.on('close', () => { if (t === token) { estadoRed = 'perdida'; setTimeout(() => { if (t === token) conectar(); }, 1500); } });
+      conn.on('error', () => {});
+    };
+    if (peer && !peer.destroyed && peer.open) return abrirConn();
+    try { if (peer) peer.destroy(); } catch {}
+    peer = new Peer({debug:1});
+    peer.on('open', abrirConn);
+    peer.on('error', e => {
+      if (t !== token) return;
+      if (e.type === 'peer-unavailable') { err = `No encuentro la sala ${sala}. ¿El número está bien? Sigo intentando…`; if (!E) pintar(); }
+      setTimeout(() => { if (t === token) conectar(); }, 3000);
+    });
+    peer.on('disconnected', () => { try { peer.reconnect(); } catch {} });
+  }
+
+  function recibir(d){
+    visto = Date.now(); estadoRed = 'ok';
+    if (!d || typeof d !== 'object' || d.t === 'pong') return;
+    err = '';
+    if (d.t === 'nombres') { lista = d.lista; if (!nombre || !E) pintar(); return; }
+    if (d.t === 'ocupado') { err = `${d.nombre} ya entró desde otro celular. Escoge otro nombre.`; nombre = null; ls.del('kh-nombre-' + sala); pintar(); return; }
+    if (d.t === 'fuera') { nombre = null; E = null; ls.del('kh-nombre-' + sala); err = 'Tu nombre se abrió en otro celular.'; pintar(); return; }
+    if (d.t === 'est') {
+      const antes = E;
+      if (d.nombre) { nombre = d.nombre; ls.set('kh-nombre-' + sala, nombre); }
+      // Una respuesta enviada que la pantalla aún no confirma no se borra al repintar.
+      if (antes && antes.fase === 'q' && d.fase === 'q' && antes.q && d.q && antes.q.i === d.q.i && antes.ya != null && d.ya == null) d.ya = antes.ya, d.pendiente = true;
+      if (d.fase === 'q') d.fin = Date.now() + (d.restante || 0);
+      const cambio = !antes || antes.fase !== d.fase || (antes.q && d.q && antes.q.i !== d.q.i) || antes.ya !== d.ya;
+      E = d;
+      if (cambio) { pintar(); if (d.fase === 'rev' && d.delta && navigator.vibrate) navigator.vibrate([40, 60, 40]); }
+      else actualizarMio();
+    }
+  }
+
+  function elegir(n){
+    n = String(n).replace(/\s+/g,' ').trim().slice(0, 22);
+    if (n.length < 2) { err = 'Escribe tu nombre.'; pintar(); return; }
+    nombre = n; ls.set('kh-nombre-' + sala, n); err = '';
+    if (conn && conn.open) conn.send({t:'soy', nombre:n, dev});
+    body.innerHTML = `<div class="tarjeta"><div class="big">…</div><p class="sub">Entrando como ${esc(n)}</p></div>`;
+  }
+  function responder(op){
+    if (!E || E.fase !== 'q' || E.ya != null) return;
+    E.ya = op; E.pendiente = true;
+    try { conn.send({t:'resp', i:E.q.i, op}); } catch {}
+    if (navigator.vibrate) navigator.vibrate(25);
+    pintar();
+  }
+
+  function mio(){ return E && E.nombre ? `<div class="mio" id="mio"><b>${esc(E.nombre)}</b> · ${E.pts.toLocaleString('es-CO')} pts${E.pos ? ` · vas ${E.pos}º de ${E.total}` : ''}</div>` : ''; }
+  function actualizarMio(){ const m = $('#mio'); if (m && E) m.outerHTML = mio(); }
+
+  function pintar(){
+    clearInterval(timerQ);
+    if (nombre && !E) {
+      body.innerHTML = `<div class="tarjeta"><div class="big">…</div><p class="sub">Entrando como ${esc(nombre)}</p><p class="err">${esc(err)}</p></div>`;
+      return;
+    }
+    if (!nombre) {
+      if (!lista) {
+        body.innerHTML = `<div class="tarjeta"><div class="big">…</div><p class="sub">Conectando con la pantalla de Luna</p><p class="err">${esc(err)}</p></div>`;
+        return;
+      }
+      body.innerHTML = `
+        <h2>¿Quién eres?</h2>
+        <p class="sub">Toca tu nombre. Luna ya sabe quién es quién.</p>
+        <div class="grid-n">${lista.map(x => `<button class="nb" data-n="${esc(x.n)}" ${x.libre ? '' : 'disabled'}>${esc(x.n)}${x.libre ? '' : '<small>ya entró</small>'}</button>`).join('')}</div>
+        <div class="fila-otro"><input class="campo" id="i-otro" placeholder="Otro nombre" maxlength="22" autocomplete="off"><button class="cbtn" id="b-otro">Entrar</button></div>
+        <p class="err">${esc(err)}</p>`;
+      body.querySelectorAll('[data-n]').forEach(b => b.onclick = () => elegir(b.dataset.n));
+      $('#b-otro').onclick = () => elegir($('#i-otro').value);
+      return;
+    }
+    const q = E.q;
+    if (E.fase === 'lobby') {
+      body.innerHTML = `
+        <div class="tarjeta"><p class="mono" style="color:#9fb3de;font-size:12px;margin:0">Adentro</p><div class="big">Hola, ${esc(nombre.split(' ')[0])}</div><p class="sub" style="margin:8px 0 0">Mira el TV: Luna arranca en un momento.</p></div>
+        <button class="link" id="b-cambiar">No soy ${esc(nombre)}</button>${mio()}`;
+      $('#b-cambiar').onclick = () => { nombre = null; E = null; ls.del('kh-nombre-' + sala); conectar(); pintar(); };
+    }
+    else if (E.fase === 'q') {
+      if (E.ya != null) {
+        const txt = q.op[E.ya];
+        body.innerHTML = `<div class="tarjeta"><p class="mono" style="color:#9fb3de;font-size:12px;margin:0">Respuesta enviada</p><div class="big" style="font-size:30px;margin:12px 0">${esc(txt)}</div><p class="sub" style="margin:0">A ver qué dice la mesa…</p></div>${mio()}`;
+        return;
+      }
+      body.innerHTML = `
+        <div class="mono" style="color:#9fb3de;font-size:11px;margin-bottom:8px">Pregunta ${q.i + 1} de ${q.n} · ${ETIQ[q.tipo]}</div>
+        <p class="cel-q">${esc(q.p)}</p>
+        <div class="barrita"><i id="c-barra"></i></div>
+        ${q.tipo === 'quien'
+          ? `<div class="grid-n">${q.op.map((o,k) => `<button class="nb nb-q" data-op="${k}">${esc(o)}</button>`).join('')}</div>`
+          : `<div class="ops-cel">${q.op.map((o,k) => `<button class="ob c${k}" data-op="${k}"><i>${FORMAS[k]}</i>${esc(o)}</button>`).join('')}</div>`}
+        ${mio()}`;
+      body.querySelectorAll('[data-op]').forEach(b => b.onclick = () => responder(+b.dataset.op));
+      const dur = (q.tipo === 'quien' ? 25 : 20) * 1000;
+      timerQ = setInterval(() => { const i = $('#c-barra'); if (!i) return; i.style.width = Math.max(0, 100 * (E.fin - Date.now()) / dur) + '%'; }, 200);
+    }
+    else if (E.fase === 'rev') {
+      const gano = E.delta > 0, ganadoras = (E.gan || []).map(k => q.op[k]);
+      const titulo = E.ya == null ? 'No alcanzaste' : gano ? (q.tipo === 'dato' ? '¡Correcto!' : '¡Votaste con la mesa!') : (q.tipo === 'dato' ? 'Nop' : 'La mesa no piensa como tú');
+      const lineaG = q.tipo === 'dato' ? `Era «${esc(ganadoras[0] || '')}»` : ganadoras.length ? `${q.tipo === 'quien' ? 'La mesa eligió' : 'Ganó'}: ${ganadoras.map(esc).join(' y ')}` : 'Nadie votó';
+      body.innerHTML = `
+        <div class="tarjeta"><p class="mono" style="color:#9fb3de;font-size:12px;margin:0">${esc(titulo)}</p>
+          <div class="big ${gano ? 'ok' : 'no'}">${gano ? '+' + E.delta : '+0'}</div>
+          <p class="sub" style="margin:6px 0 0">${lineaG}</p></div>${mio()}`;
+    }
+    else if (E.fase === 'fin') {
+      const p = E.podio || [];
+      body.innerHTML = `
+        <div class="tarjeta"><p class="mono" style="color:#9fb3de;font-size:12px;margin:0">Fin del juego</p>
+          <div class="big">${E.pos ? E.pos + 'º' : '—'}</div><p class="sub" style="margin:0">de ${E.total} · ${E.pts.toLocaleString('es-CO')} pts</p>
+          <p class="sub" style="margin:16px 0 0">${p.map((r,k) => `${k + 1}º ${esc(r.n)}`).join(' · ')}</p></div>
+        <p class="sub" style="text-align:center;margin-top:18px">Feliz cumpleaños, Ricardo.</p>`;
+      if (E.pos === 1) lluvia(200);
+    }
+  }
+}
+})();
+</script>
+</body>
+</html>
