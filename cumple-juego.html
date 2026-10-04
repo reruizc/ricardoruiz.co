@@ -161,45 +161,28 @@ h1.tit em{font-style:normal;color:var(--oro)}
 'use strict';
 
 // ════════════════════════ Datos del juego ════════════════════════
-const NOMBRES = ['Angela','Abraham','Daniel','Doc Carlitos','Alvaro','Diego Garzón','Santiago','Juanita','Caro','Diego Benítez','Ricardo'];
+const NOMBRES = ['Angela','Abraham','Daniel','Doc Carlitos','Alvaro','Diego Garzón','Santiago','Juanita','Caro','Diego Benítez'];
 const PREF = 'rrcumple33-';           // id de la sala en el servidor de señalización de PeerJS
 const FORMAS = ['▲','◆','●','■'];
 
 // tipo: 'quien' (las opciones son los nombres de la mesa · gana la mayoría)
 //       'polemica' (opinión · gana la mayoría)
 //       'dato' (tiene respuesta correcta en ok)
-const PRINCIPAL = [
-  {tipo:'polemica', p:'Arranquemos suave. ¿Se habla de política en esta mesa?', op:['Sí, para eso vinimos','Nunca, es un cumpleaños','Solo después del tercer vino','Solo si gana mi candidato']},
-  {tipo:'quien', p:'¿Quién de la mesa llegaría tarde a su propio matrimonio?'},
-  {tipo:'dato', p:'Según la invitación, esta fiesta es la Elección 33. ¿En qué mesa votamos?', op:['Mesa 33','Mesa 305','Mesa 1993','Mesa 001'], ok:1, luna:'Mesa 305. Yo la leí. Ustedes, por lo visto, no todos.'},
-  {tipo:'polemica', p:'¿La arepa es colombiana o venezolana?', op:['Colombiana, obvio','Venezolana','De los dos','Pásenme otra y no peleemos']},
-  {tipo:'quien', p:'Si me dejan un fin de semana con alguien de esta mesa, ¿quién me cuida mejor?'},
-  {tipo:'dato', p:'Para los que oyen a Ricardo en la cena: ¿con qué código conoce la Registraduría a Antioquia?', op:['01','05','11','16'], ok:0, luna:'Es 01. El 05 es el del DANE. Si sabían eso, ya están igual de mal que Ricardo.'},
-  {tipo:'polemica', p:'¿Qué es peor?', op:['Audios de cinco minutos','Escribir «jajaja» sin reírse','Contestar «ok»','Llamar sin avisar']},
-  {tipo:'quien', p:'¿Quién de la mesa se lanza al Concejo en 2027?'},
-  {tipo:'dato', p:'¿Por cuántos votos, más o menos, se decidió la segunda vuelta de 2026?', op:['Unos 25.000','Unos 250.000','Cerca de un millón','Más de dos millones'], ok:1, luna:'Unos 250.000: menos de un punto. Foto finish.'},
-  {tipo:'polemica', p:'¿Piña en la pizza?', op:['Sí, sin vergüenza','Jamás','Solo si nadie me ve','Depende del vino']},
-  {tipo:'quien', p:'¿Quién sobrevive menos en un apocalipsis zombi?'},
-  {tipo:'dato', p:'¿Qué departamento decidió la segunda vuelta?', op:['Bogotá','Antioquia','Valle del Cauca','Atlántico'], ok:1, luna:'Antioquia: más de un millón de votos de ventaja. Cuatro veces el margen del país.'},
-  {tipo:'polemica', p:'¿Cuántos años aparenta Ricardo hoy?', op:['25, está divino','33, los que tiene','40, la política envejece','Depende de la luz']},
-  {tipo:'quien', p:'¿Quién va a ser el último en irse de esta fiesta?'},
-  {tipo:'dato', p:'¿En qué año nació Ricardo?', op:['1991','1992','1993','1994'], ok:2, luna:'1993. Mañana cumple 33. Yo cumplo menos, pero en años de perro le gano.'},
+// Las 10 preguntas sobre Ricardo · todas de selección múltiple con única respuesta (ok = índice correcto).
+// La respuesta correcta va en distinta posición en cada una para que no se adivine por el patrón.
+const PREGUNTAS = [
+  {tipo:'dato', p:'¿En qué partidos políticos ha sido militante Ricardo?', op:['Centro Democrático y Partido Liberal','Cambio Radical y Partido Verde','Partido de la U y Partido Liberal','Pacto Histórico y Partido Verde'], ok:1, luna:'Cambio Radical y el Partido Verde. Ricardo también ha tenido su trasteo.'},
+  {tipo:'dato', p:'¿Dónde trabaja Ricardo?', op:['En la Registraduría','En la Presidencia','En el DNP','En el Senado'], ok:2, luna:'En el DNP. Por eso todo lo quiere medir.'},
+  {tipo:'dato', p:'¿De qué ideología es Ricardo?', op:['Centro-derecha','Izquierda','Centro-izquierda','Derecha'], ok:0, luna:'Centro-derecha. Que no les digan otra cosa.'},
+  {tipo:'dato', p:'Ricardo es Libra. ¿Y de ascendente?', op:['Escorpio','Leo','Géminis','Libra'], ok:3, luna:'Libra con ascendente Libra. Doble balanza.'},
+  {tipo:'dato', p:'Si Ricardo no se dedicara a la política, ¿a qué se dedicaría?', op:['A la cocina','Al fútbol','A la música','A pasear perros'], ok:1, luna:'Al fútbol. La política perdió un delantero.'},
+  {tipo:'dato', p:'¿Cuál es la frase política que más le gusta a Ricardo?', op:['«Trabajar, trabajar y trabajar»','«Creyó que podía desafiar al Estado. Bienvenido a la Patria Milagro»','«Hola, soy Santos y gobierno como canto»','«El que la hace la paga»'], ok:2, luna:'«Hola, soy Santos y gobierno como canto». Un clásico.'},
+  {tipo:'dato', p:'Esta es fácil: ¿cómo se llama la perrita de Ricardo?', op:['Lola','Kira','Canela','Luna'], ok:3, luna:'Luna. O sea, yo. Quien falló esta se queda sin croqueta.'},
+  {tipo:'dato', p:'¿Qué partido político le cae más mal a Ricardo?', op:['Pacto Histórico','Centro Democrático','Partido Liberal','Cambio Radical'], ok:0, luna:'El Pacto Histórico. Y no es nada personal… bueno, un poquito.'},
+  {tipo:'dato', p:'¿Cuántas veces han funado a Ricardo?', op:['Nunca, es un santo','Una vez, y fue injusto','Unas cinco','Ni él mismo sabe'], ok:3, luna:'Ni él mismo sabe. Yo tampoco llevo la cuenta.'},
+  {tipo:'dato', p:'Para cerrar: ¿cuál es el trago favorito de Ricardo?', op:['Aguardiente Antioqueño','Vodka Absolut','Ron Viejo de Caldas','Whisky'], ok:1, luna:'Vodka Absolut. Ya saben qué traer el otro año.'},
 ];
-const EXTRA = [
-  {tipo:'quien', p:'¿Quién de la mesa contesta los WhatsApp tres días después?'},
-  {tipo:'polemica', p:'¿Cuál es el peor pecado en una cena?', op:['Llegar tarde','Llegar con las manos vacías','Hablar de política','Irse antes del postre']},
-  {tipo:'dato', p:'¿Qué participación hubo en la segunda vuelta de 2026?', op:['48 %','58 %','64 %','71 %'], ok:2, luna:'64 %. Seis puntos más que en primera vuelta. El 58 % era la primera, para los que cayeron.'},
-  {tipo:'quien', p:'¿Quién ganaría una elección en esta mesa?'},
-  {tipo:'polemica', p:'¿Ricardo debería tener un día al año sin hablar de elecciones?', op:['Sí, hoy','Imposible','No, es su lenguaje del amor','Que hable, pero con datos']},
-  {tipo:'quien', p:'¿Quién está haciendo trampa en este momento?'},
-];
-const CIERRE = {tipo:'polemica', p:'La última, y la más polémica: ¿quién manda en esta casa?', op:['Ricardo','Luna','El que tenga el control del TV','Nadie, esto es anarquía']};
-const MODOS = {
-  corta:  {txt:'Corta · 12',  lista:() => [...PRINCIPAL.slice(0,11), CIERRE]},
-  normal: {txt:'Normal · 16', lista:() => [...PRINCIPAL, CIERRE]},
-  larga:  {txt:'Larga · 22',  lista:() => [...PRINCIPAL, ...EXTRA, CIERRE]},
-};
-const ETIQ = {quien:'¿Quién de la mesa?', polemica:'Polémica', dato:'Dato de Ricardo'};
+const ETIQ = {quien:'¿Quién de la mesa?', polemica:'Polémica', dato:'¿Cuánto conoces a Ricardo?'};
 
 // ════════════════════════ Utilidades ════════════════════════
 const $ = s => document.querySelector(s);
@@ -375,7 +358,7 @@ function pantalla(){
   // ── Flujo del juego ──
   function empezar(){
     if (!Object.keys(S.jug).length) return;
-    S.lista = MODOS[S.modo].lista(); for (const n in S.jug) S.jug[n].pts = 0;
+    S.lista = PREGUNTAS.slice(); for (const n in S.jug) S.jug[n].pts = 0;
     lanzar(0);
   }
   function lanzar(i){
@@ -447,7 +430,7 @@ function pantalla(){
     if (S.fase === 'lobby') {
       const unidos = Object.keys(S.jug).length;
       body.innerHTML = `
-        <h1 class="tit">El Kahoot <em>polémico</em><br>de Luna.</h1>
+        <h1 class="tit">¿Cuánto conoces<br>a <em>Ricardo</em>?</h1>
         <div class="lobby">
           <div class="qr"><img alt="Código QR para entrar" src="https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=8&data=${encodeURIComponent(urlSala())}"></div>
           <div>
@@ -459,10 +442,9 @@ function pantalla(){
         <div class="roster">${roster().map(n => `<span class="${S.jug[n] ? (enLinea(n) ? 'on' : 'dormido') : ''}">${esc(n)}</span>`).join('')}</div>
         ${red !== 'ok' ? `<div class="aviso">La pantalla todavía no está conectada a la sala (${esc(red)}). Si sigue así, revisa el internet.</div>` : ''}`;
       foot.innerHTML = `
-        <div class="modos">Partida ${Object.entries(MODOS).map(([k,m]) => `<button data-modo="${k}" aria-pressed="${S.modo === k}">${m.txt}</button>`).join('')}</div>
+        <div class="modos">${PREGUNTAS.length} preguntas sobre Ricardo</div>
         <button class="btn sec" id="b-voz">${voz ? 'Voz de Luna: sí' : 'Voz de Luna: no'}</button>
         <button class="btn" id="b-sig" ${unidos ? '' : 'disabled'}>${unidos ? `Empezar con ${unidos}` : 'Esperando jugadores…'}</button>`;
-      foot.querySelectorAll('[data-modo]').forEach(b => b.onclick = () => { S.modo = b.dataset.modo; guardar(); render(); });
       if (!$('#globo').classList.contains('on')) setTimeout(() => decir('Escaneen el código y escojan su nombre. Yo hago las preguntas.', false), 3500);
     }
     else if (S.fase === 'q') {
