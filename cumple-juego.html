@@ -109,6 +109,13 @@ h1.tit em{font-style:normal;color:var(--oro)}
 .pod.p1 .bloque{height:34vh;background:var(--oro)}
 .pod.p2 .bloque{height:24vh;background:#dfe6f5}
 .pod.p3 .bloque{height:17vh;background:#e6a46b}
+.pod.tapado .n{color:#ffffff40}
+.pod.tapado .bloque{opacity:.3;filter:saturate(.2)}
+.pod.redoble .bloque{opacity:.75;animation:temblor .11s linear infinite}
+.pod.nuevo .n,.pod.nuevo .pts{animation:aparece .7s cubic-bezier(.2,.9,.3,1.5)}
+@keyframes temblor{0%,100%{transform:translateX(-4px)}50%{transform:translateX(4px)}}
+@keyframes aparece{from{transform:scale(.3);opacity:0}to{transform:none;opacity:1}}
+.resto{display:flex;flex-wrap:wrap;gap:.6vh 1.6vw;margin-top:1.8vh;font:clamp(13px,1.2vw,22px)/1.3 var(--sans);color:#cfdcf7}
 .aviso{font:clamp(13px,1.1vw,20px)/1.4 var(--sans);color:#ffd0dc;background:#ff5d8f22;border:1px solid #ff5d8f66;border-radius:12px;padding:1vh 1vw;margin-top:1.4vh}
 
 /* ───────── Celular ───────── */
@@ -264,13 +271,51 @@ function pantalla(){
   function decir(txt, hablar = true, etiqueta = 'Luna'){
     $('#globo-t').textContent = txt; $('#globo small').textContent = etiqueta; $('#globo').classList.add('on');
     if (hablar && voz && 'speechSynthesis' in window) {
-      try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(txt.replace(/[«»]/g,'')); if (vozEs) u.voice = vozEs; u.lang = vozEs ? vozEs.lang : 'es-CO'; u.rate = 1.02; u.pitch = 1.2; speechSynthesis.speak(u); } catch {}
+      try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(txt.replace(/[«»]/g,'')); if (vozEs) u.voice = vozEs; u.lang = vozEs ? vozEs.lang : 'es-CO'; u.onstart = () => bajar(true); u.onend = u.onerror = () => bajar(false); u.rate = 1.02; u.pitch = 1.2; speechSynthesis.speak(u); } catch {}
     }
   }
   let ac = null;
   function tono(f, d = .15, vol = .12, cuando = 0){
     try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); const t = ac.currentTime + cuando; const o = ac.createOscillator(), g = ac.createGain(); o.type = 'triangle'; o.frequency.value = f; g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + d); o.connect(g).connect(ac.destination); o.start(t); o.stop(t + d); } catch {}
   }
+
+  // ── Música: las dos pistas se alternan pregunta a pregunta ──
+  // Viven en S3, no en el repo: el repo es público y la música tiene derechos.
+  const MUS_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/cumple-2026/';
+  const pistas = ['musica-a.mp3', 'musica-b.mp3'].map(f => { const a = new Audio(MUS_URL + f); a.preload = 'auto'; a.loop = true; a.volume = 0; return a; });
+  const VOL_ALTO = .55, VOL_BAJO = .16;
+  let musica = ls.get('kh-musica') !== '0', sonando = null, hablando = false, tope = VOL_ALTO;
+  function fundir(a, hasta, ms, alFinal){
+    clearInterval(a._f); const desde = a.volume, t0 = performance.now();
+    a._f = setInterval(() => { const p = Math.min(1, (performance.now() - t0) / ms); a.volume = Math.max(0, Math.min(1, desde + (hasta - desde) * p)); if (p >= 1) { clearInterval(a._f); if (alFinal) alFinal(); } }, 40);
+  }
+  function sonar(k){
+    callar(); if (!musica) return;
+    const a = pistas[k % pistas.length]; clearInterval(a._f); tope = VOL_ALTO;
+    try { a.currentTime = 0; } catch {}
+    a.volume = 0; a.play().catch(() => {}); sonando = a;
+    fundir(a, hablando ? VOL_BAJO : tope, 700);
+  }
+  function callar(ms = 600){ const a = sonando; sonando = null; if (a) fundir(a, 0, ms, () => a.pause()); }
+  function bajar(on){ hablando = on; if (sonando) fundir(sonando, on ? Math.min(VOL_BAJO, tope) : tope, on ? 250 : 700); }
+  function redoble(seg = 2.6){
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const t0 = ac.currentTime + .05, sr = ac.sampleRate;
+      const golpe = ac.createBuffer(1, Math.floor(sr * .06), sr), d = golpe.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 4);
+      for (let t = 0; t < seg; t += .085 - .05 * (t / seg)) {
+        const s = ac.createBufferSource(), g = ac.createGain(), f = ac.createBiquadFilter();
+        f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = .7; s.buffer = golpe; g.gain.value = .25 + .5 * (t / seg);
+        s.connect(f).connect(g).connect(ac.destination); s.start(t0 + t);
+      }
+      const pl = ac.createBuffer(1, Math.floor(sr * 1.4), sr), e = pl.getChannelData(0);
+      for (let i = 0; i < e.length; i++) e[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / e.length, 2.5);
+      const s = ac.createBufferSource(), g = ac.createGain(), f = ac.createBiquadFilter();
+      f.type = 'highpass'; f.frequency.value = 5000; s.buffer = pl; g.gain.value = .5; s.connect(f).connect(g).connect(ac.destination); s.start(t0 + seg);
+    } catch {}
+  }
+  function fanfarria(){ [523, 659, 784, 1047].forEach((f, k) => tono(f, .5, .14, k * .13)); tono(1047, 1.4, .12, .55); tono(1319, 1.4, .1, .55); }
 
   // ── Jugadores ──
   const roster = () => [...NOMBRES, ...S.extra];
@@ -288,8 +333,13 @@ function pantalla(){
       m.ya = S.resp[n] ? S.resp[n].op : null;
     }
     if (S.fase === 'q') m.restante = Math.max(0, S.t0 + S.dur - Date.now());
-    if (S.fase === 'rev' && S.ult) { m.gan = S.ult.gan; m.delta = S.ult.deltas[n] || 0; }
-    if (S.fase === 'fin') m.podio = rk.slice(0, 3);
+    if (S.fase === 'rev' && S.ult) { m.gan = S.ult.gan; m.delta = S.ult.deltas[n] || 0; m.rapido = S.ult.rapido === n; m.ultimo = S.ult.ultimo === n; }
+    if (S.fase === 'fin') {
+      // Mientras el podio se revela, el celular no puede adelantar quién ganó.
+      const L = Math.min(3, rk.length); m.paso = S.paso || 0; m.L = L;
+      m.podio = rk.slice(0, L).map((r, k) => k + 1 > L - m.paso ? r : null);
+      if (m.paso < L) delete m.pos;
+    }
     return m;
   }
   const nombresLibres = dev => roster().map(n => ({n, libre:!ocupado(n, dev), jugando:!!S.jug[n]}));
@@ -367,8 +417,9 @@ function pantalla(){
     S.op = q.tipo === 'quien' ? roster() : q.op;
     S.dur = (q.tipo === 'quien' ? 25 : 20) * 1000; S.t0 = Date.now();
     guardar(); difundir(); render();
+    sonar(i);
     decir(q.p, true, `Pregunta ${i + 1} de ${S.lista.length}`);
-    tono(660, .12); tono(880, .18, .12, .12);
+    if (!musica) { tono(660, .12); tono(880, .18, .12, .12); }
   }
   function cerrar(){
     if (S.fase !== 'q') return;
@@ -383,17 +434,20 @@ function pantalla(){
       const d = Math.round(1000 * (1 - Math.min(1, r.ms / S.dur) / 2));
       deltas[n] = d; if (S.jug[n]) S.jug[n].pts += d;
     }
-    S.ult = {cuenta, gan, deltas}; S.fase = 'rev';
+    const orden = Object.entries(S.resp).sort((a, b) => a[1].ms - b[1].ms).map(([n]) => n);
+    const bien = orden.filter(n => gan.includes(S.resp[n].op));
+    const rapido = bien[0] || null, ultimo = orden.length >= 2 ? orden[orden.length - 1] : null;
+    S.ult = {cuenta, gan, deltas, orden, bien, rapido, rapidoMs:rapido ? S.resp[rapido].ms : 0, ultimo, ultimoBien:ultimo ? gan.includes(S.resp[ultimo].op) : false, sin:Object.keys(S.jug).filter(n => !S.resp[n])};
+    S.fase = 'rev'; callar();
     guardar(); difundir(); render();
-    decir(comentario(q, cuenta, gan), true, 'Resultado');
+    decir(comentario(q, cuenta, gan) + felicitar(S.ult) + reganar(S.ult), true, 'Resultado');
     tono(523, .14); tono(659, .14, .12, .12); tono(784, .3, .12, .24);
   }
   function comentario(q, cuenta, gan){
     const total = cuenta.reduce((a,b) => a + b, 0);
     if (!total) return 'Nadie respondió. ¿Están vivos? Ladren si me oyen.';
     if (q.tipo === 'dato') {
-      const bien = cuenta[q.ok];
-      return (q.luna || `Era «${S.op[q.ok]}».`) + (bien === total ? ' ¡Todos acertaron!' : bien === 0 ? ' Nadie acertó.' : '');
+      return q.luna || `Era «${S.op[q.ok]}».`;
     }
     const nombres = gan.map(k => S.op[k]);
     if (q.tipo === 'quien') {
@@ -405,21 +459,87 @@ function pantalla(){
     const share = cuenta[gan[0]] / total;
     return share >= .75 ? `Casi unanimidad: «${nombres[0]}».` : share > .5 ? `Ganó «${nombres[0]}», pero no fue fácil.` : `Ganó «${nombres[0]}» sin mayoría. Mesa dividida.`;
   }
+  const seg = ms => (ms / 1000).toFixed(1).replace('.', ',');
+  const listaY = a => a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' y ' + a[a.length - 1];
+  function felicitar(u){
+    if (!u.orden || !u.orden.length) return '';
+    if (!u.bien.length) return ' Nadie acertó. Qué vergüenza con el cumpleañero.';
+    if (u.bien.length === 1) return ` Solo acertó ${u.bien[0]}, en ${seg(u.rapidoMs)} segundos. ¡Bravo!`;
+    if (u.bien.length === u.orden.length && u.orden.length > 2) return ` ¡Todos acertaron! La respuesta más rápida fue de ${u.rapido}: ${seg(u.rapidoMs)} segundos.`;
+    const nom = u.bien.length <= 4 ? listaY(u.bien) : `${u.bien.slice(0, 3).join(', ')} y ${u.bien.length - 3} más`;
+    return ` ¡Bien, ${nom}! La respuesta más rápida fue de ${u.rapido}: ${seg(u.rapidoMs)} segundos.`;
+  }
+  // Regaños al que respondió de último. Sin adjetivos con género: «de último» no cambia.
+  const REGANO = [
+    n => `${n}, respondiste de último. ¿Estabas buscando en Google?`,
+    n => `${n}, te demoraste más que la Registraduría con el escrutinio.`,
+    n => `${n}, de último. Hasta yo respondo más rápido, y no tengo dedos.`,
+    n => `${n}, de último. ¿Te estabas sirviendo otro vodka?`,
+    n => `${n}, te demoraste más que un trámite en el DNP.`,
+    n => `${n}, de último. Así no se gana una elección.`,
+    n => `${n}, de último. Te voy a esconder los zapatos.`,
+    n => `${n}, aquí no se piensa tanto. Se responde.`,
+  ];
+  const REGANO_MAL = [
+    n => `Y ${n}: de último y encima mal. Doble regaño.`,
+    n => `${n}, te demoraste todo eso para equivocarte. Increíble.`,
+    n => `${n}, de último y mal. Ni yo, que solo como croquetas, fallo tanto.`,
+    n => `${n}, mucho pensar para tan poco acierto.`,
+    n => `${n}, de último y fallaste. Esta noche te toca lavar los platos.`,
+  ];
+  function reganar(u){
+    const out = [];
+    if (u.ultimo) {
+      const n = u.ultimo, L = u.ultimoBien ? REGANO : REGANO_MAL;
+      out.push(n === u.rapido ? `Eso sí, ${n} respondió de último. Acertó, pero se tomó su tiempo.` : L[(S.i * 7 + n.length) % L.length](n));
+    }
+    if (u.sin && u.sin.length && u.sin.length <= 3 && u.orden.length) out.push(`Y ${listaY(u.sin)} ni ${u.sin.length === 1 ? 'respondió' : 'respondieron'}.`);
+    return out.length ? ' ' + out.join(' ') : '';
+  }
   function siguiente(){
     if (S.fase === 'lobby') return empezar();
     if (S.fase === 'q') return cerrar();
     if (S.fase === 'rev') return S.i + 1 < S.lista.length ? lanzar(S.i + 1) : terminar();
+    if (S.fase === 'fin') return revelar();
   }
   function terminar(){
-    S.fase = 'fin'; guardar(); difundir(); render();
-    const rk = ranking();
-    decir(rk.length ? `¡Ganó ${rk[0].n}, con ${rk[0].pts.toLocaleString('es-CO')} puntos! Feliz cumpleaños, Ricardo.` : 'Se acabó. Feliz cumpleaños, Ricardo.', true, 'Fin del juego');
-    lluvia(320); try { luna && luna.celebrar(); } catch {}
+    callar(300);
+    S.fase = 'fin'; S.paso = 0; revelando = false; guardar(); difundir(); render();
+    if (!ranking().length) { decir('Se acabó. Feliz cumpleaños, Ricardo.', true, 'Fin del juego'); return; }
+    decir('Se acabaron las preguntas. Llegó el momento de saber quién conoce mejor a Ricardo.', true, 'El podio');
+    setTimeout(() => { if (S.fase === 'fin' && !S.paso) sonar(1); }, 500);
+  }
+  // Tercero, segundo y primero, cada uno con su redoble. Ricardo marca el ritmo con el botón.
+  let revelando = false, recien = 0, tRecien = 0;
+  const ORD = {1:'primer', 2:'segundo', 3:'tercer'};
+  function revelar(){
+    const rk = ranking(), L = Math.min(3, rk.length);
+    if (revelando || (S.paso || 0) >= L) return;
+    const lugar = L - (S.paso || 0), espera = lugar === 1 ? 3800 : 2600;
+    revelando = true; render();
+    decir(lugar === 1 ? 'Y la persona que más conoce a Ricardo… en primer lugar…' : `En ${ORD[lugar]} lugar…`, true, `Puesto ${lugar}`);
+    tope = .07; if (sonando) fundir(sonando, tope, 400);
+    setTimeout(() => redoble(espera / 1000), 700);
+    setTimeout(() => {
+      const r = rk[lugar - 1];
+      revelando = false; S.paso = (S.paso || 0) + 1; recien = lugar; tRecien = Date.now();
+      guardar(); difundir(); render();
+      if (lugar === 1) {
+        callar(400);
+        decir(`¡${r.n}, con ${r.pts.toLocaleString('es-CO')} puntos! Feliz cumpleaños, Ricardo.`, true, 'Primer lugar');
+        fanfarria(); lluvia(380); try { luna && luna.celebrar(); } catch {}
+      } else {
+        decir(r.pts ? `¡${r.n}! Con ${r.pts.toLocaleString('es-CO')} puntos.` : `¡${r.n}! Con cero puntos. Pero vino, y eso cuenta.`, true, `Puesto ${lugar}`);
+        tono(784, .3, .12); lluvia(70);
+        tope = VOL_ALTO; if (sonando) fundir(sonando, VOL_BAJO, 600);
+      }
+    }, 700 + espera + 80);
   }
   function reiniciar(){
     if (!confirm('¿Empezar una partida nueva? Se borran los puntos (los jugadores siguen conectados).')) return;
     for (const n in S.jug) S.jug[n].pts = 0;
-    S.fase = 'lobby'; S.i = -1; S.resp = {}; S.ult = null; S.lista = [];
+    callar(300); revelando = false;
+    S.fase = 'lobby'; S.i = -1; S.resp = {}; S.ult = null; S.lista = []; S.paso = 0;
     guardar(); difundir(); render(); decir('Partida nueva. Todos en cero.', false);
   }
 
@@ -443,6 +563,7 @@ function pantalla(){
         ${red !== 'ok' ? `<div class="aviso">La pantalla todavía no está conectada a la sala (${esc(red)}). Si sigue así, revisa el internet.</div>` : ''}`;
       foot.innerHTML = `
         <div class="modos">${PREGUNTAS.length} preguntas sobre Ricardo</div>
+        <button class="btn sec" id="b-mus">${musica ? 'Música: sí' : 'Música: no'}</button>
         <button class="btn sec" id="b-voz">${voz ? 'Voz de Luna: sí' : 'Voz de Luna: no'}</button>
         <button class="btn" id="b-sig" ${unidos ? '' : 'disabled'}>${unidos ? `Empezar con ${unidos}` : 'Esperando jugadores…'}</button>`;
       if (!$('#globo').classList.contains('on')) setTimeout(() => decir('Escaneen el código y escojan su nombre. Yo hago las preguntas.', false), 3500);
@@ -456,7 +577,7 @@ function pantalla(){
           ? `<div class="nombres-q">${S.op.map(n => `<span>${esc(n)}</span>`).join('')}</div>`
           : `<div class="ops">${S.op.map((o,k) => `<div class="op c${k}"><i>${FORMAS[k]}</i>${esc(o)}</div>`).join('')}</div>`}
         <div class="faltan" id="faltan"></div>`;
-      foot.innerHTML = `<button class="btn sec" id="b-fin">Terminar juego</button><button class="btn" id="b-sig">Cerrar respuestas</button>`;
+      foot.innerHTML = `<button class="btn sec" id="b-mus">${musica ? 'Música: sí' : 'Música: no'}</button><button class="btn sec" id="b-fin">Terminar juego</button><button class="btn" id="b-sig">Cerrar respuestas</button>`;
       pintarFaltan(); reloj();
     }
     else if (S.fase === 'rev') {
@@ -472,23 +593,37 @@ function pantalla(){
             <div class="barra ${u.gan.includes(f.k) ? 'gana' : ''}"><span>${q.tipo === 'quien' ? '' : FORMAS[f.k] + ' '}${esc(f.o)}</span><b>${f.v}</b>
               <div class="pista"><i class="${q.tipo === 'quien' ? 'c' + (f.k % 4) : 'c' + f.k}" data-w="${Math.round(100 * f.v / total)}"></i></div></div>`).join('') : '<p style="color:#9fb3de">Nadie votó.</p>'}
           </div>
-          <div class="tabla"><h3>Tabla</h3>${rk.slice(0, 11).map((r,k) => `<div class="fila"><span class="p">${k + 1}º</span><span>${esc(r.n)}</span><span class="d">${u.deltas[r.n] ? '+' + u.deltas[r.n] : ''}</span><b>${r.pts.toLocaleString('es-CO')}</b></div>`).join('')}</div>
+          <div class="tabla"><h3>Tabla</h3>${rk.slice(0, 11).map((r,k) => `<div class="fila"><span class="p">${k + 1}º</span><span>${esc(r.n)}${r.n === u.rapido ? ' ⚡' : ''}${r.n === u.ultimo ? ' 🐢' : ''}</span><span class="d">${u.deltas[r.n] ? '+' + u.deltas[r.n] : ''}</span><b>${r.pts.toLocaleString('es-CO')}</b></div>`).join('')}</div>
         </div>`;
       const ult = S.i + 1 >= S.lista.length;
       foot.innerHTML = `<button class="btn sec" id="b-fin">Terminar juego</button><button class="btn" id="b-sig">${ult ? 'Ver el podio' : 'Siguiente pregunta'}</button>`;
       setTimeout(() => body.querySelectorAll('.pista i').forEach(i => i.style.width = i.dataset.w + '%'), 80);
     }
     else if (S.fase === 'fin') {
-      const rk = ranking(), pos = [rk[1], rk[0], rk[2]], cl = ['p2','p1','p3'], num = [2,1,3];
+      const rk = ranking(), L = Math.min(3, rk.length), paso = S.paso || 0, listo = paso >= L, sig = L - paso;
+      const visto = lugar => lugar > L - paso;
       body.innerHTML = `
-        <h1 class="tit">Resultado <em>oficial</em>.</h1>
-        <div class="podio">${pos.map((r,k) => r ? `<div class="pod ${cl[k]}"><div class="n">${esc(r.n)}</div><div class="pts">${r.pts.toLocaleString('es-CO')} pts</div><div class="bloque">${num[k]}</div></div>` : '<div></div>').join('')}</div>`;
-      foot.innerHTML = `<button class="btn sec" id="b-nueva">Partida nueva</button>`;
-      $('#b-nueva').onclick = reiniciar;
+        <h1 class="tit">${listo ? 'Resultado <em>oficial</em>.' : '¿Quién conoce mejor<br>a <em>Ricardo</em>?'}</h1>
+        <div class="podio">${[2, 1, 3].map(lugar => {
+          const r = rk[lugar - 1]; if (!r || lugar > L) return '<div></div>';
+          const v = visto(lugar), cls = v ? (lugar === recien && Date.now() - tRecien < 1500 ? 'nuevo' : '') : 'tapado' + (revelando && lugar === sig ? ' redoble' : '');
+          return `<div class="pod p${lugar} ${cls}"><div class="n">${v ? esc(r.n) : '?'}</div><div class="pts">${v ? r.pts.toLocaleString('es-CO') + ' pts' : '&nbsp;'}</div><div class="bloque">${lugar}</div></div>`;
+        }).join('')}</div>
+        ${listo && rk.length > 3 ? `<div class="resto">${rk.slice(3).map((r, k) => `<span>${k + 4}º ${esc(r.n)} · ${r.pts.toLocaleString('es-CO')}</span>`).join('')}</div>` : ''}`;
+      foot.innerHTML = listo || !L
+        ? `<button class="btn sec" id="b-nueva">Partida nueva</button>`
+        : `<button class="btn" id="b-sig" ${revelando ? 'disabled' : ''}>${revelando ? 'Redoble…' : `Revelar el ${ORD[sig]} lugar`}</button>`;
+      const bn = $('#b-nueva'); if (bn) bn.onclick = reiniciar;
     }
     const bs = $('#b-sig'); if (bs) bs.onclick = siguiente;
     const bf = $('#b-fin'); if (bf) bf.onclick = () => { if (confirm('¿Terminar el juego y ver el podio?')) { if (S.fase === 'q') cerrar(); terminar(); } };
+    const bm = $('#b-mus'); if (bm) bm.onclick = alternarMusica;
     const bv = $('#b-voz'); if (bv) bv.onclick = () => { voz = !voz; ls.set('kh-voz', voz ? '1' : '0'); render(); if (voz) decir('Hola, aquí estoy.'); };
+  }
+  function alternarMusica(){
+    musica = !musica; ls.set('kh-musica', musica ? '1' : '0');
+    if (!musica) callar(200); else if (S.fase === 'q') sonar(S.i);
+    render();
   }
   function pintarFaltan(){
     const el = $('#faltan'); if (!el) return;
@@ -502,7 +637,7 @@ function pantalla(){
     const a = $('#r-arco'), b = $('#r-num');
     if (a) { a.setAttribute('stroke-dashoffset', (119.4 * (1 - rest / S.dur)).toFixed(1)); a.setAttribute('stroke', seg <= 5 ? 'var(--rosa)' : 'var(--oro)'); }
     if (b) b.textContent = seg;
-    if (seg !== ultSeg) { if (seg <= 5 && seg > 0) tono(seg === 1 ? 990 : 880, .06, .08); ultSeg = seg; }
+    if (seg !== ultSeg) { if (seg <= 5 && seg > 0 && !sonando) tono(seg === 1 ? 990 : 880, .06, .08); ultSeg = seg; }
     if (rest <= 0) cerrar();
   }
   setInterval(() => { reloj(); pintarRed(); }, 250);
@@ -511,12 +646,13 @@ function pantalla(){
 
   addEventListener('keydown', e => {
     if (e.target.closest('input,textarea')) return;
+    if (e.key === 'm' || e.key === 'M') return alternarMusica();
     if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') { e.preventDefault(); const b = $('#b-sig'); if (b && !b.disabled) siguiente(); }
   });
   // Si la pantalla se recargó en mitad de una pregunta vencida, la cierro al arrancar.
   render();
   cargarPeer().then(abrirSala).catch(err => { red = err.message; pintarRed(); render(); });
-  window.KH = {S:() => S, conns, siguiente, nueva:() => { if (confirm('¿Sala nueva? Todos tendrán que volver a entrar.')) { ls.del(KEY); location.reload(); } }};
+  window.KH = {S:() => S, conns, siguiente, pistas, ult:() => S.ult, nueva:() => { if (confirm('¿Sala nueva? Todos tendrán que volver a entrar.')) { ls.del(KEY); location.reload(); } }};
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -601,7 +737,7 @@ function celular(){
       // Una respuesta enviada que la pantalla aún no confirma no se borra al repintar.
       if (antes && antes.fase === 'q' && d.fase === 'q' && antes.q && d.q && antes.q.i === d.q.i && antes.ya != null && d.ya == null) d.ya = antes.ya, d.pendiente = true;
       if (d.fase === 'q') d.fin = Date.now() + (d.restante || 0);
-      const cambio = !antes || antes.fase !== d.fase || (antes.q && d.q && antes.q.i !== d.q.i) || antes.ya !== d.ya;
+      const cambio = !antes || antes.fase !== d.fase || (antes.q && d.q && antes.q.i !== d.q.i) || antes.ya !== d.ya || antes.paso !== d.paso;
       E = d;
       if (cambio) { pintar(); if (d.fase === 'rev' && d.delta && navigator.vibrate) navigator.vibrate([40, 60, 40]); }
       else actualizarMio();
@@ -679,10 +815,18 @@ function celular(){
       body.innerHTML = `
         <div class="tarjeta"><p class="mono" style="color:#9fb3de;font-size:12px;margin:0">${esc(titulo)}</p>
           <div class="big ${gano ? 'ok' : 'no'}">${gano ? '+' + E.delta : '+0'}</div>
-          <p class="sub" style="margin:6px 0 0">${lineaG}</p></div>${mio()}`;
+          <p class="sub" style="margin:6px 0 0">${lineaG}</p>
+          ${E.rapido ? '<p class="sub" style="margin:12px 0 0;color:var(--oro)">⚡ La respuesta más rápida</p>' : E.ultimo ? '<p class="sub" style="margin:12px 0 0;color:#ff9db9">🐢 Respondiste de último. Luna te está mirando.</p>' : ''}</div>${mio()}`;
+    }
+    else if (E.fase === 'fin' && E.paso < E.L) {
+      const p = (E.podio || []).map((r, k) => r ? `${k + 1}º ${esc(r.n)}` : null).filter(Boolean).reverse();
+      body.innerHTML = `
+        <div class="tarjeta"><p class="mono" style="color:#9fb3de;font-size:12px;margin:0">El podio</p>
+          <div class="big">🥁</div><p class="sub" style="margin:0">Luna está revelando el podio. Mira el TV.</p>
+          ${p.length ? `<p class="sub" style="margin:14px 0 0">${p.join(' · ')}</p>` : ''}</div>`;
     }
     else if (E.fase === 'fin') {
-      const p = E.podio || [];
+      const p = (E.podio || []).filter(Boolean);
       body.innerHTML = `
         <div class="tarjeta"><p class="mono" style="color:#9fb3de;font-size:12px;margin:0">Fin del juego</p>
           <div class="big">${E.pos ? E.pos + 'º' : '—'}</div><p class="sub" style="margin:0">de ${E.total} · ${E.pts.toLocaleString('es-CO')} pts</p>
