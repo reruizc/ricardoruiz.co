@@ -353,11 +353,71 @@ def construir_html_cierre(b):
     return '\n'.join(L)
 
 
+# Medido el 5-oct-2026: el pie de «Fuentes» se partió y sus dos últimas líneas
+# quedaron SOLAS en una sexta página, con el encabezado y nada más. Y al corregir
+# el brief a mano, lo que quedó en esa sexta página fue la cola de una tabla. La
+# regla: si la última página llega con poco (menos de POCO de su alto), se vuelve
+# a componer apretando un poco —primero el pie, después la letra del cuerpo— y
+# esa versión SOLO se queda si de verdad ahorra la página. Nunca se recorta texto.
+# Los niveles son acumulativos y pequeños a propósito: un salto grande de letra
+# se nota más que una página de sobra.
+POCO = 0.40
+COMPACTAR = (
+    '.foot { margin-top:8px !important; padding-top:6px !important; '
+    'font-size:7.1pt !important; line-height:1.4 !important; }',
+    'body { font-size:9.5pt !important; line-height:1.46 !important; }',
+    'body { font-size:9.2pt !important; line-height:1.42 !important; }',
+)
+
+
+def _uso_pagina(page):
+    """Hasta qué fracción del alto llega el texto de la página, sin contar el
+    encabezado (.top), que se repite en todas."""
+    fondo = [0.0]
+
+    def rec(box, dentro):
+        el = getattr(box, 'element', None)
+        cls = el.get('class') or '' if el is not None and hasattr(el, 'get') else ''
+        dentro = dentro or 'top' in cls.split()
+        txt = getattr(box, 'text', None)
+        if not dentro and isinstance(txt, str) and txt.strip():
+            fondo[0] = max(fondo[0], (box.position_y or 0) + (box.height or 0))
+        for c in getattr(box, 'children', None) or []:
+            rec(c, dentro)
+
+    pb = page._page_box
+    rec(pb, False)
+    return fondo[0] / (pb.height or page.height or 1)
+
+
+def _componer(doc):
+    from weasyprint import HTML
+
+    def comp(extra):
+        return HTML(string=doc.replace('</style>', extra + '</style>', 1),
+                    base_url=ROOT).render()
+
+    d = comp('')
+    try:
+        if len(d.pages) < 2 or _uso_pagina(d.pages[-1]) >= POCO:
+            return d
+    except Exception:                                            # noqa: BLE001
+        return d                         # si cambia la API interna, como antes
+    extra = ''
+    for nivel, css in enumerate(COMPACTAR, 1):
+        extra += css
+        c = comp(extra)
+        if len(c.pages) < len(d.pages):
+            print(f'[render] la última página llegaba casi vacía: compactado nivel {nivel}')
+            return c
+    print('[render] ⚠ la última página llega casi vacía y compactar no la ahorra')
+    return d
+
+
 def render(doc, out):
     os.makedirs(os.path.dirname(out) or '.', exist_ok=True)
     try:
-        from weasyprint import HTML
-        HTML(string=doc, base_url=ROOT).write_pdf(out)
+        _componer(doc).write_pdf(out)
         return 'weasyprint'
     except ImportError:
         pass
