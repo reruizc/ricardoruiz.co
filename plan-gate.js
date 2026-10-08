@@ -1,6 +1,8 @@
 /* plan-gate.js — gate por plan (anónimo · Básico · Pro · Premium) compartido.
  *
- * Extrae el bloque que veleta.html y oportunidad.html tenían duplicado inline.
+ * Extrae el bloque que veleta.html y oportunidad.html tenían duplicado inline
+ * (desde oct-2026 las dos lo usan, con su modal verde propio vía `modal:'gate'`).
+ * Lo usan también los tableros resultados-{jal,concejo,asamblea}-2023 y brujula-2027.
  * Todo vive dentro de un IIFE y solo se expone `window.PlanGate`, para no chocar
  * con constantes que las páginas ya declaran (PLAN_LABEL, etc.).
  *
@@ -16,6 +18,23 @@
  *
  * El modal (DOM + CSS) lo inyecta el propio script: la página no copia HTML.
  * Paleta del sistema visual v2 (fondo #060810, azul #0047FF); sin modo día.
+ *
+ * Opciones extra de GATE_FEATURES (todas opcionales; sin ellas todo sigue igual):
+ *   price:      { pro:{cop,sub}, premium:{cop,sub} }  texto del precio por plan
+ *   ctaUpgrade: 'Empezar con {plan}'                   botón principal si ya tiene cuenta
+ *                                                      (por defecto 'Pasar a {plan}')
+ *   modal:      'gate' | { overlay, tag, title, … }    usar el modal PROPIO de la página
+ *               en vez de inyectar el de aquí. 'gate' = los ids #gate-* que traen
+ *               veleta.html y oportunidad.html. En este modo no se inyecta CSS ni DOM
+ *               ni se enganchan eventos: el markup de la página llama a
+ *               PlanGate.close() · PlanGate.toggleLogin() · PlanGate.submitLogin(event).
+ *   onLogin:    async fn(plan, user)                   se espera tras el login del
+ *               modal y ANTES de cerrarlo (p. ej. refrescar contadores).
+ *
+ * requireOrSample(feat, key, max, opts) acepta un 4º argumento opcional:
+ *   opts.storageKey  llave completa de localStorage (en vez de 'gate-sample-'+key),
+ *                    para conservar contadores que la página ya tenía.
+ *   opts.blocked     feature cuyo texto se muestra al anónimo que ya gastó la muestra.
  */
 (function () {
   'use strict';
@@ -43,6 +62,34 @@
     return (cfg().copy || {})[feat] ||
       { title: 'Esta función está bloqueada', desc: 'Requiere un plan superior.' };
   }
+  function priceFor(plan) {
+    var o = cfg().price;
+    return (o && o[plan]) || PLAN_PRICE[plan];
+  }
+
+  /* Ids de cada pieza del modal. Por defecto, los del modal que inyecta este
+     script; con GATE_FEATURES.modal, los del modal que ya trae la página. */
+  var PG_IDS = {
+    overlay: 'pg-modal', tag: 'pg-tag', title: 'pg-title', desc: 'pg-desc',
+    price: 'pg-price', priceSub: 'pg-price-sub', cta: 'pg-cta', ctaLogin: 'pg-cta-login',
+    login: 'pg-login', email: 'pg-email', pw: 'pg-pw', err: 'pg-err', submit: 'pg-login-submit',
+  };
+  var GATE_IDS = {   // markup #gate-* de veleta.html y oportunidad.html
+    overlay: 'gate-modal', tag: 'gate-tag', title: 'gate-title', desc: 'gate-desc',
+    price: 'gate-price', priceSub: 'gate-price-sub', cta: 'gate-cta-primary', ctaLogin: 'gate-cta-login',
+    login: 'gate-login', email: 'gate-login-email', pw: 'gate-login-pw', err: 'gate-login-err',
+    submit: 'gate-login-submit',
+  };
+  function ownModal() { return !!cfg().modal; }
+  function ids() {
+    var m = cfg().modal;
+    if (!m) return PG_IDS;
+    if (m === 'gate' || m === true) return GATE_IDS;
+    var o = {};
+    for (var k in GATE_IDS) o[k] = m[k] || GATE_IDS[k];
+    return o;
+  }
+  function el(role) { return document.getElementById(ids()[role]); }
 
   function loadUserFromStorage() {
     try {
@@ -89,18 +136,21 @@
   }
 
   /* Muestra gratis para anónimos: N usos antes de exigir cuenta (patrón veleta). */
-  function sampleUsed(key) {
-    try { return parseInt(localStorage.getItem('gate-sample-' + key) || '0', 10) || 0; }
+  function sampleKey(key, opts) {
+    return (opts && opts.storageKey) || ('gate-sample-' + key);
+  }
+  function sampleUsed(key, opts) {
+    try { return parseInt(localStorage.getItem(sampleKey(key, opts)) || '0', 10) || 0; }
     catch (_) { return 0; }
   }
-  function sampleBump(key) {
-    try { localStorage.setItem('gate-sample-' + key, String(sampleUsed(key) + 1)); } catch (_) {}
+  function sampleBump(key, opts) {
+    try { localStorage.setItem(sampleKey(key, opts), String(sampleUsed(key, opts) + 1)); } catch (_) {}
   }
   /* true si puede seguir; consume una muestra cuando el plan no alcanza. */
-  function requireOrSample(feat, key, max) {
+  function requireOrSample(feat, key, max, opts) {
     if (has(feat)) return true;
-    if (_plan === 'anonymous' && sampleUsed(key) < (max || 1)) { sampleBump(key); return true; }
-    openModal(feat);
+    if (_plan === 'anonymous' && sampleUsed(key, opts) < (max || 1)) { sampleBump(key, opts); return true; }
+    openModal((_plan === 'anonymous' && opts && opts.blocked) || feat);
     return false;
   }
 
@@ -169,6 +219,8 @@
   function inject() {
     if (_injected) return;
     _injected = true;
+    // Modal propio de la página: su markup ya trae CSS y handlers inline.
+    if (ownModal()) return;
     var st = document.createElement('style');
     st.textContent = CSS;
     document.head.appendChild(st);
@@ -191,40 +243,42 @@
     var needed = planFor(feat);
     var c = copyFor(feat);
     var isAnon = _plan === 'anonymous';
-    document.getElementById('pg-tag').textContent =
-      isAnon ? 'Crea tu cuenta gratis' : 'Disponible en ' + (PLAN_LABEL[needed] || needed);
-    document.getElementById('pg-title').textContent = c.title;
-    document.getElementById('pg-desc').textContent  = c.desc;
-    var price = document.getElementById('pg-price');
-    var sub   = document.getElementById('pg-price-sub');
-    var p = PLAN_PRICE[needed];
+    var label = PLAN_LABEL[needed] || needed;
+    el('tag').textContent = isAnon ? 'Crea tu cuenta gratis' : 'Disponible en ' + label;
+    el('title').textContent = c.title;
+    el('desc').textContent  = c.desc;
+    var price = el('price');
+    var sub   = el('priceSub');
+    var p = priceFor(needed);
     // A un anónimo primero le pedimos cuenta (gratis); el precio solo confunde.
-    if (!isAnon && p) {
-      price.textContent = p.cop; sub.textContent = p.sub;
-      price.style.display = sub.style.display = '';
-    } else {
-      price.style.display = sub.style.display = 'none';
+    if (price && sub) {
+      if (!isAnon && p) {
+        price.textContent = p.cop; sub.textContent = p.sub;
+        price.style.display = sub.style.display = '';
+      } else {
+        price.style.display = sub.style.display = 'none';
+      }
     }
-    var cta = document.getElementById('pg-cta');
-    var login = document.getElementById('pg-cta-login');
+    var cta = el('cta');
+    var login = el('ctaLogin');
     if (isAnon) {
       cta.href = 'register.html';
       cta.textContent = 'Crear cuenta gratis';
-      login.style.display = '';
+      if (login) login.style.display = '';
     } else {
       cta.href = 'pricing.html';
-      cta.textContent = 'Pasar a ' + (PLAN_LABEL[needed] || needed);
-      login.style.display = 'none';
+      cta.textContent = (cfg().ctaUpgrade || 'Pasar a {plan}').replace('{plan}', label);
+      if (login) login.style.display = 'none';
     }
-    document.getElementById('pg-modal').classList.add('show');
+    el('overlay').classList.add('show');
   }
 
   function closeModal() {
-    var ov = document.getElementById('pg-modal');
+    var ov = el('overlay');
     if (ov) ov.classList.remove('show');
-    var form = document.getElementById('pg-login');
+    var form = el('login');
     if (form) { form.classList.remove('show'); form.reset(); }
-    var err = document.getElementById('pg-err');
+    var err = el('err');
     if (err) err.textContent = '';
     // El cursor custom del sitio queda "pegado" si el botón bajo el puntero
     // desaparece sin disparar mouseout (regla del proyecto).
@@ -234,20 +288,21 @@
   }
 
   function toggleLogin() {
-    var form = document.getElementById('pg-login');
+    var form = el('login');
     if (!form) return;
     form.classList.toggle('show');
     if (form.classList.contains('show')) {
-      setTimeout(function () { var e = document.getElementById('pg-email'); if (e) e.focus(); }, 30);
+      setTimeout(function () { var e = el('email'); if (e) e.focus(); }, 30);
     }
   }
 
   async function onInlineLogin(ev) {
-    ev.preventDefault();
-    var email = document.getElementById('pg-email');
-    var pw    = document.getElementById('pg-pw');
-    var err   = document.getElementById('pg-err');
-    var btn   = document.getElementById('pg-login-submit');
+    if (ev && ev.preventDefault) ev.preventDefault();
+    var email = el('email');
+    var pw    = el('pw');
+    var err   = el('err');
+    var btn   = el('submit');
+    if (!email || !pw) return false;
     err.textContent = '';
     btn.disabled = true;
     var prev = btn.textContent;
@@ -263,6 +318,9 @@
         localStorage.setItem('rr-user', JSON.stringify(data.user));
         _user = data.user;
         _plan = data.user.plan || 'free';
+        // Hook de la página (p. ej. refrescar contadores) antes de cerrar.
+        var hook = cfg().onLogin;
+        if (typeof hook === 'function') await hook(_plan, _user);
         closeModal();
         emit();
       } else {
@@ -294,6 +352,8 @@
     sampleUsed: sampleUsed,
     open: openModal,
     close: closeModal,
+    toggleLogin: toggleLogin,
+    submitLogin: onInlineLogin,
     onChange: onChange,
     refresh: async function () { await refreshUserFromAPI(); emit(); return _plan; },
     reset: function () { _user = null; _plan = 'anonymous'; emit(); },
