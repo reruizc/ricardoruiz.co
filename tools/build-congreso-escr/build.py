@@ -54,6 +54,18 @@ CFG = {
         '2014': {'NACIONAL': '0', 'INDIGENAS': '4'},
     },
 }
+CFG['camara'] = {
+    '2022': {'2': 'TERRITORIAL', '0': 'TERRITORIAL', '6': 'INDIGENAS', '5': 'AFRO-DESCENDIENTES'},   # 0 = Internacional
+    '2018': {'1': 'TERRITORIAL', '4': 'INDIGENAS', '5': 'AFRO-DESCENDIENTES'},
+    '2014': {'1': 'TERRITORIAL', '4': 'INDIGENAS', '5': 'AFRO-DESCENDIENTES'},
+}
+CAM_CIRCS = ('TERRITORIAL', 'INDIGENAS', 'AFRO-DESCENDIENTES')
+# Curules territoriales por departamento (igual 2014-2026, salvo el exterior: 2 hasta 2014, 1 desde 2018)
+CUR_DEP = {'60': 2, '01': 17, '40': 2, '03': 7, '16': 18, '05': 6, '07': 6, '09': 5, '44': 2, '46': 2, '11': 4,
+           '12': 4, '17': 2, '88': 1, '13': 5, '15': 7, '50': 2, '54': 2, '19': 4, '48': 2, '21': 5, '52': 3,
+           '23': 5, '25': 5, '64': 2, '26': 3, '24': 4, '56': 2, '27': 7, '28': 3, '29': 6, '31': 13, '68': 2,
+           '72': 2}
+CUR_ESP = {'INDIGENAS': 1, 'AFRO-DESCENDIENTES': 2}
 CIRC_META = {'NACIONAL': {'codigo': '0', 'curules': 100, 'umbral_pct': 0.03},
              'INDIGENAS': {'codigo': '4', 'curules': 2, 'umbral_pct': 0.0}}
 ESP = {'996': 'votblan', '997': 'votnul', '998': 'votnma', '999': 'votnma'}
@@ -72,6 +84,12 @@ LISTAS_MANUALES = {
         'CARLOS FELIPE MEJIA MEJIA', 'PAOLA ANDREA HOLGUIN MORENO', 'NOHORA STELLA TOVAR REY',
         'HONORIO MIGUEL HENRIQUEZ PINEDO'],
 }
+# Elegidos de listas cerradas de Cámara por (año, departamento, partido), en orden de lista.
+# Se llena desde camara_listas_cerradas.json (fuente anotada en ese archivo).
+_LC = Path(__file__).with_name('camara_listas_cerradas.json')
+_LCJ = json.loads(_LC.read_text()) if _LC.exists() else {}
+LISTAS_CAMARA = {tuple(k.split('|')): v for k, v in _LCJ.get('listas', {}).items()}
+LISTAS_AFRO = {tuple(k.split('|', 1)): v for k, v in _LCJ.get('afro', {}).items()}
 FECHA = {'2022': '13 de marzo de 2022', '2018': '11 de marzo de 2018', '2014': '9 de marzo de 2014'}
 
 # nombres de departamento iguales a los de 2026 (la página los casa con el GeoJSON)
@@ -174,7 +192,9 @@ def nodo_circ(c, nom_par, nom_can, con_cifra, circ):
     out = {'votval': votval, 'votblan': e.get('votblan', 0), 'votnul': e.get('votnul', 0),
            'votnma': e.get('votnma', 0)}
     out['votant'] = votval + out['votblan'] + out['votnul'] + out['votnma']
-    if con_cifra:
+    if con_cifra is None:          # Cámara: sus nodos no llevan cifra ni umbral
+        pass
+    elif con_cifra:
         meta = CIRC_META[circ]
         umbral = round(meta['umbral_pct'] * (votval + out['votblan']))
         _, cifra = dhondt(partidos, meta['curules'], umbral)
@@ -185,12 +205,13 @@ def nodo_circ(c, nom_par, nom_can, con_cifra, circ):
     return out
 
 
-def nodo(acc, nom_par, nom_can, con_cifra=False, **ident):
-    pc = {circ: nodo_circ(acc[circ], nom_par, nom_can, con_cifra, circ) for circ in ('NACIONAL', 'INDIGENAS') if circ in acc}
+def nodo(acc, nom_par, nom_can, con_cifra=False, circs=('NACIONAL', 'INDIGENAS'), **ident):
+    pc = {circ: nodo_circ(acc[circ], nom_par, nom_can, con_cifra, circ) for circ in circs if circ in acc}
     root = dict(ident)
     for k in ('votval', 'votblan', 'votnul', 'votnma', 'votant'):
         root[k] = sum(x[k] for x in pc.values())
-    root['cifra'] = root['umbral'] = 0
+    if con_cifra is not None:
+        root['cifra'] = root['umbral'] = 0
     partidos, candidatos = {}, {}
     for x in pc.values():
         for p, v in x['partidos'].items():
@@ -347,6 +368,215 @@ def senado(anio, mun_nom, pue_nom):
             print(f"     {p['curules']:3d}  {p['partido']}")
 
 
+# ─── Cámara ──────────────────────────────────────────────────────────────────
+def curules_camara(partidos, blancos, s):
+    """Art. 263: 1 curul → mayoría · 2 → cuociente con umbral del 30 % · 3+ → cifra repartidora con umbral
+    del 50 % del cuociente. El cuociente va sobre los válidos (listas + blanco)."""
+    vot = {p: v for p, v in partidos.items() if v > 0}
+    if not vot:
+        return {}
+    if s == 1:
+        return {max(vot, key=vot.get): 1}
+    q = (sum(vot.values()) + blancos) / s
+    if s == 2:
+        el = {p: v for p, v in vot.items() if v >= 0.3 * q}
+        cur = {p: int(v // q) for p, v in el.items()}
+        orden = sorted(el, key=lambda p: -(el[p] - cur[p] * q))
+        for i in range(s - sum(cur.values())):     # si solo una lista pasa el umbral, se queda con las dos
+            cur[orden[i % len(orden)]] += 1
+        return {p: n for p, n in cur.items() if n}
+    cur, _ = dhondt({p: v for p, v in vot.items() if v >= 0.5 * q}, s, 0)
+    return cur
+
+
+def curules_afro(partidos, blancos, anio):
+    """Afro (2 curules). 2014: umbral del 30 % (FUNECO, única lista que lo pasó, se quedó con las dos).
+    2018-2026: cuociente y mayor residuo sin umbral (así salen las declaratorias). Igual que la página."""
+    if anio == '2014':
+        return curules_camara(partidos, blancos, 2)
+    vot = {p: v for p, v in partidos.items() if v > 0}
+    if not vot:
+        return {}
+    q = (sum(vot.values()) + blancos) / 2
+    cur = {p: int(v // q) for p, v in vot.items()}
+    for p in sorted(vot, key=lambda p: -(vot[p] - cur[p] * q))[:max(0, 2 - sum(cur.values()))]:
+        cur[p] += 1
+    return {p: n for p, n in cur.items() if n}
+
+
+def slim(nodo_):
+    return {k: v for k, v in nodo_.items() if k not in ('candidatos', 'por_circunscripcion', 'puestos', 'mesas')}
+
+
+def camara(anio, mun_nom, pue_nom):
+    t0 = time.time()
+    cir = CFG['camara'][anio]
+    out = OUT / f'camara-{anio}'
+    tmp = TMP / f'camara-{anio}'
+    tmp.mkdir(parents=True, exist_ok=True)
+    for f in tmp.glob('*.tsv'):
+        f.unlink()
+    nom_par, nom_can, cod_par, catalogo = defaultdict(dict), defaultdict(dict), {}, {}
+    fhs = {}
+    with open(GCS / f'GCS_{anio}CON.csv', encoding='utf-8-sig', newline='') as fh:
+        rd = csv.reader(fh, delimiter=';')
+        next(rd)
+        for r in rd:
+            if r[2] != '2' or r[4] not in cir:
+                continue
+            circ = cir[r[4]]
+            dep = '88' if (anio == '2022' and r[4] == '0' and r[6] != '0') else r[6].zfill(2)
+            par, can = r[11], r[13]
+            if dep == '00':            # catálogo sin territorio (solo algunas listas, solo 2022)
+                if can not in ESP and can != '0':
+                    catalogo.setdefault((circ, r[12].strip()), {})[int(can)] = r[14].strip()
+                continue
+            nom_par[dep].setdefault((circ, par), r[12].strip())
+            cod_par[(dep, circ, r[12].strip())] = par.zfill(4)
+            if can not in ESP:
+                nom_can[dep].setdefault((circ, par, can), r[14].strip())
+            w = fhs.get(dep)
+            if w is None:
+                w = fhs[dep] = open(tmp / f'{dep}.tsv', 'w')
+            w.write('\t'.join((r[7].zfill(3), r[8].zfill(2), r[9].zfill(2), r[10].zfill(3), circ, par, can, r[15])) + '\n')
+    for w in fhs.values():
+        w.close()
+    print(f'  camara {anio}: partido en {len(fhs)} departamentos ({time.time() - t0:.0f} s)')
+
+    dep_entries, nac_circ = [], {c: {'votval': 0, 'votblan': 0, 'votnul': 0, 'votnma': 0, 'votant': 0} for c in CAM_CIRCS}
+    nac_part, nac_cand, especial = {}, defaultdict(list), {c: defaultdict(int) for c in ('INDIGENAS', 'AFRO-DESCENDIENTES')}
+    especial_cand, cerradas, pendientes = {c: defaultdict(list) for c in especial}, {'territorial': {}}, []
+    especial_blan = {c: 0 for c in especial}
+    esp_cand = defaultdict(lambda: defaultdict(int))
+    for dep in sorted(fhs):
+        NP, NC = nom_par[dep], nom_can[dep]
+        acc_dep, muns, coms, pues, mesas = {}, {}, {}, {}, {}
+        with open(tmp / f'{dep}.tsv') as f:
+            for line in f:
+                mun, zona, pue, mesa, circ, par, can, v = line.rstrip('\n').split('\t')
+                v = int(v)
+                com = comuna(dep, mun, zona)[0]
+                for acc in (acc_dep, muns.setdefault(mun, {}), coms.setdefault((mun, com), {}),
+                            pues.setdefault((mun, com, zona, pue), {}), mesas.setdefault((mun, com, zona, pue, mesa), {})):
+                    sumar(acc, circ, par, can, v)
+        dn = DEP_NOM.get(dep, dep)
+
+        def mn(m):
+            return mun_nom.get(f'{dep}-{m}') or f'MUNICIPIO {m}'
+
+        def pn(m, z, p):
+            return pue_nom.get(dep + m + z + p) or csvnames.rotulo_puesto(dep, m, z, p, dn, mn(m))
+
+        def N(a, **ident):
+            return nodo(a, NP, NC, None, CAM_CIRCS, **ident)
+
+        base = {'dep_cod': dep, 'dep_nom': dn}
+        com_nom = {(m, comuna(dep, m, z)[0]): comuna(dep, m, z)[1] for (m, _c, z, _p) in pues}
+        L_mun = []
+        (out / f'dep-{dep}').mkdir(parents=True, exist_ok=True)
+        # índices hijo por padre: recorrer todas las mesas por cada puesto era cuadrático (Bogotá: 15 min)
+        pues_por_com, mesas_por_pue = defaultdict(list), defaultdict(list)
+        for k in sorted(pues):
+            pues_por_com[k[:2]].append(k)
+        for k in sorted(mesas):
+            mesas_por_pue[k[:4]].append(k)
+        for m, am in sorted(muns.items()):
+            nm = N(am, **base, cod=m, nombre=mn(m))
+            nm['comunas'] = []
+            for (mm, c), ac in sorted(coms.items()):
+                if mm != m:
+                    continue
+                cn = com_nom[(m, c)]
+                ident_c = dict(**base, mun_cod=m, mun_nom=mn(m), cod=c, nombre=cn, com_cod=c, com_nom=cn)
+                nc = N(ac, **ident_c)
+                nc['puestos'] = []
+                nav = slim(nc)
+                nav['puestos'] = []
+                for (m2, c2, z, p) in pues_por_com[(m, c)]:
+                    ap = pues[(m2, c2, z, p)]
+                    pc = f'{c}-{z}-{p}'
+                    ident_p = dict(**base, mun_cod=m, mun_nom=mn(m), com_cod=c, com_nom=cn, zon_cod=z, cod=pc,
+                                   pue_cod=pc, pue_cod_raw=p, nombre=pn(m, z, p))
+                    np_ = N(ap, **ident_p)
+                    np_['mesas'] = [N(amz, **base, mun_cod=m, mun_nom=mn(m), com_cod=c, com_nom=cn, zon_cod=z,
+                                      cod=me, nombre=f'Mesa {me}', mesa=me, pue_cod=pc, pue_cod_raw=p, pue_nom=pn(m, z, p))
+                                    for (m3, c3, z3, p3, me) in mesas_por_pue[(m, c, z, p)] for amz in (mesas[(m3, c3, z3, p3, me)],)]
+                    nc['puestos'].append(np_)
+                    nav['puestos'].append(slim(np_))
+                escribe(out / f'dep-{dep}' / f'com-{m}-{c}.json', nc)
+                nm['comunas'].append(nav)
+            L_mun.append(nm)
+        nd = N(acc_dep, cod=dep, nombre=dn)
+        nd['municipios'] = L_mun
+        escribe(out / f'dep-{dep}.json', nd)
+        for circ, x in nd['por_circunscripcion'].items():
+            dep_entries.append({'cod': dep, 'nombre': dn, 'circ_nom': circ,
+                                **{k: x[k] for k in ('votval', 'votblan', 'votnul', 'votnma', 'votant')},
+                                'partidos': x['partidos'], 'candidatos': x['candidatos']})
+            for k in nac_circ[circ]:
+                nac_circ[circ][k] += x[k]
+            for pn_, v in x['partidos'].items():
+                e = nac_part.setdefault(pn_, {'partido': pn_, 'codigo': cod_par.get((dep, circ, pn_), ''), 'votos': 0})
+                e['votos'] += v
+            for pn_, l in x['candidatos'].items():
+                if circ in especial:     # nacional: el mismo candidato aparece en cada departamento → sumar
+                    for c in l:
+                        esp_cand[pn_][(c['nombre'], c.get('codigo', ''))] += c['votos']
+                else:
+                    nac_cand[pn_].extend(l)
+            if circ in especial:
+                especial_blan[circ] += x['votblan']
+                for pn_, v in x['partidos'].items():
+                    especial[circ][pn_] += v
+                for pn_, l in x['candidatos'].items():
+                    especial_cand[circ][pn_].extend(l)
+        # curules territoriales y listas cerradas de este departamento
+        t_ = nd['por_circunscripcion']['TERRITORIAL']
+        s = CUR_DEP[dep] if not (dep == '88' and anio == '2014') else 2
+        for pn_, n in curules_camara(t_['partidos'], t_['votblan'], s).items():
+            # ⚠ el catálogo (dep 00) de Cámara 2022 trae nombres sueltos SIN departamento: usarlo mezclaba
+            # la lista del Pacto de Bogotá con la de Antioquia. Las listas cerradas salen de LISTAS_CAMARA.
+            if not t_['candidatos'].get(pn_):
+                nombres = LISTAS_CAMARA.get((anio, dep, pn_))
+                if nombres and len(nombres) == n:
+                    cerradas['territorial'].setdefault(dep, {})[pn_] = nombres
+                else:
+                    pendientes.append({'circ': 'TERRITORIAL', 'dep': dep, 'dep_nom': dn, 'partido': pn_, 'curules': n,
+                                       'nombres_cargados': len(nombres or [])})
+    for circ, vot in especial.items():
+        cur = (curules_afro(dict(vot), especial_blan[circ], anio) if circ == 'AFRO-DESCENDIENTES'
+               else curules_camara(dict(vot), 0, CUR_ESP[circ]))
+        for pn_, n in cur.items():
+            if especial_cand[circ].get(pn_):
+                continue
+            nombres = LISTAS_AFRO.get((anio, pn_)) if circ == 'AFRO-DESCENDIENTES' else None
+            if nombres and len(nombres) == n:
+                cerradas.setdefault('afro', {})[pn_] = nombres
+            else:
+                pendientes.append({'circ': circ, 'partido': pn_, 'curules': n})
+    escribe(out / 'departamentos.json', sorted(dep_entries, key=lambda x: (x['nombre'], x['circ_nom'])))
+    partidos = sorted(nac_part.values(), key=lambda x: -x['votos'])
+    for e in partidos:
+        esp = [{'nombre': n, 'votos': v, 'codigo': c} for (n, c), v in esp_cand.get(e['partido'], {}).items()]
+        e['candidatos'] = sorted(nac_cand.get(e['partido'], []) + esp, key=lambda x: -x['votos'])
+    t_ = nac_circ['TERRITORIAL']
+    escribe(out / 'resumen.json', {
+        'corporacion': 'CAMARA', 'generado_en': datetime.now(timezone.utc).isoformat(), **t_,
+        'partidos': partidos, 'por_circunscripcion': nac_circ,
+        'fuente_nacional': f'Registraduría · consolidado del escrutinio (GCS) · elecciones del {FECHA[anio]}',
+        'nota_territorial': 'Departamento, municipio, puesto y mesa: el mismo consolidado del escrutinio.'})
+    escribe(out / 'listas_cerradas.json', cerradas)
+    escribe(out / 'listas_cerradas_pendientes.json', pendientes)
+    with open(out / 'censo.csv', 'w', newline='') as f:
+        w = csv.writer(f, delimiter=';')
+        w.writerow(['dd', 'mm', 'zz', 'pp', 'mujeres', 'hombres', 'total'])
+        w.writerows(censo_por_puesto(anio))
+    for f in tmp.glob('*.tsv'):
+        f.unlink()
+    print(f'  camara {anio}: listo en {time.time() - t0:.0f} s · territorial votantes {t_["votant"]:,} · '
+          f'listas cerradas resueltas {sum(len(v) for v in cerradas["territorial"].values())} · pendientes {len(pendientes)}')
+
+
 def censo_por_puesto(anio):
     """Censo de ESA elección por puesto (2018 y 2022); 2014 no tiene → la página muestra % de válidos."""
     f = BD / 'censos-registraduria' / f'{anio}_datos_censo-electoral-min.json'
@@ -364,11 +594,11 @@ def censo_por_puesto(anio):
 
 def main():
     corp, anios = sys.argv[1], sys.argv[2:]
-    if corp != 'senado':
-        raise SystemExit('por ahora: senado')
+    if corp not in ('senado', 'camara'):
+        raise SystemExit('uso: build.py senado|camara <año>…')
     mun_nom, pue_nom = cargar_nombres()
     for a in anios:
-        senado(a, mun_nom, pue_nom)
+        (senado if corp == 'senado' else camara)(a, mun_nom, pue_nom)
 
 
 if __name__ == '__main__':
