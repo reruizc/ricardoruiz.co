@@ -30,7 +30,7 @@
   // estado del formulario mientras está abierto. `deEmpresa` marca los sectores
   // que llegaron por la empresa y que la persona no ha tocado: si quita la
   // empresa, esos se van con ella; los que marcó a mano se quedan.
-  let F={sectores:[], deEmpresa:new Set(), empresa:null};
+  let F={paso:1, sectores:[], deEmpresa:new Set(), empresa:null};
   let _sug=[], _sugIdx=-1;
 
   const $=id=>document.getElementById(id);
@@ -96,9 +96,9 @@
     const c=$('introCuenta');
     if(c){
       const n=F.sectores.length;
-      c.textContent=n===0?'Elige uno o varios.':(n>=MAX_SEC?`Llegaste al máximo de ${MAX_SEC}. Quita uno para cambiarlo.`:`${n} ${n===1?'sector elegido':'sectores elegidos'} · puedes sumar hasta ${MAX_SEC}.`);
+      c.textContent=n===0?(F.paso===3?'Elige al menos uno para entrar.':'Elige uno o varios. Si no sabes cuál, sigue y dinos tu empresa.'):(n>=MAX_SEC?`Llegaste al máximo de ${MAX_SEC}. Quita uno para cambiarlo.`:`${n} ${n===1?'sector elegido':'sectores elegidos'} · puedes sumar hasta ${MAX_SEC}.`);
     }
-    const ok=$('introOk'); if(ok) ok.disabled=F.sectores.length===0;
+    pintarAcciones();
   }
   function toggleSec(k){
     const i=F.sectores.indexOf(k);
@@ -114,16 +114,22 @@
     const e=F.empresa;
     if(!e){ box.innerHTML=''; box.hidden=true; return; }
     box.hidden=false;
+    const ss=(e.x||[]).map(k=>esc(nombreSec(k))).join(' · ');
     const toca=(e.x||[]).length
-      ? `Toca ${e.x.length===1?'el sector':'los sectores'} <b>${e.x.map(k=>esc(nombreSec(k))).join(' · ')}</b>. Los marcamos arriba; quita los que no te sirvan.`
-      : (e.libre?'No está todavía en nuestro listado de empresas, así que no te sugerimos sector: márcalo arriba.'
-                :'No le asociamos un sector en particular: márcalo arriba.');
+      ? (F.paso===3
+          ? `Sumó ${e.x.length===1?'el sector':'los sectores'} <b>${ss}</b>. Quita abajo los que no te sirvan.`
+          : `Toca ${e.x.length===1?'el sector':'los sectores'} <b>${ss}</b>. Los vas a ver marcados en el siguiente paso.`)
+      : (e.libre?'Todavía no está en nuestro listado, así que no le sugerimos sector.'
+                :'No le asociamos un sector en particular.');
     box.innerHTML=`<div class="intro-emp-card">
       ${marca(e,'intro-logo')}
       <div class="intro-emp-txt"><div class="intro-emp-n">${esc(e.n)}${e.g?' <span class="intro-tag">gremio</span>':''}</div><div class="intro-emp-d">${toca}</div></div>
-      <button type="button" class="intro-x" id="introEmpX" aria-label="Quitar ${esc(e.n)}">×</button>
+      ${F.paso===3
+        ? '<button type="button" class="intro-link" id="introEmpCambiar">Cambiar</button>'
+        : `<button type="button" class="intro-x" id="introEmpX" aria-label="Quitar ${esc(e.n)}">×</button>`}
     </div>`;
-    $('introEmpX').onclick=()=>quitarEmpresa(true);
+    const x=$('introEmpX'); if(x) x.onclick=()=>quitarEmpresa(true);
+    const c=$('introEmpCambiar'); if(c) c.onclick=()=>irA(2);
   }
   function elegirEmpresa(e){
     quitarEmpresa(false);
@@ -132,12 +138,12 @@
       if(!F.sectores.includes(k) && F.sectores.length<MAX_SEC){ F.sectores.push(k); F.deEmpresa.add(k); }
     });
     const inp=$('introEmp'); if(inp) inp.value='';
-    cerrarSug(); pintarEmpresa(); pintarSectores();
+    cerrarSug(); pintarEmpresa(); pintarSectores(); pintarAcciones();
   }
   function quitarEmpresa(repintar){
     F.sectores=F.sectores.filter(k=>!F.deEmpresa.has(k));
     F.deEmpresa.clear(); F.empresa=null;
-    if(repintar){ pintarEmpresa(); pintarSectores(); const i=$('introEmp'); if(i) i.focus(); }
+    if(repintar){ pintarEmpresa(); pintarSectores(); pintarAcciones(); const i=$('introEmp'); if(i) i.focus(); }
   }
 
   function cerrarSug(){ const l=$('introSug'); if(l){ l.hidden=true; l.innerHTML=''; } _sug=[]; _sugIdx=-1; const i=$('introEmp'); if(i) i.setAttribute('aria-expanded','false'); }
@@ -166,50 +172,119 @@
     const on=l.querySelector('li.on'); if(on) on.scrollIntoView({block:'nearest'});
   }
 
-  function pintarFormulario(){
-    const box=$('intro'); if(!box) return;
-    box.innerHTML=`<div class="intro-card">
-      <div class="home-eyebrow">Antes de empezar · menos de un minuto</div>
-      <h1 id="introT">¿En qué <em>sector</em> está tu organización?</h1>
-      <p class="intro-lead">Así Caudal te muestra primero lo que te toca. Puedes elegir varios: una empresa como Uber está a la vez en transporte, trabajo y consumo.</p>
-      <div class="intro-secs" id="introSecs" role="group" aria-labelledby="introT"></div>
-      <div class="intro-cuenta" id="introCuenta" aria-live="polite"></div>
+  /* ---------- los tres pasos ----------
+     Una pregunta por pantalla, con transición y con «Volver» en cada una: quien
+     se equivoca de sector o de empresa retrocede sin perder lo demás. El tercer
+     paso existe porque la empresa SUMA sectores: ahí se ve el resultado y se
+     corrige antes de entrar. */
+  const PASOS=[
+    {t:'Tu sector', h:'¿En qué <em>sector</em> está tu organización?',
+     p:'Puedes elegir varios: una empresa como Uber está a la vez en transporte, trabajo y consumo.',
+     // para qué le sirve: lo que Caudal de verdad hace con el sector, nada más
+     por:{t:'Para qué te sirve', l:[
+       ['Congreso','los proyectos de ley que tocan tu sector y en qué va cada uno'],
+       ['Ejecutivo y reguladores','decretos, resoluciones, circulares y sanciones de las superintendencias'],
+       ['Contratación','los contratos del Estado y los procesos abiertos en tu sector'],
+       ['Consultas públicas','las normas en consulta donde todavía puedes opinar'],
+       ['Prensa','lo que se está diciendo de tu sector en medios nacionales y regionales'],
+       ['Tu radar','la Rosa de los Vientos de tu sector, con lo que se movió en los últimos tres días']]}},
+    {t:'Tu empresa', h:'¿Qué <em>empresa</em> u organización es?',
+     p:'Es opcional. Si nos lo dices, sumamos los sectores que toca y la búsqueda arranca por ella.',
+     por:{t:'Para qué te sirve', l:[
+       ['Su nombre propio','buscamos tu empresa con nombre propio en sanciones, contratos y prensa, no solo el tema'],
+       ['Lo que el Estado no nombra','el Congreso no escribe «Uber» sino «plataformas de transporte»: traducimos la marca a esos temas'],
+       ['Varios sectores','si tu empresa está en más de un sector, los sumamos para que no se te escape ninguno']]}},
+    {t:'Confirmar', h:'Esto es lo que vas a ver <em>primero</em>.',
+     p:'Revisa los sectores antes de entrar. Si algo no va, quítalo aquí o vuelve al paso que quieras.'},
+  ];
 
-      <h2 class="intro-h2" id="introEmpT">¿Qué empresa u organización es? <span>opcional</span></h2>
-      <p class="intro-lead">Si nos lo dices, marcamos los sectores que toca y la búsqueda arranca por ella.</p>
-      <div class="intro-emp">
+  function pintarAcciones(){
+    const box=$('introAcc'); if(!box) return;
+    const sinSec=F.sectores.length===0;
+    if(F.paso===1){
+      // sin sector también se puede seguir: quien solo sabe su empresa la dice
+      // en el paso 2 y de ahí salen los sectores
+      box.innerHTML=`<button type="button" class="intro-ok" id="introSig">Siguiente →</button>
+        <button type="button" class="intro-skip" id="introSkip">Prefiero ver todo</button>`;
+      $('introSig').onclick=()=>irA(2); $('introSkip').onclick=saltar;
+    }else if(F.paso===2){
+      box.innerHTML=`<button type="button" class="intro-back" id="introAtras">← Volver</button>
+        <button type="button" class="intro-ok" id="introSig">${F.empresa?'Siguiente →':'Seguir sin empresa →'}</button>`;
+      $('introAtras').onclick=()=>irA(1); $('introSig').onclick=()=>irA(3);
+    }else{
+      box.innerHTML=`<button type="button" class="intro-back" id="introAtras">← Volver</button>
+        <button type="button" class="intro-ok" id="introOk"${sinSec?' disabled':''}>Ver Caudal para mi sector →</button>`;
+      $('introAtras').onclick=()=>irA(2); $('introOk').onclick=confirmar;
+    }
+  }
+
+  function pintarPaso(dir){
+    const box=$('intro'); if(!box) return;
+    const P=PASOS[F.paso-1];
+    const pasos=PASOS.map((x,i)=>{
+      const n=i+1, hecho=n<F.paso, act=n===F.paso;
+      // los pasos ya hechos son clicables: volver a cualquiera, no solo al anterior
+      return hecho
+        ? `<button type="button" class="intro-dot hecho" data-p="${n}">${n} · ${esc(x.t)}</button>`
+        : `<span class="intro-dot${act?' act':''}"${act?' aria-current="step"':''}>${n} · ${esc(x.t)}</span>`;
+    }).join('<span class="intro-dot-sep" aria-hidden="true"></span>');
+    let cuerpo='';
+    if(F.paso===1) cuerpo=`<div class="intro-secs" id="introSecs" role="group" aria-labelledby="introT"></div>
+      <div class="intro-cuenta" id="introCuenta" aria-live="polite"></div>`;
+    else if(F.paso===2) cuerpo=`<div class="intro-emp">
         <input id="introEmp" type="search" autocomplete="off" placeholder="Escribe el nombre: Uber, Ecopetrol, Bancolombia, ANDI…"
-          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="introSug" aria-labelledby="introEmpT" />
+          role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="introSug" aria-labelledby="introT" />
         <ul class="intro-sug" id="introSug" role="listbox" hidden></ul>
       </div>
-      <div id="introEmpSel" hidden></div>
-
-      <div class="intro-acc">
-        <button type="button" class="intro-ok" id="introOk" disabled>Ver Caudal para mi sector →</button>
-        <button type="button" class="intro-skip" id="introSkip">Prefiero ver todo</button>
+      <div id="introEmpSel" hidden></div>`;
+    else cuerpo=`<div id="introEmpSel" hidden></div>
+      ${F.empresa?'':'<p class="intro-lead intro-sin-emp">Sin empresa. <button type="button" class="intro-link" id="introAddEmp">Agregar una</button></p>'}
+      <h2 class="intro-h2">Tus sectores</h2>
+      <div class="intro-secs" id="introSecs" role="group" aria-label="Tus sectores"></div>
+      <div class="intro-cuenta" id="introCuenta" aria-live="polite"></div>`;
+    box.innerHTML=`<div class="intro-card">
+      <div class="intro-pasos" role="navigation" aria-label="Pasos">${pasos}</div>
+      <div class="intro-paso ${dir<0?'atras':'adelante'}">
+        <h1 id="introT">${P.h}</h1>
+        <p class="intro-lead">${P.p}</p>
+        ${cuerpo}
+        ${P.por?`<div class="intro-porque"><div class="intro-porque-t">${esc(P.por.t)}</div><ul>${P.por.l.map(([a,b])=>`<li><b>${esc(a)}</b> · ${esc(b)}</li>`).join('')}</ul></div>`:''}
+        <div class="intro-acc" id="introAcc"></div>
       </div>
       <p class="intro-nota">Se guarda solo en este navegador y lo puedes cambiar cuando quieras.</p>
     </div>`;
-    const inp=$('introEmp');
-    let t=null;
-    inp.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(()=>pintarSug(inp.value),90); });
-    inp.addEventListener('keydown',e=>{
-      if(e.key==='ArrowDown'){ e.preventDefault(); moverSug(1); }
-      else if(e.key==='ArrowUp'){ e.preventDefault(); moverSug(-1); }
-      else if(e.key==='Enter'){ e.preventDefault(); if(_sug.length) elegirEmpresa(_sug[_sugIdx>=0?_sugIdx:0]); }
-      else if(e.key==='Escape'){ cerrarSug(); }
-    });
-    inp.addEventListener('blur',()=>setTimeout(cerrarSug,120));
-    $('introOk').onclick=confirmar;
-    $('introSkip').onclick=saltar;
-    pintarSectores(); pintarEmpresa();
+    box.querySelectorAll('.intro-dot.hecho').forEach(b=>{ b.onclick=()=>irA(+b.dataset.p); });
+    const add=$('introAddEmp'); if(add) add.onclick=()=>irA(2);
+    if(F.paso===2){
+      const inp=$('introEmp');
+      let t=null;
+      inp.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(()=>pintarSug(inp.value),90); });
+      inp.addEventListener('keydown',e=>{
+        if(e.key==='ArrowDown'){ e.preventDefault(); moverSug(1); }
+        else if(e.key==='ArrowUp'){ e.preventDefault(); moverSug(-1); }
+        else if(e.key==='Enter'){ e.preventDefault(); if(_sug.length) elegirEmpresa(_sug[_sugIdx>=0?_sugIdx:0]); }
+        else if(e.key==='Escape'){ cerrarSug(); }
+      });
+      inp.addEventListener('blur',()=>setTimeout(cerrarSug,120));
+    }
+    if(F.paso!==2) pintarSectores();
+    pintarEmpresa(); pintarAcciones();
+  }
+
+  function irA(n){
+    const dir=n<F.paso?-1:1;
+    F.paso=n; cerrarSug();
+    pintarPaso(dir);
+    window.scrollTo({top:0,behavior:'instant'});
+    const h=$('introT'); if(h){ h.setAttribute('tabindex','-1'); h.focus({preventScroll:true}); }
+    if(n===2){ const i=$('introEmp'); if(i && !F.empresa) setTimeout(()=>i.focus({preventScroll:true}),260); }
   }
 
   /* ---------- mostrar / ocultar ---------- */
   function mostrar(){
     const home=$('view-home'), box=$('intro'); if(!home||!box) return;
     const prev=leer();
-    F={sectores:(prev&&prev.sectores||[]).slice(), deEmpresa:new Set(), empresa:prev&&prev.empresa||null};
+    F={paso:1, sectores:(prev&&prev.sectores||[]).slice(), deEmpresa:new Set(), empresa:prev&&prev.empresa||null};
     home.classList.add('intro-on'); box.hidden=false;
     box.innerHTML='<div class="intro-card"><div class="home-eyebrow">Antes de empezar</div><p class="intro-lead">Cargando los sectores…</p></div>';
     window.scrollTo({top:0,behavior:'instant'});
@@ -219,7 +294,7 @@
       // al reabrir, los sectores que coinciden con la empresa guardada vuelven a
       // contar como suyos: si la quita, se van con ella
       if(F.empresa) (F.empresa.x||[]).forEach(k=>{ if(F.sectores.includes(k)) F.deEmpresa.add(k); });
-      pintarFormulario();
+      F.paso=1; pintarPaso(1);
       const h=$('introT'); if(h){ h.setAttribute('tabindex','-1'); h.focus({preventScroll:true}); }
     }).catch(()=>{
       // sin el listado la pregunta no tiene sentido: se deja pasar a la portada
