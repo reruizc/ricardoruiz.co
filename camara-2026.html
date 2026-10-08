@@ -483,12 +483,12 @@
               <div class="umbral-label">Curules totales asignadas</div>
               <div class="umbral-val" id="curules-total">—</div>
               <div class="umbral-label" style="margin-top:.5rem">Método</div>
-              <div class="umbral-val" id="metodo-txt" style="font-size:.65rem">D'Hondt por circunscripción · umbral 3%</div>
+              <div class="umbral-val" id="metodo-txt" style="font-size:.65rem">Cifra repartidora por circunscripción · umbral 50% del cuociente</div>
               <div id="dep-cifras" style="display:none">
                 <div style="height:1px;background:var(--border);margin:.75rem 0"></div>
                 <div class="umbral-label">Cifra repartidora</div>
                 <div class="umbral-val" id="cifra-val">—</div>
-                <div class="umbral-label" style="margin-top:.5rem">Umbral (3%)</div>
+                <div class="umbral-label" style="margin-top:.5rem">Umbral (50% cuociente)</div>
                 <div class="umbral-val" id="umbral-dep-val">—</div>
               </div>
             </div>
@@ -697,8 +697,12 @@
       return {cur};
     }
 
-    // Art. 263 C.P.: 1 curul → mayoría; 2 curules → cuociente electoral umbral 30%; 3+ → D'Hondt umbral 3%
-    function asignarCurules(partidos_votos, curules) {
+    // Art. 263 C.P.: 1 curul → mayoría; 2 curules → cuociente electoral, umbral 30% del cuociente;
+    // 3+ → cifra repartidora, umbral 50% del cuociente. El cuociente se calcula sobre los válidos
+    // (listas + voto en blanco): `blancos` es opcional porque no todos los llamadores lo tienen.
+    // Antes el umbral de 3+ era el 3% de los votos por listas: en 2026 da lo mismo en todos los
+    // departamentos, pero en Risaralda 2014/2018/2022 y Quindío 2022 asignaba una curul de más.
+    function asignarCurules(partidos_votos, curules, blancos=0) {
       const eleg0 = Object.entries(partidos_votos).filter(([p,v])=>v>0&&!/blanco/i.test(p));
       if(!eleg0.length) return {cur:{}, cifra:0, umbral:0, metodo:'—'};
       if(curules === 1){
@@ -706,7 +710,7 @@
         return {cur:{[win[0]]:1}, cifra:win[1], umbral:0, metodo:'Mayoría simple · 1 curul'};
       }
       if(curules === 2){
-        const total = eleg0.reduce((s,[,v])=>s+v,0);
+        const total = eleg0.reduce((s,[,v])=>s+v,0) + (blancos||0);
         const cuociente = total / 2;
         const umb30 = cuociente * 0.30;
         const eleg = eleg0.filter(([,v])=>v>=umb30);
@@ -717,7 +721,10 @@
             .slice(0,restantes).forEach(({p})=>cur[p]++);
         return {cur, cifra:Math.round(cuociente), umbral:Math.round(umb30), metodo:'Cuociente electoral · umbral 30%'};
       }
-      return {...dhondtDep(partidos_votos, curules), metodo:`D'Hondt · umbral 3%`};
+      const validos = eleg0.reduce((s,[,v])=>s+v,0) + (blancos||0);
+      const umbral = validos / curules * 0.5;
+      const elegibles = Object.fromEntries(eleg0.filter(([,v])=>v>=umbral));
+      return {...dhondtDep(elegibles, curules, 0), umbral:Math.round(umbral), metodo:`Cifra repartidora · umbral 50% del cuociente`};
     }
 
     // ─── CACHE ────────────────────────────────────────────────
@@ -822,7 +829,7 @@
           const tipo = getDepCirc(dep);
           if(tipo === 'TERRITORIAL'){
             const nCurules = getCurulesDep(dep.nombre);
-            const { cur } = asignarCurules(dep.partidos||{}, nCurules);
+            const { cur } = asignarCurules(dep.partidos||{}, nCurules, dep.votblan);
             Object.entries(cur).forEach(([p,v])=>{ curulesNac[p]=(curulesNac[p]||0)+v; });
           } else if(tipo === 'INDIGENAS'){
             Object.entries(dep.partidos||{}).forEach(([p,v])=>{ _votosInd[p]=(_votosInd[p]||0)+v; });
@@ -841,7 +848,7 @@
         // ── Construir nacElegidos desde candidatos de departamentos.json ──
         const _nNorm = s=>s.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
         deps.filter(d=>getDepCirc(d)==='TERRITORIAL').forEach(dep=>{
-          const {cur:_cf}=asignarCurules(dep.partidos||{},getCurulesDep(dep.nombre));
+          const {cur:_cf}=asignarCurules(dep.partidos||{},getCurulesDep(dep.nombre),dep.votblan);
           Object.entries(dep.candidatos||{}).forEach(([partido,cands])=>{
             const nC=_cf[partido]||0; if(!nC) return;
             const nomPart=_nNorm(partido); let r=nC;
@@ -909,7 +916,7 @@
       document.getElementById('kpi-row').innerHTML=`
         <div class="kpi-card"><div class="kpi-label">Votantes</div><div class="kpi-val wh">${fmt(va)}</div><div class="kpi-delta">${depNom?depNom:'Nacional'}</div></div>
         <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val gr">${fmt(vv)}</div><div class="kpi-delta">${pct(vv,va)}% de los votantes</div></div>
-        <div class="kpi-card"><div class="kpi-label">Curules asignadas</div><div class="kpi-val">${cTotal} / ${maxC}</div><div class="kpi-delta">D'Hondt · umbral 3% · ${depNom?'esta circ.':'suma circ.'}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Curules asignadas</div><div class="kpi-val">${cTotal} / ${maxC}</div><div class="kpi-delta">Cifra repartidora · umbral 50% del cuociente · ${depNom?'esta circ.':'suma circ.'}</div></div>
         <div class="kpi-card"><div class="kpi-label">Partido puntero</div><div class="kpi-val sm">${topP?topP[0].split(' ').slice(0,3).join(' '):'—'}</div><div class="kpi-delta">${topP?topP[1]+' curules':''}</div></div>`;
       document.getElementById('curules-total').textContent = `${cTotal} de ${maxC}`;
     }
@@ -1072,7 +1079,7 @@
         if(val === 'AFRO-DESCENDIENTES')      _mt.textContent = "Cuociente electoral · umbral 30% · circunscripción nacional (2 curules)";
         else if(val === 'INDIGENAS')           _mt.textContent = "Mayoría simple · circunscripción nacional (1 curul)";
         else if(val === 'RESULTADOS_GENERALES')_mt.textContent = "Mapa y hemiciclo por departamento";
-        else                                   _mt.textContent = "D'Hondt por circunscripción · umbral 3%";
+        else                                   _mt.textContent = "Cifra repartidora por circunscripción · umbral 50% del cuociente";
       }
       const isRG = val === 'RESULTADOS_GENERALES';
       _rgMode = isRG;
@@ -1537,7 +1544,7 @@
       } else if(curCorp === 'INDIGENAS'){
         curFrozen = curulesIndigenas; cifraVal = 0; umbralVal = 0;
       } else {
-        ({ cur: curFrozen, cifra: cifraVal, umbral: umbralVal } = asignarCurules(depPartidosVotos, nCurules));
+        ({ cur: curFrozen, cifra: cifraVal, umbral: umbralVal } = asignarCurules(depPartidosVotos, nCurules, depCirc.votblan));
       }
       curDepCurules = curFrozen;
       const totalCurules = Object.values(curFrozen).reduce((s,v)=>s+v,0);
@@ -1570,7 +1577,7 @@
         const _lCifra = document.querySelector('#dep-cifras .umbral-label');
         const _lUmb   = document.querySelectorAll('#dep-cifras .umbral-label')[1];
         if(_lCifra) _lCifra.textContent = nCurules===2 ? 'Cuociente electoral' : nCurules===1 ? 'Votos (mayoría)' : 'Cifra repartidora';
-        if(_lUmb)   _lUmb.textContent   = nCurules===2 ? 'Umbral (30% cuociente)' : nCurules===1 ? '—' : 'Umbral (3%)';
+        if(_lUmb)   _lUmb.textContent   = nCurules===2 ? 'Umbral (30% cuociente)' : nCurules===1 ? '—' : 'Umbral (50% cuociente)';
         document.getElementById('cifra-val').textContent = fmt(cifraVal);
         document.getElementById('umbral-dep-val').textContent = nCurules===1 ? '—' : fmt(umbralVal);
       }
@@ -1958,7 +1965,7 @@
         if(!dep){ return _rgRenderHemicicloForDep(_rgCamFilter.depCod); }
         const nC=getCurulesDep(dep.nombre);
         // Reparto según reglas del art. 263 C.P. (usando asignarCurules, idéntico a TERRITORIAL)
-        const {cur}=asignarCurules(_rgCamFilter.partidos||{}, nC);
+        const {cur}=asignarCurules(_rgCamFilter.partidos||{}, nC, _rgCamFilter.votblan);
         const curMap = {};
         Object.entries(cur||{}).forEach(([p,n])=>{ if(n>0) curMap[p]=n; });
         // Para WHAT IF no tenemos candidatos elegidos reales del territorio pequeño;
@@ -1992,7 +1999,7 @@
         const nC=getCurulesDep(dep.nombre);
         let depData=null; try{ depData=await getJSON('dep-'+depCod); }catch(_){}
         const depCirc=(depData||dep).por_circunscripcion?.['TERRITORIAL']??(depData||dep);
-        const {cur}=asignarCurules(depCirc.partidos||{}, nC);
+        const {cur}=asignarCurules(depCirc.partidos||{}, nC, depCirc.votblan);
         // Para el dep-level usamos datos del dep (más ricos que los del listing)
         const depForNames={cod:dep.cod, nombre:dep.nombre, candidatos:depCirc.candidatos||dep.candidatos||{}};
         const winners=_buildWinnerNamesDep(depForNames, cur);
@@ -2032,7 +2039,7 @@
         // Territorial: un dep a la vez
         deps.filter(d=>getDepCirc(d)==='TERRITORIAL').forEach(dep=>{
           const nC=getCurulesDep(dep.nombre);
-          const {cur}=asignarCurules(dep.partidos||{}, nC);
+          const {cur}=asignarCurules(dep.partidos||{}, nC, dep.votblan);
           Object.entries(cur).forEach(([partido,n])=>{
             if(!n) return;
             if(!out[partido]) out[partido]=[];
