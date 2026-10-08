@@ -70,6 +70,14 @@ CONTROL = {
     ('2018', '1v'): {'IVAN DUQUE': 7616857, 'GUSTAVO PETRO': 4855069},
     ('2022', '2v'): {'GUSTAVO PETRO': 11292758, 'RODOLFO HERNANDEZ': 10604656},
 }
+# 2010 y 2014: las cifras que ya cuadraron al voto en build_pres_historico.py (CLAUDE.md), con
+# el nombre tal como viene en cada archivo (no es igual entre años: en 2014 1V «Calderon» va
+# sin tilde). 2014-1V no va: el GCS es un corte de escrutinio, no el boletín.
+CONTROL.update({
+    ('2010', '1v'): {'JUAN MANUEL SANTOS CALDERÓN': 6802043, 'AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS': 3134222},
+    ('2010', '2v'): {'JUAN MANUEL SANTOS CALDERÓN': 9028943, 'AURELIJUS RUTENIS ANTANAS MOCKUS SIVICKAS': 3587975},
+    ('2014', '2v'): {'JUAN MANUEL SANTOS CALDERON': 7839342, 'OSCAR IVAN ZULUAGA': 6917001},
+})
 
 
 def title(s):
@@ -141,14 +149,21 @@ def leer_vuelta(path, acc, clave):
     crudo = 0
     with open(path, encoding='utf-8-sig', errors='replace') as f:
         rd = csv.reader(f, delimiter=';')
-        next(rd, None)
+        cab = [c.strip() for c in next(rd, [])]
+        # ⚠ las columnas se ubican por NOMBRE: el orden cambia entre archivos, incluso dentro
+        # de un mismo año (2010 1V trae la geografía en las columnas 2-5 y la 2V en 6-9).
+        try:
+            i_dep, i_mun, i_zon, i_pue = (cab.index(c) for c in ('COD_DDE', 'COD_MME', 'COD_ZZ', 'COD_PP'))
+            i_can, i_des, i_vot = (cab.index(c) for c in ('COD_CAN', 'DES_CAN', 'NUM_VOT'))
+        except ValueError:
+            sys.exit(f'encabezado inesperado en {os.path.basename(path)}: {cab}')
         for r in rd:
             if len(r) < 16:
                 continue
-            dep, mun, zon, pue = to2(r[6]), to3(r[7]), to2(r[8]), to2(r[9])
-            can, des = r[13].strip(), norm_cand(r[14])
+            dep, mun, zon, pue = to2(r[i_dep]), to3(r[i_mun]), to2(r[i_zon]), to2(r[i_pue])
+            can, des = r[i_can].strip(), norm_cand(r[i_des])
             try:
-                v = int(r[15])
+                v = int(r[i_vot])
             except ValueError:
                 continue
             if not v:
@@ -316,7 +331,7 @@ def build(anio):
 
 if __name__ == '__main__':
     args = sys.argv[1:] or ['todos']
-    anios = ['2018', '2022'] if args[0] == 'todos' else args
+    anios = ['2010', '2014', '2018', '2022', '2026'] if args[0] == 'todos' else args
     for a in anios:
         print(f'\n=== PRESIDENCIAL {a} ===')
         build(a)

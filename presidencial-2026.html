@@ -370,12 +370,17 @@
     const _normC = c => String(Number(c));
     const _normN = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
     const _to2   = v => v!=null && v!=='' ? String(parseInt(v,10)||0).padStart(2,'0') : '';
-    const titleCase = s => String(s||'').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()).replace(/\bD\.c\./g,'D.C.');
+    // ⚠ \b\w no conoce las tildes: «CALDERÓN» salía «CalderóN». Se capitaliza al inicio de cada palabra.
+    const titleCase = s => String(s||'').toLowerCase().replace(/(^|[\s\-(«"])(\p{L})/gu,(m,a,c)=>a+c.toUpperCase()).replace(/\bD\.c\./g,'D.C.');
     function shortLast(nombre){
       // Toma las últimas 2 palabras del nombre completo: "Roy Leonardo Barreras Montealegre" → "Barreras Montealegre"
       const parts = String(nombre||'').trim().split(/\s+/);
       if(parts.length<=2) return titleCase(nombre);
-      return titleCase(parts.slice(-2).join(' '));
+      // las partículas van con el apellido: «Abelardo De La Espriella» → «De La Espriella», no «La Espriella»
+      const PART = /^(de|del|la|las|los|y)$/i;
+      let i = parts.length - 2;
+      if(PART.test(parts[i])) while(i > 1 && PART.test(parts[i-1])) i--;
+      return titleCase(parts.slice(i).join(' '));
     }
     function lighten(hex, pct){ // pct 0..1
       const h = hex.replace('#',''); const n = parseInt(h,16);

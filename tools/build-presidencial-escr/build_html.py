@@ -14,6 +14,8 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 CHASIS = os.path.join(RAIZ, 'consultas-escr-2026.html')
 
 ANIOS = {
+    '2010': {'fecha1v': '30 May 2010', 'fecha2v': '20 Jun 2010'},
+    '2014': {'fecha1v': '25 May 2014', 'fecha2v': '15 Jun 2014'},
     '2018': {'fecha1v': '27 May 2018', 'fecha2v': '17 Jun 2018'},
     '2022': {'fecha1v': '29 May 2022', 'fecha2v': '19 Jun 2022'},
     # 2026: escrutinio de las comisiones (mesa a mesa) + exterior del preconteo. Conserva el
