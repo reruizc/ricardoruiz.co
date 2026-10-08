@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
 <link href="caudal-base.css?v=20260915-word" rel="stylesheet" />
 <link rel="stylesheet" href="caudal-ui.css?v=20260913a" />
+<link rel="stylesheet" href="caudal-intro.css?v=20261008a" />
 <script>
   /* Contratación dejó de ser una vista de acá (sep-2026) y tiene página propia.
      Va en el <head> y no en initHome para que un enlace viejo a #contratacion
@@ -58,10 +59,13 @@
   <main class="wrap" id="app" tabindex="-1" hidden>
     <!-- ===== HOME · paraguas ===== -->
     <div id="view-home">
+      <!-- la pregunta de entrada (caudal-intro.js): sector y, si quiere, empresa -->
+      <section class="intro" id="intro" hidden aria-labelledby="introT"></section>
       <div class="hero home-hero">
         <h1>Para navegar la <em>complejidad</em>.</h1>
         <div class="home-eyebrow">Tu punto de partida · Caudal × Cauce</div>
         <p>Busca un tema, una entidad o un sector. Cruza seis fuentes en una sola consulta y encuentra la señal que necesitas.</p>
+        <div class="intro-strip" id="introStrip" hidden></div>
         <div class="search">
           <input id="hq" aria-label="Tema, entidad o sector" type="search" placeholder="¿Qué necesitas seguir?" autocomplete="off" />
           <button id="hgo">Buscar</button>
@@ -330,6 +334,7 @@
 <script src="caudal-contratacion.js?v=20260907"></script>
 <script src="caudal-cliente.js?v=20260916-fable"></script>
 <script src="caudal-votos.js?v=20260907"></script>
+<script src="caudal-intro.js?v=20261008c"></script>
 <script>
 (function(){
   'use strict';
@@ -1351,6 +1356,8 @@
     // SUCOP abiertas, con cada tema verificado contra el propio Caudal. Si el
     // JSON no llega, quedan los ejemplos fijos de arriba: nunca una caja vacía.
     pintarTemasDelMomento();
+    // la pregunta de sector y empresa: solo si entra a la portada sin destino
+    if(typeof window.introInit==='function') window.introInit();
     const temaInicial=(new URLSearchParams(location.search).get('tema')||'').trim();
     if(temaInicial) uniSearch(temaInicial);
     const uq=document.getElementById('uq'), ugo=document.getElementById('ugo');
@@ -1860,7 +1867,7 @@
      Los hooks de las vistas que se fueron (regLoadStats, cliInit, bancLoad…)
      los publica ahora su propio archivo. */
   Object.assign(window, {
-    initHome, loadStats, radLoad,
+    initHome, loadStats, radLoad, uniSearch,
     esc, fmt, cortar, listaConMuro, muroLista, muroLectura, mailtoHref,
     shortTitle, infoIcon, pcolor, CONTACTO_MAIL,
     RES_COLOR, RES_TXT, EMP_COLOR, EMP_TXT, EMP_INFO, EMBUDO_INFO,
