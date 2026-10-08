@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Elecciones atípicas · Ricardo Ruiz</title>
+  <meta name="description" content="Resultados oficiales de las elecciones atípicas de alcalde y gobernador 2025-2026, del escrutinio de la Registraduría: por candidato, por puesto y con la participación sobre el censo de cada elección." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <style>
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-display:swap; }
+    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-display:swap; }
+    :root{
+      --bg:#060810; --ink:#f4f3ef; --dim:rgba(244,243,239,.55); --faint:rgba(244,243,239,.32);
+      --card:rgba(10,10,16,.75); --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.14);
+      --blue:#0047FF; --blue2:#3d6fff; --green:#4ade80; --warn:#f0c040;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--ink);font-family:'HelveticaNeue',Helvetica,Arial,sans-serif;min-height:100vh;overflow-x:hidden;
+      background-image:radial-gradient(circle at 15% -10%,rgba(0,71,255,.18),transparent 45%),radial-gradient(circle at 100% 20%,rgba(61,111,255,.08),transparent 40%)}
+    a{color:var(--blue2)}
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid var(--line)}
+    .back{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.55);padding:.42rem .9rem}
+    .back:hover{background:var(--green);color:var(--bg)}
+    .logo{display:flex;align-items:center;gap:.55rem;text-decoration:none}
+    .bars{display:flex;align-items:flex-end;gap:3px;height:20px}.bars i{width:5px;background:var(--blue);display:block}
+    .logo b{font-family:'Syne',sans-serif;font-weight:800;font-size:1.45rem;letter-spacing:-.03em;color:var(--ink)}.logo b span{color:var(--blue)}
+    main{max-width:1240px;margin:0 auto;padding:2rem 2.5rem 3rem}
+    .kicker{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--blue2);margin-bottom:.7rem}
+    h1{font-weight:700;font-size:clamp(1.8rem,3.4vw,2.9rem);letter-spacing:-.035em;line-height:1.05}
+    .lead{color:var(--dim);font-size:1rem;line-height:1.55;max-width:56rem;margin-top:.9rem}
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:1.8rem 0}
+    .kpi{background:var(--card);border:1px solid var(--line);padding:1.1rem 1.2rem}
+    .kpi .l{font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:var(--faint);margin-bottom:.45rem}
+    .kpi .v{font-weight:700;font-size:1.7rem;letter-spacing:-.03em;line-height:1.05}
+    .kpi .s{font-size:.78rem;color:var(--dim);margin-top:.35rem}
+    .grid{display:grid;grid-template-columns:1.25fr 1fr;gap:1.2rem;align-items:start}
+    .grid.solo{grid-template-columns:1fr}
+    .card{background:var(--card);border:1px solid var(--line);padding:1.2rem}
+    .card h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:500;margin-bottom:1rem}
+    .cand{margin-bottom:.95rem}
+    .cand-top{display:flex;justify-content:space-between;gap:1rem;align-items:baseline}
+    .cand-n{font-weight:600;font-size:1rem}.cand-p{font-size:.78rem;color:var(--faint);margin-top:.15rem}
+    .cand-v{font-weight:700;font-size:1.05rem;white-space:nowrap}.cand-v small{font-weight:400;color:var(--dim);font-size:.78rem;margin-left:.35rem}
+    .cand.tach .cand-n{color:var(--dim);text-decoration:line-through;text-decoration-color:rgba(244,243,239,.35)}
+    .tach-n{font-size:.76rem;color:var(--warn);margin-top:.3rem}
+    .bar{height:8px;background:rgba(255,255,255,.06);margin-top:.45rem}.bar i{display:block;height:100%}
+    .modes{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.8rem}
+    .modes button{font:inherit;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);background:rgba(255,255,255,.04);border:1px solid var(--line2);padding:.38rem .75rem;cursor:pointer}
+    .modes button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+    #map{height:520px;background:transparent}
+    .leaflet-container{background:transparent;font-family:inherit}
+    .leaflet-tooltip{background:rgba(6,8,16,.97)!important;border:1px solid rgba(0,71,255,.4)!important;color:var(--ink)!important;border-radius:0!important;width:240px;white-space:normal!important;font-size:.82rem!important;padding:.5rem .65rem!important}
+    .leaflet-tooltip:before{display:none!important}
+    .legend{display:flex;flex-wrap:wrap;gap:.9rem;font-size:.75rem;color:var(--dim);margin-top:.7rem}
+    .legend span{display:inline-flex;align-items:center;gap:.4rem}.legend i{width:11px;height:11px;display:inline-block}
+    table{width:100%;border-collapse:collapse;font-size:.84rem}
+    th{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:500;text-align:right;padding:.5rem .45rem;border-bottom:1px solid var(--line2);cursor:pointer;user-select:none;white-space:nowrap}
+    th:first-child,td:first-child{text-align:left}
+    td{padding:.5rem .45rem;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+    tbody tr{cursor:pointer}tbody tr:hover td{background:rgba(255,255,255,.035)}
+    tr.sel td{background:rgba(0,71,255,.14)}
+    .dot{display:inline-block;width:9px;height:9px;margin-right:.4rem;vertical-align:middle}
+    .tbl-wrap{overflow-x:auto}
+    .sec{margin-top:1.2rem}
+    .note{font-size:.8rem;color:var(--faint);line-height:1.55;margin-top:1rem}
+    .aviso{border-left:3px solid var(--warn);background:rgba(240,192,64,.07);padding:.8rem 1rem;font-size:.86rem;line-height:1.5;color:var(--ink);margin-top:1.2rem}
+    .crumb{font-size:.78rem;color:var(--dim);margin-bottom:.7rem}.crumb a{cursor:pointer}
+    .lista{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1.6rem}
+    .item{display:block;background:var(--card);border:1px solid var(--line);padding:1rem 1.15rem;text-decoration:none;color:var(--ink)}
+    a.item:hover{border-color:var(--blue)}
+    .item .f{font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+    .item b{display:block;font-size:1.02rem;margin:.35rem 0 .3rem}
+    .item .d{font-size:.8rem;color:var(--dim);line-height:1.45}
+    .item .tag{display:inline-block;margin-top:.55rem;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;padding:.2rem .45rem;border:1px solid var(--line2);color:var(--dim)}
+    .item .tag.ok{border-color:rgba(74,222,128,.5);color:var(--green)}
+    .item.off{opacity:.55}
+    h3{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:500;margin-top:2rem}
+    footer{border-top:1px solid var(--line);padding:1rem 2.5rem;font-size:.66rem;letter-spacing:.06em;color:var(--faint);display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+    @media(max-width:900px){
+      .nav,main,footer{padding-left:16px;padding-right:16px}
+      .kpis{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}#map{height:400px}.lista{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="back" id="back" href="electoral.html">← Volver</a>
+    <a class="logo" href="index.html"><span class="bars"><i style="height:9px"></i><i style="height:14px"></i><i style="height:20px"></i><i style="height:12px"></i></span><b>Ricardo<span>.</span>Ruiz</b></a>
+  </nav>
+  <main id="main"></main>
+  <footer><span>ricardoruiz.co · análisis electoral</span><span>Datos: Registraduría Nacional</span></footer>
+
+<script>
+// Índice de las atípicas 2025-2026. `e` = JSON propio (atipicas/<e>.json) · `href` = página aparte.
+// `dato`: 'mesa' (mesa a mesa del escrutinio) · 'total' (solo el total oficial) · null (no hay resultado publicado).
+const ATIPICAS = [
+  {f:'2026-09-20', t:'Alcaldía de Cartago', d:'Valle del Cauca', href:'atipica-cartago-2026.html', dato:'total', fuente:'boletín de preconteo al 100 % de mesas'},
+  {f:'2026-07-26', t:'Alcaldía de Tunja', d:'Boyacá', href:'atipica-tunja-2026.html', dato:'total', fuente:'boletín de preconteo al 100 % de mesas'},
+  {f:'2026-07-05', t:'Gobernación de San Andrés', d:'San Andrés, Providencia y Santa Catalina', dato:null},
+  {f:'2026-06-07', t:'Alcaldía de Gigante', d:'Huila', dato:null},
+  {f:'2026-05-03', t:'Alcaldía de Fonseca', d:'La Guajira', dato:null},
+  {f:'2026-04-19', t:'Alcaldía de Sitionuevo', d:'Magdalena', dato:null},
+  {f:'2026-04-19', t:'Alcaldía de Concepción', d:'Santander', dato:null},
+  {f:'2026-02-01', t:'Alcaldía de Ponedera', d:'Atlántico', dato:null},
+  {f:'2026-01-18', t:'Alcaldía de Girón', d:'Santander', e:'giron-2026', dato:'mesa'},
+  {f:'2025-12-14', t:'Alcaldía de Bucaramanga', d:'Santander', e:'bucaramanga-2025', dato:'total', fuente:'E-26 del escrutinio municipal'},
+  {f:'2025-11-23', t:'Gobernación del Magdalena', d:'Magdalena', href:'atipica-magdalena-2025.html', dato:'mesa'},
+  {f:'2025-11-09', t:'Alcaldía de Villeta', d:'Cundinamarca', dato:null},
+  {f:'2025-08-17', t:'Alcaldía de Melgar', d:'Tolima', dato:null},
+  {f:'2025-07-06', t:'Alcaldía de Chitaraque', d:'Boyacá', dato:null},
+  {f:'2025-07-06', t:'Alcaldía de Inzá', d:'Cauca', dato:null},
+  {f:'2025-06-15', t:'Gobernación del Vichada', d:'Vichada', e:'vichada-2025', dato:'mesa'},
+  {f:'2025-05-18', t:'Alcaldía de Coyaima', d:'Tolima', dato:null},
+  {f:'2025-05-18', t:'Alcaldía de Oiba', d:'Santander', dato:null},
+  {f:'2025-05-18', t:'Alcaldía de La Jagua del Pilar', d:'La Guajira', dato:null},
+  {f:'2025-05-04', t:'Alcaldía de Duitama', d:'Boyacá', e:'duitama-2025', dato:'mesa'},
+  {f:'2025-05-04', t:'Alcaldía de Nuevo Colón', d:'Boyacá', dato:null},
+  {f:'2025-05-04', t:'Alcaldía de La Victoria', d:'Boyacá', dato:null},
+  {f:'2025-04-06', t:'Alcaldía de Apartadó', d:'Antioquia', e:'apartado-2025', dato:'mesa'},
+  {f:'2025-03-30', t:'Alcaldía de Chiriguaná', d:'Cesar', dato:null},
+  {f:'2025-03-09', t:'Alcaldía de El Rosario', d:'Nariño', dato:null},
+  {f:'2025-03-09', t:'Alcaldía de Pamplonita', d:'Norte de Santander', dato:null},
+  {f:'2025-02-23', t:'Gobernación del Putumayo', d:'Putumayo', dato:null},
+  {f:'2025-02-23', t:'Alcaldía de Puerto Guzmán', d:'Putumayo', dato:null},
+];
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const fecha = s => { const [y,m,d] = s.split('-').map(Number); return `${d} de ${MESES[m-1]} de ${y}`; };
+const fmt = n => (n==null?'—':Math.round(n).toLocaleString('es-CO'));
+const pc = (a,b) => b ? (100*a/b).toLocaleString('es-CO',{minimumFractionDigits:1,maximumFractionDigits:1})+' %' : '—';
+const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const PART = /^(de|del|la|las|los|y|el|en|e)$/i;
+const titulo = s => String(s||'').toLowerCase().split(/\s+/).map((w,i)=> /^(\p{L}\.)+\p{L}?$/u.test(w) ? w.toUpperCase() : i && PART.test(w) ? w : w.replace(/^(\p{L})/u, c=>c.toUpperCase())).join(' ');
+const hex = (h,a) => { const n=parseInt(h.slice(1),16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; };
+const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Departamentos-mps/';
+const main = document.getElementById('main');
+
+function indice(){
+  document.title = 'Elecciones atípicas 2025-2026 · Ricardo Ruiz';
+  const item = a => {
+    const url = a.e ? `atipica.html?e=${a.e}` : a.href;
+    const tag = a.dato==='mesa' ? '<span class="tag ok">Escrutinio por puesto</span>'
+              : a.dato==='total' ? `<span class="tag ok">Resultado total</span>` : '<span class="tag">Sin resultado publicado</span>';
+    const body = `<div class="f">${fecha(a.f)}</div><b>${a.t}</b><div class="d">${a.d}${a.fuente?' · '+a.fuente:''}</div>${tag}`;
+    return url ? `<a class="item" href="${url}">${body}</a>` : `<div class="item off">${body}</div>`;
+  };
+  const anios = [...new Set(ATIPICAS.map(a=>a.f.slice(0,4)))];
+  const con = ATIPICAS.filter(a=>a.dato).length, mesa = ATIPICAS.filter(a=>a.dato==='mesa').length;
+  main.innerHTML = `<div class="kicker">Elecciones atípicas</div><h1>Alcaldías y gobernaciones que se volvieron a votar</h1>
+    <p class="lead">Cuando el Consejo de Estado anula una elección, o la justicia saca al mandatario, se vota otra vez para completar el periodo 2024-2027. Aquí están las ${ATIPICAS.length} de 2025 y 2026. Hay resultado publicado para ${con}: por puesto en ${mesa}, del escrutinio, y el total en el resto. En las demás, la Registraduría ya retiró el sitio de escrutinio y los formularios E-14 solo se publican como imagen.</p>
+    ${anios.map(y=>`<h3>${y}</h3><div class="lista">${ATIPICAS.filter(a=>a.f.startsWith(y)).map(item).join('')}</div>`).join('')}
+    <p class="note">Los resultados por puesto salen del mesa a mesa (MMV) que publica cada sitio de escrutinio y se cuadraron voto a voto con la declaratoria (E-26) de la comisión que cerró el escrutinio. La participación se calcula sobre el censo de cada elección.</p>`;
+}
+
+async function eleccion(clave){
+  document.getElementById('back').href = 'atipica.html';
+  document.getElementById('back').textContent = '← Atípicas';
+  const D = await fetch(`atipicas/${clave}.json?v=20261008`).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); });
+  const C = D.candidatos;
+  document.title = `${D.eleccion} ${D.fecha.slice(0,4)} · Ricardo Ruiz`;
+  const esDep = D.nivel==='dep', esTotal = D.nivel==='total';
+  const tach = C.map(c=>!!c.tachado);
+
+  // ── agregados ──
+  const resumen = o => { const cand=o.v.reduce((a,b)=>a+b,0); const val=cand+o.blanco; const vot=val+o.nulos+o.nomarc;
+    const iw=o.v.indexOf(Math.max(...o.v)); return {cand,val,vot,iw}; };
+  const T = {v:C.map(()=>0), blanco:0, nulos:0, nomarc:0, censo:0, mesas:0, tachados:C.map(()=>0)};
+  const M = {};
+  if (esTotal){ Object.assign(T, D.totales); }
+  else for (const p of D.puestos){
+    p.v.forEach((x,i)=>T.v[i]+=x); ['blanco','nulos','nomarc','mesas'].forEach(k=>T[k]+=p[k]); T.censo += p.censo||0;
+    (p.tachados||[]).forEach((x,i)=>T.tachados[i]+=x);
+    Object.assign(p, resumen(p));
+    if (esDep){
+      const m = M[p.mun] ||= {cod:p.mun, nombre:D.municipios[p.mun]||p.mun, v:C.map(()=>0), blanco:0, nulos:0, nomarc:0, censo:0, mesas:0, puestos:[]};
+      p.v.forEach((x,i)=>m.v[i]+=x); ['blanco','nulos','nomarc','mesas'].forEach(k=>m[k]+=p[k]); m.censo+=p.censo||0; m.puestos.push(p);
+    }
+  }
+  Object.values(M).forEach(m=>Object.assign(m, resumen(m)));
+  Object.assign(T, resumen(T));
+  if (!esTotal) T.censo = D.censo_total;
+  const ord = C.map((c,i)=>i).sort((a,b)=>T.v[b]-T.v[a]);
+  const g = ord[0], s2 = ord[1];
+  const unidades = esDep ? Object.values(M) : (D.puestos||[]);
+  const ganaN = i => unidades.filter(u=>u.iw===i).length;
+  const uNom = esDep ? 'municipios' : 'puestos';
+
+  main.innerHTML = `
+    <div class="kicker">Elección atípica · ${fecha(D.fecha)}</div>
+    <h1>${D.eleccion}</h1>
+    <p class="lead">${esc(D.motivo)}</p>
+    <div class="kpis" id="kpis"></div>
+    <div class="grid${esTotal?' solo':''}">
+      ${esTotal?'':`<div class="card"><h2>${esDep?'Mapa por municipio':'Mapa por puesto de votación'}</h2><div class="modes" id="modes"></div><div id="map"></div><div class="legend" id="legend"></div></div>`}
+      <div class="card"><h2 id="cand-title">Resultado</h2><div id="cands"></div><p class="note" id="cand-note"></p></div>
+    </div>
+    <div id="aviso"></div>
+    ${esTotal?'':`<div class="card sec"><h2>${esDep?'Municipios':'Puestos de votación'}</h2><div class="tbl-wrap"><table id="t-u"></table></div></div>`}
+    ${esDep?'<div class="card sec" id="pue-card" style="display:none"><div class="crumb"><a id="pue-back">← Todos los municipios</a></div><h2 id="pue-title">Puestos</h2><div class="tbl-wrap"><table id="t-pue"></table></div></div>':''}
+    <p class="note">Fuente: ${esc(D.fuente)}${esTotal?', declaratoria (E-26) escaneada':', mesa a mesa (MMV) cuadrado voto a voto con la declaratoria (E-26)'}; censo electoral por puesto de esta elección. Porcentajes de candidato sobre votos válidos (candidatos + voto en blanco).${esTotal?' El sitio de escrutinio ya no publica el mesa a mesa, así que no hay resultado por puesto.':''}</p>`;
+
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="l">Ganó</div><div class="v" style="color:${C[g].color}">${C[g].corto}</div><div class="s">${C[g].partido}</div></div>
+    <div class="kpi"><div class="l">Votación</div><div class="v">${fmt(T.v[g])}</div><div class="s">${pc(T.v[g],T.val)} de los válidos</div></div>
+    <div class="kpi"><div class="l">Diferencia con el 2º</div><div class="v">${fmt(T.v[g]-T.v[s2])}</div><div class="s">${esTotal?`sobre ${C[s2].corto}`:`Gana ${ganaN(g)} de ${unidades.length} ${uNom}`}</div></div>
+    <div class="kpi"><div class="l">Participación</div><div class="v">${pc(T.vot,T.censo)}</div><div class="s">${fmt(T.vot)} de ${fmt(T.censo)} habilitados${T.mesas?` · ${fmt(T.mesas)} mesas`:''}</div></div>`;
+
+  if (tach.some(Boolean)){
+    const i = tach.indexOf(true);
+    document.getElementById('aviso').innerHTML = `<div class="aviso"><b>${C[i].nombre}</b> aparece con cero votos porque la comisión escrutadora general declaró no marcados sus ${fmt(T.tachados[i])} votos: ${esc(C[i].tachado)}. Esos votos quedaron dentro de los no marcados, y la participación los cuenta.</div>`;
+  }
+
+  function pintaCands(o, titulo_){
+    document.getElementById('cand-title').textContent = titulo_;
+    const max = Math.max(...o.v);
+    document.getElementById('cands').innerHTML = ord.map(i=>`
+      <div class="cand${tach[i]?' tach':''}"><div class="cand-top"><div><div class="cand-n">${C[i].nombre}</div><div class="cand-p">${C[i].partido}</div></div>
+      <div class="cand-v">${fmt(o.v[i])}<small>${pc(o.v[i],o.val)}</small></div></div>
+      ${tach[i]?`<div class="tach-n">Votos marcados por ${C[i].corto} y declarados no marcados: ${fmt(o.tachados ? o.tachados[i] : 0)}</div>`:`<div class="bar"><i style="width:${max?100*o.v[i]/max:0}%;background:${C[i].color}"></i></div>`}</div>`).join('') + `
+      <div class="cand"><div class="cand-top"><div><div class="cand-n" style="font-weight:400;color:var(--dim)">Voto en blanco</div></div><div class="cand-v">${fmt(o.blanco)}<small>${pc(o.blanco,o.val)}</small></div></div></div>`;
+    document.getElementById('cand-note').textContent = `Válidos ${fmt(o.val)} · nulos ${fmt(o.nulos)} · no marcados ${fmt(o.nomarc)}${o.censo?` · participación ${pc(o.vot,o.censo)}`:''}`;
+  }
+  const tituloTot = esDep ? 'Resultado departamental' : 'Resultado municipal';
+  pintaCands(T, tituloTot);
+  if (esTotal) return;
+
+  // ── mapa ──
+  let modo = 'gana';
+  const vivos = ord.filter(i=>!tach[i]);
+  const modos = [['gana','Quién gana']].concat(vivos.slice(0,2).map(i=>['c'+i, C[i].corto])).concat(tach.map((x,i)=>x?['t'+i, `${C[i].corto} (tachados)`]:null).filter(Boolean)).concat([['part','Participación']]);
+  const elModes = document.getElementById('modes');
+  elModes.innerHTML = modos.map(([k,t])=>`<button data-k="${k}" class="${k===modo?'on':''}">${t}</button>`).join('');
+  elModes.onclick = e => { const b=e.target.closest('button'); if(!b) return; modo=b.dataset.k; [...elModes.children].forEach(x=>x.classList.toggle('on',x===b)); pinta(); };
+  const color = u => {
+    if (modo==='gana'){ const sh=u.v[u.iw]/u.val; return [C[u.iw].color, Math.min(.95,.3+(sh-.3)*1.6)]; }
+    if (modo==='part'){ const r=u.censo?u.vot/u.censo:0; return ['#3d6fff', Math.max(.12,Math.min(.95,(r-.15)/.4))]; }
+    if (modo[0]==='t'){ const i=+modo.slice(1), x=(u.tachados||[])[i]||0; return ['#f0c040', Math.max(.08,Math.min(.95,(x/(u.val+x))*1.3))]; }
+    const i=+modo.slice(1); return [C[i].color, Math.max(.08,Math.min(.95,(u.v[i]/u.val)*1.4))];
+  };
+  const tip = (u, nombre) => `<b>${esc(nombre)}</b><br>`+vivos.map(i=>`<span class="dot" style="background:${C[i].color}"></span>${C[i].corto}: ${pc(u.v[i],u.val)}`).join('<br>')+`<br><span style="color:var(--dim)">${fmt(u.vot)} votantes${u.censo?' · participación '+pc(u.vot,u.censo):''}</span>`;
+  const map = L.map('map',{zoomControl:true,attributionControl:false,scrollWheelZoom:false,zoomSnap:.25});
+  map.setView([5,-74],6);
+  const geo = await fetch(`${S3}${D.dep}.json`).then(r=>r.json());
+  let capa, puntos = [], marcas = {};
+  if (esDep){
+    capa = L.geoJSON(geo,{style:f=>{ const m=M[f.properties.mun_elec]; if(!m) return {color:'#333',weight:.6,fillColor:'#1a1d29',fillOpacity:.6};
+        const [c,op]=color(m); return {color:'rgba(6,8,16,.9)',weight:.8,fillColor:c,fillOpacity:Math.max(.08,op)}; },
+      onEachFeature:(f,l)=>{ const m=M[f.properties.mun_elec]; if(!m) return; l.bindTooltip(()=>tip(m,m.nombre),{sticky:true}); l.on('click',()=>abre(m.cod)); }}).addTo(map);
+  } else {
+    const mun = D.puestos[0].mun;
+    capa = L.geoJSON({type:'FeatureCollection',features:geo.features.filter(f=>f.properties.mun_elec===mun)},
+      {style:{color:'rgba(244,243,239,.35)',weight:1,fillColor:'#1a1d29',fillOpacity:.5},interactive:false}).addTo(map);
+    const vmax = Math.max(...D.puestos.map(p=>p.vot));
+    for (const p of D.puestos){
+      if (!p.ll) continue;
+      const mk = L.circleMarker(p.ll,{radius:3+11*Math.sqrt(p.vot/vmax),weight:1,color:'rgba(6,8,16,.9)'}).addTo(map);
+      mk.bindTooltip(()=>tip(p,titulo(p.nombre)),{sticky:true}); mk.on('click',()=>marca(p));
+      puntos.push([mk,p]); marcas[p.zona+p.pue]=mk;
+    }
+  }
+  const fit = () => { map.invalidateSize(); const b = esDep ? capa.getBounds() : L.featureGroup(puntos.map(x=>x[0])).getBounds(); if (b.isValid()) map.fitBounds(b,{padding:[14,14],animate:false}); };
+  setTimeout(fit,0); new ResizeObserver(fit).observe(document.getElementById('map'));
+  function pinta(){
+    if (esDep) capa.setStyle(f=>{ const m=M[f.properties.mun_elec]; if(!m) return {color:'#333',weight:.6,fillColor:'#1a1d29',fillOpacity:.6}; const [c,op]=color(m); return {color:'rgba(6,8,16,.9)',weight:.8,fillColor:c,fillOpacity:Math.max(.08,op)}; });
+    else puntos.forEach(([mk,p])=>{ const [c,op]=color(p); mk.setStyle({fillColor:c,fillOpacity:Math.max(.15,op)}); });
+    const lg=document.getElementById('legend');
+    if (modo==='gana') lg.innerHTML = vivos.filter(i=>ganaN(i)).map(i=>`<span><i style="background:${C[i].color}"></i>${C[i].corto} · ${ganaN(i)} ${uNom}</span>`).join('') + `<span>Más intenso = gana por más${esDep?'':' · más grande = más votantes'}</span>`;
+    else if (modo==='part') lg.innerHTML = '<span><i style="background:rgba(61,111,255,.15)"></i>15 %</span><span><i style="background:rgba(61,111,255,.95)"></i>55 % o más</span>';
+    else if (modo[0]==='t') lg.innerHTML = `<span><i style="background:rgba(240,192,64,.1)"></i>0 %</span><span><i style="background:rgba(240,192,64,.95)"></i>70 % o más de los votos marcados por ${C[+modo.slice(1)].corto}</span>`;
+    else { const i=+modo.slice(1); lg.innerHTML = `<span><i style="background:${hex(C[i].color,.1)}"></i>0 %</span><span><i style="background:${hex(C[i].color,.95)}"></i>70 % o más</span>`; }
+  }
+  pinta();
+
+  // ── tabla ──
+  let orden = {k:'vot', d:-1}, sel=null;
+  const corto = i => C[i].corto.split(' ').slice(-1)[0];
+  const cols = [['nombre',esDep?'Municipio':'Puesto']].concat(esDep?[]:[['mesas','Mesas']]).concat([['censo','Censo'],['vot','Votantes'],['part','Partic.']]).concat(vivos.map(i=>['c'+i, corto(i)])).concat([['gana','Gana']]);
+  const val = (u,k) => k==='part'? (u.censo?u.vot/u.censo:0) : (k[0]==='c'&&k!=='censo') ? u.v[+k.slice(1)]/u.val : k==='gana' ? C[u.iw].corto : k==='nombre' ? (esDep?u.nombre:titulo(u.nombre)) : u[k];
+  function tabla(){
+    const rows = unidades.slice().sort((a,b)=>{ const x=val(a,orden.k), y=val(b,orden.k); return (x>y?1:x<y?-1:0)*orden.d; });
+    const id = u => esDep ? u.cod : u.zona+u.pue;
+    document.getElementById('t-u').innerHTML = `<thead><tr>${cols.map(([k,t])=>`<th data-k="${k}">${t}${orden.k===k?(orden.d<0?' ↓':' ↑'):''}</th>`).join('')}</tr></thead><tbody>${rows.map(u=>`
+      <tr data-c="${id(u)}" class="${sel===id(u)?'sel':''}"><td><span class="dot" style="background:${C[u.iw].color}"></span>${esc(esDep?u.nombre:titulo(u.nombre))}</td>${esDep?'':`<td>${u.mesas}</td>`}<td>${fmt(u.censo)}</td><td>${fmt(u.vot)}</td><td>${pc(u.vot,u.censo)}</td>${vivos.map(i=>`<td>${pc(u.v[i],u.val)}</td>`).join('')}<td style="text-align:left">${C[u.iw].corto}</td></tr>`).join('')}</tbody>`;
+  }
+  document.getElementById('t-u').onclick = e => {
+    const th=e.target.closest('th'); if(th){ const k=th.dataset.k; orden = {k, d: orden.k===k ? -orden.d : (k==='nombre'||k==='gana'?1:-1)}; tabla(); return; }
+    const tr=e.target.closest('tr[data-c]'); if(!tr) return;
+    if (esDep) abre(tr.dataset.c); else marca(D.puestos.find(p=>p.zona+p.pue===tr.dataset.c));
+  };
+  tabla();
+
+  function marca(p){
+    sel = p.zona+p.pue; tabla(); pintaCands(p, titulo(p.nombre));
+    const mk = marcas[sel]; if (mk){ map.setView(mk.getLatLng(), Math.max(map.getZoom(),14), {animate:false}); mk.openTooltip(); }
+  }
+  function abre(cod){
+    sel = cod; const m = M[cod]; tabla(); pintaCands(m, m.nombre);
+    const card=document.getElementById('pue-card'); card.style.display='block';
+    document.getElementById('pue-title').textContent = `Puestos de ${m.nombre} · ${m.puestos.length}`;
+    const ps = m.puestos.slice().sort((a,b)=>(b.vot)-(a.vot));
+    document.getElementById('t-pue').innerHTML = `<thead><tr><th>Puesto</th><th>Mesas</th><th>Censo</th><th>Votantes</th><th>Partic.</th>${vivos.map(i=>`<th>${corto(i)}</th>`).join('')}<th>Blanco</th></tr></thead><tbody>${ps.map(p=>`
+      <tr><td><span class="dot" style="background:${C[p.iw].color}"></span>${esc(titulo(p.nombre))}</td><td>${p.mesas}</td><td>${fmt(p.censo)}</td><td>${fmt(p.vot)}</td><td>${pc(p.vot,p.censo)}</td>${vivos.map(i=>`<td>${fmt(p.v[i])}</td>`).join('')}<td>${fmt(p.blanco)}</td></tr>`).join('')}</tbody>`;
+    card.scrollIntoView({behavior:'instant',block:'start'});
+  }
+  if (esDep) document.getElementById('pue-back').onclick = () => { sel=null; tabla(); pintaCands(T,tituloTot); document.getElementById('pue-card').style.display='none'; };
+  else document.getElementById('cand-title').onclick = () => { sel=null; tabla(); pintaCands(T,tituloTot); fit(); };
+}
+
+const clave = new URLSearchParams(location.search).get('e');
+if (clave && ATIPICAS.some(a=>a.e===clave)) eleccion(clave).catch(err=>{ main.innerHTML = `<p class="lead">No se pudo cargar esta elección (${esc(err.message)}). <a href="atipica.html">Ver todas las atípicas</a>.</p>`; });
+else indice();
+</script>
+</body>
+</html>
