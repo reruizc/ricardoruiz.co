@@ -498,6 +498,9 @@
      portada ya no la hace repetirse: si ya lo dijo, se queda callada. */
   let vistaComentada = '';
   function alCambiarVista() {
+    ubicarEnPortada();
+    if (!dock.hidden && !entroYa) entrar();
+    else if (!dock.hidden && contexto().vista !== 'intro') mascota?.idle().catch(() => {});
     const v = contexto().vista;
     if (v === vistaComentada) return;
     vistaComentada = v;
@@ -538,7 +541,7 @@
   const PAUSA_ENTRE = 25000, MAX_GENERALES = 3;
   let ultimoComentario = Date.now(), generalesDichos = 0;   /* el reloj arranca con la página: nada antes del saludo */
   const temaDicho = t => memoria.temas.includes(t.clave);
-  function libre() { return presentada && !abierto && !calculando && globo && globo.hidden; }
+  function libre() { return !dock.hidden && !(document.getElementById('partidaSaludo') && contexto().vista === 'intro') && presentada && !abierto && !calculando && globo && globo.hidden; }
   function comentar(t) {
     if (!t || temaDicho(t)) return false;
     if (!decir(t.dicho, 20000)) return false;
@@ -606,7 +609,7 @@
     /* Ya se presentó en esta pestaña: aparece sentada y atenta, sin caminar.
        `idle()` arranca en 4,8 s y no emite `candi:complete`, así que el
        descanso y el globo se enganchan a mano. */
-    if (memoria.presentada) {
+    if (memoria.presentada && !document.getElementById('partidaSaludo')) {
       escena.dataset.estado = 'idle_seated';
       mascota.idle().catch(e => fallarAtlas(e && e.message));
       montarDescanso();
@@ -749,7 +752,7 @@
   const reenviarEstado = e => tira?.dispatchEvent(new CustomEvent('candi:state', { detail: e.detail }));
   /* Libre = panel cerrado, pantalla con escena, sin pregunta en vuelo y sin
      cálculo en curso (mientras investiga o piensa no se va por el hueso). */
-  function habilitarDescanso() { descanso?.enable(!abierto && !bajito.matches && !enVuelo && !calculando); }
+  function habilitarDescanso() { descanso?.enable(!abierto && !bajito.matches && !enVuelo && !calculando && !(document.getElementById('candiBienvenida') && contexto().vista === 'intro')); }
   function alCambiarAlto() { if (bajito.matches) volverAlDock(); habilitarDescanso(); ajustarSuelo(); }
 
   /* La tira se apoya en la misma línea de suelo que la escena del dock. */
@@ -800,6 +803,11 @@
   }
   function mostrarGlobo() {
     presentada = true;
+    if (document.getElementById('partidaSaludo') && contexto().vista === 'intro') {
+      memoria.presentada = true; recordar();
+      globo.hidden = true;
+      return; // El saludo de Luna se lee en el panel, sin globo duplicado.
+    }
     vigilarTarjetas();
     vistaComentada = contexto().vista;
     if (abierto || globo.dataset.visto === '1') { if (calculando) avisarCalculo(); return; }
@@ -891,9 +899,38 @@
     return true;
   }
 
+  /* La portada reserva un lugar en el flujo: la mascota y su saludo nunca
+     cubren las opciones. Al abrir el chat vuelve al dock flotante habitual. */
+  function ubicarEnPortada() {
+    const sitio = document.getElementById('candiBienvenida');
+    if (!sitio || !dock) return;
+    const enIntro = contexto().vista === 'intro';
+    const stage = document.getElementById('intro').dataset.stage;
+    const visible = !enIntro || stage === 'greeting' || stage === 'options';
+    const destino = enIntro && !abierto ? sitio : document.body;
+    if (dock.parentElement !== destino) {
+      volverAlDock();
+      destino.append(dock);
+    }
+    dock.hidden = !visible;
+    if (!visible) { ocultarGlobo(); mascota?.pause(); }
+    habilitarDescanso();
+  }
+  function sincronizarEtapaIntro() {
+    if (!dock) return;
+    ubicarEnPortada();
+    if (dock.hidden) return;
+    const stage = document.getElementById('intro')?.dataset.stage;
+    if (!entroYa) entrar();
+    else if (stage === 'greeting') mascota?.play().catch(e => fallarAtlas(e?.message));
+    else mascota?.idle().catch(() => {});
+  }
+  document.addEventListener('c360:intro-stage', sincronizarEtapaIntro);
+
   /* ─── Abrir, cerrar, desmontar ───────────────────────────────────────── */
   function abrir() {
     abierto = true; ocultarGlobo();
+    ubicarEnPortada();
     habilitarDescanso(); volverAlDock();
     dock.classList.add('abierto'); panel.hidden = false;
     launcher.setAttribute('aria-expanded', 'true');
@@ -905,6 +942,7 @@
     abierto = false;
     dock.classList.remove('abierto'); panel.hidden = true;
     launcher.setAttribute('aria-expanded', 'false');
+    ubicarEnPortada();
     if (foco) launcher.focus();
     habilitarDescanso();
     /* Ojo: NO se llama pause() acá. Candi vive en la pantalla aunque el panel
@@ -984,8 +1022,12 @@
      no hay nada que guiar, y su saludo se perdería detrás. */
   function arrancar() {
     montar();
+    ubicarEnPortada();
     const preload = document.getElementById('preload');
-    const mostrar = () => { dock.hidden = false; entrar(); };
+    const mostrar = () => {
+      if (document.getElementById('partidaSaludo')) sincronizarEtapaIntro();
+      else { dock.hidden = false; entrar(); }
+    };
     if (!preload || !preload.classList.contains('active')) return mostrar();
     const obs = new MutationObserver(() => { if (!preload.classList.contains('active')) { obs.disconnect(); mostrar(); } });
     obs.observe(preload, { attributes: true, attributeFilter: ['class'] });

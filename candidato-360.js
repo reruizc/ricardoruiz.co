@@ -121,7 +121,55 @@ function showScreen(id) {
   refreshTopBack();
   if (id === 'existing') setTimeout(() => $('candidateSearch')?.focus({ preventScroll: true }), 80);
   if (id === 'new') aplicarGateNuevo();
+  if (id !== 'intro') clearTimeout(partidaTimer);
 }
+/* Presentación secuencial; los pasos siguientes conservan su estado. */
+function avanzarIntro() {
+  if ($('introNext').disabled) return;
+  $('introPresentation').classList.add('hidden');
+  $('choicePanel').classList.remove('hidden');
+  $('intro').classList.add('intro-choosing');
+  cambiarPais(false);
+  const heading = document.querySelector('#paisPaso h2');
+  if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+function volverIntro() {
+  $('choicePanel').classList.add('hidden');
+  $('introPresentation').classList.remove('hidden');
+  $('intro').classList.remove('intro-choosing');
+  clearTimeout(partidaTimer);
+  etapaIntro('welcome');
+  $('introNext').focus({ preventScroll: true });
+}
+(function prepararIntro() {
+  const card = $('introPresentation');
+  const links = card.querySelector('.intro-links');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  links.inert = true;
+  function ready() {
+    links.inert = false;
+    card.classList.add('intro-ready');
+    card.classList.remove('intro-playing');
+    $('introNext').disabled = false;
+  }
+  function start() {
+    card.classList.add('intro-playing');
+    if (reduced.matches) ready();
+    else {
+      setTimeout(() => { links.inert = false; card.classList.add('intro-details'); }, 1100);
+      setTimeout(ready, 1900);
+    }
+  }
+  const preload = $('preload');
+  if (preload?.classList.contains('active')) {
+    const observer = new MutationObserver(() => {
+      if (!preload.classList.contains('active')) { observer.disconnect(); start(); }
+    });
+    observer.observe(preload, { attributes: true, attributeFilter: ['class'] });
+  } else start();
+})();
+
 const INTRO_INFO = {
   how: { kicker: 'Así funciona', title: 'De la evidencia a la campaña.', paragraphs: ['Primero identificamos si ya tiene historia electoral o si empieza desde cero. Con ese punto de partida activamos únicamente las fuentes y los territorios que necesita su candidatura.', 'Después conectamos resultados, conversación pública, agenda normativa y territorio en un CRM preparado para convertir evidencia electoral en decisiones de campaña.'] },
   why: { kicker: 'Por qué elegirnos', title: 'Toda la inteligencia electoral, en un solo lugar.', paragraphs: ['Integramos evidencia territorial, competencia, resultados históricos y seguimiento de campaña para traducir información compleja en decisiones claras y oportunas.', 'Es una plataforma diseñada específicamente para candidaturas en Colombia: reúne una lectura que normalmente estaría dispersa entre bases, mapas y equipos distintos.'] }
@@ -360,15 +408,43 @@ function paisInicial() {
   try { const g = localStorage.getItem('c360-pais'); if (g && PAISES[g]) return g; } catch {}
   return null;
 }
+let partidaTimer = 0;
+function etapaIntro(stage) {
+  $('intro').dataset.stage = stage;
+  document.dispatchEvent(new CustomEvent('c360:intro-stage', { detail: { stage } }));
+}
 function elegirPais(codigo) {
   if (!PAISES[codigo]) return;
   PAIS = codigo;
   try { localStorage.setItem('c360-pais', codigo); } catch {}
-  $('paisNombre').textContent = PAISES[codigo].nombre; $('paisBandera').textContent = PAISES[codigo].bandera;
-  $('paisPaso').classList.add('hidden'); $('partidaPaso').classList.remove('hidden');
+  $('paisNombre').textContent = PAISES[codigo].nombre;
+  $('paisPaso').classList.add('hidden');
+  $('partidaPaso').classList.remove('hidden');
+  $('partidaOpciones').classList.add('hidden');
+  $('partidaSkip').classList.remove('hidden');
+  clearTimeout(partidaTimer);
+  etapaIntro('greeting');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  $('lunaSaludoTitulo').focus({ preventScroll: true });
+  // Texto siempre disponible, incluso si el atlas de la mascota falla.
+  partidaTimer = setTimeout(mostrarOpcionesPartida, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 7500);
 }
-function cambiarPais() { $('partidaPaso').classList.add('hidden'); $('paisPaso').classList.remove('hidden'); }
-function montarPais() { const p = paisInicial(); if (p) elegirPais(p); }
+function mostrarOpcionesPartida() {
+  clearTimeout(partidaTimer);
+  if ($('intro').dataset.stage !== 'greeting' || $('intro').classList.contains('hidden')) return;
+  $('partidaOpciones').classList.remove('hidden');
+  const moveFocus = document.activeElement === $('partidaSkip');
+  $('partidaSkip').classList.add('hidden');
+  etapaIntro('options');
+  if (moveFocus) $('partidaTitulo').focus({ preventScroll: true });
+}
+function cambiarPais(enfocar = true) {
+  clearTimeout(partidaTimer);
+  $('partidaPaso').classList.add('hidden'); $('paisPaso').classList.remove('hidden');
+  etapaIntro('country');
+  if (enfocar) document.querySelector('#paisPaso [data-pais="' + (PAIS || 'co') + '"]')?.focus({ preventScroll: true });
+}
+function montarPais() { PAIS = paisInicial(); }
 
 /* ─── 3 bis. Modo pruebas (cuenta de administración) ─────────────────────────
    «Una cuenta = un candidato» es una regla del PRODUCTO: existe para que un
