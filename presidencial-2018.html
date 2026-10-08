@@ -274,7 +274,7 @@
     </div>
     <div class="meta-bar">
       <span class="meta-item">Elección: <b>Presidencia · 27 May 2018 y 17 Jun 2018</b></span>
-      <span class="meta-item">Total votos: <b id="meta-votval">—</b></span>
+      <span class="meta-item"><span id="meta-votlbl">Total votos</span>: <b id="meta-votval">—</b></span>
       <div class="source-badge">Fuente: <b>Registraduría · Escrutinio Definitivo</b></div>
       <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
     </div>
@@ -479,8 +479,7 @@
         if(_c && STATE.consultas[_c]) STATE.activeCons = _c;
         if(!STATE.consultas[STATE.activeCons]) STATE.activeCons = resumen.consultas[0].clave;
         buildCandColors();
-        const totalVotos = resumen.consultas.reduce((s,c)=>s+(c.votos||0), 0);
-        document.getElementById('meta-votval').textContent = fmt(totalVotos);
+        renderMetaTotal();
         document.getElementById('load-state').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
         renderConsChips();
@@ -564,11 +563,23 @@
       }
     }
 
+    // Total del encabezado: el de la consulta/vuelta ACTIVA, nunca la suma de todas.
+    // En las presidenciales sumar 1V + 2V contaba dos veces al mismo electorado (y en
+    // el Pacto 2025 Senado y Cámara se votaron el mismo día, en tarjetones aparte).
+    // El total de cada consulta sigue a la vista en su chip.
+    function renderMetaTotal(){
+      const c = STATE.consultas[STATE.activeCons];
+      document.getElementById('meta-votlbl').textContent =
+        c ? `Total votos · ${CONS_SHORT[c.clave]||c.nombre}` : 'Total votos';
+      document.getElementById('meta-votval').textContent = c ? fmt(c.votos||0) : '—';
+    }
+
     // ─── SETTERS ──────────────────────────────────────────────────
     function setConsulta(clave){
       if(clave===STATE.activeCons) return;
       STATE.activeCons = clave;
       STATE.activeCand = null; // reset candidato cuando cambia la consulta
+      renderMetaTotal();
       renderConsChips();
       renderCandChips();
       renderAll();
