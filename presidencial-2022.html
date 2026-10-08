@@ -469,6 +469,10 @@
         STATE.deps = deps;
         // index resumen.consultas[] by clave for quick lookups
         resumen.consultas.forEach(c => { STATE.consultas[c.clave] = c; });
+        // ?c=<clave> abre directo en esa consulta (las tarjetas de electoral.html lo usan)
+        const _c = new URLSearchParams(location.search).get('c');
+        if(_c && STATE.consultas[_c]) STATE.activeCons = _c;
+        if(!STATE.consultas[STATE.activeCons]) STATE.activeCons = resumen.consultas[0].clave;
         buildCandColors();
         const totalVotos = resumen.consultas.reduce((s,c)=>s+(c.votos||0), 0);
         document.getElementById('meta-votval').textContent = fmt(totalVotos);
@@ -502,17 +506,35 @@
         </button>`;
       }).join('');
     }
+    // Con muchos candidatos (las consultas del Pacto 2025 tienen 144 y 374) un botón por
+    // candidato dejaba una lista de 14.000 px: se muestran los 12 primeros del territorio
+    // que se está viendo, un buscador y «ver todos». El candidato elegido siempre queda a la vista.
+    const CHIPS_MAX = 12;
+    let _chipsTodos = false, _chipsFiltro = '';
     function renderCandChips(){
       const c = STATE.consultas[STATE.activeCons];
-      if(!c){ document.getElementById('cand-chips').innerHTML=''; return; }
+      const box = document.getElementById('cand-chips');
+      if(!c){ box.innerHTML=''; return; }
       const winnerCol = CONS_COLOR[STATE.activeCons]||'#555';
-      const cands = [...c.candidatos].sort((a,b)=>b.votos-a.votos);
+      // orden del territorio activo (en un depto: sus candidatos); si no hay alcance, el nacional
+      const scope = (STATE.resumen && STATE.deps) ? getScope() : null;
+      let cands = scope ? scope.consulta.cands.filter(x=>x.votos>0) : [...c.candidatos];
+      cands = cands.map(x=>({...x, codigo: x.codigo || codigoFor(STATE.activeCons, x.nombre)})).sort((a,b)=>b.votos-a.votos);
+      const muchos = cands.length > CHIPS_MAX;
+      const q = _normN(_chipsFiltro||'');
+      let vis = cands;
+      if(q) vis = cands.filter(x=>_normN(x.nombre).includes(q));
+      else if(muchos && !_chipsTodos){
+        vis = cands.slice(0, CHIPS_MAX);
+        const act = cands.find(x=>x.codigo===STATE.activeCand);
+        if(act && !vis.includes(act)) vis = [...vis, act];
+      }
       const chips = [];
       // chip "Ganador" (vista por defecto: cada territorio se pinta con el color del candidato que ganó allí)
       chips.push(`<button class="chip cand-chip ${STATE.activeCand===null?'active':''}" style="--cand-color:${winnerCol};--dot:${winnerCol}" onclick="setCandidato(null)">
         <span class="chip-dot"></span>Ganador por territorio
       </button>`);
-      cands.forEach(cand=>{
+      vis.forEach(cand=>{
         const col = candColor(STATE.activeCons, cand.codigo);
         const isAct = STATE.activeCand===cand.codigo;
         chips.push(`<button class="chip cand-chip ${isAct?'active':''}" style="--cand-color:${col};--dot:${col}" onclick="setCandidato('${cand.codigo}')" title="${cand.nombre}">
@@ -520,7 +542,21 @@
           <span class="chip-sub">${fmt(cand.votos)}</span>
         </button>`);
       });
-      document.getElementById('cand-chips').innerHTML = chips.join('');
+      let extra = '';
+      if(muchos){
+        extra = `<div class="chips-tools" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.4rem">
+          <input id="chips-q" type="search" placeholder="Buscar entre ${fmt(cands.length)} candidatos…" value="${(_chipsFiltro||'').replace(/"/g,'&quot;')}"
+            style="font:inherit;font-size:.72rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);color:inherit;padding:.45rem .7rem;min-width:220px">
+          ${q ? '' : `<button class="chip cand-chip" onclick="_chipsTodos=!_chipsTodos;renderCandChips()">${_chipsTodos ? 'Ver solo los primeros' : `Ver todos (${fmt(cands.length)})`}</button>`}
+          ${q && !vis.length ? '<span style="font-size:.72rem;opacity:.6">Sin coincidencias en este territorio</span>' : ''}
+        </div>`;
+      }
+      box.innerHTML = chips.join('') + extra;
+      const inp = document.getElementById('chips-q');
+      if(inp){
+        inp.oninput = e => { _chipsFiltro = e.target.value; const pos = e.target.selectionStart; renderCandChips();
+          const n = document.getElementById('chips-q'); if(n){ n.focus(); n.setSelectionRange(pos,pos); } };
+      }
     }
 
     // ─── SETTERS ──────────────────────────────────────────────────
@@ -616,6 +652,7 @@
       if(!scope){ console.warn('No scope'); return; }
       renderDrillNav();
       renderLevelBadge();
+      renderCandChips();          // el orden y la lista dependen del territorio
       renderMapLabels(scope);
       renderKPIs(scope);
       renderRankTable(scope);
@@ -694,7 +731,7 @@
         card4 = `<div class="kpi-card"><div class="kpi-label">Margen 1° – 2°</div><div class="kpi-val sm gr">${fmt(margen)}</div><div class="kpi-delta">${pct(margen, cons.votos)} pp</div></div>`;
       }
       document.getElementById('kpi-row').innerHTML = `
-        <div class="kpi-card"><div class="kpi-label">Votos en la vuelta</div><div class="kpi-val wh">${fmt(cons.votos)}</div><div class="kpi-delta">${scope.nombre}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Votos válidos</div><div class="kpi-val wh">${fmt(cons.votos)}</div><div class="kpi-delta">${scope.nombre}</div></div>
         <div class="kpi-card"><div class="kpi-label">Candidatos/as</div><div class="kpi-val">${cons.cands.length}</div><div class="kpi-delta">con votación</div></div>
         <div class="kpi-card"><div class="kpi-label">Puntero</div><div class="kpi-val sm" style="color:${winner?candColor(STATE.activeCons, winner.codigo||winner.nombre):'#fff'}">${winner?shortLast(winner.nombre):'—'}</div><div class="kpi-delta">${winner?fmt(winner.votos)+' votos · '+pct(winner.votos,cons.votos)+'%':''}</div></div>
         ${card4}`;

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Consultas Presidenciales 2026 · Escrutinio · Ricardo Ruiz</title>
+  <title>Consultas Pacto Histórico 2025 · Escrutinio · Ricardo Ruiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
@@ -245,9 +245,9 @@
       <span class="curtain-tag">ricardoruiz.co</span>
       <div class="curtain-headline">
         <span class="curtain-line"><span class="curtain-word from-left white">Consultas</span></span>
-        <span class="curtain-line"><span class="curtain-word from-right blue">2026</span></span>
+        <span class="curtain-line"><span class="curtain-word from-right blue">Pacto 2025</span></span>
       </div>
-      <span class="curtain-sub">Consultas Presidenciales · Escrutinio</span>
+      <span class="curtain-sub">Consultas Pacto Histórico 2025 · Escrutinio</span>
     </div>
   </div>
 
@@ -266,14 +266,14 @@
       </a>
     </nav>
     <div class="top-bar">
-      <div class="page-title">Consultas<br/><span>Presidenciales 2026</span></div>
+      <div class="page-title">Consultas Pacto Histórico<br/><span>Senado y Cámara 2025</span></div>
     </div>
     <div class="breadcrumb">
       <a href="electoral.html" onclick="navTo(event,'electoral.html')">Resultados Electorales</a>
-      &nbsp;/&nbsp; Consultas Presidenciales · Escrutinio 2026
+      &nbsp;/&nbsp; Consultas Pacto Histórico · Senado y Cámara 2025
     </div>
     <div class="meta-bar">
-      <span class="meta-item">Elección: <b>Consultas · 13 Mar 2026</b></span>
+      <span class="meta-item">Elección: <b>Consultas internas · 26 Oct 2025</b></span>
       <span class="meta-item">Total votos: <b id="meta-votval">—</b></span>
       <div class="source-badge">Fuente: <b>Registraduría · Escrutinio Definitivo</b></div>
       <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
@@ -287,18 +287,13 @@
       <div id="main-content" class="hidden">
         <div class="selector-row">
           <div class="selector-block" style="flex:1.1">
-            <span class="sub-label">Consulta presidencial</span>
+            <span class="sub-label">Consulta</span>
             <div class="chips" id="cons-chips"></div>
           </div>
           <div class="selector-block" style="flex:2.4">
             <span class="sub-label">Candidato/a en el mapa</span>
             <div class="chips" id="cand-chips"></div>
           </div>
-        </div>
-
-        <div class="endoso-cta">
-          <div class="endoso-cta-text"><b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato presidencial con uno al Congreso mesa por mesa.</div>
-          <a href="endoso-2026.html" class="endoso-btn" id="endoso-cta-btn">Calcular endoso →</a>
         </div>
 
         <div class="kpi-row" id="kpi-row"></div>
@@ -391,21 +386,22 @@
     // ─── CONSULTA + CANDIDATO COLORS ─────────────────────────────
     // Color del chip principal de cada consulta (visual del filtro).
     const CONS_COLOR = {
-      gran:       '#1866DF',
-      frente:     '#3d8b3d',
-      soluciones: '#d9db24',
+      'senado': '#6B2D8B',
+      'camara': '#c0392b',
     };
     const CONS_SHORT = {
-      gran:       'La Gran Consulta',
-      frente:     'Frente por la Vida',
-      soluciones: 'Consulta de Soluciones',
+      'senado': 'Consulta Senado',
+      'camara': 'Consulta Cámara',
     };
     // Color por candidato, derivado de su código dentro de la consulta.
     // El ganador (rank 1) hereda el color principal; los demás vienen de una paleta.
+    // Los colores siguen el orden de votacion de cada vuelta. NO son fijos por
+    // persona: un mismo candidato puede tener otro color entre 1V y 2V si cambio
+    // de posicion. La leyenda y el mapa siempre leen del mismo sitio, asi que
+    // dentro de una vuelta son consistentes.
     const CONS_PALETTE = {
-      gran: ['#1866DF','#06b6d4','#E53935','#003580','#7c3aed','#0067B1','#C8102E','#F7941D','#0d9488'],
-      frente: ['#3d8b3d','#22c55e','#65a30d','#15803d','#4d7c0f'],
-      soluciones: ['#d9db24','#eab308','#facc15'],
+      'senado': ['#6B2D8B', '#c0392b', '#e0803a', '#0047FF', '#3d8b3d', '#7c3aed', '#06b6d4', '#d9db24', '#0d9488', '#C8102E', '#F7941D', '#0067B1'],
+      'camara': ['#c0392b', '#6B2D8B', '#e0803a', '#0047FF', '#3d8b3d', '#7c3aed', '#06b6d4', '#d9db24', '#0d9488', '#C8102E', '#F7941D', '#0067B1'],
     };
     // candKey: `${consulta}__${codigo}` → color
     let CAND_COLOR = {};
@@ -433,7 +429,7 @@
       deps: null,              // deps.json raw
       depData: {},             // depCod → dep-{cod}.json
       consultas: {},           // clave → {clave,nombre,votos,candidatos:[{nombre,codigo,votos}]}
-      activeCons: 'gran',
+      activeCons: 'senado',
       activeCand: null,        // codigo (string) o null = "Ganador"
       level: 'nac',            // nac | dep | mun | com
       depCod: null,
@@ -451,7 +447,7 @@
     const _fetchCache = {};
     async function getJSON(path){
       if(_fetchCache[path]) return _fetchCache[path];
-      const r = await fetch(`${S3}/consultas/${path}.json`);
+      const r = await fetch(`${S3}/pres-escr/pacto2025/${path}.json`);
       if(!r.ok) throw new Error(`No se pudo cargar ${path}.json (HTTP ${r.status})`);
       _fetchCache[path] = await r.json();
       return _fetchCache[path];
@@ -459,7 +455,7 @@
     async function getDepData(depCod){
       if(STATE.depData[depCod]) return STATE.depData[depCod];
       const code = _to2(depCod);
-      const r = await fetch(`${S3}/consultas/dep-${code}.json`);
+      const r = await fetch(`${S3}/pres-escr/pacto2025/dep-${code}.json`);
       if(!r.ok) throw new Error(`No se pudo cargar dep-${code}.json (HTTP ${r.status})`);
       STATE.depData[depCod] = await r.json();
       return STATE.depData[depCod];

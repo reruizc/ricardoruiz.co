@@ -41,6 +41,24 @@ ZONA_COMUNA = os.path.join(RAIZ, 'Bases de datos', 'output_geo', 'zona-comuna.js
 VUELTAS = [('1v', 'Primera vuelta', 'PRES1V'), ('2v', 'Segunda vuelta', 'PRES2V')]
 SPECIAL_CAN = {'96', '97', '98', '996', '997', '998', '999'}
 
+# Elecciones que no siguen el patrón GCS_{año}PRES{1V,2V}.csv de FINAL SUBIDA GCS.
+#   2026: el GCS lo arma gcs_2026.py desde el mesa a mesa de las comisiones.
+#   pacto2025: consultas internas del Pacto Histórico (26-oct-2025) para ordenar sus
+#              listas de Senado y Cámara. Mismas posiciones de columna que el GCS.
+ESPECIALES = {
+    '2026': {'especiales': {'996', '997', '998', '999'},
+             'dir': os.path.join(RAIZ, 'Bases de datos', 'escrutinio-2026'),
+             'vueltas': VUELTAS, 'archivo': 'GCS_2026{suf}.csv', 'etiqueta': '{nom} 2026',
+             'nombres': os.path.join(RAIZ, 'Bases de datos', 'escrutinio-2026', 'puestos_nombres_2026.json')},
+    'pacto2025': {'dir': GCS,
+                  'vueltas': [('senado', 'Consulta Senado', 'CONSU_SEN'), ('camara', 'Consulta Cámara', 'CONSU_CAM')],
+                  'archivo': 'GCS_2025{suf}.csv', 'etiqueta': '{nom} · Pacto Histórico 2025',
+                  # ⚠ en el tarjetón del Senado hay aspirantes con número 96, 97 y 98: aquí los
+                  # especiales son solo los de tres dígitos (con la regla de 2018 desaparecían
+                  # Quintero Vergara, Montes Tuirán y Enríquez Hernández, 7.402 votos)
+                  'especiales': {'996', '997', '998', '999'}},
+}
+
 # Anclas contra el resultado oficial. Solo van las dos que reproducen el oficial
 # al voto (verificadas antes en este repo); las otras dos vueltas vienen en un
 # corte del GCS ligeramente menor al boletin publicado -- 2018-2V da Duque
@@ -138,6 +156,11 @@ def leer_vuelta(path, acc, clave):
             crudo += v
             if can in SPECIAL_CAN:
                 acc['esp'][clave][des] += v
+                if 'BLANCO' in des.upper():
+                    # el voto en blanco es válido: entra al denominador de cada nivel
+                    for k in (('dep', dep), ('mun', (dep, mun)), ('zon', (dep, mun, zon)), ('pue', (dep, mun, zon, pue))):
+                        acc['blanco'][k][clave] += v
+                    acc['blanco'][('nac', '')][clave] += v
                 continue
             nac[des] += v
             acc['dep'][dep][clave][des] += v
@@ -147,22 +170,40 @@ def leer_vuelta(path, acc, clave):
     return crudo
 
 
-def bloque(counter):
+BLANCO = {}   # nivel → vuelta → votos en blanco (lo llena build antes de emitir)
+
+
+def bloque(counter, nivel=None, clave=None):
+    """`votos` = votos VÁLIDOS: candidatos + voto en blanco, que es el denominador oficial
+    de los porcentajes (el chasis divide cada candidato por este total). En las consultas
+    no hay voto en blanco y queda igual a la suma de candidatos."""
     cands = sorted(counter.items(), key=lambda kv: -kv[1])
-    return {'votos': sum(counter.values()),
-            'cands': [{'nombre': n, 'votos': v} for n, v in cands]}
+    blanco = BLANCO.get(nivel, {}).get(clave, 0) if nivel else 0
+    b = {'votos': sum(counter.values()) + blanco,
+         'cands': [{'nombre': n, 'votos': v} for n, v in cands]}
+    if blanco:
+        b['blanco'] = blanco
+    return b
 
 
 def build(anio):
+    global VUELTAS, SPECIAL_CAN
+    esp = ESPECIALES.get(anio, {})
+    SPECIAL_CAN = esp.get('especiales', {'96', '97', '98', '996', '997', '998', '999'})
+    VUELTAS = esp.get('vueltas', [('1v', 'Primera vuelta', 'PRES1V'), ('2v', 'Segunda vuelta', 'PRES2V')])
     dep_nom, mun_nom, pue_nom, zc = cargar_nombres()
+    if esp.get('nombres') and os.path.exists(esp['nombres']):
+        with open(esp['nombres'], encoding='utf-8') as f:
+            pue_nom.update(json.load(f))      # el nombre oficial del año manda sobre el georef
     mk = lambda: collections.defaultdict(collections.Counter)
     crudos = {}
-    acc = {'nac': mk(), 'esp': mk(),
+    acc = {'nac': mk(), 'esp': mk(), 'blanco': collections.defaultdict(collections.Counter),
            'dep': collections.defaultdict(mk), 'mun': collections.defaultdict(mk),
            'zon': collections.defaultdict(mk), 'pue': collections.defaultdict(mk)}
 
     for clave, _, suf in VUELTAS:
-        path = os.path.join(GCS, f'GCS_{anio}{suf}.csv')
+        path = (os.path.join(esp['dir'], esp['archivo'].format(suf=suf)) if esp
+                else os.path.join(GCS, f'GCS_{anio}{suf}.csv'))
         if not os.path.exists(path):
             sys.exit(f'falta {path}')
         print(f'  leyendo {os.path.basename(path)} ...', flush=True)
@@ -190,19 +231,22 @@ def build(anio):
             if got != esperado:
                 sys.exit('el total no cuadra con el oficial; no se escribe nada')
 
+    BLANCO.clear()
+    BLANCO.update(acc['blanco'])
     out_dir = os.path.join(OUT_BASE, anio)
     os.makedirs(out_dir, exist_ok=True)
 
     # --- resumen nacional ---
     vueltas_meta = []
     for clave, nom_v, _ in VUELTAS:
-        b = bloque(acc['nac'][clave])
+        b = bloque(acc['nac'][clave], ('nac', ''), clave)
         cods = {}
         cands = []
         for i, c in enumerate(b['cands'], 1):
             cods[c['nombre']] = str(i)
             cands.append({'nombre': c['nombre'], 'votos': c['votos'], 'codigo': str(i)})
-        vueltas_meta.append({'clave': clave, 'nombre': nom_v, 'nombre_largo': f'{nom_v} {anio}',
+        largo = esp['etiqueta'].format(nom=nom_v) if esp else f'{nom_v} {anio}'
+        vueltas_meta.append({'clave': clave, 'nombre': nom_v, 'nombre_largo': largo,
                              'votos': b['votos'], 'candidatos': cands,
                              'especiales': dict(acc['esp'][clave])})
     resumen = {'anio': anio, 'consultas': vueltas_meta}
@@ -214,7 +258,7 @@ def build(anio):
     for dep in sorted(acc['dep']):
         e = {'cod': dep, 'nombre': dep_nom.get(dep, f'Depto {dep}')}
         for clave, _, _ in VUELTAS:
-            b = bloque(acc['dep'][dep][clave])
+            b = bloque(acc['dep'][dep][clave], ('dep', dep), clave)
             e[clave] = {'votos': b['votos'],
                         'candidatos': [{'nombre': c['nombre'], 'votos': c['votos']} for c in b['cands']]}
         deps.append(e)
@@ -236,22 +280,22 @@ def build(anio):
     for dep in sorted(acc['dep']):
         d = {'cod': dep, 'nombre': dep_nom.get(dep, f'Depto {dep}')}
         for clave, _, _ in VUELTAS:
-            d[clave] = bloque(acc['dep'][dep][clave])
+            d[clave] = bloque(acc['dep'][dep][clave], ('dep', dep), clave)
         munis = []
         for mun in sorted(muns_by_dep[dep]):
             m = {'cod': mun, 'nombre': mun_nom.get((dep, mun), f'Municipio {mun}')}
             for clave, _, _ in VUELTAS:
-                m[clave] = bloque(acc['mun'][(dep, mun)][clave])
+                m[clave] = bloque(acc['mun'][(dep, mun)][clave], ('mun', (dep, mun)), clave)
             zonas = []
             for zon in sorted(zons_by_mun[(dep, mun)]):
                 z = {'cod': zon, 'nombre': nombre_zona(dep, mun, zon, zc)}
                 for clave, _, _ in VUELTAS:
-                    z[clave] = bloque(acc['zon'][(dep, mun, zon)][clave])
+                    z[clave] = bloque(acc['zon'][(dep, mun, zon)][clave], ('zon', (dep, mun, zon)), clave)
                 puestos = []
                 for pue in sorted(pues_by_zon[(dep, mun, zon)]):
                     p = {'cod': pue, 'nombre': pue_nom.get(dep + mun + zon + pue, f'Puesto {pue}')}
                     for clave, _, _ in VUELTAS:
-                        p[clave] = bloque(acc['pue'][(dep, mun, zon, pue)][clave])
+                        p[clave] = bloque(acc['pue'][(dep, mun, zon, pue)][clave], ('pue', (dep, mun, zon, pue)), clave)
                     puestos.append(p)
                 z['puestos'] = puestos
                 zonas.append(z)
