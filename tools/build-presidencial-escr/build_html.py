@@ -72,9 +72,9 @@ def genera(anio, cfg):
          f'<div class="source-badge">Fuente: <b>{cfg.get("fuente", "Registraduría · Escrutinio Definitivo")}</b></div>'),
 
         # --- datos ---
-        ("const r = await fetch(`${S3}/consultas/${path}.json`);",
+        ("const r = await fetch(`${S3}/consultas/${path}.json?v=20261008`);",
          "const r = await fetch(`${S3}/%s/${path}.json`);" % s3),
-        ("const r = await fetch(`${S3}/consultas/dep-${code}.json`);",
+        ("const r = await fetch(`${S3}/consultas/dep-${code}.json?v=20261008`);",
          "const r = await fetch(`${S3}/%s/dep-${code}.json`);" % s3),
 
         # --- las dos vueltas reemplazan a las tres consultas ---

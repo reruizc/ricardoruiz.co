@@ -1096,6 +1096,19 @@
     let _circWinner = null; // {com_cod: {partido, votos, nombre, total}}
     let _munWinner = null;  // {'dep_cod-mun_cod': {partido, votos, nombre, total}}
 
+    // Electos declarados en el E-26 de cada comisión general (1034-1049, escrutinio general de marzo de 2026).
+    // La curul es de la LISTA más votada (voto a la organización + sus dos candidatos) y, dentro de ella,
+    // de su candidato más votado: no del candidato con más votos personales de la circunscripción, que en
+    // las circunscripciones 1 y 9 pertenece a una lista que quedó segunda.
+    const CITREP_ELECTOS = {
+      '01':'ESNEYDER GOMEZ SALAMANCA', '02':'KAREN ASTRITH MANRIQUE OLARTE', '03':'JAVIER EDUARDO LOPEZ DIAZ',
+      '04':'TATIANA JUDITH GAONA PINZON', '05':'NIXON PERDOMO JURAGARO', '06':'JAMES HERMENEGILDO MOSQUERA TORRES',
+      '07':'ALEJANDRO CASTILLO GAITAN', '08':'LUIS RAMIRO RICARDO BUELVAS', '09':'EDINSON RODRIGUEZ CANCHIMBO',
+      '10':'ARNULFO MINA GARCES', '11':'JHON FREDI VALENCIA CAICEDO', '12':'JORGE RODRIGO TOVAR VELEZ',
+      '13':'JUAN CARLOS VARGAS SOLER', '14':'LAURA VANESSA DIAZ CURA', '15':'MARIA JANETH SABOGAL ROBLES',
+      '16':'KAREN JULIANA LOPEZ SALAZAR',
+    };
+    const _nCit = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z ]/g,'').replace(/\s+/g,' ').trim();
     function buildCircWinner(circs){
       const out = {};
       circs.forEach(circ => {
@@ -1110,13 +1123,16 @@
         });
         const entries = Object.entries(map).sort((a,b)=>b[1]-a[1]);
         const top = entries[0];
-        // Nombre del electo (candidato con más votos en la circ)
+        // Electo: el declarado en el E-26; si faltara, el candidato más votado de la lista ganadora
         let electo = null, electoVotos = 0;
+        const oficial = CITREP_ELECTOS[circ.cod];
         Object.entries(circ.candidatos||{}).forEach(([nom,v])=>{
-          if(v > electoVotos){ electoVotos = v; electo = nom; }
+          if(oficial){ if(_nCit(nom)===_nCit(oficial)){ electo = nom; electoVotos = v; } }
+          else if(top && resumenData._c2p[nom]===top[0] && v > electoVotos){ electoVotos = v; electo = nom; }
         });
+        const partidoElecto = electo ? resumenData._c2p[electo] : null;
         out[circ.cod] = {
-          partido: top ? top[0] : null,
+          partido: partidoElecto || (top ? top[0] : null),
           votos: top ? top[1] : 0,
           total,
           nombre: circ.nombre,
