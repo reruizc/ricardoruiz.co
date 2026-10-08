@@ -500,11 +500,12 @@
   function alCambiarVista() {
     ubicarEnPortada();
     if (!dock.hidden && !entroYa) entrar();
-    else if (!dock.hidden && contexto().vista !== 'intro') mascota?.idle().catch(() => {});
+    else if (!dock.hidden && !['intro', 'existing'].includes(contexto().vista)) mascota?.idle().catch(() => {});
     const v = contexto().vista;
     if (v === vistaComentada) return;
     vistaComentada = v;
     vigilarTarjetas();
+    if (document.getElementById('candiBusqueda') && v === 'existing') { ocultarGlobo(); return; }
     if (!presentada || abierto || calculando) return;
     const texto = VISTAS[v]?.saludo;
     /* Un comentario de la pantalla anterior no se queda colgado sobre la nueva. */
@@ -541,7 +542,7 @@
   const PAUSA_ENTRE = 25000, MAX_GENERALES = 3;
   let ultimoComentario = Date.now(), generalesDichos = 0;   /* el reloj arranca con la página: nada antes del saludo */
   const temaDicho = t => memoria.temas.includes(t.clave);
-  function libre() { return !dock.hidden && !(document.getElementById('partidaSaludo') && contexto().vista === 'intro') && presentada && !abierto && !calculando && globo && globo.hidden; }
+  function libre() { return !dock.hidden && !(document.getElementById('partidaSaludo') && ['intro', 'existing'].includes(contexto().vista)) && presentada && !abierto && !calculando && globo && globo.hidden; }
   function comentar(t) {
     if (!t || temaDicho(t)) return false;
     if (!decir(t.dicho, 20000)) return false;
@@ -752,7 +753,7 @@
   const reenviarEstado = e => tira?.dispatchEvent(new CustomEvent('candi:state', { detail: e.detail }));
   /* Libre = panel cerrado, pantalla con escena, sin pregunta en vuelo y sin
      cálculo en curso (mientras investiga o piensa no se va por el hueso). */
-  function habilitarDescanso() { descanso?.enable(!abierto && !bajito.matches && !enVuelo && !calculando && !(document.getElementById('candiBienvenida') && contexto().vista === 'intro')); }
+  function habilitarDescanso() { descanso?.enable(!abierto && !bajito.matches && !enVuelo && !calculando && !(document.getElementById('candiBienvenida') && ['intro', 'existing'].includes(contexto().vista))); }
   function alCambiarAlto() { if (bajito.matches) volverAlDock(); habilitarDescanso(); ajustarSuelo(); }
 
   /* La tira se apoya en la misma línea de suelo que la escena del dock. */
@@ -803,7 +804,7 @@
   }
   function mostrarGlobo() {
     presentada = true;
-    if (document.getElementById('partidaSaludo') && contexto().vista === 'intro') {
+    if (document.getElementById('partidaSaludo') && ['intro', 'existing'].includes(contexto().vista)) {
       memoria.presentada = true; recordar();
       globo.hidden = true;
       return; // El saludo de Luna se lee en el panel, sin globo duplicado.
@@ -902,12 +903,14 @@
   /* La portada reserva un lugar en el flujo: la mascota y su saludo nunca
      cubren las opciones. Al abrir el chat vuelve al dock flotante habitual. */
   function ubicarEnPortada() {
-    const sitio = document.getElementById('candiBienvenida');
+    const vista = contexto().vista;
+    const sitio = document.getElementById(vista === 'existing' ? 'candiBusqueda' : 'candiBienvenida');
     if (!sitio || !dock) return;
-    const enIntro = contexto().vista === 'intro';
+    const enIntro = vista === 'intro';
+    const enBusqueda = vista === 'existing';
     const stage = document.getElementById('intro').dataset.stage;
     const visible = !enIntro || stage === 'greeting' || stage === 'options';
-    const destino = enIntro && !abierto ? sitio : document.body;
+    const destino = (enIntro || enBusqueda) && !abierto ? sitio : document.body;
     if (dock.parentElement !== destino) {
       volverAlDock();
       destino.append(dock);
@@ -920,12 +923,13 @@
     if (!dock) return;
     ubicarEnPortada();
     if (dock.hidden) return;
-    const stage = document.getElementById('intro')?.dataset.stage;
+    const stage = document.getElementById(contexto().vista === 'existing' ? 'existing' : 'intro')?.dataset.stage;
     if (!entroYa) entrar();
     else if (stage === 'greeting') mascota?.play().catch(e => fallarAtlas(e?.message));
     else mascota?.idle().catch(() => {});
   }
   document.addEventListener('c360:intro-stage', sincronizarEtapaIntro);
+  document.addEventListener('c360:search-stage', sincronizarEtapaIntro);
 
   /* ─── Abrir, cerrar, desmontar ───────────────────────────────────────── */
   function abrir() {

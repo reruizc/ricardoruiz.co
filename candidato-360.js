@@ -119,7 +119,8 @@ function showScreen(id) {
      pueden desplazarlo de lado; el scroll vertical sí se lleva arriba. */
   window.scrollTo({ top: 0, behavior: 'instant' });
   refreshTopBack();
-  if (id === 'existing') setTimeout(() => $('candidateSearch')?.focus({ preventScroll: true }), 80);
+  if (id === 'existing') prepararBusqueda();
+  else clearTimeout(historicalGreetingTimer);
   if (id === 'new') aplicarGateNuevo();
   if (id !== 'intro') clearTimeout(partidaTimer);
 }
@@ -133,6 +134,10 @@ function avanzarIntro() {
   const heading = document.querySelector('#paisPaso h2');
   if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
   window.scrollTo({ top: 0, behavior: 'instant' });
+}
+function volverPasoIntro() {
+  if ($('intro').dataset.stage === 'country') volverIntro();
+  else cambiarPais();
 }
 function volverIntro() {
   $('choicePanel').classList.add('hidden');
@@ -417,7 +422,6 @@ function elegirPais(codigo) {
   if (!PAISES[codigo]) return;
   PAIS = codigo;
   try { localStorage.setItem('c360-pais', codigo); } catch {}
-  $('paisNombre').textContent = PAISES[codigo].nombre;
   $('paisPaso').classList.add('hidden');
   $('partidaPaso').classList.remove('hidden');
   $('partidaOpciones').classList.add('hidden');
@@ -883,6 +887,30 @@ function candidateProfile(candidate) {
   if (key.split(/\s+/).length === 3 && new Set(history.map(item => departamentoDelSlug(item.slug)).filter(Boolean)).size !== 1) return { ...candidate, id: candidate.slug };
   const years = [...new Set(history.map(candidateYear).filter(Boolean))].sort((a, b) => a - b);
   return { ...history[0], id: `persona-${key.toLowerCase().replace(/\s+/g, '-')}`, nombre: history[0].nombre, history, historyVotes: history.reduce((sum, item) => sum + Number(item.votos || 0), 0), historyLabel: `${history.length} candidaturas registradas · ${years.join(', ')}` };
+}
+let historicalGreetingTimer = 0;
+let historicalExplained = false;
+function prepararBusqueda() {
+  clearTimeout(historicalGreetingTimer);
+  const ready = historicalExplained;
+  $('existing').dataset.stage = ready ? 'search' : 'greeting';
+  $('historicalSearchBox').classList.toggle('hidden', !ready);
+  $('historicalSkip').classList.toggle('hidden', ready);
+  document.dispatchEvent(new CustomEvent('c360:search-stage'));
+  $('historicalTitle').focus({ preventScroll: true });
+  if (!ready) historicalGreetingTimer = setTimeout(() => mostrarBusqueda(), matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 8500);
+}
+function mostrarBusqueda(enfocar = false) {
+  clearTimeout(historicalGreetingTimer);
+  if ($('existing').classList.contains('hidden')) return;
+  historicalExplained = true;
+  $('existing').dataset.stage = 'search';
+  $('historicalSearchBox').classList.remove('hidden');
+  const focoEnBoton = document.activeElement === $('historicalSkip');
+  $('historicalSkip').classList.add('hidden');
+  document.dispatchEvent(new CustomEvent('c360:search-stage'));
+  // No abrir el teclado móvil automáticamente al terminar la explicación.
+  if (enfocar || focoEnBoton) $('candidateSearch').focus({ preventScroll: true });
 }
 function beginHistorical() {
   /* Con vínculo no se busca: la cuenta ya tiene candidato (en modo pruebas sí). */
