@@ -926,7 +926,7 @@
           <!-- inyectado por renderTransferSliders() -->
         </div>
         <button class="src-reset" onclick="resetTransfers()" style="margin-top:.6rem">Restablecer todos a 0%</button>
-        <div class="lock-overlay" onclick="openBlockedModal('transferencia')">
+        <div class="lock-overlay" onclick="PlanGate.open('transferencia')">
           <div class="lock-ico">🔒</div>
           <div class="lock-label">Disponible en Pro</div>
           <div class="lock-sub">Simula transferencias de voto entre candidatos del mismo bloque</div>
@@ -943,7 +943,7 @@
           <div id="src-sliders"></div>
           <button class="src-reset" onclick="resetWeights()">Restablecer 40·35·15·10</button>
         </div>
-        <div class="lock-overlay" onclick="openBlockedModal('pesos-fuente')">
+        <div class="lock-overlay" onclick="PlanGate.open('pesos-fuente')">
           <div class="lock-ico">🔒</div>
           <div class="lock-label">Disponible en Pro</div>
           <div class="lock-sub">Ajusta el peso de cada fuente histórica</div>
@@ -1040,217 +1040,83 @@
     <p style="opacity:.7;margin-top:.8rem"><a href="electoral.html">← Volver a Electoral</a> &nbsp;·&nbsp; <a href="veleta.html">Veleta</a> &nbsp;·&nbsp; ricardoruiz.co · 2026</p>
   </footer>
 
+  <script src="plan-gate.js?v=20261008"></script>
   <script>
   /* ════════════════════════════════════════════════════════════════
      OPORTUNIDAD · voto blando afín por candidato 2026
      ════════════════════════════════════════════════════════════════ */
 
   /* ─── PLAN GATE ────────────────────────────────────────────────
-     Consume el JWT de rr-auth.reruizc.workers.dev y mapea a tier
-     (anonymous → free → pro → premium → full). Cada acción
-     bloqueable llama a requireFeature(name) que abre un modal de
-     upgrade si el usuario no tiene permiso. Tomado del mismo
-     contrato que dashboard.html (campo user.plan). */
-  const AUTH_URL = 'https://rr-auth.reruizc.workers.dev/auth/me';
-  const PLAN_RANK = { anonymous:0, free:1, pro:2, premium:3, full:3 };
-  const PLAN_LABEL = { anonymous:'Anónimo', free:'Básico', pro:'Pro', premium:'Premium', full:'Full' };
-  let _userPlan = 'anonymous';
-  let _userInfo = null;
-
-  // Mapping declarativo: feature → plan mínimo. Cualquier acción
-  // bloqueable se nombra aquí.
-  const FEATURE_PLAN = {
-    'candidato':         'free',     // cambiar de candidato requiere cuenta (excepto el 1er switch anónimo)
-    'candidato-anonimo-agotado': 'free',  // alias: ya usaste tu cambio de muestra
-    'capa-opo-abs':      'free',
-    'nivel-dep-mun':     'free',
-    'hover-detalle':     'free',
-    'ciudades-comunas':  'pro',
-    'bog-upl':           'pro',
-    'bog-barrios':       'pro',
-    'mde-barrios':       'pro',
-    'transferencia':     'pro',
-    'pesos-fuente':      'pro',
-    'descarga-csv':      'pro',
-    'descarga-csv-quota':'premium',  // upgrade path cuando se agota la cuota Pro
-    'capa-puestos':      'premium',
-    'reporte-pdf':       'premium',
+     La lógica vive en plan-gate.js (compartido con veleta.html, los
+     tableros territoriales 2023 y brujula-2027): consume el JWT de
+     rr-auth.reruizc.workers.dev, mapea a tier (anonymous → free → pro →
+     premium → full), abre el modal de bloqueo y hace el login inline.
+     Aquí solo se declara qué plan pide cada función y el texto del modal.
+     El modal es el de esta página (#gate-modal, en verde): plan-gate lo
+     llena en vez de inyectar el suyo (`modal:'gate'`). */
+  window.GATE_FEATURES = {
+    // Mapping declarativo: feature → plan mínimo. Cualquier acción
+    // bloqueable se nombra aquí.
+    plan: {
+      'candidato':         'free',     // cambiar de candidato requiere cuenta (excepto el 1er switch anónimo)
+      'candidato-anonimo-agotado': 'free',  // alias: ya usaste tu cambio de muestra
+      'capa-opo-abs':      'free',
+      'nivel-dep-mun':     'free',
+      'hover-detalle':     'free',
+      'ciudades-comunas':  'pro',
+      'bog-upl':           'pro',
+      'bog-barrios':       'pro',
+      'mde-barrios':       'pro',
+      'transferencia':     'pro',
+      'pesos-fuente':      'pro',
+      'descarga-csv':      'pro',
+      'descarga-csv-quota':'premium',  // upgrade path cuando se agota la cuota Pro
+      'capa-puestos':      'premium',
+      'reporte-pdf':       'premium',
+    },
+    // Copy del modal por feature. Si falta entry, se usa el genérico.
+    copy: {
+      'candidato':        { title:'Selecciona el candidato a analizar', desc:'Crea tu cuenta gratis para explorar el mapa de oportunidad de cualquier candidato.' },
+      'candidato-anonimo-agotado': { title:'Ya usaste tu cambio de muestra', desc:'Como invitado puedes ver dos candidatos: Cepeda (por defecto) y uno a tu elección. Para alternar libremente entre los seis candidatos del ponderador, crea tu cuenta gratis.' },
+      'capa-opo-abs':     { title:'Capa Oportunidad / Abstención', desc:'Necesitas una cuenta gratis para alternar entre las dos capas de análisis.' },
+      'nivel-dep-mun':    { title:'Cambiar nivel territorial', desc:'Necesitas una cuenta gratis para alternar entre vista departamental y municipal.' },
+      'hover-detalle':    { title:'Detalle del territorio', desc:'Necesitas una cuenta gratis para ver el desglose por fuente histórica al pasar el cursor por el mapa.' },
+      'ciudades-comunas': { title:'Vista por comunas (8 ciudades)', desc:'El drilldown a Bogotá, Medellín, Cali, Pereira, Ibagué, Barranquilla, Montería y Manizales está en Pro.' },
+      'bog-upl':          { title:'Bogotá · Unidades de Planeamiento Local', desc:'La vista por las 33 UPL de Bogotá está en Pro.' },
+      'bog-barrios':      { title:'Bogotá · barrios catastrales', desc:'El mapa por los 1.000+ barrios catastrales de Bogotá está en Pro.' },
+      'mde-barrios':      { title:'Medellín · barrios', desc:'El mapa por los 147 barrios oficiales de Medellín está en Pro.' },
+      'transferencia':    { title:'Transferencia intra-bloque', desc:'Simula qué pasa si tu candidato absorbe parte del voto de otros candidatos de su mismo bloque ideológico. Disponible en Pro.' },
+      'pesos-fuente':     { title:'Pesos por fuente histórica', desc:'Ajusta cuánto pesa cada elección pasada (Pres-22, Cong-26, Pres-18, Consultas) al construir el mapa. Disponible en Pro.' },
+      'descarga-csv':     { title:'Descargar lista completa (CSV)', desc:'Descarga el ranking completo del territorio donde estás posicionado (departamentos, municipios, comunas/UPL/barrios o puestos). Pro: 3 descargas/mes. Premium: 10/mes.' },
+      'descarga-csv-quota': { title:'Cuota mensual alcanzada', desc:'Ya usaste todas tus descargas de este mes. La cuota se renueva el primer día del próximo mes. Considera subir a Premium para 10 descargas/mes.' },
+      'capa-puestos':     { title:'Capa Puestos de votación', desc:'El mapa de los 13.500+ puestos de votación con bias propio por puesto está disponible en Premium.' },
+      'reporte-pdf':      { title:'Reporte territorial PDF', desc:'Reporte mensual personalizado con análisis territorial y recomendaciones tácticas. Disponible en Premium.' },
+    },
+    // Precio sugerido por plan (mostrado en el modal). Coincide con pricing.html.
+    price: {
+      pro:     { cop:'$79.900 COP',  sub:'al mes · o $59.900/mes con plan anual' },
+      premium: { cop:'$219.000 COP', sub:'al mes · o $179.000/mes con plan anual' },
+    },
+    ctaUpgrade: 'Empezar con {plan}',
+    modal: 'gate',                       // usa #gate-modal (markup al final de la página)
+    // Login inline OK → repintar chip y candados y refrescar la cuota ANTES de
+    // cerrar el modal. Por simplicidad no se reintenta la acción que disparó el
+    // modal: mejor UX que reintentos automáticos que pueden cambiar de
+    // candidato sin intención.
+    onLogin: async function(){
+      renderPlanChip();
+      applyLockState();
+      await dlRefreshStatus();
+      renderDlCounter();
+    },
   };
-
-  // Copy del modal por feature. Si falta entry, se usa el genérico.
-  const FEATURE_COPY = {
-    'candidato':        { title:'Selecciona el candidato a analizar', desc:'Crea tu cuenta gratis para explorar el mapa de oportunidad de cualquier candidato.' },
-    'candidato-anonimo-agotado': { title:'Ya usaste tu cambio de muestra', desc:'Como invitado puedes ver dos candidatos: Cepeda (por defecto) y uno a tu elección. Para alternar libremente entre los seis candidatos del ponderador, crea tu cuenta gratis.' },
-    'capa-opo-abs':     { title:'Capa Oportunidad / Abstención', desc:'Necesitas una cuenta gratis para alternar entre las dos capas de análisis.' },
-    'nivel-dep-mun':    { title:'Cambiar nivel territorial', desc:'Necesitas una cuenta gratis para alternar entre vista departamental y municipal.' },
-    'hover-detalle':    { title:'Detalle del territorio', desc:'Necesitas una cuenta gratis para ver el desglose por fuente histórica al pasar el cursor por el mapa.' },
-    'ciudades-comunas': { title:'Vista por comunas (8 ciudades)', desc:'El drilldown a Bogotá, Medellín, Cali, Pereira, Ibagué, Barranquilla, Montería y Manizales está en Pro.' },
-    'bog-upl':          { title:'Bogotá · Unidades de Planeamiento Local', desc:'La vista por las 33 UPL de Bogotá está en Pro.' },
-    'bog-barrios':      { title:'Bogotá · barrios catastrales', desc:'El mapa por los 1.000+ barrios catastrales de Bogotá está en Pro.' },
-    'mde-barrios':      { title:'Medellín · barrios', desc:'El mapa por los 147 barrios oficiales de Medellín está en Pro.' },
-    'transferencia':    { title:'Transferencia intra-bloque', desc:'Simula qué pasa si tu candidato absorbe parte del voto de otros candidatos de su mismo bloque ideológico. Disponible en Pro.' },
-    'pesos-fuente':     { title:'Pesos por fuente histórica', desc:'Ajusta cuánto pesa cada elección pasada (Pres-22, Cong-26, Pres-18, Consultas) al construir el mapa. Disponible en Pro.' },
-    'descarga-csv':     { title:'Descargar lista completa (CSV)', desc:'Descarga el ranking completo del territorio donde estás posicionado (departamentos, municipios, comunas/UPL/barrios o puestos). Pro: 3 descargas/mes. Premium: 10/mes.' },
-    'descarga-csv-quota': { title:'Cuota mensual alcanzada', desc:'Ya usaste todas tus descargas de este mes. La cuota se renueva el primer día del próximo mes. Considera subir a Premium para 10 descargas/mes.' },
-    'capa-puestos':     { title:'Capa Puestos de votación', desc:'El mapa de los 13.500+ puestos de votación con bias propio por puesto está disponible en Premium.' },
-    'reporte-pdf':      { title:'Reporte territorial PDF', desc:'Reporte mensual personalizado con análisis territorial y recomendaciones tácticas. Disponible en Premium.' },
-  };
-
-  // Precio sugerido por plan (mostrado en el modal). Coincide con pricing.html.
-  const PLAN_PRICE = {
-    pro:     { cop:'$79.900 COP',  sub:'al mes · o $59.900/mes con plan anual' },
-    premium: { cop:'$219.000 COP', sub:'al mes · o $179.000/mes con plan anual' },
-  };
-
-  function loadUserFromStorage(){
-    try {
-      const raw = localStorage.getItem('rr-user');
-      const tok = localStorage.getItem('rr-token');
-      if (raw && tok){
-        _userInfo = JSON.parse(raw);
-        _userPlan = (_userInfo && _userInfo.plan) || 'free';
-        return true;
-      }
-    } catch(_){}
-    _userInfo = null;
-    _userPlan = 'anonymous';
-    return false;
-  }
-
-  async function refreshUserFromAPI(){
-    const tok = localStorage.getItem('rr-token');
-    if (!tok){ _userInfo = null; _userPlan = 'anonymous'; return; }
-    try {
-      const res = await fetch(AUTH_URL, { headers:{ 'Authorization': `Bearer ${tok}` } });
-      if (res.status === 401){
-        localStorage.removeItem('rr-token');
-        localStorage.removeItem('rr-user');
-        _userInfo = null; _userPlan = 'anonymous';
-        return;
-      }
-      const data = await res.json();
-      if (data && data.ok && data.user){
-        _userInfo = data.user;
-        _userPlan = data.user.plan || 'free';
-        localStorage.setItem('rr-user', JSON.stringify(data.user));
-      }
-    } catch(_){ /* network fail → conservar estado del localStorage */ }
-  }
-
-  function hasFeature(feat){
-    const needed = FEATURE_PLAN[feat] || 'free';
-    return PLAN_RANK[_userPlan] >= PLAN_RANK[needed];
-  }
-
-  // Abre el modal de upgrade. Lo expongo en window para usarlo desde onclick="...".
-  function openBlockedModal(feat){
-    const needed = FEATURE_PLAN[feat] || 'pro';
-    const copy = FEATURE_COPY[feat] || { title:'Esta función está bloqueada', desc:'Requiere un plan superior.' };
-    const isAnon = _userPlan === 'anonymous';
-    const tag = isAnon ? 'Crea tu cuenta gratis' : `Disponible en ${PLAN_LABEL[needed]}`;
-    document.getElementById('gate-tag').textContent = tag;
-    document.getElementById('gate-title').textContent = copy.title;
-    document.getElementById('gate-desc').textContent  = copy.desc;
-    // Precio: solo se muestra si el feature requiere pro/premium y el usuario no es anónimo.
-    const priceEl    = document.getElementById('gate-price');
-    const priceSubEl = document.getElementById('gate-price-sub');
-    if (!isAnon && (needed === 'pro' || needed === 'premium')){
-      const p = PLAN_PRICE[needed];
-      priceEl.textContent    = p ? p.cop : '';
-      priceSubEl.textContent = p ? p.sub : '';
-      priceEl.style.display = priceSubEl.style.display = '';
-    } else {
-      priceEl.style.display = priceSubEl.style.display = 'none';
-    }
-    // CTA primario: anónimo → register; resto → pricing.
-    // CTA login secundario: sólo visible para anónimos.
-    const ctaPrimary = document.getElementById('gate-cta-primary');
-    const ctaLogin   = document.getElementById('gate-cta-login');
-    if (isAnon){
-      ctaPrimary.href = 'register.html';
-      ctaPrimary.textContent = 'Crear cuenta gratis';
-      if (ctaLogin) ctaLogin.style.display = '';
-    } else {
-      ctaPrimary.href = 'pricing.html';
-      ctaPrimary.textContent = `Empezar con ${PLAN_LABEL[needed]}`;
-      if (ctaLogin) ctaLogin.style.display = 'none';
-    }
-    document.getElementById('gate-modal').classList.add('show');
-  }
-  function closeBlockedModal(){
-    document.getElementById('gate-modal').classList.remove('show');
-    // Reset del form de login para que la próxima vez no muestre el panel.
-    const form = document.getElementById('gate-login');
-    const err  = document.getElementById('gate-login-err');
-    if (form){ form.classList.remove('show'); form.reset(); }
-    if (err){ err.textContent = ''; }
-  }
-
-  // Click en "Ya tengo cuenta" dentro del modal de bloqueo:
-  // toggle del form inline de login.
-  function toggleGateLogin(){
-    const form = document.getElementById('gate-login');
-    if (!form) return;
-    form.classList.toggle('show');
-    if (form.classList.contains('show')){
-      // foco al email después de un tick para que la animación no se lo coma
-      setTimeout(() => { document.getElementById('gate-login-email')?.focus(); }, 30);
-    }
-  }
-  window.toggleGateLogin = toggleGateLogin;
-
-  // Submit del form de login inline → POST /auth/login → recarga estado.
-  async function onInlineLogin(ev){
-    ev.preventDefault();
-    const emailEl = document.getElementById('gate-login-email');
-    const pwEl    = document.getElementById('gate-login-pw');
-    const errEl   = document.getElementById('gate-login-err');
-    const btn     = document.getElementById('gate-login-submit');
-    if (!emailEl || !pwEl) return false;
-    errEl.textContent = '';
-    btn.disabled = true;
-    const prevText = btn.textContent;
-    btn.textContent = 'Entrando…';
-    try {
-      const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/login', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ email: emailEl.value.trim(), password: pwEl.value }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (data && data.ok && data.token && data.user){
-        localStorage.setItem('rr-token', data.token);
-        localStorage.setItem('rr-user',  JSON.stringify(data.user));
-        _userInfo = data.user;
-        _userPlan = data.user.plan || 'free';
-        renderPlanChip();
-        applyLockState();
-        await dlRefreshStatus();
-        renderDlCounter();
-        closeBlockedModal();
-        // Ahora que está logueado, el botón que disparó el modal puede
-        // re-intentarse — pero por simplicidad cerramos y el usuario
-        // vuelve a hacer click. Mejor UX que reintentos automáticos
-        // que pueden cambiar de candidato sin intención.
-      } else {
-        errEl.textContent = (data && data.error) || 'Email o contraseña incorrectos.';
-      }
-    } catch(e){
-      errEl.textContent = 'No se pudo conectar. Revisa tu conexión e intenta de nuevo.';
-    } finally {
-      btn.disabled = false;
-      btn.textContent = prevText;
-    }
-    return false;
-  }
-  window.onInlineLogin = onInlineLogin;
 
   // Click en "Ya tengo cuenta" desde el welcome modal: cierra welcome y
   // abre el de bloqueo con el form ya desplegado.
   function welcomeOpenLogin(){
     closeWelcomeModal();
     // Usamos 'candidato' como feature genérica para mostrar el modal.
-    openBlockedModal('candidato');
+    PlanGate.open('candidato');
     // Desplegar el form de login automáticamente.
     setTimeout(() => {
       const form = document.getElementById('gate-login');
@@ -1262,7 +1128,7 @@
 
   /* ─── WELCOME MODAL (anónimos primer visit) ──────────────────── */
   function showWelcomeIfFirst(){
-    if (_userPlan !== 'anonymous') return;
+    if (PlanGate.plan !== 'anonymous') return;
     try {
       if (localStorage.getItem('opo-welcome-shown') === '1') return;
     } catch(_) {}
@@ -1276,20 +1142,12 @@
   }
   window.closeWelcomeModal = closeWelcomeModal;
 
-  // Helper: ejecuta una acción si el feature está disponible; si no,
-  // abre el modal y retorna false. Para usar al inicio de cada función.
-  function requireFeature(feat){
-    if (hasFeature(feat)) return true;
-    openBlockedModal(feat);
-    return false;
-  }
-
   // Aplica/quita la clase .locked a un panel-card según el plan.
   function applyLockState(){
     const xfer = document.getElementById('xfer-card');
     const src  = document.getElementById('src-card');
-    if (xfer) xfer.classList.toggle('locked', !hasFeature('transferencia'));
-    if (src)  src.classList.toggle('locked',  !hasFeature('pesos-fuente'));
+    if (xfer) xfer.classList.toggle('locked', !PlanGate.has('transferencia'));
+    if (src)  src.classList.toggle('locked',  !PlanGate.has('pesos-fuente'));
   }
 
   // Renderiza el chip "Plan: X" en la nav.
@@ -1299,15 +1157,11 @@
     const up   = document.getElementById('plan-chip-up');
     if (!chip) return;
     chip.style.display = 'inline-flex';
-    name.textContent = PLAN_LABEL[_userPlan] || 'Anónimo';
+    name.textContent = PlanGate.label() || 'Anónimo';
     // El "↑ Upgrade" sólo se muestra si hay algo a lo que subir.
-    const showUpgrade = PLAN_RANK[_userPlan] < PLAN_RANK.premium;
+    const showUpgrade = PlanGate.rank() < PlanGate.rank('premium');
     up.style.display = showUpgrade ? '' : 'none';
   }
-
-  // Exponer al global scope (necesario porque algunos handlers usan onclick="...")
-  window.openBlockedModal  = openBlockedModal;
-  window.closeBlockedModal = closeBlockedModal;
 
   /* ─── DESCARGAS · QUOTA MENSUAL ────────────────────────────────
      Quota por plan: free=0 / pro=3 / premium=10 / full=∞.
@@ -1335,7 +1189,7 @@
     try { localStorage.setItem(_dlLocalKey(), String(_dlLocalUsed() + 1)); }
     catch(_) {}
   }
-  function _dlLocalQuota(){ return DL_QUOTA[_userPlan] || 0; }
+  function _dlLocalQuota(){ return DL_QUOTA[PlanGate.plan] || 0; }
 
   // Pregunta al worker el estado actual de descargas. Si el endpoint
   // aún no está desplegado (404) o falla, devuelve el estado local.
@@ -1421,22 +1275,22 @@
     }
     // El botón PDF (reporte territorial) solo se ve a partir de Premium.
     if (btnPdf){
-      btnPdf.style.display = hasFeature('reporte-pdf') ? '' : 'none';
+      btnPdf.style.display = PlanGate.has('reporte-pdf') ? '' : 'none';
     }
   }
 
   // Mensaje de error legible para el usuario según el reason del worker.
   function _dlErrorModalFor(reason){
-    if (reason === 'plan')  openBlockedModal('descarga-csv');
-    else if (reason === 'quota') openBlockedModal('descarga-csv-quota');
-    else                    openBlockedModal('descarga-csv');
+    if (reason === 'plan')  PlanGate.open('descarga-csv');
+    else if (reason === 'quota') PlanGate.open('descarga-csv-quota');
+    else                    PlanGate.open('descarga-csv');
   }
 
   // Click en "Descargar Top (CSV)": gate por plan + intenta consumir
   // una descarga en el worker (con fallback local). Exporta TODA la
   // lista del scope activo, no sólo el top mostrado en el panel.
   async function onDownloadTopCSV(){
-    if (!requireFeature('descarga-csv')) return;
+    if (!PlanGate.require('descarga-csv')) return;
     // Recolecta la lista completa del scope actual.
     const full = (STATE._topItemsAll && STATE._topItemsAll.length)
       ? STATE._topItemsAll
@@ -1610,7 +1464,7 @@
   }
 
   async function onDownloadTopPDF(){
-    if (!requireFeature('reporte-pdf')) return;
+    if (!PlanGate.require('reporte-pdf')) return;
     // Tomamos hasta el top 50 del scope activo.
     const full = (STATE._topItemsAll && STATE._topItemsAll.length)
       ? STATE._topItemsAll
@@ -3966,7 +3820,7 @@
   function onDepClick(elec){
     if (!elec) return;
     // Anónimo: drill-in al depto requiere cuenta gratis.
-    if (!requireFeature('nivel-dep-mun')) return;
+    if (!PlanGate.require('nivel-dep-mun')) return;
     // Bogotá D.C. (electoral 16) tiene un solo "municipio" — saltar
     // directo a la capa de localidades para no perder un click.
     if (String(elec).padStart(2,'0') === '16'){
@@ -3995,7 +3849,7 @@
   // Bogotá:   click en una localidad → barrios de esa localidad.
   async function drillToBarriosOfCom(cityKey, comCod, comName){
     if (cityKey === 'medellin'){
-      if (!requireFeature('mde-barrios')) return;
+      if (!PlanGate.require('mde-barrios')) return;
       showLoading(true);
       try {
         await Promise.all([loadMdeBarriosGeo(), loadMdeBarrioSignals()]);
@@ -4010,7 +3864,7 @@
       return;
     }
     if (cityKey === 'bogota'){
-      if (!requireFeature('bog-barrios')) return;
+      if (!PlanGate.require('bog-barrios')) return;
       showLoading(true);
       try {
         await Promise.all([loadBogBarrioGeo(), loadBogBarrioSignals()]);
@@ -4027,7 +3881,7 @@
   }
   // Bogotá UPL: click en una UPL → barrios contenidos por PIP.
   async function drillToBarriosOfUpl(uplCod, uplName){
-    if (!requireFeature('bog-barrios')) return;
+    if (!PlanGate.require('bog-barrios')) return;
     showLoading(true);
     try {
       await Promise.all([loadBogBarrioGeo(), loadBogBarrioSignals()]);
@@ -4458,7 +4312,7 @@
 
   async function setMdeView(view){
     if (view === STATE.mdeView && STATE.selectedCity === 'medellin') return;
-    if (view === 'barrios' && !requireFeature('mde-barrios')) return;
+    if (view === 'barrios' && !PlanGate.require('mde-barrios')) return;
     STATE.mdeView = view;
     // Toggle manual del sub-view limpia cualquier drill a una comuna específica.
     STATE.barrioParent = null;
@@ -4763,8 +4617,8 @@
 
   async function setBogView(view){
     if (view === STATE.bogView && STATE.selectedCity === 'bogota') return;
-    if (view === 'upl' && !requireFeature('bog-upl')) return;
-    if (view === 'barrios' && !requireFeature('bog-barrios')) return;
+    if (view === 'upl' && !PlanGate.require('bog-upl')) return;
+    if (view === 'barrios' && !PlanGate.require('bog-barrios')) return;
     STATE.bogView = view;
     // Toggle manual del sub-view limpia cualquier drill a una localidad/UPL específica.
     STATE.barrioParent = null;
@@ -5133,7 +4987,7 @@
 
   /* ───────── Ciudades — drilldown a comuna/localidad ───────── */
   async function onCityClick(cityKey){
-    if (!requireFeature('ciudades-comunas')) return;
+    if (!PlanGate.require('ciudades-comunas')) return;
     // Entrar a una ciudad nueva limpia cualquier drill anterior a barrios
     // de una comuna/localidad/UPL.
     STATE.barrioParent = null;
@@ -5828,26 +5682,14 @@
   }
 
   // Anónimo: permite UN cambio de candidato gratis antes de exigir cuenta.
-  // Contador persistido para que no se "reset" al refrescar.
-  function _anonCandSwitches(){
-    try { return parseInt(localStorage.getItem('opo-anon-cand-switches')||'0',10)||0; }
-    catch(_){ return 0; }
-  }
-  function _anonCandSwitchBump(){
-    try { localStorage.setItem('opo-anon-cand-switches', String(_anonCandSwitches()+1)); }
-    catch(_){}
-  }
+  // Contador persistido para que no se "reset" al refrescar; se conserva la
+  // llave de siempre para no regalar otra muestra a quien ya la usó.
+  const CAND_SAMPLE = { storageKey:'opo-anon-cand-switches', blocked:'candidato-anonimo-agotado' };
 
   function setCandidate(id){
     if (id === STATE.candId) return;
     // Anónimo: 1 cambio gratis. Después → modal.
-    if (_userPlan === 'anonymous'){
-      if (_anonCandSwitches() >= 1){
-        openBlockedModal('candidato-anonimo-agotado');
-        return;
-      }
-      _anonCandSwitchBump();
-    } else if (!requireFeature('candidato')) return;
+    if (!PlanGate.requireOrSample('candidato', 'opo-cand', 1, CAND_SAMPLE)) return;
     STATE.candId = id;
     document.querySelectorAll('.cand-pill').forEach(el => {
       el.classList.toggle('active', el.dataset.id === id);
@@ -5883,7 +5725,7 @@
   function onWeightChange(key, val){
     // Defensa en profundidad: el overlay candado ya captura el click,
     // pero alguien con devtools puede invocar el handler directo.
-    if (!hasFeature('pesos-fuente')){ openBlockedModal('pesos-fuente'); return; }
+    if (!PlanGate.has('pesos-fuente')){ PlanGate.open('pesos-fuente'); return; }
     val = +val;
     // Redistribuir para mantener suma = 100, sólo a las otras fuentes proporcionalmente
     const oldVal = STATE.weights[key];
@@ -5964,7 +5806,7 @@
     wrap.innerHTML = rows.join('');
   }
   function onTransferChange(donorId, v){
-    if (!hasFeature('transferencia')){ openBlockedModal('transferencia'); return; }
+    if (!PlanGate.has('transferencia')){ PlanGate.open('transferencia'); return; }
     const ppAbs = +v;
     const c = CANDIDATOS.find(x => x.id === donorId);
     const pp = pondPct(c) || 0;
@@ -5989,7 +5831,7 @@
     }, 20);
   }
   function resetTransfers(){
-    if (!requireFeature('transferencia')) return;
+    if (!PlanGate.require('transferencia')) return;
     STATE.transfers[STATE.candId] = {};
     refreshLiderUI();
     showLoading(true);
@@ -6058,7 +5900,7 @@
   }
 
   function resetWeights(){
-    if (!requireFeature('pesos-fuente')) return;
+    if (!PlanGate.require('pesos-fuente')) return;
     SOURCE_BUCKETS.forEach(b => { STATE.weights[b.key] = b.defW; });
     renderSourceSliders();
     showLoading(true);
@@ -6075,8 +5917,8 @@
   function setLayer(L){
     if (L === STATE.layer) return;
     // Gates por capa: opo/abs requiere cuenta gratis; puestos requiere Premium.
-    if (L === 'pue'){ if (!requireFeature('capa-puestos')) return; }
-    else { if (!requireFeature('capa-opo-abs')) return; }
+    if (L === 'pue'){ if (!PlanGate.require('capa-puestos')) return; }
+    else { if (!PlanGate.require('capa-opo-abs')) return; }
     const prev = STATE.layer;
     STATE.layer = L;
     document.getElementById('layer-opo').classList.toggle('active', L==='opo');
@@ -6145,7 +5987,7 @@
     // Salir del modo Puestos si estaba activo.
     if (STATE.layer === 'pue') setLayer('opo');
     if (lvl === STATE.level && !STATE.selectedDep && !STATE.selectedCity) return;
-    if (!requireFeature('nivel-dep-mun')) return;
+    if (!PlanGate.require('nivel-dep-mun')) return;
     STATE.level = lvl;
     document.getElementById('lvl-dep').classList.toggle('active', lvl==='dep');
     document.getElementById('lvl-mun').classList.toggle('active', lvl==='mun');
@@ -6211,7 +6053,7 @@
     //    chip y el lock-state desde el primer frame. Lectura local
     //    primero (instantánea); refresh contra el worker en segundo
     //    plano para invalidar tokens vencidos.
-    loadUserFromStorage();
+    const gateReady = PlanGate.init();   // lee localStorage ya; el refresh corre detrás
     renderPlanChip();
     applyLockState();
     // Estado inicial del contador con datos locales para evitar parpadeo;
@@ -6221,7 +6063,7 @@
     // Welcome modal sólo se dispara después del refresh contra el worker:
     // si el usuario ya tiene sesión válida, NO queremos enseñarle el modal
     // de "modo invitado" sólo porque el localStorage llegó vacío.
-    refreshUserFromAPI().then(async () => {
+    gateReady.then(async () => {
       renderPlanChip();
       applyLockState();
       await dlRefreshStatus();
@@ -6259,8 +6101,8 @@
   })();
   </script>
 
-  <!-- Modal de bloqueo por plan (Pro / Premium) -->
-  <div class="gate-overlay" id="gate-modal" onclick="if(event.target===this) closeBlockedModal()">
+  <!-- Modal de bloqueo por plan (Pro / Premium) · lo llena plan-gate.js con modal:'gate' -->
+  <div class="gate-overlay" id="gate-modal" onclick="if(event.target===this) PlanGate.close()">
     <div class="gate-card">
       <div class="gate-tag" id="gate-tag">Disponible en Pro</div>
       <div class="gate-title" id="gate-title">Esta función está bloqueada</div>
@@ -6269,11 +6111,11 @@
       <div class="gate-price-sub" id="gate-price-sub"></div>
       <div class="gate-actions">
         <a class="gate-btn gate-btn-primary" id="gate-cta-primary" href="pricing.html">Ver planes</a>
-        <button class="gate-btn gate-btn-ghost" id="gate-cta-login" onclick="toggleGateLogin()" style="display:none">Ya tengo cuenta</button>
-        <button class="gate-btn gate-btn-ghost" id="gate-cta-secondary" onclick="closeBlockedModal()">Cerrar</button>
+        <button class="gate-btn gate-btn-ghost" id="gate-cta-login" onclick="PlanGate.toggleLogin()" style="display:none">Ya tengo cuenta</button>
+        <button class="gate-btn gate-btn-ghost" id="gate-cta-secondary" onclick="PlanGate.close()">Cerrar</button>
       </div>
       <!-- Login inline (se despliega al click en "Ya tengo cuenta") -->
-      <form class="gate-login" id="gate-login" onsubmit="onInlineLogin(event)">
+      <form class="gate-login" id="gate-login" onsubmit="PlanGate.submitLogin(event)">
         <div class="gate-login-title">Iniciar sesión</div>
         <div class="gate-login-field">
           <label for="gate-login-email">Email</label>
