@@ -392,10 +392,10 @@
       &nbsp;/&nbsp; Escrutinio Senado 2026
     </div>
     <div class="meta-bar">
-      <span class="meta-item" id="sn-meta-elec">Elección: <b>Congreso · Declarados 14 abr 2026</b></span>
+      <span class="meta-item" id="sn-meta-elec">Elección: <b>Congreso · Declaratoria CNE 13 jul 2026</b></span>
       <span class="meta-item" id="sn-meta-curules">Curules: <b>100</b></span>
       <span class="meta-item">Votos válidos: <b id="meta-votval">—</b></span>
-      <div class="source-badge" id="sn-source">Fuente: <b>Registraduría · Escrutinio</b></div>
+      <div class="source-badge" id="sn-source">Fuente: <b>CNE · Res. E-3328</b></div>
       <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
     </div>
 
@@ -526,7 +526,7 @@
 
   <div class="full-footer">
     <span class="footer-brand">ricardoruiz.co · Elecciones Colombia 2026</span>
-    <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
+    <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Totales nacionales: CNE, Res. E-3328 (13 jul 2026) · Detalle territorial: comisiones escrutadoras, Registraduría</a></span>
   </div>
 
   <script>
@@ -1019,7 +1019,8 @@
       try{
         resumenData = await getJSON('resumen');
         try{ circData = await getJSON('circunscripciones'); }catch(_){}
-        document.getElementById('meta-votval').textContent = fmt(19481501);
+        // válidos = votos por listas + voto en blanco (19.478.739 en la declaratoria del CNE)
+        document.getElementById('meta-votval').textContent = fmt(resumenData.validos_con_blanco || ((resumenData.votval||0)+(resumenData.votblan||0)));
         document.getElementById('load-state').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
         renderKPI();
@@ -1606,7 +1607,8 @@
         const terrVotes = Object.entries(_rgFilter.nacPartidos)
           .map(([partido,votos])=>({partido,votos})).filter(p=>p.votos>0);
         const totalTerrVotes = terrVotes.reduce((s,p)=>s+p.votos,0);
-        const umbral3 = totalTerrVotes*0.03;
+        // el umbral es el 3% de los votos VÁLIDOS: listas + voto en blanco (art. 263 C.P.)
+        const umbral3 = (_rgFilter.nacVV || totalTerrVotes)*0.03;
         const aboveUmbral = terrVotes.filter(p=>p.votos>=umbral3);
         const whatIfResult = dhondt(aboveUmbral, 100);
         whatIfMap = {};
@@ -2126,7 +2128,8 @@
         contextLabel = _rgFilter.nombre;
         const terrVotes = Object.entries(_rgFilter.nacPartidos).map(([partido,votos])=>({partido,votos})).filter(p=>p.votos>0);
         const totalTerrVotes = terrVotes.reduce((s,p)=>s+p.votos,0);
-        const umbral3 = totalTerrVotes*0.03;
+        // el umbral es el 3% de los votos VÁLIDOS: listas + voto en blanco (art. 263 C.P.)
+        const umbral3 = (_rgFilter.nacVV || totalTerrVotes)*0.03;
         const aboveUmbral = terrVotes.filter(p=>p.votos>=umbral3);
         const whatIfResult = dhondt(aboveUmbral, 100);
         const whatIfMap = {};
@@ -2194,45 +2197,45 @@
         htmlLang:'es', pageTitle:'Escrutinio Senado 2026 · Ricardo Ruiz',
         back:'← Volver', titleLine1:'Senado de', titleSpan:'la República',
         breadcrumb1:'Resultados Electorales', breadcrumb2:'Escrutinio Senado 2026',
-        metaElec:'Elección: <b>Congreso · Definitivos 14 abr 2026</b>',
+        metaElec:'Elección: <b>Congreso · Declaratoria CNE 13 jul 2026</b>',
         metaCurules:'Curules: <b>100</b>',
-        source:'Fuente: <b>Registraduría · Escrutinio</b>',
+        source:'Fuente: <b>CNE · Res. E-3328</b>',
         themeDay:'☀ Modo día', themeNight:'🌙 Modo noche',
         loading:'Cargando escrutinio…',
         endosoText:'<b>¿Quieres medir el endoso?</b><br/>Compara la votación de un candidato al Senado con uno de Cámara mesa por mesa.',
         endosoBtn:'Calcular endoso →',
         footer1:'ricardoruiz.co · Elecciones Colombia 2026',
-        footer2:'Fuente: Registraduría Nacional',
+        footer2:'Totales nacionales: CNE, Res. E-3328 (13 jul 2026) · Detalle territorial: comisiones escrutadoras, Registraduría',
         login:'Iniciar sesión', register:'Registrarse', logout:'Salir', planes:'Planes',
       },
       us: {
         htmlLang:'en', pageTitle:'Senate Scrutiny 2026 · Ricardo Ruiz',
         back:'← Back', titleLine1:'Senate of the', titleSpan:'Republic',
         breadcrumb1:'Electoral Results', breadcrumb2:'Senate Official Count 2026',
-        metaElec:'Election: <b>Congress · Official Apr 14, 2026</b>',
+        metaElec:'Election: <b>Congress · CNE declaration Jul 13, 2026</b>',
         metaCurules:'Seats: <b>100</b>',
-        source:'Source: <b>Registraduría · Official count</b>',
+        source:'Source: <b>CNE · Res. E-3328</b>',
         themeDay:'☀ Day mode', themeNight:'🌙 Night mode',
         loading:'Loading results…',
         endosoText:'<b>Want to measure endorsement?</b><br/>Compare a Senate candidate\'s votes with a House candidate station by station.',
         endosoBtn:'Calculate endorsement →',
         footer1:'ricardoruiz.co · Colombia Elections 2026',
-        footer2:'Source: National Civil Registry',
+        footer2:'National totals: CNE, Res. E-3328 (Jul 13, 2026) · Territorial detail: scrutiny commissions, Registraduría',
         login:'Log in', register:'Sign up', logout:'Log out', planes:'Plans',
       },
       cn: {
         htmlLang:'zh', pageTitle:'参议院计票 2026 · Ricardo Ruiz',
         back:'← 返回', titleLine1:'共和国', titleSpan:'参议院',
         breadcrumb1:'选举结果', breadcrumb2:'参议院官方计票 2026',
-        metaElec:'选举: <b>国会 · 官方结果 2026年4月14日</b>',
+        metaElec:'选举: <b>国会 · 全国选举委员会宣告 2026年7月13日</b>',
         metaCurules:'席位: <b>100</b>',
-        source:'来源: <b>Registraduría · 官方计票</b>',
+        source:'来源: <b>CNE · E-3328号决议</b>',
         themeDay:'☀ 日间模式', themeNight:'🌙 夜间模式',
         loading:'正在加载结果…',
         endosoText:'<b>想测量背书吗？</b><br/>逐投票站比较参议院候选人与众议院候选人的得票数。',
         endosoBtn:'计算背书 →',
         footer1:'ricardoruiz.co · 哥伦比亚选举 2026',
-        footer2:'来源：国家民事登记处',
+        footer2:'全国总数：全国选举委员会 E-3328号决议（2026年7月13日）· 地区明细：计票委员会，国家民事登记处',
         login:'登录', register:'注册', logout:'退出', planes:'计划',
       },
     };
