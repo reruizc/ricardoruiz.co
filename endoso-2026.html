@@ -525,7 +525,7 @@
             <div class="selector-group">
               <div class="selector-label"><span class="cand-badge" style="background:var(--blue)"></span>Candidato A</div>
               <div class="ac-wrap">
-                <input type="text" class="ac-input" id="ac-input-A" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearch('A')" onfocus="acOpen('A')" onkeydown="acKey(event,'A')" />
+                <input type="text" class="ac-input" id="ac-input-A" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearchDebounced('A')" onfocus="acOpen('A')" onkeydown="acKey(event,'A')" />
                 <div class="ac-dropdown" id="ac-drop-A"></div>
               </div>
               <div class="corp-hint" id="corp-A"></div>
@@ -534,7 +534,7 @@
             <div class="selector-group">
               <div class="selector-label"><span class="cand-badge" style="background:var(--purple)"></span>Candidato B</div>
               <div class="ac-wrap">
-                <input type="text" class="ac-input" id="ac-input-B" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearch('B')" onfocus="acOpen('B')" onkeydown="acKey(event,'B')" />
+                <input type="text" class="ac-input" id="ac-input-B" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearchDebounced('B')" onfocus="acOpen('B')" onkeydown="acKey(event,'B')" />
                 <div class="ac-dropdown" id="ac-drop-B"></div>
               </div>
               <div class="corp-hint" id="corp-B"></div>
@@ -559,7 +559,7 @@
               <div class="selector-group">
                 <div class="selector-label"><span class="cand-badge" style="background:var(--green)"></span>Candidato C</div>
                 <div class="ac-wrap">
-                  <input type="text" class="ac-input" id="ac-input-C" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearch('C')" onfocus="acOpen('C')" onkeydown="acKey(event,'C')" />
+                  <input type="text" class="ac-input" id="ac-input-C" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearchDebounced('C')" onfocus="acOpen('C')" onkeydown="acKey(event,'C')" />
                   <div class="ac-dropdown" id="ac-drop-C"></div>
                 </div>
                 <div class="corp-hint" id="corp-C"></div>
@@ -567,7 +567,7 @@
               <div class="selector-group">
                 <div class="selector-label"><span class="cand-badge" style="background:var(--orange)"></span>Candidato D</div>
                 <div class="ac-wrap">
-                  <input type="text" class="ac-input" id="ac-input-D" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearch('D')" onfocus="acOpen('D')" onkeydown="acKey(event,'D')" />
+                  <input type="text" class="ac-input" id="ac-input-D" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearchDebounced('D')" onfocus="acOpen('D')" onkeydown="acKey(event,'D')" />
                   <div class="ac-dropdown" id="ac-drop-D"></div>
                 </div>
                 <div class="corp-hint" id="corp-D"></div>
@@ -589,7 +589,7 @@
               <div class="selector-group">
                 <div class="selector-label"><span class="cand-badge" style="background:#f472b6"></span>Candidato extra 1</div>
                 <div class="ac-wrap">
-                  <input type="text" class="ac-input" id="ac-input-E1" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearch('E1')" onfocus="acOpen('E1')" onkeydown="acKey(event,'E1')" />
+                  <input type="text" class="ac-input" id="ac-input-E1" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearchDebounced('E1')" onfocus="acOpen('E1')" onkeydown="acKey(event,'E1')" />
                   <div class="ac-dropdown" id="ac-drop-E1"></div>
                 </div>
                 <div class="corp-hint" id="corp-E1"></div>
@@ -597,7 +597,7 @@
               <div class="selector-group">
                 <div class="selector-label"><span class="cand-badge" style="background:#38bdf8"></span>Candidato extra 2 <span style="font-family:'HelveticaNeue',Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:.741rem;color:rgba(255,255,255,.25)">(opcional)</span></div>
                 <div class="ac-wrap">
-                  <input type="text" class="ac-input" id="ac-input-E2" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearch('E2')" onfocus="acOpen('E2')" onkeydown="acKey(event,'E2')" />
+                  <input type="text" class="ac-input" id="ac-input-E2" placeholder="Escribir nombre…" autocomplete="off" oninput="acSearchDebounced('E2')" onfocus="acOpen('E2')" onkeydown="acKey(event,'E2')" />
                   <div class="ac-dropdown" id="ac-drop-E2"></div>
                 </div>
                 <div class="corp-hint" id="corp-E2"></div>
@@ -728,6 +728,11 @@
             <span style="color:rgba(255,255,255,.3);font-size:.69rem">${e.message}</span>
           </div>`;
       }
+      // La base ya quedó armada: ahora sí puede apilarse Concejo y JAL (ver
+      // _apilaLocal). Hoy los buscadores aparecen solo tras la base, así que no
+      // debería llegar nada antes; la guarda queda por si eso cambia.
+      _baseListo = true;
+      _apilaLocal(null);
     }
 
     // ─── AUTOCOMPLETE ─────────────────────────────────────────
@@ -750,23 +755,60 @@
     // ~250k candidaturas: no entran al índice del arranque. Se piden al primer
     // foco/tecla del buscador, igual que en analisis-candidato.html, y se apilan
     // SIN agrupar por persona (esta página compara candidaturas, no personas).
-    let _localReq = null, _localDone = false;
+    // Cada índice se apila EN CUANTO llega (mismo patrón de analisis-candidato):
+    // antes se esperaba a los ocho y Concejo 2023 tardaba en ser buscable.
+    // ⚠️ loadIndex REASIGNA candIndex al terminar: lo que llegue antes de la base
+    // espera en _localPend y entra al drenar, o esa reasignación lo borraría.
+    let _localReq = null, _localDone = false, _acLocalHechas = 0;
+    let _baseListo = false, _localPend = [];
+    function _apilaLocal(list) {
+      if (list && list.length) _localPend.push(list);
+      if (!_baseListo) return;
+      while (_localPend.length) {
+        const l = _localPend.shift();
+        const have = new Set(candIndex.map(c => c.slug));
+        candIndex = candIndex.concat(l.filter(c => !have.has(c.slug)));
+      }
+      const el = document.getElementById('meta-cands');
+      if (el && candIndex.length) el.textContent = candIndex.length.toLocaleString('es-CO');
+      // Repinta solo los desplegables abiertos: reabrir uno cerrado mientras se
+      // trabaja en otro buscador sería un estorbo (pasa hasta ocho veces).
+      ['A','B','C','D','E1','E2'].forEach(k => {
+        const d = document.getElementById(`ac-drop-${k}`);
+        if (d && d.classList.contains('open') && !acSelected[k]) acSearch(k);
+      });
+    }
     function ensureLocal() {
       if (_localDone || _localReq) return _localReq;
-      _localReq = CandRegistry.loadLocal().then(list => {
+      _localReq = CandRegistry.loadLocal({
+        onSource: (list, _src, i) => { _acLocalHechas = i; _apilaLocal(list); },
+      }).then(list => {
         _localDone = true;
-        const have = new Set(candIndex.map(c => c.slug));
-        candIndex = candIndex.concat(list.filter(c => !have.has(c.slug)));
-        const el = document.getElementById('meta-cands');
-        if (el) el.textContent = candIndex.length.toLocaleString('es-CO');
-        // Repintar si el usuario ya estaba escribiendo.
-        ['A','B','C','D','E1','E2'].forEach(k => {
-          const i = document.getElementById(`ac-input-${k}`);
-          if (i && i.value.trim().length >= 2 && !acSelected[k]) acSearch(k);
-        });
+        _apilaLocal([]);   // quita el aviso de carga de los desplegables abiertos
         return list;
-      }).catch(e => { console.warn('[local] no disponible:', e && e.message); _localDone = true; });
+      }).catch(e => { console.warn('[local] no disponible:', e && e.message); _localDone = true; _apilaLocal([]); });
       return _localReq;
+    }
+
+    /* Con ~428k candidaturas cada tecla recorría el índice entero. El debounce
+       corta las pasadas intermedias: se busca ~90 ms después de la última tecla
+       (imperceptible al escribir), una pasada por palabra y no una por letra.
+       Lo que invalida la selección (botón Calcular, rótulos) va de una: no puede
+       quedar 90 ms habilitado con un candidato que ya se está borrando. */
+    const _acTimer = {};
+    function acSearchDebounced(k) {
+      ensureLocal();                       // dispara la carga diferida ya, no en 90 ms
+      acLimpiaSel(k);
+      clearTimeout(_acTimer[k]);
+      _acTimer[k] = setTimeout(() => acSearch(k), 90);
+    }
+
+    function acLimpiaSel(k) {
+      const input = document.getElementById(`ac-input-${k}`);
+      acSelected[k] = null; // limpiar selección al escribir
+      input.classList.remove('selected');
+      checkRunBtn();
+      updateCondLabels();
     }
 
     function acSearch(k) {
@@ -774,17 +816,15 @@
       const input = document.getElementById(`ac-input-${k}`);
       const drop  = document.getElementById(`ac-drop-${k}`);
       const q = input.value.trim();
-      acSelected[k] = null; // limpiar selección al escribir
-      input.classList.remove('selected');
-      checkRunBtn();
-      updateCondLabels();
+      acLimpiaSel(k);
 
       if (q.length < 2) { drop.classList.remove('open'); drop.innerHTML=''; return; }
 
       // Ordena por relevancia + votación (CandRegistry.acRank) en vez de cortar
       // en el orden de carga: con 419k candidaturas, ese corte escondía Concejo
-      // y JAL detrás de todas las demás fuentes.
-      const rank = CandRegistry.acRank(q, candIndex, 30);
+      // y JAL detrás de todas las demás fuentes. Límite 20, como en
+      // analisis-candidato y comparar-candidatos.
+      const rank = CandRegistry.acRank(q, candIndex, 20);
       const results = rank.items;
       const cargando = !_localDone;
       if (!results.length && !cargando) { drop.classList.remove('open'); drop.innerHTML=''; return; }
@@ -799,7 +839,12 @@
       if (rank.total > results.length) {
         html += `<div class="ac-more">${results.length} de ${rank.total.toLocaleString('es-CO')} coincidencias · agrega el apellido para afinar</div>`;
       }
-      if (cargando) html += `<div class="ac-more">Cargando Concejo y JAL…</div>`;
+      // Concejo y JAL entran por carga diferida: sin este aviso, escribir rápido
+      // mostraba "sin resultados" y parecía que faltaran esos datos.
+      if (cargando) {
+        const t = LANG[getLang()] || LANG.co;
+        html += `<div class="ac-more">${t.loadingLocalShort(Math.max(1, CandRegistry.LOCAL_SOURCES.length - _acLocalHechas))}</div>`;
+      }
       drop.innerHTML = html;
       acHighlight[k] = -1;
       drop.classList.add('open');
@@ -812,6 +857,7 @@
     }
 
     function acSelect(k, el) {
+      clearTimeout(_acTimer[k]);   // una búsqueda pendiente borraría esta selección
       const input = document.getElementById(`ac-input-${k}`);
       const drop  = document.getElementById(`ac-drop-${k}`);
       const circ  = el.dataset.circ || '';
@@ -1993,6 +2039,7 @@
         themeDay: '☀ Modo día',
         themeNight: '🌙 Modo noche',
         loadingLabel: 'Cargando candidatos…',
+        loadingLocalShort: n => n === 1 ? 'Cargando Concejo y JAL · falta 1 índice' : `Cargando Concejo y JAL · faltan ${n} índices`,
         helpP1: 'Esta herramienta mide el endoso cruzado entre dos candidatos al Congreso 2026: compara su votación mesa por mesa para identificar en qué zonas compartieron electorado y con qué intensidad. Es útil para detectar afinidades territoriales entre listas, corporaciones o partidos.',
         helpP2: 'Selecciona un Candidato A y un Candidato B en los campos de búsqueda y haz clic en <b>Calcular endoso</b>. Puedes explorar los resultados en el mapa o en la tabla, y aplicar filtros geográficos para ver el detalle por departamento o municipio.',
         helpOk: 'OK',
@@ -2052,6 +2099,7 @@
         themeDay: '☀ Day mode',
         themeNight: '🌙 Night mode',
         loadingLabel: 'Loading candidates…',
+        loadingLocalShort: n => n === 1 ? 'Loading council and local boards · 1 index to go' : `Loading council and local boards · ${n} indexes to go`,
         helpP1: 'This tool measures cross-endorsement between two candidates in the 2026 Congress election: it compares their vote counts polling station by polling station to identify areas where they shared voters and with what intensity. Useful for detecting territorial affinities between lists, chambers, or parties.',
         helpP2: 'Select Candidate A and Candidate B in the search fields and click <b>Calculate endorsement</b>. You can explore results on the map or table, and apply geographic filters to see details by department or municipality.',
         helpOk: 'OK',
@@ -2111,6 +2159,7 @@
         themeDay: '☀ 日间模式',
         themeNight: '🌙 夜间模式',
         loadingLabel: '正在加载候选人…',
+        loadingLocalShort: n => `正在加载市议会与地方委员会 · 还差 ${n} 个索引`,
         helpP1: '此工具测量2026年国会选举中两位候选人之间的交叉背书：逐投票站比较他们的得票数，以识别他们共享选民的区域及其强度。适用于检测名单、议院或政党之间的地域亲和力。',
         helpP2: '在搜索字段中选择候选人A和候选人B，然后点击<b>计算背书</b>。您可以在地图或表格中探索结果，并应用地理过滤器查看省或市的详细信息。',
         helpOk: '确定',
