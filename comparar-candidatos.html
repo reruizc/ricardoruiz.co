@@ -344,7 +344,7 @@
         </div>
         <div class="ac-wrap">
           <input class="ac-input a" id="ac-a" type="text" placeholder="Nombre del candidato…"
-            autocomplete="off" oninput="acSearchA()" onkeydown="acKeyA(event)" onfocus="acSearchA()" />
+            autocomplete="off" oninput="acSearchDebounced('A')" onkeydown="acKeyA(event)" onfocus="acSearchA()" />
           <div class="ac-dropdown" id="drop-a"></div>
         </div>
       </div>
@@ -358,7 +358,7 @@
         </div>
         <div class="ac-wrap">
           <input class="ac-input b" id="ac-b" type="text" placeholder="Nombre del candidato…"
-            autocomplete="off" oninput="acSearchB()" onkeydown="acKeyB(event)" onfocus="acSearchB()" />
+            autocomplete="off" oninput="acSearchDebounced('B')" onkeydown="acKeyB(event)" onfocus="acSearchB()" />
           <div class="ac-dropdown" id="drop-b"></div>
         </div>
       </div>
@@ -552,6 +552,11 @@
         const hint = document.getElementById('search-hint');
         if (hint) hint.textContent = 'Error al cargar el índice';
       }
+      // La base ya quedó armada: ahora sí se apila lo de Concejo y JAL que haya
+      // llegado antes (ver _apilaLocal). También si la base falló: esperar
+      // dejaría el buscador vacío con Concejo y JAL ya descargados.
+      _baseListo = true;
+      _apilaLocal(null);
     }
 
     function isPartyEntry(c) {
@@ -560,20 +565,41 @@
       return /^(PARTIDO|MOVIMIENTO|COALICION|ALIANZA|LISTA|PACTO)\b/.test(n);
     }
 
-    // \u2500\u2500\u2500 FUENTES LOCALES (Concejo \u00b7 JAL 2023) \u00b7 carga diferida \u2500\u2500\u2500\u2500
-    // ~108k candidatos: se piden al primer foco/tecla del buscador y se apilan.
-    let _localReq = null, _localDone = false;
+    // ─── FUENTES LOCALES (Concejo · JAL, los 4 años) · carga diferida ────
+    // Se piden al primer foco/tecla del buscador y se apilan EN CUANTO llega
+    // cada índice (mismo patrón de analisis-candidato.html): antes se esperaba a
+    // los ocho y, mientras tanto, el buscador parecía no tener Concejo ni JAL.
+    // ⚠️ Carrera: loadIndex termina REASIGNANDO candIndex. Si un índice local
+    // llegara antes, esa reasignación se lo llevaría por delante sin avisar. Por
+    // eso lo que llegue antes de la base espera en _localPend y entra al drenar.
+    let _localReq = null, _localDone = false, _acLocalHechas = 0;
+    let _baseListo = false, _localPend = [];
+    function _apilaLocal(list) {
+      if (list && list.length) _localPend.push(list);
+      if (!_baseListo) return;
+      while (_localPend.length) {
+        const l = _localPend.shift();
+        const have = new Set(candIndex.map(c => c.slug));
+        candIndex = candIndex.concat(l.filter(c => !have.has(c.slug)));
+      }
+      const hint = document.getElementById('search-hint');
+      if (hint && candIndex.length) hint.textContent = `${candIndex.length.toLocaleString('es-CO')} candidatos cargados`;
+      // Repinta solo el desplegable que esté abierto: reabrir uno cerrado
+      // mientras se trabaja en el otro buscador sería un estorbo.
+      if (document.getElementById('drop-a').classList.contains('open')) acSearchA();
+      if (document.getElementById('drop-b').classList.contains('open')) acSearchB();
+    }
     function ensureLocal() {
       if (_localDone) return _localReq;
       if (_localReq) return _localReq;
-      _localReq = CandRegistry.loadLocal({ includeParties: false }).then(list => {
+      _localReq = CandRegistry.loadLocal({
+        includeParties: false,
+        onSource: (list, _src, i) => { _acLocalHechas = i; _apilaLocal(list); },
+      }).then(list => {
         _localDone = true;
-        const have = new Set(candIndex.map(c => c.slug));
-        candIndex = candIndex.concat(list.filter(c => !have.has(c.slug)));
-        const hint = document.getElementById('search-hint');
-        if (hint) hint.textContent = `${candIndex.length.toLocaleString('es-CO')} candidatos cargados`;
+        _apilaLocal([]);   // quita el aviso de carga de los desplegables abiertos
         return list;
-      }).catch(e => { console.warn('[local] no disponible:', e && e.message); _localDone = true; });
+      }).catch(e => { console.warn('[local] no disponible:', e && e.message); _localDone = true; _apilaLocal([]); });
       return _localReq;
     }
 
@@ -605,9 +631,25 @@
       if (rank.total > results.length) {
         html += `<div class="ac-more">${results.length} de ${rank.total.toLocaleString('es-CO')} coincidencias · agrega el apellido para afinar</div>`;
       }
-      if (cargando) html += `<div class="ac-more">Cargando Concejo y JAL…</div>`;
+      // Concejo y JAL entran por carga diferida: sin este aviso, escribir rápido
+      // mostraba "sin resultados" y parecía que faltaran esos datos.
+      if (cargando) {
+        const n = Math.max(1, CandRegistry.LOCAL_SOURCES.length - _acLocalHechas);
+        html += `<div class="ac-more">${n === 1 ? 'Cargando Concejo y JAL · falta 1 índice' : `Cargando Concejo y JAL · faltan ${n} índices`}</div>`;
+      }
       drop.innerHTML = html;
       drop.classList.add('open');
+    }
+
+    /* Con ~428k candidaturas cada tecla recorría el índice entero. El debounce
+       corta las pasadas intermedias: se busca ~90 ms después de la última tecla
+       (imperceptible al escribir), una pasada por palabra y no una por letra.
+       Mismo patrón de analisis-candidato.html; el foco sigue buscando de una. */
+    const _acTimer = { A: null, B: null };
+    function acSearchDebounced(lado) {
+      ensureLocal();                       // dispara la carga diferida ya, no en 90 ms
+      clearTimeout(_acTimer[lado]);
+      _acTimer[lado] = setTimeout(lado === 'B' ? acSearchB : acSearchA, 90);
     }
 
     function acSearchA() {
@@ -648,6 +690,7 @@
     });
 
     async function selectA(slug) {
+      clearTimeout(_acTimer.A);   // una búsqueda pendiente reabriría el desplegable
       const meta = candIndex.find(c => c.slug === slug);
       if (!meta) return;
       metaA = meta;
@@ -660,6 +703,7 @@
     }
 
     async function selectB(slug) {
+      clearTimeout(_acTimer.B);   // una búsqueda pendiente reabriría el desplegable
       const meta = candIndex.find(c => c.slug === slug);
       if (!meta) return;
       metaB = meta;
