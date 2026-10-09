@@ -24,7 +24,7 @@
   'use strict';
 
   const KEY='caudal-intro-v1';
-  const DATA_URL='caudal-empresas.json?v=20261008b';
+  const DATA_URL='caudal-empresas.json?v=20261008g';
   const MAX_SEC=5, MAX_SUG=8, MAX_TEMAS=6;
   let DATA=null, _carga=null;
   // estado del formulario mientras está abierto. `deEmpresa` marca los sectores
