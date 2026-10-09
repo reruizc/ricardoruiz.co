@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-<link href="caudal-base.css?v=20260915-word" rel="stylesheet" />
+<link href="caudal-base.css?v=20261009b" rel="stylesheet" />
 <link rel="stylesheet" href="caudal-ui.css?v=20261009a" />
 <link rel="stylesheet" href="caudal-intro.css?v=20261009a" />
 <script>
@@ -738,6 +738,7 @@
     },
     mount(el,msg,compact){
       if(!el) return;
+      if(el.id==='uni-summary-body'){ const sum=document.getElementById('uni-summary'); if(sum) sum.classList.remove('uni-sep'); }
       el.innerHTML=this.html(msg,compact);
       if(!this._t){ this._i=Math.floor(Math.random()*UNI_FACTS.length); this._t=setInterval(()=>this.tick(),4200); }
       this.tick(true);
@@ -1133,11 +1134,15 @@
     const map=uniRefMap();
     const cz=l.certeza||{}; const CC={alta:'var(--green)',media:'var(--amber)',baja:'var(--red)'};
     const chip=cz.nivel?`<span class="ichip" style="display:inline-block;width:auto;padding:.12rem .5rem;font-size:.62rem;color:${CC[cz.nivel]||'inherit'};border-color:${CC[cz.nivel]||'inherit'}55" title="${esc(cz.por_que||'')}">certeza ${esc(cz.nivel)}</span>`:'';
-    const li=a=>(a||[]).length?`<ul style="margin:.35rem 0 0 1rem;padding:0;line-height:1.5">${a.map(t=>`<li>${uniTexto(t,map)}</li>`).join('')}</ul>`:'';
-    const blk=(h,t)=>t?`<div class="blk"><div class="h">${h}</div><div class="t">${uniTexto(t,map)}</div></div>`:'';
+    // Cada parte de la respuesta va en su propio bloque, con su color, y TODO el
+    // cuerpo con un solo tamaño de letra (lo fija .uni-b en caudal-base.css):
+    // antes la respuesta iba a 1,02 rem en línea, la lista heredaba otro tamaño
+    // y los demás bloques iban a 0,86, y se leía como tres documentos pegados.
+    const li=a=>(a||[]).length?`<ul class="uni-b-lista">${a.map(t=>`<li>${uniTexto(t,map)}</li>`).join('')}</ul>`:'';
+    const blk=(h,t,c)=>t?`<div class="uni-b uni-b-${c}"><div class="uni-b-h">${h}</div><div class="uni-b-t">${uniTexto(t,map)}</div></div>`:'';
     // cada fuente, con su registro real; si el código no casa con nada, se
     // muestra el pilar y nada más — nunca un nombre adivinado
-    const fu=(l.fuentes||[]).length?`<div class="blk"><div class="h">Fuentes usadas</div><ul class="uni-fuentes">${l.fuentes.map(f=>{const c=String(f.ref||'').toUpperCase().trim();const r=map[c];return `<li><span class="uni-fu-pilar">${esc(r?r.pilar:(f.pilar||''))}</span> ${r?uniRefHTML(c,map,true):esc(c)}</li>`;}).join('')}</ul></div>`:'';
+    const fu=(l.fuentes||[]).length?`<div class="uni-b uni-b-fuentes"><div class="uni-b-h">Fuentes usadas</div><ul class="uni-fuentes">${l.fuentes.map(f=>{const c=String(f.ref||'').toUpperCase().trim();const r=map[c];return `<li><span class="uni-fu-pilar">${esc(r?r.pilar:(f.pilar||''))}</span> ${r?uniRefHTML(c,map,true):esc(c)}</li>`;}).join('')}</ul></div>`:'';
     // ⚠️ Si la respuesta se escribió sin alguna fuente, se dice CUÁLES entraron.
     // Sin esto, «no hay actos del regulador» y «no dio tiempo a preguntarle» se
     // leerían igual — que es exactamente el error que tenía el pilar de medios.
@@ -1162,9 +1167,10 @@
         <button type="submit">Preguntar</button>
         <div class="uni-seguir-nota">Usa la misma evidencia de esta búsqueda${_uniHist.length?` · ${_uniHist.length+1} preguntas en esta conversación`:''}. Para un tema nuevo, busca arriba.</div>
       </form>`;
-    el.innerHTML=`${aviso}${alcance}${hilo}${etiqueta}<div class="blk"><div class="t" style="font-size:1.02rem;line-height:1.55">${uniTexto(l.respuesta||'',map)} ${chip}</div>${cz.por_que?`<div class="cob-note" style="margin-top:.3rem">${uniTexto(cz.por_que,map)}</div>`:''}</div>
-      ${(l.transversales||[]).length?`<div class="blk"><div class="h">Lo clave para informar</div>${li(l.transversales)}</div>`:''}
-      ${blk('Qué está vivo en el Estado',l.en_tramite)}${blk('Qué dice la prensa',l.prensa)}${blk('Qué hacer',l.accion)}${fu}${seguir}`;
+    const sum=document.getElementById('uni-summary'); if(sum) sum.classList.add('uni-sep');
+    el.innerHTML=`${aviso}${alcance}${hilo}${etiqueta}<div class="uni-b uni-b-resp"><div class="uni-b-h">◈ Respuesta · sobre lo que Caudal encontró en sus fuentes</div><div class="uni-b-t">${uniTexto(l.respuesta||'',map)} ${chip}</div>${cz.por_que?`<div class="uni-b-nota">${uniTexto(cz.por_que,map)}</div>`:''}</div>
+      ${(l.transversales||[]).length?`<div class="uni-b uni-b-clave"><div class="uni-b-h">Lo clave para informar</div>${li(l.transversales)}</div>`:''}
+      ${blk('Qué está vivo en el Estado',l.en_tramite,'estado')}${blk('Qué dice la prensa',l.prensa,'prensa')}${blk('Qué hacer',l.accion,'hacer')}${fu}${seguir}`;
     const rosa=document.getElementById('uni-aviso-rosa'); if(rosa) rosa.onclick=()=>showView('cliente');
     const f=document.getElementById('uni-seguir');
     if(f) f.onsubmit=e=>{ e.preventDefault(); const q=document.getElementById('uni-seguir-q').value; uniPreguntar(q,false); };
