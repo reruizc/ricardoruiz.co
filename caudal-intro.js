@@ -328,6 +328,21 @@
     const uq=$('uq'); if(uq) uq.value=t;
     window.uniSearch(t);
   }
+  /* «Empieza por» va en UN renglón: se esconden los temas que caen al segundo.
+     Se vuelve a medir cuando cambia el ancho (girar el teléfono, abrir el panel). */
+  let _roTemas=null;
+  function unRenglon(fila){
+    if(!fila) return;
+    const medir=()=>{
+      const chips=[...fila.querySelectorAll('.chip-tema')];
+      chips.forEach(c=>{ c.hidden=false; });
+      const top=(chips[0]||{}).offsetTop;
+      chips.forEach(c=>{ if(c.offsetTop>top+4) c.hidden=true; });
+    };
+    medir();
+    if(_roTemas) _roTemas.disconnect();
+    if('ResizeObserver' in window){ _roTemas=new ResizeObserver(()=>medir()); _roTemas.observe(fila); }
+  }
   function pintarFranja(){
     const box=$('introStrip'); if(!box) return;
     const st=leer();
@@ -355,9 +370,10 @@
           ${secs.map(k=>`<button type="button" class="chip intro-strip-sec" data-k="${esc(k)}" title="Abrir el radar de ${esc(nombreSec(k))} en la Rosa de los Vientos">${esc(nombreSec(k))}</button>`).join('')}
           <button type="button" class="intro-strip-edit" id="introCambiar">Cambiar</button>
         </div>
-        ${temas.length?`<div class="intro-strip-row"><span class="chips-label intro-strip-lbl">Empieza por</span>
+        ${temas.length?`<div class="intro-strip-row intro-strip-temas"><span class="chips-label intro-strip-lbl">Empieza por</span>
           ${temas.map(t=>`<button type="button" class="chip chip-tema" data-q="${esc(t)}">${esc(t)}</button>`).join('')}</div>`:''}`;
       box.querySelectorAll('[data-q]').forEach(b=>{ b.onclick=()=>buscarTema(b.dataset.q); });
+      unRenglon(box.querySelector('.intro-strip-temas'));
       box.querySelectorAll('.intro-strip-sec').forEach(b=>{ b.onclick=()=>abrirSector(b.dataset.k); });
       $('introCambiar').onclick=mostrar;
     }).catch(()=>{ box.hidden=true; });

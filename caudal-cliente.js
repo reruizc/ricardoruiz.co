@@ -108,7 +108,7 @@
     // portada: la tarjeta que lleva acá
     const t=document.querySelector('#radar-cta .rc-t'); if(t) t.textContent=N;
     const d=document.querySelector('#radar-cta .rc-d');
-    if(d) d.textContent='Sigue un sector o un cliente: el Estado, su competencia y la conversación pública, en un radar con señales priorizadas.';
+    if(d) d.textContent='Elige un sector o el perfil de tu empresa y la Rosa cruza lo que produce el Estado, lo que hace tu competencia, lo que dice la prensa y las oportunidades abiertas, en un radar con señales priorizadas y una lectura con plan de acción.';
     const g=document.querySelector('#radar-cta .rc-go'); if(g) g.textContent='Abrir radar →';
     const e=document.querySelector('#cli-body .cli-empty');
     if(e) e.textContent=`Crea el perfil de un cliente —o abre un sector de muestra— para orientarlo.`;
