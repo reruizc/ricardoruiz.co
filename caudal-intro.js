@@ -87,9 +87,12 @@
   /* ---------- el formulario ---------- */
   function pintarSectores(){
     const box=$('introSecs'); if(!box||!DATA) return;
-    // paso 1: tarjetas con imagen; paso 3: chips, que ahí solo se corrige
-    const tarjeta=F.paso===1;
+    // tarjetas con imagen en los dos pasos que muestran sectores. En la
+    // confirmación las no elegidas van en gris y atenuadas: de un vistazo se ve
+    // qué quedó, y un clic suma o quita sin volver atrás
+    const tarjeta=F.paso===1||F.paso===3;
     box.classList.toggle('intro-tiles',tarjeta);
+    box.classList.toggle('intro-tiles-confirma',F.paso===3);
     box.innerHTML=DATA.sectores.map(s=>{
       const on=F.sectores.includes(s.k);
       const por=on&&F.deEmpresa.has(s.k)&&F.empresa?` <span class="intro-por">por ${esc(F.empresa.n)}</span>`:'';
