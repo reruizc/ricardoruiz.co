@@ -319,7 +319,43 @@
     // pida quien la pida (setAcceso o cliInit), y una sola vez.
     if(window.CLI_AUTO_PERFIL){ window.CLI_AUTO_PERFIL=false; pfAutoAbrir(); }
   }
+  /* Para qué sirve la Rosa y qué se compra. Quien no tiene acceso —sin cuenta o
+     con la cuenta gratuita— llegaba a una ilustración y a un «crea tu cuenta», sin
+     saber por qué pagaría. Este bloque lo dice en términos de empresa y SOLO con
+     lo que la Rosa hace hoy: los cuatro rumbos, las señales con nivel y acción, la
+     lectura con plan, el brief y las alertas. Sin cifras inventadas. */
+  function rosaValor(){
+    const box=document.getElementById('cli-valor'); if(!box) return;
+    if(ACCESO||IS_GUEST){ box.hidden=true; box.innerHTML=''; return; }
+    const R=[
+      ['N','Norte','Las oportunidades','Consultas públicas abiertas donde todavía puedes opinar, procesos de contratación a los que te puedes presentar y proyectos en el Congreso que aún se pueden mover.'],
+      ['E','Oriente','La conversación','Lo que dicen la prensa y las cuentas oficiales sobre tus temas, tu sector y tu nombre, para que no te enteres tarde de lo que se dice de ti.'],
+      ['S','Sur','La competencia','Tus competidores con el mismo detalle que tú: qué les sancionaron, qué contratos ganan y qué proyectos los tocan.'],
+      ['W','Occidente','Lo que produce el Estado','Proyectos de ley, decretos y actos de doce reguladores y superintendencias, cruzados con lo que hace tu empresa.'],
+    ];
+    const RECIBE=[
+      ['Señales priorizadas','cada una con nivel —alto, medio o bajo— y una acción sugerida con el plazo y la entidad reales.'],
+      ['Una lectura de analista','qué importa esta semana, por qué te toca y un plan con acción, responsable y plazo.'],
+      ['Un brief listo para reenviar','lo que se movió en las últimas 72 horas, en PDF, para tu junta o tu equipo.'],
+      ['Alertas por correo','cuando algo se mueve en lo que vigilas, y silencio cuando no pasa nada.'],
+      ['Leída desde tu empresa','tus líneas de negocio, tus competidores, tus plazos y lo que no te interesa, no un tablero genérico del sector.'],
+    ];
+    const ctaCuenta=HAS_SESSION?'':`<a class="rv-btn" href="register.html?next=${encodeURIComponent('caudal-mi.html')}">Crear cuenta gratis</a>`;
+    box.hidden=false;
+    box.innerHTML=`<div class="rv-eyebrow">Para qué te sirve</div>
+      <h2 id="rosaValorT">Tu radar de lo que el Estado, tu competencia y la opinión pública están moviendo sobre tu negocio.</h2>
+      <p class="rv-lead">Hoy eso está repartido en el Congreso, una docena de reguladores, el portal de contratación y cientos de medios, y nadie te dice cuál de esas mil cosas le pega a tu empresa esta semana. La Rosa lo cruza por ti con la ficha de tu organización y te dice qué mirar, por qué te importa y qué hacer, antes de que se decida.</p>
+      <div class="rv-rumbos">${R.map(([l,r,t,d])=>`<div class="rv-rumbo"><span class="rv-let">${l}</span><div><div class="rv-rt">${esc(r)} · ${esc(t)}</div><div class="rv-rd">${esc(d)}</div></div></div>`).join('')}</div>
+      <h3 class="rv-h3">Lo que recibes con el acceso</h3>
+      <ul class="rv-lista">${RECIBE.map(([t,d])=>`<li><b>${esc(t)}:</b> ${esc(d)}</li>`).join('')}</ul>
+      <div class="rv-planes">
+        <div class="rv-plan"><div class="rv-pt">${HAS_SESSION?'Tu cuenta gratuita':'Con una cuenta gratis'}</div><div class="rv-pd">Ves el radar de tu sector: las señales del Estado, la prensa y la contratación, sin la lectura de tu empresa.</div></div>
+        <div class="rv-plan on"><div class="rv-pt">Con acceso Caudal</div><div class="rv-pd">La Rosa de tu propia empresa, con su lectura y plan, el brief, las alertas y las cuentas de tu equipo. Con el contrato anual, además, un analista de Cauce que te la lee.</div></div>
+      </div>
+      <div class="rv-cta">${ctaCuenta}<a class="rv-btn rv-btn-p" href="caudal-pricing.html">Ver el acceso para tu empresa →</a></div>`;
+  }
   function pfRenderBar(){
+    rosaValor();
     const bar=document.getElementById('cli-perfiles'); if(!bar) return;
     if(IS_GUEST){
       bar.innerHTML='<span class="pf-lbl">Perfiles de cliente</span><span class="cob-note" style="margin:0">Entra con tu cuenta para guardar los temas y las empresas de un cliente.</span>';
