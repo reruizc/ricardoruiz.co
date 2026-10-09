@@ -87,10 +87,20 @@
   /* ---------- el formulario ---------- */
   function pintarSectores(){
     const box=$('introSecs'); if(!box||!DATA) return;
+    // paso 1: tarjetas con imagen; paso 3: chips, que ahí solo se corrige
+    const tarjeta=F.paso===1;
+    box.classList.toggle('intro-tiles',tarjeta);
     box.innerHTML=DATA.sectores.map(s=>{
       const on=F.sectores.includes(s.k);
       const por=on&&F.deEmpresa.has(s.k)&&F.empresa?` <span class="intro-por">por ${esc(F.empresa.n)}</span>`:'';
-      return `<button type="button" class="chip intro-sec${on?' on':''}" data-k="${esc(s.k)}" aria-pressed="${on}">${esc(s.n)}${por}</button>`;
+      if(!tarjeta) return `<button type="button" class="chip intro-sec${on?' on':''}" data-k="${esc(s.k)}" aria-pressed="${on}">${esc(s.n)}${por}</button>`;
+      // la imagen la pone diseño en imagenes/caudal-sector/{k}.jpg; mientras no
+      // exista, el recuadro queda vacío con su tono, nunca con un ícono roto
+      return `<button type="button" class="intro-sec intro-tile${on?' on':''}" data-k="${esc(s.k)}" aria-pressed="${on}">
+        <span class="intro-tile-img"><img src="imagenes/caudal-sector/${esc(s.k)}.jpg" alt="" loading="lazy" onerror="this.remove()"></span>
+        <span class="intro-tile-n">${esc(s.n)}</span>${por}
+        <span class="intro-tile-ok" aria-hidden="true">✓</span>
+      </button>`;
     }).join('');
     box.querySelectorAll('.intro-sec').forEach(b=>{ b.onclick=()=>toggleSec(b.dataset.k); });
     const c=$('introCuenta');
@@ -179,21 +189,12 @@
      corrige antes de entrar. */
   const PASOS=[
     {t:'Tu sector', h:'¿En qué <em>sector</em> está tu organización?',
-     p:'Puedes elegir varios: una empresa como Uber está a la vez en transporte, trabajo y consumo.',
-     // para qué le sirve: lo que Caudal de verdad hace con el sector, nada más
-     por:{t:'Para qué te sirve', l:[
-       ['Congreso','los proyectos de ley que tocan tu sector y en qué va cada uno'],
-       ['Ejecutivo y reguladores','decretos, resoluciones, circulares y sanciones de las superintendencias'],
-       ['Contratación','los contratos del Estado y los procesos abiertos en tu sector'],
-       ['Consultas públicas','las normas en consulta donde todavía puedes opinar'],
-       ['Prensa','lo que se está diciendo de tu sector en medios nacionales y regionales'],
-       ['Tu radar','la Rosa de los Vientos de tu sector, con lo que se movió en los últimos tres días']]}},
+     p:'Hay empresas y multinacionales a las que les afectan varios sectores a la vez, así que puedes marcar todos los que te apliquen.',
+     // plegado: quien quiere saber para qué, lo abre; quien no, no lo lee
+     por:'Tu sector es el filtro con el que Caudal ordena lo que produce el Estado. En vez de mostrarte miles de normas, proyectos de ley y noticias, te pone primero lo que puede cambiarle las reglas de juego a tu empresa: una regulación que te sube los costos, un proyecto que abre o cierra un mercado, un contrato público al que puedes presentarte o una consulta donde todavía puedes opinar. La idea es que te enteres a tiempo, cuando todavía puedes hacer algo, y no por la prensa cuando ya se decidió.'},
     {t:'Tu empresa', h:'¿Qué <em>empresa</em> u organización es?',
      p:'Es opcional. Si nos lo dices, sumamos los sectores que toca y la búsqueda arranca por ella.',
-     por:{t:'Para qué te sirve', l:[
-       ['Su nombre propio','buscamos tu empresa con nombre propio en sanciones, contratos y prensa, no solo el tema'],
-       ['Lo que el Estado no nombra','el Congreso no escribe «Uber» sino «plataformas de transporte»: traducimos la marca a esos temas'],
-       ['Varios sectores','si tu empresa está en más de un sector, los sumamos para que no se te escape ninguno']]}},
+     por:'Con el nombre de tu empresa dejamos de hablarte en general. Caudal la busca con nombre propio donde el Estado sí la menciona —sanciones, contratos y prensa— y traduce su actividad al lenguaje en que la nombran las leyes y los decretos, que casi nunca usan la marca. Si tu empresa está en varios sectores, los sumamos para que no se te escape ninguno.'},
     {t:'Confirmar', h:'Esto es lo que vas a ver <em>primero</em>.',
      p:'Revisa los sectores antes de entrar. Si algo no va, quítalo aquí o vuelve al paso que quieras.'},
   ];
@@ -204,9 +205,8 @@
     if(F.paso===1){
       // sin sector también se puede seguir: quien solo sabe su empresa la dice
       // en el paso 2 y de ahí salen los sectores
-      box.innerHTML=`<button type="button" class="intro-ok" id="introSig">Siguiente →</button>
-        <button type="button" class="intro-skip" id="introSkip">Prefiero ver todo</button>`;
-      $('introSig').onclick=()=>irA(2); $('introSkip').onclick=saltar;
+      box.innerHTML=`<button type="button" class="intro-ok" id="introSig">Siguiente →</button>`;
+      $('introSig').onclick=()=>irA(2);
     }else if(F.paso===2){
       box.innerHTML=`<button type="button" class="intro-back" id="introAtras">← Volver</button>
         <button type="button" class="intro-ok" id="introSig">${F.empresa?'Siguiente →':'Seguir sin empresa →'}</button>`;
@@ -232,7 +232,7 @@
     if(F.paso===1) cuerpo=`<div class="intro-secs" id="introSecs" role="group" aria-labelledby="introT"></div>
       <div class="intro-cuenta" id="introCuenta" aria-live="polite"></div>`;
     else if(F.paso===2) cuerpo=`<div class="intro-emp">
-        <input id="introEmp" type="search" autocomplete="off" placeholder="Escribe el nombre: Uber, Ecopetrol, Bancolombia, ANDI…"
+        <input id="introEmp" type="search" autocomplete="off" placeholder="Escribe el nombre: Ecopetrol, Bancolombia, Nutresa, ANDI…"
           role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="introSug" aria-labelledby="introT" />
         <ul class="intro-sug" id="introSug" role="listbox" hidden></ul>
       </div>
@@ -248,7 +248,7 @@
         <h1 id="introT">${P.h}</h1>
         <p class="intro-lead">${P.p}</p>
         ${cuerpo}
-        ${P.por?`<div class="intro-porque"><div class="intro-porque-t">${esc(P.por.t)}</div><ul>${P.por.l.map(([a,b])=>`<li><b>${esc(a)}</b> · ${esc(b)}</li>`).join('')}</ul></div>`:''}
+        ${P.por?`<details class="intro-porque"><summary>¿Para qué me sirve?</summary><p>${esc(P.por)}</p></details>`:''}
         <div class="intro-acc" id="introAcc"></div>
       </div>
       <p class="intro-nota">Se guarda solo en este navegador y lo puedes cambiar cuando quieras.</p>
