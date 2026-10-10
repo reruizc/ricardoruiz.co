@@ -21,13 +21,20 @@
      Lambda con un secreto compartido, y de paso deja de publicar la URL de la
      Lambda en un repo abierto. Ver rr-auth · ruta /caudal/api. */
   const API = 'https://rr-auth.reruizc.workers.dev/caudal/api';
-  /* Lista de EMERGENCIA, no la whitelist. Quién entra a Caudal lo decide el
-     worker (`/caudal/acceso/me`, llaves `caudal:acceso:<correo>` en KV), que se
-     otorga y revoca con tools/caudal/acceso/ sin tocar código. Esta lista solo
-     se usa si el worker NO responde: sin ella, una caída dejaría a Ricardo y a
-     los socios por fuera de su propia plataforma; con ella, nadie nuevo entra
-     durante la caída. Agregar gente ACÁ ya no sirve — hay que otorgar por CLI. */
-  const EMERGENCIA = ['reruizc@gmail.com', 'nuevagemela@gmail.com', 'diego@cauce.co'];
+  /* Respaldo para cuando el worker NO responde. Quién entra a Caudal lo decide
+     el worker (`/caudal/acceso/me`, llaves `caudal:acceso:<correo>` en KV), que
+     se otorga y revoca con tools/caudal/acceso/ sin tocar código. Si el worker
+     se cae, entra quien el worker dejó entrar la última vez EN ESTE NAVEGADOR:
+     así una caída no deja a Ricardo y a los socios por fuera de su propia
+     plataforma, nadie nuevo entra durante la caída y no hace falta escribir
+     correos en este archivo, que es público (antes había una lista fija). */
+  const ULTIMO_ACCESO='caudal-ultimo-acceso';
+  function recordarAcceso(em,acceso){
+    try{
+      if(acceso&&em) localStorage.setItem(ULTIMO_ACCESO,String(em).toLowerCase().trim());
+      else localStorage.removeItem(ULTIMO_ACCESO);
+    }catch(e){}
+  }
 
   // tooltips ⓘ: toggle al click; cierra al clickear afuera
   addEventListener('click',e=>{
@@ -65,7 +72,7 @@
   // es la versión educada del "contáctenos" de la competencia.
   const token=localStorage.getItem('rr-token'); const uRaw=localStorage.getItem('rr-user');
   let user=null; try{user=uRaw?JSON.parse(uRaw):null;}catch(e){}
-  const enEmergencia=em=>!!em&&EMERGENCIA.includes(String(em).toLowerCase().trim());
+  const enEmergencia=em=>{ try{ return !!em&&localStorage.getItem(ULTIMO_ACCESO)===String(em).toLowerCase().trim(); }catch(e){ return false; } };
   const toLogin=()=>{localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');location.replace('login.html');};
   // ACCESO decide el muro · IS_GUEST es invitado por link (sin cuenta → no puede
   // guardar perfiles, el worker exige sesión) · HAS_SESSION es "hay cuenta".
@@ -102,7 +109,7 @@
     }catch(e){ /* el refresco del perfil no decide el acceso */ }
     let ac=null;
     try{ ac=await acRes.json(); }catch(e){ /* cae a emergencia abajo */ }
-    if(ac&&ac.ok&&typeof ac.acceso==='boolean') return setAcceso(ac.acceso);
+    if(ac&&ac.ok&&typeof ac.acceso==='boolean'){ recordarAcceso(user.email,ac.acceso); return setAcceso(ac.acceso); }
     return setAcceso(enEmergencia(user.email));
   })();
 

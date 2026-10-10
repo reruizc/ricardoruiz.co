@@ -615,17 +615,21 @@
 
   <script>
     // ─── EMAIL GATE ───────────────────────────────────────────────────
-    const ALLOWED = ['reruizc@gmail.com', 'nuevagemela@gmail.com', 'yocreoencarvalho@gmail.com', 'danielurreapena@gmail.com'];
+    // Quién entra lo decide el worker: /auth/me devuelve las llaves de esta cuenta
+    // (`accesos`). Los correos ya no viven en el código, que es público.
+    const ACCESO = 'proyecto-dc';
     const token = localStorage.getItem('rr-token');
     const userRaw = localStorage.getItem('rr-user');
     const user = userRaw ? JSON.parse(userRaw) : null;
-    function emailAllowed(em){ return em && ALLOWED.includes(String(em).toLowerCase().trim()); }
+    function tieneAcceso(u){ return !!u && Array.isArray(u.accesos) && u.accesos.indexOf(ACCESO) >= 0; }
+    // La caché de antes del cambio no trae `accesos`: en ese caso no se niega en local, se le pregunta al worker.
+    function cacheNiega(u){ return !!u && Array.isArray(u.accesos) && !tieneAcceso(u); }
     function denyToLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); window.location.replace('../login.html'); }
     function denyToDashboard(){ window.location.replace('../dashboard.html'); }
 
     if (!token || !user) {
       denyToLogin();
-    } else if (!emailAllowed(user.email)) {
+    } else if (cacheNiega(user)) {
       denyToDashboard();
     } else {
       (async () => {
@@ -635,7 +639,7 @@
           });
           if (res.status === 401) return denyToLogin();
           const data = await res.json();
-          if (!data.ok || !emailAllowed(data.user && data.user.email)) {
+          if (!data.ok || !tieneAcceso(data.user)) {
             return denyToDashboard();
           }
           localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, user, data.user)));

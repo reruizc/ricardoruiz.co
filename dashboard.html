@@ -1228,7 +1228,6 @@ const PRIVATE_TOOLS = [
     href: 'natalia-parra.html',
     cta: 'Abrir ficha ↗',
     note: 'Privado · gated por whitelist',
-    allowedEmails: ['reruizc@gmail.com', 'nasopr81@gmail.com'],
   },
   {
     id: 'brujula-asuncion-admin',
@@ -1241,7 +1240,6 @@ const PRIVATE_TOOLS = [
     href: 'brujula-asuncion/admin.html',
     cta: 'Abrir panel ↗',
     note: 'Privado · acceso por correo autorizado',
-    allowedEmails: ['reruizc@gmail.com', 'nuevagemela@gmail.com'],
   },
   {
     id: 'caudal',
@@ -1254,7 +1252,6 @@ const PRIVATE_TOOLS = [
     href: 'caudal-mi.html',
     cta: 'Abrir Mi Caudal ↗',
     note: 'Contexto sectorial gratuito · análisis empresarial con acceso',
-    allowedEmails: ['reruizc@gmail.com', 'nuevagemela@gmail.com', 'diego@cauce.co'],
     allowedPlans: ['caudal'],
   },
   {
@@ -1268,7 +1265,6 @@ const PRIVATE_TOOLS = [
     href: 'charla-sabana/presentacion.html',
     cta: 'Abrir presentación ↗',
     note: 'Personal · link público: cualquiera con el enlace la ve',
-    allowedEmails: ['reruizc@gmail.com'],
   },
   {
     id: 'proyecto-dc',
@@ -1281,7 +1277,6 @@ const PRIVATE_TOOLS = [
     href: 'proyecto-dc.html',
     cta: 'Abrir expediente ↗',
     note: 'No descargable · Solo lectura',
-    allowedEmails: ['reruizc@gmail.com', 'nuevagemela@gmail.com', 'yocreoencarvalho@gmail.com', 'danielurreapena@gmail.com'],
   },
   {
     id: 'observatorio-mujer',
@@ -1294,7 +1289,6 @@ const PRIVATE_TOOLS = [
     href: 'observatorio-mujer.html',
     cta: 'Abrir prototipo ↗',
     note: 'Prototipo v0 · acceso restringido',
-    allowedEmails: ['reruizc@gmail.com', 'nuevagemela@gmail.com'],
   },
   {
     id: 'narrativas-lab',
@@ -1307,7 +1301,6 @@ const PRIVATE_TOOLS = [
     href: 'narrativas-lab.html',
     cta: 'Abrir borrador ↗',
     note: 'Privado · borrador · datos simulados',
-    allowedEmails: ['reruizc@gmail.com', 'frp1978@gmail.com', 'nuevagemela@gmail.com'],
   },
   {
     id: 'pauta-2v',
@@ -1320,7 +1313,6 @@ const PRIVATE_TOOLS = [
     href: 'pauta-digital-2v.html',
     cta: 'Abrir tablero ↗',
     note: 'Privado · borrador · 2ª vuelta',
-    allowedEmails: ['reruizc@gmail.com', 'jorge.ovalle@correounivalle.edu.co'],
   },
   {
     id: 'risaralda-electoral',
@@ -1333,7 +1325,6 @@ const PRIVATE_TOOLS = [
     href: 'risaralda-electoral.html',
     cta: 'Abrir módulo ↗',
     note: 'Privado · solo lectura',
-    allowedEmails: ['reruizc@gmail.com', 'nuevagemela@gmail.com', 'mariacirof@gmail.com', 'mxrianagilvalencia@gmail.com', 'luisalopezme@gmail.com'],
   },
   {
     id: 'admin-analytics',
@@ -1346,7 +1337,6 @@ const PRIVATE_TOOLS = [
     href: 'admin-analytics.html',
     cta: 'Abrir panel ↗',
     note: 'Admin · solo Ricardo',
-    allowedEmails: ['reruizc@gmail.com'],
   },
   {
     id: 'admin-pronosticos',
@@ -1359,7 +1349,6 @@ const PRIVATE_TOOLS = [
     href: 'admin-pronosticos.html',
     cta: 'Abrir panel ↗',
     note: 'Admin · solo Ricardo',
-    allowedEmails: ['reruizc@gmail.com'],
   },
   {
     id: 'admin-juez',
@@ -1372,7 +1361,6 @@ const PRIVATE_TOOLS = [
     href: 'admin-juez.html',
     cta: 'Abrir panel ↗',
     note: 'Admin · solo Ricardo',
-    allowedEmails: ['reruizc@gmail.com'],
   },
   {
     id: 'admin-c360-contendientes',
@@ -1385,7 +1373,6 @@ const PRIVATE_TOOLS = [
     href: 'admin-c360-contendientes.html',
     cta: 'Abrir panel ↗',
     note: 'Admin · solo Ricardo',
-    allowedEmails: ['reruizc@gmail.com'],
   },
 ];
 
@@ -1669,9 +1656,7 @@ function render() {
   const plan = PLANS[planKey] || PLANS.free;
   const isTopTier = planKey === 'premium';
   const isCancelled = !!user.cancelledAt;
-  const userEmail = (user.email || '').toLowerCase().trim();
-  const ADMIN_EMAILS = ['reruizc@gmail.com', 'nuevagemela@gmail.com'];
-  const isAdmin = ADMIN_EMAILS.includes(userEmail);
+  const isAdmin = user.isAdmin === true;   // lo decide el worker (/auth/me)
 
   /* TOP BAR */
   document.getElementById('back-label').textContent = t.back;
@@ -1763,7 +1748,11 @@ function render() {
 
   /* ACCESOS — personal · encargos · admin (lista compacta, columna A del fold) */
   const accessEl = document.getElementById('access-list');
-  const visiblePrivate = PRIVATE_TOOLS.filter(p => p.id === 'caudal' || (p.allowedEmails || []).map(x => x.toLowerCase()).includes(userEmail)
+  // Quién ve cada tarjeta privada lo decide el worker: /auth/me devuelve las
+  // llaves de esta cuenta (`accesos`) y la llave es el `id` de la tarjeta. Los
+  // correos ya no viven en este archivo, que es público.
+  const accesos = Array.isArray(user.accesos) ? user.accesos : [];
+  const visiblePrivate = PRIVATE_TOOLS.filter(p => p.id === 'caudal' || accesos.includes(p.id)
     || (p.allowedPlans || []).includes(String(user.plan || '').toLowerCase()));
   const groupOrder = ['personal', 'encargos', 'admin'];
   const byGroup = {};

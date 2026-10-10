@@ -1183,20 +1183,12 @@
     window._isPremium = false;
     window._isAdmin   = false;
     window._isFullAccess = false;
-    // Whitelist de emails admin. Equivalentes al gate de admin-* pages.
-    const ADMIN_EMAILS = ['reruizc@gmail.com'];
-    // Acceso total (colaboradores de confianza, sin ser admin del sitio):
-    // bypass del gate de plan y de la cuota de crudos. Descargas ilimitadas.
-    const FULL_ACCESS_EMAILS = ['nuevagemela@gmail.com'];   // Nury Gómez
-
-    // Permisos puntuales por archivo (sin dar acceso total): email → lista de
-    // { cat, anio }. Desbloquea esa tarjeta de año con todas sus variantes
-    // (mesa CSV, ZIP por depto, puesto CSV) y NO consume la cuota Premium.
-    const FILE_GRANTS = {
-      'consultoria@legitimalab.com': [ { cat: 'territoriales', anio: 2023 } ],   // Juan José Guerrero
-      'm.villabona@uniandes.edu.co': [ { cat: 'congreso', anio: 2014 },          // Mariana Villabona (Pro)
-                                       { cat: 'congreso', anio: 2018 } ],
-    };
+    // Quién tiene acceso total y quién tiene permisos puntuales por archivo lo
+    // decide el worker: /auth/me y /auth/login devuelven, solo para la cuenta que
+    // pregunta, `isAdmin`, `accesos` (la llave 'descargas-todo' = sin límites) y
+    // `permisosDescarga` ([{ cat, anio }], desbloquea esa tarjeta de año con todas
+    // sus variantes y NO consume la cuota Premium). Los correos ya no viven en
+    // este archivo, que es público.
     function hasFileGrant(catId, anio) {
       return (window._fileGrants || []).some(g => g.cat === catId && g.anio === anio);
     }
@@ -1583,15 +1575,35 @@
       // Plan global para gate de crudos
       window._userPlan  = (token && user && user.plan) ? user.plan.toLowerCase() : 'anon';
       window._isPremium = ['premium','full'].includes(window._userPlan);
-      const _email = (token && user && user.email) ? user.email.toLowerCase() : '';
-      // Admins (whitelist por email): sin límites de descarga + acceso a todos los tiers.
-      window._isAdmin   = !!(_email && ADMIN_EMAILS.includes(_email));
-      // Acceso total: admins + colaboradores whitelisted. Bypass de plan y cuota.
-      window._isFullAccess = window._isAdmin || (!!_email && FULL_ACCESS_EMAILS.includes(_email));
-      // Acceso total se trata como Premium para el resto del gate.
-      if (window._isFullAccess) window._isPremium = true;
-      // Permisos puntuales por archivo para este email
-      window._fileGrants = (_email && FILE_GRANTS[_email]) || [];
+      // Privilegios de la cuenta, tal como los dio el worker (ver arriba).
+      function aplicarPrivilegios(u) {
+        const conSesion = !!(token && u);
+        // Admins: sin límites de descarga + acceso a todos los tiers.
+        window._isAdmin   = conSesion && u.isAdmin === true;
+        // Acceso total: admins + colaboradores con la llave. Bypass de plan y cuota.
+        window._isFullAccess = window._isAdmin || (conSesion && Array.isArray(u.accesos) && u.accesos.includes('descargas-todo'));
+        // Acceso total se trata como Premium para el resto del gate.
+        if (window._isFullAccess) window._isPremium = true;
+        // Permisos puntuales por archivo para esta cuenta
+        window._fileGrants = (conSesion && Array.isArray(u.permisosDescarga)) ? u.permisosDescarga : [];
+      }
+      aplicarPrivilegios(user);
+      // La caché puede ser de antes de que el worker diera estos campos (o de
+      // antes de un permiso nuevo): se refresca y, si algo cambió, se vuelve a
+      // pintar la pestaña de crudos.
+      if (token && user) {
+        fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+          .then(r => r.ok ? r.json() : null)
+          .then(d => {
+            if (!d || !d.ok || !d.user) return;
+            const nuevo = Object.assign({}, user, d.user);
+            try { localStorage.setItem('rr-user', JSON.stringify(nuevo)); } catch (e) {}
+            const antes = JSON.stringify([window._isAdmin, window._isFullAccess, window._fileGrants]);
+            aplicarPrivilegios(nuevo);
+            if (JSON.stringify([window._isAdmin, window._isFullAccess, window._fileGrants]) !== antes && typeof renderCrudos === 'function') renderCrudos();
+          })
+          .catch(() => {});
+      }
 
       // Render nav auth bar
       if (authEl) {

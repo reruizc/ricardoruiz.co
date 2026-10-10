@@ -592,19 +592,23 @@ footer p{margin-bottom:.5rem}
 <script>
 /* ═══ GATE ═══ */
 (function(){
-  var ALLOWED = ['reruizc@gmail.com', 'nasopr81@gmail.com'];
+  // Quién entra lo decide el worker: /auth/me devuelve las llaves de esta cuenta
+  // (`accesos`). Los correos ya no viven en el código, que es público.
+  var ACCESO = 'nsp-barrios-unidos';
   var token = localStorage.getItem('rr-token');
   var raw = localStorage.getItem('rr-user');
   var user = null;
   try { user = raw ? JSON.parse(raw) : null; } catch(e) { user = null; }
-  function ok(em){ return em && ALLOWED.indexOf(String(em).toLowerCase().trim()) >= 0; }
+  function ok(u){ return !!u && Array.isArray(u.accesos) && u.accesos.indexOf(ACCESO) >= 0; }
+  // La caché de antes del cambio no trae `accesos`: en ese caso se le pregunta al worker.
+  function cacheNiega(u){ return !!u && Array.isArray(u.accesos) && !ok(u); }
   function toLogin(){ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); location.replace('login.html'); }
   function toDash(){ location.replace('dashboard.html'); }
   if (!token || !user) { toLogin(); return; }
-  if (!ok(user.email)) { toDash(); return; }
+  if (cacheNiega(user)) { toDash(); return; }
   fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
     .then(function(r){ if (r.status === 401) { toLogin(); return null; } return r.json(); })
-    .then(function(d){ if (!d) return; if (!d.ok || !ok(d.user && d.user.email)) { toDash(); return; } reveal(); })
+    .then(function(d){ if (!d) return; if (!d.ok || !ok(d.user)) { toDash(); return; } try { localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, user, d.user))); } catch(e) {} reveal(); })
     .catch(function(){ reveal(); });
   function reveal(){
     var g = document.getElementById('gate');

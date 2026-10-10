@@ -5,10 +5,14 @@
    y todas las subpáginas. Requiere cities.js y engine.js cargados antes.
    ════════════════════════════════════════════════════════════════ */
 (function(){
-  const ALLOWED = ['reruizc@gmail.com', 'frp1978@gmail.com', 'nuevagemela@gmail.com']; // + Nury (socia)
+  // Quién entra lo decide el worker: /auth/me devuelve las llaves de esta cuenta
+  // (`accesos`). Los correos ya no viven en el código, que es público.
+  const ACCESO = 'narrativas-lab';
 
   /* ── GATE ───────────────────────────────────────────── */
-  function emailAllowed(em){ return em && ALLOWED.includes(String(em).toLowerCase().trim()); }
+  function tieneAcceso(u){ return !!u && Array.isArray(u.accesos) && u.accesos.indexOf(ACCESO) >= 0; }
+  // La caché de antes del cambio no trae `accesos`: en ese caso no se niega en local, se le pregunta al worker.
+  function cacheNiega(u){ return !!u && Array.isArray(u.accesos) && !tieneAcceso(u); }
   function denyToLogin(){ try{ localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); }catch(e){} window.location.replace('../login.html'); }
   function denyToDashboard(){ window.location.replace('../dashboard.html'); }
 
@@ -25,7 +29,7 @@
       if (typeof onReady === 'function') onReady(user);
     };
     if (!token || !user) return denyToLogin();
-    if (!emailAllowed(user.email)) return denyToDashboard();
+    if (cacheNiega(user)) return denyToDashboard();
     // En localhost (máquina de dev) confiamos en la whitelist local y evitamos
     // el round-trip al worker — así el preview funciona sin sesión real.
     if (['localhost','127.0.0.1'].includes(location.hostname)) return reveal();
@@ -34,7 +38,7 @@
         const res = await fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers:{ 'Authorization':`Bearer ${token}` } });
         if (res.status === 401) return denyToLogin();
         const data = await res.json();
-        if (!data.ok || !emailAllowed(data.user && data.user.email)) return denyToDashboard();
+        if (!data.ok || !tieneAcceso(data.user)) return denyToDashboard();
         try { localStorage.setItem('rr-user', JSON.stringify(Object.assign({}, user, data.user))); } catch(e){}
         reveal();
       } catch(e){ reveal(); }   // si el worker no responde, no bloquear (ya pasó la whitelist local)
@@ -99,5 +103,5 @@
     return sel;
   }
 
-  window.NLCommon = { ALLOWED, bootGate, initCursor, getMsg, saveMsg, getVar, saveVar, mountCitySelect };
+  window.NLCommon = { ACCESO, bootGate, initCursor, getMsg, saveMsg, getVar, saveVar, mountCitySelect };
 })();

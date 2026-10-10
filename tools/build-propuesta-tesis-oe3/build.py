@@ -221,7 +221,7 @@ HTML_DOC = r"""<!DOCTYPE html>
       <div class="pname">Carlos Henry Rodr&iacute;guez Salgado</div>
       <div class="psub">Candidato a Doctor en Relaciones P&uacute;blicas y Comunicaci&oacute;n Digital &middot; USMP, Lima</div>
       <div class="frow"><span class="k">PROYECTO</span><span class="v">Tesis doctoral &middot; OE3</span></div>
-      <div class="frow"><span class="k">CORREO</span><span class="v">Carloshrodriquez10@hotmail.com</span></div>
+      <div class="frow"><span class="k">CORREO</span><span class="v">__CORREO__</span></div>
     </div>
   </div>
 
@@ -398,7 +398,12 @@ HTML_DOC = r"""<!DOCTYPE html>
 </body>
 </html>"""
 
+# El correo del cliente NO va en el código (el repo es público): se pasa al
+# generar, p. ej. CORREO_CLIENTE="…" python3 <este script>.
+CORREO_CLIENTE = os.environ.get("CORREO_CLIENTE", "")
+
 HTML_DOC = (HTML_DOC
+            .replace("__CORREO__", CORREO_CLIENTE)
             .replace("__SYNE__", FONT_SYNE)
             .replace("__WORDS__", PRECIO_BASE_W)
             .replace("__USD__", PRECIO_BASE_USD)

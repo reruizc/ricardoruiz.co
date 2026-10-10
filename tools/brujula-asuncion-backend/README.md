@@ -29,7 +29,7 @@ PREFIX=ricardoruiz.co/brujula-asuncion/respuestas
 ALLOWED_ORIGIN=https://ricardoruiz.co
 AUTH_ME=https://rr-auth.reruizc.workers.dev/auth/me
 MAX_ADMIN_ROWS=10000
-BRUJULA_ADMINS=nuevagemela@gmail.com   # correos con acceso al panel SIN ser admin global de rr-auth
+BRUJULA_ADMINS=<correo>                 # correos con acceso al panel SIN ser admin global de rr-auth
 ```
 
 ## Servir la Brújula desde otro dominio
@@ -111,7 +111,7 @@ User-Agent, correo, nombre, coordenadas ni local de votación.
 
 `is_admin()` acepta dos cosas: el `isAdmin` global de `rr-auth` (hoy solo
 `reruizc@gmail.com`) **o** un correo de la lista `BRUJULA_ADMINS` de la Lambda. La lista
-existe para no volver admin de TODO el sitio a la cliente del caso: `nuevagemela@gmail.com`
+existe para no volver admin de TODO el sitio a la cliente del caso (su correo va solo en ese secreto)
 entra a este panel y a nada más. Como la variable vive en la Lambda, el correo no queda
 en el repo público. Para sumar a alguien: agregarlo a `BRUJULA_ADMINS` con
 `update-function-configuration` (⚠️ `--environment` reemplaza el bloque entero: van las

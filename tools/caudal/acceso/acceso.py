@@ -11,10 +11,10 @@ NO es autoservicio: el modelo comercial es aprovisionamiento manual de cuentas
 ya habladas. Por eso todo esto exige credenciales de admin.
 
     python3 tools/caudal/acceso/acceso.py listar
-    python3 tools/caudal/acceso/acceso.py otorgar diego@cauce.co --nota "Cauce · piloto"
+    python3 tools/caudal/acceso/acceso.py otorgar cliente@empresa.co --nota "Cauce · piloto"
     python3 tools/caudal/acceso/acceso.py otorgar juan@gremio.co --dias 90 --nota "Prueba 3 meses"
-    python3 tools/caudal/acceso/acceso.py ver diego@cauce.co
-    python3 tools/caudal/acceso/acceso.py revocar diego@cauce.co
+    python3 tools/caudal/acceso/acceso.py ver cliente@empresa.co
+    python3 tools/caudal/acceso/acceso.py revocar cliente@empresa.co
 
 Credenciales, en orden de preferencia (ver README.md de esta carpeta):
   1. RR_ADMIN_API_KEY en el entorno o en ~/.config/caudal/acceso.env

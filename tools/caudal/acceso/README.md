@@ -16,10 +16,10 @@ cuentas ya habladas: no hay pasarela de pago acá y todo exige admin.
 
 ```bash
 python3 tools/caudal/acceso/acceso.py listar
-python3 tools/caudal/acceso/acceso.py otorgar diego@cauce.co --nota "Cauce · piloto"
+python3 tools/caudal/acceso/acceso.py otorgar cliente@empresa.co --nota "Cauce · piloto"
 python3 tools/caudal/acceso/acceso.py otorgar juan@gremio.co --dias 90 --nota "Prueba 3 meses"
-python3 tools/caudal/acceso/acceso.py ver diego@cauce.co
-python3 tools/caudal/acceso/acceso.py revocar diego@cauce.co
+python3 tools/caudal/acceso/acceso.py ver cliente@empresa.co
+python3 tools/caudal/acceso/acceso.py revocar cliente@empresa.co
 ```
 
 - **Sin `--dias` el acceso no vence.** Con `--dias`, la llave de KV se borra
@@ -109,8 +109,8 @@ entra en juego si el worker no responde, y está para que una caída no deje a
 Ricardo y a los socios por fuera de su propia plataforma. Agregar gente ahí ya
 no sirve — hay que otorgar por CLI.
 
-Los dos correos no-admin que estaban en la lista vieja (`diego@cauce.co` y
-`nuevagemela@gmail.com`) **quedaron sembrados en KV** antes del corte, para que
+Los dos correos no-admin que estaban en la lista vieja (el de Cauce y el de
+la socia) **quedaron sembrados en KV** antes del corte, para que
 nadie perdiera el acceso que ya tenía. No hubo alta nueva: es la misma gente
 que entraba por el HTML.
 

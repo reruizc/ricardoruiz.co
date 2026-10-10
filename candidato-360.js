@@ -458,9 +458,11 @@ function montarPais() { PAIS = paisInicial(); }
    cambia de candidato y NADA se escribe en el worker — así ninguna prueba deja
    puesto un vínculo que después solo soporte puede borrar. Se apaga con
    ?pruebas=0 para ver la página tal como la ve un cliente. */
-const ADMIN_EMAILS = ['reruizc@gmail.com', 'nuevagemela@gmail.com'];
 let PRUEBAS = false;
-function esAdmin() { return SESSION.fuente === 'admin' || ADMIN_EMAILS.includes(String(SESSION.user?.email || '').toLowerCase().trim()); }
+/* Quién administra lo decide el worker: /c360/me (`fuente:'admin'`) y, mientras
+   responde, el `isAdmin` que /auth/me dejó en la caché. Los correos ya no viven
+   en este archivo, que es público. */
+function esAdmin() { return SESSION.fuente === 'admin' || SESSION.user?.isAdmin === true; }
 function resolverModoPruebas() {
   PRUEBAS = esAdmin() && new URLSearchParams(location.search).get('pruebas') !== '0';
   /* El muro es de vitrina (el dato de esta página es público); abrirlo en local

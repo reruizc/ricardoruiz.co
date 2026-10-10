@@ -286,8 +286,9 @@
     $('panelCuerpo')?.classList.add('hidden');
   }
 
-  const ADMIN = ['reruizc@gmail.com', 'nuevagemela@gmail.com'];
-  function esAdmin() { return SESION.fuente === 'admin' || ADMIN.includes(String(SESION.user?.email || '').toLowerCase().trim()); }
+  /* Quién administra lo decide el worker (`fuente:'admin'` de /c360/me, o el
+     `isAdmin` de /auth/me en la caché). Sin correos en este archivo público. */
+  function esAdmin() { return SESION.fuente === 'admin' || SESION.user?.isAdmin === true; }
   /* Desata la cuenta de la candidatura actual con la ruta de soporte que ya
      existe. Deja copia 400 días del lado del worker. Solo administración. */
   async function soltarVinculo() {

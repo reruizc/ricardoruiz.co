@@ -46,10 +46,13 @@
   // Son prospectos con nombre propio: un usuario nuevo no tiene por qué ver
   // quién está en conversaciones con Cauce (reportado por Ricardo, sep-7-2026:
   // los vio con una cuenta recién creada). Solo el equipo los ve como muestra.
-  const EQUIPO=['reruizc@gmail.com','nuevagemela@gmail.com','diego@cauce.co'];
-  function esEquipo(){
-    try{ const u=JSON.parse(localStorage.getItem('rr-user')||'null'); return !!(u&&EQUIPO.includes(String(u.email||'').toLowerCase())); }catch(e){ return false; }
+  // Quién es «el equipo» lo decide el worker: /auth/me devuelve las llaves de
+  // esta cuenta (`accesos`) y la de esto es 'caudal-equipo'. Los correos ya no
+  // viven en este archivo, que es público.
+  function tieneLlave(k){
+    try{ const u=JSON.parse(localStorage.getItem('rr-user')||'null'); return !!(u&&Array.isArray(u.accesos)&&u.accesos.includes(k)); }catch(e){ return false; }
   }
+  function esEquipo(){ return tieneLlave('caudal-equipo'); }
   const CLI_SECS=[
     ['salud','Salud',1],['ambiente','Ambiente',1],['contratacion','Contratación',1],
     ['financiero','Financiero',1],['transporte','Transporte',1],['energia','Energía',0],
@@ -1499,16 +1502,12 @@
      ⚠️ El zip va SIN COMPRIMIR (método 0, «stored»). Un brief son decenas de
      KB: traerse un deflate al navegador para ahorrar 30 KB es peor negocio que
      los 30 KB. El formato lo admite y Word lo abre igual. */
-  // Quién puede llevarse el borrador editable. NO es la lista EQUIPO de arriba
-  // —esa decide quién ve los prospectos con nombre— y no se fundieron a
-  // propósito: son dos permisos distintos, y mezclarlos haría que ampliar uno
-  // ampliara el otro sin que nadie lo note.
-  const BRIEF_EDITABLE=['reruizc@gmail.com','pablo@cauce.co','diego@cauce.co'];
-  function briefPuedeEditable(){
-    try{ const u=JSON.parse(localStorage.getItem('rr-user')||'null');
-      return !!(u && BRIEF_EDITABLE.includes(String(u.email||'').toLowerCase().trim()));
-    }catch(e){ return false; }
-  }
+  // Quién puede llevarse el borrador editable: llave 'caudal-brief-editable' en
+  // el worker. NO es la llave del equipo de arriba —esa decide quién ve los
+  // prospectos con nombre— y no se fundieron a propósito: son dos permisos
+  // distintos, y mezclarlos haría que ampliar uno ampliara el otro sin que
+  // nadie lo note.
+  function briefPuedeEditable(){ return tieneLlave('caudal-brief-editable'); }
 
   // ── zip mínimo (solo «stored») ────────────────────────────────────────
   const _CRCTAB=(()=>{ const t=new Uint32Array(256);

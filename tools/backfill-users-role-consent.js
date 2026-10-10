@@ -51,9 +51,11 @@ const EXCLUDE_TEST = new Set([
 
 // Cuentas internas del dueño — opcional, las marcamos como consultor
 // porque sí sabemos qué hacen.
+// Las cuentas de terceros van en INTERNOS_EXTRA (separadas por coma), no en el
+// código: el repo es público.
 const INTERNAL_AS_CONSULTOR = new Set([
-  'reruizc@gmail.com', 'reruizc@unal.edu.co',
-  'nuevagemela@gmail.com', 'jdl2018@ricardoruiz.co',
+  'reruizc@gmail.com', 'reruizc@unal.edu.co', 'jdl2018@ricardoruiz.co',
+  ...String(process.env.INTERNOS_EXTRA || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
 ]);
 
 const APPLY = process.argv.includes('--apply');

@@ -4,8 +4,11 @@ Envía la propuesta OE3 por correo vía Resend, con el PDF adjunto.
 La API key se lee de la variable de entorno RESEND_API_KEY (nunca se guarda).
 
 Uso:
-    RESEND_API_KEY='re_xxx' python3 tools/send-propuesta/send.py          # envía
-    RESEND_API_KEY='re_xxx' python3 tools/send-propuesta/send.py --dry    # prueba sin enviar
+    RESEND_API_KEY='re_xxx' PARA='cliente@correo.com' python3 tools/send-propuesta/send.py          # envía
+    RESEND_API_KEY='re_xxx' PARA='cliente@correo.com' python3 tools/send-propuesta/send.py --dry    # prueba sin enviar
+
+El destinatario va en PARA (separado por comas si son varios) y no en el código:
+el repo es público.
 """
 import os
 import sys
@@ -15,7 +18,7 @@ import urllib.request
 
 # --- Configuración (editar si hace falta) ----------------------------------
 FROM      = "Ricardo Ruiz <contacto@ricardoruiz.co>"
-TO        = ["Carloshrodriquez10@hotmail.com"]
+TO        = [c.strip() for c in os.environ.get("PARA", "").split(",") if c.strip()]
 REPLY_TO  = "reruizc@gmail.com"
 SUBJECT   = "Propuesta — Objetivo 3 de tu tesis (social listening + análisis de sentimiento)"
 PDF_PATH  = ("/Users/ricardoruiz/ricardoruiz.co/Propuestas/"
@@ -93,6 +96,8 @@ def main():
     if dry:
         print("\n[--dry] No se envió nada. Quita --dry para enviar.")
         return
+    if not TO:
+        sys.exit("Falta el destinatario: PARA='cliente@correo.com' python3 tools/send-propuesta/send.py")
 
     req = urllib.request.Request(
         "https://api.resend.com/emails",
