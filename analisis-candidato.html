@@ -1152,7 +1152,6 @@
     const S3 = RRData.publicUrl('congreso-2026/output');
     const S3_PHOTOS = RRData.publicUrl('congreso-2026/output/fotos-candidatos');
     const DEPARTAMENTOS_GEOJSON_URL = RRData.publicUrl('congreso-2026/output/mapas-2026/DEPARTAMENTOS2.json');
-    const MUNICIPIOS_GEOJSON_URL = RRData.publicUrl('congreso-2026/output/mapas-2026/MUNICIPIOS.json');
     const DEPARTAMENTOS_MPS_URL = RRData.publicUrl('congreso-2026/output/mapas-2026/Departamentos-mps') + '/';
     const BOGOTA_LOCALIDADES_URL  = RRData.publicUrl('congreso-2026/output/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json');
     const PUESTOS_GEOREF_URL      = RRData.publicUrl('congreso-2026/output/mapas-2026/PUESTOS_GEOREF.csv');
@@ -1629,7 +1628,6 @@
     let leafletMap = null;
     let geojsonLayer = null;          // siempre apunta a activeBoundaryLayer (compatibilidad interna)
     let departamentosLayer = null;
-    let municipiosLayer = null;
     let activeBoundaryLayer = null;
     let depVoteData = {};   // { depCode: { nom, v } }
     let maxDepVotes = 1;
@@ -1805,38 +1803,11 @@
       }
     }
 
-    // ─── CAPA MUNICIPIOS (bajo demanda, una sola carga) ──────
-    // Llamar cuando el usuario seleccione un departamento específico.
-    // NOTA homologación: para colorear municipios, cruzar por
-    //   feature.properties.MPIO_CDPMP (código DANE 5 dígitos) contra tabla externa.
-    //   El contorno base se renderiza aunque no haya datos de votos.
     // TODO (capa premium): puestos de votación sí usan [lat, lng] desde m.lat/m.lng —
     //   crear loadPuestosLayer() en ruta separada con L.circleMarker().
-    async function loadMunicipiosLayer() {
-      if (!municipiosLayer) {
-        console.log('[Mapa] Cargando municipios…', MUNICIPIOS_GEOJSON_URL);
-        try {
-          const r = await fetch(MUNICIPIOS_GEOJSON_URL);
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          const geoData = await r.json();
-          const featureCount = geoData?.features?.length ?? 0;
-          console.log(`[Mapa] MUNICIPIOS cargados: ${featureCount} features`);
-          if (featureCount === 0) {
-            console.warn('[Mapa] GeoJSON de municipios vacío — no se renderiza');
-            return;
-          }
-          console.log('[Mapa] Primera feature properties:', JSON.stringify(geoData.features[0].properties));
-          municipiosLayer = L.geoJSON(geoData, {
-            style: featureStyle,
-            onEachFeature: onEachFeature
-          });
-        } catch(e) {
-          console.error('[Mapa] Error cargando municipios:', e.message);
-          return;
-        }
-      }
-      showBoundaryLayer(municipiosLayer);
-    }
+    // (La capa nacional de municipios desde mapas-2026/MUNICIPIOS.json se quitó: no se
+    //  llamaba en ningún sitio y el archivo no existe en S3. Los municipios salen de
+    //  Departamentos-mps/{dd}.json.)
 
     // ─── VISTA NACIONAL ─────────────────────────────────────
     function showNationalView() {
