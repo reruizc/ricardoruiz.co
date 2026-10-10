@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script defer src="/track.js"></script>
   <title>Centro de Descargas · Ricardo Ruiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -324,6 +325,14 @@
       background: var(--paper-2); color: var(--ink-3);
       cursor: default; pointer-events: none;
     }
+    /* 05 sin Pro/Premium: el botón no descarga, abre el aviso del plan */
+    .dept-dl-btn.locked { background: var(--paper-2); color: var(--ink-3); font-family: var(--mono); }
+    .dept-dl-btn.locked:hover { background: var(--paper-2); color: var(--ink); }
+    .dept-dl-note {
+      font-family: var(--sans); font-size: 14.5px; line-height: 1.55;
+      color: var(--ink-2); padding: .9rem 0 .4rem;
+    }
+    .dept-dl-note a { color: var(--accent); }
 
     /* ─── CRUDOS · CATEGORÍAS ──────────────────────── */
     .cat-card {
@@ -977,9 +986,16 @@
       return `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/><path d="M3 13h10v1.5H3z"/></svg>`;
     }
 
+    // Secciones 01-04: cualquier cuenta registrada descarga, también el plan
+    // Básico. Sin cuenta, el botón invita a registrarse. Se pinta según el
+    // estado que deja el bloque AUTH + GATE (más abajo), que corre antes.
+    const REGISTRO_DESCARGAS = 'register.html?next=descargas.html';
     function renderGrid(containerId, items, base) {
       const el = document.getElementById(containerId);
       if (!el) return;
+      const btn = it => window._conSesion
+        ? `<a class="dl-btn" href="${base}${it.archivo}" target="_blank" download>${dlIcon()} Descargar</a>`
+        : `<a class="dl-btn dl-btn-registro" href="${REGISTRO_DESCARGAS}" onclick="navTo(event,'${REGISTRO_DESCARGAS}')">Regístrate gratis para descargar</a>`;
       el.innerHTML = items.map(it => `
         <div class="dl-card">
           <div class="dl-card-top">
@@ -989,8 +1005,15 @@
             </div>
           </div>
           <div class="dl-meta">${it.filas} filas &nbsp;·&nbsp; ${it.mb} MB</div>
-          <a class="dl-btn" href="${base}${it.archivo}" target="_blank" download>${dlIcon()} Descargar</a>
+          ${btn(it)}
         </div>`).join('');
+    }
+    function pintarDescargas() {
+      renderGrid('grid-esc1v', ESC1V, S3_DESCARGAS);
+      renderGrid('grid-cne', CNE_OFICIAL, S3_CNE);
+      renderGrid('grid-corp', CORP, S3_DEC);
+      renderGrid('grid-circ', CIRC, S3_DEC);
+      renderDeptGen();
     }
 
     // ─── PRODUCTOS POR BARRIO (pago único · 850.000 c/u) ──────────────────────
@@ -1054,7 +1077,13 @@
       });
     }
 
+    // Deptos con archivo CITREP. En los otros 15 no hay circunscripción de paz y
+    // S3 da 403 (comprobado con HEAD contra S3 el 10-oct-2026).
+    const CITREP_DEPTOS = new Set(['ANTIOQUIA','ARAUCA','BOLIVAR','CAQUETA','CAUCA','CESAR','CHOCO','CORDOBA','GUAVIARE','HUILA','LA_GUAJIRA','MAGDALENA','META','NARINO','NORTE_DE_SAN','PUTUMAYO','SUCRE','TOLIMA','VALLE']);
+
     // ─── RENDER DEPT GENERAL ─────────────────────────────────────────────────
+    // 05: solo Pro, Premium o acceso total (window._isPaidDl). Al resto se le
+    // muestra la lista con el botón bloqueado, que explica qué plan la incluye.
     function renderDeptGen() {
       const key = document.getElementById('sel-dept-gen').value;
       const list = document.getElementById('list-dept-gen');
@@ -1065,16 +1094,20 @@
         { label:'Todos (consolidado)',  sub:'Todas las corporaciones y circunscripciones', url:`${S3_DEC}por_departamento/${key}_DECLARADOS.xlsx` },
         { label:'Senado',               sub:'Solo resultados Senado',                       url:`${S3_DEC}por_corporacion_depto/SENADO/${key}_DECLARADOS.xlsx` },
         { label:'Cámara',               sub:'Solo resultados Cámara',                       url:`${S3_DEC}por_corporacion_depto/CAMARA/${key}_DECLARADOS.xlsx` },
-        { label:'CITREP',               sub:'Circunscripciones transitorias',               url:`${S3_DEC}por_corporacion_depto/CITREP/${key}_DECLARADOS.xlsx` },
+        CITREP_DEPTOS.has(key) && { label:'CITREP', sub:'Circunscripciones transitorias',  url:`${S3_DEC}por_corporacion_depto/CITREP/${key}_DECLARADOS.xlsx` },
         { label:'Consultas',            sub:'Consultas presidenciales',                     url:`${S3_DEC}por_corporacion_depto/CONSULTAS/${key}_DECLARADOS.xlsx` },
-      ];
-      list.innerHTML = rows.map(r => `
+      ].filter(Boolean);
+      const pago = !!window._isPaidDl;
+      const nota = pago ? '' : `<div class="dept-dl-note">La descarga por departamento está en los planes <b>Pro</b> y <b>Premium</b>. ${window._conSesion ? 'Con tu plan Básico descargas las secciones 01 a 04.' : `Con una <a href="${REGISTRO_DESCARGAS}" onclick="navTo(event,'${REGISTRO_DESCARGAS}')">cuenta gratis</a> descargas las secciones 01 a 04.`} <a href="pricing.html" onclick="navTo(event,'pricing.html')">Ver planes →</a></div>`;
+      list.innerHTML = nota + rows.map(r => `
         <div class="dept-dl-row">
           <div class="dept-dl-info">
             <span class="dept-dl-label">${label} · ${r.label}</span>
             <span class="dept-dl-sub">${r.sub}</span>
           </div>
-          <a class="dept-dl-btn" href="${r.url}" target="_blank" download>${dlIcon()} Descargar</a>
+          ${pago
+            ? `<a class="dept-dl-btn" href="${r.url}" target="_blank" download>${dlIcon()} Descargar</a>`
+            : `<button type="button" class="dept-dl-btn locked" onclick="abrirAvisoPlan()">Pro o Premium</button>`}
         </div>`).join('');
     }
 
@@ -1560,6 +1593,16 @@
     function closeProModal() {
       document.getElementById('pro-overlay')?.classList.add('hidden');
     }
+    // Se abre al tocar una descarga por departamento (05) sin Pro/Premium.
+    function abrirAvisoPlan() {
+      const overlay = document.getElementById('pro-overlay');
+      if (!overlay) return;
+      overlay.querySelector('.pro-modal-title').textContent = 'Descarga por departamento';
+      overlay.querySelector('.pro-modal-sub').innerHTML = window._conSesion
+        ? 'Está en los planes <b>Pro</b> y <b>Premium</b>. Con tu plan Básico descargas las secciones 01 a 04.'
+        : 'Está en los planes <b>Pro</b> y <b>Premium</b>. Con una cuenta gratis descargas las secciones 01 a 04.';
+      overlay.classList.remove('hidden');
+    }
     document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('pro-overlay')?.addEventListener('click', function(e) {
         if (e.target === this) closeProModal();
@@ -1572,12 +1615,13 @@
       const token = localStorage.getItem('rr-token');
       const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
 
-      // Plan global para gate de crudos
-      window._userPlan  = (token && user && user.plan) ? user.plan.toLowerCase() : 'anon';
-      window._isPremium = ['premium','full'].includes(window._userPlan);
       // Privilegios de la cuenta, tal como los dio el worker (ver arriba).
       function aplicarPrivilegios(u) {
         const conSesion = !!(token && u);
+        window._conSesion = conSesion;
+        // Plan global para gate de crudos
+        window._userPlan  = (conSesion && u.plan) ? String(u.plan).toLowerCase() : 'anon';
+        window._isPremium = ['premium','full'].includes(window._userPlan);
         // Admins: sin límites de descarga + acceso a todos los tiers.
         window._isAdmin   = conSesion && u.isAdmin === true;
         // Acceso total: admins + colaboradores con la llave. Bypass de plan y cuota.
@@ -1586,11 +1630,13 @@
         if (window._isFullAccess) window._isPremium = true;
         // Permisos puntuales por archivo para esta cuenta
         window._fileGrants = (conSesion && Array.isArray(u.permisosDescarga)) ? u.permisosDescarga : [];
+        // 05 · por departamento: Pro, Premium o acceso total.
+        window._isPaidDl = window._isFullAccess || ['pro','premium','full'].includes(window._userPlan);
       }
       aplicarPrivilegios(user);
       // La caché puede ser de antes de que el worker diera estos campos (o de
       // antes de un permiso nuevo): se refresca y, si algo cambió, se vuelve a
-      // pintar la pestaña de crudos.
+      // pintar lo que depende de ella.
       if (token && user) {
         fetch('https://rr-auth.reruizc.workers.dev/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
           .then(r => r.ok ? r.json() : null)
@@ -1598,15 +1644,22 @@
             if (!d || !d.ok || !d.user) return;
             const nuevo = Object.assign({}, user, d.user);
             try { localStorage.setItem('rr-user', JSON.stringify(nuevo)); } catch (e) {}
-            const antes = JSON.stringify([window._isAdmin, window._isFullAccess, window._fileGrants]);
+            const estado = () => JSON.stringify([window._userPlan, window._isAdmin, window._isFullAccess, window._fileGrants]);
+            const antes = estado();
             aplicarPrivilegios(nuevo);
-            if (JSON.stringify([window._isAdmin, window._isFullAccess, window._fileGrants]) !== antes && typeof renderCrudos === 'function') renderCrudos();
+            if (estado() !== antes) {
+              if (typeof renderCrudos === 'function') renderCrudos();
+              pintarDescargas();
+              pintarNavPlan();
+            }
           })
           .catch(() => {});
       }
 
       // Render nav auth bar
-      if (authEl) {
+      function pintarNavPlan() {
+        if (!authEl) return;
+        const user = JSON.parse(localStorage.getItem('rr-user') || 'null');
         if (token && user) {
           const planLabels = { free:'Free', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análisis', full:'Premium' };
           authEl.innerHTML = `
@@ -1619,57 +1672,14 @@
             <a href="elige-plan.html" class="e-btn-register" onclick="navTo(event,'elige-plan.html')">Registrarse</a>`;
         }
       }
+      pintarNavPlan();
 
-      // Pro/Premium gate (acceso total lo bypassa por completo)
-      const isPaid = window._isFullAccess || (token && user && user.plan && ['pro','premium','full'].includes(user.plan.toLowerCase()));
-      if (!isPaid) {
-        // Disable all download buttons
-        document.querySelectorAll('.dl-btn, .dept-dl-btn').forEach(btn => {
-          btn.classList.add('disabled');
-          btn.removeAttribute('href');
-          btn.removeAttribute('download');
-          btn.style.pointerEvents = 'none';
-          btn.style.opacity = '.35';
-          btn.style.cursor = 'default';
-        });
-        // Show modal after curtain closes
-        const modalTitle = token && user
-          ? 'Contenido exclusivo'
-          : 'Acceso restringido';
-        const modalSub = token && user
-          ? 'Tu cuenta no tiene un plan activo. Actualiza a <b>Pro</b> o <b>Premium</b> para descargar los archivos.'
-          : 'Debes tener una cuenta <b>Pro</b> o <b>Premium</b> para acceder a las descargas.';
-        const overlay = document.getElementById('pro-overlay');
-        if (overlay) {
-          overlay.querySelector('.pro-modal-title').textContent = modalTitle;
-          overlay.querySelector('.pro-modal-sub').innerHTML = modalSub;
-          setTimeout(() => { overlay.classList.remove('hidden'); }, 1400);
-        }
-        // Also re-disable any dynamically rendered buttons (dept selectors)
-        const origRenderDeptGen = window.renderDeptGen;
-        const origRenderDeptCam = window.renderDeptCam;
-        const origRenderDeptCirc = window.renderDeptCirc;
-        function disableNewBtns() {
-          document.querySelectorAll('.dept-dl-btn:not([style*="pointer-events"])').forEach(btn => {
-            btn.classList.add('disabled');
-            btn.removeAttribute('href');
-            btn.removeAttribute('download');
-            btn.style.pointerEvents = 'none';
-            btn.style.opacity = '.35';
-            btn.style.cursor = 'default';
-          });
-        }
-        window.renderDeptGen  = function() { if(origRenderDeptGen) origRenderDeptGen(); disableNewBtns(); };
-        window.renderDeptCam  = function() { if(origRenderDeptCam) origRenderDeptCam(); disableNewBtns(); };
-        window.renderDeptCirc = function() { if(origRenderDeptCirc) origRenderDeptCirc(); disableNewBtns(); };
-      }
+      // Ya no hay modal automático: 01-04 se pintan según la sesión
+      // (renderGrid) y 05 según el plan (renderDeptGen).
     })();
 
     // ─── INIT ─────────────────────────────────────────────────────────────────
-    renderGrid('grid-esc1v', ESC1V, S3_DESCARGAS);
-    renderGrid('grid-cne', CNE_OFICIAL, S3_CNE);
-    renderGrid('grid-corp', CORP, S3_DEC);
-    renderGrid('grid-circ', CIRC, S3_DEC);
+    pintarDescargas();   // después del bloque AUTH + GATE, que deja el estado
     renderBarrio();
     populateSelect('sel-dept-gen', DEPTOS_GEN);
     renderCrudos();  // IIFE de auth corre antes (setea _userPlan/_isPremium)
