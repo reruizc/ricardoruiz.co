@@ -340,7 +340,7 @@
   </div>
 
   <div class="full-footer">
-    <span class="footer-brand">ricardoruiz.co · Elecciones Colombia 2026</span>
+    <span class="footer-brand">ricardoruiz.co · Elecciones Colombia 2018</span>
     <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
   </div>
 
@@ -780,8 +780,22 @@
           <td class="r" style="font-weight:500">${fmt(c.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${col}" data-w="${bw}"></div></div></td>
         </tr>`;
-      }).join('');
+      }).join('') + filaBlanco(cons, sorted);
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),60);
+    }
+    /* Los % van sobre los votos válidos, que en la presidencial incluyen el
+       blanco (votos = candidatos + blanco en resumen/dep-NN.json). Sin esta
+       fila el ganador sale con 49,66 % y los candidatos no suman 100. En las
+       consultas no hay blanco (votos = suma de candidatos) y no aparece. */
+    function filaBlanco(cons, sorted){
+      const blanco = (cons.votos||0) - sorted.reduce((t,c)=>t+(c.votos||0),0);
+      if(blanco<=0) return '';
+      return `<tr style="cursor:default">
+          <td></td>
+          <td style="color:rgba(255,255,255,.5)">Voto en blanco</td>
+          <td class="r" style="color:rgba(255,255,255,.5)">${fmt(blanco)}</td>
+          <td class="r"><span class="pct-val" style="color:rgba(255,255,255,.5)">${pct(blanco, cons.votos)}%</span></td>
+        </tr>`;
     }
 
     // ─── DONUT ────────────────────────────────────────────────────
