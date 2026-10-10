@@ -630,7 +630,7 @@
           { feature: 'Affinity Test and Pronostico 1V', values: { free: true, pro: true, premium: true, custom: true } },
           { feature: 'CITREP 2026 · territorial composition', values: { free: true, pro: true, premium: true, custom: true } },
           { feature: 'Senate, House and 2026 consultation results', values: { free: true, pro: true, premium: true, custom: true } },
-          { feature: 'Opportunity Map · weighted candidates', note: 'Anonymous: 1 sample switch. Free: switch freely between the 6 candidates. Pro/Premium: extra analysis layers.', values: { free: 'Base view', pro: true, premium: true, custom: true } },
+          { feature: 'Opportunity Map · weighted candidates', note: 'Anonymous: 1 sample switch. Basic: switch freely between the 6 candidates. Pro/Premium: extra analysis layers.', values: { free: 'Base view', pro: true, premium: true, custom: true } },
           { feature: 'Commune-level drilldown in 8 cities', note: 'Bogota, Medellin, Cali, Pereira, Ibague, Barranquilla, Monteria and Manizales.', values: { free: false, pro: true, premium: true, custom: true } },
           { feature: 'Bogota UPLs + cadastral neighborhoods · Medellin neighborhoods', note: '33 UPLs and 1,000+ cadastral neighborhoods in Bogota; 147 official neighborhoods in Medellin.', values: { free: false, pro: true, premium: true, custom: true } },
           { feature: 'Intra-bloc transfer simulator', note: 'Simulates how much your candidate gains by absorbing affine candidates.', values: { free: false, pro: true, premium: true, custom: true } },
@@ -795,7 +795,7 @@
           { feature: '亲和力测试与 Pronostico 1V', values: { free: true, pro: true, premium: true, custom: true } },
           { feature: 'CITREP 2026 · 区域构成', values: { free: true, pro: true, premium: true, custom: true } },
           { feature: '2026 参议院、众议院与初选结果', values: { free: true, pro: true, premium: true, custom: true } },
-          { feature: '机会地图 · 加权候选人', note: '匿名：1 次样本切换。Free：在 6 位候选人间自由切换。Pro/Premium：附加分析图层。', values: { free: '基础视图', pro: true, premium: true, custom: true } },
+          { feature: '机会地图 · 加权候选人', note: '匿名：1 次样本切换。基础版：在 6 位候选人间自由切换。Pro/Premium：附加分析图层。', values: { free: '基础视图', pro: true, premium: true, custom: true } },
           { feature: '8 座城市的区级下钻', note: '波哥大、麦德林、卡利、佩雷拉、伊瓦格、巴兰基亚、蒙特里亚和马尼萨莱斯。', values: { free: false, pro: true, premium: true, custom: true } },
           { feature: '波哥大 UPL + 地籍街区 · 麦德林街区', note: '波哥大 33 个 UPL 与 1,000+ 地籍街区；麦德林 147 个官方街区。', values: { free: false, pro: true, premium: true, custom: true } },
           { feature: '同阵营票源转移模拟器', note: '模拟你的候选人吸收同阵营候选人票源后的收益。', values: { free: false, pro: true, premium: true, custom: true } },
@@ -960,7 +960,7 @@
           { feature: 'Teste de afinidade e Prognóstico 1V', values: { free: true, pro: true, premium: true, custom: true } },
           { feature: 'CITREP 2026 · composição territorial', values: { free: true, pro: true, premium: true, custom: true } },
           { feature: 'Resultados Senado, Câmara e consultas 2026', values: { free: true, pro: true, premium: true, custom: true } },
-          { feature: 'Mapa de Oportunidade · candidatos do ponderador', note: 'Anônimo: 1 troca de amostra. Free: alterna livre entre os 6 candidatos. Pro/Premium: camadas adicionais de análise.', values: { free: 'Visão base', pro: true, premium: true, custom: true } },
+          { feature: 'Mapa de Oportunidade · candidatos do ponderador', note: 'Anônimo: 1 troca de amostra. Básico: alterna livre entre os 6 candidatos. Pro/Premium: camadas adicionais de análise.', values: { free: 'Visão base', pro: true, premium: true, custom: true } },
           { feature: 'Drilldown a comunas em 8 cidades', note: 'Bogotá, Medellín, Cali, Pereira, Ibagué, Barranquilla, Montería e Manizales.', values: { free: false, pro: true, premium: true, custom: true } },
           { feature: 'Bogotá UPL + bairros cadastrais · Medellín bairros', note: '33 UPL e 1.000+ bairros cadastrais em Bogotá; 147 bairros oficiais em Medellín.', values: { free: false, pro: true, premium: true, custom: true } },
           { feature: 'Simulador de transferência intra-bloco', note: 'Simula quanto seu candidato recebe se absorver parte do voto de candidatos afins.', values: { free: false, pro: true, premium: true, custom: true } },
@@ -1140,7 +1140,9 @@
         const price = formatPrice(plan);
         const isLoggedIn = !!localStorage.getItem('rr-token');
         const user = JSON.parse(localStorage.getItem('rr-user') || 'null');
-        const isCurrent = user && user.plan === plan.id;
+        // El plan gratis es «Básico»: el worker puede llamarlo free, basico o basic.
+        const userPlan = user && (['basico','basic'].includes(user.plan) ? 'free' : user.plan);
+        const isCurrent = !!user && userPlan === plan.id;
 
         const priceHTML = plan.free
           ? `<div class="plan-price-wrap">
@@ -1186,7 +1188,7 @@
           <div class="plan-card ${plan.featured ? 'featured' : ''}">
             <div class="plan-badge">
               <div class="plan-badge-dot"></div>
-              ${plan.id.toUpperCase()}
+              ${(plan.free ? plan.name : plan.id).toUpperCase()}
               ${badgeHTML}
             </div>
             <div class="plan-name">${plan.name}</div>
@@ -1302,12 +1304,12 @@
       if (!area) return;
       if (token && user) {
         const planLabels = currentLang === 'us'
-          ? { free:'Free', pro:'Pro', premium:'Premium', basic:'Basic', analysis:'Analysis', full:'Full' }
+          ? { free:'Basic', basico:'Basic', pro:'Pro', premium:'Premium', basic:'Basic', analysis:'Analysis', full:'Full' }
           : currentLang === 'cn'
-            ? { free:'免费', pro:'Pro', premium:'Premium', basic:'基础版', analysis:'分析版', full:'完整版' }
+            ? { free:'基础版', basico:'基础版', pro:'Pro', premium:'Premium', basic:'基础版', analysis:'分析版', full:'完整版' }
             : currentLang === 'br'
-              ? { free:'Free', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análise', full:'Completo' }
-              : { free:'Free', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análisis', full:'Completo' };
+              ? { free:'Básico', basico:'Básico', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análise', full:'Completo' }
+              : { free:'Básico', basico:'Básico', pro:'Pro', premium:'Premium', basic:'Básico', analysis:'Análisis', full:'Completo' };
         area.dataset.loggedIn = '1';
         area.innerHTML = `
           <span class="e-user-plan">${planLabels[user.plan] || user.plan}</span>
