@@ -114,7 +114,7 @@
   }
   function evTitulo(t){ const s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
   function evRow(it,camara,i){
-    const meta=[it.comision?`Comisión ${esc(it.comision)}`:'',evFmtFecha(it.fecha),it.estado?esc(it.estado):'']
+    const meta=[evEsAL(it)?'Acto legislativo':'',it.comision?`Comisión ${esc(it.comision)}`:'',evFmtFecha(it.fecha),it.estado?esc(it.estado):'']
       .filter(Boolean).map(m=>`<span class="m">${m}</span>`).join('');
     const auts=autoresCorto(it.autor);
     return `<div class="ev-row ${camara}" data-i="${i}" tabindex="0" role="button">
@@ -132,6 +132,9 @@
      el resumen salió solo del título (explica.base='titulo', típico de un PDF
      escaneado), «Texto disponible» haría creer que el resumen leyó el
      articulado. */
+  /* El feed de Cámara mezcla actos legislativos (reformas a la Constitución)
+     con proyectos de ley; se rotulan para no llamarlos «proyecto de ley». */
+  function evEsAL(it){ return /acto legislativo/i.test(it.tipo||''); }
   function evEstadoTexto(it){
     const base=(it.explica||{}).base;
     if(it.pdf&&base==='titulo') return `<span class="ev-pending">◐ Resumen solo del título</span>`;
@@ -168,7 +171,7 @@
     }else{
       cuerpo=`<div class="md-ojo">Todavía no hay un resumen de este proyecto: la Secretaría publicó el título pero aún no el texto radicado. Aparecerá aquí en cuanto salga.</div>`;
     }
-    return `<div class="md-tag">Proyecto de ley · ${camara==='sen'?'Senado':'Cámara de Representantes'} · Legislatura 2026–2027</div>
+    return `<div class="md-tag">${evEsAL(it)?'Proyecto de acto legislativo':'Proyecto de ley'} · ${camara==='sen'?'Senado':'Cámara de Representantes'} · Legislatura 2026–2027</div>
       <div><span class="md-num">${esc(it.numero||'—')}</span></div>
       ${cuerpo}
       <div class="md-sec">Título radicado</div>
