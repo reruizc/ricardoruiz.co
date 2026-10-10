@@ -323,6 +323,22 @@
         <span class="t" style="width:${Math.max(1,100*v/max)}%"></span>
         <span class="v">${(100*v/tot).toFixed(1).replace('.',',')}%</span></div>`).join('');
   }
+  /* Extorsión 2023: el lote SIEDCO trae 3 a 4 veces lo de 2022 y 2024, y
+     MinDefensa da 11.078 para ese año (las dos fuentes cuadran en 2015-2021).
+     Mientras no se revise el lote, se avisa en el perfil y en la calidad. La
+     nota se calcula sobre el dato y se apaga sola si el pico desaparece. */
+  const EXT_MDN_2023=11078;  // mindefensa.json → .delitos.extorsiones.anio["2023"] (corte 31-ago-2026)
+  function notaExtorsion2023(){
+    const A=ST.meta.anios, v=((ST.nac||{}).por_anio||{}).extorsiones||[], i=A.indexOf(2023);
+    if(i<1||!v[i]) return '';
+    const vec=Math.max(v[i-1]||0,v[i+1]||0);
+    if(!vec||v[i]<2*vec) return '';
+    return `<b>Extorsión 2023 no cuadra.</b> El archivo de la Policía (SIEDCO) trae <b>${fmt(v[i])}</b> denuncias
+      ese año, frente a ${fmt(v[i-1])} en 2022 y ${fmt(v[i+1])} en 2024. MinDefensa reporta <b>${fmt(EXT_MDN_2023)}</b>
+      para 2023, y las dos fuentes prácticamente coinciden de 2015 a 2021. Todavía no sabemos si el lote de 2023
+      trae registros repetidos o mal clasificados: no leas ese pico como un salto real de la extorsión.`;
+  }
+
   function perfil(){
     const N=ST.nac, s=ST.sel;
     const d=ST.meta.delitos.find(x=>x.id===s)||{};
@@ -387,6 +403,7 @@
     const av=[];
     if((d.desde||0)>ST.meta.anios[0]) av.push(`<b>Este delito existe desde el lote de ${d.desde}</b>, así que su perfil describe ${d.desde}–2026, no la década.`);
     if(d.sin_anio>0) av.push(`<b>${Math.round(100*d.sin_anio/d.total)}% de estos hechos llegó sin año</b>, pero sí con hora y día de la semana: el perfil de arriba los incluye.`);
+    if(s==='extorsiones'){ const n=notaExtorsion2023(); if(n) av.push(n); }
     const w=document.getElementById('w-perfil');
     w.innerHTML=av.join('<br><br>'); w.style.display=av.length?'':'none';
   }
@@ -479,6 +496,7 @@
       llegó</b> en ninguna de las dos, y los homicidios no traen el artículo del Código Penal, así que no se
       puede separar.</p>
       <p style="margin-bottom:.7rem"><b>Bogotá venía dentro de Cundinamarca.</b> ${esc(c.nota_bogota)}</p>
+      ${notaExtorsion2023()?`<p style="margin-bottom:.7rem">${notaExtorsion2023()}</p>`:''}
       <p style="margin-bottom:.7rem"><b>La medianoche es, muchas veces, «no sé a qué hora».</b> La fuente
       escribe 00:00 cuando no conoce la hora del hecho. En homicidios ese valor es tan frecuente como
       cualquier otro —o sea, es real—, pero en delitos sexuales aparece 9 veces de más, en violencia
@@ -487,7 +505,7 @@
       <p style="margin-bottom:.7rem"><b>El perfil es el de la víctima.</b> Género, edad, estudios,
       ocupación y nacionalidad describen a quien denuncia, no a quien agrede. Del agresor la fuente
       solo registra cómo se movía.</p>
-      <p style="margin-bottom:.7rem"><b>Las tasas por habitante llegan hasta 2018.</b> La proyección
+      <p style="margin-bottom:.7rem"><b>Las tasas por habitante arrancan en 2018.</b> La proyección
       municipal del DANE es post-censo y arranca ese año; 2015, 2016 y 2017 van en volumen absoluto.
       Dentro de las ciudades no hay tasa: el DANE no publica población por comuna.</p>
       ${fr.length?`<p><b>Fechas fuera de rango:</b> ${fr.map(([a,n])=>`${fmt(n)} hechos fechados en ${a}`).join(', ')}

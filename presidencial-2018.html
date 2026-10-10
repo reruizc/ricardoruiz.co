@@ -303,7 +303,10 @@
             <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem;flex-wrap:wrap">
               <div class="card-label" style="margin-bottom:0" id="map-label">Mapa nacional</div>
               <span class="level-badge nac" id="level-badge">Nacional</span>
-              <button id="excel-download-btn" class="excel-btn excel-btn-locked" onclick="downloadExcelCurrentView()">⬇ Descarga Excel</button>
+              <!-- Oculto: la exportación nunca se implementó (downloadExcelCurrentView solo
+                   hace console.log) y el botón cobraba Pro por algo que no existe. Quitar
+                   «hidden» cuando haya export real (modelo: senado-2022.html). -->
+              <button id="excel-download-btn" class="excel-btn excel-btn-locked" onclick="downloadExcelCurrentView()" hidden>⬇ Descarga Excel</button>
             </div>
             <div class="drill-nav" id="drill-nav"></div>
             <div class="map-wrap">
@@ -337,7 +340,7 @@
   </div>
 
   <div class="full-footer">
-    <span class="footer-brand">ricardoruiz.co · Elecciones Colombia 2026</span>
+    <span class="footer-brand">ricardoruiz.co · Elecciones Colombia 2018</span>
     <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
   </div>
 
@@ -777,8 +780,22 @@
           <td class="r" style="font-weight:500">${fmt(c.votos)}</td>
           <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${col}" data-w="${bw}"></div></div></td>
         </tr>`;
-      }).join('');
+      }).join('') + filaBlanco(cons, sorted);
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),60);
+    }
+    /* Los % van sobre los votos válidos, que en la presidencial incluyen el
+       blanco (votos = candidatos + blanco en resumen/dep-NN.json). Sin esta
+       fila el ganador sale con 49,66 % y los candidatos no suman 100. En las
+       consultas no hay blanco (votos = suma de candidatos) y no aparece. */
+    function filaBlanco(cons, sorted){
+      const blanco = (cons.votos||0) - sorted.reduce((t,c)=>t+(c.votos||0),0);
+      if(blanco<=0) return '';
+      return `<tr style="cursor:default">
+          <td></td>
+          <td style="color:rgba(255,255,255,.5)">Voto en blanco</td>
+          <td class="r" style="color:rgba(255,255,255,.5)">${fmt(blanco)}</td>
+          <td class="r"><span class="pct-val" style="color:rgba(255,255,255,.5)">${pct(blanco, cons.votos)}%</span></td>
+        </tr>`;
     }
 
     // ─── DONUT ────────────────────────────────────────────────────
@@ -1236,7 +1253,7 @@
     (function loop(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ri.style.left=rx+'px';ri.style.top=ry+'px';requestAnimationFrame(loop);})();
     document.addEventListener('mouseover',e=>{if(e.target.closest('a,button,select,input')){cur2.style.transform='translate(-50%,-50%) scale(2.5)';cur2.style.background='transparent';cur2.style.border='1.5px solid var(--blue)';ri.style.opacity='0';}else{cur2.style.transform='translate(-50%,-50%) scale(1)';cur2.style.background='var(--blue)';cur2.style.border='none';ri.style.opacity='.4';}});
 
-    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Free',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="elige-plan.html" class="e-btn-register">Registrarse</a>`;}}
+    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Básico',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="elige-plan.html" class="e-btn-register">Registrarse</a>`;}}
     async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateExcelDownloadBtn();}
     function updateExcelDownloadBtn(){const token=localStorage.getItem('rr-token');const user=JSON.parse(localStorage.getItem('rr-user')||'null');const btn=document.getElementById('excel-download-btn');if(!btn)return;const ok=token&&user&&['pro','premium','full'].includes(user.plan);btn.className='excel-btn '+(ok?'excel-btn-active':'excel-btn-locked');}
     function downloadExcelCurrentView(){const token=localStorage.getItem('rr-token');const user=JSON.parse(localStorage.getItem('rr-user')||'null');const ok=token&&user&&['pro','premium','full'].includes(user.plan);if(!ok){showProToast();return;}console.log('TODO excel export');}

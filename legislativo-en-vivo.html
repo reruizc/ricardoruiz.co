@@ -83,7 +83,7 @@
         <div class="ev-pager" id="ev-pager-cam"></div>
       </div>
     </div>
-    <div class="note" style="margin-top:1.2rem">Se guardan los <b>15 radicados más recientes</b> de cada cámara, del más nuevo al más viejo. El histórico completo (más de 10.600 proyectos desde 1990) es buscable en <a href="legislativo-proyectos.html" style="color:var(--blue-light)">Radar legislativo</a>. Fuentes: Secretaría del Senado · Cámara de Representantes.</div>
+    <div class="note" style="margin-top:1.2rem">Se guardan los <b>15 radicados más recientes</b> de cada cámara, del más nuevo al más viejo. El histórico completo (más de 13.800 proyectos desde 1990) es buscable en <a href="legislativo-proyectos.html" style="color:var(--blue-light)">Radar legislativo</a>. Fuentes: Secretaría del Senado · Cámara de Representantes.</div>
   </section>
 
   <!-- ══ MODAL COMPARTIDO (proyecto de ley · ficha de congresista) ═══ -->
@@ -114,7 +114,7 @@
   }
   function evTitulo(t){ const s=String(t||'').replace(/\s+/g,' ').trim(); return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
   function evRow(it,camara,i){
-    const meta=[it.comision?`Comisión ${esc(it.comision)}`:'',evFmtFecha(it.fecha),it.estado?esc(it.estado):'']
+    const meta=[evEsAL(it)?'Acto legislativo':'',it.comision?`Comisión ${esc(it.comision)}`:'',evFmtFecha(it.fecha),it.estado?esc(it.estado):'']
       .filter(Boolean).map(m=>`<span class="m">${m}</span>`).join('');
     const auts=autoresCorto(it.autor);
     return `<div class="ev-row ${camara}" data-i="${i}" tabindex="0" role="button">
@@ -125,8 +125,20 @@
       </div>
       <div class="ev-meta">${meta}</div>
       <div class="ev-meta">${auts?`<span class="m">${auts}</span>`:''}
-        <span class="${it.pdf?'ev-ready':'ev-pending'}">${it.pdf?'● Texto disponible':'○ Texto pendiente'}</span></div>
+        ${evEstadoTexto(it)}</div>
     </div>`;
+  }
+  /* El rótulo de la fila dice qué hay detrás del resumen. Si el PDF existe pero
+     el resumen salió solo del título (explica.base='titulo', típico de un PDF
+     escaneado), «Texto disponible» haría creer que el resumen leyó el
+     articulado. */
+  /* El feed de Cámara mezcla actos legislativos (reformas a la Constitución)
+     con proyectos de ley; se rotulan para no llamarlos «proyecto de ley». */
+  function evEsAL(it){ return /acto legislativo/i.test(it.tipo||''); }
+  function evEstadoTexto(it){
+    const base=(it.explica||{}).base;
+    if(it.pdf&&base==='titulo') return `<span class="ev-pending">◐ Resumen solo del título</span>`;
+    return `<span class="${it.pdf?'ev-ready':'ev-pending'}">${it.pdf?'● Texto disponible':'○ Texto pendiente'}</span>`;
   }
   /* de dónde salió el resumen — se dice explícito para que se pueda contrastar
      con el PDF oficial y para no vender como lectura del articulado algo que
@@ -137,6 +149,7 @@
     objeto:'del objeto declarado por el autor en la ficha oficial',
     titulo:'únicamente del título radicado — el articulado todavía no se publica',
   };
+  const EV_BASE_TITULO_CON_PDF='únicamente del título radicado — el texto ya está publicado, pero el resumen no lo leyó: para el detalle, descárgalo arriba';
   function evModal(it,camara,basePdf){
     const pdf=it.pdf?(/^https?:/i.test(it.pdf)?it.pdf:basePdf+it.pdf):null;
     const ex=it.explica;
@@ -158,7 +171,7 @@
     }else{
       cuerpo=`<div class="md-ojo">Todavía no hay un resumen de este proyecto: la Secretaría publicó el título pero aún no el texto radicado. Aparecerá aquí en cuanto salga.</div>`;
     }
-    return `<div class="md-tag">Proyecto de ley · ${camara==='sen'?'Senado':'Cámara de Representantes'} · Legislatura 2026–2027</div>
+    return `<div class="md-tag">${evEsAL(it)?'Proyecto de acto legislativo':'Proyecto de ley'} · ${camara==='sen'?'Senado':'Cámara de Representantes'} · Legislatura 2026–2027</div>
       <div><span class="md-num">${esc(it.numero||'—')}</span></div>
       ${cuerpo}
       <div class="md-sec">Título radicado</div>
@@ -170,7 +183,7 @@
              :`<span class="ev-nopdf">Texto radicado aún no publicado</span>`}
         ${it.fuente?`<a class="ev-src" href="${esc(it.fuente)}" target="_blank" rel="noopener">Ver en ${camara==='sen'?'Senado':'Cámara'} ↗</a>`:''}
       </div>
-      ${ex?`<div class="md-src">Resumen en lenguaje llano redactado automáticamente a partir ${EV_BASE_TXT[ex.base]||'de la ficha oficial'}. Es una lectura de apoyo, no el texto legal: lo que obliga es el documento radicado.</div>`:''}`;
+      ${ex?`<div class="md-src">Resumen en lenguaje llano redactado automáticamente a partir ${(ex.base==='titulo'&&pdf)?EV_BASE_TITULO_CON_PDF:(EV_BASE_TXT[ex.base]||'de la ficha oficial')}. Es una lectura de apoyo, no el texto legal: lo que obliga es el documento radicado.</div>`:''}`;
   }
   function evPaint(box,list,camara,basePdf){
     if(!list||!list.length){ box.innerHTML=`<div class="ev-empty">Aún no hay proyectos radicados en la legislatura 2026–2027 por esta cámara. Aparecerán aquí apenas la Secretaría los publique.</div>`; return; }

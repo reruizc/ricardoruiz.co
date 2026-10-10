@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>El mapa del delito · Policía 2015-2026 · Ricardo Ruiz</title>
-  <meta name="description" content="Dónde se denuncia cada delito en Colombia: del mapa nacional a los 1.111 municipios, con los 21 delitos de la Policía Nacional entre 2015 y agosto de 2026." />
+  <meta name="description" content="Dónde se denuncia cada delito en Colombia: del mapa nacional a los 1.112 municipios, con los 21 delitos de la Policía Nacional entre 2015 y agosto de 2026." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
@@ -539,11 +539,25 @@
       '<span>menos</span>'+PONAL.RAMPA.map(c=>`<i style="background:${c}"></i>`).join('')+
       `<span>más — hasta ${fmtV(max)}</span>`;
   }
+  /* Extorsión 2023: el lote SIEDCO trae 3 a 4 veces lo de 2022 y 2024, y
+     MinDefensa da 11.078 para ese año (las dos fuentes cuadran en 2015-2021).
+     Se calcula sobre la suma de departamentos y se apaga sola si el pico
+     desaparece del dato. Misma nota en policia-historico.html. */
+  const EXT_MDN_2023=11078;  // mindefensa.json → .delitos.extorsiones.anio["2023"] (corte 31-ago-2026)
+  function notaExtorsion2023(){
+    const A=ST.meta.anios, i=A.indexOf(2023);
+    if(i<1||!ST.deps) return '';
+    const suma=k=>Object.values(ST.deps).reduce((t,o)=>t+((((o.d||{}).extorsiones||{}).y||[])[k]||0),0);
+    const v=suma(i), va=suma(i-1), vb=suma(i+1), vec=Math.max(va,vb);
+    if(!v||!vec||v<2*vec) return '';
+    return `<b>Extorsión 2023 no cuadra.</b> El archivo de la Policía (SIEDCO) trae ${fmt(v)} denuncias ese año, frente a ${fmt(va)} en 2022 y ${fmt(vb)} en 2024; MinDefensa reporta ${fmt(EXT_MDN_2023)}. Todavía no sabemos si el lote trae registros repetidos o mal clasificados: no leas 2023 como un salto real, y con «Todos» los años ese lote pesa de más.`;
+  }
   /* Los avisos no son decorativos: sin ellos el mapa afirma cosas que el dato
      no sostiene (un delito sin año, o uno que solo existe en 2024). */
   function pintarAvisos(){
     const d=ST.meta.delitos.find(x=>x.id===ST.delito)||{};
     const av=[];
+    if(ST.delito==='extorsiones'&&(ST.anio==='todos'||+ST.anio===2023)){ const n=notaExtorsion2023(); if(n) av.push(n); }
     if(d.desde>ST.meta.anios[0]) av.push(`<b>Desde ${d.desde}.</b> La Policía empezó a entregar este delito en ese lote, así que no tiene historia anterior.`);
     /* Dentro de la ciudad: cuánto del delito no se pudo ubicar en comuna ese
        año. En 2025-2026 el «barrio pendiente por asignar» se disparó (Bogotá 51%
