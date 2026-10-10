@@ -111,7 +111,7 @@
       <div class="panel"><h3>El embudo del trámite · 1990–2026</h3><div id="embudo-box"></div><div class="note" id="emb-note">Cada fila es una fase del trámite; el ↓% dice cuántos sobreviven de una fase a la siguiente.</div></div>
       <div class="panel"><h3>Mortandad por año del cuatrienio</h3><div id="mort-box"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
       <div class="panel wide"><h3>Proyectos de ley por cuatrienio de gobierno</h3><div class="scrollx" id="cuat-pl"></div>
-        <div class="tnote">Cada fila es el periodo presidencial en que se radicó el proyecto, sin importar cuándo terminó su trámite. «Otros» reúne los que el registro dejó sin estado. Los dos últimos cuatrienios todavía tienen proyectos vivos, así que su porcentaje de aprobación va a subir un poco.</div>
+        <div class="tnote">Cada fila es el periodo presidencial en que se radicó el proyecto, sin importar cuándo terminó su trámite. «Otros» reúne los que el registro dejó sin estado. Los dos últimos cuatrienios todavía tienen proyectos vivos, así que su porcentaje de aprobación va a subir un poco.<span id="cuat-pl-vivo"></span></div>
       </div>
       <div class="panel wide"><h3>Proyectos de acto legislativo por cuatrienio</h3><div class="scrollx" id="cuat-al"></div>
         <div class="tnote"><b>Sin columna de aprobados, a propósito.</b> El registro publica por aparte 33 actos legislativos sancionados entre 1993 y 2025, pero <b>no los enlaza con el proyecto que les dio origen</b>, así que la tasa de éxito no se puede calcular con esta fuente sin inventarla. Lo que sí se puede medir es el volumen y la mortandad, y ahí la reforma constitucional se cuadruplicó: de 62 intentos en 1992-1994 a 237 en 2018-2022.</div>
@@ -203,15 +203,16 @@
       : ['Cuatrienio','Radicados','Archivados','Retirados','En trámite','Otros'];
     const body=rows.map(r=>{
       const enCurso=r[0]==='2026-2030';
+      const corte=enCurso?`<span class="muted" style="display:block;font-size:.8em;font-weight:400;white-space:nowrap">${esc(esPL&&r.vivo?r.vivo:'corte ago-2026')}</span>`:'';
       if(esPL){
         const [c,t,ley,arch,ret,tr,otr]=r;
         const pct=t?100*ley/t:0;
         const barra=enCurso?'<span class="muted">en curso</span>'
           :`<span class="pbar"><i style="width:${Math.round(60*pct/maxPct)}px"></i><b>${pct.toFixed(1).replace('.',',')}%</b></span>`;
-        return `<tr class="${enCurso?'curso':''}"><td class="cu">${esc(c)}</td><td>${fmt(t)}</td><td class="ley">${fmt(ley)}</td><td class="arch">${fmt(arch)}</td><td>${fmt(ret)}</td><td class="tram">${fmt(tr)}</td><td class="muted">${fmt(otr)}</td><td>${barra}</td></tr>`;
+        return `<tr class="${enCurso?'curso':''}"><td class="cu">${esc(c)}${corte}</td><td>${fmt(t)}</td><td class="ley">${fmt(ley)}</td><td class="arch">${fmt(arch)}</td><td>${fmt(ret)}</td><td class="tram">${fmt(tr)}</td><td class="muted">${fmt(otr)}</td><td>${barra}</td></tr>`;
       }
       const [c,t,arch,ret,tr,otr]=r;
-      return `<tr class="${enCurso?'curso':''}"><td class="cu">${esc(c)}</td><td>${fmt(t)}</td><td class="arch">${fmt(arch)}</td><td>${fmt(ret)}</td><td class="tram">${fmt(tr)}</td><td class="muted">${fmt(otr)}</td></tr>`;
+      return `<tr class="${enCurso?'curso':''}"><td class="cu">${esc(c)}${corte}</td><td>${fmt(t)}</td><td class="arch">${fmt(arch)}</td><td>${fmt(ret)}</td><td class="tram">${fmt(tr)}</td><td class="muted">${fmt(otr)}</td></tr>`;
     }).join('');
     return `<table class="ctab"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>`;
   }
@@ -235,8 +236,41 @@
     box.innerHTML=funnel(embudo);
     requestAnimationFrame(()=>box.querySelectorAll('.f2-bar').forEach(b=>b.style.width=b.dataset.w+'%'));
   }
+  /* La fila 2026-2030 de proyectos de ley no puede quedarse en el corte de
+     agosto: la legislatura sigue radicando. Se lee del mismo JSON del monitor
+     de ritmo del hub (legislativo.html), que se actualiza solo y cuenta igual
+     que esta tabla: proyectos de ley únicos, deduplicados entre cámaras. Solo
+     trae el total, así que el desglose por estado queda en «—» hasta el
+     próximo corte del histórico. Los actos legislativos no están en ese JSON
+     y su fila sigue con el corte de agosto (rotulado). */
+  const RITMO_URL='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/ritmo-legislaturas.json';
+  let CUAT_VIVO=null, ULT_STATS=null;
+  async function cargaRitmo(){
+    try{
+      const r=await fetch(RITMO_URL+'?v='+Math.floor(Date.now()/3600000));
+      if(!r.ok) return;
+      const j=await r.json(), s=(j.series||{})['2026'], ven=j.ventana||{};
+      if(!s||!(s.total>0)) return;
+      const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+      const MESL=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const [m,d]=String(ven.hasta||'').split('-'), ok=+d&&MES[+m-1];
+      CUAT_VIVO={total:s.total, hasta:ok?`${+d} ${MES[+m-1]}`:'', hastaL:ok?`${+d} de ${MESL[+m-1]}`:'', lag:ven.lag_dias|0};
+    }catch(e){ /* sin monitor, queda el corte de agosto */ }
+  }
   function pintaTablas(s){
-    const pl=(s&&Array.isArray(s.por_cuatrienio)&&s.por_cuatrienio.length)?s.por_cuatrienio:CUAT_PL;
+    if(s) ULT_STATS=s; else s=ULT_STATS;
+    let pl=(s&&Array.isArray(s.por_cuatrienio)&&s.por_cuatrienio.length)?s.por_cuatrienio:CUAT_PL;
+    if(pl===CUAT_PL&&CUAT_VIVO){
+      pl=pl.map(r=>{
+        if(r[0]!=='2026-2030') return r;
+        const f=['2026-2030',CUAT_VIVO.total,null,null,null,null,null];
+        f.vivo=CUAT_VIVO.hasta?`al ${CUAT_VIVO.hasta}`:'a hoy';
+        return f;
+      });
+      const n=document.getElementById('cuat-pl-vivo');
+      if(n) n.innerHTML=` La fila <b>2026-2030</b> cuenta los proyectos radicados desde el 20 de julio${CUAT_VIVO.hastaL?` hasta el ${CUAT_VIVO.hastaL}`:''}, con el mismo dato del monitor de ritmo del <a href="legislativo.html" style="color:inherit">hub</a>, que se actualiza solo`+
+        (CUAT_VIVO.lag?`; los últimos ${CUAT_VIVO.lag} días son provisionales`:'')+`. Su desglose por estado llega con el próximo corte del histórico.`;
+    }
     const al=(s&&Array.isArray(s.actos_por_cuatrienio)&&s.actos_por_cuatrienio.length)?s.actos_por_cuatrienio:CUAT_AL;
     const a=document.getElementById('cuat-pl'), b=document.getElementById('cuat-al');
     if(a) a.innerHTML=tablaCuat(pl,'pl');
@@ -245,6 +279,7 @@
   async function loadHistorico(){
     paintEmbudo(STATS_FALLBACK.embudo_universo);
     pintaTablas(null);
+    cargaRitmo().then(()=>{ if(CUAT_VIVO) pintaTablas(null); });
     try{
       const s=await call({action:'stats'});
       if(s&&s.n_proyectos){
