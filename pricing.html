@@ -1066,11 +1066,16 @@
     }
 
     // ─── AHORRO ANUAL ─────────────────────────────────────────────────────────
-    // Precio mensual sin descuento en la moneda que se muestra.
+    // Precio mensual sin descuento en la moneda que se muestra. El mensual en
+    // USD sigue la misma proporción anual/mensual que el COP, que es lo que
+    // cobra Wompi: así el ahorro es el mismo en las dos monedas (Pro USD 52,
+    // Premium USD 121; antes 49 y 124, un 20 % fijo).
     function monthlyPrice(plan) {
-      return currencyUSD
-        ? Math.round(plan.priceUSD / 0.8)
-        : (plan.priceCOPMonthly || Math.round(plan.priceCOP / 0.8 / 1000) * 1000);
+      if (currencyUSD) {
+        const ratio = plan.priceCOPMonthly ? plan.priceCOPMonthly / plan.priceCOP : 1 / 0.8;
+        return Math.round(plan.priceUSD * ratio);
+      }
+      return plan.priceCOPMonthly || Math.round(plan.priceCOP / 0.8 / 1000) * 1000;
     }
     // Ahorro de pagar el año frente al mensual, en %. Sale de los precios, no
     // de una cifra fija: hoy 25 % en Pro y 18 % en Premium (COP).
