@@ -5,8 +5,17 @@ corporación local de 2023 para el drill de resultados-{jal,concejo}-2023.html
 (barrio · puesto · mesa). Un JSON por comuna, cargado LAZY al abrir la comuna
 (no entra al JSON principal, que es liviano).
 
-    python3 build_territorial_comuna_detalle.py jal        # JAL / ediles (default)
-    python3 build_territorial_comuna_detalle.py concejo    # Concejo distrital / municipal
+    python3 build_territorial_comuna_detalle.py jal [AÑO]      # JAL / ediles (default)
+    python3 build_territorial_comuna_detalle.py concejo [AÑO]  # Concejo distrital / municipal
+
+AÑO = 2023 (default) o 2019, con los mismos archivos y COD_COR que
+build_territorial_resultados.py. Para años distintos de 2023 la comuna, las
+coordenadas y el barrio de cada puesto salen de `puestos_historicos.resolver`
+(el código de puesto no es estable: ver ese módulo) y el puesto se muestra con
+su nombre DE ESE AÑO. Un puesto ubicado en comuna pero sin par en el georef
+2026 entra a la comuna sin coordenadas, en el barrio «SIN UBICAR EN EL MAPA». Las columnas se leen por NOMBRE: GCS_2019JAL
+trae la geografía ANTES de COD_COR y el filtro awk y el sort se arman con las
+posiciones de su cabecera, no con las de 2023.
 
 Cada comuna trae:
   - partidos[]  (master, ordenado desc)   · cands[] = [nombre, partyIdx]  (master)
@@ -45,17 +54,21 @@ GEOREF = os.path.join(BD, 'PUESTOS_GEOREF.csv')
 SCRATCH = os.environ.get('SCRATCH_DIR',
     '/private/tmp/claude-501/-Users-ricardoruiz-ricardoruiz-co/9416b8e0-fd95-4229-aeaa-f8a817241616/scratchpad')
 
-# corporación → CSV crudo · COD_COR · carpeta de salida · temporal ordenado
+# corporación → (año → CSV crudo · COD_COR). Carpeta y temporal salen del año.
 CORPS = {
-    'jal':     {'csv': 'GCS_2023JAL.csv', 'cor': '5', 'dir': 'output_jal_2023',
-                'sorted': 'jal_2023_sorted.csv'},
-    'concejo': {'csv': 'GCS_2023TER.csv', 'cor': '4', 'dir': 'output_concejo_2023',
-                'sorted': 'concejo_2023_sorted.csv'},
+    'jal':     {2023: {'csv': 'GCS_2023JAL.csv', 'cor': '5'},
+                2019: {'csv': 'GCS_2019JAL.csv', 'cor': '5'}},
+    'concejo': {2023: {'csv': 'GCS_2023TER.csv', 'cor': '4'},
+                2019: {'csv': 'GCS_2019TER.csv', 'cor': '7'}},
 }
 CORP = sys.argv[1] if len(sys.argv) > 1 else 'jal'
 if CORP not in CORPS:
     sys.exit(f'corporación desconocida: {CORP} (usa {" | ".join(CORPS)})')
-CFG = CORPS[CORP]
+AÑO = int(sys.argv[2]) if len(sys.argv) > 2 else 2023
+if AÑO not in CORPS[CORP]:
+    sys.exit(f'año sin configurar para {CORP}: {AÑO}')
+CFG = dict(CORPS[CORP][AÑO], dir=f'output_{CORP}_{AÑO}',
+           sorted=f'{CORP}_{AÑO}_sorted.csv')
 SRC = os.path.join(BD, 'FINAL SUBIDA GCS', CFG['csv'])
 OUT_DIR = os.path.join(BD, CFG['dir'], 'comuna')
 SORTED = os.path.join(SCRATCH, CFG['sorted'])
@@ -113,9 +126,14 @@ COMUNA_GEO = {
 }
 NAME_FIELDS = ['nombre', 'NOMBRE', 'barrio', 'BARRIO', 'BARRIOS', 'Barrio', 'NOMBRE_BAR', 'name', 'NOM_BARRIO']
 SPECIAL = {'996', '997', '998', '999'}
-C_COR = 2
-C_CAN, C_VOT, C_DDE, C_MME, C_ZZ, C_PP = 13, 15, 6, 7, 8, 9
-C_MS, C_PAR, C_DESPAR, C_DESCAN = 10, 11, 12, 14
+# Columnas por NOMBRE (gcs_columnas): GCS_2019JAL no tiene el orden de 2023.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gcs_columnas import columnas                                    # noqa: E402
+_C = columnas(SRC)
+C_COR = _C['COD_COR']
+C_CAN, C_VOT, C_DDE, C_MME, C_ZZ, C_PP = _C['COD_CAN'], _C['NUM_VOT'], _C['COD_DDE'], _C['COD_MME'], _C['COD_ZZ'], _C['COD_PP']
+C_MS, C_PAR, C_DESPAR, C_DESCAN = _C['DES_MS'], _C['COD_PAR'], _C['DES_PAR'], _C['DES_CAN']
+C_ANCHO = _C['_ancho']
 
 
 def ensure_sorted():
@@ -130,12 +148,13 @@ def ensure_sorted():
         print(f'· usando temporal ya ordenado: {SORTED}')
         return
     os.makedirs(SCRATCH, exist_ok=True)
-    ciudades = ' || '.join(f'($7+0=={int(d)} && $8+0=={int(m)})' for (d, m) in CITIES)
-    prog = f'NR>1 && $3=="{CFG["cor"]}" && ({ciudades})'
-    print(f'· filtrando y ordenando {CFG["csv"]} (COD_COR={CFG["cor"]}, 11 ciudades)…')
+    fd, fm, fc = C_DDE + 1, C_MME + 1, C_COR + 1      # awk cuenta desde 1
+    ciudades = ' || '.join(f'(${fd}+0=={int(d)} && ${fm}+0=={int(m)})' for (d, m) in CITIES)
+    prog = f'NR>1 && ${fc}=="{CFG["cor"]}" && ({ciudades})'
+    print(f'· filtrando y ordenando {CFG["csv"]} (COD_COR={CFG["cor"]}, {len(CITIES)} ciudades)…')
     with open(SORTED, 'wb') as out:
         p1 = subprocess.Popen(['awk', '-F;', prog, SRC], stdout=subprocess.PIPE)
-        p2 = subprocess.Popen(['sort', '-t;', '-k7,7', '-k8,8', '-S', '1G'],
+        p2 = subprocess.Popen(['sort', '-t;', f'-k{fd},{fd}', f'-k{fm},{fm}', '-S', '1G'],
                               stdin=p1.stdout, stdout=out,
                               env={**os.environ, 'LC_ALL': 'C', 'TMPDIR': SCRATCH})
         p1.stdout.close()
@@ -433,6 +452,13 @@ def main():
             ok += gi['comC'] != 'ND'
         print(f'· comuna externa en {CITIES[keyc]}: {ok} puestos ubicados')
 
+    HIST = None
+    if AÑO != 2023:
+        from puestos_historicos import resolver                          # noqa: E402
+        HIST = resolver(AÑO, set(CITIES), {c: g['comC'] for c, g in georef.items()},
+                        {c: g['pueNom'] for c, g in georef.items()}, set(COMUNA_EXTERNA))
+        print(f'· {AÑO}: {len(HIST)} puestos ubicados por nombre (cascada B·A·C)')
+
     # PIP por ciudad (una sola vez): asigna barrio a cada pcode de esa ciudad
     pip_by_city = {}
     fill_by_city = {}    # membresía barrio→comuna para el relleno de vecino
@@ -470,6 +496,8 @@ def main():
     index_rows = []
     cur = None
     cands = {}
+    # votos (todos) de puestos que el georef 2026 no conoce / sin comuna, por ciudad
+    fuera = {}
 
     def comuna(cd_map, comC, name):
         c = cd_map.get(comC)
@@ -482,7 +510,7 @@ def main():
         # el temporal ya viene SIN encabezado (awk NR>1 en build_jal_2023.py)
         rd = csv.reader(f, delimiter=';')
         for row in rd:
-            if len(row) < 16:
+            if len(row) < C_ANCHO:
                 continue
             if row[C_COR].strip() != CFG['cor']:   # GCS_2023TER mezcla las 4 corporaciones
                 continue
@@ -505,9 +533,22 @@ def main():
                 continue
             zz, pp = (row[C_ZZ] or '').strip().zfill(2), (row[C_PP] or '').strip().zfill(2)
             pcode = f'{dde}{mme}{zz}{pp}'
-            gi = georef.get(pcode)
-            comC = gi['comC'] if gi else 'ND'
+            if HIST is None:
+                code26, nom_viejo = pcode, None
+                gi = georef.get(pcode)
+                comC = gi['comC'] if gi else 'ND'
+                ubicado = gi is not None
+            else:
+                h = HIST.get(pcode)
+                ubicado = h is not None
+                comC, code26, nom_viejo = (h[0], h[1], h[2]) if h else ('ND', None, None)
+                gi = georef.get(code26) if code26 else None
             if comC == 'ND':
+                fz = fuera.setdefault(keyc, {'sin_georef': 0, 'puestos': set(), 'sin_comuna': 0})
+                if not ubicado:
+                    fz['sin_georef'] += v; fz['puestos'].add(pcode)
+                else:
+                    fz['sin_comuna'] += v
                 continue
             c = comuna(cands, comC, clean_com(''))   # name se fija abajo con georef comuna
             # nombre de comuna: usar el de resultados (número); dejamos genérico
@@ -519,10 +560,10 @@ def main():
             pk = f'{zz}-{pp}'
             p = c['puestos'].get(pk)
             if p is None:
-                fi, bnm = puesto_barrio.get(pcode, (None, None))
-                barrio_label = bnm or (gi['barrio'] if gi else 'SIN BARRIO')
+                fi, bnm = puesto_barrio.get(code26, (None, None)) if code26 else (None, None)
+                barrio_label = bnm or (gi['barrio'] if gi else 'SIN UBICAR EN EL MAPA')
                 p = c['puestos'][pk] = {
-                    'nombre': gi['pueNom'] if gi else f'PUESTO {zz}-{pp}',
+                    'nombre': nom_viejo or (gi['pueNom'] if gi else f'PUESTO {zz}-{pp}'),
                     'barrio': barrio_label, 'feat': fi,
                     'lat': gi['lat'] if gi else None, 'lon': gi['lon'] if gi else None,
                     'validos': 0, 'blanco': 0, 'nulos': 0, 'cands': {}, 'listas': {}, 'mesas': {}}
@@ -573,6 +614,9 @@ def main():
     total_fill = sum(r[5] for r in index_rows)
     print(f'\n→ {len(index_rows)} comunas · {total_bytes/1e6:.1f} MB total · '
           f'{total_fill} barrios de relleno (vecino más cercano)')
+    for keyc, fz in sorted(fuera.items()):
+        print(f"  fuera del mapa · {CITIES[keyc]:14} {len(fz['puestos'])} puestos sin ubicar "
+              f"({fz['sin_georef']:,} votos) · {fz['sin_comuna']:,} votos sin comuna")
     big = sorted(index_rows, key=lambda r: -r[4])[:5]
     for k, nm, npu, nba, sz, nfl in big:
         print(f'  {k:12} {nm:22} {npu:3} puestos · {nba:3} barrios · {nfl:3} relleno · {sz//1024} KB')

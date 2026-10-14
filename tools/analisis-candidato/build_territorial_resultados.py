@@ -5,8 +5,22 @@ CIUDAD → COMUNA/LOCALIDAD para los tableros resultados-{jal,concejo}-2023.html
 NO es por-candidato (eso lo hacen build_jal_2023 / build_concejo_2023); esto es el
 resumen agregado que colorea el mapa de comunas y llena la tabla.
 
-    python3 build_territorial_resultados.py jal        # JAL / ediles   (default)
-    python3 build_territorial_resultados.py concejo    # Concejo distrital / municipal
+    python3 build_territorial_resultados.py jal [AÑO]      # JAL / ediles   (default)
+    python3 build_territorial_resultados.py concejo [AÑO]  # Concejo distrital / municipal
+
+AÑO = 2023 (default, no cambia nada de lo que ya existe) o 2019. Los códigos de
+corporación cambian por año: 2023 → JAL en GCS_2023JAL (COR 5) y concejo en
+GCS_2023TER (COR 4); 2019 → JAL en GCS_2019JAL (COR 5, con las columnas en OTRO
+orden: la geografía va antes de COD_COR) y concejo en GCS_2019TER (COR 7). Las
+columnas se leen por NOMBRE (gcs_columnas), así que el orden distinto de
+GCS_2019JAL no exige un layout aparte.
+
+⚠️⚠️ El georef es de 2026 y el código de puesto NO es estable entre elecciones
+(Villavicencio 2019: solo un tercio de los códigos nombra el mismo lugar en
+2026). Para años distintos de 2023 la comuna de cada puesto sale de la cascada
+de `puestos_historicos.resolver` (nombre del puesto en el censo del año contra
+el georef 2026 y el Divipol 2021). Lo que no se puede ubicar queda fuera del
+mapa y se cuenta por ciudad en `fuera_mapa` (no se esconde).
 
 Ciudades soportadas: las 11 con GeoJSON de comuna/localidad de código numérico
 limpio en S3 (mapas-2026/Ciudades-COM-LOC/{CITY}X.json), que casa con el
@@ -31,28 +45,34 @@ Subida a S3:
     "s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/jal-2023/resultados-jal-2023.json" \
     --content-type "application/json" --cache-control "public, max-age=300"
 """
-import csv, json, os, re, sys, unicodedata
+import csv, datetime, json, os, re, sys, unicodedata
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BD   = os.path.join(ROOT, 'Bases de datos')
 GEOREF = os.path.join(BD, 'PUESTOS_GEOREF.csv')
 
-# corporación → CSV crudo · COD_COR · carpeta de salida · rótulos
+# corporación → CSV crudo · COD_COR · carpeta de salida · rótulos, POR AÑO
 CORPS = {
     'jal': {
-        'csv': 'GCS_2023JAL.csv', 'cor': '5', 'dir': 'output_jal_2023',
-        'file': 'resultados-jal-2023.json', 'eleccion': 'JAL (Ediles) 2023',
+        2023: {'csv': 'GCS_2023JAL.csv', 'cor': '5'},
+        2019: {'csv': 'GCS_2019JAL.csv', 'cor': '5'},
+        'eleccion': 'JAL (Ediles) {año}',
     },
     'concejo': {
-        'csv': 'GCS_2023TER.csv', 'cor': '4', 'dir': 'output_concejo_2023',
-        'file': 'resultados-concejo-2023.json',
-        'eleccion': 'Concejo Distrital / Municipal 2023',
+        2023: {'csv': 'GCS_2023TER.csv', 'cor': '4'},
+        2019: {'csv': 'GCS_2019TER.csv', 'cor': '7'},
+        'eleccion': 'Concejo Distrital / Municipal {año}',
     },
 }
 CORP = sys.argv[1] if len(sys.argv) > 1 else 'jal'
 if CORP not in CORPS:
     sys.exit(f'corporación desconocida: {CORP} (usa {" | ".join(CORPS)})')
-CFG = CORPS[CORP]
+AÑO = int(sys.argv[2]) if len(sys.argv) > 2 else 2023
+if AÑO not in CORPS[CORP]:
+    sys.exit(f'año sin configurar para {CORP}: {AÑO}')
+CFG = dict(CORPS[CORP][AÑO], dir=f'output_{CORP}_{AÑO}',
+           file=f'resultados-{CORP}-{AÑO}.json',
+           eleccion=CORPS[CORP]['eleccion'].format(año=AÑO))
 SRC = os.path.join(BD, 'FINAL SUBIDA GCS', CFG['csv'])
 OUT = os.path.join(BD, CFG['dir'], CFG['file'])
 
@@ -84,6 +104,7 @@ COMUNA_EXTERNA = {
 }.get(CORP, {})
 # Cómo se llama la unidad de las ciudades resueltas por archivo externo.
 COM_LABEL = {('05', '001'): 'UCG'} if CORP == 'concejo' else {}
+VERSION = datetime.date.today().isoformat()
 SPECIAL = {'996', '997', '998', '999'}   # blanco, nulos, no-marcados, no-marcados
 # Columnas por NOMBRE: el archivo territorial trae 19 columnas y el de JAL 16.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -118,6 +139,7 @@ def load_georef():
             print(f'· ⚠ sin {os.path.basename(ruta)}: esa ciudad se queda sin comuna')
     pot = {}   # (dd,mm,comCode) → censo (M+H)
     comN = {}  # (dd,mm,comCode) → nombre limpio
+    nom26 = {}  # code26 → nombre del puesto (para ubicar puestos de años viejos)
     keys = {f'{dd}{mm}' for (dd, mm) in [(d.zfill(2), m.zfill(3)) for (d, m) in CITIES]}
     with open(GEOREF, encoding='utf-8-sig') as f:
         for row in csv.DictReader(f, delimiter=';'):
@@ -138,6 +160,7 @@ def load_georef():
                 # BAHÍA» en cinco comunas distintas.
                 name = f"{COM_LABEL.get(keyc, 'COMUNA')} {int(comC)}" if comC.isdigit() else ''
             by9[code] = comC
+            nom26[code] = (row.get('NOMBRE PUESTO') or '').strip()
             k = (code[:2], code[2:5], comC)
             try:
                 m = int((row.get('MUJERES') or '0').strip() or 0)
@@ -147,16 +170,28 @@ def load_georef():
             pot[k] = pot.get(k, 0) + m + h
             if k not in comN and name.upper() not in ('NULL', ''):
                 comN[k] = clean_com(name)
-    return by9, pot, comN
+    return by9, pot, comN, nom26
 
 
 def main():
-    by9, pot, comN = load_georef()
+    by9, pot, comN, nom26 = load_georef()
+    HIST = None
+    if AÑO != 2023:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from puestos_historicos import resolver                          # noqa: E402
+        HIST = resolver(AÑO, set(CITIES), by9, nom26, set(COMUNA_EXTERNA))
+        print(f'· {AÑO}: {len(HIST)} puestos ubicados por nombre (cascada B·A·C)')
     # data[(dde,mme)] = { comCode: {name, validos, blanco, nulos, mesas:set,
     #                     parties:{p:v}, cands:{(par,can,name):v}} }
     data = {}
     for (dde, mme) in CITIES:
         data[(dde, mme)] = {}
+    # Lo que no entra al mapa por comuna, por ciudad: votos de puestos que el
+    # georef 2026 no conoce (en años viejos, puestos que ya no existen) y votos
+    # de puestos que sí conoce pero sin comuna (corregimientos, zona rural).
+    # Todos son votos totales (válidos + blanco + nulos + no marcados).
+    fuera = {k: {'sin_georef': 0, 'puestos_sin_georef': set(), 'sin_comuna': 0,
+                 'total_csv': 0, 'regla': {}} for k in CITIES}
     n = 0
     with open(SRC, encoding='utf-8', errors='replace', newline='') as f:
         rd = csv.reader(f, delimiter=';')
@@ -179,7 +214,23 @@ def main():
                 continue
             dd = dde.zfill(2); mm = mme
             zz = (row[C_ZZ] or '').strip().zfill(2); pp = (row[C_PP] or '').strip().zfill(2)
-            comC = by9.get(f'{dd}{mm}{zz}{pp}', 'ND')
+            pcode = f'{dd}{mm}{zz}{pp}'
+            fz = fuera[keyc]
+            fz['total_csv'] += v
+            if HIST is None:
+                ubicado = pcode in by9
+                comC = by9.get(pcode, 'ND')
+            else:
+                h = HIST.get(pcode)
+                ubicado = h is not None
+                comC = h[0] if h else 'ND'
+                if h:
+                    fz['regla'][h[3]] = fz['regla'].get(h[3], 0) + v
+            if not ubicado:
+                fz['sin_georef'] += v
+                fz['puestos_sin_georef'].add(pcode)
+            elif comC == 'ND':
+                fz['sin_comuna'] += v
             cd = data[keyc]
             c = cd.get(comC)
             if c is None:
@@ -245,10 +296,18 @@ def main():
             continue
         top_city_parties = sorted(city_parties.items(), key=lambda kv: -kv[1])[:8]
         key = f'{dde}-{mme}'
+        fz = fuera[(dde, mme)]
         out_cities.append({
             'key': key, 'name': name, 'dep': dep, 'nivel': nivel,
             'dde': dde, 'mme': mme, 'n_comunas': len(comunas),
             'validos': tot_val, 'blanco': tot_bl, 'potencial': tot_pot,
+            # votos_sin_ubicar: puesto que no se pudo ubicar (2023: código que el
+            # georef 2026 no tiene; años viejos: sin par por nombre en la cascada).
+            'fuera_mapa': {'votos_sin_ubicar': fz['sin_georef'],
+                           'puestos_sin_ubicar': len(fz['puestos_sin_georef']),
+                           'votos_sin_comuna': fz['sin_comuna'],
+                           'votos_total_csv': fz['total_csv'],
+                           **({'votos_por_regla': fz['regla']} if HIST is not None else {})},
         })
         out_data[key] = {'comunas': comunas,
                          'totals': {'validos': tot_val, 'blanco': tot_bl,
@@ -258,13 +317,18 @@ def main():
     out_cities.sort(key=lambda x: -x['validos'])
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', encoding='utf-8') as f:
-        json.dump({'v': '2026-09-17', 'eleccion': CFG['eleccion'],
+        json.dump({'v': VERSION, 'anio': AÑO, 'eleccion': CFG['eleccion'],
                    'cities': out_cities, 'data': out_data},
                   f, ensure_ascii=False, separators=(',', ':'))
     print(f'{n:,} filas · {len(out_cities)} ciudades → {OUT}')
     print(f'  ({os.path.getsize(OUT)//1024} KB)')
     for cc in out_cities:
-        print(f"  {cc['name']:14} {cc['n_comunas']:2} {cc['nivel']:9} · {cc['validos']:>9,} válidos")
+        fz = cc['fuera_mapa']
+        pct = 100 * fz['votos_sin_ubicar'] / fz['votos_total_csv'] if fz['votos_total_csv'] else 0
+        print(f"  {cc['name']:14} {cc['n_comunas']:2} {cc['nivel']:9} · {cc['validos']:>9,} válidos"
+              f" · sin ubicar: {fz['puestos_sin_ubicar']} puestos, {fz['votos_sin_ubicar']:,} votos ({pct:.2f} %)"
+              f" · sin comuna: {fz['votos_sin_comuna']:,}"
+              + (f" · por regla {fz['votos_por_regla']}" if 'votos_por_regla' in fz else ''))
 
 
 if __name__ == '__main__':

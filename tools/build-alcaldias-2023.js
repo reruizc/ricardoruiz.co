@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 // tools/build-alcaldias-2023.js
 //
-// Procesa GCS_2023TER.csv y genera agregados NACIONALES de alcaldías:
+// Procesa GCS_{AÑO}TER.csv y genera agregados NACIONALES de alcaldías:
+//
+//   node tools/build-alcaldias-2023.js <GCS_AÑOTER.csv> <out-dir> [AÑO]
+//
+// AÑO sale del nombre del CSV si no se pasa (GCS_2019TER → 2019). El nombre
+// del script se conserva por compatibilidad; sirve para 2019 y 2023 (en los
+// dos años DES_COR = 'ALCALDE'). Fecha de la elección en FECHA_POR_AÑO.
 //
 //   {outDir}/nacional/resumen.json          totales nacionales + ranking de
 //                                           partidos por # alcaldías ganadas
@@ -31,6 +37,7 @@ const SPECIAL_CODES = {
 };
 
 const COR_NAME = 'ALCALDE';   // procesar sólo esta corporación
+const FECHA_POR_AÑO = { 2019: '2019-10-27', 2023: '2023-10-29' };
 
 const COMUNAS_DATA_PATH = '/Users/ricardoruiz/ricardoruiz.co/Bases de datos/COMUNAS_DATA.csv';
 
@@ -196,14 +203,16 @@ function fmtMB(b){ return (b/1024/1024).toFixed(2) + ' MB'; }
 function fmtKB(b){ return Math.round(b/1024) + ' KB'; }
 
 async function main(){
-  const [, , csvPath, outDir] = process.argv;
+  const [, , csvPath, outDir, añoArg] = process.argv;
+  const año = parseInt(añoArg || ((path.basename(csvPath || '').match(/(\d{4})/) || [])[1]) || '2023', 10);
+  if (!FECHA_POR_AÑO[año]){ console.error(`Año sin fecha configurada: ${año}`); process.exit(1); }
   if (!csvPath || !outDir){
-    console.error('Uso: node tools/build-alcaldias-2023.js <archivo.csv> <out-dir>');
+    console.error('Uso: node tools/build-alcaldias-2023.js <archivo.csv> <out-dir> [año]');
     process.exit(1);
   }
   if (!fs.existsSync(csvPath)){ console.error(`No existe: ${csvPath}`); process.exit(1); }
 
-  console.log(`\n[alcaldias-2023] procesando ${path.basename(csvPath)}`);
+  console.log(`\n[alcaldias-${año}] procesando ${path.basename(csvPath)}`);
   const t0 = Date.now();
   const divipole = loadDivipole();
   const { nacional, porDepto, porMun, porPuestoByDep, rowsRead, rowsKept, rowsSkipTotal } = await processCsv(csvPath);
@@ -275,8 +284,8 @@ async function main(){
   // Resumen total
   const totalCenso = munWinners.reduce((s,m) => s + (m.censo || 0), 0);
   const resumen = {
-    eleccion: 'alcaldias-2023',
-    fecha: '2023-10-29',
+    eleccion: `alcaldias-${año}`,
+    fecha: FECHA_POR_AÑO[año],
     deptos: Object.keys(divipole.depto).length,
     municipios: munWinners.length,
     votos_validos: nacSer.votos_validos,

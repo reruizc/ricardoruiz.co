@@ -410,8 +410,9 @@
     });
 
     // ─── CONST ────────────────────────────────────────────────
-    // Corporación de esta página. resultados-jal-2023.html es el MISMO archivo
-    // con otro CORP + otro hero: si tocas la lógica, tócala en los dos.
+    // Corporación de esta página. Hay SEIS copias de este chasis:
+    // resultados-{jal,concejo,asamblea}-{2019,2023}.html. Solo cambian CORP y el
+    // hero/pie: si tocas la lógica, tócala en las seis.
     const CORP={
       key:'concejo', s3dir:'concejo-2023', localDir:'output_concejo_2023',
       dataFile:'resultados-concejo-2023.json',
@@ -430,11 +431,11 @@
     const GEO_BASE=`${S3}/mapas-2026/Ciudades-COM-LOC`;
 
     // ─── GATE POR PLAN ────────────────────────────────────────
-    // Abierto: mapa de ciudad, grid de comunas y quién ganó (es el dato público).
-    // De pago: el desagregado fino (barrio · puesto · mesa), que es el trabajo propio.
-    // Un anónimo puede abrir UNA comuna de muestra antes de que le pidamos cuenta.
+    // Regla general (oct-2026): HASTA PUESTO PARA TODOS, incluidos anónimos;
+    // MESA SOLO CON CUENTA (gratis). El mapa de barrios sigue en Pro.
+    // 'anonymous' es el rango 0 de PlanGate: abierto a cualquiera.
     window.GATE_FEATURES={
-      plan:{ 'drill':'free', 'barrios':'pro', 'puestos':'pro', 'mesas':'premium' },
+      plan:{ 'drill':'anonymous', 'barrios':'pro', 'puestos':'anonymous', 'mesas':'free' },
       copy:{
         'drill':{ title:`Ver el detalle de ${CORP.unidad==='municipio'?'este municipio':'esta '+CORP.unidad}`,
           desc:`Ya viste ${CORP.unidad==='municipio'?'uno':'una'} de muestra. Crea tu cuenta gratis y abre ${CORP.unidad==='municipio'?'todos los':'todas las'} ${CORP.unidadPl}: partidos, votos y los ${CORP.cargoPl} uno por uno.` },
@@ -443,9 +444,15 @@
         'puestos':{ title:`Puestos de votación`,
           desc:`El desglose por puesto de votación, con todos los ${CORP.cargoPl} en cada uno, está en Pro.` },
         'mesas':{ title:`Mesa a mesa`,
-          desc:`El detalle mesa a mesa —la unidad más fina del escrutinio— está en Premium.` },
+          desc:`El detalle mesa a mesa —la unidad más fina del escrutinio— es gratis: solo necesitas una cuenta.` },
       },
     };
+    // Rótulo del candado según el plan que pide cada función (sale de GATE_FEATURES,
+    // no se escribe a mano: así el rótulo no se queda atrás si cambia la regla).
+    function gateTag(feat){
+      const p=PlanGate.planFor(feat);
+      return p==='premium'?'Premium':p==='pro'?'Pro':'Cuenta gratis';
+    }
     function gateReRender(){
       updateElectoralNav();
       if(selComuna!=null && curDetail){        // el detalle abierto refleja el plan nuevo
@@ -803,7 +810,7 @@
 
     function openComuna(num, scroll){
       const r=curByNum[num]; if(!r) return;
-      // anónimo: una comuna de muestra y luego cuenta gratis
+      // 'drill' está abierto a todos (rango anonymous): no gasta muestras
       if(!PlanGate.requireOrSample('drill', CORP.sampleKey, 1)) return;
       selComuna=num; selBarrio=null; detView='resumen'; curDetail=null; curUnits={}; votFilter=null;
       detState={r, num, partidos:r.partidos||[], cands:r.cands||[]};
@@ -835,8 +842,8 @@
         </div>
         <div class="det-nav" id="det-nav">
           <button data-v="resumen" class="on" onclick="setDetView('resumen')">Resumen</button>
-          <button data-v="puestos" onclick="setDetView('puestos')" disabled>Puestos${PlanGate.has('puestos')?'':' <span class="pg-lock">Pro</span>'}</button>
-          <button data-v="mesas" onclick="setDetView('mesas')" disabled>Mesas${PlanGate.has('mesas')?'':' <span class="pg-lock">Premium</span>'}</button>
+          <button data-v="puestos" onclick="setDetView('puestos')" disabled>Puestos${PlanGate.has('puestos')?'':` <span class="pg-lock">${gateTag('puestos')}</span>`}</button>
+          <button data-v="mesas" onclick="setDetView('mesas')" disabled>Mesas${PlanGate.has('mesas')?'':` <span class="pg-lock">${gateTag('mesas')}</span>`}</button>
           <span class="dn-load" id="dn-load">cargando desagregado…</span>
         </div>
         <div id="det-content"></div>`;
@@ -873,7 +880,7 @@
           const ok=PlanGate.has(v);
           b.classList.toggle('locked',!ok);
           b.innerHTML=(v==='puestos'?'Puestos':'Mesas')
-            +(ok?'':` <span class="pg-lock">${v==='mesas'?'Premium':'Pro'}</span>`);
+            +(ok?'':` <span class="pg-lock">${gateTag(v)}</span>`);
         }
       });
     }
@@ -911,7 +918,7 @@
         // Bloqueado: mostramos cuántos barrios hay (el valor está a la vista) pero no el dato.
         sel=`<div class="barrio-picker barrio-locked" onclick="PlanGate.open('barrios')">
           <label>Seleccione barrio</label>
-          <span class="lock-hint"><span class="pg-lock">Pro</span> ${barrios.length} barrios con votación propia · toca para desbloquear</span></div>`;
+          <span class="lock-hint"><span class="pg-lock">${gateTag('barrios')}</span> ${barrios.length} barrios con votación propia · toca para desbloquear</span></div>`;
       } else if(barrios.length){
         const opts=`<option value="">Toda la ${nl}</option>`+barrios.map((b,i)=>`<option value="${i}"${selBarrio==i?' selected':''}>${b.name} (${fmt(b.validos)} válidos)</option>`).join('');
         sel=`<div class="barrio-picker"><label>Seleccione barrio</label><select onchange="selectBarrio(this.value)">${opts}</select>`
@@ -974,13 +981,13 @@
     // viaja completo al navegador — igual que en el resto del sitio.)
     function paywallWrap(html, feat){
       if(PlanGate.has(feat)) return html;
-      const need=PlanGate.planFor(feat)==='premium'?'Premium':'Pro';
+      const need=gateTag(feat);
       const que=feat==='mesas'?'el detalle mesa a mesa':'el desglose por puesto de votación';
       return `<div class="pg-paywall"><div class="pg-blurred" aria-hidden="true">${html}</div>
         <div class="pg-paywall-cta">
           <span class="pg-lock">${need}</span>
           <div class="pgc-t">Aquí está ${que}</div>
-          <button class="pgc-btn" onclick="PlanGate.open('${feat}')">Desbloquear con ${need}</button>
+          <button class="pgc-btn" onclick="PlanGate.open('${feat}')">${need==='Cuenta gratis'?'Entra o crea tu cuenta gratis':'Desbloquear con '+need}</button>
         </div></div>`;
     }
 
@@ -989,7 +996,7 @@
       const puestos=(curDetail.puestos||[]).map((p,i)=>({...p,_i:i})).sort((a,b)=>b.validos-a.validos);
       curUnits={};
       const rows=puestos.map(p=>{ const id='p'+p._i;
-        curUnits[id]=()=>unitCandTable(p.v,p.validos)+((p.mesas&&p.mesas.length)?`<div class="subhdr">Desagregar por mesa <button class="mesa-btn" onclick="showMesas('${id}',${p._i})">ver ${p.mesas.length} mesas${PlanGate.has('mesas')?'':' <span class="pg-lock">Premium</span>'}</button></div><div id="mesas-${id}"></div>`:'');
+        curUnits[id]=()=>unitCandTable(p.v,p.validos)+((p.mesas&&p.mesas.length)?`<div class="subhdr">Desagregar por mesa <button class="mesa-btn" onclick="showMesas('${id}',${p._i})">ver ${p.mesas.length} mesas${PlanGate.has('mesas')?'':` <span class="pg-lock">${gateTag('mesas')}</span>`}</button></div><div id="mesas-${id}"></div>`:'');
         return unitRow(id, p.nombre, p.barrio, unitWinner(p.v), p.validos); }).join('');
       document.getElementById('det-content').innerHTML=paywallWrap(`<div class="unit-list">${rows}</div>`,'puestos');
     }

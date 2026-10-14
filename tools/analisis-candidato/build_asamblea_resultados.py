@@ -24,18 +24,31 @@ Censo/nombres: Bases de datos/PUESTOS_GEOREF.csv
 Bogotá (dde 16) NO tiene asamblea (es Distrito Capital) → queda fuera.
 
 S3: congreso-2026/output/asamblea-2023/{resultados-asamblea-2023.json,dep/,mun/}
+
+Otros años (el default sigue siendo 2023, así que nada de lo existente cambia):
+
+    python3 build_asamblea_resultados.py 2019    # GCS_2019TER · COD_COR='5'
+
+→ Bases de datos/output_asamblea_2019/{resultados-asamblea-2019.json,dep/,mun/}
+⚠️ El código de ASAMBLEA cambia por año: 2023 → 2 · 2019 → 5 · 2015 → 2 · 2011 → 5
+(y 2011 tiene 17 columnas: leerla exige revisar gcs_columnas antes).
 """
-import csv, json, os, subprocess, sys, unicodedata
+import csv, datetime, json, os, subprocess, sys, unicodedata
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BD   = os.path.join(ROOT, 'Bases de datos')
-SRC  = os.path.join(BD, 'FINAL SUBIDA GCS', 'GCS_2023TER.csv')
+COR_POR_AÑO = {2023: '2', 2019: '5'}     # código de ASAMBLEA en GCS_{año}TER
+AÑO = int(sys.argv[1]) if len(sys.argv) > 1 else 2023
+if AÑO not in COR_POR_AÑO:
+    sys.exit(f'año sin configurar: {AÑO} (usa {" | ".join(map(str, COR_POR_AÑO))})')
+SRC  = os.path.join(BD, 'FINAL SUBIDA GCS', f'GCS_{AÑO}TER.csv')
 GEOREF = os.path.join(BD, 'PUESTOS_GEOREF.csv')
-OUT_DIR = os.path.join(BD, 'output_asamblea_2023')
+OUT_DIR = os.path.join(BD, f'output_asamblea_{AÑO}')
 SCRATCH = os.environ.get('SCRATCH_DIR', '/tmp')
-SORTED = os.path.join(SCRATCH, 'asamblea_2023_sorted.csv')
+SORTED = os.path.join(SCRATCH, f'asamblea_{AÑO}_sorted.csv')
+VERSION = datetime.date.today().isoformat()
 
-COD_COR = '2'
+COD_COR = COR_POR_AÑO[AÑO]
 SPECIAL = {'996', '997', '998', '999'}
 # Columnas por NOMBRE: el archivo territorial trae 19 columnas, no 16.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -46,6 +59,9 @@ C_CAN, C_VOT, C_DDE, C_MME, C_ZZ, C_PP = _C['COD_CAN'], _C['NUM_VOT'], _C['COD_D
 C_MS, C_PAR, C_DESPAR, C_DESCAN = _C['DES_MS'], _C['COD_PAR'], _C['DES_PAR'], _C['DES_CAN']
 C_ANCHO = _C['_ancho']
 BOGOTA = '16'          # Distrito Capital: sin asamblea
+# Rótulo del puesto que la fuente de nombres no conoce (2023: georef 2026;
+# otros años: censo de ese año). No se inventa a qué corresponde.
+SIN_NOMBRE = 'sin georreferenciar' if AÑO == 2023 else f'sin nombre en el censo {AÑO}' 
 
 
 def strip(s):
@@ -76,6 +92,15 @@ def load_georef():
                 if mu and mu.upper() != 'NULL':
                     munN[(dd, mm)] = mu
             pueN[code] = (row.get('NOMBRE PUESTO') or '').strip() or f'PUESTO {code[5:7]}-{code[7:]}'
+    if AÑO != 2023:
+        # ⚠️ El código de puesto no es estable entre elecciones (ver
+        # puestos_historicos.py): el nombre de 2026 de un código de 2019 puede ser
+        # OTRO lugar. Para años viejos el puesto se nombra con el censo DE ESE AÑO.
+        ruta = os.path.join(BD, 'censos-registraduria', f'{AÑO}_datos_censo-electoral-min.json')
+        with open(ruta, encoding='utf-8') as f:
+            pueN = {f"{r['cod_depto']}{r['cod_mun']}{r['zona']}{r['cod_puesto']}": r['puesto_votacion']
+                    for r in json.load(f)['data']
+                    if r.get('tipo_eleccion') == 'AUTORIDADES TERRITORIALES' and r.get('puesto_votacion')}
     return pot, depN, munN, pueN
 
 
@@ -85,7 +110,7 @@ def ensure_sorted():
         print(f'· usando temporal ya ordenado: {SORTED}')
         return
     os.makedirs(SCRATCH, exist_ok=True)
-    print(f'· filtrando GCS_2023TER (COD_COR={COD_COR}) y ordenando…')
+    print(f'· filtrando GCS_{AÑO}TER (COD_COR={COD_COR}) y ordenando…')
     with open(SORTED, 'wb') as out:
         p1 = subprocess.Popen(['awk', '-F;', f'NR>1 && ${C_COR + 1}=="{COD_COR}"', SRC], stdout=subprocess.PIPE)
         p2 = subprocess.Popen(['sort', '-t;', f'-k{C_DDE + 1},{C_DDE + 1}', f'-k{C_MME + 1},{C_MME + 1}', '-S', '1G'],
@@ -153,7 +178,7 @@ def flush_depto(dde, muns, pot, depN, munN, pueN, index_rows):
                 'code': pk, 'nombre': p['nombre'],
                 # el georef no cubre algunos agregados del CSV (p.ej. zona 99 puesto 00);
                 # se muestran igual, marcados — no inventamos a qué corresponden.
-                'barrio': '' if p['georef'] else 'sin georreferenciar',
+                'barrio': '' if p['georef'] else SIN_NOMBRE,
                 'validos': p['validos'], 'blanco': p['blanco'], 'nulos': p['nulos'],
                 'v': vlist(p['cands'], cidx), 'mesas': mesas,
             })
@@ -263,9 +288,9 @@ def main():
         flush_depto(cur, muns, pot, depN, munN, pueN, index_rows)
 
     index_rows.sort(key=lambda r: -r['validos'])
-    idx = os.path.join(OUT_DIR, 'resultados-asamblea-2023.json')
+    idx = os.path.join(OUT_DIR, f'resultados-asamblea-{AÑO}.json')
     with open(idx, 'w', encoding='utf-8') as f:
-        json.dump({'v': '2026-09-17', 'eleccion': 'Asamblea Departamental 2023',
+        json.dump({'v': VERSION, 'anio': AÑO, 'eleccion': f'Asamblea Departamental {AÑO}',
                    'cities': index_rows}, f, ensure_ascii=False, separators=(',', ':'))
 
     def dirsize(p):
