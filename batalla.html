@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Anatomía de una batalla</title>
+<meta name="description" content="Batalla de enmarcado en tiempo real: fases, correlación de fuerzas, frentes, iniciativa y terreno.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&display=swap" rel="stylesheet">
+<style>
+@font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-light.woff2') format('woff2');font-weight:300;font-display:swap}
+@font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue.woff2') format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-medium.woff2') format('woff2');font-weight:500;font-display:swap}
+@font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-bold.woff2') format('woff2');font-weight:600 900;font-display:swap}
+:root{
+  --bg:#060810; --card:rgba(12,14,22,.82); --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+  --ink:#f1f0ec; --ink2:#b9bcc6; --mute:#7f8494;
+  --g:#4f7dff; --o:#e8483a; --c:#9a7be0; --n:#8b93a6;
+  --gold:#e3b04b; --accent:#3d6fff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:'HelveticaNeue','Helvetica Neue',Helvetica,Arial,sans-serif;font-weight:400;line-height:1.45;
+  background-image:radial-gradient(1100px 600px at 12% -10%,rgba(0,71,255,.16),transparent 60%),radial-gradient(900px 600px at 100% 10%,rgba(232,72,58,.08),transparent 60%);min-height:100vh}
+a{color:inherit}
+.wrap{max-width:1320px;margin:0 auto;padding:0 20px}
+nav.top{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;max-width:1320px;margin:0 auto}
+.back{color:#4ade80;text-decoration:none;font-size:.85rem;letter-spacing:.04em}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.15rem;text-decoration:none;letter-spacing:-.01em}
+.logo span{color:var(--accent)}
+.kicker{font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);font-weight:600}
+h1{font-size:clamp(1.9rem,4.4vw,3.2rem);font-weight:700;letter-spacing:-.02em;line-height:1.05;margin:.35rem 0 .5rem}
+h2{font-size:1.15rem;font-weight:600;letter-spacing:-.01em}
+.sub{color:var(--ink2);max-width:780px;font-size:1rem}
+.guerra{color:var(--mute);font-size:.85rem;margin-top:.5rem}
+.guerra b{color:var(--ink2);font-weight:500}
+.hero{padding:18px 0 10px;display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end}
+.reloj{text-align:right;min-width:220px}
+.reloj .min{font-size:2.4rem;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.reloj .lbl{font-size:.75rem;color:var(--mute);letter-spacing:.08em;text-transform:uppercase}
+.reloj .act{font-size:.78rem;color:var(--ink2);margin-top:4px}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;letter-spacing:.14em;color:#4ade80;font-weight:600}
+.live i{width:7px;height:7px;border-radius:50%;background:#4ade80;box-shadow:0 0 0 0 rgba(74,222,128,.6);animation:pulse 1.8s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(74,222,128,.55)}70%{box-shadow:0 0 0 9px rgba(74,222,128,0)}100%{box-shadow:0 0 0 0 rgba(74,222,128,0)}}
+.ctx{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
+.ctx span{font-size:.78rem;color:var(--ink2);background:rgba(255,255,255,.04);border:1px solid var(--line);padding:5px 10px;border-radius:999px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.sec{margin:18px 0}
+.sec-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.sec-h .n{font-size:.7rem;color:var(--gold);letter-spacing:.2em;font-weight:600;margin-right:8px}
+.sec-h p{color:var(--mute);font-size:.8rem;max-width:620px}
+.grid2{display:grid;grid-template-columns:1.05fr 1fr;gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+/* sin min-width:0 una tabla larga empuja la columna del grid más allá de la pantalla */
+.grid2>*,.grid3>*{min-width:0}
+td{overflow-wrap:anywhere}
+@media (max-width:980px){.grid2,.grid3{grid-template-columns:1fr}.hero{grid-template-columns:1fr}.reloj{text-align:left}}
+
+/* edades */
+.edades{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.edad{position:relative;padding:12px 12px 10px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);min-height:92px}
+.edad .num{font-size:.68rem;color:var(--mute);letter-spacing:.14em}
+.edad .nom{font-weight:600;font-size:.95rem;margin:2px 0 4px}
+.edad .not{font-size:.74rem;color:var(--mute);line-height:1.3}
+.edad.pas{border-color:var(--line2)}
+.edad.pas .nom{color:var(--ink2)}
+.edad.act{border-color:var(--gold);background:linear-gradient(180deg,rgba(227,176,75,.14),rgba(227,176,75,.03))}
+.edad.act .num{color:var(--gold)}
+.edad.act::after{content:'AHORA';position:absolute;top:10px;right:10px;font-size:.6rem;letter-spacing:.16em;color:var(--gold);font-weight:700}
+@media (max-width:820px){.edades{grid-template-columns:repeat(3,1fr)}}
+.cinta{display:flex;gap:2px;margin-top:10px;height:16px}
+.cinta div{flex:1;border-radius:2px;cursor:default}
+.cinta-eje{display:flex;justify-content:space-between;font-size:.68rem;color:var(--mute);margin-top:4px}
+
+/* marcador */
+.marcador{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center}
+.lado{display:flex;flex-direction:column;gap:2px}
+.lado.der{text-align:right;align-items:flex-end}
+.lado .bn{font-size:.8rem;letter-spacing:.16em;text-transform:uppercase;font-weight:600}
+.lado .f{font-size:3rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.lado .d{font-size:.8rem;color:var(--ink2)}
+.vs{font-size:.8rem;color:var(--mute);text-align:center}
+.vs b{display:block;font-size:1.5rem;color:var(--ink);font-weight:700}
+.tira{position:relative;height:16px;border-radius:999px;overflow:hidden;display:flex;margin:14px 0 6px;background:rgba(255,255,255,.04)}
+.tira div{height:100%;transition:width .6s}
+.tira .mid{position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.7}
+.toggle{display:inline-flex;border:1px solid var(--line2);border-radius:999px;overflow:hidden}
+.toggle button{background:none;border:0;color:var(--ink2);font:inherit;font-size:.78rem;padding:6px 12px;cursor:pointer}
+.toggle button.on{background:rgba(255,255,255,.1);color:var(--ink)}
+.explica{font-size:.82rem;color:var(--ink2);margin-top:10px}
+.lectura{margin-top:14px;padding:14px 16px;border-left:3px solid var(--gold);background:rgba(227,176,75,.06);border-radius:0 10px 10px 0}
+.lectura .tit{font-weight:600;margin-bottom:4px}
+.lectura p{color:var(--ink2);font-size:.92rem}
+.lectura small{display:block;color:var(--mute);font-size:.72rem;margin-top:6px}
+
+/* mapa */
+#mapa{height:520px;border-radius:12px;background:#05070c;border:1px solid var(--line)}
+.leaflet-container{background:#05070c;font-family:inherit}
+.leaflet-tooltip.tt{background:rgba(6,8,16,.97);border:1px solid rgba(255,255,255,.18);color:var(--ink);border-radius:8px;padding:8px 10px;width:260px;white-space:normal;font-size:.8rem;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.leaflet-tooltip.tt:before{display:none}
+.city-lbl{font-size:.68rem;color:var(--ink);text-shadow:0 1px 3px #000,0 0 6px #000;white-space:nowrap;font-weight:500;pointer-events:none}
+.leyenda{display:flex;flex-wrap:wrap;gap:12px;font-size:.74rem;color:var(--ink2);margin-top:10px}
+.leyenda i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+
+/* frente */
+.frente{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:560px){.frente{grid-template-columns:1fr}.marcador .lado .f{font-size:2.2rem}.edad{min-height:0}}
+.frente h3{font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;font-weight:600;margin-bottom:6px}
+.unidad{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:rgba(255,255,255,.015);cursor:default}
+.unidad.vacia{opacity:.55}
+.unidad .t{display:flex;justify-content:space-between;gap:8px;font-weight:600;font-size:.88rem}
+.unidad .t span{font-variant-numeric:tabular-nums;color:var(--ink2);font-weight:500}
+.unidad .bar{height:6px;border-radius:3px;background:rgba(255,255,255,.06);margin:7px 0 6px;overflow:hidden}
+.unidad .bar div{height:100%;border-radius:3px}
+.unidad .m{font-size:.74rem;color:var(--mute);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.up{color:#4ade80}.dn{color:var(--mute)}
+
+/* gráficos */
+svg text{font-family:inherit}
+.chart{width:100%;height:auto;display:block;overflow:visible}
+#tip{position:fixed;pointer-events:none;z-index:9999;background:rgba(6,8,16,.97);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:8px 10px;font-size:.78rem;max-width:300px;display:none;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+#tip b{font-weight:600}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:0}
+
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th{text-align:left;font-weight:500;color:var(--mute);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--line2)}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.chip{display:inline-block;font-size:.68rem;padding:2px 7px;border-radius:999px;border:1px solid var(--line2);color:var(--ink2);margin:2px 4px 0 0;white-space:nowrap}
+.chip.G{border-color:rgba(79,125,255,.55);color:#a9bfff}
+.chip.O{border-color:rgba(232,72,58,.55);color:#ffb1a8}
+.chip.C{border-color:rgba(154,123,224,.6);color:#d2c3ff}
+.chip.h{border-color:rgba(227,176,75,.55);color:#f2d08c}
+.feed{max-height:560px;overflow:auto}
+.feed .it{padding:9px 2px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:62px 1fr;gap:10px}
+.feed .hr{font-size:.75rem;color:var(--mute);font-variant-numeric:tabular-nums}
+.feed a{text-decoration:none}
+.feed a:hover{text-decoration:underline}
+.feed .md{font-size:.72rem;color:var(--mute)}
+.filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.filtros button{background:rgba(255,255,255,.03);border:1px solid var(--line2);color:var(--ink2);font:inherit;font-size:.74rem;border-radius:999px;padding:4px 10px;cursor:pointer}
+.filtros button.on{background:rgba(255,255,255,.12);color:var(--ink)}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.kpi .v{font-size:1.6rem;font-weight:700;font-variant-numeric:tabular-nums}
+.kpi .l{font-size:.72rem;color:var(--mute)}
+.nota{font-size:.78rem;color:var(--mute);margin-top:8px}
+.nota b{color:var(--ink2);font-weight:500}
+.apagado{border:1px dashed var(--line2);border-radius:12px;padding:16px;color:var(--ink2);font-size:.88rem}
+.metodo p,.metodo li{color:var(--ink2);font-size:.86rem;margin-bottom:8px}
+.metodo ul{padding-left:18px}
+.metodo code{font-size:.78rem;color:var(--ink);background:rgba(255,255,255,.06);padding:1px 5px;border-radius:4px}
+details summary{cursor:pointer;color:var(--ink2);font-size:.85rem}
+.err{color:#ffb1a8;font-size:.85rem;padding:20px}
+footer{color:var(--mute);font-size:.75rem;padding:30px 0 50px;text-align:center}
+</style>
+</head>
+<body>
+<nav class="top">
+  <a class="back" href="index.html">← Volver</a>
+  <a class="logo" href="index.html">Ricardo<span>.</span>Ruiz</a>
+</nav>
+
+<div class="wrap">
+  <header class="hero">
+    <div>
+      <div class="kicker">Anatomía de una batalla <span class="live" id="live" style="margin-left:10px"><i></i>EN VIVO</span></div>
+      <h1 id="titulo">Cargando…</h1>
+      <p class="sub" id="subtitulo"></p>
+      <p class="guerra" id="guerra"></p>
+      <div class="ctx" id="ctx"></div>
+    </div>
+    <div class="reloj">
+      <div class="lbl" id="reloj-lbl">Minuto de la batalla</div>
+      <div class="min" id="reloj">—</div>
+      <div class="act" id="act"></div>
+    </div>
+  </header>
+
+  <section class="sec card" id="s-fases">
+    <div class="sec-h"><h2><span class="n">01</span>Las fases de la batalla</h2>
+      <p>Como las edades de un juego de estrategia: la fase sale del tipo de hechos que reporta la prensa en los últimos 90 minutos. La cinta muestra la fase hora por hora.</p></div>
+    <div class="edades" id="edades"></div>
+    <div class="cinta" id="cinta"></div>
+    <div class="cinta-eje" id="cinta-eje"></div>
+  </section>
+
+  <section class="sec card" id="s-marcador">
+    <div class="sec-h"><h2><span class="n">02</span>El marcador · correlación de fuerzas</h2>
+      <div class="toggle" id="tg-ventana"><button data-v="ult3h" class="on">Últimas 3 horas</button><button data-v="batalla">Toda la batalla</button></div></div>
+    <div class="marcador">
+      <div class="lado"><div class="bn" style="color:var(--g)">Gobierno</div><div class="f" id="fG">—</div><div class="d" id="dG"></div></div>
+      <div class="vs" id="vs"><b>vs</b>fuerza</div>
+      <div class="lado der"><div class="bn" style="color:var(--o)">Oposición</div><div class="f" id="fO">—</div><div class="d" id="dO"></div></div>
+    </div>
+    <div class="tira" id="tira"><div style="background:var(--g)"></div><div style="background:var(--o)"></div><span class="mid"></span></div>
+    <p class="explica" id="lanch"></p>
+    <div id="lectura"></div>
+  </section>
+
+  <div class="grid2 sec">
+    <section class="card" id="s-terreno">
+      <div class="sec-h"><h2><span class="n">03</span>El terreno</h2>
+        <p>Ciudades nombradas en la cobertura de la marcha. Tamaño = titulares; color = qué bando enmarca más esa ciudad; anillo = hubo choque reportado. La niebla cubre los departamentos sin cobertura.</p></div>
+      <div id="mapa"></div>
+      <div class="leyenda">
+        <span><i style="background:var(--g)"></i>Enmarca más el Gobierno</span>
+        <span><i style="background:var(--o)"></i>Enmarca más la Oposición</span>
+        <span><i style="background:var(--c)"></i>Disputada</span>
+        <span><i style="background:var(--n)"></i>Solo cobertura de servicio</span>
+        <span><i style="background:transparent;border:2px dashed #f1f0ec"></i>Choque reportado</span>
+      </div>
+    </section>
+    <section class="card" id="s-frente">
+      <div class="sec-h"><h2><span class="n">04</span>El frente · los marcos como batallones</h2>
+        <p>Cada marco es una unidad. Barra = fuerza (medios² × peso). Debajo: medios que lo llevan, primer disparo y medios nuevos en la última hora.</p></div>
+      <div class="frente" id="frente"></div>
+    </section>
+  </div>
+
+  <section class="sec card" id="s-partido">
+    <div class="sec-h"><h2><span class="n">05</span>El partido · quién tiene la posesión</h2>
+      <p>Arriba, la posesión: participación del Gobierno en la fuerza de las 3 horas anteriores a cada momento (sobre la línea gana el Gobierno, bajo ella la Oposición). Abajo, titulares cada 30 minutos por bando, con los choques marcados.</p></div>
+    <svg class="chart" id="g-posesion" viewBox="0 0 1000 230"></svg>
+    <svg class="chart" id="g-volumen" viewBox="0 0 1000 200" style="margin-top:8px"></svg>
+    <div class="leyenda">
+      <span><i style="background:var(--g);border-radius:2px"></i>Marco del Gobierno</span>
+      <span><i style="background:var(--o);border-radius:2px"></i>Marco de la Oposición</span>
+      <span><i style="background:var(--c);border-radius:2px"></i>Choque de marcos en el mismo titular</span>
+      <span><i style="background:var(--n);border-radius:2px"></i>Sin marco (servicio, neutro)</span>
+      <span>⚔ choque reportado · ✸ hecho grave</span>
+    </div>
+  </section>
+
+  <div class="grid2 sec">
+    <section class="card" id="s-iniciativa">
+      <div class="sec-h"><h2><span class="n">06</span>La iniciativa · quién enmarca primero</h2>
+        <p>Para cada choque reportado (el primero de cada ciudad), cuánto tarda en aparecer en prensa la voz del Gobierno y la de la Oposición.</p></div>
+      <div id="iniciativa"></div>
+    </section>
+    <section class="card" id="s-voz">
+      <div class="sec-h"><h2><span class="n">07</span>La voz oficial · dónde surge y quién la difunde</h2>
+        <p>Titulares cuya fuente destacada es el Gobierno (presidente, ministros, Casa de Nariño, Policía), frente a los de la Oposición. La curva cuenta medios distintos que la repiten.</p></div>
+      <svg class="chart" id="g-voces" viewBox="0 0 600 210"></svg>
+      <div id="voces"></div>
+    </section>
+  </div>
+
+  <div class="grid2 sec">
+    <section class="card" id="s-colision">
+      <div class="sec-h"><h2><span class="n">08</span>¿Choque o conversaciones paralelas?</h2>
+        <p>Si los dos marcos aparecen en el mismo titular, los bandos se están respondiendo. Si cada medio solo lleva uno, es el cura predicándole al coro.</p></div>
+      <div id="colision"></div>
+      <svg class="chart" id="g-alineacion" viewBox="0 0 600 150" style="margin-top:12px"></svg>
+    </section>
+    <section class="card" id="s-matices">
+      <div class="sec-h"><h2><span class="n">09</span>Matices dentro de cada bando</h2>
+        <p>Qué marco empuja cada bando. Hipótesis a seguir: a la Oposición le rinde más la indignación (autoritarismo, paramilitarismo) que el reclamo social difuso.</p></div>
+      <div id="matices"></div>
+    </section>
+  </div>
+
+  <div class="grid2 sec">
+    <section class="card" id="s-nodos">
+      <div class="sec-h"><h2><span class="n">10</span>Los nodos · quién dispara y quién amplifica</h2>
+        <p>Primeros medios en usar cada marco, y los medios con más titulares de la batalla con su inclinación.</p></div>
+      <div id="nodos"></div>
+    </section>
+    <section class="card" id="s-externa">
+      <div class="sec-h"><h2><span class="n">11</span>La mirada externa · inversionistas y prensa internacional</h2>
+        <p>Prensa en inglés y financiera sobre Colombia y el gobierno, con la TRM de los últimos días.</p></div>
+      <div id="externa"></div>
+    </section>
+  </div>
+
+  <div class="grid2 sec">
+    <section class="card" id="s-feed">
+      <div class="sec-h"><h2><span class="n">12</span>Parte de guerra · titulares</h2><p>Los titulares de la batalla, del más reciente al más antiguo, con su clasificación.</p></div>
+      <div class="filtros" id="filtros">
+        <button data-f="" class="on">Todos</button><button data-f="G">Gobierno</button><button data-f="O">Oposición</button>
+        <button data-f="C">Choque de marcos</button><button data-f="h">Hechos de choque</button>
+      </div>
+      <div class="feed" id="feed"></div>
+    </section>
+    <section class="card" id="s-x">
+      <div class="sec-h"><h2><span class="n">13</span>La conversación en X</h2></div>
+      <div id="xbox"></div>
+      <div class="sec-h" style="margin-top:22px"><h2><span class="n">14</span>Actores en la cobertura</h2></div>
+      <div id="actores"></div>
+    </section>
+  </div>
+
+  <section class="sec card metodo" id="s-metodo">
+    <div class="sec-h"><h2><span class="n">15</span>Cómo se mide</h2></div>
+    <p><b>La guerra es la continuación de la política por otros medios</b> (Clausewitz). Aquí la batalla es por el enmarcado: quién queda percibido del lado correcto de la historia. Cada batalla tiene fecha y hora conocidas, así que no se mide la sorpresa sino la ejecución.</p>
+    <ul>
+      <li><b>Fuerza (Lanchester, 1916).</b> <span id="m-lanch"></span>. La ley cuadrática dice que la ventaja numérica vale más que la calidad: con el doble de medios, el rival necesita cuatro veces más peso por medio para empatar.</li>
+      <li><b>Marcos.</b> Cada titular se clasifica con un libro de códigos fijo (abajo). Lo hace un modelo de lenguaje con instrucciones de no inventar; el diccionario de palabras queda como respaldo y como auditoría. Se mide el marco que el titular activa, no si es cierto.</li>
+      <li><b>Fases.</b> Salen de los hechos reportados en los 90 minutos anteriores: choque si al menos 20 % de los titulares reporta disturbios, bloqueos o capturas; quiebre si dos medios reportan un hecho grave.</li>
+      <li><b>Iniciativa y voz oficial.</b> Para cada titular el modelo marca quién habla (Gobierno, Oposición, terceros). Así se mide cuánto tarda cada bando en enmarcar un choque y qué medios repiten su voz.</li>
+      <li><b>Lo estructural (Turchin).</b> Esta capa mide el clima de una batalla; la presión de fondo (salario real, costo de los alimentos, competencia entre élites, estrés fiscal) es la siguiente capa y todavía no está construida.</li>
+    </ul>
+    <p class="nota"><b>Límites.</b> Se leen titulares, no notas completas. Google News entrega hasta 100 resultados por consulta, así que el corpus se acumula corrida a corrida y lo anterior al primer arranque puede estar incompleto. Los nodos son medios, no cuentas: sin X no hay personas. El peso de cada medio es una estimación declarada de alcance, no un juicio de calidad.</p>
+    <details style="margin-top:10px"><summary>Libro de códigos: marcos y palabras</summary><div id="codigos" style="margin-top:10px"></div></details>
+  </section>
+
+  <footer>Ricardo.Ruiz · Anatomía de una batalla · datos de Google News y Banco de la República · <span id="pie"></span></footer>
+</div>
+<div id="tip"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+'use strict';
+const S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+const P=new URLSearchParams(location.search);
+const ID=P.get('b')||'marcha-14oct-2026';
+const LOCAL=P.has('local');
+const DATA=LOCAL?`Bases%20de%20datos/batalla/${ID}/batalla.json`:`${S3}/batalla/${ID}.json`;
+const GEO=`${S3}/mapas-2026/DEPARTAMENTOS2.json`;
+const COL={G:'#4f7dff',O:'#e8483a',C:'#9a7be0',N:'#8b93a6'};
+let D=null, ventana='ult3h', filtro='';
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const nf=(n,d=0)=>n==null?'—':Number(n).toLocaleString('es-CO',{maximumFractionDigits:d,minimumFractionDigits:d});
+const hora=iso=>new Date(iso).toLocaleTimeString('es-CO',{timeZone:'America/Bogota',hour:'numeric',minute:'2-digit'});
+const diaHora=iso=>new Date(iso).toLocaleString('es-CO',{timeZone:'America/Bogota',weekday:'short',hour:'numeric',minute:'2-digit'});
+const minutos=m=>m==null?'—':(m<60?`${m} min`:`${Math.floor(m/60)} h ${m%60} min`);
+
+/* tooltip */
+const tip=$('tip');
+function showTip(e,html){tip.innerHTML=html;tip.style.display='block';moveTip(e);}
+function moveTip(e){const w=tip.offsetWidth,h=tip.offsetHeight;let x=e.clientX+14,y=e.clientY+14;
+  if(x+w>innerWidth-8)x=e.clientX-w-14; if(y+h>innerHeight-8)y=e.clientY-h-14; tip.style.left=x+'px';tip.style.top=y+'px';}
+function hideTip(){tip.style.display='none';}
+
+async function cargar(){
+  try{
+    const r=await fetch(DATA+(DATA.includes('?')?'&':'?')+'t='+Date.now(),{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    D=await r.json(); pintar();
+  }catch(e){
+    if(!D) $('titulo').textContent='La batalla todavía no tiene datos publicados';
+    console.warn('batalla:',e);
+  }
+}
+
+function pintar(){
+  document.title=`${D.titulo} · Anatomía de una batalla`;
+  $('titulo').textContent=D.titulo; $('subtitulo').textContent=D.subtitulo||'';
+  $('guerra').innerHTML=D.guerra?`La guerra de fondo: <b>${esc(D.guerra)}</b>`:'';
+  $('ctx').innerHTML=(D.contexto||[]).map(c=>`<span>${esc(c)}</span>`).join('');
+  reloj(); fases(); marcador(); mapa(); frente(); partido(); iniciativa(); voces(); colision(); matices();
+  nodos(); externa(); feed(); xbox(); actores(); metodo();
+  $('pie').textContent=`${nf(D.corpus.titulares)} titulares de ${nf(D.corpus.medios)} medios · ${nf(D.corpus.relevantes)} sobre la batalla`;
+}
+
+function reloj(){
+  const ini=new Date(D.inicio), gen=new Date(D.generado), ahora=new Date();
+  const m=Math.round((ahora-ini)/60000);
+  $('reloj-lbl').textContent=m>=0?`Minuto desde el pitazo (${hora(D.inicio)})`:'Faltan para el pitazo';
+  $('reloj').textContent=m>=0?`${nf(m)}′`:minutos(-m);
+  const hace=Math.round((ahora-gen)/60000);
+  $('act').textContent=`Datos de las ${hora(D.generado)} · hace ${hace<1?'menos de 1':hace} min`;
+  $('live').style.display=hace<60?'inline-flex':'none';
+}
+
+/* 01 fases */
+function fases(){
+  const idx=D.fases.findIndex(f=>f.id===D.fase);
+  $('edades').innerHTML=D.fases.map((f,i)=>`<div class="edad ${i===idx?'act':(i<idx?'pas':'')}">
+    <div class="num">FASE ${i+1}</div><div class="nom">${esc(f.nombre)}</div><div class="not">${esc(f.nota)}</div></div>`).join('');
+  const ini=new Date(D.inicio);
+  const h=D.fase_hist.filter(x=>new Date(x.t)>=new Date(ini-12*3600e3));
+  const pos=Object.fromEntries(D.fases.map((f,i)=>[f.id,i]));
+  // fase ordinal → una sola tinta, de tenue a intensa
+  const tono=i=>`rgba(227,176,75,${.22+i*.15})`;
+  $('cinta').innerHTML=h.map(x=>`<div style="background:${tono(pos[x.f])}" data-t="${x.t}" data-f="${x.f}"></div>`).join('');
+  $('cinta').querySelectorAll('div').forEach(el=>{
+    el.onmousemove=e=>showTip(e,`<b>${hora(el.dataset.t)}</b><br>${esc(D.fases[pos[el.dataset.f]].nombre)}`);
+    el.onmouseleave=hideTip;});
+  if(h.length) $('cinta-eje').innerHTML=`<span>${diaHora(h[0].t)}</span><span>${diaHora(h[h.length-1].t)}</span>`;
+}
+
+/* 02 marcador */
+function marcador(){
+  const m=D.marcador[ventana]; const G=m.G,O=m.O;
+  $('fG').textContent=nf(G.F); $('fO').textContent=nf(O.F);
+  $('dG').textContent=`${G.N} medios · peso ${nf(G.q,2)} · ${m.items_G} titulares`;
+  $('dO').textContent=`${O.N} medios · peso ${nf(O.q,2)} · ${m.items_O} titulares`;
+  const s=m.share_G;
+  const t=$('tira').children; t[0].style.width=(s==null?50:s*100)+'%'; t[1].style.width=(s==null?50:(1-s)*100)+'%';
+  $('vs').innerHTML=s==null?'<b>—</b>sin datos':`<b>${nf(s*100)}–${nf((1-s)*100)}</b>% de la fuerza`;
+  let txt='';
+  if(G.N&&O.N){
+    const [a,b,na,nb]=G.N>=O.N?['Gobierno','Oposición',G.N,O.N]:['Oposición','Gobierno',O.N,G.N];
+    const r=(na/nb)**2;
+    txt=na===nb?`Mismo número de medios (${na}): decide el peso de cada medio.`:
+      `El ${a} llega a ${na} medios contra ${nb}. Por la ley cuadrática, para empatar, la ${b==='Oposición'?'Oposición':'gestión del Gobierno'} necesitaría ${nf(r,1)} veces más peso por medio — hoy tiene ${nf((b==='Oposición'?O.q:G.q)/(b==='Oposición'?G.q:O.q),2)} veces.`;
+  }
+  $('lanch').textContent=txt;
+  const L=D.lectura;
+  $('lectura').innerHTML=L&&L.texto?`<div class="lectura"><div class="tit">${esc(L.titular||'Lectura del momento')}</div><p>${esc(L.texto)}</p>
+    <small>Lectura automática (${esc(L.modelo)}) de las cifras y titulares de esta página · ${hora(L.generado)}. No es opinión editorial.</small></div>`:'';
+}
+$('tg-ventana').onclick=e=>{const b=e.target.closest('button'); if(!b)return; ventana=b.dataset.v;
+  $('tg-ventana').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); if(D) marcador();};
+
+/* 03 mapa */
+let MAP=null, depLayer=null, cityLayer=null;
+const COLOMBIA=L.latLngBounds([[-4.3,-79.1],[12.5,-66.9]]);
+async function mapa(){
+  if(!MAP){
+    MAP=L.map('mapa',{zoomControl:true,attributionControl:false,scrollWheelZoom:false,zoomSnap:.25}).setView([4.6,-74.2],5);
+    try{
+      const g=await (await fetch(GEO)).json();
+      depLayer=L.geoJSON(g,{style:()=>({color:'rgba(255,255,255,.18)',weight:1,fillColor:'#000',fillOpacity:.5})}).addTo(MAP);
+    }catch(e){console.warn('mapa',e);}
+    // Leaflet mide el contenedor al crearse; en grid eso pasa antes del layout y deja el país diminuto.
+    // Se re-encuadra DESPUÉS del layout y cada vez que cambia el tamaño (setTimeout, no rAF: rAF se congela en pestaña oculta).
+    const encuadrar=()=>{MAP.invalidateSize();MAP.fitBounds(COLOMBIA,{animate:false,padding:[6,6]});};
+    new ResizeObserver(()=>setTimeout(encuadrar,0)).observe($('mapa'));
+    setTimeout(encuadrar,0);
+  }
+  const conCobertura=new Set(D.terreno.map(c=>c.depto));
+  if(depLayer) depLayer.setStyle(f=>conCobertura.has(f.properties.name)?
+    {color:'rgba(255,255,255,.35)',weight:1,fillColor:'#1a2033',fillOpacity:.55}:
+    {color:'rgba(255,255,255,.1)',weight:1,fillColor:'#000',fillOpacity:.72});
+  if(cityLayer) cityLayer.remove();
+  cityLayer=L.layerGroup().addTo(MAP);
+  const max=Math.max(1,...D.terreno.map(c=>c.items));
+  D.terreno.slice().sort((a,b)=>b.items-a.items).forEach(c=>{
+    const col=(c.G+c.O===0)?COL.N:(c.G>=c.O*1.5?COL.G:(c.O>=c.G*1.5?COL.O:COL.C));
+    const r=5+Math.sqrt(c.items/max)*22;
+    if(c.nivel>=2) L.circleMarker([c.lat,c.lon],{radius:r+5,color:'#f1f0ec',weight:c.nivel>=3?3:1.5,dashArray:c.nivel>=3?null:'4 3',fill:false,interactive:false}).addTo(cityLayer);
+    const mk=L.circleMarker([c.lat,c.lon],{radius:r,color:'#060810',weight:2,fillColor:col,fillOpacity:.9}).addTo(cityLayer);
+    const tension=c.nivel>=3?'✸ hecho grave reportado':(c.nivel>=2?`⚔ ${c.n2} titular(es) de choque`:(c.nivel===1?'concentraciones reportadas':'sin hechos reportados'));
+    mk.bindTooltip(`<b>${esc(c.nombre)}</b> · ${esc(c.depto)}<br>${c.items} titulares · Gobierno ${c.G} · Oposición ${c.O}<br>${tension}`+
+      (c.ultimo?`<br><span style="color:#9aa">${hora(c.ultimo.t)} · ${esc(c.ultimo.medio)}</span><br>${esc(c.ultimo.titulo)}`:''),{className:'tt',direction:'top',sticky:true});
+    if(c.items>=Math.max(2,max*.15)) L.marker([c.lat,c.lon],{interactive:false,icon:L.divIcon({className:'city-lbl',html:esc(c.nombre),iconSize:null,iconAnchor:[-r-4,6]})}).addTo(cityLayer);
+  });
+}
+
+/* 04 frente */
+function frente(){
+  const fs=D.frentes.filter(f=>f.bando==='G'||f.bando==='O');
+  const max=Math.max(1,...fs.map(f=>f.F));
+  const col=b=>fs.filter(f=>f.bando===b).map(f=>{
+    const d=f.medios_1h-f.medios_1h_antes;
+    const vel=f.medios_1h?`<span class="${d>0?'up':'dn'}">${d>0?'▲':(d<0?'▼':'■')} ${f.medios_1h} medio${f.medios_1h===1?'':'s'} en la última hora</span>`:'<span class="dn">sin movimiento en la última hora</span>';
+    return `<div class="unidad ${f.items?'':'vacia'}" data-id="${f.id}">
+      <div class="t">${esc(f.nombre)}<span>${nf(f.F)}</span></div>
+      <div class="bar"><div style="width:${f.F/max*100}%;background:${COL[b]}"></div></div>
+      <div class="m"><span>${f.N} medios · ${f.items} titulares</span>${f.primero?`<span>1.er disparo ${hora(f.primero.t)}</span>`:'<span>aún no aparece</span>'}</div>
+      <div class="m" style="margin-top:2px">${vel}</div></div>`;}).join('');
+  $('frente').innerHTML=`<div><h3 style="color:var(--g)">Gobierno</h3>${col('G')}</div><div><h3 style="color:var(--o)">Oposición</h3>${col('O')}</div>`;
+  $('frente').querySelectorAll('.unidad').forEach(el=>{
+    const f=D.frentes.find(x=>x.id===el.dataset.id);
+    el.onmousemove=e=>showTip(e,`<b>${esc(f.nombre)}</b><br><span style="color:#aab">${esc(f.nota)}</span>`+
+      (f.primero?`<br><br>Primer disparo · ${hora(f.primero.t)} · ${esc(f.primero.medio)}<br>${esc(f.primero.titulo)}`:'')+
+      (f.ejemplo&&f.items>1?`<br><br>Último · ${hora(f.ejemplo.t)} · ${esc(f.ejemplo.medio)}<br>${esc(f.ejemplo.titulo)}`:''));
+    el.onmouseleave=hideTip;});
+}
+
+/* 05 partido: posesión + volumen */
+function serieVentana(){
+  const ini=new Date(D.inicio);
+  return D.serie.filter(s=>new Date(s.t)>=new Date(ini-12*3600e3));
+}
+function ejeX(svg,s,x,y0){
+  let g='';
+  s.forEach((p,i)=>{const d=new Date(p.t); const hh=Number(d.toLocaleString('en-US',{timeZone:'America/Bogota',hour:'numeric',hour12:false}));
+    if(d.getUTCMinutes()===0&&hh%3===0) g+=`<text x="${x(i)}" y="${y0+16}" fill="#7f8494" font-size="11" text-anchor="middle">${hora(p.t)}</text>`;});
+  return g;
+}
+function partido(){
+  const s=serieVentana(); if(!s.length) return;
+  const W=1000,H=230,ml=44,mr=12,mt=14,mb=26, n=s.length;
+  const x=i=>ml+(W-ml-mr)*(n<=1?0:i/(n-1)), y=v=>mt+(H-mt-mb)*(1-v);
+  const ini=new Date(D.inicio); const iIni=s.findIndex(p=>new Date(p.t)>=ini);
+  let pts=s.map((p,i)=>p.sG==null?null:[x(i),y(p.sG)]);
+  // área sobre/bajo 50 % con recorte
+  let path='',seg=[];
+  const segs=[]; pts.forEach(p=>{if(p)seg.push(p);else if(seg.length){segs.push(seg);seg=[];}}); if(seg.length)segs.push(seg);
+  segs.forEach(sg=>{path+='M'+sg.map(p=>p.join(',')).join('L');});
+  const areas=segs.map(sg=>`M${sg[0][0]},${y(.5)}L`+sg.map(p=>p.join(',')).join('L')+`L${sg[sg.length-1][0]},${y(.5)}Z`).join('');
+  let g=`<defs><clipPath id="arriba"><rect x="0" y="0" width="${W}" height="${y(.5)}"/></clipPath><clipPath id="abajo"><rect x="0" y="${y(.5)}" width="${W}" height="${H}"/></clipPath></defs>`;
+  [0,.25,.5,.75,1].forEach(v=>{g+=`<line x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,${v===.5?.35:.06})" ${v===.5?'stroke-dasharray="4 4"':''}/>
+    <text x="${ml-6}" y="${y(v)+4}" fill="#7f8494" font-size="11" text-anchor="end">${v*100}%</text>`;});
+  g+=`<path d="${areas}" fill="${COL.G}" fill-opacity=".22" clip-path="url(#arriba)"/><path d="${areas}" fill="${COL.O}" fill-opacity=".22" clip-path="url(#abajo)"/>`;
+  g+=`<path d="${path}" fill="none" stroke="#f1f0ec" stroke-width="2" stroke-linejoin="round"/>`;
+  g+=`<text x="${ml+6}" y="${y(1)+12}" fill="${'#a9bfff'}" font-size="11">Gobierno domina</text><text x="${ml+6}" y="${y(0)-4}" fill="#ffb1a8" font-size="11">Oposición domina</text>`;
+  if(iIni>=0) g+=`<line x1="${x(iIni)}" x2="${x(iIni)}" y1="${mt}" y2="${H-mb}" stroke="#e3b04b" stroke-width="1.5"/><text x="${x(iIni)+5}" y="${mt+10}" fill="#e3b04b" font-size="11">pitazo ${hora(D.inicio)}</text>`;
+  g+=ejeX(null,s,x,H-mb);
+  g+=`<line id="xh" x1="0" x2="0" y1="${mt}" y2="${H-mb}" stroke="rgba(255,255,255,.5)" visibility="hidden"/><rect x="${ml}" y="${mt}" width="${W-ml-mr}" height="${H-mt-mb}" fill="transparent" id="hit1"/>`;
+  const sv=$('g-posesion'); sv.innerHTML=g;
+  sv.querySelector('#hit1').onmousemove=e=>{const r=sv.getBoundingClientRect(); const px=(e.clientX-r.left)/r.width*W;
+    const i=Math.max(0,Math.min(n-1,Math.round((px-ml)/(W-ml-mr)*(n-1)))); const p=s[i];
+    const xh=sv.querySelector('#xh'); xh.setAttribute('x1',x(i)); xh.setAttribute('x2',x(i)); xh.setAttribute('visibility','visible');
+    showTip(e,`<b>${hora(p.t)}</b><br>`+(p.sG==null?'sin titulares con marco en las 3 h previas':`Posesión del Gobierno: <b>${nf(p.sG*100)} %</b><br>Oposición: ${nf((1-p.sG)*100)} %`));};
+  sv.querySelector('#hit1').onmouseleave=()=>{hideTip(); sv.querySelector('#xh').setAttribute('visibility','hidden');};
+
+  // volumen apilado
+  const H2=200, mb2=26, mt2=22; const y2max=Math.max(1,...s.map(p=>p.G+p.O+p.C+p.N));
+  const yv=v=>mt2+(H2-mt2-mb2)*(1-v/y2max); const bw=Math.max(2,(W-ml-mr)/n-2);
+  let g2='';
+  [0,.5,1].forEach(f=>{const v=Math.round(y2max*f); g2+=`<line x1="${ml}" x2="${W-mr}" y1="${yv(v)}" y2="${yv(v)}" stroke="rgba(255,255,255,.06)"/><text x="${ml-6}" y="${yv(v)+4}" fill="#7f8494" font-size="11" text-anchor="end">${v}</text>`;});
+  s.forEach((p,i)=>{let acc=0; const cx=x(i)-bw/2;
+    [['G',p.G],['O',p.O],['C',p.C],['N',p.N]].forEach(([k,v],j,arr)=>{ if(!v)return;
+      const y1=yv(acc+v), h=yv(acc)-y1-1; acc+=v;
+      const top=!arr.slice(j+1).some(q=>q[1]); g2+=`<rect x="${cx}" y="${y1}" width="${bw}" height="${Math.max(0,h)}" fill="${COL[k]}" ${top?'rx="2"':''}/>`;});
+    if(p.h3) g2+=`<text x="${x(i)}" y="${yv(acc)-6}" text-anchor="middle" font-size="13" fill="#f1f0ec">✸</text>`;
+    else if(p.h2) g2+=`<text x="${x(i)}" y="${yv(acc)-6}" text-anchor="middle" font-size="12" fill="#e3b04b">⚔</text>`;
+    g2+=`<rect x="${cx-1}" y="${mt2}" width="${bw+2}" height="${H2-mt2-mb2}" fill="transparent" data-i="${i}" class="hb"/>`;});
+  if(iIni>=0) g2+=`<line x1="${x(iIni)}" x2="${x(iIni)}" y1="${mt2}" y2="${H2-mb2}" stroke="#e3b04b" stroke-width="1.5"/>`;
+  g2+=ejeX(null,s,x,H2-mb2);
+  const sv2=$('g-volumen'); sv2.innerHTML=g2;
+  sv2.querySelectorAll('.hb').forEach(r=>{r.onmousemove=e=>{const p=s[+r.dataset.i];
+    showTip(e,`<b>${hora(p.t)} – ${hora(new Date(new Date(p.t).getTime()+30*60e3).toISOString())}</b><br>`+
+      `<span class="sw" style="background:${COL.G}"></span>Gobierno ${p.G}<br><span class="sw" style="background:${COL.O}"></span>Oposición ${p.O}<br>`+
+      `<span class="sw" style="background:${COL.C}"></span>Choque de marcos ${p.C}<br><span class="sw" style="background:${COL.N}"></span>Sin marco ${p.N}`+
+      (p.h2||p.h3?`<br>⚔ ${p.h2} de choque${p.h3?` · ✸ ${p.h3} grave(s)`:''}`:''));}; r.onmouseleave=hideTip;});
+}
+
+/* 06 iniciativa */
+function iniciativa(){
+  const I=D.iniciativa; let h='';
+  const pm=I.primer_marco||{};
+  h+=`<div class="kpis" style="grid-template-columns:1fr 1fr">`+['G','O'].map(b=>{const x=pm[b];
+    return `<div class="kpi"><div class="l">Primer titular con marco del ${b==='G'?'Gobierno':'la Oposición'}</div>
+      <div class="v" style="color:${COL[b]};font-size:1.3rem">${x?hora(x.t):'—'}</div><div class="l">${x?esc(x.medio)+' · '+esc(x.titulo):''}</div></div>`;}).join('')+`</div>`;
+  if(!I.choques||!I.choques.length){h+=`<p class="nota" style="margin-top:12px">Todavía no hay choques reportados en prensa. Cuando aparezca el primero, aquí se mide cuánto tarda cada bando en enmarcarlo.</p>`;}
+  else{
+    h+=`<table style="margin-top:12px"><tr><th>Choque reportado</th><th class="num">Gobierno habla</th><th class="num">Oposición habla</th></tr>`+
+      I.choques.map(c=>`<tr><td><b>${hora(c.t)}</b>${c.ciudad?' · '+esc(c.ciudad):''} ${c.nivel>=3?'✸':'⚔'}<br><span class="md" style="color:#7f8494">${esc(c.medio)} · ${esc(c.titulo)}</span></td>
+        <td class="num" style="color:${COL.G}">${c.resp_G?'+'+minutos(c.resp_G.lag_min):'—'}</td><td class="num" style="color:${COL.O}">${c.resp_O?'+'+minutos(c.resp_O.lag_min):'—'}</td></tr>`).join('')+`</table>`;
+  }
+  $('iniciativa').innerHTML=h;
+}
+
+/* 07 voces */
+function voces(){
+  const V=D.voces||{}; const ser=['G','O','T'].filter(k=>V[k]&&V[k].curva&&V[k].curva.length);
+  const sv=$('g-voces'); const W=600,H=210,ml=36,mr=90,mt=12,mb=24;
+  if(!ser.length){sv.innerHTML='';$('voces').innerHTML='<p class="nota">Sin titulares con voz identificada todavía.</p>';return;}
+  const all=ser.flatMap(k=>V[k].curva.map(c=>new Date(c[0]).getTime())); const t0=Math.min(...all), t1=Math.max(Date.now(),...all);
+  const ymax=Math.max(...ser.map(k=>V[k].curva[V[k].curva.length-1][1]));
+  const x=t=>ml+(W-ml-mr)*((t-t0)/((t1-t0)||1)), y=v=>mt+(H-mt-mb)*(1-v/ymax);
+  const colv={G:COL.G,O:COL.O,T:'#c9ccd6'}, nom={G:'Gobierno',O:'Oposición',T:'Terceros'};
+  let g='';
+  [0,.5,1].forEach(f=>{const v=Math.round(ymax*f);g+=`<line x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,.06)"/><text x="${ml-6}" y="${y(v)+4}" fill="#7f8494" font-size="11" text-anchor="end">${v}</text>`;});
+  ser.forEach(k=>{const c=V[k].curva; let d=''; c.forEach((p,i)=>{const X=x(new Date(p[0]).getTime()),Y=y(p[1]); d+=(i?`H${X}V${Y}`:`M${X},${Y}`);});
+    const last=c[c.length-1]; d+=`H${x(t1)}`;
+    g+=`<path d="${d}" fill="none" stroke="${colv[k]}" stroke-width="2"/><text x="${W-mr+6}" y="${y(last[1])+4}" fill="#c9ccd6" font-size="11">${nom[k]} · ${last[1]}</text>`;});
+  g+=`<text x="${ml}" y="${H-6}" fill="#7f8494" font-size="11">${diaHora(new Date(t0).toISOString())}</text><text x="${W-mr}" y="${H-6}" fill="#7f8494" font-size="11" text-anchor="end">ahora</text>`;
+  sv.innerHTML=g;
+  const G=V.G||{};
+  $('voces').innerHTML=`<p class="nota">La voz del Gobierno apareció primero a las <b>${G.primero?hora(G.primero.t):'—'}</b>${G.primero?' en '+esc(G.primero.medio):''}; la repiten <b>${G.medios||0}</b> medios en ${G.items||0} titulares.</p>`+
+    (G.repetidores&&G.repetidores.length?`<p class="nota">Más la repiten: ${G.repetidores.slice(0,6).map(r=>`${esc(r.medio)} (${r.n})`).join(' · ')}</p>`:'')+
+    (V.O&&V.O.repetidores&&V.O.repetidores.length?`<p class="nota">La voz de la Oposición la repiten: ${V.O.repetidores.slice(0,6).map(r=>`${esc(r.medio)} (${r.n})`).join(' · ')}</p>`:'');
+}
+
+/* 08 colisión */
+function colision(){
+  const C=D.colision; const tot=C.G+C.O+C.C;
+  const pct=v=>tot?v/tot*100:0;
+  $('colision').innerHTML=`<div class="kpis"><div class="kpi"><div class="v">${C.indice==null?'—':nf(C.indice*100)+' %'}</div><div class="l">titulares donde chocan los dos marcos</div></div>
+    <div class="kpi"><div class="v">${C.medios_cruce}</div><div class="l">medios que llevan ambos marcos</div></div>
+    <div class="kpi"><div class="v">${C.medios_eco}</div><div class="l">medios con un solo marco (3+ titulares)</div></div></div>
+    <div class="tira" style="height:14px;margin-top:14px"><div style="width:${pct(C.G)}%;background:${COL.G}"></div><div style="width:${pct(C.O)}%;background:${COL.O}"></div><div style="width:${pct(C.C)}%;background:${COL.C}"></div></div>
+    <p class="nota">${C.G} solo Gobierno · ${C.O} solo Oposición · ${C.C} con los dos marcos. ${C.indice!=null&&C.indice<.15?'<b>Conversaciones paralelas</b>: cada bando le habla a los suyos.':'Hay choque directo de marcos.'}</p>`+
+    (C.eco&&C.eco.length?`<p class="nota">Un solo marco: ${C.eco.map(esc).join(' · ')}</p>`:'');
+  // franja de alineación de medios
+  const ms=D.nodos.amplificadores.filter(m=>m.alin!=null); const sv=$('g-alineacion'); const W=600,H=150,ml=20,mr=20;
+  const x=a=>ml+(W-ml-mr)*(a+1)/2; const maxt=Math.max(1,...ms.map(m=>m.tot));
+  let g=`<line x1="${ml}" x2="${W-mr}" y1="70" y2="70" stroke="rgba(255,255,255,.15)"/><line x1="${x(0)}" x2="${x(0)}" y1="40" y2="100" stroke="rgba(255,255,255,.3)" stroke-dasharray="3 3"/>
+    <text x="${ml}" y="128" fill="#a9bfff" font-size="11">← lleva marcos del Gobierno</text><text x="${W-mr}" y="128" fill="#ffb1a8" font-size="11" text-anchor="end">lleva marcos de la Oposición →</text>`;
+  ms.forEach((m,i)=>{const r=4+Math.sqrt(m.tot/maxt)*12; const yy=70+((i%3)-1)*14;
+    g+=`<circle cx="${x(m.alin)}" cy="${yy}" r="${r}" fill="${m.alin<-.2?COL.G:(m.alin>.2?COL.O:COL.C)}" fill-opacity=".75" stroke="#060810" stroke-width="2" data-i="${i}" class="md-dot"/>`;});
+  sv.innerHTML=g;
+  sv.querySelectorAll('.md-dot').forEach(c=>{const m=ms[+c.dataset.i]; c.onmousemove=e=>showTip(e,`<b>${esc(m.medio)}</b><br>${m.tot} titulares · Gobierno ${m.G} · Oposición ${m.O} · ambos ${m.C}`); c.onmouseleave=hideTip;});
+}
+
+/* 09 matices */
+function matices(){
+  const M=D.matices; const nom={G:'Gobierno',O:'Oposición'};
+  $('matices').innerHTML=['G','O'].map(b=>{const xs=M[b]||[]; const tot=xs.reduce((a,x)=>a+x.n,0);
+    return `<h3 style="color:${COL[b]};font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;margin:6px 0 8px">${nom[b]} · ${tot} usos de marco</h3>`+
+      (xs.length?xs.map(x=>`<div style="display:grid;grid-template-columns:170px 1fr 48px;gap:10px;align-items:center;margin-bottom:7px;font-size:.82rem">
+        <span>${esc(x.nombre)}</span><div style="height:8px;background:rgba(255,255,255,.06);border-radius:4px"><div style="height:100%;width:${x.p*100}%;background:${COL[b]};border-radius:4px"></div></div>
+        <span style="text-align:right;color:var(--ink2);font-variant-numeric:tabular-nums">${nf(x.p*100)} %</span></div>`).join(''):'<p class="nota">Sin marcos todavía.</p>');}).join('');
+  const O=Object.fromEntries((M.O||[]).map(x=>[x.id,x.p]));
+  const ind=(O.autoritarismo||0)+(O.paramilitarismo||0), soc=O.justicia_social||0;
+  $('matices').innerHTML+=`<p class="nota" style="margin-top:10px">En la Oposición, <b>indignación ${nf(ind*100)} %</b> (autoritarismo + paramilitarismo) frente a <b>reclamo social ${nf(soc*100)} %</b> (hambre y salario).${(O.paramilitarismo||0)===0?' El marco del paramilitarismo no ha aparecido en ningún titular.':''}</p>`;
+}
+
+/* 10 nodos */
+function nodos(){
+  const N=D.nodos;
+  let h='<table><tr><th>Marco</th><th>Primeros en dispararlo</th></tr>'+N.primeros.filter(p=>p.medios.length).map(p=>`<tr><td><span class="chip ${p.bando}">${esc(p.nombre)}</span></td><td>${p.medios.map(m=>`${hora(m.t)} ${esc(m.medio)}`).join('<br>')}</td></tr>`).join('')+'</table>';
+  h+='<table style="margin-top:14px"><tr><th>Medio</th><th class="num">Titulares</th><th class="num">Gob.</th><th class="num">Opo.</th><th class="num">Ambos</th></tr>'+
+    N.amplificadores.slice(0,12).map(m=>`<tr><td>${esc(m.medio)}</td><td class="num">${m.tot}</td><td class="num" style="color:${COL.G}">${m.G}</td><td class="num" style="color:${COL.O}">${m.O}</td><td class="num" style="color:${COL.C}">${m.C}</td></tr>`).join('')+'</table>';
+  $('nodos').innerHTML=h;
+}
+
+/* 11 externa */
+function externa(){
+  const E=D.externa; let h=`<div class="kpis"><div class="kpi"><div class="v">${E.items}</div><div class="l">titulares de prensa internacional y financiera</div></div>
+    <div class="kpi"><div class="v">${E.riesgo}</div><div class="l">hablan de riesgo, protestas o tensión</div></div>
+    <div class="kpi"><div class="v">${E.confianza}</div><div class="l">hablan de reformas o confianza</div></div></div>`;
+  if(E.trm&&E.trm.length>1){
+    const t=E.trm, W=600,H=110,ml=50,mr=60,mt=12,mb=22; const vs=t.map(p=>p.v); const lo=Math.min(...vs),hi=Math.max(...vs);
+    const x=i=>ml+(W-ml-mr)*i/(t.length-1), y=v=>mt+(H-mt-mb)*(1-(v-lo)/((hi-lo)||1));
+    const last=t[t.length-1];
+    h+=`<svg class="chart" id="g-trm" viewBox="0 0 ${W} ${H}" style="margin-top:12px">
+      <text x="${ml-6}" y="${y(hi)+4}" fill="#7f8494" font-size="11" text-anchor="end">${nf(hi)}</text><text x="${ml-6}" y="${y(lo)+4}" fill="#7f8494" font-size="11" text-anchor="end">${nf(lo)}</text>
+      <path d="M${t.map((p,i)=>x(i)+','+y(p.v)).join('L')}" fill="none" stroke="#e3b04b" stroke-width="2"/>
+      <circle cx="${x(t.length-1)}" cy="${y(last.v)}" r="4" fill="#e3b04b"/><text x="${x(t.length-1)+8}" y="${y(last.v)+4}" fill="#f1f0ec" font-size="11">${nf(last.v)}</text>
+      <text x="${ml}" y="${H-4}" fill="#7f8494" font-size="11">${t[0].f}</text><text x="${W-mr}" y="${H-4}" fill="#7f8494" font-size="11" text-anchor="end">TRM ${last.f}</text>
+      <rect x="${ml}" y="${mt}" width="${W-ml-mr}" height="${H-mt-mb}" fill="transparent" id="hit-trm"/></svg>`;
+  }
+  h+=`<div class="feed" style="max-height:300px;margin-top:10px">`+E.titulares.map(x=>`<div class="it"><div class="hr">${hora(x.t)}</div><div>
+    <a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.titulo)}</a><div class="md">${esc(x.medio)} ${x.lang==='en'?'· inglés':''} ${x.tono?`<span class="chip ${x.tono==='riesgo'?'h':''}">${x.tono}</span>`:''}</div></div></div>`).join('')+`</div>`;
+  $('externa').innerHTML=h;
+  const hit=document.getElementById('hit-trm');
+  if(hit){const t=E.trm; hit.onmousemove=e=>{const r=hit.getBoundingClientRect(); const i=Math.max(0,Math.min(t.length-1,Math.round((e.clientX-r.left)/r.width*(t.length-1))));
+    showTip(e,`<b>${t[i].f}</b><br>TRM ${nf(t[i].v,2)} pesos por dólar`);}; hit.onmouseleave=hideTip;}
+}
+
+/* 12 feed */
+const MNOM=()=>Object.fromEntries((D.metodo.marcos||[]).map(m=>[m.id,m]));
+function feed(){
+  const mm=MNOM();
+  const xs=D.feed.filter(x=>!filtro||(filtro==='h'?x.h>=2:x.b===filtro));
+  $('feed').innerHTML=xs.map(x=>`<div class="it"><div class="hr">${hora(x.t)}</div><div>
+    <a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.titulo)}</a>
+    <div class="md">${esc(x.medio)}${x.ci.length?' · '+x.ci.map(esc).join(', '):''}${x.v?` · voz: ${x.v==='G'?'Gobierno':x.v==='O'?'Oposición':'terceros'}`:''}</div>
+    <div>${x.m.map(id=>mm[id]?`<span class="chip ${mm[id].bando}">${esc(mm[id].nombre)}</span>`:'').join('')}${x.h>=3?'<span class="chip h">✸ hecho grave</span>':x.h===2?'<span class="chip h">⚔ choque</span>':''}</div></div></div>`).join('')||'<p class="nota">Nada con este filtro.</p>';
+}
+$('filtros').onclick=e=>{const b=e.target.closest('button'); if(!b)return; filtro=b.dataset.f; $('filtros').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); if(D) feed();};
+
+/* 13 X */
+function xbox(){
+  const X=D.x;
+  if(!X){$('xbox').innerHTML=`<div class="apagado"><b>Capa apagada.</b> Con la escucha de X encendida, esta sección mide lo que la prensa no puede:
+    las <b>cuentas</b> que dispersan cada marco, la velocidad de propagación por minuto, y si los dos bandos se responden
+    o conversan en paralelo. Mismo libro de códigos, misma ley de fuerzas: N = cuentas distintas, q = interacción media.</div>`;return;}
+  const tot=X.G.F+X.O.F, s=tot?X.G.F/tot:null;
+  const lista=b=>(X.nodos[b]||[]).slice(0,6).map(n=>`<div style="display:flex;justify-content:space-between;font-size:.8rem;padding:3px 0;border-bottom:1px solid var(--line)"><a href="https://x.com/${encodeURIComponent(n.cuenta)}" target="_blank" rel="noopener">@${esc(n.cuenta)}</a><span style="color:var(--ink2);font-variant-numeric:tabular-nums">${nf(n.interaccion)}</span></div>`).join('')||'<p class="nota">—</p>';
+  $('xbox').innerHTML=`<div class="marcador" style="grid-template-columns:1fr auto 1fr">
+      <div class="lado"><div class="bn" style="color:var(--g)">Gobierno en X</div><div class="f" style="font-size:2rem">${nf(X.G.F)}</div><div class="d">${X.G.N} cuentas</div></div>
+      <div class="vs"><b>${s==null?'—':nf(s*100)+'–'+nf((1-s)*100)}</b>% de la fuerza</div>
+      <div class="lado der"><div class="bn" style="color:var(--o)">Oposición en X</div><div class="f" style="font-size:2rem">${nf(X.O.F)}</div><div class="d">${X.O.N} cuentas</div></div></div>
+    <p class="nota">${nf(X.publicaciones)} publicaciones sobre la batalla · ${X.choque} con los dos marcos · corrida de las ${hora(X.generado)} (US$${nf(X.costo_usd,2)}).</p>
+    <div class="grid2" style="gap:14px;margin-top:10px"><div><h3 style="color:var(--g);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px">Nodos del Gobierno</h3>${lista('G')}</div>
+      <div><h3 style="color:var(--o);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px">Nodos de la Oposición</h3>${lista('O')}</div></div>
+    <p class="nota">Interacción = me gusta + 2 × reposteos + respuestas + citas. Se cuentan cuentas, no seguidores.</p>`;
+}
+/* 14 actores */
+function actores(){
+  const A=D.actores||[]; const max=Math.max(1,...A.map(a=>a.n));
+  $('actores').innerHTML=A.map(a=>`<div style="display:grid;grid-template-columns:180px 1fr 70px;gap:10px;align-items:center;margin-bottom:6px;font-size:.82rem">
+    <span>${esc(a.nombre)}</span><div style="height:8px;background:rgba(255,255,255,.06);border-radius:4px"><div style="height:100%;width:${a.n/max*100}%;background:${a.bando==='N'?COL.N:COL[a.bando]};border-radius:4px"></div></div>
+    <span style="text-align:right;color:var(--ink2);font-variant-numeric:tabular-nums">${a.n}${a.n3h?` <small style="color:#7f8494">(${a.n3h} en 3 h)</small>`:''}</span></div>`).join('')||'<p class="nota">Sin menciones.</p>';
+}
+/* 15 método */
+function metodo(){
+  $('m-lanch').textContent=D.metodo.lanchester;
+  const nb={G:'Gobierno',O:'Oposición',N:'Terreno común'};
+  $('codigos').innerHTML='<table><tr><th>Marco</th><th>Bando</th><th>Palabras del diccionario (respaldo)</th></tr>'+D.metodo.marcos.map(m=>`<tr><td>${esc(m.nombre)}</td><td>${nb[m.bando]}</td><td style="color:#9aa">${m.terminos.map(esc).join(', ')}</td></tr>`).join('')+'</table>'+
+    (D.metodo.regla_terminos?`<p class="nota">${esc(D.metodo.regla_terminos)}</p>`:'');
+}
+
+cargar();
+setInterval(cargar,120000);
+setInterval(()=>{if(D)reloj();},30000);
+})();
+</script>
+</body>
+</html>
