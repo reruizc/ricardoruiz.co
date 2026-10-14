@@ -1159,7 +1159,10 @@ async function pintarMapaDepto({ id = 'mapaDepto', codigo = '', nombre = '', mun
       if (suyo) encendidos++;
     });
     const partes = lienzo.querySelectorAll('path').length;
-    const pista = codigo && !municipio && partes > 1 ? 'Toque su municipio' : !codigo && selectDepto && !nombre ? 'Toque su departamento' : '';
+    /* «Toque su municipio» solo si hay municipio que tocar: en asamblea y
+       gobernación el departamento ya es la respuesta (sin `select` el mapa ni
+       siquiera deja tocar). */
+    const pista = codigo && select && !municipio && partes > 1 ? 'Toque su municipio' : !codigo && selectDepto && !nombre ? 'Toque su departamento' : '';
     /* Bogotá es distrito y departamento: «BOGOTÁ, D.C. · Bogotá D.C.» sobra. */
     const repetido = normalizedText(municipio) === normalizedText(nombre);
     $(id + 'Pie').innerHTML = escHtml(municipio && !repetido ? `${NOMBRE_BONITO(municipio)} · ${nombre}` : (nombre || 'Elija el departamento')) + (pista ? `<small>${pista}</small>` : '');
@@ -1320,7 +1323,9 @@ function updateCampaignTerritory() {
   $('campaignLocalityField').classList.toggle('hidden', !jal || !$('campaignMunicipality').value);
   if (!municipal) $('campaignMunicipalityNota').classList.add('hidden');
   $('campaignDepartment').required = municipal || CORP_DEPARTAMENTAL.includes(corp); $('campaignMunicipality').required = municipal; $('campaignLocality').required = jal;
-  if ($('campaignDepartment').value && municipal) loadCampaignMunicipalities();
+  /* También al pasar a una departamental: limpia el municipio que quedara
+     de la corporación anterior. */
+  if ($('campaignDepartment').value) loadCampaignMunicipalities();
 }
 async function cargarMunicipios(select, dep, cacheKey) {
   select.innerHTML = '<option value="">Cargando municipios…</option>';
@@ -1361,6 +1366,17 @@ async function loadCampaignMunicipalities() {
   refrescarPartidoCampana();                 /* otro departamento, otro catálogo de partidos */
   if (!dep) { $('campaignMunicipalityField').classList.add('hidden'); return refrescarContinuar(); }
   $('campaignLocality').innerHTML = '<option value="">Primero seleccione municipio</option>';
+  /* Asamblea y gobernación se eligen en TODO el departamento: no hay municipio
+     que preguntar. Antes el desplegable salía igual —`municipioImplicito`
+     destapa el campo cuando el departamento tiene varios— y además dejaba
+     elegido el municipio de un intento anterior por concejo, que se colaba en
+     la campaña guardada («Neiva · Huila» para una gobernación). */
+  if (!CORP_MUNICIPAL.includes($('otherCorporation').value)) {
+    $('campaignMunicipalityField').classList.add('hidden');
+    $('campaignMunicipalityNota').classList.add('hidden');
+    $('campaignMunicipality').innerHTML = '<option value="">No aplica: la corporación es departamental</option>';
+    return territorioResuelto();
+  }
   /* Ya hay departamento: la pregunta del municipio tiene sentido y aparece
      —salvo que el departamento tenga uno solo, que lo decide municipioImplicito. */
   if (CORP_MUNICIPAL.includes($('otherCorporation').value)) $('campaignMunicipalityField').classList.remove('hidden');
@@ -1403,7 +1419,7 @@ function campanaActual(corpKey) {
   const aval = avalVigente();
   const firmas = CORP_UNINOMINAL.includes(corpKey) && aval === 'firmas', indeciso = aval === 'indeciso';
   return { corp: corpKey, avales: firmas ? 'firmas' : indeciso ? 'indeciso' : 'partido', espectro: firmas || indeciso ? espectroVigente() : '',
-    partido: firmas || indeciso ? '' : (String($('campaignParty')?.value || '').trim() || crmCandidate?.partido || ''), ruta: isOther ? 'other' : 'same', departamento: isOther ? $('campaignDepartment').value : '', departamentoNombre: isOther ? ($('campaignDepartment').options[$('campaignDepartment').selectedIndex]?.text || '') : '', municipio: isOther ? $('campaignMunicipality').value : '', localidad: isOther ? $('campaignLocality').value : '' };
+    partido: firmas || indeciso ? '' : (String($('campaignParty')?.value || '').trim() || crmCandidate?.partido || ''), ruta: isOther ? 'other' : 'same', departamento: isOther ? $('campaignDepartment').value : '', departamentoNombre: isOther ? ($('campaignDepartment').options[$('campaignDepartment').selectedIndex]?.text || '') : '', municipio: isOther && CORP_MUNICIPAL.includes(corpKey) ? $('campaignMunicipality').value : '', localidad: isOther && corpKey === 'jal' ? $('campaignLocality').value : '' };
 }
 /* Rellena la ruta con la campaña guardada (al volver con vínculo). */
 async function precargarCampana(campana) {
