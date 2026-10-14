@@ -36,8 +36,12 @@ const SPECIAL_CODES = {
   '996':'blanco', '997':'nulos', '998':'no_marcados', '999':'no_marcados',
 };
 
-const COR_NAME = 'ALCALDE';   // procesar sólo esta corporación
-const FECHA_POR_AÑO = { 2019: '2019-10-27', 2023: '2023-10-29' };
+// DES_COR cambia de nombre: 'ALCALDE' en 2019 y 2023, 'ALCALDIA' en 2011 y 2015.
+const COR_NAMES = new Set(['ALCALDE', 'ALCALDIA']);
+const FECHA_POR_AÑO = { 2011: '2011-10-30', 2015: '2015-10-25', 2019: '2019-10-27', 2023: '2023-10-29' };
+// 2011 entrecomilla nombres de partido y candidato ("MOVIMIENTO ""MIRA"" "):
+// se quitan las comillas de borde y se desdoblan las internas. Sin comillas no cambia nada.
+const unq = s => (s.length > 1 && s[0] === '"' && s[s.length - 1] === '"') ? s.slice(1, -1).replace(/""/g, '"') : s;
 
 const COMUNAS_DATA_PATH = '/Users/ricardoruiz/ricardoruiz.co/Bases de datos/COMUNAS_DATA.csv';
 
@@ -154,9 +158,9 @@ async function processCsv(csvPath){
     if (!line) continue;
     rowsRead++;
 
-    const parts = line.split(';');
+    const parts = line.split(';').map(unq);
     const corDes = String(parts[idx['DES_COR']] || '').trim().toUpperCase();
-    if (corDes !== COR_NAME) continue;
+    if (!COR_NAMES.has(corDes)) continue;
 
     const dep = pad(parts[idx['COD_DDE']], 2);
     const mun = pad(parts[idx['COD_MME']], 3);
@@ -172,8 +176,11 @@ async function processCsv(csvPath){
     const candNombre = normName(des);
     const candPartido = normName(par);
 
-    // Filtro: "CANDIDATOS TOTALES" es la fila agregada de la Registraduría
-    if (candNombre === 'CANDIDATOS TOTALES' || candPartido === 'CANDIDATOS TOTALES'){
+    // Filtro: "CANDIDATOS TOTALES" es la fila agregada de la Registraduría.
+    // ⚠️ Solo en filas de candidato: en 2015 y 2023 blanco/nulos/no marcados (996-999)
+    // llegan con DES_PAR = 'CANDIDATOS TOTALES', y filtrarlos dejaba `especiales`
+    // vacío (participación subestimada en todo el país, sin ningún error).
+    if (!SPECIAL_CODES[cod] && (candNombre === 'CANDIDATOS TOTALES' || candPartido === 'CANDIDATOS TOTALES')){
       rowsSkipTotal++;
       continue;
     }

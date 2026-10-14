@@ -25,8 +25,15 @@ BD = os.path.join(RAIZ, 'Bases de datos')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gcs_columnas import columnas                                    # noqa: E402
 
-COR = {2019: {'alcaldia': '6', 'asamblea': '5', 'concejo': '7', 'jal': '5'}}
-CSV_JAL = {2019: 'GCS_2019JAL.csv'}
+COR = {2019: {'alcaldia': '6', 'asamblea': '5', 'concejo': '7', 'jal': '5'},
+       2015: {'alcaldia': '3', 'asamblea': '2', 'concejo': '4', 'jal': '5'},
+       2011: {'alcaldia': '6', 'asamblea': '5', 'concejo': '7', 'jal': '8'}}
+CSV_JAL = {2019: 'GCS_2019JAL.csv', 2015: 'GCS_2015TER.csv', 2011: 'GCS_2011TER.csv'}
+# Controles fijos por año (cifras oficiales ya validadas en CLAUDE.md):
+#   alcalde de Bogotá y votos · depto y apellido del diputado más votado
+CONTROLES = {2019: ('CLAUDIA', 1109362, '31', 'GARCES ROJAS'),
+             2015: ('PENALOSA', 906058, '31', 'GARCES ROJAS'),
+             2011: ('PETRO', 723157, '03', 'MERLANO')}
 ESP = {'996': 'blanco', '997': 'nulos', '998': 'nulos', '999': 'nulos'}
 FALLAS = []
 # Defectos de la FUENTE, medidos y explicados: no son del tablero.
@@ -159,12 +166,17 @@ def main():
     cors = COR[año]
     ter = os.path.join(BD, 'FINAL SUBIDA GCS', f'GCS_{año}TER.csv')
     print('· leyendo', os.path.basename(ter))
-    T = leer_csv(ter, {cors['alcaldia'], cors['asamblea'], cors['concejo']})
-    print('· leyendo', CSV_JAL[año])
-    J = leer_csv(os.path.join(BD, 'FINAL SUBIDA GCS', CSV_JAL[año]), {cors['jal']})
-
-    rj = validar_local('jal', año, J[cors['jal']], leer_idx(a.indices, 'jal', año))
-    rc = validar_local('concejo', año, T[cors['concejo']], leer_idx(a.indices, 'concejo', año))
+    # JAL y Concejo solo si el año ya tiene su tablero por comuna.
+    hay = {c: os.path.exists(os.path.join(BD, f'output_{c}_{año}', f'resultados-{c}-{año}.json'))
+           for c in ('jal', 'concejo')}
+    T = leer_csv(ter, {cors['alcaldia'], cors['asamblea']} | ({cors['concejo']} if hay['concejo'] else set()))
+    rc = None
+    if hay['jal']:
+        print('· leyendo', CSV_JAL[año])
+        J = leer_csv(os.path.join(BD, 'FINAL SUBIDA GCS', CSV_JAL[año]), {cors['jal']})
+        validar_local('jal', año, J[cors['jal']], leer_idx(a.indices, 'jal', año))
+    if hay['concejo']:
+        rc = validar_local('concejo', año, T[cors['concejo']], leer_idx(a.indices, 'concejo', año))
 
     # ── Asamblea por departamento
     print(f'\n══ asamblea {año}')
@@ -181,7 +193,7 @@ def main():
         tab = {'validos': 0, 'blanco': 0, 'nulos': 0}; tc = {}
         for m in d['comunas'].values():
             for k in tab: tab[k] += m[k]
-            for nom, _p, v in m['cands']: tc[nom] = tc.get(nom, 0) + v
+            for nom, _p, v in m['cands']: tc[n(nom)] = tc.get(n(nom), 0) + v
         csvd = {}
         for (d2, _m), x in A.items():
             if d2 != dd: continue
@@ -223,29 +235,30 @@ def main():
 
     # ── Controles fijos
     print(f'\n══ controles {año}')
+    alc_nom, alc_v, dep_asam, diputado = CONTROLES[año]
     bog = [m for m in json.load(open(os.path.join(BD, f'output_alcaldias_{año}', 'departamentos', '16', 'municipios.json'))) if m['mun'] == '001'][0]
     top = bog['candidatos'][0]
     print(f"  Alcaldía Bogotá: {top['nombre']} {top['votos']:,}")
-    if not ('CLAUDIA' in top['nombre'] and top['votos'] == 1109362): falla('Claudia López ≠ 1.109.362')
+    if not (alc_nom in top['nombre'] and top['votos'] == alc_v): falla(f'alcalde de Bogotá ≠ {alc_nom} {alc_v:,}')
     tc = {}
-    for c in rc['data']['16-001']['comunas'].values():
+    for c in (rc['data']['16-001']['comunas'].values() if rc else []):
         for nom, _p, v in c['cands']: tc[nom] = tc.get(nom, 0) + v
     # El tablero no cuenta Corferias y cárceles (sin comuna), así que el control es
     # de ORDEN: mismo top 3 que el índice, con Abisambra y Cancino adentro.
     t3 = [nom for nom, _ in sorted(tc.items(), key=lambda kv: -kv[1])[:3]]
-    ixb = sorted((c for c in leer_idx(a.indices, 'concejo', año) if c['slug'].startswith(f'CONC{año}-16-1-')),
+    ixb = [] if not rc else sorted((c for c in leer_idx(a.indices, 'concejo', año) if c['slug'].startswith(f'CONC{año}-16-1-')),
                  key=lambda c: -c['votos'])[:3]
     print(f"  Concejo Bogotá top 3 · tablero: {t3}")
     print(f"                        índice:  {[(c['nombre'], c['votos']) for c in ixb]}")
-    if t3 != [n(c['nombre']) for c in ixb] or not ({'ABISAMBRA', 'CANCINO'} <= {w for nom in t3 for w in nom.split()}):
-        falla('top 3 Concejo Bogotá: tablero ≠ índice o sin Abisambra/Cancino')
-    d = json.load(open(os.path.join(BD, f'output_asamblea_{año}', 'dep', '31.json'), encoding='utf-8'))
+    if rc and (t3 != [n(c['nombre']) for c in ixb] or (año == 2019 and not ({'ABISAMBRA', 'CANCINO'} <= {w for nom in t3 for w in nom.split()}))):
+        falla('top 3 Concejo Bogotá: tablero ≠ índice (o, en 2019, sin Abisambra/Cancino)')
+    d = json.load(open(os.path.join(BD, f'output_asamblea_{año}', 'dep', f'{dep_asam}.json'), encoding='utf-8'))
     tv = {}
     for m in d['comunas'].values():
         for nom, _p, v in m['cands']: tv[nom] = tv.get(nom, 0) + v
     t1 = max(tv.items(), key=lambda kv: kv[1])
-    print(f"  Asamblea Valle top (tablero): {t1}")
-    if 'GARCES ROJAS' not in t1[0]: falla('top Asamblea Valle no es Garcés Rojas')
+    print(f"  Asamblea {dep_asam} top (tablero): {t1}")
+    if diputado not in t1[0]: falla(f'top Asamblea {dep_asam} no es {diputado}')
 
     print(f'\n{"✓ TODO CUADRA" if not FALLAS else f"✗ {len(FALLAS)} fallas"}')
     sys.exit(1 if FALLAS else 0)

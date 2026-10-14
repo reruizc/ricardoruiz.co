@@ -7,6 +7,7 @@ de los de 2023 (tal como están en el último commit), que son la fuente de la l
     alcaldias-2023.html                         → alcaldias-{AÑO}.html
 
     python3 tools/analisis-candidato/clonar_tableros.py 2019
+    python3 tools/analisis-candidato/clonar_tableros.py 2015 asamblea,alcaldias   # solo esas
 
 Solo cambia lo que depende del año: el bloque CORP (s3dir · localDir ·
 dataFile), título, telón, fecha, pie y los enlaces cruzados. La lógica NO se
@@ -84,6 +85,10 @@ def aviso_asamblea(año):
             for p in json.load(f)['puestos']:
                 if p.get('barrio'):
                     n += 1; v += p['validos'] + p['blanco'] + p['nulos']
+    if not os.path.exists(os.path.join(BD, 'censos-registraduria', f'{año}_datos_censo-electoral-min.json')):
+        return (f'La Registraduría no publica el nombre de cada puesto de {año} y el código de puesto '
+                f'no es estable entre elecciones (el nombre de hoy puede ser otro lugar): los puestos '
+                f'se muestran por zona y número. ')
     txt = (f'Los puestos se nombran con el censo electoral de {año}, no con el de hoy: el código '
            f'de puesto no es estable entre elecciones y el nombre actual puede ser otro lugar. ')
     if n:
@@ -111,7 +116,11 @@ def clonar_resultados(corp, año):
         s = rep(s, '<a href="concejo-2023.html">Escrutinio y curules</a>', '<a href="analisis-candidato.html">Análisis por candidato</a>')
         s = rep(s, '<a href="resultados-jal-2023.html">Resultados JAL</a>', f'<a href="resultados-jal-{año}.html">Resultados JAL</a>')
     if corp == 'asamblea':
-        s = rep(s, '<a href="resultados-concejo-2023.html">Resultados Concejo</a>', f'<a href="resultados-concejo-{año}.html">Resultados Concejo</a>')
+        # El enlace solo si ese año tiene tablero de Concejo (2015 y 2011 aún no).
+        if os.path.exists(os.path.join(BD, f'output_concejo_{año}', f'resultados-concejo-{año}.json')):
+            s = rep(s, '<a href="resultados-concejo-2023.html">Resultados Concejo</a>', f'<a href="resultados-concejo-{año}.html">Resultados Concejo</a>')
+        else:
+            s = rep(s, ' · <a href="resultados-concejo-2023.html">Resultados Concejo</a>', '')
     if '2023' in re.sub(r'<!--.*?-->|\{2019,2023\}', '', s):
         resto = sorted(set(re.findall(r'.{30}2023.{20}', s)))
         raise SystemExit(f'{corp}: quedó «2023» en la página:\n  ' + '\n  '.join(resto))
@@ -144,6 +153,9 @@ def clonar_alcaldias(año):
 
 if __name__ == '__main__':
     año = int(sys.argv[1])
+    que = sys.argv[2].split(',') if len(sys.argv) > 2 else ['jal', 'concejo', 'asamblea', 'alcaldias']
     for corp in ('jal', 'concejo', 'asamblea'):
-        clonar_resultados(corp, año)
-    clonar_alcaldias(año)
+        if corp in que:
+            clonar_resultados(corp, año)
+    if 'alcaldias' in que:
+        clonar_alcaldias(año)

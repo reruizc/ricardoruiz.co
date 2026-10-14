@@ -31,13 +31,13 @@ Otros años (el default sigue siendo 2023, así que nada de lo existente cambia)
 
 → Bases de datos/output_asamblea_2019/{resultados-asamblea-2019.json,dep/,mun/}
 ⚠️ El código de ASAMBLEA cambia por año: 2023 → 2 · 2019 → 5 · 2015 → 2 · 2011 → 5
-(y 2011 tiene 17 columnas: leerla exige revisar gcs_columnas antes).
+(2011 tiene 17 columnas: gcs_columnas las resuelve por nombre, NUM_VOT incluido).
 """
 import csv, datetime, json, os, subprocess, sys, unicodedata
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BD   = os.path.join(ROOT, 'Bases de datos')
-COR_POR_AÑO = {2023: '2', 2019: '5'}     # código de ASAMBLEA en GCS_{año}TER
+COR_POR_AÑO = {2023: '2', 2019: '5', 2015: '2', 2011: '5'}   # ASAMBLEA en GCS_{año}TER
 AÑO = int(sys.argv[1]) if len(sys.argv) > 1 else 2023
 if AÑO not in COR_POR_AÑO:
     sys.exit(f'año sin configurar: {AÑO} (usa {" | ".join(map(str, COR_POR_AÑO))})')
@@ -61,7 +61,10 @@ C_ANCHO = _C['_ancho']
 BOGOTA = '16'          # Distrito Capital: sin asamblea
 # Rótulo del puesto que la fuente de nombres no conoce (2023: georef 2026;
 # otros años: censo de ese año). No se inventa a qué corresponde.
-SIN_NOMBRE = 'sin georreferenciar' if AÑO == 2023 else f'sin nombre en el censo {AÑO}' 
+NOMBRES_DEL_AÑO = AÑO == 2023 or os.path.exists(
+    os.path.join(BD, 'censos-registraduria', f'{AÑO}_datos_censo-electoral-min.json'))
+SIN_NOMBRE = ('sin georreferenciar' if AÑO == 2023 else
+              f'sin nombre en el censo {AÑO}' if NOMBRES_DEL_AÑO else '')
 
 
 def strip(s):
@@ -96,6 +99,10 @@ def load_georef():
         # ⚠️ El código de puesto no es estable entre elecciones (ver
         # puestos_historicos.py): el nombre de 2026 de un código de 2019 puede ser
         # OTRO lugar. Para años viejos el puesto se nombra con el censo DE ESE AÑO.
+        # Antes de 2018 no hay censo por puesto publicado: sin nombres, el puesto
+        # va como «Zona zz · puesto pp» y no se le inventa uno.
+        if not NOMBRES_DEL_AÑO:
+            return pot, depN, munN, {}
         ruta = os.path.join(BD, 'censos-registraduria', f'{AÑO}_datos_censo-electoral-min.json')
         with open(ruta, encoding='utf-8') as f:
             pueN = {f"{r['cod_depto']}{r['cod_mun']}{r['zona']}{r['cod_puesto']}": r['puesto_votacion']
