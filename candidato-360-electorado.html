@@ -219,7 +219,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
 <script src="platform-config.js"></script>
 <script src="data-client.js"></script>
 <script src="partidos-bloques.js?v=20260929"></script>
-<script src="candidato-360-electorado.js?v=20260929"></script>
+<script src="candidato-360-franjas.js?v=20261014"></script><script src="candidato-360-electorado.js?v=20260929"></script>
 <script src="candidato-360-panel.js?v=20260929"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
 <script src="assets/candidato-360/candi/candi-atletica.js?v=4"></script>
@@ -537,8 +537,10 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
   /* ── Barrios sin puesto propio: el color del vecino más cercano ──────────
      Un barrio sin puesto de votación no tiene dato propio (en Cartagena son
      138 de 213). Se pinta con el valor del barrio CON dato más cercano por
-     centroide —mismo criterio del relleno de los tableros de 2023—, punteado y
-     translúcido, y nunca entra a un total ni a una lista. Tope de 3 km: más
+     centroide —mismo criterio del relleno de los tableros de 2023— y va RAYADO
+     con ese color (`C360Franjas`, candidato-360-franjas.js), nunca relleno: un
+     relleno pálido se leía como un cero suyo. Nunca entra a un total ni a una
+     lista. Tope de 3 km: más
      lejos (islas, veredas) prefiere quedar sin dato a inventar un vecino. */
   const RELLENO_MAX_KM = 3;
   function centroide(g) {
@@ -581,7 +583,7 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     };
     const porCodigo = new Map(C.unidades.map((u, j) => [u.geoCode || u.code, { u, x: xs[j] }]));
     const relleno = C.tipo === 'barrio' && C.geo ? rellenos(C.geo, C.cfg, new Set(porCodigo.keys())) : new Map();
-    const estiloRelleno = r => { const o = porCodigo.get(r.de), e = estilo(o.u, o.x); return { color: 'rgba(23,37,28,.45)', weight: .8, dashArray: '3 3', fillColor: e.fillColor, fillOpacity: Math.min(.42, e.fillOpacity * .5), className: '' }; };
+    const estiloRelleno = r => { const o = porCodigo.get(r.de), e = estilo(o.u, o.x), F = window.C360Franjas; return F ? { color: 'rgba(23,37,28,.45)', weight: .8, fillColor: F.franja(e.fillColor), fillOpacity: .8, className: '' } : { color: 'rgba(23,37,28,.45)', weight: .8, dashArray: '3 3', fillColor: e.fillColor, fillOpacity: Math.min(.42, e.fillOpacity * .5), className: '' }; };
     if (C.geo) {
       if (C.tipo === 'barrio' && !ST.cfg?.rotate) ST.tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(mapa);
       ST.capa = L.geoJSON(C.geo, {
@@ -591,9 +593,9 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
           const vecino = r && porCodigo.get(r.de);
           const nombre = C.cfg.name(f.properties);
           layer.bindTooltip(o ? tooltip(o.u, o.x)
-            : r ? `<b>${esc(P.lugar(nombre))}</b> · color del vecino` : `<b>${esc(P.lugar(nombre))}</b> · sin dato`, { sticky: true, className: 'tp' });
+            : r ? `<b>${esc(P.lugar(nombre))}</b> · sin puesto · léalo con ${esc(P.lugar(r.nombre))}` : `<b>${esc(P.lugar(nombre))}</b> · sin dato`, { sticky: true, className: 'tp' });
           const ver = () => o ? fichaZona(o.u, o.x, p)
-            : r ? fichaTexto(nombre, `Sin puesto de votación propio: toma el color de <b>${esc(P.lugar(r.nombre))}</b>, el barrio con dato más cercano (${r.km < 1 ? `${Math.round(r.km * 1000)} m` : `${r.km.toFixed(1).replace('.', ',')} km`}). Es un color inferido: no suma a ningún total. ${esc(METRICAS[metrica].boton)} del vecino: <b>${fmtMetrica(valorMetrica(vecino.u, vecino.x))}</b>.`)
+            : r ? fichaTexto(nombre, `Sin puesto de votación: quienes viven aquí votan en puestos de barrios vecinos. Léalo junto con <b>${esc(P.lugar(r.nombre))}</b>, el barrio con puesto más cercano (${r.km < 1 ? `${Math.round(r.km * 1000)} m` : `${r.km.toFixed(1).replace('.', ',')} km`}). ${esc(METRICAS[metrica].boton)} de ese barrio: <b>${fmtMetrica(valorMetrica(vecino.u, vecino.x))}</b>. Las rayas llevan su color y no suman a ningún total.`)
             : fichaTexto(nombre, `Sin dato: no tiene puesto propio y ningún barrio con dato queda a menos de ${RELLENO_MAX_KM} km.`);
           layer.on('mouseover', ver);
           if (!(C.tipo === 'unidad' && ST.cfg?.barrios && o)) layer.on('click', ver);
@@ -629,12 +631,12 @@ ol.crecen{margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5}ol.cre
     $('mapaLeyenda').innerHTML = metrica === 'pega'
       ? `<span><i style="background:${base};opacity:.88"></i>le pega fuerte (≥ ${veces(PEGA_FUERTE)}) · parpadea</span><span><i style="background:${base};opacity:.42"></i>le pega (1,00-1,15)</span><span><i style="background:#cdd8d0"></i>parejo</span><span><i style="background:#e6ebe6"></i>flojo (&lt; 0,85)</span>`
       : esc_.leyenda.map(([c, t]) => `<span><i style="background:${c}"></i>${esc(t)}</span>`).join('') + '<span><i style="background:#eef0ea"></i>sin dato</span>';
-    if (relleno.size) $('mapaLeyenda').innerHTML += '<span><i style="background:#cfdcd3;opacity:.6;border:1px dashed rgba(23,37,28,.55)"></i>sin puesto propio · color del vecino</span>';
+    if (relleno.size) $('mapaLeyenda').innerHTML += '<span><i style="background:repeating-linear-gradient(45deg,#8fa598 0 2.5px,transparent 2.5px 6px);border:1px solid rgba(23,37,28,.45)"></i>sin puesto · rayado con el color del vecino</span>';
     pintarBarra();
     const unidadTxt = nombreEscala(C.tipo);
     $('tpMapaTitulo').textContent = (metrica === 'pega' ? `${p.nombre}: dónde le pegan, por ${unidadTxt}` : `${METRICAS[metrica].titulo}, por ${unidadTxt}`).replace(/\.?$/, '.');
     const conDatoN = C.tipo === 'barrio' ? C.unidades.length : 0;
-    const extra = `${relleno.size ? ` <b>${num(conDatoN)} barrios tienen puesto de votación</b>; otros ${num(relleno.size)} no, y se pintan punteados con el color del barrio con dato más cercano (a menos de ${RELLENO_MAX_KM} km). Ese color es inferido: no entra a ningún total.` : ''}${ST.cfg?.barrios && C.tipo === 'unidad' ? ` <b>Haga clic en una ${esc(ST.cfg.rotuloUnidad || unidadSingular())}</b> para bajar a sus barrios.` : ''}${C.tipo === 'barrio' && !ST.unidadAbierta && ST.barrios?.faltan ? ` ${ST.barrios.faltan} ${ST.barrios.faltan === 1 ? esc(unidadSingular()) + ' no tiene' : esc(sinArticulo(unidadPlural())) + ' no tienen'} cartografía por barrio y ${ST.barrios.faltan === 1 ? 'queda' : 'quedan'} fuera del mapa.` : ''}${C.tipo === 'barrio' && ST.unidadAbierta ? ' <b>Vuelva a «Barrios»</b> para ver la ciudad entera.' : ''}${ST.modo === 'puesto' ? ' Este municipio no tiene cartografía por comuna, así que el mapa muestra los puestos de votación.' : ''}`;
+    const extra = `${relleno.size ? ` <b>${num(conDatoN)} barrios tienen puesto de votación</b>; otros ${num(relleno.size)} no: quienes viven ahí votan en puestos de barrios vecinos. Van rayados con el color del barrio con puesto más cercano (a menos de ${RELLENO_MAX_KM} km), que es junto al que conviene leerlos; no entran a ningún total.` : ''}${ST.cfg?.barrios && C.tipo === 'unidad' ? ` <b>Haga clic en una ${esc(ST.cfg.rotuloUnidad || unidadSingular())}</b> para bajar a sus barrios.` : ''}${C.tipo === 'barrio' && !ST.unidadAbierta && ST.barrios?.faltan ? ` ${ST.barrios.faltan} ${ST.barrios.faltan === 1 ? esc(unidadSingular()) + ' no tiene' : esc(sinArticulo(unidadPlural())) + ' no tienen'} cartografía por barrio y ${ST.barrios.faltan === 1 ? 'queda' : 'quedan'} fuera del mapa.` : ''}${C.tipo === 'barrio' && ST.unidadAbierta ? ' <b>Vuelva a «Barrios»</b> para ver la ciudad entera.' : ''}${ST.modo === 'puesto' ? ' Este municipio no tiene cartografía por comuna, así que el mapa muestra los puestos de votación.' : ''}`;
     $('mapaNota').innerHTML = (metrica === 'pega'
       ? `Cada zona se colorea por <b>le pega</b> = (peso de ${esc(p.corto)} entre quienes pueden votar ahí ÷ su peso en ${esc(ST.lugar)}) × (voto de ${esc(ST.famTexto)} ${esc(ST.cuando)} ahí ÷ su promedio en ${esc(ST.lugar)}). Quién puede votar: censo electoral de 2026 por puesto (Registraduría); el cruce sexo × edad se estima, porque la Registraduría publica el sexo y la edad por separado. Voto: ${textoFuente()}.`
       : `${esc(METRICAS[metrica].nota)} Los colores reparten las zonas en cinco grupos del mismo tamaño${metrica === 'crecimiento' ? ', salvo el crecimiento, que usa cortes fijos' : ''}. Pase el cursor por una zona para ver todo lo que se sabe de ella.`) + extra;

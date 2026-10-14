@@ -3625,12 +3625,14 @@ function recortarAVentana(bounds, ventana) {
    quedaban las demás comunas con su color de votos —otra escala con la misma
    rampa— o el callejero en gris, y no se sabía qué se comparaba con qué. El
    desglose de la derecha sigue siendo el de la unidad abierta. */
-/* ── Barrios sin puesto propio: el color del vecino más cercano ────────────
+/* ── Barrios sin puesto propio: rayados con el color del vecino ─────────────
    Un barrio sin puesto de votación no tiene votos ni censo propios, y en el
-   mapa quedaba como un hueco (en Cartagena, 138 de 213). Se pinta con el valor
-   del barrio CON puesto más cercano por centroide, punteado y translúcido, y
+   mapa quedaba como un hueco (en Cartagena, 138 de 213). Se busca el barrio
+   CON puesto más cercano por centroide y el barrio va RAYADO con su color
+   (`C360Franjas`), nunca relleno: un relleno pálido se leía como un cero suyo
+   cuando el vecino tenía 0 votos. El globo dice junto a qué barrio leerlo, y
    nunca entra al desglose ni a un total. Mismo criterio que la página del
-   electorado y los tableros de 2023. Tope de 3 km: más lejos queda sin dato. */
+   electorado. Tope de 3 km: más lejos queda sin dato. */
 const RELLENO_MAX_KM = 3;
 function centroideBarrio(g) {
   const anillos = g?.type === 'Polygon' ? [g.coordinates[0]] : g?.type === 'MultiPolygon' ? g.coordinates.map(pg => pg[0]) : [];
@@ -3693,7 +3695,7 @@ async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = tr
   if (crmMapLayer) crmLeafletMap.removeLayer(crmMapLayer);   /* se saca del mapa, no del grupo: vuelve al subir de nivel */
   const estilo = f => {
     const k = f.properties._k, enFoco = !todo && f.properties._u === key, r = !conPuesto.has(k) && relleno.get(k);
-    if (r) { const v = Number(values[r.de] || 0); return { fillColor: MAP_COLOR(v / max), fillOpacity: v ? .3 : .08, color: 'rgba(16,34,56,.5)', weight: enFoco ? .9 : .6, dashArray: '3 3' }; }
+    if (r) { const v = Number(values[r.de] || 0); return { fillColor: window.C360Franjas ? C360Franjas.franja(v ? MAP_COLOR(v / max) : '') : MAP_COLOR(v / max), fillOpacity: v ? .75 : .4, color: 'rgba(16,34,56,.45)', weight: enFoco ? .9 : .6, dashArray: null }; }
     const v = Number(values[k] || 0); return { fillColor: MAP_COLOR(v / max), fillOpacity: v ? .62 : .1, color: enFoco ? 'rgba(16,34,56,.7)' : 'rgba(16,34,56,.3)', weight: enFoco ? .9 : .5, dashArray: null };
   };
   crmBarrioLayer = L.geoJSON({ type: 'FeatureCollection', features }, {
@@ -3703,9 +3705,14 @@ async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = tr
       layer._vitrinaCode = k;
       const unidad = u && state.namesByArea[u] ? `<br><span style="opacity:.7">${escHtml(NOMBRE_BONITO(state.namesByArea[u]))}</span>` : '';
       const que = crmMapMode === 'proyectado' ? 'votos proyectados' : state.censo ? 'personas habilitadas' : 'votos';
+      /* El globo es corto a propósito: con la explicación completa medía más de
+         1.000 px en una sola línea y se salía del mapa. La explicación larga va
+         en la nota de abajo. */
+      const vecino = r && Number(values[r.de] || 0);
+      const dist = r ? (window.C360Franjas ? C360Franjas.distancia(r.km) : `${r.km.toFixed(1)} km`) : '';
       layer.bindTooltip(r
-        ? `<strong>${NOMBRE_BONITO(f.properties._n)}</strong>${unidad}<br>Sin puesto de votación propio: toma el color de <b>${escHtml(NOMBRE_BONITO(r.nombre))}</b>, el barrio con puesto más cercano (${r.km < 1 ? `${Math.round(r.km * 1000)} m` : `${r.km.toFixed(1).replace('.', ',')} km`}), que tiene ${Number(values[r.de] || 0).toLocaleString('es-CO')} ${que}. Es un color inferido: no suma a ningún total.`
-        : !conPuesto.has(k) ? `<strong>${NOMBRE_BONITO(f.properties._n)}</strong>${unidad}<br>Sin puesto de votación propio ni barrio con puesto a menos de ${RELLENO_MAX_KM} km.`
+        ? `<strong>${NOMBRE_BONITO(f.properties._n)}</strong>${unidad}<br>Sin puesto de votación: quienes viven aquí votan cerca. Léalo junto con <b>${escHtml(NOMBRE_BONITO(r.nombre))}</b> (${dist}${vecino ? ` · ${vecino.toLocaleString('es-CO')} ${que}` : ''}).`
+        : !conPuesto.has(k) ? `<strong>${NOMBRE_BONITO(f.properties._n)}</strong>${unidad}<br>Sin puesto de votación ni barrio con puesto a menos de ${RELLENO_MAX_KM} km.`
         : `<strong>${NOMBRE_BONITO(f.properties._n)}</strong>${unidad}<br>${v.toLocaleString('es-CO')} ${que}`, { sticky: true });
       layer.on('mouseover', () => layer.setStyle({ weight: 1.5, color: '#fff' }));
       layer.on('mouseout', () => layer.setStyle(estilo(f)));
@@ -3723,7 +3730,7 @@ async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = tr
     ? ` Toda la ciudad por barrio, con una sola escala de color; el borde marca cada ${escHtml(state.config.title)}. Toque un barrio para abrir su zona.`
     : ` Se ve toda la ciudad por barrio, con una sola escala de color; el borde grueso marca ${escHtml(NOMBRE_BONITO(donde))}. Toque un barrio de otra zona para abrirla.`)
     + (() => { const n = new Set(features.filter(f => !conPuesto.has(f.properties._k) && relleno.has(f.properties._k)).map(f => f.properties._k)).size;
-        return n ? ` Los ${n.toLocaleString('es-CO')} barrios punteados no tienen puesto de votación propio: toman el color del barrio con puesto más cercano (a menos de ${RELLENO_MAX_KM} km). Ese color es inferido y no entra al desglose.` : ''; })()
+        return n ? ` Los ${n.toLocaleString('es-CO')} barrios rayados no tienen puesto de votación: quienes viven ahí votan en puestos de barrios vecinos. Las rayas llevan el color del barrio con puesto más cercano (a menos de ${RELLENO_MAX_KM} km), que es junto al que conviene leerlos; no entran al desglose ni a ningún total.` : ''; })()
     + (fuente.aviso ? ` ${fuente.aviso}` : '');
   setTimeout(candadoDetalle, 0);
 }
