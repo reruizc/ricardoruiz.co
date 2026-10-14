@@ -12,6 +12,27 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <!-- Gate por plan (plan-gate.js): hasta puesto, abierto a todos (también al anónimo);
+       mesa a mesa, cuenta registrada (plan free o superior). Es de producto, no de seguridad:
+       el JSON de mesas sigue viajando completo al navegador, igual que en los tableros 2023. -->
+  <script src="plan-gate.js?v=20261013"></script>
+  <script>
+    window.MESA_GATE_TXT = {
+      co: { title:'Mesa a mesa con tu cuenta',
+            desc:'El resultado de cada mesa de votación está disponible para cuentas registradas. Crear la cuenta es gratis y no pide tarjeta.',
+            lock:'🔒 Mesas: con tu cuenta' },
+      us: { title:'Polling-table results with your account',
+            desc:'The result of each polling table is available to registered accounts. Creating an account is free and needs no card.',
+            lock:'🔒 Tables: with your account' },
+      cn: { title:'登录后查看逐个投票桌结果',
+            desc:'每个投票桌的结果向注册账户开放。注册免费，无需银行卡。',
+            lock:'🔒 投票桌：登录后查看' },
+    };
+    window.GATE_FEATURES = {
+      plan: { mesas:'free' },
+      copy: { get mesas(){ const t=window.MESA_GATE_TXT; return t[localStorage.getItem('rr-lang')]||t.co; } },
+    };
+  </script>
   <style>
     /* Helvetica Neue embebida (sistema visual v2). Syne solo en el logo. */
     @font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-thin.woff2') format('woff2');font-weight:200;font-style:normal;font-display:swap}
@@ -301,6 +322,7 @@
       /* RG panel: colapsar grid de 2 columnas para que todo quepa y scrollee */
       #panel-resultados-generales > div{grid-template-columns:1fr !important}
       #hemiciclo-map{height:340px !important}
+      .pg-card{max-height:calc(100vw - 2rem) !important}   /* modal del gate de mesas */
     }
     /* Custom select overlay (sólo se monta cuando se está en modo rotado) */
     ._sel-overlay{position:fixed;inset:0;background:rgba(4,6,16,.92);z-index:99999;display:flex;align-items:center;justify-content:center;padding:1rem}
@@ -1340,6 +1362,20 @@
       document.getElementById('pue-filter-container').style.display='flex';
     }
 
+    // ─── Gate de mesas (plan-gate.js · GATE_FEATURES en el <head>) ─────────
+    // Puesto para todos; la mesa, solo con cuenta. Si plan-gate.js no cargó no se bloquea
+    // nada: el gate es de producto y un 404 no puede dejar la página sin mesas.
+    function _puedeMesas(){ return !window.PlanGate || PlanGate.has('mesas'); }
+    function _pideMesas(){ return !window.PlanGate || PlanGate.require('mesas'); }
+    function _mesaAllOpt(){ return _puedeMesas() ? 'TODAS' : GATE_FEATURES.copy.mesas.lock; }
+    // Repinta el candado de la primera opción y, si se perdió el acceso con una mesa
+    // abierta (logout desde la nav), vuelve al puesto sin recargar.
+    function _aplicaGateMesas(){
+      const sel=document.getElementById('mesa-select'); if(!sel) return;
+      if(sel.options[0]&&sel.options[0].value==='') sel.options[0].textContent=_mesaAllOpt();
+      if(sel.value && !_puedeMesas()){ sel.value=''; onMesaChange(''); }
+    }
+
     async function onPueChange(cod){
       const depCod=document.getElementById('dep-select').value;
       const munCod=document.getElementById('mun-select').value;
@@ -1366,14 +1402,16 @@
       const mesas=await getDepJSON('mesas',depCod);
       const sel=document.getElementById('mesa-select');
       const seenM=new Set();
-      sel.innerHTML='<option value="">TODAS</option>';
+      sel.innerHTML=`<option value="">${_mesaAllOpt()}</option>`;
       mesas.filter(m=>m.dep_cod===depCod&&m.mun_cod===munCod&&m.pue_cod===cod).sort((a,b)=>+a.mesa-(+b.mesa)).forEach(m=>{if(seenM.has(m.mesa))return;seenM.add(m.mesa);const o=document.createElement('option');o.value=m.mesa;o.textContent=`Mesa ${m.mesa}`;sel.appendChild(o);});
       document.getElementById('mesa-filter-container').style.display='flex';
       if(!localStorage.getItem('rr-token')){showInviteToast();}
     }
 
     async function onMesaChange(cod){
-      if(!localStorage.getItem('rr-token')){showInviteToast();}
+      // Mesa a mesa: solo con cuenta. Por aquí pasan también el WHAT IF por mesa
+      // (RESULTADOS_GENERALES) y el overlay de selects del móvil rotado.
+      if(cod && !_pideMesas()){ document.getElementById('mesa-select').value=''; return; }
       const depCod=document.getElementById('dep-select').value;
       const munCod=document.getElementById('mun-select').value;
       const pueCod=document.getElementById('pue-select').value;
@@ -1493,7 +1531,7 @@
           await updateHemicicloMap(depCod, munCod||null);
           // Buscar el dato más profundo para _rgFilter
           try {
-            if(mesaCod && pueCod){
+            if(mesaCod && pueCod && _puedeMesas()){
               const mesas=await getDepJSON('mesas',depCod);
               const m=mesas.find(x=>x.dep_cod===depCod&&x.mun_cod===munCod&&x.pue_cod===pueCod&&x.mesa===mesaCod);
               if(m) _rgFilter=_buildRGFilterFromData(m,`Mesa ${mesaCod} · ${m.pue_nom||pueCod}`);
@@ -1526,7 +1564,7 @@
         const pueCod=document.getElementById('pue-select').value;
         const mesaCod=document.getElementById('mesa-select').value;
         renderKPI(); renderDonut();
-        if(mesaCod) onMesaChange(mesaCod);
+        if(mesaCod && _puedeMesas()) onMesaChange(mesaCod);
         else if(pueCod) renderGeoPartidos('pue',depCod,munCod,pueCod);
         else if(zonaCod) onZonaChange(zonaCod);
         else if(munCod) renderGeoPartidos('mun',depCod,munCod,null);
@@ -2235,7 +2273,7 @@
     };
 
     function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;const lang=localStorage.getItem('rr-lang')||'co';const t=SN_LANG[lang]||SN_LANG.co;if(token&&user){const pl=lang==='us'?{free:'Free',basic:'Basic',analysis:'Analysis',full:'Full',pro:'Pro',premium:'Premium'}:lang==='cn'?{free:'免费',basic:'基础版',analysis:'分析版',full:'完整版',pro:'Pro',premium:'Premium'}:{free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo',pro:'Pro',premium:'Premium'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">${t.logout}</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">${t.planes}</a><a href="login.html?redirect=senado-2014.html" class="e-btn-login">${t.login}</a><a href="elige-plan.html" class="e-btn-register">${t.register}</a>`;}}
-    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateEndosoCta();updateExcelDownloadBtn();}
+    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateEndosoCta();updateExcelDownloadBtn();if(window.PlanGate)PlanGate.reset();}
     function updateEndosoCta(){}
     function updateExcelDownloadBtn(){const token=localStorage.getItem('rr-token');const user=JSON.parse(localStorage.getItem('rr-user')||'null');const btn=document.getElementById('excel-download-btn');if(!btn)return;const ok=token&&user&&['pro','premium','full'].includes(user.plan);btn.className='excel-btn '+(ok?'excel-btn-active':'excel-btn-locked');}
     function downloadExcelCurrentView(){
@@ -2299,6 +2337,13 @@
     function showInviteToast(){const t=document.getElementById('invite-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
     function showProToast(){const t=document.getElementById('pro-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
     updateElectoralNav(); updateEndosoCta(); updateExcelDownloadBtn();
+    // Gate de mesas: repinta nav, Excel y candado al validar el token contra el worker (un
+    // token vencido vuelve a anónimo y se limpia de localStorage), al entrar por el modal
+    // inline y al salir (eLogOut → PlanGate.reset).
+    if(window.PlanGate){
+      PlanGate.onChange(()=>{ updateElectoralNav(); updateEndosoCta(); updateExcelDownloadBtn(); _aplicaGateMesas(); });
+      PlanGate.init();
+    }
 
     // ─── COPY PROTECTION ──────────────────────────────────────
     function showCopyToast() {
@@ -2408,6 +2453,7 @@
       if(footerBrands[1]) footerBrands[1].innerHTML = `<a href="https://registraduria.gov.co" target="_blank">${t.footer2}</a>`;
       // Nav auth
       updateElectoralNav();
+      _aplicaGateMesas();   // candado de mesas en el idioma elegido
     }
 
     snApplyLang();

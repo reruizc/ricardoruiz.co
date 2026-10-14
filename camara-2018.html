@@ -12,6 +12,27 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Gate por plan (plan-gate.js): hasta puesto, abierto a todos (también al anónimo);
+       mesa a mesa, cuenta registrada (plan free o superior). Es de producto, no de seguridad:
+       el JSON de mesas sigue viajando completo al navegador, igual que en los tableros 2023. -->
+  <script src="plan-gate.js?v=20261013"></script>
+  <script>
+    window.MESA_GATE_TXT = {
+      co: { title:'Mesa a mesa con tu cuenta',
+            desc:'El resultado de cada mesa de votación está disponible para cuentas registradas. Crear la cuenta es gratis y no pide tarjeta.',
+            lock:'🔒 Mesas: con tu cuenta' },
+      us: { title:'Polling-table results with your account',
+            desc:'The result of each polling table is available to registered accounts. Creating an account is free and needs no card.',
+            lock:'🔒 Tables: with your account' },
+      cn: { title:'登录后查看逐个投票桌结果',
+            desc:'每个投票桌的结果向注册账户开放。注册免费，无需银行卡。',
+            lock:'🔒 投票桌：登录后查看' },
+    };
+    window.GATE_FEATURES = {
+      plan: { mesas:'free' },
+      copy: { get mesas(){ const t=window.MESA_GATE_TXT; return t[localStorage.getItem('rr-lang')]||t.co; } },
+    };
+  </script>
   <style>
     /* HelveticaNeue embebida (familia completa). El logo va aparte en Syne. */
     @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-thin.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
@@ -1071,7 +1092,7 @@
         const _rgEffMun = curMun==='TODOS'?'':curMun;
         const _rgEffZon = curZon==='TODOS'?'':curZon;
         const _rgEffPue = curPue==='TODOS'?'':curPue;
-        const _rgEffMesa= curMesa==='TODOS'?'':curMesa;
+        const _rgEffMesa= (curMesa==='TODOS' || !_puedeMesas())?'':curMesa;   // mesa: solo con cuenta
         (async ()=>{
           try{
             if(_rgEffDep){
@@ -1324,6 +1345,20 @@
       _reRenderDep();
     }
 
+    // ─── Gate de mesas (plan-gate.js · GATE_FEATURES en el <head>) ─────────
+    // Puesto para todos; la mesa, solo con cuenta. Si plan-gate.js no cargó no se bloquea
+    // nada: el gate es de producto y un 404 no puede dejar la página sin mesas.
+    function _puedeMesas(){ return !window.PlanGate || PlanGate.has('mesas'); }
+    function _pideMesas(){ return !window.PlanGate || PlanGate.require('mesas'); }
+    function _mesaAllOpt(){ return _puedeMesas() ? 'Todas las mesas' : GATE_FEATURES.copy.mesas.lock; }
+    // Repinta el candado de la primera opción y, si se perdió el acceso con una mesa
+    // abierta (logout desde la nav), vuelve al puesto sin recargar.
+    function _aplicaGateMesas(){
+      const sel=document.getElementById('mesa-select'); if(!sel) return;
+      if(sel.options[0]&&sel.options[0].value==='TODOS') sel.options[0].textContent=_mesaAllOpt();
+      if(curMesa!=='TODOS' && !_puedeMesas()) switchPue(curPue);
+    }
+
     // ─── SWITCH PUESTO ────────────────────────────────────────
     async function switchPue(pueCod){
       curPue = pueCod; resetSelFrom('mesa');
@@ -1332,7 +1367,7 @@
         const pue = (curComData.puestos||[]).find(p=>p.cod===pueCod || p.pue_cod===pueCod);
         if(pue?.mesas?.length){
           const mesaOpts = pue.mesas.map(m=>({value: String(m.mesa||m.cod), label: m.nombre||`Mesa ${m.mesa||m.cod}`}));
-          setSel('mesa-select', mesaOpts, 'Todas las mesas');
+          setSel('mesa-select', mesaOpts, _mesaAllOpt());
           showSel('mesa-label', true); showSel('mesa-select', true);
         }
         // RG WHAT IF a nivel puesto
@@ -1352,7 +1387,11 @@
 
     // ─── SWITCH MESA ──────────────────────────────────────────
     async function switchMesa(mesaCod){
-      if(!localStorage.getItem('rr-token')){ showInviteToast(); }
+      // Mesa a mesa: solo con cuenta. Va ANTES de _rgMode: cubre el WHAT IF por mesa
+      // (_rgCamFilter) y la vista normal (_reRenderDep → renderMesaView).
+      if(mesaCod && mesaCod!=='TODOS' && !_pideMesas()){
+        curMesa='TODOS'; const s=document.getElementById('mesa-select'); if(s) s.value='TODOS'; return;
+      }
       curMesa = mesaCod;
       if(_rgMode){
         _ensureRGActive();
@@ -1439,7 +1478,7 @@
     }
 
     async function _reRenderDep(){
-      if(curMesa && curMesa!=='TODOS'){ renderMesaView(); return; }
+      if(curMesa && curMesa!=='TODOS' && _puedeMesas()){ renderMesaView(); return; }
       const deps = await getJSON('departamentos');
       const dep = deps.find(d=>d.cod===curDep && getDepCirc(d)===curCorp);
       if(dep) renderDepView(dep);
@@ -2529,11 +2568,18 @@
 
     // ─── NAV AUTH ─────────────────────────────────────────────
     function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;const lang=localStorage.getItem('rr-lang')||'co';const t=CAM_LANG[lang]||CAM_LANG.co;if(token&&user){const pl=lang==='us'?{free:'Free',basic:'Basic',analysis:'Analysis',full:'Full',pro:'Pro',premium:'Premium'}:lang==='cn'?{free:'免费',basic:'基础版',analysis:'分析版',full:'完整版',pro:'Pro',premium:'Premium'}:{free:'Free',basic:'Básico',analysis:'Análisis',full:'Completo',pro:'Pro',premium:'Premium'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">${t.logout}</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">${t.planes}</a><a href="login.html?redirect=camara-2018.html" class="e-btn-login">${t.login}</a><a href="elige-plan.html" class="e-btn-register">${t.register}</a>`;}}
-    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateEndosoCta();updateExcelDownloadBtn();}
+    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateEndosoCta();updateExcelDownloadBtn();if(window.PlanGate)PlanGate.reset();}
     function updateEndosoCta(){}
     function dismissInfoBar(){sessionStorage.setItem('rr-info-bar-ok','1');const b=document.getElementById('info-bar');if(b)b.style.display='none';}
     (function(){if(!sessionStorage.getItem('rr-info-bar-ok')){const b=document.getElementById('info-bar');if(b)b.style.display='flex';}})();
     updateElectoralNav(); updateEndosoCta(); updateExcelDownloadBtn();
+    // Gate de mesas: repinta nav, Excel y candado al validar el token contra el worker (un
+    // token vencido vuelve a anónimo y se limpia de localStorage), al entrar por el modal
+    // inline y al salir (eLogOut → PlanGate.reset).
+    if(window.PlanGate){
+      PlanGate.onChange(()=>{ updateElectoralNav(); updateEndosoCta(); updateExcelDownloadBtn(); _aplicaGateMesas(); });
+      PlanGate.init();
+    }
     init();
     // MOBILE LANDSCAPE HINT
     function dismissOrient(){ sessionStorage.setItem("orient-ok","1"); document.getElementById("orient-overlay").classList.remove("show"); }
@@ -2564,6 +2610,7 @@
       if(footerBrands[0]) footerBrands[0].textContent = t.footer1;
       if(footerBrands[1]) footerBrands[1].innerHTML = `<a href="https://registraduria.gov.co" target="_blank">${t.footer2}</a>`;
       updateElectoralNav();
+      _aplicaGateMesas();   // candado de mesas en el idioma elegido
     }
 
     camApplyLang();

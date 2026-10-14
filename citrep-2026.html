@@ -10,6 +10,27 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <!-- Gate por plan (plan-gate.js): hasta puesto, abierto a todos (también al anónimo);
+       mesa a mesa, cuenta registrada (plan free o superior). Es de producto, no de seguridad:
+       el JSON de mesas sigue viajando completo al navegador, igual que en los tableros 2023. -->
+  <script src="plan-gate.js?v=20261013"></script>
+  <script>
+    window.MESA_GATE_TXT = {
+      co: { title:'Mesa a mesa con tu cuenta',
+            desc:'El resultado de cada mesa de votación está disponible para cuentas registradas. Crear la cuenta es gratis y no pide tarjeta.',
+            lock:'🔒 Mesas: con tu cuenta' },
+      us: { title:'Polling-table results with your account',
+            desc:'The result of each polling table is available to registered accounts. Creating an account is free and needs no card.',
+            lock:'🔒 Tables: with your account' },
+      cn: { title:'登录后查看逐个投票桌结果',
+            desc:'每个投票桌的结果向注册账户开放。注册免费，无需银行卡。',
+            lock:'🔒 投票桌：登录后查看' },
+    };
+    window.GATE_FEATURES = {
+      plan: { mesas:'free' },
+      copy: { get mesas(){ const t=window.MESA_GATE_TXT; return t[localStorage.getItem('rr-lang')]||t.co; } },
+    };
+  </script>
   <style>
     /* HelveticaNeue embebida (familia completa). El logo va aparte en Syne. */
     @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-thin.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
@@ -375,7 +396,7 @@
       <button class="orient-btn" onclick="dismissOrient()">Ok</button>
     </div>
   </div>
-  <div class="copy-toast" id="premium-toast" style="border-color:rgba(74,222,128,.4);color:rgba(180,255,200,.9)">Las mesas requieren plan Premium · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
+  <div class="copy-toast" id="mesa-toast" style="border-color:rgba(0,71,255,.4);color:rgba(180,210,255,.9)">Las mesas se ven con tu cuenta · <a href="elige-plan.html" style="color:#7ab3ff;font-weight:700;text-decoration:underline">Regístrate gratis</a></div>
   <div class="curtain" id="curtain">
     <div class="curtain-layer"></div><div class="curtain-layer"></div>
     <div class="curtain-layer"></div><div class="curtain-layer"></div>
@@ -874,7 +895,7 @@
       // CAMBIO: si la vista es 'circ', renderizar a nivel circunscripción (com_cod)
       const nivelGeo = (v==='circ') ? 'circ' : 'dep';
       await renderGeoPartidos(nivelGeo,cod,null,null);
-      if(v==='mun'||v==='pue'||v==='zona'){
+      if(v==='mun'||v==='pue'||v==='zona'||v==='mesa'){   // 'mesa' faltaba: la vista Por mesa nunca llenaba municipios
         const muns=await getJSON('municipios');
         const sel=document.getElementById('mun-select');
         sel.innerHTML='<option value="">— Selecciona municipio —</option>';
@@ -943,6 +964,20 @@
       setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),100);
     }
 
+    // ─── Gate de mesas (plan-gate.js · GATE_FEATURES en el <head>) ─────────
+    // Puesto para todos; la mesa, solo con cuenta. Si plan-gate.js no cargó no se bloquea
+    // nada: el gate es de producto y un 404 no puede dejar la página sin mesas.
+    function _puedeMesas(){ return !window.PlanGate || PlanGate.has('mesas'); }
+    function _pideMesas(){ return !window.PlanGate || PlanGate.require('mesas'); }
+    function _mesaAllOpt(){ return _puedeMesas() ? '— Selecciona mesa —' : GATE_FEATURES.copy.mesas.lock; }
+    // Repinta el candado de la primera opción y, si se perdió el acceso con una mesa
+    // abierta (logout desde la nav), vuelve al puesto sin recargar.
+    function _aplicaGateMesas(){
+      const sel=document.getElementById('mesa-select'); if(!sel) return;
+      if(sel.options.length>1&&sel.options[0].value==='') sel.options[0].textContent=_mesaAllOpt();
+      if(sel.value && !_puedeMesas()){ sel.value=''; onMesaChange(''); }
+    }
+
     async function onPueChange(cod){
       const depCod=document.getElementById('dep-select').value;
       const munCod=document.getElementById('mun-select').value;
@@ -951,19 +986,18 @@
       if(!cod){if(munCod)await renderGeoPartidos('mun',depCod,munCod,null);else if(depCod)await renderGeoPartidos('dep',depCod,null,null);else{renderNacional();renderKPI();renderDonut();}return;}
       await renderGeoPartidos('pue',depCod,munCod,cod);
       if(v==='mesa'){
-        const user=JSON.parse(localStorage.getItem('rr-user')||'null');
-        const isPremium=user&&['premium','full'].includes(user.plan);
+        // Las mesas se listan a todos (lo bloqueado se ve); abrir una pide cuenta (onMesaChange).
         const sel=document.getElementById('mesa-select');
-        if(!isPremium){sel.innerHTML='<option disabled selected>🔒 Requiere plan Premium</option>';return;}
         const mesas=await getJSON('mesas');
-        sel.innerHTML='<option value="">— Selecciona mesa —</option>';
+        sel.innerHTML=`<option value="">${_mesaAllOpt()}</option>`;
         mesas.filter(m=>m.dep_cod===depCod&&m.mun_cod===munCod&&m.pue_cod===cod).sort((a,b)=>+a.mesa-(+b.mesa)).forEach(m=>{const o=document.createElement('option');o.value=m.mesa;o.textContent=`Mesa ${m.mesa}`;sel.appendChild(o);});
+        if(!_puedeMesas()) showMesaToast();
       }
     }
 
     async function onMesaChange(cod){
-      const user=JSON.parse(localStorage.getItem('rr-user')||'null');
-      if(!user||!['premium','full'].includes(user.plan)){showPremiumToast();return;}
+      // Mesa a mesa: solo con cuenta (antes de oct-2026, solo Premium).
+      if(cod && !_pideMesas()){ document.getElementById('mesa-select').value=''; return; }
       const depCod=document.getElementById('dep-select').value;
       const munCod=document.getElementById('mun-select').value;
       const pueCod=document.getElementById('pue-select').value;
@@ -1530,12 +1564,17 @@
       },
     };
 
-    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;const lang=localStorage.getItem('rr-lang')||'co';const t=CIT_LANG[lang]||CIT_LANG.co;if(token&&user){const pl=lang==='us'?{free:'Free',basic:'Basic',analysis:'Analysis',pro:'Pro',premium:'Premium',full:'Full'}:lang==='cn'?{free:'免费',basic:'基础版',analysis:'分析版',pro:'Pro',premium:'Premium',full:'完整版'}:{free:'Free',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">${t.logout}</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">${t.planes}</a><a href="login.html" class="e-btn-login">${t.login}</a><a href="elige-plan.html" class="e-btn-register">${t.register}</a>`;}}
-    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();}
+    function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;const lang=localStorage.getItem('rr-lang')||'co';const t=CIT_LANG[lang]||CIT_LANG.co;if(token&&user){const pl=lang==='us'?{free:'Free',basic:'Basic',analysis:'Analysis',pro:'Pro',premium:'Premium',full:'Full'}:lang==='cn'?{free:'免费',basic:'基础版',analysis:'分析版',pro:'Pro',premium:'Premium',full:'完整版'}:{free:'Free',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">${t.logout}</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">${t.planes}</a><a href="login.html?redirect=citrep-2026.html" class="e-btn-login">${t.login}</a><a href="elige-plan.html" class="e-btn-register">${t.register}</a>`;}}
+    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();if(window.PlanGate)PlanGate.reset();}
     updateElectoralNav();
+    // Gate de mesas: repinta nav y candado al validar el token, al entrar por el modal y al salir.
+    if(window.PlanGate){
+      PlanGate.onChange(()=>{ updateElectoralNav(); _aplicaGateMesas(); });
+      PlanGate.init();
+    }
 
     function showCopyToast(){const now=Date.now();if(showCopyToast._last&&now-showCopyToast._last<60000)return;showCopyToast._last=now;const t=document.getElementById('copy-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),3000);}
-    function showPremiumToast(){const t=document.getElementById('premium-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
+    function showMesaToast(){const t=document.getElementById('mesa-toast');if(!t)return;t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
     document.addEventListener('copy',e=>{if(!localStorage.getItem('rr-token')){e.preventDefault();showCopyToast();}});
     document.addEventListener('selectstart',e=>{if(!localStorage.getItem('rr-token')&&!e.target.closest('select,input')){e.preventDefault();showCopyToast();}});
     init();
@@ -1563,6 +1602,7 @@
       if(footerBrands[0]) footerBrands[0].textContent = t.footer1;
       if(footerBrands[1]) footerBrands[1].innerHTML = `<a href="https://registraduria.gov.co" target="_blank">${t.footer2}</a>`;
       updateElectoralNav();
+      _aplicaGateMesas();   // candado de mesas en el idioma elegido
     }
 
     citApplyLang();

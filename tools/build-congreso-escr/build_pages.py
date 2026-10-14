@@ -7,6 +7,9 @@
 Cada reemplazo es una cadena EXACTA de la plantilla y el script aborta si alguna no aparece:
 si cambias senado-2026.html en esas líneas, ajusta aquí la cadena. Los datos los genera
 build.py en Bases de datos/output_congreso_escr/senado-<año>/ (S3: congreso-2026/output/senado-<año>/).
+
+El gate de mesas (plan-gate.js: puesto para todos, mesa con cuenta) vive en las plantillas de 2026 y
+pasa tal cual a las copias: no se toca aquí. Cambiar la regla = editar la plantilla y regenerar.
 """
 import json
 import re
@@ -38,7 +41,7 @@ def selector(actual, corp='senado', span='sn-meta-anio'):
 def restos_2026(t):
     return [m.group(0) for m in re.finditer(r'.{0,40}2026.{0,40}', t)
             if not re.search(r'elecciones-2026|congreso-2026|mapas-2026|endoso-2026|camara-2026|senado-2026\.html|'
-                             r'SENADO_2026|Electos 2026', m.group(0))]
+                             r'SENADO_2026|Electos 2026|plan-gate\.js\?v=', m.group(0))]
 
 
 def reemplazar(t, a, b, n=None):
