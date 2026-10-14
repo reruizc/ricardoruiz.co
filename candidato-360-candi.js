@@ -87,8 +87,8 @@
   };
   VISTAS.arquetipos = {
     titulo: 'Los arquetipos de tu territorio',
-    texto: 'Aquí ves qué mueve el voto en cada barrio donde están tus votos: el arquetipo que manda, cómo se reparte tu votación entre todos en 2023 y a dónde va en 2027, el mapa barrio por barrio y la ficha de cada arquetipo. Si todavía no tienes votos en la ciudad, lo que ves es la ciudad, no tú.',
-    saludo: 'Los arquetipos no son grupos de gente: son la emoción con la que un barrio decide el voto. Por eso el mismo barrio puede cambiar de arquetipo entre una elección y otra. Úsalos para decidir cómo hablar, no a quién.',
+    texto: 'Aquí ves cómo vota cada barrio donde están tus votos: el arquetipo que manda, cómo se reparte tu votación entre todos, el mapa barrio por barrio y la ficha de cada arquetipo. En Medellín y Cartagena comparas 2023 con 2027; en Bogotá, el Concejo con la Alcaldía. Si todavía no tienes votos en la ciudad, lo que ves es la ciudad, no tú.',
+    saludo: 'Los arquetipos no son grupos de gente: son la manera en que un barrio decide el voto —una emoción en Medellín y Cartagena, una costumbre medida en Bogotá—. Por eso el mismo barrio puede cambiar de arquetipo entre una elección y otra. Úsalos para decidir cómo hablar, no a quién.',
     chips: ['¿Qué es un arquetipo?', '¿Por qué 2027 es una simulación?', '¿Cómo le hablo al arquetipo que manda?']
   };
   VISTAS.diad = {
@@ -156,7 +156,7 @@
      El `saludo` de cada vista es uno y fijo. Los TEMAS dependen de la campaña
      que la persona armó —corporación, partido o firmas, si cambia de
      corporación, la ciudad— y de qué módulos existen para su territorio
-     (arquetipos solo en Medellín y Cartagena, barrios solo donde hay
+     (arquetipos en Medellín, Cartagena y Bogotá, barrios solo donde hay
      cartografía, firmas solo en cargo uninominal por firmas).
 
      Cada tema: { id, si(p) → ¿aplica?, texto(p), chip?, mod?, cambio? }
@@ -237,7 +237,7 @@
     p.ciudad = p.departamental ? '' : ciudadDeTexto(p.lugar);
     p.ciudadNombre = CIUDAD_NOMBRE[p.ciudad] || '';
     p.cargo = CORP_NOMBRE[p.corp] || 'tu corporación';
-    p.arquetipos = p.ciudad === 'MEDELLIN' || p.ciudad === 'CARTAGENA';
+    p.arquetipos = p.ciudad === 'MEDELLIN' || p.ciudad === 'CARTAGENA' || p.ciudad === 'BOGOTA';
     p.barrios = !!p.ciudad;                       /* las cuatro con cartografía barrial en el CRM */
     p.firmas = p.uninominal && p.aval === 'firmas';
     p.sinPartido = p.aval === 'firmas' || p.aval === 'indeciso';
@@ -327,8 +327,10 @@
         texto: () => 'En Medellín los arquetipos son cinco familias emocionales por barrio. No te dicen a quién hablarle sino cómo: el mismo mensaje se escucha distinto en un barrio de protección que en uno de castigo.' },
       { id: 'arq-cartagena', mod: '#crmArquetipos', si: p => p.ciudad === 'CARTAGENA',
         texto: () => 'Cartagena tiene ocho arquetipos propios, no los de Medellín, y cada barrio es una mezcla de ellos. Ojo: 2023 es proyección y 2027 es simulación.' },
+      { id: 'arq-bogota', mod: '#crmArquetipos', si: p => p.ciudad === 'BOGOTA',
+        texto: p => `En Bogotá los arquetipos no salen de un estudio de emociones: salen de cómo vota cada barrio. Hay una tipología para el Concejo y otra para la Alcaldía, y la de ${p.corp === 'alcaldia' ? 'la Alcaldía' : 'el Concejo'} va primero porque es la tuya.` },
       { id: 'arq-no', mod: '#crmArquetipos', si: p => !p.arquetipos,
-        texto: () => 'Los arquetipos hoy existen para Medellín y Cartagena. Para tu territorio, lo que más te dice a quién hablarle es el perfil del votante, la tarjeta de al lado.' },
+        texto: () => 'Los arquetipos hoy existen para Medellín, Cartagena y Bogotá. Para tu territorio, lo que más te dice a quién hablarle es el perfil del votante, la tarjeta de al lado.' },
       { id: 'electorado', mod: '#crmPerfil', si: () => true,
         texto: p => `Ahí ves a quién puede votar, no solo a quién votó: el censo de 2026 por sexo y edad en tus puestos${p.sinPartido ? ', medido con tu familia política' : ''}. Empieza por los perfiles que salen marcados como viables.` },
       { id: 'firmas-mod', mod: '#crmFirmas', si: p => p.firmas,
@@ -366,8 +368,10 @@
         texto: () => 'Si todavía no tienes votos en la ciudad, abro con la lente de tu partido o tu familia: lo que ves es dónde está tu gente posible, no tus votantes.' },
       { id: 'cartagena', si: p => p.ciudad === 'CARTAGENA',
         texto: () => 'En Cartagena cada barrio es una mezcla de ocho arquetipos, así que tus votos se reparten entre varios. La ficha trae las palancas de cada uno: úsalas para escoger el tono.' },
+      { id: 'bogota', si: p => p.ciudad === 'BOGOTA',
+        texto: () => 'En Bogotá el mismo barrio vota distinto cada tarjetón: puede ser de gestión al Concejo y de voto útil a la Alcaldía. Mira las dos columnas. Y «Barrio de gestión» quiere decir que ahí ya hay alguien con red: si eres nueva o nuevo, entra por alianza.' },
       { id: 'otra-ciudad', si: p => !p.arquetipos,
-        texto: () => 'Tu campaña no es en Medellín ni en Cartagena, que son las dos ciudades con arquetipos. Lo que ves acá es la ciudad, no tu territorio.' }
+        texto: () => 'Tu campaña no es en Medellín, Cartagena ni Bogotá, que son las ciudades con arquetipos. Lo que ves acá es la ciudad, no tu territorio.' }
     ],
     diad: [
       { id: 'fuente-territorio', si: p => p.salto || !p.historial,

@@ -29,6 +29,12 @@
    ⚠️ Producto general: ningún texto visible nombra a quien construyó la
    cartografía. Se habla de «el estudio» o «la cartografía emocional».
 
+   ⚠️ Bogotá (oct-2026) entra con «Ver arquetipos» y SIN «Simulación»: sus
+   arquetipos son de comportamiento electoral medido, no de un estudio de
+   emociones, así que no hay sensibilidades por tema con qué mover las
+   palancas, e inventarlas sería presentar algo estimado como propio. En vez
+   de años tiene CORTES por corporación (`X.cortes`: Concejo y Alcaldía).
+
    ⚠️ Medellín: la mezcla 2015-2023 es el puntaje relativo del estudio
    (normalizado a 1) y la de 2027 son sus probabilidades de proyección. Como
    el estudio AJUSTÓ a mano el arquetipo 2027 de 48 barrios, la mezcla 2027 se
@@ -38,6 +44,11 @@
 (function (global) {
   'use strict';
   const AÑOS = ['2015', '2019', '2023', '2027'];
+  /* Los tiempos que se recorren: años en Medellín y Cartagena, corporaciones
+     en Bogotá. Y cómo se nombra cada uno en botones y frases. */
+  const cortes = () => X?.cortes || AÑOS;
+  const txtCorte = a => X?.corteTxt ? X.corteTxt(a) : a;
+  const ordenDe = a => X?.ordenDe ? X.ordenDe(a) : X.orden;
   const K = 0.085;
   /* Cuánto pesa la palanca del alcalde frente a las temáticas. */
   const PESO_ALCALDE = 2.4;
@@ -75,6 +86,31 @@
      el ancla del alcalde, a quién mueve esa palanca y la parte de la ficha
      que solo esa ciudad tiene. */
   const ADAPT = {
+    bogota(L) {
+      const D = L.D, F = D.familias, cs = L.cortes, ck = k => k.charAt(0);
+      const B = {};
+      for (const [code, b] of Object.entries(D.barrios)) {
+        const dom = {}, mez = {}, peso = {};
+        cs.forEach(k => { dom[k] = b[ck(k)]?.d; mez[k] = b[ck(k)]?.m || null; peso[k] = b.w; });
+        B[code] = { nombre: b.n, unidad: b.l, dom, mez, resp: .5, peso, raw: b };
+      }
+      return {
+        id: 'bogota', nombre: 'Bogotá', ventana: null, sim: false, cortes: cs,
+        corteNombre: k => L.corteNombre(k), corteArt: k => L.corteArt(k), corteTxt: k => `${L.corteNombre(k)} 2023`,
+        nat: Object.fromEntries(cs.map(k => [k, 'lectura 2023'])),
+        orden: [...(D.orden?.[cs[0]] || []), ...(D.orden?.[cs[1]] || [])], ordenDe: k => D.orden?.[k] || [],
+        B,
+        fam: id => F[id] && { nombre: F[id].nombre, largo: F[id].nombre, color: F[id].color, sens: {} },
+        mezcla: 'mezcla',
+        share: () => null,
+        movilidad: 'Movilidad', ancla: null, alcaldia: { mas: {}, menos: {} },
+        introVer: n => `Los ${n} barrios de Bogotá con puesto de votación propio y sus arquetipos de comportamiento electoral: una tipología para el Concejo y otra para la Alcaldía. Cada barrio es una mezcla; el color es el que manda.`,
+        toque: ' Toque un barrio para ver su ficha: qué arquetipo manda y con cuánto, cómo vota en cada corporación y qué significa para una campaña.',
+        notaMapa: ' Bogotá va girada 90°, como en el resto del producto: el norte queda a la izquierda. En gris, los barrios sin puesto de votación propio.',
+        ficha: null,
+        campana: id => { const f = F[id] || {}; return { lema: f.lema, decide: f.decide, oficio: f.oficio }; },
+      };
+    },
     cartagena(L) {
       const D = L.D, F = D.familias;
       const B = {};
@@ -197,12 +233,14 @@
     const caja = $('aqModos');
     if (!X) { caja.classList.add('hidden'); return; }
     caja.classList.remove('hidden');
-    const ops = [['lectura', 'Su lectura', 'leer desde sus votos, su lado o la ciudad'], ['ver', 'Ver arquetipos', 'el mapa y la ficha de cada barrio'], ['sim', 'Simulación', 'mueva palancas y vea qué cambia']];
+    const ops = [['lectura', 'Su lectura', 'leer desde sus votos, su lado o la ciudad'], ['ver', 'Ver arquetipos', 'el mapa y la ficha de cada barrio'], ['sim', 'Simulación', 'mueva palancas y vea qué cambia']]
+      .filter(([k]) => k !== 'sim' || X.sim !== false);
     caja.innerHTML = `<span class="rot">Ver</span>` + ops.map(([k, t, sub]) => `<button type="button" class="aq-lente" data-modo="${k}" aria-pressed="${S.modo === k}">${esc(t)}<small>${esc(sub)}</small></button>`).join('');
     caja.querySelectorAll('[data-modo]').forEach(b => b.addEventListener('click', () => usarModo(b.dataset.modo)));
   }
   function usarModo(m) {
     if (!X) return;
+    if (m === 'sim' && X.sim === false) m = 'ver';
     S.modo = m;
     pintarModos();
     $('aqLectura').classList.toggle('hidden', m !== 'lectura');
@@ -238,9 +276,9 @@
   /* ═══ VER ARQUETIPOS ════════════════════════════════════════════════════ */
   function pintarVer() {
     const l = L();
-    $('aqVerIntro').textContent = X.introVer(Object.keys(X.B).length) + ' Toque un barrio para ver su ficha: qué arquetipo manda y con cuánto, cómo ha cambiado desde 2015, cómo ha votado y qué significa ese arquetipo para una campaña.';
+    $('aqVerIntro').textContent = X.introVer(Object.keys(X.B).length) + (X.toque || ' Toque un barrio para ver su ficha: qué arquetipo manda y con cuánto, cómo ha cambiado desde 2015, cómo ha votado y qué significa ese arquetipo para una campaña.');
     if (!l.geo) { $('aqVerMapa').classList.add('hidden'); $('aqVerNota').textContent = 'La cartografía de barrios no respondió.'; return; }
-    $('aqVerControles').innerHTML = `<span class="rot">Año</span>${AÑOS.map(a => `<button type="button" class="aq-tog" data-ano="${a}" aria-pressed="${S.verAno === a}">${a} · ${X.nat[a]}</button>`).join('')}`;
+    $('aqVerControles').innerHTML = `<span class="rot">${X.cortes ? 'Corporación' : 'Año'}</span>${cortes().map(a => `<button type="button" class="aq-tog" data-ano="${a}" aria-pressed="${S.verAno === a}">${X.cortes ? esc(txtCorte(a)) : `${a} · ${X.nat[a]}`}</button>`).join('')}`;
     $('aqVerControles').querySelectorAll('[data-ano]').forEach(b => b.addEventListener('click', () => { S.verAno = b.dataset.ano; pintarVer(); }));
     const nuevo = !M.ver;
     if (nuevo) M.ver = crearMapa('aqVerMapa'); else setTimeout(() => M.ver.invalidateSize(), 0);
@@ -264,20 +302,20 @@
     if (nuevo) encuadrar(M.ver, M.verCapa);
     /* Leyenda: tocar un arquetipo pinta cuánto pesa en cada barrio. */
     const cuenta = domCount(a);
-    $('aqVerLeyenda').innerHTML = `<span class="rot">${pinta ? 'Pinta el peso de' : 'Toque uno para ver dónde pesa'}</span>` + X.orden.map(id => `<button type="button" class="aq-ley" data-arq="${id}" aria-pressed="${pinta === id}"><i style="background:${color(id)}"></i>${esc(nombre(id))} <em>${cuenta[id] || 0}</em></button>`).join('') + (pinta ? '<button type="button" class="aq-ley" data-arq="">← volver al que manda</button>' : '');
+    $('aqVerLeyenda').innerHTML = `<span class="rot">${pinta ? 'Pinta el peso de' : 'Toque uno para ver dónde pesa'}</span>` + ordenDe(a).map(id => `<button type="button" class="aq-ley" data-arq="${id}" aria-pressed="${pinta === id}"><i style="background:${color(id)}"></i>${esc(nombre(id))} <em>${cuenta[id] || 0}</em></button>`).join('') + (pinta ? '<button type="button" class="aq-ley" data-arq="">← volver al que manda</button>' : '');
     $('aqVerLeyenda').querySelectorAll('[data-arq]').forEach(b => b.addEventListener('click', () => { S.verPinta = b.dataset.arq && b.dataset.arq !== S.verPinta ? b.dataset.arq : null; pintarVer(); }));
     $('aqVerNota').innerHTML = (pinta
-      ? `Intensidad: cuánto pesa <b>${esc(nombre(pinta))}</b> en el ${X.mezcla} de cada barrio (${a}). El número junto a cada arquetipo es en cuántos barrios manda.`
-      : `Color: el arquetipo que manda en cada barrio (${a}, ${X.nat[a]}); más intenso, más concentrado. El número junto a cada arquetipo es en cuántos barrios manda.`) + X.notaMapa;
+      ? `Intensidad: cuánto pesa <b>${esc(nombre(pinta))}</b> en el ${X.mezcla} de cada barrio (${esc(txtCorte(a))}). El número junto a cada arquetipo es en cuántos barrios manda.`
+      : `Color: el arquetipo que manda en cada barrio (${esc(txtCorte(a))}, ${X.nat[a]}); más intenso, más concentrado. El número junto a cada arquetipo es en cuántos barrios manda.`) + X.notaMapa;
     if (S.verSel && X.B[S.verSel]) fichaVer(S.verSel); else $('aqVerFicha').innerHTML = fichaCiudad();
   }
 
   /* Sin barrio elegido: la ciudad y cómo usar el mapa. */
   function fichaCiudad() {
     const a = S.verAno, sh = share(a), cuenta = domCount(a);
-    return `<h4>${esc(X.nombre)} · ${a}</h4><p class="aq-v-sub">Toque un barrio en el mapa para ver su ficha completa.</p>
+    return `<h4>${esc(X.nombre)} · ${esc(txtCorte(a))}</h4><p class="aq-v-sub">Toque un barrio en el mapa para ver su ficha completa.</p>
       ${barra(sh)}<ul class="aq-lista">${orden(sh).map(([id, p]) => `<li><span class="pt" style="background:${color(id)}"></span><b>${pct(p)}</b><span>${esc(nombre(id))}</span><em>${cuenta[id] || 0} barrios</em></li>`).join('')}</ul>
-      <p class="aq-v-nota">El porcentaje es el peso de cada arquetipo en el voto de la ciudad (ponderado por el volumen de cada barrio). ${a} es ${X.nat[a]}.</p>`;
+      <p class="aq-v-nota">El porcentaje es el peso de cada arquetipo en el voto de la ciudad (ponderado por el volumen de cada barrio). ${X.cortes ? 'Es lectura observada de 2023.' : `${a} es ${X.nat[a]}.`}</p>`;
   }
   const barra = mez => `<div class="aq-barra">${orden(mez).map(([id, p]) => `<i style="flex:${p};background:${color(id)}" title="${esc(nombre(id))} ${pct(p)}"></i>`).join('')}</div>`;
 
@@ -286,9 +324,19 @@
     const b = X.B[code], mez = orden(b.mez?.[a]), d = b.dom?.[a];
     const pd = b.mez?.[a]?.[d], seg = mez.find(([id]) => id !== d);
     const cs = share(a)?.[d] || 0;
-    const partes = [`<b>${esc(lugar(b.nombre))}</b> es un barrio de <b>${esc(nombre(d))}</b>${pd != null ? `: en ${a} ese arquetipo explica el <b>${pct(pd)}</b> de su ${X.mezcla}${seg ? `, y le sigue ${esc(nombre(seg[0]))} con ${pct(seg[1])}` : ''}` : ` en ${a}`}.`];
+    /* Los nombres de Bogotá ya dicen qué clase de barrio es («Barrio de
+       gestión», «Norte de figuras»): «un barrio de Barrio de gestión» no se
+       lee, así que allá va «del tipo». */
+    const partes = [X.cortes
+      ? `En ${esc(X.corteArt(a))}, <b>${esc(lugar(b.nombre))}</b> es del tipo <b>«${esc(nombre(d))}»</b>${pd != null ? `: explica el <b>${pct(pd)}</b> de su ${X.mezcla}${seg ? `, y le sigue ${esc(nombre(seg[0]))} con ${pct(seg[1])}` : ''}` : ''}.`
+      : `<b>${esc(lugar(b.nombre))}</b> es un barrio de <b>${esc(nombre(d))}</b>${pd != null ? `: en ${a} ese arquetipo explica el <b>${pct(pd)}</b> de su ${X.mezcla}${seg ? `, y le sigue ${esc(nombre(seg[0]))} con ${pct(seg[1])}` : ''}` : ` en ${a}`}.`];
     if (pd != null) partes.push(pd >= .6 ? 'Es un barrio de lectura clara: un solo arquetipo ordena a la mayoría.' : pd >= .45 ? 'Manda, pero con competencia: un mensaje solo para ese arquetipo deja afuera a buena parte del barrio.' : 'Es un barrio mixto: ningún arquetipo se despega.');
     if (cs && pd != null) partes.push(`En la ciudad, ${esc(nombre(d))} pesa ${pct(cs)}: aquí, ${dec((pd / cs).toFixed(1))} veces eso.`);
+    if (X.cortes) {
+      /* Bogotá: no hay trayectoria en el tiempo sino otra corporación. */
+      X.cortes.filter(x => x !== a && b.dom?.[x]).forEach(x => partes.push(b.dom[x] === d ? '' : `En ${esc(X.corteArt(x))} es del tipo <b>«${esc(nombre(b.dom[x]))}»</b>: el mismo barrio vota distinto cada tarjetón.`));
+      return partes.join(' ');
+    }
     const doms = AÑOS.map(x => b.dom?.[x]).filter(Boolean);
     const cambios = doms.slice(1).filter((x, i) => x !== doms[i]).length;
     partes.push(cambios ? `Su dominante cambió ${cambios === 1 ? 'una vez' : `${cambios} veces`} entre 2015 y 2027 (${doms.map(x => esc(nombre(x))).join(' → ')}).` : 'Ha tenido el mismo dominante en todos los cortes, de 2015 a 2027.');
@@ -304,7 +352,7 @@
     const votos = C.votos?.()?.[code];
     const loc = Object.values(X.B).filter(x => x.unidad === b.unidad), locIgual = loc.filter(x => x.dom?.[a] === d).length;
     const sh = share(a);
-    const tray = AÑOS.map(x => `<div class="aq-tray-p"><small>${x}</small>${chip(b.dom?.[x])}${b.mez?.[x]?.[b.dom?.[x]] != null ? `<em>${pct(b.mez[x][b.dom[x]])}</em>` : ''}</div>`).join('<span class="aq-tray-f">→</span>');
+    const tray = cortes().map(x => `<div class="aq-tray-p"><small>${X.cortes ? esc(X.corteNombre(x)) : x}</small>${chip(b.dom?.[x])}${b.mez?.[x]?.[b.dom?.[x]] != null ? `<em>${pct(b.mez[x][b.dom[x]])}</em>` : ''}</div>`).join('<span class="aq-tray-f">→</span>');
     const cp = X.campana(d) || {};
     const fila = (t, v) => v ? `<p><span>${t}:</span> ${esc(v)}</p>` : '';
     $('aqVerFicha').innerHTML = `
@@ -312,19 +360,19 @@
       <p class="aq-v-sub">${esc(lugar(b.unidad))}${X.ficha.sub(b)}</p>
       ${votos ? `<p class="aq-v-votos">${esc(C.voz().unidad)} acá: <b>${num(votos)}</b></p>` : ''}
       <p class="aq-v-relato">${relato(code, a)}</p>
-      ${b.mez?.[a] ? `<h5>${X.mezcla === 'perfil' ? 'Su perfil' : 'La mezcla'} en ${a}</h5>${barra(b.mez[a])}
+      ${b.mez?.[a] ? `<h5>${X.mezcla === 'perfil' ? 'Su perfil' : 'La mezcla'} en ${esc(txtCorte(a))}</h5>${barra(b.mez[a])}
       <ul class="aq-lista">${orden(b.mez[a]).filter(([, p]) => p >= .02).map(([id, p]) => `<li><span class="pt" style="background:${color(id)}"></span><b>${pct(p)}</b><span>${esc(nombre(id))}</span><em>ciudad ${pct(sh?.[id])}</em></li>`).join('')}</ul>
       ${X.id === 'medellin' ? `<p class="aq-v-nota">${a === '2027' ? 'Probabilidad de cada arquetipo en la proyección 2027.' : 'Puntaje relativo de cada arquetipo en el estudio, llevado a 100.'}</p>` : ''}` : ''}
-      <h5>Su trayectoria</h5><div class="aq-tray">${tray}</div>
+      <h5>${X.cortes ? 'En cada corporación' : 'Su trayectoria'}</h5><div class="aq-tray">${tray}</div>
       ${X.ficha.cuerpo(b, a)}
       <h5>Qué significa para una campaña</h5>
       <div class="aq-v-arq" style="--c:${color(d)}">
         <b>${esc(F(d)?.largo || nombre(d))}</b>${cp.lema ? ` · <em>${esc(cp.lema)}</em>` : ''}
-        ${fila('Quién es', cp.perfil)}${fila('Cómo decide', cp.decide)}${fila('Lo enciende', cp.enciende)}${fila('Lo calma', cp.calma)}
+        ${fila('Quién es', cp.perfil)}${fila('Cómo decide', cp.decide)}${fila('Criterio de oficio', cp.oficio)}${fila('Lo enciende', cp.enciende)}${fila('Lo calma', cp.calma)}
         ${fila('A qué le teme', cp.miedo)}${fila('Si no se le cumple', cp.fuga)}${fila('Cómo hablarle', cp.tono)}${fila('Por dónde', cp.canales)}
         ${cp.temas ? `<p><span>Temas que lo mueven:</span> ${esc(cp.temas)}.</p>` : ''}
       </div>
-      <p class="aq-v-nota">En ${esc(lugar(b.unidad))}, ${locIgual} de ${loc.length} barrios tienen el mismo arquetipo dominante en ${a}.</p>
+      <p class="aq-v-nota">En ${esc(lugar(b.unidad))}, ${locIgual} de ${loc.length} barrios tienen el mismo arquetipo dominante en ${esc(X.cortes ? X.corteArt(a) : a)}.</p>
       <button type="button" class="ghost aq-v-cerrar" id="aqVerCerrar">← Ver la ciudad</button>`;
     $('aqVerCerrar').onclick = () => { S.verSel = null; pintarVer(); };
   }
@@ -332,6 +380,18 @@
   /* La parte de la ficha propia de cada estudio. */
   const conc = v => v == null ? '—' : `${dec(v)} %`;
   const FICHA = {
+    bogota: {
+      sub: b => { const r = b.raw, k = r[S.verAno.charAt(0)]?.k; return `${r.e != null ? ` · estrato ${dec(r.e.toFixed(1))}` : ''}${k != null ? ` · confianza ${pct(k)}${k < .6 ? ' · de frontera' : ''}` : ''}`; },
+      /* Cómo vota el barrio en la corporación elegida, contra la ciudad. */
+      cuerpo: (b, a) => {
+        const r = b.raw, v = k => L().variable(k, r.x?.[k]);
+        const llaves = a === 'alcaldia' ? ['p', 'ml', 'cr', 'ov', 'ga', 'bo', 'na', 'ba', 'vo'] : ['p', 'ml', 'ar', 'la', 'ce', 'de', 'in', 't1'];
+        return `<h5>Cómo vota el barrio <small>(${esc(txtCorte(a))} · contra la ciudad)</small></h5>`
+          + llaves.map(k => { const x = v(k); return `<div class="fila"><span>${esc(x.t)}</span><b>${esc(x.v)} <em>· ${esc(x.c)}</em></b></div>`; }).join('')
+          + `<div class="fila"><span>Votantes 2023</span><b>${num(r.w)}</b></div>`
+          + '<p class="aq-v-nota">El voto con base propia es lo que las candidaturas al Concejo sacan aquí por encima de lo que su lista saca en la zona, descontado el azar. La movilización local compara la participación de 2023 con la de la primera vuelta de 2026: más de ×1 es que el barrio sale más por lo local que el promedio.</p>';
+      },
+    },
     cartagena: {
       sub: b => { const r = b.raw, her = /heredado/i.test(r.tipo || ''); return ` · ${her ? `sin puesto propio${r.cercano?.cluster ? ` · lectura heredada de ${esc(lugar(r.cercano.cluster))}${r.cercano.km ? ` (${dec(r.cercano.km)} km)` : ''}` : ''}` : 'con puesto de votación propio'} · confianza ${esc(String(r.confianza || '').toLowerCase())}`; },
       cuerpo: b => {
@@ -516,6 +576,9 @@
     const l = L();
     X = l && ADAPT[l.ciudad] ? ADAPT[l.ciudad](l) : null;
     if (X) X.ficha = FICHA[X.id];
+    /* Bogotá recorre corporaciones; si antes se leyó otra ciudad, el corte
+       que quedó guardado no existe aquí. */
+    S.verAno = X?.cortes ? X.cortes[0] : (AÑOS.includes(S.verAno) ? S.verAno : '2027');
     pintarModos();
     if (!X) return;
     const h = location.hash;

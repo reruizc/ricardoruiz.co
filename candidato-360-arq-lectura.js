@@ -15,15 +15,26 @@
      retrospectivas; 2027 es simulación. El barrio casa POR NOMBRE con el
      diccionario puesto→barrio del mapa (los 211 de Nury son los 211 de la capa).
 
+   · BOGOTÁ — NO es cartografía emocional: son arquetipos de COMPORTAMIENTO
+     electoral medidos solo con resultados oficiales, censo y estrato
+     (tools/candidato-360/arquetipos-bogota/). Dos tipologías, una por
+     corporación (Concejo y Alcaldía 2023), con MEZCLA por barrio. En vez de
+     años tiene CORTES, y la corporación de la campaña va primero.
+
    Sin votos propios en la ciudad (una candidatura nueva) se describe la ciudad
    con el volumen que el propio estudio le da a cada barrio, y se dice.
+
+   Los «cortes» (`L.cortes`) son los dos tiempos que la página muestra lado a
+   lado: 2023 y 2027 en Medellín y Cartagena, Concejo y Alcaldía en Bogotá.
+   Las filas traen `a23`/`a27` por compatibilidad: son el primer y el segundo
+   corte, sea cual sea.
 
    Depende de C360Electorado (puestos con coordenada, códigos de puesto y de
    municipio) y de RRData. No toca el DOM.                                      */
 (function (global) {
   const RR = global.RRData;
   const E = () => global.C360Electorado;
-  const MEDELLIN = '01001', CARTAGENA = '05001';
+  const MEDELLIN = '01001', CARTAGENA = '05001', BOGOTA = '16001';
   const ARQ_BASE = RR.publicUrl('bases+de+datos/Proyecto+DC/arquetipos');
   const VOT27_URL = `${RR.publicUrl('bases+de+datos/Proyecto+DC/votacion-arquetipo-2027')}/votacion-2027.json?v=20260528`;
   const ARQ_CTG_BASE = RR.publicUrl('bases+de+datos/Proyecto+DC/arquetipos-cartagena');
@@ -53,14 +64,10 @@
      Manda el municipio al que se lanza; si no hay (campaña departamental o la
      ruta «la misma corporación»), donde están la mayoría de sus votos. Y si se
      lanza en otro lado pero sus votos están en una de las dos, se lee ahí.  */
+  const CIUDAD_DE = { [MEDELLIN]: 'medellin', [CARTAGENA]: 'cartagena', [BOGOTA]: 'bogota' };
   function ciudadDe(municipioCampana, mesas) {
     const mayor = E().municipioMayoritario(mesas || []);
-    const campana = municipioCampana || '';
-    if (campana === MEDELLIN || (!campana && mayor === MEDELLIN)) return 'medellin';
-    if (campana === CARTAGENA || (!campana && mayor === CARTAGENA)) return 'cartagena';
-    if (mayor === MEDELLIN) return 'medellin';
-    if (mayor === CARTAGENA) return 'cartagena';
-    return null;
+    return CIUDAD_DE[municipioCampana || ''] || CIUDAD_DE[mayor] || null;
   }
   /* El municipio de la campaña guardada en el vínculo, como código electoral
      de 5 dígitos. El formulario guarda el nombre DANE («CARTAGENA DE INDIAS»):
@@ -201,11 +208,81 @@
     };
   }
 
-  /* La lectura de una ciudad. */
-  function leer(ciudad, mesas) {
+  /* ── Bogotá ───────────────────────────────────────────────────────────── */
+  const ARQ_BOG_BASE = RR.publicUrl('congreso-2026/output/arquetipos-bogota');
+  const ARQ_BOG_URL = `${ARQ_BOG_BASE}/arquetipos-bogota.json?v=20261014`;
+  /* El catastral simplificado (~4 m): el panel no necesita los 6,5 MB del
+     completo ni los 19 archivos por localidad del CRM. */
+  const BOG_GEO_URL = `${ARQ_BOG_BASE}/barrios-bogota.json?v=20261014`;
+  const BOG_DIC_JS = 'candidato-360-data/bogota-puesto-barrio.js';
+  const ZONA_FUERA = new Set(['90', '98']);   /* puesto censo y cárceles: no son de ningún barrio */
+  /* Cómo se escribe cada variable: porcentaje, decimal o índice. */
+  const fmtVar = (f, v) => v == null ? '—' : f === 'pct' ? `${Math.round(v * 100)} %` : f === 'idx' ? `×${v.toFixed(2).replace('.', ',')}` : v.toFixed(1).replace('.', ',');
+  async function leerBogota(mesas, opts = {}) {
+    const [D] = await Promise.all([json(ARQ_BOG_URL), cargarScript(BOG_DIC_JS).catch(() => null)]);
+    const dic = global.Candidato360BogotaPuestoBarrio || {};
+    /* La corporación de la campaña manda: quien va a la Alcaldía lee primero
+       la tipología de Alcaldía. JAL y el resto, la de Concejo. */
+    const cortes = opts.corp === 'alcaldia' ? ['alcaldia', 'concejo'] : ['concejo', 'alcaldia'];
+    const [k0, k1] = cortes, ck = k => k.charAt(0);   /* en el JSON: c = Concejo, a = Alcaldía */
+    const porBarrio = {};
+    let votos = 0, ubicados = 0;
+    (mesas || []).forEach(m => {
+      const v = Number(m.v || 0); if (!v || codigoMunicipio(m) !== BOGOTA) return;
+      votos += v;
+      const zz = String(m.zon || '').padStart(2, '0'); if (ZONA_FUERA.has(zz)) return;
+      const cod = dic[`${zz}-${String(m.pue || '').padStart(2, '0')}`]; if (!cod) return;
+      ubicados += v; porBarrio[cod] = (porBarrio[cod] || 0) + v;
+    });
+    const conVotos = ubicados > 0;
+    const pesos = conVotos ? porBarrio : Object.fromEntries(Object.entries(D.barrios).map(([k, b]) => [k, Number(b.w || 0)]));
+    const reparto = { [k0]: {}, [k1]: {} }, porLoc = {};
+    let total = 0, sinDato = 0;
+    Object.entries(pesos).forEach(([k, v]) => {
+      if (!v) return; total += v;
+      const b = D.barrios[k]; if (!b) { sinDato += v; return; }
+      const L = porLoc[b.l] || (porLoc[b.l] = { votos: 0, [k0]: {}, [k1]: {} });
+      L.votos += v;
+      cortes.forEach(c => Object.entries(b[ck(c)]?.m || {}).forEach(([id, p]) => {
+        reparto[c][id] = (reparto[c][id] || 0) + v * p;
+        L[c][id] = (L[c][id] || 0) + v * p;
+      }));
+    });
+    const top = o => Object.entries(o).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const filasComuna = Object.entries(porLoc).sort((a, b) => b[1].votos - a[1].votos).map(([nombre, L]) => ({ nombre, votos: L.votos, a23: top(L[k0]), a27: top(L[k1]) }));
+    const filasBarrio = Object.entries(pesos).filter(([k, v]) => v && D.barrios[k]).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
+      const b = D.barrios[k], conf = b[ck(k0)]?.k;
+      return { code: k, votos: v, nombre: b.n, comuna: b.l, a23: b[ck(k0)]?.d, a27: b[ck(k1)]?.d, conf, riesgo: conf != null && conf < .6 ? 'de frontera' : null };
+    });
+    const F = D.familias, V = D.variables || {};
+    const geo = await json(BOG_GEO_URL).then(g => E().rotar90(g)).catch(() => null);
+    return {
+      ciudad: 'bogota', nombreCiudad: 'Bogotá', unidad: 'localidad', unidades: 'localidades', D,
+      conVotos, total, sinDato, reparto, filasComuna, filasBarrio, pesos, votosCiudad: votos, ubicados,
+      cortes, corteNombre: k => D.corporacion?.[k] || k,
+      /* Para las frases: «en el Concejo», «al Concejo», «en la Alcaldía». */
+      corteArt: k => k === 'alcaldia' ? 'la Alcaldía' : 'el Concejo', corteA: k => k === 'alcaldia' ? 'a la Alcaldía' : 'al Concejo', idsDe: k => D.orden?.[k] || [], ids: [...(D.orden?.[k0] || []), ...(D.orden?.[k1] || [])],
+      nombreDe: id => F[id]?.nombre || 'Sin dato', cortoDe: id => F[id]?.nombre || 'Sin dato', colorDe: id => F[id]?.color || '#6b7280',
+      geo, codeDe: p => String(p.codigo || ''), nombreGeo: p => p.nombre || 'Barrio',
+      dominanteDe: (code, k) => D.barrios[code]?.[ck(k)]?.d,
+      mezclaDe: (code, k) => D.barrios[code]?.[ck(k)]?.m || null,
+      confianzaDe: (code, k) => D.barrios[code]?.[ck(k)]?.k,
+      /* Una variable del barrio o del arquetipo contra la ciudad, ya escrita. */
+      variable: (k, v) => ({ t: V[k]?.t || k, v: fmtVar(V[k]?.f, v), c: fmtVar(V[k]?.f, D.ciudad?.[k]) }),
+      ficha: id => {
+        const f = F[id]; if (!f) return null;
+        return { ...f, id, rasgos: (f.rasgos || []).map(k => ({ t: V[k]?.t || k, v: fmtVar(V[k]?.f, f.perfil?.[k]), c: fmtVar(V[k]?.f, D.ciudad?.[k]) })) };
+      },
+    };
+  }
+
+  /* La lectura de una ciudad. `opts.corp` = corporación de la campaña (Bogotá
+     la usa para decidir qué tipología va primero). */
+  function leer(ciudad, mesas, opts) {
     if (ciudad === 'cartagena') return leerCartagena(mesas);
     if (ciudad === 'medellin') return leerMedellin(mesas);
-    return Promise.reject(new Error('sin cartografía emocional'));
+    if (ciudad === 'bogota') return leerBogota(mesas, opts);
+    return Promise.reject(new Error('sin arquetipos para esta ciudad'));
   }
   /* ── La huella de su PARTIDO o de su familia política en la ciudad ───────
      Para leer los arquetipos desde donde vota su lado, no solo desde donde
@@ -218,7 +295,7 @@
      Devuelve los votos como «mesas» por puesto, para leerlos con `leer()`
      igual que una votación propia. */
   const S3 = RR.publicUrl('congreso-2026/output');
-  const CIUDAD_COD = { cartagena: ['05', '001'], medellin: ['01', '001'] };
+  const CIUDAD_COD = { cartagena: ['05', '001'], medellin: ['01', '001'], bogota: ['16', '001'] };
   async function huella(ciudad, campana) {
     const PB = global.PartidosBloques, EE = E(), c = campana || {};
     const [dep, mun] = CIUDAD_COD[ciudad] || []; if (!dep) return null;
@@ -260,16 +337,16 @@
      exige un 8 % del voto para que un arquetipo marginal no gane por azar:
      con 5 %, en Cartagena ganaba el guardián insular del centro-derecha con
      6 % contra 5 % de la ciudad, que es ruido y no un nicho. */
-  function afinidad(L, Lciudad, año = '2023') {
+  function afinidad(L, Lciudad, año = L.cortes?.[0] || '2023') {
     const sh = (X, id) => (X.reparto[año]?.[id] || 0) / (X.total || 1);
-    return (L.ids || []).map(id => ({ id, share: sh(L, id), ciudad: sh(Lciudad, id), ratio: sh(Lciudad, id) ? sh(L, id) / sh(Lciudad, id) : 0 }))
+    return (L.idsDe ? L.idsDe(año) : L.ids || []).map(id => ({ id, share: sh(L, id), ciudad: sh(Lciudad, id), ratio: sh(Lciudad, id) ? sh(L, id) / sh(Lciudad, id) : 0 }))
       .filter(x => x.share >= .08).sort((a, b) => b.ratio - a.ratio);
   }
   /* El arquetipo que más pesa en 2023 y su porcentaje. */
-  function principal(L, año = '2023') {
+  function principal(L, año = L.cortes?.[0] || '2023') {
     const top = Object.entries(L.reparto[año] || {}).sort((a, b) => b[1] - a[1])[0];
     return top ? { id: top[0], votos: top[1], share: L.total ? top[1] / L.total : 0 } : null;
   }
 
-  global.C360ArqLectura = { MEDELLIN, CARTAGENA, ciudadDe, municipioDeCampana, leer, principal, huella, afinidad, emocion, normBarrio };
+  global.C360ArqLectura = { MEDELLIN, CARTAGENA, BOGOTA, ciudadDe, municipioDeCampana, leer, principal, huella, afinidad, emocion, normBarrio };
 })(window);

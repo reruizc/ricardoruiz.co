@@ -4309,11 +4309,13 @@ async function renderTerritorioObjetivo(c) {
    SU votación —no «cómo es la ciudad» sino «cómo es el pedazo de ciudad donde
    están sus votos»:
 
-   · ARQUETIPOS (Medellín y Cartagena). El Proyecto DC reconstruyó barrio por
-     barrio qué mueve el voto —protección, continuidad, supervivencia, castigo,
-     pertenencia— con Alcaldía, Concejo y JAL de 2015, 2019 y 2023, y proyectó
-     2027. Acá se cruza con los votos de la persona. Otras ciudades ven la
-     tarjeta apagada diciendo qué falta, que es más honesto que esconderla.
+   · ARQUETIPOS (Medellín, Cartagena y Bogotá). En Medellín y Cartagena son
+     cartografía emocional: qué mueve el voto en cada barrio, reconstruido con
+     Alcaldía, Concejo y JAL de 2015, 2019 y 2023 y proyectado a 2027. En
+     Bogotá son de comportamiento electoral medido (cómo vota cada barrio, una
+     tipología para el Concejo y otra para la Alcaldía). Acá se cruza con los
+     votos de la persona. Otras ciudades ven la tarjeta apagada diciendo qué
+     falta, que es más honesto que esconderla.
 
    · PERFIL DEL VOTANTE. El voto es secreto y nadie puede decir quién votó por
      usted; lo que sí se puede es describir el ELECTORADO de los puestos donde
@@ -4350,23 +4352,28 @@ async function pintarArquetipos() {
   const ciudad = A.ciudadDe(await municipioArquetipos(), mesas);
   if (!ciudad) {
     card.classList.add('module-apagado');
-    $('crmArqTitulo').textContent = 'Por ahora, Medellín y Cartagena.';
-    $('crmArqCopy').textContent = 'La cartografía emocional —qué mueve el voto en cada barrio— está reconstruida para los barrios de Medellín y de Cartagena con las elecciones de 2015, 2019 y 2023. Cuando exista para su ciudad, esta tarjeta se enciende sola.';
-    $('crmArqDato').textContent = '—'; $('crmArqSub').textContent = 'sin cartografía emocional acá';
+    $('crmArqTitulo').textContent = 'Por ahora, Medellín, Cartagena y Bogotá.';
+    $('crmArqCopy').textContent = 'Los arquetipos —cómo vota cada barrio— existen para Medellín y Cartagena (cartografía emocional con las elecciones de 2015, 2019 y 2023) y para Bogotá (comportamiento electoral de 2019 y 2023). Cuando existan para su ciudad, esta tarjeta se enciende sola.';
+    $('crmArqDato').textContent = '—'; $('crmArqSub').textContent = 'sin arquetipos acá';
     return;
   }
-  const nombreCiudad = ciudad === 'cartagena' ? 'Cartagena' : 'Medellín';
+  const nombreCiudad = { cartagena: 'Cartagena', medellin: 'Medellín', bogota: 'Bogotá' }[ciudad];
+  const bog = ciudad === 'bogota';
   card.classList.remove('module-apagado');
   $('crmArqTitulo').textContent = `Leyendo los barrios de ${nombreCiudad}…`;
-  $('crmArqCopy').textContent = ciudad === 'cartagena' ? 'Cruzando su votación con los ocho arquetipos de la ciudad.' : 'Cruzando su votación con los cinco arquetipos del territorio.';
+  $('crmArqCopy').textContent = bog ? 'Cruzando su votación con los arquetipos de voto de Bogotá: cómo vota cada barrio al Concejo y a la Alcaldía.' : ciudad === 'cartagena' ? 'Cruzando su votación con los ocho arquetipos de la ciudad.' : 'Cruzando su votación con los cinco arquetipos del territorio.';
   try {
-    const L = await A.leer(ciudad, mesas), top = A.principal(L);
+    /* Bogotá tiene una tipología por corporación: manda la de la campaña. */
+    const corp = currentTargetTerritory()?.corporation || CAMPANA_ACTUAL?.corp || SESSION.vinculo?.campana?.corp || corporacionHistorica(crmCandidate);
+    const L = await A.leer(ciudad, mesas, { corp }), top = A.principal(L);
     if (!top) throw new Error('sin cruce');
     const f = L.ficha(top.id), pct = Math.round(top.share * 100);
     const lema = ciudad === 'cartagena' ? `${f.lema}. La emoción que lo ordena: ${f.emocion}.` : f.lema;
     const unidades = L.filasComuna.length === 1 ? `una ${L.unidad}` : `${L.filasComuna.length} ${L.unidades}`;
     const art = ciudad === 'cartagena' ? 'el arquetipo ' : '';
-    $('crmArqTitulo').textContent = L.conVotos ? `Su voto vive en barrios de ${ciudad === 'cartagena' ? 'arquetipo ' : ''}${f.nombre.toLowerCase()}.` : `${nombreCiudad} vota desde ${art}${f.nombre.toLowerCase()}.`;
+    $('crmArqTitulo').textContent = bog
+      ? (L.conVotos ? `Su voto ${L.corteA(L.cortes[0])} está sobre todo en barrios «${f.nombre}».` : `En ${L.corteArt(L.cortes[0])} de Bogotá pesa más «${f.nombre}».`)
+      : L.conVotos ? `Su voto vive en barrios de ${ciudad === 'cartagena' ? 'arquetipo ' : ''}${f.nombre.toLowerCase()}.` : `${nombreCiudad} vota desde ${art}${f.nombre.toLowerCase()}.`;
     $('crmArqCopy').textContent = `${lema} ${L.conVotos ? `Es el arquetipo de ${pct} % de sus votos en la ciudad, repartidos en ${unidades}.` : 'Es el arquetipo con más peso en la ciudad; cuando tenga votos propios acá la lectura se hace con ellos.'}`;
     $('crmArqDato').textContent = `${pct} %`;
     $('crmArqSub').textContent = L.conVotos ? 'de sus votos, en ese arquetipo' : 'del voto de la ciudad';
