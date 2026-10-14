@@ -12,6 +12,8 @@ Bases de datos/output_presidencial_escr/{ano}/:
   resumen.json    nacional: las dos vueltas con sus candidatos
   deps.json       33 deptos con el agregado de cada vuelta
   dep-{cod}.json  arbol depto -> municipio -> zona -> puesto
+  mesas/{vuelta}-{dep}.json   mesa a mesa de cada puesto (lo carga el visor solo
+                  al abrir un puesto; ver escribir_mesas)
 
 Las dos vueltas viajan como las "consultas" del chasis original: claves '1v'
 y '2v'. Asi el frontend no necesita un modelo de datos nuevo.
@@ -155,6 +157,7 @@ def leer_vuelta(path, acc, clave):
         try:
             i_dep, i_mun, i_zon, i_pue = (cab.index(c) for c in ('COD_DDE', 'COD_MME', 'COD_ZZ', 'COD_PP'))
             i_can, i_des, i_vot = (cab.index(c) for c in ('COD_CAN', 'DES_CAN', 'NUM_VOT'))
+            i_mes = cab.index('DES_MS')
         except ValueError:
             sys.exit(f'encabezado inesperado en {os.path.basename(path)}: {cab}')
         for r in rd:
@@ -169,6 +172,14 @@ def leer_vuelta(path, acc, clave):
             if not v:
                 continue
             crudo += v
+            # mesa a mesa: candidatos por nombre y especiales en tres casillas fijas
+            mes = r[i_mes].strip()
+            mes = str(int(mes)) if mes.isdigit() else (mes or '?')
+            cm = acc['mesa'][clave][(dep, mun, zon, pue)][mes]
+            if can in SPECIAL_CAN:
+                cm[tipo_especial(des)] += v
+            else:
+                cm[des] += v
             if can in SPECIAL_CAN:
                 acc['esp'][clave][des] += v
                 if 'BLANCO' in des.upper():
@@ -183,6 +194,80 @@ def leer_vuelta(path, acc, clave):
             acc['zon'][(dep, mun, zon)][clave][des] += v
             acc['pue'][(dep, mun, zon, pue)][clave][des] += v
     return crudo
+
+
+def tipo_especial(des):
+    """Casilla del especial en el archivo de mesas. Se clasifica por el TEXTO solo entre
+    los COD_CAN especiales (la candidatura real «Promotores voto en blanco» de 2018 no
+    pasa por aquí). Un especial que no encaje aborta: preferible a perderlo callado."""
+    u = des.upper()
+    if 'BLANCO' in u:
+        return '__b'
+    if 'NULO' in u:
+        return '__n'
+    if 'MARCADO' in u:
+        return '__x'
+    sys.exit(f'especial sin casilla en el archivo de mesas: {des!r}')
+
+
+def cargar_georef():
+    """Códigos de puesto (9 díg.) que tienen coordenada en el georef de 2026."""
+    con = set()
+    with open(GEOREF, encoding='utf-8-sig', errors='replace') as f:
+        delim = ';' if f.readline().count(';') > 3 else ','
+    with open(GEOREF, encoding='utf-8-sig', errors='replace') as f:
+        for r in csv.DictReader(f, delimiter=delim):
+            cc = (r.get('CÓDIGO COMPLETO') or r.get('CODIGO COMPLETO') or '').strip()
+            lat = (r.get('LATITUD') or r.get('LAT') or '').strip()
+            if len(cc) == 9 and lat and lat.upper() != 'NULL':
+                con.add(cc)
+    return con
+
+
+def escribir_mesas(acc, out_dir, cand_orden):
+    """mesas/{vuelta}-{dep}.json — un archivo por vuelta/consulta y departamento.
+
+    El visor lo pide solo cuando el usuario abre un puesto (patrón de Senado:
+    departamentos/{cod}/mesas.json), así dep-{cod}.json no engorda. Formato compacto:
+
+      {"v":"2v","dep":"16","cands":[nombre, …],      # índice = orden nacional de la vuelta
+       "p":{"001-03-01":[[mesa,[i,votos,i,votos…],blanco,nulos,no_marcados], …]},
+       "sg":["001-90-01", …]}                          # puestos sin coordenada en el georef
+
+    Validos de la mesa = suma de candidatos + blanco (igual que `votos` en dep-*.json);
+    total = validos + nulos + no marcados. Mesa sin número en la fuente → '?'.
+    """
+    geo = cargar_georef()
+    mdir = os.path.join(out_dir, 'mesas')
+    os.makedirs(mdir, exist_ok=True)
+    pesos = {}
+    for clave, _, _ in VUELTAS:
+        idx = {n: i for i, n in enumerate(cand_orden[clave])}
+        por_dep = collections.defaultdict(dict)
+        sin_geo = collections.defaultdict(list)
+        for (dep, mun, zon, pue), mesas in acc['mesa'][clave].items():
+            filas = []
+            for mes in sorted(mesas, key=lambda m: (not m.isdigit(), int(m) if m.isdigit() else 0, m)):
+                c = mesas[mes]
+                vs = []
+                for n, v in sorted(((n, v) for n, v in c.items() if not n.startswith('__')),
+                                   key=lambda kv: idx[kv[0]]):
+                    vs += [idx[n], v]
+                filas.append([mes, vs, c['__b'], c['__n'], c['__x']])
+            k = f'{mun}-{zon}-{pue}'
+            por_dep[dep][k] = filas
+            if dep != '88' and (dep + mun + zon + pue) not in geo:
+                sin_geo[dep].append(k)
+        for dep in sorted(por_dep):
+            d = {'v': clave, 'dep': dep, 'cands': cand_orden[clave],
+                 'p': dict(sorted(por_dep[dep].items())), 'sg': sorted(sin_geo[dep])}
+            path = os.path.join(mdir, f'{clave}-{dep}.json')
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(d, f, ensure_ascii=False, separators=(',', ':'))
+            pesos[f'{clave}-{dep}'] = os.path.getsize(path)
+    top = sorted(pesos.items(), key=lambda kv: -kv[1])[:3]
+    print(f'  mesas: {len(pesos)} archivos · {sum(pesos.values())/1024/1024:.1f} MB · mayores: '
+          + ', '.join(f'{k} {v/1024/1024:.2f} MB' for k, v in top))
 
 
 BLANCO = {}   # nivel → vuelta → votos en blanco (lo llena build antes de emitir)
@@ -212,7 +297,9 @@ def build(anio):
             pue_nom.update(json.load(f))      # el nombre oficial del año manda sobre el georef
     mk = lambda: collections.defaultdict(collections.Counter)
     crudos = {}
+    mesa = lambda: collections.defaultdict(lambda: collections.defaultdict(collections.Counter))
     acc = {'nac': mk(), 'esp': mk(), 'blanco': collections.defaultdict(collections.Counter),
+           'mesa': collections.defaultdict(mesa),
            'dep': collections.defaultdict(mk), 'mun': collections.defaultdict(mk),
            'zon': collections.defaultdict(mk), 'pue': collections.defaultdict(mk)}
 
@@ -253,6 +340,7 @@ def build(anio):
 
     # --- resumen nacional ---
     vueltas_meta = []
+    cand_orden = {}
     for clave, nom_v, _ in VUELTAS:
         b = bloque(acc['nac'][clave], ('nac', ''), clave)
         cods = {}
@@ -260,6 +348,7 @@ def build(anio):
         for i, c in enumerate(b['cands'], 1):
             cods[c['nombre']] = str(i)
             cands.append({'nombre': c['nombre'], 'votos': c['votos'], 'codigo': str(i)})
+        cand_orden[clave] = [c['nombre'] for c in b['cands']]
         largo = esp['etiqueta'].format(nom=nom_v) if esp else f'{nom_v} {anio}'
         vueltas_meta.append({'clave': clave, 'nombre': nom_v, 'nombre_largo': largo,
                              'votos': b['votos'], 'candidatos': cands,
@@ -321,6 +410,8 @@ def build(anio):
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(d, f, ensure_ascii=False, separators=(',', ':'))
         total_bytes += os.path.getsize(path)
+
+    escribir_mesas(acc, out_dir, cand_orden)
 
     con_nombre = sum(1 for k in acc['pue'] if (k[0] + k[1] + k[2] + k[3]) in pue_nom)
     print(f'  {len(deps)} deptos · {len(acc["mun"])} municipios · {len(acc["pue"])} puestos')

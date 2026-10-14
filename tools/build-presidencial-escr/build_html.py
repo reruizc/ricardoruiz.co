@@ -71,11 +71,11 @@ def genera(anio, cfg):
         ('<div class="source-badge">Fuente: <b>Registraduría · Escrutinio Definitivo</b></div>',
          f'<div class="source-badge">Fuente: <b>{cfg.get("fuente", "Registraduría · Escrutinio Definitivo")}</b></div>'),
 
-        # --- datos ---
-        ("const r = await fetch(`${S3}/consultas/${path}.json?v=20261008`);",
-         "const r = await fetch(`${S3}/%s/${path}.json`);" % s3),
-        ("const r = await fetch(`${S3}/consultas/dep-${code}.json?v=20261008`);",
-         "const r = await fetch(`${S3}/%s/dep-${code}.json`);" % s3),
+        # --- datos (resumen, deps, dep-{cod} y mesas/{vuelta}-{dep} cuelgan de DATA) ---
+        ("    const DATA_DIR  = 'consultas';", f"    const DATA_DIR  = '{s3}';"),
+        ("    const LOCAL_DIR = 'Bases de datos/output_agregados/consultas';",
+         f"    const LOCAL_DIR = 'Bases de datos/output_presidencial_escr/{s3.split('/')[-1]}';"),
+        ("    const DATA_V    = '?v=20261008';", "    const DATA_V    = '';"),
 
         # --- las dos vueltas reemplazan a las tres consultas ---
         ("""    const CONS_COLOR = {

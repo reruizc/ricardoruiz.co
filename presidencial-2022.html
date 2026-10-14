@@ -177,6 +177,41 @@
     @media(max-width:900px){body{cursor:auto}.cursor,.cursor-ring{display:none}.top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer{padding-left:1.2rem;padding-right:1.2rem}.bg-overlay{background:rgba(4,6,16,.93)}.kpi-row{grid-template-columns:1fr 1fr;gap:.6rem} #cons-map{height:340px}}
     @media(max-width:600px){.kpi-row{grid-template-columns:1fr}}
     .hidden{display:none!important}
+    .level-badge.pue{color:rgba(244,114,182,.85);border-color:rgba(244,114,182,.3);background:rgba(244,114,182,.06)}
+    /* panel de zonas · puestos · mesas (debajo del mapa) */
+    .terr-card{margin-top:1.2rem}
+    .terr-head{display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap;margin-bottom:.7rem}
+    .terr-head .card-label{margin-bottom:0}
+    .terr-sub{font-size:.72rem;color:rgba(255,255,255,.4)}
+    .terr-scroll{max-height:460px;overflow:auto}
+    .terr-table td.nm{font-weight:500}
+    .terr-tag{display:inline-block;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,158,11,.9);border:1px solid rgba(245,158,11,.35);padding:.05rem .35rem;margin-left:.4rem;vertical-align:middle;font-weight:400}
+    .terr-win{display:inline-flex;align-items:center;gap:.4rem}
+    .terr-win i{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}
+    .pue-meta{display:flex;gap:1.4rem;flex-wrap:wrap;font-size:.74rem;color:rgba(255,255,255,.5);margin-bottom:.9rem}
+    .pue-meta b{color:var(--white);font-weight:600}
+    .mesa-scroll{overflow-x:auto}
+    .mesa-table{width:100%;border-collapse:collapse;font-size:.8rem}
+    .mesa-table th{font-size:.55rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4);text-align:right;padding:.45rem .5rem;border-bottom:1px solid var(--border);white-space:nowrap;font-weight:400}
+    .mesa-table th:first-child,.mesa-table td:first-child{text-align:left}
+    .mesa-table th .cdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:.3rem;vertical-align:middle}
+    .mesa-table td{text-align:right;padding:.4rem .5rem;border-bottom:1px solid rgba(255,255,255,.05);color:rgba(255,255,255,.75);white-space:nowrap}
+    .mesa-table td.w{font-weight:700;color:var(--white)}
+    .mesa-table td.esp{color:rgba(255,255,255,.45)}
+    .mesa-table td.tot{color:var(--white);font-weight:500}
+    .mesa-table tfoot td{border-top:1px solid rgba(255,255,255,.18);border-bottom:none;color:var(--white);font-weight:600}
+    .mesa-note{font-size:.7rem;color:rgba(255,255,255,.42);margin-top:.7rem;line-height:1.6}
+    .mesa-note.warn{color:rgba(245,158,11,.9)}
+    .mesa-loader{display:flex;align-items:center;gap:.7rem;padding:1.2rem 0;font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.4)}
+    .mesa-loader .loader-ring{width:22px;height:22px}
+    /* contenido bloqueado: se ve borroso y encima el CTA (patrón de los tableros 2023) */
+    .pg-paywall{position:relative}
+    .pg-blurred{filter:blur(5px);pointer-events:none;user-select:none;opacity:.7;max-height:340px;overflow:hidden}
+    .pg-paywall-cta{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.55rem;text-align:center;padding:1rem;
+      background:linear-gradient(180deg,rgba(6,8,16,.28) 0%,rgba(6,8,16,.55) 45%,rgba(6,8,16,.9) 100%)}
+    .pg-paywall-cta .pgc-t{font-size:.9rem;color:var(--white)}
+    .pg-paywall-cta .pgc-btn{font-family:inherit;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;background:var(--blue);color:#fff;border:none;padding:.6rem 1.15rem;cursor:none}
+    .pg-paywall-cta .pgc-btn:hover{background:#0035cc}
     /* Day mode */
     body.day-mode{--white:#1a1a2e;--card-border:rgba(0,0,0,.12);--border:rgba(0,0,0,.08);--bar-bg:rgba(0,0,0,.1);--td-hover:rgba(0,71,255,.04);background:#e6ded3;color:#1a1a2e}
     body.day-mode .bg-layer{opacity:.04}
@@ -332,6 +367,14 @@
             </div>
           </div>
         </div>
+
+        <div class="card terr-card hidden" id="terr-card">
+          <div class="terr-head">
+            <div class="card-label" id="terr-label">Puestos de votación</div>
+            <span class="terr-sub" id="terr-sub"></span>
+          </div>
+          <div id="terr-body"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -341,6 +384,7 @@
     <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
   </div>
 
+  <script src="plan-gate.js"></script>
   <script>
     // ─── CONFIG ───────────────────────────────────────────────────
     const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
@@ -358,6 +402,22 @@
     // NO es 1:1 (Medellín: 32 zonas → 16 comunas), así que un join por número
     // atribuye los votos a la comuna equivocada.
     const ZONA_COMUNA_URL = `${S3}/mapas-2026/zona-comuna.json`;
+
+    // Carpeta de datos de ESTA página (build_html.py la cambia por año/consulta).
+    // ?local=1 lee los JSON del repo en vez de S3 (verificación antes de subir).
+    const DATA_DIR  = 'pres-escr/2022';
+    const LOCAL_DIR = 'Bases de datos/output_presidencial_escr/2022';
+    const DATA_V    = '';
+    const LOCAL     = new URLSearchParams(location.search).has('local');
+    const DATA      = LOCAL ? encodeURI(LOCAL_DIR) : `${S3}/${DATA_DIR}`;
+
+    // ─── GATE POR PLAN ────────────────────────────────────────────
+    // Hasta puesto, abierto a todos (también al anónimo). Mesa a mesa: cuenta gratis.
+    window.GATE_FEATURES = {
+      plan: { 'mesas':'free' },
+      copy: { 'mesas': { title:'Mesa a mesa',
+        desc:'El detalle de cada mesa —votos por candidato, blanco, nulos y no marcados— es gratis con tu cuenta. Crea una y lo ves en todas las elecciones del visor.' } },
+    };
 
     // ─── HELPERS ──────────────────────────────────────────────────
     const fmt = n => Number(n||0).toLocaleString('es-CO');
@@ -436,10 +496,11 @@
       consultas: {},           // clave → {clave,nombre,votos,candidatos:[{nombre,codigo,votos}]}
       activeCons: '1v',
       activeCand: null,        // codigo (string) o null = "Ganador"
-      level: 'nac',            // nac | dep | mun | com
+      level: 'nac',            // nac | dep | mun | com | pue
       depCod: null,
       munCod: null,
       zonCod: null,
+      pueCod: null,
       // map state
       map: null,
       currentLayer: null,
@@ -452,7 +513,7 @@
     const _fetchCache = {};
     async function getJSON(path){
       if(_fetchCache[path]) return _fetchCache[path];
-      const r = await fetch(`${S3}/pres-escr/2022/${path}.json`);
+      const r = await fetch(`${DATA}/${path}.json${DATA_V}`);
       if(!r.ok) throw new Error(`No se pudo cargar ${path}.json (HTTP ${r.status})`);
       _fetchCache[path] = await r.json();
       return _fetchCache[path];
@@ -460,10 +521,23 @@
     async function getDepData(depCod){
       if(STATE.depData[depCod]) return STATE.depData[depCod];
       const code = _to2(depCod);
-      const r = await fetch(`${S3}/pres-escr/2022/dep-${code}.json`);
+      const r = await fetch(`${DATA}/dep-${code}.json${DATA_V}`);
       if(!r.ok) throw new Error(`No se pudo cargar dep-${code}.json (HTTP ${r.status})`);
       STATE.depData[depCod] = await r.json();
       return STATE.depData[depCod];
+    }
+    // Mesa a mesa: mesas/{clave}-{dep}.json, pedido solo al abrir un puesto (patrón de
+    // Senado, departamentos/{cod}/mesas.json) para no engordar dep-{cod}.json.
+    // 404/403 = todavía no publicado → null (la página sigue funcionando).
+    const _mesasCache = {};
+    function getMesas(clave, depCod){
+      const k = `${clave}-${_to2(depCod)}`;
+      if(!_mesasCache[k]){
+        _mesasCache[k] = fetch(`${DATA}/mesas/${k}.json${DATA_V}`)
+          .then(r=>{ if(r.status===404||r.status===403) return null; if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+          .catch(e=>{ delete _mesasCache[k]; throw e; });
+      }
+      return _mesasCache[k];
     }
 
     // ─── INIT ─────────────────────────────────────────────────────
@@ -486,6 +560,8 @@
         renderCandChips();
         renderAll();
         initMap();
+        PlanGate.onChange(()=>{ updateElectoralNav(); if(STATE.level==='pue') renderTerr(); });
+        PlanGate.init();
         // Best-effort: si no llega, el mapa de comunas cae al join por número.
         fetch(ZONA_COMUNA_URL)
           .then(r=>r.ok?r.json():null)
@@ -594,10 +670,11 @@
     // ─── SCOPE-AWARE DATA ─────────────────────────────────────────
     // Retorna { nombre, consulta:{votos,cands[]}, children:[{cod,nombre,consulta:{votos,cands}}] }
     // donde `consulta` es el bucket activo, y `children` son los territorios siguientes (deptos, muns, zonas).
-    function getScope(){
+    function getScope(lvl){
+      lvl = lvl || STATE.level;
       const clave = STATE.activeCons;
       // Nivel nacional
-      if(STATE.level==='nac'){
+      if(lvl==='nac'){
         const c = STATE.consultas[clave];
         const children = (STATE.deps||[]).map(d => ({
           cod: d.cod, nombre: titleCase(d.nombre),
@@ -612,7 +689,7 @@
       const dep = STATE.depData[STATE.depCod];
       if(!dep) return null;
       // Nivel depto
-      if(STATE.level==='dep'){
+      if(lvl==='dep'){
         const b = dep[clave]||{votos:0,cands:[]};
         const children = (dep.municipios||[]).map(m=>({
           cod: m.cod, nombre: titleCase(m.nombre),
@@ -627,7 +704,7 @@
       const mun = (dep.municipios||[]).find(m=>m.cod===STATE.munCod);
       if(!mun) return null;
       // Nivel municipio
-      if(STATE.level==='mun'){
+      if(lvl==='mun'){
         const b = mun[clave]||{votos:0,cands:[]};
         const children = (mun.zonas||[]).map(z=>({
           cod: z.cod, nombre: titleCase(z.nombre),
@@ -642,9 +719,12 @@
       // Nivel zona/comuna/localidad
       const zon = (mun.zonas||[]).find(z=>z.cod===STATE.zonCod);
       if(!zon) return null;
-      const b = zon[clave]||{votos:0,cands:[]};
+      // Nivel puesto
+      const unidad = lvl==='pue' ? (zon.puestos||[]).find(p=>p.cod===STATE.pueCod) : zon;
+      if(!unidad) return null;
+      const b = unidad[clave]||{votos:0,cands:[]};
       return {
-        nombre: titleCase(zon.nombre),
+        nombre: titleCase(unidad.nombre),
         consulta: { votos: b.votos, cands: b.cands.map(x=>({nombre:x.nombre,codigo:codigoFor(clave, x.nombre),votos:x.votos})) },
         children: [],
       };
@@ -674,6 +754,7 @@
       renderRankTable(scope);
       renderDonut(scope);
       renderMap(scope);
+      renderTerr();
     }
 
     function renderDrillNav(){
@@ -693,7 +774,11 @@
         const dep = STATE.depData[STATE.depCod];
         const mun = dep?.municipios?.find(m=>m.cod===STATE.munCod);
         const zon = mun?.zonas?.find(z=>z.cod===STATE.zonCod);
-        items.push({label:titleCase(zon?.nombre||STATE.zonCod), click:'', active:true});
+        items.push({label:titleCase(zon?.nombre||STATE.zonCod), click:'mapBackTo(\'com\')', active:STATE.level==='com'});
+        if(STATE.pueCod){
+          const pue = zon?.puestos?.find(p=>p.cod===STATE.pueCod);
+          items.push({label:titleCase(pue?.nombre||STATE.pueCod), click:'', active:true});
+        }
       }
       nav.innerHTML = items.map((it,i)=>{
         const cls = it.active ? 'drill-crumb active' : (it.click?'drill-crumb clickable':'drill-crumb');
@@ -705,7 +790,7 @@
 
     function renderLevelBadge(){
       const badge = document.getElementById('level-badge');
-      const map = {nac:['Nacional','nac'], dep:['Departamento','dep'], mun:['Municipio','mun'], com:['Comuna/Localidad','com']};
+      const map = {nac:['Nacional','nac'], dep:['Departamento','dep'], mun:['Municipio','mun'], com:['Zona','com'], pue:['Puesto','pue']};
       const [label, cls] = map[STATE.level]||['—','nac'];
       badge.textContent = label;
       badge.className = 'level-badge '+cls;
@@ -721,7 +806,7 @@
       const hint = document.getElementById('map-hint');
       if(STATE.level==='nac') hint.textContent = 'Click en un departamento para entrar';
       else if(STATE.level==='dep') hint.textContent = 'Click en un municipio para entrar';
-      else if(STATE.level==='mun') hint.textContent = 'Click en una comuna/localidad';
+      else if(STATE.level==='mun') hint.textContent = 'Zonas y puestos: debajo del mapa';
       else hint.textContent = '';
     }
     function findCandName(clave, codigo){
@@ -1039,7 +1124,10 @@
       </div>`;
     }
 
-    async function renderMap(scope){
+    // `lvl` permite pintar otra capa sin tocar STATE.level (antes el respaldo de municipio sin
+    // comunas ponía STATE.level='dep' durante un await y el resto de la página lo leía así).
+    async function renderMap(scope, lvl){
+      lvl = lvl || STATE.level;
       if(!STATE.map) return;
       // Asegura el tamaño correcto del contenedor (la cortina puede haberlo dejado en 0×0).
       try{ STATE.map.invalidateSize(); }catch(_){}
@@ -1047,9 +1135,9 @@
       if(STATE.currentLayer){ STATE.map.removeLayer(STATE.currentLayer); STATE.currentLayer=null; }
       // Botón volver
       const backBtn = document.getElementById('cons-map-back');
-      backBtn.style.display = STATE.level==='nac' ? 'none' : '';
+      backBtn.style.display = lvl==='nac' ? 'none' : '';
 
-      if(STATE.level==='nac'){
+      if(lvl==='nac'){
         if(!STATE._deptoGeoRaw) return;
         const lookup = buildTerritoryLookup(scope);
         const style = feat=>{
@@ -1080,7 +1168,7 @@
         try{ STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[6,6]}); }catch(_){}
         return;
       }
-      if(STATE.level==='dep'){
+      if(lvl==='dep'){
         const lookup = buildTerritoryLookup(scope);
         try{
           let geo = STATE._depGeoCache[STATE.depCod];
@@ -1121,7 +1209,9 @@
         }catch(e){ console.warn('[Map] depto:', e); }
         return;
       }
-      if(STATE.level==='mun' || STATE.level==='com'){
+      if(lvl==='mun' || lvl==='com' || lvl==='pue'){
+        // en zona y puesto el mapa sigue siendo el del municipio (no hay polígono de puesto)
+        if(lvl!=='mun') scope = getScope('mun') || scope;
         const dep = STATE.depData[STATE.depCod];
         const mun = dep?.municipios?.find(m=>m.cod===STATE.munCod);
         const city = detectCity(STATE.depCod, STATE.munCod, mun?.nombre);
@@ -1130,7 +1220,7 @@
           // mantenemos visible la capa del departamento ya que no hay drill cartográfico posible.
           document.getElementById('map-hint').textContent = 'Sin desagregación geográfica';
           // Renderiza fallback como capa del depto sin highlight extra
-          await (async()=>{ STATE.level='dep'; await renderMap(getScope()); STATE.level='mun'; })();
+          await renderMap(getScope('dep'), 'dep');
           return;
         }
         const lookup = buildTerritoryLookup(scopeComunas(scope));
@@ -1194,7 +1284,7 @@
     async function drillToDep(depCod){
       try{
         STATE.depCod = depCod;
-        STATE.munCod = null; STATE.zonCod = null;
+        STATE.munCod = null; STATE.zonCod = null; STATE.pueCod = null;
         STATE.level = 'dep';
         await getDepData(depCod);
         renderAll();
@@ -1207,21 +1297,189 @@
     }
     async function drillToMun(munCod){
       STATE.munCod = munCod;
-      STATE.zonCod = null;
+      STATE.zonCod = null; STATE.pueCod = null;
       STATE.level = 'mun';
       renderAll();
     }
+    function drillToZon(zonCod){
+      STATE.zonCod = zonCod; STATE.pueCod = null;
+      STATE.level = 'com';
+      renderAll();
+    }
+    function drillToPue(zonCod, pueCod){
+      STATE.zonCod = zonCod; STATE.pueCod = pueCod;
+      STATE.level = 'pue';
+      renderAll();
+      const c = document.getElementById('terr-card');
+      if(c) c.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+    // Un municipio con una sola zona no tiene nada que elegir en ese nivel: se salta.
+    function _soloUnaZona(){
+      const mun = STATE.depData[STATE.depCod]?.municipios?.find(m=>m.cod===STATE.munCod);
+      return (mun?.zonas||[]).length===1;
+    }
     function mapBack(){
-      if(STATE.level==='com'){ STATE.zonCod=null; STATE.level='mun'; }
+      if(STATE.level==='pue'){ STATE.pueCod=null; if(_soloUnaZona()){ STATE.zonCod=null; STATE.level='mun'; } else STATE.level='com'; }
+      else if(STATE.level==='com'){ STATE.zonCod=null; STATE.level='mun'; }
       else if(STATE.level==='mun'){ STATE.munCod=null; STATE.level='dep'; }
       else if(STATE.level==='dep'){ STATE.depCod=null; STATE.level='nac'; }
       renderAll();
     }
     function mapBackTo(level){
+      STATE.pueCod = null;
       if(level==='nac'){ STATE.depCod=null; STATE.munCod=null; STATE.zonCod=null; STATE.level='nac'; }
       else if(level==='dep'){ STATE.munCod=null; STATE.zonCod=null; STATE.level='dep'; }
       else if(level==='mun'){ STATE.zonCod=null; STATE.level='mun'; }
+      else if(level==='com'){ STATE.level = _soloUnaZona() ? 'mun' : 'com'; if(STATE.level==='mun') STATE.zonCod=null; }
       renderAll();
+    }
+
+    // ─── ZONAS · PUESTOS · MESAS (panel bajo el mapa) ─────────────
+    // municipio → zonas (si hay más de una) → puestos → mesas. Hasta puesto, abierto a
+    // todos; la tabla de mesas se ve borrosa para el anónimo (PlanGate 'mesas' = cuenta gratis).
+    const _escA = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    function _ganador(b){
+      const c = (b?.cands||[]).slice().sort((x,y)=>y.votos-x.votos)[0];
+      if(!c) return '<span style="opacity:.4">—</span>';
+      const col = candColor(STATE.activeCons, codigoFor(STATE.activeCons, c.nombre)||c.nombre);
+      return `<span class="terr-win"><i style="background:${col}"></i>${_escA(shortLast(c.nombre))} <span style="opacity:.5">${pct(c.votos,b.votos)}%</span></span>`;
+    }
+    // Rótulo de los agregados que no son un puesto físico del georef.
+    function _tagPuesto(depCod, zonCod, p){
+      if(_to2(depCod)==='88') return '';
+      if(zonCod==='90') return '<span class="terr-tag">puesto censo</span>';
+      if(zonCod==='98') return '<span class="terr-tag">cárceles</span>';
+      if(/^Puesto [0-9A-Z]+$/i.test(p.nombre||'')) return '<span class="terr-tag">sin georreferenciar</span>';
+      return '';
+    }
+    function _filaUnidad(u, onclick, extra){
+      const b = u[STATE.activeCons]||{votos:0,cands:[]};
+      let cand = '';
+      if(STATE.activeCand){
+        const nom = findCandName(STATE.activeCons, STATE.activeCand);
+        const c = (b.cands||[]).find(x=>_normN(x.nombre)===_normN(nom));
+        cand = `<td class="r">${c?fmt(c.votos):'0'} <span style="opacity:.5">${pct(c?c.votos:0,b.votos)}%</span></td>`;
+      }
+      return `<tr onclick="${onclick}"><td class="nm">${_escA(titleCase(u.nombre))}${extra||''}</td><td>${_ganador(b)}</td>${cand}<td class="r">${fmt(b.votos)}</td></tr>`;
+    }
+    function _tablaUnidades(filas, titulo){
+      const cand = STATE.activeCand ? `<th class="r">${_escA(shortLast(findCandName(STATE.activeCons, STATE.activeCand)))}</th>` : '';
+      return `<div class="terr-scroll"><table class="results-table terr-table"><thead><tr><th>${titulo}</th><th>Ganador</th>${cand}<th class="r">Votos válidos</th></tr></thead><tbody>${filas.join('')}</tbody></table></div>`;
+    }
+    function renderTerr(){
+      const card = document.getElementById('terr-card');
+      if(!card) return;
+      const lvl = STATE.level;
+      if(lvl==='nac' || lvl==='dep'){ card.classList.add('hidden'); return; }
+      const clave = STATE.activeCons;
+      const dep = STATE.depData[STATE.depCod];
+      const mun = dep?.municipios?.find(m=>m.cod===STATE.munCod);
+      if(!mun){ card.classList.add('hidden'); return; }
+      card.classList.remove('hidden');
+      const lab = document.getElementById('terr-label'), sub = document.getElementById('terr-sub'), body = document.getElementById('terr-body');
+      const votos = u => (u[clave]?.votos)||0;
+      const zonas = mun.zonas||[];
+      // municipio con varias zonas → elegir zona
+      if(lvl==='mun' && zonas.length>1){
+        lab.textContent = `Zonas de ${titleCase(mun.nombre)}`;
+        sub.textContent = `${zonas.length} zonas · ${fmt(zonas.reduce((s,z)=>s+(z.puestos||[]).length,0))} puestos · elige una zona para ver sus puestos`;
+        const filas = zonas.slice().sort((a,b)=>votos(b)-votos(a))
+          .map(z=>_filaUnidad(z, `drillToZon('${z.cod}')`, ` <span style="opacity:.45;font-size:.72rem">· ${(z.puestos||[]).length} puestos</span>`));
+        body.innerHTML = _tablaUnidades(filas, 'Zona');
+        return;
+      }
+      // zona (o municipio de una sola zona) → elegir puesto
+      if(lvl==='mun' || lvl==='com'){
+        const zon = lvl==='com' ? zonas.find(z=>z.cod===STATE.zonCod) : zonas[0];
+        if(!zon){ card.classList.add('hidden'); return; }
+        const ps = (zon.puestos||[]).slice().sort((a,b)=>votos(b)-votos(a));
+        lab.textContent = `Puestos de votación · ${titleCase(lvl==='com'?zon.nombre:mun.nombre)}`;
+        sub.textContent = `${ps.length} puesto${ps.length===1?'':'s'} · elige uno para ver sus mesas`;
+        body.innerHTML = _tablaUnidades(ps.map(p=>_filaUnidad(p, `drillToPue('${zon.cod}','${p.cod}')`, _tagPuesto(STATE.depCod, zon.cod, p))), 'Puesto');
+        return;
+      }
+      // puesto → mesas
+      const zon = zonas.find(z=>z.cod===STATE.zonCod);
+      const pue = zon?.puestos?.find(p=>p.cod===STATE.pueCod);
+      if(!pue){ card.classList.add('hidden'); return; }
+      const b = pue[clave]||{votos:0,cands:[]};
+      lab.textContent = `Mesa a mesa · ${titleCase(pue.nombre)}`;
+      sub.innerHTML = `${_escA(titleCase(zon.nombre))} · ${_escA(titleCase(mun.nombre))}${_tagPuesto(STATE.depCod, zon.cod, pue)}`;
+      body.innerHTML = `<div class="pue-meta"><span>Votos válidos del puesto: <b>${fmt(b.votos)}</b></span>${b.blanco?`<span>Voto en blanco: <b>${fmt(b.blanco)}</b></span>`:''}<span>Ganador: ${_ganador(b)}</span></div>
+        <div id="mesas-wrap"><div class="mesa-loader"><div class="loader-ring"></div>Cargando mesas…</div></div>`;
+      const want = `${clave}|${STATE.depCod}|${STATE.munCod}|${STATE.zonCod}|${STATE.pueCod}`;
+      const pinta = html => {
+        const now = `${STATE.activeCons}|${STATE.depCod}|${STATE.munCod}|${STATE.zonCod}|${STATE.pueCod}`;
+        const w = document.getElementById('mesas-wrap');
+        if(w && now===want && STATE.level==='pue') w.innerHTML = html;   // el usuario no se movió mientras bajaba
+      };
+      // Consultas 2026: las mesas ya vienen dentro de dep-{cod}.json (solo candidatos).
+      if(Array.isArray(pue.mesas)){
+        const filas = pue.mesas.map(m=>({mesa:m.mesa, v:m[clave]||{}, b:null, n:null, x:null})).filter(m=>Object.keys(m.v).length);
+        pinta(_tablaMesas(filas, b, false, false));
+        return;
+      }
+      getMesas(clave, STATE.depCod).then(mf=>{
+        if(!mf){ pinta(`<div class="mesa-note">El detalle por mesa de esta elección todavía no está publicado. Lo de arriba (puesto, zona, municipio) sí es el escrutinio completo.</div>`); return; }
+        const k = `${STATE.munCod}-${STATE.zonCod}-${STATE.pueCod}`;
+        const filas = (mf.p[k]||[]).map(([mesa, vs, bl, nu, nm])=>{
+          const v = {}; for(let i=0;i<vs.length;i+=2) v[mf.cands[vs[i]]] = vs[i+1];
+          return {mesa, v, b:bl, n:nu, x:nm};
+        });
+        pinta(_tablaMesas(filas, b, true, (mf.sg||[]).includes(k)));
+      }).catch(e=>{
+        console.warn('[Mesas]', e);
+        pinta(`<div class="mesa-note warn">No se pudo cargar el detalle por mesa (${_escA(e.message)}). Intenta de nuevo en un momento.</div>`);
+      });
+    }
+    // filas: [{mesa, v:{nombre:votos}, b, n, x}] · b/n/x null cuando la fuente no los trae.
+    function _tablaMesas(filas, pb, conEsp, sinGeo){
+      if(!filas.length) return `<div class="mesa-note">Este puesto no tiene mesas con votación en esta ${STATE.activeCons.length===2?'vuelta':'consulta'}.</div>`;
+      const clave = STATE.activeCons;
+      // Las consultas internas no tienen voto en blanco: sin esa columna en vez de una de ceros.
+      const conB = conEsp && Object.keys(STATE.consultas[clave]?.especiales||{}).some(k=>/blanco/i.test(k));
+      // Columnas: los candidatos con más votos en el puesto (máx. 6) + el candidato elegido; el resto, «Otros».
+      const orden = (pb.cands||[]).slice().sort((a,b)=>b.votos-a.votos).map(c=>c.nombre);
+      let cols = orden.slice(0, 6);
+      const act = STATE.activeCand ? findCandName(clave, STATE.activeCand) : null;
+      if(act && orden.includes(act) && !cols.includes(act)) cols.push(act);
+      const hayOtros = orden.length > cols.length;
+      const enCols = new Set(cols);
+      const tot = {c:{}, o:0, b:0, n:0, x:0, val:0, t:0};
+      const fila = m=>{
+        let otros = 0, cand = 0, max = -1, win = null;
+        for(const [nom,v] of Object.entries(m.v)){ cand += v; if(!enCols.has(nom)) otros += v; if(v>max){ max=v; win=nom; } }
+        const val = cand + (m.b||0), t = val + (m.n||0) + (m.x||0);
+        cols.forEach(c=>{ tot.c[c] = (tot.c[c]||0) + (m.v[c]||0); });
+        tot.o += otros; tot.b += m.b||0; tot.n += m.n||0; tot.x += m.x||0; tot.val += val; tot.t += t;
+        const celdas = cols.map(c=>`<td class="${c===win&&max>0?'w':''}">${fmt(m.v[c]||0)}</td>`).join('');
+        const esp = conEsp ? `${conB?`<td class="esp">${fmt(m.b)}</td>`:''}<td class="esp">${fmt(m.n)}</td><td class="esp">${fmt(m.x)}</td>` : '';
+        const etq = m.mesa==='?' ? 'sin número' : `Mesa ${m.mesa}`;
+        return `<tr><td>${etq}</td>${celdas}${hayOtros?`<td>${fmt(otros)}</td>`:''}${esp}<td class="tot">${fmt(conEsp?t:cand)}</td></tr>`;
+      };
+      const cuerpo = filas.map(fila).join('');
+      const th = cols.map(c=>`<th title="${_escA(c)}"><span class="cdot" style="background:${candColor(clave, codigoFor(clave,c)||c)}"></span>${_escA(shortLast(c))}</th>`).join('');
+      const thEsp = conEsp ? `${conB?'<th>Blanco</th>':''}<th>Nulos</th><th>No marcados</th>` : '';
+      const pie = `<tr><td>Suma · ${fmt(filas.length)} mesas</td>${cols.map(c=>`<td>${fmt(tot.c[c])}</td>`).join('')}${hayOtros?`<td>${fmt(tot.o)}</td>`:''}${conEsp?`${conB?`<td>${fmt(tot.b)}</td>`:''}<td>${fmt(tot.n)}</td><td>${fmt(tot.x)}</td>`:''}<td>${fmt(conEsp?tot.t:tot.val)}</td></tr>`;
+      const tabla = `<div class="mesa-scroll"><table class="mesa-table"><thead><tr><th>Mesa</th>${th}${hayOtros?'<th>Otros</th>':''}${thEsp}<th>Total</th></tr></thead><tbody>${cuerpo}</tbody><tfoot>${pie}</tfoot></table></div>`;
+      const notas = [];
+      notas.push(conEsp ? `Total = votos por candidato${conB?' + blanco':''} + nulos + no marcados.` : 'Esta fuente trae por mesa solo los votos por candidato: blanco, nulos y no marcados no están desagregados.');
+      if(hayOtros) notas.push(`«Otros» suma ${fmt(orden.length - cols.length)} candidatos con menos votos en este puesto.`);
+      let aviso = '';
+      if(tot.val !== (pb.votos||0)) aviso = `<div class="mesa-note warn">La suma de las mesas (${fmt(tot.val)} válidos) no coincide con el total del puesto (${fmt(pb.votos)}).</div>`;
+      if(sinGeo) notas.push('Este puesto no tiene coordenada en el georreferenciado de 2026: es un agregado de la fuente o un puesto que ya no existe.');
+      return paywallWrap(tabla, 'mesas', filas.length) + `<div class="mesa-note">${notas.join(' ')}</div>` + aviso;
+    }
+    // Lo bloqueado se muestra BORROSO en vez de esconderse: se ve que el dato existe y
+    // cuánto hay. (El gate es de producto, no de seguridad: el JSON ya viaja al navegador.)
+    function paywallWrap(html, feat, n){
+      if(window.PlanGate && PlanGate.has(feat)) return html;
+      return `<div class="pg-paywall"><div class="pg-blurred" aria-hidden="true">${html}</div>
+        <div class="pg-paywall-cta">
+          <span class="pg-lock">Cuenta gratis</span>
+          <div class="pgc-t">Aquí está el detalle de ${n?fmt(n)+' mesas':'cada mesa'}</div>
+          <button class="pgc-btn" onclick="PlanGate.open('${feat}')">Crear cuenta gratis</button>
+        </div></div>`;
     }
 
     // ─── BOILERPLATE: nav, theme, curtain, cursor, toasts ────────
@@ -1237,7 +1495,7 @@
     document.addEventListener('mouseover',e=>{if(e.target.closest('a,button,select,input')){cur2.style.transform='translate(-50%,-50%) scale(2.5)';cur2.style.background='transparent';cur2.style.border='1.5px solid var(--blue)';ri.style.opacity='0';}else{cur2.style.transform='translate(-50%,-50%) scale(1)';cur2.style.background='var(--blue)';cur2.style.border='none';ri.style.opacity='.4';}});
 
     function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Free',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="elige-plan.html" class="e-btn-register">Registrarse</a>`;}}
-    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateExcelDownloadBtn();}
+    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateExcelDownloadBtn();if(window.PlanGate)PlanGate.reset();}
     function updateExcelDownloadBtn(){const token=localStorage.getItem('rr-token');const user=JSON.parse(localStorage.getItem('rr-user')||'null');const btn=document.getElementById('excel-download-btn');if(!btn)return;const ok=token&&user&&['pro','premium','full'].includes(user.plan);btn.className='excel-btn '+(ok?'excel-btn-active':'excel-btn-locked');}
     function downloadExcelCurrentView(){const token=localStorage.getItem('rr-token');const user=JSON.parse(localStorage.getItem('rr-user')||'null');const ok=token&&user&&['pro','premium','full'].includes(user.plan);if(!ok){showProToast();return;}console.log('TODO excel export');}
     function showProToast(){const t=document.getElementById('pro-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
