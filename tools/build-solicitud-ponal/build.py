@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Genera el PDF del derecho de peticion a SIEDCO desde el markdown.
+"""Genera el PDF de un derecho de peticion desde su markdown.
 
 El markdown es la FUENTE: este script no duplica el texto, lo lee.
-    python3 tools/build-solicitud-ponal/build.py
+    python3 tools/build-solicitud-ponal/build.py                      # SIEDCO (default)
+    python3 tools/build-solicitud-ponal/build.py <carta.md> <carta.pdf> ["Titulo del PDF"]
+
+Marcas del markdown: @REF@ referencia · @H@ subtitulo · @FIRMA@ inicio de la firma ·
+lineas "1." lista numerada · "- " viñetas · "|a|b|" fila de tabla verde.
 """
 import os, re, sys
 from reportlab.lib.pagesizes import letter
@@ -15,8 +19,9 @@ from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer, Table,
                                 TableStyle, ListFlowable, ListItem)
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-MD   = os.path.join(RAIZ, 'PONAL 2026', 'solicitud-2026.md')
-OUT  = os.path.join(RAIZ, 'PONAL 2026', 'Solicitud RERC DATA 2026.pdf')
+MD   = sys.argv[1] if len(sys.argv) > 2 else os.path.join(RAIZ, 'PONAL 2026', 'solicitud-2026.md')
+OUT  = sys.argv[2] if len(sys.argv) > 2 else os.path.join(RAIZ, 'PONAL 2026', 'Solicitud RERC DATA 2026.pdf')
+TITULO = sys.argv[3] if len(sys.argv) > 3 else 'Derecho de peticion - SIEDCO 2026' 
 
 FUENTE, FUENTE_B = 'Helvetica', 'Helvetica-Bold'
 VERDE = colors.HexColor('#1f7a45')   # el verde de las tablas del oficio original
@@ -77,8 +82,7 @@ def tabla(celdas, ancho):
 def construir():
     doc = SimpleDocTemplate(OUT, pagesize=letter,
         leftMargin=2.6*cm, rightMargin=2.6*cm, topMargin=2.6*cm, bottomMargin=2.4*cm,
-        title='Derecho de peticion - SIEDCO 2026',
-        author='Ricardo Esteban Ruiz Castro', subject='Solicitud de informacion SIEDCO 2025-2026')
+        title=TITULO, author='Ricardo Esteban Ruiz Castro', subject=TITULO)
     ancho = doc.width
     with open(MD, encoding='utf-8') as f:
         lineas = f.read().split('\n')
