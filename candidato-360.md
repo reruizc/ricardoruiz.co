@@ -338,9 +338,8 @@ prueba-pais (7)         el selector de país en la portada
    estudio emocional. Método, datos (S3 `congreso-2026/output/arquetipos-bogota/`)
    y validación en `tools/candidato-360/arquetipos-bogota/LEEME.md`. Fuera de
    esas tres ciudades la tarjeta se apaga y lo dice.
-   ⚠️ El worker todavía dice «solo existen Medellín y Cartagena» en el prompt
-   de Candi para las ciudades SIN arquetipos (`rr-auth/src/index.js`, línea
-   ~8466): falta sumar Bogotá y desplegar.
+   El prompt de Candi en el worker ya los nombra a los tres
+   (`C360_CANDI_PROMPT_V` v9, 14-oct-2026).
 5. **Movimientos regionales sin clasificar (9,1 %).** Los que no dejan rastro
    suficiente. Bajar el umbral de `clasificar-locales.mjs` sube la cobertura y
    baja la confianza: es una decisión, no un bug.
