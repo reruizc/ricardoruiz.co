@@ -69,12 +69,34 @@ launchctl bootout gui/$(id -u)/co.ricardoruiz.batalla          # apagarlo
 **Nueva batalla** = copiar el JSON, cambiar `id`, `inicio`, `hasta`, consultas,
 actores y (si hace falta) marcos. No se toca código.
 
+## v2 (14-oct-2026, noche): corte, sets, atención, departamentos y X
+
+- **Corte** (`corte` en el JSON de la batalla): pasado el corte todo se calcula a esa hora, la
+  página dice FINAL y deja de refrescarse. El agente launchd se apaga con `launchctl bootout`.
+- **Fases recalibradas** (`fase_en`): choque = 2+ medios distintos con hecho de choque en 90 min;
+  desenlace = pasadas 3 h, la atención cae bajo la mitad del pico; después de un choque no se
+  vuelve a «despliegue». La regla vieja dejó la marcha en despliegue hasta las 7 p. m.
+- **Sets**: horas seguidas con la misma fase = un set, con su ganador (≥55 % de la fuerza).
+- **Ponderado por atención**: la fuerza móvil de 3 h de cada media hora pesa por los titulares
+  de esa media hora frente al pico. Mide «pegó fuerte, pero cuando ya nadie miraba».
+- **Departamentos** (`terreno_dep`): ciudades nombradas + nombres de departamento sin ambigüedad
+  (fuera Bolívar, Nariño, Meta, Cesar, Magdalena… y Cauca solo si no es «Valle del Cauca»).
+- **Choque o paralelas**: vocabulario propio/compartido (log-odds), ¿se miran? (qué parte de los
+  titulares de cada bando nombra a un actor del otro), choque por tramos, puentes y cámaras.
+- **X por tramos de 2 h** (`x_capa.py --ventanas --orden Top --gastar`): las publicaciones más
+  destacadas de cada tramo; fuerza por tramo, nodos, respuestas y citas cruzadas, cuentas puente.
+  `--reusar` reclasifica lo ya capturado sin volver a pagar. Captura del 14-oct: 1.580 ítems,
+  668 únicos, US$0,334.
+- **Respaldo de modelo**: DeepSeek se cayó la noche del 14-oct (timeouts y respuestas sin
+  `choices`). `BATALLA_LLM=claude` usa Claude Opus 5.5 con esfuerzo bajo por HTTP directo (llave
+  en `~/.config/caudal/anthropic.env`, mismo patrón que los briefs). Por defecto intenta DeepSeek
+  y cae a Claude si falla.
+- Página en pestañas, con el veredicto y los sets siempre arriba, repetición jugada a jugada,
+  mapa por departamentos con tres modos y panel de detalle, batallones clicables y filtros.
+
 ## Lo que falta (en orden)
 
-1. **Capa X (Apify)**. La que de verdad mide nodos de cuentas, velocidad por
-   minuto y respuestas cruzadas entre bandos. El actor y el freno de gasto ya
-   existen en `tools/caudal/redes/escucha_perfil.py` (~US$0,22 por 1.000
-   publicaciones). Mismo libro de códigos; N = cuentas distintas, q = interacción.
+1. Capa X en vivo cada 30 min durante una batalla (hoy se corrió una vez, al corte).
 2. **Capa estructural (Turchin)**: presión de fondo (salario real, precio de los
    alimentos, desempleo juvenil, competencia entre élites, estrés fiscal) como el
    «terreno» lento sobre el que se libran las batallas.
