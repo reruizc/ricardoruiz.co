@@ -1,10 +1,18 @@
 # Prompt para GPT · rediseño visual de «Anatomía de una batalla»
 
-Pega esto en GPT junto con el archivo `batalla.html` y capturas de https://cauce.co y https://ricardoruiz.co/caudal-portada.html.
+Adjunta en GPT el ZIP `Bases de datos/batalla/paquete-gpt.zip` y pega el texto de abajo.
 
 ---
 
-Eres diseñador de producto editorial y de datos. Te paso `batalla.html`, un tablero de un solo archivo (HTML + CSS + JS sin frameworks, mapas con Leaflet 1.9.4) que mide la disputa por el enmarcado de un hecho político en prensa y en X. Hoy se ve como un dashboard genérico oscuro. Quiero que se sienta como un producto de **Caudal × Cauce**: serio, editorial, con carácter, y entretenido de seguir, como una transmisión deportiva bien hecha.
+Eres diseñador de producto editorial y de datos. Te adjunto un ZIP con `batalla.html`, un tablero de un solo archivo (HTML + CSS + JS sin frameworks, mapas con Leaflet 1.9.4) que mide la disputa por el enmarcado de un hecho político en prensa y en X. Hoy se ve como un dashboard genérico oscuro. Quiero que se sienta como un producto de **Caudal × Cauce**: serio, editorial, con carácter, y entretenido de seguir, como una transmisión deportiva bien hecha.
+
+**Qué hay en el ZIP (rutas relativas a la raíz)**
+- `batalla.html` — la página (todo el CSS va en el `<style>` del `<head>`).
+- `fonts/helveticaneue{,-light,-medium,-bold}.woff2` — las fuentes que carga.
+- `caudalxcauce.png` — logo Caudal × Cauce de la barra superior.
+- `caudalxcauce/img/{mapa-rio-azul,ondas,topo,mapa-ciudad}.webp` — texturas de Caudal.
+- `Bases de datos/batalla/marcha-14oct-2026/batalla.json` — los datos de la marcha. Para verla con ellos, sirve la carpeta (`python3 -m http.server`) y abre `batalla.html?local=1`.
+- Referencias en vivo: https://ricardoruiz.co/batalla.html (la página actual), https://ricardoruiz.co/caudal-portada.html (Caudal) y https://cauce.co (Cauce).
 
 **Identidad que hay que usar**
 - Caudal: fondo casi negro `#0a0a0a`, azul cielo `#98c0f8` como acento, tinta `#f0f0f0` / `#b8c0cc` / `#8a93a3`, titulares en Helvetica Neue 800 con tracking negativo, la «onda» (trazo curvo de 120×24) como separador, y texturas de mapa de río / ondas concéntricas / topografía de fondo (archivos `caudalxcauce/img/{mapa-rio-azul,ondas,topo,mapa-ciudad}.webp`).
@@ -13,7 +21,7 @@ Eres diseñador de producto editorial y de datos. Te paso `batalla.html`, un tab
 
 **Restricciones que no se negocian**
 1. No cambies los `id` del HTML ni la lógica JS: el JS pinta todo por `id`. Solo HTML de estructura, CSS y, si hace falta, clases.
-2. Los colores de datos no son decorativos. Hoy: Gobierno `#4f7dff`, Oposición `#e8483a`, terreno común `#9a7be0`, neutro `#8b93a6`. En la reunión con Cauce se decidió **alejarse del rojo/azul bipartidista**: propón una pareja nueva que no evoque partidos, que sea distinguible para daltónicos (verifícalo) y que no use el azul cielo de la marca para un bando.
+2. Los colores de datos no son decorativos y ya están decididos: Gobierno `#1f9e92` (verde azulado), Oposición `#d4702a` (naranja), los dos marcos `#c9ccd3`, sin marco `#6b7280`. Se eligieron para no evocar partidos y están validados para daltonismo. No los cambies ni uses el azul cielo de la marca para un bando.
 3. Lenguaje: nada de «ganó / perdió». Usa «ventaja», «puntos», «lleva la iniciativa».
 4. Debe funcionar a 375 px de ancho sin scroll horizontal, con 16 px de margen.
 5. Sin librerías nuevas; fuentes ya cargadas en `fonts/`.
