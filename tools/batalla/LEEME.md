@@ -1,4 +1,4 @@
-# Anatomía de una batalla · `batalla.html` + `tools/batalla/`
+# Anatomía de una batalla · `contienda.html` + `tools/batalla/`
 
 Tablero en vivo de una **batalla de enmarcado**: la disputa entre bandos por cómo
 queda contado un hecho con fecha y hora conocidas (una marcha, una votación, un
@@ -7,7 +7,7 @@ política* (Clausewitz) y aquí la guerra es por quedar del lado correcto de la
 historia; cada marcha, votación o decreto es una batalla de esa guerra larga.
 
 ```
-batalla.html                     el tablero (sistema visual v2, lee S3 cada 2 min)
+contienda.html                   el tablero (batalla.html redirige aquí) (sistema visual v2, lee S3 cada 2 min)
 tools/batalla/batalla.py         recolector + clasificador + métricas
 tools/batalla/batallas/<id>.json una batalla: bandos, marcos, hechos, actores, consultas
 tools/batalla/ciudades.json      61 ciudades detectables con su centro (build_ciudades.py)
@@ -64,7 +64,7 @@ cp tools/batalla/co.ricardoruiz.batalla.plist ~/Library/LaunchAgents/
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/co.ricardoruiz.batalla.plist
 launchctl bootout gui/$(id -u)/co.ricardoruiz.batalla          # apagarlo
 ```
-`batalla.html?local=1` lee la salida local; `?b=<id>` elige otra batalla.
+`contienda.html?local=1` lee la salida local; `?b=<id>` elige otra batalla.
 
 **Nueva batalla** = copiar el JSON, cambiar `id`, `inicio`, `hasta`, consultas,
 actores y (si hace falta) marcos. No se toca código.
@@ -115,3 +115,7 @@ actores y (si hace falta) marcos. No se toca código.
   (`LECTURA_VERSION` v5). `--sin-lectura` ahora conserva la lectura guardada (útil para una escrita a mano).
 - **Colores** sin evocar partidos: Gobierno `#1f9e92` (verde azulado), Oposición `#d4702a` (naranja),
   validados para daltonismo; «los dos marcos» y «sin marco» en neutros.
+- **16-oct (tarde)**: la página pasó a `contienda.html` («Anatomía de una contienda mediática», sin vocabulario
+  bélico a pedido de Cauce); `batalla.html` quedó como redirección que conserva `?` y `#`. Rediseño editorial
+  hecho con GPT y fusionado. Puentes y cámaras guardan hasta 40 medios y cada medio abre sus titulares en una
+  ventana, para que se vea el criterio de la clasificación.

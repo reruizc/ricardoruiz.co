@@ -730,9 +730,9 @@ def calcular(cfg, corpus, ext, ciudades, trm_serie):
                           'jaccard': round(len(topG & topO) / len(topG | topO), 3) if (topG | topO) else None},
                 'se_miran': mira, 'por_tramo': por_tramo,
                 'puentes': [{'medio': m['medio'], 'G': m['G'], 'O': m['O'], 'C': m['C']} for m in
-                            sorted(cruce, key=lambda m: -(m['G'] + m['O'] + m['C']))[:10]],
+                            sorted(cruce, key=lambda m: -(m['G'] + m['O'] + m['C']))[:40]],
                 'camaras': [{'medio': m['medio'], 'lado': 'G' if m['G'] else 'O', 'n': m['G'] + m['O']} for m in
-                            sorted(eco, key=lambda m: -m['tot'])[:10]],
+                            sorted(eco, key=lambda m: -m['tot'])[:40]],
                 'medios_cruce': len(cruce), 'medios_eco': len(eco),
                 'eco': [m['medio'] for m in sorted(eco, key=lambda m: -m['tot'])[:10]],
                 'ejemplos': list(reversed(ejemplos_choque))}
