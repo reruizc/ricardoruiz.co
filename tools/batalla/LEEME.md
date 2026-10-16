@@ -103,3 +103,15 @@ actores y (si hace falta) marcos. No se toca código.
 3. **Lentes por actor**: cómo entiende Colombia cada actor relevante (Abelardo,
    Petro, el inversionista) — qué marcos usa, qué teme, qué datos mira.
 4. GDELT como segunda fuente de volumen y tono (API gratis, 1 consulta cada 5 s).
+
+## v3 (16-oct-2026): prensa internacional aparte y lenguaje sin «ganar»
+
+- **Prensa internacional** (`internacional()` en `batalla.py`): por el país del dominio (`dom`, que se guarda
+  desde ahora) o, sin dominio, por la lista `INTERNACIONAL`. No suma al marcador, a las fases ni al mapa; va
+  en `externa.internacional` y en la pestaña «Cómo nos ven afuera». En la marcha eran 90 titulares de 66
+  medios, 68 % con el marco de la Oposición: al sacarlos, el despliegue y el choque quedaron parejos y el
+  ponderado pasó de 59–41 a 70–30 para el Gobierno.
+- **Lenguaje**: «ventaja», «puntos», «parejo» (bajo 55 %); nada de «ganó». El prompt de la lectura lo prohíbe
+  (`LECTURA_VERSION` v5). `--sin-lectura` ahora conserva la lectura guardada (útil para una escrita a mano).
+- **Colores** sin evocar partidos: Gobierno `#1f9e92` (verde azulado), Oposición `#d4702a` (naranja),
+  validados para daltonismo; «los dos marcos» y «sin marco» en neutros.

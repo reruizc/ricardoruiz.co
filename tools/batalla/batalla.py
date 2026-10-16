@@ -79,6 +79,44 @@ TIER2 = ['la patria', 'el nuevo dia', 'la opinion', 'el informador', 'el meridia
          'chicanoticias', 'caracol tv', 'telecaribe', 'canal tro', 'teleislas', 'la cronica', 'el olfato',
          'proclama', 'seguimiento', 'denuncias', 'vorágine', 'voragine', 'el frente', 'boyaca7dias',
          'cuestion publica', 'colombiano', 'diario', 'noticias']
+# Prensa de fuera de Colombia: va en su propia caja («cómo nos ven afuera») y no suma al marcador
+# ni al mapa (decisión con Cauce, 15-oct-2026). Con dominio (`dom`, desde jun-oct 2026 en adelante)
+# manda el país del dominio; sin él, esta lista de nombres. Ojo: «El País» a secas es el de Cali.
+INTERNACIONAL = ['yahoo', 'france 24', 'bloomberg linea', 'prensa latina', 'el cronista', 'dw com', 'dw ',
+                 'telesur', 'efe', 'marca', 'cr hoy', 'primicias', 'nodal', 'la iguana', 'abc',
+                 'euronews', 'rfi', 'aporrea', 'audacy', 'version final', 'hartford courant', 'pluralidad z',
+                 'diario de coahuila', 'ap news', 'associated press', 'la nacion costa rica', 'el comercio peru',
+                 'verdad de monagas', 'democrata', 'europa press', 'independent en espanol', 'acento',
+                 'diario las americas', 'diariovea', 'chicago tribune', 'america teve', 'latam gremial',
+                 'santa maria times', 'globovision', 'eju tv', 'ciudadccs', 'informando al pueblo oriental',
+                 'ciudad valencia', 'identidad correntina', 'ecuavisa', 'xeva', 'noticias24hrs', 'el economista',
+                 'clarin', 'notimerica', 'tvn panama', 'voz del interior', 'yvke', 'morning call', 'wplg',
+                 'lancasteronline', 'canal n', 'seattlepi', 'ansa', 'la tercera', 'panam post', 'la diaria',
+                 'uruguay al dia', 'ct insider', 'cooperativa', 'pulso diario san luis', 'cdn', 'abc com py',
+                 'cubadebate', 'tribunanoticias', 'expreso ec', 'milenio', 'radio formula', '24 horas', 'reuters',
+                 'bbc', 'cnn', 'new york times', 'washington post', 'financial times', 'wall street journal',
+                 'guardian', 'economist', 'le monde', 'el mundo', 'rtve', 'cadena ser', 'onda cero', 'la vanguardia',
+                 'perfil', 'infobae america', 'el pais america', 'la jornada', 'reforma', 'aristegui', 'el universal mx']
+DOM_NACIONAL = ('.co', '.com.co', '.gov.co', '.edu.co', '.org.co')
+DOM_FUERA = ('.mx', '.ar', '.cl', '.pe', '.ec', '.ve', '.bo', '.uy', '.py', '.cr', '.pa', '.gt', '.hn', '.sv',
+             '.ni', '.do', '.cu', '.pr', '.es', '.br', '.us', '.uk', '.fr', '.de', '.it')
+
+
+def internacional(it):
+    dom = (it.get('dom') or '').lower().rstrip('/')
+    host = dom.split('//')[-1].split('/')[0]
+    if host.endswith(DOM_NACIONAL):
+        return False
+    if host.endswith(DOM_FUERA):
+        return True
+    if (it.get('medio') or '').strip() == 'EL PAÍS':      # elpais.com (España/América); «El País» es el de Cali
+        return True
+    m = ' ' + norm(it.get('medio')) + ' '
+    if ' colombia ' in m:                                  # «Noticias Pereira, Colombia y el Mundo» es de aquí
+        return False
+    return any(' ' + k.strip() + ' ' in m or (k.endswith(' ') and ' ' + k in m) for k in INTERNACIONAL)
+
+
 OFICIAL = ['gov.co', 'alcaldia', 'gobernacion', 'presidencia', 'policia nacional', 'ministerio', 'concejo de',
            'defensoria', 'procuraduria', 'registraduria']
 
@@ -142,6 +180,7 @@ def google_news(q, lang='es'):
         except Exception:                                       # noqa: BLE001
             continue
         out.append({'titulo': titulo, 'medio': medio or '¿?', 'url': it.findtext('link') or '',
+                    'dom': (src.get('url') or '') if src is not None else '',
                     'pub': pub.isoformat(timespec='seconds'), 'lang': lang})
     return out
 
@@ -442,6 +481,8 @@ def calcular(cfg, corpus, ext, ciudades, trm_serie):
     desde = dt.datetime.fromisoformat(cfg['desde']).astimezone(dt.timezone.utc)
     items = sorted((i for i in corpus.values() if desde <= ts(i) <= ahora + dt.timedelta(minutes=0 if cerrada else 10)), key=ts)
     relevantes = [i for i in items if i['c']['rel']]
+    afuera = [i for i in relevantes if internacional(i)]           # caja aparte: no suma al marcador ni al mapa
+    relevantes = [i for i in relevantes if not internacional(i)]
     marcos_cfg = {m['id']: m for m in cfg['marcos']}
 
     # --- fase actual e historia por hora desde el día anterior
@@ -777,6 +818,16 @@ def calcular(cfg, corpus, ext, ciudades, trm_serie):
                'titulares': [{'t': x['pub'], 'medio': x['medio'], 'titulo': x['titulo'], 'url': x['url'],
                               'lang': x['lang'], 'tono': x['tono']} for x in reversed(exts[-24:])],
                'trm': trm_serie}
+    afuera_d = [i for i in afuera if ts(i) >= inicio - dt.timedelta(hours=12)]
+    cnt_af = Counter(i['medio'] for i in afuera_d)
+    externa['internacional'] = {
+        'items': len(afuera_d), 'medios': len(cnt_af),
+        'G': sum(1 for i in afuera_d if bando_de(i) == 'G'), 'O': sum(1 for i in afuera_d if bando_de(i) == 'O'),
+        'C': sum(1 for i in afuera_d if bando_de(i) == 'C'), 'N': sum(1 for i in afuera_d if bando_de(i) == 'N'),
+        'marcos': Counter(m for i in afuera_d for m in i['c']['m']).most_common(6),
+        'top': cnt_af.most_common(10),
+        'titulares': [{'t': i['pub'], 'medio': i['medio'], 'titulo': i['titulo'], 'url': i['url'], 'b': bando_de(i)}
+                      for i in reversed(afuera_d[-30:])]}
 
     feed = [{'t': i['pub'], 'medio': i['medio'], 'titulo': i['titulo'], 'url': i['url'], 'b': bando_de(i),
              'm': i['c']['m'], 'h': i['c']['h'], 'v': i['c'].get('v', ''), 's': i['c']['src'][0], 'd': i['c']['dep'], 'ci': [cmap[c]['nombre'] for c in i['c']['ci']]}
@@ -819,19 +870,20 @@ def deepseek_key():
         return ''
 
 
-LECTURA_VERSION = 'v4'
+LECTURA_VERSION = 'v5'
 LECTURA_PROMPT = """Eres un analista de medios neutral. Recibes las métricas de una «batalla de enmarcado»
 entre dos bandos (Gobierno y Oposición) alrededor de un hecho político colombiano, y los titulares más recientes.
 Escribe la lectura del momento en ESPAÑOL, tuteo neutro, como el relato de un partido, en 3 o 4 frases
 (máximo 95 palabras). Reglas duras:
 1. Usa SOLO las cifras y titulares que te paso. No inventes hechos, cifras ni citas.
 2. No atribuyas intenciones ni especules sobre lo que un actor «busca» o «prepara».
-3. No tomes partido ni califiques a los bandos; describe qué marco gana terreno y dónde.
+3. No tomes partido ni califiques a los bandos; describe qué marco toma ventaja y dónde. NUNCA escribas «ganó»,
+   «perdió», «ganador» ni «derrota»: habla de «ventaja», «puntos» e «iniciativa».
 4. Si los datos son pocos, dilo.
 5. Nada de jerga técnica: no escribas «share», «items», «F» ni decimales como 0,009; di «titulares», «medios»,
    «fuerza» y porcentajes redondos. Un hecho de choque es un disturbio o enfrentamiento reportado, no un anuncio.
-6. Si "cerrada" es true, la batalla terminó: escribe el BALANCE FINAL (hasta 130 palabras): quién ganó cada
-   fase (sets), el marcador ponderado por atención frente al sin ponderar, y si un bando pegó fuerte cuando la
+6. Si "cerrada" es true, la batalla terminó: escribe el BALANCE FINAL (hasta 130 palabras): qué bando llevó la
+   ventaja en cada fase (sets), el marcador ponderado por atención frente al sin ponderar, y si un bando pegó fuerte cuando la
    atención ya había caído. Si hay datos de X, di si coinciden con la prensa.
 Devuelve JSON: {"lectura": "...", "titular": "frase de máximo 12 palabras para el marcador"}"""
 
@@ -972,6 +1024,8 @@ def main():
             out['x'] = x
     if not a.sin_lectura:
         out['lectura'] = lectura(out, carpeta)
+    elif (carpeta / 'lectura.json').exists():             # --sin-lectura conserva la última (p. ej. escrita a mano)
+        out['lectura'] = json.loads((carpeta / 'lectura.json').read_text())
 
     ruta = carpeta / 'batalla.json'
     ruta.write_text(json.dumps(out, ensure_ascii=False, separators=(',', ':')))
