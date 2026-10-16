@@ -60,9 +60,9 @@ FASES = [
     ('preparacion', 'Preparación', 'Convocatoria, rutas, decreto: las fuerzas se alistan.'),
     ('despliegue', 'Despliegue', 'La gente llega a las plazas; se toman posiciones.'),
     ('choque', 'Choque', 'Contacto: disturbios, bloqueos, capturas, gases.'),
-    ('quiebre', 'Punto de quiebre', 'Un hecho grave cambia la batalla: muertos, heridos graves, incendios.'),
+    ('quiebre', 'Punto de quiebre', 'Un hecho grave cambia la contienda: muertos, heridos graves, incendios.'),
     ('desenlace', 'Desenlace', 'Balances, cifras oficiales y repliegue.'),
-    ('secuelas', 'Secuelas', 'Las ondas: demandas, debates, mercados, la siguiente batalla.'),
+    ('secuelas', 'Secuelas', 'Las ondas: demandas, debates, mercados, la siguiente contienda.'),
 ]
 
 # Peso de cada medio (la q de Lanchester). Declarado y movible, no un ranking de
