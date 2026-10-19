@@ -314,7 +314,19 @@ El chasis está copiado ocho veces y ya divergió:
    juez, pensamiento investigativo): no son módulos del ciclo. Cada tarjeta tiene un
    hueco de imagen opcional `imagenes/lab-{problema,estructural,mactor,evaluacion,
    alternativas,ain,prospect,comunicar}.jpg` (1200×600 aprox.; si falta, no se ve).
-1. **Sistema visual del cuerpo.** El Lab sigue en el chasis del dashboard de mayo
+0b. **Decidido el 19-oct (Ricardo): identidad propia.** El Lab deja la paleta del
+   dashboard (papel oscuro · salmón · Familjen/Petrona, «la letra tan Claude») y pasa a
+   **«la mesa de planeación»** en `lab-theme.css`: tablero claro con trama de puntos
+   (`#f2efe6`), tinta de marcador índigo (`#1f1b3a`), notas adhesivas como acentos
+   (caléndula `#f5c518` · azul `#4f7ee8` · rosa `#ef7c8e` · verde `#5cb37f`), tarjetas
+   con pestaña de color y número, Bricolage Grotesque en titulares, Public Sans en texto,
+   JetBrains Mono en etiquetas. Siempre clara: el botón día/noche queda oculto. Se aplica
+   a los 8 módulos redefiniendo las variables que ya usaban (un solo archivo). Las 8
+   imágenes de tarjeta (`imagenes/lab-*.jpg`, 1200×605) se generaron con Canva con la
+   misma escena —mesas, mapas y notas adhesivas en municipios colombianos, luz de día— y
+   quedan también en el diseño de Canva «Lienzo blanco horizontal» (DAHYbZIQ4-I) por si
+   hay que reexportarlas.
+1. **Sistema visual del cuerpo.** ~~El Lab sigue en el chasis del dashboard de mayo~~ (resuelto arriba). Antes:
    (Familjen Grotesk · Petrona · Space Mono, papel #1a1610, salmón), mientras
    `index.html`, `dashboard.html` y el resto migraron en julio al sistema v2
    (Helvetica Neue embebida, #060810, azul). Hoy el Lab es la única familia de
