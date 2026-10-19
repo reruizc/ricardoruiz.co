@@ -78,7 +78,7 @@
       br:{login:'Entrar',register:'Cadastrar',profile:'Meu painel',logout:'Sair'},
     }[lang]||{login:'Iniciar sesión',register:'Registrarse',profile:'Mi panel',logout:'Salir'};
     if(token&&user){
-      const planLabels={free:'Free',pro:'Pro',premium:'Premium',basic:'Básico',analysis:'Análisis',full:'Completo'};
+      const planLabels={free:({us:'Basic',cn:'基础版'})[lang]||'Básico',pro:'Pro',premium:'Premium',basic:'Básico',analysis:'Análisis',full:'Completo'};
       area.dataset.loggedIn='1';
       area.innerHTML=`<span class="e-user-plan">${planLabels[user.plan]||user.plan}</span>
         <a href="dashboard.html" class="e-btn-profile">${T.profile}</a>
