@@ -32,7 +32,9 @@ RAIZ = Path(__file__).resolve().parents[3]
 # este repo (es público). Se pasa con --anexo o con C360_ESTRATEGIA_ANEXO.
 ANEXO = os.environ.get('C360_ESTRATEGIA_ANEXO', '')
 SALIDA = RAIZ / 'candidato-360-data/estrategia-banco.json'
-CODIGOS = ['PRO', 'CON', 'SUP', 'CAS', 'PER', 'CMN', 'PDP', 'NDF', 'BDG', 'PVP', 'CIM']
+CODIGOS = ['PRO', 'CON', 'SUP', 'CAS', 'PER', 'CMN', 'PDP', 'NDF', 'BDG', 'PVP', 'CIM',
+           # v1 de Bogotá (oct-19-2026): 2 nuevos de Concejo y los 8 de Alcaldía
+           'CSD', 'NDO', 'NES', 'NBA', 'CDE', 'CTR', 'CMA', 'PJA', 'BRV', 'SVC']
 RE_COD = re.compile(r'\b(' + '|'.join(CODIGOS) + r')\b')
 # Lo que delata el caso: si algo de esto sobrevive, el JSON no se escribe. La
 # lista vive FUERA del repo (los términos son el nombre del cliente), una por
@@ -284,9 +286,9 @@ def leer_arquetipos(texto):
 
 # ── Lo que pone el equipo (no sale del anexo) ─────────────────────────────
 # Qué id de cada lectura de arquetipos corresponde a cada código de la matriz.
-# Los 5 emocionales son los de la cartografía de Medellín; los 6 de Bogotá son
-# la tipología de Concejo. Cartagena (8 propios) y la Alcaldía de Bogotá (5)
-# todavía no tienen fila: el motor dice «todavía no».
+# Los 5 emocionales son los de la cartografía de Medellín; los de Bogotá son las
+# dos tipologías v1 (8 de Concejo y 8 de Alcaldía, oct-19-2026). Cartagena (8
+# propios) todavía no tiene fila: el motor dice «todavía no».
 EQUIVALENCIAS = {
     'PRO': ('emocional', 'medellin', '2023', 'proteccion'),
     'CON': ('emocional', 'medellin', '2023', 'continuidad'),
@@ -299,6 +301,16 @@ EQUIVALENCIAS = {
     'BDG': ('bogota-concejo', 'bogota', 'concejo', 'gestion'),
     'PVP': ('bogota-concejo', 'bogota', 'concejo', 'poco-voto'),
     'CIM': ('bogota-concejo', 'bogota', 'concejo', 'movilizada'),
+    'CSD': ('bogota-concejo', 'bogota', 'concejo', 'sin-dueno'),
+    'NDO': ('bogota-concejo', 'bogota', 'concejo', 'opinion'),
+    'NES': ('bogota-alcaldia', 'bogota', 'alcaldia', 'estrategico'),
+    'NBA': ('bogota-alcaldia', 'bogota', 'alcaldia', 'alternativa'),
+    'CDE': ('bogota-alcaldia', 'bogota', 'alcaldia', 'decide'),
+    'CTR': ('bogota-alcaldia', 'bogota', 'alcaldia', 'tradicional'),
+    'CMA': ('bogota-alcaldia', 'bogota', 'alcaldia', 'media-alineada'),
+    'PJA': ('bogota-alcaldia', 'bogota', 'alcaldia', 'alineada'),
+    'BRV': ('bogota-alcaldia', 'bogota', 'alcaldia', 'reparte'),
+    'SVC': ('bogota-alcaldia', 'bogota', 'alcaldia', 'cruce-sur'),
 }
 
 # El calendario de 2027. ⚠️ La Registraduría no ha expedido la resolución:
@@ -422,7 +434,7 @@ def main():
     for f in fichas_rama:
         f['principio'] = next((p['id'] for p in principios if f['rama'] in p['ramas'] or f['id'] in p['fichas']), None)
     if set(matriz) != set(CODIGOS) or any(len(v) != 8 for v in matriz.values()):
-        sys.exit('la matriz no trae las 11 filas × 8 principios')
+        sys.exit(f'la matriz no trae las {len(CODIGOS)} filas × 8 principios')
 
     banco = {
         'v': '2026-10-19',

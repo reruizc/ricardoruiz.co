@@ -124,20 +124,22 @@
         _enc: CONFLICTO.test(n) ? (GESTION.test(n) ? 'mixto' : 'conflicto') : (GESTION.test(n) ? 'gestion' : 'neutro') });
     });
     const N = filas.length;
-
-    /* Temas: cuántos titulares tocan cada uno. */
+    /* «Reciente» depende de la ventana: con 30 días es la última semana contra
+       las tres anteriores; con la ventana corta del briefing (3 días, oct-2026)
+       es hoy y ayer contra el día anterior. */
+    const ventana = ctx.ventana || 30, corte = ventana <= 7 ? 1 : 7;
     const temas = TEMAS.map(t => {
       const suyos = filas.filter(f => f._temas.includes(t.id));
-      const recientes = suyos.filter(f => f._dias != null && f._dias <= 7).length;
+      const recientes = suyos.filter(f => f._dias != null && f._dias <= corte).length;
       return { id: t.id, nombre: t.nombre, corto: t.corto || t.nombre.toLowerCase(), n: suyos.length, pct: N ? suyos.length / N : 0, recientes };
     }).filter(t => t.n).sort((a, b) => b.n - a.n);
     const sinTema = filas.filter(f => !f._temas.length).length;
 
     /* Qué sube: participación en la última semana contra las tres anteriores.
        Exige al menos 3 titulares recientes: con menos, «sube» es ruido. */
-    const nRec = filas.filter(f => f._dias != null && f._dias <= 7).length, nPrev = filas.filter(f => f._dias != null && f._dias > 7).length;
+    const nRec = filas.filter(f => f._dias != null && f._dias <= corte).length, nPrev = filas.filter(f => f._dias != null && f._dias > corte).length;
     const subiendo = nRec >= 5 && nPrev >= 5 ? temas.map(t => {
-      const prev = filas.filter(f => f._dias != null && f._dias > 7 && f._temas.includes(t.id)).length;
+      const prev = filas.filter(f => f._dias != null && f._dias > corte && f._temas.includes(t.id)).length;
       return Object.assign({}, t, { delta: t.recientes / nRec - prev / nPrev });
     }).filter(t => t.recientes >= 3 && t.delta >= 0.05).sort((a, b) => b.delta - a.delta).slice(0, 3) : [];
 
@@ -211,13 +213,13 @@
       .sort((a, b) => b.n - a.n).slice(0, 36);
 
     /* Ritmo: titulares por día en la ventana. */
-    const ventana = ctx.ventana || 30, serie = Array(ventana).fill(0);
+    const serie = Array(ventana).fill(0);
     filas.forEach(f => { if (f._dias != null && f._dias >= 0 && f._dias < ventana) serie[ventana - 1 - f._dias]++; });
 
     const enc = { conflicto: 0, gestion: 0, mixto: 0, neutro: 0 };
     filas.forEach(f => enc[f._enc]++);
 
-    return { N, filas, temas, sinTema, subiendo, medios, actores, nube, serie, encuadre: enc, nRec, nPrev };
+    return { N, filas, temas, sinTema, subiendo, medios, actores, nube, serie, encuadre: enc, nRec, nPrev, corte };
   }
 
   /* ── Sintonía con los arquetipos ─────────────────────────────────────────

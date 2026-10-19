@@ -259,7 +259,7 @@
         <article class="sal-card"><h4>A quién nombran</h4><p class="sal-sub">Personas e instituciones que aparecen en dos o más titulares, sin la alcaldía ni el concejo que ya van en la búsqueda. Detectado por nombres propios: es aproximado.</p><div id="salActores"></div></article>
         <article class="sal-card"><h4>Las palabras que más se repiten</h4><p class="sal-sub">Sin palabras vacías, sin el nombre del lugar ni los nombres de arriba.</p><div class="sal-nube" id="salNube"></div></article>
         <article class="sal-card"><h4>Quién lo publica</h4><p class="sal-sub">Los medios con más titulares en esta lectura.</p><div id="salMedios"></div></article>
-        <article class="sal-card ancha"><h4>El ritmo y el tono</h4><p class="sal-sub">Titulares por día en los últimos 30 días (en coral, la última semana) y el encuadre del vocabulario: conflicto —denuncia, crisis, protesta— contra gestión —anuncia, inaugura, entrega—.</p><div id="salRitmo"></div></article>
+        <article class="sal-card ancha"><h4>El ritmo y el tono</h4><p class="sal-sub">Titulares por día en la ventana de la escucha (en coral, los más recientes) y el encuadre del vocabulario: conflicto —denuncia, crisis, protesta— contra gestión —anuncia, inaugura, entrega—.</p><div id="salRitmo"></div></article>
         <article class="sal-card ancha" id="salGeoCard"><h4 id="salGeoTitulo">Dónde pasa lo que se publica</h4><p class="sal-sub" id="salGeoSub">Los lugares de su territorio que nombran los titulares. Parpadea todo lugar con al menos un titular; tóquelo para ver cuáles.</p>
           <div class="sal-geo"><div class="sal-mapa" id="salMapa"></div><div><div id="salLugares"><p class="sal-vacio">Buscando los lugares de su territorio en los titulares…</p></div></div></div>
           <p class="sal-sub" id="salGeoNota" style="margin:10px 0 0"></p></article>
@@ -281,7 +281,7 @@
     </section>
     <div class="lectura" id="lectura"></div>
 
-    <p class="panel-nota">Esta página reúne las dos mitades de la escucha: la prensa abierta —Google News, ventana de 30 días, consultada con su territorio y sus ideas— y sus cuentas de redes, buscadas y validadas una a una. Lo que queda guardado en la candidatura son sus usuarios y sus ideas; el briefing de cada tres días usa lo mismo para filtrar lo que le llega al correo.</p>
+    <p class="panel-nota">Esta página reúne las dos mitades de la escucha: la prensa abierta —Google News, ventana de 3 días, la misma cadencia del briefing, consultada con su territorio y sus ideas— y sus cuentas de redes, buscadas y validadas una a una. Lo que queda guardado en la candidatura son sus usuarios y sus ideas; el briefing de cada tres días usa lo mismo para filtrar lo que le llega al correo.</p>
   </div>
 </div></main>
 
@@ -291,13 +291,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="candidato-360-electorado.js?v=20260929"></script>
 <script src="candidato-360-geoprensa.js?v=20260927"></script>
-<script src="candidato-360-arquetipos.js?v=20261001b"></script>
-<script src="candidato-360-saliencia.js?v=20260928"></script>
+<script src="candidato-360-arquetipos.js?v=20261019"></script>
+<script src="candidato-360-saliencia.js?v=20261019"></script>
 <script>
 (function () {
   'use strict';
   const P = window.C360Panel, $ = P.$, esc = P.esc, num = P.num;
-  const VENTANA = 30;          /* días · la misma ventana del briefing */
+  /* días · la misma cadencia del briefing (cada 3 días). Era 30: la escucha
+     tiene que medir lo que pasó desde el último correo, no el mes (oct-19-2026). */
+  const VENTANA = 3;
   const MAX_IDEAS = 3;
   /* Que dijo «todavía no tengo» se recuerda por dispositivo: el vínculo solo
      guarda cuentas e ideas, y agregarle un campo obliga a tocar el worker, que
@@ -841,7 +843,9 @@
   }
   function pintarArquetipos(a, t, sint, arqT, arqT0) {
     const pesos = arqT?.pesos || null;
-    const propia = arqT0?.familias ? `<p class="sal-arq-aviso">Son los <b>${arqT0.familias.length} arquetipos de ${esc(arqT0.territorio.nombre)}</b>, no las cinco familias de referencia. Qué tema mueve a cada uno sale de las palancas temáticas de la cartografía; donde no las calificó, se completó leyendo su ficha, y así lo marca cada fila.</p>` : '';
+    const propia = arqT0?.familias ? (arqT0.territorio.heuristica
+      ? `<p class="sal-arq-aviso">Son los <b>${arqT0.familias.length} arquetipos de ${esc(arqT0.territorio.nombre)}</b> ${esc(t.corp === 'alcaldia' ? 'de la Alcaldía' : 'del Concejo')}, no las cinco familias de referencia: salen de cómo vota cada barrio, no de un estudio de emociones. Qué tema mueve a cada uno es <b>criterio del equipo</b>, leído de lo que se midió de cada arquetipo.</p>`
+      : `<p class="sal-arq-aviso">Son los <b>${arqT0.familias.length} arquetipos de ${esc(arqT0.territorio.nombre)}</b>, no las cinco familias de referencia. Qué tema mueve a cada uno sale de las palancas temáticas de la cartografía; donde no las calificó, se completó leyendo su ficha, y así lo marca cada fila.</p>`) : '';
     const aviso = propia + (salVista === 'pais'
       ? `<p class="sal-arq-aviso">En la agenda nacional la sintonía va sin ponderar: el reparto de arquetipos es de un electorado territorial, y aquí se lee al país entero.</p>`
       : pesos
@@ -852,7 +856,7 @@
       const f = x.familia, w = pesos?.[f.slug];
       return `<div class="sal-arq-fila" style="--c:${f.color}"><div><b class="nom">${esc(f.nombre)}</b>
         <p>${x.activa ? `En esta agenda lo activa <b>${esc(x.activa.corto)}</b>.` : ''} ${x.hueco.length ? `La prensa casi no habla de <b>${esc(x.hueco.join(' ni de '))}</b>, que es lo que más lo mueve.` : ''}</p>
-        <p>${f.tono ? `Se le habla en tono ${esc(f.tono.toLowerCase())}. Lo desmoviliza: ${esc(f.desmoviliza.toLowerCase())}.` : `${esc(f.decide)} Se enciende con ${esc(String(f.sube || '').replace(/\.$/, '').toLowerCase())}.`}</p>
+        <p>${f.tono ? `Se le habla en tono ${esc(f.tono.toLowerCase())}. Lo desmoviliza: ${esc(f.desmoviliza.toLowerCase())}.` : f.oficio ? `${esc(f.decide)} <b>Cómo ganárselo:</b> ${esc(f.oficio)}` : `${esc(f.decide)} Se enciende con ${esc(String(f.sube || '').replace(/\.$/, '').toLowerCase())}.`}</p>
         ${x.activa && f.sensNury && !f.sensNury.includes(x.activa.id) ? `<p class="sal-sub" style="margin:4px 0 0">El peso de ${esc(x.activa.corto)} para este arquetipo es inferido de su ficha, no calificado en la cartografía.</p>` : ''}
         <div class="sal-arq-bar"><i style="width:${Math.max(0, (x.indice - 1) / 4 * 100).toFixed(1)}%"></i></div></div>
         <div class="sal-arq-cifra">${x.indice.toFixed(1)}<small>sintonía · de 5</small>${w != null ? `<span style="display:block;margin-top:10px">${pct(w)}<small>de su electorado</small></span>` : ''}</div></div>`;
@@ -910,7 +914,7 @@
 
     const maxD = Math.max(1, ...a.serie), e = a.encuadre, N = Math.max(1, a.N);
     const seg = (k, c) => e[k] ? `<i style="width:${(e[k] / N * 100).toFixed(1)}%;background:${c}" title="${num(e[k])}"></i>` : '';
-    $('salRitmo').innerHTML = `<div class="sal-ritmo">${a.serie.map((n, i) => `<i class="${i >= a.serie.length - 7 ? 'sem' : ''}" style="height:${(n / maxD * 100).toFixed(1)}%" title="${num(n)} titulares"></i>`).join('')}</div>
+    $('salRitmo').innerHTML = `<div class="sal-ritmo">${a.serie.map((n, i) => `<i class="${i >= a.serie.length - 1 - (a.corte ?? 7) ? 'sem' : ''}" style="height:${(n / maxD * 100).toFixed(1)}%" title="${num(n)} titulares"></i>`).join('')}</div>
       <div class="sal-eje"><span>hace ${VENTANA} días</span><span>pico: ${num(Math.max(...a.serie))} en un día</span><span>hoy</span></div>
       <div class="sal-enc">${seg('conflicto', 'var(--coral)')}${seg('mixto', '#e7b3a6')}${seg('gestion', 'var(--green)')}${seg('neutro', '#d4d9d2')}</div>
       <div class="sal-enc-ley"><span style="--c:var(--coral)">Conflicto <b>${pct(e.conflicto / N)}</b></span><span style="--c:#e7b3a6">Mixto <b>${pct(e.mixto / N)}</b></span><span style="--c:var(--green)">Gestión <b>${pct(e.gestion / N)}</b></span><span style="--c:#d4d9d2">Sin marca <b>${pct(e.neutro / N)}</b></span></div>`;

@@ -581,3 +581,23 @@ definido»: sexo y edad no cargaban. Ahora `completarCampana(v)` en
 `municipio` y `localidad` al arrancar **cualquier** panel. Bogotá queda como
 `16` + «BOGOTÁ, D.C.». Fuera de Bogotá el departamento sale del slug
 territorial más reciente.
+
+### Escucha · arquetipos de Bogotá y ventana de 3 días (oct-19-2026)
+
+- **Arquetipos:** la escucha de una campaña en Bogotá lee los 8 arquetipos de su
+  corporación (la JAL usa los del Concejo), no las cinco familias de referencia.
+  Es una entrada nueva en `TERRITORIOS` de `candidato-360-arquetipos.js`
+  (`clave` = corporación; la caché va por territorio y clave), y los pesos son
+  el voto 2023 de la ciudad. La tarjeta avisa que la sensibilidad por tema es
+  **criterio del equipo** (`heuristica`), y cada fila trae «Cómo ganárselo».
+  El worker (`C360_ARQ_TERRITORIALES`) suma el JSON de Bogotá, así que la
+  lectura con IA acepta esos slugs; lee `quien` y `oficio`.
+- **Ventana:** `VENTANA` pasa de 30 a **3 días**, la misma cadencia del
+  briefing, porque la escucha mide lo que pasó desde el último correo. En
+  `candidato-360-saliencia.js`, «reciente» depende de la ventana: con 7 días o
+  menos es hoy y ayer contra el día anterior; con más, la última semana contra
+  las anteriores. Así Mi Congreso y contendientes, que usan 30, no cambian.
+- **Las redes siguen apagadas en el panel** (`CAPTURA_ENCENDIDA = false`). Para
+  encenderlas faltan la ruta `GET /c360/captura`, un workflow que corra
+  `capturar.mjs` dos veces al día con los secretos de Apify y del modelo, y que
+  el panel pinte `propias` y `comentarios_propios`.

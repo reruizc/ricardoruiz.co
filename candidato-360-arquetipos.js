@@ -14,8 +14,8 @@
       habla. Esto sirve en CUALQUIER territorio.
 
    2. `TERRITORIOS` — cuánto pesa cada familia en un electorado concreto. Hoy
-      Medellín y Cartagena (proyección 2027 por barrio); Cartagena además trae
-      sus propias ocho familias. **Para sumar un
+      Medellín y Cartagena (proyección 2027 por barrio) y Bogotá (voto 2023);
+      Cartagena y Bogotá traen sus propios ocho arquetipos. **Para sumar un
       territorio nuevo basta una entrada acá**: el panel de escucha la toma
       sola y pasa de «perfil de referencia» a «agenda ponderada por su
       electorado». Sin entrada, el panel lo dice en vez de suponer un reparto.
@@ -78,6 +78,7 @@
      (`calza`) y de dónde sale el peso de cada familia (`cargar`, que devuelve
      `{ slug: fracción }` sumando ~1). */
   const S3_CTG = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/Proyecto+DC/arquetipos-cartagena';
+  const S3_BOG = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/arquetipos-bogota';
 
   const TERRITORIOS = [
     /* Cartagena trae su PROPIA taxonomía: ocho arquetipos de Nury, no las
@@ -101,6 +102,29 @@
             emocion: f.emocion, decide: f.decide || '', sube: f.sube || '', baja: f.baja || '', perfil: f.perfil || '', palancas: f.palancas || [], tematicas: f.tematicas || [] };
         });
         return { pesos: { ...(d.ciudad_share?.['2027'] || {}) }, familias };
+      },
+    },
+    /* Bogotá (oct-19-2026): los 8 arquetipos de comportamiento electoral de la
+       corporación de la campaña (la JAL usa los del Concejo). No hay estudio
+       emocional: la sensibilidad por tema es criterio del equipo
+       (tools/candidato-360/arquetipos-bogota/publicar.py, `SENS`), y la tarjeta
+       lo dice (`heuristica`). Los pesos son el voto 2023 de la ciudad. */
+    {
+      id: 'bogota', nombre: 'Bogotá', heuristica: true,
+      fuente: 'Arquetipos de comportamiento electoral de Bogotá, voto 2023',
+      calza: t => !t.departamental && Boolean(t.esBogota),
+      clave: t => (t?.corp === 'alcaldia' ? 'alcaldia' : 'concejo'),
+      cargar: async t => {
+        const corp = t?.corp === 'alcaldia' ? 'alcaldia' : 'concejo';
+        const r = await fetch(`${S3_BOG}/arquetipos-bogota.json?v=20261019`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const d = await r.json();
+        const familias = (d.orden?.[corp] || []).map(slug => {
+          const f = d.familias[slug];
+          return { slug, color: f.color, nombre: f.nombre, largo: f.nombre, tagline: f.lema, sens: f.sens || {}, heuristica: true,
+            decide: f.decide || '', oficio: f.oficio || '', perfil: f.quien || '', sube: '', baja: '', palancas: [], tematicas: [] };
+        });
+        return { pesos: { ...(d.share?.[corp] || {}) }, familias };
       },
     },
     {
@@ -128,10 +152,12 @@
     if (!def) return null;
     /* `cargar` devuelve los pesos solos, o `{ pesos, familias }` cuando el
        territorio tiene su propia taxonomía. */
-    if (!cache.has(def.id)) cache.set(def.id, def.cargar().then(r => (r && r.pesos && typeof r.pesos === 'object' && !Array.isArray(r.pesos) && r.familias)
+    /* Bogotá lee una tipología por corporación: la caché va por territorio y clave. */
+    const id = def.clave ? `${def.id}:${def.clave(t)}` : def.id;
+    if (!cache.has(id)) cache.set(id, def.cargar(t).then(r => (r && r.pesos && typeof r.pesos === 'object' && !Array.isArray(r.pesos) && r.familias)
       ? { territorio: def, pesos: r.pesos, familias: r.familias }
       : { territorio: def, pesos: r, familias: null }).catch(() => null));
-    return cache.get(def.id);
+    return cache.get(id);
   }
 
   global.C360Arquetipos = { FAMILIAS, TERRITORIOS, deTerritorio };
