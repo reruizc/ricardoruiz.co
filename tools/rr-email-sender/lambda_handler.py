@@ -13,8 +13,13 @@ Payload (JSON):
     "limitTo": ["a@x.com", "b@y.com"],    # opcional, restringe a estos correos
     "from": "Ricardo Ruiz <ricardo@ricardoruiz.co>",  # opcional
     "replyTo": "reruizc@gmail.com",       # opcional
-    "rateDelaySec": 1.1                   # opcional, default 1.1s (sandbox 1/s)
+    "rateDelaySec": 0.1,                  # opcional, default 0.1s (SES en producción: 14/s)
+    "plans": ["free"]                     # opcional: solo estos planes EFECTIVOS
   }
+
+Plan efectivo: un plan pago con planExpiresAt vencido cuenta como "free".
+Sin "plans" le escribe a todos (comportamiento anterior). La Lambda corta a
+los 300 s: con 0,1 s de espera caben ~1.500 envíos.
 """
 import os
 import json
@@ -44,7 +49,7 @@ def fetch_users():
             "User-Agent": "rr-email-sender/1.0 (+https://ricardoruiz.co)",
         },
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=150) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     if not data.get("ok"):
         raise RuntimeError(f"Worker /admin/users-list error: {data.get('error', 'unknown')}")
@@ -55,6 +60,23 @@ def unsub_url(email):
     e_enc = base64.urlsafe_b64encode(email.lower().encode("utf-8")).decode("ascii").rstrip("=")
     sig = hmac.new(UNSUB_SECRET.encode("utf-8"), email.lower().encode("utf-8"), hashlib.sha256).hexdigest()[:32]
     return f"{WORKER_BASE}/unsub?e={e_enc}&t={sig}"
+
+
+PAGOS = {"pro", "premium", "full", "analysis", "c360"}
+
+
+def plan_efectivo(user, ahora_ms):
+    plan = (user.get("plan") or "free").lower()
+    if plan == "basic":
+        plan = "free"
+    exp = user.get("planExpiresAt")
+    if plan in PAGOS and exp:
+        try:
+            if float(exp) < ahora_ms:
+                return "free"
+        except (TypeError, ValueError):
+            pass
+    return plan
 
 
 def first_name(user):
@@ -111,7 +133,8 @@ def handler(event, context):
     limit_to = event.get("limitTo")
     from_addr = event.get("from") or DEFAULT_FROM
     reply_to = event.get("replyTo") or DEFAULT_REPLY_TO
-    rate_delay = float(event.get("rateDelaySec", 1.1))
+    rate_delay = float(event.get("rateDelaySec", 0.1))
+    plans = event.get("plans")
 
     if not subject:
         return {"ok": False, "error": "subject required"}
@@ -134,11 +157,23 @@ def handler(event, context):
     users = [u for u in users if not u.get("unsubscribed")]
     print(f"After unsub/email filter: {len(users)}")
 
+    ahora_ms = time.time() * 1000
+    por_plan = {}
+    for u in users:
+        u["_plan"] = plan_efectivo(u, ahora_ms)
+        por_plan[u["_plan"]] = por_plan.get(u["_plan"], 0) + 1
+    print(f"Por plan efectivo: {por_plan}")
+    if plans:
+        keep = {str(p).lower() for p in plans}
+        users = [u for u in users if u["_plan"] in keep]
+        print(f"After plans filter {sorted(keep)}: {len(users)}")
+
     if dry_run:
         return {
             "ok": True,
             "dryRun": True,
             "wouldSend": len(users),
+            "porPlan": por_plan,
             "sample": [
                 {"email": u["email"], "name": u.get("name"), "unsubUrl": unsub_url(u["email"])}
                 for u in users[:3]
@@ -147,6 +182,11 @@ def handler(event, context):
 
     sent, failed, errors = 0, 0, []
     for i, u in enumerate(users):
+        if context is not None and context.get_remaining_time_in_millis() < 8000:
+            print(f"Tiempo agotado tras {i} envíos; faltan {len(users) - i}")
+            return {"ok": False, "sent": sent, "failed": failed, "errors": errors,
+                    "total": len(users), "cortado": True,
+                    "pendientes": [x["email"] for x in users[i:]]}
         if i > 0:
             time.sleep(rate_delay)
         r = send_one(subject, html, from_addr, reply_to, u)
