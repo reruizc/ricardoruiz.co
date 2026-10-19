@@ -68,7 +68,12 @@ def baja(url, destino):
     os.makedirs(os.path.dirname(destino), exist_ok=True)
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     with urllib.request.urlopen(req, timeout=180) as r:
-        datos = json.loads(r.read().decode('utf-8'))
+        raw = r.read()
+    # los JSON de S3 pueden ir con Content-Encoding: gzip (urllib no descomprime solo)
+    if raw[:2] == b'\x1f\x8b':
+        import gzip
+        raw = gzip.decompress(raw)
+    datos = json.loads(raw.decode('utf-8'))
     json.dump(datos, open(destino, 'w', encoding='utf-8'), ensure_ascii=False)
     return datos
 
