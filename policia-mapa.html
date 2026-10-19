@@ -4,8 +4,17 @@
   <script defer src="/track.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <title>El mapa del delito · Policía 2015-2026 · Ricardo Ruiz</title>
   <meta name="description" content="Dónde se denuncia cada delito en Colombia: del mapa nacional a los 1.112 municipios, con los 21 delitos de la Policía Nacional entre 2015 y agosto de 2026." />
+  <link rel="canonical" href="https://ricardoruiz.co/policia-mapa.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Ricardo Ruiz" />
+  <meta property="og:title" content="El mapa del delito en Colombia, municipio por municipio" />
+  <meta property="og:description" content="Dónde se denuncia cada delito en Colombia: del mapa nacional a los 1.112 municipios, con los 21 delitos de la Policía Nacional entre 2015 y agosto de 2026." />
+  <meta property="og:url" content="https://ricardoruiz.co/policia-mapa.html" />
+  <meta property="og:image" content="https://ricardoruiz.co/imagenes-index/proyectos/policia.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
@@ -109,13 +118,10 @@
   <div class="page-header compacta">
     <div class="page-tag">Policía Nacional · 2015–ago 2026</div>
     <h1 class="page-title">El mapa del delito</h1>
-    <p class="page-sub">Escoge un delito y un año y mira dónde se denuncia. Haz clic en un departamento para bajar a sus municipios, y en <strong>Bogotá, Medellín o Cali</strong> para llegar a la comuna y al barrio. Los conteos son <strong>denuncias</strong>, no víctimas totales. Con un año de 2018 en adelante puedes pasar a <strong>tasa por 100.000 habitantes</strong>, que es lo que permite comparar territorios de distinto tamaño.</p>
+    <p class="page-sub">Escoge un delito y un año y mira dónde se denuncia. Haz clic en un departamento para bajar a sus municipios, y en <strong>Bogotá, Medellín o Cali</strong> para llegar a la comuna y al barrio, año por año desde 2015. Las otras seis ciudades grandes tienen su mes a mes en <a href="policia-ciudades.html" style="color:var(--amber)">Ciudades por dentro</a>. Los conteos son <strong>denuncias</strong>, no víctimas totales. Con un año de 2018 en adelante puedes pasar a <strong>tasa por 100.000 habitantes</strong>, que es lo que permite comparar territorios de distinto tamaño.</p>
   </div>
 
-  <div class="sec-bar">
-    <a href="policia.html" class="sec-back">← Todas las secciones</a>
-    <a href="policia-historico.html" class="sec-back">El histórico en cifras</a>
-  </div>
+  <div class="sec-bar" id="sec-bar"><a href="policia.html" class="sec-back">← Todas las secciones</a></div>
 
   <div class="mp-wrap">
     <div class="flt">
@@ -174,7 +180,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="legislativo-base.js"></script>
-  <script src="ponal-base.js"></script>
+  <script src="ponal-base.js?v=20261013"></script>
   <script>
   const ST={delito:'homicidios',anio:'todos',dep:null,mun:null,tasa:false,
             meta:null,deps:null,muns:null,pob:null,ciuIdx:null,ciu:null,
@@ -186,7 +192,7 @@
      orden de magnitud; la página lo declara. Solo existe por departamento y
      municipio: dentro de la ciudad (comunas) no hay modalidad. */
   const PISO_PCT=10;
-  const QUIEBRE_MOD='Desde enero de 2026 cambió cómo se registra la modalidad en algunas regiones: los «ataques de GAO» pasaron de 8% de los homicidios del país en diciembre de 2025 a 24% en enero de 2026, y el sicariato bajó en la misma proporción, sin que cambiara el total de homicidios. El salto se concentra en Antioquia (sicariato de 65% a 14%; grupos armados de 7% a 63%), Nariño, Cauca y Magdalena; en Bogotá, Atlántico, Sucre o Quindío no se movió. Es un cambio de clasificación, no un giro del conflicto que el dato pruebe: no compares 2026 con años anteriores en sicariato y grupos armados.';
+  const QUIEBRE_MOD=PONAL.QUIEBRE_MOD;
   const conMod=()=>ST.delito==='homicidios'&&ST.mod!=='todas'&&ST.MOD;
   function modDe(clave,esNac,grupo,anio){
     const o=(esNac?ST.MOD.deptos:ST.MOD.muns)[clave]||{};
@@ -317,6 +323,33 @@
     }
   }
 
+  /* ── enlace directo ────────────────────────────────────────────
+     ?d=delito&a=año&dep=DD&mun=DDDDD&t=1&mod=grupo&pct=1
+     Todo se valida contra los datos: un valor que no existe cae al de por
+     defecto, así un enlace viejo nunca deja la página rota. */
+  function leerEnlace(){
+    const q=PONAL.leerURL(), m=ST.meta;
+    const d=m.delitos.find(x=>x.id===q.d); if(d) ST.delito=d.id;
+    const dd=m.delitos.find(x=>x.id===ST.delito)||{};
+    if(q.a&&(q.a==='todos'||(m.anios.includes(+q.a)&&+q.a>=(dd.desde||0)))) ST.anio=q.a;
+    if(q.t==='1') ST.tasa=true;
+    if(ST.delito==='homicidios'&&ST.MOD&&ST.MOD.grupos.includes(q.mod)){
+      ST.mod=q.mod; if(q.pct==='1'){ ST.pct=true; ST.tasa=false; }
+    }
+    if(q.dep&&ST.deps[q.dep]) ST.dep=q.dep;
+    return (q.mun&&ST.ciuIdx[q.mun]&&ST.ciuIdx[q.mun].mapa)?q.mun:null;
+  }
+  function escribirEnlace(){
+    PONAL.escribirURL({d:ST.delito==='homicidios'?null:ST.delito, a:ST.anio==='todos'?null:ST.anio,
+      dep:ST.mun?null:ST.dep, mun:ST.mun, t:!!(ST.tasa&&hayTasa()),
+      mod:conMod()?ST.mod:null, pct:!!(conMod()&&ST.pct)});
+    const lab=(ST.meta.delitos.find(x=>x.id===ST.delito)||{}).label||'';
+    const ter=ST.mun?ST.ciuIdx[ST.mun].n:ST.dep?ST.deps[ST.dep].n:'Colombia';
+    document.title=`${lab} · ${ter} · El mapa del delito · Ricardo Ruiz`;
+  }
+  /* las nueve ciudades con mes a mes por comuna y barrio viven en otra página */
+  const urlCiudad=d=>`policia-ciudades.html?${PONAL.LOCAL?'local=1&':''}c=${d}&d=${ST.delito}`;
+
   /* nivel actual: 'nac' → 'dep' → 'ciu' (solo Bogotá, Medellín y Cali) */
   function nivel(){ return ST.mun?'ciu':(ST.dep?'dep':'nac'); }
 
@@ -345,9 +378,12 @@
         const k=claveDe(f.properties,nv), r=byKey[k];
         const nom=r?r.n:nombreGeo(f.properties,nv);
         const und=ST.tasa&&hayTasa()?' por 100.000 hab.':'';
-        l.bindTooltip(`<b>${esc(nom)}</b><br>${r?fmtV(r.v)+und:'sin dato'}`,{sticky:true});
+        const pista=nv==='dep'&&k&&ST.ciuIdx[k]&&ST.ciuIdx[k].mapa?'<br><span style="opacity:.6">clic: comunas y barrios</span>'
+                  :nv==='dep'&&k&&ST.ciuMes&&ST.ciuMes.has(k)?'<br><span style="opacity:.6">clic: mes a mes por comuna y barrio ↗</span>':'';
+        l.bindTooltip(`<b>${esc(nom)}</b><br>${r?fmtV(r.v)+und:'sin dato'}${pista}`,{sticky:true});
         if(nv==='nac'&&k) l.on('click',()=>abrirDep(k));
         if(nv==='dep'&&k&&ST.ciuIdx[k]&&ST.ciuIdx[k].mapa) l.on('click',()=>abrirCiudad(k));
+        else if(nv==='dep'&&k&&ST.ciuMes&&ST.ciuMes.has(k)) l.on('click',()=>{ location.href=urlCiudad(k); });
       }
     }).addTo(map);
     if(nv==='nac') PONAL.avisarSinMatch(geo.features.map(f=>f.properties.name),x=>claveDe({name:x},'nac'));
@@ -355,6 +391,7 @@
     pintarPanel(filas,nv);
     pintarLeyenda(max);
     pintarAvisos();
+    escribirEnlace();
   }
 
   /* Cada nivel casa por una llave distinta:
@@ -471,15 +508,19 @@
     const max=Math.max(1e-9,...filas.map(f=>f.v));
     document.getElementById('rk').innerHTML=filas.slice(0,30).map((f,i)=>{
       const drill=nv==='nac'?`data-dep="${f.k}"`
-                : (nv==='dep'&&ST.ciuIdx[f.k]&&ST.ciuIdx[f.k].mapa)?`data-ciu="${f.k}"`:'';
+                : (nv==='dep'&&ST.ciuIdx[f.k]&&ST.ciuIdx[f.k].mapa)?`data-ciu="${f.k}"`
+                : (nv==='dep'&&ST.ciuMes&&ST.ciuMes.has(f.k))?`data-mes="${f.k}"`:'';
+      const marca=drill.startsWith('data-ciu')?' <span style="opacity:.5">↳</span>'
+                 :drill.startsWith('data-mes')?' <span style="opacity:.5" title="Mes a mes por comuna y barrio, en Ciudades por dentro">↗</span>':'';
       return `<button class="rk-i" ${drill}>
          <span class="rk-p">${i+1}</span>
-         <span class="rk-n">${esc(f.n)}${drill&&nv==='dep'?' <span style="opacity:.5">↳</span>':''}</span>
+         <span class="rk-n">${esc(f.n)}${marca}</span>
          <span class="rk-v">${fmtV(f.v)}</span>
          <span class="rk-b" style="width:${Math.max(2,100*f.v/max)}%"></span>
        </button>`;}).join('')||'<div style="font-size:.72rem;color:var(--gray)">Sin denuncias registradas.</div>';
     document.querySelectorAll('#rk .rk-i[data-dep]').forEach(b=>b.onclick=()=>abrirDep(b.dataset.dep));
     document.querySelectorAll('#rk .rk-i[data-ciu]').forEach(b=>b.onclick=()=>abrirCiudad(b.dataset.ciu));
+    document.querySelectorAll('#rk .rk-i[data-mes]').forEach(b=>b.onclick=()=>{ location.href=urlCiudad(b.dataset.mes); });
 
     document.getElementById('bcrumb').innerHTML=
       nv==='nac' ? '<span>Colombia · 33 departamentos</span>'
@@ -515,8 +556,9 @@
          <span class="rk-b" style="width:${Math.max(2,100*b.v/max)}%"></span>
        </div>`).join('')
       :'<div style="font-size:.72rem;color:var(--gray)">Sin denuncias de este delito.</div>';
-    document.getElementById('bar-n').textContent=
-      `El total por barrio es de todos los años juntos, no del año escogido arriba.`;
+    document.getElementById('bar-n').innerHTML=
+      `El total por barrio es de todos los años juntos, no del año escogido arriba.`+
+      (ST.ciuMes&&ST.ciuMes.has(ST.mun)?` Para el barrio mes a mes, con mapa: <a href="${urlCiudad(ST.mun)}" style="color:var(--amber)">${esc(ST.ciuIdx[ST.mun].n)} por dentro →</a>`:'');
   }
 
   /* El botón de tasa se apaga solo donde la tasa no existe, y dice por qué en
@@ -588,6 +630,7 @@
 
   /* ── arranque ───────────────────────────────────────────────── */
   (async()=>{
+    PONAL.barraSecciones('mapa');
     try{
       const [m,dp,mu,ci]=await Promise.all([PONAL.meta(),PONAL.deptos(),PONAL.municipios(),PONAL.ciudades()]);
       ST.meta=m; ST.deps=dp.deptos; ST.muns=mu.muns; ST.ciuIdx=ci.ciudades;
@@ -595,8 +638,12 @@
       try{ ST.pob=await PONAL.poblacion(); }catch(e){ console.warn('[PONAL] sin población, solo conteo'); }
       /* la modalidad también es best-effort: sin ella el filtro no aparece */
       try{ ST.MOD=await PONAL.modalidad(); }catch(e){ console.warn('[PONAL] sin modalidad del homicidio'); }
+      /* qué ciudades tienen además el mes a mes por barrio (best-effort) */
+      try{ ST.ciuMes=new Set((await PONAL.ciudadesMes()).ciudades.map(c=>c.dane)); }catch(e){ ST.ciuMes=new Set(); }
       document.getElementById('btn-tasa').onclick=()=>{ ST.tasa=!ST.tasa; pintar(); };
-      pintarFiltros(); initMapa(); await pintar();
+      const mun=leerEnlace();
+      pintarFiltros(); initMapa();
+      if(mun) await abrirCiudad(mun); else await pintar();
     }catch(e){
       document.getElementById('map').innerHTML=
         `<div style="padding:2rem;font-size:.8rem;color:var(--gray)">No pude cargar los datos: ${esc(e.message)}</div>`;

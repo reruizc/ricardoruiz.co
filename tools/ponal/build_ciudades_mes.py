@@ -172,7 +172,7 @@ def main():
                          sin_com=defaultdict(lambda: [0] * len(MESES)),
                          com=defaultdict(lambda: defaultdict(lambda: [0] * len(MESES))),
                          bar=defaultdict(lambda: defaultdict(lambda: [0] * len(MESES))),
-                         bar_info={}, casado=0, con_barrio=0, total=0)
+                         bar_info={}, casado=0, con_barrio=0, total=0, rechazo=0)
 
     with SRC_2.open(encoding="utf-8-sig", newline="") as f:
         rd = csv.reader(f, delimiter=";")
@@ -220,6 +220,13 @@ def main():
                     d = comuna_por_desc(dane, row[I["Hechos.COMUNAS_ZONAS_DESCRIPCION"]])
                     if d is not None:
                         com = d
+                # si ya se sabe la comuna y el polígono casado está en OTRA, el
+                # casamiento está mal (medido: «Las Acacias» de Kennedy caía en
+                # «Acacias Usaquén»). Se descarta el polígono, no la comuna.
+                if com is not None and pi is not None and C["bar_com"][pi] is not None and C["bar_com"][pi] != com:
+                    C["casado"] -= q
+                    C["rechazo"] += q
+                    pi = None
                 if com is None and pi is not None:
                     com = C["bar_com"][pi]
             else:
@@ -237,8 +244,9 @@ def main():
                 C["com"][com][did][mi] += q
             key = clave_barrio(b)
             C["bar"][key][did][mi] += q
-            inf = C["bar_info"].setdefault(key, {"n": Counter(), "p": pi, "c": Counter()})
+            inf = C["bar_info"].setdefault(key, {"n": Counter(), "p": Counter(), "c": Counter()})
             inf["n"][b.title()] += q
+            inf["p"][pi] += q        # el polígono lo decide la mayoría de las filas, no la primera
             if com is not None:
                 inf["c"][com] += q
 
@@ -249,7 +257,8 @@ def main():
         barrios = []
         for key, dd in C["bar"].items():
             inf = C["bar_info"][key]
-            barrios.append([inf["n"].most_common(1)[0][0], inf["p"] if inf["p"] is not None else -1,
+            pm = inf["p"].most_common(1)[0][0]
+            barrios.append([inf["n"].most_common(1)[0][0], pm if pm is not None else -1,
                             inf["c"].most_common(1)[0][0] if inf["c"] else None,
                             {d: v for d, v in dd.items() if any(v)}])
         barrios.sort(key=lambda x: -sum(sum(v) for v in x[3].values()))
@@ -262,14 +271,14 @@ def main():
                "comunas": {str(k): {d: v for d, v in x.items() if any(v)} for k, x in C["com"].items()},
                "barrios": [[n, p, (str(cm) if cm is not None else None), d] for n, p, cm, d in barrios],
                "cobertura": {"hechos": C["total"], "con_barrio": C["con_barrio"], "casado": C["casado"],
-                             "modos": dict(C["cas"].modo),
+                             "modos": dict(C["cas"].modo), "rechazo_comuna": C["rechazo"],
                              "con_comuna": C["total"] - sum(sum(v) for v in C["sin_com"].values())}}
         (OUT / f"{dane}.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
         cb = out["cobertura"]
         index.append({"dane": dane, "n": c["n"], "tipo": c["tipo"], "hechos": cb["hechos"]})
         print(f"  {c['n']:12s} {cb['hechos']:>8,} hechos · con barrio {100*cb['con_barrio']/cb['hechos']:.1f}% · "
               f"casado a polígono {100*cb['casado']/max(1,cb['con_barrio']):.1f}% · con comuna {100*cb['con_comuna']/cb['hechos']:.1f}% · "
-              f"{len(barrios)} barrios · {(OUT / f'{dane}.json').stat().st_size/1024:.0f} KB · {dict(C['cas'].modo)}")
+              f"rechazados por comuna {C['rechazo']:,} · {len(barrios)} barrios · {(OUT / f'{dane}.json').stat().st_size/1024:.0f} KB · {dict(C['cas'].modo)}")
     index.sort(key=lambda x: -x["hechos"])
     (OUT / "index.json").write_text(json.dumps({"v": "2026-09-30", "meses": MESES, "ciudades": index}, ensure_ascii=False), encoding="utf-8")
 

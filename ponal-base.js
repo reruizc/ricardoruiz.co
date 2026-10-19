@@ -1,4 +1,5 @@
-/* Base de datos compartida del hub de Policía (hub + mapa + histórico).
+/* Base de datos compartida del hub de Policía (hub + mapa + ciudades +
+   histórico + datos abiertos).
    Lo visual lo pone `legislativo-base.css` / `legislativo-base.js`, que son
    genéricos (cursor, nav, tarjetas, modal, sesión); aquí solo vive lo que
    sabe de PONAL: de dónde bajan los JSON, el catálogo de delitos y el cruce
@@ -34,6 +35,9 @@
   const municipios =()=>j(BASE+'/municipios.json'+V(),'muns');
   /* modalidad presunta del homicidio (MinDefensa): la entrega SIEDCO no la trae */
   const modalidad  =()=>j(BASE+'/homicidio-modalidad.json'+V(),'mod');
+  /* índice de las nueve ciudades mes a mes (1 KB): lo usan el hub, el mapa y
+     la página de datos abiertos para enlazar a policia-ciudades.html */
+  const ciudadesMes=()=>j(BASE+'/ciudades-mes/index.json'+V(),'ciu-mes-idx');
   const geoDeptos  =()=>j(MAPAS+'/DEPARTAMENTOS2.json','geo-dep');
   /* Los archivos municipales se llaman por código ELECTORAL, pero adentro
      cada municipio trae `mpio_cdpmp`, que es el DANE de 5 dígitos — el mismo
@@ -100,7 +104,57 @@
       geometry:{...x.geometry, coordinates:f(x.geometry.coordinates)}}))};
   }
 
-  window.PONAL={meta,nacional,deptos,municipios,modalidad,poblacion,ciudades,ciudad,
+  /* ── quiebre de registro de la modalidad del homicidio ────────────────
+     Medido mes a mes y por departamento (sep-2026). Lo citan el mapa, el
+     histórico y la página de datos abiertos: una sola copia para que no se
+     desincronicen si se corrige una cifra. */
+  const QUIEBRE_MOD='Desde enero de 2026 cambió cómo se registra la modalidad en algunas regiones: los «ataques de GAO» pasaron de 8% de los homicidios del país en diciembre de 2025 a 24% en enero de 2026, y el sicariato bajó en la misma proporción, sin que cambiara el total de homicidios. El salto se concentra en Antioquia (sicariato de 65% a 14%; grupos armados de 7% a 63%), Nariño, Cauca y Magdalena; en Bogotá, Atlántico, Sucre o Quindío no se movió. Es un cambio de clasificación, no un giro del conflicto que el dato pruebe: no compares 2026 con años anteriores en sicariato y grupos armados.';
+
+  /* ── las secciones del hub: UNA lista para las cinco páginas ───────────
+     Antes cada página escribía su barra a mano y se habían desincronizado (el
+     mapa no enlazaba a datos abiertos, el histórico tampoco). La página deja
+     en #sec-bar solo el enlace al hub, por si este script no carga. */
+  const SECCIONES=[
+    ['mapa','policia-mapa.html','El mapa del delito'],
+    ['ciudades','policia-ciudades.html','Ciudades por dentro'],
+    ['historico','policia-historico.html','El histórico en cifras'],
+    ['abiertos','policia-abiertos.html','Lo que el Estado publica']];
+  function barraSecciones(actual){
+    const el=document.getElementById('sec-bar'); if(!el) return;
+    if(!document.getElementById('ponal-sec-css')){
+      const st=document.createElement('style'); st.id='ponal-sec-css';
+      st.textContent='.sec-back.actual{background:rgba(74,222,128,.14);border-color:#4ade80;color:var(--white);pointer-events:none}'+
+        /* en el teléfono, cinco botones apilados ocupaban 172 px: van en una tira que se desliza */
+        '@media(max-width:640px){#sec-bar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:.2rem}#sec-bar::-webkit-scrollbar{display:none}#sec-bar .sec-back{white-space:nowrap;flex:0 0 auto}}';
+      document.head.appendChild(st);
+    }
+    /* ?local=1 viaja entre secciones: así se verifica un build sin subirlo */
+    const q=LOCAL?'?local=1':'';
+    el.innerHTML=`<a href="policia.html${q}" class="sec-back">← Todas las secciones</a>`+
+      SECCIONES.map(([k,h,n])=>`<a href="${h}${q}" class="sec-back${k===actual?' actual':''}"${k===actual?' aria-current="page"':''}>${n}</a>`).join('');
+    /* en la tira del teléfono, la página actual tiene que quedar a la vista */
+    const a=el.querySelector('.actual');
+    if(a&&el.scrollWidth>el.clientWidth)
+      el.scrollLeft=a.getBoundingClientRect().left-el.getBoundingClientRect().left+el.scrollLeft-16;
+  }
+
+  /* ── estado en la URL ─────────────────────────────────────────────────
+     Cada vista se puede compartir con su enlace (delito, año, territorio,
+     ciudad, mes). replaceState y no pushState: mover un filtro no debe llenar
+     el historial del navegador. Los valores por defecto se omiten para que
+     el enlace salga corto, y `local` se conserva. */
+  function leerURL(){ return Object.fromEntries(new URLSearchParams(location.search)); }
+  function escribirURL(o){
+    const q=new URLSearchParams(location.search);
+    Object.entries(o).forEach(([k,v])=>{
+      if(v==null||v===''||v===false) q.delete(k); else q.set(k,v===true?'1':String(v));
+    });
+    const s=q.toString();
+    try{ history.replaceState(null,'',location.pathname+(s?'?'+s:'')+location.hash); }catch(e){}
+  }
+
+  window.PONAL={meta,nacional,deptos,municipios,modalidad,poblacion,ciudades,ciudad,ciudadesMes,
     geoDeptos,geoMuns,geoCiudad,rotar90,
-    DANE_A_ELECTORAL,ALIAS,norm,color,RAMPA,conSerie,avisarSinMatch,BASE};
+    DANE_A_ELECTORAL,ALIAS,norm,color,RAMPA,conSerie,avisarSinMatch,BASE,LOCAL,
+    QUIEBRE_MOD,SECCIONES,barraSecciones,leerURL,escribirURL};
 })();

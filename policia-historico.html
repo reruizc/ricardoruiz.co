@@ -4,8 +4,17 @@
   <script defer src="/track.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <title>El histórico en cifras · Policía 2015-2026 · Ricardo Ruiz</title>
   <meta name="description" content="Qué subió y qué bajó en diez años de denuncias a la Policía Nacional: tendencia por delito, hora del día, día de la semana y perfil de la víctima." />
+  <link rel="canonical" href="https://ricardoruiz.co/policia-historico.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Ricardo Ruiz" />
+  <meta property="og:title" content="El delito en Colombia: qué subió y qué bajó desde 2015" />
+  <meta property="og:description" content="Qué subió y qué bajó en diez años de denuncias a la Policía Nacional: tendencia por delito, hora del día, día de la semana y perfil de la víctima." />
+  <meta property="og:url" content="https://ricardoruiz.co/policia-historico.html" />
+  <meta property="og:image" content="https://ricardoruiz.co/imagenes-index/proyectos/policia.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
@@ -129,10 +138,7 @@
     <p class="page-sub">Once años completos de denuncias, más lo que va de 2026, delito por delito. Qué creció y qué cayó, en qué mes y a qué hora ocurre, y a quién le pasa. Todo es <strong>denuncia registrada</strong>: si un delito sube, puede ser que ocurra más o que se denuncie más — y en varios casos es lo segundo.</p>
   </div>
 
-  <div class="sec-bar">
-    <a href="policia.html" class="sec-back">← Todas las secciones</a>
-    <a href="policia-mapa.html" class="sec-back">El mapa del delito</a>
-  </div>
+  <div class="sec-bar" id="sec-bar"><a href="policia.html" class="sec-back">← Todas las secciones</a></div>
 
   <div class="hs">
     <div class="sec">
@@ -142,7 +148,7 @@
       <div class="warn" id="w-tend"></div>
     </div>
 
-    <div class="sec">
+    <div class="sec" id="perfil" style="scroll-margin-top:80px">
       <div class="sec-t">El perfil de cada delito</div>
       <div class="sec-s">Escoge uno y mira cuándo ocurre y a quién le ocurre. La hora y el día de la semana están en <b>casi todos</b> los registros, incluso en los que no traen año. El perfil de la persona —género, edad, estudios, ocupación, nacionalidad— es el de <b>la víctima</b>, no el del agresor; la fuente solo describe al agresor por cómo se movía.</div>
       <div id="pills" style="margin-bottom:1.2rem"></div>
@@ -205,7 +211,7 @@
   </footer>
 
   <script src="legislativo-base.js"></script>
-  <script src="ponal-base.js"></script>
+  <script src="ponal-base.js?v=20261013"></script>
   <script>
   const ST={meta:null,nac:null,sel:'homicidios'};
 
@@ -273,19 +279,21 @@
       }).join('')+'</tbody>';
 
     const par=filas.filter(f=>f.parcial);
-    document.getElementById('w-tend').innerHTML=
-      `<b>Tres delitos no tienen tendencia confiable.</b> ${par.map(f=>
+    const N_TXT=['Ningún delito','Un delito','Dos delitos','Tres delitos','Cuatro delitos','Cinco delitos'];
+    const nPar=N_TXT[par.length]||`${par.length} delitos`;
+    document.getElementById('w-tend').innerHTML=(par.length?
+      `<b>${nPar} ${par.length===1?'no tiene':'no tienen'} tendencia confiable.</b> ${par.map(f=>
         `<i>${esc(f.label.toLowerCase())}</i> (solo ${f.cob}% con año)`).join(', ')}:
        a más de la mitad de esos registros la fuente no les puso año, así que su curva
        está construida sobre una fracción del dato y no sabemos si lo que falta se
        reparte parejo entre los años. El cambio va en gris y con <b>?</b> a propósito —
        <b>no lo leas como que el delito se multiplicó</b>. El total de la primera columna
-       sí es firme: ahí entran todos los registros.
-       <br><br><b>Por eso las columnas de año no suman el total:</b>
+       sí es firme: ahí entran todos los registros.<br><br>`:'')+
+       `<b>Por eso las columnas de año no suman el total:</b>
        ${fmt(ST.meta.calidad.sin_anio_total)} hechos
        (${String(ST.meta.calidad.sin_anio_pct).replace('.',',')}% del archivo) quedan fuera de
        cualquier año concreto.
-       <br><br><b>Las dos últimas columnas sí son firmes para los tres</b>: las entregas de
+       <br><br><b>Las tres últimas columnas sí son firmes para todos los delitos</b>: las entregas de
        2025 y 2026 traen fecha en todos los registros, así que el cambio de enero a
        ${['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][(ST.meta.anio_parcial||{}).hasta_mes||12]}
        compara lo mismo con lo mismo.`;
@@ -297,6 +305,8 @@
       `<button class="pill${d.id===ST.sel?' on':''}" data-d="${d.id}">${esc(d.label)}</button>`).join('');
     document.querySelectorAll('#pills .pill').forEach(b=>b.onclick=()=>{
       ST.sel=b.dataset.d; pills(); perfil();
+      /* ?d=delito deja compartir el perfil que se está mirando */
+      PONAL.escribirURL({d:ST.sel==='homicidios'?null:ST.sel});
     });
   }
   function barras(el,labels,vals,fmtL){
@@ -450,7 +460,7 @@
      Barras apiladas al 100% por año. Solo con homicidios: es el único delito
      para el que existe la variable. Best-effort: sin el JSON, no aparece. */
   /* Quiebre de registro medido mes a mes y por departamento (sep-2026). */
-  const QUIEBRE_MOD='Desde enero de 2026 cambió cómo se registra la modalidad en algunas regiones: los «ataques de GAO» pasaron de 8% de los homicidios del país en diciembre de 2025 a 24% en enero de 2026, y el sicariato bajó en la misma proporción, sin que cambiara el total de homicidios. El salto se concentra en Antioquia (sicariato de 65% a 14%; grupos armados de 7% a 63%), Nariño, Cauca y Magdalena; en Bogotá, Atlántico, Sucre o Quindío no se movió. Es un cambio de clasificación, no un giro del conflicto que el dato pruebe: no compares 2026 con años anteriores en sicariato y grupos armados.';
+  const QUIEBRE_MOD=PONAL.QUIEBRE_MOD;
   const MOD_COL={sicariato:'#d1584e',armados:'#be185d',rina:'#e0a03a',atraco:'#22d3ee',familia:'#a78bfa',otras:'#475569',establecer:'#334155'};
   function modalidad(s){
     const box=document.getElementById('mod-wrap'), M=ST.mod;
@@ -514,11 +524,16 @@
   }
 
   (async()=>{
+    PONAL.barraSecciones('historico');
     try{
       const [m,n]=await Promise.all([PONAL.meta(),PONAL.nacional()]);
       ST.meta=m; ST.nac=n;
+      const q=PONAL.leerURL();
+      if(q.d&&m.delitos.some(x=>x.id===q.d)) ST.sel=q.d;
       try{ ST.mod=await PONAL.modalidad(); }catch(e){ console.warn('[PONAL] sin modalidad del homicidio'); }
       tabla(); pills(); perfil(); calidad();
+      /* con ?d= el visitante viene por un perfil concreto: se lleva hasta allá */
+      if(q.d&&ST.sel===q.d) document.getElementById('perfil').scrollIntoView({behavior:'instant',block:'start'});
     }catch(e){
       document.querySelector('.hs').innerHTML=
         `<div class="sec"><div class="sec-t">No pude cargar los datos</div>

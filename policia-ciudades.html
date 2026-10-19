@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ciudades por dentro · Policía · Ricardo Ruiz</title>
+  <meta name="description" content="Nueve ciudades de Colombia por comuna y por barrio, mes a mes: Bogotá, Medellín, Cali, Barranquilla, Cartagena, Bucaramanga, Cúcuta, Pereira y Manizales, con la denuncia ante la Policía Nacional desde enero de 2025." />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="canonical" href="https://ricardoruiz.co/policia-ciudades.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Ricardo Ruiz" />
+  <meta property="og:title" content="Ciudades por dentro: el delito por comuna y barrio, mes a mes" />
+  <meta property="og:description" content="Nueve ciudades de Colombia por comuna y por barrio, con la denuncia ante la Policía Nacional desde enero de 2025." />
+  <meta property="og:url" content="https://ricardoruiz.co/policia-ciudades.html" />
+  <meta property="og:image" content="https://ricardoruiz.co/imagenes-index/proyectos/policia.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="legislativo-base.css" />
+  <!-- mismos estilos y mismo motor de gráficos que policia-abiertos.html -->
+  <link rel="stylesheet" href="ponal-graficos.css?v=20261013" />
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="policia.html" class="e-btn-back" id="nav-back-btn">← Policía</a>
+      <span class="nav-page-tag">Policía</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <div class="country-selector-wrap">
+        <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+          <span id="countryBtnLabel">Colombia</span>
+          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="country-dropdown" id="countryDropdown">
+          <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+          <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+          <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+          <div class="country-option" data-value="br" onclick="selectCountry(this)"><span class="country-check">✓</span> Brasil</div>
+          <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+        </div>
+      </div>
+      <a href="index.html" class="logo-link">
+        <div class="logo-bars">
+          <div class="logo-bar" style="height:20px"></div>
+          <div class="logo-bar" style="height:15px"></div>
+          <div class="logo-bar" style="height:9px"></div>
+          <div class="logo-bar" style="height:4px"></div>
+        </div>
+        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">Policía Nacional · entrega SIEDCO · mes a mes</div>
+    <h1 class="page-title">Ciudades por dentro</h1>
+    <p class="page-sub">Nueve ciudades con su mapa de <strong>comunas o localidades</strong> y su mapa de <strong>barrios</strong>. Escoge la ciudad, el delito y el mes: cada mes se compara con el anterior y el <strong>año corrido</strong> con el mismo tramo del año pasado. El enlace de esta página cambia con lo que escojas, así que puedes <strong>compartir exactamente la vista</strong> que estás mirando. Es denuncia registrada, no delito ocurrido.</p>
+  </div>
+
+  <div class="sec-bar" id="sec-bar"><a href="policia.html" class="sec-back">← Todas las secciones</a></div>
+
+  <div class="hs" id="hs">
+    <div class="loading" id="loading">Cargando el índice de ciudades…</div>
+    <div id="cuerpo" style="display:none">
+    <div class="sec" id="s-ciudades">
+      <div class="sec-n">Mes a mes · comuna y barrio</div>
+      <div class="sec-t" id="t-ciu-h">Cada ciudad por dentro</div>
+      <div class="sec-s">El barrio de la denuncia se casa por nombre con la cartografía barrial. El que no casa sigue contando en la ciudad, y en su comuna cuando se sabe, pero no se pinta en el mapa de barrios.</div>
+      <div class="ctl"><label>Ciudad</label><span id="p-ciu"></span></div>
+      <div class="ctl"><label>Delito</label><select class="sel" id="s-ciu-del"></select>
+        <label>Mes</label><select class="sel" id="s-ciu-mes"></select></div>
+      <div class="kpis" id="k-ciu"></div>
+      <div class="nota" id="n-ciu-hist" style="margin:-.4rem 0 1rem"></div>
+      <div class="warn" id="w-ciu" style="display:none;margin:0 0 1rem"></div>
+      <div class="g2">
+        <div><div class="mini-t" id="t-ciu-serie">Por mes</div><div class="ch" id="c-ciu-serie"></div><div class="leg" id="l-ciu-serie"></div></div>
+        <div><div class="mini-t">Qué delitos mueven el cambio del año corrido</div><div class="bars" id="b-ciu-del"></div></div>
+      </div>
+      <div class="ctl" style="margin-top:1.3rem"><label>Pintar</label><span id="p-ciu-met"></span></div>
+      <div class="g2">
+        <div><div class="mini-t" id="h-ciu-com">Comunas</div><div id="map-com" class="mapc"></div></div>
+        <div><div class="mini-t" id="h-ciu-bar">Barrios</div><div id="map-bar" class="mapc"></div></div>
+      </div>
+      <div class="leg" id="l-ciu-map"></div>
+      <div class="nota" id="n-ciu-map"></div>
+      <div class="mini-t" style="margin-top:1.4rem" id="t-ciu-tcom">Comunas</div>
+      <div class="scrollx"><table class="tt" id="t-ciu-com"></table></div>
+      <div class="ctl" style="margin-top:1.4rem"><label>Barrios</label><span id="p-ciu-ord"></span><input class="sel" id="q-ciu-bar" placeholder="Buscar barrio…" style="min-width:170px"></div>
+      <div class="scrollx"><table class="tt" id="t-ciu-bar"></table></div>
+      <div class="nota" id="n-ciu-bar"></div>
+    </div>
+    </div>
+  </div>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Policía · Ciudades por dentro</span>
+    <a href="policia.html" class="e-btn-back" style="font-size:.62rem">← Policía</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script src="ponal-base.js?v=20261013"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="ponal-graficos.js?v=20261013"></script>
+  <script>
+  /* Un JSON por ciudad desde tools/ponal/build_ciudades_mes.py. El módulo salió
+     tal cual de policia-abiertos.html (sección 04): mismas cuentas, mismos
+     avisos. Lo nuevo aquí es el enlace directo y la guarda contra la carrera. */
+  const ST={};
+  /* ═════════════════════════ 4 · ciudades ═════════════════════════
+     Un JSON por ciudad (build_ciudades_mes.py): meses 2025-01…2026-08, por
+     delito, a nivel ciudad · comuna · barrio. Todo el cálculo de mes anterior y
+     año corrido vive en `per()`, para que mapa, tabla y KPIs no puedan
+     discrepar entre sí. */
+  const CIU={idx:null,cache:{},geo:{},sel:null,del:'todos',mes:null,met:'dytd',ord:'ytd',q:'',maps:{}};
+  const MESL=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const mesTxt=m=>{const [a,b]=m.split('-');return MESL[+b-1]+' de '+a};
+  async function ciuData(d){
+    if(!CIU.cache[d]) CIU.cache[d]=await J('ciudades-mes/'+d+'.json');
+    return CIU.cache[d];
+  }
+  async function ciuGeo(url,rot){
+    if(!CIU.geo[url]){ const r=await fetch(url); if(!r.ok) throw new Error('geo '+r.status); let g=await r.json(); if(rot) g=PONAL.rotar90(g); CIU.geo[url]=g; }
+    return CIU.geo[url];
+  }
+  /* suma de un registro {delito:[20 meses]} según el delito escogido */
+  function serieDe(rec){
+    if(!rec) return null;
+    if(CIU.del!=='todos') return rec[CIU.del]||null;
+    let out=null; Object.values(rec).forEach(v=>{ if(!out) out=v.slice(); else v.forEach((x,i)=>out[i]+=x); });
+    return out;
+  }
+  /* periodos: mes, mes anterior, año corrido y el mismo tramo del año anterior */
+  function periodos(D){
+    const i=D.meses.indexOf(CIU.mes), [a,m]=CIU.mes.split('-').map(Number);
+    const yi=D.meses.map((x,k)=>[x,k]).filter(([x])=>+x.slice(0,4)===a&&+x.slice(5)<=m).map(([,k])=>k);
+    const yp=D.meses.map((x,k)=>[x,k]).filter(([x])=>+x.slice(0,4)===a-1&&+x.slice(5)<=m).map(([,k])=>k);
+    return {i, ip:i-1, yi, yp:yp.length===yi.length?yp:null};
+  }
+  function per(v,P){
+    if(!v) return {m:0,mp:0,dm:null,y:0,yp:null,dy:null};
+    const sum=ix=>ix.reduce((t,k)=>t+(v[k]||0),0);
+    const m=v[P.i]||0, mp=P.ip>=0?(v[P.ip]||0):null, y=sum(P.yi), yp=P.yp?sum(P.yp):null;
+    return {m,mp,dm:mp?100*(m-mp)/mp:null,y,yp,dy:yp?100*(y-yp)/yp:null};
+  }
+  const sig=v=>v==null?'—':(v>0?'+':'')+v.toFixed(1).replace('.',',')+'%';
+  const cls=v=>v==null?'gr':v>0?'up':v<0?'dn':'';
+  /* color divergente: rojo sube, verde baja; gris si la base es chica (un
+     barrio que pasa de 2 a 4 «sube 100%» y no dice nada) */
+  const DIV_UP=['#3b1d1d','#6b2626','#9c3030','#cc3d3d','#f05a4f'], DIV_DN=['#13302a','#1b4d40','#226b57','#2a8a6f','#34b38f'];
+  function colorCambio(pct,base){
+    if(pct==null||base<10) return 'rgba(255,255,255,.06)';
+    const t=Math.min(1,Math.abs(pct)/60), k=Math.min(4,Math.floor(t*5));
+    return pct>=0?DIV_UP[k]:DIV_DN[k];
+  }
+  /* Peso de cada unidad dentro de lo que SÍ quedó ubicado. Si el barrio
+     pendiente se lleva parejo un pedazo de todas las comunas, el peso no
+     cambia: es la lectura que no depende de cuántos hechos perdieron el barrio.
+     `dp` = cambio relativo del peso frente al mismo tramo del año anterior. */
+  function pesos(rs){
+    const t1=rs.reduce((a,r)=>a+r.y,0), t0=rs.reduce((a,r)=>a+(r.yp||0),0);
+    rs.forEach(r=>{ r.s1=t1?100*r.y/t1:null; r.s0=(t0&&r.yp!=null)?100*r.yp/t0:null; r.dp=(r.s0&&r.s1!=null)?100*(r.s1/r.s0-1):null; });
+  }
+  function valorMapa(r){
+    if(CIU.met==='mes') return {v:r.m,c:null};
+    if(CIU.met==='ytd') return {v:r.y,c:null};
+    if(CIU.met==='dmes') return {v:r.dm,c:colorCambio(r.dm,r.mp||0)};
+    if(CIU.met==='peso') return {v:r.dp,c:colorCambio(r.dp,r.yp||0)};
+    return {v:r.dy,c:colorCambio(r.dy,r.yp||0)};
+  }
+  function tipHtml(nom,r,extra){
+    return `<b>${esc(nom)}</b>${extra||''}<br>${mesTxt(CIU.mes)}: ${nf(r.m)} <span style="opacity:.7">(${sig(r.dm)} vs mes anterior)</span><br>Año corrido: ${nf(r.y)} <span style="opacity:.7">(${sig(r.dy)} vs ${+CIU.mes.slice(0,4)-1})</span>`+
+      (r.s1!=null?`<br>Peso en lo ubicado: ${pf(r.s1,1)} <span style="opacity:.7">(${r.s0==null?'—':pf(r.s0,1)} el año anterior)</span>`:'');
+  }
+  function mapaCiu(id){
+    if(!CIU.maps[id]){
+      const m=L.map(id,{zoomControl:true,attributionControl:false,scrollWheelZoom:false,zoomSnap:.25}).setView([4.6,-74.1],11);
+      CIU.maps[id]={m,layer:null,bounds:null,w:0};
+      if(window.ResizeObserver) new ResizeObserver(es=>{const nw=Math.round(es[0].contentRect.width),o=CIU.maps[id];
+        if(nw&&nw!==o.w){o.w=nw; o.m.invalidateSize(false); if(o.bounds) o.m.fitBounds(o.bounds,{padding:[8,8],animate:false});}}).observe(document.getElementById(id));
+    }
+    return CIU.maps[id];
+  }
+  function encuadrar(o,b){ o.bounds=b; setTimeout(()=>{o.m.invalidateSize(false); o.m.fitBounds(b,{padding:[8,8],animate:false});},0); }
+
+  /* `tok` evita la carrera: si alguien cambia de ciudad mientras la anterior
+     todavía baja, la vieja ya no pinta encima de la nueva */
+  async function ciudades(tok){
+    const D=await ciuData(CIU.sel); if(tok!==_pc) return;
+    const P=periodos(D), A=+CIU.mes.slice(0,4);
+    const tipoPl={localidad:'localidades',comuna:'comunas',UCG:'unidades comuneras (UCG)'}[D.tipo]||'comunas';
+    const delNom=CIU.del==='todos'?'todos los delitos':(ST.lab[CIU.del]||CIU.del).toLowerCase();
+    document.getElementById('t-ciu-h').textContent=`${D.n} por dentro`;
+    document.title=`${D.n} · ${CIU.del==='todos'?'Delitos':ST.lab[CIU.del]||CIU.del} · Ciudades por dentro · Ricardo Ruiz`;
+    const hist=ST.ciuHist&&ST.ciuHist[CIU.sel]&&ST.ciuHist[CIU.sel].mapa;
+    document.getElementById('n-ciu-hist').innerHTML=hist
+      ?`Para ver ${esc(D.n)} año por año desde 2015, por ${esc(D.tipo==='localidad'?'localidad':'comuna')}: <a href="policia-mapa.html?${PONAL.LOCAL?'local=1&':''}mun=${CIU.sel}${CIU.del!=='todos'?'&d='+CIU.del:''}" style="color:var(--amber)">el mapa del delito →</a>`
+      :'';
+    // KPIs ciudad
+    const rc=per(serieDe(D.ciudad),P), rpend=per(serieDe(D.pend),P), rsc=per(serieDe(D.sin_com),P);
+    const pp=(a,b)=>b?100*a/b:null;
+    document.getElementById('k-ciu').innerHTML=[
+      [nf(rc.m),`${mesTxt(CIU.mes)} · ${delNom}`],
+      [`<span class="${cls(rc.dm)==='up'?'no':cls(rc.dm)==='dn'?'ok':''}">${sig(rc.dm)}</span>`,`frente a ${MESL[(P.ip>=0?+D.meses[P.ip].slice(5):1)-1]} (${nf(rc.mp)})`],
+      [nf(rc.y),`año corrido, enero a ${MESL[+CIU.mes.slice(5)-1]} de ${A}`],
+      [`<span class="${cls(rc.dy)==='up'?'no':cls(rc.dy)==='dn'?'ok':''}">${sig(rc.dy)}</span>`,rc.yp==null?'sin año anterior en la entrega':`frente al mismo tramo de ${A-1} (${nf(rc.yp)})`],
+      [pf(pp(rpend.y,rc.y),0),'del año corrido sin barrio («pendiente por asignar»)'],
+      [pf(100*D.cobertura.casado/Math.max(1,D.cobertura.con_barrio),0),'de los hechos con barrio casan con un polígono'],
+    ].map(([b,t])=>`<div class="kpi"><b>${b}</b><span>${t}</span></div>`).join('');
+    // alerta del barrio pendiente: si cambió entre los dos tramos, la comparación por comuna/barrio está sesgada
+    const sp1=pp(rpend.y,rc.y), sp0=rc.yp?pp(per(serieDe(D.pend),P).yp,rc.yp):null, sm1=pp(rpend.m,rc.m), sm0=rc.mp?pp(rpend.mp,rc.mp):null;
+    const w=document.getElementById('w-ciu'), avisos=[];
+    if(sp0!=null&&Math.abs(sp1-sp0)>=5) avisos.push(`en el año corrido los hechos sin barrio pasaron de <b>${pf(sp0,0)}</b> a <b>${pf(sp1,0)}</b>`);
+    if(sm0!=null&&Math.abs(sm1-sm0)>=5) avisos.push(`entre los dos meses pasaron de <b>${pf(sm0,0)}</b> a <b>${pf(sm1,0)}</b>`);
+    w.style.display=avisos.length?'block':'none';
+    w.innerHTML=avisos.length?`<b>Ojo con los mapas de este delito:</b> ${avisos.join(' y ')}. La cifra de la ciudad está bien, pero una comuna o un barrio que «baja» puede estar perdiendo el barrio en el registro, no el delito. ${CIU.met==='peso'?'Estás viendo el <b>cambio de peso</b>, que compara cada unidad contra lo que sí quedó ubicado y no depende de cuántos hechos perdieron el barrio.':'<button class="pill" id="b-ciu-peso" style="margin:.4rem 0 0">Ver el cambio de peso, que no depende del barrio pendiente</button>'}`:'';
+    const bp=document.getElementById('b-ciu-peso'); if(bp) bp.onclick=()=>{CIU.met='peso'; document.querySelectorAll('#p-ciu-met button').forEach(x=>x.classList.toggle('on',x.dataset.v==='peso')); pintarCiu();};
+    // serie 2025 vs 2026
+    const sv=serieDe(D.ciudad)||[], lab=MESES.map(x=>x);
+    const y25=D.meses.map((x,k)=>x.startsWith('2025')?sv[k]:null).filter((x,k)=>D.meses[k].startsWith('2025'));
+    const y26=MESES.map((_,k)=>{const j=D.meses.indexOf(`2026-${String(k+1).padStart(2,'0')}`);return j>=0?sv[j]:null});
+    lineas('c-ciu-serie',lab,[{name:'2025',color:'rgba(255,255,255,.45)',values:y25,w:2},{name:'2026',color:AMB,values:y26,w:3}],{H:230});
+    leyenda('l-ciu-serie',[['2025','rgba(255,255,255,.45)',1],['2026',AMB,1]]);
+    document.getElementById('t-ciu-serie').textContent=`${D.n} · ${delNom} · 2025 contra 2026`;
+    // qué delitos explican el cambio del año corrido
+    const contrib=D.delitos.map(d=>{const r=per(D.ciudad[d],P);return {d,dif:r.yp==null?0:r.y-r.yp,r}}).filter(x=>x.dif).sort((a,b)=>Math.abs(b.dif)-Math.abs(a.dif)).slice(0,10);
+    barrasH('b-ciu-del',contrib.map(x=>({l:`${ST.lab[x.d]||x.d} · ${sig(x.r.dy)}`,v:Math.abs(x.dif),c:x.dif>0?RED:GRN})),{fmt:v=>v});
+    document.querySelectorAll('#b-ciu-del .bar-i .v').forEach((el,k)=>{const x=contrib[k]; el.textContent=(x.dif>0?'+':'−')+nf(Math.abs(x.dif));});
+    // comunas
+    const filas=Object.entries(D.comunas).map(([c,rec])=>({c,n:D.com_nom[c]||c,r:per(serieDe(rec),P)}));
+    pesos(filas.map(f=>f.r));
+    const byC={}; filas.forEach(f=>byC[f.c]=f);
+    const gC=await ciuGeo(D.geo.com,D.rot); if(tok!==_pc) return;
+    const oC=mapaCiu('map-com');
+    const valsC=filas.map(f=>valorMapa(f.r).v).filter(v=>v!=null), maxC=Math.max(...valsC,1);
+    if(oC.layer) oC.m.removeLayer(oC.layer);
+    oC.layer=L.geoJSON(gC,{style:(f)=>{const c=D.com_feat[gC.features.indexOf(f)], x=byC[c];
+        if(!x) return {color:'#060810',weight:.8,fillColor:'rgba(255,255,255,.04)',fillOpacity:1};
+        const vm=valorMapa(x.r); return {color:'#060810',weight:.8,fillColor:vm.c||PONAL.color(vm.v,maxC),fillOpacity:.92};},
+      onEachFeature:(f,l)=>{const c=D.com_feat[gC.features.indexOf(f)], x=byC[c]; l.bindTooltip(x?tipHtml(x.n,x.r):`<b>${esc(D.com_nom[c]||'')}</b><br>Sin hechos ubicados`,{sticky:true});}}).addTo(oC.m);
+    /* Encuadre: Bogotá trae Sumapaz (media ciudad sin denuncias) y Medellín sus
+       corregimientos; encuadrar por el bounds real deja el casco urbano diminuto. */
+    let bnd=oC.layer.getBounds();
+    if(D.ventana) bnd=L.latLngBounds([D.ventana[0],D.ventana[2]],[D.ventana[1],D.ventana[3]]);
+    else if(Array.isArray(D.encuadre)){ const b=L.latLngBounds([]); oC.layer.eachLayer(l=>{ if(D.encuadre.includes(+D.com_feat[gC.features.indexOf(l.feature)])) b.extend(l.getBounds()); }); if(b.isValid()) bnd=b; }
+    else if(D.encuadre==='bar') bnd=L.geoJSON(await ciuGeo(D.geo.bar,D.rot)).getBounds();
+    encuadrar(oC,bnd);
+    document.getElementById('h-ciu-com').textContent=`${D.n} · ${tipoPl}`;
+    // barrios
+    const gB=await ciuGeo(D.geo.bar,D.rot); if(tok!==_pc) return;
+    const oB=mapaCiu('map-bar');
+    const bar=D.barrios.map(([n,p,c,rec])=>({n,p,c,r:per(serieDe(rec),P)})).filter(b=>b.r.y||b.r.m||b.r.yp||b.r.mp);
+    const byP={}; bar.forEach(b=>{ if(b.p>=0){ if(!byP[b.p]) byP[b.p]={n:b.n,r:{...b.r},k:1}; else { const o=byP[b.p]; ['m','mp','y','yp'].forEach(k=>o.r[k]=(o.r[k]||0)+(b.r[k]||0)); o.k++; } } });
+    Object.values(byP).forEach(o=>{ if(o.k>1){ o.r.dm=o.r.mp?100*(o.r.m-o.r.mp)/o.r.mp:null; o.r.dy=o.r.yp?100*(o.r.y-o.r.yp)/o.r.yp:null; } });
+    pesos(Object.values(byP).map(o=>o.r)); pesos(bar.map(b=>b.r));
+    const valsB=Object.values(byP).map(o=>valorMapa(o.r).v).filter(v=>v!=null), maxB=Math.max(...valsB,1);
+    if(oB.layer) oB.m.removeLayer(oB.layer);
+    const campo=D.geo.bar_campo;
+    oB.layer=L.geoJSON(gB,{style:(f)=>{const x=byP[gB.features.indexOf(f)];
+        if(!x) return {color:'rgba(255,255,255,.07)',weight:.4,fillColor:'rgba(255,255,255,.025)',fillOpacity:1};
+        const vm=valorMapa(x.r); return {color:'#060810',weight:.4,fillColor:vm.c||PONAL.color(vm.v,maxB),fillOpacity:.92};},
+      onEachFeature:(f,l)=>{const i=gB.features.indexOf(f), x=byP[i]; l._idx=i; l.bindTooltip(x?tipHtml(f.properties[campo]||x.n,x.r,x.k>1?` <span style="opacity:.6">· ${x.k} nombres de la denuncia</span>`:''):`<b>${esc(f.properties[campo]||'')}</b><br>Sin hechos con este nombre de barrio`,{sticky:true});}}).addTo(oB.m);
+    encuadrar(oB,bnd);
+    const casadosY=bar.filter(b=>b.p>=0).reduce((t,b)=>t+b.r.y,0), todosY=bar.reduce((t,b)=>t+b.r.y,0);
+    document.getElementById('h-ciu-bar').textContent=`${D.n} · barrios · el ${pf(pp(casadosY,todosY),0)} de los hechos con barrio del año corrido queda en el mapa`;
+    // leyenda y nota
+    const esCambio=CIU.met==='dmes'||CIU.met==='dytd'||CIU.met==='peso';
+    document.getElementById('l-ciu-map').innerHTML=esCambio
+      ?`<span>baja</span>${DIV_DN.slice().reverse().map(c=>`<i style="background:${c}"></i>`).join('')}${DIV_UP.map(c=>`<i style="background:${c}"></i>`).join('')}<span>sube · hasta ±60%</span><span><i style="background:rgba(255,255,255,.06)"></i>base menor a 10 casos</span>`
+      :`<span>menos</span>${PONAL.RAMPA.map(c=>`<i style="background:${c}"></i>`).join('')}<span>más casos</span>`;
+    document.getElementById('n-ciu-map').innerHTML=`Las ${tipoPl} y los barrios sin color no tienen hechos ubicados en este periodo. ${D.n==='Cúcuta'?'La capa oficial de comunas de Cúcuta no cubre toda la ciudad: 45 barrios de la comuna 6 quedan por fuera del polígono. ':''}${D.rot?'Bogotá va girada 90°, como en el resto del sitio. ':''}Cuando varios nombres de la denuncia caen en el mismo polígono, se suman.`;
+    // tabla de comunas
+    const tot=per(serieDe(D.ciudad),P), sc=rsc;
+    const fila=(n,r,extra='')=>`<td>${n}${extra}</td><td class="n">${nf(r.m)}</td><td class="n">${r.mp==null?'—':nf(r.mp)}</td><td class="n ${cls(r.dm)}">${sig(r.dm)}</td><td class="n">${nf(r.y)}</td><td class="n">${r.yp==null?'—':nf(r.yp)}</td><td class="n ${cls(r.dy)}">${sig(r.dy)}</td><td class="n">${r.s1==null?'—':pf(r.s1,1)}</td><td class="n ${cls(r.dp)}">${sig(r.dp)}</td>`;
+    const cab=`<thead><tr><th></th><th class="n">${MESL[+CIU.mes.slice(5)-1].slice(0,3)} ${String(A).slice(2)}</th><th class="n">mes ant.</th><th class="n">cambio</th><th class="n">año corrido</th><th class="n">mismo tramo ${A-1}</th><th class="n">cambio</th><th class="n" title="Peso dentro de lo ubicado en el año corrido">peso</th><th class="n" title="Cambio del peso frente al mismo tramo del año anterior">cambio peso</th></tr></thead>`;
+    document.getElementById('t-ciu-tcom').textContent=`${tipoPl[0].toUpperCase()+tipoPl.slice(1)} · ${delNom}`;
+    document.getElementById('t-ciu-com').innerHTML=cab+'<tbody>'+filas.sort((a,b)=>b.r.y-a.r.y).map(f=>`<tr>${fila(esc(f.n),f.r)}</tr>`).join('')+
+      `<tr class="sc">${fila('Sin '+(D.tipo==='localidad'?'localidad':'comuna')+' (barrio pendiente o sin casar)',{...sc,s1:null,dp:null})}</tr><tr>${fila('<b style="color:var(--white)">Total ciudad</b>',{...tot,s1:null,dp:null})}</tr></tbody>`;
+    // tabla de barrios
+    const q=CIU.q.trim().toLowerCase();
+    let lb=bar.filter(b=>!q||b.n.toLowerCase().includes(q));
+    const ordF={ytd:(a,b)=>b.r.y-a.r.y, mes:(a,b)=>b.r.m-a.r.m, sube:(a,b)=>((b.r.y-(b.r.yp||0))-(a.r.y-(a.r.yp||0))), baja:(a,b)=>((a.r.y-(a.r.yp||0))-(b.r.y-(b.r.yp||0)))}[CIU.ord];
+    if(CIU.ord==='sube'||CIU.ord==='baja') lb=lb.filter(b=>b.r.yp!=null&&(b.r.yp+b.r.y)>=10);
+    lb.sort(ordF);
+    document.getElementById('t-ciu-bar').innerHTML=cab.replace('<th></th>','<th>Barrio</th>')+'<tbody>'+lb.slice(0,40).map(b=>`<tr class="cl" data-p="${b.p}">${fila(esc(b.n),b.r,`<span class="cols"> · ${esc(D.com_nom[b.c]||'sin comuna')}${b.p<0?' · no está en el mapa':''}</span>`)}</tr>`).join('')+'</tbody>';
+    document.querySelectorAll('#t-ciu-bar tr.cl').forEach(tr=>tr.onclick=()=>{const p=+tr.dataset.p; if(p<0) return; oB.layer.eachLayer(l=>{ if(l._idx===p){ oB.m.fitBounds(l.getBounds(),{maxZoom:15,animate:false}); l.openTooltip(); } }); document.getElementById('map-bar').scrollIntoView({behavior:'instant',block:'center'});});
+    document.getElementById('n-ciu-bar').textContent=`${lb.length} barrios con hechos en el periodo${q?' que coinciden con la búsqueda':''}; se muestran los primeros 40. «Más subió» y «más bajó» comparan el año corrido con el mismo tramo del año anterior, solo en barrios con 10 casos o más entre los dos. «Peso» es la parte del barrio en lo que sí quedó ubicado; su cambio no depende de cuántos hechos llegaron sin barrio. Toca un barrio para verlo en el mapa.`;
+  }
+
+  const METS=['dytd','dmes','peso','ytd','mes'], ORDS=['ytd','mes','sube','baja'];
+  async function initCiudades(){
+    CIU.idx=await J('ciudades-mes/index.json');
+    const meses=CIU.idx.meses, ult=meses[meses.length-1], q=PONAL.leerURL();
+    CIU.ult=ult;
+    /* enlace directo: ?c=DANE&d=delito&m=AAAA-MM&p=pintar&o=orden. Todo se
+       valida contra el índice: un valor que no existe cae al de por defecto. */
+    CIU.sel=CIU.idx.ciudades.some(c=>c.dane===q.c)?q.c:CIU.idx.ciudades[0].dane;
+    CIU.mes=meses.slice(1).includes(q.m)?q.m:ult;
+    if(METS.includes(q.p)) CIU.met=q.p;
+    if(ORDS.includes(q.o)) CIU.ord=q.o;
+    if(q.d) CIU.del=q.d;                      // llenarDel lo valida contra la ciudad
+    pills('p-ciu',CIU.idx.ciudades.map(c=>[c.dane,c.n]),()=>CIU.sel,async v=>{CIU.sel=v; await llenarDel(); pintarCiu();});
+    const sm=document.getElementById('s-ciu-mes');
+    sm.innerHTML=meses.slice(1).reverse().map(m=>`<option value="${m}">${mesTxt(m)}</option>`).join('');
+    sm.value=CIU.mes;
+    sm.onchange=e=>{CIU.mes=e.target.value; pintarCiu();};
+    document.getElementById('s-ciu-del').onchange=e=>{CIU.del=e.target.value; pintarCiu();};
+    pills('p-ciu-met',[['dytd','Cambio año corrido'],['dmes','Cambio vs mes anterior'],['peso','Cambio de peso (año corrido)'],['ytd','Casos año corrido'],['mes','Casos del mes']],()=>CIU.met,v=>{CIU.met=v; pintarCiu();});
+    pills('p-ciu-ord',[['ytd','Más casos (año corrido)'],['mes','Más casos (mes)'],['sube','Más subió'],['baja','Más bajó']],()=>CIU.ord,v=>{CIU.ord=v; pintarCiu();});
+    let t=null; document.getElementById('q-ciu-bar').oninput=e=>{clearTimeout(t); t=setTimeout(()=>{CIU.q=e.target.value; pintarCiu();},200);};
+    await llenarDel(); pintarCiu();
+  }
+  async function llenarDel(){
+    const D=await ciuData(CIU.sel), sel=document.getElementById('s-ciu-del');
+    sel.innerHTML='<option value="todos">Todos los delitos</option>'+D.delitos.map(d=>`<option value="${d}">${esc(ST.lab[d]||d)}</option>`).join('');
+    if(CIU.del!=='todos'&&!D.delitos.includes(CIU.del)) CIU.del='todos';
+    sel.value=CIU.del;
+  }
+  let _pc=0;
+  async function pintarCiu(){
+    const tok=++_pc;
+    document.getElementById('h-ciu-bar').textContent='Cargando barrios…';
+    try{
+      await ciudades(tok);
+      if(tok===_pc) PONAL.escribirURL({c:CIU.sel, d:CIU.del==='todos'?null:CIU.del,
+        m:CIU.mes===CIU.ult?null:CIU.mes, p:CIU.met==='dytd'?null:CIU.met, o:CIU.ord==='ytd'?null:CIU.ord});
+    }catch(e){ if(tok===_pc){ console.error(e); document.getElementById('n-ciu-map').textContent='No se pudo cargar la cartografía de esta ciudad ('+e.message+').'; } }
+  }
+
+  (async()=>{
+    PONAL.barraSecciones('ciudades');
+    try{
+      const meta=await PONAL.meta();
+      ST.lab={}; (meta.delitos||[]).forEach(d=>ST.lab[d.id]=d.label);
+      /* qué ciudades tienen además el histórico por comuna 2015-2026 en el mapa */
+      try{ ST.ciuHist=(await PONAL.ciudades()).ciudades; }catch(e){ ST.ciuHist=null; }
+      document.getElementById('loading').style.display='none';
+      document.getElementById('cuerpo').style.display='block';
+      await initCiudades();
+    }catch(e){
+      console.error(e);
+      document.getElementById('loading').textContent='No se pudieron cargar los datos ('+e.message+').';
+    }
+  })();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>
