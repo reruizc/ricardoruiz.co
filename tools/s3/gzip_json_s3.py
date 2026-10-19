@@ -10,6 +10,7 @@ los datos de Policía. S3 no comprime nada solo; una ficha de senador pesaba
     python3 tools/s3/gzip_json_s3.py --prefijo congreso-2026/output/endoso/ --dry-run
     python3 tools/s3/gzip_json_s3.py --prefijo congreso-2026/output/endoso/ --min-kb 200
     python3 tools/s3/gzip_json_s3.py --prefijo congreso-2026/output/endoso/ --revertir
+    python3 tools/s3/gzip_json_s3.py --prefijo congreso-2026/output/endoso/ --verificar
 
 Por cada archivo: se salta si ya está en gzip · guarda el ORIGINAL en
 `Bases de datos/s3-gzip-backup/<key>` · valida que sea JSON · sube la versión
@@ -27,6 +28,7 @@ sin error. Hay que volver a correr esta herramienta sobre su prefijo.
 import argparse, gzip, json, os, sys, threading, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import boto3
+from botocore.config import Config
 
 BUCKET = 'elecciones-2026'
 RAIZ = 'ricardoruiz.co/'
@@ -35,7 +37,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 BACKUP = os.path.join(ROOT, 'Bases de datos', 's3-gzip-backup')
 BITACORA = os.path.join(BACKUP, 'bitacora.jsonl')
 
-s3 = boto3.client('s3', region_name='us-east-1')
+# reintentos: con varias tandas a la vez S3 corta conexiones y da read timeouts
+s3 = boto3.client('s3', region_name='us-east-1',
+                  config=Config(retries={'max_attempts': 8, 'mode': 'adaptive'}, read_timeout=180, connect_timeout=30))
 _lock = threading.Lock()
 
 
@@ -69,7 +73,17 @@ def sube(key, cuerpo, head, gz):
     s3.put_object(**kw)
 
 
-def relee(key):
+def relee(key, intentos=4):
+    for k in range(intentos):
+        try:
+            return _relee(key)
+        except Exception:
+            if k == intentos - 1:
+                raise
+            time.sleep(2 + 3 * k)
+
+
+def _relee(key):
     req = urllib.request.Request(url_publica(key), headers={'Accept-Encoding': 'gzip',
                                  'User-Agent': 'gzip_json_s3/1.0 (+https://ricardoruiz.co)'})
     with urllib.request.urlopen(req, timeout=300) as r:
@@ -121,6 +135,22 @@ def revierte(key, dry):
     return ('ok', key, len(orig), len(orig))
 
 
+def verifica(key, dry):
+    """Lo servido, descomprimido, debe ser idéntico al respaldo. Si difiere,
+    se restaura el original (nunca debería pasar; es la red de seguridad)."""
+    dest = os.path.join(BACKUP, key)
+    if not os.path.exists(dest):
+        return ('sin-respaldo', key, 0, None)
+    orig = open(dest, 'rb').read()
+    plano, ce, n = relee(key)
+    if plano == orig:
+        return ('identico-gzip' if ce == 'gzip' else 'identico-claro', key, len(orig), n)
+    if not dry:
+        sube(key, orig, s3.head_object(Bucket=BUCKET, Key=key), False)
+        anota({'key': key, 'estado': 'restaurado-por-verificacion'})
+    return ('error', key, len(orig), 'DIFIERE del respaldo · restaurado')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--prefijo', action='append', required=True,
@@ -129,17 +159,21 @@ def main():
     ap.add_argument('--hilos', type=int, default=12)
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--revertir', action='store_true')
+    ap.add_argument('--verificar', action='store_true',
+                    help='compara todo lo que tiene respaldo contra lo servido')
     a = ap.parse_args()
     os.makedirs(BACKUP, exist_ok=True)
 
     objetos = []
     for p in a.prefijo:
         p = p if p.startswith(RAIZ) else RAIZ + p
-        objetos += listar(p, a.min_kb * 1024)
+        objetos += listar(p, 0 if a.verificar else a.min_kb * 1024)
+    if a.verificar:
+        objetos = [(k, n) for k, n in objetos if os.path.exists(os.path.join(BACKUP, k))]
     total_mb = sum(s for _, s in objetos) / 1e6
     print(f'{len(objetos)} archivos ≥ {a.min_kb} KB · {total_mb:,.0f} MB listados', flush=True)
 
-    fn = revierte if a.revertir else comprime
+    fn = verifica if a.verificar else (revierte if a.revertir else comprime)
     cuenta = {}
     antes = despues = 0
     t0 = time.time()
