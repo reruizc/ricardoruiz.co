@@ -174,9 +174,7 @@
 .lf-buscar{display:inline-block;margin-top:.15rem;font-size:.8rem;color:var(--ink-2,#4b4766)}
 .lf-pie{font-size:.74rem;line-height:1.45;color:var(--ink-3,#767290);margin:.7rem 0 0}
 .lf-cargando{font-size:.84rem;color:var(--ink-3,#767290);font-style:italic}
-@keyframes lf-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-.lf-anim{animation:lf-in .25s ease-out}
-@media (prefers-reduced-motion:reduce){.lf-anim{animation:none}.lf-chip,.lf-add{transition:none}}
+@media (prefers-reduced-motion:reduce){.lf-chip,.lf-add{transition:none}}
 `;
     const st = document.createElement('style');
     st.id = 'lab-fuentes-css';
@@ -287,6 +285,7 @@
     const selectOtro = `<select class="lf-otro" data-lf-otro aria-label="Elegir otro tema"><option value="">${ids.length ? 'Otro tema…' : 'Elige el tema…'}</option>${opcionesOtro}</select>`;
 
     if (!tema) {
+      inst._ultHtml = null; inst._ultTema = null;
       el.innerHTML = `<div class="lf">
         <div class="lf-eyebrow">Datos para tu problema</div>
         <div class="lf-titulo">¿De dónde sacas las cifras?</div>
@@ -319,7 +318,7 @@
     }).join('');
     const buscar = `<a class="lf-buscar" href="https://www.datos.gov.co/browse?q=${encodeURIComponent(tema.q)}" target="_blank" rel="noopener noreferrer">Buscar «${esc(tema.q)}» en datos.gov.co ↗</a>`;
 
-    el.innerHTML = `<div class="lf lf-anim">
+    const html = `<div class="lf${inst._ultTema !== tema.id ? ' lf-anim' : ''}">
       <div class="lf-eyebrow">Datos para tu problema</div>
       <div class="lf-titulo">Para «${esc(tema.nombre)}» hay datos aquí</div>
       <div class="lf-temas">${chips}${selectOtro}</div>
@@ -329,6 +328,11 @@
       </div>
       <p class="lf-pie">Las cifras municipales salen de datos.gov.co (Policía Nacional y Ministerio de Educación), 2018-2024. Revisa la ficha técnica de cada fuente antes de citarla.</p>
     </div>`;
+    // Repintar solo si algo cambió: mientras se escribe, el panel se recalcula
+    // cada pausa y no debe parpadear ni volver a animarse con el mismo tema.
+    const sinAnim = html.replace(' lf-anim', '');
+    if (sinAnim !== inst._ultHtml) { el.innerHTML = html; inst._ultHtml = sinAnim; }
+    inst._ultTema = tema.id;
     if (tema.ind.length) asegurarDatos(inst, tema);
   }
 

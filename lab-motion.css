@@ -1,0 +1,179 @@
+/* ════════════════════════════════════════════════════════════════════════
+   Lab de Políticas Públicas · movimiento («la mesa de planeación»)
+   ════════════════════════════════════════════════════════════════════════
+   Cargado por los 8 módulos DESPUÉS de lab-theme.css. Solo anima lo que ya
+   existe: no cambia layout, colores ni contenido.
+
+   1. Cambio de paso: la etapa entra subiendo; la nota de intro se «pega».
+   2. Pastillas de paso: la que se completa se estampa (lab-motion.js le pone
+      .lm-recien solo a la que acaba de pasar a hecha, no a todas).
+   3. Celdas y opciones: se hunden al presionar y rebotan al cambiar
+      (.lm-pop, también desde lab-motion.js, porque cada clic re-pinta la tabla).
+   4. Resultados: barras que crecen, tarjetas que llegan en cascada, números
+      que cuentan (JS) y puntos de los gráficos de Chart.js en secuencia (JS).
+
+   Las entradas usan fill «backwards», no «both»: con «both» la animación
+   se queda con el transform final y anula el :hover de las tarjetas.
+
+   Todo va dentro de prefers-reduced-motion: no-preference. Con movimiento
+   reducido el lab se ve exactamente igual que sin este archivo.
+   ════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: no-preference) {
+
+  :root {
+    --lm-salida: cubic-bezier(.2, .7, .2, 1);
+    --lm-rebote: cubic-bezier(.34, 1.56, .64, 1);
+  }
+
+  /* ── 1 · Cambio de paso ─────────────────────────────────────────────── */
+  section[id^="stage-"]:not(.is-hidden) {
+    animation: lm-etapa .38s var(--lm-salida) backwards;
+  }
+  section[id^="stage-"]:not(.is-hidden) > .stage-intro,
+  section[id^="stage-"]:not(.is-hidden) .welcome .eyebrow,
+  section[id^="stage-"]:not(.is-hidden) .hub-hero .eyebrow {
+    animation: lm-nota .5s var(--lm-rebote) .08s backwards;
+  }
+  @keyframes lm-etapa {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+  }
+  /* Una nota adhesiva que se pega: entra un poco torcida y se asienta.
+     Termina en «none» para no pisar el rotate(-1.2deg) que el tema le da
+     a las etiquetas: por eso esas van con su propia animación. */
+  @keyframes lm-nota {
+    from { opacity: 0; transform: translateY(-8px) rotate(-1.6deg) scale(.98); }
+    to   { opacity: 1; transform: none; }
+  }
+  section[id^="stage-"]:not(.is-hidden) .welcome .eyebrow,
+  section[id^="stage-"]:not(.is-hidden) .hub-hero .eyebrow {
+    animation-name: lm-etiqueta;
+  }
+  @keyframes lm-etiqueta {
+    from { opacity: 0; transform: translateY(-8px) rotate(-4deg) scale(.96); }
+    to   { opacity: 1; transform: rotate(-1.2deg); }
+  }
+
+  /* Tarjetas del hub: llegan en cascada, como notas puestas sobre la mesa. */
+  #stage-hub:not(.is-hidden) .mod-card {
+    animation: lm-tarjeta .45s var(--lm-salida) backwards;
+  }
+  #stage-hub .mod-card:nth-child(1) { animation-delay: .04s; }
+  #stage-hub .mod-card:nth-child(2) { animation-delay: .08s; }
+  #stage-hub .mod-card:nth-child(3) { animation-delay: .12s; }
+  #stage-hub .mod-card:nth-child(4) { animation-delay: .16s; }
+  #stage-hub .mod-card:nth-child(5) { animation-delay: .20s; }
+  #stage-hub .mod-card:nth-child(6) { animation-delay: .24s; }
+  #stage-hub .mod-card:nth-child(7) { animation-delay: .28s; }
+  #stage-hub .mod-card:nth-child(8) { animation-delay: .32s; }
+  @keyframes lm-tarjeta {
+    from { opacity: 0; transform: translateY(18px) rotate(.6deg); }
+    to   { opacity: 1; transform: none; }
+  }
+  /* Al pasar el mouse, la tarjeta se levanta como una nota que se toma. */
+  .mod-card:hover { transform: translateY(-4px) rotate(-.4deg); }
+
+  /* ── 2 · Pastillas de paso ──────────────────────────────────────────── */
+  .step-pill { transition: background-color .25s ease, border-color .25s ease, color .25s ease, transform .2s var(--lm-rebote); }
+  .step-pill:hover { transform: translateY(-1px); }
+  .step-pill.lm-recien { animation: lm-sello .55s var(--lm-rebote) backwards; }
+  .step-pill.lm-activa { animation: lm-activa .4s var(--lm-rebote) backwards; }
+  @keyframes lm-sello {
+    0%   { transform: scale(1); box-shadow: 0 0 0 0 rgba(92, 179, 127, .55); }
+    35%  { transform: scale(1.14) rotate(-2deg); }
+    100% { transform: none; box-shadow: 0 0 0 10px rgba(92, 179, 127, 0); }
+  }
+  @keyframes lm-activa {
+    from { transform: translateY(3px) scale(.96); }
+    to   { transform: none; }
+  }
+  /* Barra de avance del modo guiado de MicMac: avanza en vez de saltar. */
+  .guided-progress-bar > * { transition: width .45s var(--lm-salida); }
+
+  /* ── 3 · Celdas, opciones y botones ─────────────────────────────────── */
+  .matrix td.cell, .cmp-cell, .rob-rate, .ci-cell, .cell-int,
+  .pill, .opt, .lf-chip, .imp-pill {
+    transition: transform .12s ease, background-color .2s ease, border-color .2s ease, color .2s ease;
+  }
+  .matrix td.cell:active, .cmp-cell:active, .rob-rate:active, .ci-cell:active,
+  .cell-int:active, .pill:active, .opt:active, .lf-chip:active {
+    transform: scale(.92);
+  }
+  .lm-pop { animation: lm-pop .38s var(--lm-rebote); }
+  @keyframes lm-pop {
+    0%   { transform: scale(.9); box-shadow: inset 0 0 0 2px var(--post-it, #f5c518); }
+    55%  { transform: scale(1.1); }
+    100% { transform: none; box-shadow: inset 0 0 0 2px transparent; }
+  }
+
+  .btn, .btn-ghost { transition: transform .15s var(--lm-rebote), background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease; }
+  .btn:hover, .btn-ghost:hover { transform: translateY(-1px); }
+  .btn:active, .btn-ghost:active { transform: translateY(1px) scale(.98); }
+  .btn:disabled, .btn:disabled:hover { transform: none; }
+
+  /* Modales: entran desde abajo en vez de aparecer. */
+  .modal-back.open .modal { animation: lm-modal .3s var(--lm-salida) backwards; }
+  .modal-back.open { animation: lm-fondo .25s ease backwards; }
+  @keyframes lm-modal { from { opacity: 0; transform: translateY(16px) scale(.98); } to { opacity: 1; transform: none; } }
+  @keyframes lm-fondo { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Acordeones de bienvenida: el contenido baja al abrir. */
+  details[open] > :not(summary) { animation: lm-baja .3s var(--lm-salida) backwards; }
+  @keyframes lm-baja { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+  /* ── 4 · Resultados que se dibujan ──────────────────────────────────── */
+  /* Barras: crecen desde la izquierda. Solo en resultados y en Monte Carlo:
+     en la matriz de comparación se re-pintan con cada clic y crecer desde
+     cero en cada calificación distraería. */
+  #stage-results:not(.is-hidden) [class*="bar-fill"],
+  #stage-results:not(.is-hidden) .rk-bar > *,
+  #mc-result [style*="height:100%"] {
+    transform-origin: left center;
+    animation: lm-barra .8s var(--lm-salida) backwards;
+  }
+  #stage-results .rank-bar-row:nth-child(2) [class*="bar-fill"],
+  #mc-result tr:nth-child(2) [style*="height:100%"] { animation-delay: .08s; }
+  #stage-results .rank-bar-row:nth-child(3) [class*="bar-fill"],
+  #mc-result tr:nth-child(3) [style*="height:100%"] { animation-delay: .16s; }
+  #stage-results .rank-bar-row:nth-child(4) [class*="bar-fill"],
+  #mc-result tr:nth-child(4) [style*="height:100%"] { animation-delay: .24s; }
+  #stage-results .rank-bar-row:nth-child(n+5) [class*="bar-fill"],
+  #mc-result tr:nth-child(n+5) [style*="height:100%"] { animation-delay: .32s; }
+  @keyframes lm-barra { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  /* Los bloques del resultado (resumen, recomendación, exportes…) llegan en
+     cascada después de la etapa, en los 8 módulos sin depender de sus ids. */
+  #stage-results:not(.is-hidden) > :not(.section-head) { animation: lm-tarjeta .45s var(--lm-salida) backwards; }
+  #stage-results > :nth-child(2) { animation-delay: .06s; }
+  #stage-results > :nth-child(3) { animation-delay: .12s; }
+  #stage-results > :nth-child(4) { animation-delay: .18s; }
+  #stage-results > :nth-child(5) { animation-delay: .24s; }
+  #stage-results > :nth-child(n+6) { animation-delay: .30s; }
+
+  /* Tarjetas de resumen y cuadrantes: llegan en cascada. */
+  #stage-results:not(.is-hidden) .res-kpi,
+  #stage-results:not(.is-hidden) .kpi-card,
+  #stage-results:not(.is-hidden) .scen-quad,
+  #stage-results:not(.is-hidden) .ranking-card,
+  #stage-results:not(.is-hidden) .rank-list li {
+    animation: lm-tarjeta .45s var(--lm-salida) backwards;
+  }
+  #stage-results .res-kpi:nth-child(2), #stage-results .kpi-card:nth-child(2), #stage-results .scen-quad:nth-child(2), #stage-results .rank-list li:nth-child(2) { animation-delay: .07s; }
+  #stage-results .res-kpi:nth-child(3), #stage-results .kpi-card:nth-child(3), #stage-results .scen-quad:nth-child(3), #stage-results .rank-list li:nth-child(3) { animation-delay: .14s; }
+  #stage-results .res-kpi:nth-child(4), #stage-results .kpi-card:nth-child(4), #stage-results .scen-quad:nth-child(4), #stage-results .rank-list li:nth-child(4) { animation-delay: .21s; }
+  #stage-results .kpi-card:nth-child(5), #stage-results .rank-list li:nth-child(5) { animation-delay: .28s; }
+  #stage-results .kpi-card:nth-child(n+6), #stage-results .rank-list li:nth-child(n+6) { animation-delay: .35s; }
+
+  /* La matriz de escenarios (Prospectiva) también al narrarse. */
+  #stage-escenarios:not(.is-hidden) .scen-quad { animation: lm-tarjeta .45s var(--lm-salida) backwards; }
+  #stage-escenarios .scen-quad:nth-child(2) { animation-delay: .07s; }
+  #stage-escenarios .scen-quad:nth-child(3) { animation-delay: .14s; }
+  #stage-escenarios .scen-quad:nth-child(4) { animation-delay: .21s; }
+
+  /* Panel de fuentes sugeridas (lab-fuentes.js): cada cifra entra en orden. */
+  .lf-anim .lf-ind, .lf-anim .lf-base { animation: lm-tarjeta .35s var(--lm-salida) backwards; }
+  .lf-anim .lf-ind:nth-of-type(2), .lf-anim .lf-base:nth-of-type(2) { animation-delay: .05s; }
+  .lf-anim .lf-ind:nth-of-type(3), .lf-anim .lf-base:nth-of-type(3) { animation-delay: .10s; }
+  .lf-anim .lf-ind:nth-of-type(4), .lf-anim .lf-base:nth-of-type(4) { animation-delay: .15s; }
+}
