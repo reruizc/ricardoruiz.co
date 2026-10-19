@@ -597,7 +597,12 @@ territorial más reciente.
   `candidato-360-saliencia.js`, «reciente» depende de la ventana: con 7 días o
   menos es hoy y ayer contra el día anterior; con más, la última semana contra
   las anteriores. Así Mi Congreso y contendientes, que usan 30, no cambian.
-- **Las redes siguen apagadas en el panel** (`CAPTURA_ENCENDIDA = false`). Para
-  encenderlas faltan la ruta `GET /c360/captura`, un workflow que corra
-  `capturar.mjs` dos veces al día con los secretos de Apify y del modelo, y que
-  el panel pinte `propias` y `comentarios_propios`.
+- **Las redes ya están encendidas en el panel** (`CAPTURA_ENCENDIDA = true`).
+  El worker sirve `GET /c360/captura` desde KV (`c360:captura:<email>`); sin
+  lectura guardada responde `{ encendida: false }` y la cuenta ve lo de siempre.
+  Por red el panel pinta **sus publicaciones que más rindieron** (capa 0),
+  **lo que le dicen en ellas** (`comentarios_propios`) y, aparte, la
+  conversación de sus temas. ⚠ La lectura todavía se corre a mano
+  (`capturar.mjs` + `wrangler kv key put`, receta en
+  `tools/candidato-360/escucha/README.md`); falta el workflow de dos veces al
+  día. Una lectura completa de las cuatro redes cuesta ~US$0,85.

@@ -136,7 +136,26 @@ vinieron, para añadir el nombre a `referenciaDePost`.
   páginas que uno ya eligió seguir. A escala de localidad eso importa más que
   el precio: se puede vender «escucha de su localidad» en X, no en las cuatro.
 
-## La captura en el panel: montada y APAGADA
+## La captura en el panel: ENCENDIDA (oct-19-2026)
+
+`CAPTURA_ENCENDIDA = true` y el worker sirve **`GET /c360/captura`**: la última
+lectura guardada en KV como `c360:captura:<email>`. Una cuenta sin lectura recibe
+`{ encendida: false }` y ve lo de siempre. El panel pinta por red **sus
+publicaciones** (capa 0), **lo que le dicen en ellas** (`comentarios_propios`) y,
+aparte, la conversación de sus temas.
+
+⚠️ **Todavía no hay recolección automática.** La lectura se corre a mano y se
+sube a KV:
+
+```bash
+node tools/candidato-360/escucha/capturar.mjs --vinculo=<vínculo.json> --gastar --salida=<captura.json>
+cd ~/rr-auth && npx wrangler kv key put "c360:captura:<correo>" --path <captura.json> --binding RR_STORE --remote
+```
+
+Lo que sigue: un workflow con `APIFY_TOKEN` y `DEEPSEEK_API_KEY` que la corra dos
+veces al día, y una ruta de servicio para guardarla sin pasar por wrangler.
+
+## Historia: la captura montada y APAGADA (sep-2026)
 
 `candidato-360-escucha.html` ya sabe pintar una lectura de las cuatro redes en
 «Lo que se publica en sus cuentas»: por red, lo que publicó, quién lo menciona,

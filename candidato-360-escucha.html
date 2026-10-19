@@ -550,14 +550,16 @@
      de verdad son tres cosas, en este orden: el recolector corriendo dos veces
      al día (tools/candidato-360/escucha/capturar.mjs), el worker sirviendo
      GET /c360/captura, y esta constante en true. */
-  const CAPTURA_ENCENDIDA = false;
+  /* Encendida el 19-oct-2026: el worker ya sirve GET /c360/captura. Una cuenta
+     sin lectura guardada recibe { encendida: false } y ve lo de siempre. */
+  const CAPTURA_ENCENDIDA = true;
   const capturaForzada = () => /[?&]captura=1\b/.test(location.search) || location.hash === '#captura';
 
   const CAP_REDES = [
-    { key: 'x', nombre: 'X', modo: 'búsqueda por palabra' },
-    { key: 'instagram', nombre: 'Instagram', modo: 'hashtags' },
-    { key: 'tiktok', nombre: 'TikTok', modo: 'hashtags' },
-    { key: 'facebook', nombre: 'Facebook', modo: 'páginas de su territorio' },
+    { key: 'x', nombre: 'X', modo: 'su cuenta + búsqueda por palabra' },
+    { key: 'instagram', nombre: 'Instagram', modo: 'su cuenta + hashtags' },
+    { key: 'tiktok', nombre: 'TikTok', modo: 'su cuenta + hashtags' },
+    { key: 'facebook', nombre: 'Facebook', modo: 'su página + páginas de su territorio' },
   ];
   const POSTURAS = [['a_favor', 'a favor', 'pf'], ['en_contra', 'en contra', 'pc'], ['neutro', 'neutro', 'pn'], ['ataque', 'ataque', 'pa']];
   const cuando = iso => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
@@ -565,25 +567,37 @@
     ? `<ul>${filas.slice(0, 3).map(f => `<li><b>${esc((f.texto || '').slice(0, 110))}${(f.texto || '').length > 110 ? '…' : ''}</b>${f.autor ? ` <small>· @${esc(f.autor)}</small>` : ''}${f.reaccion ? ` <small>· ${num(f.reaccion)} reacciones</small>` : ''}</li>`).join('')}</ul>`
     : `<p>${vacio}</p>`;
 
+  /* La postura de unos comentarios, con sus citas: la cifra nunca va sola. */
+  function bloquePostura(c, titulo) {
+    if (!c) return '';
+    if (!c.n) return c.motivo ? `<p class="cap-motivo" style="margin-top:10px">${esc(titulo)}: ${esc(c.motivo)}</p>` : '';
+    const total = POSTURAS.reduce((s, [k]) => s + (c.postura?.[k] || 0), 0);
+    return `<p style="margin-top:10px"><b style="color:var(--ink)">${esc(titulo)}</b> · ${num(c.n)} comentarios bajo ${num(c.posts || 0)} publicaciones${c.clasificados ? '' : ' (sin clasificar)'}</p>` +
+      (total ? `<div class="cap-postura">${POSTURAS.map(([k, , cl]) => `<i class="${cl}" style="width:${(c.postura[k] || 0) / total * 100}%"></i>`).join('')}</div>
+      <div class="cap-leyenda">${POSTURAS.map(([k, l, cl]) => `<span><i class="${cl}"></i>${l} ${Math.round((c.postura[k] || 0) / total * 100)} %</span>`).join('')}</div>` : '') +
+      (c.citas || []).map(q => `<div class="cap-cita">«${esc(q.texto.slice(0, 160))}${q.texto.length > 160 ? '…' : ''}»<small>${esc(q.postura.replace('_', ' '))}${q.autor ? ` · @${esc(q.autor)}` : ''}</small></div>`).join('');
+  }
+
   function tarjetaRed(def, r, perfiles) {
     const cuenta = (perfiles || []).find(p => p.red === def.key && p.handle);
     if (!r) return `<article class="cap-red"><h5>${def.nombre}</h5><div class="cap-modo">${def.modo}</div><p class="cap-motivo">Esta red no vino en la lectura.</p></article>`;
     if (r.estado === 'sin_temas') return `<article class="cap-red"><h5>${def.nombre}</h5><div class="cap-modo">${def.modo}</div><p class="cap-motivo">Falta escribir sus ideas de campaña más abajo: sin ellas no hay qué buscar.</p></article>`;
-    if (r.estado === 'sin_datos' || r.estado === 'error') return `<article class="cap-red"><h5>${def.nombre}</h5><div class="cap-modo">${def.modo}</div><p class="cap-motivo"><b>Sin lectura esta vez.</b> ${esc(r.motivo || '')} Eso no significa que no haya conversación.</p></article>`;
-    const c = r.comentarios, total = c ? POSTURAS.reduce((s, [k]) => s + (c.postura?.[k] || 0), 0) : 0;
-    const postura = c && c.n
-      ? `<p style="margin-top:10px"><b style="color:var(--ink)">Lo que se siente</b> · ${num(c.n)} comentarios bajo ${num(c.posts || 0)} publicaciones${c.clasificados ? '' : ' (sin clasificar)'}</p>` +
-        (total ? `<div class="cap-postura">${POSTURAS.map(([k, , cl]) => `<i class="${cl}" style="width:${(c.postura[k] || 0) / total * 100}%"></i>`).join('')}</div>
-        <div class="cap-leyenda">${POSTURAS.map(([k, l, cl]) => `<span><i class="${cl}"></i>${l} ${Math.round((c.postura[k] || 0) / total * 100)} %</span>`).join('')}</div>` : '') +
-        (c.citas || []).map(q => `<div class="cap-cita">«${esc(q.texto.slice(0, 160))}${q.texto.length > 160 ? '…' : ''}»<small>${esc(q.postura.replace('_', ' '))}${q.autor ? ` · @${esc(q.autor)}` : ''}</small></div>`).join('')
-      : c?.motivo ? `<p class="cap-motivo" style="margin-top:10px">Comentarios: ${esc(c.motivo)}</p>` : '';
+    /* Sin conversación pero con sus propias publicaciones, igual se muestra. */
+    if ((r.estado === 'sin_datos' || r.estado === 'error') && !r.publicados?.length) return `<article class="cap-red"><h5>${def.nombre}</h5><div class="cap-modo">${def.modo}</div><p class="cap-motivo"><b>Sin lectura esta vez.</b> ${esc(r.motivo || '')} Eso no significa que no haya conversación.</p></article>`;
+    const postura = bloquePostura(r.comentarios, 'Lo que se siente en la conversación');
+    /* Capa 0 (oct-19-2026): lo que publicó en su cuenta y lo que le dicen ahí. */
+    const suyas = r.publicados?.length
+      ? `<p><b style="color:var(--ink)">Sus publicaciones que más rindieron</b></p>${lista(r.publicados.map(p => ({ ...p, autor: '' })), '')}`
+      : r.propias && r.propias.estado !== 'ok' ? `<p class="cap-motivo">Sus publicaciones: ${esc(r.propias.motivo || 'sin lectura esta vez')}</p>` : '';
+    const posturaSuya = bloquePostura(r.comentarios_propios, 'Lo que le dicen en sus publicaciones');
     const paginas = def.key === 'facebook' && r.paginas?.length ? `<p>Páginas seguidas: ${r.paginas.map(u => `<small>${esc(u.replace(/^https?:\/\/(www\.)?facebook\.com\//, ''))}</small>`).join(', ')}</p>` : '';
     return `<article class="cap-red">
       <h5>${def.nombre}${r.handle ? ` <small style="font:500 11px var(--mono);color:var(--muted)">@${esc(r.handle)}</small>` : ''}</h5>
       <div class="cap-modo">${def.modo}</div>
       <div class="cap-cifras"><span><b>${num(r.publicados.length)}</b><small>publicó</small></span><span><b>${num(r.menciones.length)}</b><small>lo mencionan</small></span><span><b>${num(r.amplifican.length)}</b><small>amplifican</small></span></div>
       ${paginas}
-      <p><b style="color:var(--ink)">Lo que se dice</b></p>
+      ${suyas}${posturaSuya}
+      <p style="margin-top:10px"><b style="color:var(--ink)">Lo que se dice de sus temas</b></p>
       ${lista(r.menciones, cuenta || def.key === 'facebook' ? 'Nadie lo mencionó en esta ventana. Eso también es dato.' : 'Sin cuenta validada: solo se leyeron sus temas.')}
       ${r.amplifican.length ? `<p style="margin-top:8px"><b style="color:var(--ink)">Quién amplifica</b> · ${r.amplifican.slice(0, 4).map(a => `@${esc(a.autor)}${a.veces > 1 ? ` ×${a.veces}` : ''}`).join(', ')}</p>` : ''}
       ${postura}
@@ -601,7 +615,7 @@
       cap.innerHTML = `<div class="captura-cab"><span class="captura-sello ok">Escucha encendida</span><small>Última lectura: ${esc(cuando(captura.generadoEn))}${captura.vinculo?.escalas?.length ? ` · ${esc(captura.vinculo.escalas.join(' y '))}` : ''}${esc(costo)}</small></div>
         <h4>Lo que se dice y lo que se siente, red por red</h4>
         <div class="captura-redes">${CAP_REDES.map(d => tarjetaRed(d, captura.redes[d.key], lista_)).join('')}</div>
-        <p class="captura-pie">Dos lecturas al día, sobre sus ${captura.vinculo?.temas?.length ? `${num(captura.vinculo.temas.length)} ideas` : 'ideas'} y su territorio. <b>Los comentarios no son la localidad:</b> son quienes comentan, y el modelo se equivoca con el sarcasmo. Por eso cada cifra va con sus citas: léalas antes de decidir nada con el porcentaje.</p>`;
+        <p class="captura-pie">Lectura de sus cuentas, de sus ${captura.vinculo?.temas?.length ? `${num(captura.vinculo.temas.length)} ideas` : 'ideas'} y de su territorio, con fecha arriba. <b>Los comentarios no son la localidad:</b> son quienes comentan, y el modelo se equivoca con el sarcasmo. Por eso cada cifra va con sus citas: léalas antes de decidir nada con el porcentaje.</p>`;
       return;
     }
     cap.classList.remove('viva');
