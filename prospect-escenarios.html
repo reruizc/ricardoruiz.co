@@ -888,7 +888,7 @@ footer.foot {
   #nav-auth-anon a, #nav-user-block a, #nav-user-block button { font-size: 10.5px !important; letter-spacing: .06em !important; }
 }
 </style>
-<link rel="stylesheet" href="lab-theme.css?v=20261019">
+<link rel="stylesheet" href="lab-theme.css?v=20261019b">
 </head>
 <body>
 <div class="cursor" id="cursor"></div>
@@ -1741,27 +1741,37 @@ function seedEjesEjemplo() {
 }
 
 // ── Importar desde MicMac ────────────────────────────────────────────────
-// MicMac vive en localStorage['micmac-current-v2'] con shape ~{ variables:[{nombre}], matrix:{i-j: valor|{valor}} }
+// MicMac guarda `vars` (strings) y `matrix` (string[][] con '-' en la diagonal, 'P', '-2'…);
+// Mactor guarda `actores` como strings y `mid` como string[][]. Las versiones viejas de
+// este importador esperaban {nombre} y 'i-j', formas que esos módulos nunca tuvieron, así
+// que la importación salía como «Actor 1…» o vacía. Estos dos helpers aceptan los dos.
+function _nombresDe(arr) {
+  return (Array.isArray(arr) ? arr : []).map(x => (typeof x === 'string' ? { nombre: x } : x)).filter(x => x && String(x.nombre || x.name || '').trim() !== '');
+}
+function _celdaDe(M, i, j) {
+  let v;
+  if (Array.isArray(M)) v = Array.isArray(M[i]) ? M[i][j] : undefined;
+  else if (M && typeof M === 'object') v = M[i + '-' + j];
+  if (v == null || v === '' || v === '-' || v === 'P') return 0;
+  if (typeof v === 'object') return Number(v.valor) || 0;
+  const n = Number(v); return isNaN(n) ? 0 : n;
+}
 function readMicmacMotrices() {
   try {
     const raw = localStorage.getItem('micmac-current-v2');
     if (!raw) return null;
     const p = JSON.parse(raw);
-    if (!p || !Array.isArray(p.variables) || p.variables.length === 0) return null;
-    const vars = p.variables;
+    const vars = _nombresDe(Array.isArray(p && p.vars) && p.vars.length ? p.vars : (p && p.variables));
+    if (vars.length === 0) return null;
     const matrix = (p.matrix && typeof p.matrix === 'object') ? p.matrix : {};
     // Calcular motricidad = suma fila |M[i,j]|, ignorando diagonal
     const motri = vars.map((v, i) => {
       let s = 0;
       for (let j = 0; j < vars.length; j++) {
         if (i === j) continue;
-        const cell = matrix[i + '-' + j];
-        let val = 0;
-        if (typeof cell === 'number') val = cell;
-        else if (cell && typeof cell === 'object' && typeof cell.valor === 'number') val = cell.valor;
-        s += Math.abs(val);
+        s += Math.abs(_celdaDe(matrix, i, j));
       }
-      return { idx:i, nombre:v.nombre || ('Variable ' + (i+1)), motri:s };
+      return { idx:i, nombre:v.nombre || v.name || ('Variable ' + (i+1)), motri:s };
     });
     motri.sort((a, b) => b.motri - a.motri);
     // Solo devolver si hay al menos 2 con motricidad > 0
@@ -1931,11 +1941,11 @@ function readMicmacVariables() {
     const raw = localStorage.getItem('micmac-current-v2');
     if (!raw) return [];
     const p = JSON.parse(raw);
-    if (!p || !Array.isArray(p.variables)) return [];
-    return p.variables.map((v, i) => ({
+    const vars = _nombresDe(Array.isArray(p && p.vars) && p.vars.length ? p.vars : (p && p.variables));
+    return vars.map((v, i) => ({
       id: 'var-' + i,
       tipo: 'variable',
-      nombre: v.nombre || ('Variable ' + (i + 1)),
+      nombre: v.nombre || v.name || ('Variable ' + (i + 1)),
       source: 'micmac'
     })).filter(x => x.nombre && x.nombre.trim() !== '');
   } catch (e) { return []; }
@@ -1945,8 +1955,7 @@ function readMactorActores() {
     const raw = localStorage.getItem('mactor-current-v1');
     if (!raw) return [];
     const p = JSON.parse(raw);
-    if (!p || !Array.isArray(p.actores)) return [];
-    return p.actores.map((a, i) => ({
+    return _nombresDe(p && p.actores).map((a, i) => ({
       id: 'actor-' + i,
       tipo: 'actor',
       nombre: a.nombre || ('Actor ' + (i + 1)),
@@ -3007,19 +3016,14 @@ function _readMicmacTopMotrices(n) {
     const raw = localStorage.getItem('micmac-current-v2');
     if (!raw) return [];
     const p = JSON.parse(raw);
-    if (!p || !Array.isArray(p.variables) || p.variables.length === 0) return [];
-    const matrix = p.matrix || {};
-    const vars = p.variables.filter(v => v && (v.nombre || v.name));
+    const matrix = (p && p.matrix) || {};
+    const vars = _nombresDe(Array.isArray(p && p.vars) && p.vars.length ? p.vars : (p && p.variables));
     if (vars.length < 2) return [];
     const motri = vars.map((v, i) => {
       let s = 0;
       for (let j = 0; j < vars.length; j++) {
         if (i === j) continue;
-        const cell = matrix[i + '-' + j];
-        let val = 0;
-        if (typeof cell === 'number') val = cell;
-        else if (cell && typeof cell === 'object' && typeof cell.valor === 'number') val = cell.valor;
-        s += Math.abs(val);
+        s += Math.abs(_celdaDe(matrix, i, j));
       }
       return { idx:i, nombre:(v.nombre || v.name || ('Variable ' + (i+1))), motri:s };
     });
