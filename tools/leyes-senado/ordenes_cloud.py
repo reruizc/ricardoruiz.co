@@ -128,18 +128,24 @@ def _fecha_fin(title, inicio):
 
 
 def _pdf_projects(url):
-    """Extrae los proyectos debatibles del PDF, sin incluir el anuncio futuro."""
+    """Extrae los proyectos debatibles del PDF, sin incluir el anuncio futuro.
+
+    Devuelve None si el PDF no se pudo bajar o leer: no es lo mismo que una
+    agenda sin proyectos, y publicarlo como 0 decía que no había nada que votar
+    el día del Presupuesto (oct-2026)."""
     if not url:
         return []
     blob = http(url, timeout=45, binary=True, retries=2)
-    if not blob or len(blob) > 20_000_000:
-        return []
+    if not blob or len(blob) > 20_000_000 or blob[:5] != b'%PDF-' and b'%PDF-' not in blob[:1024]:
+        return None
     try:
         from pypdf import PdfReader
         reader = PdfReader(io.BytesIO(blob), strict=False)
         text = '\n'.join((page.extract_text() or '') for page in reader.pages[:12])
     except Exception:
-        return []
+        return None
+    if len(text.strip()) < 100:      # escaneado: sin capa de texto (Quinta de Cámara)
+        return None
     # En comisiones el anuncio de la próxima sesión suele estar al final. En
     # plenaria aparece antes de los proyectos del día, así que solo se recorta
     # cuando queda después de la primera cita real.
@@ -168,6 +174,15 @@ def _pdf_projects(url):
     return out
 
 
+def _fila(url, **campos):
+    """Fila de un orden del día con sus proyectos; marca pdf_error si no se leyó."""
+    projects = _pdf_projects(url)
+    row = dict(campos, url=url, proyectos=projects or [], n_proyectos=len(projects or []))
+    if projects is None:
+        row['pdf_error'] = True
+    return row
+
+
 def _en_ventana(fecha, fecha_fin, desde, hasta):
     return bool(fecha and fecha <= hasta and (fecha_fin or fecha) >= desde)
 
@@ -194,13 +209,10 @@ def _camara_scope(name, term, desde, hasta):
         url = _pdf_from_wp(event)
         fecha_fin = _fecha_fin(title, fecha)
         if _en_ventana(fecha, fecha_fin, desde, hasta) and url:
-            projects = _pdf_projects(url)
-            rows.append({'id': f"cam-{event.get('id')}", 'fecha': fecha,
-                         'fecha_fin': fecha_fin,
-                         'publicado': (event.get('date') or '')[:10],
-                         'corporacion': 'Cámara', 'ambito': CAM_NICE[name],
-                         'titulo': title, 'url': url,
-                         'proyectos': projects, 'n_proyectos': len(projects)})
+            rows.append(_fila(url, id=f"cam-{event.get('id')}", fecha=fecha,
+                              fecha_fin=fecha_fin,
+                              publicado=(event.get('date') or '')[:10],
+                              corporacion='Cámara', ambito=CAM_NICE[name], titulo=title))
     return name, rows
 
 
@@ -229,13 +241,10 @@ def _senado(desde, hasta):
         url = (((doc.get('links') or {}).get('file') or {}).get('href') or '').replace('http://', 'https://')
         fecha_fin = _fecha_fin(title, fecha)
         if _en_ventana(fecha, fecha_fin, desde, hasta) and url:
-            projects = _pdf_projects(url)
-            rows.append({'id': f"sen-{doc.get('id')}", 'fecha': fecha,
-                         'fecha_fin': fecha_fin,
-                         'publicado': (doc.get('publish_date') or '')[:10],
-                         'corporacion': 'Senado', 'ambito': ambito,
-                         'titulo': title, 'url': url,
-                         'proyectos': projects, 'n_proyectos': len(projects)})
+            rows.append(_fila(url, id=f"sen-{doc.get('id')}", fecha=fecha,
+                              fecha_fin=fecha_fin,
+                              publicado=(doc.get('publish_date') or '')[:10],
+                              corporacion='Senado', ambito=ambito, titulo=title))
     return rows
 
 
@@ -249,16 +258,15 @@ def _senado_plenaria(desde, hasta):
         if re.search(r'comunicado|cronograma|correccion|cambio de hora', folded):
             continue
         fecha = _fecha(title, (doc.get('publish_date') or '')[:10])
-        url = (((doc.get('links') or {}).get('file') or {}).get('href') or '').replace('http://', 'https://')
+        # ⚠ secretariasenado.gov.co NO responde por https (oct-2026: 75 s sin un
+        # byte) y por http sí. Forzar https dejaba la plenaria en «0 proyectos».
+        url = (((doc.get('links') or {}).get('file') or {}).get('href') or '').replace('https://', 'http://')
         fecha_fin = _fecha_fin(title, fecha)
         if _en_ventana(fecha, fecha_fin, desde, hasta) and url:
-            projects = _pdf_projects(url)
-            rows.append({'id': f"sen-{doc.get('id')}", 'fecha': fecha,
-                         'fecha_fin': fecha_fin,
-                         'publicado': (doc.get('publish_date') or '')[:10],
-                         'corporacion': 'Senado', 'ambito': 'Plenaria de Senado',
-                         'titulo': title, 'url': url,
-                         'proyectos': projects, 'n_proyectos': len(projects)})
+            rows.append(_fila(url, id=f"sen-{doc.get('id')}", fecha=fecha,
+                              fecha_fin=fecha_fin,
+                              publicado=(doc.get('publish_date') or '')[:10],
+                              corporacion='Senado', ambito='Plenaria de Senado', titulo=title))
     return rows
 
 
@@ -294,6 +302,23 @@ def build_ordenes(upload=True):
         if key not in best or (row['publicado'], row['n_proyectos']) > (best[key]['publicado'], best[key]['n_proyectos']):
             best[key] = row
     rows = sorted(best.values(), key=lambda x: (x['fecha'], x['corporacion'], x['ambito']))
+
+    # Un PDF que hoy no bajó conserva lo leído en la corrida anterior para el
+    # mismo orden del día: los servidores del Congreso se caen a ratos y la
+    # agenda de un día no cambia de una hora a otra.
+    if any(r.get('pdf_error') for r in rows):
+        try:
+            prev = json.loads(http(f'https://{S3_BUCKET}.s3.us-east-1.amazonaws.com/{KEY}',
+                                   timeout=20, retries=2) or '{}')
+            antes = {o.get('id'): o for o in prev.get('ordenes') or []}
+            for r in rows:
+                p = antes.get(r['id'])
+                if r.get('pdf_error') and p and p.get('proyectos'):
+                    r.update(proyectos=p['proyectos'], n_proyectos=len(p['proyectos']),
+                             proyectos_de=p.get('proyectos_de') or prev.get('v'))
+                    r.pop('pdf_error', None)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f'corrida anterior: {exc}')
     result = {'v': now.isoformat(), 'desde': desde, 'hasta': hasta, 'n': len(rows),
               'ordenes': rows,
               'cobertura': 'Cámara: 14 comisiones y plenaria. Senado: plenaria y comisiones Cuarta, Quinta y Sexta.',

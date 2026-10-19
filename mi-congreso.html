@@ -57,7 +57,7 @@
     .mc-head .fc-photo{width:123px;height:157px}
     .mc-head .fc-photo img{width:100%;height:100%;object-fit:cover}
     .mc-head .fc-photo span{font-weight:800;font-size:1.4rem;color:#fff}
-    .mc-name{font-family:var(--hn);font-weight:800;font-size:clamp(1.3rem,2.6vw,1.9rem);letter-spacing:-.03em;line-height:1.1;color:var(--white)}
+    .mc-name{padding-right:11.5rem;font-family:var(--hn);font-weight:800;font-size:clamp(1.3rem,2.6vw,1.9rem);letter-spacing:-.03em;line-height:1.1;color:var(--white)}
     .mc-meta{font-size:.78rem;color:var(--gray);margin-top:.45rem;line-height:1.6}
     .mc-meta b{color:var(--white);font-weight:500}
     .mc-chips{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.7rem}
@@ -83,6 +83,11 @@
     .mc-mios{border:1px solid rgba(180,83,9,.35);background:rgba(180,83,9,.06);padding:.7rem .85rem;margin-bottom:.9rem}
     .mc-mios h4{margin:0 0 .35rem;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);font-weight:700}
     .mc-mios .mc-row{border-bottom-color:rgba(180,83,9,.15)}
+    .mc-resumen{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem}
+    .mc-resumen button,.mc-resumen a{font-family:var(--hn);font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.5rem .8rem;border:1px solid var(--card-border);background:transparent;color:var(--white);cursor:pointer;text-decoration:none}
+    .mc-resumen a.wa{border-color:rgba(21,128,61,.5);color:var(--green)}
+    .mc-resumen .ok{font-size:.7rem;color:var(--green);align-self:center}
+    .mc-avisa{font-size:.66rem;font-weight:600;color:var(--green)!important;text-decoration:underline;cursor:pointer;margin-left:.35rem}
     .mc-more{background:none;border:1px solid var(--card-border);color:var(--blue-light);font-size:.7rem;padding:.35rem .7rem;margin-top:.6rem;cursor:pointer}
     .mc-row .d{font-size:.62rem;color:var(--gray);width:60px;flex-shrink:0;padding-top:.15rem;letter-spacing:.04em;font-variant-numeric:tabular-nums}
     .mc-row .t{font-size:.82rem;color:var(--white);line-height:1.45;min-width:0}
@@ -130,7 +135,7 @@
     .mc-alert .st a{color:var(--gray);font-size:.68rem}
     .mc-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
     @media(max-width:900px){ .mc-grid{grid-template-columns:1fr} .mc-roadmap ul{grid-template-columns:1fr} .mc-alert{grid-template-columns:1fr} }
-    @media(max-width:600px){ .mc-head{flex-direction:column} .mc-change{position:static;margin-top:.6rem} .kpis{grid-template-columns:repeat(2,1fr)} }
+    @media(max-width:600px){ .mc-head{flex-direction:column} .mc-name{padding-right:0} .mc-change{position:static;margin-top:.6rem} .kpis{grid-template-columns:repeat(2,1fr)} }
   </style>
 </head>
 <body>
@@ -339,6 +344,8 @@
     return _cache[k];
   }
   const KPI={};
+  /* lo que va al «resumen del día»: cada panel deja aquí su parte al pintarse */
+  const RES={};
   function pintaKpis(){
     const k=KPI, box=document.getElementById('mc-kpis');
     const cell=(n,l,cls)=>`<div class="kpi${cls?' '+cls:''}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
@@ -352,6 +359,7 @@
   async function montar(my){
     const e=ME, b=bancadaOf(e.partido);
     Object.keys(KPI).forEach(k=>delete KPI[k]);
+    Object.keys(RES).forEach(k=>delete RES[k]);
     /* identidad, de inmediato; foto y comisión llegan después */
     document.getElementById('mc-head').innerHTML=`
       <div class="fc-photo" id="mc-photo" style="background:${b.color}"><span>${esc(initials(e.nombre))}</span></div>
@@ -360,6 +368,7 @@
         <div class="mc-meta"><b>${chamberNice(e.corp)}</b> · ${esc(depNice(e.dep))} · ${esc(e.partido)}</div>
         <div class="mc-chips"><span class="mc-chip b" style="color:${b.color}">${esc(b.name)}</span><span class="mc-chip" id="mc-com-chip">Comisión: buscando…</span><span class="mc-chip" id="mc-votos-chip"></span></div>
         <div id="mc-ficha"></div>
+        <div class="mc-resumen"><button type="button" onclick="copiarResumen()">Copiar el resumen del día</button><a class="wa" id="mc-wa" href="#" target="_blank" rel="noopener" onclick="return waResumen(this)">Enviar por WhatsApp</a><span class="ok" id="mc-res-ok"></span></div>
       </div>
       <button class="mc-change" type="button" onclick="cambiar()">Cambiar de congresista</button>`;
     /* mi bancada: sale del listado, no espera a la red */
@@ -514,10 +523,11 @@
         .filter(o=>/plenaria/i.test(o.ambito||'')||(miCom&&miCom.test(o.ambito||'')))
         .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
       const src=document.getElementById('mc-agenda-src'); if(src) src.textContent=`órdenes del día publicados · ${fechaCorta(j.v)||''}`;
+      RES.agenda=rows.map(o=>({fecha:o.fecha, ambito:o.ambito||o.corporacion, n:(o.proyectos||[]).filter(p=>p.titulo).length, err:!!o.pdf_error}));
       if(!rows.length){ box.innerHTML=`<div class="mc-empty">No hay orden del día publicado hoy ni en los próximos días para ${comKey?nombreCom(comKey)+' ni la plenaria':'la plenaria'} de ${chamberNice(e.corp)}. Se actualiza cada vez que las secretarías publican.</div>`; return; }
       box.innerHTML=rows.map(o=>{
         const ps=(o.proyectos||[]).filter(p=>p.titulo);
-        return `<div class="mc-row"><span class="d">${esc(fechaCorta(o.fecha))}</span><span class="t"><b style="font-weight:500">${esc(o.ambito||o.corporacion)}</b>${ps.length?` · ${ps.length} proyecto${ps.length===1?'':'s'}`:''}<small>${ps.slice(0,3).map(p=>esc(cut(shortTitle(p.titulo),110))).join(' · ')}${ps.length>3?` · y ${ps.length-3} más`:''}</small><small><a href="${esc(o.url)}" target="_blank" rel="noopener">Abrir el documento oficial ↗</a></small></span></div>`;
+        return `<div class="mc-row"><span class="d">${esc(fechaCorta(o.fecha))}</span><span class="t"><b style="font-weight:500">${esc(o.ambito||o.corporacion)}</b>${ps.length?` · ${ps.length} proyecto${ps.length===1?'':'s'}`:''}${o.pdf_error?'<small>No pudimos leer este documento (puede ser un escaneo): revísalo en el original.</small>':''}<small>${ps.slice(0,3).map(p=>esc(cut(shortTitle(p.titulo),110))).join(' · ')}${ps.length>3?` · y ${ps.length-3} más`:''}</small><small><a href="${esc(o.url)}" target="_blank" rel="noopener">Abrir el documento oficial ↗</a></small></span></div>`;
       }).join('');
     }catch(err){ if(my===SEQ) box.innerHTML='<div class="mc-empty">No se pudo consultar la agenda en este momento.</div>'; }
   }
@@ -567,6 +577,51 @@
     if(citas.length){ n=Math.max(n,citas.some(c=>/plenaria/i.test(c.o.ambito||''))?5:3); }
     return `<div class="mc-av" title="${esc(ETAPAS[n-1])}">${ETAPAS.map((_,k)=>`<i class="${k<n?'on':''}"></i>`).join('')}</div><div class="mc-av-l">Etapa ${n} de 6 · <b>${esc(ETAPAS[n-1])}</b></div>`;
   }
+  function alertaActiva(){ try{ const s=JSON.parse(localStorage.getItem(AL_KEY)||'null'); return !!(s&&s.estado==='confirmada'&&ME&&norm(s.congresista||'')===norm(ME.nombre)); }catch(err){ return false; } }
+  function avisaLink(num){
+    if(alertaActiva()) return ' · <span style="color:var(--green)">alertas activas ✓</span>';
+    return ` · <a class="mc-avisa" onclick="avisame('${esc(String(num||'').replace(/'/g,''))}')">Avísame cuando avance</a>`;
+  }
+  /* las alertas siguen a TODOS los proyectos que firma el congresista: este
+     atajo solo lleva al formulario y dice qué cubre, no crea una alerta aparte */
+  function avisame(num){
+    const box=document.getElementById('mc-alert'); if(!box) return;
+    box.scrollIntoView({block:'start',behavior:'smooth'});
+    alertaSt('warn',`Con tu correo te avisamos cuando el <b>${esc(num)}</b> cambie de estado o vuelva a un orden del día, y lo mismo con los demás proyectos que firmas.`);
+    setTimeout(()=>{ const c=document.getElementById('mc-alert-correo'); if(c) c.focus({preventScroll:true}); },400);
+  }
+  function textoResumen(){
+    if(!ME) return '';
+    const hoy=new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',weekday:'long',day:'numeric',month:'long'}).format(new Date());
+    const L=[`Mi Congreso · ${nice(ME.nombre)} · ${hoy}`,''];
+    const mios=RES.mios||[], numDe=RES.numDe||(()=>'');
+    const ag=mios.filter(x=>x._citas&&x._citas.length);
+    if(ag.length){
+      L.push('Tus proyectos en el orden del día:');
+      ag.forEach(x=>x._citas.forEach(c=>{
+        const amb=String(c.o.ambito||c.o.corporacion||'').replace(/\bSeptima\b/,'Séptima');
+        L.push(`• ${numDe(x)||''} — ${cut(shortTitle(x.titulo),90)} · ${amb}${/plenaria/i.test(amb)?'':' de '+c.o.corporacion}, ${diaCorto(c.o.fecha)}, puesto ${c.pos} de ${c.tot}`);
+      }));
+    } else L.push('Ninguno de tus proyectos está en un orden del día publicado para los próximos días.');
+    if(RES.agenda&&RES.agenda.length){
+      L.push('','Agenda de tu comisión y de la plenaria:');
+      RES.agenda.forEach(r=>L.push(`• ${diaCorto(r.fecha)} · ${String(r.ambito).replace(/\bSeptima\b/,'Séptima')}${r.n?` · ${r.n} proyecto${r.n===1?'':'s'}`:(r.err?' · documento sin leer, revisar el original':'')}`));
+    }
+    if(mios.length){
+      const princ=mios.filter(x=>x._primero).length;
+      const deb=mios.filter(x=>{ const e=etapaDe(x.estado); return !e.fin&&(e.n>=3||(x._citas||[]).length); }).length;
+      L.push('',`Proyectos que firmas en la legislatura: ${mios.length} (${princ} como autor principal) · ${deb} en debate o más adelante.`);
+    }
+    L.push('','Fuente: órdenes del día oficiales de Senado y Cámara · ricardoruiz.co/mi-congreso.html');
+    return L.join('\n');
+  }
+  async function copiarResumen(){
+    const t=textoResumen(), ok=document.getElementById('mc-res-ok');
+    try{ await navigator.clipboard.writeText(t); }
+    catch(err){ const a=document.createElement('textarea'); a.value=t; document.body.appendChild(a); a.select(); try{ document.execCommand('copy'); }catch(e2){} a.remove(); }
+    if(ok){ ok.textContent='Copiado'; setTimeout(()=>{ ok.textContent=''; },2500); }
+  }
+  function waResumen(a){ a.href='https://wa.me/?text='+encodeURIComponent(textoResumen()); return true; }
   async function cargarProyectos(e,my){
     const box=document.getElementById('mc-proy'), mios_box=document.getElementById('mc-agenda-mios');
     try{
@@ -581,13 +636,14 @@
         return i<0?null:{...x,_auts:auts,_primero:i===0,_citas:citasDe(x,ord)};
       }).filter(Boolean).sort((a,b)=>(b._citas.length>0)-(a._citas.length>0)||String(b.fecha||'').localeCompare(String(a.fecha||'')));
       KPI.proy=mios.length; pintaKpis();
+      RES.mios=mios; RES.numDe=x=>x._cam==='Cámara'?(x.numero_camara||x.numero_senado):(x.numero_senado||x.numero_camara);
       const numDe=x=>x._cam==='Cámara'?(x.numero_camara||x.numero_senado):(x.numero_senado||x.numero_camara);
       /* en la agenda: SUS proyectos en cualquier orden del día vigente, no solo
          los de su comisión (un proyecto suyo puede ir a otra comisión) */
       const agendados=mios.filter(x=>x._citas.length);
-      if(mios_box) mios_box.innerHTML=agendados.length?`<div class="mc-mios"><h4>Tus proyectos en el orden del día</h4>${agendados.map(x=>x._citas.map(c=>`<div class="mc-row"><span class="d">${esc(diaCorto(c.o.fecha))}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),110))}<small>${esc(numDe(x)||'')} · ${citaTxt(c)}</small></span></div>`).join('')).join('')}</div>`:'';
+      if(mios_box) mios_box.innerHTML=agendados.length?`<div class="mc-mios"><h4>Tus proyectos en el orden del día</h4>${agendados.map(x=>x._citas.map(c=>`<div class="mc-row"><span class="d">${esc(diaCorto(c.o.fecha))}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),110))}<small>${esc(numDe(x)||'')} · ${citaTxt(c)}${avisaLink(numDe(x))}</small></span></div>`).join('')).join('')}</div>`:'';
       if(!mios.length){ box.innerHTML=`<div class="mc-empty">No aparece como firmante de ningún proyecto radicado en la legislatura 2026-2027, según los registros de Senado y Cámara. Los proyectos entran al rastreo apenas las secretarías los publican, con rezago de días en Cámara.</div>`; return; }
-      const fila=x=>`<div class="mc-row"><span class="d">${esc(numDe(x)||'—')}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),150))}${avanceHtml(x,x._citas)}${x._citas.map(c=>`<span class="mc-cita">En el orden del día: ${citaTxt(c)}</span>`).join('')}<small>${esc(x._cam)}${x.comision?' · '+esc(comisionNice(x.comision)):''}${x.estado?' · '+esc(x.estado):''}${x.fecha?' · radicado '+esc(fechaCorta(x.fecha)):''} · ${x._auts.length===1?'firma solo':x._auts.length+' firmantes'}${x.fuente_url?` · <a href="${esc(x.fuente_url)}" target="_blank" rel="noopener">fuente ↗</a>`:''}</small></span></div>`;
+      const fila=x=>`<div class="mc-row"><span class="d">${esc(numDe(x)||'—')}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),150))}${avanceHtml(x,x._citas)}${x._citas.map(c=>`<span class="mc-cita">En el orden del día: ${citaTxt(c)}${avisaLink(numDe(x))}</span>`).join('')}<small>${esc(x._cam)}${x.comision?' · '+esc(comisionNice(x.comision)):''}${x.estado?' · '+esc(x.estado):''}${x.fecha?' · radicado '+esc(fechaCorta(x.fecha)):''} · ${x._auts.length===1?'firma solo':x._auts.length+' firmantes'}${x.fuente_url?` · <a href="${esc(x.fuente_url)}" target="_blank" rel="noopener">fuente ↗</a>`:''}</small></span></div>`;
       const pinta=todos_=>{
         const lista=todos_?mios:mios.slice(0,12);
         box.innerHTML=lista.map(fila).join('')

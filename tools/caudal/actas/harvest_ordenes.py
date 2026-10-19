@@ -57,12 +57,27 @@ PDF_RE = re.compile(r'(?:href|src)="([^"]+\.pdf)"', re.I)
 #   (a) año partido por el wrap de columna del PDF ("202 1" en vez de "2021")
 #   (b) doble numeración bicameral ("No. 102 de 2025 Cámara, 083 de 2025 Senado")
 #   (c) cláusula "Acumulado con el Proyecto de Ley No. NNN de AAAA Cámara" antes de la cita
+# Y desde oct-2026 dos más (mismo arreglo que ordenes_cloud.py en la Lambda):
+#   (d) palabras partidas por el PDF ("P royecto", "L ey", "C ámara") y doble espacio
+#       ("Proyecto de  Ley"): _suelta() admite un espacio entre letras.
+#   (e) título SIN comilla de cierre: termina en "Autores:" o en la cita siguiente.
+#       Sin esto el título se tragaba al proyecto de abajo y lo perdía.
+# Medido sobre los 3.940 órdenes del caché: +1.030 proyectos-sesión, −21 (son
+# acumulados: ahora entra el principal, que el patrón viejo no veía por "L ey").
+def _suelta(palabra):
+    return r'\s?'.join('[aá]' if c in 'aá' else re.escape(c) for c in palabra)
+
+
+_CITA = (_suelta('Proyecto') + r'\s+de\s+(?:' + _suelta('Ley') + '|' + _suelta('Acto') + ')'
+         + r'[^"“”]{0,60}?\d{1,4}\s*de\s*2\s?0\s?\d\s?\d')
+_CAMARA = '(?:' + _suelta('Cámara') + '|' + _suelta('Senado') + ')'
 PROJ_BLOCK_RE = re.compile(
-    r'Proyecto de (?:Ley|Acto Legislativo)(?:\s+Org[aá]nica)?[^0-9"“]{0,30}'
-    r'(\d{1,4})\s*de\s*(2\s?0\s?\d\s?\d)\s*(?:C[aá]mara|Senado)?'
+    _suelta('Proyecto') + r'\s+de\s+(?:' + _suelta('Ley') + '|' + _suelta('Acto') + r'\s+'
+    + _suelta('Legislativo') + r')(?:\s+Org[aá]nica)?[^0-9"“]{0,30}'
+    r'(\d{1,4})\s*de\s*(2\s?0\s?\d\s?\d)\s*' + _CAMARA + '?'
     r'(?:\s*(?:,|[-–—]|:)?\s*(?:Acumulado con el Proyecto de (?:Ley|Acto Legislativo)[^0-9"“]{0,25})?'
-    r'\d{1,4}\s*de\s*(?:20)?\s?\d\s?\d\s*(?:C[aá]mara|Senado)?)?'
-    r'[^"“]{0,30}["“](.+?)["”]', re.I | re.S)
+    r'\d{1,4}\s*de\s*(?:20)?\s?\d\s?\d\s*' + _CAMARA + '?)?'
+    r'[^"“]{0,30}["“](.+?)(?:["”]|(?=\s+Autor(?:es|a)?\s*:)|(?=' + _CITA + '))', re.I | re.S)
 # variante SIN número/título inline (algunas comisiones desde ~2024): el orden
 # del día solo cita la Gaceta de radicación — "Proyecto de Ley: Gaceta del
 # Congreso 2048 de 2025". Se resuelve por Gaceta contra nuestro propio dataset
