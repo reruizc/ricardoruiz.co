@@ -325,6 +325,11 @@
     try {
       Object.keys(BUILD).forEach(k => localStorage.setItem(KEYS[k], JSON.stringify(BUILD[k]())));
       localStorage.setItem(FLAG, '1');
+      // El caso es de Bogotá: deja el municipio elegido para las fuentes
+      // sugeridas (lab-fuentes.js), salvo que el usuario ya tenga uno.
+      if (!localStorage.getItem('lab-territorio-v1')) {
+        localStorage.setItem('lab-territorio-v1', JSON.stringify({ dep: '11', mun: '11001', demo: true }));
+      }
     } catch (e) { window.alert('No se pudo guardar el caso de ejemplo en este navegador.'); return false; }
     if (opts.abrir && HREF[opts.abrir]) {
       const dest = HREF[opts.abrir];
@@ -341,7 +346,11 @@
       const ok = window.confirm('Se borra el caso de ejemplo de los ocho módulos, incluidos los cambios que le hayas hecho. ¿Continuar?');
       if (!ok) return false;
     }
-    try { Object.values(KEYS).forEach(k => localStorage.removeItem(k)); localStorage.removeItem(FLAG); } catch (e) {}
+    try {
+      Object.values(KEYS).forEach(k => localStorage.removeItem(k)); localStorage.removeItem(FLAG);
+      const t = JSON.parse(localStorage.getItem('lab-territorio-v1') || 'null');
+      if (t && t.demo) localStorage.removeItem('lab-territorio-v1');
+    } catch (e) {}
     if (opts.recargar !== false) location.reload();
     return true;
   }

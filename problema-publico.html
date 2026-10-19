@@ -1189,6 +1189,9 @@ footer.foot {
       <div class="field-hint">Una sola frase. Incluye <em>qué pasa</em>, <em>dónde</em>, <em>cuánto</em> y <em>desde cuándo</em>. Evita verbos vagos como «mejorar» o «fortalecer».</div>
     </div>
 
+    <!-- Fuentes sugeridas según el tema (lab-fuentes.js) -->
+    <div id="lf-def"></div>
+
     <div class="field-row">
       <div class="field">
         <label class="field-label" for="def-magnitud">Magnitud actual</label>
@@ -1333,21 +1336,10 @@ footer.foot {
       <button class="btn-ghost" onclick="seedEvidencia()">Cargar 3 fuentes típicas de referencia</button>
     </div>
 
-    <!-- Sprint E.5 · cargar evidencia oficial municipal -->
-    <div style="margin-top:1.4rem;padding:1.1rem 1.2rem;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--accent)">
-      <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:.4rem">Evidencia oficial municipal</div>
-      <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.3rem">Cargar cifras oficiales para tu territorio</div>
-      <div style="font-family:var(--italic);font-style:italic;font-size:.9rem;line-height:1.5;color:var(--ink-2);margin-bottom:.85rem">Si tu problema es local, podemos precargar 4-5 fuentes oficiales con cifras del último año disponible. Datos: Policía Nacional (seguridad) + MEN (educación). Tú las editas y completas con lo que aplique.</div>
-      <div style="display:flex;gap:.55rem;flex-wrap:wrap;align-items:center">
-        <select id="pp-evid-dep" class="evid-input" style="min-width:180px" onchange="ppEvidPobMuns(this.value)">
-          <option value="">— departamento —</option>
-        </select>
-        <select id="pp-evid-mun" class="evid-input" style="min-width:180px">
-          <option value="">— municipio —</option>
-        </select>
-        <button class="btn" onclick="ppLoadEvidenciaTerritorial()">↓ Cargar evidencia oficial</button>
-      </div>
-    </div>
+    <!-- Fuentes sugeridas según el tema: cifras del municipio + bases (lab-fuentes.js).
+         Reemplaza la caja «Evidencia oficial municipal» de E.5, que cargaba 5
+         indicadores fijos sin importar el tema del problema. -->
+    <div id="lf-evid"></div>
 
     <div class="actions">
       <button class="btn-ghost" onclick="goToStep(1)">← Editar problema</button>
@@ -1697,9 +1689,10 @@ footer.foot {
 
 <div class="toast" id="toast"></div>
 
-<script src="lab-recursos.js?v=20261018"></script>
-<script src="lab-demo.js?v=20261018"></script>
+<script src="lab-recursos.js?v=20261019"></script>
+<script src="lab-demo.js?v=20261019"></script>
 <script src="lab-indicadores.js?v=20261018"></script>
+<script src="lab-fuentes.js?v=20261019"></script>
 
 <script>
 'use strict';
@@ -2094,6 +2087,7 @@ function goToStep(n) {
   else if (n === 3) { renderAlternativas();showStage('stage-alternativas'); }
   else if (n === 4) { renderCriterios();   showStage('stage-criterios'); }
   else if (n === 5) { renderComparacion(); showStage('stage-comparacion'); }
+  if ((n === 1 || n === 2) && window.LabFuentes) window.LabFuentes.refrescarTodos();
 }
 function goToResults() {
   renderResults();
@@ -2196,7 +2190,10 @@ function addEvidencia() {
   STATE.evidencia.push({ fuente:'', anyo:'', dato:'', link:'', nota:'' });
   saveState(); renderEvidencia();
 }
-function delEvidencia(i) { STATE.evidencia.splice(i,1); saveState(); renderEvidencia(); }
+function delEvidencia(i) {
+  STATE.evidencia.splice(i,1); saveState(); renderEvidencia();
+  if (window.LabFuentes) window.LabFuentes.refrescarTodos();
+}
 function updateEvid(i, key, val) {
   if (!STATE.evidencia[i]) return;
   STATE.evidencia[i][key] = val;
@@ -2216,69 +2213,28 @@ function seedEvidencia() {
   showToast('3 fuentes típicas cargadas. Edita los datos según tu caso.');
 }
 
-// Sprint E.5 · evidencia oficial territorial (lab-indicadores.js)
-function ppEvidPobDeptos() {
-  const sel = document.getElementById('pp-evid-dep');
-  if (!sel || sel.options.length > 1) return;  // ya poblado
-  if (!window.LabIndicadores) return;
-  window.LabIndicadores.load().then(() => {
-    const deptos = window.LabIndicadores.getDeptosCatalog();
-    sel.insertAdjacentHTML('beforeend',
-      deptos.map(d => `<option value="${d.cod}">${escapeHtml(d.nombre)}</option>`).join(''));
-  }).catch(() => {});
+// Fuentes sugeridas según el tema del problema (lab-fuentes.js).
+// Un panel bajo el enunciado (paso 1) y otro en la evidencia (paso 2); los
+// dos añaden a STATE.evidencia.
+function ppTextoProblema() {
+  const d = STATE.definicion || {};
+  return [d.enunciado || '', [d.magnitud, (d.afectados || []).join(' '), (STATE.sintoma || {}).sintoma].join(' ')];
 }
-function ppEvidPobMuns(depCod) {
-  const sel = document.getElementById('pp-evid-mun');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">— municipio —</option>';
-  if (!depCod || !window.LabIndicadores || !window.LabIndicadores.isLoaded()) return;
-  const muns = window.LabIndicadores.getMunsByDepto(depCod);
-  sel.insertAdjacentHTML('beforeend',
-    muns.map(m => `<option value="${m.divipola}">${escapeHtml(m.nombre)}</option>`).join(''));
-}
-function ppLoadEvidenciaTerritorial() {
-  const munSel = document.getElementById('pp-evid-mun');
-  const divipola = munSel ? munSel.value : '';
-  if (!divipola) { showToast('Selecciona municipio primero.'); return; }
-  if (!window.LabIndicadores) { showToast('Datos no disponibles.'); return; }
-  window.LabIndicadores.load().then(() => {
-    const mun = window.LabIndicadores.getMun(divipola);
-    if (!mun) { showToast('Municipio no encontrado.'); return; }
-    // Catálogo de indicadores prioritarios + sus datos del último año
-    const PRIORIDAD = ['homicidios','violencia_intrafamiliar','hurto_personas','cobertura_neta','desercion'];
-    let added = 0;
-    PRIORIDAD.forEach(indId => {
-      const latest = window.LabIndicadores.getLatestValue(divipola, indId);
-      if (!latest || latest.value == null) return;
-      const indMeta = window.LabIndicadores.getCatalog().find(i => i.id === indId);
-      if (!indMeta) return;
-      const valStr = window.LabIndicadores.formatValue(latest.value, indId);
-      STATE.evidencia.push({
-        fuente: indMeta.fuente,
-        anyo: String(latest.year),
-        dato: `${indMeta.nombre} · ${mun.nombre}: ${valStr}${indMeta.unidad === '%' ? '' : ' ' + indMeta.unidad}` + (latest.isProxy ? ' (aprox)' : ''),
-        link: indMeta.fuente_url,
-        nota: indMeta.nota + (latest.isProxy ? ' Nota: ' + latest.proxyNote : '')
-      });
-      added++;
-    });
-    if (added === 0) { showToast('No se encontraron datos para este municipio.'); return; }
-    saveState(); renderEvidencia();
-    showToast(`✓ ${added} fuentes oficiales cargadas para ${mun.nombre}.`);
-  }).catch(e => {
-    showToast('Error cargando indicadores.');
-    console.error(e);
-  });
-}
-// Auto-poblar el dep-select cuando entra a stage-evidencia
-const _origGoToStep = window.goToStep;
-if (typeof goToStep === 'function') {
-  // Wrap goToStep: cuando el step sea 2 (evidencia), poblar deptos
-  const _orig = goToStep;
-  window.goToStep = function(n) {
-    _orig(n);
-    if (n === 2) setTimeout(ppEvidPobDeptos, 50);
+function ppMontarFuentes() {
+  if (!window.LabFuentes) return;
+  const opts = {
+    modulo: 'problema',
+    texto: ppTextoProblema,
+    escuchar: ['def-enunciado', 'def-magnitud'],
+    anadir: f => {
+      STATE.evidencia.push({ fuente: f.fuente, anyo: f.anyo, dato: f.dato, link: f.link, nota: f.nota });
+      saveState(); renderEvidencia();
+      showToast(STATE.step === 2 ? 'Añadida a tu evidencia.' : 'Añadida a tu evidencia (paso 2).');
+    },
+    yaEsta: f => STATE.evidencia.some(e => e.link === f.link && (e.dato || '') === (f.dato || ''))
   };
+  window.LabFuentes.montar(document.getElementById('lf-def'), opts);
+  window.LabFuentes.montar(document.getElementById('lf-evid'), opts);
 }
 
 // ═════════════════════════════════════════════════════════════════════════
@@ -3444,6 +3400,7 @@ function applyAltImport(payload) {
   const restored = loadState();
   renderAll();
   bindDefinicionInputs();
+  ppMontarFuentes();
   if (restored && STATE.step >= 1 && STATE.definicion.enunciado) {
     // Si había trabajo previo, aterriza en la mecánica donde se quedó.
     goToStep(STATE.step || 1);

@@ -667,6 +667,9 @@ footer.foot { max-width:980px; margin:0 auto; padding:2rem 1.75rem 1.5rem; borde
       <div class="field-hint">Cifra fuerte + fuente. Sirve al periodista y al ciudadano informado. Si vienes del módulo evaluación, las cifras de la línea base son tus mejores candidatos.</div>
     </div>
 
+    <!-- Fuentes sugeridas según el tema (lab-fuentes.js) -->
+    <div id="lf-com"></div>
+
     <div class="field">
       <label class="field-label">Valores invocados (chips · 2-5)</label>
       <div class="chip-list" id="msg-valores-list"></div>
@@ -1181,8 +1184,10 @@ footer.foot { max-width:980px; margin:0 auto; padding:2rem 1.75rem 1.5rem; borde
   <span><a href="analisis-estructural.html" style="color:var(--ink-3)">← Volver al lab</a></span>
 </footer>
 
-<script src="lab-recursos.js?v=20261018"></script>
-<script src="lab-demo.js?v=20261018"></script>
+<script src="lab-recursos.js?v=20261019"></script>
+<script src="lab-demo.js?v=20261019"></script>
+<script src="lab-indicadores.js?v=20261018"></script>
+<script src="lab-fuentes.js?v=20261019"></script>
 <script>
 /* ═════════════════════════════════════════════════════════════════════════
  * COMUNICAR LA POLÍTICA · v1
@@ -1573,6 +1578,7 @@ function renderMensaje() {
   renderMsgValores();
   countMsgWords();
   updateMsgMeta();
+  if (window.LabFuentes) window.LabFuentes.refrescarTodos();
 }
 function renderMsgSec() {
   const wrap = document.getElementById('msg-sec-list');
@@ -2571,11 +2577,26 @@ function iaAdoptNarrativa() {
   showToast('Narrativa rellenada. Edítala con tu experiencia real.');
 }
 
+/* Fuentes sugeridas según el tema (lab-fuentes.js): cifras del municipio y
+   bases para la «evidencia principal» del mensaje. */
+function comMontarFuentes() {
+  if (!window.LabFuentes) return;
+  const ta = window.LabFuentes.paraTextarea('msg-evidencia');
+  window.LabFuentes.montar(document.getElementById('lf-com'), {
+    modulo: 'comunicar',
+    texto: () => [[STATE.contexto.politica, STATE.contexto.enunciado].join(' '), [STATE.mensaje.primario, STATE.mensaje.promesa].join(' ')],
+    escuchar: ['msg-primario', 'msg-promesa'],
+    anadir: f => { ta.anadir(f); showToast('Añadida a la evidencia principal.'); },
+    yaEsta: ta.yaEsta
+  });
+}
+
 /* ═════════════════════════════ Init ═════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
   autoTheme();
   setupCursor();
   loadState();
+  comMontarFuentes();
   if (STATE.step && STATE.step > 1 && STATE.step <= 8) {
     // resume desde último stage
     renderStep(STATE.step);

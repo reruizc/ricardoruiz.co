@@ -22,6 +22,7 @@ window.LAB_RECURSOS = {
   categorias: [
     { id: 'co-pp',       nombre: 'Colombia · Política pública',     orden: 1 },
     { id: 'co-datos',    nombre: 'Colombia · Datos abiertos',       orden: 2 },
+    { id: 'co-sector',   nombre: 'Colombia · Datos por sector',     orden: 2.5 },
     { id: 'evaluacion',  nombre: 'Evaluación de política',          orden: 3 },
     { id: 'diseno',      nombre: 'Diseño de política y participación', orden: 4 },
     { id: 'prospectiva', nombre: 'Prospectiva y método',            orden: 5 }
@@ -77,35 +78,40 @@ window.LAB_RECURSOS = {
       nombre: 'DANE · Departamento Administrativo Nacional de Estadística',
       url: 'https://www.dane.gov.co/',
       desc: 'Estadísticas oficiales: censo, calidad de vida, mercado laboral, pobreza, geoestadísticas, proyecciones poblacionales.',
-      modulos: ['problema', 'estructural', 'evaluacion']
+      modulos: ['problema', 'estructural', 'evaluacion'],
+      temas: ['general', 'pobreza', 'empleo', 'poblacion', 'vivienda']
     },
     {
       id: 'terridata', categoria: 'co-datos',
       nombre: 'TerriData · Indicadores territoriales',
       url: 'https://terridata.dnp.gov.co/',
       desc: 'Indicadores territoriales del DNP a nivel municipal y departamental. ~700 indicadores estandarizados con fichas técnicas.',
-      modulos: ['problema', 'estructural']
+      modulos: ['problema', 'estructural'],
+      temas: ['general']
     },
     {
       id: 'datos-gov', categoria: 'co-datos',
       nombre: 'Datos.gov.co · Datos Abiertos Colombia',
       url: 'https://www.datos.gov.co/',
       desc: 'Portal oficial de datos abiertos del Estado colombiano. Datasets de todas las entidades nacionales y muchas territoriales.',
-      modulos: ['problema', 'estructural', 'evaluacion']
+      modulos: ['problema', 'estructural', 'evaluacion'],
+      temas: ['general']
     },
     {
       id: 'banrep', categoria: 'co-datos',
       nombre: 'Banco de la República · Estadísticas',
       url: 'https://www.banrep.gov.co/es/estadisticas',
       desc: 'Series de tiempo macroeconómicas: tasas, inflación, cuentas nacionales, sector externo, mercado financiero.',
-      modulos: ['problema', 'estructural']
+      modulos: ['problema', 'estructural'],
+      temas: ['empleo', 'fiscal']
     },
     {
       id: 'secop', categoria: 'co-datos',
       nombre: 'SECOP · Contratación Pública',
       url: 'https://www.colombiacompra.gov.co/secop/secop-ii',
       desc: 'Sistema Electrónico de Contratación Pública. Toda la contratación del Estado colombiano. Útil para mapear actores y dimensionar costos reales.',
-      modulos: ['mactor', 'problema']
+      modulos: ['mactor', 'problema'],
+      temas: ['fiscal']
     },
     {
       id: 'registraduria', categoria: 'co-datos',
@@ -119,21 +125,218 @@ window.LAB_RECURSOS = {
       nombre: 'MEN · SNIES (educación superior)',
       url: 'https://snies.mineducacion.gov.co/portal/',
       desc: 'Sistema Nacional de Información de Educación Superior: matrícula, oferta, graduados, instituciones.',
-      modulos: ['problema']
+      modulos: ['problema'],
+      temas: ['educacion']
     },
     {
       id: 'sispro', categoria: 'co-datos',
       nombre: 'MinSalud · SISPRO',
       url: 'https://www.sispro.gov.co/',
       desc: 'Sistema integral de información de salud: aseguramiento, prestaciones, eventos en salud pública, mortalidad.',
-      modulos: ['problema']
+      modulos: ['problema'],
+      temas: ['salud']
     },
     {
       id: 'policia-stats', categoria: 'co-datos',
       nombre: 'Policía Nacional · Información criminalidad',
       url: 'https://www.policia.gov.co/grupo-informacion-criminalidad',
       desc: 'Estadísticas de hechos delictivos por tipología, municipio y período. Microdatos para análisis territorial.',
-      modulos: ['problema', 'estructural']
+      modulos: ['problema', 'estructural'],
+      temas: ['seguridad', 'genero']
+    },
+
+    // ─── Colombia · Datos por sector (lab-fuentes.js los sugiere según el tema) ───
+    {
+      id: 'men-estadisticas', categoria: 'co-sector',
+      nombre: 'MEN · Estadísticas de educación preescolar, básica y media',
+      url: 'https://www.datos.gov.co/d/sras-4t5p',
+      desc: 'Cobertura, deserción, reprobación y matrícula por entidad territorial certificada, 2011 en adelante. Es la base de las cifras de educación del lab.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['educacion']
+    },
+    {
+      id: 'icfes-data', categoria: 'co-sector',
+      nombre: 'ICFES · DataIcfes (resultados Saber)',
+      url: 'https://www.icfes.gov.co/investigaciones/data-icfes/',
+      desc: 'Resultados de Saber 3°, 5°, 9° y 11 por colegio y municipio. Sirve para hablar de calidad, no solo de cobertura.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['educacion']
+    },
+    {
+      id: 'sivigila', categoria: 'co-sector',
+      nombre: 'INS · SIVIGILA (vigilancia en salud pública)',
+      url: 'https://portalsivigila.ins.gov.co/',
+      desc: 'Eventos de notificación obligatoria por municipio y semana: dengue, desnutrición, intento de suicidio, violencia de género, mortalidad materna.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['salud', 'genero', 'infancia']
+    },
+    {
+      id: 'dane-eevv', categoria: 'co-sector',
+      nombre: 'DANE · Nacimientos y defunciones',
+      url: 'https://www.dane.gov.co/index.php/estadisticas-por-tema/salud/nacimientos-y-defunciones',
+      desc: 'Estadísticas vitales por municipio: mortalidad infantil y materna, causas de muerte, embarazo adolescente.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['salud', 'infancia', 'poblacion']
+    },
+    {
+      id: 'forensis', categoria: 'co-sector',
+      nombre: 'Medicina Legal · Forensis',
+      url: 'https://www.medicinalegal.gov.co/cifras-estadisticas/forensis',
+      desc: 'Lesiones y muertes por causa externa: homicidios, violencia de pareja, violencia sexual, lesiones de tránsito, suicidios.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['seguridad', 'genero', 'movilidad']
+    },
+    {
+      id: 'mindefensa-homicidio', categoria: 'co-sector',
+      nombre: 'MinDefensa · Homicidios por municipio',
+      url: 'https://www.datos.gov.co/d/m8fd-ahd9',
+      desc: 'Registro diario de homicidios con municipio, arma y modalidad, desde 2003. Se actualiza cada mes.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['seguridad']
+    },
+    {
+      id: 'mindefensa-vif', categoria: 'co-sector',
+      nombre: 'MinDefensa · Violencia intrafamiliar por municipio',
+      url: 'https://www.datos.gov.co/d/gepp-dxcs',
+      desc: 'Casos registrados de violencia intrafamiliar por municipio, sexo y edad de la víctima.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['genero', 'seguridad', 'infancia']
+    },
+    {
+      id: 'dane-geih', categoria: 'co-sector',
+      nombre: 'DANE · Mercado laboral (GEIH)',
+      url: 'https://www.dane.gov.co/index.php/estadisticas-por-tema/mercado-laboral/empleo-y-desempleo',
+      desc: 'Desempleo, informalidad y ocupación para 23 ciudades y áreas metropolitanas, mes a mes.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['empleo']
+    },
+    {
+      id: 'dane-pobreza', categoria: 'co-sector',
+      nombre: 'DANE · Pobreza y condiciones de vida',
+      url: 'https://www.dane.gov.co/index.php/estadisticas-por-tema/pobreza-y-condiciones-de-vida',
+      desc: 'Pobreza monetaria y multidimensional, NBI, calidad de vida e inseguridad alimentaria.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['pobreza']
+    },
+    {
+      id: 'dane-deficit', categoria: 'co-sector',
+      nombre: 'DANE · Déficit habitacional',
+      url: 'https://www.dane.gov.co/index.php/estadisticas-por-tema/demografia-y-poblacion/deficit-habitacional',
+      desc: 'Déficit cuantitativo y cualitativo de vivienda por municipio, con base en el censo.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['vivienda']
+    },
+    {
+      id: 'minvivienda', categoria: 'co-sector',
+      nombre: 'MinVivienda',
+      url: 'https://www.minvivienda.gov.co/',
+      desc: 'Programas de vivienda y mejoramiento, y estadísticas del sector.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['vivienda']
+    },
+    {
+      id: 'sui', categoria: 'co-sector',
+      nombre: 'Superservicios · SUI',
+      url: 'https://sui.superservicios.gov.co/',
+      desc: 'Sistema Único de Información de servicios públicos: cobertura, calidad y tarifas de acueducto, alcantarillado, aseo y energía por prestador.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['agua', 'energia']
+    },
+    {
+      id: 'minvivienda-agua', categoria: 'co-sector',
+      nombre: 'MinVivienda · Agua y saneamiento básico',
+      url: 'https://www.minvivienda.gov.co/viceministerio-de-agua-y-saneamiento-basico',
+      desc: 'Política, planes departamentales de agua y reportes del sector de agua potable y saneamiento.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['agua']
+    },
+    {
+      id: 'siac', categoria: 'co-sector',
+      nombre: 'SIAC · Sistema de Información Ambiental',
+      url: 'https://www.siac.gov.co/',
+      desc: 'Deforestación, calidad del aire, recurso hídrico y biodiversidad, con capas para descargar.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['ambiente']
+    },
+    {
+      id: 'ideam', categoria: 'co-sector',
+      nombre: 'IDEAM',
+      url: 'https://www.ideam.gov.co/',
+      desc: 'Clima, hidrología, alertas por lluvias e inundaciones, y monitoreo de bosques.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['ambiente']
+    },
+    {
+      id: 'ansv-observatorio', categoria: 'co-sector',
+      nombre: 'ANSV · Observatorio Nacional de Seguridad Vial',
+      url: 'https://ansv.gov.co/es/observatorio',
+      desc: 'Víctimas y siniestros de tránsito por municipio, actor vial y tipo de vehículo.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['movilidad']
+    },
+    {
+      id: 'dane-tic', categoria: 'co-sector',
+      nombre: 'DANE · Tecnologías de la información',
+      url: 'https://www.dane.gov.co/index.php/estadisticas-por-tema/tecnologia-e-innovacion/tecnologias-de-la-informacion-y-las-comunicaciones-tic',
+      desc: 'Acceso y uso de internet y dispositivos en hogares y personas.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['conectividad']
+    },
+    {
+      id: 'upra', categoria: 'co-sector',
+      nombre: 'UPRA · Planificación rural agropecuaria',
+      url: 'https://upra.gov.co/',
+      desc: 'Frontera agrícola, uso del suelo, mercado de tierras y aptitud agropecuaria por municipio.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['rural']
+    },
+    {
+      id: 'agronet', categoria: 'co-sector',
+      nombre: 'Agronet · Estadísticas agropecuarias',
+      url: 'https://www.agronet.gov.co/',
+      desc: 'Área, producción y rendimiento de cultivos por municipio (Evaluaciones Agropecuarias Municipales).',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['rural']
+    },
+    {
+      id: 'uariv', categoria: 'co-sector',
+      nombre: 'Unidad para las Víctimas',
+      url: 'https://www.unidadvictimas.gov.co/',
+      desc: 'Registro Único de Víctimas: víctimas por hecho, municipio y año; reparación y retornos.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['victimas']
+    },
+    {
+      id: 'migracion', categoria: 'co-sector',
+      nombre: 'Migración Colombia',
+      url: 'https://www.migracioncolombia.gov.co/',
+      desc: 'Población migrante por municipio y estatus, y flujos migratorios.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['migracion']
+    },
+    {
+      id: 'chip', categoria: 'co-sector',
+      nombre: 'Contaduría · CHIP (finanzas territoriales)',
+      url: 'https://www.chip.gov.co/',
+      desc: 'Ejecución presupuestal, ingresos y gastos reportados por cada alcaldía y gobernación (FUT).',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['fiscal']
+    },
+    {
+      id: 'dane-proyecciones', categoria: 'co-sector',
+      nombre: 'DANE · Proyecciones de población',
+      url: 'https://www.dane.gov.co/index.php/estadisticas-por-tema/demografia-y-poblacion/proyecciones-de-poblacion',
+      desc: 'Población por municipio, sexo y edad simple hasta 2035. El denominador de casi cualquier tasa.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['poblacion', 'infancia', 'general']
+    },
+    {
+      id: 'upme', categoria: 'co-sector',
+      nombre: 'UPME · Energía',
+      url: 'https://www.upme.gov.co/',
+      desc: 'Cobertura de energía eléctrica, demanda y planes de expansión, incluidas zonas no interconectadas.',
+      modulos: ['problema', 'ain', 'comunicar', 'evaluacion'],
+      temas: ['energia']
     },
 
     // ─── Evaluación de política ────────────────────────────────────────────
