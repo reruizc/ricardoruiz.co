@@ -964,6 +964,8 @@ a.hl-item:hover .t { color: var(--accent); }
   .topbar { grid-template-columns: 1fr auto; gap: .75rem; padding: .85rem 1rem; }
   .topbar-center { display: none; }
   .topbar-right { gap: .5rem; }
+  .logo-link { gap: .45rem; }
+  .logo-text { font-size: .85rem; }   /* Syne 800 es ancho: a 1.1rem el logo se salía a 375 px */
   .country-btn { padding: .35rem .55rem; }
   .country-btn .country-label { display: none; }
   .user-block { display: none; }
@@ -976,6 +978,15 @@ a.hl-item:hover .t { color: var(--accent); }
   .tool { min-height: 180px; padding: 1.5rem; }
   .tool::after { font-size: 5.5rem; }
   .quota-used { font-size: 4rem; }
+}
+/* Pantallas muy estrechas (320–369 px): el botón «Volver» queda solo con la flecha;
+   el texto sigue ahí para lectores de pantalla. */
+@media (max-width: 369px) {
+  #back-label {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  .section-head { flex-wrap: wrap; gap: .4rem 1.5rem; }   /* «9 secciones · 3 bloqueadas» pasa a otra línea */
 }
 </style>
 </head>
@@ -1165,6 +1176,11 @@ const user  = JSON.parse(localStorage.getItem('rr-user') || 'null');
 if (!token || !user) window.location.href = 'login.html';
 
 /* ─── PLAN CONFIG ─── */
+// Secciones públicas: abiertas en cualquier plan, también en el Básico.
+const OPEN_TOOLS = ['legislativo', 'seguridad', 'lab'];
+// Abiertas para cualquier cuenta registrada: en descargas.html las secciones
+// 01-04 son de todos los planes; la propia página decide el resto.
+const ACCOUNT_TOOLS = [...OPEN_TOOLS, 'descargas'];
 const PLANS = {
   // SKU aparte (sep-2026): quien paga Caudal no compra el electoral. Sin esta
   // entrada el chip diría "Básico" con el plan activo.
@@ -1172,42 +1188,45 @@ const PLANS = {
     label: 'Caudal', downloads: 0,
     desc: 'Acceso completo a Caudal: inteligencia legislativa y regulatoria por perfil, con lectura del analista y alertas.',
     perks: ['Los 7 pilares de Caudal', 'Perfiles por sector y empresa vigilada', 'Lectura del analista y alertas por correo'],
-    tools: ['caudal'],
+    tools: ['caudal', ...ACCOUNT_TOOLS],
   },
   // Candidato 360 (sep-2026): SKU propio, una cuenta = un candidato.
   c360: {
     label: 'Candidato 360', downloads: 0,
     desc: 'CRM de campaña para una candidatura: historial mesa a mesa, mapa por localidad y barrio, y meta de votos para 2027.',
     perks: ['Historial electoral recortado al territorio al que aspira', 'Mapa por localidad, comuna y barrio con la meta distribuida', 'Un solo candidato por cuenta'],
-    tools: ['electoral', 'consulta2025', 'c360'],
+    tools: ['electoral', 'consulta2025', ...OPEN_TOOLS, 'c360', 'descargas'],
   },
   free: {
     label: 'Básico', downloads: 0,
-    desc: 'Acceso a resultados electorales 2025-2026 y visualizaciones básicas.',
-    perks: ['Histórico electoral 2025 y 2026', 'Análisis con filtros básicos', 'Visualizaciones territoriales esenciales'],
-    tools: ['electoral', 'consulta2025'],
+    desc: 'Resultados electorales 2025-2026, Congreso, Seguridad y el Lab de políticas públicas.',
+    perks: ['Histórico electoral 2025 y 2026', 'Congreso, Seguridad y Lab de políticas públicas', 'Descargas: Presidencial 2026 por puesto y Congreso 2026'],
+    tools: ['electoral', 'consulta2025', ...ACCOUNT_TOOLS],
   },
   pro: {
     label: 'Pro', downloads: 3,
     desc: 'Análisis avanzado de partidos, endoso y 3 descargas mensuales.',
     perks: ['3 descargas al mes', 'Análisis de partidos y medición de endoso', 'Mapas por comunas y localidades'],
-    tools: ['electoral', 'consulta2025', 'partidos', 'endoso'],
+    tools: ['electoral', 'consulta2025', ...OPEN_TOOLS, 'partidos', 'endoso', 'descargas'],
   },
   premium: {
     label: 'Premium', downloads: 10,
     desc: 'Acceso completo, centro de descargas y 10 archivos mensuales.',
     perks: ['10 descargas al mes', 'Centro de descargas completo', 'Notificaciones de actualización'],
-    tools: ['electoral', 'consulta2025', 'partidos', 'endoso', 'descargas'],
+    tools: ['electoral', 'consulta2025', ...OPEN_TOOLS, 'partidos', 'endoso', 'descargas'],
   },
 };
 
 const ALL_TOOLS = [
   { id:'electoral',    name:'Histórico Electoral', desc:'Resultados 2025 y 2026 con drill-down hasta puesto de votación. Senado, Cámara, CITREP y Consultas.', href:'electoral.html',           tag:'Datos territoriales' },
   { id:'consulta2025', name:'Consulta 2025',       desc:'Análisis completo de la consulta presidencial del Pacto Histórico, octubre de 2025.',                  href:'Consulta-2025.html',       tag:'Análisis profundo' },
+  { id:'legislativo',  name:'Congreso',            desc:'El Congreso 2026-2030 en datos: congresistas, comisiones, proyectos de ley radicados y el histórico legislativo desde 1990.', href:'legislativo.html', tag:'Legislativo 2026-2030' },
+  { id:'seguridad',    name:'Seguridad',           desc:'Delitos denunciados a la Policía entre 2015 y agosto de 2026, municipio por municipio: dónde ocurren, cuándo y a quién.', href:'policia.html',     tag:'Policía · 2015-2026' },
+  { id:'lab',          name:'Lab de Políticas Públicas', desc:'Análisis estructural de sistemas, mapeo de actores y diseño de problemas públicos, para planeación territorial y diagnóstico estratégico.', href:'analisis-estructural.html', tag:'Prospectiva' },
   { id:'partidos',     name:'Análisis Partidos',   desc:'Desempeño territorial por partido y movimiento. Drill-down hasta comuna y localidad.',                 href:'analisis-partidos.html',   tag:'Mapas y métricas' },
   { id:'endoso',       name:'Medición de Endoso',  desc:'Índice de endoso de candidatos a partir del comportamiento electoral territorial en las elecciones 2026.', href:'endoso-2026.html',     tag:'Índice 2026' },
   { id:'c360',         name:'Candidato 360',       desc:'CRM de campaña para una candidatura: historial mesa a mesa recortado a su territorio, mapa por barrio y meta de votos 2027.', href:'candidato-360.html',        tag:'Campaña 2027' },
-  { id:'descargas',    name:'Centro de Descargas', desc:'Archivos Excel por departamento, circunscripción y corporación hasta nivel de puesto de votación.',     href:'descargas.html',           tag:'Bases · Excel' },
+  { id:'descargas',    name:'Centro de Descargas', desc:'Presidencial 2026 por puesto y Congreso 2026 por corporación y circunscripción, gratis con tu cuenta. Por departamento y datos crudos, según tu plan.',     href:'descargas.html',           tag:'Bases · Excel' },
 ];
 
 const PRIVATE_GROUPS = {
