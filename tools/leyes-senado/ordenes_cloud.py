@@ -42,10 +42,21 @@ SEN_SCOPE = {'comision-cuarta': 'Comisión Cuarta',
 MESES = {'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5,
          'junio': 6, 'julio': 7, 'agosto': 8, 'septiembre': 9,
          'setiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12}
+def _suelta(palabra):
+    r"""'Ley' → r'L\s?e\s?y'. Los PDF de la Cámara parten palabras al azar
+    («Proyecto de L ey N° 152 de 20 26»): sin esto, el Presupuesto 2027 en la
+    plenaria del 19-oct-2026 salía con 0 proyectos. Medido sobre 3.940 órdenes
+    del día guardados: +267 proyectos leídos; los 21 que dejan de leerse son
+    acumulados que antes se leían EN LUGAR del principal (que traía la palabra
+    partida)."""
+    return r'\s?'.join('[aá]' if c in 'aá' else re.escape(c) for c in palabra)
+
+
 PROJECT_RE = re.compile(
-    r'Proyecto\s+de\s+(Ley|Acto\s+Legislativo)(?:\s+Org[aá]nica)?'
+    _suelta('Proyecto') + r'\s+de\s+(' + _suelta('Ley') + '|' + _suelta('Acto') + r'\s+'
+    + _suelta('Legislativo') + r')(?:\s+Org[aá]nica)?'
     r'[^0-9“\"]{0,45}(\d{1,4})\s+de\s+(2\s?0\s?\d\s?\d)'
-    r'(?:\s+(C[aá]mara|Senado))?.{0,180}?[“\"](.+?)[”\"]', re.I | re.S)
+    r'(?:\s+(' + _suelta('Cámara') + '|' + _suelta('Senado') + r'))?.{0,180}?[“\"](.+?)[”\"]', re.I | re.S)
 
 
 def _plain(value):
@@ -151,6 +162,7 @@ def _pdf_projects(url):
         title = _pdf_plain(title).strip(' “”.')
         if len(title) < 12:
             continue
+        chamber = re.sub(r'\s+', '', chamber or '')
         out.append({'numero': f'{int(number):03d} de {year}' + (f' {chamber}' if chamber else ''),
                     'titulo': title})
     return out

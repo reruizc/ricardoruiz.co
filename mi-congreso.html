@@ -72,6 +72,18 @@
     .mc-grid .panel h3 small{margin-left:auto;font-size:.6rem;letter-spacing:.06em;color:rgba(20,22,31,.45);text-transform:none}
     .mc-row{display:flex;gap:.8rem;align-items:flex-start;padding:.65rem 0;border-bottom:1px solid rgba(20,22,31,.07)}
     .mc-row:last-child{border-bottom:none}
+    .mc-av{display:flex;gap:3px;margin:.45rem 0 .15rem;max-width:260px}
+    .mc-av i{flex:1;height:5px;background:rgba(20,22,31,.10);border-radius:1px}
+    .mc-av i.on{background:var(--blue-light)}
+    .mc-av.fin i.on{background:var(--gray)}
+    .mc-av-l{font-size:.64rem;color:var(--gray);letter-spacing:.02em}
+    .mc-av-l b{color:var(--white);font-weight:500}
+    .mc-cita{display:block;margin-top:.35rem;font-size:.68rem;color:var(--amber);font-weight:600}
+    .mc-cita a{color:var(--amber)!important;text-decoration:underline}
+    .mc-mios{border:1px solid rgba(180,83,9,.35);background:rgba(180,83,9,.06);padding:.7rem .85rem;margin-bottom:.9rem}
+    .mc-mios h4{margin:0 0 .35rem;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);font-weight:700}
+    .mc-mios .mc-row{border-bottom-color:rgba(180,83,9,.15)}
+    .mc-more{background:none;border:1px solid var(--card-border);color:var(--blue-light);font-size:.7rem;padding:.35rem .7rem;margin-top:.6rem;cursor:pointer}
     .mc-row .d{font-size:.62rem;color:var(--gray);width:60px;flex-shrink:0;padding-top:.15rem;letter-spacing:.04em;font-variant-numeric:tabular-nums}
     .mc-row .t{font-size:.82rem;color:var(--white);line-height:1.45;min-width:0}
     .mc-row .t small{display:block;font-size:.66rem;color:var(--gray);margin-top:.2rem}
@@ -169,7 +181,7 @@
       <div class="mc-head" id="mc-head"></div>
       <div class="kpis" id="mc-kpis"></div>
       <div class="mc-grid">
-        <div class="panel"><h3>Mi agenda <small id="mc-agenda-src"></small></h3><div id="mc-agenda"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+        <div class="panel"><h3>Mi agenda <small id="mc-agenda-src"></small></h3><div id="mc-agenda-mios"></div><div id="mc-agenda"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
         <div class="panel"><h3>Mis proyectos en esta legislatura <small>rastreo diario · Senado y Cámara</small></h3><div id="mc-proy"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
         <div class="panel"><h3>Cómo he votado <small id="mc-voto-src"></small></h3>
           <div class="seg-sub" style="margin-top:0">Dónde me votaron · 2026</div>
@@ -509,23 +521,81 @@
       }).join('');
     }catch(err){ if(my===SEQ) box.innerHTML='<div class="mc-empty">No se pudo consultar la agenda en este momento.</div>'; }
   }
+  /* ── Avance del trámite ─────────────────────────────────────────────
+     Etapa 1-6 desde el ESTADO oficial del registro. El Senado lo da fino
+     (designar ponentes · rendir ponencia · discutir en 1º o 2º debate); la
+     Cámara casi siempre dice solo «Trámite en Comisión», así que ahí la etapa
+     se completa con el orden del día: si está agendado, está en debate. */
+  const ETAPAS=['Radicado','En comisión','En primer debate','Aprobado en primer debate','En segundo debate','Pasa a la otra cámara'];
+  function etapaDe(estado){
+    const s=norm(estado);
+    if(/archivad|retirad/.test(s)) return {fin:'Archivado o retirado'};
+    if(/acumulad/.test(s)) return {fin:'Acumulado a otro proyecto'};
+    if(/enviar a comision/.test(s)) return {n:1};
+    if(/segundo debate/.test(s)) return {n:/discutir/.test(s)?5:4};
+    if(/discutir ponencia|debate de comision/.test(s)) return {n:3};
+    if(/tramite en plenaria/.test(s)) return {n:4};
+    if(/ponen|tramite en comision/.test(s)) return {n:2};
+    return {n:1};
+  }
+  /* «033 de 2026 Cámara» · «447/2026C» · «298/26» → «33/26C». Sin cámara
+     explícita se usa la del documento (orden del día) o la del registro. */
+  function numKey(num,camDef){
+    const m=String(num||'').match(/0*(\d{1,4})\s*(?:de|\/)\s*(?:20)?(\d{2})\s*(c[aá]mara|senado|c|s)?/i);
+    if(!m) return null;
+    const c=m[3]?(/^s/i.test(m[3])?'S':'C'):camDef;
+    return c?`${+m[1]}/${m[2]}${c}`:null;
+  }
+  function citasDe(x,ord){
+    const keys=new Set([numKey(x.numero_senado,'S'),numKey(x.numero_camara,'C')].filter(Boolean));
+    const out=[];
+    for(const o of ord){
+      const ps=o.proyectos||[], cam=/senado/i.test(o.corporacion||'')?'S':'C';
+      ps.forEach((p,i)=>{ if(keys.has(numKey(p.numero,cam))) out.push({o,pos:i+1,tot:ps.length}); });
+    }
+    return out.sort((a,b)=>String(a.o.fecha).localeCompare(String(b.o.fecha)));
+  }
+  const diaCorto=f=>{ const d=new Date(String(f)+'T12:00:00'); return isNaN(d)?fechaCorta(f):['dom','lun','mar','mié','jue','vie','sáb'][d.getDay()]+' '+fechaCorta(f); };
+  function citaTxt(c){
+    const amb=String(c.o.ambito||c.o.corporacion||'').replace(/\bSeptima\b/,'Séptima');
+    return `${esc(amb)}${/plenaria/i.test(amb)?'':' de '+esc(c.o.corporacion)}, ${esc(diaCorto(c.o.fecha))} · puesto ${c.pos} de ${c.tot} en la lista`+(c.o.url?` · <a href="${esc(c.o.url)}" target="_blank" rel="noopener">orden del día ↗</a>`:'');
+  }
+  function avanceHtml(x,citas){
+    const e=etapaDe(x.estado);
+    if(e.fin) return `<div class="mc-av fin">${ETAPAS.map(()=>'<i></i>').join('')}</div><div class="mc-av-l"><b>${esc(e.fin)}</b>${citas.length&&/acumulad/i.test(e.fin)?' · se debate junto con el principal':''}</div>`;
+    let n=e.n;
+    if(citas.length){ n=Math.max(n,citas.some(c=>/plenaria/i.test(c.o.ambito||''))?5:3); }
+    return `<div class="mc-av" title="${esc(ETAPAS[n-1])}">${ETAPAS.map((_,k)=>`<i class="${k<n?'on':''}"></i>`).join('')}</div><div class="mc-av-l">Etapa ${n} de 6 · <b>${esc(ETAPAS[n-1])}</b></div>`;
+  }
   async function cargarProyectos(e,my){
-    const box=document.getElementById('mc-proy');
+    const box=document.getElementById('mc-proy'), mios_box=document.getElementById('mc-agenda-mios');
     try{
-      const r=await call({action:'radicados'});
+      const [r,ordJ]=await Promise.all([call({action:'radicados'}), getJSON(URL_ORD,300000).catch(()=>({ordenes:[]}))]);
       if(my!==SEQ) return;
+      const partes=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+      const toma=t=>partes.find(p=>p.type===t)?.value; const hoy=`${toma('year')}-${toma('month')}-${toma('day')}`;
+      const ord=(ordJ.ordenes||[]).filter(o=>(o.fecha_fin||o.fecha)>=hoy);
       const todos=[...(r.radicados||[]).map(x=>({...x,_cam:'Senado'})),...(r.radicados_camara||[]).map(x=>({...x,_cam:'Cámara'}))];
       const mios=todos.map(x=>{
         const auts=autoresDe(x.autor); const i=auts.findIndex(a=>mismaPersona(a,e.nombre));
-        return i<0?null:{...x,_auts:auts,_primero:i===0};
-      }).filter(Boolean).sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
+        return i<0?null:{...x,_auts:auts,_primero:i===0,_citas:citasDe(x,ord)};
+      }).filter(Boolean).sort((a,b)=>(b._citas.length>0)-(a._citas.length>0)||String(b.fecha||'').localeCompare(String(a.fecha||'')));
       KPI.proy=mios.length; pintaKpis();
+      const numDe=x=>x._cam==='Cámara'?(x.numero_camara||x.numero_senado):(x.numero_senado||x.numero_camara);
+      /* en la agenda: SUS proyectos en cualquier orden del día vigente, no solo
+         los de su comisión (un proyecto suyo puede ir a otra comisión) */
+      const agendados=mios.filter(x=>x._citas.length);
+      if(mios_box) mios_box.innerHTML=agendados.length?`<div class="mc-mios"><h4>Tus proyectos en el orden del día</h4>${agendados.map(x=>x._citas.map(c=>`<div class="mc-row"><span class="d">${esc(diaCorto(c.o.fecha))}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),110))}<small>${esc(numDe(x)||'')} · ${citaTxt(c)}</small></span></div>`).join('')).join('')}</div>`:'';
       if(!mios.length){ box.innerHTML=`<div class="mc-empty">No aparece como firmante de ningún proyecto radicado en la legislatura 2026-2027, según los registros de Senado y Cámara. Los proyectos entran al rastreo apenas las secretarías los publican, con rezago de días en Cámara.</div>`; return; }
-      box.innerHTML=mios.slice(0,12).map(x=>{
-        const num=x._cam==='Cámara'?(x.numero_camara||x.numero_senado):(x.numero_senado||x.numero_camara);
-        return `<div class="mc-row"><span class="d">${esc(num||'—')}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),150))}<small>${esc(x._cam)}${x.comision?' · '+esc(comisionNice(x.comision)):''}${x.estado?' · '+esc(x.estado):''}${x.fecha?' · radicado '+esc(fechaCorta(x.fecha)):''} · ${x._auts.length===1?'firma solo':x._auts.length+' firmantes'}${x.fuente_url?` · <a href="${esc(x.fuente_url)}" target="_blank" rel="noopener">fuente ↗</a>`:''}</small></span></div>`;
-      }).join('')+(mios.length>12?`<div class="note" style="margin-top:.6rem">Y ${mios.length-12} más. El Radar legislativo tiene la lista completa.</div>`:'')
-      +`<div class="note" style="margin-top:.6rem">★ = primera firma (autor principal). El resto son coautorías: en el registro, adherir a un proyecto y redactarlo pesan igual.</div>`;
+      const fila=x=>`<div class="mc-row"><span class="d">${esc(numDe(x)||'—')}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),150))}${avanceHtml(x,x._citas)}${x._citas.map(c=>`<span class="mc-cita">En el orden del día: ${citaTxt(c)}</span>`).join('')}<small>${esc(x._cam)}${x.comision?' · '+esc(comisionNice(x.comision)):''}${x.estado?' · '+esc(x.estado):''}${x.fecha?' · radicado '+esc(fechaCorta(x.fecha)):''} · ${x._auts.length===1?'firma solo':x._auts.length+' firmantes'}${x.fuente_url?` · <a href="${esc(x.fuente_url)}" target="_blank" rel="noopener">fuente ↗</a>`:''}</small></span></div>`;
+      const pinta=todos_=>{
+        const lista=todos_?mios:mios.slice(0,12);
+        box.innerHTML=lista.map(fila).join('')
+          +(mios.length>12&&!todos_?`<button class="mc-more" id="mc-proy-mas">Ver los ${mios.length} proyectos</button>`:'')
+          +`<div class="note" style="margin-top:.6rem">★ = primera firma (autor principal). El resto son coautorías: en el registro, adherir a un proyecto y redactarlo pesan igual. La etapa sale del estado oficial; en Cámara, que casi siempre reporta solo «Trámite en Comisión», se completa con los órdenes del día publicados.</div>`;
+        const b=document.getElementById('mc-proy-mas'); if(b) b.onclick=()=>pinta(true);
+      };
+      pinta(false);
     }catch(err){ if(my===SEQ) box.innerHTML='<div class="mc-empty">No se pudo consultar el registro de radicados.</div>'; }
   }
   async function cargarVoto(e,my){
