@@ -79,6 +79,29 @@ añada a la tabla. Es el único pedazo del perfil que no sale solo del vínculo,
 la salida honesta a largo plazo es preguntarle al candidato qué páginas locales
 sigue —él las conoce mejor que nosotros—.
 
+## Capa 0 · sus propias cuentas (19-oct-2026)
+
+Hasta esta fecha la escucha **no leía las cuentas del candidato**: «lo que
+publicó» salía solo de los posts suyos que aparecieran por casualidad en las
+búsquedas por tema. Ahora, si el vínculo trae la cuenta de una red, `PROPIAS`
+(en `perfil.mjs`) la lee directamente:
+
+| Red | Actor | Input |
+|---|---|---|
+| X | `kaitoeasyapi/…` | `from:<usuario>` |
+| Instagram | `apify/instagram-profile-scraper` | `usernames` (trae las ~12 últimas en `latestPosts`; los otros dos actores de Instagram dan «Request got blocked» sobre un perfil) |
+| TikTok | `clockworks/tiktok-scraper` | `profiles` |
+| Facebook | `apify/facebook-posts-scraper` | su página |
+
+Las publicaciones leídas así llenan `publicados`, y los comentarios de sus
+`postsPropios` (3) posts con más reacción van a **`comentarios_propios`**: es lo
+que se siente sobre él. `comentarios` sigue siendo la conversación del
+territorio, sin sus posts. Cada red trae `propias: { estado, n, motivo }`. Los
+dos campos son nuevos y aditivos: el panel todavía no los pinta.
+
+⚠️ Los nombres de campo del input son los usuales de cada actor. La primera
+corrida va con `--tope` bajo: si uno cambió, falla con el error del actor.
+
 ## Dos capas, dentro del mismo módulo
 
 | Capa | Qué trae | Cómo | Se cobra |

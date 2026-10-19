@@ -27,7 +27,7 @@
 import { writeFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { REDES, COMENTARIOS, plan, planComentarios, referenciaDePost, perfilDeVinculo, cargarVinculo, norm } from './perfil.mjs';
+import { REDES, PROPIAS, COMENTARIOS, plan, planComentarios, referenciaDePost, perfilDeVinculo, cargarVinculo, norm } from './perfil.mjs';
 import { tokenApify, AYUDA_TOKEN, clienteApify } from './apify.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
@@ -95,34 +95,13 @@ const llave = SIN_MODELO ? null : await llaveModelo();
 if (!SIN_MODELO && !llave) { console.error('\nFalta DEEPSEEK_API_KEY (en el entorno o en .env). Para raspar sin clasificar: --sin-modelo\n'); process.exit(1); }
 const apify = clienteApify(token);
 
-for (const f of filasPosts) {
-  const red = { estado: 'ok', motivo: '', modo: f.modo, handle: PERFIL.cuentas[f.red] || '', paginas: f.red === 'facebook' ? f.consultas : undefined,
-    publicados: [], menciones: [], amplifican: [], temas: {}, comentarios: null };
-  captura.redes[f.red] = red;
-  if (f.motivo) { red.estado = f.red === 'facebook' || PERFIL.temas.length ? 'sin_datos' : 'sin_temas'; red.motivo = f.motivo; continue; }
-  process.stdout.write(`\n▸ ${f.etiqueta} · posts… `);
-  let items = [];
+/* Comentarios de unos posts, clasificados por el modelo. La usan las dos
+   capas: la conversación del territorio y los posts del propio candidato. */
+async function leerComentarios(f, posts) {
+  const fc = filasCom.find(c => c.red === f.red);
+  process.stdout.write(`▸ ${f.etiqueta} · comentarios de ${posts.length} posts… `);
   try {
-    const r = await apify.correr(f.actor, REDES[f.red].input(f.consultas, TOPE ?? f.tope));
-    captura.costo.apifyUsd += r.cobrado; items = r.items;
-    console.log(`${r.items.length} ítems · $${r.cobrado.toFixed(4)}`);
-  } catch (e) { red.estado = 'error'; red.motivo = e.message; console.log(`FALLÓ · ${e.message}`); continue; }
-  if (!items.length) { red.estado = 'sin_datos'; red.motivo = 'el actor no devolvió nada: puede ser la red bloqueada o el input con otro nombre de campo, no ausencia de conversación'; continue; }
-
-  const fichas = items.map(ficha).filter(x => x.texto);
-  red.publicados = fichas.filter(x => propio(x, red.handle)).sort((a, b) => b.reaccion - a.reaccion).slice(0, 10);
-  red.menciones = fichas.filter(x => !propio(x, red.handle)).sort((a, b) => b.reaccion - a.reaccion).slice(0, 30);
-  const porAutor = {}; for (const m of red.menciones) if (m.autor) { porAutor[m.autor] = porAutor[m.autor] || { autor: m.autor, veces: 0, alcance: 0 }; porAutor[m.autor].veces++; porAutor[m.autor].alcance += m.reaccion; }
-  red.amplifican = Object.values(porAutor).sort((a, b) => b.alcance - a.alcance || b.veces - a.veces).slice(0, 8);
-  for (const x of fichas) for (const t of temaDe(x.texto, PERFIL.temas)) red.temas[t] = (red.temas[t] || 0) + 1;
-
-  /* Capa 2: los comentarios de los posts con más reacción, clasificados. */
-  const fc = filasCom.find(c => c.red === f.red); if (!fc || fc.motivo) continue;
-  const elegidos = items.map(referenciaDePost).filter(Boolean).sort((a, b) => b.reaccion - a.reaccion).slice(0, fc.posts);
-  if (!elegidos.length) { red.comentarios = { n: 0, motivo: 'ningún post trajo URL con nombre de campo conocido' }; continue; }
-  process.stdout.write(`▸ ${f.etiqueta} · comentarios de ${elegidos.length} posts… `);
-  try {
-    const r = await apify.correr(fc.actor, COMENTARIOS[f.red].input(elegidos, TOPE ? Math.min(TOPE, fc.tope) : fc.tope));
+    const r = await apify.correr(fc.actor, COMENTARIOS[f.red].input(posts, TOPE ? Math.min(TOPE, fc.tope) : fc.tope));
     captura.costo.apifyUsd += r.cobrado;
     const coms = r.items.map(ficha).filter(x => x.texto);
     console.log(`${coms.length} comentarios · $${r.cobrado.toFixed(4)}`);
@@ -134,8 +113,57 @@ for (const f of filasPosts) {
     }
     /* Tres citas, una por postura cuando la hay: la cifra nunca sale sola. */
     const citas = ['en_contra', 'a_favor', 'ataque', 'neutro'].map(p => coms.find(c => c.postura === p)).filter(Boolean).slice(0, 3).map(c => ({ texto: c.texto, postura: c.postura, autor: c.autor, url: c.url }));
-    red.comentarios = { n: coms.length, posts: elegidos.length, clasificados: SIN_MODELO ? 0 : coms.filter(c => c.postura).length, postura, tono, temas, citas };
-  } catch (e) { red.comentarios = { n: 0, motivo: e.message }; console.log(`FALLÓ · ${e.message}`); }
+    return { n: coms.length, posts: posts.length, clasificados: SIN_MODELO ? 0 : coms.filter(c => c.postura).length, postura, tono, temas, citas };
+  } catch (e) { console.log(`FALLÓ · ${e.message}`); return { n: 0, motivo: e.message }; }
+}
+
+for (const f of filasPosts) {
+  const red = { estado: 'ok', motivo: '', modo: f.modo, handle: PERFIL.cuentas[f.red] || '', paginas: f.red === 'facebook' ? f.consultas : undefined,
+    publicados: [], menciones: [], amplifican: [], temas: {}, comentarios: null };
+  captura.redes[f.red] = red;
+  /* Capa 0: sus cuentas. Corre aunque la red no tenga temas: lo que él publica
+     y lo que le comentan no depende de las búsquedas. */
+  let suyos = [];
+  if (red.handle && PROPIAS[f.red]) {
+    process.stdout.write(`\n▸ ${f.etiqueta} · ${PROPIAS[f.red].modo} (@${red.handle})… `);
+    try {
+      const r = await apify.correr(PROPIAS[f.red].actor, PROPIAS[f.red].input(red.handle, TOPE ?? f.propio));
+      /* Algunos actores de perfil (Instagram) devuelven UN ítem con el perfil y
+         sus publicaciones en `latestPosts`: se aplanan para leer los posts. */
+      captura.costo.apifyUsd += r.cobrado; const bloqueos = r.items.filter(it => it.error || it.requestErrorMessages);
+      suyos = r.items.filter(it => !(it.error || it.requestErrorMessages)).flatMap(it => Array.isArray(it.latestPosts) ? it.latestPosts : [it]);
+      console.log(`${suyos.length} publicaciones · $${r.cobrado.toFixed(4)}`);
+      red.propias = { estado: suyos.length ? 'ok' : 'sin_datos', n: suyos.length,
+        motivo: suyos.length ? '' : bloqueos.length ? `la red bloqueó la lectura: ${String(bloqueos[0].error || bloqueos[0].errorDescription || '').slice(0, 120)}` : 'el actor no devolvió nada: puede ser la cuenta privada, el usuario mal escrito o el input con otro nombre de campo' };
+    } catch (e) { red.propias = { estado: 'error', n: 0, motivo: e.message }; console.log(`FALLÓ · ${e.message}`); }
+    if (suyos.length) red.publicados = suyos.map(ficha).filter(x => x.texto).sort((a, b) => b.reaccion - a.reaccion).slice(0, 10);
+    /* Lo que se siente sobre él: los comentarios de sus posts con más reacción. */
+    const top = suyos.map(referenciaDePost).filter(Boolean).sort((a, b) => b.reaccion - a.reaccion).slice(0, COMENTARIOS.postsPropios);
+    if (top.length && COMENTARIOS[f.red]) red.comentarios_propios = await leerComentarios(f, top);
+  }
+  if (f.motivo) { red.estado = f.red === 'facebook' || PERFIL.temas.length ? 'sin_datos' : 'sin_temas'; red.motivo = f.motivo; continue; }
+  process.stdout.write(`\n▸ ${f.etiqueta} · posts… `);
+  let items = [];
+  try {
+    const r = await apify.correr(f.actor, REDES[f.red].input(f.consultas, TOPE ?? f.tope));
+    captura.costo.apifyUsd += r.cobrado; items = r.items;
+    console.log(`${r.items.length} ítems · $${r.cobrado.toFixed(4)}`);
+  } catch (e) { red.estado = 'error'; red.motivo = e.message; console.log(`FALLÓ · ${e.message}`); continue; }
+  if (!items.length) { red.estado = 'sin_datos'; red.motivo = 'el actor no devolvió nada: puede ser la red bloqueada o el input con otro nombre de campo, no ausencia de conversación'; continue; }
+
+  const fichas = items.map(ficha).filter(x => x.texto);
+  if (!red.publicados.length) red.publicados = fichas.filter(x => propio(x, red.handle)).sort((a, b) => b.reaccion - a.reaccion).slice(0, 10);
+  red.menciones = fichas.filter(x => !propio(x, red.handle)).sort((a, b) => b.reaccion - a.reaccion).slice(0, 30);
+  const porAutor = {}; for (const m of red.menciones) if (m.autor) { porAutor[m.autor] = porAutor[m.autor] || { autor: m.autor, veces: 0, alcance: 0 }; porAutor[m.autor].veces++; porAutor[m.autor].alcance += m.reaccion; }
+  red.amplifican = Object.values(porAutor).sort((a, b) => b.alcance - a.alcance || b.veces - a.veces).slice(0, 8);
+  for (const x of fichas) for (const t of temaDe(x.texto, PERFIL.temas)) red.temas[t] = (red.temas[t] || 0) + 1;
+
+  /* Capa 2: los comentarios de los posts con más reacción de la conversación
+     (sin los suyos, que ya se leyeron arriba), clasificados. */
+  const fc = filasCom.find(c => c.red === f.red); if (!fc || fc.motivo) continue;
+  const elegidos = items.filter(it => !propio(it, red.handle)).map(referenciaDePost).filter(Boolean).sort((a, b) => b.reaccion - a.reaccion).slice(0, COMENTARIOS.postsPorCorrida);
+  if (!elegidos.length) { red.comentarios = { n: 0, motivo: 'ningún post trajo URL con nombre de campo conocido' }; continue; }
+  red.comentarios = await leerComentarios(f, elegidos);
 }
 
 const salida = args.salida ? path.resolve(String(args.salida)) : path.join(AQUI, 'captura.json');

@@ -886,14 +886,40 @@ function departamentoDelSlug(slug) {
   const m = String(slug || '').match(/^(?:ASAM|GOB|ALC|JAL|CONC)\d{4}-(\d+)-|^CON\d{4}-C-(\d+)-/);
   return m ? String(m[1] || m[2]).replace(/^0+/, '') : '';
 }
+/* Las candidaturas por LISTA CERRADA no existen en los índices: la
+   Registraduría solo registra el voto al logo, así que quien encabezó una lista
+   cerrada «no compitió» para los datos (el cabeza de Colombia Justa Libres al
+   Concejo de Bogotá 2019: 101.604 votos de lista y dos curules, invisibles). La tabla curada a mano
+   (candidato-360-data/listas-cerradas.js, con fuente por lista) las devuelve
+   como registros SIN voto propio: entran al historial y al selector de años,
+   pero no tienen slug ni mesas, así que nunca se dibujan en el mapa. */
+function candidaturasPorListaCerrada(key, nombre) {
+  const out = [];
+  for (const l of (window.Candidato360ListasCerradas || [])) {
+    /* Los elegidos y, aparte, el cabeza de una lista que no sacó curul. */
+    const personas = (l.elegidos || []).map(e => ({ ...e, elegido: true }));
+    if (l.cabeza && !personas.some(e => e.nombre === l.cabeza)) personas.push({ nombre: l.cabeza, renglon: 1, elegido: false });
+    for (const e of personas) {
+      if (fourNameKey({ nombre: e.nombre, circunscripcion: l.circunscripcion }) !== key) continue;
+      out.push({ slug: '', source: 'listas-cerradas', nombre: nombre || e.nombre, partido: l.partido, votos: 0,
+        corp: `${l.corpLabel} · ${l.circunscripcion} · ${l.anio}`, circunscripcion: l.circunscripcion,
+        listaCerrada: { anio: l.anio, partido: l.partido, votosLista: l.votosLista, curules: l.curules, renglon: e.renglon || null, elegido: e.elegido, nota: l.nota || '', fuentes: l.fuentes || [] } });
+    }
+  }
+  return out;
+}
 function candidateProfile(candidate) {
   const key = fourNameKey(candidate); if (!key) return { ...candidate, id: candidate.slug };
   const seen = new Set;
-  const history = historicalIndex.filter(item => fourNameKey(item) === key).filter(item => { const itemKey = item.slug || `${item.nombre}|${item.corp}|${item.partido}`; if (seen.has(itemKey)) return false; seen.add(itemKey); return true; }).sort((a, b) => candidateYear(b) - candidateYear(a));
+  const reales = historicalIndex.filter(item => fourNameKey(item) === key).filter(item => { const itemKey = item.slug || `${item.nombre}|${item.corp}|${item.partido}`; if (seen.has(itemKey)) return false; seen.add(itemKey); return true; });
+  if (key.split(/\s+/).length === 3 && new Set(reales.map(item => departamentoDelSlug(item.slug)).filter(Boolean)).size !== 1) return { ...candidate, id: candidate.slug };
+  const conocidos = new Set(reales.map(item => `${candidateYear(item)}|${String(item.corp || '').split('·')[0].trim()}`));
+  const cerradas = candidaturasPorListaCerrada(key, reales[0]?.nombre).filter(c => !conocidos.has(`${candidateYear(c)}|${c.corp.split('·')[0].trim()}`));
+  const history = reales.concat(cerradas).sort((a, b) => candidateYear(b) - candidateYear(a));
   if (history.length < 2) return { ...candidate, id: candidate.slug };
-  if (key.split(/\s+/).length === 3 && new Set(history.map(item => departamentoDelSlug(item.slug)).filter(Boolean)).size !== 1) return { ...candidate, id: candidate.slug };
+  const base = history.find(item => !item.listaCerrada) || history[0];
   const years = [...new Set(history.map(candidateYear).filter(Boolean))].sort((a, b) => a - b);
-  return { ...history[0], id: `persona-${key.toLowerCase().replace(/\s+/g, '-')}`, nombre: history[0].nombre, history, historyVotes: history.reduce((sum, item) => sum + Number(item.votos || 0), 0), historyLabel: `${history.length} candidaturas registradas · ${years.join(', ')}` };
+  return { ...base, id: `persona-${key.toLowerCase().replace(/\s+/g, '-')}`, nombre: base.nombre, history, historyVotes: history.reduce((sum, item) => sum + Number(item.votos || 0), 0), historyLabel: `${history.length} candidaturas registradas · ${years.join(', ')}` };
 }
 let historicalGreetingTimer = 0;
 let historicalExplained = false;
@@ -2557,7 +2583,7 @@ function cuartilElectoral(candidatura) {
 /* La candidatura que se puntúa es la MÁS RECIENTE (history ya viene ordenado
    por año descendente): el puntaje es «cómo le fue la última vez», no su récord
    histórico. */
-function candidaturaPuntuada(profile) { return profile?.history?.length ? profile.history[0] : profile; }
+function candidaturaPuntuada(profile) { return profile?.history?.length ? (profile.history.find(c => !c.listaCerrada) || profile.history[0]) : profile; }
 /* Referencia territorial: en Bogotá el alcalde, en el resto el gobernador del
    departamento donde se va a lanzar. Sale del mismo índice que ya está en
    memoria: el más votado de esa elección es quien la ganó. */
@@ -3976,7 +4002,25 @@ function electionViewStyleMap() {
   renderMapBreakdown(values, state.namesByArea, crmMapMode === 'proyectado' ? `Meta proyectada por ${state.config.title}` : `Promedio de votos por ${state.config.title}`);
   $('crmMapVotes').textContent = `${Math.round(Object.values(values).reduce((t, v) => t + Number(v || 0), 0)).toLocaleString('es-CO')} votos`;
 }
+/* Una candidatura por lista cerrada no tiene voto propio por mesa: se dice qué
+   pasó (votos de la lista, curules, renglón) en vez de dibujar un mapa vacío. */
+function mostrarListaCerrada(record) {
+  const L = record.candidate.listaCerrada;
+  if (crmMapLayer) { crmLeafletMap?.removeLayer(crmMapLayer); crmMapLayer = null; }
+  if (crmBarrioLayer) { crmLeafletMap?.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
+  const mapEl = $('crmMap'); mapEl.querySelector('.crm-territory-notice')?.remove();
+  const partido = escHtml(String(L.partido).split(' ').map(w => w.length > 3 ? NOMBRE_BONITO(w) : w.toLowerCase()).join(' '));
+  const renglon = L.renglon === 1 ? 'Encabezó la lista' : L.renglon ? `Fue el renglón ${L.renglon} de la lista` : 'Salió por la lista';
+  const resultado = L.curules ? `${L.curules} curul${L.curules === 1 ? '' : 'es'}${L.elegido ? '' : ', sin la suya'}` : 'ninguna curul';
+  const notice = document.createElement('div'); notice.className = 'crm-territory-notice';
+  notice.innerHTML = `<strong>${record.year}</strong><span>${renglon} cerrada de ${partido}: ${Number(L.votosLista || 0).toLocaleString('es-CO')} votos de lista y ${resultado}.</span>`;
+  mapEl.append(notice);
+  $('crmMapVotes').textContent = 'Lista cerrada';
+  $('crmBreakdown').innerHTML = `<h4>Lista cerrada · ${record.year}</h4><p class="helper">En una lista cerrada no hay voto preferente: la gente vota por el logo y las curules se asignan en el orden de la lista. Por eso la Registraduría no registra votos a nombre de ${escHtml(record.candidate.nombre)} ese año y no hay mapa de votación propia.</p>${(L.fuentes || []).length ? `<p class="helper">Fuente: ${L.fuentes.map((u, i) => `<a href="${escHtml(u)}" target="_blank" rel="noopener">${i + 1}</a>`).join(' · ')}</p>` : ''}`;
+  $('crmMapNote').textContent = 'Seleccione otra elección, el promedio o la proyección para ver el mapa.';
+}
 async function showElectionYear(record, { restoreToggles = true } = {}) {
+  if (record.candidate?.listaCerrada) { electionViewActive = record.year; mostrarListaCerrada(record); if (restoreToggles) renderElectionViewToggles(); return false; }
   const applicability = await electionAppliesToTarget(record.candidate);
   electionViewActive = record.year;
   if (!applicability.applies) { showTerritoryNotApplicable(record.year); if (restoreToggles) renderElectionViewToggles(); return false; }
@@ -3991,7 +4035,12 @@ async function showElectionYear(record, { restoreToggles = true } = {}) {
 async function showElectionAverage(projected = false) {
   /* Desde el mapa del destino, el promedio se pinta sobre la capa del historial. */
   if (EN_DESTINO && electionViewRecords.length) { destinoTok++; await renderSingleElection(electionViewRecords[electionViewRecords.length - 1].candidate); }
-  for (const record of electionViewRecords) { if (!electionViewSnapshots.has(record.year)) await showElectionYear(record, { restoreToggles: false }); }
+  /* Las listas cerradas no tienen mapa: no entran al promedio. Y si la última
+     vista fue una (que quita la capa), se vuelve a pintar una elección real. */
+  const conVoto = electionViewRecords.filter(r => !r.candidate?.listaCerrada);
+  for (const record of conVoto) { if (!electionViewSnapshots.has(record.year)) await showElectionYear(record, { restoreToggles: false }); }
+  if (!crmMapLayer && conVoto.length) await showElectionYear(conVoto[conVoto.length - 1], { restoreToggles: false });
+  $('crmMap')?.querySelector('.crm-territory-notice')?.remove();
   const snapshots = [...electionViewSnapshots.values()];
   if (!snapshots.length) { showTerritoryNotApplicable('PROMEDIO'); renderElectionViewToggles(); return; }
   const compatible = snapshots.filter(s => s.config?.title === snapshots[0].config?.title), reference = compatible[compatible.length - 1];
@@ -4143,8 +4192,10 @@ async function loadHistoricalMap(candidate) {
   $('crmMapPanelNum').textContent = '01 · Mapa de historial electoral';
   const records = electionViewHistory(candidate);
   if (records.length < 2) { await renderSingleElection(candidate); ensureCRMMapToggles(); refreshMapLevels(); return; }
-  electionViewRecords = records; electionViewActive = records[records.length - 1].year;
-  await showElectionYear(records[records.length - 1], { restoreToggles: false });
+  /* Abre en la elección más reciente CON voto propio: una lista cerrada no tiene mapa. */
+  const inicial = [...records].reverse().find(r => !r.candidate.listaCerrada) || records[records.length - 1];
+  electionViewRecords = records; electionViewActive = inicial.year;
+  await showElectionYear(inicial, { restoreToggles: false });
   renderElectionViewToggles();
 }
 /* El territorio de la campaña cuando el historial está en otra parte: el mismo

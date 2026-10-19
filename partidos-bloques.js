@@ -68,6 +68,15 @@
   'PARTIDO CENTRO DEMOCRATICO': 'd',
   'PARTIDO POLITICO CREEMOS': 'd',
   'NUEVA FUERZA DEMOCRATICA': 'd',
+  /* Coalición al Concejo de Bogotá 2023: Nueva Fuerza Democrática (d) +
+     Salvación Nacional (cd). Va con la derecha porque su elegido (NFD) y su
+     electorado son los de la derecha cristiana de familia, más cerca de
+     Colombia Justa Libres que de Cambio Radical. Sin esta entrada caía en `sc`. */
+  'BOGOTA MAS FUERTE': 'd',
+  /* Movimiento Libres (2015): confesional, se fundió en Colombia Justa Libres.
+     Ya caía en `d` por parecido con «Justa Libres»; queda explícito. */
+  'LIBRES': 'd',
+  'MOVIMIENTO LIBRES': 'd',
   // partidos que faltaban y que aparecen sobre todo dentro de coaliciones
   'PARTIDO POLITICO MIRA': 'cd',           // conservadurismo social, sin adscripción de gobierno
   'PARTIDO COLOMBIA JUSTA LIBRES': 'd',    // confesional evangélico

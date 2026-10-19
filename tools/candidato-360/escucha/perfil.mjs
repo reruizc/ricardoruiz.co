@@ -112,6 +112,28 @@ export const REDES = {
   },
 };
 
+/* ── Capa 0 · sus propias cuentas ──────────────────────────────────────────
+   Las búsquedas de arriba escuchan la CONVERSACIÓN de su territorio; un post
+   del candidato solo aparecía ahí si por casualidad usaba la palabra buscada.
+   Esta capa lee sus cuentas directamente (lo que publicó y cuánto rindió) y
+   alimenta los comentarios de SUS posts, que es donde está lo que se siente
+   sobre él. Cuesta `propio` resultados por red y corrida, ya contados en
+   plan(). ⚠️ Los nombres de campo del input son los usuales del actor: la
+   primera corrida con --tope bajo dice si alguno cambió (error explícito). */
+export const PROPIAS = {
+  x:         { actor: 'kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest', modo: 'sus tweets',
+               input: (h, n) => ({ searchTerms: [`from:${h}`], maxItems: n, sort: 'Latest' }) },
+  /* ⚠️ instagram-scraper e instagram-post-scraper sobre un perfil devuelven un
+     ítem de ERROR («Request got blocked», 19-oct-2026). El de perfil sí pasa y
+     trae las últimas ~12 publicaciones en `latestPosts` (capturar.mjs aplana). */
+  instagram: { actor: 'apify/instagram-profile-scraper', modo: 'sus publicaciones',
+               input: (h) => ({ usernames: [h] }) },
+  tiktok:    { actor: 'clockworks/tiktok-scraper', modo: 'sus videos',
+               input: (h, n) => ({ profiles: [h], resultsPerPage: n, proxyCountryCode: 'CO' }) },
+  facebook:  { actor: 'apify/facebook-posts-scraper', modo: 'su página',
+               input: (h, n) => ({ startUrls: [{ url: `https://www.facebook.com/${h}` }], resultsLimit: n }) },
+};
+
 /* ── Capa 2 · los comentarios ─────────────────────────────────────────────
    El sentimiento no vive en los posts, vive en los comentarios: el post de la
    Alcaldía diciendo «inauguramos el parque» es neutro por definición; los 140
@@ -128,7 +150,7 @@ export const REDES = {
    variar: un input con otro nombre falla con un error explícito del actor,
    que medir.mjs muestra tal cual.                                            */
 export const COMENTARIOS = {
-  postsPorCorrida: 3, tope: 30,
+  postsPorCorrida: 3, postsPropios: 3, tope: 30,
   x:         { actor: 'kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest', modo: 'respuestas (son tweets)',
                input: (posts, tope) => ({ searchTerms: posts.map(p => `conversation_id:${p.id}`), maxItems: posts.length * tope, sort: 'Latest' }) },
   instagram: { actor: 'apify/instagram-comment-scraper', modo: 'comentarios del post',
@@ -190,7 +212,7 @@ export function plan(perfil) {
 export function planComentarios(perfil, planPosts = plan(perfil)) {
   return planPosts.map(f => {
     const c = COMENTARIOS[f.red];
-    const posts = f.motivo ? 0 : COMENTARIOS.postsPorCorrida + (perfil.cuentas?.[f.red] ? 1 : 0);
+    const posts = f.motivo ? 0 : COMENTARIOS.postsPorCorrida + (perfil.cuentas?.[f.red] ? COMENTARIOS.postsPropios : 0);
     return { red: f.red, etiqueta: f.etiqueta, modo: c.modo, actor: c.actor, posts, tope: COMENTARIOS.tope,
       motivo: f.motivo ? `sin posts de ${f.etiqueta}, no hay comentarios que leer` : '', porCorrida: posts * COMENTARIOS.tope };
   });

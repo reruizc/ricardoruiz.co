@@ -453,3 +453,49 @@ primera consultoría hecha a mano.
   y `LEAFLET_DIST` apuntando a un `npm pack leaflet@1.9.4`. Varias fallan igual
   en `HEAD` (la vitrina en el paso del país, arquetipos por la API vieja del
   modal, una del mapa): son anteriores a este módulo.
+
+### Candidaturas por lista cerrada en el historial (oct-19-2026)
+
+En una lista cerrada la Registraduría solo registra el voto al logo: los
+candidatos **no existen en el GCS, ni con cero votos**. Por eso quien encabezó
+o salió por una lista cerrada «no compitió» ese año en la plataforma. El caso
+que lo destapó: un concejal de Bogotá aparecía con 2015 y 2023, y faltaba su
+2019, cuando encabezó la lista cerrada de Colombia Justa Libres (101.604 votos
+y 2 curules).
+
+- **`candidato-360-data/listas-cerradas.js`** (`window.Candidato360ListasCerradas`),
+  curada a mano y con fuente por lista. Trae la **declaratoria original** (los
+  reemplazos van en `nota`), el renglón (`null` si no está verificado) y el
+  `cabeza` aunque la lista no haya sacado curul. Arranca con el Concejo de
+  Bogotá 2019 (Colombia Justa Libres, Coalición Colombia Humana, Colombia
+  Renaciente) y 2023 (Pacto Histórico, Creemos, Liga).
+- **`candidaturasPorListaCerrada(key)`** en `candidato-360.js` las suma al
+  historial de la persona como registros **sin slug ni voto propio**
+  (`listaCerrada: {…}`), por la misma llave de persona (`fourNameKey`). No
+  duplica un año y una corporación que ya estén en el índice.
+- **Mapa:** el botón del año aparece, pero `showElectionYear` muestra
+  `mostrarListaCerrada` (votos de la lista, curules, renglón y fuentes) en vez
+  de un mapa vacío. El CRM abre en la elección más reciente **con** voto propio,
+  y el promedio y la proyección las excluyen.
+  ⚠️ Mostrar una lista cerrada quita la capa del mapa: el promedio vuelve a
+  pintar una elección real antes de promediar (si no, quedaba en blanco).
+- **`candidaturaPuntuada`** y la base del perfil saltan los registros de lista
+  cerrada: no tienen mesas.
+- Medido: el cabeza de Colombia Justa Libres 2019 queda con «3 candidaturas ·
+  2015, 2019, 2023» y promedio de 10.204 (solo 2015 y 2023); el renglón 2 de esa
+  lista gana su 2019 y la renglón 7 del Pacto 2023, su 2023.
+- ⚠️ **Límite:** quien SOLO compitió por listas cerradas (Heidy Sánchez, Clara
+  López en 2019) no aparece en el buscador, porque el buscador nace del índice.
+  Hacerlo exige entradas sintéticas en el buscador que abran un CRM sin mapa.
+- ⚠️ **Concejo de Bogotá: la cifra repartidora va sobre 44 curules**; la 45 es la
+  de oposición. Con 45 el Pacto 2023 saldría con 8 curules y la cifra con 47.726;
+  la declaratoria le dio 7, con cifra 49.481. `vote-target.js` ya descuenta esa
+  curul (`CURUL_OPOSICION`).
+- Para ampliar: agregar una entrada por lista, **con fuente**. Las
+  declaratorias (E-26) de concejos no están en línea; sirven las sentencias de
+  nulidad electoral, las actas y resoluciones del concejo, las páginas de la
+  alcaldía y la prensa con la lista en orden.
+- De paso, en `partidos-bloques.js` (y en su copia de `alcaldias-2023.html`):
+  **«Bogotá Más Fuerte»** (Nueva Fuerza Democrática + Salvación Nacional), que
+  caía en `sc`, queda en derecha; **Libres** queda explícito en derecha (ya caía
+  ahí, pero por parecido con «Justa Libres»).
