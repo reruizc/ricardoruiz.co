@@ -389,6 +389,21 @@ function pintarBriefing() {
   if (on) { const u = b.ultimoEnvio ? new Date(b.ultimoEnvio) : null; sub.textContent = u ? `último envío ${u.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} · ${b.envios || 0} enviados` : 'el primero sale en la próxima corrida (07:30)'; }
   else sub.textContent = 'se activa con un clic';
 }
+/* La tarjeta 03 también dice qué hacer con lo que pasó en estos 3 días: la
+   prensa y las redes cruzadas con sus arquetipos, y el mapa de barrios a
+   priorizar. La lectura entera vive en candidato-360-ciclo.js. Solo con
+   acceso: arma consultas al proxy de Caudal y lee la captura de la cuenta. */
+async function pintarCiclo() {
+  const C = window.C360Ciclo; if (!C) return;
+  if (!SESSION.acceso || !SESSION.token || CRM_VITRINA) { C.pintar(null); return; }
+  try {
+    const mesas = crmCandidate ? await mesasDelHistorial() : [];
+    const ciudad = C360ArqLectura.ciudadDe(await municipioArquetipos(), mesas);
+    const corp = currentTargetTerritory()?.corporation || CAMPANA_ACTUAL?.corp || SESSION.vinculo?.campana?.corp || corporacionHistorica(crmCandidate);
+    const slug = crmCandidate?.slug || SESSION.vinculo?.candidato?.slug || SESSION.vinculo?.nuevo?.nombre || '';
+    C.pintar({ token: SESSION.token, vinculo: SESSION.vinculo, ciudad, corp, mesas, slug });
+  } catch (e) { C.pintar(null); }
+}
 async function toggleBriefing() {
   if (!SESSION.acceso) return abrirPaywall();
   if (!SESSION.vinculo) { alert('Primero abra el CRM de su candidatura: el briefing se ata a ella.'); return; }
@@ -2409,6 +2424,7 @@ async function launchCRM(event) {
   pintarBriefing();
   pintarEscucha();
   pintarArquetipos();
+  pintarCiclo();
   pintarPerfil();
   pintarDiaD();
   pintarFirmas();
@@ -2457,6 +2473,7 @@ async function abrirCRMNuevo() {
   pintarBriefing();
   pintarEscucha();
   pintarArquetipos();
+  pintarCiclo();
   pintarPerfil();
   pintarDiaD();
   pintarFirmas();
@@ -4931,6 +4948,12 @@ function pintarTabEstrategia(tab) {
   ESTR_TAB = tab;
   document.querySelectorAll('#estrategia .estr-tab[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
   $('estrCuerpo').innerHTML = tab === 'territorio' ? htmlTerritorio() : htmlPosicionamiento();
+  /* Toggle estratégico de iglesias (candidato-360-iglesias.js): solo si la
+     persona está entre las candidaturas que mide el análisis. */
+  if (tab === 'territorio' && window.C360Iglesias && crmCandidate) {
+    const slugs = (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).concat(crmCandidate.slug).filter(Boolean);
+    C360Iglesias.montar($('estrCuerpo'), slugs, () => ESTR_TAB === 'territorio');
+  }
 }
 const pctE = x => `${(x * 100).toFixed(1).replace('.', ',')} %`;
 const vecesE = x => x == null ? '—' : `×${x.toFixed(2).replace('.', ',')}`;

@@ -606,3 +606,60 @@ territorial más reciente.
   (`capturar.mjs` + `wrangler kv key put`, receta en
   `tools/candidato-360/escucha/README.md`); falta el workflow de dos veces al
   día. Una lectura completa de las cuatro redes cuesta ~US$0,85.
+
+### Tarjeta 03 · qué sugiere el ciclo de 3 días (`candidato-360-ciclo.js` · oct-19-2026)
+
+La tarjeta del briefing ya no solo prende el correo: dice **qué hacer con lo que
+pasó en estos 3 días**, con mapa. `window.C360Ciclo.pintar(ctx)`, llamado desde
+`pintarCiclo()` en `candidato-360.js` junto a la tarjeta 05.
+
+- **Insumos**, todos ya existentes: la prensa del territorio (mismas consultas
+  que el briefing y la escucha, vía `C360Panel`; caché por hora en
+  `sessionStorage` por el límite del proxy de Caudal), la lectura de redes de la
+  cuenta (`GET /c360/captura`, si existe), los arquetipos de la ciudad y la
+  afinidad del candidato con cada uno. Por eso `candidato-360.html` carga ahora
+  `candidato-360-panel.js`, `-saliencia.js` y `-arquetipos.js`.
+- **Las ideas de la captura** («seguridad en TransMilenio») se llevan a los
+  temas de agenda con el diccionario de la saliencia, para sumarse con la
+  prensa. Prensa y redes pesan mitad y mitad cuando están las dos.
+- **Prioridad:** `relevancia(arquetipo) = e^(1,2·(activación − media)) ×
+  afinidad acotada a [0,5; 2]`, con activación = sensibilidad del arquetipo
+  ponderada por el peso de cada tema; `prioridad(barrio) = Σ mezcla ×
+  relevancia × electorado × castigo de visita`. Se suma por localidad o comuna
+  y salen las 3 primeras, cada una con sus barrios por visitar. El mapa pinta
+  la prioridad del barrio contra la ciudad por **quintiles** (con cortes fijos
+  casi todo quedaba en los tonos claros).
+- **Visitas:** se marcan tocando el barrio en el mapa y quedan en este
+  dispositivo (`localStorage['c360-visitas:<slug>']`). Hasta 7 días el barrio
+  pesa 35 %; de 8 a 21, 60 %; después vuelve a contar entero. ⚠ No se
+  comparten entre dispositivos ni con el equipo: eso pide una ruta en el
+  worker (`/c360/visitas` en el vínculo), pendiente.
+- **«Qué llevar»** es el `oficio` del arquetipo más relevante y el tema que lo
+  abre hoy.
+- Con lectura, la tarjeta ocupa el ancho entero y baja a la segunda fila
+  (`order` en la grilla, con `:has`), para no dejar huecos junto a 02 y 04.
+- Lo dice en pantalla: describe el territorio, no a las personas, y en Bogotá
+  qué tema mueve a cada arquetipo es criterio del equipo.
+- Sin acceso, en vitrina o sin token no se pinta (`pintar(null)`). Ciudad sin
+  arquetipos: sale el resumen de agenda y redes, sin mapa.
+
+### Toggle estratégico · ¿su voto sigue a las iglesias cristianas? (`candidato-360-iglesias.js` · oct-19-2026)
+
+Bloque plegable al final de la pestaña Territorio del módulo 11. Solo aparece si
+alguna candidatura de la persona está en
+`candidato-360-data/iglesias-concejo-bogota-2023.json`, que arma
+`tools/candidato-360/iglesias/analisis.py` (método y límites en su `LEEME.md`):
+10 candidaturas al Concejo de Bogotá 2023, 5 de base cristiana y 5 de control.
+Por cada una: razón de participación entre el 25 % de puestos con más templos no
+católicos cerca y el 25 % con menos, correlación de rangos y regresión ponderada
+con católicos, estrato y estrato², con robustez por efectos fijos de localidad.
+
+- **Medido:** de los cristianos, solo un candidato de MIRA sigue el mapa de
+  templos (2,39×, y se sostiene con estrato y localidad). Un control liberal
+  también sale alto en la razón simple: las iglesias están en barrios
+  populares, por eso manda la cifra con controles.
+- ⚠ Templos de OpenStreetMap: contra el catastro aparece el 60 % de los no
+  católicos notables, y muchos evangélicos funcionan en locales que ningún
+  mapa registra. Es correlación ecológica del territorio, no voto religioso.
+- La lectura comparada y la conclusión práctica salen de reglas fijas
+  (`veredicto` y `comparada`), no de un modelo.
