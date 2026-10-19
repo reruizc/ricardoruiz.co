@@ -915,6 +915,30 @@ footer.foot {
 .proj-disclosure summary:hover { background:var(--paper-3); }
 .proj-disclosure .proj-caret { display:inline-block; transition:transform .15s; }
 .proj-disclosure[open] .proj-caret { transform:rotate(90deg); }
+
+.pp-empty-note {
+  padding:1rem 1.2rem; border:1px dashed var(--rule-strong); background:var(--paper-2);
+  font-family:var(--italic); font-style:italic; font-size:.93rem; line-height:1.5; color:var(--ink-2);
+}
+
+/* ── Lab · ajustes móviles compartidos (oct-2026): topbar que no se corta, FAB que no tapa ── */
+@media (max-width:1100px) {
+  /* En pantallas angostas el botón de recursos tapaba los campos: pasa a icono compacto, abajo a la derecha. */
+  body { padding-bottom: 4.4rem; }
+  .lab-fab { left: auto !important; right: .9rem !important; bottom: .9rem !important; padding: 0 !important; width: 40px; height: 40px; justify-content: center; }
+  .lab-fab > span:not(.lab-fab-icon) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .lab-fab .lab-fab-icon { font-size: 1.05rem; }
+  .toast { bottom: 4.4rem; }
+}
+@media (max-width:720px) {
+  .topbar { grid-template-columns: minmax(0,1fr) auto; gap: .6rem; padding: .7rem .9rem; }
+  .topbar-left { min-width: 0; flex-wrap: wrap; gap: .5rem .7rem; }
+  .topbar-right { gap: .5rem; }
+  .topbar .btn-back { padding: .38rem .6rem; }
+  .theme-btn { padding: .35rem .55rem; font-size: 10.5px; white-space: nowrap; }
+  #nav-auth-anon { gap: .5rem !important; margin-left: 0 !important; }
+  #nav-auth-anon a, #nav-user-block a, #nav-user-block button { font-size: 10.5px !important; letter-spacing: .06em !important; }
+}
 </style>
 </head>
 <body>
@@ -1033,6 +1057,7 @@ footer.foot {
         <a class="btn-ghost" href="analisis-estructural.html">← Volver al lab</a>
         <button class="btn btn-big" onclick="startFlow()">Empecemos →</button>
       </div>
+      <p data-lab-demo="pp"></p>
 
       <p style="margin-top:2.5rem;font-family:var(--italic);font-style:italic;color:var(--ink-3);font-size:.92rem;max-width:60ch;margin-left:auto;margin-right:auto;line-height:1.55">
         ¿Ya tienes claras las variables y quieres entender <em>cómo se
@@ -1042,7 +1067,7 @@ footer.foot {
         <a href="mactor.html" style="color:var(--accent);font-style:normal;font-weight:600">análisis de actores →</a>.
         ¿Vas a <em>medir el efecto</em> de la política?
         <a href="evaluacion.html" style="color:var(--accent);font-style:normal;font-weight:600">evaluación →</a>.
-        Los cuatro son módulos complementarios del mismo lab.
+        Los ocho son módulos complementarios del mismo lab.
       </p>
     </div>
   </section>
@@ -1307,7 +1332,7 @@ footer.foot {
 
     <!-- Sprint E.5 · cargar evidencia oficial municipal -->
     <div style="margin-top:1.4rem;padding:1.1rem 1.2rem;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--accent)">
-      <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:.4rem">Sprint E · evidencia oficial municipal</div>
+      <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:.4rem">Evidencia oficial municipal</div>
       <div style="font-family:var(--sans);font-weight:700;font-size:1rem;color:var(--ink);margin-bottom:.3rem">Cargar cifras oficiales para tu territorio</div>
       <div style="font-family:var(--italic);font-style:italic;font-size:.9rem;line-height:1.5;color:var(--ink-2);margin-bottom:.85rem">Si tu problema es local, podemos precargar 4-5 fuentes oficiales con cifras del último año disponible. Datos: Policía Nacional (seguridad) + MEN (educación). Tú las editas y completas con lo que aplique.</div>
       <div style="display:flex;gap:.55rem;flex-wrap:wrap;align-items:center">
@@ -1553,9 +1578,8 @@ footer.foot {
       (<em>Manual de prospectiva y decisión estratégica</em>, ILPES/CEPAL,
       2007) y de la tradición colombiana de Jaime Torres-Melo y Jairo
       Santander (<em>Introducción a las políticas públicas</em>, IEMP, 2013).
-      Próximas versiones incorporarán copiloto IA para sugerir alternativas
-      y validar el conjunto de criterios, plantillas seed por sector y
-      respaldo PDF descargable.
+      La guía paso a paso y el respaldo académico en PDF están en
+      «¿En qué se basa?», al inicio del módulo.
     </p>
   </section>
 </main>
@@ -1670,8 +1694,9 @@ footer.foot {
 
 <div class="toast" id="toast"></div>
 
-<script src="lab-recursos.js"></script>
-<script src="lab-indicadores.js"></script>
+<script src="lab-recursos.js?v=20261018"></script>
+<script src="lab-demo.js?v=20261018"></script>
+<script src="lab-indicadores.js?v=20261018"></script>
 
 <script>
 'use strict';
@@ -2475,6 +2500,12 @@ function renderRankBars() {
   const items = STATE.alternativas.map((a, i) => ({ name: a.nombre || `Alternativa ${i+1}`, score: computeAltScore(i), baseline: a.baseline }))
                                    .sort((a, b) => b.score - a.score);
   const maxSc = Math.max(...items.map(it => it.score), 0.001);
+  // Sin una sola celda calificada no hay ranking que mostrar: tres barras en 0.00
+  // se leen como «todas empatan», que no es lo que pasa.
+  if (!Object.keys(STATE.scores || {}).length) {
+    container.innerHTML = `<div class="pp-empty-note">Aún no has calificado ninguna celda. Haz clic en la matriz de arriba: cada clic sube el valor de 1 a 5 y el ranking se arma solo.</div>`;
+    return;
+  }
   container.innerHTML = items.map((it, pos) => {
     const pct = (it.score / maxSc * 100).toFixed(0);
     const cls = pos === 0 && it.score > 0 ? 'rank-bar-row winner' : 'rank-bar-row';
@@ -2502,6 +2533,7 @@ function renderResults() {
     idx: i, name: a.nombre || `Alternativa ${i+1}`, score: computeAltScore(i), baseline: a.baseline
   })).sort((x, y) => y.score - x.score);
   const winner = items[0];
+  const hayScores = Object.keys(STATE.scores || {}).length > 0;
 
   const sumPesos = STATE.criterios.reduce((s, c) => s + (Number(c.peso) || 0), 0) || 1;
   const critHeader = STATE.criterios.map(c => {
@@ -2515,7 +2547,7 @@ function renderResults() {
       return `<td class="num">${v || '—'}</td>`;
     }).join('');
     const sc = computeAltScore(ai);
-    const winnerCls = (winner && winner.idx === ai) ? 'winner' : '';
+    const winnerCls = (hayScores && winner && winner.idx === ai) ? 'winner' : '';
     return `<tr class="${winnerCls}"><td>${escapeHtml(a.nombre)}${a.baseline ? ' <span style="color:var(--gold)">★</span>' : ''}</td>${cells}<td class="num">${sc.toFixed(2)}</td></tr>`;
   }).join('');
 
@@ -2532,11 +2564,14 @@ function renderResults() {
     </div>
 
     <h3 style="font-family:var(--sans);font-weight:700;font-size:1.1rem;margin:.4rem 0 .6rem">Recomendación</h3>
-    <div style="background:var(--accent-soft);border:1px solid var(--accent-tint);border-left:3px solid var(--accent);padding:1.2rem 1.4rem">
+    ${hayScores ? `<div style="background:var(--accent-soft);border:1px solid var(--accent-tint);border-left:3px solid var(--accent);padding:1.2rem 1.4rem">
       <div style="font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:.4rem">Alternativa con mayor score ponderado</div>
       <div style="font-family:var(--sans);font-weight:700;font-size:1.25rem;color:var(--ink);margin-bottom:.3rem">${winner ? escapeHtml(winner.name) : '—'}</div>
       <div style="font-family:var(--mono);font-size:13px;color:var(--ink-2)">Score: <b style="color:var(--accent)">${winner ? winner.score.toFixed(2) : '0'}</b> / 5.00</div>
-    </div>
+    </div>` : `<div class="pp-empty-note" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;text-align:left">
+      <span style="flex:1;min-width:240px"><b style="font-family:var(--sans);font-style:normal;color:var(--ink)">Todavía no hay recomendación.</b> La matriz de comparación está sin calificar, así que ninguna alternativa tiene score. El memo se completa cuando califiques al menos una fila.</span>
+      <button class="btn-ghost" type="button" onclick="goToStep(5)">Calificar la matriz →</button>
+    </div>`}
 
     <h3 style="font-family:var(--sans);font-weight:700;font-size:1.1rem;margin:1.4rem 0 .6rem">Matriz de comparación</h3>
     <div style="overflow-x:auto">

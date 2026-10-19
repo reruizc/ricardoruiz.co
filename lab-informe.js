@@ -211,9 +211,26 @@
     };
   }
 
+  // Lee una celda de matriz en cualquiera de los dos formatos que ha tenido el lab:
+  // arreglo de arreglos con strings ('0'..'3', '-2', 'P', '-' en la diagonal, '' sin dato),
+  // que es lo que guardan analisis-estructural y mactor hoy, o diccionario 'i-j' → número/objeto.
+  function _celda(M, i, j) {
+    let v;
+    if (Array.isArray(M)) v = Array.isArray(M[i]) ? M[i][j] : undefined;
+    else if (M && typeof M === 'object') v = M[`${i}-${j}`];
+    if (v == null || v === '' || v === '-' || v === 'P') return 0;
+    if (typeof v === 'object') return Number(v.valor) || 0;
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+  }
+  function _nombres(arr) {
+    return _arrSafe(arr).map(x => (typeof x === 'string' ? { nombre: x } : x)).filter(x => x && _nonEmpty(x.nombre));
+  }
+
   function _resumenMicmac(s) {
     if (!s) return { isEmpty:true };
-    const variables = _arrSafe(s.variables).filter(v => v && _nonEmpty(v.nombre));
+    // analisis-estructural guarda `vars` (strings) y `matrix` (string[][]); se aceptan también `variables` y 'i-j'.
+    const variables = _nombres(Array.isArray(s.vars) && s.vars.length ? s.vars : s.variables);
     if (variables.length < 2) return { isEmpty:true };
     // Calculamos motricidad / dependencia desde la matriz (acepta valencias firmadas).
     const M = s.matrix && typeof s.matrix === 'object' ? s.matrix : {};
@@ -223,11 +240,7 @@
     for (let i = 0; i < N; i++) {
       for (let j = 0; j < N; j++) {
         if (i === j) continue;
-        const key = `${i}-${j}`;
-        const v = M[key];
-        let mag = 0;
-        if (typeof v === 'number') mag = Math.abs(v);
-        else if (typeof v === 'object' && v) mag = Math.abs(Number(v.valor) || 0);
+        const mag = Math.abs(_celda(M, i, j));
         motri[i] += mag;
         dep[j]   += mag;
       }
@@ -266,8 +279,9 @@
 
   function _resumenMactor(s) {
     if (!s) return { isEmpty:true };
-    const actores = _arrSafe(s.actores).filter(a => a && _nonEmpty(a.nombre));
-    const objetivos = _arrSafe(s.objetivos).filter(o => o && _nonEmpty(o.nombre || o));
+    // mactor guarda `actores`/`objetivos` como strings y `mid`/`mao` como string[][].
+    const actores = _nombres(s.actores);
+    const objetivos = _nombres(s.objetivos);
     if (actores.length < 2) return { isEmpty:true };
     const N = actores.length;
     const MID = s.mid || {};
@@ -276,7 +290,7 @@
     for (let i = 0; i < N; i++) {
       for (let j = 0; j < N; j++) {
         if (i === j) continue;
-        const v = Number(MID[`${i}-${j}`]) || 0;
+        const v = _celda(MID, i, j);
         I[i] += v;
         D[j] += v;
       }
@@ -296,7 +310,7 @@
     for (let k = 0; k < M; k++) {
       let saldo = 0, mov = 0;
       for (let i = 0; i < N; i++) {
-        const v = Number(MAO[`${i}-${k}`]) || 0;
+        const v = _celda(MAO, i, k);
         saldo += v * R[i];
         mov += Math.abs(v);
       }
@@ -858,7 +872,7 @@
 
     // 8. Escenarios prospectivos
     const pr = state.prospect ? state.prospect.resumen : { isEmpty:true };
-    md += `## 8. Escenarios prospectivos\n\n`;
+    md += `## 7. Escenarios prospectivos\n\n`;
     if (pr.isEmpty) {
       md += `_(El módulo de Escenarios Prospectivos no tiene contenido — abrir ` +
             '`prospect-escenarios.html` para construir 4 futuros plausibles y probar alternativas contra cada uno.)_\n\n';
@@ -893,7 +907,7 @@
 
     // 9. Comunicar la política
     const co = state.comunicar ? state.comunicar.resumen : { isEmpty:true };
-    md += `## 9. Plan de comunicación de la política\n\n`;
+    md += `## 8. Plan de comunicación de la política\n\n`;
     if (co.isEmpty) {
       md += `_(El módulo Comunicar la política no tiene contenido — abrir ` +
             '`comunicar.html` para construir el plan de comunicación pública con audiencias, mensaje clave, narrativa Ganz, framing Lakoff, matriz de canales BIT EAST, vocería, cronograma y medición OCDE 9-dim.)_\n\n';
@@ -938,7 +952,7 @@
     }
 
     // 10. Próximos pasos
-    md += `## 10. Próximos pasos operativos\n\n`;
+    md += `## 9. Próximos pasos operativos\n\n`;
     const pasos = [];
     if (!pp.isEmpty && pp.evidencia.length < 3) pasos.push('Levantar evidencia adicional (mínimo 3 fuentes) para sostener el diagnóstico.');
     if (!ma.isEmpty && ma.objetivos.length && ma.objetivos[0].saldo < 0) pasos.push(`El saldo del objetivo principal es negativo (${ma.objetivos[0].nombre}) — diseñar estrategia de negociación con dominantes opositores.`);
@@ -1250,7 +1264,7 @@
 
     // ─── 8. Escenarios prospectivos
     const pr = state.prospect ? state.prospect.resumen : { isEmpty:true };
-    drawH2('8. Escenarios prospectivos');
+    drawH2('7. Escenarios prospectivos');
     if (pr.isEmpty) {
       drawCalloutBox('No hay análisis prospectivo. Abrir prospect-escenarios.html para construir 4 futuros plausibles (método de ejes de incertidumbre · Schwartz GBN) y probar alternativas contra cada uno (Robust Decision Making · Lempert RAND).', SOFT);
     } else {
@@ -1279,7 +1293,7 @@
 
     // ─── 9. Plan de comunicación
     const co = state.comunicar ? state.comunicar.resumen : { isEmpty:true };
-    drawH2('9. Plan de comunicación de la política');
+    drawH2('8. Plan de comunicación de la política');
     if (co.isEmpty) {
       drawCalloutBox('No hay plan de comunicación. Abrir comunicar.html para construir el plan público (audiencias · mensaje · narrativa Ganz · framing Lakoff · matriz BIT EAST · vocería · medición OCDE 9-dim).', SOFT);
     } else {
@@ -1312,7 +1326,7 @@
     }
 
     // ─── 10. Próximos pasos
-    drawH2('10. Próximos pasos operativos');
+    drawH2('9. Próximos pasos operativos');
     const pasos = [];
     if (!pp.isEmpty && pp.evidencia.length < 3) pasos.push('Levantar evidencia adicional (mínimo 3 fuentes) para sostener el diagnóstico.');
     if (!ma.isEmpty && ma.objetivos.length && ma.objetivos[0].saldo < 0) pasos.push(`El saldo del objetivo principal es negativo (${ma.objetivos[0].nombre}) — diseñar estrategia de negociación con dominantes opositores.`);
