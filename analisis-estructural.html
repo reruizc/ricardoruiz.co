@@ -3895,12 +3895,35 @@ function showStage(id) {
     if (el) el.classList.toggle('is-hidden', s !== id);
   });
   if (typeof updateLabFabVisibility === 'function') updateLabFabVisibility();
+  _syncNavBack(id);
   // Sprint G — repintar "Mi informe del lab" cada vez que volvemos al hub,
   // así refleja cualquier avance en los demás módulos.
   if (id === 'stage-hub' && typeof renderInformeSection === 'function') {
     try { renderInformeSection(); } catch {}
   }
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// El botón Volver de la barra es contextual: en el hub sale al sitio; dentro
+// del módulo de análisis estructural (o del wizard) devuelve al hub, que es
+// lo que hacen los otros 7 módulos con «Volver al lab». Sin esto, quien
+// estaba en MicMac salía a ricardoruiz.co y perdía el lab.
+function _syncNavBack(id) {
+  const a = document.querySelector('.lab-nav .e-btn-back');
+  if (!a) return;
+  if (id === 'stage-hub') {
+    a.textContent = '← Volver';
+    a.setAttribute('href', 'index.html');
+    a.onclick = null;
+  } else {
+    a.textContent = '← Volver al lab';
+    a.setAttribute('href', 'analisis-estructural.html');
+    a.onclick = (ev) => {
+      ev.preventDefault();
+      if (window.location.hash) history.replaceState(null, '', window.location.pathname + window.location.search);
+      showStage('stage-hub');
+    };
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════════════
