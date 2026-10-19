@@ -305,7 +305,16 @@ El chasis está copiado ocho veces y ya divergió:
 
 ## 5. Decisiones que son de Ricardo (no se pueden tomar desde el código)
 
-1. **Sistema visual.** El Lab sigue en el chasis del dashboard de mayo
+0. **Decidido el 19-oct (Ricardo):** la barra superior pasa al sistema v2 del sitio
+   (`lab-nav.css`, misma barra que electoral/noticias: Volver verde, sesión naranja,
+   registro azul, logo Syne) en los 8 archivos; el cuerpo del Lab conserva su paleta.
+   El inicio del hub se reescribió en lenguaje llano (para alcaldes y concejales de
+   municipios de categorías 4-6): el tag de cada tarjeta es la pregunta que responde y
+   los autores bajan a una línea «Método». Se quitó el bloque «Más del Lab» (tutela,
+   juez, pensamiento investigativo): no son módulos del ciclo. Cada tarjeta tiene un
+   hueco de imagen opcional `imagenes/lab-{problema,estructural,mactor,evaluacion,
+   alternativas,ain,prospect,comunicar}.jpg` (1200×600 aprox.; si falta, no se ve).
+1. **Sistema visual del cuerpo.** El Lab sigue en el chasis del dashboard de mayo
    (Familjen Grotesk · Petrona · Space Mono, papel #1a1610, salmón), mientras
    `index.html`, `dashboard.html` y el resto migraron en julio al sistema v2
    (Helvetica Neue embebida, #060810, azul). Hoy el Lab es la única familia de
