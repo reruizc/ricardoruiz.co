@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Mi bancada · Mi Congreso · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
+  <link rel="stylesheet" href="mi-congreso.css?v=20261019" />
+  <style>
+    .bc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.6rem}
+    .bc-p{display:flex;gap:.7rem;align-items:center;background:#fff;border:1px solid var(--card-border);padding:.55rem .6rem}
+    .bc-p.yo{border-color:var(--amber);background:rgba(180,83,9,.05)}
+    .bc-p .ph{width:42px;height:54px;flex-shrink:0;border-radius:3px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.72rem}
+    .bc-p .ph img{width:100%;height:100%;object-fit:cover}
+    .bc-p b{display:block;font-size:.78rem;color:var(--white);font-weight:600;line-height:1.25}
+    .bc-p small{display:block;font-size:.64rem;color:var(--gray);line-height:1.4;margin-top:.1rem}
+  </style>
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="mi-congreso.html" class="e-btn-back">← Volver</a>
+      <span class="nav-page-tag">Mi Congreso</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <a href="index.html" class="logo-link"><div class="logo-bars"><div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div></div><span class="logo-text">Ricardo<span>.</span>Ruiz</span></a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">Mi Congreso · 07 · electos 2026–2030</div>
+    <h1 class="page-title">Mi bancada</h1>
+    <p class="page-sub">Quiénes son, dónde se sientan, cuántos votos trajo cada uno y cómo ha votado tu partido como bloque. La composición sale del escrutinio 2026; la disciplina, de las actas de plenaria del Congreso anterior, porque este apenas empieza a votar.</p>
+  </div>
+  <div class="sec-bar" id="mc-sec-bar"></div>
+
+  <section>
+    <div id="mc-head"></div>
+    <div class="kpis" id="bc-kpis"></div>
+    <div class="mc-grid three" style="margin-top:0">
+      <div class="panel"><h3>En qué comisiones están</h3><div id="bc-com"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+      <div class="panel"><h3>De dónde vienen</h3><div id="bc-dep"></div></div>
+      <div class="panel"><h3>Quién trajo los votos <small>2026</small></h3><div id="bc-votos"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+    </div>
+    <div class="mc-grid">
+      <div class="panel"><h3>¿Vota en bloque? <small id="bc-disc-src">Cámara · Congreso anterior</small></h3><div id="bc-disc"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+      <div class="panel"><h3>Quién se sale de la línea <small>Congreso anterior</small></h3><div id="bc-dis"></div></div>
+    </div>
+    <div class="panel" style="margin-top:1.2rem"><h3>La bancada completa <small id="bc-n"></small></h3><div class="mc-filters" id="bc-f"><button data-f="todos" class="on">Todos</button><button data-f="SENADO">Senado</button><button data-f="CAMARA">Cámara</button></div><div class="bc-grid" id="bc-lista"></div></div>
+  </section>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Mi Congreso · Congreso 2026–2030</span>
+    <a href="mi-congreso.html" class="e-btn-back" style="font-size:.62rem">← Mi Congreso</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script src="legislativo-electos.js"></script>
+  <script src="mi-congreso-base.js?v=20261019"></script>
+  <script>
+  (async function(){
+    const e=MC.pagina('bancada'); if(!e) return;
+    const {nice,initials,mismaPersona,nombreCom}=MC;
+    const b=bancadaOf(e.partido), col=b.color;
+    const todos=ELECTOS.filter(x=>bancadaOf(x.partido).name===b.name);
+    const sen=todos.filter(x=>x.corp==='SENADO'), muj=todos.filter(x=>x.gen==='F');
+    const deps=new Set(todos.filter(x=>x.corp==='CAMARA').map(x=>x.dep));
+    const cell=(n,l,cls)=>`<div class="kpi${cls?' '+cls:''}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+    document.getElementById('bc-kpis').innerHTML=`<div class="kpi"><div class="n" style="color:${col}">${todos.length}</div><div class="l">curules de ${esc(b.name)}</div></div>`
+      +cell(sen.length,'en Senado')+cell(todos.length-sen.length,'en Cámara')+cell(MC.pct(muj.length,todos.length)+'%','mujeres ('+muj.length+')')+cell(deps.size,'departamentos con representante');
+    /* de dónde vienen */
+    const porDep={}; todos.filter(x=>x.corp==='CAMARA').forEach(x=>{ porDep[x.dep]=(porDep[x.dep]||0)+1; });
+    const dl=Object.entries(porDep).sort((a,c)=>c[1]-a[1]), mxd=dl[0]?dl[0][1]:1;
+    document.getElementById('bc-dep').innerHTML=(dl.length?dl.slice(0,12).map(([d,n])=>MC.hbar(depNice(d),n,mxd,{me:d===e.dep})).join(''):'<div class="mc-empty">Sin representantes a la Cámara.</div>')
+      +(sen.length?`<p class="note">Más ${sen.length} en el Senado, de circunscripción nacional.</p>`:'');
+    /* comisiones */
+    MC.comision(e).then(c=>{
+      const out=[];
+      Object.entries(c.todas||{}).forEach(([k,v])=>{ const n=todos.filter(x=>((v||{})[x.corp==='SENADO'?'senado':'camara']||[]).some(m=>mismaPersona(m.nombre,x.nombre))).length; if(n) out.push([k,n]); });
+      out.sort((a,c2)=>c2[1]-a[1]); const mx=out[0]?out[0][1]:1;
+      const sinCom=todos.length-out.reduce((s,r)=>s+(r[0]==='ACUSACIONES'?0:r[1]),0);
+      document.getElementById('bc-com').innerHTML=(out.map(([k,n])=>MC.hbar(nombreCom(k),n,mx,{me:k===c.key})).join('')||'<div class="mc-empty">Sin datos de comisiones.</div>')
+        +`<p class="note">En ámbar, la tuya.${sinCom>0?` ${sinCom} sin comisión en nuestro registro (en Senado la asignación aún no está completa).`:''}</p>`;
+    }).catch(()=>{ document.getElementById('bc-com').innerHTML='<div class="mc-empty">No cargó.</div>'; });
+    /* votos 2026 y la plantilla, con foto */
+    let I=null, F='todos';
+    try{ I=await MC.indiceElectoral(); }catch(err){}
+    const vot=x=>I?((I.hitDe(x)||{}).votos||0):0;
+    const filas=todos.map(x=>({x,v:vot(x),h:I?I.hitDe(x):null})).sort((a,c)=>c.v-a.v);
+    const conV=filas.filter(r=>r.v>0), mxv=conV[0]?conV[0].v:1, totV=conV.reduce((s,r)=>s+r.v,0);
+    document.getElementById('bc-votos').innerHTML=conV.length?conV.slice(0,10).map(r=>MC.hbar(nice(r.x.nombre),r.v,mxv,{me:r.x===e})).join('')
+      +`<p class="note">${conV.length>3?`Los tres primeros suman el ${MC.pct(conV.slice(0,3).reduce((s,r)=>s+r.v,0),totV)}% del voto personal de la bancada. `:''}${filas.length-conV.length?`${filas.length-conV.length} llegaron por lista cerrada, sin votación personal.`:''}</p>`:'<div class="mc-empty">La bancada compitió con lista cerrada: no hay votación personal.</div>';
+    function pinta(){
+      const L=filas.filter(r=>F==='todos'||r.x.corp===F);
+      document.getElementById('bc-n').textContent=`${L.length} congresistas`;
+      document.getElementById('bc-lista').innerHTML=L.map(r=>`<div class="bc-p${r.x===e?' yo':''}"><span class="ph" style="background:${b.color}" data-foto="${r.h?esc(I.foto(r.h)):''}">${esc(initials(r.x.nombre))}</span><span><b>${esc(nice(r.x.nombre))}${r.x===e?' · tú':''}</b><small>${r.x.corp==='SENADO'?'Senado':'Cámara · '+esc(depNice(r.x.dep))}${r.v?' · '+fmt(r.v)+' votos':' · lista cerrada'}</small></span></div>`).join('');
+      document.querySelectorAll('#bc-lista [data-foto]').forEach(ph=>{ const u=ph.dataset.foto; if(!u) return; const img=new Image(); img.alt=''; img.loading='lazy'; img.onload=()=>{ ph.innerHTML=''; ph.appendChild(img); }; img.src=u; });
+    }
+    document.querySelectorAll('#bc-f button').forEach(bt=>bt.onclick=()=>{ F=bt.dataset.f; document.querySelectorAll('#bc-f button').forEach(x=>x.classList.toggle('on',x===bt)); pinta(); });
+    pinta();
+    /* disciplina de bancada (Caudal) */
+    const kc=MC.BANC_CAUDAL[b.name], disc=document.getElementById('bc-disc'), dis=document.getElementById('bc-dis');
+    if(!kc){ disc.innerHTML=`<div class="mc-empty">${esc(b.name)} no tiene una bancada propia en el registro de votaciones del Congreso anterior (allí va en «Otro», una bolsa de partidos sin una mayoría contra la cual medir).</div>`; dis.innerHTML='<div class="mc-empty">Sin datos para esta bancada.</div>'; return; }
+    try{
+      const d=await MC.bancadasDisc(); const C=d.camara||{}, S=d.senado||{};
+      const B=(C.bancadas||[]).slice().sort((a,c)=>c.bloque_pct-a.bloque_pct), mine=B.find(x=>x.bancada===kc), sb=(S.bancadas||[]).find(x=>x.bancada===kc);
+      disc.innerHTML=(mine?`<div class="mc-align"><span class="n">${Math.round(mine.bloque_pct)}%</span><span class="t">de las votaciones divididas de Cámara, ${esc(b.name)} votó en bloque (90% o más del mismo lado). Índice de Rice ${String(mine.rice).replace('.',',')}; en votos de fondo ${mine.bloque_pct_fondo!=null?Math.round(mine.bloque_pct_fondo)+'%':'—'}. Coincidió con el gobierno el <b>${mine.alineacion}%</b> de las veces.</span></div>`:'')
+        +'<div class="seg-sub">Todas las bancadas · % de votaciones en bloque</div>'+B.map(x=>MC.hbar(x.bancada,x.bloque_pct,100,{me:x.bancada===kc,txt:Math.round(x.bloque_pct)+'%'})).join('')
+        +(sb?`<p class="note">En Senado (solo ${sb.n_votaciones} votaciones divididas medibles): bloque ${Math.round(sb.bloque_pct)}%, Rice ${String(sb.rice).replace('.',',')}.</p>`:'')
+        +`<p class="note">${esc((d.meta||{}).contestada||'')}</p>`;
+      const ds=(C.disidentes||[]).filter(x=>x.bancada===kc).sort((a,c)=>c.pct-a.pct).slice(0,8);
+      const ss=(S.disidentes||[]).filter(x=>x.bancada===kc&&x.pct>0).sort((a,c)=>c.pct-a.pct).slice(0,4);
+      dis.innerHTML=(ds.length?ds.map(x=>MC.hbar(tCase(x.nombre),x.pct,100,{me:mismaPersona(x.nombre,e.nombre),txt:String(x.pct).replace('.',',')+'%'})).join(''):`<div class="mc-empty">Nadie de esta bancada está entre los ${(C.disidentes||[]).length} representantes que más se salieron de la línea en Cámara (todos por encima del ${String(Math.min(...(C.disidentes||[{pct:0}]).map(x=>x.pct))).replace('.',',')}%).</div>`)
+        +(ss.length?'<div class="seg-sub">Senado</div>'+ss.map(x=>MC.hbar(tCase(x.nombre),x.pct,100,{me:mismaPersona(x.nombre,e.nombre),txt:String(x.pct).replace('.',',')+'%'})).join(''):'')
+        +`<p class="note">% de votaciones divididas en que la persona votó contra la mayoría de su bancada (mediana de la Cámara: ${String((C.disidentes_meta||{}).mediana_pct||'—').replace('.',',')}%). El registro publica solo los que más se salen. Cubre las plenarias de Cámara desde 2014: muchos ya no están en el Congreso.</p>`;
+    }catch(err){ disc.innerHTML='<div class="mc-empty">La disciplina de bancada no cargó en este momento.</div>'; }
+  })();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>

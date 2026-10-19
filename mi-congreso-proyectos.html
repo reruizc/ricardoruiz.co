@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Mis proyectos · Mi Congreso · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
+  <link rel="stylesheet" href="mi-congreso.css?v=20261019" />
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="mi-congreso.html" class="e-btn-back">← Volver</a>
+      <span class="nav-page-tag">Mi Congreso</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <a href="index.html" class="logo-link"><div class="logo-bars"><div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div></div><span class="logo-text">Ricardo<span>.</span>Ruiz</span></a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">Mi Congreso · 02 · legislatura 2026–2027</div>
+    <h1 class="page-title">Mis proyectos</h1>
+    <p class="page-sub">Todo lo que firmas en la legislatura, con la etapa en que va cada proyecto. El <b>avance general</b> es el promedio de la etapa de tus proyectos vivos sobre las seis etapas de una cámara (radicado → pasa a la otra cámara); los archivados y acumulados no cuentan.</p>
+  </div>
+  <div class="sec-bar" id="mc-sec-bar"></div>
+
+  <section>
+    <div id="mc-head"></div>
+    <div class="mc-grid" style="grid-template-columns:.8fr 1.2fr;margin-top:0">
+      <div class="panel"><h3>Avance general</h3><div id="pr-av"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+      <div class="panel"><h3>Dónde están <small>proyectos por etapa</small></h3><div id="pr-funnel"></div></div>
+    </div>
+    <div class="mc-grid" style="grid-template-columns:1.5fr .5fr">
+      <div class="panel">
+        <h3>Cada proyecto <small>rastreo diario · Senado y Cámara</small></h3>
+        <div class="mc-filters" id="pr-f">
+          <button data-f="todos" class="on">Todos</button><button data-f="princ">★ Autor principal</button><button data-f="agenda">En el orden del día</button><button data-f="debate">En debate o más</button><button data-f="fin">Archivados</button>
+        </div>
+        <div id="pr-lista"></div>
+      </div>
+      <div class="panel"><h3>Con quién más firmas</h3><div id="pr-coaut"></div></div>
+    </div>
+  </section>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Mi Congreso · Congreso 2026–2030</span>
+    <a href="mi-congreso.html" class="e-btn-back" style="font-size:.62rem">← Mi Congreso</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script src="legislativo-electos.js"></script>
+  <script src="mi-congreso-base.js?v=20261019"></script>
+  <script>
+  (async function(){
+    const e=MC.pagina('proyectos'); if(!e) return;
+    const {cut,shortTitle,numDe,citaTxt,avanceHtml,etapaEf,fechaCorta,comisionNice}=MC;
+    try{
+      const mios=await MC.mios(e);
+      if(!mios.length){
+        document.getElementById('pr-av').innerHTML='<div class="mc-empty">No aparece como firmante de ningún proyecto radicado en la legislatura 2026-2027, según los registros de Senado y Cámara. Los proyectos entran al rastreo apenas las secretarías los publican, con rezago de días en Cámara.</div>';
+        ['pr-funnel','pr-lista','pr-coaut'].forEach(id=>document.getElementById(id).innerHTML='<div class="mc-empty">Sin proyectos todavía.</div>');
+        return;
+      }
+      const av=MC.avanceGeneral(mios), princ=mios.filter(x=>x._primero).length, ag=mios.filter(x=>x._citas.length).length;
+      const sen=mios.filter(x=>x._cam==='Senado').length;
+      document.getElementById('pr-av').innerHTML=`<div class="mc-ring-wrap">${MC.ring(av.pct,120)}<div class="mc-lbl" style="margin:0"><b>${mios.length} proyectos firmados</b> · ${sen} en Senado y ${mios.length-sen} en Cámara.<br>★ <b>${princ}</b> como autor principal (primera firma).<br><b>${av.debate}</b> en debate o más adelante · <b>${ag}</b> en un orden del día publicado.${av.fin?`<br>${av.fin} archivados, retirados o acumulados.`:''}</div></div>`;
+      /* embudo por etapa */
+      const cuenta=MC.ETAPAS.map((_,i)=>mios.filter(x=>etapaEf(x).n===i+1).length);
+      const mx=Math.max(1,...cuenta,av.fin);
+      document.getElementById('pr-funnel').innerHTML=MC.ETAPAS.map((t,i)=>MC.hbar(`${i+1} · ${t}`,cuenta[i],mx)).join('')+MC.hbar('Archivado, retirado o acumulado',av.fin,mx,{cls:'fin'})
+        +`<p class="note">La etapa sale del estado oficial. En Cámara, que casi siempre reporta solo «Trámite en Comisión», se completa con los órdenes del día publicados: si está agendado, está en debate.</p>`;
+      /* coautores frecuentes */
+      const co={}; mios.forEach(x=>(x._coaut||[]).forEach(a=>{ const k=norm(a).replace(/^h\.?\s?[sr]\.?\s*/,''); (co[k]=co[k]||{n:0,nom:a}).n++; }));
+      const top=Object.values(co).sort((a,b)=>b.n-a.n).slice(0,12), cmx=top[0]?top[0].n:1;
+      document.getElementById('pr-coaut').innerHTML=top.length?top.map(c=>MC.hbar(MC.nice(c.nom.replace(/^H\.?\s?[SR]\.?\s*/i,'')),c.n,cmx)).join('')+'<p class="note">Cuántos de tus proyectos comparten firma con cada colega. Firmar en bloque es común: no siempre es una alianza.</p>':'<div class="mc-empty">Tus proyectos los firmas solo.</div>';
+      /* la lista */
+      let F='todos';
+      const reloj=x=>{ const r=MC.relojDe(x); if(r.fin) return ''; return `<span class="mc-risk ${r.ritmo}" title="Meta: ${esc(r.meta)} antes del ${esc(MC.fechaLarga(r.limite))}">${esc(r.rotulo)}</span>`; };
+      const fila=x=>`<div class="mc-row"><span class="d">${esc(numDe(x)||'—')}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),170))} ${reloj(x)}${avanceHtml(x)}${x._citas.map(c=>`<span class="mc-cita">En el orden del día: ${citaTxt(c)}</span>`).join('')}<small>${esc(MC.TIPO_NICE[MC.tipoDe(x)])} · ${esc(x._cam)}${x.comision?' · '+esc(comisionNice(x.comision)):''}${x.estado?' · '+esc(x.estado):''}${x.fecha?' · radicado '+esc(fechaCorta(x.fecha)):''} · ${x._n===1?'firma solo':x._n+' firmantes'}${x.intentos_previos?` · <b>${x.intentos_previos}</b> intento${x.intentos_previos===1?'':'s'} previo${x.intentos_previos===1?'':'s'} con el mismo título`:''}${x.fuente_url?` · <a href="${esc(x.fuente_url)}" target="_blank" rel="noopener">fuente ↗</a>`:''} · <a class="mc-avisa" href="mi-congreso.html?avisa=${encodeURIComponent(numDe(x)||'')}">Avísame cuando avance</a></small></span></div>`;
+      const filtra={todos:()=>true,princ:x=>x._primero,agenda:x=>x._citas.length,debate:x=>{ const s=etapaEf(x); return !s.fin&&s.n>=3; },fin:x=>!!etapaEf(x).fin};
+      function pinta(){
+        const L=mios.filter(filtra[F]);
+        document.getElementById('pr-lista').innerHTML=(L.length?L.map(fila).join(''):'<div class="mc-empty">Nada en este filtro.</div>')
+          +'<p class="note">★ = primera firma (autor principal); en el registro, adherir a un proyecto y redactarlo pesan igual. La etiqueta de ritmo compara la etapa con el tiempo de sesión que ya corrió: el detalle está en <a href="mi-congreso-reloj.html">Reloj de trámite</a>.</p>';
+      }
+      document.querySelectorAll('#pr-f button').forEach(b=>b.onclick=()=>{ F=b.dataset.f; document.querySelectorAll('#pr-f button').forEach(x=>x.classList.toggle('on',x===b)); pinta(); });
+      pinta();
+    }catch(err){ document.getElementById('pr-av').innerHTML='<div class="mc-empty">No se pudo consultar el registro de radicados.</div>'; }
+  })();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>

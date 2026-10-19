@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Mi agenda · Mi Congreso · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
+  <link rel="stylesheet" href="mi-congreso.css?v=20261019" />
+  <style>
+    .ag-day{scroll-margin-top:90px;margin-top:1.4rem}
+    .ag-day h4{font-family:var(--hn);font-weight:700;font-size:.95rem;color:var(--white);margin:0 0 .5rem;display:flex;align-items:baseline;gap:.6rem}
+    .ag-day h4 small{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gray);font-weight:500}
+    .ag-ses{background:#fff;border:1px solid var(--card-border);padding:.9rem 1rem;margin-bottom:.6rem}
+    .ag-ses.mia{border-left:3px solid var(--blue-light)}
+    .ag-ses.conmio{border-left:3px solid var(--amber)}
+    .ag-ses .h{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;font-size:.86rem;color:var(--white);font-weight:600}
+    .ag-ses .h .tag{font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;padding:.18rem .45rem;font-weight:700}
+    .ag-ses .h .tag.b{background:rgba(0,71,255,.08);color:var(--blue-light)}
+    .ag-ses .h .tag.a{background:rgba(180,83,9,.1);color:var(--amber)}
+    .ag-ses .h a{margin-left:auto;font-size:.66rem;font-weight:500;color:var(--blue-light);text-decoration:none}
+    .ag-ses ol{margin:.55rem 0 0 1.1rem;padding:0;font-size:.76rem;color:var(--white);line-height:1.5}
+    .ag-ses ol li{margin:.18rem 0}
+    .ag-ses ol li small{color:var(--gray);font-size:.66rem}
+    .ag-ses ol li.mio{color:var(--amber);font-weight:600}
+    .ag-ses .x{font-size:.72rem;color:var(--gray);margin-top:.4rem}
+    .ag-ses ol.mas li:nth-child(n+9){display:none}
+    .ag-ses ol.mas.open li{display:list-item}
+    .ag-ses .vermas{font-size:.66rem;color:var(--blue-light);background:none;border:none;padding:.3rem 0 0;cursor:pointer;text-decoration:underline}
+  </style>
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="mi-congreso.html" class="e-btn-back">← Volver</a>
+      <span class="nav-page-tag">Mi Congreso</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <a href="index.html" class="logo-link"><div class="logo-bars"><div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div></div><span class="logo-text">Ricardo<span>.</span>Ruiz</span></a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">Mi Congreso · 01 · órdenes del día publicados</div>
+    <h1 class="page-title">Mi agenda</h1>
+    <p class="page-sub">Las sesiones que las secretarías ya publicaron, día por día. En azul, tu comisión y la plenaria de tu cámara; en ámbar, las sesiones donde está un proyecto que firmas, sea de la comisión que sea. Pasa el mouse por un día para ver los temas; haz clic para ir a su detalle.</p>
+  </div>
+  <div class="sec-bar" id="mc-sec-bar"></div>
+
+  <section>
+    <div id="mc-head"></div>
+    <div class="kpis" id="ag-kpis"></div>
+    <div class="panel">
+      <h3>Las próximas cuatro semanas <small id="ag-src"></small></h3>
+      <div id="ag-cal"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div>
+      <div class="mc-legend" style="margin-top:.7rem"><span><i style="background:var(--blue-light)"></i>tu comisión o plenaria</span><span><i style="background:var(--amber)"></i>con un proyecto tuyo</span><span><i style="background:rgba(20,22,31,.25)"></i>otras sesiones del Congreso</span><span><i style="background:repeating-linear-gradient(135deg,rgba(20,22,31,.2) 0 2px,transparent 2px 4px)"></i>receso legislativo</span></div>
+      <p class="note">Las secretarías publican el orden del día uno a cinco días antes de la sesión: las semanas siguientes se van llenando solas. Un día vacío no es un día sin sesión, es un día sin documento publicado todavía.</p>
+    </div>
+    <div class="panel" style="margin-top:1.2rem" id="ag-mios-wrap" hidden><h3>Tus proyectos en el orden del día</h3><div id="ag-mios"></div></div>
+    <div class="panel" style="margin-top:1.2rem">
+      <h3>Día por día</h3>
+      <div class="mc-filters" id="ag-f"><button data-f="mio" class="on">Mi comisión, mi plenaria y mis proyectos</button><button data-f="todo">Todo el Congreso</button></div>
+      <div id="ag-dias"></div>
+    </div>
+  </section>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Mi Congreso · Congreso 2026–2030</span>
+    <a href="mi-congreso.html" class="e-btn-back" style="font-size:.62rem">← Mi Congreso</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script src="legislativo-electos.js"></script>
+  <script src="mi-congreso-base.js?v=20261019"></script>
+  <script>
+  (async function(){
+    const e=MC.pagina('agenda'); if(!e) return;
+    const {esMia,cut,shortTitle,diaCorto,ambitoNice,numDe,citaTxt}=MC;
+    let FILTRO='mio';
+    try{
+      const [ord,com,mios]=await Promise.all([MC.ordenes(),MC.comision(e),MC.mios(e).catch(()=>[])]);
+      const hoy=MC.hoyBog();
+      document.getElementById('ag-src').textContent=`actualizado ${MC.fechaCorta(ord.v)}`;
+      const vig=ord.vigentes;
+      const mias=vig.filter(o=>esMia(o,e,com.key));
+      const agendados=mios.filter(x=>x._citas.length);
+      const nProyMias=mias.reduce((s,o)=>s+(o.proyectos||[]).length,0);
+      const cell=(n,l,cls)=>`<div class="kpi${cls?' '+cls:''}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+      document.getElementById('ag-kpis').innerHTML=
+        cell(vig.length,'sesiones publicadas en el Congreso')+
+        cell(mias.length,`de ${com.key?esc(com.nombre)+' o ':''}tu plenaria`,'hl2')+
+        cell(nProyMias,'proyectos en esas listas')+
+        cell(agendados.length,'proyectos tuyos agendados','hl')+
+        cell(com.key?esc(com.nombre.replace('Comisión ','')):'—','tu comisión');
+      /* calendario: clic en un día baja a su detalle */
+      MC.calendario(document.getElementById('ag-cal'),{ord:vig,e,comKey:com.key,misProy:mios,semanas:4,
+        onDia:f=>{ if(FILTRO==='mio'&&!document.getElementById('d-'+f)){ FILTRO='todo'; marca(); pinta(); }
+          const el=document.getElementById('d-'+f); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); history.replaceState(null,'','#'+f); }});
+      if(agendados.length){
+        document.getElementById('ag-mios-wrap').hidden=false;
+        document.getElementById('ag-mios').innerHTML=agendados.map(x=>x._citas.map(c=>`<div class="mc-row"><span class="d">${esc(diaCorto(c.o.fecha))}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal">★</span> ':''}${esc(cut(shortTitle(x.titulo),130))}<small>${esc(numDe(x)||'')} · ${citaTxt(c)}</small></span></div>`).join('')).join('');
+      }
+      const D=MC.porDia(vig,e,com.key,mios);
+      const misKeys=new Map(); mios.forEach(x=>x._citas.forEach(c=>misKeys.set((c.o.id||c.o.url)+'#'+c.pos,x)));
+      function pinta(){
+        const dias=Object.keys(D).sort();
+        const html=dias.map(f=>{
+          let L=D[f]; if(FILTRO==='mio') L=L.filter(r=>r.mia||r.conMio);
+          if(!L.length) return '';
+          L=L.slice().sort((a,b)=>(b.conMio-a.conMio)||(b.mia-a.mia)||String(a.o.ambito).localeCompare(String(b.o.ambito)));
+          return `<div class="ag-day" id="d-${f}"><h4>${esc(diaCorto(f))}${f===hoy?' <small>hoy</small>':''}<small>${L.length} sesi${L.length===1?'ón':'ones'}</small></h4>${L.map(r=>{
+            const ps=(r.o.proyectos||[]);
+            return `<div class="ag-ses${r.conMio?' conmio':(r.mia?' mia':'')}"><div class="h">${esc(ambitoNice(r.o.ambito||r.o.corporacion))}${/plenaria/i.test(r.o.ambito||'')?'':' · '+esc(r.o.corporacion||'')}${r.mia?'<span class="tag b">tu agenda</span>':''}${r.conMio?'<span class="tag a">★ con un proyecto tuyo</span>':''}${r.o.url?`<a href="${esc(r.o.url)}" target="_blank" rel="noopener">Documento oficial ↗</a>`:''}</div>
+              ${ps.length?`<ol class="${ps.length>8?'mas':''}">${ps.map((p,i)=>{ const mio=misKeys.get((r.o.id||r.o.url)+'#'+(i+1)); return `<li class="${mio?'mio':''}">${mio?'★ ':''}${esc(cut(shortTitle(p.titulo||'(sin título en el documento)'),170))} <small>· ${esc(p.numero||'')}</small></li>`; }).join('')}</ol>${ps.length>8?`<button class="vermas" type="button">Ver los ${ps.length} puntos</button>`:''}`
+                :`<div class="x">${r.o.pdf_error?'No pudimos leer este documento (puede ser un escaneo): revísalo en el original.':'Sin proyectos de ley en la lista: suele ser control político, proposiciones o elección de funcionarios.'}</div>`}</div>`;
+          }).join('')}</div>`;
+        }).join('');
+        const box=document.getElementById('ag-dias');
+        box.innerHTML=html||`<div class="mc-empty">${FILTRO==='mio'?`No hay sesión publicada de ${com.key?esc(com.nombre)+' ni ':''}tu plenaria, ni con un proyecto tuyo. Mira «Todo el Congreso».`:'No hay órdenes del día vigentes publicados.'}</div>`;
+        box.querySelectorAll('.vermas').forEach(b=>b.onclick=()=>{ const ol=b.previousElementSibling; ol.classList.toggle('open'); b.textContent=ol.classList.contains('open')?'Ver menos':`Ver los ${ol.children.length} puntos`; });
+      }
+      function marca(){ document.querySelectorAll('#ag-f button').forEach(b=>b.classList.toggle('on',b.dataset.f===FILTRO)); }
+      document.querySelectorAll('#ag-f button').forEach(b=>b.onclick=()=>{ FILTRO=b.dataset.f; marca(); pinta(); });
+      if(!mias.length&&!agendados.length){ FILTRO='todo'; marca(); }
+      pinta();
+      const h=location.hash.slice(1);
+      if(/^\d{4}-\d{2}-\d{2}$/.test(h)){ if(!document.getElementById('d-'+h)){ FILTRO='todo'; marca(); pinta(); } const el=document.getElementById('d-'+h); if(el) setTimeout(()=>el.scrollIntoView({block:'start'}),60); }
+    }catch(err){ document.getElementById('ag-cal').innerHTML='<div class="mc-empty">No se pudo consultar la agenda en este momento.</div>'; }
+  })();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>

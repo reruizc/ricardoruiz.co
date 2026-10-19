@@ -5,138 +5,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mi Congreso · Tu curul, día a día · Ricardo Ruiz</title>
-  <meta name="description" content="Espacio de trabajo para congresistas y sus equipos (UTL): la agenda de tu comisión, los proyectos que firmas, cómo votas, el control político y la prensa, en un solo tablero." />
+  <meta name="description" content="Espacio de trabajo para congresistas y sus equipos (UTL): la agenda de tu comisión, los proyectos que firmas y su reloj de trámite, cómo votas, el control político, la prensa y tu bancada." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <style>
-    /* ── tema CLARO de esta página ──────────────────────────────────
-       El chasis compartido (legislativo-base.css) es oscuro. Aquí se
-       redefinen las variables del sistema visual a una paleta papel/tinta
-       y se sobreescriben las pocas reglas del chasis que traen colores
-       fijos. La BARRA SUPERIOR se queda oscura a propósito: dentro de
-       .electoral-nav las variables vuelven a sus valores de noche. */
-    :root{
-      --white:#14161f; --gray:rgba(20,22,31,.58); --gray-light:rgba(20,22,31,.22);
-      --border:rgba(20,22,31,.1); --card-bg:#ffffff; --card-bg2:rgba(20,22,31,.04);
-      --card-border:rgba(20,22,31,.11); --blue-light:#0047FF;
-      --green:#15803d; --amber:#b45309; --red:#b91c1c;
-    }
-    body{background:#f2f1ec}
-    .bg-layer{background:#f2f1ec}
-    .electoral-nav{background:#060810;border-bottom-color:rgba(255,255,255,.08);
-      --white:#f4f3ef; --gray:rgba(255,255,255,.5); --gray-light:rgba(255,255,255,.2);
-      --card-border:rgba(255,255,255,.07); --blue-light:#3d6fff; --green:#4ade80}
-    .note{color:rgba(20,22,31,.5)}
-    .seg-sub{color:rgba(20,22,31,.5)}
-    .f-input::placeholder{color:rgba(20,22,31,.35)}
-    .fc-photo{border-color:rgba(20,22,31,.12)}
-    .bt-av{border-color:#fff;background:#3b4252}
-    .bt-av.more{background:rgba(20,22,31,.08);color:rgba(20,22,31,.7)}
-    .kpi,.panel{box-shadow:0 1px 2px rgba(20,22,31,.04)}
-    footer .e-btn-back{color:var(--green);border-color:rgba(21,128,61,.45)}
-    footer .e-btn-back:hover{background:var(--green);border-color:var(--green);color:#fff}
-
-    /* ── solo de esta página ─────────────────────────────────────── */
-    .mc-pick{position:relative;max-width:560px}
-    .mc-pick .f-input{width:100%;min-width:0;font-size:1rem;padding:.8rem 1rem}
-    .mc-ac{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:50;background:#fff;border:1px solid var(--card-border);box-shadow:0 12px 30px rgba(20,22,31,.14);display:none;max-height:340px;overflow:auto}
-    .mc-ac.on{display:block}
-    .mc-ac-row{display:flex;align-items:center;gap:.7rem;padding:.6rem .9rem;border-bottom:1px solid rgba(20,22,31,.06);cursor:none}
-    .mc-ac-row:hover,.mc-ac-row.sel{background:rgba(0,71,255,.08)}
-    .mc-ac-row i{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-    .mc-ac-row b{font-weight:500;color:var(--white);font-size:.9rem}
-    .mc-ac-row small{color:var(--gray);font-size:.7rem;margin-left:auto;white-space:nowrap}
-    .mc-hint{font-size:.72rem;color:var(--gray);margin-top:.6rem;line-height:1.5}
-    .mc-hint b{color:var(--white);cursor:none;border-bottom:1px dotted var(--gray)}
-    /* identidad */
-    .mc-head{display:flex;gap:1.3rem;align-items:flex-start;background:var(--card-bg);border:1px solid var(--card-border);padding:1.4rem 1.5rem;margin-bottom:1.2rem;position:relative}
-    .mc-head .fc-photo{width:123px;height:157px}
-    .mc-head .fc-photo img{width:100%;height:100%;object-fit:cover}
-    .mc-head .fc-photo span{font-weight:800;font-size:1.4rem;color:#fff}
-    .mc-name{padding-right:11.5rem;font-family:var(--hn);font-weight:800;font-size:clamp(1.3rem,2.6vw,1.9rem);letter-spacing:-.03em;line-height:1.1;color:var(--white)}
-    .mc-meta{font-size:.78rem;color:var(--gray);margin-top:.45rem;line-height:1.6}
-    .mc-meta b{color:var(--white);font-weight:500}
-    .mc-chips{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.7rem}
-    .mc-chip{font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;padding:.3rem .6rem;border:1px solid var(--card-border);color:var(--gray)}
-    .mc-chip.b{border-color:currentColor}
-    .mc-change{position:absolute;right:1.2rem;top:1.2rem;font-size:.62rem;letter-spacing:.09em;text-transform:uppercase;color:var(--gray);background:none;border:1px solid var(--gray-light);padding:.35rem .7rem;cursor:none}
-    .mc-change:hover{color:var(--white);border-color:var(--white)}
-    /* paneles */
-    .mc-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-top:1.2rem}
-    .mc-grid .panel{min-width:0}
-    .mc-grid .panel h3{display:flex;align-items:center;gap:.6rem}
-    .mc-grid .panel h3 small{margin-left:auto;font-size:.6rem;letter-spacing:.06em;color:rgba(20,22,31,.45);text-transform:none}
-    .mc-row{display:flex;gap:.8rem;align-items:flex-start;padding:.65rem 0;border-bottom:1px solid rgba(20,22,31,.07)}
-    .mc-row:last-child{border-bottom:none}
-    .mc-av{display:flex;gap:3px;margin:.45rem 0 .15rem;max-width:260px}
-    .mc-av i{flex:1;height:5px;background:rgba(20,22,31,.10);border-radius:1px}
-    .mc-av i.on{background:var(--blue-light)}
-    .mc-av.fin i.on{background:var(--gray)}
-    .mc-av-l{font-size:.64rem;color:var(--gray);letter-spacing:.02em}
-    .mc-av-l b{color:var(--white);font-weight:500}
-    .mc-cita{display:block;margin-top:.35rem;font-size:.68rem;color:var(--amber);font-weight:600}
-    .mc-cita a{color:var(--amber)!important;text-decoration:underline}
-    .mc-mios{border:1px solid rgba(180,83,9,.35);background:rgba(180,83,9,.06);padding:.7rem .85rem;margin-bottom:.9rem}
-    .mc-mios h4{margin:0 0 .35rem;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);font-weight:700}
-    .mc-mios .mc-row{border-bottom-color:rgba(180,83,9,.15)}
-    .mc-resumen{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem}
-    .mc-resumen button,.mc-resumen a{font-family:var(--hn);font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.5rem .8rem;border:1px solid var(--card-border);background:transparent;color:var(--white);cursor:pointer;text-decoration:none}
-    .mc-resumen a.wa{border-color:rgba(21,128,61,.5);color:var(--green)}
-    .mc-resumen .ok{font-size:.7rem;color:var(--green);align-self:center}
-    .mc-avisa{font-size:.66rem;font-weight:600;color:var(--green)!important;text-decoration:underline;cursor:pointer;margin-left:.35rem}
-    .mc-more{background:none;border:1px solid var(--card-border);color:var(--blue-light);font-size:.7rem;padding:.35rem .7rem;margin-top:.6rem;cursor:pointer}
-    .mc-row .d{font-size:.62rem;color:var(--gray);width:60px;flex-shrink:0;padding-top:.15rem;letter-spacing:.04em;font-variant-numeric:tabular-nums}
-    .mc-row .t{font-size:.82rem;color:var(--white);line-height:1.45;min-width:0}
-    .mc-row .t small{display:block;font-size:.66rem;color:var(--gray);margin-top:.2rem}
-    .mc-row .t a{color:var(--blue-light);text-decoration:none}
-    .mc-row .n{margin-left:auto;font-weight:700;font-size:.8rem;white-space:nowrap;padding-top:.1rem}
-    .mc-star{color:var(--amber)}
-    .mc-align{display:flex;align-items:baseline;gap:.7rem;margin-bottom:.6rem}
-    .mc-align .n{font-family:var(--hn);font-weight:800;font-size:2rem;letter-spacing:-.04em;color:var(--white)}
-    .mc-align .t{font-size:.74rem;color:var(--gray);line-height:1.45}
-    .mc-bar{display:flex;height:8px;overflow:hidden;margin:.5rem 0 .9rem;background:rgba(20,22,31,.08)}
-    .mc-bar i{display:block;height:100%}
-    .mc-bar .si{background:var(--green)}.mc-bar .no{background:var(--red)}.mc-bar .ab{background:var(--amber)}
-    .mc-empty{font-size:.78rem;color:var(--gray);line-height:1.6}
-    .mc-faces{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.6rem}
-    .mc-roadmap{margin-top:1.4rem;border-top:2px solid var(--amber)}
-    .mc-roadmap ul{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.4rem;margin-top:.9rem}
-    .mc-roadmap li{font-size:.78rem;color:var(--gray);line-height:1.5;padding-left:1rem;position:relative}
-    .mc-roadmap li::before{content:'→';position:absolute;left:0;color:var(--amber)}
-    .mc-roadmap li b{color:var(--white);font-weight:500}
-    /* mapa de votación (dentro de «Cómo he votado») */
-    .mc-map{height:320px;margin:.3rem 0 .6rem;background:transparent}
-    .leaflet-container{background:transparent!important;font-family:var(--hn)!important;cursor:none}
-    .leaflet-tooltip{font-family:var(--hn)!important;font-weight:400!important;font-size:.78rem!important;background:#fff!important;border:1px solid rgba(20,22,31,.18)!important;color:var(--white)!important;border-radius:0!important;padding:.35rem .55rem!important;box-shadow:0 4px 14px rgba(20,22,31,.12)!important}
-    .leaflet-tooltip:before{display:none!important}
-    .leaflet-interactive{cursor:none}
-    /* alertas */
-    .mc-alert{margin-top:1.2rem;border-top:2px solid var(--green);display:grid;grid-template-columns:1.1fr .9fr;gap:1.6rem}
-    .mc-alert h3{color:var(--green)}
-    .mc-alert p{font-size:.82rem;color:var(--gray);line-height:1.6}
-    .mc-alert ul{list-style:none;margin:.6rem 0 0;display:grid;gap:.35rem}
-    .mc-alert li{font-size:.78rem;color:var(--gray);padding-left:1rem;position:relative;line-height:1.5}
-    .mc-alert li::before{content:'✓';position:absolute;left:0;color:var(--green)}
-    .mc-alert form{display:flex;flex-direction:column;gap:.7rem}
-    .mc-alert .f-input{min-width:0;width:100%}
-    .mc-alert label.ck{display:flex;gap:.55rem;align-items:flex-start;font-size:.7rem;color:var(--gray);line-height:1.5}
-    .mc-alert label.ck input{margin-top:.2rem;flex-shrink:0}
-    .mc-alert button.go{font-family:var(--hn);font-weight:700;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:#fff;background:var(--green);border:none;padding:.75rem 1rem;cursor:none}
-    .mc-alert button.go:disabled{opacity:.5}
-    .mc-alert .st{font-size:.78rem;line-height:1.55;padding:.7rem .85rem;border:1px solid var(--card-border);background:rgba(20,22,31,.03)}
-    .mc-alert .st.ok{border-color:rgba(21,128,61,.45);color:var(--white)}
-    .mc-alert .st.warn{border-color:rgba(180,83,9,.5);color:var(--white)}
-    .mc-alert .st.err{border-color:rgba(185,28,28,.5);color:var(--white)}
-    .mc-alert .st b{color:var(--green)}
-    .mc-alert .st a{color:var(--gray);font-size:.68rem}
-    .mc-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
-    @media(max-width:900px){ .mc-grid{grid-template-columns:1fr} .mc-roadmap ul{grid-template-columns:1fr} .mc-alert{grid-template-columns:1fr} }
-    @media(max-width:600px){ .mc-head{flex-direction:column} .mc-name{padding-right:0} .mc-change{position:static;margin-top:.6rem} .kpis{grid-template-columns:repeat(2,1fr)} }
-  </style>
+  <link rel="stylesheet" href="mi-congreso.css?v=20261019" />
 </head>
 <body>
   <div class="bg-layer"></div>
@@ -166,7 +40,7 @@
   <div class="page-header compacta">
     <div class="page-tag">Mi Congreso · espacio de trabajo · Congreso 2026–2030</div>
     <h1 class="page-title">Tu curul, día a día</h1>
-    <p class="page-sub">Para congresistas y sus equipos de trabajo legislativo. Elige tu nombre y el tablero arma lo que hoy se lleva a mano: la agenda de tu comisión, los proyectos que firmas, cómo has votado, a quién has citado y qué dice la prensa. Todo sale de registros públicos y se actualiza con el rastreo diario.</p>
+    <p class="page-sub">Para congresistas y sus equipos de trabajo legislativo. Elige tu nombre y el tablero arma lo que hoy se lleva a mano: la agenda de tu comisión, los proyectos que firmas y cuánto tiempo les queda, cómo has votado, a quién has citado, qué dice la prensa y cómo se mueve tu bancada. Cada tarjeta abre su propia página. Todo sale de registros públicos y se actualiza con el rastreo diario.</p>
   </div>
 
   <section id="mi-congreso">
@@ -184,21 +58,45 @@
     <!-- paso 2 · el tablero -->
     <div id="mc-tablero" style="display:none">
       <div class="mc-head" id="mc-head"></div>
-      <div class="kpis" id="mc-kpis"></div>
-      <div class="mc-grid">
-        <div class="panel"><h3>Mi agenda <small id="mc-agenda-src"></small></h3><div id="mc-agenda-mios"></div><div id="mc-agenda"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
-        <div class="panel"><h3>Mis proyectos en esta legislatura <small>rastreo diario · Senado y Cámara</small></h3><div id="mc-proy"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
-        <div class="panel"><h3>Cómo he votado <small id="mc-voto-src"></small></h3>
-          <div class="seg-sub" style="margin-top:0">Dónde me votaron · 2026</div>
-          <div class="mc-map" id="mc-map"></div>
-          <div class="note" id="mc-map-note" style="margin-top:0">Cargando el mapa de tu votación…</div>
-          <div class="seg-sub">En plenaria</div>
-          <div id="mc-voto"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div>
-        </div>
-        <div class="panel"><h3>Control político <small>citaciones en órdenes del día</small></h3><div id="mc-cit"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
-        <div class="panel"><h3>En la prensa <small>últimos 30 días · Google News</small></h3><div id="mc-prensa"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
-        <div class="panel"><h3>Mi bancada <small>listado de electos</small></h3><div id="mc-banc"></div></div>
+
+      <div class="mc-cards" id="mc-cards">
+        <a class="mc-card w2" href="mi-congreso-agenda.html" data-card="agenda">
+          <div class="mc-card-img" style="background-image:url('imagenes/mi-congreso-agenda.jpg')"><span class="mc-card-tag" data-tag>Órdenes del día</span><div class="mc-card-t"><div class="k">01 · las próximas dos semanas</div><div class="h">Mi agenda</div></div></div>
+          <div class="mc-card-b" data-b><div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div></div>
+          <div class="mc-card-f"><span>Abrir mi agenda</span><span>↗</span></div>
+        </a>
+        <a class="mc-card" href="mi-congreso-proyectos.html" data-card="proyectos">
+          <div class="mc-card-img" style="background-image:url('imagenes/mi-congreso-proyectos.jpg')"><span class="mc-card-tag">Legislatura 2026-27</span><div class="mc-card-t"><div class="k">02</div><div class="h">Mis proyectos</div></div></div>
+          <div class="mc-card-b" data-b><div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div></div>
+          <div class="mc-card-f"><span>Ver el avance de cada uno</span><span>↗</span></div>
+        </a>
+        <a class="mc-card" href="mi-congreso-reloj.html" data-card="reloj">
+          <div class="mc-card-img" style="background-image:url('imagenes/mi-congreso-reloj.jpg')"><span class="mc-card-tag new">Nuevo</span><div class="mc-card-t"><div class="k">03 · art. 162 CP · art. 190 Ley 5ª</div><div class="h">Reloj de trámite</div></div></div>
+          <div class="mc-card-b" data-b><div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div></div>
+          <div class="mc-card-f"><span>Cuánto le queda a cada proyecto</span><span>↗</span></div>
+        </a>
+        <a class="mc-card" href="mi-congreso-votos.html" data-card="votos">
+          <div class="mc-card-img" style="background-image:url('imagenes/mi-congreso-votos.jpg')"><span class="mc-card-tag">Urnas y plenaria</span><div class="mc-card-t"><div class="k">04</div><div class="h">Cómo he votado</div></div></div>
+          <div class="mc-card-b" data-b><div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div></div>
+          <div class="mc-card-f"><span>Mapa de mis votos y mi récord</span><span>↗</span></div>
+        </a>
+        <a class="mc-card" href="mi-congreso-control.html" data-card="control">
+          <div class="mc-card-img" style="background-image:url('imagenes/mi-congreso-control.jpg')"><span class="mc-card-tag">Citaciones</span><div class="mc-card-t"><div class="k">05</div><div class="h">Control político</div></div></div>
+          <div class="mc-card-b" data-b><div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div></div>
+          <div class="mc-card-f"><span>Abrir control político</span><span>↗</span></div>
+        </a>
+        <a class="mc-card w2" href="mi-congreso-prensa.html" data-card="prensa">
+          <div class="mc-card-img" style="background-image:url('imagenes/mi-congreso-prensa.jpg')"><span class="mc-card-tag">Últimos 30 días</span><div class="mc-card-t"><div class="k">06 · de qué se habla cuando te nombran</div><div class="h">En la prensa</div></div></div>
+          <div class="mc-card-b" data-b><div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div></div>
+          <div class="mc-card-f"><span>Temas, tono, medios y titulares</span><span>↗</span></div>
+        </a>
+        <a class="mc-card" href="mi-congreso-bancada.html" data-card="bancada">
+          <div class="mc-card-img" style="background-image:url('imagenes/mi-congreso-bancada.jpg')"><span class="mc-card-tag">Electos 2026–2030</span><div class="mc-card-t"><div class="k">07</div><div class="h">Mi bancada</div></div></div>
+          <div class="mc-card-b" data-b><div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div></div>
+          <div class="mc-card-f"><span>Colegas, comisiones y disciplina</span><span>↗</span></div>
+        </a>
       </div>
+
       <div class="panel mc-alert" id="mc-alert">
         <div>
           <h3>Alertas por correo</h3>
@@ -222,10 +120,9 @@
       </div>
       <div class="panel mc-roadmap">
         <h3>Lo que viene en Mi Congreso</h3>
-        <p class="note" style="margin:0">Esta es la primera versión, montada sobre el mismo motor que alimenta el Legislativo. Lo siguiente, en orden:</p>
+        <p class="note" style="margin:0">Montado sobre el mismo motor que alimenta el Legislativo. Lo siguiente, en orden:</p>
         <ul>
           <li><b>Antecedentes</b>: qué se ha radicado antes sobre el mismo tema, cuántas veces y por qué murió.</li>
-          <li><b>Reloj del trámite</b> (art. 190 Ley 5ª) por proyecto, con el bloqueo real de tu comisión.</li>
           <li><b>Cómo votó mi bancada</b> en cada proyecto de fondo, y quién se salió.</li>
           <li><b>Mi territorio</b>: dónde está tu voto hasta el barrio, desde la ficha electoral.</li>
           <li><b>Borrador de exposición de motivos</b> con el histórico desde 1990 como insumo.</li>
@@ -241,51 +138,14 @@
 
   <script src="legislativo-base.js"></script>
   <script src="legislativo-electos.js"></script>
+  <script src="candidato-360-saliencia.js?v=20260928"></script>
+  <script src="mi-congreso-base.js?v=20261019"></script>
   <script>
-  /* ── Mi Congreso · v1 ─────────────────────────────────────────────
-     Todo lo que se pinta sale de fuentes que ya existen:
-       · ELECTOS (legislativo-electos.js)          → identidad y bancada
-       · comisiones-2026.json (S3)                 → comisión y mesa directiva
-       · ordenes-vigentes.json (S3)                → agenda de su comisión y plenaria
-       · action:'radicados'                        → proyectos que firma
-       · action:'congresista'                      → voto nominal + citaciones
-       · action:'medios'                           → prensa
-       · endoso/index.json (S3)                    → foto, votos 2026 y ficha
-     La elección se guarda en localStorage['mi-congreso-v1']. */
-  const S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
-  const URL_COM=S3+'/legislativo/comisiones-2026.json';
-  const URL_ORD=S3+'/legislativo/ordenes-vigentes.json';
-  const URL_ENDOSO=S3+'/endoso/index.json';
-  const S3_PHOTOS=S3+'/fotos-candidatos';
-  const KEY='mi-congreso-v1';
-  const initials=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
-  const toks=s=>norm(s).replace(/[^a-z0-9ñ\s]/g,' ').split(/\s+/).filter(t=>t.length>2&&!/^(h\.?[sr]\.?|de|del|la|los|las|y)$/.test(t));
-  /* dos nombres son la misma persona si el más corto cabe entero en el largo
-     y comparten al menos dos tokens (un apellido solo casa homónimos) */
-  function mismaPersona(a,b){
-    const A=toks(a), B=toks(b); if(A.length<2||B.length<2) return false;
-    const [c,l]=A.length<=B.length?[A,B]:[B,A];
-    return c.every(t=>l.includes(t));
-  }
-  const fechaCorta=f=>{ const m=String(f||'').match(/(\d{4})[-/](\d{2})[-/](\d{2})/); if(!m) return ''; const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; return `${+m[3]} ${M[+m[2]-1]}`; };
-  const TITLE_PREF=/^\s*por\s+(?:medio\s+de\s+)?(?:el\s+medio\s+de\s+)?(?:la|el|los|las)?\s*cual(?:es)?\s+se\s+/i;
-  function shortTitle(t){
-    let s=String(t||'').replace(TITLE_PREF,'').replace(/\s+/g,' ').trim();
-    if(s.length<6) s=String(t||'').replace(/\s+/g,' ').trim();
-    /* el récord de voto trae a veces solo el número ("089 de 2024 Senado"):
-       se deja tal cual, que en minúscula queda peor */
-    if(/^\d+\s+de\s+\d{4}/i.test(s)) return s;
-    return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase();
-  }
-  const chamberNice=c=>c==='SENADO'?'Senado':'Cámara de Representantes';
-  /* Senado manda «SEXTA»; Cámara manda «Comisión Séptima Constitucional
-     Permanente» → un solo rótulo corto: «Comisión Séptima» */
-  const comisionNice=c=>{ const m=norm(c).match(/(primera|segunda|tercera|cuarta|quinta|sexta|septima)/); return m?'Comisión '+tCase(m[1]).replace('Septima','Séptima'):'Comisión '+tCase(String(c||'').replace(/^comisi[oó]n\s+/i,'')); };
-  /* recorte por palabra, con puntos suspensivos: cortar a mitad de palabra
-     deja títulos tipo "…y se dictan otras disp" */
-  const cut=(s,n)=>{ s=String(s||''); if(s.length<=n) return s; const c=s.slice(0,n); const i=c.lastIndexOf(' '); return (i>n*0.6?c.slice(0,i):c)+'…'; };
-  /* el listado trae Senado en Title Case y Cámara en MAYÚSCULA SOSTENIDA */
-  const nice=n=>{ n=String(n||''); return n===n.toUpperCase()?tCase(n):n; };
+  /* ── Mi Congreso · hub ─────────────────────────────────────────────
+     Siete tarjetas, cada una con su imagen, un vistazo vivo de su dato y
+     su propia página. La lógica compartida vive en mi-congreso-base.js. */
+  const {esMia,cut,shortTitle,nice,diaCorto,fechaCorta,ambitoNice,numDe,etapaEf}=MC;
+  const PARAMS=new URLSearchParams(location.search);
 
   /* ── buscador ────────────────────────────────────────────────────── */
   const q=document.getElementById('mc-q'), ac=document.getElementById('mc-ac');
@@ -305,7 +165,7 @@
   q.addEventListener('input',acRender);
   q.addEventListener('keydown',ev=>{
     if(!AC_LIST.length) return;
-    if(ev.key==='ArrowDown'){ AC_SEL=(AC_SEL+1)%AC_LIST.length; acRender(); q.value=q.value; }
+    if(ev.key==='ArrowDown'){ AC_SEL=(AC_SEL+1)%AC_LIST.length; }
     else if(ev.key==='ArrowUp'){ AC_SEL=(AC_SEL-1+AC_LIST.length)%AC_LIST.length; }
     else if(ev.key==='Enter'){ ev.preventDefault(); elegir(AC_LIST[AC_SEL]); return; }
     else if(ev.key==='Escape'){ ac.classList.remove('on'); return; }
@@ -322,386 +182,193 @@
   function elegir(e){
     if(!e) return;
     ME=e; ac.classList.remove('on'); q.value='';
-    try{ localStorage.setItem(KEY,JSON.stringify({nombre:e.nombre,corp:e.corp})); }catch(err){}
+    MC.guardar(e);
+    /* llegó desde una página de módulo sin congresista elegido: de vuelta allá */
+    const ir=PARAMS.get('ir'), mod=MC.MODULOS.find(m=>m.id===ir);
+    if(mod){ location.href=mod.href; return; }
     document.getElementById('mc-elegir').style.display='none';
     document.getElementById('mc-tablero').style.display='';
     montar(++SEQ);
   }
   function cambiar(){
-    ME=null; try{ localStorage.removeItem(KEY); }catch(err){}
-    if(MAP&&MAPLAYER){ MAP.removeLayer(MAPLAYER); MAPLAYER=null; }
-    const n=document.getElementById('mc-map-note'); if(n) n.textContent='Cargando el mapa de tu votación…';
+    ME=null; MC.olvidar();
     document.getElementById('mc-tablero').style.display='none';
     document.getElementById('mc-elegir').style.display='';
     q.focus();
   }
 
-  /* ── el tablero ──────────────────────────────────────────────────── */
-  const _cache={};
-  async function getJSON(url,bust){
-    const k=url; if(_cache[k]) return _cache[k];
-    _cache[k]=(async()=>{ const r=await fetch(url+(bust?'?v='+Math.floor(Date.now()/bust):''),{cache:'default'}); if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })();
-    return _cache[k];
-  }
-  const KPI={};
-  /* lo que va al «resumen del día»: cada panel deja aquí su parte al pintarse */
-  const RES={};
-  function pintaKpis(){
-    const k=KPI, box=document.getElementById('mc-kpis');
-    const cell=(n,l,cls)=>`<div class="kpi${cls?' '+cls:''}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
-    box.innerHTML=
-      cell(k.proy!=null?k.proy:'—','proyectos que firmo · 2026-27','hl2')+
-      cell(k.alin!=null?k.alin+'%':'—','votos con la bancada de gobierno','hl')+
-      cell(k.votos!=null?fmt(k.votos):'—','votos nominales registrados')+
-      cell(k.cit!=null?k.cit:'—','citaciones de control político')+
-      cell(k.banc!=null?k.banc:'—','colegas en mi bancada');
-  }
-  async function montar(my){
-    const e=ME, b=bancadaOf(e.partido);
-    Object.keys(KPI).forEach(k=>delete KPI[k]);
+  /* ── tablero ─────────────────────────────────────────────────────── */
+  const RES={};   // lo que va al «resumen del día»
+  const body=id=>document.querySelector(`[data-card="${id}"] [data-b]`);
+  const vacio=(id,html)=>{ const b=body(id); if(b) b.innerHTML=`<div class="mc-empty">${html}</div>`; };
+  const SKEL='<div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div>';
+  function montar(my){
+    const e=ME;
     Object.keys(RES).forEach(k=>delete RES[k]);
-    /* identidad, de inmediato; foto y comisión llegan después */
-    document.getElementById('mc-head').innerHTML=`
-      <div class="fc-photo" id="mc-photo" style="background:${b.color}"><span>${esc(initials(e.nombre))}</span></div>
-      <div style="min-width:0;flex:1">
-        <div class="mc-name">${esc(nice(e.nombre))}</div>
-        <div class="mc-meta"><b>${chamberNice(e.corp)}</b> · ${esc(depNice(e.dep))} · ${esc(e.partido)}</div>
-        <div class="mc-chips"><span class="mc-chip b" style="color:${b.color}">${esc(b.name)}</span><span class="mc-chip" id="mc-com-chip">Comisión: buscando…</span><span class="mc-chip" id="mc-votos-chip"></span></div>
-        <div id="mc-ficha"></div>
-        <div class="mc-resumen"><button type="button" onclick="copiarResumen()">Copiar el resumen del día</button><a class="wa" id="mc-wa" href="#" target="_blank" rel="noopener" onclick="return waResumen(this)">Enviar por WhatsApp</a><span class="ok" id="mc-res-ok"></span></div>
-      </div>
-      <button class="mc-change" type="button" onclick="cambiar()">Cambiar de congresista</button>`;
-    /* mi bancada: sale del listado, no espera a la red */
-    const colegas=ELECTOS.filter(x=>bancadaOf(x.partido).name===b.name&&x.nombre!==e.nombre);
-    KPI.banc=colegas.length; pintaKpis();
-    const sen=colegas.filter(x=>x.corp==='SENADO').length;
-    document.getElementById('mc-banc').innerHTML=`<div class="mc-empty" style="margin-bottom:.4rem"><b style="color:var(--white)">${esc(b.name)}</b> · ${colegas.length} colegas: ${sen} en Senado y ${colegas.length-sen} en Cámara.</div>`
-      +`<div class="mc-faces">${colegas.slice(0,14).map(x=>`<span class="bt-av" title="${esc(nice(x.nombre))}" style="background:${b.color}">${esc(initials(x.nombre))}</span>`).join('')}${colegas.length>14?`<span class="bt-av more">+${colegas.length-14}</span>`:''}</div>`
-      +`<a class="ps-cta" href="legislativo-congreso.html">Ver la bancada completa →</a>`;
-    /* lo demás, en paralelo; cada panel se pinta cuando llega su dato */
-    cargarFoto(e,my); cargarComision(e,my); cargarProyectos(e,my); cargarVoto(e,my); cargarPrensa(e,my);
+    document.querySelectorAll('[data-card] [data-b]').forEach(b=>b.innerHTML=SKEL);
+    const head=document.getElementById('mc-head');
+    MC.renderHead(head,e,{extra:`<div id="mc-ficha"></div><div class="mc-resumen"><button type="button" onclick="copiarResumen()">Copiar el resumen del día</button><a class="wa" href="#" target="_blank" rel="noopener" onclick="return waResumen(this)">Enviar por WhatsApp</a><span class="ok" id="mc-res-ok"></span></div>`});
+    head.querySelector('[data-mc-cambiar]').onclick=cambiar;
+    const misP=MC.mios(e);
+    cardAgenda(e,my,misP); cardProyectos(e,my,misP); cardReloj(e,my,misP);
+    cardVotos(e,my); cardControl(e,my); cardPrensa(e,my); cardBancada(e,my);
     alertaPinta();
   }
-  async function cargarFoto(e,my){
+  const ok=my=>my===SEQ;
+
+  async function cardAgenda(e,my,misP){
     try{
-      const d=await getJSON(URL_ENDOSO);
-      const list=Array.isArray(d)?d:(d.candidatos||[]);
-      const corp=e.corp==='SENADO'?'SENADO':'CAMARA';
-      const hit=list.filter(c=>c.tipo!=='partido'&&(c.corp||'').toUpperCase().startsWith(corp)&&mismaPersona(c.nombre,e.nombre)).sort((a,b)=>(b.votos||0)-(a.votos||0))[0];
-      if(my!==SEQ) return;
-      if(!hit){
-        const n=document.getElementById('mc-map-note'); const m=document.getElementById('mc-map');
-        if(m) m.style.display='none';
-        if(n) n.textContent='Sin votación personal en el registro 2026: tu lista fue cerrada y el voto fue al logo del partido, así que no hay mapa individual.';
+      const [ord,com,mios]=await Promise.all([MC.ordenes(),MC.comision(e),misP.catch(()=>[])]);
+      if(!ok(my)) return;
+      const b=body('agenda'); const hoy=MC.hoyBog();
+      const mias=ord.vigentes.filter(o=>esMia(o,e,com.key)).sort((a,c)=>String(a.fecha).localeCompare(String(c.fecha)));
+      RES.agenda=mias.map(o=>({fecha:o.fecha,ambito:o.ambito||o.corporacion,n:(o.proyectos||[]).filter(p=>p.titulo).length,err:!!o.pdf_error}));
+      const agendados=mios.filter(x=>x._citas.length);
+      const prox=mias[0];
+      const cab=prox
+        ?`<div class="mc-lbl" style="margin:0 0 .6rem">Tu próxima sesión: <b>${esc(diaCorto(prox.fecha))} · ${esc(ambitoNice(prox.ambito))}</b>${(prox.proyectos||[]).length?` · ${(prox.proyectos||[]).length} proyecto${(prox.proyectos||[]).length===1?'':'s'} en la lista`:''}${agendados.length?` · <span style="color:var(--amber);font-weight:700">★ ${agendados.length} proyecto${agendados.length===1?'':'s'} tuyo${agendados.length===1?'':'s'} agendado${agendados.length===1?'':'s'}</span>`:''}</div>`
+        :`<div class="mc-lbl" style="margin:0 0 .6rem">Sin orden del día publicado para ${com.key?esc(com.nombre)+' ni ':''}la plenaria de tu cámara. Abajo, lo que sí publicó el resto del Congreso.</div>`;
+      const cal=document.createElement('div');
+      b.innerHTML=cab; b.appendChild(cal);
+      MC.calendario(cal,{ord:ord.vigentes,e,comKey:com.key,misProy:mios,semanas:2,compacto:true,
+        onDia:f=>{ location.href='mi-congreso-agenda.html#'+f; }});
+      b.insertAdjacentHTML('beforeend',`<div class="mc-legend" style="margin-top:.55rem"><span><i style="background:var(--blue-light)"></i>tu comisión o plenaria</span><span><i style="background:var(--amber)"></i>con un proyecto tuyo</span><span><i style="background:rgba(20,22,31,.25)"></i>otras sesiones</span><span>Pasa el mouse por un día para ver los temas.</span></div>`);
+    }catch(err){ if(ok(my)) vacio('agenda','No se pudo consultar la agenda en este momento.'); }
+  }
+
+  async function cardProyectos(e,my,misP){
+    try{
+      const mios=await misP; if(!ok(my)) return;
+      RES.mios=mios;
+      if(!mios.length){ vacio('proyectos','No aparece como firmante de proyectos radicados en la legislatura 2026-2027. Los de Cámara entran al rastreo con días de rezago.'); return; }
+      const av=MC.avanceGeneral(mios), princ=mios.filter(x=>x._primero).length, ag=mios.filter(x=>x._citas.length).length;
+      body('proyectos').innerHTML=`<div class="mc-ring-wrap">${MC.ring(av.pct)}<div><div class="mc-lbl" style="margin:0"><b>Avance general</b> de tus ${av.vivos} proyecto${av.vivos===1?'':'s'} vivo${av.vivos===1?'':'s'}, en promedio sobre las 6 etapas de una cámara.</div></div></div>
+        <div class="mc-pills"><span class="mc-pill">${mios.length} firmados</span><span class="mc-pill">★ ${princ} como autor principal</span><span class="mc-pill${av.debate?' on':''}">${av.debate} en debate o más</span>${ag?`<span class="mc-pill on">${ag} en el orden del día</span>`:''}${av.fin?`<span class="mc-pill">${av.fin} archivados o acumulados</span>`:''}</div>`;
+    }catch(err){ if(ok(my)) vacio('proyectos','No se pudo consultar el registro de radicados.'); }
+  }
+
+  async function cardReloj(e,my,misP){
+    const L=MC.legislatura();
+    try{
+      const mios=await misP.catch(()=>[]); if(!ok(my)) return;
+      const rel=mios.map(x=>MC.relojDe(x)).filter(r=>!r.fin);
+      const sinPrimer=rel.filter(r=>r.meta==='el primer debate').length;
+      const atras=rel.filter(r=>r.ritmo==='alto').length, quedan=rel.filter(r=>r.ritmo==='medio').length;
+      body('reloj').innerHTML=`<div class="mc-big">${L.quedan}<small>días de sesión</small></div>
+        <div class="mc-lbl">quedan en la legislatura 2026-2027 (cierra el <b>20 de junio de 2027</b>). ${L.enReceso?'Hoy el Congreso está en receso.':`El periodo actual cierra en ${L.alCierrePeriodo} días.`}</div>
+        <div class="mc-meter" style="margin:.7rem 0 .2rem"><i style="width:${L.pct}%"></i></div>
+        <div class="mc-lbl" style="margin-top:.2rem">${L.pct}% del tiempo de sesión ya corrió.</div>
+        ${rel.length?`<div class="mc-pills"><span class="mc-pill">${sinPrimer} sin primer debate</span>${atras?`<span class="mc-pill" style="color:var(--red);border-color:rgba(185,28,28,.3)">${atras} atrasado${atras===1?'':'s'}</span>`:''}${quedan?`<span class="mc-pill" style="color:var(--amber);border-color:rgba(180,83,9,.3)">${quedan} se está${quedan===1?'':'n'} quedando</span>`:''}</div>`:''}`;
+    }catch(err){ if(ok(my)) vacio('reloj','No se pudo calcular el reloj en este momento.'); }
+  }
+
+  async function cardVotos(e,my){
+    try{
+      const [el,v]=await Promise.all([MC.electoral(e).catch(()=>({hit:null})),MC.voto(e)]);
+      if(!ok(my)) return;
+      const f=document.getElementById('mc-ficha');
+      if(el.hit&&f) f.innerHTML=`<a class="ps-cta" href="analisis-candidato.html?cand=${encodeURIComponent(el.hit.slug)}">Mi ficha electoral · mapa y drill territorial →</a>`;
+      const circ=e.corp==='SENADO'?'senadores electos':`representantes electos por ${depNice(e.dep)}`;
+      const top=el.hit
+        ?`<div class="mc-ring-wrap"><div class="mc-score"><b>${el.score}</b><small>puntaje</small></div><div><div class="mc-big" style="font-size:1.6rem">${fmt(el.hit.votos)}<small>votos</small></div><div class="mc-lbl">${el.puesto?`N.º <b>${el.puesto}</b> de ${el.nPares} ${circ}`:''}</div></div></div>`
+        :`<div class="mc-lbl" style="margin:0 0 .4rem"><b>Lista cerrada</b>: el voto fue al logo del partido, así que no hay votación personal ni puntaje.</div>`;
+      let dato='';
+      if(v&&v.error) dato=`<div class="mc-lbl" style="margin-top:.7rem">El récord de voto en plenaria no respondió en este momento.</div>`;
+      else if(v&&v.encontrado&&v.n_votos) dato=`<div class="mc-lbl" style="margin-top:.7rem"><b>${v.alineacion_gob!=null?v.alineacion_gob+'%':''}</b>${v.alineacion_gob!=null?(v.bancada==='Pacto/izq'?' de coincidencia con la mayoría del Pacto, tu bancada, en ':' de coincidencia con la bancada de gobierno en '):''}${fmt(v.n_votos)} votos nominales registrados${v.camara?' en '+esc(v.camara):''}.</div>`;
+      else dato=`<div class="mc-lbl" style="margin-top:.7rem">Aún sin voto nominal registrado a tu nombre en plenaria.</div>`;
+      body('votos').innerHTML=top+dato;
+    }catch(err){ if(ok(my)) vacio('votos','No se pudo consultar tu votación en este momento.'); }
+  }
+
+  async function cardControl(e,my){
+    try{
+      const [v,com]=await Promise.all([MC.voto(e),MC.comision(e).catch(()=>({}))]);
+      if(!ok(my)) return;
+      if(v&&v.error){ vacio('control','El récord de citaciones no respondió en este momento.'); return; }
+      const c=v&&v.citaciones;
+      if(c&&c.n_citaciones){
+        const t=(c.citados_top||[])[0];
+        body('control').innerHTML=`<div class="mc-big">${c.n_citaciones}<small>citaciones</small></div><div class="mc-lbl">agendadas ${c.n_agendamientos||0} veces en órdenes del día.${t?` A quien más has citado: <b>${esc(tCase(t.nombre))}</b> (${t.n}).`:''}</div>`;
         return;
       }
-      const ch=document.getElementById('mc-votos-chip'); if(ch&&hit.votos) ch.textContent=`${fmt(hit.votos)} votos en 2026`;
-      cargarMapa(hit,e,my);
-      const f=document.getElementById('mc-ficha'); if(f) f.innerHTML=`<a class="ps-cta" href="analisis-candidato.html?cand=${encodeURIComponent(hit.slug)}">Mi ficha electoral · mapa y drill territorial →</a>`;
-      const ph=document.getElementById('mc-photo'); if(!ph) return;
-      const img=new Image(); img.alt=nice(e.nombre); img.onload=()=>{ if(my===SEQ){ ph.innerHTML=''; ph.appendChild(img); } };
-      img.src=`${S3_PHOTOS}/${encodeURIComponent(hit.slug)}.jpg`;
-    }catch(err){ /* sin foto ni ficha: el tablero sigue */ }
+      /* sin citaciones propias: el panorama del Congreso y de su comisión */
+      const p=await MC.citPanorama(); if(!ok(my)) return;
+      const s=p.sistema||{}, ck=com&&com.key?norm(com.key):null, cam=e.corp==='SENADO'?'senado':'camara';
+      const cob=(s.cobertura||[]).find(x=>x.camara===cam&&ck&&norm(x.ambito)===ck);
+      const tc=(s.top_citados||[])[0];
+      body('control').innerHTML=`<div class="mc-lbl" style="margin:0 0 .5rem">Aún sin citaciones a tu nombre. Mientras tanto:</div>
+        ${cob&&cob.n_citaciones?`<div class="mc-big" style="font-size:1.8rem">${cob.n_citaciones}<small>citaciones</small></div><div class="mc-lbl">agendó ${esc(com.nombre)} de ${cam==='senado'?'Senado':'Cámara'} desde 2017.</div>`:(com&&com.key?`<div class="mc-lbl">${esc(com.nombre)} de ${cam==='senado'?'Senado':'Cámara'} no registra citaciones en su orden del día desde 2017: puede que no publique ahí su control político.</div>`:'')}
+        ${tc?`<div class="mc-lbl" style="margin-top:.5rem">El funcionario más citado en el Congreso: <b>${esc(tCase(tc.nombre))}</b> (${tc.n}).</div>`:''}`;
+    }catch(err){ if(ok(my)) vacio('control','No se pudo consultar el control político.'); }
   }
-  /* ── mapa de votación 2026 ──────────────────────────────────────
-     Heredado de brujula-2027.html / analisis-candidato.html: choropleth sin
-     tiles sobre los GeoJSON del proyecto. Regla: senador → el país por
-     departamentos; representante → su departamento por municipios (mun_elec);
-     Bogotá → las 20 localidades, giradas 90° a la izquierda (convención del
-     sitio). Una candidatura de Cámara repartida en varios departamentos
-     (étnica, CITREP) cae al mapa nacional. */
-  const GEO_DEPTOS=S3+'/mapas-2026/DEPARTAMENTOS2.json';
-  const GEO_MUNS=c=>S3+'/mapas-2026/Departamentos-mps/'+String(c).padStart(2,'0')+'.json';
-  const GEO_BOG=S3+'/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json';
-  let MAP=null, MAPLAYER=null;
-  function depKey(s){
-    s=norm(s).toUpperCase();
-    if(s.indexOf('BOGOTA')>=0) return 'BOGOTA';
-    if(s.indexOf('VALLE')>=0) return 'VALLE';
-    if(s.indexOf('SAN ANDRES')>=0) return 'SANANDRES';
-    if(s.indexOf('NORTE')>=0&&s.indexOf('SAN')>=0) return 'NSANTANDER';
-    return s.replace(/[^A-Z]/g,'');
-  }
-  function rotateGeoJSON90Left(geo){
-    const cx=-74.08, cy=4.65;
-    const rc=([lon,lat])=>[cx-(lat-cy), cy+(lon-cx)];
-    const rg=g=>g.type==='Polygon'?{...g,coordinates:g.coordinates.map(r=>r.map(rc))}
-      :g.type==='MultiPolygon'?{...g,coordinates:g.coordinates.map(p=>p.map(r=>r.map(rc)))}:g;
-    return {...geo,features:geo.features.map(f=>({...f,geometry:rg(f.geometry)}))};
-  }
-  const estiloDe=(v,max)=>({color:'rgba(20,22,31,.28)',weight:.7,fillColor:'#0047FF',fillOpacity:v?.1+.8*Math.sqrt(v/max):.03});
-  async function cargarMapa(hit,e,my){
-    const box=document.getElementById('mc-map'), note=document.getElementById('mc-map-note');
-    if(!box||!window.L){ if(note) note.textContent='El mapa no está disponible en este navegador.'; return; }
-    box.style.display='';
-    if(note) note.textContent=e.corp==='SENADO'
-      ?'Descargando tu votación mesa a mesa (con votación nacional son varios MB: puede tardar hasta 20 segundos)…'
-      :'Descargando tu votación mesa a mesa…';
+
+  async function cardPrensa(e,my){
     try{
-      const d=await getJSON(S3+'/endoso/'+encodeURIComponent(hit.slug)+'.json');
-      if(my!==SEQ) return;
-      const deps={}, muns={}, locs={}; let total=0, sinLoc=0;
-      (d.mesas||[]).forEach(r=>{
-        const v=r.v||0; total+=v;
-        const dep=String(r.dep||''); if(!dep) return;
-        (deps[dep]=deps[dep]||{nom:r.depNom||'',v:0}).v+=v;
-        const mk=dep+'-'+String(r.mun||''); (muns[mk]=muns[mk]||{dep,mun:String(r.mun||''),nom:r.munNom||'',v:0}).v+=v;
-        if(dep==='16'){ const z=String(r.zon||'').padStart(2,'0'); if(/^(0[1-9]|1\d|20)$/.test(z)) locs[z]=(locs[z]||0)+v; else sinLoc+=v; }
-      });
-      const depKeys=Object.keys(deps).filter(k=>deps[k].v>0).sort((a,b)=>deps[b].v-deps[a].v);
-      if(!MAP){ MAP=L.map('mc-map',{zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,doubleClickZoom:false,boxZoom:false,keyboard:false}); }
-      if(MAPLAYER){ MAP.removeLayer(MAPLAYER); MAPLAYER=null; }
-      const nacional = e.corp==='SENADO' || depKeys.length!==1;
-      let leyenda='';
-      if(nacional){
-        const geo=await getJSON(GEO_DEPTOS); if(my!==SEQ) return;
-        const vals={}; depKeys.forEach(k=>{ vals[depKey(deps[k].nom)]=deps[k].v; });
-        const max=Math.max(1,...Object.values(vals));
-        MAPLAYER=L.geoJSON(geo,{style:f=>estiloDe(vals[depKey(f.properties.name||'')]||0,max),
-          onEachFeature:(f,ly)=>{ const v=vals[depKey(f.properties.name||'')]||0; ly.bindTooltip(`<b>${esc(f.properties.name||'')}</b><br>${fmt(v)} votos`,{sticky:true}); }}).addTo(MAP);
-        const top=depKeys.slice(0,3).map(k=>`${tCase(deps[k].nom)} ${fmt(deps[k].v)}`).join(' · ');
-        /* lo que no tiene polígono (consulados) se declara, no se esconde */
-        const geoKeys=new Set(geo.features.map(f=>depKey(f.properties.name||'')));
-        const fuera=depKeys.filter(k=>!geoKeys.has(depKey(deps[k].nom))).reduce((t,k)=>t+deps[k].v,0);
-        leyenda=`Intensidad = concentración de tu votación por departamento. ${top?'Donde más: '+top+'.':''}${fuera?` ${fmt(fuera)} votos en el exterior (consulados), fuera del mapa.`:''}`;
-      }else if(depKeys[0]==='16'){
-        const geo=rotateGeoJSON90Left(await getJSON(GEO_BOG)); if(my!==SEQ) return;
-        const max=Math.max(1,...Object.values(locs));
-        MAPLAYER=L.geoJSON(geo,{style:f=>estiloDe(locs[String(f.properties.LocCodigo).padStart(2,'0')]||0,max),
-          onEachFeature:(f,ly)=>{ const v=locs[String(f.properties.LocCodigo).padStart(2,'0')]||0; ly.bindTooltip(`<b>${esc(tCase(f.properties.LocNombre||''))}</b><br>${fmt(v)} votos`,{sticky:true}); }}).addTo(MAP);
-        const top=Object.entries(locs).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([z,v])=>{ const f=geo.features.find(x=>String(x.properties.LocCodigo).padStart(2,'0')===z); return `${tCase((f||{}).properties?.LocNombre||'loc. '+z)} ${fmt(v)}`; }).join(' · ');
-        leyenda=`Bogotá por localidades (mapa girado 90°, como en el resto del sitio). ${top?'Donde más: '+top+'.':''}${sinLoc?` ${fmt(sinLoc)} votos sin localidad (consulados, cárceles, puesto censo).`:''}`;
-      }else{
-        const dep=depKeys[0];
-        const geo=await getJSON(GEO_MUNS(dep)); if(my!==SEQ) return;
-        const vals={}; Object.values(muns).forEach(m=>{ if(m.dep===dep) vals[String(parseInt(m.mun,10))]=m.v; });
-        const max=Math.max(1,...Object.values(vals));
-        const nomDe=f=>f.properties.mpio_cnmbr||f.properties.name||f.properties.mun_nom||'Municipio';
-        MAPLAYER=L.geoJSON(geo,{style:f=>estiloDe(vals[String(parseInt(f.properties.mun_elec,10))]||0,max),
-          onEachFeature:(f,ly)=>{ const v=vals[String(parseInt(f.properties.mun_elec,10))]||0; ly.bindTooltip(`<b>${esc(tCase(nomDe(f)))}</b><br>${fmt(v)} votos`,{sticky:true}); }}).addTo(MAP);
-        const top=Object.values(muns).filter(m=>m.dep===dep).sort((a,b)=>b.v-a.v).slice(0,3).map(m=>`${tCase(m.nom)} ${fmt(m.v)}`).join(' · ');
-        leyenda=`${tCase(deps[dep].nom)} por municipios. Intensidad = concentración de tu votación. ${top?'Donde más: '+top+'.':''}`;
-      }
-      /* Encuadre robusto. Leaflet mide el contenedor al crearse y, sobre un
-         mapa recién creado SIN vista, fitBounds devolvía zoom = Infinity
-         (medido: 20 localidades en el DOM y trazos de 0×0). Se fija una vista
-         definida primero y se calcula el zoom sobre ella; setTimeout y no
-         rAF, que se congela en pestaña de fondo. */
-      setTimeout(()=>{
-        if(my!==SEQ||!MAPLAYER) return;
-        MAP.invalidateSize();
-        const b=MAPLAYER.getBounds(); if(!b.isValid()) return;
-        MAP.setView(b.getCenter(), 6, {animate:false});
-        const z=MAP.getBoundsZoom(b, false, L.point(6,6));
-        MAP.setView(b.getCenter(), Number.isFinite(z)?z:6, {animate:false});
-      },0);
-      if(note) note.textContent=leyenda+` Total 2026: ${fmt(total)} votos.`;
-    }catch(err){ if(my===SEQ&&note) note.textContent='El mapa no cargó en este momento; las cifras de la ficha sí son reales.'; }
+      const d=await MC.prensa(e); if(!ok(my)) return;
+      const rs=(d.resultados||[]);
+      if(!rs.length){ vacio('prensa',`Sin titulares que mencionen «${esc(MC.corto(e))}» en los últimos 30 días.`); return; }
+      const a=window.C360Saliencia?C360Saliencia.analizar(rs,{anclas:[MC.corto(e)],ventana:30}):null;
+      const enc=a?a.encuadre:null, N=rs.length;
+      const tono=enc?`<div class="mc-tone"><i class="cf" style="width:${100*enc.conflicto/N}%"></i><i class="mx" style="width:${100*enc.mixto/N}%"></i><i class="gs" style="width:${100*enc.gestion/N}%"></i><i class="nt" style="width:${100*enc.neutro/N}%"></i></div><div class="mc-legend"><span><i style="background:var(--red)"></i>conflicto ${MC.pct(enc.conflicto,N)}%</span><span><i style="background:var(--green)"></i>gestión ${MC.pct(enc.gestion,N)}%</span><span><i style="background:rgba(20,22,31,.18)"></i>neutro ${MC.pct(enc.neutro,N)}%</span></div>`:'';
+      body('prensa').innerHTML=`<div style="display:grid;grid-template-columns:auto 1fr;gap:1.2rem;align-items:end">
+          <div><div class="mc-big">${d.n||N}<small>titulares</small></div><div class="mc-lbl">en ${d.n_medios||'varios'} medios · buscando «${esc(MC.corto(e))}»</div></div>
+          <div>${a?MC.spark(a.serie):''}<div class="mc-lbl" style="margin-top:.1rem;text-align:right">ritmo de los últimos 30 días</div></div>
+        </div>${tono}
+        ${a&&a.temas.length?`<div class="mc-pills">${a.temas.slice(0,4).map(t=>`<span class="mc-pill on">${esc(t.nombre)} · ${Math.round(100*t.pct)}%</span>`).join('')}</div>`:''}
+        <div class="mc-lbl" style="margin-top:.55rem">Último: <b>${esc(cut(rs[0].titulo,110))}</b> · ${esc(rs[0].medio||'')}</div>`;
+    }catch(err){ if(ok(my)) vacio('prensa','No se pudo consultar la prensa en este momento.'); }
   }
-  async function cargarComision(e,my){
-    const chip=document.getElementById('mc-com-chip'), box=document.getElementById('mc-agenda');
-    let comKey=null, mesa=null;
+
+  async function cardBancada(e,my){
+    const b=bancadaOf(e.partido);
+    const colegas=ELECTOS.filter(x=>bancadaOf(x.partido).name===b.name&&x.nombre!==e.nombre);
+    const todos=colegas.concat([e]), muj=todos.filter(x=>x.gen==='F').length, sen=todos.filter(x=>x.corp==='SENADO').length;
+    const faces=colegas.slice(0,10).map(x=>`<span class="bt-av" title="${esc(nice(x.nombre))}" style="background:${b.color}">${esc(MC.initials(x.nombre))}</span>`).join('')+(colegas.length>10?`<span class="bt-av more">+${colegas.length-10}</span>`:'');
+    body('bancada').innerHTML=`<div class="mc-big" style="color:${b.color}">${todos.length}<small>curules</small></div><div class="mc-lbl"><b>${esc(b.name)}</b> · ${sen} en Senado y ${todos.length-sen} en Cámara · ${MC.pct(muj,todos.length)}% mujeres.</div><div class="mc-faces" style="padding-left:8px">${faces}</div><div class="mc-lbl" data-rice style="margin-top:.6rem"></div>`;
+    const kc=MC.BANC_CAUDAL[b.name]; if(!kc) return;
     try{
-      const j=await getJSON(URL_COM,3600000);
-      const corp=e.corp==='SENADO'?'senado':'camara';
-      for(const [k,v] of Object.entries(j.comisiones||{})){
-        if(((v||{})[corp]||[]).some(m=>mismaPersona(m.nombre,e.nombre))){ comKey=k; mesa=(v.mesa||[]).find(p=>p.corp===corp&&mismaPersona(p.nombre,e.nombre)); break; }
-      }
+      const d=await MC.bancadasDisc(); if(!ok(my)) return;
+      const r=((d.camara||{}).bancadas||[]).find(x=>x.bancada===kc);
+      const el=document.querySelector('[data-card="bancada"] [data-rice]');
+      if(r&&el) el.innerHTML=`En el Congreso anterior votó <b>en bloque el ${Math.round(r.bloque_pct)}%</b> de las votaciones divididas de Cámara (Rice ${String(r.rice).replace('.',',')}).`;
     }catch(err){}
-    if(my!==SEQ) return;
-    const nombreCom=k=>k==='ACUSACIONES'?'Investigación y Acusación':'Comisión '+tCase(k);
-    if(chip) chip.innerHTML=comKey?`${esc(nombreCom(comKey))}${mesa?` · <span class="mc-star">★ ${mesa.cargo==='presidencia'?'preside':'vicepresidencia'}</span>`:''}`:'Comisión: no figura en nuestro registro';
-    /* agenda: órdenes del día vigentes de su comisión + plenaria de su cámara */
-    try{
-      const j=await getJSON(URL_ORD,300000);
-      if(my!==SEQ) return;
-      const partes=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
-      const toma=t=>partes.find(p=>p.type===t)?.value; const hoy=`${toma('year')}-${toma('month')}-${toma('day')}`;
-      const miCam=e.corp==='SENADO'?/senado/i:/c[aá]mara/i;
-      const miCom=comKey?new RegExp(comKey==='ACUSACIONES'?'acusaci':tCase(comKey),'i'):null;
-      const rows=(j.ordenes||[]).filter(o=>(o.fecha_fin||o.fecha)>=hoy&&miCam.test(o.corporacion||''))
-        .filter(o=>/plenaria/i.test(o.ambito||'')||(miCom&&miCom.test(o.ambito||'')))
-        .sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
-      const src=document.getElementById('mc-agenda-src'); if(src) src.textContent=`órdenes del día publicados · ${fechaCorta(j.v)||''}`;
-      RES.agenda=rows.map(o=>({fecha:o.fecha, ambito:o.ambito||o.corporacion, n:(o.proyectos||[]).filter(p=>p.titulo).length, err:!!o.pdf_error}));
-      if(!rows.length){ box.innerHTML=`<div class="mc-empty">No hay orden del día publicado hoy ni en los próximos días para ${comKey?nombreCom(comKey)+' ni la plenaria':'la plenaria'} de ${chamberNice(e.corp)}. Se actualiza cada vez que las secretarías publican.</div>`; return; }
-      box.innerHTML=rows.map(o=>{
-        const ps=(o.proyectos||[]).filter(p=>p.titulo);
-        return `<div class="mc-row"><span class="d">${esc(fechaCorta(o.fecha))}</span><span class="t"><b style="font-weight:500">${esc(o.ambito||o.corporacion)}</b>${ps.length?` · ${ps.length} proyecto${ps.length===1?'':'s'}`:''}${o.pdf_error?'<small>No pudimos leer este documento (puede ser un escaneo): revísalo en el original.</small>':''}<small>${ps.slice(0,3).map(p=>esc(cut(shortTitle(p.titulo),110))).join(' · ')}${ps.length>3?` · y ${ps.length-3} más`:''}</small><small><a href="${esc(o.url)}" target="_blank" rel="noopener">Abrir el documento oficial ↗</a></small></span></div>`;
-      }).join('');
-    }catch(err){ if(my===SEQ) box.innerHTML='<div class="mc-empty">No se pudo consultar la agenda en este momento.</div>'; }
   }
-  /* ── Avance del trámite ─────────────────────────────────────────────
-     Etapa 1-6 desde el ESTADO oficial del registro. El Senado lo da fino
-     (designar ponentes · rendir ponencia · discutir en 1º o 2º debate); la
-     Cámara casi siempre dice solo «Trámite en Comisión», así que ahí la etapa
-     se completa con el orden del día: si está agendado, está en debate. */
-  const ETAPAS=['Radicado','En comisión','En primer debate','Aprobado en primer debate','En segundo debate','Pasa a la otra cámara'];
-  function etapaDe(estado){
-    const s=norm(estado);
-    if(/archivad|retirad/.test(s)) return {fin:'Archivado o retirado'};
-    if(/acumulad/.test(s)) return {fin:'Acumulado a otro proyecto'};
-    if(/enviar a comision/.test(s)) return {n:1};
-    if(/segundo debate/.test(s)) return {n:/discutir/.test(s)?5:4};
-    if(/discutir ponencia|debate de comision/.test(s)) return {n:3};
-    if(/tramite en plenaria/.test(s)) return {n:4};
-    if(/ponen|tramite en comision/.test(s)) return {n:2};
-    return {n:1};
-  }
-  /* «033 de 2026 Cámara» · «447/2026C» · «298/26» → «33/26C». Sin cámara
-     explícita se usa la del documento (orden del día) o la del registro. */
-  function numKey(num,camDef){
-    const m=String(num||'').match(/0*(\d{1,4})\s*(?:de|\/)\s*(?:20)?(\d{2})\s*(c[aá]mara|senado|c|s)?/i);
-    if(!m) return null;
-    const c=m[3]?(/^s/i.test(m[3])?'S':'C'):camDef;
-    return c?`${+m[1]}/${m[2]}${c}`:null;
-  }
-  function citasDe(x,ord){
-    const keys=new Set([numKey(x.numero_senado,'S'),numKey(x.numero_camara,'C')].filter(Boolean));
-    const out=[];
-    for(const o of ord){
-      const ps=o.proyectos||[], cam=/senado/i.test(o.corporacion||'')?'S':'C';
-      ps.forEach((p,i)=>{ if(keys.has(numKey(p.numero,cam))) out.push({o,pos:i+1,tot:ps.length}); });
-    }
-    return out.sort((a,b)=>String(a.o.fecha).localeCompare(String(b.o.fecha)));
-  }
-  const diaCorto=f=>{ const d=new Date(String(f)+'T12:00:00'); return isNaN(d)?fechaCorta(f):['dom','lun','mar','mié','jue','vie','sáb'][d.getDay()]+' '+fechaCorta(f); };
-  function citaTxt(c){
-    const amb=String(c.o.ambito||c.o.corporacion||'').replace(/\bSeptima\b/,'Séptima');
-    return `${esc(amb)}${/plenaria/i.test(amb)?'':' de '+esc(c.o.corporacion)}, ${esc(diaCorto(c.o.fecha))} · puesto ${c.pos} de ${c.tot} en la lista`+(c.o.url?` · <a href="${esc(c.o.url)}" target="_blank" rel="noopener">orden del día ↗</a>`:'');
-  }
-  function avanceHtml(x,citas){
-    const e=etapaDe(x.estado);
-    if(e.fin) return `<div class="mc-av fin">${ETAPAS.map(()=>'<i></i>').join('')}</div><div class="mc-av-l"><b>${esc(e.fin)}</b>${citas.length&&/acumulad/i.test(e.fin)?' · se debate junto con el principal':''}</div>`;
-    let n=e.n;
-    if(citas.length){ n=Math.max(n,citas.some(c=>/plenaria/i.test(c.o.ambito||''))?5:3); }
-    return `<div class="mc-av" title="${esc(ETAPAS[n-1])}">${ETAPAS.map((_,k)=>`<i class="${k<n?'on':''}"></i>`).join('')}</div><div class="mc-av-l">Etapa ${n} de 6 · <b>${esc(ETAPAS[n-1])}</b></div>`;
-  }
-  function alertaActiva(){ try{ const s=JSON.parse(localStorage.getItem(AL_KEY)||'null'); return !!(s&&s.estado==='confirmada'&&ME&&norm(s.congresista||'')===norm(ME.nombre)); }catch(err){ return false; } }
-  function avisaLink(num){
-    if(alertaActiva()) return ' · <span style="color:var(--green)">alertas activas ✓</span>';
-    return ` · <a class="mc-avisa" onclick="avisame('${esc(String(num||'').replace(/'/g,''))}')">Avísame cuando avance</a>`;
-  }
-  /* las alertas siguen a TODOS los proyectos que firma el congresista: este
-     atajo solo lleva al formulario y dice qué cubre, no crea una alerta aparte */
-  function avisame(num){
-    const box=document.getElementById('mc-alert'); if(!box) return;
-    box.scrollIntoView({block:'start',behavior:'smooth'});
-    alertaSt('warn',`Con tu correo te avisamos cuando el <b>${esc(num)}</b> cambie de estado o vuelva a un orden del día, y lo mismo con los demás proyectos que firmas.`);
-    setTimeout(()=>{ const c=document.getElementById('mc-alert-correo'); if(c) c.focus({preventScroll:true}); },400);
-  }
+
+  /* ── resumen del día ─────────────────────────────────────────────── */
   function textoResumen(){
     if(!ME) return '';
     const hoy=new Intl.DateTimeFormat('es-CO',{timeZone:'America/Bogota',weekday:'long',day:'numeric',month:'long'}).format(new Date());
     const L=[`Mi Congreso · ${nice(ME.nombre)} · ${hoy}`,''];
-    const mios=RES.mios||[], numDe=RES.numDe||(()=>'');
+    const mios=RES.mios||[];
     const ag=mios.filter(x=>x._citas&&x._citas.length);
     if(ag.length){
       L.push('Tus proyectos en el orden del día:');
       ag.forEach(x=>x._citas.forEach(c=>{
-        const amb=String(c.o.ambito||c.o.corporacion||'').replace(/\bSeptima\b/,'Séptima');
+        const amb=ambitoNice(c.o.ambito||c.o.corporacion);
         L.push(`• ${numDe(x)||''} — ${cut(shortTitle(x.titulo),90)} · ${amb}${/plenaria/i.test(amb)?'':' de '+c.o.corporacion}, ${diaCorto(c.o.fecha)}, puesto ${c.pos} de ${c.tot}`);
       }));
     } else L.push('Ninguno de tus proyectos está en un orden del día publicado para los próximos días.');
     if(RES.agenda&&RES.agenda.length){
       L.push('','Agenda de tu comisión y de la plenaria:');
-      RES.agenda.forEach(r=>L.push(`• ${diaCorto(r.fecha)} · ${String(r.ambito).replace(/\bSeptima\b/,'Séptima')}${r.n?` · ${r.n} proyecto${r.n===1?'':'s'}`:(r.err?' · documento sin leer, revisar el original':'')}`));
+      RES.agenda.forEach(r=>L.push(`• ${diaCorto(r.fecha)} · ${ambitoNice(r.ambito)}${r.n?` · ${r.n} proyecto${r.n===1?'':'s'}`:(r.err?' · documento sin leer, revisar el original':'')}`));
     }
     if(mios.length){
       const princ=mios.filter(x=>x._primero).length;
-      const deb=mios.filter(x=>{ const e=etapaDe(x.estado); return !e.fin&&(e.n>=3||(x._citas||[]).length); }).length;
-      L.push('',`Proyectos que firmas en la legislatura: ${mios.length} (${princ} como autor principal) · ${deb} en debate o más adelante.`);
+      const av=MC.avanceGeneral(mios);
+      L.push('',`Proyectos que firmas en la legislatura: ${mios.length} (${princ} como autor principal) · ${av.debate||0} en debate o más adelante · avance general ${av.pct}%.`);
     }
+    const lg=MC.legislatura();
+    L.push(`Quedan ${lg.quedan} días hábiles de sesión en la legislatura (cierra el 20 de junio de 2027).`);
     L.push('','Fuente: órdenes del día oficiales de Senado y Cámara · ricardoruiz.co/mi-congreso.html');
     return L.join('\n');
   }
   async function copiarResumen(){
-    const t=textoResumen(), ok=document.getElementById('mc-res-ok');
+    const t=textoResumen(), okEl=document.getElementById('mc-res-ok');
     try{ await navigator.clipboard.writeText(t); }
     catch(err){ const a=document.createElement('textarea'); a.value=t; document.body.appendChild(a); a.select(); try{ document.execCommand('copy'); }catch(e2){} a.remove(); }
-    if(ok){ ok.textContent='Copiado'; setTimeout(()=>{ ok.textContent=''; },2500); }
+    if(okEl){ okEl.textContent='Copiado'; setTimeout(()=>{ okEl.textContent=''; },2500); }
   }
   function waResumen(a){ a.href='https://wa.me/?text='+encodeURIComponent(textoResumen()); return true; }
-  async function cargarProyectos(e,my){
-    const box=document.getElementById('mc-proy'), mios_box=document.getElementById('mc-agenda-mios');
-    try{
-      const [r,ordJ]=await Promise.all([call({action:'radicados'}), getJSON(URL_ORD,300000).catch(()=>({ordenes:[]}))]);
-      if(my!==SEQ) return;
-      const partes=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
-      const toma=t=>partes.find(p=>p.type===t)?.value; const hoy=`${toma('year')}-${toma('month')}-${toma('day')}`;
-      const ord=(ordJ.ordenes||[]).filter(o=>(o.fecha_fin||o.fecha)>=hoy);
-      const todos=[...(r.radicados||[]).map(x=>({...x,_cam:'Senado'})),...(r.radicados_camara||[]).map(x=>({...x,_cam:'Cámara'}))];
-      const mios=todos.map(x=>{
-        const auts=autoresDe(x.autor); const i=auts.findIndex(a=>mismaPersona(a,e.nombre));
-        return i<0?null:{...x,_auts:auts,_primero:i===0,_citas:citasDe(x,ord)};
-      }).filter(Boolean).sort((a,b)=>(b._citas.length>0)-(a._citas.length>0)||String(b.fecha||'').localeCompare(String(a.fecha||'')));
-      KPI.proy=mios.length; pintaKpis();
-      RES.mios=mios; RES.numDe=x=>x._cam==='Cámara'?(x.numero_camara||x.numero_senado):(x.numero_senado||x.numero_camara);
-      const numDe=x=>x._cam==='Cámara'?(x.numero_camara||x.numero_senado):(x.numero_senado||x.numero_camara);
-      /* en la agenda: SUS proyectos en cualquier orden del día vigente, no solo
-         los de su comisión (un proyecto suyo puede ir a otra comisión) */
-      const agendados=mios.filter(x=>x._citas.length);
-      if(mios_box) mios_box.innerHTML=agendados.length?`<div class="mc-mios"><h4>Tus proyectos en el orden del día</h4>${agendados.map(x=>x._citas.map(c=>`<div class="mc-row"><span class="d">${esc(diaCorto(c.o.fecha))}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),110))}<small>${esc(numDe(x)||'')} · ${citaTxt(c)}${avisaLink(numDe(x))}</small></span></div>`).join('')).join('')}</div>`:'';
-      if(!mios.length){ box.innerHTML=`<div class="mc-empty">No aparece como firmante de ningún proyecto radicado en la legislatura 2026-2027, según los registros de Senado y Cámara. Los proyectos entran al rastreo apenas las secretarías los publican, con rezago de días en Cámara.</div>`; return; }
-      const fila=x=>`<div class="mc-row"><span class="d">${esc(numDe(x)||'—')}</span><span class="t">${x._primero?'<span class="mc-star" title="Autor principal (primera firma)">★</span> ':''}${esc(cut(shortTitle(x.titulo),150))}${avanceHtml(x,x._citas)}${x._citas.map(c=>`<span class="mc-cita">En el orden del día: ${citaTxt(c)}${avisaLink(numDe(x))}</span>`).join('')}<small>${esc(x._cam)}${x.comision?' · '+esc(comisionNice(x.comision)):''}${x.estado?' · '+esc(x.estado):''}${x.fecha?' · radicado '+esc(fechaCorta(x.fecha)):''} · ${x._auts.length===1?'firma solo':x._auts.length+' firmantes'}${x.fuente_url?` · <a href="${esc(x.fuente_url)}" target="_blank" rel="noopener">fuente ↗</a>`:''}</small></span></div>`;
-      const pinta=todos_=>{
-        const lista=todos_?mios:mios.slice(0,12);
-        box.innerHTML=lista.map(fila).join('')
-          +(mios.length>12&&!todos_?`<button class="mc-more" id="mc-proy-mas">Ver los ${mios.length} proyectos</button>`:'')
-          +`<div class="note" style="margin-top:.6rem">★ = primera firma (autor principal). El resto son coautorías: en el registro, adherir a un proyecto y redactarlo pesan igual. La etapa sale del estado oficial; en Cámara, que casi siempre reporta solo «Trámite en Comisión», se completa con los órdenes del día publicados.</div>`;
-        const b=document.getElementById('mc-proy-mas'); if(b) b.onclick=()=>pinta(true);
-      };
-      pinta(false);
-    }catch(err){ if(my===SEQ) box.innerHTML='<div class="mc-empty">No se pudo consultar el registro de radicados.</div>'; }
-  }
-  async function cargarVoto(e,my){
-    const box=document.getElementById('mc-voto'), cit=document.getElementById('mc-cit'), src=document.getElementById('mc-voto-src');
-    let d=null;
-    try{ d=await call({action:'congresista',q:e.nombre}); }catch(err){ d=null; }
-    if(my!==SEQ) return;
-    if(!d||!d.encontrado){
-      box.innerHTML=`<div class="mc-empty">Sin voto nominal registrado a tu nombre. El registro cubre las plenarias de Cámara (2014–2026) y de Senado (2017–2026): si esta es tu primera legislatura, tus votos empezarán a aparecer con las primeras plenarias de fondo.</div>`;
-      cit.innerHTML=`<div class="mc-empty">Sin citaciones registradas a tu nombre todavía. Se leen de los órdenes del día de comisión y plenaria; no todas las comisiones publican su control político.</div>`;
-      KPI.votos=0; KPI.cit=0; pintaKpis(); return;
-    }
-    const su=d.resumen||{}, tot=d.n_votos||0, si=su.Si||0, no=su.No||0, ab=su.Abstencion||0;
-    const esSen=/senado/i.test(d.camara||'');
-    /* la Lambda puede devolver un récord SOLO de control político (citaciones
-       sin voto): ahí «0 Sí · 0 No» no es un dato, es ausencia */
-    if(!tot){
-      box.innerHTML=`<div class="mc-empty">Sin voto nominal registrado a tu nombre. El registro cubre las plenarias de Cámara (2014–2026) y de Senado (2017–2026): si esta es tu primera legislatura, tus votos empezarán a aparecer con las primeras plenarias de fondo.</div>`;
-      KPI.votos=0; pintaKpis();
-    }else{
-    if(src) src.textContent=esSen?'plenaria de Senado · 2017–2026':'plenaria de Cámara · 2014–2026';
-    KPI.votos=tot; KPI.alin=d.alineacion_gob; pintaKpis();
-    const top=Object.values(d.por_proyecto||{}).sort((a,b)=>(b.n||0)-(a.n||0)).slice(0,6);
-    box.innerHTML=(d.alineacion_gob!=null?`<div class="mc-align"><span class="n">${d.alineacion_gob}%</span><span class="t">de tus votos coinciden con la bancada de gobierno (Pacto) en ${d.n_contestadas||0} votaciones contestadas${d.otra_camara?' · incluye tu paso por la otra cámara':''}</span></div>`:'')
-      +`<div class="mc-bar"><i class="si" style="width:${tot?100*si/tot:0}%"></i><i class="no" style="width:${tot?100*no/tot:0}%"></i><i class="ab" style="width:${tot?100*ab/tot:0}%"></i></div>`
-      +`<div class="mc-empty" style="margin-bottom:.5rem"><b style="color:var(--green)">${fmt(si)} Sí</b> · <b style="color:var(--red)">${fmt(no)} No</b>${ab?` · <b style="color:var(--amber)">${fmt(ab)} abstenciones</b>`:''} en ${fmt(tot)} votos nominales sobre ${fmt(d.n_proyectos||0)} proyectos.</div>`
-      +(top.length?`<div class="seg-sub" style="margin-top:.6rem">Donde más has votado</div>`+top.map(p=>`<div class="mc-row"><span class="d">${esc(p.numero_senado||p.numero_camara||p.tk||'')}</span><span class="t">${esc(cut(shortTitle(p.titulo),120))}<small>${Object.entries(p.r||{}).map(([k,v])=>`${v} ${k}`).join(' · ')}</small></span><span class="n">${p.n}</span></div>`).join(''):'')
-      +`<div class="note" style="margin-top:.6rem">${esSen?'La API pública del Senado solo registra Sí y No, sin abstención ni «no votó».':'Actas de plenaria de Cámara: voto electrónico y OCR de las actas 2014-2017.'} El sentido de cada voto (ponencia, articulado, aplazamiento) llega en la siguiente versión.</div>`;
-    }
-    const c=d.citaciones;
-    if(!c||!c.n_citaciones){ cit.innerHTML=`<div class="mc-empty">Sin citaciones a tu nombre en los órdenes del día que se rastrean. Ojo: hay comisiones que no publican su control político, así que «0» no siempre significa «no citó».</div>`; KPI.cit=0; pintaKpis(); return; }
-    KPI.cit=c.n_citaciones; pintaKpis();
-    const ultimas=(c.citaciones||[]).slice().sort((a,b)=>String(b.primera||'').localeCompare(String(a.primera||''))).slice(0,5);
-    cit.innerHTML=`<div class="mc-empty" style="margin-bottom:.4rem"><b style="color:var(--white)">${c.n_citaciones} citaciones</b> que llegaron ${c.n_agendamientos||0} veces a un orden del día.</div>`
-      +((c.citados_top||[]).length?`<div class="seg-sub">A quién has citado más</div>`+(c.citados_top||[]).slice(0,5).map(x=>`<div class="mc-row"><span class="t">${esc(tCase(x.nombre))}</span><span class="n">${x.n}</span></div>`).join(''):'')
-      +(ultimas.length?`<div class="seg-sub" style="margin-top:.7rem">Las últimas</div>`+ultimas.map(x=>`<div class="mc-row"><span class="d">${esc(fechaCorta(x.primera))}</span><span class="t">${esc(cut(x.tema,140))}<small>${esc(tCase(x.ambito||''))} · ${x.camara==='senado'?'Senado':'Cámara'}</small></span></div>`).join(''):'');
-  }
-  async function cargarPrensa(e,my){
-    const box=document.getElementById('mc-prensa');
-    /* nombre corto (primer nombre + primer apellido) — así lo escribe la prensa */
-    const t=nice(e.nombre).split(/\s+/); const corto=t.length>=3?`${t[0]} ${t[t.length-2]}`:nice(e.nombre);
-    try{
-      const d=await call({action:'medios',query:corto,dias:30});
-      if(my!==SEQ) return;
-      const rs=(d.resultados||[]).slice(0,8);
-      if(!rs.length){ box.innerHTML=`<div class="mc-empty">Sin titulares que mencionen «${esc(corto)}» en los últimos 30 días.</div>`; return; }
-      box.innerHTML=`<div class="mc-empty" style="margin-bottom:.4rem">${d.n||rs.length} titulares en ${d.n_medios||'varios'} medios buscando «${esc(corto)}».</div>`
-        +rs.map(r=>`<div class="mc-row"><span class="d">${esc(fechaCorta(r.fecha||r.fecha_pub||''))}</span><span class="t"><a href="${esc(r.url||'#')}" target="_blank" rel="noopener">${esc(r.titulo||r.title||'')}</a><small>${esc(r.medio||'')}${r.alcance==='regional'?' · regional':''}</small></span></div>`).join('');
-    }catch(err){ if(my===SEQ) box.innerHTML='<div class="mc-empty">No se pudo consultar la prensa en este momento.</div>'; }
-  }
 
   /* ── alertas por correo ───────────────────────────────────────────
      Alta sin sesión contra el worker; nada se manda hasta que la persona
@@ -712,13 +379,19 @@
   function alertaSt(cls,html){ const st=document.getElementById('mc-alert-st'); if(!st) return; st.className='st '+cls; st.innerHTML=html; st.style.display=''; }
   function alertaPinta(){
     if(!ME) return;
-    const q=document.getElementById('mc-alert-quien'); if(q) q.textContent=nice(ME.nombre).split(/\s+/).slice(0,2).join(' ');
+    const qn=document.getElementById('mc-alert-quien'); if(qn) qn.textContent=nice(ME.nombre).split(/\s+/).slice(0,2).join(' ');
     let s=null; try{ s=JSON.parse(localStorage.getItem(AL_KEY)||'null'); }catch(err){}
     if(s&&s.correo){
       const mismo=norm(s.congresista||'')===norm(ME.nombre);
       const c=document.getElementById('mc-alert-correo'); if(c&&!c.value) c.value=s.correo;
       if(s.estado==='confirmada') alertaSt('ok',`<b>Alertas activas</b> para ${esc(nice(s.congresista||''))} en <b>${esc(s.correo)}</b>.${mismo?'':' Estás viendo a otro congresista: si activas aquí, las alertas pasan a este.'}`);
       else alertaSt('warn',`Falta un clic: te mandamos un correo a <b>${esc(s.correo)}</b> para confirmar. Si no llega, revisa spam o vuelve a activar.`);
+    }
+    /* «Avísame cuando avance» desde la página de proyectos */
+    const num=PARAMS.get('avisa');
+    if(num){
+      alertaSt('warn',`Con tu correo te avisamos cuando el <b>${esc(num)}</b> cambie de estado o vuelva a un orden del día, y lo mismo con los demás proyectos que firmas.`);
+      setTimeout(()=>{ document.getElementById('mc-alert').scrollIntoView({block:'start'}); const c=document.getElementById('mc-alert-correo'); if(c) c.focus({preventScroll:true}); },300);
     }
   }
   document.getElementById('mc-alert-form').addEventListener('submit',async ev=>{
@@ -734,8 +407,6 @@
       const r=await fetch(AUTH_URL+'/micongreso/alerta',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({correo,congresista:ME.nombre,corp:ME.corp,consent:true,website:hp})});
       const d=await r.json().catch(()=>({}));
-      /* 404 = el worker todavía no tiene la ruta desplegada: se dice así,
-         no como un error de la persona */
       if(r.status===404){ alertaSt('warn','Las alertas por correo se están activando en estos días. Vuelve a intentarlo pronto.'); return; }
       if(!r.ok||!d.ok){ alertaSt('err',esc(d.error||`No se pudo activar (HTTP ${r.status}). Inténtalo en unos minutos.`)); return; }
       const estado=d.estado==='confirmada'?'confirmada':'pendiente';
@@ -746,7 +417,7 @@
     finally{ btn.disabled=false; }
   });
   (function(){
-    const v=new URLSearchParams(location.search).get('alerta'); if(!v) return;
+    const v=PARAMS.get('alerta'); if(!v) return;
     let s=null; try{ s=JSON.parse(localStorage.getItem(AL_KEY)||'null'); }catch(err){}
     if(v==='confirmada'){ if(s){ s.estado='confirmada'; try{ localStorage.setItem(AL_KEY,JSON.stringify(s)); }catch(err){} } }
     if(v==='baja'){ try{ localStorage.removeItem(AL_KEY); }catch(err){} }
@@ -755,7 +426,6 @@
                vencida:['err','Ese enlace venció (dura 72 horas). Vuelve a activar las alertas para recibir uno nuevo.'],
                invalida:['err','Ese enlace no es válido.'], error:['err','No se pudo completar la operación. Inténtalo de nuevo.']};
     const m=MSG[v]; if(!m) return;
-    /* se pinta apenas exista el panel (el tablero puede tardar en montarse) */
     const t=setInterval(()=>{ const st=document.getElementById('mc-alert-st'); if(!st) return; clearInterval(t); alertaSt(m[0],m[1]); st.scrollIntoView({block:'center'}); },200);
     setTimeout(()=>clearInterval(t),8000);
     history.replaceState(null,'',location.pathname);
@@ -763,9 +433,11 @@
 
   /* ── init: si ya eligió antes, entra directo al tablero ─────────── */
   (function(){
-    let saved=null; try{ saved=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(err){}
-    const e=saved&&ELECTOS.find(x=>x.nombre===saved.nombre&&x.corp===saved.corp);
-    if(e) elegir(e); else q.focus();
+    if(PARAMS.get('cambiar')){ MC.olvidar(); history.replaceState(null,'',location.pathname); }
+    const e=MC.me();
+    if(e&&!PARAMS.get('ir')){ ME=e; document.getElementById('mc-elegir').style.display='none'; document.getElementById('mc-tablero').style.display=''; montar(++SEQ); }
+    else if(e&&PARAMS.get('ir')) elegir(e);
+    else q.focus();
   })();
   </script>
   <script src="lang.js"></script>

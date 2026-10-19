@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>En la prensa · Mi Congreso · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
+  <link rel="stylesheet" href="mi-congreso.css?v=20261019" />
+  <style>
+    .pr-sint{font-size:1.02rem;line-height:1.65;color:var(--white);margin:0}
+    .pr-sint b{font-weight:700}
+    .pr-chip{display:inline-flex;align-items:center;gap:.4rem;font-size:.7rem;padding:.3rem .6rem;background:rgba(0,71,255,.08);color:var(--blue-light);border:1px solid rgba(0,71,255,.3);margin-bottom:.6rem}
+    .pr-chip button{background:none;border:none;color:inherit;font-size:.9rem;cursor:pointer;padding:0}
+    .pr-tag{display:inline-block;font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;padding:.12rem .35rem;margin-left:.3rem;font-weight:700;vertical-align:middle}
+    .pr-tag.conflicto{background:rgba(185,28,28,.1);color:var(--red)}
+    .pr-tag.gestion{background:rgba(21,128,61,.1);color:var(--green)}
+    .pr-tag.mixto{background:rgba(180,83,9,.1);color:var(--amber)}
+  </style>
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="mi-congreso.html" class="e-btn-back">← Volver</a>
+      <span class="nav-page-tag">Mi Congreso</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <a href="index.html" class="logo-link"><div class="logo-bars"><div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div></div><span class="logo-text">Ricardo<span>.</span>Ruiz</span></a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">Mi Congreso · 06 · Google News · prensa nacional y regional</div>
+    <h1 class="page-title">En la prensa</h1>
+    <p class="page-sub">Qué se publica cuando te nombran: de qué temas, con qué tono, en qué medios y junto a quién. Todo se calcula sobre los titulares, sin modelo: cada cifra se rastrea hasta sus titulares, y tocar un tema, un medio, un actor o una palabra los filtra.</p>
+  </div>
+  <div class="sec-bar" id="mc-sec-bar"></div>
+
+  <section>
+    <div id="mc-head"></div>
+    <div class="mc-filters" id="pr-ven"><button data-d="7">7 días</button><button data-d="30" class="on">30 días</button><button data-d="90">90 días</button></div>
+    <div class="panel"><h3>La lectura</h3><div id="pr-sint"><div class="loading">Leyendo titulares <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+    <div class="kpis" id="pr-kpis" style="margin-top:1.2rem"></div>
+    <div class="mc-grid">
+      <div class="panel"><h3>Ritmo <small>titulares por día</small></h3><div id="pr-ritmo"></div></div>
+      <div class="panel"><h3>Tono <small>vocabulario de conflicto o de gestión</small></h3><div id="pr-tono"></div></div>
+    </div>
+    <div class="mc-grid three">
+      <div class="panel"><h3>De qué se habla</h3><div id="pr-temas"></div></div>
+      <div class="panel"><h3>A quién nombran contigo</h3><div id="pr-act"></div></div>
+      <div class="panel"><h3>Quién publica</h3><div id="pr-med"></div></div>
+    </div>
+    <div class="panel" style="margin-top:1.2rem"><h3>Las palabras</h3><div id="pr-nube"></div></div>
+    <div class="panel" style="margin-top:1.2rem"><h3>Los titulares</h3><div id="pr-chip"></div><div id="pr-lista"></div></div>
+  </section>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Mi Congreso · Congreso 2026–2030</span>
+    <a href="mi-congreso.html" class="e-btn-back" style="font-size:.62rem">← Mi Congreso</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script src="legislativo-electos.js"></script>
+  <script src="candidato-360-saliencia.js?v=20260928"></script>
+  <script src="mi-congreso-base.js?v=20261019"></script>
+  <script>
+  (function(){
+    const e=MC.pagina('prensa'); if(!e) return;
+    const S=window.C360Saliencia, corto=MC.corto(e);
+    const persona=[corto.split(/\s+/).map(w=>w.normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase())];
+    let A=null, FIL=null, DIAS=30;
+    const ENC={conflicto:'conflicto',gestion:'gestión',mixto:'mixto',neutro:'neutro'};
+
+    function filtra(f){ FIL=f; pintaLista(); document.getElementById('pr-lista').scrollIntoView({behavior:'smooth',block:'start'}); }
+    function pintaLista(){
+      let L=A.filas;
+      const chip=document.getElementById('pr-chip');
+      if(FIL){
+        if(FIL.t==='tema') L=L.filter(f=>f._temas.includes(FIL.v));
+        else if(FIL.t==='medio') L=L.filter(f=>(f.medio||'Sin identificar').trim()===FIL.v);
+        else if(FIL.t==='actor') L=L.filter((f,i)=>FIL.idx.includes(A.filas.indexOf(f)));
+        else if(FIL.t==='palabra') L=L.filter(f=>S.norm(f.titulo).includes(' '+FIL.v));
+        else if(FIL.t==='enc') L=L.filter(f=>f._enc===FIL.v);
+        chip.innerHTML=`<span class="pr-chip">${esc(FIL.label)} · ${L.length} titular${L.length===1?'':'es'} <button type="button" aria-label="Quitar filtro">×</button></span>`;
+        chip.querySelector('button').onclick=()=>{ FIL=null; pintaLista(); };
+      }else chip.innerHTML='';
+      L=L.slice().sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
+      document.getElementById('pr-lista').innerHTML=L.map(r=>`<div class="mc-row"><span class="d">${esc(MC.fechaCorta(r.fecha||''))}</span><span class="t"><a href="${esc(r.url||'#')}" target="_blank" rel="noopener">${esc(r.titulo||'')}</a>${r._enc!=='neutro'?`<span class="pr-tag ${r._enc}">${ENC[r._enc]}</span>`:''}<small>${esc(r.medio||'')}${r.alcance==='regional'?' · regional':''}${r._temas.length?' · '+r._temas.map(id=>(S.TEMAS.find(t=>t.id===id)||{}).nombre).join(', '):''}</small></span></div>`).join('')||'<div class="mc-empty">Nada en este filtro.</div>';
+    }
+    async function carga(){
+      ['pr-sint'].forEach(id=>document.getElementById(id).innerHTML='<div class="loading">Leyendo titulares <span class="dots"><span></span><span></span><span></span></span></div>');
+      let d;
+      try{ d=await MC.prensa(e,DIAS); }catch(err){ document.getElementById('pr-sint').innerHTML='<div class="mc-empty">No se pudo consultar la prensa en este momento.</div>'; return; }
+      const rs=d.resultados||[];
+      if(!rs.length){
+        document.getElementById('pr-sint').innerHTML=`<div class="mc-empty">Sin titulares que mencionen «${esc(corto)}» en los últimos ${DIAS} días. Prueba con una ventana más larga.</div>`;
+        ['pr-kpis','pr-ritmo','pr-tono','pr-temas','pr-act','pr-med','pr-nube','pr-lista','pr-chip'].forEach(id=>document.getElementById(id).innerHTML='');
+        return;
+      }
+      A=S.analizar(rs,{anclas:[corto],persona,ventana:DIAS});
+      const N=A.N, enc=A.encuadre, t0=A.temas[0], ac0=A.actores[0], md0=A.medios[0];
+      const marcados=enc.conflicto+enc.gestion+enc.mixto;
+      /* si la mayoría es neutra, decir «domina el conflicto» por 3 contra 0 exagera */
+      const lado=enc.conflicto>enc.gestion*1.5?'conflicto':enc.gestion>enc.conflicto*1.5?'gestión':null;
+      const tonoTxt=marcados<N*0.5
+        ?`la mayoría de los titulares (${MC.pct(enc.neutro,N)}%) son <b>informativos</b>, sin vocabulario de conflicto ni de gestión${lado&&marcados?`; entre los demás pesa más el de ${lado}`:''}`
+        :(lado?`domina el vocabulario de <b>${lado}</b>`:'el tono está <b>repartido</b> entre conflicto y gestión');
+      const sube=A.subiendo[0];
+      document.getElementById('pr-sint').innerHTML=`<p class="pr-sint">En los últimos ${DIAS} días te nombran <b>${N} titulares</b> de <b>${d.n_medios||A.medios.length} medios</b>${t0?`; el tema que más pesa es <b>${esc(t0.nombre.toLowerCase())}</b> (${Math.round(100*t0.pct)}%)`:''}${sube?` y el que más <b>sube</b> esta semana, ${esc(sube.nombre.toLowerCase())}`:''}. ${tonoTxt.charAt(0).toUpperCase()+tonoTxt.slice(1)}${ac0?`. A quien más nombran contigo es <b>${esc(ac0.actor)}</b>`:''}${md0?`${ac0?', y':'. Quien'} ${ac0?'quien ':''}más publica es <b>${esc(md0.medio)}</b>`:''}.</p><p class="note">Mide lo que se publica, no lo que pasa en la calle. Un titular puede tener varios temas o ninguno: el ${MC.pct(A.sinTema,N)}% no cae en ningún tema y se muestra, no se esconde.</p>`;
+      const reg=(d.por_alcance||[]).find(x=>x.alcance==='regional');
+      const cell=(n,l,cls)=>`<div class="kpi${cls?' '+cls:''}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+      document.getElementById('pr-kpis').innerHTML=cell(N,'titulares','hl2')+cell(d.n_medios||A.medios.length,'medios distintos')+cell(MC.pct(enc.conflicto+enc.mixto,N)+'%','con tono de conflicto')+cell(A.nRec,'en la última semana')+cell(reg?reg.n:0,'de prensa regional');
+      document.getElementById('pr-ritmo').innerHTML=`${MC.spark(A.serie,90)}<div class="mc-lbl" style="display:flex;justify-content:space-between"><span>hace ${DIAS} días</span><span>pico: ${Math.max(...A.serie)} en un día</span><span>hoy</span></div>`;
+      const tb=(k,cls)=>`<i class="${cls}" style="width:${100*enc[k]/N}%"></i>`;
+      document.getElementById('pr-tono').innerHTML=`<div class="mc-tone" style="height:16px">${tb('conflicto','cf')}${tb('mixto','mx')}${tb('gestion','gs')}${tb('neutro','nt')}</div>`
+        +[['conflicto','Conflicto','var(--red)'],['gestion','Gestión','var(--green)'],['mixto','Mixto','var(--amber)'],['neutro','Neutro','rgba(20,22,31,.3)']].map(([k,l,c])=>`<div class="mc-hbar click" data-enc="${k}"><span class="l"><i style="display:inline-block;width:8px;height:8px;background:${c};margin-right:.35rem"></i>${l}</span><span class="b"><i style="width:${100*enc[k]/N}%;background:${c}"></i></span><span class="v">${enc[k]}</span></div>`).join('')
+        +'<p class="note">Conflicto: denuncia, crisis, rechazo, investigación. Gestión: anuncia, aprueba, avanza, logra. Es vocabulario del titular, no lectura de intención.</p>';
+      document.querySelectorAll('#pr-tono [data-enc]').forEach(el=>el.onclick=()=>filtra({t:'enc',v:el.dataset.enc,label:'Tono: '+ENC[el.dataset.enc]}));
+      const mxT=Math.max(1,...A.temas.map(t=>t.n));
+      document.getElementById('pr-temas').innerHTML=A.temas.map(t=>`<div class="mc-hbar click" data-tema="${t.id}"><span class="l">${esc(t.nombre)}</span><span class="b"><i style="width:${100*t.n/mxT}%"></i></span><span class="v">${t.n}</span></div>`).join('')||'<div class="mc-empty">Ningún titular cae en los temas del diccionario.</div>';
+      document.querySelectorAll('#pr-temas [data-tema]').forEach(el=>el.onclick=()=>{ const t=A.temas.find(x=>x.id===el.dataset.tema); filtra({t:'tema',v:t.id,label:'Tema: '+t.nombre}); });
+      const mxA=Math.max(1,...A.actores.map(a=>a.n));
+      document.getElementById('pr-act').innerHTML=A.actores.map((a,i)=>`<div class="mc-hbar click${a.usted?' me':''}" data-a="${i}"><span class="l">${esc(a.actor)}</span><span class="b"><i style="width:${100*a.n/mxA}%"></i></span><span class="v">${a.n}</span></div>`).join('')+(A.actores.length?'<p class="note">Nombres propios detectados en los titulares (dos o más palabras en mayúscula): una aproximación. Tu propio nombre se excluye.</p>':'<div class="mc-empty">Ningún nombre se repite en dos titulares o más.</div>');
+      document.querySelectorAll('#pr-act [data-a]').forEach(el=>el.onclick=()=>{ const a=A.actores[+el.dataset.a]; filtra({t:'actor',idx:a.idx,label:'Con: '+a.actor}); });
+      const md=A.medios.slice(0,12), mxM=Math.max(1,...md.map(m=>m.n));
+      document.getElementById('pr-med').innerHTML=md.map((m,i)=>`<div class="mc-hbar click" data-m="${i}"><span class="l">${esc(m.medio)}</span><span class="b"><i style="width:${100*m.n/mxM}%"></i></span><span class="v">${m.n}</span></div>`).join('');
+      document.querySelectorAll('#pr-med [data-m]').forEach(el=>el.onclick=()=>{ const m=md[+el.dataset.m]; filtra({t:'medio',v:m.medio,label:'Medio: '+m.medio}); });
+      const mxN=Math.max(1,...A.nube.map(w=>w.n));
+      document.getElementById('pr-nube').innerHTML=A.nube.length?`<div class="mc-cloud">${A.nube.map(w=>`<span data-w="${esc(w.r)}" data-f="${esc(w.w)}" style="font-size:${(.75+1.1*w.n/mxN).toFixed(2)}rem;opacity:${(.55+.45*w.n/mxN).toFixed(2)}">${esc(w.w)}</span>`).join('')}</div>`:'<div class="mc-empty">Muy pocos titulares para una nube.</div>';
+      document.querySelectorAll('#pr-nube [data-w]').forEach(el=>el.onclick=()=>filtra({t:'palabra',v:el.dataset.w,label:'Palabra: '+el.dataset.f}));
+      FIL=null; pintaLista();
+    }
+    document.querySelectorAll('#pr-ven button').forEach(b=>b.onclick=()=>{ DIAS=+b.dataset.d; document.querySelectorAll('#pr-ven button').forEach(x=>x.classList.toggle('on',x===b)); carga(); });
+    carga();
+  })();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Control político · Mi Congreso · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
+  <link rel="stylesheet" href="mi-congreso.css?v=20261019" />
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="mi-congreso.html" class="e-btn-back">← Volver</a>
+      <span class="nav-page-tag">Mi Congreso</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <a href="index.html" class="logo-link"><div class="logo-bars"><div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div></div><span class="logo-text">Ricardo<span>.</span>Ruiz</span></a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">Mi Congreso · 05 · citaciones en órdenes del día</div>
+    <h1 class="page-title">Control político</h1>
+    <p class="page-sub">A quién has citado, sobre qué y cuántas veces llegó tu citación a un orden del día. Si todavía no tienes, el panorama: qué agenda tu comisión, quién cita más en el Congreso, a qué funcionarios se cita, y un buscador para ver si un tema ya tiene debate.</p>
+  </div>
+  <div class="sec-bar" id="mc-sec-bar"></div>
+
+  <section>
+    <div id="mc-head"></div>
+    <div id="ct-mio"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div>
+    <div class="panel" style="margin-top:1.2rem">
+      <h3>¿Ya hay debate sobre tu tema? <small>buscador de citaciones del Congreso</small></h3>
+      <form class="mc-search" id="ct-form"><input class="f-input" id="ct-q" placeholder="Un tema o un funcionario: «agua», «Ministro de Hacienda», «Ecopetrol»…" /><button type="submit">Buscar</button></form>
+      <div id="ct-res"><div class="mc-empty">Busca por tema o por cargo. Devuelve la citación, a quién citaron, quién la firmó y cuándo se agendó.</div></div>
+    </div>
+    <div class="mc-grid three">
+      <div class="panel"><h3>Quién cita más <small>Congreso</small></h3><div id="ct-citantes"></div></div>
+      <div class="panel"><h3>A quién se cita más</h3><div id="ct-citados"></div></div>
+      <div class="panel"><h3>Por comisión <small id="ct-cob-src"></small></h3><div id="ct-cob"></div></div>
+    </div>
+    <div class="panel" style="margin-top:1.2rem"><h3>Citaciones agendadas por año</h3><div id="ct-anio"></div></div>
+  </section>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Mi Congreso · Congreso 2026–2030</span>
+    <a href="mi-congreso.html" class="e-btn-back" style="font-size:.62rem">← Mi Congreso</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script src="legislativo-electos.js"></script>
+  <script src="mi-congreso-base.js?v=20261019"></script>
+  <script>
+  (async function(){
+    const e=MC.pagina('control'); if(!e) return;
+    const {cut,fechaCorta,mismaPersona}=MC;
+    const cam=e.corp==='SENADO'?'senado':'camara';
+    const AMB=a=>{ a=String(a||''); return a==='plenaria'?'Plenaria':'Comisión '+tCase(a).replace('Septima','Séptima'); };
+    const citados=c=>(c.citados||[]).map(x=>[x.nombre,x.cargo].filter(Boolean).join(', ')).filter(Boolean);
+    const conAnio=f=>f?`${fechaCorta(f)} ${String(f).slice(0,4)}`:'';
+    const filaCit=(c,conCitantes)=>`<div class="mc-row"><span class="d">${esc(conAnio(c.primera))}</span><span class="t">${esc(cut(c.tema||'(sin tema en el orden del día)',180))}<small>${esc(AMB(c.ambito))} · ${c.camara==='senado'?'Senado':'Cámara'}${c.n>1?` · agendada ${c.n} veces`:''}${citados(c).length?' · citados: '+esc(cut(citados(c).join(' · '),160)):''}</small>${conCitantes&&(c.citantes||[]).length?`<small>Firman: ${esc((c.citantes||[]).slice(0,6).map(x=>x.nombre).join(', '))}${c.citantes.length>6?` y ${c.citantes.length-6} más`:''}</small>`:''}</span></div>`;
+
+    /* lo propio */
+    const [v,com]=await Promise.all([MC.voto(e),MC.comision(e).catch(()=>({}))]);
+    const c=v&&v.citaciones, box=document.getElementById('ct-mio');
+    if(v&&v.error){ box.innerHTML='<div class="mc-callout amber">Tu récord de citaciones no respondió en este momento. Abajo, el panorama del Congreso.</div>'; }
+    else if(c&&c.n_citaciones){
+      const L=(c.citaciones||[]).slice().sort((a,b)=>String(b.primera||'').localeCompare(String(a.primera||'')));
+      const mx=Math.max(1,...(c.citados_top||[]).map(x=>x.n));
+      const actual=L.filter(x=>/2026-2027/.test(x.k||'')).length;
+      box.innerHTML=`<div class="kpis" style="grid-template-columns:repeat(4,1fr)"><div class="kpi"><div class="n">${c.n_citaciones}</div><div class="l">citaciones que firmaste</div></div><div class="kpi"><div class="n">${c.n_agendamientos||0}</div><div class="l">veces en un orden del día</div></div><div class="kpi hl2"><div class="n">${actual}</div><div class="l">en la legislatura 2026–2027</div></div><div class="kpi"><div class="n">${(c.citados_top||[]).length}</div><div class="l">funcionarios distintos</div></div></div>
+        <div class="mc-grid" style="margin-top:0;grid-template-columns:.8fr 1.2fr"><div class="panel"><h3>A quién has citado</h3>${(c.citados_top||[]).slice(0,10).map(x=>MC.hbar(tCase(x.nombre||'—'),x.n,mx)).join('')}</div>
+        <div class="panel"><h3>Tus citaciones</h3>${L.map(x=>filaCit(x,false)).join('')}<p class="note">Es la citación <b>agendada</b>, no el debate realizado: una citación que aparece muchas veces y nunca se hace es una señal, no un error.</p></div></div>`;
+    }else{
+      box.innerHTML=`<div class="mc-callout">Todavía no hay citaciones a tu nombre en los órdenes del día que se rastrean. Ojo: hay comisiones que no publican su control político en la agenda, así que «0» no siempre significa «no citó». Abajo, el panorama para preparar el primero.</div>`;
+    }
+
+    /* panorama del Congreso */
+    try{
+      const p=await MC.citPanorama(); const s=p.sistema||{}, meta=p.meta||{};
+      const tc=s.top_citantes||[], mxc=Math.max(1,...tc.map(x=>x.n));
+      document.getElementById('ct-citantes').innerHTML=tc.slice(0,10).map(x=>MC.hbar(tCase(x.nombre),x.n,mxc,{me:mismaPersona(x.nombre,e.nombre)})).join('')+`<p class="note">Sobre ${fmt(meta.n_citaciones||0)} citaciones de ${fmt(meta.n_congresistas||0)} congresistas desde 2017; incluye legislaturas anteriores.</p>`;
+      const td=s.top_citados||[], mxd=Math.max(1,...td.map(x=>x.n));
+      document.getElementById('ct-citados').innerHTML=td.slice(0,10).map(x=>MC.hbar(tCase(x.nombre)+(x.cargo&&!norm(x.nombre).includes(norm(x.cargo).slice(0,8))?' · '+x.cargo:''),x.n,mxd)).join('');
+      const cobT=(s.cobertura||[]).filter(x=>x.camara===cam), cob=cobT.filter(x=>x.n_citaciones>0).sort((a,b)=>b.n_citaciones-a.n_citaciones);
+      const sinCP=cobT.filter(x=>!x.n_citaciones).map(x=>AMB(x.ambito));
+      const mxo=Math.max(1,...cob.map(x=>x.n_citaciones));
+      const ck=com&&com.key?norm(com.key):'';
+      document.getElementById('ct-cob-src').textContent=cam==='senado'?'Senado':'Cámara';
+      document.getElementById('ct-cob').innerHTML=cob.map(x=>MC.hbar(AMB(x.ambito),x.n_citaciones,mxo,{me:norm(x.ambito)===ck})).join('')
+        +`<p class="note">En ámbar, tu comisión.${sinCP.length?` Sin una sola citación en su orden del día: ${esc(sinCP.join(', '))}. Ahí «0» puede ser que no publican el control político en la agenda.`:''}</p>`;
+      const pa=s.por_anio||[], mxa=Math.max(1,...pa.map(x=>x.n));
+      document.getElementById('ct-anio').innerHTML=`<div class="mc-cols" style="height:110px">${pa.map(x=>`<i style="height:${100*x.n/mxa}%" title="${x.anio}: ${x.n}"></i>`).join('')}</div><div style="display:flex;gap:2px;margin-top:.3rem">${pa.map(x=>`<span style="flex:1;text-align:center;font-size:.6rem;color:var(--gray)">${x.anio}<br><b style="color:var(--white)">${x.n}</b></span>`).join('')}</div><p class="note">Cuenta la citación <b>agendada</b> en un orden del día, no el debate realizado. El pico de 2020 coincide con la pandemia y las sesiones virtuales.</p>`;
+    }catch(err){ ['ct-citantes','ct-citados','ct-cob','ct-anio'].forEach(id=>document.getElementById(id).innerHTML='<div class="mc-empty">No cargó en este momento.</div>'); }
+
+    /* buscador */
+    document.getElementById('ct-form').addEventListener('submit',async ev=>{
+      ev.preventDefault();
+      const qv=document.getElementById('ct-q').value.trim(), res=document.getElementById('ct-res');
+      if(qv.length<3){ res.innerHTML='<div class="mc-empty">Escribe al menos tres letras.</div>'; return; }
+      res.innerHTML='<div class="loading">Buscando <span class="dots"><span></span><span></span><span></span></span></div>';
+      try{
+        const d=await MC.api({action:'citaciones',q:qv},30);
+        const L=d.citaciones||[];
+        res.innerHTML=L.length?`<div class="mc-lbl" style="margin:0 0 .4rem"><b>${d.n}</b> citaci${d.n===1?'ón':'ones'} sobre «${esc(qv)}»${d.n>L.length?` · se muestran las ${L.length} más recientes`:''}.</div>`+L.slice(0,30).map(x=>filaCit(x,true)).join(''):`<div class="mc-empty">Nadie ha citado sobre «${esc(qv)}» en los órdenes del día rastreados: el tema está libre.</div>`;
+      }catch(err){ res.innerHTML='<div class="mc-empty">La búsqueda no respondió. Inténtalo en un minuto.</div>'; }
+    });
+  })();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>

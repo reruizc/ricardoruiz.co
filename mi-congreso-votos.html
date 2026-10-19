@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Cómo he votado · Mi Congreso · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
+  <link rel="stylesheet" href="mi-congreso.css?v=20261019" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="mi-congreso.html" class="e-btn-back">← Volver</a>
+      <span class="nav-page-tag">Mi Congreso</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <a href="index.html" class="logo-link"><div class="logo-bars"><div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div></div><span class="logo-text">Ricardo<span>.</span>Ruiz</span></a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">Mi Congreso · 04 · urnas 2026 y plenaria</div>
+    <h1 class="page-title">Cómo he votado</h1>
+    <p class="page-sub">Las dos caras del voto: el que recibiste en marzo de 2026, con tu puntaje electoral y dónde está tu fuerza, y el que depositas en la plenaria, con el récord nominal que registran las actas.</p>
+  </div>
+  <div class="sec-bar" id="mc-sec-bar"></div>
+
+  <section>
+    <div id="mc-head"></div>
+    <div class="mc-grid" style="grid-template-columns:.85fr 1.15fr;margin-top:0">
+      <div class="panel"><h3>Puntaje electoral 2026</h3><div id="vt-score"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+      <div class="panel"><h3>Frente a tus pares <small id="vt-pares-src"></small></h3><div id="vt-pares"></div></div>
+    </div>
+    <div class="mc-grid" style="grid-template-columns:1.3fr .7fr">
+      <div class="panel"><h3>Dónde me votaron <small>mesa a mesa · 2026</small></h3><div class="mc-map lg" id="mc-map"></div><div class="note" id="mc-map-note" style="margin-top:0">Cargando el mapa de tu votación…</div></div>
+      <div class="panel"><h3>Donde más <small id="vt-top-src"></small></h3><div id="vt-top"></div></div>
+    </div>
+    <div class="mc-grid">
+      <div class="panel"><h3>En plenaria <small id="vt-src"></small></h3><div id="vt-voto"><div class="loading">Cargando <span class="dots"><span></span><span></span><span></span></span></div></div></div>
+      <div class="panel"><h3>Proyecto por proyecto</h3><div id="vt-proy"></div></div>
+    </div>
+  </section>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Mi Congreso · Congreso 2026–2030</span>
+    <a href="mi-congreso.html" class="e-btn-back" style="font-size:.62rem">← Mi Congreso</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script src="legislativo-electos.js"></script>
+  <script src="mi-congreso-base.js?v=20261019"></script>
+  <script>
+  (async function(){
+    const e=MC.pagina('votos'); if(!e) return;
+    const {cut,shortTitle,nice}=MC, S3=MC.S3;
+
+    /* ── puntaje y pares ─────────────────────────────────────────── */
+    let EL=null;
+    try{
+      EL=await MC.electoral(e);
+      if(!EL.hit){
+        document.getElementById('vt-score').innerHTML='<div class="mc-empty"><b>Lista cerrada.</b> Tu partido compitió con lista cerrada: el voto fue al logo y la Registraduría no registra votación personal, así que no hay puntaje ni mapa individual.</div>';
+        document.getElementById('vt-pares').innerHTML='<div class="mc-empty">Sin votación personal con qué compararte.</div>';
+        document.getElementById('mc-map').style.display='none';
+        document.getElementById('mc-map-note').textContent='Sin votación personal: no hay mapa.';
+        document.getElementById('vt-top').innerHTML='';
+      }else{
+        const circ=e.corp==='SENADO'?'senadores electos':`representantes electos por ${depNice(e.dep)}`;
+        document.getElementById('vt-score').innerHTML=`<div class="mc-ring-wrap"><div class="mc-score lg"><b>${EL.score}</b><small>de 100</small></div><div>
+            <div class="mc-big" style="font-size:1.9rem">${fmt(EL.hit.votos)}<small>votos</small></div>
+            <div class="mc-lbl">N.º <b>${EL.puesto}</b> de ${EL.nPares} ${circ} · N.º ${EL.rankCand} de ${fmt(EL.nCand)} candidaturas a ${e.corp==='SENADO'?'Senado':'Cámara'} en el país.</div>
+            ${EL.lista?`<div class="mc-lbl">Aportaste el <b>${(100*EL.hit.votos/EL.lista).toFixed(1).replace('.',',')}%</b> de los ${fmt(EL.lista)} votos de tu lista al Senado.</div>`:''}
+          </div></div>
+          <p class="note">El puntaje usa la misma escala de la ficha electoral del sitio: 100 es el presidente electo en segunda vuelta y el resto se mide en escala logarítmica contra sus votos (tope 99). Sirve para comparar candidaturas de distinto tamaño en una sola regla.</p>
+          <a class="ps-cta" href="analisis-candidato.html?cand=${encodeURIComponent(EL.hit.slug)}">Mi ficha electoral completa →</a>`;
+        const P=EL.pares.filter(r=>r.v>0), mx=P[0]?P[0].v:1;
+        const idx=P.findIndex(r=>r.x===e);
+        const vis=P.length<=14?P:P.filter((r,i)=>i<8||Math.abs(i-idx)<=2);
+        document.getElementById('vt-pares-src').textContent=e.corp==='SENADO'?'senadores electos 2026':`representantes por ${depNice(e.dep)}`;
+        document.getElementById('vt-pares').innerHTML=vis.map((r,i)=>{ const pos=P.indexOf(r)+1; return (i>0&&P.indexOf(r)-P.indexOf(vis[i-1])>1?'<div class="mc-lbl" style="text-align:center">⋯</div>':'')+MC.hbar(`${pos}. ${nice(r.x.nombre)}`,r.v,mx,{me:r.x===e}); }).join('')
+          +(P.length<EL.nPares?`<p class="note">${EL.nPares-P.length} colega${EL.nPares-P.length===1?'':'s'} de esta lista no tiene${EL.nPares-P.length===1?'':'n'} votación personal (listas cerradas o curules especiales).</p>`:'');
+        cargarMapa(EL.hit);
+      }
+    }catch(err){ document.getElementById('vt-score').innerHTML='<div class="mc-empty">No se pudo consultar tu votación en este momento.</div>'; }
+
+    /* ── mapa (heredado de la v1: choropleth sin tiles) ──────────────
+       senador → país por departamentos; representante → su departamento
+       por municipios (mun_elec); Bogotá → 20 localidades giradas 90°. */
+    function depKey(s){
+      s=norm(s).toUpperCase();
+      if(s.indexOf('BOGOTA')>=0) return 'BOGOTA';
+      if(s.indexOf('VALLE')>=0) return 'VALLE';
+      if(s.indexOf('SAN ANDRES')>=0) return 'SANANDRES';
+      if(s.indexOf('NORTE')>=0&&s.indexOf('SAN')>=0) return 'NSANTANDER';
+      return s.replace(/[^A-Z]/g,'');
+    }
+    function rot(geo){
+      const cx=-74.08, cy=4.65, rc=([lon,lat])=>[cx-(lat-cy), cy+(lon-cx)];
+      const rg=g=>g.type==='Polygon'?{...g,coordinates:g.coordinates.map(r=>r.map(rc))}:g.type==='MultiPolygon'?{...g,coordinates:g.coordinates.map(p=>p.map(r=>r.map(rc)))}:g;
+      return {...geo,features:geo.features.map(f=>({...f,geometry:rg(f.geometry)}))};
+    }
+    const estilo=(v,max)=>({color:'rgba(20,22,31,.28)',weight:.7,fillColor:'#0047FF',fillOpacity:v?.1+.8*Math.sqrt(v/max):.03});
+    async function cargarMapa(hit){
+      const box=document.getElementById('mc-map'), note=document.getElementById('mc-map-note');
+      note.textContent=e.corp==='SENADO'?'Descargando tu votación mesa a mesa (con votación nacional son varios MB: puede tardar hasta 20 segundos)…':'Descargando tu votación mesa a mesa…';
+      try{
+        const d=await MC.getJSON(S3+'/endoso/'+encodeURIComponent(hit.slug)+'.json');
+        const deps={}, muns={}, locs={}; let total=0, sinLoc=0;
+        (d.mesas||[]).forEach(r=>{
+          const v=r.v||0; total+=v; const dep=String(r.dep||''); if(!dep) return;
+          (deps[dep]=deps[dep]||{nom:r.depNom||'',v:0}).v+=v;
+          const mk=dep+'-'+String(r.mun||''); (muns[mk]=muns[mk]||{dep,mun:String(r.mun||''),nom:r.munNom||'',v:0}).v+=v;
+          if(dep==='16'){ const z=String(r.zon||'').padStart(2,'0'); if(/^(0[1-9]|1\d|20)$/.test(z)) locs[z]=(locs[z]||0)+v; else sinLoc+=v; }
+        });
+        const depKeys=Object.keys(deps).filter(k=>deps[k].v>0).sort((a,b)=>deps[b].v-deps[a].v);
+        const MAP=L.map('mc-map',{zoomSnap:0.25,zoomControl:false,attributionControl:false,scrollWheelZoom:false,dragging:false,doubleClickZoom:false,boxZoom:false,keyboard:false});
+        let LAYER, leyenda='', top=[];
+        const nacional=e.corp==='SENADO'||depKeys.length!==1;
+        if(nacional){
+          const geo=await MC.getJSON(S3+'/mapas-2026/DEPARTAMENTOS2.json');
+          const vals={}; depKeys.forEach(k=>{ vals[depKey(deps[k].nom)]=deps[k].v; });
+          const max=Math.max(1,...Object.values(vals));
+          LAYER=L.geoJSON(geo,{style:f=>estilo(vals[depKey(f.properties.name||'')]||0,max),onEachFeature:(f,ly)=>{ const v=vals[depKey(f.properties.name||'')]||0; ly.bindTooltip(`<b>${esc(f.properties.name||'')}</b><br>${fmt(v)} votos · ${(100*v/(total||1)).toFixed(1).replace('.',',')}%`,{sticky:true}); }}).addTo(MAP);
+          const geoKeys=new Set(geo.features.map(f=>depKey(f.properties.name||'')));
+          const fuera=depKeys.filter(k=>!geoKeys.has(depKey(deps[k].nom))).reduce((t,k)=>t+deps[k].v,0);
+          leyenda=`Intensidad = concentración de tu votación por departamento.${fuera?` ${fmt(fuera)} votos en el exterior (consulados), fuera del mapa.`:''}`;
+          top=depKeys.map(k=>({n:tCase(deps[k].nom),v:deps[k].v}));
+          document.getElementById('vt-top-src').textContent='por departamento';
+        }else if(depKeys[0]==='16'){
+          const geo=rot(await MC.getJSON(S3+'/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json'));
+          const max=Math.max(1,...Object.values(locs));
+          const nomL=z=>{ const f=geo.features.find(x=>String(x.properties.LocCodigo).padStart(2,'0')===z); return tCase((f||{}).properties?.LocNombre||'Localidad '+z); };
+          LAYER=L.geoJSON(geo,{style:f=>estilo(locs[String(f.properties.LocCodigo).padStart(2,'0')]||0,max),onEachFeature:(f,ly)=>{ const v=locs[String(f.properties.LocCodigo).padStart(2,'0')]||0; ly.bindTooltip(`<b>${esc(tCase(f.properties.LocNombre||''))}</b><br>${fmt(v)} votos`,{sticky:true}); }}).addTo(MAP);
+          leyenda=`Bogotá por localidades (girada 90°, como en el resto del sitio).${sinLoc?` ${fmt(sinLoc)} votos sin localidad (consulados, cárceles, puesto censo).`:''}`;
+          top=Object.entries(locs).sort((a,b)=>b[1]-a[1]).map(([z,v])=>({n:nomL(z),v}));
+          document.getElementById('vt-top-src').textContent='por localidad';
+        }else{
+          const dep=depKeys[0];
+          const geo=await MC.getJSON(S3+'/mapas-2026/Departamentos-mps/'+String(dep).padStart(2,'0')+'.json');
+          const vals={}; Object.values(muns).forEach(m=>{ if(m.dep===dep) vals[String(parseInt(m.mun,10))]=m.v; });
+          const max=Math.max(1,...Object.values(vals));
+          const nomDe=f=>f.properties.mpio_cnmbr||f.properties.name||f.properties.mun_nom||'Municipio';
+          LAYER=L.geoJSON(geo,{style:f=>estilo(vals[String(parseInt(f.properties.mun_elec,10))]||0,max),onEachFeature:(f,ly)=>{ const v=vals[String(parseInt(f.properties.mun_elec,10))]||0; ly.bindTooltip(`<b>${esc(tCase(nomDe(f)))}</b><br>${fmt(v)} votos · ${(100*v/(total||1)).toFixed(1).replace('.',',')}%`,{sticky:true}); }}).addTo(MAP);
+          leyenda=`${tCase(deps[dep].nom)} por municipios. Intensidad = concentración de tu votación.`;
+          top=Object.values(muns).filter(m=>m.dep===dep).sort((a,b)=>b.v-a.v).map(m=>({n:tCase(m.nom),v:m.v}));
+          document.getElementById('vt-top-src').textContent='por municipio';
+        }
+        /* encuadre: vista definida primero (sobre un mapa sin vista, fitBounds
+           daba zoom = Infinity); setTimeout y no rAF */
+        setTimeout(()=>{ MAP.invalidateSize(); const b=LAYER.getBounds(); if(!b.isValid()) return; MAP.setView(b.getCenter(),6,{animate:false}); const z=MAP.getBoundsZoom(b,false,L.point(6,6)); MAP.setView(b.getCenter(),Number.isFinite(z)?z:6,{animate:false}); },0);
+        note.textContent=leyenda+` Total 2026: ${fmt(total)} votos.`;
+        /* donde más: top 12 + concentración */
+        const t12=top.slice(0,12), mx=t12[0]?t12[0].v:1;
+        const top3=top.slice(0,3).reduce((s,r)=>s+r.v,0);
+        document.getElementById('vt-top').innerHTML=t12.map(r=>MC.hbar(r.n,r.v,mx)).join('')
+          +`<p class="note">Los tres primeros concentran el <b>${MC.pct(top3,total)}%</b> de tu votación${top.length>3?`, repartida en ${top.length} territorios con al menos un voto`:''}.</p>`;
+      }catch(err){ note.textContent='El mapa no cargó en este momento; las cifras de arriba sí son reales.'; }
+    }
+
+    /* ── voto nominal ────────────────────────────────────────────── */
+    const box=document.getElementById('vt-voto'), proy=document.getElementById('vt-proy');
+    const d=await MC.voto(e);
+    if(d&&d.error==='red'){
+      box.innerHTML='<div class="mc-empty">No se pudo consultar el récord de voto en este momento. Vuelve a cargar en un minuto.</div>';
+      proy.innerHTML=''; return;
+    }
+    if(!d||!d.encontrado||!d.n_votos){
+      box.innerHTML=`<div class="mc-empty">Sin voto nominal registrado a tu nombre. El registro cubre las plenarias de Cámara (2014–2026) y de Senado (2017–2026): si esta es tu primera legislatura, tus votos empezarán a aparecer con las primeras plenarias de fondo.</div>`;
+      proy.innerHTML='<div class="mc-empty">Sin récord por proyecto todavía.</div>'; return;
+    }
+    const su=d.resumen||{}, tot=d.n_votos||0, si=su.Si||0, no=su.No||0, ab=su.Abstencion||0;
+    const esSen=/senado/i.test(d.camara||'');
+    document.getElementById('vt-src').textContent=esSen?'Senado · 2017–2026':'Cámara · 2014–2026';
+    const po=d.posiciones||{}, ptot=(po.a_favor||0)+(po.en_contra||0)+(po.dividido||0)+(po.sin_fondo||0);
+    box.innerHTML=(d.alineacion_gob!=null?`<div class="mc-align"><span class="n">${d.alineacion_gob}%</span><span class="t">de tus votos coinciden con ${d.bancada==='Pacto/izq'?'la mayoría del Pacto, tu propia bancada (gobierno 2022–2026),':'la bancada de gobierno 2022–2026 (Pacto)'} en ${d.n_contestadas||0} votaciones divididas${d.bancada?` · tu bancada en el registro: ${esc(d.bancada)}`:''}</span></div>`:'')
+      +`<div class="mc-bar"><i class="si" style="width:${100*si/tot}%"></i><i class="no" style="width:${100*no/tot}%"></i><i class="ab" style="width:${100*ab/tot}%"></i></div>`
+      +`<div class="mc-empty" style="margin-bottom:.5rem"><b style="color:var(--green)">${fmt(si)} Sí</b> · <b style="color:var(--red)">${fmt(no)} No</b>${ab?` · <b style="color:var(--amber)">${fmt(ab)} abstenciones</b>`:''} en ${fmt(tot)} votos nominales sobre ${fmt(d.n_proyectos||0)} proyectos.</div>`
+      +(ptot?`<div class="seg-sub">Tu posición de fondo, proyecto por proyecto</div>`+[['a_favor','A favor'],['en_contra','En contra'],['dividido','Dividido entre votaciones'],['sin_fondo','Solo votos de trámite']].map(([k,l])=>MC.hbar(l,po[k]||0,ptot,{txt:`${po[k]||0} · ${MC.pct(po[k]||0,ptot)}%`})).join('')
+        +`<p class="note">«De fondo» separa los votos sobre el contenido (ponencia, articulado) de los de trámite (impedimentos, orden del día, aplazamientos). ${esSen?'La API pública del Senado solo registra Sí y No.':'Actas de plenaria de Cámara: voto electrónico y OCR de las actas 2014-2017.'}</p>`:'');
+    const lista=(d.por_proyecto||[]).slice().sort((a,b)=>(b.n||0)-(a.n||0));
+    const POS={a_favor:'a favor',en_contra:'en contra',dividido:'dividido',sin_fondo:'solo trámite'};
+    let todos=false;
+    const pinta=()=>{ proy.innerHTML=(todos?lista:lista.slice(0,12)).map(p=>`<div class="mc-row"><span class="d">${esc(p.tk||p.numero_senado||p.numero_camara||'')}</span><span class="t">${p.titulo?esc(cut(shortTitle(p.titulo),120)):'<span style="color:var(--gray)">Proyecto '+esc(p.tk||'')+' (el acta no trae el título)</span>'}<small>${Object.entries(p.r||{}).map(([k,v])=>`${v} ${k}`).join(' · ')}${p.pos&&p.pos.pos?' · posición: <b>'+esc(POS[p.pos.pos]||p.pos.pos)+'</b>':''}</small></span><span class="n">${p.n}</span></div>`).join('')
+      +(lista.length>12&&!todos?`<button class="mc-more" id="vt-mas">Ver los ${lista.length} proyectos</button>`:'')+'<p class="note">El número de la derecha es cuántas veces votaste en ese proyecto (cada artículo, proposición o impedimento es una votación).</p>';
+      const b=document.getElementById('vt-mas'); if(b) b.onclick=()=>{ todos=true; pinta(); }; };
+    pinta();
+  })();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>
