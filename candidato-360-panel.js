@@ -321,6 +321,30 @@
     if (!SESION.vinculo?.local) return;
     try { const j = JSON.stringify(SESION.vinculo); sessionStorage.setItem(VINCULO_LOCAL_KEY, j); localStorage.setItem(VINCULO_LOCAL_KEY, j); } catch {}
   }
+  /* La ruta «misma corporación» guarda la campaña SIN territorio: se deriva del
+     historial (territorioDe). Los paneles que leen campana.departamento o
+     campana.municipio directo —el del electorado, sexo y edad— quedaban en «la
+     campaña no tiene territorio definido» (oct-19-2026, concejal de Bogotá con
+     la misma corporación). Se completa aquí, una vez, para todos los paneles. */
+  function completarCampana(v) {
+    if (!v) return;
+    const c = v.campana = v.campana || {};
+    const t = territorioDe(v);
+    if (!c.corp && t.corp) c.corp = t.corp;
+    if (!c.departamentoNombre && t.depNombre) c.departamentoNombre = t.depNombre;
+    if (!c.municipio && !t.departamental && t.mun) c.municipio = t.esBogota ? 'BOGOTÁ, D.C.' : t.mun;
+    if (!c.localidad && t.loc) c.localidad = t.loc;
+    if (!c.departamento) {
+      if (t.esBogota) c.departamento = '16';
+      else {
+        /* El departamento electoral va en el slug territorial (CONC2023-16-…);
+           se toma el de la candidatura más reciente. */
+        const deps = (v.candidato?.slugs || []).map(s => { const m = String(s).match(/^(?:ASAM|GOB|ALC|JAL|CONC)(\d{4})-(\d+)-/); return m ? [Number(m[1]), m[2]] : null; }).filter(Boolean).sort((x, y) => y[0] - x[0]);
+        if (deps.length) c.departamento = String(deps[0][1]).padStart(2, '0');
+      }
+    }
+  }
+
   async function arrancar(pagina) {
     try { SESION.token = localStorage.getItem('rr-token') || null; SESION.user = JSON.parse(localStorage.getItem('rr-user') || 'null'); } catch {}
     if (SESION.token) {
@@ -340,6 +364,7 @@
     const next = encodeURIComponent(pagina);
     if (!SESION.token) return muro('Este panel trabaja sobre <b>su</b> candidatura, así que primero hay que saber quién es.', `<a class="wall-btn primary" href="login.html?next=${next}">Iniciar sesión</a>`), false;
     if (!SESION.acceso) return muro('Su cuenta todavía no tiene acceso a Candidato 360.', `<a class="wall-btn primary" href="candidato-360.html?comprar=1">Ver qué incluye</a>`), false;
+    completarCampana(SESION.vinculo);
     if (!SESION.vinculo) return muro('Su cuenta todavía no tiene una candidatura abierta: los paneles se arman sobre su territorio y su nombre.', `<a class="wall-btn primary" href="candidato-360.html?abrir=1">Abrir mi candidatura</a>`), false;
     const cab = $('panelCandidatura');
     if (cab) {

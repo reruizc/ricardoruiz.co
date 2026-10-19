@@ -499,3 +499,85 @@ y 2 curules).
   **«Bogotá Más Fuerte»** (Nueva Fuerza Democrática + Salvación Nacional), que
   caía en `sc`, queda en derecha; **Libres** queda explícito en derecha (ya caía
   ahí, pero por parecido con «Justa Libres»).
+
+### Arquetipos de Bogotá v1 · 8 por corporación, simulador y lectura personal (oct-19-2026)
+
+Pedido de Ricardo al revisar la candidatura de un concejal de Bogotá. Reemplaza
+la v0 de 6+5 descrita arriba (respaldo en
+`Bases de datos/arquetipos-bogota/respaldo-v6-20261019/`).
+
+- **8 arquetipos en cada corporación** (`arquetipos.py`, k = 8, silueta 0,193
+  en Concejo y 0,195 en Alcaldía, contra 0,207 y 0,215 de la v0).
+  - **En el Concejo** la «clase media de nombre» se parte en dos: **«Clase
+    media sin dueño»** (vota más que el promedio y tiene la menor base propia
+    de la ciudad) y la de siempre. El norte también se parte en dos: **«Norte
+    de opinión»** (estrato 4, mucha participación, casi sin lista cerrada) y
+    «Norte de figuras» (19 barrios de estrato 5-6).
+  - **En la Alcaldía** entran **«Norte que busca alternativa»**, **«Barrio
+    popular que reparte el voto»** y **«Clase media alineada»**.
+  - ⚠️ Los 11 slugs de la v0 **se conservan**; solo se agregan `sin-dueno`,
+    `opinion`, `alternativa`, `reparte` y `media-alineada`. La matriz del
+    módulo 11 (`estrategia-banco.json`) todavía no tiene fila para los nuevos.
+- **Textos en lenguaje de campaña** (`TEXTOS` en `publicar.py`), cuatro por
+  arquetipo:
+  - `lema`: la frase;
+  - `quien`: quién vive ahí;
+  - `decide`: cómo vota, dicho simple;
+  - `oficio`: cómo ganárselo, rotulado como criterio de oficio.
+
+  Antes eran párrafos de analista que un político no leía.
+- **Relleno de vecino:** 474 barrios sin puesto propio toman el arquetipo del
+  barrio con dato más cercano (≤ 2 km, por centroide). Van en `barrios` con
+  `r: {de, km}` y `w: 0`. Se pintan **tenues y punteados**, y no entran a
+  conteos, tablas ni simulación (`relleno` en el adaptador, `rellenoDe` en la
+  lectura).
+- **Simulador también en Bogotá** (`ADAPT.bogota.sim = true`):
+  - ⚠️ **La sensibilidad por tema (`SENS`) es heurística del equipo**: en Bogotá
+    no hay estudio emocional, y la página lo dice.
+  - `resp` sale del cambio de voto 2019-2023 de la corporación de la campaña.
+  - El ancla del alcalde es **Galán, 26 % de buena gestión e imagen 55 %**
+    (Bogotá Cómo Vamos, EPC 2025), con paso de 5 puntos por palanca.
+  - La base es la corporación (Concejo 2023 / Alcaldía 2023), no un año.
+  - Tablas, media de sensibilidad y ficha usan solo los arquetipos de esa
+    corporación (`ordenDe`).
+- **Portada** (`#aqIntro`): qué es un arquetipo, de dónde sale y cómo se leen
+  principal y ascendente. Se ve una vez por pestaña (`sessionStorage`), y el
+  botón «¿Qué es un arquetipo?» la reabre. Al cerrarla se repinta el mapa,
+  porque nació oculto.
+- **Encabezado personal** (`#aqPersonal`): «{Nombre}, su arquetipo principal
+  al Concejo es X con ascendente Y», con las razones.
+  - Principal = mayor afinidad con al menos 5 % de los votos (`A.afinidad`).
+  - Ascendente = la segunda afinidad, si es ≥ ×1.
+  - Si el arquetipo con más votos no es el principal, se dice: «es volumen, no
+    afinidad».
+- **06 · Los arquetipos de la ciudad**: solo los de la **corporación de la
+  campaña**, como cards con imagen. Hay un botón para ver los de la otra
+  corporación.
+  - Imagen: `assets/candidato-360/arquetipos-bogota/{slug}.webp`, con
+    `onerror` que la quita si no existe.
+  - ⚠️ **Las 16 imágenes no existen todavía**: son trabajo de §10.
+- **05 · Sus barrios**: en pantalla, el top 10; el resto se descarga en CSV
+  (`descargarBarrios`, separado por `;` y con BOM para Excel). Vale para las
+  tres ciudades.
+- `?arqlocal=1` lee los JSON de `Bases de datos/arquetipos-bogota/publicar/`
+  para revisar antes de subir.
+
+### El mapa del CRM no se gira al pasar a barrios en Bogotá (oct-19-2026)
+
+`pintarCiudadBarrios` des-giraba los barrios para calzar con el callejero real.
+Al bajar de localidad a barrio el mapa se volteaba 90°. Ahora, si la ciudad va
+girada (`state.rotado`, solo Bogotá), los barrios se giran igual que las
+localidades. El callejero se quita porque ya no calzaría, y el contorno de
+unidades usa la geometría girada (`contornoUnidades(..., { girado })`). La vista
+de puestos (puntos en coordenadas reales) sigue sin girar y con callejero.
+
+### La campaña de «la misma corporación» se completa en los paneles (oct-19-2026)
+
+Con la ruta «misma corporación», el CRM guarda la campaña **sin territorio**.
+Los paneles lo derivan del historial (`territorioDe`), pero el del electorado
+leía `campana.departamento` directo y respondía «La campaña no tiene territorio
+definido»: sexo y edad no cargaban. Ahora `completarCampana(v)` en
+`candidato-360-panel.js` completa `departamento`, `departamentoNombre`,
+`municipio` y `localidad` al arrancar **cualquier** panel. Bogotá queda como
+`16` + «BOGOTÁ, D.C.». Fuera de Bogotá el departamento sale del slug
+territorial más reciente.

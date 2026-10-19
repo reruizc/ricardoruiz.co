@@ -10,7 +10,8 @@ dos, más las que describen el estilo de voto de esa elección).
 
 Método (heurística declarada, ver LEEME.md):
   1. Variables estandarizadas (media 0, desviación 1 entre los barrios).
-  2. k-medias con semilla fija; k = 6 en Concejo y 5 en Alcaldía.
+  2. k-medias con semilla fija; k = 8 en las dos corporaciones (v1, oct-19-2026;
+     la v0 tenía 6 y 5, respaldo en respaldo-v6-20261019/).
   3. Cada grupo recibe su nombre comparando su centro con una FIRMA escrita a
      mano (qué variables lo distinguen), con asignación óptima: así el nombre
      no depende del número que k-medias le dé al grupo.
@@ -34,26 +35,34 @@ R_BOOT = 200
 
 CORP = {
     'concejo': {
-        'k': 6,
+        'k': 8,
         'vars': ['estrato', 'part23', 'mov_local', 'cerrada', 'logo_abierta', 'arraigo', 'desafeccion'],
         # Firma: qué distingue a cada arquetipo (signo esperado en unidades z).
+        # v1 (oct-19-2026): de 6 a 8. Con k = 8 la «clase media de nombre» se
+        # parte en dos (la que vota poco a nombres de partido y la que vota
+        # mucho sin dueño en el barrio) y el norte en dos (opinión y figuras).
         'firmas': {
-            'gestion':     {'arraigo': 2, 'logo_abierta': -0.5, 'cerrada': -0.3},
-            'partido':     {'cerrada': 1.5, 'estrato': -0.7, 'arraigo': -0.3},
-            'poco-voto':   {'desafeccion': 1.5, 'part23': -1.2, 'mov_local': -1, 'logo_abierta': 1, 'estrato': -1},
-            'movilizada':  {'part23': 2, 'mov_local': 2},
-            'figuras':     {'estrato': 2, 'desafeccion': -1.5, 'cerrada': -1.5},
+            'figuras':     {'estrato': 2.5, 'arraigo': 1.5, 'desafeccion': -2, 'cerrada': -2},
+            'opinion':     {'estrato': 1.4, 'part23': 1.2, 'cerrada': -1.5, 'arraigo': -0.5, 'desafeccion': -1.4},
+            'movilizada':  {'part23': 1.5, 'mov_local': 1.7, 'arraigo': 0.9, 'logo_abierta': -1.3},
+            'gestion':     {'arraigo': 1.7, 'logo_abierta': -0.9},
+            'poco-voto':   {'desafeccion': 1.4, 'part23': -1.1, 'mov_local': -1.1, 'logo_abierta': 1.8, 'estrato': -1.2},
+            'partido':     {'cerrada': 0.9, 'desafeccion': 0.8, 'estrato': -0.6, 'part23': -0.6},
+            'sin-dueno':   {'part23': 0.6, 'mov_local': 0.5, 'arraigo': -0.8},
             'nombre':      {},
         },
     },
     'alcaldia': {
-        'k': 5,
+        'k': 8,
         'vars': ['estrato', 'part23', 'mov_local', 'cruzado', 'alc_oviedo', 'nec_alc', 'blanco_alc', 'alc_bolivar'],
         'firmas': {
-            'estrategico': {'estrato': 2, 'cruzado': 2, 'nec_alc': -2, 'alc_bolivar': -1.5},
-            'decide':      {'part23': 1.5, 'mov_local': 1.5, 'alc_oviedo': 1.5},
-            'cruce-sur':   {'estrato': -1, 'cruzado': 1, 'alc_oviedo': -1, 'part23': -1},
-            'alineada':    {'cruzado': -1, 'nec_alc': 1, 'alc_bolivar': 1},
+            'estrategico': {'estrato': 2.5, 'cruzado': 2.5, 'nec_alc': -2.9, 'alc_bolivar': -2.4, 'blanco_alc': -2},
+            'alternativa': {'estrato': 1.3, 'part23': 1.3, 'alc_oviedo': 1.2, 'nec_alc': -1.2, 'alc_bolivar': -1.6},
+            'decide':      {'part23': 1.5, 'mov_local': 1.4, 'alc_oviedo': 1.1, 'cruzado': -0.8},
+            'cruce-sur':   {'estrato': -1.5, 'part23': -1.3, 'alc_oviedo': -1.9, 'blanco_alc': 1.2, 'cruzado': 0.9},
+            'reparte':     {'estrato': -0.5, 'cruzado': 0.6, 'alc_oviedo': -0.8, 'alc_bolivar': 0.5},
+            'alineada':    {'estrato': -0.8, 'part23': -0.7, 'nec_alc': 0.9, 'blanco_alc': 1.2, 'alc_bolivar': 1.0, 'cruzado': -0.6},
+            'media-alineada': {'cruzado': -0.8, 'nec_alc': 0.7, 'alc_oviedo': 0.4},
             'tradicional': {},
         },
     },
@@ -67,14 +76,19 @@ FICHA = {
         'partido':    ('Periferia de partido', '#7c3aed', 'Se vota la lista, no la persona: alto voto a listas cerradas, electorado joven.'),
         'poco-voto':  ('Periferia que vota poco', '#64748b', 'Participación baja, y el voto local se moviliza menos que el nacional; muchos tarjetones nulos o sin marcar.'),
         'movilizada': ('Ciudadela movilizada', '#0d9488', 'La participación más alta de la ciudad y, sobre todo, sale a votar lo local más que el promedio.'),
-        'figuras':    ('Norte de figuras', '#1d4ed8', 'Casi sin voto perdido; se vota a nombres conocidos de toda la ciudad, más a la derecha.'),
+        'figuras':    ('Norte de figuras', '#1d4ed8', 'Estrato alto, casi sin voto perdido y con redes personales de figuras conocidas.'),
+        'opinion':    ('Norte de opinión', '#0e7490', 'Estrato alto, participa mucho y no vota listas cerradas: se decide por opinión, no por estructura.'),
+        'sin-dueno':  ('Clase media sin dueño', '#be185d', 'Vota más que el promedio y casi nadie tiene el barrio amarrado: el voto está libre.'),
         'nombre':     ('Clase media de nombre', '#ca8a04', 'El grueso de Bogotá: vota a nombres conocidos dentro del electorado de su partido.'),
     },
     'alcaldia': {
         'estrategico': ('Norte estratégico', '#1d4ed8', 'Concentra el voto en el favorito aunque al Concejo vote otra cosa.'),
+        'alternativa': ('Norte que busca alternativa', '#0e7490', 'Clase media alta que participa mucho y probó al candidato sin partido.'),
         'decide':      ('Clase media que decide', '#0d9488', 'Alta participación y voto que se mueve: fue de Claudia en 2019 y se partió entre Galán y Oviedo en 2023.'),
         'cruce-sur':   ('Sur popular de voto cruzado', '#c2410c', 'Al Concejo vota a las maquinarias de su barrio; a la Alcaldía, a otra cosa.'),
+        'reparte':     ('Barrio popular que reparte el voto', '#9a3412', 'Vota distinto en los dos tarjetones, sin irse a los extremos.'),
         'alineada':    ('Periferia joven alineada', '#7c3aed', 'Vota a la Alcaldía como vota al Concejo; la contienda más repartida.'),
+        'media-alineada': ('Clase media alineada', '#be185d', 'Clase media que vota a la Alcaldía igual que al Concejo.'),
         'tradicional': ('Clase media tradicional', '#ca8a04', 'Estable entre elecciones, mayoría holgada al ganador, participación media.'),
     },
 }
@@ -173,7 +187,7 @@ def tipologia(filas, corp):
 
 def main():
     filas = leer()
-    out = {'v': '2026-10-14', 'ciudad': 'Bogotá', 'naturaleza': 'lectura observada 2023 (borrador v0)',
+    out = {'v': '2026-10-19', 'ciudad': 'Bogotá', 'naturaleza': 'lectura observada 2023 (v1, 8 arquetipos)',
            'fuente': 'Registraduría: Alcaldía y Concejo 2019 y 2023, presidencial 2026 1V; censo electoral 2023 y 2026; estrato SDP/IDECA',
            'corporaciones': {}, 'barrios': {}}
     for corp in CORP:
@@ -193,7 +207,7 @@ def main():
                       'vars': {k: (round(f[k], 4) if isinstance(f[k], float) else f[k]) for k in
                                ('part23', 'part26', 'mov_local', 'logo', 'cerrada', 'logo_abierta', 'arraigo', 'sigue_lista',
                                 'desafeccion', 'incumbente', 'top1_cand', 'cruzado', 'alc_galan', 'alc_oviedo', 'alc_bolivar',
-                                'nec_alc', 'blanco_alc', 'vol_alc_19_23', 'conc_izq', 'conc_ci', 'conc_c', 'conc_cd', 'conc_d',
+                                'nec_alc', 'blanco_alc', 'vol_alc_19_23', 'vol_19_23', 'conc_izq', 'conc_ci', 'conc_c', 'conc_cd', 'conc_d',
                                 'joven', 'mayor', 'votantes23', 'censo23')}})
     # cruce Concejo × Alcaldía
     cruce = {}

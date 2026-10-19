@@ -209,11 +209,12 @@
   }
 
   /* ── Bogotá ───────────────────────────────────────────────────────────── */
-  const ARQ_BOG_BASE = RR.publicUrl('congreso-2026/output/arquetipos-bogota');
-  const ARQ_BOG_URL = `${ARQ_BOG_BASE}/arquetipos-bogota.json?v=20261014`;
+  /* `?arqlocal=1` lee lo que dejó publicar.py en el repo, para revisar antes de subir. */
+  const ARQ_BOG_BASE = /[?&]arqlocal=1/.test(global.location?.search || '') ? 'Bases%20de%20datos/arquetipos-bogota/publicar' : RR.publicUrl('congreso-2026/output/arquetipos-bogota');
+  const ARQ_BOG_URL = `${ARQ_BOG_BASE}/arquetipos-bogota.json?v=20261019`;
   /* El catastral simplificado (~4 m): el panel no necesita los 6,5 MB del
      completo ni los 19 archivos por localidad del CRM. */
-  const BOG_GEO_URL = `${ARQ_BOG_BASE}/barrios-bogota.json?v=20261014`;
+  const BOG_GEO_URL = `${ARQ_BOG_BASE}/barrios-bogota.json?v=20261019`;
   const BOG_DIC_JS = 'candidato-360-data/bogota-puesto-barrio.js';
   const ZONA_FUERA = new Set(['90', '98']);   /* puesto censo y cárceles: no son de ningún barrio */
   /* Cómo se escribe cada variable: porcentaje, decimal o índice. */
@@ -264,6 +265,8 @@
       corteArt: k => k === 'alcaldia' ? 'la Alcaldía' : 'el Concejo', corteA: k => k === 'alcaldia' ? 'a la Alcaldía' : 'al Concejo', idsDe: k => D.orden?.[k] || [], ids: [...(D.orden?.[k0] || []), ...(D.orden?.[k1] || [])],
       nombreDe: id => F[id]?.nombre || 'Sin dato', cortoDe: id => F[id]?.nombre || 'Sin dato', colorDe: id => F[id]?.color || '#6b7280',
       geo, codeDe: p => String(p.codigo || ''), nombreGeo: p => p.nombre || 'Barrio',
+      /* Barrio sin puesto propio, pintado con el arquetipo de su vecino. */
+      rellenoDe: code => D.barrios[code]?.r || null,
       dominanteDe: (code, k) => D.barrios[code]?.[ck(k)]?.d,
       mezclaDe: (code, k) => D.barrios[code]?.[ck(k)]?.m || null,
       confianzaDe: (code, k) => D.barrios[code]?.[ck(k)]?.k,

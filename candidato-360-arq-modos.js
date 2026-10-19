@@ -89,26 +89,42 @@
     bogota(L) {
       const D = L.D, F = D.familias, cs = L.cortes, ck = k => k.charAt(0);
       const B = {};
+      /* Volatilidad de la corporación de la campaña (cambio de voto 2019-2023):
+         más volátil, más responde al escenario. Los barrios rellenados con su
+         vecino (`r`) heredan su mezcla y no pesan en nada. */
+      const volK = cs[0] === 'alcaldia' ? 'vo' : 'vc';
       for (const [code, b] of Object.entries(D.barrios)) {
         const dom = {}, mez = {}, peso = {};
         cs.forEach(k => { dom[k] = b[ck(k)]?.d; mez[k] = b[ck(k)]?.m || null; peso[k] = b.w; });
-        B[code] = { nombre: b.n, unidad: b.l, dom, mez, resp: .5, peso, raw: b };
+        const vol = Number(b.x?.[volK] ?? D.barrios[b.r?.de]?.x?.[volK] ?? .25);
+        B[code] = { nombre: b.n, unidad: b.l, dom, mez, resp: Math.max(.2, Math.min(1.4, .3 + 1.6 * vol)), peso, raw: b, relleno: b.r || null };
       }
       return {
-        id: 'bogota', nombre: 'Bogotá', ventana: null, sim: false, cortes: cs,
+        id: 'bogota', nombre: 'Bogotá', ventana: null, sim: true, cortes: cs,
         corteNombre: k => L.corteNombre(k), corteArt: k => L.corteArt(k), corteTxt: k => `${L.corteNombre(k)} 2023`,
         nat: Object.fromEntries(cs.map(k => [k, 'lectura 2023'])),
         orden: [...(D.orden?.[cs[0]] || []), ...(D.orden?.[cs[1]] || [])], ordenDe: k => D.orden?.[k] || [],
         B,
-        fam: id => F[id] && { nombre: F[id].nombre, largo: F[id].nombre, color: F[id].color, sens: {} },
+        fam: id => F[id] && { nombre: F[id].nombre, largo: F[id].nombre, color: F[id].color, sens: F[id].sens || {} },
         mezcla: 'mezcla',
         share: () => null,
-        movilidad: 'Movilidad', ancla: null, alcaldia: { mas: {}, menos: {} },
+        movilidad: 'Movilidad (TransMilenio, vías, metro en obra)',
+        ancla: {
+          alcalde: 'Carlos Fernando Galán', valor: 26, paso: 5, imagen: 55,
+          fuente: 'Bogotá Cómo Vamos 2025', detalle: 'Encuesta de Percepción Ciudadana 2025, publicada el 4 de diciembre de 2025',
+          url: 'https://bogotacomovamos.org/la-percepcion-de-inseguridad-aumenta-en-bogota-mientras-los-jovenes-lideran-el-optimismo-ciudadano-revela-la-encuesta-de-percepcion-ciudadana-2025/',
+          nota: 'La encuesta no publica la gestión del alcalde por localidad, así que el ancla es la misma en cada barrio.',
+        },
+        /* Regla nuestra: arriba premia a quien vota estable o vota por quien
+           resuelve; abajo, a quien vota desde la oposición o desde la opinión. */
+        alcaldia: { mas: { tradicional: .7, 'media-alineada': .4, decide: .3, estrategico: .3, nombre: .5, gestion: .4, movilizada: .3, 'sin-dueno': .3 },
+          menos: { alineada: .8, 'cruce-sur': .5, reparte: .3, alternativa: .4, partido: .7, 'poco-voto': .3, opinion: .4, figuras: .3 } },
+        senses: 'heuristica',
         introVer: n => `Los ${n} barrios de Bogotá con puesto de votación propio y sus arquetipos de comportamiento electoral: una tipología para el Concejo y otra para la Alcaldía. Cada barrio es una mezcla; el color es el que manda.`,
         toque: ' Toque un barrio para ver su ficha: qué arquetipo manda y con cuánto, cómo vota en cada corporación y qué significa para una campaña.',
         notaMapa: ' Bogotá va girada 90°, como en el resto del producto: el norte queda a la izquierda. En gris, los barrios sin puesto de votación propio.',
         ficha: null,
-        campana: id => { const f = F[id] || {}; return { lema: f.lema, decide: f.decide, oficio: f.oficio }; },
+        campana: id => { const f = F[id] || {}; return { lema: f.lema, perfil: f.quien, decide: f.decide, oficio: f.oficio }; },
       };
     },
     cartagena(L) {
@@ -226,7 +242,7 @@
     for (const id in o) o[id] /= t || 1;
     return o;
   }
-  function domCount(a) { const c = {}; Object.values(X.B).forEach(b => { const d = b.dom?.[a]; if (d) c[d] = (c[d] || 0) + 1; }); return c; }
+  function domCount(a) { const c = {}; Object.values(X.B).forEach(b => { const d = b.dom?.[a]; if (d && !b.relleno) c[d] = (c[d] || 0) + 1; }); return c; }
 
   /* ── El cambio de modo ──────────────────────────────────────────────── */
   function pintarModos() {
@@ -291,11 +307,12 @@
         if (!b || !dom) return { color: '#fff', weight: .6, fillColor: '#c9ccc4', fillOpacity: .18 };
         if (pinta) { const p = b.mez?.[a]?.[pinta] || 0; return { color: sel ? '#111' : '#fff', weight: sel ? 2.4 : .6, fillColor: color(pinta), fillOpacity: .06 + .84 * Math.sqrt(p / maxPeso) }; }
         const pd = b.mez?.[a]?.[dom];
+        if (b.relleno) return { color: sel ? '#111' : 'rgba(40,40,40,.45)', weight: sel ? 2.4 : .6, dashArray: '2 3', fillColor: color(dom), fillOpacity: .3 };
         return { color: sel ? '#111' : '#fff', weight: sel ? 2.4 : .6, fillColor: color(dom), fillOpacity: pd == null ? .75 : .35 + .6 * Math.min(1, Math.max(0, (pd - .2) / .5)) };
       },
       onEachFeature: (f, layer) => {
         const code = l.codeDe(f.properties), b = X.B[code];
-        layer.bindTooltip(`<b>${esc(lugar(l.nombreGeo(f.properties)))}</b> · ${b?.dom?.[a] ? esc(nombre(b.dom[a])) : 'sin medición'}`, { className: 'aq-tt', sticky: true });
+        layer.bindTooltip(`<b>${esc(lugar(l.nombreGeo(f.properties)))}</b> · ${b?.dom?.[a] ? esc(nombre(b.dom[a])) + (b.relleno ? ' (sin puesto propio: lectura de su vecino)' : '') : 'sin medición'}`, { className: 'aq-tt', sticky: true });
         if (b) layer.on('click', () => { S.verSel = code; fichaVer(code); M.verCapa.setStyle(M.verCapa.options.style); if (matchMedia('(max-width:900px)').matches) $('aqVerFicha').scrollIntoView({ behavior: 'instant', block: 'start' }); });
       },
     }).addTo(M.ver);
@@ -381,10 +398,11 @@
   const conc = v => v == null ? '—' : `${dec(v)} %`;
   const FICHA = {
     bogota: {
-      sub: b => { const r = b.raw, k = r[S.verAno.charAt(0)]?.k; return `${r.e != null ? ` · estrato ${dec(r.e.toFixed(1))}` : ''}${k != null ? ` · confianza ${pct(k)}${k < .6 ? ' · de frontera' : ''}` : ''}`; },
+      sub: b => { const r = b.raw; if (r.r) return ` · sin puesto de votación propio · lectura heredada de ${esc(lugar(X.B[r.r.de]?.nombre || 'su vecino'))} (${dec(r.r.km)} km)`; const k = r[S.verAno.charAt(0)]?.k; return `${r.e != null ? ` · estrato ${dec(r.e.toFixed(1))}` : ''}${k != null ? ` · confianza ${pct(k)}${k < .6 ? ' · de frontera' : ''}` : ''}`; },
       /* Cómo vota el barrio en la corporación elegida, contra la ciudad. */
       cuerpo: (b, a) => {
         const r = b.raw, v = k => L().variable(k, r.x?.[k]);
+        if (r.r) return '<p class="aq-v-nota">Este barrio no tiene puesto de votación propio: quienes viven aquí votan en puestos de barrios vecinos. Toma el arquetipo del barrio con dato más cercano; no tiene votos propios ni entra a ningún total.</p>';
         const llaves = a === 'alcaldia' ? ['p', 'ml', 'cr', 'ov', 'ga', 'bo', 'na', 'ba', 'vo'] : ['p', 'ml', 'ar', 'la', 'ce', 'de', 'in', 't1'];
         return `<h5>Cómo vota el barrio <small>(${esc(txtCorte(a))} · contra la ciudad)</small></h5>`
           + llaves.map(k => { const x = v(k); return `<div class="fila"><span>${esc(x.t)}</span><b>${esc(x.v)} <em>· ${esc(x.c)}</em></b></div>`; }).join('')
@@ -437,8 +455,9 @@
   function activo() { return PALANCAS.some(p => S.pal[p.id] && visible(p)); }
   const MEDIA = {};
   function mediaSens(t) {
-    const k = `${X.id}:${t}`;
-    if (!(k in MEDIA)) { const v = X.orden.map(id => F(id)?.sens?.[t] ?? 2.5); MEDIA[k] = v.reduce((a, b) => a + b, 0) / v.length; }
+    const k = `${X.id}:${S.simBase}:${t}`;
+    /* Bogotá trae dos tipologías: la media es la de la corporación simulada. */
+    if (!(k in MEDIA)) { const v = ordenDe(S.simBase).map(id => F(id)?.sens?.[t] ?? 2.5); MEDIA[k] = v.reduce((a, b) => a + b, 0) / v.length; }
     return MEDIA[k];
   }
   function simular(b, base) {
@@ -476,7 +495,7 @@
 
   function pintarSim() {
     const l = L(), A = X.ancla;
-    $('aqSimIntro').innerHTML = `Cada palanca va de −5 a +5. Cuando un tema se deteriora, ganan peso los arquetipos más sensibles a ese tema según el estudio; cuando mejora, se calman. Lo que se mueve es ${X.id === 'cartagena' ? 'la mezcla de los ocho arquetipos de cada barrio' : 'el perfil de cada barrio en los cinco arquetipos'}, y el mapa pinta el que queda mandando.`;
+    $('aqSimIntro').innerHTML = `Cada palanca va de −5 a +5. Cuando un tema se deteriora, ganan peso los arquetipos más sensibles a ese tema${X.senses === 'heuristica' ? ' (en Bogotá esa sensibilidad es criterio del equipo: no hay estudio de emociones)' : ' según el estudio'}; cuando mejora, se calman. Lo que se mueve es ${X.id === 'medellin' ? 'el perfil de cada barrio en los cinco arquetipos' : `la mezcla de los ocho arquetipos de cada barrio${X.cortes ? ` (${esc(txtCorte(S.simBase))})` : ''}`}, y el mapa pinta el que queda mandando.`;
     $('aqSimNota').innerHTML = `La simulación es nuestra: parte del ${X.mezcla} de cada barrio y de qué tan sensible es cada arquetipo a cada tema, y aplica una regla declarada: el peso de cada arquetipo se multiplica según qué tan sensible es a los temas que se movieron, más en los barrios que históricamente han sido más volátiles. La palanca del alcalde arranca en la cifra medida: <b>${A.valor} %</b> califica buena o muy buena la gestión de ${esc(A.alcalde)} y <b>${A.imagen} %</b> tiene imagen favorable de él (<a href="${A.url}" target="_blank" rel="noopener">${esc(A.fuente)}</a>, ${esc(A.detalle)}); se usa la gestión porque es lo que un barrio premia o castiga. ${esc(A.nota)} A qué arquetipos mueve esa palanca es regla nuestra. Sirve para comparar escenarios, no para pronosticar.`;
     if ($('aqSimPalancas').dataset.ciudad !== X.id) {
       $('aqSimPalancas').innerHTML = `<div class="aq-esc"><span class="rot">Escenarios</span>${ESCENARIOS.map(([t], i) => `<button type="button" class="aq-tog" data-esc="${i}">${esc(t)}</button>`).join('')}<button type="button" class="aq-tog" data-esc="reset">↻ Todo en cero</button></div>`
@@ -497,7 +516,7 @@
         valoresPal(); repintarSim();
       }));
     }
-    $('aqSimControles').innerHTML = `<span class="rot">Parte de</span>${[['2027', `2027 · ${X.nat['2027']}`], ['2023', `2023 · ${X.nat['2023']}`]].map(([k, t]) => `<button type="button" class="aq-tog" data-base="${k}" aria-pressed="${S.simBase === k}">${t}</button>`).join('')}`
+    $('aqSimControles').innerHTML = `<span class="rot">Parte de</span>${(X.cortes ? X.cortes.map(k => [k, txtCorte(k)]) : [['2027', `2027 · ${X.nat['2027']}`], ['2023', `2023 · ${X.nat['2023']}`]]).map(([k, t]) => `<button type="button" class="aq-tog" data-base="${k}" aria-pressed="${S.simBase === k}">${t}</button>`).join('')}`
       + `<span class="rot" style="margin-left:12px">Qué pinta</span>${[['dom', 'El que manda en el escenario'], ['cambio', 'Solo los barrios que cambian']].map(([k, t]) => `<button type="button" class="aq-tog" data-sver="${k}" aria-pressed="${S.simVer === k}">${t}</button>`).join('')}`;
     $('aqSimControles').querySelectorAll('[data-base]').forEach(b => b.addEventListener('click', () => { S.simBase = b.dataset.base; pintarSim(); }));
     $('aqSimControles').querySelectorAll('[data-sver]').forEach(b => b.addEventListener('click', () => { S.simVer = b.dataset.sver; pintarSim(); }));
@@ -517,6 +536,7 @@
         const code = l.codeDe(f.properties), r = RS[code], sel = code === S.simSel;
         if (!r) return { color: '#fff', weight: .6, fillColor: '#c9ccc4', fillOpacity: .18 };
         const cambia = r.d0 !== r.d1;
+        if (X.B[code]?.relleno) return { color: 'rgba(40,40,40,.45)', weight: .6, dashArray: '2 3', fillColor: S.simVer === 'cambio' && !cambia ? '#c9ccc4' : color(r.d1), fillOpacity: S.simVer === 'cambio' && !cambia ? .15 : .3 };
         if (S.simVer === 'cambio') return { color: sel || cambia ? '#111' : '#fff', weight: sel ? 2.4 : cambia ? 1.3 : .5, fillColor: cambia ? color(r.d1) : '#c9ccc4', fillOpacity: cambia ? .85 : .2 };
         return { color: sel || cambia ? '#111' : '#fff', weight: sel ? 2.4 : cambia ? 1.4 : .6, dashArray: cambia && !sel ? '3 2' : null, fillColor: color(r.d1), fillOpacity: .35 + .6 * Math.min(1, Math.max(0, ((r.sim[r.d1] || .5) - .2) / .5)) };
       },
@@ -537,7 +557,9 @@
     const peso = code => Number(X.B[code]?.peso?.[base] || 0);
     const agrega = (pesoDe, cual) => { const o = {}; let t = 0; for (const [code, r] of Object.entries(RS)) { const w = pesoDe(code); if (!w) continue; t += w; for (const [id, p] of Object.entries(r[cual])) o[id] = (o[id] || 0) + w * p; } for (const id in o) o[id] /= t || 1; return o; };
     const c0 = agrega(peso, 'base'), c1 = agrega(peso, 'sim');
-    const cambian = Object.entries(RS).filter(([, r]) => r.d0 !== r.d1).sort((a, b) => peso(b[0]) - peso(a[0]));
+    /* Los barrios rellenados con su vecino se pintan pero no se cuentan. */
+    const propios = Object.keys(RS).filter(c => !X.B[c]?.relleno);
+    const cambian = Object.entries(RS).filter(([c, r]) => r.d0 !== r.d1 && !X.B[c]?.relleno).sort((a, b) => peso(b[0]) - peso(a[0]));
     const votosCiudad = cambian.reduce((s, [c]) => s + peso(c), 0), totCiudad = Object.keys(RS).reduce((s, c) => s + peso(c), 0);
     const flujos = {};
     cambian.forEach(([, r]) => { const k = `${r.d0}>${r.d1}`; flujos[k] = (flujos[k] || 0) + 1; });
@@ -549,20 +571,20 @@
       if (Object.keys(v0).length) lente = `<div class="aq-sim-bloque"><h5>${esc(V.Voto)} en este escenario</h5>${tablaDelta(v0, v1)}</div>`;
     }
     $('aqSimResumen').innerHTML = !activo()
-      ? `<p class="aq-v-nota">Todas las palancas en cero: el mapa es el ${base} del estudio (${X.nat[base]}) tal cual. Mueva una palanca o escoja un escenario.</p>`
-      : `<div class="aq-sim-cifras"><div><b>${cambian.length}</b><span>de ${Object.keys(RS).length} barrios cambian de arquetipo dominante</span></div><div><b>${pct(votosCiudad / (totCiudad || 1))}</b><span>del voto de la ciudad vive en esos barrios</span></div></div>
+      ? `<p class="aq-v-nota">Todas las palancas en cero: el mapa es ${X.cortes ? `la lectura de ${esc(txtCorte(base))}` : `el ${base} del estudio (${X.nat[base]})`} tal cual. Mueva una palanca o escoja un escenario.</p>`
+      : `<div class="aq-sim-cifras"><div><b>${cambian.length}</b><span>de ${propios.length} barrios con puesto de votación cambian de arquetipo dominante</span></div><div><b>${pct(votosCiudad / (totCiudad || 1))}</b><span>del voto de la ciudad vive en esos barrios</span></div></div>
         <div class="aq-sim-grid"><div class="aq-sim-bloque"><h5>${esc(X.nombre)}: antes y después</h5>${tablaDelta(c0, c1)}</div>${lente}
         <div class="aq-sim-bloque"><h5>Los movimientos</h5>${Object.entries(flujos).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, n]) => { const [x, y] = k.split('>'); return `<div class="fila"><span>${chip(x)} → ${chip(y)}</span><b>${n}</b></div>`; }).join('') || '<p class="aq-v-nota">Ningún barrio cambia de dominante: el escenario mueve los perfiles, pero no alcanza a voltear a nadie.</p>'}
         ${cambian.length ? `<p class="aq-v-nota">Los más grandes que cambian: ${cambian.slice(0, 8).map(([c]) => esc(lugar(X.B[c].nombre))).join(', ')}.</p>` : ''}</div></div>`;
   }
   function tablaDelta(a, b) {
-    return `<ul class="aq-lista aq-delta">${X.orden.map(id => [id, a[id] || 0, b[id] || 0]).sort((x, y) => y[2] - x[2]).map(([id, p0, p1]) => `<li><span class="pt" style="background:${color(id)}"></span><b>${pct(p1)}</b><span>${esc(nombre(id))}</span><em class="${p1 - p0 > .003 ? 'sube' : p1 - p0 < -.003 ? 'baja' : ''}">${pp(p1 - p0)}</em></li>`).join('')}</ul>`;
+    return `<ul class="aq-lista aq-delta">${ordenDe(S.simBase).map(id => [id, a[id] || 0, b[id] || 0]).sort((x, y) => y[2] - x[2]).map(([id, p0, p1]) => `<li><span class="pt" style="background:${color(id)}"></span><b>${pct(p1)}</b><span>${esc(nombre(id))}</span><em class="${p1 - p0 > .003 ? 'sube' : p1 - p0 < -.003 ? 'baja' : ''}">${pp(p1 - p0)}</em></li>`).join('')}</ul>`;
   }
   function fichaSim() {
     const code = S.simSel, r = RS[code], b = X.B[code]; if (!r || !b) return;
-    const movs = X.orden.map(id => [id, (r.sim[id] || 0) - (r.base[id] || 0)]).sort((x, y) => Math.abs(y[1]) - Math.abs(x[1])).slice(0, 4);
+    const movs = ordenDe(S.simBase).map(id => [id, (r.sim[id] || 0) - (r.base[id] || 0)]).sort((x, y) => Math.abs(y[1]) - Math.abs(x[1])).slice(0, 4);
     $('aqSimFicha').innerHTML = `<h5>${esc(lugar(b.nombre))}</h5><div style="color:var(--muted);font-size:12px;margin-bottom:6px">${esc(lugar(b.unidad))}${b.volNivel ? ` · ${X.id === 'cartagena' ? 'volatilidad' : 'riesgo de cambio'} ${esc(String(b.volNivel).toLowerCase())}` : ''}</div>
-      <div class="fila"><span>Manda hoy (${S.simBase})</span><b>${chip(r.d0)}</b></div>
+      <div class="fila"><span>Manda hoy (${esc(txtCorte(S.simBase))})</span><b>${chip(r.d0)}</b></div>
       <div class="fila"><span>En el escenario</span><b>${chip(r.d1)}${r.d0 !== r.d1 ? '<span class="aq-marca">cambia</span>' : ''}</b></div>
       <div style="margin-top:8px;font-size:11.5px;color:var(--muted)">Antes</div><div class="mez">${orden(r.base).map(([id, p]) => `<i style="flex:${p};background:${color(id)}"></i>`).join('')}</div>
       <div style="font-size:11.5px;color:var(--muted)">Después</div><div class="mez">${orden(r.sim).map(([id, p]) => `<i style="flex:${p};background:${color(id)}"></i>`).join('')}</div>
@@ -579,6 +601,7 @@
     /* Bogotá recorre corporaciones; si antes se leyó otra ciudad, el corte
        que quedó guardado no existe aquí. */
     S.verAno = X?.cortes ? X.cortes[0] : (AÑOS.includes(S.verAno) ? S.verAno : '2027');
+    S.simBase = X?.cortes ? X.cortes[0] : (AÑOS.includes(S.simBase) ? S.simBase : '2027');
     pintarModos();
     if (!X) return;
     const h = location.hash;

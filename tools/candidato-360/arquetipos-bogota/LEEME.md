@@ -1,4 +1,4 @@
-# Candidato 360 · arquetipos de voto de Bogotá (v1 · integrado al panel 05 el 14-oct-2026)
+# Candidato 360 · arquetipos de voto de Bogotá (v1 · 8 por corporación desde el 19-oct-2026)
 
 Arquetipos de **comportamiento electoral observado**, barrio por barrio, por
 corporación (Concejo y Alcaldía 2023). No son la cartografía emocional de
@@ -7,6 +7,12 @@ oficiales, censo y estrato. Se pueden combinar después, pero no se homologan.
 
 La lectura para discutir (nombres, cifras, mapas, límites) está en
 `Propuestas/candidato-360/arquetipos-bogota/borrador.md`.
+
+> **19-oct-2026:** k = 8 en Concejo y en Alcaldía (antes 6 y 5). Textos en
+> lenguaje de campaña, `SENS` heurístico para el simulador y relleno de vecino
+> para los barrios sin puesto (`publicar.py`). Detalle en `candidato-360.md` §11,
+> «Arquetipos de Bogotá v1». Respaldo de la v0 en
+> `Bases de datos/arquetipos-bogota/respaldo-v6-20261019/`.
 
 ## Correr
 

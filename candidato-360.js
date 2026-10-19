@@ -3652,10 +3652,10 @@ function desrotarGeoJSON(geoData) {
   const geometry = g => g.type === 'Polygon' ? { ...g, coordinates: g.coordinates.map(r => r.map(back)) } : g.type === 'MultiPolygon' ? { ...g, coordinates: g.coordinates.map(p => p.map(r => r.map(back))) } : g;
   return { ...geoData, features: geoData.features.map(f => ({ ...f, geometry: geometry(f.geometry) })) };
 }
-function contornoUnidades(state, key) {
+function contornoUnidades(state, key, { girado = false } = {}) {
   if (!state?.geoData) return null;
-  if (state.rotado && !state.geoSinRotar) state.geoSinRotar = desrotarGeoJSON(state.geoData);
-  const geo = state.rotado ? state.geoSinRotar : state.geoData;
+  if (state.rotado && !girado && !state.geoSinRotar) state.geoSinRotar = desrotarGeoJSON(state.geoData);
+  const geo = state.rotado && !girado ? state.geoSinRotar : state.geoData;
   const capa = L.geoJSON(geo, { interactive: false, style: f => { const foco = state.config.code(f.properties) === key; return { fill: false, color: '#173f2c', weight: foco ? 3.2 : 1.1, opacity: foco ? .95 : .5 }; } });
   capa._contorno = true;
   return capa;
@@ -3740,14 +3740,20 @@ async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = tr
   renderMapBreakdown(valoresFoco, Object.fromEntries(foco.map(f => [f.properties._k, f.properties._n])), tituloBarrial(baseFoco));
   const max = Math.max(1, ...features.map(f => Number(values[f.properties._k] || 0)));
   if (crmBarrioLayer) crmLeafletMap.removeLayer(crmBarrioLayer);
-  ponerBasemap('crm-basemap-tenue');
+  /* ⚠️ Bogotá (oct-19-2026, pedido de Ricardo): los barrios se dibujan GIRADOS
+     90°, igual que las localidades y que el panel de arquetipos; antes se
+     des-giraban para calzar con el callejero y el mapa se volteaba al bajar de
+     nivel. Girados, el callejero real ya no calza, así que se quita. */
+  const girar = Boolean(state.rotado);
+  const vista = girar ? rotateGeoJSON90Left({ type: 'FeatureCollection', features }).features : features;
+  if (girar) quitarBasemap(); else ponerBasemap('crm-basemap-tenue');
   if (crmMapLayer) crmLeafletMap.removeLayer(crmMapLayer);   /* se saca del mapa, no del grupo: vuelve al subir de nivel */
   const estilo = f => {
     const k = f.properties._k, enFoco = !todo && f.properties._u === key, r = !conPuesto.has(k) && relleno.get(k);
     if (r) { const v = Number(values[r.de] || 0); return { fillColor: window.C360Franjas ? C360Franjas.franja(v ? MAP_COLOR(v / max) : '') : MAP_COLOR(v / max), fillOpacity: v ? .75 : .4, color: 'rgba(16,34,56,.45)', weight: enFoco ? .9 : .6, dashArray: null }; }
     const v = Number(values[k] || 0); return { fillColor: MAP_COLOR(v / max), fillOpacity: v ? .62 : .1, color: enFoco ? 'rgba(16,34,56,.7)' : 'rgba(16,34,56,.3)', weight: enFoco ? .9 : .5, dashArray: null };
   };
-  crmBarrioLayer = L.geoJSON({ type: 'FeatureCollection', features }, {
+  crmBarrioLayer = L.geoJSON({ type: 'FeatureCollection', features: vista }, {
     style: estilo,
     onEachFeature: (f, layer) => {
       const k = f.properties._k, u = f.properties._u, v = Number(values[k] || 0), r = !conPuesto.has(k) && relleno.get(k);
@@ -3770,10 +3776,11 @@ async function pintarCiudadBarrios(state, fuente, features, key, { encuadre = tr
       if (u && u !== key) layer.on('click', () => { renderBarriosForArea(u, { encuadre: false }); setMapLevel('barrio'); });
     }
   });
-  const contorno = contornoUnidades(state, todo ? null : key); if (contorno) crmBarrioLayer.addLayer(contorno);
+  const contorno = contornoUnidades(state, todo ? null : key, { girado: girar }); if (contorno) crmBarrioLayer.addLayer(contorno);
   crmBarrioLayer._vitrinaTop = vitrinaTop(valoresFoco);
   crmBarrioLayer.addTo(crmLeafletMap);
-  if (encuadre && foco.length) encuadrarBounds(recortarAVentana(L.geoJSON({ type: 'FeatureCollection', features: foco }).getBounds(), state.config.ventana), 20);
+  const focoVista = todo ? vista : vista.filter(f => f.properties._u === key);
+  if (encuadre && focoVista.length) encuadrarBounds(girar ? L.geoJSON({ type: 'FeatureCollection', features: focoVista }).getBounds() : recortarAVentana(L.geoJSON({ type: 'FeatureCollection', features: foco }).getBounds(), state.config.ventana), 20);
   const donde = todo ? (NOMBRE_BONITO(state.tituloLugar || '') || 'la ciudad') : fuente.donde(key, foco);
   $('crmMapNote').innerHTML = notaBarrial(donde, baseFoco) + (todo
     ? ` Toda la ciudad por barrio, con una sola escala de color; el borde marca cada ${escHtml(state.config.title)}. Toque un barrio para abrir su zona.`

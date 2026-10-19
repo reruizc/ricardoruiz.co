@@ -34,68 +34,145 @@ OUT = DIR / 'publicar'
 
 CORP = {'concejo': 'Concejo', 'alcaldia': 'Alcaldía'}
 
-# Colores validados con el validador de paleta (dataviz): Alcaldía pasa todos
-# los pares; Concejo pasa visión normal y queda en 6,9 de separación para
-# daltonismo, legal con apoyo (leyenda, nombre al pasar el cursor, ficha).
+# v1 (oct-19-2026): 8 arquetipos por corporación. Los 6+5 de la v0 conservan
+# su color; los nuevos toman tonos que no chocan con sus vecinos de mapa.
 COLOR = {
-    'figuras': '#2a78d6', 'nombre': '#eda100', 'partido': '#4a3aa7',
-    'gestion': '#e34948', 'poco-voto': '#008300', 'movilizada': '#1baf7a',
-    'estrategico': '#2a78d6', 'tradicional': '#eda100', 'alineada': '#4a3aa7',
-    'decide': '#e87ba4', 'cruce-sur': '#008300',
+    # Concejo
+    'figuras': '#2a78d6', 'opinion': '#0e7490', 'nombre': '#eda100', 'sin-dueno': '#c026d3',
+    'partido': '#4a3aa7', 'gestion': '#e34948', 'poco-voto': '#008300', 'movilizada': '#1baf7a',
+    # Alcaldía
+    'estrategico': '#2a78d6', 'alternativa': '#0e7490', 'tradicional': '#eda100', 'media-alineada': '#c026d3',
+    'alineada': '#4a3aa7', 'decide': '#e87ba4', 'cruce-sur': '#008300', 'reparte': '#9a3412',
 }
 
+# Los textos van en lenguaje de campaña, para un político y no para un
+# analista (pedido de Ricardo, oct-19-2026):
+#   lema   · una frase que se recuerda
+#   quien  · quién vive y vota ahí
+#   decide · cómo vota (lo MEDIDO, dicho simple)
+#   oficio · cómo ganárselo (criterio de oficio, el panel lo rotula así)
 TEXTOS = {
+    # ── Concejo ──
     'nombre': dict(
-        lema='Vota a nombres conocidos dentro del electorado de su partido.',
-        decide='Elige el partido de siempre y, dentro de la lista, el nombre que más ha visto. Es el voto con menos base propia de la ciudad: aquí casi nadie tiene el barrio amarrado.',
-        oficio='La pelea es con los compañeros de lista y la gana el nombre más visible: recordación, medios y redes pesan más que la estructura de barrio.'),
+        lema='Vota por el nombre que más ha oído.',
+        quien='Barrios de clase media de estrato 3, el grueso de Bogotá: Engativá, Kennedy, Suba, Fontibón.',
+        decide='Escoge el partido de siempre y, dentro de la lista, al candidato que más le suena. Casi nadie tiene el barrio amarrado.',
+        oficio='Hágase conocer: aquí gana el nombre que más se ve. Su pelea es con los compañeros de su propia lista.'),
+    'sin-dueno': dict(
+        lema='Vota mucho y nadie lo tiene amarrado.',
+        quien='Clase media que sale a votar más que el promedio de la ciudad.',
+        decide='Participa más que casi todos, pero no le debe el voto a ningún concejal del barrio: es el voto más libre de Bogotá.',
+        oficio='Es el voto que está en juego. Llegue con propuestas claras y hágase conocer antes que los demás.'),
     'partido': dict(
-        lema='Se vota la lista, no la persona.',
-        decide='El voto a listas cerradas más alto de la ciudad y el electorado más joven. Decide por el partido y su bandera; el nombre del candidato pesa poco.',
-        oficio='Con lista abierta, el trabajo es que marquen el número además del logo; con lista cerrada, que salgan a votar. Uno de cada doce tarjetones al Concejo se pierde nulo o sin marcar: la pedagogía del tarjetón rinde.'),
-    'figuras': dict(
-        lema='Vota nombres conocidos de toda la ciudad y casi no pierde voto.',
-        decide='Participa más que el promedio y casi no anula ni deja el tarjetón sin marcar. Se inclina a la derecha más que la ciudad. Su base propia es de redes personales de figuras conocidas, no de gestión de barrio.',
-        oficio='Opinión: medios, redes, debate y reconocimiento del nombre. Es un electorado que compara.'),
-    'gestion': dict(
-        lema='Una parte grande del voto va a quien se conoce en la zona.',
-        decide='La base propia más alta de la ciudad, el mayor voto a concejales en ejercicio y un candidato que se lleva una tajada grande del barrio. Se vota a la persona que está, que resuelve, que se conoce.',
-        oficio='Es territorio ocupado: el voto de base propia es sobre todo de quien ya lo tiene, y se mantiene entre elecciones. Para una candidatura nueva la entrada es la alianza o el endoso más que la competencia de frente; para quien ya tiene base, cuidarla.'),
+        lema='Vota por el partido, no por la persona.',
+        quien='Barrios populares de estrato 2 con mucha gente joven: Bosa, Kennedy, Ciudad Bolívar, Suba.',
+        decide='Marca el logo de su partido y el nombre del candidato le pesa poco. Es donde más se vota por listas cerradas.',
+        oficio='Si su lista es abierta, enséñele a marcar su número además del logo. Uno de cada doce tarjetones se pierde nulo o sin marcar.'),
+    'opinion': dict(
+        lema='Se decide por lo que opina, no por quién lo visita.',
+        quien='Barrios de estrato alto que votan mucho: Usaquén, Chapinero, Teusaquillo, el norte de Suba.',
+        decide='Casi no vota listas cerradas ni pierde votos. Elige al candidato por sus posiciones y por lo que ve en medios y redes.',
+        oficio='Tome posición clara en los temas de ciudad y aparezca en medios. Aquí no se gana puerta a puerta.'),
     'poco-voto': dict(
-        lema='Participa poco, y lo local la moviliza menos que lo nacional.',
-        decide='La participación más baja de la ciudad y donde más tarjetones al Concejo salen nulos o sin marcar; cuando vota, más que en otros lados marca solo el logo.',
-        oficio='El voto está en movilizar: transporte, acompañamiento y explicar cómo se marca el tarjetón. Es donde más rinde el día de la elección.'),
+        lema='Vota poco, y cuando vota, a veces se le pierde el voto.',
+        quien='Barrios populares de estrato 1 y 2: Ciudad Bolívar, Usme, Kennedy, San Cristóbal.',
+        decide='Es el que menos sale a votar al Concejo; sale más para la Presidencia. Muchos tarjetones quedan nulos o sin marcar.',
+        oficio='Aquí no hay que convencer, hay que movilizar: transporte, acompañamiento y explicar cómo se marca el tarjetón.'),
+    'figuras': dict(
+        lema='Vota por figuras conocidas y casi nunca pierde el voto.',
+        quien='Los barrios más ricos de la ciudad, estrato 5 y 6.',
+        decide='Vota más a la derecha que la ciudad y casi no anula. Sigue a figuras conocidas que tienen redes propias en la zona.',
+        oficio='Pesa el reconocimiento y quién lo respalda. Una figura conocida a su lado abre más puertas que un volante.'),
+    'gestion': dict(
+        lema='Vota por quien le resolvió algo.',
+        quien='Barrios tradicionales del centro y el sur oriente: San Cristóbal, Rafael Uribe, Santa Fe, Los Mártires.',
+        decide='Es el barrio con más voto propio de los concejales: se vota a la persona que conoce, que está y que resuelve.',
+        oficio='Ya tiene dueño. Si usted es ese dueño, cuídelo; si no, entre de la mano de un aliado del barrio, no de frente.'),
     'movilizada': dict(
-        lema='Sale a votar lo local más que cualquier otro barrio.',
-        decide='Conjuntos y ciudadelas de clase media con la participación más alta de la ciudad, y que votan lo local relativamente más que lo nacional. Su voto a la Alcaldía es de los más movedizos.',
-        oficio='Electorado que sí vota en lo local y compara propuestas: propuestas concretas de ciudad y de barrio.'),
+        lema='Sale a votar por lo de su barrio.',
+        quien='Conjuntos y ciudadelas de clase media: Ciudad Salitre, Muzú, Puente Aranda, Tibabuyes.',
+        decide='Es el que más vota de la ciudad y el que más se moviliza por lo local. Compara propuestas antes de decidir.',
+        oficio='Llegue con propuestas concretas para su conjunto y su sector, y rinda cuentas de lo que hizo.'),
+    # ── Alcaldía ──
     'estrategico': dict(
-        lema='Concentra el voto en el favorito aunque al Concejo vote otra cosa.',
-        decide='La contienda más concentrada de la ciudad. Al Concejo vota a la derecha más que nadie y a la Alcaldía se va con quien puede ganar: vota útil.',
-        oficio='Pesa parecer el ganador viable: encuestas, respaldos y la sensación de que el voto no se pierde.'),
+        lema='Vota por el que puede ganar.',
+        quien='Los barrios más ricos de la ciudad, estrato 5 y 6.',
+        decide='Concentra el voto en el favorito aunque al Concejo vote distinto: no quiere botar el voto.',
+        oficio='Hay que parecer el ganador: encuestas, respaldos y la sensación de que el voto no se pierde.'),
+    'alternativa': dict(
+        lema='Busca una opción distinta a las de siempre.',
+        quien='Barrios de estrato 4 que votan mucho.',
+        decide='Vota mucho y fue donde mejor le fue al candidato sin partido en 2023. Se fija en la persona más que en la etiqueta.',
+        oficio='Cabe el candidato nuevo o independiente, si se muestra preparado y sin padrinos.'),
     'decide': dict(
-        lema='Alta participación y voto que se mueve: aquí se gana la Alcaldía.',
-        decide='El voto más movedizo de la ciudad entre 2019 y 2023, y donde el candidato sin partido sacó su mejor resultado. Participa más que el promedio y vota lo local.',
-        oficio='Cabe el candidato sin partido. Se convence con propuesta y con la persona, y no se queda con el de la vez pasada.'),
-    'cruce-sur': dict(
-        lema='Al Concejo vota a las candidaturas de su barrio; a la Alcaldía, a otra cosa.',
-        decide='Participación baja. El voto al Concejo va más que en la ciudad a candidaturas de centro con base en el barrio, y el de la Alcaldía a candidatos de opinión. El candidato sin partido sacó aquí su peor resultado.',
-        oficio='El concejal o el edil del barrio no trae el voto de la Alcaldía: cada tarjetón se gana por aparte. Movilizar pesa, porque la participación es baja.'),
-    'alineada': dict(
-        lema='Vota a la Alcaldía como vota al Concejo.',
-        decide='El voto cruzado más bajo de la ciudad: la misma familia política en los dos tarjetones. Es la contienda más repartida y el electorado más joven.',
-        oficio='Voto de bloque: lo mueven la identidad política y la coherencia entre el candidato y su lista.'),
+        lema='Aquí se gana la Alcaldía.',
+        quien='Clase media que vota mucho: Engativá, Kennedy, Fontibón.',
+        decide='Es el voto que más se mueve: fue de Claudia López en 2019 y en 2023 se partió entre Galán y Oviedo.',
+        oficio='No se queda con el de la vez pasada. Se convence con propuesta y con la persona.'),
     'tradicional': dict(
-        lema='Estable, con mayoría holgada al ganador.',
-        decide='Participación media, poca volatilidad y mayoría clara al favorito. Su electorado es algo mayor que el promedio.',
-        oficio='Valora la continuidad y la gestión que se ve; el cambio brusco le cuesta.'),
+        lema='Vota estable y por el favorito.',
+        quien='Clase media de estrato 3, con un electorado algo mayor que el promedio.',
+        decide='Cambia poco de una elección a otra y le da una mayoría clara al ganador.',
+        oficio='Valora la continuidad y lo que se ve hecho. El cambio brusco le cuesta.'),
+    'media-alineada': dict(
+        lema='Vota igual a la Alcaldía y al Concejo.',
+        quien='Clase media de estrato 2 y 3.',
+        decide='Elige la misma línea política en los dos tarjetones y reparte su voto entre varios candidatos.',
+        oficio='Lo mueve la coherencia: que el candidato a la Alcaldía y su lista al Concejo digan lo mismo.'),
+    'alineada': dict(
+        lema='Vota por su bando en los dos tarjetones.',
+        quien='Barrios populares con mucha gente joven: Bosa, Kennedy, Usme.',
+        decide='Vota a la Alcaldía como vota al Concejo, más a la izquierda que la ciudad, y en una contienda muy repartida.',
+        oficio='Voto de identidad política: se le habla desde su lado y con coherencia entre candidato y lista.'),
+    'reparte': dict(
+        lema='Vota distinto en cada tarjetón.',
+        quien='Barrios populares de estrato 2.',
+        decide='Al Concejo vota por unos y a la Alcaldía por otros, sin irse a ningún extremo.',
+        oficio='El concejal del barrio no le trae el voto de la Alcaldía, ni al revés: cada tarjetón se gana por aparte.'),
+    'cruce-sur': dict(
+        lema='Vota al conocido para el Concejo y a otro para la Alcaldía.',
+        quien='Barrios populares de estrato 1 del sur: Ciudad Bolívar, Usme, San Cristóbal.',
+        decide='Vota poco. Al Concejo, a los candidatos de su barrio; a la Alcaldía, a otra cosa. El candidato sin partido sacó aquí su peor resultado.',
+        oficio='Hay que movilizar, porque sale poco a votar, y ganarse cada tarjetón por separado.'),
 }
+
+# Sensibilidad por tema (1-5) para el simulador. ⚠️ HEURÍSTICA DEL EQUIPO: en
+# Bogotá no hay estudio emocional (en Medellín y Cartagena sí). Sale de leer
+# lo medido de cada arquetipo (estrato, participación, voto por persona o por
+# partido, ideología) y el panel lo dice. Temas = llaves de PALANCAS en
+# candidato-360-arq-modos.js.
+TEMAS = ['seguridad', 'empleo', 'servicios', 'movilidad', 'vivienda', 'corrupcion', 'ambiente', 'salud_educacion', 'participacion', 'cultura']
+SENS = {
+    'nombre':         [4, 3, 3, 4, 2, 3, 2, 3, 2, 2],
+    'sin-dueno':      [4, 3, 3, 5, 2, 4, 3, 4, 3, 2],
+    'partido':        [3, 5, 4, 4, 4, 3, 3, 4, 3, 4],
+    'opinion':        [4, 2, 2, 4, 2, 5, 4, 3, 2, 2],
+    'poco-voto':      [4, 5, 5, 3, 4, 2, 4, 4, 4, 3],
+    'figuras':        [5, 2, 1, 3, 2, 4, 3, 2, 1, 2],
+    'gestion':        [4, 3, 4, 3, 4, 2, 3, 3, 5, 4],
+    'movilizada':     [4, 3, 3, 4, 3, 4, 3, 4, 4, 3],
+    'estrategico':    [5, 2, 1, 4, 2, 4, 3, 2, 1, 2],
+    'alternativa':    [4, 2, 2, 4, 2, 5, 4, 3, 2, 2],
+    'decide':         [4, 3, 3, 5, 2, 4, 3, 4, 3, 2],
+    'tradicional':    [4, 3, 3, 3, 2, 3, 2, 3, 2, 2],
+    'media-alineada': [3, 4, 3, 4, 3, 3, 3, 4, 3, 3],
+    'reparte':        [4, 4, 4, 3, 3, 2, 3, 3, 4, 3],
+    'alineada':       [3, 5, 4, 4, 4, 3, 3, 5, 3, 4],
+    'cruce-sur':      [4, 5, 5, 3, 4, 2, 4, 4, 4, 3],
+}
+# Los barrios sin puesto de votación propio toman el arquetipo del barrio con
+# dato más cercano (centroide), hasta esta distancia. No suman a nada.
+RELLENO_MAX_KM = 2.0
+# Imagen de cada arquetipo (la dibuja quien hace lo gráfico, §10 de
+# candidato-360.md). Si no existe, el panel la omite.
+IMAGEN = 'assets/candidato-360/arquetipos-bogota/{}.webp'
 
 # Lo que el texto de cada arquetipo afirma y no siempre está entre las
 # variables que lo definen: se muestra igual, para que se vea medido.
 RASGO_EXTRA = {
     'gestion': ['in', 't1'], 'cruce-sur': ['cr'], 'decide': ['vo'], 'estrategico': ['cr', 'der'],
     'alineada': ['j'], 'partido': ['j'], 'tradicional': ['my'], 'figuras': ['der'], 'poco-voto': ['ml'],
+    'opinion': ['der'], 'sin-dueno': ['p'], 'alternativa': ['ov'], 'reparte': ['cr'], 'media-alineada': ['cr'],
 }
 
 # Cómo se muestra cada variable: llave corta, etiqueta y formato.
@@ -110,6 +187,7 @@ VAR = {
     # solo descriptivas (no definen el arquetipo)
     'incumbente': ('in', 'Voto a concejales en ejercicio', 'pct'), 'top1_cand': ('t1', 'El candidato más votado del barrio', 'pct'),
     'alc_galan': ('ga', 'Voto a Galán', 'pct'), 'vol_alc_19_23': ('vo', 'Cambio de voto a la Alcaldía 2019–2023', 'pct'),
+    'vol_19_23': ('vc', 'Cambio de voto al Concejo 2019–2023', 'pct'),
     'conc_izq': ('iz', 'Concejo · izquierda', 'pct'), 'conc_d': ('der', 'Concejo · derecha', 'pct'),
     'joven': ('j', 'Censo de 18 a 30 años', 'pct'), 'mayor': ('my', 'Censo de 61 años o más', 'pct'),
 }
@@ -162,7 +240,8 @@ def main():
                 z = sorted(meta['vars'], key=lambda v: -abs(a['z'][v]))[:2]
             familias[s] = {
                 'corp': corp, 'nombre': a['nombre'], 'color': COLOR[s], 'barrios': a['barrios'], 'votantes': a['votantes'],
-                **TEXTOS[s],
+                **TEXTOS[s], 'imagen': IMAGEN.format(s),
+                'sens': dict(zip(TEMAS, SENS[s])), 'sens_heuristica': True,
                 # llaves; el valor sale de `perfil` y se compara con `ciudad`
                 'rasgos': [VAR[v][0] for v in z] + [k for k in RASGO_EXTRA.get(s, []) if k not in [VAR[v][0] for v in z]],
                 'ejemplos': a['ejemplos'][:6],
@@ -179,8 +258,35 @@ def main():
                 c = b[corp]
                 out[corp[0]] = {'d': c['dom'], 'k': c['conf'], 'm': {i: p for i, p in c['mez'].items() if p >= .01}}
         barrios[cod] = out
+    # ── Relleno de vecino: los barrios sin puesto de votación propio toman el
+    # arquetipo del barrio con dato más cercano. Van marcados (`r`), con peso
+    # 0: se pintan, no suman a ningún total ni entran a ninguna tabla.
+    g = gpd.read_file(BD / 'output_pacto_1v_2026' / 'geo' / 'BOG-BARRIOS-CATASTRALES.json')
+    g = g[g['loc_codigo'] != '20'].copy()
+    cen = g.to_crs(3116).geometry.centroid
+    pos = {str(c): (p.x, p.y) for c, p in zip(g['codigo'], cen)}
+    loc_nombre = {}
+    for c, l in zip(g['codigo'], g['loc_codigo']):
+        if str(c) in barrios:
+            loc_nombre.setdefault(l, barrios[str(c)]['l'])
+    con = [(c, pos[c]) for c in barrios if c in pos]
+    rellenos = 0
+    for c, l, nom in zip(g['codigo'], g['loc_codigo'], g['nombre']):
+        c = str(c)
+        if c in barrios or c not in pos:
+            continue
+        x0, y0 = pos[c]
+        de, d2 = min(((k, (x - x0) ** 2 + (y - y0) ** 2) for k, (x, y) in con), key=lambda z: z[1])
+        km = d2 ** .5 / 1000
+        if km > RELLENO_MAX_KM:
+            continue
+        v = barrios[de]
+        barrios[c] = {'n': nom, 'l': loc_nombre.get(l, v['l']), 'e': None, 'w': 0, 'x': {},
+                      'r': {'de': de, 'km': round(km, 2)}, **{k: v[k] for k in ('c', 'a') if k in v}}
+        rellenos += 1
+    print('barrios rellenados con su vecino:', rellenos)
     pub = {
-        'v': arq['v'], 'naturaleza': 'lectura observada 2023', 'cortes': list(CORP), 'corporacion': CORP,
+        'v': arq['v'], 'naturaleza': 'lectura observada 2023', 'relleno_max_km': RELLENO_MAX_KM, 'cortes': list(CORP), 'corporacion': CORP,
         'fuente': arq['fuente'], 'familias': familias, 'orden': orden, 'share': share, 'ciudad': ciudad,
         'variables': {VAR[v][0]: {'t': VAR[v][1], 'f': VAR[v][2]} for v in VAR},
         'metodo': {corp: {k: C['meta'][k] for k in ('silueta', 'barrios', 'nitidos', 'frontera')} for corp, C in arq['corporaciones'].items()},
@@ -189,8 +295,6 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / 'arquetipos-bogota.json').write_text(json.dumps(pub, ensure_ascii=False, separators=(',', ':')))
 
-    g = gpd.read_file(BD / 'output_pacto_1v_2026' / 'geo' / 'BOG-BARRIOS-CATASTRALES.json')
-    g = g[g['loc_codigo'] != '20'].copy()
     g['geometry'] = g.geometry.simplify(0.00004, preserve_topology=True)
     g = g.rename(columns={'loc_codigo': 'loc'})[['codigo', 'nombre', 'loc', 'geometry']]
     gj = json.loads(g.to_json(drop_id=True))
