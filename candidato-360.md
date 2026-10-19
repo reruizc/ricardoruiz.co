@@ -123,6 +123,7 @@ son 01-10, con 08 endoso, 09 Día D y 10 contendientes; ver `candidato-360.html`
 | `candidato-360-electorado.js` | Las cuentas del electorado (perfil del censo, ideología del territorio, votación objetivo). Compartido por la tarjeta 07 y su página: si cada pantalla calculara por su lado, darían cifras distintas sobre lo mismo. Devuelve **datos**, no texto. |
 | `candidato-360-endoso.js` | El endoso de aliados (`window.C360Endoso`): recorta los votos del aliado al territorio, mide la tasa contra a quién apoyó y suma. Lo usan la tarjeta 08 y su panel; no conoce el CRM ni el DOM (el recorte y el nombre de las zonas se le pasan). Prueba: `node tools/candidato-360/prueba-endoso.mjs` (`--sin-red` para solo la lógica). |
 | `candidato-360-contendientes.js` | Los contendientes (`window.C360Contendientes`, fases 1-5 de `tools/candidato-360/contendientes/PLAN.md`; lo usan la tarjeta 10 y su panel): rivales probables por fuente (A ganó la curul en 2023 · B compitió ahí · C tiene votos ahí de otra elección), familia política con la franja «no sabemos», afinidad territorial con su base, presión competitiva en tres niveles, la escalera dentro de su lista y el mapa de disputa por puesto. `leer` es la entrada única (tarjeta y panel la llaman con las mismas entradas), `cargar` hace la IO, `evaluar` el cálculo, `disputaPorUnidad` el mapa por barrio, comuna o municipio y `planoSVG` el dibujo, sin DOM. Usa `VoteTarget.reparto` (el mismo reparto de la meta) y `C360DiaD.puestosDestino`; sin archivos por comuna lee la matriz nacional `matriz-puesto/{corp}-{año}/{dde}[-{mme}].json` (fase 4, `tools/candidato-360/contendientes/build_matriz_puesto.py`; si no está, baja el archivo de cada rival). Prueba: `node tools/candidato-360/prueba-contendientes.mjs` (`--sin-red` para solo la lógica, `MATRIZ_LOCAL=1` para leer la matriz del disco). |
+| `candidato-360-estrategia.js` | La estrategia (`window.C360Estrategia`, tarjeta 11 y su vista ampliada; plan en `tools/candidato-360/estrategia/PLAN.md`): la **fase** del calendario 2027, el **orden de los 8 principios** del banco (Σ arquetipo: parte en su votación × afinidad acotada a ×0,5–×2 × celda de la matriz), la **tabla de territorio** (peso del arquetipo × afinidad → retener · retener y crecer · hacerse conocer · movilizar · no gastar, con barrios fuertes y huecos), **figura o barrio** por el arraigo medido y la **competencia en su lista** (lee la escalera del panel 10). Determinista y sin DOM: `evaluar` es la entrada única. La afinidad NO se calcula aquí: es `C360ArqLectura.afinidad` (con `{minimo: 0}`) y, en JAL, contra `C360ArqLectura.recortar(LC, localidad)`. Prueba: `node tools/candidato-360/prueba-estrategia.mjs` (`--sin-red` para solo la lógica). |
 | `candidato-360-arq-lectura.js` | La lectura de arquetipos (`window.C360ArqLectura`): qué ciudad (`ciudadDe`, con la campaña guardada — ⚠️ una candidatura NUEVA no pasa por el formulario de la ruta con historial y antes la tarjeta salía apagada: Nury en la Alcaldía de Cartagena, sep-29), el reparto de sus votos por arquetipo (Medellín por coordenada del puesto en el polígono DAP; Cartagena por nombre de barrio y con la MEZCLA de ocho) y la geometría para el mapa. La usan la tarjeta 05 y su página: salió de `candidato-360.js` para que las dos no digan cifras distintas. |
 | `candidato-360-panel.js` | El chasis de los paneles: sesión, vínculo, muro, territorio y helpers de formato. |
 | `candidato-360-candi.js` (+ `assets/candidato-360/candi/`) | Candi, la guía (Luna): dock, globo, panel de preguntas (`POST /c360/candi`) y el adaptador de los reproductores de Astra (`candi-atletica.js` v4 · `candi-hueso.js` v2). **Pensando** (gafas, 6 s) para la espera de un cálculo de la página (`Candi.calculo`); **investigando** (lupa, 4,8 s, 29-sep) solo mientras una pregunta escrita va al worker: una por pregunta, sin bucle, nunca junto con pensando (la segunda espera a `cuandoAtenta`), y si la respuesta llega antes se la deja terminar. **Descanso**: tras 20 s sin actividad cruza la pantalla de lado a lado y alterna derecha → izquierda → derecha; sale desde la Candi visible (dock, echada o sentada en la franja) y, si despierta lejos de casa, se queda sentada ahí (`rincon`). Panel abierto, pregunta en vuelo, cálculo o pantalla baja lo inhiben con `enable(false)`; un solo temporizador, el del reproductor. ⚠️ El adaptador sobreescribe `layout`/`play`/`stop` de la instancia: la casa es el extremo derecho; si ya está en el extremo de destino se invierte el lado (si no, camina en el sitio); y `stop` solo restaura el sprite si de verdad caminaba — la restauración hace `seek(4800)` y pisaba la lupa recién arrancada. ⚠️ `candi:complete` solo sale al terminar la ENTRADA: esperar solo ese evento tras una reacción colgaba para siempre. ⚠️ En el panel del navegador la pestaña va oculta: rAF, `resize` y el `change` de las media queries no llegan; se verifica con un rAF de mentira y `document.hidden` forzado. Pruebas: `node assets/candidato-360/candi/test-hueso.cjs` y `node tools/candidato-360/prueba-candi.mjs`. |
@@ -207,6 +208,8 @@ columnas y el de JAL 16, y leerlas por posición fija tomaba `DES_DDE` como
 código de municipio sin fallar, solo produciendo basura.
 | `asamblea-2023/dep/<dep>.json` | Resultados de asamblea por **municipio**: la única elección que baja a todos los municipios del país con voto por partido. |
 | `concejo-2023/resultados-concejo-2023.json` | Concejo por **comuna**, solo en once ciudades. |
+| `candidato-360-data/estrategia-banco.json` | El banco de estrategia (capa A): 8 principios, 39 fichas (25 de tronco, 14 de rama) con referencia y DOI, la modulación por arquetipo, 5 ramas, la matriz arquetipo × principio en números (2 · 1 · 0 · −1) para los 6 arquetipos de Concejo de Bogotá y los 5 emocionales de Medellín, más el calendario 2027, los cuadrantes y las acciones por fase. Literatura pública: **ningún candidato real**. Lo genera `tools/candidato-360/estrategia/build_banco.py` desde el anexo A (interno, fuera del repo; ruta en `C360_ESTRATEGIA_ANEXO`) y aborta si queda algo del caso. |
+| `candidato-360-data/arraigo-concejo-bogota-2023.json` | El arraigo de las 435 candidaturas al Concejo de Bogotá 2023 por **slug** (sin nombres): `[localidad, barrio]` y la referencia de la ciudad (14,2 %, la mayor de las dos escalas ponderada por votos). Sale del CSV del estudio de arquetipos de Bogotá con `tools/candidato-360/estrategia/build_arraigo.py`. |
 | `candidato-360-data/` (en el repo) | Logos de partido, barrios aproximados, catálogos por departamento y los Excel de homónimos. |
 
 ⚠️ **Dos sistemas de códigos.** El *electoral* (el de la Registraduría, el que
@@ -361,3 +364,92 @@ Lo que más ayuda, en orden:
 
 Lo que no: convertirlo en un predictor, estimar lo que no está publicado, o
 presentar como dato de la persona lo que es del territorio.
+
+## 11. Bitácora técnica
+
+### Módulo 11 · Estrategia (`candidato-360-estrategia.js` · oct-19-2026 · fases 1 y 2 del plan)
+
+La tarjeta 11 del CRM y su vista ampliada, **dentro de `candidato-360.html`**
+(decisión de Ricardo: no hay página aparte). Plan, reglas y fases que faltan en
+`tools/candidato-360/estrategia/PLAN.md`; el banco de literatura salió de la
+primera consultoría hecha a mano.
+
+- **Banco** (`candidato-360-data/estrategia-banco.json`, 60 KB): lo arma
+  `C360_ESTRATEGIA_ANEXO=<ruta> python3 tools/candidato-360/estrategia/build_banco.py`
+  leyendo el anexo A (interno, fuera del repo: su ruta lleva el nombre del
+  cliente y por eso no va escrita en el código). Pasan los principios, las fichas de tronco y de
+  rama, la modulación por arquetipo, las ramas y la matriz; **no pasan** las
+  líneas «Para …», el Nivel 3 (el caso) ni la capa B. Una frase del tronco que
+  hablaba del caso sin nombrarlo se reescribe en general, y el script aborta si
+  queda algo del caso: los términos a vigilar están en
+  `Bases de datos/candidato-360/estrategia-prohibido.txt` (fuera del repo; sin
+  ese archivo no corre). La prueba lo usa si existe. Lo que agrega el equipo va rotulado: el calendario 2027
+  (con estado `ley` · `anunciado` · `derivado`: la Registraduría no ha expedido
+  la resolución), las fases, los cuadrantes y las acciones, cada una con sus
+  fichas o «criterio de oficio».
+- **El orden de los principios** = Σ sobre los arquetipos de (parte en su
+  votación × afinidad acotada a ×0,5–×2), normalizado, × la celda de la matriz.
+  Va de −1 a 2. Empates por id.
+- **La tabla de territorio**: grande = peso en el territorio de la mediana para
+  arriba; afinidad alta = ×1,05 o más (el umbral del panel 05). Si el arquetipo
+  vota 4 pp o más por debajo de la participación de la ciudad y ya lo prefiere o
+  pesa mucho → **movilizar** (rama R2). Barrios fuertes (×1,25 o más) y huecos
+  (×0,8 o menos) por arquetipo dominante, solo en barrios con 0,06 % o más del
+  territorio (≈1.500 votantes en Bogotá).
+- **Figura o barrio**: arraigo ÷ el de la ciudad < 0,75 → figura; > 1,25 →
+  barrio. El arraigo solo está medido para el Concejo de Bogotá 2023; una JAL
+  sin medida sale «barrio» rotulado como criterio de oficio, y el resto no se
+  inclina.
+- **Competencia en la lista**: lee la escalera y el plano del panel 10
+  (`CONT_LECTURA`; `pintarContendientes` dispara `pintarEstrategia` al
+  terminar, con o sin rivales). Lista abierta: el rival principal es el de la
+  propia lista más cercano por arriba (o por abajo si ya entra).
+- **Lentes**: sus votos; si no tiene en la ciudad, los de su partido o familia
+  (`C360ArqLectura.huella`, la del panel 05); si tampoco, la ciudad, y entonces
+  no hay afinidad ni cuadrantes. En JAL el territorio es su **localidad**
+  (`recortar`), que sale de la campaña, de lo que completó el panel 10 o de la
+  localidad con más votos en sus mesas.
+- **«Todavía no»**: ciudad sin arquetipos, campaña departamental, Cartagena (8
+  arquetipos propios sin fila en la matriz) y la Alcaldía de Bogotá (sus 5
+  arquetipos tampoco tienen fila). La tarjeta lo dice y muestra la fase.
+- ⚠️⚠️ **La afinidad del panel 05 reparte con la MEZCLA de cada barrio y la del
+  caso hecho a mano usó el arquetipo DOMINANTE.** Mismo dato, dos reglas: para el
+  concejal de referencia la «ciudadela movilizada» da **×1,20** (9,7 % contra
+  8,1 %) en el producto y ×1,76 (9,9 % contra 5,6 %) en el documento. La mezcla
+  aplana los cocientes (sus afinidades van de ×0,90 a ×1,20), y por eso en el
+  producto «barrio de gestión» le sale ×0,95 («no gastar») donde el caso decía
+  «retener». El motor usa la del panel a propósito, para que las dos pantallas
+  no se contradigan; si se quiere la otra regla, se cambia en un solo sitio
+  (`afinidad`) y cambian las dos.
+- **Vista ampliada**: es una sub-vista DENTRO de `#crm` (`#estrategia`;
+  `#crm.crm-en-estrategia` esconde el tablero), no un `.screen`: cada pantalla
+  tiene su guía en Candi y en el worker (`prueba-candi` exige que coincidan) y
+  esto no la necesitaba. El «← Volver» de la barra la cierra antes de salir del
+  CRM. Pestañas Posicionamiento y Territorio; «Plan por fase» y «Formatos»
+  aparecen apagadas hasta las fases 3 y 4. El plano de territorio ajusta el eje
+  de afinidad a los datos (acotado a ×0,5–×2: un arquetipo marginal con ×0,15
+  apilaba todo arriba) y las etiquetas se esquivan entre sí.
+- **Vitrina**: la tarjeta se ve completa (lugar, fase, tres principios y acción
+  de la semana: es el esqueleto del motor) y «Ver la estrategia» abre el
+  paywall, por el mismo listener de captura de los demás módulos.
+- **Prueba** `node tools/candidato-360/prueba-estrategia.mjs` (51 comprobaciones,
+  ~25 s con red): el banco íntegro y sin el caso, una regla por caso del motor, y
+  dos candidaturas reales de Bogotá descritas por su papel, con el orden de los
+  principios y la tabla de territorio **fijados**:
+  · concejal «figura» con arraigo bajo (7,0 % contra 14,2 %): A7 · A1 · A6 · A8 ·
+    A5 · A2 · A3 · A4; hacerse conocer en clase media de nombre y norte de
+    figuras, movilizar en periferia de partido, retener y crecer en ciudadela
+    movilizada;
+  · edilesa de Barrios Unidos (709 votos, contra su localidad): A7 · A1 · A8 · A6
+    · A2 · A3 · A4 · A5; retener clase media de nombre y norte de figuras,
+    hacerse conocer en la ciudadela movilizada; 3.ª de su lista a 910 votos del
+    último elegido.
+  Verificado en el navegador (modo pruebas de admin simulado en `localhost`) con
+  los dos casos: mismas cifras que la prueba, vuelta al tablero, vitrina con
+  paywall y teléfono sin desborde.
+- ⚠️ Las pruebas de Playwright del repo importan Playwright desde
+  `/opt/node22/…` y Leaflet desde `package/dist`, rutas de otra máquina. En la
+  Mac M5 corren con un hook de resolución hacia `/opt/homebrew/lib/node_modules`
+  y `LEAFLET_DIST` apuntando a un `npm pack leaflet@1.9.4`. Varias fallan igual
+  en `HEAD` (la vitrina en el paso del país, arquetipos por la API vieja del
+  modal, una del mapa): son anteriores a este módulo.

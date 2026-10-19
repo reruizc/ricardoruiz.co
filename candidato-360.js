@@ -111,7 +111,12 @@ const screens = [...document.querySelectorAll('.screen')];
 const topBack = document.createElement('button');
 topBack.type = 'button'; topBack.className = 'nav-back'; topBack.textContent = '← Volver';
 document.querySelector('.topbar .nav-left').prepend(topBack);
-topBack.addEventListener('click', () => document.querySelector('.screen:not(.hidden) .flow-top .back')?.click());
+/* La estrategia (tarjeta 11) es una sub-vista DENTRO del CRM, no una pantalla:
+   con ella abierta, «Volver» regresa al tablero y no a la ruta. */
+topBack.addEventListener('click', () => {
+  if (document.getElementById('crm')?.classList.contains('crm-en-estrategia')) return volverAlCRM();
+  document.querySelector('.screen:not(.hidden) .flow-top .back')?.click();
+});
 function refreshTopBack() { const current = document.querySelector('.screen:not(.hidden)'); topBack.classList.toggle('visible', Boolean(current && current.id !== 'intro')); }
 function showScreen(id) {
   screens.forEach(s => s.classList.toggle('hidden', s.id !== id));
@@ -2382,6 +2387,7 @@ async function launchCRM(event) {
   pintarDiaD();
   pintarFirmas();
   pintarEndoso();
+  estrategiaCargando();
   loadHistoricalMap(crmCandidate);
   renderCRMProfilePhoto(crmCandidate);
   pintarPuntaje(crmCandidate);
@@ -2429,6 +2435,7 @@ async function abrirCRMNuevo() {
   pintarDiaD();
   pintarFirmas();
   pintarEndoso();
+  estrategiaCargando();
   renderTerritorioCiudad({ ...c, partido: c.partido || n.partido || '' }).then(ok => { if (!ok) renderTerritorioObjetivo(c); }).catch(() => renderTerritorioObjetivo(c));
   window.Candi?.calculo?.(true);
   try {
@@ -4680,10 +4687,11 @@ async function pintarEndoso() {
    probable de la meta—, así que las dos pantallas dan las mismas cifras.
    En vitrina el plano deja nítidos los tres de más presión (su historial ya
    es público en el índice) y a los demás los pinta sin nombre. */
-let CONT_TURNO = 0;
+let CONT_TURNO = 0, CONT_LECTURA = null;
 async function pintarContendientes() {
   const card = $('crmContendientes'), K = window.C360Contendientes; if (!card || !K) return;
   const turno = ++CONT_TURNO;
+  CONT_LECTURA = null;
   $('crmContTitulo').textContent = 'Buscando a sus rivales probables…';
   $('crmContDato').textContent = '…'; $('crmContSub').textContent = 'leyendo el registro'; $('crmContPlano').innerHTML = ''; $('crmContRevision').textContent = '';
   try {
@@ -4706,6 +4714,8 @@ async function pintarContendientes() {
     $('crmContPlano').innerHTML = K.planoSVG(L, { ancho: 520, alto: 300, etiquetas: 3, vitrina: CRM_VITRINA });
     $('crmContDato').textContent = N(r.enIndice);
     $('crmContSub').textContent = `presión alta ${N(r.niveles.alta)} · media ${N(r.niveles.media)} · baja ${N(r.niveles.baja)}`;
+    CONT_LECTURA = L;
+    pintarEstrategia();   /* la competencia en la lista sale de esta misma lectura */
     /* La revisión mensual de prensa del territorio (fase 5). En vitrina no se
        pide: es parte de lo que se cobra, y sin acceso el worker no la da. */
     const t = K.terrKey(L.corp || corp, alcance);
@@ -4719,6 +4729,7 @@ async function pintarContendientes() {
     }
   } catch (e) {
     if (turno !== CONT_TURNO) return;
+    pintarEstrategia();   /* sin rivales la estrategia sale igual, sin la competencia en la lista */
     /* Una falla de red no es «no hay registro»: se dice distinto. */
     if (/No se pudieron leer/.test(e?.message || '')) { $('crmContTitulo').textContent = 'No pudimos leer el registro de su territorio.'; $('crmContCopy').textContent = 'Vuelva a cargar la página en un momento.'; $('crmContDato').textContent = '—'; $('crmContSub').textContent = 'sin conexión con los datos'; return; }
     $('crmContTitulo').textContent = 'Todavía no hay rivales que mostrar.';
@@ -4726,6 +4737,233 @@ async function pintarContendientes() {
     $('crmContDato').textContent = '—'; $('crmContSub').textContent = 'sin registro comparable';
   }
 }
+/* ─── 9 quater. Estrategia (tarjeta 11) ─────────────────────────────────────
+   El cálculo vive en candidato-360-estrategia.js (window.C360Estrategia,
+   tools/candidato-360/estrategia/PLAN.md): la tarjeta y la vista ampliada
+   pintan el MISMO resultado (`ESTR`), así que no pueden decir cosas
+   distintas. La vista ampliada es una sub-vista del CRM (#estrategia, dentro
+   de #crm), no una página aparte: usa lo que el CRM ya cargó.
+   Insumos: los arquetipos del panel 05 (la afinidad es la de
+   C360ArqLectura), el arraigo medido del Concejo de Bogotá 2023 y la escalera
+   de su lista que calculó el panel 10. En vitrina se ve el esqueleto (lugar,
+   fase, los tres principios y la acción de la semana); la vista ampliada abre
+   el paywall, como los demás módulos. */
+let ESTR_TURNO = 0, ESTR = null, ESTR_TAB = 'posicionamiento';
+function estrategiaCargando() {
+  ESTR = null; ESTR_TURNO++;
+  cerrarEstrategia();
+  $('crmEstrategia')?.classList.remove('module-apagado');
+  $('crmEstrTitulo').textContent = 'Leyendo su estrategia…';
+  $('crmEstrCopy').textContent = 'Cruzando los arquetipos de su votación con el banco de literatura de estrategia política.';
+  $('crmEstrPrincipios').innerHTML = ''; $('crmEstrAccion').classList.add('hidden');
+  $('crmEstrDato').textContent = '…'; $('crmEstrSub').textContent = 'cargando'; $('crmEstrBtn').disabled = true;
+}
+/* La localidad de una JAL: la de la campaña, la que completó el panel 10 o la
+   que más se repite en sus mesas (la campaña «la misma corporación» se guarda
+   sin territorio). */
+function localidadEstrategia(campana, mesas) {
+  if (campana.localidad) return campana.localidad;
+  if (CONT_LECTURA?.campana?.localidad) return CONT_LECTURA.campana.localidad;
+  const n = {}; (mesas || []).forEach(m => { if (m.comNom) n[m.comNom] = (n[m.comNom] || 0) + Number(m.v || 0); });
+  return Object.entries(n).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+}
+async function pintarEstrategia() {
+  const card = $('crmEstrategia'), S = window.C360Estrategia, A = window.C360ArqLectura; if (!card || !S || !A) return;
+  const turno = ++ESTR_TURNO;
+  try {
+    const [banco, arraigos] = await Promise.all([S.cargarBanco(), S.cargarArraigo()]);
+    const campana = CAMPANA_ACTUAL || SESSION.vinculo?.campana || {};
+    const corp = currentTargetTerritory()?.corporation || campana.corp || corporacionHistorica(crmCandidate);
+    const mesas = crmCandidate ? await mesasDelHistorial() : [];
+    const ciudad = A.ciudadDe(await municipioArquetipos(), mesas);
+    const entrada = { banco, ciudad, corp, escalera: CONT_LECTURA?.escalera, plano: CONT_LECTURA?.plano };
+    const slugs = crmCandidate ? (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean) : [];
+    entrada.arraigo = S.arraigoDe(arraigos, slugs);
+    let huella = null;
+    if (ciudad) {
+      const opts = { corp };
+      const [LC, Lp] = await Promise.all([A.leer(ciudad, [], opts), A.leer(ciudad, mesas, opts)]);
+      /* La lente: sus votos; si no tiene en la ciudad, los de su partido o su
+         familia (la misma huella del panel 05); si tampoco, la ciudad. */
+      let L = Lp, lente = 'propio';
+      if (!Lp.conVotos) {
+        huella = await A.huella(ciudad, campana).catch(() => null);
+        const Lh = huella?.fuente ? await A.leer(ciudad, huella.mesas, opts).catch(() => null) : null;
+        if (Lh?.conVotos) { L = Lh; lente = 'partido'; } else { L = LC; lente = 'ciudad'; }
+      }
+      /* Una JAL compite en su localidad, no en la ciudad: el territorio contra
+         el que se mide la afinidad es la localidad. */
+      let LT = LC;
+      if (corp === 'jal') { const loc = localidadEstrategia(campana, mesas), R = loc ? A.recortar(LC, loc) : null; if (R?.total) LT = R; }
+      Object.assign(entrada, { L, LT, lente });
+    }
+    const R = S.evaluar(entrada);
+    if (turno !== ESTR_TURNO) return;
+    ESTR = { R, banco, huella, nombre: crmCandidate?.nombre || NUEVO?.nombre || 'Su candidatura', ciudadNombre: { bogota: 'Bogotá', medellin: 'Medellín', cartagena: 'Cartagena' }[ciudad] || '' };
+    pintarTarjetaEstrategia();
+  } catch (e) {
+    if (turno !== ESTR_TURNO) return;
+    card.classList.add('module-apagado');
+    $('crmEstrTitulo').textContent = 'No pudimos armar la estrategia.';
+    $('crmEstrCopy').textContent = 'Una de las fuentes (el banco, los arquetipos o su votación) no respondió. Vuelva a abrir el CRM en un momento.';
+    $('crmEstrDato').textContent = '—'; $('crmEstrSub').textContent = 'fuente no disponible';
+  }
+}
+const fechaCorta = iso => { const [a, m, d] = String(iso).split('-').map(Number); return `${d} ${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][m - 1]} ${a}`; };
+function pintarTarjetaEstrategia() {
+  const { R, banco } = ESTR, F = R.fase, card = $('crmEstrategia');
+  const prox = F.proximo;
+  $('crmEstrDato').textContent = prox ? prox.dias.toLocaleString('es-CO') : '—';
+  $('crmEstrSub').textContent = prox ? `días para: ${prox.nombre.toLowerCase()}` : F.nombre;
+  if (R.estado !== 'ok') {
+    card.classList.add('module-apagado');
+    $('crmEstrTitulo').textContent = 'Todavía no.';
+    $('crmEstrCopy').textContent = `${R.motivo} Mientras tanto, la fase: ${F.nombre.toLowerCase()}. ${F.que}`;
+    $('crmEstrPrincipios').innerHTML = ''; $('crmEstrAccion').classList.add('hidden'); $('crmEstrBtn').disabled = true;
+    return;
+  }
+  card.classList.remove('module-apagado');
+  $('crmEstrTitulo').textContent = R.lugar;
+  const de = { propio: 'de su votación', partido: 'de la votación de su partido', ciudad: 'de la ciudad' }[R.lente];
+  $('crmEstrCopy').textContent = `Fase de ${F.nombre.toLowerCase()}: ${F.que} Lo que más pesa, según los arquetipos ${de}:`;
+  $('crmEstrPrincipios').innerHTML = R.principios.slice(0, 3).map(p => `<li><b>${escHtml(p.id)}</b> ${escHtml(p.corto)}</li>`).join('');
+  const a = R.accion;
+  if (a) {
+    $('crmEstrAccion').innerHTML = `<b>Esta semana.</b> ${escHtml(a.texto)} <small>${a.fichas.length ? `Sale de ${escHtml(a.fichas.map(id => C360Estrategia.ficha(banco, id)?.corto || id).join(' · '))}` : 'Criterio de oficio'}</small>`;
+    $('crmEstrAccion').classList.remove('hidden');
+  } else $('crmEstrAccion').classList.add('hidden');
+  $('crmEstrBtn').disabled = false;
+}
+function abrirEstrategia() {
+  if (CRM_VITRINA) return abrirPaywall('La estrategia se abre con el acceso a Candidato 360.');
+  if (!ESTR || ESTR.R.estado !== 'ok') return;
+  $('estrNombre').textContent = NOMBRE_BONITO(ESTR.nombre);
+  $('estrLugar').textContent = ESTR.R.lugar;
+  pintarFaseEstrategia();
+  pintarTabEstrategia(ESTR_TAB);
+  $('estrAdvertencias').innerHTML = `<span class="panel-num">Cómo leer esto</span><ul>${ESTR.R.advertencias.map(t => `<li>${escHtml(t)}</li>`).join('')}<li>El voto es secreto: todo se describe por el censo y el comportamiento de los barrios donde están sus votos, nunca por quién votó.</li><li>No es un predictor: ordena principios y territorios con la evidencia que hay; no dice quién gana.</li></ul>`;
+  /* Sub-vista del CRM: se esconde el tablero (CSS) y se muestra esta. No es
+     un `.screen` porque cada pantalla tiene su guía en Candi y en el worker. */
+  $('crm').classList.add('crm-en-estrategia'); $('estrategia').classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+function cerrarEstrategia() { $('crm')?.classList.remove('crm-en-estrategia'); $('estrategia')?.classList.add('hidden'); }
+function volverAlCRM() {
+  cerrarEstrategia();
+  /* Leaflet mide su caja al crearse: tras volver de una vista oculta hay que
+     pedirle que la mida otra vez. */
+  setTimeout(() => { crmLeafletMap?.invalidateSize(); $('crmEstrategia')?.scrollIntoView({ block: 'center', behavior: 'instant' }); }, 0);
+}
+/* Una ficha del banco como enlace: «Green y Gerber 2019», con su DOI. */
+function fichaHtml(id) {
+  const f = C360Estrategia.ficha(ESTR.banco, id); if (!f) return '';
+  const url = C360Estrategia.enlaceDe(f), t = `${f.refs.map(r => r.texto).join(' · ')}${f.tipo === 'oficio' ? ' · oficio: repertorio de experiencia, no prueba' : ' · evidencia'}`;
+  const cuerpo = `${escHtml(f.corto)}<i class="${f.tipo}">${f.tipo === 'oficio' ? 'oficio' : 'evidencia'}</i>`;
+  return url ? `<a class="estr-ficha" href="${escHtml(url)}" target="_blank" rel="noopener" title="${escHtml(t)}">${cuerpo}</a>` : `<span class="estr-ficha" title="${escHtml(t)}">${cuerpo}</span>`;
+}
+const fichasHtml = ids => (ids || []).length ? `<span class="estr-fichas">${ids.map(fichaHtml).join('')}</span>` : '<span class="estr-fichas"><span class="estr-ficha oficio-sola">criterio de oficio</span></span>';
+function pintarFaseEstrategia() {
+  const F = ESTR.R.fase;
+  const hitos = F.hitos.map(h => `<li class="${h.pasado ? 'pasado' : ''} ${F.proximo?.id === h.id ? 'proximo' : ''}"><b>${escHtml(fechaCorta(h.fecha))}</b><span>${escHtml(h.nombre)}</span><em class="estado-${h.estado}" title="${escHtml(h.fuente)}">${{ ley: 'por ley', anunciado: 'anunciado', derivado: 'derivado de la ley' }[h.estado] || h.estado}</em></li>`).join('');
+  $('estrFase').innerHTML = `<div class="estr-fase-cab"><div><span class="panel-num">La fase</span><h3>${escHtml(F.nombre)}${F.hasta ? ` · hasta el ${escHtml(fechaCorta(F.hasta))}` : ''}</h3><p>${escHtml(F.que)} ${fichasHtml(F.fichas)}</p></div>
+    <div class="estr-cuenta"><strong>${F.eleccion.dias.toLocaleString('es-CO')}</strong><small>días para la elección del ${escHtml(fechaCorta(F.eleccion.fecha))}</small></div></div>
+    <ol class="estr-hitos">${hitos}</ol><p class="helper">${escHtml(F.nota)} El corte de las fases es ${escHtml(F.corte)}.</p>`;
+}
+function pintarTabEstrategia(tab) {
+  ESTR_TAB = tab;
+  document.querySelectorAll('#estrategia .estr-tab[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+  $('estrCuerpo').innerHTML = tab === 'territorio' ? htmlTerritorio() : htmlPosicionamiento();
+}
+const pctE = x => `${(x * 100).toFixed(1).replace('.', ',')} %`;
+const vecesE = x => x == null ? '—' : `×${x.toFixed(2).replace('.', ',')}`;
+const VALOR_CELDA = { 2: 'central', 1: 'útil', '-1': 'riesgo' };
+function htmlPosicionamiento() {
+  const { R } = ESTR, fig = R.figura, nombreArq = Object.fromEntries(R.arquetipos.map(a => [a.codigo, a.nombre]));
+  const lenteTxt = { propio: 'sus votos', partido: `los votos de ${ESTR.huella?.partido ? NOMBRE_BONITO(ESTR.huella.partido) : 'su partido o su familia política'} (usted no tiene votos propios en la ciudad)`, ciudad: 'la ciudad entera (sin votos propios ni de su partido en la ciudad, la afinidad no se puede medir)' }[R.lente];
+  const barra = fig.medida ? `<div class="estr-arraigo"><div><span>Su arraigo</span><i style="width:${Math.min(100, fig.valor / .3 * 100)}%"></i><b>${pctE(fig.valor)}</b></div><div><span>La ciudad</span><i class="ref" style="width:${Math.min(100, fig.referencia / .3 * 100)}%"></i><b>${pctE(fig.referencia)}</b></div></div>
+    <p class="helper">Arraigo: la parte de su votación del Concejo 2023 que se aparta de la geografía de su propia lista, descontado lo que se apartaría por azar (estudio de arquetipos de Bogotá). La ciudad, con la misma regla y ponderada por votos.</p>` : '';
+  const lugar = `<article class="panel estr-bloque"><span class="panel-num">01 · El lugar que ocupa</span><h3>${escHtml(fig.nombre || 'Sin arraigo medido')}</h3>
+    <p>${escHtml(fig.texto)} ${fig.oficio ? '<span class="estr-oficio">criterio de oficio</span>' : ''} ${fig.fichas?.length ? fichasHtml(fig.fichas) : ''}</p>${barra}
+    <p class="helper">Leído con ${escHtml(lenteTxt)}${R.recorte ? `, contra su localidad (${escHtml(NOMBRE_BONITO(R.recorte))})` : ''}. El personaje, el tono y los temas propios llegan con un cuestionario corto en la siguiente versión: lo de aquí sale solo de los datos.</p></article>`;
+  const princ = R.principios.map((p, i) => {
+    const ancho = Math.max(0, (p.puntaje + 1) / 3 * 100);
+    const aportes = p.aportes.slice(0, 4).map(x => `<li><b class="c-${x.celda < 0 ? 'riesgo' : 'pos'}">${VALOR_CELDA[x.celda]}</b> en ${escHtml(nombreArq[x.codigo] || x.codigo)} (${pctE(x.peso)} del peso)${x.nota ? `: ${escHtml(x.nota)}` : ''}</li>`).join('');
+    const mods = p.modulacion.slice(0, 4).map(m => `<li>${fichaHtml(m.ficha)} para «${escHtml(nombreArq[m.codigo] || m.codigo)}»: ${escHtml(m.texto)}</li>`).join('');
+    return `<details class="estr-principio" ${i < 3 ? 'open' : ''}><summary><span class="rank">${i + 1}</span><b>${escHtml(p.id)} · ${escHtml(p.corto)}</b><span class="estr-puntaje" title="De −1 (todos sus arquetipos en riesgo) a 2 (todos en central)"><i style="width:${ancho}%"></i><em>${p.puntaje.toFixed(2).replace('.', ',')}</em></span></summary>
+      <p>${escHtml(p.texto)}</p>${aportes ? `<h5>Por qué pesa así en su territorio</h5><ul>${aportes}</ul>` : '<p class="helper">Ninguno de sus arquetipos lo modula: vale como el principio general.</p>'}
+      ${mods ? `<h5>Lo que cambia para sus arquetipos <span class="estr-oficio">hipótesis del equipo</span></h5><ul>${mods}</ul>` : ''}
+      <h5>De dónde sale</h5>${fichasHtml(p.fichas)}</details>`;
+  }).join('');
+  const C = R.competencia, N = x => Number(x || 0).toLocaleString('es-CO');
+  const internos = C.internos?.length ? `<table class="estr-tabla"><thead><tr><th>Puesto en 2023</th><th>En su lista</th><th class="num">Votos</th><th></th></tr></thead><tbody>
+      ${C.usted ? `<tr class="usted"><td>${C.usted.puesto}.º</td><td>Usted</td><td class="num">${N(C.usted.votos)}</td><td>${C.usted.elegido ? 'entró' : ''}</td></tr>` : ''}
+      ${C.internos.map(f => `<tr ${C.principal?.nombre === f.nombre ? 'class="principal"' : ''}><td>${f.puesto}.º</td><td>${escHtml(NOMBRE_BONITO(f.nombre))}${C.principal?.nombre === f.nombre ? ' <em>rival principal</em>' : ''}</td><td class="num">${N(f.votos)}</td><td>${f.elegido ? 'entró' : ''}</td></tr>`).join('')}</tbody></table>` : '';
+  const comp = `<article class="panel estr-bloque"><span class="panel-num">03 · La competencia en su lista</span><h3>${escHtml(C.lista ? NOMBRE_BONITO(C.lista) : 'Su lista')}</h3><p>${escHtml(C.texto)} ${C.fichas?.length ? fichasHtml(C.fichas) : ''}</p>
+    ${C.estado === 'abierta' && C.distancia != null ? `<p>En 2023 quedó a <b>${N(C.distancia)}</b> votos del último elegido de su lista.</p>` : ''}${internos}
+    ${C.presion?.length ? `<p class="helper">De su misma lista, con presión sobre sus puestos (panel 10): ${C.presion.map(r => `${escHtml(NOMBRE_BONITO(r.nombre))} (${escHtml(r.nivel)})`).join(', ')}.</p>` : ''}</article>`;
+  const acc = R.acciones.map(a => `<li><span class="estr-p">${escHtml(a.principio)}</span>${escHtml(a.texto)} ${fichasHtml(a.fichas)}</li>`).join('');
+  return `${lugar}<article class="panel estr-bloque"><span class="panel-num">02 · Los ocho principios, en el orden que le sirve</span><h3>Lo que la literatura pone primero para su territorio.</h3>
+    <p class="helper">El peso de cada principio = la parte de cada arquetipo en ${R.lente === 'ciudad' ? 'la ciudad' : 'su votación'} × su afinidad (acotada entre ×0,5 y ×2) × lo que dice la matriz arquetipo × principio (central, útil, igual o riesgo). La matriz es una hipótesis del equipo, no un hallazgo de los autores.</p>${princ}</article>
+    ${comp}<article class="panel estr-bloque"><span class="panel-num">04 · Esta fase: ${escHtml(R.fase.nombre.toLowerCase())}</span><h3>Qué hacer ahora, en el orden de sus principios.</h3><ol class="estr-acciones">${acc}</ol>
+    <p class="helper">La redacción para su caso —qué decir a cada arquetipo y cómo responder a sus flancos— llega con la siguiente versión. Lo de aquí es el esqueleto, con la referencia de cada paso.</p></article>`;
+}
+/* El plano de territorio: peso en el territorio (x) contra afinidad (y, en
+   escala logarítmica para que ×0,8 y ×1,25 queden a la misma distancia de 1).
+   El eje vertical se ajusta a los datos: las afinidades de una votación suelen
+   ir de ×0,9 a ×1,2 y con una escala fija de ×0,5 a ×2 se apilaban todas. Las
+   etiquetas se esquivan entre sí; el anillo marca los que van a «movilizar». */
+function planoTerritorio(filas) {
+  const W = 620, H = 340, m = { l: 52, r: 24, t: 22, b: 42 };
+  const xmax = Math.max(.1, ...filas.map(f => f.territorio)) * 1.1;
+  /* Acotada a ×0,5–×2, como en el cálculo: un arquetipo marginal con ×0,15
+     estiraba el eje y apilaba a todos los demás arriba. */
+  const acot = v => Math.min(2, Math.max(.5, v)), rs = filas.map(f => acot(f.ratio));
+  const lo = Math.log2(Math.max(.5 / 1.08, Math.min(.8, ...rs) / 1.08)), hi = Math.log2(Math.min(2 * 1.08, Math.max(1.25, ...rs) * 1.08));
+  const X = v => m.l + v / xmax * (W - m.l - m.r), Y = v => m.t + (1 - (Math.log2(acot(v)) - lo) / (hi - lo)) * (H - m.t - m.b);
+  const s = [...filas.map(f => f.territorio)].sort((a, b) => a - b), n = s.length, med = n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
+  const rot = (x, y, t, a = 'start') => `<text x="${x}" y="${y}" text-anchor="${a}" class="estr-q">${escHtml(t)}</text>`;
+  const marcas = [.5, .8, 1, 1.25, 1.5, 2].filter(v => Math.log2(v) >= lo && Math.log2(v) <= hi);
+  /* Etiquetas: a la derecha de la burbuja (a la izquierda si está en el
+     último tercio), y si chocan con una ya puesta, arriba o abajo. */
+  const cajas = [], puestas = filas.map(f => ({ f, cx: X(f.territorio), cy: Y(f.ratio), r: 6 + Math.sqrt(f.share) * 22 })).sort((a, b) => b.f.share - a.f.share).map(p => {
+    const ancho = p.f.nombre.length * 6.4, izq = p.cx > W * .66;
+    const x = izq ? p.cx - p.r - 4 : p.cx + p.r + 4, x0 = izq ? x - ancho : x;
+    let y = p.cy + 4;
+    for (const d of [0, -15, 15, -30, 30, -45, 45]) {
+      const yy = p.cy + 4 + d;
+      if (!cajas.some(c => x0 < c.x1 && x0 + ancho > c.x0 && Math.abs(yy - c.y) < 13)) { y = yy; break; }
+    }
+    cajas.push({ x0, x1: x0 + ancho, y });
+    return { ...p, tx: x, ty: y, anchor: izq ? 'end' : 'start' };
+  });
+  return `<svg class="estr-plano" viewBox="0 0 ${W} ${H}" role="img" aria-label="Arquetipos según su peso en el territorio y la afinidad de su votación">
+    <line x1="${X(med)}" y1="${m.t}" x2="${X(med)}" y2="${H - m.b}" class="estr-eje"/><line x1="${m.l}" y1="${Y(1.05)}" x2="${W - m.r}" y2="${Y(1.05)}" class="estr-eje"/>
+    ${rot(m.l + 6, m.t + 10, 'Retener y crecer')}${rot(W - m.r - 4, m.t + 10, 'Retener', 'end')}${rot(m.l + 6, H - m.b - 8, 'No gastar ahí')}${rot(W - m.r - 4, H - m.b - 8, 'Hacerse conocer', 'end')}
+    <text x="${(W + m.l) / 2}" y="${H - 8}" text-anchor="middle" class="estr-ax">Peso del arquetipo en el territorio →</text>
+    <text x="14" y="${(H - m.b + m.t) / 2}" text-anchor="middle" transform="rotate(-90 14 ${(H - m.b + m.t) / 2})" class="estr-ax">Afinidad de su votación →</text>
+    ${marcas.map(v => `<text x="${m.l - 6}" y="${Y(v) + 4}" text-anchor="end" class="estr-ax">×${String(v).replace('.', ',')}</text>`).join('')}
+    ${puestas.map(p => `<g><circle cx="${p.cx}" cy="${p.cy}" r="${p.r}" fill="${p.f.color}" fill-opacity=".8" stroke="#fff"/>${p.f.cuadrante === 'movilizar' ? `<circle cx="${p.cx}" cy="${p.cy}" r="${p.r + 4}" class="estr-anillo"/>` : ''}<text x="${p.tx}" y="${p.ty}" text-anchor="${p.anchor}" class="estr-n">${escHtml(p.f.nombre)}</text></g>`).join('')}
+  </svg>${filas.some(f => f.cuadrante === 'movilizar') ? '<p class="helper">El anillo marca los arquetipos que van a «movilizar»: votan poco y ya lo prefieren o pesan mucho, así que la regla de los cuadrantes cede.</p>' : ''}`;
+}
+function htmlTerritorio() {
+  const { R } = ESTR, T = R.territorio, med = R.lente !== 'ciudad';
+  const donde = R.recorte ? `su localidad (${NOMBRE_BONITO(R.recorte)})` : `la ciudad (${ESTR.ciudadNombre})`;
+  /* En una JAL todos los barrios son de su localidad: no se repite. */
+  const barrio = b => `${escHtml(NOMBRE_BONITO(b.nombre))}${b.unidad && !R.recorte ? ` <small>${escHtml(NOMBRE_BONITO(b.unidad))}</small>` : ''} <b>${vecesE(b.idx)}</b>`;
+  const tarjetas = T.map(t => `<article class="estr-arq" style="--c:${t.color}"><header><b>${escHtml(t.nombre)}</b>${t.accion ? `<span class="estr-cuadrante q-${t.cuadrante}">${escHtml(t.accion)}</span>` : ''}</header>
+      <p class="estr-cifras">${med ? `${pctE(t.share)} de su votación · ` : ''}${pctE(t.territorio)} de ${escHtml(donde)}${med ? ` · afinidad ${vecesE(t.ratio)}` : ''}${t.participacion != null ? ` · participación ${pctE(t.participacion)} (ciudad ${pctE(t.participacionRef)})` : ''}</p>
+      ${t.que ? `<p>${escHtml(t.que)} ${fichasHtml(t.fichas)}</p>` : ''}
+      ${t.centrales.length ? `<p class="estr-celdas"><em>Central para este arquetipo:</em> ${t.centrales.map(c => `<b>${c.principio}</b> ${escHtml(c.nota)}`).join(' · ')}</p>` : ''}
+      ${t.riesgos.length ? `<p class="estr-celdas riesgo"><em>Con riesgo:</em> ${t.riesgos.map(c => `<b>${c.principio}</b> ${escHtml(c.nota)}`).join(' · ')}</p>` : ''}
+      ${t.fuertes.length ? `<p class="estr-barrios"><em>Barrios donde rinde por encima:</em> ${t.fuertes.map(barrio).join(' · ')}</p>` : ''}
+      ${t.huecos.length ? `<p class="estr-barrios hueco"><em>Huecos:</em> ${t.huecos.map(barrio).join(' · ')}</p>` : ''}</article>`).join('');
+  return `<article class="panel estr-bloque"><span class="panel-num">01 · Dónde y con quién</span><h3>Cada arquetipo de ${escHtml(donde)}, en su cuadrante.</h3>
+    <p class="helper">Dos ejes: cuánto pesa el arquetipo en el territorio (grande, de la mediana para arriba) y la afinidad de ${R.lente === 'partido' ? 'la votación de su partido' : 'su votación'} con él (alta, ×1,05 o más: la misma regla del panel de arquetipos). Si el arquetipo vota poco —4 puntos o más por debajo de la participación de la ciudad— y ya lo prefiere o pesa mucho, lo que rinde es movilizar.</p>
+    ${med ? planoTerritorio(T) : '<p><b>Sin votos propios ni de su partido en la ciudad no hay afinidad que medir.</b> Abajo va el peso de cada arquetipo en el territorio y lo que el banco dice para cada uno; cuando tenga una votación, los cuadrantes aparecen.</p>'}</article>
+    <div class="estr-arqs">${tarjetas}</div>
+    <p class="helper">Los barrios: su peso en ${R.lente === 'propio' ? 'su votación' : 'esa votación'} contra su peso en el territorio, solo en barrios con 0,06 % o más del territorio (unos 1.500 votantes en Bogotá) y del arquetipo que manda en el barrio. Describe el comportamiento de los barrios donde están los votos, no quién votó: el voto es secreto. «Lo que dice el banco» es la matriz arquetipo × principio, una hipótesis del equipo.</p>`;
+}
+
 /* ─── 10. Arranque ───────────────────────────────────────────────────────── */
 (function init() {
   montarWizardNuevo();

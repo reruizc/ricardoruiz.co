@@ -337,10 +337,32 @@
      exige un 8 % del voto para que un arquetipo marginal no gane por azar:
      con 5 %, en Cartagena ganaba el guardián insular del centro-derecha con
      6 % contra 5 % de la ciudad, que es ruido y no un nicho. */
-  function afinidad(L, Lciudad, año = L.cortes?.[0] || '2023') {
+  /* `opts.minimo` cambia ese 8 %: la tabla de territorio de la estrategia
+     (candidato-360-estrategia.js) necesita TODOS los arquetipos, también los
+     chicos, porque «pesa poco y ahí rinde por debajo» es una respuesta. */
+  function afinidad(L, Lciudad, año = L.cortes?.[0] || '2023', opts = {}) {
+    const minimo = opts.minimo ?? .08;
     const sh = (X, id) => (X.reparto[año]?.[id] || 0) / (X.total || 1);
     return (L.idsDe ? L.idsDe(año) : L.ids || []).map(id => ({ id, share: sh(L, id), ciudad: sh(Lciudad, id), ratio: sh(Lciudad, id) ? sh(L, id) / sh(Lciudad, id) : 0 }))
-      .filter(x => x.share >= .08).sort((a, b) => b.ratio - a.ratio);
+      .filter(x => x.share >= minimo).sort((a, b) => b.ratio - a.ratio);
+  }
+  /* Una lectura recortada a una unidad (localidad o comuna): el territorio de
+     una JAL no es la ciudad. Rehace el reparto con los mismos pesos y la misma
+     mezcla de cada barrio; Medellín, sin mezcla, aporta todo al dominante. */
+  function recortar(L, unidad) {
+    const u = normBarrio(unidad), dentro = new Set(L.filasBarrio.filter(f => normBarrio(f.comuna) === u).map(f => f.code));
+    const cortes = L.cortes || ['2023', '2027'], reparto = Object.fromEntries(cortes.map(k => [k, {}]));
+    const pesos = {};
+    let total = 0;
+    Object.entries(L.pesos).forEach(([code, v]) => {
+      if (!v || !dentro.has(code)) return;
+      pesos[code] = v; total += v;
+      cortes.forEach(k => {
+        const m = L.mezclaDe(code, k) || (L.dominanteDe(code, k) ? { [L.dominanteDe(code, k)]: 1 } : {});
+        Object.entries(m).forEach(([id, p]) => { reparto[k][id] = (reparto[k][id] || 0) + v * p; });
+      });
+    });
+    return { ...L, pesos, total, reparto, filasBarrio: L.filasBarrio.filter(f => dentro.has(f.code)), recorte: unidad };
   }
   /* El arquetipo que más pesa en 2023 y su porcentaje. */
   function principal(L, año = L.cortes?.[0] || '2023') {
@@ -348,5 +370,5 @@
     return top ? { id: top[0], votos: top[1], share: L.total ? top[1] / L.total : 0 } : null;
   }
 
-  global.C360ArqLectura = { MEDELLIN, CARTAGENA, BOGOTA, ciudadDe, municipioDeCampana, leer, principal, huella, afinidad, emocion, normBarrio };
+  global.C360ArqLectura = { MEDELLIN, CARTAGENA, BOGOTA, ciudadDe, municipioDeCampana, leer, principal, huella, afinidad, recortar, emocion, normBarrio };
 })(window);
