@@ -704,6 +704,28 @@ Día de la elección esté cerrado, **09 no aparece** en ninguna fase. Abrir una
 fase es `C360Plan.abrir(id)`; la portada se pinta en cada apertura del CRM
 (`C360Plan.mostrar()` tras `showScreen('crm')`). No toca el cálculo de ningún
 módulo: solo muestra u oculta tarjetas (clase `plan-fuera`).
+- **Cada fase lleva una ilustración** isométrica en pastel, estilo Monument
+  Valley (`assets/candidato-360/fases/{planeacion,posicionamiento,campana,remate,dia}.webp`,
+  960×640, ~25 KB). Se generaron con Canva y viven en el lienzo «Lienzo blanco
+  horizontal» (DAHYbZIQ4-I), páginas 34 a 38; para cambiar una, se regenera ahí
+  y se exporta en JPG. ⚠ La imagen lleva `width`/`height` en el HTML: el CSS
+  necesita `height:auto` o la proporción 3:2 no aplica.
+- **Al abrir una fase no hay barra de navegación**: arriba sale la imagen, el
+  nombre y un párrafo que explica la fase. Para volver a las fases está el
+  «Volver» de la barra superior (desde la estrategia vuelve a la fase; desde la
+  fase, a la portada).
+- **Tarjeta 11 · Estrategia**: en vez de la lista de principios, un discurso
+  personalizado (`discursoEstrategia()` en candidato-360.js) según la
+  corporación (lista o uninominal, lista cerrada), la ciudad, el partido o la
+  familia política y lo que dicen sus datos (`R.lugar`), sobre por qué la
+  estrategia es la parte estructural de la campaña. Debajo sigue «Esta semana».
+  La vista ampliada abre con **«Su estrategia, en dos párrafos»**
+  (`estrategiaEnDosParrafos()`: el lugar y dónde pesan sus votos; la fase, los
+  tres principios que más le sirven, la pelea en su lista y la acción), y el
+  panel de la fase trae un párrafo que la explica (`FASE_PARRAFO`, por id del
+  calendario del banco). Todo sale de datos ya calculados: sin modelo de
+  lenguaje. ⚠ Las frases por familia asumen gobierno nacional de derecha en
+  2026-2030 (mismo supuesto que el copy del briefing).
 
 ### Contendientes: quien hoy ocupa un cargo no compite (oct-20-2026)
 

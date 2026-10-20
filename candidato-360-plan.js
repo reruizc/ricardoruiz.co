@@ -37,9 +37,11 @@
   const FASES = [
     { id: 'planeacion', nombre: 'Planeación', activa: true, cuando: 'Ahora',
       que: 'De dónde parte: su historial, la meta de votos, el territorio, sus rivales y la estrategia.',
+      parrafo: 'Antes de salir a la calle hay que saber de dónde parte: dónde estuvieron sus votos, cuántos necesita, cómo vota cada barrio y contra quién compite. Con eso se escoge una estrategia, y la estrategia ordena todo lo demás. Esta fase no se cierra: se vuelve a ella cada vez que cambie algo grande, como el aval, la lista o un rival.',
       modulos: ['estrategia', 'partida', 'meta', 'arquetipos', 'perfil', 'contendientes', 'endoso', 'firmas', 'mapa'] },
     { id: 'posicionamiento', nombre: 'Posicionamiento', activa: true, cuando: 'Ahora · hasta el 28 de febrero de 2027',
       que: 'El lugar que ocupa antes de la campaña: qué dice, a quién le habla y dónde se deja ver. La persuasión se hace temprano.',
+      parrafo: 'Hasta el 28 de febrero de 2027 se construye el lugar que usted ocupa en la cabeza del votante, antes de que empiece el ruido de la campaña. Lo que la gente piense de usted en marzo es, en buena parte, lo que pensará en octubre: en las últimas semanas la persuasión casi no mueve a nadie. Aquí se decide qué dice, a quién le habla primero y en qué barrios se deja ver; la escucha y el briefing le dicen si está funcionando.',
       modulos: ['estrategia', 'briefing', 'escucha', 'arquetipos', 'contendientes'] },
     { id: 'campana', nombre: 'Campaña', activa: false, abre: '2027-03-01', cuando: 'Marzo a septiembre de 2027',
       que: 'Cerrar el aval y la lista, inscribirse (junio y julio) y movilizar a quien ya lo prefiere.',
@@ -53,12 +55,14 @@
   ];
 
   let FASE = null;
+  /* Ilustraciones de las fases (estilo Monument Valley, generadas en Canva). */
+  const IMG = id => `assets/candidato-360/fases/${id}.webp?v=20261020`;
 
   function estilos() {
     if ($('c360PlanCss')) return;
     const s = document.createElement('style'); s.id = 'c360PlanCss';
     s.textContent = `
-#crm.plan-portada>*:not(.flow-top):not(#crmPlan){display:none!important}
+#crm.plan-portada:not(.crm-en-estrategia)>*:not(.flow-top):not(#crmPlan){display:none!important}
 #crm.plan-fase{display:flex;flex-direction:column}
 #crm.plan-fase>.flow-top{order:0}#crm.plan-fase>#crmPlan{order:1}#crm.plan-fase>.dash-head{order:2}
 #crm.plan-fase>.panel{order:3}#crm.plan-fase>.crm-grid{order:4;margin-bottom:14px}#crm.plan-fase>article.panel{order:5}#crm.plan-fase>.estr-vista{order:6}
@@ -67,18 +71,20 @@
 .plan-hola{margin:8px 0 26px}.plan-hola h2{font-size:clamp(36px,5vw,62px);line-height:.98;margin:6px 0 10px}.plan-hola p{color:var(--muted);max-width:640px;margin:0;font-size:17px}
 .plan-fases{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;counter-reset:fase}
 .plan-card{counter-increment:fase;position:relative;display:flex;flex-direction:column;gap:8px;padding:20px 18px;min-height:250px;background:var(--cream);border:1px solid var(--line);text-align:left;font:inherit;color:inherit}
-.plan-card:before{content:counter(fase,decimal-leading-zero);font:500 11px var(--mono);color:var(--green);letter-spacing:.1em}
+.plan-card .plan-num{font:500 11px var(--mono);color:var(--green);letter-spacing:.1em}.plan-card.cerrada .plan-num{color:var(--muted)}
 .plan-card h3{font-size:22px;margin:0}.plan-card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.45}
 .plan-card .plan-cuando{font:500 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--green)}
 .plan-card .plan-trae{margin-top:auto;font-size:12px;color:var(--muted)}.plan-card .plan-trae b{color:var(--ink)}
 .plan-card.activa{cursor:pointer;transition:.2s}.plan-card.activa:hover,.plan-card.activa:focus{border-color:var(--green);transform:translateY(-3px);outline:none}
 .plan-card.activa .plan-ir{font:700 13px var(--sans);color:var(--green)}
-.plan-card.cerrada{background:transparent;border-style:dashed;opacity:.72}.plan-card.cerrada:before{color:var(--muted)}.plan-card.cerrada .plan-cuando{color:var(--muted)}
+.plan-card.cerrada{background:transparent;border-style:dashed;opacity:.8}.plan-card.cerrada .plan-cuando{color:var(--muted)}
 .plan-card .plan-sello{position:absolute;top:16px;right:16px;font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;padding:3px 7px;border:1px solid currentColor}
 .plan-card.activa .plan-sello{color:var(--green)}.plan-card.cerrada .plan-sello{color:var(--muted)}
-.plan-barra{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 22px;padding:12px 14px;background:var(--cream);border:1px solid var(--line)}
-.plan-barra .back{margin-right:8px}.plan-barra b{font-family:var(--display);font-size:17px}.plan-barra .plan-chip{border:1px solid var(--line);background:transparent;padding:6px 10px;cursor:pointer;font:600 12px var(--sans);color:var(--ink)}
-.plan-barra .plan-chip[aria-pressed=true]{background:var(--forest);color:#fff;border-color:var(--forest)}.plan-barra small{color:var(--muted);flex-basis:100%}
+.plan-card{overflow:hidden}.plan-card .plan-img{display:block;width:calc(100% + 36px);max-width:none;margin:-20px -18px 4px;height:auto;aspect-ratio:3/2;object-fit:cover;background:#f3ebe0}
+.plan-card.cerrada .plan-img{filter:saturate(.75)}.plan-card .plan-sello{background:rgba(255,253,248,.92)}
+.plan-intro{display:grid;grid-template-columns:minmax(0,300px) 1fr;gap:24px;align-items:center;margin:0 0 24px;padding:18px;background:var(--cream);border:1px solid var(--line)}
+.plan-intro img{width:100%;height:auto;aspect-ratio:3/2;object-fit:cover;display:block}.plan-intro h2{font-size:clamp(28px,3.4vw,42px);margin:6px 0 10px;line-height:1}.plan-intro p{margin:0;color:var(--muted);font-size:16px;max-width:760px}
+@media(max-width:700px){.plan-intro{grid-template-columns:1fr}}
 @media(max-width:1100px){.plan-fases{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:700px){.plan-fases{grid-template-columns:1fr}.plan-card{min-height:0}}`;
     document.head.appendChild(s);
@@ -102,8 +108,9 @@
       <div class="plan-fases">${FASES.map(f => {
         const trae = f.modulos.filter(m => NOMBRE_MODULO[m]).map(m => NOMBRE_MODULO[m]);
         return `<${f.activa ? 'button type="button"' : 'div'} class="plan-card ${f.activa ? 'activa' : 'cerrada'}" ${f.activa ? `data-fase="${f.id}"` : 'aria-disabled="true"'}>
+          <img class="plan-img" src="${IMG(f.id)}" alt="" width="600" height="400" loading="lazy" onerror="this.remove()">
           <span class="plan-sello">${f.activa ? 'Abierta' : 'Próximamente'}</span>
-          <h3>${esc(f.nombre)}</h3><span class="plan-cuando">${esc(f.cuando)}</span><p>${esc(f.que)}</p>
+          <span class="plan-num">${String(FASES.indexOf(f) + 1).padStart(2, '0')}</span><h3>${esc(f.nombre)}</h3><span class="plan-cuando">${esc(f.cuando)}</span><p>${esc(f.que)}</p>
           <span class="plan-trae">${f.activa ? `<span class="plan-ir">Abrir →</span>` : `Se abre el ${esc(fecha(f.abre))}.${trae.length ? ` Trae <b>${esc(trae.join(' · '))}</b>.` : ''}`}</span>
         </${f.activa ? 'button' : 'div'}>`;
       }).join('')}</div>`;
@@ -121,12 +128,9 @@
     crm.classList.remove('plan-portada'); crm.classList.add('plan-fase');
     limpiarFiltro();
     Object.entries(PIEZAS).forEach(([k, p]) => { if (!f.modulos.includes(k)) p()?.classList.add('plan-fuera'); });
-    const activas = FASES.filter(x => x.activa);
-    caja.innerHTML = `<div class="plan-barra"><button type="button" class="back" id="planVolver">← Plan de campaña</button>
-      ${activas.map(x => `<button type="button" class="plan-chip" data-fase="${x.id}" aria-pressed="${x.id === id}">${esc(x.nombre)}</button>`).join('')}
-      <small>${esc(f.que)}</small></div>`;
-    $('planVolver').onclick = portada;
-    caja.querySelectorAll('.plan-chip').forEach(b => b.onclick = () => abrir(b.dataset.fase));
+    /* Sin barra de navegación: para volver a las fases está «Volver» arriba. */
+    const n = String(FASES.indexOf(f) + 1).padStart(2, '0');
+    caja.innerHTML = `<div class="plan-intro"><img src="${IMG(f.id)}" alt="" width="600" height="400" onerror="this.remove()"><div><span class="kicker">Fase ${n} · ${esc(f.cuando)}</span><h2>${esc(f.nombre)}</h2><p>${esc(f.parrafo || f.que)}</p></div></div>`;
     window.scrollTo({ top: 0, behavior: 'instant' });
     /* El mapa de Leaflet mide su caja al crearse: si estuvo oculto, se le avisa. */
     setTimeout(() => window.dispatchEvent(new Event('resize')), 0);

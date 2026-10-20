@@ -115,6 +115,8 @@ document.querySelector('.topbar .nav-left').prepend(topBack);
    con ella abierta, «Volver» regresa al tablero y no a la ruta. */
 topBack.addEventListener('click', () => {
   if (document.getElementById('crm')?.classList.contains('crm-en-estrategia')) return volverAlCRM();
+  /* Dentro de una fase del plan, «Volver» regresa a la portada de fases. */
+  if (document.getElementById('crm')?.classList.contains('plan-fase') && !document.getElementById('crm').classList.contains('hidden')) return window.C360Plan?.portada();
   document.querySelector('.screen:not(.hidden) .flow-top .back')?.click();
 });
 function refreshTopBack() { const current = document.querySelector('.screen:not(.hidden)'); topBack.classList.toggle('visible', Boolean(current && current.id !== 'intro')); }
@@ -4887,6 +4889,75 @@ async function pintarEstrategia() {
     $('crmEstrDato').textContent = '—'; $('crmEstrSub').textContent = 'fuente no disponible';
   }
 }
+/* ── El discurso de la estrategia (oct-20-2026) ──────────────────────────
+   La tarjeta 11 abre con un discurso personalizado —corporación, ciudad,
+   partido o familia política y lo que dicen sus datos— sobre por qué la
+   estrategia es la parte estructural de la campaña; la vista ampliada abre con
+   la estrategia en dos párrafos. Todo sale de datos ya calculados (ESTR.R y
+   la campaña): no hay modelo de lenguaje ni frases inventadas sobre la persona. */
+const ESTR_CORP = {
+  concejo: (t, cerrada) => `en el Concejo${t ? ` de ${t}` : ''} no se compite contra un rival sino por un lugar: las curules se reparten entre listas, así que primero tiene que crecer su lista y ${cerrada ? 'después pesar su nombre al armarla, porque en lista cerrada el orden lo pone el partido' : 'después ganarse un renglón dentro de ella'}.`,
+  jal: (t, cerrada) => `en la JAL${t ? ` de ${t}` : ''} las curules se reparten entre listas en un territorio pequeño: se gana con presencia cuadra por cuadra y con un nombre que los vecinos ya reconozcan${cerrada ? ', y en lista cerrada pesando en el orden' : ''}.`,
+  asamblea: (t, cerrada) => `en la Asamblea${t ? ` de ${t}` : ''} se reparten las curules entre listas en todo el departamento: el voto está regado en muchos municipios y la lista tiene que crecer en cada uno${cerrada ? ', con su nombre pesando al armarla' : ''}.`,
+  alcaldia: t => `por la Alcaldía${t ? ` de ${t}` : ''} gana uno solo: hay que juntar una mayoría, no un nicho, y eso obliga a decidir temprano a quién le habla primero y a quién no va a convencer.`,
+  gobernacion: t => `por la Gobernación${t ? ` de ${t}` : ''} gana uno solo y el voto está repartido en todo el departamento: hay que juntar una mayoría que se sostenga lejos de la capital.`,
+};
+function contextoCampanaEstr() {
+  const c = CAMPANA_ACTUAL || SESSION.vinculo?.campana || {};
+  const corp = ESTR?.R?.corp || c.corp || crmCandidate?.corp || 'concejo';
+  const lugar = ESTR?.ciudadNombre || NOMBRE_BONITO(corp === 'jal' ? (c.localidad || c.municipio) : CORP_MUNICIPAL.includes(corp) ? c.municipio : c.departamentoNombre) || '';
+  const partido = sinPartido(c.avales) ? '' : (c.partido || crmCandidate?.partido || '');
+  const bloque = partido ? (window.PartidosBloques?.bloqueDeCandidatura?.(partido, crmCandidate?.nombre || '') || 'sc') : (c.espectro || 'sc');
+  const con = partido ? `Con el aval de ${NOMBRE_BONITO(partido)}` : c.avales === 'firmas' ? 'Por firmas, sin la maquinaria de un partido detrás' : `Desde ${FAMILIA_CON_ARTICULO[bloque] || FAMILIA_CON_ARTICULO.sc}`;
+  const nombre = String(ESTR?.nombre || crmCandidate?.nombre || NUEVO?.nombre || '').trim().split(/\s+/)[0] || '';
+  return { corp, lugar, partido, bloque, con, nombre: nombre ? nombre.charAt(0).toUpperCase() + nombre.slice(1).toLowerCase() : '' };
+}
+function discursoEstrategia() {
+  const k = contextoCampanaEstr(), R = ESTR?.R;
+  const cerrada = R?.competencia?.estado === 'cerrada';
+  const base = (ESTR_CORP[k.corp] || ESTR_CORP.concejo)(k.lugar, cerrada);
+  const estructural = 'Por eso la estrategia es la parte estructural de la campaña: decide qué lugar ocupa, a quién le habla y dónde pone su tiempo, y todo lo demás —piezas, eventos, pauta— se monta encima. Una campaña sin estrategia gasta igual, pero no suma.';
+  const en = k.lugar ? ` en ${k.lugar}` : '';
+  const familia = k.bloque === 'izq' || k.bloque === 'ci'
+    ? `${k.con}, en la orilla contraria al gobierno nacional, su terreno natural es el contraste y el control: la estrategia le dice en qué barrios ese mensaje encuentra eco y en cuáles solo gasta.`
+    : k.bloque === 'd' || k.bloque === 'cd'
+      ? `${k.con}, cerca del gobierno nacional, va a cargar con lo que la Nación haga${en}: la estrategia le dice dónde defenderlo, dónde hablar de lo propio y dónde no vale la pena entrar.`
+      : k.bloque === 'c'
+        ? `${k.con}, el centro se gana con argumentos y llegando primero a los barrios que no tienen dueño: la estrategia le marca cuáles son.`
+        : `${k.con}, sin una línea nacional que lo arrastre o lo hunda, lo que lo define es lo que haga en el territorio: la estrategia le dice dónde.`;
+  const datos = R?.estado === 'ok' && R.lugar ? ` Lo que dicen sus datos hoy: ${R.lugar.charAt(0).toLowerCase()}${R.lugar.slice(1)}` : '';
+  const arranque = base.charAt(0).toUpperCase() + base.slice(1);
+  return `${k.nombre ? `${k.nombre}, ${base}` : arranque} ${estructural} ${familia}${datos}`;
+}
+const pctCorto = x => `${Math.round((x || 0) * 100)} %`;
+function estrategiaEnDosParrafos() {
+  const R = ESTR.R, k = contextoCampanaEstr(), F = R.fase, fig = R.figura || {};
+  const arqs = (R.arquetipos || []).slice();
+  const grande = arqs.slice().sort((a, b) => b.share - a.share)[0];
+  const afin = arqs.filter(a => a.ratio != null && a.share >= .08).sort((a, b) => b.ratio - a.ratio)[0];
+  const de = { propio: 'Sus votos', partido: 'Los votos de su partido', ciudad: 'El voto de la ciudad' }[R.lente] || 'Sus votos';
+  const quien = fig.nombre ? `Su lugar: ${fig.nombre.toLowerCase()}. ${fig.texto || ''}` : (R.lugar || '');
+  const dondeVotos = grande ? ` ${de} pesan más en «${grande.nombre}» (${pctCorto(grande.share)})${afin && afin.nombre !== grande.nombre && R.lente !== 'ciudad' ? ` y rinden por encima de la ciudad en «${afin.nombre}» (${vecesE(afin.ratio)})` : afin && R.lente !== 'ciudad' ? `, donde rinden ${vecesE(afin.ratio)} lo que pesa en el territorio` : ''}: ahí está su base y desde ahí se crece.` : '';
+  const p1 = `${quien}${dondeVotos}`.replace(/\s+/g, ' ').trim();
+  const top = (R.principios || []).slice(0, 3).map(p => `«${p.corto.charAt(0).toLowerCase()}${p.corto.slice(1)}»`);
+  const orden = top.length ? ` Por eso, en orden, lo que más le sirve es ${top.length > 1 ? `${top.slice(0, -1).join(', ')} y ${top[top.length - 1]}` : top[0]}.` : '';
+  const C = R.competencia || {}, N = x => Number(x || 0).toLocaleString('es-CO');
+  const lista = C.estado === 'abierta' && C.distancia != null ? ` En su lista de 2023 quedó a ${N(C.distancia)} votos del último elegido: la pelea también es interna.`
+    : C.estado === 'cerrada' ? ' Va en lista cerrada: su trabajo es que la lista crezca y que su nombre pese al armarla.' : '';
+  const accion = R.accion ? ` Para empezar esta semana: ${R.accion.texto.charAt(0).toLowerCase()}${R.accion.texto.slice(1)}` : '';
+  const MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const hasta = F.hasta ? (([a, m, d]) => `${Number(d)} de ${MES[Number(m) - 1]} de ${a}`)(String(F.hasta).split('-')) : '';
+  const p2 = `Está en la fase de ${F.nombre.toLowerCase()}${hasta ? `, que va hasta el ${hasta}` : ''}. La tarea: ${(F.que.charAt(0).toLowerCase() + F.que.slice(1)).replace(/: /g, '; ')}${orden}${lista}${accion}`;
+  return [p1, p2];
+}
+/* Qué significa la fase, en un párrafo (ids del calendario del banco). */
+const FASE_PARRAFO = {
+  posicionamiento: 'Hasta el 28 de febrero de 2027 se construye el lugar que usted ocupa en la cabeza del votante, antes de que empiece el ruido de la campaña. Lo que la gente piense de usted en marzo es, en buena parte, lo que pensará en octubre: en las últimas semanas la persuasión casi no mueve a nadie. Aquí se decide qué dice, a quién le habla primero y en qué barrios se deja ver; la escucha y el briefing le dicen si está funcionando.',
+  precampana: 'De marzo a julio de 2027 se cierra el vehículo: el aval, el renglón o el tipo de lista, y la inscripción (junio y julio). Es la fase de los acuerdos; sin dejar de rendir cuentas en el territorio.',
+  campana: 'Desde el 31 de julio de 2027 hay propaganda permitida: la campaña sale a la calle y la pauta pesa, pero su efecto dura pocos días. El trabajo es movilizar a quien ya lo prefiere y concentrar la presencia cerca del día.',
+  diad: 'La última semana es para sacar a votar y cuidar el voto: hogares, transporte, el tarjetón y los testigos en los puestos que más pesan.',
+  despues: 'Pasada la elección vienen el escrutinio y, si ganó, la campaña permanente empieza con el cargo.',
+};
 const fechaCorta = iso => { const [a, m, d] = String(iso).split('-').map(Number); return `${d} ${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][m - 1]} ${a}`; };
 function pintarTarjetaEstrategia() {
   const { R, banco } = ESTR, F = R.fase, card = $('crmEstrategia');
@@ -4895,16 +4966,15 @@ function pintarTarjetaEstrategia() {
   $('crmEstrSub').textContent = prox ? `días para: ${prox.nombre.toLowerCase()}` : F.nombre;
   if (R.estado !== 'ok') {
     card.classList.add('module-apagado');
-    $('crmEstrTitulo').textContent = 'Todavía no.';
-    $('crmEstrCopy').textContent = `${R.motivo} Mientras tanto, la fase: ${F.nombre.toLowerCase()}. ${F.que}`;
+    $('crmEstrTitulo').textContent = 'La estrategia es la estructura de su campaña.';
+    $('crmEstrCopy').textContent = `${discursoEstrategia()} ${R.motivo}`;
     $('crmEstrPrincipios').innerHTML = ''; $('crmEstrAccion').classList.add('hidden'); $('crmEstrBtn').disabled = true;
     return;
   }
   card.classList.remove('module-apagado');
-  $('crmEstrTitulo').textContent = R.lugar;
-  const de = { propio: 'de su votación', partido: 'de la votación de su partido', ciudad: 'de la ciudad' }[R.lente];
-  $('crmEstrCopy').textContent = `Fase de ${F.nombre.toLowerCase()}: ${F.que} Lo que más pesa, según los arquetipos ${de}:`;
-  $('crmEstrPrincipios').innerHTML = R.principios.slice(0, 3).map(p => `<li><b>${escHtml(p.id)}</b> ${escHtml(p.corto)}</li>`).join('');
+  $('crmEstrTitulo').textContent = 'La estrategia es la estructura de su campaña.';
+  $('crmEstrCopy').textContent = discursoEstrategia();
+  $('crmEstrPrincipios').innerHTML = '';
   const a = R.accion;
   if (a) {
     $('crmEstrAccion').innerHTML = `<b>Esta semana.</b> ${escHtml(a.texto)} <small>${a.fichas.length ? `Sale de ${escHtml(a.fichas.map(id => C360Estrategia.ficha(banco, id)?.corto || id).join(' · '))}` : 'Criterio de oficio'}</small>`;
@@ -4917,6 +4987,7 @@ function abrirEstrategia() {
   if (!ESTR || ESTR.R.estado !== 'ok') return;
   $('estrNombre').textContent = NOMBRE_BONITO(ESTR.nombre);
   $('estrLugar').textContent = ESTR.R.lugar;
+  $('estrResumen').innerHTML = `<span class="panel-num">Su estrategia, en dos párrafos</span>${estrategiaEnDosParrafos().map(t => `<p>${escHtml(t)}</p>`).join('')}`;
   pintarFaseEstrategia();
   pintarTabEstrategia(ESTR_TAB);
   $('estrAdvertencias').innerHTML = `<span class="panel-num">Cómo leer esto</span><ul>${ESTR.R.advertencias.map(t => `<li>${escHtml(t)}</li>`).join('')}<li>El voto es secreto: todo se describe por el censo y el comportamiento de los barrios donde están sus votos, nunca por quién votó.</li><li>No es un predictor: ordena principios y territorios con la evidencia que hay; no dice quién gana.</li></ul>`;
@@ -4943,7 +5014,7 @@ const fichasHtml = ids => (ids || []).length ? `<span class="estr-fichas">${ids.
 function pintarFaseEstrategia() {
   const F = ESTR.R.fase;
   const hitos = F.hitos.map(h => `<li class="${h.pasado ? 'pasado' : ''} ${F.proximo?.id === h.id ? 'proximo' : ''}"><b>${escHtml(fechaCorta(h.fecha))}</b><span>${escHtml(h.nombre)}</span><em class="estado-${h.estado}" title="${escHtml(h.fuente)}">${{ ley: 'por ley', anunciado: 'anunciado', derivado: 'derivado de la ley' }[h.estado] || h.estado}</em></li>`).join('');
-  $('estrFase').innerHTML = `<div class="estr-fase-cab"><div><span class="panel-num">La fase</span><h3>${escHtml(F.nombre)}${F.hasta ? ` · hasta el ${escHtml(fechaCorta(F.hasta))}` : ''}</h3><p>${escHtml(F.que)} ${fichasHtml(F.fichas)}</p></div>
+  $('estrFase').innerHTML = `<div class="estr-fase-cab"><div><span class="panel-num">La fase</span><h3>${escHtml(F.nombre)}${F.hasta ? ` · hasta el ${escHtml(fechaCorta(F.hasta))}` : ''}</h3>${FASE_PARRAFO[F.id] ? `<p class="estr-fase-parrafo">${escHtml(FASE_PARRAFO[F.id])}</p>` : ''}<p>${escHtml(F.que)} ${fichasHtml(F.fichas)}</p></div>
     <div class="estr-cuenta"><strong>${F.eleccion.dias.toLocaleString('es-CO')}</strong><small>días para la elección del ${escHtml(fechaCorta(F.eleccion.fecha))}</small></div></div>
     <ol class="estr-hitos">${hitos}</ol><p class="helper">${escHtml(F.nota)} El corte de las fases es ${escHtml(F.corte)}.</p>`;
 }
