@@ -512,12 +512,16 @@
 
     // ─── DATA SOURCES ─────────────────────────────────────────────────
     const S3_BASE = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co';
-    const ARQ_BASE = `${S3_BASE}/bases+de+datos/Proyecto+DC/arquetipos`;
+    // `?arqlocal=1` lee los JSON que deja build.py en el repo, para revisar antes de subir.
+    const ARQ_LOCAL = /[?&]arqlocal=1/.test(location.search);
+    const ARQ_S3 = `${S3_BASE}/bases+de+datos/Proyecto+DC/arquetipos`;
+    const ARQ_BASE = ARQ_LOCAL ? '../Bases%20de%20datos/proyecto-dc/arquetipos' : ARQ_S3;
     const URL = {
-      arquetipos:     `${ARQ_BASE}/arquetipos.json`,
+      // ?v: nombres y lectura 2027 nuevos (entrega del 1-oct-2026).
+      arquetipos:     `${ARQ_BASE}/arquetipos.json?v=20261020`,
       porBarrio:      `${ARQ_BASE}/por-barrio.json`,
       porComuna:      `${ARQ_BASE}/por-comuna.json`,
-      proyeccion:     `${ARQ_BASE}/proyeccion-2027-resumen.json`,
+      proyeccion:     `${ARQ_BASE}/proyeccion-2027-resumen.json?v=20261020`,
       correlaciones:  `${ARQ_BASE}/correlaciones-top.json`,
       transiciones:   `${ARQ_BASE}/transiciones.json`,
       metodologia:    `${ARQ_BASE}/metodologia.json`,
@@ -587,6 +591,8 @@
         fetch(URL.comunasGeo).then(r=>r.json()),
         fetch(URL.votacion27).then(r=>r.json()).catch(() => null),
       ]);
+      // En local, los emblemas 2027 nuevos todavía no están en S3: se leen del repo.
+      if (ARQ_LOCAL) Object.values(arqJ.arquetipos || {}).forEach(a => { if (a.evol && a.evol.escudo) a.evol.escudo = a.evol.escudo.replace(ARQ_S3, ARQ_BASE); });
       STATE.data = { arquetipos: arqJ, porBarrio: barJ, porComuna: comJ, proyeccion: proJ, correlaciones: corJ, transiciones: traJ, metodologia: metJ, votacion27: votJ };
       STATE.geo  = { barrios: barGeo, comunas: comGeo };
       // Inyectar arquetipo_ajustado_2027 (versión definitiva Nury) en cada
@@ -767,11 +773,18 @@
              onerror="this.outerHTML='<div class=\\'arq-escudo-fallback\\' style=\\'background:${colorFamHex(famId)}\\'>${d.label_corto[0]}</div>'" />
         <div class="arq-name">${v.nombre}</div>
         <div class="arq-emo">${v.emocion}</div>
-        <dl class="arq-meta">
+        ${v.tipo_decision ? `<dl class="arq-meta">
+          <dt>Demanda</dt><dd>${v.deseo}</dd>
+          <dt>Pierde apoyo</dt><dd>${v.miedo}</dd>
+          <dt>Decide</dt><dd>${v.tipo_decision} · ${v.comportamiento}</dd>
+          <dt>Temas</dt><dd>${v.temas}</dd>
+          <dt>Sesgos</dt><dd>${v.sesgo}</dd>
+          <dt>Se mueve</dt><dd>${v.cambio}</dd>
+        </dl>` : `<dl class="arq-meta">
           <dt>Deseo</dt><dd>${v.deseo}</dd>
           <dt>Miedo</dt><dd>${v.miedo}</dd>
           <dt>Sesgo</dt><dd>${v.sesgo}</dd>
-        </dl>
+        </dl>`}
         <div style="clear:both"></div>
       `;
     }
@@ -1265,7 +1278,7 @@
       const wrap = document.getElementById('slide-grid');
       wrap.innerHTML = SLIDES.map(s => `
         <div class="slide-card">
-          <img src="${ARQ_BASE}/cartografia/slide_${String(s.n).padStart(2,'0')}.png" alt="${s.cap}" loading="lazy" />
+          <img src="${ARQ_S3}/cartografia/slide_${String(s.n).padStart(2,'0')}.png" alt="${s.cap}" loading="lazy" />
           <div class="slide-cap">${s.cap}</div>
         </div>
       `).join('');

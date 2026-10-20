@@ -34,8 +34,11 @@ from datetime import datetime, timezone
 warnings.filterwarnings('ignore')
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-XLSX = os.path.join(ROOT, 'proyecto-dc', 'Actualizacion-2027', 'VOTACIÓN ESPERADA POR ARQUETIPO 2027.xlsx')
-OUT_DIR = os.path.join(ROOT, 'Bases de datos', 'proyecto-dc', 'votacion-arquetipo-2027')
+# Argumentos opcionales: [xlsx] [carpeta de salida]. La entrega del 1-oct-2026
+# (VOTACION_ESPERADA_MEDELLIN_2027_NUEVOS_ARQUETIPOS.xlsx) trae los mismos votos
+# con los nombres 2027 nuevos: el JSON sale igual, porque guarda slugs.
+XLSX = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'proyecto-dc', 'Actualizacion-2027', 'VOTACIÓN ESPERADA POR ARQUETIPO 2027.xlsx')
+OUT_DIR = sys.argv[2] if len(sys.argv) > 2 else os.path.join(ROOT, 'Bases de datos', 'proyecto-dc', 'votacion-arquetipo-2027')
 OUT_FILE = os.path.join(OUT_DIR, 'votacion-2027.json')
 
 # Mapeo nombres de arquetipo (texto en xlsx) → slug interno
@@ -52,7 +55,19 @@ SLUG_BY_NAME = {
     'Continuidad pragmática y gestión barrial':           'continuidad',
     'Supervivencia económica y servicios cotidianos':     'supervivencia',
     'Pertenencia comunitaria y autonomía territorial':    'pertenencia',
+    # nombres 2027 nuevos (entrega del 1-oct-2026)
+    'Resultados Primero': 'proteccion',
+    'Ojo Abierto':        'castigo',
+    'Confianza Cercana':  'continuidad',
+    'Hogar Seguro':       'supervivencia',
+    'Orgullo de Barrio':  'pertenencia',
 }
+NOMBRE_NUEVO = {'proteccion': 'Resultados Primero', 'castigo': 'Ojo Abierto', 'continuidad': 'Confianza Cercana',
+                'supervivencia': 'Hogar Seguro', 'pertenencia': 'Orgullo de Barrio'}
+
+def votos_col(row, slug, viejo):
+    """La columna de votos esperados con el nombre viejo o el nuevo."""
+    return row.get(f'Votos esperados · {viejo}', row.get(f'Votos esperados · {NOMBRE_NUEVO[slug]}'))
 
 def to_slug(name):
     if name is None:
@@ -98,11 +113,11 @@ def main():
             pass
 
         votos_arq = {
-            'proteccion':    _r2(row['Votos esperados · Protección con resultados y orden competente']),
-            'castigo':       _r2(row['Votos esperados · Castigo a la restauración y demanda de alternancia']),
-            'continuidad':   _r2(row['Votos esperados · Continuidad pragmática y gestión barrial']),
-            'supervivencia': _r2(row['Votos esperados · Supervivencia económica y servicios cotidianos']),
-            'pertenencia':   _r2(row['Votos esperados · Pertenencia comunitaria y autonomía territorial']),
+            'proteccion':    _r2(votos_col(row, 'proteccion', 'Protección con resultados y orden competente')),
+            'castigo':       _r2(votos_col(row, 'castigo', 'Castigo a la restauración y demanda de alternancia')),
+            'continuidad':   _r2(votos_col(row, 'continuidad', 'Continuidad pragmática y gestión barrial')),
+            'supervivencia': _r2(votos_col(row, 'supervivencia', 'Supervivencia económica y servicios cotidianos')),
+            'pertenencia':   _r2(votos_col(row, 'pertenencia', 'Pertenencia comunitaria y autonomía territorial')),
         }
         votos_2027_total = sum(v for v in votos_arq.values() if v is not None)
         votos_base_2023  = _ri(row['Votos base 2023'])

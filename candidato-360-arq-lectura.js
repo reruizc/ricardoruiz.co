@@ -35,10 +35,13 @@
   const RR = global.RRData;
   const E = () => global.C360Electorado;
   const MEDELLIN = '01001', CARTAGENA = '05001', BOGOTA = '16001';
-  const ARQ_BASE = RR.publicUrl('bases+de+datos/Proyecto+DC/arquetipos');
+  /* `?arqlocal=1` lee los JSON que dejan los build en `Bases de datos/` del
+     repo (Medellín, Cartagena y Bogotá), para revisar antes de subir a S3. */
+  const ARQ_LOCAL = /[?&]arqlocal=1/.test(global.location?.search || '');
+  const ARQ_BASE = ARQ_LOCAL ? 'Bases%20de%20datos/proyecto-dc/arquetipos' : RR.publicUrl('bases+de+datos/Proyecto+DC/arquetipos');
   const VOT27_URL = `${RR.publicUrl('bases+de+datos/Proyecto+DC/votacion-arquetipo-2027')}/votacion-2027.json?v=20260528`;
-  const ARQ_CTG_BASE = RR.publicUrl('bases+de+datos/Proyecto+DC/arquetipos-cartagena');
-  const ARQ_CTG_URL = `${ARQ_CTG_BASE}/arquetipos-cartagena.json?v=20261001`;
+  const ARQ_CTG_BASE = ARQ_LOCAL ? 'Bases%20de%20datos/proyecto-dc/arquetipos-cartagena' : RR.publicUrl('bases+de+datos/Proyecto+DC/arquetipos-cartagena');
+  const ARQ_CTG_URL = `${ARQ_CTG_BASE}/arquetipos-cartagena.json?v=20261020`;
   const MDE_BARRIOS_URL = `${RR.publicUrl('bases+de+datos')}/MEDELLIN_BARRIOS_OFICIAL.json`;
   const CTG_BARRIOS_URL = `${RR.publicUrl('congreso-2026/output')}/mapas-2026/Ciudades-COM-LOC/CARTAGENAX.json`;
   /* El diccionario puesto→barrio de Cartagena es el mismo del CRM y del panel
@@ -83,7 +86,7 @@
   let mdePromise = null;
   function datosMedellin() {
     if (!mdePromise) mdePromise = Promise.all([
-      json(`${ARQ_BASE}/arquetipos.json`), json(`${ARQ_BASE}/por-barrio.json`), json(`${ARQ_BASE}/por-comuna.json`), json(VOT27_URL).catch(() => null),
+      json(`${ARQ_BASE}/arquetipos.json?v=20261020`), json(`${ARQ_BASE}/por-barrio.json`), json(`${ARQ_BASE}/por-comuna.json`), json(VOT27_URL).catch(() => null),
     ]).then(([familias, barrios, comunas, vot27]) => {
       Object.entries(vot27?.barrios || {}).forEach(([dap, v]) => {
         const b = barrios[dap]; if (!b || !v.arquetipo_ajustado_2027) return;
@@ -204,13 +207,13 @@
       geo, codeDe: p => normBarrio(p.NOMBRE), nombreGeo: p => p.NOMBRE || 'Barrio',
       dominanteDe: (code, año) => D.barrios[code]?.dominante?.[año],
       mezclaDe: (code, año) => D.barrios[code]?.mezcla?.[año] || null,
-      ficha: id => { const f = F[id]; if (!f) return null; return { ...f, id, emocion: emocion(f), escudo: `${ARQ_CTG_BASE}/escudos/${id}.jpg` }; },
+      ficha: id => { const f = F[id]; if (!f) return null; return { ...f, id, emocion: emocion(f), escudo: `${ARQ_CTG_BASE}/tipologias/${id}.jpg?v=20261020` }; },
     };
   }
 
   /* ── Bogotá ───────────────────────────────────────────────────────────── */
   /* `?arqlocal=1` lee lo que dejó publicar.py en el repo, para revisar antes de subir. */
-  const ARQ_BOG_BASE = /[?&]arqlocal=1/.test(global.location?.search || '') ? 'Bases%20de%20datos/arquetipos-bogota/publicar' : RR.publicUrl('congreso-2026/output/arquetipos-bogota');
+  const ARQ_BOG_BASE = ARQ_LOCAL ? 'Bases%20de%20datos/arquetipos-bogota/publicar' : RR.publicUrl('congreso-2026/output/arquetipos-bogota');
   const ARQ_BOG_URL = `${ARQ_BOG_BASE}/arquetipos-bogota.json?v=20261019`;
   /* El catastral simplificado (~4 m): el panel no necesita los 6,5 MB del
      completo ni los 19 archivos por localidad del CRM. */
