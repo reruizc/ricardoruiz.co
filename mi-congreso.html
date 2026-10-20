@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
-  <link rel="stylesheet" href="mi-congreso.css?v=20261019" />
+  <link rel="stylesheet" href="mi-congreso.css?v=20261019b" />
 </head>
 <body>
   <div class="bg-layer"></div>
@@ -69,6 +69,11 @@
           <div class="mc-card-img" style="background-image:url('imagenes/mi-congreso-proyectos.jpg')"><span class="mc-card-tag">Legislatura 2026-27</span><div class="mc-card-t"><div class="k">02</div><div class="h">Mis proyectos</div></div></div>
           <div class="mc-card-b" data-b><div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div></div>
           <div class="mc-card-f"><span>Ver el avance de cada uno</span><span>↗</span></div>
+        </a>
+        <a class="mc-card w3" href="mi-congreso-fuerzas.html" data-card="fuerzas">
+          <div class="mc-card-img" style="background-image:url('imagenes/mi-congreso-fuerzas.jpg')"><span class="mc-card-tag new">Nuevo</span><div class="mc-card-t"><div class="k">08 · correlación de fuerzas</div><div class="h">Fuerzas</div></div></div>
+          <div class="mc-card-b" data-b><div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div></div>
+          <div class="mc-card-f"><span>Quién te ayuda a pasarlo y a quién buscar</span><span>↗</span></div>
         </a>
         <a class="mc-card" href="mi-congreso-reloj.html" data-card="reloj">
           <div class="mc-card-img" style="background-image:url('imagenes/mi-congreso-reloj.jpg')"><span class="mc-card-tag new">Nuevo</span><div class="mc-card-t"><div class="k">03 · art. 162 CP · art. 190 Ley 5ª</div><div class="h">Reloj de trámite</div></div></div>
@@ -139,10 +144,10 @@
   <script src="legislativo-base.js"></script>
   <script src="legislativo-electos.js"></script>
   <script src="candidato-360-saliencia.js?v=20261019"></script>
-  <script src="mi-congreso-base.js?v=20261019"></script>
+  <script src="mi-congreso-base.js?v=20261019b"></script>
   <script>
   /* ── Mi Congreso · hub ─────────────────────────────────────────────
-     Siete tarjetas, cada una con su imagen, un vistazo vivo de su dato y
+     Ocho tarjetas, cada una con su imagen, un vistazo vivo de su dato y
      su propia página. La lógica compartida vive en mi-congreso-base.js. */
   const {esMia,cut,shortTitle,nice,diaCorto,fechaCorta,ambitoNice,numDe,etapaEf}=MC;
   const PARAMS=new URLSearchParams(location.search);
@@ -211,7 +216,7 @@
     head.querySelector('[data-mc-cambiar]').onclick=cambiar;
     const misP=MC.mios(e);
     cardAgenda(e,my,misP); cardProyectos(e,my,misP); cardReloj(e,my,misP);
-    cardVotos(e,my); cardControl(e,my); cardPrensa(e,my); cardBancada(e,my);
+    cardVotos(e,my); cardControl(e,my); cardPrensa(e,my); cardBancada(e,my); cardFuerzas(e,my,misP);
     alertaPinta();
   }
   const ok=my=>my===SEQ;
@@ -245,6 +250,26 @@
       body('proyectos').innerHTML=`<div class="mc-ring-wrap">${MC.ring(av.pct)}<div><div class="mc-lbl" style="margin:0"><b>Avance general</b> de tus ${av.vivos} proyecto${av.vivos===1?'':'s'} vivo${av.vivos===1?'':'s'}, en promedio sobre las 6 etapas de una cámara.</div></div></div>
         <div class="mc-pills"><span class="mc-pill">${mios.length} firmados</span><span class="mc-pill">★ ${princ} como autor principal</span><span class="mc-pill${av.debate?' on':''}">${av.debate} en debate o más</span>${ag?`<span class="mc-pill on">${ag} en el orden del día</span>`:''}${av.fin?`<span class="mc-pill">${av.fin} archivados o acumulados</span>`:''}</div>`;
     }catch(err){ if(ok(my)) vacio('proyectos','No se pudo consultar el registro de radicados.'); }
+  }
+
+  async function cardFuerzas(e,my,misP){
+    try{
+      const [com,coal,mios]=await Promise.all([MC.comision(e),MC.coaliciones().catch(()=>null),misP.catch(()=>[])]);
+      if(!ok(my)) return;
+      const vivos=mios.filter(x=>!etapaEf(x).fin&&MC.comKeyDe(x.comision));
+      const x=vivos.find(z=>z._citas.length)||vivos[0]||null;
+      const comKey=x?MC.comKeyDe(x.comision):com.key;
+      if(!comKey){ vacio('fuerzas','Sin proyectos con comisión asignada ni comisión propia en la composición publicada. Cuando un proyecto tuyo llegue a comisión, aquí aparece su cuenta.'); return; }
+      const corp=x?(x._cam==='Senado'?'senado':'camara'):(e.corp==='SENADO'?'senado':'camara');
+      const F=MC.fuerzas({e,x,com,comKey,corp,coal,periodo:'petro'});
+      if(!F.n){ vacio('fuerzas','No tenemos la composición de esa comisión.'); return; }
+      const leg=MC.FZ_CAT.filter(c=>F.cuenta[c.id]&&c.id!=='yo').map(c=>`<span><i style="background:${c.c};${c.id==='sin'?'border:1px dashed rgba(20,22,31,.4)':c.id==='bisagra'?'border:1px solid rgba(20,22,31,.35)':''}"></i>${esc(c.t)} ${F.cuenta[c.id]}</span>`).join('');
+      body('fuerzas').innerHTML=`<div>${MC.hemiciclo(F,{w:520})}</div><div>
+        <div class="mc-lbl" style="margin:0 0 .5rem">${x?`<b>${esc(numDe(x)||'')}</b> · ${esc(cut(shortTitle(x.titulo),120))}`:`Sin proyecto en el centro: <b>${esc(MC.nombreCom(comKey))}</b> vista desde tu bancada.`}</div>
+        <div class="mc-lbl" style="margin:0 0 .6rem">${esc(MC.nombreCom(comKey))} de ${corp==='senado'?'Senado':'Cámara'}: <b>${F.n}</b> miembros, mayoría de <b>${F.mayoria}</b>. Base posible <b>${F.base}</b>${F.falta?` · faltan <b style="color:var(--amber)">${F.falta}</b>`:' · <b style="color:var(--green)">alcanza</b>'}.</div>
+        <div class="mc-legend">${leg}</div>
+        <p class="note" style="margin-top:.6rem">Cada color es una evidencia (firmó, bancada, afinidad medida), no una posición adivinada.${vivos.length>1?` Tienes ${vivos.length} proyectos con comisión: adentro los recorres uno por uno.`:''}</p></div>`;
+    }catch(err){ if(ok(my)) vacio('fuerzas','No se pudo armar la cuenta en este momento.'); }
   }
 
   async function cardReloj(e,my,misP){

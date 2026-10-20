@@ -119,10 +119,33 @@
   /* «Hoy es congresista»: el nombre corto del electo (≥ 3 componentes) cabe
      entero en el del candidato. Medido sobre Bogotá 2023 sin falsos positivos
      en los 120 más votados (PLAN H10). */
-  function esCongresista(nombre, congresistas) {
-    const t = new Set(norm(nombre).split(' '));
-    return (congresistas || []).some(e => { const s = norm(e).split(' ').filter(Boolean); return s.length >= 3 && s.every(w => t.has(w)); });
+  /* ⚠ Cuenta las palabras repetidas: con un Set, «SANTIAGO MONTOYA MONTOYA»
+     (senador) casaba con «SANTIAGO PERDOMO MONTOYA» (otra persona). */
+  const contar = ws => ws.reduce((m, w) => m.set(w, (m.get(w) || 0) + 1), new Map());
+  function nombreCabe(corto, largo) {
+    const s = norm(corto).split(' ').filter(Boolean); if (s.length < 3) return false;
+    const t = contar(norm(largo).split(' ')), c = contar(s);
+    return [...c].every(([w, n]) => (t.get(w) || 0) >= n);
   }
+  function esCongresista(nombre, congresistas) {
+    return (congresistas || []).some(e => nombreCabe(e, nombre));
+  }
+  /* «Hoy ocupa un cargo»: Congreso 2026-2030, alcaldía o gobernación 2024-2027
+     o el gobierno nacional desde el 7-ago-2026 (candidato-360-data/
+     cargos-actuales.js, de tools/candidato-360/contendientes/build_cargos.py).
+     Ninguno puede competir en octubre de 2027. Misma regla de nombre que el
+     Congreso. */
+  const CARGOS = () => global.Candidato360CargosActuales || { cargos: [], revisadas: {} };
+  function cargoDe(nombre) {
+    const c = CARGOS().cargos.find(x => nombreCabe(x.nombre, nombre));
+    return c ? c.cargo : null;
+  }
+  /* Por ahora se excluye solo donde la lista ya se revisó a mano. */
+  function excluyeCargos(alcance) {
+    if (!alcance?.municipio) return false;
+    return Boolean(CARGOS().revisadas[pad(alcance.departamento, 2) + pad(alcance.municipio, 3)]);
+  }
+  const NO_COMPITE = new Set(['cargo-actual', 'congresista-2026', 'en-ejercicio', 'titular-no-reelegible']);
 
   /* ── Los datos por puesto ──────────────────────────────────────────────
      Forma común, venga de la matriz por comuna/municipio o de los archivos de
@@ -441,6 +464,8 @@
          millones de votos. Quedan en la lista, fuera del índice. */
       if (!UNINOMINALES.includes(ctx.corp) && UNINOMINAL_SLUG.test(e.slug || '')) marcas.push('voto-uninominal');
       if (enEjercicio.has(e.slug)) marcas.push('en-ejercicio');
+      const cargo = cargoDe(e.nombre);
+      if (cargo) marcas.push('cargo-actual');
       const enIndice = !marcas.some(m => FUERA_DEL_INDICE.has(m));
       return {
         key: r.key, nombre: e.nombre, partido: e.partido || '', slug: e.slug, corp: e.corp || '', anio: anio(e),
@@ -448,7 +473,7 @@
         fuentes: ['A', 'B', 'C', 'E'].filter(f => r.fuentes.has(f)), votos: r.votos,
         afinidad: af, franja: franja(af), correlacion: r.porPuesto ? correlacion(ctx.base, r.porPuesto, datos) : null,
         presion: presion({ cercania: cer, afinidad: af, votos: r.votos, meta: ctx.meta }),
-        marcas, enIndice, porPuesto: r.porPuesto,
+        marcas, enIndice, porPuesto: r.porPuesto, cargo,
         entradas: r.entradas.map(x => ({ slug: x.slug, nombre: x.nombre, corp: x.corp, partido: x.partido, votos: x.votos })),
       };
     });
@@ -459,6 +484,16 @@
       const n = String(a?.nombre || '').trim(); if (!n || yaEstan.has(norm(n))) return;
       yaEstan.add(norm(n)); rivales.push(sinDatos({ key: `mano:${norm(n)}`, nombre: n, partido: a.partido || '', fuentes: ['E'], familiaUsuario: fu }));
     });
+    /* Quien hoy ocupa un cargo no puede competir: sale de la lista y del plano,
+       y se dice quién salió y por qué (`excluidos`). */
+    let excluidos = [];
+    if (ctx.excluirCargos) {
+      excluidos = rivales.filter(r => r.marcas.some(m => NO_COMPITE.has(m)))
+        .map(r => ({ nombre: r.nombre, votos: r.votos, motivo: r.cargo || MARCA_TXT[r.marcas.find(m => NO_COMPITE.has(m))] || '' }))
+        .sort((a, b) => b.votos - a.votos);
+      const fuera = new Set(excluidos.map(x => x.nombre));
+      for (let i = rivales.length - 1; i >= 0; i--) if (fuera.has(rivales[i].nombre)) rivales.splice(i, 1);
+    }
     niveles(rivales);
     rivales.sort((a, b) => (b.enIndice - a.enIndice) || (b.presion - a.presion) || (b.votos - a.votos));
 
@@ -486,7 +521,7 @@
     if (datos.origen === 'archivos') avisos.push('sin-voto-de-lista');
     if (datos.faltan) avisos.push('matriz-incompleta');
     return {
-      rivales, plano: rivales.filter(r => r.enIndice).slice(0, TOP_PLANO),
+      rivales, excluidos, plano: rivales.filter(r => r.enIndice).slice(0, TOP_PLANO),
       vitrina: rivales.filter(r => r.enIndice).slice(0, VITRINA).map(r => r.key),
       escalera: escalera(rep, ctx.partidoCampana, ctx.usuario),
       mapa, avisos, familiaUsuario: fu, baseModo: ctx.baseModo || null,
@@ -740,7 +775,7 @@
       }
     }
     const L = evaluar({ ...cargado, familiaUsuario: familiaCampana(campana), partidoCampana: campana.avales === 'partido' || !campana.avales ? (campana.partido || '') : '',
-      usuario, meta, congresistas: congresistas(), agregadosLibres: agregados.filter(a => a && !a.slug) });
+      usuario, meta, congresistas: congresistas(), agregadosLibres: agregados.filter(a => a && !a.slug), excluirCargos: excluyeCargos(alcance) });
     L.familiaTexto = cargado.familiaTexto || '';
     L.alcance = alcance; L.corp = campana.corp || '';
     /* Sin un solo puesto leído no hay lectura: que quien llama lo diga, en vez
@@ -908,7 +943,7 @@
   }
   const FRANJA_TXT = { alta: 'rinde más en su base', 'mismo-terreno': 'mismo terreno', baja: 'rinde menos en su base', 'sin-dato': 'sin votos por puesto' };
   const NIVEL_TXT = { alta: 'Presión alta', media: 'Presión media', baja: 'Presión baja' };
-  const MARCA_TXT = { 'congresista-2026': 'Hoy es congresista (2026-2030)', 'titular-no-reelegible': 'No puede reelegirse (C.P. arts. 303 y 314)', 'cambio-de-partido': 'Compitió por otro partido antes', 'voto-uninominal': 'Sus votos son de alcaldía o gobernación: no se comparan con los de una lista', 'en-ejercicio': 'Hoy ocupa ese cargo (elegido en 2023)', 'sin-datos-electorales': 'Sin candidaturas en el registro: no se puede medir' };
+  const MARCA_TXT = { 'cargo-actual': 'Hoy ocupa un cargo y no puede competir en 2027', 'congresista-2026': 'Hoy es congresista (2026-2030)', 'titular-no-reelegible': 'No puede reelegirse (C.P. arts. 303 y 314)', 'cambio-de-partido': 'Compitió por otro partido antes', 'voto-uninominal': 'Sus votos son de alcaldía o gobernación: no se comparan con los de una lista', 'en-ejercicio': 'Hoy ocupa ese cargo (elegido en 2023)', 'sin-datos-electorales': 'Sin candidaturas en el registro: no se puede medir' };
   const AVISO_TXT = {
     'territorio-parejo': 'En este territorio todos compiten por los mismos puestos: casi ningún rival rinde en su base distinto de como rinde en el resto. Lo que los separa es la lista y la familia política, no el territorio.',
     'base-familia': 'Todavía no tiene votos propios en este territorio, así que la afinidad se mide contra los votos de su familia política en 2023.',

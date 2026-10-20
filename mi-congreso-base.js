@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Mi Congreso · base compartida del hub y de las 7 páginas de módulo
+   Mi Congreso · base compartida del hub y de las 8 páginas de módulo
    ───────────────────────────────────────────────────────────────────
    Va DESPUÉS de legislativo-base.js (esc, fmt, norm, tCase, depNice, call,
    autoresDe) y de legislativo-electos.js (ELECTOS, bancadaOf).
@@ -34,6 +34,7 @@
     {id:'control',  href:'mi-congreso-control.html',   t:'Control político'},
     {id:'prensa',   href:'mi-congreso-prensa.html',    t:'En la prensa'},
     {id:'bancada',  href:'mi-congreso-bancada.html',   t:'Mi bancada'},
+    {id:'fuerzas',  href:'mi-congreso-fuerzas.html',   t:'Fuerzas'},
   ];
 
   /* ── texto ───────────────────────────────────────────────────────── */
@@ -220,7 +221,7 @@
           return {numero_senado:x.numero_senado,numero_camara:x.numero_camara,titulo:x.titulo,estado:x.estado,
             tipo_de_ley:x.tipo_de_ley,tipologia:x.tipologia,comision:x.comision,fecha:x.fecha,fuente_url:x.fuente_url,
             gaceta:x.gaceta,intentos_previos:x.intentos_previos,_cam:x._cam,_n:auts.length,_primero:i===0,
-            _coaut:auts.filter((a,j)=>j!==i).slice(0,40)};
+            _coaut:auts.filter((a,j)=>j!==i).slice(0,150)};
         }).filter(Boolean);
         base._leg=r.legislatura;
         sesSet(k,base);
@@ -353,6 +354,137 @@
   const BANC_CAUDAL={'Pacto Histórico':'Pacto/izq','Centro Democrático':'Centro Democrático','Partido Liberal':'Liberal',
     'Partido Conservador':'Conservador','Partido de la U':'La U','Cambio Radical':'Cambio Radical','Alianza Verde':'Verde/Centro'};
 
+  /* ── correlación de fuerzas de un proyecto ───────────────────────────
+     El centro es la COMISIÓN donde está el proyecto: cada silla es un
+     miembro real (comisiones-2026.json) y se colorea por la EVIDENCIA que
+     hay sobre él, nunca por un bando adivinado:
+       · tú · firmó (es coautor) · su bancada (la del congresista elegido)
+       · bancada afín / bisagra / suele votar distinto: coincidencia entre
+         mayorías de bancada en votaciones de fondo (coaliciones de Caudal,
+         Cámara 2018-2026). Es afinidad DE BANCADA en el cuatrienio pasado,
+         no lo que esta persona hará con este proyecto.
+       · sin dato: bancada que Caudal no mide (minoritarias, étnicas, CITREP).
+     «En contra» no existe: solo se sabría con un voto sobre el proyecto. */
+  const FZ_CAT=[
+    {id:'yo',      t:'Tú',                      c:'#14161f'},
+    {id:'firmo',   t:'Firmó el proyecto',       c:'#0047FF'},
+    {id:'banc',    t:'Tu bancada',              c:'#5b82ff'},
+    {id:'afin',    t:'Bancada afín',            c:'#a8bcff'},
+    {id:'bisagra', t:'Bancada bisagra',         c:'#d9d6cb'},
+    {id:'distinto',t:'Suele votar distinto',    c:'#5d6271'},
+    {id:'sin',     t:'Sin dato de afinidad',    c:'rgba(20,22,31,.10)'},
+  ];
+  const FZ_AFIN=60, FZ_BISAGRA=40;
+  const COM_KEYS=['PRIMERA','SEGUNDA','TERCERA','CUARTA','QUINTA','SEXTA','SEPTIMA'];
+  /* «Comisión Primera Constitucional Permanente» · «PRIMERA» · «Primera» → PRIMERA */
+  function comKeyDe(c){ const m=norm(c).match(/(primera|segunda|tercera|cuarta|quinta|sexta|septima)/); return m?m[1].toUpperCase():null; }
+  const coaliciones=()=>api({action:'coaliciones'},120);
+  /* nombre de bancada del listado → nombre de Caudal (o null si no la mide) */
+  const bancCaudal=partido=>BANC_CAUDAL[bancadaOf(partido||'').name]||null;
+  function afinidad(coal,periodo,a,b){
+    if(!a||!b) return null; if(a===b) return 100;
+    const P=(((coal||{}).camara||{}).periodos||{})[periodo]; if(!P) return null;
+    const m=P.matriz||{}; const r=m[[a,b].sort().join('|')]||m[a+'|'+b]||m[b+'|'+a];
+    return r&&r.n>=25?r.pct:null;
+  }
+  /* las sillas de la comisión `comKey` de la cámara `corp` ('senado'|'camara') */
+  function fuerzas({e,x,com,comKey,corp,coal,periodo}){
+    const v=(com&&com.todas||{})[comKey]||{}; const L=v[corp]||[];
+    const autores=x?autoresDe(x.autor||'').concat(x._coaut||[]):[];
+    const miB=bancCaudal(e.partido), miNom=bancadaOf(e.partido).name;
+    const sillas=L.map(m=>{
+      const bn=bancadaOf(m.partido||''), bc=bancCaudal(m.partido);
+      let cat, pct=null;
+      if(mismaPersona(m.nombre,e.nombre)) cat='yo';
+      else if(x&&(autores.some(a=>mismaPersona(a,m.nombre)))) cat='firmo';
+      else if(bn.name===miNom&&bn.name!=='Otros y coaliciones') cat='banc';
+      else { pct=afinidad(coal,periodo,miB,bc); cat=pct==null?'sin':pct>=FZ_AFIN?'afin':pct>=FZ_BISAGRA?'bisagra':'distinto'; }
+      return {nombre:m.nombre,partido:m.partido||'',banc:bn.name,color:bn.color,cat,pct};
+    });
+    const ord=FZ_CAT.map(c=>c.id);
+    sillas.sort((a,b)=>ord.indexOf(a.cat)-ord.indexOf(b.cat)||String(a.banc).localeCompare(b.banc)||String(a.nombre).localeCompare(b.nombre));
+    const n=sillas.length, mayoria=Math.floor(n/2)+1;
+    const cuenta={}; FZ_CAT.forEach(c=>cuenta[c.id]=0); sillas.forEach(s=>cuenta[s.cat]++);
+    const base=cuenta.yo+cuenta.firmo+cuenta.banc+cuenta.afin;
+    const mesa=(v.mesa||[]).filter(p=>p.corp===corp).map(p=>({...p,silla:sillas.find(s=>mismaPersona(s.nombre,p.nombre))||null}));
+    return {comKey,corp,sillas,n,mayoria,cuenta,base,falta:Math.max(0,mayoria-base),mesa,miB,miNom};
+  }
+  /* hemiciclo: filas concéntricas, sillas repartidas por longitud de arco y
+     ordenadas por ángulo, así cada categoría queda en un solo sector de
+     izquierda (con usted) a derecha (lejos) */
+  function hemiciclo(F,opt){
+    opt=opt||{}; const W=opt.w||560, cx=W/2;
+    const n=F.sillas.length; if(!n) return '';
+    const rows=n<=16?2:n<=30?3:4, rMax=W*0.44, rMin=rMax*(rows===2?0.6:rows===3?0.5:0.46);
+    const radios=Array.from({length:rows},(_,i)=>rows===1?rMax:rMin+(rMax-rMin)*i/(rows-1));
+    const sumR=radios.reduce((s,r)=>s+r,0);
+    let porFila=radios.map(r=>Math.max(1,Math.round(n*r/sumR)));
+    let dif=n-porFila.reduce((s,k)=>s+k,0); porFila[rows-1]+=dif;
+    const pos=[];
+    radios.forEach((r,i)=>{ const k=porFila[i]; for(let j=0;j<k;j++){ const a=Math.PI*(k===1?0.5:j/(k-1)); pos.push({a,r}); } });
+    pos.sort((p,q)=>p.a-q.a||q.r-p.r);
+    const paso=Math.min(...radios.map((r,i)=>Math.PI*r/Math.max(1,porFila[i]-1)), (rMax-rMin)/(rows-1));
+    const seat=Math.min(W*0.033,paso*0.4);
+    const cy=Math.round(rMax+seat+4), H=Math.round(cy+seat+6);
+    const col=Object.fromEntries(FZ_CAT.map(c=>[c.id,c.c]));
+    const circles=F.sillas.map((s,i)=>{
+      const p=pos[i], x=cx-p.r*Math.cos(p.a), y=cy-p.r*Math.sin(p.a);
+      const stroke=s.cat==='sin'?'stroke="rgba(20,22,31,.35)" stroke-dasharray="2 2"':s.cat==='bisagra'?'stroke="rgba(20,22,31,.35)"':s.cat==='yo'?'stroke="#f2b705" stroke-width="2.5"':'stroke="#fff"';
+      return `<circle class="mc-seat" data-i="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${seat.toFixed(1)}" fill="${col[s.cat]}" ${stroke} stroke-width="${s.cat==='yo'?2.5:1}"/>`;
+    }).join('');
+        return `<svg class="mc-hemi" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hemiciclo de la comisión: ${F.n} miembros">${circles}
+      <text x="${cx}" y="${cy-rMin*0.42}" class="mc-hemi-n">${F.base}<tspan class="mc-hemi-of"> / ${F.mayoria}</tspan></text>
+      <rect x="${cx-rMin*0.55}" y="${cy-rMin*0.3}" width="${rMin*1.1}" height="5" fill="rgba(20,22,31,.08)"/>
+      <rect x="${cx-rMin*0.55}" y="${cy-rMin*0.3}" width="${(rMin*1.1*Math.min(1,F.base/F.mayoria)).toFixed(1)}" height="5" fill="${F.base>=F.mayoria?'#15803d':'#0047FF'}"/>
+      <text x="${cx}" y="${cy-rMin*0.3+20}" class="mc-hemi-l">base posible · mayoría</text>
+    </svg>`;
+  }
+  function tipSilla(s,F,periodoTxt){
+    const c=FZ_CAT.find(k=>k.id===s.cat);
+    const af=s.pct!=null&&s.cat!=='banc'&&s.cat!=='yo'&&s.cat!=='firmo'?`<div>Su bancada (${esc(s.banc)}) coincidió con la tuya en el <b>${Math.round(s.pct)}%</b> de las votaciones de fondo · ${esc(periodoTxt)}</div>`:'';
+    return `<h5>${esc(nice(s.nombre))}</h5><div>${esc(s.partido||'—')}</div><div style="margin-top:.25rem"><b>${esc(c.t)}</b></div>${af}`;
+  }
+  /* la ficha completa de Caudal para un radicado. Los radicados no traen el
+     id del dataset: se resuelve por título y se confirma por NÚMERO (nunca
+     por parecido de título solo). El articulado se valida contra el título:
+     medido oct-2026, a los proyectos de Cámara de la legislatura viva les
+     llega a veces el articulado de OTRO proyecto, y eso no se puede mostrar. */
+  const tokNum=s=>{ const m=String(s||'').match(/0*(\d{1,4})\s*\/\s*(?:20)?(\d{2})/); return m?`${+m[1]}/${m[2]}`:null; };
+  const normT=s=>norm(s).replace(/[^a-z0-9ñ ]/g,' ').replace(/\s+/g,' ').trim();
+  function fichaDe(x){
+    const key=String(x.numero_senado||'')+'|'+String(x.numero_camara||'');
+    return memo('ficha:'+key,async()=>{
+      const hit0=sesGet('ficha:'+key,60); if(hit0) return hit0;
+      const q=normT(x.titulo).split(' ').slice(0,14).join(' ');
+      const r=await call({action:'buscar',query:q,limit:10,anio_min:2026});
+      const tS=tokNum(x.numero_senado), tC=tokNum(x.numero_camara);
+      const hit=(r.resultados||[]).find(h=>(tS&&tokNum(h.ns)===tS)||(tC&&tokNum(h.nc)===tC));
+      if(!hit){ const out={encontrada:false}; sesSet('ficha:'+key,out); return out; }
+      const f=await call({action:'proyecto',id:hit.id,tb:hit.tb||'pdly'});
+      if(!f||f.error) return {encontrada:false};
+      let art=f.articulado||null, artMal=false;
+      if(art){ const a=normT(art.titulo).slice(0,60), b=normT(f.titulo).slice(0,60), c=normT(x.titulo).slice(0,60); if(a!==b&&a!==c){ art=null; artMal=true; } }
+      const out={encontrada:true,id:hit.id,tb:hit.tb,titulo:f.titulo,comision:f.comision,art,artMal,
+        artCob:f.articulado_cobertura||null,importancia:f.importancia||null,
+        bloqueo:f.bloqueo||null,bloqueoSen:f.bloqueo_senado||null,
+        votoNominal:!!(f.voto_nominal||f.voto_nominal_senado),empuje:f.empuje_txt||null,
+        veces:f.veces_presentado||null,n_firmantes:f.n_firmantes||null};
+      sesSet('ficha:'+key,out); return out;
+    });
+  }
+  /* titulares sobre el TEMA del proyecto: la prensa casi nunca cita el número,
+     así que se busca por las palabras del título y se exige que el titular
+     traiga al menos dos de ellas. No se clasifica postura. */
+  const STOP=new Set('para sobre entre desde hasta cual cuales donde como contra mediante segun dictan otras disposiciones medio modifica modifican establece establecen crea crean ley leyes articulo articulos nacional republica colombia colombiano colombiana por del las los una uno que con sus mas adiciona adicionan reforma reforman regula regulan expide expiden fortalece promueve garantiza declara otorga autoriza incluye dicta normas'.split(' '));
+  function palabrasTema(t){ return [...new Set(normT(shortTitle(t)).split(' ').filter(w=>w.length>4&&!STOP.has(w)))].slice(0,5); }
+  async function prensaTema(x,dias){
+    const P=palabrasTema(x.titulo); if(P.length<2) return {palabras:P,res:[]};
+    const d=await api({action:'medios',query:P.slice(0,4).join(' '),dias:dias||60},30);
+    const raiz=P.map(w=>w.slice(0,6));
+    const res=((d&&d.resultados)||[]).filter(r=>{ const t=' '+normT(r.titulo)+' '; return raiz.filter(w=>t.includes(' '+w)).length>=2; });
+    return {palabras:P,res,flexible:d&&d.flexible};
+  }
+
   /* ── cabecera de identidad y barra de módulos ────────────────────── */
   function renderHead(el,e,opt){
     opt=opt||{}; const b=bancadaOf(e.partido);
@@ -472,5 +604,6 @@
     initials,mismaPersona,fechaCorta,fechaLarga,diaCorto,hoyBog,iso,dia,shortTitle,chamberNice,comisionNice,nombreCom,ambitoNice,cut,nice,corto,pct,
     me,guardar,olvidar,requireMe,getJSON,api,comision,ordenes,esMia,etapaDe,etapaEf,numKey,citasDe,numDe,citaTxt,avanceHtml,tipoDe,
     mios,avanceGeneral,indiceElectoral,enSesion,diasHabSesion,diasCal,legislatura,relojDe,puntaje,electoral,fotoDe,voto,prensa,citPanorama,bancadasDisc,bloqueo,stats,
-    renderHead,renderNav,pagina,tip,tipOn,porDia,tipDia,calendario,ring,spark,hbar};
+    renderHead,renderNav,pagina,tip,tipOn,porDia,tipDia,calendario,ring,spark,hbar,
+    FZ_CAT,FZ_AFIN,FZ_BISAGRA,COM_KEYS,comKeyDe,coaliciones,bancCaudal,afinidad,fuerzas,hemiciclo,tipSilla,fichaDe,tokNum,palabrasTema,prensaTema};
 })();

@@ -681,3 +681,59 @@ con católicos, estrato y estrato², con robustez por efectos fijos de localidad
   mapa registra. Es correlación ecológica del territorio, no voto religioso.
 - La lectura comparada y la conclusión práctica salen de reglas fijas
   (`veredicto` y `comparada`), no de un modelo.
+
+### Portada del CRM: el plan de campaña por fases (`candidato-360-plan.js` · oct-20-2026)
+
+Antes de los módulos, el CRM saluda («Hola, Emel. Este es su plan de campaña.»)
+y muestra cinco fases: **Planeación · Posicionamiento · Campaña · Remate · Día
+de la elección**. Solo las dos primeras están abiertas; las otras se ven con su
+fecha y lo que van a traer. Al abrir una fase se ocultan los módulos que no le
+sirven y **11 · Estrategia va de primera**.
+
+| Fase | Fechas | Módulos |
+|---|---|---|
+| Planeación | ahora | 11 · punto de partida · 02 · 05 · 06 · 10 · 08 · 07 · 01 (el mapa al final) |
+| Posicionamiento | hasta el 28-feb-2027 | 11 · 03 · 04 · 05 · 10 |
+| Campaña | 1-mar a sep-2027 (cerrada) | 11 · 03 · 04 · 08 · 10 |
+| Remate | 1 al 24-oct-2027 (cerrada) | 11 · 03 · 04 |
+| Día de la elección | 25 al 31-oct-2027 (cerrada) | **09** |
+
+Las fechas salen del calendario del banco de estrategia (posicionamiento hasta
+febrero, inscripción en junio-julio, propaganda desde el 31-jul). ⚠ Mientras el
+Día de la elección esté cerrado, **09 no aparece** en ninguna fase. Abrir una
+fase es `C360Plan.abrir(id)`; la portada se pinta en cada apertura del CRM
+(`C360Plan.mostrar()` tras `showScreen('crm')`). No toca el cálculo de ningún
+módulo: solo muestra u oculta tarjetas (clase `plan-fuera`).
+
+### Contendientes: quien hoy ocupa un cargo no compite (oct-20-2026)
+
+`candidato-360-data/cargos-actuales.js` (de
+`tools/candidato-360/contendientes/build_cargos.py`) lista **285 congresistas
+2026-2030, 1.132 alcaldes y gobernadores 2024-2027** (el más votado de cada
+circunscripción en los índices de 2023) y **218 nombrados del gobierno nacional
+desde el 7-ago-2026** (Diario Oficial, sin cédulas). En **Bogotá, Medellín, Cali y
+Cartagena** (`revisadas`) quien aparezca ahí —o tenga las marcas
+`congresista-2026`, `en-ejercicio` o `titular-no-reelegible`— **sale de la lista y
+del plano**; la tarjeta y el panel dicen cuántos y quiénes (`L.excluidos`). En el
+resto del país sigue lo de antes (marcados pero dentro). Para sumar una ciudad:
+revisar los cruces y agregarla a `REVISADAS` en el builder.
+- Revisión del 20-oct (Concejo y Alcaldía 2023/2019 y Congreso 2026): fuera de
+  senadores, 18 cruces y todos correctos (Galán, Rodrigo Lara, Briceño, Gordillo,
+  Forero, Nicolás Gómez; Fico, Nataly Vélez, Carrasquilla, Simón Molina…).
+- ⚠ **La regla de nombre cuenta palabras repetidas.** Con un `Set`, «Santiago
+  Montoya Montoya» (senador) casaba con «Santiago Perdomo Montoya»; el
+  `esCongresista` de antes tenía el mismo error y ya está corregido.
+- ⚠ Pendiente: las atípicas 2025-2026 (Bucaramanga, Tunja, Cartago, Girón…)
+  cambiaron al alcalde de 2023 y aquí sigue el de 2023.
+- La prueba `prueba-contendientes.mjs` falla en «Concejo · H9» (72 sin familia
+  política contra 37 esperados) **desde antes de este cambio**.
+
+### La lectura de redes es de la candidatura, no de la cuenta (oct-20-2026)
+
+La captura vive en `c360:captura:<email>`, pero una cuenta puede probar otra
+candidatura (vínculo local) o soporte puede cambiarle el vínculo. Probando con
+su propio nombre, Ricardo veía las cuentas de otra candidatura. Ahora la página
+de escucha, la tarjeta 03 y el worker (`GET /c360/captura` y el inventario del
+briefing) solo usan la lectura si `captura.vinculo.nombre` coincide con la
+candidatura abierta (todas las palabras de uno caben en el otro; lecturas viejas
+sin nombre pasan).
