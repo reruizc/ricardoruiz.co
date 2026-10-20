@@ -26,50 +26,55 @@
 (function (global) {
   'use strict';
 
-  /* Las llaves de `sens` son los temas de agenda que clasifica
+  /* Nombres y textos 2027 de la entrega del 1-oct-2026 (matriz actualizada:
+     Resultados Primero, Ojo Abierto, Confianza Cercana, Hogar Seguro, Orgullo
+     de Barrio). El slug no cambia. ⚠️ `sens` sigue siendo la matriz de mayo: la
+     nueva recalibra varias celdas y mover eso cambia la escucha y la
+     simulación, así que espera visto bueno (ver candidato-360.md).
+     Las llaves de `sens` son los temas de agenda que clasifica
      candidato-360-saliencia.js (TEMAS). Los temas sin llave acá (política,
      ambiente, vivienda y obras) no mueven la sintonía de ninguna familia. */
   const FAMILIAS = [
-    { slug: 'proteccion', color: '#2563eb', nombre: 'Protección con resultados', largo: 'Protección con resultados y orden competente',
-      tagline: 'Orden que se ve · resultados verificables',
+    { slug: 'proteccion', color: '#2563eb', nombre: 'Resultados Primero', largo: 'Resultados Primero',
+      tagline: 'Gestión visible · Resultados concretos',
       sens: { seguridad: 5, corrupcion: 3, empleo: 4, servicios: 4, movilidad: 4, salud_educacion: 3, participacion: 2, cultura: 2 },
-      activa: 'Resultados visibles, seguridad barrial y autoridad eficaz',
-      desmoviliza: 'Promesa vacía, burocracia y deterioro urbano',
-      fuga: 'Si la seguridad o la gestión no se sienten en el barrio, migra a castigo o supervivencia económica',
-      tono: 'Firme, serio, ejecutivo, verificable y territorial',
-      canales: 'WhatsApp, Facebook, radio y TV local, líderes de seguridad y comercio' },
-    { slug: 'castigo', color: '#dc2626', nombre: 'Castigo y alternancia', largo: 'Castigo a la restauración y demanda de alternancia',
-      tagline: 'Desencanto activo · vigilancia ciudadana',
+      activa: 'Resultados verificables en seguridad, movilidad, servicios, espacio público y obras',
+      desmoviliza: 'Improvisación, desorden, deterioro visible y ausencia de resultados',
+      fuga: 'Pierde apoyo ante improvisación, desorden, deterioro o ausencia de resultados concretos; puede moverse hacia Ojo Abierto u Hogar Seguro',
+      tono: 'Serio, técnico, claro y orientado a logros verificables',
+      canales: 'WhatsApp, prensa local, redes informativas, debates y referidos' },
+    { slug: 'castigo', color: '#dc2626', nombre: 'Ojo Abierto', largo: 'Ojo Abierto',
+      tagline: 'Verdad comprobable · Transparencia real',
       sens: { seguridad: 4, corrupcion: 5, empleo: 4, servicios: 3, movilidad: 3, salud_educacion: 3, participacion: 4, cultura: 3 },
-      activa: 'Denuncia sustentada, control ciudadano y alternativa confiable',
-      desmoviliza: 'Rabia vacía, opacidad y excusas',
-      fuga: 'Puede migrar a continuidad si hay beneficios visibles o a pertenencia si emerge un liderazgo local fuerte',
-      tono: 'Crítico, documentado, vigilante, cívico y argumentativo',
-      canales: 'WhatsApp, YouTube, Facebook, medios digitales, debates, vocerías ciudadanas' },
-    { slug: 'continuidad', color: '#16a34a', nombre: 'Continuidad pragmática', largo: 'Continuidad pragmática y gestión barrial',
-      tagline: 'Vínculo que funciona · gestión semanal',
+      activa: 'Transparencia, evidencia, rendición de cuentas, control público y coherencia',
+      desmoviliza: 'Escándalo, clientelismo, mentira, opacidad o acusaciones sin prueba',
+      fuga: 'Se aleja ante escándalo, clientelismo, mentira o incoherencia; puede moverse hacia Confianza Cercana u Orgullo de Barrio',
+      tono: 'Claro, verificable, frontal y basado en evidencia',
+      canales: 'WhatsApp, medios locales, X / Twitter, debates y veedurías barriales' },
+    { slug: 'continuidad', color: '#16a34a', nombre: 'Confianza Cercana', largo: 'Confianza Cercana',
+      tagline: 'Presencia real · Escucha activa',
       sens: { seguridad: 3, corrupcion: 2, empleo: 3, servicios: 5, movilidad: 4, salud_educacion: 4, participacion: 5, cultura: 3 },
-      activa: 'Respuesta cercana, trámites, programas y gestión semanal',
-      desmoviliza: 'Ruptura del vínculo o abandono del territorio',
-      fuga: 'Si la continuidad no resuelve, migra a supervivencia económica o a castigo',
-      tono: 'Cercano, funcional, barrial, concreto y continuista con mejoras',
-      canales: 'WhatsApp, reuniones pequeñas, llamadas, líderes comunitarios, casa a casa, JAL' },
-    { slug: 'supervivencia', color: '#b45309', nombre: 'Supervivencia económica', largo: 'Supervivencia económica y servicios cotidianos',
-      tagline: 'Bolsillo apretado · soluciones inmediatas',
+      activa: 'Escucha, respuesta, servicios, liderazgo local y continuidad útil',
+      desmoviliza: 'Distancia, frialdad, abandono territorial o ruptura del canal de respuesta',
+      fuga: 'Si percibe distancia, frialdad o ruptura del canal de respuesta, se desconecta y busca otro referente; puede moverse hacia Hogar Seguro u Ojo Abierto',
+      tono: 'Cálido, cercano, concreto y de presencia permanente',
+      canales: 'WhatsApp, casa a casa, reuniones barriales, líderes locales y Facebook' },
+    { slug: 'supervivencia', color: '#b45309', nombre: 'Hogar Seguro', largo: 'Hogar Seguro',
+      tagline: 'Bolsillo protegido · Servicios útiles',
       sens: { seguridad: 3, corrupcion: 2, empleo: 5, servicios: 5, movilidad: 4, salud_educacion: 4, participacion: 2, cultura: 2 },
-      activa: 'Empleo, alivios, subsidios, transporte y servicios',
-      desmoviliza: 'Lenguaje abstracto, tecnocracia y promesa lejana',
-      fuga: 'Puede ser capturado por maquinarias locales o por propuestas con beneficios muy tangibles',
-      tono: 'Directo, sencillo, útil, empático y resolvedor',
-      canales: 'WhatsApp, TikTok, radio popular, activaciones territoriales, voz a voz' },
-    { slug: 'pertenencia', color: '#a21caf', nombre: 'Pertenencia comunitaria', largo: 'Pertenencia comunitaria y autonomía territorial',
-      tagline: 'Voz del barrio · identidad y arraigo',
+      activa: 'Empleo, ingresos, servicios útiles, seguridad, salud y costo de vida',
+      desmoviliza: 'Incertidumbre económica, alzas de gastos esenciales y falta de soluciones cotidianas',
+      fuga: 'Si aumenta la incertidumbre económica o empeoran los gastos esenciales, castiga o se abstiene; puede moverse hacia Resultados Primero u opciones económicas',
+      tono: 'Simple, empático, útil y orientado a soluciones del día a día',
+      canales: 'WhatsApp, TV / radio local, referidos, Facebook y conversación familiar' },
+    { slug: 'pertenencia', color: '#a21caf', nombre: 'Orgullo de Barrio', largo: 'Orgullo de Barrio',
+      tagline: 'Identidad viva · Barrio con voz',
       sens: { seguridad: 4, corrupcion: 3, empleo: 3, servicios: 4, movilidad: 3, salud_educacion: 3, participacion: 5, cultura: 5 },
-      activa: 'Reconocimiento, participación, cultura y liderazgo local',
-      desmoviliza: 'Invisibilización, centralismo y falta de escucha',
-      fuga: 'Si no hay liderazgo confiable, puede migrar a protección o a castigo',
-      tono: 'Comunitario, reconocedor, participativo, identitario y esperanzador',
-      canales: 'WhatsApp comunitario, Facebook, Instagram, encuentros barriales, colectivos culturales' },
+      activa: 'Participación, cultura, liderazgo, seguridad, servicios y representación local',
+      desmoviliza: 'Abandono, desprecio simbólico, centralización o participación sin incidencia',
+      fuga: 'Si siente abandono, desprecio simbólico o participación sin incidencia, se aleja y castiga; puede moverse hacia Resultados Primero u Ojo Abierto',
+      tono: 'Orgulloso, comunitario, directo y con arraigo local',
+      canales: 'WhatsApp, liderazgos barriales, eventos comunitarios, Facebook y casa a casa' },
   ];
 
   const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/bases+de+datos/Proyecto+DC/arquetipos';
@@ -93,7 +98,7 @@
       fuente: 'Simulación 2027 por barrio · cartografía emocional de Cartagena',
       calza: t => !t.departamental && /^CARTAGENA( DE INDIAS)?$/.test(norm(t.munLimpio || t.base)) && (!t.depNombre || norm(t.depNombre) === 'BOLIVAR'),
       cargar: async () => {
-        const r = await fetch(`${S3_CTG}/arquetipos-cartagena.json?v=20261001`);
+        const r = await fetch(`${S3_CTG}/arquetipos-cartagena.json?v=20261020`);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = await r.json();
         const familias = (d.orden || Object.keys(d.familias)).map(slug => {

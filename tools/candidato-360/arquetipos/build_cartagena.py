@@ -6,7 +6,11 @@ tarjeta 05 de candidato-360 cruza con los votos de la candidatura.
 
     python3 tools/candidato-360/arquetipos/build_cartagena.py [carpeta_insumos]
 
-Por defecto busca los insumos en `Bases de datos/proyecto-dc/arquetipos-cartagena/insumos/`.
+Por defecto busca los insumos en la entrega rehecha del 1-oct-2026
+(`Bases de datos/proyecto-dc/entrega-nury-cartagena-20261001/CARTAGENA_TIPOLOGIAS_VOTANTE_2027_FINAL/`),
+que cambió los ocho nombres y llama a la categoría «tipología de votante». Las
+cifras son las mismas de la entrega de septiembre (se comparó celda por celda);
+los nombres de archivo de las dos versiones casan con los mismos patrones.
 
 Qué NO es igual a Medellín, y por qué importa:
 - Cartagena tiene OCHO arquetipos propios, no las cinco familias de Medellín.
@@ -34,22 +38,27 @@ import openpyxl
 
 warnings.filterwarnings('ignore')
 RAIZ = Path(__file__).resolve().parents[3]
-INSUMOS = Path(sys.argv[1]) if len(sys.argv) > 1 else RAIZ / 'Bases de datos/proyecto-dc/arquetipos-cartagena/insumos'
+INSUMOS = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(
+    '/Users/ricardoruiz/ricardoruiz.co/Bases de datos/proyecto-dc/entrega-nury-cartagena-20261001/CARTAGENA_TIPOLOGIAS_VOTANTE_2027_FINAL')
 SALIDA = RAIZ / 'Bases de datos/proyecto-dc/arquetipos-cartagena/arquetipos-cartagena.json'
 AÑOS = ['2015', '2019', '2023', '2027']
 
-# Orden de columnas de Nury. El slug es nuestro; el nombre es el de ella.
+# Orden de columnas de Nury. El slug es nuestro (y se queda: es la llave en
+# datos, imágenes y código); el nombre es el de ella. Nombres del 1-oct-2026
+# (README_CAMBIOS_TIPOLOGIAS_CARTAGENA.txt); el de septiembre queda en
+# `nombre_anterior` y sigue casando, por si se corre con la entrega vieja.
 ARQ = [
-    ('guardian-funcional', 'Guardián funcional'),
-    ('gestor-vigilante', 'Gestor vigilante'),
-    ('pragmatico-servicios', 'Pragmático de servicios'),
-    ('protesta-resolutiva', 'Protesta resolutiva'),
-    ('defensor-territorial', 'Defensor territorial'),
-    ('guardian-insular', 'Guardián insular'),
-    ('productivo-pragmatico', 'Productivo-pragmático'),
-    ('mediador-comunitario', 'Mediador comunitario'),
+    ('guardian-funcional', 'Orden que Cumple', 'Guardián funcional'),
+    ('gestor-vigilante', 'Ojo al Poder', 'Gestor vigilante'),
+    ('pragmatico-servicios', 'Barrio que Resuelve', 'Pragmático de servicios'),
+    ('protesta-resolutiva', 'Cambio de Verdad', 'Protesta resolutiva'),
+    ('defensor-territorial', 'Orgullo de Tierra', 'Defensor territorial'),
+    ('guardian-insular', 'Que Miren la Isla', 'Guardián insular'),
+    ('productivo-pragmatico', 'Primero el Trabajo', 'Productivo-pragmático'),
+    ('mediador-comunitario', 'El que Responde', 'Mediador comunitario'),
 ]
-SLUG = {n: s for s, n in ARQ}
+SLUG = {**{v: s for s, _, v in ARQ}, **{n: s for s, n, _ in ARQ}}
+ANTERIOR = {s: v for s, _, v in ARQ}
 
 # Lo que traen las tarjetas gráficas de Nury (lema, palancas emocionales 1-5 y
 # edades), transcrito de las ocho piezas. El color es nuestro.
@@ -131,7 +140,7 @@ def leer_integrado():
     """Las fichas 2027 de la sección 5 del INTEGRADO: perfil, cómo decide,
     sesgos, cinco palancas emocionales, cinco temáticas y barrios representativos."""
     import zipfile
-    m = sorted(glob.glob(str(INSUMOS / 'INTEGRADO CARTAGENA.docx')))
+    m = sorted(glob.glob(str(INSUMOS / 'INTEGRADO?CARTAGENA*.docx')))
     if not m:
         print('  ⚠ sin INTEGRADO: las fichas salen sin cómo decide ni palancas temáticas')
         return {}
@@ -146,7 +155,7 @@ def leer_integrado():
         if not mm or mm.group(1) not in SLUG:
             continue
         slug, f = SLUG[mm.group(1)], {}
-        sint = re.sub(r'^Síntesis del arquetipo\.\s*', '', ps[i + 1])
+        sint = re.sub(r'^Síntesis del (arquetipo|tipología de votante)\.\s*', '', ps[i + 1])
         corte = re.search(r'\s(?!Cartagena\b)([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\b', sint[1:])
         f['perfil'] = sint[corte.start() + 2:].strip() if corte else ''
         for j in range(i + 2, min(i + 40, len(ps) - 1)):
@@ -182,20 +191,37 @@ def abrir(patron):
     return openpyxl.load_workbook(m[0], read_only=True, data_only=True)
 
 
-def main():
-    carto = abrir('CARTOGRAF*EMOCIONAL CARTAGENA.xlsx')
-    simu = abrir('SIMULACI*ARQUETIPOS 2027.xlsx')
-    sens = abrir('SENSIBILIDAD POBLACIONAL CARTAGENA.xlsx')
+def leer_diccionario():
+    """El diccionario del 1-oct-2026: descripción de comportamiento, decisión,
+    riesgo de fuga y barrios de referencia de cada tipología. Opcional."""
+    m = sorted(glob.glob(str(INSUMOS / 'DICCIONARIO*CARTAGENA*.xlsx')))
+    if not m:
+        return {}
+    out = {}
+    for r in filas(openpyxl.load_workbook(m[0], read_only=True, data_only=True).worksheets[0], 2):
+        slug = SLUG.get(r[1])
+        if slug:
+            out[slug] = dict(descripcion=r[2], decision=r[3], riesgo_fuga=r[5], uso=r[7])
+    return out
 
-    # ── fichas ──
+
+def main():
+    carto = abrir('CARTOGRAF*EMOCIONAL?CARTAGENA*.xlsx')
+    simu = abrir('SIMULACI*2027.xlsx')
+    sens = abrir('SENSIBILIDAD?POBLACIONAL?CARTAGENA*.xlsx')
+
+    # ── fichas ── (la hoja se llama «03_Fichas_Arquetipos» o «03_Fichas_Tipología de votantes»)
     familias = {}
-    for r in filas(carto['03_Fichas_Arquetipos'], 4):
+    fichas = next(n for n in carto.sheetnames if n.startswith('03_Fichas'))
+    for r in filas(carto[fichas], 4):
         slug = SLUG.get(r[0])
         if not slug:
             continue
-        familias[slug] = dict(nombre=r[0], familia_fuente=r[1], emocion=r[2], rasgos=r[3],
+        familias[slug] = dict(nombre=r[0], nombre_anterior=ANTERIOR[slug], familia_fuente=r[1], emocion=r[2], rasgos=r[3],
                               sube=r[4], baja=r[5], **TARJETA[slug])
     assert len(familias) == 8, familias.keys()
+    for slug, d in leer_diccionario().items():
+        familias[slug].update({k: v for k, v in d.items() if v})
     integ = leer_integrado()
     for slug, f in familias.items():
         extra = integ.get(slug, {})
@@ -263,7 +289,7 @@ def main():
         k = norm(r[0])
         mezcla = {}
         for a in AÑOS:
-            mezcla[a] = {s: r4(r[col[f'% {a} {n}']]) for s, n in ARQ}
+            mezcla[a] = {s: r4(r[col[f'% {a} {n}']] if f'% {a} {n}' in col else r[col[f'% {a} {v}']]) for s, n, v in ARQ}
             tot = sum(mezcla[a].values())
             assert abs(tot - 1) < 0.01, (k, a, tot)
         b = dict(
@@ -296,12 +322,12 @@ def main():
         print('  ⚠ sin arquetipo:', faltan)
 
     out = dict(
-        v='2026-10-01',
+        v='2026-10-20',
         ciudad='Cartagena',
-        fuente='Nury Astrid · cartografía emocional de Cartagena 2015-2027 (sep-2026)',
+        fuente='Nury Astrid · cartografía emocional de Cartagena 2015-2027 (sep-2026; nombres del 1-oct-2026)',
         naturaleza={'2015': 'ancla histórica', '2019': 'proyección retrospectiva',
                     '2023': 'proyección retrospectiva', '2027': 'simulación'},
-        orden=[s for s, _ in ARQ],
+        orden=[s for s, _, _ in ARQ],
         familias=familias,
         ciudad_share=ciudad,
         dominantes=dominantes,

@@ -15,6 +15,12 @@ Inputs (rutas absolutas relativas al primer argumento):
     EVOLUCIÓN ARQUETIPOS MEDELLÍN.xlsx
     VOTOS 2027 ARQUETIPO BARRIO.xlsx
 
+Un tercer argumento opcional reemplaza el Excel de EVOLUCIÓN (solo se lee su
+hoja «2027»). Así entra la entrega del 1-oct-2026 con los nombres 2027 nuevos
+(EVOLUCION_ARQUETIPOS_MEDELLIN_2027_NUEVOS_NOMBRES.xlsx): ⚠️ en ese archivo
+las hojas 2015/2019/2023 llegaron con fórmulas rotas (#REF!, #VALUE!), pero
+este script no las lee; la hoja 2027 es idéntica a la vigente salvo los nombres.
+
 Outputs (en el segundo argumento):
     arquetipos.json
     por-barrio.json
@@ -50,6 +56,13 @@ FAMILY_MAP = {
     "Supervivencia económica y servicios cotidianos": "supervivencia",
     "Castigo a la restauración y demanda de alternancia": "castigo",
     "Pertenencia comunitaria y autonomía territorial": "pertenencia",
+    # Nombres 2027 nuevos (Nury, entrega ACTUALIZADOS del 1-oct-2026): cambia
+    # el nombre y la lectura, no la familia ni ninguna cifra.
+    "Resultados Primero": "proteccion",
+    "Ojo Abierto": "castigo",
+    "Confianza Cercana": "continuidad",
+    "Hogar Seguro": "supervivencia",
+    "Orgullo de Barrio": "pertenencia",
     "Sin dato": None,
 }
 
@@ -79,13 +92,30 @@ ARQUETIPOS_CANON = {
         },
         "evol": {
             "id": "proteccion_evol",
-            "nombre": "Protección con resultados y orden competente",
-            "emocion": "Demanda de orden con eficacia probada",
-            "deseo": "Mantener la seguridad pero exigir resultados visibles y gestión competente.",
-            "miedo": "Retroceso del orden, criminalidad reactiva, fallas en la ejecución.",
-            "sesgo": "Sesgo de continuidad bajo desempeño percibido.",
-            "escudo": f"{S3_ESCUDOS}/proteccion-resultados.jpg",
+            "nombre": "Resultados Primero",
+            "nombre_anterior": "Protección con resultados y orden competente",
+            "emocion": "Exigencia de desempeño y resultados verificables",
+            "deseo": "Que la ciudad funcione con seguridad, movilidad, servicios, espacio público y ejecución visible.",
+            "miedo": "Pierde apoyo ante improvisación, desorden, deterioro o ausencia de resultados concretos.",
+            "sesgo": "Prueba visible; aversión al deterioro; confirmación pragmática; competencia técnica.",
+            "escudo": f"{S3_ESCUDOS}/resultados-primero.jpg",
             "vigencia": "2027",
+            "descripcion": "Elector pragmático que evalúa la administración por resultados concretos. Da valor a seguridad, movilidad, servicios, obras y orden cotidiano; premia capacidad de gestión verificable y penaliza improvisación, deterioro o incumplimiento.",
+            "tipo_decision": "Pragmática-racional",
+            "temas": "Seguridad, movilidad, servicios, espacio público, obras y gestión.",
+            "registro": "Serio, técnico, claro y orientado a logros verificables.",
+            "indicadores": [
+                "Gestión visible",
+                "Resultados concretos",
+                "Ciudad que funciona"
+            ],
+            "perfil": "Adultos de 30 a 65 años; hogares trabajadores; jefaturas de hogar; comerciantes y empleados; sectores populares y medios; territorios donde seguridad, movilidad, servicios y funcionamiento urbano pesan en la evaluación.",
+            "comportamiento": "Compara desempeño, orden y capacidad de gestión. Premia resultados visibles y castiga improvisación, deterioro o lentitud.",
+            "activa": "Resultados verificables en seguridad, movilidad, servicios, espacio público y obras",
+            "desmoviliza": "Improvisación, desorden, deterioro visible y ausencia de resultados",
+            "cambio": "Hacia Ojo Abierto u Hogar Seguro",
+            "canales": "WhatsApp, prensa local, redes informativas, debates y referidos",
+            "contenidos": "Indicadores, comparativos, obras terminadas, seguridad y movilidad"
         },
     },
     "continuidad": {
@@ -105,13 +135,30 @@ ARQUETIPOS_CANON = {
         },
         "evol": {
             "id": "continuidad_evol",
-            "nombre": "Continuidad pragmática y gestión barrial",
-            "emocion": "Pragmatismo de redes locales conocidas",
-            "deseo": "Que la red barrial siga resolviendo lo cotidiano sin disrupción.",
-            "miedo": "Quiebre de la red local, llegada de actores externos.",
-            "sesgo": "Sesgo de proximidad y confianza en gestores conocidos.",
-            "escudo": f"{S3_ESCUDOS}/continuidad-gestion.jpg",
+            "nombre": "Confianza Cercana",
+            "nombre_anterior": "Continuidad pragmática y gestión barrial",
+            "emocion": "Confianza práctica basada en presencia y respuesta",
+            "deseo": "Cercanía, escucha y soluciones concretas mediante redes locales que responden.",
+            "miedo": "Si percibe distancia, frialdad o ruptura del canal de respuesta, se desconecta y busca otro referente.",
+            "sesgo": "Reciprocidad; prueba social local; familiaridad; cercanía afectiva.",
+            "escudo": f"{S3_ESCUDOS}/confianza-cercana.jpg",
             "vigencia": "2027",
+            "descripcion": "Elector relacional que confía en quien aparece, escucha y resuelve. La cercanía, la familiaridad y las redes locales pesan cuando producen soluciones concretas y una respuesta sostenida.",
+            "tipo_decision": "Relacional-comunitaria",
+            "temas": "Servicios, participación, seguridad, gestión local, cultura barrial y presencia territorial.",
+            "registro": "Cálido, cercano, concreto y de presencia permanente.",
+            "indicadores": [
+                "Presencia real",
+                "Escucha activa",
+                "Respuesta cercana"
+            ],
+            "perfil": "Adultos y familias conectados con redes comunitarias, liderazgos, programas, servicios y espacios barriales; sectores populares y medios bajos con alta valoración de presencia territorial.",
+            "comportamiento": "Confía en la presencia real y en quien responde. Tiende a sostener apoyo cuando la relación local produce soluciones concretas.",
+            "activa": "Escucha, respuesta, servicios, liderazgo local y continuidad útil",
+            "desmoviliza": "Distancia, frialdad, abandono territorial o ruptura del canal de respuesta",
+            "cambio": "Hacia Hogar Seguro u Ojo Abierto",
+            "canales": "WhatsApp, casa a casa, reuniones barriales, líderes locales y Facebook",
+            "contenidos": "Historias, soluciones locales, testimonios, seguridad del barrio y agenda comunitaria"
         },
     },
     "supervivencia": {
@@ -131,13 +178,30 @@ ARQUETIPOS_CANON = {
         },
         "evol": {
             "id": "supervivencia_evol",
-            "nombre": "Supervivencia económica y servicios cotidianos",
-            "emocion": "Apuro material sostenido, exigencia de gestión efectiva",
-            "deseo": "Acceso a ingresos, ayudas y trámites con menos fricción.",
-            "miedo": "Pérdida de ayudas y deterioro de servicios públicos.",
-            "sesgo": "Sesgo de utilidad inmediata combinado con desconfianza institucional.",
-            "escudo": f"{S3_ESCUDOS}/supervivencia-cotidianos.jpg",
+            "nombre": "Hogar Seguro",
+            "nombre_anterior": "Supervivencia económica y servicios cotidianos",
+            "emocion": "Protección del hogar y estabilidad cotidiana",
+            "deseo": "Empleo, alivio al bolsillo y servicios que protejan la tranquilidad familiar.",
+            "miedo": "Si aumenta la incertidumbre económica o empeoran los gastos esenciales, castiga o se abstiene.",
+            "sesgo": "Aversión a la pérdida; sesgo del presente; escasez; protección familiar.",
+            "escudo": f"{S3_ESCUDOS}/hogar-seguro.jpg",
             "vigencia": "2027",
+            "descripcion": "Elector protector y práctico cuya prioridad es la estabilidad cotidiana. Evalúa empleo, ingresos, servicios, seguridad y costo de vida por su impacto directo sobre el hogar.",
+            "tipo_decision": "Protectora-práctica",
+            "temas": "Empleo e ingresos, servicios, seguridad, salud/educación, costo de vida y vivienda.",
+            "registro": "Simple, empático, útil y orientado a soluciones del día a día.",
+            "indicadores": [
+                "Bolsillo protegido",
+                "Servicios útiles",
+                "Tranquilidad en casa"
+            ],
+            "perfil": "Hogares de ingresos bajos y medios; trabajadores independientes e informales; cuidadores; familias con presión por empleo, servicios, transporte, alimentación y vivienda.",
+            "comportamiento": "Compara empleo, bolsillo, seguridad y estabilidad. Puede cambiar con rapidez cuando empeora el ingreso disponible o el costo de vida.",
+            "activa": "Empleo, ingresos, servicios útiles, seguridad, salud y costo de vida",
+            "desmoviliza": "Incertidumbre económica, alzas de gastos esenciales y falta de soluciones cotidianas",
+            "cambio": "Hacia Resultados Primero u opciones económicas",
+            "canales": "WhatsApp, TV / radio local, referidos, Facebook y conversación familiar",
+            "contenidos": "Precios, subsidios, salud, empleo y seguridad"
         },
     },
     "castigo": {
@@ -157,13 +221,30 @@ ARQUETIPOS_CANON = {
         },
         "evol": {
             "id": "castigo_evol",
-            "nombre": "Castigo a la restauración y demanda de alternancia",
-            "emocion": "Indignación contra la restauración hegemónica",
-            "deseo": "Romper la continuidad del orden percibido como excluyente y abrir alternancia.",
-            "miedo": "Consolidación de una élite excluyente o regresión autoritaria.",
-            "sesgo": "Sesgo de castigo retrospectivo, sensibilidad a la fatiga del oficialismo.",
-            "escudo": f"{S3_ESCUDOS}/castigo-restauracion.jpg",
+            "nombre": "Ojo Abierto",
+            "nombre_anterior": "Castigo a la restauración y demanda de alternancia",
+            "emocion": "Vigilancia ciudadana y control público",
+            "deseo": "Instituciones confiables, transparencia, evidencia y control ciudadano.",
+            "miedo": "Se aleja ante escándalo, clientelismo, mentira o incoherencia.",
+            "sesgo": "Aversión a la traición; sesgo de confirmación; indignación moral; detección de incoherencias.",
+            "escudo": f"{S3_ESCUDOS}/ojo-abierto.jpg",
             "vigencia": "2027",
+            "descripcion": "Elector vigilante que compara versiones, revisa datos y exige coherencia. Organiza su evaluación alrededor de transparencia, control público y evidencia; castiga opacidad, escándalos e inconsistencias.",
+            "tipo_decision": "Vigilante-crítica",
+            "temas": "Transparencia, control público, seguridad, participación y servicios.",
+            "registro": "Claro, verificable, frontal y basado en evidencia.",
+            "indicadores": [
+                "Verdad comprobable",
+                "Transparencia real",
+                "Control ciudadano"
+            ],
+            "perfil": "Jóvenes adultos y adultos expuestos a debate público; sectores medios y populares informados; ciudadanía con memoria comparativa y sensibilidad frente a transparencia y control.",
+            "comportamiento": "Vigila, contrasta versiones, revisa evidencia y castiga incoherencias, opacidad o concentración de poder.",
+            "activa": "Transparencia, evidencia, rendición de cuentas, control público y coherencia",
+            "desmoviliza": "Escándalo, clientelismo, mentira, opacidad o acusaciones sin prueba",
+            "cambio": "Hacia Confianza Cercana u Orgullo de Barrio",
+            "canales": "WhatsApp, medios locales, X / Twitter, debates y veedurías barriales",
+            "contenidos": "Contratos, cifras, denuncias, comparativos y control político"
         },
     },
     "pertenencia": {
@@ -183,13 +264,30 @@ ARQUETIPOS_CANON = {
         },
         "evol": {
             "id": "pertenencia_evol",
-            "nombre": "Pertenencia comunitaria y autonomía territorial",
-            "emocion": "Reivindicación de autonomía local y voz propia",
-            "deseo": "Reconocimiento institucional y autonomía decisoria sobre el territorio.",
-            "miedo": "Tratamiento como periferia subordinada o pérdida de la voz barrial.",
-            "sesgo": "Sesgo identitario reforzado y desconfianza al centralismo.",
-            "escudo": f"{S3_ESCUDOS}/pertenencia-comunitaria.jpg",
+            "nombre": "Orgullo de Barrio",
+            "nombre_anterior": "Pertenencia comunitaria y autonomía territorial",
+            "emocion": "Identidad local, pertenencia y representación territorial",
+            "deseo": "Reconocimiento, respeto, voz y presencia real del territorio en las decisiones públicas.",
+            "miedo": "Si siente abandono, desprecio simbólico o participación sin incidencia, se aleja y castiga.",
+            "sesgo": "Identidad social; pertenencia; prueba social local; reciprocidad comunitaria.",
+            "escudo": f"{S3_ESCUDOS}/orgullo-de-barrio.jpg",
             "vigencia": "2027",
+            "descripcion": "Elector identitario-territorial que se activa cuando el barrio es reconocido, respetado y representado. Valora participación, cultura, liderazgo local, seguridad y memoria comunitaria.",
+            "tipo_decision": "Identitaria-territorial",
+            "temas": "Participación, cultura barrial, seguridad, servicios, espacio público, liderazgo y juventud.",
+            "registro": "Orgulloso, comunitario, directo y con arraigo local.",
+            "indicadores": [
+                "Identidad viva",
+                "Barrio con voz",
+                "Respeto territorial"
+            ],
+            "perfil": "Mujeres, jóvenes, liderazgos comunitarios, agentes culturales y educativos, redes de cuidado y ciudadanía con fuerte identidad barrial.",
+            "comportamiento": "Se activa por identidad, orgullo local y representación. Valora que el barrio tenga voz, liderazgo legítimo y reconocimiento efectivo.",
+            "activa": "Participación, cultura, liderazgo, seguridad, servicios y representación local",
+            "desmoviliza": "Abandono, desprecio simbólico, centralización o participación sin incidencia",
+            "cambio": "Hacia Resultados Primero u Ojo Abierto",
+            "canales": "WhatsApp, liderazgos barriales, eventos comunitarios, Facebook y casa a casa",
+            "contenidos": "Cultura barrial, mejoras locales, liderazgos, seguridad y participación"
         },
     },
 }
@@ -348,7 +446,8 @@ def build_por_barrio(wb_a, wb_e, wb_v):
             ),
         }
         for fam_id, (pcol, vcol) in prob_cols.items():
-            pv = p27.get(pcol)
+            # La hoja 2027 de la entrega del 1-oct titula la columna con el nombre nuevo.
+            pv = p27.get(pcol, p27.get(f"Prob 2027 · {ARQUETIPOS_CANON[fam_id]['evol']['nombre']}"))
             vv = v.get(vcol)
             if pv is not None:
                 probs_2027[fam_id] = round(float(pv), 4)
@@ -451,7 +550,8 @@ def build_proyeccion_2027_resumen(wb_v, wb_a):
         arqs_2027.append({
             "id": f"{fam}_evol",
             "familia": fam,
-            "nombre": r["Arquetipo 2027"],
+            # El Excel de votos trae los nombres 2027 viejos: manda el canónico.
+            "nombre": ARQUETIPOS_CANON[fam]["evol"]["nombre"],
             "votos": votos,
             "pct_ciudad": r4(r["Pct votos ciudad 2027 proyectado"]),
             "pct_barrial_prom": r4(r["Pct_promedio_barrial"]),
@@ -588,7 +688,7 @@ def write_json(path: Path, data: Any):
 
 
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4):
         print(__doc__)
         sys.exit(2)
 
@@ -596,7 +696,7 @@ def main():
     out = Path(sys.argv[2])
 
     f_analisis = src / "ANALISIS DE EVOLUCIÓN ARQUETIPOS.xlsx"
-    f_evolucion = src / "EVOLUCIÓN ARQUETIPOS MEDELLÍN.xlsx"
+    f_evolucion = Path(sys.argv[3]) if len(sys.argv) == 4 else src / "EVOLUCIÓN ARQUETIPOS MEDELLÍN.xlsx"
     f_votos = src / "VOTOS 2027 ARQUETIPO BARRIO.xlsx"
     for f in (f_analisis, f_evolucion, f_votos):
         if not f.exists():

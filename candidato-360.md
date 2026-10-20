@@ -681,3 +681,64 @@ con católicos, estrato y estrato², con robustez por efectos fijos de localidad
   mapa registra. Es correlación ecológica del territorio, no voto religioso.
 - La lectura comparada y la conclusión práctica salen de reglas fijas
   (`veredicto` y `comparada`), no de un modelo.
+
+### Arquetipos de Medellín y Cartagena · nombres nuevos del estudio (oct-20-2026)
+
+Dos entregas del estudio del 1-oct-2026 (en `Bases de datos/proyecto-dc/entrega-nury-*-20261001/`,
+fuera del repo). **Las dos son de nombre y de lectura, no de cifras**: se
+compararon celda por celda contra los Excel vigentes y ningún voto, mezcla,
+dominante, probabilidad ni barrio cambia. Los slugs se quedan (son la llave en
+datos, imágenes y código).
+
+| Medellín · slug | Nombre 2027 nuevo | Antes |
+|---|---|---|
+| `proteccion` | Resultados Primero | Protección con resultados y orden competente |
+| `castigo` | Ojo Abierto | Castigo a la restauración y demanda de alternancia |
+| `continuidad` | Confianza Cercana | Continuidad pragmática y gestión barrial |
+| `supervivencia` | Hogar Seguro | Supervivencia económica y servicios cotidianos |
+| `pertenencia` | Orgullo de Barrio | Pertenencia comunitaria y autonomía territorial |
+
+Los nombres base 2015-2023 no cambian. Cartagena pasa a llamar la categoría
+«tipología de votante» y renombra las ocho: `guardian-funcional` Orden que
+Cumple · `gestor-vigilante` Ojo al Poder · `pragmatico-servicios` Barrio que
+Resuelve · `protesta-resolutiva` Cambio de Verdad · `defensor-territorial`
+Orgullo de Tierra · `guardian-insular` Que Miren la Isla · `productivo-pragmatico`
+Primero el Trabajo · `mediador-comunitario` El que Responde (tabla en el
+`README_CAMBIOS_TIPOLOGIAS_CARTAGENA.txt` de la entrega).
+
+- **Medellín.** `build.py` toma la hoja 2027 del Excel nuevo (tercer argumento)
+  y escribe la lectura 2027 de la matriz actualizada en `evol` de
+  `arquetipos.json`: disposición, demanda, condición de cambio, tipo de
+  decisión, temas, registro, perfil, canales, factores cognitivos y hacia dónde
+  se mueve; `nombre_anterior` guarda el viejo. Cambian solo `arquetipos.json`
+  y `proyeccion-2027-resumen.json`; los otros cinco salen idénticos byte a byte.
+  `votacion-2027.json` guarda slugs y sale igual: no se vuelve a subir.
+  ⚠️ En el Excel nuevo de evolución las hojas 2015/2019/2023 llegaron con
+  fórmulas rotas (`#REF!`); el build no las lee.
+- **Cartagena.** `build_cartagena.py` lee la entrega rehecha (los patrones de
+  archivo casan con las dos versiones), suma del diccionario nuevo
+  `descripcion`, `decision`, `riesgo_fuga` y `uso`, y deja `nombre_anterior`.
+  La ficha del panel 05 muestra «Cuándo se aleja».
+- **Imágenes.** Emblemas 2027 de Medellín en `arquetipos/escudos/{resultados-primero,…}.jpg`
+  (llaves nuevas) y afiches de Cartagena en `arquetipos-cartagena/tipologias/{slug}.jpg`
+  (antes `escudos/`, que traen el nombre viejo pintado).
+- **En frase**, los nombres de Cartagena van entre comillas y con sus
+  mayúsculas («vota desde el arquetipo «Primero el Trabajo»»): en minúscula se
+  leían como frase suelta. Medellín y Bogotá siguen igual.
+- **`?arqlocal=1`** ahora sirve también para Medellín y Cartagena (panel 05,
+  `proyecto-dc/arquetipos.html` y `escenarios-2027.html`): lee los JSON que dejan
+  los build en `Bases de datos/` para revisar antes de subir.
+- **Sin aplicar, esperan visto bueno: las sensibilidades.** La matriz nueva de
+  Medellín recalibra 11 celdas de las 40 y la de Cartagena trae una matriz 8 × 11
+  completa del estudio, hecha sobre las palancas de este simulador. Medido con
+  la regla de la Simulación (barrios que cambian de dominante): Cartagena,
+  escándalo 86 → 15, inseguridad 23 → 3, crisis de agua 18 → 2 (su matriz es
+  pareja, 3-5 en casi todo, y el simulador mueve por la diferencia con la media);
+  Medellín, crisis de agua 3 → 28, lluvias 0 → 12, golpe económico 15 → 4. Por
+  eso `sens` sigue siendo la de antes en `candidato-360-arquetipos.js`,
+  `build_cartagena.py` y `escenarios-2027.html`.
+- ⚠️ Quedan con los nombres viejos, fuera de este cambio: el worker (`rr-auth`,
+  lectura de noticias de la tarjeta 04), `tools/agenda-medios-recomienda/arquetipos.json`,
+  `tools/proyecto-dc-escenarios-estrategia/` y `tools/test-presidencial-explica/`
+  (lambdas, piden despliegue), y `brujula-2027.html`, `dashboard-general.html` y
+  `elpais-cali-dashboard.html`. El banco de estrategia solo usa códigos.

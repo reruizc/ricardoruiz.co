@@ -297,8 +297,8 @@ table.aq-mini{width:100%;border-collapse:collapse;font-size:12px}
 <script src="data-client.js"></script>
 <script src="partidos-bloques.js?v=20261019"></script>
 <script src="candidato-360-electorado.js?v=20260929"></script>
-<script src="candidato-360-arq-lectura.js?v=20261019-arq8"></script>
-<script src="candidato-360-arquetipos.js?v=20261019"></script>
+<script src="candidato-360-arq-lectura.js?v=20261020-nury"></script>
+<script src="candidato-360-arquetipos.js?v=20261020-nury"></script>
 <script src="candidato-360-arq-modos.js?v=20261019-arq8"></script>
 <script src="candidato-360-panel.js?v=20261019"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
@@ -475,12 +475,14 @@ table.aq-mini{width:100%;border-collapse:collapse;font-size:12px}
   function pintarManda() {
     const V = voz(), top = A.principal(L), f = L.ficha(top.id), c = L.colorDe(top.id);
     const top27 = A.principal(L, K()[1]);
-    const art = ctg() ? 'arquetipo ' : '';
+    /* Los nombres de Cartagena son frases propias («Primero el Trabajo», oct-2026):
+       van entre comillas y como los escribe el estudio, no en minúscula. */
+    const enFrase = n => ctg() ? `«${n}»` : n.toLowerCase();
     $('aqMandaTitulo').textContent = bog()
       ? (LENTE === 'ciudad' ? `En ${L.corteArt(K()[0])} de Bogotá pesa más «${f.nombre}».` : `${V.Voto}, leído con ${L.corteArt(K()[0])}, está sobre todo en barrios «${f.nombre}».`)
       : LENTE === 'ciudad'
-      ? `${L.nombreCiudad} vota desde ${ctg() ? 'el arquetipo ' : ''}${f.nombre.toLowerCase()}.`
-      : `${V.Voto} vive en barrios de ${art}${f.nombre.toLowerCase()}.`;
+      ? `${L.nombreCiudad} vota desde ${ctg() ? 'el arquetipo ' : ''}${enFrase(f.nombre)}.`
+      : `${V.Voto} vive en barrios de ${ctg() ? 'arquetipo ' : ''}${enFrase(f.nombre)}.`;
     let copy = LENTE === 'ciudad'
       ? `La ciudad entera, pesada por los votos de 2023 de cada barrio.${!LENTES.propio ? ` Todavía no tiene votos propios en ${esc(L.nombreCiudad)}: cuando tenga una elección detrás, se suma la lectura desde sus votos.` : ''}`
       : `De ${esc(V.votos)} ubicados en barrios de ${esc(L.nombreCiudad)} (<b>${num(L.total)}</b>), <b>${pct0(top.share)}</b> están en ese arquetipo.`;
@@ -495,7 +497,7 @@ table.aq-mini{width:100%;border-collapse:collapse;font-size:12px}
       if (a && a.ratio >= 1.05) {
         const fa = L.ficha(a.id);
         afin = `<div class="aq-afin" style="--c:${L.colorDe(a.id)}"><b>El arquetipo más afín a ${esc(LENTE === 'partido' ? nombreHuella() : 'su votación')}: ${esc(fa.nombre)}</b> · <b class="x">${veces(a.ratio)}</b> lo que pesa en la ciudad (${pct0(a.share)} contra ${pct0(a.ciudad)}).
-          ${a.id === top.id ? 'Coincide con el que manda: es su base natural.' : `No es el que más pesa en ${esc(V.de)} —ese es ${esc(f.nombre.toLowerCase())}—, pero es donde ${LENTE === 'partido' ? 'su lado' : 'usted'} rinde por encima de la ciudad: es el territorio donde el mensaje ya tiene tierra abonada.`}</div>`;
+          ${a.id === top.id ? 'Coincide con el que manda: es su base natural.' : `No es el que más pesa en ${esc(V.de)} —ese es ${esc(enFrase(f.nombre))}—, pero es donde ${LENTE === 'partido' ? 'su lado' : 'usted'} rinde por encima de la ciudad: es el territorio donde el mensaje ya tiene tierra abonada.`}</div>`;
       } else if (a) afin = `<div class="aq-afin"><b>Ningún arquetipo se despega:</b> ${esc(V.de)} se reparte casi igual que la ciudad (el más alto, ${esc(L.nombreDe(a.id))}, pesa ${veces(a.ratio)} lo de la ciudad). No hay un nicho: se compite en toda la ciudad.</div>`;
     }
     let cuerpo;
@@ -510,6 +512,7 @@ table.aq-mini{width:100%;border-collapse:collapse;font-size:12px}
         ${f.decide ? `<p class="aq-par"><em>Cómo decide el voto:</em> ${esc(f.decide)}</p>` : ''}
         ${f.perfil ? `<p class="aq-par"><em>Quién es:</em> ${esc(f.perfil)}${f.edades ? ` · ${esc(f.edades)} años` : ''}.</p>` : ''}
         <p class="aq-par"><em>Se enciende con</em> ${esc(String(f.sube || '').replace(/\.$/, '').toLowerCase())}. <em>Se calma con</em> ${esc(String(f.baja || '').replace(/\.$/, '').toLowerCase())}.</p>
+        ${f.riesgo_fuga ? `<p class="aq-par"><em>Cuándo se aleja:</em> ${esc(String(f.riesgo_fuga).replace(/\.$/, ''))}.</p>` : ''}
         ${palancas('Palancas emocionales', f.palancas, c)}${palancas('Temas que lo mueven', f.tematicas, c)}`;
     } else {
       cuerpo = `<p class="aq-lema">${esc(f.lema)}</p>
@@ -552,7 +555,7 @@ table.aq-mini{width:100%;border-collapse:collapse;font-size:12px}
     $('aqRepartoCopy').innerHTML = (bog()
       ? `Cada barrio de Bogotá es una <b>mezcla</b> de los arquetipos de cada corporación, y los votos se reparten con esa mezcla. A la izquierda, ${esc(L.corteArt(k0))}; a la derecha, ${esc(L.corteArt(k1))}: son dos lecturas del mismo barrio, porque en Bogotá se vota distinto cada tarjetón.`
       : ctg()
-      ? 'Cada barrio de Cartagena no tiene un solo arquetipo sino una <b>mezcla de los ocho</b>: los votos se reparten con esa mezcla —un barrio que es 60 % protesta y 20 % productivo aporta a los dos—, no solo con el que manda.'
+      ? 'Cada barrio de Cartagena no tiene un solo arquetipo sino una <b>mezcla de los ocho</b>: los votos se reparten con esa mezcla —un barrio que es 60 % Cambio de Verdad y 20 % Primero el Trabajo aporta a los dos—, no solo con el que manda.'
       : 'Cada barrio de Medellín tiene un arquetipo: el voto del barrio entero va a ese. A la derecha, a dónde se mueve ese mismo voto con la proyección 2027.')
       + (LENTE !== 'ciudad' ? ' Al lado de cada uno, lo que pesa en la ciudad: la diferencia es la afinidad.' : '')
       + (LENTE !== 'ciudad' && L.sinDato ? ` ${num(L.sinDato)} votos cayeron en barrios sin medición.` : '')

@@ -4452,10 +4452,11 @@ async function pintarArquetipos() {
     const f = L.ficha(top.id), pct = Math.round(top.share * 100);
     const lema = ciudad === 'cartagena' ? `${f.lema}. La emoción que lo ordena: ${f.emocion}.` : f.lema;
     const unidades = L.filasComuna.length === 1 ? `una ${L.unidad}` : `${L.filasComuna.length} ${L.unidades}`;
-    const art = ciudad === 'cartagena' ? 'el arquetipo ' : '';
+    /* Cartagena: el nombre es una frase propia («Primero el Trabajo»), va entre comillas. */
+    const enFrase = n => ciudad === 'cartagena' ? `«${n}»` : n.toLowerCase();
     $('crmArqTitulo').textContent = bog
       ? (L.conVotos ? `Su voto ${L.corteA(L.cortes[0])} está sobre todo en barrios «${f.nombre}».` : `En ${L.corteArt(L.cortes[0])} de Bogotá pesa más «${f.nombre}».`)
-      : L.conVotos ? `Su voto vive en barrios de ${ciudad === 'cartagena' ? 'arquetipo ' : ''}${f.nombre.toLowerCase()}.` : `${nombreCiudad} vota desde ${art}${f.nombre.toLowerCase()}.`;
+      : L.conVotos ? `Su voto vive en barrios de ${ciudad === 'cartagena' ? 'arquetipo ' : ''}${enFrase(f.nombre)}.` : `${nombreCiudad} vota desde ${ciudad === 'cartagena' ? 'el arquetipo ' : ''}${enFrase(f.nombre)}.`;
     $('crmArqCopy').textContent = `${lema} ${L.conVotos ? `Es el arquetipo de ${pct} % de sus votos en la ciudad, repartidos en ${unidades}.` : 'Es el arquetipo con más peso en la ciudad; cuando tenga votos propios acá la lectura se hace con ellos.'}`;
     $('crmArqDato').textContent = `${pct} %`;
     $('crmArqSub').textContent = L.conVotos ? 'de sus votos, en ese arquetipo' : 'del voto de la ciudad';
