@@ -3071,8 +3071,18 @@ function quitarBasemap() { if (crmTileLayer) { crmLeafletMap.removeLayer(crmTile
    contenedor, la ciudad queda diminuta en un marco enorme. Por eso se mide
    antes, se encuadra, y se vuelve a medir y encuadrar cuando el navegador ya
    acomodó todo. Era lo que dejaba a Cali del tamaño de una uña. */
+/* El último encuadre queda guardado: la portada del plan oculta el CRM y el
+   mapa puede armarse con la caja en 0×0 (zoom de calle, sin polígonos a la
+   vista). Al abrir una fase, candidato-360-plan.js llama reencuadrarMapas(). */
+let crmUltimoEncuadre = null;
+function reencuadrarMapas() {
+  if (crmUltimoEncuadre) encuadrarBounds(crmUltimoEncuadre.bounds, crmUltimoEncuadre.padding);
+  window.C360Ciclo?.reencuadrar?.();
+}
+window.reencuadrarMapas = reencuadrarMapas;
 function encuadrarBounds(bounds, padding = 24) {
   if (!crmLeafletMap || !bounds?.isValid()) return;
+  crmUltimoEncuadre = { bounds, padding };
   const ajustar = () => { crmLeafletMap?.invalidateSize(); crmLeafletMap?.fitBounds(bounds, { padding: [padding, padding], animate: false }); };
   ajustar();
   setTimeout(ajustar, 60);

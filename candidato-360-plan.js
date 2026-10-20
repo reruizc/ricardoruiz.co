@@ -134,7 +134,7 @@
     caja.innerHTML = `<div class="plan-intro"><img src="${IMG(f.id)}" alt="" width="600" height="400" onerror="this.remove()"><div><span class="kicker">Fase ${n} · ${esc(f.cuando)}</span><h2>${esc(f.nombre)}</h2><p>${esc(f.parrafo || f.que)}</p></div></div>`;
     window.scrollTo({ top: 0, behavior: 'instant' });
     /* El mapa de Leaflet mide su caja al crearse: si estuvo oculto, se le avisa. */
-    setTimeout(() => window.dispatchEvent(new Event('resize')), 0);
+    setTimeout(() => { window.dispatchEvent(new Event('resize')); window.reencuadrarMapas?.(); }, 0);
   }
 
   function mostrar() { portada(); }

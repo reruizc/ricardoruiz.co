@@ -299,13 +299,21 @@
         if (b) lay.on('click', () => alTocar(code, nom));
       },
     }).addTo(MAPA);
-    setTimeout(() => {
-      MAPA.invalidateSize();
-      try { const bb = CAPA.getBounds(); if (bb.isValid()) { const z = MAPA.getBoundsZoom(bb); MAPA.fitBounds(bb, { padding: [6, 6], animate: false, maxZoom: Number.isFinite(z) ? Math.max(z, 10) : 11 }); } } catch {}
-    }, 0);
+    setTimeout(reencuadrar, 0);
   }
 
   /* ── CSS ──────────────────────────────────────────────────────────────── */
+  /* Encuadra el mapa de zonas. También lo llama el plan por fases al abrir
+     una fase: si el mapa se armó con la portada encima, midió una caja de 0×0. */
+  function reencuadrar() {
+    if (!MAPA || !CAPA) return;
+    const ajustar = () => {
+      MAPA.invalidateSize();
+      try { const bb = CAPA.getBounds(); if (bb.isValid()) { const z = MAPA.getBoundsZoom(bb); MAPA.fitBounds(bb, { padding: [6, 6], animate: false, maxZoom: Number.isFinite(z) ? Math.max(z, 10) : 11 }); } } catch {}
+    };
+    ajustar(); setTimeout(ajustar, 60); setTimeout(ajustar, 260);
+  }
+
   function estilos() {
     if ($('c360CicloCss')) return;
     const s = document.createElement('style'); s.id = 'c360CicloCss';
@@ -407,5 +415,5 @@
     }
   }
 
-  global.C360Ciclo = { pintar, VENTANA, _relevancias: relevancias, _prioridades: prioridades, _leerRedes: leerRedes };
+  global.C360Ciclo = { pintar, reencuadrar, VENTANA, _relevancias: relevancias, _prioridades: prioridades, _leerRedes: leerRedes };
 })(window);
