@@ -301,12 +301,124 @@ def _articulado():
     return _ARTICULADO
 
 
-def _articulado_de(tb, pid):
-    """Extracción de un proyecto, o None. La llave es la misma de _full()."""
+# ── Identidad del articulado (19-oct-2026) ──────────────────────────────────
+# El id de un proyecto que solo existe en Cámara (≥ 900000) NO es estable:
+# camara_merge.py lo asigna por posición y el dataset se reconstruye a diario.
+# articulado.json se arma otro día, así que su `tb:id` deja de señalar al mismo
+# proyecto en cuanto el dataset vuelve a subir. Medido: 185 de 227 extracciones
+# de Cámara se servían pegadas a OTRO proyecto (pal:900339, el 447/2026C sobre
+# conflicto de intereses, devolvía el distrito de Manizales). Por eso la ficha
+# se cruza con el articulado por la CLAVE estable — la misma que calcula
+# tools/caudal/analisis/extraer_articulado.py (`clave_estable`) — y además el
+# título tiene que parecerse. Los ids del Senado sí son estables.
+_ID_BASE_CAMARA = 900_000
+_ART_POR_CLAVE = None
+
+
+def _num_tok_art(num):
+    m = re.search(r'(\d{1,4})\s*/\s*(?:20)?(\d{2})', str(num or ''))
+    return f'{int(m.group(1))}/{m.group(2)}' if m else None
+
+
+def _clave_articulado(tb, rec):
+    """Gemela de `clave_estable` del extractor: si cambia una, cambia la otra."""
     try:
-        return _articulado().get('por_proyecto', {}).get(f'{tb}:{int(pid)}')
+        pid = int(rec.get('id'))
     except (TypeError, ValueError):
         return None
+    if pid < _ID_BASE_CAMARA:
+        return f'{tb}:{pid}'
+    leg = rec.get('legislatura') or ''
+    num = _num_tok_art(rec.get('numero_camara'))
+    if num and leg:
+        return f'{tb}:C{num}:{leg}'
+    num = _num_tok_art(rec.get('numero_senado'))
+    return f'{tb}:S{num}:{leg}' if num and leg else None
+
+
+def _art_por_clave():
+    """{clave estable → extracción}. Las entradas sin `clave` (artefacto anterior
+    al 19-oct-2026) no entran: sin ella no hay cómo saber de quién son."""
+    global _ART_POR_CLAVE
+    if _ART_POR_CLAVE is None:
+        idx = {}
+        for d in (_articulado().get('por_proyecto') or {}).values():
+            if d.get('clave'):
+                idx.setdefault(d['clave'], d)
+        _ART_POR_CLAVE = idx
+    return _ART_POR_CLAVE
+
+
+def _palabras_titulo(t):
+    t = _unicodedata.normalize('NFD', str(t or '')).encode('ascii', 'ignore').decode().lower()
+    return {w for w in re.findall(r'[a-z0-9]+', t) if len(w) > 3}
+
+
+def _titulos_compatibles(a, b, umbral=0.5):
+    """Seguro final, no la llave: el mismo proyecto escrito en mayúsculas o con
+    comillas pasa de 0.9; dos proyectos distintos rara vez pasan de 0.3."""
+    pa, pb = _palabras_titulo(a), _palabras_titulo(b)
+    if not pa or not pb:
+        return True
+    return len(pa & pb) / min(len(pa), len(pb)) >= umbral
+
+
+_RE_FUENTE_RADICADO = re.compile(
+    r'^(radicados-(?:camara-)?texto)/(\d{4}-\d{4})/PLC?-0*(\d+)-(\d{2,4})C?(?:-ACUM-[\d-]+)?\.txt$')
+
+
+def _fuente_cuadra(fuente, rec):
+    """¿El radicado del que salió la extracción es de este proyecto? None si la
+    fuente es una gaceta o el título (el nombre no dice de quién es)."""
+    m = _RE_FUENTE_RADICADO.match(fuente or '')
+    if not m:
+        return None
+    carpeta, leg, n, a = m.groups()
+    if leg != (rec.get('legislatura') or ''):
+        return False
+    campo = 'numero_camara' if carpeta == 'radicados-camara-texto' else 'numero_senado'
+    return _num_tok_art(rec.get(campo)) == f'{int(n)}/{a[-2:]}'
+
+
+def _articulado_de(tb, pid, rec=None):
+    """Extracción de un proyecto, o None. Nunca la de otro: se busca por la
+    clave estable del registro vigente y se verifica el título."""
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return None
+    if rec is None:
+        try:
+            rec = _full().get(f'{tb}:{pid}')
+        except Exception:
+            rec = None
+    if rec is None:
+        # sin el registro no se puede verificar nada; el id del Senado es
+        # estable, el de Cámara no se sirve a ciegas
+        if pid >= _ID_BASE_CAMARA:
+            return None
+        art = (_articulado().get('por_proyecto') or {}).get(f'{tb}:{pid}')
+        return art if art and (art.get('clave') in (None, f'{tb}:{pid}')) else None
+    clave = _clave_articulado(tb, rec)
+    if not clave:
+        return None
+    art = _art_por_clave().get(clave)
+    if art is None and pid < _ID_BASE_CAMARA:
+        # artefacto viejo, sin `clave`: el id del Senado sigue sirviendo
+        art = (_articulado().get('por_proyecto') or {}).get(f'{tb}:{pid}')
+        if art and art.get('clave') and art['clave'] != clave:
+            art = None
+    if art and _fuente_cuadra(art.get('fuente'), rec) is False:
+        print(f'[articulado] el radicado {art.get("fuente")} no es de {tb}:{pid} ({clave}) · se omite')
+        return None
+    # contra el título que se le dio al modelo cuando lo hay (es lo que de
+    # verdad se leyó); si no, contra el que se fijó al armar el artefacto
+    if art and not _titulos_compatibles(art.get('titulo_leido') or art.get('titulo'),
+                                        rec.get('titulo')):
+        print(f'[articulado] título no coincide para {tb}:{pid} ({clave}) · se omite')
+        return None
+    # el id que viaja es el de HOY, no el del día en que se armó el artefacto
+    return dict(art, tok=f'{tb}:{pid}', id=pid) if art else None
 
 
 def _cuatrienio_de(legislatura):

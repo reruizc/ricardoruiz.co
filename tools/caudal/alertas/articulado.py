@@ -189,7 +189,12 @@ class Indice:
 
     def buscar(self, pid=None, tab=None, numero=None, camara=None, titulo=None):
         """El articulado de un proyecto, o None. Por orden de fiabilidad."""
-        if pid is not None:
+        # Solo los ids del Senado sirven de llave: los de Cámara (≥ 900000) se
+        # asignan por posición y cambian cada vez que se reconstruye el dataset,
+        # así que el id del evento y el del artefacto pueden ser de proyectos
+        # distintos (medido el 19-oct-2026: 185 de 227). Para Cámara manda el
+        # número del radicado y, si no, el título.
+        if pid is not None and _camara_de_id(pid) == 'senado':
             reg = self.por_tok.get(f'{tab or "pdly"}:{pid}') or self.por_id.get(str(pid))
             if reg:
                 return reg

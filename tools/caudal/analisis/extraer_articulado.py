@@ -311,9 +311,12 @@ _RANK_BASE = {0: 'exposicion_motivos', 1: 'ponencia', 2: 'otro_documento',
               3: 'otro_documento', 4: 'otro_documento'}
 
 
+LEG_VIVA = '2026-2027'
+
+
 def _texto_por_manifiesto():
-    """{token de radicado → key del texto en S3}, leído de los manifiestos del
-    rastreo diario.
+    """{(cámara, token de radicado) → (key del texto en S3, título)}, leído de los
+    manifiestos del rastreo diario de la legislatura viva.
 
     `proyectos.jsonl` se regenera en el cron y trae `texto_s3`, pero el texto de
     los radicados entra a S3 varias veces al día: entre una reconstrucción del
@@ -321,10 +324,17 @@ def _texto_por_manifiesto():
     no lo sabe. Medido: 56 proyectos de la legislatura viva quedaban extraídos
     solo del título teniendo el radicado completo en S3. El manifiesto es la
     fuente más fresca, así que se usa como respaldo — nunca pisa al dataset.
+
+    ⚠ La llave lleva la CÁMARA (19-oct-2026). Antes era solo el número, con los
+    dos manifiestos en el mismo dict: el 040/26 del Senado y el 040/2026C de
+    Cámara son proyectos distintos y el que llegaba primero se quedaba con la
+    llave. Así 63 proyectos de Cámara se extrajeron del radicado de un proyecto
+    del Senado (y el 119/26 del Senado, cuyo PDF no se baja, del de Cámara).
+    Cada manifiesto solo responde por su propia cámara.
     """
     out = {}
-    for nombre in ('pl-radicados-2026-2027.jsonl',
-                   'pl-radicados-camara-2026-2027.jsonl'):
+    for nombre, cam, campo in (('pl-radicados-2026-2027.jsonl', 'S', 'numero_senado'),
+                               ('pl-radicados-camara-2026-2027.jsonl', 'C', 'numero_camara')):
         p = DIST / 's3' / nombre
         if not p.exists():
             continue
@@ -335,18 +345,81 @@ def _texto_por_manifiesto():
                 d = json.loads(ln)
             except Exception:
                 continue
-            if not d.get('s3_txt'):
-                continue
-            for k in ('numero_senado', 'numero_camara', 'proyecto'):
-                t = _num_token(d.get(k))
-                if t:
-                    out.setdefault(t, d['s3_txt'])
+            t = _num_token(d.get(campo))
+            if t and d.get('s3_txt'):
+                out.setdefault((cam, t), (d['s3_txt'], d.get('titulo') or ''))
     return out
 
 
 def _num_token(num):
     m = re.search(r'(\d{1,4})\s*/\s*(?:20)?(\d{2})', str(num or ''))
     return f'{int(m.group(1))}/{m.group(2)}' if m else None
+
+
+# ── Identidad estable de un proyecto (19-oct-2026) ───────────────────────────
+# Los registros que solo existen en Cámara NO traen id propio: camara_merge.py
+# les asigna `ID_BASE + posición` en el orden en que llegan, y ese orden cambia
+# cada vez que se reconstruye el dataset (entra un radicado nuevo, la dedup
+# contra el Senado decide distinto). Medido: de 227 extracciones de Cámara
+# publicadas, 185 quedaron colgadas de un id que hoy es OTRO proyecto
+# (pal:900339, 447/2026C, servía el texto del distrito de Manizales). Los ids
+# del Senado sí son estables: son los de leyes.senado.gov.co.
+#
+# Así que la caché y el artefacto se identifican por:
+#   · Senado  → `tb:id` de siempre                    (pdly:9963)
+#   · Cámara  → `tb:C<número>:<legislatura>`         (pal:C447/26:2026-2027)
+# La legislatura va porque el número NO es único: 511/2025C existe en 2024-2025
+# y en 2025-2026. El `tb` va porque PL y AL numeran aparte.
+ID_BASE_CAMARA = 900_000
+
+
+def clave_estable(tb, r):
+    """Identidad del proyecto que sobrevive a una reconstrucción del dataset."""
+    try:
+        pid = int(r.get('id'))
+    except (TypeError, ValueError):
+        return None
+    if pid < ID_BASE_CAMARA:
+        return f'{tb}:{pid}'
+    leg = r.get('legislatura') or ''
+    num = _num_token(r.get('numero_camara'))
+    if num and leg:
+        return f'{tb}:C{num}:{leg}'
+    num = _num_token(r.get('numero_senado'))      # 2 registros de Cámara sin número propio
+    return f'{tb}:S{num}:{leg}' if num and leg else None
+
+
+_RE_FUENTE_RADICADO = re.compile(
+    r'^(radicados-(?:camara-)?texto)/(\d{4}-\d{4})/PLC?-0*(\d+)-(\d{2,4})C?(?:-ACUM-[\d-]+)?\.txt$')
+
+
+def fuente_cuadra(fuente, r):
+    """¿El archivo de texto radicado es de ESTE proyecto? None si la fuente no es
+    un radicado (gaceta o título): ahí el nombre no dice de quién es."""
+    m = _RE_FUENTE_RADICADO.match(fuente or '')
+    if not m:
+        return None
+    carpeta, leg, n, a = m.groups()
+    if leg != (r.get('legislatura') or ''):
+        return False
+    campo = 'numero_camara' if carpeta == 'radicados-camara-texto' else 'numero_senado'
+    return _num_token(r.get(campo)) == f'{int(n)}/{a[-2:]}'
+
+
+def _palabras(t):
+    import unicodedata
+    t = unicodedata.normalize('NFD', str(t or '')).encode('ascii', 'ignore').decode().lower()
+    return {w for w in re.findall(r'[a-z0-9]+', t) if len(w) > 3}
+
+
+def titulos_compatibles(a, b, umbral=0.5):
+    """Solape de palabras sobre el título más corto. Es un seguro, no la llave:
+    un mismo proyecto escrito en mayúsculas, con comillas o con «Título:» delante
+    pasa de 0.9; dos proyectos distintos rara vez pasan de 0.3."""
+    pa, pb = _palabras(a), _palabras(b)
+    if not pa or not pb:
+        return True                   # sin título no hay con qué dudar
+    return len(pa & pb) / min(len(pa), len(pb)) >= umbral
 
 
 def construir_plan(refresh_s3=False):
@@ -369,19 +442,27 @@ def construir_plan(refresh_s3=False):
     tiene_texto = s3_gaceta_keys(refresh_s3)
     plan = []
     for r, tb in proyectos:
-        item = {'tok': f"{tb}:{r['id']}", 'tb': tb, 'id': r['id'],
+        item = {'tok': f"{tb}:{int(r['id'])}", 'tb': tb, 'id': int(r['id']),
+                'clave': clave_estable(tb, r),
                 'titulo': r.get('titulo', ''),
                 'numero': r.get('numero_senado') or r.get('numero_camara') or '',
+                'numero_senado': r.get('numero_senado') or '',
                 'numero_camara': r.get('numero_camara') or '',
                 'legislatura': r.get('legislatura', ''),
                 'cuatrienio': r.get('cuatrienio', ''),
                 'anio': r.get('anio'), 'resultado': r.get('resultado'),
                 'comision': r.get('comision', '')}
         txt = r.get('texto_s3')
-        if not txt:      # respaldo: el manifiesto va más fresco que el dataset
-            for k in ('numero_senado', 'numero_camara'):
-                txt = manif.get(_num_token(r.get(k)))
-                if txt:
+        if txt and fuente_cuadra(txt, r) is False:
+            txt = None   # el dataset no debería traer esto, pero si lo trae no se lee
+        if not txt and r.get('legislatura') == LEG_VIVA:
+            # respaldo: el manifiesto va más fresco que el dataset. Solo en la
+            # legislatura del manifiesto, cada número contra SU cámara y con el
+            # título como seguro (el 040/2026 de una legislatura no es el de otra).
+            for cam, k in (('S', 'numero_senado'), ('C', 'numero_camara')):
+                hit = manif.get((cam, _num_token(r.get(k))))
+                if hit and titulos_compatibles(hit[1], r.get('titulo')):
+                    txt = hit[0]
                     break
         if txt:
             item.update(base='texto_radicado', fuente=txt,
@@ -655,6 +736,13 @@ def _norm_extraccion(ex, item, base):
 
     return {
         'tok': item['tok'], 'tb': item['tb'], 'id': item['id'],
+        # identidad estable + lo que se le dijo al modelo que estaba leyendo:
+        # con esto cualquier consumidor puede verificar que la extracción es
+        # del proyecto que pide, sin fiarse del id
+        'clave': item.get('clave'), 'legislatura': item.get('legislatura'),
+        'numero_senado': item.get('numero_senado') or None,
+        'numero_camara': item.get('numero_camara') or None,
+        'titulo_leido': item.get('titulo'),
         'base': base, 'base_txt': BASE_LABEL.get(base, base),
         'fuente': item.get('fuente'), 'fuente_txt': item.get('fuente_txt'),
         'resumen': _s(ex.get('resumen'), 600),
@@ -687,8 +775,11 @@ def _vacios(d):
 
 
 # ------------------------------------------------------------------ extract
-def _cache_path(tok):
-    return EXDIR / (tok.replace(':', '-') + '.json')
+def _cache_path(clave):
+    """Un archivo por proyecto, nombrado por su CLAVE estable (no por el id: el
+    de Cámara cambia entre reconstrucciones). Para el Senado la clave es el
+    `tb:id` de siempre, así que sus archivos conservan el nombre."""
+    return EXDIR / (clave.replace(':', '-').replace('/', '-') + '.json')
 
 
 # Calidad de la base, de mejor a peor. Sirve para saber si vale la pena volver
@@ -697,13 +788,18 @@ _CALIDAD_BASE = {'texto_radicado': 0, 'exposicion_motivos': 1, 'ponencia': 2,
                  'otro_documento': 3, 'titulo': 4}
 
 
-def _cacheado(tok, base_plan=None):
-    p = _cache_path(tok)
+def _cacheado(clave, base_plan=None, item=None):
+    p = _cache_path(clave)
     if not p.exists():
         return None
     try:
         d = json.loads(p.read_text(encoding='utf-8'))
     except Exception:
+        return None
+    # Una extracción hecha sobre el radicado de OTRO proyecto no es caché
+    # válida: hay que volver a pedirla con el texto correcto (pdly:10042, el
+    # 119/26 del Senado, quedó leído del 119/2026C de Cámara).
+    if item is not None and fuente_cuadra(d.get('fuente'), item) is False:
         return None
     # PROMPT_VERSION en la llave de caché: al cambiar el prompt, lo viejo se
     # re-pide solo (no hay que acordarse de borrar nada). Se compara contra la
@@ -812,9 +908,14 @@ def cmd_extract(args):
         sel = [p for p in sel if p['base'] != 'titulo']
     if args.toks:
         quiero = set(args.toks.split(','))
-        sel = [p for p in sel if p['tok'] in quiero]
+        sel = [p for p in sel if p['tok'] in quiero or p['clave'] in quiero]
+    sin_clave = [p for p in sel if not p['clave']]
+    if sin_clave:
+        print(f'· {len(sin_clave)} sin clave estable (registro de Cámara sin número): '
+              'no se extraen, no habría cómo volver a encontrarlos')
+        sel = [p for p in sel if p['clave']]
     # los que ya están en caché con el prompt vigente no se vuelven a pedir
-    pend = [p for p in sel if not _cacheado(p['tok'], p['base'])]
+    pend = [p for p in sel if not _cacheado(p['clave'], p['base'], p)]
     # documento primero, título después: el orden en que aporta valor
     pend.sort(key=lambda p: (p['base'] == 'titulo', -(p.get('anio') or 0)))
     # el conteo del caché se toma ANTES de --limit: calculado después, un
@@ -852,7 +953,7 @@ def cmd_extract(args):
                 err += 1
                 print(f'  ! {p["tok"]} ({p["base"]}): {type(e).__name__}: {str(e)[:120]}')
                 continue
-            _cache_path(p['tok']).write_text(json.dumps(d, ensure_ascii=False), encoding='utf-8')
+            _cache_path(p['clave']).write_text(json.dumps(d, ensure_ascii=False), encoding='utf-8')
             ok += 1
             tin += d['_meta']['tok_in']
             tout += d['_meta']['tok_out']
@@ -874,18 +975,52 @@ def cmd_extract(args):
 # -------------------------------------------------------------------- build
 def cmd_build(args):
     """Caché por proyecto → artefacto único para S3 (metadata/articulado.json)."""
-    plan = {p['tok']: p for p in construir_plan()}
+    plan_lista = construir_plan()
+    plan = {p['tok']: p for p in plan_lista}
+    # clave estable → proyecto(s) de HOY. Casi siempre uno; son dos cuando el
+    # registro de Cámara trae el mismo proyecto repetido (22 casos, todos
+    # históricos): el texto es el mismo, la extracción les sirve a ambos.
+    por_clave = defaultdict(list)
+    for p in plan_lista:
+        if p['clave']:
+            por_clave[p['clave']].append(p)
     por_proyecto, por_sector = {}, defaultdict(list)
     bases, conf, vac, modelos = Counter(), Counter(), Counter(), Counter()
     n_camp = Counter()
+    descartes = Counter()
     tin = tout = 0
     for f in sorted(EXDIR.glob('*.json')):
         try:
             d = json.loads(f.read_text(encoding='utf-8'))
         except Exception:
             continue
-        tok = d.get('tok')
-        if not tok:
+        if not d.get('tok'):
+            continue
+        # Las extracciones anteriores al 19-oct-2026 no traen `clave`. Las del
+        # Senado se identifican por su id, que es estable. Las de Cámara NO: su
+        # id ya puede ser de otro proyecto, así que no entran (se re-extraen).
+        clave = d.get('clave')
+        if not clave:
+            try:
+                pid = int(str(d['tok']).split(':')[1])
+            except (IndexError, ValueError):
+                pid = ID_BASE_CAMARA
+            if pid >= ID_BASE_CAMARA:
+                descartes['Cámara sin clave estable (extracción anterior al 19-oct)'] += 1
+                continue
+            clave = d['tok']
+        hoy = por_clave.get(clave)
+        if not hoy:
+            descartes['la clave ya no está en el dataset'] += 1
+            continue
+        # Dos seguros más, por si una clave llegara a apuntar mal: el archivo
+        # radicado tiene que ser de este proyecto, y el título que se le dio al
+        # modelo tiene que parecerse al de hoy.
+        if fuente_cuadra(d.get('fuente'), hoy[0]) is False:
+            descartes['el texto radicado es de otro proyecto'] += 1
+            continue
+        if d.get('titulo_leido') and not titulos_compatibles(d['titulo_leido'], hoy[0]['titulo']):
+            descartes['el título leído no coincide con el de hoy'] += 1
             continue
         meta = d.pop('_meta', {})
         tin += meta.get('tok_in', 0)
@@ -897,13 +1032,17 @@ def cmd_build(args):
         # modelo resulta flojo en algún campo, es lo que dice qué revisar.
         d['modelo'] = meta.get('model') or DEEPSEEK_MODEL
         d['vacios'] = meta.get('vacios', [])
-        p = plan.get(tok) or {}
-        d['titulo'] = p.get('titulo', '')
-        d['anio'] = p.get('anio')
-        d['legislatura'] = p.get('legislatura')
-        for k in ('tb', 'id'):
-            d.setdefault(k, p.get(k))
-        por_proyecto[tok] = d
+        d['clave'] = clave
+        for p in hoy:
+            # el id y el título que viajan son los de HOY: el artefacto se
+            # indexa por el id vigente, y la Lambda vuelve a verificar la clave
+            e = dict(d, tok=p['tok'], tb=p['tb'], id=p['id'], titulo=p.get('titulo', ''),
+                     anio=p.get('anio'), legislatura=p.get('legislatura'),
+                     numero_senado=p.get('numero_senado') or None,
+                     numero_camara=p.get('numero_camara') or None)
+            por_proyecto[p['tok']] = e
+            for s_ in (e.get('aplica_a') or {}).get('sectores', []):
+                por_sector[s_].append(p['tok'])
         bases[d.get('base')] += 1
         conf[d.get('confianza')] += 1
         modelos[d['modelo']] += 1
@@ -912,8 +1051,6 @@ def cmd_build(args):
         for k in CAMPOS:
             if k not in d['vacios']:
                 n_camp[k] += 1
-        for s in (d.get('aplica_a') or {}).get('sectores', []):
-            por_sector[s].append(tok)
 
     n = len(por_proyecto)
     cobertura = {}
@@ -946,6 +1083,9 @@ def cmd_build(args):
             # diferencia por la que paga. Va dentro de `stats` porque la Lambda
             # filtra las claves de nivel raíz y `stats` sí viaja entera.
             'cobertura': cobertura,
+            # lo que había en caché y NO entró, con su motivo (regla de
+            # honestidad: nada se descarta en silencio)
+            'descartadas': dict(descartes),
         },
         'por_sector': {k: v for k, v in por_sector.items()},
         'por_proyecto': por_proyecto,
@@ -960,10 +1100,95 @@ def cmd_build(args):
     print('  cobertura:', ' · '.join(
         f"{k} {v['leidos']}/{v['universo']} ({v['pct']}%)" for k, v in cobertura.items()))
     print('  confianza:', dict(conf))
+    if descartes:
+        print('  DESCARTADAS de la caché:', dict(descartes))
     print('  campos llenos:', {k: f'{v} ({v/max(n,1):.0%})' for k, v in n_camp.items()})
     print('  costo acumulado del corpus extraído: USD %.4f' % _usd(tin, tout))
     print('\n  subir:  aws s3 cp "%s" s3://%s/metadata/articulado.json '
           '--content-type application/json' % (dest, BUCKET))
+
+
+# ------------------------------------------------------------------ migrar
+def cmd_migrar(args):
+    """Caché vieja (llaveada por id) → caché por clave estable, en EXDIR.
+
+    Solo se re-llavea lo que se puede PROBAR:
+      · Senado: el id es estable; entra tal cual, salvo que su texto radicado
+        sea de otro proyecto (entonces se re-extrae).
+      · Cámara: entra solo si el texto salió de un radicado de CÁMARA, porque el
+        nombre del archivo (PLC-447-2026C, carpeta 2026-2027) dice de qué
+        proyecto es. En su momento se extrajo con el título de ese mismo
+        proyecto: el cruce ocurrió después, al publicar con ids corridos.
+        Medido el 19-oct-2026: el solape título↔resumen contra el dueño del
+        archivo es 0,46 de mediana (Senado: 0,50); contra el dueño actual del
+        id, 0,08.
+      · Lo demás (Cámara leída de un radicado del Senado, de una gaceta o del
+        título) no se puede atribuir: queda fuera y, si se sabe de quién
+        debía ser, se lista para re-extraer.
+    """
+    origen = Path(args.origen)
+    plan = construir_plan()
+    por_clave = {p['clave']: p for p in plan if p['clave']}
+    por_tok = {p['tok']: p for p in plan}
+    EXDIR.mkdir(parents=True, exist_ok=True)
+    escritos, reextraer, c = {}, set(), Counter()
+    for f in sorted(origen.glob('*.json')):
+        try:
+            d = json.loads(f.read_text(encoding='utf-8'))
+        except Exception:
+            continue
+        tok = d.get('tok') or ''
+        try:
+            tb, pid = tok.split(':')[0], int(tok.split(':')[1])
+        except (IndexError, ValueError):
+            c['sin tok'] += 1
+            continue
+        if d.get('clave'):
+            clave = d['clave']
+        elif pid < ID_BASE_CAMARA:
+            clave = tok
+        else:
+            m = _RE_FUENTE_RADICADO.match(d.get('fuente') or '')
+            if not m:
+                c[f'Cámara · {d.get("base")} sin radicado: no se puede atribuir'] += 1
+                continue
+            carpeta, leg, n, a = m.groups()
+            clave = f'{tb}:C{int(n)}/{a[-2:]}:{leg}'
+            if carpeta != 'radicados-camara-texto':
+                # leyó el radicado del Senado con el mismo número: el proyecto
+                # de Cámara que debía leerse es este, y hay que pedirlo de nuevo
+                if clave in por_clave:
+                    reextraer.add(clave)
+                c['Cámara leída de un radicado del Senado → re-extraer'] += 1
+                continue
+        p = por_clave.get(clave) or por_tok.get(clave)
+        if not p:
+            c['la clave ya no está en el dataset'] += 1
+            continue
+        if fuente_cuadra(d.get('fuente'), p) is False:
+            reextraer.add(clave)
+            c['el radicado es de otro proyecto → re-extraer'] += 1
+            continue
+        # si dos ids viejos apuntaban al mismo proyecto, gana la más reciente
+        ts = (d.get('_meta') or {}).get('ts') or ''
+        if clave in escritos:
+            c['duplicada (se queda la más reciente)'] += 1
+            if escritos[clave] >= ts:
+                continue
+        escritos[clave] = ts
+        d['clave'] = clave
+        d.setdefault('_meta', {})['migrada'] = {'de': f'{origen.name}/{f.name}',
+                                               'tok_viejo': tok,
+                                               'fecha': time.strftime('%Y-%m-%d')}
+        _cache_path(clave).write_text(json.dumps(d, ensure_ascii=False), encoding='utf-8')
+        c['Senado · id estable' if pid < ID_BASE_CAMARA else 'Cámara · re-llaveada por su radicado'] += 1
+    reextraer -= set(escritos)
+    print(f'{origen} → {EXDIR}')
+    for k, v in c.most_common():
+        print(f'  {v:>5}  {k}')
+    print(f'  escritas: {len(escritos)} · a re-extraer: {len(reextraer)}')
+    if reextraer:
+        print('\n  extract --toks ' + ','.join(sorted(reextraer)))
 
 
 # -------------------------------------------------------------------- stats
@@ -992,7 +1217,9 @@ def cmd_stats(args):
         except Exception:
             continue
         m = d.get('_meta', {})
-        hechos[d.get('tok')] = d
+        # por clave estable; las viejas de Cámara (sin clave) no cuentan como
+        # cobertura de ningún proyecto, porque su id ya no dice cuál es
+        hechos[d.get('clave') or d.get('tok')] = d
         tin += m.get('tok_in', 0)
         tout += m.get('tok_out', 0)
         modos[m.get('modo')] += 1
@@ -1014,7 +1241,7 @@ def cmd_stats(args):
         v = vac.get(k, 0)
         print(f'    {k:<14} {v:>5} vacíos ({v/n:.0%}) · {n-v} con dato ({(n-v)/n:.0%})')
     for cua in ('2026-2030', '2022-2026'):
-        toks = {t for t, p in plan.items() if p['cuatrienio'] == cua}
+        toks = {p['clave'] for p in plan.values() if p['cuatrienio'] == cua and p['clave']}
         hay = len(toks & set(hechos))
         print(f'  cobertura {cua}: {hay}/{len(toks)} ({hay/max(len(toks),1):.0%})')
 
@@ -1042,6 +1269,10 @@ def main():
 
     p = sub.add_parser('build', help='caché → dist/s3/articulado.json')
     p.set_defaults(fn=cmd_build)
+
+    p = sub.add_parser('migrar', help='caché vieja por id → caché por clave estable (en EXDIR)')
+    p.add_argument('origen', help='directorio de la caché vieja (p.ej. …/analisis/extract-merge)')
+    p.set_defaults(fn=cmd_migrar)
 
     p = sub.add_parser('stats', help='cobertura, costo y campos vacíos')
     p.set_defaults(fn=cmd_stats)
