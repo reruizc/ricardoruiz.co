@@ -68,7 +68,7 @@
 #crm.plan-fase>.panel{order:3}#crm.plan-fase>.crm-grid{order:4;margin-bottom:14px}#crm.plan-fase>article.panel{order:5}#crm.plan-fase>.estr-vista{order:6}
 #crm.plan-fase .plan-fuera{display:none!important}
 #crm.plan-fase .crm-grid>#crmEstrategia{order:-5}
-.plan-hola{margin:8px 0 26px}.plan-hola h2{font-size:clamp(36px,5vw,62px);line-height:.98;margin:6px 0 10px}.plan-hola p{color:var(--muted);max-width:640px;margin:0;font-size:17px}
+.plan-hola{margin:8px 0 26px}.plan-hola h2{font-size:clamp(36px,5vw,62px);line-height:.98;margin:6px 0 10px}.plan-hola p{color:var(--muted);max-width:640px;margin:0;font-size:17px}.plan-hola .plan-por-que{max-width:860px;margin-top:14px;font-size:15px;line-height:1.55;color:var(--ink);border-left:3px solid var(--green);padding-left:14px}
 .plan-fases{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;counter-reset:fase}
 .plan-card{counter-increment:fase;position:relative;display:flex;flex-direction:column;gap:8px;padding:20px 18px;min-height:250px;background:var(--cream);border:1px solid var(--line);text-align:left;font:inherit;color:inherit}
 .plan-card .plan-num{font:500 11px var(--mono);color:var(--green);letter-spacing:.1em}.plan-card.cerrada .plan-num{color:var(--muted)}
@@ -104,7 +104,8 @@
     const nombre = nombreCorto();
     caja.classList.remove('hidden');
     caja.innerHTML = `<div class="plan-hola"><div class="kicker">Plan de campaña · 2027</div><h2>Hola${nombre ? `, ${esc(nombre)}` : ''}. Este es su plan de campaña.</h2>
-      <p>Cinco fases hasta el 31 de octubre de 2027. Cada una abre las herramientas que sirven en ese momento; hoy están abiertas las dos primeras.</p></div>
+      <p>Cinco fases hasta el 31 de octubre de 2027. Cada una abre las herramientas que sirven en ese momento; hoy están abiertas las dos primeras.</p>
+      <p class="plan-por-que">¿Por qué cinco? Porque una campaña no es una sola carrera: son cinco momentos con reglas distintas. Primero se planea —de dónde parte y qué estrategia escoger—. Después se posiciona, mientras todavía hay tiempo para que el votante lo conozca, porque la persuasión rinde temprano. Luego viene la campaña: aval, lista, inscripción y propaganda. El remate es el último mes, cuando la pauta pesa pero su efecto dura pocos días. Y el día de la elección se gana con logística: sacar a votar y cuidar el voto. Hacer en cada momento lo que ese momento pide es la diferencia entre gastar y sumar.</p></div>
       <div class="plan-fases">${FASES.map(f => {
         const trae = f.modulos.filter(m => NOMBRE_MODULO[m]).map(m => NOMBRE_MODULO[m]);
         return `<${f.activa ? 'button type="button"' : 'div'} class="plan-card ${f.activa ? 'activa' : 'cerrada'}" ${f.activa ? `data-fase="${f.id}"` : 'aria-disabled="true"'}>
