@@ -1,0 +1,67 @@
+name: Candidato 360 · escucha de redes
+
+# Corre a diario a las 05:30 de Bogotá (10:30 UTC), antes del briefing de las
+# 07:30, así el correo y la tarjeta 03 leen redes de la madrugada. Pide al
+# worker rr-auth las cuentas con el módulo de escucha vigente, corre una
+# lectura por cuenta (Apify + DeepSeek) y la guarda en el worker. No hay pasos
+# a mano: una cuenta que recibe el módulo entra sola en la corrida siguiente.
+#
+# Secretos del repositorio (Settings → Secrets → Actions):
+#   CAUDAL_ALERTAS_TOKEN  el mismo del briefing y del worker
+#   APIFY_TOKEN           cuenta de Apify (cobra por resultado)
+#   DEEPSEEK_API_KEY      clasifica postura, tema y tono de los comentarios
+#
+# Topes (variables del repositorio, opcionales): C360_ESCUCHA_TOPE_MES_USD
+# (por cuenta, 40 por defecto) y C360_ESCUCHA_TOPE_CORRIDA_USD (25).
+on:
+  schedule:
+    - cron: '30 10 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Solo simular (no gasta en Apify ni guarda)'
+        type: boolean
+        default: false
+      forzar:
+        description: 'Leer aunque la última lectura tenga menos de 20 horas'
+        type: boolean
+        default: false
+      solo:
+        description: 'Solo esta cuenta (correo)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: candidato-360-escucha
+  cancel-in-progress: false
+
+jobs:
+  escucha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Correr el recolector
+        env:
+          CAUDAL_ALERTAS_TOKEN: ${{ secrets.CAUDAL_ALERTAS_TOKEN }}
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          C360_ESCUCHA_TOPE_MES_USD: ${{ vars.C360_ESCUCHA_TOPE_MES_USD }}
+          C360_ESCUCHA_TOPE_CORRIDA_USD: ${{ vars.C360_ESCUCHA_TOPE_CORRIDA_USD }}
+          SOLO: ${{ inputs.solo }}   # por entorno, no interpolado en el script
+        run: |
+          for s in CAUDAL_ALERTAS_TOKEN APIFY_TOKEN DEEPSEEK_API_KEY; do
+            if [ -z "${!s}" ]; then echo "::error::Falta el secreto $s en el repositorio (Settings → Secrets → Actions)."; exit 1; fi
+          done
+          EXTRA=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then EXTRA="$EXTRA --dry-run"; fi
+          if [ "${{ inputs.forzar }}" = "true" ]; then EXTRA="$EXTRA --forzar"; fi
+          if [ -n "$SOLO" ]; then node tools/candidato-360/escucha/recolectar.mjs $EXTRA "--solo=$SOLO"; else node tools/candidato-360/escucha/recolectar.mjs $EXTRA; fi

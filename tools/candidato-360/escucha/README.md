@@ -144,16 +144,39 @@ lectura guardada en KV como `c360:captura:<email>`. Una cuenta sin lectura recib
 publicaciones** (capa 0), **lo que le dicen en ellas** (`comentarios_propios`) y,
 aparte, la conversación de sus temas.
 
-⚠️ **Todavía no hay recolección automática.** La lectura se corre a mano y se
-sube a KV:
+### La lectura corre sola (oct-20-2026)
+
+`.github/workflows/candidato-360-escucha.yml` corre **a diario a las 05:30 de
+Bogotá** (antes del briefing de las 07:30). `recolectar.mjs` pide al worker
+`GET /c360/captura/inventario`, corre una lectura por cuenta con `captura.mjs`
+(el mismo código del ensayo a mano) y la devuelve con `POST /c360/captura/guardar`.
+Las dos rutas van en la tabla `SERVICIO` del worker con el secreto
+`CAUDAL_ALERTAS_TOKEN`.
+
+**Quién entra:** acceso vigente + el módulo `escucha` + algo que escuchar (una
+cuenta validada o una idea). El módulo lo tienen los administradores, el plan
+interno `full` y la cortesía que lo liste:
+`POST /c360/acceso/save {email, dias, nota, modulos: ["escucha"]}` (sin
+`modulos` en el pedido se conservan los que tenía). El plan `c360` pagado
+todavía no lo trae: falta el SKU con escucha.
+
+**Frenos:** una lectura por cuenta cada ~20 h (re-correr no cobra doble) · tope
+por cuenta y mes (`C360_ESCUCHA_TOPE_MES_USD`, US$40) · tope por corrida
+(`C360_ESCUCHA_TOPE_CORRIDA_USD`, US$25) · una lectura vacía se reintenta una
+vez y si sigue vacía **no pisa** la anterior. El gasto del mes lo lleva el worker
+dentro de la captura (`gastoMes: {mes, usd, lecturas}`), sin otra escritura.
 
 ```bash
-node tools/candidato-360/escucha/capturar.mjs --vinculo=<vínculo.json> --gastar --salida=<captura.json>
-cd ~/rr-auth && npx wrangler kv key put "c360:captura:<correo>" --path <captura.json> --binding RR_STORE --remote
+node tools/candidato-360/escucha/recolectar.mjs --dry-run            # inventario y plan, sin gastar
+node tools/candidato-360/escucha/recolectar.mjs --solo=correo@x.co --forzar
 ```
 
-Lo que sigue: un workflow con `APIFY_TOKEN` y `DEEPSEEK_API_KEY` que la corra dos
-veces al día, y una ruta de servicio para guardarla sin pasar por wrangler.
+⚠️ **Con el worker no se usa `fetch`**: el de Node manda `Sec-Fetch-Mode`, la
+huella de navegador que el guarda de servicio rechaza (responde 404 como ruta
+inexistente). `recolectar.mjs` usa `node:https`.
+
+Secretos del repo: `CAUDAL_ALERTAS_TOKEN`, `APIFY_TOKEN`, `DEEPSEEK_API_KEY`.
+El ensayo a mano (`capturar.mjs`) sigue sirviendo para probar un vínculo.
 
 ## Historia: la captura montada y APAGADA (sep-2026)
 

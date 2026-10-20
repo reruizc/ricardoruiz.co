@@ -602,10 +602,20 @@ territorial más reciente.
   lectura guardada responde `{ encendida: false }` y la cuenta ve lo de siempre.
   Por red el panel pinta **sus publicaciones que más rindieron** (capa 0),
   **lo que le dicen en ellas** (`comentarios_propios`) y, aparte, la
-  conversación de sus temas. ⚠ La lectura todavía se corre a mano
-  (`capturar.mjs` + `wrangler kv key put`, receta en
-  `tools/candidato-360/escucha/README.md`); falta el workflow de dos veces al
-  día. Una lectura completa de las cuatro redes cuesta ~US$0,85.
+  conversación de sus temas. Una lectura completa de las cuatro redes
+  cuesta ~US$0,85.
+- **La lectura corre sola desde el 20-oct-2026**
+  (`candidato-360-escucha.yml`, a diario a las 05:30 de Bogotá): `recolectar.mjs`
+  pide `GET /c360/captura/inventario`, lee cada cuenta con `captura.mjs` y la
+  guarda con `POST /c360/captura/guardar` (rutas de servicio, secreto
+  `CAUDAL_ALERTAS_TOKEN`). Entra quien tiene acceso vigente, el **módulo
+  `escucha`** y algo que escuchar. El módulo vive en el acceso
+  (`_c360AccesoDe` devuelve `modulos`; `/c360/me` lo expone): lo tienen
+  administradores, el plan `full` y la cortesía que lo liste
+  (`POST /c360/acceso/save {…, modulos: ["escucha"]}`); el plan `c360` pagado
+  aún no, falta el SKU. Frenos: una lectura cada ~20 h, US$40 por cuenta al mes,
+  US$25 por corrida, y una lectura vacía no pisa la anterior. Detalle en
+  `tools/candidato-360/escucha/README.md`.
 
 ### Tarjeta 03 · qué sugiere el ciclo de 3 días (`candidato-360-ciclo.js` · oct-19-2026)
 
