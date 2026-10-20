@@ -213,8 +213,7 @@
       const k='mios:'+e.corp+':'+e.nombre;
       let base=sesGet(k,15);
       if(!base){
-        const r=await call({action:'radicados'});
-        const todos=[...(r.radicados||[]).map(x=>({...x,_cam:'Senado'})),...(r.radicados_camara||[]).map(x=>({...x,_cam:'Cámara'}))];
+        const todos=await radicadosTodos(); const r={legislatura:todos._leg};
         base=todos.map(x=>{
           const auts=autoresDe(x.autor); const i=auts.findIndex(a=>mismaPersona(a,e.nombre));
           if(i<0) return null;
@@ -230,6 +229,23 @@
       const out=base.map(x=>({...x,_citas:citasDe(x,ord.vigentes||[])}));
       return out.sort((a,b)=>(b._citas.length>0)-(a._citas.length>0)||String(b.fecha||'').localeCompare(String(a.fecha||'')));
     });
+  }
+  /* todos los radicados de la legislatura viva (2,4 MB): una sola descarga
+     por página, compartida entre «mis proyectos» y el buscador de Fuerzas */
+  function radicadosTodos(){
+    return memo('radraw',async()=>{
+      const r=await call({action:'radicados'});
+      const L=[...(r.radicados||[]).map(x=>({...x,_cam:'Senado'})),...(r.radicados_camara||[]).map(x=>({...x,_cam:'Cámara'}))];
+      L._leg=r.legislatura; return L;
+    });
+  }
+  /* un radicado cualquiera en la misma forma que los de mios() */
+  function proyectoDe(x,e,ord){
+    const auts=autoresDe(x.autor); const i=e?auts.findIndex(a=>mismaPersona(a,e.nombre)):-1;
+    return {numero_senado:x.numero_senado,numero_camara:x.numero_camara,titulo:x.titulo,estado:x.estado,
+      tipo_de_ley:x.tipo_de_ley,tipologia:x.tipologia,comision:x.comision,fecha:x.fecha,fuente_url:x.fuente_url,
+      autor:x.autor,_cam:x._cam,_n:auts.length,_primero:i===0,_mio:i>=0,_coaut:auts.filter((a,j)=>j!==i),
+      _citas:citasDe(x,ord||[])};
   }
   /* % de avance general: promedio de la etapa sobre los proyectos vivos */
   function avanceGeneral(lista){
@@ -358,56 +374,86 @@
      El centro es la COMISIÓN donde está el proyecto: cada silla es un
      miembro real (comisiones-2026.json) y se colorea por la EVIDENCIA que
      hay sobre él, nunca por un bando adivinado:
-       · tú · firmó (es coautor) · su bancada (la del congresista elegido)
-       · bancada afín / bisagra / suele votar distinto: coincidencia entre
-         mayorías de bancada en votaciones de fondo (coaliciones de Caudal,
-         Cámara 2018-2026). Es afinidad DE BANCADA en el cuatrienio pasado,
-         no lo que esta persona hará con este proyecto.
-       · sin dato: bancada que Caudal no mide (minoritarias, étnicas, CITREP).
-     «En contra» no existe: solo se sabría con un voto sobre el proyecto. */
+       · tú · firmó (es coautor) · tu bancada (la OFICIAL, no la lista con la
+         que se eligió: Villalba entró por «Ahora Colombia» y es Nuevo
+         Liberalismo)
+       · suele coincidir / a veces / suele votar distinto: coincidencia de voto
+         en las votaciones DISPUTADAS de la legislatura viva (desde el 20-jul),
+         persona a persona en el Senado; en Cámara —cuyo voto nominal llega con
+         meses de rezago— entre bancadas, medido en el Senado.
+       · sin dato: no hay votaciones compartidas suficientes.
+     «En contra» no existe: solo se sabría con un voto sobre el proyecto.
+     Datos: fuerzas-internas-2026.json (tools/mi-congreso/build_fuerzas_internas.py). */
   const FZ_CAT=[
     {id:'yo',      t:'Tú',                      c:'#14161f'},
     {id:'firmo',   t:'Firmó el proyecto',       c:'#0047FF'},
     {id:'banc',    t:'Tu bancada',              c:'#5b82ff'},
-    {id:'afin',    t:'Bancada afín',            c:'#a8bcff'},
-    {id:'bisagra', t:'Bancada bisagra',         c:'#d9d6cb'},
+    {id:'afin',    t:'Suele coincidir contigo', c:'#a8bcff'},
+    {id:'bisagra', t:'A veces coincide',        c:'#d9d6cb'},
     {id:'distinto',t:'Suele votar distinto',    c:'#5d6271'},
-    {id:'sin',     t:'Sin dato de afinidad',    c:'rgba(20,22,31,.10)'},
+    {id:'sin',     t:'Sin dato de voto',        c:'rgba(20,22,31,.10)'},
   ];
   const FZ_AFIN=60, FZ_BISAGRA=40;
   const COM_KEYS=['PRIMERA','SEGUNDA','TERCERA','CUARTA','QUINTA','SEXTA','SEPTIMA'];
+  /* ?local=1 lee los JSON del repo (verificación antes de subir a S3) */
+  const LOCAL_FZ=/[?&]local=1\b/.test(location.search);
+  const FZ_BASE=LOCAL_FZ?'Bases%20de%20datos/legislativo':S3+'/legislativo';
+  const URL_INT=FZ_BASE+'/fuerzas-internas-2026.json';
   /* «Comisión Primera Constitucional Permanente» · «PRIMERA» · «Primera» → PRIMERA */
   function comKeyDe(c){ const m=norm(c).match(/(primera|segunda|tercera|cuarta|quinta|sexta|septima)/); return m?m[1].toUpperCase():null; }
-  const coaliciones=()=>api({action:'coaliciones'},120);
-  /* nombre de bancada del listado → nombre de Caudal (o null si no la mide) */
-  const bancCaudal=partido=>BANC_CAUDAL[bancadaOf(partido||'').name]||null;
-  function afinidad(coal,periodo,a,b){
-    if(!a||!b) return null; if(a===b) return 100;
-    const P=(((coal||{}).camara||{}).periodos||{})[periodo]; if(!P) return null;
-    const m=P.matriz||{}; const r=m[[a,b].sort().join('|')]||m[a+'|'+b]||m[b+'|'+a];
-    return r&&r.n>=25?r.pct:null;
+  /* bancada oficial y coincidencia de voto de la legislatura viva */
+  function internas(){
+    return memo('int',async()=>{
+      const d=await getJSON(URL_INT,3600000);
+      ['senado','camara'].forEach(c=>(d[c].miembros||[]).forEach((m,i)=>{ m._t=toks(m.n); m._i=i; }));
+      return d;
+    });
+  }
+  const casaT=(A,B)=>{ if(A.length<2||B.length<2) return false; const [c,l]=A.length<=B.length?[A,B]:[B,A]; return c.every(t=>l.includes(t)); };
+  /* el registro oficial de una persona en su cámara ('senado'|'camara') */
+  function oficialDe(I,nombre,corp){
+    if(!I) return null; const T=toks(nombre);
+    return (I[corp].miembros||[]).find(m=>casaT(T,m._t))||null;
+  }
+  function bancadaDe(I,nombre,corp,partido){
+    const o=oficialDe(I,nombre,corp); if(o) return {name:o.b,partido:o.p,of:true};
+    return {name:bancadaOf(partido||'').name,partido:partido||'',of:false};
+  }
+  /* coincidencia de la persona `m` con el usuario: primero persona a persona
+     (Senado, misma cámara), si no, entre bancadas medidas en el Senado */
+  function coincidencia(I,yo,corpYo,otro,corpOtro,bYo,bOtro){
+    if(!I) return null;
+    if(corpYo==='senado'&&corpOtro==='senado'){
+      const a=oficialDe(I,yo,'senado'), b=oficialDe(I,otro,'senado');
+      if(a&&b){ const k=a._i<b._i?`${a._i}|${b._i}`:`${b._i}|${a._i}`; const r=(I.senado.pares||{})[k]; if(r) return {pct:r[0],n:r[1],via:'persona'}; }
+    }
+    if(bYo&&bOtro&&bYo!==bOtro){ const r=(I.bancadas||{})[[bYo,bOtro].sort().join('|')]; if(r) return {pct:r[0],n:r[1],via:'bancada'}; }
+    return null;
   }
   /* las sillas de la comisión `comKey` de la cámara `corp` ('senado'|'camara') */
-  function fuerzas({e,x,com,comKey,corp,coal,periodo}){
+  function fuerzas({e,x,com,comKey,corp,I}){
     const v=(com&&com.todas||{})[comKey]||{}; const L=v[corp]||[];
     const autores=x?autoresDe(x.autor||'').concat(x._coaut||[]):[];
-    const miB=bancCaudal(e.partido), miNom=bancadaOf(e.partido).name;
+    const corpYo=e.corp==='SENADO'?'senado':'camara';
+    const miB=bancadaDe(I,e.nombre,corpYo,e.partido);
     const sillas=L.map(m=>{
-      const bn=bancadaOf(m.partido||''), bc=bancCaudal(m.partido);
-      let cat, pct=null;
+      const bn=bancadaDe(I,m.nombre,corp,m.partido), col=bancadaOf(bn.partido||m.partido||'').color;
+      let cat, co=null;
       if(mismaPersona(m.nombre,e.nombre)) cat='yo';
       else if(x&&(autores.some(a=>mismaPersona(a,m.nombre)))) cat='firmo';
-      else if(bn.name===miNom&&bn.name!=='Otros y coaliciones') cat='banc';
-      else { pct=afinidad(coal,periodo,miB,bc); cat=pct==null?'sin':pct>=FZ_AFIN?'afin':pct>=FZ_BISAGRA?'bisagra':'distinto'; }
-      return {nombre:m.nombre,partido:m.partido||'',banc:bn.name,color:bn.color,cat,pct};
+      else if(bn.name===miB.name&&bn.name!=='Otros y coaliciones'&&bn.name!=='Sin dato') cat='banc';
+      else { co=coincidencia(I,e.nombre,corpYo,m.nombre,corp,miB.name,bn.name); cat=!co?'sin':co.pct>=FZ_AFIN?'afin':co.pct>=FZ_BISAGRA?'bisagra':'distinto'; }
+      return {nombre:m.nombre,partido:bn.partido||m.partido||'',lista:m.partido||'',banc:bn.name,of:bn.of,color:col,cat,pct:co?co.pct:null,nv:co?co.n:null,via:co?co.via:null};
     });
     const ord=FZ_CAT.map(c=>c.id);
-    sillas.sort((a,b)=>ord.indexOf(a.cat)-ord.indexOf(b.cat)||String(a.banc).localeCompare(b.banc)||String(a.nombre).localeCompare(b.nombre));
+    sillas.sort((a,b)=>ord.indexOf(a.cat)-ord.indexOf(b.cat)||(b.pct||0)-(a.pct||0)||String(a.banc).localeCompare(b.banc)||String(a.nombre).localeCompare(b.nombre));
     const n=sillas.length, mayoria=Math.floor(n/2)+1;
     const cuenta={}; FZ_CAT.forEach(c=>cuenta[c.id]=0); sillas.forEach(s=>cuenta[s.cat]++);
     const base=cuenta.yo+cuenta.firmo+cuenta.banc+cuenta.afin;
     const mesa=(v.mesa||[]).filter(p=>p.corp===corp).map(p=>({...p,silla:sillas.find(s=>mismaPersona(s.nombre,p.nombre))||null}));
-    return {comKey,corp,sillas,n,mayoria,cuenta,base,falta:Math.max(0,mayoria-base),mesa,miB,miNom};
+    const viaPersona=sillas.some(s=>s.via==='persona');
+    return {comKey,corp,sillas,n,mayoria,cuenta,base,falta:Math.max(0,mayoria-base),mesa,miB,viaPersona,
+      cob:I&&I.senado?I.senado.cobertura:null};
   }
   /* hemiciclo: filas concéntricas, sillas repartidas por longitud de arco y
      ordenadas por ángulo, así cada categoría queda en un solo sector de
@@ -439,10 +485,13 @@
       <text x="${cx}" y="${cy-rMin*0.3+20}" class="mc-hemi-l">base posible · mayoría</text>
     </svg>`;
   }
-  function tipSilla(s,F,periodoTxt){
+  function tipSilla(s,F){
     const c=FZ_CAT.find(k=>k.id===s.cat);
-    const af=s.pct!=null&&s.cat!=='banc'&&s.cat!=='yo'&&s.cat!=='firmo'?`<div>Su bancada (${esc(s.banc)}) coincidió con la tuya en el <b>${Math.round(s.pct)}%</b> de las votaciones de fondo · ${esc(periodoTxt)}</div>`:'';
-    return `<h5>${esc(nice(s.nombre))}</h5><div>${esc(s.partido||'—')}</div><div style="margin-top:.25rem"><b>${esc(c.t)}</b></div>${af}`;
+    const co=s.pct==null?'':s.via==='persona'
+      ?`<div>Coincidió contigo en el <b>${Math.round(s.pct)}%</b> de ${s.nv} votaciones disputadas del Senado en esta legislatura.</div>`
+      :`<div>Su bancada (${esc(s.banc)}) coincidió con la tuya en el <b>${Math.round(s.pct)}%</b> de ${s.nv} votaciones disputadas del Senado en esta legislatura.</div>`;
+    const lista=s.of&&s.lista&&norm(s.lista)!==norm(s.partido)?`<div style="opacity:.75">Se eligió por: ${esc(s.lista)}</div>`:'';
+    return `<h5>${esc(nice(s.nombre))}</h5><div>Bancada: <b>${esc(s.banc)}</b>${s.of?'':' (según la lista con la que se eligió)'}</div>${lista}<div style="margin-top:.25rem"><b>${esc(c.t)}</b></div>${co}`;
   }
   /* la ficha completa de Caudal para un radicado. Los radicados no traen el
      id del dataset: se resuelve por título y se confirma por NÚMERO (nunca
@@ -471,6 +520,12 @@
         veces:f.veces_presentado||null,n_firmantes:f.n_firmantes||null};
       sesSet('ficha:'+key,out); return out;
     });
+  }
+  /* fuerzas externas precalculadas por proyecto (build_fuerzas_externas.py) */
+  function tokProyecto(x){ const c=x._cam==='Senado'?'S':'C'; const t=tokNum(c==='S'?(x.numero_senado||x.numero_camara):(x.numero_camara||x.numero_senado)); return t?`${c}-${t.replace('/','-')}`:null; }
+  function externosDe(x){
+    const t=tokProyecto(x); if(!t) return Promise.resolve(null);
+    return memo('ext:'+t,async()=>{ try{ return await getJSON(FZ_BASE+'/fuerzas-externas/'+t+'.json',3600000); }catch(err){ return null; } });
   }
   /* titulares sobre el TEMA del proyecto: la prensa casi nunca cita el número,
      así que se busca por las palabras del título y se exige que el titular
@@ -501,6 +556,12 @@
     comision(e).then(c=>{
       const chip=el.querySelector('[data-mc-com]'); if(!chip) return;
       chip.innerHTML=c.key?`${esc(c.nombre)}${c.mesa?` · <span class="mc-star">★ ${c.mesa.cargo==='presidencia'?'preside':'vicepresidencia'}</span>`:''}`:'Comisión: no figura en nuestro registro';
+    }).catch(()=>{});
+    /* la bancada es la OFICIAL (Senado y Cámara la publican), no la lista con
+       la que se eligió: Villalba entró por «Ahora Colombia» y es Nuevo Liberalismo */
+    internas().then(I=>{
+      const o=oficialDe(I,e.nombre,e.corp==='SENADO'?'senado':'camara'); const chip=el.querySelector('.mc-chip.b'); if(!o||!chip) return;
+      chip.textContent=o.b; chip.style.color=bancadaOf(o.p).color; chip.title=`Bancada oficial · se eligió por ${nice(e.partido)}`;
     }).catch(()=>{});
     electoral(e).then(r=>{
       if(!r.hit) return;
@@ -605,5 +666,5 @@
     me,guardar,olvidar,requireMe,getJSON,api,comision,ordenes,esMia,etapaDe,etapaEf,numKey,citasDe,numDe,citaTxt,avanceHtml,tipoDe,
     mios,avanceGeneral,indiceElectoral,enSesion,diasHabSesion,diasCal,legislatura,relojDe,puntaje,electoral,fotoDe,voto,prensa,citPanorama,bancadasDisc,bloqueo,stats,
     renderHead,renderNav,pagina,tip,tipOn,porDia,tipDia,calendario,ring,spark,hbar,
-    FZ_CAT,FZ_AFIN,FZ_BISAGRA,COM_KEYS,comKeyDe,coaliciones,bancCaudal,afinidad,fuerzas,hemiciclo,tipSilla,fichaDe,tokNum,palabrasTema,prensaTema};
+    FZ_CAT,FZ_AFIN,FZ_BISAGRA,COM_KEYS,comKeyDe,internas,oficialDe,bancadaDe,coincidencia,fuerzas,hemiciclo,tipSilla,fichaDe,tokNum,palabrasTema,prensaTema,radicadosTodos,proyectoDe,tokProyecto,externosDe};
 })();

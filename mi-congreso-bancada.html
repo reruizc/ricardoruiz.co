@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
-  <link rel="stylesheet" href="mi-congreso.css?v=20261019b" />
+  <link rel="stylesheet" href="mi-congreso.css?v=20261020" />
   <style>
     .bc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.6rem}
     .bc-p{display:flex;gap:.7rem;align-items:center;background:#fff;border:1px solid var(--card-border);padding:.55rem .6rem}
@@ -39,7 +39,7 @@
   <div class="page-header compacta">
     <div class="page-tag">Mi Congreso · 07 · electos 2026–2030</div>
     <h1 class="page-title">Mi bancada</h1>
-    <p class="page-sub">Quiénes son, dónde se sientan, cuántos votos trajo cada uno y cómo ha votado tu partido como bloque. La composición sale del escrutinio 2026; la disciplina, de las actas de plenaria del Congreso anterior, porque este apenas empieza a votar.</p>
+    <p class="page-sub">Quiénes son, dónde se sientan, cuántos votos trajo cada uno y cómo ha votado tu partido como bloque. La bancada es la oficial que publican el Senado y la Cámara (no la lista con la que cada uno se eligió); la disciplina, de las actas de plenaria del Congreso anterior, porque este apenas empieza a votar.</p>
   </div>
   <div class="sec-bar" id="mc-sec-bar"></div>
 
@@ -65,13 +65,19 @@
 
   <script src="legislativo-base.js"></script>
   <script src="legislativo-electos.js"></script>
-  <script src="mi-congreso-base.js?v=20261019b"></script>
+  <script src="mi-congreso-base.js?v=20261020"></script>
   <script>
   (async function(){
     const e=MC.pagina('bancada'); if(!e) return;
     const {nice,initials,mismaPersona,nombreCom}=MC;
-    const b=bancadaOf(e.partido), col=b.color;
-    const todos=ELECTOS.filter(x=>bancadaOf(x.partido).name===b.name);
+    /* la bancada OFICIAL (Senado y Cámara la publican), no la lista con la que
+       cada uno se eligió: «Ahora Colombia» reúne a MIRA, Nuevo Liberalismo y
+       Dignidad, que son bancadas distintas */
+    let INT=null; try{ INT=await MC.internas(); }catch(err){}
+    const corpDe=x=>x.corp==='SENADO'?'senado':'camara';
+    const bOf=x=>MC.bancadaDe(INT,x.nombre,corpDe(x),x.partido);
+    const mb=bOf(e), b={name:mb.name,color:bancadaOf(mb.partido||e.partido).color}, col=b.color;
+    const todos=ELECTOS.filter(x=>bOf(x).name===b.name);
     const sen=todos.filter(x=>x.corp==='SENADO'), muj=todos.filter(x=>x.gen==='F');
     const deps=new Set(todos.filter(x=>x.corp==='CAMARA').map(x=>x.dep));
     const cell=(n,l,cls)=>`<div class="kpi${cls?' '+cls:''}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
