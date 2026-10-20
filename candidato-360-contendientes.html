@@ -29,6 +29,7 @@
 .k-resumen{display:flex;flex-wrap:wrap;gap:clamp(18px,4vw,40px);align-items:flex-end;margin:10px 0 14px}
 .k-resumen b{display:block;font:800 clamp(30px,5vw,44px)/1 var(--display);letter-spacing:-.03em;color:var(--ink)}
 .k-resumen span{display:block;font-size:12.5px;color:var(--muted);margin-top:4px;max-width:22ch}
+.k-excluidos details{margin:0 0 14px;font-size:13.5px}.k-excluidos summary{cursor:pointer;color:var(--muted,#5a6070)}.k-excluidos ul{margin:8px 0 6px 18px;padding:0}.k-excluidos li{margin:2px 0}
 .k-avisos p{border-left:3px solid var(--coral);padding:8px 12px;background:rgba(239,112,93,.07);font-size:13.5px;line-height:1.5;margin:0 0 10px}
 .k-leyenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 0;font-size:12.5px;color:var(--muted)}
 .k-leyenda i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
@@ -154,7 +155,7 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
     <section class="panel hidden" id="kListaSec">
       <span class="panel-num">04 · La lista completa</span>
       <h3>Todos sus rivales probables.</h3>
-      <p id="kListaCopy"></p>
+      <p id="kListaCopy"></p><div class="k-excluidos" id="kExcluidos"></div>
       <div style="overflow-x:auto;border:1px solid var(--line)"><table class="k-tabla"><thead><tr>
         <th data-orden="nombre">Nombre</th><th data-orden="fuente">De dónde sale</th><th data-orden="familia">Familia</th>
         <th data-orden="afinidad" class="num">Afinidad</th><th data-orden="votos" class="num">Votos en el territorio</th><th data-orden="presion" aria-sort="descending">Presión</th>
@@ -178,14 +179,14 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
 <script src="data-client.js"></script>
 <script src="cand-index.js?v=20260919"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="legislativo-electos.js"></script>
+<script src="legislativo-electos.js"></script><script src="candidato-360-data/cargos-actuales.js?v=20261020"></script>
 <script src="vote-target.js?v=20260928"></script>
 <script src="partidos-bloques.js?v=20261019"></script>
 <script src="candidato-360-electorado.js?v=20260929"></script>
 <script src="candidato-360-diad.js?v=20260928i"></script>
 <script src="candidato-360-endoso.js?v=20260928g"></script>
 <script src="candidato-360-saliencia.js?v=20261019"></script>
-<script src="candidato-360-contendientes.js?v=20260929"></script>
+<script src="candidato-360-contendientes.js?v=20261020"></script>
 <script src="candidato-360-panel.js?v=20261019"></script>
 <!-- Candi: la guía de la página. Lee la vista de <body data-candi-vista>. -->
 <script src="assets/candidato-360/candi/candi-atletica.js?v=4"></script>
@@ -298,6 +299,9 @@ table.k-tabla{border-collapse:collapse;width:100%;min-width:720px;font-size:13px
     document.querySelectorAll('.k-tabla th').forEach(th => { th.toggleAttribute('aria-sort', th.dataset.orden === ST.orden); if (th.dataset.orden === ST.orden) th.setAttribute('aria-sort', ST.dir < 0 ? 'descending' : 'ascending'); });
     const c = L.rivales.filter(r => r.fuentes.includes('C')).length, dP = L.rivales.filter(r => r.fuentes.includes('D')).length, eM = L.rivales.filter(r => r.fuentes.includes('E')).length;
     $('kListaCopy').textContent = `${num(L.rivales.length)} rivales probables: ${num(L.rivales.filter(r => r.fuentes.includes('A')).length)} ganaron la curul en 2023, los demás compitieron aquí con al menos la mitad de lo que sacó el último elegido de su lista${c ? `, ${num(c)} tienen votos aquí de otra elección` : ''}${dP ? `, ${num(dP)} ${dP === 1 ? 'fue dicho' : 'fueron dichos'} en prensa como aspirante${dP === 1 ? '' : 's'} (revisión mensual)` : ''}${eM ? ` y ${num(eM)} ${eM === 1 ? 'lo agregó' : 'los agregó'} usted` : ''}. Toque una fila para abrir la ficha.`;
+    /* Quien hoy ocupa un cargo no puede competir en 2027: salió de la lista, y se dice quién y por qué. */
+    const ex = L.excluidos || [];
+    $('kExcluidos').innerHTML = ex.length ? `<details><summary>${num(ex.length)} ${ex.length === 1 ? 'persona salió' : 'personas salieron'} de la lista porque hoy ${ex.length === 1 ? 'ocupa' : 'ocupan'} un cargo y no ${ex.length === 1 ? 'puede' : 'pueden'} competir en 2027</summary><ul>${ex.map(x => `<li><b>${esc(P.lugar(x.nombre))}</b> · ${esc(x.motivo)}</li>`).join('')}</ul><p class="helper">Congreso 2026-2030, alcaldías y gobernaciones 2024-2027 y gobierno nacional desde el 7 de agosto de 2026 (Diario Oficial). Si alguien está mal, escríbanos.</p></details>` : '';
   }
   document.querySelectorAll('.k-tabla th').forEach(th => th.addEventListener('click', () => {
     if (!ST.L) return; const o = th.dataset.orden;

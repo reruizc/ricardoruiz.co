@@ -2420,6 +2420,7 @@ async function launchCRM(event) {
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Mapa de historial electoral';
   showScreen('crm');
+  window.C360Plan?.mostrar();   /* «Hola, …»: el plan por fases antes de los módulos */
   pintarVitrina();
   pintarBriefing();
   pintarEscucha();
@@ -2469,6 +2470,7 @@ async function abrirCRMNuevo() {
   CAMPANA_ACTUAL = c;
   CRM_VITRINA = false;
   showScreen('crm');
+  window.C360Plan?.mostrar();   /* «Hola, …»: el plan por fases antes de los módulos */
   pintarVitrina();
   pintarBriefing();
   pintarEscucha();
@@ -4785,7 +4787,8 @@ async function pintarContendientes() {
     const nombres = top.map(x => NOMBRE_BONITO(K.corto(x.nombre)));
     $('crmContCopy').textContent = `Los de más presión: ${nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}` : nombres[0]}. En el plano, su familia política contra cuánto rinde cada uno en los puestos donde usted saca votos.`
       + (L.avisos.includes('territorio-parejo') ? ' En su territorio todos compiten por los mismos puestos: lo que los separa es la lista y la familia.' : '')
-      + (esc?.usted && !esc.usted.elegido && esc.distancia != null ? ` En su lista de 2023 quedó ${esc.usted.puesto}.º, a ${N(esc.distancia)} votos del último elegido.` : '');
+      + (esc?.usted && !esc.usted.elegido && esc.distancia != null ? ` En su lista de 2023 quedó ${esc.usted.puesto}.º, a ${N(esc.distancia)} votos del último elegido.` : '')
+      + (L.excluidos?.length ? ` Quitamos a ${N(L.excluidos.length)} que hoy ocupan un cargo y no pueden competir en 2027${L.excluidos.length <= 3 ? ` (${L.excluidos.map(x => NOMBRE_BONITO(K.corto(x.nombre))).join(', ')})` : `, entre ellos ${L.excluidos.slice(0, 2).map(x => NOMBRE_BONITO(K.corto(x.nombre))).join(' y ')}`}.` : '');
     $('crmContPlano').innerHTML = K.planoSVG(L, { ancho: 520, alto: 300, etiquetas: 3, vitrina: CRM_VITRINA });
     $('crmContDato').textContent = N(r.enIndice);
     $('crmContSub').textContent = `presión alta ${N(r.niveles.alta)} · media ${N(r.niveles.media)} · baja ${N(r.niveles.baja)}`;

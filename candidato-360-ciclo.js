@@ -116,12 +116,24 @@
   }
 
   /* ── 2. Redes ─────────────────────────────────────────────────────────── */
-  async function redes(token) {
+  /* La lectura de redes se guarda por CUENTA, pero una cuenta puede probar otra
+     candidatura (vínculo local, o un vínculo que soporte cambió). Solo se pinta
+     si es de la candidatura abierta: si no, otra persona vería las cuentas de
+     alguien más (pasó: probando una candidatura propia salían las de otro). */
+  const _tokNombre = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z ]+/g, ' ').split(/\s+/).filter(w => w.length >= 3);
+  function capturaEsDe(cap, nombre) {
+    const a = _tokNombre(cap?.vinculo?.nombre), b = _tokNombre(nombre);
+    if (!a.length) return true;                 /* lecturas viejas sin nombre */
+    if (!b.length) return false;
+    const sa = new Set(a), sb = new Set(b);
+    return a.every(w => sb.has(w)) || b.every(w => sa.has(w));
+  }
+  async function redes(token, nombre) {
     if (!token) return null;
     try {
       const r = await fetch(`${AUTH_API}/c360/captura`, { headers: { Authorization: `Bearer ${token}` } });
       const d = await r.json();
-      return d?.encendida ? d : null;
+      return d?.encendida && capturaEsDe(d, nombre) ? d : null;
     } catch { return null; }
   }
   const NOMBRE_RED = { x: 'X', instagram: 'Instagram', tiktok: 'TikTok', facebook: 'Facebook' };
@@ -345,7 +357,7 @@
       const lecturaArq = ctx.ciudad
         ? Promise.all([A.leer(ctx.ciudad, [], { corp: ctx.corp }), A.leer(ctx.ciudad, ctx.mesas || [], { corp: ctx.corp })]).catch(() => [null, null])
         : Promise.resolve([null, null]);
-      const [pz, cap, [L, Lp]] = await Promise.all([prensa(P, t), redes(ctx.token), lecturaArq, visitasServidor(ctx.token, ctx.slug)]);
+      const [pz, cap, [L, Lp]] = await Promise.all([prensa(P, t), redes(ctx.token, P.nombreCandidatura(ctx.vinculo)), lecturaArq, visitasServidor(ctx.token, ctx.slug)]);
       if (turno !== TURNO) return;
       const a = pz.items.length ? S.analizar(pz.items, { locales: P.terminosLocales(t), persona: P.terminosPersona(), ventana: VENTANA, anclas: [t.entidad, t.cuerpo] }) : null;
       if (a) a.filas.forEach((f, i) => { f.suyo = pz.items[i]?.suyo; });

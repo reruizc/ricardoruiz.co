@@ -644,9 +644,21 @@
      forzada para verla). Un 404 es «la ruta no existe todavía» y se pinta
      como apagada, no como error. */
   let capturaActual = null;
+  /* La lectura de redes se guarda por CUENTA, pero una cuenta puede probar otra
+     candidatura (vínculo local, o un vínculo que soporte cambió). Solo se pinta
+     si es de la candidatura abierta: si no, otra persona vería las cuentas de
+     alguien más (pasó: probando una candidatura propia salían las de otro). */
+  const _tokNombre = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z ]+/g, ' ').split(/\s+/).filter(w => w.length >= 3);
+  function capturaEsDe(cap, nombre) {
+    const a = _tokNombre(cap?.vinculo?.nombre), b = _tokNombre(nombre);
+    if (!a.length) return true;                 /* lecturas viejas sin nombre */
+    if (!b.length) return false;
+    const sa = new Set(a), sb = new Set(b);
+    return a.every(w => sb.has(w)) || b.every(w => sa.has(w));
+  }
   async function cargarCaptura() {
     if (!(CAPTURA_ENCENDIDA || capturaForzada())) return null;
-    try { const r = await P.api('/c360/captura'); capturaActual = r.ok && r.data?.encendida ? r.data : null; } catch { capturaActual = null; }
+    try { const r = await P.api('/c360/captura'); capturaActual = r.ok && r.data?.encendida && capturaEsDe(r.data, P.nombreCandidatura()) ? r.data : null; } catch { capturaActual = null; }
     return capturaActual;
   }
 
