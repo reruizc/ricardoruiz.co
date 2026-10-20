@@ -42,6 +42,7 @@ import html as _html
 import json
 import os
 import re
+import subprocess
 import sys
 import unicodedata
 import urllib.error
@@ -530,6 +531,10 @@ def contratos(v, t, desde, visto):
                 continue
             if ciudad_ok and norm(r.get('ciudad') or '') != ciudad_ok:
                 continue
+            # Bogotá es sede de entidades de Cundinamarca (el Instituto de Caminos,
+            # la Gobernación): firman en Bogotá obras de Quipile o Guaduas.
+            if t['es_bogota'] and 'CUNDINAMARCA' in norm(r.get('entidad') or ''):
+                continue
             cid = r.get('id') or h('c', r.get('entidad'), r.get('objeto'), r.get('valor'), f)
             if cid in vistos or cid in seen:
                 continue
@@ -682,6 +687,61 @@ def render(v, t, P, C, N, desde, hasta, primera):
     return asunto, html, texto, n_items
 
 
+# ─── La lectura del ciclo (oct-2026) ────────────────────────────────────────
+# El correo dice lo mismo que la tarjeta 03 del CRM: qué movió la agenda, a qué
+# arquetipos le habla y en qué localidades conviene estar, con los barrios que
+# faltan por visitar. El cálculo es el JavaScript de la tarjeta, corrido en Node
+# (lectura.mjs); el correo lo arma correo_ciclo.py con la forma del de Caudal.
+# Si la lectura falla, sale el formato anterior: un briefing nunca se pierde
+# por esto.
+LECTURA = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lectura.mjs')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+
+def vinculo_lectura(v):
+    nuevo = v.get('tipo') == 'nuevo'
+    return {
+        'tipo': v.get('tipo'),
+        'candidato': None if nuevo else {'nombre': v.get('nombre') or '', 'slugs': (v.get('candidato') or {}).get('slugs') or [],
+                                         'corp': (v.get('candidato') or {}).get('corp') or ''},
+        'nuevo': {'nombre': v.get('nombre') or '', 'nombrePublico': v.get('nombrePublico') or ''} if nuevo else None,
+        'campana': v.get('campana') or {},
+        'escucha': v.get('escucha') or {},
+    }
+
+
+def lectura_ciclo(v, P, dias):
+    items = [{'titulo': p['titulo'], 'medio': p['medio'], 'url': p['url'], 'fecha': p['fecha']} for p in P['usted'] + P['territorio']]
+    pedido = {'vinculo': vinculo_lectura(v), 'items': items, 'captura': v.get('captura'), 'visitas': v.get('visitas') or {}, 'dias': dias}
+    r = subprocess.run(['node', LECTURA], input=json.dumps(pedido), capture_output=True, text=True, timeout=300)
+    if r.returncode != 0:
+        raise RuntimeError(f'node salió con {r.returncode}: {r.stderr.strip()[-300:]}')
+    d = json.loads(r.stdout or '{}')
+    if d.get('error'):
+        raise RuntimeError(d['error'])
+    return d
+
+
+def render_ciclo(v, t, P, C, N, desde, hasta, primera):
+    import correo_ciclo as cc
+    ciclo = lectura_ciclo(v, P, max(1, (hasta - desde).days))
+    extra = []
+    # De sus temas, solo lo que pasa en su territorio o lo nombra: una idea
+    # suelta («seguridad en parques») trae notas de cualquier parte del país.
+    nombre = norm(v.get('nombre') or '')
+    lugar = re.compile(r'\b(' + '|'.join(re.escape(norm(x)) for x in [t['etiqueta'], t.get('loc') or ''] if x) + r')\b')
+    for tema in (P.get('temas') or [])[:3]:
+        propio = nombre and norm(tema['idea']) in nombre
+        claves = [w for w in norm(tema['idea']).split() if len(w) >= 4]
+        habla = lambda tt: sum(1 for w in claves if w[:6] in tt) * 2 >= len(claves)   # la mitad de sus palabras, por raíz
+        for p in [p for p in tema['items'] if propio or (lugar.search(norm(p['titulo'])) and habla(norm(p['titulo'])))][:1]:
+            extra.append({'tipo': 'prensa', 'rotulo': 'Sus temas · ' + recortar(tema['idea'], 40), 'titulo': p['titulo'], 'url': p['url']})
+    b = cc.armar(ciclo, v.get('captura') or {}, vinculo_lectura(v), desde, hasta, visitas=v.get('visitas') or {},
+                 extra_prensa=extra, contratos=C['items'], normas=N['items'], primera=primera)
+    print(f'   lectura: {ciclo.get("ciudad") or "sin arquetipos"} · ' + (' · '.join(z['nombre'] for z in b['zonas']) or ciclo.get('motivo', '')))
+    return cc.asunto(b), cc.cuerpo_html(b), cc.texto(b)
+
+
 # ─── motor ──────────────────────────────────────────────────────────────────
 def le_toca(v, forzar):
     b = v.get('briefing') or {}
@@ -721,6 +781,11 @@ def procesar(v, args):
     print(f'   prensa {len(P["usted"])}+{len(P["territorio"])}+{len(P["pais"])} país+{sum(len(x["items"]) for x in P["temas"])} temas (de {P["n_usted"]}+{P["n_territorio"]}, {P["fallos"]}/{P["consultas"]} fallos) · contratos {len(C["items"])} de {C["n"]} ({cop(C["valor"])}) · normas {len(N["items"])}')
 
     asunto, html, texto, n_items = render(v, t, P, C, N, desde, hoy, primera)
+    if not args.formato_viejo:
+        try:
+            asunto, html, texto = render_ciclo(v, t, P, C, N, desde, hoy, primera)
+        except Exception as ex:                                  # noqa: BLE001
+            print(f'   ! la lectura del ciclo falló, sale el formato anterior: {str(ex)[:200]}')
     if args.guardar_html:
         os.makedirs(args.guardar_html, exist_ok=True)
         base = os.path.join(args.guardar_html, re.sub(r'[^a-z0-9]+', '-', v['email'].lower()))
@@ -758,6 +823,7 @@ def main():
     ap.add_argument('--forzar', action='store_true', help='ignora la cadencia de 3 días')
     ap.add_argument('--solo', help='solo esta cuenta (correo)')
     ap.add_argument('--guardar-html', help='carpeta donde dejar el HTML y el texto de cada briefing')
+    ap.add_argument('--formato-viejo', action='store_true', help='el correo de antes, sin la lectura del ciclo')
     ap.add_argument('--inventario', help='JSON con la forma de /c360/briefing/inventario (pruebas sin worker)')
     ap.add_argument('--worker', help=f'URL del worker (default {WORKER})')
     args = ap.parse_args()

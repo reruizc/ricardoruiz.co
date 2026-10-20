@@ -639,11 +639,19 @@ pasó en estos 3 días**, con mapa. `window.C360Ciclo.pintar(ctx)`, llamado desd
   y salen las 3 primeras, cada una con sus barrios por visitar. El mapa pinta
   la prioridad del barrio contra la ciudad por **quintiles** (con cortes fijos
   casi todo quedaba en los tonos claros).
-- **Visitas:** se marcan tocando el barrio en el mapa y quedan en este
-  dispositivo (`localStorage['c360-visitas:<slug>']`). Hasta 7 días el barrio
-  pesa 35 %; de 8 a 21, 60 %; después vuelve a contar entero. ⚠ No se
-  comparten entre dispositivos ni con el equipo: eso pide una ruta en el
-  worker (`/c360/visitas` en el vínculo), pendiente.
+- **Visitas:** se marcan tocando el barrio en el mapa y se guardan en el
+  worker (`GET/POST /c360/visitas`, llave `c360:visitas:<email>`), con copia en
+  `localStorage['c360-visitas:<slug>']` de respaldo. Las ve todo el equipo y
+  las descuenta el briefing por correo. Hasta 7 días el barrio pesa 35 %; de 8
+  a 21, 60 %; después vuelve a contar entero.
+- **El briefing por correo trae esta lectura (20-oct-2026)** con la forma
+  del correo de Caudal: qué movió la agenda (prensa y redes), a qué arquetipos le
+  habla, en qué localidades estar y qué barrios faltan por visitar. El cálculo es
+  el mismo JavaScript de la tarjeta corrido en Node (`lectura.mjs`); lo arma
+  `correo_ciclo.py`. Si la lectura falla sale el formato anterior. Las **visitas
+  pasaron al worker** (`GET/POST /c360/visitas`): las ve todo el equipo y las
+  descuenta el correo. Sin arquetipos para la ciudad, el correo sale sin zonas y
+  lo dice.
 - **«Qué llevar»** es el `oficio` del arquetipo más relevante y el tema que lo
   abre hoy.
 - Con lectura, la tarjeta ocupa el ancho entero y baja a la segunda fila

@@ -80,8 +80,8 @@ vínculos, 37 s, sin fallos de fuente.
 - La normativa por municipio casi siempre viene vacía (Presidencia rara vez
   nombra un municipio). Vale la pena sumar las **ordenanzas y acuerdos** del
   propio concejo cuando exista esa fuente (módulo de proyectos de acuerdo).
-- No hay lectura del analista (LLM) todavía: el briefing es dato ordenado. Es
-  la evolución natural cuando el módulo de arquetipos exista.
+- La lectura del ciclo es determinista (sin LLM): sale de la prensa, las redes,
+  los arquetipos y las visitas. Ver «El correo con la lectura del ciclo».
 
 ## Lo que el candidato marcó en la escucha manda (sep-2026)
 
@@ -95,3 +95,37 @@ el lugar, si marcó «de una causa»). Sin preferencias: solo el territorio, má
 las ideas si las escribió. Probar sin worker:
 `python3 motor.py --inventario prueba.json --dry-run --forzar --guardar-html /tmp/b`.
 
+
+## El correo con la lectura del ciclo (oct-20-2026)
+
+Desde el 20-oct el correo ya no es solo dato ordenado: lleva la **lectura de la
+tarjeta 03 del CRM** con la forma del correo de Caudal (saludo, portada oscura
+con la lectura, tres cifras, «si solo tiene tiempo para una cosa», el párrafo,
+**dónde estar esta semana** con los barrios por visitar, qué llevar, lo que se
+movió en una línea cada cosa y lo que viene).
+
+| Pieza | Qué hace |
+|---|---|
+| `lectura.mjs` | Corre en Node **los mismos scripts del navegador** (`candidato-360-arq-lectura.js`, `-saliencia.js`, `-ciclo.js`…) en un contexto `vm`. Entra el vínculo, los titulares, la captura de redes y las visitas; sale la lectura (arquetipos con su relevancia y prioridades por localidad). Un solo cálculo para la tarjeta y el correo. |
+| `correo_ciclo.py` | Arma el correo (HTML y texto) desde la lectura, más contratos y normas en una línea cada uno. |
+| `motor.py` | Igual que antes (cadencia, visto, silencio si no hay nada), pero con `render_ciclo`. Si la lectura falla, sale el formato anterior: un briefing nunca se pierde por esto. `--formato-viejo` fuerza el de antes. |
+
+El inventario del worker trae ahora `candidato.slugs` (para leer sus votos),
+`captura` (solo temas y postura de la última lectura de redes) y `visitas`.
+
+**Las visitas viven en el worker** (`GET/POST /c360/visitas`, llave
+`c360:visitas:<email>`): las marca cualquiera del equipo en el mapa de la tarjeta
+03 y el correo las descuenta (≤7 días ×0,35; ≤21 días ×0,6). La copia local del
+navegador queda de respaldo; la primera vez se sube lo que ya estaba marcado.
+
+Sin arquetipos para la ciudad (hoy hay Bogotá, Medellín y Cartagena) el correo
+sale igual con prensa, redes, plata y reglas, y dice por qué no trae zonas.
+De sus temas solo entra lo que nombra su territorio y la mitad de las palabras
+de la idea: una idea suelta trae notas de cualquier parte del país.
+En Bogotá se descartan los contratos de entidades de Cundinamarca (tienen sede
+en Bogotá y firman obras de otros municipios).
+
+```bash
+python3 tools/candidato-360/briefing/motor.py --inventario prueba.json --dry-run --forzar --guardar-html /tmp/b
+echo '{"vinculo":{…},"items":[…]}' | node tools/candidato-360/briefing/lectura.mjs
+```

@@ -18,8 +18,8 @@
        prioridad(barrio)     = Σ mezcla del barrio × relevancia × electorado
                                × castigo si ya lo visitó
 
-   Las visitas se marcan tocando un barrio en el mapa y se guardan en este
-   dispositivo (localStorage). Una visita de los últimos 7 días baja la
+   Las visitas se marcan tocando un barrio en el mapa y se guardan en el
+   worker (/c360/visitas), con copia en este dispositivo. Una visita de los últimos 7 días baja la
    prioridad del barrio al 35 %; de 8 a 21 días, al 60 %. Pasado eso cuenta
    como no visitado: el barrio vuelve a necesitarlo.
 
@@ -57,6 +57,30 @@
   function leerVisitas(slug) { try { return JSON.parse(localStorage.getItem(claveVisitas(slug)) || '{}') || {}; } catch { return {}; } }
   function guardarVisitas(slug, v) { try { localStorage.setItem(claveVisitas(slug), JSON.stringify(v)); } catch {} }
   const diasDesde = iso => Math.floor((Date.now() - new Date(iso).getTime()) / 864e5);
+  /* Las visitas viven en el worker (GET/POST /c360/visitas): las ve todo el
+     equipo y las lee el briefing por correo. La copia local es el respaldo si
+     el worker no responde. La primera vez, lo que ya estaba marcado en este
+     dispositivo se sube. */
+  async function visitasServidor(token, slug) {
+    if (!token) return null;
+    try {
+      const r = await fetch(`${AUTH_API}/c360/visitas`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await r.json();
+      if (!r.ok || !d?.visitas) return null;
+      const local = leerVisitas(slug);
+      if (!Object.keys(d.visitas).length && Object.keys(local).length) {
+        Object.entries(local).forEach(([code, v]) => marcarServidor(token, code, v));
+        return local;
+      }
+      guardarVisitas(slug, d.visitas);
+      return d.visitas;
+    } catch { return null; }
+  }
+  function marcarServidor(token, code, v) {
+    if (!token) return;
+    fetch(`${AUTH_API}/c360/visitas`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(v ? { code, nombre: v.nombre || '', fecha: v.fecha } : { code, quitar: true }) }).catch(() => {});
+  }
   function castigo(iso) {
     if (!iso) return 1;
     const d = diasDesde(iso);
@@ -321,7 +345,7 @@
       const lecturaArq = ctx.ciudad
         ? Promise.all([A.leer(ctx.ciudad, [], { corp: ctx.corp }), A.leer(ctx.ciudad, ctx.mesas || [], { corp: ctx.corp })]).catch(() => [null, null])
         : Promise.resolve([null, null]);
-      const [pz, cap, [L, Lp]] = await Promise.all([prensa(P, t), redes(ctx.token), lecturaArq]);
+      const [pz, cap, [L, Lp]] = await Promise.all([prensa(P, t), redes(ctx.token), lecturaArq, visitasServidor(ctx.token, ctx.slug)]);
       if (turno !== TURNO) return;
       const a = pz.items.length ? S.analizar(pz.items, { locales: P.terminosLocales(t), persona: P.terminosPersona(), ventana: VENTANA, anclas: [t.entidad, t.cuerpo] }) : null;
       if (a) a.filas.forEach((f, i) => { f.suyo = pz.items[i]?.suyo; });
@@ -358,13 +382,13 @@
       <div class="ciclo-mapa" id="crmCicloMapa"></div>
       <div class="ciclo-ley"><span>prioridad</span>${RAMPA.map(c => `<i style="background:${c};margin:0"></i>`).join('')}<span>de menos a más</span><span><i class="vis"></i>visitado (${num(nVis)})</span></div>
       </div></div>` : `</div></div><p class="ciclo-nota">Cuando su ciudad tenga arquetipos por barrio (hoy Bogotá, Medellín y Cartagena), acá aparece el mapa de zonas a priorizar.</p>`}
-      <p class="ciclo-nota">La prioridad junta tres cosas: dónde viven los arquetipos que la agenda de estos días mueve, cuánto rinde usted con cada uno y si ya visitó el barrio (toque un barrio en el mapa para marcarlo; queda en este dispositivo). Describe el territorio, no a las personas.${L?.ciudad === 'bogota' ? ' En Bogotá, qué tema mueve a cada arquetipo es criterio del equipo.' : ''}${R?.fecha ? ` Redes leídas el ${esc(new Date(R.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }))}.` : ''}</p>`;
+      <p class="ciclo-nota">La prioridad junta tres cosas: dónde viven los arquetipos que la agenda de estos días mueve, cuánto rinde usted con cada uno y si ya visitó el barrio (toque un barrio en el mapa para marcarlo; lo ve todo su equipo y lo usa el briefing por correo). Describe el territorio, no a las personas.${L?.ciudad === 'bogota' ? ' En Bogotá, qué tema mueve a cada arquetipo es criterio del equipo.' : ''}${R?.fecha ? ` Redes leídas el ${esc(new Date(R.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }))}.` : ''}</p>`;
     if (L) {
       MAPA = null; CAPA = null;
       pintarMapa($('crmCicloMapa'), L, pr, (code, nom) => {
         const v = leerVisitas(ctx.slug);
-        if (v[code] && diasDesde(v[code].fecha) <= 21) delete v[code];
-        else v[code] = { fecha: new Date().toISOString().slice(0, 10), nombre: nom };
+        if (v[code] && diasDesde(v[code].fecha) <= 21) { delete v[code]; marcarServidor(ctx.token, code, null); }
+        else { v[code] = { fecha: new Date().toISOString().slice(0, 10), nombre: nom }; marcarServidor(ctx.token, code, v[code]); }
         guardarVisitas(ctx.slug, v);
         render();
       });
