@@ -454,6 +454,18 @@ primera consultoría hecha a mano.
   en `HEAD` (la vitrina en el paso del país, arquetipos por la API vieja del
   modal, una del mapa): son anteriores a este módulo.
 
+- **Cartagena (oct-20-2026) · filas del equipo SIN VALIDAR.** El anexo de la consultoría no traía
+  filas para sus 8 tipologías, así que la estrategia de Cartagena nunca se armaba («la matriz del
+  banco todavía no tiene una fila»). Las 8 filas viven en `FILAS_EQUIPO` de `build_banco.py`
+  (códigos OQC · OAP · BQR · CDV · ODT · QMI · PET · EQR, corte `2023`), redactadas desde el
+  diccionario del estudio de Nury (decisión de voto, temas, riesgo de fuga y uso de cada
+  tipología). Llevan `fuente: 'equipo-sin-validar'`; el motor expone `R.matrizSinValidar` y la
+  página lo dice en la sección 02 y en los dos párrafos. Para cambiar una celda: editar
+  `FILAS_EQUIPO` y regenerar con `--anexo <ruta del anexo A>` (la ruta no va escrita aquí: lleva el nombre de la clienta).
+- ⚠ **Mapas tras la portada del plan.** La portada oculta el CRM y el mapa se armaba sobre una
+  caja de 0×0 (zoom de calle, sin polígonos). `encuadrarBounds` guarda el último encuadre y
+  `reencuadrarMapas()` lo repite al abrir una fase (también `C360Ciclo.reencuadrar`).
+
 ### Candidaturas por lista cerrada en el historial (oct-19-2026)
 
 En una lista cerrada la Registraduría solo registra el voto al logo: los

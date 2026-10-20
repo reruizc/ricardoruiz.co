@@ -288,7 +288,7 @@ def leer_arquetipos(texto):
 # Qué id de cada lectura de arquetipos corresponde a cada código de la matriz.
 # Los 5 emocionales son los de la cartografía de Medellín; los de Bogotá son las
 # dos tipologías v1 (8 de Concejo y 8 de Alcaldía, oct-19-2026). Cartagena (8
-# propios) todavía no tiene fila: el motor dice «todavía no».
+# propios) va aparte, en FILAS_EQUIPO.
 EQUIVALENCIAS = {
     'PRO': ('emocional', 'medellin', '2023', 'proteccion'),
     'CON': ('emocional', 'medellin', '2023', 'continuidad'),
@@ -389,8 +389,55 @@ ADVERTENCIAS = [
     'La «modulación por arquetipo» y la matriz son hipótesis del equipo, no hallazgos de los autores: ninguno de estos textos estudió nuestros arquetipos.',
     'Las referencias están verificadas por ficha (autor, año, título y DOI), no por lectura completa: antes de citar una cifra frente a alguien, se abre la fuente.',
     'Casi toda la evidencia experimental es de Estados Unidos, donde es público quién votó. En Colombia no lo es: se trasladan principios, no guiones.',
+    'Las filas de Cartagena (sus 8 tipologías) son criterio del equipo SIN VALIDAR: salen del diccionario del estudio de tipologías, no del anexo de la consultoría.',
     'Los anuncios movieron poco las preferencias sin importar a quién iban dirigidos (Coppock, Hill y Vavreck 2020): la modulación por arquetipo pesa en el contacto personal y en la agenda, no en la pauta.',
 ]
+
+
+# ── Cartagena: filas del equipo, SIN VALIDAR (oct-20-2026) ─────────────────
+# El anexo no trae filas para las 8 tipologías de Cartagena. Estas las redactó
+# el equipo leyendo el diccionario del estudio de Nury (entrega del 1-oct-2026:
+# descripción, decisión de voto, temas, riesgo de fuga y uso estratégico de
+# cada tipología). Son criterio del equipo sin validar: van marcadas con
+# `fuente: 'equipo-sin-validar'` y la página lo dice. El código es nuestro; el
+# nombre, el del estudio; el id, el de arquetipos-cartagena.json.
+# Escala: 2 central · 1 útil · 0 igual · -1 riesgo. Nota corta por celda ≠ 0.
+FILAS_EQUIPO = {
+    'OQC': ('Orden que Cumple', 'guardian-funcional',
+            {'A1': (2, 'orden urbano y gestión como valencia'), 'A2': (1, 'reputación de ciudad'), 'A3': (0, ''),
+             'A4': (1, 'contraste con datos de gestión'), 'A5': (0, ''), 'A6': (2, 'resultados visibles y medibles'),
+             'A7': (2, 'crédito por lo que funciona'), 'A8': (1, 'difundir resultados')}),
+    'OAP': ('Ojo al Poder', 'gestor-vigilante',
+            {'A1': (1, 'transparencia como tema propio'), 'A2': (1, 'rendición de cuentas'), 'A3': (0, ''),
+             'A4': (2, 'compara discurso con ejecución'), 'A5': (0, ''), 'A6': (2, 'datos y control ciudadano'),
+             'A7': (1, 'posición coherente'), 'A8': (1, 'redes y medios para verificar')}),
+    'BQR': ('Barrio que Resuelve', 'pragmatico-servicios',
+            {'A1': (1, 'servicios y seguridad del barrio'), 'A2': (1, 'cuidado del hogar'), 'A3': (1, 'la vida diaria'),
+             'A4': (0, ''), 'A5': (1, 'presencia y respuesta rápida'), 'A6': (0, ''),
+             'A7': (2, 'crédito por soluciones concretas [R3]'), 'A8': (0, '')}),
+    'CDV': ('Cambio de Verdad', 'protesta-resolutiva',
+            {'A1': (1, 'un cambio creíble, con salida'), 'A2': (1, 'firmeza y justicia'), 'A3': (2, 'indignación con salida [R5]'),
+             'A4': (-1, 'pide ataque; rinde la prueba'), 'A5': (1, 'se abstiene si ve más de lo mismo'), 'A6': (0, ''),
+             'A7': (1, 'prueba territorial'), 'A8': (0, '')}),
+    'ODT': ('Orgullo de Tierra', 'defensor-territorial',
+            {'A1': (1, 'beneficio local como tema'), 'A2': (2, 'dignidad y territorio'), 'A3': (2, 'el «nosotros» [R4]'),
+             'A4': (0, ''), 'A5': (2, 'acuerdos con la comunidad [R2.1]'), 'A6': (0, ''),
+             'A7': (1, 'presencia y cumplimiento'), 'A8': (1, 'WhatsApp comunitario')}),
+    'QMI': ('Que Miren la Isla', 'guardian-insular',
+            {'A1': (1, 'agua y conexión como tema'), 'A2': (1, 'memoria del abandono'), 'A3': (2, 'la narrativa del abandono'),
+             'A4': (0, ''), 'A5': (2, 'presencia en la isla, cara a cara [R2]'), 'A6': (1, 'pocos puestos: cada uno pesa'),
+             'A7': (2, 'cumplimiento que se vea'), 'A8': (-1, 'conectividad débil: lo digital no llega')}),
+    'PET': ('Primero el Trabajo', 'productivo-pragmatico',
+            {'A1': (2, 'empleo como tema propio'), 'A2': (1, 'sustento y estabilidad'), 'A3': (0, ''),
+             'A4': (0, ''), 'A5': (0, ''), 'A6': (1, 'empleo con cifras'),
+             'A7': (2, 'crédito por lo que llega al bolsillo'), 'A8': (0, '')}),
+    'EQR': ('El que Responde', 'mediador-comunitario',
+            {'A1': (1, 'cumplimiento como valencia'), 'A2': (1, 'respeto al liderazgo local'), 'A3': (1, 'trato directo'),
+             'A4': (0, ''), 'A5': (2, 'liderazgos y acuerdos [R2]'), 'A6': (1, 'cumplimiento medible por puesto'),
+             'A7': (2, 'crédito por gestión local [R3]'), 'A8': (1, 'WhatsApp de líderes')}),
+}
+# A qué ramas del anexo sirve cada fila del equipo (las que cita su nota).
+RAMAS_EQUIPO = {'R2': ['QMI', 'EQR'], 'R3': ['BQR', 'EQR'], 'R4': ['ODT'], 'R5': ['CDV']}
 
 
 def main():
@@ -435,6 +482,16 @@ def main():
         f['principio'] = next((p['id'] for p in principios if f['rama'] in p['ramas'] or f['id'] in p['fichas']), None)
     if set(matriz) != set(CODIGOS) or any(len(v) != 8 for v in matriz.values()):
         sys.exit(f'la matriz no trae las {len(CODIGOS)} filas × 8 principios')
+    # Las filas del equipo entran DESPUÉS del chequeo del anexo: no son del anexo.
+    for c, (nombre, aid, celdas) in FILAS_EQUIPO.items():
+        if c in matriz or len(celdas) != 8:
+            sys.exit(f'fila del equipo {c}: código repetido o sin los 8 principios')
+        matriz[c] = {p: v for p, (v, _) in celdas.items()}
+        notas[c] = {p: n for p, (v, n) in celdas.items() if v != 0 and n}
+        arquetipos[c] = {'nombre': nombre, 'familia': 'cartagena-tipologias', 'ciudad': 'cartagena', 'corte': '2023', 'id': aid,
+                         'fuente': 'equipo-sin-validar'}
+    for r in ramas:
+        r['arquetipos'] = r['arquetipos'] + [c for c in RAMAS_EQUIPO.get(r['id'], []) if c not in r['arquetipos']]
 
     banco = {
         'v': '2026-10-19',

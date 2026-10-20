@@ -4950,6 +4950,7 @@ function estrategiaEnDosParrafos() {
   const quien = fig.nombre ? `Su lugar: ${fig.nombre.toLowerCase()}. ${fig.texto || ''}` : (R.lugar || '');
   const dondeVotos = grande ? ` ${de} pesan más en «${grande.nombre}» (${pctCorto(grande.share)})${afin && afin.nombre !== grande.nombre && R.lente !== 'ciudad' ? ` y rinden por encima de la ciudad en «${afin.nombre}» (${vecesE(afin.ratio)})` : afin && R.lente !== 'ciudad' ? `, donde rinden ${vecesE(afin.ratio)} lo que pesa en el territorio` : ''}: ahí está su base y desde ahí se crece.` : '';
   const p1 = `${quien}${dondeVotos}`.replace(/\s+/g, ' ').trim();
+  const aviso = R.matrizSinValidar ? ' (El orden de los principios en esta ciudad sale de una matriz del equipo que todavía no está validada.)' : '';
   const top = (R.principios || []).slice(0, 3).map(p => `«${p.corto.charAt(0).toLowerCase()}${p.corto.slice(1)}»`);
   const orden = top.length ? ` Por eso, en orden, lo que más le sirve es ${top.length > 1 ? `${top.slice(0, -1).join(', ')} y ${top[top.length - 1]}` : top[0]}.` : '';
   const C = R.competencia || {}, N = x => Number(x || 0).toLocaleString('es-CO');
@@ -4958,7 +4959,7 @@ function estrategiaEnDosParrafos() {
   const accion = R.accion ? ` Para empezar esta semana: ${R.accion.texto.charAt(0).toLowerCase()}${R.accion.texto.slice(1)}` : '';
   const MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   const hasta = F.hasta ? (([a, m, d]) => `${Number(d)} de ${MES[Number(m) - 1]} de ${a}`)(String(F.hasta).split('-')) : '';
-  const p2 = `Está en la fase de ${F.nombre.toLowerCase()}${hasta ? `, que va hasta el ${hasta}` : ''}. La tarea: ${(F.que.charAt(0).toLowerCase() + F.que.slice(1)).replace(/: /g, '; ')}${orden}${lista}${accion}`;
+  const p2 = `Está en la fase de ${F.nombre.toLowerCase()}${hasta ? `, que va hasta el ${hasta}` : ''}. La tarea: ${(F.que.charAt(0).toLowerCase() + F.que.slice(1)).replace(/: /g, '; ')}${orden}${lista}${accion}${aviso}`;
   return [p1, p2];
 }
 /* Qué significa la fase, en un párrafo (ids del calendario del banco). */
@@ -5069,7 +5070,7 @@ function htmlPosicionamiento() {
     ${C.presion?.length ? `<p class="helper">De su misma lista, con presión sobre sus puestos (panel 10): ${C.presion.map(r => `${escHtml(NOMBRE_BONITO(r.nombre))} (${escHtml(r.nivel)})`).join(', ')}.</p>` : ''}</article>`;
   const acc = R.acciones.map(a => `<li><span class="estr-p">${escHtml(a.principio)}</span>${escHtml(a.texto)} ${fichasHtml(a.fichas)}</li>`).join('');
   return `${lugar}<article class="panel estr-bloque"><span class="panel-num">02 · Los ocho principios, en el orden que le sirve</span><h3>Lo que la literatura pone primero para su territorio.</h3>
-    <p class="helper">El peso de cada principio = la parte de cada arquetipo en ${R.lente === 'ciudad' ? 'la ciudad' : 'su votación'} × su afinidad (acotada entre ×0,5 y ×2) × lo que dice la matriz arquetipo × principio (central, útil, igual o riesgo). La matriz es una hipótesis del equipo, no un hallazgo de los autores.</p>${princ}</article>
+    <p class="helper">El peso de cada principio = la parte de cada arquetipo en ${R.lente === 'ciudad' ? 'la ciudad' : 'su votación'} × su afinidad (acotada entre ×0,5 y ×2) × lo que dice la matriz arquetipo × principio (central, útil, igual o riesgo). La matriz es una hipótesis del equipo, no un hallazgo de los autores.${R.matrizSinValidar ? ' <b>Las filas de esta ciudad son criterio del equipo sin validar</b>: salen del diccionario del estudio de tipologías y todavía no se han contrastado en campo.' : ''}</p>${princ}</article>
     ${comp}<article class="panel estr-bloque"><span class="panel-num">04 · Esta fase: ${escHtml(R.fase.nombre.toLowerCase())}</span><h3>Qué hacer ahora, en el orden de sus principios.</h3><ol class="estr-acciones">${acc}</ol>
     <p class="helper">La redacción para su caso —qué decir a cada arquetipo y cómo responder a sus flancos— llega con la siguiente versión. Lo de aquí es el esqueleto, con la referencia de cada paso.</p></article>`;
 }

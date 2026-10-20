@@ -23,7 +23,7 @@
 
    No toca el DOM. En Node se usa pasándole `banco` y las lecturas a `evaluar`. */
 (function (global) {
-  const BANCO_URL = 'candidato-360-data/estrategia-banco.json?v=20261019';
+  const BANCO_URL = 'candidato-360-data/estrategia-banco.json?v=20261020-ctg';
   const ARRAIGO_URL = 'candidato-360-data/arraigo-concejo-bogota-2023.json?v=20261019';
   /* Corporaciones que se leen con arquetipos de ciudad. Una asamblea o una
      gobernación se juegan en todo el departamento y los arquetipos son de una
@@ -289,7 +289,9 @@
     const acc = acciones(banco, F.id, orden, fig, comp);
     return {
       estado: 'ok', fase: F, ciudad: e.ciudad, corp: e.corp, corte, lente: e.lente, recorte: LT.recorte || null,
-      arquetipos: arqs, pesos: pesos(arqs), principios: orden, territorio: territorio(banco, arqs, { L, LT, corte }),
+      arquetipos: arqs, pesos: pesos(arqs), principios: orden,
+      /* Filas que redactó el equipo y nadie ha validado (hoy, las 8 de Cartagena). */
+      matrizSinValidar: Object.values(cod).some(c => banco.arquetipos?.[c]?.fuente === 'equipo-sin-validar'), territorio: territorio(banco, arqs, { L, LT, corte }),
       figura: fig, competencia: comp, acciones: acc, accion: acc[0] || null, lugar: lugar(fig, arqs, e.lente),
       advertencias: banco.advertencias,
     };

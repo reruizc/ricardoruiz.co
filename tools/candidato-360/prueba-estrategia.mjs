@@ -109,7 +109,11 @@ ok(E.pesos([arq('X', .1, .1, 9), arq('Y', .1, .1, 1)]).X === 2 / 3, 'la afinidad
 const acc = E.acciones(banco, 'posicionamiento', E.principios(banco, [arq('BDG', 1, 1, 1)]), { lectura: 'barrio' }, { estado: 'abierta' });
 ok(acc[0].principio === 'A6' && acc.every(a => a.fase === 'posicionamiento') && !acc.some(a => a.lectura === 'figura'), 'las acciones salen de la fase, en el orden de los principios, y las de figura no salen para un trabajo de barrio');
 ok(E.acciones(banco, 'precampana', E.principios(banco, [arq('CMN', 1, 1, 1)]), {}, { estado: 'cerrada' }).filter(a => a.principio === 'A1').every(a => a.lista === 'cerrada'), 'en precampaña, lista cerrada: la acción de A1 es la del renglón, no la del voto preferente');
-ok(E.evaluar({ banco, ciudad: 'cartagena', corp: 'concejo', L: { total: 1 } }).estado === 'todavia-no' && E.evaluar({ banco, ciudad: null, corp: 'concejo' }).estado === 'todavia-no' && E.evaluar({ banco, ciudad: 'bogota', corp: 'asamblea', L: { total: 1 } }).estado === 'todavia-no', 'Cartagena, una ciudad sin arquetipos y una asamblea dicen «todavía no»');
+ok(E.evaluar({ banco, ciudad: null, corp: 'concejo' }).estado === 'todavia-no' && E.evaluar({ banco, ciudad: 'bogota', corp: 'asamblea', L: { total: 1 } }).estado === 'todavia-no', 'una ciudad sin arquetipos y una asamblea dicen «todavía no»');
+/* Cartagena (oct-20-2026): sus 8 tipologías tienen fila, del equipo y sin validar. */
+const ctg = Object.values(banco.arquetipos).filter(a => a.ciudad === 'cartagena');
+ok(ctg.length === 8 && ctg.every(a => a.corte === '2023' && a.fuente === 'equipo-sin-validar'), 'Cartagena: las 8 tipologías tienen fila, marcada como criterio del equipo sin validar');
+ok(solo('QMI').at(-1) === 'A8', 'un territorio todo «Que Miren la Isla»: lo digital va al final (la conectividad no llega)');
 ok(/Alcaldía de Bogotá/.test(E.evaluar({ banco, ciudad: 'bogota', corp: 'alcaldia', L: { total: 1, cortes: ['alcaldia', 'concejo'] } }).motivo), 'la Alcaldía de Bogotá dice «todavía no» con su razón (la matriz arrancó con los seis de Concejo)');
 
 /* ── 2. Casos reales ───────────────────────────────────────────────────── */
