@@ -3911,11 +3911,12 @@ function startBlank() {
   renderCloudBars();
 }
 
-function showStage(id) {
+function showStage(id, opts) {
   ['stage-hub','stage-hub-wizard','stage-welcome','stage-wizard','stage-vars','stage-capture','stage-results'].forEach(s => {
     const el = document.getElementById(s);
     if (el) el.classList.toggle('is-hidden', s !== id);
   });
+  _pushStage(id, !!(opts && opts.fromHistory));
   if (typeof updateLabFabVisibility === 'function') updateLabFabVisibility();
   _syncNavBack(id);
   // Sprint G — repintar "Mi informe del lab" cada vez que volvemos al hub,
@@ -3926,6 +3927,34 @@ function showStage(id) {
   if (id === 'stage-hub' || id === 'stage-welcome') _syncResumeUI();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// ── Historial del navegador ─────────────────────────────────────────────
+// Cada etapa del módulo es una entrada del historial. Antes, «atrás» en el
+// navegador sacaba del lab desde cualquier etapa (ninguna etapa cambiaba
+// la URL). La URL no cambia: se guarda el id de la etapa en history.state.
+let _histCurrent = null;
+function _pushStage(id, fromHistory) {
+  if (fromHistory || id === _histCurrent) { _histCurrent = id; return; }
+  const st = { labStage: id };
+  try {
+    if (_histCurrent === null) history.replaceState(st, '', location.href);
+    else history.pushState(st, '', location.href);
+  } catch {}
+  _histCurrent = id;
+}
+function _restoreStage(id) {
+  const n = STATE.vars.length;
+  if ((id === 'stage-capture' || id === 'stage-results') && n < 2) id = 'stage-welcome';
+  if (id === 'stage-vars') { renderVars(); if (n >= 2) varsShowEditor(); }
+  if (id === 'stage-capture') setMode(STATE.mode);
+  if (id === 'stage-wizard') { renderWizardOpts(); setWizardStep(STATE.wizard.step || 1); }
+  if (id === 'stage-hub-wizard' && HUB_STATE.step > 5) setHubWizStep(5);
+  showStage(id, { fromHistory: true });
+}
+window.addEventListener('popstate', ev => {
+  const id = ev.state && ev.state.labStage;
+  _restoreStage(id || 'stage-hub');
+});
 
 // ── Retomar sin perder la matriz ─────────────────────────────────────────
 // Antes, la única ruta desde la bienvenida pasaba por el wizard y
@@ -3989,7 +4018,7 @@ function _syncNavBack(id) {
     a.setAttribute('href', 'analisis-estructural.html');
     a.onclick = (ev) => {
       ev.preventDefault();
-      if (window.location.hash) history.replaceState(null, '', window.location.pathname + window.location.search);
+      if (window.location.hash) history.replaceState({ labStage: _histCurrent }, '', window.location.pathname + window.location.search);
       showStage('stage-hub');
     };
   }
@@ -5846,7 +5875,7 @@ async function handleInviteOnLoad() {
   if (!r.ok) { showToast(r.data.error || 'No se pudo aceptar la invitación'); return; }
   showToast('Te uniste al proyecto.');
   url.searchParams.delete('invite');
-  window.history.replaceState({}, '', url.toString());
+  window.history.replaceState({ labStage: _histCurrent }, '', url.toString());
   await cloudLoad(r.data.projId);
   refreshProjectsList();
 }
