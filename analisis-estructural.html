@@ -11,6 +11,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=Petrona:ital,wght@1,300;1,400;1,500;1,600&family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="lab-nav.css?v=20261019b">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- Respaldo local: si la CDN está bloqueada (redes institucionales), los resultados no se quedan en blanco. -->
+<script>window.Chart || document.write('<script src="assets/vendor/chart.umd.min.js?v=4.4.1"><\/script>');</script>
 <style>
 /* ──────────────────────────────────────────────────────────────────
    ANÁLISIS ESTRUCTURAL · paleta dashboard (noche por defecto, día opcional)
@@ -1842,7 +1844,7 @@ footer.foot a:hover { color: var(--accent); }
     <div id="hub-inprogress-chip" class="is-hidden" style="margin-bottom:1.2rem;padding:.7rem 1rem;background:var(--accent-soft);border:1px solid var(--accent-tint);border-left:3px solid var(--accent);display:flex;align-items:center;gap:.85rem;flex-wrap:wrap">
       <span style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700">En progreso</span>
       <span style="font-family:var(--italic);font-style:italic;font-size:.92rem;color:var(--ink-2);flex:1;min-width:220px">Tienes un análisis estructural sin terminar.</span>
-      <button class="btn-ghost" style="padding:.4rem .85rem;font-size:.85rem;border-color:var(--accent);color:var(--accent)" onclick="showStage('stage-welcome')">Retomar análisis estructural →</button>
+      <button class="btn-ghost" style="padding:.4rem .85rem;font-size:.85rem;border-color:var(--accent);color:var(--accent)" onclick="resumeAnalysis()">Retomar análisis estructural →</button>
     </div>
 
     <div class="hub-hero">
@@ -2209,9 +2211,14 @@ footer.foot a:hover { color: var(--accent); }
         </details>
       </div>
 
+      <div id="welcome-resume" class="is-hidden" style="margin:0 auto 1.2rem;max-width:560px;padding:.8rem 1rem;background:var(--accent-soft);border:1px solid var(--accent-tint);border-left:3px solid var(--accent);text-align:left">
+        <div style="font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700">Análisis en curso</div>
+        <div id="welcome-resume-text" style="font-family:var(--italic);font-style:italic;font-size:.95rem;color:var(--ink-2);margin:.3rem 0 .7rem"></div>
+        <button class="btn" onclick="resumeAnalysis()">Continuar donde iba →</button>
+      </div>
       <div style="display:flex;gap:.7rem;justify-content:center;flex-wrap:wrap">
         <button class="btn-ghost" onclick="backToHub()">← Volver al lab</button>
-        <button class="btn btn-big" onclick="startWizard()">Empezar →</button>
+        <button class="btn btn-big" id="welcome-start-btn" onclick="startWizard()">Empezar →</button>
       </div>
       <p data-lab-demo="micmac"></p>
 
@@ -2445,7 +2452,9 @@ footer.foot a:hover { color: var(--accent); }
       <button class="btn-mini" id="cb-save-capture" onclick="cloudSave()">Guardar en la nube</button>
     </div>
 
-    <div class="fuzzy-bar">
+    <!-- Modo difuso desactivado: las bandas de MicMac se normalizan con el máximo del
+         escenario central y salen mal escaladas. Se reactiva cuando se corrija el cálculo. -->
+    <div class="fuzzy-bar is-hidden" hidden>
       <label class="fuzzy-label">
         <span class="fuzzy-icon" title="Confianza con la que calificaste la matriz">≈</span>
         Confianza en las calificaciones:
@@ -2806,9 +2815,14 @@ footer.foot a:hover { color: var(--accent); }
         para análisis de actores y conflictos.
       </p>
       <p>
-        <b>Tu privacidad.</b> Todo el cálculo se hace en tu navegador. Si
-        guardas en la nube, solo viajan los nombres de variables y las
-        calificaciones — nunca enviamos tus resultados a terceros.
+        <b>Tu privacidad.</b> Todo el cálculo (MicMac, DEMATEL e ISM) se
+        hace en tu navegador y tu trabajo queda guardado ahí. Si guardas en
+        la nube, viajan a nuestro servidor los nombres de las variables, la
+        matriz y los datos del proyecto. El copiloto de IA es opcional:
+        solo cuando tú lo activas enviamos las variables, la matriz o los
+        resultados al proveedor del modelo (DeepSeek) para generar la
+        respuesta, y en ningún otro momento. No uses el copiloto con
+        información reservada o datos personales.
       </p>
       <p style="border-top:1px solid var(--rule);padding-top:1rem;margin-top:1.4rem">
         <b>¿Quieres profundizar?</b><br/>
@@ -3474,7 +3488,8 @@ function loadState() {
     STATE.matrix = obj.matrix || [];
     STATE.captureIdx = obj.captureIdx || 0;
     STATE.mode = obj.mode || 'table';
-    STATE.uncertainty = obj.uncertainty || 'high';
+    // Modo difuso desactivado temporalmente (ver .fuzzy-bar): siempre puntual.
+    STATE.uncertainty = 'high';
     return true;
   } catch { return false; }
 }
@@ -3861,6 +3876,7 @@ function _resetStage04ToIntro() {
 function startProject() {
   const tplId = STATE.wizard.tpl;
   if (!tplId) return;
+  if (!_confirmDiscardProgress('Empezar con la plantilla')) return;
   const tpl = TEMPLATES[tplId];
   STATE.meta.tplId = tplId;
   STATE.meta.nombre = tpl.nombre;
@@ -3878,6 +3894,7 @@ function startProject() {
   renderCloudBars();
 }
 function startBlank() {
+  if (!_confirmDiscardProgress('Empezar en blanco')) return;
   STATE.meta.tplId = null;
   STATE.meta.nombre = 'Análisis personalizado';
   STATE.meta.createdAt = STATE.meta.createdAt || new Date().toISOString();
@@ -3906,7 +3923,54 @@ function showStage(id) {
   if (id === 'stage-hub' && typeof renderInformeSection === 'function') {
     try { renderInformeSection(); } catch {}
   }
+  if (id === 'stage-hub' || id === 'stage-welcome') _syncResumeUI();
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Retomar sin perder la matriz ─────────────────────────────────────────
+// Antes, la única ruta desde la bienvenida pasaba por el wizard y
+// startProject(), que reinicia la matriz. Ahora el chip del hub y la
+// bienvenida ofrecen volver directo a donde se iba.
+function _progressSummary() {
+  const n = STATE.vars.length;
+  if (n < 2) return null;
+  const { filled, total } = countFilled();
+  return { n, filled, total };
+}
+function _syncResumeUI() {
+  const p = _progressSummary();
+  const chip = document.getElementById('hub-inprogress-chip');
+  if (chip) chip.classList.toggle('is-hidden', !p && !(STATE.wizard && STATE.wizard.q1));
+  const box = document.getElementById('welcome-resume');
+  const txt = document.getElementById('welcome-resume-text');
+  const start = document.getElementById('welcome-start-btn');
+  if (!box) return;
+  box.classList.toggle('is-hidden', !p);
+  if (p && txt) {
+    const nombre = STATE.meta.nombre ? `«${STATE.meta.nombre}» · ` : '';
+    txt.textContent = `${nombre}${p.n} variables · ${p.filled} de ${p.total} relaciones calificadas. «Empezar» crea un análisis nuevo.`;
+  }
+  if (start) start.textContent = p ? 'Empezar uno nuevo →' : 'Empezar →';
+}
+function resumeAnalysis() {
+  const p = _progressSummary();
+  if (!p) { showStage('stage-welcome'); return; }
+  if (p.filled > 0) { goToCapture(); return; }
+  renderVars(); varsShowEditor(); showStage('stage-vars');
+}
+// Confirmación antes de reemplazar una matriz con trabajo. Devuelve true si
+// se puede seguir. No pregunta cuando las variables son exactamente las de
+// la plantilla y no hay celdas calificadas (reinicio sin pérdida).
+function _confirmDiscardProgress(nextLabel) {
+  const p = _progressSummary();
+  if (!p) return true;
+  const tplVars = STATE.meta.tplId && TEMPLATES[STATE.meta.tplId] ? TEMPLATES[STATE.meta.tplId].vars : null;
+  const sameVars = tplVars && tplVars.length === STATE.vars.length && tplVars.every((v, i) => v === STATE.vars[i]);
+  if (p.filled === 0 && sameVars) return true;
+  const detalle = p.filled > 0
+    ? `${p.filled} relaciones calificadas`
+    : `${p.n} variables editadas`;
+  return confirm(`Tienes un análisis en curso con ${detalle}. ${nextLabel} lo reemplaza y se pierden esas calificaciones.\n\n¿Continuar?`);
 }
 
 // El botón Volver de la barra es contextual: en el hub sale al sitio; dentro
@@ -4868,6 +4932,26 @@ function goToCapture() {
 
 let _chartInstance = null;
 
+// Chart.js viene de una CDN con respaldo local. Si aun así no está, el
+// ranking se pinta igual y el hueco del gráfico lo dice en vez de quedar
+// en blanco (antes la función reventaba antes de llegar al ranking).
+function _chartAvailable(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  const wrap = canvas ? canvas.closest('.chart-wrap') : null;
+  if (window.Chart) {
+    if (wrap) { const m = wrap.querySelector('.chart-unavailable'); if (m) m.remove(); }
+    return true;
+  }
+  if (wrap && !wrap.querySelector('.chart-unavailable')) {
+    const m = document.createElement('p');
+    m.className = 'chart-unavailable empty-msg';
+    m.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:1.5rem;margin:0';
+    m.textContent = 'No se pudo cargar la librería de gráficos (Chart.js). El ranking de la derecha sí está calculado; revisa la conexión y recarga para ver el mapa.';
+    wrap.appendChild(m);
+  }
+  return false;
+}
+
 function goToResults() {
   _resetStage04ToIntro();
   showStage('stage-results');
@@ -4892,6 +4976,10 @@ function renderResults() {
     if (_chartInstance) { _chartInstance.destroy(); _chartInstance = null; }
     return;
   }
+  // Con pocas celdas la mediana de motricidad y dependencia es 0 y todas
+  // las variables caen en «clave». Por debajo del umbral no se clasifica.
+  const SPARSE_MIN = 0.3;
+  const sparse = filled < total * SPARSE_MIN;
 
   const accent = getComputedStyle(document.body).getPropertyValue('--accent').trim();
   const green = getComputedStyle(document.body).getPropertyValue('--green').trim();
@@ -4901,13 +4989,14 @@ function renderResults() {
   const ruleStrong = getComputedStyle(document.body).getPropertyValue('--rule-strong').trim();
   const colorOf = c => ({ motriz: green, clave: accent, autonoma: ink3, resultado: amber }[c]);
 
-  const ctx = document.getElementById('chart-scatter').getContext('2d');
   const data = STATE.vars.map((v, i) => ({
     x: res.depN[i], y: res.motriN[i],
     label: 'V' + String(i + 1).padStart(2, '0'),
     name: v, cuadrante: res.cuadrante[i]
   }));
-  if (_chartInstance) _chartInstance.destroy();
+  if (_chartInstance) { _chartInstance.destroy(); _chartInstance = null; }
+  if (_chartAvailable('chart-scatter')) {
+  const ctx = document.getElementById('chart-scatter').getContext('2d');
   _chartInstance = new Chart(ctx, {
     type: 'scatter',
     data: {
@@ -5008,6 +5097,7 @@ function renderResults() {
       }
     }]
   });
+  }
 
   // Ranking
   const groups = {
@@ -5017,7 +5107,12 @@ function renderResults() {
     autonoma: { title: 'Variables autónomas', cls: 't-auto',  desc: 'Bajo poder e independientes. Marginales.' }
   };
   let html = '';
-  for (const key of ['clave','motriz','resultado','autonoma']) {
+  if (sparse) {
+    const faltan = Math.ceil(total * SPARSE_MIN) - filled;
+    html = `<div class="rank-group"><div class="rank-title t-dep"><span class="rank-dot"></span>Cuadrantes no disponibles</div>
+      <p class="empty-msg" style="margin-top:.6rem">Has calificado ${filled} de ${total} relaciones. Con menos del ${Math.round(SPARSE_MIN * 100)} % de la matriz la mediana de motricidad y dependencia es cero y todas las variables caerían en «clave», lo que no dice nada. Califica al menos ${faltan} relaciones más para ver la clasificación.</p></div>`;
+  }
+  for (const key of sparse ? [] : ['clave','motriz','resultado','autonoma']) {
     const vars = STATE.vars
       .map((v, i) => ({ name: v, i, code: 'V' + String(i + 1).padStart(2, '0'), m: res.motriN[i], d: res.depN[i] }))
       .filter(x => res.cuadrante[x.i] === key)
@@ -5274,8 +5369,9 @@ function renderDEMATEL() {
   const xMax = Math.max(0.001, maxP * 1.05);
   const yLim = Math.max(0.001, maxAbsR * 1.15);
 
+  if (_chartDemInstance) { _chartDemInstance.destroy(); _chartDemInstance = null; }
+  if (_chartAvailable('chart-dematel')) {
   const ctx = document.getElementById('chart-dematel').getContext('2d');
-  if (_chartDemInstance) _chartDemInstance.destroy();
   _chartDemInstance = new Chart(ctx, {
     type: 'scatter',
     data: { datasets: [{
@@ -5372,6 +5468,7 @@ function renderDEMATEL() {
       }
     }]
   });
+  }
 
   // Ranking DEMATEL: cuadrantes
   const groups = {
@@ -6339,9 +6436,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 250);
   }
   // Si hay un análisis estructural en progreso, muestra un chip en el hub.
-  const hasInProgress = restored && (STATE.vars.length >= 2 || (STATE.wizard && STATE.wizard.q1));
-  const inProgressChip = document.getElementById('hub-inprogress-chip');
-  if (inProgressChip) inProgressChip.classList.toggle('is-hidden', !hasInProgress);
+  _syncResumeUI();
   // Aplica botón activo de confianza según STATE.uncertainty restaurado
   document.querySelectorAll('.fuzzy-opt').forEach(b => b.classList.toggle('active', b.dataset.u === (STATE.uncertainty || 'high')));
   const helps = {
