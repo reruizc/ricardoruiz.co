@@ -1227,36 +1227,67 @@
       return (window._fileGrants || []).some(g => g.cat === catId && g.anio === anio);
     }
 
-    // ─── CUOTA PREMIUM · 1 descarga por cuenta, ÚNICA (no renovable) ──────────
-    // Premium incluye 1 archivo histórico de muestra de por vida. Para acceder
-    // a más, el cliente debe contratar el Plan Datos (catálogo histórico
-    // completo). Persistencia: localStorage por ahora; cuando exista el
-    // endpoint en rr-auth, mover a /raw/status + /raw/consume con anchor por
-    // email del usuario (server-side, anti-reset).
-    const PREMIUM_RAW_QUOTA_TOTAL = 1;
-    function _rawAccountKey() {
-      // Anchor por email si está en sesión; fallback genérico si no.
+    // ─── CUOTA PREMIUM · 10 descargas al mes, compartidas ────────────────────
+    // Los históricos cuentan contra la MISMA cuota mensual de Veleta y
+    // Oportunidad: worker rr-auth /dl/status + /dl/consume (KV RR_DL; Premium 10).
+    // Un archivo = una descarga, en la variante que se elija. Si el worker no
+    // responde se usa el mismo respaldo local que esas dos páginas
+    // (opo-dl-AAAA-MM), para que el contador siga siendo uno solo.
+    // Antes era 1 archivo de muestra por cuenta, de por vida, contado solo en
+    // este navegador; la página de precios prometía 10 al mes.
+    const DL_QUOTA = { pro:3, premium:10, full:9999 };
+    const DL_API   = 'https://rr-auth.reruizc.workers.dev/dl';
+    window._dlState = { used:0, quota:0, source:'local' };
+    function _dlLocalKey() {
+      const d = new Date();
+      return `opo-dl-${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    }
+    function _dlLocalUsed() {
+      try { return parseInt(localStorage.getItem(_dlLocalKey()) || '0', 10) || 0; }
+      catch(e) { return 0; }
+    }
+    function _dlLocalQuota() { return DL_QUOTA[window._userPlan] || 0; }
+    async function dlRefreshStatus() {
+      const tok = localStorage.getItem('rr-token');
+      window._dlState = { used:_dlLocalUsed(), quota:_dlLocalQuota(), source:'local' };
+      if (!tok) return window._dlState;
       try {
-        const u = JSON.parse(localStorage.getItem('rr-user') || 'null');
-        if (u && u.email) return 'rr-raw-dl-acct-' + u.email.toLowerCase();
+        const res = await fetch(`${DL_API}/status`, { headers:{ 'Authorization':`Bearer ${tok}` } });
+        if (res.ok) {
+          const d = await res.json();
+          // El plan 'full' no está en la tabla del worker (le da 0): se queda con la local.
+          if (window._userPlan !== 'full') window._dlState = { used:d.used|0, quota:d.quota|0, source:'worker' };
+        }
       } catch(e) {}
-      return 'rr-raw-dl-acct-anon';
+      return window._dlState;
     }
-    function getRawDownloadsLifetime() {
-      try { return JSON.parse(localStorage.getItem(_rawAccountKey()) || '[]'); }
-      catch(e) { return []; }
+    async function dlConsume() {
+      const tok = localStorage.getItem('rr-token');
+      if (tok && window._userPlan !== 'full') {
+        try {
+          const res = await fetch(`${DL_API}/consume`, { method:'POST', headers:{ 'Authorization':`Bearer ${tok}` } });
+          if (res.ok || res.status === 403) {
+            const d = await res.json();
+            window._dlState = { used:d.used|0, quota:d.quota|0, source:'worker' };
+            return res.ok;
+          }
+        } catch(e) {}
+      }
+      try { localStorage.setItem(_dlLocalKey(), String(_dlLocalUsed() + 1)); } catch(e) {}
+      window._dlState = { used:window._dlState.used + 1, quota:window._dlState.quota, source:'local-fallback' };
+      return true;
     }
+    function rawRestantes() { return Math.max(0, window._dlState.quota - window._dlState.used); }
     function rawCanDownload() {
-      if (window._isFullAccess) return true;  // admins + acceso total: sin límites
-      return window._isPremium && getRawDownloadsLifetime().length < PREMIUM_RAW_QUOTA_TOTAL;
+      if (window._isFullAccess || window._userPlan === 'full') return true;  // sin tope
+      return window._isPremium && rawRestantes() > 0;
     }
-    function recordRawDownload(catId, año, file) {
-      if (window._isFullAccess) return;  // admins + acceso total no consumen cuota
-      if (hasFileGrant(catId, año)) return;  // permisos puntuales no consumen cuota
-      const arr = getRawDownloadsLifetime();
-      arr.push({ catId, año, file, ts: new Date().toISOString() });
-      localStorage.setItem(_rawAccountKey(), JSON.stringify(arr));
+    function _proximoMes() {
+      const d = new Date();
+      return new Date(d.getFullYear(), d.getMonth() + 1, 1)
+        .toLocaleDateString('es-CO', { day:'numeric', month:'long' });
     }
+    const CONTACTO_PERSONALIZADO = 'https://wa.me/573243036767?text=Hola%20Ricardo%2C%20necesito%20m%C3%A1s%20archivos%20del%20cat%C3%A1logo%20hist%C3%B3rico.';
 
     function getCrudoBanner() {
       // ── ADMIN ── (bypass total)
@@ -1281,35 +1312,34 @@
       }
       // ── PREMIUM ──
       if (window._isPremium) {
-        const used     = getRawDownloadsLifetime().length;
-        const restante = Math.max(0, PREMIUM_RAW_QUOTA_TOTAL - used);
-        const titleTxt = used === 0
-          ? `1 descarga histórica de muestra disponible`
-          : `Ya usaste tu descarga histórica de muestra`;
-        const upgradeCta = used > 0
-          ? `<a href="pricing.html" class="crudo-banner-cta" onclick="navTo(event,'pricing.html')">Ver Plan Datos · acceso ilimitado</a>`
-          : ``;
+        const { used, quota } = window._dlState;
+        const restante = rawRestantes();
+        const titleTxt = restante > 0
+          ? `${restante} de ${quota} descargas disponibles este mes`
+          : `Ya usaste tus ${quota} descargas de este mes`;
+        const upgradeCta = restante > 0 ? `` :
+          `<a href="${CONTACTO_PERSONALIZADO}" class="crudo-banner-cta" target="_blank" rel="noopener">Necesito más archivos este mes →</a>`;
         return `
           <div class="crudo-banner premium">
             <div class="crudo-banner-title">Plan Premium · ${titleTxt}</div>
             <div class="crudo-banner-body">
-              Como cliente <b>Premium</b> tienes derecho a <b>1 archivo crudo histórico de muestra por cuenta</b>, sin costo adicional. Es una <b>descarga única, no renovable</b> — cuando la uses, los demás archivos quedan reservados al <b>Plan Datos</b> (catálogo histórico completo).<br/><br/>
+              Como cliente <b>Premium</b> tienes <b>${quota} descargas al mes</b> del catálogo histórico. Cada archivo cuenta como <b>una descarga</b>, en la granularidad y el formato que elijas. La cuota se comparte con las descargas de Veleta y Oportunidad y se renueva el <b>${_proximoMes()}</b>.<br/><br/>
               <b>Todos los archivos están normalizados</b> con la estructura oficial de la Registraduría. Por cada votación tendrás <b>15-16 columnas</b> que responden a las preguntas clave: <b>qué elección es</b> (presidencial, congreso, territorial), <b>cuándo se hizo</b> (fecha), <b>qué corporación se votó</b> (Senado, Cámara, Presidencia, etc.), <b>qué circunscripción aplica</b> (nacional, territorial, indígena, afro, CITREP), <b>dónde se votó</b> (departamento → municipio → zona electoral → puesto de votación → mesa), <b>por quién</b> (partido político y nombre del candidato) y <b>cuántos votos obtuvo</b>. Cada archivo se entrega en cuatro variantes — <b>mesa</b> (granularidad máxima, una fila por mesa) y <b>puesto</b> (agregado por puesto de votación, ~85% menos filas), cada una en <b>CSV</b> (recomendado para análisis con Python, R o Stata) y <b>XLSX</b> (Excel, abrible de forma directa). Para Congreso y Territoriales, la versión mesa XLSX llega como ZIP por departamento en próxima entrega; el agregado por puesto sí está disponible en CSV. Limpieza ya hecha: ya identificamos qué filas son <b>votos en blanco, nulos o no marcados</b>, y marcamos las <b>mesas atípicas</b> (CORFERIAS en Bogotá, cárceles, consulados en el exterior) para que las uses o las descartes según tu análisis.<br/><br/>
-              Cada archivo es el insumo para reconstruir el voto a la mesa: cruce con georreferenciación de puestos, transferencia entre bloques, abstención territorial, mapa de bias regional. Estado: <b>${used}/${PREMIUM_RAW_QUOTA_TOTAL} usadas</b> · ${restante>0?`<b style="color:var(--green)">${restante} disponible</b>`:`<b style="color:#f0c040">muestra consumida — sigue con Plan Datos</b>`}.
+              Cada archivo es el insumo para reconstruir el voto a la mesa: cruce con georreferenciación de puestos, transferencia entre bloques, abstención territorial, mapa de bias regional. Estado: <b>${used}/${quota} usadas este mes</b> · ${restante>0?`<b style="color:var(--green)">${restante} disponible${restante===1?'':'s'}</b>`:`<b style="color:#f0c040">cuota del mes usada · se renueva el ${_proximoMes()}</b>`}.
             </div>
             ${upgradeCta}
           </div>`;
       }
       // ── NO PREMIUM ──
       const cta = window._userPlan === 'anon'
-        ? `<a href="elige-plan.html" class="crudo-banner-cta" onclick="navTo(event,'elige-plan.html')">Registrarme · Lista de espera</a>`
-        : `<a href="pricing.html" class="crudo-banner-cta" onclick="navTo(event,'pricing.html')">Ver Plan Datos</a>`;
+        ? `<a href="elige-plan.html" class="crudo-banner-cta" onclick="navTo(event,'elige-plan.html')">Crear mi cuenta</a>`
+        : `<a href="pricing.html" class="crudo-banner-cta" onclick="navTo(event,'pricing.html')">Ver plan Premium</a>`;
       return `
         <div class="crudo-banner warn">
-          <div class="crudo-banner-title">Próximamente · Plan Datos</div>
+          <div class="crudo-banner-title">Incluido en el plan Premium</div>
           <div class="crudo-banner-body">
-            El centro de descargas de <b>crudos por mesa 2010 – 2025</b> es parte del <b>Plan Datos</b>. Todos los archivos ya están <b>normalizados</b> con la estructura oficial de la Registraduría: por cada votación tendrás qué elección es, cuándo se hizo, qué corporación, qué circunscripción, dónde se votó (departamento → municipio → zona → puesto → mesa), partido, nombre del candidato y votos. Con la limpieza inicial hecha (votos blancos/nulos/no marcados identificados, mesas atípicas etiquetadas). Disponibles en <b>CSV</b> y <b>XLSX</b> según el tamaño del archivo.<br/><br/>
-            Mientras tanto, los clientes <b>Premium</b> tienen <b>1 archivo histórico de muestra incluido</b> (descarga única por cuenta, no renovable). Para acceso al catálogo completo, llega el <b>Plan Datos</b>. Déjanos tu correo si quieres acceso temprano.
+            Los <b>crudos por mesa 2010 – 2025</b> se descargan con el plan <b>Premium</b>: <b>10 archivos al mes</b>. Todos los archivos ya están <b>normalizados</b> con la estructura oficial de la Registraduría: por cada votación tendrás qué elección es, cuándo se hizo, qué corporación, qué circunscripción, dónde se votó (departamento → municipio → zona → puesto → mesa), partido, nombre del candidato y votos. Con la limpieza inicial hecha (votos blancos/nulos/no marcados identificados, mesas atípicas etiquetadas). Disponibles en <b>CSV</b> y <b>XLSX</b> según el tamaño del archivo.<br/><br/>
+            Si necesitas una categoría completa o el catálogo entero de una vez, lo armamos en el plan <b>Personalizado</b>.
           </div>
           ${cta}
         </div>`;
@@ -1320,12 +1350,11 @@
       if (!root) return;
       const isPremium    = window._isPremium;
       const canDl        = rawCanDownload();   // sólo Premium con cuota disponible
-      const quotaUsed    = isPremium && !canDl;
       // Botón principal de la categoría (paquete completo) — siempre va a Solicitar
       const bundleClass  = isPremium ? 'cat-bundle-btn premium' : 'cat-bundle-btn locked';
       const bundleLabel  = isPremium
-        ? (quotaUsed ? 'Solicitar paquete · Plan Datos / B2B' : 'Solicitar paquete · B2B')
-        : 'Próximamente · Plan Datos';
+        ? 'Paquete completo · Personalizado'
+        : 'Disponible en Premium';
       // Los años: si puede descargar quedan activos; si no, locked
       const yearLockClass = canDl ? '' : ' locked';
 
@@ -1483,7 +1512,9 @@
         ? `Tienes <b>acceso total</b> al catálogo. Esta descarga no consume cuota.`
         : hasFileGrant(catId, año)
         ? `Este archivo está <b>habilitado para tu cuenta</b>: puedes descargarlo en cualquiera de sus variantes, sin costo y <b>sin consumir tu cuota Premium</b>.`
-        : `Esta acción <b>usa tu descarga histórica de muestra</b> (cuota Premium · 1 archivo por cuenta, <b>no renovable</b>). Elige granularidad y formato — solo se cobra como una descarga. Cuando confirmes, los demás archivos quedarán reservados al <b>Plan Datos</b>.`;
+        : window._userPlan === 'full'
+        ? `Tu plan no tiene tope de descargas del catálogo histórico.`
+        : `Esta descarga <b>cuenta como 1 de tus ${window._dlState.quota} descargas del mes</b> (te quedan ${rawRestantes()}). Elige granularidad y formato: se cuenta una sola vez.`;
       meta.innerHTML = `
         <span>${ref.file.replace(/\.csv$/,'')} · referencia ${fmtMB(ref.mb)} CSV mesa</span>
         <span>Fuente: Registraduría Nacional (formato GCS · normalizado)</span>
@@ -1491,11 +1522,16 @@
         <span style="color:var(--gold);font-size:11.5px;line-height:1.5">⚠ El Mesa · CSV NO se abre completo en Excel (límite de 1.048.576 filas — saldría «El archivo no está totalmente cargado»). Para Excel usa el ZIP por departamento; el CSV es para Python, R, Stata o Power BI.</span>
       `;
 
+      // La descarga sale en el mismo clic (si esperara al worker, el navegador
+      // la trataría como ventana emergente y la bloquearía); el consumo se
+      // registra enseguida y el banner se repinta con el saldo nuevo.
       function commitDownload(target) {
-        recordRawDownload(catId, año, target.file);
+        const gratis = window._isFullAccess || window._userPlan === 'full' || hasFileGrant(catId, año);
+        if (!gratis && !rawCanDownload()) { closeConfirmModal(); openReqModal(catId, año, extra); return; }
         triggerDownload(target.url, target.file);
         closeConfirmModal();
-        renderCrudos();   // refresca banner y desactiva resto de botones
+        if (gratis) return;
+        dlConsume().then(() => renderCrudos());
       }
 
       // Render hasta 4 botones de descarga + cancelar.
@@ -1539,18 +1575,32 @@
       const isPremium = window._isPremium;
       const premQuotaUsed = isPremium && !rawCanDownload();
 
+      const cta = document.querySelector('#req-overlay .req-cta');
+      const ctaContacto = () => {
+        if (!cta) return;
+        cta.href = CONTACTO_PERSONALIZADO; cta.target = '_blank'; cta.rel = 'noopener';
+        cta.onclick = null; cta.textContent = 'Escribir a Ricardo →';
+      };
+      const ctaPlanes = () => {
+        if (!cta) return;
+        cta.href = 'pricing.html'; cta.removeAttribute('target');
+        cta.onclick = e => navTo(e, 'pricing.html'); cta.textContent = 'Ver planes y precios →';
+      };
       if (premQuotaUsed) {
-        tag.textContent = `Muestra Premium consumida`;
-        title.textContent = `Acceso al resto del catálogo`;
-        sub.textContent  = `Ya usaste tu descarga histórica incluida en Premium (1 por cuenta, no renovable). Para acceder a más archivos, actualiza al Plan Datos y elige el paquete que mejor se adapte.`;
+        tag.textContent = `Cuota del mes usada`;
+        title.textContent = `Ya usaste tus ${window._dlState.quota} descargas de este mes`;
+        sub.textContent  = `Se renuevan el ${_proximoMes()}. Si necesitas más archivos antes, o el catálogo completo, lo armamos en el plan Personalizado.`;
+        ctaContacto();
       } else if (isPremium) {
         tag.textContent = `Paquete completo`;
-        title.textContent = `Más allá de tu descarga incluida`;
-        sub.textContent = `Tu plan Premium incluye 1 archivo histórico de muestra. Si necesitas un paquete completo — una categoría entera o el catálogo histórico — el Plan Datos te lo entrega de un golpe, con licencia perpetua.`;
+        title.textContent = `Una categoría entera o todo el catálogo`;
+        sub.textContent = `Tus ${window._dlState.quota} descargas al mes son por archivo. Si necesitas una categoría completa o el catálogo histórico de una vez, lo armamos en el plan Personalizado.`;
+        ctaContacto();
       } else {
-        tag.textContent = `Plan Datos`;
-        title.textContent = `Acceso al catálogo histórico`;
-        sub.textContent  = `Las descargas del catálogo histórico requieren el Plan Datos. Elige el tier que mejor se adapte — un archivo individual, una categoría completa o el catálogo entero.`;
+        tag.textContent = `Plan Premium`;
+        title.textContent = `Descarga del catálogo histórico`;
+        sub.textContent  = `Los archivos históricos se descargan con el plan Premium: 10 al mes, en CSV o Excel, por mesa o por puesto de votación.`;
+        ctaPlanes();
       }
 
       meta.innerHTML = `
@@ -1649,7 +1699,7 @@
             const antes = estado();
             aplicarPrivilegios(nuevo);
             if (estado() !== antes) {
-              if (typeof renderCrudos === 'function') renderCrudos();
+              if (typeof renderCrudos === 'function') { renderCrudos(); dlRefreshStatus().then(() => renderCrudos()); }
               pintarDescargas();
               pintarNavPlan();
             }
@@ -1684,10 +1734,11 @@
     renderBarrio();
     populateSelect('sel-dept-gen', DEPTOS_GEN);
     renderCrudos();  // IIFE de auth corre antes (setea _userPlan/_isPremium)
+    dlRefreshStatus().then(() => renderCrudos());  // saldo del mes desde el worker
   </script>
   <script src="lang.js"></script>
 
-  <!-- CONFIRM DOWNLOAD MODAL (Premium · 1/mes no acumulable) -->
+  <!-- CONFIRM DOWNLOAD MODAL (Premium · 10 al mes, cuota compartida con Veleta y Oportunidad) -->
   <div id="confirm-overlay" class="conf-overlay hidden" onclick="if(event.target===this)closeConfirmModal()">
     <div class="conf-modal">
       <span class="conf-tag" id="confirm-tag">Confirmar descarga · Premium</span>
@@ -1704,7 +1755,7 @@
   <!-- UPGRADE / PRICING MODAL (reemplaza el viejo de WhatsApp + correo) -->
   <div id="req-overlay" class="req-overlay hidden" onclick="if(event.target===this)closeReqModal()">
     <div class="req-modal">
-      <span class="req-tag" id="req-tag">Plan Datos</span>
+      <span class="req-tag" id="req-tag">Plan Premium</span>
       <div class="req-title" id="req-title">Actualiza tu plan</div>
       <div class="req-sub" id="req-sub">Para acceder a más archivos del catálogo histórico, actualiza tu plan. Las descargas se entregan de inmediato, sin esperar a un correo de confirmación.</div>
       <div class="req-meta" id="req-meta"></div>
