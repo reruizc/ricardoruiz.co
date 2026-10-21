@@ -23,20 +23,10 @@ ANIOS = {
     '2026': {'fecha1v': '31 May 2026', 'fecha2v': '21 Jun 2026', 'endoso': True,
              'meta': 'Presidencia · 31 May y 21 Jun 2026',
              'fuente': 'Registraduría · Escrutinio de comisiones · exterior del preconteo'},
-    # Consultas internas del Pacto Histórico para ordenar sus listas al Congreso.
-    'pacto2025': {
-        'salida': 'consultas-pacto-2025.html', 's3': 'pres-escr/pacto2025',
-        'titulo': 'Consultas Pacto Histórico 2025', 'linea1': 'Consultas', 'linea2': 'Pacto 2025',
-        'pagina': 'Consultas Pacto Histórico<br/><span>Senado y Cámara 2025</span>',
-        'miga': 'Consultas Pacto Histórico · Senado y Cámara 2025',
-        'meta': 'Consultas internas · 26 Oct 2025', 'sublabel': 'Consulta', 'kpi': 'Votos en la consulta',
-        'pie': 'Consultas Pacto Histórico 2025',
-        'activa': 'senado',
-        'color': {'senado': '#6B2D8B', 'camara': '#c0392b'},
-        'corto': {'senado': 'Consulta Senado', 'camara': 'Consulta Cámara'},
-        'paleta': {'senado': ['#6B2D8B','#c0392b','#e0803a','#0047FF','#3d8b3d','#7c3aed','#06b6d4','#d9db24','#0d9488','#C8102E','#F7941D','#0067B1'],
-                   'camara': ['#c0392b','#6B2D8B','#e0803a','#0047FF','#3d8b3d','#7c3aed','#06b6d4','#d9db24','#0d9488','#C8102E','#F7941D','#0067B1']},
-    },
+    # consultas-pacto-2025.html YA NO sale de aquí (oct-2026): es una página propia con
+    # el esquema de Senado 2026 (filtros en cascada hasta barrio y mesa). Regenerarla
+    # desde este chasis la devolvería al diseño del mapa. Sus datos siguen saliendo de
+    # build.py pacto2025 y build_geo_pacto.py.
 }
 
 

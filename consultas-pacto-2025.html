@@ -3,40 +3,61 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Consultas Pacto Histórico 2025 · Escrutinio · Ricardo Ruiz</title>
+  <title>Consultas Pacto Histórico 2025 · Senado y Cámara · Ricardo Ruiz</title>
+  <meta name="description" content="Votos de cada candidato en las consultas internas del Pacto Histórico del 26 de octubre de 2025, al Senado y a la Cámara, por departamento, municipio, localidad, barrio, puesto y mesa." />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <!-- Gate por plan (plan-gate.js): hasta puesto, abierto a todos (también al anónimo);
+       mesa a mesa, cuenta registrada (plan free o superior). Es de producto, no de seguridad:
+       el JSON de mesas sigue viajando completo al navegador, igual que en los tableros 2023. -->
+  <script src="plan-gate.js?v=20261013"></script>
+  <script>
+    window.MESA_GATE_TXT = {
+      co: { title:'Mesa a mesa con tu cuenta',
+            desc:'El resultado de cada mesa de votación está disponible para cuentas registradas. Crear la cuenta es gratis y no pide tarjeta.',
+            lock:'🔒 Mesas: con tu cuenta' },
+      us: { title:'Polling-table results with your account',
+            desc:'The result of each polling table is available to registered accounts. Creating an account is free and needs no card.',
+            lock:'🔒 Tables: with your account' },
+      cn: { title:'登录后查看逐个投票桌结果',
+            desc:'每个投票桌的结果向注册账户开放。注册免费，无需银行卡。',
+            lock:'🔒 投票桌：登录后查看' },
+    };
+    window.GATE_FEATURES = {
+      plan: { mesas:'free' },
+      copy: { get mesas(){ const t=window.MESA_GATE_TXT; return t[localStorage.getItem('rr-lang')]||t.co; } },
+    };
+  </script>
   <style>
-    /* HelveticaNeue embebida (familia completa). El logo va aparte en Syne. */
-    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-thin.woff2') format('woff2'); font-weight:200; font-style:normal; font-display:swap; }
-    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-light.woff2') format('woff2'); font-weight:300; font-style:normal; font-display:swap; }
-    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
-    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-medium.woff2') format('woff2'); font-weight:500; font-style:normal; font-display:swap; }
-    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-bold.woff2') format('woff2'); font-weight:600 900; font-style:normal; font-display:swap; }
-    @font-face { font-family:'HelveticaNeue'; src:url('fonts/helveticaneue-italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:swap; }
-    [onclick*="toggleTheme"] { display: none !important; }  /* sistema visual v2: sin toggle de modo dia */
+    /* Helvetica Neue embebida (sistema visual v2). Syne solo en el logo. */
+    @font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-thin.woff2') format('woff2');font-weight:200;font-style:normal;font-display:swap}
+    @font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-light.woff2') format('woff2');font-weight:300;font-style:normal;font-display:swap}
+    @font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue.woff2') format('woff2');font-weight:400;font-style:normal;font-display:swap}
+    @font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-medium.woff2') format('woff2');font-weight:500;font-style:normal;font-display:swap}
+    @font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-bold.woff2') format('woff2');font-weight:600 900;font-style:normal;font-display:swap}
+    @font-face{font-family:'HelveticaNeue';src:url('fonts/helveticaneue-italic.woff2') format('woff2');font-weight:400;font-style:italic;font-display:swap}
     :root{--white:#f4f3ef;--blue:#0047FF;--green:#4ade80;--card-border:rgba(255,255,255,0.1);--border:rgba(255,255,255,0.08);--bar-bg:rgba(255,255,255,0.1);--td-hover:rgba(255,255,255,0.04)}
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html{scroll-behavior:smooth}
-    body{background:#060810;color:var(--white);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;cursor:none;min-height:100vh;overflow-x:hidden}
-    .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
-    .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);opacity:.4}
-    .bg-layer{position:fixed;inset:0;z-index:0;background:url('foto-fondo.webp') center right/cover no-repeat}
-    .bg-overlay{position:fixed;inset:0;z-index:1;background:linear-gradient(to right,rgba(4,6,16,.97) 0%,rgba(4,6,16,.94) 55%,rgba(4,6,16,.72) 72%,rgba(4,6,16,.35) 88%,rgba(4,6,16,.10) 100%)}
+    body{background:#060810;color:var(--white);font-family:HelveticaNeue,Helvetica,Arial,sans-serif;cursor:none;min-height:100vh;overflow-x:hidden}
+    .cursor{position:fixed;width:10px;height:10px;background:var(--blue);border-radius:50%;pointer-events:none;z-index:999999;transform:translate(-50%,-50%);transition:transform .15s,background .2s}
+    .cursor-ring{position:fixed;width:32px;height:32px;border:1.5px solid var(--blue);border-radius:50%;pointer-events:none;z-index:999998;transform:translate(-50%,-50%);opacity:.4}
+    .bg-layer{position:fixed;inset:0;z-index:0;background:radial-gradient(1100px 700px at 78% -8%, rgba(0,71,255,.16), transparent 60%),radial-gradient(900px 600px at 10% 110%, rgba(61,111,255,.10), transparent 55%),#060810}
+    .bg-overlay{position:fixed;inset:0;z-index:1;background:transparent}
     .shell{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column}
     .electoral-nav{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:.9rem 2.5rem;border-bottom:1px solid rgba(255,255,255,.06);background:rgba(4,6,16,.6);backdrop-filter:blur(8px);flex-shrink:0}
     .electoral-nav-auth{display:flex;align-items:center;gap:.75rem}
-    .e-btn-login{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);text-decoration:none;border:1.5px solid transparent;padding:.35rem .8rem;transition:color .2s,border-color .2s}
+    .e-btn-login{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);text-decoration:none;border:1.5px solid transparent;padding:.35rem .8rem;transition:color .2s,border-color .2s}
     .e-btn-login:hover{color:var(--white);border-color:rgba(255,255,255,.2)}
-    .e-btn-register{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.35rem .8rem}
-    .e-user-name{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7)}
-    .e-user-plan{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.2rem .6rem}
-    .e-btn-logout{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0}
-    .e-btn-back{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0}
+    .e-btn-register{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-decoration:none;background:var(--blue);border:1.5px solid var(--blue);padding:.35rem .8rem}
+    .e-user-name{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+    .e-user-plan{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);background:rgba(0,71,255,.12);padding:.2rem .6rem}
+    .e-btn-logout{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.25);background:none;border:none;cursor:none;padding:0}
+    .e-btn-back{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--green);text-decoration:none;border:1.5px solid rgba(74,222,128,.4);padding:.3rem .8rem;transition:color .2s,border-color .2s,background .2s;flex-shrink:0}
     .e-btn-back:hover{color:#060810;background:var(--green);border-color:var(--green)}
     .logo-link{display:flex;align-items:center;gap:.55rem;text-decoration:none;opacity:.8;transition:opacity .2s}
     .logo-link:hover{opacity:1}
@@ -45,105 +66,132 @@
     .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(1.1rem,2vw,1.8rem);letter-spacing:-.03em;color:var(--white)}
     .logo-text span{color:var(--blue)}
     @media(max-width:900px){.electoral-nav{display:none}}
+    .country-selector-wrap{position:relative}
+    .country-btn{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);background:none;border:1px solid rgba(255,255,255,.15);padding:.3rem .65rem;cursor:none;display:flex;align-items:center;transition:border-color .2s,color .2s}
+    .country-btn:hover,.country-btn.open{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.7)}
+    .country-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:#0e1220;border:1px solid rgba(255,255,255,.12);min-width:190px;display:none;flex-direction:column;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+    .country-dropdown.open{display:flex}
+    .country-option{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.65rem;letter-spacing:.05em;padding:.65rem 1rem;cursor:pointer;display:flex;align-items:center;gap:.5rem;color:rgba(255,255,255,.5);border-bottom:1px solid rgba(255,255,255,.07);transition:background .15s;user-select:none}
+    .country-option:last-child{border-bottom:none}
+    .country-option:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.8)}
+    .country-option.selected{color:var(--blue)}
+    .country-check{font-size:.6rem;width:12px;opacity:0;color:var(--blue)}
+    .country-option.selected .country-check{opacity:1}
     .top-bar{display:flex;align-items:flex-start;justify-content:space-between;padding:1.1rem 2.5rem 0;flex-shrink:0}
-    .page-title{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
+    .page-title{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:800;font-size:clamp(1.5rem,2.8vw,2.5rem);letter-spacing:-.04em;line-height:1.05;color:var(--white);text-shadow:0 2px 24px rgba(0,71,255,.4)}
     .page-title span{color:var(--blue)}
-    .breadcrumb{padding:.6rem 2.5rem 0;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);border-bottom:1px solid var(--border);padding-bottom:.7rem;flex-shrink:0}
+    .breadcrumb{padding:.6rem 2.5rem 0;font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);border-bottom:1px solid var(--border);padding-bottom:.7rem;flex-shrink:0}
     .breadcrumb a{color:rgba(0,71,255,.7);text-decoration:none}
     .breadcrumb a:hover{color:var(--blue)}
-    .meta-bar{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;padding:.5rem 2.5rem;border-bottom:1px solid var(--border);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.62rem;letter-spacing:.08em;color:rgba(255,255,255,.35);flex-shrink:0}
+    .meta-bar{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;padding:.5rem 2.5rem;border-bottom:1px solid var(--border);font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.62rem;letter-spacing:.08em;color:rgba(255,255,255,.35);flex-shrink:0}
     .meta-item b{color:rgba(74,222,128,.85);font-weight:700}
-    .source-badge{margin-left:auto;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:.3rem .8rem}
+    .source-badge{margin-left:auto;font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);background:rgba(255,255,255,.04);border:1px solid var(--border);padding:.3rem .8rem}
     .source-badge b{color:var(--blue)}
-    .content-area{flex:1;padding:1.4rem 2.5rem 1.5rem}
+    .content-area{flex:1;padding:1.8rem 2.5rem 1.5rem}
     .loader-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;min-height:300px}
     .loader-ring{width:40px;height:40px;border:2px solid rgba(0,71,255,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .loader-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3)}
-    .sub-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.62rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4)}
-    .selector-row{display:flex;gap:1.2rem;align-items:flex-start;margin-bottom:1.2rem;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:1rem}
-    .selector-block{display:flex;flex-direction:column;gap:.5rem;min-width:0;flex:1}
-    .chips{display:flex;gap:.5rem;flex-wrap:wrap}
-    .chip{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.04);color:rgba(255,255,255,.6);border:1.5px solid var(--card-border);padding:.45rem .85rem;cursor:pointer;transition:all .18s;position:relative}
-    .chip:hover{background:rgba(255,255,255,.08);color:var(--white)}
-    .chip.active{background:var(--cons-color,var(--blue));color:#fff;border-color:var(--cons-color,var(--blue))}
-    .chip.cand-chip.active{background:var(--cand-color,var(--blue));color:#fff;border-color:var(--cand-color,var(--blue))}
-    .chip-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dot,var(--blue));margin-right:.45rem;vertical-align:middle}
-    .chip.active .chip-dot{background:rgba(255,255,255,.95)}
-    .chip-sub{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.55rem;color:rgba(255,255,255,.35);margin-left:.45rem;font-weight:400}
-    .chip.active .chip-sub{color:rgba(255,255,255,.85)}
-    .chip-count{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.55rem;background:rgba(0,0,0,.25);padding:.08rem .35rem;margin-left:.45rem;border-radius:2px}
-    .chip.active .chip-count{background:rgba(255,255,255,.25)}
-    .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.2rem}
-    .kpi-card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1rem 1.2rem;backdrop-filter:blur(4px)}
-    .kpi-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
-    .kpi-val{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:1.55rem;letter-spacing:-.04em;line-height:1;color:var(--blue)}
-    .kpi-val.wh{color:var(--white)}.kpi-val.gr{color:var(--green)}.kpi-val.sm{font-size:.92rem;line-height:1.3}
-    .kpi-delta{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.58rem;color:rgba(255,255,255,.28);margin-top:.3rem}
-    .results-grid{display:grid;grid-template-columns:1fr 360px;gap:1.2rem}
-    .card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.2rem;overflow:hidden;backdrop-filter:blur(4px)}
-    .card-label{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:.8rem}
-    .drill-nav{display:flex;align-items:center;gap:.5rem;margin-bottom:.8rem;flex-wrap:wrap}
-    .drill-crumb{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);cursor:pointer;padding:.25rem .6rem;border:1px solid transparent;transition:color .15s}
-    .drill-crumb.active{color:var(--white);border-color:var(--card-border);background:rgba(255,255,255,.04)}
-    .drill-crumb.clickable{color:rgba(0,71,255,.75)}
-    .drill-crumb.clickable:hover{color:var(--blue)}
-    .drill-sep{color:rgba(255,255,255,.2);font-size:.55rem}
-    .level-badge{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;padding:.18rem .55rem;border:1px solid;margin-left:auto}
-    .level-badge.nac{color:rgba(167,139,250,.8);border-color:rgba(167,139,250,.3);background:rgba(167,139,250,.06)}
-    .level-badge.dep{color:rgba(0,71,255,.85);border-color:rgba(0,71,255,.3);background:rgba(0,71,255,.06)}
-    .level-badge.mun{color:rgba(74,222,128,.8);border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.06)}
-    .level-badge.com{color:rgba(245,158,11,.85);border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.06)}
-    .map-wrap{position:relative}
-    #cons-map{width:100%;height:520px;background:#060810}
-    .map-back-btn{position:absolute;top:.55rem;right:.55rem;z-index:500;background:rgba(0,71,255,.92);color:#fff;border:none;padding:.4rem .8rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;border-radius:2px;transition:background .18s}
-    .map-back-btn:hover{background:rgba(0,71,255,1)}
-    .map-hint{position:absolute;bottom:.6rem;left:.6rem;z-index:500;background:rgba(6,8,16,.78);padding:.35rem .65rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.08);pointer-events:none}
-    .leaflet-container{background:#060810 !important}
-    .leaflet-tile-pane{display:none}
-    .leaflet-control-attribution{background:rgba(6,8,16,.75)!important;color:rgba(255,255,255,.2)!important;font-size:.4rem!important}
-    .leaflet-control-attribution a{color:rgba(0,71,255,.5)!important}
-    #cons-map .leaflet-interactive{cursor:pointer !important}
-    .leaflet-tooltip{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif!important;font-weight:400!important;font-size:.85rem!important;background:rgba(6,8,16,0.97)!important;border:1px solid rgba(0,71,255,0.4)!important;color:#f4f3ef!important;box-shadow:none!important;padding:.45rem .65rem!important;border-radius:0!important;width:240px!important;white-space:normal!important;line-height:1.45!important;overflow-wrap:break-word!important;word-break:normal!important}
-    .leaflet-tooltip:before{display:none!important}
-    .results-table{width:100%;border-collapse:collapse}
-    .results-table th{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);text-align:left;padding:.45rem .55rem;border-bottom:1px solid var(--border);white-space:nowrap}
-    .results-table th.r{text-align:right}
-    .results-table td{padding:.55rem .55rem;border-bottom:1px solid rgba(255,255,255,.05);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:400;font-size:.86rem;color:rgba(255,255,255,.78);vertical-align:middle}
-    .results-table td.r{text-align:right}
-    .results-table tbody tr{cursor:pointer;transition:background .15s}
-    .results-table tbody tr:hover td{background:var(--td-hover)}
-    .results-table tbody tr.active td{background:rgba(0,71,255,.08)}
-    .bar-wrap{width:60px;height:4px;background:var(--bar-bg);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle}
-    .bar-fill{height:100%;background:var(--blue);border-radius:2px;transition:width .8s ease}
-    .pct-val{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:700;font-size:.78rem;color:var(--white);display:inline-block;width:46px;text-align:right;margin-left:6px}
-    .winner-row td{background:color-mix(in srgb,var(--w-color,#0047FF) 14%,transparent)!important}
-    .winner-row td:first-child{border-left:3px solid var(--w-color,#fff)}
-    .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem;margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border)}
-    .donut-cw{position:relative;width:140px;height:140px}
-    .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
-    .donut-pct{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:1.4rem;letter-spacing:-.04em;color:var(--white);line-height:1}
-    .donut-sub{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.5rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.32);margin-top:3px}
-    .donut-legend{width:100%;display:flex;flex-direction:column;gap:.45rem}
-    .li{display:flex;align-items:center;gap:.55rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:400;font-size:.74rem;color:rgba(255,255,255,.6)}
-    .ld{width:9px;height:9px;border-radius:50%;flex-shrink:0}
-    .lv{margin-left:auto;color:var(--white);font-weight:500;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif}
-    .full-footer{flex-shrink:0;width:100%;border-top:1px solid var(--border);padding:.5rem 2.5rem;display:flex;align-items:center;justify-content:space-between}
-    .footer-brand{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.62rem;letter-spacing:.09em;color:rgba(255,255,255,.2)}
-    .footer-brand a{color:rgba(255,255,255,.25);text-decoration:none}
-    .endoso-cta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;background:rgba(0,71,255,.07);border:1px solid rgba(0,71,255,.2);padding:.85rem 1.4rem;margin-bottom:1.2rem;backdrop-filter:blur(4px)}
-    .endoso-cta-text{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.06em;color:rgba(255,255,255,.7);line-height:1.6}
+    .loader-label{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+    .endoso-cta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;background:rgba(0,71,255,.07);border:1px solid rgba(0,71,255,.2);padding:1rem 1.5rem;margin-bottom:1.5rem;backdrop-filter:blur(4px)}
+    .endoso-cta-text{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:400;font-size:.92rem;letter-spacing:.04em;color:rgba(255,255,255,.5);line-height:1.6}
     .endoso-cta-text b{color:var(--white)}
-    .endoso-btn{display:inline-flex;align-items:center;gap:.6rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);background:var(--blue);border:none;padding:.55rem 1.3rem;cursor:pointer;text-decoration:none;transition:background .2s;white-space:nowrap;flex-shrink:0}
+    .endoso-btn{display:inline-flex;align-items:center;gap:.6rem;font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);background:var(--blue);border:none;padding:.6rem 1.4rem;cursor:pointer;text-decoration:none;transition:background .2s;white-space:nowrap;flex-shrink:0}
     .endoso-btn:hover{background:#0035cc}
-    .excel-btn{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;padding:.3rem .85rem;border:none;cursor:pointer;transition:background .2s;margin-left:auto}
+    .endoso-btn.endoso-locked{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.3);cursor:not-allowed}
+    .endoso-btn.endoso-locked:hover{background:rgba(255,255,255,.07)}
+    .sub-selector{display:flex;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border);padding-bottom:1rem}
+    .sub-label{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-right:.25rem}
+    .dep-select{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.65rem;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.45rem 2rem .45rem .8rem;cursor:pointer;outline:none;transition:border-color .2s;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aaa' stroke-width='1.5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .75rem center}
+    .dep-select:hover,.dep-select:focus{border-color:var(--blue)}
+    .dep-select option{background:#0e1220;color:var(--white)}
+    .search-input{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.65rem;letter-spacing:.06em;background:rgba(255,255,255,.05);border:1.5px solid var(--card-border);color:var(--white);padding:.45rem .8rem;outline:none;width:200px;transition:border-color .2s}
+    .search-input:focus{border-color:var(--blue)}
+    .search-input::placeholder{color:rgba(255,255,255,.25)}
+    .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+    .kpi-card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.1rem 1.3rem;backdrop-filter:blur(4px)}
+    .kpi-label{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.6rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
+    .kpi-val{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:800;font-size:1.7rem;letter-spacing:-.04em;line-height:1;color:var(--blue)}
+    .kpi-val.wh{color:var(--white)}.kpi-val.gr{color:var(--green)}.kpi-val.sm{font-size:.95rem;line-height:1.3}
+    .kpi-delta{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.6rem;color:rgba(255,255,255,.28);margin-top:.3rem}
+    .results-grid{display:grid;grid-template-columns:1fr 300px;gap:1.2rem}
+    .card{background:rgba(255,255,255,.04);border:1px solid var(--card-border);padding:1.3rem;overflow:hidden;backdrop-filter:blur(4px)}
+    .card-label{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.78rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:1rem}
+    .drill-nav{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap}
+    .drill-crumb{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);cursor:pointer;padding:.3rem .7rem;border:1px solid transparent;transition:color .15s}
+    .drill-crumb.active{color:var(--white);border-color:var(--card-border);background:rgba(255,255,255,.04)}
+    .drill-crumb.clickable{color:rgba(0,71,255,.7)}
+    .drill-crumb.clickable:hover{color:var(--blue)}
+    .drill-sep{color:rgba(255,255,255,.2);font-size:.6rem}
+    .level-badge{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;padding:.2rem .55rem;border:1px solid}
+    .level-badge.dep{color:rgba(167,139,250,.7);border-color:rgba(167,139,250,.25);background:rgba(167,139,250,.06)}
+    .level-badge.mun{color:rgba(0,71,255,.8);border-color:rgba(0,71,255,.3);background:rgba(0,71,255,.06)}
+    .level-badge.pues{color:rgba(74,222,128,.7);border-color:rgba(74,222,128,.25);background:rgba(74,222,128,.06)}
+    .circ-toggle{display:flex;gap:.5rem;margin-bottom:1rem}
+    .circ-btn{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;padding:.28rem .9rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.4);cursor:pointer;transition:all .15s}
+    .circ-btn:hover{border-color:rgba(167,139,250,.4);color:rgba(167,139,250,.8)}
+    .circ-btn.circ-btn-active{background:rgba(167,139,250,.12);border-color:rgba(167,139,250,.4);color:rgba(167,139,250,.9)}
+    body.day-mode .circ-btn{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.15);color:rgba(0,0,0,.4)}
+    body.day-mode .circ-btn.circ-btn-active{background:rgba(120,80,200,.1);border-color:rgba(120,80,200,.35);color:rgba(120,80,200,.9)}
+    .results-table{width:100%;border-collapse:collapse}
+    .results-table th{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.58rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.25);text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--border);white-space:nowrap}
+    .results-table th.r{text-align:right}
+    .results-table td{padding:.65rem .6rem;border-bottom:1px solid rgba(255,255,255,.05);font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.74rem;color:rgba(255,255,255,.75);vertical-align:middle}
+    .results-table td.r{text-align:right}
+    .results-table tr:hover td{background:var(--td-hover)}
+    .bar-wrap{width:72px;height:4px;background:var(--bar-bg);border-radius:2px;overflow:hidden;display:inline-block;vertical-align:middle}
+    .bar-fill{height:100%;background:var(--blue);border-radius:2px;transition:width 1s ease}
+    .pct-val{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:700;font-size:.8rem;color:var(--white);display:inline-block;width:46px;text-align:right;margin-left:6px}
+    .cbadge{display:inline-flex;align-items:center;justify-content:center;background:rgba(0,71,255,.15);color:#fff;font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:500;font-size:.95rem;min-width:28px;height:24px;padding:0 6px;border:1px solid rgba(0,71,255,.3)}
+    .cbadge.sub{background:rgba(255,255,255,.04);color:rgba(255,255,255,.2);border-color:rgba(255,255,255,.08)}
+    .drill-btn{background:none;border:none;color:var(--blue);font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.74rem;cursor:pointer;text-align:left;padding:0;display:inline-flex;align-items:center;gap:.4rem;transition:color .15s}
+    .drill-btn:hover{color:#7ab3ff}
+    .expand-btn{background:none;border:none;cursor:pointer;font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.78rem;letter-spacing:.06em;color:rgba(0,71,255,.9);display:flex;align-items:center;gap:.4rem;padding:.25rem 0;transition:color .15s;font-weight:500}
+    .expand-btn:hover{color:var(--blue);text-decoration:underline}
+    .excel-btn{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;padding:.3rem .85rem;border:none;cursor:pointer;transition:background .2s;margin-left:auto}
     .excel-btn-active{background:#16a34a;color:#fff}
     .excel-btn-active:hover{background:#15803d}
     .excel-btn-locked{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.35);cursor:pointer}
-    .theme-btn{display:none !important;display:flex;align-items:center;gap:.4rem;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:pointer;transition:all .2s;flex-shrink:0}
-    .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
-    .copy-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(24px);background:rgba(10,10,20,.97);border:1.5px solid rgba(255,100,100,.5);color:rgba(255,180,180,.9);font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.88rem;letter-spacing:.08em;padding:1rem 2rem;z-index:99998;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center}
-    .copy-toast.show{opacity:1;transform:translate(-50%,-50%);pointer-events:auto}
+    body.day-mode .excel-btn-locked{background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.18);color:rgba(0,0,0,.35)}
+    .cands-inner{background:rgba(0,0,0,.2);border-top:1px solid var(--border);border-bottom:2px solid rgba(0,71,255,.2);padding:.5rem 1rem .75rem 2.5rem;display:none}
+    .cands-inner.open{display:block}
+    .cands-table{width:100%;border-collapse:collapse;font-size:.94rem}
+    .cands-table thead th{font-size:.94rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.25);padding:.4rem .5rem;border-bottom:1px solid var(--border);font-weight:400}
+    .cands-table tbody tr{border-bottom:1px solid rgba(255,255,255,.05)}
+    .cands-table tbody tr:last-child{border-bottom:none}
+    .cands-table tbody td{padding:.35rem .5rem;vertical-align:middle;font-size:.88rem}
+    .cands-table tbody td:nth-child(3){font-size:1.05rem;font-weight:300}
+    .cands-table tbody td.r{font-size:.85rem!important}
+    #sena-map-wrap{display:none}
+    .leaflet-container{background:#060810 !important}
+    .leaflet-tile-pane{display:none}
+    .leaflet-control-attribution{background:rgba(6,8,16,.75) !important;color:rgba(255,255,255,.2) !important;font-size:.4rem !important}
+    .leaflet-control-attribution a{color:rgba(0,71,255,.5) !important}
+    .leaflet-control-zoom a{background:rgba(13,15,28,.9) !important;color:var(--white) !important;border-color:rgba(255,255,255,.15) !important}
+    .leaflet-control-zoom a:hover{background:rgba(0,71,255,.3) !important}
+    .donut-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem}
+    .donut-cw{position:relative;width:150px;height:150px}
+    .donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+    .donut-pct{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.04em;color:var(--white);line-height:1}
+    .donut-sub{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-top:2px}
+    .gender-censo-label{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.6rem}
+    body.day-mode .gender-censo-label{color:rgba(0,0,0,.5)}
+    /* Hacer que deptos/muns del mapa se vean clickeables */
+    #hemiciclo-map .leaflet-interactive{cursor:pointer !important}
+    .donut-legend{width:100%;display:flex;flex-direction:column;gap:.55rem}
+    .li{display:flex;align-items:center;gap:.6rem;font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:400;font-size:.75rem;color:rgba(255,255,255,.5)}
+    .ld{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .lv{margin-left:auto;color:var(--white);font-weight:400;font-family:HelveticaNeue,Helvetica,Arial,sans-serif}
+    .umbral-bar{margin-top:1rem;padding-top:.8rem;border-top:1px solid var(--border)}
+    .umbral-label{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:400;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:.4rem}
+    .umbral-val{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.72rem;color:var(--blue)}
+    .back-bar{flex-shrink:0;padding:.6rem 2.5rem 1rem;display:flex;align-items:center;gap:1rem}
+    .leaflet-tooltip{font-family:HelveticaNeue,Helvetica,Arial,sans-serif!important;font-weight:400!important;font-size:.85rem!important;background:rgba(6,8,16,0.97)!important;border:1px solid rgba(0,71,255,0.4)!important;color:#f4f3ef!important;box-shadow:none!important;padding:.45rem .65rem!important;border-radius:0!important;width:220px!important;white-space:normal!important;line-height:1.45!important;overflow-wrap:break-word!important;word-break:normal!important}
+    .leaflet-tooltip:before{display:none!important}
+    .back-btn{display:inline-flex;align-items:center;gap:.5rem;font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--white);text-decoration:none;cursor:pointer;background:rgba(0,71,255,.25);border:1px solid rgba(0,71,255,.5);padding:.3rem .9rem;transition:background .2s}
+    .back-btn:hover{background:rgba(0,71,255,.45)}
+    .full-footer{flex-shrink:0;width:100%;border-top:1px solid var(--border);padding:.5rem 2.5rem;display:flex;align-items:center;justify-content:space-between}
+    .footer-brand{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.62rem;letter-spacing:.09em;color:rgba(255,255,255,.2)}
+    .footer-brand a{color:rgba(255,255,255,.25);text-decoration:none}
     .curtain{position:fixed;inset:0;z-index:99999;pointer-events:none}
     .curtain-layer{position:absolute;inset:0;background:#04060e}
     .curtain-layer:nth-child(1){clip-path:polygon(0 0,100% 0,100% 22%,0 28%);transform:translateX(-110%);transition:transform .58s cubic-bezier(.75,0,.25,1) 0s}
@@ -151,9 +199,9 @@
     .curtain-layer:nth-child(3){clip-path:polygon(0 53%,100% 47%,100% 76%,0 82%);transform:translateX(-110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .14s}
     .curtain-layer:nth-child(4){clip-path:polygon(0 80%,100% 74%,100% 100%,0 100%);transform:translateX(110%);transition:transform .58s cubic-bezier(.75,0,.25,1) .21s}
     .curtain-stage{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;pointer-events:none}
-    .curtain-tag{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:1.08rem;letter-spacing:.35em;text-transform:uppercase;color:rgba(0,71,255,.7);opacity:0;transform:translateY(-12px);transition:opacity .4s ease,transform .4s ease}
-    .curtain-sub{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.975rem;letter-spacing:.22em;color:rgba(255,255,255,.35);text-transform:uppercase;opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease}
-    .curtain-headline{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-weight:800;font-size:clamp(2.6rem,6.5vw,5.85rem);letter-spacing:-.03em;line-height:1.05;text-shadow:0 0 50px rgba(0,71,255,.5);text-align:center}
+    .curtain-tag{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:1.08rem;letter-spacing:.35em;text-transform:uppercase;color:rgba(0,71,255,.7);opacity:0;transform:translateY(-12px);transition:opacity .4s ease,transform .4s ease}
+    .curtain-sub{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.975rem;letter-spacing:.22em;color:rgba(255,255,255,.35);text-transform:uppercase;opacity:0;transform:translateY(12px);transition:opacity .4s ease,transform .4s ease}
+    .curtain-headline{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:800;font-size:clamp(2.6rem,6.5vw,5.85rem);letter-spacing:-.03em;line-height:1.05;text-shadow:0 0 50px rgba(0,71,255,.5);text-align:center}
     .curtain-line{overflow:hidden;display:block}
     .curtain-word{display:inline-block;opacity:0;transition:transform .52s cubic-bezier(.25,.46,.45,.94),opacity .45s ease}
     .curtain-word.from-left{transform:translateX(-80px)}.curtain-word.from-right{transform:translateX(80px)}
@@ -173,90 +221,147 @@
     .curtain.closing .curtain-word.from-left,.curtain.closing .curtain-word.from-right{transform:translateX(0);opacity:1;transition-delay:.62s}
     .curtain.closing .curtain-tag{opacity:1;transform:translateY(0);transition-delay:.68s}
     .curtain.closing .curtain-sub{opacity:1;transform:translateY(0);transition-delay:.72s}
-    @media(max-width:1080px){.results-grid{grid-template-columns:1fr} #cons-map{height:400px}}
-    @media(max-width:900px){body{cursor:auto}.cursor,.cursor-ring{display:none}.top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer{padding-left:1.2rem;padding-right:1.2rem}.bg-overlay{background:rgba(4,6,16,.93)}.kpi-row{grid-template-columns:1fr 1fr;gap:.6rem} #cons-map{height:340px}}
-    @media(max-width:600px){.kpi-row{grid-template-columns:1fr}}
+    @media(max-width:1000px){.results-grid{grid-template-columns:1fr}}
+    @media(max-width:900px){body{cursor:auto}.cursor,.cursor-ring{display:none}.top-bar,.breadcrumb,.meta-bar,.content-area,.full-footer,.back-bar{padding-left:1.2rem;padding-right:1.2rem}.bg-overlay{background:transparent}.kpi-row{grid-template-columns:1fr 1fr;gap:.75rem}}
+    @media(max-width:600px){.kpi-row{grid-template-columns:1fr}.sub-selector{flex-direction:column;align-items:flex-start}.search-input{width:100%}}
     .hidden{display:none!important}
-    .level-badge.pue{color:rgba(244,114,182,.85);border-color:rgba(244,114,182,.3);background:rgba(244,114,182,.06)}
-    /* panel de zonas · puestos · mesas (debajo del mapa) */
-    .terr-card{margin-top:1.2rem}
-    .terr-head{display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap;margin-bottom:.7rem}
-    .terr-head .card-label{margin-bottom:0}
-    .terr-sub{font-size:.72rem;color:rgba(255,255,255,.4)}
-    .terr-scroll{max-height:460px;overflow:auto}
-    .terr-table td.nm{font-weight:500}
-    .terr-tag{display:inline-block;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,158,11,.9);border:1px solid rgba(245,158,11,.35);padding:.05rem .35rem;margin-left:.4rem;vertical-align:middle;font-weight:400}
-    .terr-win{display:inline-flex;align-items:center;gap:.4rem}
-    .terr-win i{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}
-    .pue-meta{display:flex;gap:1.4rem;flex-wrap:wrap;font-size:.74rem;color:rgba(255,255,255,.5);margin-bottom:.9rem}
-    .pue-meta b{color:var(--white);font-weight:600}
-    .mesa-scroll{overflow-x:auto}
-    .mesa-table{width:100%;border-collapse:collapse;font-size:.8rem}
-    .mesa-table th{font-size:.55rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.4);text-align:right;padding:.45rem .5rem;border-bottom:1px solid var(--border);white-space:nowrap;font-weight:400}
-    .mesa-table th:first-child,.mesa-table td:first-child{text-align:left}
-    .mesa-table th .cdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:.3rem;vertical-align:middle}
-    .mesa-table td{text-align:right;padding:.4rem .5rem;border-bottom:1px solid rgba(255,255,255,.05);color:rgba(255,255,255,.75);white-space:nowrap}
-    .mesa-table td.w{font-weight:700;color:var(--white)}
-    .mesa-table td.esp{color:rgba(255,255,255,.45)}
-    .mesa-table td.tot{color:var(--white);font-weight:500}
-    .mesa-table tfoot td{border-top:1px solid rgba(255,255,255,.18);border-bottom:none;color:var(--white);font-weight:600}
-    .mesa-note{font-size:.7rem;color:rgba(255,255,255,.42);margin-top:.7rem;line-height:1.6}
-    .mesa-note.warn{color:rgba(245,158,11,.9)}
-    .mesa-loader{display:flex;align-items:center;gap:.7rem;padding:1.2rem 0;font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.4)}
-    .mesa-loader .loader-ring{width:22px;height:22px}
-    /* contenido bloqueado: se ve borroso y encima el CTA (patrón de los tableros 2023) */
-    .pg-paywall{position:relative}
-    .pg-blurred{filter:blur(5px);pointer-events:none;user-select:none;opacity:.7;max-height:340px;overflow:hidden}
-    .pg-paywall-cta{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.55rem;text-align:center;padding:1rem;
-      background:linear-gradient(180deg,rgba(6,8,16,.28) 0%,rgba(6,8,16,.55) 45%,rgba(6,8,16,.9) 100%)}
-    .pg-paywall-cta .pgc-t{font-size:.9rem;color:var(--white)}
-    .pg-paywall-cta .pgc-btn{font-family:inherit;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;background:var(--blue);color:#fff;border:none;padding:.6rem 1.15rem;cursor:none}
-    .pg-paywall-cta .pgc-btn:hover{background:#0035cc}
-    /* Day mode */
+    .copy-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateY(24px);background:rgba(10,10,20,.97);border:1.5px solid rgba(255,100,100,.5);color:rgba(255,180,180,.9);font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.88rem;letter-spacing:.08em;padding:1rem 2rem;z-index:99998;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center}
+    .copy-toast.show{opacity:1;transform:translate(-50%,-50%);pointer-events:auto}
+    /* DAY MODE */
+    .theme-btn{display:flex;align-items:center;gap:.4rem;font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:.3rem .75rem;cursor:pointer;transition:all .2s;flex-shrink:0}
+    .theme-btn:hover{background:rgba(255,255,255,.15);color:var(--white)}
+    body.day-mode .theme-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25);color:var(--blue)}
     body.day-mode{--white:#1a1a2e;--card-border:rgba(0,0,0,.12);--border:rgba(0,0,0,.08);--bar-bg:rgba(0,0,0,.1);--td-hover:rgba(0,71,255,.04);background:#e6ded3;color:#1a1a2e}
     body.day-mode .bg-layer{opacity:.04}
     body.day-mode .bg-overlay{background:linear-gradient(to right,rgba(240,235,228,.99) 0%,rgba(240,235,228,.97) 55%,rgba(240,235,228,.85) 72%,rgba(240,235,228,.6) 88%,rgba(240,235,228,.25) 100%)}
+    body.day-mode .shell{color:#0d1120}
     body.day-mode .electoral-nav{background:rgba(240,235,228,.92);border-bottom-color:rgba(0,0,0,.1)}
     body.day-mode .logo-text{color:#0d1120}
+    body.day-mode .e-btn-login{color:rgba(0,0,0,.6)}
+    body.day-mode .e-user-name{color:rgba(0,0,0,.7)}
+    body.day-mode .e-btn-logout{color:rgba(0,0,0,.35)}
     body.day-mode .page-title{color:#0d1120;text-shadow:none}
+    body.day-mode .page-title span{color:var(--blue)}
     body.day-mode .breadcrumb{color:rgba(0,0,0,.45);border-bottom-color:rgba(0,0,0,.1)}
     body.day-mode .meta-bar{color:rgba(0,0,0,.55);border-bottom-color:rgba(0,0,0,.1)}
     body.day-mode .meta-item b{color:#0a7a3e}
     body.day-mode .source-badge{color:rgba(0,0,0,.4);background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.1)}
+    body.day-mode .content-area{background:transparent}
     body.day-mode .kpi-card{background:#f7f8fc;border:1px solid rgba(0,0,0,.09)}
     body.day-mode .kpi-label{color:rgba(0,0,0,.5)}
     body.day-mode .kpi-delta{color:rgba(0,0,0,.4)}
-    body.day-mode .selector-row{border-bottom-color:rgba(0,0,0,.1)}
-    body.day-mode .sub-label{color:rgba(0,0,0,.5)}
-    body.day-mode .chip{background:rgba(255,255,255,.7);color:rgba(0,0,0,.7);border-color:rgba(0,0,0,.12)}
-    body.day-mode .chip:hover{background:#fff;color:#0d1120}
-    body.day-mode .card{background:#f0f2f8;border-color:rgba(0,0,0,.1)}
-    body.day-mode .card-label{color:rgba(0,0,0,.5)}
+    body.day-mode .sub-selector{border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .search-input{background:#fff;border-color:rgba(0,0,0,.2);color:#0d1120}
+    body.day-mode .search-input::placeholder{color:rgba(0,0,0,.3)}
     body.day-mode .results-table th{color:rgba(0,0,0,.4);border-bottom-color:rgba(0,0,0,.1)}
-    body.day-mode .results-table td{color:rgba(0,0,0,.78);border-bottom-color:rgba(0,0,0,.06)}
-    body.day-mode .bar-wrap{background:rgba(0,0,0,.1)}
-    body.day-mode .drill-crumb{color:rgba(0,0,0,.5)}
-    body.day-mode .drill-crumb.active{color:#1a1a2e;background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.12)}
-    body.day-mode .donut-pct{color:#0d1120}
-    body.day-mode .li{color:rgba(0,0,0,.7)}
-    body.day-mode .lv{color:#0d1120}
+    body.day-mode .results-table td{color:rgba(0,0,0,.8);border-bottom-color:rgba(0,0,0,.06)}
+    body.day-mode .results-table tr:hover td{background:rgba(0,71,255,.04)}
     body.day-mode .full-footer{border-top-color:rgba(0,0,0,.1)}
     body.day-mode .footer-brand{color:rgba(0,0,0,.35)}
-    body.day-mode .theme-btn{display:none !important;background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.25);color:var(--blue)}
     body.day-mode .e-btn-register,body.day-mode .endoso-btn{color:#f4f3ef}
+    body.day-mode .card{background:#f0f2f8;border-color:rgba(0,0,0,.1)}
+    body.day-mode .dep-select{background:#fff;border-color:rgba(0,0,0,.2);color:#1a1a2e}
+    body.day-mode .dep-select option{background:#fff;color:#1a1a2e}
+    body.day-mode .cands-inner{background:rgba(0,0,0,.03);border-top-color:rgba(0,0,0,.08);border-bottom-color:rgba(0,71,255,.2)}
+    body.day-mode .cands-table thead th{color:rgba(0,0,0,.4);border-bottom-color:rgba(0,0,0,.1)}
+    body.day-mode .cands-table tbody tr{border-bottom-color:rgba(0,0,0,.06)}
+    body.day-mode .bar-wrap{background:rgba(0,0,0,.1)}
+    body.day-mode .cbadge{background:rgba(0,71,255,.1);color:var(--blue);border-color:rgba(0,71,255,.25)}
+    body.day-mode .cbadge.sub{background:rgba(0,0,0,.05);color:rgba(0,0,0,.35);border-color:rgba(0,0,0,.1)}
+    body.day-mode .level-badge.dep{color:rgba(120,80,200,.9);border-color:rgba(120,80,200,.35);background:rgba(120,80,200,.08)}
+    body.day-mode .level-badge.mun{color:rgba(0,71,255,.9);border-color:rgba(0,71,255,.35);background:rgba(0,71,255,.08)}
+    body.day-mode .level-badge.pues{color:#0a7a3e;border-color:rgba(10,122,62,.35);background:rgba(10,122,62,.08)}
+    body.day-mode .results-table td{color:rgba(0,0,0,.75)!important}
+    body.day-mode .donut-wrap{background:rgba(0,0,0,.03);border-color:rgba(0,0,0,.08)}
+    body.day-mode .donut-sub{color:rgba(0,0,0,.45)}
+    body.day-mode .drill-crumb{color:rgba(0,0,0,.5)}
+    body.day-mode .drill-crumb.active{color:#1a1a2e;background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.12)}
+    body.day-mode .card-label{color:rgba(0,0,0,.4)}
+    body.day-mode .umbral-bar{background:rgba(0,0,0,.07)}
+    body.day-mode .umbral-label{color:rgba(0,0,0,.5)}
+    body.day-mode .back-btn{background:rgba(0,71,255,.08);border-color:rgba(0,71,255,.3);color:var(--blue)}
+    body.day-mode .expand-btn{color:rgba(0,71,255,.8)}
     body.day-mode .endoso-cta{background:rgba(0,71,255,.06);border-color:rgba(0,71,255,.15)}
     body.day-mode .endoso-cta-text{color:rgba(0,0,0,.7)}
-    body.day-mode .map-hint{background:rgba(255,255,255,.85);color:rgba(0,0,0,.55);border-color:rgba(0,0,0,.08)}
-    body.day-mode #cons-map{background:#fff}
-    body.day-mode .leaflet-container{background:#fff !important}
-    /* Orient overlay */
-    .orient-overlay{display:none;position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,.88);align-items:center;justify-content:center;padding:1.5rem}
-    .orient-overlay.show{display:flex}
-    .orient-box{background:#0e1220;border:1px solid rgba(255,255,255,.12);padding:2rem 1.8rem;max-width:320px;text-align:center}
-    .orient-icon{font-size:2.2rem;margin-bottom:1rem;display:block}
-    .orient-msg{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.78rem;letter-spacing:.06em;line-height:1.9;color:rgba(255,255,255,.75);margin-bottom:1.5rem}
-    .orient-btn{font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;background:#4ade80;color:#060810;border:none;padding:.55rem 2rem;cursor:pointer;transition:background .2s}
-    .orient-btn:hover{background:#22c55e}
+    body.day-mode .sub-label{color:rgba(0,0,0,.45)}
+    body.day-mode .li{color:rgba(0,0,0,.6)}
+    body.day-mode .lv{color:rgba(0,0,0,.85)}
+    body.day-mode .endoso-btn.endoso-locked{background:rgba(0,0,0,.05);border:1px solid rgba(0,0,0,.18);color:rgba(0,0,0,.45)}
+    .cand-elected{color:#39ff7a}
+    body.day-mode .cand-elected{color:var(--blue)!important}
+
+    .orient-overlay{display:none}
+    /* Modal confirmación descarga */
+    .dl-modal{display:none;position:fixed;inset:0;z-index:99997;background:rgba(4,6,16,.78);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:1.5rem}
+    .dl-modal.show{display:flex}
+    .dl-box{background:#0e1220;border:1px solid rgba(0,71,255,.3);padding:2.2rem 2rem 1.8rem;max-width:520px;width:100%;text-align:center;box-shadow:0 12px 48px rgba(0,0,0,.5)}
+    .dl-title{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:400;font-size:1.15rem;color:var(--white);margin-bottom:1rem;letter-spacing:-.01em}
+    .dl-text{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:400;font-size:1rem;line-height:1.6;color:rgba(255,255,255,.8);margin-bottom:1.6rem}
+    .dl-text a{color:var(--blue);text-decoration:underline;font-weight:500}
+    .dl-text a:hover{color:#7ab3ff}
+    .dl-btns{display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap}
+    .dl-btn{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-weight:400;font-size:.95rem;letter-spacing:.02em;padding:.65rem 1.6rem;cursor:pointer;border:none;transition:background .2s}
+    .dl-btn-ok{background:var(--blue);color:#fff}
+    .dl-btn-ok:hover{background:#0035cc}
+    .dl-btn-cancel{background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.15)}
+    .dl-btn-cancel:hover{background:rgba(255,255,255,.12);color:var(--white)}
+    body.day-mode .dl-modal{background:rgba(240,235,228,.85)}
+    body.day-mode .dl-box{background:#fff;border-color:rgba(0,71,255,.25)}
+    body.day-mode .dl-title{color:#1a1a2e}
+    body.day-mode .dl-text{color:rgba(0,0,0,.75)}
+    body.day-mode .dl-btn-cancel{background:rgba(0,0,0,.04);color:rgba(0,0,0,.6);border-color:rgba(0,0,0,.15)}
+    body.day-mode .dl-btn-cancel:hover{background:rgba(0,0,0,.08);color:#1a1a2e}
+    /* Auto-rotate en móvil portrait: rota html y permite scroll dentro del body */
+    @media screen and (orientation:portrait) and (max-width:900px){
+      html{transform:rotate(-90deg) translateX(-100%);transform-origin:top left;width:100vh;height:100vw;position:fixed;top:0;left:0;overflow:hidden}
+      body{width:100vh;height:100vw;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+      .shell{min-height:0;height:auto}
+      .content-area{flex:none;padding-bottom:6rem !important}
+      .full-footer{padding-bottom:2rem}
+      /* RG panel: colapsar grid de 2 columnas para que todo quepa y scrollee */
+      #panel-resultados-generales > div{grid-template-columns:1fr !important}
+      #hemiciclo-map{height:340px !important}
+      .pg-card{max-height:calc(100vw - 2rem) !important}   /* modal del gate de mesas */
+    }
+    /* Custom select overlay (sólo se monta cuando se está en modo rotado) */
+    ._sel-overlay{position:fixed;inset:0;background:rgba(4,6,16,.92);z-index:99999;display:flex;align-items:center;justify-content:center;padding:1rem}
+    ._sel-panel{background:#0e1220;border:1px solid rgba(0,71,255,.35);max-width:420px;width:100%;max-height:80vh;display:flex;flex-direction:column;font-family:HelveticaNeue,Helvetica,Arial,sans-serif}
+    ._sel-title{padding:.9rem 1rem;font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:#0047FF;border-bottom:1px solid rgba(255,255,255,.08);font-family:HelveticaNeue,Helvetica,Arial,sans-serif}
+    ._sel-list{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1}
+    ._sel-opt{display:block;width:100%;text-align:left;background:transparent;color:#f4f3ef;border:none;border-bottom:1px solid rgba(255,255,255,.05);padding:.85rem 1rem;font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.95rem;cursor:pointer}
+    ._sel-opt:hover,._sel-opt:active{background:rgba(0,71,255,.12)}
+    ._sel-opt.sel{color:#0047FF;font-weight:700}
+    ._sel-close{padding:.8rem;background:rgba(255,255,255,.06);color:rgba(255,255,255,.7);border:none;font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;border-top:1px solid rgba(255,255,255,.08)}
+    body.day-mode ._sel-overlay{background:rgba(230,222,211,.94)}
+    body.day-mode ._sel-panel{background:#fff;border-color:rgba(0,71,255,.3)}
+    body.day-mode ._sel-opt{color:#1a1a2e;border-bottom-color:rgba(0,0,0,.06)}
+    body.day-mode ._sel-close{background:rgba(0,0,0,.05);color:rgba(0,0,0,.6);border-top-color:rgba(0,0,0,.08)}
+    /* ── propio de la consulta del Pacto ── */
+    .filt{display:flex;align-items:center;gap:.5rem}
+    .cand-nom{font-size:.82rem;color:rgba(255,255,255,.85)}
+    .results-table td .cand-elected{color:#39ff7a}
+    .nota-fuente{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.68rem;line-height:1.7;color:rgba(255,255,255,.35);margin-top:1.4rem;max-width:980px}
+    #units-body{max-height:560px;overflow-y:auto}
+    .mesa-scroll{overflow-x:auto}
+    .mesa-table{width:100%;border-collapse:collapse;font-size:.74rem;font-family:HelveticaNeue,Helvetica,Arial,sans-serif}
+    .mesa-table th{font-size:.55rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);text-align:right;padding:.5rem .55rem;border-bottom:1px solid var(--border);white-space:nowrap;font-weight:400}
+    .mesa-table th:first-child,.mesa-table td:first-child{text-align:left}
+    .mesa-table th .cdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:.3rem;vertical-align:middle}
+    .mesa-table td{text-align:right;padding:.45rem .55rem;border-bottom:1px solid rgba(255,255,255,.05);color:rgba(255,255,255,.75);white-space:nowrap}
+    .mesa-table td.w{font-weight:700;color:var(--white)}
+    .mesa-table td.esp{color:rgba(255,255,255,.45)}
+    .mesa-table td.tot{color:var(--white);font-weight:500}
+    .mesa-table tfoot td{border-top:1px solid rgba(255,255,255,.18);border-bottom:none;color:var(--white);font-weight:600}
+    .mesa-note{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.7rem;color:rgba(255,255,255,.42);margin-top:.7rem;line-height:1.6}
+    .mesa-note.warn{color:rgba(245,158,11,.9)}
+    .pg-paywall{position:relative}
+    .pg-blurred{filter:blur(5px);pointer-events:none;user-select:none;opacity:.7;max-height:340px;overflow:hidden}
+    .pg-paywall-cta{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.55rem;text-align:center;padding:1rem;background:linear-gradient(180deg,rgba(6,8,16,.28) 0%,rgba(6,8,16,.55) 45%,rgba(6,8,16,.9) 100%)}
+    .pg-paywall-cta .pgc-t{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.9rem;color:var(--white)}
+    .pg-paywall-cta .pgc-btn{font-family:HelveticaNeue,Helvetica,Arial,sans-serif;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;background:var(--blue);color:#fff;border:none;padding:.6rem 1.15rem;cursor:none}
+    .pg-paywall-cta .pgc-btn:hover{background:#0035cc}
+    .filt .dep-select{max-width:260px;text-overflow:ellipsis}
+    .results-grid{align-items:start}
   </style>
 </head>
 <body>
@@ -265,14 +370,7 @@
   <div class="bg-layer"></div>
   <div class="bg-overlay"></div>
   <div class="copy-toast" id="copy-toast"><a href="elige-plan.html" style="color:inherit;font-weight:700;text-decoration:underline">Regístrate</a> para copiar este contenido</div>
-  <div class="copy-toast" id="pro-toast" style="border-color:rgba(74,222,128,.4);color:rgba(180,255,200,.9)">Sólo disponible en plan Pro o superior · <a href="pricing.html" style="color:#4ade80">Ver planes →</a></div>
-  <div class="orient-overlay" id="orient-overlay">
-    <div class="orient-box">
-      <span class="orient-icon">📱↔</span>
-      <p class="orient-msg">Para una visualización adecuada,<br/>te pedimos usar el móvil<br/>en formato horizontal.</p>
-      <button class="orient-btn" onclick="dismissOrient()">Ok</button>
-    </div>
-  </div>
+  <div class="copy-toast" id="invite-toast" style="border-color:rgba(0,71,255,.4);color:rgba(180,210,255,.9);max-width:340px;line-height:1.7">¿Te gusta este nivel de detalle? <a href="elige-plan.html" style="color:#7ab3ff;font-weight:700;text-decoration:underline">Regístrate gratis</a> para más funciones</div>
   <div class="curtain" id="curtain">
     <div class="curtain-layer"></div><div class="curtain-layer"></div>
     <div class="curtain-layer"></div><div class="curtain-layer"></div>
@@ -282,1215 +380,486 @@
         <span class="curtain-line"><span class="curtain-word from-left white">Consultas</span></span>
         <span class="curtain-line"><span class="curtain-word from-right blue">Pacto 2025</span></span>
       </div>
-      <span class="curtain-sub">Consultas Pacto Histórico 2025 · Escrutinio</span>
+      <span class="curtain-sub">Senado y Cámara · Escrutinio</span>
     </div>
   </div>
 
   <div class="shell">
     <nav class="electoral-nav">
       <div style="display:flex;align-items:center;gap:1rem">
-        <a href="electoral.html" class="e-btn-back" onclick="navTo(event,'electoral.html')">← Volver</a>
+        <a href="electoral.html" class="e-btn-back" id="sn-back" onclick="navTo(event,'electoral.html')">← Volver</a>
         <div id="e-nav-auth" class="electoral-nav-auth"></div>
       </div>
-      <a href="electoral.html" class="logo-link" onclick="navTo(event,'electoral.html')">
-        <div class="logo-bars">
-          <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
-          <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+      <div style="display:flex;align-items:center;gap:1.2rem">
+        <div class="country-selector-wrap">
+          <button class="country-btn" id="countryBtn" onclick="toggleCountryDropdown()">
+            <span id="countryBtnLabel">Colombia</span>
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style="margin-left:6px;transition:transform .2s" id="countryChevron"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <div class="country-dropdown" id="countryDropdown">
+            <div class="country-option selected" data-value="co" onclick="selectCountry(this)"><span class="country-check">✓</span> Colombia</div>
+            <div class="country-option" data-value="us" onclick="selectCountry(this)"><span class="country-check">✓</span> United States / UK</div>
+            <div class="country-option" data-value="mx" onclick="selectCountry(this)"><span class="country-check">✓</span> México</div>
+            <div class="country-option" data-value="cn" onclick="selectCountry(this)"><span class="country-check">✓</span> 中国 / China</div>
+          </div>
         </div>
-        <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
-      </a>
+        <a href="electoral.html" class="logo-link" onclick="navTo(event,'electoral.html')">
+          <div class="logo-bars">
+            <div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div>
+            <div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div>
+          </div>
+          <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+        </a>
+      </div>
     </nav>
     <div class="top-bar">
-      <div class="page-title">Consultas Pacto Histórico<br/><span>Senado y Cámara 2025</span></div>
+      <div class="page-title" id="sn-title">Consultas Pacto Histórico<br/><span>Senado y Cámara 2025</span></div>
     </div>
-    <div class="breadcrumb">
+    <div class="breadcrumb" id="sn-breadcrumb">
       <a href="electoral.html" onclick="navTo(event,'electoral.html')">Resultados Electorales</a>
-      &nbsp;/&nbsp; Consultas Pacto Histórico · Senado y Cámara 2025
+      &nbsp;/&nbsp; Consultas internas del Pacto Histórico · 26 oct 2025
     </div>
     <div class="meta-bar">
-      <span class="meta-item">Elección: <b>Consultas internas · 26 Oct 2025</b></span>
-      <span class="meta-item"><span id="meta-votlbl">Total votos</span>: <b id="meta-votval">—</b></span>
-      <div class="source-badge">Fuente: <b>Registraduría · Escrutinio Definitivo</b></div>
-      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀ Modo día</button>
+      <span class="meta-item">Elección: <b>Consultas internas · 26 oct 2025</b></span>
+      <span class="meta-item">Senado: <b>144 candidatos</b></span>
+      <span class="meta-item">Cámara: <b>374 candidatos en 31 departamentos</b></span>
+      <div class="source-badge">Fuente: <b>Registraduría · Escrutinio</b></div>
     </div>
-
     <div class="content-area">
       <div id="load-state" class="loader-wrap">
         <div class="loader-ring"></div>
-        <div class="loader-label">Cargando escrutinio…</div>
+        <div class="loader-label" id="pc-loading">Cargando la consulta…</div>
       </div>
       <div id="main-content" class="hidden">
-        <div class="selector-row">
-          <div class="selector-block" style="flex:1.1">
-            <span class="sub-label">Consulta</span>
-            <div class="chips" id="cons-chips"></div>
+        <div class="sub-selector">
+          <div style="display:flex;align-items:center;gap:.5rem">
+            <span class="sub-label">Departamento:</span>
+            <select class="dep-select" id="dep-select" onchange="onSel('dep',this.value)">
+              <option value="">NACIONAL – TODOS</option>
+            </select>
           </div>
-          <div class="selector-block" style="flex:2.4">
-            <span class="sub-label">Candidato/a en el mapa</span>
-            <div class="chips" id="cand-chips"></div>
+          <div id="mun-filter-container" class="filt" style="display:none">
+            <span class="sub-label">Municipio:</span>
+            <select class="dep-select" id="mun-select" onchange="onSel('mun',this.value)"></select>
           </div>
+          <div id="com-filter-container" class="filt" style="display:none">
+            <span class="sub-label" id="com-label">Comuna:</span>
+            <select class="dep-select" id="com-select" onchange="onSel('com',this.value)"></select>
+          </div>
+          <div id="bar-filter-container" class="filt" style="display:none">
+            <span class="sub-label">Barrio:</span>
+            <select class="dep-select" id="bar-select" onchange="onSel('bar',this.value)"></select>
+          </div>
+          <div id="pue-filter-container" class="filt" style="display:none">
+            <span class="sub-label">Puesto:</span>
+            <select class="dep-select" id="pue-select" onchange="onSel('pue',this.value)"></select>
+          </div>
+          <div id="mesa-filter-container" class="filt" style="display:none">
+            <span class="sub-label">Mesa:</span>
+            <select class="dep-select" id="mesa-select" onchange="onSel('mesa',this.value)"></select>
+          </div>
+          <span class="sub-label" style="margin-left:1rem">Buscar candidato:</span>
+          <input id="cand-search" type="search" class="search-input" placeholder="Nombre o apellido…"
+            oninput="STATE.q=this.value;renderCands()" />
         </div>
-
         <div class="kpi-row" id="kpi-row"></div>
-
-        <div class="results-grid" id="cons-main-grid">
+        <div class="circ-toggle" id="circ-toggle">
+          <button class="circ-btn" id="circ-btn-senado" onclick="setClave('senado')">Consulta Senado</button>
+          <button class="circ-btn" id="circ-btn-camara" onclick="setClave('camara')">Consulta Cámara</button>
+        </div>
+        <div class="results-grid">
           <div class="card">
-            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem;flex-wrap:wrap">
-              <div class="card-label" style="margin-bottom:0" id="map-label">Mapa nacional</div>
-              <span class="level-badge nac" id="level-badge">Nacional</span>
-              <!-- Oculto: la exportación nunca se implementó (downloadExcelCurrentView solo
-                   hace console.log) y el botón cobraba Pro por algo que no existe. Quitar
-                   «hidden» cuando haya export real (modelo: senado-2022.html). -->
-              <button id="excel-download-btn" class="excel-btn excel-btn-locked" onclick="downloadExcelCurrentView()" hidden>⬇ Descarga Excel</button>
+            <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
+              <div class="card-label" style="margin-bottom:0" id="lbl-tabla">Candidatos</div>
+              <span class="level-badge dep" id="drill-badge">Nacional</span>
             </div>
             <div class="drill-nav" id="drill-nav"></div>
-            <div class="map-wrap">
-              <div id="cons-map"></div>
-              <button id="cons-map-back" class="map-back-btn" style="display:none" onclick="mapBack()">← Volver</button>
-              <div class="map-hint" id="map-hint">Click en un departamento para entrar</div>
-            </div>
+            <div id="cands-aviso"></div>
+            <table class="results-table">
+              <thead id="cands-thead"></thead>
+              <tbody id="cands-tbody"></tbody>
+            </table>
+            <div id="cands-mas"></div>
           </div>
           <div class="card">
-            <div class="card-label" id="rank-label">Top candidatos · Nacional</div>
-            <table class="results-table">
-              <thead>
-                <tr><th>#</th><th>Candidato/a</th><th class="r">Votos</th><th class="r" style="min-width:90px">%</th></tr>
-              </thead>
-              <tbody id="tbody-rank"></tbody>
-            </table>
+            <div class="card-label">Distribución de votos</div>
             <div class="donut-wrap">
               <div class="donut-cw">
-                <canvas id="donut-cons"></canvas>
+                <canvas id="donut-cands"></canvas>
                 <div class="donut-center">
-                  <div class="donut-pct" id="pct-cons">—</div>
-                  <div class="donut-sub" id="sub-cons">consulta</div>
+                  <div class="donut-pct" id="donut-pct">—</div>
+                  <div class="donut-sub" id="donut-sub">puntero</div>
                 </div>
               </div>
-              <div class="donut-legend" id="leg-cons"></div>
+              <div class="donut-legend" id="donut-legend"></div>
             </div>
+            <div class="umbral-bar" id="esp-bar"></div>
           </div>
         </div>
-
-        <div class="card terr-card hidden" id="terr-card">
-          <div class="terr-head">
-            <div class="card-label" id="terr-label">Puestos de votación</div>
-            <span class="terr-sub" id="terr-sub"></span>
+        <div class="card" id="units-card" style="margin-top:1.2rem">
+          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.8rem;flex-wrap:wrap">
+            <div class="card-label" style="margin-bottom:0" id="lbl-units">Por departamento</div>
           </div>
-          <div id="terr-body"></div>
+          <div id="units-body"></div>
         </div>
+        <div class="nota-fuente" id="nota-fuente"></div>
       </div>
     </div>
+    <div class="full-footer">
+      <span class="footer-brand">ricardoruiz.co · Consultas Pacto Histórico 2025</span>
+      <span class="footer-brand"><a href="https://www.registraduria.gov.co" target="_blank" rel="noopener">Fuente: Registraduría Nacional del Estado Civil</a></span>
+    </div>
   </div>
-
-  <div class="full-footer">
-    <span class="footer-brand">ricardoruiz.co · Consultas Pacto Histórico 2025</span>
-    <span class="footer-brand"><a href="https://registraduria.gov.co" target="_blank">Fuente: Registraduría Nacional</a></span>
-  </div>
-
-  <script src="plan-gate.js"></script>
   <script>
-    // ─── CONFIG ───────────────────────────────────────────────────
-    const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
-    const DEPTO_GEOJSON   = `${S3}/mapas-2026/DEPARTAMENTOS2.json`;
-    const DEPTOS_MPS_URL  = `${S3}/mapas-2026/Departamentos-mps/`;
-    const BOGOTA_LOC_URL  = `${S3}/mapas-2026/Ciudades-COM-LOC/BOG-LOCALIDADX.json`;
-    const MEDELLIN_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/MEDELLINX.json`;
-    const CALI_COM_URL     = `${S3}/mapas-2026/Ciudades-COM-LOC/CALIX.json`;
-    const BARRANQUILLA_COM_URL = `${S3}/mapas-2026/Ciudades-COM-LOC/BARRANQUILLAX.json`;
-    const IBAGUE_COM_URL       = `${S3}/mapas-2026/Ciudades-COM-LOC/IBAGUEX.json`;
-    const MANIZALES_COM_URL    = `${S3}/mapas-2026/Ciudades-COM-LOC/MANIZALESX.json`;
-    const PEREIRA_COM_URL      = `${S3}/mapas-2026/Ciudades-COM-LOC/PEREIRAX.json`;
-    // Tabla zona electoral → comuna/localidad política (derivada de PUESTOS_GEOREF).
-    // Los datos vienen por zona y los polígonos son de comuna; en varias ciudades
-    // NO es 1:1 (Medellín: 32 zonas → 16 comunas), así que un join por número
-    // atribuye los votos a la comuna equivocada.
-    const ZONA_COMUNA_URL = `${S3}/mapas-2026/zona-comuna.json`;
+    // ─── CONSULTAS DEL PACTO HISTÓRICO · 26 oct 2025 ─────────────
+    // Misma lógica de Senado 2026: filtros en cascada (departamento → municipio →
+    // comuna/localidad → barrio → puesto → mesa) y debajo la lista, que aquí son
+    // candidatos y no partidos. En Cámara cada departamento tiene sus propios
+    // candidatos. Datos: pres-escr/pacto2025/ (build.py pacto2025) + geo/{dd}.json
+    // (comuna y barrio de cada puesto, build_geo_pacto.py).
+    const S3    = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output';
+    const LOCAL = new URLSearchParams(location.search).has('local');
+    const DATA  = LOCAL ? encodeURI('Bases de datos/output_presidencial_escr/pacto2025') : `${S3}/pres-escr/pacto2025`;
+    const NIVELES = ['dep','mun','com','bar','pue','mesa'];
+    const TOP = 30;   // filas visibles antes de «ver todos»
+    const PALETA = ['#0047FF','#c0392b','#e0803a','#3d8b3d','#7c3aed','#06b6d4','#d9db24','#0d9488','#C8102E','#F7941D','#0067B1','#a855f7'];
 
-    // Carpeta de datos de ESTA página (build_html.py la cambia por año/consulta).
-    // ?local=1 lee los JSON del repo en vez de S3 (verificación antes de subir).
-    const DATA_DIR  = 'pres-escr/pacto2025';
-    const LOCAL_DIR = 'Bases de datos/output_presidencial_escr/pacto2025';
-    const DATA_V    = '';
-    const LOCAL     = new URLSearchParams(location.search).has('local');
-    const DATA      = LOCAL ? encodeURI(LOCAL_DIR) : `${S3}/${DATA_DIR}`;
-
-    // ─── GATE POR PLAN ────────────────────────────────────────────
-    // Hasta puesto, abierto a todos (también al anónimo). Mesa a mesa: cuenta gratis.
-    window.GATE_FEATURES = {
-      plan: { 'mesas':'free' },
-      copy: { 'mesas': { title:'Mesa a mesa',
-        desc:'El detalle de cada mesa —votos por candidato, blanco, nulos y no marcados— es gratis con tu cuenta. Crea una y lo ves en todas las elecciones del visor.' } },
-    };
-
-    // ─── HELPERS ──────────────────────────────────────────────────
-    const fmt = n => Number(n||0).toLocaleString('es-CO');
-    const pct = (n,t) => t ? ((n/t)*100).toFixed(2) : '0.00';
-    const _normC = c => String(Number(c));
-    const _normN = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
-    const _to2   = v => v!=null && v!=='' ? String(parseInt(v,10)||0).padStart(2,'0') : '';
-    // ⚠ \b\w no conoce las tildes: «CALDERÓN» salía «CalderóN». Se capitaliza al inicio de cada palabra.
-    const titleCase = s => String(s||'').toLowerCase().replace(/(^|[\s\-(«"])(\p{L})/gu,(m,a,c)=>a+c.toUpperCase()).replace(/\bD\.c\./g,'D.C.');
-    function shortLast(nombre){
-      // Toma las últimas 2 palabras del nombre completo: "Roy Leonardo Barreras Montealegre" → "Barreras Montealegre"
-      const parts = String(nombre||'').trim().split(/\s+/);
-      if(parts.length<=2) return titleCase(nombre);
-      // las partículas van con el apellido: «Abelardo De La Espriella» → «De La Espriella», no «La Espriella»
-      const PART = /^(de|del|la|las|los|y)$/i;
-      let i = parts.length - 2;
-      if(PART.test(parts[i])) while(i > 1 && PART.test(parts[i-1])) i--;
-      return titleCase(parts.slice(i).join(' '));
-    }
-    function lighten(hex, pct){ // pct 0..1
-      const h = hex.replace('#',''); const n = parseInt(h,16);
-      let r=(n>>16)&255, g=(n>>8)&255, b=n&255;
-      r=Math.round(r+(255-r)*pct); g=Math.round(g+(255-g)*pct); b=Math.round(b+(255-b)*pct);
-      return `rgb(${r},${g},${b})`;
-    }
-    function withAlpha(hex, a){
-      const h = hex.replace('#',''); const n = parseInt(h,16);
-      return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
-    }
-
-    // ─── CONSULTA + CANDIDATO COLORS ─────────────────────────────
-    // Color del chip principal de cada consulta (visual del filtro).
-    const CONS_COLOR = {
-      'senado': '#6B2D8B',
-      'camara': '#c0392b',
-    };
-    const CONS_SHORT = {
-      'senado': 'Consulta Senado',
-      'camara': 'Consulta Cámara',
-    };
-    // Color por candidato, derivado de su código dentro de la consulta.
-    // El ganador (rank 1) hereda el color principal; los demás vienen de una paleta.
-    // Los colores siguen el orden de votacion de cada vuelta. NO son fijos por
-    // persona: un mismo candidato puede tener otro color entre 1V y 2V si cambio
-    // de posicion. La leyenda y el mapa siempre leen del mismo sitio, asi que
-    // dentro de una vuelta son consistentes.
-    const CONS_PALETTE = {
-      'senado': ['#6B2D8B', '#c0392b', '#e0803a', '#0047FF', '#3d8b3d', '#7c3aed', '#06b6d4', '#d9db24', '#0d9488', '#C8102E', '#F7941D', '#0067B1'],
-      'camara': ['#c0392b', '#6B2D8B', '#e0803a', '#0047FF', '#3d8b3d', '#7c3aed', '#06b6d4', '#d9db24', '#0d9488', '#C8102E', '#F7941D', '#0067B1'],
-    };
-    // candKey: `${consulta}__${codigo}` → color
-    let CAND_COLOR = {};
-    function buildCandColors(){
-      Object.entries(STATE.consultas).forEach(([clave, c])=>{
-        const pal = CONS_PALETTE[clave] || ['#0047FF','#666'];
-        // sort cands by votos (desc) and assign palette in order
-        const sorted = [...c.candidatos].sort((a,b)=>b.votos-a.votos);
-        sorted.forEach((cand, i)=>{
-          CAND_COLOR[`${clave}__${cand.codigo||cand.nombre}`] = pal[i % pal.length];
-          CAND_COLOR[`${clave}__N::${_normN(cand.nombre)}`] = pal[i % pal.length];
-        });
-      });
-    }
-    function candColor(clave, codigoOrNombre){
-      const k1 = `${clave}__${codigoOrNombre}`;
-      if(CAND_COLOR[k1]) return CAND_COLOR[k1];
-      const k2 = `${clave}__N::${_normN(codigoOrNombre)}`;
-      return CAND_COLOR[k2] || '#777';
-    }
-
-    // ─── STATE ────────────────────────────────────────────────────
     const STATE = {
-      resumen: null,           // resumen.json raw
-      deps: null,              // deps.json raw
-      depData: {},             // depCod → dep-{cod}.json
-      consultas: {},           // clave → {clave,nombre,votos,candidatos:[{nombre,codigo,votos}]}
-      activeCons: 'senado',
-      activeCand: null,        // codigo (string) o null = "Ganador"
-      level: 'nac',            // nac | dep | mun | com | pue
-      depCod: null,
-      munCod: null,
-      zonCod: null,
-      pueCod: null,
-      // map state
-      map: null,
-      currentLayer: null,
-      _deptoGeoRaw: null,
-      _depGeoCache: {},
-      _cityGeoCache: {},
+      clave: 'senado', resumen: null, deps: [], dep: {}, geo: {}, mesas: {},
+      sel: { dep:'', mun:'', com:'', bar:'', pue:'', mesa:'' },
+      q: '', todos: false, colores: {},
     };
 
-    // ─── DATA LOADING ─────────────────────────────────────────────
-    const _fetchCache = {};
-    async function getJSON(path){
-      if(_fetchCache[path]) return _fetchCache[path];
-      const r = await fetch(`${DATA}/${path}.json${DATA_V}`);
-      if(!r.ok) throw new Error(`No se pudo cargar ${path}.json (HTTP ${r.status})`);
-      _fetchCache[path] = await r.json();
-      return _fetchCache[path];
+    // ─── utilidades ───────────────────────────────────────────────
+    const fmt = n => (n||0).toLocaleString('es-CO');
+    const pct = (a,b) => b ? (a/b*100) : 0;
+    const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const _norm = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    const MENORES = new Set(['de','del','la','las','los','el','y','e','en','por','a']);
+    function tc(s){
+      return String(s||'').toLowerCase().split(/(\s+|-|\/|\()/).map((w,i)=>{
+        if(!w.trim() || /^[\s\-\/(]$/.test(w)) return w;
+        if(i>0 && MENORES.has(w)) return w;
+        if(/^(i{1,3}|iv|v|vi{0,3}|ix|x)$/.test(w)) return w.toUpperCase();
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      }).join('').replace(/\bD\.c\./i,'D.C.')
+        .replace(/^Bogota\.? D\.C\.$/,'Bogotá D.C.')
+        .replace(/\b(Sede|Bloque|Torre) ([a-z])\b/g,(m,a,b)=>`${a} ${b.toUpperCase()}`);
     }
-    async function getDepData(depCod){
-      if(STATE.depData[depCod]) return STATE.depData[depCod];
-      const code = _to2(depCod);
-      const r = await fetch(`${DATA}/dep-${code}.json${DATA_V}`);
-      if(!r.ok) throw new Error(`No se pudo cargar dep-${code}.json (HTTP ${r.status})`);
-      STATE.depData[depCod] = await r.json();
-      return STATE.depData[depCod];
+    async function getJSON(ruta){
+      const r = await fetch(`${DATA}/${ruta}`);
+      if(r.status===404 || r.status===403) return null;
+      if(!r.ok) throw new Error(`HTTP ${r.status} en ${ruta}`);
+      return r.json();
     }
-    // Mesa a mesa: mesas/{clave}-{dep}.json, pedido solo al abrir un puesto (patrón de
-    // Senado, departamentos/{cod}/mesas.json) para no engordar dep-{cod}.json.
-    // 404/403 = todavía no publicado → null (la página sigue funcionando).
-    const _mesasCache = {};
-    function getMesas(clave, depCod){
-      const k = `${clave}-${_to2(depCod)}`;
-      if(!_mesasCache[k]){
-        _mesasCache[k] = fetch(`${DATA}/mesas/${k}.json${DATA_V}`)
-          .then(r=>{ if(r.status===404||r.status===403) return null; if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-          .catch(e=>{ delete _mesasCache[k]; throw e; });
+    async function cargaDep(dd){
+      if(!STATE.dep[dd]){
+        const [d, g] = await Promise.all([getJSON(`dep-${dd}.json`), getJSON(`geo/${dd}.json`).catch(()=>null)]);
+        STATE.dep[dd] = d; STATE.geo[dd] = g || {};
       }
-      return _mesasCache[k];
+      return STATE.dep[dd];
+    }
+    function cargaMesas(dd){
+      const k = `${STATE.clave}-${dd}`;
+      if(!STATE.mesas[k]) STATE.mesas[k] = getJSON(`mesas/${k}.json`).catch(e=>{ delete STATE.mesas[k]; throw e; });
+      return STATE.mesas[k];
     }
 
-    // ─── INIT ─────────────────────────────────────────────────────
-    async function init(){
-      try{
-        const [resumen, deps] = await Promise.all([getJSON('resumen'), getJSON('deps')]);
-        STATE.resumen = resumen;
-        STATE.deps = deps;
-        // index resumen.consultas[] by clave for quick lookups
-        resumen.consultas.forEach(c => { STATE.consultas[c.clave] = c; });
-        // ?c=<clave> abre directo en esa consulta (las tarjetas de electoral.html lo usan)
-        const _c = new URLSearchParams(location.search).get('c');
-        if(_c && STATE.consultas[_c]) STATE.activeCons = _c;
-        if(!STATE.consultas[STATE.activeCons]) STATE.activeCons = resumen.consultas[0].clave;
-        buildCandColors();
-        renderMetaTotal();
-        document.getElementById('load-state').classList.add('hidden');
-        document.getElementById('main-content').classList.remove('hidden');
-        renderConsChips();
-        renderCandChips();
-        renderAll();
-        initMap();
-        PlanGate.onChange(()=>{ updateElectoralNav(); if(STATE.level==='pue') renderTerr(); });
-        PlanGate.init();
-        // Best-effort: si no llega, el mapa de comunas cae al join por número.
-        fetch(ZONA_COMUNA_URL)
-          .then(r=>r.ok?r.json():null)
-          .then(j=>{ if(j&&j.muns){ STATE.zonaComuna=j; if(STATE.level==='mun'||STATE.level==='com') renderMap(getScope()); } })
-          .catch(()=>{});
-      }catch(e){
-        console.error('[Consultas] init error:', e);
-        document.getElementById('load-state').innerHTML =
-          `<div style="font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.7rem;color:rgba(255,100,100,.8);text-align:center;line-height:1.8">Error al cargar datos.<br/><span style="color:rgba(255,255,255,.3);font-size:.6rem">${e.message}</span></div>`;
-      }
+    // ─── territorio: comuna y barrio salen del censo de puestos ───
+    function zonaSinGeo(zz){
+      return ({ '00':'Cabecera municipal', '99':'Zona rural', '90':'Puesto censo', '98':'Cárceles' })[zz] || `Zona ${Number(zz)}`;
     }
-
-    // ─── CHIP RENDERS ─────────────────────────────────────────────
-    function renderConsChips(){
-      const el = document.getElementById('cons-chips');
-      el.innerHTML = STATE.resumen.consultas.map(c=>{
-        const col = CONS_COLOR[c.clave] || '#555';
-        const isActive = c.clave===STATE.activeCons;
-        return `<button class="chip ${isActive?'active':''}" style="--cons-color:${col};--dot:${col}" data-cons="${c.clave}" onclick="setConsulta('${c.clave}')">
-          <span class="chip-dot"></span>${CONS_SHORT[c.clave]||c.nombre}
-          <span class="chip-sub">${fmt(c.votos)}</span>
-        </button>`;
-      }).join('');
-    }
-    // Con muchos candidatos (las consultas del Pacto 2025 tienen 144 y 374) un botón por
-    // candidato dejaba una lista de 14.000 px: se muestran los 12 primeros del territorio
-    // que se está viendo, un buscador y «ver todos». El candidato elegido siempre queda a la vista.
-    const CHIPS_MAX = 12;
-    let _chipsTodos = false, _chipsFiltro = '';
-    function renderCandChips(){
-      const c = STATE.consultas[STATE.activeCons];
-      const box = document.getElementById('cand-chips');
-      if(!c){ box.innerHTML=''; return; }
-      const winnerCol = CONS_COLOR[STATE.activeCons]||'#555';
-      // orden del territorio activo (en un depto: sus candidatos); si no hay alcance, el nacional
-      const scope = (STATE.resumen && STATE.deps) ? getScope() : null;
-      let cands = scope ? scope.consulta.cands.filter(x=>x.votos>0) : [...c.candidatos];
-      cands = cands.map(x=>({...x, codigo: x.codigo || codigoFor(STATE.activeCons, x.nombre)})).sort((a,b)=>b.votos-a.votos);
-      const muchos = cands.length > CHIPS_MAX;
-      const q = _normN(_chipsFiltro||'');
-      let vis = cands;
-      if(q) vis = cands.filter(x=>_normN(x.nombre).includes(q));
-      else if(muchos && !_chipsTodos){
-        vis = cands.slice(0, CHIPS_MAX);
-        const act = cands.find(x=>x.codigo===STATE.activeCand);
-        if(act && !vis.includes(act)) vis = [...vis, act];
-      }
-      const chips = [];
-      // chip "Ganador" (vista por defecto: cada territorio se pinta con el color del candidato que ganó allí)
-      chips.push(`<button class="chip cand-chip ${STATE.activeCand===null?'active':''}" style="--cand-color:${winnerCol};--dot:${winnerCol}" onclick="setCandidato(null)">
-        <span class="chip-dot"></span>Ganador por territorio
-      </button>`);
-      vis.forEach(cand=>{
-        const col = candColor(STATE.activeCons, cand.codigo);
-        const isAct = STATE.activeCand===cand.codigo;
-        chips.push(`<button class="chip cand-chip ${isAct?'active':''}" style="--cand-color:${col};--dot:${col}" onclick="setCandidato('${cand.codigo}')" title="${cand.nombre}">
-          <span class="chip-dot"></span>${shortLast(cand.nombre)}
-          <span class="chip-sub">${fmt(cand.votos)}</span>
-        </button>`);
-      });
-      let extra = '';
-      if(muchos){
-        extra = `<div class="chips-tools" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.4rem">
-          <input id="chips-q" type="search" placeholder="Buscar entre ${fmt(cands.length)} candidatos…" value="${(_chipsFiltro||'').replace(/"/g,'&quot;')}"
-            style="font:inherit;font-size:.72rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);color:inherit;padding:.45rem .7rem;min-width:220px">
-          ${q ? '' : `<button class="chip cand-chip" onclick="_chipsTodos=!_chipsTodos;renderCandChips()">${_chipsTodos ? 'Ver solo los primeros' : `Ver todos (${fmt(cands.length)})`}</button>`}
-          ${q && !vis.length ? '<span style="font-size:.72rem;opacity:.6">Sin coincidencias en este territorio</span>' : ''}
-        </div>`;
-      }
-      box.innerHTML = chips.join('') + extra;
-      const inp = document.getElementById('chips-q');
-      if(inp){
-        inp.oninput = e => { _chipsFiltro = e.target.value; const pos = e.target.selectionStart; renderCandChips();
-          const n = document.getElementById('chips-q'); if(n){ n.focus(); n.setSelectionRange(pos,pos); } };
-      }
-    }
-
-    // Total del encabezado: el de la consulta/vuelta ACTIVA, nunca la suma de todas.
-    // En las presidenciales sumar 1V + 2V contaba dos veces al mismo electorado (y en
-    // el Pacto 2025 Senado y Cámara se votaron el mismo día, en tarjetones aparte).
-    // El total de cada consulta sigue a la vista en su chip.
-    function renderMetaTotal(){
-      const c = STATE.consultas[STATE.activeCons];
-      document.getElementById('meta-votlbl').textContent =
-        c ? `Total votos · ${CONS_SHORT[c.clave]||c.nombre}` : 'Total votos';
-      document.getElementById('meta-votval').textContent = c ? fmt(c.votos||0) : '—';
-    }
-
-    // ─── SETTERS ──────────────────────────────────────────────────
-    function setConsulta(clave){
-      if(clave===STATE.activeCons) return;
-      STATE.activeCons = clave;
-      STATE.activeCand = null; // reset candidato cuando cambia la consulta
-      renderMetaTotal();
-      renderConsChips();
-      renderCandChips();
-      renderAll();
-    }
-    function setCandidato(codigo){
-      if(codigo===STATE.activeCand) return;
-      STATE.activeCand = codigo;
-      renderCandChips();
-      renderAll();
-    }
-
-    // ─── SCOPE-AWARE DATA ─────────────────────────────────────────
-    // Retorna { nombre, consulta:{votos,cands[]}, children:[{cod,nombre,consulta:{votos,cands}}] }
-    // donde `consulta` es el bucket activo, y `children` son los territorios siguientes (deptos, muns, zonas).
-    function getScope(lvl){
-      lvl = lvl || STATE.level;
-      const clave = STATE.activeCons;
-      // Nivel nacional
-      if(lvl==='nac'){
-        const c = STATE.consultas[clave];
-        const children = (STATE.deps||[]).map(d => ({
-          cod: d.cod, nombre: titleCase(d.nombre),
-          consulta: d[clave] || {votos:0, candidatos:[]}
-        }));
-        return {
-          nombre: 'Nacional',
-          consulta: { votos: c.votos, cands: c.candidatos.map(x=>({nombre:x.nombre,codigo:x.codigo,votos:x.votos})) },
-          children,
-        };
-      }
-      const dep = STATE.depData[STATE.depCod];
-      if(!dep) return null;
-      // Nivel depto
-      if(lvl==='dep'){
-        const b = dep[clave]||{votos:0,cands:[]};
-        const children = (dep.municipios||[]).map(m=>({
-          cod: m.cod, nombre: titleCase(m.nombre),
-          consulta: m[clave] || {votos:0, cands:[]}
-        }));
-        return {
-          nombre: titleCase(dep.nombre),
-          consulta: { votos: b.votos, cands: b.cands.map(x=>({nombre:x.nombre,codigo:codigoFor(clave, x.nombre),votos:x.votos})) },
-          children,
-        };
-      }
-      const mun = (dep.municipios||[]).find(m=>m.cod===STATE.munCod);
-      if(!mun) return null;
-      // Nivel municipio
-      if(lvl==='mun'){
-        const b = mun[clave]||{votos:0,cands:[]};
-        const children = (mun.zonas||[]).map(z=>({
-          cod: z.cod, nombre: titleCase(z.nombre),
-          consulta: z[clave] || {votos:0, cands:[]}
-        }));
-        return {
-          nombre: titleCase(mun.nombre),
-          consulta: { votos: b.votos, cands: b.cands.map(x=>({nombre:x.nombre,codigo:codigoFor(clave, x.nombre),votos:x.votos})) },
-          children,
-        };
-      }
-      // Nivel zona/comuna/localidad
-      const zon = (mun.zonas||[]).find(z=>z.cod===STATE.zonCod);
-      if(!zon) return null;
-      // Nivel puesto
-      const unidad = lvl==='pue' ? (zon.puestos||[]).find(p=>p.cod===STATE.pueCod) : zon;
-      if(!unidad) return null;
-      const b = unidad[clave]||{votos:0,cands:[]};
-      return {
-        nombre: titleCase(unidad.nombre),
-        consulta: { votos: b.votos, cands: b.cands.map(x=>({nombre:x.nombre,codigo:codigoFor(clave, x.nombre),votos:x.votos})) },
-        children: [],
-      };
-    }
-
-    // Lookup helper: `dep-{cod}` no incluye `codigo` en sus cands, así que matchea por nombre normalizado contra resumen.
-    const _codByNameByCons = {};
-    function codigoFor(clave, nombre){
-      if(!_codByNameByCons[clave]){
-        _codByNameByCons[clave] = {};
-        (STATE.consultas[clave]?.candidatos||[]).forEach(c=>{
-          _codByNameByCons[clave][_normN(c.nombre)] = c.codigo;
-        });
-      }
-      return _codByNameByCons[clave][_normN(nombre)] || null;
-    }
-
-    // ─── RENDER ALL ───────────────────────────────────────────────
-    function renderAll(){
-      const scope = getScope();
-      if(!scope){ console.warn('No scope'); return; }
-      renderDrillNav();
-      renderLevelBadge();
-      renderCandChips();          // el orden y la lista dependen del territorio
-      renderMapLabels(scope);
-      renderKPIs(scope);
-      renderRankTable(scope);
-      renderDonut(scope);
-      renderMap(scope);
-      renderTerr();
-    }
-
-    function renderDrillNav(){
-      const nav = document.getElementById('drill-nav');
-      const items = [];
-      items.push({label:'Nacional', click:'mapBackTo(\'nac\')', active:STATE.level==='nac'});
-      if(STATE.depCod){
-        const dep = STATE.depData[STATE.depCod] || STATE.deps.find(d=>d.cod===STATE.depCod);
-        items.push({label:titleCase(dep?.nombre||STATE.depCod), click:'mapBackTo(\'dep\')', active:STATE.level==='dep'});
-      }
-      if(STATE.munCod){
-        const dep = STATE.depData[STATE.depCod];
-        const mun = dep?.municipios?.find(m=>m.cod===STATE.munCod);
-        items.push({label:titleCase(mun?.nombre||STATE.munCod), click:'mapBackTo(\'mun\')', active:STATE.level==='mun'});
-      }
-      if(STATE.zonCod){
-        const dep = STATE.depData[STATE.depCod];
-        const mun = dep?.municipios?.find(m=>m.cod===STATE.munCod);
-        const zon = mun?.zonas?.find(z=>z.cod===STATE.zonCod);
-        items.push({label:titleCase(zon?.nombre||STATE.zonCod), click:'mapBackTo(\'com\')', active:STATE.level==='com'});
-        if(STATE.pueCod){
-          const pue = zon?.puestos?.find(p=>p.cod===STATE.pueCod);
-          items.push({label:titleCase(pue?.nombre||STATE.pueCod), click:'', active:true});
-        }
-      }
-      nav.innerHTML = items.map((it,i)=>{
-        const cls = it.active ? 'drill-crumb active' : (it.click?'drill-crumb clickable':'drill-crumb');
-        const handler = it.click && !it.active ? `onclick="${it.click}"` : '';
-        const sep = i<items.length-1?'<span class="drill-sep">›</span>':'';
-        return `<span class="${cls}" ${handler}>${it.label}</span>${sep}`;
-      }).join('');
-    }
-
-    function renderLevelBadge(){
-      const badge = document.getElementById('level-badge');
-      const map = {nac:['Nacional','nac'], dep:['Departamento','dep'], mun:['Municipio','mun'], com:['Zona','com'], pue:['Puesto','pue']};
-      const [label, cls] = map[STATE.level]||['—','nac'];
-      badge.textContent = label;
-      badge.className = 'level-badge '+cls;
-    }
-
-    function renderMapLabels(scope){
-      const consNom = CONS_SHORT[STATE.activeCons]||STATE.activeCons;
-      document.getElementById('map-label').textContent = `${consNom} · ${scope.nombre}`;
-      const candLabel = STATE.activeCand ?
-        ` · ${shortLast(findCandName(STATE.activeCons, STATE.activeCand))}` : ' · Ganador por territorio';
-      document.getElementById('rank-label').textContent = `Candidatos en ${scope.nombre}`;
-      // map hint changes by level
-      const hint = document.getElementById('map-hint');
-      if(STATE.level==='nac') hint.textContent = 'Click en un departamento para entrar';
-      else if(STATE.level==='dep') hint.textContent = 'Click en un municipio para entrar';
-      else if(STATE.level==='mun') hint.textContent = 'Zonas y puestos: debajo del mapa';
-      else hint.textContent = '';
-    }
-    function findCandName(clave, codigo){
-      const c = STATE.consultas[clave];
-      if(!c) return '';
-      const f = c.candidatos.find(x=>x.codigo===codigo);
-      return f?.nombre || '';
-    }
-
-    // ─── KPIs ─────────────────────────────────────────────────────
-    function renderKPIs(scope){
-      const cons = scope.consulta;
-      const sorted = [...cons.cands].sort((a,b)=>b.votos-a.votos);
-      const winner = sorted[0];
-      const second = sorted[1];
-      const margen = (winner && second) ? winner.votos - second.votos : 0;
-      const candFiltro = STATE.activeCand ? cons.cands.find(c=>c.codigo===STATE.activeCand) : null;
-
-      let card4;
-      if(candFiltro){
-        card4 = `<div class="kpi-card"><div class="kpi-label">${shortLast(candFiltro.nombre)}</div><div class="kpi-val sm" style="color:${candColor(STATE.activeCons,STATE.activeCand)}">${fmt(candFiltro.votos)}</div><div class="kpi-delta">${pct(candFiltro.votos, cons.votos)}% de la consulta</div></div>`;
-      } else {
-        card4 = `<div class="kpi-card"><div class="kpi-label">Margen 1° – 2°</div><div class="kpi-val sm gr">${fmt(margen)}</div><div class="kpi-delta">${pct(margen, cons.votos)} pp</div></div>`;
-      }
-      document.getElementById('kpi-row').innerHTML = `
-        <div class="kpi-card"><div class="kpi-label">Votos en la consulta</div><div class="kpi-val wh">${fmt(cons.votos)}</div><div class="kpi-delta">${scope.nombre}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Candidatos/as</div><div class="kpi-val">${cons.cands.length}</div><div class="kpi-delta">con votación</div></div>
-        <div class="kpi-card"><div class="kpi-label">Puntero</div><div class="kpi-val sm" style="color:${winner?candColor(STATE.activeCons, winner.codigo||winner.nombre):'#fff'}">${winner?shortLast(winner.nombre):'—'}</div><div class="kpi-delta">${winner?fmt(winner.votos)+' votos · '+pct(winner.votos,cons.votos)+'%':''}</div></div>
-        ${card4}`;
-    }
-
-    // ─── RANK TABLE ───────────────────────────────────────────────
-    function renderRankTable(scope){
-      const cons = scope.consulta;
-      const sorted = [...cons.cands].sort((a,b)=>b.votos-a.votos);
-      const tbody = document.getElementById('tbody-rank');
-      if(!sorted.length){
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:rgba(255,255,255,.3);padding:1.5rem">Sin votación en este territorio</td></tr>`;
-        return;
-      }
-      const maxV = sorted[0].votos||1;
-      tbody.innerHTML = sorted.map((c,i)=>{
-        const col = candColor(STATE.activeCons, c.codigo||c.nombre);
-        const isActiveCand = STATE.activeCand && c.codigo===STATE.activeCand;
-        const isWinner = i===0;
-        const pctV = pct(c.votos, cons.votos);
-        const bw = ((c.votos/maxV)*100).toFixed(1);
-        const trClass = isWinner ? `winner-row" style="--w-color:${col}"` : (isActiveCand?'class="active"':'class=""');
-        const trAttr = isWinner ? `class="${trClass}"` : trClass;
-        return `<tr ${trAttr} onclick="setCandidato('${c.codigo||''}')">
-          <td style="color:rgba(255,255,255,.35);width:1.8rem">${i+1}</td>
-          <td><div style="display:flex;align-items:center;gap:.5rem"><span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0"></span><span style="font-weight:500">${shortLast(c.nombre)}</span></div></td>
-          <td class="r" style="font-weight:500">${fmt(c.votos)}</td>
-          <td class="r"><span class="pct-val">${pctV}%</span><div class="bar-wrap"><div class="bar-fill" style="width:0;background:${col}" data-w="${bw}"></div></div></td>
-        </tr>`;
-      }).join('') + filaBlanco(cons, sorted);
-      setTimeout(()=>tbody.querySelectorAll('.bar-fill[data-w]').forEach(b=>b.style.width=b.dataset.w+'%'),60);
-    }
-    /* Los % van sobre los votos válidos, que en la presidencial incluyen el
-       blanco (votos = candidatos + blanco en resumen/dep-NN.json). Sin esta
-       fila el ganador sale con 49,66 % y los candidatos no suman 100. En las
-       consultas no hay blanco (votos = suma de candidatos) y no aparece. */
-    function filaBlanco(cons, sorted){
-      const blanco = (cons.votos||0) - sorted.reduce((t,c)=>t+(c.votos||0),0);
-      if(blanco<=0) return '';
-      return `<tr style="cursor:default">
-          <td></td>
-          <td style="color:rgba(255,255,255,.5)">Voto en blanco</td>
-          <td class="r" style="color:rgba(255,255,255,.5)">${fmt(blanco)}</td>
-          <td class="r"><span class="pct-val" style="color:rgba(255,255,255,.5)">${pct(blanco, cons.votos)}%</span></td>
-        </tr>`;
-    }
-
-    // ─── DONUT ────────────────────────────────────────────────────
-    let donutChart = null;
-    function renderDonut(scope){
-      const cons = scope.consulta;
-      const sorted = [...cons.cands].sort((a,b)=>b.votos-a.votos);
-      if(donutChart) donutChart.destroy();
-      const top = sorted.slice(0,5);
-      const otros = sorted.slice(5).reduce((s,c)=>s+c.votos,0);
-      const lbls = top.map(c=>shortLast(c.nombre));
-      const data = top.map(c=>c.votos);
-      const cols = top.map(c=>candColor(STATE.activeCons, c.codigo||c.nombre));
-      if(otros>0){ lbls.push('Otros'); data.push(otros); cols.push('#444'); }
-      donutChart = new Chart(document.getElementById('donut-cons').getContext('2d'),{
-        type:'doughnut',
-        data:{labels:lbls, datasets:[{data, backgroundColor:cols, borderWidth:0, hoverOffset:6}]},
-        options:{responsive:true,maintainAspectRatio:true,cutout:'70%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw.toLocaleString('es-CO')}`}}}}
-      });
-      const focus = STATE.activeCand
-        ? cons.cands.find(c=>c.codigo===STATE.activeCand)
-        : sorted[0];
-      document.getElementById('pct-cons').textContent = focus ? pct(focus.votos, cons.votos)+'%' : '—';
-      document.getElementById('sub-cons').textContent = focus ? shortLast(focus.nombre) : 'consulta';
-      document.getElementById('leg-cons').innerHTML = top.map((c,i)=>{
-        const col = candColor(STATE.activeCons, c.codigo||c.nombre);
-        return `<div class="li"><span class="ld" style="background:${col}"></span><span>${shortLast(c.nombre)}</span><span class="lv">${pct(c.votos,cons.votos)}%</span></div>`;
-      }).join('');
-    }
-
-    // ─── MAP ──────────────────────────────────────────────────────
-    function initMap(){
-      if(STATE.map) return;
-      const el = document.getElementById('cons-map');
-      STATE.map = L.map(el, {
-        center:[4.5,-74.0], zoom:5,
-        zoomControl:false, attributionControl:true,
-        scrollWheelZoom:false, doubleClickZoom:false,
-        touchZoom:false, boxZoom:false, keyboard:false,
-        dragging:false, tap:false,
-      });
-      // El contenedor puede tener tamaño 0 mientras la cortina cubre la página.
-      // Si Leaflet añade una capa con viewport 0×0, los paths SVG quedan con
-      // geometría vacía. Cuando el tamaño cambia a ≠0 forzamos un re-render
-      // completo (remueve la capa actual y vuelve a llamar a renderMap).
-      let lastW = 0, lastH = 0;
-      const ro = new ResizeObserver(entries=>{
-        for(const e of entries){
-          const w = e.contentRect.width, h = e.contentRect.height;
-          if(w>0 && h>0 && (Math.abs(w-lastW)>1 || Math.abs(h-lastH)>1)){
-            const wasZero = (lastW===0 || lastH===0);
-            lastW=w; lastH=h;
-            try{ STATE.map.invalidateSize(); }catch(_){}
-            // Si el zoom quedó nulo (porque fitBounds corrió con 0×0), restaurar
-            // un zoom base antes de re-encuadrar.
-            if(STATE.map.getZoom()==null) STATE.map.setView([4.5,-74.0], 5);
-            if(wasZero){
-              // El primer render se hizo con 0×0; remover la capa y re-render limpio.
-              if(STATE.currentLayer){ try{STATE.map.removeLayer(STATE.currentLayer);}catch(_){} STATE.currentLayer=null; }
-              renderMap(getScope());
-            } else if(STATE.currentLayer){
-              try{ STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[6,6]}); }catch(_){}
-            }
-          }
-        }
-      });
-      ro.observe(el);
-      window.addEventListener('resize', ()=>{ try{STATE.map.invalidateSize();}catch(_){} });
-      // Si la página se cargó en pestaña en background (timers throttled),
-      // al volver visible re-rendereamos para asegurar geometría válida del SVG.
-      document.addEventListener('visibilitychange', ()=>{
-        if(document.visibilityState==='visible'){
-          try{
-            STATE.map.invalidateSize();
-            if(STATE.map.getZoom()==null) STATE.map.setView([4.5,-74.0], 5);
-            if(STATE.currentLayer){
-              const valid=[...el.querySelectorAll('svg path')].some(p=>(p.getAttribute('d')||'').length>20);
-              if(!valid){
-                try{STATE.map.removeLayer(STATE.currentLayer);}catch(_){} STATE.currentLayer=null;
-                renderMap(getScope());
-              } else {
-                try{STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[6,6]});}catch(_){}
-              }
-            }
-          }catch(_){}
-        }
-      });
-      // Red de seguridad para entornos donde ResizeObserver no dispara confiable
-      // (e.g. tab en background al cargar): reintenta varias veces.
-      [400, 1000, 1600, 2400].forEach(ms=>setTimeout(()=>{
-        try{
-          STATE.map.invalidateSize();
-          if(STATE.map.getZoom()==null) STATE.map.setView([4.5,-74.0], 5);
-          if(STATE.currentLayer){
-            const valid=[...el.querySelectorAll('svg path')].some(p=>(p.getAttribute('d')||'').length>20);
-            if(!valid){
-              try{STATE.map.removeLayer(STATE.currentLayer);}catch(_){} STATE.currentLayer=null;
-              renderMap(getScope());
-            } else {
-              try{STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[6,6]});}catch(_){}
-            }
-          }
-        }catch(_){}
-      }, ms));
-      // Precarga del GeoJSON nacional
-      fetch(DEPTO_GEOJSON).then(r=>r.ok?r.json():null).then(g=>{
-        if(g){ STATE._deptoGeoRaw = g; renderMap(getScope()); }
-      }).catch(e=>console.warn('[Map] depto geo:', e));
-    }
-
-    // Build "lookup": para cada territorio del scope.children, calcular el ganador
-    // dentro de la consulta activa, o (si hay candidato) el voto/porcentaje del candidato.
-    // Los datos submunicipales vienen por ZONA ELECTORAL, pero los polígonos de
-    // ciudad son COMUNAS/LOCALIDADES políticas y la relación no siempre es 1:1
-    // (Medellín: zonas 30,31,32 → comuna 16 Belén). Suma las zonas de cada comuna
-    // antes de pintar. Si el municipio no está en la tabla la relación es la
-    // identidad (Bogotá: zona = localidad) y el scope pasa intacto.
-    function scopeComunas(scope){
-      const key = `${_to2(STATE.depCod)}-${String(STATE.munCod||'').padStart(3,'0')}`;
-      const map = STATE.zonaComuna?.muns?.[key];
-      if(!map || !scope?.children?.length) return scope;
-      const agg = {};
-      scope.children.forEach(ch=>{
-        const cod = map.z[String(ch.cod).padStart(2,'0')];
-        if(!cod) return;   // zonas 90/98 (puesto censo, cárceles): sin comuna
-        const a = agg[cod] || (agg[cod] = { votos:0, byName:{} });
-        a.votos += ch.consulta?.votos || 0;
-        ((ch.consulta?.cands)||[]).forEach(c=>{ a.byName[c.nombre] = (a.byName[c.nombre]||0) + (c.votos||0); });
-      });
-      if(!Object.keys(agg).length) return scope;
-      const children = Object.keys(agg).sort().map(cod=>({
-        cod,
-        nombre: titleCase(map.c[cod] || `Comuna ${Number(cod)}`),
-        consulta: {
-          votos: agg[cod].votos,
-          cands: Object.entries(agg[cod].byName)
-            .map(([nombre,votos])=>({ nombre, votos, codigo: codigoFor(STATE.activeCons, nombre) }))
-            .sort((a,b)=>b.votos-a.votos),
-        },
+    function puestosDe(dd, mun){
+      const g = STATE.geo[dd] || {}, out = [];
+      (mun.zonas||[]).forEach(z=>(z.puestos||[]).forEach(p=>{
+        const key = `${mun.cod}-${z.cod}-${p.cod}`;
+        const [c, b] = g[key] || ['',''];
+        out.push({ key, zona:z.cod, p, com: c || zonaSinGeo(z.cod), bar: b || 'Sin barrio registrado' });
       }));
-      return {...scope, children};
-    }
-    function buildTerritoryLookup(scope){
-      const out = {};        // cod (normalizado) → { winner:{nombre,codigo,votos}, vCand, vTotal, byName }
-      const byName = {};     // nombre normalizado → mismo registro
-      (scope.children||[]).forEach(ch=>{
-        const cands = (ch.consulta?.cands||ch.consulta?.candidatos)||[];
-        if(!cands.length){ return; }
-        const sorted = [...cands].sort((a,b)=>b.votos-a.votos);
-        const winner = sorted[0];
-        let vCand = 0;
-        if(STATE.activeCand){
-          const cName = findCandName(STATE.activeCons, STATE.activeCand);
-          const f = cands.find(c=>(c.codigo&&c.codigo===STATE.activeCand) || _normN(c.nombre)===_normN(cName));
-          vCand = f?.votos||0;
-        }
-        const rec = {
-          winner: { nombre: winner.nombre, codigo: winner.codigo||codigoFor(STATE.activeCons, winner.nombre), votos: winner.votos },
-          vCand,
-          vTotal: ch.consulta?.votos || cands.reduce((s,c)=>s+c.votos,0),
-          nombre: ch.nombre,
-        };
-        out[_normC(ch.cod)] = rec;
-        byName[_normN(ch.nombre)] = rec;
-      });
-      out.__byName = byName;
       return out;
     }
+    function suma(nodos){
+      const acc = {}; let votos = 0;
+      nodos.forEach(n=>{ if(!n) return; votos += n.votos||0; (n.cands||n.candidatos||[]).forEach(c=>{ acc[c.nombre]=(acc[c.nombre]||0)+c.votos; }); });
+      return { votos, cands: Object.entries(acc).map(([nombre,votos])=>({nombre,votos})) };
+    }
+    const nodo = x => x ? { votos:x.votos||0, cands:(x.cands||x.candidatos||[]) } : { votos:0, cands:[] };
+    const etiquetaCom = dd => dd==='16' ? 'Localidad' : 'Comuna / zona';
 
-    // Decide el fill color para un territorio según el modo activo.
-    function fillForRec(rec){
-      if(!rec) return '#333';
-      if(STATE.activeCand){
-        // Gradiente sobre el candidato seleccionado
-        if(!rec.vTotal) return '#333';
-        const share = rec.vCand / rec.vTotal;
-        // Gradient: 0..0.05 → muy claro / 0.5+ → color completo
-        const col = candColor(STATE.activeCons, STATE.activeCand);
-        // Mezcla del color con #1a1f2e según share
-        const t = Math.min(1, share*1.6 + 0.1);  // suaviza
-        return lighten(col, 1-t);
-      }
-      // Ganador
-      const w = rec.winner;
-      if(!w) return '#333';
-      return candColor(STATE.activeCons, w.codigo || w.nombre);
-    }
-    function fillOpacityForRec(rec){
-      if(!rec) return 0.18;
-      if(STATE.activeCand){
-        if(!rec.vTotal) return 0.18;
-        const share = rec.vCand/rec.vTotal;
-        return 0.32 + Math.min(0.55, share*1.1);
-      }
-      return 0.78;
-    }
-
-    // City detection (Bogotá, Medellín, Cali, Barranquilla, Ibagué, Manizales, Pereira).
-    function detectCity(depCod, munCod, munName){
-      if(_normC(depCod)==='16') return CITY_MAPS.bogota;
-      if(!munName) return null;
-      const n = _normN(munName);
-      if(/MEDELL/.test(n)) return CITY_MAPS.medellin;
-      if(/^CALI$|SANTIAGO DE CALI/.test(n)) return CITY_MAPS.cali;
-      if(/BARRANQUILLA/.test(n)) return CITY_MAPS.barranquilla;
-      if(/IBAGU/.test(n)) return CITY_MAPS.ibague;
-      if(/MANIZALES/.test(n)) return CITY_MAPS.manizales;
-      if(/PEREIRA/.test(n)) return CITY_MAPS.pereira;
-      return null;
-    }
-    const CITY_MAPS = {
-      bogota:       { key:'bogota',       url:BOGOTA_LOC_URL,      rotate:true,
-                      code:p=>_to2(p.LocCodigo),                  name:p=>p.LocNombre||p.nombre||'Localidad' },
-      medellin:     { key:'medellin',     url:MEDELLIN_COM_URL,    rotate:false,
-                      code:p=>_to2(p.CODIGO),                     name:p=>p.NOMBRE||p.IDENTIFICACION||'Comuna' },
-      cali:         { key:'cali',         url:CALI_COM_URL,        rotate:false,
-                      code:p=>_to2(p.comuna),                     name:p=>p.nombre||`Comuna ${p.comuna}` },
-      barranquilla: { key:'barranquilla', url:BARRANQUILLA_COM_URL,rotate:false,
-                      code:p=>_to2(p.id),                         name:p=>p.nombre||'Localidad' },
-      ibague:       { key:'ibague',       url:IBAGUE_COM_URL,      rotate:false,
-                      code:p=>{const m=String(p.COMUNAS||'').match(/(\d+)/); return m?_to2(m[1]):'';},
-                      name:p=>p.COMUNAS||'Comuna' },
-      manizales:    { key:'manizales',    url:MANIZALES_COM_URL,   rotate:false,
-                      code:p=>_to2(p.ID_COMUNA),                  name:p=>p.NOMBRES_CO||'Comuna' },
-      pereira:      { key:'pereira',      url:PEREIRA_COM_URL,     rotate:false,
-                      code:_=>'', name:p=>p.Comuna||'Comuna' },
-    };
-    function rotateGeoJSON90Left(geoData){
-      const cx=-74.08, cy=4.65;
-      const rc=([lon,lat])=>[cx-(lat-cy), cy+(lon-cx)];
-      const rg=geom=>{
-        if(!geom) return geom;
-        if(geom.type==='Polygon') return {...geom, coordinates: geom.coordinates.map(r=>r.map(rc))};
-        if(geom.type==='MultiPolygon') return {...geom, coordinates: geom.coordinates.map(p=>p.map(r=>r.map(rc)))};
-        return geom;
-      };
-      return {...geoData, features: geoData.features.map(f=>({...f, geometry: rg(f.geometry)}))};
-    }
-    // Build per-feature tooltip HTML.
-    function tooltipHTML(name, rec){
-      if(!rec) return `<div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700">${name.toUpperCase()}</span><br/><span style="color:rgba(255,255,255,.4)">Sin datos</span></div>`;
-      if(STATE.activeCand){
-        const cName = findCandName(STATE.activeCons, STATE.activeCand);
-        const col = candColor(STATE.activeCons, STATE.activeCand);
-        const pctV = rec.vTotal ? ((rec.vCand/rec.vTotal)*100).toFixed(1) : '0.0';
-        return `<div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700">${name.toUpperCase()}</span><br/>
-          <span style="color:${col};font-weight:600">${shortLast(cName)}</span><br/>
-          ${fmt(rec.vCand)} votos · ${pctV}% de la consulta<br/>
-          <span style="color:rgba(255,255,255,.45);font-size:.75rem">Ganador local: ${shortLast(rec.winner.nombre)}</span>
-        </div>`;
-      }
-      const w = rec.winner;
-      const col = candColor(STATE.activeCons, w.codigo||w.nombre);
-      const pctV = rec.vTotal ? ((w.votos/rec.vTotal)*100).toFixed(1) : '0.0';
-      return `<div style="font-family:HelveticaNeue, Helvetica, Arial, sans-serif;font-weight:700">${name.toUpperCase()}</span><br/>
-        <span style="color:${col};font-weight:700">${shortLast(w.nombre)}</span><br/>
-        ${fmt(w.votos)} votos · ${pctV}%
-      </div>`;
-    }
-
-    // `lvl` permite pintar otra capa sin tocar STATE.level (antes el respaldo de municipio sin
-    // comunas ponía STATE.level='dep' durante un await y el resto de la página lo leía así).
-    async function renderMap(scope, lvl){
-      lvl = lvl || STATE.level;
-      if(!STATE.map) return;
-      // Asegura el tamaño correcto del contenedor (la cortina puede haberlo dejado en 0×0).
-      try{ STATE.map.invalidateSize(); }catch(_){}
-      // Remueve capa actual
-      if(STATE.currentLayer){ STATE.map.removeLayer(STATE.currentLayer); STATE.currentLayer=null; }
-      // Botón volver
-      const backBtn = document.getElementById('cons-map-back');
-      backBtn.style.display = lvl==='nac' ? 'none' : '';
-
-      if(lvl==='nac'){
-        if(!STATE._deptoGeoRaw) return;
-        const lookup = buildTerritoryLookup(scope);
-        const style = feat=>{
-          const code = _depCodeFromProps(feat.properties);
-          const rec = lookup[_normC(code)] || (lookup.__byName||{})[_normN(feat.properties.name||feat.properties.NOMBRE||'')];
-          return {
-            fillColor: fillForRec(rec),
-            fillOpacity: fillOpacityForRec(rec),
-            color:'rgba(255,255,255,0.35)', weight:1,
-          };
-        };
-        STATE.currentLayer = L.geoJSON(STATE._deptoGeoRaw, {
-          style,
-          onEachFeature:(feat, layer)=>{
-            const code = _depCodeFromProps(feat.properties);
-            const rec = lookup[_normC(code)] || (lookup.__byName||{})[_normN(feat.properties.name||feat.properties.NOMBRE||'')];
-            const name = rec?.nombre || feat.properties.name || feat.properties.NOMBRE || 'Depto';
-            layer.on({
-              mouseover(e){
-                layer.setStyle({weight:2, color:'#fff', fillOpacity:Math.min(1, fillOpacityForRec(rec)+0.18)});
-                layer.bindTooltip(tooltipHTML(name, rec),{sticky:true,opacity:1}).openTooltip(e.latlng);
-              },
-              mouseout(){ layer.setStyle(style(feat)); layer.closeTooltip(); },
-              click(){ if(code) drillToDep(_to2(code)); }
-            });
-          }
-        }).addTo(STATE.map);
-        try{ STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[6,6]}); }catch(_){}
-        return;
-      }
-      if(lvl==='dep'){
-        const lookup = buildTerritoryLookup(scope);
-        try{
-          let geo = STATE._depGeoCache[STATE.depCod];
-          if(!geo){
-            const r = await fetch(`${DEPTOS_MPS_URL}${_to2(STATE.depCod)}.json`);
-            if(!r.ok) throw new Error(`HTTP ${r.status}`);
-            geo = await r.json();
-            STATE._depGeoCache[STATE.depCod] = geo;
-          }
-          const style = feat=>{
-            const p = feat.properties;
-            const code = p.mun_elec!=null ? _normC(p.mun_elec) : null;
-            const rec = code ? lookup[code] : (lookup.__byName||{})[_normN(p.mpio_cnmbr||p.NOMBRE||'')];
-            return {
-              fillColor: fillForRec(rec),
-              fillOpacity: fillOpacityForRec(rec),
-              color:'rgba(255,255,255,0.35)', weight:1,
-            };
-          };
-          STATE.currentLayer = L.geoJSON(geo, {
-            style,
-            onEachFeature:(feat, layer)=>{
-              const p = feat.properties;
-              const code = p.mun_elec!=null ? _normC(p.mun_elec) : null;
-              const rec = code ? lookup[code] : (lookup.__byName||{})[_normN(p.mpio_cnmbr||p.NOMBRE||'')];
-              const name = rec?.nombre || p.mpio_cnmbr || p.NOMBRE || p.nombre || 'Mun';
-              layer.on({
-                mouseover(e){
-                  layer.setStyle({weight:2, color:'#fff', fillOpacity:Math.min(1, fillOpacityForRec(rec)+0.18)});
-                  layer.bindTooltip(tooltipHTML(name, rec),{sticky:true,opacity:1}).openTooltip(e.latlng);
-                },
-                mouseout(){ layer.setStyle(style(feat)); layer.closeTooltip(); },
-                click(){ if(p.mun_elec!=null) drillToMun(_to2(p.mun_elec).padStart(3,'0').slice(-3)); }
-              });
-            }
-          }).addTo(STATE.map);
-          try{ STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[10,10]}); }catch(_){}
-        }catch(e){ console.warn('[Map] depto:', e); }
-        return;
-      }
-      if(lvl==='mun' || lvl==='com' || lvl==='pue'){
-        // en zona y puesto el mapa sigue siendo el del municipio (no hay polígono de puesto)
-        if(lvl!=='mun') scope = getScope('mun') || scope;
-        const dep = STATE.depData[STATE.depCod];
-        const mun = dep?.municipios?.find(m=>m.cod===STATE.munCod);
-        const city = detectCity(STATE.depCod, STATE.munCod, mun?.nombre);
-        if(!city){
-          // No tenemos GeoJSON de comunas/localidades para este municipio:
-          // mantenemos visible la capa del departamento ya que no hay drill cartográfico posible.
-          document.getElementById('map-hint').textContent = 'Sin desagregación geográfica';
-          // Renderiza fallback como capa del depto sin highlight extra
-          await renderMap(getScope('dep'), 'dep');
-          return;
+    // ─── el alcance seleccionado: sus votos y sus subunidades ─────
+    function alcance(){
+      const s = STATE.sel, k = STATE.clave;
+      if(!s.dep){
+        if(k==='senado'){
+          const c = STATE.resumen.consultas.find(x=>x.clave==='senado');
+          return { nivel:'nac', nombre:'Nacional', datos:{ votos:c.votos, cands:c.candidatos }, esp:c.especiales,
+                   units:{ titulo:'Por departamento', filas: STATE.deps.map(d=>({ id:d.cod, nombre:tc(d.nombre), ...nodo(d.senado) })) } };
         }
-        const lookup = buildTerritoryLookup(scopeComunas(scope));
-        try{
-          let geo = STATE._cityGeoCache[city.key];
-          if(!geo){
-            const r = await fetch(city.url); if(!r.ok) throw new Error(`HTTP ${r.status}`);
-            const raw = await r.json();
-            geo = city.rotate ? rotateGeoJSON90Left(raw) : raw;
-            STATE._cityGeoCache[city.key] = geo;
-          }
-          const resolve = p=>{
-            const c = city.code(p);
-            if(c && lookup[_normC(c)]) return lookup[_normC(c)];
-            return (lookup.__byName||{})[_normN(city.name(p))]||null;
-          };
-          const style = feat=>{
-            const rec = resolve(feat.properties);
-            return {
-              fillColor: fillForRec(rec),
-              fillOpacity: fillOpacityForRec(rec),
-              color:'rgba(255,255,255,0.35)', weight:1,
-            };
-          };
-          STATE.currentLayer = L.geoJSON(geo, {
-            style,
-            onEachFeature:(feat, layer)=>{
-              const p = feat.properties;
-              const rec = resolve(p);
-              const name = rec?.nombre || city.name(p) || 'Comuna';
-              layer.on({
-                mouseover(e){
-                  layer.setStyle({weight:2, color:'#fff', fillOpacity:Math.min(1, fillOpacityForRec(rec)+0.18)});
-                  layer.bindTooltip(tooltipHTML(name, rec),{sticky:true,opacity:1}).openTooltip(e.latlng);
-                },
-                mouseout(){ layer.setStyle(style(feat)); layer.closeTooltip(); },
-              });
-            }
-          }).addTo(STATE.map);
-          try{ STATE.map.fitBounds(STATE.currentLayer.getBounds(),{padding:[10,10]}); }catch(_){}
-        }catch(e){ console.warn('[Map] city:', e); }
+        const cands = [];
+        STATE.deps.forEach(d=>(d.camara?.candidatos||[]).forEach(c=>cands.push({ ...c, dep:tc(d.nombre) })));
+        const c = STATE.resumen.consultas.find(x=>x.clave==='camara');
+        return { nivel:'nac', nombre:'Nacional', datos:{ votos:cands.reduce((a,c)=>a+c.votos,0), cands }, esp:c?.especiales, conDep:true,
+                 units:{ titulo:'Por departamento', filas: STATE.deps.map(d=>({ id:d.cod, nombre:tc(d.nombre), ...nodo(d.camara) })) } };
       }
-    }
-    function _depCodeFromProps(props){
-      if(props.electoral_id!=null && props.electoral_id!=='') return _normC(props.electoral_id);
-      // Fallback: lookup por nombre en STATE.deps
-      const nom = props.name||props.NOMBRE||props.nombre||'';
-      const norm = _normN(nom);
-      const found = (STATE.deps||[]).find(d=>{
-        const dn = _normN(d.nombre);
-        return dn===norm
-          || (norm.includes('BOGOTA') && dn.includes('BOGOTA'))
-          || (norm.includes('NORTE') && norm.includes('SAN') && dn.includes('NORTE'))
-          || (norm.includes('VALLE') && dn.includes('VALLE'))
-          || (norm.includes('SAN ANDRES') && dn.includes('SAN ANDRES'));
-      });
-      return found ? _normC(found.cod) : null;
+      const D = STATE.dep[s.dep];
+      if(!s.mun) return { nivel:'dep', nombre:tc(D.nombre), datos:nodo(D[k]),
+        units:{ titulo:'Por municipio', filas:(D.municipios||[]).map(m=>({ id:m.cod, nombre:tc(m.nombre), ...nodo(m[k]) })) } };
+      const M = D.municipios.find(m=>m.cod===s.mun);
+      const ps = puestosDe(s.dep, M);
+      const agrupa = (lista, campo) => { const g = {}; lista.forEach(x=>(g[x[campo]] ||= []).push(x)); return g; };
+      if(!s.com){
+        const g = agrupa(ps,'com');
+        return { nivel:'mun', nombre:tc(M.nombre), datos:nodo(M[k]),
+          units:{ titulo:`Por ${etiquetaCom(s.dep).toLowerCase()}`, filas:Object.entries(g).map(([n,l])=>({ id:n, nombre:tc(n), ...suma(l.map(x=>x.p[k])) })) } };
+      }
+      const enCom = ps.filter(x=>x.com===s.com);
+      if(!s.bar){
+        const g = agrupa(enCom,'bar');
+        return { nivel:'com', nombre:tc(s.com), datos:suma(enCom.map(x=>x.p[k])),
+          units:{ titulo:'Por barrio', filas:Object.entries(g).map(([n,l])=>({ id:n, nombre:tc(n), ...suma(l.map(x=>x.p[k])) })) } };
+      }
+      const enBar = enCom.filter(x=>x.bar===s.bar);
+      if(!s.pue) return { nivel:'bar', nombre:tc(s.bar), datos:suma(enBar.map(x=>x.p[k])),
+        units:{ titulo:'Por puesto de votación', filas:enBar.map(x=>({ id:x.key, nombre:tc(x.p.nombre), ...nodo(x.p[k]) })) } };
+      const P = enBar.find(x=>x.key===s.pue);
+      return { nivel: s.mesa ? 'mesa' : 'pue', nombre: s.mesa ? `Mesa ${s.mesa}` : tc(P.p.nombre), puesto:P, datos:nodo(P.p[k]) };
     }
 
-    // ─── DRILL ────────────────────────────────────────────────────
-    async function drillToDep(depCod){
+    // ─── selects ──────────────────────────────────────────────────
+    function llenaSelect(id, opciones, todos, valor){
+      const el = document.getElementById(id);
+      el.innerHTML = `<option value="">${todos}</option>` + opciones.map(o=>`<option value="${esc(o.v)}">${esc(o.t)}</option>`).join('');
+      el.value = valor || '';
+    }
+    function muestra(id, si){ document.getElementById(id).style.display = si ? 'flex' : 'none'; }
+    async function pintaSelects(){
+      const s = STATE.sel, k = STATE.clave;
+      document.getElementById('dep-select').value = s.dep;
+      muestra('mun-filter-container', !!s.dep);
+      muestra('com-filter-container', !!s.mun);
+      muestra('bar-filter-container', !!s.com);
+      muestra('pue-filter-container', !!s.bar);
+      muestra('mesa-filter-container', !!s.pue);
+      if(!s.dep) return;
+      const D = STATE.dep[s.dep];
+      const ordV = (a,b) => b.n - a.n || a.t.localeCompare(b.t,'es');
+      llenaSelect('mun-select', (D.municipios||[]).map(m=>({v:m.cod, t:tc(m.nombre), n:m[k]?.votos||0})).sort(ordV), 'TODOS', s.mun);
+      if(!s.mun) return;
+      document.getElementById('com-label').textContent = etiquetaCom(s.dep) + ':';
+      const ps = puestosDe(s.dep, D.municipios.find(m=>m.cod===s.mun));
+      const grupos = (lista, campo) => { const g = {}; lista.forEach(x=>{ g[x[campo]] = (g[x[campo]]||0) + (x.p[k]?.votos||0); }); return Object.entries(g).map(([v,n])=>({v, t:tc(v), n})).sort(ordV); };
+      llenaSelect('com-select', grupos(ps,'com'), 'TODAS', s.com);
+      if(!s.com) return;
+      const enCom = ps.filter(x=>x.com===s.com);
+      llenaSelect('bar-select', grupos(enCom,'bar'), 'TODOS', s.bar);
+      if(!s.bar) return;
+      llenaSelect('pue-select', enCom.filter(x=>x.bar===s.bar).map(x=>({v:x.key, t:tc(x.p.nombre), n:x.p[k]?.votos||0})).sort(ordV), 'TODOS', s.pue);
+      if(!s.pue) return;
+      const sel = document.getElementById('mesa-select');
+      sel.innerHTML = '<option value="">TODAS</option>'; sel.disabled = true;
       try{
-        STATE.depCod = depCod;
-        STATE.munCod = null; STATE.zonCod = null; STATE.pueCod = null;
-        STATE.level = 'dep';
-        await getDepData(depCod);
-        renderAll();
-        // Bogotá: salta directo a localidades (un solo mun = 001)
-        const dep = STATE.depData[depCod];
-        if(_normC(depCod)==='16' && dep?.municipios?.length===1){
-          await drillToMun(dep.municipios[0].cod);
-        }
-      }catch(e){ console.warn('[Drill dep]', e); }
+        const m = await cargaMesas(s.dep);
+        const filas = m?.p?.[s.pue] || [];
+        const lock = window.PlanGate && !PlanGate.has('mesas');
+        sel.innerHTML = (lock ? `<option value="">${esc(mesaTxt().lock)}</option>` : '<option value="">TODAS</option>')
+          + filas.map(f=>`<option value="${esc(f[0])}">Mesa ${esc(f[0])}</option>`).join('');
+        sel.value = s.mesa || ''; sel.disabled = !filas.length;
+      }catch(e){ sel.innerHTML = '<option value="">Sin mesas</option>'; }
     }
-    async function drillToMun(munCod){
-      STATE.munCod = munCod;
-      STATE.zonCod = null; STATE.pueCod = null;
-      STATE.level = 'mun';
-      renderAll();
+    function mesaTxt(){ const t = window.MESA_GATE_TXT; return t[localStorage.getItem('rr-lang')] || t.co; }
+
+    async function onSel(nivel, valor){
+      if(nivel==='mesa' && valor && window.PlanGate && !PlanGate.has('mesas')){
+        document.getElementById('mesa-select').value = ''; PlanGate.open('mesas'); return;
+      }
+      const i = NIVELES.indexOf(nivel);
+      STATE.sel[nivel] = valor;
+      NIVELES.slice(i+1).forEach(n=>STATE.sel[n]='');
+      STATE.todos = false;
+      if(nivel==='dep' && valor){
+        cargando(true);
+        try{ await cargaDep(valor); }catch(e){ error(e); return; }
+        cargando(false);
+        // Bogotá tiene un solo municipio: se entra directo a sus localidades (igual que Senado).
+        const D = STATE.dep[valor];
+        if(D.municipios?.length===1) STATE.sel.mun = D.municipios[0].cod;
+      }
+      escribeURL(); render();
     }
-    function drillToZon(zonCod){
-      STATE.zonCod = zonCod; STATE.pueCod = null;
-      STATE.level = 'com';
-      renderAll();
+    function irA(nivel, valor){
+      if(nivel==='nac'){ onSel('dep',''); return; }
+      onSel(nivel, valor);
     }
-    function drillToPue(zonCod, pueCod){
-      STATE.zonCod = zonCod; STATE.pueCod = pueCod;
-      STATE.level = 'pue';
-      renderAll();
-      const c = document.getElementById('terr-card');
-      if(c) c.scrollIntoView({behavior:'smooth', block:'start'});
-    }
-    // Un municipio con una sola zona no tiene nada que elegir en ese nivel: se salta.
-    function _soloUnaZona(){
-      const mun = STATE.depData[STATE.depCod]?.municipios?.find(m=>m.cod===STATE.munCod);
-      return (mun?.zonas||[]).length===1;
-    }
-    function mapBack(){
-      if(STATE.level==='pue'){ STATE.pueCod=null; if(_soloUnaZona()){ STATE.zonCod=null; STATE.level='mun'; } else STATE.level='com'; }
-      else if(STATE.level==='com'){ STATE.zonCod=null; STATE.level='mun'; }
-      else if(STATE.level==='mun'){ STATE.munCod=null; STATE.level='dep'; }
-      else if(STATE.level==='dep'){ STATE.depCod=null; STATE.level='nac'; }
-      renderAll();
-    }
-    function mapBackTo(level){
-      STATE.pueCod = null;
-      if(level==='nac'){ STATE.depCod=null; STATE.munCod=null; STATE.zonCod=null; STATE.level='nac'; }
-      else if(level==='dep'){ STATE.munCod=null; STATE.zonCod=null; STATE.level='dep'; }
-      else if(level==='mun'){ STATE.zonCod=null; STATE.level='mun'; }
-      else if(level==='com'){ STATE.level = _soloUnaZona() ? 'mun' : 'com'; if(STATE.level==='mun') STATE.zonCod=null; }
-      renderAll();
+    function setClave(c){
+      if(c===STATE.clave) return;
+      STATE.clave = c; STATE.sel.mesa = ''; STATE.todos = false;
+      escribeURL(); render();
     }
 
-    // ─── ZONAS · PUESTOS · MESAS (panel bajo el mapa) ─────────────
-    // municipio → zonas (si hay más de una) → puestos → mesas. Hasta puesto, abierto a
-    // todos; la tabla de mesas se ve borrosa para el anónimo (PlanGate 'mesas' = cuenta gratis).
-    const _escA = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    function _ganador(b){
-      const c = (b?.cands||[]).slice().sort((x,y)=>y.votos-x.votos)[0];
-      if(!c) return '<span style="opacity:.4">—</span>';
-      const col = candColor(STATE.activeCons, codigoFor(STATE.activeCons, c.nombre)||c.nombre);
-      return `<span class="terr-win"><i style="background:${col}"></i>${_escA(shortLast(c.nombre))} <span style="opacity:.5">${pct(c.votos,b.votos)}%</span></span>`;
-    }
-    // Rótulo de los agregados que no son un puesto físico del georef.
-    function _tagPuesto(depCod, zonCod, p){
-      if(_to2(depCod)==='88') return '';
-      if(zonCod==='90') return '<span class="terr-tag">puesto censo</span>';
-      if(zonCod==='98') return '<span class="terr-tag">cárceles</span>';
-      if(/^Puesto [0-9A-Z]+$/i.test(p.nombre||'')) return '<span class="terr-tag">sin georreferenciar</span>';
-      return '';
-    }
-    function _filaUnidad(u, onclick, extra){
-      const b = u[STATE.activeCons]||{votos:0,cands:[]};
-      let cand = '';
-      if(STATE.activeCand){
-        const nom = findCandName(STATE.activeCons, STATE.activeCand);
-        const c = (b.cands||[]).find(x=>_normN(x.nombre)===_normN(nom));
-        cand = `<td class="r">${c?fmt(c.votos):'0'} <span style="opacity:.5">${pct(c?c.votos:0,b.votos)}%</span></td>`;
+    // ─── render ───────────────────────────────────────────────────
+    let A = null;
+    async function render(){
+      document.getElementById('circ-btn-senado').classList.toggle('circ-btn-active', STATE.clave==='senado');
+      document.getElementById('circ-btn-camara').classList.toggle('circ-btn-active', STATE.clave==='camara');
+      A = alcance();
+      if(A.nivel==='pue'){
+        // Nulos y no marcados del puesto: suma de sus mesas.
+        try{
+          const m = await cargaMesas(STATE.sel.dep);
+          const filas = m?.p?.[STATE.sel.pue] || [];
+          if(filas.length) A.esp = { 'Votos Nulos':filas.reduce((a,f)=>a+(f[3]||0),0), 'Votos No Marcados':filas.reduce((a,f)=>a+(f[4]||0),0) };
+        }catch(e){}
       }
-      return `<tr onclick="${onclick}"><td class="nm">${_escA(titleCase(u.nombre))}${extra||''}</td><td>${_ganador(b)}</td>${cand}<td class="r">${fmt(b.votos)}</td></tr>`;
-    }
-    function _tablaUnidades(filas, titulo){
-      const cand = STATE.activeCand ? `<th class="r">${_escA(shortLast(findCandName(STATE.activeCons, STATE.activeCand)))}</th>` : '';
-      return `<div class="terr-scroll"><table class="results-table terr-table"><thead><tr><th>${titulo}</th><th>Ganador</th>${cand}<th class="r">Votos válidos</th></tr></thead><tbody>${filas.join('')}</tbody></table></div>`;
-    }
-    function renderTerr(){
-      const card = document.getElementById('terr-card');
-      if(!card) return;
-      const lvl = STATE.level;
-      if(lvl==='nac' || lvl==='dep'){ card.classList.add('hidden'); return; }
-      const clave = STATE.activeCons;
-      const dep = STATE.depData[STATE.depCod];
-      const mun = dep?.municipios?.find(m=>m.cod===STATE.munCod);
-      if(!mun){ card.classList.add('hidden'); return; }
-      card.classList.remove('hidden');
-      const lab = document.getElementById('terr-label'), sub = document.getElementById('terr-sub'), body = document.getElementById('terr-body');
-      const votos = u => (u[clave]?.votos)||0;
-      const zonas = mun.zonas||[];
-      // municipio con varias zonas → elegir zona
-      if(lvl==='mun' && zonas.length>1){
-        lab.textContent = `Zonas de ${titleCase(mun.nombre)}`;
-        sub.textContent = `${zonas.length} zonas · ${fmt(zonas.reduce((s,z)=>s+(z.puestos||[]).length,0))} puestos · elige una zona para ver sus puestos`;
-        const filas = zonas.slice().sort((a,b)=>votos(b)-votos(a))
-          .map(z=>_filaUnidad(z, `drillToZon('${z.cod}')`, ` <span style="opacity:.45;font-size:.72rem">· ${(z.puestos||[]).length} puestos</span>`));
-        body.innerHTML = _tablaUnidades(filas, 'Zona');
-        return;
+      if(A.nivel==='mesa'){
+        try{
+          const m = await cargaMesas(STATE.sel.dep);
+          const f = (m?.p?.[STATE.sel.pue]||[]).find(x=>String(x[0])===String(STATE.sel.mesa));
+          if(f){
+            const cands = []; for(let i=0;i<f[1].length;i+=2) cands.push({ nombre:m.cands[f[1][i]], votos:f[1][i+1] });
+            A.datos = { votos:cands.reduce((a,c)=>a+c.votos,0), cands };
+            A.esp = { 'Votos Nulos':f[3]||0, 'Votos No Marcados':f[4]||0 };
+          }
+        }catch(e){}
       }
-      // zona (o municipio de una sola zona) → elegir puesto
-      if(lvl==='mun' || lvl==='com'){
-        const zon = lvl==='com' ? zonas.find(z=>z.cod===STATE.zonCod) : zonas[0];
-        if(!zon){ card.classList.add('hidden'); return; }
-        const ps = (zon.puestos||[]).slice().sort((a,b)=>votos(b)-votos(a));
-        lab.textContent = `Puestos de votación · ${titleCase(lvl==='com'?zon.nombre:mun.nombre)}`;
-        sub.textContent = `${ps.length} puesto${ps.length===1?'':'s'} · elige uno para ver sus mesas`;
-        body.innerHTML = _tablaUnidades(ps.map(p=>_filaUnidad(p, `drillToPue('${zon.cod}','${p.cod}')`, _tagPuesto(STATE.depCod, zon.cod, p))), 'Puesto');
-        return;
-      }
-      // puesto → mesas
-      const zon = zonas.find(z=>z.cod===STATE.zonCod);
-      const pue = zon?.puestos?.find(p=>p.cod===STATE.pueCod);
-      if(!pue){ card.classList.add('hidden'); return; }
-      const b = pue[clave]||{votos:0,cands:[]};
-      lab.textContent = `Mesa a mesa · ${titleCase(pue.nombre)}`;
-      sub.innerHTML = `${_escA(titleCase(zon.nombre))} · ${_escA(titleCase(mun.nombre))}${_tagPuesto(STATE.depCod, zon.cod, pue)}`;
-      body.innerHTML = `<div class="pue-meta"><span>Votos válidos del puesto: <b>${fmt(b.votos)}</b></span>${b.blanco?`<span>Voto en blanco: <b>${fmt(b.blanco)}</b></span>`:''}<span>Ganador: ${_ganador(b)}</span></div>
-        <div id="mesas-wrap"><div class="mesa-loader"><div class="loader-ring"></div>Cargando mesas…</div></div>`;
-      const want = `${clave}|${STATE.depCod}|${STATE.munCod}|${STATE.zonCod}|${STATE.pueCod}`;
-      const pinta = html => {
-        const now = `${STATE.activeCons}|${STATE.depCod}|${STATE.munCod}|${STATE.zonCod}|${STATE.pueCod}`;
-        const w = document.getElementById('mesas-wrap');
-        if(w && now===want && STATE.level==='pue') w.innerHTML = html;   // el usuario no se movió mientras bajaba
-      };
-      // Consultas 2026: las mesas ya vienen dentro de dep-{cod}.json (solo candidatos).
-      if(Array.isArray(pue.mesas)){
-        const filas = pue.mesas.map(m=>({mesa:m.mesa, v:m[clave]||{}, b:null, n:null, x:null})).filter(m=>Object.keys(m.v).length);
-        pinta(_tablaMesas(filas, b, false, false));
-        return;
-      }
-      getMesas(clave, STATE.depCod).then(mf=>{
-        if(!mf){ pinta(`<div class="mesa-note">El detalle por mesa de esta elección todavía no está publicado. Lo de arriba (puesto, zona, municipio) sí es el escrutinio completo.</div>`); return; }
-        const k = `${STATE.munCod}-${STATE.zonCod}-${STATE.pueCod}`;
-        const filas = (mf.p[k]||[]).map(([mesa, vs, bl, nu, nm])=>{
-          const v = {}; for(let i=0;i<vs.length;i+=2) v[mf.cands[vs[i]]] = vs[i+1];
-          return {mesa, v, b:bl, n:nu, x:nm};
-        });
-        pinta(_tablaMesas(filas, b, true, (mf.sg||[]).includes(k)));
-      }).catch(e=>{
-        console.warn('[Mesas]', e);
-        pinta(`<div class="mesa-note warn">No se pudo cargar el detalle por mesa (${_escA(e.message)}). Intenta de nuevo en un momento.</div>`);
-      });
+      await pintaSelects();
+      renderKPIs(); renderDrill(); renderCands(); renderDonut(); renderUnits();
+      document.getElementById('nota-fuente').innerHTML = notaFuente();
     }
-    // filas: [{mesa, v:{nombre:votos}, b, n, x}] · b/n/x null cuando la fuente no los trae.
-    function _tablaMesas(filas, pb, conEsp, sinGeo){
-      if(!filas.length) return `<div class="mesa-note">Este puesto no tiene mesas con votación en esta ${STATE.activeCons.length===2?'vuelta':'consulta'}.</div>`;
-      const clave = STATE.activeCons;
-      // Las consultas internas no tienen voto en blanco: sin esa columna en vez de una de ceros.
-      const conB = conEsp && Object.keys(STATE.consultas[clave]?.especiales||{}).some(k=>/blanco/i.test(k));
-      // Columnas: los candidatos con más votos en el puesto (máx. 6) + el candidato elegido; el resto, «Otros».
-      const orden = (pb.cands||[]).slice().sort((a,b)=>b.votos-a.votos).map(c=>c.nombre);
-      let cols = orden.slice(0, 6);
-      const act = STATE.activeCand ? findCandName(clave, STATE.activeCand) : null;
-      if(act && orden.includes(act) && !cols.includes(act)) cols.push(act);
-      const hayOtros = orden.length > cols.length;
-      const enCols = new Set(cols);
-      const tot = {c:{}, o:0, b:0, n:0, x:0, val:0, t:0};
-      const fila = m=>{
+
+    function ordenados(){ return (A.datos.cands||[]).filter(c=>c.votos>0).slice().sort((a,b)=>b.votos-a.votos); }
+
+    function renderKPIs(){
+      const c = ordenados(), tot = A.datos.votos, total = STATE.resumen.consultas.find(x=>x.clave===STATE.clave);
+      const p1 = c[0], p2 = c[1];
+      const universo = STATE.clave==='senado' ? (total?.candidatos?.length||0) : (STATE.sel.dep ? (STATE.dep[STATE.sel.dep]?.camara?.cands?.length||0) : 0);
+      document.getElementById('kpi-row').innerHTML = `
+        <div class="kpi-card"><div class="kpi-label">Votos por candidatos</div><div class="kpi-val wh">${fmt(tot)}</div><div class="kpi-delta">${esc(A.nombre)} · ${STATE.clave==='senado'?'consulta Senado':'consulta Cámara'}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Candidatos con votos</div><div class="kpi-val">${fmt(c.length)}</div><div class="kpi-delta">${universo?`de ${fmt(universo)} inscritos en ${STATE.clave==='senado'?'la consulta':esc(A.nivel==='nac'?'el país':tc(STATE.dep[STATE.sel.dep].nombre))}`:'en los 31 departamentos con consulta'}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Puntero</div><div class="kpi-val sm" style="color:var(--blue)">${p1?esc(tc(p1.nombre)):'—'}</div><div class="kpi-delta">${p1?`${fmt(p1.votos)} votos · ${pct(p1.votos,tot).toFixed(2)} %`:''}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Margen 1° – 2°</div><div class="kpi-val gr">${p2?fmt(p1.votos-p2.votos):'—'}</div><div class="kpi-delta">${p2?`${(pct(p1.votos,tot)-pct(p2.votos,tot)).toFixed(2)} pp sobre ${esc(tc(p2.nombre))}`:''}</div></div>`;
+    }
+
+    function renderDrill(){
+      const s = STATE.sel, migas = [{ n:'nac', v:'', t:'Nacional' }];
+      if(s.dep){ const D = STATE.dep[s.dep]; migas.push({ n:'dep', v:s.dep, t:tc(D.nombre) });
+        if(s.mun && D.municipios.length>1) migas.push({ n:'mun', v:s.mun, t:tc(D.municipios.find(m=>m.cod===s.mun).nombre) }); }
+      if(s.com) migas.push({ n:'com', v:s.com, t:tc(s.com) });
+      if(s.bar) migas.push({ n:'bar', v:s.bar, t:tc(s.bar) });
+      if(s.pue) migas.push({ n:'pue', v:s.pue, t:tc(A.puesto?.p.nombre||'') });
+      if(s.mesa) migas.push({ n:'mesa', v:s.mesa, t:`Mesa ${s.mesa}` });
+      document.getElementById('drill-nav').innerHTML = migas.map((m,i)=> i===migas.length-1
+        ? `<span class="drill-crumb active">${esc(m.t)}</span>`
+        : `<span class="drill-crumb clickable" onclick="volverA(${i})">${esc(m.t)}</span><span class="drill-sep">›</span>`).join('');
+      const badge = { nac:['dep','Nacional'], dep:['dep','Departamento'], mun:['mun','Municipio'], com:['mun', etiquetaCom(s.dep)], bar:['mun','Barrio'], pue:['pues','Puesto'], mesa:['pues','Mesa'] }[A.nivel];
+      const b = document.getElementById('drill-badge'); b.className = `level-badge ${badge[0]}`; b.textContent = badge[1];
+      document.getElementById('lbl-tabla').textContent = `Candidatos · ${STATE.clave==='senado'?'Consulta Senado':'Consulta Cámara'} · ${A.nombre}`;
+    }
+    function volverA(i){
+      const orden = ['nac', ...NIVELES];
+      // la miga i corresponde al nivel i-1 de la lista visible; se reconstruye vaciando lo que sigue
+      const visibles = ['nac'];
+      const s = STATE.sel;
+      if(s.dep){ visibles.push('dep'); if(s.mun && STATE.dep[s.dep].municipios.length>1) visibles.push('mun'); }
+      ['com','bar','pue','mesa'].forEach(n=>{ if(s[n]) visibles.push(n); });
+      const destino = visibles[i];
+      if(destino==='nac'){ onSel('dep',''); return; }
+      const idx = NIVELES.indexOf(destino);
+      NIVELES.slice(idx+1).forEach(n=>STATE.sel[n]='');
+      if(destino==='dep' && STATE.dep[s.dep].municipios.length===1) STATE.sel.mun = STATE.dep[s.dep].municipios[0].cod;
+      STATE.todos = false; escribeURL(); render();
+    }
+
+    function colorDe(nombre){ return STATE.colores[STATE.clave]?.[nombre] || 'rgba(255,255,255,.25)'; }
+    function renderCands(){
+      const c = ordenados(), tot = A.datos.votos, q = _norm(STATE.q).trim();
+      const aviso = document.getElementById('cands-aviso');
+      aviso.innerHTML = (STATE.clave==='camara' && STATE.sel.dep && !(STATE.dep[STATE.sel.dep]?.camara?.cands?.length))
+        ? `<div class="mesa-note" style="margin-bottom:1rem">En ${esc(tc(STATE.dep[STATE.sel.dep].nombre))} no hubo consulta a la Cámara: el Pacto no la convocó en este departamento.</div>` : '';
+      const conDep = !!A.conDep;
+      document.getElementById('cands-thead').innerHTML = `<tr><th>#</th><th>Candidato</th>${conDep?'<th>Departamento</th>':''}<th class="r">Votos</th><th class="r">%</th></tr>`;
+      let filas = c.map((x,i)=>({ ...x, rank:i+1 }));
+      if(q) filas = filas.filter(x=>_norm(x.nombre).includes(q) || (conDep && _norm(x.dep).includes(q)));
+      const total = filas.length, visibles = (q || STATE.todos) ? filas : filas.slice(0, TOP);
+      const max = c[0]?.votos || 1;
+      document.getElementById('cands-tbody').innerHTML = visibles.map(x=>`
+        <tr>
+          <td style="color:rgba(255,255,255,.3);width:32px">${x.rank}</td>
+          <td><span style="display:inline-flex;align-items:center;gap:.55rem"><span style="width:8px;height:8px;border-radius:50%;background:${colorDe(x.nombre)};flex-shrink:0"></span><span class="cand-nom${x.rank===1?' cand-elected':''}">${esc(tc(x.nombre))}</span></span></td>
+          ${conDep?`<td style="color:rgba(255,255,255,.45)">${esc(x.dep)}</td>`:''}
+          <td class="r" style="font-variant-numeric:tabular-nums">${fmt(x.votos)}</td>
+          <td class="r" style="white-space:nowrap"><span class="bar-wrap"><span class="bar-fill" style="display:block;width:${(x.votos/max*100).toFixed(1)}%"></span></span><span class="pct-val">${pct(x.votos,tot).toFixed(2)}%</span></td>
+        </tr>`).join('') || `<tr><td colspan="${conDep?5:4}" style="color:rgba(255,255,255,.35)">${q?'Ningún candidato con ese nombre en este territorio.':'Sin votos registrados.'}</td></tr>`;
+      document.getElementById('cands-mas').innerHTML = (!q && total > TOP)
+        ? `<button class="expand-btn" style="margin-top:.9rem" onclick="STATE.todos=!STATE.todos;renderCands()">${STATE.todos?'▲ Ver solo los primeros '+TOP:`▼ Ver los ${fmt(total)} candidatos`}</button>` : '';
+    }
+
+    let donut = null;
+    function renderDonut(){
+      const c = ordenados(), tot = A.datos.votos;
+      const top = c.slice(0,5), resto = tot - top.reduce((a,x)=>a+x.votos,0);
+      const etiquetas = top.map(x=>tc(x.nombre)).concat(resto>0?['Otros candidatos']:[]);
+      const valores = top.map(x=>x.votos).concat(resto>0?[resto]:[]);
+      const colores = top.map(x=>colorDe(x.nombre)).concat(resto>0?['rgba(255,255,255,.12)']:[]);
+      document.getElementById('donut-pct').textContent = c[0] ? `${pct(c[0].votos,tot).toFixed(1)}%` : '—';
+      document.getElementById('donut-sub').textContent = c[0] ? 'el puntero' : '';
+      const ctx = document.getElementById('donut-cands');
+      if(window.Chart){
+        if(donut) donut.destroy();
+        donut = new Chart(ctx, { type:'doughnut', data:{ labels:etiquetas, datasets:[{ data:valores, backgroundColor:colores, borderWidth:0 }] },
+          options:{ cutout:'72%', plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:i=>` ${i.label}: ${fmt(i.raw)} (${pct(i.raw,tot).toFixed(1)}%)` } } }, animation:{ duration:500 } } });
+      }
+      document.getElementById('donut-legend').innerHTML = etiquetas.map((t,i)=>
+        `<div class="li"><span class="ld" style="background:${colores[i]}"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t)}</span><span class="lv">${fmt(valores[i])}</span></div>`).join('');
+      const e = A.esp;
+      document.getElementById('esp-bar').innerHTML = e
+        ? `<div class="umbral-label">Fuera de los candidatos</div>${Object.entries(e).map(([k,v])=>`<div class="li"><span>${esc(({'Votos Nulos':'Nulos','Votos No Marcados':'No marcados'})[k]||k)}</span><span class="lv">${fmt(v)}</span></div>`).join('')}`
+        : `<div class="umbral-label">Nulos y no marcados</div><div class="li" style="font-size:.68rem;line-height:1.5">Se ven en el total nacional, en cada puesto y en cada mesa.</div>`;
+    }
+
+    async function renderUnits(){
+      const card = document.getElementById('units-card'), body = document.getElementById('units-body');
+      if(A.nivel==='pue'){ card.style.display=''; document.getElementById('lbl-units').textContent = `Mesa a mesa · ${A.nombre}`; await renderMesas(body); return; }
+      if(!A.units || A.nivel==='mesa'){ card.style.display='none'; return; }
+      card.style.display = '';
+      document.getElementById('lbl-units').textContent = A.units.titulo;
+      const sig = { nac:'dep', dep:'mun', mun:'com', com:'bar', bar:'pue' }[A.nivel];
+      const filas = A.units.filas.slice().sort((a,b)=>b.votos-a.votos);
+      body.innerHTML = `<table class="results-table"><thead><tr><th>${esc(A.units.titulo.replace(/^Por /,'').replace(/^./,m=>m.toUpperCase()))}</th><th class="r">Votos</th><th>Puntero</th><th class="r">% del puntero</th></tr></thead><tbody>${
+        filas.map(f=>{
+          const p = (f.cands||[]).slice().sort((a,b)=>b.votos-a.votos)[0];
+          return `<tr style="cursor:pointer" onclick="irA('${sig}', ${esc(JSON.stringify(f.id))})">
+            <td><button class="drill-btn">${esc(f.nombre)} ›</button></td>
+            <td class="r">${fmt(f.votos)}</td>
+            <td>${p&&p.votos?`<span style="display:inline-flex;align-items:center;gap:.5rem"><span style="width:8px;height:8px;border-radius:50%;background:${colorDe(p.nombre)}"></span>${esc(tc(p.nombre))}</span>`:'<span style="color:rgba(255,255,255,.3)">—</span>'}</td>
+            <td class="r">${p&&p.votos?pct(p.votos,f.votos).toFixed(1)+'%':''}</td></tr>`;
+        }).join('')}</tbody></table>`;
+    }
+
+    async function renderMesas(body){
+      body.innerHTML = '<div class="mesa-note">Cargando las mesas…</div>';
+      let m;
+      try{ m = await cargaMesas(STATE.sel.dep); }catch(e){ body.innerHTML = `<div class="mesa-note warn">No se pudo cargar el detalle por mesa. Intenta de nuevo en un momento.</div>`; return; }
+      const filas = m?.p?.[STATE.sel.pue] || [];
+      if(!filas.length){ body.innerHTML = '<div class="mesa-note">Este puesto no tiene mesas con votación en esta consulta.</div>'; return; }
+      const orden = ordenados().map(c=>c.nombre), cols = orden.slice(0,6), enCols = new Set(cols), idx = {};
+      m.cands.forEach((n,i)=>idx[i]=n);
+      const tot = { c:{}, o:0, n:0, x:0, t:0 };
+      const cuerpo = filas.map(f=>{
+        const v = {}; for(let i=0;i<f[1].length;i+=2) v[idx[f[1][i]]] = f[1][i+1];
         let otros = 0, cand = 0, max = -1, win = null;
-        for(const [nom,v] of Object.entries(m.v)){ cand += v; if(!enCols.has(nom)) otros += v; if(v>max){ max=v; win=nom; } }
-        const val = cand + (m.b||0), t = val + (m.n||0) + (m.x||0);
-        cols.forEach(c=>{ tot.c[c] = (tot.c[c]||0) + (m.v[c]||0); });
-        tot.o += otros; tot.b += m.b||0; tot.n += m.n||0; tot.x += m.x||0; tot.val += val; tot.t += t;
-        const celdas = cols.map(c=>`<td class="${c===win&&max>0?'w':''}">${fmt(m.v[c]||0)}</td>`).join('');
-        const esp = conEsp ? `${conB?`<td class="esp">${fmt(m.b)}</td>`:''}<td class="esp">${fmt(m.n)}</td><td class="esp">${fmt(m.x)}</td>` : '';
-        const etq = m.mesa==='?' ? 'sin número' : `Mesa ${m.mesa}`;
-        return `<tr><td>${etq}</td>${celdas}${hayOtros?`<td>${fmt(otros)}</td>`:''}${esp}<td class="tot">${fmt(conEsp?t:cand)}</td></tr>`;
-      };
-      const cuerpo = filas.map(fila).join('');
-      const th = cols.map(c=>`<th title="${_escA(c)}"><span class="cdot" style="background:${candColor(clave, codigoFor(clave,c)||c)}"></span>${_escA(shortLast(c))}</th>`).join('');
-      const thEsp = conEsp ? `${conB?'<th>Blanco</th>':''}<th>Nulos</th><th>No marcados</th>` : '';
-      const pie = `<tr><td>Suma · ${fmt(filas.length)} mesas</td>${cols.map(c=>`<td>${fmt(tot.c[c])}</td>`).join('')}${hayOtros?`<td>${fmt(tot.o)}</td>`:''}${conEsp?`${conB?`<td>${fmt(tot.b)}</td>`:''}<td>${fmt(tot.n)}</td><td>${fmt(tot.x)}</td>`:''}<td>${fmt(conEsp?tot.t:tot.val)}</td></tr>`;
-      const tabla = `<div class="mesa-scroll"><table class="mesa-table"><thead><tr><th>Mesa</th>${th}${hayOtros?'<th>Otros</th>':''}${thEsp}<th>Total</th></tr></thead><tbody>${cuerpo}</tbody><tfoot>${pie}</tfoot></table></div>`;
-      const notas = [];
-      notas.push(conEsp ? `Total = votos por candidato${conB?' + blanco':''} + nulos + no marcados.` : 'Esta fuente trae por mesa solo los votos por candidato: blanco, nulos y no marcados no están desagregados.');
-      if(hayOtros) notas.push(`«Otros» suma ${fmt(orden.length - cols.length)} candidatos con menos votos en este puesto.`);
-      let aviso = '';
-      if(tot.val !== (pb.votos||0)) aviso = `<div class="mesa-note warn">La suma de las mesas (${fmt(tot.val)} válidos) no coincide con el total del puesto (${fmt(pb.votos)}).</div>`;
-      if(sinGeo) notas.push('Este puesto no tiene coordenada en el georreferenciado de 2026: es un agregado de la fuente o un puesto que ya no existe.');
-      return paywallWrap(tabla, 'mesas', filas.length) + `<div class="mesa-note">${notas.join(' ')}</div>` + aviso;
+        for(const [nom,x] of Object.entries(v)){ cand += x; if(!enCols.has(nom)) otros += x; if(x>max){ max=x; win=nom; } }
+        const t = cand + (f[3]||0) + (f[4]||0);
+        cols.forEach(c=>tot.c[c]=(tot.c[c]||0)+(v[c]||0)); tot.o+=otros; tot.n+=f[3]||0; tot.x+=f[4]||0; tot.t+=t;
+        return `<tr><td><button class="drill-btn" onclick="onSel('mesa','${esc(f[0])}')">Mesa ${esc(f[0])}</button></td>${cols.map(c=>`<td class="${c===win&&max>0?'w':''}">${fmt(v[c]||0)}</td>`).join('')}<td>${fmt(otros)}</td><td class="esp">${fmt(f[3])}</td><td class="esp">${fmt(f[4])}</td><td class="tot">${fmt(t)}</td></tr>`;
+      }).join('');
+      const th = cols.map(c=>`<th title="${esc(tc(c))}"><span class="cdot" style="background:${colorDe(c)}"></span>${esc(tc(c).split(' ').slice(-2).join(' '))}</th>`).join('');
+      const tabla = `<div class="mesa-scroll"><table class="mesa-table"><thead><tr><th>Mesa</th>${th}<th>Otros</th><th>Nulos</th><th>No marcados</th><th>Total</th></tr></thead><tbody>${cuerpo}</tbody>
+        <tfoot><tr><td>Suma · ${fmt(filas.length)} mesas</td>${cols.map(c=>`<td>${fmt(tot.c[c])}</td>`).join('')}<td>${fmt(tot.o)}</td><td>${fmt(tot.n)}</td><td>${fmt(tot.x)}</td><td>${fmt(tot.t)}</td></tr></tfoot></table></div>`;
+      const nota = `<div class="mesa-note">Columnas: los ${cols.length} candidatos más votados del puesto; «Otros» suma al resto. Total = votos por candidatos + nulos + no marcados. Toca una mesa para ver su lista completa.</div>`;
+      body.innerHTML = paywallWrap(tabla, 'mesas', filas.length) + nota;
     }
-    // Lo bloqueado se muestra BORROSO en vez de esconderse: se ve que el dato existe y
-    // cuánto hay. (El gate es de producto, no de seguridad: el JSON ya viaja al navegador.)
     function paywallWrap(html, feat, n){
-      if(window.PlanGate && PlanGate.has(feat)) return html;
+      if(!window.PlanGate || PlanGate.has(feat)) return html;
       return `<div class="pg-paywall"><div class="pg-blurred" aria-hidden="true">${html}</div>
         <div class="pg-paywall-cta">
           <span class="pg-lock">Cuenta gratis</span>
@@ -1498,6 +867,62 @@
           <button class="pgc-btn" onclick="PlanGate.open('${feat}')">Crear cuenta gratis</button>
         </div></div>`;
     }
+    function notaFuente(){
+      const s = STATE.sel;
+      const partes = ['Escrutinio de la Registraduría de las consultas internas del Pacto Histórico del 26 de octubre de 2025 (Senado y Cámara, tarjetones aparte). Con esos resultados el Pacto ordenó sus listas cerradas al Congreso.'];
+      if(s.mun) partes.push('La comuna o localidad y el barrio de cada puesto salen del censo de puestos de votación de la Registraduría (2026); los puestos que no aparecen ahí se agrupan por zona electoral. El barrio es el del lugar donde funciona el puesto, no el de residencia de quienes votaron.');
+      partes.push('Hasta el puesto de votación se consulta sin cuenta; mesa a mesa, con una cuenta gratuita.');
+      return partes.join(' ');
+    }
+
+    // ─── URL: ?c=camara&dep=16&mun=001&com=…&bar=…&pue=…&mesa=… ──
+    function escribeURL(){
+      const p = new URLSearchParams();
+      if(STATE.clave!=='senado') p.set('c', STATE.clave);
+      NIVELES.forEach(n=>{ if(STATE.sel[n]) p.set(n, STATE.sel[n]); });
+      if(LOCAL) p.set('local','1');
+      history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+    }
+    async function leeURL(){
+      const p = new URLSearchParams(location.search);
+      if(p.get('c')==='camara') STATE.clave = 'camara';
+      const dep = p.get('dep');
+      if(!dep || !STATE.deps.some(d=>d.cod===dep)) return;
+      await cargaDep(dep);
+      STATE.sel.dep = dep;
+      const D = STATE.dep[dep];
+      const mun = p.get('mun') || (D.municipios.length===1 ? D.municipios[0].cod : '');
+      if(!D.municipios.some(m=>m.cod===mun)) return;
+      STATE.sel.mun = mun;
+      const ps = puestosDe(dep, D.municipios.find(m=>m.cod===mun));
+      const com = p.get('com'); if(!com || !ps.some(x=>x.com===com)) return; STATE.sel.com = com;
+      const bar = p.get('bar'); if(!bar || !ps.some(x=>x.com===com && x.bar===bar)) return; STATE.sel.bar = bar;
+      const pue = p.get('pue'); if(!pue || !ps.some(x=>x.key===pue && x.bar===bar)) return; STATE.sel.pue = pue;
+      const mesa = p.get('mesa'); if(mesa && (!window.PlanGate || PlanGate.has('mesas'))) STATE.sel.mesa = mesa;
+    }
+
+    // ─── arranque ─────────────────────────────────────────────────
+    function cargando(si){ document.getElementById('load-state').classList.toggle('hidden', !si); document.getElementById('main-content').classList.toggle('hidden', si); }
+    function error(e){ document.getElementById('load-state').classList.remove('hidden'); document.getElementById('main-content').classList.add('hidden'); document.getElementById('pc-loading').textContent = `No se pudieron cargar los datos (${e.message}). Recarga la página en un momento.`; }
+    async function init(){
+      try{
+        const [r, d] = await Promise.all([getJSON('resumen.json'), getJSON('deps.json')]);
+        STATE.resumen = r; STATE.deps = d.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+        // Un color por candidato según su puesto nacional; se conserva al bajar de nivel.
+        ['senado','camara'].forEach(k=>{
+          const lista = k==='senado' ? r.consultas.find(x=>x.clave==='senado').candidatos
+            : STATE.deps.flatMap(x=>x.camara?.candidatos||[]);
+          STATE.colores[k] = {};
+          lista.slice().sort((a,b)=>b.votos-a.votos).forEach((c,i)=>{ STATE.colores[k][c.nombre] = PALETA[i % PALETA.length]; });
+        });
+        document.getElementById('dep-select').innerHTML = '<option value="">NACIONAL – TODOS</option>' +
+          STATE.deps.map(x=>`<option value="${x.cod}">${esc(x.nombre.toUpperCase())}</option>`).join('');
+        await leeURL();
+        cargando(false);
+        render();
+      }catch(e){ error(e); }
+    }
+    if(window.PlanGate){ PlanGate.onChange(()=>{ updateElectoralNav(); if(A) render(); }); PlanGate.init(); }
 
     // ─── BOILERPLATE: nav, theme, curtain, cursor, toasts ────────
     const curtain=document.getElementById('curtain');
@@ -1512,23 +937,70 @@
     document.addEventListener('mouseover',e=>{if(e.target.closest('a,button,select,input')){cur2.style.transform='translate(-50%,-50%) scale(2.5)';cur2.style.background='transparent';cur2.style.border='1.5px solid var(--blue)';ri.style.opacity='0';}else{cur2.style.transform='translate(-50%,-50%) scale(1)';cur2.style.background='var(--blue)';cur2.style.border='none';ri.style.opacity='.4';}});
 
     function updateElectoralNav(){const token=localStorage.getItem('rr-token'),user=JSON.parse(localStorage.getItem('rr-user')||'null'),area=document.getElementById('e-nav-auth');if(!area)return;if(token&&user){const pl={free:'Básico',basic:'Básico',analysis:'Análisis',pro:'Pro',premium:'Premium',full:'Completo'};area.innerHTML=`<span class="e-user-plan">${pl[user.plan]||user.plan}</span><span class="e-user-name">${user.name.split(' ')[0]}</span><button class="e-btn-logout" onclick="eLogOut()">Salir</button>`;}else{area.innerHTML=`<a href="pricing.html" style="font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);text-decoration:none">Planes</a><a href="login.html" class="e-btn-login">Iniciar sesión</a><a href="elige-plan.html" class="e-btn-register">Registrarse</a>`;}}
-    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();updateExcelDownloadBtn();if(window.PlanGate)PlanGate.reset();}
-    function updateExcelDownloadBtn(){const token=localStorage.getItem('rr-token');const user=JSON.parse(localStorage.getItem('rr-user')||'null');const btn=document.getElementById('excel-download-btn');if(!btn)return;const ok=token&&user&&['pro','premium','full'].includes(user.plan);btn.className='excel-btn '+(ok?'excel-btn-active':'excel-btn-locked');}
-    function downloadExcelCurrentView(){const token=localStorage.getItem('rr-token');const user=JSON.parse(localStorage.getItem('rr-user')||'null');const ok=token&&user&&['pro','premium','full'].includes(user.plan);if(!ok){showProToast();return;}console.log('TODO excel export');}
-    function showProToast(){const t=document.getElementById('pro-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),4000);}
+    async function eLogOut(){const token=localStorage.getItem('rr-token');if(token){try{await fetch('https://rr-auth.reruizc.workers.dev/auth/logout',{method:'POST',headers:{'Authorization':`Bearer ${token}`}});}catch{}}localStorage.removeItem('rr-token');localStorage.removeItem('rr-user');updateElectoralNav();if(window.PlanGate)PlanGate.reset();}
     function showCopyToast(){const now=Date.now();if(showCopyToast._last&&now-showCopyToast._last<60000)return;showCopyToast._last=now;const t=document.getElementById('copy-toast');t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),3000);}
     document.addEventListener('copy',e=>{if(!localStorage.getItem('rr-token')){e.preventDefault();showCopyToast();}});
-    updateElectoralNav();updateExcelDownloadBtn();
+    updateElectoralNav();
 
-    function dismissOrient(){sessionStorage.setItem("orient-ok","1");document.getElementById("orient-overlay").classList.remove("show");}
-    if(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)&&!sessionStorage.getItem("orient-ok")){document.getElementById("orient-overlay").classList.add("show");}
 
-    // Tema día/noche: lógica compartida en theme.js (incluido al final del archivo).
+
+    // ─── Custom select overlay para móvil rotado ─────────────────────────
+    // El <select> nativo abre su picker en orientación del dispositivo
+    // (vertical, ya que no gira con el transform). Para que se vea
+    // horizontal, mostramos un modal propio en el DOM rotado.
+    function _isMobileRotated(){
+      return window.matchMedia('(orientation:portrait) and (max-width:900px)').matches;
+    }
+    function _openSelectOverlay(selEl, labelText){
+      const overlay=document.createElement('div'); overlay.className='_sel-overlay';
+      const panel=document.createElement('div'); panel.className='_sel-panel';
+      const title=document.createElement('div'); title.className='_sel-title';
+      title.textContent = labelText || selEl.getAttribute('aria-label') || 'Seleccionar';
+      panel.appendChild(title);
+      const list=document.createElement('div'); list.className='_sel-list';
+      [...selEl.options].forEach(o=>{
+        const b=document.createElement('button');
+        b.type='button';
+        b.className='_sel-opt'+(o.value===selEl.value?' sel':'');
+        b.textContent=o.textContent;
+        b.addEventListener('click',()=>{
+          selEl.value=o.value;
+          selEl.dispatchEvent(new Event('change',{bubbles:true}));
+          document.body.removeChild(overlay);
+        });
+        list.appendChild(b);
+      });
+      panel.appendChild(list);
+      const close=document.createElement('button'); close.type='button'; close.className='_sel-close'; close.textContent='Cerrar';
+      close.addEventListener('click',()=>{ if(overlay.parentNode) document.body.removeChild(overlay); });
+      panel.appendChild(close);
+      overlay.appendChild(panel);
+      overlay.addEventListener('click', e=>{ if(e.target===overlay) document.body.removeChild(overlay); });
+      document.body.appendChild(overlay);
+    }
+    // Engancha todos los <select> de filtros: dep/mun/zona/pue/mesa
+    (function bindMobileSelects(){
+      const ids=['dep-select','mun-select','com-select','bar-select','pue-select','mesa-select'];
+      ids.forEach(id=>{
+        const el=document.getElementById(id); if(!el) return;
+        const labelFor = {
+          'dep-select':'Departamento','mun-select':'Municipio',
+          'com-select':'Localidad / Comuna','bar-select':'Barrio','pue-select':'Puesto','mesa-select':'Mesa',
+        }[id];
+        el.addEventListener('mousedown', e=>{
+          if(_isMobileRotated()){ e.preventDefault(); el.blur(); _openSelectOverlay(el, labelFor); }
+        });
+        // touchstart complementa en iOS donde mousedown a veces no prefija al picker
+        el.addEventListener('touchstart', e=>{
+          if(_isMobileRotated()){ e.preventDefault(); el.blur(); _openSelectOverlay(el, labelFor); }
+        }, {passive:false});
+      });
+    })();
     init();
   </script>
   <script src="theme.js"></script>
-<script>/* sistema visual v2: modo dia retirado -- se mantiene siempre oscuro */
-(function(){var b=document.body;var strip=function(){if(b&&b.classList.contains('day-mode'))b.classList.remove('day-mode');};strip();try{new MutationObserver(strip).observe(b,{attributes:true,attributeFilter:['class']});}catch(e){}})();</script>
+  <script>/* sistema visual v2: siempre oscuro */(function(){var b=document.body;var s=function(){if(b.classList.contains('day-mode'))b.classList.remove('day-mode');};s();try{new MutationObserver(s).observe(b,{attributes:true,attributeFilter:['class']});}catch(e){}})();</script>
+  <script src="lang.js"></script>
   <script>
     /* bfcache: al volver con "atras" el telon quedo cerrado encima -> reabrirlo,
        si no la pagina restaurada queda tapada por las bandas. */
