@@ -1976,6 +1976,22 @@ módulo: solo muestra u oculta tarjetas (clase `plan-fuera`).
   `setView` antes de medir, y un `ResizeObserver` sobre `#crmMap` vuelve al
   último encuadre cuando la caja pasa de 0 a su tamaño. Era intermitente por
   la carrera entre el fetch de la geometría y la apertura de la fase.
+  - **Segunda pasada el mismo día** (los pantallazos de Ricardo seguían
+    mostrando el mapa en blanco por barrio y el del ciclo chico): el mapa del
+    ciclo (`candidato-360-ciclo.js`) gana su propio `ResizeObserver`,
+    `zoomSnap: 0.1` (con 0.25 redondeaba hacia abajo y la ciudad quedaba hasta
+    un 19 % más chica) y se encuadra por los **barrios con prioridad**
+    (`boundsConDato`), no por todo el catastral. Medido: el catastral
+    simplificado de Bogotá va de 4,469 a 4,833 de latitud, sin barrios lejanos
+    que estiren el marco; lo que lo dejaba chico era encuadrar con una caja de
+    otro tamaño. ⚠ No se pudo reproducir en local: la tarjeta 03 necesita la
+    prensa de la Lambda, que desde `localhost` da CORS.
+  - **«Proyectado» mostraba Teusaquillo en vez de Bogotá** (JAL → Concejo): en
+    local el salto reparte bien (Suba · Kennedy · Engativá). Lo único que lo
+    explica es reabrir desde el vínculo con una campaña cuya `ruta` no diga
+    `other`: `precargarCampana` caía a «misma corporación», el CRM abría como
+    JAL y sin salto. Ahora también es «otra» cuando `campana.corp` difiere de
+    la corporación del historial. Por verificar con la cuenta real de Ricardo.
 - **Cada fase lleva una ilustración**: desde el **22-oct-2026 son pictogramas
   planos y serios** (figuras tipo señalética, azul noche sobre papel, con un
   acento verde azulado y uno coral; sin texto ni símbolos de partido), porque

@@ -1472,7 +1472,12 @@ function campanaActual(corpKey) {
 /* Rellena la ruta con la campaña guardada (al volver con vínculo). */
 async function precargarCampana(campana) {
   if (!campana) return;
-  const isOther = campana.ruta === 'other' || !corporacionHistorica(crmCandidate);
+  /* «Otra corporación» también cuando la campaña guardada va a una corporación
+     distinta de la del historial, aunque `ruta` no diga «other» (campañas
+     guardadas antes de ese campo, o con él perdido): sin esto el CRM se abría
+     como JAL, sin salto, y «Proyectado» dejaba toda la meta en Teusaquillo. */
+  const corpHist = corporacionHistorica(crmCandidate);
+  const isOther = campana.ruta === 'other' || !corpHist || (campana.corp && campana.corp !== corpHist);
   document.querySelector(`input[name="corporationRoute"][value="${isOther ? 'other' : 'same'}"]`).checked = true;
   if (campana.partido && $('campaignParty')) $('campaignParty').value = campana.partido;
   /* Quien volvió sin partido —por firmas o sin decidirse— vuelve con su

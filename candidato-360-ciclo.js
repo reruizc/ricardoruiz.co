@@ -275,15 +275,24 @@
     const v = Object.values(pr.barrios).map(b => b.indice).sort((x, y) => x - y);
     if (v.length >= 10) CORTES = [.2, .4, .6, .8].map(q => v[Math.floor(q * (v.length - 1))]);
   }
+  let L_ACTUAL = null;
   function pintarMapa(el, L, pr, alTocar) {
     if (!global.L || !L.geo) { el.classList.add('hidden'); return; }
+    L_ACTUAL = L;
     fijarCortes(pr);
     el.classList.remove('hidden');
     if (!MAPA) {
-      MAPA = global.L.map(el, { zoomControl: true, attributionControl: false, scrollWheelZoom: false, zoomSnap: 0.25 });
+      /* zoomSnap fino: con 0.25 el encuadre redondea hacia abajo y la ciudad
+         queda hasta un 19 % más chica de lo que cabe. */
+      MAPA = global.L.map(el, { zoomControl: true, attributionControl: false, scrollWheelZoom: false, zoomSnap: 0.1 });
       MAPA.setView([4.65, -74.1], 11);
+      /* La caja nace en 0×0 cuando el CRM está tapado por la portada del plan
+         o la tarjeta se pinta antes de acomodarse: al tomar tamaño, se vuelve a
+         encuadrar. Sin esto el mapa quedaba con el encuadre de otra caja. */
+      if (global.ResizeObserver) { let tm = null; new ResizeObserver(() => { clearTimeout(tm); tm = setTimeout(() => { if (el.clientWidth > 0 && el.clientHeight > 0) reencuadrar(); }, 80); }).observe(el); }
     }
     if (CAPA) MAPA.removeLayer(CAPA);
+    CON_DATO = new Set(Object.keys(pr.barrios || {}));
     CAPA = global.L.geoJSON(L.geo, {
       style: f => {
         const b = pr.barrios[L.codeDe(f.properties || {})];
@@ -305,6 +314,18 @@
   /* ── CSS ──────────────────────────────────────────────────────────────── */
   /* Encuadra el mapa de zonas. También lo llama el plan por fases al abrir
      una fase: si el mapa se armó con la portada encima, midió una caja de 0×0. */
+  let CON_DATO = null;
+  function boundsConDato() {
+    if (!CAPA) return null;
+    let bb = null, n = 0;
+    CAPA.eachLayer(lay => {
+      const code = L_ACTUAL?.codeDe?.(lay.feature?.properties || {});
+      if (CON_DATO && CON_DATO.size && !CON_DATO.has(code)) return;
+      const b = lay.getBounds?.(); if (!b || !b.isValid()) return;
+      bb = bb ? bb.extend(b) : global.L.latLngBounds(b.getSouthWest(), b.getNorthEast()); n++;
+    });
+    return n ? bb : CAPA.getBounds();
+  }
   function reencuadrar() {
     if (!MAPA || !CAPA) return;
     const ajustar = () => {
@@ -312,7 +333,9 @@
          zoom queda en NaN y invalidateSize revienta antes del fitBounds. */
       const s = MAPA.getSize(); if (!(s.x > 12 && s.y > 12)) return;
       try {
-        const bb = CAPA.getBounds(); if (!bb.isValid()) return;
+        /* Se encuadra por los barrios CON prioridad (los que pintan): los
+           polígonos sin dato siguen dibujados, pero no mandan el encuadre. */
+        const bb = boundsConDato(); if (!bb || !bb.isValid()) return;
         if (!Number.isFinite(MAPA.getZoom())) MAPA.setView(bb.getCenter(), 11, { animate: false });
         MAPA.invalidateSize();
         const z = MAPA.getBoundsZoom(bb); MAPA.fitBounds(bb, { padding: [6, 6], animate: false, maxZoom: Number.isFinite(z) ? Math.max(z, 10) : 11 });
