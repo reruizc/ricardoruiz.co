@@ -7,7 +7,7 @@
 (function (global) {
   'use strict';
   global.RR_WOMPI_LINKS = Object.freeze({
-    pro:     Object.freeze({ mensual: 'https://checkout.wompi.co/l/Ds08zS', anual: 'https://checkout.wompi.co/l/2Kdoxx' }),
-    premium: Object.freeze({ mensual: 'https://checkout.wompi.co/l/E1ZVCn', anual: 'https://checkout.wompi.co/l/XWAdkz' }),
+    pro:     Object.freeze({ mensual: 'https://checkout.wompi.co/l/Ds08zS', anual: 'https://checkout.wompi.co/l/sX2Xi5' }),
+    premium: Object.freeze({ mensual: 'https://checkout.wompi.co/l/E1ZVCn', anual: 'https://checkout.wompi.co/l/On6Ncq' }),
   });
 })(window);
