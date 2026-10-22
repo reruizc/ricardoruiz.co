@@ -3033,6 +3033,15 @@ function crearMapa(center, zoom) {
      hay un factor 2: Bogotá quedaba en zoom 11 ocupando la mitad del marco,
      con Kennedy y Bosa diminutas y el resto vacío. Con zoom fraccionario el
      encuadre es exacto. */
+  if (!crmLeafletMap) {
+    /* Cuando la caja pasa de 0×0 a su tamaño real (abrir una fase del plan,
+       girar el teléfono, cerrar la estrategia) se vuelve al último encuadre. */
+    if (window.ResizeObserver && !mapEl._c360Ro) {
+      let t = null;
+      mapEl._c360Ro = new ResizeObserver(() => { clearTimeout(t); t = setTimeout(() => { if (mapEl.clientWidth > 0 && mapEl.clientHeight > 0) reencuadrarMapas(); }, 80); });
+      mapEl._c360Ro.observe(mapEl);
+    }
+  }
   if (!crmLeafletMap) { mapEl.innerHTML = ''; crmLeafletMap = L.map(mapEl, { zoomControl: false, attributionControl: true, zoomSnap: 0.1, scrollWheelZoom: false, dragging: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false }).setView(center, zoom); crmLeafletMap.on('layeradd layerremove', () => setTimeout(candadoDetalle, 0)); }
   else { crmLeafletMap.invalidateSize(); if (crmMapLayer) { crmLeafletMap.removeLayer(crmMapLayer); crmMapLayer = null; } }
   if (crmBarrioLayer) { crmLeafletMap.removeLayer(crmBarrioLayer); crmBarrioLayer = null; }
@@ -3083,7 +3092,25 @@ window.reencuadrarMapas = reencuadrarMapas;
 function encuadrarBounds(bounds, padding = 24) {
   if (!crmLeafletMap || !bounds?.isValid()) return;
   crmUltimoEncuadre = { bounds, padding };
-  const ajustar = () => { crmLeafletMap?.invalidateSize(); crmLeafletMap?.fitBounds(bounds, { padding: [padding, padding], animate: false }); };
+  const ajustar = () => {
+    const m = crmLeafletMap; if (!m) return;
+    /* ⚠️⚠️ Con la caja en 0×0 (la portada del plan deja el CRM en display:none
+       mientras el mapa se arma) Leaflet resta el padding al tamaño, saca un
+       ancho NEGATIVO, el logaritmo da NaN y el zoom queda en NaN. Desde ahí
+       cada invalidateSize revienta con «Invalid LatLng object: (NaN, NaN)»
+       antes de llegar al fitBounds, y el mapa se queda en blanco para siempre
+       aunque la caja ya mida 975×520 (reproducido el 22-oct-2026 con el JAL de
+       Teusaquillo). Dos defensas: no encuadrar sin caja (el ResizeObserver de
+       crearMapa vuelve a llamar cuando la haya) y, si el zoom ya quedó en NaN,
+       devolverle una vista válida antes de medir. */
+    const s = m.getSize();
+    if (!(s.x > padding * 2 && s.y > padding * 2)) return;
+    try {
+      if (!Number.isFinite(m.getZoom())) m.setView(bounds.getCenter(), 10, { animate: false });
+      m.invalidateSize();
+      m.fitBounds(bounds, { padding: [padding, padding], animate: false });
+    } catch (e) { console.warn('encuadrarBounds', e); }
+  };
   ajustar();
   setTimeout(ajustar, 60);
   setTimeout(ajustar, 260);

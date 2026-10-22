@@ -1962,6 +1962,20 @@ módulo: solo muestra u oculta tarjetas (clase `plan-fuera`).
   Volver de la barra sigue activo. Antes eran `<div aria-disabled>` y no se
   podía ver qué había adentro. Verificado en el navegador con Campaña (5
   módulos en gris) y Día de la elección (solo 09).
+- ⚠️⚠️ **El mapa del CRM salía EN BLANCO a veces (22-oct-2026, lo reportó
+  Ricardo con el JAL de Teusaquillo).** La portada del plan deja el CRM en
+  `display:none` mientras el mapa se arma; `fitBounds` con la caja en 0×0 le
+  resta el padding al tamaño, saca un ancho **negativo**, el logaritmo da NaN
+  y **el zoom de Leaflet queda en NaN**. Desde ahí cada `invalidateSize` revienta
+  con «Invalid LatLng object: (NaN, NaN)» ANTES de llegar al `fitBounds`, así
+  que el reencuadre de `C360Plan.abrir` no servía y el mapa quedaba vacío para
+  siempre, aunque la caja ya midiera 975×520 (reproducido: `getZoom()` → NaN,
+  23 `<path>` en el DOM, nada visible). Arreglo en `encuadrarBounds`
+  (`candidato-360.js`) y en `reencuadrar` de `candidato-360-ciclo.js`: no se
+  encuadra sin caja, si el zoom ya es NaN se le devuelve una vista válida con
+  `setView` antes de medir, y un `ResizeObserver` sobre `#crmMap` vuelve al
+  último encuadre cuando la caja pasa de 0 a su tamaño. Era intermitente por
+  la carrera entre el fetch de la geometría y la apertura de la fase.
 - **Cada fase lleva una ilustración**: desde el **22-oct-2026 son pictogramas
   planos y serios** (figuras tipo señalética, azul noche sobre papel, con un
   acento verde azulado y uno coral; sin texto ni símbolos de partido), porque

@@ -308,8 +308,15 @@
   function reencuadrar() {
     if (!MAPA || !CAPA) return;
     const ajustar = () => {
-      MAPA.invalidateSize();
-      try { const bb = CAPA.getBounds(); if (bb.isValid()) { const z = MAPA.getBoundsZoom(bb); MAPA.fitBounds(bb, { padding: [6, 6], animate: false, maxZoom: Number.isFinite(z) ? Math.max(z, 10) : 11 }); } } catch {}
+      /* Misma trampa que encuadrarBounds en candidato-360.js: con caja 0×0 el
+         zoom queda en NaN y invalidateSize revienta antes del fitBounds. */
+      const s = MAPA.getSize(); if (!(s.x > 12 && s.y > 12)) return;
+      try {
+        const bb = CAPA.getBounds(); if (!bb.isValid()) return;
+        if (!Number.isFinite(MAPA.getZoom())) MAPA.setView(bb.getCenter(), 11, { animate: false });
+        MAPA.invalidateSize();
+        const z = MAPA.getBoundsZoom(bb); MAPA.fitBounds(bb, { padding: [6, 6], animate: false, maxZoom: Number.isFinite(z) ? Math.max(z, 10) : 11 });
+      } catch {}
     };
     ajustar(); setTimeout(ajustar, 60); setTimeout(ajustar, 260);
   }
