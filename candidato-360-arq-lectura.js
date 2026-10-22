@@ -34,6 +34,11 @@
 (function (global) {
   const RR = global.RRData;
   const E = () => global.C360Electorado;
+  /* Medellín 2027: el JSON de S3 trae en `evol.nombre` el nombre nuevo de la
+     entrega del 1-oct-2026, que es de Proyecto DC y no de este producto;
+     `nombre_anterior` guarda el que Candidato 360 usaba (pedido del estudio,
+     22-oct-2026). Acá manda el anterior. */
+  const nombre27 = f => f?.evol?.nombre_anterior || f?.evol?.nombre;
   const MEDELLIN = '01001', CARTAGENA = '05001', BOGOTA = '16001';
   /* `?arqlocal=1` lee los JSON que dejan los build en `Bases de datos/` del
      repo (Medellín, Cartagena y Bogotá), para revisar antes de subir a S3. */
@@ -153,14 +158,14 @@
     return {
       ciudad: 'medellin', nombreCiudad: 'Medellín', unidad: 'comuna', unidades: 'comunas', familias, barrios, comunas,
       conVotos, total, sinDato, reparto, filasComuna, filasBarrio, pesos, votosCiudad: votos, ubicados, ids,
-      nombreDe: (id, año) => { const f = A[id]; return f ? (año === '2027' ? f.evol.nombre : f.base.nombre) : 'Sin dato'; },
+      nombreDe: (id, año) => { const f = A[id]; return f ? (año === '2027' ? nombre27(f) : f.base.nombre) : 'Sin dato'; },
       cortoDe: id => A[id]?.label_corto || 'Sin dato',
       colorDe: id => A[id]?.color || '#6b7280',
       /* Para el mapa: el polígono se casa por su CODIGO (DAP). */
       geo: capa.geo, codeDe: p => String(p.CODIGO || ''), nombreGeo: p => p.NOMBRE || 'Barrio',
       dominanteDe: (code, año) => año === '2027' ? barrios[code]?.proyeccion_2027?.arquetipo_proy : barrios[code]?.arquetipo?.['2023'],
       mezclaDe: () => null,
-      ficha: id => { const f = A[id]; if (!f) return null; return { id, nombre: f.base.nombre, nombre27: f.evol?.nombre, color: f.color, lema: f.base.deseo, emocion: String(f.base.emocion || '').toLowerCase(), miedo: f.base.miedo, sesgo: f.base.sesgo, escudo: f.base.escudo, escudo27: f.evol?.escudo }; },
+      ficha: id => { const f = A[id]; if (!f) return null; return { id, nombre: f.base.nombre, nombre27: nombre27(f), color: f.color, lema: f.base.deseo, emocion: String(f.base.emocion || '').toLowerCase(), miedo: f.base.miedo, sesgo: f.base.sesgo, escudo: f.base.escudo, escudo27: f.evol?.escudo }; },
     };
   }
 

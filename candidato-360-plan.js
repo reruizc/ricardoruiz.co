@@ -7,7 +7,10 @@
    primeras, 11 · Estrategia va de primera.
 
    Hoy están abiertas Planeación y Posicionamiento. Las otras tres se ven con
-   su fecha y lo que van a traer (el Día de la elección trae 09). Las fechas
+   su fecha y lo que van a traer (el Día de la elección trae 09), y DESDE EL
+   22-OCT TAMBIÉN SE PUEDEN ABRIR: se entra, se ven sus módulos en gris y sin
+   responder al clic, con un aviso de cuándo se abre la fase (pedido de
+   Ricardo: que se pueda mirar qué hay adentro, no solo el rótulo). Las fechas
    salen del calendario del banco de estrategia (estrategia-banco.json): el
    posicionamiento hasta el 28-feb-2027, la inscripción en junio y julio, la
    propaganda desde el 31-jul y la última semana para el Día D.
@@ -55,8 +58,10 @@
   ];
 
   let FASE = null;
-  /* Ilustraciones de las fases (estilo Monument Valley, generadas en Canva). */
-  const IMG = id => `assets/candidato-360/fases/${id}.webp?v=20261020`;
+  /* Ilustraciones de las fases: pictogramas planos y serios (figuras tipo
+     señalética), generados en Canva el 22-oct-2026. Reemplazaron a las
+     isométricas estilo Monument Valley, que no gustaron. */
+  const IMG = id => `assets/candidato-360/fases/${id}.webp?v=20261022`;
 
   function estilos() {
     if ($('c360PlanCss')) return;
@@ -67,6 +72,10 @@
 #crm.plan-fase>.flow-top{order:0}#crm.plan-fase>#crmPlan{order:1}#crm.plan-fase>.dash-head{order:2}
 #crm.plan-fase>.panel{order:3}#crm.plan-fase>.crm-grid{order:4;margin-bottom:14px}#crm.plan-fase>article.panel{order:5}#crm.plan-fase>.estr-vista{order:6}
 #crm.plan-fase .plan-fuera{display:none!important}
+#crm.plan-fase.plan-cerrada .crm-grid>*:not(.plan-fuera),#crm.plan-fase.plan-cerrada>.panel,#crm.plan-fase.plan-cerrada>article.panel,#crm.plan-fase.plan-cerrada>.estr-vista,#crm.plan-fase.plan-cerrada>.dash-head{opacity:.45;filter:grayscale(1);pointer-events:none;user-select:none}
+#crm.plan-fase.plan-cerrada .plan-intro{border-style:dashed}
+.plan-aviso{display:flex;gap:12px;align-items:center;margin:-10px 0 22px;padding:12px 16px;background:var(--cream);border:1px dashed var(--line);border-left:3px solid var(--coral);font-size:14px;color:var(--ink)}
+.plan-aviso b{color:var(--coral)}.plan-aviso span{color:var(--muted)}
 #crm.plan-fase .crm-grid>#crmEstrategia{order:-5}
 .plan-hola{margin:8px 0 26px}.plan-hola h2{font-size:clamp(36px,5vw,62px);line-height:.98;margin:6px 0 10px}.plan-hola p{color:var(--muted);max-width:640px;margin:0;font-size:17px}.plan-hola .plan-por-que{max-width:860px;margin-top:14px;font-size:15px;line-height:1.55;color:var(--ink);border-left:3px solid var(--green);padding-left:14px}
 .plan-fases{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;counter-reset:fase}
@@ -77,7 +86,7 @@
 .plan-card .plan-trae{margin-top:auto;font-size:12px;color:var(--muted)}.plan-card .plan-trae b{color:var(--ink)}
 .plan-card.activa{cursor:pointer;transition:.2s}.plan-card.activa:hover,.plan-card.activa:focus{border-color:var(--green);transform:translateY(-3px);outline:none}
 .plan-card.activa .plan-ir{font:700 13px var(--sans);color:var(--green)}
-.plan-card.cerrada{background:transparent;border-style:dashed;opacity:.8}.plan-card.cerrada .plan-cuando{color:var(--muted)}
+.plan-card.cerrada{background:transparent;border-style:dashed;opacity:.8;cursor:pointer;transition:.2s}.plan-card.cerrada:hover,.plan-card.cerrada:focus{opacity:1;border-color:var(--muted);transform:translateY(-3px);outline:none}.plan-card.cerrada .plan-ir{font:700 13px var(--sans);color:var(--muted)}.plan-card.cerrada .plan-cuando{color:var(--muted)}
 .plan-card .plan-sello{position:absolute;top:16px;right:16px;font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;padding:3px 7px;border:1px solid currentColor}
 .plan-card.activa .plan-sello{color:var(--green)}.plan-card.cerrada .plan-sello{color:var(--muted)}
 .plan-card{overflow:hidden}.plan-card .plan-img{display:block;width:calc(100% + 36px);max-width:none;margin:-20px -18px 4px;height:auto;aspect-ratio:3/2;object-fit:cover;background:#f3ebe0}
@@ -99,7 +108,7 @@
   function portada() {
     const caja = $('crmPlan'), crm = $('crm'); if (!caja || !crm) return;
     estilos(); FASE = null;
-    crm.classList.add('plan-portada'); crm.classList.remove('plan-fase');
+    crm.classList.add('plan-portada'); crm.classList.remove('plan-fase', 'plan-cerrada');
     limpiarFiltro();
     const nombre = nombreCorto();
     caja.classList.remove('hidden');
@@ -108,14 +117,15 @@
       <p class="plan-por-que">¿Por qué cinco? Porque una campaña no es una sola carrera: son cinco momentos con reglas distintas. Primero se planea —de dónde parte y qué estrategia escoger—. Después se posiciona, mientras todavía hay tiempo para que el votante lo conozca, porque la persuasión rinde temprano. Luego viene la campaña: aval, lista, inscripción y propaganda. El remate es el último mes, cuando la pauta pesa pero su efecto dura pocos días. Y el día de la elección se gana con logística: sacar a votar y cuidar el voto. Hacer en cada momento lo que ese momento pide es la diferencia entre gastar y sumar.</p></div>
       <div class="plan-fases">${FASES.map(f => {
         const trae = f.modulos.filter(m => NOMBRE_MODULO[m]).map(m => NOMBRE_MODULO[m]);
-        return `<${f.activa ? 'button type="button"' : 'div'} class="plan-card ${f.activa ? 'activa' : 'cerrada'}" ${f.activa ? `data-fase="${f.id}"` : 'aria-disabled="true"'}>
+        /* Las cerradas también se abren: adentro los módulos van en gris. */
+        return `<button type="button" class="plan-card ${f.activa ? 'activa' : 'cerrada'}" data-fase="${f.id}">
           <img class="plan-img" src="${IMG(f.id)}" alt="" width="600" height="400" loading="lazy" onerror="this.remove()">
           <span class="plan-sello">${f.activa ? 'Abierta' : 'Próximamente'}</span>
           <span class="plan-num">${String(FASES.indexOf(f) + 1).padStart(2, '0')}</span><h3>${esc(f.nombre)}</h3><span class="plan-cuando">${esc(f.cuando)}</span><p>${esc(f.que)}</p>
-          <span class="plan-trae">${f.activa ? `<span class="plan-ir">Abrir →</span>` : `Se abre el ${esc(fecha(f.abre))}.${trae.length ? ` Trae <b>${esc(trae.join(' · '))}</b>.` : ''}`}</span>
-        </${f.activa ? 'button' : 'div'}>`;
+          <span class="plan-trae">${f.activa ? `<span class="plan-ir">Abrir →</span>` : `Se abre el ${esc(fecha(f.abre))}.${trae.length ? ` Trae <b>${esc(trae.join(' · '))}</b>.` : ''} <span class="plan-ir">Ver qué trae →</span>`}</span>
+        </button>`;
       }).join('')}</div>`;
-    caja.querySelectorAll('.plan-card.activa').forEach(b => b.onclick = () => abrir(b.dataset.fase));
+    caja.querySelectorAll('.plan-card').forEach(b => b.onclick = () => abrir(b.dataset.fase));
   }
 
   function limpiarFiltro() {
@@ -123,15 +133,17 @@
   }
 
   function abrir(id) {
-    const f = FASES.find(x => x.id === id && x.activa); if (!f) return;
+    const f = FASES.find(x => x.id === id); if (!f) return;
     const caja = $('crmPlan'), crm = $('crm'); if (!caja || !crm) return;
     estilos(); FASE = id;
-    crm.classList.remove('plan-portada'); crm.classList.add('plan-fase');
+    crm.classList.remove('plan-portada'); crm.classList.add('plan-fase'); crm.classList.toggle('plan-cerrada', !f.activa);
     limpiarFiltro();
     Object.entries(PIEZAS).forEach(([k, p]) => { if (!f.modulos.includes(k)) p()?.classList.add('plan-fuera'); });
     /* Sin barra de navegación: para volver a las fases está «Volver» arriba. */
     const n = String(FASES.indexOf(f) + 1).padStart(2, '0');
-    caja.innerHTML = `<div class="plan-intro"><img src="${IMG(f.id)}" alt="" width="600" height="400" onerror="this.remove()"><div><span class="kicker">Fase ${n} · ${esc(f.cuando)}</span><h2>${esc(f.nombre)}</h2><p>${esc(f.parrafo || f.que)}</p></div></div>`;
+    const trae = f.modulos.filter(m => NOMBRE_MODULO[m]).map(m => NOMBRE_MODULO[m]);
+    caja.innerHTML = `<div class="plan-intro"><img src="${IMG(f.id)}" alt="" width="600" height="400" onerror="this.remove()"><div><span class="kicker">Fase ${n} · ${esc(f.cuando)}</span><h2>${esc(f.nombre)}</h2><p>${esc(f.parrafo || f.que)}</p></div></div>`
+      + (f.activa ? '' : `<div class="plan-aviso" role="status"><b>Todavía no se abre.</b><span>Esta fase se abre el ${esc(fecha(f.abre))}. Lo que ve abajo es lo que va a traer${trae.length ? ` (${esc(trae.join(' · '))})` : ''}: por ahora no responde al clic.</span></div>`);
     window.scrollTo({ top: 0, behavior: 'instant' });
     /* El mapa de Leaflet mide su caja al crearse: si estuvo oculto, se le avisa. */
     setTimeout(() => { window.dispatchEvent(new Event('resize')); window.reencuadrarMapas?.(); }, 0);
