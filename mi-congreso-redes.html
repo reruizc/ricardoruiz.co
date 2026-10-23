@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
   <link rel="stylesheet" href="mi-congreso.css?v=20261023" />
+  <style>.pr-sint{font-size:1.02rem;line-height:1.65;color:var(--white);margin:0}.pr-sint b{font-weight:700}</style>
 </head>
 <body>
   <div class="bg-layer"></div>
@@ -37,6 +38,7 @@
   <section>
     <div id="mc-head"></div>
     <div id="rd-estado"></div>
+    <div class="panel" id="rd-lectura-panel" style="margin-top:1.2rem"><h3>La lectura <small id="rd-lectura-meta"></small></h3><div id="rd-lectura"></div></div>
     <div class="kpis" id="rd-kpis" style="margin-top:1.2rem"></div>
     <div class="rd-redes" id="rd-redes"></div>
     <p class="note" id="rd-pie" style="margin-top:1.2rem"></p>
@@ -92,6 +94,27 @@
       </div>`;
     }
 
+    /* La lectura escrita por el modelo en el recolector (lectura.mjs). Si no
+       vino, se arma en cifras acá mismo: nunca se inventa un párrafo. */
+    function pintaLectura(d,R,t){
+      const L=d.lectura, el=document.getElementById('rd-lectura'), meta=document.getElementById('rd-lectura-meta');
+      const NOM={x:'X',instagram:'Instagram',tiktok:'TikTok',facebook:'Facebook'};
+      const top=Object.entries(R).flatMap(([k,r])=>(r.publicados||[]).map(p=>({...p,red:NOM[k]||k}))).sort((a,b)=>(b.reaccion||0)-(a.reaccion||0))[0];
+      const tot=t.post.a_favor+t.post.en_contra+t.post.neutro+t.post.ataque;
+      const cifras=`<p class="pr-sint"><b>En cifras:</b> ${num(t.pub)} publicaciones suyas leídas${top?`, la que más rindió en ${esc(top.red)} con ${num(top.reaccion)} reacciones: «${esc(cut(top.texto,120))}»`:''}. ${num(t.com)} comentarios leídos${tot?`, clasificados como ${MC.pct(t.post.a_favor,tot)}% a favor, ${MC.pct(t.post.en_contra,tot)}% en contra, ${MC.pct(t.post.ataque,tot)}% ataque y ${MC.pct(t.post.neutro,tot)}% neutro`:''}. ${num(t.men)} publicaciones de otros sobre sus temas.</p>`;
+      if(!L||!(L.lectura||[]).length){
+        meta.textContent='resumen en cifras · esta lectura no trae texto del modelo';
+        el.innerHTML=cifras+'<p class="note">La lectura escrita se genera en el recolector; si el modelo falló, queda este resumen que se calcula sobre los mismos datos.</p>';
+        return;
+      }
+      meta.textContent=`escrita por ${L.modelo||'el modelo'} sobre esta lectura`;
+      el.innerHTML=`<p class="pr-sint" style="font-weight:700;font-size:1.12rem;margin-bottom:.7rem">${esc(L.titular)}</p>`
+        +L.lectura.map(p=>`<p class="pr-sint" style="margin-bottom:.6rem">${esc(p)}</p>`).join('')
+        +(L.cambio?`<p class="pr-sint" style="margin-top:.5rem"><b>Desde la lectura anterior${L.anterior&&L.anterior.generadoEn?` (${esc(MC.fechaCorta(L.anterior.generadoEn))})`:''}:</b> ${esc(L.cambio)}</p>`:'')
+        +((L.senales||[]).length?`<h4 style="font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--white);margin:.9rem 0 .35rem">Señales para esta semana</h4><ul style="margin:0;padding-left:1.1rem;font-size:.84rem;line-height:1.55;color:var(--white)">${L.senales.map(s=>`<li style="margin-bottom:.25rem">${esc(s)}</li>`).join('')}</ul>`:'')
+        +cifras.replace('class="pr-sint"','class="pr-sint" style="margin-top:.8rem;font-size:.84rem;color:var(--gray)"')
+        +'<p class="note">El modelo solo puede citar y contar lo que está en la lectura; aun así, es un modelo: cada cita se puede abrir abajo, en su red.</p>';
+    }
     MC.escucha(e).then(d=>{
       const est=document.getElementById('rd-estado');
       if(!d){
@@ -102,8 +125,9 @@
       const temas=(d.vinculo&&d.vinculo.temas)||[];
       est.innerHTML=`<div class="panel"><span class="rd-sello">Escucha encendida</span><div class="mc-lbl" style="margin-top:.6rem">Última lectura: <b>${esc(cuando(d.generadoEn))}</b>${d.automatica?' · se actualiza sola cada mañana':''}${costo?` · esta lectura costó US$${costo.toFixed(2)}`:''}${d.congresista&&d.congresista.verificadas?` · cuentas comprobadas el ${esc(d.congresista.verificadas.split(' ')[0])}`:''}</div>
         ${temas.length?`<div class="mc-lbl">Temas que se buscan, sacados de sus proyectos: ${temas.map(t=>`<b>«${esc(t)}»</b>`).join(' · ')}</div>`:''}</div>`;
-      const R=d.redes||{}; let pub=0,men=0,com=0,cls=0;
-      Object.values(R).forEach(r=>{ pub+=(r.publicados||[]).length; men+=(r.menciones||[]).length; [r.comentarios,r.comentarios_propios].forEach(c=>{ if(c){ com+=c.n||0; cls+=c.clasificados||0; } }); });
+      const R=d.redes||{}; let pub=0,men=0,com=0,cls=0; const post={a_favor:0,en_contra:0,neutro:0,ataque:0};
+      Object.values(R).forEach(r=>{ pub+=(r.publicados||[]).length; men+=(r.menciones||[]).length; [r.comentarios,r.comentarios_propios].forEach(c=>{ if(c){ com+=c.n||0; cls+=c.clasificados||0; Object.keys(post).forEach(k=>post[k]+=(c.postura||{})[k]||0); } }); });
+      pintaLectura(d,R,{pub,men,com,post});
       const cell=(n,l,c)=>`<div class="kpi${c?' '+c:''}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
       document.getElementById('rd-kpis').innerHTML=cell(num(pub),'publicaciones suyas leídas','hl2')+cell(num(men),'publicaciones de otros sobre sus temas')+cell(num(com),'comentarios leídos')+cell(num(cls),'comentarios con postura clasificada');
       const cuentas=(d.congresista&&d.congresista.cuentas)||{};

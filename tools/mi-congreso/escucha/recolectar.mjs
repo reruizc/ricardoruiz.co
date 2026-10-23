@@ -24,12 +24,16 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { capturar, capturaVacia, planDe, llaveModelo, tokenApify } from '../../candidato-360/escucha/captura.mjs';
+import { lecturaDe } from './lectura.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(AQUI, '../../..');
 const SALIDA = path.join(REPO, 'mi-congreso-data', 'escucha');
 const args = Object.fromEntries(process.argv.slice(2).map(a => { const m = a.match(/^--([^=]+)=(.*)$/); return m ? [m[1], m[2]] : [a.replace(/^--/, ''), true]; }));
 const SECO = Boolean(args['dry-run']), FORZAR = Boolean(args.forzar);
+/* --solo-lectura: no raspa nada; vuelve a escribir la lectura sobre la captura
+   que ya está en disco (para cambiar el prompt sin pagar Apify). */
+const SOLO_LECTURA = Boolean(args['solo-lectura']);
 const TOPE = args.tope ? Number(args.tope) : null;
 const TOPE_MES = Number(args['tope-mes'] || process.env.MC_ESCUCHA_TOPE_MES_USD || 40);
 const HORAS_MIN = Number(args['horas-min'] || 20);
@@ -62,7 +66,7 @@ if (!entradas.length) { console.log('Nadie en cuentas.json (o el --solo no casa 
 let token = null, llave = null;
 if (!SECO) {
   token = await tokenApify(); llave = await llaveModelo();
-  if (!token) { console.error('Falta APIFY_TOKEN'); process.exit(1); }
+  if (!token && !SOLO_LECTURA) { console.error('Falta APIFY_TOKEN'); process.exit(1); }
   if (!llave) { console.error('Falta DEEPSEEK_API_KEY'); process.exit(1); }
 }
 await mkdir(SALIDA, { recursive: true });
@@ -78,6 +82,16 @@ for (const [nombreElectos, c] of entradas) {
   console.log(`  temas: ${PERFIL.temas.map(t => `«${t}»`).join(' · ') || '—'}`);
   for (const f of filasPosts) console.log(`  ${f.etiqueta.padEnd(10)} ${f.motivo ? '— ' + f.motivo : `${f.consultas.length} consultas × ${TOPE ?? f.tope}${f.propio ? ` + ${f.propio} propias` : ''} + comentarios de ${filasCom.find(x => x.red === f.red)?.posts || 0} posts`}`);
   const gastoMes = previa?.gastoMes && previa.gastoMes.mes === mesDe(new Date().toISOString()) ? previa.gastoMes : { mes: mesDe(new Date().toISOString()), usd: 0, lecturas: 0 };
+  if (SOLO_LECTURA) {
+    if (!previa) { console.log('  no hay captura en disco sobre la cual escribir\n'); continue; }
+    try {
+      previa.lectura = await lecturaDe(previa, previa.lectura?.anterior ? { generadoEn: previa.lectura.anterior.generadoEn, redes: null } : null, llave, { log: s => process.stdout.write('  ' + s) });
+      gastoMes.usd += previa.lectura.usd; previa.gastoMes = gastoMes;
+      await writeFile(archivo, JSON.stringify(previa)); escritos++;
+      console.log(`  ✓ lectura reescrita en ${path.relative(REPO, archivo)} · «${previa.lectura.titular}»\n`);
+    } catch (e) { fallos++; console.log(`  ✗ la lectura falló: ${e.message}\n`); }
+    continue;
+  }
   if (!FORZAR && horasDesde(previa?.generadoEn) < HORAS_MIN) { console.log(`  ya tiene lectura de hace ${horasDesde(previa.generadoEn).toFixed(1)} h: se salta\n`); continue; }
   const estimado = previa?.costo ? Number(previa.costo.apifyUsd || 0) + Number(previa.costo.modeloUsd || 0) : 1.0;
   if (gastoMes.usd + estimado > TOPE_MES) { console.log(`  tope del mes: lleva ${usd(gastoMes.usd)} de ${usd(TOPE_MES)}\n`); continue; }
@@ -100,6 +114,10 @@ for (const [nombreElectos, c] of entradas) {
      las cuentas de otra persona. `automatica` lo dice el pie de la página. */
   cap.congresista = { nombre: nombreElectos, corp: c.corp, slug: c.slug, cuentas: c.cuentas, verificadas: c.verificadas || '' };
   cap.automatica = Boolean(process.env.GITHUB_ACTIONS);
+  /* La lectura escrita: si el modelo falla, la captura sale sin ella y la
+     página pinta el resumen en cifras que calcula sola. */
+  try { cap.lectura = await lecturaDe(cap, previa, llave, { log: s => process.stdout.write('  ' + s) }); gastoMes.usd += cap.lectura.usd; }
+  catch (e) { console.log(`\n  la lectura escrita falló (${e.message}); la captura sale sin ella`); }
   cap.gastoMes = gastoMes;
   await writeFile(archivo, JSON.stringify(cap));
   escritos++;

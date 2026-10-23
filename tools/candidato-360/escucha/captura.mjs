@@ -29,7 +29,11 @@ const texto = it => String(it.text || it.caption || it.desc || it.description ||
 const autor = it => String(it.author?.userName || it.author?.username || it.ownerUsername || it.authorMeta?.name || it.user?.username || it.pageName || it.author || it.username || '').replace(/^@/, '');
 const fecha = it => it.createdAt || it.timestamp || it.createTimeISO || it.time || it.date || null;
 const propio = (it, handle) => Boolean(handle) && norm(autor(it)) === norm(handle);
-const ficha = it => { const r = referenciaDePost(it) || {}; return { texto: texto(it).slice(0, 280), autor: autor(it), fecha: fecha(it), url: r.url || '', reaccion: r.reaccion || 0, comentarios: r.comentarios ?? null }; };
+/* ⚠️ `slice` cuenta unidades UTF-16 y parte un emoji por la mitad: el JSON
+   queda con un sustituto suelto que Python no puede volver a escribir. Se
+   recorta por caracteres completos. */
+const recorta = (s, n) => Array.from(String(s || '')).slice(0, n).join('');
+const ficha = it => { const r = referenciaDePost(it) || {}; return { texto: recorta(texto(it), 280), autor: autor(it), fecha: fecha(it), url: r.url || '', reaccion: r.reaccion || 0, comentarios: r.comentarios ?? null }; };
 
 /* Cuántas veces aparece cada tema en un texto, por palabra pelada. Es un
    conteo de menciones, no una clasificación: el modelo hace lo fino. */
@@ -76,13 +80,17 @@ export async function capturar(vinculo, { token, llave = null, sinModelo = false
   const console = { log: (...xs) => log(xs.join(' ') + '\n') };
   const process_ = { stdout: { write: log } };
 
-  async function leerComentarios(f, posts) {
+  async function leerComentarios(f, posts, handle = PERFIL.cuentas[f.red] || '') {
     const fc = filasCom.find(c => c.red === f.red);
     process_.stdout.write(`▸ ${f.etiqueta} · comentarios de ${posts.length} posts… `);
     try {
       const r = await apify.correr(fc.actor, COMENTARIOS[f.red].input(posts, TOPE ? Math.min(TOPE, fc.tope) : fc.tope));
       captura.costo.apifyUsd += r.cobrado;
-      const coms = r.items.map(ficha).filter(x => x.texto);
+      /* ⚠️ Dos basuras medidas en X (oct-2026): el actor mete su propio aviso de
+         precios («From KaitoEasyAPI, a reminder…») como si fuera un tweet, y la
+         búsqueda por conversación devuelve también el tweet RAÍZ del propio
+         candidato. Ninguno es «lo que le dicen». */
+      const coms = r.items.map(ficha).filter(x => x.texto && !/KaitoEasyAPI/i.test(x.texto) && !propio(x, handle));
       console.log(`${coms.length} comentarios · $${r.cobrado.toFixed(4)}`);
       const postura = { a_favor: 0, en_contra: 0, neutro: 0, ataque: 0 }, tono = {}, temas = {};
       if (!SIN_MODELO && coms.length) {
