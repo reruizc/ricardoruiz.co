@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Congreso Claro · El Congreso de Colombia, explicado</title>
+<meta name="description" content="Qué se discute hoy en el Congreso de Colombia, qué proyectos de ley acaban de llegar y qué cambiarían, los temas de la semana y cómo nace una ley. En lenguaje sencillo." />
+<meta property="og:title" content="Congreso Claro · El Congreso, explicado" />
+<meta property="og:description" content="La agenda del día, los proyectos nuevos en lenguaje sencillo y un banco de información para entender cómo funciona el Congreso." />
+<meta name="theme-color" content="#f6f2e8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   Congreso Claro · página ciudadana del Congreso
+   ───────────────────────────────────────────────────────────────────
+   Autocontenida a propósito (un solo archivo, sin la marca del sitio) para
+   poder publicarla en un dominio neutro. Lee SOLO archivos públicos de S3:
+   la API de Caudal no admite otros dominios, así que aquí no se usa.
+     · ordenes-vigentes.json   agenda de comisiones y plenarias
+     · en-vivo.json            últimos radicados + resumen en lenguaje llano
+     · temas-del-momento.json  temas de la semana (prensa + radicados + consultas)
+     · ritmo-legislaturas.json proyectos radicados 2026 vs 2022 vs 2018
+     · comisiones-2026.json    integrantes y mesas directivas
+   Lo que casi no cambia (composición, estadística histórica) va embebido.
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --paper:#f6f2e8; --paper2:#efe9da; --card:#fffdf8; --ink:#16182b; --ink2:#4a4d63; --ink3:#7d8096;
+  --line:rgba(22,24,43,.12); --line2:rgba(22,24,43,.22);
+  --sun:#f2b705; --sun-soft:#fdf1c7; --blue:#2c56e0; --blue-soft:#e3e9fd;
+  --coral:#e2553b; --coral-soft:#fbe3dd; --green:#1f8a5e; --green-soft:#dcf1e7;
+  --plum:#7a3fa0; --plum-soft:#efe4f6;
+  --senado:#2c56e0; --camara:#1f8a5e;
+  --r:18px; --r2:12px;
+  --disp:'Bricolage Grotesque',system-ui,sans-serif;
+  --txt:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --sh:0 1px 2px rgba(22,24,43,.05),0 8px 24px rgba(22,24,43,.06);
+  --sh2:0 2px 4px rgba(22,24,43,.06),0 18px 40px rgba(22,24,43,.12);
+  color-scheme:light;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+body{font-family:var(--txt);background:var(--paper);color:var(--ink);font-size:17px;line-height:1.55;overflow-x:hidden;
+  background-image:radial-gradient(rgba(22,24,43,.07) 1px,transparent 1.3px);background-size:22px 22px}
+a{color:var(--blue)}
+button{font:inherit;color:inherit;cursor:pointer}
+img,svg{display:block}
+.wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ── barra superior ─────────────────────────────────────────────── */
+.top{position:sticky;top:0;z-index:50;background:rgba(246,242,232,.88);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:18px;height:66px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);flex-shrink:0}
+.brand b{font-family:var(--disp);font-weight:800;font-size:1.32rem;letter-spacing:-.03em}
+.brand b i{font-style:normal;color:var(--blue)}
+.menu{display:flex;gap:4px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+.menu::-webkit-scrollbar{display:none}
+.menu a{font-size:.88rem;font-weight:700;color:var(--ink2);text-decoration:none;padding:8px 12px;border-radius:99px;white-space:nowrap;transition:background .2s,color .2s}
+.menu a:hover,.menu a.on{background:var(--ink);color:var(--paper)}
+
+/* ── cinta de lo último ─────────────────────────────────────────── */
+.ticker{background:var(--ink);color:#fff;overflow:hidden;white-space:nowrap;font-size:.86rem;height:38px;display:flex;align-items:center}
+.ticker .lbl{flex-shrink:0;background:var(--sun);color:var(--ink);font-weight:700;padding:0 14px;height:100%;display:flex;align-items:center;gap:7px;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;position:relative;z-index:2}
+.ticker .lbl::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--coral);animation:latido 1.6s infinite}
+.ticker .run{display:inline-flex;gap:46px;padding-left:30px;animation:corre 90s linear infinite}
+.ticker:hover .run{animation-play-state:paused}
+.ticker .run button{background:none;border:0;color:#fff;opacity:.9;white-space:nowrap}
+.ticker .run button:hover{opacity:1;text-decoration:underline}
+.ticker .run b{color:var(--sun);font-weight:700;margin-right:6px}
+@keyframes corre{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes latido{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:.5}}
+
+/* ── portada ────────────────────────────────────────────────────── */
+.hero{padding:56px 0 30px}
+.hero-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:40px;align-items:center}
+.kicker{display:inline-flex;align-items:center;gap:8px;font-size:.8rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink2);background:var(--card);border:1px solid var(--line);padding:6px 12px;border-radius:99px}
+.kicker .dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(31,138,94,.18)}
+.kicker .dot.off{background:var(--ink3);box-shadow:0 0 0 4px rgba(125,128,150,.18)}
+h1{font-family:var(--disp);font-weight:800;font-size:clamp(2.4rem,5.4vw,4.3rem);line-height:.98;letter-spacing:-.045em;margin:18px 0 18px}
+h1 .mk{background:linear-gradient(transparent 62%,var(--sun) 62%,var(--sun) 92%,transparent 92%);padding:0 .08em}
+.lead{font-size:1.18rem;color:var(--ink2);max-width:36em}
+.hero-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.btn{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:.95rem;text-decoration:none;padding:12px 18px;border-radius:99px;border:2px solid var(--ink);background:var(--ink);color:var(--paper);transition:transform .2s,box-shadow .2s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(22,24,43,.2)}
+.btn.ghost{background:transparent;color:var(--ink)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tile{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 16px;box-shadow:var(--sh);text-decoration:none;color:var(--ink);overflow:hidden;transition:transform .25s,box-shadow .25s;min-height:150px;display:flex;flex-direction:column}
+.tile:hover{transform:translateY(-4px) rotate(-.4deg);box-shadow:var(--sh2)}
+.tile .t{font-size:.78rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2)}
+.tile .n{font-family:var(--disp);font-weight:800;font-size:3.1rem;line-height:1;letter-spacing:-.04em;margin:10px 0 6px}
+.tile .s{font-size:.9rem;color:var(--ink2);margin-top:auto}
+.tile .ic{position:absolute;right:14px;top:14px;width:42px;height:42px;border-radius:12px;display:grid;place-items:center}
+.tile.a{background:var(--sun-soft)} .tile.a .ic{background:var(--sun)}
+.tile.b{background:var(--blue-soft)} .tile.b .ic{background:var(--blue);color:#fff}
+.tile.c{background:var(--green-soft)} .tile.c .ic{background:var(--green);color:#fff}
+.tile.d{background:var(--coral-soft)} .tile.d .ic{background:var(--coral);color:#fff}
+
+/* ── secciones ─────────────────────────────────────────────────── */
+section.blk{padding:64px 0 22px}
+.sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:26px}
+.sec-num{font-family:var(--disp);font-weight:800;font-size:.9rem;color:var(--ink);background:var(--sun);display:inline-block;padding:3px 10px;border-radius:8px;margin-bottom:12px}
+h2{font-family:var(--disp);font-weight:800;font-size:clamp(1.9rem,3.6vw,2.8rem);line-height:1.02;letter-spacing:-.04em}
+.sec-sub{color:var(--ink2);max-width:40em;margin-top:10px;font-size:1.05rem}
+h3{font-family:var(--disp);font-weight:700;font-size:1.25rem;letter-spacing:-.02em;line-height:1.15}
+.note{font-size:.86rem;color:var(--ink3);margin-top:14px;line-height:1.5}
+.note b{color:var(--ink2)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px;box-shadow:var(--sh)}
+
+/* aparición al hacer scroll */
+.rv{opacity:0;transform:translateY(22px);transition:opacity .6s ease,transform .6s cubic-bezier(.2,.8,.2,1)}
+.rv.in{opacity:1;transform:none}
+
+/* ── chips ──────────────────────────────────────────────────────── */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--line2);background:var(--card);padding:7px 13px;border-radius:99px;font-size:.88rem;font-weight:700;color:var(--ink2);transition:all .2s;display:inline-flex;align-items:center;gap:7px}
+.chip:hover{border-color:var(--ink);color:var(--ink)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.chip .c{font-size:.75rem;opacity:.7}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:700;letter-spacing:.04em;padding:4px 9px;border-radius:99px;background:var(--paper2);color:var(--ink2);white-space:nowrap}
+.tag i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.tag.sen{background:var(--blue-soft);color:var(--senado)}
+.tag.cam{background:var(--green-soft);color:var(--camara)}
+.tag.cancel{background:var(--coral);color:#fff}
+
+/* ── agenda ─────────────────────────────────────────────────────── */
+.days{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;margin-bottom:20px;scrollbar-width:thin}
+.day{flex-shrink:0;min-width:104px;text-align:left;background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:10px 14px;transition:all .2s}
+.day:hover{border-color:var(--ink)}
+.day .dn{font-size:.74rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+.day .dd{font-family:var(--disp);font-weight:800;font-size:1.35rem;letter-spacing:-.03em;line-height:1.1}
+.day .dc{font-size:.78rem;color:var(--ink2)}
+.day.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.day.on .dn,.day.on .dc{color:rgba(246,242,232,.75)}
+.day.vacio{opacity:.6}
+.ses-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px}
+.ses{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;display:flex;flex-direction:column;position:relative}
+.ses-top{padding:16px 18px 12px;border-bottom:1px dashed var(--line2)}
+.ses-top .row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.ses-top h3{font-size:1.18rem}
+.ses-top .when{font-size:.88rem;color:var(--ink2);margin-top:4px}
+.ses.cancelada{opacity:.62}
+.ses.cancelada h3{text-decoration:line-through;text-decoration-thickness:2px}
+.ses-body{padding:12px 18px 16px;flex:1;display:flex;flex-direction:column;gap:10px}
+.bill{display:flex;gap:10px;align-items:flex-start;text-align:left;background:none;border:0;padding:8px 10px;margin:0 -10px;border-radius:10px;transition:background .2s;width:calc(100% + 20px)}
+.bill:hover{background:var(--paper)}
+.bill .pos{flex-shrink:0;width:26px;height:26px;border-radius:8px;background:var(--paper2);font-weight:700;font-size:.8rem;display:grid;place-items:center;color:var(--ink2)}
+.bill .tx{font-size:.95rem;line-height:1.4}
+.bill .tx small{display:block;color:var(--ink3);font-size:.78rem;margin-top:2px}
+.bill .tx em{font-style:normal;color:var(--blue);font-weight:700;font-size:.8rem}
+.ses-empty{font-size:.92rem;color:var(--ink2);background:var(--paper);border-radius:12px;padding:12px 14px}
+.ses-empty b{color:var(--ink)}
+.ses-foot{padding:12px 18px;border-top:1px solid var(--line);font-size:.86rem;display:flex;justify-content:space-between;gap:10px}
+.ses-foot a{font-weight:700;text-decoration:none}
+.empty-day{background:var(--card);border:1.5px dashed var(--line2);border-radius:var(--r);padding:30px;text-align:center;color:var(--ink2)}
+.empty-day b{display:block;font-family:var(--disp);font-size:1.4rem;color:var(--ink);margin-bottom:6px}
+
+/* ── temas ─────────────────────────────────────────────────────── */
+.temas{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.tema{perspective:1200px;min-height:340px;background:none;border:0;text-align:left;padding:0}
+.tema .in2{position:relative;width:100%;height:100%;min-height:340px;transition:transform .7s cubic-bezier(.3,.7,.2,1);transform-style:preserve-3d}
+.tema.flip .in2{transform:rotateY(180deg)}
+.tema .cara{position:absolute;inset:0;border-radius:var(--r);padding:20px;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex;flex-direction:column;box-shadow:var(--sh);border:1px solid var(--line)}
+.tema .frente{background:var(--card)}
+.tema .dorso{background:var(--ink);color:var(--paper);transform:rotateY(180deg);overflow:auto}
+.tema .tic{width:50px;height:50px;border-radius:14px;display:grid;place-items:center;margin-bottom:14px}
+.tema h3{font-size:1.32rem;margin-bottom:8px}
+.tema p{font-size:.95rem;color:var(--ink2)}
+.tema .medidor{margin-top:auto;padding-top:14px;display:grid;gap:6px}
+.tema .med{display:grid;grid-template-columns:74px 1fr 30px;gap:8px;align-items:center;font-size:.76rem;color:var(--ink3)}
+.tema .med .b{height:7px;background:var(--paper2);border-radius:9px;overflow:hidden}
+.tema .med .b i{display:block;height:100%;width:0;border-radius:9px;transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
+.tema .med .v{text-align:right;font-weight:700;color:var(--ink2)}
+.tema .gira{font-size:.78rem;font-weight:700;color:var(--blue);margin-top:10px}
+.tema .dorso h4{font-family:var(--disp);font-size:1.05rem;margin-bottom:10px}
+.tema .dorso ul{list-style:none;display:grid;gap:9px;font-size:.88rem;line-height:1.4}
+.tema .dorso li{padding-left:16px;position:relative;color:rgba(246,242,232,.88)}
+.tema .dorso li::before{content:'“';position:absolute;left:0;top:-2px;color:var(--sun);font-weight:700;font-size:1.1rem}
+.tema .dorso .arch{margin-top:auto;padding-top:14px;font-size:.84rem;color:rgba(246,242,232,.75)}
+.tema .dorso .arch b{color:var(--sun);font-family:var(--disp);font-size:1.4rem;display:block}
+
+/* ── lo nuevo ─────────────────────────────────────────────────── */
+.nv-tools{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:18px}
+.search{display:flex;align-items:center;gap:8px;background:var(--card);border:1.5px solid var(--line2);border-radius:99px;padding:8px 14px;min-width:240px;flex:1;max-width:380px}
+.search input{border:0;background:none;font:inherit;font-size:.95rem;outline:none;width:100%;color:var(--ink)}
+.search:focus-within{border-color:var(--ink)}
+.nuevos{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.nv{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--sh);text-align:left;display:flex;flex-direction:column;gap:10px;transition:transform .25s,box-shadow .25s;position:relative;overflow:hidden}
+.nv::after{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--tc,var(--blue))}
+.nv:hover{transform:translateY(-4px);box-shadow:var(--sh2)}
+.nv .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.nv h3{font-size:1.1rem;line-height:1.22}
+.nv .afe{font-size:.88rem;color:var(--ink2)}
+.nv .foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.8rem;color:var(--ink3)}
+.nv .foot b{color:var(--blue)}
+.mini{display:flex;gap:3px;margin-top:2px}
+.mini i{height:6px;flex:1;border-radius:4px;background:var(--paper2)}
+.mini i.on{background:var(--green)}
+.mini.fin i{background:var(--line2)}
+.more{display:flex;justify-content:center;margin-top:22px}
+
+/* ── cómo nace una ley ─────────────────────────────────────────── */
+.ruta{position:relative;display:grid;grid-template-columns:repeat(8,1fr);gap:10px;margin:8px 0 22px}
+.ruta::before{content:'';position:absolute;left:4%;right:4%;top:30px;height:4px;background:var(--paper2);border-radius:4px}
+.ruta .prog{position:absolute;left:4%;top:30px;height:4px;background:var(--ink);border-radius:4px;width:0;transition:width .6s ease}
+.paso{position:relative;background:none;border:0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;z-index:1}
+.paso .bola{width:62px;height:62px;border-radius:50%;background:var(--card);border:3px solid var(--line2);display:grid;place-items:center;transition:all .35s cubic-bezier(.3,1.5,.5,1)}
+.paso .bola span{font-family:var(--disp);font-weight:800;font-size:1.15rem}
+.paso .nm{font-size:.84rem;font-weight:700;line-height:1.2;color:var(--ink2)}
+.paso.hecho .bola{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.paso.on .bola{background:var(--sun);border-color:var(--ink);color:var(--ink);transform:scale(1.14)}
+.paso.on .nm{color:var(--ink)}
+.paso-det{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:start;min-height:170px}
+.paso-det .big{font-family:var(--disp);font-weight:800;font-size:5rem;line-height:.8;color:var(--sun);-webkit-text-stroke:2px var(--ink)}
+.paso-det h3{font-size:1.6rem;margin-bottom:8px}
+.paso-det p{color:var(--ink2);max-width:46em}
+.paso-det .dato{margin-top:12px;display:inline-flex;gap:8px;align-items:flex-start;background:var(--sun-soft);border-radius:12px;padding:10px 14px;font-size:.92rem}
+.paso-det .anim{animation:entra .45s ease}
+@keyframes entra{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+.ruta-ctl{display:flex;gap:8px;margin-top:16px}
+.ruta-ctl button{border:1.5px solid var(--line2);background:var(--card);border-radius:99px;padding:7px 14px;font-weight:700;font-size:.86rem}
+.ruta-ctl button:hover{border-color:var(--ink)}
+
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
+.cien{display:grid;grid-template-columns:repeat(20,1fr);gap:5px;margin:16px 0 14px}
+.cien i{aspect-ratio:1;border-radius:50%;background:var(--paper2);transform:scale(0);transition:transform .4s cubic-bezier(.3,1.6,.5,1),background .4s}
+.cien.in i{transform:scale(1)}
+.ley-leg{display:grid;gap:8px;font-size:.92rem}
+.ley-leg div{display:grid;grid-template-columns:14px 44px 1fr;gap:10px;align-items:center}
+.ley-leg i{width:14px;height:14px;border-radius:50%}
+.ley-leg b{font-family:var(--disp);font-size:1.1rem}
+.big-num{font-family:var(--disp);font-weight:800;font-size:4.2rem;letter-spacing:-.05em;line-height:.9}
+.big-num small{font-size:1.4rem;letter-spacing:-.02em}
+.tipos{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}
+.tipo{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:8px}
+.tipo .deb{display:flex;gap:4px;flex-wrap:wrap}
+.tipo .deb i{width:16px;height:16px;border-radius:5px;background:var(--blue)}
+.tipo .deb i.x{background:var(--coral)}
+.tipo p{font-size:.92rem;color:var(--ink2)}
+.tipo small{font-size:.8rem;color:var(--ink3);margin-top:auto}
+
+/* ── ritmo ─────────────────────────────────────────────────────── */
+.ritmo{display:grid;grid-template-columns:1fr 1.5fr;gap:24px;align-items:center}
+.ritmo svg{width:100%;height:auto;overflow:visible}
+.ritmo .ln{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.ritmo .lbl-y{font-size:12px;fill:var(--ink3)}
+
+/* ── comisiones ────────────────────────────────────────────────── */
+.coms{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.com{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:10px;transition:transform .25s,box-shadow .25s}
+.com:hover{transform:translateY(-4px);box-shadow:var(--sh2)}
+.com .nn{font-family:var(--disp);font-weight:800;font-size:2.6rem;line-height:.9;letter-spacing:-.05em;color:var(--cc)}
+.com h3{font-size:1.15rem}
+.com .apodo{font-size:.9rem;font-weight:700;color:var(--ink)}
+.com ul{list-style:none;display:flex;flex-wrap:wrap;gap:5px}
+.com li{font-size:.78rem;background:var(--paper);border-radius:99px;padding:3px 9px;color:var(--ink2)}
+.com .mesa{font-size:.82rem;color:var(--ink3);margin-top:auto;padding-top:10px;border-top:1px dashed var(--line2);line-height:1.45}
+.com .mesa b{color:var(--ink2)}
+.com.extra{background:var(--ink);color:var(--paper)}
+.com.extra h3,.com.extra .apodo{color:var(--paper)}
+.com.extra p{font-size:.92rem;color:rgba(246,242,232,.82)}
+
+/* ── composición ───────────────────────────────────────────────── */
+.camaras{display:grid;grid-template-columns:1fr 1.5fr;gap:18px}
+.waffle{display:grid;gap:4px;margin:14px 0}
+.waffle i{aspect-ratio:1;border-radius:4px;opacity:0;transform:scale(.3);transition:opacity .3s,transform .4s cubic-bezier(.3,1.6,.5,1)}
+.waffle.in i{opacity:1;transform:none}
+.wleg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.8rem;color:var(--ink2)}
+.wleg span{display:inline-flex;align-items:center;gap:6px}
+.wleg i{width:10px;height:10px;border-radius:3px}
+.cifras{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.cifra{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh)}
+.cifra b{font-family:var(--disp);font-weight:800;font-size:2.4rem;letter-spacing:-.04em;line-height:1;display:block}
+.cifra span{font-size:.88rem;color:var(--ink2)}
+
+/* ── glosario ───────────────────────────────────────────────────── */
+.glo-tools{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:18px}
+.glosario{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.gl{background:var(--card);border:1px solid var(--line);border-radius:var(--r2);padding:16px 18px;box-shadow:var(--sh);text-align:left;transition:border-color .2s}
+.gl:hover{border-color:var(--ink)}
+.gl h3{font-size:1.1rem;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.gl h3 .mas{font-family:var(--txt);font-size:1.2rem;color:var(--ink3);transition:transform .3s}
+.gl p{font-size:.94rem;color:var(--ink2);margin-top:6px}
+.gl .ej{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s ease}
+.gl .ej>div{overflow:hidden}
+.gl .ej p{background:var(--sun-soft);border-radius:10px;padding:10px 12px;margin-top:10px;color:var(--ink)}
+.gl.open .ej{grid-template-rows:1fr}
+.gl.open .mas{transform:rotate(45deg)}
+.gl mark{background:var(--sun);color:inherit;border-radius:3px;padding:0 2px}
+
+/* ── preguntas ─────────────────────────────────────────────────── */
+.faq{display:grid;gap:10px;max-width:880px}
+.faq details{background:var(--card);border:1px solid var(--line);border-radius:var(--r2);padding:4px 18px;box-shadow:var(--sh)}
+.faq summary{font-family:var(--disp);font-weight:700;font-size:1.12rem;padding:14px 0;list-style:none;display:flex;justify-content:space-between;gap:12px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:'+';font-size:1.4rem;line-height:1;color:var(--ink3);transition:transform .3s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details p{padding:0 0 16px;color:var(--ink2)}
+
+/* ── pie ────────────────────────────────────────────────────────── */
+footer{margin-top:70px;background:var(--ink);color:rgba(246,242,232,.82);padding:44px 0 36px;font-size:.92rem}
+footer .wrap{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:30px}
+footer h4{font-family:var(--disp);color:#fff;font-size:1.05rem;margin-bottom:10px}
+footer a{color:var(--sun)}
+footer ul{list-style:none;display:grid;gap:6px}
+footer .legal{grid-column:1/-1;border-top:1px solid rgba(246,242,232,.15);padding-top:18px;font-size:.82rem;color:rgba(246,242,232,.6)}
+
+/* ── ficha (modal) ─────────────────────────────────────────────── */
+dialog{border:0;padding:0;border-radius:22px;max-width:720px;width:calc(100% - 28px);max-height:calc(100dvh - 40px);background:var(--card);color:var(--ink);box-shadow:0 30px 80px rgba(0,0,0,.35);margin:auto}
+dialog::backdrop{background:rgba(22,24,43,.55);backdrop-filter:blur(3px)}
+dialog[open]{animation:sube .35s cubic-bezier(.2,.9,.3,1.1)}
+@keyframes sube{from{opacity:0;transform:translateY(30px) scale(.97)}to{opacity:1;transform:none}}
+.md{padding:26px 28px 24px;overflow:auto;max-height:calc(100dvh - 40px)}
+.md .x{position:sticky;top:0;float:right;width:38px;height:38px;border-radius:50%;border:1.5px solid var(--line2);background:var(--card);font-size:1.1rem;margin:-6px -8px 0 10px}
+.md .x:hover{border-color:var(--ink)}
+.md h2{font-size:clamp(1.4rem,3vw,1.9rem);margin:12px 0 14px}
+.md h4{font-family:var(--disp);font-size:1rem;letter-spacing:-.01em;margin:20px 0 8px;display:flex;align-items:center;gap:8px}
+.md h4 i{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-style:normal;font-size:.8rem}
+.md ul.cambia{list-style:none;display:grid;gap:8px}
+.md ul.cambia li{padding:10px 12px 10px 38px;background:var(--paper);border-radius:12px;position:relative;font-size:.97rem}
+.md ul.cambia li::before{content:counter(c);counter-increment:c;position:absolute;left:10px;top:10px;width:20px;height:20px;border-radius:6px;background:var(--ink);color:var(--paper);font-size:.72rem;font-weight:700;display:grid;place-items:center}
+.md ul.cambia{counter-reset:c}
+.md .ojo{background:var(--coral-soft);border-radius:12px;padding:12px 14px;font-size:.95rem}
+.md .afecta{background:var(--blue-soft);border-radius:12px;padding:12px 14px;font-size:.95rem}
+.md .oficial{font-size:.86rem;color:var(--ink2);background:var(--paper);border-radius:12px;padding:12px 14px;line-height:1.5}
+.md .estado{display:grid;gap:8px}
+.md .estado .mini i{height:9px}
+.md .acciones{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.md .aviso{font-size:.8rem;color:var(--ink3);margin-top:16px;line-height:1.5}
+
+/* ── cargando / error ──────────────────────────────────────────── */
+.sk{background:linear-gradient(90deg,var(--paper2) 0%,#fff 50%,var(--paper2) 100%);background-size:200% 100%;animation:brillo 1.4s infinite;border-radius:var(--r);min-height:160px}
+@keyframes brillo{from{background-position:200% 0}to{background-position:-200% 0}}
+.err{background:var(--card);border:1.5px dashed var(--coral);border-radius:var(--r);padding:18px;color:var(--ink2)}
+
+/* ── consulta: cards con imagen ─────────────────────────────────── */
+.feat{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.fcard{position:relative;min-height:360px;border-radius:22px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;color:#fff;text-decoration:none;box-shadow:var(--sh2);isolation:isolate}
+.fcard .bg{position:absolute;inset:0;background-size:cover;background-position:center;transform:scale(1.04);transition:transform 1.4s cubic-bezier(.2,.8,.2,1);z-index:-2}
+.fcard::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(14,15,30,.94) 8%,rgba(14,15,30,.55) 42%,rgba(14,15,30,0) 78%);z-index:-1}
+.fcard .bg.alto{background-position:center 30%}
+.fcard:hover .bg{transform:scale(1.12)}
+.fcard .in3{padding:26px 26px 24px}
+.fcard .k{display:inline-block;font-size:.74rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;background:var(--sun);color:var(--ink);padding:4px 10px;border-radius:99px;margin-bottom:12px}
+.fcard h3{font-size:clamp(1.6rem,2.6vw,2.1rem);color:#fff;letter-spacing:-.03em;margin-bottom:8px}
+.fcard p{color:rgba(255,255,255,.86);max-width:30em}
+.fcard .st{display:flex;gap:22px;margin:16px 0 18px;flex-wrap:wrap}
+.fcard .st b{display:block;font-family:var(--disp);font-size:2rem;line-height:1;color:var(--sun)}
+.fcard .st span{font-size:.8rem;color:rgba(255,255,255,.75)}
+.fcard .go{display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--ink);font-weight:700;padding:11px 17px;border-radius:99px;transition:gap .25s}
+.fcard:hover .go{gap:14px}
+
+/* ── archivo ───────────────────────────────────────────────────── */
+.bigsearch{display:flex;align-items:center;gap:12px;background:var(--card);border:2.5px solid var(--ink);border-radius:18px;padding:6px 8px 6px 18px;box-shadow:var(--sh)}
+.bigsearch input{flex:1;border:0;background:none;font:inherit;font-size:1.2rem;outline:none;padding:10px 0;color:var(--ink);min-width:0}
+.bigsearch button{background:var(--ink);color:var(--paper);border:0;border-radius:12px;padding:12px 18px;font-weight:700}
+.ejemplos{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 4px;align-items:center;font-size:.88rem;color:var(--ink3)}
+.arc-res{margin-top:24px}
+.arc-top{display:grid;grid-template-columns:minmax(220px,.8fr) 1.6fr;gap:18px}
+.arc-big{font-family:var(--disp);font-weight:800;font-size:clamp(3rem,7vw,5rem);line-height:.9;letter-spacing:-.05em}
+.arc-big small{display:block;font-family:var(--txt);font-size:1rem;letter-spacing:0;font-weight:400;color:var(--ink2);margin-top:10px;line-height:1.45}
+.stack{display:flex;height:16px;border-radius:9px;overflow:hidden;background:var(--paper2);margin:14px 0 10px}
+.stack i{height:100%;width:0;transition:width 1s cubic-bezier(.2,.8,.2,1)}
+.stk-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.82rem;color:var(--ink2)}
+.stk-leg span{display:inline-flex;gap:6px;align-items:center}
+.stk-leg i{width:10px;height:10px;border-radius:3px}
+.yb{display:flex;align-items:flex-end;gap:3px;height:150px;margin-top:10px}
+.yb button{flex:1;border:0;background:var(--blue);border-radius:4px 4px 0 0;height:0;min-height:0;transition:height .9s cubic-bezier(.2,.8,.2,1),background .2s;padding:0;position:relative}
+.yb button.cero{background:var(--paper2)}
+.yb button:hover,.yb button.on{background:var(--coral)}
+.yb-ax{display:flex;justify-content:space-between;font-size:.76rem;color:var(--ink3);margin-top:6px}
+.yb-tip{font-size:.86rem;color:var(--ink2);min-height:1.4em;margin-top:6px}
+.arc-list{margin-top:18px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
+.arc-list .hd{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ar{display:grid;grid-template-columns:58px 1fr auto;gap:14px;align-items:center;padding:13px 18px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;width:100%;transition:background .2s}
+.ar:hover{background:var(--paper)}
+.ar .y{font-family:var(--disp);font-weight:800;font-size:1.15rem}
+.ar .t{font-size:.95rem;line-height:1.38}
+.ar .t small{display:block;color:var(--ink3);font-size:.78rem;margin-top:3px}
+.res{font-size:.74rem;font-weight:700;padding:4px 9px;border-radius:99px;white-space:nowrap}
+.pager{display:flex;gap:6px;justify-content:center;padding:14px;flex-wrap:wrap}
+.pager button{border:1.5px solid var(--line2);background:var(--card);border-radius:10px;min-width:38px;padding:6px 10px;font-weight:700;font-size:.86rem}
+.pager button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.pager button:disabled{opacity:.35}
+.cargando{display:flex;align-items:center;gap:12px;color:var(--ink2);padding:24px 4px}
+.cargando i{width:22px;height:22px;border-radius:50%;border:3px solid var(--paper2);border-top-color:var(--ink);animation:gira .8s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+
+/* ── votaciones ────────────────────────────────────────────────── */
+.vt-pick{position:relative;max-width:640px}
+.ac{position:absolute;left:0;right:0;top:calc(100% + 6px);background:var(--card);border:1.5px solid var(--ink);border-radius:14px;box-shadow:var(--sh2);z-index:20;max-height:360px;overflow:auto;display:none}
+.ac.on{display:block}
+.ac button{display:flex;width:100%;gap:10px;align-items:center;text-align:left;border:0;background:none;padding:11px 16px;border-bottom:1px solid var(--line)}
+.ac button:hover,.ac button.sel{background:var(--sun-soft)}
+.ac button b{font-weight:700}
+.ac button small{margin-left:auto;color:var(--ink3);font-size:.78rem;white-space:nowrap}
+.actual{font-size:.7rem;font-weight:700;background:var(--green);color:#fff;padding:2px 7px;border-radius:99px;white-space:nowrap}
+.perfil{margin-top:22px}
+.pf-head{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.pf-av{width:70px;height:70px;border-radius:20px;background:var(--ink);color:var(--sun);display:grid;place-items:center;font-family:var(--disp);font-weight:800;font-size:1.6rem;flex-shrink:0}
+.pf-head h3{font-size:1.8rem;letter-spacing:-.03em}
+.pf-head .sub{color:var(--ink2);font-size:.95rem;margin-top:4px}
+.pf-tabs{display:flex;gap:8px;margin:18px 0 0}
+.pf-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px}
+.pf-kpis div{background:var(--paper);border-radius:14px;padding:14px 16px}
+.pf-kpis b{font-family:var(--disp);font-weight:800;font-size:2rem;line-height:1;display:block}
+.pf-kpis span{font-size:.84rem;color:var(--ink2)}
+.sino{display:flex;height:30px;border-radius:10px;overflow:hidden;margin:16px 0 8px;font-size:.8rem;font-weight:700;color:#fff}
+.sino i{display:flex;align-items:center;padding:0 10px;width:0;transition:width 1s cubic-bezier(.2,.8,.2,1);white-space:nowrap;overflow:hidden;font-style:normal}
+.sino .si{background:var(--green)}.sino .no{background:var(--coral)}.sino .ot{background:var(--ink3)}
+.alin{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:var(--blue-soft);border-radius:14px;padding:14px 16px;margin-top:14px}
+.alin>b{font-family:var(--disp);font-weight:800;font-size:2.2rem;color:var(--blue)}
+.alin p{font-size:.92rem;color:var(--ink2)}
+.vp{display:grid;grid-template-columns:1fr auto;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:center}
+.vp .t{font-size:.95rem;line-height:1.38}
+.vp .t small{display:block;color:var(--ink3);font-size:.78rem;margin-top:3px}
+.vp .vv{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.pill{font-size:.74rem;font-weight:700;padding:4px 9px;border-radius:99px;white-space:nowrap}
+.pill.si{background:var(--green-soft);color:var(--green)}.pill.no{background:var(--coral-soft);color:var(--coral)}
+.pill.fav{background:var(--green);color:#fff}.pill.con{background:var(--coral);color:#fff}.pill.div{background:var(--sun);color:var(--ink)}.pill.trm{background:var(--paper2);color:var(--ink2)}
+.vt-vacio{background:var(--card);border:1.5px dashed var(--line2);border-radius:var(--r);padding:22px;color:var(--ink2);margin-top:20px}
+
+/* ── comisión (ficha) ──────────────────────────────────────────── */
+.com{cursor:pointer;text-align:left;font:inherit;color:inherit}
+.com .ver{font-size:.84rem;font-weight:700;color:var(--cc)}
+dialog.ancho{max-width:900px}
+.cm-tabs{display:flex;gap:8px;margin:14px 0 6px}
+.miembros{display:flex;flex-wrap:wrap;gap:6px}
+.mb{display:inline-flex;align-items:center;gap:7px;font-size:.84rem;background:var(--paper);border:1px solid transparent;border-radius:99px;padding:5px 11px;color:var(--ink)}
+.mb i{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.mb.mesa{background:var(--ink);color:var(--paper)}
+.mb.vt{border-color:var(--line2);cursor:pointer}
+.mb.vt:hover{border-color:var(--ink)}
+.mb.vt::after{content:'✓';font-size:.7rem;color:var(--green);font-weight:700}
+.top3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
+.t3{background:var(--paper);border-radius:16px;padding:16px;text-align:left;border:1.5px solid transparent;display:flex;flex-direction:column;gap:8px;transition:border-color .2s,transform .2s}
+.t3:hover{border-color:var(--ink);transform:translateY(-2px)}
+.t3 .rk{font-family:var(--disp);font-weight:800;font-size:2.2rem;line-height:.9;color:var(--sun);-webkit-text-stroke:1.5px var(--ink)}
+.t3 h5{font-family:var(--disp);font-size:1rem;line-height:1.25;font-weight:700}
+.t3 small{font-size:.78rem;color:var(--ink3)}
+.cm-lista{margin-top:12px;max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:14px}
+.cm-lista .ar{grid-template-columns:1fr auto;padding:10px 14px}
+
+/* ── móvil ──────────────────────────────────────────────────────── */
+@media(max-width:1060px){
+  .temas,.coms{grid-template-columns:repeat(2,1fr)}
+  .nuevos,.glosario{grid-template-columns:repeat(2,1fr)}
+  .tipos{grid-template-columns:repeat(2,1fr)}
+  .cifras{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:860px){
+  .hero-grid,.ritmo,.dos,.camaras,.feat,.arc-top{grid-template-columns:1fr}
+  .pf-kpis{grid-template-columns:repeat(2,1fr)}
+  .top3{grid-template-columns:1fr}
+  html{scroll-padding-top:118px}
+  .top .wrap{flex-wrap:wrap;height:auto;padding-top:10px;padding-bottom:8px;row-gap:8px}
+  .menu{width:100%;margin-left:0;margin-right:-16px;padding-right:16px}
+  .menu a{background:var(--card);border:1px solid var(--line);font-size:.82rem;padding:6px 11px}
+  .ruta{grid-template-columns:repeat(4,1fr);row-gap:22px}
+  .ruta::before,.ruta .prog{display:none}
+  footer .wrap{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  body{font-size:16px}
+  .wrap{padding:0 16px}
+  .hero{padding-top:34px}
+  .temas,.coms,.nuevos,.glosario,.tipos{grid-template-columns:1fr}
+  .ses-grid{grid-template-columns:1fr}
+  .tile .n{font-size:2.5rem}
+  .paso-det{grid-template-columns:1fr}
+  .paso-det .big{font-size:3.4rem}
+  .paso .bola{width:52px;height:52px}
+  .cien{grid-template-columns:repeat(10,1fr)}
+  .md{padding:22px 18px 20px}
+  .search{min-width:0;max-width:none}
+  .fcard{min-height:320px}
+  .ar{grid-template-columns:44px 1fr}
+  .ar .res{grid-column:2;justify-self:start}
+  .bigsearch input{font-size:1rem}
+  .vp{grid-template-columns:1fr}
+  .vp .vv{justify-content:flex-start}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .rv{opacity:1;transform:none}
+  .ticker .run{animation:none}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#inicio" aria-label="Congreso Claro, inicio">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="10" fill="#16182b"/><path d="M8 14.5 17 8l9 6.5" fill="none" stroke="#f2b705" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/><path d="M11 16v8M15 16v8M19 16v8M23 16v8" stroke="#f6f2e8" stroke-width="2.4" stroke-linecap="round"/><path d="M8.5 26.5h17" stroke="#f6f2e8" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <b>Congreso<i>Claro</i></b>
+    </a>
+    <nav class="menu" aria-label="Secciones">
+      <a href="#agenda">Agenda</a>
+      <a href="#temas">Temas</a>
+      <a href="#nuevos">Lo nuevo</a>
+      <a href="#archivo">Archivo</a>
+      <a href="#votos">Votaciones</a>
+      <a href="#ruta">Cómo nace una ley</a>
+      <a href="#comisiones">Comisiones</a>
+      <a href="#quienes">Quiénes son</a>
+      <a href="#glosario">Glosario</a>
+    </nav>
+  </div>
+</header>
+
+<div class="ticker" id="ticker" aria-label="Últimos proyectos radicados"><div class="lbl">Acaba de llegar</div><div class="run" id="ticker-run"></div></div>
+
+<main id="inicio">
+
+<!-- ── portada ── -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="rv">
+      <span class="kicker" id="estado-congreso"><span class="dot"></span> Congreso 2026 – 2030</span>
+      <h1>Lo que pasa en el Congreso, <span class="mk">contado en sencillo</span>.</h1>
+      <p class="lead">Qué se discute hoy, qué proyectos de ley acaban de llegar y qué cambiarían en tu vida. Y, si quieres entender cómo funciona todo, un banco de información para consultar cuando lo necesites.</p>
+      <div class="hero-cta">
+        <a class="btn" href="#agenda">Ver la agenda de hoy →</a>
+        <a class="btn ghost" href="#ruta">¿Cómo nace una ley?</a>
+      </div>
+    </div>
+    <div class="tiles rv" id="tiles">
+      <a class="tile a" href="#agenda" data-dia="hoy"><span class="ic" aria-hidden="true">☀</span><span class="t">Hoy</span><span class="n" data-n="t-hoy">–</span><span class="s" id="t-hoy-s">sesiones publicadas</span></a>
+      <a class="tile b" href="#agenda" data-dia="manana"><span class="ic" aria-hidden="true">→</span><span class="t">Mañana</span><span class="n" data-n="t-man">–</span><span class="s" id="t-man-s">sesiones publicadas</span></a>
+      <a class="tile c" href="#agenda"><span class="ic" aria-hidden="true">§</span><span class="t">En la agenda</span><span class="n" data-n="t-proy">–</span><span class="s">proyectos de ley citados a debate en los próximos días</span></a>
+      <a class="tile d" href="#nuevos"><span class="ic" aria-hidden="true">✦</span><span class="t">Esta legislatura</span><span class="n" data-n="t-rad">–</span><span class="s" id="t-rad-s">proyectos radicados desde el 20 de julio</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- ── 01 agenda ── -->
+<section class="blk" id="agenda">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="sec-num">01 · La agenda</span>
+        <h2>¿Qué se discute hoy y mañana?</h2>
+        <p class="sec-sub">Cada comisión y cada plenaria publica su <b>orden del día</b>: la lista de lo que va a discutir. Toca un proyecto para ver de qué se trata. Si un proyecto está de primero en la lista, tiene más chance de que lo discutan ese día.</p>
+      </div>
+    </div>
+    <div class="days" id="days" role="tablist" aria-label="Días con sesiones"></div>
+    <div id="agenda-box"><div class="ses-grid"><div class="sk"></div><div class="sk"></div><div class="sk"></div></div></div>
+    <p class="note" id="agenda-nota"></p>
+  </div>
+</section>
+
+<!-- ── 02 temas ── -->
+<section class="blk" id="temas">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="sec-num">02 · Los temas de la semana</span>
+        <h2>De qué se está hablando</h2>
+        <p class="sec-sub">Los asuntos que más aparecen en la prensa política de los últimos días, cruzados con lo que llega al Congreso y con las normas que el Gobierno tiene abiertas a comentarios. <b>Toca una tarjeta para darle la vuelta</b> y ver de dónde sale. Las barras dicen cuántas notas de prensa, proyectos nuevos y normas del Gobierno en consulta tocan el tema.</p>
+      </div>
+    </div>
+    <div class="temas" id="temas-box"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+    <p class="note" id="temas-nota"></p>
+  </div>
+</section>
+
+<!-- ── 03 lo nuevo ── -->
+<section class="blk" id="nuevos">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="sec-num">03 · Lo que acaba de llegar</span>
+        <h2>Proyectos nuevos, en lenguaje sencillo</h2>
+        <p class="sec-sub">Los últimos proyectos de ley radicados en el Senado y en la Cámara. Cada tarjeta dice qué cambiaría si se aprueba y a quién le aplica. Que un proyecto llegue <b>no significa que vaya a ser ley</b>: la mayoría no lo logra.</p>
+      </div>
+    </div>
+    <div class="nv-tools rv">
+      <div class="chips" id="nv-cam">
+        <button class="chip on" data-c="">Todos</button>
+        <button class="chip" data-c="sen">Senado</button>
+        <button class="chip" data-c="cam">Cámara</button>
+      </div>
+      <label class="search"><span aria-hidden="true">⌕</span><span class="sr">Buscar</span><input id="nv-q" type="search" placeholder="Busca un tema: salud, vivienda, impuestos…" autocomplete="off" /></label>
+    </div>
+    <div class="chips rv" id="nv-temas" style="margin-bottom:18px"></div>
+    <div class="nuevos" id="nv-box"><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+    <div class="more"><button class="btn ghost" id="nv-mas" hidden>Ver más proyectos</button></div>
+    <p class="note" id="nv-nota"></p>
+  </div>
+</section>
+
+<!-- ── consulta: dos puertas con imagen ── -->
+<section class="blk" id="consulta">
+  <div class="wrap">
+    <div class="sec-head rv"><div><span class="sec-num">Para investigar</span><h2>Consulta el archivo del Congreso</h2><p class="sec-sub">Dos herramientas para ir más allá de lo que pasa hoy: buscar si un tema ya se había discutido antes y ver cómo vota cada congresista.</p></div></div>
+    <div class="feat">
+      <a class="fcard rv" href="#archivo"><div class="bg alto" style="background-image:url('img/archivo.jpg')"></div><div class="in3"><span class="k">El archivo</span><h3>¿Ya se había propuesto?</h3><p>Escribe un tema y mira cuántas veces se ha presentado un proyecto sobre eso desde 1991, en qué años y cuántos se volvieron ley.</p><div class="st"><div><b data-cuenta="15421">0</b><span>proyectos y reformas</span></div><div><b>1991</b><span>desde este año</span></div></div><span class="go">Buscar en el archivo →</span></div></a>
+      <a class="fcard rv" href="#votos" style="transition-delay:120ms"><div class="bg" style="background-image:url('img/votaciones.jpg')"></div><div class="in3"><span class="k">Las votaciones</span><h3>¿Cómo vota tu congresista?</h3><p>Busca a un senador o representante y mira cuántas veces votó sí o no, en qué proyectos y con quién suele coincidir.</p><div class="st"><div><b data-cuenta="518" id="fc-n">0</b><span>congresistas con voto registrado</span></div><div><b data-cuenta="111" id="fc-e">0</b><span>siguen en el Congreso actual</span></div></div><span class="go">Ver las votaciones →</span></div></a>
+    </div>
+  </div>
+</section>
+
+<!-- ── 04 el archivo ── -->
+<section class="blk" id="archivo">
+  <div class="wrap">
+    <div class="sec-head rv"><div><span class="sec-num">04 · El archivo</span><h2>¿Cuántas veces se ha presentado?</h2><p class="sec-sub">Muchas ideas llegan al Congreso una y otra vez. Busca un tema y verás cuántos proyectos se han radicado sobre él, en qué años y qué pasó con ellos.</p></div></div>
+    <form class="bigsearch rv" id="arc-form" role="search"><span aria-hidden="true" style="font-size:1.3rem">⌕</span><label class="sr" for="arc-q">Buscar un tema en el archivo</label><input id="arc-q" type="search" placeholder="Escribe un tema: cannabis, salud mental, eutanasia…" autocomplete="off" /><button type="submit">Buscar</button></form>
+    <div class="ejemplos rv" id="arc-ej"><span>Prueba con:</span></div>
+    <div id="arc-res" class="arc-res" aria-live="polite"></div>
+    <p class="note" id="arc-nota">Buscamos en el título de los proyectos de ley y de las reformas constitucionales. Un mismo tema puede escribirse de varias formas: si no aparece, prueba con otra palabra.</p>
+  </div>
+</section>
+
+<!-- ── 05 las votaciones ── -->
+<section class="blk" id="votos">
+  <div class="wrap">
+    <div class="sec-head rv"><div><span class="sec-num">05 · Las votaciones</span><h2>¿Cómo ha votado?</h2><p class="sec-sub">Cuando una votación es nominal queda registrado lo que votó cada congresista. Busca un nombre para ver su récord. Un mismo proyecto se vota muchas veces (la ponencia, cada artículo, las propuestas de cambio), por eso alguien puede tener varios sí y varios no en una sola ley.</p></div></div>
+    <div class="vt-pick rv">
+      <div class="bigsearch"><span aria-hidden="true" style="font-size:1.3rem">⌕</span><label class="sr" for="vt-q">Buscar congresista</label><input id="vt-q" type="search" placeholder="Escribe el nombre de un senador o representante" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="vt-ac" /></div>
+      <div class="ac" id="vt-ac" role="listbox"></div>
+    </div>
+    <div class="ejemplos rv" id="vt-ej"><span>Del Congreso actual:</span></div>
+    <div id="vt-perfil" class="perfil" aria-live="polite"></div>
+    <p class="note" id="vt-nota"></p>
+  </div>
+</section>
+
+<!-- ── 06 cómo nace una ley ── -->
+<section class="blk" id="ruta">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="sec-num">06 · Cómo nace una ley</span>
+        <h2>El camino de una idea hasta volverse ley</h2>
+        <p class="sec-sub">Una ley común necesita <b>cuatro debates</b>: dos en el Senado y dos en la Cámara. Toca cada paso o deja que avance solo.</p>
+      </div>
+    </div>
+    <div class="panel rv">
+      <div class="ruta" id="ruta-pasos"><div class="prog" id="ruta-prog"></div></div>
+      <div class="paso-det" id="ruta-det"></div>
+      <div class="ruta-ctl">
+        <button type="button" id="ruta-ant">← Anterior</button>
+        <button type="button" id="ruta-play">❚❚ Pausar</button>
+        <button type="button" id="ruta-sig">Siguiente →</button>
+      </div>
+    </div>
+
+    <div class="dos">
+      <div class="panel rv">
+        <h3>De cada 100 proyectos que llegan…</h3>
+        <div class="cien" id="cien"></div>
+        <div class="ley-leg" id="cien-leg"></div>
+        <p class="note">Cuenta sobre <b>14.316 proyectos de ley</b> presentados desde 1990 en el Senado y la Cámara. «Otras causas» junta los que se votaron en contra, los que cayeron al cerrar el periodo y los archivados sin causa informada en el registro.</p>
+      </div>
+      <div class="panel rv">
+        <h3>¿Cuánto se demora?</h3>
+        <p class="sec-sub" style="margin-top:6px">Desde que un proyecto se radica hasta que recibe su primer debate pasan, en la mitad de los casos, más de</p>
+        <div class="big-num" style="margin:14px 0 6px"><span data-cuenta="177">0</span> <small>días</small></div>
+        <p class="note" style="margin-top:0">Mediana sobre 4.000 proyectos con fecha conocida. Un cuarto de ellos tarda más de 296 días.</p>
+        <h3 style="margin-top:22px">¿Y si se acaba el tiempo?</h3>
+        <p style="color:var(--ink2);margin-top:6px">Un proyecto que no recibe su primer debate antes de que termine la legislatura <b>se archiva</b>. Y ninguno puede durar más de dos legislaturas (artículo 162 de la Constitución). Así se archivan <b>1 de cada 5</b>.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:34px" class="rv">No todas las leyes son iguales</h3>
+    <div class="tipos" id="tipos"></div>
+  </div>
+</section>
+
+<!-- ── 07 ritmo ── -->
+<section class="blk" id="ritmo">
+  <div class="wrap">
+    <div class="panel ritmo rv">
+      <div>
+        <span class="sec-num">07 · El ritmo</span>
+        <h2 style="font-size:clamp(1.6rem,3vw,2.2rem)" id="ritmo-tit">¿Este Congreso presenta más proyectos?</h2>
+        <p class="sec-sub" id="ritmo-txt">Comparamos los proyectos radicados desde la instalación con los mismos días de los dos Congresos anteriores.</p>
+        <div class="wleg" id="ritmo-leg" style="margin-top:14px"></div>
+      </div>
+      <div id="ritmo-box"><div class="sk"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 08 comisiones ── -->
+<section class="blk" id="comisiones">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="sec-num">08 · Las comisiones</span>
+        <h2>¿Quién estudia cada tema?</h2>
+        <p class="sec-sub">El primer debate ocurre en una de las <b>siete comisiones</b> de cada cámara. A cuál va un proyecto depende de su tema. Cada congresista pertenece a una sola. <b>Toca una comisión</b> para ver quiénes la integran y qué proyectos tiene en trámite.</p>
+      </div>
+    </div>
+    <div class="coms" id="coms-box"></div>
+  </div>
+</section>
+
+<!-- ── 09 quiénes son ── -->
+<section class="blk" id="quienes">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="sec-num">09 · Quiénes son</span>
+        <h2>El Congreso que elegimos en 2026</h2>
+        <p class="sec-sub">Cada cuadrito es una curul, coloreada por el partido o la lista con la que esa persona fue elegida.</p>
+      </div>
+    </div>
+    <div class="cifras rv" id="cifras"></div>
+    <div class="camaras">
+      <div class="panel rv"><h3>Senado</h3><p class="note" style="margin-top:4px">Se elige en todo el país, menos dos curules indígenas.</p><div class="waffle" id="w-sen"></div><div class="wleg" id="wl-sen"></div></div>
+      <div class="panel rv"><h3>Cámara de Representantes</h3><p class="note" style="margin-top:4px">Se elige por departamento, más curules indígenas, afro, de colombianos en el exterior y 16 de paz.</p><div class="waffle" id="w-cam"></div><div class="wleg" id="wl-cam"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── 10 glosario ── -->
+<section class="blk" id="glosario">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="sec-num">10 · Banco de información</span>
+        <h2>Las palabras del Congreso</h2>
+        <p class="sec-sub">Lo que significan las palabras que salen en las noticias. Toca una para ver un ejemplo.</p>
+      </div>
+    </div>
+    <div class="glo-tools rv">
+      <label class="search"><span aria-hidden="true">⌕</span><span class="sr">Buscar en el glosario</span><input id="gl-q" type="search" placeholder="¿Qué palabra buscas?" autocomplete="off" /></label>
+      <div class="chips" id="gl-cat"></div>
+    </div>
+    <div class="glosario" id="gl-box"></div>
+  </div>
+</section>
+
+<!-- ── 11 preguntas ── -->
+<section class="blk" id="preguntas">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <div>
+        <span class="sec-num">11 · Preguntas frecuentes</span>
+        <h2>Lo que la gente pregunta</h2>
+      </div>
+    </div>
+    <div class="faq rv" id="faq"></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <h4>Congreso Claro</h4>
+      <p>Un proyecto de pedagogía ciudadana para entender qué pasa en el Congreso de Colombia. No es una página oficial del Congreso.</p>
+    </div>
+    <div>
+      <h4>De dónde salen los datos</h4>
+      <ul>
+        <li>Proyectos y órdenes del día: <a href="https://leyes.senado.gov.co/proyectos-de-ley" target="_blank" rel="noopener">Senado</a> y <a href="https://www.camara.gov.co" target="_blank" rel="noopener">Cámara</a></li>
+        <li>Temas de la semana: prensa política vía Google News</li>
+        <li>Normas en consulta: SUCOP del Gobierno</li>
+      </ul>
+    </div>
+    <div>
+      <h4>Última actualización</h4>
+      <ul id="fuentes-fechas"><li>Cargando…</li></ul>
+    </div>
+    <p class="legal">Los resúmenes en lenguaje sencillo se generan de forma automática a partir del texto radicado y pueden tener errores u omisiones. Antes de citarlos, revisa siempre el texto oficial del proyecto, que se enlaza en cada ficha.</p>
+  </div>
+</footer>
+
+<dialog id="ficha" aria-labelledby="ficha-tit"><div class="md" id="ficha-body"></div></dialog>
+
+<script>
+(function(){
+'use strict';
+const S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/';
+const URL={
+  ord:S3+'ordenes-vigentes.json', viv:S3+'en-vivo.json', tem:S3+'temas-del-momento.json',
+  rit:S3+'ritmo-legislaturas.json', com:S3+'comisiones-2026.json',
+  /* lo que antes solo daba la API de Caudal, publicado como archivo estático
+     (tools/congreso-claro/build_datos.py) */
+  arc:S3+'congreso-claro/archivo.json', act:S3+'congreso-claro/activos.json',
+  vidx:S3+'congreso-claro/votos/indice.json', vot:S3+'congreso-claro/votos/'
+};
+
+/* ── utilidades ─────────────────────────────────────────────────── */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const fmt=n=>Number(n||0).toLocaleString('es-CO');
+const MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DIA=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const fISO=f=>{ const m=String(f||'').match(/(\d{4})[-/](\d{2})[-/](\d{2})/); return m?`${m[1]}-${m[2]}-${m[3]}`:''; };
+const dObj=f=>new Date(fISO(f)+'T12:00:00');
+const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const sumaDias=(f,n)=>{ const d=dObj(f); d.setDate(d.getDate()+n); return iso(d); };
+function hoyBog(){
+  const p=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+  const t=k=>p.find(x=>x.type===k).value; return `${t('year')}-${t('month')}-${t('day')}`;
+}
+const HOY=hoyBog(), MANANA=sumaDias(HOY,1);
+const fLarga=f=>{ const d=dObj(f); return isNaN(d)?'':`${DIA[d.getDay()]} ${d.getDate()} de ${MES[d.getMonth()]}`; };
+const fCorta=f=>{ const d=dObj(f); return isNaN(d)?'':`${d.getDate()} de ${MES[d.getMonth()]}`; };
+const cuandoFue=f=>{ const k=fISO(f); if(k===HOY) return 'hoy'; if(k===sumaDias(HOY,-1)) return 'ayer'; return fCorta(k); };
+const capital=s=>{ s=String(s||'').trim(); return s.charAt(0).toUpperCase()+s.slice(1); };
+/* el registro escribe muchos títulos en MAYÚSCULA SOSTENIDA y con «Por medio de la cual…» */
+const PREF=/^\s*(por\s+(medio\s+)?(de\s+)?(la|el)\s+(cual|que)\s+(se\s+)?|mediante\s+(la|el)\s+cual\s+(se\s+)?)/i;
+function corto(t,n){
+  let s=String(t||'').replace(/\s+/g,' ').trim();
+  s=s.replace(PREF,'');
+  if(s===s.toUpperCase()) s=s.toLowerCase();
+  s=capital(s.replace(/\s+y se dictan otras disposiciones\.?$/i,'').replace(/[.\s]+$/,''));
+  if(n&&s.length>n){ const c=s.slice(0,n); const i=c.lastIndexOf(' '); s=(i>n*.6?c.slice(0,i):c)+'…'; }
+  return s;
+}
+/* tildes que el generador de temas a veces omite */
+const TILDES=[[/\bminimo\b/g,'mínimo'],[/\bcompensacion\b/g,'compensación'],[/\bpension(al)?\b/g,(m,a)=>a?'pensional':'pensión'],[/\beducacion\b/g,'educación'],[/\bpolitica\b/g,'política'],[/\bcamara\b/g,'Cámara'],[/\bregalias\b/g,'regalías'],[/\breforma tributaria\b/g,'reforma tributaria'],[/\bnacion\b/g,'Nación'],[/\benergia\b/g,'energía']];
+const conTildes=s=>TILDES.reduce((a,[re,r])=>a.replace(re,r),String(s||''));
+/* «401 de 2026 Cámara» · «458/2026C» · «311/26» (Senado) → «401/26C» */
+function numKey(num,def){
+  const m=String(num||'').match(/0*(\d{1,4})\s*(?:de|\/)\s*(?:20)?(\d{2})\s*(c[aá]mara|senado|c|s)?/i);
+  if(!m) return null;
+  const c=m[3]?(/^s/i.test(m[3])?'S':'C'):def;
+  return `${+m[1]}/${m[2]}${c}`;
+}
+const numNice=k=>{ if(!k) return ''; const m=k.match(/(\d+)\/(\d+)([SC])/); return m?`${m[1]} de 20${m[2]} · ${m[3]==='S'?'Senado':'Cámara'}`:k; };
+async function getJSON(u){
+  const r=await fetch(u+'?v='+Math.floor(Date.now()/300000),{cache:'default'});
+  if(!r.ok) throw new Error('HTTP '+r.status); return r.json();
+}
+
+/* ── temas de los proyectos (diccionario, sin modelo) ─────────────────
+   Inicios de palabra: «educa» casa educación y educativo. Gana el tema
+   con más coincidencias; «honores» va aparte porque un homenaje a un
+   municipio también nombra el municipio. */
+const TEMAS=[
+  {id:'salud',t:'Salud',c:'#e2553b',ic:'✚',w:['salud','eps','hospital','medic','mental','enfermedad','vacun','cancer','farmac','pacient','sanitari','suicid']},
+  {id:'educacion',t:'Educación',c:'#2c56e0',ic:'✎',w:['educa','colegio','universi','estudiant','docente','escolar','icetex','escuela','aprendiz','bachiller']},
+  {id:'trabajo',t:'Trabajo y pensiones',c:'#c27a00',ic:'⚒',w:['trabaj','laboral','empleo','pension','salari','sindical','cuidado','jubil','cesantia','contrato sindical','acoso laboral','cajas de compensacion']},
+  {id:'vivienda',t:'Vivienda y servicios',c:'#7a3fa0',ic:'⌂',w:['vivienda','arriendo','cuota inicial','reasent','servicios publicos','acueduct','energia electrica','tarifa','domiciliari']},
+  {id:'ambiente',t:'Ambiente',c:'#1f8a5e',ic:'❦',w:['ambient','humedal','agua','rio ','rios','bosque','clima','minera','mineria','fracking','fauna','animal','paramo','residuo','reciclaj','cuenca','biodivers','contamina']},
+  {id:'seguridad',t:'Seguridad y justicia',c:'#16182b',ic:'⚖',w:['seguridad','policia','penal','delito','carcel','justicia','sometimiento','crimen','criminal','armas','extorsion','victim','juez','fiscalia']},
+  {id:'economia',t:'Impuestos y economía',c:'#b8860b',ic:'$',w:['impuest','tribut','presupuest','regalia','financ','banco','credito','obras por impuestos','renta','iva','deuda','economic','empresa','emprend','comercio','zona franca','zonas francas','inversion','deposit']},
+  {id:'campo',t:'Campo',c:'#6b8e23',ic:'✿',w:['agro','campesin','rural','tierra','agricult','ganad','cafe','pesca','alimentari']},
+  {id:'transporte',t:'Transporte y vías',c:'#d2691e',ic:'⇄',w:['transporte','via ','vias','transito','movilidad','aeropuert','moto','vehicul','carretera','peaje','ferre']},
+  {id:'tecnologia',t:'Tecnología',c:'#0e7c86',ic:'⌘',w:['digital','internet','tecnolog','datos personales','inteligencia artificial','telecomunic','plataforma','ciber','conectividad']},
+  {id:'familia',t:'Mujer, niñez y familia',c:'#c2185b',ic:'♥',w:['mujer','genero','nino','ninez','infancia','adolesc','famili','joven','juventud','madre','violencia intrafamiliar','feminicid']},
+  {id:'cultura',t:'Cultura y deporte',c:'#8e44ad',ic:'♫',w:['cultura','deport','artist','gastronom','turism','museo','music','festival','cine','artesan','patrimonio','gastronom']},
+  {id:'paz',t:'Paz y conflicto',c:'#4a90a4',ic:'☮',w:['paz','ley 418','orden publico','acuerdo de paz','conflicto','reincorpor','desmovil','victimas del conflicto']},
+  {id:'estado',t:'Congreso, Estado y transparencia',c:'#5d6271',ic:'⚑',w:['corrupc','cabildeo','contratacion','transparen','congres','conflicto de interes','elector','partido','servidor public','funcion public','control fiscal','contralor','procurad']},
+  {id:'honores',t:'Honores y homenajes',c:'#a0522d',ic:'★',w:['honores','homenaje','exalta','conmemor','aniversario','centenario','bicentenario','vincula a la celebracion','se asocia a la celebracion','anos de fundacion']},
+];
+const TEMA_OTRO={id:'otro',t:'Otros temas',c:'#7d8096',ic:'•'};
+const TEMA_BY=Object.fromEntries(TEMAS.map(t=>[t.id,t]));
+function temaDe(txt){
+  const s=' '+norm(txt).replace(/[^a-z0-9ñ ]/g,' ').replace(/\s+/g,' ')+' ';
+  const h=TEMAS.find(t=>t.id==='honores');
+  if(h.w.some(w=>s.includes(' '+w))) return h;
+  let best=null,bn=0;
+  for(const t of TEMAS){ if(t.id==='honores') continue; let n=0; for(const w of t.w) if(s.includes(' '+w.trim())) n++; if(n>bn){bn=n;best=t;} }
+  return best||TEMA_OTRO;
+}
+
+/* ── estado del trámite en palabras ─────────────────────────────── */
+const PASOS=[
+  {nm:'Llega',t:'Se radica',p:'Un congresista, el Gobierno, una alta corte o un grupo de ciudadanos presenta el proyecto por escrito en la Secretaría del Senado o de la Cámara. Se le pone un número y se publica en la Gaceta del Congreso, el diario oficial del Congreso.',d:'Los ciudadanos también pueden presentar proyectos si reúnen firmas equivalentes al 5 % del censo electoral (artículo 155 de la Constitución).'},
+  {nm:'Comisión',t:'Se envía a una comisión',p:'Según su tema, el proyecto va a una de las siete comisiones. Si es de salud o de trabajo va a la Séptima; si es de impuestos, a la Tercera. Ahí se hace el primer debate.',d:'Cada congresista pertenece a una sola comisión permanente.'},
+  {nm:'Ponentes',t:'Se nombran ponentes',p:'La mesa directiva de la comisión elige a uno o varios congresistas, los ponentes, para que estudien el proyecto a fondo y escriban un informe, la ponencia, que recomienda aprobarlo, cambiarlo o archivarlo.',d:'Muchos proyectos se quedan aquí: si nadie presenta la ponencia, nunca se discuten.'},
+  {nm:'1er debate',t:'Primer debate en comisión',p:'La comisión discute la ponencia y vota artículo por artículo. Puede hacerle cambios. Si lo aprueba, pasa a la plenaria de esa misma cámara.',d:'Entre el primer y el segundo debate deben pasar al menos ocho días (artículo 160 de la Constitución).'},
+  {nm:'2º debate',t:'Segundo debate en plenaria',p:'La plenaria, donde están todos los senadores o todos los representantes, vuelve a discutir y a votar. Si lo aprueba, el proyecto cruza a la otra cámara.',d:'Entre la aprobación en una cámara y el inicio del debate en la otra deben pasar al menos quince días.'},
+  {nm:'Otra cámara',t:'Tercer y cuarto debate',p:'En la otra cámara se repite el camino: comisión y plenaria. Si el Senado empezó, ahora sigue la Cámara, y al revés.',d:'Por eso una ley necesita cuatro debates en total.'},
+  {nm:'Conciliación',t:'Se ponen de acuerdo',p:'Si el Senado y la Cámara aprobaron textos distintos, una comisión con miembros de las dos cámaras escribe un solo texto, que vuelve a votarse en las dos plenarias.',d:'Si no hay diferencias, este paso no hace falta.'},
+  {nm:'Sanción',t:'El presidente lo firma',p:'El presidente de la República firma la ley, y entonces se publica en el Diario Oficial y empieza a regir. También puede objetarla, es decir, devolverla al Congreso por inconveniente o por inconstitucional.',d:'Si el presidente la objeta por inconstitucional y el Congreso insiste, decide la Corte Constitucional.'},
+];
+function estadoDe(estado){
+  const s=norm(estado);
+  if(/archivad/.test(s)) return {fin:true,t:'Archivado: ya no sigue su trámite'};
+  if(/retirad/.test(s)) return {fin:true,t:'Su autor lo retiró'};
+  if(/acumulad/.test(s)) return {fin:true,t:'Se unió a otro proyecto parecido, que sigue adelante'};
+  if(/sancion/.test(s)) return {n:8,t:'Aprobado por el Congreso: espera la firma del Presidente'};
+  if(/conciliac/.test(s)) return {n:7,t:'Las dos cámaras están ajustando un texto común'};
+  if(/enviar a comision/.test(s)) return {n:1,t:'Acaba de llegar: falta enviarlo a una comisión'};
+  if(/segundo debate/.test(s)) return /discutir/.test(s)?{n:5,t:'Aprobado en comisión: listo para debatirse en la plenaria'}:{n:5,t:'Aprobado en comisión: preparan el debate en la plenaria'};
+  if(/tramite en plenaria/.test(s)) return {n:5,t:'Se discute en la plenaria'};
+  if(/discutir ponencia para primer|debate de comision/.test(s)) return {n:4,t:'Listo para su primer debate en la comisión'};
+  if(/designar ponentes/.test(s)) return {n:2,t:'En la comisión: esperan que le nombren ponentes'};
+  if(/tramite en comision/.test(s)) return {n:2,t:'En estudio en la comisión'};
+  if(/ponencia/.test(s)) return {n:3,t:'En la comisión: los ponentes preparan su informe'};
+  return {n:1,t:capital(String(estado||'Radicado').toLowerCase())};
+}
+const miniHtml=e=>e.fin?`<div class="mini fin">${PASOS.map(()=>'<i></i>').join('')}</div>`
+  :`<div class="mini" title="Paso ${e.n} de 8">${PASOS.map((_,i)=>`<i class="${i<e.n?'on':''}"></i>`).join('')}</div>`;
+
+/* ── aparición, cuentas animadas ────────────────────────────────── */
+const vistos=new WeakSet();
+function cuenta(el,hasta,ms){
+  if(!el) return; ms=ms||1200; hasta=+hasta||0;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches||document.hidden){ el.textContent=fmt(hasta); return; }
+  const t0=performance.now();
+  const paso=t=>{ const k=Math.min(1,(t-t0)/ms), e=1-Math.pow(1-k,3); el.textContent=fmt(Math.round(hasta*e)); if(k<1) requestAnimationFrame(paso); };
+  requestAnimationFrame(paso);
+  setTimeout(()=>{ el.textContent=fmt(hasta); },ms+400);   // por si rAF se congela en pestaña oculta
+}
+let IO=null;
+function alAparecer(el){
+  if(!el||vistos.has(el)) return;
+  if(el.matches('.rv')) el.classList.add('in');
+  el.querySelectorAll('[data-cuenta]').forEach(x=>cuenta(x,x.dataset.cuenta));
+  el.querySelectorAll('.cien,.waffle').forEach(x=>x.classList.add('in'));
+  el.querySelectorAll('[data-w]').forEach(x=>{ x.style.width=x.dataset.w+'%'; });
+  vistos.add(el);
+}
+function observar(root){
+  const els=[...(root||document).querySelectorAll('.rv')];
+  if('IntersectionObserver' in window){
+    IO=IO||new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ alAparecer(e.target); IO.unobserve(e.target); } }),{rootMargin:'0px 0px -8% 0px'});
+    els.forEach(el=>IO.observe(el));
+  }
+  /* respaldo: hay navegadores y vistas previas donde el observador no dispara */
+  setTimeout(()=>els.forEach(alAparecer),2600);
+}
+
+/* ── ficha (modal) ──────────────────────────────────────────────── */
+const DLG=$('#ficha');
+function abrir(html,cls){
+  DLG.className=cls||'';
+  $('#ficha-body').innerHTML=`<button class="x" type="button" aria-label="Cerrar" onclick="document.getElementById('ficha').close()">✕</button>`+html;
+  if(DLG.showModal) DLG.showModal(); else DLG.setAttribute('open','');
+  $('#ficha-body').scrollTop=0;
+}
+DLG.addEventListener('click',e=>{ if(e.target===DLG) DLG.close(); });
+
+/* autores: «H.S. ARIEL ÁVILA MARTÍNEZ, JOHN AMAYA, H.R. …» → nombres limpios */
+function autores(txt){
+  return String(txt||'').replace(/\s(H\.?\s?[SR]\.?)\s/gi,', $1 ').split(',')
+    .map(x=>x.replace(/^\s*H\.?\s?[SR]\.?\s*/i,'').trim()).filter(x=>x&&x.length>3)
+    .map(x=>x===x.toUpperCase()?x.toLowerCase().replace(/(^|\s)(\p{L})/gu,(m,a,b)=>a+b.toUpperCase()):x);
+}
+const BASE_TXT={texto:'el texto completo radicado',pdf:'el texto radicado (PDF)',objeto:'el objeto del proyecto que publica la Cámara',titulo:'solo el título del proyecto, porque el texto aún no está disponible'};
+
+let VIV=null;          // {lista, porKey, base, actualizado}
+function fichaProyecto(x){
+  const e=estadoDe(x.estado), tm=temaDe((x.explica&&x.explica.titular||'')+' '+x.titulo);
+  const ex=x.explica||{}, aut=autores(x.autor);
+  const pdf=x.pdf?(VIV.base+x.pdf):'';
+  abrir(`<div class="row" style="display:flex;gap:6px;flex-wrap:wrap">
+      <span class="tag ${x._cam==='sen'?'sen':'cam'}">${x._cam==='sen'?'Senado':'Cámara'}</span>
+      <span class="tag"><i style="background:${tm.c}"></i>${esc(tm.t)}</span>
+      <span class="tag">Radicado ${esc(cuandoFue(x.fecha))}</span>
+    </div>
+    <h2 id="ficha-tit">${esc(ex.titular||corto(x.titulo))}</h2>
+    <div class="estado"><b style="font-size:.95rem">${esc(e.t)}</b>${miniHtml(e)}</div>
+    ${(ex.cambia||[]).length?`<h4><i style="background:var(--sun)">✦</i>Qué cambiaría si se aprueba</h4><ul class="cambia">${ex.cambia.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`:''}
+    ${ex.afecta?`<h4><i style="background:var(--blue);color:#fff">◎</i>A quién le aplica</h4><div class="afecta">${esc(ex.afecta)}</div>`:''}
+    ${ex.ojo?`<h4><i style="background:var(--coral);color:#fff">!</i>Ojo</h4><div class="ojo">${esc(ex.ojo)}</div>`:''}
+    <h4><i style="background:var(--paper2)">§</i>Cómo se llama oficialmente</h4>
+    <div class="oficial"><b>Proyecto de ley ${esc(numNice(x._key))}</b><br>${esc(corto(x.titulo))}.${aut.length?`<br><br><b>Lo firman:</b> ${esc(aut.slice(0,4).join(', '))}${aut.length>4?` y ${aut.length-4} más`:''}.`:''}</div>
+    <div class="acciones">
+      ${pdf?`<a class="btn" href="${esc(pdf)}" target="_blank" rel="noopener">Leer el texto oficial (PDF)</a>`:''}
+      ${x.fuente?`<a class="btn ghost" href="${esc(x.fuente)}" target="_blank" rel="noopener">Ver en la página del ${x._cam==='sen'?'Senado':'Congreso'}</a>`:''}
+    </div>
+    <p class="aviso">Resumen automático hecho a partir de ${esc(BASE_TXT[ex.base]||'la información publicada')}. Puede tener errores: confírmalo en el texto oficial.</p>`);
+}
+function fichaAgenda(p,o){
+  const k=numKey(p.numero,/senado/i.test(o.corporacion)?'S':'C');
+  const v=k&&VIV&&VIV.porKey[k];
+  if(v) return fichaProyecto(v);
+  const tm=temaDe(p.titulo);
+  abrir(`<div class="row" style="display:flex;gap:6px;flex-wrap:wrap">
+      <span class="tag">${esc(numNice(k)||p.numero)}</span>
+      <span class="tag"><i style="background:${tm.c}"></i>${esc(tm.t)}</span>
+    </div>
+    <h2 id="ficha-tit">${esc(corto(p.titulo))}</h2>
+    <div class="afecta">Está en el orden del día de la <b>${esc(nombreAmbito(o))}</b> para el ${esc(fLarga(o.fecha))}. Estar en la lista significa que lo pueden discutir y votar ese día, aunque muchas veces la sesión no alcanza a llegar hasta él.</div>
+    <h4><i style="background:var(--paper2)">§</i>Título oficial</h4>
+    <div class="oficial">${esc(p.titulo)}</div>
+    <div class="acciones">${o.url?`<a class="btn" href="${esc(o.url)}" target="_blank" rel="noopener">Ver el orden del día oficial</a>`:''}
+      <a class="btn ghost" href="https://www.google.com/search?q=${encodeURIComponent('proyecto de ley '+p.numero)}" target="_blank" rel="noopener">Buscar noticias sobre este proyecto</a></div>
+    <p class="aviso">Para los proyectos más recientes mostramos un resumen en lenguaje sencillo. Este todavía no lo tiene.</p>`);
+}
+
+/* ── 01 agenda ──────────────────────────────────────────────────── */
+const nombreAmbito=o=>{
+  let a=String(o.ambito||'').replace(/\bSeptima\b/,'Séptima').trim();
+  if(/plenaria/i.test(a)) return `Plenaria del ${/senado/i.test(o.corporacion)?'Senado':'de la Cámara'}`.replace('del de la','de la');
+  return `${a||'Sesión'} del ${/senado/i.test(o.corporacion)?'Senado':'de la Cámara'}`.replace('del de la','de la');
+};
+const horaDe=t=>{ const m=String(t||'').match(/(\d{1,2})\s*:\s*(\d{2})\s*(a\.?\s?m\.?|p\.?\s?m\.?)/i); return m?`${+m[1]}:${m[2]} ${/p/i.test(m[3])?'p. m.':'a. m.'}`:''; };
+const QUE_ES={
+  mujer:'La Comisión Legal para la Equidad de la Mujer vigila que las leyes y el Gobierno cumplan los derechos de las mujeres.',
+  cuentas:'La Comisión Legal de Cuentas revisa cómo se gastó el presupuesto del año anterior.',
+  etica:'La Comisión de Ética estudia las quejas sobre la conducta de los congresistas.',
+  humanos:'La Comisión de Derechos Humanos y Audiencias recibe denuncias y hace seguimiento a la situación de derechos humanos.',
+  acusa:'La Comisión de Investigación y Acusación investiga al presidente y a otros altos funcionarios.',
+  control:'Es un debate de <b>control político</b>: los congresistas citan a un ministro u otro funcionario para que rinda cuentas sobre un tema. No se votan leyes.',
+};
+let ORD=null, DIA_SEL=HOY;
+function sesionesDe(f){ return (ORD.ordenes||[]).filter(o=>o.fecha<=f&&f<=(o.fecha_fin||o.fecha)); }
+function pintaDias(){
+  const set=new Set([HOY,MANANA]);
+  (ORD.ordenes||[]).forEach(o=>{ let f=o.fecha; const fin=o.fecha_fin||o.fecha; while(f<=fin){ if(f>=HOY) set.add(f); f=sumaDias(f,1); } });
+  const dias=[...set].sort().slice(0,10);
+  $('#days').innerHTML=dias.map(f=>{
+    const n=sesionesDe(f).length, d=dObj(f);
+    const lbl=f===HOY?'Hoy':f===MANANA?'Mañana':DIA[d.getDay()];
+    return `<button class="day${f===DIA_SEL?' on':''}${n?'':' vacio'}" role="tab" aria-selected="${f===DIA_SEL}" data-f="${f}"><div class="dn">${esc(lbl)}</div><div class="dd">${d.getDate()} ${MES[d.getMonth()].slice(0,3)}</div><div class="dc">${n?`${n} sesi${n===1?'ón':'ones'}`:'sin sesiones'}</div></button>`;
+  }).join('');
+  $$('#days .day').forEach(b=>b.onclick=()=>{ DIA_SEL=b.dataset.f; pintaDias(); pintaAgenda(); });
+}
+function pintaAgenda(){
+  const L=sesionesDe(DIA_SEL).sort((a,b)=>(b.n_proyectos||0)-(a.n_proyectos||0));
+  const box=$('#agenda-box');
+  if(!L.length){
+    const prox=[...new Set((ORD.ordenes||[]).map(o=>o.fecha).filter(f=>f>DIA_SEL))].sort()[0];
+    const d=dObj(DIA_SEL).getDay();
+    box.innerHTML=`<div class="empty-day"><b>${DIA_SEL===HOY?'Hoy':'Ese día'} no hay sesiones publicadas</b>${d===0||d===6?'Los fines de semana el Congreso casi nunca sesiona. ':''}${prox?`La próxima sesión publicada es el <a href="#agenda" data-ir="${prox}">${esc(fLarga(prox))}</a>.`:'Las comisiones suelen publicar su orden del día uno o dos días antes.'}</div>`;
+    const a=box.querySelector('[data-ir]'); if(a) a.onclick=ev=>{ ev.preventDefault(); DIA_SEL=a.dataset.ir; pintaDias(); pintaAgenda(); };
+    return;
+  }
+  box.innerHTML=`<div class="ses-grid">${L.map((o,i)=>{
+    const sen=/senado/i.test(o.corporacion), canc=/cancelad|aplazad/i.test(o.titulo), hora=horaDe(o.titulo);
+    const semana=o.fecha!==(o.fecha_fin||o.fecha);
+    const ps=(o.proyectos||[]).filter(p=>p.titulo||p.numero);
+    const amb=norm(o.ambito);
+    let vacio='';
+    if(!ps.length){
+      const tip=/control pol/i.test(o.titulo)?'control':/mujer/.test(amb)?'mujer':/cuentas/.test(amb)?'cuentas':/etica/.test(amb)?'etica':/humanos/.test(amb)?'humanos':/acusac/.test(amb)?'acusa':'';
+      vacio=`<div class="ses-empty">${o.pdf_error?'<b>No pudimos leer este documento</b> (suele ser un escaneo). Ábrelo para ver qué se discute.':(tip?QUE_ES[tip]:'Esta sesión no trae proyectos de ley en la lista: puede ser para proposiciones, audiencias o asuntos internos.')}${tip&&o.pdf_error?' '+QUE_ES[tip]:''}</div>`;
+    }
+    return `<article class="ses${canc?' cancelada':''} rv" style="transition-delay:${Math.min(i,6)*60}ms">
+      <div class="ses-top">
+        <div class="row"><span class="tag ${sen?'sen':'cam'}">${sen?'Senado':'Cámara'}</span>${canc?'<span class="tag cancel">Cancelada</span>':''}${semana?'<span class="tag">Agenda de la semana</span>':''}${hora?`<span class="tag">◷ ${esc(hora)}</span>`:''}</div>
+        <h3>${esc(nombreAmbito(o))}</h3>
+        <div class="when">${semana?`Del ${esc(fCorta(o.fecha))} al ${esc(fCorta(o.fecha_fin))}`:esc(capital(fLarga(o.fecha)))}${ps.length?` · ${ps.length} proyecto${ps.length===1?'':'s'}`:''}</div>
+      </div>
+      <div class="ses-body">${ps.length?ps.slice(0,6).map((p,j)=>{
+        const k=numKey(p.numero,sen?'S':'C'), tm=temaDe(p.titulo), con=k&&VIV&&VIV.porKey[k];
+        return `<button class="bill" type="button" data-o="${esc(o.id)}" data-p="${j}"><span class="pos" style="background:${tm.c}1f;color:${tm.c}">${j+1}</span><span class="tx">${esc(corto(p.titulo,120))}<small>${esc(tm.t)} · ${esc(numNice(k)||p.numero||'')}${con?' · <em>tiene resumen ✦</em>':''}</small></span></button>`;
+      }).join('')+(ps.length>6?`<div class="note" style="margin:0">y ${ps.length-6} más en el documento oficial</div>`:''):vacio}</div>
+      <div class="ses-foot"><span>Publicado ${esc(cuandoFue(o.publicado||o.fecha))}</span>${o.url?`<a href="${esc(o.url)}" target="_blank" rel="noopener">Orden del día oficial ↗</a>`:''}</div>
+    </article>`;
+  }).join('')}</div>`;
+  box.querySelectorAll('.bill').forEach(b=>b.onclick=()=>{ const o=ORD.ordenes.find(x=>x.id===b.dataset.o); fichaAgenda(o.proyectos.filter(p=>p.titulo||p.numero)[+b.dataset.p],o); });
+  observar(box);
+}
+function initAgenda(o){
+  ORD=o; ORD.ordenes=(o.ordenes||[]).map(x=>({...x,fecha:fISO(x.fecha),fecha_fin:fISO(x.fecha_fin||x.fecha)}));
+  const hoyN=sesionesDe(HOY).length, manN=sesionesDe(MANANA).length;
+  if(!hoyN){ const prox=[...new Set(ORD.ordenes.map(x=>x.fecha).filter(f=>f>HOY))].sort()[0]; if(prox&&!sesionesDe(MANANA).length) DIA_SEL=HOY; }
+  cuenta($('[data-n="t-hoy"]'),hoyN); cuenta($('[data-n="t-man"]'),manN);
+  if(!manN){ const d=dObj(MANANA).getDay(); if(d===0||d===6) $('#t-man-s').textContent='fin de semana: casi nunca hay sesión'; }
+  const futuros=new Set();
+  ORD.ordenes.filter(x=>(x.fecha_fin||x.fecha)>=HOY&&!/cancelad/i.test(x.titulo)).forEach(x=>(x.proyectos||[]).forEach(p=>{ const k=numKey(p.numero,/senado/i.test(x.corporacion)?'S':'C'); if(k) futuros.add(k); }));
+  cuenta($('[data-n="t-proy"]'),futuros.size);
+  pintaDias(); pintaAgenda();
+  $('#agenda-nota').innerHTML=`Revisamos las órdenes del día publicadas por <b>${esc(o.cobertura||'el Senado y la Cámara')}</b>. Algunas comisiones publican tarde o en documentos escaneados que no se pueden leer automáticamente: si no ves una sesión, consulta la página oficial de la comisión.`;
+}
+
+/* ── 02 temas ───────────────────────────────────────────────────── */
+function initTemas(t){
+  const L=(t.temas||[]).slice(0,8);
+  if(!L.length){ $('#temas-box').innerHTML='<div class="err">Por ahora no hay temas para mostrar.</div>'; return; }
+  const mx=k=>Math.max(1,...L.map(x=>(x.capas||{})[k]||0));
+  const MX={prensa:mx('prensa'),radicados:mx('radicados'),consultas:mx('consultas')};
+  $('#temas-box').innerHTML=L.map((x,i)=>{
+    const nm=capital(conTildes(x.tema)), tm=temaDe(x.tema+' '+x.por_que), c=x.capas||{};
+    const med=(lbl,k,col)=>`<div class="med"><span>${lbl}</span><span class="b"><i data-w="${Math.round(100*(c[k]||0)/MX[k])}" style="background:${col}"></i></span><span class="v">${c[k]||0}</span></div>`;
+    return `<button class="tema rv" type="button" style="transition-delay:${i*70}ms" aria-label="${esc(nm)}: dar vuelta a la tarjeta">
+      <div class="in2">
+        <div class="cara frente">
+          <div class="tic" style="background:${tm.c}1f;color:${tm.c};font-size:1.5rem">${tm.ic}</div>
+          <h3>${esc(nm)}</h3>
+          <p>${esc(x.por_que)}</p>
+          <div class="medidor">${med('Prensa','prensa',tm.c)}${med('Proyectos','radicados','#2c56e0')}${med('Consultas','consultas','#1f8a5e')}</div>
+          <div class="gira">Ver de dónde sale ↻</div>
+        </div>
+        <div class="cara dorso">
+          <h4>Lo que dicen los titulares</h4>
+          <ul>${(x.evidencia||[]).slice(0,3).map(e=>`<li>${esc(e)}</li>`).join('')}</ul>
+          <div class="arch"><b>${fmt(x.n_congreso||0)}</b>proyectos sobre este tema en el archivo del Congreso desde 1990${x.n_congreso?'':' (no es un asunto de ley: es de la conversación pública)'}.</div>
+        </div>
+      </div></button>`;
+  }).join('');
+  $$('#temas-box .tema').forEach(b=>b.onclick=()=>b.classList.toggle('flip'));
+  const g=t.generado?new Date(t.generado):null, fz=t.fuentes||{};
+  $('#temas-nota').innerHTML=`Temas detectados de forma automática sobre <b>${fmt(fz.prensa)}</b> notas de prensa de los últimos tres días, <b>${fmt(fz.radicados)}</b> proyectos radicados esta semana y <b>${fmt(fz.consultas)}</b> borradores de normas del Gobierno abiertos a comentarios. «Normas en consulta» son decretos o resoluciones que el Gobierno publica para que cualquiera los comente antes de firmarlos.${g&&!isNaN(g)?` Actualizado el ${esc(fCorta(iso(g)))}.`:''}`;
+  observar($('#temas-box'));
+}
+
+/* ── 03 lo nuevo ────────────────────────────────────────────────── */
+let NV_CAM='', NV_TEMA='', NV_Q='', NV_N=9;
+function initNuevos(v){
+  const map=(l,cam)=>(l||[]).map(x=>{ const k=numKey(x.numero,cam==='sen'?'S':'C'); return {...x,_cam:cam,_key:k,_f:fISO(x.fecha),_tema:temaDe(((x.explica||{}).titular||'')+' '+x.titulo)}; });
+  const vis=new Set(), L=[...map(v.senado,'sen'),...map(v.camara,'cam')].filter(x=>{ if(!x._key||vis.has(x._key)) return false; vis.add(x._key); return true; })
+    .sort((a,b)=>b._f.localeCompare(a._f));
+  VIV={lista:L,porKey:Object.fromEntries(L.map(x=>[x._key,x])),base:v.base_pdf||S3,actualizado:v.actualizado};
+  /* ticker */
+  const items=L.slice(0,12).map(x=>`<button type="button" data-k="${esc(x._key)}"><b>${x._cam==='sen'?'Senado':'Cámara'}</b>${esc(corto((x.explica||{}).titular||x.titulo,110))}</button>`).join('');
+  $('#ticker-run').innerHTML=items+items;
+  $$('#ticker-run button').forEach(b=>b.onclick=()=>fichaProyecto(VIV.porKey[b.dataset.k]));
+  /* chips de tema con conteo */
+  const cnt={}; L.forEach(x=>cnt[x._tema.id]=(cnt[x._tema.id]||0)+1);
+  const temas=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+  $('#nv-temas').innerHTML=`<button class="chip on" data-t="">Todos los temas</button>`+temas.map(([id,n])=>{ const t=TEMA_BY[id]||TEMA_OTRO; return `<button class="chip" data-t="${id}"><span style="color:${t.c}">${t.ic}</span>${esc(t.t)} <span class="c">${n}</span></button>`; }).join('');
+  $$('#nv-temas .chip').forEach(b=>b.onclick=()=>{ NV_TEMA=b.dataset.t; $$('#nv-temas .chip').forEach(c=>c.classList.toggle('on',c===b)); NV_N=9; pintaNuevos(); });
+  $$('#nv-cam .chip').forEach(b=>b.onclick=()=>{ NV_CAM=b.dataset.c; $$('#nv-cam .chip').forEach(c=>c.classList.toggle('on',c===b)); NV_N=9; pintaNuevos(); });
+  $('#nv-q').oninput=e=>{ NV_Q=norm(e.target.value); NV_N=9; pintaNuevos(); };
+  $('#nv-mas').onclick=()=>{ NV_N+=9; pintaNuevos(); };
+  pintaNuevos();
+  const a=v.actualizado?new Date(v.actualizado):null;
+  $('#nv-nota').innerHTML=`Los ${L.length} proyectos más recientes de cada cámara, tomados del registro del Senado (leyes.senado.gov.co) y de la Cámara (camara.gov.co).${a&&!isNaN(a)?` Revisado el ${esc(fCorta(iso(a)))} a las ${a.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',timeZone:'America/Bogota'})}.`:''}`;
+}
+function pintaNuevos(){
+  const L=VIV.lista.filter(x=>(!NV_CAM||x._cam===NV_CAM)&&(!NV_TEMA||x._tema.id===NV_TEMA)&&(!NV_Q||norm(x.titulo+' '+JSON.stringify(x.explica||{})+' '+x.autor).includes(NV_Q)));
+  const box=$('#nv-box');
+  if(!L.length){ box.innerHTML='<div class="empty-day" style="grid-column:1/-1"><b>Nada por aquí</b>Prueba con otra palabra o quita los filtros.</div>'; $('#nv-mas').hidden=true; return; }
+  box.innerHTML=L.slice(0,NV_N).map((x,i)=>{
+    const ex=x.explica||{}, e=estadoDe(x.estado);
+    return `<button class="nv rv" type="button" data-k="${esc(x._key)}" style="--tc:${x._tema.c};transition-delay:${(i%9)*50}ms">
+      <div class="row"><span class="tag ${x._cam==='sen'?'sen':'cam'}">${x._cam==='sen'?'Senado':'Cámara'}</span><span class="tag"><i style="background:${x._tema.c}"></i>${esc(x._tema.t)}</span></div>
+      <h3>${esc(ex.titular||corto(x.titulo,140))}</h3>
+      ${ex.afecta?`<div class="afe"><b>A quién le aplica:</b> ${esc(corto(ex.afecta,150))}</div>`:''}
+      <div>${miniHtml(e)}</div>
+      <div class="foot"><span>Radicado ${esc(cuandoFue(x.fecha))}</span><b>Ver qué cambia →</b></div>
+    </button>`;
+  }).join('');
+  box.querySelectorAll('.nv').forEach(b=>b.onclick=()=>fichaProyecto(VIV.porKey[b.dataset.k]));
+  $('#nv-mas').hidden=L.length<=NV_N;
+  observar(box);
+}
+
+/* ── 04 cómo nace una ley ───────────────────────────────────────── */
+let RUTA_I=0, RUTA_T=null, RUTA_PLAY=true;
+function pintaRuta(i){
+  RUTA_I=(i+PASOS.length)%PASOS.length;
+  $$('#ruta-pasos .paso').forEach((b,k)=>{ b.classList.toggle('on',k===RUTA_I); b.classList.toggle('hecho',k<RUTA_I); b.setAttribute('aria-current',k===RUTA_I?'step':'false'); });
+  $('#ruta-prog').style.width=(92*RUTA_I/(PASOS.length-1))+'%';
+  const p=PASOS[RUTA_I];
+  $('#ruta-det').innerHTML=`<div class="big">${RUTA_I+1}</div><div class="anim"><h3>${esc(p.t)}</h3><p>${esc(p.p)}</p><div class="dato"><b>Dato:</b> ${esc(p.d)}</div></div>`;
+}
+function rutaAuto(){ clearInterval(RUTA_T); if(RUTA_PLAY) RUTA_T=setInterval(()=>pintaRuta(RUTA_I+1),6500); $('#ruta-play').textContent=RUTA_PLAY?'❚❚ Pausar':'▶ Reproducir'; }
+function initRuta(){
+  $('#ruta-pasos').insertAdjacentHTML('beforeend',PASOS.map((p,i)=>`<button class="paso" type="button" data-i="${i}"><span class="bola"><span>${i+1}</span></span><span class="nm">${esc(p.nm)}</span></button>`).join(''));
+  $$('#ruta-pasos .paso').forEach(b=>b.onclick=()=>{ RUTA_PLAY=false; rutaAuto(); pintaRuta(+b.dataset.i); });
+  $('#ruta-ant').onclick=()=>{ RUTA_PLAY=false; rutaAuto(); pintaRuta(RUTA_I-1); };
+  $('#ruta-sig').onclick=()=>{ RUTA_PLAY=false; rutaAuto(); pintaRuta(RUTA_I+1); };
+  $('#ruta-play').onclick=()=>{ RUTA_PLAY=!RUTA_PLAY; rutaAuto(); };
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) RUTA_PLAY=false;
+  pintaRuta(0); rutaAuto();
+  /* de cada 100 · resultados de 14.316 proyectos de ley 1990-2026 (corte jul-2026) */
+  const R=[{t:'Se volvieron ley',n:18,c:'#1f8a5e'},{t:'Se archivaron porque se les acabó el tiempo',n:20,c:'#f2b705'},{t:'Se archivaron por otras causas',n:42,c:'#c9c3b2'},{t:'Los retiraron sus autores',n:7,c:'#e2553b'},{t:'Siguen en trámite',n:10,c:'#2c56e0'},{t:'Sin dato',n:3,c:'#e8e2d2'}];
+  let dots=''; let k=0; R.forEach(r=>{ for(let j=0;j<r.n;j++){ dots+=`<i style="background:${r.c};transition-delay:${k*12}ms" title="${esc(r.t)}"></i>`; k++; } });
+  $('#cien').innerHTML=dots;
+  $('#cien-leg').innerHTML=R.filter(r=>r.t!=='Sin dato').map(r=>`<div><i style="background:${r.c}"></i><b>${r.n}</b><span>${esc(r.t)}</span></div>`).join('');
+  const T=[
+    {t:'Ley ordinaria',deb:4,p:'La mayoría de las leyes. Se aprueba con la mayoría de los votos de quienes estén en la sesión.',s:'Cuatro debates · hasta dos legislaturas'},
+    {t:'Ley orgánica',deb:4,p:'Fija las reglas con las que funcionan otras leyes, como la del presupuesto o la del ordenamiento del territorio.',s:'Necesita mayoría absoluta de los miembros'},
+    {t:'Ley estatutaria',deb:4,x:1,p:'Regula derechos fundamentales, la justicia, los partidos y la participación ciudadana. La Corte Constitucional la revisa antes de que rija.',s:'Mayoría absoluta · en una sola legislatura'},
+    {t:'Acto legislativo',deb:8,p:'Reforma la Constitución. Pasa dos veces por las dos cámaras, en dos periodos de sesiones seguidos.',s:'Ocho debates en dos vueltas'},
+  ];
+  $('#tipos').innerHTML=T.map((x,i)=>`<div class="tipo rv" style="transition-delay:${i*70}ms"><h3>${esc(x.t)}</h3><div class="deb" aria-label="${x.deb} debates">${'<i></i>'.repeat(x.deb)}${x.x?'<i class="x" title="Revisión de la Corte"></i>':''}</div><p>${esc(x.p)}</p><small>${esc(x.s)}</small></div>`).join('');
+}
+
+/* ── 05 ritmo ───────────────────────────────────────────────────── */
+function initRitmo(r){
+  const S=r.series||{}, Y=['2018','2022','2026'].filter(y=>S[y]);
+  const COL={'2018':'#c9c3b2','2022':'#7d8096','2026':'#e2553b'};
+  const acum=y=>{ let a=0; return (S[y].dias||[]).map(d=>a+=d.n||0); };
+  const A=Object.fromEntries(Y.map(y=>[y,acum(y)]));
+  const n=Math.max(...Y.map(y=>A[y].length)), mx=Math.max(...Y.map(y=>A[y][A[y].length-1]||0),1);
+  const W=640,H=300,pl=40,pb=26,pt=12;
+  const X=i=>pl+(W-pl-10)*i/Math.max(1,n-1), Yv=v=>pt+(H-pt-pb)*(1-v/mx);
+  const grid=[0,.25,.5,.75,1].map(k=>{ const v=Math.round(mx*k); return `<line x1="${pl}" x2="${W-10}" y1="${Yv(v)}" y2="${Yv(v)}" stroke="rgba(22,24,43,.08)"/><text class="lbl-y" x="${pl-8}" y="${Yv(v)+4}" text-anchor="end">${fmt(v)}</text>`; }).join('');
+  /* etiquetas al final de cada línea, separadas al menos 17 px para que no se monten */
+  const ly={}; Y.map(y=>[y,Yv(A[y][A[y].length-1])-10]).sort((p,q)=>p[1]-q[1]).forEach(([y,v],i,arr)=>{ ly[y]=i&&v-ly[arr[i-1][0]]<17?ly[arr[i-1][0]]+17:v; });
+  const lines=Y.map(y=>{ const p=A[y].map((v,i)=>`${X(i).toFixed(1)},${Yv(v).toFixed(1)}`).join(' '); const L=A[y].length-1;
+    return `<polyline class="ln" points="${p}" stroke="${COL[y]}" style="stroke-dasharray:2000;stroke-dashoffset:2000" data-ln/><circle cx="${X(L)}" cy="${Yv(A[y][L])}" r="5" fill="${COL[y]}"/><text x="${X(L)-8}" y="${ly[y]}" text-anchor="end" font-size="13" font-weight="700" fill="${COL[y]==='#c9c3b2'?'#9a937f':COL[y]}" paint-order="stroke" stroke="#fffdf8" stroke-width="4">${y} · ${fmt(A[y][L])}</text>`; }).join('');
+  const ini=S['2026']&&S['2026'].dias[0], fin=S['2026']&&S['2026'].dias[S['2026'].dias.length-1];
+  $('#ritmo-box').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Proyectos radicados acumulados por día hábil: 2018, 2022 y 2026">${grid}${lines}<text class="lbl-y" x="${pl}" y="${H-6}">${ini?'20 de julio':''}</text><text class="lbl-y" x="${W-10}" y="${H-6}" text-anchor="end">${fin?esc(fCorta('2026-'+fin.d)):''}</text></svg>`;
+  $('#ritmo-leg').innerHTML=Y.map(y=>`<span><i style="background:${COL[y]}"></i>Congreso elegido en ${y}</span>`).join('');
+  const t26=A['2026']?A['2026'][A['2026'].length-1]:0, t22=A['2022']?A['2022'][A['2022'].length-1]:0;
+  if(t26&&t22){
+    const d=Math.round(100*(t26-t22)/t22);
+    $('#ritmo-tit').textContent=d>0?`Este Congreso presenta ${d} % más proyectos que el anterior`:`Este Congreso presenta ${Math.abs(d)} % menos proyectos que el anterior`;
+    $('#ritmo-txt').innerHTML=`Entre el 20 de julio y el ${esc(fCorta('2026-'+fin.d))} se radicaron <b>${fmt(t26)}</b> proyectos de ley, contra <b>${fmt(t22)}</b> en los mismos días de 2022. Presentar muchos no es lo mismo que aprobar muchos: la mayoría se archiva.`;
+    $('[data-n="t-rad"]').dataset.v=t26; cuenta($('[data-n="t-rad"]'),t26);
+    $('#t-rad-s').textContent=`proyectos de ley radicados desde el 20 de julio`;
+  }
+  const v=r.ventana||{};
+  if(v.provisional_desde) $('#ritmo-box').insertAdjacentHTML('beforeend',`<p class="note">Las últimas semanas pueden crecer todavía: la Cámara publica sus proyectos con días de retraso.</p>`);
+  const anim=()=>$$('#ritmo-box [data-ln]').forEach((l,i)=>{ l.style.transition=`stroke-dashoffset 1.8s ${i*.25}s ease`; l.style.strokeDashoffset='0'; });
+  const el=$('#ritmo .panel');
+  if('IntersectionObserver' in window){ const io=new IntersectionObserver(es=>{ if(es[0].isIntersecting){ anim(); io.disconnect(); } }); io.observe(el); }
+  setTimeout(anim,3000);
+}
+
+/* ── 06 comisiones ──────────────────────────────────────────────── */
+const COMS=[
+  {k:'PRIMERA',n:'1',c:'#2c56e0',ap:'La de la Constitución',t:['Reformas a la Constitución','Derechos fundamentales','Paz','Justicia','Organización del territorio','Partidos y elecciones','Comunidades étnicas']},
+  {k:'SEGUNDA',n:'2',c:'#4a90a4',ap:'La de las relaciones con el mundo',t:['Relaciones internacionales','Tratados','Defensa y Fuerzas Militares','Servicio militar','Comercio exterior','Honores y monumentos']},
+  {k:'TERCERA',n:'3',c:'#b8860b',ap:'La de la plata que entra',t:['Impuestos','Hacienda pública','Bancos y crédito','Banco de la República','Seguros y bolsa']},
+  {k:'CUARTA',n:'4',c:'#c27a00',ap:'La de la plata que sale',t:['Presupuesto','Control fiscal','Bienes del Estado','Patentes y marcas','Contratación del Estado']},
+  {k:'QUINTA',n:'5',c:'#1f8a5e',ap:'La del campo y el ambiente',t:['Agro','Ambiente','Recursos naturales','Tierras baldías','Pesca y mar','Minas y energía']},
+  {k:'SEXTA',n:'6',c:'#d2691e',ap:'La de la infraestructura y el conocimiento',t:['Transporte y vías','Comunicaciones','Servicios públicos','Educación y cultura','Ciencia y tecnología','Turismo']},
+  {k:'SEPTIMA',n:'7',c:'#e2553b',ap:'La de la vida diaria',t:['Trabajo y salarios','Pensiones','Salud','Vivienda','Cajas de compensación','Deporte','Mujer y familia']},
+];
+function initComisiones(j){
+  const C=(j&&j.comisiones)||{};
+  const mesaTxt=k=>{ const m=((C[k]||{}).mesa||[]).filter(p=>/presiden/i.test(p.cargo)&&!/vice/i.test(p.cargo));
+    if(!m.length) return '';
+    return 'Presiden: '+m.map(p=>`<b>${esc(p.nombre)}</b> (${p.corp==='senado'?'Senado':'Cámara'})`).join(' y '); };
+  $('#coms-box').innerHTML=COMS.map((x,i)=>{
+    const v=C[x.k]||{}, ns=(v.senado||[]).length, nc=(v.camara||[]).length;
+    return `<button class="com rv" type="button" data-k="${x.k}" style="--cc:${x.c};transition-delay:${i*60}ms">
+      <div class="nn">${x.n}</div><h3>Comisión ${x.k==='SEPTIMA'?'Séptima':capital(x.k.toLowerCase())}</h3><div class="apodo">${esc(x.ap)}</div>
+      <ul>${x.t.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>
+      <div class="mesa">${ns||nc?`${ns} senadores y ${nc} representantes. `:''}${mesaTxt(x.k)}</div>
+      <span class="ver">Ver integrantes y proyectos activos →</span>
+    </button>`;
+  }).join('')+`<div class="com extra rv" style="transition-delay:420ms"><h3>Las plenarias</h3><div class="apodo">Donde se reúnen todos</div><p>El segundo y el cuarto debate ocurren en la plenaria: los 103 senadores juntos o los 182 representantes juntos. También existen comisiones legales, como la de Ética, la de la Mujer o la de Acusaciones, que no tramitan leyes.</p></div>`;
+  COMJ=C;
+  $$('#coms-box .com[data-k]').forEach(b=>b.onclick=()=>abrirComision(b.dataset.k));
+  observar($('#coms-box'));
+}
+
+/* ── 07 quiénes son · composición según la lista con que fueron elegidos ── */
+const COMP={
+  SENADO:[['Pacto Histórico',25,'#6B2D8B'],['Centro Democrático',17,'#0088BB'],['Partido Liberal',13,'#C8102E'],['Alianza por Colombia',11,'#4CAF50'],['Partido Conservador',10,'#003580'],['Partido de la U',8,'#F7941D'],['Cambio Radical',7,'#E91E8C'],['Ahora Colombia',5,'#1A3FC4'],['Salvación Nacional',4,'#00AEEF'],['Indígenas',2,'#b0713d'],['Estatuto de Oposición',1,'#6b7b87']],
+  CAMARA:[['Pacto Histórico',38,'#6B2D8B'],['Centro Democrático',31,'#0088BB'],['Partido Liberal',24,'#C8102E'],['Partido Conservador',19,'#003580'],['Otros y coaliciones',17,'#8494a0'],['Curules de paz',16,'#e0a03a'],['Partido de la U',13,'#F7941D'],['Cambio Radical',11,'#E91E8C'],['Alianza Verde',7,'#4CAF50'],['Afro y raizal',2,'#8a5a2e'],['Salvación Nacional',1,'#00AEEF'],['Ahora Colombia',1,'#1A3FC4'],['Indígenas',1,'#b0713d'],['Estatuto de Oposición',1,'#6b7b87']],
+  MUJERES:{SENADO:32,CAMARA:52}
+};
+function initQuienes(){
+  const waffle=(el,leg,L,cols)=>{
+    let h='',k=0; L.forEach(([n,c,col])=>{ for(let i=0;i<c;i++){ h+=`<i style="background:${col};transition-delay:${k*6}ms" title="${esc(n)}"></i>`; k++; } });
+    el.style.gridTemplateColumns=`repeat(${cols},1fr)`; el.innerHTML=h;
+    leg.innerHTML=L.map(([n,c,col])=>`<span><i style="background:${col}"></i>${esc(n)} · ${c}</span>`).join('');
+  };
+  const cs=innerWidth<600;
+  waffle($('#w-sen'),$('#wl-sen'),COMP.SENADO,cs?13:16);
+  waffle($('#w-cam'),$('#wl-cam'),COMP.CAMARA,cs?16:24);
+  $('#w-sen').parentElement.classList.add('rv'); $('#w-cam').parentElement.classList.add('rv');
+  const tot=285, muj=COMP.MUJERES.SENADO+COMP.MUJERES.CAMARA;
+  $('#cifras').innerHTML=[
+    [tot,'congresistas en total'],[103,'senadores'],[182,'representantes a la Cámara'],[muj,`mujeres (${Math.round(100*muj/tot)} % de las curules)`]
+  ].map(([n,t])=>`<div class="cifra"><b data-cuenta="${n}">0</b><span>${esc(t)}</span></div>`).join('');
+}
+
+/* ── 08 glosario ────────────────────────────────────────────────── */
+const GLO=[
+  {w:'Radicar',c:'tramite',d:'Presentar oficialmente un proyecto ante la Secretaría del Senado o de la Cámara. Desde ese momento tiene número y empieza su trámite.',e:'«Se radicó el proyecto 311 de 2026» quiere decir que ya entró al Congreso, no que ya se aprobó.'},
+  {w:'Proyecto de ley',c:'tramite',d:'Una propuesta escrita de ley. Solo se vuelve ley si supera todos los debates y el presidente la firma.',e:'Un proyecto puede proponer, por ejemplo, prohibir el fracking en los humedales.'},
+  {w:'Ponente',c:'tramite',d:'El congresista encargado de estudiar a fondo un proyecto y recomendar qué hacer con él.',e:'Si un proyecto «no tiene ponente», nadie lo está estudiando y no avanza.'},
+  {w:'Ponencia',c:'tramite',d:'El informe que escribe el ponente. Recomienda aprobar el proyecto, cambiarlo o archivarlo, y propone el texto que se va a votar.',e:'«Ponencia positiva con modificaciones» significa que el ponente lo apoya, pero con cambios.'},
+  {w:'Debate',c:'tramite',d:'Cada vez que una comisión o una plenaria discute y vota el proyecto. Una ley común necesita cuatro.',e:'«Pasó su primer debate» quiere decir que lo aprobó la comisión.'},
+  {w:'Orden del día',c:'tramite',d:'La lista de temas que una comisión o plenaria va a tratar en una sesión, en orden.',e:'Estar de primero en el orden del día da más posibilidades de que el proyecto se discuta ese día.'},
+  {w:'Archivado',c:'tramite',d:'Un proyecto que ya no sigue su camino. Puede pasar porque se votó en contra, porque su autor lo retiró o porque se le acabó el tiempo.',e:'Un proyecto archivado puede volver a presentarse en otra legislatura, empezando de cero.'},
+  {w:'Archivado por términos',c:'tramite',d:'El proyecto que se archiva porque no alcanzó a pasar los debates en el plazo que fija la Constitución.',e:'Si un proyecto no recibe su primer debate antes de que termine la legislatura, se archiva.'},
+  {w:'Acumulado',c:'tramite',d:'Cuando dos o más proyectos sobre el mismo tema se juntan y se tramitan como uno solo.',e:'Dos proyectos distintos sobre el sistema de cuidado pueden acumularse para discutirse juntos.'},
+  {w:'Conciliación',c:'tramite',d:'El paso en el que Senado y Cámara se ponen de acuerdo cuando aprobaron textos distintos del mismo proyecto.',e:'Si el Senado aprobó 20 artículos y la Cámara 22, la conciliación decide el texto final.'},
+  {w:'Sanción presidencial',c:'tramite',d:'La firma del presidente que convierte el proyecto aprobado en ley.',e:'Después de la sanción, la ley se publica en el Diario Oficial y empieza a regir.'},
+  {w:'Objeción presidencial',c:'tramite',d:'Cuando el presidente no firma y devuelve el proyecto al Congreso porque lo considera inconveniente o inconstitucional.',e:'Si la objeción es por inconstitucional y el Congreso insiste, decide la Corte Constitucional.'},
+  {w:'Mensaje de urgencia',c:'tramite',d:'Una petición del presidente para que un proyecto se tramite rápido. Las comisiones de Senado y Cámara lo discuten juntas.',e:'El Gobierno suele pedir urgencia para reformas que considera prioritarias.'},
+  {w:'Comisión constitucional',c:'organos',d:'Uno de los siete grupos en que se divide cada cámara por temas. Ahí ocurre el primer debate.',e:'La Comisión Séptima estudia los proyectos de salud, trabajo y pensiones.'},
+  {w:'Comisión legal',c:'organos',d:'Comisiones con funciones especiales que no tramitan leyes, como Ética, Cuentas, Derechos Humanos, Equidad de la Mujer o Acusaciones.',e:'La Comisión de Acusaciones de la Cámara investiga al presidente de la República.'},
+  {w:'Plenaria',c:'organos',d:'La reunión de todos los miembros de una cámara: los 103 senadores o los 182 representantes.',e:'El segundo debate de un proyecto se hace en la plenaria.'},
+  {w:'Mesa directiva',c:'organos',d:'El presidente y los vicepresidentes de una cámara o de una comisión. Organizan las sesiones y reparten los proyectos.',e:'La mesa directiva de una comisión decide quién es ponente de cada proyecto.'},
+  {w:'Bancada',c:'organos',d:'El grupo de congresistas de un mismo partido. Deben actuar juntos en las decisiones que el partido tome.',e:'«La bancada liberal votará en contra» quiere decir que todos sus congresistas deberían votar no.'},
+  {w:'Curul',c:'organos',d:'El puesto de un congresista. Hay 103 en el Senado y 182 en la Cámara.',e:'«El partido ganó 25 curules» significa que eligió 25 congresistas.'},
+  {w:'Curules de paz (CITREP)',c:'organos',d:'Dieciséis puestos en la Cámara para víctimas de las regiones más golpeadas por el conflicto, creados por el Acuerdo de Paz.',e:'Solo pueden aspirar organizaciones de víctimas, no los partidos tradicionales.'},
+  {w:'Estatuto de la Oposición',c:'organos',d:'La ley que da garantías a los partidos que se declaran en oposición al Gobierno, entre ellas una curul para quien queda segundo en la elección presidencial.',e:'Quien quedó segundo en la presidencial puede ocupar una curul en el Senado.'},
+  {w:'UTL',c:'organos',d:'Unidad de Trabajo Legislativo: el equipo de asesores de cada congresista.',e:'Muchos proyectos los escriben las UTL y los firma el congresista.'},
+  {w:'Legislatura',c:'tiempo',d:'El año de trabajo del Congreso: va del 20 de julio al 20 de junio del año siguiente, en dos periodos de sesiones.',e:'La legislatura 2026-2027 empezó el 20 de julio de 2026.'},
+  {w:'Periodo de sesiones',c:'tiempo',d:'El Congreso sesiona del 20 de julio al 16 de diciembre y del 16 de marzo al 20 de junio. El resto del tiempo está en receso.',e:'En enero el Congreso no sesiona, salvo que el Gobierno lo convoque a sesiones extras.'},
+  {w:'Sesiones extraordinarias',c:'tiempo',d:'Sesiones fuera del periodo normal, convocadas por el Gobierno. Solo se tratan los temas que el Gobierno pida.',e:'El Gobierno puede convocar en enero para que se vote una reforma pendiente.'},
+  {w:'Cuatrienio',c:'tiempo',d:'Los cuatro años para los que se elige el Congreso. Este va de 2026 a 2030.',e:'En el último año del cuatrienio se archivan muchos proyectos por falta de tiempo.'},
+  {w:'Quórum',c:'votacion',d:'El número mínimo de congresistas que deben estar para poder deliberar o votar. Para decidir hace falta la mayoría de los miembros.',e:'«Se rompió el quórum» significa que se fueron tantos que no se podía votar.'},
+  {w:'Mayoría simple',c:'votacion',d:'Más de la mitad de los votos de quienes están presentes en la sesión, siempre que haya quórum.',e:'Las leyes ordinarias se aprueban con mayoría simple.'},
+  {w:'Mayoría absoluta',c:'votacion',d:'Más de la mitad de todos los miembros de la corporación, estén o no en la sesión.',e:'En el Senado, la mayoría absoluta son 52 votos.'},
+  {w:'Voto nominal',c:'votacion',d:'La votación en la que queda registrado cómo votó cada congresista, con su nombre.',e:'Gracias al voto nominal se puede saber si tu representante votó sí o no.'},
+  {w:'Control político',c:'control',d:'La función del Congreso de vigilar al Gobierno. Los congresistas citan a ministros y otros funcionarios a rendir cuentas.',e:'Un debate de control político sobre la crisis de salud cita al ministro de Salud.'},
+  {w:'Moción de censura',c:'control',d:'La votación con la que el Congreso puede sacar del cargo a un ministro o a otros altos funcionarios. Requiere la mayoría absoluta.',e:'Se han propuesto varias mociones de censura y muy pocas han prosperado.'},
+  {w:'Audiencia pública',c:'control',d:'Una sesión abierta en la que ciudadanos y organizaciones pueden hablar sobre un proyecto antes de que se vote.',e:'Antes de votar una reforma laboral, la comisión puede escuchar a sindicatos y empresarios.'},
+  {w:'Gaceta del Congreso',c:'control',d:'La publicación oficial donde aparecen los proyectos, las ponencias y las actas de las sesiones.',e:'El texto completo de cualquier proyecto está en la Gaceta del Congreso.'},
+  {w:'Ley de honores',c:'tipos',d:'Una ley que rinde homenaje a una persona, un municipio o una fecha. No cambia derechos ni obligaciones.',e:'Muchos proyectos que llegan son para celebrar el aniversario de un municipio.'},
+  {w:'Acto legislativo',c:'tipos',d:'El nombre que recibe una reforma a la Constitución tramitada por el Congreso. Necesita ocho debates.',e:'La reforma que creó las curules de paz fue un acto legislativo.'},
+  {w:'Ley estatutaria',c:'tipos',d:'Ley sobre derechos fundamentales, justicia, partidos o participación ciudadana. La revisa la Corte Constitucional antes de que rija.',e:'La ley que regula el derecho a la salud es estatutaria.'},
+];
+const GLO_CAT={'':'Todas',tramite:'El trámite',organos:'Quién es quién',tiempo:'Los tiempos',votacion:'Las votaciones',control:'Vigilar al Gobierno',tipos:'Tipos de norma'};
+let GL_C='', GL_Q='';
+function pintaGlosario(){
+  const q=norm(GL_Q).trim();
+  const L=GLO.filter(g=>(!GL_C||g.c===GL_C)&&(!q||norm(g.w+' '+g.d).includes(q)));
+  const marca=s=>{ if(!q) return esc(s); const n=norm(s), i=n.indexOf(q); if(i<0) return esc(s); return esc(s.slice(0,i))+'<mark>'+esc(s.slice(i,i+q.length))+'</mark>'+esc(s.slice(i+q.length)); };
+  $('#gl-box').innerHTML=L.length?L.map(g=>`<button class="gl" type="button" aria-expanded="false"><h3>${marca(g.w)}<span class="mas" aria-hidden="true">+</span></h3><p>${marca(g.d)}</p><div class="ej"><div><p><b>Ejemplo:</b> ${esc(g.e)}</p></div></div></button>`).join('')
+    :'<div class="empty-day" style="grid-column:1/-1"><b>No encontramos esa palabra</b>Prueba con otra o revisa la ortografía.</div>';
+  $$('#gl-box .gl').forEach(b=>b.onclick=()=>{ const o=b.classList.toggle('open'); b.setAttribute('aria-expanded',o); });
+}
+function initGlosario(){
+  $('#gl-cat').innerHTML=Object.entries(GLO_CAT).map(([k,t])=>`<button class="chip${k===''?' on':''}" data-c="${k}">${esc(t)}</button>`).join('');
+  $$('#gl-cat .chip').forEach(b=>b.onclick=()=>{ GL_C=b.dataset.c; $$('#gl-cat .chip').forEach(c=>c.classList.toggle('on',c===b)); pintaGlosario(); });
+  $('#gl-q').oninput=e=>{ GL_Q=e.target.value; pintaGlosario(); };
+  pintaGlosario();
+}
+
+/* ── 09 preguntas ───────────────────────────────────────────────── */
+const FAQ=[
+  ['¿Puedo ver las sesiones del Congreso?','Sí. Las sesiones son públicas: se transmiten por el Canal Congreso y por los canales oficiales del Senado y de la Cámara en internet. También puedes asistir en persona a algunas sesiones, con registro previo.'],
+  ['¿Puedo opinar sobre un proyecto de ley?','Sí. Cualquier persona puede enviar observaciones por escrito sobre un proyecto mientras está en la comisión (artículo 230 de la Ley 5ª de 1992). Las comisiones también hacen audiencias públicas en las que ciudadanos y organizaciones pueden intervenir.'],
+  ['¿Un ciudadano puede presentar un proyecto?','Sí, si reúne firmas de un número de ciudadanos igual o mayor al 5 % del censo electoral (artículo 155 de la Constitución). También pueden hacerlo, entre otros, los congresistas, el Gobierno, las altas cortes y el 30 % de los concejales o diputados del país.'],
+  ['¿Quién me representa?','En el Senado te representan los 103 senadores, que se eligen en todo el país. En la Cámara te representan los congresistas elegidos por tu departamento, además de las curules especiales indígenas, afro, de colombianos en el exterior y de paz.'],
+  ['¿Por qué se archivan tantos proyectos?','Porque el tiempo es limitado y se presentan muchos más de los que se alcanzan a discutir. Si un proyecto no recibe su primer debate antes del fin de la legislatura, se archiva. De cada 100, unos 18 terminan siendo ley.'],
+  ['¿Que un proyecto esté en el orden del día quiere decir que lo van a votar?','No necesariamente. Significa que se puede discutir y votar ese día, pero muchas sesiones no alcanzan a llegar a todos los puntos de la lista, o se levantan por falta de quórum.'],
+  ['¿Los resúmenes de esta página son oficiales?','No. Se hacen de forma automática a partir del texto que se radicó en el Congreso y pueden tener errores. Cada ficha enlaza al texto oficial para que lo puedas confirmar.'],
+];
+function initFaq(){ $('#faq').innerHTML=FAQ.map(([q,a])=>`<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join(''); }
+
+/* ── estado del Congreso (sesiona o receso) ─────────────────────── */
+function initEstado(){
+  const y=+HOY.slice(0,4);
+  const per=[[`${y-1}-07-20`,`${y-1}-12-16`],[`${y}-03-16`,`${y}-06-20`],[`${y}-07-20`,`${y}-12-16`]];
+  const en=per.find(([a,b])=>HOY>=a&&HOY<=b);
+  const el=$('#estado-congreso');
+  if(en){ const dias=Math.round((dObj(en[1])-dObj(HOY))/864e5); el.innerHTML=`<span class="dot"></span> El Congreso está sesionando · faltan ${dias} días para el receso`; }
+  else{ const prox=per.map(p=>p[0]).find(a=>a>HOY)||`${y+1}-03-16`; el.innerHTML=`<span class="dot off"></span> El Congreso está en receso · vuelve el ${esc(fCorta(prox))}`; }
+}
+
+/* ── menú activo según la sección visible ───────────────────────── */
+function initMenu(){
+  const links=$$('.menu a'), secs=links.map(a=>document.querySelector(a.getAttribute('href')));
+  const fn=()=>{ const y=scrollY+120; let k=-1; secs.forEach((s,i)=>{ if(s&&s.offsetTop<=y) k=i; }); links.forEach((a,i)=>a.classList.toggle('on',i===k)); };
+  addEventListener('scroll',fn,{passive:true}); fn();
+  $$('.tile[data-dia]').forEach(t=>t.addEventListener('click',()=>{ if(!ORD) return; DIA_SEL=t.dataset.dia==='manana'?MANANA:HOY; pintaDias(); pintaAgenda(); }));
+}
+
+
+/* ── utilidades de personas y partidos ──────────────────────────── */
+const STOPN=new Set(['de','del','la','las','los','y']);
+const toksN=n=>norm(n).replace(/[^a-z0-9ñ ]/g,' ').split(/\s+/).filter(t=>t.length>2&&!STOPN.has(t));
+function misma(a,b){ const A=toksN(a),B=toksN(b); if(A.length<2||B.length<2) return false; const [c,l]=A.length<=B.length?[A,B]:[B,A]; return c.every(t=>l.includes(t)); }
+const PARTIDOS=[[/pacto/i,'#6B2D8B'],[/centro democr/i,'#0088BB'],[/liberal/i,'#C8102E'],[/conservador/i,'#003580'],[/de la u\b|partido de la u|la u$/i,'#F7941D'],[/cambio radical/i,'#E91E8C'],[/verde/i,'#4CAF50'],[/alianza por colombia/i,'#4CAF50'],[/mira|ahora colombia/i,'#1A3FC4'],[/salvaci/i,'#00AEEF'],[/mais|aico|ind[ií]gena/i,'#b0713d'],[/citrep|paz/i,'#e0a03a'],[/dem[oó]crata/i,'#2f6f9f'],[/nuevo liberalismo/i,'#d4452a']];
+const colorP=p=>{ for(const [re,c] of PARTIDOS) if(re.test(p||'')) return c; return '#8494a0'; };
+const iniciales=n=>String(n||'').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+const pageBar=(tot,pg,per,fn)=>{ const n=Math.ceil(tot/per); if(n<=1) return ''; const ini=Math.max(1,Math.min(pg-2,n-4)), fin=Math.min(n,ini+4);
+  let h=`<button type="button" data-pg="${pg-1}" ${pg===1?'disabled':''} aria-label="Anterior">‹</button>`;
+  for(let i=ini;i<=fin;i++) h+=`<button type="button" data-pg="${i}" class="${i===pg?'on':''}">${i}</button>`;
+  return h+`<button type="button" data-pg="${pg+1}" ${pg===n?'disabled':''} aria-label="Siguiente">›</button>`; };
+
+/* ── 04 el archivo ──────────────────────────────────────────────── */
+const RES_TXT={LEY:['Se volvió ley','#1f8a5e'],ARCHIVADO_TIEMPO:['Se le acabó el tiempo','#d9a300'],ARCHIVADO_OTRO:['Archivado por otra causa','#a39d8c'],RETIRADO:['Lo retiraron','#e2553b'],EN_TRAMITE:['En trámite','#2c56e0'],OTRO:['Otro','#c9c3b2'],SIN_DATO:['Sin dato','#ddd6c4']};
+const COM_TXT=['Sin comisión','Primera','Segunda','Tercera','Cuarta','Quinta','Sexta','Séptima','Comisiones económicas'];
+let ARC=null, ARC_P=null, ARC_RES=[], ARC_PG=1, ARC_ANIO=0, ARC_ORD='nuevo';
+function cargaArchivo(){
+  if(!ARC_P) ARC_P=getJSON(URL.arc).then(d=>{ const R=d.meta.resultados; d.p.forEach(r=>{ r._n=' '+norm(r[3]).replace(/[^a-z0-9ñ ]/g,' ')+' '; r._r=R[r[4]]; }); ARC=d; return d; });
+  ARC_P.catch(()=>{ ARC_P=null; });
+  return ARC_P;
+}
+const STOPQ=new Set(['de','del','la','las','los','el','en','por','para','con','que','una','uno','sobre','ley','proyecto']);
+async function buscaArchivo(q){
+  q=String(q||'').trim(); const box=$('#arc-res');
+  const tk=norm(q).replace(/[^a-z0-9ñ ]/g,' ').split(/\s+/).filter(t=>t.length>=3&&!STOPQ.has(t));
+  if(!tk.length){ box.innerHTML=q?'<div class="vt-vacio">Escribe al menos una palabra de tres letras o más.</div>':''; return; }
+  if(!ARC){ box.innerHTML='<div class="cargando"><i></i>Abriendo el archivo de 15.000 proyectos…</div>'; try{ await cargaArchivo(); }catch(e){ box.innerHTML='<div class="err">No pudimos abrir el archivo. Intenta de nuevo en un rato.</div>'; return; } }
+  /* cada palabra debe aparecer al inicio de una palabra del título (cannabis, cannábico) */
+  ARC_RES=ARC.p.filter(r=>tk.every(t=>r._n.includes(' '+t)));
+  ARC_PG=1; ARC_ANIO=0; pintaArchivo(q);
+  try{ history.replaceState(null,'','#archivo='+encodeURIComponent(q)); }catch(e){}
+}
+function pintaArchivo(q){
+  const box=$('#arc-res'), R=ARC_RES, M=ARC.meta;
+  if(!R.length){ box.innerHTML=`<div class="vt-vacio"><b>No encontramos proyectos con «${esc(q)}» en el título.</b> Prueba con un sinónimo o con una sola palabra. Por ejemplo, en vez de «marihuana» prueba «cannabis».</div>`; return; }
+  const leyes=R.filter(r=>r._r==='LEY').length;
+  const cnt={}; R.forEach(r=>cnt[r._r]=(cnt[r._r]||0)+1);
+  const orden=['LEY','EN_TRAMITE','ARCHIVADO_TIEMPO','ARCHIVADO_OTRO','RETIRADO','OTRO','SIN_DATO'].filter(k=>cnt[k]);
+  const porA={}; R.forEach(r=>{ if(r[0]) porA[r[0]]=(porA[r[0]]||0)+1; });
+  const yMax=Math.max(1,...Object.values(porA)); const anios=[]; for(let y=M.desde;y<=M.hasta;y++) anios.push(y);
+  const pico=Object.entries(porA).sort((a,b)=>b[1]-a[1])[0];
+  const rep=R.reduce((m,r)=>r[7]>m[7]?r:m,R[0]);
+  box.innerHTML=`<div class="arc-top">
+      <div class="panel"><div class="arc-big" data-cuenta="${R.length}">0<small>proyecto${R.length===1?'':'s'} sobre «${esc(q)}» desde ${M.desde}${pico?`. El año con más fue <b>${pico[0]}</b>, con ${pico[1]}.`:''}</small></div>
+        <div class="stack">${orden.map(k=>`<i data-sw="${(100*cnt[k]/R.length).toFixed(2)}" style="background:${RES_TXT[k][1]}" title="${esc(RES_TXT[k][0])}: ${cnt[k]}"></i>`).join('')}</div>
+        <div class="stk-leg">${orden.map(k=>`<span><i style="background:${RES_TXT[k][1]}"></i>${esc(RES_TXT[k][0])} · <b>${cnt[k]}</b></span>`).join('')}</div>
+        <p class="note">${leyes?`<b>${leyes} de ${R.length}</b> (${Math.round(100*leyes/R.length)} %) terminaron siendo ley.`:'Ninguno ha terminado siendo ley.'}${rep&&rep[7]>1?` Una misma idea se ha radicado hasta <b>${rep[7]} veces</b>.`:''}</p></div>
+      <div class="panel"><h3 style="font-size:1.05rem">Proyectos radicados por año</h3><p class="note" style="margin-top:4px">Toca una barra para ver solo ese año.</p>
+        <div class="yb" id="arc-yb">${anios.map(y=>`<button type="button" data-y="${y}" data-h="${porA[y]?Math.max(4,100*porA[y]/yMax):2}" class="${porA[y]?'':'cero'}" aria-label="${y}: ${porA[y]||0} proyectos" title="${y}: ${porA[y]||0}"></button>`).join('')}</div>
+        <div class="yb-ax"><span>${M.desde}</span><span>${Math.round((M.desde+M.hasta)/2)}</span><span>${M.hasta}</span></div>
+        <div class="yb-tip" id="arc-tip"></div></div>
+    </div>
+    <div class="arc-list"><div class="hd"><b id="arc-cuenta"></b><div class="chips"><button class="chip${ARC_ORD==='nuevo'?' on':''}" data-o="nuevo">Más recientes</button><button class="chip${ARC_ORD==='viejo'?' on':''}" data-o="viejo">Más antiguos</button><button class="chip${ARC_ORD==='ley'?' on':''}" data-o="ley">Leyes primero</button></div></div>
+      <div id="arc-filas"></div><div class="pager" id="arc-pager"></div></div>`;
+  const big=box.querySelector('[data-cuenta]'); const small=big.querySelector('small').outerHTML; big.removeAttribute('data-cuenta');
+  big.innerHTML='<span>0</span>'+small; cuenta(big.querySelector('span'),R.length,900);
+  /* setTimeout y no rAF: rAF se congela con la pestaña en segundo plano y las barras quedaban en cero */
+  setTimeout(()=>{ box.querySelectorAll('[data-sw]').forEach(i=>i.style.width=i.dataset.sw+'%'); box.querySelectorAll('#arc-yb button').forEach(b=>b.style.height=b.dataset.h+'%'); },60);
+  box.querySelectorAll('#arc-yb button').forEach(b=>{
+    b.onmouseenter=()=>{ $('#arc-tip').textContent=`${b.dataset.y}: ${porA[b.dataset.y]||0} proyecto${porA[b.dataset.y]===1?'':'s'}`; };
+    b.onclick=()=>{ const y=+b.dataset.y; ARC_ANIO=ARC_ANIO===y?0:y; box.querySelectorAll('#arc-yb button').forEach(x=>x.classList.toggle('on',+x.dataset.y===ARC_ANIO)); ARC_PG=1; filasArchivo(); };
+  });
+  box.querySelectorAll('.arc-list .chip').forEach(c=>c.onclick=()=>{ ARC_ORD=c.dataset.o; box.querySelectorAll('.arc-list .chip').forEach(x=>x.classList.toggle('on',x===c)); ARC_PG=1; filasArchivo(); });
+  filasArchivo();
+}
+function filasArchivo(){
+  let L=ARC_RES.filter(r=>!ARC_ANIO||r[0]===ARC_ANIO);
+  L=L.slice().sort(ARC_ORD==='viejo'?(a,b)=>a[0]-b[0]:ARC_ORD==='ley'?(a,b)=>(b._r==='LEY')-(a._r==='LEY')||b[0]-a[0]:(a,b)=>b[0]-a[0]);
+  const per=10, ini=(ARC_PG-1)*per;
+  $('#arc-cuenta').textContent=ARC_ANIO?`${L.length} en ${ARC_ANIO}`:`${L.length} proyecto${L.length===1?'':'s'}`;
+  $('#arc-filas').innerHTML=L.slice(ini,ini+per).map(r=>{ const rs=RES_TXT[r._r]||RES_TXT.SIN_DATO;
+    return `<button class="ar" type="button" data-i="${ARC.p.indexOf(r)}"><span class="y">${r[0]||'—'}</span><span class="t">${esc(corto(r[3],170))}<small>${r[8]?'Reforma constitucional':'Proyecto de ley'} ${esc(r[2])} · ${r[1]==='S'?'Senado':'Cámara'}${r[5]?` · Comisión ${COM_TXT[r[5]]}`:''}${r[7]>1?` · presentado ${r[7]} veces`:''}</small></span><span class="res" style="background:${rs[1]}22;color:${rs[1]==='#a39d8c'?'#6d685a':rs[1]}">${esc(rs[0])}</span></button>`; }).join('');
+  $('#arc-pager').innerHTML=pageBar(L.length,ARC_PG,per);
+  $$('#arc-pager button').forEach(b=>b.onclick=()=>{ ARC_PG=+b.dataset.pg; filasArchivo(); $('#arc-filas').scrollIntoView({behavior:'smooth',block:'nearest'}); });
+  $$('#arc-filas .ar').forEach(b=>b.onclick=()=>fichaArchivo(ARC.p[+b.dataset.i]));
+}
+function fichaArchivo(r){
+  const rs=RES_TXT[r._r]||RES_TXT.SIN_DATO, tm=temaDe(r[3]);
+  const expl={LEY:'Pasó todos los debates y el presidente lo firmó.',ARCHIVADO_TIEMPO:'No alcanzó a pasar sus debates en el plazo que fija la Constitución y se archivó.',ARCHIVADO_OTRO:'Se archivó por otra causa: se votó en contra, cayó al terminar el periodo o el registro no informa por qué.',RETIRADO:'Su autor lo retiró.',EN_TRAMITE:'Todavía está en trámite.',OTRO:'Tuvo otro desenlace, por ejemplo se acumuló a un proyecto parecido.',SIN_DATO:'El registro no dice qué pasó con él.'}[r._r]||'';
+  abrir(`<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag">${r[0]||'Sin año'}</span><span class="tag ${r[1]==='S'?'sen':'cam'}">Registro del ${r[1]==='S'?'Senado':'de la Cámara'}</span><span class="tag"><i style="background:${tm.c}"></i>${esc(tm.t)}</span></div>
+    <h2 id="ficha-tit">${esc(corto(r[3]))}</h2>
+    <div class="afecta" style="background:${rs[1]}1f"><b>${esc(rs[0])}.</b> ${esc(expl)}</div>
+    <h4><i style="background:var(--paper2)">§</i>Datos del proyecto</h4>
+    <div class="oficial">${r[8]?'Proyecto de acto legislativo (reforma a la Constitución)':'Proyecto de ley'} <b>${esc(r[2])}</b>${r[11]?` · legislatura ${esc(r[11])}`:''}${r[5]?` · Comisión ${COM_TXT[r[5]]}`:''}.${r[9]?`<br>Lo presentó <b>${esc(r[9])}</b>${r[10]>1?` junto con ${r[10]-1} persona${r[10]>2?'s':''} más`:''}.`:''}${r[7]>1?`<br>Esta idea se ha radicado <b>${r[7]} veces</b> en distintos años.`:''}</div>
+    <div class="acciones"><a class="btn" href="https://www.google.com/search?q=${encodeURIComponent('proyecto de ley '+r[2]+' '+corto(r[3],80))}" target="_blank" rel="noopener">Buscar noticias de este proyecto</a></div>
+    <p class="aviso">Datos del registro de proyectos del Senado (desde 1991) y de la Cámara (desde 2010).</p>`);
+}
+function initArchivo(){
+  const EJ=['cannabis','salud mental','eutanasia','porte de armas','fracking','reforma pensional','animales','inteligencia artificial'];
+  $('#arc-ej').insertAdjacentHTML('beforeend',EJ.map(e=>`<button class="chip" type="button" data-q="${esc(e)}">${esc(e)}</button>`).join(''));
+  $$('#arc-ej .chip').forEach(c=>c.onclick=()=>{ $('#arc-q').value=c.dataset.q; buscaArchivo(c.dataset.q); });
+  $('#arc-form').onsubmit=e=>{ e.preventDefault(); buscaArchivo($('#arc-q').value); };
+  let t=null; $('#arc-q').addEventListener('input',e=>{ clearTimeout(t); const v=e.target.value; if(v.trim().length>=4) t=setTimeout(()=>buscaArchivo(v),450); });
+  $('#arc-q').addEventListener('focus',()=>cargaArchivo().catch(()=>{}),{once:true});
+  const m=location.hash.match(/^#archivo=(.+)$/); if(m){ const q=decodeURIComponent(m[1]); $('#arc-q').value=q; buscaArchivo(q); setTimeout(()=>$('#archivo').scrollIntoView(),300); }
+}
+
+/* ── 05 las votaciones ──────────────────────────────────────────── */
+let VIDX=null, VIDX_P=null;
+function cargaVotos(){ if(!VIDX_P){ VIDX_P=getJSON(URL.vidx).then(d=>{ d.c.forEach(x=>x._n=' '+norm(x.n).replace(/[^a-z0-9ñ ]/g,' ')+' '); VIDX=d; return d; }); VIDX_P.catch(()=>{ VIDX_P=null; }); } return VIDX_P; }
+/* 1.295 de 1.300 no es «100 %» */
+const pctSi=(si,tot)=>{ if(!tot) return '—'; const p=100*si/tot; return (p>99&&p<100)||(p>0&&p<1)?p.toFixed(1).replace('.',',')+' %':Math.round(p)+' %'; };
+const POS_TXT={a_favor:['Apoyó en el fondo','fav'],en_contra:['Se opuso en el fondo','con'],dividido:['Votó dividido','div'],sin_fondo:['Solo trámite','trm']};
+async function perfilVotos(id){
+  const box=$('#vt-perfil'); box.innerHTML='<div class="cargando"><i></i>Buscando su récord de votación…</div>';
+  let f; try{ f=await getJSON(URL.vot+encodeURIComponent(id)+'.json'); }catch(e){ box.innerHTML='<div class="err">No pudimos cargar ese récord. Intenta de nuevo.</div>'; return; }
+  let bi=0;
+  const pinta=()=>{
+    const B=f.bloques[bi], tot=B.si+B.no+B.otros, a=f.actual;
+    const sub=[a?`Hoy es ${a.corp==='Senado'?'senador':'representante'}${a.dep&&a.dep!=='NACIONAL'?' por '+esc(capital(a.dep.toLowerCase())):''} (${esc(capital(String(a.partido).toLowerCase()))})`:'No está en el Congreso 2026-2030',`récord en ${f.bloques.map(b=>b.camara).join(' y ')}`].join(' · ');
+    box.innerHTML=`<div class="panel">
+      <div class="pf-head"><div class="pf-av">${esc(iniciales(f.nombre))}</div><div><h3>${esc(f.nombre)} ${a?'<span class="actual">Congreso actual</span>':''}</h3><div class="sub">${sub}</div></div></div>
+      ${f.bloques.length>1?`<div class="pf-tabs chips">${f.bloques.map((b,i)=>`<button class="chip${i===bi?' on':''}" data-b="${i}">Como ${b.camara==='Senado'?'senador':'representante'}</button>`).join('')}</div>`:''}
+      <div class="pf-kpis">
+        <div><b data-cuenta="${B.n_votos}">0</b><span>votos registrados${B.desde?` desde ${B.desde}`:''}</span></div>
+        <div><b data-cuenta="${B.n_proyectos}">0</b><span>proyectos distintos</span></div>
+        <div><b>${pctSi(B.si,tot)}</b><span>de sus votos fueron Sí</span></div>
+        <div><b>${esc(B.bancada||'—')}</b><span>bancada en esas votaciones</span></div>
+      </div>
+      <div class="sino"><i class="si" data-sw="${tot?100*B.si/tot:0}">Sí ${fmt(B.si)}</i><i class="no" data-sw="${tot?100*B.no/tot:0}">No ${fmt(B.no)}</i>${B.otros?`<i class="ot" data-sw="${100*B.otros/tot}">Otro ${fmt(B.otros)}</i>`:''}</div>
+      ${B.alin!=null&&B.n_cont?`<div class="alin"><b>${B.alin} %</b><p>de las veces votó igual que la mayoría del <b>Pacto Histórico</b>, la bancada del gobierno Petro, en las <b>${fmt(B.n_cont)}</b> votaciones disputadas (las que no fueron casi unánimes). Sirve para ver qué tan cerca estuvo del gobierno anterior.</p></div>`:''}
+      ${B.camara==='Senado'?`<p class="note">En el Senado casi todas las votaciones registradas terminan con amplia mayoría, por eso el porcentaje de Sí suele ser muy alto. Lo que más dice es cómo votó cuando hubo desacuerdo.</p>`:''}
+      ${B.posiciones?`<p class="note">En la Cámara también clasificamos su posición de fondo en cada proyecto, mirando las votaciones que deciden su suerte (la ponencia, el articulado, el archivo): <b>apoyó ${B.posiciones.a_favor||0}</b>, <b>se opuso a ${B.posiciones.en_contra||0}</b> y votó dividido en ${B.posiciones.dividido||0}.</p>`:''}
+      <h3 style="margin-top:22px;font-size:1.15rem">Los proyectos que más votó</h3>
+      <label class="search" style="margin:10px 0 4px;max-width:420px"><span aria-hidden="true">⌕</span><span class="sr">Filtrar proyectos</span><input id="vp-q" type="search" placeholder="Filtrar: salud, pensional, presupuesto…" autocomplete="off" /></label>
+      <div id="vp-lista"></div><div class="pager" id="vp-pager"></div>
+      <p class="note">Fuente: ${B.camara==='Senado'?'API de votaciones del Senado, que solo registra Sí y No':'actas de plenaria de la Cámara (voto electrónico)'}. Cubre ${B.camara==='Senado'?'2017 a junio de 2026':'2014 a junio de 2026'}. Quien llegó por lista cerrada o no tuvo votaciones nominales no aparece.</p>
+    </div>`;
+    box.querySelectorAll('[data-cuenta]').forEach(x=>cuenta(x,x.dataset.cuenta,900));
+    setTimeout(()=>box.querySelectorAll('.sino [data-sw]').forEach(i=>i.style.width=i.dataset.sw+'%'),60);
+    box.querySelectorAll('.pf-tabs .chip').forEach(c=>c.onclick=()=>{ bi=+c.dataset.b; pinta(); });
+    let pg=1;
+    const lista=()=>{ const q=norm($('#vp-q').value).trim(); const L=B.proyectos.filter(p=>!q||norm(p[0]).includes(q)); const per=8, ini=(pg-1)*per;
+      $('#vp-lista').innerHTML=L.length?L.slice(ini,ini+per).map(p=>{ const rs=RES_TXT[p[3]];
+        return `<div class="vp"><div class="t">${esc(corto(p[0],160))}<small>${esc(p[1])}${p[2]?` · ${p[2]}`:''}${rs?` · ${esc(rs[0])}`:''}</small></div><div class="vv">${p[4]?`<span class="pill si">Sí ×${p[4]}</span>`:''}${p[5]?`<span class="pill no">No ×${p[5]}</span>`:''}${p[7]&&POS_TXT[p[7]]?`<span class="pill ${POS_TXT[p[7]][1]}">${POS_TXT[p[7]][0]}</span>`:''}</div></div>`; }).join(''):'<p class="note">Ningún proyecto con esa palabra.</p>';
+      $('#vp-pager').innerHTML=pageBar(L.length,pg,per);
+      $$('#vp-pager button').forEach(b=>b.onclick=()=>{ pg=+b.dataset.pg; lista(); }); };
+    $('#vp-q').oninput=()=>{ pg=1; lista(); }; lista();
+  };
+  pinta();
+  try{ history.replaceState(null,'','#votos='+encodeURIComponent(id)); }catch(e){}
+}
+function initVotos(){
+  const inp=$('#vt-q'), ac=$('#vt-ac'); let sel=-1, L=[];
+  const cierra=()=>{ ac.classList.remove('on'); inp.setAttribute('aria-expanded','false'); };
+  const elegir=x=>{ inp.value=x.n; cierra(); perfilVotos(x.id); };
+  const pintaAC=()=>{ ac.innerHTML=L.map((x,i)=>`<button type="button" role="option" class="${i===sel?'sel':''}" data-i="${i}"><b>${esc(x.n)}</b>${x.e?'<span class="actual">actual</span>':''}<small>${esc(x.c)} · ${fmt(x.v)} votos</small></button>`).join('')||'<p class="note" style="padding:12px 16px;margin:0">No encontramos a nadie con ese nombre. Quienes llegaron por primera vez en 2026 todavía no tienen votaciones registradas.</p>';
+    ac.classList.add('on'); inp.setAttribute('aria-expanded','true');
+    ac.querySelectorAll('button').forEach(b=>b.onmousedown=e=>{ e.preventDefault(); elegir(L[+b.dataset.i]); }); };
+  inp.addEventListener('focus',()=>cargaVotos().catch(()=>{}));
+  inp.addEventListener('input',async()=>{ const q=norm(inp.value).replace(/[^a-z0-9ñ ]/g,' ').trim(); if(q.length<3){ cierra(); return; }
+    await cargaVotos(); const tk=q.split(/\s+/);
+    L=VIDX.c.filter(x=>tk.every(t=>x._n.includes(' '+t))).sort((a,b)=>(!!b.e-!!a.e)||b.v-a.v).slice(0,10); sel=-1; pintaAC(); });
+  inp.addEventListener('keydown',e=>{ if(!ac.classList.contains('on')) return;
+    if(e.key==='ArrowDown'){ sel=Math.min(L.length-1,sel+1); pintaAC(); e.preventDefault(); }
+    else if(e.key==='ArrowUp'){ sel=Math.max(0,sel-1); pintaAC(); e.preventDefault(); }
+    else if(e.key==='Enter'){ e.preventDefault(); if(L[Math.max(0,sel)]) elegir(L[Math.max(0,sel)]); }
+    else if(e.key==='Escape') cierra(); });
+  inp.addEventListener('blur',()=>setTimeout(cierra,150));
+  cargaVotos().then(d=>{
+    const M=d.meta; $('#fc-n').dataset.cuenta=M.n; $('#fc-e').dataset.cuenta=M.electos_con_record;
+    $('#vt-nota').innerHTML=`Hay récord para <b>${fmt(M.n)}</b> congresistas. De los ${M.electos_total} del Congreso actual, <b>${M.electos_con_record}</b> ya habían votado antes; los otros ${M.electos_sin_record} llegaron por primera vez en 2026 o entraron por lista cerrada, así que todavía no tienen votaciones en este registro.`;
+    const ej=d.c.filter(x=>x.e).slice(0,6);
+    $('#vt-ej').insertAdjacentHTML('beforeend',ej.map(x=>`<button class="chip" type="button" data-id="${esc(x.id)}">${esc(x.n)}</button>`).join(''));
+    $$('#vt-ej .chip').forEach(c=>c.onclick=()=>{ const x=d.c.find(y=>y.id===c.dataset.id); inp.value=x.n; perfilVotos(x.id); });
+    const m=location.hash.match(/^#votos=(.+)$/); if(m){ perfilVotos(decodeURIComponent(m[1])); setTimeout(()=>$('#votos').scrollIntoView(),300); }
+  }).catch(()=>{ $('#vt-nota').textContent='No pudimos cargar el listado de congresistas en este momento.'; });
+}
+function irAVotos(id,nombre){ DLG.close(); $('#vt-q').value=nombre; $('#votos').scrollIntoView({behavior:'smooth'}); perfilVotos(id); }
+
+/* ── ficha de una comisión: integrantes y proyectos activos ─────── */
+let COMJ=null, ACT=null, ACT_P=null;
+function cargaActivos(){ if(!ACT_P){ ACT_P=getJSON(URL.act).then(d=>ACT=d); ACT_P.catch(()=>{ ACT_P=null; }); } return ACT_P; }
+const COM_NOMBRE=k=>'Comisión '+(k==='SEPTIMA'?'Séptima':capital(k.toLowerCase()));
+function agendado(num,cam){
+  if(!ORD) return null; const k=numKey(num,cam);
+  return k?(ORD.ordenes||[]).find(o=>(o.fecha_fin||o.fecha)>=HOY&&!/cancelad/i.test(o.titulo)&&(o.proyectos||[]).some(p=>numKey(p.numero,/senado/i.test(o.corporacion)?'S':'C')===k)):null;
+}
+/* «más avanzados»: etapa del trámite, luego si ya está en un orden del día, luego cuántos lo firman */
+function rankActivos(L,cam){
+  return L.map(r=>{ const e=estadoDe(r[2]), ag=agendado(r[0],cam); return {r,e,ag,sc:(e.n||0)*100+(ag?50:0)+Math.min(r[5]||0,30)}; })
+    .sort((a,b)=>b.sc-a.sc||String(b.r[3]).localeCompare(a.r[3]));
+}
+function fichaActivo(x,cam){
+  const k=numKey(x.r[0],cam==='senado'?'S':'C'), v=k&&VIV&&VIV.porKey[k];
+  if(v) return fichaProyecto(v);
+  const tm=temaDe(x.r[1]);
+  abrir(`<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag ${cam==='senado'?'sen':'cam'}">${cam==='senado'?'Senado':'Cámara'}</span><span class="tag"><i style="background:${tm.c}"></i>${esc(tm.t)}</span>${x.r[3]?`<span class="tag">Radicado el ${esc(fCorta(x.r[3]))}</span>`:''}</div>
+    <h2 id="ficha-tit">${esc(x.r[1])}</h2>
+    <div class="estado"><b style="font-size:.95rem">${esc(x.e.t)}</b>${miniHtml(x.e)}</div>
+    ${x.ag?`<div class="afecta" style="margin-top:14px">Está en el orden del día de la <b>${esc(nombreAmbito(x.ag))}</b> del ${esc(fLarga(x.ag.fecha))}.</div>`:''}
+    <h4><i style="background:var(--paper2)">§</i>Datos del proyecto</h4>
+    <div class="oficial">${x.r[4]==='acto'?'Proyecto de acto legislativo':'Proyecto de ley'} <b>${esc(numNice(k)||x.r[0])}</b>.${x.r[6]?`<br>Lo presentó <b>${esc(x.r[6])}</b>${x.r[5]>1?` junto con ${x.r[5]-1} persona${x.r[5]>2?'s':''} más`:''}.`:''}</div>
+    <div class="acciones">${x.ag&&x.ag.url?`<a class="btn" href="${esc(x.ag.url)}" target="_blank" rel="noopener">Ver el orden del día</a>`:''}<a class="btn ghost" href="https://www.google.com/search?q=${encodeURIComponent('proyecto de ley '+x.r[0]+' '+x.r[1].slice(0,80))}" target="_blank" rel="noopener">Buscar noticias</a></div>
+    <p class="aviso">Para los proyectos más recientes mostramos un resumen en lenguaje sencillo. Este todavía no lo tiene.</p>`,'ancho');
+}
+async function abrirComision(k){
+  const info=COMS.find(c=>c.k===k)||{}, v=(COMJ||{})[k]||{};
+  abrir(`<div id="cm-box"><div class="cargando"><i></i>Cargando la ${esc(COM_NOMBRE(k))}…</div></div>`,'ancho');
+  try{ await Promise.all([cargaActivos(),cargaVotos().catch(()=>null)]); }catch(e){ $('#cm-box').innerHTML=`<h2 id="ficha-tit">${esc(COM_NOMBRE(k))}</h2><div class="err">No pudimos cargar los proyectos activos. Intenta de nuevo en un rato.</div>`; return; }
+  let cam='senado';
+  const pinta=()=>{
+    const miembros=v[cam]||[], mesa=(v.mesa||[]).filter(m=>m.corp===cam);
+    const esMesa=n=>mesa.find(m=>misma(m.nombre,n));
+    const conVoto=n=>VIDX&&VIDX.c.find(x=>misma(x.n,n));
+    const ord=miembros.slice().sort((a,b)=>(!!esMesa(b.nombre)-!!esMesa(a.nombre))||String(a.partido).localeCompare(b.partido));
+    const L=rankActivos(((ACT.comisiones||{})[k]||{})[cam]||[],cam==='senado'?'S':'C');
+    const top=L.slice(0,3);
+    $('#cm-box').innerHTML=`<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag" style="background:${info.c}22;color:${info.c}">${esc(info.ap||'')}</span></div>
+      <h2 id="ficha-tit">${esc(COM_NOMBRE(k))}</h2>
+      <p style="color:var(--ink2)">Estudia: ${esc((info.t||[]).join(', ').toLowerCase())}. Hay una ${esc(COM_NOMBRE(k))} en el Senado y otra en la Cámara, con integrantes y proyectos distintos.</p>
+      <div class="cm-tabs chips"><button class="chip${cam==='senado'?' on':''}" data-c="senado">Del Senado</button><button class="chip${cam==='camara'?' on':''}" data-c="camara">De la Cámara</button></div>
+      <h4><i style="background:var(--sun)">★</i>Los 3 proyectos activos que más han avanzado</h4>
+      ${top.length?`<div class="top3">${top.map((x,i)=>`<button class="t3" type="button" data-i="${i}"><span class="rk">${i+1}</span><h5>${esc(corto(x.r[1],110))}</h5><small>${esc(x.e.t)}</small>${miniHtml(x.e)}${x.ag?`<small><b style="color:var(--green)">● En el orden del día del ${esc(fCorta(x.ag.fecha))}</b></small>`:''}</button>`).join('')}</div>
+      <p class="note">Orden: primero los que van más adelante en el trámite; a igual avance, los que ya están en un orden del día y los que firman más congresistas.</p>`:'<p class="note">Esta comisión no tiene proyectos activos registrados en esta legislatura.</p>'}
+      ${L.length>3?`<h4><i style="background:var(--blue);color:#fff">≡</i>Todos sus proyectos activos (${L.length})</h4>
+      <label class="search" style="max-width:420px"><span aria-hidden="true">⌕</span><span class="sr">Filtrar</span><input id="cm-q" type="search" placeholder="Filtrar por palabra" autocomplete="off" /></label>
+      <div class="cm-lista" id="cm-lista"></div>`:''}
+      <h4><i style="background:var(--ink);color:var(--paper)">◎</i>Sus ${miembros.length} integrantes</h4>
+      <div class="miembros">${ord.map(m=>{ const me=esMesa(m.nombre), vt=conVoto(m.nombre);
+        return `<span class="mb${me?' mesa':''}${vt?' vt':''}" ${vt?`role="button" tabindex="0" data-v="${esc(vt.id)}" data-n="${esc(vt.n)}" title="Ver cómo ha votado"`:`title="${esc(m.partido)}"`}><i style="background:${colorP(m.partido)}"></i>${esc(m.nombre)}${me?` · ${me.cargo==='presidencia'?'presidente':'vicepresidente'}`:''}</span>`; }).join('')}</div>
+      <p class="note">Toca a quien tenga ✓ para ver cómo ha votado. La composición viene de las listas oficiales de comisiones; puede cambiar si hay reemplazos.</p>`;
+    $$('#cm-box .cm-tabs .chip').forEach(c=>c.onclick=()=>{ cam=c.dataset.c; pinta(); });
+    $$('#cm-box .t3').forEach(b=>b.onclick=()=>fichaActivo(top[+b.dataset.i],cam));
+    $$('#cm-box .mb.vt').forEach(b=>{ const go=()=>irAVotos(b.dataset.v,b.dataset.n); b.onclick=go; b.onkeydown=e=>{ if(e.key==='Enter') go(); }; });
+    const lista=()=>{ const q=norm(($('#cm-q')||{}).value||'').trim(); const F=L.filter(x=>!q||norm(x.r[1]).includes(q));
+      $('#cm-lista').innerHTML=F.map(x=>`<button class="ar" type="button" data-i="${L.indexOf(x)}"><span class="t">${esc(corto(x.r[1],150))}<small>${esc(x.r[0])} · ${esc(x.e.t)}${x.ag?' · <b style="color:var(--green)">en el orden del día</b>':''}</small></span><span class="res" style="background:var(--paper2);color:var(--ink2)">Paso ${x.e.n||'—'} de 8</span></button>`).join('')||'<p class="note" style="padding:12px">Nada con esa palabra.</p>';
+      $$('#cm-lista .ar').forEach(b=>b.onclick=()=>fichaActivo(L[+b.dataset.i],cam)); };
+    if($('#cm-lista')){ $('#cm-q').oninput=lista; lista(); }
+  };
+  pinta();
+}
+
+/* ── arranque ───────────────────────────────────────────────────── */
+initEstado(); initRuta(); initQuienes(); initGlosario(); initFaq(); initMenu(); initArchivo(); initVotos(); observar(document);
+const ok=(p,fn,box,msg)=>p.then(fn).catch(e=>{ console.warn(msg,e); if(box) $(box).innerHTML=`<div class="err">No pudimos cargar ${msg} en este momento. Intenta recargar la página en un rato.</div>`; });
+const P={ord:getJSON(URL.ord),viv:getJSON(URL.viv),tem:getJSON(URL.tem),rit:getJSON(URL.rit),com:getJSON(URL.com)};
+/* la agenda usa los resúmenes de lo nuevo para enlazar fichas: espera a los dos */
+ok(P.viv,initNuevos,'#nv-box','los proyectos nuevos').finally(()=>ok(P.ord,initAgenda,'#agenda-box','la agenda'));
+ok(P.tem,initTemas,'#temas-box','los temas de la semana');
+ok(P.rit,initRitmo,'#ritmo-box','el ritmo de radicación');
+P.com.then(initComisiones,()=>initComisiones(null));
+Promise.allSettled([P.ord,P.viv,P.tem]).then(([o,v,t])=>{
+  const li=(lbl,iso8601)=>{ const d=iso8601?new Date(iso8601):null; return `<li>${lbl}: ${d&&!isNaN(d)?esc(d.toLocaleString('es-CO',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit',timeZone:'America/Bogota'})):'sin dato'}</li>`; };
+  $('#fuentes-fechas').innerHTML=li('Agenda',o.value&&o.value.v)+li('Proyectos nuevos',v.value&&v.value.actualizado)+li('Temas',t.value&&t.value.generado);
+});
+})();
+</script>
+</body>
+</html>

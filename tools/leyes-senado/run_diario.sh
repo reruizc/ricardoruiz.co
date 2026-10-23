@@ -26,6 +26,7 @@
 #   texto_index               build_texto_index.py        articulado buscable (incl. lo vivo)
 #   dataset_upload_*          aws s3 cp                   dist/ → metadata/
 #   ritmo                     build_ritmo.py              monitor de ritmo (lee dist, va tras el dataset)
+#   congreso_claro_activos    congreso-claro/build_datos.py  proyectos activos por comisión (página ciudadana)
 #   anla_fetch/build          harvest_anla.py             Gaceta Ambiental (pilar Regulatorio)
 #   supers_consolida          harvest_supers.py normalize las 12 fuentes del pilar en un dataset
 #   supers_build_s3           build_s3.py                 el slim que lee la Lambda
@@ -448,10 +449,19 @@ etapa() {
     etapa --nombre ritmo --timeout 1200 \
           --desc "monitor de ritmo de radicación" \
           -- python3 tools/leyes-senado/build_ritmo.py --upload
+
+    # ── Congreso Claro · proyectos en trámite por comisión ──
+    # La página ciudadana (congreso-claro.pages.dev) no puede usar la API de
+    # Caudal (CORS solo admite ricardoruiz.co), así que lee este JSON de S3.
+    # Sale del mismo dist del día; si falla, la página sigue con el de ayer.
+    etapa --nombre congreso_claro_activos --timeout 600 \
+          --desc "Congreso Claro · proyectos activos por comisión" \
+          -- python3 tools/congreso-claro/build_datos.py --solo-activos --subir
   else
     etapa --nombre texto_index --omitida "el dataset falló (rc=$rc_ds): indexar sobre un dataset roto sería peor que no indexar"
     etapa --nombre dataset_upload --omitida "el dataset falló (rc=$rc_ds): no hay archivo nuevo que subir"
     etapa --nombre ritmo --omitida "el dataset falló (rc=$rc_ds): el monitor lee dist/proyectos.jsonl; con uno roto publicaría una comparación falsa"
+    etapa --nombre congreso_claro_activos --omitida "el dataset falló (rc=$rc_ds): la página conserva el JSON de ayer"
   fi
 
   # ── pilar Regulatorio · Gaceta Ambiental de la ANLA ──
