@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <script defer src="/track.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>En redes · Mi Congreso · Ricardo Ruiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
+  <link rel="stylesheet" href="mi-congreso.css?v=20261023" />
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+  <nav class="electoral-nav">
+    <div class="e-nav-left">
+      <a href="mi-congreso.html" class="e-btn-back">← Volver</a>
+      <span class="nav-page-tag">Mi Congreso</span>
+      <div class="electoral-nav-auth" id="nav-auth-area"></div>
+    </div>
+    <div class="e-nav-right">
+      <a href="index.html" class="logo-link"><div class="logo-bars"><div class="logo-bar" style="height:20px"></div><div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:9px"></div><div class="logo-bar" style="height:4px"></div></div><span class="logo-text">Ricardo<span>.</span>Ruiz</span></a>
+    </div>
+  </nav>
+
+  <div class="page-header compacta">
+    <div class="page-tag">Mi Congreso · 09 · X · Instagram · TikTok · Facebook</div>
+    <h1 class="page-title">En redes</h1>
+    <p class="page-sub">Lo que publicas en tus cuentas y cuánto rinde, lo que te responden debajo, y la conversación sobre los temas de tus proyectos. La lectura se hace una vez al día; la postura de los comentarios la clasifica un modelo y por eso cada cifra va con sus citas.</p>
+  </div>
+  <div class="sec-bar" id="mc-sec-bar"></div>
+
+  <section>
+    <div id="mc-head"></div>
+    <div id="rd-estado"></div>
+    <div class="kpis" id="rd-kpis" style="margin-top:1.2rem"></div>
+    <div class="rd-redes" id="rd-redes"></div>
+    <p class="note" id="rd-pie" style="margin-top:1.2rem"></p>
+  </section>
+
+  <footer>
+    <span class="footer-brand">ricardoruiz.co · Mi Congreso · Congreso 2026–2030</span>
+    <a href="mi-congreso.html" class="e-btn-back" style="font-size:.62rem">← Mi Congreso</a>
+  </footer>
+
+  <script src="legislativo-base.js"></script>
+  <script src="legislativo-electos.js"></script>
+  <script src="mi-congreso-base.js?v=20261023"></script>
+  <script>
+  (function(){
+    const e=MC.pagina('redes'); if(!e) return;
+    const {cut,nice}=MC;
+    const REDES=[
+      {key:'x',nombre:'X',modo:'sus tweets · búsqueda por palabra de sus temas',url:h=>`https://x.com/${h}`},
+      {key:'instagram',nombre:'Instagram',modo:'sus publicaciones · hashtags de sus temas',url:h=>`https://www.instagram.com/${h}`},
+      {key:'tiktok',nombre:'TikTok',modo:'sus videos · hashtags de sus temas',url:h=>`https://www.tiktok.com/@${h}`},
+      {key:'facebook',nombre:'Facebook',modo:'su página',url:h=>`https://www.facebook.com/${h}`},
+    ];
+    const POSTURAS=[['a_favor','a favor','pf'],['en_contra','en contra','pc'],['neutro','neutro','pn'],['ataque','ataque','pa']];
+    const cuando=iso=>{ if(!iso) return ''; const d=new Date(iso); return isNaN(d)?'':d.toLocaleString('es-CO',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}); };
+    const num=n=>fmt(n||0);
+    const posts=(filas,vacio,sinAutor)=>filas.length
+      ?filas.slice(0,4).map(f=>`<div class="rd-post">${f.url?`<a href="${esc(f.url)}" target="_blank" rel="noopener">`:''}${esc(cut(f.texto||'',150))}${f.url?'</a>':''}<small>${!sinAutor&&f.autor?`@${esc(f.autor)} · `:''}${f.reaccion?`${num(f.reaccion)} reacciones`:'sin reacciones contadas'}${f.comentarios!=null?` · ${num(f.comentarios)} comentarios`:''}${f.fecha?` · ${esc(cuando(f.fecha))}`:''}</small></div>`).join('')
+      :`<div class="mc-empty">${vacio}</div>`;
+
+    /* la postura de unos comentarios, siempre con sus citas: la cifra nunca va sola */
+    function postura(c,titulo){
+      if(!c) return '';
+      if(!c.n) return c.motivo?`<h4>${esc(titulo)}</h4><div class="rd-motivo">${esc(c.motivo)}</div>`:'';
+      const total=POSTURAS.reduce((s,[k])=>s+((c.postura||{})[k]||0),0);
+      return `<h4>${esc(titulo)}</h4><div class="mc-lbl" style="margin-top:0">${num(c.n)} comentarios bajo ${num(c.posts||0)} publicaciones${c.clasificados?'':' · sin clasificar'}</div>`
+        +(total?`<div class="rd-postura">${POSTURAS.map(([k,,cl])=>`<i class="${cl}" style="width:${100*((c.postura||{})[k]||0)/total}%"></i>`).join('')}</div><div class="mc-legend">${POSTURAS.map(([k,l,cl])=>`<span><i class="${cl}" style="background:${cl==='pf'?'var(--green)':cl==='pc'?'var(--amber)':cl==='pa'?'var(--red)':'rgba(20,22,31,.18)'}"></i>${l} ${Math.round(100*((c.postura||{})[k]||0)/total)}%</span>`).join('')}</div>`:'')
+        +(c.citas||[]).map(q=>`<div class="rd-cita">«${esc(cut(q.texto||'',200))}»<small>${esc(String(q.postura||'').replace('_',' '))}${q.autor?` · @${esc(q.autor)}`:''}${q.url?` · <a href="${esc(q.url)}" target="_blank" rel="noopener">ver</a>`:''}</small></div>`).join('');
+    }
+    function tarjeta(def,r,handle){
+      const cab=`<h3>${def.nombre}${handle?`<small><a href="${esc(def.url(handle))}" target="_blank" rel="noopener">@${esc(handle)} ↗</a></small>`:''}</h3><div class="rd-modo">${esc(def.modo)}</div>`;
+      if(!r) return `<div class="rd-red">${cab}<div class="mc-empty">Esta red no entró en la lectura${handle?'':': no hay cuenta registrada'}.</div></div>`;
+      const sinNada=(r.estado==='sin_datos'||r.estado==='error'||r.estado==='sin_temas')&&!(r.publicados||[]).length&&!(r.propias&&r.propias.n);
+      if(sinNada) return `<div class="rd-red">${cab}<div class="rd-motivo"><b>Sin lectura esta vez.</b> ${esc(r.motivo||r.propias&&r.propias.motivo||'')} Eso no significa que no haya conversación.</div></div>`;
+      const pub=r.publicados||[], men=r.menciones||[], amp=r.amplifican||[];
+      return `<div class="rd-red">${cab}
+        <div class="rd-cifras"><span><b>${num(pub.length)}</b><small>publicaciones suyas</small></span><span><b>${num(men.length)}</b><small>la mencionan o hablan de sus temas</small></span><span><b>${num(amp.length)}</b><small>cuentas que amplifican</small></span></div>
+        ${pub.length?`<h4>Lo que publicó y más rindió</h4>${posts(pub,'',true)}`:(r.propias&&r.propias.estado!=='ok'?`<div class="rd-motivo">Sus publicaciones: ${esc(r.propias.motivo||'sin lectura esta vez')}</div>`:'')}
+        ${postura(r.comentarios_propios,'Lo que le dicen en sus publicaciones')}
+        ${r.estado==='ok'||men.length?`<h4>Lo que se dice de sus temas</h4>${posts(men,'Nadie habló de sus temas en esta ventana. Eso también es dato.')}`:(r.motivo?`<div class="rd-motivo">${esc(r.motivo)}</div>`:'')}
+        ${amp.length?`<h4>Quién amplifica</h4><div class="mc-pills">${amp.slice(0,6).map(a=>`<span class="mc-pill">@${esc(a.autor)}${a.veces>1?` ×${a.veces}`:''}</span>`).join('')}</div>`:''}
+        ${postura(r.comentarios,'Lo que se siente en la conversación de sus temas')}
+      </div>`;
+    }
+
+    MC.escucha(e).then(d=>{
+      const est=document.getElementById('rd-estado');
+      if(!d){
+        est.innerHTML=`<div class="panel"><h3>La escucha de redes no está encendida para ${esc(nice(e.nombre))}</h3><p class="mc-empty" style="margin-top:.6rem">Es un módulo que se enciende persona por persona: cada lectura diaria de las cuatro redes cuesta y se activa a mano. Los demás módulos de Mi Congreso siguen funcionando igual. <a href="mi-congreso.html">← Volver al tablero</a></p></div>`;
+        return;
+      }
+      const costo=d.costo?Number(d.costo.apifyUsd||0)+Number(d.costo.modeloUsd||0):0;
+      const temas=(d.vinculo&&d.vinculo.temas)||[];
+      est.innerHTML=`<div class="panel"><span class="rd-sello">Escucha encendida</span><div class="mc-lbl" style="margin-top:.6rem">Última lectura: <b>${esc(cuando(d.generadoEn))}</b>${d.automatica?' · se actualiza sola cada mañana':''}${costo?` · esta lectura costó US$${costo.toFixed(2)}`:''}${d.congresista&&d.congresista.verificadas?` · cuentas comprobadas el ${esc(d.congresista.verificadas.split(' ')[0])}`:''}</div>
+        ${temas.length?`<div class="mc-lbl">Temas que se buscan, sacados de sus proyectos: ${temas.map(t=>`<b>«${esc(t)}»</b>`).join(' · ')}</div>`:''}</div>`;
+      const R=d.redes||{}; let pub=0,men=0,com=0,cls=0;
+      Object.values(R).forEach(r=>{ pub+=(r.publicados||[]).length; men+=(r.menciones||[]).length; [r.comentarios,r.comentarios_propios].forEach(c=>{ if(c){ com+=c.n||0; cls+=c.clasificados||0; } }); });
+      const cell=(n,l,c)=>`<div class="kpi${c?' '+c:''}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+      document.getElementById('rd-kpis').innerHTML=cell(num(pub),'publicaciones suyas leídas','hl2')+cell(num(men),'publicaciones de otros sobre sus temas')+cell(num(com),'comentarios leídos')+cell(num(cls),'comentarios con postura clasificada');
+      const cuentas=(d.congresista&&d.congresista.cuentas)||{};
+      document.getElementById('rd-redes').innerHTML=REDES.map(def=>tarjeta(def,R[def.key],(R[def.key]&&R[def.key].handle)||cuentas[def.key]||'')).join('');
+      document.getElementById('rd-pie').innerHTML=`Lectura de sus cuentas y de sus temas, con fecha arriba. Lo que se publica en una red no es la opinión pública: son quienes publican y comentan ahí. La postura la pone un modelo y se equivoca con el sarcasmo; por eso cada porcentaje va con sus citas, para leerlas antes de decidir nada con el número. Una red «sin lectura» puede ser la red bloqueando la lectura, no ausencia de conversación.`;
+    });
+  })();
+  </script>
+  <script src="lang.js"></script>
+</body>
+</html>

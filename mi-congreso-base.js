@@ -35,7 +35,27 @@
     {id:'prensa',   href:'mi-congreso-prensa.html',    t:'En la prensa'},
     {id:'bancada',  href:'mi-congreso-bancada.html',   t:'Mi bancada'},
     {id:'fuerzas',  href:'mi-congreso-fuerzas.html',   t:'Fuerzas'},
+    /* solo para quien tenga la escucha de redes encendida (ver escucha()) */
+    {id:'redes',    href:'mi-congreso-redes.html',     t:'En redes', solo:true},
   ];
+  /* ── escucha de redes · encendida persona por persona ──────────────
+     No es un módulo de todos: cada lectura cuesta plata (Apify) y se enciende
+     a mano en tools/mi-congreso/escucha/cuentas.json. El recolector deja la
+     última lectura en mi-congreso-data/escucha/<slug>.json y ESA es la llave:
+     si el archivo existe para la persona elegida, aparecen la tarjeta y la
+     página; si no (404), ni se nombran. Se comprueba que el JSON sea de esa
+     persona para no pintarle a nadie las cuentas de otra. */
+  const escuchaSlug=e=>norm(e.nombre).replace(/[^a-z0-9ñ]+/g,'-').replace(/^-|-$/g,'');
+  let ESCUCHA_ON=false;
+  function escucha(e){
+    return memo('esc:'+e.nombre,async()=>{
+      const r=await fetch(`mi-congreso-data/escucha/${escuchaSlug(e)}.json?v=${Math.floor(Date.now()/600000)}`,{cache:'default'});
+      if(!r.ok) return null;
+      const d=await r.json();
+      if(!d||!d.redes||!d.congresista||d.congresista.nombre!==e.nombre||d.congresista.corp!==e.corp) return null;
+      ESCUCHA_ON=true; return d;
+    }).catch(()=>null);
+  }
 
   /* ── texto ───────────────────────────────────────────────────────── */
   const initials=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
@@ -572,7 +592,7 @@
   }
   function renderNav(cur){
     const bar=document.getElementById('mc-sec-bar'); if(!bar) return;
-    bar.innerHTML=`<a class="sec-back" href="mi-congreso.html">← Mi Congreso</a><nav class="mc-nav">${MODULOS.map(m=>`<a href="${m.href}"${m.id===cur?' class="on"':''}>${esc(m.t)}</a>`).join('')}</nav>`;
+    bar.innerHTML=`<a class="sec-back" href="mi-congreso.html">← Mi Congreso</a><nav class="mc-nav">${MODULOS.filter(m=>!m.solo||ESCUCHA_ON||m.id===cur).map(m=>`<a href="${m.href}"${m.id===cur?' class="on"':''}>${esc(m.t)}</a>`).join('')}</nav>`;
   }
   /* arma una página de módulo: exige congresista, pinta cabecera y barra */
   function pagina(id){
@@ -580,6 +600,8 @@
     renderNav(id);
     const h=document.getElementById('mc-head'); if(h) renderHead(h,e,{mini:true});
     const m=MODULOS.find(x=>x.id===id); if(m) document.title=`${m.t} · ${nice(e.nombre)} · Mi Congreso`;
+    /* la pestaña «En redes» entra a la barra solo si esta persona tiene lectura */
+    if(!ESCUCHA_ON) escucha(e).then(d=>{ if(d) renderNav(id); });
     return e;
   }
 
@@ -664,7 +686,7 @@
   window.MC={S3,URL_COM,URL_ORD,KEY,MODULOS,LEG,ETAPAS,TIPO_NICE,BANC_CAUDAL,
     initials,mismaPersona,fechaCorta,fechaLarga,diaCorto,hoyBog,iso,dia,shortTitle,chamberNice,comisionNice,nombreCom,ambitoNice,cut,nice,corto,pct,
     me,guardar,olvidar,requireMe,getJSON,api,comision,ordenes,esMia,etapaDe,etapaEf,numKey,citasDe,numDe,citaTxt,avanceHtml,tipoDe,
-    mios,avanceGeneral,indiceElectoral,enSesion,diasHabSesion,diasCal,legislatura,relojDe,puntaje,electoral,fotoDe,voto,prensa,citPanorama,bancadasDisc,bloqueo,stats,
+    escucha,escuchaSlug,mios,avanceGeneral,indiceElectoral,enSesion,diasHabSesion,diasCal,legislatura,relojDe,puntaje,electoral,fotoDe,voto,prensa,citPanorama,bancadasDisc,bloqueo,stats,
     renderHead,renderNav,pagina,tip,tipOn,porDia,tipDia,calendario,ring,spark,hbar,
     FZ_CAT,FZ_AFIN,FZ_BISAGRA,COM_KEYS,comKeyDe,internas,oficialDe,bancadaDe,coincidencia,fuerzas,hemiciclo,tipSilla,fichaDe,tokNum,palabrasTema,prensaTema,radicadosTodos,proyectoDe,tokProyecto,externosDe};
 })();

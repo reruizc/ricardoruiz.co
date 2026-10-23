@@ -56,6 +56,7 @@ export const PAGINAS_FACEBOOK = {
   },
 };
 function paginasDe(t) {
+  if (Array.isArray(t.paginas)) return t.paginas.slice();
   const ciudad = PAGINAS_FACEBOOK.ciudad[norm(t.munLimpio || t.base)] || [];
   const local = t.corp === 'jal' ? (PAGINAS_FACEBOOK.localidad[norm(t.loc)] || []) : [];
   return [...local, ...ciudad];
@@ -64,16 +65,22 @@ function paginasDe(t) {
 /* ── El perfil, desde el vínculo ─────────────────────────────────────────── */
 export function perfilDeVinculo(vinculo, overrides = {}) {
   const partes = v => String(v).split('|').map(x => x.trim()).filter(Boolean);
-  const t = territorioDe(vinculo);
+  /* Un vínculo puede traer el territorio YA ARMADO (`vinculo.territorio`): es
+     lo que usa Mi Congreso para un congresista en ejercicio —«Senado de la
+     República · Colombia»—, que no tiene campaña territorial de la que
+     derivarlo. Trae además `escalas` (vacías para una curul nacional: el
+     hashtag #colombia no es una conversación) y `rol`, con el que el modelo
+     clasifica («la senadora X» y no «la candidatura de X»). */
+  const t = vinculo?.territorio || territorioDe(vinculo);
   const e = vinculo?.escucha || {};
   const temas = overrides.temas ? partes(overrides.temas) : (e.ideas || []).map(x => String(x).trim()).filter(Boolean);
   /* Las escalas según la corporación: la localidad y su ciudad para la JAL;
      el municipio para Concejo y Alcaldía; el departamento para las otras. */
-  const escalas = t.corp === 'jal' && t.loc ? [oracion(t.loc), t.base] : [t.base];
+  const escalas = Array.isArray(t.escalas) ? t.escalas.slice() : (t.corp === 'jal' && t.loc ? [oracion(t.loc), t.base] : [t.base]);
   const cuentas = Object.fromEntries((e.redes?.perfiles || []).filter(p => p.handle && p.veredicto && !['no_encontrado', 'sin_validar'].includes(p.veredicto)).map(p => [p.red, p.handle]));
   const nombre = vinculo?.candidato?.nombre || vinculo?.nuevo?.nombre || '';
   return {
-    candidato: `${t.corpLabel} · ${t.etiqueta}`, nombre, corp: t.corp, temas, escalas, cuentas,
+    candidato: `${t.corpLabel} · ${t.etiqueta}`, nombre, corp: t.corp, temas, escalas, cuentas, rol: t.rol || '',
     paginas: overrides.paginas ? partes(overrides.paginas) : paginasDe(t),
     corridasDia: Number(overrides.corridas || 2), dias: Number(overrides.dias || 30),
     territorio: t,
@@ -89,7 +96,7 @@ export const REDES = {
     actor: 'kaitoeasyapi/twitter-x-data-tweet-scraper-pay-per-result-cheapest',
     /* El único que busca por palabra de verdad: cada tema por cada escala,
        más el nombre de la candidatura. */
-    consultas: p => [...p.temas.flatMap(t => p.escalas.map(e => `"${t}" ${e}`)), ...(p.nombre ? [`"${p.nombre}"`] : [])],
+    consultas: p => [...p.temas.flatMap(t => p.escalas.length ? p.escalas.map(e => `"${t}" ${e}`) : [`"${t}"`]), ...(p.nombre ? [`"${p.nombre}"`] : [])],
     input: (qs, tope) => ({ searchTerms: qs, maxItems: qs.length * tope, sort: 'Latest' }),
   },
   instagram: {

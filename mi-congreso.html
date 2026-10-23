@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
-  <link rel="stylesheet" href="mi-congreso.css?v=20261020" />
+  <link rel="stylesheet" href="mi-congreso.css?v=20261023" />
 </head>
 <body>
   <div class="bg-layer"></div>
@@ -95,6 +95,13 @@
           <div class="mc-card-b" data-b><div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div></div>
           <div class="mc-card-f"><span>Temas, tono, medios y titulares</span><span>↗</span></div>
         </a>
+        <!-- Escucha de redes: oculta salvo para quien la tenga encendida
+             (mi-congreso-data/escucha/<slug>.json existe para la persona elegida) -->
+        <a class="mc-card" href="mi-congreso-redes.html" data-card="redes" style="display:none">
+          <div class="mc-card-img" style="background-image:url('imagenes/mi-congreso-redes.jpg')"><span class="mc-card-tag new">Encendida para ti</span><div class="mc-card-t"><div class="k">09 · X · Instagram · TikTok · Facebook</div><div class="h">En redes</div></div></div>
+          <div class="mc-card-b" data-b><div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div></div>
+          <div class="mc-card-f"><span>Lo que publicas y lo que te responden</span><span>↗</span></div>
+        </a>
         <a class="mc-card" href="mi-congreso-bancada.html" data-card="bancada">
           <div class="mc-card-img" style="background-image:url('imagenes/mi-congreso-bancada.jpg')"><span class="mc-card-tag">Electos 2026–2030</span><div class="mc-card-t"><div class="k">07</div><div class="h">Mi bancada</div></div></div>
           <div class="mc-card-b" data-b><div class="mc-skel big"></div><div class="mc-skel"></div><div class="mc-skel w6"></div></div>
@@ -144,7 +151,7 @@
   <script src="legislativo-base.js"></script>
   <script src="legislativo-electos.js"></script>
   <script src="candidato-360-saliencia.js?v=20261019"></script>
-  <script src="mi-congreso-base.js?v=20261020"></script>
+  <script src="mi-congreso-base.js?v=20261023"></script>
   <script>
   /* ── Mi Congreso · hub ─────────────────────────────────────────────
      Ocho tarjetas, cada una con su imagen, un vistazo vivo de su dato y
@@ -216,7 +223,7 @@
     head.querySelector('[data-mc-cambiar]').onclick=cambiar;
     const misP=MC.mios(e);
     cardAgenda(e,my,misP); cardProyectos(e,my,misP); cardReloj(e,my,misP);
-    cardVotos(e,my); cardControl(e,my); cardPrensa(e,my); cardBancada(e,my); cardFuerzas(e,my,misP);
+    cardVotos(e,my); cardControl(e,my); cardPrensa(e,my); cardBancada(e,my); cardFuerzas(e,my,misP); cardRedes(e,my);
     alertaPinta();
   }
   const ok=my=>my===SEQ;
@@ -342,6 +349,25 @@
         ${a&&a.temas.length?`<div class="mc-pills">${a.temas.slice(0,4).map(t=>`<span class="mc-pill on">${esc(t.nombre)} · ${Math.round(100*t.pct)}%</span>`).join('')}</div>`:''}
         <div class="mc-lbl" style="margin-top:.55rem">Último: <b>${esc(cut(rs[0].titulo,110))}</b> · ${esc(rs[0].medio||'')}</div>`;
     }catch(err){ if(ok(my)) vacio('prensa','No se pudo consultar la prensa en este momento.'); }
+  }
+
+  /* solo para quien tenga la escucha encendida: sin lectura, la tarjeta ni se ve */
+  async function cardRedes(e,my){
+    const card=document.querySelector('[data-card="redes"]'); if(!card) return;
+    card.style.display='none';
+    try{
+      const d=await MC.escucha(e); if(!ok(my)) return;
+      if(!d){ return; }
+      card.style.display='';
+      const R=d.redes||{}; let pub=0,men=0,com=0; const post={a_favor:0,en_contra:0,neutro:0,ataque:0};
+      Object.values(R).forEach(r=>{ pub+=(r.publicados||[]).length; men+=(r.menciones||[]).length; [r.comentarios,r.comentarios_propios].forEach(c=>{ if(c&&c.n){ com+=c.n; Object.keys(post).forEach(k=>post[k]+=(c.postura||{})[k]||0); } }); });
+      const tot=post.a_favor+post.en_contra+post.neutro+post.ataque;
+      const top=Object.values(R).flatMap(r=>r.publicados||[]).sort((a,b)=>(b.reaccion||0)-(a.reaccion||0))[0];
+      const vivas=Object.entries(R).filter(([,r])=>r.estado==='ok'||(r.publicados||[]).length).map(([k])=>({x:'X',instagram:'Instagram',tiktok:'TikTok',facebook:'Facebook'})[k]||k);
+      body('redes').innerHTML=`<div class="mc-big">${com}<small>comentarios leídos</small></div><div class="mc-lbl">${pub} publicaciones suyas y ${men} de otros sobre sus temas · ${vivas.length?vivas.join(', '):'sin red con lectura'} · ${esc(MC.fechaCorta(d.generadoEn))}</div>
+        ${tot?`<div class="mc-tone"><i class="gs" style="width:${100*post.a_favor/tot}%"></i><i class="mx" style="width:${100*post.en_contra/tot}%"></i><i class="cf" style="width:${100*post.ataque/tot}%"></i><i class="nt" style="width:${100*post.neutro/tot}%"></i></div><div class="mc-legend"><span><i style="background:var(--green)"></i>a favor ${MC.pct(post.a_favor,tot)}%</span><span><i style="background:var(--amber)"></i>en contra ${MC.pct(post.en_contra,tot)}%</span><span><i style="background:var(--red)"></i>ataque ${MC.pct(post.ataque,tot)}%</span><span><i style="background:rgba(20,22,31,.18)"></i>neutro ${MC.pct(post.neutro,tot)}%</span></div>`:''}
+        ${top?`<div class="mc-lbl" style="margin-top:.55rem">Lo que más rindió: <b>${esc(cut(top.texto,110))}</b>${top.reaccion?` · ${fmt(top.reaccion)} reacciones`:''}</div>`:''}`;
+    }catch(err){ card.style.display='none'; }
   }
 
   async function cardBancada(e,my){

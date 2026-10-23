@@ -39,7 +39,8 @@ function temaDe(t, temas) { const n = norm(t); return temas.filter(tema => n.inc
 async function clasificar(items, llave, contexto) {
   if (!items.length) return { filas: [], usd: 0 };
   const lote = items.map((it, i) => `${i}\t${it.texto.slice(0, 220)}`).join('\n');
-  const sistema = `Eres analista de conversación pública en Colombia. Recibes comentarios y publicaciones de redes sociales sobre la candidatura de ${contexto.nombre || 'un candidato'} a ${contexto.candidato}. Temas de campaña: ${contexto.temas.map(t => `«${t}»`).join(', ') || 'ninguno declarado'}.
+  const quien = contexto.rol || `la candidatura de ${contexto.nombre || 'un candidato'} a ${contexto.candidato}`;
+  const sistema = `Eres analista de conversación pública en Colombia. Recibes comentarios y publicaciones de redes sociales sobre ${quien}. Temas de campaña: ${contexto.temas.map(t => `«${t}»`).join(', ') || 'ninguno declarado'}.
 Para CADA línea devuelve un objeto JSON con: i (el número), postura (a_favor | en_contra | neutro | ataque — «ataque» es agresión personal, no crítica), tema (uno de los temas de campaña, u "otro"), tono (queja | propuesta | burla | denuncia | apoyo | informativo).
 Si no puedes decidir, postura "neutro". El sarcasmo bogotano existe: ante la duda, neutro. Responde SOLO un arreglo JSON, sin texto alrededor.`;
   const r = await fetch(MODELO_URL, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${llave}` },

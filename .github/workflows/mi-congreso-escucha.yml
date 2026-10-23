@@ -1,0 +1,76 @@
+name: Mi Congreso · escucha de redes
+
+# Corre a diario a las 05:45 de Bogotá (10:45 UTC), después de la escucha de
+# Candidato 360 para no pisarse en Apify. Lee las cuentas de los congresistas
+# con la escucha encendida (tools/mi-congreso/escucha/cuentas.json), corre una
+# lectura por persona (Apify + DeepSeek, el motor de Candidato 360) y deja el
+# JSON en mi-congreso-data/escucha/<slug>.json, que GitHub Pages sirve.
+# Encender a alguien = agregar su entrada a cuentas.json; no hay más pasos.
+#
+# Secretos del repositorio (los mismos de candidato-360-escucha.yml):
+#   APIFY_TOKEN · DEEPSEEK_API_KEY
+# Variable opcional: MC_ESCUCHA_TOPE_MES_USD (por persona, 40 por defecto).
+on:
+  schedule:
+    - cron: '45 10 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Solo simular (no gasta en Apify ni escribe)'
+        type: boolean
+        default: false
+      forzar:
+        description: 'Leer aunque la última lectura tenga menos de 20 horas'
+        type: boolean
+        default: false
+      solo:
+        description: 'Solo esta persona (slug de cuentas.json)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mi-congreso-escucha
+  cancel-in-progress: false
+
+jobs:
+  escucha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Correr el recolector
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          MC_ESCUCHA_TOPE_MES_USD: ${{ vars.MC_ESCUCHA_TOPE_MES_USD }}
+          SOLO: ${{ inputs.solo }}   # por entorno, no interpolado en el script
+        run: |
+          for s in APIFY_TOKEN DEEPSEEK_API_KEY; do
+            if [ -z "${!s}" ]; then echo "::error::Falta el secreto $s en el repositorio (Settings → Secrets → Actions)."; exit 1; fi
+          done
+          EXTRA=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then EXTRA="$EXTRA --dry-run"; fi
+          if [ "${{ inputs.forzar }}" = "true" ]; then EXTRA="$EXTRA --forzar"; fi
+          if [ -n "$SOLO" ]; then node tools/mi-congreso/escucha/recolectar.mjs $EXTRA "--solo=$SOLO"; else node tools/mi-congreso/escucha/recolectar.mjs $EXTRA; fi
+
+      # El JSON va al repo porque es lo que sirve la página. Si Ricardo subió
+      # algo mientras corría, se rebasa antes de empujar; sin cambios no hay
+      # commit (una corrida que se saltó por las 20 h no ensucia el historial).
+      - name: Guardar la lectura en el repo
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mi-congreso-data/escucha/
+          if git diff --cached --quiet; then echo 'Sin cambios que guardar.'; exit 0; fi
+          git commit -m "mi-congreso: lectura de redes $(date -u +%Y-%m-%d)"
+          git pull --rebase origin main
+          git push origin HEAD:main
