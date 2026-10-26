@@ -46,13 +46,13 @@
       que: 'El lugar que ocupa antes de la campaña: qué dice, a quién le habla y dónde se deja ver. La persuasión se hace temprano.',
       parrafo: 'Hasta el 28 de febrero de 2027 se construye el lugar que usted ocupa en la cabeza del votante, antes de que empiece el ruido de la campaña. Lo que la gente piense de usted en marzo es, en buena parte, lo que pensará en octubre: en las últimas semanas la persuasión casi no mueve a nadie. Aquí se decide qué dice, a quién le habla primero y en qué barrios se deja ver; la escucha y el briefing le dicen si está funcionando.',
       modulos: ['estrategia', 'briefing', 'escucha', 'arquetipos', 'contendientes'] },
-    { id: 'campana', nombre: 'Campaña', activa: false, abre: '2027-03-01', cuando: 'Marzo a septiembre de 2027',
+    { id: 'campana', nombre: 'Campaña', activa: false, abre: '2027-03-01', cuando: '1 de marzo al 24 de septiembre de 2027',
       que: 'Cerrar el aval y la lista, inscribirse (junio y julio) y movilizar a quien ya lo prefiere.',
       modulos: ['estrategia', 'briefing', 'escucha', 'endoso', 'contendientes'] },
-    { id: 'remate', nombre: 'Remate', activa: false, abre: '2027-10-01', cuando: '1 al 24 de octubre de 2027',
+    { id: 'remate', nombre: 'Remate', activa: false, abre: '2027-09-25', cuando: '25 de septiembre al 23 de octubre de 2027',
       que: 'Concentrar la pauta y la presencia donde rinden: su efecto dura pocos días.',
       modulos: ['estrategia', 'briefing', 'escucha'] },
-    { id: 'dia', nombre: 'Día de la elección', activa: false, abre: '2027-10-25', cuando: 'Domingo 31 de octubre de 2027',
+    { id: 'dia', nombre: 'Día de la elección', activa: false, abre: '2027-10-24', cuando: '24 al 31 de octubre de 2027',
       que: 'Sacar a votar y cuidar el voto: testigos en los puestos que más pesan.',
       modulos: ['diad'] },
   ];
@@ -77,12 +77,12 @@
 .plan-aviso{display:flex;gap:12px;align-items:center;margin:-10px 0 22px;padding:12px 16px;background:var(--cream);border:1px dashed var(--line);border-left:3px solid var(--coral);font-size:14px;color:var(--ink)}
 .plan-aviso b{color:var(--coral)}.plan-aviso span{color:var(--muted)}
 #crm.plan-fase .crm-grid>#crmEstrategia{order:-5}
-.plan-hola{margin:8px 0 26px}.plan-hola h2{font-size:clamp(36px,5vw,62px);line-height:.98;margin:6px 0 10px}.plan-hola p{color:var(--muted);max-width:640px;margin:0;font-size:17px}.plan-hola .plan-por-que{max-width:860px;margin-top:14px;font-size:15px;line-height:1.55;color:var(--ink);border-left:3px solid var(--green);padding-left:14px}
+.plan-hola{margin:8px 0 26px}.plan-hola h2{font-size:clamp(36px,5vw,62px);line-height:.98;margin:6px 0 10px}.plan-hola p{color:var(--muted);max-width:640px;margin:0;font-size:17px}.plan-hola .plan-por-que{max-width:920px;margin-top:16px;font-size:17.5px;line-height:1.6;color:var(--ink);border-left:3px solid var(--green);padding-left:14px}
 .plan-fases{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;counter-reset:fase}
 .plan-card{counter-increment:fase;position:relative;display:flex;flex-direction:column;gap:8px;padding:20px 18px;min-height:250px;background:var(--cream);border:1px solid var(--line);text-align:left;font:inherit;color:inherit}
 .plan-card .plan-num{font:500 11px var(--mono);color:var(--green);letter-spacing:.1em}.plan-card.cerrada .plan-num{color:var(--muted)}
 .plan-card h3{font-size:22px;margin:0}.plan-card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.45}
-.plan-card .plan-cuando{font:500 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--green)}
+.plan-card .plan-cuando{font:500 12.5px/1.45 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--green)}
 .plan-card .plan-trae{margin-top:auto;font-size:12px;color:var(--muted)}.plan-card .plan-trae b{color:var(--ink)}
 .plan-card.activa{cursor:pointer;transition:.2s}.plan-card.activa:hover,.plan-card.activa:focus{border-color:var(--green);transform:translateY(-3px);outline:none}
 .plan-card.activa .plan-ir{font:700 13px var(--sans);color:var(--green)}
@@ -94,6 +94,12 @@
 .plan-intro{display:grid;grid-template-columns:minmax(0,300px) 1fr;gap:24px;align-items:center;margin:0 0 24px;padding:18px;background:var(--cream);border:1px solid var(--line)}
 .plan-intro img{width:100%;height:auto;aspect-ratio:3/2;object-fit:cover;display:block}.plan-intro h2{font-size:clamp(28px,3.4vw,42px);margin:6px 0 10px;line-height:1}.plan-intro p{margin:0;color:var(--muted);font-size:16px;max-width:760px}
 @media(max-width:700px){.plan-intro{grid-template-columns:1fr}}
+.plan-card .plan-trae{display:flex;flex-direction:column;align-items:stretch;gap:10px;font-size:13.5px}
+.plan-card .plan-ir{display:flex;align-items:center;justify-content:center;min-height:46px;padding:12px 16px;font:700 13px var(--sans)!important;letter-spacing:.16em;text-transform:uppercase}
+.plan-card.activa .plan-ir{background:var(--ink);border:1px solid var(--ink);color:#fff!important;transition:background .2s}
+.plan-card.activa:hover .plan-ir,.plan-card.activa:focus .plan-ir{background:var(--green);border-color:var(--green)}
+.plan-card.cerrada .plan-ir{border:1px solid var(--muted);background:transparent;color:var(--muted)!important}
+.plan-card.cerrada:hover .plan-ir,.plan-card.cerrada:focus .plan-ir{border-color:var(--ink);color:var(--ink)!important}
 @media(max-width:1100px){.plan-fases{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:700px){.plan-fases{grid-template-columns:1fr}.plan-card{min-height:0}}`;
     document.head.appendChild(s);
@@ -114,15 +120,15 @@
     caja.classList.remove('hidden');
     caja.innerHTML = `<div class="plan-hola"><div class="kicker">Plan de campaña · 2027</div><h2>Hola${nombre ? `, ${esc(nombre)}` : ''}. Este es su plan de campaña.</h2>
       <p>Cinco fases hasta el 31 de octubre de 2027. Cada una abre las herramientas que sirven en ese momento; hoy están abiertas las dos primeras.</p>
-      <p class="plan-por-que">¿Por qué cinco? Porque una campaña no es una sola carrera: son cinco momentos con reglas distintas. Primero se planea —de dónde parte y qué estrategia escoger—. Después se posiciona, mientras todavía hay tiempo para que el votante lo conozca, porque la persuasión rinde temprano. Luego viene la campaña: aval, lista, inscripción y propaganda. El remate es el último mes, cuando la pauta pesa pero su efecto dura pocos días. Y el día de la elección se gana con logística: sacar a votar y cuidar el voto. Hacer en cada momento lo que ese momento pide es la diferencia entre gastar y sumar.</p></div>
+      <p class="plan-por-que">Tienes cinco etapas que desarrollar en una campaña. No es una sola carrera lineal. Primero se planea, en donde la estrategia es el corazón de la campaña, lo cual depende de dónde te lanzas, tu ideología política y tu arquetipo. Después debes posicionarte, pues esto reduce costos de campaña para que el votante te conozca. Luego viene la campaña: aval, lista, inscripción y propaganda ¡a toda! Por último, el remate es el último mes, cuando la pauta pesa pero su efecto dura pocos días; ahí es donde están las mayores inversiones. Luego, el día de la elección se gana con logística: sacar a votar y cuidar el voto. Es muy importante seguir estos pasos si quieres ganar y que la campaña no te salga tan costosa.</p></div>
       <div class="plan-fases">${FASES.map(f => {
-        const trae = f.modulos.filter(m => NOMBRE_MODULO[m]).map(m => NOMBRE_MODULO[m]);
-        /* Las cerradas también se abren: adentro los módulos van en gris. */
+        /* Las cerradas también se abren: adentro los módulos van en gris. Lo que
+           trae cada una se ve al abrirla, no en la tarjeta (oct-26-2026). */
         return `<button type="button" class="plan-card ${f.activa ? 'activa' : 'cerrada'}" data-fase="${f.id}">
           <img class="plan-img" src="${IMG(f.id)}" alt="" width="600" height="400" loading="lazy" onerror="this.remove()">
           <span class="plan-sello">${f.activa ? 'Abierta' : 'Próximamente'}</span>
           <span class="plan-num">${String(FASES.indexOf(f) + 1).padStart(2, '0')}</span><h3>${esc(f.nombre)}</h3><span class="plan-cuando">${esc(f.cuando)}</span><p>${esc(f.que)}</p>
-          <span class="plan-trae">${f.activa ? `<span class="plan-ir">Abrir →</span>` : `Se abre el ${esc(fecha(f.abre))}.${trae.length ? ` Trae <b>${esc(trae.join(' · '))}</b>.` : ''} <span class="plan-ir">Ver qué trae →</span>`}</span>
+          <span class="plan-trae">${f.activa ? `<span class="plan-ir">Abrir</span>` : `<span class="plan-abre">Se abre el ${esc(fecha(f.abre))}.</span><span class="plan-ir">Ver</span>`}</span>
         </button>`;
       }).join('')}</div>`;
     caja.querySelectorAll('.plan-card').forEach(b => b.onclick = () => abrir(b.dataset.fase));

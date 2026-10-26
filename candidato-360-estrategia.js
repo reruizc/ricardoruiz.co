@@ -23,7 +23,7 @@
 
    No toca el DOM. En Node se usa pasándole `banco` y las lecturas a `evaluar`. */
 (function (global) {
-  const BANCO_URL = 'candidato-360-data/estrategia-banco.json?v=20261020-ctg';
+  const BANCO_URL = 'candidato-360-data/estrategia-banco.json?v=20261026-diad';
   const ARRAIGO_URL = 'candidato-360-data/arraigo-concejo-bogota-2023.json?v=20261019';
   /* Corporaciones que se leen con arquetipos de ciudad. Una asamblea o una
      gobernación se juegan en todo el departamento y los arquetipos son de una

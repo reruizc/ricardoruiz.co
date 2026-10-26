@@ -692,7 +692,7 @@
        propio reproductor; acá solo se limpia lo que se crea. */
   const DESCANSO_MS = 20000;
   const bajito = matchMedia('(max-height:520px)');
-  let tira = null, descanso = null, rincon = null, origen = null;
+  let tira = null, descanso = null, rincon = null, origen = null, terminarPaseo = false;
 
   function montarDescanso() {
     if (descanso || !mascota || typeof CandiBoneSequence !== 'function') return;
@@ -722,9 +722,14 @@
          cero y la «casa» caía en el borde IZQUIERDO; la casa es el derecho. */
       const r = escena.getBoundingClientRect();
       const casa = r.width ? acota(r.right - der - sw - tira.getBoundingClientRect().left + (sw - size) / 2) : tope;
-      const extremo = lado => lado === 'left' ? izq : casa;
-      const start = origen == null ? extremo(descanso.fromSide) : acota(origen);
-      return { ...g, size, start, end: extremo(descanso.toSide), casa, izq };
+      /* Oct-25-2026: el paseo va por el borde de abajo de la pantalla, así que
+         el extremo derecho ya no es la casa (está encima de «Pregúntame»):
+         es justo a la izquierda del botón, para no caminar por encima de él. */
+      const b = launcher?.getBoundingClientRect();
+      const finDer = b?.width ? Math.max(izq, Math.min(casa, b.left - tira.getBoundingClientRect().left - size - 12)) : casa;
+      const extremo = lado => lado === 'left' ? izq : finDer;
+      const start = origen == null ? extremo(descanso.fromSide) : Math.max(izq, Math.min(finDer, origen));
+      return { ...g, size, start, end: extremo(descanso.toSide), casa, izq, der: finDer };
     };
     /* 2) play: antes de salir se anota dónde está la Candi visible. Si ya está
           prácticamente en el extremo al que le tocaría ir (volvió al dock tras
@@ -737,7 +742,7 @@
          pantalla ya baja, se hace aquí lo que haría `alCambiarAlto`. */
       if (bajito.matches) { alCambiarAlto(); return Promise.resolve(); }
       origen = posicionVisible();
-      const g = descanso.layout(), destino = descanso.side === 'right' ? g.izq : g.casa;
+      const g = descanso.layout(), destino = descanso.side === 'right' ? g.izq : g.der;
       if (Math.abs(origen - destino) < g.size / 2) descanso.side = descanso.side === 'right' ? 'left' : 'right';
       return playBase(...args);
     };
@@ -755,12 +760,27 @@
           y dejaba la puerta abierta a pensar y a investigar a la vez. */
     const stopBase = descanso.stop.bind(descanso);
     descanso.stop = (restore = true) => {
+      terminarPaseo = false;
       restore = restore && descanso.active;
       stopBase(restore);
       if (!restore || !mascota) return;
       mascota.sprite.style.left = ''; mascota.sprite.style.right = '';
       if (rincon) mascota.sprite.hidden = true;
     };
+    /* 4) Interrumpir a mitad del paseo (oct-25-2026, pedido de Ricardo): ya no
+          se queda sentada en mitad de la pantalla. Si la actividad llega
+          mientras CAMINA, termina de caminar hasta el extremo y ahí se sienta
+          atenta (salta el recoger y el echarse). Solo aplica a la actividad
+          del usuario: abrir el panel, preguntar o un cálculo siguen
+          devolviéndola al dock en el acto (`wake` directo). */
+    const actividadBase = descanso.onActivity;
+    const TIPOS_ACTIVIDAD = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'input'];
+    TIPOS_ACTIVIDAD.forEach(t => document.removeEventListener(t, actividadBase));
+    descanso.onActivity = e => {
+      if (descanso.active && !descanso.resting && !descanso.actor.hidden && descanso.phase === 'walk') { terminarPaseo = true; return; }
+      actividadBase(e);
+    };
+    TIPOS_ACTIVIDAD.forEach(t => document.addEventListener(t, descanso.onActivity, { passive: true }));
     /* El reproductor escucha `candi:state` en SU escenario; la mascota lo emite en el dock. */
     escena.addEventListener('candi:state', reenviarEstado);
     tira.addEventListener('candi:bone-state', alDescanso);
@@ -775,7 +795,7 @@
     if (rincon) return rincon.x;
     const x = parseFloat(descanso.actor.style.left);
     if (descanso.active && !descanso.actor.hidden && Number.isFinite(x)) return x;
-    return descanso.layout().casa;
+    return descanso.layout().der;
   }
   const reenviarEstado = e => tira?.dispatchEvent(new CustomEvent('candi:state', { detail: e.detail }));
   /* Libre = panel cerrado, pantalla con escena, sin pregunta en vuelo y sin
@@ -783,12 +803,12 @@
   function habilitarDescanso() { descanso?.enable(!abierto && !bajito.matches && !enVuelo && !calculando && !(document.getElementById('candiBienvenida') && ['intro', 'existing'].includes(contexto().vista))); }
   function alCambiarAlto() { if (bajito.matches) volverAlDock(); habilitarDescanso(); ajustarSuelo(); }
 
-  /* La tira se apoya en la misma línea de suelo que la escena del dock. */
+  /* La tira va por el borde de abajo de la pantalla (oct-25-2026; antes se
+     apoyaba en la línea de suelo de la escena del dock, encima del botón). */
+  const SUELO_PX = 6;
   function ajustarSuelo() {
-    if (!tira || escena.hidden) return;
-    const r = escena.getBoundingClientRect();
-    if (!r.height) return;
-    tira.style.setProperty('--candi-suelo', Math.max(0, innerHeight - r.bottom) + 'px');
+    if (!tira) return;
+    tira.style.setProperty('--candi-suelo', SUELO_PX + 'px');
   }
   function alRedimensionar() {
     ajustarSuelo();
@@ -804,6 +824,8 @@
      el extremo contrario, así que siempre camina. */
   function alDescanso(e) {
     const st = e.detail?.state;
+    /* Llegó al extremo con una interrupción pendiente: ahí se sienta. */
+    if (st === 'pickup' && terminarPaseo) { descanso.side = descanso.toSide; return descanso.wake(); }
     if (st === 'awake') return despertarDonde();
     if (st === 'walk') quitarRincon();
   }

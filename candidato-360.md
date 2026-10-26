@@ -523,6 +523,19 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
   una sola para los dos, guardada en `localStorage['c360-candi-letra']`). La
   escala es la variable `--candi-esc` del contenedor de Candi y multiplica la
   letra y el ancho del panel y del globo (`candidato-360-candi.css`, al final).
+- **Paseo del hueso (26-oct-2026).** Va por el borde de abajo de la pantalla
+  (`SUELO_PX`), no por la línea del dock, y su extremo derecho queda a la
+  izquierda de «Pregúntame». Si el usuario la interrumpe mientras camina, ya no
+  se queda en mitad de la pantalla: termina de caminar hasta el extremo y ahí
+  se sienta atenta (se salta recoger y echarse). Abrir el panel, preguntar o un
+  cálculo la siguen devolviendo al dock en el acto.
+- **Fechas de las fases (26-oct-2026).** Remate desde el 25 de septiembre;
+  el Día de la elección se abre el 24 de octubre, una semana antes (también en
+  `estrategia-banco.json` y en `build_banco.py`). El texto de la portada del
+  plan lo escribió Ricardo y va en tú a propósito.
+- **Tarjetas de fase (26-oct-2026).** El rótulo de fechas pasa de 10 a 12,5 px;
+  «Abrir» es un botón (sin flecha) y las fases cerradas solo dicen cuándo se
+  abren, con un botón «Ver»: lo que trae cada una se ve al abrirla.
 
 ### 10.3 Candi (Luna)
 
@@ -1981,9 +1994,9 @@ sirven y **11 · Estrategia va de primera**.
 |---|---|---|
 | Planeación | ahora | 11 · punto de partida · 02 · 05 · 06 · 10 · 08 · 07 · 01 (el mapa al final) |
 | Posicionamiento | hasta el 28-feb-2027 | 11 · 03 · 04 · 05 · 10 |
-| Campaña | 1-mar a sep-2027 (cerrada) | 11 · 03 · 04 · 08 · 10 |
-| Remate | 1 al 24-oct-2027 (cerrada) | 11 · 03 · 04 |
-| Día de la elección | 25 al 31-oct-2027 (cerrada) | **09** |
+| Campaña | 1-mar al 24-sep-2027 (cerrada) | 11 · 03 · 04 · 08 · 10 |
+| Remate | 25-sep al 23-oct-2027 (cerrada) | 11 · 03 · 04 |
+| Día de la elección | 24 al 31-oct-2027 (cerrada; se prepara una semana antes) | **09** |
 
 Las fechas salen del calendario del banco de estrategia (posicionamiento hasta
 febrero, inscripción en junio-julio, propaganda desde el 31-jul). ⚠ Mientras el
