@@ -106,6 +106,12 @@ const conAfin = E.principios(banco, [arq('CMN', .4, .5, .8), arq('CIM', .1, .05,
 const sinAfin = E.principios(banco, [arq('CMN', .4, .5, 1), arq('CIM', .1, .05, 1)]);
 ok(conAfin.find(p => p.id === 'A5').puntaje < sinAfin.find(p => p.id === 'A5').puntaje, 'la afinidad pesa: si rinde el doble en CIM (que castiga movilizar), A5 baja');
 ok(E.pesos([arq('X', .1, .1, 9), arq('Y', .1, .1, 1)]).X === 2 / 3, 'la afinidad se acota en ×2');
+/* Un arquetipo sin fila en la matriz (los de Bogotá pasaron a 8 el 19-oct y la
+   matriz tiene 6): cuenta como «igual», no se descarta ni revienta. */
+const nuevo = { codigo: null, sinFila: true, id: 'nuevo', nombre: 'nuevo', share: .5, territorio: .5, ratio: 1 };
+const conNuevo = E.principios(banco, [arq('PVP', .5, .5, 1), nuevo]);
+ok(igual(conNuevo.map(p => p.id), solo('PVP')) && conNuevo.find(p => p.id === 'A5').puntaje === 1, 'un arquetipo sin fila cuenta como «igual»: diluye el puntaje (A5 pasa de 2 a 1) pero no cambia el orden');
+ok(E.territorio(banco, [arq('PVP', .5, .5, 1.2), nuevo]).find(t => t.id === 'nuevo').centrales.length === 0, 'en la tabla de territorio el sin fila sale, con su cuadrante y sin celdas de la matriz');
 const acc = E.acciones(banco, 'posicionamiento', E.principios(banco, [arq('BDG', 1, 1, 1)]), { lectura: 'barrio' }, { estado: 'abierta' });
 ok(acc[0].principio === 'A6' && acc.every(a => a.fase === 'posicionamiento') && !acc.some(a => a.lectura === 'figura'), 'las acciones salen de la fase, en el orden de los principios, y las de figura no salen para un trabajo de barrio');
 ok(E.acciones(banco, 'precampana', E.principios(banco, [arq('CMN', 1, 1, 1)]), {}, { estado: 'cerrada' }).filter(a => a.principio === 'A1').every(a => a.lista === 'cerrada'), 'en precampaña, lista cerrada: la acción de A1 es la del renglón, no la del voto preferente');
@@ -123,7 +129,7 @@ if (!process.argv.includes('--sin-red')) {
     const txt = await readFile(new URL('legislativo-electos.js', RAIZ), 'utf8');
     const congresistas = JSON.parse(txt.match(/ELECTOS_RAW=(\[.*?\]\]);/s)[1]).map(r => r[1]);
     const LC = await A.leer('bogota', [], { corp: 'concejo' });
-    const pinta = R => R.territorio.map(t => `${t.codigo} ${(t.share * 100).toFixed(1)}/${(t.territorio * 100).toFixed(1)} ×${t.ratio?.toFixed(2)} ${t.cuadrante}`).join(' · ');
+    const pinta = R => R.territorio.map(t => `${t.codigo || t.id} ${(t.share * 100).toFixed(1)}/${(t.territorio * 100).toFixed(1)} ×${t.ratio?.toFixed(2)} ${t.cuadrante}`).join(' · ');
 
     /* 2a · Un concejal «figura» de Bogotá con arraigo bajo. Se relanza al
        Concejo con su lista de 2023. */
@@ -148,14 +154,20 @@ if (!process.argv.includes('--sin-red')) {
          motor— reparte con la MEZCLA de cada barrio, que aplana los cocientes:
          ×1,20 (9,7 % contra 8,1 %). Mismo dato, dos reglas; la del producto es
          la del panel. */
-      ok(Math.abs(cim.ratio - 1.20) < .01 && Math.abs(cim.share - .097) < .001 && Math.abs(cim.territorio - .081) < .001, `figura · afinidad con «Ciudadela movilizada» ×${cim.ratio.toFixed(2)} (9,7 % contra 8,1 %): la del panel 05, con la mezcla de cada barrio`);
-      ok(igual(R.principios.map(p => p.id), ['A7', 'A1', 'A6', 'A8', 'A5', 'A2', 'A3', 'A4']), `figura · orden de los principios FIJADO: ${R.principios.map(p => p.id).join(' ')}`);
-      ok(igual(R.territorio.map(t => [t.codigo, t.cuadrante]), [['CMN', 'conocer'], ['PDP', 'movilizar'], ['NDF', 'conocer'], ['BDG', 'no-gastar'], ['CIM', 'retener-crecer'], ['PVP', 'no-gastar']]),
-        'figura · tabla de territorio FIJADA: clase media de nombre y norte de figuras para hacerse conocer, periferia de partido para movilizar, ciudadela movilizada para retener y crecer');
+      /* Re-fijado el 19-oct-2026: los arquetipos de Bogotá pasaron de 6 a 8 por
+         corporación. Con 6 daba ×1,20 (9,7 % contra 8,1 %) y el orden
+         A7 A1 A6 A8 A5 A2 A3 A4. Los dos nuevos («sin-dueno» y «opinion») aún
+         no tienen fila en la matriz y se llevan el 39 % de su votación: cuentan
+         como «igual», y por eso A5 sube. */
+      ok(Math.abs(cim.ratio - 1.25) < .01 && Math.abs(cim.share - .046) < .001 && Math.abs(cim.territorio - .037) < .001, `figura · afinidad con «Ciudadela movilizada» ×${cim.ratio.toFixed(2)} (4,6 % contra 3,7 %): la del panel 05, con la mezcla de cada barrio`);
+      ok(Math.abs(R.sinFila.share - .393) < .002, `figura · ${(R.sinFila.share * 100).toFixed(1)} % de su votación en arquetipos sin fila en la matriz (${R.sinFila.nombres.join(', ')})`);
+      ok(igual(R.principios.map(p => p.id), ['A7', 'A6', 'A5', 'A1', 'A8', 'A2', 'A3', 'A4']), `figura · orden de los principios FIJADO: ${R.principios.map(p => p.id).join(' ')}`);
+      ok(igual(R.territorio.map(t => [t.codigo || t.id, t.cuadrante]), [['sin-dueno', 'retener'], ['PDP', 'movilizar'], ['CMN', 'conocer'], ['opinion', 'retener'], ['PVP', 'no-gastar'], ['BDG', 'no-gastar'], ['NDF', 'no-gastar'], ['CIM', 'retener-crecer']]),
+        'figura · tabla de territorio FIJADA (8 arquetipos): retener clase media sin dueño y norte de opinión, movilizar periferia de partido, hacerse conocer en clase media de nombre, retener y crecer en ciudadela movilizada');
       ok(R.accion?.lectura === 'figura' && R.accion.principio === 'A7', 'figura · la acción de la semana es la de toma de posición (figura de ciudad, A7)');
       ok(R.competencia.estado === 'abierta' && R.competencia.usted?.puesto === 1 && R.competencia.usted.elegido && R.competencia.principal?.puesto === 2, 'figura · lista abierta, encabezó su lista: el rival principal es el segundo de la misma lista');
       ok(R.figura.lectura === 'figura' && R.figura.valor === .07, `figura · arraigo 7 % contra ${(R.figura.referencia * 100).toFixed(1)} % de la ciudad: figura de ciudad`);
-      ok(/^Figura de ciudad, con su mejor terreno en «Ciudadela movilizada»/.test(R.lugar), 'figura · el lugar dice figura de ciudad y su mejor terreno');
+      ok(/^Figura de ciudad, con su mejor terreno en «Norte de opinión»/.test(R.lugar), 'figura · el lugar dice figura de ciudad y su mejor terreno (el más afín con al menos 8 % de su votación)');
     }
 
     /* 2b · Una edilesa de barrio: se relanza a la JAL de Barrios Unidos. El
@@ -178,8 +190,8 @@ if (!process.argv.includes('--sin-red')) {
       ok(R.competencia.estado === 'abierta' && R.competencia.usted?.puesto === 3 && R.competencia.distancia === 910, `edilesa · 3.ª de su lista, a 910 votos del último elegido (${R.competencia.usted?.puesto}, ${R.competencia.distancia})`);
       ok(R.competencia.principal?.puesto === 2 && R.competencia.principal.elegido, 'edilesa · el rival principal es el último elegido de su propia lista');
       ok(igual(R.principios.map(p => p.id), ['A7', 'A1', 'A8', 'A6', 'A2', 'A3', 'A4', 'A5']), `edilesa · orden de los principios FIJADO: ${R.principios.map(p => p.id).join(' ')}`);
-      ok(igual(R.territorio.map(t => [t.codigo, t.cuadrante]), [['CMN', 'retener'], ['CIM', 'conocer'], ['NDF', 'retener'], ['BDG', 'no-gastar'], ['PDP', 'no-gastar'], ['PVP', 'no-gastar']]),
-        'edilesa · tabla de territorio FIJADA (contra su localidad): retener clase media de nombre y norte de figuras, hacerse conocer en la ciudadela movilizada');
+      ok(igual(R.territorio.map(t => [t.codigo || t.id, t.cuadrante]), [['opinion', 'retener'], ['CMN', 'conocer'], ['sin-dueno', 'retener'], ['CIM', 'conocer'], ['BDG', 'no-gastar'], ['PDP', 'no-gastar'], ['NDF', 'retener-crecer'], ['PVP', 'no-gastar']]),
+        'edilesa · tabla de territorio FIJADA (8 arquetipos, contra su localidad): retener norte de opinión y clase media sin dueño, hacerse conocer en clase media de nombre y ciudadela movilizada');
       ok(R.accion?.lectura === 'barrio' && R.accion.principio === 'A7', 'edilesa · la acción de la semana es la de rendición de cuentas por sector (trabajo de barrio, A7)');
     }
   } catch (e) {

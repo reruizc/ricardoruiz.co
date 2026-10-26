@@ -86,16 +86,21 @@
   const corteDe = L => L?.cortes?.[0] || '2023';
 
   /* Los arquetipos de la lectura, con la afinidad del panel 05 (sin el piso
-     del 8 %: la tabla de territorio necesita también los chicos). */
+     del 8 %: la tabla de territorio necesita también los chicos).
+     Un arquetipo SIN fila en la matriz (los de Bogotá pasaron de 6 a 8 por
+     corporación el 19-oct y la matriz arrancó con 6) NO se descarta: entra con
+     `codigo: null` y cuenta como «igual» (celda 0) en todos los principios. Si
+     se descartara, su peso desaparecería del cálculo y de la tabla de
+     territorio sin que nada lo dijera. */
   function arquetiposDe({ banco, ciudad, L, LT, lente }) {
     const A = global.C360ArqLectura, corte = corteDe(LT || L), cod = codigos(banco, ciudad, corte);
     const medida = lente !== 'ciudad';
     const filas = A.afinidad(L, LT, corte, { minimo: 0 });
     const D = LT?.D;   /* Bogotá trae la participación del arquetipo y de la ciudad */
-    return filas.filter(x => cod[x.id]).map(x => {
+    return filas.map(x => {
       const f = L.ficha?.(x.id) || {};
       return {
-        codigo: cod[x.id], id: x.id, nombre: L.nombreDe ? L.nombreDe(x.id, corte) : x.id, color: L.colorDe ? L.colorDe(x.id) : '#6b7280',
+        codigo: cod[x.id] || null, sinFila: !cod[x.id], id: x.id, nombre: L.nombreDe ? L.nombreDe(x.id, corte) : x.id, color: L.colorDe ? L.colorDe(x.id) : '#6b7280',
         share: x.share, territorio: x.ciudad, ratio: medida ? x.ratio : null,
         participacion: f.perfil?.p ?? null, participacionRef: D?.ciudad?.p ?? null,
       };
@@ -110,16 +115,20 @@
   function pesos(arqs) {
     const w = arqs.map(a => a.share * (a.ratio == null ? 1 : acotar(a.ratio)));
     const s = w.reduce((x, y) => x + y, 0) || 1;
-    return Object.fromEntries(arqs.map((a, i) => [a.codigo, w[i] / s]));
+    return Object.fromEntries(arqs.map((a, i) => [a.id, w[i] / s]));   /* por id: los sin fila no tienen código */
   }
   function principios(banco, arqs) {
-    const W = pesos(arqs), M = banco.matriz, N = banco.notas_matriz || {};
+    const Wid = pesos(arqs), M = banco.matriz, N = banco.notas_matriz || {};
     const fichaDe = id => banco.fichas.find(f => f.id === id);
+    /* Los sin fila pesan en el denominador (diluyen) pero su celda es 0. */
+    const filas = arqs.map(a => ({ id: a.id, codigo: a.codigo, peso: Wid[a.id] || 0 }));
+    const W = {};   /* por código, solo los que tienen fila (para ramas y modulación) */
+    filas.forEach(f => { if (f.codigo) W[f.codigo] = (W[f.codigo] || 0) + f.peso; });
     const top = Object.entries(W).sort((a, b) => b[1] - a[1]).map(([c]) => c);
     const lista = banco.principios.map(p => {
-      const aportes = Object.entries(W).map(([c, w]) => ({ codigo: c, peso: w, celda: M[c]?.[p.id] ?? 0, nota: N[c]?.[p.id] || '' }))
+      const aportes = filas.filter(f => f.codigo).map(f => ({ codigo: f.codigo, peso: f.peso, celda: M[f.codigo]?.[p.id] ?? 0, nota: N[f.codigo]?.[p.id] || '' }))
         .filter(x => x.celda !== 0).sort((a, b) => Math.abs(b.peso * b.celda) - Math.abs(a.peso * a.celda));
-      const puntaje = r3(Object.entries(W).reduce((s, [c, w]) => s + w * (M[c]?.[p.id] ?? 0), 0));
+      const puntaje = r3(filas.reduce((s, f) => s + f.peso * (f.codigo ? M[f.codigo]?.[p.id] ?? 0 : 0), 0));
       /* Las ramas del principio que sirven a alguno de sus arquetipos con peso. */
       const ramas = (banco.ramas || []).filter(r => p.ramas.includes(r.id) && r.arquetipos.some(c => (W[c] || 0) >= .1));
       const fichas = [...p.fichas, ...ramas.flatMap(r => r.fichas)].filter((x, i, a) => a.indexOf(x) === i);
@@ -171,7 +180,7 @@
     const M = banco.matriz, N = banco.notas_matriz || {};
     return arqs.map(a => {
       const q = cuadrante(a, med), C = q ? banco.cuadrantes[q] : null;
-      const celdas = v => Object.entries(M[a.codigo] || {}).filter(([, x]) => x === v).map(([p]) => ({ principio: p, nota: N[a.codigo]?.[p] || '' }));
+      const celdas = v => !a.codigo ? [] : Object.entries(M[a.codigo] || {}).filter(([, x]) => x === v).map(([p]) => ({ principio: p, nota: N[a.codigo]?.[p] || '' }));
       return { ...a, grande: a.territorio >= med, cuadrante: q, accion: C?.nombre || null, que: C?.que || null, fichas: C?.fichas || [],
         centrales: celdas(2), riesgos: celdas(-1), fuertes: B[a.id]?.fuertes || [], huecos: B[a.id]?.huecos || [] };
     }).sort((a, b) => b.territorio - a.territorio);
@@ -291,7 +300,9 @@
       estado: 'ok', fase: F, ciudad: e.ciudad, corp: e.corp, corte, lente: e.lente, recorte: LT.recorte || null,
       arquetipos: arqs, pesos: pesos(arqs), principios: orden,
       /* Filas que redactó el equipo y nadie ha validado (hoy, las 8 de Cartagena). */
-      matrizSinValidar: Object.values(cod).some(c => banco.arquetipos?.[c]?.fuente === 'equipo-sin-validar'), territorio: territorio(banco, arqs, { L, LT, corte }),
+      matrizSinValidar: Object.values(cod).some(c => banco.arquetipos?.[c]?.fuente === 'equipo-sin-validar'),
+      /* Cuánto de la votación cae en arquetipos sin fila en la matriz. */
+      sinFila: { share: r3(arqs.filter(a => a.sinFila).reduce((s, a) => s + a.share, 0)), nombres: arqs.filter(a => a.sinFila).map(a => a.nombre) }, territorio: territorio(banco, arqs, { L, LT, corte }),
       figura: fig, competencia: comp, acciones: acc, accion: acc[0] || null, lugar: lugar(fig, arqs, e.lente),
       advertencias: banco.advertencias,
     };
