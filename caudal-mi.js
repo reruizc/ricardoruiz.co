@@ -151,6 +151,7 @@ function modoEmpresa(k){
   // el sector de la cuenta no es el de la empresa abierta: se esconde
   const sec=$('mi-sector'); if(sec) sec.hidden=!!p;
   document.title=p?`${p.nombre} · Mi Caudal`:'Mi Caudal · tu contexto';
+  { const inp=$('hoy-mod-in'); if(inp){ delete inp.dataset.tocado; inp.value=p?p.nombre:''; modsPintar(); } }
   empRender();
   if(p) hoyCargar({empresa:p}); else hoyPerfilPorDefecto();
 }
@@ -213,6 +214,49 @@ function hoyRumbos(){
   });
   $('hoy-rumbos').querySelectorAll('[data-hoy-act]').forEach(b=>b.onclick=e=>{
     e.stopPropagation(); HOY_RUMBO=b.closest('[data-rumbo]').dataset.rumbo; hoyActualizar(); });
+}
+/* ══ Explorar módulos ════════════════════════════════════════════════════
+   Al lado de «Abrir la Rosa completa»: los diez pilares de Caudal, para quien
+   quiere ir directo a uno (el Congreso, SUCOP, la contratación…). Si escribe
+   algo arriba, cada tarjeta abre su módulo con esa búsqueda hecha (el mismo
+   ?q= que usa caudal-explorar.html); sin texto, abre el módulo tal cual. En
+   modo empresa arranca con el nombre de la empresa escrito. */
+const MODULOS=[
+  {id:'congreso',    n:'Congreso y órgano legislativo',      s:'Proyectos, leyes y quién los empuja',   q:t=>t?'caudal.html?q='+t+'#congreso':'caudal.html#congreso'},
+  {id:'regulatorio', n:'Superintendencias y comisiones',     s:'Actos y sanciones de los reguladores',  q:t=>t?'caudal.html?q='+t+'#regulatorio':'caudal.html#regulatorio'},
+  {id:'medios',      n:'Medios nacionales y regionales',     s:'Ritmo y focos de la cobertura',          q:t=>t?'caudal-medios.html?q='+t:'caudal-medios.html'},
+  {id:'datos',       n:'Datos abiertos y contratación',      s:'SECOP II en vivo',                       q:t=>t?'caudal-contratacion.html?q='+t:'caudal-contratacion.html'},
+  {id:'control',     n:'Órganos de control y altas cortes',  s:'Providencias que cambian la norma',      q:t=>t?'caudal.html?q='+t+'#control':'caudal.html#control'},
+  {id:'ejecutivo',   n:'Ejecutivo nacional · Presidencia',   s:'Decretos con su texto oficial',          q:t=>t?'caudal.html?q='+t+'#ejecutivo':'caudal.html#ejecutivo'},
+  {id:'sucop',       n:'Consulta pública de normas · SUCOP', s:'Borradores que aún se pueden comentar', q:t=>t?'caudal.html?q='+t+'#sucop':'caudal.html#sucop'},
+  {id:'gacetas',     n:'Diarios y gacetas oficiales',        s:'El texto completo del trámite',          q:t=>t?'caudal.html?q='+t+'#gacetas':'caudal.html#gacetas'},
+  {id:'territorial', n:'Entidades territoriales',            s:'En construcción · ver el avance',        q:()=>'caudal.html#territorial'},
+  {id:'redes',       n:'Redes sociales oficiales y voceros', s:'Cuentas y voceros verificados',          q:t=>t?'caudal-voceros.html?q='+t:'caudal-voceros.html'},
+];
+function modsPintar(){
+  const box=$('hoy-modulos'); if(!box) return;
+  const inp=$('hoy-mod-in'), v=(inp&&inp.value||'').trim(), t=encodeURIComponent(v);
+  const grid=$('hoy-mod-grid'); if(!grid) return;
+  grid.innerHTML=MODULOS.map(m=>`<a class="hoy-mod" href="${m.q(t)}" style="background-image:url('imagenes/caudal-${m.id}.jpg')">
+    <span class="hoy-mod-n">${esc(m.n)}</span><span class="hoy-mod-s">${v&&m.id!=='territorial'?'Buscar «'+esc(v)+'»':esc(m.s)}</span></a>`).join('');
+}
+function modsToggle(abrir){
+  const box=$('hoy-modulos'), b=$('hoy-mods'); if(!box||!b) return;
+  const on=typeof abrir==='boolean'?abrir:box.hidden;
+  box.hidden=!on; b.setAttribute('aria-expanded',String(on));
+  if(on&&!box.dataset.listo){
+    box.dataset.listo='1';
+    box.innerHTML=`<div class="hoy-mod-q"><label for="hoy-mod-in">Buscar en un módulo</label>
+      <input id="hoy-mod-in" type="text" autocomplete="off" placeholder="Un tema, una entidad, una empresa… (o déjalo vacío)"></div>
+      <div class="hoy-mod-grid" id="hoy-mod-grid"></div>`;
+    $('hoy-mod-in').addEventListener('input',modsPintar);
+  }
+  if(on){
+    const p=EMP_LIST.find(x=>x.k===EMP_ACTIVA), inp=$('hoy-mod-in');
+    if(inp&&!inp.dataset.tocado) inp.value=p?p.nombre:'';
+    if(inp) inp.oninput=()=>{ inp.dataset.tocado='1'; modsPintar(); };
+    modsPintar();
+  }
 }
 /* ══ Competidores del Sur ═════════════════════════════════════════════════
    Un perfil sin competencia deja el Sur vacío para siempre. Dos puertas: a
@@ -325,7 +369,8 @@ function hoySenales(){
     const txt=(HOY_L&&(HOY_L[HOY_RUMBO]||'')).trim();
     const ana=txt
       ? `<div class="hoy-ana"><div class="hoy-ana-t">Lo que dice el analista</div><p>${esc(txt)}</p></div>`
-      : (lista.length?`<div class="hoy-ana pend"><p>${HOY_L?'La lectura no trajo un análisis para este rumbo.':'El analista está escribiendo la lectura de este rumbo. Mientras tanto, la lista está abajo.'}</p></div>`:'');
+      : (lista.length?(HOY_L?'<div class="hoy-ana pend"><p>La lectura no trajo un análisis para este rumbo.</p></div>'
+          :'<div class="hoy-ana pend">'+mar(['El analista está leyendo este rumbo…','Cruzando las señales con la ficha…','Mientras tanto, la lista está abajo.'],{mini:true})+'</div>'):'');
     const ver=lista.length
       ? (HOY_VER||!txt
           ? '<div class="sig-list">'+lista.slice(0,10).map(hoySig).join('')+'</div>'
@@ -365,8 +410,9 @@ async function hoyCargar(ctx, opt={}){
   const mine=++hoyRev; hoyStop();
   HOY_CTX=ctx; HOY_L=null; if(!opt.mantener){ HOY_RUMBO=''; HOY_ACT=0; HOY_VER=false; }
   $('hoy').hidden=false;
-  $('hoy-estado').textContent='Cruzando el Estado, la competencia y la conversación…';
-  if(!opt.mantener){ $('hoy-lectura').replaceChildren(); $('hoy-rumbos').replaceChildren(); $('hoy-senales').replaceChildren(); }
+  $('hoy-estado').textContent='';
+  if(!opt.mantener){ $('hoy-lectura').replaceChildren(); $('hoy-rumbos').replaceChildren();
+    $('hoy-senales').innerHTML=mar(['Leyendo el Congreso y los reguladores…','Escuchando la prensa y las redes…','Buscando consultas abiertas y eventos…']); }
   let req;
   if(ctx.empresa){
     const p=ctx.empresa;
@@ -403,7 +449,7 @@ async function hoyCargar(ctx, opt={}){
   // 2 · el titular
   if(d.lectura&&!d.lectura.error) return hoyTitular(d.lectura);
   if(!d.lectura_key){ $('hoy-estado').textContent='Abre la Rosa completa para la lectura del analista.'; return; }
-  $('hoy-estado').textContent='Escribiendo la lectura del analista…';
+  $('hoy-estado').innerHTML=mar(['Escribiendo la lectura del analista…','Leyendo cada rumbo de la Rosa…','Ordenando lo que mueve la aguja…'],{mini:true});
   hoySondear(d.lectura_key, mine);
 }
 function hoySondear(key, mine){
@@ -468,7 +514,7 @@ async function init(){
   catch(e){$('status').textContent=e.status===401?'Inicia sesión para recuperar tu espacio.':e.message;$('welcome').hidden=e.status!==401;$('retry').hidden=e.status===401;}
 }
 $('tipo').addEventListener('change',organization);
-$('edit').onclick=()=>form(true);$('edit2').onclick=()=>form(true);$('mi-volver').onclick=()=>irEmpresa('');$('cancel').onclick=workspace;$('refresh').onclick=loadSector;$('retry').onclick=init;
+$('edit').onclick=()=>form(true);$('hoy-mods').onclick=()=>modsToggle();$('edit2').onclick=()=>form(true);$('mi-volver').onclick=()=>irEmpresa('');$('cancel').onclick=workspace;$('refresh').onclick=loadSector;$('retry').onclick=init;
 $('context-form').addEventListener('submit',async e=>{
   e.preventDefault();$('save').disabled=true;$('form-error').textContent='';
   try{state=await api('/caudal/cuenta',{tipo:$('tipo').value,organizacion:$('organizacion').value,sector:$('sector').value,rol:$('rol').value});workspace();$('context-title').tabIndex=-1;$('context-title').focus();}

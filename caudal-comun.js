@@ -116,6 +116,56 @@
     el.onclick=()=>{ window._ampliarEmp=!window._ampliarEmp; rerun(); };
   }
 
+  /* ── El cargador de Caudal: un mar con un barco que lo cruza ──────────────
+     Pedido de Ricardo (oct-26-2026): las lecturas tardan de 5 a 7 segundos y
+     un texto suelto que dice «cargando» se lee como página colgada. El barco
+     cruza en ~6,5 s y los tres mensajes rotan cada ~2,2 s, así que en una
+     espera normal se alcanza a ver el ciclo completo. Todo en CSS: no hay
+     temporizadores que limpiar cuando el contenido real reemplaza al cargador.
+     Con «reducir movimiento» queda quieto. Siempre tres mensajes: si llegan
+     menos se repite el último, porque la animación está hecha para tres. */
+  const MAR_CSS = `
+  .cau-mar{display:flex;flex-direction:column;align-items:center;gap:.55rem;padding:1.1rem 0 .6rem;color:var(--ink2,#4d5462)}
+  .cau-mar svg{width:min(320px,100%);height:auto;overflow:hidden;border-radius:0 0 10px 10px}
+  .cau-mar .cm-ola{fill:var(--teal-soft,rgba(152,192,248,.22));animation:cmOla 3.2s linear infinite}
+  .cau-mar .cm-cresta{fill:none;stroke:var(--teal,#3d6eb8);stroke-width:1.4;stroke-linecap:round;animation:cmOla 3.2s linear infinite}
+  .cau-mar .cm-ola.o2{fill:var(--teal-dim,rgba(152,192,248,.4));stroke:none;opacity:.55;animation-duration:5.4s;animation-direction:reverse}
+  .cau-mar .cm-barco{animation:cmCruza 6.5s linear infinite}
+  .cau-mar .cm-bob{animation:cmBob 1.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+  .cau-mar .cm-casco{fill:var(--ink,#14161c)} .cau-mar .cm-vela{fill:var(--teal,#3d6eb8)}
+  .cau-mar .cm-msgs{position:relative;height:1.3em;width:100%;font-size:.78rem;text-align:center}
+  .cau-mar .cm-msgs span{position:absolute;left:0;right:0;opacity:0;animation:cmMsg 6.6s linear infinite}
+  .cau-mar .cm-msgs span:nth-child(2){animation-delay:2.2s} .cau-mar .cm-msgs span:nth-child(3){animation-delay:4.4s}
+  .cau-mar.mini{flex-direction:row;padding:.2rem 0;gap:.7rem} .cau-mar.mini svg{width:110px}
+  .cau-mar.mini .cm-msgs{text-align:left;font-size:.76rem}
+  @keyframes cmOla{from{transform:translateX(0)}to{transform:translateX(-80px)}}
+  @keyframes cmCruza{from{transform:translateX(-40px)}to{transform:translateX(330px)}}
+  @keyframes cmBob{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(3px) rotate(4deg)}}
+  @keyframes cmMsg{0%{opacity:0;transform:translateY(4px)}5%,28%{opacity:1;transform:none}33%,100%{opacity:0;transform:translateY(-4px)}}
+  @media (prefers-reduced-motion:reduce){.cau-mar *{animation:none!important}.cau-mar .cm-barco{transform:translateX(150px)}.cau-mar .cm-msgs span:first-child{opacity:1}}`;
+  function marCss(){
+    if(document.getElementById('cau-mar-css')) return;
+    const st=document.createElement('style'); st.id='cau-mar-css'; st.textContent=MAR_CSS;
+    document.head.appendChild(st);
+  }
+  function mar(msgs, opt){
+    marCss();
+    const m=(Array.isArray(msgs)&&msgs.length?msgs:['Cargando…']).slice(0,3);
+    while(m.length<3) m.push(m[m.length-1]);
+    // una ola de periodo 80: el trazo mide 400 y se corre 80 por ciclo, sin costura
+    const cresta=y=>{ let d=`M-80 ${y}`; for(let x=-80;x<400;x+=80) d+=` q20 -7 40 0 t40 0`; return d; };
+    const ola=y=>cresta(y)+` V70 H-80 Z`;
+    return `<div class="cau-mar${opt&&opt.mini?' mini':''}" role="status" aria-live="polite">
+      <svg viewBox="0 0 320 70" aria-hidden="true">
+        <path class="cm-ola o2" d="${ola(44)}"/>
+        <g class="cm-barco"><g class="cm-bob">
+          <path class="cm-vela" d="M14 34 V14 L26 32 Z"/><path class="cm-vela" d="M12 34 V20 L5 33 Z" opacity=".6"/>
+          <path class="cm-casco" d="M2 35 H30 L25 41 H7 Z"/></g></g>
+        <path class="cm-ola" d="${ola(40)}"/><path class="cm-cresta" d="${cresta(40)}"/>
+      </svg>
+      <div class="cm-msgs">${m.map(t=>`<span>${esc(t)}</span>`).join('')}</div></div>`;
+  }
+
   /* Todo se publica en `window` porque así es como ya se consumía entre
      archivos: el código de las vistas usa estos nombres como identificador
      suelto (`esc(...)`, `listaConMuro(...)`) y resuelve contra el global. */
@@ -123,6 +173,6 @@
     esc, fmt, fmtCOP,
     CONTACTO_MAIL, COMPRA_URL, CORTE_LIBRE, mailtoHref, volverAqui,
     cortar, muroLista, listaConMuro, muroLectura,
-    empresaHint, wireEmpresaHint,
+    empresaHint, wireEmpresaHint, mar,
   });
 })();
