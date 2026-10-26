@@ -49,8 +49,8 @@
   .mi-emp-ficha h4:first-child{margin-top:0}
   .mi-emp-ficha p{font-size:.84rem; line-height:1.55; color:var(--ink2); margin:0}
   .mi-emp-ficha ul{margin:.2rem 0 0 1.1rem; padding:0; font-size:.82rem; line-height:1.5; color:var(--ink2)}
-  .mi-emp-cols{display:grid; grid-template-columns:1fr 1fr; gap:0 1.6rem}
-  .mi-emp-lineas{display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.3rem}
+  .mi-emp-cols{display:grid; grid-template-columns:1fr 1fr; gap:0 1.6rem; margin-top:1.4rem; padding-top:1.1rem; border-top:1px solid var(--border)}
+  .mi-emp-lineas{display:flex; flex-wrap:wrap; gap:.45rem; margin-top:.4rem}
   .mi-emp-lineas span{font-size:.7rem; padding:.28rem .6rem; border:1px solid var(--border2); border-radius:999px; color:var(--ink2)}
   .mi-emp-lineas span b{color:var(--teal); font-weight:600}
   .mi-emp-acts{display:flex; gap:.6rem; flex-wrap:wrap; margin-top:1rem}
@@ -72,6 +72,26 @@
   .hoy-titular{font-size:.92rem; line-height:1.55; color:var(--ink); margin:.7rem 0 .2rem}
   /* Los cuatro rumbos, con su conteo de 72 h. Sale del radar, no del modelo:
      se puede pintar en cuanto aterriza el radar, sin esperar la lectura. */
+  /* Encabezado en modo empresa: logo + nombre en el azul de Caudal */
+  #mi-h1.con-logo{display:flex; align-items:center; justify-content:center; gap:.9rem; flex-wrap:wrap}
+  .mi-h1-logo{width:64px; height:64px; border-radius:12px; background:#fff; border:1px solid var(--border); display:inline-flex; align-items:center; justify-content:center; overflow:hidden}
+  .mi-h1-logo img{max-width:86%; max-height:86%; object-fit:contain}
+  .mi-volver{margin-top:.8rem}
+  #hoy-rosa{text-decoration:none; display:inline-block; padding:.55rem 1rem; border-radius:7px; font-size:.8rem}
+  .mi-sec-acts{display:flex; gap:.5rem}
+  .mi-explorar{display:flex; align-items:center; justify-content:space-between; gap:1.2rem; flex-wrap:wrap;
+    background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1rem 1.2rem; margin:0 0 1.6rem}
+  .mi-explorar .btn-t{text-decoration:none; padding:.6rem 1.1rem; border-radius:7px; font-size:.82rem; white-space:nowrap}
+  /* Los rumbos se tocan: filtran las señales de abajo */
+  .hoy-r{cursor:none; transition:.15s; position:relative}
+  .hoy-r:hover{border-color:var(--teal)}
+  .hoy-r.on{border-color:var(--teal); box-shadow:0 0 0 1px var(--teal)}
+  .hoy-r-act{margin-top:.45rem; font:inherit; font-size:.68rem; font-weight:700; padding:.3rem .65rem; border-radius:6px; border:none; background:var(--teal); color:#fff; cursor:none}
+  .hoy-r-act:disabled{opacity:.6}
+  .hoy-sel{display:flex; align-items:center; justify-content:space-between; gap:.8rem; flex-wrap:wrap; margin:0 0 .6rem}
+  .hoy-sel-t{font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink3)}
+  .hoy-vacio{border:1px dashed var(--border2); border-radius:8px; padding:1rem 1.1rem; font-size:.84rem; line-height:1.55; color:var(--ink2)}
+  .hoy-vacio .btn-t{margin-top:.7rem}
   .hoy-rumbos{display:grid; grid-template-columns:repeat(4,1fr); gap:.6rem; margin:1rem 0 .2rem}
   .hoy-r{border:1px solid var(--border); border-radius:8px; padding:.6rem .7rem; background:var(--card2)}
   .hoy-r.mov{border-color:var(--teal-dim); background:var(--teal-soft)}
@@ -84,7 +104,6 @@
   .hoy-r.mov .hoy-r-n{color:var(--ink); font-weight:600}
   @media(max-width:640px){ .hoy-rumbos{grid-template-columns:repeat(2,1fr)} }
   /* El selector de cliente: solo aparece con más de uno. */
-  .hoy-clientes{margin:.9rem 0 0; justify-content:flex-start}
 
   /* El formulario: dos columnas que se apilan en móvil. */
   .mi-grid{display:grid; grid-template-columns:1fr 1fr; gap:.9rem; margin-top:.9rem}
@@ -123,7 +142,8 @@
 
   <main class="wrap" id="app" tabindex="-1" hidden>
     <div class="hero">
-      <h1>Mi <em>Caudal</em>.</h1>
+      <h1 id="mi-h1">Mi <em>Caudal</em>.</h1>
+      <button class="btn-g mi-volver" id="mi-volver" type="button" hidden>Volver a Mi Caudal</button>
       <p id="status" role="status">Comprobando tu sesión…</p>
     </div>
 
@@ -134,7 +154,7 @@
         <div class="t">Guarda tu organización, sector y rol una vez y retoma el contexto
           cada vez que entres. La cuenta gratuita abre el contexto de tu sector; el
           acceso personalizado incorpora las prioridades de tu organización.</div>
-        <a class="muro-btn" href="register.html?next=caudal-mi.html">Crear mi cuenta →</a>
+        <a class="muro-btn" href="register.html?next=caudal-mi.html">Crear mi cuenta</a>
         <a class="muro-btn" style="background:transparent;color:var(--ink2);border-color:var(--border2)"
            href="login.html?next=caudal-mi.html">Ya tengo cuenta</a>
       </div>
@@ -187,23 +207,13 @@
       <section class="hoy" id="hoy" hidden>
         <div class="hoy-head">
           <div class="hoy-t">Hoy para <em id="hoy-cliente"></em></div>
-          <a class="btn-g" id="hoy-rosa" href="caudal.html#cliente">Abrir la Rosa completa →</a>
+          <a class="btn-t" id="hoy-rosa" href="caudal.html#cliente">Abrir la Rosa completa</a>
         </div>
         <div class="cob-note" id="hoy-estado" style="margin:.5rem 0 0"></div>
         <div id="hoy-lectura"></div>
         <div class="hoy-rumbos" id="hoy-rumbos"></div>
         <div id="hoy-senales" style="margin-top:1rem"></div>
-        <div class="chips hoy-clientes" id="hoy-clientes"></div>
       </section>
-
-      <div class="mi-ctx">
-        <div>
-          <div class="pf-wizard-step" id="level"></div>
-          <div class="mi-ctx-t" id="context-title" tabindex="-1"></div>
-          <div class="mi-ctx-d" id="context-copy"></div>
-        </div>
-        <button class="btn-g" id="edit" type="button">Editar mis datos</button>
-      </div>
 
       <!-- Empresas disponibles: perfiles de cliente real que vienen del motor
            (SECTORES_CLIENTE con cliente:true). Se pintan solo para el equipo,
@@ -212,22 +222,35 @@
       <section id="empresas" hidden>
         <div class="cli-sub"><span class="cs-n">◈</span> Empresas disponibles</div>
         <div class="cob-note" style="margin:0 0 .2rem">Perfiles de cliente ya armados en Caudal: qué hace cada
-          empresa, por dónde le llega la regulación y qué decide con esto. Abre uno para ver su ficha y su radar.</div>
+          empresa, por dónde le llega la regulación y qué decide con esto. Abre una para ver su ficha y su resumen del día.</div>
         <div id="empresas-grid" class="mi-emp-grid"></div>
       </section>
 
-      <section id="company" hidden>
-        <div class="cli-sub"><span class="cs-n">◈</span> Tus organizaciones</div>
-        <div class="cob-note" style="margin:0 0 .2rem">Abre un perfil para consultar su radar,
-          su lectura y su plan de acción. Cada perfil conserva sus propias prioridades.</div>
-        <div id="profiles" class="mi-perfiles"></div>
-        <a class="text-link" href="caudal.html#cliente">Crear o administrar perfiles →</a>
+      <!-- Explorar una organización que NO es cliente: competidor, aliado o
+           contraparte. Lleva a caudal-explorar.html (diccionario + resumen +
+           Rosa o cualquiera de los diez módulos). -->
+      <section class="mi-explorar" id="explorar" hidden>
+        <div>
+          <div class="cli-sub" style="margin:0"><span class="cs-n">◈</span> Explorar otra organización</div>
+          <div class="cob-note" style="margin:.35rem 0 0">Un competidor, un aliado o una contraparte que no es tu cliente: búscala
+            en el diccionario de Caudal, mira su resumen y abre su Rosa de los Vientos o cualquiera de los diez módulos.</div>
+        </div>
+        <a class="btn-t" href="caudal-explorar.html">Explorar una organización</a>
       </section>
 
-      <section aria-labelledby="sector-title">
+      <div class="mi-ctx" id="mi-ctx">
+        <div>
+          <div class="pf-wizard-step" id="level"></div>
+          <div class="mi-ctx-t" id="context-title" tabindex="-1"></div>
+          <div class="mi-ctx-d" id="context-copy"></div>
+        </div>
+        <button class="btn-g" id="edit" type="button">Editar mis datos</button>
+      </div>
+
+      <section id="mi-sector" aria-labelledby="sector-title">
         <div class="cli-sub mi-sec-head">
           <span><span class="cs-n">◈</span> <span id="sector-title"></span></span>
-          <button class="btn-g" id="refresh" type="button">Actualizar</button>
+          <span class="mi-sec-acts"><button class="btn-g" id="edit2" type="button" hidden>Editar mis datos</button><button class="btn-g" id="refresh" type="button">Actualizar</button></span>
         </div>
         <div class="cob-note" id="sector-status" role="status" style="margin:0 0 .6rem"></div>
         <div class="kpis mi-kpis" id="metrics"></div>
@@ -241,7 +264,7 @@
           <div class="t">El acceso personalizado cruza tu actividad, tus prioridades y tu
             competencia para explicar qué te afecta y qué conviene hacer, con la lectura
             firmada por un analista.</div>
-          <a class="muro-btn" href="caudal-pricing.html">Conocer el acceso personalizado →</a>
+          <a class="muro-btn" href="caudal-pricing.html">Conocer el acceso personalizado</a>
         </div>
       </section>
     </div>
@@ -261,7 +284,7 @@
      caudal.html y caudal-contratacion.html, que cargan los mismos archivos. -->
 <script src="caudal-comun.js?v=20260907"></script>
 <script src="caudal-base.js?v=20261025"></script>
-<script src="caudal-mi.js?v=20261026"></script>
+<script src="caudal-mi.js?v=20261026b"></script>
 <script>
 (function(){
   'use strict';

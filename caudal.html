@@ -426,9 +426,9 @@
      ⚠️ Al tocar cualquiera hay que bumpear su ?v= en las DOS páginas. -->
 <script src="caudal-pilares.js?v=20260921a"></script>
 <script src="caudal-contratacion.js?v=20260907"></script>
-<script src="caudal-cliente.js?v=20261026"></script>
+<script src="caudal-cliente.js?v=20261026b"></script>
 <script src="caudal-votos.js?v=20260907"></script>
-<script src="caudal-intro.js?v=20261009c"></script>
+<script src="caudal-intro.js?v=20261026"></script>
 <script>
 (function(){
   'use strict';
@@ -1448,6 +1448,19 @@
     });
   }
 
+  /* Abre un pilar con la búsqueda ya hecha. Es el mismo salto que usa la
+     búsqueda universal (wireUniTab), extendido a Control y Gacetas. */
+  function abrirPilarConQuery(k, query){
+    if(!query) return;
+    if(k==='congreso'){ showView('congreso'); q.value=query; buscar(); }
+    else if(k==='regulatorio'){ showView('regulatorio'); const e=document.getElementById('rq'); if(e)e.value=query; REG.q=query; regBuscar(); }
+    else if(k==='ejecutivo'){ showView('ejecutivo'); const e=document.getElementById('eq'); if(e)e.value=query; EJE.q=query; ejeBuscar(); }
+    else if(k==='medios'){ showView('medios'); const e=document.getElementById('mq'); if(e)e.value=query; MED.q=query; medBuscar(); }
+    else if(k==='sucop'){ showView('sucop'); const e=document.getElementById('sq'); if(e)e.value=query; SUC.q=query; SUC.estado=''; sucSyncEstados(); sucBuscar(); }
+    else if(k==='control'){ showView('control'); const e=document.getElementById('ctrlq'), b=document.getElementById('ctrlgo'); if(e)e.value=query; if(b) setTimeout(()=>b.click(),0); }
+    else if(k==='gacetas'){ showView('gacetas'); const e=document.getElementById('gq'), b=document.getElementById('ggo'); if(e)e.value=query; if(b) setTimeout(()=>b.click(),0); }
+  }
+
   function initHome(){
     renderPillars();
     regInit();
@@ -1476,6 +1489,9 @@
     if(typeof window.introInit==='function') window.introInit();
     const temaInicial=(new URLSearchParams(location.search).get('tema')||'').trim();
     if(temaInicial) uniSearch(temaInicial);
+    // ?q=<texto>#<pilar>: llega desde «Explorar una organización» (caudal-explorar.html)
+    const qInicial=(new URLSearchParams(location.search).get('q')||'').trim();
+    if(qInicial && initialView) abrirPilarConQuery(initialView, qInicial);
     const uq=document.getElementById('uq'), ugo=document.getElementById('ugo');
     const goUni=()=>{ const v=(uq&&uq.value||'').trim(); if(v) uniSearch(v); };
     if(ugo) ugo.onclick=goUni;

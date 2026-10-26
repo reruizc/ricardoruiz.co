@@ -137,6 +137,15 @@
       // solo si la cuenta es del equipo, igual que sus chips).
       const sk=(new URLSearchParams(location.search).get('sector')||'').trim();
       if(sk && (CLI_SECS.some(x=>x[0]===sk) || (esEquipo()&&CLI_CLIENTES.some(x=>x[0]===sk)))) setTimeout(()=>cliLoad({sector:sk}),0);
+      // ?empresa=<k>&n=<nombre> (desde «Explorar una organización»): radar de una
+      // empresa del diccionario sin guardarla como perfil. La llave basta: el
+      // motor la traduce a sus temas del Congreso y la busca por identidad en
+      // Regulatorio, prensa y SECOP.
+      const ek=(new URLSearchParams(location.search).get('empresa')||'').trim().toLowerCase();
+      if(ek && /^[a-z0-9]+$/.test(ek)){
+        const en=(new URLSearchParams(location.search).get('n')||ek).trim().slice(0,80);
+        setTimeout(()=>cliLoad({perfil:{nombre:en, empresas:[ek], temas:[]}}),0);
+      }
       const drill=document.createElement('details');
       drill.className='sec-drill';
       // El latido se apaga la primera vez que alguien lo abre, y no vuelve:
@@ -298,7 +307,7 @@
   async function pfAutoAbrir(){
     // ?sector=<k> (desde Mi Caudal · Empresas disponibles) manda sobre el último
     // perfil: quien llegó pidiendo DiDi no quiere aterrizar en Cauce.
-    if(new URLSearchParams(location.search).get('sector')) return false;
+    { const u=new URLSearchParams(location.search); if(u.get('sector')||u.get('empresa')) return false; }
     if(!PF_LIST.length) return false;
     const pedido=new URLSearchParams(location.search).get('perfil');
     if(pedido&&!PF_LIST.some(p=>p.perfilId===pedido)){

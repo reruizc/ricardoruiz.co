@@ -36,7 +36,9 @@ LOGOS = os.path.join(ROOT, 'Bases de datos', 'caudal-logos', 'logos')
 
 # Los presets que se ofrecen a cualquiera. DiDi, Binance y Cauce son clientes
 # con nombre y solo los ve el equipo: no van en la pregunta de entrada.
-PRIVADOS = {'didi', 'binance', 'cauce'}
+# Se deriva de la marca `cliente` y no de una lista a mano: con la lista,
+# Comfama (oct-2026) se coló como sector público en la pregunta de entrada.
+PRIVADOS = {s['k'] for s in C.SECTORES_CLIENTE if s.get('cliente')} | {'cauce'}
 
 # Tópico del tesauro → sector(es) de Caudal. Lo que no tiene un sector propio
 # (tributario, víctimas, propiedad intelectual…) atraviesa a todos y no

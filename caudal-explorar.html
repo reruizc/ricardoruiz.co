@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Explorar una organización · Caudal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+<link href="caudal-base.css?v=20261009b" rel="stylesheet" />
+<link rel="stylesheet" href="caudal-ui.css?v=20261009e" />
+<style>
+  /* ===== Explorar una organización ===============================
+     Un competidor, un aliado o una contraparte que NO es cliente: se busca
+     en el diccionario (caudal-empresas.json), se resume con el mismo radar
+     de la Rosa (sin lectura del modelo: es una consulta rápida) y se ofrece
+     abrir su Rosa o cualquiera de los diez módulos con la búsqueda hecha. */
+  .ex-search{position:relative}
+  .ex-sug{position:absolute; top:calc(100% + .35rem); left:0; right:0; z-index:30; list-style:none; margin:0; padding:.35rem;
+    background:var(--card); border:1px solid var(--border2); border-radius:8px; box-shadow:0 10px 30px rgba(0,0,0,.12); text-align:left}
+  .ex-sug li{display:flex; align-items:center; gap:.7rem; padding:.5rem .6rem; border-radius:6px; cursor:none}
+  .ex-sug li.on,.ex-sug li:hover{background:var(--teal-soft)}
+  .ex-sug-n{font-size:.88rem; color:var(--ink)}
+  .ex-sug-s{font-size:.66rem; color:var(--ink3); margin-left:auto; white-space:nowrap}
+  .ex-logo{width:40px; height:40px; flex:0 0 40px; border-radius:8px; background:#fff; border:1px solid var(--border);
+    display:inline-flex; align-items:center; justify-content:center; overflow:hidden; font-size:.78rem; font-weight:700; color:var(--teal)}
+  .ex-logo img{max-width:86%; max-height:86%; object-fit:contain}
+  .ex-logo.ini{background:var(--teal-soft); border-color:transparent}
+  .ex-logo.xl{width:72px; height:72px; flex-basis:72px; border-radius:14px; font-size:1.2rem}
+  .ex-card{background:var(--card); border:1px solid var(--border); border-left:3px solid var(--teal); border-radius:10px; padding:1.3rem 1.4rem; margin:1.6rem 0 1.8rem}
+  .ex-head{display:flex; align-items:center; gap:1rem; flex-wrap:wrap}
+  .ex-nom{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-weight:800; font-size:1.6rem; letter-spacing:-.02em; line-height:1.1}
+  .ex-nom em{font-style:normal; color:var(--teal)}
+  .ex-tags{display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.45rem}
+  .ex-tags span{font-size:.68rem; padding:.24rem .6rem; border:1px solid var(--border2); border-radius:999px; color:var(--ink2)}
+  .ex-head .btn-t{margin-left:auto; text-decoration:none; padding:.6rem 1.1rem; border-radius:7px; font-size:.82rem}
+  .ex-rumbos{display:grid; grid-template-columns:repeat(4,1fr); gap:.6rem; margin:1.2rem 0 1rem}
+  .ex-r{border:1px solid var(--border); border-radius:8px; padding:.6rem .7rem; background:var(--card2)}
+  .ex-r-l{font-size:.58rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3)}
+  .ex-r-l b{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-size:.95rem; color:var(--ink); margin-right:.3rem; letter-spacing:0}
+  .ex-r-n{font-size:.76rem; color:var(--ink2); margin-top:.3rem}
+  .ex-kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:.6rem; margin:0 0 1rem}
+  .ex-kpis .kpi{padding:.8rem .9rem}
+  .ex-mods{display:grid; grid-template-columns:repeat(5,1fr); gap:.7rem; margin:.9rem 0 2rem}
+  .ex-mod{position:relative; display:flex; flex-direction:column; justify-content:flex-end; min-height:150px; border-radius:10px; overflow:hidden;
+    text-decoration:none; color:#f4f4f4; background:#1b2430 center/cover no-repeat; border:1px solid var(--border); transition:.15s}
+  .ex-mod::before{content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(10,14,22,.15),rgba(10,14,22,.85))}
+  .ex-mod:hover{transform:translateY(-2px); border-color:var(--teal)}
+  .ex-mod span{position:relative; padding:0 .8rem}
+  .ex-mod-n{font-weight:700; font-size:.8rem; line-height:1.25}
+  .ex-mod-q{font-size:.64rem; color:rgba(240,240,240,.78); padding-bottom:.8rem !important; margin-top:.25rem}
+  .ex-mod.soon{opacity:.75}
+  .ex-nodicc{border:1px dashed var(--border2); border-radius:8px; padding:.9rem 1rem; font-size:.84rem; color:var(--ink2); line-height:1.55; margin:1.4rem 0}
+  @media(max-width:900px){ .ex-mods{grid-template-columns:repeat(3,1fr)} }
+  @media(max-width:640px){ .ex-mods{grid-template-columns:repeat(2,1fr)} .ex-rumbos,.ex-kpis{grid-template-columns:repeat(2,1fr)} .ex-head .btn-t{margin-left:0} }
+</style>
+</head>
+<body class="caudal-app">
+  <a class="skip-link" href="#app">Saltar al contenido</a>
+  <div class="cur" id="cur"></div><div class="cur-ring" id="curRing"></div>
+
+  <div class="gate" id="gate">
+    <div class="gate-text">Cargando</div>
+    <div class="gate-bar"></div>
+  </div>
+
+  <nav id="topNav" hidden>
+    <div class="e-nav-left">
+      <a href="caudal.html" class="e-btn-back" id="navBack">← Caudal</a>
+    </div>
+    <div class="cobrand-cluster">
+      <img class="cobrand" src="caudalxcauce.png" alt="Caudal × Cauce · navegar la complejidad" />
+      <div class="poweredby">
+        <span class="pb-txt">powered by</span>
+        <a href="index.html" class="logo-link">
+          <div class="logo-bars">
+            <div class="logo-bar" style="height:15px"></div>
+            <div class="logo-bar" style="height:11px"></div>
+            <div class="logo-bar" style="height:7px"></div>
+            <div class="logo-bar" style="height:3px"></div>
+          </div>
+          <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="wrap" id="app" tabindex="-1" hidden>
+    <div class="hero">
+      <h1>Explora otra <em>organización</em>.</h1>
+      <p>Un competidor, un aliado o una contraparte que no es tu cliente. Escribe el nombre:
+         Caudal la busca en su diccionario de empresas y gremios, te resume lo que el Estado,
+         la prensa y la contratación pública dicen de ella, y te deja abrir su Rosa de los
+         Vientos o ir directo a cualquiera de los diez módulos.</p>
+      <div class="search ex-search">
+        <input id="exq" type="text" placeholder="Ecopetrol, Rappi, Comfenalco, Asobancaria…" autocomplete="off"
+               role="combobox" aria-expanded="false" aria-controls="exsug" aria-autocomplete="list" />
+        <button id="exgo" type="button">Buscar</button>
+        <ul id="exsug" class="ex-sug" role="listbox" hidden></ul>
+      </div>
+      <p class="cob-note" id="ex-estado" role="status" style="margin-top:.8rem"></p>
+    </div>
+
+    <section id="ex-res" hidden>
+      <div class="ex-card" id="ex-card"></div>
+      <div class="cli-sub"><span class="cs-n">◈</span> <span id="ex-mods-t">Búscala en un módulo</span></div>
+      <div class="cob-note" style="margin:0">Cada módulo se abre con la búsqueda ya hecha.</div>
+      <div class="ex-mods" id="ex-mods"></div>
+    </section>
+
+    <div class="foot">
+      Caudal · una alianza entre <a href="index.html">RicardoRuiz.co</a> (tecnología y automatización)
+      y <a href="https://cauce.co/" target="_blank" rel="noopener">Cauce</a> (asesoría en asuntos
+      públicos y regulatorios).<br />
+      Análisis asistido por IA sobre datos oficiales. Borrador; el criterio experto es del analista.
+    </div>
+  </main>
+
+<!-- Mismo orden que caudal-mi.html: común → shell → página. -->
+<script src="caudal-comun.js?v=20260907"></script>
+<script src="caudal-base.js?v=20261025"></script>
+<script>
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const DATA_URL='caudal-empresas.json?v=20261026';
+  let DATA=null, IDX=[], SUG=[], SUG_I=-1, ACTUAL=null, REV=0;
+  const norm=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9& ]+/g,' ').replace(/\s+/g,' ').trim();
+
+  /* Los diez módulos, en el orden de la portada. `q` arma el destino con la
+     búsqueda hecha (caudal.html entiende ?q=<texto>#<pilar>); Territorial
+     todavía no busca y abre su vista de avance. */
+  const MODS=[
+    {id:'congreso',    n:'Congreso y órgano legislativo',       q:t=>'caudal.html?q='+t+'#congreso'},
+    {id:'regulatorio', n:'Superintendencias y comisiones',      q:t=>'caudal.html?q='+t+'#regulatorio'},
+    {id:'medios',      n:'Medios nacionales y regionales',      q:t=>'caudal-medios.html?q='+t},
+    {id:'datos',       n:'Datos abiertos y contratación',       q:t=>'caudal-contratacion.html?q='+t},
+    {id:'control',     n:'Órganos de control y altas cortes',   q:t=>'caudal.html?q='+t+'#control'},
+    {id:'ejecutivo',   n:'Ejecutivo nacional · Presidencia',    q:t=>'caudal.html?q='+t+'#ejecutivo'},
+    {id:'sucop',       n:'Consulta pública de normas · SUCOP',  q:t=>'caudal.html?q='+t+'#sucop'},
+    {id:'gacetas',     n:'Diarios y gacetas oficiales',         q:t=>'caudal.html?q='+t+'#gacetas'},
+    {id:'territorial', n:'Entidades territoriales',             q:()=>'caudal.html#territorial', soon:true},
+    {id:'redes',       n:'Redes sociales oficiales y voceros',  q:t=>'caudal-voceros.html?q='+t},
+  ];
+  // En el radar de UNA empresa, lo que la nombra cae en el Sur (el motor lo
+  // trata como vigilada): acá se rotula por lo que es.
+  const RUMBOS=[['norte','N','Norte','oportunidades'],['este','E','Oriente','conversación'],['sur','S','Sur','con su nombre'],['oeste','W','Occidente','el Estado']];
+
+  function logo(e,cls){
+    const ini=(e.n||'?').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    if(!(e.l&&DATA&&DATA.logos)) return `<span class="ex-logo ini ${cls||''}">${esc(ini)}</span>`;
+    return `<span class="ex-logo ${cls||''}"><img src="${DATA.logos}${encodeURIComponent(e.k)}.png" alt="" loading="lazy"
+      onerror="this.parentNode.classList.add('ini');this.replaceWith(document.createTextNode('${esc(ini)}'))"></span>`;
+  }
+  const secNom=k=>{ const s=(DATA&&DATA.sectores||[]).find(x=>x.k===k); return s?s.n:''; };
+
+  async function cargar(){
+    try{ const r=await fetch(DATA_URL); DATA=await r.json(); }
+    catch(e){ $('ex-estado').textContent='No pudimos cargar el diccionario de empresas. Recarga la página.'; return; }
+    IDX=(DATA.empresas||[]).map(e=>({e, nn:norm(e.n), al:(e.a||[]).map(norm)}));
+    const k=(new URLSearchParams(location.search).get('e')||'').trim();
+    const t=(new URLSearchParams(location.search).get('t')||'').trim();
+    const e=k&&IDX.find(x=>x.e.k===k);
+    if(e) elegir(e.e,{sinUrl:true});
+    else if(t){ $('exq').value=t; sinDiccionario(t,{sinUrl:true}); }
+    else $('exq').focus();
+  }
+
+  /* Coincidencia: primero lo que EMPIEZA por lo escrito (nombre o alias),
+     después lo que lo contiene. Es la misma lógica de la pregunta de entrada. */
+  function buscarEn(q){
+    const qn=norm(q); if(!qn) return [];
+    const ini=[], con=[];
+    for(const x of IDX){
+      const todo=[x.nn,...x.al];
+      if(todo.some(s=>s.startsWith(qn)||s.includes(' '+qn))) ini.push(x.e);
+      else if(todo.some(s=>s.includes(qn))) con.push(x.e);
+      if(ini.length>=8) break;
+    }
+    return ini.concat(con).slice(0,8);
+  }
+  function pintarSug(){
+    const ul=$('exsug'), inp=$('exq');
+    ul.hidden=!SUG.length; inp.setAttribute('aria-expanded',String(!!SUG.length));
+    ul.innerHTML=SUG.map((e,i)=>`<li role="option" id="exs${i}" data-i="${i}" class="${i===SUG_I?'on':''}" aria-selected="${i===SUG_I}">
+      ${logo(e)}<span class="ex-sug-n">${esc(e.n)}</span><span class="ex-sug-s">${esc((e.x||[]).map(secNom).filter(Boolean).slice(0,2).join(' · '))}</span></li>`).join('');
+    ul.querySelectorAll('li').forEach(li=>li.onmousedown=ev=>{ ev.preventDefault(); elegir(SUG[+li.dataset.i]); });
+  }
+  function enviar(){
+    const q=$('exq').value.trim(); if(!q) return;
+    if(SUG_I>=0&&SUG[SUG_I]) return elegir(SUG[SUG_I]);
+    const r=buscarEn(q), qn=norm(q);
+    const exacta=r.find(e=>norm(e.n)===qn||(e.a||[]).some(a=>norm(a)===qn));
+    if(exacta) return elegir(exacta);
+    if(r.length===1) return elegir(r[0]);
+    if(r.length){ SUG=r; SUG_I=0; pintarSug(); $('ex-estado').textContent='Hay varias coincidencias: escoge una.'; return; }
+    sinDiccionario(q);
+  }
+  function url(params){
+    const u=new URL(location.href); ['e','t'].forEach(k=>u.searchParams.delete(k));
+    Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));
+    history.replaceState(null,'',u.pathname+u.search);
+  }
+
+  function pintarMods(texto, conRosa){
+    const t=encodeURIComponent(texto);
+    $('ex-mods-t').textContent=`Busca «${texto}» en un módulo`;
+    $('ex-mods').innerHTML=MODS.map(m=>`<a class="ex-mod${m.soon?' soon':''}" href="${m.q(t)}" style="background-image:url('imagenes/caudal-${m.id}.jpg')">
+      <span class="ex-mod-n">${esc(m.n)}</span>
+      <span class="ex-mod-q">${m.soon?'En construcción · ver el avance':'Buscar «'+esc(texto)+'»'}</span></a>`).join('');
+  }
+
+  // Lo escrito no está en el diccionario: igual se puede buscar como texto en
+  // los módulos, pero no hay Rosa (la Rosa necesita la llave de la empresa).
+  function sinDiccionario(q,opt={}){
+    ACTUAL=null; SUG=[]; pintarSug();
+    if(!opt.sinUrl) url({t:q});
+    $('ex-estado').textContent='';
+    $('ex-res').hidden=false;
+    $('ex-card').innerHTML=`<div class="ex-nodicc"><b>«${esc(q)}» no está en el diccionario de Caudal.</b> Igual puedes buscarla como texto
+      en cualquiera de los módulos de abajo. Para abrir su Rosa de los Vientos hace falta que esté en el diccionario:
+      escríbenos y la agregamos con sus temas y su razón social.</div>`;
+    pintarMods(q,false);
+  }
+
+  function elegir(e,opt={}){
+    ACTUAL=e; SUG=[]; SUG_I=-1; pintarSug();
+    $('exq').value=e.n; $('ex-estado').textContent='';
+    if(!opt.sinUrl) url({e:e.k});
+    document.title=`${e.n} · Explorar · Caudal`;
+    const secs=(e.x||[]).map(secNom).filter(Boolean);
+    const rosa='caudal.html?empresa='+encodeURIComponent(e.k)+'&n='+encodeURIComponent(e.n)+'#cliente';
+    $('ex-res').hidden=false;
+    $('ex-card').innerHTML=`<div class="ex-head">${logo(e,'xl')}
+        <div><div class="ex-nom"><em>${esc(e.n)}</em></div>
+          <div class="ex-tags">${secs.map(s=>`<span>${esc(s)}</span>`).join('')}${(e.a||[]).slice(0,2).map(a=>`<span>también «${esc(a)}»</span>`).join('')}</div></div>
+        <a class="btn-t" href="${rosa}">Abrir su Rosa de los Vientos</a></div>
+      <div id="ex-resumen"><div class="llm-load" style="padding:1.4rem 0 .4rem">Cruzando el Estado, la prensa y la contratación <span class="dots"><span></span><span></span><span></span></span></div></div>`;
+    pintarMods(e.n,true);
+    resumen(e);
+  }
+
+  /* El resumen es el mismo radar de la Rosa, pedido para un perfil de una sola
+     empresa y SIN lectura del modelo: tarda segundos, no minutos, y no gasta. */
+  async function resumen(e){
+    const mine=++REV, box=()=>$('ex-resumen');
+    if(!window.HAS_SESSION){
+      box().innerHTML='<div class="cob-note" style="margin-top:1rem">Entra con tu cuenta para ver el resumen de esta organización. Los módulos de abajo sí están abiertos.</div>';
+      return;
+    }
+    let d;
+    try{ d=await call({action:'cliente',lectura:false,perfil:{nombre:e.n,empresas:[e.k],temas:[]}}); }
+    catch(err){ if(mine===REV) box().innerHTML='<div class="cob-note" style="margin-top:1rem">No se pudo armar el resumen. Los módulos de abajo siguen disponibles.</div>'; return; }
+    if(mine!==REV) return;
+    if(!d||d.error){ box().innerHTML=`<div class="cob-note" style="margin-top:1rem">${esc((d&&d.error)||'No se pudo armar el resumen.')}</div>`; return; }
+    const k=d.kpis||{}, cc=k.cardinales||{}, md=k.mov_dias||3;
+    const rumbos=RUMBOS.map(([key,l,nom,que])=>{ const c=cc[key]||{}, mov=c.mov||0, tot=c.total||0;
+      return `<div class="ex-r"><div class="ex-r-l"><b>${l}</b>${esc(nom)} · ${esc(que)}</div>
+        <div class="ex-r-n">${mov?`${mov} en ${md*24} h · `:''}${tot?`${tot} señal${tot>1?'es':''}`:'sin señales'}</div></div>`; }).join('');
+    const kp=[[k.n_proyectos_sector,'proyectos del Congreso sobre su actividad'],[k.n_senales_vigiladas,'señales con su nombre propio'],
+              [k.n_contratos_vigiladas,'contratos con el Estado'],[k.n_radar,'señales en el radar']];
+    const ORD={alto:0,medio:1,bajo:2}, NIV={alto:'alta',medio:'media',bajo:'baja'};
+    const grupos=[['Congreso',d.congreso],['Regulatorio',d.regulatorio],['Medios',d.medios],['Contratación',d.contratacion]];
+    const todas=grupos.flatMap(([src,it])=>(Array.isArray(it)?it:[]).map(x=>({...x,source:src})))
+      .sort((a,b)=>(b.vigilada?1:0)-(a.vigilada?1:0)||(b.mov?1:0)-(a.mov?1:0)||(ORD[a.nivel]??3)-(ORD[b.nivel]??3));
+    const sig=todas.slice(0,5).map(x=>{ const u=x.url&&/^https?:/.test(x.url)?x.url:'', t=esc(x.titulo||x.objeto||x.motivo||x.descripcion||'Señal'), n=NIV[x.nivel]?x.nivel:'bajo';
+      return `<div class="sig ${n}"><span class="sig-lvl">${NIV[n]}</span><div class="sig-body"><div class="sig-title">${u?`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${t}</a>`:t}</div>
+        <div class="sig-tags"><span>${esc(x.source)}</span>${x.fecha?`<span>· ${esc(String(x.fecha).slice(0,10))}</span>`:''}${x.vigilada?'<span>· la nombra</span>':''}</div></div></div>`; }).join('');
+    box().innerHTML=`<div class="ex-rumbos">${rumbos}</div>
+      <div class="ex-kpis">${kp.map(([n,l])=>`<div class="kpi"><div class="n">${Number.isFinite(n)?fmt(n):'—'}</div><div class="l">${esc(l)}</div></div>`).join('')}</div>
+      ${sig?`<div class="sig-list">${sig}</div>`:'<div class="cob-note">Ninguna fuente de Caudal trae hoy señales sobre esta organización.</div>'}
+      <div class="cob-note" style="margin-top:.8rem">Resumen sin lectura del analista. La Rosa completa trae la lectura, el expediente y las alertas.</div>`;
+  }
+
+  function wire(){
+    const inp=$('exq');
+    let t=null;
+    inp.addEventListener('input',()=>{ clearTimeout(t); t=setTimeout(()=>{ SUG=buscarEn(inp.value); SUG_I=-1; pintarSug(); },90); });
+    inp.addEventListener('keydown',ev=>{
+      if(ev.key==='ArrowDown'&&SUG.length){ ev.preventDefault(); SUG_I=(SUG_I+1)%SUG.length; pintarSug(); }
+      else if(ev.key==='ArrowUp'&&SUG.length){ ev.preventDefault(); SUG_I=(SUG_I-1+SUG.length)%SUG.length; pintarSug(); }
+      else if(ev.key==='Enter'){ ev.preventDefault(); enviar(); }
+      else if(ev.key==='Escape'){ SUG=[]; pintarSug(); }
+    });
+    inp.addEventListener('blur',()=>setTimeout(()=>{ SUG=[]; pintarSug(); },120));
+    $('exgo').onclick=enviar;
+  }
+
+  window.CAUDAL_BACK={txt:'← Mi Caudal', href:'caudal-mi.html'};
+  window.initHome=function(){ wire(); cargar(); };
+  window.loadStats=function(){ /* sin mortandad del Congreso acá */ };
+  window.pfLoadList=function(){};
+  queueMicrotask(reveal);
+})();
+</script>
+</body>
+</html>
