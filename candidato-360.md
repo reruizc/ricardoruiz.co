@@ -480,8 +480,9 @@ flecha y con la letra más grande (nombre 25 px, fecha 14,5 px). Al elegir país
 título del siguiente paso; al volver regresa al país elegido. La carga inicial
 recordada no roba el foco.
 
-Candi tiene un espacio en el flujo de la portada (`#candiBienvenida`), junto a
-la bienvenida en escritorio y antes del selector en móvil. `ubicarEnPortada()`
+Candi tiene un espacio en el flujo de la portada (`#candiBienvenida`), en el
+saludo que sigue al país; desde el 25-oct-2026 no aparece en la pregunta del
+punto de partida ni en la búsqueda del nombre. `ubicarEnPortada()`
 mueve el mismo dock: abrir el chat o salir de la portada lo devuelve a `body`;
 cerrarlo o volver lo trae al espacio reservado. Su paseo del hueso se desactiva
 solo en esta portada para evitar que cruce las opciones. Las páginas sin ese
@@ -509,6 +510,12 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
   (márgenes, títulos, Candi más pequeña) y, en teléfonos de ≤700 px, se oculta
   la frase bajo «¿Cuál es su punto de partida?».
 - Todo en el bloque final de `candidato-360.css` («Incorporación sin flechas…»).
+- **Segunda ronda (mismo día): Candi solo saluda.** En la pregunta del punto de
+  partida y en la búsqueda del nombre ya no aparece (`ubicarEnPortada()` en
+  `candidato-360-candi.js` la monta visible solo en la etapa `greeting`). Las
+  tarjetas «Ya fui candidato» y «Es mi primera candidatura» toman ese espacio:
+  más altas y con letra más grande. El paso del país va sin la frase «Los
+  módulos son los mismos en los tres…» y con el título más grande.
 
 ### 10.3 Candi (Luna)
 

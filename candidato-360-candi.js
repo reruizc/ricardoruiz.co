@@ -913,7 +913,10 @@
     const enIntro = vista === 'intro';
     const enBusqueda = vista === 'existing';
     const stage = document.getElementById('intro').dataset.stage;
-    const visible = !enIntro || stage === 'greeting' || stage === 'options';
+    /* Oct-25-2026 (pedido de Ricardo): Candi solo se ve en su saludo. En la
+       pregunta del punto de partida y en la búsqueda del nombre no aparece:
+       esas pantallas son para decidir, y las opciones necesitan el espacio. */
+    const visible = enIntro ? stage === 'greeting' : !enBusqueda;
     const destino = (enIntro || enBusqueda) && !abierto ? sitio : document.body;
     if (dock.parentElement !== destino) {
       volverAlDock();
