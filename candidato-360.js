@@ -5204,7 +5204,8 @@ function contextoIAEstrategia() {
   const hist = crmCandidate ? leerCorpHistorica(crmCandidate.corp) : null;
   const arqs = (R.arquetipos || []).slice().sort((x, y) => y.share - x.share).slice(0, 3);
   return {
-    nombre: k.nombre, corp: k.corp, lugar: k.lugar, aval: c.avales || 'partido',
+    nombre: k.nombre, corp: k.corp, lugar: k.lugar,
+    aval: c.avales === 'indeciso' ? `todavía sin partido (se mide con ${FAMILIA_CON_ARTICULO[k.bloque] || 'su familia política'})` : c.avales === 'firmas' ? 'por firmas, sin partido' : (k.partido ? `con ${NOMBRE_BONITO(k.partido)}` : 'con partido'),
     partido: k.partido ? NOMBRE_BONITO(k.partido) : '', familia: FAMILIA_CON_ARTICULO[k.bloque] || '',
     /* Se lanzó, no necesariamente ganó: el historial es de candidaturas. */
     historial: hist ? { n: crmCandidate.history?.length || 1, ultima: `se lanzó ${aCorp(hist.tipo, hist.lugar)} en ${hist.año}`, anios: hist.año ? 2027 - Number(hist.año) : null, mismaCorporacion: hist.tipo === k.corp, gano: 'no se sabe' } : null,
