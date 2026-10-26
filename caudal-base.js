@@ -194,7 +194,7 @@
   // Pinta el botón «atrás» según la pila. Se llama desde showView Y desde
   // pintarNav, porque pintarNav REHACE el botón con innerHTML: sin volver a
   // cablear aquí, el enlace se queda con su href y saca al usuario del producto.
-  const VIEW_NAMES={home:'Explorar Caudal',buscar:'Resultados de búsqueda',congreso:'Congreso',control:'Órganos de control',regulatorio:'Regulatorio',ejecutivo:'Ejecutivo',sucop:'Consulta pública',gacetas:'Gacetas',cliente:'Radar',medios:'Medios',radicados:'Últimos radicados',bancadas:'Disciplina de bancada',coaliciones:'Coaliciones'};
+  const VIEW_NAMES={home:'Explorar Caudal',buscar:'Resultados de búsqueda',congreso:'Congreso',control:'Órganos de control',regulatorio:'Regulatorio',ejecutivo:'Ejecutivo',sucop:'Consulta pública',gacetas:'Gacetas',cliente:'Radar',medios:'Medios',radicados:'Últimos radicados',bancadas:'Disciplina de bancada',coaliciones:'Coaliciones',territorial:'Entidades territoriales'};
   const VIEW_PARENT={radicados:'congreso',bancadas:'congreso',coaliciones:'bancadas'};
   let _navStack=[];
   function pintarBack(){

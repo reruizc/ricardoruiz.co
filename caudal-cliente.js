@@ -42,7 +42,7 @@
   // Los dos primeros son CLIENTES con nombre, no sectores: van aparte porque
   // muestran lo que un preset genérico no puede — una empresa con varias líneas
   // de negocio, cada una en su comisión, y con competencia real en el Sur.
-  const CLI_CLIENTES=[['didi','DiDi',1],['binance','Binance',1]];
+  const CLI_CLIENTES=[['didi','DiDi',1],['binance','Binance',1],['comfama','Comfama',1]];
   // Son prospectos con nombre propio: un usuario nuevo no tiene por qué ver
   // quién está en conversaciones con Cauce (reportado por Ricardo, sep-7-2026:
   // los vio con una cuenta recién creada). Solo el equipo los ve como muestra.

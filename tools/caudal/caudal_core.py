@@ -162,6 +162,14 @@ SINONIMOS = [
         'sistema de salud', 'reforma a la salud', 'entidades promotoras de salud',
         'prestadores de servicios de salud', 'seguridad social en salud',
         'aseguramiento en salud']},
+    # Cajas de compensación familiar (Comfama, Comfenalco, Colsubsidio…). Medido
+    # sobre el dataset (oct-2026): 'cajas de compensacion' 11 títulos ·
+    # 'subsidio familiar' 14 · 'cuota monetaria' 1, sin colisiones. Antes su
+    # núcleo en el diccionario era 'salud / EPS e IPS', que las trataba como
+    # aseguradoras: el Congreso legisla sobre el SUBSIDIO y los PARAFISCALES.
+    {'k': 'cajas de compensacion / subsidio familiar', 'terms': [
+        'cajas de compensacion', 'compensacion familiar', 'subsidio familiar',
+        'cuota monetaria']},
     {'k': 'pensiones y cesantias', 'terms': [
         'regimen pensional', 'sistema pensional', 'reforma pensional', 'cesantias',
         'fondos de pensiones', 'pension de vejez']},
@@ -486,6 +494,79 @@ SECTORES_CLIENTE = [
      'temas': ['presupuesto general de la nacion', 'reforma tributaria',
                'consulta previa', 'protesta social', 'reforma electoral',
                'inversion extranjera', 'reforma pensional', 'reforma a la salud']},
+
+    # Comfama · prospecto vía Pablo (Cauce), oct-2026. Pide una Rosa «muy
+    # enfocada en regulación»: superintendencias, ministerios y, ojalá,
+    # Gobernación, Asamblea y Concejo de Medellín. ⚠️ Su regulador DIRECTO
+    # (Superintendencia del Subsidio Familiar) NO es fuente de Caudal todavía,
+    # ni lo son el Concejo de Medellín ni la Asamblea de Antioquia: las tres
+    # están exploradas y en construcción en el pilar Territorial (ver
+    # CAUDAL.md · «Fuentes exploradas para Comfama»). Lo que SÍ cubre hoy:
+    # Congreso (subsidio familiar, laboral, salud, vivienda), SUCOP (MinTrabajo
+    # y Gobernación de Antioquia publican ahí), Supersalud por la IPS y Savia
+    # Salud, SECOP y prensa por identidad, y la SSF como vocero (Redes).
+    # Los temas van como FRASES LITERALES (el radar busca con expandir=False):
+    # medidos en el dataset uno por uno antes de entrar.
+    {'k': 'comfama', 'nombre': 'Comfama', 'tipo': 'empresa', 'comision': 'Séptima',
+     'sector_sanciones': 'salud', 'cliente': True,
+     'descripcion': 'Caja de compensación familiar de Antioquia. Su regulador directo '
+                    '(Supersubsidio) y los cuerpos colegiados de Medellín y Antioquia '
+                    'entran por el pilar Territorial, en construcción.',
+     'que_hace': 'Caja de compensación familiar de Antioquia: recauda el aporte '
+                 'parafiscal del 4 % y lo devuelve como cuota monetaria, subsidio de '
+                 'vivienda, empleo y protección al cesante, salud (IPS propia y '
+                 'participación en Savia Salud), educación, cultura, recreación y '
+                 'crédito social. Entidad privada sin ánimo de lucro vigilada por la '
+                 'Superintendencia del Subsidio Familiar. Su exposición regulatoria '
+                 'llega por tres puertas: la ley del subsidio y los parafiscales '
+                 '(Congreso y MinTrabajo), la regulación sectorial de cada servicio '
+                 '(salud, vivienda, educación) y las decisiones de Medellín y '
+                 'Antioquia, donde opera.',
+     'lector': 'Equipo de asuntos corporativos y relaciones institucionales de la '
+               'caja. Lee para decidir si un proyecto exige posición pública, si '
+               'conviene moverlo por Asocajas o solo, y qué le toca a cada servicio '
+               '(subsidio, vivienda, empleo, salud, educación).',
+     'decisiones': ['Si fijar posición sobre un proyecto que toque el 4 % o el subsidio familiar',
+                    'Si comentar un proyecto de norma de MinTrabajo o de la Supersubsidio en consulta',
+                    'Si pedir audiencia en la Comisión Séptima y con qué ponente',
+                    'Cómo responder a un debate o citación del Concejo de Medellín o la Asamblea',
+                    'Qué ajustar en un servicio antes de que la regla exista'],
+     'jurisdicciones': ['Colombia'],
+     'interlocutores': ['Superintendencia del Subsidio Familiar', 'Ministerio del Trabajo',
+                        'Ministerio de Salud', 'Supersalud', 'Ministerio de Vivienda',
+                        'UGPP', 'DIAN', 'Gobernación de Antioquia', 'Alcaldía de Medellín',
+                        'Concejo de Medellín', 'Asamblea de Antioquia', 'Asocajas'],
+     'relojes': ['Legislatura: del 20 de julio al 20 de junio',
+                 'Reglamentación de la reforma laboral (Ley 2466 de 2025)',
+                 'Trámite de la reforma a la salud y el papel que le asigne a las cajas',
+                 'Sesiones ordinarias del Concejo de Medellín y la Asamblea de Antioquia '
+                 '(marzo-abril · junio-julio · octubre-noviembre)',
+                 'Circulares y visitas de inspección de la Supersubsidio'],
+     'no_interesa': ['Transporte aéreo, carga y concesiones viales',
+                     'Minería e hidrocarburos', 'Telecomunicaciones',
+                     'Comercio exterior y aduanas',
+                     'Sector financiero sin efecto en el crédito social'],
+     'empresas_keys': ['comfama'],
+     'competencia': ['comfenalco', 'colsubsidio', 'compensar', 'cafam', 'comfandi'],
+     'lineas': [
+         {'nombre': 'Subsidio familiar y parafiscales', 'comision': 'Séptima',
+          'temas': ['cajas de compensacion', 'subsidio familiar']},
+         {'nombre': 'Empleo y protección al cesante', 'comision': 'Séptima',
+          'temas': ['laboral', 'proteccion al cesante', 'seguridad social']},
+         {'nombre': 'Salud · IPS y Savia Salud', 'comision': 'Séptima',
+          'temas': ['sistema de salud', 'reforma a la salud', 'aseguramiento en salud']},
+         {'nombre': 'Vivienda · subsidio y FOVIS', 'comision': 'Séptima',
+          'temas': ['vivienda de interes social', 'subsidio de vivienda']},
+         {'nombre': 'Educación, primera infancia y cultura', 'comision': 'Sexta',
+          'temas': ['educacion', 'primera infancia']},
+         {'nombre': 'Tributario · parafiscales y ESAL', 'comision': 'Tercera',
+          'temas': ['tributario']},
+     ],
+     'temas': ['cajas de compensacion', 'subsidio familiar', 'laboral',
+               'proteccion al cesante', 'seguridad social', 'sistema de salud',
+               'reforma a la salud', 'aseguramiento en salud',
+               'vivienda de interes social', 'subsidio de vivienda', 'educacion',
+               'primera infancia', 'tributario']},
 
     # ── sectores genéricos (demo y plantilla de arranque) ──────────────────
     {'k': 'salud', 'nombre': 'Salud', 'tipo': 'gremio', 'comision': 'Séptima',

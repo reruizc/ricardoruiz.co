@@ -53,6 +53,7 @@ TOPICO_SECTOR = {
     'obra publica y contratacion estatal': ['contratacion'],
     'tecnologia digital / IA': ['tic'],
     'laboral': ['trabajo'],
+    'cajas de compensacion / subsidio familiar': ['trabajo', 'salud'],
     'vivienda y construccion': ['vivienda'],
     'competencia y consumidor': ['comercio'],
     'energia y servicios publicos': ['energia'],
