@@ -554,6 +554,19 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
   reabre una sola vez por pestaña (`sessionStorage['c360-pendiente-abierto']`),
   para que quien vuelve a la portada y recarga no quede atrapado. Sin sesión
   no se reabre nada.
+- **Candi en el teléfono: barra inferior (26-oct-2026, pedido de Ricardo).**
+  En pantallas de 560 px o menos ya no hay «Pregúntame» ni globo: una barra
+  abajo, con la piel de la barra superior de Congreso Claro (papel translúcido
+  con desenfoque), muestra lo que dice Candi —copia del globo vía
+  `MutationObserver`— o «Toca aquí para preguntarle a Candi.», con un piquito
+  hacia ella, que se sienta encima. Tocarla abre el chat. Solo existe cuando
+  el dock vive en `<body>` (en la portada Candi va dentro de la tarjeta). La
+  página reserva 62 px fijos (`--c360-barra`, que también descuenta
+  `--c360-alto`): un mensaje largo crece hacia arriba sobre el contenido en
+  vez de mover la página. El paseo del hueso va encima de la barra.
+- **Recorte de Candi en el saludo, corregido.** En teléfonos de pantalla baja
+  el escenario medía 130 px y la figura 160: se le cortaba la cabeza. Ahora la
+  figura mide 122 en un escenario de 132.
 
 ### 10.3 Candi (Luna)
 

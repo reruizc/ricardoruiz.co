@@ -405,7 +405,21 @@
 
   /* ─── Andamiaje ──────────────────────────────────────────────────────── */
   const esc = s => String(s == null ? '' : s).replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
-  let dock, panel, escena, launcher, globo, log, input, enviar, guia, chips, mascota = null;
+  let dock, panel, escena, launcher, globo, barra, log, input, enviar, guia, chips, mascota = null;
+  const BARRA_INVITA = 'Toca aquí para preguntarle a Candi.';
+  const BARRA_ALTO = 62;   /* el espacio que la página le reserva abajo (--c360-barra) */
+  function pintarBarra() {
+    if (!barra || !globo) return;
+    const dice = !globo.hidden && globo.querySelector('#candiGloboTexto')?.textContent.trim();
+    barra.querySelector('#candiBarraTexto').textContent = dice || BARRA_INVITA;
+    barra.classList.toggle('con-mensaje', Boolean(dice));
+    barra.setAttribute('aria-label', `${dice ? `Candi dice: ${dice}. ` : ''}Abrir el chat con Candi`);
+    /* Se reserva un alto FIJO, no el medido: un mensaje largo crece hacia
+       arriba sobre el contenido y no mueve la página cada vez que habla. */
+    const visible = matchMedia('(max-width:560px)').matches && dock.parentElement === document.body && !dock.hidden;
+    document.documentElement.style.setProperty('--c360-barra', visible ? BARRA_ALTO + 'px' : '0px');
+    if (typeof ajustarSuelo === 'function') ajustarSuelo();
+  }
   let abierto = false, entroYa = false, enVuelo = false, vistaPintada = '';
   /* ─── La memoria de la sesión ──────────────────────────────────────────
      Cada módulo es una página aparte, así que sin esto Candi entraba
@@ -466,6 +480,7 @@
         <button type="button" class="candi-globo-x" id="candiGloboX" aria-label="Cerrar el saludo de Candi">×</button>
       </div>
       <div class="candi-stage candi-escena" id="candiEscena" aria-hidden="true"></div>
+      <button type="button" class="candi-barra" id="candiBarra" aria-controls="candiPanel"><span id="candiBarraTexto"></span></button>
       <button type="button" class="candi-launcher" id="candiLauncher" aria-expanded="false" aria-controls="candiPanel">
         <span class="candi-cara" aria-hidden="true"></span><span class="candi-launcher-txt">Pregúntame</span>
       </button>`;
@@ -475,8 +490,18 @@
     input = dock.querySelector('#candiInput'); enviar = dock.querySelector('#candiEnviar');
     guia = dock.querySelector('#candiGuia'); chips = dock.querySelector('#candiChips');
     globo = dock.querySelector('#candiGlobo');
+    barra = dock.querySelector('#candiBarra');
 
     launcher.addEventListener('click', () => abierto ? cerrar({ foco: true }) : abrir());
+    /* En el teléfono (oct-26-2026, pedido de Ricardo) no hay «Pregúntame» ni
+       globo: una barra abajo muestra lo que dice Candi —o una invitación a
+       preguntarle— con un piquito hacia ella, y tocarla abre el chat. La barra
+       copia el globo (texto y visibilidad), así que todo lo que hoy dice el
+       globo sale ahí sin tocar a quien lo dice. */
+    barra.addEventListener('click', abrir);
+    new MutationObserver(pintarBarra).observe(globo, { attributes: true, attributeFilter: ['hidden'], childList: true, characterData: true, subtree: true });
+    addEventListener('resize', pintarBarra);
+    pintarBarra();
     dock.querySelector('#candiMin').addEventListener('click', () => cerrar({ foco: true }));
     globo.querySelector('p').addEventListener('click', abrir);
     globo.querySelector('#candiGloboX').addEventListener('click', e => { e.stopPropagation(); ocultarGlobo(); });
@@ -808,7 +833,9 @@
   const SUELO_PX = 6;
   function ajustarSuelo() {
     if (!tira) return;
-    tira.style.setProperty('--candi-suelo', SUELO_PX + 'px');
+    /* En el teléfono la barra ocupa el borde de abajo: el paseo va encima. */
+    const b = barra && barra.offsetParent !== null ? barra.getBoundingClientRect() : null;
+    tira.style.setProperty('--candi-suelo', (b ? Math.max(SUELO_PX, innerHeight - b.top + 4) : SUELO_PX) + 'px');
   }
   function alRedimensionar() {
     ajustarSuelo();
@@ -970,6 +997,7 @@
     dock.hidden = !visible;
     if (!visible) { ocultarGlobo(); mascota?.pause(); }
     habilitarDescanso();
+    pintarBarra();
   }
   function sincronizarEtapaIntro() {
     if (!dock) return;
