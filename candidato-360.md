@@ -568,6 +568,27 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
   el escenario medía 130 px y la figura 160: se le cortaba la cabeza. Ahora la
   figura mide 122 en un escenario de 132.
 
+- **«¿Cómo funciona?» y «¿Por qué elegirnos?» con brief descargable (26-oct-2026,
+  pedido de Ricardo).** Los dos modales de la portada decían dos párrafos genéricos;
+  ahora «Cómo funciona» son cinco pasos numerados y «Por qué elegirnos» ocho
+  diferenciales frente a la competencia (los de `Propuestas/candidato-360/
+  competencia-2026-09-30.md`: mesa a mesa 2010-2026 buscable por nombre · meta con la
+  ley · censo 2026 por puesto y arquetipos en tres ciudades · rivales y aliados con
+  votos · plan del día D con ficha logística · briefing con prensa, contratos y normas
+  · cada cifra con fuente, sin custodiar contactos ni envíos masivos · precio público
+  desde $300.000). Texto en `INTRO_INFO` (ahora `html`, no `paragraphs`). Los dos
+  cierran con **«Descargar el brief comercial · PDF · 4 láminas»** →
+  `assets/candidato-360/Candidato-360-brief-comercial.pdf` (`BRIEF_PDF`), generado por
+  `python3 tools/candidato-360/brief-comercial/build.py` (WeasyPrint, A4 apaisado,
+  identidad papel/azul noche/coral, Helvetica del repo): portada con tres cifras ·
+  cómo funciona + once módulos · lo habitual contra lo que hace Candidato 360 y lo que
+  no hacemos a propósito · planes y cómo empezar. ⚠️ Los precios «desde» del PDF salen
+  de la escalera de `candidato-360-brief.html` (300.000 × factor por corporación;
+  completo 1.100.000 de lista): si esa escalera cambia, regenerar el PDF. ⚠️ La regla
+  global `.open{font:… var(--mono);text-transform:uppercase}` alcanza al modal abierto
+  (`#introModal.open`) y ponía las listas en monoespaciada y mayúscula; el bloque final
+  de `candidato-360.css` lo devuelve a Manrope.
+
 ### 10.3 Candi (Luna)
 
 Candi es la guía de la plataforma y es **Luna, la perrita de Ricardo**, en 3D

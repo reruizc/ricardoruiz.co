@@ -206,15 +206,36 @@ function volverIntro() {
   } else start();
 })();
 
+const BRIEF_PDF = 'assets/candidato-360/Candidato-360-brief-comercial.pdf';
 const INTRO_INFO = {
-  how: { kicker: 'Así funciona', title: 'De la evidencia a la campaña.', paragraphs: ['Primero identificamos si ya tiene historia electoral o si empieza desde cero. Con ese punto de partida activamos únicamente las fuentes y los territorios que necesita su candidatura.', 'Después conectamos resultados, conversación pública, agenda normativa y territorio en un CRM preparado para convertir evidencia electoral en decisiones de campaña.'] },
-  why: { kicker: 'Por qué elegirnos', title: 'Toda la inteligencia electoral, en un solo lugar.', paragraphs: ['Integramos evidencia territorial, competencia, resultados históricos y seguimiento de campaña para traducir información compleja en decisiones claras y oportunas.', 'Es una plataforma diseñada específicamente para candidaturas en Colombia: reúne una lectura que normalmente estaría dispersa entre bases, mapas y equipos distintos.'] }
+  how: { kicker: 'Así funciona', title: 'De su nombre a su plan de campaña, en una sesión.', html: `
+<ol class="intro-pasos">
+<li><b>Díganos quién es.</b> Si ya se lanzó, lo buscamos entre 439.000 candidaturas de 2010 a 2026 y traemos su historial mesa a mesa. Si es su primera vez, bastan seis preguntas.</li>
+<li><b>Elija a qué se lanza.</b> Corporación, territorio y aval: partido o firmas. Con eso activamos solo los datos de su campaña.</li>
+<li><b>Reciba su punto de partida.</b> El mapa de su votación hasta el puesto, la meta de votos calculada con la ley electoral y el perfil de quien puede votar por usted, con el censo de 2026.</li>
+<li><b>Lea el territorio.</b> Arquetipos por barrio, contendientes, aliados que pueden endosarle votos y lo que la prensa y las redes dicen de usted.</li>
+<li><b>Planee y ejecute.</b> Estrategia por fases, plan del día de la elección puesto por puesto y un briefing en su correo cada tres días. Candi, la guía, le explica cada pantalla.</li>
+</ol>
+<p class="intro-cierre">Todo sale de resultados oficiales y del censo electoral. Cuando algo se estima, se dice que se estima y con qué.</p>` },
+  why: { kicker: 'Por qué elegirnos', title: 'Lo que ningún otro programa de campaña le muestra.', html: `
+<p class="intro-lead">Los demás administran a su gente. Candidato 360 le dice dónde están los votos, cuántos le faltan y qué hacer para conseguirlos.</p>
+<ul class="intro-ventajas">
+<li><b>Historial mesa a mesa, 2010 a 2026, todas las corporaciones.</b> Buscable por su nombre. Nadie más lo publica con ese detalle.</li>
+<li><b>La meta con la ley, no un número redondo.</b> Umbral, cifra repartidora y curules reales, en cuatro escalones: del mínimo al deseado.</li>
+<li><b>Quién puede votar por usted, puesto por puesto.</b> Censo oficial de 2026 por sexo y edad, y en Bogotá, Medellín y Cartagena, arquetipos por barrio: qué mueve el voto en cada uno.</li>
+<li><b>Rivales y aliados medidos con votos.</b> Contra quién compite, dónde se pelea el voto y cuántos votos le pueden pasar sus aliados.</li>
+<li><b>El día de la elección, planeado antes.</b> En qué puestos necesita testigo y la ficha logística de cada uno: señal, internet, acceso, orden público.</li>
+<li><b>Prensa, contratos públicos y normas en su correo cada tres días</b>, y escucha de redes como módulo aparte.</li>
+<li><b>Cada cifra con su fuente y su cobertura.</b> No guardamos su base de contactos ni hacemos envíos masivos: su información sigue siendo suya.</li>
+<li><b>Un precio por mes, desde $300.000, sin contratos largos.</b> Se arma por módulos y se cancela cuando quiera.</li>
+</ul>` }
 };
 function showIntroInfo(topic) {
   const content = INTRO_INFO[topic]; if (!content) return;
   $('introModalKicker').textContent = content.kicker; $('introModalTitle').textContent = content.title;
-  $('introModalText').innerHTML = content.paragraphs.map(p => `<p>${p}</p>`).join('');
+  $('introModalText').innerHTML = content.html + `<p class="intro-descarga-wrap"><a class="intro-descarga" href="${BRIEF_PDF}" download target="_blank" rel="noopener">Descargar el brief comercial<small>PDF · 4 láminas</small></a></p>`;
   $('introModal').classList.add('open');
+  $('introModal').querySelector('.intro-modal-card').scrollTop = 0;
 }
 function closeIntroModal() { $('introModal').classList.remove('open'); }
 $('introModal').addEventListener('click', e => { if (e.target === $('introModal')) closeIntroModal(); });
