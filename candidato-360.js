@@ -109,17 +109,34 @@ async function localidadesDe(depNombre, munNombre) {
 /* ─── 2. Pantallas y modales ─────────────────────────────────────────────── */
 const screens = [...document.querySelectorAll('.screen')];
 const topBack = document.createElement('button');
-topBack.type = 'button'; topBack.className = 'nav-back'; topBack.textContent = '← Volver';
+topBack.type = 'button'; topBack.className = 'nav-back'; topBack.textContent = 'Volver';
 document.querySelector('.topbar .nav-left').prepend(topBack);
+/* Alto real de la barra: las pantallas de incorporación miden el espacio que
+   queda debajo para caber sin scroll cuando el contenido alcanza (oct-2026). */
+(function medirBarra() {
+  const bar = document.querySelector('.topbar');
+  if (!bar) return;
+  const fijar = () => document.documentElement.style.setProperty('--c360-nav', bar.offsetHeight + 'px');
+  fijar();
+  if (window.ResizeObserver) new ResizeObserver(fijar).observe(bar);
+  else addEventListener('resize', fijar);
+})();
 /* La estrategia (tarjeta 11) es una sub-vista DENTRO del CRM, no una pantalla:
    con ella abierta, «Volver» regresa al tablero y no a la ruta. */
 topBack.addEventListener('click', () => {
   if (document.getElementById('crm')?.classList.contains('crm-en-estrategia')) return volverAlCRM();
   /* Dentro de una fase del plan, «Volver» regresa a la portada de fases. */
   if (document.getElementById('crm')?.classList.contains('plan-fase') && !document.getElementById('crm').classList.contains('hidden')) return window.C360Plan?.portada();
+  /* En la portada, el país y el punto de partida viven en la misma pantalla:
+     «Volver» deshace un paso (punto de partida → país → presentación). */
+  if (!$('intro').classList.contains('hidden')) return volverPasoIntro();
   document.querySelector('.screen:not(.hidden) .flow-top .back')?.click();
 });
-function refreshTopBack() { const current = document.querySelector('.screen:not(.hidden)'); topBack.classList.toggle('visible', Boolean(current && current.id !== 'intro')); }
+function refreshTopBack() {
+  const current = document.querySelector('.screen:not(.hidden)');
+  const enPortada = current?.id === 'intro';
+  topBack.classList.toggle('visible', Boolean(current && (!enPortada || !$('choicePanel').classList.contains('hidden'))));
+}
 function showScreen(id) {
   screens.forEach(s => s.classList.toggle('hidden', s.id !== id));
   /* El shell recorta con overflow:clip, así que ni focus() ni scrollIntoView
@@ -138,6 +155,7 @@ function avanzarIntro() {
   $('choicePanel').classList.remove('hidden');
   $('intro').classList.add('intro-choosing');
   cambiarPais(false);
+  refreshTopBack();
   const heading = document.querySelector('#paisPaso h2');
   if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
   window.scrollTo({ top: 0, behavior: 'instant' });
@@ -151,6 +169,7 @@ function volverIntro() {
   $('introPresentation').classList.remove('hidden');
   $('intro').classList.remove('intro-choosing');
   clearTimeout(partidaTimer);
+  refreshTopBack();
   etapaIntro('welcome');
   $('introNext').focus({ preventScroll: true });
 }
@@ -438,6 +457,7 @@ function paisInicial() {
 let partidaTimer = 0;
 function etapaIntro(stage) {
   $('intro').dataset.stage = stage;
+  refreshTopBack();
   document.dispatchEvent(new CustomEvent('c360:intro-stage', { detail: { stage } }));
 }
 function elegirPais(codigo) {
@@ -587,7 +607,7 @@ function aplicarGateRuta() {
   /* Por id, no por clase: en el pie hay dos botones «next» —continuar y abrir
      el CRM— y el primero se quedaba con la etiqueta del segundo. */
   const boton = $('abrirCRM');
-  if (boton) boton.textContent = bloqueado ? 'Ver el CRM de campaña →' : 'Abrir CRM de campaña →';
+  if (boton) boton.textContent = bloqueado ? 'Ver el CRM de campaña' : 'Abrir CRM de campaña';
   if (!bloqueado) return aviso?.remove();
   if (!aviso) {
     aviso = document.createElement('div');
@@ -1830,8 +1850,8 @@ function montarWizardNuevo() {
     } else def.fields.forEach(f => f && step.append(f));
     if (def.cards) { const picker = createCorporationPicker('Seleccione una corporación', '', key => { electionSelect.value = key; updateTerritory(); }); picker.id = 'newCorporationPicker'; step.append(picker); }
     const actions = document.createElement('div'); actions.className = 'wizard-actions';
-    if (index) { const back = document.createElement('button'); back.type = 'button'; back.className = 'wizard-back'; back.textContent = '← Anterior'; back.addEventListener('click', () => showNewWizardStep(index - 1)); actions.append(back); }
-    const next = document.createElement('button'); next.type = def.final ? 'submit' : 'button'; next.className = 'next wizard-next'; next.textContent = def.final ? 'Crear punto de partida →' : 'Siguiente →';
+    if (index) { const back = document.createElement('button'); back.type = 'button'; back.className = 'wizard-back'; back.textContent = 'Anterior'; back.addEventListener('click', () => showNewWizardStep(index - 1)); actions.append(back); }
+    const next = document.createElement('button'); next.type = def.final ? 'submit' : 'button'; next.className = 'next wizard-next'; next.textContent = def.final ? 'Crear punto de partida' : 'Siguiente';
     if (!def.final) next.addEventListener('click', () => advanceNewWizard(index));
     actions.append(next); step.append(actions); wizard.append(step);
   });

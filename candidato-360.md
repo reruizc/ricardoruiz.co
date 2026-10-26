@@ -474,8 +474,9 @@ Cartagena, Quito y Asunción, respectivamente. Viven en
 `assets/candidato-360/pais-{colombia,ecuador,paraguay}-v1.webp` (600 × 400;
 ~196 KB entre las tres). Son referencias ilustradas, no fotografías documentales.
 Prompts exactos y herramienta: `assets/candidato-360/paises-prompts-v1.md`.
-La imagen ocupa una columna propia; nombre, bandera, fecha y flecha quedan fuera
-de ella, con foco visible y ajuste hasta 320 px. Al elegir país el foco pasa al
+La imagen ocupa una columna propia; nombre y fecha quedan fuera de ella, con
+foco visible y ajuste hasta 320 px. Desde el 25-oct-2026 las tarjetas van sin
+flecha y con la letra más grande (nombre 25 px, fecha 14,5 px). Al elegir país el foco pasa al
 título del siguiente paso; al volver regresa al país elegido. La carga inicial
 recordada no roba el foco.
 
@@ -485,6 +486,29 @@ mueve el mismo dock: abrir el chat o salir de la portada lo devuelve a `body`;
 cerrarlo o volver lo trae al espacio reservado. Su paseo del hueso se desactiva
 solo en esta portada para evitar que cruce las opciones. Las páginas sin ese
 contenedor conservan su comportamiento.
+
+### Incorporación sin flechas y sin scroll (25-oct-2026)
+
+Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
+
+- **Sin flechas** (→ ←) en cajas ni botones de la incorporación: portada,
+  países, punto de partida, búsqueda, ruta y candidatura nueva, incluidos los
+  textos que arma `candidato-360.js` (wizard, «Abrir CRM de campaña»). El CRM
+  conserva las suyas.
+- **«Siguiente»** en mayúscula sostenida, ancho (62 % de la fila) y sin flecha.
+  **«Elegir mi punto de partida»** y **«Escribir mi nombre»** son botones.
+- **«Volver» vive en la barra superior** (`nav-back`, sin flecha) también en la
+  portada: en ella deshace un paso (punto de partida → país → presentación) con
+  `volverPasoIntro()`. El «Volver» de dentro de la caja (`.intro-return` y el de
+  `#existing`) se oculta.
+- **Sin scroll donde cabe**: las pantallas de incorporación miden el alto que
+  deja la barra (`--c360-nav`, que fija un `ResizeObserver` en
+  `candidato-360.js`, porque en el teléfono la barra pasa de 83 a 113 px cuando
+  aparece «Volver») y la caja ya no es un cuadrado fijo. Medido sin scroll en
+  1440×900, 1366×768, 375×812 y 375×667. En pantallas bajas se aprieta el aire
+  (márgenes, títulos, Candi más pequeña) y, en teléfonos de ≤700 px, se oculta
+  la frase bajo «¿Cuál es su punto de partida?».
+- Todo en el bloque final de `candidato-360.css` («Incorporación sin flechas…»).
 
 ### 10.3 Candi (Luna)
 
