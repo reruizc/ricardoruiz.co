@@ -536,6 +536,15 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
 - **Tarjetas de fase (26-oct-2026).** El rótulo de fechas pasa de 10 a 12,5 px;
   «Abrir» es un botón (sin flecha) y las fases cerradas solo dicen cuándo se
   abren, con un botón «Ver»: lo que trae cada una se ve al abrirla.
+- **La candidatura nueva ya no pide cuenta para empezar (26-oct-2026, pedido
+  de Ricardo probando como usuario externo).** Antes un muro tapaba el
+  formulario. Ahora se llenan los seis pasos sin cuenta y el CRM abre en vista
+  previa (`CRM_VITRINA`), igual que la ruta con historial: el registro se pide
+  al tocar un módulo. Sin acceso no se vincula ni se guarda nada en el
+  worker. ⚠️ Lo llenado no sobrevive al registro: quien crea la cuenta vuelve
+  a la portada y repite los seis pasos (la ruta con historial tiene el mismo
+  hueco). La pantalla pasó además a la caja centrada de 720 px de la ruta con
+  historial; antes ocupaba todo el ancho.
 
 ### 10.3 Candi (Luna)
 

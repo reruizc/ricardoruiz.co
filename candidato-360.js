@@ -113,13 +113,17 @@ topBack.type = 'button'; topBack.className = 'nav-back'; topBack.textContent = '
 document.querySelector('.topbar .nav-left').prepend(topBack);
 /* Alto real de la barra: las pantallas de incorporación miden el espacio que
    queda debajo para caber sin scroll cuando el contenido alcanza (oct-2026). */
+function fijarAltoBarra() {
+  const bar = document.querySelector('.topbar');
+  if (bar) document.documentElement.style.setProperty('--c360-nav', bar.offsetHeight + 'px');
+}
 (function medirBarra() {
   const bar = document.querySelector('.topbar');
   if (!bar) return;
-  const fijar = () => document.documentElement.style.setProperty('--c360-nav', bar.offsetHeight + 'px');
+  const fijar = fijarAltoBarra;
   fijar();
   if (window.ResizeObserver) new ResizeObserver(fijar).observe(bar);
-  else addEventListener('resize', fijar);
+  addEventListener('resize', fijar);   /* además: al girar o redimensionar, el observador puede llegar tarde */
 })();
 /* La estrategia (tarjeta 11) es una sub-vista DENTRO del CRM, no una pantalla:
    con ella abierta, «Volver» regresa al tablero y no a la ruta. */
@@ -136,6 +140,7 @@ function refreshTopBack() {
   const current = document.querySelector('.screen:not(.hidden)');
   const enPortada = current?.id === 'intro';
   topBack.classList.toggle('visible', Boolean(current && (!enPortada || !$('choicePanel').classList.contains('hidden'))));
+  fijarAltoBarra();   /* «Volver» cambia el alto de la barra en el teléfono: se mide ya, sin esperar al observador */
 }
 function showScreen(id) {
   screens.forEach(s => s.classList.toggle('hidden', s.id !== id));
@@ -617,12 +622,25 @@ function aplicarGateRuta() {
   }
   aviso.innerHTML = `<p>Sin cuenta puede ver el CRM en vista previa: mapa, historial, proyección y meta de votos. El detalle por barrio y los módulos —briefing, escucha, arquetipos, perfil del votante— se abren con el acceso activo, que deja su cuenta vinculada a <b>este candidato</b>.</p>`;
 }
+/* Oct-26-2026 (pedido de Ricardo, probando como usuario externo): la
+   candidatura nueva ya NO se tapa. Igual que la ruta con historial, sin cuenta
+   se llenan los seis pasos y el CRM abre en vista previa; el registro se pide
+   al elegir un módulo (el capturador de clics de la vitrina). Nada se vincula
+   ni se guarda en el worker sin acceso: el vínculo sigue siendo la única
+   decisión irreversible y solo pasa con el acceso activo. */
 function aplicarGateNuevo() {
   const box = document.querySelector('#new .search-box'); if (!box) return;
-  const bloqueado = SESSION.listo && !SESSION.acceso;
-  box.classList.toggle('locked', bloqueado);
-  if (bloqueado) muro(box, 'La candidatura nueva se construye con su acceso activo. Cada cuenta se vincula a <b>una sola candidatura</b>, y esa decisión no se cambia desde la plataforma.');
-  else quitarMuro(box);
+  box.classList.remove('locked'); quitarMuro(box);
+  const bloqueado = SESSION.listo && !SESSION.acceso && !PRUEBAS;
+  let aviso = box.querySelector('#avisoGateNuevo');
+  if (!bloqueado) return aviso?.remove();
+  if (!aviso) {
+    aviso = document.createElement('div');
+    aviso.id = 'avisoGateNuevo';
+    aviso.className = 'c360-vitrina';
+    box.querySelector('.new-wizard')?.after(aviso);
+  }
+  aviso.innerHTML = `<p>Puede armar su candidatura sin cuenta y verla en vista previa. Los módulos se abren con el acceso activo, que vincula su cuenta a <b>esta candidatura</b>.</p>`;
 }
 
 /* ─── 4. Índice electoral y pantalla de espera ───────────────────────────── */
@@ -1876,7 +1894,8 @@ function montarWizardNuevo() {
 let NUEVO = null;
 async function createNew(e) {
   e.preventDefault();
-  if (!SESSION.acceso) return abrirPaywall();
+  /* Sin acceso: vista previa, sin guardar nada (ver aplicarGateNuevo). */
+  const vitrina = !PRUEBAS && !SESSION.acceso;
   const dep = $('department'), depNombre = dep.options[dep.selectedIndex]?.text || '';
   const modo = $('partyMode').value, indeciso = modo === 'indeciso';
   if (indeciso && !espectroNuevoVigente()) { window.showNewWizardStep?.(4); return; }
@@ -1885,7 +1904,8 @@ async function createNew(e) {
      cuando quien no se había decidido lo define desde el CRM. */
   const campana = { corp: $('election').value, ruta: 'other', avales: indeciso ? 'indeciso' : 'partido', espectro: indeciso ? espectroNuevoVigente() : '', partido: nuevo.partido, departamento: dep.value, departamentoNombre: depNombre, municipio: MUNICIPAL_ELECTIONS.includes($('election').value) ? $('municipality').value : '', localidad: $('election').value === 'jal' ? $('locality').value : '' };
   if (!nuevo.nombre || !campana.corp || !campana.departamento) return;
-  if (PRUEBAS) vinculoLocal({ tipo: 'nuevo', nuevo, campana });
+  if (vitrina) { /* vista previa: nada se guarda ni se vincula */ }
+  else if (PRUEBAS) vinculoLocal({ tipo: 'nuevo', nuevo, campana });
   else if (SESSION.vinculo) guardarCampana(campana);   /* quien vuelve a definir el partido */
   else {
     const sigue = await confirmarVinculo(nuevo.nombre, `${CRM_CORPORATIONS[campana.corp]} · ${[campana.localidad, campana.municipio, depNombre].filter(Boolean).join(' · ')}`);
@@ -1898,7 +1918,7 @@ async function createNew(e) {
      declaró van como preferencias de la escucha (/c360/escucha), que es donde
      después se piden los usuarios. `medios` va vacío a propósito: esa pregunta
      la hace el panel de escucha, y con él vacío el panel la sigue haciendo. */
-  if (nuevo.redesUsa.length) {
+  if (nuevo.redesUsa.length && !vitrina) {
     const preferencias = { redes: nuevo.redesUsa, medios: [] };
     if (SESSION.vinculo?.local) { SESSION.vinculo.escucha = Object.assign({}, SESSION.vinculo.escucha || {}, { preferencias }); persistirVinculoLocal(); }
     else if (SESSION.vinculo) {
@@ -2495,7 +2515,7 @@ async function abrirCRMNuevo() {
   document.getElementById('crmProfilePhoto')?.remove(); document.getElementById('crmProfilePhotoMissing')?.remove(); $('crmInitials').classList.remove('crm-avatar-hidden');
   $('crmPuntaje').innerHTML = ''; $('crmPuntaje').classList.add('hidden'); PUNTAJE_ACTUAL = null;   /* sin historial no hay puntaje: un cero ahí sería una calificación, no un dato */
   CAMPANA_ACTUAL = c;
-  CRM_VITRINA = false;
+  CRM_VITRINA = !PRUEBAS && !SESSION.acceso;
   showScreen('crm');
   window.C360Plan?.mostrar();   /* «Hola, …»: el plan por fases antes de los módulos */
   pintarVitrina();
