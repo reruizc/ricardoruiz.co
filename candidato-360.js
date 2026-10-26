@@ -5195,9 +5195,14 @@ function temasArquetipo(id) {
   const nom = k => (T.find(t => t.id === k)?.corto || T.find(t => t.id === k)?.nombre || k.replace(/_/g, ' ')).toLowerCase();
   return Object.entries(sens).filter(([, v]) => v >= 4).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => nom(k));
 }
+/* El arquetipo que más pesa (por votos) y el que más rinde (por afinidad):
+   la tarjeta habla del primero, el aviso de la vista muestra los dos si son
+   distintos. Antes cada pieza escogía con un criterio y se contradecían. */
 function arquetipoPrincipalEstr() {
-  const arqs = (ESTR?.R?.arquetipos || []).slice();
-  return arqs.filter(a => a.ratio != null && a.share >= .08).sort((a, b) => b.ratio - a.ratio)[0] || arqs.sort((a, b) => b.share - a.share)[0] || null;
+  return (ESTR?.R?.arquetipos || []).slice().sort((a, b) => b.share - a.share)[0] || null;
+}
+function arquetipoAfinEstr() {
+  return (ESTR?.R?.arquetipos || []).filter(a => a.ratio != null && a.share >= .08).sort((a, b) => b.ratio - a.ratio)[0] || null;
 }
 const listaY = xs => xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : (xs[0] || '');
 /* Versión fija del párrafo, para cuando no hay IA: el mismo esqueleto que
@@ -5333,7 +5338,10 @@ async function lecturaIAEstrategia() {
     if (L.temas?.length) pintarTemasEstr(L.temas);
     const n = L.noticia ? NOTICIAS_ESTR[L.noticia - 1] : null;
     const pie = n ? `A partir de: ${n.url ? `<a href="${escHtml(n.url)}" target="_blank" rel="noopener">«${escHtml(n.titulo)}»</a>` : `«${escHtml(n.titulo)}»`}${n.medio ? ` · ${escHtml(n.medio)}` : ''}` : 'Lectura con IA sobre tus datos';
-    $('crmEstrAccion').innerHTML = `<b>Esta semana.</b> ${escHtml(L.semana)} <small>${pie}</small>`;
+    /* El modelo suele arrancar «Esta semana se habla de…»: sin esto salía
+       «Esta semana. Esta semana se habla…». */
+    const m = String(L.semana).match(/^(esta semana)([\s\S]*)$/i);
+    $('crmEstrAccion').innerHTML = `${m ? `<b>${escHtml(m[1])}</b>${escHtml(m[2])}` : `<b>Esta semana.</b> ${escHtml(L.semana)}`} <small>${pie}</small>`;
     $('crmEstrAccion').classList.remove('hidden');
     ESTR.ia = L;
   } catch {}
@@ -5349,11 +5357,11 @@ const ESTR_INTRO_VISTA = 'c360-estr-intro-vista';
 async function pintarIntroEstrategia() {
   const R = ESTR.R, k = contextoCampanaEstr(), c = CAMPANA_ACTUAL || SESSION.vinculo?.campana || {};
   if (!PERFIL_ESTR_LISTO) { PERFIL_ESTR = await perfilMarcadoEstrategia().catch(() => null); PERFIL_ESTR_LISTO = true; }
-  const a = arquetipoPrincipalEstr(), may = t => t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+  const a = arquetipoPrincipalEstr(), af = arquetipoAfinEstr(), may = t => t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
   const deQuien = R.lente === 'propio' ? 'de tus votos' : R.lente === 'partido' ? 'de los votos de tu familia política' : 'del voto de la ciudad';
   const sinPerfil = crmCandidate ? 'Sin diferencia marcada con el municipio: no cambia la estrategia.' : 'Se mide cuando tengas votos en puestos de votación.';
   const datos = [
-    ['Arquetipo', a ? `«${a.nombre}»: ${pctCorto(a.share)} ${deQuien}.` : 'Tu ciudad todavía no tiene arquetipos por barrio.'],
+    ['Arquetipo', a ? `«${a.nombre}»: ${pctCorto(a.share)} ${deQuien}.${af && af.id !== a.id ? ` Donde más rindes: «${af.nombre}» (${vecesE(af.ratio)}).` : ''}` : 'Tu ciudad todavía no tiene arquetipos por barrio.'],
     ['Edad', PERFIL_ESTR?.edad ? `${may(PERFIL_ESTR.edad)}.` : sinPerfil],
     ['Sexo', PERFIL_ESTR?.sexo ? `${may(PERFIL_ESTR.sexo)}.` : sinPerfil],
     ['Familia política', k.partido ? `Con el aval de ${NOMBRE_BONITO(k.partido)}.` : c.avales === 'firmas' ? 'Por firmas, sin partido.' : `Sin partido todavía: se mide con ${FAMILIA_CON_ARTICULO[k.bloque] || 'tu familia política'}.`],
