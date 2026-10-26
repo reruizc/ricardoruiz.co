@@ -80,10 +80,10 @@
 #crm.plan-fase .crm-grid>#crmEstrategia{order:-5}
 .plan-hola{margin:8px 0 26px}.plan-hola h2{font-size:clamp(36px,5vw,62px);line-height:.98;margin:6px 0 10px}.plan-hola p{color:var(--muted);max-width:640px;margin:0;font-size:17px}.plan-hola .plan-por-que{max-width:920px;margin-top:16px;font-size:17.5px;line-height:1.6;color:var(--ink);border-left:3px solid var(--green);padding-left:14px}
 .plan-hola{margin:8px 0 22px}
-.plan-etapas-aviso{max-width:980px;padding:30px 34px 28px;background:var(--cream);border:1px solid var(--line);border-left:5px solid var(--coral);box-shadow:14px 14px 0 var(--mint);animation:planAviso .35s ease}
-.plan-etapas-aviso p{margin:0 0 16px;font-size:clamp(19px,1.9vw,24px);line-height:1.5;color:var(--ink)}
+.plan-etapas-aviso{max-width:980px;margin-top:clamp(24px,5vh,56px);padding:clamp(32px,4vw,46px) clamp(30px,4vw,48px) clamp(30px,3.6vw,42px);background:var(--cream);border:1px solid var(--line);border-left:5px solid var(--coral);box-shadow:14px 14px 0 var(--mint);animation:planAviso .35s ease}
+.plan-etapas-aviso p{margin:0 0 24px;font-size:clamp(19px,1.9vw,24px);line-height:1.7;color:var(--ink)}
 .plan-etapas-aviso .plan-etapas-cierre{font-weight:800;color:var(--green)}
-.plan-etapas-ok{margin-top:8px;min-width:240px;min-height:54px;padding:14px 28px;border:0;background:var(--ink);color:#fff;font:800 15px var(--sans);letter-spacing:.18em;text-transform:uppercase;cursor:pointer;transition:background .2s}
+.plan-etapas-ok{margin-top:14px;min-width:240px;min-height:54px;padding:14px 28px;border:0;background:var(--ink);color:#fff;font:800 15px var(--sans);letter-spacing:.18em;text-transform:uppercase;cursor:pointer;transition:background .2s}
 .plan-etapas-ok:hover,.plan-etapas-ok:focus{background:var(--green);outline:none}
 .plan-etapas-cuerpo{animation:planAviso .35s ease}
 .plan-sub{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;justify-content:space-between;margin:0 0 18px}
