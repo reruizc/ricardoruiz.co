@@ -422,6 +422,15 @@
   function marcarDicha(v) { if (v && !yaDicha(v)) { memoria.dichas.push(v); recordar(); } }
   const historial = [];                                    /* {rol, texto} — se manda recortado */
 
+  const LETRA_KEY = 'c360-candi-letra', LETRA_ESCALAS = [.9, 1, 1.12, 1.25, 1.4, 1.55], LETRA_INICIAL = 2;
+  let letraIdx = (() => { try { const v = Number(localStorage.getItem(LETRA_KEY)); return Number.isInteger(v) && v >= 0 && v < LETRA_ESCALAS.length && localStorage.getItem(LETRA_KEY) !== null ? v : LETRA_INICIAL; } catch { return LETRA_INICIAL; } })();
+  function aplicarLetra() {
+    if (!dock) return;
+    dock.style.setProperty('--candi-esc', String(LETRA_ESCALAS[letraIdx]));
+    dock.querySelectorAll('[data-letra="-1"]').forEach(b => { b.disabled = letraIdx === 0; });
+    dock.querySelectorAll('[data-letra="1"]').forEach(b => { b.disabled = letraIdx === LETRA_ESCALAS.length - 1; });
+  }
+
   function montar() {
     dock = document.createElement('div');
     dock.className = 'candi-dock'; dock.id = 'candiDock'; dock.hidden = true;
@@ -434,6 +443,7 @@
             <h2 id="candiTitulo">Candi</h2>
             <p>Tu guía de la plataforma. Te digo qué hace cada parte y dónde está cada cosa.</p>
           </div>
+          <div class="candi-letra" role="group" aria-label="Tamaño de la letra de Candi"><button type="button" data-letra="-1" aria-label="Letra más pequeña">A−</button><button type="button" data-letra="1" aria-label="Letra más grande">A+</button></div>
           <button type="button" class="candi-min" id="candiMin" aria-label="Cerrar el panel de Candi">–</button>
         </header>
         <div class="candi-cuerpo">
@@ -451,6 +461,7 @@
         </div>
       </section>
       <div class="candi-globo" id="candiGlobo" role="status" hidden>
+        <div class="candi-letra" role="group" aria-label="Tamaño de la letra de Candi"><button type="button" data-letra="-1" aria-label="Letra más pequeña">A−</button><button type="button" data-letra="1" aria-label="Letra más grande">A+</button></div>
         <p id="candiGloboTexto"></p>
         <button type="button" class="candi-globo-x" id="candiGloboX" aria-label="Cerrar el saludo de Candi">×</button>
       </div>
@@ -469,6 +480,18 @@
     dock.querySelector('#candiMin').addEventListener('click', () => cerrar({ foco: true }));
     globo.querySelector('p').addEventListener('click', abrir);
     globo.querySelector('#candiGloboX').addEventListener('click', e => { e.stopPropagation(); ocultarGlobo(); });
+    /* Tamaño de letra (oct-25-2026, pedido de Ricardo): A− y A+ en el panel y
+       en el globo, una sola escala para los dos, recordada en este navegador.
+       Arranca un 12 % por encima del tamaño original. Tocarla en el globo lo
+       deja quieto: quien está ajustando la letra está leyendo. */
+    dock.querySelectorAll('[data-letra]').forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();
+      letraIdx = Math.max(0, Math.min(LETRA_ESCALAS.length - 1, letraIdx + Number(b.dataset.letra)));
+      try { localStorage.setItem(LETRA_KEY, String(letraIdx)); } catch {}
+      aplicarLetra();
+      if (globo.contains(b)) clearTimeout(mostrarGlobo._t);
+    }));
+    aplicarLetra();
     dock.querySelector('#candiForm').addEventListener('submit', e => { e.preventDefault(); preguntar(input.value); });
     /* Escape cierra, pero solo si el foco está adentro: si hay un modal del
        CRM encima, la tecla es suya. */

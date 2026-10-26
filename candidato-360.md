@@ -516,6 +516,13 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
   tarjetas «Ya fui candidato» y «Es mi primera candidatura» toman ese espacio:
   más altas y con letra más grande. El paso del país va sin la frase «Los
   módulos son los mismos en los tres…» y con el título más grande.
+- **Tercera ronda: la búsqueda ya no nombra a Candi** (rótulo «Cómo buscarse» y
+  el texto de usted, como el resto del producto) y **la letra de Candi es
+  ajustable**. Panel y globo arrancan un 12 % más grandes que el diseño
+  original y traen botones A− / A+ (escala 0,9 · 1 · 1,12 · 1,25 · 1,4 · 1,55,
+  una sola para los dos, guardada en `localStorage['c360-candi-letra']`). La
+  escala es la variable `--candi-esc` del contenedor de Candi y multiplica la
+  letra y el ancho del panel y del globo (`candidato-360-candi.css`, al final).
 
 ### 10.3 Candi (Luna)
 
