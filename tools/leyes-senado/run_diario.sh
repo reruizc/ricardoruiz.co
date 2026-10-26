@@ -605,14 +605,24 @@ etapa() {
   # hay estado que acumular), así que corre aunque el fetch de hoy falle. Va a
   # un índice aparte del pilar Ejecutivo; lo lee la tarjeta de Diarios y
   # gacetas y el radar del cliente (punto Oeste). Piso de 500 actos.
+  # El caché de texto se comparte por S3 (raw/diario-oficial-txt/): la Mac
+  # sembró todo 2026 el 26-oct y la EC2 solo tenía 47 ediciones. Se baja lo
+  # que falte y se sube lo nuevo, siempre ADITIVO (sin --delete).
+  DOC="$REPO/Bases de datos/leyes-senado/ejecutivo/diario-oficial"
+  etapa --nombre diario_oficial_cache_sync --timeout 600 \
+        --desc "caché de texto del Diario Oficial ↔ S3 (aditivo)" \
+        -- bash -c "mkdir -p \"$DOC\" && aws s3 sync s3://caudal-legislativo/raw/diario-oficial-txt/ \"$DOC/\" --only-show-errors && \
+           aws s3 sync \"$DOC/\" s3://caudal-legislativo/raw/diario-oficial-txt/ --only-show-errors"
   etapa --nombre diario_oficial_actos --timeout 600 \
         --desc "resoluciones, circulares y acuerdos del Diario Oficial → índice" \
         -- python3 tools/caudal/ejecutivo/harvest_diario_oficial.py actos
   rc_do=$?
   if [ $rc_do -eq 0 ]; then
     DOD="$REPO/Bases de datos/leyes-senado/ejecutivo/dist"
-    etapa --nombre diario_oficial_actos_upload --timeout 300 --desc "diario-oficial-actos.jsonl + stats → S3 (piso 500)" \
+    etapa --nombre diario_oficial_actos_upload --timeout 300 --desc "diario-oficial-actos.jsonl + stats → S3 (piso 500 y ≥90 % del anterior)" \
           -- bash -c "n=\$(grep -c . \"$DOD/diario-oficial-actos.jsonl\"); [ \"\$n\" -ge 500 ] || { echo \"solo \$n actos: no se sube\"; exit 1; }; \
+             prev=\$(aws s3 cp s3://caudal-legislativo/metadata/diario-oficial-actos-stats.json - 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"n\",0))' 2>/dev/null || echo 0); \
+             [ \"\$n\" -ge \$((prev*9/10)) ] || { echo \"\$n actos contra \$prev en S3: un caché recortado no pisa el índice\"; exit 1; }; \
              aws s3 cp \"$DOD/diario-oficial-actos.jsonl\" s3://caudal-legislativo/metadata/diario-oficial-actos.jsonl --content-type application/json --cache-control 'private, max-age=300' && \
              aws s3 cp \"$DOD/diario-oficial-actos-stats.json\" s3://caudal-legislativo/metadata/diario-oficial-actos-stats.json --content-type application/json --cache-control 'private, max-age=300'"
   else
