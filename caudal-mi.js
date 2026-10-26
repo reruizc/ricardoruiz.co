@@ -41,7 +41,7 @@ function workspace(){
   $('context-title').textContent=state.sectores[c.sector]||c.sector;
   $('context-copy').textContent=[c.organizacion||(c.tipo==='independiente'?'Independiente':'Sin organización'),c.rol].join(' · ')+(paid?'. Tus perfiles empresariales están disponibles abajo.':'. Estás viendo el contexto de tu sector, no un análisis específico de tu organización.');
   $('company').hidden=!paid;$('upgrade').hidden=paid;
-  loadSector();if(paid) loadProfiles();
+  loadSector();if(paid){ loadProfiles(); loadEmpresas(); }
 }
 async function loadProfiles(){
   const account=state;$('profiles').textContent='Cargando tus perfiles…';
@@ -62,6 +62,75 @@ async function loadProfiles(){
              $('hoy-estado').textContent='Escoge abajo el cliente con el que vas a trabajar hoy. Caudal recuerda el último y la próxima vez abre directo en él.'; }
     }
   }catch(e){if(account===state)$('profiles').textContent=e.message;}
+}
+/* ══ Empresas disponibles ═══════════════════════════════════════════════
+   Los perfiles de cliente REAL del motor (DiDi · Binance · Comfama…), que
+   `perfil_meta` entrega como plantillas con la marca `cliente`. Solo los ve
+   el equipo (llave 'caudal-equipo' de /auth/me, la misma que usa la Rosa
+   para sus chips): son prospectos con nombre y un usuario nuevo no tiene por
+   qué saber quién está en conversaciones con Cauce. La ficha se despliega acá
+   mismo; el radar vive en la Rosa y se abre con ?sector=<k>#cliente. */
+const LOGOS='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/caudal/logos/';
+function esEquipo(){
+  try{ const u=JSON.parse(localStorage.getItem('rr-user')||'null'); return !!(u&&Array.isArray(u.accesos)&&u.accesos.includes('caudal-equipo')); }
+  catch(e){ return false; }
+}
+let EMP_LIST=[], EMP_OPEN='';
+function empLogo(p){
+  const ini=(p.nombre||'?').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  // si el logo no existe se cae a las iniciales, nunca a una imagen rota
+  return `<span class="mi-emp-logo"><img src="${LOGOS}${encodeURIComponent(p.k)}.png" alt="" loading="lazy"
+    onerror="this.parentNode.classList.add('ini');this.replaceWith(document.createTextNode('${esc(ini)}'))"></span>`;
+}
+function empFicha(p){
+  const li=a=>(a||[]).map(x=>`<li>${esc(typeof x==='string'?x:(x&&x.nombre)||'')}</li>`).join('');
+  const lineas=(p.lineas||[]).map(l=>`<span>${esc(l.nombre)}${l.comision?` · <b>${esc(l.comision)}</b>`:''}</span>`).join('');
+  const comp=(p.competencia||[]).map(x=>typeof x==='string'?x:(x&&x.nombre)||'').filter(Boolean);
+  return `<div class="mi-emp-ficha" id="emp-ficha">
+    ${p.que_hace?`<h4>Qué hace</h4><p>${esc(p.que_hace)}</p>`:''}
+    ${lineas?`<h4>Líneas de negocio y su comisión</h4><div class="mi-emp-lineas">${lineas}</div>`:''}
+    <div class="mi-emp-cols">
+      <div>
+        ${p.decisiones&&p.decisiones.length?`<h4>Qué decide con esto</h4><ul>${li(p.decisiones)}</ul>`:''}
+        ${p.relojes&&p.relojes.length?`<h4>Sus relojes</h4><ul>${li(p.relojes)}</ul>`:''}
+      </div>
+      <div>
+        ${p.interlocutores&&p.interlocutores.length?`<h4>Interlocutores</h4><ul>${li(p.interlocutores)}</ul>`:''}
+        ${comp.length?`<h4>Competencia vigilada</h4><ul>${comp.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`:''}
+        ${p.lector?`<h4>Quién lee el brief</h4><p>${esc(p.lector)}</p>`:''}
+      </div>
+    </div>
+    <div class="mi-emp-acts">
+      <a class="btn-t" href="caudal.html?sector=${encodeURIComponent(p.k)}#cliente">Abrir su radar en la Rosa →</a>
+      <button type="button" class="btn-g" data-emp-cerrar>Cerrar ficha</button>
+    </div>
+  </div>`;
+}
+function empRender(){
+  const box=$('empresas-grid'); if(!box) return;
+  box.innerHTML=EMP_LIST.map(p=>`<button type="button" class="mi-emp${p.k===EMP_OPEN?' on':''}" data-emp="${esc(p.k)}" aria-expanded="${p.k===EMP_OPEN}">
+      ${empLogo(p)}
+      <span><span class="mi-emp-n">${esc(p.nombre)}</span>
+        <span class="mi-emp-d">${esc(p.descripcion||'')}</span>
+        <span class="mi-emp-m">${(p.lineas||[]).length} líneas · ${(p.temas||[]).length} temas${p.comision?` · ${esc(p.comision)}`:''}</span></span>
+    </button>`).join('');
+  const abierta=EMP_LIST.find(p=>p.k===EMP_OPEN);
+  if(abierta) box.insertAdjacentHTML('beforeend', empFicha(abierta));
+  box.querySelectorAll('[data-emp]').forEach(b=>b.onclick=()=>{ EMP_OPEN=EMP_OPEN===b.dataset.emp?'':b.dataset.emp; empRender();
+    if(EMP_OPEN){ const f=$('emp-ficha'); if(f) f.scrollIntoView({behavior:'smooth',block:'nearest'}); } });
+  const c=box.querySelector('[data-emp-cerrar]'); if(c) c.onclick=()=>{ EMP_OPEN=''; empRender(); };
+}
+async function loadEmpresas(){
+  const sec=$('empresas'); if(!sec) return;
+  if(!esEquipo()){ sec.hidden=true; return; }
+  const account=state;
+  try{
+    const m=await call({action:'perfil_meta'}); if(account!==state) return;
+    // Cauce es la casa (su brief es para los socios), no una empresa disponible
+    EMP_LIST=(m&&m.plantillas||[]).filter(p=>p&&p.cliente&&p.k!=='cauce');
+  }catch(e){ EMP_LIST=[]; }
+  sec.hidden=!EMP_LIST.length;
+  empRender();
 }
 /* ══ «Hoy para ti» ═══════════════════════════════════════════════════════
    Lo primero que ve quien tiene un cliente abierto: qué se movió en 72 h.

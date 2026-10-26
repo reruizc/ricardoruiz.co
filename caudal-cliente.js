@@ -133,6 +133,10 @@
                        :'Su regulador sectorial todavía no es fuente de Caudal');
         c.onclick=()=>cliLoad({sector:k}); cont.appendChild(c); });
       if(esEquipo()) pinta(CLI_CLIENTES,'cli-real');
+      // deep link ?sector=<k>#cliente: abre ese preset de una (los de cliente real
+      // solo si la cuenta es del equipo, igual que sus chips).
+      const sk=(new URLSearchParams(location.search).get('sector')||'').trim();
+      if(sk && (CLI_SECS.some(x=>x[0]===sk) || (esEquipo()&&CLI_CLIENTES.some(x=>x[0]===sk)))) setTimeout(()=>cliLoad({sector:sk}),0);
       const drill=document.createElement('details');
       drill.className='sec-drill';
       // El latido se apaga la primera vez que alguien lo abre, y no vuelve:
@@ -292,6 +296,9 @@
   // ninguno marcado, NO elige por él — mostrar el radar del cliente equivocado
   // es peor que mostrar la lista.
   async function pfAutoAbrir(){
+    // ?sector=<k> (desde Mi Caudal · Empresas disponibles) manda sobre el último
+    // perfil: quien llegó pidiendo DiDi no quiere aterrizar en Cauce.
+    if(new URLSearchParams(location.search).get('sector')) return false;
     if(!PF_LIST.length) return false;
     const pedido=new URLSearchParams(location.search).get('perfil');
     if(pedido&&!PF_LIST.some(p=>p.perfilId===pedido)){
