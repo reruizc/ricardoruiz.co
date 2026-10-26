@@ -663,9 +663,8 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
     (`POST /c360/estrategia/ia`, `lecturaIAEstrategia`): recibe solo lo que ya calculó
     `C360Estrategia` y aterriza la acción al caso; si la respuesta trae una cifra que no
     estaba en el contexto, el worker la descarta. Sesión, 20 por cuenta y día, caché de
-    siete días. ⚠️ **La ruta está escrita en `rr-auth` pero NO desplegada** (falta el
-    visto bueno de Ricardo para el worker compartido); mientras tanto la tarjeta muestra
-    la versión fija sin error.
+    siete días. Desplegada el 26-oct-2026 (`rr-auth` 3a05bd3). Si falla, no hay sesión o
+    se acaba la cuota, la tarjeta se queda con la versión fija sin error.
   - *Botones del CRM*: en mayúscula y sin flecha.
 
 ### 10.3 Candi (Luna)
