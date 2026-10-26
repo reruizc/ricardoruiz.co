@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
 """
-Brief comercial de Candidato 360 · 4 láminas apaisadas (A4 horizontal).
+Brief comercial de Candidato 360 · 6 láminas apaisadas (A4 horizontal).
 
 Es el PDF que se descarga desde los botones «¿Cómo funciona?» y «¿Por qué
 elegirnos?» de la portada (candidato-360.html, INTRO_INFO → BRIEF_PDF). Cada
 lámina cabe en una página: si el texto crece, hay que recortarlo, no dejar que
 salte de página.
 
-Láminas: 1 portada con tres cifras · 2 cómo funciona (cinco pasos + once
-módulos) · 3 por qué elegirnos (lo habitual contra lo que hace Candidato 360,
-y lo que no hacemos a propósito) · 4 planes y cómo empezar.
+Láminas: 1 portada con tres diferenciales · 2 cómo funciona (cinco pasos +
+once módulos) · 3 arquetipos por barrio · 4 por qué elegirnos (lo habitual
+contra lo que hace Candidato 360, curaduría mensual, lo que no hacemos) ·
+5 su territorio mes a mes (Policía, DANE, contratación) · 6 planes.
+
+Imágenes: los pictogramas de las fases (assets/candidato-360/fases/*.webp) y
+dos dibujados a mano en el mismo estilo (assets/candidato-360/brief/*.svg).
 
 Identidad: la de Candidato 360 (papel, azul noche, verde azulado, coral), no
 el sistema visual v2 oscuro del sitio. Helvetica Neue del repo; Syne solo en
 el nombre. Los precios salen de la escalera de candidato-360-brief.html
-(BASE_LISTA 300.000 × factor por corporación; completo 1.100.000 de lista):
-si esa escalera cambia, cambiar PRECIOS aquí.
+(BASE_LISTA 300.000 × factor por corporación; completo 1.100.000 de lista)
+MÁS el 20 % que Ricardo pidió para el brief el 26-oct-2026 (SUBIDA). La
+página candidato-360-brief.html todavía no lleva esa subida.
 
     python3 tools/candidato-360/brief-comercial/build.py
 
@@ -38,10 +43,13 @@ FECHA = f"{_MESES[_hoy.month - 1].capitalize()} de {_hoy.year}"
 
 # ── Precios «desde» por corporación: escalera del brief vigente (tamaño 1,0) ──
 BASE_LISTA, COMPLETO_LISTA = 300_000, 1_100_000
+SUBIDA = 1.2   # +20 % sobre la escalera del brief web (26-oct-2026)
 FACTOR = [("Junta Administradora Local", 1.0), ("Concejo", 1.4), ("Alcaldía", 1.8),
           ("Asamblea", 2.4), ("Gobernación", 3.0)]
 cop = lambda n: "$" + f"{round(n / 10_000) * 10_000:,}".replace(",", ".")
-PRECIOS = [(c, cop(BASE_LISTA * f), cop(COMPLETO_LISTA * f)) for c, f in FACTOR]
+PRECIOS = [(c, cop(BASE_LISTA * f * SUBIDA), cop(COMPLETO_LISTA * f * SUBIDA)) for c, f in FACTOR]
+DESDE = cop(BASE_LISTA * SUBIDA)
+IMG = lambda n: f"file://{ROOT}/assets/candidato-360/{n}"
 
 CSS = f"""
 @font-face{{font-family:HN;src:url('file://{FDIR}/helveticaneue.woff2')}}
@@ -113,6 +121,36 @@ tbody tr:nth-child(even) td{{background:#fffdf8}}
 .contacto{{margin-top:5mm;background:#fffdf8;border:1px solid rgba(16,34,56,.14);padding:3.6mm 4mm;font-size:9pt;line-height:1.5}}
 .contacto b{{color:#102b46}}
 small{{color:#637080;font-size:7.6pt}}
+.top{{display:grid;grid-template-columns:1fr 64mm;gap:8mm;align-items:center;margin-bottom:4mm}}
+.top .lead{{margin-bottom:0}}
+.top img{{width:64mm;height:42.6mm;object-fit:cover;display:block;border:1px solid rgba(16,34,56,.12)}}
+.portada-grid{{display:grid;grid-template-columns:1fr 92mm;gap:10mm;align-items:center;margin-top:10mm}}
+.portada-grid img{{width:92mm;height:61.3mm;object-fit:cover;display:block;border:3px solid #f6f1e8}}
+.cifra b.t{{font-size:15pt;line-height:1.12;letter-spacing:-.015em}}
+.ciudades{{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;margin:0 0 4mm}}
+.ciudad{{background:#fffdf8;border:1px solid rgba(16,34,56,.14);border-top:3px solid #147c70;padding:3.4mm 3.8mm}}
+.ciudad b{{display:block;font:700 11pt HN;color:#102b46}}
+.ciudad em{{display:block;font-style:normal;font:700 7.4pt HN;letter-spacing:.08em;text-transform:uppercase;color:#ef705d;margin:.8mm 0 1.8mm}}
+.ciudad p{{margin:0 0 1.6mm;font-size:8.2pt;line-height:1.4;color:#3a4a5c}}
+.chips{{display:flex;flex-wrap:wrap;gap:1.2mm}}
+.chip{{font:500 7.2pt HN;background:#f6f1e8;border:1px solid rgba(16,34,56,.16);padding:.6mm 1.8mm;color:#102b46}}
+.entrega{{display:grid;grid-template-columns:repeat(4,1fr);gap:3.5mm}}
+.entrega div{{border-top:1px solid rgba(16,34,56,.2);padding-top:1.8mm;font-size:8.2pt;line-height:1.4;color:#3a4a5c}}
+.entrega b{{display:block;color:#102b46;font-size:8.8pt;margin-bottom:.6mm}}
+.banda{{background:#102b46;color:#f6f1e8;padding:2.8mm 4.4mm;margin:0 0 3mm;display:grid;grid-template-columns:44mm 1fr;gap:5mm;align-items:center}}
+.banda b{{font:700 12.5pt/1.15 HN;color:#fff}}
+.banda span{{font-size:8.8pt;line-height:1.45;color:#dfe8ea}}
+.fuentes3{{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;margin:0 0 5mm}}
+.fuente{{background:#fffdf8;border:1px solid rgba(16,34,56,.14);padding:3.6mm 4mm;box-shadow:2.6mm 2.6mm 0 #b9ded2}}
+.fuente em{{display:block;font-style:normal;font:700 7.2pt HN;letter-spacing:.14em;text-transform:uppercase;color:#147c70;margin-bottom:1.2mm}}
+.fuente b{{display:block;font:700 11pt/1.2 HN;color:#102b46;margin-bottom:1.6mm}}
+.fuente p{{margin:0;font-size:8.4pt;line-height:1.45;color:#3a4a5c}}
+.fuente small{{display:block;margin-top:2mm}}
+.dos table{{font-size:7.9pt;line-height:1.34}} .dos td{{padding:1.5mm 2.2mm}} .dos th{{padding:1.6mm 2.2mm}}
+.ciudad p{{font-size:9.2pt;line-height:1.45}} .chip{{font-size:8pt;padding:.8mm 2mm}} .ciudad{{padding:4.4mm 4.6mm}}
+.ciudad em{{margin-bottom:2.4mm}} .entrega div{{font-size:9.2pt;line-height:1.45}} .entrega b{{font-size:10pt}}
+.fuente p{{font-size:9.6pt;line-height:1.5}} .fuente b{{font-size:12.5pt}} .fuente{{padding:5mm 5mm 4.4mm}}
+.lam5 .caja{{font-size:9.6pt;padding:4mm 4.6mm}} .lam5 .caja b{{font-size:11pt}}
 """
 
 MODULOS = [
@@ -132,25 +170,25 @@ MODULOS = [
 VENTAJAS = [
     ("Historial electoral",
      "Resultados por municipio, a veces por puesto, solo en planes para partidos.",
-     "<b>Mesa a mesa, 2010 a 2026, todas las corporaciones</b>, buscable por el nombre del candidato. Nadie más lo publica con ese detalle."),
+     "<b>Mesa a mesa, 2010 a 2026, todas las corporaciones</b>, buscable por el nombre del candidato, y <b>cada puesto conectado con su barrio</b>."),
     ("Meta de votos",
      "Una casilla que la campaña llena a ojo.",
      "<b>Calculada con la ley</b>: umbral, cifra repartidora y curules reales, en cuatro escalones del mínimo al deseado, repartida por localidad y barrio."),
     ("Electorado",
      "Demografía general del municipio.",
-     "<b>Censo oficial de 2026 puesto por puesto</b>, por sexo y edad, y <b>arquetipos por barrio</b> en Bogotá, Medellín y Cartagena."),
+     "<b>Censo oficial de 2026 puesto por puesto</b>, por sexo y edad, y <b>arquetipos por barrio</b>: qué mueve el voto en cada uno."),
     ("Rivales y aliados",
      "«Análisis de oposición» en redes, sin votos.",
-     "<b>Medidos con votos</b>: contra quién compite, dónde se pelea el voto y cuántos votos le pueden pasar sus aliados."),
+     "<b>Medidos con votos y revisados cada mes</b>: contra quién compite, dónde se pelea el voto y cuántos votos le pueden pasar sus aliados."),
     ("Día de la elección",
      "Una app de testigos que opera ese día.",
      "<b>El plan antes del día</b>: en qué puestos necesita testigo y la ficha logística de cada uno (señal, internet, acceso, orden público)."),
     ("Información del territorio",
      "Escucha de redes, cobrada aparte.",
-     "<b>Prensa, contratos públicos y normas</b> en su correo cada tres días; la escucha de redes, como módulo."),
+     "<b>Seguridad, empleo, contratos y normas</b> de su territorio, actualizados cada mes, y la prensa en su correo cada tres días."),
     ("Precio",
      "Cotización por demo; sin cifras públicas.",
-     "<b>Publicado, por mes y por módulos</b>, desde $300.000. Se cancela cuando quiera."),
+     f"<b>Publicado, por mes y por módulos</b>, desde {DESDE}. Se cancela cuando quiera."),
 ]
 
 
@@ -175,26 +213,33 @@ HTML_DOC = f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><style
 
 <div class="lam oscura">
   <div class="cab"><div class="marca">Candidato <b>360</b></div><div class="ojo">Plataforma electoral · Elecciones territoriales de Colombia · octubre de 2027</div></div>
-  <h1 style="margin-top:22mm;color:#fff">Su campaña empieza con evidencia.</h1>
-  <p class="portada-sub">Un CRM electoral que convierte los resultados oficiales y el censo en decisiones de campaña: dónde están sus votos, cuántos le faltan y qué hacer para conseguirlos. Para concejo, alcaldía, JAL, asamblea y gobernación.</p>
+  <div class="portada-grid">
+    <div>
+      <h1 style="color:#fff">Su campaña empieza con evidencia.</h1>
+      <p class="portada-sub">Un CRM electoral que convierte los resultados oficiales y el censo en decisiones de campaña: dónde están sus votos, cuántos le faltan y qué hacer para conseguirlos. Para concejo, alcaldía, JAL, asamblea y gobernación.</p>
+    </div>
+    <img src="{IMG('fases/planeacion.webp')}" alt="">
+  </div>
   <div class="cifras">
-    <div class="cifra"><b>439.015</b><span>candidaturas con su historial, buscables por nombre</span></div>
-    <div class="cifra"><b>2010 a 2026</b><span>dieciséis años de resultados mesa a mesa, todas las corporaciones</span></div>
-    <div class="cifra"><b>13.700</b><span>puestos de votación con el censo oficial de 2026, por sexo y edad</span></div>
+    <div class="cifra"><b>Más de 400.000</b><span>candidaturas de 2010 a 2026, mesa a mesa y buscables por nombre</span></div>
+    <div class="cifra"><b class="t">Su perfil y el de su familia política</b><span>quién es usted como candidato y cómo vota el partido o el sector ideológico por el que se lanza</span></div>
+    <div class="cifra"><b class="t">Puestos conectados con sus barrios</b><span>la lista de puestos existe; saber en qué barrio está cada voto, no. Nosotros lo cruzamos</span></div>
   </div>
   {PIE}
 </div>
 
 <div class="lam">
-  <div class="cab"><div class="marca">Candidato <b>360</b></div><div class="ojo">Lámina 2 de 4 · Cómo funciona</div></div>
-  <h2><span>Así funciona</span>De su nombre a su plan de campaña, en una sesión.</h2>
-  <p class="lead">Cinco pasos. Los dos primeros los da usted; los otros tres los da la plataforma con datos oficiales.</p>
+  <div class="cab"><div class="marca">Candidato <b>360</b></div><div class="ojo">Lámina 2 de 6 · Cómo funciona</div></div>
+  <div class="top"><div>
+    <h2><span>Así funciona</span>De su nombre a su plan de campaña, en una sesión.</h2>
+    <p class="lead">Cinco pasos. Los dos primeros los da usted; los otros tres los da la plataforma con datos oficiales.</p>
+  </div><img src="{IMG('fases/posicionamiento.webp')}" alt=""></div>
   <div class="pasos">
-    <div class="paso"><i>1</i><b>Díganos quién es</b><p>Si ya se lanzó, lo buscamos entre 439.000 candidaturas y traemos su historial mesa a mesa. Si es su primera vez, bastan seis preguntas.</p></div>
-    <div class="paso"><i>2</i><b>Elija a qué se lanza</b><p>Corporación, territorio y aval: partido o firmas. Con eso activamos solo los datos de su campaña.</p></div>
-    <div class="paso"><i>3</i><b>Reciba su punto de partida</b><p>El mapa de su votación hasta el puesto, la meta calculada con la ley y el perfil de quien puede votar por usted, con el censo de 2026.</p></div>
-    <div class="paso"><i>4</i><b>Lea el territorio</b><p>Arquetipos por barrio, contendientes, aliados que pueden endosarle votos y lo que la prensa y las redes dicen de usted.</p></div>
-    <div class="paso"><i>5</i><b>Planee y ejecute</b><p>Estrategia por fases, plan del día de la elección puesto por puesto y un briefing en su correo cada tres días.</p></div>
+    <div class="paso"><i>1</i><b>Díganos quién es</b><p>Si ya se lanzó, lo buscamos entre más de 400.000 candidaturas y traemos su historial mesa a mesa. Si es su primera vez, bastan seis preguntas.</p></div>
+    <div class="paso"><i>2</i><b>Elija a qué se lanza</b><p>Corporación, territorio y aval: partido o firmas. Con eso armamos su perfil y el de su familia política.</p></div>
+    <div class="paso"><i>3</i><b>Reciba su punto de partida</b><p>El mapa de su votación por barrio y puesto, la meta calculada con la ley y quién puede votar por usted, con el censo de 2026.</p></div>
+    <div class="paso"><i>4</i><b>Lea el territorio</b><p>Arquetipos por barrio, contendientes y aliados revisados cada mes, y lo que dicen la prensa y las redes.</p></div>
+    <div class="paso"><i>5</i><b>Planee y ejecute</b><p>Hoja de ruta en cinco etapas, plan del día de la elección puesto por puesto y un briefing en su correo cada tres días.</p></div>
   </div>
   <div class="h3">Los once módulos del tablero</div>
   <div class="modulos">{modulos_html()}</div>
@@ -202,43 +247,83 @@ HTML_DOC = f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><style
 </div>
 
 <div class="lam">
-  <div class="cab"><div class="marca">Candidato <b>360</b></div><div class="ojo">Lámina 3 de 4 · Por qué elegirnos</div></div>
-  <h2><span>Por qué elegirnos</span>Lo que ningún otro programa de campaña le muestra.</h2>
-  <p class="lead">Los demás administran a su gente. Candidato 360 le dice dónde están los votos, cuántos le faltan y qué hacer para conseguirlos.</p>
-  <div class="dos">
-    <div>{ventajas_html()}</div>
-    <div>
-      <div class="caja"><b>Lo que no hacemos, a propósito</b>No guardamos su base de contactos ni hacemos envíos masivos por WhatsApp: su información sigue siendo suya y su campaña no corre el riesgo de un bloqueo. Lo que construimos es el mensaje listo para que su gente lo envíe desde su propio celular.</div>
-      <div class="caja verde"><b>Cada cifra con su fuente</b>Resultados oficiales de la Registraduría y censo electoral. Cuando algo se estima, la pantalla dice que se estima, con qué y qué parte de su votación cubre. El voto es secreto: se describe el censo de los puestos, nunca a las personas.</div>
-      <div class="caja verde" style="border-color:#102b46"><b>Candi, la guía</b>Explica cada pantalla y sugiere qué mirar según la corporación, el aval y el territorio que eligió.</div>
-    </div>
+  <div class="cab"><div class="marca">Candidato <b>360</b></div><div class="ojo">Lámina 3 de 6 · Arquetipos</div></div>
+  <div class="top"><div>
+    <h2><span>Lo que nadie más tiene</span>Qué mueve el voto en cada barrio.</h2>
+    <p class="lead">Un arquetipo es una forma de votar que se repite en varios barrios: qué decide a la gente de ahí, qué la moviliza y qué la aleja. Ningún programa de campaña que revisamos, en Colombia ni afuera, lo ofrece.</p>
+  </div><img src="{IMG('fases/campana.webp')}" alt=""></div>
+  <div class="ciudades">
+    <div class="ciudad"><b>Medellín</b><em>5 arquetipos · 152 barrios</em><p>Cartografía emocional del voto barrial de 2015 a 2023, con su proyección a 2027.</p><div class="chips"><span class="chip">Protección con resultados</span><span class="chip">Castigo y alternancia</span><span class="chip">Continuidad pragmática</span><span class="chip">Supervivencia económica</span><span class="chip">Pertenencia comunitaria</span></div></div>
+    <div class="ciudad"><b>Cartagena</b><em>8 tipologías · 211 barrios</em><p>Tipologías propias de la ciudad, con la mezcla de las ocho en cada barrio.</p><div class="chips"><span class="chip">Orden que Cumple</span><span class="chip">Ojo al Poder</span><span class="chip">Barrio que Resuelve</span><span class="chip">Cambio de Verdad</span><span class="chip">Orgullo de Tierra</span><span class="chip">Que Miren la Isla</span><span class="chip">Primero el Trabajo</span><span class="chip">El que Responde</span></div></div>
+    <div class="ciudad"><b>Bogotá</b><em>8 por corporación · 519 barrios</em><p>Salen de cómo vota cada barrio en Concejo, Alcaldía y presidencial, con su estrato. Al Concejo, por ejemplo:</p><div class="chips"><span class="chip">Clase media sin dueño</span><span class="chip">Norte de opinión</span><span class="chip">Norte de figuras</span><span class="chip">Barrio de gestión</span><span class="chip">Periferia de partido</span><span class="chip">Ciudadela movilizada</span></div></div>
+  </div>
+  <div class="h3">Lo que le entrega</div>
+  <div class="entrega">
+    <div><b>Su arquetipo principal</b>Y su ascendente: con qué forma de votar se parece más su votación, medido barrio por barrio.</div>
+    <div><b>Dónde pesa cada uno</b>Los barrios de su territorio por arquetipo, con su votación y la de su familia política.</div>
+    <div><b>Cómo hablarle</b>Qué lo activa, qué lo desmoviliza, el tono y los canales que funcionan con cada uno.</div>
+    <div><b>Qué pasa si…</b>Un simulador: si la seguridad o el empleo empeoran, qué barrios cambian de ánimo.</div>
   </div>
   {PIE}
 </div>
 
 <div class="lam">
-  <div class="cab"><div class="marca">Candidato <b>360</b></div><div class="ojo">Lámina 4 de 4 · Planes y cómo empezar</div></div>
-  <h2><span>Planes</span>Un precio por mes. Sin contratos largos.</h2>
-  <p class="lead">La base incluye el mapa, la meta, el electorado y las firmas. Cada módulo se suma aparte y se activa o se quita cualquier mes. El precio escala con la corporación y con el tamaño del territorio.</p>
+  <div class="cab"><div class="marca">Candidato <b>360</b></div><div class="ojo">Lámina 4 de 6 · Por qué elegirnos</div></div>
+  <div class="top"><div>
+    <h2><span>Por qué elegirnos</span>Lo que ningún otro programa de campaña le muestra.</h2>
+    <p class="lead">Los demás administran a su gente. Candidato 360 le dice dónde están los votos, cuántos le faltan y qué hacer para conseguirlos.</p>
+  </div><img src="{IMG('fases/remate.webp')}" alt=""></div>
+  <div class="banda"><b>Curamos la información cada mes.</b><span>Cada mes revisamos sus contendientes y sus aliados: quién entra, quién se baja, quién cambia de partido o de aval. La campaña se mueve con el posicionamiento, y la lectura se mueve con ella.</span></div>
+  <div class="dos">
+    <div>{ventajas_html()}</div>
+    <div>
+      <div class="caja"><b>Lo que no hacemos, a propósito</b>No guardamos su base de contactos ni hacemos envíos masivos por WhatsApp: su información sigue siendo suya y su campaña no corre el riesgo de un bloqueo.</div>
+      <div class="caja verde"><b>Cada cifra con su fuente</b>Resultados oficiales de la Registraduría y censo electoral. Cuando algo se estima, se dice con qué. El voto es secreto: se describe el censo de los puestos, nunca a las personas.</div>
+    </div>
+  </div>
+  {PIE}
+</div>
+
+<div class="lam lam5">
+  <div class="cab"><div class="marca">Candidato <b>360</b></div><div class="ojo">Lámina 5 de 6 · Su territorio, mes a mes</div></div>
+  <div class="top"><div>
+    <h2><span>Datos del territorio</span>Lo que pasa en su territorio, cada mes.</h2>
+    <p class="lead">Una tarjeta en la etapa de posicionamiento con las bases públicas que se actualizan cada mes, leídas para su municipio y, en las ciudades principales, para sus comunas y barrios.</p>
+  </div><img src="{IMG('brief/territorio-mes.svg')}" alt=""></div>
+  <div class="fuentes3">
+    <div class="fuente"><em>Seguridad</em><b>Delitos de la Policía Nacional</b><p>Homicidios, hurtos, violencia intrafamiliar, extorsión y diecisiete delitos más, por municipio. En las ciudades principales, por comuna y barrio: mes contra mes y año corrido.</p><small>Policía Nacional y Ministerio de Defensa</small></div>
+    <div class="fuente"><em>Empleo</em><b>Mercado laboral del DANE</b><p>Desempleo, ocupación e informalidad en las 23 ciudades principales y sus áreas metropolitanas, con el dato que el DANE publica cada mes.</p><small>DANE · Gran Encuesta Integrada de Hogares</small></div>
+    <div class="fuente"><em>Gestión pública</em><b>Contratos y normas</b><p>Los contratos públicos que se firman en su territorio y las normas que lo tocan, en el briefing que le llega cada tres días.</p><small>SECOP y diarios oficiales</small></div>
+  </div>
+  <div class="caja verde" style="margin-top:0"><b>Para qué le sirve</b>Un dato propio para cada discurso y cada debate: dónde subió el hurto, qué ciudad perdió empleo, qué contrato se firmó en su barrio. Con la fuente al lado, para que nadie se lo pueda discutir.</div>
+  {PIE}
+</div>
+
+<div class="lam">
+  <div class="cab"><div class="marca">Candidato <b>360</b></div><div class="ojo">Lámina 6 de 6 · Planes y cómo empezar</div></div>
+  <div class="top"><div>
+    <h2><span>Planes</span>Un precio por mes. Sin contratos largos.</h2>
+    <p class="lead">La base incluye el mapa, la meta, el electorado y las firmas. Cada módulo se suma aparte y se activa o se quita cualquier mes. El precio escala con la corporación y con el tamaño del territorio.</p>
+  </div><img src="{IMG('fases/dia.webp')}" alt=""></div>
   <div class="planes">
     <div>
       <div class="formas">
         <div class="forma"><b>Esencial</b><em>Base + briefing</em><p>Para arrancar con el territorio claro y la meta puesta, con su territorio en el correo cada tres días.</p></div>
         <div class="forma star"><b>Con escucha</b><em>El más elegido</em><p>La base, el briefing y la escucha social dos veces al día en X, Instagram, TikTok y Facebook.</p></div>
-        <div class="forma"><b>Completo</b><em>Todo el tablero</em><p>Briefing, escucha con sentimiento, endoso, estrategia y acciones: la campaña entera leída y planeada desde un solo lugar.</p></div>
+        <div class="forma"><b>Completo</b><em>Todo el tablero</em><p>Briefing, escucha con sentimiento, arquetipos, endoso, estrategia y acciones, en un solo lugar.</p></div>
       </div>
       {precios_html()}
-      <small>Pesos colombianos por mes, IVA incluido, para el territorio más pequeño de cada corporación; una ciudad grande o un departamento grande sube hasta 1,6 veces. Arquetipos por barrio se suma aparte donde existen. Precios de lista a {FECHA.lower()}; la cotización exacta se arma en la plataforma.</small>
+      <small>Pesos colombianos por mes, IVA incluido, para el territorio más pequeño de cada corporación; una ciudad o un departamento grande sube hasta 1,6 veces. Precios de lista a {FECHA.lower()}; la cotización exacta se arma en la plataforma.</small>
     </div>
     <div>
       <div class="h3">Cómo empezar</div>
       <ol class="pasos-v">
         <li><b>Entre con su nombre.</b> La búsqueda es abierta: vea su historial, el mapa de su votación y su meta antes de pagar.</li>
         <li><b>Arme su candidatura.</b> Diga a qué se lanza, con qué aval y en qué territorio. Puede hacerlo sin cuenta.</li>
-        <li><b>Active el acceso.</b> Una cuenta se vincula a un solo candidato, así su información no se mezcla con la de nadie más. La corporación y el territorio sí se ajustan cuando quiera.</li>
+        <li><b>Active el acceso.</b> Una cuenta se vincula a un solo candidato. La corporación y el territorio sí se ajustan cuando quiera.</li>
         <li><b>La primera semana.</b> Escriba sus ideas de campaña y conecte sus redes: el primer briefing llega a los tres días.</li>
       </ol>
-      <div class="contacto"><b>ricardoruiz.co/candidato-360.html</b><br>hola@ricardoruiz.co<br><small>Una cuenta, un candidato. Se paga mes a mes y se cancela cuando quiera.</small></div>
+      <div class="contacto"><b>ricardoruiz.co/candidato-360.html</b><br>hola@ricardoruiz.co · WhatsApp +57 324 303 6767<br><small>Agende 30 minutos: calendar.app.google/PGDbTQfmNmtgPud8A</small></div>
     </div>
   </div>
   {PIE}

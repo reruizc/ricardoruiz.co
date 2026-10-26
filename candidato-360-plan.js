@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    CANDIDATO 360 · el plan de campaña por fases (portada del CRM · oct-20-2026)
    ───────────────────────────────────────────────────────────────────────────
-   Antes de los once módulos, el CRM saluda («Hola, Emel») y muestra el plan en
+   Antes de los once módulos, el CRM saluda («¡Hola, Emel! Esta es tu hoja de ruta»), muestra el aviso de las cinco etapas y muestra el plan en
    cinco fases: Planeación · Posicionamiento · Campaña · Remate · Día de la
    elección. Cada fase abre solo los módulos que le sirven; en las dos
    primeras, 11 · Estrategia va de primera.
@@ -58,6 +58,7 @@
   ];
 
   let FASE = null;
+  const AVISO_KEY = 'c360-plan-etapas-vistas';
   /* Ilustraciones de las fases: pictogramas planos y serios (figuras tipo
      señalética), generados en Canva el 22-oct-2026. Reemplazaron a las
      isométricas estilo Monument Valley, que no gustaron. */
@@ -78,6 +79,20 @@
 .plan-aviso b{color:var(--coral)}.plan-aviso span{color:var(--muted)}
 #crm.plan-fase .crm-grid>#crmEstrategia{order:-5}
 .plan-hola{margin:8px 0 26px}.plan-hola h2{font-size:clamp(36px,5vw,62px);line-height:.98;margin:6px 0 10px}.plan-hola p{color:var(--muted);max-width:640px;margin:0;font-size:17px}.plan-hola .plan-por-que{max-width:920px;margin-top:16px;font-size:17.5px;line-height:1.6;color:var(--ink);border-left:3px solid var(--green);padding-left:14px}
+.plan-hola{margin:8px 0 22px}
+.plan-etapas-aviso{max-width:980px;padding:30px 34px 28px;background:var(--cream);border:1px solid var(--line);border-left:5px solid var(--coral);box-shadow:14px 14px 0 var(--mint);animation:planAviso .35s ease}
+.plan-etapas-aviso p{margin:0 0 16px;font-size:clamp(19px,1.9vw,24px);line-height:1.5;color:var(--ink)}
+.plan-etapas-aviso .plan-etapas-cierre{font-weight:800;color:var(--green)}
+.plan-etapas-ok{margin-top:8px;min-width:240px;min-height:54px;padding:14px 28px;border:0;background:var(--ink);color:#fff;font:800 15px var(--sans);letter-spacing:.18em;text-transform:uppercase;cursor:pointer;transition:background .2s}
+.plan-etapas-ok:hover,.plan-etapas-ok:focus{background:var(--green);outline:none}
+.plan-etapas-cuerpo{animation:planAviso .35s ease}
+.plan-sub{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;justify-content:space-between;margin:0 0 18px}
+.plan-sub p{margin:0;color:var(--muted);font-size:17px;max-width:680px}
+.plan-etapas-ver{border:1px solid var(--ink);background:transparent;color:var(--ink);padding:10px 14px;font:700 12px var(--sans);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.plan-etapas-ver:hover{background:var(--ink);color:#fff}
+@keyframes planAviso{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media(max-width:700px){.plan-etapas-aviso{padding:22px 18px;box-shadow:8px 8px 0 var(--mint)}.plan-etapas-ok{width:100%}}
+@media(prefers-reduced-motion:reduce){.plan-etapas-aviso,.plan-etapas-cuerpo{animation:none}}
 .plan-fases{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;counter-reset:fase}
 .plan-card{counter-increment:fase;position:relative;display:flex;flex-direction:column;gap:8px;padding:20px 18px;min-height:250px;background:var(--cream);border:1px solid var(--line);text-align:left;font:inherit;color:inherit}
 .plan-card .plan-num{font:500 11px var(--mono);color:var(--green);letter-spacing:.1em}.plan-card.cerrada .plan-num{color:var(--muted)}
@@ -118,9 +133,18 @@
     limpiarFiltro();
     const nombre = nombreCorto();
     caja.classList.remove('hidden');
-    caja.innerHTML = `<div class="plan-hola"><div class="kicker">Plan de campaña · 2027</div><h2>Hola${nombre ? `, ${esc(nombre)}` : ''}. Este es su plan de campaña.</h2>
-      <p>Cinco fases hasta el 31 de octubre de 2027. Cada una abre las herramientas que sirven en ese momento; hoy están abiertas las dos primeras.</p>
-      <p class="plan-por-que">Tienes cinco etapas que desarrollar en una campaña. No es una sola carrera lineal. Primero se planea, en donde la estrategia es el corazón de la campaña, lo cual depende de dónde te lanzas, tu ideología política y tu arquetipo. Después debes posicionarte, pues esto reduce costos de campaña para que el votante te conozca. Luego viene la campaña: aval, lista, inscripción y propaganda ¡a toda! Por último, el remate es el último mes, cuando la pauta pesa pero su efecto dura pocos días; ahí es donde están las mayores inversiones. Luego, el día de la elección se gana con logística: sacar a votar y cuidar el voto. Es muy importante seguir estos pasos si quieres ganar y que la campaña no te salga tan costosa.</p></div>
+    /* Primero el aviso de las cinco etapas, en grande; con «Siguiente» se
+       despliegan las cinco cajas (pedido de Ricardo, 26-oct-2026). Se ve una
+       vez por pestaña y se reabre con «Cómo funcionan las cinco etapas». */
+    const vista = (() => { try { return sessionStorage.getItem(AVISO_KEY) === '1'; } catch { return false; } })();
+    caja.innerHTML = `<div class="plan-hola"><div class="kicker">Plan de campaña · 2027</div><h2>¡Hola${nombre ? `, ${esc(nombre)}` : ''}! Esta es tu hoja de ruta.</h2></div>
+      <div class="plan-etapas-aviso${vista ? ' hidden' : ''}" role="region" aria-label="Las cinco etapas de una campaña">
+        <p>Tienes cinco etapas que desarrollar en una campaña. No es una sola carrera lineal. Primero se planea, en donde la estrategia es el corazón de la campaña, lo cual depende de dónde te lanzas, tu ideología política y tu arquetipo. Después debes posicionarte, pues esto reduce costos de campaña para que el votante te conozca. Luego viene la campaña: aval, lista, inscripción y propaganda ¡a toda! Por último, el remate es el último mes, cuando la pauta pesa pero su efecto dura pocos días; ahí es donde están las mayores inversiones. Luego, el día de la elección se gana con logística: sacar a votar y cuidar el voto.</p>
+        <p class="plan-etapas-cierre">Es muy importante seguir estos pasos si quieres ganar y que la campaña no te salga tan costosa.</p>
+        <button type="button" class="plan-etapas-ok">Siguiente</button>
+      </div>
+      <div class="plan-etapas-cuerpo${vista ? '' : ' hidden'}">
+      <div class="plan-sub"><p>Cinco etapas hasta el 31 de octubre de 2027. Cada una abre las herramientas que sirven en ese momento; hoy están abiertas las dos primeras.</p><button type="button" class="plan-etapas-ver">Cómo funcionan las cinco etapas</button></div>
       <div class="plan-fases">${FASES.map(f => {
         /* Las cerradas también se abren: adentro los módulos van en gris. Lo que
            trae cada una se ve al abrirla, no en la tarjeta (oct-26-2026). */
@@ -130,8 +154,18 @@
           <span class="plan-num">${String(FASES.indexOf(f) + 1).padStart(2, '0')}</span><h3>${esc(f.nombre)}</h3><span class="plan-cuando">${esc(f.cuando)}</span><p>${esc(f.que)}</p>
           <span class="plan-trae">${f.activa ? `<span class="plan-ir">Abrir</span>` : `<span class="plan-abre">Se abre el ${esc(fecha(f.abre))}.</span><span class="plan-ir">Ver</span>`}</span>
         </button>`;
-      }).join('')}</div>`;
+      }).join('')}</div></div>`;
     caja.querySelectorAll('.plan-card').forEach(b => b.onclick = () => abrir(b.dataset.fase));
+    const aviso = caja.querySelector('.plan-etapas-aviso'), cuerpo = caja.querySelector('.plan-etapas-cuerpo');
+    caja.querySelector('.plan-etapas-ok').onclick = () => {
+      try { sessionStorage.setItem(AVISO_KEY, '1'); } catch {}
+      aviso.classList.add('hidden'); cuerpo.classList.remove('hidden');
+      cuerpo.querySelector('.plan-card')?.focus({ preventScroll: true });
+    };
+    caja.querySelector('.plan-etapas-ver').onclick = () => {
+      cuerpo.classList.add('hidden'); aviso.classList.remove('hidden');
+      aviso.querySelector('.plan-etapas-ok').focus({ preventScroll: true });
+    };
   }
 
   function limpiarFiltro() {

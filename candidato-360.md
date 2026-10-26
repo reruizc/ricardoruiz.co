@@ -580,14 +580,36 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
   cierran con **«Descargar el brief comercial · PDF · 4 láminas»** →
   `assets/candidato-360/Candidato-360-brief-comercial.pdf` (`BRIEF_PDF`), generado por
   `python3 tools/candidato-360/brief-comercial/build.py` (WeasyPrint, A4 apaisado,
-  identidad papel/azul noche/coral, Helvetica del repo): portada con tres cifras ·
-  cómo funciona + once módulos · lo habitual contra lo que hace Candidato 360 y lo que
-  no hacemos a propósito · planes y cómo empezar. ⚠️ Los precios «desde» del PDF salen
-  de la escalera de `candidato-360-brief.html` (300.000 × factor por corporación;
-  completo 1.100.000 de lista): si esa escalera cambia, regenerar el PDF. ⚠️ La regla
+  identidad papel/azul noche/coral, Helvetica del repo). **Seis láminas** desde la
+  segunda ronda del mismo día: portada (más de 400.000 candidaturas · su perfil y el de
+  su familia política · puestos conectados con sus barrios) · cómo funciona + once
+  módulos · **arquetipos** (Medellín 5, Cartagena 8, Bogotá 8 por corporación, y qué
+  entrega) · por qué elegirnos con la banda «Curamos la información cada mes»
+  (contendientes y aliados) · **su territorio mes a mes** (Policía, empleo DANE GEIH en
+  23 ciudades, SECOP y normas) · planes. Cada lámina lleva un pictograma: los de las
+  fases y dos dibujados a mano en el mismo estilo (`assets/candidato-360/brief/`
+  `territorio-mes.svg` y `en-construccion.svg`). ⚠️ Los precios del PDF son la escalera
+  de `candidato-360-brief.html` **× 1,2** (`SUBIDA`, pedido de Ricardo): desde 360.000.
+  La página del brief web sigue en 300.000; el modal ya dice 360.000. ⚠️ La tarjeta de
+  datos del territorio y el empleo del DANE **no existen todavía en el CRM**: el PDF los
+  ofrece como parte de la etapa de posicionamiento. ⚠️ La regla
   global `.open{font:… var(--mono);text-transform:uppercase}` alcanza al modal abierto
   (`#introModal.open`) y ponía las listas en monoespaciada y mayúscula; el bloque final
   de `candidato-360.css` lo devuelve a Manrope.
+
+- **Ecuador y Paraguay, en construcción (26-oct-2026).** Antes de elegir país el
+  rótulo de la portada dice «Colombia · Ecuador · Paraguay» (decía «Elecciones
+  territoriales 2027» sin país elegido). Las tarjetas dicen «Territoriales 2027»,
+  «Seccionales 2026» y «Siguiente proceso electoral». Elegir Ecuador o Paraguay ya no
+  lleva al saludo de Candi: `mostrarConstruccion(codigo)` abre `#paisConstruccion`
+  (etapa `construccion`) con el pictograma, «Agendar 30 minutos»
+  (calendar.app.google/PGDbTQfmNmtgPud8A), WhatsApp con el país en el mensaje y el
+  correo. «Volver» regresa a los países.
+- **Plan de campaña: aviso de cinco etapas (26-oct-2026).** El título es «¡Hola,
+  {nombre}! Esta es tu hoja de ruta.» y debajo va el texto de las cinco etapas en
+  grande, como aviso, con «Siguiente»; solo entonces se despliegan las cinco tarjetas.
+  Se ve una vez por pestaña (`sessionStorage['c360-plan-etapas-vistas']`) y se reabre
+  con «Cómo funcionan las cinco etapas».
 
 ### 10.3 Candi (Luna)
 

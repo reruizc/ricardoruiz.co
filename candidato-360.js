@@ -206,34 +206,36 @@ function volverIntro() {
   } else start();
 })();
 
-const BRIEF_PDF = 'assets/candidato-360/Candidato-360-brief-comercial.pdf';
+const BRIEF_PDF = 'assets/candidato-360/Candidato-360-brief-comercial.pdf?v=20261026b';
 const INTRO_INFO = {
   how: { kicker: 'Así funciona', title: 'De su nombre a su plan de campaña, en una sesión.', html: `
 <ol class="intro-pasos">
-<li><b>Díganos quién es.</b> Si ya se lanzó, lo buscamos entre 439.000 candidaturas de 2010 a 2026 y traemos su historial mesa a mesa. Si es su primera vez, bastan seis preguntas.</li>
-<li><b>Elija a qué se lanza.</b> Corporación, territorio y aval: partido o firmas. Con eso activamos solo los datos de su campaña.</li>
-<li><b>Reciba su punto de partida.</b> El mapa de su votación hasta el puesto, la meta de votos calculada con la ley electoral y el perfil de quien puede votar por usted, con el censo de 2026.</li>
-<li><b>Lea el territorio.</b> Arquetipos por barrio, contendientes, aliados que pueden endosarle votos y lo que la prensa y las redes dicen de usted.</li>
-<li><b>Planee y ejecute.</b> Estrategia por fases, plan del día de la elección puesto por puesto y un briefing en su correo cada tres días. Candi, la guía, le explica cada pantalla.</li>
+<li><b>Díganos quién es.</b> Si ya se lanzó, lo buscamos entre más de 400.000 candidaturas de 2010 a 2026 y traemos su historial mesa a mesa. Si es su primera vez, bastan seis preguntas.</li>
+<li><b>Elija a qué se lanza.</b> Corporación, territorio y aval: partido o firmas. Con eso armamos su perfil y el de su familia política, y activamos solo los datos de su campaña.</li>
+<li><b>Reciba su punto de partida.</b> El mapa de su votación por barrio y por puesto, la meta de votos calculada con la ley electoral y el perfil de quien puede votar por usted, con el censo de 2026.</li>
+<li><b>Lea el territorio.</b> Arquetipos por barrio, contendientes y aliados revisados cada mes, seguridad y empleo de su territorio mes a mes, y lo que la prensa y las redes dicen de usted.</li>
+<li><b>Planee y ejecute.</b> Una hoja de ruta en cinco etapas, plan del día de la elección puesto por puesto y un briefing en su correo cada tres días. Candi, la guía, le explica cada pantalla.</li>
 </ol>
 <p class="intro-cierre">Todo sale de resultados oficiales y del censo electoral. Cuando algo se estima, se dice que se estima y con qué.</p>` },
   why: { kicker: 'Por qué elegirnos', title: 'Lo que ningún otro programa de campaña le muestra.', html: `
 <p class="intro-lead">Los demás administran a su gente. Candidato 360 le dice dónde están los votos, cuántos le faltan y qué hacer para conseguirlos.</p>
 <ul class="intro-ventajas">
-<li><b>Historial mesa a mesa, 2010 a 2026, todas las corporaciones.</b> Buscable por su nombre. Nadie más lo publica con ese detalle.</li>
+<li><b>Historial mesa a mesa, 2010 a 2026, todas las corporaciones.</b> Más de 400.000 candidaturas buscables por nombre, con su perfil y el de su familia política.</li>
+<li><b>Cada puesto conectado con su barrio.</b> La lista de puestos existe; saber en qué barrios están sus votos, no. Nosotros lo cruzamos.</li>
 <li><b>La meta con la ley, no un número redondo.</b> Umbral, cifra repartidora y curules reales, en cuatro escalones: del mínimo al deseado.</li>
-<li><b>Quién puede votar por usted, puesto por puesto.</b> Censo oficial de 2026 por sexo y edad, y en Bogotá, Medellín y Cartagena, arquetipos por barrio: qué mueve el voto en cada uno.</li>
-<li><b>Rivales y aliados medidos con votos.</b> Contra quién compite, dónde se pelea el voto y cuántos votos le pueden pasar sus aliados.</li>
+<li><b>Arquetipos: qué mueve el voto en cada barrio.</b> Qué decide a la gente, qué la moviliza y qué la aleja, en Bogotá, Medellín y Cartagena. Ningún competidor lo tiene.</li>
+<li><b>Quién puede votar por usted, puesto por puesto.</b> Censo oficial de 2026 por sexo y edad.</li>
+<li><b>Rivales y aliados medidos con votos y curados cada mes.</b> Quién entra, quién se baja y quién cambia de aval: la lectura se mueve con su posicionamiento.</li>
 <li><b>El día de la elección, planeado antes.</b> En qué puestos necesita testigo y la ficha logística de cada uno: señal, internet, acceso, orden público.</li>
-<li><b>Prensa, contratos públicos y normas en su correo cada tres días</b>, y escucha de redes como módulo aparte.</li>
+<li><b>Su territorio, mes a mes.</b> Seguridad de la Policía, empleo del DANE, contratos y normas, más la prensa en su correo cada tres días.</li>
 <li><b>Cada cifra con su fuente y su cobertura.</b> No guardamos su base de contactos ni hacemos envíos masivos: su información sigue siendo suya.</li>
-<li><b>Un precio por mes, desde $300.000, sin contratos largos.</b> Se arma por módulos y se cancela cuando quiera.</li>
+<li><b>Un precio por mes, desde $360.000, sin contratos largos.</b> Se arma por módulos y se cancela cuando quiera.</li>
 </ul>` }
 };
 function showIntroInfo(topic) {
   const content = INTRO_INFO[topic]; if (!content) return;
   $('introModalKicker').textContent = content.kicker; $('introModalTitle').textContent = content.title;
-  $('introModalText').innerHTML = content.html + `<p class="intro-descarga-wrap"><a class="intro-descarga" href="${BRIEF_PDF}" download target="_blank" rel="noopener">Descargar el brief comercial<small>PDF · 4 láminas</small></a></p>`;
+  $('introModalText').innerHTML = content.html + `<p class="intro-descarga-wrap"><a class="intro-descarga" href="${BRIEF_PDF}" download target="_blank" rel="noopener">Descargar el brief comercial<small>PDF · 6 láminas</small></a></p>`;
   $('introModal').classList.add('open');
   $('introModal').querySelector('.intro-modal-card').scrollTop = 0;
 }
@@ -491,6 +493,7 @@ function elegirPais(codigo) {
   PAIS = codigo;
   try { localStorage.setItem('c360-pais', codigo); } catch {}
   $('paisPaso').classList.add('hidden');
+  if (codigo !== 'co') { mostrarConstruccion(codigo); return; }
   $('partidaPaso').classList.remove('hidden');
   $('partidaOpciones').classList.add('hidden');
   $('partidaSkip').classList.remove('hidden');
@@ -510,9 +513,25 @@ function mostrarOpcionesPartida() {
   etapaIntro('options');
   if (moveFocus) $('partidaTitulo').focus({ preventScroll: true });
 }
+/* Ecuador y Paraguay todavía no tienen datos: en vez del saludo de Candi se
+   dice que está en construcción y se ofrece hablar (agenda, WhatsApp, correo). */
+function mostrarConstruccion(codigo) {
+  clearTimeout(partidaTimer);
+  const nombre = PAISES[codigo]?.nombre || '';
+  $('partidaPaso').classList.add('hidden');
+  $('construccionKicker').textContent = `${nombre} · en construcción`;
+  $('construccionTitulo').textContent = `Candidato 360 para ${nombre} está en construcción.`;
+  $('construccionTexto').textContent = `Estamos preparando los resultados electorales y la cartografía de ${nombre}. Si quiere saber más o reservar su lugar, escríbanos o agende una llamada de 30 minutos.`;
+  $('construccionWa').href = 'https://wa.me/573243036767?text=' + encodeURIComponent(`Hola Ricardo, quiero saber más de Candidato 360 en ${nombre}.`);
+  $('construccionMail').href = 'mailto:hola@ricardoruiz.co?subject=' + encodeURIComponent(`Candidato 360 en ${nombre}`);
+  $('paisConstruccion').classList.remove('hidden');
+  etapaIntro('construccion');
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  $('construccionTitulo').focus({ preventScroll: true });
+}
 function cambiarPais(enfocar = true) {
   clearTimeout(partidaTimer);
-  $('partidaPaso').classList.add('hidden'); $('paisPaso').classList.remove('hidden');
+  $('partidaPaso').classList.add('hidden'); $('paisConstruccion').classList.add('hidden'); $('paisPaso').classList.remove('hidden');
   etapaIntro('country');
   if (enfocar) document.querySelector('#paisPaso [data-pais="' + (PAIS || 'co') + '"]')?.focus({ preventScroll: true });
 }
