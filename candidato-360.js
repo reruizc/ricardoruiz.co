@@ -5198,6 +5198,7 @@ function pintarTarjetaEstrategia() {
   $('crmEstrBtn').disabled = false;
   lecturaIAEstrategia();
 }
+const fechaLarga = iso => { const [a, m, d] = String(iso).split('-').map(Number); return `${d} de ${['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'][m - 1]} de ${a}`; };
 function contextoIAEstrategia() {
   const R = ESTR.R, k = contextoCampanaEstr(), c = CAMPANA_ACTUAL || SESSION.vinculo?.campana || {};
   const hist = crmCandidate ? leerCorpHistorica(crmCandidate.corp) : null;
@@ -5205,10 +5206,12 @@ function contextoIAEstrategia() {
   return {
     nombre: k.nombre, corp: k.corp, lugar: k.lugar, aval: c.avales || 'partido',
     partido: k.partido ? NOMBRE_BONITO(k.partido) : '', familia: FAMILIA_CON_ARTICULO[k.bloque] || '',
-    historial: hist ? { n: crmCandidate.history?.length || 1, ultima: `${aCorp(hist.tipo, hist.lugar)} en ${hist.año}`, anios: hist.año ? 2027 - Number(hist.año) : null, mismaCorporacion: hist.tipo === k.corp } : null,
+    /* Se lanzó, no necesariamente ganó: el historial es de candidaturas. */
+    historial: hist ? { n: crmCandidate.history?.length || 1, ultima: `se lanzó ${aCorp(hist.tipo, hist.lugar)} en ${hist.año}`, anios: hist.año ? 2027 - Number(hist.año) : null, mismaCorporacion: hist.tipo === k.corp, gano: 'no se sabe' } : null,
     lente: ESTR_LENTE[R.lente] || '', lugarEstrategico: R.lugar || '', figura: R.figura?.nombre || '',
-    arquetipos: arqs.map(x => ({ nombre: x.nombre, peso: pctCorto(x.share), rinde: x.ratio != null && R.lente !== 'ciudad' ? vecesE(x.ratio) : '' })),
-    fase: { nombre: R.fase?.nombre || '', hasta: R.fase?.hasta || '', que: R.fase?.que || '' },
+    /* Cada cifra va con lo que significa, para que el modelo no la convierta en «votantes». */
+    arquetipos: arqs.map(x => ({ nombre: x.nombre, peso: `${pctCorto(x.share)} de ${R.lente === 'propio' ? 'tus votos' : R.lente === 'partido' ? 'los votos de tu familia' : 'el voto de la ciudad'}`, rinde: x.ratio != null && R.lente !== 'ciudad' ? `${vecesE(x.ratio)} frente a lo que ese arquetipo pesa en el territorio` : '' })),
+    fase: { nombre: R.fase?.nombre || '', hasta: R.fase?.hasta ? fechaLarga(R.fase.hasta) : '', que: R.fase?.que || '' },
     principios: (R.principios || []).slice(0, 3).map(p => ({ corto: p.corto, texto: p.texto })),
     accion: R.accion?.texto || '', apoyoAccion: (R.accion?.fichas || []).map(id => C360Estrategia.ficha(ESTR.banco, id)?.corto || id).join(' · '),
     competencia: R.competencia?.texto || '',
