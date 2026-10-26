@@ -5772,6 +5772,16 @@ def handler(event, context):
         # ignora aunque venga en el cuerpo. El worker ya la quita a quien no tiene
         # acceso; esto es la segunda capa para quien llame a la Lambda directo.
         perfil = body.get('perfil') if autorizado else None
+        # Empresa PREDEFINIDA (Comfama, DiDi…) abierta en Mi Caudal: no tiene
+        # perfil en el KV, así que viaja su llave y la ficha sale del motor. El
+        # worker solo deja pasar `cliente_k` a quien tiene acceso.
+        ck = str(body.get('cliente_k') or '').strip().lower()
+        if autorizado and not perfil and re.match(r'^[a-z0-9]{2,30}$', ck):
+            pre = caudal_core.sector_cliente(ck)
+            if pre and pre.get('cliente'):
+                perfil = caudal_core.perfil_desde_sector(ck)
+                perfil['empresas'] = [e['k'] for e in perfil.get('empresas', [])]
+                perfil['competencia'] = [c['k'] for c in perfil.get('competencia', [])]
         key, hecha, cliente = _respuesta_pedir(q, body.get('contexto'), perfil,
                                                body.get('historial'))
         extra = {'cliente': cliente} if cliente else {}

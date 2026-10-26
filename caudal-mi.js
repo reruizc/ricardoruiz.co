@@ -151,7 +151,6 @@ function modoEmpresa(k){
   // el sector de la cuenta no es el de la empresa abierta: se esconde
   const sec=$('mi-sector'); if(sec) sec.hidden=!!p;
   document.title=p?`${p.nombre} · Mi Caudal`:'Mi Caudal · tu contexto';
-  { const inp=$('hoy-mod-in'); if(inp){ delete inp.dataset.tocado; inp.value=p?p.nombre:''; modsPintar(); } }
   empRender();
   if(p) hoyCargar({empresa:p}); else hoyPerfilPorDefecto();
 }
@@ -217,10 +216,11 @@ function hoyRumbos(){
 }
 /* ══ Explorar módulos ════════════════════════════════════════════════════
    Al lado de «Abrir la Rosa completa»: los diez pilares de Caudal, para quien
-   quiere ir directo a uno (el Congreso, SUCOP, la contratación…). Si escribe
-   algo arriba, cada tarjeta abre su módulo con esa búsqueda hecha (el mismo
-   ?q= que usa caudal-explorar.html); sin texto, abre el módulo tal cual. En
-   modo empresa arranca con el nombre de la empresa escrito. */
+   quiere ir directo a uno (el Congreso, SUCOP, la contratación…). La empresa
+   NO es el término de búsqueda (decisión de Ricardo, oct-26): es el contexto.
+   Al abrir un módulo se deja su ficha en sessionStorage['caudal-ctx'] y
+   caudal-ctx.js marca allá lo que le toca y personaliza la lectura. Si se
+   escribe un tema arriba, la tarjeta abre con esa búsqueda hecha. */
 const MODULOS=[
   {id:'congreso',    n:'Congreso y órgano legislativo',      s:'Proyectos, leyes y quién los empuja',   q:t=>t?'caudal.html?q='+t+'#congreso':'caudal.html#congreso'},
   {id:'regulatorio', n:'Superintendencias y comisiones',     s:'Actos y sanciones de los reguladores',  q:t=>t?'caudal.html?q='+t+'#regulatorio':'caudal.html#regulatorio'},
@@ -237,8 +237,23 @@ function modsPintar(){
   const box=$('hoy-modulos'); if(!box) return;
   const inp=$('hoy-mod-in'), v=(inp&&inp.value||'').trim(), t=encodeURIComponent(v);
   const grid=$('hoy-mod-grid'); if(!grid) return;
-  grid.innerHTML=MODULOS.map(m=>`<a class="hoy-mod" href="${m.q(t)}" style="background-image:url('imagenes/caudal-${m.id}.jpg')">
+  grid.innerHTML=MODULOS.map(m=>`<a class="hoy-mod" data-mod="${m.id}" href="${m.q(t)}" style="background-image:url('imagenes/caudal-${m.id}.jpg')">
     <span class="hoy-mod-n">${esc(m.n)}</span><span class="hoy-mod-s">${v&&m.id!=='territorial'?'Buscar «'+esc(v)+'»':esc(m.s)}</span></a>`).join('');
+  grid.querySelectorAll('[data-mod]').forEach(a=>a.addEventListener('click',ctxGuardar));
+}
+/* La ficha que viaja: temas, nombres que la identifican (las empresas del
+   diccionario y su competencia, nunca el nombre suelto de la organización:
+   «Cauce» casaría con «el cauce del río») y las entidades que sigue. */
+function ctxGuardar(){
+  const cl=(HOY_D&&HOY_D.cliente)||{};
+  const pre=EMP_LIST.find(x=>x.k===EMP_ACTIVA);
+  const fuente=pre||HOY_PERFIL||{};
+  const nom=x=>typeof x==='string'?x:(x&&x.nombre)||'';
+  const nombres=[...new Set([].concat(cl.empresas||[],cl.competencia||[],fuente.competencia||[]).map(nom).filter(n=>n&&n.length>=4))];
+  const ctx={tipo:EMP_ACTIVA?'empresa':'perfil', id:EMP_ACTIVA||(HOY_CTX&&HOY_CTX.perfil)||'',
+    nombre:cl.nombre||fuente.nombre||$('hoy-cliente').textContent||'tu cliente',
+    temas:(cl.temas&&cl.temas.length?cl.temas:fuente.temas)||[], nombres, entidades:fuente.interlocutores||[]};
+  try{ sessionStorage.setItem('caudal-ctx',JSON.stringify(ctx)); }catch(e){}
 }
 function modsToggle(abrir){
   const box=$('hoy-modulos'), b=$('hoy-mods'); if(!box||!b) return;
@@ -246,17 +261,12 @@ function modsToggle(abrir){
   box.hidden=!on; b.setAttribute('aria-expanded',String(on));
   if(on&&!box.dataset.listo){
     box.dataset.listo='1';
-    box.innerHTML=`<div class="hoy-mod-q"><label for="hoy-mod-in">Buscar en un módulo</label>
-      <input id="hoy-mod-in" type="text" autocomplete="off" placeholder="Un tema, una entidad, una empresa… (o déjalo vacío)"></div>
+    box.innerHTML=`<div class="hoy-mod-q"><label for="hoy-mod-in">Abrir con un tema</label>
+      <input id="hoy-mod-in" type="text" autocomplete="off" placeholder="Opcional: un tema para abrir el módulo ya buscado"></div>
       <div class="hoy-mod-grid" id="hoy-mod-grid"></div>`;
     $('hoy-mod-in').addEventListener('input',modsPintar);
   }
-  if(on){
-    const p=EMP_LIST.find(x=>x.k===EMP_ACTIVA), inp=$('hoy-mod-in');
-    if(inp&&!inp.dataset.tocado) inp.value=p?p.nombre:'';
-    if(inp) inp.oninput=()=>{ inp.dataset.tocado='1'; modsPintar(); };
-    modsPintar();
-  }
+  if(on) modsPintar();
 }
 /* ══ Competidores del Sur ═════════════════════════════════════════════════
    Un perfil sin competencia deja el Sur vacío para siempre. Dos puertas: a

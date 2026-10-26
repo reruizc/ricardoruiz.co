@@ -415,6 +415,7 @@
 <!-- El shell (acceso, cursor, call() y el router de vistas) vive aparte. Va
      ANTES de este script: define reveal/showView/call, que lo de abajo usa.
      ⚠️ Al tocar caudal-base.js hay que bumpear este ?v=. -->
+<script src="caudal-ctx.js?v=20261026"></script>
 <script src="caudal-comun.js?v=20261026b"></script>
 <script src="caudal-base.js?v=20261025"></script>
 <!-- Las vistas, agrupadas por afinidad. Van DESPUÉS del shell (usan call() y
@@ -1309,7 +1310,14 @@
     _uniCtx=contexto; _uniFuentes=fuentesUsadas; _uniFaltaron=nFaltaron;
     const falla=(m,d)=>uniResumenFallback(m,d,opts.slot||null);
     const pedido={action:'respuesta',query,contexto};
-    const pid=uniPerfilId(); if(pid) pedido.perfilId=pid;
+    // La empresa activa de Mi Caudal (caudal-ctx.js) manda sobre la elección
+    // guardada: quien entró leyendo para Comfama pregunta para Comfama. Un
+    // perfil guardado va por perfilId; una empresa predefinida, por cliente_k.
+    // El worker decide si la cuenta puede usar cualquiera de los dos.
+    const _cx=window.CAUDAL_CTX;
+    if(_cx&&_cx.tipo==='perfil'&&_cx.id) pedido.perfilId=_cx.id;
+    else if(_cx&&_cx.tipo==='empresa'&&_cx.id) pedido.cliente_k=_cx.id;
+    else { const pid=uniPerfilId(); if(pid) pedido.perfilId=pid; }
     if(opts.historial&&opts.historial.length) pedido.historial=opts.historial;
     let cliente='';
     const pintar=l=>uniPintarRespuesta(l,fuentesUsadas,nFaltaron,{cliente});
