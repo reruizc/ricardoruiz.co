@@ -365,7 +365,7 @@ _ROTULO = re.compile(
     r'^\s*(Resoluciones(?:\s+(?:Ejecutivas|ejecutivas|Conjuntas|conjuntas|Org[áa]nicas|Reglamentarias))?'
     r'|RESOLUCIONES|Circulares(?:\s+(?:Externas|externas|Conjuntas|Arancelarias))?|CIRCULARES'
     r'|Acuerdos|ACUERDOS|Directivas(?:\s+Presidenciales)?|Decretos|DECRETOS|Leyes|LEYES'
-    r'|Autos|Edictos|Avisos|Notificaciones|Actos\s+Legislativos)\s*$')
+    r'|Autos|Edictos|Avisos|Actos\s+Legislativos)\s*$')
 # Grupos de entidades: van encima de la entidad y no son ella.
 _GRUPOS = {
     'establecimientos publicos', 'superintendencias', 'unidades administrativas especiales',
@@ -386,7 +386,7 @@ _DEPENDENCIA = re.compile(
     r'Direcci[óo]n Regional|Vicepresidencia|Delegatura|Superintendencia Delegada|Direcci[óo]n General$|'
     r'Consejo (?:Superior|Directivo|Acad[ée]mico)|Comisi[óo]n Rectora|Director(?:a)? del))')
 # Una «entidad» que en realidad es dependencia hereda la entidad anterior.
-_SOLO_DEP = re.compile(r'^(?:Direcci[óo]n Territorial|Territorial|Subdirecci[óo]n|Viceministerio|Oficina|'
+_SOLO_DEP = re.compile(r'^(?:Bogot[áa]\s*-|Direcci[óo]n Territorial|Territorial|Subdirecci[óo]n|Viceministerio|Oficina|'
                        r'Secretar[íi]a(?! de (?:Salud|Educaci|Hacienda|Planeaci))|Grupo|Delegatura|'
                        r'Direcci[óo]n de Gesti[óo]n|Vicepresidencia)\b')
 # Palabras con que empieza una entidad: lo que viene antes (firmas, filas de
@@ -402,16 +402,17 @@ _CABEZA = re.compile(
     r'Entidad Promotora|Positiva|Ecopetrol|Computadores para Educar|Territorial|Secretar[íi]a)\b')
 # Grupos que a veces vienen pegados a la entidad (o con basura delante).
 _GRUPO_EN = re.compile(
-    r'(?i)\b(Establecimientos P[úu]blicos|Superintendencias(?!\s+de\b)|Unidades Administrativas Especiales|'
+    r'(?i)\b(Establecimientos P[úu]blicos|Superintendencias(?!\s+de)|Unidades Administrativas Especiales|'
     r'Agencias Nacionales(?: de Naturaleza Especial)?|Corporaciones Aut[óo]nomas Regionales|'
     r'Entes Universitarios Aut[óo]nomos|Entidades Financieras de Naturaleza (?:Especial|[ÚU]nica)|'
     r'Empresas Industriales y Comerciales del Estado|Empresas Sociales del Estado|'
-    r'Sociedades de Econom[íi]a Mixta|Departamentos Administrativos|Edici[óo]n Extraordinaria)\b')
+    r'Sociedades de Econom[íi]a Mixta|Departamentos Administrativos|Edici[óo]n Extraordinaria|'
+    r'Empresas? Industriale?s? y Comercial(?:es)? del Estado)\b')
 _RUIDO = re.compile(
     r'^\s*(DIARIO OFICIAL|Edici[óo]n\s+[\d.]+|\d{1,4}|[A-ZÁ][a-zé]+,\s+\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4}'
     r'|I S S N.*|ISSN.*|Fundado el .*|Rep[úu]blica de Colombia|A[ñn]o CLX.*|IMPRENTA NACIONAL.*'
     r'|e-mail:.*|Carrera 66.*|Conmutador.*|P[áa]gs?\.?|Imprenta Nacional de Colombia|Alba Viviana.*'
-    r'|Gerente General|Tarifa postal.*|Directora?\s*:.*|MINISTERIO DEL INTERIOR)\s*$')
+    r'|Gerente General|Tarifa postal.*|Directora?\s*:.*|MINISTERIO DEL INTERIOR|Por el Presidente Manuel Murillo Toro)\s*$')
 _MINUSC = {'de', 'del', 'la', 'las', 'los', 'el', 'y', 'e', 'para', 'por', 'en', 'a', 'al', 'o', 'u'}
 
 
@@ -507,7 +508,15 @@ _CANON = {
 
 def _normal_entidad(t):
     t = re.sub(r'^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+', '', re.sub(r'\s+', ' ', t)).strip(' ,.-–')
-    t = re.sub(r'^Superintendencias de\b', 'Superintendencia de', t)
+    t = re.sub(r'^Superintendencias (de|del)\b', r'Superintendencia \1', t)
+    # el firmante a veces queda como entidad: «Ministro de…», «Superintendenta de…»
+    t = re.sub(r'^Ministr[oa] (de|del)\b', r'Ministerio \1', t)
+    t = re.sub(r'^Superintendent[ea] (de|del)\b', r'Superintendencia \1', t)
+    t = re.sub(r'^(?:UAE|U\.\s*A?\.?\s*E\.)\s+', '', t)
+    # una cita que arrastra otra entidad delante: manda el ministerio
+    mi = t.find('Ministerio ')
+    if mi > 0:
+        t = t[mi:]
     pal = t.split(' ')
     t = ' '.join(p.lower() if (i and p.lower() in _MINUSC - {'el'}) else p for i, p in enumerate(pal))
     k = re.sub(r'[^a-z ]', '', _fold(t)).strip()
