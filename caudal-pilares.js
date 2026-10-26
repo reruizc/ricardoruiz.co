@@ -888,6 +888,7 @@
   async function gacLoadStats(){
     gacInit();
     const el=document.getElementById('gac-landing');
+    if(!_doInited) doBuscar();
     if(GAC_STATS){ gacRenderLanding(GAC_STATS); return; }
     if(el) el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Cargando el índice de la Gaceta <span class="dots"><span></span><span></span><span></span></span></div>';
     try{ GAC_STATS=await call({action:'gacetas'}); }catch(e){}
@@ -906,6 +907,76 @@
       const t=document.createElement('span'); t.className='chip'; t.textContent='Inicio'; t.onclick=gacShowLanding; cont.appendChild(t); }
     const gb=document.getElementById('gacBack'); if(gb) gb.onclick=()=>showView('home');
   }
+
+  /* ---------- Diario Oficial · resoluciones, circulares y acuerdos ----------
+     Índice de `harvest_diario_oficial.py actos` (Lambda: action
+     'diario-oficial'). Los actos de personal y trámites individuales
+     (nombramientos, extradiciones…) se ocultan por defecto: son la mitad del
+     Diario y no le cambian nada a nadie fuera de la persona. */
+  const DO={q:'', tipo:'', entidad:'', admin:false};
+  let _doInited=false, _doSeq=0;
+  const DO_TIPOS=[['','Todo'],['RESOLUCIONES','Resoluciones'],['CIRCULARES','Circulares'],['ACUERDOS','Acuerdos'],['DIRECTIVAS','Directivas']];
+  function doCard(r){
+    const nom=`${r.subtipo||r.tipo||''} ${r.numero} de ${r.anio}`;
+    const tags=[r.dependencia?esc(r.dependencia):'', r.fecha?'expedida el '+esc(r.fecha):'',
+                r.edicion?`Diario Oficial ${esc(r.edicion)}${r.pagina?', pág. '+esc(String(r.pagina)):''}`:'',
+                r.publicado&&r.publicado!==r.fecha?'publicada el '+esc(r.publicado):''].filter(Boolean).join(' · ');
+    return `<div class="sanc">
+      <div class="sanc-top"><span class="sanc-name">${esc(nom)}</span>${r.entidad?`<span class="doc-badge">${esc(r.entidad)}</span>`:''}${r.administrativo?'<span class="doc-badge">trámite individual</span>':''}${r.seccion==='varios'?'<span class="doc-badge">sección Varios</span>':''}</div>
+      <div class="sanc-motivo">${esc(r.descripcion||'')}</div>
+      <div class="sanc-tags">${tags}${r.entidad_inferida?' · <span title="La edición no trae el nombre de la entidad en el texto: se tomó de quien firma">entidad inferida del firmante</span>':''}</div>
+    </div>`;
+  }
+  // «resolución 2563 de 2026», «circular externa 034», «2563/2026» → número y año
+  function doNorma(q){
+    const m=q.match(/^(?:(resoluci[oó]n|circular(?:\s+externa)?|acuerdo|directiva)\s+)?(?:n[uú]mero\s+|no\.?\s*)?0*(\d{1,16})(?:\s*(?:de|\/)\s*(\d{4}))?$/i);
+    if(!m) return null;
+    const t=(m[1]||'').toLowerCase();
+    return {numero:m[2], anio:m[3]||'', tipo:t.startsWith('resol')?'RESOLUCIONES':t.startsWith('circ')?'CIRCULARES':t.startsWith('acu')?'ACUERDOS':t.startsWith('dir')?'DIRECTIVAS':''};
+  }
+  function doSync(){
+    document.querySelectorAll('#do-tipos .chip[data-t]').forEach(c=>c.classList.toggle('on',c.dataset.t===DO.tipo));
+    const a=document.querySelector('#do-tipos .chip[data-admin]'); if(a) a.classList.toggle('on',DO.admin);
+  }
+  async function doBuscar(){
+    doInit();
+    const mine=++_doSeq, el=document.getElementById('do-results');
+    if(el) el.innerHTML='<div class="llm-load" style="padding:1.4rem;justify-content:center">Leyendo el Diario Oficial <span class="dots"><span></span><span></span><span></span></span></div>';
+    const n=DO.q?doNorma(DO.q):null;
+    const body={action:'diario-oficial', tipo:DO.tipo, entidad:DO.entidad, administrativos:DO.admin};
+    if(n){ body.numero=n.numero; if(n.anio) body.anio=n.anio; if(n.tipo&&!DO.tipo) body.tipo=n.tipo; }
+    else body.query=DO.q;
+    let d; try{ d=await call(body); }catch(e){ if(mine===_doSeq&&el) el.innerHTML='<div class="err">No se pudo consultar el Diario Oficial. Reintenta.</div>'; return; }
+    if(mine!==_doSeq||!el) return;
+    const cob=d.cobertura||{};
+    const qué=DO.q?`«${esc(DO.q)}»`:'lo último publicado';
+    const filtro=DO.entidad?` · ${esc(DO.entidad)} <a href="#" id="do-quita" style="color:var(--ink3)">quitar</a>`:'';
+    const cab=`<div class="r-sub" style="margin-bottom:.7rem"><b>${fmt(d.n||0)}</b> actos · ${qué}${filtro}</div>`;
+    const pie=`<div class="cob-note" style="margin-top:.8rem">${fmt(d.total||0)} actos de ${fmt(d.n_entidades||0)} entidades en el índice${cob.desde?`, ediciones del ${esc(cob.desde)} al ${esc(cob.hasta)}`:''}.${DO.admin?'':' Los nombramientos y trámites individuales están ocultos.'}</div>`;
+    const res=d.resultados||[];
+    el.innerHTML=cab+(res.length?`<div class="sanc-list">${res.slice(0,40).map(doCard).join('')}</div>${res.length>40?`<div class="cob-note">Y ${fmt(d.n-40)} más: afina la búsqueda.</div>`:''}`
+      :`<div class="cob-note">Ningún acto del Diario Oficial coincide${n?' con ese número':''}. Si la norma es de esta semana, puede que la edición todavía no se haya leído.</div>`)+pie;
+    const q=document.getElementById('do-quita'); if(q) q.onclick=e=>{ e.preventDefault(); DO.entidad=''; doBuscar(); };
+    const ents=document.getElementById('do-ents');
+    if(ents) ents.innerHTML=DO.entidad?'':(d.entidades||[]).slice(0,8).map(x=>`<span class="chip" data-e="${esc(x.entidad)}">${esc(x.entidad)} · ${fmt(x.n)}</span>`).join('');
+    if(ents) ents.querySelectorAll('[data-e]').forEach(c=>c.onclick=()=>{ DO.entidad=c.dataset.e; doBuscar(); });
+  }
+  function doInit(){
+    if(_doInited) return; _doInited=true;
+    const q=document.getElementById('doq'), go=document.getElementById('dogo');
+    const ir=()=>{ DO.q=(q&&q.value||'').trim(); doBuscar(); };
+    if(go) go.onclick=ir;
+    if(q) q.addEventListener('keydown',e=>{ if(e.key==='Enter') ir(); });
+    const t=document.getElementById('do-tipos');
+    if(t){
+      t.innerHTML=DO_TIPOS.map(([k,l])=>`<span class="chip" data-t="${k}">${l}</span>`).join('')
+        +'<span class="chip" data-admin="1" title="Nombramientos, extradiciones y otros actos que solo afectan a una persona">Incluir trámites individuales</span>';
+      t.querySelectorAll('[data-t]').forEach(c=>c.onclick=()=>{ DO.tipo=c.dataset.t; doSync(); doBuscar(); });
+      t.querySelector('[data-admin]').onclick=()=>{ DO.admin=!DO.admin; doSync(); doBuscar(); };
+    }
+    doSync();
+  }
+
 
   /* Lo que caudal.html necesita de acá: la búsqueda universal entra a los
      `*Buscar`/`*Card`/`*Init` de cada pilar, y caudal-base.js llama los

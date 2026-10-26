@@ -161,6 +161,14 @@ def archivos(leg=None):
              min_bytes=3_000, campo_fecha=None,
              productor='run_diario.sh · harvest_decretos.py build',
              consumidor='acción `ejecutivo` (landing) + brief (`cobertura.hasta`)'),
+        # Resoluciones, circulares y acuerdos del Diario Oficial (oct-2026): se
+        # re-extraen del caché de texto en cada corrida. 1.375 actos de 80
+        # ediciones pesan ~1 MB; el piso es holgado para que un caché recién
+        # vaciado no pase por bueno.
+        dict(bucket=BUCKET_PRIV, key='metadata/diario-oficial-actos.jsonl', clase='diario',
+             min_bytes=400_000,
+             productor='run_diario.sh · harvest_diario_oficial.py actos',
+             consumidor='acción `diario-oficial` · tarjeta Diarios y gacetas · radar del cliente (Oeste)'),
         # El pilar Regulatorio dejó de ser manual: desde ago-2026 el cron refresca
         # la Gaceta Ambiental de la ANLA 2x/día y vuelve a consolidar las 12
         # fuentes, así que estos dos se re-suben en cada corrida. Con clase

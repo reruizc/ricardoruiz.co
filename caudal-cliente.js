@@ -863,6 +863,14 @@
       return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
         <div class="sig-title">${tit}</div><div class="sig-tags">Consulta pública · ${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
+    // Oeste · lo que ya se expidió en el Diario Oficial (oct-2026). Sin enlace
+    // permanente (el PDF de la Imprenta es de sesión): se cita la edición.
+    if(x.tipo==='diario_oficial'){
+      const tags=[x.entidad?esc(x.entidad):'', x.norma?esc(x.norma):'', x.edicion?`Diario Oficial ${esc(x.edicion)}${x.pagina?', pág. '+esc(String(x.pagina)):''}`:'',
+                  x.fecha?esc(x.fecha):'', x.sobre?'sobre «'+esc(x.sobre)+'»':'', x.interlocutor?'la expide un interlocutor tuyo':''].filter(Boolean).join(' · ');
+      return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title">${esc(x.titulo||x.norma||'Norma expedida')}</div><div class="sig-tags">Diario Oficial · ${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
+    }
     if(x.tipo==='eventos'){
       const tags=[x.medio?esc(x.medio):'', x.fecha?esc(x.fecha):'', x.sobre?'sobre «'+esc(x.sobre)+'»':''].filter(Boolean).join(' · ');
       return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
@@ -902,6 +910,10 @@
     if(pilar==='regulatorio') return cl.sector_sanciones
       ? (reg.length?`<div class="sig-list">${reg.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin actos recientes del regulador en esta fuente.</div>')
       : '<div class="cli-reg-none">El regulador de este sector todavía no es fuente de Caudal — las entidades entran por etapas. Si tu exposición es ambiental (licenciamiento, seguimiento, sanción), el sector <b>Ambiente</b> ya trae el expediente completo de la ANLA.</div>';
+    if(pilar==='diario_oficial'){
+      const dof=d.diario_oficial||[];
+      return dof.length?`<div class="sig-list">${dof.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Ninguna resolución, circular o acuerdo de los últimos 60 días en el Diario Oficial cruza con estos temas ni sale de sus interlocutores.</div>';
+    }
     if(pilar==='contratacion') return con.length?`<div class="sig-list">${con.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin contratación reciente para los temas de este sector.</div>';
     if(pilar==='oportunidades'){
       const op=[].concat(d.sucop||[], d.eventos||[]);
@@ -987,6 +999,7 @@
       <div class="chips" id="cli-toggle" style="justify-content:flex-start;margin-top:.3rem">
         <span class="chip" data-p="congreso">Legislativo <b>${congreso.length}</b></span>
         <span class="chip" data-p="regulatorio">Regulatorio <b>${reg.length}</b></span>
+        <span class="chip" data-p="diario_oficial">Diario Oficial <b>${(d.diario_oficial||[]).length}</b></span>
         <span class="chip" data-p="contratacion">Contratación <b>${con.length}</b></span>
         <span class="chip" data-p="oportunidades">Consultas y eventos <b>${(d.sucop||[]).length+(d.eventos||[]).length}</b></span>
         <span class="chip" data-p="medios">Prensa <b>${medios.length}</b></span>
@@ -1228,7 +1241,8 @@
   const BRIEF_CARD=[['norte','NORTE · oportunidades'],['este','ORIENTE · conversación'],
                     ['sur','SUR · competencia'],['oeste','OCCIDENTE · Estado']];
   const BRIEF_FUENTE={congreso:'Congreso',regulatorio:'Regulatorio',medios:'Prensa',redes:'Redes · X',
-                      contratacion:'Contratación',ejecutivo:'Ejecutivo',sucop:'Consulta pública',eventos:'Evento'};
+                      contratacion:'Contratación',ejecutivo:'Ejecutivo',sucop:'Consulta pública',eventos:'Evento',
+                      diario_oficial:'Diario Oficial'};
   // ⚠️ La URL va como ENLACE, nunca como texto. Medido en el primer brief: una
   // sola nota de prensa de Google News ocupaba CINCO LÍNEAS de base64 —
   // `news.google.com/rss/articles/CBMivAFBVV95cUxQ…` son más de 500 caracteres —
@@ -1297,7 +1311,8 @@
     const d=_CLI_LAST; if(!d) return null;
     const cl=d.cliente||{}, k=d.kpis||{};
     const todas=[].concat(d.congreso||[],d.regulatorio||[],d.medios||[],
-                          d.contratacion||[],d.ejecutivo||[],d.sucop||[],d.eventos||[],d.redes||[]);
+                          d.contratacion||[],d.ejecutivo||[],d.sucop||[],d.eventos||[],d.redes||[],
+                          d.diario_oficial||[]);
     // `mov` lo marca la Lambda contra su propio reloj: no se recalcula acá para
     // que el PDF y la pantalla no puedan discrepar por la zona horaria del
     // navegador de quien descarga.

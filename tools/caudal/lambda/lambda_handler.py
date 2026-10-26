@@ -933,6 +933,54 @@ def _ejecutivo():
     return _EJEC
 
 
+# --- Diario Oficial · resoluciones, circulares y acuerdos (oct-2026) -------
+# Índice aparte del pilar Ejecutivo: lo arma `harvest_diario_oficial.py actos`
+# desde el texto de cada edición. Trae la entidad que expide cada acto, así que
+# sirve para el radar del cliente (sus interlocutores) y para la alerta de
+# «la prensa reporta una norma que no está en las fuentes oficiales».
+_DO_ACTOS = None
+_DO_STATS = None
+
+
+def _do_actos():
+    global _DO_ACTOS
+    if _DO_ACTOS is None:
+        try:
+            obj = _s3.get_object(Bucket=BUCKET, Key='metadata/diario-oficial-actos.jsonl')
+            filas = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
+            for r in filas:
+                # blob plegado una sola vez por contenedor (ver _fold_q)
+                r['_q'] = _fold_q(' '.join([r.get('entidad') or '', r.get('dependencia') or '',
+                                            r.get('descripcion') or '', r.get('subtipo') or '']))
+                r['_e'] = _fold_q(r.get('entidad') or '')
+            _DO_ACTOS = filas
+        except Exception as e:
+            print(f'[do] actos FAIL: {type(e).__name__}: {e}')
+            _DO_ACTOS = []
+    return _DO_ACTOS
+
+
+def _do_stats():
+    global _DO_STATS
+    if _DO_STATS is None:
+        try:
+            _DO_STATS = _get_json('metadata/diario-oficial-actos-stats.json')
+        except Exception:
+            _DO_STATS = {'n': 0, 'entidades': [], 'cobertura': {}}
+    return _DO_STATS
+
+
+def _do_card(r):
+    pub = r.get('publicacion') or {}
+    return {'tipo': r.get('tipo'), 'subtipo': r.get('subtipo'), 'numero': r.get('numero'),
+            'anio': r.get('anio'), 'fecha': r.get('fecha'), 'entidad': r.get('entidad'),
+            'dependencia': r.get('dependencia'), 'grupo': r.get('grupo'),
+            'seccion': r.get('seccion'), 'administrativo': r.get('administrativo', False),
+            'descripcion': (r.get('descripcion') or '')[:600],
+            'edicion': pub.get('edicion'), 'publicado': pub.get('fecha'), 'pagina': pub.get('pagina'),
+            'entidad_inferida': r.get('entidad_origen') == 'firmante'}
+
+
 # --- pilar Órganos de control y altas cortes -------------------------------
 _CONTROL = None
 _CONTROL_STATS = None
@@ -2827,7 +2875,7 @@ LECTURA_MAX_SENALES = 26
 #   Oeste  · el Estado    → Congreso y superintendencias sobre TU tema
 CARD_POR_TIPO = {'contratacion': 'norte', 'sucop': 'norte', 'eventos': 'norte',
                  'medios': 'este', 'redes': 'este',
-                 'congreso': 'oeste', 'regulatorio': 'oeste'}
+                 'congreso': 'oeste', 'regulatorio': 'oeste', 'diario_oficial': 'oeste'}
 CARD_LBL = {'norte': 'NORTE · oportunidad', 'este': 'ESTE · conversación',
             'sur': 'SUR · competencia',    'oeste': 'OESTE · Estado'}
 
@@ -3231,6 +3279,10 @@ def _lectura_cliente_prompt(s, senales, kpis):
         elif x['tipo'] == 'sucop':
             lines.append(f"- [CONSULTA PÚBLICA ABIERTA · prioridad {x['nivel']}] cierra {x.get('cierra', '')} · "
                          f"{x.get('entidad', '')}: {(x.get('titulo') or '')[:110]}")
+        elif x['tipo'] == 'diario_oficial':
+            lines.append(f"- [NORMA EXPEDIDA · DIARIO OFICIAL · prioridad {x['nivel']}] publicada {x.get('fecha', '')} · "
+                         f"{x.get('entidad', '')} · {x.get('norma', '')}: {(x.get('titulo') or '')[:120]}"
+                         + (" · la expide un interlocutor del cliente" if x.get('interlocutor') else ''))
         elif x['tipo'] == 'eventos':
             lines.append(f"- [EVENTO DEL SECTOR · prioridad {x['nivel']}] {x.get('fecha', '')} "
                          f"{x.get('medio', '')}: {(x.get('titulo') or '')[:110]}")
@@ -4271,6 +4323,101 @@ def _sucop_para_perfil(s, cap=4):
     return out, len(hits)
 
 
+# Siglas con que los perfiles nombran a sus interlocutores → cómo firma la
+# entidad en el Diario Oficial. Sin esto «Supersalud» y «UGPP» no casan nunca.
+_DO_SIGLAS = {
+    'supersalud': 'superintendencia nacional de salud',
+    'supersubsidio': 'superintendencia del subsidio familiar',
+    'ugpp': 'gestion pensional y contribuciones parafiscales',
+    'dian': 'direccion de impuestos y aduanas nacionales',
+    'supertransporte': 'superintendencia de transporte',
+    'superfinanciera': 'superintendencia financiera',
+    'supersociedades': 'superintendencia de sociedades',
+    'sic': 'superintendencia de industria y comercio',
+    'uiaf': 'unidad de informacion y analisis financiero',
+    'anla': 'autoridad nacional de licencias ambientales',
+    'invima': 'instituto nacional de vigilancia de medicamentos',
+    'icbf': 'instituto colombiano de bienestar familiar',
+    'sena': 'servicio nacional de aprendizaje',
+    'dnp': 'departamento nacional de planeacion',
+    'adres': 'administradora de los recursos del sistema general de seguridad social',
+}
+
+
+def _do_interlocutores(s):
+    out = []
+    for x in (s.get('interlocutores') or []):
+        f = _fold_q(x)
+        f = _DO_SIGLAS.get(f, f)
+        if len(f) >= 4:
+            out.append(f)
+    return out
+
+
+def _do_es_suya(ent_fold, inter):
+    return any(i in ent_fold or (len(ent_fold) >= 8 and ent_fold in i) for i in inter)
+
+
+DO_VENTANA_DIAS = 60
+
+
+def _do_para_perfil(s, cap=5):
+    """Resoluciones, circulares y acuerdos publicados en el Diario Oficial que
+    tocan los temas del perfil o salen de sus interlocutores. Los actos de
+    personal (nombramientos, extradiciones…) no entran nunca. Lo del Diario
+    Oficial ya está EXPEDIDO: va al Oeste (Estado), no a oportunidades."""
+    temas = [_fold_q(t) for t in (s.get('temas') or []) if len(_fold_q(t)) >= 4]
+    for t in caudal_core.temas_de_empresas(s.get('empresas_keys')):
+        tf = _fold_q(t)
+        if len(tf) >= 4 and tf not in temas:
+            temas.append(tf)
+    inter = _do_interlocutores(s)
+    if not temas and not inter:
+        return [], 0
+    corte = (datetime.date.today() - datetime.timedelta(days=DO_VENTANA_DIAS)).isoformat()
+    # plural solo en «-es» y solo si el tema acaba en consonante: «laboral» casa
+    # con «laborales», pero «tributario» NO con los «tributarios» de un río
+    temas_rx = [(t, re.compile(r'\b' + re.escape(t) + (r'(?:es)?' if t[-1] not in 'aeiou' else '') + r'\b'))
+                for t in temas]
+    tema_hits, solo_ent = [], []
+    for r in _do_actos():
+        if r.get('administrativo') or r.get('seccion') != 'oficial':
+            continue
+        pub = (r.get('publicacion') or {}).get('fecha') or ''
+        if pub < corte:
+            continue
+        # palabra completa: por subcadena «tributario» casaba con los
+        # «tributarios» de un río en las resoluciones de las CAR
+        toca = next((t for t, rx in temas_rx if rx.search(r['_q'])), None)
+        suya = bool(inter) and _do_es_suya(r['_e'], inter)
+        if toca:
+            tema_hits.append((r, toca, suya))
+        elif suya:
+            solo_ent.append((r, None, True))
+    orden = lambda x: (0 if x[2] else 1, -(int(((x[0].get('publicacion') or {}).get('fecha') or '0000-00-00').replace('-', ''))))
+    tema_hits.sort(key=orden)
+    solo_ent.sort(key=orden)
+    elegidos = tema_hits[:cap] + solo_ent[:max(0, min(2, cap - len(tema_hits[:cap])))]
+    hoy = datetime.date.today()
+    out = []
+    for r, toca, suya in elegidos:
+        pub = r.get('publicacion') or {}
+        try:
+            reciente = (hoy - datetime.date.fromisoformat(pub.get('fecha') or '')).days <= 7
+        except ValueError:
+            reciente = False
+        nivel = 'alto' if (toca and suya) or (toca and reciente) else ('medio' if toca else 'bajo')
+        nom = f"{(r.get('subtipo') or r.get('tipo') or '').capitalize()} {r.get('numero')} de {r.get('anio')}"
+        out.append({'tipo': 'diario_oficial', 'titulo': (r.get('descripcion') or '')[:220],
+                    'norma': nom, 'entidad': r.get('entidad') or '', 'dependencia': r.get('dependencia') or '',
+                    'fecha': pub.get('fecha') or r.get('fecha') or '', 'expedida': r.get('fecha') or '',
+                    'edicion': pub.get('edicion'), 'pagina': pub.get('pagina'),
+                    'sobre': toca or '', 'interlocutor': suya, 'nivel': nivel,
+                    'accion': (f'{nom} ya está expedida (Diario Oficial {pub.get("edicion")}, pág. '
+                               f'{pub.get("pagina")}) — revisar si cambia obligaciones o trámites')})
+    return out, len(tema_hits) + len(solo_ent)
+
+
 def _entrada_libre(c):
     """Competidor que no está en el diccionario, con la forma de una entrada para
     los cruces por identidad (prensa y Regulatorio). Sin razón social curada:
@@ -4984,6 +5131,41 @@ def handler(event, context):
             'resultados': out,
         })
 
+    if action == 'diario-oficial':  # resoluciones, circulares y acuerdos del Diario Oficial
+        q = _fold_q(body.get('query') or '')
+        ent = _fold_q(body.get('entidad') or '')
+        tipo = str(body.get('tipo') or '').upper()
+        con_admin = bool(body.get('administrativos'))
+        con_varios = bool(body.get('varios'))
+        numero = re.sub(r'^0+(?=\d)', '', str(body.get('numero') or '').strip())
+        anio = str(body.get('anio') or '').strip()
+        toks = [t for t in re.split(r'\s+', q) if len(t) >= 3]
+        hits = []
+        for r in _do_actos():
+            if numero and r.get('numero') != numero:
+                continue
+            if anio and r.get('anio') != anio:
+                continue
+            if not con_admin and r.get('administrativo') and not numero:
+                continue
+            if not con_varios and r.get('seccion') != 'oficial' and not numero:
+                continue
+            if tipo and r.get('tipo') != tipo:
+                continue
+            if ent and ent not in r['_e']:
+                continue
+            if toks and not all(t in r['_q'] for t in toks):
+                continue
+            hits.append(r)
+        hits.sort(key=lambda r: ((r.get('publicacion') or {}).get('fecha') or '', r.get('fecha') or ''), reverse=True)
+        import collections as _co
+        facet = _co.Counter(r.get('entidad') or '' for r in hits)
+        st = _do_stats()
+        return _resp(200, {'n': len(hits), 'resultados': [_do_card(r) for r in hits[:80]],
+                           'entidades': [{'entidad': e, 'n': n} for e, n in facet.most_common(25) if e],
+                           'cobertura': st.get('cobertura') or {}, 'total': st.get('n', 0),
+                           'n_entidades': len(st.get('entidades') or [])})
+
     if action == 'gacetas':        # pilar Diarios y gacetas · Gaceta del Congreso
         d, idx, por_proy = _gacetas()
         q = (body.get('query') or '').strip()
@@ -5615,7 +5797,13 @@ def handler(event, context):
         except Exception as e:
             print(f'[cliente] eventos FAIL: {type(e).__name__}: {e}')
             evt = []
-        senales = rc['senales'] + reg + med + con + suc + evt + red
+        # --- Oeste · lo que ya se expidió en el Diario Oficial --------------
+        try:
+            dof, n_dof = _do_para_perfil(s)
+        except Exception as e:
+            print(f'[cliente] diario oficial FAIL: {type(e).__name__}: {e}')
+            dof, n_dof = [], 0
+        senales = rc['senales'] + reg + dof + med + con + suc + evt + red
         n_vig = sum(1 for x in senales if x.get('vigilada'))
         kpis = {'n_radar': len(senales),
                 'alto': sum(1 for x in senales if x['nivel'] == 'alto'),
@@ -5627,6 +5815,7 @@ def handler(event, context):
                 'n_medios_sector': n_med, 'n_medios_exterior': n_med_ext,
                 'n_contratos_sector': n_con,
                 'n_consultas_abiertas': n_suc, 'n_eventos': len(evt),
+                'n_diario_oficial': n_dof,
                 'n_vigiladas': len(emps_vig), 'n_senales_vigiladas': n_vig,
                 'n_contratos_vigiladas': n_con_vig,
                 # articulado: cuántas señales del Congreso traen "qué cambia" y
@@ -5673,7 +5862,7 @@ def handler(event, context):
                            'contratacion_generica_omitida': con_generica_muda,
                            'descartes': s.get('descartes', [])},
                'congreso': rc['senales'], 'regulatorio': reg, 'medios': med,
-               'contratacion': con, 'sucop': suc, 'eventos': evt,
+               'contratacion': con, 'sucop': suc, 'eventos': evt, 'diario_oficial': dof,
                'redes': red, 'kpis': kpis, 'sectores': sectores}
         out['cliente']['avisos'] = s.get('avisos', [])
         # `lectura:true` YA NO significa "espérame la síntesis": significa

@@ -600,6 +600,24 @@ etapa() {
   else
     etapa --nombre ejecutivo_diario_oficial --omitida "el fetch de Socrata falló (rc=$rc_ej)"
   fi
+  # Resoluciones, circulares y acuerdos del Diario Oficial (oct-2026): se
+  # re-extraen de TODO el caché de texto (el caché es la fuente de verdad, no
+  # hay estado que acumular), así que corre aunque el fetch de hoy falle. Va a
+  # un índice aparte del pilar Ejecutivo; lo lee la tarjeta de Diarios y
+  # gacetas y el radar del cliente (punto Oeste). Piso de 500 actos.
+  etapa --nombre diario_oficial_actos --timeout 600 \
+        --desc "resoluciones, circulares y acuerdos del Diario Oficial → índice" \
+        -- python3 tools/caudal/ejecutivo/harvest_diario_oficial.py actos
+  rc_do=$?
+  if [ $rc_do -eq 0 ]; then
+    DOD="$REPO/Bases de datos/leyes-senado/ejecutivo/dist"
+    etapa --nombre diario_oficial_actos_upload --timeout 300 --desc "diario-oficial-actos.jsonl + stats → S3 (piso 500)" \
+          -- bash -c "n=\$(grep -c . \"$DOD/diario-oficial-actos.jsonl\"); [ \"\$n\" -ge 500 ] || { echo \"solo \$n actos: no se sube\"; exit 1; }; \
+             aws s3 cp \"$DOD/diario-oficial-actos.jsonl\" s3://caudal-legislativo/metadata/diario-oficial-actos.jsonl --content-type application/json --cache-control 'private, max-age=300' && \
+             aws s3 cp \"$DOD/diario-oficial-actos-stats.json\" s3://caudal-legislativo/metadata/diario-oficial-actos-stats.json --content-type application/json --cache-control 'private, max-age=300'"
+  else
+    etapa --nombre diario_oficial_actos_upload --omitida "el índice de actos no se armó (rc=$rc_do): en S3 queda el de ayer"
+  fi
   if [ $rc_ej -eq 0 ]; then
     etapa --nombre ejecutivo_build --timeout 300 --desc "raw → normativa.jsonl + stats (+ Diario Oficial)" \
           -- python3 tools/caudal/ejecutivo/harvest_decretos.py build
