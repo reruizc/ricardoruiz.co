@@ -5020,7 +5020,7 @@ async function pintarContendientes() {
    el paywall, como los demás módulos. */
 let ESTR_TURNO = 0, ESTR = null, ESTR_TAB = 'posicionamiento';
 function estrategiaCargando() {
-  ESTR = null; ESTR_TURNO++;
+  ESTR = null; ESTR_TURNO++; PERFIL_ESTR = null; PERFIL_ESTR_LISTO = false; NOTICIAS_ESTR = [];
   cerrarEstrategia();
   $('crmEstrategia')?.classList.remove('module-apagado');
   $('crmEstrTitulo').textContent = 'Leyendo su estrategia…';
@@ -5069,7 +5069,7 @@ async function pintarEstrategia() {
     }
     const R = S.evaluar(entrada);
     if (turno !== ESTR_TURNO) return;
-    ESTR = { R, banco, huella, nombre: crmCandidate?.nombre || NUEVO?.nombre || 'Su candidatura', ciudadNombre: { bogota: 'Bogotá', medellin: 'Medellín', cartagena: 'Cartagena' }[ciudad] || '' };
+    ESTR = { R, banco, huella, L: entrada.L || null, nombre: crmCandidate?.nombre || NUEVO?.nombre || 'Su candidatura', ciudadNombre: { bogota: 'Bogotá', medellin: 'Medellín', cartagena: 'Cartagena' }[ciudad] || '' };
     pintarTarjetaEstrategia();
   } catch (e) {
     if (turno !== ESTR_TURNO) return;
@@ -5158,46 +5158,117 @@ const fechaCorta = iso => { const [a, m, d] = String(iso).split('-').map(Number)
    worker responde, la lectura de DeepSeek (/c360/estrategia/ia), que recibe
    SOLO lo que ya calculó C360Estrategia y no puede meter cifras propias. */
 const ESTR_LENTE = { propio: 'sus votos', partido: 'los votos de su partido o su familia política', ciudad: 'el voto de toda la ciudad' };
-function variablesEstrategia() {
-  const R = ESTR.R, k = contextoCampanaEstr(), out = [];
-  const arqs = (R.arquetipos || []).slice();
-  const afin = arqs.filter(a => a.ratio != null && a.share >= .08).sort((a, b) => b.ratio - a.ratio)[0] || arqs.slice().sort((a, b) => b.share - a.share)[0];
-  if (afin) out.push({ nombre: `Tu terreno: «${afin.nombre}»`, por_que: afin.ratio != null && R.lente !== 'ciudad' ? `Ahí ${R.lente === 'propio' ? 'tus votos rinden' : 'tu familia rinde'} ${vecesE(afin.ratio)} lo que pesa en el territorio.` : `Es el arquetipo que más pesa en ${ESTR_LENTE[R.lente] || 'el territorio'} (${pctCorto(afin.share)}).` });
-  const fam = k.partido ? NOMBRE_BONITO(k.partido) : (FAMILIA_CON_ARTICULO[k.bloque] || '').replace(/^su /, 'tu ');
-  if (fam) out.push({ nombre: k.partido ? 'Tu partido' : 'Tu familia política', por_que: `${fam.charAt(0).toUpperCase() + fam.slice(1)}: define con quién compartes votantes y contra quién compites.` });
-  if (R.figura?.nombre) out.push({ nombre: R.figura.nombre, por_que: (R.figura.texto || '').split('. ')[0].replace(/\.$/, '') + '.' });
-  return out.slice(0, 3);
+/* El título de la tarjeta cambia en cada visita (pedido de Ricardo,
+   26-oct-2026): con la misma frase siempre la tarjeta parece un adorno. Se
+   evita repetir la última que vio en este dispositivo. */
+const TITULOS_ESTR = [
+  n => `${n}, así se arma tu estrategia.`,
+  n => `${n}, esta es la jugada.`,
+  n => `${n}, por aquí va tu campaña.`,
+  n => `${n}, tu estrategia en corto.`,
+  n => `${n}, esto es lo que mueve tu campaña.`,
+  n => `${n}, lo que te toca en esta etapa.`,
+  n => `${n}, dónde poner la energía.`,
+  n => `${n}, tu campaña ya tiene rumbo.`,
+  n => `${n}, la ruta hasta octubre.`,
+  n => `${n}, lo que dicen tus datos.`,
+  n => `${n}, así se abre camino.`,
+  n => `${n}, el mapa de tu estrategia.`,
+  n => `${n}, lo que viene ahora.`,
+  n => `${n}, aquí empieza la estrategia.`,
+];
+function tituloEstrategia(nombre) {
+  let ult = -1; try { ult = Number(localStorage.getItem('c360-estr-titulo') ?? -1); } catch {}
+  let i = Math.floor(Math.random() * TITULOS_ESTR.length);
+  if (i === ult) i = (i + 1) % TITULOS_ESTR.length;
+  try { localStorage.setItem('c360-estr-titulo', String(i)); } catch {}
+  const t = TITULOS_ESTR[i](nombre || 'Tu candidatura');
+  return nombre ? t : t.replace(/^Tu candidatura, (\w)/, (m, c) => c.toUpperCase());
 }
-function pintarVariablesEstr(vars) {
+/* Los temas que mueven a un arquetipo: su sensibilidad 1-5 por tema de agenda
+   (la ficha de Bogotá y Cartagena la trae; Medellín usa la de sus cinco
+   familias). Se devuelven los tres más altos, con el nombre de la escucha. */
+function temasArquetipo(id) {
+  const f = ESTR?.L?.ficha?.(id) || {};
+  const sens = f.sens && Object.keys(f.sens).length ? f.sens : (window.C360Arquetipos?.FAMILIAS || []).find(x => x.slug === id)?.sens || {};
+  const T = window.C360Saliencia?.TEMAS || [];
+  const nom = k => (T.find(t => t.id === k)?.corto || T.find(t => t.id === k)?.nombre || k.replace(/_/g, ' ')).toLowerCase();
+  return Object.entries(sens).filter(([, v]) => v >= 4).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => nom(k));
+}
+function arquetipoPrincipalEstr() {
+  const arqs = (ESTR?.R?.arquetipos || []).slice();
+  return arqs.filter(a => a.ratio != null && a.share >= .08).sort((a, b) => b.ratio - a.ratio)[0] || arqs.sort((a, b) => b.share - a.share)[0] || null;
+}
+const listaY = xs => xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : (xs[0] || '');
+/* Versión fija del párrafo, para cuando no hay IA: el mismo esqueleto que
+   pidió Ricardo («tu voto de clase media en Bogotá, desde el centro-derecha,
+   tiene que trabajar A, B y C»), armado solo con datos ya calculados. */
+function lecturaFijaEstr() {
+  const R = ESTR.R, k = contextoCampanaEstr(), a = arquetipoPrincipalEstr();
+  const sujeto = R.lente === 'partido' ? 'El voto de tu familia política' : R.lente === 'ciudad' ? 'El voto de la ciudad' : 'Tu voto';
+  const fam = k.partido ? `con el aval de ${NOMBRE_BONITO(k.partido)}` : `desde ${(FAMILIA_CON_ARTICULO[k.bloque] || FAMILIA_CON_ARTICULO.sc).replace(/^su /, 'tu ')}`;
+  if (!a) return `${sujeto}${k.lugar ? ` en ${k.lugar}` : ''}${fam ? `, ${fam},` : ''} todavía no tiene arquetipos por barrio: la estrategia se arma con tu corporación, tu fase y tu historial.`;
+  const temas = temasArquetipo(a.id);
+  return `${sujeto} pesa en «${a.nombre}»${k.lugar ? ` en ${k.lugar}` : ''}${fam ? `, ${fam}` : ''}${temas.length ? `: ahí lo que mueve es ${listaY(temas)}.` : '.'}`;
+}
+function pintarTemasEstr(temas) {
   const ul = $('crmEstrVariables'); if (!ul) return;
-  ul.innerHTML = vars.map(v => `<li><b>${escHtml(v.nombre)}</b><span>${escHtml(v.por_que)}</span></li>`).join('');
-  ul.classList.toggle('hidden', !vars.length);
+  ul.className = 'estr-temas';
+  ul.innerHTML = (temas || []).map(t => `<li>${escHtml(t)}</li>`).join('');
+  ul.classList.toggle('hidden', !(temas || []).length);
 }
 function pintarTarjetaEstrategia() {
-  const { R, banco } = ESTR, F = R.fase, card = $('crmEstrategia'), k = contextoCampanaEstr();
+  const { R } = ESTR, F = R.fase, card = $('crmEstrategia'), k = contextoCampanaEstr();
   const prox = F.proximo;
   $('crmEstrDato').textContent = prox ? prox.dias.toLocaleString('es-CO') : '—';
   $('crmEstrSub').textContent = prox ? `días para: ${prox.nombre.toLowerCase()}` : F.nombre;
-  $('crmEstrTitulo').textContent = k.nombre ? `${k.nombre}, así se arma tu estrategia.` : 'Así se arma tu estrategia.';
+  $('crmEstrTitulo').textContent = tituloEstrategia(k.nombre);
   $('crmEstrPrincipios').innerHTML = '';
   if (R.estado !== 'ok') {
     card.classList.add('module-apagado');
     $('crmEstrCopy').textContent = R.motivo || '';
-    pintarVariablesEstr([]); $('crmEstrAccion').classList.add('hidden'); $('crmEstrBtn').disabled = true;
+    pintarTemasEstr([]); $('crmEstrAccion').classList.add('hidden'); $('crmEstrBtn').disabled = true;
     return;
   }
   card.classList.remove('module-apagado');
-  const vars = variablesEstrategia();
-  $('crmEstrCopy').textContent = vars.length ? `${k.nombre ? `${k.nombre}, la` : 'La'} estamos armando con ${vars.length === 2 ? 'dos' : 'tres'} variables:` : discursoEstrategia();
-  pintarVariablesEstr(vars);
-  const a = R.accion;
-  if (a) {
-    $('crmEstrAccion').innerHTML = `<b>Esta semana.</b> ${escHtml(a.texto)} <small>${a.fichas.length ? `Sale de ${escHtml(a.fichas.map(id => C360Estrategia.ficha(banco, id)?.corto || id).join(' · '))}` : 'Criterio de oficio'}</small>`;
+  $('crmEstrCopy').textContent = lecturaFijaEstr();
+  const a = arquetipoPrincipalEstr();
+  pintarTemasEstr(a ? temasArquetipo(a.id) : []);
+  /* La acción fija va sin autores: la referencia académica vive en la vista
+     ampliada, no en la tarjeta. */
+  if (R.accion) {
+    $('crmEstrAccion').innerHTML = `<b>Esta semana.</b> ${escHtml(R.accion.texto)}`;
     $('crmEstrAccion').classList.remove('hidden');
   } else $('crmEstrAccion').classList.add('hidden');
   $('crmEstrBtn').disabled = false;
   lecturaIAEstrategia();
 }
+/* ── La prensa de la semana para «Esta semana» ─────────────────────────────
+   La misma fuente del briefing (Google News por el proxy de Caudal), con las
+   consultas del territorio de la campaña y siete días de ventana. Se queda con
+   los titulares que de verdad son del territorio y los agrupa por historia,
+   ordenados por cuántos medios la cuentan. Se cachea una hora en la pestaña. */
+async function noticiasEstrategia() {
+  const P = window.C360Panel;
+  if (!P || !SESSION.token || !SESSION.vinculo) return [];
+  P.SESION.token = SESSION.token; P.SESION.vinculo = SESSION.vinculo;
+  const t = P.territorioDe(SESSION.vinculo), consultas = P.consultasTerritorio(t);
+  if (!consultas.length) return [];
+  const llave = `c360-estr-prensa:${t.etiqueta}:${new Date().toISOString().slice(0, 13)}`;
+  try { const c = sessionStorage.getItem(llave); if (c) return JSON.parse(c); } catch {}
+  const rs = await Promise.all(consultas.map(q => P.caudal({ action: 'medios', query: q, dias: 7 }).catch(() => null)));
+  if (rs.every(r => !r)) return [];
+  const locales = P.terminosLocales(t), vistos = new Set(), items = [];
+  rs.forEach(d => (d?.resultados || []).forEach(r => {
+    const tit = r.titulo || '', key = P.norm(tit).slice(0, 90);
+    if (!key || vistos.has(key) || !(P.puntajeLocal(tit, t, locales) > 0)) return;
+    vistos.add(key); items.push({ titulo: tit, medio: r.medio || '', url: r.url || '', fecha: String(r.fecha || '').slice(0, 10) });
+  }));
+  const out = P.agruparPorCobertura(items).slice(0, 8).map(g => ({ ...g.titular, medios: g.medios }));
+  try { sessionStorage.setItem(llave, JSON.stringify(out)); } catch {}
+  return out;
+}
+let NOTICIAS_ESTR = [];
 const fechaLarga = iso => { const [a, m, d] = String(iso).split('-').map(Number); return `${d} de ${['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'][m - 1]} de ${a}`; };
 /* Edad y sexo entran a la lectura SOLO si están marcados (pedido de Ricardo,
    26-oct-2026). Es el censo de los puestos donde saca votos, ponderado por sus
@@ -5226,39 +5297,93 @@ function contextoIAEstrategia() {
   const hist = crmCandidate ? leerCorpHistorica(crmCandidate.corp) : null;
   const arqs = (R.arquetipos || []).slice().sort((x, y) => y.share - x.share).slice(0, 3);
   return {
-    nombre: k.nombre, corp: k.corp, lugar: k.lugar,
+    nombre: k.nombre, corp: CRM_CORPORATIONS[k.corp] || k.corp, lugar: k.lugar,
     aval: c.avales === 'indeciso' ? `todavía sin partido (se mide con ${FAMILIA_CON_ARTICULO[k.bloque] || 'su familia política'})` : c.avales === 'firmas' ? 'por firmas, sin partido' : (k.partido ? `con ${NOMBRE_BONITO(k.partido)}` : 'con partido'),
     partido: k.partido ? NOMBRE_BONITO(k.partido) : '', familia: FAMILIA_CON_ARTICULO[k.bloque] || '',
     /* Se lanzó, no necesariamente ganó: el historial es de candidaturas. */
-    historial: hist ? { n: crmCandidate.history?.length || 1, ultima: `se lanzó ${aCorp(hist.tipo, hist.lugar)} en ${hist.año}`, anios: hist.año ? 2027 - Number(hist.año) : null, mismaCorporacion: hist.tipo === k.corp, gano: 'no se sabe' } : null,
-    lente: ESTR_LENTE[R.lente] || '', lugarEstrategico: R.lugar || '', figura: R.figura?.nombre || '',
-    /* Cada cifra va con lo que significa, para que el modelo no la convierta en «votantes». */
-    arquetipos: arqs.map(x => ({ nombre: x.nombre, peso: `${pctCorto(x.share)} de ${R.lente === 'propio' ? 'tus votos' : R.lente === 'partido' ? 'los votos de tu familia' : 'el voto de la ciudad'}`, rinde: x.ratio != null && R.lente !== 'ciudad' ? `${vecesE(x.ratio)} frente a lo que ese arquetipo pesa en el territorio` : '' })),
+    historial: hist ? { n: crmCandidate.history?.length || 1, ultima: `se lanzó ${aCorp(hist.tipo, hist.lugar)} en ${hist.año}`, anios: hist.año ? 2027 - Number(hist.año) : null, mismaCorporacion: hist.tipo === k.corp } : null,
+    lente: { propio: 'sus votos', partido: 'los votos de su familia política (no tiene votos propios aquí)', ciudad: 'el voto de toda la ciudad (no hay votos propios ni de su familia)' }[R.lente] || '',
+    lugarEstrategico: R.lugar || '', figura: R.figura?.nombre || '',
+    /* Cada cifra va con lo que significa, para que el modelo no la convierta en
+       «votantes». Los temas son la sensibilidad del arquetipo (4 o 5 de 5). */
+    arquetipos: arqs.map(x => {
+      const f = ESTR.L?.ficha?.(x.id) || {};
+      return { nombre: x.nombre, peso: `${pctCorto(x.share)} de ${R.lente === 'propio' ? 'tus votos' : R.lente === 'partido' ? 'los votos de tu familia' : 'el voto de la ciudad'}`,
+        rinde: x.ratio != null && R.lente !== 'ciudad' ? `${vecesE(x.ratio)} frente a lo que pesa en el territorio` : '',
+        decide: f.decide || f.lema || '', temas: temasArquetipo(x.id) };
+    }),
     fase: { nombre: R.fase?.nombre || '', hasta: R.fase?.hasta ? fechaLarga(R.fase.hasta) : '', que: R.fase?.que || '' },
-    principios: (R.principios || []).slice(0, 3).map(p => ({ corto: p.corto, texto: p.texto })),
-    accion: R.accion?.texto || '', apoyoAccion: (R.accion?.fichas || []).map(id => C360Estrategia.ficha(ESTR.banco, id)?.corto || id).join(' · '),
-    competencia: R.competencia?.texto || '',
+    accion: R.accion?.texto || '', competencia: R.competencia?.texto || '',
     perfil: PERFIL_ESTR || null,
+    noticias: NOTICIAS_ESTR.map(x => ({ titulo: x.titulo, medio: x.medio, fecha: x.fecha, medios: x.medios })),
   };
 }
-let PERFIL_ESTR = null;
+let PERFIL_ESTR = null, PERFIL_ESTR_LISTO = false;
 async function lecturaIAEstrategia() {
   if (!SESSION.token || !ESTR) return;
   const turno = ESTR_TURNO;
   try {
-    PERFIL_ESTR = await perfilMarcadoEstrategia();
+    const [perfil, noticias] = await Promise.all([perfilMarcadoEstrategia().catch(() => null), noticiasEstrategia().catch(() => [])]);
+    PERFIL_ESTR = perfil; PERFIL_ESTR_LISTO = true; NOTICIAS_ESTR = noticias || [];
     if (turno !== ESTR_TURNO) return;
     const r = await apiC360('/c360/estrategia/ia', { method: 'POST', body: JSON.stringify({ contexto: contextoIAEstrategia() }) });
-    if (turno !== ESTR_TURNO || !r.ok || !r.data?.saludo) return;   /* sin ruta, sin cuota o sin lectura: queda la versión fija */
+    if (turno !== ESTR_TURNO || !r.ok || !r.data?.lectura) return;   /* sin ruta, sin cuota o sin lectura: queda la versión fija */
     const L = r.data;
-    $('crmEstrCopy').textContent = L.saludo;
-    pintarVariablesEstr(L.variables || []);
-    if (L.semana) {
-      $('crmEstrAccion').innerHTML = `<b>Esta semana.</b> ${escHtml(L.semana)} <small>${L.apoyo ? `Sale de ${escHtml(L.apoyo)} · ` : ''}lectura con IA sobre tus datos</small>`;
-      $('crmEstrAccion').classList.remove('hidden');
-    }
+    $('crmEstrCopy').textContent = L.lectura;
+    if (L.temas?.length) pintarTemasEstr(L.temas);
+    const n = L.noticia ? NOTICIAS_ESTR[L.noticia - 1] : null;
+    const pie = n ? `A partir de: ${n.url ? `<a href="${escHtml(n.url)}" target="_blank" rel="noopener">«${escHtml(n.titulo)}»</a>` : `«${escHtml(n.titulo)}»`}${n.medio ? ` · ${escHtml(n.medio)}` : ''}` : 'Lectura con IA sobre tus datos';
+    $('crmEstrAccion').innerHTML = `<b>Esta semana.</b> ${escHtml(L.semana)} <small>${pie}</small>`;
+    $('crmEstrAccion').classList.remove('hidden');
     ESTR.ia = L;
   } catch {}
+}
+/* ── Antes de abrir la estrategia: cómo la construimos (26-oct-2026) ──────
+   Pedido de Ricardo: un aviso que explique con qué datos de ESTA candidatura
+   se arma (arquetipo, edad, sexo, familia política, territorio, corporación),
+   que pasan por el banco de ocho estrategias, que de ahí sale la historia que
+   sostiene hasta octubre y que encima van las acciones. Con «Siguiente» se
+   abre la estrategia. Se ve una vez por sesión; el botón de la cabecera lo
+   vuelve a abrir. */
+const ESTR_INTRO_VISTA = 'c360-estr-intro-vista';
+async function pintarIntroEstrategia() {
+  const R = ESTR.R, k = contextoCampanaEstr(), c = CAMPANA_ACTUAL || SESSION.vinculo?.campana || {};
+  if (!PERFIL_ESTR_LISTO) { PERFIL_ESTR = await perfilMarcadoEstrategia().catch(() => null); PERFIL_ESTR_LISTO = true; }
+  const a = arquetipoPrincipalEstr(), may = t => t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+  const deQuien = R.lente === 'propio' ? 'de tus votos' : R.lente === 'partido' ? 'de los votos de tu familia política' : 'del voto de la ciudad';
+  const sinPerfil = crmCandidate ? 'Sin diferencia marcada con el municipio: no cambia la estrategia.' : 'Se mide cuando tengas votos en puestos de votación.';
+  const datos = [
+    ['Arquetipo', a ? `«${a.nombre}»: ${pctCorto(a.share)} ${deQuien}.` : 'Tu ciudad todavía no tiene arquetipos por barrio.'],
+    ['Edad', PERFIL_ESTR?.edad ? `${may(PERFIL_ESTR.edad)}.` : sinPerfil],
+    ['Sexo', PERFIL_ESTR?.sexo ? `${may(PERFIL_ESTR.sexo)}.` : sinPerfil],
+    ['Familia política', k.partido ? `Con el aval de ${NOMBRE_BONITO(k.partido)}.` : c.avales === 'firmas' ? 'Por firmas, sin partido.' : `Sin partido todavía: se mide con ${FAMILIA_CON_ARTICULO[k.bloque] || 'tu familia política'}.`],
+    ['Territorio', k.lugar ? `${k.lugar}.` : 'El de tu campaña.'],
+    ['Corporación', `${CRM_CORPORATIONS[k.corp] || 'Tu corporación'}.`],
+  ];
+  const top = new Set((R.principios || []).slice(0, 3).map(p => p.id));
+  const ochos = (R.principios || []).map(p => `<li class="${top.has(p.id) ? 'tuya' : ''}"><b>${escHtml(p.corto)}</b>${top.has(p.id) ? '<i>pesa más en tu caso</i>' : ''}</li>`).join('');
+  const fecha = R.fase?.eleccion?.fecha ? fechaLarga(R.fase.eleccion.fecha) : 'octubre de 2027';
+  $('estrIntro').innerHTML = `<span class="panel-num">Antes de abrirla</span>
+    <h3>${escHtml(k.nombre || 'Tu candidatura')}, así construimos tu estrategia.</h3>
+    <p>No sale de una plantilla. Partimos de seis datos de tu candidatura:</p>
+    <dl class="estr-intro-datos">${datos.map(([t, v]) => `<div><dt>${t}</dt><dd>${escHtml(v)}</dd></div>`).join('')}</dl>
+    <p>Con esos datos pasamos por un banco de <b>ocho estrategias de campaña</b>, sacadas de la investigación sobre elecciones y del oficio de quienes las hacen. Cada una pesa distinto según dónde están tus votos y qué mueve a ese electorado:</p>
+    <ol class="estr-intro-ocho">${ochos}</ol>
+    <p>De las que más pesan sale <b>tu historia</b>: la esencia de tu campaña, lo que vas a sostener de aquí a la elección del ${escHtml(fecha)}. Una campaña que cambia de relato cada mes no deja nada en la cabeza de nadie. Encima de esa historia van las <b>acciones concretas</b> de cada fase, que cambian con el calendario y con la prensa de cada semana.</p>
+    <button type="button" class="solid estr-intro-sig" onclick="cerrarIntroEstrategia()">Siguiente: ver mi estrategia</button>`;
+}
+async function mostrarIntroEstrategia(forzar) {
+  let vista = false; try { vista = sessionStorage.getItem(ESTR_INTRO_VISTA) === '1'; } catch {}
+  if (vista && !forzar) { $('estrategia').classList.remove('estr-intro-on'); return; }
+  $('estrategia').classList.add('estr-intro-on');
+  $('estrIntro').innerHTML = '<p class="helper">Preparando…</p>';
+  await pintarIntroEstrategia();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+function cerrarIntroEstrategia() {
+  try { sessionStorage.setItem(ESTR_INTRO_VISTA, '1'); } catch {}
+  $('estrategia').classList.remove('estr-intro-on');
+  window.scrollTo({ top: 0, behavior: 'instant' });
 }
 function abrirEstrategia() {
   if (CRM_VITRINA) return abrirPaywall('La estrategia se abre con el acceso a Candidato 360.');
@@ -5273,6 +5398,7 @@ function abrirEstrategia() {
      un `.screen` porque cada pantalla tiene su guía en Candi y en el worker. */
   $('crm').classList.add('crm-en-estrategia'); $('estrategia').classList.remove('hidden');
   window.scrollTo({ top: 0, behavior: 'instant' });
+  mostrarIntroEstrategia(false);
 }
 function cerrarEstrategia() { $('crm')?.classList.remove('crm-en-estrategia'); $('estrategia')?.classList.add('hidden'); }
 function volverAlCRM() {
