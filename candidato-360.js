@@ -5199,6 +5199,28 @@ function pintarTarjetaEstrategia() {
   lecturaIAEstrategia();
 }
 const fechaLarga = iso => { const [a, m, d] = String(iso).split('-').map(Number); return `${d} de ${['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'][m - 1]} de ${a}`; };
+/* Edad y sexo entran a la lectura SOLO si están marcados (pedido de Ricardo,
+   26-oct-2026). Es el censo de los puestos donde saca votos, ponderado por sus
+   votos, contra el del municipio: no describe a quien votó por él. Umbrales
+   medidos con casos reales: un grupo de edad que se aparta 6 puntos o más
+   (Ricardo Ruiz en Teusaquillo: mayores de 60 = 34,9 % contra 20,9 %) y el
+   sexo si se aparta 2,5 puntos (en los dos casos medidos, ninguno pasó de 1,1). */
+const UMBRAL_EDAD_ESTR = .06, UMBRAL_SEXO_ESTR = .025;
+async function perfilMarcadoEstrategia() {
+  if (!crmCandidate) return null;
+  let P = PERFIL_ACTUAL;
+  if (!P) { try { P = await perfilDelVotante(); } catch { return null; } }
+  if (!P?.votos) return null;
+  const out = {}, pc = x => `${(x * 100).toFixed(1).replace('.', ',')} %`;
+  const g = P.edad?.grupos, gm = P.edadMunicipio?.grupos, G = window.C360Electorado?.GRUPOS_EDAD || [];
+  if (g && gm) {
+    const k = g.map((x, i) => [i, x - gm[i]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
+    if (k && Math.abs(k[1]) >= UMBRAL_EDAD_ESTR && G[k[0]]) out.edad = `${G[k[0]].nombre.toLowerCase()} (${G[k[0]].rango}): ${pc(g[k[0]])} del censo de tus puestos contra ${pc(gm[k[0]])} del municipio`;
+  }
+  if (P.mujeres != null && P.mujeresMunicipio != null && Math.abs(P.mujeres - P.mujeresMunicipio) >= UMBRAL_SEXO_ESTR)
+    out.sexo = `mujeres: ${pc(P.mujeres)} del censo de tus puestos contra ${pc(P.mujeresMunicipio)} del municipio`;
+  return Object.keys(out).length ? out : null;
+}
 function contextoIAEstrategia() {
   const R = ESTR.R, k = contextoCampanaEstr(), c = CAMPANA_ACTUAL || SESSION.vinculo?.campana || {};
   const hist = crmCandidate ? leerCorpHistorica(crmCandidate.corp) : null;
@@ -5216,12 +5238,16 @@ function contextoIAEstrategia() {
     principios: (R.principios || []).slice(0, 3).map(p => ({ corto: p.corto, texto: p.texto })),
     accion: R.accion?.texto || '', apoyoAccion: (R.accion?.fichas || []).map(id => C360Estrategia.ficha(ESTR.banco, id)?.corto || id).join(' · '),
     competencia: R.competencia?.texto || '',
+    perfil: PERFIL_ESTR || null,
   };
 }
+let PERFIL_ESTR = null;
 async function lecturaIAEstrategia() {
   if (!SESSION.token || !ESTR) return;
   const turno = ESTR_TURNO;
   try {
+    PERFIL_ESTR = await perfilMarcadoEstrategia();
+    if (turno !== ESTR_TURNO) return;
     const r = await apiC360('/c360/estrategia/ia', { method: 'POST', body: JSON.stringify({ contexto: contextoIAEstrategia() }) });
     if (turno !== ESTR_TURNO || !r.ok || !r.data?.saludo) return;   /* sin ruta, sin cuota o sin lectura: queda la versión fija */
     const L = r.data;
