@@ -190,7 +190,9 @@ _RAW = [
      'salud / EPS e IPS,farmaceutico / medicamentos', '', ''),
     ('sanitas', 'Sanitas (Keralty)', 'salud', 'sanitas|keralty|colsanitas',
      'salud / EPS e IPS', 'eps sanitas', ''),
-    ('compensar', 'Compensar', 'salud', 'compensar', 'cajas de compensacion / subsidio familiar,laboral,salud / EPS e IPS', '', ''),
+    # 'compensar' a secas es un verbo: medido oct-2026, traía «necesitarían ahorrar
+    # para compensar…» y una indemnización en Cantabria al Sur de Comfama.
+    ('compensar', 'Compensar', 'salud', 'compensar eps|caja compensar|compensar caja', 'cajas de compensacion / subsidio familiar,laboral,salud / EPS e IPS', 'caja de compensacion familiar compensar|compensar eps|caja compensar', ''),
     ('nuevaeps', 'Nueva EPS', 'salud', 'nueva eps', 'salud / EPS e IPS', '', ''),
     ('saludtotal', 'Salud Total', 'salud', 'salud total', 'salud / EPS e IPS', '', ''),
     ('coosalud', 'Coosalud', 'salud', 'coosalud', 'salud / EPS e IPS', '', ''),
@@ -199,7 +201,9 @@ _RAW = [
     ('saviasalud', 'Savia Salud', 'salud', 'savia salud', 'salud / EPS e IPS', '', ''),
     ('medimas', 'Medimás', 'salud', 'medimas', 'salud / EPS e IPS', '', ''),
     ('colsubsidio', 'Colsubsidio', 'salud', 'colsubsidio', 'cajas de compensacion / subsidio familiar,*laboral,salud / EPS e IPS', '', ''),
-    ('cafam', 'Cafam', 'salud', 'cafam', 'cajas de compensacion / subsidio familiar,*laboral,salud / EPS e IPS', '', ''),
+    # 'avenida cafam' es una vía de Melgar (Tolima): medido oct-2026, traía un
+    # homicidio en esa avenida al radar de Comfama como «Cafam en prensa».
+    ('cafam', 'Cafam', 'salud', 'cafam', 'cajas de compensacion / subsidio familiar,*laboral,salud / EPS e IPS', '', 'avenida cafam|av cafam'),
 
     # ---- farmacéutico y droguerías --------------------------------------
     ('tecnoquimicas', 'Tecnoquímicas', 'farma', 'tecnoquimicas',

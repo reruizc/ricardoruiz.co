@@ -2825,7 +2825,8 @@ LECTURA_MAX_SENALES = 26
 #                           pilar que venga: si sancionan a tu competidor eso es
 #                           noticia de competencia, no "regulatorio" a secas
 #   Oeste  · el Estado    → Congreso y superintendencias sobre TU tema
-CARD_POR_TIPO = {'contratacion': 'norte', 'medios': 'este', 'redes': 'este',
+CARD_POR_TIPO = {'contratacion': 'norte', 'sucop': 'norte', 'eventos': 'norte',
+                 'medios': 'este', 'redes': 'este',
                  'congreso': 'oeste', 'regulatorio': 'oeste'}
 CARD_LBL = {'norte': 'NORTE · oportunidad', 'este': 'ESTE · conversación',
             'sur': 'SUR · competencia',    'oeste': 'OESTE · Estado'}
@@ -3227,6 +3228,12 @@ def _lectura_cliente_prompt(s, senales, kpis):
                          f"@{x.get('autor', '')} ({x.get('seguidores', 0)} seguidores · "
                          f"{x.get('likes', 0)} me gusta · {x.get('rts', 0)} reposts) sobre "
                          f"«{x.get('tema', '')}»: {x.get('texto', '')[:170]}")
+        elif x['tipo'] == 'sucop':
+            lines.append(f"- [CONSULTA PÚBLICA ABIERTA · prioridad {x['nivel']}] cierra {x.get('cierra', '')} · "
+                         f"{x.get('entidad', '')}: {(x.get('titulo') or '')[:110]}")
+        elif x['tipo'] == 'eventos':
+            lines.append(f"- [EVENTO DEL SECTOR · prioridad {x['nivel']}] {x.get('fecha', '')} "
+                         f"{x.get('medio', '')}: {(x.get('titulo') or '')[:110]}")
         elif x['tipo'] == 'contratacion':
             lines.append(f"- [CONTRATACIÓN · prioridad {x['nivel']}{vig}] {x.get('fecha', '')} "
                          f"{x.get('entidad', '')} → {x.get('proveedor', '')}: "
@@ -4141,6 +4148,139 @@ def _medios_para_empresas(emps, cap=5):
     return out
 
 
+# --- Norte · oportunidades más allá de SECOP (oct-2026) -------------------
+# El Norte era solo contratación, y para un cliente que no le vende al Estado
+# (Cauce, Binance) quedaba vacío siempre. Oportunidad es también la ventana
+# para comentar un borrador de norma y el foro donde se discute su agenda. Lo
+# segundo lo pidió Comfama por escrito (oct-21-2026): «convocatorias, mesas de
+# trabajo, jornadas de socialización, encuentros sectoriales, capacitaciones,
+# eventos… promovidos por estas entidades».
+EVT_DIAS = 30
+# ⚠️⚠️ La lista de OR tiene que ser CORTA. Medido oct-2026: con 13 términos
+# Google News deja de exigir el nombre entre comillas y devuelve 98 eventos de
+# cualquier parte («Juegos de Mesa en Neuquén») tanto para «Comfama» como para
+# «Llorente y Cuenca». Con 9 términos, o con el nombre primero, sí lo exige.
+EVT_Q = ('foro OR seminario OR cumbre OR conversatorio OR simposio OR '
+         '"congreso nacional" OR "congreso internacional" OR "audiencia pública" OR '
+         '"encuentro nacional"')
+EVT_Q_NOMBRE = '"{}" (foro OR seminario OR cumbre OR congreso OR encuentro OR conversatorio)'
+# Lo que pidió Comfama para las entidades que sigue: mesas, convocatorias, socialización.
+EVT_Q_ENTIDAD = '"{}" (foro OR seminario OR "mesa de trabajo" OR convocatoria OR socialización OR encuentro)'
+# ⚠️ «congreso» suelto NO entra: casa con el Congreso de la República en
+# cualquier titular político. Solo las formas que nombran un evento.
+EVT_RE = re.compile(
+    r'\b(foros?|seminarios?|cumbres?|conversatorios?|simposios?|'
+    r'congreso (nacional|internacional|anual|latinoamericano|colombiano|iberoamericano)|'
+    r'audiencias? publicas?|encuentros? (nacional|regional|internacional|sectorial|empresarial)|'
+    r'mesas? de trabajo|jornadas? de socializacion|socializacion|convocatorias?)\b')
+_EVT_STOP = {'nacion', 'general', 'publica', 'publico', 'sobre', 'entre', 'para', 'familiar'}
+
+
+def _evt_palabras(t):
+    """Raíces (6 letras) de las palabras con cuerpo de un tema: el titular debe
+    nombrar alguna. Medido: sin esto «presupuesto general de la nación» traía
+    el Congreso Nacional de Salud y una cumbre de ONU Mujeres."""
+    return [w[:6] for w in _fold_q(t).split() if len(w) >= 5 and w not in _EVT_STOP]
+
+
+def _eventos_para_perfil(s, emps_vig, cap=4):
+    """Eventos del sector en prensa: por TEMA (el titular debe nombrarlo), por el
+    NOMBRE de la empresa (basta que la nota la nombre) y por las ENTIDADES que
+    el cliente sigue (el titular debe nombrar a la entidad)."""
+    temas = [t for t in (s.get('temas') or []) if len(_fold_q(t)) >= 5][:3]
+    if s.get('tipo') == 'consultora':
+        temas += ['asuntos públicos']
+    propias = [e['nombre'] for e in emps_vig[:1]]
+    inter = [x for x in (s.get('interlocutores') or [])][:3]
+    planes = ([('tema', t) for t in temas] + [('nombre', n) for n in propias]
+              + [('entidad', x) for x in inter])
+    if not planes:
+        return []
+    ck = f'eventos2-{_hash24("|".join(f"{a}:{b}" for a, b in planes))}-{_medios_cache_bucket()}'
+    cached = _cache_get(ck)
+    if cached is not None:
+        return cached.get('items', [])
+    corte = _time.strftime('%Y-%m-%d', _time.gmtime(_time.time() - EVT_DIAS * 86400))
+    res = {}
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        def _q(modo, t):
+            if modo == 'nombre':
+                return EVT_Q_NOMBRE.format(t)
+            if modo == 'entidad':
+                return EVT_Q_ENTIDAD.format(t)
+            return f'({EVT_Q}) "{t}"'
+        futs = {pool.submit(_medios_query_events, _q(modo, t), EVT_DIAS): (modo, t)
+                for modo, t in planes}
+        for fut in as_completed(futs):
+            res[futs[fut]] = fut.result()
+    out, vistos = [], set()
+    for modo, t in planes:
+        pal = _evt_palabras(t)
+        for e in res.get((modo, t), []):
+            tit = e.get('titulo') or ''
+            tf = _fold_q(tit)
+            if e.get('exterior') or (e.get('fecha') or '') < corte or not EVT_RE.search(tf):
+                continue
+            if modo in ('tema', 'entidad') and pal and not any(w in tf for w in pal):
+                continue
+            k = _medios_norm(tit)[:90]
+            if k in vistos:
+                continue
+            vistos.add(k)
+            reciente = (e.get('fecha') or '') >= _time.strftime(
+                '%Y-%m-%d', _time.gmtime(_time.time() - 7 * 86400))
+            out.append({'tipo': 'eventos', 'titulo': tit, 'url': e.get('url'),
+                        'medio': e.get('medio'), 'fecha': e.get('fecha'),
+                        'sobre': t, 'por': modo,
+                        'nivel': 'alto' if (modo == 'nombre' or reciente) else 'medio',
+                        'accion': ('Evento que nombra a la organización — confirmar participación o vocería'
+                                   if modo == 'nombre' else
+                                   'Evento del sector — evaluar asistencia, vocería o patrocinio')})
+    out = sorted(out, key=lambda x: (0 if x['nivel'] == 'alto' else 1, -_sucop_dias_desde_epoca(x.get('fecha'))))[:cap]
+    _cache_put(ck, {'items': out})
+    return out
+
+
+def _sucop_para_perfil(s, cap=4):
+    """Borradores de norma ABIERTOS a comentarios que tocan los temas del perfil
+    (mismo cruce que el expediente). Si la entidad que lo publica está entre
+    los interlocutores del cliente, sube a prioridad alta."""
+    temas = [_fold_q(t) for t in (s.get('temas') or []) if len(_fold_q(t)) >= 4]
+    for t in caudal_core.temas_de_empresas(s.get('empresas_keys')):
+        tf = _fold_q(t)
+        if len(tf) >= 4 and tf not in temas:
+            temas.append(tf)
+    if not temas:
+        return [], 0
+    inter = [_fold_q(x) for x in (s.get('interlocutores') or []) if len(_fold_q(x)) >= 4]
+    hits = [r for r in _sucop()
+            if r.get('estado_consulta') in ('abierta', 'cierra_pronto')
+            and any(t in (r.get('q') or '') for t in temas)]
+    hits.sort(key=_sucop_orden)
+    out = []
+    for r in hits[:cap]:
+        ent = r.get('entidad') or ''
+        suya = any(i in _fold_q(ent) or _fold_q(ent) in i for i in inter)
+        fin = r.get('fecha_fin') or ''
+        out.append({'tipo': 'sucop', 'titulo': (r.get('titulo') or '')[:200], 'entidad': ent,
+                    'url': r.get('url') or '', 'fecha': r.get('fecha_inicio') or '',
+                    'cierra': fin, 'dias': r.get('dias_restantes'),
+                    'nivel': 'alto' if (r.get('estado_consulta') == 'cierra_pronto' or suya) else 'medio',
+                    'accion': (f'Borrador en consulta pública hasta el {fin} — se puede comentar'
+                               if fin else 'Borrador en consulta pública — se puede comentar')})
+    return out, len(hits)
+
+
+def _entrada_libre(c):
+    """Competidor que no está en el diccionario, con la forma de una entrada para
+    los cruces por identidad (prensa y Regulatorio). Sin razón social curada:
+    el nombre es la identidad y no hay vetos."""
+    n = _fold_q(c.get('nombre') or c.get('k') or '')
+    return {'k': c.get('k'), 'nombre': c.get('nombre') or n, 'sector': '', 'tipo': 'empresa',
+            'flags': [], 'extranjera': False, 'alias': [n], 'topicos': [], 'nucleo': [],
+            'contexto': [], 'entidad': [n], 'excluir': [], 'libre': True}
+
+
 def _secop_para_empresas(emps, cap=5):
     """Contratos que SON de las vigiladas (proveedor o entidad), por identidad.
 
@@ -5048,6 +5188,68 @@ def handler(event, context):
         # autocompletado del diccionario (④) para elegir empresas vigiladas
         return _resp(200, {'empresas': caudal_core.buscar_empresas(body.get('query', ''))})
 
+    if action == 'competidores':
+        # «Explora competidores por mí» (oct-2026): el Sur de un perfil sin
+        # competencia queda vacío para siempre. El modelo propone TRES y el
+        # usuario decide si los sigue; no se guarda nada desde acá.
+        # Se le pasan candidatos del diccionario que comparten actividad con el
+        # perfil, para que prefiera los que Caudal ya sabe identificar; si los
+        # competidores reales no están (las firmas de asuntos públicos de Cauce
+        # no lo están), los nombra igual y se siguen por su nombre.
+        s = caudal_core.normalizar_perfil(body.get('perfil') or {})
+        ya = {e['k'] for e in s.get('empresas', [])} | {c['k'] for c in s.get('competencia', [])}
+        topk = set()
+        for t in (s.get('temas') or []):
+            topk.update(x['k'] for x in caudal_core._topicos(t))
+        for e in s.get('empresas', []):
+            topk.update(e.get('nucleo') or [])
+        cands = [e for e in empresas.EMPRESAS
+                 if e['k'] not in ya and set(e.get('nucleo') or []) & topk][:90]
+        ck = 'competidores2-' + _hash24('|'.join([s['nombre'], s.get('que_hace', ''),
+                                                  ','.join(sorted(ya)), ','.join(sorted(topk))]))
+        cached = _cache_get(ck)
+        if cached:
+            return _resp(200, cached)
+        system = ('Eres analista de inteligencia competitiva para organizaciones que operan '
+                  'en Colombia. Propones exactamente TRES organizaciones reales que compiten '
+                  'con el cliente por clientes, contratos, afiliados o influencia en su '
+                  'agenda pública. Prefieres las del LISTADO cuando de verdad compiten; si '
+                  'las competidoras reales no están en el listado, las nombras igual. Nunca '
+                  'inventas organizaciones ni datos. Responde SOLO JSON: {"competidores": '
+                  '[{"nombre": str, "k": str (la llave del listado, o "" si no está), '
+                  '"razon": str (una frase concreta: en qué compiten)}]}')
+        lista = '\n'.join(f"- {e['k']} · {e['nombre']} ({e['sector']})" for e in cands) or '(vacío)'
+        user = (f"Cliente: {s['nombre']} ({s.get('tipo') or 'organización'})\n"
+                f"Qué hace: {s.get('que_hace') or s.get('descripcion') or '—'}\n"
+                f"Temas que sigue: {', '.join(s.get('temas') or []) or '—'}\n"
+                f"Ya sigue a: {', '.join(c['nombre'] for c in s.get('competencia', [])) or 'nadie'}\n\n"
+                f"LISTADO (llave · nombre):\n{lista}")
+        try:
+            d = _llm_json('contexto', system, user, 1500, valida=_exige('competidores'))
+        except Exception as e:
+            return _resp(200, {'competidores': [], 'error': 'No pudimos proponer competidores ahora. Intenta de nuevo.'})
+        idx = {e['k']: e for e in cands}
+        out, vistos = [], set()
+        for c in d.get('competidores') or []:
+            if not isinstance(c, dict):
+                continue
+            k = str(c.get('k') or '').strip().lower()
+            e = idx.get(k)
+            nombre = (e['nombre'] if e else str(c.get('nombre') or '').strip())[:60]
+            # la llave de un competidor libre viaja al KV del worker, que solo
+            # admite [a-z0-9 ._-]: «LLYC (Llorente & Cuenca)» se volvía inválida
+            clave = e['k'] if e else re.sub(r'\s+', ' ', re.sub(r'[^a-z0-9 ]+', ' ', _fold_q(nombre))).strip()[:40]
+            if len(nombre) < 3 or clave in vistos or clave in ya:
+                continue
+            vistos.add(clave)
+            out.append({'k': clave, 'nombre': nombre, 'en_diccionario': bool(e),
+                        'razon': str(c.get('razon') or '').strip()[:200]})
+            if len(out) >= 3:
+                break
+        res = {'competidores': out, 'n_candidatos': len(cands)}
+        _cache_put(ck, res)
+        return _resp(200, res)
+
 
     if action == 'tablero':
         # ── EL EXPEDIENTE DEL CLIENTE ──────────────────────────────────────
@@ -5218,6 +5420,15 @@ def handler(event, context):
             if not s:
                 return _resp(400, {'error': f'sector desconocido: {sk}', 'sectores': sectores})
         emps_vig = [e for e in empresas.EMPRESAS if e['k'] in set(s.get('empresas_keys') or [])]
+        # La competencia de un perfil GUARDADO no entraba al radar: los presets la
+        # suman a empresas_keys en sector_cliente, pero normalizar_perfil la deja
+        # aparte. Ahora entra al Sur igual en los dos casos, y las que no están
+        # en el diccionario se siguen por su nombre (_entrada_libre).
+        _ya = {e['k'] for e in emps_vig}
+        emps_vig += [e for e in empresas.EMPRESAS
+                     if e['k'] in set(s.get('competencia_keys') or []) and e['k'] not in _ya]
+        emps_vig += [_entrada_libre(c) for c in (s.get('competencia') or [])
+                     if isinstance(c, dict) and c.get('libre')]
         rc = caudal.radar_congreso(temas=s.get('temas', []),
                                    comision_lbl=s.get('comision', ''),
                                    empresas_keys=s.get('empresas_keys'))
@@ -5338,7 +5549,7 @@ def handler(event, context):
         # mencionan. Es la pregunta directa "¿mi vigilada le vende al Estado?".
         con_vig, vig_cids, n_con_vig, con_vig_vacio = [], set(), 0, False
         try:
-            cv = _secop_para_empresas(emps_vig)
+            cv = _secop_para_empresas([e for e in emps_vig if not e.get('libre')])
             n_con_vig = cv.get('n', 0)
             con_vig_vacio = bool(cv.get('sin_contratos'))
             for quien, r in cv.get('resultados', []):
@@ -5393,7 +5604,18 @@ def handler(event, context):
         except Exception as e:
             print(f'[cliente] redes FAIL: {type(e).__name__}: {e}')
             red, red_meta = [], {'estado': 'error', 'n': 0, 'n_colombia': 0, 'generado': None}
-        senales = rc['senales'] + reg + med + con + red
+        # --- Norte · consultas abiertas y eventos ---------------------------
+        try:
+            suc, n_suc = _sucop_para_perfil(s)
+        except Exception as e:
+            print(f'[cliente] sucop FAIL: {type(e).__name__}: {e}')
+            suc, n_suc = [], 0
+        try:
+            evt = _eventos_para_perfil(s, emps_vig)
+        except Exception as e:
+            print(f'[cliente] eventos FAIL: {type(e).__name__}: {e}')
+            evt = []
+        senales = rc['senales'] + reg + med + con + suc + evt + red
         n_vig = sum(1 for x in senales if x.get('vigilada'))
         kpis = {'n_radar': len(senales),
                 'alto': sum(1 for x in senales if x['nivel'] == 'alto'),
@@ -5404,6 +5626,7 @@ def handler(event, context):
                 'n_otros_actos_sector': n_otros,
                 'n_medios_sector': n_med, 'n_medios_exterior': n_med_ext,
                 'n_contratos_sector': n_con,
+                'n_consultas_abiertas': n_suc, 'n_eventos': len(evt),
                 'n_vigiladas': len(emps_vig), 'n_senales_vigiladas': n_vig,
                 'n_contratos_vigiladas': n_con_vig,
                 # articulado: cuántas señales del Congreso traen "qué cambia" y
@@ -5450,7 +5673,8 @@ def handler(event, context):
                            'contratacion_generica_omitida': con_generica_muda,
                            'descartes': s.get('descartes', [])},
                'congreso': rc['senales'], 'regulatorio': reg, 'medios': med,
-               'contratacion': con, 'redes': red, 'kpis': kpis, 'sectores': sectores}
+               'contratacion': con, 'sucop': suc, 'eventos': evt,
+               'redes': red, 'kpis': kpis, 'sectores': sectores}
         out['cliente']['avisos'] = s.get('avisos', [])
         # `lectura:true` YA NO significa "espérame la síntesis": significa
         # "prepárala". El radar tiene que salir siempre rápido (medido:

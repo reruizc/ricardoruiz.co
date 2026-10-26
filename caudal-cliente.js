@@ -855,6 +855,20 @@
         <div class="sig-title">${vt}<a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.titulo)}</a></div>
         <div class="sig-tags">${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
+    // Norte · oportunidades (oct-2026): borradores abiertos a comentarios y
+    // eventos del sector. Los dos llevan su enlace: la acción es abrirlos.
+    if(x.tipo==='sucop'){
+      const tags=[x.entidad?esc(x.entidad):'', x.cierra?'cierra '+esc(x.cierra):'', x.dias!=null?esc(String(x.dias))+' días':''].filter(Boolean).join(' · ');
+      const tit=x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.titulo||'Borrador en consulta')}</a>`:esc(x.titulo||'Borrador en consulta');
+      return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title">${tit}</div><div class="sig-tags">Consulta pública · ${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
+    }
+    if(x.tipo==='eventos'){
+      const tags=[x.medio?esc(x.medio):'', x.fecha?esc(x.fecha):'', x.sobre?'sobre «'+esc(x.sobre)+'»':''].filter(Boolean).join(' · ');
+      return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.titulo)}</a></div>
+        <div class="sig-tags">Evento · ${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
+    }
     if(x.tipo==='contratacion'){
       const tags=[x.proveedor?esc(x.proveedor):'', x.departamento?esc(x.departamento):'', x.fecha?esc(x.fecha):'',
                   x.valor?fmtCOP(x.valor):''].filter(Boolean).join(' · ');
@@ -889,6 +903,10 @@
       ? (reg.length?`<div class="sig-list">${reg.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin actos recientes del regulador en esta fuente.</div>')
       : '<div class="cli-reg-none">El regulador de este sector todavía no es fuente de Caudal — las entidades entran por etapas. Si tu exposición es ambiental (licenciamiento, seguimiento, sanción), el sector <b>Ambiente</b> ya trae el expediente completo de la ANLA.</div>';
     if(pilar==='contratacion') return con.length?`<div class="sig-list">${con.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin contratación reciente para los temas de este sector.</div>';
+    if(pilar==='oportunidades'){
+      const op=[].concat(d.sucop||[], d.eventos||[]);
+      return op.length?`<div class="sig-list">${op.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Ninguna consulta pública abierta ni evento del sector cruza hoy con estos temas.</div>';
+    }
     if(pilar==='medios') return medios.length?`<div class="sig-list">${medios.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin cobertura de prensa reciente para este sector.</div>';
     if(pilar==='redes'){
       const redes=d.redes||[], k=d.kpis||{};
@@ -970,6 +988,7 @@
         <span class="chip" data-p="congreso">Legislativo <b>${congreso.length}</b></span>
         <span class="chip" data-p="regulatorio">Regulatorio <b>${reg.length}</b></span>
         <span class="chip" data-p="contratacion">Contratación <b>${con.length}</b></span>
+        <span class="chip" data-p="oportunidades">Consultas y eventos <b>${(d.sucop||[]).length+(d.eventos||[]).length}</b></span>
         <span class="chip" data-p="medios">Prensa <b>${medios.length}</b></span>
         ${(d.redes&&d.redes.length)||(k.redes_estado&&k.redes_estado!=='sin_escucha')?`<span class="chip" data-p="redes">Redes · X <b>${(d.redes||[]).length}</b></span>`:''}
       </div>
@@ -1209,7 +1228,7 @@
   const BRIEF_CARD=[['norte','NORTE · oportunidades'],['este','ORIENTE · conversación'],
                     ['sur','SUR · competencia'],['oeste','OCCIDENTE · Estado']];
   const BRIEF_FUENTE={congreso:'Congreso',regulatorio:'Regulatorio',medios:'Prensa',redes:'Redes · X',
-                      contratacion:'Contratación',ejecutivo:'Ejecutivo',sucop:'Consulta pública'};
+                      contratacion:'Contratación',ejecutivo:'Ejecutivo',sucop:'Consulta pública',eventos:'Evento'};
   // ⚠️ La URL va como ENLACE, nunca como texto. Medido en el primer brief: una
   // sola nota de prensa de Google News ocupaba CINCO LÍNEAS de base64 —
   // `news.google.com/rss/articles/CBMivAFBVV95cUxQ…` son más de 500 caracteres —
@@ -1278,7 +1297,7 @@
     const d=_CLI_LAST; if(!d) return null;
     const cl=d.cliente||{}, k=d.kpis||{};
     const todas=[].concat(d.congreso||[],d.regulatorio||[],d.medios||[],
-                          d.contratacion||[],d.ejecutivo||[],d.sucop||[],d.redes||[]);
+                          d.contratacion||[],d.ejecutivo||[],d.sucop||[],d.eventos||[],d.redes||[]);
     // `mov` lo marca la Lambda contra su propio reloj: no se recalcula acá para
     // que el PDF y la pantalla no puedan discrepar por la zona horaria del
     // navegador de quien descarga.

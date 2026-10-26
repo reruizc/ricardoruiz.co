@@ -1038,7 +1038,21 @@ def normalizar_perfil(p):
         key = _norm(str(raw or '')).strip()
         e = idx.get(key)
         if not e:
-            if key:
+            # Un competidor que NO está en el diccionario (las firmas de
+            # asuntos públicos de Cauce, oct-2026) ya no se descarta: se sigue
+            # por su NOMBRE en prensa y en el pilar Regulatorio, nunca en SECOP
+            # (ahí un nombre suelto casa con personas naturales). Se exige un
+            # nombre con cuerpo: tres letras no identifican a nadie.
+            slug = re.sub(r'[^a-z0-9 ]+', ' ', key).strip()
+            slug = re.sub(r'\s+', ' ', slug)[:40]
+            if len(slug) >= 4 and not slug.isdigit():
+                if slug not in vistas_c:
+                    vistas_c.add(slug)
+                    comp.append({'k': slug, 'nombre': slug.title(), 'tipo': 'empresa',
+                                 'sector': '', 'libre': True})
+                    avisos.append(f'«{slug.title()}» no está en el diccionario: se sigue '
+                                  'por su nombre en prensa y en el pilar Regulatorio')
+            elif key:
                 descartes.append(str(raw))
             continue
         if e['k'] in vistas_c:
@@ -1078,7 +1092,7 @@ def normalizar_perfil(p):
         # ── la ficha ──────────────────────────────────────────────────────
         'tipo': tipo,
         'competencia': comp,
-        'competencia_keys': [e['k'] for e in comp],
+        'competencia_keys': [e['k'] for e in comp if not e.get('libre')],
         'lineas': _ficha_lineas(p, avisos),
         'descartes': descartes,
         'avisos': avisos,

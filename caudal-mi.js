@@ -193,7 +193,7 @@ function ultimoPerfil(){
   // misma llave que caudal-cliente.js: los dos recuerdan el mismo cliente
   try{ return localStorage.getItem('caudal-perfil-ult:'+(em||'anon'))||''; }catch(e){ return ''; }
 }
-let HOY_CTX=null, HOY_D=null, HOY_RUMBO='', HOY_ACT=0;
+let HOY_CTX=null, HOY_D=null, HOY_RUMBO='', HOY_ACT=0, HOY_L=null, HOY_VER=false, HOY_PERFIL=null;
 function hoyRumbos(){
   const k=(HOY_D&&HOY_D.kpis)||{}, cc=k.cardinales||{}, md=k.mov_dias||3;
   $('hoy-rumbos').innerHTML=HOY_RUMBOS.map(([key,let_,nom,que])=>{
@@ -207,12 +207,78 @@ function hoyRumbos(){
       + `</div>`;
   }).join('');
   $('hoy-rumbos').querySelectorAll('[data-rumbo]').forEach(el=>{
-    const sel=()=>{ HOY_RUMBO=HOY_RUMBO===el.dataset.rumbo?'':el.dataset.rumbo; hoyRumbos(); hoySenales(); };
+    const sel=()=>{ HOY_RUMBO=HOY_RUMBO===el.dataset.rumbo?'':el.dataset.rumbo; HOY_VER=false; hoyRumbos(); hoySenales(); };
     el.onclick=e=>{ if(e.target.closest('[data-hoy-act]')) return; sel(); };
     el.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); sel(); } };
   });
   $('hoy-rumbos').querySelectorAll('[data-hoy-act]').forEach(b=>b.onclick=e=>{
     e.stopPropagation(); HOY_RUMBO=b.closest('[data-rumbo]').dataset.rumbo; hoyActualizar(); });
+}
+/* ══ Competidores del Sur ═════════════════════════════════════════════════
+   Un perfil sin competencia deja el Sur vacío para siempre. Dos puertas: a
+   mano (diccionario, o un nombre libre que se sigue por prensa) o «Explora
+   competidores por mí», que le pide tres a DeepSeek (acción `competidores`
+   de la Lambda) y deja al usuario decidir. Solo para un perfil GUARDADO: se
+   escribe en su `competencia` con /caudal/perfil/save, que reemplaza la ficha
+   entera, así que se manda el perfil completo y solo cambia esa lista. */
+let COMP_SUG=[], COMP_MSG='', COMP_DICC=null;
+const compSlug=t=>normTxt(t).replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim().slice(0,40);
+function compHTML(n){
+  const sug=COMP_SUG.map((c,i)=>`<label class="comp-sug"><input type="checkbox" data-comp-i="${i}" ${c.on?'checked':''}>
+      <span><b>${esc(c.nombre)}</b> <span class="comp-tag">${c.en_diccionario?'en el diccionario':'se sigue por su nombre'}</span>
+      ${c.razon?`<span class="comp-razon">${esc(c.razon)}</span>`:''}</span></label>`).join('');
+  return `<div class="comp-box"><div class="hoy-ana-t">${n?'Sumar competidores':'Elige a quién seguir'}</div>
+    <div class="comp-acts"><button type="button" class="btn-t" data-comp-ia>Explora competidores por mí</button>
+      <span class="comp-man"><input id="comp-in" list="comp-dl" placeholder="o escribe un nombre: Compensar, LLYC…" autocomplete="off"><datalist id="comp-dl"></datalist>
+      <button type="button" class="btn-g" data-comp-add>Agregar</button></span></div>
+    ${sug?`<div class="comp-list">${sug}</div><button type="button" class="btn-t" data-comp-seguir>Seguir a los seleccionados</button>`:''}
+    ${COMP_MSG?`<div class="cob-note" style="margin-top:.6rem">${esc(COMP_MSG)}</div>`:''}</div>`;
+}
+async function compDicc(){
+  if(COMP_DICC) return COMP_DICC;
+  try{ const d=await (await fetch('caudal-empresas.json?v=20261026')).json(); COMP_DICC=d.empresas||[]; }catch(e){ COMP_DICC=[]; }
+  return COMP_DICC;
+}
+function compWire(){
+  const box=$('hoy-senales');
+  box.querySelectorAll('[data-comp-i]').forEach(c=>c.onchange=()=>{ COMP_SUG[+c.dataset.compI].on=c.checked; });
+  const ia=box.querySelector('[data-comp-ia]');
+  if(ia) ia.onclick=async()=>{
+    ia.disabled=true; ia.textContent='Buscando competidores…'; COMP_MSG='';
+    const p=HOY_PERFIL||{};
+    let d; try{ d=await call({action:'competidores',perfil:{nombre:p.nombre,tipo:p.tipo||'',que_hace:p.que_hace||'',
+      descripcion:p.descripcion||'',temas:p.temas||[],empresas:p.empresas||[],competencia:p.competencia||[]}}); }catch(e){ d={error:'No pudimos proponer competidores ahora.'}; }
+    if(d&&d.error) COMP_MSG=d.error;
+    (d&&d.competidores||[]).forEach(c=>{ if(!COMP_SUG.some(x=>x.k===c.k)) COMP_SUG.push({...c,on:true}); });
+    if(d&&!d.error&&!(d.competidores||[]).length) COMP_MSG='El modelo no encontró competidores claros para este perfil. Agrégalos a mano.';
+    hoySenales();
+  };
+  const inp=$('comp-in');
+  if(inp){ compDicc().then(l=>{ const dl=$('comp-dl'); if(dl) dl.innerHTML=l.slice(0,2100).map(e=>`<option value="${esc(e.n)}">`).join(''); }); }
+  const add=box.querySelector('[data-comp-add]');
+  if(add) add.onclick=async()=>{
+    const v=(inp&&inp.value||'').trim(); if(v.length<3) return;
+    const l=await compDicc(), vn=normTxt(v);
+    const e=l.find(x=>normTxt(x.n)===vn||(x.a||[]).some(a=>normTxt(a)===vn));
+    const c=e?{k:e.k,nombre:e.n,en_diccionario:true,razon:'',on:true}:{k:compSlug(v),nombre:v,en_diccionario:false,razon:'',on:true};
+    if(c.k.length<4){ COMP_MSG='Ese nombre es muy corto para seguirlo con precisión.'; return hoySenales(); }
+    if(!COMP_SUG.some(x=>x.k===c.k)) COMP_SUG.push(c);
+    COMP_MSG=''; hoySenales();
+  };
+  const seg=box.querySelector('[data-comp-seguir]');
+  if(seg) seg.onclick=async()=>{
+    const elegidos=COMP_SUG.filter(c=>c.on); if(!elegidos.length) return;
+    seg.disabled=true; seg.textContent='Guardando…';
+    try{
+      const pid=HOY_CTX&&HOY_CTX.perfil;
+      const actual=(await api('/caudal/perfil/load?perfilId='+encodeURIComponent(pid))).perfil||{};
+      const prev=(actual.competencia||[]).map(c=>typeof c==='string'?c:(c&&c.k)||'').filter(Boolean);
+      const comp=[...new Set(prev.concat(elegidos.map(c=>c.k)))];
+      await api('/caudal/perfil/save',Object.assign({},actual,{perfilId:pid,competencia:comp}));
+      COMP_SUG=[]; COMP_MSG=`Ahora sigues a ${elegidos.map(c=>c.nombre).join(', ')}. El Sur se está actualizando.`;
+      hoyActualizar();
+    }catch(e){ COMP_MSG=e.message||'No se pudo guardar.'; seg.disabled=false; seg.textContent='Seguir a los seleccionados'; hoySenales(); }
+  };
 }
 /* «Actualizar» vuelve a correr el radar entero: prensa (Google News), SECOP,
    Congreso y reguladores se consultan en vivo en cada llamada, no hay caché
@@ -234,17 +300,17 @@ function hoySig(x){
 }
 // Por qué un rumbo puede venir vacío. Dicho con el dato, no con un «sin datos».
 function hoyPorQue(r,k){
-  if(r==='norte') return 'Ningún proceso de contratación del Estado cruza hoy con los temas de este perfil.';
+  if(r==='norte') return 'Ningún proceso de contratación, consulta pública abierta ni evento del sector cruza hoy con los temas de este perfil.';
   if(r==='este') return 'No hay cobertura de prensa sobre sus temas en las últimas dos semanas.'
     +(k.redes_estado==='sin_escucha'?' La escucha de redes sociales no está activa para este perfil.':'');
   if(r==='sur') return k.n_vigiladas
     ? `Ninguna de las ${k.n_vigiladas} empresas vigiladas tuvo señales en las fuentes de Caudal.`
-    : 'Este perfil no vigila competidores ni empresas: el Sur se llena cuando se agregan en la Rosa.';
+    : 'Este perfil todavía no sigue a ningún competidor. Agrégalos a mano o deja que Caudal te proponga tres.';
   return 'Ni el Congreso ni los reguladores tienen señales sobre sus temas.';
 }
 function hoySenales(){
   const d=HOY_D||{}, k=d.kpis||{};
-  const grupos=[['Congreso',d.congreso],['Regulatorio',d.regulatorio],['Medios',d.medios],['Contratación',d.contratacion],['Redes',d.redes]];
+  const grupos=[['Congreso',d.congreso],['Regulatorio',d.regulatorio],['Medios',d.medios],['Contratación',d.contratacion],['Consulta pública',d.sucop],['Evento',d.eventos],['Redes',d.redes]];
   const todas=grupos.flatMap(([src,items])=>(Array.isArray(items)?items:[]).map(x=>({...x,source:src})));
   const ORD={alto:0,medio:1,bajo:2};
   if(HOY_RUMBO){
@@ -254,12 +320,25 @@ function hoySenales(){
     const cab=`<div class="hoy-sel"><span class="hoy-sel-t">${esc(r[2])} · ${esc(r[3])} · ${lista.length} señal${lista.length===1?'':'es'}</span>`
       + `<button type="button" class="btn-g" data-hoy-todo>Ver el resumen</button></div>`;
     const hora=HOY_ACT?`<div class="cob-note" style="margin:.5rem 0 0">Consultado de nuevo a las ${new Date(HOY_ACT).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}</div>`:'';
-    $('hoy-senales').innerHTML = cab + (lista.length
-      ? '<div class="sig-list">'+lista.slice(0,10).map(hoySig).join('')+'</div>'
-        +(lista.length>10?`<div class="cob-note">Y ${lista.length-10} más en la Rosa completa.</div>`:'')
-      : `<div class="hoy-vacio">${esc(hoyPorQue(HOY_RUMBO,k))}<br><button type="button" class="btn-t" data-hoy-act2>Actualizar</button>${hora}</div>`);
-    const t=$('hoy-senales').querySelector('[data-hoy-todo]'); if(t) t.onclick=()=>{ HOY_RUMBO=''; hoyRumbos(); hoySenales(); };
+    // 1 · lo que dice el analista sobre este rumbo (la lectura ya trae un
+    // párrafo por punto cardinal); 2 · la lista, detrás de «Ver todas».
+    const txt=(HOY_L&&(HOY_L[HOY_RUMBO]||'')).trim();
+    const ana=txt
+      ? `<div class="hoy-ana"><div class="hoy-ana-t">Lo que dice el analista</div><p>${esc(txt)}</p></div>`
+      : (lista.length?`<div class="hoy-ana pend"><p>${HOY_L?'La lectura no trajo un análisis para este rumbo.':'El analista está escribiendo la lectura de este rumbo. Mientras tanto, la lista está abajo.'}</p></div>`:'');
+    const ver=lista.length
+      ? (HOY_VER||!txt
+          ? '<div class="sig-list">'+lista.slice(0,10).map(hoySig).join('')+'</div>'
+            +(lista.length>10?`<div class="cob-note">Y ${lista.length-10} más en la Rosa completa.</div>`:'')
+            +(txt?'<button type="button" class="btn-g hoy-ver" data-hoy-ver>Ocultar la lista</button>':'')
+          : `<button type="button" class="btn-g hoy-ver" data-hoy-ver>Ver todas las señales (${lista.length})</button>`)
+      : `<div class="hoy-vacio">${esc(hoyPorQue(HOY_RUMBO,k))}<br><button type="button" class="btn-t" data-hoy-act2>Actualizar</button>${hora}</div>`;
+    const comp=(HOY_RUMBO==='sur'&&HOY_CTX&&HOY_CTX.perfil)?compHTML(lista.length):'';
+    $('hoy-senales').innerHTML = cab + ana + ver + comp;
+    const t=$('hoy-senales').querySelector('[data-hoy-todo]'); if(t) t.onclick=()=>{ HOY_RUMBO=''; HOY_VER=false; hoyRumbos(); hoySenales(); };
     const a=$('hoy-senales').querySelector('[data-hoy-act2]'); if(a) a.onclick=()=>{ a.disabled=true; a.textContent='Actualizando…'; hoyActualizar(); };
+    const v=$('hoy-senales').querySelector('[data-hoy-ver]'); if(v) v.onclick=()=>{ HOY_VER=!HOY_VER; hoySenales(); };
+    if(comp) compWire();
     return;
   }
   // Lo que se movió y pesa. Si nada se movió, se dice — y se muestra lo más
@@ -275,6 +354,8 @@ function hoySenales(){
 function hoyTitular(l){
   // El titular de la lectura. Si el modelo no lo trajo, se usa el Norte, que
   // es la lectura del contexto — nunca se inventa una frase.
+  HOY_L=l||null;
+  if(HOY_RUMBO) hoySenales();   // el párrafo del rumbo abierto llega con la lectura
   const t=(l&&(l.titular||l.norte||l.lo_que_importa)||'').trim();
   $('hoy-lectura').innerHTML=t?`<div class="hoy-titular">${esc(t)}</div>`:'';
   $('hoy-estado').textContent='';
@@ -282,7 +363,7 @@ function hoyTitular(l){
 function loadHoy(perfilId){ return hoyCargar({perfil:perfilId}); }
 async function hoyCargar(ctx, opt={}){
   const mine=++hoyRev; hoyStop();
-  HOY_CTX=ctx; if(!opt.mantener){ HOY_RUMBO=''; HOY_ACT=0; }
+  HOY_CTX=ctx; HOY_L=null; if(!opt.mantener){ HOY_RUMBO=''; HOY_ACT=0; HOY_VER=false; }
   $('hoy').hidden=false;
   $('hoy-estado').textContent='Cruzando el Estado, la competencia y la conversación…';
   if(!opt.mantener){ $('hoy-lectura').replaceChildren(); $('hoy-rumbos').replaceChildren(); $('hoy-senales').replaceChildren(); }
@@ -301,6 +382,7 @@ async function hoyCargar(ctx, opt={}){
     try{ perfil=(await api('/caudal/perfil/load?perfilId='+encodeURIComponent(perfilId))).perfil; }
     catch(e){ if(mine===hoyRev) $('hoy-estado').textContent=e.message; return; }
     if(mine!==hoyRev) return;
+    HOY_PERFIL=Object.assign({perfilId},perfil);
     $('hoy-cliente').textContent=perfil.nombre||'tu cliente';
     // La ficha completa: sin ella la lectura se escribe sin saber quién es el
     // cliente (defecto medido en sep-2026).
