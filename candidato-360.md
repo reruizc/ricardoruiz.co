@@ -676,6 +676,31 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
     ⚠️ Con ese contexto más largo DeepSeek devolvía el contenido vacío con 3000 tokens:
     el worker arranca en 8000 y reintenta una vez con 14000.
   - *Botones del CRM*: en mayúscula y sin flecha.
+  - *Tarjeta 11, segunda vuelta (26-oct-2026, prompt v5)*. Pedido de Ricardo: menos
+    académica y más de la semana.
+    - **Título**: sale de un banco de 14 frases (`TITULOS_ESTR`) y no repite la última
+      que vio ese dispositivo (`localStorage['c360-estr-titulo']`).
+    - **Párrafo**: «Tu voto pesa en «X» en Bogotá, desde el centro-derecha…» y cierra con
+      los temas que hay que trabajar. Los temas salen de la sensibilidad 1-5 del
+      arquetipo (`temasArquetipo`: 4 o 5 de 5; la ficha de Bogotá y Cartagena la trae,
+      Medellín usa la de sus cinco familias de `C360Arquetipos`) y se pintan como fichas.
+      Las tres variables en caja se quitaron: el párrafo las junta.
+    - **Esta semana**: sin autores en la tarjeta (la referencia vive en la vista
+      ampliada). Con IA, arranca de una noticia del territorio: `noticiasEstrategia` usa
+      la misma fuente del briefing (proxy de Caudal, `consultasTerritorio`, 7 días,
+      filtro `puntajeLocal`, agrupado por historia y ordenado por cuántos medios la
+      cuentan; caché de una hora en la pestaña) y manda hasta 8 titulares. El modelo
+      escoge uno solo si toca un tema o el territorio, sin agregarle hechos; el pie dice
+      «A partir de: «titular» · medio» con el enlace. Las cifras de los titulares solo
+      valen si el modelo cita esa noticia.
+    - Salida del worker v5: `{lectura, temas, semana, noticia}` (antes `saludo`,
+      `variables`, `apoyo`). Prohibido nombrar autores, estudios o jerga.
+    - **Antes de abrir la estrategia** sale un aviso (`#estrIntro`,
+      `mostrarIntroEstrategia`): los seis datos de la candidatura (arquetipo, edad, sexo,
+      familia política, territorio, corporación), el banco de ocho estrategias con las
+      tres que más pesan marcadas, y que de ahí sale la historia que se sostiene hasta la
+      elección, con las acciones encima. «Siguiente» abre la estrategia; se ve una vez
+      por sesión y el botón «Cómo armamos tu estrategia» lo vuelve a abrir.
 
 ### 10.3 Candi (Luna)
 
