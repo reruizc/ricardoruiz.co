@@ -541,10 +541,19 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
   formulario. Ahora se llenan los seis pasos sin cuenta y el CRM abre en vista
   previa (`CRM_VITRINA`), igual que la ruta con historial: el registro se pide
   al tocar un módulo. Sin acceso no se vincula ni se guarda nada en el
-  worker. ⚠️ Lo llenado no sobrevive al registro: quien crea la cuenta vuelve
-  a la portada y repite los seis pasos (la ruta con historial tiene el mismo
-  hueco). La pantalla pasó además a la caja centrada de 720 px de la ruta con
+  worker. La pantalla pasó además a la caja centrada de 720 px de la ruta con
   historial; antes ocupaba todo el ancho.
+- **Lo llenado sin cuenta sobrevive al registro (26-oct-2026).** En vista
+  previa, las dos rutas guardan en el navegador `localStorage['c360-pendiente']`
+  con la forma del vínculo (`{tipo, candidato|nuevo, campana, ts}`; vence a los
+  30 días). Al volver con sesión iniciada y sin vínculo, `recuperarPendiente`
+  lo reabre con `abrirVinculo(p)`: sin acceso queda en vista previa (con los
+  planes encima si llega con `?comprar=1`); con acceso pide la confirmación de
+  siempre y vincula (la candidatura nueva por `recuperarPendiente`, la de
+  historial por `launchCRM`). Se borra al vincular (`guardarVinculo`) y se
+  reabre una sola vez por pestaña (`sessionStorage['c360-pendiente-abierto']`),
+  para que quien vuelve a la portada y recarga no quede atrapado. Sin sesión
+  no se reabre nada.
 
 ### 10.3 Candi (Luna)
 

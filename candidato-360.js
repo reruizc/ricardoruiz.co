@@ -332,7 +332,7 @@ async function guardarVinculo(payload) {
   if (r.status === 409) { SESSION.vinculo = r.data.vinculo || SESSION.vinculo; return { ok: false, existente: true }; }
   if (r.status === 403) { SESSION.acceso = false; return { ok: false, sinAcceso: true }; }
   if (!r.ok) return { ok: false, error: r.data?.error || `HTTP ${r.status}` };
-  SESSION.vinculo = r.data.vinculo; return { ok: true };
+  SESSION.vinculo = r.data.vinculo; borrarPendiente(); return { ok: true };
 }
 let CAMPANA_ACTUAL = null;
 async function guardarCampana(campana) {
@@ -523,6 +523,23 @@ function resolverModoPruebas() {
    reabrir la candidatura que se estaba mirando. Se guarda en sessionStorage
    y en localStorage, y al leer manda localStorage (ver leerVinculoLocal). */
 const VINCULO_LOCAL_KEY = 'c360-vinculo-pruebas';
+/* ─── Lo que se llenó sin cuenta (oct-26-2026, pedido de Ricardo) ──────────
+   En vista previa nada se guarda en el worker, pero quien se registra para
+   abrir un módulo no debería repetir la búsqueda o los seis pasos. Se guarda
+   en ESTE navegador con la misma forma del vínculo ({tipo, candidato|nuevo,
+   campana}) y, al volver con sesión iniciada y sin vínculo, `recuperarPendiente`
+   lo reabre: sin acceso, en vista previa; con acceso, con la confirmación de
+   siempre antes de vincular. Vence a los 30 días y se borra al vincular. */
+const PENDIENTE_KEY = 'c360-pendiente', PENDIENTE_DIAS = 30;
+function guardarPendiente(p) { try { localStorage.setItem(PENDIENTE_KEY, JSON.stringify(Object.assign({}, p, { ts: Date.now() }))); } catch {} }
+function borrarPendiente() { try { localStorage.removeItem(PENDIENTE_KEY); } catch {} }
+function leerPendiente() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDIENTE_KEY) || 'null');
+    if (!p || !['nuevo', 'historial'].includes(p.tipo) || !p.campana || Date.now() - (p.ts || 0) > PENDIENTE_DIAS * 864e5) { borrarPendiente(); return null; }
+    return p;
+  } catch { return null; }
+}
 function vinculoLocal(payload) { SESSION.vinculo = Object.assign({ local: true }, payload); persistirVinculoLocal(); }
 function persistirVinculoLocal() {
   if (!SESSION.vinculo?.local) return;
@@ -1904,7 +1921,7 @@ async function createNew(e) {
      cuando quien no se había decidido lo define desde el CRM. */
   const campana = { corp: $('election').value, ruta: 'other', avales: indeciso ? 'indeciso' : 'partido', espectro: indeciso ? espectroNuevoVigente() : '', partido: nuevo.partido, departamento: dep.value, departamentoNombre: depNombre, municipio: MUNICIPAL_ELECTIONS.includes($('election').value) ? $('municipality').value : '', localidad: $('election').value === 'jal' ? $('locality').value : '' };
   if (!nuevo.nombre || !campana.corp || !campana.departamento) return;
-  if (vitrina) { /* vista previa: nada se guarda ni se vincula */ }
+  if (vitrina) guardarPendiente({ tipo: 'nuevo', nuevo, campana });   /* vista previa: solo en este navegador */
   else if (PRUEBAS) vinculoLocal({ tipo: 'nuevo', nuevo, campana });
   else if (SESSION.vinculo) guardarCampana(campana);   /* quien vuelve a definir el partido */
   else {
@@ -1918,15 +1935,41 @@ async function createNew(e) {
      declaró van como preferencias de la escucha (/c360/escucha), que es donde
      después se piden los usuarios. `medios` va vacío a propósito: esa pregunta
      la hace el panel de escucha, y con él vacío el panel la sigue haciendo. */
-  if (nuevo.redesUsa.length && !vitrina) {
-    const preferencias = { redes: nuevo.redesUsa, medios: [] };
-    if (SESSION.vinculo?.local) { SESSION.vinculo.escucha = Object.assign({}, SESSION.vinculo.escucha || {}, { preferencias }); persistirVinculoLocal(); }
-    else if (SESSION.vinculo) {
-      const r = await apiC360('/c360/escucha', { method: 'POST', body: JSON.stringify({ preferencias }) }).catch(() => null);
-      if (r?.ok && r.data?.vinculo) SESSION.vinculo = r.data.vinculo;
-    }
-  }
+  if (!vitrina) await guardarRedesDelAlta(nuevo.redesUsa);
   abrirCRMNuevo();
+}
+async function guardarRedesDelAlta(redes) {
+  if (!redes?.length) return;
+  const preferencias = { redes, medios: [] };
+  if (SESSION.vinculo?.local) { SESSION.vinculo.escucha = Object.assign({}, SESSION.vinculo.escucha || {}, { preferencias }); persistirVinculoLocal(); }
+  else if (SESSION.vinculo) {
+    const r = await apiC360('/c360/escucha', { method: 'POST', body: JSON.stringify({ preferencias }) }).catch(() => null);
+    if (r?.ok && r.data?.vinculo) SESSION.vinculo = r.data.vinculo;
+  }
+}
+/* Reabre lo que se llenó sin cuenta (ver PENDIENTE_KEY). Devuelve true si lo
+   tomó, para que el arranque no abra otra cosa encima. */
+async function recuperarPendiente() {
+  if (PRUEBAS || !SESSION.token) return false;
+  const p = leerPendiente(); if (!p) return false;
+  if (SESSION.vinculo) { borrarPendiente(); return false; }   /* la cuenta ya tiene su candidatura */
+  /* Una vez por pestaña: quien vuelve a la portada y recarga no queda atrapado
+     en la vista previa; otra pestaña u otro día, sí se le ofrece de nuevo. */
+  try { if (sessionStorage.getItem('c360-pendiente-abierto')) return false; sessionStorage.setItem('c360-pendiente-abierto', '1'); } catch {}
+  if (p.tipo === 'nuevo' && SESSION.acceso) {
+    const c = p.campana;
+    const sigue = await confirmarVinculo(p.nuevo?.nombre || 'Candidatura nueva', `${CRM_CORPORATIONS[c.corp] || ''} · ${[c.localidad, c.municipio, c.departamentoNombre].filter(Boolean).join(' · ')}`);
+    if (!sigue) return true;   /* lo pendiente se queda: puede confirmarlo en otra visita */
+    const r = await guardarVinculo({ tipo: 'nuevo', nuevo: p.nuevo, campana: c });
+    if (!r.ok) { if (r.existente) { alert(`Su cuenta ya está vinculada a ${vinculoDescripcion()}. Para cambiarla escriba a ${SESSION.soporte}.`); borrarPendiente(); return abrirVinculo(), true; } alert(`No se pudo guardar la candidatura: ${r.error || 'sin acceso'}`); return true; }
+    await guardarRedesDelAlta(p.nuevo?.redesUsa);
+    abrirVinculo();
+    return true;
+  }
+  /* Sin acceso: vista previa. Con acceso en la ruta con historial, launchCRM
+     pide la confirmación y vincula, como si la persona lo hiciera a mano. */
+  abrirVinculo(p);
+  return true;
 }
 
 /* ─── 7 ter. El punto de partida, dicho como se dice ────────────────────────
@@ -2443,7 +2486,7 @@ async function launchCRM(event) {
   const corporation = CRM_CORPORATIONS[corpKey], territory = campaignTerritory(corpKey);
   if (territory === null) { irAPaso('lugar', { animar: true }); $('campaignDepartment').focus({ preventScroll: true }); return; }
   const campana = campanaActual(corpKey);
-  if (CRM_VITRINA) { /* vista previa: nada se guarda ni se vincula */ }
+  if (CRM_VITRINA) guardarPendiente({ tipo: 'historial', candidato: { id: crmCandidate.id, nombre: crmCandidate.nombre, slugs: (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean), corp: crmCandidate.corp, partido: crmCandidate.partido, circunscripcion: crmCandidate.circunscripcion }, campana });   /* vista previa: solo en este navegador */
   else if (PRUEBAS) vinculoLocal({ tipo: 'historial', candidato: { id: crmCandidate.id, nombre: crmCandidate.nombre, slugs: (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean), corp: crmCandidate.corp, partido: crmCandidate.partido, circunscripcion: crmCandidate.circunscripcion }, campana });
   else if (!SESSION.vinculo) {
     const sigue = await confirmarVinculo(crmCandidate.nombre, `${corporation}${territory ? ` · ${territory}` : ''}`);
@@ -2537,8 +2580,8 @@ async function abrirCRMNuevo() {
   pintarContendientes();
 }
 /* Volver a la candidatura vinculada (al cargar o al intentar cambiarla). */
-async function abrirVinculo() {
-  const v = SESSION.vinculo; if (!v) return showScreen('intro');
+async function abrirVinculo(v = SESSION.vinculo) {
+  if (!v) return showScreen('intro');
   if (v.tipo === 'nuevo') { NUEVO = { ...v.nuevo, campana: v.campana }; return abrirCRMNuevo(); }
   const slugs = v.candidato?.slugs || [];
   const preload = $('preload');
@@ -5223,6 +5266,8 @@ function htmlTerritorio() {
        ?abrir=1. Con vínculo se abre el CRM directo; SIN vínculo la respuesta
        no es la portada —desde la que el botón parece no haber hecho nada— sino
        la búsqueda, que es donde una candidatura se abre de verdad. */
+    recuperarPendiente().then(tomado => {
+    if (tomado) return;
     if (new URLSearchParams(location.search).get('abrir') === '1') {
       /* En modo pruebas manda la candidatura que se estaba mirando en esta
          pestaña, no el vínculo real de la cuenta de administración. */
@@ -5230,6 +5275,7 @@ function htmlTerritorio() {
       if (local) SESSION.vinculo = local;
       if (SESSION.vinculo) abrirVinculo(); else beginHistorical();
     }
+    });
   });
   setTimeout(() => { clearInterval(strategyMessageTimer); $('preload').classList.remove('active'); }, 6000);   /* red de seguridad si el worker no responde */
 })();
