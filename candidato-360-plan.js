@@ -70,10 +70,10 @@
     s.textContent = `
 #crm.plan-portada:not(.crm-en-estrategia)>*:not(.flow-top):not(#crmPlan){display:none!important}
 #crm.plan-fase{display:flex;flex-direction:column}
-#crm.plan-fase>.flow-top{order:0}#crm.plan-fase>#crmPlan{order:1}#crm.plan-fase>.dash-head{order:2}
+#crm.plan-fase>.flow-top{order:0}#crm.plan-fase>#crmPlan{order:1}#crm.plan-fase>.dash-head{order:2}#crm.plan-fase>.crm-cabecera{order:2}
 #crm.plan-fase>.panel{order:3}#crm.plan-fase>.crm-grid{order:4;margin-bottom:14px}#crm.plan-fase>article.panel{order:5}#crm.plan-fase>.estr-vista{order:6}
 #crm.plan-fase .plan-fuera{display:none!important}
-#crm.plan-fase.plan-cerrada .crm-grid>*:not(.plan-fuera),#crm.plan-fase.plan-cerrada>.panel,#crm.plan-fase.plan-cerrada>article.panel,#crm.plan-fase.plan-cerrada>.estr-vista,#crm.plan-fase.plan-cerrada>.dash-head{opacity:.45;filter:grayscale(1);pointer-events:none;user-select:none}
+#crm.plan-fase.plan-cerrada .crm-grid>*:not(.plan-fuera),#crm.plan-fase.plan-cerrada>.panel,#crm.plan-fase.plan-cerrada>article.panel,#crm.plan-fase.plan-cerrada>.estr-vista,#crm.plan-fase.plan-cerrada>.crm-cabecera,#crm.plan-fase.plan-cerrada>.dash-head{opacity:.45;filter:grayscale(1);pointer-events:none;user-select:none}
 #crm.plan-fase.plan-cerrada .plan-intro{border-style:dashed}
 .plan-aviso{display:flex;gap:12px;align-items:center;margin:-10px 0 22px;padding:12px 16px;background:var(--cream);border:1px dashed var(--line);border-left:3px solid var(--coral);font-size:14px;color:var(--ink)}
 .plan-aviso b{color:var(--coral)}.plan-aviso span{color:var(--muted)}
@@ -120,10 +120,12 @@
     document.head.appendChild(s);
   }
 
+  /* #crmName ya trae el primer nombre y el primer apellido (nombreCorto en
+     candidato-360.js): el saludo los usa los dos, «¡Hola, Ricardo Ruiz!». */
   function nombreCorto() {
     const n = ($('crmName')?.textContent || '').trim();
-    const w = n.split(/\s+/)[0] || '';
-    return w ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : '';
+    if (!n || /^candidatura$/i.test(n)) return '';
+    return n.toLowerCase().replace(/(^|[\s-])([a-záéíóúñü])/g, (m, a, c) => a + c.toUpperCase()).replace(/\b(De|Del|La|Las|Los|Y)\b/g, w => w.toLowerCase());
   }
 
   function portada() {

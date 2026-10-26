@@ -645,6 +645,29 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
     cuando se regenera el hub.
   - `?terrlocal=1` lee el `territorio.json` del repo para probar antes de subir.
 
+- **Nombre corto, punto de partida a la derecha y estrategia con IA (26-oct-2026).**
+  - *Nombre*: en todo el CRM va el primer nombre y el primer apellido
+    (`nombreCorto` en `candidato-360.js`: «RICARDO ESTEBAN RUIZ CASTRO» → «RICARDO
+    RUIZ»; las partículas van con la palabra siguiente; con tres palabras se mira la
+    segunda contra una lista de segundos nombres comunes). El saludo del plan dice
+    «¡Hola, Ricardo Ruiz!».
+  - *Punto de partida*: va a la derecha del nombre (`.crm-cabecera`, una columna bajo
+    1000 px) y en corto y en tú: cómo viene (según cuántas candidaturas y hace cuántos
+    años: «Nunca es tarde para retomar la política electoral» desde 8 años), a qué va,
+    qué significa el salto, cómo va sin partido o por firmas, y la invitación a la
+    estrategia («para que llegues a ser alcalde o alcaldesa…» en los uninominales). Se
+    quitó el párrafo regional y el dato de 2023 que se agregaban después.
+  - *Tarjeta 11*: pictograma propio (`assets/candidato-360/brief/estrategia.svg`), saludo
+    corto con dos o tres variables (terreno por arquetipo, partido o familia, figura) y
+    la acción de esta semana. Encima, si el worker responde, la lectura de **DeepSeek**
+    (`POST /c360/estrategia/ia`, `lecturaIAEstrategia`): recibe solo lo que ya calculó
+    `C360Estrategia` y aterriza la acción al caso; si la respuesta trae una cifra que no
+    estaba en el contexto, el worker la descarta. Sesión, 20 por cuenta y día, caché de
+    siete días. ⚠️ **La ruta está escrita en `rr-auth` pero NO desplegada** (falta el
+    visto bueno de Ricardo para el worker compartido); mientras tanto la tarjeta muestra
+    la versión fija sin error.
+  - *Botones del CRM*: en mayúscula y sin flecha.
+
 ### 10.3 Candi (Luna)
 
 Candi es la guía de la plataforma y es **Luna, la perrita de Ricardo**, en 3D

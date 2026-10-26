@@ -45,6 +45,23 @@ const DEP_CODES = { 'Amazonas': '60', 'Antioquia': '01', 'Arauca': '40', 'Atlán
 
 const escHtml = s => String(s || '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
 function normalizedText(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+/* En pantalla va el primer nombre y el primer apellido (decisión de Ricardo,
+   26-oct-2026): «RICARDO ESTEBAN RUIZ CASTRO» → «RICARDO RUIZ». Las partículas
+   van con la palabra que sigue («ABELARDO DE LA ESPRIELLA» queda entero). Con
+   tres palabras no hay forma segura de saber si la segunda es nombre o
+   apellido: se mira contra los segundos nombres más comunes. */
+const PARTICULAS_NOMBRE = new Set(['DE', 'DEL', 'LA', 'LAS', 'LOS', 'Y', 'SAN', 'SANTA', 'MC', 'VAN', 'VON', 'DA', 'DI', 'DOS']);
+const SEGUNDOS_NOMBRES = new Set('JOSE MARIA CARLOS ANDRES ALBERTO ANTONIO FERNANDO ENRIQUE EDUARDO ALEJANDRO ESTEBAN DAVID FELIPE JAVIER LUIS MANUEL ANDREA PATRICIA ISABEL CRISTINA FERNANDA ALEJANDRA LUCIA ELENA CAROLINA PAOLA CAMILO JULIAN MAURICIO IVAN ARTURO AUGUSTO HUMBERTO MARCELA LILIANA ESPERANZA ROCIO JOHANA ESTELLA EUGENIA INES TERESA MERCEDES SOFIA VALENTINA DANIEL MIGUEL RICARDO RAFAEL ALFONSO GUILLERMO HERNANDO GUSTAVO JORGE ADRIANA MILENA YANETH YOLANDA STELLA EMILIO ERNESTO FRANCISCO GABRIEL HERNAN IGNACIO JAIME JULIO LEONARDO MARIO NICOLAS OSCAR PABLO RAMIRO RODRIGO SANTIAGO SEBASTIAN TOMAS VICENTE ALBA ANA ANGELA BEATRIZ CECILIA CLARA DIANA ELIZABETH EMILIA GLORIA HELENA JULIANA LAURA LUISA LUZ MARGARITA MARTA MONICA NATALIA PILAR ROSA SANDRA SARA SILVIA SUSANA VICTORIA'.split(' '));
+function nombreCorto(nombre) {
+  const t = String(nombre || '').trim().split(/\s+/).filter(Boolean);
+  const llano = w => w.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+  const g = []; let buf = [];
+  for (const w of t) { buf.push(w); if (!PARTICULAS_NOMBRE.has(llano(w))) { g.push(buf.join(' ')); buf = []; } }
+  if (buf.length) g.push(buf.join(' '));
+  if (g.length <= 2) return g.join(' ');
+  if (g.length === 3) return `${g[0]} ${SEGUNDOS_NOMBRES.has(llano(g[1])) ? g[2] : g[1]}`;
+  return `${g[0]} ${g[2]}`;
+}
 function initials(name) { return String(name || 'CR').split(/\s+/).slice(0, 2).map(x => x[0] || '').join('').toUpperCase() || 'CR'; }
 function optionList(items, label) { return `<option value="">${label}</option>` + items.map(x => `<option value="${escHtml(x.value || x)}">${escHtml(x.label || x)}</option>`).join(''); }
 const $ = id => document.getElementById(id);
@@ -2163,50 +2180,42 @@ async function agregarDatoRegional(el, { dep, municipio, bloque, partido, corp }
   const d = await F.dato({ dep, municipio, codigoMunicipio, bloque, partido, corp }).catch(() => '');
   if (d && el.textContent === antes) el.textContent = `${antes} ${d}`;
 }
+/* ── El punto de partida, corto y en tú (pedido de Ricardo, 26-oct-2026) ──
+   Antes era un párrafo largo (la frase del partido, la regional y un dato de
+   2023 que llegaba después). Ahora son cinco piezas breves: cómo viene
+   (según cuántas veces y hace cuánto se lanzó), a qué va, qué significa el
+   salto, cómo va sin partido o por firmas, y la invitación a la estrategia. */
+const RANGO_CORP = { jal: 1, concejo: 2, alcaldia: 3, asamblea: 3, gobernacion: 4, camara: 5, senado: 6, presidencial: 7, otra: 0 };
+function cierrePartida(corpKey, lugar) {
+  const quien = corpKey === 'alcaldia' ? `alcalde o alcaldesa${lugar ? ` de ${lugar}` : ''}` : corpKey === 'gobernacion' ? `gobernador o gobernadora${lugar ? ` de ${lugar}` : ''}` : '';
+  return quien
+    ? `Te recomendamos revisar la estrategia de campaña: te da una estructura clara y aterriza las acciones para que llegues a ser ${quien}.`
+    : 'Te recomendamos revisar la estrategia de campaña: te da una estructura clara y aterriza las acciones que te llevan a la curul que buscas.';
+}
+function avalPartida(campana) {
+  const familia = FAMILIA_CON_ARTICULO[campana?.espectro] || FAMILIA_CON_ARTICULO.sc;
+  if (campana?.avales === 'indeciso') return `Todavía no tienes partido: mientras lo defines, todo se calcula con ${familia.replace('su familia', 'tu familia')}.`;
+  if (campana?.avales === 'firmas') return `Vas por firmas desde ${familia.replace('su familia', 'tu familia')}: primero se recogen las firmas, después los votos.`;
+  return '';
+}
 function fraseDePartida({ candidate, corpKey, territory, campana }) {
   const hist = leerCorpHistorica(candidate?.corp), n = candidate?.history?.length || 0;
   const lugarNuevo = NOMBRE_BONITO(String(territory || '').split('·')[0].trim()) || hist.lugar;
   const destino = nombreDeCorp(corpKey, lugarNuevo);
-  const cuando = haceCuanto(hist.año);
-  const apertura = n >= 2
-    ? punto(`¡${n} candidaturas en el historial (${[...new Set(candidate.history.map(candidateYear).filter(Boolean))].sort((a, b) => a - b).join(', ')})! La última fue ${aCorp(hist.tipo, hist.lugar)}${cuando ? ` ${cuando}` : ''}`)
-    : `¡Vimos que se lanzó ${aCorp(hist.tipo, hist.lugar)}${cuando ? ` ${cuando}` : ''}!`;
-  const ahora = punto(`Ahora vamos por ${destino}`);
-  /* ¿Se muda? El territorio de la campaña contra el de su última elección. */
+  const años = hist.año ? 2027 - Number(hist.año) : null, cuando = haceCuanto(hist.año), antes = aCorp(hist.tipo, hist.lugar);
+  const apertura = n >= 2 ? `¡Hola! Llevas ${n} candidaturas encima, y la última fue ${antes}${cuando ? ` ${cuando}` : ''}: eso es experiencia que no se improvisa.`
+    : años >= 8 ? `¡Hola! Vimos que la última vez que te lanzaste fue hace ${años} años, ${antes}. Nunca es tarde para retomar la política electoral.`
+    : años >= 4 ? `¡Hola! Tu última candidatura fue ${antes}${cuando ? ` ${cuando}` : ''}: hay una votación tuya para volver a buscar.`
+    : `¡Hola! Vienes de lanzarte ${antes}${cuando ? ` ${cuando}` : ''}: la campaña está fresca.`;
+  const sinPartidoYa = sinPartido(campana?.avales);
+  const deQuien = sinPartidoYa ? 'tu familia política' : 'tu partido';
   const mudanza = Boolean(lugarNuevo) && Boolean(hist.lugar) && normalizedText(lugarNuevo) !== normalizedText(hist.lugar);
-  const porFirmas = campana?.avales === 'firmas', indeciso = campana?.avales === 'indeciso';
-  const bonito = nombre => String(nombre || '').replace(/^(PARTIDO|MOVIMIENTO)\s+(POLÍTICO\s+)?/i, '').split(' ').map(w => w.length > 3 ? NOMBRE_BONITO(w) : w.toLowerCase()).join(' ').replace(/^(\w)/, c => c.toUpperCase());
-  const partido = porFirmas || indeciso ? '' : String(campana?.partido || candidate?.partido || '').trim();
-  const bloque = partido ? PartidosBloques.bloqueDeCandidatura(partido, candidate?.nombre || '') : 'sc';
-  const partidoBonito = bonito(partido);
-  const cambioDePartido = partido && candidate?.partido && normalizedText(partido) !== normalizedText(candidate.partido);
-  const avalNuevo = !cambioDePartido ? ''
-    : mudanza ? ' Es un aval nuevo, y en territorio nuevo: la huella que cuenta es la de ese partido allá.'
-    : ' Es un aval nuevo: el mapa conserva su votación, la huella del partido cambia.';
-  const reg = regionDeCampana(candidate, campana);
-  /* Con partido: primero cómo se ubica ESE partido (si está en el
-     diccionario), si no, la frase de su familia. */
-  const identidad = partido ? window.C360Frases?.partido(partido) : '';
-  let conQuien = partido ? (identidad ? punto(identidad.charAt(0).toUpperCase() + identidad.slice(1)) : elegir(FRASES_BLOQUE[bloque] || FRASES_BLOQUE.sc, candidate?.nombre)(partidoBonito)) + avalNuevo : '';
-  if (porFirmas) {
-    const espectro = campana?.espectro || 'sc';
-    const familia = FAMILIA_CON_ARTICULO[espectro] || FAMILIA_CON_ARTICULO.sc;
-    const viene = candidate?.partido ? `Viene de ${bonito(candidate.partido)}, pero esta vez ` : '';
-    const frase = viene + elegir(FRASES_FIRMAS[espectro] || FRASES_FIRMAS.sc, candidate?.nombre)(familia);
-    conQuien = punto(frase.charAt(0).toUpperCase() + frase.slice(1));
-  }
-  if (indeciso) {
-    const espectro = campana?.espectro || 'sc';
-    const familia = FAMILIA_CON_ARTICULO[espectro] || FAMILIA_CON_ARTICULO.sc;
-    const viene = candidate?.partido ? `Viene de ${bonito(candidate.partido)} y ` : '';
-    conQuien = punto(`${viene ? viene + 'todavía' : 'Todavía'} no tiene partido: se lanza desde ${familia}, y con esa familia se calcula todo mientras lo define. Cuando lo tenga, se pone en el CRM y el mapa cambia a la huella de ese partido`);
-  }
-  const contexto = { lugarViejo: hist.lugar, lugarNuevo, mudanza, esCiudad: Boolean(cityLayerFor(lugarNuevo)) };
-  const salto = punto(FRASES_SALTO[tipoDeSalto(hist.tipo, corpKey)](contexto));
-  /* Y lo que significa esa familia EN ESTE territorio: la lectura regional. */
-  const familiaRegion = partido ? bloque : (campana?.espectro || '');
-  const regional = window.C360Frases?.linea({ ...reg, bloque: familiaRegion }) || '';
-  return [apertura, ahora, salto, conQuien, regional].filter(Boolean).join(' ');
+  const misma = hist.tipo === corpKey;
+  const salto = misma && !mudanza ? 'Repites corporación: ya conoces el terreno, y tu votación es el punto de partida.'
+    : misma ? `Es la misma corporación en otro territorio: la meta se reparte por donde vota ${deQuien} allá.`
+    : (RANGO_CORP[corpKey] || 0) > (RANGO_CORP[hist.tipo] || 0) ? `El salto es grande, y por eso la meta se reparte por donde vota ${deQuien}.`
+    : 'Bajas a un territorio más pequeño: ahí cada voto se nota.';
+  return [apertura, punto(`Ahora vamos por ${destino}`), salto, avalPartida(campana), cierrePartida(corpKey, lugarNuevo)].filter(Boolean).join(' ');
 }
 
 /* ─── 8. CRM: apertura, meta de votos y foto ─────────────────────────────── */
@@ -2538,14 +2547,10 @@ async function launchCRM(event) {
   CAMPANA_ACTUAL = campana;
 
   $('crmBack').textContent = '← Cambiar corporación'; $('crmBack').onclick = () => showScreen('candidateRoute');
-  $('crmInitials').textContent = initials(crmCandidate.nombre); $('crmName').textContent = crmCandidate.nombre;
+  $('crmInitials').textContent = initials(nombreCorto(crmCandidate.nombre)); $('crmName').textContent = nombreCorto(crmCandidate.nombre);
   $('crmTarget').textContent = `Candidatura 2027 · ${corporation}${territory ? ` · ${territory}` : ''}`;
+  $('crmPartidaTit').textContent = 'Tu historial, conectado a la nueva campaña.';
   $('crmContext').textContent = fraseDePartida({ candidate: crmCandidate, corpKey, territory, campana });
-  {
-    const partidoCtx = sinPartido(campana.avales) ? '' : String(campana.partido || crmCandidate.partido || '');
-    const bloqueCtx = partidoCtx ? PartidosBloques.bloqueDeCandidatura(partidoCtx, crmCandidate.nombre || '') : (campana.espectro || '');
-    agregarDatoRegional($('crmContext'), { ...regionDeCampana(crmCandidate, campana), bloque: bloqueCtx, partido: partidoCtx, corp: campana?.corp || '' });
-  }
   $('crmPartidoPendiente')?.classList.toggle('hidden', campana.avales !== 'indeciso');
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
   $('crmMapPanelNum').textContent = '01 · Mapa de historial electoral';
@@ -2582,16 +2587,13 @@ async function abrirCRMNuevo() {
   const c = n.campana, lugar = [c.localidad, c.municipio, c.departamentoNombre].filter(Boolean).map(NOMBRE_BONITO).join(' · ');
   const indeciso = c.avales === 'indeciso', partido = indeciso ? '' : (n.partido || c.partido || '');
   $('crmBack').textContent = '← Inicio'; $('crmBack').onclick = () => showScreen('intro');
-  $('crmInitials').textContent = initials(n.nombre); $('crmName').textContent = n.nombre;
+  $('crmInitials').textContent = initials(nombreCorto(n.nombre)); $('crmName').textContent = nombreCorto(n.nombre);
   $('crmTarget').textContent = `Candidatura 2027 · ${CRM_CORPORATIONS[c.corp]} · ${lugar}`;
-  $('crmContext').textContent = `Candidatura nueva${indeciso ? `, todavía sin partido: se lanza desde ${FAMILIA_CON_ARTICULO[c.espectro] || FAMILIA_CON_ARTICULO.sc}, y con esa familia se calcula todo mientras lo define` : partido ? ` con ${partido}${n.partidoNuevo ? ' (movimiento por constituir)' : ''}` : ''}. Sin historial propio, el punto de partida es el territorio: la referencia son los resultados de 2023 en ${lugar}.${n.objetivo ? ` Primer objetivo: ${n.objetivo.toLowerCase()}.` : ''}${textoRedesCRM(n)}`;
   {
-    const bloqueN = partido ? PartidosBloques.bloqueDeCandidatura(partido, n.nombre || '') : (c.espectro || '');
-    const identidad = partido ? window.C360Frases?.partido(partido) : '';
-    const regional = window.C360Frases?.linea({ dep: c.departamento, municipio: c.municipio, bloque: bloqueN }) || '';
-    const extra = [identidad ? `${identidad.charAt(0).toUpperCase()}${identidad.slice(1)}.` : '', regional].filter(Boolean).join(' ');
-    if (extra) $('crmContext').textContent += ` ${extra}`;
-    agregarDatoRegional($('crmContext'), { dep: c.departamento, municipio: c.municipio, bloque: bloqueN, partido, corp: c.corp });
+    const lugarCorto = NOMBRE_BONITO(c.corp === 'jal' ? (c.localidad || c.municipio) : CORP_MUNICIPAL.includes(c.corp) ? c.municipio : c.departamentoNombre).replace(/,?\s*D\.?\s*C\.?$/i, '');
+    const conPartido = partido && !sinPartido(c.avales) ? `Vas con ${NOMBRE_BONITO(partido)}${n.partidoNuevo ? ', un movimiento por constituir' : ''}.` : avalPartida(c);
+    $('crmPartidaTit').textContent = 'Tu punto de partida es el territorio.';
+    $('crmContext').textContent = [`¡Hola! Es tu primera candidatura, y vamos por ${nombreDeCorp(c.corp, lugarCorto)}.`, `Sin historial propio, se arranca desde el territorio: la referencia son los resultados de 2023 en ${lugarCorto}.`, conPartido, cierrePartida(c.corp, lugarCorto)].filter(Boolean).join(' ');
   }
   $('crmPartidoPendiente')?.classList.toggle('hidden', !indeciso);
   $('crmVoteNumber').textContent = '…'; $('crmVoteTarget').textContent = 'Calculando objetivo competitivo'; $('crmVoteFormula').textContent = 'Contrastando la corporación y el territorio con la última elección comparable.';
@@ -5097,8 +5099,8 @@ function contextoCampanaEstr() {
   const partido = sinPartido(c.avales) ? '' : (c.partido || crmCandidate?.partido || '');
   const bloque = partido ? (window.PartidosBloques?.bloqueDeCandidatura?.(partido, crmCandidate?.nombre || '') || 'sc') : (c.espectro || 'sc');
   const con = partido ? `Con el aval de ${NOMBRE_BONITO(partido)}` : c.avales === 'firmas' ? 'Por firmas, sin la maquinaria de un partido detrás' : `Desde ${FAMILIA_CON_ARTICULO[bloque] || FAMILIA_CON_ARTICULO.sc}`;
-  const nombre = String(ESTR?.nombre || crmCandidate?.nombre || NUEVO?.nombre || '').trim().split(/\s+/)[0] || '';
-  return { corp, lugar, partido, bloque, con, nombre: nombre ? nombre.charAt(0).toUpperCase() + nombre.slice(1).toLowerCase() : '' };
+  const nombre = NOMBRE_BONITO(nombreCorto(ESTR?.nombre || crmCandidate?.nombre || NUEVO?.nombre || ''));
+  return { corp, lugar, partido, bloque, con, nombre };
 }
 function discursoEstrategia() {
   const k = contextoCampanaEstr(), R = ESTR?.R;
@@ -5148,33 +5150,90 @@ const FASE_PARRAFO = {
   despues: 'Pasada la elección vienen el escrutinio y, si ganó, la campaña permanente empieza con el cargo.',
 };
 const fechaCorta = iso => { const [a, m, d] = String(iso).split('-').map(Number); return `${d} ${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][m - 1]} ${a}`; };
+/* ── La tarjeta 11, corta y con nombre propio (26-oct-2026) ───────────────
+   Pedido de Ricardo: un saludo corto que diga sobre qué variables se arma la
+   estrategia, y la acción de esta semana en el contexto de esta candidatura,
+   no la frase genérica de la bibliografía. Primero se pinta una versión fija
+   con los datos ya calculados (sirve sin red y sin sesión); encima, si el
+   worker responde, la lectura de DeepSeek (/c360/estrategia/ia), que recibe
+   SOLO lo que ya calculó C360Estrategia y no puede meter cifras propias. */
+const ESTR_LENTE = { propio: 'sus votos', partido: 'los votos de su partido o su familia política', ciudad: 'el voto de toda la ciudad' };
+function variablesEstrategia() {
+  const R = ESTR.R, k = contextoCampanaEstr(), out = [];
+  const arqs = (R.arquetipos || []).slice();
+  const afin = arqs.filter(a => a.ratio != null && a.share >= .08).sort((a, b) => b.ratio - a.ratio)[0] || arqs.slice().sort((a, b) => b.share - a.share)[0];
+  if (afin) out.push({ nombre: `Tu terreno: «${afin.nombre}»`, por_que: afin.ratio != null && R.lente !== 'ciudad' ? `Ahí ${R.lente === 'propio' ? 'tus votos rinden' : 'tu familia rinde'} ${vecesE(afin.ratio)} lo que pesa en el territorio.` : `Es el arquetipo que más pesa en ${ESTR_LENTE[R.lente] || 'el territorio'} (${pctCorto(afin.share)}).` });
+  const fam = k.partido ? NOMBRE_BONITO(k.partido) : (FAMILIA_CON_ARTICULO[k.bloque] || '').replace(/^su /, 'tu ');
+  if (fam) out.push({ nombre: k.partido ? 'Tu partido' : 'Tu familia política', por_que: `${fam.charAt(0).toUpperCase() + fam.slice(1)}: define con quién compartes votantes y contra quién compites.` });
+  if (R.figura?.nombre) out.push({ nombre: R.figura.nombre, por_que: (R.figura.texto || '').split('. ')[0].replace(/\.$/, '') + '.' });
+  return out.slice(0, 3);
+}
+function pintarVariablesEstr(vars) {
+  const ul = $('crmEstrVariables'); if (!ul) return;
+  ul.innerHTML = vars.map(v => `<li><b>${escHtml(v.nombre)}</b><span>${escHtml(v.por_que)}</span></li>`).join('');
+  ul.classList.toggle('hidden', !vars.length);
+}
 function pintarTarjetaEstrategia() {
-  const { R, banco } = ESTR, F = R.fase, card = $('crmEstrategia');
+  const { R, banco } = ESTR, F = R.fase, card = $('crmEstrategia'), k = contextoCampanaEstr();
   const prox = F.proximo;
   $('crmEstrDato').textContent = prox ? prox.dias.toLocaleString('es-CO') : '—';
   $('crmEstrSub').textContent = prox ? `días para: ${prox.nombre.toLowerCase()}` : F.nombre;
+  $('crmEstrTitulo').textContent = k.nombre ? `${k.nombre}, así se arma tu estrategia.` : 'Así se arma tu estrategia.';
+  $('crmEstrPrincipios').innerHTML = '';
   if (R.estado !== 'ok') {
     card.classList.add('module-apagado');
-    $('crmEstrTitulo').textContent = 'La estrategia es la estructura de su campaña.';
-    $('crmEstrCopy').textContent = `${discursoEstrategia()} ${R.motivo}`;
-    $('crmEstrPrincipios').innerHTML = ''; $('crmEstrAccion').classList.add('hidden'); $('crmEstrBtn').disabled = true;
+    $('crmEstrCopy').textContent = R.motivo || '';
+    pintarVariablesEstr([]); $('crmEstrAccion').classList.add('hidden'); $('crmEstrBtn').disabled = true;
     return;
   }
   card.classList.remove('module-apagado');
-  $('crmEstrTitulo').textContent = 'La estrategia es la estructura de su campaña.';
-  $('crmEstrCopy').textContent = discursoEstrategia();
-  $('crmEstrPrincipios').innerHTML = '';
+  const vars = variablesEstrategia();
+  $('crmEstrCopy').textContent = vars.length ? `${k.nombre ? `${k.nombre}, la` : 'La'} estamos armando con ${vars.length === 2 ? 'dos' : 'tres'} variables:` : discursoEstrategia();
+  pintarVariablesEstr(vars);
   const a = R.accion;
   if (a) {
     $('crmEstrAccion').innerHTML = `<b>Esta semana.</b> ${escHtml(a.texto)} <small>${a.fichas.length ? `Sale de ${escHtml(a.fichas.map(id => C360Estrategia.ficha(banco, id)?.corto || id).join(' · '))}` : 'Criterio de oficio'}</small>`;
     $('crmEstrAccion').classList.remove('hidden');
   } else $('crmEstrAccion').classList.add('hidden');
   $('crmEstrBtn').disabled = false;
+  lecturaIAEstrategia();
+}
+function contextoIAEstrategia() {
+  const R = ESTR.R, k = contextoCampanaEstr(), c = CAMPANA_ACTUAL || SESSION.vinculo?.campana || {};
+  const hist = crmCandidate ? leerCorpHistorica(crmCandidate.corp) : null;
+  const arqs = (R.arquetipos || []).slice().sort((x, y) => y.share - x.share).slice(0, 3);
+  return {
+    nombre: k.nombre, corp: k.corp, lugar: k.lugar, aval: c.avales || 'partido',
+    partido: k.partido ? NOMBRE_BONITO(k.partido) : '', familia: FAMILIA_CON_ARTICULO[k.bloque] || '',
+    historial: hist ? { n: crmCandidate.history?.length || 1, ultima: `${aCorp(hist.tipo, hist.lugar)} en ${hist.año}`, anios: hist.año ? 2027 - Number(hist.año) : null, mismaCorporacion: hist.tipo === k.corp } : null,
+    lente: ESTR_LENTE[R.lente] || '', lugarEstrategico: R.lugar || '', figura: R.figura?.nombre || '',
+    arquetipos: arqs.map(x => ({ nombre: x.nombre, peso: pctCorto(x.share), rinde: x.ratio != null && R.lente !== 'ciudad' ? vecesE(x.ratio) : '' })),
+    fase: { nombre: R.fase?.nombre || '', hasta: R.fase?.hasta || '', que: R.fase?.que || '' },
+    principios: (R.principios || []).slice(0, 3).map(p => ({ corto: p.corto, texto: p.texto })),
+    accion: R.accion?.texto || '', apoyoAccion: (R.accion?.fichas || []).map(id => C360Estrategia.ficha(ESTR.banco, id)?.corto || id).join(' · '),
+    competencia: R.competencia?.texto || '',
+  };
+}
+async function lecturaIAEstrategia() {
+  if (!SESSION.token || !ESTR) return;
+  const turno = ESTR_TURNO;
+  try {
+    const r = await apiC360('/c360/estrategia/ia', { method: 'POST', body: JSON.stringify({ contexto: contextoIAEstrategia() }) });
+    if (turno !== ESTR_TURNO || !r.ok || !r.data?.saludo) return;   /* sin ruta, sin cuota o sin lectura: queda la versión fija */
+    const L = r.data;
+    $('crmEstrCopy').textContent = L.saludo;
+    pintarVariablesEstr(L.variables || []);
+    if (L.semana) {
+      $('crmEstrAccion').innerHTML = `<b>Esta semana.</b> ${escHtml(L.semana)} <small>${L.apoyo ? `Sale de ${escHtml(L.apoyo)} · ` : ''}lectura con IA sobre tus datos</small>`;
+      $('crmEstrAccion').classList.remove('hidden');
+    }
+    ESTR.ia = L;
+  } catch {}
 }
 function abrirEstrategia() {
   if (CRM_VITRINA) return abrirPaywall('La estrategia se abre con el acceso a Candidato 360.');
   if (!ESTR || ESTR.R.estado !== 'ok') return;
-  $('estrNombre').textContent = NOMBRE_BONITO(ESTR.nombre);
+  $('estrNombre').textContent = NOMBRE_BONITO(nombreCorto(ESTR.nombre));
   $('estrLugar').textContent = ESTR.R.lugar;
   $('estrResumen').innerHTML = `<span class="panel-num">Su estrategia, en dos párrafos</span>${estrategiaEnDosParrafos().map(t => `<p>${escHtml(t)}</p>`).join('')}`;
   pintarFaseEstrategia();
