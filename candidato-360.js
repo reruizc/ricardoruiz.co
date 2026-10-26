@@ -206,14 +206,14 @@ function volverIntro() {
   } else start();
 })();
 
-const BRIEF_PDF = 'assets/candidato-360/Candidato-360-brief-comercial.pdf?v=20261026b';
+const BRIEF_PDF = 'assets/candidato-360/Candidato-360-brief-comercial.pdf?v=20261026c';
 const INTRO_INFO = {
   how: { kicker: 'Así funciona', title: 'De su nombre a su plan de campaña, en una sesión.', html: `
 <ol class="intro-pasos">
 <li><b>Díganos quién es.</b> Si ya se lanzó, lo buscamos entre más de 400.000 candidaturas de 2010 a 2026 y traemos su historial mesa a mesa. Si es su primera vez, bastan seis preguntas.</li>
 <li><b>Elija a qué se lanza.</b> Corporación, territorio y aval: partido o firmas. Con eso armamos su perfil y el de su familia política, y activamos solo los datos de su campaña.</li>
 <li><b>Reciba su punto de partida.</b> El mapa de su votación por barrio y por puesto, la meta de votos calculada con la ley electoral y el perfil de quien puede votar por usted, con el censo de 2026.</li>
-<li><b>Lea el territorio.</b> Arquetipos por barrio, contendientes y aliados revisados cada mes, seguridad y empleo de su territorio mes a mes, y lo que la prensa y las redes dicen de usted.</li>
+<li><b>Lea el territorio.</b> Arquetipos por barrio, contendientes y aliados revisados cada mes, seguridad, empleo y educación de su territorio mes a mes, y lo que la prensa y las redes dicen de usted.</li>
 <li><b>Planee y ejecute.</b> Una hoja de ruta en cinco etapas, plan del día de la elección puesto por puesto y un briefing en su correo cada tres días. Candi, la guía, le explica cada pantalla.</li>
 </ol>
 <p class="intro-cierre">Todo sale de resultados oficiales y del censo electoral. Cuando algo se estima, se dice que se estima y con qué.</p>` },
@@ -227,7 +227,7 @@ const INTRO_INFO = {
 <li><b>Quién puede votar por usted, puesto por puesto.</b> Censo oficial de 2026 por sexo y edad.</li>
 <li><b>Rivales y aliados medidos con votos y curados cada mes.</b> Quién entra, quién se baja y quién cambia de aval: la lectura se mueve con su posicionamiento.</li>
 <li><b>El día de la elección, planeado antes.</b> En qué puestos necesita testigo y la ficha logística de cada uno: señal, internet, acceso, orden público.</li>
-<li><b>Su territorio, mes a mes.</b> Seguridad de la Policía, empleo del DANE, contratos y normas, más la prensa en su correo cada tres días.</li>
+<li><b>Su territorio, mes a mes.</b> Delitos de la Policía, empleo e informalidad del DANE y deserción escolar, para su localidad, municipio o departamento, con frases listas para el discurso. La prensa, los contratos y las normas le llegan al correo cada tres días.</li>
 <li><b>Cada cifra con su fuente y su cobertura.</b> No guardamos su base de contactos ni hacemos envíos masivos: su información sigue siendo suya.</li>
 <li><b>Un precio por mes, desde $360.000, sin contratos largos.</b> Se arma por módulos y se cancela cuando quiera.</li>
 </ul>` }
@@ -2558,6 +2558,7 @@ async function launchCRM(event) {
   pintarCiclo();
   pintarPerfil();
   pintarDiaD();
+  pintarTerritorio(true);
   pintarFirmas();
   pintarEndoso();
   estrategiaCargando();
@@ -2608,6 +2609,7 @@ async function abrirCRMNuevo() {
   pintarCiclo();
   pintarPerfil();
   pintarDiaD();
+  pintarTerritorio(false);
   pintarFirmas();
   pintarEndoso();
   estrategiaCargando();
@@ -4679,6 +4681,26 @@ async function pintarDiaD() {
     $('crmDiaDTitulo').textContent = 'Todavía no hay plan para esta candidatura.';
     $('crmDiaDCopy').textContent = 'Sin votos por puesto en el territorio al que se lanza no hay qué priorizar, y priorizar al azar sería peor que no hacerlo. La hoja de vida de los puestos sí existe y la va a encontrar en el panel.';
     $('crmDiaDDato').textContent = '—'; $('crmDiaDSub').textContent = 'sin votos por puesto';
+  }
+}
+/* ── 12 · Su territorio, mes a mes ─────────────────────────────────────────
+   La tarjeta adelanta la frase más fuerte del panel y una cifra; el detalle
+   (Policía, DANE, Ministerio de Educación) vive en candidato-360-territorio.html.
+   Son bases públicas: se calcula también en vitrina, el clic sí abre el muro. */
+async function pintarTerritorio(conHistorial) {
+  const card = $('crmTerritorio'); if (!card || !window.C360Territorio) return;
+  $('crmTerrTitulo').textContent = 'Leyendo los datos de su territorio…';
+  try {
+    const v = { campana: Object.assign({}, CAMPANA_ACTUAL || {}) };
+    if (conHistorial && crmCandidate) v.candidato = { corp: crmCandidate.corp, slugs: (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean) };
+    const R = window.C360Territorio.resumen(await window.C360Territorio.leer(v));
+    $('crmTerrTitulo').textContent = R.titulo;
+    $('crmTerrCopy').textContent = R.copy + (R.nota ? ` ${R.nota}` : '');
+    $('crmTerrDato').textContent = R.dato; $('crmTerrSub').textContent = R.sub;
+  } catch (e) {
+    $('crmTerrTitulo').textContent = 'Todavía no leemos los datos de este territorio.';
+    $('crmTerrCopy').textContent = 'Sin el municipio o el departamento de la campaña no hay a qué territorio pedirle los datos. Ajuste el territorio en la ruta y vuelva a abrir el CRM.';
+    $('crmTerrDato').textContent = '—'; $('crmTerrSub').textContent = 'sin territorio';
   }
 }
 async function pintarPerfil() {

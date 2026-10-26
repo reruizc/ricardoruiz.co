@@ -396,5 +396,5 @@
 
   global.C360Panel = { SESION, api, caudal, arrancar, guardarEscucha, territorio, lugar, nombreCandidatura, nombrePublico, muro, $, esc, num,
     territorioDe, consultasTerritorio, consultasNacionales, agruparPorCobertura, terminosLocales, esAdmin, soltarVinculo, terminosPersona, puntajeLocal, mencionaPersona, oracion, norm, toks,
-    tipoMedio, escalaLabel };
+    tipoMedio, escalaLabel, completarCampana };
 })(window);

@@ -10,7 +10,8 @@ salte de página.
 Láminas: 1 portada con tres diferenciales · 2 cómo funciona (cinco pasos +
 once módulos) · 3 arquetipos por barrio · 4 por qué elegirnos (lo habitual
 contra lo que hace Candidato 360, curaduría mensual, lo que no hacemos) ·
-5 su territorio mes a mes (Policía, DANE, contratación) · 6 planes.
+5 su territorio mes a mes (Policía, DANE, Ministerio de Educación; es la
+tarjeta 12 del CRM) · 6 planes.
 
 Imágenes: los pictogramas de las fases (assets/candidato-360/fases/*.webp) y
 dos dibujados a mano en el mismo estilo (assets/candidato-360/brief/*.svg).
@@ -288,14 +289,14 @@ HTML_DOC = f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><style
   <div class="cab"><div class="marca">Candidato <b>360</b></div><div class="ojo">Lámina 5 de 6 · Su territorio, mes a mes</div></div>
   <div class="top"><div>
     <h2><span>Datos del territorio</span>Lo que pasa en su territorio, cada mes.</h2>
-    <p class="lead">Una tarjeta en la etapa de posicionamiento con las bases públicas que se actualizan cada mes, leídas para su municipio y, en las ciudades principales, para sus comunas y barrios.</p>
+    <p class="lead">La tarjeta 12 del tablero, en las etapas de planeación, posicionamiento y campaña: las bases públicas que se actualizan cada mes, leídas para su localidad si va a una JAL, su municipio si va a un concejo o una alcaldía, y su departamento si va a una asamblea o una gobernación.</p>
   </div><img src="{IMG('brief/territorio-mes.svg')}" alt=""></div>
   <div class="fuentes3">
     <div class="fuente"><em>Seguridad</em><b>Delitos de la Policía Nacional</b><p>Homicidios, hurtos, violencia intrafamiliar, extorsión y diecisiete delitos más, por municipio. En las ciudades principales, por comuna y barrio: mes contra mes y año corrido.</p><small>Policía Nacional y Ministerio de Defensa</small></div>
-    <div class="fuente"><em>Empleo</em><b>Mercado laboral del DANE</b><p>Desempleo, ocupación e informalidad en las 23 ciudades principales y sus áreas metropolitanas, con el dato que el DANE publica cada mes.</p><small>DANE · Gran Encuesta Integrada de Hogares</small></div>
-    <div class="fuente"><em>Gestión pública</em><b>Contratos y normas</b><p>Los contratos públicos que se firman en su territorio y las normas que lo tocan, en el briefing que le llega cada tres días.</p><small>SECOP y diarios oficiales</small></div>
+    <div class="fuente"><em>Empleo</em><b>Mercado laboral del DANE</b><p>Desempleo, ocupación e informalidad en las 32 capitales, y en 23 ciudades con su área metropolitana el trimestre que el DANE publica cada mes.</p><small>DANE · Gran Encuesta Integrada de Hogares</small></div>
+    <div class="fuente"><em>Educación</em><b>Cobertura y deserción escolar</b><p>Cuántos niños de 5 a 16 años están matriculados y cuántos dejan el colegio en el año, de 2018 a hoy, por municipio.</p><small>Ministerio de Educación Nacional</small></div>
   </div>
-  <div class="caja verde" style="margin-top:0"><b>Para qué le sirve</b>Un dato propio para cada discurso y cada debate: dónde subió el hurto, qué ciudad perdió empleo, qué contrato se firmó en su barrio. Con la fuente al lado, para que nadie se lo pueda discutir.</div>
+  <div class="caja verde" style="margin-top:0"><b>Para qué le sirve</b>Frases listas para cada discurso y cada debate, armadas con esas cifras: dónde subió el hurto, cuánto pesa su localidad en la ciudad, cómo está el desempleo frente al país. Con la fuente al lado, para que nadie se las pueda discutir. Los contratos públicos y las normas de su territorio le llegan aparte, en el briefing cada tres días.</div>
   {PIE}
 </div>
 

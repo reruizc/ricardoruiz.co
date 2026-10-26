@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Lo que pasa en su territorio, mes a mes: delitos de la Policía, empleo del DANE y educación del Ministerio, leídos para la localidad, el municipio o el departamento al que se lanza.">
+<title>Su territorio, mes a mes · Candidato 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<!-- ⚠️ Al tocar candidato-360.css, candidato-360-panel.js o candidato-360-territorio.js hay que bumpear su ?v= acá. -->
+<link rel="stylesheet" href="candidato-360.css?v=20261026-pais2">
+<link rel="stylesheet" href="assets/candidato-360/candi/candi-saludo.css?v=3">
+<link rel="stylesheet" href="assets/candidato-360/candi/candi-hueso.css?v=1">
+<link rel="stylesheet" href="candidato-360-candi.css?v=20261026-barra">
+<style>
+.panel-shell{max-width:1080px;margin:0 auto;padding:clamp(26px,4vw,52px) clamp(18px,4vw,40px) 70px}
+.panel-hero{border-bottom:1px solid var(--line);padding-bottom:26px;margin-bottom:30px}
+.panel-hero h1{font:800 clamp(30px,4.4vw,46px)/1.06 var(--display);letter-spacing:-.02em;margin:8px 0 10px;color:var(--ink);max-width:24ch;text-wrap:balance}
+.panel-hero p{margin:0;max-width:66ch;font-size:15px;line-height:1.6;color:var(--muted)}
+.panel-candidatura:empty{display:none}
+.panel-candidatura{display:inline-block;margin-top:14px;font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--green);border:1px solid rgba(20,124,112,.32);padding:6px 10px}
+.panel-nota{margin-top:24px;font-size:12.5px;line-height:1.6;color:var(--muted)}
+.hidden{display:none!important}
+#panelCuerpo>.panel{margin-bottom:18px}
+.panel h3{font-size:clamp(22px,2.6vw,28px);margin:6px 0 10px}
+.panel>p{color:var(--muted);font-size:14.5px;line-height:1.6;max-width:72ch}
+
+/* Escala: de qué territorio sale cada bloque */
+.te-escala{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+.te-escala span{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:5px 9px;border:1px solid var(--line);color:var(--muted)}
+.te-escala span b{color:var(--ink);font-weight:500}
+
+/* Frases */
+.te-frases{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:10px}
+.te-frases li{position:relative;padding:14px 16px 14px 46px;background:var(--cream);border:1px solid var(--line);font-size:15.5px;line-height:1.55;color:var(--ink)}
+.te-frases li::before{content:'“';position:absolute;left:14px;top:4px;font:800 34px var(--display);color:var(--coral)}
+.te-frases button{margin-top:6px}
+.te-copiar{border:1px solid var(--ink);background:transparent;color:var(--ink);padding:9px 14px;font:700 12px var(--sans);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;margin-top:14px}
+.te-copiar:hover{background:var(--ink);color:#fff}
+
+/* Cifras */
+.te-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:18px 0 6px}
+.te-kpi{border:1px solid var(--line);background:var(--cream);padding:14px 16px}
+.te-kpi b{display:block;font:800 clamp(26px,3.4vw,34px)/1 var(--display);letter-spacing:-.02em;color:var(--ink)}
+.te-kpi span{display:block;margin-top:6px;font-size:12.5px;line-height:1.4;color:var(--muted)}
+.te-kpi em{display:block;margin-top:4px;font-style:normal;font:500 11px var(--mono);letter-spacing:.04em;color:var(--green)}
+.te-kpi em.sube{color:#c0392b}
+
+/* Tabla */
+.te-tabla-caja{overflow-x:auto;margin-top:14px;border:1px solid var(--line)}
+table.te-tabla{border-collapse:collapse;width:100%;min-width:640px;font-size:13.5px}
+.te-tabla th{text-align:left;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line);background:rgba(0,0,0,.02);white-space:nowrap}
+.te-tabla td{padding:9px 12px;border-bottom:1px solid var(--line)}
+.te-tabla tr:last-child td{border-bottom:0}
+.te-tabla .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.te-tabla tr{cursor:pointer}.te-tabla tr:hover td{background:rgba(185,222,210,.25)}
+.te-tabla tr.sel td{background:rgba(185,222,210,.45)}
+.te-tabla .sube{color:#c0392b}.te-tabla .baja{color:var(--green)}
+.te-tabla small{color:var(--muted)}
+
+/* Gráficos */
+.te-graf{margin-top:16px;border:1px solid var(--line);background:var(--cream);padding:14px 14px 8px}
+.te-graf h4{margin:0 0 4px;font:700 15px var(--display);color:var(--ink)}
+.te-graf p{margin:0 0 8px;font-size:12.5px;color:var(--muted)}
+.te-graf svg{display:block;width:100%;height:auto}
+.te-dos{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:760px){.te-dos{grid-template-columns:1fr}}
+.te-aviso{margin-top:14px;border:1px solid var(--line);border-left:3px solid var(--amber,#c88a2e);padding:12px 14px;font-size:13.5px;line-height:1.55;color:var(--muted)}
+.te-aviso b{color:var(--ink)}
+.te-barrios{list-style:none;padding:0;margin:12px 0 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.te-barrios li{border:1px solid var(--line);padding:9px 12px;font-size:13.5px;display:flex;justify-content:space-between;gap:10px}
+.te-barrios li b{color:var(--ink);font-weight:700}
+.te-barrios li span{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.te-leyenda{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:4px}
+.te-leyenda i{display:inline-block;width:12px;height:3px;vertical-align:middle;margin-right:5px}
+</style>
+</head>
+<body data-candi-vista="territorio">
+<nav class="topbar"><div class="nav-left"><a href="candidato-360.html?abrir=1" class="nav-planes">← CRM</a><div class="nav-auth" id="navAuth"></div></div><div class="nav-right"><a class="brand" href="index.html"><span class="mark"><i></i><i></i><i></i><i></i></span><b>Ricardo<span>.</span>Ruiz</b></a></div></nav>
+<main class="app-shell"><div class="panel-shell">
+  <header class="panel-hero">
+    <div class="kicker">Candidato 360 · panel 12</div>
+    <h1 id="teTitulo">Su territorio, mes a mes.</h1>
+    <p>Las bases públicas que se actualizan cada mes, leídas para el lugar al que se lanza: los <b>delitos</b> que denuncia la Policía, el <b>desempleo y la informalidad</b> del DANE, y la <b>cobertura y la deserción escolar</b> del Ministerio de Educación. Si se lanza a una Junta Administradora Local, baja a su localidad o comuna; a un concejo o una alcaldía, a su municipio; a una asamblea o una gobernación, a su departamento.</p>
+    <span class="panel-candidatura" id="panelCandidatura"></span>
+    <div class="te-escala" id="teEscala"></div>
+  </header>
+  <div id="panelMuro" class="hidden"></div>
+  <div id="panelCuerpo">
+    <div id="teCargando" class="panel"><p class="helper" style="margin:0">Leyendo la Policía, el DANE y el Ministerio de Educación para su territorio…</p></div>
+    <div id="teAviso" class="hidden"></div>
+    <div id="teCuerpo" class="hidden">
+
+      <section class="panel" id="teFrasesSec">
+        <span class="panel-num">00 · Para su discurso</span>
+        <h3>Datos propios para cada visita y cada debate.</h3>
+        <p>Frases armadas con las cifras de abajo. Cada una se puede verificar en su fuente, así que nadie se la puede discutir.</p>
+        <ul class="te-frases" id="teFrases"></ul>
+        <button type="button" class="te-copiar" id="teCopiar">Copiar las frases</button>
+      </section>
+
+      <section class="panel" id="teSegSec">
+        <span class="panel-num">01 · Seguridad · Policía Nacional</span>
+        <h3 id="teSegTitulo">Qué delitos se denuncian.</h3>
+        <p id="teSegCopy"></p>
+        <div id="teLocal" class="hidden">
+          <div class="te-kpis" id="teLocalKpis"></div>
+          <div class="te-graf"><h4 id="teLocalGrafTit"></h4><p id="teLocalGrafSub"></p><div id="teLocalGraf"></div><div class="te-leyenda" id="teLocalLey"></div></div>
+          <div class="te-aviso hidden" id="teLocalSesgo"></div>
+          <h4 style="margin:20px 0 0;font:700 16px var(--display)" id="teBarriosTit"></h4>
+          <ul class="te-barrios" id="teBarrios"></ul>
+        </div>
+        <div class="te-tabla-caja"><table class="te-tabla"><thead><tr id="teTablaCab"></tr></thead><tbody id="teTabla"></tbody></table></div>
+        <div class="te-dos">
+          <div class="te-graf"><h4 id="teAnualTit"></h4><p id="teAnualSub"></p><div id="teAnual"></div></div>
+          <div class="te-graf" id="teMesCaja"><h4 id="teMesTit"></h4><p id="teMesSub"></p><div id="teMes"></div></div>
+        </div>
+      </section>
+
+      <section class="panel" id="teEmpSec">
+        <span class="panel-num">02 · Empleo · DANE</span>
+        <h3 id="teEmpTitulo">El mercado laboral.</h3>
+        <p id="teEmpCopy"></p>
+        <div class="te-kpis" id="teEmpKpis"></div>
+        <div class="te-graf"><h4 id="teEmpGrafTit">La tasa de desempleo, periodo a periodo</h4><p id="teEmpGrafSub"></p><div id="teEmpGraf"></div><div class="te-leyenda" id="teEmpLey"></div></div>
+      </section>
+
+      <section class="panel" id="teEduSec">
+        <span class="panel-num">03 · Educación · Ministerio de Educación</span>
+        <h3 id="teEduTitulo">Cuántos niños están en el colegio.</h3>
+        <p id="teEduCopy"></p>
+        <div class="te-kpis" id="teEduKpis"></div>
+        <div class="te-dos">
+          <div class="te-graf"><h4>Cobertura neta, de 5 a 16 años</h4><p>Porcentaje de niños de esa edad matriculados en el grado que les corresponde.</p><div id="teEduCob"></div></div>
+          <div class="te-graf"><h4>Deserción escolar en el año</h4><p>Porcentaje de estudiantes que dejan el colegio durante el año lectivo.</p><div id="teEduDes"></div></div>
+        </div>
+      </section>
+
+    </div>
+    <p class="panel-nota" id="teNota"></p>
+  </div>
+</div></main>
+<script src="platform-config.js"></script>
+<script src="candidato-360-panel.js?v=20261026-terr"></script>
+<script src="candidato-360-territorio.js?v=20261026"></script>
+<script src="assets/candidato-360/candi/candi-atletica.js?v=4"></script>
+<script src="assets/candidato-360/candi/candi-hueso.js?v=2"></script>
+<script src="candidato-360-candi.js?v=20261026-terr"></script>
+<script>
+(async function () {
+  const P = window.C360Panel, T = window.C360Territorio, $ = P.$, esc = P.esc;
+  const { f1, N, fP } = T;
+  let I = null, DELITO = 'hurto_personas';
+
+  /* ── Gráficos en SVG, sin librerías ─────────────────────────────── */
+  function barras(valores, etiquetas, { parcialDesde = -1, alto = 190 } = {}) {
+    const W = 520, H = alto, m = { t: 14, r: 8, b: 26, l: 8 };
+    const max = Math.max(1, ...valores.map(v => v || 0)), n = valores.length, bw = (W - m.l - m.r) / n;
+    const y = v => m.t + (H - m.t - m.b) * (1 - (v || 0) / max);
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
+    valores.forEach((v, i) => {
+      const x = m.l + i * bw + bw * .14, w = bw * .72, par = parcialDesde >= 0 && i >= parcialDesde;
+      s += `<rect x="${x.toFixed(1)}" y="${y(v).toFixed(1)}" width="${w.toFixed(1)}" height="${(H - m.b - y(v)).toFixed(1)}" fill="${par ? '#ef705d' : '#147c70'}" opacity="${par ? .55 : .85}"><title>${esc(etiquetas[i])}: ${N(v || 0)}</title></rect>`;
+      if (n <= 14 || i % 2 === 0) s += `<text x="${(x + w / 2).toFixed(1)}" y="${H - 9}" text-anchor="middle" font-size="10" fill="#637080" font-family="DM Mono, monospace">${esc(String(etiquetas[i]).replace(/^20/, "'"))}</text>`;
+    });
+    return s + '</svg>';
+  }
+  function lineas(series, etiquetas, { alto = 200, sufijo = '', cero = true, entero = !sufijo } = {}) {
+    const W = 520, H = alto, m = { t: 14, r: 10, b: 26, l: 52 };
+    const fmt = v => entero ? N(v) : f1(v);
+    const todos = series.flatMap(s => s.v).filter(v => v != null);
+    if (!todos.length) return '';
+    const max = Math.max(...todos), min = cero ? 0 : Math.min(...todos);
+    const pad = (max - min) * .1 || 1, lo = cero ? 0 : min - pad, hi = max + pad;
+    const n = etiquetas.length, x = i => m.l + (W - m.l - m.r) * (n === 1 ? .5 : i / (n - 1)), y = v => m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo));
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
+    for (let k = 0; k <= 3; k++) { const v = lo + (hi - lo) * k / 3; s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="rgba(16,34,56,.08)"/><text x="${m.l - 6}" y="${(y(v) + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="#637080" font-family="DM Mono, monospace">${fmt(v)}${sufijo}</text>`; }
+    series.forEach(se => {
+      const pts = se.v.map((v, i) => v == null ? null : `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+      const d = pts.reduce((a, p) => p ? a + (a.endsWith('|') || !a ? 'M' : 'L') + p : a + '|', '').replace(/\|/g, '');
+      s += `<path d="${d}" fill="none" stroke="${se.color}" stroke-width="${se.ancho || 2.4}" stroke-linejoin="round" stroke-linecap="round" ${se.punteada ? 'stroke-dasharray="5 4"' : ''}/>`;
+      const k = se.v.map((v, i) => v == null ? -1 : i).filter(i => i >= 0).pop();
+      if (k != null && k >= 0) s += `<circle cx="${x(k).toFixed(1)}" cy="${y(se.v[k]).toFixed(1)}" r="3.6" fill="${se.color}"><title>${esc(etiquetas[k])}: ${fmt(se.v[k])}${sufijo}</title></circle>`;
+    });
+    const paso = Math.ceil(n / 7);
+    /* La última etiqueta siempre va, alineada a la derecha; la anterior se
+       salta si quedaría encima de ella. */
+    etiquetas.forEach((e, i) => {
+      const ultima = i === n - 1;
+      if (!ultima && (i % paso !== 0 || n - 1 - i < paso * .7)) return;
+      s += `<text x="${x(i).toFixed(1)}" y="${H - 9}" text-anchor="${ultima ? 'end' : i === 0 ? 'start' : 'middle'}" font-size="9.5" fill="#637080" font-family="DM Mono, monospace">${esc(e)}</text>`;
+    });
+    return s + '</svg>';
+  }
+  const mesCorto = ym => { const [a, m] = ym.split('-').map(Number); return `${T.MESES[m - 1].slice(0, 3)} ${String(a).slice(2)}`; };
+  const flecha = c => c == null ? '<small>—</small>' : `<span class="${c > 0 ? 'sube' : 'baja'}">${c > 0 ? '+' : '−'}${fP(c)}</span>`;
+
+  /* ── 01 · Seguridad ─────────────────────────────────────────────── */
+  function pintarSeguridad() {
+    const S = I.seg, r = I.r;
+    if (!S) { $('teSegCopy').textContent = 'La Policía no tiene registros para este territorio.'; return; }
+    const ent = r.nivel === 'departamento' ? I.nomDep : I.nomMun;
+    const par = S.parcial;
+    $('teSegTitulo').textContent = r.nivel === 'localidad' ? `Qué delitos se denuncian en ${I.lugar} y en ${I.nomMun}.` : `Qué delitos se denuncian en ${ent}.`;
+    $('teSegCopy').innerHTML = `Hechos denunciados ante la Policía Nacional, por año, con corte a ${par ? `${T.MESES[par.hasta_mes - 1]} de ${par.anio}` : 'el último mes publicado'}. La tasa compara con el país por cada 100.000 habitantes. Toque un delito para ver su serie.` +
+      (r.nivel === 'localidad' && !I.com ? ` <b>La Policía no publica mes a mes por ${S.mes ? 'esta unidad' : 'localidad o comuna'} en ${esc(I.nomMun)}</b>: abajo va la ciudad entera.` : '');
+    /* La localidad o comuna (JAL) */
+    if (S.mes && I.com) {
+      const M = S.mes, pd = M.porDelito, peso = M.peso || {};
+      $('teLocal').classList.remove('hidden');
+      const tot = k => Object.values(pd).reduce((s, x) => s + x[k], 0);
+      const tYtd = tot('ytd'), tPrev = tot('ytdPrev');
+      const kp = [['hurto_personas', 'hurtos a personas'], ['violencia_intra', 'casos de violencia intrafamiliar'], ['lesiones', 'lesiones personales']];
+      $('teLocalKpis').innerHTML = `<div class="te-kpi"><b>${N(tYtd)}</b><span>delitos denunciados en ${esc(I.lugar)}, ${esc(M.rango)} de ${M.anioYtd}</span><em>${N(tPrev)} en el mismo periodo de ${M.anioYtd - 1} · solo lo que la Policía ubica en la localidad</em></div>` +
+        kp.filter(([id]) => peso[id]).map(([id, nom]) => `<div class="te-kpi"><b>${f1(peso[id].w26 * 100)} %</b><span>de los ${nom} de ${esc(I.nomMun)} que la Policía ubica caen en ${esc(I.lugar)}</span><em>${f1(peso[id].w25 * 100)} % el año anterior</em></div>`).join('');
+      const idL = pd[DELITO] ? DELITO : 'hurto_personas', s = pd[idL];
+      $('teLocalGrafTit').textContent = `${S.filas.find(f => f.id === idL)?.label || 'Hurto a personas'}, mes a mes`;
+      $('teLocalGrafSub').textContent = `${I.lugar} (línea verde) contra el peso que tiene en ${I.nomMun} (línea punteada, en % de lo ubicado).`;
+      const ubic = M.meses.map((_, i) => { const c = M.ubicadoMes?.[idL]?.[i] || 0; return c ? (s.serie[i] || 0) / c * 100 : null; });
+      $('teLocalGraf').innerHTML = lineas([{ v: s.serie, color: '#147c70' }], M.meses.map(mesCorto), { alto: 180 }) + lineas([{ v: ubic, color: '#ef705d', punteada: true }], M.meses.map(mesCorto), { alto: 120, sufijo: ' %', cero: false });
+      $('teLocalLey').innerHTML = `<span><i style="background:#147c70"></i>hechos en ${esc(I.lugar)}</span><span><i style="background:#ef705d"></i>peso en ${esc(I.nomMun)}</span>`;
+      if (M.sesgo?.alto) {
+        $('teLocalSesgo').classList.remove('hidden');
+        $('teLocalSesgo').innerHTML = `<b>Ojo con la caída de 2026.</b> Desde finales de 2025 la Policía deja sin barrio buena parte de los hechos: en ${esc(I.nomMun)} pasó de ${f1(M.sesgo.p25 * 100)} % a ${f1(M.sesgo.p26 * 100)} % de los hurtos a personas. Esos hechos no se pueden asignar a ninguna localidad, así que el volumen de ${esc(I.lugar)} parece bajar aunque no baje. Por eso aquí se lee el <b>peso</b>: qué parte de lo que sí se ubica cae en ${esc(I.lugar)}.`;
+      }
+      $('teBarriosTit').textContent = `Los barrios de ${I.lugar} con más delitos denunciados en ${S.ult}`;
+      $('teBarrios').innerHTML = M.barrios.slice(0, 12).map(b => `<li><b>${esc(P.oracion(b.n))}</b><span>${N(b.y25)}</span></li>`).join('') || '<li>Sin barrios con dato.</li>';
+    }
+    /* La tabla del municipio o departamento */
+    const conMes = !!S.mes, M = S.mes;
+    $('teTablaCab').innerHTML = `<th>Delito${r.nivel === 'localidad' ? ` · ${esc(I.nomMun)} entera` : ''}</th><th class="num">${S.ult - 1}</th><th class="num">${S.ult}</th><th class="num">Cambio</th>` +
+      (conMes ? `<th class="num">${esc(M.rango.replace('y ', 'a '))} ${M.anioYtd}</th><th class="num">vs. ${M.anioYtd - 1}</th>` : `<th class="num">${par ? `${par.etiqueta} ${par.anio}` : ''}</th>`) + `<th class="num">Por 100.000 hab.</th><th class="num">País</th>`;
+    $('teTabla').innerHTML = S.filas.map(f => {
+      const md = conMes ? M.porDelito[f.id] : null;
+      return `<tr data-id="${f.id}" class="${f.id === DELITO ? 'sel' : ''}"><td>${esc(f.label)}${f.parcial ? ' <small>· sin tendencia</small>' : ''}</td><td class="num">${N(f.vp)}</td><td class="num">${N(f.v)}</td><td class="num">${flecha(f.cambio)}</td>` +
+        (conMes ? `<td class="num">${md ? N(md.cYtd) : '—'}</td><td class="num">${md ? flecha(md.cCambio) : '—'}</td>` : `<td class="num">${f.vn != null ? N(f.vn) : '—'}</td>`) +
+        `<td class="num">${f.tasa != null ? f1(f.tasa) : '—'}</td><td class="num">${f.tasaNac != null ? f1(f.tasaNac) : '—'}</td></tr>`;
+    }).join('');
+    $('teTabla').querySelectorAll('tr').forEach(tr => tr.onclick = () => { DELITO = tr.dataset.id; pintarSeguridad(); });
+    const fila = S.filas.find(f => f.id === DELITO) || S.filas[0];
+    const anios = I.meta.anios;
+    $('teAnualTit').textContent = `${fila.label} · ${r.nivel === 'localidad' ? I.nomMun : ent}, año a año`;
+    $('teAnualSub').textContent = par ? `La última barra es ${par.etiqueta} de ${par.anio}: el año va incompleto.` : '';
+    $('teAnual').innerHTML = barras(anios.map((a, i) => fila.serie[i] || 0), anios, { parcialDesde: par ? anios.indexOf(par.anio) : -1 });
+    if (conMes && M.porDelito[fila.id]) {
+      $('teMesCaja').classList.remove('hidden');
+      $('teMesTit').textContent = `${fila.label} · ${I.nomMun}, mes a mes`;
+      $('teMesSub').textContent = `De enero de ${S.ult} a ${M.hastaTxt}.`;
+      $('teMes').innerHTML = lineas([{ v: M.porDelito[fila.id].ciudad, color: '#102b46' }], M.meses.map(mesCorto));
+    } else $('teMesCaja').classList.add('hidden');
+  }
+
+  /* ── 02 · Empleo ────────────────────────────────────────────────── */
+  function pintarEmpleo() {
+    const E = I.emp;
+    if (!E) { $('teEmpCopy').textContent = 'El DANE no publica mercado laboral para este territorio ni para la capital de su departamento.'; return; }
+    const donde = E.area ? `el área metropolitana de ${E.nombre}` : E.nombre;
+    $('teEmpTitulo').textContent = `El mercado laboral de ${E.area ? `el área metropolitana de ${E.nombre}` : E.nombre}.`;
+    $('teEmpCopy').innerHTML = (E.ref ? `<b>El DANE no mide el empleo de ${esc(I.nomMun)}.</b> La referencia más cercana es ${esc(E.nombre)}, la capital del departamento. ` : '') +
+      (E.capital ? `El DANE no publica empleo por departamento cada mes: aquí va ${esc(E.nombre)}, la capital. ` : '') +
+      (E.area && !E.ref ? `El DANE mide ${esc(I.nomMun)} junto con el resto del área metropolitana de ${esc(E.nombre)}. ` : '') +
+      `Gran Encuesta Integrada de Hogares, ${esc(E.tipo)} ${esc(E.periodo)}.`;
+    const dif = E.tdPrev != null ? E.td - E.tdPrev : null;
+    $('teEmpKpis').innerHTML =
+      `<div class="te-kpi"><b>${f1(E.td)} %</b><span>tasa de desempleo · ${esc(E.periodo)}</span>${dif != null ? `<em class="${dif > 0 ? 'sube' : ''}">${dif > 0 ? '+' : '−'}${f1(Math.abs(dif))} puntos frente a ${esc(E.periodoPrev)}</em>` : ''}</div>` +
+      (E.tdNac != null ? `<div class="te-kpi"><b>${f1(E.tdNac)} %</b><span>desempleo del país en el mismo periodo</span></div>` : '') +
+      `<div class="te-kpi"><b>${f1(E.to)} %</b><span>tasa de ocupación: de cada 100 personas en edad de trabajar, cuántas trabajan</span></div>` +
+      (E.inf != null ? `<div class="te-kpi"><b>${f1(E.inf)} %</b><span>de quienes trabajan lo hacen en la informalidad · ${esc(E.infPeriodo)}</span>${E.infPrev != null ? `<em>${f1(E.infPrev)} % un año antes</em>` : ''}</div>` : '');
+    const p = E.serie.p, etiquetas = p.map(x => x.replace(/^(\w{3})\w* - (\w{3})\w*\s(\d{2})(\d{2})$/, '$1–$2 $4').replace(/^(\w{3})\s\d{2} - (\w{3})\s(\d{2})$/, '$1–$2 $3'));
+    const nac = E.serieNac ? p.map(l => { const k = E.serieNac.p.indexOf(l); return k >= 0 ? E.serieNac.td[k] : null; }) : null;
+    $('teEmpGrafSub').textContent = `${E.tipo === 'trimestre móvil' ? 'Cada punto es un trimestre que se corre un mes' : 'Cada punto es un año que se corre un mes'}: así lo publica el DANE para ${E.area ? 'un área metropolitana' : 'esta ciudad'}.`;
+    $('teEmpGraf').innerHTML = lineas([{ v: E.serie.td, color: '#147c70' }].concat(nac ? [{ v: nac, color: '#637080', punteada: true, ancho: 1.8 }] : []), etiquetas, { sufijo: ' %', cero: false });
+    $('teEmpLey').innerHTML = `<span><i style="background:#147c70"></i>${esc(donde)}</span>${nac ? '<span><i style="background:#637080"></i>Colombia</span>' : ''}`;
+  }
+
+  /* ── 03 · Educación ─────────────────────────────────────────────── */
+  function pintarEducacion() {
+    const Ed = I.edu;
+    if (!Ed) { $('teEduCopy').textContent = 'El Ministerio de Educación no publica cobertura ni deserción para este territorio.'; return; }
+    const nom = Ed.capital ? Ed.nombre : I.nomMun;
+    $('teEduTitulo').textContent = `Cuántos niños están en el colegio en ${nom}.`;
+    $('teEduCopy').innerHTML = (Ed.capital ? `El Ministerio publica por municipio, no por departamento: aquí va ${esc(Ed.nombre)}, la capital. ` : '') +
+      (I.r.nivel === 'localidad' ? `El dato es de ${esc(I.nomMun)} entera: el Ministerio no lo abre por localidad. ` : '') +
+      (Ed.aprox ? `<b>${esc(nom)} no es entidad territorial certificada en educación</b>, así que el Ministerio reporta el dato de su departamento: léalo como el del departamento. ` : '') +
+      `Matrícula oficial y privada, ${Ed.desde} a ${Ed.anio}.` + (Ed.cobUlt > 100 ? ' Una cobertura de más de 100 % pasa cuando la proyección de población del DANE se queda corta frente a la matrícula: es del dato, no un error de lectura.' : '');
+    $('teEduKpis').innerHTML =
+      (Ed.cobUlt != null ? `<div class="te-kpi"><b>${f1(Ed.cobUlt)} %</b><span>cobertura neta de 5 a 16 años · ${Ed.anio}</span><em>${f1(Ed.cobPrimero)} % en ${Ed.desde}</em></div>` : '') +
+      (Ed.desUlt != null ? `<div class="te-kpi"><b>${f1(Ed.desUlt)} %</b><span>deserción escolar en el año · ${Ed.anio}</span><em class="${Ed.desUlt > Ed.desPrimero ? 'sube' : ''}">${f1(Ed.desPrimero)} % en ${Ed.desde}</em></div>` : '');
+    const anios = s => s ? s.v.map((_, i) => String(s.desde + i)) : [];
+    $('teEduCob').innerHTML = Ed.cob ? lineas([{ v: Ed.cob.v, color: '#147c70' }], anios(Ed.cob), { alto: 170, sufijo: ' %', cero: false }) : '<p>Sin dato.</p>';
+    $('teEduDes').innerHTML = Ed.des ? lineas([{ v: Ed.des.v, color: '#ef705d' }], anios(Ed.des), { alto: 170, sufijo: ' %', cero: false }) : '<p>Sin dato.</p>';
+  }
+
+  async function armar(v) {
+    I = await T.leer(v);
+    const r = I.r;
+    $('teTitulo').textContent = `Lo que pasa en ${I.lugar}, mes a mes.`;
+    const escala = r.nivel === 'localidad' ? (I.com ? `Seguridad: <b>${esc(I.lugar)}</b> y ${esc(I.nomMun)}` : `Seguridad: <b>${esc(I.nomMun)}</b> (sin dato por localidad)`) : `Seguridad: <b>${esc(r.nivel === 'departamento' ? I.nomDep : I.nomMun)}</b>`;
+    $('teEscala').innerHTML = `<span>${escala}</span>` + (I.emp ? `<span>Empleo: <b>${esc(I.emp.area ? `${I.emp.nombre} A.M.` : I.emp.nombre)}</b>${I.emp.ref || I.emp.capital ? ' (capital)' : ''}</span>` : '') + (I.edu ? `<span>Educación: <b>${esc(I.edu.capital ? I.edu.nombre : I.nomMun)}</b>${I.edu.aprox ? ' (dato del departamento)' : ''}</span>` : '');
+    $('teFrases').innerHTML = I.frases.map(f => `<li>${esc(f)}</li>`).join('') || '<li>Todavía no hay datos suficientes para armar frases.</li>';
+    $('teCopiar').onclick = async () => { try { await navigator.clipboard.writeText(I.frases.map(f => '• ' + f).join('\n') + `\n\nFuentes: Policía Nacional, DANE (GEIH) y Ministerio de Educación.`); $('teCopiar').textContent = 'Copiadas'; setTimeout(() => $('teCopiar').textContent = 'Copiar las frases', 1800); } catch {} };
+    pintarSeguridad(); pintarEmpleo(); pintarEducacion();
+    const F = I.fuentes, c = F.corte;
+    $('teNota').innerHTML = `Fuentes: <b>Policía Nacional</b> (${esc(F.policia)}${c ? `; ${c.anio} va hasta ${T.MESES[c.hasta_mes - 1]}` : ''}) · <b>DANE</b>, ${esc(F.dane)}${F.danePeriodo ? ` (último periodo: ${esc(F.danePeriodo)})` : ''} · <b>${esc(F.men)}</b>. Población para las tasas: proyecciones municipales del DANE. Se actualiza cada mes, cuando las entidades publican. Las tres son bases públicas: no hay aquí ningún dato que no se pueda verificar.`;
+    $('teCuerpo').classList.remove('hidden');
+  }
+  window.C360TerritorioPagina = { armar, informe: () => I };
+  if (!(await P.arrancar('candidato-360-territorio.html'))) { $('teCargando').classList.add('hidden'); return; }
+  window.Candi?.calculo?.(true, 'Estoy leyendo los datos de tu territorio. Ve mirando el resto de la página.');
+  try { await armar(P.SESION.vinculo); }
+  catch (e) { $('teAviso').classList.remove('hidden'); $('teAviso').innerHTML = `<div class="panel"><p>No pudimos leer los datos de su territorio: ${esc(e.message || e)}. Vuelva a cargar la página en un momento.</p></div>`; }
+  finally { window.Candi?.calculo?.(false); $('teCargando').classList.add('hidden'); }
+})();
+</script>
+</body>
+</html>

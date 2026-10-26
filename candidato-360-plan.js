@@ -32,23 +32,23 @@
     estrategia: () => $('crmEstrategia'), mapa: () => $('crmMap')?.closest('article'), partida: () => $('crmContext')?.closest('.panel'),
     meta: () => document.querySelector('#crm .crm-vote-target'), briefing: () => $('crmBriefing'), escucha: () => $('crmEscucha'),
     arquetipos: () => $('crmArquetipos'), perfil: () => $('crmPerfil'), firmas: () => $('crmFirmas'), endoso: () => $('crmEndoso'),
-    diad: () => $('crmDiaD'), contendientes: () => $('crmContendientes'),
+    diad: () => $('crmDiaD'), contendientes: () => $('crmContendientes'), territorio: () => $('crmTerritorio'),
   };
   const NOMBRE_MODULO = { estrategia: '11 · Estrategia', mapa: '01 · Mapa de historial', meta: '02 · Objetivo de votos', briefing: '03 · Briefing', escucha: '04 · Escucha social',
-    arquetipos: '05 · Arquetipos', perfil: '06 · Perfil del votante', firmas: '07 · Firmas', endoso: '08 · Endoso de aliados', diad: '09 · El día de la elección', contendientes: '10 · Contendientes' };
+    arquetipos: '05 · Arquetipos', perfil: '06 · Perfil del votante', firmas: '07 · Firmas', endoso: '08 · Endoso de aliados', diad: '09 · El día de la elección', contendientes: '10 · Contendientes', territorio: '12 · Su territorio' };
 
   const FASES = [
     { id: 'planeacion', nombre: 'Planeación', activa: true, cuando: 'Ahora',
       que: 'De dónde parte: su historial, la meta de votos, el territorio, sus rivales y la estrategia.',
       parrafo: 'Antes de salir a la calle hay que saber de dónde parte: dónde estuvieron sus votos, cuántos necesita, cómo vota cada barrio y contra quién compite. Con eso se escoge una estrategia, y la estrategia ordena todo lo demás. Esta fase no se cierra: se vuelve a ella cada vez que cambie algo grande, como el aval, la lista o un rival.',
-      modulos: ['estrategia', 'partida', 'meta', 'arquetipos', 'perfil', 'contendientes', 'endoso', 'firmas', 'mapa'] },
+      modulos: ['estrategia', 'partida', 'meta', 'arquetipos', 'perfil', 'contendientes', 'endoso', 'firmas', 'territorio', 'mapa'] },
     { id: 'posicionamiento', nombre: 'Posicionamiento', activa: true, cuando: 'Ahora · hasta el 28 de febrero de 2027',
       que: 'El lugar que ocupa antes de la campaña: qué dice, a quién le habla y dónde se deja ver. La persuasión se hace temprano.',
       parrafo: 'Hasta el 28 de febrero de 2027 se construye el lugar que usted ocupa en la cabeza del votante, antes de que empiece el ruido de la campaña. Lo que la gente piense de usted en marzo es, en buena parte, lo que pensará en octubre: en las últimas semanas la persuasión casi no mueve a nadie. Aquí se decide qué dice, a quién le habla primero y en qué barrios se deja ver; la escucha y el briefing le dicen si está funcionando.',
-      modulos: ['estrategia', 'briefing', 'escucha', 'arquetipos', 'contendientes'] },
+      modulos: ['estrategia', 'briefing', 'escucha', 'territorio', 'arquetipos', 'contendientes'] },
     { id: 'campana', nombre: 'Campaña', activa: false, abre: '2027-03-01', cuando: '1 de marzo al 24 de septiembre de 2027',
       que: 'Cerrar el aval y la lista, inscribirse (junio y julio) y movilizar a quien ya lo prefiere.',
-      modulos: ['estrategia', 'briefing', 'escucha', 'endoso', 'contendientes'] },
+      modulos: ['estrategia', 'briefing', 'escucha', 'territorio', 'endoso', 'contendientes'] },
     { id: 'remate', nombre: 'Remate', activa: false, abre: '2027-09-25', cuando: '25 de septiembre al 23 de octubre de 2027',
       que: 'Concentrar la pauta y la presencia donde rinden: su efecto dura pocos días.',
       modulos: ['estrategia', 'briefing', 'escucha'] },

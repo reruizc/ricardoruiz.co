@@ -590,9 +590,8 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
   fases y dos dibujados a mano en el mismo estilo (`assets/candidato-360/brief/`
   `territorio-mes.svg` y `en-construccion.svg`). ⚠️ Los precios del PDF son la escalera
   de `candidato-360-brief.html` **× 1,2** (`SUBIDA`, pedido de Ricardo): desde 360.000.
-  La página del brief web sigue en 300.000; el modal ya dice 360.000. ⚠️ La tarjeta de
-  datos del territorio y el empleo del DANE **no existen todavía en el CRM**: el PDF los
-  ofrece como parte de la etapa de posicionamiento. ⚠️ La regla
+  La página del brief web también sube ×1,2 desde el mismo día (`SUBIDA` en su
+  `factor()`). La lámina 5 describe la tarjeta 12, que ya existe (ver abajo). ⚠️ La regla
   global `.open{font:… var(--mono);text-transform:uppercase}` alcanza al modal abierto
   (`#introModal.open`) y ponía las listas en monoespaciada y mayúscula; el bloque final
   de `candidato-360.css` lo devuelve a Manrope.
@@ -610,6 +609,41 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
   grande, como aviso, con «Siguiente»; solo entonces se despliegan las cinco tarjetas.
   Se ve una vez por pestaña (`sessionStorage['c360-plan-etapas-vistas']`) y se reabre
   con «Cómo funcionan las cinco etapas».
+
+- **Tarjeta y panel 12 · Su territorio, mes a mes (26-oct-2026, pedido de Ricardo).**
+  `candidato-360-territorio.js` (`C360Territorio.leer(vinculo)` → informe;
+  `.resumen(informe)` → tarjeta) y `candidato-360-territorio.html` (panel, mismo chasis
+  que el del Día D). Lee el territorio de la campaña con `territorioDe` +
+  `completarCampana` (exportada ahora desde `candidato-360-panel.js`): **JAL → su
+  localidad o comuna y la ciudad alrededor · concejo y alcaldía → su municipio ·
+  asamblea y gobernación → su departamento.**
+  - *Seguridad*: los JSON públicos del hub de Policía, sin copiar nada
+    (`ponal/{meta,municipios,deptos,nacional,poblacion}.json` y, en las nueve ciudades
+    con mes a mes, `ponal/ciudades-mes/{dane}.json`). Tabla de 21 delitos (año
+    anterior, último completo, cambio, enero-agosto contra el mismo periodo, tasa por
+    100.000 contra el país), serie anual y mensual. En JAL: el **peso** de la localidad
+    en lo que la Policía ubica en la ciudad, sus barrios con más hechos y el aviso del
+    «barrio pendiente» (en Bogotá pasó de 9 % a 36 % de los hurtos a personas entre
+    2025 y 2026, así que el volumen de una localidad parece caer sin caer).
+    ⚠️ La tabla del municipio usa la serie de la CIUDAD (`cYtd`, `cCambio`); la de la
+    localidad solo se usa para el peso. Mezclarlas daba «−88,9 %» de hurtos en Bogotá.
+  - *Empleo*: DANE GEIH, `tools/candidato-360/territorio/build.py` → `territorio.json`
+    (S3 `congreso-2026/output/candidato-360/territorio.json`, gzip). Trimestre móvil en
+    23 ciudades con su área metropolitana (Bello lee «Medellín A.M.» y lo dice), año
+    móvil en las 32 capitales, informalidad. Un municipio fuera de las 23 lee la capital
+    de su departamento, rotulada como referencia; un departamento, su capital.
+  - *Educación*: cobertura neta y deserción del MEN por municipio (`indicadores-mun.json`
+    del Lab). 1.044 de 1.108 municipios no son entidad certificada y traen el dato del
+    departamento: van marcados. Bogotá venía marcada por error y se corrige en el build.
+  - *Para su discurso*: frases armadas con esas cifras, con botón para copiarlas.
+  - Va en las fases Planeación, Posicionamiento y Campaña (`PIEZAS.territorio`). En
+    vitrina se calcula (son datos públicos); el clic abre el muro como las demás.
+  - **Cada mes**: bajar los dos anexos nuevos del DANE (`anex-GEIH-<mes><año>.xlsx` y
+    `anex-GEIHEISS-<trimestre><año>.xlsx`, páginas de empleo y de informalidad), correr
+    `python3 tools/candidato-360/territorio/build.py <geih> <eiss>` y subirlo con
+    `--content-encoding gzip`, bumpeando `?v=` en `TERR`. La Policía se actualiza sola
+    cuando se regenera el hub.
+  - `?terrlocal=1` lee el `territorio.json` del repo para probar antes de subir.
 
 ### 10.3 Candi (Luna)
 

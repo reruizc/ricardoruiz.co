@@ -97,6 +97,12 @@
     saludo: 'La votación nunca se reparte pareja: unos pocos puestos juntan la mayor parte de los votos. Empieza por los que cubren el 70 % y mira cuántos de esos no tienen señal: ahí el testigo necesita un plan para reportar antes de que llegue el domingo.',
     chips: ['¿Por qué me salen tantos puestos?', '¿Qué hago con un puesto sin señal?', '¿Cómo descargo el plan?']
   };
+  VISTAS.territorio = {
+    titulo: 'Su territorio, mes a mes',
+    texto: 'Aquí está lo que pasa donde te lanzas, con datos públicos que se actualizan cada mes: los delitos que denuncia la Policía, el desempleo y la informalidad del DANE, y la cobertura y deserción escolar del Ministerio de Educación. Arriba van frases listas para el discurso, cada una con su fuente.',
+    saludo: 'Un dato propio vale más que una opinión: arriba tienes frases armadas con las cifras de tu territorio. Úsalas en un debate o en una visita, y cuando alguien te discuta, la fuente está debajo.',
+    chips: ['¿Cada cuánto se actualiza?', '¿Por qué mi localidad parece bajar en 2026?', '¿De dónde sale el desempleo de mi municipio?']
+  };
   VISTAS.endoso = {
     titulo: 'Endoso de aliados',
     texto: 'Aquí sumas a quienes te van a apoyar: excandidatos, con su votación, y líderes sin candidatura propia, marcando en el mapa los puestos donde trabajan. Si me dices a quién apoyó cada uno antes, mido cuánto rindió esa persona donde ellos estaban. Solo cuentan los votos del territorio donde compites, y todo sale en rango: es un techo, no una promesa. Los nombres de tus líderes se quedan en tu navegador; no los guardamos en ningún servidor.',
