@@ -663,8 +663,18 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
     (`POST /c360/estrategia/ia`, `lecturaIAEstrategia`): recibe solo lo que ya calculó
     `C360Estrategia` y aterriza la acción al caso; si la respuesta trae una cifra que no
     estaba en el contexto, el worker la descarta. Sesión, 20 por cuenta y día, caché de
-    siete días. Desplegada el 26-oct-2026 (`rr-auth` 3a05bd3). Si falla, no hay sesión o
-    se acaba la cuota, la tarjeta se queda con la versión fija sin error.
+    siete días. Desplegada el 26-oct-2026 (`rr-auth` 3a05bd3) y probada con la cuenta de
+    administración en dos casos reales (Ricardo Ruiz, JAL de Teusaquillo 2015 → Concejo
+    de Bogotá; Andrés Tobón, Concejo de Medellín 2023): 10 a 18 segundos. Si falla, no
+    hay sesión o se acaba la cuota, la tarjeta se queda con la versión fija sin error.
+    Prompt `C360_ESTR_IA_PROMPT_V` v4: «tus votos», nunca «tus votantes»; lanzarse no es
+    ganar; fechas con números; las variables son rasgos de la candidatura, no la acción.
+    **Edad y sexo entran solo si están marcados** (`perfilMarcadoEstrategia`): el censo
+    de los puestos donde saca votos contra el del municipio, si un grupo de edad se
+    aparta 6 puntos o más, o el sexo 2,5 puntos. Medido: Ricardo Ruiz, mayores de 60 =
+    34,9 % contra 20,9 % (entra); el resto de los cruces medidos no pasó de 3,3 puntos.
+    ⚠️ Con ese contexto más largo DeepSeek devolvía el contenido vacío con 3000 tokens:
+    el worker arranca en 8000 y reintenta una vez con 14000.
   - *Botones del CRM*: en mayúscula y sin flecha.
 
 ### 10.3 Candi (Luna)
