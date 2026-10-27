@@ -280,12 +280,18 @@ def armar(ciclo, cap, vinculo, desde, hasta, visitas=None, extra_prensa=None, co
         dura = max(por_red, key=lambda r: (r['hostil'] / r['n'], r['n']))
         grandes = [r for r in por_red if r['n'] >= 20] or por_red     # 11 de 13 no dice nada
         amable = max(grandes, key=lambda r: (r['favor'] / r['n'], -r['hostil'] / r['n']))
-        if dura['hostil']:
+        # «Le comentan duro» solo si de verdad pesa lo hostil (una cuarta parte o
+        # más, o más que lo a favor). Antes salía con 3 de 45 en contra y 37 a
+        # favor (oct-27-2026), que es justo lo contrario.
+        es_dura = dura['hostil'] and (dura['hostil'] / dura['n'] >= .25 or dura['hostil'] > dura['favor'])
+        if es_dura:
             temas_lin.append({'tipo': 'redes', 'rotulo': f'Redes · {dura["nombre"]}',
                               'titulo': f'En {dura["nombre"]} le comentan duro: {num(dura["hostil"])} de {num(dura["n"])} comentarios en contra o en ataque, {num(dura["favor"])} a favor.'})
-        if amable is not dura and amable['favor']:
+        if (amable is not dura or not es_dura) and amable['favor']:
             temas_lin.append({'tipo': 'redes', 'rotulo': f'Redes · {amable["nombre"]}',
-                              'titulo': f'En {amable["nombre"]}, al revés: {num(amable["favor"])} de {num(amable["n"])} comentarios a favor.'})
+                              'titulo': (f'En {amable["nombre"]}, al revés: ' if es_dura else f'En {amable["nombre"]}, ')
+                                        + f'{num(amable["favor"])} de {num(amable["n"])} comentarios a favor'
+                                        + (f' y {num(amable["hostil"])} en contra.' if amable['hostil'] else '.')})
 
     # La plata y las reglas: las mismas fuentes del briefing de siempre (SECOP y
     # Presidencia), en una línea cada cosa, como los temas del correo de Caudal.
@@ -328,8 +334,18 @@ def asunto(b):
     return f'{base} · {lista(z)}' if z else base
 
 
-def cuerpo_html(b, borrador=False):
+def cuerpo_html(b, borrador=False, imagenes=None):
+    """`imagenes` = {clave: url} de graficos.py (prensa, zonas, redes,
+    arquetipos). Las que no vengan no se pintan: el correo sale igual."""
     m, lec = b['_meta'], b['lectura']
+    imagenes = imagenes or {}
+    ALT = {'prensa': 'De qué habló la prensa, por tema', 'zonas': 'Mapa de las localidades donde estar esta semana',
+           'redes': 'Lo que le comentan en sus publicaciones, por red', 'arquetipos': 'Cuánto rinde en cada arquetipo frente a la ciudad'}
+
+    def img(k, arriba=14):
+        u = imagenes.get(k)
+        return (f'<tr><td style="padding:{arriba}px 28px 0"><img src="{e(u)}" alt="{e(ALT.get(k, ""))}" width="564" '
+                f'style="display:block;width:100%;max-width:564px;height:auto;border:1px solid {LINEA};border-radius:8px"></td></tr>') if u else ''
 
     def cifra(n, rotulo, color=VERDE):
         return (f'<td align="center" width="33%" style="padding:0 6px">'
@@ -343,7 +359,8 @@ def cuerpo_html(b, borrador=False):
     filas_z = ''
     for i, z in enumerate(b['zonas'], 1):
         ancho = max(8, round(100 * z['share'] / mx))
-        color = RAMPA[min(4, 5 - i)]
+        # Con el mapa en el correo, las barras van en su misma gama verde (más peso, más oscuro).
+        color = ['#0d5a51', '#147c70', '#3f9d8a'][i - 1] if imagenes.get('zonas') and i <= 3 else RAMPA[min(4, 5 - i)]
         arqs = []
         for a in z['arq']:
             n = b['nombre_arq'].get(a)
@@ -426,16 +443,17 @@ def cuerpo_html(b, borrador=False):
 
 <tr><td style="padding:18px 28px 0;font-size:15px">{e(lec['parrafo'])}</td></tr>
 
-{f'<tr><td style="padding:14px 28px 0">{arq_pills}</td></tr>' if arq_pills else ''}
+{img('arquetipos', 18) or (f'<tr><td style="padding:14px 28px 0">{arq_pills}</td></tr>' if arq_pills else '')}
 
-{f'<tr><td style="padding:26px 28px 0;font-size:19px;font-weight:bold">Dónde estar esta semana</td></tr><tr><td style="padding:6px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{filas_z}</table></td></tr>' if filas_z else ''}
+{f'<tr><td style="padding:26px 28px 0;font-size:19px;font-weight:bold">Dónde estar esta semana</td></tr>{img("zonas", 10)}<tr><td style="padding:6px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{filas_z}</table></td></tr>' if filas_z else ''}
 
 {f'<tr><td style="padding:12px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{PAPEL};border-radius:6px"><tr><td style="padding:12px 16px;font-size:14px"><b>Qué llevar a esas zonas.</b> {e(lec["llevar"])}</td></tr></table></td></tr>' if lec.get('llevar') else ''}
 
 {f'<tr><td style="padding:22px 28px 0;font-size:13px;color:{GRIS}">{e(b["sin_zonas"])}</td></tr>' if b.get('sin_zonas') else f'<tr><td style="padding:12px 28px 0;font-size:13px"><a href="{SITIO}" style="color:{VERDE};font-weight:bold;text-decoration:none">Ver el mapa de barrios y marcar visitas en su CRM →</a></td></tr>'}
 
-{f'<tr><td style="padding:26px 28px 0;font-size:19px;font-weight:bold">Lo que se movió</td></tr><tr><td style="padding:6px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{filas_t}</table></td></tr>' if filas_t else ''}
+{f'<tr><td style="padding:26px 28px 0;font-size:19px;font-weight:bold">Lo que se movió</td></tr>{img("prensa", 10)}<tr><td style="padding:6px 28px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{filas_t}</table></td></tr>' if filas_t else ''}
 
+{img('redes', 16)}
 {f'<tr><td style="padding:12px 28px 0;font-size:13px;color:{GRIS}">{redes_txt}</td></tr>' if redes_txt else ''}
 
 {f'<tr><td style="padding:24px 28px 0;font-size:19px;font-weight:bold">Lo que viene</td></tr><tr><td style="padding:6px 28px 0"><table role="presentation" cellpadding="0" cellspacing="0">{filas_a}</table></td></tr>' if filas_a else ''}

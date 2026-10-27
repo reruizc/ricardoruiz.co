@@ -722,7 +722,7 @@ def lectura_ciclo(v, P, dias):
     return d
 
 
-def render_ciclo(v, t, P, C, N, desde, hasta, primera):
+def render_ciclo(v, t, P, C, N, desde, hasta, primera, graf_dir=None, graf_url=None, borrador=False):
     import correo_ciclo as cc
     ciclo = lectura_ciclo(v, P, max(1, (hasta - desde).days))
     extra = []
@@ -739,7 +739,21 @@ def render_ciclo(v, t, P, C, N, desde, hasta, primera):
     b = cc.armar(ciclo, v.get('captura') or {}, vinculo_lectura(v), desde, hasta, visitas=v.get('visitas') or {},
                  extra_prensa=extra, contratos=C['items'], normas=N['items'], primera=primera)
     print(f'   lectura: {ciclo.get("ciudad") or "sin arquetipos"} · ' + (' · '.join(z['nombre'] for z in b['zonas']) or ciclo.get('motivo', '')))
-    return cc.asunto(b), cc.cuerpo_html(b), cc.texto(b)
+    # Gráficos (oct-27-2026): solo cuando se piden. `graf_url` es el prefijo con
+    # el que el correo los busca (relativo para el borrador; una URL pública
+    # cuando se publiquen para el envío real).
+    imagenes = {}
+    if graf_dir:
+        import graficos
+        rf = str(b['_meta'].get('redes_fecha') or '')
+        try:
+            rf = cc.fecha(dt.date.fromisoformat(rf[:10])) if rf else None
+        except ValueError:
+            pass
+        rutas = graficos.graficar(ciclo, v.get('captura') or {}, graf_dir, desde, hasta, rf)
+        imagenes = {k: f'{graf_url or graf_dir}/{os.path.basename(r)}' for k, r in rutas.items()}
+        print(f'   gráficos: {", ".join(imagenes) or "ninguno"}')
+    return cc.asunto(b), cc.cuerpo_html(b, borrador=borrador, imagenes=imagenes), cc.texto(b)
 
 
 # ─── motor ──────────────────────────────────────────────────────────────────
@@ -783,7 +797,9 @@ def procesar(v, args):
     asunto, html, texto, n_items = render(v, t, P, C, N, desde, hoy, primera)
     if not args.formato_viejo:
         try:
-            asunto, html, texto = render_ciclo(v, t, P, C, N, desde, hoy, primera)
+            slug = re.sub(r'[^a-z0-9]+', '-', v['email'].lower())
+            gd = os.path.join(args.guardar_html, slug + '-graficos') if args.graficos and args.guardar_html else None
+            asunto, html, texto = render_ciclo(v, t, P, C, N, desde, hoy, primera, gd, slug + '-graficos' if gd else None, borrador=bool(args.dry_run and gd))
         except Exception as ex:                                  # noqa: BLE001
             print(f'   ! la lectura del ciclo falló, sale el formato anterior: {str(ex)[:200]}')
     if args.guardar_html:
@@ -823,6 +839,7 @@ def main():
     ap.add_argument('--forzar', action='store_true', help='ignora la cadencia de 3 días')
     ap.add_argument('--solo', help='solo esta cuenta (correo)')
     ap.add_argument('--guardar-html', help='carpeta donde dejar el HTML y el texto de cada briefing')
+    ap.add_argument('--graficos', action='store_true', help='con --guardar-html: dibuja los gráficos y los mete en el HTML (borrador)')
     ap.add_argument('--formato-viejo', action='store_true', help='el correo de antes, sin la lectura del ciclo')
     ap.add_argument('--inventario', help='JSON con la forma de /c360/briefing/inventario (pruebas sin worker)')
     ap.add_argument('--worker', help=f'URL del worker (default {WORKER})')

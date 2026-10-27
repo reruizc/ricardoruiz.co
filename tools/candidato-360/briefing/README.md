@@ -129,3 +129,24 @@ en Bogotá y firman obras de otros municipios).
 python3 tools/candidato-360/briefing/motor.py --inventario prueba.json --dry-run --forzar --guardar-html /tmp/b
 echo '{"vinculo":{…},"items":[…]}' | node tools/candidato-360/briefing/lectura.mjs
 ```
+
+## Gráficos en el correo (oct-27-2026 · solo borrador por ahora)
+
+`graficos.py` dibuja cuatro PNG desde la MISMA lectura del correo: de qué habló
+la prensa (`prensa`), el mapa de Bogotá con el peso de cada localidad
+(`zonas`, rotado 90° y sin Sumapaz), la postura de los comentarios por red
+(`redes`: verde a favor · gris neutro · coral en contra o ataque, con la cifra
+en cada tramo) y el rendimiento por arquetipo frente a la ciudad
+(`arquetipos`). Se dibujan a 1200 px para un correo de 600.
+
+```bash
+python3 motor.py --inventario prueba.json --dry-run --forzar --guardar-html /tmp/b --graficos
+```
+
+Deja `<slug>-graficos/*.png` al lado del HTML y el correo los busca con ruta
+relativa, con la marca de borrador. ⚠️ **Para el envío real falta publicarlos**
+en una URL pública (S3) y pasar esa URL en `graf_url`: con rutas relativas el
+correo llega sin imágenes. Hasta entonces la corrida diaria no los usa.
+
+De paso: «En X le comentan duro» solo sale si lo hostil pesa una cuarta parte
+o más (o supera lo a favor). Antes salía con 3 de 45 en contra y 37 a favor.
