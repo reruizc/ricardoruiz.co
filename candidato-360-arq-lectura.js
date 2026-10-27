@@ -219,7 +219,7 @@
   /* ── Bogotá ───────────────────────────────────────────────────────────── */
   /* `?arqlocal=1` lee lo que dejó publicar.py en el repo, para revisar antes de subir. */
   const ARQ_BOG_BASE = ARQ_LOCAL ? 'Bases%20de%20datos/arquetipos-bogota/publicar' : RR.publicUrl('congreso-2026/output/arquetipos-bogota');
-  const ARQ_BOG_URL = `${ARQ_BOG_BASE}/arquetipos-bogota.json?v=20261019`;
+  const ARQ_BOG_URL = `${ARQ_BOG_BASE}/arquetipos-bogota.json?v=20261027`;
   /* El catastral simplificado (~4 m): el panel no necesita los 6,5 MB del
      completo ni los 19 archivos por localidad del CRM. */
   const BOG_GEO_URL = `${ARQ_BOG_BASE}/barrios-bogota.json?v=20261019`;

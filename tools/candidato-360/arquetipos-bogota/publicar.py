@@ -45,6 +45,32 @@ COLOR = {
     'alineada': '#4a3aa7', 'decide': '#e87ba4', 'cruce-sur': '#008300', 'reparte': '#9a3412',
 }
 
+# Nombre emocional (oct-27-2026, pedido de Ricardo): el nombre técnico dice
+# CÓMO vota el barrio («Barrio de gestión»), y el candidato necesita saber qué
+# lo MUEVE para conectarse con él, como ya pasa en Medellín y Cartagena. El
+# técnico se conserva en `tecnico` y el panel lo muestra debajo. Mismo estilo
+# que los ocho de Cartagena («Barrio que Resuelve», «Primero el Trabajo»).
+EMOCIONAL = {
+    # ── Concejo ──
+    'nombre':     ('Confianza en lo Conocido', 'Confía en el nombre que ya ha oído y en el partido de siempre'),
+    'sin-dueno':  ('Voto Libre', 'Independencia: no le debe el voto a nadie y exige que se lo ganen'),
+    'partido':    ('Fiel a la Causa', 'Lealtad al partido y a lo que representa, más que a la persona'),
+    'opinion':    ('Convicción Propia', 'Criterio propio: decide por posiciones, no por visitas'),
+    'poco-voto':  ('Esperanza por Despertar', 'Desencanto: siente que la política del Concejo no le habla'),
+    'figuras':    ('Respaldo al Liderazgo', 'Seguridad en figuras conocidas, con trayectoria y redes propias'),
+    'gestion':    ('Trabajo por la Comunidad', 'Gratitud y reciprocidad con quien está y resuelve'),
+    'movilizada': ('Orgullo de lo Nuestro', 'Arraigo: sale a votar para defender lo de su barrio'),
+    # ── Alcaldía ──
+    'decide':         ('La Balanza de Bogotá', 'Duda abierta: se mueve de un lado a otro y decide la Alcaldía'),
+    'estrategico':    ('Voto que no se Pierde', 'Prudencia: concentra el voto en quien puede ganar'),
+    'alternativa':    ('Ganas de Algo Nuevo', 'Hartazgo de lo de siempre y búsqueda de una opción distinta'),
+    'tradicional':    ('Lo Seguro Primero', 'Necesidad de certeza: cambia poco y acompaña al favorito'),
+    'media-alineada': ('Coherencia de Línea', 'Consistencia: la misma línea política en los dos tarjetones'),
+    'alineada':       ('Identidad de Bando', 'Pertenencia política: vota por su lado en todo'),
+    'reparte':        ('Cada Voto en su Lugar', 'Autonomía práctica: escoge distinto en cada tarjetón'),
+    'cruce-sur':      ('Lealtad Cercana', 'Vínculo con lo cercano: al conocido del barrio, aunque a la Alcaldía vote distinto'),
+}
+
 # Los textos van en lenguaje de campaña, para un político y no para un
 # analista (pedido de Ricardo, oct-19-2026):
 #   lema   · una frase que se recuerda
@@ -239,7 +265,7 @@ def main():
             if len(z) < 2:
                 z = sorted(meta['vars'], key=lambda v: -abs(a['z'][v]))[:2]
             familias[s] = {
-                'corp': corp, 'nombre': a['nombre'], 'color': COLOR[s], 'barrios': a['barrios'], 'votantes': a['votantes'],
+                'corp': corp, 'nombre': EMOCIONAL[s][0], 'tecnico': a['nombre'], 'emocion': EMOCIONAL[s][1], 'color': COLOR[s], 'barrios': a['barrios'], 'votantes': a['votantes'],
                 **TEXTOS[s], 'imagen': IMAGEN.format(s),
                 'sens': dict(zip(TEMAS, SENS[s])), 'sens_heuristica': True,
                 # llaves; el valor sale de `perfil` y se compara con `ciudad`

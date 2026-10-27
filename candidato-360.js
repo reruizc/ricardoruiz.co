@@ -5162,28 +5162,27 @@ const ESTR_LENTE = { propio: 'sus votos', partido: 'los votos de su partido o su
    26-oct-2026): con la misma frase siempre la tarjeta parece un adorno. Se
    evita repetir la última que vio en este dispositivo. */
 const TITULOS_ESTR = [
-  n => `${n}, así se arma tu estrategia.`,
-  n => `${n}, esta es la jugada.`,
-  n => `${n}, por aquí va tu campaña.`,
-  n => `${n}, tu estrategia en corto.`,
-  n => `${n}, esto es lo que mueve tu campaña.`,
-  n => `${n}, lo que te toca en esta etapa.`,
-  n => `${n}, dónde poner la energía.`,
-  n => `${n}, tu campaña ya tiene rumbo.`,
-  n => `${n}, la ruta hasta octubre.`,
-  n => `${n}, lo que dicen tus datos.`,
-  n => `${n}, así se abre camino.`,
-  n => `${n}, el mapa de tu estrategia.`,
-  n => `${n}, lo que viene ahora.`,
-  n => `${n}, aquí empieza la estrategia.`,
+  'Esta es la base de tu campaña hasta octubre.',
+  'La idea que sostiene tu campaña.',
+  'Lo que no cambia de tu campaña.',
+  'La esencia de tu campaña, de aquí a la elección.',
+  'Tu campaña, en una idea.',
+  'El rumbo fijo de tu campaña.',
+  'Lo que le da forma a tu campaña.',
+  'Tu norte hasta el día de la elección.',
+  'La columna de tu campaña.',
+  'Lo que tu campaña va a sostener.',
+  'El caparazón de tu campaña.',
+  'Tu estrategia: lo que no se mueve.',
+  'La idea central de tu campaña.',
+  'De aquí a octubre, esto es tu campaña.',
 ];
-function tituloEstrategia(nombre) {
+function tituloEstrategia() {
   let ult = -1; try { ult = Number(localStorage.getItem('c360-estr-titulo') ?? -1); } catch {}
   let i = Math.floor(Math.random() * TITULOS_ESTR.length);
   if (i === ult) i = (i + 1) % TITULOS_ESTR.length;
   try { localStorage.setItem('c360-estr-titulo', String(i)); } catch {}
-  const t = TITULOS_ESTR[i](nombre || 'Tu candidatura');
-  return nombre ? t : t.replace(/^Tu candidatura, (\w)/, (m, c) => c.toUpperCase());
+  return TITULOS_ESTR[i];
 }
 /* Los temas que mueven a un arquetipo: su sensibilidad 1-5 por tema de agenda
    (la ficha de Bogotá y Cartagena la trae; Medellín usa la de sus cinco
@@ -5205,16 +5204,21 @@ function arquetipoAfinEstr() {
   return (ESTR?.R?.arquetipos || []).filter(a => a.ratio != null && a.share >= .08).sort((a, b) => b.ratio - a.ratio)[0] || null;
 }
 const listaY = xs => xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : (xs[0] || '');
-/* Versión fija del párrafo, para cuando no hay IA: el mismo esqueleto que
-   pidió Ricardo («tu voto de clase media en Bogotá, desde el centro-derecha,
-   tiene que trabajar A, B y C»), armado solo con datos ya calculados. */
-function lecturaFijaEstr() {
+/* La estrategia como idea central (27-oct-2026, pedido de Ricardo): no el
+   método («tus votos pesan en…») sino la idea que la campaña sostiene hasta
+   la elección. Esta es la versión fija, para cuando no hay IA: la arma con la
+   familia, el perfil, el territorio, la forma (figura o barrio) y la causa o
+   los temas. La de DeepSeek la reemplaza cuando llega. */
+function causaActual() { return (CAMPANA_ACTUAL || SESSION.vinculo?.campana || {}).causa || ''; }
+function tesisFijaEstr() {
   const R = ESTR.R, k = contextoCampanaEstr(), a = arquetipoPrincipalEstr();
-  const sujeto = R.lente === 'partido' ? 'El voto de tu familia política' : R.lente === 'ciudad' ? 'El voto de la ciudad' : 'Tu voto';
-  const fam = k.partido ? `con el aval de ${NOMBRE_BONITO(k.partido)}` : `desde ${(FAMILIA_CON_ARTICULO[k.bloque] || FAMILIA_CON_ARTICULO.sc).replace(/^su /, 'tu ')}`;
-  if (!a) return `${sujeto}${k.lugar ? ` en ${k.lugar}` : ''}${fam ? `, ${fam},` : ''} todavía no tiene arquetipos por barrio: la estrategia se arma con tu corporación, tu fase y tu historial.`;
-  const temas = temasArquetipo(a.id);
-  return `${sujeto} pesa en «${a.nombre}»${k.lugar ? ` en ${k.lugar}` : ''}${fam ? `, ${fam}` : ''}${temas.length ? `: ahí lo que mueve es ${listaY(temas)}.` : '.'}`;
+  const fam = k.partido ? `Con el aval de ${NOMBRE_BONITO(k.partido)}` : `Desde ${(FAMILIA_CON_ARTICULO[k.bloque] || FAMILIA_CON_ARTICULO.sc).replace(/^su /, 'tu ')}`;
+  const edad = PERFIL_ESTR?.edad ? ', con un electorado de más edad en tus puestos' : '';
+  const donde = k.lugar ? ` y en ${k.lugar}` : '';
+  const forma = { figura: 'ser una voz de ciudad con posiciones claras', barrio: 'ser quien está y resuelve en el barrio', mixto: 'ser una voz de ciudad que también se ve en el barrio' }[R.figura?.lectura] || 'hacerte conocer con una idea clara';
+  const causa = causaActual(), temas = a ? temasArquetipo(a.id) : [];
+  const sobre = causa ? `alrededor de tu causa: ${causa.replace(/\.$/, '')}` : temas.length ? `sobre ${listaY(temas)}` : '';
+  return `${fam}${edad}${donde}, tu campaña tiene que ${forma}${sobre ? `, ${sobre}` : ''}${a ? `, empezando por los barrios «${a.nombre}»` : ''}.`;
 }
 function pintarTemasEstr(temas) {
   const ul = $('crmEstrVariables'); if (!ul) return;
@@ -5222,12 +5226,42 @@ function pintarTemasEstr(temas) {
   ul.innerHTML = (temas || []).map(t => `<li>${escHtml(t)}</li>`).join('');
   ul.classList.toggle('hidden', !(temas || []).length);
 }
+const SEMANA_ROT = 'Esta semana, tu estrategia se aterriza así:';
+/* «Ya tengo una causa específica» (27-oct-2026): la razón por la que la
+   persona quiere movilizar. Se guarda en la campaña (/c360/campana, campo
+   `causa`) y la estrategia con IA se arma alrededor de ella. */
+function pintarCausaEstr() {
+  const c = causaActual(), caja = $('crmEstrCausa'); if (!caja) return;
+  caja.innerHTML = c
+    ? `<p class="estr-causa-tuya"><span>Tu causa</span>${escHtml(c)} <button type="button" class="enlace-boton" onclick="editarCausaEstr()">Cambiar</button></p>`
+    : `<button type="button" class="ghost estr-causa-btn" onclick="editarCausaEstr()">Ya tengo una causa específica</button>`;
+}
+function editarCausaEstr() {
+  if (CRM_VITRINA) return abrirPaywall('La estrategia se abre con el acceso a Candidato 360.');
+  const caja = $('crmEstrCausa'); if (!caja) return;
+  caja.innerHTML = `<form class="estr-causa-form" onsubmit="event.preventDefault();guardarCausaEstr()"><label for="crmEstrCausaTxt">¿Cuál es la causa por la que quieres que la gente salga a votar?</label>
+    <div><input id="crmEstrCausaTxt" maxlength="150" placeholder="Ej.: que los parques del barrio vuelvan a ser seguros para los niños" value="${escHtml(causaActual())}">
+    <button type="submit" class="solid">Guardar</button><button type="button" class="ghost" onclick="pintarCausaEstr()">Cancelar</button></div>
+    <small>La estrategia se vuelve a armar alrededor de ella. ${causaActual() ? 'Déjala vacía y guarda para quitarla.' : ''}</small></form>`;
+  $('crmEstrCausaTxt')?.focus();
+}
+async function guardarCausaEstr() {
+  const txt = ($('crmEstrCausaTxt')?.value || '').replace(/\s+/g, ' ').trim().slice(0, 150);
+  const c = CAMPANA_ACTUAL || SESSION.vinculo?.campana;
+  if (!c) { alert('Primero abre el CRM de tu candidatura: la causa se guarda con ella.'); return; }
+  await guardarCampana({ ...c, causa: txt });
+  pintarCausaEstr();
+  if (!ESTR || ESTR.R.estado !== 'ok') return;
+  $('crmEstrCopy').textContent = tesisFijaEstr();
+  $('crmEstrAccion').querySelector('small')?.remove();
+  lecturaIAEstrategia();
+}
 function pintarTarjetaEstrategia() {
   const { R } = ESTR, F = R.fase, card = $('crmEstrategia'), k = contextoCampanaEstr();
   const prox = F.proximo;
   $('crmEstrDato').textContent = prox ? prox.dias.toLocaleString('es-CO') : '—';
   $('crmEstrSub').textContent = prox ? `días para: ${prox.nombre.toLowerCase()}` : F.nombre;
-  $('crmEstrTitulo').textContent = tituloEstrategia(k.nombre);
+  $('crmEstrTitulo').textContent = tituloEstrategia();
   $('crmEstrPrincipios').innerHTML = '';
   if (R.estado !== 'ok') {
     card.classList.add('module-apagado');
@@ -5236,13 +5270,14 @@ function pintarTarjetaEstrategia() {
     return;
   }
   card.classList.remove('module-apagado');
-  $('crmEstrCopy').textContent = lecturaFijaEstr();
+  $('crmEstrCopy').textContent = tesisFijaEstr();
   const a = arquetipoPrincipalEstr();
   pintarTemasEstr(a ? temasArquetipo(a.id) : []);
+  pintarCausaEstr();
   /* La acción fija va sin autores: la referencia académica vive en la vista
      ampliada, no en la tarjeta. */
   if (R.accion) {
-    $('crmEstrAccion').innerHTML = `<b>Esta semana.</b> ${escHtml(R.accion.texto)}`;
+    $('crmEstrAccion').innerHTML = `<b>${SEMANA_ROT}</b> ${escHtml(R.accion.texto)}`;
     $('crmEstrAccion').classList.remove('hidden');
   } else $('crmEstrAccion').classList.add('hidden');
   $('crmEstrBtn').disabled = false;
@@ -5313,13 +5348,14 @@ function contextoIAEstrategia() {
        «votantes». Los temas son la sensibilidad del arquetipo (4 o 5 de 5). */
     arquetipos: arqs.map(x => {
       const f = ESTR.L?.ficha?.(x.id) || {};
-      return { nombre: x.nombre, peso: `${pctCorto(x.share)} de ${R.lente === 'propio' ? 'tus votos' : R.lente === 'partido' ? 'los votos de tu familia' : 'el voto de la ciudad'}`,
+      return { nombre: x.nombre, emocion: f.emocion || '', peso: `${pctCorto(x.share)} de ${R.lente === 'propio' ? 'tus votos' : R.lente === 'partido' ? 'los votos de tu familia' : 'el voto de la ciudad'}`,
         rinde: x.ratio != null && R.lente !== 'ciudad' ? `${vecesE(x.ratio)} frente a lo que pesa en el territorio` : '',
         decide: f.decide || f.lema || '', temas: temasArquetipo(x.id) };
     }),
     fase: { nombre: R.fase?.nombre || '', hasta: R.fase?.hasta ? fechaLarga(R.fase.hasta) : '', que: R.fase?.que || '' },
     accion: R.accion?.texto || '', competencia: R.competencia?.texto || '',
     perfil: PERFIL_ESTR || null,
+    causa: causaActual(),
     noticias: NOTICIAS_ESTR.map(x => ({ titulo: x.titulo, medio: x.medio, fecha: x.fecha, medios: x.medios })),
   };
 }
@@ -5332,16 +5368,16 @@ async function lecturaIAEstrategia() {
     PERFIL_ESTR = perfil; PERFIL_ESTR_LISTO = true; NOTICIAS_ESTR = noticias || [];
     if (turno !== ESTR_TURNO) return;
     const r = await apiC360('/c360/estrategia/ia', { method: 'POST', body: JSON.stringify({ contexto: contextoIAEstrategia() }) });
-    if (turno !== ESTR_TURNO || !r.ok || !r.data?.lectura) return;   /* sin ruta, sin cuota o sin lectura: queda la versión fija */
+    if (turno !== ESTR_TURNO || !r.ok || !r.data?.estrategia) return;   /* sin ruta, sin cuota o sin lectura: queda la versión fija */
     const L = r.data;
-    $('crmEstrCopy').textContent = L.lectura;
+    $('crmEstrCopy').textContent = L.estrategia;
     if (L.temas?.length) pintarTemasEstr(L.temas);
     const n = L.noticia ? NOTICIAS_ESTR[L.noticia - 1] : null;
     const pie = n ? `A partir de: ${n.url ? `<a href="${escHtml(n.url)}" target="_blank" rel="noopener">«${escHtml(n.titulo)}»</a>` : `«${escHtml(n.titulo)}»`}${n.medio ? ` · ${escHtml(n.medio)}` : ''}` : 'Lectura con IA sobre tus datos';
     /* El modelo suele arrancar «Esta semana se habla de…»: sin esto salía
        «Esta semana. Esta semana se habla…». */
-    const m = String(L.semana).match(/^(esta semana)([\s\S]*)$/i);
-    $('crmEstrAccion').innerHTML = `${m ? `<b>${escHtml(m[1])}</b>${escHtml(m[2])}` : `<b>Esta semana.</b> ${escHtml(L.semana)}`} <small>${pie}</small>`;
+    const sem = String(L.semana).replace(/^esta semana[,:.]?\s*/i, '');
+    $('crmEstrAccion').innerHTML = `<b>${SEMANA_ROT}</b> ${escHtml(sem.charAt(0).toUpperCase() + sem.slice(1))} <small>${pie}</small>`;
     $('crmEstrAccion').classList.remove('hidden');
     ESTR.ia = L;
   } catch {}
@@ -5368,12 +5404,13 @@ async function pintarIntroEstrategia() {
     ['Territorio', k.lugar ? `${k.lugar}.` : 'El de tu campaña.'],
     ['Corporación', `${CRM_CORPORATIONS[k.corp] || 'Tu corporación'}.`],
   ];
+  if (causaActual()) datos.push(['Tu causa', `${causaActual().replace(/\.$/, '')}.`]);
   const top = new Set((R.principios || []).slice(0, 3).map(p => p.id));
   const ochos = (R.principios || []).map(p => `<li class="${top.has(p.id) ? 'tuya' : ''}"><b>${escHtml(p.corto)}</b>${top.has(p.id) ? '<i>pesa más en tu caso</i>' : ''}</li>`).join('');
   const fecha = R.fase?.eleccion?.fecha ? fechaLarga(R.fase.eleccion.fecha) : 'octubre de 2027';
   $('estrIntro').innerHTML = `<span class="panel-num">Antes de abrirla</span>
     <h3>${escHtml(k.nombre || 'Tu candidatura')}, así construimos tu estrategia.</h3>
-    <p>No sale de una plantilla. Partimos de seis datos de tu candidatura:</p>
+    <p>No sale de una plantilla. Partimos de ${datos.length === 7 ? 'siete' : 'seis'} datos de tu candidatura:</p>
     <dl class="estr-intro-datos">${datos.map(([t, v]) => `<div><dt>${t}</dt><dd>${escHtml(v)}</dd></div>`).join('')}</dl>
     <p>Con esos datos pasamos por un banco de <b>ocho estrategias de campaña</b>, sacadas de la investigación sobre elecciones y del oficio de quienes las hacen. Cada una pesa distinto según dónde están tus votos y qué mueve a ese electorado:</p>
     <ol class="estr-intro-ocho">${ochos}</ol>

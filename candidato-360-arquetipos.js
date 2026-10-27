@@ -123,7 +123,7 @@
       clave: t => (t?.corp === 'alcaldia' ? 'alcaldia' : 'concejo'),
       cargar: async t => {
         const corp = t?.corp === 'alcaldia' ? 'alcaldia' : 'concejo';
-        const r = await fetch(`${S3_BOG}/arquetipos-bogota.json?v=20261019`);
+        const r = await fetch(`${S3_BOG}/arquetipos-bogota.json?v=20261027`);
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const d = await r.json();
         const familias = (d.orden?.[corp] || []).map(slug => {
