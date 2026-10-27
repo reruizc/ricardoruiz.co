@@ -128,7 +128,7 @@
   function pintarMapa(C) {
     const el = document.getElementById('igMapa'); if (!el || !global.L) return;
     const L = global.L;
-    const m = L.map(el, { zoomControl: true, scrollWheelZoom: false, attributionControl: true }).setView([4.64, -74.1], 11);
+    const m = L.map(el, { zoomControl: true, scrollWheelZoom: false, attributionControl: true, zoomSnap: 0.25 }).setView([4.64, -74.1], 11);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, opacity: .45, attribution: '&copy; OpenStreetMap' }).addTo(m);
     const vmax = Math.max(...C.puestos.map(p => p.v)) || 1;
     C.puestos.forEach(p => {
@@ -143,8 +143,17 @@
       .bindTooltip(`${esc(nomIg(x.nombre))}${x.val ? `<br>${nf(x.v)} votos suyos a ${RADIO} m · rinde ${dec(x.ratio)}×` : ''}`).addTo(m));
     C.coinc.forEach(x => L.marker([x.lat, x.lon], { icon: L.divIcon({ className: 'ig-pin', html: `<span>${x.n}</span>`, iconSize: [24, 24], iconAnchor: [12, 12] }), zIndexOffset: 1000 })
       .bindTooltip(`<b>${esc(nomIg(x.nombre))}</b><br>${esc(x.loc)}<br>${nf(x.v)} votos suyos a ${RADIO} m · rinde ${dec(x.ratio)}×`).addTo(m));
-    /* Leaflet mide su caja al crearse: se reencuadra después del layout. */
-    setTimeout(() => { m.invalidateSize(); m.fitBounds([[4.48, -74.22], [4.8, -74.02]]); }, 0);
+    /* Leaflet mide su caja al crearse, y la vista de estrategia termina de
+       armarse después: se reencuadra a los puestos con votos cada vez que la
+       caja cambia de tamaño, y una vez más por si acaso. */
+    const con = C.puestos.filter(p => p.v);
+    const lats = con.map(p => p.lat).sort((a, b) => a - b), lons = con.map(p => p.lon).sort((a, b) => a - b);
+    const q = (xs, f) => xs[Math.min(xs.length - 1, Math.max(0, Math.round(f * (xs.length - 1))))];
+    const caja = [[q(lats, .01), q(lons, .01)], [q(lats, .99), q(lons, .99)]];
+    const encuadrar = () => { if (!el.clientWidth) return; m.invalidateSize(); m.fitBounds(caja, { padding: [12, 12], animate: false }); };
+    el._igMapa = m;
+    setTimeout(encuadrar, 0); setTimeout(encuadrar, 400);
+    if (global.ResizeObserver) { let w = 0; new ResizeObserver(() => { if (el.clientWidth !== w) { w = el.clientWidth; encuadrar(); } }).observe(el); }
   }
 
   function estilos() {
