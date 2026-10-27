@@ -740,6 +740,17 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
   (SVG a mano, 240×160, misma paleta de las imágenes de las fases; el archivo se llama
   como el `id` del principio en el banco).
 
+- **La noticia sin agregados (27-oct-2026, prompt v7).** Con la causa de prueba, el
+  modelo escribió «los pasajes de Transmilenio que nadie está midiendo», y el titular
+  no dice eso. La regla 9 ahora prohíbe agregarle a la noticia hechos, causas,
+  culpables, juicios o absolutos, con el ejemplo malo y el bueno, y pide poner el
+  aporte en la acción. Además el worker revisa la semana contra el titular escogido
+  (`_c360EstrIAAgregados`, lista `C360_ESTR_IA_AGREGADOS`: nadie, nunca, jamás,
+  ninguno, siempre, culpa, abandono, olvido, caos, escándalo…): si aparece una que
+  el titular no trae, pide la lectura otra vez con la corrección; si vuelve a pasar,
+  responde 422 y la tarjeta se queda con la versión fija. Probado seis veces contra
+  DeepSeek con el contexto real: ninguna agregó nada.
+
 ### 10.3 Candi (Luna)
 
 Candi es la guía de la plataforma y es **Luna, la perrita de Ricardo**, en 3D
