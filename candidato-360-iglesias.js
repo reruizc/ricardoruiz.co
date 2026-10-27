@@ -14,7 +14,7 @@
 (function (global) {
   'use strict';
 
-  const URL_DATOS = 'candidato-360-data/iglesias-concejo-bogota-2023.json?v=20261019';
+  const URL_DATOS = 'candidato-360-data/iglesias-concejo-bogota-2023.json?v=20261027';
   const esc = s => String(s ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
   const dec = (x, n = 2) => x == null || Number.isNaN(x) ? '—' : Number(x).toFixed(n).replace('.', ',');
   const titulo = s => String(s || '').toLowerCase().replace(/(^|[\s(\-])([a-záéíóúñü])/g, (m, a, b) => a + b.toUpperCase()).replace(/\b(De|Del|La|Las|Los|Y|El|En)\b/g, w => w.toLowerCase()).replace(/^(\w)/, c => c.toUpperCase());
@@ -71,6 +71,82 @@
     </details>`;
   }
 
+  /* ── Mapa: iglesias de barrio donde coincide su voto (oct-27-2026) ─────────
+     Pedido de Ricardo para Emel Rojas: no la correlación de toda la ciudad sino
+     el mapa de las iglesias PEQUEÑAS (las de barrio) y en cuáles su votación
+     del Concejo 2023 rinde por encima de su promedio. Las redes grandes (G12 de
+     los Castellanos, Iglesia de Dios Ministerial del MIRA, Manantial, El Lugar de
+     su Presencia, Casa sobre la Roca, Bethesda, Universal) van en gris: son
+     estructura electoral de otros. Todo se calcula aquí con `mapa` del JSON. */
+  const RADIO = 500, MIN_VOTOS = 40, UMBRAL = 1.2;
+  const dist = (a, b, c, d) => { const R = 6371000, r = Math.PI / 180, dp = (c - a) * r, dl = (d - b) * r; const h = Math.sin(dp / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin(dl / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+  const nf = n => Math.round(n).toLocaleString('es-CO');
+  const TILDE_LOC = { Fontibon: 'Fontibón', Engativa: 'Engativá', Usaquen: 'Usaquén', 'Ciudad Bolivar': 'Ciudad Bolívar', 'Los Martires': 'Los Mártires', 'Antonio Narino': 'Antonio Nariño', 'San Cristobal': 'San Cristóbal' };
+  const nomIg = n => !n ? 'Iglesia sin nombre en el mapa' : n === n.toLowerCase() ? titulo(n) : n;
+  function cruce(D, slug) {
+    const M = D.mapa; if (!M?.votos?.[slug]) return null;
+    const V = M.votos[slug], P = M.puestos;
+    const totV = P.reduce((s, p) => s + (V[p[0]] || 0), 0), totVal = P.reduce((s, p) => s + p[3], 0), media = totV / totVal;
+    /* OSM repite templos: el mismo punto con dos nombres («Iglesia Emmanuel» e
+       «Iglesia Evangélica Emmanuel»). A menos de 60 m se funden. */
+    const GEN = new Set(['IGLESIA', 'CRISTIANA', 'CRISTIANO', 'EVANGELICA', 'CENTRO', 'COMUNIDAD', 'MINISTERIO', 'MINISTERIOS', 'INTERNACIONAL', 'SEDE', 'COLOMBIA', 'DIOS']);
+    const propias = n => new Set(String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().split(/[^A-Z]+/).filter(w => w.length > 3 && !GEN.has(w)));
+    const igl = [];
+    M.iglesias.forEach(([lat, lon, nombre, grande, red]) => {
+      const pn = propias(nombre);
+      const dup = igl.find(x => x.grande === !!grande && (dist(lat, lon, x.lat, x.lon) < 40 ||
+        (dist(lat, lon, x.lat, x.lon) < 150 && [...pn].some(w => propias(x.nombre).has(w)))));
+      if (dup) { if ((nombre || '').length > dup.nombre.length) dup.nombre = nombre; return; }
+      igl.push({ lat, lon, nombre: nombre || '', grande: !!grande, red: red || '' });
+    });
+    igl.forEach(x => {
+      const cerca = P.filter(p => dist(x.lat, x.lon, p[1], p[2]) <= RADIO);
+      x.v = cerca.reduce((s, p) => s + (V[p[0]] || 0), 0);
+      x.val = cerca.reduce((s, p) => s + p[3], 0);
+      x.ratio = x.val ? (x.v / x.val) / media : null;
+      const loc = {}; cerca.forEach(p => { if (p[4]) loc[p[4]] = (loc[p[4]] || 0) + p[3]; });
+      x.loc = Object.entries(loc).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+      x.loc = TILDE_LOC[x.loc] || x.loc;
+    });
+    const coinc = igl.filter(x => !x.grande && x.ratio >= UMBRAL && x.v >= MIN_VOTOS).sort((a, b) => b.ratio - a.ratio);
+    coinc.forEach((x, i) => { x.n = i + 1; });
+    const puestos = P.map(p => ({ p: p[0], lat: p[1], lon: p[2], val: p[3], loc: TILDE_LOC[p[4]] || p[4], v: V[p[0]] || 0, ratio: p[3] ? ((V[p[0]] || 0) / p[3]) / media : 0 }));
+    return { media, igl, coinc, puestos, pequenas: igl.filter(x => !x.grande).length, grandes: igl.filter(x => x.grande) };
+  }
+  function htmlMapa(D, propio, C) {
+    const redes = [...new Set(C.grandes.map(g => g.red))];
+    const filas = C.coinc.slice(0, 12).map(x => `<tr><td class="ig-n">${x.n}</td><td>${esc(nomIg(x.nombre))}<small>${esc(x.loc)}</small></td><td><b>${dec(x.ratio)}×</b></td><td>${nf(x.v)}</td></tr>`).join('');
+    return `<div class="panel estr-bloque ig-mapa-bloque"><span class="panel-num">Estratégico · iglesias de barrio</span>
+      <h3>¿En qué iglesias pequeñas coincide su voto?</h3>
+      <p class="ig-veredicto">De ${C.pequenas} iglesias cristianas de barrio que tiene el mapa de Bogotá, en <b>${C.coinc.length}</b> su votación al Concejo 2023 en los puestos a ${RADIO} m rinde al menos ${dec(UMBRAL, 1)} veces su promedio de la ciudad, con ${MIN_VOTOS} votos o más. Son las puertas naturales: comunidades pequeñas en barrios donde usted ya tiene votos.</p>
+      <div class="ig-mapa-cols"><div><div class="ig-mapa" id="igMapa"></div>
+      <div class="ig-ley"><span><i class="pu bajo"></i>puesto donde rinde menos que su promedio</span><span><i class="pu alto"></i>donde rinde más</span><span><i class="ig peq"></i>iglesia de barrio</span><span><i class="ig num">1</i>coincide con su voto</span><span><i class="ig gra"></i>red grande, de otros</span></div></div>
+      <div><table class="ig-coinc"><thead><tr><th>#</th><th>Iglesia</th><th>Rinde</th><th>Sus votos</th></tr></thead><tbody>${filas || '<tr><td colspan="4">Ninguna iglesia pequeña pasa el umbral.</td></tr>'}</tbody></table></div></div>
+      <p class="helper"><b>Rinde:</b> su participación en los puestos a ${RADIO} m de la iglesia dividida por su participación en toda la ciudad (${dec(C.media * 100, 2)} % de los votos válidos). <b>Sus votos:</b> los que sacó en esos puestos. En gris, las redes grandes que tienen estructura electoral propia y no son terreno a disputar: ${esc(redes.join(' · '))}.</p>
+      <p class="helper">⚠ Describe el territorio, no a las personas: que haya una iglesia cerca de un puesto donde usted saca votos no dice que quienes van a esa iglesia votaron por usted. Las iglesias salen de OpenStreetMap, que registra una parte: muchas congregaciones funcionan en locales que ningún mapa tiene.</p></div>`;
+  }
+  function pintarMapa(C) {
+    const el = document.getElementById('igMapa'); if (!el || !global.L) return;
+    const L = global.L;
+    const m = L.map(el, { zoomControl: true, scrollWheelZoom: false, attributionControl: true }).setView([4.64, -74.1], 11);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, opacity: .45, attribution: '&copy; OpenStreetMap' }).addTo(m);
+    const vmax = Math.max(...C.puestos.map(p => p.v)) || 1;
+    C.puestos.forEach(p => {
+      if (!p.v) return;
+      L.circleMarker([p.lat, p.lon], { radius: 2 + 7 * Math.sqrt(p.v / vmax), stroke: false, fillOpacity: p.ratio >= 1 ? .55 : .35,
+        fillColor: p.ratio >= 1.5 ? '#0d5a51' : p.ratio >= 1 ? '#3f9d8a' : '#9fb3c4' })
+        .bindTooltip(`${esc(p.loc)} · puesto ${esc(p.p)}<br>${nf(p.v)} votos · rinde ${dec(p.ratio)}×`).addTo(m);
+    });
+    C.igl.filter(x => x.grande).forEach(x => L.circleMarker([x.lat, x.lon], { radius: 5, color: '#fff', weight: 1.5, fillColor: '#8a8f96', fillOpacity: .9 })
+      .bindTooltip(`${esc(x.nombre)}<br>Red grande: ${esc(x.red)}`).addTo(m));
+    C.igl.filter(x => !x.grande && !x.n).forEach(x => L.circleMarker([x.lat, x.lon], { radius: 4.5, color: '#fff', weight: 1.2, fillColor: '#ef705d', fillOpacity: .85 })
+      .bindTooltip(`${esc(nomIg(x.nombre))}${x.val ? `<br>${nf(x.v)} votos suyos a ${RADIO} m · rinde ${dec(x.ratio)}×` : ''}`).addTo(m));
+    C.coinc.forEach(x => L.marker([x.lat, x.lon], { icon: L.divIcon({ className: 'ig-pin', html: `<span>${x.n}</span>`, iconSize: [24, 24], iconAnchor: [12, 12] }), zIndexOffset: 1000 })
+      .bindTooltip(`<b>${esc(nomIg(x.nombre))}</b><br>${esc(x.loc)}<br>${nf(x.v)} votos suyos a ${RADIO} m · rinde ${dec(x.ratio)}×`).addTo(m));
+    /* Leaflet mide su caja al crearse: se reencuadra después del layout. */
+    setTimeout(() => { m.invalidateSize(); m.fitBounds([[4.48, -74.22], [4.8, -74.02]]); }, 0);
+  }
+
   function estilos() {
     if (document.getElementById('c360IglesiasCss')) return;
     const s = document.createElement('style'); s.id = 'c360IglesiasCss';
@@ -87,6 +163,19 @@
 .ig-tabla td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}.ig-tabla td small{display:block;opacity:.65;font-size:11px}
 .ig-yo td{background:rgba(240,180,95,.18)}.ig-sig{color:var(--green);font-weight:700}`;
     document.head.appendChild(s);
+    const t = document.createElement('style'); t.id = 'c360IglesiasMapaCss';
+    t.textContent = `.ig-mapa-bloque h3{margin:6px 0 8px}.ig-mapa-cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start;margin:10px 0}
+.ig-mapa{height:440px;border:1px solid var(--line)}
+.ig-ley{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--muted);margin-top:8px}.ig-ley span{display:inline-flex;align-items:center;gap:5px}
+.ig-ley i{display:inline-block;width:11px;height:11px;border-radius:50%}.ig-ley .pu.bajo{background:#9fb3c4}.ig-ley .pu.alto{background:#3f9d8a}
+.ig-ley .ig.peq{background:#ef705d;border:1.5px solid #fff;box-shadow:0 0 0 1px #ef705d}.ig-ley .ig.gra{background:#8a8f96}
+.ig-ley .ig.num{width:16px;height:16px;background:#102238;color:#fff;font:700 9.5px/16px var(--sans);text-align:center;font-style:normal}
+.ig-coinc{width:100%;border-collapse:collapse;font-size:13px}.ig-coinc th{text-align:left;font:500 10px var(--mono);text-transform:uppercase;letter-spacing:.06em;padding:6px;border-bottom:1px solid var(--line)}
+.ig-coinc td{padding:7px 6px;border-bottom:1px solid var(--line);vertical-align:top}.ig-coinc td small{display:block;color:var(--muted);font-size:11px}
+.ig-n{font-weight:800;color:#ef705d}
+.ig-pin span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#102238;color:#fff;font:700 11px var(--sans);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+@media(max-width:900px){.ig-mapa-cols{grid-template-columns:1fr}.ig-mapa{height:360px}}`;
+    document.head.appendChild(t);
   }
 
   /* `slugs`: las candidaturas de la persona (actual + historial). */
@@ -96,8 +185,11 @@
     const propio = D.candidatos.find(c => slugs.includes(c.slug)); if (!propio) return;
     if (!cont.isConnected || !vigente() || cont.querySelector('.ig-toggle')) return;
     estilos();
+    const C = cruce(D, propio.slug);
+    if (C) cont.insertAdjacentHTML('beforeend', htmlMapa(D, propio, C));
     cont.insertAdjacentHTML('beforeend', html(D, propio));
+    if (C) pintarMapa(C);
   }
 
-  global.C360Iglesias = { montar, veredicto };
+  global.C360Iglesias = { montar, veredicto, cruce };
 })(window);

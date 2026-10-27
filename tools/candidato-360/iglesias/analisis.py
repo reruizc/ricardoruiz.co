@@ -85,6 +85,35 @@ DEN_NO_CATOLICA = {'protestant', 'evangelical', 'pentecostal', 'baptist', 'seven
 DEN_OTRA_CRISTIANA = {'jehovahs_witness', 'mormon', 'greek_orthodox', 'orthodox', 'christ_scientist',
                       'russian_orthodox', 'new_apostolic'}
 
+# Iglesias grandes: redes con muchas sedes y, varias, con estructura electoral
+# propia. No son terreno a disputar para una candidatura cristiana de otra red
+# (el G12 es de los Castellanos; la Iglesia de Dios Ministerial, del MIRA).
+GRANDES = [
+    (r'mision carismatica|\bg12\b|\bmci\b', 'G12 · Misión Carismática Internacional'),
+    (r'ministerial', 'Iglesia de Dios Ministerial · MIRA'),
+    (r'manantial de vida eterna', 'Manantial de Vida Eterna'),
+    (r'lugar de su presencia', 'El Lugar de su Presencia'),
+    (r'casa sobre la roca', 'Casa sobre la Roca'),
+    (r'bethesda|betesda', 'Centro Misionero Bethesda'),
+    (r'universal', 'Iglesia Universal del Reino de Dios'),
+]
+
+
+def red_grande(nombre):
+    n = norm(nombre)
+    for rx, red in GRANDES:
+        if re.search(rx, n):
+            return [1, red]
+    return [0, '']
+
+
+def titulo_lugar(s):
+    s = str(s or '').strip()
+    if not s or s.upper() == 'NULL':
+        return ''
+    return ' '.join(w if w in ('de', 'del', 'la', 'las', 'los', 'y', 'el') else w.capitalize() for w in s.lower().split())
+
+
 def norm(s):
     s = unicodedata.normalize('NFD', s or '')
     return ''.join(c for c in s if unicodedata.category(c) != 'Mn').lower()
@@ -302,7 +331,7 @@ def main():
         if z in ZONAS_FUERA or p not in coords or val <= 0:
             continue
         lat, lon, nom, com = coords[p]
-        filas.append({'puesto': p, 'zona': z, 'lat': lat, 'lon': lon, 'nombre': nom, 'validos': val,
+        filas.append({'puesto': p, 'zona': z, 'lat': lat, 'lon': lon, 'nombre': nom, 'com': com, 'validos': val,
                       'estrato': estr.get(pb.get(p))})
     P = pd.DataFrame(filas)
     val_tot = sum(validos.values())
@@ -337,6 +366,7 @@ def main():
           f'cuartil bajo: {int(bajo.sum())} puestos (media {P.nc_1000[bajo].mean():.2f})')
     cerca_idmji = P.idmji_1000 > 0
 
+    votos_mapa = {}
     for slug, grupo, nota in CANDIDATOS:
         c = candidato(slug)
         porp = defaultdict(int)
@@ -349,6 +379,7 @@ def main():
         X = P.copy()
         X['v'] = X.puesto.map(porp).fillna(0)
         X['part'] = X.v / X.validos * 100  # en puntos porcentuales
+        votos_mapa[slug] = {p: int(v) for p, v in zip(X.puesto, X.v) if v > 0}
         cubre = X.v.sum() / c['votos']
 
         rho5, p5 = spearmanr(X.part, X.nc_500)
@@ -474,6 +505,20 @@ def main():
         'candidatos': resultados,
         'iglesias_no_catolicas': [[round(r.lat, 5), round(r.lon, 5), r.nombre] for r in nc.itertuples()],
         'puestos_nc_500': {r.puesto: int(r.nc_500) for r in P.itertuples()},
+        # Capa del mapa (oct-27-2026, pedido de Ricardo para Emel Rojas): las
+        # iglesias no católicas de Bogotá marcadas grande/pequeña, y los votos de
+        # cada candidato por puesto, para que el panel cruce en el navegador
+        # cuánto rinde cada candidatura alrededor de cada iglesia pequeña.
+        'mapa': {
+            'puestos': [[r.puesto, round(r.lat, 5), round(r.lon, 5), int(r.validos), titulo_lugar(r.com)] for r in P.itertuples()],
+            'votos': votos_mapa,
+            'iglesias': [[round(r.lat, 5), round(r.lon, 5), r.nombre, *red_grande(r.nombre)]
+                         for r in nc.itertuples() if r.bog and not re.search(r'\bcolegio\b', norm(r.nombre))],
+            'nota_grandes': 'Grandes: redes con muchas sedes y estructura electoral propia (Misión Carismática '
+                            'Internacional-G12, Iglesia de Dios Ministerial-MIRA, Manantial de Vida Eterna, El Lugar de '
+                            'su Presencia, Casa sobre la Roca, Centro Misionero Bethesda, Iglesia Universal). El resto, '
+                            'congregaciones de barrio. Criterio del equipo, por nombre.',
+        },
     }
     txt = json.dumps(salida, ensure_ascii=False, separators=(',', ':'))
     SALIDA.write_text(txt)
