@@ -730,6 +730,16 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
     Voto en su Lugar · Lealtad Cercana. Subido a S3 (`?v=20261027`); verificado que
     solo cambian esos tres campos. El panel 05 muestra el técnico debajo del nombre.
 
+- **Tarjeta 11, ajustes (27-oct-2026, b).** La línea «La estrategia es el caparazón…»
+  va en Archivo Narrow (Google Fonts, cargada en candidato-360.html) para que quepa en
+  un renglón. Junto al título hay un «?» (`mostrarAyudaEstr`, `#crmEstrAyuda`) que
+  explica la idea central, los temas y la acción de la semana; el guardia de la vitrina
+  lo deja pasar. El pie de «Esta semana» dice solo «Ver fuente: {medio}» con el enlace
+  (el titular va en el `title`). En el aviso de la vista ampliada cada una de las 8
+  estrategias lleva su pictograma: `assets/candidato-360/estrategias/A1.svg`…`A8.svg`
+  (SVG a mano, 240×160, misma paleta de las imágenes de las fases; el archivo se llama
+  como el `id` del principio en el banco).
+
 ### 10.3 Candi (Luna)
 
 Candi es la guía de la plataforma y es **Luna, la perrita de Ricardo**, en 3D
