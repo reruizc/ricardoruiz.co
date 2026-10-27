@@ -645,6 +645,9 @@ etapa() {
   etapa --nombre entidades_cce --timeout 900 \
         --desc "Colombia Compra: convocatorias, circulares, conceptos (solo lo nuevo) y capacitaciones" \
         -- python3 tools/caudal/entidades/harvest_cce.py fetch
+  etapa --nombre entidades_sic --timeout 900 \
+        --desc "SIC: proyectos propios, abogacía de la competencia y eventos" \
+        -- python3 tools/caudal/entidades/harvest_sic.py fetch
   etapa --nombre entidades_build --timeout 600 \
         --desc "entidades → borradores/normas/eventos.jsonl → S3 (no encoge a menos de la mitad)" \
         -- python3 tools/caudal/entidades/build.py --subir

@@ -143,8 +143,33 @@ def fuente_cce():
     return borr, normas, eventos
 
 
+def fuente_sic():
+    """SIC: sus proyectos propios (los de SUCOP los deduplica la Lambda), los
+    conceptos de abogacía de la competencia y sus eventos. Las circulares y
+    resoluciones generales ya van por el pilar Regulatorio."""
+    raw = C.RAW / 'sic'
+    ent, sector, fuente = 'Superintendencia de Industria y Comercio', 'Comercio, Industria y Turismo', 'sic'
+    hoy = datetime.date.today().isoformat()
+    items = (C.leer(raw / 'proyectos.json', {}) or {}).get('items', {})
+    borr = []
+    for r in items.values():
+        b = borrador_sucop(r, ent, sector, fuente, hoy)
+        if r.get('objeto'):
+            b['objeto'] = r['objeto']
+        borr.append(b)
+    normas = []
+    for r in (C.leer(raw / 'normas.json', {}) or {}).get('items', []):
+        n = norma_ejecutivo(r, ent, fuente)
+        n['entidad_regulada'] = r.get('entidad_regulada') or ''
+        normas.append(n)
+    eventos = [{**e, 'entidad': ent, 'fuente': fuente, 'q': _q(e.get('titulo'), e.get('descripcion'),
+                                                               ' '.join(e.get('categorias') or []))}
+               for e in (C.leer(raw / 'eventos.json', {}) or {}).get('items', [])]
+    return borr, normas, eventos
+
+
 FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), ('ssf', fuente_ssf),
-           ('cce', fuente_cce)]
+           ('cce', fuente_cce), ('sic', fuente_sic)]
 
 
 def build():

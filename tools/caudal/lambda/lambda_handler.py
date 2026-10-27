@@ -1218,10 +1218,13 @@ def _sucop():
     except Exception:
         recs = []
     # Borradores que las entidades publican FUERA de SUCOP (MinSalud sacó los
-    # suyos de 2026). Mismo formato; si un título ya está en SUCOP, manda SUCOP.
-    vistos = {(r.get('q') or '')[:120] for r in recs}
+    # suyos de 2026). Mismo formato; si el borrador ya está en SUCOP, manda
+    # SUCOP. Se compara el EPÍGRAFE normalizado desde «por la cual»: cada portal
+    # le antepone cosas distintas («Proyecto Normativo:», comillas, el tipo).
+    vistos = {_clave_borrador(r.get('titulo') or r.get('objeto')) for r in recs}
+    vistos.discard('')
     for r in ent_borr:
-        if (r.get('q') or '')[:120] not in vistos:
+        if _clave_borrador(r.get('titulo') or r.get('objeto')) not in vistos:
             recs.append(dict(r))
     for r in recs:
         ec, dias = _sucop_estado_consulta(r.get('fecha_inicio'), r.get('fecha_fin'),
@@ -1230,6 +1233,14 @@ def _sucop():
         r['dias_restantes'] = dias
     _SUCOP = ((hoy, id(ent_borr)), recs)
     return recs
+
+
+def _clave_borrador(t):
+    f = _fold_q(t or '')
+    m = re.search(r'\bpor (?:medio de )?(?:la|el) cual\b', f)
+    if m:
+        f = f[m.start():]
+    return re.sub(r'[^a-z0-9]', '', f)[:90]
 
 
 def _sucop_dias_desde_epoca(f):
