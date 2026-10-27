@@ -2028,6 +2028,24 @@ Doc completa en `tools/candidato-360/briefing/README.md`.
   Fuerza Aérea por estar ubicadas en Bogotá.
 - La meta de votos se guarda en `campana.meta` (la escribe `pintarMeta`).
 
+### Correo revisado a una candidatura, con adjuntos (`/c360/correo/enviar` · oct-27-2026)
+El briefing que Ricardo revisa y manda a mano (el primero, Emel Rojas, el 27-oct-2026):
+PDF para leer, Word para editar y el correo con la estructura del brief de Cauce.
+- Ruta de servicio `POST /c360/correo/enviar` en `rr-auth`, con el token de briefs
+  (`CAUDAL_BRIEFS_TOKEN`). Asunto con la marca «Candidato 360 ·» (la de Caudal anteponía
+  «Caudal ·») y **solo a `C360_CORREO_DESTINATARIOS`**, la lista que Ricardo autoriza uno
+  por uno en `rr-auth/src/index.js`. No enciende el briefing automático del vínculo.
+- Se manda con el workflow «Mandar un brief ya escrito» de `reruizc/caudal-briefs`:
+  `enviar_brief.py` va por esta ruta cuando el JSON trae `_correo.producto: "c360"` y usa
+  `_correo.asunto` y `_correo.html` tal cual. Los archivos van en
+  `s3://caudal-legislativo/metadata/briefs/<preset>/Brief-<Preset>-<fecha>.{json,pdf,docx}`:
+  `gh workflow run enviar.yml -R reruizc/caudal-briefs -f preset=emel -f fecha=AAAA-MM-DD -f para=<correo>`.
+- Las imágenes del correo van a `congreso-2026/output/c360-correos/<token aleatorio>/` (público,
+  sin vencimiento: un enlace firmado vence en 7 días y rompía el correo). Son gráficos agregados.
+- El generador de cada entrega vive con el cliente, fuera de git (`Propuestas/emel-rojas/
+  briefing-AAAA-MM-DD/build_pdf.py` y `build_correo.py`), porque lleva etiquetas a mano.
+- Para autorizar otra candidatura: agregar su correo a `C360_CORREO_DESTINATARIOS` y desplegar.
+
 ### Precios y paquetes (decisión de Ricardo, sep-6-2026)
 Base por corporación + LEGO. **Cada módulo cuesta un 30% del plan base de su
 corporación**; el full lleva descuento. Anclaje: topes CNE 2023 (Alcaldía de
