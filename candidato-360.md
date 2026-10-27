@@ -1902,6 +1902,29 @@ con católicos, estrato y estrato², con robustez por efectos fijos de localidad
 - La lectura comparada y la conclusión práctica salen de reglas fijas
   (`veredicto` y `comparada`), no de un modelo.
 
+**Mapa de iglesias de barrio donde coincide el voto (oct-27-2026).** Pedido de
+Ricardo para Emel Rojas: no solo la correlación de toda la ciudad, sino en qué
+iglesias PEQUEÑAS rinde su voto. Va encima del toggle, en la misma pestaña
+Territorio y para las mismas 10 candidaturas del análisis.
+- `analisis.py` emite ahora `mapa`: los puestos (código, coordenada, válidos,
+  localidad), los votos de cada candidatura por puesto y las iglesias no
+  católicas de Bogotá marcadas grande o pequeña (`GRANDES`: G12 de los
+  Castellanos, Iglesia de Dios Ministerial del MIRA, Manantial, El Lugar de su
+  Presencia, Casa sobre la Roca, Bethesda, Universal; criterio del equipo, por
+  nombre). Ninguna cifra del análisis cambió (verificado clave por clave).
+- `cruce()` en `candidato-360-iglesias.js`: puestos a 500 m de cada iglesia,
+  su participación ahí contra la de toda la ciudad; «coincide» si rinde 1,2×
+  o más con 40 votos o más. Funde los templos repetidos de OSM (a menos de 40 m,
+  o de 150 m con una palabra propia del nombre en común). Emel: 115 pequeñas y 11
+  coincidencias; la primera, la Adventista Gerizim en Rafael Uribe Uribe (3,18×).
+- El mapa Leaflet se reencuadra a los puestos con votos con un ResizeObserver: la
+  vista de estrategia termina de armarse después de crearlo y el primer encuadre
+  salía alejado.
+- ⚠ OSM registra una parte de las iglesias pequeñas. Se buscó en datos.gov.co un
+  registro de entidades religiosas de Bogotá y no hay (solo Pereira); la vía es
+  pedir al Ministerio del Interior el Registro Público de Entidades Religiosas
+  con dirección y geocodificarlo.
+
 ### Candi · la guía de la plataforma (`candidato-360-candi.js` · sep-20-2026)
 
 > ⚠️ Escrita el 20-sep con la v2. Cambiaron cuatro cosas: **(1)** entra una vez
