@@ -922,7 +922,9 @@ def _ejecutivo_stats():
 
 
 def _ejecutivo():
-    """Lista slim de normativa del Ejecutivo (lazy — solo al buscar). Cache warm."""
+    """Lista slim de normativa del Ejecutivo (lazy — solo al buscar). Cache warm.
+    Suma las normas y conceptos de los ministerios con sitio propio (oct-2026),
+    que se releen cada hora (ver _entidades_jsonl)."""
     global _EJEC
     if _EJEC is None:
         try:
@@ -930,27 +932,34 @@ def _ejecutivo():
             _EJEC = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
         except Exception:
             _EJEC = []
-        # normas y conceptos de los ministerios con sitio propio (oct-2026):
-        # mismo formato, con `entidad` y `fuente`, y PDF de enlace permanente
-        _EJEC = _EJEC + _entidades_jsonl('normas')
-    return _EJEC
+    ent = _entidades_jsonl('normas')
+    if _EJEC_MIX[0] is not ent:
+        _EJEC_MIX[0], _EJEC_MIX[1] = ent, _EJEC + ent
+    return _EJEC_MIX[1]
+
+
+_EJEC_MIX = [None, []]
 
 
 # --- Entidades con sitio propio (oct-2026) ---------------------------------
 # Tres índices genéricos que arma tools/caudal/entidades/build.py (MinSalud
 # primero; cada entidad nueva entra ahí sin tocar la Lambda).
 _ENT_CACHE = {}
+ENT_TTL = 3600     # el cron sube 2x/día: un contenedor caliente no puede quedarse con el de ayer
 
 
 def _entidades_jsonl(nombre):
-    if nombre not in _ENT_CACHE:
+    viejo = _ENT_CACHE.get(nombre)
+    if viejo is None or _time.time() - viejo[0] > ENT_TTL:
         try:
             obj = _s3.get_object(Bucket=BUCKET, Key=f'metadata/entidades-{nombre}.jsonl')
-            _ENT_CACHE[nombre] = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
+            filas = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
         except Exception as e:
             print(f'[entidades] {nombre} FAIL: {type(e).__name__}: {e}')
-            _ENT_CACHE[nombre] = []
-    return _ENT_CACHE[nombre]
+            # si falla la relectura, se sigue con lo que había (no se vacía)
+            filas = viejo[1] if viejo else []
+        _ENT_CACHE[nombre] = (_time.time(), filas)
+    return _ENT_CACHE[nombre][1]
 
 
 # --- Diario Oficial · resoluciones, circulares y acuerdos (oct-2026) -------
@@ -1195,7 +1204,9 @@ def _sucop():
     """
     global _SUCOP
     hoy = _sucop_hoy()
-    if _SUCOP is not None and _SUCOP[0] == hoy:
+    ent_borr = _entidades_jsonl('borradores')
+    # se rehace al cambiar de día O cuando se relee el índice de entidades
+    if _SUCOP is not None and _SUCOP[0] == (hoy, id(ent_borr)):
         return _SUCOP[1]
     try:
         obj = _s3.get_object(Bucket=BUCKET, Key='metadata/sucop.jsonl')
@@ -1205,15 +1216,15 @@ def _sucop():
     # Borradores que las entidades publican FUERA de SUCOP (MinSalud sacó los
     # suyos de 2026). Mismo formato; si un título ya está en SUCOP, manda SUCOP.
     vistos = {(r.get('q') or '')[:120] for r in recs}
-    for r in _entidades_jsonl('borradores'):
+    for r in ent_borr:
         if (r.get('q') or '')[:120] not in vistos:
-            recs.append(r)
+            recs.append(dict(r))
     for r in recs:
         ec, dias = _sucop_estado_consulta(r.get('fecha_inicio'), r.get('fecha_fin'),
                                           r.get('estado'), hoy)
         r['estado_consulta'] = ec
         r['dias_restantes'] = dias
-    _SUCOP = (hoy, recs)
+    _SUCOP = ((hoy, id(ent_borr)), recs)
     return recs
 
 

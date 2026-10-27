@@ -40,6 +40,26 @@ def _q(*partes):
     return C.fold(' '.join(p for p in partes if p))
 
 
+def borrador_sucop(r, ent, sector, fuente, hoy):
+    """Un borrador cosechado → el formato de SUCOP que espera la Lambda."""
+    abierta = r.get('vigente_en_fuente') and (r.get('fecha_fin') or '') >= hoy
+    return {
+        'id': f"{fuente}-{r['id']}", 'codigo': '', 'tipo': 'norma',
+        'titulo': r['titulo'], 'objeto': r['titulo'], 'entidad': ent, 'sector': sector,
+        'tipo_norma': r.get('tipo_norma') or '', 'anio': (r.get('fecha_inicio') or r.get('creado') or '')[:4],
+        'estado': 'Activa' if abierta else 'Finalizada',
+        'estado_fuente': ('En consulta pública' if abierta else
+                          'Ya no está publicado por la entidad' if not r.get('vigente_en_fuente') else 'Cerrada'),
+        'estado_vista': 'En consulta pública' if abierta else 'Consulta cerrada',
+        'fecha_inicio': r.get('fecha_inicio') or '', 'fecha_fin': r.get('fecha_fin') or '',
+        'comentarios': 0, 'likes': 0, 'n_documentos': 1 + len(r.get('anexos') or []),
+        'url': _u(r.get('url')), 'creado': r.get('creado') or '', 'topicos': [],
+        'fuente': fuente, 'fuera_de_sucop': True, 'dependencia': r.get('dependencia') or '',
+        'comentarios_a': r.get('comentarios_a') or '', 'anexos': r.get('anexos') or [],
+        'q': _q(r['titulo'], ent, r.get('dependencia'), r.get('tipo_norma')),
+    }
+
+
 def fuente_minsalud():
     raw = C.RAW / 'minsalud'
     ent, sector, fuente = 'Ministerio de Salud y Protección Social', 'Salud y Protección Social', 'minsalud'
@@ -47,23 +67,7 @@ def fuente_minsalud():
     borr = []
     for nombre in ('proyectos', 'ain'):
         items = (C.leer(raw / f'{nombre}.json', {}) or {}).get('items', {})
-        for r in items.values():
-            abierta = r.get('vigente_en_fuente') and (r.get('fecha_fin') or '') >= hoy
-            borr.append({
-                'id': f"{fuente}-{r['id']}", 'codigo': '', 'tipo': 'norma',
-                'titulo': r['titulo'], 'objeto': r['titulo'], 'entidad': ent, 'sector': sector,
-                'tipo_norma': r.get('tipo_norma') or '', 'anio': (r.get('fecha_inicio') or r.get('creado') or '')[:4],
-                'estado': 'Activa' if abierta else 'Finalizada',
-                'estado_fuente': ('En consulta pública' if abierta else
-                                  'Ya no está publicado por la entidad' if not r.get('vigente_en_fuente') else 'Cerrada'),
-                'estado_vista': 'En consulta pública' if abierta else 'Consulta cerrada',
-                'fecha_inicio': r.get('fecha_inicio') or '', 'fecha_fin': r.get('fecha_fin') or '',
-                'comentarios': 0, 'likes': 0, 'n_documentos': 1 + len(r.get('anexos') or []),
-                'url': _u(r.get('url')), 'creado': r.get('creado') or '', 'topicos': [],
-                'fuente': fuente, 'fuera_de_sucop': True, 'dependencia': r.get('dependencia') or '',
-                'comentarios_a': r.get('comentarios_a') or '', 'anexos': r.get('anexos') or [],
-                'q': _q(r['titulo'], ent, r.get('dependencia'), r.get('tipo_norma')),
-            })
+        borr += [borrador_sucop(r, ent, sector, fuente, hoy) for r in items.values()]
     normas = []
     for r in (C.leer(raw / 'normas.json', {}) or {}).get('items', []):
         if r['tipo'] in NO_NORMAS or not (r.get('titulo') or r.get('descripcion')):
@@ -80,7 +84,16 @@ def fuente_minsalud():
     return borr, normas, eventos
 
 
-FUENTES = [('minsalud', fuente_minsalud)]
+def fuente_mincomercio():
+    """Solo borradores por ahora (punto 3 de la fase 1); sus normas expedidas
+    ya llegan por el Diario Oficial."""
+    ent, sector, fuente = 'Ministerio de Comercio, Industria y Turismo', 'Comercio, Industria y Turismo', 'mincomercio'
+    hoy = datetime.date.today().isoformat()
+    items = (C.leer(C.RAW / 'mincomercio' / 'proyectos.json', {}) or {}).get('items', {})
+    return [borrador_sucop(r, ent, sector, fuente, hoy) for r in items.values()], [], []
+
+
+FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio)]
 
 
 def build():

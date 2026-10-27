@@ -636,6 +636,9 @@ etapa() {
   etapa --nombre entidades_minsalud --timeout 900 \
         --desc "MinSalud por su API: borradores, AIN, normograma y calendario" \
         -- python3 tools/caudal/entidades/harvest_minsalud.py fetch
+  etapa --nombre entidades_mincomercio --timeout 300 \
+        --desc "MinComercio: proyectos de decreto, resolución y circular (fuera de SUCOP)" \
+        -- python3 tools/caudal/entidades/harvest_mincomercio.py fetch
   etapa --nombre entidades_build --timeout 600 \
         --desc "entidades → borradores/normas/eventos.jsonl → S3 (no encoge a menos de la mitad)" \
         -- python3 tools/caudal/entidades/build.py --subir
