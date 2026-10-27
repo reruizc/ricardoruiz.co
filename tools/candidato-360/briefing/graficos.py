@@ -149,7 +149,8 @@ def zonas(ciclo, ruta):
         p = fila.iloc[0].geometry.representative_point()
         ax.scatter([p.x], [p.y], s=330, color=CORAL, edgecolor=CREMA, linewidth=1.6, zorder=5)
         ax.text(p.x, p.y, str(i + 1), ha='center', va='center', fontsize=10.5, fontweight='bold', color='white', zorder=6)
-        ax.annotate(_titulo(u['nombre']), (p.x, p.y), xytext=(13, -2), textcoords='offset points', fontsize=10, fontweight='bold', color=TINTA, zorder=6)
+        # Solo el número: el nombre va en la lista de abajo (pedido de Ricardo,
+        # oct-27-2026: los rótulos oscuros sobre el mapa hacían ruido).
     fig.subplots_adjust(left=.02, right=.98, top=.86, bottom=.13)
     fig.text(.04, .97, 'Dónde estar esta semana', ha='left', va='top', fontsize=14.5, fontweight='bold', color=TINTA)
     fig.text(.04, .905, 'Cuánto pesa cada localidad en la prioridad de este ciclo. Más oscuro, más peso.', ha='left', va='top', fontsize=10.5, color=MUTED)
