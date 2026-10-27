@@ -282,9 +282,13 @@ def main():
                              'base64': base64.b64encode(fh.read()).decode('ascii')})
 
     hasta = (meta.get('ventana') or {}).get('hasta', '')
+    # Un brief que no es de Caudal (el briefing de una candidatura de Candidato
+    # 360, oct-27-2026) trae su correo YA armado en `_correo` {asunto, html}: el
+    # workflow lo manda por el mismo camino, sin pasar por la plantilla de Caudal.
+    propio = b.get('_correo') or {}
     payload = {
-        'asunto': asunto(b),
-        'html': cuerpo_html(b),
+        'asunto': propio.get('asunto') or asunto(b),
+        'html': propio.get('html') or cuerpo_html(b),
         'para': para,
         'etiqueta': f"brief-{(meta.get('cliente') or 'cliente').lower()}-{hasta}",
         'adjuntos': adjuntos,
