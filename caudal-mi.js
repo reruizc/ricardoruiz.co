@@ -255,6 +255,50 @@ function ctxGuardar(){
     temas:(cl.temas&&cl.temas.length?cl.temas:fuente.temas)||[], nombres, entidades:fuente.interlocutores||[]};
   try{ sessionStorage.setItem('caudal-ctx',JSON.stringify(ctx)); }catch(e){}
 }
+/* ══ Las dos alertas del panel ════════════════════════════════════════════
+   1 · Normas que la prensa cita (con número y año) y que Caudal no encuentra
+       en el Ejecutivo, el Diario Oficial, el sitio de la entidad ni el
+       Regulatorio. Puede ser que aún no se publiquen, o un hueco nuestro.
+   2 · Tus entidades: qué lee Caudal de cada interlocutor del cliente y qué no,
+       con el porqué. Sale del catálogo tools/caudal/entidades/catalogo.py. */
+const AL_EST={conectada:'Conectada',parcial:'Parcial',sin_fuente:'Sin fuente',sin_revisar:'Sin revisar',no_aplica:'No aplica'};
+function alertasPintar(){
+  const d=HOY_D||{}, cob=d.cobertura||[], np=d.normas_prensa||{}, faltan=np.no_encontradas||[];
+  const b=$('hoy-alertas-b'), n=$('hoy-alertas-n'), box=$('hoy-alertas'), av=$('hoy-aviso-normas');
+  if(!b||!box) return;
+  const huecos=cob.filter(e=>e.estado==='sin_fuente'||e.estado==='sin_revisar').length;
+  b.hidden=!(cob.length||np.revisados);
+  n.textContent=(faltan.length+huecos)||'';
+  av.innerHTML=faltan.length
+    ? `<div class="hoy-aviso">La prensa cita ${faltan.length===1?'una norma':faltan.length+' normas'} que todavía no aparece${faltan.length===1?'':'n'} en las fuentes oficiales que Caudal lee: <b>${faltan.map(x=>esc(x.norma)).join(' · ')}</b>.<button type="button" data-al-ver>Ver el detalle</button></div>`
+    : '';
+  const v=av.querySelector('[data-al-ver]'); if(v) v.onclick=()=>alertasToggle(true);
+  const normas=faltan.length
+    ? faltan.map(x=>{ const u=safeUrl(x.url); return `<div class="al-norma"><b>${esc(x.norma)}</b><div>${u?`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(x.titulo)}</a>`:esc(x.titulo)}</div><div>${esc([x.medio,(x.fecha||'').slice(0,10)].filter(Boolean).join(' · '))}</div></div>`; }).join('')
+      +'<p class="al-sub">Puede que la entidad aún no la publique, o que su fuente no esté conectada a Caudal. Se vuelve a revisar con cada actualización.</p>'
+    : `<p class="al-sub">${np.revisados?`Revisamos ${np.revisados} titulares sobre sus temas e interlocutores. ${np.citas?`Las ${np.citas===1?'una norma citada está':np.citas+' normas citadas están'} en las fuentes oficiales.`:'Ninguno cita una norma con número y año.'}`:'Sin titulares para revisar hoy.'}</p>`;
+  const ent=cob.map(e=>{
+    const c=e.conteos||{}, nums=[];
+    if(c.borradores_abiertos) nums.push(`${c.borradores_abiertos} borrador${c.borradores_abiertos===1?'':'es'} abierto${c.borradores_abiertos===1?'':'s'}`);
+    if(c.eventos_por_venir) nums.push(`${c.eventos_por_venir} evento${c.eventos_por_venir===1?'':'s'} por venir`);
+    if(c.diario_oficial_anio) nums.push(`${c.diario_oficial_anio} actos en el Diario Oficial este año`);
+    const nom=e.nombre!==e.interlocutor?`${esc(e.nombre)}`:esc(e.interlocutor);
+    return `<div class="al-ent"><div class="al-ent-t"><span>${nom}</span><span class="al-est ${esc(e.estado)}">${esc(AL_EST[e.estado]||e.estado)}</span></div>
+      ${e.cubre&&e.cubre.length?`<p><b>Caudal lee:</b> ${esc(e.cubre.join(' · '))}</p>`:''}
+      ${e.falta&&e.falta.length?`<p><b>Falta:</b> ${esc(e.falta.join(' · '))}</p>`:''}
+      ${e.nota?`<p class="n">${esc(e.nota)}</p>`:''}
+      ${nums.length?`<p class="n">${esc(nums.join(' · '))}</p>`:''}</div>`;}).join('');
+  box.innerHTML=`<div class="al-h">Normas en prensa que no están en las fuentes oficiales</div>${normas}
+    <div class="al-h" style="margin-top:1.1rem">Tus entidades · qué vigila Caudal</div>
+    ${cob.length?`<p class="al-sub">Las entidades que este cliente sigue. «Parcial» quiere decir que se lee una parte; abajo dice cuál falta y por qué.</p><div class="al-ents">${ent}</div>`
+      :'<p class="al-sub">Este perfil no tiene entidades marcadas como interlocutores. Agrégalas en la ficha para ver qué cubre Caudal de cada una.</p>'}`;
+}
+function alertasToggle(abrir){
+  const box=$('hoy-alertas'), b=$('hoy-alertas-b'); if(!box||!b) return;
+  const on=typeof abrir==='boolean'?abrir:box.hidden;
+  box.hidden=!on; b.setAttribute('aria-expanded',String(on));
+  if(on) box.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
 function modsToggle(abrir){
   const box=$('hoy-modulos'), b=$('hoy-mods'); if(!box||!b) return;
   const on=typeof abrir==='boolean'?abrir:box.hidden;
@@ -421,7 +465,8 @@ async function hoyCargar(ctx, opt={}){
   HOY_CTX=ctx; HOY_L=null; if(!opt.mantener){ HOY_RUMBO=''; HOY_ACT=0; HOY_VER=false; }
   $('hoy').hidden=false;
   $('hoy-estado').textContent='';
-  if(!opt.mantener){ $('hoy-lectura').replaceChildren(); $('hoy-rumbos').replaceChildren();
+  if(!opt.mantener){ $('hoy-alertas').hidden=true; $('hoy-alertas-b').hidden=true; $('hoy-aviso-normas').replaceChildren();
+    $('hoy-lectura').replaceChildren(); $('hoy-rumbos').replaceChildren();
     $('hoy-senales').innerHTML=mar(['Leyendo el Congreso y los reguladores…','Escuchando la prensa y las redes…','Buscando consultas abiertas y eventos…']); }
   let req;
   if(ctx.empresa){
@@ -455,7 +500,7 @@ async function hoyCargar(ctx, opt={}){
   if(mine!==hoyRev) return;
   if(d&&d.error){ $('hoy-estado').textContent=d.error; return; }
   // 1 · lo que no depende del modelo, ya
-  HOY_D=d; hoyRumbos(); hoySenales();
+  HOY_D=d; hoyRumbos(); hoySenales(); alertasPintar();
   // 2 · el titular
   if(d.lectura&&!d.lectura.error) return hoyTitular(d.lectura);
   if(!d.lectura_key){ $('hoy-estado').textContent='Abre la Rosa completa para la lectura del analista.'; return; }
@@ -524,7 +569,7 @@ async function init(){
   catch(e){$('status').textContent=e.status===401?'Inicia sesión para recuperar tu espacio.':e.message;$('welcome').hidden=e.status!==401;$('retry').hidden=e.status===401;}
 }
 $('tipo').addEventListener('change',organization);
-$('edit').onclick=()=>form(true);$('hoy-mods').onclick=()=>modsToggle();$('edit2').onclick=()=>form(true);$('mi-volver').onclick=()=>irEmpresa('');$('cancel').onclick=workspace;$('refresh').onclick=loadSector;$('retry').onclick=init;
+$('edit').onclick=()=>form(true);$('hoy-mods').onclick=()=>modsToggle();$('hoy-alertas-b').onclick=()=>alertasToggle();$('edit2').onclick=()=>form(true);$('mi-volver').onclick=()=>irEmpresa('');$('cancel').onclick=workspace;$('refresh').onclick=loadSector;$('retry').onclick=init;
 $('context-form').addEventListener('submit',async e=>{
   e.preventDefault();$('save').disabled=true;$('form-error').textContent='';
   try{state=await api('/caudal/cuenta',{tipo:$('tipo').value,organizacion:$('organizacion').value,sector:$('sector').value,rol:$('rol').value});workspace();$('context-title').tabIndex=-1;$('context-title').focus();}

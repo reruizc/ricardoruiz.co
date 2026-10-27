@@ -172,6 +172,52 @@ FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), (
            ('cce', fuente_cce), ('sic', fuente_sic)]
 
 
+def _es_de(alias, nombre):
+    """Las siglas cortas («dian», «sena») solo como palabra completa."""
+    import re
+    n = C.fold(nombre)
+    if not n:
+        return False
+    for a in alias:
+        if len(a) <= 6:
+            if re.search(r'\b' + re.escape(a) + r'\b', n):
+                return True
+        elif a in n or (len(n) >= 8 and n in a):
+            return True
+    return False
+
+
+def catalogo(borr, normas, eventos):
+    """El catálogo de cobertura con sus conteos de hoy (ver catalogo.py)."""
+    import catalogo as K
+    hoy = datetime.date.today().isoformat()
+    anio = hoy[:4]
+    do = []
+    p = C.REPO / 'Bases de datos' / 'leyes-senado' / 'ejecutivo' / 'dist' / 'diario-oficial-actos.jsonl'
+    if p.exists():
+        for l in p.open(encoding='utf-8'):
+            r = json.loads(l)
+            if r.get('anio') == anio and not r.get('administrativo') and r.get('seccion') == 'oficial':
+                do.append(r.get('entidad') or '')
+    out = []
+    for e in K.CATALOGO:
+        al = [C.fold(a) for a in e['alias']]
+        c = {'diario_oficial_anio': sum(1 for x in do if _es_de(al, x)),
+             'borradores_abiertos': sum(1 for b in borr if _es_de(al, b['entidad'])
+                                        and b['estado'] == 'Activa'),
+             'normas_anio': sum(1 for n in normas if _es_de(al, n['entidad']) and n.get('anio') == anio
+                                and not n.get('administrativo')),
+             'eventos_por_venir': sum(1 for v in eventos if _es_de(al, v['entidad']) and (v.get('dia') or '') >= hoy)}
+        e = dict(e)
+        # si lo único que la cubre es el Diario Oficial y este año no publicó
+        # nada ahí, decir «parcial» sería prometer una cobertura que no existe
+        if e['cubre'] == [K.DO] and c['diario_oficial_anio'] == 0:
+            e['estado'], e['cubre'] = 'sin_fuente', []
+            e['nota'] = (e['nota'] + ' ' if e['nota'] else '') + f'No publicó actos en el Diario Oficial en {anio}.'
+        out.append({**e, 'alias': al, 'conteos': c})
+    return {'generado': datetime.datetime.now().isoformat(timespec='seconds'), 'anio': anio, 'entidades': out}
+
+
 def build():
     borr, normas, eventos, por = [], [], [], {}
     for k, fn in FUENTES:
@@ -192,6 +238,7 @@ def build():
         with (C.DIST / f'entidades-{nombre}.jsonl').open('w', encoding='utf-8') as fh:
             for r in filas:
                 fh.write(json.dumps(r, ensure_ascii=False) + '\n')
+    C.escribir(C.DIST / 'entidades-catalogo.json', catalogo(borr, normas, eventos))
     stats = {'generado': datetime.datetime.now().isoformat(timespec='seconds'), 'por_fuente': por,
              'n_borradores': len(borr), 'n_normas': len(normas), 'n_eventos': len(eventos)}
     C.escribir(C.DIST / 'entidades-stats.json', stats)
@@ -215,6 +262,9 @@ def subir(stats):
         subprocess.run(['aws', 's3', 'cp', str(C.DIST / f'entidades-{nombre}.jsonl'),
                         f's3://{BUCKET}/metadata/entidades-{nombre}.jsonl', '--content-type', 'application/json',
                         '--cache-control', 'private, max-age=300', '--only-show-errors'], check=True)
+    subprocess.run(['aws', 's3', 'cp', str(C.DIST / 'entidades-catalogo.json'),
+                    f's3://{BUCKET}/metadata/entidades-catalogo.json', '--content-type', 'application/json',
+                    '--cache-control', 'private, max-age=300', '--only-show-errors'], check=True)
     subprocess.run(['aws', 's3', 'cp', str(C.DIST / 'entidades-stats.json'),
                     f's3://{BUCKET}/metadata/entidades-stats.json', '--content-type', 'application/json',
                     '--cache-control', 'private, max-age=300', '--only-show-errors'], check=True)

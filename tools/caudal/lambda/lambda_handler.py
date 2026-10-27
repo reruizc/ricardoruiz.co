@@ -4573,6 +4573,150 @@ def _eventos_oficiales(s, cap=3):
     return out[:cap]
 
 
+# ── Las dos alertas del panel (fase 1 · punto 7 · oct-2026) ─────────────────
+# a) «Tus entidades»: qué lee Caudal de cada interlocutor del cliente y qué no.
+#    Sale de metadata/entidades-catalogo.json (tools/caudal/entidades/catalogo.py
+#    + conteos que suma build.py).
+# b) «La prensa cita una norma que no está en las fuentes oficiales»: normas con
+#    número Y año en titulares del cliente que no aparecen en el Ejecutivo, el
+#    Diario Oficial, el sitio de la entidad ni el Regulatorio. Sirve en dos
+#    sentidos: anticipa algo que aún no se publica y destapa un hueco nuestro.
+_CAT = [0.0, None]
+
+
+def _catalogo_entidades():
+    if _CAT[1] is None or _time.time() - _CAT[0] > ENT_TTL:
+        try:
+            _CAT[1] = _get_json('metadata/entidades-catalogo.json')
+        except Exception as e:
+            print(f'[catalogo] FAIL: {type(e).__name__}: {e}')
+            _CAT[1] = _CAT[1] or {'entidades': []}
+        _CAT[0] = _time.time()
+    return _CAT[1]
+
+
+def _alias_en(alias, texto):
+    """Las siglas cortas («dian», «sena») solo como palabra completa."""
+    n = _fold_q(texto)
+    if not n:
+        return False
+    for a in alias:
+        if len(a) <= 6:
+            if re.search(r'\b' + re.escape(a) + r'\b', n):
+                return True
+        elif a in n or (len(n) >= 8 and n in a):
+            return True
+    return False
+
+
+def _cobertura_para_perfil(s):
+    cat = _catalogo_entidades()
+    out, vistas = [], set()
+    for x in (s.get('interlocutores') or []):
+        e = next((e for e in cat.get('entidades', []) if _alias_en(e.get('alias') or [], x)), None)
+        if e:
+            if e['k'] in vistas:
+                continue
+            vistas.add(e['k'])
+            out.append({'interlocutor': x, 'k': e['k'], 'nombre': e['nombre'], 'estado': e['estado'],
+                        'cubre': e.get('cubre') or [], 'falta': e.get('falta') or [],
+                        'nota': e.get('nota') or '', 'conteos': e.get('conteos') or {}})
+        else:
+            out.append({'interlocutor': x, 'k': '', 'nombre': x, 'estado': 'sin_revisar', 'cubre': [],
+                        'falta': ['Caudal todavía no ha revisado sus fuentes'], 'nota': '', 'conteos': {}})
+    orden = {'sin_fuente': 0, 'sin_revisar': 1, 'parcial': 2, 'conectada': 3, 'no_aplica': 4}
+    out.sort(key=lambda e: orden.get(e['estado'], 9))
+    return out
+
+
+NORMA_CITA_RE = re.compile(
+    r'\b(decreto(?:\s+legislativo|\s+reglamentario)?|resoluci[oó]n|circular(?:\s+externa|\s+conjunta)?|ley)'
+    r'\s+(?:n[uú]mero\s+|n[oº°]\.?\s*)?0*(\d{1,7})\s+(?:de|del)\s+(20\d{2})\b', re.I)
+_TIPO_CITA = {'decreto': 'DECRETOS', 'resolucion': 'RESOLUCIONES', 'circular': 'CIRCULARES', 'ley': 'LEYES'}
+_NORMAS_IDX = [0.0, None]
+
+
+def _tipo_canon(t):
+    t = _fold_q(t)
+    for k, v in _TIPO_CITA.items():
+        if t.startswith(k):
+            return v
+    return ''
+
+
+def _normas_conocidas():
+    """(tipo, número, año) de todo lo expedido que Caudal tiene: Ejecutivo
+    (Presidencia + entidades con sitio propio), Diario Oficial y Regulatorio."""
+    if _NORMAS_IDX[1] is not None and _time.time() - _NORMAS_IDX[0] < ENT_TTL:
+        return _NORMAS_IDX[1]
+    idx = set()
+
+    def add(tipo, num, anio):
+        num = str(num or '').strip().lstrip('0')
+        if tipo and num.isdigit() and anio:
+            idx.add((tipo, num, str(anio)[:4]))
+    for r in _ejecutivo():
+        add(_tipo_canon(r.get('tipo') or ''), r.get('numero'), r.get('anio'))
+    for r in _do_actos():
+        add(_tipo_canon(r.get('tipo') or ''), r.get('numero'), r.get('anio'))
+    for r in _sanciones():
+        if r.get('tipo_acto') not in ('resolucion', 'circular'):
+            continue
+        m = re.search(r'(\d{1,16})(?:-\d)?\s+de\s+(\d{4})', r.get('resolucion') or '')
+        if m:
+            add(_tipo_canon(r.get('tipo') or r.get('tipo_acto') or ''), m.group(1), m.group(2))
+    _NORMAS_IDX[0], _NORMAS_IDX[1] = _time.time(), idx
+    return idx
+
+
+def _normas_en_prensa(s, titulares):
+    """Busca normas citadas con número y año en los titulares del cliente y en
+    una consulta dirigida por tema e interlocutor; devuelve las que Caudal NO
+    encuentra en sus fuentes oficiales. Solo normas del año en curso o el
+    anterior: una ley de 1993 citada en prensa no es noticia de cobertura."""
+    planes = [t for t in (s.get('temas') or []) if len(_fold_q(t)) >= 5][:3] + \
+             [x for x in (s.get('interlocutores') or [])][:3]
+    ck = f'normaprensa-{_hash24("|".join(planes))}-{_medios_cache_bucket()}'
+    extra = _cache_get(ck)
+    if extra is None:
+        extra = []
+        if planes:
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                futs = [pool.submit(_medios_query_events, f'"{t}" (decreto OR resolución OR circular)', 21)
+                        for t in planes]
+                for f in as_completed(futs):
+                    try:
+                        extra += [{'titulo': e.get('titulo'), 'url': e.get('url'), 'medio': e.get('medio'),
+                                   'fecha': e.get('fecha')} for e in f.result() if not e.get('exterior')]
+                    except Exception as ex:
+                        print(f'[normas-prensa] consulta FAIL: {ex}')
+        _cache_put(ck, extra)
+    anio = datetime.date.today().year
+    conocidas = _normas_conocidas()
+    vistas, citas, faltan = set(), 0, []
+    revisados = 0
+    for t in list(titulares) + list(extra):
+        tit = t.get('titulo') or ''
+        if not tit:
+            continue
+        revisados += 1
+        for m in NORMA_CITA_RE.finditer(tit):
+            tipo, num, a = _tipo_canon(m.group(1)), m.group(2).lstrip('0'), m.group(3)
+            if int(a) < anio - 1 or not tipo:
+                continue
+            k = (tipo, num, a)
+            if k in vistas:
+                continue
+            vistas.add(k)
+            citas += 1
+            if k in conocidas:
+                continue
+            faltan.append({'norma': f'{m.group(1).strip().capitalize()} {num} de {a}', 'tipo': tipo,
+                           'titulo': tit, 'medio': t.get('medio') or '', 'fecha': t.get('fecha') or '',
+                           'url': t.get('url') or ''})
+    return {'revisados': revisados, 'citas': citas, 'no_encontradas': faltan[:6]}
+
+
 def _entrada_libre(c):
     """Competidor que no está en el diccionario, con la forma de una entrada para
     los cruces por identidad (prensa y Regulatorio). Sin razón social curada:
@@ -5962,6 +6106,21 @@ def handler(event, context):
         except Exception as e:
             print(f'[cliente] diario oficial FAIL: {type(e).__name__}: {e}')
             dof, n_dof = [], 0
+        # --- las dos alertas del panel (no son señales: no cuentan en la Rosa) ---
+        try:
+            cobertura = _cobertura_para_perfil(s)
+        except Exception as e:
+            print(f'[cliente] cobertura FAIL: {type(e).__name__}: {e}')
+            cobertura = []
+        try:
+            tits = [{'titulo': r.get('titulo'), 'url': r.get('url'), 'medio': r.get('medio'),
+                     'fecha': r.get('fecha')} for r in (med_agg.get('resultados') or [])] + \
+                   [{'titulo': x.get('titulo'), 'url': x.get('url'), 'medio': x.get('medio'),
+                     'fecha': x.get('fecha')} for x in med_vig + evt]
+            normas_prensa = _normas_en_prensa(s, tits)
+        except Exception as e:
+            print(f'[cliente] normas en prensa FAIL: {type(e).__name__}: {e}')
+            normas_prensa = {'revisados': 0, 'citas': 0, 'no_encontradas': [], 'error': True}
         senales = rc['senales'] + reg + dof + med + con + suc + evt + red
         n_vig = sum(1 for x in senales if x.get('vigilada'))
         kpis = {'n_radar': len(senales),
@@ -6022,6 +6181,7 @@ def handler(event, context):
                            'descartes': s.get('descartes', [])},
                'congreso': rc['senales'], 'regulatorio': reg, 'medios': med,
                'contratacion': con, 'sucop': suc, 'eventos': evt, 'diario_oficial': dof,
+               'cobertura': cobertura, 'normas_prensa': normas_prensa,
                'redes': red, 'kpis': kpis, 'sectores': sectores}
         out['cliente']['avisos'] = s.get('avisos', [])
         # `lectura:true` YA NO significa "espérame la síntesis": significa

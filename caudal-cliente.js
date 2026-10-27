@@ -918,6 +918,17 @@
     if(pilar==='regulatorio') return cl.sector_sanciones
       ? (reg.length?`<div class="sig-list">${reg.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin actos recientes del regulador en esta fuente.</div>')
       : '<div class="cli-reg-none">El regulador de este sector todavía no es fuente de Caudal — las entidades entran por etapas. Si tu exposición es ambiental (licenciamiento, seguimiento, sanción), el sector <b>Ambiente</b> ya trae el expediente completo de la ANLA.</div>';
+    // «Tus entidades»: qué lee Caudal de cada interlocutor del cliente y qué no
+    if(pilar==='entidades'){
+      const cob=d.cobertura||[], EST={conectada:'Conectada',parcial:'Parcial',sin_fuente:'Sin fuente',sin_revisar:'Sin revisar',no_aplica:'No aplica'};
+      if(!cob.length) return '<div class="cli-reg-none">Este perfil no tiene entidades marcadas como interlocutores.</div>';
+      return `<div class="cob-note" style="margin-bottom:.6rem">«Parcial» quiere decir que Caudal lee una parte; cada tarjeta dice cuál falta y por qué.</div><div class="sig-list">`
+        + cob.map(e=>`<div class="sig ${e.estado==='conectada'?'bajo':e.estado==='parcial'?'medio':'alto'}"><span class="sig-lvl">${esc(EST[e.estado]||e.estado)}</span><div class="sig-body">
+          <div class="sig-title">${esc(e.nombre)}</div>
+          ${e.cubre&&e.cubre.length?`<div class="sig-tags">Caudal lee: ${esc(e.cubre.join(' · '))}</div>`:''}
+          ${e.falta&&e.falta.length?`<div class="sig-action">Falta: ${esc(e.falta.join(' · '))}${e.nota?' — '+esc(e.nota):''}</div>`:(e.nota?`<div class="sig-action">${esc(e.nota)}</div>`:'')}
+          </div></div>`).join('')+'</div>';
+    }
     if(pilar==='diario_oficial'){
       const dof=d.diario_oficial||[];
       return dof.length?`<div class="sig-list">${dof.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Ninguna resolución, circular o acuerdo de los últimos 60 días en el Diario Oficial cruza con estos temas ni sale de sus interlocutores.</div>';
@@ -1003,11 +1014,13 @@
       ${k.n_medios_exterior?`<div class="cob-note" style="margin:.4rem 0"><b>${k.n_medios_exterior}</b> titular(es) de prensa del exterior quedaron fuera del radar: hablan del tema en Perú, Panamá o Estados Unidos, no en Colombia. Se descartan acá, no se borran de la fuente.</div>`:''}
       ${k.n_con_articulado?`<div class="cli-note"><b>Qué cambian:</b> de las ${congreso.length} señales del Congreso, <b>${k.n_con_articulado}</b> ya tienen el articulado leído${k.n_te_aplica?` y <b>${k.n_te_aplica}</b> le aplican a tu sector o a tus vigiladas`:''}. El resto todavía no se ha extraído.</div>`:''}
       <div class="cob-note" style="margin:.5rem 0 1.3rem">De un histórico de <b>${fmt(k.n_proyectos_sector)}</b> proyectos${cl.sector_sanciones?` y <b>${fmt((k.n_sanciones_sector||0)+(k.n_otros_actos_sector||0))}</b> actos del regulador (<b>${fmt(k.n_sanciones_sector)}</b> de ellos sanciones)`:''} que tocan estos temas, ${MARCA.nombre} prioriza por accionabilidad — precisión sobre volumen.${(cl.temas_usados&&cl.temas_usados.length)?` Se buscó por: <b>${esc(cl.temas_usados.join(' · '))}</b>.`:''}</div>
+      ${((d.normas_prensa||{}).no_encontradas||[]).length?`<div class="cob-note" style="margin:0 0 1.1rem;padding:.6rem .8rem;border:1px solid #fdba74;background:#fff7ed;color:#7c2d12;border-radius:8px">La prensa cita ${d.normas_prensa.no_encontradas.length===1?'una norma':d.normas_prensa.no_encontradas.length+' normas'} que todavía no aparece${d.normas_prensa.no_encontradas.length===1?'':'n'} en las fuentes oficiales que ${MARCA.nombre} lee: <b>${esc(d.normas_prensa.no_encontradas.map(x=>x.norma).join(' · '))}</b>. Puede que la entidad aún no la publique, o que su fuente no esté conectada.</div>`:''}
       <div class="cli-sub">Explorar el detalle</div>
       <div class="chips" id="cli-toggle" style="justify-content:flex-start;margin-top:.3rem">
         <span class="chip" data-p="congreso">Legislativo <b>${congreso.length}</b></span>
         <span class="chip" data-p="regulatorio">Regulatorio <b>${reg.length}</b></span>
         <span class="chip" data-p="diario_oficial">Diario Oficial <b>${(d.diario_oficial||[]).length}</b></span>
+        ${(d.cobertura||[]).length?`<span class="chip" data-p="entidades">Tus entidades <b>${(d.cobertura||[]).length}</b></span>`:''}
         <span class="chip" data-p="contratacion">Contratación <b>${con.length}</b></span>
         <span class="chip" data-p="oportunidades">Consultas y eventos <b>${(d.sucop||[]).length+(d.eventos||[]).length}</b></span>
         <span class="chip" data-p="medios">Prensa <b>${medios.length}</b></span>
