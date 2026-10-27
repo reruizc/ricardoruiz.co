@@ -867,13 +867,13 @@
     // permanente (el PDF de la Imprenta es de sesión): se cita la edición.
     if(x.tipo==='diario_oficial'){
       const tags=[x.entidad?esc(x.entidad):'', x.norma?esc(x.norma):'', x.edicion?`Diario Oficial ${esc(x.edicion)}${x.pagina?', pág. '+esc(String(x.pagina)):''}`:'',
-                  x.fecha?esc(x.fecha):'', x.sobre?'sobre «'+esc(x.sobre)+'»':'', x.interlocutor?'la expide un interlocutor tuyo':''].filter(Boolean).join(' · ');
+                  x.fecha?esc(x.fecha):'', x.vigilada?'nombra a '+esc(x.vigilada):'', x.sobre?'sobre «'+esc(x.sobre)+'»':'', x.interlocutor?'la expide un interlocutor tuyo':''].filter(Boolean).join(' · ');
       return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
         <div class="sig-title">${esc(x.titulo||x.norma||'Norma expedida')}</div><div class="sig-tags">Diario Oficial · ${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
     // Oeste · norma o concepto que la entidad publica en su propio sitio
     if(x.tipo==='norma_entidad'){
-      const tags=[x.entidad?esc(x.entidad):'', x.norma?esc(x.norma):'', x.fecha?esc(x.fecha):'', x.sobre?'sobre «'+esc(x.sobre)+'»':''].filter(Boolean).join(' · ');
+      const tags=[x.entidad?esc(x.entidad):'', x.norma?esc(x.norma):'', x.fecha?esc(x.fecha):'', x.vigilada?'nombra a '+esc(x.vigilada):'', x.sobre?'sobre «'+esc(x.sobre)+'»':''].filter(Boolean).join(' · ');
       const href=x.url?encodeURI(x.url):'';
       const tit=href?`<a href="${esc(href)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.titulo||x.norma)}</a>`:esc(x.titulo||x.norma);
       return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">

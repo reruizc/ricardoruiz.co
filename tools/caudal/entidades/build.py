@@ -60,6 +60,16 @@ def borrador_sucop(r, ent, sector, fuente, hoy):
     }
 
 
+def norma_ejecutivo(r, ent, fuente):
+    """Una norma cosechada → el formato de normativa que mezcla el Ejecutivo."""
+    desc = r.get('descripcion') or r.get('titulo')
+    return {'tipo': r['tipo'], 'subtipo': r.get('subtipo') or '', 'numero': r.get('numero') or '',
+            'anio': r.get('anio') or '', 'fecha': r.get('fecha') or '', 'titulo': r.get('titulo') or '',
+            'descripcion': desc, 'url': _u(r.get('url')), 'entidad': ent, 'fuente': fuente,
+            'administrativo': bool(r.get('administrativo', C.es_administrativo(desc))),
+            'q': _q(r.get('titulo'), desc, r.get('subtema'), ent, r.get('subtipo'))}
+
+
 def fuente_minsalud():
     raw = C.RAW / 'minsalud'
     ent, sector, fuente = 'Ministerio de Salud y Protección Social', 'Salud y Protección Social', 'minsalud'
@@ -72,11 +82,7 @@ def fuente_minsalud():
     for r in (C.leer(raw / 'normas.json', {}) or {}).get('items', []):
         if r['tipo'] in NO_NORMAS or not (r.get('titulo') or r.get('descripcion')):
             continue
-        desc = r.get('descripcion') or r.get('titulo')
-        normas.append({'tipo': r['tipo'], 'subtipo': r.get('subtipo') or '', 'numero': r.get('numero') or '',
-                       'anio': r.get('anio') or '', 'fecha': r.get('fecha') or '', 'titulo': r.get('titulo') or '',
-                       'descripcion': desc, 'url': _u(r.get('url')), 'entidad': ent, 'fuente': fuente,
-                       'q': _q(r.get('titulo'), desc, r.get('subtema'), ent, r.get('subtipo'))})
+        normas.append(norma_ejecutivo(r, ent, fuente))
     eventos = []
     for r in (C.leer(raw / 'eventos.json', {}) or {}).get('items', []):
         eventos.append({**r, 'entidad': ent, 'fuente': fuente,
@@ -93,7 +99,23 @@ def fuente_mincomercio():
     return [borrador_sucop(r, ent, sector, fuente, hoy) for r in items.values()], [], []
 
 
-FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio)]
+def fuente_ssf():
+    """Supersubsidio: borradores (pocos, tabla a mano), circulares, resoluciones
+    y el calendario ICS. La relatoría jurídica va en la fase 4."""
+    raw = C.RAW / 'ssf'
+    ent, sector, fuente = 'Superintendencia del Subsidio Familiar', 'Trabajo', 'ssf'
+    hoy = datetime.date.today().isoformat()
+    items = (C.leer(raw / 'proyectos.json', {}) or {}).get('items', {})
+    borr = [borrador_sucop(r, ent, sector, fuente, hoy) for r in items.values()]
+    normas = [norma_ejecutivo(r, ent, fuente) for r in (C.leer(raw / 'normas.json', {}) or {}).get('items', [])
+              if r.get('descripcion') and (r.get('numero') or r.get('fecha'))]
+    eventos = [{**e, 'entidad': ent, 'fuente': fuente,
+                'q': _q(e.get('titulo'), e.get('descripcion'))}
+               for e in (C.leer(raw / 'eventos.json', {}) or {}).get('items', [])]
+    return borr, normas, eventos
+
+
+FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), ('ssf', fuente_ssf)]
 
 
 def build():

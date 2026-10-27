@@ -982,6 +982,10 @@ def _do_actos():
                 r['_q'] = _fold_q(' '.join([r.get('entidad') or '', r.get('dependencia') or '',
                                             r.get('descripcion') or '', r.get('subtipo') or '']))
                 r['_e'] = _fold_q(r.get('entidad') or '')
+                # solo el texto del acto: el nombre de quien firma no es tema
+                # («Superintendencia del Subsidio Familiar» casaba «subsidio familiar»
+                # en su propio presupuesto interno)
+                r['_d'] = _fold_q(r.get('descripcion') or '')
             _DO_ACTOS = filas
         except Exception as e:
             print(f'[do] actos FAIL: {type(e).__name__}: {e}')
@@ -4402,7 +4406,7 @@ def _do_es_suya(ent_fold, inter):
 DO_VENTANA_DIAS = 60
 
 
-def _do_para_perfil(s, cap=5):
+def _do_para_perfil(s, cap=5, emps=None):
     """Resoluciones, circulares y acuerdos publicados en el Diario Oficial que
     tocan los temas del perfil o salen de sus interlocutores. Los actos de
     personal (nombramientos, extradiciones…) no entran nunca. Lo del Diario
@@ -4413,23 +4417,39 @@ def _do_para_perfil(s, cap=5):
         if len(tf) >= 4 and tf not in temas:
             temas.append(tf)
     inter = _do_interlocutores(s)
-    if not temas and not inter:
+    # empresas que sigue el cliente (competencia o vigiladas): un acto que las
+    # NOMBRA entra aunque no toque un tema, y va al Sur. Ahí no se descarta lo
+    # que parece trámite: una «toma de posesión» de una caja no es un nombramiento.
+    vig_rx = []
+    for e in (emps or []):
+        al = [_fold_q(a) for a in (e.get('alias') or []) + [e.get('nombre') or ''] if len(_fold_q(a)) >= 4]
+        if al:
+            vig_rx.append((e.get('nombre') or e.get('k'),
+                           re.compile(r'\b(?:' + '|'.join(re.escape(a) for a in dict.fromkeys(al)) + r')\b')))
+    if not temas and not inter and not vig_rx:
         return [], 0
     corte = (datetime.date.today() - datetime.timedelta(days=DO_VENTANA_DIAS)).isoformat()
     # plural solo en «-es» y solo si el tema acaba en consonante: «laboral» casa
     # con «laborales», pero «tributario» NO con los «tributarios» de un río
     temas_rx = [(t, re.compile(r'\b' + re.escape(t) + (r'(?:es)?' if t[-1] not in 'aeiou' else '') + r'\b'))
                 for t in temas]
-    tema_hits, solo_ent = [], []
+    tema_hits, solo_ent, vig_hits = [], [], []
     for r in _do_actos():
-        if r.get('administrativo') or r.get('seccion') != 'oficial':
-            continue
         pub = (r.get('publicacion') or {}).get('fecha') or ''
         if pub < corte:
             continue
+        vig = next((n for n, rx in vig_rx if rx.search(r['_q'])), None)
+        if vig:
+            vig_hits.append((r, vig, _do_es_suya(r['_e'], inter) if inter else False))
+            continue
+        if r.get('administrativo') or r.get('seccion') != 'oficial':
+            continue
         # palabra completa: por subcadena «tributario» casaba con los
         # «tributarios» de un río en las resoluciones de las CAR
-        toca = next((t for t, rx in temas_rx if rx.search(r['_q'])), None)
+        # sin las menciones a la propia entidad: «… de la Superintendencia del
+        # Subsidio Familiar» no hace que su presupuesto interno sea del tema
+        txt_d = (r.get('_d') or r['_q']).replace(r['_e'], ' ') if r['_e'] else (r.get('_d') or r['_q'])
+        toca = next((t for t, rx in temas_rx if rx.search(txt_d)), None)
         suya = bool(inter) and _do_es_suya(r['_e'], inter)
         if toca:
             tema_hits.append((r, toca, suya))
@@ -4437,7 +4457,7 @@ def _do_para_perfil(s, cap=5):
             solo_ent.append((r, None, True))
     # normas y conceptos que la entidad publica en su sitio (MinSalud): si la
     # misma norma ya salió del Diario Oficial, no se repite
-    ya = {(r['_e'], r.get('numero'), r.get('anio')) for r, _, _ in tema_hits + solo_ent}
+    ya = {(r['_e'], r.get('numero'), r.get('anio')) for r, _, _ in tema_hits + solo_ent + vig_hits}
     for r in _entidades_jsonl('normas'):
         f = r.get('fecha') or ''
         if f < corte or f > datetime.date.today().isoformat():
@@ -4445,7 +4465,15 @@ def _do_para_perfil(s, cap=5):
         ef = _fold_q(r.get('entidad') or '')
         if (ef, r.get('numero'), r.get('anio')) in ya:
             continue
-        toca = next((t for t, rx in temas_rx if rx.search(r.get('q') or '')), None)
+        vig = next((n for n, rx in vig_rx if rx.search(r.get('q') or '')), None)
+        if vig:
+            vig_hits.append(({**r, '_e': ef, 'publicacion': {'fecha': f}, '_sitio': True}, vig,
+                             _do_es_suya(ef, inter) if inter else False))
+            continue
+        if r.get('administrativo'):
+            continue
+        texto = _fold_q((r.get('titulo') or '') + ' ' + (r.get('descripcion') or '')).replace(ef, ' ')
+        toca = next((t for t, rx in temas_rx if rx.search(texto)), None)
         if not toca:
             continue                     # del sitio propio solo entra lo que toca un tema
         suya = bool(inter) and _do_es_suya(ef, inter)
@@ -4453,31 +4481,36 @@ def _do_para_perfil(s, cap=5):
     orden = lambda x: (0 if x[2] else 1, -(int(((x[0].get('publicacion') or {}).get('fecha') or '0000-00-00').replace('-', ''))))
     tema_hits.sort(key=orden)
     solo_ent.sort(key=orden)
-    elegidos = tema_hits[:cap] + solo_ent[:max(0, min(2, cap - len(tema_hits[:cap])))]
+    vig_hits.sort(key=lambda x: -(int(((x[0].get('publicacion') or {}).get('fecha') or '0000-00-00').replace('-', ''))))
+    elegidos = ([(r, None, suya, v) for r, v, suya in vig_hits[:3]]
+                + [(r, t, suya, None) for r, t, suya in tema_hits[:cap]]
+                + [(r, t, suya, None) for r, t, suya in solo_ent[:max(0, min(2, cap - len(tema_hits[:cap])))]])
     hoy = datetime.date.today()
     out = []
-    for r, toca, suya in elegidos:
+    for r, toca, suya, vig in elegidos:
         pub = r.get('publicacion') or {}
         try:
             reciente = (hoy - datetime.date.fromisoformat(pub.get('fecha') or '')).days <= 7
         except ValueError:
             reciente = False
-        nivel = 'alto' if (toca and suya) or (toca and reciente) else ('medio' if toca else 'bajo')
+        nivel = 'alto' if vig or (toca and suya) or (toca and reciente) else ('medio' if toca else 'bajo')
         nom = f"{(r.get('subtipo') or r.get('tipo') or '').capitalize()} {r.get('numero')} de {r.get('anio')}"
+        if vig:
+            acc_v = (f'{nom} nombra a {vig} — revisar qué le cambia y si te toca a ti también')
         if r.get('_sitio'):
-            out.append({'tipo': 'norma_entidad', 'titulo': (r.get('descripcion') or '')[:220], 'norma': nom,
+            out.append({'tipo': 'norma_entidad', 'vigilada': vig, 'titulo': (r.get('descripcion') or '')[:220], 'norma': nom,
                         'entidad': r.get('entidad') or '', 'fecha': pub.get('fecha') or '', 'url': r.get('url') or '',
                         'sobre': toca or '', 'interlocutor': suya, 'nivel': nivel,
-                        'accion': (f'{nom} publicada en el sitio de {r.get("entidad")} — '
+                        'accion': acc_v if vig else (f'{nom} publicada en el sitio de {r.get("entidad")} — '
                                    + ('leer el concepto: fija cómo interpreta la norma' if r.get('tipo') == 'CONCEPTOS'
                                       else 'revisar si cambia obligaciones o trámites'))})
             continue
-        out.append({'tipo': 'diario_oficial', 'titulo': (r.get('descripcion') or '')[:220],
+        out.append({'tipo': 'diario_oficial', 'vigilada': vig, 'titulo': (r.get('descripcion') or '')[:220],
                     'norma': nom, 'entidad': r.get('entidad') or '', 'dependencia': r.get('dependencia') or '',
                     'fecha': pub.get('fecha') or r.get('fecha') or '', 'expedida': r.get('fecha') or '',
                     'edicion': pub.get('edicion'), 'pagina': pub.get('pagina'),
                     'sobre': toca or '', 'interlocutor': suya, 'nivel': nivel,
-                    'accion': (f'{nom} ya está expedida (Diario Oficial {pub.get("edicion")}, pág. '
+                    'accion': acc_v if vig else (f'{nom} ya está expedida (Diario Oficial {pub.get("edicion")}, pág. '
                                f'{pub.get("pagina")}) — revisar si cambia obligaciones o trámites')})
     return out, len(tema_hits) + len(solo_ent)
 
@@ -5898,7 +5931,7 @@ def handler(event, context):
             print(f'[cliente] eventos oficiales FAIL: {type(e).__name__}: {e}')
         # --- Oeste · lo que ya se expidió en el Diario Oficial --------------
         try:
-            dof, n_dof = _do_para_perfil(s, cap=6)
+            dof, n_dof = _do_para_perfil(s, cap=6, emps=emps_vig)
         except Exception as e:
             print(f'[cliente] diario oficial FAIL: {type(e).__name__}: {e}')
             dof, n_dof = [], 0

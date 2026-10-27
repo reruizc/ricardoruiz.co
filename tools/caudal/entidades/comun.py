@@ -71,3 +71,17 @@ def escribir(p, obj):
     tmp = p.with_suffix(p.suffix + '.tmp')
     tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=1), encoding='utf-8')
     tmp.replace(p)
+
+
+# Actos de personal y trámites individuales (misma regla que el Diario Oficial,
+# tools/caudal/ejecutivo/harvest_diario_oficial.py `_ADMIN`): se marcan, no se
+# borran. El radar del cliente no los usa.
+_ADMIN = re.compile(
+    r'(?i)\b(nombramientos?|se\s+nombra|nombra\s+en|renuncia|encargo|vacaciones|vacancia|reintegro|'
+    r'comisi[óo]n\s+de\s+servicios|insubsistencia|retiro\s+del\s+servicio|toma\s+de\s+posesi[óo]n|'
+    r'periodo\s+de\s+prueba|per[íi]odo\s+de\s+prueba|provisionalidad|prima\s+t[ée]cnica|'
+    r'licencia\s+(?:no\s+)?remunerada|extradici[óo]n|recurso\s+de\s+reposici[óo]n)')
+
+
+def es_administrativo(texto):
+    return bool(_ADMIN.search((texto or '')[:300]))
