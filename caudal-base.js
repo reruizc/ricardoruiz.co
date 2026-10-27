@@ -247,6 +247,7 @@
     if(v==='ejecutivo') hook('ejeLoadStats');
     if(v==='sucop') hook('sucLoadStats');
     if(v==='gacetas') hook('gacLoadStats');
+    if(v==='territorial') hook('terrLoad');
     if(v==='medios') hook('medLoadLanding');
     if(v==='control') hook('controlLoad');
     if(v==='radicados') hook('radLoad');

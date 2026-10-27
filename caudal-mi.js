@@ -404,11 +404,11 @@ function hoyPorQue(r,k){
   if(r==='sur') return k.n_vigiladas
     ? `Ninguna de las ${k.n_vigiladas} empresas vigiladas tuvo señales en las fuentes de Caudal.`
     : 'Este perfil todavía no sigue a ningún competidor. Agrégalos a mano o deja que Caudal te proponga tres.';
-  return 'Ni el Congreso, ni los reguladores, ni el Diario Oficial de los últimos 60 días tienen señales sobre sus temas.';
+  return 'Ni el Congreso, ni los reguladores, ni el Diario Oficial, ni las corporaciones territoriales que sigue tienen señales sobre sus temas.';
 }
 function hoySenales(){
   const d=HOY_D||{}, k=d.kpis||{};
-  const grupos=[['Congreso',d.congreso],['Regulatorio',d.regulatorio],['Diario Oficial',d.diario_oficial],['Medios',d.medios],['Contratación',d.contratacion],['Consulta pública',d.sucop],['Evento',d.eventos],['Redes',d.redes]];
+  const grupos=[['Congreso',d.congreso],['Regulatorio',d.regulatorio],['Diario Oficial',d.diario_oficial],['Territorial',d.territorial],['Medios',d.medios],['Contratación',d.contratacion],['Consulta pública',d.sucop],['Evento',d.eventos],['Redes',d.redes]];
   const todas=grupos.flatMap(([src,items])=>(Array.isArray(items)?items:[]).map(x=>({...x,source:x.tipo==='norma_entidad'?'Sitio de '+(x.entidad||'la entidad'):src})));
   const ORD={alto:0,medio:1,bajo:2};
   if(HOY_RUMBO){

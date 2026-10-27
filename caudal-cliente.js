@@ -879,6 +879,14 @@
       return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
         <div class="sig-title">${tit}</div><div class="sig-tags">Sitio de la entidad · ${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
+    // Oeste · Asamblea de Antioquia y Concejo de Medellín (fase 2 · oct-2026)
+    if(x.tipo==='territorial'){
+      const tags=[x.entidad?esc(x.entidad):'', x.norma?esc(x.norma):'', x.estado?esc(x.estado):'', x.vigilada?'nombra a '+esc(x.vigilada):'', x.sobre?'sobre «'+esc(x.sobre)+'»':''].filter(Boolean).join(' · ');
+      const href=x.url?encodeURI(x.url):'';
+      const tit=href?`<a href="${esc(href)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.titulo||x.norma)}</a>`:esc(x.titulo||x.norma);
+      return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title">${tit}</div><div class="sig-tags">Territorial · ${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
+    }
     if(x.tipo==='eventos'){
       const tags=[x.medio?esc(x.medio):'', x.fecha?esc(x.fecha):'', x.lugar?esc(x.lugar):'', x.sobre?'sobre «'+esc(x.sobre)+'»':''].filter(Boolean).join(' · ');
       return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
@@ -928,6 +936,10 @@
           ${e.cubre&&e.cubre.length?`<div class="sig-tags">Caudal lee: ${esc(e.cubre.join(' · '))}</div>`:''}
           ${e.falta&&e.falta.length?`<div class="sig-action">Falta: ${esc(e.falta.join(' · '))}${e.nota?' — '+esc(e.nota):''}</div>`:(e.nota?`<div class="sig-action">${esc(e.nota)}</div>`:'')}
           </div></div>`).join('')+'</div>';
+    }
+    if(pilar==='territorial'){
+      const t=d.territorial||[];
+      return t.length?`<div class="sig-list">${t.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Ningún proyecto, ordenanza, acuerdo ni citación de la Asamblea o el Concejo cruza con estos temas, o el perfil no sigue esas corporaciones.</div>';
     }
     if(pilar==='diario_oficial'){
       const dof=d.diario_oficial||[];
@@ -1020,6 +1032,7 @@
         <span class="chip" data-p="congreso">Legislativo <b>${congreso.length}</b></span>
         <span class="chip" data-p="regulatorio">Regulatorio <b>${reg.length}</b></span>
         <span class="chip" data-p="diario_oficial">Diario Oficial <b>${(d.diario_oficial||[]).length}</b></span>
+        ${(d.territorial||[]).length?`<span class="chip" data-p="territorial">Territorial <b>${d.territorial.length}</b></span>`:''}
         ${(d.cobertura||[]).length?`<span class="chip" data-p="entidades">Tus entidades <b>${(d.cobertura||[]).length}</b></span>`:''}
         <span class="chip" data-p="contratacion">Contratación <b>${con.length}</b></span>
         <span class="chip" data-p="oportunidades">Consultas y eventos <b>${(d.sucop||[]).length+(d.eventos||[]).length}</b></span>
@@ -1263,7 +1276,7 @@
                     ['sur','SUR · competencia'],['oeste','OCCIDENTE · Estado']];
   const BRIEF_FUENTE={congreso:'Congreso',regulatorio:'Regulatorio',medios:'Prensa',redes:'Redes · X',
                       contratacion:'Contratación',ejecutivo:'Ejecutivo',sucop:'Consulta pública',eventos:'Evento',
-                      diario_oficial:'Diario Oficial'};
+                      diario_oficial:'Diario Oficial',territorial:'Territorial'};
   // ⚠️ La URL va como ENLACE, nunca como texto. Medido en el primer brief: una
   // sola nota de prensa de Google News ocupaba CINCO LÍNEAS de base64 —
   // `news.google.com/rss/articles/CBMivAFBVV95cUxQ…` son más de 500 caracteres —
@@ -1333,7 +1346,7 @@
     const cl=d.cliente||{}, k=d.kpis||{};
     const todas=[].concat(d.congreso||[],d.regulatorio||[],d.medios||[],
                           d.contratacion||[],d.ejecutivo||[],d.sucop||[],d.eventos||[],d.redes||[],
-                          d.diario_oficial||[]);
+                          d.diario_oficial||[],d.territorial||[]);
     // `mov` lo marca la Lambda contra su propio reloj: no se recalcula acá para
     // que el PDF y la pantalla no puedan discrepar por la zona horaria del
     // navegador de quien descarga.

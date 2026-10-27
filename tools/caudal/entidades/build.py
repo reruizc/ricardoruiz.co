@@ -168,6 +168,59 @@ def fuente_sic():
     return borr, normas, eventos
 
 
+# Estados del Concejo que cierran el trámite (lo demás sigue vivo)
+_FIN_CONCEJO = ('archiv', 'retirad', 'negad', 'sancionad', 'acumulad', 'desistid', 'hundid')
+
+
+def territorial():
+    """Asamblea de Antioquia y Concejo de Medellín → un índice propio
+    (entidades-territorial.jsonl) para la tarjeta de Entidades territoriales y el
+    radar; las sesiones del Concejo van además a los eventos."""
+    raw = C.RAW / 'territorial'
+    out, eventos = [], []
+    hoy = datetime.date.today()
+    a = C.leer(raw / 'asamblea.json', {}) or {}
+    corp = 'Asamblea de Antioquia'
+    for x in a.get('proyectos', []):
+        try:
+            viejo = (hoy - datetime.date.fromisoformat(x['fecha'])).days > 200
+        except ValueError:
+            viejo = True
+        vivo = not x['estado'].startswith('Aprobado') and not viejo
+        out.append({'corporacion': corp, 'fuente': 'asamblea-antioquia', 'tipo': 'proyecto',
+                    'tipo_nombre': 'Proyecto de ordenanza', 'numero': x['numero'], 'anio': x['anio'],
+                    'fecha': x['fecha'], 'titulo': x['titulo'], 'estado': x['estado'], 'en_tramite': vivo,
+                    'url': _u(x['url']), 'pagina': x.get('pagina') or '', 'ordenanza': x.get('ordenanza'),
+                    'q': _q(x['titulo'], x['estado'], corp)})
+    for x in a.get('ordenanzas', []):
+        out.append({'corporacion': corp, 'fuente': 'asamblea-antioquia', 'tipo': 'norma',
+                    'tipo_nombre': 'Ordenanza', 'numero': x['numero'], 'anio': x['anio'], 'fecha': x['fecha'],
+                    'titulo': x['titulo'], 'estado': 'Expedida', 'en_tramite': False, 'url': _u(x['url']),
+                    'pagina': x.get('pagina') or '', 'q': _q(x['titulo'], corp, 'ordenanza')})
+    c = C.leer(raw / 'concejo.json', {}) or {}
+    corp = 'Concejo de Medellín'
+    for x in c.get('proyectos', []):
+        vivo = not any(k in C.fold(x['estado']) for k in _FIN_CONCEJO) and x['anio'] >= str(hoy.year - 1)
+        out.append({'corporacion': corp, 'fuente': 'concejo-medellin', 'tipo': 'proyecto',
+                    'tipo_nombre': 'Proyecto de acuerdo', 'numero': x['numero'], 'anio': x['anio'],
+                    'fecha': '', 'titulo': x['titulo'], 'estado': x['estado'], 'en_tramite': vivo,
+                    'url': '', 'pagina': x.get('pagina') or '', 'q': _q(x['titulo'], x['estado'], corp)})
+    for x in c.get('acuerdos', []):
+        out.append({'corporacion': corp, 'fuente': 'concejo-medellin', 'tipo': 'norma', 'tipo_nombre': 'Acuerdo',
+                    'numero': x['numero'], 'anio': x['anio'], 'fecha': '', 'titulo': x['titulo'],
+                    'estado': x['estado'], 'en_tramite': False, 'proyecto': x.get('proyecto') or '',
+                    'url': '', 'pagina': x.get('pagina') or '', 'q': _q(x['titulo'], corp, 'acuerdo')})
+    for x in c.get('citaciones', []):
+        out.append({'corporacion': corp, 'fuente': 'concejo-medellin', 'tipo': 'citacion',
+                    'tipo_nombre': 'Citación de control político', 'numero': x['codigo'], 'anio': x['fecha'][:4],
+                    'fecha': x['fecha'], 'titulo': x['titulo'], 'estado': x['estado'], 'en_tramite': False,
+                    'url': '', 'pagina': x.get('pagina') or '', 'q': _q(x['titulo'], corp, 'control politico')})
+    for e in c.get('eventos', []):
+        eventos.append({**e, 'entidad': corp, 'fuente': 'concejo-medellin',
+                        'q': _q(e.get('titulo'), e.get('descripcion'), ' '.join(e.get('categorias') or []))})
+    return out, eventos
+
+
 FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), ('ssf', fuente_ssf),
            ('cce', fuente_cce), ('sic', fuente_sic)]
 
@@ -187,7 +240,7 @@ def _es_de(alias, nombre):
     return False
 
 
-def catalogo(borr, normas, eventos):
+def catalogo(borr, normas, eventos, terr=()):
     """El catálogo de cobertura con sus conteos de hoy (ver catalogo.py)."""
     import catalogo as K
     hoy = datetime.date.today().isoformat()
@@ -207,7 +260,8 @@ def catalogo(borr, normas, eventos):
                                         and b['estado'] == 'Activa'),
              'normas_anio': sum(1 for n in normas if _es_de(al, n['entidad']) and n.get('anio') == anio
                                 and not n.get('administrativo')),
-             'eventos_por_venir': sum(1 for v in eventos if _es_de(al, v['entidad']) and (v.get('dia') or '') >= hoy)}
+             'eventos_por_venir': sum(1 for v in eventos if _es_de(al, v['entidad']) and (v.get('dia') or '') >= hoy),
+             'proyectos_en_tramite': sum(1 for t in terr if _es_de(al, t['corporacion']) and t['en_tramite'])}
         e = dict(e)
         # si lo único que la cubre es el Diario Oficial y este año no publicó
         # nada ahí, decir «parcial» sería prometer una cobertura que no existe
@@ -231,18 +285,27 @@ def build():
         eventos += e
         por[k] = {'borradores': len(b), 'normas': len(n), 'eventos': len(e),
                   'borradores_abiertos': sum(1 for x in b if x['estado'] == 'Activa')}
+    try:
+        terr, ev_terr = territorial()
+    except Exception as ex:
+        print(f'  ! territorial: {ex}', file=sys.stderr)
+        terr, ev_terr = [], []
+    eventos += ev_terr
+    por['territorial'] = {'items': len(terr), 'en_tramite': sum(1 for x in terr if x['en_tramite']),
+                          'eventos': len(ev_terr)}
     C.DIST.mkdir(parents=True, exist_ok=True)
     for nombre, filas, orden in (('borradores', borr, 'fecha_inicio'), ('normas', normas, 'fecha'),
-                                 ('eventos', eventos, 'fecha_inicio')):
+                                 ('eventos', eventos, 'fecha_inicio'), ('territorial', terr, 'anio')):
         filas.sort(key=lambda r: r.get(orden) or '', reverse=True)
         with (C.DIST / f'entidades-{nombre}.jsonl').open('w', encoding='utf-8') as fh:
             for r in filas:
                 fh.write(json.dumps(r, ensure_ascii=False) + '\n')
-    C.escribir(C.DIST / 'entidades-catalogo.json', catalogo(borr, normas, eventos))
+    C.escribir(C.DIST / 'entidades-catalogo.json', catalogo(borr, normas, eventos, terr))
     stats = {'generado': datetime.datetime.now().isoformat(timespec='seconds'), 'por_fuente': por,
              'n_borradores': len(borr), 'n_normas': len(normas), 'n_eventos': len(eventos)}
     C.escribir(C.DIST / 'entidades-stats.json', stats)
-    print(f"  {len(borr)} borradores · {len(normas)} normas · {len(eventos)} eventos · fuentes: {', '.join(por)}")
+    print(f"  {len(borr)} borradores · {len(normas)} normas · {len(eventos)} eventos · {len(terr)} territoriales"
+          f" · fuentes: {', '.join(por)}")
     return stats
 
 
@@ -258,7 +321,12 @@ def subir(stats):
         if prev.get(k) and stats.get(k, 0) < prev[k] // 2:
             print(f'  ✗ {k}: {stats.get(k)} contra {prev[k]} en S3 — no se sube', file=sys.stderr)
             return False
-    for nombre in ('borradores', 'normas', 'eventos'):
+    pt = ((prev.get('por_fuente') or {}).get('territorial') or {}).get('items', 0)
+    nt = ((stats.get('por_fuente') or {}).get('territorial') or {}).get('items', 0)
+    if pt and nt < pt // 2:
+        print(f'  ✗ territorial: {nt} contra {pt} en S3 — no se sube', file=sys.stderr)
+        return False
+    for nombre in ('borradores', 'normas', 'eventos', 'territorial'):
         subprocess.run(['aws', 's3', 'cp', str(C.DIST / f'entidades-{nombre}.jsonl'),
                         f's3://{BUCKET}/metadata/entidades-{nombre}.jsonl', '--content-type', 'application/json',
                         '--cache-control', 'private, max-age=300', '--only-show-errors'], check=True)

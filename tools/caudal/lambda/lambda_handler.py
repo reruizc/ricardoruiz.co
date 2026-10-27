@@ -2928,7 +2928,7 @@ LECTURA_MAX_SENALES = 26
 CARD_POR_TIPO = {'contratacion': 'norte', 'sucop': 'norte', 'eventos': 'norte',
                  'medios': 'este', 'redes': 'este',
                  'congreso': 'oeste', 'regulatorio': 'oeste', 'diario_oficial': 'oeste',
-                 'norma_entidad': 'oeste'}
+                 'norma_entidad': 'oeste', 'territorial': 'oeste'}
 CARD_LBL = {'norte': 'NORTE · oportunidad', 'este': 'ESTE · conversación',
             'sur': 'SUR · competencia',    'oeste': 'OESTE · Estado'}
 
@@ -3336,6 +3336,9 @@ def _lectura_cliente_prompt(s, senales, kpis):
             lines.append(f"- [NORMA EXPEDIDA · DIARIO OFICIAL · prioridad {x['nivel']}] publicada {x.get('fecha', '')} · "
                          f"{x.get('entidad', '')} · {x.get('norma', '')}: {(x.get('titulo') or '')[:120]}"
                          + (" · la expide un interlocutor del cliente" if x.get('interlocutor') else ''))
+        elif x['tipo'] == 'territorial':
+            lines.append(f"- [{(x.get('entidad') or '').upper()} · prioridad {x['nivel']}{vig}] {x.get('norma', '')} "
+                         f"({x.get('estado', '')}): {(x.get('titulo') or '')[:120]}")
         elif x['tipo'] == 'norma_entidad':
             lines.append(f"- [NORMA O CONCEPTO EN EL SITIO DE LA ENTIDAD · prioridad {x['nivel']}] {x.get('fecha', '')} · "
                          f"{x.get('entidad', '')} · {x.get('norma', '')}: {(x.get('titulo') or '')[:120]}")
@@ -4562,6 +4565,8 @@ def _eventos_oficiales(s, cap=3):
         suya = bool(inter) and _do_es_suya(_fold_q(e.get('entidad') or ''), inter)
         if not toca and not suya:
             continue
+        if not toca and e.get('fuente') == 'concejo-medellin':
+            continue            # una plenaria cualquiera no es señal: solo las que tocan un tema
         social = 'Participación Social' in (e.get('categorias') or [])
         out.append({'tipo': 'eventos', 'titulo': e.get('titulo'), 'url': e.get('url') or '',
                     'medio': f"{e.get('entidad')} · calendario oficial", 'fecha': e.get('dia'),
@@ -4715,6 +4720,58 @@ def _normas_en_prensa(s, titulares):
                            'titulo': tit, 'medio': t.get('medio') or '', 'fecha': t.get('fecha') or '',
                            'url': t.get('url') or ''})
     return {'revisados': revisados, 'citas': citas, 'no_encontradas': faltan[:6]}
+
+
+def _territorial_para_perfil(s, emps=None, cap=5):
+    """Asamblea de Antioquia y Concejo de Medellín (fase 2): solo para quien sigue
+    esa corporación (interlocutor). Entran los proyectos en trámite, las
+    ordenanzas y acuerdos del último año y las citaciones de control político
+    recientes que tocan un tema del perfil o nombran a una de sus empresas."""
+    inter = _do_interlocutores(s)
+    corps = [c for c in ('asamblea de antioquia', 'concejo de medellin') if any(c in i for i in inter)]
+    if not corps:
+        return [], 0
+    temas = [_fold_q(t) for t in (s.get('temas') or []) if len(_fold_q(t)) >= 4]
+    temas_rx = [(t, re.compile(r'\b' + re.escape(t) + (r'(?:es)?' if t[-1] not in 'aeiou' else '') + r'\b'))
+                for t in temas]
+    vig_rx = []
+    for e in (emps or []):
+        al = [_fold_q(a) for a in (e.get('alias') or []) + [e.get('nombre') or ''] if len(_fold_q(a)) >= 4]
+        if al:
+            vig_rx.append((e.get('nombre') or e.get('k'),
+                           re.compile(r'\b(?:' + '|'.join(re.escape(a) for a in dict.fromkeys(al)) + r')\b')))
+    hoy = datetime.date.today()
+    anio_min = str(hoy.year - 1)
+    hits = []
+    for r in _entidades_jsonl('territorial'):
+        if _fold_q(r.get('corporacion') or '') not in corps:
+            continue
+        reciente = r.get('en_tramite') or (r.get('anio') or '') >= anio_min
+        if not reciente:
+            continue
+        if r.get('tipo') == 'citacion' and (r.get('fecha') or '') < (hoy - datetime.timedelta(days=60)).isoformat():
+            continue
+        texto = _fold_q(r.get('titulo') or '')
+        vig = next((n for n, rx in vig_rx if rx.search(texto)), None)
+        toca = next((t for t, rx in temas_rx if rx.search(texto)), None)
+        if not vig and not toca:
+            continue
+        hits.append((r, toca, vig))
+    hits.sort(key=lambda x: (0 if x[2] else 1, 0 if x[0].get('en_tramite') else 1,
+                             -(int((x[0].get('anio') or '0') + (x[0].get('numero') or '0').zfill(4)
+                                   if (x[0].get('numero') or '').isdigit() else 0))))
+    out = []
+    for r, toca, vig in hits[:cap]:
+        nom = f"{r.get('tipo_nombre')} {r.get('numero')}" + (f" de {r.get('anio')}" if r.get('anio') else '')
+        vivo = r.get('en_tramite')
+        out.append({'tipo': 'territorial', 'vigilada': vig, 'titulo': (r.get('titulo') or '')[:220], 'norma': nom,
+                    'entidad': r.get('corporacion'), 'estado': r.get('estado') or '', 'fecha': r.get('fecha') or '',
+                    'url': r.get('url') or r.get('pagina') or '', 'sobre': toca or '', 'en_tramite': vivo,
+                    'nivel': 'alto' if (vig or (vivo and toca)) else 'medio',
+                    'accion': (f'{nom} en trámite en la {r.get("corporacion")} ({r.get("estado")}) — '
+                               'se puede incidir antes del siguiente debate') if vivo else
+                              (f'{nom} de la {r.get("corporacion")} — revisar qué cambia en el territorio')})
+    return out, len(hits)
 
 
 def _entrada_libre(c):
@@ -5430,6 +5487,35 @@ def handler(event, context):
             'resultados': out,
         })
 
+    if action == 'territorial':     # Entidades territoriales · Asamblea de Antioquia y Concejo de Medellín
+        q = _fold_q(body.get('query') or '')
+        corp = _fold_q(body.get('corporacion') or '')
+        tipo = str(body.get('tipo') or '')
+        solo_vivos = bool(body.get('en_tramite'))
+        toks = [t for t in re.split(r'\s+', q) if len(t) >= 3]
+        recs = _entidades_jsonl('territorial')
+        hits = [r for r in recs
+                if (not corp or corp in _fold_q(r.get('corporacion') or ''))
+                and (not tipo or r.get('tipo') == tipo)
+                and (not solo_vivos or r.get('en_tramite'))
+                and (not toks or all(t in (r.get('q') or '') for t in toks))]
+        hits.sort(key=lambda r: ((r.get('anio') or ''), int(r['numero']) if (r.get('numero') or '').isdigit() else 0,
+                                 r.get('fecha') or ''), reverse=True)
+        hoy = datetime.date.today().isoformat()
+        ev = sorted([e for e in _entidades_jsonl('eventos')
+                     if e.get('fuente') == 'concejo-medellin' and (e.get('dia') or '') >= hoy
+                     and (not corp or 'concejo' in corp) and (not toks or all(t in (e.get('q') or '') for t in toks))],
+                    key=lambda e: e.get('dia') or '')
+        por = {}
+        for r in recs:
+            k = r.get('corporacion') or ''
+            d = por.setdefault(k, {'corporacion': k, 'en_tramite': 0, 'proyectos': 0, 'normas': 0, 'citaciones': 0})
+            d['en_tramite'] += 1 if r.get('en_tramite') else 0
+            d[{'proyecto': 'proyectos', 'norma': 'normas', 'citacion': 'citaciones'}.get(r.get('tipo'), 'normas')] += 1
+        return _resp(200, {'n': len(hits), 'resultados': [{k: v for k, v in r.items() if k != 'q'} for r in hits[:60]],
+                           'proximas': [{k: v for k, v in e.items() if k != 'q'} for e in ev[:12]],
+                           'por_corporacion': list(por.values())})
+
     if action == 'diario-oficial':  # resoluciones, circulares y acuerdos del Diario Oficial
         q = _fold_q(body.get('query') or '')
         ent = _fold_q(body.get('entidad') or '')
@@ -6121,7 +6207,12 @@ def handler(event, context):
         except Exception as e:
             print(f'[cliente] normas en prensa FAIL: {type(e).__name__}: {e}')
             normas_prensa = {'revisados': 0, 'citas': 0, 'no_encontradas': [], 'error': True}
-        senales = rc['senales'] + reg + dof + med + con + suc + evt + red
+        try:
+            terr, n_terr = _territorial_para_perfil(s, emps_vig)
+        except Exception as e:
+            print(f'[cliente] territorial FAIL: {type(e).__name__}: {e}')
+            terr, n_terr = [], 0
+        senales = rc['senales'] + reg + dof + terr + med + con + suc + evt + red
         n_vig = sum(1 for x in senales if x.get('vigilada'))
         kpis = {'n_radar': len(senales),
                 'alto': sum(1 for x in senales if x['nivel'] == 'alto'),
@@ -6133,7 +6224,7 @@ def handler(event, context):
                 'n_medios_sector': n_med, 'n_medios_exterior': n_med_ext,
                 'n_contratos_sector': n_con,
                 'n_consultas_abiertas': n_suc, 'n_eventos': len(evt),
-                'n_diario_oficial': n_dof,
+                'n_diario_oficial': n_dof, 'n_territorial': n_terr,
                 'n_vigiladas': len(emps_vig), 'n_senales_vigiladas': n_vig,
                 'n_contratos_vigiladas': n_con_vig,
                 # articulado: cuántas señales del Congreso traen "qué cambia" y
@@ -6180,7 +6271,7 @@ def handler(event, context):
                            'contratacion_generica_omitida': con_generica_muda,
                            'descartes': s.get('descartes', [])},
                'congreso': rc['senales'], 'regulatorio': reg, 'medios': med,
-               'contratacion': con, 'sucop': suc, 'eventos': evt, 'diario_oficial': dof,
+               'contratacion': con, 'sucop': suc, 'eventos': evt, 'diario_oficial': dof, 'territorial': terr,
                'cobertura': cobertura, 'normas_prensa': normas_prensa,
                'redes': red, 'kpis': kpis, 'sectores': sectores}
         out['cliente']['avisos'] = s.get('avisos', [])
