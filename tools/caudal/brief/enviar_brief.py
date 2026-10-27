@@ -293,8 +293,11 @@ def main():
         'etiqueta': f"brief-{(meta.get('cliente') or 'cliente').lower()}-{hasta}",
         'adjuntos': adjuntos,
     }
+    # Un correo de Candidato 360 va por su propia ruta: asunto «Candidato 360 ·»
+    # y solo a los destinatarios que Ricardo autoriza en el worker.
+    ruta = '/c360/correo/enviar' if propio.get('producto') == 'c360' else RUTA
     req = urllib.request.Request(
-        WORKER + RUTA, data=json.dumps(payload).encode('utf-8'), method='POST',
+        WORKER + ruta, data=json.dumps(payload).encode('utf-8'), method='POST',
         headers={'Content-Type': 'application/json', 'User-Agent': UA,
                  'X-Caudal-Briefs': token})
     try:
