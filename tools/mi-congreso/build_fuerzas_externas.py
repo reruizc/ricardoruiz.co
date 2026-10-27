@@ -23,8 +23,22 @@ Fuentes, todas ya existentes:
                                            (tools/caudal/empresas.py)
   · congresistas a excluir (son internos)  fuerzas-internas-2026.json
 
-El articulado de Cámara de la legislatura viva llega cruzado con el de otro
-proyecto (oct-2026): se usa solo si su título casa con el del proyecto.
+El articulado se lee directo de s3://caudal-legislativo/metadata/articulado.json
+(la extracción con modelo local, 857 proyectos el 27-oct-2026), por número de
+radicado y legislatura —nunca por el id de Cámara, que cambia a diario— y solo
+se usa si su título casa con el del proyecto. Si el archivo no baja, se cae a
+la ficha de la API.
+
+Del articulado salen dos clases de actores con cerca = 1:
+  · «obliga»   el texto le impone una obligación (campo sobre_quien), y se
+               guarda QUÉ le exige (`exige`, hasta 3), que es lo que se le
+               preguntaría a ese actor;
+  · «nombrado» el texto dice que le aplica (aplica_a.sujetos) o el diccionario
+               de empresas lo encuentra en el texto.
+Los colectivos que no son una entidad («operadores de telecomunicaciones»,
+«hogares beneficiarios») entran como tipo `grupo`: no tienen vocero único,
+pero son a quienes toca el proyecto. Lo que el propio proyecto CREA (un comité
+nuevo) no entra: todavía no existe para pronunciarse.
 
 Salida: Bases de datos/legislativo/fuerzas-externas/{S|C}-{num}-{aa}.json + index.json
 S3:     congreso-2026/output/legislativo/fuerzas-externas/ (público)
@@ -58,6 +72,7 @@ CACHE = OUT / '_cache'
 INTERNAS = REPO / 'Bases de datos' / 'legislativo' / 'fuerzas-internas-2026.json'
 S3_DIR = 's3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/fuerzas-externas/'
 API = 'https://rr-auth.reruizc.workers.dev/caudal/api'
+ORDENES_URL = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/ordenes-vigentes.json'
 DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
 DEEPSEEK_MODEL = 'deepseek-v4-flash'
 PV = 'fx2'          # súbelo al cambiar el prompt: invalida la caché del modelo
@@ -98,7 +113,8 @@ def call(payload, intentos=3):
 
 
 def tok_num(s):
-    m = re.search(r'0*(\d{1,4})\s*/\s*(?:20)?(\d{2})', str(s or ''))
+    """«219/26» · «447/2026C» · «011 de 2025 Senado» → «219/26»."""
+    m = re.search(r'0*(\d{1,4})\s*(?:/|\bde\b)\s*(?:20)?(\d{2})(?!\d)', str(s or ''), re.I)
     return f'{int(m.group(1))}/{m.group(2)}' if m else None
 
 
@@ -214,6 +230,73 @@ CANON = [
 ]
 
 
+RX_ENTIDAD = re.compile(r'^(el |la |los |las )?(gobierno|ministeri|minister|superintendenci|agencia|anla|corporaciones? autonom|'
+                        r'car |alcald|gobernaci|departament|municipi|distrit|servicio geologico|ungrd|unidad |instituto |icbf|'
+                        r'sena\b|direccion |comision de regulacion|crc\b|creg\b|cra\b|dian\b|banco de la republica|fondo |'
+                        r'registradur|policia|fuerzas? (militares|publica)|ejercito|armada|fiscal|procuradur|contralor|defensor|'
+                        r'consejo nacional|consejo superior|rama judicial|jueces|juzgados|tribunal|corte |entidades? (publicas|territoriales|del estado)|'
+                        r'autoridades|empresas sociales del estado|ese\b|hospitales publicos|instituciones educativas oficiales|secretar|'
+                        r'dane\b|dnp\b|departamento nacional|departamento administrativo|colombia compra|invima|ica\b|ideam|parques nacionales|'
+                        r'servicio nacional|ministerio|presidencia|vicepresidencia|consejer|comisionad)')
+# colectivos que no son nadie en particular: no se publican como actor
+VAGOS = {'todas las personas', 'personas', 'la ciudadania', 'ciudadania', 'ciudadanos', 'la poblacion', 'poblacion',
+         'toda la poblacion', 'los colombianos', 'habitantes', 'el estado', 'estado', 'estado colombiano',
+         'terceros', 'sujetos obligados', 'destinatarios', 'beneficiarios', 'interesados', 'particulares', 'usuarios'}
+
+
+VAGO_RX = re.compile(r'^(las? |los? )?(entidades (competentes|del orden|publicas y privadas|responsables)|personas naturales|'
+                     r'toda persona|todas las (entidades|personas)|sector (productivo|publico y privado)|autoridades competentes|'
+                     r'actores|demas entidades|instancias|organismos competentes)')
+SIGLAS = {'sgc': 'Servicio Geológico Colombiano', 'ungrd': 'Unidad Nacional para la Gestión del Riesgo de Desastres',
+          'mintic': 'Ministerio de Tecnologías de la Información y las Comunicaciones', 'anla': 'ANLA',
+          'minvivienda': 'Ministerio de Vivienda', 'minagricultura': 'Ministerio de Agricultura y Desarrollo Rural',
+          'minambiente': 'Ministerio de Ambiente y Desarrollo Sostenible', 'minhacienda': 'Ministerio de Hacienda',
+          'minsalud': 'Ministerio de Salud', 'mineducacion': 'Ministerio de Educación', 'dnp': 'Departamento Nacional de Planeación',
+          'dane': 'DANE', 'ica': 'Instituto Colombiano Agropecuario (ICA)', 'icbf': 'ICBF', 'sena': 'SENA', 'dian': 'DIAN',
+          'crc': 'Comisión de Regulación de Comunicaciones', 'creg': 'CREG', 'sic': 'Superintendencia de Industria y Comercio'}
+_PARTE_ENT = r'(?:el |la |los |las )?(?:Ministeri|Minist|Superintend|Agencia|Corporaci|Unidad|Instituto|Servicio|Gobierno|Departamento|Direcci|Comisi|Fondo|Banco|ANLA|UNGRD|SGC|Min[A-Z]|ICA\b|DNP|DANE|SENA|ICBF|DIAN|CRC|CREG|SIC\b)'
+
+
+def partes_obligado(nombre):
+    """«SGC, UNGRD y MinTIC» → tres entidades. Solo se parte si TODAS las
+    piezas son entidades: «Departamentos de Atlántico, Bolívar y Cesar» o
+    «Ministerio de Minas y Energía» quedan enteros."""
+    s = re.sub(r'\s+', ' ', str(nombre or '')).strip()
+    piezas = [p.strip(' .;:') for p in re.split(r',\s*|\s+y\s+(?=' + _PARTE_ENT + ')', s) if p.strip(' .;:')]
+    if len(piezas) > 1 and all(re.match(_PARTE_ENT, p) for p in piezas):
+        return piezas
+    return [s]
+
+
+def canon_obligado(nombre):
+    n = norm(nombre)
+    if n in SIGLAS:
+        return SIGLAS[n]
+    m = re.match(r'^(el |la )?ministr[oa] de (.+)$', n)
+    if m:
+        return 'Ministerio de ' + nombre.split(' de ', 1)[1]
+    return nombre
+
+
+def tipo_obligado(nombre):
+    n = norm(nombre)
+    if RX_ENTIDAD.match(n):
+        return 'entidad'
+    if re.match(r'^(universidad|instituciones de educacion superior)', n):
+        return 'academia'
+    return 'grupo'
+
+
+def limpia_obligado(nombre):
+    """«operadores de telecomunicaciones (TELCO)» → «Operadores de telecomunicaciones (TELCO)»;
+    descarta los vacíos y los demasiado vagos para pedirles cita."""
+    s = re.sub(r'\s+', ' ', str(nombre or '')).strip(' .;:,')
+    if not s or len(s) < 3 or len(s) > 110 or norm(s) in VAGOS or VAGO_RX.match(norm(s)):
+        return None
+    s = canon_obligado(s)
+    return s[0].upper() + s[1:]
+
+
 def canon_actor(nombre, tipo):
     """→ (nombre, tipo) canónicos, o None si hay que descartarlo."""
     n = norm(nombre)
@@ -278,9 +361,71 @@ def deepseek(key, user):
 
 
 # ─────────────────────────────────────────────────────────────── proyecto
+ART_S3 = 's3://caudal-legislativo/metadata/articulado.json'
+_ART = {'idx': None, 'v': None, 'n': 0}
+
+
+def articulado_index():
+    """(cámara, número) → articulado, de la extracción publicada en S3."""
+    if _ART['idx'] is not None:
+        return _ART['idx']
+    _ART['idx'] = {}
+    dst = CACHE / 'articulado.json'
+    CACHE.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(['aws', 's3', 'cp', ART_S3, str(dst), '--quiet'], check=True, timeout=180)
+        d = json.loads(dst.read_text())
+    except Exception as err:                                # noqa: BLE001
+        print('  ! no bajó el articulado de S3, se usa la API:', err, file=sys.stderr)
+        return _ART['idx']
+    _ART['v'], _ART['n'] = d.get('v'), d.get('n')
+    for a in (d.get('por_proyecto') or {}).values():
+        for cam, num in (('S', a.get('numero_senado')), ('C', a.get('numero_camara'))):
+            t = tok_num(num)
+            if t:
+                _ART['idx'].setdefault((cam, t), []).append(a)
+    return _ART['idx']
+
+
+def _palabras(z):
+    return {w for w in norm(z).split() if len(w) > 4 and w not in STOP}
+
+
+def _titulo_casa(a, *titulos):
+    """Mismo arranque del título, o (para los títulos que salen del PDF del
+    orden del día, que no vienen idénticos) ≥ 60 % de palabras en común."""
+    ta = a.get('titulo') or a.get('titulo_leido')
+    t = norm(ta)[:60]
+    if not t:
+        return False
+    for z in titulos:
+        if not z:
+            continue
+        if t == norm(z)[:60]:
+            return True
+        A, B = _palabras(ta), _palabras(z)
+        if A and B and len(A & B) / min(len(A), len(B)) >= .6:
+            return True
+    return False
+
+
+def articulado_de(x):
+    """El articulado del radicado, por número, con su título verificado (el
+    número se repite entre legislaturas y entre cámaras). None si no hay o si
+    ningún título casa: antes de prestar el texto de otro proyecto, nada."""
+    idx = articulado_index()
+    for cam, num in (('S', x.get('numero_senado')), ('C', x.get('numero_camara'))):
+        t = tok_num(num)
+        for a in (idx.get((cam, t)) or []) if t else []:
+            if _titulo_casa(a, x.get('titulo')):
+                return a
+    return None
+
+
 def ficha(x):
     """Ficha de Caudal para el radicado: se resuelve por título y se confirma
-    por número. El articulado solo vale si su título casa con el proyecto."""
+    por número. El articulado solo vale si su título casa con el proyecto.
+    Respaldo de articulado_de() cuando el archivo de S3 no está."""
     q = ' '.join(norm(x['titulo']).split()[:14])
     r = call({'action': 'buscar', 'query': q, 'limit': 10, 'anio_min': 2026}) or {}
     tS, tC = tok_num(x.get('numero_senado')), tok_num(x.get('numero_camara'))
@@ -299,23 +444,74 @@ def ficha(x):
     return f, art
 
 
-def prensa(x):
-    P = palabras_tema(x['titulo'])
-    if len(P) < 2:
-        return P, []
+# verbos y sustantivos de trámite que abren muchos títulos y no dicen el tema:
+# con ellos la consulta «reconoce derecho eleccion aplicacion» no trae nada.
+# Solo para la SEGUNDA consulta: la primera sigue siendo la de la página.
+GENERICAS_TEMA = set(('reconoce reconocen derecho derechos marco general politica estado fortalecer focalizacion '
+                      'eficiencia sostenibilidad financiera constituye constituyen establecen competencias '
+                      'organizacion funcionamiento implementa implementar medidas mecanismos sistema programa '
+                      'creacion nueva nuevo integral publica publico nacionales especial especiales '
+                      'aplicacion eleccion otorgado otorgada fuentes financiacion modificacion adicion '
+                      'parcialmente promover impulsar regimen').split())
+
+
+# palabras que casan con media prensa: dos de ellas juntas («región Caribe»)
+# no prueban que el titular hable del proyecto (salían reinados y tarifas).
+COMUNES_TEMA = set(('region caribe pacifico andina orinoquia amazonia departamento departamentos municipio '
+                    'municipios ciudad ciudades servicio servicios sistema salud educacion trabajo social sociales '
+                    'gobierno personas familias desarrollo nacional fondo').split())
+
+
+def _consulta(P, minimo=2):
     d = call({'action': 'medios', 'query': ' '.join(P[:4]), 'dias': DIAS}) or {}
     raiz = [w[:6] for w in P]
+    comun = {w[:6] for w in COMUNES_TEMA}
     res = []
     for r in d.get('resultados') or []:
         t = ' ' + norm(r.get('titulo')) + ' '
-        if sum(1 for w in raiz if ' ' + w in t) >= 2:
+        hit = [w for w in raiz if ' ' + w in t]
+        if len(hit) >= min(minimo, len(raiz)) and (len(raiz) == 1 or any(w not in comun for w in hit)):
             res.append({'titulo': r.get('titulo'), 'url': r.get('url'), 'medio': r.get('medio'),
                         'fecha': (r.get('fecha') or '')[:10]})
-    return P, res[:30]
+    return res
+
+
+def palabras_fuertes(titulo):
+    """Las palabras del título que nombran el TEMA, sin las de trámite."""
+    s = TITLE_PREF.sub('', str(titulo or ''))
+    Q = []
+    for w in norm(s).split():
+        if len(w) > 4 and w not in STOP and w not in GENERICAS_TEMA and w not in Q:
+            Q.append(w)
+    return Q[:5]
+
+
+def prensa(x):
+    """Titulares sobre el tema. Se busca con las palabras FUERTES del título
+    («marco general política estado bioeconomía» traía notas de Marco Rubio);
+    si queda una sola y es larga (≥ 8 letras, «bioeconomia»), basta con ella.
+    Si no hay palabras fuertes, se cae a las de la página."""
+    Q = palabras_fuertes(x['titulo'])
+    P = palabras_tema(x['titulo'])
+    res, usadas = [], []
+    if len(Q) >= 2:
+        res, usadas = _consulta(Q), Q
+    elif len(Q) == 1 and len(Q[0]) >= 8:
+        res, usadas = _consulta(Q, minimo=1), Q
+    # la consulta de la página, con el mismo filtro, suma lo que Google News
+    # devuelve distinto para otra combinación de palabras
+    if len(P) >= 2 and P[:4] != usadas[:4] and (len(usadas) >= 2 or not usadas):
+        vistos = {r['url'] for r in res}
+        res += [r for r in _consulta(P) if r['url'] not in vistos]
+        usadas = usadas or P
+    res.sort(key=lambda r: r.get('fecha') or '', reverse=True)
+    return usadas, res[:30]
 
 
 def actores_de(x, D, key, congresistas):
-    f, art = ficha(x)
+    art = articulado_de(x)
+    if art is None and not _ART['n']:
+        _, art = ficha(x)                                   # sin el archivo de S3
     P, tit = prensa(x)
     ap = (art or {}).get('aplica_a') or {}
     sectores = [s for s in (ap.get('sectores') or []) if s != 'multisectorial']
@@ -337,12 +533,49 @@ def actores_de(x, D, key, congresistas):
                      'peso': 0, 'cerca': .25, 'cerca_por': 'prensa', '_t': set()}
         return A[kk]
 
-    # 1) nombrados en el texto
+    # 0) lo que el texto le exige a cada quien: el obligado entra con cerca 1
+    #    y con la lista de lo que se le exige. Lo que el proyecto CREA no entra.
+    creado = norm(' '.join([str((art or {}).get('resumen') or ''), x['titulo']]))
+
+    def lo_crea(n):
+        nn = norm(n)
+        return bool(nn) and re.search(r'\b(crea(n|r)?|constituye(n)?|conforma(n)?|instituye(n)?) (el |la |los |las |un |una )?' + re.escape(nn[:40]), creado) is not None
+
+    def del_texto(crudo):
+        out = []
+        for pieza in partes_obligado(crudo):
+            quien = limpia_obligado(pieza)
+            if not quien or lo_crea(quien):
+                continue
+            e = next(iter(D.buscar(quien).values()), None)
+            if e and not es_medio(e):
+                out.append(poner(e['nombre'], tipo_de(e), e['sector'], e['k']))
+                continue
+            c = canon_actor(quien, tipo_obligado(quien))
+            if c:
+                tp = c[1] if c[1] in ('entidad', 'persona') else tipo_obligado(c[0])
+                out.append(poner(c[0], tp))
+        return out
+
+    for o in (art or {}).get('obligaciones') or []:
+        ob = re.sub(r'\s+', ' ', str(o.get('obligacion') or '')).strip()
+        for a in del_texto(o.get('sobre_quien')):
+            a['cerca'], a['cerca_por'] = 1.0, 'obliga'
+            ex = a.setdefault('exige', [])
+            if ob and ob not in ex and len(ex) < 3:
+                ex.append(ob[:220] + ('' if not o.get('plazo') else f" (plazo: {str(o['plazo'])[:60]})"))
+    # 1) nombrados en el texto: los sujetos a los que dice aplicar
+    for suj in (ap.get('sujetos') or [])[:12]:
+        for a in del_texto(suj):
+            if a['cerca_por'] != 'obliga':
+                a['cerca'], a['cerca_por'] = 1.0, 'nombrado'
+    #    y las empresas o gremios del diccionario que aparecen en el texto
     for e in en_texto.values():
         if es_medio(e):
             continue
         a = poner(e['nombre'], tipo_de(e), e['sector'], e['k'])
-        a['cerca'], a['cerca_por'] = 1.0, 'nombrado'
+        if a['cerca_por'] != 'obliga':
+            a['cerca'], a['cerca_por'] = 1.0, 'nombrado'
     # 2) gremios del sector que el texto regula
     gremios = [e for e in DIC.EMPRESAS if e['tipo'] == 'gremio' and e['sector'] in sectores[:2]]
     for e in gremios[:8]:
@@ -411,15 +644,23 @@ def actores_de(x, D, key, congresistas):
     for a in A.values():
         a['peso'] = len(a.pop('_t'))
         out.append(a)
-    out.sort(key=lambda a: (-(a['postura'] is not None), -a['cerca'], -a['peso'], a['n']))
+    out.sort(key=lambda a: (-(a['postura'] is not None), -a['cerca'], -(a['cerca_por'] == 'obliga'), -a['peso'], a['n']))
+    base = (art or {}).get('base')
+    solo_titulo = base == 'titulo'
     return {
         'v': date.today().isoformat(), 'numero': (x.get('numero_senado') if x['_cam'] == 'Senado' else x.get('numero_camara')),
         'camara': x['_cam'], 'titulo': x['titulo'], 'sectores': sectores, 'sujetos': (ap.get('sujetos') or [])[:10],
-        'articulado': bool(art), 'palabras': P, 'n_titulares': len(tit), 'dias': DIAS,
+        'articulado': bool(art), 'art_base': base, 'art_confianza': (art or {}).get('confianza'),
+        'art_modelo': (art or {}).get('modelo'), 'art_v': _ART['v'],
+        'n_obligados': sum(1 for a in out if a['cerca_por'] == 'obliga'),
+        'palabras': P, 'n_titulares': len(tit), 'dias': DIAS,
         'actores': out[:MAX_ACTORES],
-        'nota': ('Actores tomados del texto del proyecto, del diccionario de gremios y empresas de Caudal y de '
+        'nota': ('Actores tomados del texto del proyecto (a quién le impone obligaciones y a quién dice aplicar), '
+                 'del diccionario de gremios y empresas de Caudal y de '
                  f'los titulares sobre el tema de los últimos {DIAS} días.'
-                 + ('' if art else ' Este proyecto todavía no tiene el articulado leído, así que nadie aparece como «nombrado en el texto».')),
+                 + (' Este proyecto todavía no tiene el articulado leído, así que nadie aparece como «nombrado en el texto».' if not art
+                    else ' Del texto solo leímos el título, así que la lista de obligados puede estar incompleta.' if solo_titulo
+                    else ' Lo que el texto exige a cada actor lo resume un modelo de lenguaje local sobre el radicado: ábrelo antes de citarlo.')),
     }
 
 
@@ -430,6 +671,7 @@ def main():
     ap.add_argument('--hilos', type=int, default=3)
     ap.add_argument('--subir', action='store_true')
     ap.add_argument('--saltar', action='store_true', help='no rehace los que ya tienen archivo')
+    ap.add_argument('--hoy', action='store_true', help='solo los proyectos del orden del día de hoy (ordenes-vigentes.json)')
     args = ap.parse_args()
 
     r = call({'action': 'radicados'}) or {}
@@ -443,6 +685,41 @@ def main():
     if args.solo:
         t = tok_num(args.solo)
         vivos = [x for x in vivos if t in (tok_num(x.get('numero_senado')), tok_num(x.get('numero_camara')))]
+    if args.hoy:
+        hoy = time.strftime('%Y-%m-%d', time.gmtime(time.time() - 5 * 3600))   # Bogotá
+        with urllib.request.urlopen(urllib.request.Request(ORDENES_URL, headers={'User-Agent': 'mi-congreso-fuerzas'}), timeout=60) as r:
+            raw = r.read()
+        if raw[:2] == b'\x1f\x8b':
+            import gzip
+            raw = gzip.decompress(raw)
+        O = json.loads(raw).get('ordenes') or []
+        pedidos = {}
+        for o in O:
+            if not (o.get('fecha') <= hoy <= (o.get('fecha_fin') or o.get('fecha'))):
+                continue
+            cam = 'S' if re.search(r'senado', o.get('corporacion') or '', re.I) else 'C'
+            for pr in o.get('proyectos') or []:
+                m = re.search(r'(c[aá]mara|senado)\b', str(pr.get('numero') or ''), re.I)
+                c = ('S' if m.group(1).lower() == 'senado' else 'C') if m else cam
+                t = tok_num(pr.get('numero'))
+                if t and pr.get('titulo'):
+                    pedidos.setdefault((c, t), pr)
+        print(f'orden del día de {hoy}: {len(pedidos)} proyectos citados')
+
+        def clave(x):
+            return ('S', tok_num(x.get('numero_senado'))) if x['_cam'] == 'Senado' else ('C', tok_num(x.get('numero_camara')))
+        vivos = [x for x in vivos if clave(x) in pedidos]
+        # los de una legislatura anterior que siguen en trámite no están en
+        # `radicados`: se arman con lo que trae el orden del día
+        ya = {clave(x) for x in vivos}
+        for (c, t), pr in pedidos.items():
+            if (c, t) in ya:
+                continue
+            num = f"{int(t.split('/')[0])}/{t.split('/')[1]}"
+            vivos.append({'titulo': pr.get('titulo'), 'estado': '', '_cam': 'Senado' if c == 'S' else 'Cámara',
+                          'numero_senado': num if c == 'S' else None, 'numero_camara': num if c == 'C' else None,
+                          '_del_orden': True})
+        print(f'  {len(ya)} de la legislatura viva · {len(vivos) - len(ya)} de legislaturas anteriores')
     if args.saltar:
         vivos = [x for x in vivos if not (OUT / f'{tok_proyecto(x)}.json').exists()]
     if args.max:

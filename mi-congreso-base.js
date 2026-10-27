@@ -518,7 +518,8 @@
      por parecido de título solo). El articulado se valida contra el título:
      medido oct-2026, a los proyectos de Cámara de la legislatura viva les
      llega a veces el articulado de OTRO proyecto, y eso no se puede mostrar. */
-  const tokNum=s=>{ const m=String(s||'').match(/0*(\d{1,4})\s*\/\s*(?:20)?(\d{2})/); return m?`${+m[1]}/${m[2]}`:null; };
+  /* «219/26» · «447/2026C» · «011 de 2025 Senado» (así escribe el orden del día) */
+  const tokNum=s=>{ const m=String(s||'').match(/0*(\d{1,4})\s*(?:\/|\bde\b)\s*(?:20)?(\d{2})(?!\d)/i); return m?`${+m[1]}/${m[2]}`:null; };
   const normT=s=>norm(s).replace(/[^a-z0-9ñ ]/g,' ').replace(/\s+/g,' ').trim();
   function fichaDe(x){
     const key=String(x.numero_senado||'')+'|'+String(x.numero_camara||'');

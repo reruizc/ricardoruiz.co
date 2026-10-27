@@ -98,7 +98,7 @@
 
   <script src="legislativo-base.js"></script>
   <script src="legislativo-electos.js"></script>
-  <script src="mi-congreso-base.js?v=20261023"></script>
+  <script src="mi-congreso-base.js?v=20261027"></script>
   <script>
   (async function(){
     const e=MC.pagina('fuerzas'); if(!e) return;
@@ -109,6 +109,18 @@
 
     const [com,I,mios,ord]=await Promise.all([MC.comision(e),MC.internas().catch(()=>null),MC.mios(e).catch(()=>[]),MC.ordenes().catch(()=>({vigentes:[]}))]);
     const vivos=mios.filter(x=>!etapaEf(x).fin);
+    /* los proyectos que se discuten HOY (orden del día), suyos o no: muchos
+       son de la legislatura anterior y no salen en el buscador de radicados */
+    const HOY=(()=>{ const h=MC.hoyBog(), vistos=new Set(), out=[];
+      (ord.vigentes||[]).filter(o=>o.fecha<=h&&h<=(o.fecha_fin||o.fecha)).forEach(o=>{
+        const camO=/senado/i.test(o.corporacion||'')?'Senado':'Cámara';
+        (o.proyectos||[]).forEach(p=>{ if(!p.titulo) return;
+          const m=String(p.numero||'').match(/(c[aá]mara|senado)\b/i), cam=m?(/^s/i.test(m[1])?'Senado':'Cámara'):camO;
+          const t=MC.tokNum(p.numero); if(!t) return; const k=cam+t; if(vistos.has(k)) return; vistos.add(k);
+          const x={titulo:p.titulo,estado:'',_cam:cam,numero_senado:cam==='Senado'?p.numero:null,numero_camara:cam==='Cámara'?p.numero:null,comision:/plenaria/i.test(o.ambito||'')?'':(o.ambito||'')};
+          out.push(Object.assign(MC.proyectoDe(x,e,ord.vigentes),{_hoy:MC.ambitoNice(o.ambito||o.corporacion)}));
+        }); });
+      return out; })();
 
     /* ── selector: sus proyectos + cualquier proyecto en trámite ──────── */
     const sel=$('fz-sel');
@@ -116,6 +128,7 @@
     function opciones(){
       sel.innerHTML=(EXTRA?`<option value="extra">Buscado: ${esc(opt(EXTRA))}</option>`:'')
         +(vivos.length?`<optgroup label="Tus proyectos vivos">${vivos.map((x,i)=>`<option value="${i}">${esc(opt(x))}</option>`).join('')}</optgroup>`:'')
+        +(HOY.length?`<optgroup label="En el orden del día de hoy">${HOY.map((x,i)=>`<option value="h${i}">${esc(`${numDe(x)||'—'} · ${cut(shortTitle(x.titulo),80)} · ${x._hoy}`)}</option>`).join('')}</optgroup>`:'')
         +(com.key?`<option value="mia">— Sin proyecto: ${esc(com.nombre)} vista desde tu bancada</option>`:'');
       sel.disabled=!sel.options.length;
     }
@@ -123,13 +136,14 @@
     const pIni=PARAMS.get('p');
     if(pIni==='mia'&&com.key) sel.value='mia';
     else if(pIni&&vivos.some(x=>numDe(x)===pIni)) sel.value=String(vivos.findIndex(x=>numDe(x)===pIni));
+    else if(pIni&&HOY.some(x=>numDe(x)===pIni)) sel.value='h'+HOY.findIndex(x=>numDe(x)===pIni);
     else if(pIni){
       /* un proyecto que no es suyo: se busca entre todos los radicados */
       try{ const T=await MC.radicadosTodos(); const r=T.find(x=>numDe(x)===pIni||x.numero_senado===pIni||x.numero_camara===pIni);
         if(r){ EXTRA=MC.proyectoDe(r,e,ord.vigentes); opciones(); sel.value='extra'; } }catch(err){}
     }
     if(!sel.value&&sel.options.length) sel.selectedIndex=0;
-    function setURL(){ const u=new URL(location.href); const v=sel.value; u.searchParams.set('p',v==='mia'?'mia':v==='extra'?numDe(EXTRA):numDe(vivos[+v])); u.searchParams.delete('c'); if(VISTA==='ext') u.searchParams.set('v','ext'); else u.searchParams.delete('v'); history.replaceState(null,'',u); }
+    function setURL(){ const u=new URL(location.href); const v=sel.value; u.searchParams.set('p',v==='mia'?'mia':v==='extra'?numDe(EXTRA):v[0]==='h'?numDe(HOY[+v.slice(1)]):numDe(vivos[+v])); u.searchParams.delete('c'); if(VISTA==='ext') u.searchParams.set('v','ext'); else u.searchParams.delete('v'); history.replaceState(null,'',u); }
     sel.onchange=()=>{ pinta(); setURL(); };
 
     /* buscador: número («219/26», «447») o palabras del título, entre los
@@ -180,7 +194,7 @@
     /* ── pintar un proyecto ───────────────────────────────────────────── */
     function pinta(){
       const my=++SEQ;
-      X=sel.value==='mia'?null:sel.value==='extra'?EXTRA:vivos[+sel.value];
+      X=sel.value==='mia'?null:sel.value==='extra'?EXTRA:sel.value[0]==='h'?HOY[+sel.value.slice(1)]:vivos[+sel.value];
       CORP=X?(X._cam==='Senado'?'senado':'camara'):(e.corp==='SENADO'?'senado':'camara');
       COMK=X?MC.comKeyDe(X.comision):com.key;
       const forz=PARAMS.get('c'); if(X&&!COMK&&forz&&MC.COM_KEYS.includes(forz)) COMK=forz;
@@ -328,9 +342,12 @@
        conversación) · tamaño = peso en la conversación del tema.
        Datos: legislativo/fuerzas-externas/{S|C}-{num}-{aa}.json
        (tools/mi-congreso/build_fuerzas_externas.py). */
-    const TIPO_COL={gremio:'#b45309',empresa:'#0047FF',entidad:'#15803d',organizacion:'#7c3aed',academia:'#0e7490',persona:'#5d6271'};
-    const TIPO_T={gremio:'Gremio',empresa:'Empresa',entidad:'Entidad pública',organizacion:'Organización social',academia:'Academia o centro de estudios',persona:'Persona'};
-    const CERCA_T={nombrado:'el texto lo nombra',sector:'es del sector que regula',prensa:'aparece en la conversación'};
+    const TIPO_COL={gremio:'#b45309',empresa:'#0047FF',entidad:'#15803d',organizacion:'#7c3aed',academia:'#0e7490',persona:'#5d6271',grupo:'#be185d'};
+    const TIPO_T={gremio:'Gremio',empresa:'Empresa',entidad:'Entidad pública',organizacion:'Organización social',academia:'Academia o centro de estudios',persona:'Persona',grupo:'Sector o grupo al que le aplica'};
+    /* «obliga» = el articulado le impone una obligación (sale de la extracción
+       del texto radicado, con lo que le exige en a.exige) */
+    const CERCA_T={obliga:'el texto le impone obligaciones',nombrado:'el texto lo nombra',sector:'es del sector que regula',prensa:'aparece en la conversación'};
+    const enTexto=a=>a.cerca_por==='obliga'||a.cerca_por==='nombrado';
     function plano(D){
       const W=640,H=420,m={l:34,r:16,t:22,b:40}, iw=W-m.l-m.r, ih=H-m.t-m.b;
       const band=.16;                       /* ancho de la franja «sin posición» */
@@ -385,7 +402,7 @@
     }
     function tipActor(a){
       const pt=a.postura==null?'No se ha pronunciado en la prensa revisada':a.postura>0?`A favor (${a.postura>=.66?'claro':'con matices'})`:`En contra (${a.postura<=-.66?'claro':'con matices'})`;
-      return `<h5>${esc(a.n)}</h5><div>${esc(TIPO_T[a.tipo]||a.tipo||'')}${a.sector?' · '+esc(a.sector.replace(/_/g,' ')):''}</div><div style="margin-top:.25rem"><b>${esc(pt)}</b></div><div>Le toca: ${esc(CERCA_T[a.cerca_por]||'')}</div><div>${a.peso||0} titular${a.peso===1?'':'es'} sobre el tema</div>${a.cita?`<div style="margin-top:.3rem;opacity:.85">«${esc(cut(a.cita.titulo,140))}» · ${esc(a.cita.medio||'')}</div>`:''}`;
+      return `<h5>${esc(a.n)}</h5><div>${esc(TIPO_T[a.tipo]||a.tipo||'')}${a.sector?' · '+esc(a.sector.replace(/_/g,' ')):''}</div><div style="margin-top:.25rem"><b>${esc(pt)}</b></div><div>Le toca: ${esc(CERCA_T[a.cerca_por]||'')}</div>${(a.exige||[]).length?`<div style="margin-top:.3rem">El texto le exige:</div><ul style="margin:.15rem 0 0;padding-left:1rem">${a.exige.map(x=>`<li>${esc(cut(x,150))}</li>`).join('')}</ul>`:''}<div style="margin-top:.25rem">${a.peso||0} titular${a.peso===1?'':'es'} sobre el tema</div>${a.cita?`<div style="margin-top:.3rem;opacity:.85">«${esc(cut(a.cita.titulo,140))}» · ${esc(a.cita.medio||'')}</div>`:''}`;
     }
     async function externos(my){
       const pb=$('fz-plano'), ab=$('fz-actores');
@@ -399,12 +416,12 @@
       if(!A.length){ pb.innerHTML='<div class="mc-empty">No encontramos gremios, empresas ni organizaciones que toque este proyecto o que hayan hablado de él. Que nadie se haya movido también es un dato.</div>'; ab.innerHTML=''; return; }
       const conP=A.filter(a=>a.postura!=null), fav=conP.filter(a=>a.postura>0).length, con=conP.length-fav;
       pb.innerHTML=plano(D)+`<div class="mc-legend" style="margin:.5rem 0 .3rem">${Object.keys(TIPO_T).filter(t=>A.some(a=>a.tipo===t)).map(t=>`<span><i style="background:${TIPO_COL[t]}"></i>${esc(TIPO_T[t])}</span>`).join('')}<span>Círculo claro = sin posición pública</span></div>
-        <div class="mc-callout">${conP.length?`<b>${fav}</b> se han pronunciado a favor y <b>${con}</b> en contra. `:'Nadie se ha pronunciado en la prensa revisada. '}${A.length-conP.length?`<b>${A.length-conP.length}</b> ${A.length-conP.length===1?'actor no ha dicho':'actores no han dicho'} nada en público`:'Todos los actores encontrados ya se pronunciaron'}${A.filter(a=>a.postura==null&&a.cerca_por==='nombrado').length?`, y de ellos <b>${A.filter(a=>a.postura==null&&a.cerca_por==='nombrado').length}</b> aparecen nombrados en el texto: son los primeros a quienes buscar`:''}.</div>
+        <div class="mc-callout">${conP.length?`<b>${fav}</b> se han pronunciado a favor y <b>${con}</b> en contra. `:'Nadie se ha pronunciado en la prensa revisada. '}${A.length-conP.length?`<b>${A.length-conP.length}</b> ${A.length-conP.length===1?'actor no ha dicho':'actores no han dicho'} nada en público`:'Todos los actores encontrados ya se pronunciaron'}${A.filter(a=>a.postura==null&&enTexto(a)).length?`, y de ellos <b>${A.filter(a=>a.postura==null&&enTexto(a)).length}</b> aparecen en el texto${A.filter(a=>a.postura==null&&a.cerca_por==='obliga').length?` (<b>${A.filter(a=>a.postura==null&&a.cerca_por==='obliga').length}</b> con obligaciones que les impone)`:''}: son los primeros a quienes buscar`:''}.</div>
         <p class="note">${esc(D.nota||'')} La postura la lee un modelo de lenguaje en el titular y siempre va con la cita: ábrela antes de usarla.</p>`;
       pb.querySelectorAll('.fz-act').forEach(c=>{ const a=A[+c.dataset.i]; MC.tipOn(c,()=>tipActor(a)); });
       const grupos=[['A favor',a=>a.postura!=null&&a.postura>0],['En contra',a=>a.postura!=null&&a.postura<0],['Sin posición pública',a=>a.postura==null]];
-      ab.innerHTML=grupos.map(([t,f])=>{ const L=A.filter(f).sort((p,q)=>(q.cerca||0)-(p.cerca||0)||(q.peso||0)-(p.peso||0)); if(!L.length) return '';
-        return `<div class="fz-g" style="margin-bottom:.9rem"><h4>${esc(t)} · ${L.length}</h4>${L.slice(0,12).map(a=>`<div class="fz-p"><span class="dot" style="background:${TIPO_COL[a.tipo]||'#5d6271'}"></span><span class="nm">${esc(a.n)}</span><small>${esc(TIPO_T[a.tipo]||'')} · ${esc(CERCA_T[a.cerca_por]||'')}${a.cita?` · <a href="${esc(a.cita.url||'#')}" target="_blank" rel="noopener">${esc(a.cita.medio||'cita')} ↗</a>`:''}</small></div>`).join('')}${L.length>12?`<p class="note">y ${L.length-12} más en el plano.</p>`:''}</div>`; }).join('');
+      ab.innerHTML=grupos.map(([t,f])=>{ const L=A.filter(f).sort((p,q)=>(q.cerca||0)-(p.cerca||0)||((q.cerca_por==='obliga')-(p.cerca_por==='obliga'))||(q.peso||0)-(p.peso||0)); if(!L.length) return '';
+        return `<div class="fz-g" style="margin-bottom:.9rem"><h4>${esc(t)} · ${L.length}</h4>${L.slice(0,12).map(a=>`<div class="fz-p"><span class="dot" style="background:${TIPO_COL[a.tipo]||'#5d6271'}"></span><span class="nm">${esc(a.n)}</span><small>${esc(TIPO_T[a.tipo]||'')} · ${esc(CERCA_T[a.cerca_por]||'')}${(a.exige||[]).length?` · le exige: ${esc(cut(a.exige[0],110))}`:''}${a.cita?` · <a href="${esc(a.cita.url||'#')}" target="_blank" rel="noopener">${esc(a.cita.medio||'cita')} ↗</a>`:''}</small></div>`).join('')}${L.length>12?`<p class="note">y ${L.length-12} más en el plano.</p>`:''}</div>`; }).join('');
     }
 
     vista(VISTA);
