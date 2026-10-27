@@ -4405,6 +4405,20 @@ def _do_es_suya(ent_fold, inter):
 
 DO_VENTANA_DIAS = 60
 
+# Ámbitos de las fuentes de entidades: lo que solo le sirve a quien sigue ese
+# frente (los conceptos de Colombia Compra son de contratación estatal).
+_AMBITOS = {'contratacion_publica': ('contrat', 'compra publica', 'compras publicas', 'secop',
+                                     'colombia compra')}
+
+
+def _ambito_ok(r, s):
+    amb = r.get('ambito')
+    if not amb:
+        return True
+    pistas = _AMBITOS.get(amb, ())
+    mira = ' '.join(_fold_q(x) for x in (s.get('temas') or []) + (s.get('interlocutores') or []))
+    return any(p in mira for p in pistas)
+
 
 def _do_para_perfil(s, cap=5, emps=None):
     """Resoluciones, circulares y acuerdos publicados en el Diario Oficial que
@@ -4461,6 +4475,8 @@ def _do_para_perfil(s, cap=5, emps=None):
     for r in _entidades_jsonl('normas'):
         f = r.get('fecha') or ''
         if f < corte or f > datetime.date.today().isoformat():
+            continue
+        if not _ambito_ok(r, s):
             continue
         ef = _fold_q(r.get('entidad') or '')
         if (ef, r.get('numero'), r.get('anio')) in ya:
@@ -4529,7 +4545,7 @@ def _eventos_oficiales(s, cap=3):
     hoy = datetime.date.today().isoformat()
     out = []
     for e in _entidades_jsonl('eventos'):
-        if (e.get('dia') or '') < hoy:
+        if (e.get('dia') or '') < hoy or not _ambito_ok(e, s):
             continue
         toca = next((t for t, rx in temas_rx if rx.search(e.get('q') or '')), None)
         suya = bool(inter) and _do_es_suya(_fold_q(e.get('entidad') or ''), inter)

@@ -115,7 +115,36 @@ def fuente_ssf():
     return borr, normas, eventos
 
 
-FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), ('ssf', fuente_ssf)]
+def fuente_cce():
+    """Colombia Compra: convocatorias de participación ciudadana (las que ya
+    enlazan a SUCOP no se repiten), circulares, conceptos de la relatoría y
+    capacitaciones."""
+    raw = C.RAW / 'cce'
+    ent, sector, fuente = 'Agencia Nacional de Contratación Pública · Colombia Compra Eficiente', 'Planeación', 'cce'
+    hoy = datetime.date.today().isoformat()
+    items = (C.leer(raw / 'proyectos.json', {}) or {}).get('items', {})
+    borr = []
+    for r in items.values():
+        if r.get('sucop_id'):
+            continue
+        b = borrador_sucop(r, ent, sector, fuente, hoy)
+        if r.get('objeto'):
+            b['objeto'] = r['objeto']
+        borr.append(b)
+    # Todo lo de Colombia Compra trata de contratación estatal: un concepto sobre
+    # «seguridad social» del contratista no es del tema «seguridad social» de una
+    # caja de compensación. `ambito` le dice al radar que solo lo use con clientes
+    # que siguen la contratación pública (ver _ambito_ok en la Lambda).
+    normas = [{**norma_ejecutivo(r, ent, fuente), 'ambito': 'contratacion_publica'}
+              for r in (C.leer(raw / 'normas.json', {}) or {}).get('items', []) if r.get('descripcion')]
+    eventos = [{**e, 'entidad': ent, 'fuente': fuente, 'ambito': 'contratacion_publica',
+                'q': _q(e.get('titulo'), e.get('descripcion'))}
+               for e in (C.leer(raw / 'eventos.json', {}) or {}).get('items', [])]
+    return borr, normas, eventos
+
+
+FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), ('ssf', fuente_ssf),
+           ('cce', fuente_cce)]
 
 
 def build():
