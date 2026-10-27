@@ -2519,7 +2519,7 @@ function candadoDetalle() {
 document.addEventListener('click', e => {
   if (!CRM_VITRINA) return;
   const el = e.target.closest('#crm .crm-grid .module:not(.crm-vote-target) :is(button, a, input)');
-  if (!el || el.classList.contains('enlace-boton') || el.classList.contains('meta-i')) return;
+  if (!el || el.classList.contains('enlace-boton') || el.classList.contains('meta-i') || el.closest('.estr-ayuda, .estr-ayuda-pop')) return;
   e.preventDefault(); e.stopPropagation();
   const modulo = el.closest('.module')?.querySelector('.panel-num')?.textContent.replace(/^\d+\s*·\s*/, '') || 'Este módulo';
   abrirPaywall(`${modulo} se abre con el acceso a Candidato 360.`);
@@ -5226,6 +5226,13 @@ function pintarTemasEstr(temas) {
   ul.innerHTML = (temas || []).map(t => `<li>${escHtml(t)}</li>`).join('');
   ul.classList.toggle('hidden', !(temas || []).length);
 }
+/* El «?» junto al título: qué muestra la tarjeta, en corto. */
+function mostrarAyudaEstr(ev) {
+  ev?.stopPropagation();
+  const pop = $('crmEstrAyuda'); if (!pop) return;
+  pop.classList.toggle('hidden');
+}
+document.addEventListener('click', e => { const pop = $('crmEstrAyuda'); if (pop && !pop.classList.contains('hidden') && !e.target.closest('.estr-ayuda-pop, .estr-ayuda')) pop.classList.add('hidden'); });
 const SEMANA_ROT = 'Esta semana, tu estrategia se aterriza así:';
 /* «Ya tengo una causa específica» (27-oct-2026): la razón por la que la
    persona quiere movilizar. Se guarda en la campaña (/c360/campana, campo
@@ -5373,7 +5380,9 @@ async function lecturaIAEstrategia() {
     $('crmEstrCopy').textContent = L.estrategia;
     if (L.temas?.length) pintarTemasEstr(L.temas);
     const n = L.noticia ? NOTICIAS_ESTR[L.noticia - 1] : null;
-    const pie = n ? `A partir de: ${n.url ? `<a href="${escHtml(n.url)}" target="_blank" rel="noopener">«${escHtml(n.titulo)}»</a>` : `«${escHtml(n.titulo)}»`}${n.medio ? ` · ${escHtml(n.medio)}` : ''}` : 'Lectura con IA sobre tus datos';
+    /* Solo «Ver fuente: medio», con el enlace: el titular entero alargaba la caja
+       y quien lo quiera leer entra con un clic (pedido de Ricardo, 27-oct). */
+    const pie = n ? `Ver fuente: ${n.url ? `<a href="${escHtml(n.url)}" target="_blank" rel="noopener" title="${escHtml(n.titulo)}">${escHtml(n.medio || 'la noticia')}</a>` : escHtml(n.medio || 'prensa')}` : 'Lectura con IA sobre tus datos';
     /* El modelo suele arrancar «Esta semana se habla de…»: sin esto salía
        «Esta semana. Esta semana se habla…». */
     const sem = String(L.semana).replace(/^esta semana[,:.]?\s*/i, '');
@@ -5406,7 +5415,9 @@ async function pintarIntroEstrategia() {
   ];
   if (causaActual()) datos.push(['Tu causa', `${causaActual().replace(/\.$/, '')}.`]);
   const top = new Set((R.principios || []).slice(0, 3).map(p => p.id));
-  const ochos = (R.principios || []).map(p => `<li class="${top.has(p.id) ? 'tuya' : ''}"><b>${escHtml(p.corto)}</b>${top.has(p.id) ? '<i>pesa más en tu caso</i>' : ''}</li>`).join('');
+  /* Cada estrategia con su pictograma (assets/candidato-360/estrategias/A1-A8.svg),
+     en el estilo de las imágenes de las fases: así la lista no se ve plana. */
+  const ochos = (R.principios || []).map(p => `<li class="${top.has(p.id) ? 'tuya' : ''}"><img src="assets/candidato-360/estrategias/${escHtml(p.id)}.svg?v=20261027" alt="" width="240" height="160" loading="lazy" onerror="this.remove()"><b>${escHtml(p.corto)}</b>${top.has(p.id) ? '<i>pesa más en tu caso</i>' : ''}</li>`).join('');
   const fecha = R.fase?.eleccion?.fecha ? fechaLarga(R.fase.eleccion.fecha) : 'octubre de 2027';
   $('estrIntro').innerHTML = `<span class="panel-num">Antes de abrirla</span>
     <h3>${escHtml(k.nombre || 'Tu candidatura')}, así construimos tu estrategia.</h3>
