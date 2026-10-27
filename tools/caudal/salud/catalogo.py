@@ -169,6 +169,16 @@ def archivos(leg=None):
              min_bytes=400_000,
              productor='run_diario.sh · harvest_diario_oficial.py actos',
              consumidor='acción `diario-oficial` · tarjeta Diarios y gacetas · radar del cliente (Oeste)'),
+        # Entidades con sitio propio (MinSalud primero, oct-2026): normas y
+        # conceptos que el Ejecutivo mezcla. ~3,9 MB con el normograma de MinSalud.
+        dict(bucket=BUCKET_PRIV, key='metadata/entidades-normas.jsonl', clase='diario',
+             min_bytes=1_500_000,
+             productor='run_diario.sh · tools/caudal/entidades/harvest_*.py + build.py',
+             consumidor='acción `ejecutivo` · radar del cliente (Oeste)'),
+        dict(bucket=BUCKET_PRIV, key='metadata/entidades-eventos.jsonl', clase='diario',
+             min_bytes=10_000,
+             productor='run_diario.sh · tools/caudal/entidades/build.py',
+             consumidor='radar del cliente (Norte · eventos oficiales)'),
         # El pilar Regulatorio dejó de ser manual: desde ago-2026 el cron refresca
         # la Gaceta Ambiental de la ANLA 2x/día y vuelve a consolidar las 12
         # fuentes, así que estos dos se re-suben en cada corrida. Con clase

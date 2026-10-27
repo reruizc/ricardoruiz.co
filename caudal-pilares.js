@@ -148,7 +148,7 @@
   /* ---------- pilar Ejecutivo Nacional · decretos y normativa ---------- */
   const EJE={tipo:'', q:''};
   const EJE_TIPOS=[['','Todas'],['DECRETOS','Decretos'],['RESOLUCIONES','Resoluciones'],['DIRECTIVAS','Directivas'],['CIRCULARES','Circulares'],['ACTOS LEGISLATIVOS','Actos legislativos'],['AGENDA REGULATORIA','Agenda regulatoria'],['LEYES','Leyes']];
-  const EJE_TSING={'DECRETOS':'Decreto','LEYES':'Ley','RESOLUCIONES':'Resolución','DIRECTIVAS':'Directiva','CIRCULARES':'Circular','ACTOS LEGISLATIVOS':'Acto legislativo','AGENDA REGULATORIA':'Agenda regulatoria','RESOLUCIONES DE NOMBRAMIENTOS':'Nombramiento','CONPES':'CONPES','CONSTITUCIÓN POLÍTICA':'Constitución','DECRETO ÚNICO REGLAMENTARIO':'Decreto Único'};
+  const EJE_TSING={'DECRETOS':'Decreto','LEYES':'Ley','RESOLUCIONES':'Resolución','DIRECTIVAS':'Directiva','CIRCULARES':'Circular','ACTOS LEGISLATIVOS':'Acto legislativo','AGENDA REGULATORIA':'Agenda regulatoria','RESOLUCIONES DE NOMBRAMIENTOS':'Nombramiento','CONPES':'CONPES','CONSTITUCIÓN POLÍTICA':'Constitución','DECRETO ÚNICO REGLAMENTARIO':'Decreto Único','CONCEPTOS':'Concepto','BOLETINES':'Boletín jurídico','NOTAS EXTERNAS':'Nota externa','ACUERDO CNSSS':'Acuerdo CNSSS','ACUERDO CRES':'Acuerdo CRES','SENTENCIA':'Sentencia'};
   let EJE_STATS=null, _ejeInited=false, _ejeSeq=0;
   function ejeSing(t){ return EJE_TSING[t]||(t?t.charAt(0)+t.slice(1).toLowerCase():'—'); }
   function ejeTitle(t){ return t?t.charAt(0)+t.slice(1).toLowerCase():'—'; }
@@ -162,7 +162,7 @@
     return `<div class="sanc">
       <div class="sanc-top">${name}<span class="sanc-fecha">${esc(r.fecha||'')}</span></div>
       ${desc?`<div class="sanc-motivo">${esc(desc)}</div>`:''}
-      <div class="sanc-tags"><span class="doc-badge pal">${esc(ejeSing(r.tipo))}</span>${r.legislativo?' · decreto legislativo':''}${href?` · <a href="${esc(href)}" target="_blank" rel="noopener" style="color:var(--ink3)">texto oficial ↗</a>`:ejePub(r)}</div>
+      <div class="sanc-tags"><span class="doc-badge pal">${esc(ejeSing(r.tipo))}</span>${r.entidad?`<span class="doc-badge">${esc(r.entidad)}</span>`:''}${r.legislativo?' · decreto legislativo':''}${href?` · <a href="${esc(href)}" target="_blank" rel="noopener" style="color:var(--ink3)">texto oficial ↗</a>`:ejePub(r)}</div>
     </div>`;
   }
   // Norma que Presidencia aún no sube a su registro mensual: se cita la edición
@@ -681,9 +681,11 @@
         <span class="doc-badge${viva?' pal':''}">${esc(r.entidad||'—')}</span>
         ${r.tipo_norma&&r.tipo_norma!=='No especificado'?`<span class="doc-badge">${esc(r.tipo_norma)}</span>`:''}
         ${r.tipo==='agenda'?'<span class="doc-badge">Agenda regulatoria</span>':''}
+        ${r.fuera_de_sucop?'<span class="doc-badge" title="La entidad lo publica en su propio sitio y no en SUCOP">Sitio de la entidad · fuera de SUCOP</span>':''}
         ${vent?`<span class="sanc-fecha">${vent}</span>`:''}
         ${r.comentarios?` · ${fmt(r.comentarios)} comentario${r.comentarios===1?'':'s'}`:''}
         ${href?` · <a href="${esc(href)}" target="_blank" rel="noopener" style="color:var(--ink3)">ficha oficial ↗</a>`:''}
+        ${r.comentarios_a&&viva?` · comentarios a <b>${esc(r.comentarios_a)}</b>`:''}
       </div>
     </div>`;
   }

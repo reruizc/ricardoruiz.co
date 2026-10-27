@@ -930,7 +930,27 @@ def _ejecutivo():
             _EJEC = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
         except Exception:
             _EJEC = []
+        # normas y conceptos de los ministerios con sitio propio (oct-2026):
+        # mismo formato, con `entidad` y `fuente`, y PDF de enlace permanente
+        _EJEC = _EJEC + _entidades_jsonl('normas')
     return _EJEC
+
+
+# --- Entidades con sitio propio (oct-2026) ---------------------------------
+# Tres índices genéricos que arma tools/caudal/entidades/build.py (MinSalud
+# primero; cada entidad nueva entra ahí sin tocar la Lambda).
+_ENT_CACHE = {}
+
+
+def _entidades_jsonl(nombre):
+    if nombre not in _ENT_CACHE:
+        try:
+            obj = _s3.get_object(Bucket=BUCKET, Key=f'metadata/entidades-{nombre}.jsonl')
+            _ENT_CACHE[nombre] = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
+        except Exception as e:
+            print(f'[entidades] {nombre} FAIL: {type(e).__name__}: {e}')
+            _ENT_CACHE[nombre] = []
+    return _ENT_CACHE[nombre]
 
 
 # --- Diario Oficial · resoluciones, circulares y acuerdos (oct-2026) -------
@@ -1182,6 +1202,12 @@ def _sucop():
         recs = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
     except Exception:
         recs = []
+    # Borradores que las entidades publican FUERA de SUCOP (MinSalud sacó los
+    # suyos de 2026). Mismo formato; si un título ya está en SUCOP, manda SUCOP.
+    vistos = {(r.get('q') or '')[:120] for r in recs}
+    for r in _entidades_jsonl('borradores'):
+        if (r.get('q') or '')[:120] not in vistos:
+            recs.append(r)
     for r in recs:
         ec, dias = _sucop_estado_consulta(r.get('fecha_inicio'), r.get('fecha_fin'),
                                           r.get('estado'), hoy)
@@ -2875,7 +2901,8 @@ LECTURA_MAX_SENALES = 26
 #   Oeste  · el Estado    → Congreso y superintendencias sobre TU tema
 CARD_POR_TIPO = {'contratacion': 'norte', 'sucop': 'norte', 'eventos': 'norte',
                  'medios': 'este', 'redes': 'este',
-                 'congreso': 'oeste', 'regulatorio': 'oeste', 'diario_oficial': 'oeste'}
+                 'congreso': 'oeste', 'regulatorio': 'oeste', 'diario_oficial': 'oeste',
+                 'norma_entidad': 'oeste'}
 CARD_LBL = {'norte': 'NORTE · oportunidad', 'este': 'ESTE · conversación',
             'sur': 'SUR · competencia',    'oeste': 'OESTE · Estado'}
 
@@ -3283,6 +3310,9 @@ def _lectura_cliente_prompt(s, senales, kpis):
             lines.append(f"- [NORMA EXPEDIDA · DIARIO OFICIAL · prioridad {x['nivel']}] publicada {x.get('fecha', '')} · "
                          f"{x.get('entidad', '')} · {x.get('norma', '')}: {(x.get('titulo') or '')[:120]}"
                          + (" · la expide un interlocutor del cliente" if x.get('interlocutor') else ''))
+        elif x['tipo'] == 'norma_entidad':
+            lines.append(f"- [NORMA O CONCEPTO EN EL SITIO DE LA ENTIDAD · prioridad {x['nivel']}] {x.get('fecha', '')} · "
+                         f"{x.get('entidad', '')} · {x.get('norma', '')}: {(x.get('titulo') or '')[:120]}")
         elif x['tipo'] == 'eventos':
             lines.append(f"- [EVENTO DEL SECTOR · prioridad {x['nivel']}] {x.get('fecha', '')} "
                          f"{x.get('medio', '')}: {(x.get('titulo') or '')[:110]}")
@@ -4394,6 +4424,21 @@ def _do_para_perfil(s, cap=5):
             tema_hits.append((r, toca, suya))
         elif suya:
             solo_ent.append((r, None, True))
+    # normas y conceptos que la entidad publica en su sitio (MinSalud): si la
+    # misma norma ya salió del Diario Oficial, no se repite
+    ya = {(r['_e'], r.get('numero'), r.get('anio')) for r, _, _ in tema_hits + solo_ent}
+    for r in _entidades_jsonl('normas'):
+        f = r.get('fecha') or ''
+        if f < corte or f > datetime.date.today().isoformat():
+            continue
+        ef = _fold_q(r.get('entidad') or '')
+        if (ef, r.get('numero'), r.get('anio')) in ya:
+            continue
+        toca = next((t for t, rx in temas_rx if rx.search(r.get('q') or '')), None)
+        if not toca:
+            continue                     # del sitio propio solo entra lo que toca un tema
+        suya = bool(inter) and _do_es_suya(ef, inter)
+        tema_hits.append(({**r, '_e': ef, 'publicacion': {'fecha': f}, '_sitio': True}, toca, suya))
     orden = lambda x: (0 if x[2] else 1, -(int(((x[0].get('publicacion') or {}).get('fecha') or '0000-00-00').replace('-', ''))))
     tema_hits.sort(key=orden)
     solo_ent.sort(key=orden)
@@ -4408,6 +4453,14 @@ def _do_para_perfil(s, cap=5):
             reciente = False
         nivel = 'alto' if (toca and suya) or (toca and reciente) else ('medio' if toca else 'bajo')
         nom = f"{(r.get('subtipo') or r.get('tipo') or '').capitalize()} {r.get('numero')} de {r.get('anio')}"
+        if r.get('_sitio'):
+            out.append({'tipo': 'norma_entidad', 'titulo': (r.get('descripcion') or '')[:220], 'norma': nom,
+                        'entidad': r.get('entidad') or '', 'fecha': pub.get('fecha') or '', 'url': r.get('url') or '',
+                        'sobre': toca or '', 'interlocutor': suya, 'nivel': nivel,
+                        'accion': (f'{nom} publicada en el sitio de {r.get("entidad")} — '
+                                   + ('leer el concepto: fija cómo interpreta la norma' if r.get('tipo') == 'CONCEPTOS'
+                                      else 'revisar si cambia obligaciones o trámites'))})
+            continue
         out.append({'tipo': 'diario_oficial', 'titulo': (r.get('descripcion') or '')[:220],
                     'norma': nom, 'entidad': r.get('entidad') or '', 'dependencia': r.get('dependencia') or '',
                     'fecha': pub.get('fecha') or r.get('fecha') or '', 'expedida': r.get('fecha') or '',
@@ -4416,6 +4469,37 @@ def _do_para_perfil(s, cap=5):
                     'accion': (f'{nom} ya está expedida (Diario Oficial {pub.get("edicion")}, pág. '
                                f'{pub.get("pagina")}) — revisar si cambia obligaciones o trámites')})
     return out, len(tema_hits) + len(solo_ent)
+
+
+def _eventos_oficiales(s, cap=3):
+    """Eventos del calendario OFICIAL de una entidad (MinSalud: jornadas de
+    socialización y capacitaciones), los que aún no pasan. Entra el que toca un
+    tema del perfil o lo organiza un interlocutor. A diferencia de los de
+    prensa, aquí el evento es un hecho: fecha, lugar y enlace de la entidad."""
+    temas = [_fold_q(t) for t in (s.get('temas') or []) if len(_fold_q(t)) >= 4]
+    inter = _do_interlocutores(s)
+    if not temas and not inter:
+        return []
+    temas_rx = [(t, re.compile(r'\b' + re.escape(t) + (r'(?:es)?' if t[-1] not in 'aeiou' else '') + r'\b'))
+                for t in temas]
+    hoy = datetime.date.today().isoformat()
+    out = []
+    for e in _entidades_jsonl('eventos'):
+        if (e.get('dia') or '') < hoy:
+            continue
+        toca = next((t for t, rx in temas_rx if rx.search(e.get('q') or '')), None)
+        suya = bool(inter) and _do_es_suya(_fold_q(e.get('entidad') or ''), inter)
+        if not toca and not suya:
+            continue
+        social = 'Participación Social' in (e.get('categorias') or [])
+        out.append({'tipo': 'eventos', 'titulo': e.get('titulo'), 'url': e.get('url') or '',
+                    'medio': f"{e.get('entidad')} · calendario oficial", 'fecha': e.get('dia'),
+                    'lugar': e.get('lugar') or '', 'sobre': toca or '', 'por': 'calendario',
+                    'nivel': 'alto' if (suya and (toca or social)) else 'medio',
+                    'accion': ('Jornada de socialización de la entidad — inscribirse y llevar posición'
+                               if social else 'Evento oficial de la entidad — evaluar asistencia')})
+    out.sort(key=lambda x: (0 if x['nivel'] == 'alto' else 1, x.get('fecha') or ''))
+    return out[:cap]
 
 
 def _entrada_libre(c):
@@ -5797,9 +5881,13 @@ def handler(event, context):
         except Exception as e:
             print(f'[cliente] eventos FAIL: {type(e).__name__}: {e}')
             evt = []
+        try:
+            evt = _eventos_oficiales(s) + evt
+        except Exception as e:
+            print(f'[cliente] eventos oficiales FAIL: {type(e).__name__}: {e}')
         # --- Oeste · lo que ya se expidió en el Diario Oficial --------------
         try:
-            dof, n_dof = _do_para_perfil(s)
+            dof, n_dof = _do_para_perfil(s, cap=6)
         except Exception as e:
             print(f'[cliente] diario oficial FAIL: {type(e).__name__}: {e}')
             dof, n_dof = [], 0

@@ -628,6 +628,17 @@ etapa() {
   else
     etapa --nombre diario_oficial_actos_upload --omitida "el índice de actos no se armó (rc=$rc_do): en S3 queda el de ayer"
   fi
+  # Entidades con sitio propio (oct-2026, plan de las 23 de Comfama): cada
+  # cosechador baja su raw y `build.py` arma los tres índices genéricos que la
+  # Lambda mezcla en SUCOP, el Ejecutivo y el Norte del radar. MinSalud borra
+  # sus borradores cerrados: el raw los acumula, por eso corre 2x/día.
+  # NO bloquea: si una entidad falla, el build usa su último raw bueno.
+  etapa --nombre entidades_minsalud --timeout 900 \
+        --desc "MinSalud por su API: borradores, AIN, normograma y calendario" \
+        -- python3 tools/caudal/entidades/harvest_minsalud.py fetch
+  etapa --nombre entidades_build --timeout 600 \
+        --desc "entidades → borradores/normas/eventos.jsonl → S3 (no encoge a menos de la mitad)" \
+        -- python3 tools/caudal/entidades/build.py --subir
   if [ $rc_ej -eq 0 ]; then
     etapa --nombre ejecutivo_build --timeout 300 --desc "raw → normativa.jsonl + stats (+ Diario Oficial)" \
           -- python3 tools/caudal/ejecutivo/harvest_decretos.py build

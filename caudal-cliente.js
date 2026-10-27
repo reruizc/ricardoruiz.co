@@ -871,8 +871,16 @@
       return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
         <div class="sig-title">${esc(x.titulo||x.norma||'Norma expedida')}</div><div class="sig-tags">Diario Oficial · ${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
+    // Oeste · norma o concepto que la entidad publica en su propio sitio
+    if(x.tipo==='norma_entidad'){
+      const tags=[x.entidad?esc(x.entidad):'', x.norma?esc(x.norma):'', x.fecha?esc(x.fecha):'', x.sobre?'sobre «'+esc(x.sobre)+'»':''].filter(Boolean).join(' · ');
+      const href=x.url?encodeURI(x.url):'';
+      const tit=href?`<a href="${esc(href)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.titulo||x.norma)}</a>`:esc(x.titulo||x.norma);
+      return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title">${tit}</div><div class="sig-tags">Sitio de la entidad · ${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
+    }
     if(x.tipo==='eventos'){
-      const tags=[x.medio?esc(x.medio):'', x.fecha?esc(x.fecha):'', x.sobre?'sobre «'+esc(x.sobre)+'»':''].filter(Boolean).join(' · ');
+      const tags=[x.medio?esc(x.medio):'', x.fecha?esc(x.fecha):'', x.lugar?esc(x.lugar):'', x.sobre?'sobre «'+esc(x.sobre)+'»':''].filter(Boolean).join(' · ');
       return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
         <div class="sig-title"><a href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.titulo)}</a></div>
         <div class="sig-tags">Evento · ${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;

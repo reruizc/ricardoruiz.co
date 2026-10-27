@@ -365,7 +365,7 @@ function hoyPorQue(r,k){
 function hoySenales(){
   const d=HOY_D||{}, k=d.kpis||{};
   const grupos=[['Congreso',d.congreso],['Regulatorio',d.regulatorio],['Diario Oficial',d.diario_oficial],['Medios',d.medios],['Contratación',d.contratacion],['Consulta pública',d.sucop],['Evento',d.eventos],['Redes',d.redes]];
-  const todas=grupos.flatMap(([src,items])=>(Array.isArray(items)?items:[]).map(x=>({...x,source:src})));
+  const todas=grupos.flatMap(([src,items])=>(Array.isArray(items)?items:[]).map(x=>({...x,source:x.tipo==='norma_entidad'?'Sitio de '+(x.entidad||'la entidad'):src})));
   const ORD={alto:0,medio:1,bajo:2};
   if(HOY_RUMBO){
     const r=HOY_RUMBOS.find(x=>x[0]===HOY_RUMBO)||[HOY_RUMBO,'',HOY_RUMBO,''];
