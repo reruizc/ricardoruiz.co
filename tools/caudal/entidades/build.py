@@ -221,8 +221,32 @@ def territorial():
     return out, eventos
 
 
+def _fuente_simple(clave, ent, sector):
+    """Entidad con proyectos.json (borradores) y normas.json (normas y conceptos)."""
+    def f():
+        raw = C.RAW / clave
+        hoy = datetime.date.today().isoformat()
+        items = (C.leer(raw / 'proyectos.json', {}) or {}).get('items', {})
+        borr = []
+        for r in items.values():
+            b = borrador_sucop(r, ent, sector, clave, hoy)
+            if r.get('objeto'):
+                b['objeto'] = r['objeto']
+            borr.append(b)
+        normas = [norma_ejecutivo(r, ent, clave) for r in (C.leer(raw / 'normas.json', {}) or {}).get('items', [])
+                  if r.get('descripcion')]
+        return borr, normas, []
+    return f
+
+
+fuente_supersociedades = _fuente_simple('supersociedades', 'Superintendencia de Sociedades', 'Comercio, Industria y Turismo')
+fuente_superfinanciera = _fuente_simple('superfinanciera', 'Superintendencia Financiera de Colombia', 'Hacienda y Crédito Público')
+fuente_supersalud = _fuente_simple('supersalud', 'Superintendencia Nacional de Salud', 'Salud y Protección Social')
+
+
 FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), ('ssf', fuente_ssf),
-           ('cce', fuente_cce), ('sic', fuente_sic)]
+           ('cce', fuente_cce), ('sic', fuente_sic), ('supersociedades', fuente_supersociedades),
+           ('superfinanciera', fuente_superfinanciera), ('supersalud', fuente_supersalud)]
 
 
 def _es_de(alias, nombre):

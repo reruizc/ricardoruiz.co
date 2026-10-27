@@ -651,6 +651,15 @@ etapa() {
   etapa --nombre entidades_territorial --timeout 900 \
         --desc "Asamblea de Antioquia (API) y Concejo de Medellín (SIMI)" \
         -- python3 tools/caudal/entidades/harvest_territorial.py fetch
+  etapa --nombre entidades_supersociedades --timeout 300 \
+        --desc "Supersociedades: conceptos del Tesauro (solo lo nuevo)" \
+        -- python3 tools/caudal/entidades/harvest_supersociedades.py fetch
+  etapa --nombre entidades_superfinanciera --timeout 300 \
+        --desc "Superfinanciera: proyectos, circulares, cartas circulares y resoluciones" \
+        -- python3 tools/caudal/entidades/harvest_superfinanciera.py fetch
+  etapa --nombre entidades_supersalud --timeout 300 \
+        --desc "Supersalud: circulares, boletín jurídico y consultas" \
+        -- python3 tools/caudal/entidades/harvest_supersalud.py fetch
   etapa --nombre entidades_build --timeout 600 \
         --desc "entidades → borradores/normas/eventos.jsonl → S3 (no encoge a menos de la mitad)" \
         -- python3 tools/caudal/entidades/build.py --subir
