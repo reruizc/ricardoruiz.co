@@ -5215,7 +5215,7 @@ function tesisFijaEstr() {
   const fam = k.partido ? `Con el aval de ${NOMBRE_BONITO(k.partido)}` : `Desde ${(FAMILIA_CON_ARTICULO[k.bloque] || FAMILIA_CON_ARTICULO.sc).replace(/^su /, 'tu ')}`;
   const edad = PERFIL_ESTR?.edad ? ', con un electorado de más edad en tus puestos' : '';
   const donde = k.lugar ? ` y en ${k.lugar}` : '';
-  const forma = { figura: 'ser una voz de ciudad con posiciones claras', barrio: 'ser quien está y resuelve en el barrio', mixto: 'ser una voz de ciudad que también se ve en el barrio' }[R.figura?.lectura] || 'hacerte conocer con una idea clara';
+  const forma = { figura: 'ser la de una voz de ciudad con posiciones claras', barrio: 'ser la de quien está y resuelve en el barrio', mixto: 'ser la de una voz de ciudad que también se ve en el barrio' }[R.figura?.lectura] || 'girar sobre una idea clara que te haga conocer';
   const causa = causaActual(), temas = a ? temasArquetipo(a.id) : [];
   const sobre = causa ? `alrededor de tu causa: ${causa.replace(/\.$/, '')}` : temas.length ? `sobre ${listaY(temas)}` : '';
   return `${fam}${edad}${donde}, tu campaña tiene que ${forma}${sobre ? `, ${sobre}` : ''}${a ? `, empezando por los barrios «${a.nombre}»` : ''}.`;

@@ -702,6 +702,34 @@ Pedido de Ricardo sobre la portada y los pasos que siguen hasta abrir el CRM:
       elección, con las acciones encima. «Siguiente» abre la estrategia; se ve una vez
       por sesión y el botón «Cómo armamos tu estrategia» lo vuelve a abrir.
 
+- **La estrategia como idea central, causa propia y arquetipos de Bogotá con nombre
+  emocional (27-oct-2026, prompt v6).** Pedido de Ricardo: la tarjeta 11 contaba el
+  método («tus votos pesan en…») en vez de decir la estrategia.
+  - *Qué es la estrategia*, fijo bajo el título: el caparazón de la campaña, que no
+    cambia hasta la elección; lo que cambia cada semana son las acciones, y salen de
+    ella. El título ya no lleva el nombre (está arriba) y rota entre 14 frases de esa
+    idea («Lo que no cambia de tu campaña.», «La idea central de tu campaña.»…).
+  - *Párrafo = la estrategia*: DeepSeek devuelve `estrategia` (máximo 40 palabras): lo
+    que tuvo en cuenta (aval o familia, perfil si es marcado, territorio y corporación)
+    y la idea central. Sin cifras ni jerga. La versión fija (`tesisFijaEstr`) usa la
+    forma de la candidatura (figura de ciudad, barrio o mixta) y la causa o los temas.
+  - *«Ya tengo una causa específica»*: botón junto a los temas; la causa se guarda en
+    la campaña (`/c360/campana`, campo nuevo `causa`, 150 caracteres) y la estrategia
+    se rearma alrededor de ella. También sale en el aviso de la vista ampliada.
+  - *Esta semana, tu estrategia se aterriza así:* la acción dice cómo baja la idea
+    central a esta semana, con la noticia como gancho si sirve.
+  - *Arquetipos de Bogotá*: los 16 tenían nombre técnico («Barrio de gestión»). Ahora
+    llevan nombre emocional, estilo Cartagena, en `EMOCIONAL` de
+    `tools/candidato-360/arquetipos-bogota/publicar.py` (campo `nombre`; el técnico
+    queda en `tecnico` y la emoción en `emocion`). Concejo: Confianza en lo Conocido
+    (de nombre) · Voto Libre (sin dueño) · Fiel a la Causa (de partido) · Convicción
+    Propia (de opinión) · Esperanza por Despertar (vota poco) · Respaldo al Liderazgo
+    (de figuras) · Trabajo por la Comunidad (de gestión) · Orgullo de lo Nuestro
+    (movilizada). Alcaldía: La Balanza de Bogotá · Voto que no se Pierde · Ganas de
+    Algo Nuevo · Lo Seguro Primero · Coherencia de Línea · Identidad de Bando · Cada
+    Voto en su Lugar · Lealtad Cercana. Subido a S3 (`?v=20261027`); verificado que
+    solo cambian esos tres campos. El panel 05 muestra el técnico debajo del nombre.
+
 ### 10.3 Candi (Luna)
 
 Candi es la guía de la plataforma y es **Luna, la perrita de Ricardo**, en 3D
