@@ -51,16 +51,16 @@ número de artículo y la página del PDF radicado. **Todo sale del articulado**
 
 | # | Cuadro | Estado | Va con |
 |---|---|---|---|
-| 1 | `21-licores-tabaco` | **por hacer** | «Uno. Licores y vinos…» |
-| 2 | `04-iva-comida` | existe (video 1) | «Dos. El IVA al mercado…» |
-| 3 | `05-efectiva` | existe (video 1) | «Tres. La compensación…» |
-| 4 | `12-asalariado` | existe (video 2) | «Cuatro. A quien gana…» |
-| 5 | `22-amnistia` | **por hacer** | «Cinco. Quien escondió…» |
-| 6 | `23-ruge` | **por hacer** | «Seis. Se crea un régimen…» |
-| 7 | `17-rentas-altas` | existe (video 2) | «Siete. El impuesto al patrimonio…» |
-| 8 | `24-facultades` | **por hacer** | «Ocho, el grande…» |
+| 1 | `21-licores-tabaco` | propio | «Uno. Licores y vinos…» |
+| 2 | `04-iva-comida` | del video 1 | «Dos. El IVA al mercado…» |
+| 3 | `05-efectiva` | del video 1 | «Tres. La compensación…» |
+| 4 | `12-asalariado` | del video 2 | «Cuatro. A quien gana…» |
+| 5 | `22-amnistia` | propio | «Cinco. Quien escondió…» |
+| 6 | `23-ruge` | propio | «Seis. Se crea un régimen…» |
+| 7 | `17-rentas-altas` | del video 2 | «Siete. El impuesto al patrimonio…» |
+| 8 | `24-facultades` | propio | «Ocho, el grande…» |
 
-Los cuatro nuevos se agregan a `tools/video-semanal/build_cuadros_2026-10-30.py` con los mismos helpers.
+Los 19 cuadros de la edición salen de `tools/video-semanal/build_cuadros_2026-10-30.py` (`cuadros/png/`).
 
 ## Dónde está cada cosa en el PDF (y qué dice exactamente)
 

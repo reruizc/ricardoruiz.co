@@ -395,6 +395,52 @@ def cuadros():
 <div class="card col" style="padding:20px 24px"><div class="big" style="font-size:56px">Normalización</div><div class="bigt">impuesto para declarar activos omitidos, incluidos criptoactivos (arts. 70-71)</div></div></div>
 <div class="aviso">El resumen ejecutivo pone al 10 % más rico un aporte neto de ~$500.000 al mes por hogar. Las empresas, en cambio, bajan su renta de 35 % a 31 %.</div>''',
               f'{PL} · arts. 48, 52, 66-68, 70-71 · exposición pp. 103-104, 139-142'))
+
+    # ── video 3 · lo más polémico (reusa 04 · 05 · 12 · 17)
+    q.append(('21-licores-tabaco', 'Lo polémico · 1 de 8', 'Licores, cerveza y cigarrillos: lo primero que sube',
+              'Es la única parte del IVA que no espera a 2028: los licores entran a la tarifa general apenas se apruebe la ley. Lo demás, desde 2027.',
+              f'''<div class="cols">
+<div class="card col" style="padding:22px 24px;border-top:6px solid {CONTRA}"><div class="k" style="color:{CONTRA}">Licores y vinos</div><div class="big" style="font-size:72px;margin-top:12px">IVA 19 %</div><div class="bigt">desde la vigencia de la ley, sumado al impuesto al consumo que ya pagan. El recaudo se cede a los departamentos para salud</div></div>
+<div class="card col" style="padding:22px 24px;border-top:6px solid {CONTRA}"><div class="k" style="color:{CONTRA}">Cigarrillos</div><div class="big" style="font-size:72px;margin-top:12px">+47 %</div><div class="bigt">en el precio, según la estimación del propio proyecto. Vapeadores y cigarrillos electrónicos: +53 %. Desde 2027</div></div></div>
+<div class="card" style="padding:22px 26px;margin-top:20px;border-top:6px solid {MEDIO}"><div class="k" style="color:{MEDIO}">Cerveza</div><div style="font-size:30px;line-height:1.3;margin-top:10px">Impuesto nuevo: <b>$330 por cada grado de alcohol</b> por litro, más un <b>10 %</b> sobre el precio. Desde 2027.</div></div>
+<div class="aviso"><b>Por qué va de primero:</b> en la Tabla 14, licores y tabaco son el 21 % de todo lo que recauda la ley en 2027 (0,49 de 2,35 puntos del PIB). Es la plata que entra antes que el IVA.</div>''',
+              f'{PL} · art. 27 (p. 234) · art. 36 (p. 239) · exposición p. 66 · Tabla 14, p. 204'))
+
+    q.append(('22-amnistia', 'Lo polémico · 5 de 8', 'Quien escondió activos paga 15 % y queda en paz',
+              'Impuesto de normalización por el año 2027: quien tenga bienes sin declarar o deudas inventadas a 1 de enero de 2027 puede ponerlos en regla. Incluye criptomonedas.',
+              f'''<div class="cols">
+<div class="card col" style="padding:22px 24px;border-top:6px solid {FAVOR}"><div class="k" style="color:{FAVOR}">Quien se normaliza</div><div class="big" style="font-size:96px;margin-top:12px">15 %</div><div class="bigt">una sola vez, sobre el valor del activo. Sin comparación patrimonial y sin renta por ese activo (art. 70, p. 288)</div></div>
+<div class="card col" style="padding:22px 24px;border-top:6px solid {CONTRA}"><div class="k" style="color:{CONTRA}">Quien declaró siempre</div><div class="big" style="font-size:96px;margin-top:12px">39 %</div><div class="bigt">tarifa máxima de renta de personas naturales con el proyecto (art. 48). Hoy, 39 % también, pero desde mucho más arriba</div></div></div>
+<div class="card" style="padding:22px 26px;margin-top:20px;border-top:6px solid {MEDIO}"><div class="k" style="color:{MEDIO}">Criptoactivos · art. 71</div><div style="font-size:28px;line-height:1.3;margin-top:10px">Régimen propio, por única vez en 2027: criptomonedas, stablecoins, NFT con valor y posiciones en protocolos descentralizados que debieron declararse antes.</div></div>
+<div class="aviso"><b>La pelea de siempre:</b> el Gobierno lo presenta como recaudo rápido y regularización; los críticos, como premio a quien no declaró. El texto no dice ninguna de las dos cosas: dice 15 % y paz.</div>''',
+              f'{PL} · arts. 70-71 (pp. 286-291) · art. 48 (p. 259)'))
+
+    q.append(('23-ruge', 'Lo polémico · 6 de 8', 'Grandes inversiones: renta del 20 % congelada 16 años',
+              'Se crea el RUGE, un Libro nuevo del Estatuto Tributario. Un proyecto de inversión «grande» que se adhiera antes de 2030 paga una renta fija, sin sobretasa, por 16 años.',
+              tabla(['Quién', 'Renta', 'Hasta cuándo'], [
+                  ('Proyecto RUGE que arranca en 2027-2028', f'<b style="color:{FAVOR}">20 %</b>', '16 años, sin sobretasa ni puntos adicionales'),
+                  ('Proyecto RUGE que arranca desde 2029', f'<b style="color:{FAVOR}">26 %</b>', '16 años'),
+                  ('Empresa común', '33 % → <b>31 %</b>', 'desde 2028'),
+                  ('Bancos y aseguradoras', '38 % → <b>36 %</b>', '5 puntos extra hasta 2030'),
+                  ('Persona natural, tramo más alto', f'<b style="color:{CONTRA}">39 %</b>', 'desde 8.670 UVT al año')], numericas=(1,)) +
+              f'''<div class="cols" style="margin-top:24px">
+<div class="card col" style="padding:18px 22px"><div class="big" style="font-size:56px">2029</div><div class="bigt">último año para pedir la adhesión (31 de diciembre)</div></div>
+<div class="card col" style="padding:18px 22px"><div class="big" style="font-size:56px">16 años</div><div class="bigt">de estabilidad «para todos los sectores», contados desde el certificado</div></div></div>
+<div class="aviso"><b>Lo verificable:</b> el texto no nombra ningún sector. Pero los gremios petroleros pidieron, antes de la radicación, estabilidad jurídica y quitar la sobretasa; el régimen trae las dos cosas.</div>''',
+              f'{PL} · art. 69, Libro Noveno ET arts. 917-925 (pp. 274-286; plazo y tarifa p. 278) · art. 57 (pp. 266-267)'))
+
+    q.append(('24-facultades', 'Lo polémico · 8 de 8', 'El artículo 7: seis meses para rehacer el Estado sin pasar por el Congreso',
+              'Facultades extraordinarias al presidente (art. 150-10 de la Constitución), y dos recortes con cifra en los artículos 16 y 17.',
+              ''.join(f'<div class="it" style="border-left-color:{CONTRA}"><b>{e(a)}</b><small>{e(b)}</small></div>' for a, b in [
+                  ('a) Suprimir, fusionar y escindir ministerios', 'y departamentos administrativos; cambiarles nombre, objetivos y estructura'),
+                  ('b) Lo mismo con superintendencias, agencias y establecimientos públicos', 'y cambiarles la naturaleza jurídica'),
+                  ('c) Reasignar funciones entre entidades', '«para eliminar la duplicidad de funciones»'),
+                  ('e) Modificar las plantas de personal', 'de ministerios, departamentos administrativos y demás entidades')]) +
+              f'''<div class="cols" style="margin-top:24px">
+<div class="card col" style="padding:18px 22px;border-top:6px solid {CONTRA}"><div class="big" style="font-size:60px">−20 %</div><div class="bigt">gasto de personal del Estado en 2028, en pesos corrientes, sin la fuerza pública (art. 16)</div></div>
+<div class="card col" style="padding:18px 22px;border-top:6px solid {CONTRA}"><div class="big" style="font-size:60px">−50 %</div><div class="bigt">contratos de prestación de servicios en 2027, frente a 2026 (art. 17)</div></div></div>
+<div class="aviso"><b>La Constitución lo permite</b> y el Congreso ya ha dado facultades así. Lo que está en disputa es el alcance (toda la estructura del Estado) y el momento. El Pacto Histórico lo llama «mico autoritario»; eso es de ellos, no del texto.</div>''',
+              f'{PL} · art. 7 (pp. 219-220) · arts. 16-17 (pp. 227-228) · Isabel Vera (Pacto), prensa 29-oct'))
     return q
 
 
