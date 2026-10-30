@@ -38,7 +38,7 @@ las tablas del proyecto, y el guion lo dice.
 
 **[Cierre]** · cámara
 > Nada de esto es ley todavía. El Congreso tiene hasta el 16 de diciembre, y las comisiones que la votan primero ya
-> hundieron una tributaria hace dos años. Les cuento cómo va.
+> hundieron una tributaria hace dos años. En la tercera parte: los ocho artículos por los que va a dar pelea.
 
 ---
 

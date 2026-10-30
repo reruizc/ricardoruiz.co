@@ -1,10 +1,12 @@
 # Edición del 30-oct-2026 · Ley de Rescate Económico (PL 477 de 2026 Cámara)
 
-Dos videos de ~2 minutos y una página interactiva. Todo sale del texto radicado, no de la prensa.
+Tres videos de ~2 minutos y una página interactiva. Todo sale del texto radicado, no de la prensa.
 
 ```
 guion-v1-quien-paga.md         video 1 · ¿quién paga? (cuadros 01-08, incluye los dos diagramas de fuerzas)
 guion-v2-como-le-pega.md       video 2 · ¿cómo le pega a usted? (cuadros 11-17) + dónde está cada dato en el PDF
+guion-v3-polemicas.md          video 3 · los 8 artículos que van a dar pelea (reusa 04·05·12·17; faltan 21-24) + texto literal y página de cada uno
+fuente-reel-v1/                edición del video 1 (cortar.py + generar.py, patrón de semana-2026-10-28)
 hallazgos-ley-rescate.md       notas de la lectura del PDF, con páginas
 cuadros/{html,png}/            15 cuadros 1080×1920 · hoja-de-contactos.jpg
 ../../../ley-de-rescate.html   calculadora: perfil + ingreso → qué le cambia, con el artículo al lado
