@@ -17,8 +17,11 @@ Todo lo que se afirma sale del PDF radicado (PL 477 de 2026 Cámara) salvo donde
 > otra cosa: el recorte real de gasto es uno de cada cuatro. El resto lo ponen empresas, trabajadores y consumidores.
 
 **[Quién gana, quién pierde]** · `03`
-> Según el Gobierno, el 10 % más rico pone unos 500 mil pesos al mes, y el 68 % más pobre recibe unos 65 mil. Del 22 %
-> que queda en el medio, el resumen no dice nada.
+> El Gobierno dice que paga el 10 % más rico. Ojo con esa palabra: por las cuentas del mismo proyecto, ese hogar gana
+> en promedio 14 millones al mes, y uno entra a pagar renta desde cinco millones y medio. O sea: un profesional con un
+> buen sueldo, no un millonario. Pone unos 500 mil pesos al mes. Al otro lado, el 68 % más pobre, hogares de un millón y
+> medio, recibe 65 mil por la devolución del IVA. Y en el medio hay un 22 %, hogares de dos a cinco millones, que no
+> aparece en el resumen: no les devuelven nada, pero el IVA al mercado y la salud más cara sí les llegan.
 
 **[IVA a la comida]** · `04`
 > Lo que más va a sonar: desde 2028, tomate, cebolla, frutas, fríjol, lenteja, sal y café pagarían IVA del 19 %. Arroz,
@@ -90,6 +93,11 @@ de estabilidad; el proyecto trae el RUGE (arts. 69, 917-925), así que van del l
   Secretaría del Senado (secretariasenado.gov.co). La lista de lo que sale es por partida arancelaria.
 - Tabla 14 (p. 204): recorte = eficiencia del gasto + gastos de personal + OPS. 0,58 de 2,35 en 2027; 1,01 de 4,09 en
   2030: 25 % en los dos años.
-- Reparto por deciles: resumen ejecutivo, p. 3.
+- Reparto por deciles: resumen ejecutivo, p. 3 (y p. 194-195: decil 1 +10,2 %, deciles 2-3 +6,3 %, decil 4 +2,5 %,
+  decil 6 +1,2 %, decil 10 −3,6 %; de los deciles 7-9 no da cifra). Los «14 millones» y el «millón y medio» son cálculo
+  propio con los datos del mismo texto: $500.000 = 3,6 % del ingreso → $13,9 M por hogar; $65.000 = 4,7 % → $1,4 M. El
+  «desde cinco millones y medio» es el umbral nuevo de renta (p. 105), que el proyecto ubica «por encima del ingreso
+  promedio de los primeros nueve deciles» de asalariados (p. 107). Los «dos a cinco millones» del medio son los hogares
+  entre el decil 6 (último con EfectIVA) y ese umbral; es orden de magnitud, no cifra del PDF.
 - EfectIVA: art. 38 (p. 241-242), los porcentajes están en el artículo, no solo en la exposición.
 - Calendario: Ape Cuello a El Tiempo (antes de la radicación). El mensaje de urgencia no está confirmado.

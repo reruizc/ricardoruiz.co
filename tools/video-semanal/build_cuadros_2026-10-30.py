@@ -266,14 +266,14 @@ def cuadros():
 <div class="aviso"><b>Por qué la cuenta no cuadra con el 70 %:</b> el Gobierno suma como «reducción del Estado» los aportes que vuelven a pagar empresas y trabajadores, y cuenta medidas que van en otros decretos, no en esta ley (p. 203).</div>''',
               f'{PL} · Tabla 14, p. 204 · cálculo propio sobre esa tabla · en % del PIB'))
 
-    q.append(('03-quien-gana-quien-pierde', '¿Quién paga? · según el Gobierno', 'Paga el 10 % más rico. Gana el 68 % más pobre. Del 22 % del medio no dice nada.',
-              'Es la cuenta del propio proyecto. El reparto depende de que la devolución del IVA funcione.',
+    q.append(('03-quien-gana-quien-pierde', '¿Quién paga? · según el Gobierno', '«Paga el 10 % más rico.» Ese 10 % es un hogar de 14 millones al mes.',
+              'Las tres cifras grandes son del proyecto. El ingreso de cada grupo sale de dividirlas por el porcentaje que el mismo texto les asigna.',
               f'''<div class="cols">
-<div class="card col" style="padding:24px 26px;border-top:6px solid {CONTRA}"><div class="k" style="color:{CONTRA}">El 10 % de mayores ingresos</div><div class="big" style="font-size:84px;margin-top:14px">−$500.000</div><div class="bigt">al mes por hogar, en promedio: 3,6 % de su ingreso</div></div>
-<div class="card col" style="padding:24px 26px;border-top:6px solid {FAVOR}"><div class="k" style="color:{FAVOR}">El 68 % de menores ingresos</div><div class="big" style="font-size:84px;margin-top:14px">+$65.000</div><div class="bigt">al mes por persona, en promedio: 4,7 % más de ingreso</div></div></div>
-<div class="card" style="padding:22px 26px;margin-top:20px;border-top:6px solid {SIN}"><div class="k" style="color:#7d8396">El 22 % del medio</div><div style="font-size:30px;line-height:1.3;margin-top:10px">El resumen ejecutivo no dice qué le pasa. Son los hogares que ganan más que el decil 6 y menos que el decil 10: no reciben devolución del IVA y sí pagan el IVA nuevo, la salud y la renta.</div></div>
-<div class="aviso">«Cerca del 97 % del recaudo tributario que recae sobre hogares lo aporta el 10 % de mayores ingresos», dice el proyecto (p. 3).</div>''',
-              f'{PL} · resumen ejecutivo, p. 3'))
+<div class="card col" style="padding:24px 26px;border-top:6px solid {CONTRA}"><div class="k" style="color:{CONTRA}">El 10 % de mayores ingresos</div><div class="big" style="font-size:84px;margin-top:14px">−$500.000</div><div class="bigt">al mes por hogar · 3,6 % de su ingreso</div><div style="font-size:27px;line-height:1.25;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">Hogar promedio de <b>$13,9 M</b> al mes. Se entra a pagar renta desde <b>$5,5 M</b> por persona.</div></div>
+<div class="card col" style="padding:24px 26px;border-top:6px solid {FAVOR}"><div class="k" style="color:{FAVOR}">El 68 % de menores ingresos</div><div class="big" style="font-size:84px;margin-top:14px">+$65.000</div><div class="bigt">al mes por persona · 4,7 % más de ingreso</div><div style="font-size:27px;line-height:1.25;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1)">Hogar promedio de <b>$1,4 M</b> al mes. Lo recibe por la devolución del IVA, desde 2028.</div></div></div>
+<div class="card" style="padding:22px 26px;margin-top:20px;border-top:6px solid {SIN}"><div class="k" style="color:#7d8396">El 22 % del medio · hogares de ~$2 M a ~$5 M</div><div style="font-size:30px;line-height:1.3;margin-top:10px">El resumen no les da cifra. Están por encima del decil 6, el último con devolución del IVA, y por debajo del umbral de renta: no reciben nada y sí pagan el IVA al mercado y la salud más cara desde dos mínimos.</div></div>
+<div class="aviso">«El 10 % de los hogares de mayores recursos asumirán el 97 % del esfuerzo tributario total de los hogares» (p. 194). Deciles 1 a 6: +10,2 % · +6,3 % · +2,5 % · … · +1,2 %. Deciles 7 a 9: sin cifra.</div>''',
+              f'{PL} · resumen p. 3 · pp. 105-107, 194 · ingreso por grupo: cálculo propio ($500.000 ÷ 3,6 % · $65.000 ÷ 4,7 %)'))
 
     q.append(('04-iva-comida', '¿Quién paga? · IVA desde 2028', 'La comida que pasa a pagar IVA del 19 %',
               'Comparación del artículo 424 vigente (Estatuto Tributario, Secretaría del Senado) con el artículo 42 del proyecto. Lo que no está en la lista nueva, paga.',
