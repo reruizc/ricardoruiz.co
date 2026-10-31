@@ -672,6 +672,18 @@ etapa() {
   etapa --nombre entidades_ugpp --timeout 300 \
         --desc "UGPP: fichas nuevas del mapa del sitio y noticias" \
         -- python3 tools/caudal/entidades/harvest_ugpp.py fetch
+  etapa --nombre entidades_minvivienda --timeout 300 \
+        --desc "MinVivienda: normativa sin asignaciones de Fonvivienda, conceptos y prensa" \
+        -- python3 tools/caudal/entidades/harvest_minvivienda.py fetch
+  etapa --nombre entidades_mineducacion --timeout 300 \
+        --desc "MinEducación: normatividad y comunicados" \
+        -- python3 tools/caudal/entidades/harvest_mineducacion.py fetch
+  etapa --nombre entidades_sena --timeout 300 \
+        --desc "SENA: proyectos y novedades del normograma" \
+        -- python3 tools/caudal/entidades/harvest_sena.py fetch
+  etapa --nombre entidades_dnp --timeout 300 \
+        --desc "DNP: normas de SharePoint y proyectos de normatividad" \
+        -- python3 tools/caudal/entidades/harvest_dnp.py fetch
   etapa --nombre entidades_build --timeout 600 \
         --desc "entidades → borradores/normas/eventos.jsonl → S3 (no encoge a menos de la mitad)" \
         -- python3 tools/caudal/entidades/build.py --subir

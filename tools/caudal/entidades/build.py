@@ -250,13 +250,18 @@ fuente_mintrabajo = _fuente_simple('mintrabajo', 'Ministerio del Trabajo', 'Trab
 fuente_funcionpublica = _fuente_simple('funcionpublica', 'Departamento Administrativo de la Función Pública', 'Función Pública')
 fuente_spe = _fuente_simple('spe', 'Unidad del Servicio Público de Empleo', 'Trabajo')
 fuente_ugpp = _fuente_simple('ugpp', 'Unidad de Gestión Pensional y Parafiscales (UGPP)', 'Hacienda y Crédito Público')
+fuente_minvivienda = _fuente_simple('minvivienda', 'Ministerio de Vivienda, Ciudad y Territorio', 'Vivienda, Ciudad y Territorio')
+fuente_mineducacion = _fuente_simple('mineducacion', 'Ministerio de Educación Nacional', 'Educación Nacional')
+fuente_sena = _fuente_simple('sena', 'Servicio Nacional de Aprendizaje (SENA)', 'Trabajo')
+fuente_dnp = _fuente_simple('dnp', 'Departamento Nacional de Planeación', 'Planeación')
 
 
 FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), ('ssf', fuente_ssf),
            ('cce', fuente_cce), ('sic', fuente_sic), ('supersociedades', fuente_supersociedades),
            ('superfinanciera', fuente_superfinanciera), ('supersalud', fuente_supersalud),
            ('mintrabajo', fuente_mintrabajo), ('funcionpublica', fuente_funcionpublica), ('spe', fuente_spe),
-           ('ugpp', fuente_ugpp)]
+           ('ugpp', fuente_ugpp), ('minvivienda', fuente_minvivienda), ('mineducacion', fuente_mineducacion),
+           ('sena', fuente_sena), ('dnp', fuente_dnp)]
 
 
 def _es_de(alias, nombre):

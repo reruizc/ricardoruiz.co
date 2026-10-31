@@ -107,6 +107,21 @@ def fecha_larga(s):
         return ''
 
 
+def ventana(texto):
+    """«del 23 al 27 de febrero de 2026» o «entre el 2 de abril y el 9 de abril de
+    2026» → (inicio, fin) en ISO; ('', '') si el texto no trae un plazo legible."""
+    t = re.sub(r'[\s\u200b\xa0]+', ' ', texto or '')
+    m = re.search(r'(?i)(?:entre el|desde el|del|el) (\d{1,2})(?:(?: de)? (?!al\b|a\b|y\b|hasta\b)([a-záéíóú]+))?(?: de (\d{4}))? '
+                  r'(?:al|a|y el|hasta el) (\d{1,2})(?: de)? ([a-záéíóú]+)(?: (?:de|del))? ?(\d{4})?', t)
+    if not m:
+        return '', ''
+    anio = m.group(6) or m.group(3)
+    if not anio:
+        return '', ''
+    ini = fecha_larga(f'{m.group(1)} de {m.group(2) or m.group(5)} de {m.group(3) or anio}')
+    return ini, fecha_larga(f'{m.group(4)} de {m.group(5)} de {anio}')
+
+
 def rss(url, timeout=60):
     """Items de un feed RSS de WordPress: título, enlace, fecha ISO y resumen."""
     x = curl(url, timeout=timeout)
