@@ -238,13 +238,25 @@ etapa() {
         -- python3 tools/leyes-senado/build_diario_s3.py --upload
 
   # ── radicados · Cámara (camara.gov.co · otro host, sin WAF) ──
-  etapa --nombre camara_radicados --critica --timeout 1800 \
-        --desc "radicados de Cámara" \
-        -- python3 tools/leyes-senado/harvest_camara.py
+  # Si el servidor no acepta conexiones, las cuatro etapas de Cámara se omiten: el
+  # 31-oct-2026 esperar sus timeouts agotó el tope de 4 h y dejó sin correr otras 40.
+  etapa --nombre camara_viva --timeout 120 \
+        --desc "¿responde camara.gov.co?" \
+        -- python3 tools/leyes-senado/camara_viva.py
+  rc_cam=$?
 
-  etapa --nombre camara_upload --critica --timeout 2400 \
-        --desc "manifiesto de Cámara a S3 (resuelve y baja gacetas nuevas)" \
-        -- python3 tools/leyes-senado/build_diario_camara_s3.py --upload
+  if [ $rc_cam -eq 0 ]; then
+    etapa --nombre camara_radicados --critica --timeout 1800 \
+          --desc "radicados de Cámara" \
+          -- python3 tools/leyes-senado/harvest_camara.py
+
+    etapa --nombre camara_upload --critica --timeout 2400 \
+          --desc "manifiesto de Cámara a S3 (resuelve y baja gacetas nuevas)" \
+          -- python3 tools/leyes-senado/build_diario_camara_s3.py --upload
+  else
+    etapa --nombre camara_radicados --omitida "camara.gov.co no responde"
+    etapa --nombre camara_upload --omitida "camara.gov.co no responde"
+  fi
 
   # ── feed público "En vivo" ──
   # Va acá a propósito: las etapas de Cámara/Imprenta dan un respiro entre los
@@ -257,10 +269,14 @@ etapa() {
   #  dataset, no la Lambda, así que necesita el dist del día — ver allá abajo)
 
   # ── órdenes del día · Cámara (wp-json, incremental) ──
-  etapa --nombre ordenes_camara --timeout 3000 \
-        --desc "órdenes del día de Cámara (14 comisiones + plenaria)" \
-        --filtro "órdenes del día de|PDFs nuevos|^  !" \
-        -- python3 tools/caudal/actas/harvest_ordenes.py todas
+  if [ $rc_cam -eq 0 ]; then
+    etapa --nombre ordenes_camara --timeout 3000 \
+          --desc "órdenes del día de Cámara (14 comisiones + plenaria)" \
+          --filtro "órdenes del día de|PDFs nuevos|^  !" \
+          -- python3 tools/caudal/actas/harvest_ordenes.py todas
+  else
+    etapa --nombre ordenes_camara --omitida "camara.gov.co no responde"
+  fi
 
   # ── órdenes del día · Senado ──
   # --actualizar-indice es obligatorio en el cron: sin él el índice cacheado hace
@@ -400,10 +416,14 @@ etapa() {
   # baja solo los radicados del día. Es el único sitio donde Cámara publica la
   # fecha — sin esto sus proyectos entran al dataset sin fecha y quedan fuera
   # del embudo (ver harvest_camara_fichas.py).
-  etapa --nombre camara_fichas --timeout 2400 \
-        --desc "fichas individuales de Cámara (fechas de radicación y debate)" \
-        --filtro "objetivo|descarga|fecha de radicación|^  !" \
-        -- python3 tools/leyes-senado/harvest_camara_fichas.py --workers 6
+  if [ $rc_cam -eq 0 ]; then
+    etapa --nombre camara_fichas --timeout 2400 \
+          --desc "fichas individuales de Cámara (fechas de radicación y debate)" \
+          --filtro "objetivo|descarga|fecha de radicación|^  !" \
+          -- python3 tools/leyes-senado/harvest_camara_fichas.py --workers 6
+  else
+    etapa --nombre camara_fichas --omitida "camara.gov.co no responde"
+  fi
 
   # ── dataset + índice de texto (la legislatura viva entra al producto) ──
   # Sin estas dos etapas el rastreo diario llegaba a S3 como manifiesto suelto
@@ -473,9 +493,9 @@ etapa() {
         -- python3 tools/caudal/supers/harvest_anla.py fetch --workers 4
 
   # `build` corre aunque `fetch` falle: reconstruye desde las páginas cacheadas,
-  # que es mejor que dejar el pilar sin refrescar. Medido ~4s con el memo del
-  # cruce contra el diccionario de empresas caliente; ~350s la primera vez
-  # después de que ese diccionario cambie (es de otro frente y crece seguido).
+  # que es mejor que dejar el pilar sin refrescar. Medido ~7s en la EC2 con el
+  # memo del cruce contra el diccionario de empresas caliente; ~40s la primera
+  # vez después de que ese diccionario cambie (es de otro frente y crece seguido).
   etapa --nombre anla_build --timeout 1200 \
         --desc "anla-gaceta.json desde las páginas cacheadas" \
         -- python3 tools/caudal/supers/harvest_anla.py build

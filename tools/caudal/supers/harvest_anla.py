@@ -424,10 +424,10 @@ def _empresas_dict():
     try:
         sys.path.insert(0, str(HERE.parent))
         import empresas as _e
-        return [e for e in _e.EMPRESAS if e['tipo'] == 'empresa'], _e.casa_registro
+        return [e for e in _e.EMPRESAS if e['tipo'] == 'empresa'], _e.casa_registro, _e._n
     except Exception as exn:            # el harvester sigue sirviendo sin el dict
         print(f'  (diccionario de empresas no disponible: {exn})')
-        return [], None
+        return [], None, None
 
 
 # --- memo del fallback de diccionario -------------------------------------
@@ -474,10 +474,27 @@ def _cargar_memo(huella):
     return d.get('m') or {}
 
 
-def _casar_dict(emps, casa, desc, proy):
+# Medido oct-2026: con 1.921 empresas el cruce completo pasó de 1.200 s en la EC2,
+# la etapa moría antes de guardar el memo y cada corrida volvía a empezar de cero:
+# 5 días sin refrescar el pilar por un cambio de una línea en el diccionario. Por
+# eso solo se llama `casa_registro` con las empresas que pueden casar. El texto
+# normalizado es [a-z0-9 ] y `casa_registro` exige palabra completa, así que una
+# frase solo puede estar si su primera palabra está: el filtro no cambia el
+# resultado, solo evita las ~1.900 empresas que no tienen cómo aparecer.
+def _indice_dict(emps):
+    """{primera palabra de cada frase de `entidad`: [empresas que la llevan]}."""
+    idx = {}
+    for e in emps:
+        for pal in {f.split()[0] for f in e['entidad'] if f.split()}:
+            idx.setdefault(pal, []).append(e)
+    return idx
+
+
+def _casar_dict(idx, casa, norm, desc, proy):
     """El cruce caro, aislado para poder memoizarlo. → nombre curado o None."""
     txt = f'{desc} {proy}'
-    m = [e for e in emps if casa(e, txt)]
+    candidatas = {id(e): e for pal in set(norm(txt).split()) for e in idx.get(pal, ())}
+    m = [e for e in candidatas.values() if casa(e, txt)]
     if len(m) != 1 or m[0]['nombre'] in NO_DICT:
         return None
     txt_f = _fold(txt)
@@ -497,7 +514,8 @@ def cmd_build():
             npag += 1
             for row in parse_cards(pf.read_text(encoding='utf-8')):
                 vistos.setdefault(row['id'], row)   # dedup global por id
-    emps, casa = _empresas_dict()
+    emps, casa, norm = _empresas_dict()
+    idx = _indice_dict(emps)
     huella = _huella_dict(emps) if emps else ''
     memo = _cargar_memo(huella) if emps else {}
     memo_new = {}
@@ -515,7 +533,7 @@ def cmd_build():
             prev = memo.get(r['id'])
             hit = prev[1] if (prev and prev[0] == ht) else _FALTA
             if hit is _FALTA:
-                hit = _casar_dict(emps, casa, desc, proy)
+                hit = _casar_dict(idx, casa, norm, desc, proy)
                 n_calc += 1
             memo_new[r['id']] = [ht, hit]   # se reescribe entero → se auto-poda
             if hit:
