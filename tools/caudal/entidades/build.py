@@ -100,8 +100,8 @@ def fuente_mincomercio():
 
 
 def fuente_ssf():
-    """Supersubsidio: borradores (pocos, tabla a mano), circulares, resoluciones
-    y el calendario ICS. La relatoría jurídica va en la fase 4."""
+    """Supersubsidio: borradores (pocos, tabla a mano), circulares, resoluciones,
+    conceptos de la relatoría, noticias y el calendario ICS."""
     raw = C.RAW / 'ssf'
     ent, sector, fuente = 'Superintendencia del Subsidio Familiar', 'Trabajo', 'ssf'
     hoy = datetime.date.today().isoformat()
@@ -109,6 +109,8 @@ def fuente_ssf():
     borr = [borrador_sucop(r, ent, sector, fuente, hoy) for r in items.values()]
     normas = [norma_ejecutivo(r, ent, fuente) for r in (C.leer(raw / 'normas.json', {}) or {}).get('items', [])
               if r.get('descripcion') and (r.get('numero') or r.get('fecha'))]
+    for nombre in ('conceptos', 'noticias'):
+        normas += [norma_ejecutivo(r, ent, fuente) for r in (C.leer(raw / f'{nombre}.json', {}) or {}).get('items', [])]
     eventos = [{**e, 'entidad': ent, 'fuente': fuente,
                 'q': _q(e.get('titulo'), e.get('descripcion'))}
                for e in (C.leer(raw / 'eventos.json', {}) or {}).get('items', [])]
@@ -222,7 +224,8 @@ def territorial():
 
 
 def _fuente_simple(clave, ent, sector):
-    """Entidad con proyectos.json (borradores) y normas.json (normas y conceptos)."""
+    """Entidad con proyectos.json (borradores), normas.json (normas y conceptos)
+    y noticias.json (comunicados, sin número)."""
     def f():
         raw = C.RAW / clave
         hoy = datetime.date.today().isoformat()
@@ -233,8 +236,9 @@ def _fuente_simple(clave, ent, sector):
             if r.get('objeto'):
                 b['objeto'] = r['objeto']
             borr.append(b)
-        normas = [norma_ejecutivo(r, ent, clave) for r in (C.leer(raw / 'normas.json', {}) or {}).get('items', [])
-                  if r.get('descripcion')]
+        normas = [norma_ejecutivo(r, ent, clave)
+                  for nombre in ('normas', 'noticias')
+                  for r in (C.leer(raw / f'{nombre}.json', {}) or {}).get('items', []) if r.get('descripcion')]
         return borr, normas, []
     return f
 
@@ -242,11 +246,17 @@ def _fuente_simple(clave, ent, sector):
 fuente_supersociedades = _fuente_simple('supersociedades', 'Superintendencia de Sociedades', 'Comercio, Industria y Turismo')
 fuente_superfinanciera = _fuente_simple('superfinanciera', 'Superintendencia Financiera de Colombia', 'Hacienda y Crédito Público')
 fuente_supersalud = _fuente_simple('supersalud', 'Superintendencia Nacional de Salud', 'Salud y Protección Social')
+fuente_mintrabajo = _fuente_simple('mintrabajo', 'Ministerio del Trabajo', 'Trabajo')
+fuente_funcionpublica = _fuente_simple('funcionpublica', 'Departamento Administrativo de la Función Pública', 'Función Pública')
+fuente_spe = _fuente_simple('spe', 'Unidad del Servicio Público de Empleo', 'Trabajo')
+fuente_ugpp = _fuente_simple('ugpp', 'Unidad de Gestión Pensional y Parafiscales (UGPP)', 'Hacienda y Crédito Público')
 
 
 FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), ('ssf', fuente_ssf),
            ('cce', fuente_cce), ('sic', fuente_sic), ('supersociedades', fuente_supersociedades),
-           ('superfinanciera', fuente_superfinanciera), ('supersalud', fuente_supersalud)]
+           ('superfinanciera', fuente_superfinanciera), ('supersalud', fuente_supersalud),
+           ('mintrabajo', fuente_mintrabajo), ('funcionpublica', fuente_funcionpublica), ('spe', fuente_spe),
+           ('ugpp', fuente_ugpp)]
 
 
 def _es_de(alias, nombre):

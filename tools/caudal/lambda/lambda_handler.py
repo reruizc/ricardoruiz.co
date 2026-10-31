@@ -4525,6 +4525,11 @@ def _do_para_perfil(s, cap=5, emps=None):
             reciente = False
         nivel = 'alto' if vig or (toca and suya) or (toca and reciente) else ('medio' if toca else 'bajo')
         nom = f"{(r.get('subtipo') or r.get('tipo') or '').capitalize()} {r.get('numero')} de {r.get('anio')}"
+        comunicado = r.get('tipo') == 'COMUNICADOS'
+        if comunicado:                   # sin número, y sin nombrar a una vigilada no sube de medio
+            nom = f"Comunicado del {pub.get('fecha') or ''}"
+            if not vig and nivel == 'alto':
+                nivel = 'medio'
         if vig:
             acc_v = (f'{nom} nombra a {vig} — revisar qué le cambia y si te toca a ti también')
         if r.get('_sitio'):
@@ -4533,6 +4538,7 @@ def _do_para_perfil(s, cap=5, emps=None):
                         'sobre': toca or '', 'interlocutor': suya, 'nivel': nivel,
                         'accion': acc_v if vig else (f'{nom} publicada en el sitio de {r.get("entidad")} — '
                                    + ('leer el concepto: fija cómo interpreta la norma' if r.get('tipo') == 'CONCEPTOS'
+                                      else 'ver si anuncia una decisión o un cambio de enfoque' if comunicado
                                       else 'revisar si cambia obligaciones o trámites'))})
             continue
         out.append({'tipo': 'diario_oficial', 'vigilada': vig, 'titulo': (r.get('descripcion') or '')[:220],

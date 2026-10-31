@@ -15,9 +15,13 @@ datos.gov.co. Su sitio (Liferay) trae tablas armadas a mano, una por vigencia:
   calendario    ICS público de Google (se dejó de alimentar el 26-jun-2026;
                 se lee igual por si lo reactivan)
 
-La relatoría jurídica (conceptos) va aparte, en la fase 4.
+  relatoría     juridica.ssf.gov.co (ASP.NET): GET → token + cookies → POST con
+                `fechaDesde/fechaHasta/Radicado` → 302 → GET `/` con la MISMA cookie
+                trae la tabla: el resultado vive en la sesión. ⚠️ Sin `Buscar`: con
+                ese campo, aunque vaya vacío, la tabla sale en blanco.
+  noticias      /web/guest/noticias, tarjetas paginadas con `_cur`
 
-Salida: `Bases de datos/caudal-entidades/raw/ssf/{proyectos,normas,eventos}.json`.
+Salida: `Bases de datos/caudal-entidades/raw/ssf/{proyectos,normas,eventos,conceptos,noticias}.json`.
 Uso: python3 tools/caudal/entidades/harvest_ssf.py fetch
 """
 import argparse
@@ -25,7 +29,9 @@ import datetime
 import hashlib
 import html
 import re
+import subprocess
 import sys
+import tempfile
 
 import comun as C
 
@@ -172,6 +178,60 @@ def eventos():
     return out
 
 
+def _sesion(metodo, url, jar, datos=None):
+    cmd = ['/usr/bin/curl', '-s', '--max-time', '120', '-A', C.UA, '-c', str(jar), '-b', str(jar), '-e', url]
+    for d in datos or []:
+        cmd += ['--data-urlencode', d]
+    r = subprocess.run(cmd + ['-X', metodo, url], capture_output=True, timeout=140)
+    return r.stdout.decode('utf-8', 'replace')
+
+
+def conceptos():
+    with tempfile.NamedTemporaryFile(suffix='.jar') as jar:
+        url = 'https://juridica.ssf.gov.co/'
+        h = _sesion('GET', url, jar.name)
+        t = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', h)
+        if not t:
+            raise RuntimeError('sin token en la relatoría')
+        hoy = datetime.date.today()
+        _sesion('POST', url, jar.name, ['fechaDesde=2015-01-01', f'fechaHasta={hoy.year}-12-31', 'Radicado=',
+                                        f'__RequestVerificationToken={t.group(1)}'])
+        h = _sesion('GET', url, jar.name)
+    out = []
+    for r in re.findall(r'<tr[^>]*>(.*?)</tr>', h, re.S):
+        tds = [_t(x) for x in re.findall(r'<td[^>]*>(.*?)</td>', r, re.S)]
+        if len(tds) < 7:
+            continue
+        rad, concl, fuentes, f, tema, subt = tds[:6]
+        d = re.match(r'(\d{2})-(\d{2})-(\d{4})', f)
+        pdf = re.search(r'href="([^"]+)"', r)
+        fecha = f'{d.group(3)}-{d.group(2)}-{d.group(1)}' if d else ''
+        out.append({'tipo': 'CONCEPTOS', 'subtipo': 'Concepto', 'numero': rad, 'anio': fecha[:4], 'fecha': fecha,
+                    'titulo': f'Concepto {rad}', 'subtema': subt,
+                    'descripcion': C.limpio(f"{tema.rstrip(' .')}: {subt.rstrip(' .')}. {concl}")[:700], 'administrativo': False,
+                    'url': html.unescape(pdf.group(1)) if pdf else 'https://juridica.ssf.gov.co/'})
+    return out
+
+
+def noticias(prev):
+    out = {x['url']: x for x in prev}
+    tope = 40 if not prev else 3
+    cur = 'com_liferay_asset_publisher_web_portlet_AssetPublisherPortlet_INSTANCE_kpzf'
+    for pag in range(1, tope + 1):
+        h = C.curl(f'{BASE}/web/guest/noticias?p_p_id={cur}&p_p_lifecycle=0&p_p_state=normal&p_p_mode=view'
+                   f'&_{cur}_cur={pag}&p_r_p_resetCur=false', timeout=60)
+        cards = re.findall(r'<div class="card-body">\s*<a href="([^"]+)"[^>]*>\s*<h4 class="card-title">(.*?)</h4>.*?'
+                           r'<p class="card-text">(.*?)</p>.*?class="dateNotice">([^<]*)<', h, re.S)
+        nuevas = 0
+        for u, t, res, f in cards:
+            u = html.unescape(u).split('?')[0]
+            nuevas += u not in out
+            out[u] = C.comunicado(_t(t), C.fecha_larga(f), u, _t(res)[:400])
+        if not cards or (prev and not nuevas):
+            break
+    return list(out.values())
+
+
 def fetch():
     OUT.mkdir(parents=True, exist_ok=True)
     gen = datetime.datetime.now().isoformat(timespec='seconds')
@@ -202,6 +262,20 @@ def fetch():
         res['eventos'] = f'{len(ev)} (último {max((e["dia"] for e in ev), default="—")})'
     except Exception as e:
         ok, res['eventos'] = False, f'FALLÓ ({e})'
+    try:
+        cs = conceptos()
+        if len(cs) < 500:
+            raise RuntimeError(f'solo {len(cs)} conceptos')
+        C.escribir(OUT / 'conceptos.json', {'generado': gen, 'entidad': ENTIDAD, 'items': cs})
+        res['conceptos'] = f'{len(cs)} (último {max(c["fecha"] for c in cs)})'
+    except Exception as e:
+        ok, res['conceptos'] = False, f'FALLÓ ({e}) — queda el archivo anterior'
+    try:
+        ns = noticias((C.leer(OUT / 'noticias.json', {}) or {}).get('items', []))
+        C.escribir(OUT / 'noticias.json', {'generado': gen, 'entidad': ENTIDAD, 'items': ns})
+        res['noticias'] = f'{len(ns)}'
+    except Exception as e:
+        ok, res['noticias'] = False, f'FALLÓ ({e})'
     for k, v in res.items():
         print(f'  ssf · {k}: {v}')
     return ok

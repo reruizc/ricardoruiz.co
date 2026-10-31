@@ -148,7 +148,7 @@
   /* ---------- pilar Ejecutivo Nacional · decretos y normativa ---------- */
   const EJE={tipo:'', q:''};
   const EJE_TIPOS=[['','Todas'],['DECRETOS','Decretos'],['RESOLUCIONES','Resoluciones'],['DIRECTIVAS','Directivas'],['CIRCULARES','Circulares'],['ACTOS LEGISLATIVOS','Actos legislativos'],['AGENDA REGULATORIA','Agenda regulatoria'],['LEYES','Leyes']];
-  const EJE_TSING={'DECRETOS':'Decreto','LEYES':'Ley','RESOLUCIONES':'Resolución','DIRECTIVAS':'Directiva','CIRCULARES':'Circular','ACTOS LEGISLATIVOS':'Acto legislativo','AGENDA REGULATORIA':'Agenda regulatoria','RESOLUCIONES DE NOMBRAMIENTOS':'Nombramiento','CONPES':'CONPES','CONSTITUCIÓN POLÍTICA':'Constitución','DECRETO ÚNICO REGLAMENTARIO':'Decreto Único','CONCEPTOS':'Concepto','BOLETINES':'Boletín jurídico','NOTAS EXTERNAS':'Nota externa','ACUERDO CNSSS':'Acuerdo CNSSS','ACUERDO CRES':'Acuerdo CRES','SENTENCIA':'Sentencia'};
+  const EJE_TSING={'DECRETOS':'Decreto','LEYES':'Ley','RESOLUCIONES':'Resolución','DIRECTIVAS':'Directiva','CIRCULARES':'Circular','ACTOS LEGISLATIVOS':'Acto legislativo','AGENDA REGULATORIA':'Agenda regulatoria','RESOLUCIONES DE NOMBRAMIENTOS':'Nombramiento','CONPES':'CONPES','CONSTITUCIÓN POLÍTICA':'Constitución','DECRETO ÚNICO REGLAMENTARIO':'Decreto Único','CONCEPTOS':'Concepto','COMUNICADOS':'Comunicado','BOLETINES':'Boletín jurídico','NOTAS EXTERNAS':'Nota externa','ACUERDO CNSSS':'Acuerdo CNSSS','ACUERDO CRES':'Acuerdo CRES','SENTENCIA':'Sentencia'};
   let EJE_STATS=null, _ejeInited=false, _ejeSeq=0;
   function ejeSing(t){ return EJE_TSING[t]||(t?t.charAt(0)+t.slice(1).toLowerCase():'—'); }
   function ejeTitle(t){ return t?t.charAt(0)+t.slice(1).toLowerCase():'—'; }

@@ -660,6 +660,18 @@ etapa() {
   etapa --nombre entidades_supersalud --timeout 300 \
         --desc "Supersalud: circulares, boletín jurídico y consultas" \
         -- python3 tools/caudal/entidades/harvest_supersalud.py fetch
+  etapa --nombre entidades_mintrabajo --timeout 300 \
+        --desc "MinTrabajo: resoluciones, circulares, conceptos, agenda y comunicados" \
+        -- python3 tools/caudal/entidades/harvest_mintrabajo.py fetch
+  etapa --nombre entidades_funcionpublica --timeout 300 \
+        --desc "Función Pública: proyectos, conceptos, circulares y agenda" \
+        -- python3 tools/caudal/entidades/harvest_funcionpublica.py fetch
+  etapa --nombre entidades_spe --timeout 300 \
+        --desc "Servicio de Empleo: resoluciones y circulares (PDF) y noticias" \
+        -- python3 tools/caudal/entidades/harvest_spe.py fetch
+  etapa --nombre entidades_ugpp --timeout 300 \
+        --desc "UGPP: fichas nuevas del mapa del sitio y noticias" \
+        -- python3 tools/caudal/entidades/harvest_ugpp.py fetch
   etapa --nombre entidades_build --timeout 600 \
         --desc "entidades → borradores/normas/eventos.jsonl → S3 (no encoge a menos de la mitad)" \
         -- python3 tools/caudal/entidades/build.py --subir
