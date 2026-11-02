@@ -390,6 +390,15 @@ def calcular(corpus, clas, temas, tram, cfg, crudo):
                        'por': {f: dict(tablero[i][f]) for f in FUENTES if tablero[i][f]['n']},
                        'serie': {d: dict(v) for d, v in sorted(serie[i].items())},
                        'voz': dict(voz[i]), 'titulares': unicos[:14], 'citas': citas[:6]})
+    # Presencia: en cuántos textos sobre la ley aparece cada jugador. Es medición, no poder.
+    voces = []
+    for v in cfg['voces']:
+        pat = re.compile(r'\b(?:' + '|'.join(re.escape(x) for x in v.get('al', [v['q'].lower()])) + r')\b')
+        v = dict(v)
+        n_txt = [bt.norm(it['txt']) for _, it, _ in items]
+        v['men'] = sum(1 for t in n_txt if pat.search(t))
+        v.pop('al', None)
+        voces.append(v)
     sin_postura = sum(1 for _, _, c in items if any(p is None for _, p in c['t']))
     fuentes = {f: {'n': base[f]['n']} for f in FUENTES}
     fuentes['prensa']['medios'] = len(medios)
@@ -399,7 +408,7 @@ def calcular(corpus, clas, temas, tram, cfg, crudo):
         fuentes[f]['comentarios'] = sum(1 for _, it, _ in items if it['f'] == f and it.get('tipo') == 'comentario')
     return {
         'v': ahora().isoformat(timespec='minutes'), 'hoy': hoy.isoformat(),
-        'proyecto': cfg['proyecto'], 'tramite': tram, 'hitos': cfg['hitos'], 'voces': cfg['voces'], 'votos': cfg['votos'], 'personas': cfg['personas'],
+        'proyecto': cfg['proyecto'], 'tramite': tram, 'hitos': cfg['hitos'], 'voces': voces, 'votos': cfg['votos'], 'personas': cfg['personas'],
         'temas': salida, 'articulos': cfg['articulos'], 'fuentes': fuentes,
         'serie_total': {d: dict(v) for d, v in sorted(total_dia.items())},
         'clasificacion': {'modelos': dict(Counter(c.get('m', '?') for _, _, c in items)), 'sin_postura': sin_postura,

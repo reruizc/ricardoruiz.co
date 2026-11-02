@@ -51,7 +51,7 @@
     const p2 = mas(d1, 8), c3 = mas(p2, 15), p4 = mas(c3, 8);
     return [[d1, 'Primer debate: Tercera de Cámara'], [p2, 'Segundo debate: plenaria de Cámara, 8 días después'], [c3, 'Tercer debate: Tercera de Senado, 15 días después'], [p4, 'Cuarto debate: plenaria de Senado, 8 días después'], [mas(p4, 1), 'Conciliación, si los textos difieren']];
   }
-  const iniciales = n => n.replace(/^(el|la|los|las|de|del)\s/i, '').split(/\s+/).filter(w => w.length > 2).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  const iniciales = n => { const w = n.replace(/^(el|la|los|las|de|del)\s/i, '').split(/\s+/).filter(x => x.length > 2); return (w.length > 1 ? w.slice(0, 2).map(x => x[0]).join('') : (w[0] || n).slice(0, 2)).toUpperCase(); };
   function cara(E, slug, nombre, org) {
     const p = (E.personas || {})[slug];
     if (p && p.foto) return `<img class="cara" src="${esc(p.foto)}" alt="${esc(p.n)}" loading="lazy" />`;

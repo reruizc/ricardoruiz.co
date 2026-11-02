@@ -8,7 +8,7 @@ Al tocar la base, subir el `?v=` en las ocho.
 temas.json          libro de códigos: 24 temas que agrupan los 106 artículos (nombre, artículos, página, nota)
 articulos.json      los 106 artículos con página y tema · lo genera build_articulos.py
 hitos.json          bitácora curada a mano. Un hito con "etapa":"pon|inf|anu|c1|p2|c3|p4|con|san" marca esa etapa como hecha
-voces.json          declaraciones verificadas una por una (p: a apoya · r rechaza · m reparos · i sin definir · g: con congreso · pub público · pri privado)
+voces.json          declaraciones verificadas una por una (p: a apoya · r rechaza · m reparos · i sin definir · g: con congreso · pub público · pri privado · n: nivel 5-2 del eje de poder · k: rótulo corto · al: nombres para contar menciones)
 personas.json       fotos y créditos · lo genera build_personas.py (foto oficial de Senado y Cámara; Wikipedia solo con licencia libre)
 votos.json          bancadas de las Comisiones Terceras y su postura inicial. Solo se marca sí/no si habló la bancada
 redes.mjs           X, TikTok, Instagram y Facebook por Apify → redes-crudo.json. Reusa los actores de candidato-360/escucha/perfil.mjs
@@ -39,6 +39,8 @@ las carpetas ocultas: por eso es `lr-datos/` y no `.lr/` (así se perdió la pri
 | Redes Apify | medido: US$0,97 y US$1,06 solo en publicaciones; con comentarios, hasta US$1,5 | `LR_TOPE_USD` 1,5 por corrida (reserva US$0,40 para comentarios) · `LR_TOPE_MES_USD` 45 |
 
 ## Reglas
+
+- **Eje de poder del esquema de fuerzas:** lectura propia con regla fija, y la página la dice. 5 escribieron el proyecto, presiden o votan en una Comisión Tercera. 4 los demás congresistas y jefes de partido. 3 gremios grandes, sindicatos e instituciones. 2 los demás. El otro eje, presencia, sí es medición.
 
 - **La ficha manda.** La prensa nunca marca una etapa como hecha. Una señal de prensa va a la bitácora rotulada «sin verificar».
 - **La postura es frente a la medida, no frente al Gobierno.** «Informa» no es neutralidad del medio: es que el titular no toma partido.
