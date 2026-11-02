@@ -10,7 +10,8 @@ titular por regex (determinista, sin LLM; lo que el regex no saca queda None
 y el titular completo va en `titulo` → campo `motivo` del esquema común):
 
   supertransporte  WordPress REST (?rest_route=/wp/v2/posts, paginado, BOM utf-8-sig)
-  sic              listado Drupal /noticias?page=N (~180 páginas; título en
+  sic              sede electrónica /noticias?page=N (el robots.txt de www.sic.gov.co
+                   prohíbe todo el sitio desde 2026); antes: listado Drupal (título en
                    <div class="titulo"><a>); fecha del detalle solo para los hits
   supersalud       SharePoint Search API ANÓNIMA (/es-co/_api/search/query) con
                    filtro path a docs.supersalud.gov.co/PortalWeb/Comunicaciones/
@@ -248,52 +249,55 @@ def _sic_fecha(page_html):
     return None
 
 
+SIC_SEDE = 'https://sedeelectronica.sic.gov.co'
+SIC_SEDE_RE = re.compile(
+    r'href="((?:https://sedeelectronica\.sic\.gov\.co)?/(?:noticias|comunicado)/[^"?#]+)"[^>]*>(.*?)</a>', re.S)
+SIC_MAX_PAG = 110          # primera corrida: el archivo completo (~103 páginas)
+SIC_MAX_PAG_INCR = 8       # después: lo nuevo siempre está en las primeras páginas
+
+
 def fetch_sic():
-    """Listado Drupal paginado; fecha del detalle solo para los hits."""
-    base = 'https://www.sic.gov.co'
-    first = _curl(f'{base}/noticias')
-    if first is None:
-        print('  ! sic: no responde /noticias', file=sys.stderr)
-        return []
-    first = first.decode('utf-8', errors='replace')
-    last_page = max((int(m) for m in SIC_PAGER_RE.findall(first)), default=0)
-    print(f'  sic: {last_page + 1} páginas de listado')
+    """Comunicados de la sede electrónica (nov-2026).
 
-    hits, seen = [], set()
-
-    def scan(page_html):
-        for href, txt in SIC_ITEM_RE.findall(page_html):
-            titulo = html.unescape(re.sub(r'<[^>]+>', ' ', txt))
-            titulo = re.sub(r'\s+', ' ', titulo).strip()
-            if not titulo or href in seen or not es_sancion(titulo):
-                continue
-            seen.add(href)
-            rec = parse_titulo(titulo)
-            rec['url'] = href if href.startswith('http') else base + href
-            rec['fecha'] = None       # se completa abajo
-            rec['id'] = f'sic-{href}'
-            hits.append(rec)
-
-    scan(first)
-    for page in range(1, last_page + 1):
-        raw = _curl(f'{base}/noticias?page={page}')
+    ⚠️ El `robots.txt` de www.sic.gov.co prohíbe rastrear TODO el sitio
+    (`Disallow: /`), así que su listado de noticias ya no se usa. El de
+    `sedeelectronica.sic.gov.co` lo permite y publica los mismos comunicados.
+    Incremental: conserva lo ya cosechado (incluidas las filas viejas de
+    www.sic.gov.co) y recorre solo las primeras páginas cuando ya hay base.
+    La fecha sale del detalle, solo para los comunicados nuevos de sanción."""
+    try:
+        prev = json.loads((RAW / 'sic.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        prev = []
+    conocidos = {r.get('url') for r in prev}
+    hay_sede = any(SIC_SEDE in (r.get('url') or '') for r in prev)
+    tope = SIC_MAX_PAG_INCR if hay_sede else SIC_MAX_PAG
+    nuevos, vistos = [], set()
+    for page in range(tope):
+        raw = _curl(f'{SIC_SEDE}/noticias?page={page}')
         if raw is None:
-            print(f'  ! sic: falló page={page}, sigo', file=sys.stderr)
-            continue
-        scan(raw.decode('utf-8', errors='replace'))
-        if page % 20 == 0:
-            print(f'  sic page {page}/{last_page}: {len(hits)} hits')
-        time.sleep(0.15)
-
-    # fecha del detalle, solo para los hits
-    for i, rec in enumerate(hits):
+            print(f'  ! sic: falló page={page}, se corta aquí', file=sys.stderr)
+            break
+        links = SIC_SEDE_RE.findall(raw.decode('utf-8', errors='replace'))
+        if not links:
+            break
+        for href, txt in links:
+            url = href if href.startswith('http') else SIC_SEDE + href
+            titulo = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', txt))).strip()
+            if not titulo or url in vistos or url in conocidos or not es_sancion(titulo):
+                continue
+            vistos.add(url)
+            rec = parse_titulo(titulo)
+            rec.update(url=url, fecha=None, id=f'sic-{url}')
+            nuevos.append(rec)
+        time.sleep(0.3)
+    for rec in nuevos:
         raw = _curl(rec['url'], timeout=30)
         if raw:
             rec['fecha'] = _sic_fecha(raw.decode('utf-8', errors='replace'))
-        if (i + 1) % 25 == 0:
-            print(f'  sic fechas: {i + 1}/{len(hits)}')
-        time.sleep(0.15)
-    return hits
+        time.sleep(0.3)
+    print(f'  sic: {len(nuevos)} sanciones nuevas en la sede electrónica · {len(prev)} ya conocidas')
+    return prev + nuevos
 
 
 # --- Clasificador propio de Supersalud (NO usar es_sancion genérico) --------

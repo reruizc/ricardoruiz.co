@@ -55,6 +55,7 @@ PISOS = {
     'secop2-multas':          490,   # 544
     'junta-contadores':        76,   # 85
     'sic':                     68,   # 76
+    'sic-firme':             3500,   # 3.938 · sanciones en firme (datos.gov.co)
     'contraloria-fiscal':      54,   # 60
     'supertransporte':         32,   # 36
     'supersalud-registro':     27,   # 30

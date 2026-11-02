@@ -539,6 +539,23 @@ etapa() {
         --desc "UIAF · obligaciones de reporte ALA/CFT" \
         -- python3 tools/caudal/supers/harvest_uiaf.py fetch
 
+  # Fuentes de sanciones que hasta el 2-nov-2026 NUNCA se volvían a bajar: el cron
+  # solo consolidaba los raw de su carga inicial (jul-ago), así que la SIC, la
+  # Superfinanciera, Supertransporte, Supersalud, INVIMA y las multas de SECOP
+  # quedaron fijas. Lo destapó un cruce con prensa: de 16 sanciones reportadas
+  # entre junio y octubre, la base tenía 3. Medido en el Mac: datos.gov.co 21 s,
+  # Superfinanciera 15 s, comunicados ~8 min (Supersalud revisa 1.174 PDF).
+  # Ninguna es crítica: si una cae, el consolidado sigue con el raw de ayer.
+  etapa --nombre supers_fetch_datosgov --timeout 600 \
+        --desc "sanciones en datos.gov.co: SIC en firme, INVIMA, SECOP, Junta de Contadores, Contraloría" \
+        -- python3 tools/caudal/supers/harvest_supers.py fetch
+  etapa --nombre supers_fetch_sfc --timeout 300 \
+        --desc "Superfinanciera · sanciones (API del buscador público)" \
+        -- python3 tools/caudal/supers/harvest_sfc.py fetch
+  etapa --nombre supers_fetch_comunicados --timeout 1200 \
+        --desc "sanciones anunciadas en comunicados: SIC (sede electrónica), Supertransporte, Supersalud" \
+        -- python3 tools/caudal/supers/harvest_comunicados.py fetch
+
   # Supersociedades tiene dos colas y la que importa refrescar a diario es la de
   # PROYECTOS: sus ventanas de comentarios duran entre 4 y 15 días, así que un
   # rastreo semanal se perdería la mitad.
@@ -735,6 +752,14 @@ etapa() {
   etapa --nombre entidades_mincultura --timeout 300 \
         --desc "MinCultura: noticias (SharePoint) y avisos de convocatorias" \
         -- python3 tools/caudal/entidades/harvest_mincultura.py fetch
+  # Sanciones en prensa contra el consolidado publicado: los lunes por la mañana.
+  # Es un chequeo de cobertura, no publica nada; deja un reporte para revisar a mano.
+  # Corre en el Mac (Google News) y lee el consolidado de S3 que arma la EC2.
+  if [ "$(date +%u)" = 1 ] && [ "$(date +%H)" -lt 14 ]; then
+    etapa --nombre cruce_prensa_sanciones --timeout 600 \
+          --desc "sanciones en prensa de los últimos 30 días que no están en el consolidado" \
+          -- python3 tools/caudal/supers/cruce_prensa.py --dias 30
+  fi
   # Agendas regulatorias: una foto al día basta (0,9 MB cada una). Sale con 1 solo si
   # SUCOP no responde; un sitio caído queda como agenda sin leer y no tumba la etapa.
   if [ "$(date +%H)" -lt 14 ]; then

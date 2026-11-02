@@ -2,7 +2,7 @@
 """
 Caudal · Ministerio de Vivienda, Ciudad y Territorio (tanda 2, oct-2026).
 
-  normativa  /normativa?f[0]=tipo_normativa:X&f[1]=fecha_norma:AAAA   (Drupal, 20 por página)
+  normativa  /normativa?page=N                                        (Drupal, 20 por página, todo junto)
   conceptos  /ministerio/conceptos-juridicos?page=N                   (tabla, ~680)
   prensa     /comunicaciones?page=N
 
@@ -12,6 +12,8 @@ fijan reglas generales (_GENERAL).
 ⚠️ La «Fecha de Norma» trae errores de captura (27/12/2026 publicada en octubre):
 si cae en el futuro, se usa la fecha de publicación.
 ⚠️ La agenda regulatoria vive en SUCOP: no se lee acá.
+⚠️ Su `robots.txt` prohíbe las búsquedas con filtros (`/*?f%5B`, `/*?f[`). Hasta el 2-nov-2026 se
+usaban; ahora se recorre el listado completo sin filtros y el tipo sale del título del acto.
 
 Salida: `Bases de datos/caudal-entidades/raw/minvivienda/{normas,noticias}.json`.
 Uso: python3 tools/caudal/entidades/harvest_minvivienda.py fetch [--todo]
@@ -40,9 +42,22 @@ def _fuera(x):
                                                   or not _GENERAL.search(x.get('descripcion') or ''))
 
 
-def _pagina(tipo, anio, n):
-    q = urllib.parse.urlencode({'f[0]': f'tipo_normativa:{tipo}', 'f[1]': f'fecha_norma:{anio}', 'page': n})
-    return C.curl(f'{BASE}/normativa?{q}', timeout=90)
+MAX_PAG = 1100            # el listado completo tiene ~1.020 páginas
+DIAS_INCR = 45            # sin --todo: hasta lo publicado hace mes y medio
+
+
+def _pagina(n):
+    return C.curl(f'{BASE}/normativa?page={n}', timeout=90)
+
+
+def _tipo(b):
+    m = re.search(r'listing-title"><span><a[^>]*>\s*([A-Za-zÁÉÍÓÚáéíóú]+)', b)
+    return {'Resolucion': 'Resolución'}.get(m.group(1), m.group(1)) if m else ''
+
+
+def _publicado(b):
+    m = re.search(r'views-field-created.*?datetime="(\d{4}-\d{2}-\d{2})', b, re.S)
+    return m.group(1) if m else ''
 
 
 def _filas(h):
@@ -76,20 +91,21 @@ def _fila(b, tipo):
 
 def normas(prev, todo):
     out = {x['url']: x for x in prev}
-    anio = datetime.date.today().year
-    for tipo in TIPOS:
-        for a in ([anio - 1, anio] if todo else [anio]):
-            h, n, ult = _pagina(tipo, a, 0), 0, 0
-            ult = _ultima(h) if todo else min(_ultima(h), 3)
-            while True:
-                for b in _filas(h):
-                    f = _fila(b, tipo)
-                    if f and not _fuera(f):
-                        out[f['url']] = f
-                n += 1
-                if n > ult:
-                    break
-                h = _pagina(tipo, a, n)
+    hoy = datetime.date.today()
+    corte = f'{hoy.year - 1}-01-01' if todo else (hoy - datetime.timedelta(days=DIAS_INCR)).isoformat()
+    for n in range(MAX_PAG):
+        filas = _filas(_pagina(n))
+        if not filas:
+            break
+        for b in filas:
+            tipo = _tipo(b)
+            if tipo in TIPOS:
+                f = _fila(b, tipo)
+                if f and not _fuera(f):
+                    out[f['url']] = f
+        # el listado va por fecha de publicación: se para cuando la página entera es vieja
+        if all(_publicado(b) and _publicado(b) < corte for b in filas):
+            break
     return list(out.values())
 
 
