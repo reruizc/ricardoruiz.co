@@ -50,6 +50,36 @@
     .cand-v{font-weight:700;font-size:1.05rem;white-space:nowrap}.cand-v small{font-weight:400;color:var(--dim);font-size:.78rem;margin-left:.35rem}
     .cand.tach .cand-n{color:var(--dim);text-decoration:line-through;text-decoration-color:rgba(244,243,239,.35)}
     .tach-n{font-size:.76rem;color:var(--warn);margin-top:.3rem}
+    .cand-who{display:flex;align-items:center;gap:.7rem;min-width:0}
+    .foto{width:46px;height:46px;border-radius:50%;object-fit:cover;object-position:50% 18%;background:#f4f3ef;flex:0 0 46px}
+    .foto.sm{width:30px;height:30px;flex-basis:30px}
+    .foto.lg{width:58px;height:58px;flex-basis:58px}
+    .kpi-g{display:flex;align-items:center;gap:.75rem}.kpi-g>div{min-width:0}
+    .esp{display:inline-block;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--warn);border:1px solid rgba(240,192,64,.45);padding:.05rem .32rem;margin-left:.4rem;vertical-align:1px}
+    .ver-todo{display:inline-block;font-size:.72rem;color:var(--blue2);cursor:pointer;margin-bottom:.8rem}
+    tfoot td{font-weight:700;border-top:1px solid var(--line2);border-bottom:0}
+    .wi-lead{font-size:.9rem;color:var(--dim);line-height:1.5;max-width:52rem;margin-bottom:1rem}
+    .wi-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:1.6rem;align-items:start}
+    .wi-sel{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1rem}
+    .wi-sel label,.wi-h{display:block;font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin-bottom:.4rem}
+    .wi-sel select{width:100%;font:inherit;font-size:.86rem;color:var(--ink);background:#0d111c;border:1px solid var(--line2);padding:.45rem .5rem}
+    .wi-h{margin-top:1.1rem}
+    .wi-row{display:grid;grid-template-columns:30px minmax(0,1fr) minmax(90px,1.15fr) 3.2rem;gap:.6rem;align-items:center;padding:.3rem 0;font-size:.84rem}
+    .wi-row.nf{grid-template-columns:minmax(0,1fr) minmax(90px,1.15fr) 3.2rem}
+    .wi-row output{text-align:right;color:var(--dim);font-size:.8rem}
+    .wi-row input{width:100%;accent-color:var(--blue2)}
+    .wi-btns{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}
+    .wi-btns button{font:inherit;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);background:rgba(255,255,255,.05);border:1px solid var(--line2);padding:.4rem .7rem;cursor:pointer}
+    .wi-btns button:hover{border-color:var(--blue2)}
+    .wi-res{background:rgba(255,255,255,.025);border:1px solid var(--line);padding:1rem}
+    .wi-head{font-weight:700;font-size:1.15rem;letter-spacing:-.02em;line-height:1.25;margin-bottom:.3rem}
+    .wi-sub{font-size:.82rem;color:var(--dim);margin-bottom:.9rem}
+    .wi-cam{color:var(--warn)}
+    .wi-bar{margin-bottom:.6rem}.wi-bar .top{display:flex;justify-content:space-between;gap:.6rem;font-size:.84rem}
+    .wi-bar small{color:var(--dim);font-size:.74rem;margin-left:.3rem}
+    .wi-fondo{border-top:1px solid var(--line);margin-top:.9rem;padding-top:.8rem;font-size:.82rem;color:var(--dim);line-height:1.5}
+    .wi-fondo p+p{margin-top:.4rem}.wi-fondo b{color:var(--ink);font-weight:600}
+    td.dif{color:var(--dim)}td.dif.mas{color:var(--green)}td.dif.menos{color:#ff8a7a}
     .bar{height:8px;background:rgba(255,255,255,.06);margin-top:.45rem}.bar i{display:block;height:100%}
     .modes{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.8rem}
     .modes button{font:inherit;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);background:rgba(255,255,255,.04);border:1px solid var(--line2);padding:.38rem .75rem;cursor:pointer}
@@ -86,6 +116,7 @@
     @media(max-width:900px){
       .nav,main,footer{padding-left:16px;padding-right:16px}
       .kpis{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}#map{height:400px}.lista{grid-template-columns:1fr}
+      .wi-grid,.wi-sel{grid-template-columns:1fr}.foto{width:38px;height:38px;flex-basis:38px}.foto.lg{width:44px;height:44px;flex-basis:44px}
     }
   </style>
 <script defer src="/track.js"></script>
@@ -138,7 +169,11 @@ const pc = (a,b) => b ? (100*a/b).toLocaleString('es-CO',{minimumFractionDigits:
 const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const PART = /^(de|del|la|las|los|y|el|en|e)$/i;
 const titulo = s => String(s||'').toLowerCase().split(/\s+/).map((w,i)=> /^(\p{L}\.)+\p{L}?$/u.test(w) ? w.toUpperCase() : i && PART.test(w) ? w : w.replace(/^(\p{L})/u, c=>c.toUpperCase())).join(' ');
+const espDe = p => p.zona==='90' ? 'puesto censo' : p.zona==='98' ? 'cárcel' : '';
+const pNom = p => titulo(p.nombre).replace(/^Carcel\b/,'Cárcel');
+const pTag = p => { const e=espDe(p); return e && !(e==='cárcel' && p.zona==='98' && /^carcel/i.test(p.nombre)) ? `<span class="esp">${e}</span>` : ''; };
 const hex = (h,a) => { const n=parseInt(h.slice(1),16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; };
+const DATA_V = '20261102';
 const S3 = 'https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/mapas-2026/Departamentos-mps/';
 const main = document.getElementById('main');
 
@@ -162,7 +197,7 @@ function indice(){
 async function eleccion(clave){
   document.getElementById('back').href = 'atipica.html';
   document.getElementById('back').textContent = '← Atípicas';
-  const D = await fetch(`atipicas/${clave}.json?v=20261008`).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); });
+  const D = await fetch(`atipicas/${clave}.json?v=${DATA_V}`).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); });
   const C = D.candidatos;
   document.title = `${D.eleccion} ${D.fecha.slice(0,4)} · Ricardo Ruiz`;
   const esDep = D.nivel==='dep', esTotal = D.nivel==='total';
@@ -191,6 +226,20 @@ async function eleccion(clave){
   const unidades = esDep ? Object.values(M) : (D.puestos||[]);
   const ganaN = i => unidades.filter(u=>u.iw===i).length;
   const uNom = esDep ? 'municipios' : 'puestos';
+  const fotoDe = (i,cl='') => C[i].foto ? `<img class="foto ${cl}" src="${C[i].foto}" alt="">` : '';
+
+  // ── por comuna: la dice el mesa a mesa, fila por fila. Puesto censo y cárcel no son de ninguna (código 000) ──
+  const COMS = {};
+  if (!esDep && !esTotal) for (const p of D.puestos){
+    if (!p.com) continue;
+    const c = COMS[p.com] ||= {cod:p.com, nombre:p.comn, v:C.map(()=>0), blanco:0, nulos:0, nomarc:0, censo:0, mesas:0, puestos:[]};
+    p.v.forEach((x,i)=>c.v[i]+=x); ['blanco','nulos','nomarc','mesas'].forEach(k=>c[k]+=p[k]); c.censo+=p.censo||0; c.puestos.push(p);
+  }
+  const listaCom = Object.values(COMS).sort((a,b)=>(a.cod==='000')-(b.cod==='000') || a.cod.localeCompare(b.cod));
+  for (const c of listaCom){ Object.assign(c, resumen(c));
+    if (c.cod==='000'){ const z=new Set(c.puestos.map(p=>p.zona)); c.nombre = z.has('90')&&z.has('98') ? 'Puesto censo y cárcel' : z.has('98') ? 'Cárcel' : z.has('90') ? 'Puesto censo' : 'Sin comuna'; }
+  }
+  const hayCom = listaCom.length>1;
 
   main.innerHTML = `
     <div class="kicker">Elección atípica · ${fecha(D.fecha)}</div>
@@ -198,16 +247,19 @@ async function eleccion(clave){
     <p class="lead">${esc(D.motivo)}</p>
     <div class="kpis" id="kpis"></div>
     <div class="grid${esTotal?' solo':''}">
-      ${esTotal?'':`<div class="card"><h2>${esDep?'Mapa por municipio':'Mapa por puesto de votación'}</h2><div class="modes" id="modes"></div><div id="map"></div><div class="legend" id="legend"></div></div>`}
-      <div class="card"><h2 id="cand-title">Resultado</h2><div id="cands"></div><p class="note" id="cand-note"></p></div>
+      ${esTotal?'':`<div class="card"><h2 id="map-title">${esDep?'Mapa por municipio':'Mapa por puesto de votación'}</h2>${D.barrios?'<div class="modes" id="vistas"></div>':''}<div class="modes" id="modes"></div><div id="map"></div><div class="legend" id="legend"></div></div>`}
+      <div class="card"><h2 id="cand-title">Resultado</h2><a class="ver-todo" id="cand-reset" hidden></a><div id="cands"></div><p class="note" id="cand-note"></p></div>
     </div>
     <div id="aviso"></div>
-    ${esTotal?'':`<div class="card sec"><h2>${esDep?'Municipios':'Puestos de votación'}</h2><div class="tbl-wrap"><table id="t-u"></table></div></div>`}
+    <div class="card sec" id="wi"></div>
+    ${hayCom?`<div class="card sec"><h2>Por comuna y corregimiento</h2><div class="tbl-wrap"><table id="t-com"></table></div><p class="note" id="com-note"></p></div>`:''}
+    ${esTotal?'':`<div class="card sec"><h2 id="pue-h">${esDep?'Municipios':'Puestos de votación'}</h2><div class="tbl-wrap"><table id="t-u"></table></div></div>`}
     ${esDep?'<div class="card sec" id="pue-card" style="display:none"><div class="crumb"><a id="pue-back">← Todos los municipios</a></div><h2 id="pue-title">Puestos</h2><div class="tbl-wrap"><table id="t-pue"></table></div></div>':''}
-    <p class="note">Fuente: ${esc(D.fuente)}${esTotal?', declaratoria (E-26) escaneada':', mesa a mesa (MMV) cuadrado voto a voto con la declaratoria (E-26)'}; censo electoral por puesto de esta elección. Porcentajes de candidato sobre votos válidos (candidatos + voto en blanco).${esTotal?' El sitio de escrutinio ya no publica el mesa a mesa, así que no hay resultado por puesto.':''}</p>`;
+    ${D.preconteo?'<div class="card sec" id="cotejo"></div>':''}
+    <p class="note">Fuente: ${esc(D.fuente)}${esTotal?', declaratoria (E-26) escaneada':', mesa a mesa (MMV) cuadrado voto a voto con la declaratoria (E-26)'}; censo electoral por puesto de esta elección. Porcentajes de candidato sobre votos válidos (candidatos + voto en blanco).${esTotal?' El sitio de escrutinio ya no publica el mesa a mesa, así que no hay resultado por puesto.':''}${C.some(c=>c.foto)?' Fotos: tarjeta electoral publicada por la Registraduría.':''}${D.barrios?' Polígonos de barrio: capa pública «Barrios de Duitama» en ArcGIS Online, no es cartografía oficial del municipio.':''}</p>`;
 
   document.getElementById('kpis').innerHTML = `
-    <div class="kpi"><div class="l">Ganó</div><div class="v" style="color:${C[g].color}">${C[g].corto}</div><div class="s">${C[g].partido}</div></div>
+    <div class="kpi"><div class="l">Ganó</div><div class="kpi-g">${fotoDe(g,'lg')}<div><div class="v" style="color:${C[g].color}">${C[g].corto}</div><div class="s">${C[g].partido}</div></div></div></div>
     <div class="kpi"><div class="l">Votación</div><div class="v">${fmt(T.v[g])}</div><div class="s">${pc(T.v[g],T.val)} de los válidos</div></div>
     <div class="kpi"><div class="l">Diferencia con el 2º</div><div class="v">${fmt(T.v[g]-T.v[s2])}</div><div class="s">${esTotal?`sobre ${C[s2].corto}`:`Gana ${ganaN(g)} de ${unidades.length} ${uNom}`}</div></div>
     <div class="kpi"><div class="l">Participación</div><div class="v">${pc(T.vot,T.censo)}</div><div class="s">${fmt(T.vot)} de ${fmt(T.censo)} habilitados${T.mesas?` · ${fmt(T.mesas)} mesas`:''}</div></div>`;
@@ -221,7 +273,7 @@ async function eleccion(clave){
     document.getElementById('cand-title').textContent = titulo_;
     const max = Math.max(...o.v);
     document.getElementById('cands').innerHTML = ord.map(i=>`
-      <div class="cand${tach[i]?' tach':''}"><div class="cand-top"><div><div class="cand-n">${C[i].nombre}</div><div class="cand-p">${C[i].partido}</div></div>
+      <div class="cand${tach[i]?' tach':''}"><div class="cand-top"><div class="cand-who">${fotoDe(i)}<div><div class="cand-n">${C[i].nombre}</div><div class="cand-p">${C[i].partido}</div></div></div>
       <div class="cand-v">${fmt(o.v[i])}<small>${pc(o.v[i],o.val)}</small></div></div>
       ${tach[i]?`<div class="tach-n">Votos marcados por ${C[i].corto} y declarados no marcados: ${fmt(o.tachados ? o.tachados[i] : 0)}</div>`:`<div class="bar"><i style="width:${max?100*o.v[i]/max:0}%;background:${C[i].color}"></i></div>`}</div>`).join('') + `
       <div class="cand"><div class="cand-top"><div><div class="cand-n" style="font-weight:400;color:var(--dim)">Voto en blanco</div></div><div class="cand-v">${fmt(o.blanco)}<small>${pc(o.blanco,o.val)}</small></div></div></div>`;
@@ -229,6 +281,8 @@ async function eleccion(clave){
   }
   const tituloTot = esDep ? 'Resultado departamental' : 'Resultado municipal';
   pintaCands(T, tituloTot);
+  whatIf();
+  if (D.preconteo) cotejo();
   if (esTotal) return;
 
   // ── mapa ──
@@ -248,7 +302,10 @@ async function eleccion(clave){
   const map = L.map('map',{zoomControl:true,attributionControl:false,scrollWheelZoom:false,zoomSnap:.25});
   map.setView([5,-74],6);
   const geo = await fetch(`${S3}${D.dep}.json`).then(r=>r.json());
-  let capa, puntos = [], marcas = {};
+  let capa, capaB = null, puntos = [], marcas = {};
+  let vista = 'pue', selCom = null;
+  const gp = L.layerGroup().addTo(map);
+  const BAR = {};
   if (esDep){
     capa = L.geoJSON(geo,{style:f=>{ const m=M[f.properties.mun_elec]; if(!m) return {color:'#333',weight:.6,fillColor:'#1a1d29',fillOpacity:.6};
         const [c,op]=color(m); return {color:'rgba(6,8,16,.9)',weight:.8,fillColor:c,fillOpacity:Math.max(.08,op)}; },
@@ -258,23 +315,55 @@ async function eleccion(clave){
     capa = L.geoJSON({type:'FeatureCollection',features:geo.features.filter(f=>f.properties.mun_elec===mun)},
       {style:{color:'rgba(244,243,239,.35)',weight:1,fillColor:'#1a1d29',fillOpacity:.5},interactive:false}).addTo(map);
     const vmax = Math.max(...D.puestos.map(p=>p.vot));
-    for (const p of D.puestos){
+    // De mayor a menor: dos puestos casi en la misma coordenada no se tapan, el pequeño queda encima.
+    for (const p of D.puestos.slice().sort((a,b)=>b.vot-a.vot)){
       if (!p.ll) continue;
-      const mk = L.circleMarker(p.ll,{radius:3+11*Math.sqrt(p.vot/vmax),weight:1,color:'rgba(6,8,16,.9)'}).addTo(map);
-      mk.bindTooltip(()=>tip(p,titulo(p.nombre)),{sticky:true}); mk.on('click',()=>marca(p));
+      const mk = L.circleMarker(p.ll,{radius:3+11*Math.sqrt(p.vot/vmax),weight:1,color:'rgba(6,8,16,.9)'}).addTo(gp);
+      const e = espDe(p);
+      mk.bindTooltip(()=>tip(p,pNom(p)+(e&&!/^c[aá]rcel/i.test(pNom(p))?` · ${e}`:'')),{sticky:true}); mk.on('click',()=>marca(p));
       puntos.push([mk,p]); marcas[p.zona+p.pue]=mk;
     }
+    if (D.barrios){
+      const gb = await fetch(`atipicas/geo/${clave}-barrios.json?v=${DATA_V}`).then(r=>r.json());
+      for (const f of gb.features){ const pr=f.properties; if (!pr.pu) continue;
+        const b = BAR[pr.n] = {nombre:pr.n, v:C.map(()=>0), blanco:0, nulos:0, nomarc:0, censo:0, mesas:0, puestos:pr.pu.map(c=>D.puestos.find(p=>p.zona+p.pue===c))};
+        for (const p of b.puestos){ p.v.forEach((x,i)=>b.v[i]+=x); ['blanco','nulos','nomarc','mesas'].forEach(k=>b[k]+=p[k]); b.censo+=p.censo||0; }
+        Object.assign(b, resumen(b));
+      }
+      const tipB = pr => { const b=BAR[pr.pu?pr.n:pr.de];
+        if (pr.pu) return tip(b,`Barrio ${pr.n}`)+`<br><span style="color:var(--dim)">${b.puestos.map(pNom).join(' · ')}</span>`;
+        return `<b>Barrio ${esc(pr.n)}</b><br><span style="color:var(--dim)">Sin puesto de votación propio. El color es el del barrio con puesto más cercano (${esc(pr.de)}) y no suma a ningún total.</span>`; };
+      capaB = L.geoJSON(gb,{style:f=>estiloB(f),onEachFeature:(f,l)=>{ l.bindTooltip(()=>tipB(f.properties),{sticky:true});
+        l.on('click',()=>{ const pr=f.properties; if (!pr.pu) return; sel=null; selCom=null; tabla(); tablaCom(); pintaCands(BAR[pr.n],`Barrio ${pr.n}`); verReset(); }); }});
+    }
   }
-  const fit = () => { map.invalidateSize(); const b = esDep ? capa.getBounds() : L.featureGroup(puntos.map(x=>x[0])).getBounds(); if (b.isValid()) map.fitBounds(b,{padding:[14,14],animate:false}); };
+  // Con capa de barrios se encuadra la ciudad: un puesto rural mínimo no debe aplastarla contra una esquina.
+  const lejos = D.barrios ? D.puestos.filter(p=>p.zona==='99'&&p.vot<100) : [];
+  function estiloB(f){ const pr=f.properties, b=BAR[pr.pu?pr.n:pr.de]; if(!b) return {color:'#333',weight:.6,fillColor:'#1a1d29',fillOpacity:.5};
+    const [c,op]=color(b);
+    return pr.pu ? {color:'rgba(6,8,16,.95)',weight:1.1,dashArray:null,fillColor:c,fillOpacity:Math.max(.3,op)}
+                 : {color:'rgba(244,243,239,.4)',weight:.7,dashArray:'3 3',fillColor:c,fillOpacity:Math.max(.07,op*.42)}; }
+  const fit = () => { map.invalidateSize(); const b = esDep ? capa.getBounds() : vista==='bar' ? capaB.getBounds() : L.featureGroup(puntos.filter(x=>!lejos.includes(x[1])).map(x=>x[0])).getBounds(); if (b.isValid()) map.fitBounds(b,{padding:[14,14],animate:false}); };
+  if (D.barrios){
+    const elV = document.getElementById('vistas');
+    elV.innerHTML = '<button data-v="pue" class="on">Por puesto</button><button data-v="bar">Por barrio</button>';
+    elV.onclick = e => { const b=e.target.closest('button'); if(!b) return; vista=b.dataset.v; [...elV.children].forEach(x=>x.classList.toggle('on',x===b));
+      if (vista==='bar'){ map.removeLayer(gp); capaB.addTo(map); } else { map.removeLayer(capaB); gp.addTo(map); }
+      document.getElementById('map-title').textContent = vista==='bar' ? 'Mapa por barrio' : 'Mapa por puesto de votación';
+      pinta(); fit(); };
+  }
   setTimeout(fit,0); new ResizeObserver(fit).observe(document.getElementById('map'));
   function pinta(){
     if (esDep) capa.setStyle(f=>{ const m=M[f.properties.mun_elec]; if(!m) return {color:'#333',weight:.6,fillColor:'#1a1d29',fillOpacity:.6}; const [c,op]=color(m); return {color:'rgba(6,8,16,.9)',weight:.8,fillColor:c,fillOpacity:Math.max(.08,op)}; });
-    else puntos.forEach(([mk,p])=>{ const [c,op]=color(p); mk.setStyle({fillColor:c,fillOpacity:Math.max(.15,op)}); });
+    else puntos.forEach(([mk,p])=>{ const [c,op]=color(p), off=selCom&&p.com!==selCom; mk.setStyle({fillColor:c,fillOpacity:off?.05:Math.max(.15,op),opacity:off?.2:1}); });
+    if (capaB) capaB.setStyle(estiloB);
     const lg=document.getElementById('legend');
     if (modo==='gana') lg.innerHTML = vivos.filter(i=>ganaN(i)).map(i=>`<span><i style="background:${C[i].color}"></i>${C[i].corto} · ${ganaN(i)} ${uNom}</span>`).join('') + `<span>Más intenso = gana por más${esDep?'':' · más grande = más votantes'}</span>`;
     else if (modo==='part') lg.innerHTML = '<span><i style="background:rgba(61,111,255,.15)"></i>15 %</span><span><i style="background:rgba(61,111,255,.95)"></i>55 % o más</span>';
     else if (modo[0]==='t') lg.innerHTML = `<span><i style="background:rgba(240,192,64,.1)"></i>0 %</span><span><i style="background:rgba(240,192,64,.95)"></i>70 % o más de los votos marcados por ${C[+modo.slice(1)].corto}</span>`;
     else { const i=+modo.slice(1); lg.innerHTML = `<span><i style="background:${hex(C[i].color,.1)}"></i>0 %</span><span><i style="background:${hex(C[i].color,.95)}"></i>70 % o más</span>`; }
+    if (vista==='pue'&&lejos.length) lg.innerHTML += `<span style="flex-basis:100%">Aleja el mapa para ver ${lejos.length===1?'el puesto rural':'los puestos rurales'} de ${lejos.map(p=>pNom(p)).join(' y ')}.</span>`;
+    if (vista==='bar') lg.innerHTML += `<span style="flex-basis:100%">${D.barrios.con_dato} de ${D.barrios.total} barrios tienen puesto y dato propio. Los punteados no tienen puesto: heredan el color del barrio con puesto más cercano y no suman a ningún total. El puesto recibe votantes de barrios vecinos, así que esto es una aproximación. Fuera de este mapa: ${D.barrios.puestos_fuera.length} puestos, los rurales, el puesto censo y la cárcel (véanse en la vista por puesto).</span>`;
   }
   pinta();
 
@@ -282,12 +371,13 @@ async function eleccion(clave){
   let orden = {k:'vot', d:-1}, sel=null;
   const corto = i => C[i].corto.split(' ').slice(-1)[0];
   const cols = [['nombre',esDep?'Municipio':'Puesto']].concat(esDep?[]:[['mesas','Mesas']]).concat([['censo','Censo'],['vot','Votantes'],['part','Partic.']]).concat(vivos.map(i=>['c'+i, corto(i)])).concat([['gana','Gana']]);
-  const val = (u,k) => k==='part'? (u.censo?u.vot/u.censo:0) : (k[0]==='c'&&k!=='censo') ? u.v[+k.slice(1)]/u.val : k==='gana' ? C[u.iw].corto : k==='nombre' ? (esDep?u.nombre:titulo(u.nombre)) : u[k];
+  const val = (u,k) => k==='part'? (u.censo?u.vot/u.censo:0) : (k[0]==='c'&&k!=='censo') ? u.v[+k.slice(1)]/u.val : k==='gana' ? C[u.iw].corto : k==='nombre' ? (esDep?u.nombre:pNom(u)) : u[k];
   function tabla(){
-    const rows = unidades.slice().sort((a,b)=>{ const x=val(a,orden.k), y=val(b,orden.k); return (x>y?1:x<y?-1:0)*orden.d; });
+    const rows = unidades.filter(u=>!selCom||u.com===selCom).sort((a,b)=>{ const x=val(a,orden.k), y=val(b,orden.k); return (x>y?1:x<y?-1:0)*orden.d; });
+    const h = document.getElementById('pue-h'); if (h&&!esDep) h.textContent = selCom ? `Puestos de ${COMS[selCom].nombre} · ${rows.length}` : 'Puestos de votación';
     const id = u => esDep ? u.cod : u.zona+u.pue;
     document.getElementById('t-u').innerHTML = `<thead><tr>${cols.map(([k,t])=>`<th data-k="${k}">${t}${orden.k===k?(orden.d<0?' ↓':' ↑'):''}</th>`).join('')}</tr></thead><tbody>${rows.map(u=>`
-      <tr data-c="${id(u)}" class="${sel===id(u)?'sel':''}"><td><span class="dot" style="background:${C[u.iw].color}"></span>${esc(esDep?u.nombre:titulo(u.nombre))}</td>${esDep?'':`<td>${u.mesas}</td>`}<td>${fmt(u.censo)}</td><td>${fmt(u.vot)}</td><td>${pc(u.vot,u.censo)}</td>${vivos.map(i=>`<td>${pc(u.v[i],u.val)}</td>`).join('')}<td style="text-align:left">${C[u.iw].corto}</td></tr>`).join('')}</tbody>`;
+      <tr data-c="${id(u)}" class="${sel===id(u)?'sel':''}"><td><span class="dot" style="background:${C[u.iw].color}"></span>${esc(esDep?u.nombre:pNom(u))}${esDep?'':pTag(u)}</td>${esDep?'':`<td>${u.mesas}</td>`}<td>${fmt(u.censo)}</td><td>${fmt(u.vot)}</td><td>${pc(u.vot,u.censo)}</td>${vivos.map(i=>`<td>${pc(u.v[i],u.val)}</td>`).join('')}<td style="text-align:left">${C[u.iw].corto}</td></tr>`).join('')}</tbody>`;
   }
   document.getElementById('t-u').onclick = e => {
     const th=e.target.closest('th'); if(th){ const k=th.dataset.k; orden = {k, d: orden.k===k ? -orden.d : (k==='nombre'||k==='gana'?1:-1)}; tabla(); return; }
@@ -296,21 +386,116 @@ async function eleccion(clave){
   };
   tabla();
 
+  // ── por comuna ──
+  function tablaCom(){
+    if (!hayCom) return;
+    const fila = (u,tag,attrs) => `<tr ${attrs}><td>${tag}</td><td>${u.puestos?u.puestos.length:D.puestos.length}</td><td>${fmt(u.mesas)}</td><td>${fmt(u.censo)}</td><td>${fmt(u.vot)}</td><td>${pc(u.vot,u.censo)}</td>${vivos.map(i=>`<td>${pc(u.v[i],u.val)}</td>`).join('')}<td style="text-align:left">${C[u.iw].corto}</td></tr>`;
+    document.getElementById('t-com').innerHTML = `<thead><tr><th>Comuna</th><th>Puestos</th><th>Mesas</th><th>Censo</th><th>Votantes</th><th>Partic.</th>${vivos.map(i=>`<th>${corto(i)}</th>`).join('')}<th>Gana</th></tr></thead><tbody>${listaCom.map(c=>fila(c,`<span class="dot" style="background:${C[c.iw].color}"></span>${esc(c.nombre)}`,`data-c="${c.cod}" class="${selCom===c.cod?'sel':''}"`)).join('')}</tbody><tfoot>${fila(T,'Total municipal','')}</tfoot>`;
+  }
+  if (hayCom){
+    document.getElementById('t-com').onclick = e => { const tr=e.target.closest('tr[data-c]'); if(!tr) return;
+      selCom = selCom===tr.dataset.c ? null : tr.dataset.c; sel=null; tabla(); tablaCom(); pinta();
+      if (selCom){ pintaCands(COMS[selCom], COMS[selCom].nombre); verReset(); } else limpiar(); };
+    const esp = listaCom.find(c=>c.cod==='000');
+    document.getElementById('com-note').textContent = `La comuna de cada puesto viene en el mesa a mesa de la Registraduría.${esp?` ${esp.nombre} (${fmt(esp.vot)} votos) queda por fuera de las comunas${esp.puestos.some(p=>p.zona==='90')?': el puesto censo reúne a votantes sin un puesto de barrio asignado':''}. Va en su propia fila y está sumado en el total, que es el del acta.`:''}`;
+  }
+  tablaCom();
+
+  function verReset(){ const a=document.getElementById('cand-reset'); a.hidden=false; a.textContent=`← Todo ${esDep?'el departamento':'el municipio'}`; }
+  function limpiar(){ sel=null; selCom=null; tabla(); tablaCom(); pinta(); pintaCands(T,tituloTot); document.getElementById('cand-reset').hidden=true; const pc_=document.getElementById('pue-card'); if(pc_) pc_.style.display='none'; fit(); }
+  document.getElementById('cand-reset').onclick = limpiar;
+
   function marca(p){
-    sel = p.zona+p.pue; tabla(); pintaCands(p, titulo(p.nombre));
+    sel = p.zona+p.pue; tabla(); pintaCands(p, pNom(p)); verReset();
     const mk = marcas[sel]; if (mk){ map.setView(mk.getLatLng(), Math.max(map.getZoom(),14), {animate:false}); mk.openTooltip(); }
   }
   function abre(cod){
-    sel = cod; const m = M[cod]; tabla(); pintaCands(m, m.nombre);
+    sel = cod; const m = M[cod]; tabla(); pintaCands(m, m.nombre); verReset();
     const card=document.getElementById('pue-card'); card.style.display='block';
     document.getElementById('pue-title').textContent = `Puestos de ${m.nombre} · ${m.puestos.length}`;
     const ps = m.puestos.slice().sort((a,b)=>(b.vot)-(a.vot));
     document.getElementById('t-pue').innerHTML = `<thead><tr><th>Puesto</th><th>Mesas</th><th>Censo</th><th>Votantes</th><th>Partic.</th>${vivos.map(i=>`<th>${corto(i)}</th>`).join('')}<th>Blanco</th></tr></thead><tbody>${ps.map(p=>`
-      <tr><td><span class="dot" style="background:${C[p.iw].color}"></span>${esc(titulo(p.nombre))}</td><td>${p.mesas}</td><td>${fmt(p.censo)}</td><td>${fmt(p.vot)}</td><td>${pc(p.vot,p.censo)}</td>${vivos.map(i=>`<td>${fmt(p.v[i])}</td>`).join('')}<td>${fmt(p.blanco)}</td></tr>`).join('')}</tbody>`;
+      <tr><td><span class="dot" style="background:${C[p.iw].color}"></span>${esc(pNom(p))}${pTag(p)}</td><td>${p.mesas}</td><td>${fmt(p.censo)}</td><td>${fmt(p.vot)}</td><td>${pc(p.vot,p.censo)}</td>${vivos.map(i=>`<td>${fmt(p.v[i])}</td>`).join('')}<td>${fmt(p.blanco)}</td></tr>`).join('')}</tbody>`;
     card.scrollIntoView({behavior:'instant',block:'start'});
   }
-  if (esDep) document.getElementById('pue-back').onclick = () => { sel=null; tabla(); pintaCands(T,tituloTot); document.getElementById('pue-card').style.display='none'; };
-  else document.getElementById('cand-title').onclick = () => { sel=null; tabla(); pintaCands(T,tituloTot); fit(); };
+  if (esDep) document.getElementById('pue-back').onclick = limpiar;
+
+  // ── what if: aritmética sobre el acta, con los supuestos a la vista ──
+  function whatIf(){
+    const vivos_ = ord.filter(i=>!tach[i]);
+    if (vivos_.length<2) return;
+    const terrs = esDep ? Object.values(M).sort((a,b)=>a.nombre.localeCompare(b.nombre)) : listaCom;
+    const WI = {rec: vivos_.includes(s2)?s2:vivos_[1], pasan:{}, terr:'', abs:0, share:60};
+    const box = document.getElementById('wi');
+    box.innerHTML = `<h2>¿Y si…? · simulador sobre el resultado del acta</h2>
+      <p class="wi-lead">Escoge una candidatura y prueba qué le habría pasado con los votos de las demás o con parte de quienes no votaron. Parte del resultado real y lo cambia solo con los supuestos que muevas aquí.</p>
+      <div class="wi-grid"><div>
+        <div class="wi-sel"><div><label for="wi-rec">Candidatura</label><select id="wi-rec">${vivos_.map(i=>`<option value="${i}">${esc(C[i].corto)}</option>`).join('')}</select></div>
+        ${terrs.length>1?`<div><label for="wi-terr">Aplicar en</label><select id="wi-terr"><option value="">${esDep?'Todo el departamento':'Todo el municipio'}</option>${terrs.map(u=>`<option value="${u.cod}">${esc(u.nombre)}</option>`).join('')}</select></div>`:''}</div>
+        <span class="wi-h" id="wi-h-t"></span><div id="wi-pasan"></div>
+        <div class="wi-btns"><button id="wi-unir">Sumar a los que perdieron</button><button id="wi-cero">Volver al resultado real</button></div>
+        <span class="wi-h">Quienes no votaron</span>
+        <div class="wi-row nf"><span id="wi-abs-l"></span><input type="range" id="wi-abs" min="0" max="100" step="1" value="0"><output id="wi-abs-o">0 %</output></div>
+        <div class="wi-row nf"><span id="wi-sh-l"></span><input type="range" id="wi-sh" min="0" max="100" step="5" value="60"><output id="wi-sh-o">60 %</output></div>
+      </div><div class="wi-res" id="wi-res"></div></div>
+      <p class="note">Es un ejercicio de aritmética, no una proyección. Los votos no se trasladan completos de una candidatura a otra, y quien no votó no se comporta necesariamente como quien sí. Los votantes nuevos que no van a la candidatura escogida se reparten entre las demás según su votación en ese territorio.</p>`;
+    const cuadroPasan = () => {
+      document.getElementById('wi-h-t').textContent = `Votos que se pasan a ${C[WI.rec].corto}`;
+      document.getElementById('wi-pasan').innerHTML = vivos_.filter(i=>i!==WI.rec).map(i=>`<div class="wi-row${C[i].foto?'':' nf'}">${fotoDe(i,'sm')}<span>${C[i].corto}</span><input type="range" min="0" max="100" step="5" value="${WI.pasan[i]||0}" data-i="${i}"><output id="wi-o-${i}">${WI.pasan[i]||0} %</output></div>`).join('');
+    };
+    const calcular = () => {
+      const u = WI.terr ? (esDep?M[WI.terr]:COMS[WI.terr]) : T;
+      const n = C.map((_,i)=>T.v[i]);
+      for (const i of vivos_) if (i!==WI.rec){ const x=u.v[i]*(WI.pasan[i]||0)/100; n[i]-=x; n[WI.rec]+=x; }
+      const abst = Math.max(0,u.censo-u.vot), nuevos = abst*WI.abs/100, alRec = nuevos*WI.share/100, resto = nuevos-alRec;
+      n[WI.rec]+=alRec;
+      const base = vivos_.filter(i=>i!==WI.rec).reduce((a,i)=>a+u.v[i],0);
+      if (base) for (const i of vivos_) if (i!==WI.rec) n[i]+=resto*u.v[i]/base;
+      const orden_ = vivos_.slice().sort((a,b)=>n[b]-n[a]), w=orden_[0], val_=T.blanco+vivos_.reduce((a,i)=>a+n[i],0);
+      return {n, w, seg:orden_[1], orden_, val_, abst, nuevos, u};
+    };
+    const pinta_ = () => {
+      const r = calcular(), cambia = r.w!==g, mx = Math.max(...r.orden_.map(i=>r.n[i]));
+      const tocado = WI.abs>0 || Object.entries(WI.pasan).some(([i,x])=>+i!==WI.rec&&x>0);
+      const dif = Math.round(r.n[r.w]-r.n[r.seg]);
+      const brecha = T.v[g]-T.v[WI.rec], otros = vivos_.filter(i=>i!==WI.rec&&i!==g).reduce((a,i)=>a+T.v[i],0), falta = brecha-otros, abstT = Math.max(0,T.censo-T.vot);
+      const nom = C[WI.rec].corto;
+      document.getElementById('wi-res').innerHTML = `
+        <div class="wi-head${cambia?' wi-cam':''}">${!tocado?`Resultado real: ganó ${C[g].corto} por ${fmt(T.v[g]-T.v[s2])} votos`:cambia?`Cambia el resultado: ganaría ${C[r.w].corto} por ${fmt(dif)} votos`:`Sigue ganando ${C[g].corto}, ahora por ${fmt(dif)} votos`}</div>
+        <div class="wi-sub">${tocado?`Votantes nuevos: ${fmt(r.nuevos)} · ${WI.terr?`cambios aplicados en ${esc(r.u.nombre)}`:'cambios en todo el territorio'}`:'Mueve un control para ver el escenario.'}</div>
+        ${r.orden_.map(i=>{ const d=Math.round(r.n[i]-T.v[i]); return `<div class="wi-bar"><div class="top"><span>${C[i].corto}</span><span>${fmt(r.n[i])}<small>${pc(r.n[i],r.val_)}${d?` · ${d>0?'+':'−'}${fmt(Math.abs(d))}`:''}</small></span></div><div class="bar"><i style="width:${mx?100*r.n[i]/mx:0}%;background:${C[i].color}"></i></div></div>`; }).join('')}
+        ${WI.rec===g?'':`<div class="wi-fondo"><p>${nom} quedó a <b>${fmt(brecha)} votos</b> de ${C[g].corto}.</p>
+        <p>${otros?(falta>0?`Aunque todas las demás candidaturas perdedoras le hubieran pasado sus votos completos, le habrían faltado <b>${fmt(falta)}</b>.`:`Con los votos de todas las demás candidaturas perdedoras habría ganado por <b>${fmt(-falta)}</b>.`):''}</p>
+        <p>Solo con abstencionistas habría necesitado <b>${fmt(brecha+1)} votos nuevos</b>, el ${pc(brecha+1,abstT)} de los ${fmt(abstT)} que no votaron, y todos a su favor. Solo con votantes que cambiaran de ${C[g].corto} a ${nom}: <b>${fmt(Math.ceil((brecha+1)/2))}</b>, el ${pc(Math.ceil((brecha+1)/2),T.v[g])} de su votación.</p></div>`}`;
+    };
+    const rotulos = () => {
+      const u = WI.terr ? (esDep?M[WI.terr]:COMS[WI.terr]) : T, abst = Math.max(0,u.censo-u.vot);
+      document.getElementById('wi-abs-l').textContent = `Cuántos votan, de ${fmt(abst)}`;
+      document.getElementById('wi-sh-l').textContent = `De esos, a ${C[WI.rec].corto}`;
+    };
+    document.getElementById('wi-pasan').oninput = e => { const i=e.target.dataset.i; if(i==null) return; WI.pasan[i]=+e.target.value; document.getElementById('wi-o-'+i).textContent=e.target.value+' %'; pinta_(); };
+    document.getElementById('wi-rec').value = WI.rec;
+    document.getElementById('wi-rec').onchange = e => { WI.rec=+e.target.value; WI.pasan={}; cuadroPasan(); rotulos(); pinta_(); };
+    const elT = document.getElementById('wi-terr'); if (elT) elT.onchange = e => { WI.terr=e.target.value; rotulos(); pinta_(); };
+    const abs = document.getElementById('wi-abs'), sh = document.getElementById('wi-sh');
+    abs.oninput = () => { WI.abs=+abs.value; document.getElementById('wi-abs-o').textContent=abs.value+' %'; pinta_(); };
+    sh.oninput = () => { WI.share=+sh.value; document.getElementById('wi-sh-o').textContent=sh.value+' %'; pinta_(); };
+    document.getElementById('wi-unir').onclick = () => { for (const i of vivos_) if (i!==WI.rec&&i!==g) WI.pasan[i]=100; cuadroPasan(); pinta_(); };
+    document.getElementById('wi-cero').onclick = () => { WI.pasan={}; WI.abs=0; abs.value=0; document.getElementById('wi-abs-o').textContent='0 %'; cuadroPasan(); pinta_(); };
+    cuadroPasan(); rotulos(); pinta_();
+  }
+
+  // ── preconteo y escrutinio: por qué circulan dos cifras ──
+  function cotejo(){
+    const P = D.preconteo, q = D.mms, filas = ord.map(i=>[C[i].nombre,P.v[i],T.v[i]]).concat([['Voto en blanco',P.blanco,T.blanco],['Nulos',P.nulos,T.nulos],['No marcados',P.nomarc,T.nomarc]]);
+    const fd = (a,b) => { const d=b-a; return `<td class="dif ${d>0?'mas':d<0?'menos':''}">${d>0?'+':d<0?'−':''}${fmt(Math.abs(d))}</td>`; };
+    const censo = (D.puestos||[]).find(p=>p.zona==='90'), carcel = (D.puestos||[]).find(p=>p.zona==='98');
+    const peor = q&&q.distintas.length ? q.distintas.slice().sort((a,b)=>Math.abs(b.sufragantes-b.votos)-Math.abs(a.sufragantes-a.votos))[0] : null;
+    document.getElementById('cotejo').innerHTML = `<h2>Por qué circulan dos cifras: preconteo y escrutinio</h2>
+      <p class="wi-lead">El boletín final del preconteo (No. ${P.boletin}, ${P.hora}) dio ${fmt(P.total)} votos. El escrutinio cerró con ${fmt(T.vot)}, ${fmt(T.vot-P.total)} más. Esta página muestra el escrutinio, porque el preconteo es informativo y la elección la define el acta de la comisión (E-26).${censo?` Las ${fmt(T.mesas)} mesas de los dos conteos incluyen el puesto censo (${esc(pNom(censo))}, ${fmt(censo.vot)} votos)${carcel?` y la cárcel (${fmt(carcel.vot)})`:''}: no explican la diferencia.`:''}</p>
+      <div class="tbl-wrap"><table><thead><tr><th>Candidatura</th><th>Preconteo</th><th>Escrutinio</th><th>Diferencia</th></tr></thead><tbody>${filas.map(([n,a,b])=>`<tr style="cursor:default"><td>${esc(n)}</td><td>${fmt(a)}</td><td>${fmt(b)}</td>${fd(a,b)}</tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td>${fmt(P.total)}</td><td>${fmt(T.vot)}</td>${fd(P.total,T.vot)}</tr></tfoot></table></div>
+      ${q?`<p class="note">Cotejo con el mesa a mesa de sufragantes: ${fmt(q.sufragantes)} sufragantes contra ${fmt(T.vot)} votos contados, ${fmt(q.sufragantes-T.vot)} de diferencia en ${q.distintas.length} de ${fmt(q.mesas)} mesas${peor?`; la mayor, ${Math.abs(peor.sufragantes-peor.votos)} votos en ${esc(titulo(peor.puesto))}, mesa ${Number(peor.mesa)}`:''}. La comisión no excluyó ${q.excluidas?`sino ${q.excluidas}`:'ninguna'} mesa, modificó ${q.modificadas} y hubo ${q.recontadas_jurados} recuento de jurados.</p>`:''}`;
+  }
 }
 
 const clave = new URLSearchParams(location.search).get('e');

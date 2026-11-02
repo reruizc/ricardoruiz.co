@@ -21,9 +21,20 @@ mesa a mesa no da exactamente lo declarado, el script aborta.
   puesto por puesto (sus votos pasan a no marcados) y se guardan aparte en `tachados`.
 ⚠ Bucaramanga: el sitio ya no sirve el MMV (devuelve la página de la aplicación). Solo hay
   totales, leídos del E-26 escaneado; el censo por puesto sí está.
+
+Campos opcionales de una elección (hoy solo Duitama):
+  'preconteo'  boletín final, transcrito y cuadrado: explica por qué circulan otras cifras.
+  'mms'        mesa a mesa de sufragantes: mesas donde sufragantes y votos no coinciden.
+  'tarjeton'   PDF de la tarjeta electoral: de ahí salen las fotos de cada candidato.
+  'barrios'    capa de polígonos: el puesto va a su barrio por el NOMBRE oficial del georef
+               y, si no casa, por punto en polígono. Con coordenadas de 9 m entre dos puestos
+               y seis barrios errados, el polígono no puede mandar. Zonas 90 y 98 quedan
+               fuera: el puesto censo y la cárcel no le pertenecen a un barrio.
 """
 import csv
 import json
+import math
+import unicodedata
 from collections import defaultdict
 from pathlib import Path
 
@@ -60,7 +71,7 @@ ELECCIONES = {
         'motivo': 'Se votó porque el Consejo de Estado anuló por doble militancia la elección de José Luis Bohórquez en 2023. Quien ganó completa el periodo 2024-2027.',
         'comision': 'escrutinio municipal (comisión 2453)',
         'cands': {
-            '004': ('Ingrith Rocío Bernal Mejía', 'Rocío Bernal', 'Coalición Duitama Nuestra Prioridad', '#6B2D8B'),
+            '004': ('Ingrith Rocío Bernal Mejía', 'Rocío Bernal', 'Coalición Duitama Nuestra Prioridad', '#a06ee0'),
             '002': ('Fernando Alexander Serrato Fonseca', 'Fernando Serrato', 'Duitama Una Sola Familia', '#f08c00'),
             '003': ('Wilfredy Bonilla Lagos', 'Wilfredy Bonilla', 'Wilfredy Alcalde', '#2f9e44'),
             '007': ('Diego Leonardo Sandoval Cepeda', 'Diego Sandoval', 'Fuerza Duitama', '#e64980'),
@@ -70,6 +81,14 @@ ELECCIONES = {
         },
         'e26': {'001': 847, '002': 9581, '003': 2238, '004': 22863, '005': 360, '006': 321, '007': 1883,
                 'blanco': 1263, 'nulos': 462, 'nomarc': 23},
+        'preconteo': {'boletin': 12, 'hora': '5:02 p. m.', 'archivo': 'Boletin_AL_12_07079.pdf',
+                      'votos': {'001': 853, '002': 9547, '003': 2240, '004': 22755, '005': 359, '006': 323,
+                                '007': 1867, 'blanco': 1261, 'nulos': 465, 'nomarc': 23}, 'total': 39693},
+        'mms': 'duitama-2025/MMS_XXX_07_079_XXX_XX_XX_XXX_2453.csv',
+        'tarjeton': {'archivo': 'duitama-2025/tarjeta-electoral-alcalde-duitama.pdf',
+                     'pos': {'001': (71, 104), '002': (264, 104), '003': (459, 104), '004': (71, 335),
+                             '005': (265, 334), '006': (460, 335), '007': (72, 562)}},
+        'barrios': {'archivo': 'duitama-2025/barrios-arcgis.geojson', 'campo': 'BARRIOS'},
     },
     'apartado-2025': {
         'titulo': 'Alcaldía de Apartadó', 'depto': 'Antioquia', 'fecha': '2025-04-06', 'nivel': 'mun', 'dep': '01',
@@ -152,6 +171,142 @@ def georef(dep):
     return pos
 
 
+def clave_nombre(s):
+    s = unicodedata.normalize('NFD', s or '').encode('ascii', 'ignore').decode().upper()
+    return ' '.join(s.split())
+
+
+def barrio_georef(dep):
+    out = {}
+    with open(GEOREF, encoding='utf-8-sig') as f:
+        for r in csv.DictReader(f, delimiter=';'):
+            c = r['CÓDIGO COMPLETO']
+            if c[:2] == dep:
+                out[(c[2:5], c[5:7], c[7:9])] = (r['BARRIO'] or '').strip()
+    return out
+
+
+def poligonos(geom):
+    return [geom['coordinates']] if geom['type'] == 'Polygon' else geom['coordinates']
+
+
+def en_anillo(x, y, anillo):
+    dentro = False
+    j = len(anillo) - 1
+    for i in range(len(anillo)):
+        xi, yi = anillo[i][:2]
+        xj, yj = anillo[j][:2]
+        if (yi > y) != (yj > y) and x < (xj - xi) * (y - yi) / (yj - yi) + xi:
+            dentro = not dentro
+        j = i
+    return dentro
+
+
+def en_poligono(x, y, geom):
+    return any(en_anillo(x, y, p[0]) and not any(en_anillo(x, y, h) for h in p[1:]) for p in poligonos(geom))
+
+
+def centro(geom):
+    pts = [c for p in poligonos(geom) for c in p[0]]
+    return sum(c[0] for c in pts) / len(pts), sum(c[1] for c in pts) / len(pts)
+
+
+def redondear(coords):
+    if isinstance(coords[0], (int, float)):
+        return [round(coords[0], 5), round(coords[1], 5)]
+    return [redondear(c) for c in coords]
+
+
+def construir_barrios(clave, cfg, puestos):
+    """Capa de barrios con el puesto que cae en cada uno. El barrio sin puesto hereda, solo para
+    pintar, el del barrio con puesto más cercano (`de`); nunca suma a un total."""
+    capa = json.load(open(SRC / cfg['barrios']['archivo'], encoding='utf-8'))
+    campo = cfg['barrios']['campo']
+    feats = capa['features']
+    por_nombre = {clave_nombre(f['properties'][campo]): f for f in feats}
+    georef_b = barrio_georef(cfg['dep'])
+    asignados = defaultdict(list)
+    fuera = []
+    for p in puestos:
+        cod = p['zona'] + p['pue']
+        if p['zona'] in ('90', '98'):
+            fuera.append(cod)
+            continue
+        f = por_nombre.get(clave_nombre(georef_b.get((p['mun'], p['zona'], p['pue']))))
+        if f is None and p.get('ll'):
+            f = next((g for g in feats if en_poligono(p['ll'][1], p['ll'][0], g['geometry'])), None)
+        if f is None:
+            fuera.append(cod)
+            continue
+        asignados[f['properties'][campo]].append(cod)
+    con_dato = [f for f in feats if f['properties'][campo] in asignados]
+    salida = []
+    for f in feats:
+        n = f['properties'][campo]
+        props = {'n': nice(n)}
+        if n in asignados:
+            props['pu'] = asignados[n]
+        else:
+            cx, cy = centro(f['geometry'])
+            cerca = min(con_dato, key=lambda g: math.hypot(centro(g['geometry'])[0] - cx, centro(g['geometry'])[1] - cy))
+            props['de'] = cerca['properties'][campo]
+        salida.append({'type': 'Feature', 'properties': props,
+                       'geometry': {'type': f['geometry']['type'], 'coordinates': redondear(f['geometry']['coordinates'])}})
+    for f in salida:
+        if 'de' in f['properties']:
+            f['properties']['de'] = nice(f['properties']['de'])
+    (OUT / 'geo').mkdir(exist_ok=True)
+    (OUT / 'geo' / f'{clave}-barrios.json').write_text(
+        json.dumps({'type': 'FeatureCollection', 'features': salida}, ensure_ascii=False, separators=(',', ':')))
+    return {'con_dato': len(con_dato), 'total': len(feats), 'puestos_fuera': fuera}
+
+
+def extraer_fotos(clave, cfg):
+    """Las fotos de la tarjeta electoral, por la posición de cada casilla en el PDF."""
+    import pymupdf
+    pdf = pymupdf.open(SRC / cfg['tarjeton']['archivo'])
+    pagina = pdf[0]
+    fotos = []
+    for im in pagina.get_images(full=True):
+        if (im[2], im[3]) == (354, 472):
+            r = pagina.get_image_rects(im[0])[0]
+            fotos.append((r.x0, r.y0, im[0], im[1]))
+    dest = OUT / 'fotos' / clave
+    dest.mkdir(parents=True, exist_ok=True)
+    rutas = {}
+    for cod, (x, y) in cfg['tarjeton']['pos'].items():
+        fx, fy, xref, smask = min(fotos, key=lambda f: math.hypot(f[0] - x, f[1] - y))
+        if math.hypot(fx - x, fy - y) > 3:
+            raise SystemExit(f'{clave}: no hay foto en la casilla de {cod}')
+        px = pymupdf.Pixmap(pdf, xref)
+        if px.alpha or px.colorspace.n != 3:
+            px = pymupdf.Pixmap(pymupdf.csRGB, px)
+        if smask:
+            px = pymupdf.Pixmap(px, pymupdf.Pixmap(pdf, smask))
+            lienzo = pymupdf.open()
+            hoja = lienzo.new_page(width=px.width, height=px.height)
+            hoja.insert_image(hoja.rect, pixmap=px)
+            px = hoja.get_pixmap(alpha=False)
+        (dest / f'{cod}.jpg').write_bytes(px.tobytes('jpeg', jpg_quality=86))
+        rutas[cod] = f'atipicas/fotos/{clave}/{cod}.jpg'
+    return rutas
+
+
+def cotejo_mms(cfg, votos_mesa):
+    filas = list(filas_mmv(SRC / cfg['mms']))
+    distintas = []
+    for r in filas:
+        k = (r['ZONA'], r['PUESTO'], r['MESA'])
+        suf = int(r['SUFRAGANTES'] or 0)
+        if suf != votos_mesa.get(k, 0):
+            distintas.append({'puesto': r['PUESNOMBRE'].strip(), 'zona': r['ZONA'], 'mesa': r['MESA'],
+                              'sufragantes': suf, 'votos': votos_mesa.get(k, 0)})
+    return {'mesas': len(filas), 'sufragantes': sum(int(r['SUFRAGANTES'] or 0) for r in filas),
+            'recontadas_jurados': sum(r['RECUENTOJURADOS'] == 'SI' for r in filas),
+            'modificadas': sum(r['MODIFICADA'] == 'SI' for r in filas),
+            'excluidas': sum(r['EXCLUIDA'] == 'SI' for r in filas), 'distintas': distintas}
+
+
 def filas_mmv(path):
     t = path.read_text(encoding='utf-8-sig')
     i = t.find('DEP;DEPNOMBRE')
@@ -180,6 +335,15 @@ def construir(clave, cfg):
            'censo_total': sum(p['censo'] for p in censo.values())}
     e26 = cfg['e26']
 
+    pre = cfg.get('preconteo')
+    if pre:
+        suma = sum(pre['votos'].values())
+        if suma != pre['total']:
+            raise SystemExit(f'{clave}: el boletín no suma {pre["total"]} → {suma}')
+        res['preconteo'] = {'boletin': pre['boletin'], 'hora': pre['hora'], 'total': pre['total'],
+                            'v': [pre['votos'][c] for c in orden], 'blanco': pre['votos']['blanco'],
+                            'nulos': pre['votos']['nulos'], 'nomarc': pre['votos']['nomarc']}
+
     if cfg['nivel'] == 'total':
         res['totales'] = {'v': [e26[c] for c in orden], 'blanco': e26['blanco'], 'nulos': e26['nulos'],
                           'nomarc': e26['nomarc'], 'censo': res['censo_total'], 'puestos': len(censo)}
@@ -189,6 +353,8 @@ def construir(clave, cfg):
     mesas = defaultdict(set)
     nombres = {}
     muns = {}
+    comunas = {}
+    votos_mesa = defaultdict(int)
     for r in filas_mmv(SRC / cfg['mmv']):
         if not (r.get('VOTOS') or '').strip().isdigit():
             continue
@@ -197,7 +363,9 @@ def construir(clave, cfg):
         if can not in ESPECIALES and can not in cfg['cands']:
             raise SystemExit(f'{clave}: candidato {can} {r["CANNOMBRE"]} no está en la configuración')
         votos[k][ESPECIALES.get(can, can)] += int(r['VOTOS'])
+        votos_mesa[(r['ZONA'], r['PUESTO'], r['MESA'])] += int(r['VOTOS'])
         mesas[k].add(r['MESA'])
+        comunas.setdefault(k, (r['COMUCODIGO'].strip(), r['COMUNOMBRE'].strip()))
         nombres.setdefault(k, r['PUESNOMBRE'].strip())
         muns.setdefault(k[0], nice(r['MUNNOMBRE'].strip()))
 
@@ -228,6 +396,8 @@ def construir(clave, cfg):
                 'censo': p.get('censo'), 'm': p.get('m'), 'h': p.get('h'), 'mesas': len(mesas[k]),
                 'v': [votos[k].get(c, 0) for c in orden],
                 'blanco': votos[k]['blanco'], 'nulos': votos[k]['nulos'], 'nomarc': votos[k]['nomarc']}
+        if comunas.get(k):
+            fila['com'], fila['comn'] = comunas[k][0], nice(comunas[k][1])
         if ll:
             fila['ll'] = ll
         if k in tachados:
@@ -237,6 +407,14 @@ def construir(clave, cfg):
     res['puestos'] = puestos
     res['puestos_sin_censo'] = sum(1 for k in votos if k not in censo)
     res['puestos_sin_ubicacion'] = sum(1 for p in puestos if 'll' not in p)
+    if cfg.get('mms'):
+        res['mms'] = cotejo_mms(cfg, votos_mesa)
+    if cfg.get('tarjeton'):
+        fotos = extraer_fotos(clave, cfg)
+        for c in cands:
+            c['foto'] = fotos[c['cod']]
+    if cfg.get('barrios'):
+        res['barrios'] = construir_barrios(clave, cfg, puestos)
     return res
 
 
