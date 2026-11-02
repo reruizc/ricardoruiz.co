@@ -36,8 +36,10 @@ CATALOGO = [
                                     'Conceptos de abogacía de la competencia', 'Eventos', SUCOP, DO],
          falta=['Doctrina jurídica: la SIC la congeló en 2021'], nota=''),
     dict(k='supervigilancia', nombre='Superintendencia de Vigilancia y Seguridad Privada', alias=['vigilancia y seguridad privada', 'supervigilancia'],
-         estado='parcial', cubre=[DO], falta=['Resoluciones y circulares propias', 'Proyectos', 'Noticias'],
-         nota='Sus conceptos están congelados desde 2018.'),
+         estado='conectada', cubre=['Resoluciones', 'Circulares', 'Proyectos propios', 'Noticias', DO],
+         falta=['Conceptos: los congeló en 2018', 'Eventos: la sección está vacía'],
+         nota='Varias resoluciones y circulares son PDF escaneados: se leen por el nombre que publica la entidad. '
+              'Sus proyectos casi nunca publican el plazo de comentarios.'),
     dict(k='supersociedades', nombre='Superintendencia de Sociedades', alias=['superintendencia de sociedades', 'supersociedades'],
          estado='conectada', cubre=['Sanciones', 'Normas', 'Conceptos jurídicos (Tesauro, 13.002)', DO],
          falta=['Eventos: su calendario responde error'], nota='Su relatoría va con rezago: el concepto más reciente es de marzo de 2026.'),
@@ -82,8 +84,12 @@ CATALOGO = [
          estado='parcial', cubre=[DO], falta=['Borradores propios', 'Agenda regulatoria', 'Convocatorias'],
          nota='Sus conceptos se congelaron en 2024.'),
     dict(k='minhacienda', nombre='Ministerio de Hacienda y Crédito Público', alias=['ministerio de hacienda', 'minhacienda', 'hacienda y credito publico'],
-         estado='parcial', cubre=[DO], falta=['Texto de sus borradores'],
-         nota='Su sitio está detrás de un antibots: lo expedido llega por el Diario Oficial, sus borradores no.'),
+         estado='parcial', cubre=['Aviso de borradores propios, con título deducido de su dirección web', DO],
+         falta=['Texto de sus borradores', 'Título oficial y plazo de comentarios de esos borradores',
+                'Noticias, circulares y conceptos de su sitio'],
+         nota='Todo su sitio está detrás de un antibots que bloquea abrir cada documento; solo queda abierto el mapa del sitio. '
+              'Caudal avisa que hay un borrador nuevo y muestra lo que dice su dirección web, que puede ser una sigla o venir '
+              'cortado, pero no tiene el texto. Lo expedido llega por el Diario Oficial.'),
     # ── otras del Ejecutivo ──
     dict(k='dnp', nombre='Departamento Nacional de Planeación', alias=['planeacion nacional', 'departamento nacional de planeacion', 'dnp'],
          estado='conectada', cubre=['Circulares y resoluciones', 'Proyectos propios que no están en SUCOP', SUCOP, DO],
@@ -103,8 +109,12 @@ CATALOGO = [
          estado='conectada', cubre=['Convocatorias de participación', 'Circulares', 'Conceptos de la relatoría', 'Capacitaciones', SUCOP, DO],
          falta=[], nota=''),
     dict(k='presidencia', nombre='Presidencia de la República', alias=['presidencia de la republica', 'presidencia'],
-         estado='parcial', cubre=['Decretos y leyes', 'Directivas', DO],
-         falta=['Su sitio web'], nota='Su sitio está detrás de un antibots; lo que expide llega por el Diario Oficial.'),
+         estado='parcial', cubre=['Decretos y leyes', 'Directivas', 'Circulares y resoluciones ejecutivas', 'Prensa (notas y videos)', DO],
+         falta=['Listado oficial de normativa de su sitio', 'Lo que expide y no pasa por el Diario Oficial'],
+         nota='Su listado de normativa está detrás de un antibots y su archivo robots.txt lo excluye, y el conjunto en datos.gov.co '
+              'está parado desde el 31 de agosto de 2026. Caudal parte del Diario Oficial y busca el PDF de cada acto en el sitio de '
+              'Presidencia: una circular o directiva que no pase por el Diario Oficial no aparece. Las notas de prensa antiguas '
+              'pueden traer el título deducido de su dirección web.'),
     dict(k='dian', nombre='Dirección de Impuestos y Aduanas Nacionales (DIAN)', alias=['impuestos y aduanas', 'dian'],
          estado='conectada', cubre=['Resoluciones y circulares', 'Conceptos y oficios (doctrina)', SUCOP, DO],
          falta=[], nota=''),

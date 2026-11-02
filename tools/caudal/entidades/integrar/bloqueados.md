@@ -4,7 +4,7 @@ Tres cosechadores nuevos: `harvest_supervigilancia.py`, `harvest_minhacienda.py`
 `harvest_presidencia.py`. No se tocó ningún archivo compartido. Las líneas de abajo ya se
 probaron importando `build.py` desde un script aparte. Nada subió a S3.
 
-Antes de integrar, decidir el punto 8. Después de la primera corrida en la EC2, mirar el punto 9.
+Integrado en `main` el 2-nov-2026. El punto 8 se resolvió: el RSS no se usa.
 
 ## 1. `build.py`: entidades
 
@@ -97,32 +97,10 @@ se corre a mano si salta la guarda.
 
 ## 5. `tools/caudal/ejecutivo/harvest_decretos.py`: PDF de decretos y leyes
 
-Los decretos y leyes desde septiembre están sin enlace en el pilar Ejecutivo: 94 filas de
-`normativa.jsonl` traen `url` vacía. `raw/presidencia/pdfs.json` ya tiene 89 de esos PDF. No van
-a `normas.json` porque saldrían dos veces.
-
-Ese archivo no es de esta rama. En `fusionar()`, antes del `for r in do.get('normas', [])`:
-
-```python
-    pdfs = {}
-    try:
-        p = REPO / 'Bases de datos' / 'caudal-entidades' / 'raw' / 'presidencia' / 'pdfs.json'
-        pdfs = json.loads(p.read_text(encoding='utf-8')).get('items', {})
-    except (OSError, json.JSONDecodeError):
-        pass
-```
-
-Y dentro del `for`, después de `fila = {k: v for k, v in r.items()}`:
-
-```python
-        if not fila.get('url') and str(fila.get('numero') or '').isdigit():
-            p = pdfs.get(f"{fila['tipo']}-{int(fila['numero'])}-{fila['anio']}")
-            fila['url'] = urllib.parse.unquote(p['url']) if p else fila.get('url', '')
-```
-
-Hay que sumar `import urllib.parse`. La URL va legible porque el frontend la codifica con
-`encodeURI`, igual que las de `_u()` en `build.py`. Una fila nueva toma su enlace al día siguiente,
-porque `entidades_presidencia` corre después de `harvest_decretos build`.
+Aplicado en la integración. 94 filas de `normativa.jsonl` traen `url` vacía y `pdfs.json` tiene 89.
+⚠️ `ejecutivo_*` corre en la EC2 y `harvest_presidencia.py` en el Mac: el mapa viaja por S3
+(`metadata/presidencia-pdfs.json`, lo sube `build.py --subir`) y `fusionar()` lo lee de ahí. La EC2 toma
+el cambio cuando el commit llega a `origin`; hasta entonces los decretos siguen sin enlace.
 
 ## 6. Lambda: que un borrador nuevo de MinHacienda llegue al radar
 
@@ -172,20 +150,15 @@ responde sin reto y trae los 15 últimos actos del mismo día, con tipo y fecha:
 internas y la agenda regulatoria. Resolvería el hueco de lo que no pasa por el Diario Oficial. Pero la
 regla `/*?` y la regla `/_*` del `robots.txt` lo excluyen, igual que `Forms/AllItems.aspx`.
 
-Esta rama no lo usa y Presidencia queda parcial. Se pidió una vez durante el sondeo, junto con
+No se usa y Presidencia queda parcial. Se pidió una vez durante el sondeo, junto con
 `AllItems.aspx`, antes de leer ese `robots.txt`. Si se quiere usar, es una decisión aparte: no hay evasión técnica,
 pero sería cosechar a diario lo que el sitio pide no rastrear.
 
-## 9. Lo que no se pudo verificar
+## 9. Dónde corre
 
-**Todo se corrió desde la Mac, no desde la EC2.** Radware y F5 suelen tratar peor las IP de nube, y
-de la EC2 no hay ninguna medición. En la primera corrida del cron hay que mirar las tres etapas:
-
-- MinHacienda: si el sitemap responde HTML, falla con «no respondió XML» y queda el archivo anterior.
-- Presidencia: si `dapre` cierra el PDF directo, avisa, se detiene y la etapa sale con error.
-  Si el reto llega a las notas, se dejan de abrir y los títulos quedan reconstruidos.
-- La guarda no se activa la primera vez, porque no hay corrida anterior. Los `raw/` de esta rama
-  están en la Mac: la EC2 arranca sin línea base y marcará `visto` con el `lastmod`, que es lo correcto.
+Las tres etapas corren en el Mac, igual que las demás `entidades_*`: es la misma IP con que se probó.
+Si algún día se mudan a la EC2, hay que volver a medir, porque Radware y F5 suelen tratar peor las IP de
+nube, y copiar antes `raw/{supervigilancia,minhacienda,presidencia}/`, que es la línea base de las guardas.
 
 ## 10. Conteos del 1-nov-2026
 

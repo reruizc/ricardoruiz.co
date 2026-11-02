@@ -32,6 +32,7 @@ import re
 import subprocess
 import sys
 import time
+import urllib.parse
 from collections import Counter
 from pathlib import Path
 
@@ -152,6 +153,18 @@ def _llave(r):
     return (r.get('tipo') or '', str(r.get('numero') or '').lstrip('0'), r.get('anio') or '')
 
 
+def _pdfs_presidencia():
+    """PDF de dapre que halla entidades/harvest_presidencia.py. Corre en el Mac y esto
+    en la EC2, así que llegan por S3. Sin ellos la fila sigue, sin enlace."""
+    try:
+        r = subprocess.run(['aws', 's3', 'cp', 's3://caudal-legislativo/metadata/presidencia-pdfs.json', '-'],
+                           capture_output=True, check=True, timeout=60)
+        return json.loads(r.stdout).get('items', {})
+    except Exception as e:
+        print(f"  ! PDF de Presidencia sin leer ({e}): los decretos del Diario Oficial van sin enlace", file=sys.stderr)
+        return {}
+
+
 def fusionar(recs):
     """Socrata (Presidencia) + Diario Oficial, dedup por (tipo, número, año).
 
@@ -170,11 +183,16 @@ def fusionar(recs):
         return recs, meta
     ya = {_llave(r) for r in recs if r.get('numero')}
     out = list(recs)
+    pdfs = _pdfs_presidencia()
     for r in do.get('normas', []):
         if _llave(r) in ya:
             meta['ya_en_socrata'] += 1
             continue
         fila = {k: v for k, v in r.items()}
+        if not fila.get('url') and str(fila.get('numero') or '').isdigit():
+            p = pdfs.get(f"{fila['tipo']}-{int(fila['numero'])}-{fila['anio']}")
+            if p:                        # legible: el frontend la codifica con encodeURI
+                fila['url'] = urllib.parse.unquote(p['url'])
         fila['q'] = _blob(fila.get('titulo'), fila.get('descripcion'))
         out.append(fila)
         ya.add(_llave(r))

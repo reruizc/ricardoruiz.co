@@ -4370,8 +4370,11 @@ def _sucop_para_perfil(s, cap=4):
     if not temas:
         return [], 0
     inter = [_fold_q(x) for x in (s.get('interlocutores') or []) if len(_fold_q(x)) >= 4]
+    # MinHacienda no deja abrir sus borradores: sin plazo, lo que avisa es que sea nuevo
+    limite = (_sucop_hoy() - datetime.timedelta(days=15)).isoformat()
     hits = [r for r in _sucop()
-            if r.get('estado_consulta') in ('abierta', 'cierra_pronto')
+            if (r.get('estado_consulta') in ('abierta', 'cierra_pronto')
+                or (r.get('sin_texto') and (r.get('visto') or '') >= limite))
             and any(t in (r.get('q') or '') for t in temas)]
     hits.sort(key=_sucop_orden)
     out = []
@@ -4383,9 +4386,12 @@ def _sucop_para_perfil(s, cap=4):
                     'url': r.get('url') or '', 'fecha': r.get('fecha_inicio') or '',
                     'cierra': fin, 'dias': r.get('dias_restantes'),
                     'nivel': 'alto' if (r.get('estado_consulta') == 'cierra_pronto' or suya) else 'medio',
-                    'accion': (f'Borrador en consulta pública hasta el {fin} — se puede comentar'
+                    'accion': ('Borrador nuevo en el sitio de la entidad. Caudal no tiene su texto ni su plazo: '
+                               'el título sale de la dirección web y hay que abrirlo en el navegador'
+                               if r.get('sin_texto') else
+                               f'Borrador en consulta pública hasta el {fin} — se puede comentar'
                                if fin else 'Borrador en consulta pública — se puede comentar')})
-    return out, len(hits)
+    return out, sum(1 for r in hits if r.get('estado_consulta') in ('abierta', 'cierra_pronto'))
 
 
 # Siglas con que los perfiles nombran a sus interlocutores → cómo firma la

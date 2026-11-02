@@ -704,6 +704,15 @@ etapa() {
   etapa --nombre entidades_dnp --timeout 300 \
         --desc "DNP: normas de SharePoint y proyectos de normatividad" \
         -- python3 tools/caudal/entidades/harvest_dnp.py fetch
+  etapa --nombre entidades_supervigilancia --timeout 300 \
+        --desc "Supervigilancia: resoluciones, circulares, proyectos y noticias" \
+        -- python3 tools/caudal/entidades/harvest_supervigilancia.py fetch
+  etapa --nombre entidades_minhacienda --timeout 300 \
+        --desc "MinHacienda: títulos de borradores desde el sitemap (sin texto, antibots)" \
+        -- python3 tools/caudal/entidades/harvest_minhacienda.py fetch
+  etapa --nombre entidades_presidencia --timeout 600 \
+        --desc "Presidencia: prensa del sitemap y PDF directos de dapre" \
+        -- python3 tools/caudal/entidades/harvest_presidencia.py fetch
   # Agendas regulatorias: una foto al día basta (0,9 MB cada una). Sale con 1 solo si
   # SUCOP no responde; un sitio caído queda como agenda sin leer y no tumba la etapa.
   if [ "$(date +%H)" -lt 14 ]; then

@@ -254,6 +254,23 @@ fuente_minvivienda = _fuente_simple('minvivienda', 'Ministerio de Vivienda, Ciud
 fuente_mineducacion = _fuente_simple('mineducacion', 'Ministerio de Educación Nacional', 'Educación Nacional')
 fuente_sena = _fuente_simple('sena', 'Servicio Nacional de Aprendizaje (SENA)', 'Trabajo')
 fuente_dnp = _fuente_simple('dnp', 'Departamento Nacional de Planeación', 'Planeación')
+fuente_supervigilancia = _fuente_simple('supervigilancia', 'Superintendencia de Vigilancia y Seguridad Privada', 'Defensa')
+fuente_presidencia = _fuente_simple('presidencia', 'Presidencia de la República', 'Presidencia de la República')
+
+
+def fuente_minhacienda():
+    """Borradores de los que solo se tiene la dirección: el antibots no deja abrirlos.
+    `objeto` le dice al lector que el título es reconstruido y que no hay texto."""
+    ent, sector, fuente = 'Ministerio de Hacienda y Crédito Público', 'Hacienda y Crédito Público', 'minhacienda'
+    hoy = datetime.date.today().isoformat()
+    items = (C.leer(C.RAW / 'minhacienda' / 'proyectos.json', {}) or {}).get('items', {})
+    borr = []
+    for r in items.values():
+        b = borrador_sucop(r, ent, sector, fuente, hoy)
+        b.update(objeto=r['objeto'], estado_fuente='Sin plazo conocido', estado_vista='Sin plazo conocido', n_documentos=0,
+                 titulo_reconstruido=True, sin_texto=True, visto=r.get('visto') or '')
+        borr.append(b)
+    return borr, [], []
 
 
 FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), ('ssf', fuente_ssf),
@@ -261,7 +278,8 @@ FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), (
            ('superfinanciera', fuente_superfinanciera), ('supersalud', fuente_supersalud),
            ('mintrabajo', fuente_mintrabajo), ('funcionpublica', fuente_funcionpublica), ('spe', fuente_spe),
            ('ugpp', fuente_ugpp), ('minvivienda', fuente_minvivienda), ('mineducacion', fuente_mineducacion),
-           ('sena', fuente_sena), ('dnp', fuente_dnp)]
+           ('sena', fuente_sena), ('dnp', fuente_dnp), ('supervigilancia', fuente_supervigilancia),
+           ('minhacienda', fuente_minhacienda), ('presidencia', fuente_presidencia)]
 
 
 def agenda_regulatoria():
@@ -436,6 +454,11 @@ def subir(stats):
                             '--only-show-errors'], check=True)
     elif stats.get('n_agenda'):
         print(f"  ✗ agenda: {stats['n_agenda']} contra {prev['n_agenda']} en S3 — no se sube", file=sys.stderr)
+    # los enlaces de decretos y leyes: los halla el Mac y los usa harvest_decretos.py en la EC2
+    pdfs = C.RAW / 'presidencia' / 'pdfs.json'
+    if pdfs.exists():
+        subprocess.run(['aws', 's3', 'cp', str(pdfs), f's3://{BUCKET}/metadata/presidencia-pdfs.json',
+                        '--content-type', 'application/json', '--only-show-errors'], check=True)
     print('  subido a S3')
     return True
 
