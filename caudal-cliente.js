@@ -863,6 +863,13 @@
       return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
         <div class="sig-title">${tit}</div><div class="sig-tags">Consulta pública · ${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
     }
+    // Norte · norma anunciada en una agenda regulatoria: aún no hay borrador.
+    if(x.tipo==='agenda'){
+      const tags=[x.entidad?esc(x.entidad):'', x.sobre?'sobre «'+esc(x.sobre)+'»':'', x.conservada?'última lectura '+esc(x.lectura):''].filter(Boolean).join(' · ');
+      const tit=x.url?`<a href="${esc(encodeURI(x.url))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(x.titulo)}</a>`:esc(x.titulo);
+      return `<div class="${cls}"><span class="sig-lvl">${x.nivel}</span><div class="sig-body">
+        <div class="sig-title">${tit}</div><div class="sig-tags">Agenda regulatoria 2027 · ${tags}</div><div class="sig-action">${esc(x.accion)}</div></div></div>`;
+    }
     // Oeste · lo que ya se expidió en el Diario Oficial (oct-2026). Sin enlace
     // permanente (el PDF de la Imprenta es de sesión): se cita la edición.
     if(x.tipo==='diario_oficial'){
@@ -947,8 +954,9 @@
     }
     if(pilar==='contratacion') return con.length?`<div class="sig-list">${con.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin contratación reciente para los temas de este sector.</div>';
     if(pilar==='oportunidades'){
-      const op=[].concat(d.sucop||[], d.eventos||[]);
-      return op.length?`<div class="sig-list">${op.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Ninguna consulta pública abierta ni evento del sector cruza hoy con estos temas.</div>';
+      const op=[].concat(d.sucop||[], d.agenda||[], d.eventos||[]);
+      const sinLeer=(d.agenda_avisos||[]).length?`<div class="cob-note" style="margin-bottom:.6rem">No se pudo leer la agenda regulatoria de <b>${esc(d.agenda_avisos.map(a=>a.entidad).join(', '))}</b>: eso no significa que esté vacía ni que no tenga cambios.</div>`:'';
+      return sinLeer+(op.length?`<div class="sig-list">${op.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Ninguna consulta pública abierta, norma anunciada ni evento del sector cruza hoy con estos temas.</div>');
     }
     if(pilar==='medios') return medios.length?`<div class="sig-list">${medios.map(cliSigCard).join('')}</div>`:'<div class="cli-reg-none">Sin cobertura de prensa reciente para este sector.</div>';
     if(pilar==='redes'){
@@ -1035,7 +1043,7 @@
         ${(d.territorial||[]).length?`<span class="chip" data-p="territorial">Territorial <b>${d.territorial.length}</b></span>`:''}
         ${(d.cobertura||[]).length?`<span class="chip" data-p="entidades">Tus entidades <b>${(d.cobertura||[]).length}</b></span>`:''}
         <span class="chip" data-p="contratacion">Contratación <b>${con.length}</b></span>
-        <span class="chip" data-p="oportunidades">Consultas y eventos <b>${(d.sucop||[]).length+(d.eventos||[]).length}</b></span>
+        <span class="chip" data-p="oportunidades">Consultas y eventos <b>${(d.sucop||[]).length+(d.agenda||[]).length+(d.eventos||[]).length}</b></span>
         <span class="chip" data-p="medios">Prensa <b>${medios.length}</b></span>
         ${(d.redes&&d.redes.length)||(k.redes_estado&&k.redes_estado!=='sin_escucha')?`<span class="chip" data-p="redes">Redes · X <b>${(d.redes||[]).length}</b></span>`:''}
       </div>
@@ -1275,7 +1283,7 @@
   const BRIEF_CARD=[['norte','NORTE · oportunidades'],['este','ORIENTE · conversación'],
                     ['sur','SUR · competencia'],['oeste','OCCIDENTE · Estado']];
   const BRIEF_FUENTE={congreso:'Congreso',regulatorio:'Regulatorio',medios:'Prensa',redes:'Redes · X',
-                      contratacion:'Contratación',ejecutivo:'Ejecutivo',sucop:'Consulta pública',eventos:'Evento',
+                      contratacion:'Contratación',ejecutivo:'Ejecutivo',sucop:'Consulta pública',agenda:'Agenda regulatoria',eventos:'Evento',
                       diario_oficial:'Diario Oficial',territorial:'Territorial'};
   // ⚠️ La URL va como ENLACE, nunca como texto. Medido en el primer brief: una
   // sola nota de prensa de Google News ocupaba CINCO LÍNEAS de base64 —
@@ -1345,7 +1353,7 @@
     const d=_CLI_LAST; if(!d) return null;
     const cl=d.cliente||{}, k=d.kpis||{};
     const todas=[].concat(d.congreso||[],d.regulatorio||[],d.medios||[],
-                          d.contratacion||[],d.ejecutivo||[],d.sucop||[],d.eventos||[],d.redes||[],
+                          d.contratacion||[],d.ejecutivo||[],d.sucop||[],d.agenda||[],d.eventos||[],d.redes||[],
                           d.diario_oficial||[],d.territorial||[]);
     // `mov` lo marca la Lambda contra su propio reloj: no se recalcula acá para
     // que el PDF y la pantalla no puedan discrepar por la zona horaria del

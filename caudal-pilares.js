@@ -212,12 +212,25 @@
     if(mine!==_ejeSeq) return;
     ejeRenderResults(d);
   }
+  // Agendas 2027, por entidad. «Sin leer» nunca se pinta como cero normas.
+  function ejeRenderAgendas(s){
+    const el=document.getElementById('eje-landing'), ags=(s&&s.agendas)||[]; if(!el||!ags.length) return;
+    const EST={publicada_sin_normas:'Publicada, sin normas',publicada_sin_leer:'Publicada, sin leer',en_formulacion:'En formulación',no_publicada:'No publicada',no_leida:'Sin leer'};
+    const fila=a=>{ const n=a.estado==='publicada'?`${fmt(a.n_normas)} norma${a.n_normas===1?'':'s'}`:(EST[a.estado]||a.estado);
+      return `<div class="sanc"><div class="sanc-top">${a.url?`<a class="sanc-name" href="${esc(encodeURI(a.url))}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(a.entidad)}</a>`:`<span class="sanc-name">${esc(a.entidad)}</span>`}<span class="sanc-fecha">${esc(n)}</span></div>
+      <div class="sanc-tags"><span class="doc-badge">${a.via==='sitio'?'Sitio de la entidad':'SUCOP'}</span>${a.consulta_fin?`<span class="doc-badge">En consulta hasta ${esc(a.consulta_fin)}</span>`:''}</div></div>`; };
+    const ob=ags.filter(a=>a.obligada), otras=ags.filter(a=>!a.obligada), pub=ob.filter(a=>a.publicada).length;
+    const c=s.agendas_cambios||{}, cambios=(c.entran||0)+(c.cambian_fecha||0)+(c.salen||0);
+    el.insertAdjacentHTML('beforeend',`<div class="cli-sub" style="margin-top:1.6rem">Agendas regulatorias 2027</div>
+      <div class="cob-note" style="margin:.4rem 0 .8rem">${pub} de las ${ob.length} entidades obligadas publicaron su agenda. ${cambios?`<b>${fmt(cambios)}</b> cambios desde la línea base del 1 de noviembre.`:'Sin cambios desde la línea base del 1 de noviembre.'}</div>
+      ${ob.map(fila).join('')}<details style="margin-top:.6rem"><summary>Otras ${otras.length} entidades</summary>${otras.map(fila).join('')}</details>`);
+  }
   async function ejeLoadStats(){
-    if(EJE_STATS){ ejeRenderLanding(EJE_STATS); return; }
+    if(EJE_STATS){ ejeRenderLanding(EJE_STATS); ejeRenderAgendas(EJE_STATS); return; }
     const el=document.getElementById('eje-landing');
     if(el) el.innerHTML='<div class="llm-load" style="padding:2rem;justify-content:center">Cargando el pilar ejecutivo <span class="dots"><span></span><span></span><span></span></span></div>';
     try{ EJE_STATS=await call({action:'ejecutivo'}); }catch(e){ EJE_STATS=null; }
-    if(EJE_STATS) ejeRenderLanding(EJE_STATS);
+    if(EJE_STATS){ ejeRenderLanding(EJE_STATS); ejeRenderAgendas(EJE_STATS); }
     else if(el) el.innerHTML='<div class="err">No se pudo cargar la normativa. Reintenta.</div>';
   }
   function ejeShowLanding(){ const r=document.getElementById('eje-results'); if(r) r.style.display='none'; const l=document.getElementById('eje-landing'); if(l) l.style.display='block'; }

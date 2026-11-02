@@ -281,6 +281,7 @@ function alertasPintar(){
     const c=e.conteos||{}, nums=[];
     if(c.borradores_abiertos) nums.push(`${c.borradores_abiertos} borrador${c.borradores_abiertos===1?'':'es'} abierto${c.borradores_abiertos===1?'':'s'}`);
     if(c.eventos_por_venir) nums.push(`${c.eventos_por_venir} evento${c.eventos_por_venir===1?'':'s'} por venir`);
+    if(c.agenda_normas) nums.push(`${c.agenda_normas} norma${c.agenda_normas===1?'':'s'} en su agenda 2027`);
     if(c.diario_oficial_anio) nums.push(`${c.diario_oficial_anio} actos en el Diario Oficial este año`);
     const nom=e.nombre!==e.interlocutor?`${esc(e.nombre)}`:esc(e.interlocutor);
     return `<div class="al-ent"><div class="al-ent-t"><span>${nom}</span><span class="al-est ${esc(e.estado)}">${esc(AL_EST[e.estado]||e.estado)}</span></div>
@@ -408,7 +409,7 @@ function hoyPorQue(r,k){
 }
 function hoySenales(){
   const d=HOY_D||{}, k=d.kpis||{};
-  const grupos=[['Congreso',d.congreso],['Regulatorio',d.regulatorio],['Diario Oficial',d.diario_oficial],['Territorial',d.territorial],['Medios',d.medios],['Contratación',d.contratacion],['Consulta pública',d.sucop],['Evento',d.eventos],['Redes',d.redes]];
+  const grupos=[['Congreso',d.congreso],['Regulatorio',d.regulatorio],['Diario Oficial',d.diario_oficial],['Territorial',d.territorial],['Medios',d.medios],['Contratación',d.contratacion],['Consulta pública',d.sucop],['Agenda regulatoria',d.agenda],['Evento',d.eventos],['Redes',d.redes]];
   const todas=grupos.flatMap(([src,items])=>(Array.isArray(items)?items:[]).map(x=>({...x,source:x.tipo==='norma_entidad'?'Sitio de '+(x.entidad||'la entidad'):src})));
   const ORD={alto:0,medio:1,bajo:2};
   if(HOY_RUMBO){

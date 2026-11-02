@@ -948,11 +948,14 @@ _ENT_CACHE = {}
 ENT_TTL = 3600     # el cron sube 2x/día: un contenedor caliente no puede quedarse con el de ayer
 
 
+_ENT_KEYS = {'agenda': 'metadata/agenda-regulatoria.jsonl'}
+
+
 def _entidades_jsonl(nombre):
     viejo = _ENT_CACHE.get(nombre)
     if viejo is None or _time.time() - viejo[0] > ENT_TTL:
         try:
-            obj = _s3.get_object(Bucket=BUCKET, Key=f'metadata/entidades-{nombre}.jsonl')
+            obj = _s3.get_object(Bucket=BUCKET, Key=_ENT_KEYS.get(nombre, f'metadata/entidades-{nombre}.jsonl'))
             filas = [json.loads(l) for l in obj['Body'].read().decode('utf-8').split('\n') if l.strip()]
         except Exception as e:
             print(f'[entidades] {nombre} FAIL: {type(e).__name__}: {e}')
@@ -2925,7 +2928,7 @@ LECTURA_MAX_SENALES = 26
 #                           pilar que venga: si sancionan a tu competidor eso es
 #                           noticia de competencia, no "regulatorio" a secas
 #   Oeste  · el Estado    → Congreso y superintendencias sobre TU tema
-CARD_POR_TIPO = {'contratacion': 'norte', 'sucop': 'norte', 'eventos': 'norte',
+CARD_POR_TIPO = {'contratacion': 'norte', 'sucop': 'norte', 'eventos': 'norte', 'agenda': 'norte',
                  'medios': 'este', 'redes': 'este',
                  'congreso': 'oeste', 'regulatorio': 'oeste', 'diario_oficial': 'oeste',
                  'norma_entidad': 'oeste', 'territorial': 'oeste'}
@@ -3342,6 +3345,9 @@ def _lectura_cliente_prompt(s, senales, kpis):
         elif x['tipo'] == 'norma_entidad':
             lines.append(f"- [NORMA O CONCEPTO EN EL SITIO DE LA ENTIDAD · prioridad {x['nivel']}] {x.get('fecha', '')} · "
                          f"{x.get('entidad', '')} · {x.get('norma', '')}: {(x.get('titulo') or '')[:120]}")
+        elif x['tipo'] == 'agenda':
+            lines.append(f"- [AGENDA REGULATORIA · prioridad {x['nivel']}] {x.get('entidad', '')}: "
+                         f"{(x.get('titulo') or '')[:110]} · {x.get('accion', '')}")
         elif x['tipo'] == 'eventos':
             lines.append(f"- [EVENTO DEL SECTOR · prioridad {x['nivel']}] {x.get('fecha', '')} "
                          f"{x.get('medio', '')}: {(x.get('titulo') or '')[:110]}")
@@ -4584,6 +4590,80 @@ def _eventos_oficiales(s, cap=3):
     return out[:cap]
 
 
+# ── Agendas regulatorias 2027 (tanda 0 · nov-2026) ──────────────────────────
+# Lo anunciado por cada entidad antes de que exista el borrador. La foto del
+# 1-nov es la línea base: lo que cambie después es la noticia. Lo que ya está en
+# consulta pública no se repite: es el mismo proceso del pilar SUCOP.
+_AGENDA_STATS = [0.0, None]
+_AGENDA_TXT = {'agregada': 'Entró a la agenda después del 1-nov',
+               'agenda_nueva': 'Publicó su agenda después del corte'}
+
+
+def _agenda_stats():
+    if _AGENDA_STATS[1] is None or _time.time() - _AGENDA_STATS[0] > ENT_TTL:
+        try:
+            _AGENDA_STATS[1] = _get_json('metadata/agenda-regulatoria-stats.json')
+        except Exception as e:
+            print(f'[agenda] stats FAIL: {type(e).__name__}: {e}')
+            _AGENDA_STATS[1] = _AGENDA_STATS[1] or {'agendas': []}
+        _AGENDA_STATS[0] = _time.time()
+    return _AGENDA_STATS[1]
+
+
+def _agenda_prevista(f):
+    return f.get('fecha_prevista') or f.get('fecha_texto') or 'sin fecha'
+
+
+def _agenda_accion(f):
+    nov = f.get('novedad')
+    if nov == 'fecha_cambiada':
+        return (f"Cambió de fecha: antes {f['fecha_base']}, ahora {_agenda_prevista(f)}" if f.get('fecha_base')
+                else f'Ahora tiene fecha: {_agenda_prevista(f)}')
+    if nov:
+        return f"{_AGENDA_TXT.get(nov, 'Cambió en la agenda')} · anunciada para {_agenda_prevista(f)}"
+    return f'Anunciada para {_agenda_prevista(f)}'
+
+
+def _agendas_norte(s, cap=4):
+    """Normas anunciadas que tocan un tema del perfil, y las novedades de sus
+    interlocutores. Primero lo que cambió, después la fecha más cercana. La línea
+    base va sin tono de alerta: que algo esté anunciado no es una noticia."""
+    temas = [_fold_q(t) for t in (s.get('temas') or []) if len(_fold_q(t)) >= 4]
+    inter = _do_interlocutores(s)
+    avisos = []
+    for a in _agenda_stats().get('agendas', []):
+        if bool(inter) and _do_es_suya(_fold_q(a.get('entidad') or ''), inter) and not a.get('leida'):
+            avisos.append({'entidad': a.get('entidad'), 'estado': a.get('estado')})
+    if not temas and not inter:
+        return [], avisos
+    rxs = [(t, re.compile(r'\b' + re.escape(t) + (r'(?:es)?' if t[-1] not in 'aeiou' else '') + r'\b')) for t in temas]
+    hoy = datetime.date.today().isoformat()
+    hits = []
+    for f in _entidades_jsonl('agenda'):
+        if f.get('estado') == 'En consulta pública':
+            continue
+        nov = f.get('novedad')
+        prev = f.get('fecha_prevista') or ''
+        if prev and prev < hoy and not nov:
+            continue
+        toca = next((t for t, rx in rxs if rx.search(f.get('q') or '')), None)
+        suya = bool(inter) and _do_es_suya(_fold_q(f.get('entidad') or ''), inter)
+        if not toca and not (suya and nov):
+            continue
+        hits.append((f, toca, suya))
+    hits.sort(key=lambda h: (not h[0].get('novedad'), not (h[1] and h[2]), h[0].get('fecha_prevista') or '9999'))
+    out = []
+    for f, toca, suya in hits[:cap]:
+        nov = f.get('novedad')
+        out.append({'tipo': 'agenda', 'titulo': (f.get('nombre') or f.get('tema') or '')[:200],
+                    'entidad': f.get('entidad'), 'url': f.get('url') or '', 'fecha': f.get('novedad_fecha') or '',
+                    'prevista': _agenda_prevista(f), 'novedad': nov or '', 'sobre': toca or '',
+                    'conservada': bool(f.get('conservada')), 'lectura': (f.get('capturado') or '')[:10],
+                    'nivel': 'alto' if (nov and suya) else ('medio' if nov else 'bajo'),
+                    'accion': _agenda_accion(f)})
+    return out, avisos
+
+
 # ── Las dos alertas del panel (fase 1 · punto 7 · oct-2026) ─────────────────
 # a) «Tus entidades»: qué lee Caudal de cada interlocutor del cliente y qué no.
 #    Sale de metadata/entidades-catalogo.json (tools/caudal/entidades/catalogo.py
@@ -5458,7 +5538,9 @@ def handler(event, context):
         q = _fold_q(body.get('query'))   # misma regla que el blob: sin tildes
         tipo = (body.get('tipo') or '').strip().upper()
         if not q and not tipo:                 # landing: agregados precalculados (rápido)
-            return _resp(200, dict(_ejecutivo_stats(), mode='stats'))
+            ags = _agenda_stats()
+            return _resp(200, dict(_ejecutivo_stats(), mode='stats', agendas=ags.get('agendas', []),
+                                   agendas_cambios=(ags.get('vs_linea_base') or {}).get('resumen') or {}))
         recs = _ejecutivo()
         # ④ el Ejecutivo tampoco nombra marcas: regula la actividad. Si la
         # consulta es una empresa, se busca su vocabulario de núcleo (OR) además
@@ -6192,6 +6274,11 @@ def handler(event, context):
             evt = _eventos_oficiales(s) + evt
         except Exception as e:
             print(f'[cliente] eventos oficiales FAIL: {type(e).__name__}: {e}')
+        try:
+            agd, agd_avisos = _agendas_norte(s)
+        except Exception as e:
+            print(f'[cliente] agendas FAIL: {type(e).__name__}: {e}')
+            agd, agd_avisos = [], []
         # --- Oeste · lo que ya se expidió en el Diario Oficial --------------
         try:
             dof, n_dof = _do_para_perfil(s, cap=6, emps=emps_vig)
@@ -6218,7 +6305,7 @@ def handler(event, context):
         except Exception as e:
             print(f'[cliente] territorial FAIL: {type(e).__name__}: {e}')
             terr, n_terr = [], 0
-        senales = rc['senales'] + reg + dof + terr + med + con + suc + evt + red
+        senales = rc['senales'] + reg + dof + terr + med + con + suc + agd + evt + red
         n_vig = sum(1 for x in senales if x.get('vigilada'))
         kpis = {'n_radar': len(senales),
                 'alto': sum(1 for x in senales if x['nivel'] == 'alto'),
@@ -6229,7 +6316,7 @@ def handler(event, context):
                 'n_otros_actos_sector': n_otros,
                 'n_medios_sector': n_med, 'n_medios_exterior': n_med_ext,
                 'n_contratos_sector': n_con,
-                'n_consultas_abiertas': n_suc, 'n_eventos': len(evt),
+                'n_consultas_abiertas': n_suc, 'n_eventos': len(evt), 'n_agenda': len(agd),
                 'n_diario_oficial': n_dof, 'n_territorial': n_terr,
                 'n_vigiladas': len(emps_vig), 'n_senales_vigiladas': n_vig,
                 'n_contratos_vigiladas': n_con_vig,
@@ -6277,7 +6364,8 @@ def handler(event, context):
                            'contratacion_generica_omitida': con_generica_muda,
                            'descartes': s.get('descartes', [])},
                'congreso': rc['senales'], 'regulatorio': reg, 'medios': med,
-               'contratacion': con, 'sucop': suc, 'eventos': evt, 'diario_oficial': dof, 'territorial': terr,
+               'contratacion': con, 'sucop': suc, 'agenda': agd, 'agenda_avisos': agd_avisos,
+               'eventos': evt, 'diario_oficial': dof, 'territorial': terr,
                'cobertura': cobertura, 'normas_prensa': normas_prensa,
                'redes': red, 'kpis': kpis, 'sectores': sectores}
         out['cliente']['avisos'] = s.get('avisos', [])

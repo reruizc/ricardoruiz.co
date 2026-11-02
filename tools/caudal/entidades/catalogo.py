@@ -17,6 +17,7 @@ contenido en el nombre o viceversa.
 
 DO = 'Diario Oficial (resoluciones, circulares y acuerdos)'
 SUCOP = 'Borradores en SUCOP'
+AGENDA = 'Agenda regulatoria 2027 (línea base y cambios)'    # lo suma build.py desde la foto vigente
 
 CATALOGO = [
     # ── superintendencias y UGPP ──

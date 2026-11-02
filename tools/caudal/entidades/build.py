@@ -264,6 +264,55 @@ FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), (
            ('sena', fuente_sena), ('dnp', fuente_dnp)]
 
 
+def agenda_regulatoria():
+    """metadata/agenda-regulatoria.jsonl: una fila por norma anunciada. El stats declara
+    el estado de cada entidad: una agenda sin leer no es una agenda vacía."""
+    v = C.leer(C.RAW / 'agendas' / 'agendas.json')
+    if not v:
+        return None
+    # `novedad` persiste contra la línea base; `novedad_fecha` solo marca lo detectado en
+    # la última foto, para que el radar lo cuente como movimiento una sola vez.
+    vs = v.get('vs_anterior') or {}
+    hoy = {f['clave'] for c in ('entran', 'cambian_fecha') for f in vs.get(c, [])}
+    filas = [{**f, 'q': _q(f['nombre'], f['tema'], f['entidad'], f['tipo_norma'], f['norma_concreta']),
+              **({'novedad_fecha': v['generado'][:10]} if f.get('novedad') and f['clave'] in hoy else {})}
+             for f in v['filas']]
+    filas.sort(key=lambda f: (not f.get('novedad'), f.get('fecha_prevista') or '9999'))
+    C.DIST.mkdir(parents=True, exist_ok=True)
+    with (C.DIST / 'agenda-regulatoria.jsonl').open('w', encoding='utf-8') as fh:
+        for f in filas:
+            fh.write(json.dumps(f, ensure_ascii=False) + '\n')
+    C.escribir(C.DIST / 'agenda-regulatoria-stats.json', {
+        'generado': v['generado'], 'foto': v['foto'], 'linea_base': v['linea_base'], 'n': len(filas),
+        'agendas': [{c: a.get(c, '') for c in ('k', 'entidad', 'obligada', 'estado', 'leida', 'publicada', 'via', 'url', 'n_normas',
+                                               'nota', 'consulta_inicio', 'consulta_fin')} for a in v['agendas']],
+        'vs_linea_base': v['vs_linea_base'], 'vs_anterior': v['vs_anterior']})
+    return len(filas)
+
+
+def _con_agenda(entradas):
+    """Suma la agenda 2027 a cada ficha desde la foto vigente, así el catálogo se pone al
+    día solo el día que una entidad la publica."""
+    import catalogo as K
+    v = C.leer(C.RAW / 'agendas' / 'agendas.json') or {}
+    agendas = {a['k']: a for a in v.get('agendas', [])}
+    for e in entradas:
+        a = agendas.get(e['k'])
+        if not a:
+            continue
+        e['falta'] = [f for f in e['falta'] if f != 'Agenda regulatoria']
+        if a['publicada']:
+            e['cubre'] = e['cubre'] + [K.AGENDA]
+            e['conteos']['agenda_normas'] = a['n_normas']
+            if a['via'] == 'sitio':
+                e['nota'] = (e['nota'] + ' ' if e['nota'] else '') + 'Publicó su agenda 2027 en su sitio, no en SUCOP.'
+        elif a['obligada'] and a['leida']:
+            e['falta'] = e['falta'] + ['Agenda regulatoria 2027: no publicada, se revisa a diario']
+        elif a['obligada']:
+            e['falta'] = e['falta'] + ['Agenda regulatoria 2027: no se pudo leer en la última corrida']
+    return entradas
+
+
 def _es_de(alias, nombre):
     """Las siglas cortas («dian», «sena») solo como palabra completa."""
     import re
@@ -308,7 +357,7 @@ def catalogo(borr, normas, eventos, terr=()):
             e['estado'], e['cubre'] = 'sin_fuente', []
             e['nota'] = (e['nota'] + ' ' if e['nota'] else '') + f'No publicó actos en el Diario Oficial en {anio}.'
         out.append({**e, 'alias': al, 'conteos': c})
-    return {'generado': datetime.datetime.now().isoformat(timespec='seconds'), 'anio': anio, 'entidades': out}
+    return {'generado': datetime.datetime.now().isoformat(timespec='seconds'), 'anio': anio, 'entidades': _con_agenda(out)}
 
 
 def build():
@@ -340,8 +389,13 @@ def build():
             for r in filas:
                 fh.write(json.dumps(r, ensure_ascii=False) + '\n')
     C.escribir(C.DIST / 'entidades-catalogo.json', catalogo(borr, normas, eventos, terr))
+    try:
+        n_agenda = agenda_regulatoria()
+    except Exception as ex:
+        print(f'  ! agendas: {ex}', file=sys.stderr)
+        n_agenda = None
     stats = {'generado': datetime.datetime.now().isoformat(timespec='seconds'), 'por_fuente': por,
-             'n_borradores': len(borr), 'n_normas': len(normas), 'n_eventos': len(eventos)}
+             'n_borradores': len(borr), 'n_normas': len(normas), 'n_eventos': len(eventos), 'n_agenda': n_agenda}
     C.escribir(C.DIST / 'entidades-stats.json', stats)
     print(f"  {len(borr)} borradores · {len(normas)} normas · {len(eventos)} eventos · {len(terr)} territoriales"
           f" · fuentes: {', '.join(por)}")
@@ -375,6 +429,13 @@ def subir(stats):
     subprocess.run(['aws', 's3', 'cp', str(C.DIST / 'entidades-stats.json'),
                     f's3://{BUCKET}/metadata/entidades-stats.json', '--content-type', 'application/json',
                     '--cache-control', 'private, max-age=300', '--only-show-errors'], check=True)
+    if stats.get('n_agenda') and stats['n_agenda'] >= (prev.get('n_agenda') or 0) // 2:
+        for nombre in ('agenda-regulatoria.jsonl', 'agenda-regulatoria-stats.json'):
+            subprocess.run(['aws', 's3', 'cp', str(C.DIST / nombre), f's3://{BUCKET}/metadata/{nombre}',
+                            '--content-type', 'application/json', '--cache-control', 'private, max-age=300',
+                            '--only-show-errors'], check=True)
+    elif stats.get('n_agenda'):
+        print(f"  ✗ agenda: {stats['n_agenda']} contra {prev['n_agenda']} en S3 — no se sube", file=sys.stderr)
     print('  subido a S3')
     return True
 
