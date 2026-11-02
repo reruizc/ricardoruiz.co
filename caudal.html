@@ -325,10 +325,11 @@
       <button class="pill-back" id="terrBack">← Volver a Caudal</button>
       <div class="hero">
         <h1>Lo que se decide <em>cerca</em> de la operación.</h1>
-        <p>La <b>Asamblea de Antioquia</b> y el <b>Concejo de Medellín</b>, leídos a diario:
-           proyectos de ordenanza y de acuerdo con su estado, ordenanzas y acuerdos expedidos,
-           citaciones de control político y las sesiones ya programadas. Busca por tema o por
-           número («ordenanza 33», «proyecto 112»).</p>
+        <p>La <b>Asamblea de Antioquia</b>, el <b>Concejo de Medellín</b>, la <b>Gobernación de
+           Antioquia</b> y la <b>Alcaldía de Medellín</b>, leídas a diario: proyectos con su estado,
+           ordenanzas y acuerdos, actas de la Asamblea, citaciones de control político, las sesiones
+           ya programadas y los decretos y resoluciones de alcance general de sus gacetas. Busca por
+           tema o por número («ordenanza 33», «proyecto 112»).</p>
         <div class="search">
           <input id="tq" type="text" placeholder="un tema · un número · «presupuesto 2027»" autocomplete="off" />
           <button id="tgo">Buscar</button>
@@ -338,14 +339,15 @@
       <div class="kpis" id="terr-kpis"></div>
       <div class="grid2">
         <div class="panel wide" id="terr-res-p"><h3 id="terr-res-h">En trámite</h3><div id="terr-res"></div></div>
-        <div class="panel" id="terr-prox-p"><h3>Próximas sesiones del Concejo</h3><div id="terr-prox"></div></div>
+        <div class="panel" id="terr-prox-p"><h3>Próximas sesiones</h3><div id="terr-prox"></div></div>
         <div class="panel terr-src">
           <h3>Lo que falta del territorio <span class="doc-badge">cobertura</span></h3>
-          <p><b>Concejo de Medellín:</b> su sistema no da enlace por registro ni el texto de cada
-             proyecto sin navegador; aquí va el estado y el título, y el enlace abre la tabla oficial.</p>
-          <p><b>Asamblea de Antioquia:</b> faltan las actas de sesión y la agenda semanal.</p>
-          <p><b>Gobernación de Antioquia:</b> sus borradores de norma están en SUCOP; sus decretos,
-             todavía no.</p>
+          <p><b>Concejo de Medellín:</b> su sistema bloquea la lectura automática del texto de cada
+             proyecto y su ponencia; aquí van el estado, el tema, la comisión y el título.</p>
+          <p><b>Gobernación de Antioquia:</b> sus borradores de norma están en SUCOP. De las gacetas
+             escaneadas hay número, fecha y PDF, pero no título.</p>
+          <p><b>Gobernación y Alcaldía:</b> los actos particulares y los movimientos presupuestales se
+             cuentan, pero no se listan.</p>
           <div class="terr-links">
             <button type="button" data-terr-sucop="Gobernación de Antioquia">Gobernación en SUCOP</button>
             <a href="#sextante" id="terrRosa">Abrir la Rosa de los Vientos</a>
@@ -615,7 +617,7 @@
     {id:'ejecutivo',   name:'Ejecutivo nacional · Presidencia',   status:'live', n:'10.193', unit:'decretos · desde 2015', desc:'Decretos, resoluciones, directivas, circulares y agenda regulatoria de la Presidencia. Cada norma enlaza su texto oficial.'},
     {id:'sucop',       name:'Consulta pública de normas · SUCOP',status:'live', n:'3.899', unit:'borradores · desde 2020', desc:'Proyectos de decreto y resolución abiertos a comentarios ANTES de expedirse. La señal más temprana de Caudal: acá la norma todavía se puede pelear.'},
     {id:'gacetas',     name:'Diarios y gacetas oficiales',      status:'live', n:'32.585', unit:'gacetas · desde 2000', desc:'La Gaceta del Congreso (exposición de motivos, ponencias, textos de plenaria y conciliaciones) y el Diario Oficial: las resoluciones, circulares y acuerdos de cada entidad, leídos a diario.'},
-    {id:'territorial', name:'Entidades territoriales',          status:'live', n:'2', unit:'corporaciones · Antioquia primero', desc:'La Asamblea de Antioquia y el Concejo de Medellín: proyectos con su estado, ordenanzas y acuerdos, control político y las sesiones programadas. Gobernaciones y otros concejos entran después.'},
+    {id:'territorial', name:'Entidades territoriales',          status:'live', n:'4', unit:'entidades · Antioquia primero', desc:'La Asamblea de Antioquia y el Concejo de Medellín: proyectos con su estado, ordenanzas y acuerdos, control político y las sesiones programadas. Gobernaciones y otros concejos entran después.'},
     {id:'redes',       name:'Redes sociales oficiales y voceros',status:'live', n:'94', unit:'entidades y gremios', desc:'Diccionario de cuentas oficiales del Estado, reguladores, cortes, Congreso y gremios, con el cargo que habla por cada uno. Leídas del sitio oficial de cada entidad.'},
   ];
   const PSTAT={live:['s-live','Activo'], data:['s-data','Datos listos'], wired:['s-data','Conectado · corte mensual'], building:['s-data','En construcción'], soon:['s-soon','Próximamente']};
@@ -1414,13 +1416,15 @@
   }
 
   /* ---------- pilar Entidades territoriales (oct-2026) ----------
-     Asamblea de Antioquia y Concejo de Medellín (acción `territorial` de la
+     Asamblea, Concejo, Gobernación y Alcaldía (acción `territorial` de la
      Lambda; índice de tools/caudal/entidades/build.py). «Gobernación en SUCOP»
      abre el pilar SUCOP con la entidad ya buscada. */
   const TERR={q:'', corp:'', tipo:'', vivos:true};
   let _terrSeq=0, _terrListo=false;
-  const TERR_F=[['corp','','Las dos'],['corp','asamblea de antioquia','Asamblea de Antioquia'],['corp','concejo de medellin','Concejo de Medellín'],
-                ['tipo','','Todo'],['tipo','proyecto','Proyectos'],['tipo','norma','Ordenanzas y acuerdos'],['tipo','citacion','Control político']];
+  const TERR_F=[['corp','','Todas'],['corp','asamblea de antioquia','Asamblea'],['corp','concejo de medellin','Concejo'],
+                ['corp','gobernacion de antioquia','Gobernación'],['corp','alcaldia de medellin','Alcaldía'],
+                ['tipo','','Todo'],['tipo','proyecto','Proyectos'],['tipo','norma','Normas'],['tipo','citacion','Control político'],['tipo','acta','Actas']];
+  const TERR_NORMAS={'Asamblea de Antioquia':'Ordenanzas','Concejo de Medellín':'Acuerdos','Gobernación de Antioquia':'Decretos y resoluciones','Alcaldía de Medellín':'Decretos, resoluciones y circulares'};
   function terrCard(r){
     const href=r.url?encodeURI(r.url):(r.pagina||'');
     const nom=`${r.tipo_nombre} ${r.numero||''}${r.anio?' de '+r.anio:''}`;
@@ -1436,13 +1440,13 @@
   }
   async function terrBuscar(){
     const mine=++_terrSeq, el=document.getElementById('terr-res');
-    if(el) el.innerHTML='<div class="llm-load" style="padding:1.4rem;justify-content:center">Leyendo la Asamblea y el Concejo <span class="dots"><span></span><span></span><span></span></span></div>';
+    if(el) el.innerHTML='<div class="llm-load" style="padding:1.4rem;justify-content:center">Leyendo las entidades territoriales <span class="dots"><span></span><span></span><span></span></span></div>';
     let d; try{ d=await call({action:'territorial',query:TERR.q,corporacion:TERR.corp,tipo:TERR.tipo,en_tramite:TERR.vivos}); }
     catch(e){ if(mine===_terrSeq&&el) el.innerHTML='<div class="err">No se pudo consultar. Reintenta.</div>'; return; }
     if(mine!==_terrSeq) return;
     const k=document.getElementById('terr-kpis');
-    if(k) k.innerHTML=(d.por_corporacion||[]).map(c=>`<div class="kpi"><div class="n" style="color:var(--green)">${fmt(c.en_tramite)}</div><div class="l">Proyectos en trámite · ${esc(c.corporacion)}</div></div>
-      <div class="kpi"><div class="n">${fmt(c.normas)}</div><div class="l">${c.corporacion.startsWith('Asamblea')?'Ordenanzas':'Acuerdos (desde '+(new Date().getFullYear()-2)+')'}</div></div>`).join('');
+    if(k) k.innerHTML=(d.por_corporacion||[]).map(c=>`${c.proyectos?`<div class="kpi"><div class="n" style="color:var(--green)">${fmt(c.en_tramite)}</div><div class="l">Proyectos en trámite · ${esc(c.corporacion)}</div></div>`:''}
+      <div class="kpi"><div class="n">${fmt(c.normas)}</div><div class="l">${esc(TERR_NORMAS[c.corporacion]||'Normas')} · ${esc(c.corporacion)}</div></div>`).join('');
     const h=document.getElementById('terr-res-h');
     if(h) h.textContent=TERR.q?`${fmt(d.n)} resultados · «${TERR.q}»`:(TERR.vivos?`En trámite · ${fmt(d.n)}`:`${fmt(d.n)} registros`);
     const res=d.resultados||[];

@@ -4583,7 +4583,7 @@ def _eventos_oficiales(s, cap=3):
         suya = bool(inter) and _do_es_suya(_fold_q(e.get('entidad') or ''), inter)
         if not toca and not suya:
             continue
-        if not toca and e.get('fuente') == 'concejo-medellin':
+        if not toca and e.get('fuente') in ('concejo-medellin', 'asamblea-antioquia'):
             continue            # una plenaria cualquiera no es señal: solo las que tocan un tema
         social = 'Participación Social' in (e.get('categorias') or [])
         out.append({'tipo': 'eventos', 'titulo': e.get('titulo'), 'url': e.get('url') or '',
@@ -4820,7 +4820,8 @@ def _territorial_para_perfil(s, emps=None, cap=5):
     ordenanzas y acuerdos del último año y las citaciones de control político
     recientes que tocan un tema del perfil o nombran a una de sus empresas."""
     inter = _do_interlocutores(s)
-    corps = [c for c in ('asamblea de antioquia', 'concejo de medellin') if any(c in i for i in inter)]
+    corps = [c for c in ('asamblea de antioquia', 'concejo de medellin', 'gobernacion de antioquia',
+                         'alcaldia de medellin') if any(c in i for i in inter)]
     if not corps:
         return [], 0
     temas = [_fold_q(t) for t in (s.get('temas') or []) if len(_fold_q(t)) >= 4]
@@ -5597,15 +5598,15 @@ def handler(event, context):
                                  r.get('fecha') or ''), reverse=True)
         hoy = datetime.date.today().isoformat()
         ev = sorted([e for e in _entidades_jsonl('eventos')
-                     if e.get('fuente') == 'concejo-medellin' and (e.get('dia') or '') >= hoy
-                     and (not corp or 'concejo' in corp) and (not toks or all(t in (e.get('q') or '') for t in toks))],
+                     if e.get('fuente') in ('concejo-medellin', 'asamblea-antioquia') and (e.get('dia') or '') >= hoy
+                     and (not corp or corp in _fold_q(e.get('entidad') or '')) and (not toks or all(t in (e.get('q') or '') for t in toks))],
                     key=lambda e: e.get('dia') or '')
         por = {}
         for r in recs:
             k = r.get('corporacion') or ''
-            d = por.setdefault(k, {'corporacion': k, 'en_tramite': 0, 'proyectos': 0, 'normas': 0, 'citaciones': 0})
+            d = por.setdefault(k, {'corporacion': k, 'en_tramite': 0, 'proyectos': 0, 'normas': 0, 'citaciones': 0, 'actas': 0})
             d['en_tramite'] += 1 if r.get('en_tramite') else 0
-            d[{'proyecto': 'proyectos', 'norma': 'normas', 'citacion': 'citaciones'}.get(r.get('tipo'), 'normas')] += 1
+            d[{'proyecto': 'proyectos', 'norma': 'normas', 'citacion': 'citaciones', 'acta': 'actas'}.get(r.get('tipo'), 'normas')] += 1
         return _resp(200, {'n': len(hits), 'resultados': [{k: v for k, v in r.items() if k != 'q'} for r in hits[:60]],
                            'proximas': [{k: v for k, v in e.items() if k != 'q'} for e in ev[:12]],
                            'por_corporacion': list(por.values())})

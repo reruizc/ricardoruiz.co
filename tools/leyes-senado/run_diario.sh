@@ -671,6 +671,12 @@ etapa() {
   etapa --nombre entidades_territorial --timeout 900 \
         --desc "Asamblea de Antioquia (API) y Concejo de Medellín (SIMI)" \
         -- python3 tools/caudal/entidades/harvest_territorial.py fetch
+  etapa --nombre entidades_gobernacion --timeout 900 \
+        --desc "Gobernación de Antioquia: decretos y resoluciones por la Gaceta Departamental" \
+        -- python3 tools/caudal/entidades/harvest_gobernacion.py fetch
+  etapa --nombre entidades_alcaldia --timeout 900 \
+        --desc "Alcaldía de Medellín: decretos, resoluciones y circulares por la Gaceta Oficial" \
+        -- python3 tools/caudal/entidades/harvest_alcaldia.py fetch
   etapa --nombre entidades_supersociedades --timeout 300 \
         --desc "Supersociedades: conceptos del Tesauro (solo lo nuevo)" \
         -- python3 tools/caudal/entidades/harvest_supersociedades.py fetch
@@ -713,6 +719,18 @@ etapa() {
   etapa --nombre entidades_presidencia --timeout 600 \
         --desc "Presidencia: prensa del sitemap y PDF directos de dapre" \
         -- python3 tools/caudal/entidades/harvest_presidencia.py fetch
+  etapa --nombre entidades_minagricultura --timeout 300 \
+        --desc "MinAgricultura: resoluciones, decretos que Presidencia no trae y noticias" \
+        -- python3 tools/caudal/entidades/harvest_minagricultura.py fetch
+  etapa --nombre entidades_minambiente --timeout 300 \
+        --desc "MinAmbiente: borradores (AJAX), normas, RSS e iCal" \
+        -- python3 tools/caudal/entidades/harvest_minambiente.py fetch
+  etapa --nombre entidades_mindeporte --timeout 300 \
+        --desc "MinDeporte: borradores, resoluciones y convocatorias" \
+        -- python3 tools/caudal/entidades/harvest_mindeporte.py fetch
+  etapa --nombre entidades_mincultura --timeout 300 \
+        --desc "MinCultura: noticias (SharePoint) y avisos de convocatorias" \
+        -- python3 tools/caudal/entidades/harvest_mincultura.py fetch
   # Agendas regulatorias: una foto al día basta (0,9 MB cada una). Sale con 1 solo si
   # SUCOP no responde; un sitio caído queda como agenda sin leer y no tumba la etapa.
   if [ "$(date +%H)" -lt 14 ]; then

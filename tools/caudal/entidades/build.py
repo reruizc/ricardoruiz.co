@@ -91,12 +91,14 @@ def fuente_minsalud():
 
 
 def fuente_mincomercio():
-    """Solo borradores por ahora (punto 3 de la fase 1); sus normas expedidas
-    ya llegan por el Diario Oficial."""
+    """Borradores y calendario de eventos; sus normas expedidas ya llegan por el
+    Diario Oficial."""
     ent, sector, fuente = 'Ministerio de Comercio, Industria y Turismo', 'Comercio, Industria y Turismo', 'mincomercio'
     hoy = datetime.date.today().isoformat()
     items = (C.leer(C.RAW / 'mincomercio' / 'proyectos.json', {}) or {}).get('items', {})
-    return [borrador_sucop(r, ent, sector, fuente, hoy) for r in items.values()], [], []
+    eventos = [{**e, 'entidad': ent, 'fuente': fuente, 'q': _q(e.get('titulo'), e.get('descripcion'))}
+               for e in (C.leer(C.RAW / 'mincomercio' / 'eventos.json', {}) or {}).get('items', [])]
+    return [borrador_sucop(r, ent, sector, fuente, hoy) for r in items.values()], [], eventos
 
 
 def fuente_ssf():
@@ -174,10 +176,37 @@ def fuente_sic():
 _FIN_CONCEJO = ('archiv', 'retirad', 'negad', 'sancionad', 'acumulad', 'desistid', 'hundid')
 
 
+_GACETAS_TERRITORIALES = (('gobernacion-antioquia', 'Gobernación de Antioquia'),
+                          ('alcaldia-medellin', 'Alcaldía de Medellín'))
+
+
+def gacetas_territoriales():
+    """Decretos, resoluciones y circulares de alcance general. Lo particular, lo
+    presupuestal de rutina y lo escaneado sin título quedan en raw y se cuentan."""
+    out, por = [], {}
+    for clave, corp in _GACETAS_TERRITORIALES:
+        items = (C.leer(C.RAW / clave / 'normas.json', {}) or {}).get('items', [])
+        cuenta = {'total': len(items), 'particulares': 0, 'rutinarios': 0, 'sin_texto': 0, 'publicados': 0}
+        for x in items:
+            if x['subtipo'] not in ('Decreto', 'Resolución', 'Circular'):
+                continue
+            if x['sin_texto'] or x['administrativo'] or x.get('rutinario'):
+                cuenta['sin_texto' if x['sin_texto'] else 'particulares' if x['administrativo'] else 'rutinarios'] += 1
+                continue
+            cuenta['publicados'] += 1
+            out.append({'corporacion': corp, 'fuente': clave, 'tipo': 'norma', 'tipo_nombre': x['subtipo'],
+                        'numero': x['numero'], 'anio': x['anio'], 'fecha': x['fecha'], 'titulo': x['titulo'],
+                        'estado': 'Expedida', 'en_tramite': False, 'url': _u(x['url']), 'pagina': _u(x['url']),
+                        'dependencia': x.get('dependencia') or '', 'gaceta': x['gaceta'],
+                        'q': _q(x['titulo'], corp, x.get('dependencia'), x['subtipo'])})
+        por[clave] = cuenta
+    return out, por
+
+
 def territorial():
-    """Asamblea de Antioquia y Concejo de Medellín → un índice propio
+    """Asamblea, Concejo, Gobernación y Alcaldía → un índice propio
     (entidades-territorial.jsonl) para la tarjeta de Entidades territoriales y el
-    radar; las sesiones del Concejo van además a los eventos."""
+    radar; las sesiones de la Asamblea y el Concejo van además a los eventos."""
     raw = C.RAW / 'territorial'
     out, eventos = [], []
     hoy = datetime.date.today()
@@ -199,6 +228,14 @@ def territorial():
                     'tipo_nombre': 'Ordenanza', 'numero': x['numero'], 'anio': x['anio'], 'fecha': x['fecha'],
                     'titulo': x['titulo'], 'estado': 'Expedida', 'en_tramite': False, 'url': _u(x['url']),
                     'pagina': x.get('pagina') or '', 'q': _q(x['titulo'], corp, 'ordenanza')})
+    for x in a.get('actas', []):
+        out.append({'corporacion': corp, 'fuente': 'asamblea-antioquia', 'tipo': 'acta',
+                    'tipo_nombre': 'Acta de sesión', 'numero': x['numero'], 'anio': x['anio'], 'fecha': x['fecha'],
+                    'titulo': x['titulo'], 'estado': x['instancia'] or 'Publicada', 'en_tramite': False,
+                    'url': _u(x['url']), 'pagina': x.get('pagina') or '', 'q': _q(x['titulo'], corp, 'acta')})
+    for e in a.get('eventos', []):
+        eventos.append({**e, 'entidad': corp, 'fuente': 'asamblea-antioquia',
+                        'q': _q(e.get('titulo'), e.get('descripcion'), ' '.join(e.get('categorias') or []))})
     c = C.leer(raw / 'concejo.json', {}) or {}
     corp = 'Concejo de Medellín'
     for x in c.get('proyectos', []):
@@ -206,12 +243,26 @@ def territorial():
         out.append({'corporacion': corp, 'fuente': 'concejo-medellin', 'tipo': 'proyecto',
                     'tipo_nombre': 'Proyecto de acuerdo', 'numero': x['numero'], 'anio': x['anio'],
                     'fecha': '', 'titulo': x['titulo'], 'estado': x['estado'], 'en_tramite': vivo,
-                    'url': '', 'pagina': x.get('pagina') or '', 'q': _q(x['titulo'], x['estado'], corp)})
+                    'url': '', 'pagina': x.get('pagina') or '',
+                    'q': _q(x['titulo'], x['estado'], corp, x.get('tema'), x.get('comision'),
+                            x.get('proponentes'), x.get('ponentes'))})
     for x in c.get('acuerdos', []):
         out.append({'corporacion': corp, 'fuente': 'concejo-medellin', 'tipo': 'norma', 'tipo_nombre': 'Acuerdo',
-                    'numero': x['numero'], 'anio': x['anio'], 'fecha': '', 'titulo': x['titulo'],
+                    'numero': x['numero'], 'anio': x['anio'], 'fecha': x.get('fecha_sancion') or '', 'titulo': x['titulo'],
                     'estado': x['estado'], 'en_tramite': False, 'proyecto': x.get('proyecto') or '',
                     'url': '', 'pagina': x.get('pagina') or '', 'q': _q(x['titulo'], corp, 'acuerdo')})
+    for x in c.get('proyectos_historicos', []):
+        if x.get('acuerdo'):        # ya es acuerdo: saldría doble y como reciente en el radar
+            continue
+        out.append({'corporacion': corp, 'fuente': 'concejo-medellin', 'tipo': 'proyecto',
+                    'tipo_nombre': 'Proyecto de acuerdo', 'numero': x['numero'], 'anio': x['anio'], 'fecha': '',
+                    'titulo': x['titulo'], 'estado': 'Sin estado en la fuente', 'en_tramite': False, 'url': '',
+                    'pagina': x['pagina'], 'q': _q(x['titulo'], corp, x.get('tema'), x.get('comision'))})
+    for x in c.get('acuerdos_historicos', []):
+        out.append({'corporacion': corp, 'fuente': 'concejo-medellin', 'tipo': 'norma', 'tipo_nombre': 'Acuerdo',
+                    'numero': x['numero'], 'anio': x['anio'], 'fecha': x.get('fecha_sancion') or '',
+                    'titulo': x['titulo'], 'estado': 'Expedido', 'en_tramite': False, 'url': '',
+                    'pagina': x['pagina'], 'q': _q(x['titulo'], corp, x.get('tema'), x.get('comision'), 'acuerdo')})
     for x in c.get('citaciones', []):
         out.append({'corporacion': corp, 'fuente': 'concejo-medellin', 'tipo': 'citacion',
                     'tipo_nombre': 'Citación de control político', 'numero': x['codigo'], 'anio': x['fecha'][:4],
@@ -220,6 +271,7 @@ def territorial():
     for e in c.get('eventos', []):
         eventos.append({**e, 'entidad': corp, 'fuente': 'concejo-medellin',
                         'q': _q(e.get('titulo'), e.get('descripcion'), ' '.join(e.get('categorias') or []))})
+    out += gacetas_territoriales()[0]
     return out, eventos
 
 
@@ -239,7 +291,10 @@ def _fuente_simple(clave, ent, sector):
         normas = [norma_ejecutivo(r, ent, clave)
                   for nombre in ('normas', 'noticias')
                   for r in (C.leer(raw / f'{nombre}.json', {}) or {}).get('items', []) if r.get('descripcion')]
-        return borr, normas, []
+        eventos = [{**e, 'entidad': ent, 'fuente': clave,
+                    'q': _q(e.get('titulo'), e.get('descripcion'), ' '.join(e.get('categorias') or []))}
+                   for e in (C.leer(raw / 'eventos.json', {}) or {}).get('items', [])]
+        return borr, normas, eventos
     return f
 
 
@@ -254,6 +309,10 @@ fuente_minvivienda = _fuente_simple('minvivienda', 'Ministerio de Vivienda, Ciud
 fuente_mineducacion = _fuente_simple('mineducacion', 'Ministerio de Educación Nacional', 'Educación Nacional')
 fuente_sena = _fuente_simple('sena', 'Servicio Nacional de Aprendizaje (SENA)', 'Trabajo')
 fuente_dnp = _fuente_simple('dnp', 'Departamento Nacional de Planeación', 'Planeación')
+fuente_minagricultura = _fuente_simple('minagricultura', 'Ministerio de Agricultura y Desarrollo Rural', 'Agropecuario, Pesquero y de Desarrollo Rural')
+fuente_minambiente = _fuente_simple('minambiente', 'Ministerio de Ambiente y Desarrollo Sostenible', 'Ambiente y Desarrollo Sostenible')
+fuente_mindeporte = _fuente_simple('mindeporte', 'Ministerio del Deporte', 'Del Deporte, la Recreación, la Actividad Física y el Aprovechamiento del Tiempo Libre')
+fuente_mincultura = _fuente_simple('mincultura', 'Ministerio de las Culturas, las Artes y los Saberes', 'Cultura')
 fuente_supervigilancia = _fuente_simple('supervigilancia', 'Superintendencia de Vigilancia y Seguridad Privada', 'Defensa')
 fuente_presidencia = _fuente_simple('presidencia', 'Presidencia de la República', 'Presidencia de la República')
 
@@ -279,7 +338,9 @@ FUENTES = [('minsalud', fuente_minsalud), ('mincomercio', fuente_mincomercio), (
            ('mintrabajo', fuente_mintrabajo), ('funcionpublica', fuente_funcionpublica), ('spe', fuente_spe),
            ('ugpp', fuente_ugpp), ('minvivienda', fuente_minvivienda), ('mineducacion', fuente_mineducacion),
            ('sena', fuente_sena), ('dnp', fuente_dnp), ('supervigilancia', fuente_supervigilancia),
-           ('minhacienda', fuente_minhacienda), ('presidencia', fuente_presidencia)]
+           ('minhacienda', fuente_minhacienda), ('presidencia', fuente_presidencia),
+           ('minagricultura', fuente_minagricultura), ('minambiente', fuente_minambiente),
+           ('mindeporte', fuente_mindeporte), ('mincultura', fuente_mincultura)]
 
 
 def agenda_regulatoria():
@@ -399,6 +460,7 @@ def build():
     eventos += ev_terr
     por['territorial'] = {'items': len(terr), 'en_tramite': sum(1 for x in terr if x['en_tramite']),
                           'eventos': len(ev_terr)}
+    por['gacetas_territoriales'] = gacetas_territoriales()[1]
     C.DIST.mkdir(parents=True, exist_ok=True)
     for nombre, filas, orden in (('borradores', borr, 'fecha_inicio'), ('normas', normas, 'fecha'),
                                  ('eventos', eventos, 'fecha_inicio'), ('territorial', terr, 'anio')):
