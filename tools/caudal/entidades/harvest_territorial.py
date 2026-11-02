@@ -33,6 +33,12 @@ IllegalArgumentException):
   ⚠️ El PDF y la ponencia viven en las pestañas de SIMI. La petición que las carga
   la frena la regla de Cloudflare del sitio («Sorry, you have been blocked»; medido
   el 1-nov-2026): NO se reintenta ni se disfraza. Falta, y se declara.
+  datos.gov.co · el Concejo publica `sqkr-77ej` (2.363 proyectos desde 1955) y
+  `9smt-mgt4` (2.020 acuerdos): suman tema, comisión, fecha de sanción e historial.
+  Su `id` es el `data-rk` de SIMI (344 de 346 cruzan, 0 mal; los 2 que faltan son
+  los más nuevos: va atrasado). ⚠️ Se cruza por `id`: hay 21 consecutivos repetidos.
+  ⚠️ «Acuerdo sancionado del periodo inferior a 2008» no es un tema, «NA» y «Sin
+  Comisión» no son comisiones y hay años como 0206. Si falla, queda lo anterior.
 
 Salida: `Bases de datos/caudal-entidades/raw/territorial/{asamblea,concejo}.json`.
 Asamblea suma `actas` y `eventos`; cada proyecto del Concejo suma `simi_id`.
@@ -55,6 +61,10 @@ OUT = C.RAW / 'territorial'
 ASAMBLEA = 'https://asambleadeantioquia.gov.co/wp-json/wp/v2'
 SIMI = 'https://simi.concejodemedellin.gov.co/simi3/invitados'
 FICHA_CONCEJO = 'https://www.concejodemedellin.gov.co/interna-proyectos-de-acuerdo?simi_id='
+DATOS_PROYECTOS = 'https://www.datos.gov.co/resource/sqkr-77ej.json?$limit=5000&$order=id'
+DATOS_ACUERDOS = 'https://www.datos.gov.co/resource/9smt-mgt4.json?$limit=5000'
+PAGINA_PROYECTOS = 'https://www.datos.gov.co/d/sqkr-77ej'
+PAGINA_ACUERDOS = 'https://www.datos.gov.co/d/9smt-mgt4'
 AGENDA_ASAMBLEA = 'https://asambleadeantioquia.gov.co/agenda/'
 ICS_ASAMBLEA = ('https://calendar.google.com/calendar/ical/4b90b2a17d7ffe4eb0fad78c30ca45ec1175f914438bd08901652537b'
                 '078a954%40group.calendar.google.com/public/basic.ics')
@@ -315,6 +325,38 @@ def ficha_concejo(simi_id, numero, anio):
     return {'proponentes': m.group(1)[:200], 'ponentes': m.group(2)[:300]} if m else None
 
 
+def _dato(v):
+    """Vacío si el campo del dataset no dice nada."""
+    v = (v or '').strip()
+    return '' if C.fold(v) in ('na', 'sin comision') or v.startswith('Acuerdo sancionado del periodo') else v
+
+
+def datos_concejo():
+    """Proyectos por `id` y acuerdos por (número, año), de los datasets del Concejo."""
+    ps = json.loads(C.curl(DATOS_PROYECTOS, timeout=90))
+    acs = json.loads(C.curl(DATOS_ACUERDOS, timeout=90))
+    if len(ps) < 2000 or len(acs) < 1800:
+        raise RuntimeError(f'solo {len(ps)} proyectos y {len(acs)} acuerdos')
+    hoy = str(datetime.date.today().year)
+    proy, acu = {}, {}
+    for r in ps:
+        n, a = _num_anio(r.get('proyecto_de_acuerdo'))
+        proy[r['id']] = {'numero': n, 'anio': a, 'titulo': (r.get('titulo') or '').strip(),
+                         'tema': _dato(r.get('tema')), 'comision': _dato(r.get('comision')), 'simi_id': r['id'],
+                         'pagina': PAGINA_PROYECTOS}
+    for r in acs:
+        num = (r.get('numero_de_acuerdo') or '').strip()
+        f = (r.get('fecha_de_sancion') or '').replace('/', '-')
+        a = r.get('a_o') if '1900' <= (r.get('a_o') or '') <= hoy else f[:4]
+        if not num.isdigit() or not '1900' <= a <= hoy:
+            continue
+        acu.setdefault((str(int(num)), a), {
+            'numero': str(int(num)), 'anio': a, 'titulo': (r.get('titulo') or '').strip(), 'tema': _dato(r.get('tema')),
+            'comision': _dato(r.get('comision')), 'fecha_sancion': f if f[:4] == a else '',
+            'gaceta': _dato(r.get('gaceta_no')), 'pagina': PAGINA_ACUERDOS})
+    return proy, acu
+
+
 def concejo(prev=None):
     hoy = datetime.date.today()
     corte = str(hoy.year - 2)
@@ -322,13 +364,21 @@ def concejo(prev=None):
     proyectos = []
     previos = {x.get('simi_id'): x for x in (prev or {}).get('proyectos', []) if x.get('simi_id')}
     consultas = 0
+    try:
+        d_proy, d_acu = datos_concejo()
+    except (RuntimeError, ValueError) as e:
+        d_proy, d_acu = None, None
+        print(f'    ! datos.gov.co: {str(e)[:100]} — quedan los datos anteriores', file=sys.stderr)
     for c, rk in zip(s.filas(), s.claves):
         if len(c) < 3:
             continue
         n, a = _num_anio(c[0])
         x = {'numero': n, 'anio': a, 'titulo': c[1], 'estado': c[2], 'pagina': s.url, 'simi_id': rk}
         p = previos.get(rk) or {}
-        x.update({k: p[k] for k in ('proponentes', 'ponentes', 'sin_ficha') if k in p})
+        x.update({k: p[k] for k in ('proponentes', 'ponentes', 'sin_ficha', 'tema', 'comision') if k in p})
+        dato = (d_proy or {}).get(rk)
+        if dato and dato['numero'] == n and dato['anio'] == a:
+            x.update(tema=dato['tema'], comision=dato['comision'])
         # solo lo vivo, y solo si cambió de estado: los archivados ya no cambian de ponentes
         vivo = a >= str(hoy.year - 1) and not re.search(r'(?i)archiv|retirad|negad|sancionad', c[2])
         if rk and vivo and consultas < 60 and (p.get('estado') != c[2] or not ('ponentes' in p or 'sin_ficha' in p)):
@@ -382,7 +432,29 @@ def concejo(prev=None):
                         'fecha_inicio': dia, 'fecha_fin': '', 'lugar': f'{c[2]} · {c[4]} a {c[5]}',
                         'descripcion': c[0], 'categorias': ['Comisión permanente'] + ([c[6]] if len(c) > 6 else []),
                         'url': s.url})
-    return {'proyectos': proyectos, 'acuerdos': acuerdos, 'citaciones': citaciones, 'eventos': eventos}
+    if d_proy is None:
+        p_hist = (prev or {}).get('proyectos_historicos', [])
+        a_hist = (prev or {}).get('acuerdos_historicos', [])
+        por_acuerdo = {(x['numero'], x['anio']): x for x in (prev or {}).get('acuerdos', [])}
+    else:
+        en_simi = {x['simi_id'] for x in proyectos}
+        p_hist = sorted((x for i, x in d_proy.items() if i not in en_simi and x['numero'] and x['anio'] >= '1900'),
+                        key=lambda x: (x['anio'], int(x['numero'])), reverse=True)
+        # SIMI saca de su tabla lo que ya es acuerdo: el acuerdo dice de qué proyecto viene
+        origen = {x['proyecto']: x for x in acuerdos if x.get('proyecto')}
+        for x in p_hist:
+            o = origen.get(f"{x['numero']}-{x['anio']}")
+            if o:
+                x['acuerdo'] = {'numero': o['numero'], 'anio': o['anio']}
+        en_simi = {(x['numero'].lstrip('0') or '0', x['anio']) for x in acuerdos}
+        a_hist = sorted((x for k, x in d_acu.items() if k not in en_simi),
+                        key=lambda x: (x['anio'], int(x['numero'])), reverse=True)
+        por_acuerdo = {(x['numero'], x['anio']): x for x in d_acu.values()}
+    for x in acuerdos:
+        dato = por_acuerdo.get((x['numero'].lstrip('0') or '0', x['anio'])) or por_acuerdo.get((x['numero'], x['anio'])) or {}
+        x.update({k: dato[k] for k in ('tema', 'comision', 'fecha_sancion', 'gaceta') if k in dato})
+    return {'proyectos': proyectos, 'acuerdos': acuerdos, 'citaciones': citaciones, 'eventos': eventos,
+            'proyectos_historicos': p_hist, 'acuerdos_historicos': a_hist}
 
 
 def fetch(todo):
@@ -409,6 +481,8 @@ def fetch(todo):
         C.escribir(OUT / 'concejo.json', {'generado': gen, **c})
         hoy = datetime.date.today().isoformat()
         print(f"  concejo · {len(c['proyectos'])} proyectos · {len(c['acuerdos'])} acuerdos · "
+              f"{sum(1 for x in c['proyectos'] if x.get('tema'))} con tema · históricos: "
+              f"{len(c['proyectos_historicos'])} proyectos y {len(c['acuerdos_historicos'])} acuerdos · "
               f"{len(c['citaciones'])} citaciones · {len(c['eventos'])} sesiones y reuniones "
               f"({sum(1 for e in c['eventos'] if e['dia'] >= hoy)} por venir)")
     except Exception as e:

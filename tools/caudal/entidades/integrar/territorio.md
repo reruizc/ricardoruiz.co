@@ -14,6 +14,7 @@ principal. Las cifras son de la corrida real del 1-nov-2026.
 | Asamblea · agenda | Google Calendar público que embebe `/agenda/` | Sesiones hasta el 11-nov | Texto | 43 sesiones, 11 por venir | Construida |
 | Concejo · PDF y ponencia | Pestañas de SIMI | n/a | n/a | 0 | **No se pudo** (causa abajo) |
 | Concejo · ficha pública | `interna-proyectos-de-acuerdo?simi_id=N` | En vivo | Texto | 12 proyectos con proponentes y ponentes | Construida, parcial |
+| Concejo · datos abiertos | datos.gov.co `sqkr-77ej` y `9smt-mgt4`, del propio Concejo | 21-oct: dos proyectos por detrás de SIMI | Tabla, sin PDF | 344 de 346 proyectos con tema · 77 de 80 acuerdos con fecha de sanción · historial de 2.018 proyectos y 1.913 acuerdos | Construida |
 
 ### Verificación de los números
 
@@ -24,6 +25,10 @@ principal. Las cifras son de la corrida real del 1-nov-2026.
 - **Medellín.** Cotejo ficha contra PDF en 18 gacetas: 182 de 187 actos coinciden. Cuatro fallos son
   solo de formato (`Acuerdo Metropolitano N°12`). Uno es un error de la ficha: la 5741 dice decreto
   0477 y el PDF no lo trae. Ese tipo de error no se corrige solo en el histórico.
+- **Datos abiertos del Concejo.** El `id` del dataset es el `data-rk` de SIMI: 344 de 346 cruzan y
+  ninguno está mal. Los 2 que faltan son los más nuevos (113 y 114 de 2026). Hay 21 consecutivos
+  repetidos, por eso se cruza por `id`. Los 80 acuerdos de SIMI están en el dataset. Los 74 proyectos
+  de 2024-2026 que SIMI ya no lista son acuerdos sancionados, verificado con el proyecto de origen.
 - **Ficha cortada.** `MED_2026_40_00012` es en el documento `MED_2026_40_000125`. El cosechador lo
   corrige con el PDF. Fue el único de 20 números `MED_`.
 
@@ -109,10 +114,32 @@ Dentro de `territorial()`, después del `for` de ordenanzas de la Asamblea:
                         'q': _q(e.get('titulo'), e.get('descripcion'), ' '.join(e.get('categorias') or []))})
 ```
 
-En el `for x in c.get('proyectos', [])` del Concejo, cambiar la `q` para que busque por proponente y ponente:
+En el `for x in c.get('proyectos', [])` del Concejo, cambiar la `q` para que busque por tema, comisión,
+proponente y ponente:
 
 ```python
-                    'q': _q(x['titulo'], x['estado'], corp, x.get('proponentes'), x.get('ponentes'))})
+                    'q': _q(x['titulo'], x['estado'], corp, x.get('tema'), x.get('comision'),
+                            x.get('proponentes'), x.get('ponentes'))})
+```
+
+En el `for x in c.get('acuerdos', [])`, cambiar `'fecha': ''` por `'fecha': x.get('fecha_sancion') or ''`.
+
+Después de ese `for`, sumar el historial. Los proyectos que ya son acuerdo se quedan en raw: en el
+índice saldrían dobles y como recientes en el radar.
+
+```python
+    for x in c.get('proyectos_historicos', []):
+        if x.get('acuerdo'):
+            continue
+        out.append({'corporacion': corp, 'fuente': 'concejo-medellin', 'tipo': 'proyecto',
+                    'tipo_nombre': 'Proyecto de acuerdo', 'numero': x['numero'], 'anio': x['anio'], 'fecha': '',
+                    'titulo': x['titulo'], 'estado': 'Sin estado en la fuente', 'en_tramite': False, 'url': '',
+                    'pagina': x['pagina'], 'q': _q(x['titulo'], corp, x.get('tema'), x.get('comision'))})
+    for x in c.get('acuerdos_historicos', []):
+        out.append({'corporacion': corp, 'fuente': 'concejo-medellin', 'tipo': 'norma', 'tipo_nombre': 'Acuerdo',
+                    'numero': x['numero'], 'anio': x['anio'], 'fecha': x.get('fecha_sancion') or '',
+                    'titulo': x['titulo'], 'estado': 'Expedido', 'en_tramite': False, 'url': '',
+                    'pagina': x['pagina'], 'q': _q(x['titulo'], corp, x.get('tema'), x.get('comision'), 'acuerdo')})
 ```
 
 Al final de `territorial()`, antes del `return`:
@@ -128,8 +155,8 @@ En `build()`, junto a `por['territorial']`, declarar lo que no se publicó:
     por['gacetas_territoriales'] = gacetas_territoriales()[1]
 ```
 
-Resultado medido con este bloque: 1.290 filas nuevas (940 Gobernación, 350 Alcaldía), unos 1,1 MB.
-Con las 702 actas, `entidades-territorial.jsonl` queda en 4.110 filas (hoy 2.118).
+Resultado medido con estos bloques: 1.290 filas de gacetas (940 Gobernación, 350 Alcaldía), 702 actas y
+3.851 del historial del Concejo. `entidades-territorial.jsonl` queda en 7.961 filas (hoy 2.118).
 
 ## `tools/leyes-senado/run_diario.sh`
 
@@ -159,7 +186,8 @@ Reemplazar las fichas de territoriales:
     dict(k='concejo-medellin', nombre='Concejo de Medellín', alias=['concejo de medellin'],
          estado='parcial', cubre=['Proyectos de acuerdo con su estado', 'Acuerdos', 'Citaciones de control político',
                                   'Sesiones de plenaria programadas', 'Reuniones de comisiones permanentes',
-                                  'Proponentes y ponentes de los proyectos abiertos a participación'],
+                                  'Proponentes y ponentes de los proyectos abiertos a participación',
+                                  'Tema, comisión y fecha de sanción', 'Historial de proyectos y acuerdos'],
          falta=['Texto de cada proyecto (PDF) y su ponencia'],
          nota='El sistema del Concejo bloquea la lectura automática de esos documentos.'),
     dict(k='gobernacion-antioquia', nombre='Gobernación de Antioquia', alias=['gobernacion de antioquia'],
@@ -237,5 +265,7 @@ Tanda 5 del plan. Detalle y evidencia en `tools/caudal/entidades/integrar/territ
 - **Concejo**: ⚠️ el PDF y la ponencia viven en pestañas de SIMI. La petición que las carga la bloquea
   Cloudflare («Sorry, you have been blocked»). No se esquiva: es un control de seguridad del sitio.
   La ficha `interna-proyectos-de-acuerdo?simi_id=<data-rk>` solo existe para proyectos abiertos a
-  participación; a los demás les responde 200 con una página genérica.
+  participación; a los demás les responde 200 con una página genérica. Tema, comisión, fecha de sanción
+  e historial salen de datos.gov.co (`sqkr-77ej`, `9smt-mgt4`), que publica el propio Concejo, sin PDF
+  y con unos días de rezago. ⚠️ Cruzar por `id` (= `data-rk`), no por consecutivo: hay 21 repetidos.
 ```
