@@ -190,8 +190,9 @@ def gacetas_territoriales():
         for x in items:
             if x['subtipo'] not in ('Decreto', 'Resolución', 'Circular'):
                 continue
-            if x['sin_texto'] or x['administrativo'] or x.get('rutinario'):
-                cuenta['sin_texto' if x['sin_texto'] else 'particulares' if x['administrativo'] else 'rutinarios'] += 1
+            sin_texto = x['sin_texto'] or not x['titulo'].strip()     # sin título no se sabe si es general
+            if sin_texto or x['administrativo'] or x.get('rutinario'):
+                cuenta['sin_texto' if sin_texto else 'particulares' if x['administrativo'] else 'rutinarios'] += 1
                 continue
             cuenta['publicados'] += 1
             out.append({'corporacion': corp, 'fuente': clave, 'tipo': 'norma', 'tipo_nombre': x['subtipo'],
