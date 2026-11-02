@@ -8,9 +8,13 @@ post con categoría:
     216  Proyecto de ordenanza          (361)
     225  Informes de ponencia           (694)  → en qué debate va cada proyecto
       6  Ordenanzas                     (1.180)
+    217  Actas de sesión                (702)  → plenaria y comisiones, con PDF
   El número y la fecha salen del título («PROYECTO DE ORDENANZA No. 41 DEL 15 DE
   OCTUBRE DE 2026 “POR MEDIO DE LA CUAL…”»). Un proyecto pasa a «ordenanza»
   cuando una ordenanza tiene el mismo epígrafe (los números no coinciden).
+  Agenda: la categoría 227 «Agenda semanal» murió en nov-2022 (imágenes de WhatsApp).
+  La vigente es el Google Calendar público que embebe /agenda/: su ICS trae cada
+  sesión con su tema, hasta dos semanas adelante.
 
 Concejo de Medellín · SIMI (PrimeFaces, sin login, `simi.concejodemedellin.gov.co/
 simi3/invitados/…`). Paginación por AJAX de a 10 filas (⚠️ con más rows da
@@ -20,9 +24,18 @@ IllegalArgumentException):
     proposiciones/citaciones  control político (fecha · sesión · código · tema · estado)
     plenaria/debates        sesiones de plenaria, ya programadas a futuro → eventos
     proyectos/permanente    reuniones de las comisiones permanentes → eventos
-  SIMI no da enlace por registro: se enlaza la página de la tabla.
+  SIMI no da enlace por registro. El `data-rk` de cada fila es el `simi_id` de la ficha
+  pública del sitio del Concejo (www…/interna-proyectos-de-acuerdo?simi_id=N), con
+  proponentes y ponentes, ⚠️ pero solo existe para los proyectos abiertos a
+  participación: a los demás les responde 200 con una página genérica. Se enlaza solo
+  si la ficha trae ese número de proyecto; `sin_ficha` evita repreguntar hasta que cambie
+  de estado.
+  ⚠️ El PDF y la ponencia viven en las pestañas de SIMI. La petición que las carga
+  la frena la regla de Cloudflare del sitio («Sorry, you have been blocked»; medido
+  el 1-nov-2026): NO se reintenta ni se disfraza. Falta, y se declara.
 
 Salida: `Bases de datos/caudal-entidades/raw/territorial/{asamblea,concejo}.json`.
+Asamblea suma `actas` y `eventos`; cada proyecto del Concejo suma `simi_id`.
 Uso: python3 tools/caudal/entidades/harvest_territorial.py fetch [--todo]
 """
 import argparse
@@ -41,6 +54,10 @@ import comun as C
 OUT = C.RAW / 'territorial'
 ASAMBLEA = 'https://asambleadeantioquia.gov.co/wp-json/wp/v2'
 SIMI = 'https://simi.concejodemedellin.gov.co/simi3/invitados'
+FICHA_CONCEJO = 'https://www.concejodemedellin.gov.co/interna-proyectos-de-acuerdo?simi_id='
+AGENDA_ASAMBLEA = 'https://asambleadeantioquia.gov.co/agenda/'
+ICS_ASAMBLEA = ('https://calendar.google.com/calendar/ical/4b90b2a17d7ffe4eb0fad78c30ca45ec1175f914438bd08901652537b'
+                '078a954%40group.calendar.google.com/public/basic.ics')
 MESES = {'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6, 'julio': 7,
          'agosto': 8, 'septiembre': 9, 'setiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12}
 _M = '(' + '|'.join(MESES) + ')'
@@ -105,14 +122,65 @@ def _doc(post):
             'url': pdf.group(1) if pdf else post['link'], 'pagina': post['link']}
 
 
+def _instancia(s):
+    f = C.fold(s)
+    return ('Sesión ordinaria' if 'ordinari' in f and 'extra' not in f else 'Sesión extraordinaria' if 'extra' in f
+            else s.capitalize().replace('Comision', 'Comisión'))
+
+
+def _acta(post):
+    tit = _txt(post['title']['rendered'])
+    fecha = _fecha_es(tit) or post['date'][:10]
+    n = re.search(r'(?i)ACTA\s+(?:No\.?|N[°º]\.?)?\s*0*(\d{1,4})', tit)
+    org = re.search(r'(?i)(COMISI[ÓO]N\s+\w+|SESI[ÓO]N(?:ES)?\s+\w+|PLENARIA)', tit)
+    pdf = re.search(r'href="([^"]+\.pdf)"', post['content']['rendered'] or '')
+    return {'id': post['id'], 'numero': n.group(1) if n else '', 'anio': fecha[:4], 'fecha': fecha,
+            'publicado': post['date'][:10], 'titulo': tit,
+            'instancia': _instancia(org.group(1)) if org else '',
+            'url': pdf.group(1) if pdf else post['link'], 'pagina': post['link']}
+
+
+def agenda_asamblea():
+    """Sesiones del calendario público: las de 60 días atrás en adelante."""
+    t = C.curl(ICS_ASAMBLEA, timeout=60).replace('\r\n ', '').replace('\n ', '')
+    lim = (datetime.date.today() - datetime.timedelta(days=60)).isoformat()
+    corp = 'Asamblea de Antioquia'
+    des = lambda x: x.replace('\\n', ' ').replace('\\,', ',').replace('\\;', ';').strip()
+    out = []
+    for e in re.findall(r'BEGIN:VEVENT(.*?)END:VEVENT', t, re.S):
+        g = lambda k: (re.search(rf'(?m)^{k}[^:\n]*:(.*)$', e) or [None, ''])[1].strip()
+        d = re.sub(r'\D', '', g('DTSTART'))[:8]
+        if len(d) < 8:
+            continue
+        dia = f'{d[:4]}-{d[4:6]}-{d[6:]}'
+        tit = des(g('SUMMARY'))
+        if dia < lim or not tit:
+            continue
+        out.append({'id': f"asamblea-{g('UID')[:40]}", 'titulo': tit[:200], 'dia': dia, 'fecha_inicio': dia,
+                    'fecha_fin': '', 'lugar': des(g('LOCATION')) or corp, 'descripcion': des(g('DESCRIPTION'))[:600] or tit,
+                    'categorias': ['Comisión' if C.fold(tit).startswith('comision') else 'Plenaria'],
+                    'url': AGENDA_ASAMBLEA})
+    return sorted(out, key=lambda x: x['dia'])
+
+
 def asamblea(prev, todo):
-    """Proyectos de ordenanza con su estado (ponencia y ordenanza), y ordenanzas."""
+    """Proyectos de ordenanza con su estado (ponencia y ordenanza), ordenanzas,
+    actas de sesión y agenda."""
     desde = None
     if prev and not todo:
         desde = (datetime.date.today() - datetime.timedelta(days=120)).isoformat()
     proy = {str(x['id']): x for x in (prev or {}).get('proyectos', [])}
     ords = {str(x['id']): x for x in (prev or {}).get('ordenanzas', [])}
     pon = {str(x['id']): x for x in (prev or {}).get('ponencias', [])}
+    actas = {str(x['id']): x for x in (prev or {}).get('actas', [])}
+    if not actas:                     # primera vez: el archivo entero, no 120 días
+        for p in _posts(217):
+            d = _acta(p)
+            actas[str(d['id'])] = d
+    else:
+        for p in _posts(217, desde):
+            d = _acta(p)
+            actas[str(d['id'])] = d
     for p in _posts(216, desde):
         d = _doc(p)
         proy[str(d['id'])] = d
@@ -166,7 +234,9 @@ def asamblea(prev, todo):
             x['estado'] = 'Radicado'
     return {'proyectos': sorted(proy.values(), key=lambda x: x['fecha'], reverse=True),
             'ponencias': sorted(pon.values(), key=lambda x: x['fecha'], reverse=True),
-            'ordenanzas': sorted(ords.values(), key=lambda x: x['fecha'], reverse=True)}
+            'ordenanzas': sorted(ords.values(), key=lambda x: x['fecha'], reverse=True),
+            'actas': sorted(actas.values(), key=lambda x: x['fecha'], reverse=True),
+            'eventos': agenda_asamblea()}
 
 
 # ─────────────────────────── Concejo (SIMI) ───────────────────────────
@@ -208,18 +278,21 @@ class Simi:
         return self._curl(d)
 
     def filas(self, hasta=None, para=None):
-        """Filas como listas de celdas de texto. `para(celdas)` True corta."""
+        """Filas como listas de celdas de texto, y en `self.claves` el `data-rk` de
+        cada una. `para(celdas)` True corta."""
         out = []
+        self.claves = []
         for primero in range(0, min(self.total, hasta or self.total), 10):
             h = self.pagina(primero)
-            rows = re.findall(r'<tr[^>]*data-ri="\d+"[^>]*>(.*?)</tr>', h, re.S)
+            rows = re.findall(r'<tr[^>]*data-ri="\d+"(?:[^>]*data-rk="(\d+)")?[^>]*>(.*?)</tr>', h, re.S)
             if not rows:
                 break
             corta = False
-            for r in rows:
+            for rk, r in rows:
                 r = re.sub(r'<script.*?</script>', '', r, flags=re.S)
                 celdas = [_txt(c) for c in re.findall(r'<td[^>]*>(.*?)</td>', r, re.S)]
                 out.append(celdas)
+                self.claves.append(rk)
                 if para and para(celdas):
                     corta = True
             if corta:
@@ -232,16 +305,43 @@ def _num_anio(s):
     return (m.group(1), m.group(2)) if m else ('', '')
 
 
-def concejo():
+def ficha_concejo(simi_id, numero, anio):
+    """Proponentes y ponentes de la ficha pública. None si la ficha no es de ese
+    proyecto: la página responde 200 igual, con otros proyectos debajo."""
+    h = C.curl(FICHA_CONCEJO + simi_id, timeout=40)
+    t = _txt(re.sub(r'<script.*?</script>|<style.*?</style>', '', h, flags=re.S))
+    m = re.search(rf'No\. proyecto:\s*{numero}-{anio}\s+Proponentes:\s*(.*?)\s+Ponentes:\s*(.*?)\s+Ver proyecto', t)
+    time.sleep(1)
+    return {'proponentes': m.group(1)[:200], 'ponentes': m.group(2)[:300]} if m else None
+
+
+def concejo(prev=None):
     hoy = datetime.date.today()
     corte = str(hoy.year - 2)
     s = Simi('proyectos/proyectos')
     proyectos = []
-    for c in s.filas():
+    previos = {x.get('simi_id'): x for x in (prev or {}).get('proyectos', []) if x.get('simi_id')}
+    consultas = 0
+    for c, rk in zip(s.filas(), s.claves):
         if len(c) < 3:
             continue
         n, a = _num_anio(c[0])
-        proyectos.append({'numero': n, 'anio': a, 'titulo': c[1], 'estado': c[2], 'pagina': s.url})
+        x = {'numero': n, 'anio': a, 'titulo': c[1], 'estado': c[2], 'pagina': s.url, 'simi_id': rk}
+        p = previos.get(rk) or {}
+        x.update({k: p[k] for k in ('proponentes', 'ponentes', 'sin_ficha') if k in p})
+        # solo lo vivo, y solo si cambió de estado: los archivados ya no cambian de ponentes
+        vivo = a >= str(hoy.year - 1) and not re.search(r'(?i)archiv|retirad|negad|sancionad', c[2])
+        if rk and vivo and consultas < 60 and (p.get('estado') != c[2] or not ('ponentes' in p or 'sin_ficha' in p)):
+            consultas += 1
+            x.pop('sin_ficha', None)
+            try:
+                f = ficha_concejo(rk, n, a)
+                x.update(f or {'sin_ficha': True})
+            except RuntimeError as e:
+                print(f'    ! ficha {n}-{a}: {str(e)[:80]}', file=sys.stderr)
+        if 'ponentes' in x and 'sin_ficha' not in x:
+            x['pagina'] = FICHA_CONCEJO + rk
+        proyectos.append(x)
     s = Simi('proyectos/acuerdos')
     acuerdos = []
     for c in s.filas(para=lambda c: _num_anio(c[0])[1] and _num_anio(c[0])[1] < corte):
@@ -292,16 +392,18 @@ def fetch(todo):
     try:
         prev = C.leer(OUT / 'asamblea.json', None)
         a = asamblea(prev, todo)
-        if len(a['proyectos']) < 50 or len(a['ordenanzas']) < 50:
-            raise RuntimeError(f"solo {len(a['proyectos'])} proyectos y {len(a['ordenanzas'])} ordenanzas")
+        if len(a['proyectos']) < 50 or len(a['ordenanzas']) < 50 or len(a['actas']) < 50:
+            raise RuntimeError(f"solo {len(a['proyectos'])} proyectos, {len(a['ordenanzas'])} ordenanzas "
+                               f"y {len(a['actas'])} actas")
         C.escribir(OUT / 'asamblea.json', {'generado': gen, **a})
         print(f"  asamblea · {len(a['proyectos'])} proyectos · {len(a['ponencias'])} ponencias · "
-              f"{len(a['ordenanzas'])} ordenanzas")
+              f"{len(a['ordenanzas'])} ordenanzas · {len(a['actas'])} actas · {len(a['eventos'])} sesiones "
+              f"({sum(1 for e in a['eventos'] if e['dia'] >= datetime.date.today().isoformat())} por venir)")
     except Exception as e:
         ok = False
         print(f'  asamblea · FALLÓ ({e}) — se conserva el archivo anterior', file=sys.stderr)
     try:
-        c = concejo()
+        c = concejo(C.leer(OUT / 'concejo.json', None))
         if len(c['proyectos']) < 100:
             raise RuntimeError(f"solo {len(c['proyectos'])} proyectos (SIMI tiene más de 300)")
         C.escribir(OUT / 'concejo.json', {'generado': gen, **c})
