@@ -12,7 +12,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102g" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102i" />
   <script defer src="/track.js"></script>
 </head>
 <body>
@@ -23,10 +23,11 @@
     <div id="app" hidden>
       <div class="fil"><div class="pills" id="f-voz"></div><input class="q" id="q" type="search" placeholder="Buscar una persona o bancada…" aria-label="Buscar voz" /></div>
       <div class="voces" id="lvoces"></div>
+      <section class="bloque" id="analistas"><div class="k">En X, todos los días</div><h2>Lo que dicen los analistas</h2><p class="sub">Leemos a diario las cuentas de estos analistas y mostramos lo que publican sobre impuestos y la ley. La postura la asigna el clasificador, publicación por publicación.</p><div class="voces" id="lanal"></div></section>
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
-  <script src="ley-rescate-base.js?v=20261102g"></script>
+  <script src="ley-rescate-base.js?v=20261102i"></script>
   <script>
 LR.pagina('voces', E => {
   const { $, esc, cara, P } = LR, F = [['todos', 'Todas'], ['r', 'Rechazan'], ['m', 'Con reparos'], ['a', 'Apoyan'], ['i', 'Sin definir']], C = { a: 'vA', r: 'vR', m: 'vM', i: '' }; let f = 'todos';
@@ -37,6 +38,9 @@ LR.pagina('voces', E => {
     $('#lvoces').innerHTML = L.map(v => `<article class="voz ${C[v.p]}">${cara(E, v.s, v.q, v.org)}<div><b>${esc(v.q)}<span class="et-p" style="color:${P[v.p][1]}">${P[v.p][0]}</span></b><small>${esc(v.c)} · ${esc(v.b)}</small><p>${esc(v.x)}</p>${v.u ? `<a href="${esc(v.u)}" target="_blank" rel="noopener">${esc(v.f)}</a>` : `<small>${esc(v.f)}</small>`}</div></article>`).join('') || '<p class="vacio">Nadie coincide con esa búsqueda.</p>';
     document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { f = b.dataset.v; pinta(); }); }
   $('#q').oninput = pinta; pinta();
+  const AN = E.analistas || [];
+  $('#lanal').innerHTML = AN.map(a => `<article class="voz">${cara(E, null, a.q)}<div><b>${esc(a.q)}</b><small>${esc(a.c)}${a.x ? ` · <a href="https://x.com/${esc(a.x)}" target="_blank" rel="noopener">@${esc(a.x)}</a>` : ''}</small>${a.posts.length ? a.posts.slice(0, 3).map(t => `<p><span class="et-p" style="color:${P[t.p][1]}">${P[t.p][0]}</span> «${esc(t.txt.length > 260 ? t.txt.slice(0, 257) + '…' : t.txt)}» ${t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">${esc(LR.corta((t.pub || '').slice(0, 10)))}</a>` : ''}</p>`).join('') : `<p class="vacio">${a.x ? 'Todavía no ha publicado sobre la ley en los últimos diez días.' : 'Estamos verificando su cuenta en X; entra en la siguiente lectura.'}</p>`}</div></article>`).join('');
+  $('#analistas').hidden = !AN.length;
 });
   </script>
 </body>

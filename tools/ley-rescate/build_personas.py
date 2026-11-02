@@ -154,6 +154,12 @@ def main():
                 print('sin foto:', v['q'])
         else:
             print('sin fuente:', v['q'])
+    # Logos de organizaciones y fotos institucionales curadas a mano (imagenes-extra.json): el archivo ya está en imagenes/ley-rescate/.
+    for s, d in json.loads((AQUI / 'imagenes-extra.json').read_text()).items():
+        gente[s] = {k: v for k, v in d.items() if k not in ('q', 'url')}
+        for v in voces:
+            if v['q'] == d['q']:
+                v['s'] = s
     (AQUI / 'voces.json').write_text(json.dumps(voces, ensure_ascii=False, indent=0))
     (AQUI / 'personas.json').write_text(json.dumps(gente, ensure_ascii=False, indent=0))
     print(len(gente), 'personas ·', sum(1 for g in gente.values() if g['foto']), 'con foto')

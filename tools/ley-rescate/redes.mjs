@@ -12,6 +12,7 @@
    El token SOLO se lee del entorno (APIFY_TOKEN). En GitHub Actions es un secreto. */
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { REDES, COMENTARIOS, referenciaDePost } from '../candidato-360/escucha/perfil.mjs';
 import { clienteApify } from '../candidato-360/escucha/apify.mjs';
@@ -39,6 +40,12 @@ const TT_TAGS = ['leyderescate', 'leyderescateeconomico', 'reformatributaria'];
 /* Las páginas de los medios nacionales: en Facebook lo que se puede leer son los
    comentarios a sus notas. Es donde comenta más gente que no vive en X. */
 const FB_PAGINAS = ['https://www.facebook.com/RevistaSemana', 'https://www.facebook.com/NoticiasCaracol', 'https://www.facebook.com/eltiempo', 'https://www.facebook.com/bluradioco'];
+/* Analistas que se leen todos los días (analistas.json). Sus publicaciones de los últimos 10 días sobre impuestos,
+   solo si el nombre visible de la cuenta trae la palabra clave: un usuario equivocado no puede colar a otra persona. */
+const ANALISTAS = JSON.parse(readFileSync(new URL('./analistas.json', import.meta.url), 'utf8')).lista.filter(a => a.x);
+const desdeAn = new Date(hoy - 10 * 864e5).toISOString().slice(0, 10);
+const nombreVisible = it => String(it.author?.name || it.author?.displayName || it.user?.name || '');
+const sinTilde = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const ES_LEY = /rescate|reforma tributaria|tributaria|\biva\b|impuestos?\b|hacienda|restrepo|paro nacional/i;
 
 const PLAN = {
@@ -99,6 +106,16 @@ async function main() {
   const x = (await correr('x', 'posts', REDES.x.actor, REDES.x.input(X_QS, Math.ceil(PLAN.x.items / X_QS.length)))).filter(i => !/KaitoEasyAPI/i.test(texto(i)));
   const xt = (await correr('x', 'posts por tema', REDES.x.actor, { ...REDES.x.input(X_TEMAS, Math.ceil(PLAN.x.temas / X_TEMAS.length)), sort: 'Top' })).filter(i => !/KaitoEasyAPI/i.test(texto(i)));
   [...x, ...xt].forEach(i => items.push(ficha('x', 'post', i)));
+  if (ANALISTAS.length) {
+    const qs = ANALISTAS.map(a => `from:${a.x} -filter:retweets since:${desdeAn}`);
+    const an = await correr('x', 'analistas', REDES.x.actor, REDES.x.input(qs, 25));
+    for (const i of an) {
+      const a = ANALISTAS.find(a => sinTilde(autor(i)) === sinTilde(a.x));
+      if (!a || !sinTilde(nombreVisible(i)).includes(sinTilde(a.clave)) || !ES_LEY.test(texto(i))) continue;
+      items.push({ ...ficha('x', 'post', i), analista: a.q });
+    }
+    (informe.x ||= []).push(`analistas: ${items.filter(i => i.analista).length} sobre la ley`);
+  }
   paraComentar.push(['x', [...xt, ...x]]);
   const tt = await correr('tiktok', 'posts', REDES.tiktok.actor, REDES.tiktok.input(TT_TAGS, Math.ceil(PLAN.tiktok.items / TT_TAGS.length)));
   tt.forEach(i => items.push(ficha('tiktok', 'post', i)));

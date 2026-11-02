@@ -200,10 +200,12 @@ def mezclar_redes(corpus):
             corpus[k]['inter'] = max(corpus[k].get('inter', 0), it.get('inter') or 0)
             continue
         # El estado viaja en un artefacto que cualquier cuenta de GitHub puede bajar: la gente común va sin nombre.
-        pub = bool(it.get('verificado')) or (it.get('seguidores') or 0) >= 50000
+        pub = bool(it.get('verificado')) or (it.get('seguidores') or 0) >= 50000 or bool(it.get('analista'))
         corpus[k] = {'f': it.get('red'), 'tipo': it.get('tipo'), 'txt': limpia_cita(txt, 500), 'padre': limpia_cita(it.get('padre') or '', 200),
                      'autor': it.get('autor') if pub else '', 'url': it.get('url') if pub else '',
                      'pub': normaliza_fecha(it.get('fecha')) or crudo.get('generado'), 'inter': it.get('inter') or 0}
+        if it.get('analista'):
+            corpus[k]['analista'] = it['analista']
         nuevos += 1
     return nuevos, crudo
 
@@ -399,6 +401,16 @@ def calcular(corpus, clas, temas, tram, cfg, crudo):
         v['men'] = sum(1 for t in n_txt if pat.search(t))
         v.pop('al', None)
         voces.append(v)
+    # Analistas que se leen a diario en X (analistas.json): sus publicaciones con la postura que les dio el clasificador.
+    analistas = []
+    for a in cfg.get('analistas', []):
+        ps = sorted(((it, c) for _, it, c in items if it.get('analista') == a['q']), key=lambda x: x[0].get('pub') or '', reverse=True)
+        posts = []
+        for it, c in ps[:6]:
+            pp = {p for _, p in c['t'] if p}
+            posts.append({'txt': it['txt'], 'url': it.get('url', ''), 'pub': it.get('pub'), 'temas': [t for t, _ in c['t']],
+                          'p': 'm' if ('r' in pp and 'a' in pp) or 'm' in pp else 'r' if 'r' in pp else 'a' if 'a' in pp else 'i'})
+        analistas.append({'q': a['q'], 'c': a['c'], 'x': a.get('x', ''), 'posts': posts})
     # Termómetro: una sola postura por texto, para no contar dos veces el que toca varios temas.
     termo = {'todo': Counter(), 'prensa': Counter(), 'redes': Counter()}
     termo_dia = defaultdict(Counter)
@@ -420,7 +432,7 @@ def calcular(corpus, clas, temas, tram, cfg, crudo):
         fuentes[f]['comentarios'] = sum(1 for _, it, _ in items if it['f'] == f and it.get('tipo') == 'comentario')
     return {
         'v': ahora().isoformat(timespec='minutes'), 'hoy': hoy.isoformat(),
-        'proyecto': cfg['proyecto'], 'tramite': tram, 'hitos': cfg['hitos'], 'voces': voces, 'votos': cfg['votos'], 'personas': cfg['personas'], 'tributarias': cfg['tributarias'],
+        'proyecto': cfg['proyecto'], 'tramite': tram, 'hitos': cfg['hitos'], 'voces': voces, 'votos': cfg['votos'], 'personas': cfg['personas'], 'tributarias': cfg['tributarias'], 'analistas': analistas, 'historico': cfg.get('historico', {}),
         'temas': salida, 'articulos': cfg['articulos'], 'fuentes': fuentes,
         'serie_total': {d: dict(v) for d, v in sorted(total_dia.items())},
         'termometro': {k: dict(v) for k, v in termo.items()}, 'termometro_dia': {d: dict(v) for d, v in sorted(termo_dia.items())},
@@ -499,7 +511,8 @@ def main():
     escribir(DATOS / 'corpus.json', corpus)
     escribir(DATOS / 'clasif.json', clas)
     cfg = {'proyecto': leer(AQUI / 'proyecto.json', {}), 'hitos': leer(AQUI / 'hitos.json', []), 'voces': leer(AQUI / 'voces.json', []),
-           'votos': leer(AQUI / 'votos.json', {}), 'articulos': leer(AQUI / 'articulos.json', []), 'personas': leer(AQUI / 'personas.json', {}), 'tributarias': leer(AQUI / 'tributarias.json', {}).get('lista', [])}
+           'votos': leer(AQUI / 'votos.json', {}), 'articulos': leer(AQUI / 'articulos.json', []), 'personas': leer(AQUI / 'personas.json', {}), 'tributarias': leer(AQUI / 'tributarias.json', {}).get('lista', []),
+           'analistas': leer(AQUI / 'analistas.json', {}).get('lista', []), 'historico': leer(AQUI / 'historico.json', {})}
     estado = calcular(corpus, clas, temas, tram, cfg, crudo)
     if llave and not o.solo_calcular:
         lect = lectura_llm(estado, llave)

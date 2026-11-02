@@ -5,7 +5,7 @@
 (function () {
   const LOCAL = new URLSearchParams(location.search).has('local');
   const URL_DATOS = (LOCAL ? 'Bases de datos/ley-rescate/estado.json' : 'ley-rescate-data/estado.json') + '?v=' + Math.floor(Date.now() / 6e5);
-  const SECCIONES = [['hub', 'ley-de-rescate-avance.html', 'Dónde va'], ['generalidades', 'ley-de-rescate-generalidades.html', 'Generalidades'], ['reloj', 'ley-de-rescate-reloj.html', 'El reloj'], ['votos', 'ley-de-rescate-votos.html', 'Los votos'], ['fuerzas', 'ley-de-rescate-fuerzas.html', 'Esquema de fuerzas'],
+  const SECCIONES = [['hub', 'ley-de-rescate-avance.html', 'Dónde va'], ['generalidades', 'ley-de-rescate-generalidades.html', 'Generalidades'], ['historico', 'ley-de-rescate-historico.html', 'Entran y salen'], ['reloj', 'ley-de-rescate-reloj.html', 'El reloj'], ['votos', 'ley-de-rescate-votos.html', 'Los votos'], ['fuerzas', 'ley-de-rescate-fuerzas.html', 'Esquema de fuerzas'],
     ['discusion', 'ley-de-rescate-discusion.html', 'La discusión'], ['articulos', 'ley-de-rescate-articulos.html', 'Los 106 artículos'], ['voces', 'ley-de-rescate-voces.html', 'Las voces'], ['bitacora', 'ley-de-rescate-bitacora.html', 'Bitácora y método']];
   const $ = s => document.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -54,7 +54,7 @@
   const iniciales = n => { const w = n.replace(/^(el|la|los|las|de|del)\s/i, '').split(/\s+/).filter(x => x.length > 2); return (w.length > 1 ? w.slice(0, 2).map(x => x[0]).join('') : (w[0] || n).slice(0, 2)).toUpperCase(); };
   function cara(E, slug, nombre, org) {
     const p = (E.personas || {})[slug];
-    if (p && p.foto) return `<img class="cara" src="${esc(p.foto)}" alt="${esc(p.n)}" loading="lazy" />`;
+    if (p && p.foto) return `<img class="cara${p.logo ? ' org logo' : ''}" src="${esc(p.foto)}" alt="${esc(p.n)}" loading="lazy" />`;
     return `<span class="cara ${org ? 'org' : ''}" aria-hidden="true">${esc(iniciales(nombre || (p && p.n) || '?'))}</span>`;
   }
   const marca = () => `<a class="poweredby" href="index.html" aria-label="Powered by Ricardo Ruiz"><span class="pb-txt">powered by</span><span class="logo-bars" aria-hidden="true"><span class="logo-bar" style="height:15px"></span><span class="logo-bar" style="height:11px"></span><span class="logo-bar" style="height:7px"></span><span class="logo-bar" style="height:3px"></span></span><span class="logo-text">Ricardo<span>.</span>Ruiz</span></a>`;

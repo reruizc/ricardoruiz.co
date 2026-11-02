@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cómo entran y cómo salen · Ley de Rescate · Caudal × Cauce</title>
+  <meta name="description" content="Qué propusieron las tributarias desde 2016 y qué quedó en la ley: los temas que sobreviven y los que se caen, con la Ley de Rescate al lado." />
+  <link rel="canonical" href="https://ricardoruiz.co/ley-de-rescate-historico.html" />
+  <meta property="og:title" content="Cómo entran y cómo salen · Ley de Rescate · Caudal × Cauce" />
+  <meta property="og:description" content="Qué propusieron las tributarias desde 2016 y qué quedó en la ley: los temas que sobreviven y los que se caen, con la Ley de Rescate al lado." />
+  <meta property="og:image" content="https://ricardoruiz.co/imagenes-index/proyectos/legislativo.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102i" />
+  <script defer src="/track.js"></script>
+</head>
+<body>
+  <main class="wrap">
+    <div class="k">Ley de Rescate · PL 477 de 2026 Cámara</div>
+    <h1>Cómo entran y cómo salen</h1>
+    <p class="lead">Qué propusieron los gobiernos en cada tributaria desde 2016 y qué quedó en la ley. <b>Cada tema se rastreó en la prensa económica y los análisis de firmas contables</b>; las fuentes están en cada fila.</p>
+    <div id="app" hidden>
+      <div class="kpis" id="hkpis"></div>
+      <section class="bloque"><div class="k">Del proyecto a la ley</div><h2>Lo que se propone y lo que sale</h2><p class="sub" id="sk-sub"></p>
+        <div class="fil"><div class="pills" id="sk-f"></div></div>
+        <div class="panel"><div id="sk"></div><div class="ley" id="sk-ley"></div></div></section>
+      <section class="bloque"><div class="k">Tema por tema</div><h2>¿Qué tanto sobrevive cada tema?</h2><p class="sub">De las veces que un gobierno lo propuso, cuántas quedó en la ley. Con ★, los temas que también trae la Ley de Rescate.</p><div class="panel"><div id="sv"></div></div></section>
+      <section class="bloque"><div class="k">Reforma por reforma</div><h2>Cómo entraron y cómo salieron</h2><p class="sub">Artículos y recaudo del proyecto radicado contra la ley aprobada. Toque una reforma para ver tema por tema.</p><div class="panel"><div id="ref"></div></div></section>
+      <section class="bloque"><div class="k">Lo que viene</div><h2>Lo que propone la Ley de Rescate, con la historia al lado</h2><p class="sub" id="rs-sub"></p><div class="panel"><div id="rs"></div></div></section>
+    </div>
+    <div id="carga">Cargando el seguimiento…</div>
+  </main>
+  <script src="ley-rescate-base.js?v=20261102i"></script>
+  <script>
+LR.pagina('historico', E => {
+  const { $, esc } = LR, H = E.historico || {}, TM = H.temas || {}, R = H.reformas || [], RES = H.rescate || [];
+  if (!R.length) { $('#app').innerHTML = '<p class="vacio">El histórico se está cargando.</p>'; return; }
+  const OUT = [['aprobado', 'Quedó en la ley', '#3d6eb8'], ['recortado', 'Quedó recortado', '#7fa3d6'], ['retirado', 'Lo sacaron en el trámite', '#c8553d'], ['se_hundio', 'Se hundió con la reforma', '#8a93a3']];
+  const OC = Object.fromEntries(OUT.map(o => [o[0], o])), coma = x => String(x).replace('.', ',');
+  const nom = r => `${r.corto} ${r.anio}`;
+  const todos = R.flatMap(rf => rf.temas.map(t => ({ ...t, rf })));
+  const pasaron = R.filter(r => r.paso);
+  const vive = x => x.r === 'aprobado' || x.r === 'recortado';
+  const enLey = todos.filter(x => x.rf.paso), sobrevive = enLey.filter(vive).length;
+  $('#hkpis').innerHTML = [['Reformas', R.length, `${pasaron.length} se volvieron ley`], ['Temas propuestos', todos.length, `${Object.keys(TM).length} temas distintos`], ['Sobrevivieron', `${Math.round(100 * todos.filter(vive).length / todos.length)} %`, 'de todo lo propuesto quedó en una ley'], ['Si la reforma pasó', `${Math.round(100 * sobrevive / enLey.length)} %`, 'de lo propuesto en las que sí pasaron']].map(([l, v, d]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join('');
+  let fil = 'todas';
+  function sankey() {
+    const D = fil === 'todas' ? todos : todos.filter(x => x.rf.id === fil);
+    $('#sk-f').innerHTML = [['todas', 'Todas']].concat(R.map(r => [r.id, nom(r)])).map(([k, t]) => `<button class="pill ${fil === k ? 'on' : ''}" data-k="${k}">${t}</button>`).join('');
+    const izq = Object.keys(TM).map(k => ({ k, n: D.filter(x => x.t === k).length })).filter(x => x.n).sort((a, b) => b.n - a.n);
+    const der = OUT.map(([k]) => ({ k, n: D.filter(x => x.r === k).length })).filter(x => x.n);
+    const tot = D.length, W = 900, gap = 6, H0 = Math.max(320, izq.length * 30), u = (H0 - gap * (izq.length - 1)) / tot, ud = (H0 - 26 * (der.length - 1)) / tot;
+    const X1 = 300, X2 = W - 210, nw = 12; let y = 0;
+    const Y = {}; izq.forEach(o => { Y[o.k] = { y, h: o.n * u, off: 0 }; y += o.n * u + gap; });
+    const YD = {}; y = 0; der.forEach(o => { YD[o.k] = { y, h: o.n * ud, off: 0 }; y += o.n * ud + 26; });
+    let links = '';
+    for (const o of izq) for (const [k] of OUT) {
+      const g = D.filter(x => x.t === o.k && x.r === k); if (!g.length) continue;
+      const a = Y[o.k], b = YD[k], h1 = g.length * u, h2 = g.length * ud, y1 = a.y + a.off, y2 = b.y + b.off; a.off += h1; b.off += h2;
+      const m = (X1 + nw + X2) / 2, tip = `<b>${esc(TM[o.k].n)}</b> → ${OC[k][1]}<br>${g.map(x => nom(x.rf)).join(', ')}`;
+      links += `<path class="sk-l" data-a="${o.k}" data-b="${k}" data-tip="${esc(tip)}" d="M${X1 + nw},${y1} C${m},${y1} ${m},${y2} ${X2},${y2} L${X2},${y2 + h2} C${m},${y2 + h2} ${m},${y1 + h1} ${X1 + nw},${y1 + h1} Z" fill="${OC[k][2]}" />`;
+    }
+    const lab = izq.map(o => { const a = Y[o.k], v = D.filter(x => x.t === o.k), s = v.filter(vive).length; return `<g class="sk-n" data-a="${o.k}"><rect x="${X1}" y="${a.y}" width="${nw}" height="${Math.max(2, a.h)}" fill="#14161c" /><text x="${X1 - 8}" y="${a.y + a.h / 2 + 4}" text-anchor="end">${RES.includes(o.k) ? '★ ' : ''}${esc(TM[o.k].n)} <tspan class="sk-c">${s} de ${v.length}</tspan></text></g>`; }).join('');
+    const labd = der.map(o => { const b = YD[o.k]; return `<g class="sk-n" data-b="${o.k}"><rect x="${X2}" y="${b.y}" width="${nw}" height="${b.h}" fill="${OC[o.k][2]}" /><text x="${X2 + nw + 8}" y="${b.y + b.h / 2 - 3}">${OC[o.k][1]}</text><text class="sk-c" x="${X2 + nw + 8}" y="${b.y + b.h / 2 + 13}">${o.n} ${o.n === 1 ? 'tema' : 'temas'} · ${Math.round(100 * o.n / tot)} %</text></g>`; }).join('');
+    $('#sk').innerHTML = `<svg class="sk" viewBox="0 -4 ${W} ${H0 + 8}" role="img" aria-label="De los temas propuestos a lo que quedó en la ley">${links}${lab}${labd}</svg>`;
+    $('#sk-sub').innerHTML = fil === 'todas' ? `A la izquierda, los temas en el orden de cuántas veces se propusieron; a la derecha, qué pasó con ellos. «4 de 6» = se propuso 6 veces y quedó en la ley 4. Pase el cursor por una banda para ver las reformas; en el celular, deslice el diagrama hacia los lados.` : (r => `${esc(r.nombre)} (${r.anio}): ${r.paso ? 'se volvió ley' : 'no se volvió ley'}. ${esc(r.nota || '')}`)(R.find(r => r.id === fil));
+    $('#sk-ley').innerHTML = OUT.map(([, t, c]) => `<span><i style="background:${c}"></i>${t}</span>`).join('');
+    document.querySelectorAll('#sk-f [data-k]').forEach(b => b.onclick = () => { fil = b.dataset.k; sankey(); });
+    const svg = $('#sk svg');
+    svg.querySelectorAll('.sk-n').forEach(n => { n.onmouseenter = () => { svg.classList.add('foco'); svg.querySelectorAll('.sk-l').forEach(l => l.classList.toggle('on', (n.dataset.a && l.dataset.a === n.dataset.a) || (n.dataset.b && l.dataset.b === n.dataset.b))); }; n.onmouseleave = () => { svg.classList.remove('foco'); svg.querySelectorAll('.sk-l.on').forEach(l => l.classList.remove('on')); }; });
+  }
+  sankey();
+  const st = Object.keys(TM).map(k => { const v = todos.filter(x => x.t === k), p = v.filter(x => x.rf.paso); return { k, n: v.length, s: v.filter(vive).length, np: p.length, sp: p.filter(vive).length }; }).filter(x => x.n).sort((a, b) => b.n - a.n || b.s - a.s);
+  const MXS = Math.max(...st.map(o => o.n));
+  $('#sv').innerHTML = st.map(o => `<div class="cr" data-tip="${esc(`<b>${TM[o.k].n}</b><br>${esc(TM[o.k].d || '')}<br>Propuesto ${o.n} veces; quedó ${o.s}.${o.np ? `<br>En las reformas que pasaron: ${o.sp} de ${o.np}.` : ''}`)}"><div class="cr-n"><b>${RES.includes(o.k) ? '★ ' : ''}${esc(TM[o.k].n)}</b><small>${o.s} de ${o.n} veces quedó en la ley</small></div><div class="cr-b st">${OUT.map(([k, , c]) => { const n = todos.filter(x => x.t === o.k && x.r === k).length; return n ? `<i class="sv" style="width:${100 * n / MXS}%;background:${c}"></i>` : ''; }).join('')}<span class="sv-n">${Math.round(100 * o.s / o.n)} %</span></div></div>`).join('');
+  $('#ref').innerHTML = R.map(r => { const mx = Math.max(...R.map(x => x.recaudo_p || 0)); return `<details class="rf"><summary><div class="cr"><div class="cr-n"><b>${esc(r.nombre)}</b><small>${r.gobierno} · ${r.anio} · ${r.paso ? 'ley' : 'no fue ley'}</small></div><div class="rf-b"><span>${r.art_p ?? '—'} → <b>${r.art_l ?? (r.paso ? '—' : '0')}</b> artículos</span><span>${r.recaudo_p != null ? `$${coma(r.recaudo_p)} → <b>${r.recaudo_a != null ? '$' + coma(r.recaudo_a) : (r.paso ? '—' : '$0')}</b> billones` : 'sin meta de recaudo'}</span><span class="rf-q">${r.temas.filter(vive).length} de ${r.temas.length} temas quedaron</span></div></div></summary><table class="tb"><tr><th>Tema</th><th>Propuso</th><th>Qué pasó</th></tr>${r.temas.map(t => `<tr><td><b>${esc(TM[t.t]?.n || t.t)}</b></td><td>${esc(t.p)}</td><td><span class="res" style="color:${OC[t.r][2]}">${OC[t.r][1]}</span>${t.q ? `<small>${esc(t.q)}</small>` : ''}${(t.f || []).length ? `<small>${t.f.slice(0, 2).map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">fuente ${i + 1}</a>`).join(' · ')}</small>` : ''}</td></tr>`).join('')}</table>${r.recaudo_nota ? `<p class="nota-f">${esc(r.recaudo_nota)}</p>` : ''}</details>`; }).join('');
+  const rs = RES.map(k => { const v = todos.filter(x => x.t === k); return { k, n: v.length, s: v.filter(vive).length, rf: v.map(x => `${nom(x.rf)}: ${OC[x.r][1].toLowerCase()}`) }; });
+  $('#rs-sub').innerHTML = `De los ${RES.length} temas tributarios que trae la Ley de Rescate, ${(k => k === 1 ? '1 no aparece' : k + ' no aparecen')(rs.filter(o => !o.n).length)} en ninguna de las ${R.length} anteriores. La historia no predice el voto: dice qué ha sido más fácil y más difícil de pasar.`;
+  $('#rs').innerHTML = rs.sort((a, b) => (a.n ? a.s / a.n : 2) - (b.n ? b.s / b.n : 2)).map(o => `<div class="cr" data-tip="${esc(o.rf.join('<br>') || 'Sin antecedentes en las tributarias desde 2016')}"><div class="cr-n"><b>${esc(TM[o.k]?.n || o.k)}</b><small>${o.n ? `Propuesto ${o.n} ${o.n === 1 ? 'vez' : 'veces'} antes` : 'Nuevo: sin antecedentes'}</small></div><div class="cr-b">${o.n ? `<i style="width:${100 * o.s / o.n}%;background:#3d6eb8"></i><span style="left:${100 * o.s / o.n}%">${o.s} de ${o.n}</span>` : '<span style="left:0">—</span>'}</div></div>`).join('');
+});
+  </script>
+</body>
+</html>
