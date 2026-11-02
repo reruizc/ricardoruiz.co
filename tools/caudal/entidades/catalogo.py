@@ -135,7 +135,11 @@ CATALOGO = [
     dict(k='uiaf', nombre='Unidad de Información y Análisis Financiero (UIAF)', alias=['uiaf', 'informacion y analisis financiero'],
          estado='parcial', cubre=['Obligaciones de reporte ALA/CFT', DO], falta=['Revisión pendiente de lo demás que publica'], nota=''),
     dict(k='banrep', nombre='Banco de la República', alias=['banco de la republica', 'banrep'],
-         estado='parcial', cubre=['Junta Directiva y régimen cambiario'], falta=['Revisión pendiente de lo demás que publica'], nota=''),
+         estado='parcial', cubre=['Junta Directiva y régimen cambiario (hasta el 6 de agosto de 2026)'],
+         falta=['Normatividad y compendio cambiario al día: su sitio bloquea la lectura automática',
+                'Conceptos cambiarios de la Secretaría de la Junta'],
+         nota='Caudal no rodea el control de acceso del sitio del Banco: lo cosechado hasta agosto sigue disponible, '
+              'pero no se actualiza.'),
     dict(k='superintendencias', nombre='Superintendencias (en general)', alias=['superintendencias'],
          estado='parcial', cubre=['Sanciones y normas de las superintendencias en el pilar Regulatorio'],
          falta=['Cada superintendencia tiene su propia cobertura: agrégalas una por una'], nota=''),

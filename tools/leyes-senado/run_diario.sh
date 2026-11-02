@@ -523,9 +523,13 @@ etapa() {
   # una petición suelta cada tanto. Cuando eso pasa el harvester conserva la copia
   # en disco —los compendios cambiarios cambian cada años, no a diario— y sale
   # con 75. Si la copia pasa de 7 días sale con 1 y entonces sí es falla.
-  etapa --nombre banrep_fetch --timeout 600 --rc-aviso 75 \
-        --desc "BanRep · Junta Directiva y régimen cambiario (incremental)" \
-        -- python3 tools/caudal/supers/harvest_banrep.py fetch
+  # ⚠️ APAGADO el 2-nov-2026 por decisión de Ricardo: para pasar el antibots del sitio
+  # (Radware) reusaba las cookies de su página de captcha, y Caudal no rodea controles
+  # de acceso. Lo ya cosechado (3.666 actos, el último del 6-ago-2026) sigue en el
+  # consolidado tal cual, sin actualizarse. Volver a encenderlo exige otra vía: acceso
+  # que dé el Banco o una fuente abierta. Lo vivo del Banco entra por su RSS público,
+  # en la línea de entidades.
+  etapa --nombre banrep_fetch --omitida "apagado el 2-nov-2026: esquivaba el antibots del sitio"
 
   etapa --nombre dian_fetch --timeout 900 \
         --desc "DIAN · resoluciones y circulares (incremental)" \
