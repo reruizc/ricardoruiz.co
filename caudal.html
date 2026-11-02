@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
 <link href="caudal-base.css?v=20261009b" rel="stylesheet" />
-<link rel="stylesheet" href="caudal-ui.css?v=20261009e" />
+<link rel="stylesheet" href="caudal-ui.css?v=20261102" />
 <link rel="stylesheet" href="caudal-intro.css?v=20261009b" />
 <script>
   /* Contratación dejó de ser una vista de acá (sep-2026) y tiene página propia.
@@ -81,7 +81,7 @@
         </div>
         <span class="rc-go">Abrir →</span>
       </a>
-      <div class="sources-heading"><div><span class="home-eyebrow">Conoce nuestro alcance</span><h2>Diez categorías. Cientos de fuentes.</h2></div><p>9 activas · 1 en preparación</p></div>
+      <div class="sources-heading"><div><span class="home-eyebrow">Conoce nuestro alcance</span><h2>Diez categorías. Cientos de fuentes.</h2></div><p id="sources-cov">10 activas · 36 entidades del Estado leídas en su fuente</p></div>
       <div class="pillars" id="pillars"></div>
     </div>
 
@@ -397,6 +397,7 @@
      necesita `conCard` y `CON`: el pilar vive en caudal-contratacion.html.
      ⚠️ Al tocar cualquiera hay que bumpear su ?v= en las DOS páginas. -->
 <script src="caudal-pilares.js?v=20261102"></script>
+<script src="caudal-cifras.js?v=20261102"></script>
 <script src="caudal-contratacion.js?v=20260907"></script>
 <script src="caudal-cliente.js?v=20261102"></script>
 <script src="caudal-votos.js?v=20260907"></script>
@@ -609,17 +610,25 @@
   // Mapa de fuentes de Cauce como pilares navegables. Los 3 vivos van primero
   // (Congreso · Regulatorio · Medios); el resto se enciende por etapas.
   const PILLARS=[
-    {id:'congreso',    name:'Congreso y órgano legislativo',    status:'live', n:'14.964', unit:'registros · 1990–2026', desc:'Proyectos de ley, actos legislativos y leyes. Cuántas veces se intentó, por qué se cae, quién lo empuja.'},
-    {id:'regulatorio', name:'Superintendencias y comisiones',   status:'live', n:'63.004', unit:'actos · 10 fuentes', desc:'Actos de la ANLA, INVIMA, SECOP, Superfinanciera, Supersalud, Supertransporte, SIC, Contraloría y más — 7.229 de ellos sanciones. Cada uno cita su resolución o comunicado.'},
+    {id:'congreso',    name:'Congreso y órgano legislativo',    status:'live', n:'15.450', unit:'registros · 1991–2026', desc:'Proyectos de ley, actos legislativos y leyes. Cuántas veces se intentó, por qué se cae, quién lo empuja.'},
+    {id:'regulatorio', name:'Superintendencias y comisiones',   status:'live', n:'81.735', unit:'actos · 17 fuentes', desc:'Actos de la ANLA, INVIMA, SECOP, Superfinanciera, Supersalud, Supertransporte, SIC, Contraloría y más — 7.333 de ellos sanciones. Cada uno cita su resolución o comunicado.'},
     {id:'medios',      name:'Medios nacionales y regionales',   status:'live', n:'en vivo', unit:'prensa por tema',      desc:'A qué ritmo crece la cobertura de un tema, quién la sostiene y en qué departamentos no se cubre — contrastado con lo que el Estado está tramitando en ese mismo momento.'},
-    {id:'datos',       name:'Datos abiertos y contratación',    status:'live', n:'5,87 M', unit:'contratos · SECOP II', desc:'Todos los contratos electrónicos del Estado, consultados en vivo y actualizados a diario. Cada uno enlaza su proceso en SECOP.'},
+    {id:'datos',       name:'Datos abiertos y contratación',    status:'live', n:'5,68 M', unit:'contratos · SECOP II', desc:'Todos los contratos electrónicos del Estado, consultados en vivo y actualizados a diario. Cada uno enlaza su proceso en SECOP.'},
     {id:'control',     name:'Órganos de control y altas cortes',status:'live', n:'10.861', unit:'providencias · Corte Constitucional', desc:'Sentencias y autos que cambian la interpretación de la norma, cosechados por 51 consultas temáticas desde 2021 — el alcance va declarado en la vista. Consejo de Estado y Corte Suprema entran en el siguiente corte.'},
-    {id:'ejecutivo',   name:'Ejecutivo nacional · Presidencia',   status:'live', n:'10.193', unit:'decretos · desde 2015', desc:'Decretos, resoluciones, directivas, circulares y agenda regulatoria de la Presidencia. Cada norma enlaza su texto oficial.'},
-    {id:'sucop',       name:'Consulta pública de normas · SUCOP',status:'live', n:'3.899', unit:'borradores · desde 2020', desc:'Proyectos de decreto y resolución abiertos a comentarios ANTES de expedirse. La señal más temprana de Caudal: acá la norma todavía se puede pelear.'},
+    {id:'ejecutivo',   name:'Ejecutivo nacional · Presidencia y ministerios',   status:'live', n:'12.124', unit:'normas de Presidencia · desde 2016', desc:'Decretos, resoluciones, directivas, circulares y agenda regulatoria de la Presidencia. Cada norma enlaza su texto oficial.'},
+    {id:'sucop',       name:'Consulta pública de normas · SUCOP',status:'live', n:'4.505', unit:'borradores · desde 2020', desc:'Proyectos de decreto y resolución abiertos a comentarios ANTES de expedirse. La señal más temprana de Caudal: acá la norma todavía se puede pelear.'},
     {id:'gacetas',     name:'Diarios y gacetas oficiales',      status:'live', n:'32.585', unit:'gacetas · desde 2000', desc:'La Gaceta del Congreso (exposición de motivos, ponencias, textos de plenaria y conciliaciones) y el Diario Oficial: las resoluciones, circulares y acuerdos de cada entidad, leídos a diario.'},
-    {id:'territorial', name:'Entidades territoriales',          status:'live', n:'4', unit:'entidades · Antioquia primero', desc:'La Asamblea de Antioquia y el Concejo de Medellín: proyectos con su estado, ordenanzas y acuerdos, control político y las sesiones programadas. Gobernaciones y otros concejos entran después.'},
+    {id:'territorial', name:'Entidades territoriales',          status:'live', n:'7.888', unit:'registros · Antioquia y Medellín', desc:'La Asamblea de Antioquia y el Concejo de Medellín: proyectos con su estado, ordenanzas y acuerdos, control político y las sesiones programadas. Gobernaciones y otros concejos entran después.'},
     {id:'redes',       name:'Redes sociales oficiales y voceros',status:'live', n:'94', unit:'entidades y gremios', desc:'Diccionario de cuentas oficiales del Estado, reguladores, cortes, Congreso y gremios, con el cargo que habla por cada uno. Leídas del sitio oficial de cada entidad.'},
   ];
+  /* Cifras, textos y fuentes medidos: caudal-cifras.js (tools/caudal/build_cifras_portada.py).
+     Si no carga, queda el respaldo de arriba. */
+  const CF=window.CAUDAL_CIFRAS||null;
+  if(CF){
+    PILLARS.forEach(p=>{ const m=CF.pilares&&CF.pilares[p.id]; if(m) Object.assign(p,{n:m.n,unit:m.unit,fuentes:m.fuentes}); });
+    const cov=document.getElementById('sources-cov');
+    if(cov&&CF.hero) cov.textContent=`10 activas · ${CF.hero.entidades} entidades del Estado leídas en su fuente`;
+  }
   const PSTAT={live:['s-live','Activo'], data:['s-data','Datos listos'], wired:['s-data','Conectado · corte mensual'], building:['s-data','En construcción'], soon:['s-soon','Próximamente']};
   function renderPillars(){
     const el=document.getElementById('pillars'); if(!el) return;
@@ -641,6 +650,8 @@
           <div class="pc-name">${esc(p.name)}</div>
           ${meta}
           <div class="pc-desc">${esc(p.desc)}</div>
+          ${(()=>{ const nom=(p.fuentes||[]).filter(x=>x.e!=='sin_fuente').map(x=>x.n), vis=nom.slice(0,4);
+            return nom.length?`<span class="pc-src"><b>Fuentes</b>${esc(vis.join(' · '))}${nom.length>vis.length?' · +'+(nom.length-vis.length):''}</span>`:''; })()}
           ${tag==='a'?`<span class="pc-open">${p.status==='building'?'Ver el avance':'Explorar fuente'} <span aria-hidden="true">↗</span></span>`:''}
         </div>
       </${tag}>`;
@@ -784,7 +795,8 @@
      y leer): cambia el mensaje, no el reloj. setInterval y no rAF: en una
      pestaña de fondo rAF se congela y el dato se queda pegado. */
   const UNI_FACTS=[
-    'Caudal cruza 14.964 registros del Congreso desde 1990, 63.004 actos de reguladores, 10.193 decretos de Presidencia y 5,87 millones de contratos del Estado.',
+    (CF&&CF.pilares)?`Caudal cruza ${CF.pilares.congreso.n} registros del Congreso desde 1991, ${CF.pilares.regulatorio.n} actos de reguladores, ${CF.pilares.ejecutivo.n} normas de Presidencia y ${CF.pilares.datos.n.replace(' M',' millones de')} contratos del Estado.`
+      :'Caudal cruza 15.450 registros del Congreso desde 1991, 81.735 actos de reguladores, 12.124 normas de Presidencia y 5,68 millones de contratos del Estado.',
     'El 63,5 % de los proyectos de ley muere antes del primer debate. El cementerio es el orden del día, no la votación.',
     'Solo el 18,4 % de los proyectos de ley termina convertido en ley.',
     'En la plenaria del Senado, el primer proyecto del orden del día se trata el 70 % de las veces; el sexto, una de cada cinco.',

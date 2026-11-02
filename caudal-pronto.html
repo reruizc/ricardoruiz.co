@@ -13,7 +13,7 @@
   <link rel="preload" as="image" href="caudalxcauce/img/mapa-rio-azul.webp" />
   <link rel="stylesheet" href="caudal-public.css?v=20260905-2" />
 
-<link rel="stylesheet" href="caudal-ui.css?v=20261009e" />
+<link rel="stylesheet" href="caudal-ui.css?v=20261102" />
 <style>
   .cta.pronto{opacity:.55;cursor:not-allowed;pointer-events:none;filter:grayscale(.4)}
   .cta.pronto b{color:var(--amber,#c4a06a);font-weight:700;text-transform:uppercase;letter-spacing:.08em}
@@ -119,10 +119,10 @@
         </div>
 
         <div class="stats">
-          <div class="stat"><div class="n">14.964</div><div class="l">registros del Congreso · 1990–2026</div></div>
-          <div class="stat"><div class="n">63.004</div><div class="l">actos regulatorios · 10 fuentes</div></div>
+          <div class="stat"><div class="n" id="st-cong">15.450</div><div class="l" id="st-cong-l">registros del Congreso · 1991–2026</div></div>
+          <div class="stat"><div class="n" id="st-actos">81.735</div><div class="l" id="st-actos-l">actos regulatorios · 17 fuentes</div></div>
           <div class="stat"><div class="n">en vivo</div><div class="l">prensa nacional y regional</div></div>
-          <div class="stat"><div class="n">9<small>/10</small></div><div class="l">categorías activas · el resto por etapas</div></div>
+          <div class="stat"><div class="n" id="st-ent">36</div><div class="l" id="st-ent-l">entidades del Estado leídas en su fuente · 10 en parte</div></div>
         </div>
       </div>
     </section>
@@ -229,6 +229,7 @@
         <p id="categoryCopy"></p>
         <p class="category-metric" id="categoryMetric" hidden></p>
         <p class="category-note" id="categoryNote"></p>
+        <div class="category-sources" id="categorySources" hidden></div>
         <form method="dialog"><button type="submit" class="cta primary">← Volver</button></form>
       </div>
     </dialog>
@@ -292,6 +293,7 @@
 
   </div>
 
+  <script src="caudal-cifras.js?v=20261102"></script>
   <script>
     // ─── SEXTANTE · puntos que palpitán por dirección ────────────────────────
     (function(){
@@ -655,18 +657,34 @@
 
     // ─── PILARES (espejo de caudal.html) ──────────────────────────────────────
     const PILLARS=[
-      {id:'congreso', name:'Congreso y órgano legislativo', status:'live', n:'14.964', unit:'registros · 1990–2026', desc:'Proyectos de ley, actos legislativos y leyes. Cuántas veces se intentó, por qué se cae, quién lo empuja.', view:'congreso'},
-      {id:'regulatorio', name:'Superintendencias y comisiones', status:'live', n:'63.004', unit:'actos · 10 fuentes', desc:'Actos de ANLA, INVIMA, SECOP, Superfinanciera, Supersalud, SIC, Contraloría y más —incluye 7.229 sanciones.', view:'regulatorio'},
+      {id:'congreso', name:'Congreso y órgano legislativo', status:'live', n:'15.450', unit:'registros · 1991–2026', desc:'Proyectos de ley, actos legislativos y leyes. Cuántas veces se intentó, por qué se cae, quién lo empuja.', view:'congreso'},
+      {id:'regulatorio', name:'Superintendencias y comisiones', status:'live', n:'81.735', unit:'actos · 17 fuentes', desc:'Actos de ANLA, INVIMA, SECOP, Superfinanciera, Supersalud, SIC, Contraloría y más —incluye 7.333 sanciones.', view:'regulatorio'},
       {id:'medios', name:'Medios nacionales y regionales', status:'live', n:'+1.800', unit:'medios rastreables · en vivo', desc:'No es un listado de titulares: mide a qué ritmo crece la cobertura de un tema, quién la sostiene, en qué departamentos no se cubre — y lo contrasta con lo que el Estado está tramitando en ese mismo momento. Cualquier medio indexado en Google News Colombia (más de 1.800 observados hasta hoy), sin un conector por medio.', href:'caudal-medios.html'},
-      {id:'datos', name:'Datos abiertos y contratación', status:'live', n:'6,03 M', unit:'contratos · SECOP II', desc:'Todos los contratos electrónicos del Estado y los procesos que los preceden, consultados en vivo y actualizados a diario. Cada uno enlaza su expediente en SECOP.', href:'caudal-contratacion.html'},
-      {id:'control', name:'Órganos de control y altas cortes', status:'live', n:'499', unit:'providencias · Corte Constitucional', desc:'Sentencias y autos de la Corte Constitucional que cambian la lectura de la norma en contratación, salud, pensiones, ambiente y elecciones, con su enlace oficial. Consejo de Estado y Corte Suprema entran en el siguiente corte.', view:'control'},
-      {id:'ejecutivo', name:'Ejecutivo nacional · Presidencia', status:'live', n:'10.193', unit:'decretos · desde 2015', desc:'Decretos, resoluciones, directivas, circulares y agenda regulatoria de la Presidencia. Cada norma enlaza su texto oficial.', view:'ejecutivo'},
-      {id:'sucop', name:'Consulta pública de normas · SUCOP', status:'live', n:'3.899', unit:'borradores · desde 2020', desc:'Proyectos de decreto y resolución abiertos a comentarios antes de expedirse: la señal más temprana de Caudal.', view:'sucop'},
-      {id:'gacetas', name:'Diarios y gacetas oficiales', status:'live', n:'32.585', unit:'gacetas del Congreso · desde 2000', desc:'La Gaceta del Congreso enumerada y cruzada con el trámite: qué proyecto cita cada una, como qué documento, y cuáles ya se pueden leer en Caudal. El Diario Oficial entra en el siguiente corte.', view:'gacetas'},
-      {id:'territorial', name:'Entidades territoriales', status:'live', desc:'La Asamblea de Antioquia y el Concejo de Medellín: proyectos con su estado, ordenanzas y acuerdos, control político y sesiones programadas. Gobernaciones y otros concejos entran después.'},
+      {id:'datos', name:'Datos abiertos y contratación', status:'live', n:'5,68 M', unit:'contratos · SECOP II', desc:'Todos los contratos electrónicos del Estado y los procesos que los preceden, consultados en vivo y actualizados a diario. Cada uno enlaza su expediente en SECOP.', href:'caudal-contratacion.html'},
+      {id:'control', name:'Órganos de control y altas cortes', status:'live', n:'10.861', unit:'providencias · Corte Constitucional desde 2021', desc:'Sentencias y autos de la Corte Constitucional que cambian la lectura de la norma en contratación, salud, pensiones, ambiente y elecciones, con su enlace oficial. Consejo de Estado y Corte Suprema entran en el siguiente corte.', view:'control'},
+      {id:'ejecutivo', name:'Ejecutivo nacional · Presidencia y ministerios', status:'live', n:'12.124', unit:'normas de Presidencia · desde 2016', desc:'Decretos, resoluciones, directivas, circulares y agenda regulatoria de la Presidencia. Cada norma enlaza su texto oficial.', view:'ejecutivo'},
+      {id:'sucop', name:'Consulta pública de normas · SUCOP', status:'live', n:'4.505', unit:'borradores · desde 2020', desc:'Proyectos de decreto y resolución abiertos a comentarios antes de expedirse: la señal más temprana de Caudal.', view:'sucop'},
+      {id:'gacetas', name:'Diarios y gacetas oficiales', status:'live', n:'32.585', unit:'gacetas del Congreso · desde 2000', desc:'La Gaceta del Congreso enumerada y cruzada con el trámite: qué proyecto cita cada una, como qué documento, y cuáles ya se pueden leer en Caudal. El Diario Oficial completo y las gacetas de Antioquia y Medellín.', view:'gacetas'},
+      {id:'territorial', name:'Entidades territoriales', status:'live', n:'7.888', unit:'registros · Antioquia y Medellín', desc:'La Asamblea de Antioquia y el Concejo de Medellín: proyectos con su estado, ordenanzas y acuerdos, control político y sesiones programadas. Gobernaciones y otros concejos entran después.'},
       {id:'redes', name:'Redes sociales oficiales y voceros', status:'live', n:'94', unit:'entidades y gremios · cuentas verificadas', desc:'Diccionario de cuentas oficiales del Estado, reguladores, cortes, Congreso y gremios, con el cargo que habla por cada uno. Las cuentas se leen del sitio oficial, no de memoria.', href:'caudal-voceros.html'}
     ];
     const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    /* ─── Cifras y fuentes medidas ─────────────────────────────────────────────
+       caudal-cifras.js lo escribe tools/caudal/build_cifras_portada.py desde la
+       API y el catálogo de entidades. Si no carga, queda el respaldo de arriba. */
+    const CF=window.CAUDAL_CIFRAS||null;
+    if(CF){
+      PILLARS.forEach(p=>{ const m=CF.pilares&&CF.pilares[p.id]; if(m) Object.assign(p,{n:m.n,unit:m.unit,desc:m.desc,fuentes:m.fuentes}); });
+      const pon=(id,v)=>{ const el=document.getElementById(id); if(el&&v!=null) el.textContent=v; };
+      const h=CF.hero||{};
+      pon('st-cong',h.congreso); pon('st-cong-l',h.congreso_l);
+      pon('st-actos',h.actos); pon('st-actos-l',h.actos_l);
+      pon('st-ent',h.entidades); pon('st-ent-l',h.entidades_l);
+    }
+    const EST_TXT={conectada:'Conectada',parcial:'En parte',sin_fuente:'Por conectar'};
+    const srcCorto=p=>{ const f=p.fuentes||[]; if(!f.length) return '';
+      const nom=f.filter(x=>x.e!=='sin_fuente').map(x=>x.n), vis=nom.slice(0,4);
+      return `<span class="pc-src"><b>Fuentes</b>${esc(vis.join(' · '))}${nom.length>vis.length?' · +'+(nom.length-vis.length):''}</span>`; };
     (function renderPillars(){
       const el=document.getElementById('pillars');
       const dialog=document.getElementById('categoryDialog');
@@ -676,6 +694,7 @@
         <span class="pc-body">
           <span class="pc-top"><span class="pc-name">${esc(p.name)}</span><span class="pc-status ${p.status==='live'?'s-live':'s-soon'}">${p.status==='live'?'Activa':'En preparación'}</span></span>
           <span class="pc-desc">${esc(p.desc)}</span>
+          ${srcCorto(p)}
           <span class="pc-open">Conocer categoría <span aria-hidden="true">＋</span></span>
         </span>
       </button>`).join('');
@@ -684,10 +703,10 @@
         regulatorio:'Reúne decisiones de distintas autoridades para reconocer obligaciones, riesgos y criterios que pueden afectar a una organización o a su sector.',
         medios:'Ayuda a seguir la conversación sobre un tema y contrastarla con las fuentes oficiales: el desfase entre lo que la prensa cuenta y lo que el Estado tramita es la señal — ruido sin trámite y regulación en silencio son riesgos opuestos.',
         datos:'Sirve para buscar oportunidades para la empresa (licitaciones y procesos abiertos en su sector) y para vigilar los procesos y contratos que la afectan, con enlace al registro original en SECOP.',
-        control:'Ayuda a entender cómo las decisiones judiciales cambian la interpretación de las reglas. La cobertura actual se concentra en la Corte Constitucional.',
-        ejecutivo:'Permite seguir las decisiones normativas de Presidencia y consultar el texto oficial para entender su alcance.',
+        control:'Ayuda a entender cómo las decisiones judiciales cambian la interpretación de las reglas. La cobertura actual se concentra en la Corte Constitucional y en los fallos fiscales de la Contraloría.',
+        ejecutivo:'Permite seguir las decisiones normativas de Presidencia y de cada ministerio —con lo que anuncian en su agenda regulatoria 2027— y consultar el texto oficial para entender su alcance.',
         sucop:'Anticipa cambios regulatorios mientras el texto todavía es un borrador y existe una ventana para presentar comentarios.',
-        gacetas:'Acerca los documentos que sustentan el debate legislativo: exposición de motivos, ponencias, textos aprobados y conciliaciones.',
+        gacetas:'Acerca los documentos que sustentan el debate legislativo —exposición de motivos, ponencias, textos aprobados y conciliaciones— y lo que cada entidad del Estado expide en el Diario Oficial.',
         territorial:'La Asamblea de Antioquia y el Concejo de Medellín, leídos a diario: proyectos de ordenanza y de acuerdo con su estado y sus ponencias, ordenanzas y acuerdos expedidos, citaciones de control político y las sesiones ya programadas. Entra al mismo chasis que las demás categorías: búsqueda por tema, alerta por perfil y cruce con la Rosa de los Vientos.',
         redes:'Permite identificar qué cuenta oficial y qué vocero corresponde a cada entidad o gremio. La cobertura actual es un directorio verificado.'
       };
@@ -702,6 +721,9 @@
         const photo=document.getElementById('categoryImage');
         photo.src='imagenes/caudal-'+p.id+'.jpg';
         document.getElementById('categoryNote').textContent=contexto[p.id]||'';
+        const src=document.getElementById('categorySources'), f=p.fuentes||[];
+        src.hidden=!f.length;
+        src.innerHTML=f.length?`<h3>Fuentes que reúne · ${f.length}</h3><ul>${f.map(x=>`<li><span class="fs-n">${esc(x.n)}</span><span class="fs-e ${esc(x.e)}">${esc(EST_TXT[x.e]||x.e)}</span>${x.l?`<span class="fs-l">${esc(x.l)}</span>`:''}</li>`).join('')}</ul>${CF&&CF.corte_txt?`<p class="fs-corte">Cifras medidas el ${esc(CF.corte_txt)}.</p>`:''}`:'';
         dialog.showModal();
       });
     })();
