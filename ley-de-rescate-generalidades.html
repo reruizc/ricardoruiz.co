@@ -12,7 +12,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102f" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102g" />
   <script defer src="/track.js"></script>
 </head>
 <body>
@@ -25,11 +25,12 @@
       <section class="bloque"><div class="k">Qué es</div><div class="panel"><p class="objeto" id="objeto"></p><div class="titulos" id="titulos"></div></div></section>
       <section class="bloque"><div class="k">Cuánto busca</div><h2>El ajuste, año por año</h2><p class="sub" id="aj-sub"></p><div class="panel"><div class="aj" id="aj"></div><div class="ley" id="aj-ley"></div></div></section>
       <section class="bloque"><div class="k">Frente a las anteriores</div><h2>Las tributarias de los últimos diez años</h2><p class="sub">Las grandes reformas que llegaron al Congreso desde 2016, aprobadas o no. <a href="ley-de-rescate-reloj.html">Compare cuánto tardó cada una</a>.</p><div class="panel tabla-w"><table class="tb" id="tb"></table></div></section>
+      <section class="bloque"><div class="k">Cuánto buscaba cada una</div><h2>¿Cuánta plata quería recaudar cada reforma?</h2><p class="sub" id="bus-sub"></p><div class="panel"><div id="bus"></div><div class="ley"><span><i style="background:var(--apoya)"></i>Aprobada</span><span><i style="background:#8a9bb8"></i>Aprobada y tumbada por la Corte</span><span><i style="background:var(--rechaza)"></i>Hundida o retirada</span><span><i style="background:var(--teal)"></i>Ley de Rescate</span></div><p class="nota-f" id="bus-f"></p></div></section>
       <section class="bloque"><div class="k">Dato curioso</div><h2>Los nombres de las tributarias</h2><p class="sub">Solo dos de las ocho llevaron «reforma tributaria» en el nombre.</p><div class="nombres" id="nombres"></div><p class="aparte" id="curioso"></p></section>
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
-  <script src="ley-rescate-base.js?v=20261102f"></script>
+  <script src="ley-rescate-base.js?v=20261102g"></script>
   <script>
 LR.pagina('generalidades', E => {
   const { $, esc, num, corta, dias } = LR, P0 = E.proyecto, A = P0.ajuste, T = E.tributarias, coma = x => String(x).replace('.', ',');
@@ -42,7 +43,13 @@ LR.pagina('generalidades', E => {
     return `<div class="aj-c" style="height:${H}px"><div class="aj-t" style="bottom:${esc0 + up + 4}px">${coma(A.total[i])} %</div>${segs}<div class="aj-0" style="bottom:${esc0}px"></div><span class="aj-y">${y}</span></div>`; }).join('');
   $('#aj-ley').innerHTML = A.grupos.map((g, k) => `<span data-tip="${esc(g.d)}"><i style="background:${CG[k]}"></i>${g.n}</span>`).join('');
   const PAL = { aprobada: 'Aprobada', caida: 'Aprobada y tumbada por la Corte', hundida: 'Hundida', retirada: 'Retirada' };
-  $('#tb').innerHTML = '<tr><th>Nombre</th><th>Gobierno</th><th>Radicada</th><th>Desenlace</th><th class="n">Días</th><th class="n">Buscaba</th></tr>' + [...T].reverse().map(t => `<tr><td><b>${esc(t.nombre)}</b><small>${esc(t.ley)}</small></td><td>${t.gobierno}</td><td>${corta(t.rad)} ${t.rad.slice(0, 4)}</td><td><span class="res ${t.res}">${PAL[t.res]}</span>${t.nota ? `<small>${esc(t.nota)}</small>` : ''}</td><td class="n">${dias(t.rad, t.fin)}</td><td class="n">${t.busca ? '$' + coma(t.busca) + ' bill.' : '—'}</td></tr>`).join('') + `<tr class="hoy"><td><b>Ley de Rescate Económico</b><small>${P0.numero}</small></td><td>De la Espriella</td><td>29 oct 2026</td><td><span class="res hoy">En trámite</span></td><td class="n">${dias(P0.radicado, E.hoy)}</td><td class="n">${coma(A.total[0])} % PIB</td></tr>`;
+  $('#tb').innerHTML = '<tr><th>Nombre</th><th>Gobierno</th><th>Radicada</th><th>Desenlace</th><th class="n">Días</th><th class="n">Buscaba</th></tr>' + [...T].reverse().map(t => `<tr><td><b>${esc(t.nombre)}</b><small>${esc(t.ley)}</small></td><td>${t.gobierno}</td><td>${corta(t.rad)} ${t.rad.slice(0, 4)}</td><td><span class="res ${t.res}">${PAL[t.res]}</span>${t.nota ? `<small>${esc(t.nota)}</small>` : ''}</td><td class="n">${dias(t.rad, t.fin)}</td><td class="n">${t.busca ? (t.bu ? `<a href="${esc(t.bu)}" target="_blank" rel="noopener">$${coma(t.busca)} bill.</a>` : '$' + coma(t.busca) + ' bill.') : '—'}${t.bn ? `<small>${esc(t.bn)}</small>` : ''}</td></tr>`).join('') + `<tr class="hoy"><td><b>Ley de Rescate Económico</b><small>${P0.numero}</small></td><td>De la Espriella</td><td>29 oct 2026</td><td><span class="res hoy">En trámite</span></td><td class="n">${dias(P0.radicado, E.hoy)}</td><td class="n">${coma(A.total[0])} % PIB<small>$40-45 bill. según la prensa</small></td></tr>`;
+  const RES = 43, COLB = { aprobada: 'var(--apoya)', caida: '#8a9bb8', hundida: 'var(--rechaza)', retirada: 'var(--rechaza)' }, BM = 45;
+  const filaB = (nom, sub, v, col, et, tip) => `<div class="cr" data-tip="${esc(tip)}"><div class="cr-n"><b>${esc(nom)}</b><small>${sub}</small></div><div class="cr-b"><i style="width:${100 * v / BM}%;background:${col}"></i><span style="left:${100 * v / BM}%">${et}</span></div></div>`;
+  $('#bus').innerHTML = T.filter(t => t.busca).map(t => filaB(t.nombre, `${t.gobierno} · ${t.rad.slice(0, 4)}`, t.busca, COLB[t.res], `$${coma(t.busca)}`, `<b>${esc(t.nombre)}</b> · ${t.rad.slice(0, 4)}<br>Buscaba $${coma(t.busca)} billones${t.bn ? '<br>' + esc(t.bn) : ''}<br>${PAL[t.res]}`)).join('') + `<div class="cr" data-tip="${esc('<b>Ley de Rescate Económico</b><br>' + coma(A.total[0]) + ' % del PIB en 2027 según el proyecto<br>La prensa lo traduce a $40-45 billones; Valora Analitik, $43 billones')}"><div class="cr-n"><b>Ley de Rescate Económico</b><small>De la Espriella · 2026</small></div><div class="cr-b"><i style="width:${100 * 40 / BM}%;background:var(--teal)"></i><i class="falta" style="left:${100 * 40 / BM}%;width:${100 * 5 / BM}%"></i><span style="left:100%">$40-45</span></div></div>`;
+  const prev = T.filter(t => t.busca), top = prev.reduce((a, t) => t.busca > a.busca ? t : a);
+  $('#bus-sub').innerHTML = `En billones de pesos, lo que anunció el Gobierno al presentar cada una, casi siempre para el primer año. La más ambiciosa hasta ahora fue la <b>${esc(top.nombre)} de ${top.rad.slice(0, 4)}</b>, con $${coma(top.busca)} billones. La Ley de Rescate busca, según la prensa, <b>entre $40 y $45 billones</b> en 2027: más que cualquiera de las anteriores.`;
+  $('#bus-f').innerHTML = `Pesos de cada año, sin ajustar por inflación: una cifra de 2016 vale más que la misma de 2026. Toque el monto en la tabla para ver la fuente. La de 2019 es la que dio el ministro al aprobarse; esa ley repetía la que tumbó la Corte.`;
   const pal = { 'Reforma tributaria estructural': 'Estructural', 'Ley de Financiamiento': 'Financiamiento', 'Ley de Crecimiento Económico': 'Crecimiento', 'Ley de Solidaridad Sostenible': 'Solidaridad', 'Ley de Inversión Social': 'Inversión', 'Reforma tributaria para la igualdad y la justicia social': 'Igualdad y justicia', };
   $('#nombres').innerHTML = [...T.map(t => [pal[t.nombre] || t.nombre, t.nombre, t.rad.slice(0, 4), t.res]), ['Rescate', 'Ley de Rescate Económico', '2026', 'hoy']].map(([w, n, y, r]) => `<div class="nom ${r}"><b>${w}</b><span>${esc(n)}</span><small>${y}</small></div>`).join('');
   const fin = T.filter(t => t.nombre === 'Ley de Financiamiento');
