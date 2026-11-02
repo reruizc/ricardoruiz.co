@@ -14,19 +14,17 @@ rastreo.py          trámite + prensa + clasificación + cálculo → estado.jso
 ```
 
 Datos en `Bases de datos/ley-rescate/` (gitignored): `corpus.json` y `clasif.json` son privados porque guardan
-comentarios de personas. Solo `estado.json` se publica, en
-`s3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/ley-rescate/estado.json` (gzip). En Actions el
-estado anterior vive en el prefijo privado `ricardoruiz.co/ley-rescate-privado/`. `?local=1` lee el JSON del disco.
+comentarios de personas. Solo `estado.json` se publica, copiado a `ley-rescate-data/estado.json` en el repo (lo sirve
+GitHub Pages; el workflow lo commitea a diario). En Actions el estado privado viaja como **artefacto**
+`ley-rescate-estado` de una corrida a la siguiente: las llaves de S3 del repositorio no pueden escribir en prefijos
+nuevos. `?local=1` lee el JSON del disco.
 
-## Encender
+## Operar
 
-1. Subir el estado inicial al prefijo privado:
-   `aws s3 cp "Bases de datos/ley-rescate/" s3://elecciones-2026/ricardoruiz.co/ley-rescate-privado/ --recursive --exclude "estado.json"`
-2. Publicar `estado.json`: `python3 tools/ley-rescate/rastreo.py --solo-calcular --subir`
-3. `git push origin HEAD:main`, y correr el workflow a mano una vez desde la pestaña Actions.
-
-La primera corrida dirá si `RR_S3_KEY_ID` puede escribir en esos prefijos y si los campos de los actores siguen vigentes.
-La capa de redes nunca se ha probado en vivo: se escribió con el código ya probado de la escucha, pero falta esa primera corrida.
+- Correr a mano: pestaña Actions → «Ley de Rescate · rastreo diario» → Run workflow (`tope_usd` sube el tope de Apify
+  solo esa vez; `sin_redes` no gasta).
+- Bajar el estado privado para mirarlo: `gh run download <id> -n ley-rescate-estado -D "Bases de datos/ley-rescate"`.
+- Apagar las redes sin apagar lo demás: variable `LR_REDES=off` en GitHub.
 
 ## Costo
 
@@ -35,8 +33,6 @@ La capa de redes nunca se ha probado en vivo: se escribió con el código ya pro
 | Prensa | gratis | no aplica |
 | Clasificación DeepSeek | centavos por corrida | no aplica |
 | Redes Apify | a medir en la primera corrida; estimado US$1 al día | `LR_TOPE_USD` 1,5 por corrida · `LR_TOPE_MES_USD` 45 |
-
-Para apagar las redes sin apagar lo demás: variable `LR_REDES=off` en GitHub.
 
 ## Reglas
 

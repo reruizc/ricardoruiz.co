@@ -1,10 +1,15 @@
 name: Ley de Rescate · rastreo diario
 
 # Corre a diario a las 06:15 de Bogotá (11:15 UTC). Lee la ficha oficial de la Cámara, los
-# órdenes del día, la prensa y las redes; clasifica con DeepSeek y publica el JSON que pinta
-# ley-de-rescate-avance.html. Doc: tools/ley-rescate/LEEME.md
+# órdenes del día, la prensa y las redes; clasifica con DeepSeek y deja estado.json en
+# ley-rescate-data/, que sirve GitHub Pages a ley-de-rescate-avance.html.
+# Doc: tools/ley-rescate/LEEME.md
 #
-# Secretos: APIFY_TOKEN · DEEPSEEK_API_KEY · RR_S3_KEY_ID · RR_S3_SECRET
+# El estado privado (corpus con comentarios de personas, clasificación) NO va al repo:
+# viaja como artefacto de una corrida a la siguiente (se guarda 90 días; cada corrida lo
+# renueva). Si se pierde, el rastreo arranca de cero y solo pierde el histórico.
+#
+# Secretos: APIFY_TOKEN · DEEPSEEK_API_KEY
 # Variables opcionales: LR_TOPE_USD (por corrida, 1.5) · LR_TOPE_MES_USD (45) · LR_REDES=off apaga Apify
 on:
   schedule:
@@ -15,9 +20,18 @@ on:
         description: 'Saltar Apify (no gasta)'
         type: boolean
         default: false
+      tope_usd:
+        description: 'Tope en dólares de esta corrida en Apify'
+        type: string
+        default: ''
+      dias:
+        description: 'Días de prensa hacia atrás'
+        type: string
+        default: '3'
 
 permissions:
-  contents: read
+  contents: write
+  actions: read
 
 concurrency:
   group: ley-rescate
@@ -25,41 +39,59 @@ concurrency:
 
 env:
   LR_DATOS: ${{ github.workspace }}/.lr
-  ESTADO_S3: s3://elecciones-2026/ricardoruiz.co/ley-rescate-privado
-  AWS_ACCESS_KEY_ID: ${{ secrets.RR_S3_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.RR_S3_SECRET }}
-  AWS_DEFAULT_REGION: us-east-1
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
   rastreo:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      # El corpus guarda comentarios de personas: vive en un prefijo PRIVADO, nunca en el repo.
-      - name: Traer el estado anterior
+      - name: Traer el estado de la corrida anterior
         run: |
           mkdir -p "$LR_DATOS"
-          aws s3 cp "$ESTADO_S3/" "$LR_DATOS/" --recursive --only-show-errors
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=ley-rescate-estado&per_page=20" \
+               --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | .id // empty')
+          if [ -z "$id" ]; then echo "Sin estado anterior: arranca de cero."; exit 0; fi
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > estado.zip
+          unzip -o -q estado.zip -d "$LR_DATOS" && rm estado.zip
+          ls -la "$LR_DATOS"
 
       - name: Leer redes
         if: ${{ !inputs.sin_redes && vars.LR_REDES != 'off' }}
         continue-on-error: true
         env:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-          LR_TOPE_USD: ${{ vars.LR_TOPE_USD }}
+          LR_TOPE_USD: ${{ inputs.tope_usd || vars.LR_TOPE_USD }}
           LR_TOPE_MES_USD: ${{ vars.LR_TOPE_MES_USD }}
         run: node tools/ley-rescate/redes.mjs
 
       - name: Rastrear, clasificar y publicar
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-        run: python3 tools/ley-rescate/rastreo.py --subir
+        run: python3 tools/ley-rescate/rastreo.py --publicar --dias "${{ inputs.dias || '3' }}"
 
-      - name: Guardar el estado
+      - name: Guardar el estado para la próxima corrida
         if: ${{ always() }}
-        run: aws s3 cp "$LR_DATOS/" "$ESTADO_S3/" --recursive --exclude "*.tmp" --exclude "*.gz" --only-show-errors
+        uses: actions/upload-artifact@v4
+        with:
+          name: ley-rescate-estado
+          path: |
+            .lr/*.json
+            !.lr/*.tmp
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Dejar estado.json en el repo
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ley-rescate-data/estado.json
+          if git diff --cached --quiet; then echo 'Sin cambios.'; exit 0; fi
+          git commit -m "ley de rescate: seguimiento $(date -u +%Y-%m-%d)"
+          git pull --rebase origin main
+          git push origin HEAD:main

@@ -6,7 +6,7 @@
   python3 tools/ley-rescate/rastreo.py --exportar p.json   # deja los textos sin clasificar y sale
   python3 tools/ley-rescate/rastreo.py --importar c.json   # mete una clasificación hecha aparte
   python3 tools/ley-rescate/rastreo.py --solo-calcular     # recalcula sin ir a la red
-  python3 tools/ley-rescate/rastreo.py --subir             # + publica estado.json en S3 (gzip)
+  python3 tools/ley-rescate/rastreo.py --publicar          # + copia estado.json a ley-rescate-data/ (lo sirve GitHub Pages)
 
 Las llaves SOLO se leen del entorno: DEEPSEEK_API_KEY. Sin ella no hay postura nueva: el tema se
 asigna por palabras y la postura queda vacía, porque el diccionario no sabe leer postura. La capa
@@ -16,12 +16,10 @@ Doc completa: tools/ley-rescate/LEEME.md
 """
 import argparse
 import datetime as dt
-import gzip
 import hashlib
 import json
 import os
 import re
-import subprocess
 import sys
 import urllib.parse
 import urllib.request
@@ -44,7 +42,7 @@ UA = hf.UA
 FICHA = 'https://www.camara.gov.co/ley-rescate-economico'
 ORDENES = ('https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/'
            'legislativo/ordenes-vigentes.json')
-S3_PUBLICO = 's3://elecciones-2026/ricardoruiz.co/congreso-2026/output/legislativo/ley-rescate/estado.json'
+PUBLICO = REPO / 'ley-rescate-data' / 'estado.json'
 MODELO = os.environ.get('DEEPSEEK_MODEL', 'deepseek-v4-flash')
 FUENTES = ['prensa', 'x', 'tiktok', 'instagram', 'facebook']
 POSTURAS = {'a': 'apoya', 'r': 'rechaza', 'm': 'mixta', 'i': 'informa'}
@@ -423,13 +421,11 @@ def lectura_llm(estado, llave):
     return j
 
 
-def subir(ruta):
-    tmp = Path(str(ruta) + '.gz')
-    tmp.write_bytes(gzip.compress(Path(ruta).read_bytes(), 9))
-    subprocess.run(['aws', 's3', 'cp', str(tmp), S3_PUBLICO, '--content-type', 'application/json', '--content-encoding', 'gzip',
-                    '--cache-control', 'public, max-age=300', '--only-show-errors'], check=True)
-    tmp.unlink()
-    print('Publicado en', S3_PUBLICO)
+def publicar(ruta):
+    """estado.json va al repo: lo sirve GitHub Pages y no tiene datos de personas (ver limpia_cita)."""
+    PUBLICO.parent.mkdir(parents=True, exist_ok=True)
+    PUBLICO.write_bytes(Path(ruta).read_bytes())
+    print('Publicado en', PUBLICO.relative_to(REPO))
 
 
 def main():
@@ -439,7 +435,7 @@ def main():
     a.add_argument('--importar')
     a.add_argument('--solo-calcular', action='store_true')
     a.add_argument('--sin-prensa', action='store_true')
-    a.add_argument('--subir', action='store_true')
+    a.add_argument('--publicar', action='store_true')
     o = a.parse_args()
     cod = leer(AQUI / 'temas.json', {})
     temas = cod['temas']
@@ -483,8 +479,8 @@ def main():
     ruta = DATOS / 'estado.json'
     escribir(ruta, estado)
     print(f"estado.json · {ruta.stat().st_size // 1024} KB · pertinentes {estado['clasificacion']['pertinentes']} de {len(corpus)}")
-    if o.subir:
-        subir(ruta)
+    if o.publicar:
+        publicar(ruta)
 
 
 if __name__ == '__main__':
