@@ -13,7 +13,13 @@ palabras («desde el 20 de octubre y hasta el 3 de noviembre de 2026»); en la
 segunda, los enlaces «Ver documento» y «Memoria justificativa» (.aspx que
 redirige al PDF). Se leen el año en curso y el anterior.
 
-Salida: `Bases de datos/caudal-entidades/raw/mincomercio/proyectos.json`,
+Calendario (tanda 3, nov-2026): `/calendario-de-eventos` es un `Calendar` de ASP.NET
+(Kentico). Cada mes es un postback con el ViewState del mes anterior y la cookie de la
+sesión, así que se recorren en cadena. Cada día de un evento de varios días repite el
+enlace; la fecha y el lugar salen de la ficha `/calendario-de-eventos/eventos/<ruta>`.
+⚠️ El «Fecha del evento» de la ficha es solo el inicio; el rango va en la línea «Fecha:».
+
+Salida: `Bases de datos/caudal-entidades/raw/mincomercio/{proyectos,eventos}.json`,
 acumulado por id (si un proyecto desaparece de la página se conserva con
 `vigente_en_fuente: false`, igual que MinSalud).
 
@@ -24,13 +30,19 @@ import datetime
 import hashlib
 import html
 import re
+import subprocess
 import sys
+import tempfile
 
 import comun as C
 
 ENTIDAD = 'Ministerio de Comercio, Industria y Turismo'
 BASE = 'https://www.mincit.gov.co'
+CALENDARIO = f'{BASE}/calendario-de-eventos'
 OUT = C.RAW / 'mincomercio'
+MESES_ADELANTE = 6
+CAIDA = .5          # una corrida con menos de la mitad de la anterior no se publica
+MIN_EVENTOS = 6     # un calendario tan corto sube y baja solo: por debajo de esto no se juzga
 TIPOS = {'decreto': 'Proyecto de Decreto', 'resolucion': 'Proyecto de Resolución',
          'circular': 'Proyecto de Circular'}
 MESES = {'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6, 'julio': 7,
@@ -103,9 +115,99 @@ def filas(tipo, anio):
     return out
 
 
+def _pedir(jar, campos=None):
+    cmd = ['/usr/bin/curl', '-s', '-L', '--max-time', '60', '-A', C.UA, '-b', jar, '-c', jar]
+    for k, v in (campos or {}).items():
+        cmd += ['--data-urlencode', f'{k}={v}']
+    r = subprocess.run(cmd + [CALENDARIO], capture_output=True, timeout=80)
+    h = r.stdout.decode('utf-8', 'replace')
+    if r.returncode or 'EventCalendar' not in h:
+        raise RuntimeError(f'el calendario no respondió (rc={r.returncode})')
+    return h
+
+
+def _siguiente(h):
+    """Los campos del postback que lleva al mes siguiente."""
+    m = re.search(r"__doPostBack\('([^']+)','(V\d+)'\)\\?\"[^>]*title=\"Go to the next month", h)
+    if not m:
+        raise RuntimeError('el calendario no trae el enlace al mes siguiente')
+    campos = {'__EVENTTARGET': m.group(1), '__EVENTARGUMENT': m.group(2)}
+    for k in ('__CMSCsrfToken', '__VIEWSTATE', '__VIEWSTATEGENERATOR'):
+        v = re.search(rf'name="{k}"[^>]*value="([^"]*)"', h)
+        campos[k] = html.unescape(v.group(1)) if v else ''
+    return campos
+
+
+def _rutas():
+    """Las fichas que enlaza el calendario, del mes en curso a MESES_ADELANTE."""
+    rutas = {}
+    with tempfile.TemporaryDirectory() as d:
+        jar = f'{d}/cookies.txt'
+        h = _pedir(jar)
+        for i in range(MESES_ADELANTE + 1):
+            rutas.update(dict.fromkeys(re.findall(r'href="(/calendario-de-eventos/eventos/[^"]+)"', h)))
+            if i < MESES_ADELANTE:
+                h = _pedir(jar, _siguiente(h))
+    return list(rutas)
+
+
+def _ficha(ruta):
+    h = re.sub(r'<(script|style|svg)[^>]*>.*?</\1>', '', C.curl(BASE + ruta, timeout=60), flags=re.S)
+    t = C.limpio(html.unescape(h))
+    m = re.search(r'Evento Mincomercio\s+(.+?)\s+Fecha del evento:\s*(\d{2})/(\d{2})/(\d{4})\s*(?:\(Evento finalizado\))?\s*(.*?)\s*'
+                  r'(?:Aliados estrat[eé]gicos|$)', t, re.S)
+    if not m:
+        raise RuntimeError(f'ficha sin fecha: {ruta}')
+    cuerpo = m.group(5)
+    dia = f'{m.group(4)}-{m.group(3)}-{m.group(2)}'
+    g = lambda k, f: (re.search(rf'\b{k}:\s*(.+?)(?:\s+(?:{f}):|\s+Inscr[ií]base|\s+Ingresar al evento|$)', cuerpo) or [None, ''])[1].strip()
+    fecha = g('Fecha', 'Hora|Lugar')
+    hora = g('Hora', 'Fecha|Lugar')
+    lugar = g('Lugar', 'Fecha|Hora')
+    fin = C.ventana(fecha)[1]
+    desc = re.split(r'\s+Fecha:', cuerpo)[0]
+    return {'id': hashlib.sha1(ruta.encode()).hexdigest()[:16], 'titulo': m.group(1)[:300], 'fecha_inicio': dia,
+            'fecha_fin': fin if fin > dia else '', 'dia': dia,
+            'lugar': ' · '.join(x for x in (lugar, f'Horario {hora}' if hora else '') if x),
+            'descripcion': desc[:800], 'categorias': [], 'url': BASE + ruta}
+
+
+def eventos():
+    p = C.leer(OUT / 'eventos.json', {}) or {}
+    rutas = _rutas()
+    antes = p.get('leidos') or 0
+    if antes >= MIN_EVENTOS and len(rutas) < antes * CAIDA:
+        raise RuntimeError(f'guarda: {len(rutas)} eventos contra {antes} de la corrida anterior')
+    hoy = datetime.date.today().isoformat()
+    previos = {e['url']: e for e in p.get('items', [])}
+    out = dict(previos)
+    for r in rutas:
+        ya = previos.get(BASE + r)
+        if ya and ya['dia'] < hoy:          # lo que ya pasó no cambia: no se vuelve a pedir
+            continue
+        out[BASE + r] = _ficha(r)
+    xs = sorted(out.values(), key=lambda e: e['dia'])
+    C.escribir(OUT / 'eventos.json', {'generado': datetime.datetime.now().isoformat(timespec='seconds'),
+                                      'entidad': ENTIDAD, 'leidos': len(rutas), 'items': xs})
+    return len(rutas), xs
+
+
 def fetch():
     OUT.mkdir(parents=True, exist_ok=True)
-    prev = (C.leer(OUT / 'proyectos.json', {}) or {}).get('items', {})
+    ok = True
+    try:
+        n, ev = eventos()
+        por_venir = sum(1 for e in ev if e['dia'] >= datetime.date.today().isoformat())
+        print(f'  mincomercio · calendario: {n} eventos en {MESES_ADELANTE + 1} meses · {por_venir} por venir · {len(ev)} acumulados')
+    except Exception as e:
+        ok = False
+        print(f'  mincomercio · calendario FALLÓ ({e}) — queda el archivo anterior', file=sys.stderr)
+    return proyectos() and ok
+
+
+def proyectos():
+    anterior = C.leer(OUT / 'proyectos.json', {}) or {}
+    prev = anterior.get('items', {})
     hoy = datetime.date.today()
     vivos, fallos = {}, []
     for anio in (hoy.year - 1, hoy.year):
@@ -119,13 +221,17 @@ def fetch():
     if not vivos:
         print('  ninguna página respondió: se conserva el archivo anterior', file=sys.stderr)
         return False
+    if len(vivos) < (anterior.get('leidos') or 0) * CAIDA:
+        print(f"  guarda: {len(vivos)} proyectos contra {anterior['leidos']} de la corrida anterior: "
+              'se conserva el archivo anterior', file=sys.stderr)
+        return False
     items = dict(prev)
     for k, v in items.items():
         if k not in vivos:
             v['vigente_en_fuente'] = False
     items.update(vivos)
     C.escribir(OUT / 'proyectos.json', {'generado': datetime.datetime.now().isoformat(timespec='seconds'),
-                                        'entidad': ENTIDAD, 'items': items, 'fallos': fallos})
+                                        'entidad': ENTIDAD, 'leidos': len(vivos), 'items': items, 'fallos': fallos})
     sin_v = sum(1 for v in vivos.values() if not v['fecha_fin'])
     abiertos = sum(1 for v in vivos.values() if v['fecha_fin'] >= hoy.isoformat())
     print(f'  mincomercio · {len(vivos)} proyectos leídos · {abiertos} abiertos · {sin_v} sin ventana'
