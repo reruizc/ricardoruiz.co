@@ -78,9 +78,12 @@ async function main() {
   const apify = clienteApify(token, { esperaMax: 240000 });
   let usd = 0;
   const items = [], informe = {};
-  const puede = () => usd < TOPE;
+  /* Los comentarios son lo más valioso y van de últimos: las publicaciones no pueden
+     comerse todo el tope (pasó el 2-nov: US$1,06 en posts y cero comentarios). */
+  const RESERVA = Math.min(0.4, TOPE * 0.3);
+  const puede = tipo => usd < (tipo === 'comentarios' ? TOPE : TOPE - RESERVA);
   async function correr(red, tipo, actor, entrada) {
-    if (!puede()) { (informe[red] ||= []).push(`${tipo}: omitido por el tope`); return []; }
+    if (!puede(tipo)) { (informe[red] ||= []).push(`${tipo}: omitido por el tope`); return []; }
     process.stdout.write(`▸ ${red} · ${tipo}… `);
     try {
       const r = await apify.correr(actor, entrada);
@@ -107,7 +110,7 @@ async function main() {
   const fb = fbTodo.filter(i => ES_LEY.test(texto(i)));
   (informe.facebook ||= []).push(`sobre la ley: ${fb.length} de ${fbTodo.length}`);
   fb.forEach(i => items.push(ficha('facebook', 'post', i)));
-  paraComentar.unshift(['facebook', fb]);
+  paraComentar.push(['facebook', fb]);
 
   /* Un comentario suelto («qué horror») no dice de qué habla: se guarda con su publicación. */
   for (const [red, lista] of paraComentar) {
