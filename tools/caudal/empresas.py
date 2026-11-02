@@ -509,7 +509,9 @@ _RAW = [
     ('offcorss', 'Offcorss', 'textil', 'offcorss', 'comercio y retail', '', ''),
 
     # ---- restaurantes y consumo -------------------------------------------
-    ('crepes', 'Crepes & Waffles', 'consumo', 'crepes waffles', 'alimentos / etiquetado,*laboral', '', ''),
+    ('crepes', 'Crepes & Waffles', 'consumo', 'crepes waffles|crepes and waffles',
+     'alimentos / etiquetado,*laboral,comercio y retail,competencia y consumidor',
+     'crepes and waffles sa|crepes waffles sa', ''),
     ('frisby', 'Frisby', 'consumo', 'frisby', 'alimentos / etiquetado', '', ''),
     ('elcorral', 'El Corral', 'consumo', 'el corral|hamburguesas el corral', 'alimentos / etiquetado', '', ''),
     ('mcdonalds', 'McDonald\'s', 'consumo', 'mcdonalds', 'alimentos / etiquetado', '', ''),
@@ -579,7 +581,7 @@ _RAW = [
     ('oracle', 'Oracle', 'tecnologia', 'oracle', 'tecnologia digital / IA', '', ''),
     ('sap', 'SAP', 'tecnologia', 'sap colombia', 'tecnologia digital / IA', '', ''),
     ('accenture', 'Accenture', 'tecnologia', 'accenture', 'tecnologia digital / IA', '', ''),
-    ('sofka', 'Sofka Technologies', 'tecnologia', 'sofka', 'tecnologia digital / IA', '', ''),
+    ('sofka', 'Sofka Technologies', 'tecnologia', 'sofka', 'tecnologia digital / IA', 'sofka technologies sas', ''),
 
     # ---- seguridad y vigilancia (2ª tanda) --------------------------------------
     ('prosegur', 'Prosegur', 'seguridad', 'prosegur', 'seguridad privada', '', ''),
@@ -873,8 +875,8 @@ _RAW = [
      'industria licorera de caldas|licorera de caldas',
      'licores y tabaco,*tributario', '', ''),
     ('elc', 'Empresa de Licores de Cundinamarca', 'alimentos',
-     'empresa de licores de cundinamarca|licorera de cundinamarca',
-     'licores y tabaco,*tributario', '', ''),
+     'empresa de licores de cundinamarca|licorera de cundinamarca|licores de cundinamarca',
+     'licores y tabaco,*tributario', 'empresa de licores de cundinamarca', ''),
 
     # =====================================================================
     # ⑥ PALMA Y CONSTRUCCIÓN (ago-2026) · 529 -> 583 entradas.
@@ -2335,8 +2337,6 @@ _RAW = [
      'licores y tabaco,alimentos / etiquetado', 'central cervecera de colombia sas', ''),
     ('fldc', 'Fábrica de Licores del Valle', 'alimentos', 'licores del valle',
      'licores y tabaco,juegos de suerte y azar', 'industria de licores del valle', ''),
-    ('empresalicorescundinamarca', 'Empresa de Licores de Cundinamarca', 'alimentos', 'licores de cundinamarca',
-     'licores y tabaco', 'empresa de licores de cundinamarca', ''),
     ('cbre', 'CBRE Colombia', 'construccion', 'cbre colombia',
      'ordenamiento territorial y urbanismo,vivienda y construccion', 'cbre colombia sas', ''),
     ('colliers', 'Colliers Colombia', 'construccion', 'colliers international',
@@ -3680,8 +3680,6 @@ _RAW = [
      'energia y servicios publicos', 'termoemcali sa esp', ''),
     ('termodorada', 'Termodorada', 'energia', 'termodorada',
      'energia y servicios publicos', 'termodorada sa esp', ''),
-    ('sofkatecnologia', 'Sofka Technologies', 'tecnologia', 'sofka technologies',
-     'tecnologia digital / IA', 'sofka technologies sas', ''),
     ('mvmingenieria', 'MVM Ingeniería', 'tecnologia', 'mvm ingenieria',
      'tecnologia digital / IA', 'mvm ingenieria de software sas', ''),
     ('experta', 'Experta Consultoría', 'tecnologia', 'experta consultoria',
@@ -3751,8 +3749,6 @@ _RAW = [
     ('laboratoriosryan', 'Ryan Laboratorios', 'farma', 'ryan laboratorios',
      'farmaceutico / medicamentos', 'laboratorios ryan sas', ''),
     # --- tt-cierre3
-    ('crepesywaffles', 'Crepes & Waffles', 'retail', 'crepes and waffles',
-     'comercio y retail,competencia y consumidor', 'crepes and waffles sa|crepes waffles sa', ''),
     ('juanchito', 'Almacenes Only', 'retail', 'almacenes only',
      'comercio y retail,competencia y consumidor', 'almacenes only sas', ''),
     ('tiendasdeportivas', 'Sportline America', 'retail', 'sportline america',
