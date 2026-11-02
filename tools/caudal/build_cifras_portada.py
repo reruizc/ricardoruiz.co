@@ -48,6 +48,75 @@ def api(action, **kw):
     return d
 
 
+# ── Medios: cuántos medios distintos ha visto Caudal ──────────────────────────
+# No hay un registro único de medios: Google News no tiene catálogo y la acción
+# `medios` no guarda nada. Se cuenta la unión de (a) todo titular guardado en
+# Bases de datos/ (briefs, batallas, Ley de Rescate, mapas de fuerzas…) y (b) un
+# barrido de hoy por los 33 departamentos y los temas del radar. Antes la portada
+# decía «+1.800» sin ninguna medición detrás; el 2-nov-2026 dio 862.
+BARRIDO = ['Amazonas', 'Antioquia', 'Arauca', 'San Andrés', 'Atlántico', 'Bogotá', 'Bolívar', 'Boyacá',
+           'Caldas', 'Caquetá', 'Casanare', 'Cauca', 'Cesar', 'Chocó', 'Córdoba', 'Cundinamarca', 'Guainía',
+           'Guaviare', 'Huila', 'La Guajira', 'Magdalena', 'Meta', 'Nariño', 'Norte de Santander', 'Putumayo',
+           'Quindío', 'Risaralda', 'Santander', 'Sucre', 'Tolima', 'Valle del Cauca', 'Vaupés', 'Vichada',
+           'Medellín', 'Cali', 'Barranquilla', 'Cartagena', 'Bucaramanga', 'Cúcuta', 'Pereira', 'Manizales',
+           'Ibagué', 'Santa Marta', 'Villavicencio', 'Pasto', 'Montería', 'Neiva', 'Valledupar', 'Popayán',
+           'salud', 'educación', 'pensiones', 'impuestos', 'Congreso', 'seguridad', 'economía', 'empleo',
+           'vivienda', 'energía', 'minería', 'transporte', 'agro', 'banca', 'medio ambiente', 'tecnología']
+NO_CORPUS = ('leyes-senado', 'output_', 'FINAL', 'censos', 'PONAL', 'escrutinio', 'candidato', 'huella')
+
+
+def _norm_medio(s):
+    import unicodedata
+    s = unicodedata.normalize('NFD', str(s)).encode('ascii', 'ignore').decode().lower()
+    return re.sub(r'[^a-z0-9]+', ' ', s).strip()
+
+
+def contar_medios():
+    import glob
+    from concurrent.futures import ThreadPoolExecutor
+    vistos = set()
+
+    def walk(o):
+        if isinstance(o, dict):
+            m = o.get('medio') or o.get('fuente_medio')
+            if isinstance(m, str) and 2 < len(m) < 80 and (o.get('titulo') or o.get('title') or o.get('url')):
+                vistos.add(_norm_medio(m))
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    for f in glob.glob(os.path.join(BD, '**', '*.json'), recursive=True) + \
+            glob.glob(os.path.join(BD, '**', '*.jsonl'), recursive=True):
+        rel = os.path.relpath(f, BD)
+        if any(x in rel for x in NO_CORPUS) or os.path.getsize(f) > 60e6:
+            continue
+        try:
+            if f.endswith('.jsonl'):
+                for l in open(f, encoding='utf-8'):
+                    try:
+                        walk(json.loads(l))
+                    except ValueError:
+                        pass
+            else:
+                walk(json.load(open(f, encoding='utf-8')))
+        except (ValueError, OSError, UnicodeDecodeError):
+            pass
+    en_corpus = len(vistos)
+
+    def una(q):
+        try:
+            return api('medios', query=q, dias=30).get('por_medio') or []
+        except Exception:
+            return []
+    with ThreadPoolExecutor(4) as ex:
+        for pm in ex.map(una, BARRIDO):
+            vistos.update(_norm_medio(x['medio']) for x in pm if x.get('medio'))
+    print(f'medios: {en_corpus} en lo guardado · {len(vistos)} con el barrido de hoy')
+    return len(vistos)
+
+
 def contar(path):
     with open(path, encoding='utf-8') as f:
         return sum(1 for l in f if l.strip())
@@ -163,9 +232,13 @@ def main(dry=False):
             fuente('SECOP I y II', 'Multas y sanciones contractuales impuestas por cada entidad'),
             fuente('Junta Central de Contadores', 'Sanciones disciplinarias'),
         ]}
+    n_medios = contar_medios()
+    piso = n_medios // 100 * 100
     P['medios'] = {
-        'n': '+1.800', 'unit': 'medios rastreables · en vivo',
-        'desc': 'No es un listado de titulares: mide a qué ritmo crece la cobertura de un tema, quién la sostiene, en qué departamentos no se cubre — y lo contrasta con lo que el Estado está tramitando en ese mismo momento. Cualquier medio indexado en Google News Colombia (más de 1.800 observados hasta hoy), sin un conector por medio.',
+        'n': f'+{mil(piso)}', 'unit': 'medios distintos leídos · en vivo',
+        'desc': 'No es un listado de titulares: mide a qué ritmo crece la cobertura de un tema, quién la sostiene, en qué '
+                'departamentos no se cubre — y lo contrasta con lo que el Estado está tramitando en ese mismo momento. '
+                f'Cualquier medio indexado en Google News Colombia, sin un conector por medio: Caudal ya ha leído {mil(n_medios)} distintos.',
         'fuentes': [
             fuente('Google News Colombia', 'Prensa nacional y regional por tema, con medio, alcance y departamento'),
             fuente('Salas de prensa oficiales', 'Comunicados de ministerios, superintendencias y Presidencia, leídos en su sitio'),

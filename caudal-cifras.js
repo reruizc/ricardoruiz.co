@@ -129,9 +129,9 @@ window.CAUDAL_CIFRAS = {
    ]
   },
   "medios": {
-   "n": "+1.800",
-   "unit": "medios rastreables · en vivo",
-   "desc": "No es un listado de titulares: mide a qué ritmo crece la cobertura de un tema, quién la sostiene, en qué departamentos no se cubre — y lo contrasta con lo que el Estado está tramitando en ese mismo momento. Cualquier medio indexado en Google News Colombia (más de 1.800 observados hasta hoy), sin un conector por medio.",
+   "n": "+800",
+   "unit": "medios distintos leídos · en vivo",
+   "desc": "No es un listado de titulares: mide a qué ritmo crece la cobertura de un tema, quién la sostiene, en qué departamentos no se cubre — y lo contrasta con lo que el Estado está tramitando en ese mismo momento. Cualquier medio indexado en Google News Colombia, sin un conector por medio: Caudal ya ha leído 862 distintos.",
    "fuentes": [
     {
      "n": "Google News Colombia",
@@ -168,7 +168,7 @@ window.CAUDAL_CIFRAS = {
    ]
   },
   "control": {
-   "n": "10.861",
+   "n": "11.087",
    "unit": "providencias · Corte Constitucional desde 2021",
    "desc": "Sentencias y autos de la Corte Constitucional que cambian la lectura de la norma en contratación, salud, pensiones, ambiente y elecciones, más los fallos de responsabilidad fiscal de la Contraloría. Consejo de Estado y Corte Suprema entran en el siguiente corte.",
    "fuentes": [
@@ -314,14 +314,14 @@ window.CAUDAL_CIFRAS = {
    ]
   },
   "gacetas": {
-   "n": "32.585",
+   "n": "33.278",
    "unit": "gacetas del Congreso · desde 2000",
    "desc": "La Gaceta del Congreso enumerada y cruzada con el trámite: qué proyecto cita cada una y como qué documento. El Diario Oficial completo —4.701 actos de 175 entidades este año— y las gacetas de Antioquia y Medellín.",
    "fuentes": [
     {
      "n": "Gaceta del Congreso",
      "e": "conectada",
-     "l": "32.585 gacetas: exposiciones de motivos, ponencias, textos aprobados y conciliaciones"
+     "l": "33.278 gacetas: exposiciones de motivos, ponencias, textos aprobados y conciliaciones"
     },
     {
      "n": "Diario Oficial",
