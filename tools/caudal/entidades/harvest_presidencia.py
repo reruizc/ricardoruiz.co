@@ -188,9 +188,10 @@ def candidatos(prev_pdfs):
 def pdfs(prev):
     items = dict(prev.get('items', {}))
     sin = dict(prev.get('sin_pdf', {}))
-    sondeos, hallados, cerrada = 0, 0, False
+    sondeos, hallados, cerrada, primeros = 0, 0, False, 0
     for tipo, numero, fecha, desc in candidatos(prev):
         k = f'{tipo}-{numero}-{fecha[:4]}'
+        primeros += k not in sin      # un acto que ya falló puede no estar publicado todavía
         hallado = None
         for nombre in _nombres(tipo, numero, fecha):
             if sondeos >= MAX_SONDEOS:
@@ -212,7 +213,7 @@ def pdfs(prev):
             sin.pop(k, None)
         else:
             sin[k] = sin.get(k, 0) + 1
-    return items, sin, sondeos, hallados, cerrada
+    return items, sin, sondeos, hallados, cerrada, primeros
 
 
 def normas(items):
@@ -248,10 +249,12 @@ def fetch():
         print(f'  presidencia · prensa FALLÓ ({e}) — queda el archivo anterior', file=sys.stderr)
     try:
         prev = C.leer(OUT / 'pdfs.json', {}) or {}
-        items, sin, sondeos, hallados, cerrada = pdfs(prev)
-        # guarda: la ruta directa dejó de servir aunque el Diario Oficial tenga actos nuevos
-        if sondeos >= 10 and not hallados and not cerrada:
-            raise RuntimeError(f'{sondeos} nombres probados y ningún PDF')
+        items, sin, sondeos, hallados, cerrada, primeros = pdfs(prev)
+        # guarda: la ruta directa dejó de servir aunque el Diario Oficial tenga actos nuevos.
+        # Solo cuentan los actos probados por primera vez: reintentar los que aún no se
+        # publican daba «ningún PDF» sin que la ruta hubiera cambiado (2-nov-2026).
+        if primeros >= 5 and not hallados and not cerrada:
+            raise RuntimeError(f'{primeros} actos nuevos probados ({sondeos} nombres) y ningún PDF')
         if cerrada:
             print('  presidencia · dapre dejó de entregar el PDF directo: se detiene por hoy', file=sys.stderr)
             ok = False
