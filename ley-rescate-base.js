@@ -1,11 +1,11 @@
-/* Seguimiento de la Ley de Rescate · base compartida de las 8 páginas.
+/* Seguimiento de la Ley de Rescate · base compartida de las 9 páginas.
    Carga ley-rescate-data/estado.json (lo escribe a diario tools/ley-rescate/rastreo.py),
    pinta la nav Caudal × Cauce, las secciones y el pie, y da los cálculos comunes.
-   Al tocar este archivo, subir el ?v= en las 8 páginas. */
+   Al tocar este archivo, subir el ?v= en las 9 páginas. */
 (function () {
   const LOCAL = new URLSearchParams(location.search).has('local');
   const URL_DATOS = (LOCAL ? 'Bases de datos/ley-rescate/estado.json' : 'ley-rescate-data/estado.json') + '?v=' + Math.floor(Date.now() / 6e5);
-  const SECCIONES = [['hub', 'ley-de-rescate-avance.html', 'Dónde va'], ['reloj', 'ley-de-rescate-reloj.html', 'El reloj'], ['votos', 'ley-de-rescate-votos.html', 'Los votos'], ['fuerzas', 'ley-de-rescate-fuerzas.html', 'Esquema de fuerzas'],
+  const SECCIONES = [['hub', 'ley-de-rescate-avance.html', 'Dónde va'], ['generalidades', 'ley-de-rescate-generalidades.html', 'Generalidades'], ['reloj', 'ley-de-rescate-reloj.html', 'El reloj'], ['votos', 'ley-de-rescate-votos.html', 'Los votos'], ['fuerzas', 'ley-de-rescate-fuerzas.html', 'Esquema de fuerzas'],
     ['discusion', 'ley-de-rescate-discusion.html', 'La discusión'], ['articulos', 'ley-de-rescate-articulos.html', 'Los 106 artículos'], ['voces', 'ley-de-rescate-voces.html', 'Las voces'], ['bitacora', 'ley-de-rescate-bitacora.html', 'Bitácora y método']];
   const $ = s => document.querySelector(s);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

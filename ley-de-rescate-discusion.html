@@ -12,7 +12,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102d" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102f" />
   <script defer src="/track.js"></script>
 </head>
 <body>
@@ -22,12 +22,13 @@
     <p class="lead" id="sub"></p>
     <div id="app" hidden>
       <div class="fil"><div><div class="g">Fuente</div><div class="pills" id="f-fuente"></div></div><div><div class="g">Ordenar por</div><div class="pills" id="f-orden"></div></div></div>
-      <div class="ley" style="margin:1rem 0 .4rem"><span><i style="background:var(--rechaza)"></i>Rechaza</span><span><i style="background:var(--mixta)"></i>Con reparos</span><span><i style="background:var(--apoya)"></i>Apoya</span><span><i style="background:var(--informa)"></i>Solo informa</span></div>
-      <div class="panel" style="padding:.3rem 1rem"><div id="lista"></div></div><div id="ficha"></div>
+      <div class="nota-t"><b>Son textos, no votos.</b> Cada barra cuenta titulares de prensa y publicaciones de redes sobre el tema, según lo que dicen de la medida. Los votos del Congreso están en <a href="ley-de-rescate-votos.html">Los votos</a>.</div>
+      <div class="ley" style="margin:1rem 0 .4rem"><span><i style="background:var(--rechaza)"></i>Textos que rechazan</span><span><i style="background:var(--mixta)"></i>Textos con reparos</span><span><i style="background:var(--apoya)"></i>Textos que apoyan</span><span><i style="background:var(--informa)"></i>Textos que solo informan</span></div>
+      <div class="panel" style="padding:.3rem 1rem"><div class="tema-cab"><span>Tema</span><span>Cómo lo reciben prensa y redes</span><span>Textos</span></div><div id="lista"></div></div><div id="ficha"></div>
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
-  <script src="ley-rescate-base.js?v=20261102d"></script>
+  <script src="ley-rescate-base.js?v=20261102f"></script>
   <script>
 LR.pagina('discusion', E => {
   const { $, esc, num, corta, suma, dur, FN, MIN_POST } = LR, S = { fuente: 'todo', orden: 'n', tema: null }, d = E.fuentes, PC = { a: 'var(--apoya)', r: 'var(--rechaza)', m: 'var(--mixta)', i: 'var(--informa)' };
@@ -47,8 +48,8 @@ LR.pagina('discusion', E => {
     $('#f-fuente').innerHTML = Object.keys(FN).map(f => { const n = f === 'todo' ? 1 : d[f]?.n; return `<button class="pill ${S.fuente === f ? 'on' : ''}" data-f="${f}" ${n ? '' : 'disabled'}>${FN[f]}${f !== 'todo' && n ? ` · ${num(n)}` : ''}</button>`; }).join('');
     $('#f-orden').innerHTML = [['n', 'Más discutido'], ['rechazo', 'Más rechazo'], ['apoyo', 'Más apoyo'], ['poco', 'Menos discutido']].map(([k, t]) => `<button class="pill ${S.orden === k ? 'on' : ''}" data-o="${k}">${t}</button>`).join('');
     const L = orden(), mx = Math.max(...L.map(x => x.o.n), 1);
-    $('#lista').innerHTML = L.map(({ t, o }) => { const seg = [['rechaza', o.rechaza], ['mixta', o.mixta], ['apoya', o.apoya], ['informa', o.informa + o.sin]], lec = o.post >= MIN_POST ? `${o.post} con postura: ${Math.round(100 * dur(o))} % rechaza` : o.post ? `Solo ${o.post} con postura` : 'Casi todo es informativo';
-      return `<button class="tema ${S.tema === t.id ? 'sel' : ''}" data-t="${t.id}" data-tip="${esc(`<b>${esc(t.nombre)}</b><br>Rechaza ${o.rechaza} · con reparos ${o.mixta} · apoya ${o.apoya} · informa ${o.informa + o.sin}`)}"><span class="nm">${esc(t.nombre)}<small>${lec}</small></span><span class="b0" style="width:${Math.max(2, 100 * o.n / mx)}%">${seg.filter(s => s[1]).map(([c, v]) => `<i style="flex:${v};background:var(--${c})"></i>`).join('')}</span><span class="num">${num(o.n)}</span></button>`; }).join('');
+    $('#lista').innerHTML = L.map(({ t, o }) => { const seg = [['rechaza', o.rechaza], ['mixta', o.mixta], ['apoya', o.apoya], ['informa', o.informa + o.sin]], lec = o.post >= MIN_POST ? `De ${num(o.post)} textos con postura, ${Math.round(100 * dur(o))} % rechaza` : o.post ? `Solo ${o.post} textos con postura` : 'Casi todo es informativo';
+      return `<button class="tema ${S.tema === t.id ? 'sel' : ''}" data-t="${t.id}" data-tip="${esc(`<b>${esc(t.nombre)}</b> · ${num(o.n)} textos<br>Rechazan ${num(o.rechaza)} · con reparos ${num(o.mixta)} · apoyan ${num(o.apoya)} · solo informan ${num(o.informa + o.sin)}<br><small>Textos de prensa y redes, no votos</small>`)}"><span class="nm">${esc(t.nombre)}<small>${lec}</small></span><span class="b0" style="width:${Math.max(2, 100 * o.n / mx)}%">${seg.filter(s => s[1]).map(([c, v]) => `<i style="flex:${v};background:var(--${c})"></i>`).join('')}</span><span class="num">${num(o.n)}<small>textos</small></span></button>`; }).join('');
     document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.fuente = b.dataset.f; pinta(); });
     document.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { S.orden = b.dataset.o; pinta(); });
     document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { S.tema = b.dataset.t; history.replaceState(null, '', '#tema=' + S.tema); pinta(); $('#ficha').scrollIntoView({ block: 'nearest' }); });

@@ -12,7 +12,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102d" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102f" />
   <script defer src="/track.js"></script>
 </head>
 <body>
@@ -25,14 +25,15 @@
         <label for="d1">Si el primer debate se vota el</label><div class="fd" id="fd1"></div><input type="range" id="d1" /><div class="veredicto" id="ver"></div></div>
         <ul class="lin" id="lin"></ul></div>
       <p class="aparte" id="aparte"></p>
+      <section class="bloque"><div class="k">Frente a las anteriores</div><h2>¿Cuánto tardaron las otras tributarias?</h2><p class="sub" id="cmp-sub"></p><div class="panel"><div id="cmp"></div><div class="ley"><span><i style="background:var(--apoya)"></i>Aprobada</span><span><i style="background:#8a9bb8"></i>Aprobada y tumbada por la Corte</span><span><i style="background:var(--rechaza)"></i>Hundida o retirada</span><span><i style="background:var(--teal);opacity:.35"></i>Ley de Rescate hasta el 16 de diciembre</span></div></div></section>
       <section class="bloque"><h2>Si no alcanza</h2><p class="sub"><b>El proyecto no se archiva el 16 de diciembre.</b> Ese día cierra el primer periodo de la legislatura. Sigue desde el 16 de febrero de 2027, y solo se cae si no tiene primer debate antes del 20 de junio de 2027 (arts. 138 y 162 C.P.). Lo que se pierde es tiempo: los impuestos de periodo, como renta, solo aplican desde el periodo siguiente a su vigencia (art. 338 C.P.). Si la ley sale en 2027, esa parte arrancaría en 2028.</p></section>
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
-  <script src="ley-rescate-base.js?v=20261102d"></script>
+  <script src="ley-rescate-base.js?v=20261102f"></script>
   <script>
 LR.pagina('reloj', E => {
-  const { $, fecha, iso, corta, larga, dias, CIERRE, ULT, pasos } = LR; let modo = 'normal';
+  const { $, esc, fecha, iso, corta, larga, dias, CIERRE, ULT, pasos } = LR; let modo = 'normal';
   const r = $('#d1'), total = dias(E.hoy, CIERRE); r.min = 1; r.max = total; r.value = Math.max(1, dias(E.hoy, '2026-11-18'));
   function pinta() { const d1 = iso(new Date(fecha(E.hoy).getTime() + Number(r.value) * 864e5)), P2 = pasos(d1, modo), fin = P2[P2.length - 1][0], ok = fin <= CIERRE, ult = ULT[modo];
     $('#fd1').textContent = larga(d1);
@@ -40,6 +41,13 @@ LR.pagina('reloj', E => {
     $('#ver').className = 'veredicto ' + (ok ? '' : 'no');
     $('#ver').innerHTML = ok ? `<b>Alcanza</b>, con ${dias(fin, CIERRE)} días de margen y sin contar agenda, fines de semana ni festivos. Último día posible: ${larga(ult)}.` : `<b>No alcanza</b> antes del 16 de diciembre. Se pasa ${dias(CIERRE, fin)} días. Último día posible en este modo: ${larga(ult)}.`;
     $('#aparte').innerHTML = modo === 'normal' ? `<b>Sin urgencia, la Comisión Tercera de la Cámara tendría que votar a más tardar el ${larga(ULT.normal)}.</b> Por eso importa si llega el mensaje de urgencia. Son plazos mínimos: entre un debate y otro van 8 días, y entre cámaras 15 (art. 160 C.P.).` : `<b>Con urgencia y sesión conjunta solo rige el plazo de 8 días</b>, y las plenarias pueden ser simultáneas (Corte Constitucional, C-784 de 2014). Cada comisión vota por separado, así que basta que una la niegue. El Gobierno no lo ha pedido todavía.`; }
+  const T = E.tributarias, d = (a, b) => dias(a, b), lim = d(E.proyecto.radicado, CIERRE), hoyD = d(E.proyecto.radicado, E.hoy), mx = Math.max(...T.map(t => d(t.rad, t.fin)), lim) + 6;
+  const ap = T.filter(t => t.res !== 'retirada' && t.res !== 'hundida').map(t => d(t.rad, t.fin)), min = Math.min(...ap);
+  $('#cmp-sub').innerHTML = `Días desde que se radicó hasta que se sancionó, se retiró o se hundió. Del 29 de octubre al 16 de diciembre hay <b>${lim} días</b>. La más rápida de las aprobadas tardó <b>${min}</b>: si esta pasa a tiempo, sería la más rápida de esta lista.`;
+  const CL = { aprobada: 'var(--apoya)', caida: '#8a9bb8', hundida: 'var(--rechaza)', retirada: 'var(--rechaza)' }, PAL = { aprobada: 'aprobada', caida: 'tumbada por la Corte', hundida: 'hundida', retirada: 'retirada' };
+  const fila = (nom, sub, n, col, extra, tip) => `<div class="cr" data-tip="${esc(tip)}"><div class="cr-n"><b>${esc(nom)}</b><small>${sub}</small></div><div class="cr-b"><i style="width:${100 * n / mx}%;background:${col}"></i>${extra || ''}<span style="left:${100 * n / mx}%">${n} d</span></div></div>`;
+  $('#cmp').innerHTML = `<div class="cr-lim" style="--l:${(100 * lim / mx).toFixed(2)}"><span>16 dic · ${lim} días</span></div>` + T.map(t => fila(t.nombre, `${t.gobierno} · ${t.rad.slice(0, 4)} · ${PAL[t.res]}`, d(t.rad, t.fin), CL[t.res], '', `<b>${t.nombre}</b> · ${t.ley}<br>${corta(t.rad)} ${t.rad.slice(0, 4)} → ${corta(t.fin)} ${t.fin.slice(0, 4)}${t.nota ? '<br>' + t.nota : ''}`)).join('')
+    + fila('Ley de Rescate Económico', `De la Espriella · 2026 · va en el día ${hoyD}`, hoyD, 'var(--teal)', `<i class="falta" style="left:${100 * hoyD / mx}%;width:${100 * (lim - hoyD) / mx}%"></i>`, `Radicada el 29 de octubre de 2026. Hoy va en el día ${hoyD}.`);
   r.oninput = pinta; document.querySelectorAll('#modo .pill').forEach(b => b.onclick = () => { modo = b.dataset.m; document.querySelectorAll('#modo .pill').forEach(x => x.classList.toggle('on', x === b)); pinta(); }); pinta();
 });
   </script>

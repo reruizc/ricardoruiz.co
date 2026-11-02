@@ -399,6 +399,18 @@ def calcular(corpus, clas, temas, tram, cfg, crudo):
         v['men'] = sum(1 for t in n_txt if pat.search(t))
         v.pop('al', None)
         voces.append(v)
+    # Termómetro: una sola postura por texto, para no contar dos veces el que toca varios temas.
+    termo = {'todo': Counter(), 'prensa': Counter(), 'redes': Counter()}
+    termo_dia = defaultdict(Counter)
+    for _, it, c in items:
+        ps = {p for _, p in c['t'] if p}
+        p = 'm' if ('r' in ps and 'a' in ps) or 'm' in ps else 'r' if 'r' in ps else 'a' if 'a' in ps else 'i'
+        for k in ('todo', 'prensa' if it['f'] == 'prensa' else 'redes'):
+            termo[k][p] += 1
+        try:
+            termo_dia[dt.datetime.fromisoformat(it['pub']).astimezone(COL).date().isoformat()][p] += 1
+        except (KeyError, TypeError, ValueError):
+            pass
     sin_postura = sum(1 for _, _, c in items if any(p is None for _, p in c['t']))
     fuentes = {f: {'n': base[f]['n']} for f in FUENTES}
     fuentes['prensa']['medios'] = len(medios)
@@ -408,9 +420,10 @@ def calcular(corpus, clas, temas, tram, cfg, crudo):
         fuentes[f]['comentarios'] = sum(1 for _, it, _ in items if it['f'] == f and it.get('tipo') == 'comentario')
     return {
         'v': ahora().isoformat(timespec='minutes'), 'hoy': hoy.isoformat(),
-        'proyecto': cfg['proyecto'], 'tramite': tram, 'hitos': cfg['hitos'], 'voces': voces, 'votos': cfg['votos'], 'personas': cfg['personas'],
+        'proyecto': cfg['proyecto'], 'tramite': tram, 'hitos': cfg['hitos'], 'voces': voces, 'votos': cfg['votos'], 'personas': cfg['personas'], 'tributarias': cfg['tributarias'],
         'temas': salida, 'articulos': cfg['articulos'], 'fuentes': fuentes,
         'serie_total': {d: dict(v) for d, v in sorted(total_dia.items())},
+        'termometro': {k: dict(v) for k, v in termo.items()}, 'termometro_dia': {d: dict(v) for d, v in sorted(termo_dia.items())},
         'clasificacion': {'modelos': dict(Counter(c.get('m', '?') for _, _, c in items)), 'sin_postura': sin_postura,
                           'textos': len(corpus), 'pertinentes': len(items)},
         'redes': {'usd': crudo.get('usd'), 'generado': crudo.get('generado'), 'informe': crudo.get('informe')} if crudo else leer(PUBLICO, {}).get('redes'),
@@ -486,7 +499,7 @@ def main():
     escribir(DATOS / 'corpus.json', corpus)
     escribir(DATOS / 'clasif.json', clas)
     cfg = {'proyecto': leer(AQUI / 'proyecto.json', {}), 'hitos': leer(AQUI / 'hitos.json', []), 'voces': leer(AQUI / 'voces.json', []),
-           'votos': leer(AQUI / 'votos.json', {}), 'articulos': leer(AQUI / 'articulos.json', []), 'personas': leer(AQUI / 'personas.json', {})}
+           'votos': leer(AQUI / 'votos.json', {}), 'articulos': leer(AQUI / 'articulos.json', []), 'personas': leer(AQUI / 'personas.json', {}), 'tributarias': leer(AQUI / 'tributarias.json', {}).get('lista', [])}
     estado = calcular(corpus, clas, temas, tram, cfg, crudo)
     if llave and not o.solo_calcular:
         lect = lectura_llm(estado, llave)

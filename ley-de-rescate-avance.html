@@ -12,7 +12,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102d" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102f" />
   <script defer src="/track.js"></script>
 </head>
 <body>
@@ -22,13 +22,15 @@
     <p class="lead">Dónde está el proyecto y cómo vamos hoy. <b>Se actualiza una vez al día</b> con la ficha oficial de la Cámara, los órdenes del día, la prensa y las redes.</p>
     <div id="app" hidden>
       <div class="kpis" id="kpis"></div>
-      <section class="bloque"><div class="k">Cómo estamos</div><div class="panel resumen"><div id="lect"></div><div id="puntos"></div></div></section>
+      <section class="bloque"><div class="k">Termómetro de medios y redes</div><h2>¿Qué tan caliente está la discusión?</h2><p class="sub">Entre los textos que toman postura, cuánto rechazo hay. Cada texto cuenta una vez, aunque toque varios temas, y los reparos cuentan como medio rechazo.</p>
+        <div class="panel termo-p"><div class="termos" id="termos"></div><div><div id="lect"></div><h4 class="mini-t">Cómo ha cambiado por día</h4><div class="termo-dias" id="tdias"></div></div></div></section>
+      <section class="bloque"><div class="k">En una línea</div><div class="panel"><div id="puntos" class="puntos4"></div></div></section>
       <section class="bloque"><div class="k">El camino</div><h2>En qué etapa va</h2><p class="sub">Una ley necesita cuatro debates. Toque cada etapa para ver qué pasa ahí y qué norma la exige.</p><div class="panel"><div class="ruta" id="etapas" style="margin-top:0"></div><div class="etinfo" id="etinfo"></div></div></section>
       <section class="bloque"><div class="k">Para entrar más</div><h2>Todo el seguimiento</h2><div class="lr-cards" id="cards"></div></section>
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
-  <script src="ley-rescate-base.js?v=20261102d"></script>
+  <script src="ley-rescate-base.js?v=20261102f"></script>
   <script>
 LR.pagina('hub', E => {
   const { $, esc, num, corta, larga, dias, ULT, CIERRE, suma, dur, etapas, cara, MIN_POST } = LR, T = E.tramite || {}, L = etapas(E), ag = (T.agenda || []).filter(a => a.fecha >= E.hoy), pon = (T.debates || []).flatMap(d => d.ponentes || []), ahora = L.find(l => l.ahora);
@@ -37,6 +39,14 @@ LR.pagina('hub', E => {
     ['Ponentes', pon.length ? String(pon.length) : 'Sin publicar', pon.length ? esc(pon.slice(0, 2).join(' · ')) : 'La ficha oficial todavía no los trae', ''],
     ['Fin del periodo', `${dias(E.hoy, CIERRE)} días`, 'Hasta el 16 de diciembre, cuando acaban las sesiones de este semestre', '']];
   $('#kpis').innerHTML = K.map(([l, v, d, c]) => `<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${esc(v)}</div><div class="d">${d}</div></div>`).join('');
+  const TT = E.termometro || {}, idx = o => { const p = (o.a || 0) + (o.r || 0) + (o.m || 0); return p ? Math.round(100 * ((o.r || 0) + (o.m || 0) / 2) / p) : null; };
+  const color = v => { const a = [61, 110, 184], g = [185, 192, 203], r = [200, 85, 61], [x, y, t] = v < 50 ? [a, g, v / 50] : [g, r, (v - 50) / 50]; return `rgb(${x.map((c, i) => Math.round(c + (y[i] - c) * t)).join(',')})`; };
+  const termo = (k, t, grande) => { const o = TT[k] || {}, v = idx(o), p = (o.a || 0) + (o.r || 0) + (o.m || 0), h = grande ? 200 : 150, alto = v == null ? 0 : (h - 34) * v / 100;
+    return `<figure class="termo ${grande ? 'g' : ''}"><svg viewBox="0 0 70 ${h + 30}" width="${grande ? 92 : 70}" role="img" aria-label="${t}: índice ${v ?? 'sin dato'} de 100"><rect x="25" y="8" width="20" height="${h - 20}" rx="10" fill="#eef0f3" stroke="#d7dbe2"/><rect x="29" y="${h - 12 - alto}" width="12" height="${alto + 4}" rx="6" fill="${v == null ? '#ccd' : color(v)}"/><circle cx="35" cy="${h + 2}" r="16" fill="${v == null ? '#ccd' : color(v)}" stroke="#d7dbe2"/>${[0, 50, 100].map(q => `<line x1="47" x2="53" y1="${h - 12 - (h - 34) * q / 100}" y2="${h - 12 - (h - 34) * q / 100}" stroke="#9aa"/><text x="56" y="${h - 9 - (h - 34) * q / 100}" font-size="8" fill="#667085">${q}</text>`).join('')}</svg>
+      <figcaption><b style="color:${v == null ? 'inherit' : color(v)}">${v ?? '—'}</b><span>${t}</span><small>${num(p)} textos con postura</small></figcaption></figure>`; };
+  $('#termos').innerHTML = termo('todo', 'Todo', true) + termo('prensa', 'Prensa') + termo('redes', 'Redes') + '<div class="termo-esc"><span>100 · todo rechaza</span><span>50 · empate</span><span>0 · todo apoya</span></div>';
+  const TD = Object.entries(E.termometro_dia || {}).filter(([d, o]) => (o.a || 0) + (o.r || 0) + (o.m || 0) >= 20).slice(-10);
+  $('#tdias').innerHTML = TD.map(([d, o]) => { const v = idx(o); return `<div data-tip="${corta(d)}: ${v} de 100 · ${num((o.a || 0) + (o.r || 0) + (o.m || 0))} textos con postura"><i style="height:${Math.max(4, v)}%;background:${color(v)}"></i><span>${corta(d)}</span></div>`; }).join('') || '<p class="vacio">Hace falta más de un día con datos.</p>';
   const Lc = E.lectura || {}; $('#lect').innerHTML = `<h3>${esc(Lc.titular || 'Seguimiento del proyecto')}</h3>${(Lc.lectura || []).map(p => `<p>${esc(p)}</p>`).join('')}<small>Lectura ${esc(Lc.origen || 'automática')} del ${corta(Lc.fecha || E.hoy)}. No predice el voto.</small>`;
   const { bloques, camaras } = E.votos, cuenta = (c, p) => bloques.filter(b => b.post === p).reduce((s, b) => s + b[c], 0);
   const temas = E.temas.filter(t => t.id !== 'general').map(t => ({ t, o: suma(t, 'todo') })), top = [...temas].sort((a, b) => b.o.n - a.o.n)[0];
@@ -54,13 +64,16 @@ LR.pagina('hub', E => {
   ruta();
   const ult = (E.hitos || []).filter(h => h.fecha <= E.hoy).sort((a, b) => b.fecha.localeCompare(a.fecha))[0], conFoto = E.voces.filter(v => v.s && E.personas[v.s]?.foto).slice(0, 6);
   const nv = g => E.voces.filter(v => v.g === g).length;
-  const C = [['ley-de-rescate-fuerzas.html', 'imagenes/mi-congreso-fuerzas.jpg', 'Esquema de fuerzas', `${E.voces.filter(v => v.p === 'r').length} en contra · ${E.voces.filter(v => v.p === 'a').length} a favor`, `Los jugadores en tres frentes: Congreso (${nv('con')}), sector público (${nv('pub')}) y sector privado (${nv('pri')}).`, 'Ver el esquema', 'w2'],
-    ['ley-de-rescate-reloj.html', 'imagenes/mi-congreso-reloj.jpg', 'El reloj', rNorm >= 0 ? `${rNorm} días` : 'Solo con urgencia', 'Para que el primer debate alcance sin mensaje de urgencia. Mueva la fecha y vea hasta dónde llega.', 'Abrir el reloj'],
+  const aj = E.proyecto.ajuste;
+  const C = [['ley-de-rescate-generalidades.html', 'imagenes/caudal-ejecutivo.jpg', 'Generalidades', `${String(aj.total[0]).replace('.', ',')} % del PIB en 2027`, `Qué es la ley, cuánto busca, cómo se compara con las ${E.tributarias.length} tributarias anteriores y el dato curioso de sus nombres.`, 'Ver la ley en una página', 'w2'],
+    ['ley-de-rescate-fuerzas.html', 'imagenes/mi-congreso-fuerzas.jpg', 'Esquema de fuerzas', `${E.voces.filter(v => v.p === 'r').length} en contra · ${E.voces.filter(v => v.p === 'a').length} a favor`, `Los jugadores en tres frentes: Congreso (${nv('con')}), sector público (${nv('pub')}) y sector privado (${nv('pri')}).`, 'Ver el esquema'],
+    ['ley-de-rescate-reloj.html', 'imagenes/mi-congreso-reloj.jpg', 'El reloj', rNorm >= 0 ? `${rNorm} días` : 'Solo con urgencia', 'Para que el primer debate alcance sin urgencia. Y cuánto tardaron las tributarias anteriores.', 'Abrir el reloj'],
     ['ley-de-rescate-votos.html', 'imagenes/legislativo-congreso.jpg', 'Los votos', `${camaras.senado.mayoria} y ${camaras.camara.mayoria}`, 'Los votos que hacen falta en cada Comisión Tercera. Haga la cuenta usted mismo, con cada congresista.', 'Hacer la cuenta'],
     ['ley-de-rescate-discusion.html', 'imagenes/caudal-medios.jpg', 'La discusión', esc(top.t.nombre), `${num(E.clasificacion.pertinentes)} textos clasificados. Qué apoya y qué rechaza la prensa y las redes.`, 'Ver la discusión'],
     ['ley-de-rescate-articulos.html', 'imagenes/caudal-gacetas.jpg', 'Los 106 artículos', `${E.temas.length - 1} temas`, 'El proyecto completo, artículo por artículo, con buscador y su página en el PDF.', 'Explorar el proyecto'],
     ['ley-de-rescate-voces.html', 'imagenes/caudal-redes.jpg', 'Las voces', `${E.voces.length} voces`, `<span class="caras-mini">${conFoto.map(v => cara(E, v.s, v.q)).join('')}</span>`, 'Ver quién dijo qué'],
-    ['ley-de-rescate-bitacora.html', 'imagenes/caudal-datos.jpg', 'Bitácora y método', ult ? corta(ult.fecha) : '', ult ? esc(ult.t) : '', 'Ver todo lo que ha pasado', 'w2']];
+    ['ley-de-rescate-bitacora.html', 'imagenes/caudal-datos.jpg', 'Bitácora y método', ult ? corta(ult.fecha) : '', ult ? esc(ult.t) : '', 'Ver todo lo que ha pasado']];
+  [C[1], C[2]] = [C[2], C[1]];
   $('#cards').innerHTML = C.map(([h, img, t, g, d, f, w], i) => `<a class="lr-card ${w || ''}" href="${h}"><div class="lr-card-img" style="background-image:url('${img}')"><div class="lr-card-t"><div class="n">0${i + 1}</div><div class="h">${t}</div></div></div><div class="lr-card-b"><div class="g">${g}</div><p>${d}</p></div><div class="lr-card-f"><span>${f}</span><span>↗</span></div></a>`).join('');
 });
   </script>
