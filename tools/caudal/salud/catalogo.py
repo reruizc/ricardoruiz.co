@@ -169,6 +169,18 @@ def archivos(leg=None):
              min_bytes=400_000,
              productor='run_diario.sh · harvest_diario_oficial.py actos',
              consumidor='acción `diario-oficial` · tarjeta Diarios y gacetas · radar del cliente (Oeste)'),
+        # Gaceta del Congreso y Corte Constitucional (nov-2026). Se cosechaban a mano
+        # y estuvieron dos meses quietas sin que nada avisara; desde el 2-nov van
+        # en run_diario.sh. La Corte se cosecha una vez al día (cada 24 h cae
+        # dentro del aviso de 26 h). Pisos: ~45 % del tamaño de nov-2026.
+        dict(bucket=BUCKET_PRIV, key='metadata/gacetas.json', clase='diario',
+             min_bytes=700_000, campo_fecha=None,
+             productor='run_diario.sh · enumerar_gacetas.py + build_gacetas_s3.py',
+             consumidor='acción `gacetas` · tarjeta Diarios y gacetas'),
+        dict(bucket=BUCKET_PRIV, key='metadata/control.jsonl', clase='diario',
+             min_bytes=10_000_000, campo_fecha=None,
+             productor='run_diario.sh · harvest_jurisprudencia.py',
+             consumidor='acción `control` · tarjeta Órganos de control y altas cortes'),
         # Entidades con sitio propio (MinSalud primero, oct-2026): normas y
         # conceptos que el Ejecutivo mezcla. ~3,9 MB con el normograma de MinSalud.
         dict(bucket=BUCKET_PRIV, key='metadata/entidades-normas.jsonl', clase='diario',

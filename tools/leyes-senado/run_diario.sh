@@ -27,6 +27,8 @@
 #   dataset_upload_*          aws s3 cp                   dist/ → metadata/
 #   ritmo                     build_ritmo.py              monitor de ritmo (lee dist, va tras el dataset)
 #   congreso_claro_activos    congreso-claro/build_datos.py  proyectos activos por comisión (página ciudadana)
+#   gacetas_enumera/texto/build/upload  enumerar_gacetas.py …  Gaceta del Congreso (ventana de 45 días)
+#   control_fetch/build/upload  harvest_jurisprudencia.py  Corte Constitucional (una vez al día)
 #   anla_fetch/build          harvest_anla.py             Gaceta Ambiental (pilar Regulatorio)
 #   supers_consolida          harvest_supers.py normalize las 12 fuentes del pilar en un dataset
 #   supers_build_s3           build_s3.py                 el slim que lee la Lambda
@@ -482,6 +484,59 @@ etapa() {
     etapa --nombre dataset_upload --omitida "el dataset falló (rc=$rc_ds): no hay archivo nuevo que subir"
     etapa --nombre ritmo --omitida "el dataset falló (rc=$rc_ds): el monitor lee dist/proyectos.jsonl; con uno roto publicaría una comparación falsa"
     etapa --nombre congreso_claro_activos --omitida "el dataset falló (rc=$rc_ds): la página conserva el JSON de ayer"
+  fi
+
+  # ── Gaceta del Congreso (tarjeta «Diarios y gacetas») · nov-2026 ──
+  # Hasta el 2-nov se enumeraba A MANO y llevaba dos meses quieta (32.585 gacetas
+  # con corte en julio). Ventana móvil de 45 días: la Imprenta numera con rezago y
+  # una gaceta puede aparecer semanas después de su fecha. Mismo host que el
+  # Diario Oficial (svrpubindc.imprenta.gov.co, con WAF): por eso corre en el Mac,
+  # al final y con 3 workers. Va DESPUÉS del dataset porque el build cruza cada
+  # gaceta con dist/proyectos.jsonl; el texto que baje entra al índice de
+  # articulado en la corrida siguiente.
+  GAC_DESDE=$(python3 -c 'import datetime as d; print(d.date.today()-d.timedelta(days=45))')
+  GAC_KEYS="$DIARIO/.gacetas_texto_keys.txt"
+  etapa --nombre gacetas_enumera --timeout 1200 \
+        --desc "Gaceta del Congreso · enumera desde $GAC_DESDE" \
+        -- python3 tools/caudal/actas/enumerar_gacetas.py --desde "$GAC_DESDE"
+  etapa --nombre gacetas_texto --timeout 2400 \
+        --desc "Gaceta del Congreso · texto de las nuevas" \
+        -- python3 tools/caudal/actas/harvest_gacetas_texto.py --indexables \
+           --desde "$GAC_DESDE" --workers 3 --timeout 300
+  # La lista de textos en S3 es parte del build (marca cuáles se pueden leer):
+  # si sale vacía, el build publicaría «0 con texto». Por eso el -s.
+  etapa --nombre gacetas_build --timeout 900 \
+        --desc "gacetas.json (cruce con el trámite)" \
+        -- bash -c 'aws s3 ls s3://caudal-legislativo/gacetas-texto/ | awk "{print \$4}" > "$1" && [ -s "$1" ] && python3 tools/caudal/gacetas/build_gacetas_s3.py --keys "$1"' _ "$GAC_KEYS"
+  if [ $? -eq 0 ]; then
+    etapa --nombre gacetas_upload --timeout 600 \
+          --desc "gacetas.json → S3 (si no trae menos que lo publicado)" \
+          -- bash -c 'python3 tools/caudal/salud/piso.py --local "$1" --s3 s3://caudal-legislativo/metadata/gacetas.json --campo n && aws s3 cp "$1" s3://caudal-legislativo/metadata/gacetas.json --content-type application/json --cache-control "private, max-age=300"' _ "$REPO/Bases de datos/leyes-senado/dist/s3/gacetas.json"
+  else
+    etapa --nombre gacetas_upload --omitida "el build de gacetas falló: queda el de la corrida anterior"
+  fi
+
+  # ── Corte Constitucional (tarjeta «Órganos de control») · nov-2026 ──
+  # También era manual y estaba quieta desde el 2-sep. `--refrescar` vuelve a
+  # pedir las 51 consultas (son ~30.000 filas: la relatoría no expone «lo nuevo
+  # desde una fecha»), así que va UNA vez al día y no dos: si la última cosecha
+  # buena tiene menos de 20 h, se salta.
+  CORTE_RAW="$REPO/Bases de datos/leyes-senado/control/raw/jurisprudencia.jsonl"
+  if python3 -c 'import os,sys,time; p=sys.argv[1]; sys.exit(0 if not os.path.exists(p) or time.time()-os.path.getmtime(p) > 20*3600 else 1)' "$CORTE_RAW"; then
+    etapa --nombre control_fetch --timeout 1800 \
+          --desc "Corte Constitucional · 51 consultas de la relatoría" \
+          -- python3 tools/caudal/control/harvest_jurisprudencia.py fetch --workers 4 --refrescar
+    etapa --nombre control_build --timeout 600 \
+          --desc "control.jsonl + control-stats.json" \
+          -- python3 tools/caudal/control/harvest_jurisprudencia.py build
+    if [ $? -eq 0 ]; then
+      CTL="$REPO/Bases de datos/leyes-senado/control/dist/s3"
+      etapa --nombre control_upload --timeout 600 \
+            --desc "Corte Constitucional → S3 (si no trae menos que lo publicado)" \
+            -- bash -c 'python3 tools/caudal/salud/piso.py --local "$1/control-stats.json" --s3 s3://caudal-legislativo/metadata/control-stats.json --campo total && aws s3 cp "$1/control.jsonl" s3://caudal-legislativo/metadata/control.jsonl --content-type application/json && aws s3 cp "$1/control-stats.json" s3://caudal-legislativo/metadata/control-stats.json --content-type application/json' _ "$CTL"
+    else
+      etapa --nombre control_upload --omitida "el build de la Corte falló: queda el de la corrida anterior"
+    fi
   fi
 
   # ── pilar Regulatorio · Gaceta Ambiental de la ANLA ──

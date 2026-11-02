@@ -21,6 +21,11 @@ aws s3 cp "Bases de datos/leyes-senado/control/dist/s3/control.jsonl" \
 aws s3 cp "Bases de datos/leyes-senado/control/dist/s3/control-stats.json" \
   s3://caudal-legislativo/metadata/control-stats.json --content-type application/json
 ```
+**Desde el 2-nov-2026 corre sola** en `run_diario.sh` (etapas `control_fetch` ·
+`control_build` · `control_upload`), una vez al día y con la guarda
+`tools/caudal/salud/piso.py` antes de subir. Los comandos de arriba quedan para
+correrla a mano.
+
 `fetch` cachea por consulta (`raw/corte/{slug}.json`) y es resumible;
 `--refrescar` ignora el caché, `--solo "tema"` corre una sola.
 
