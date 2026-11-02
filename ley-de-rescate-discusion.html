@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>La discusión · Ley de Rescate · Caudal × Cauce</title>
+  <meta name="description" content="Qué temas de la Ley de Rescate concentran la discusión en prensa y redes, y cuáles se apoyan o se rechazan." />
+  <link rel="canonical" href="https://ricardoruiz.co/ley-de-rescate-discusion.html" />
+  <meta property="og:title" content="La discusión · Ley de Rescate · Caudal × Cauce" />
+  <meta property="og:description" content="Qué temas de la Ley de Rescate concentran la discusión en prensa y redes, y cuáles se apoyan o se rechazan." />
+  <meta property="og:image" content="https://ricardoruiz.co/imagenes-index/proyectos/legislativo.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102" />
+  <script defer src="/track.js"></script>
+</head>
+<body>
+  <main class="wrap">
+    <div class="k">Ley de Rescate · PL 477 de 2026 Cámara</div>
+    <h1>Qué se está discutiendo</h1>
+    <p class="lead" id="sub"></p>
+    <div id="app" hidden>
+      <div class="fil"><div><div class="g">Fuente</div><div class="pills" id="f-fuente"></div></div><div><div class="g">Ordenar por</div><div class="pills" id="f-orden"></div></div></div>
+      <div class="ley" style="margin:1rem 0 .4rem"><span><i style="background:var(--rechaza)"></i>Rechaza</span><span><i style="background:var(--mixta)"></i>Con reparos</span><span><i style="background:var(--apoya)"></i>Apoya</span><span><i style="background:var(--informa)"></i>Solo informa</span></div>
+      <div class="panel" style="padding:.3rem 1rem"><div id="lista"></div></div><div id="ficha"></div>
+    </div>
+    <div id="carga">Cargando el seguimiento…</div>
+  </main>
+  <script src="ley-rescate-base.js?v=20261102"></script>
+  <script>
+LR.pagina('discusion', E => {
+  const { $, esc, num, corta, suma, dur, FN, MIN_POST } = LR, S = { fuente: 'todo', orden: 'n', tema: null }, d = E.fuentes, PC = { a: 'var(--apoya)', r: 'var(--rechaza)', m: 'var(--mixta)', i: 'var(--informa)' };
+  const orden = () => { const L = E.temas.filter(t => t.id !== 'general').map(t => ({ t, o: suma(t, S.fuente) })), hay = x => x.o.post >= MIN_POST;
+    const cmp = { n: (a, b) => b.o.n - a.o.n, rechazo: (a, b) => (hay(b) - hay(a)) || (dur(b.o) - dur(a.o)) || (b.o.n - a.o.n), apoyo: (a, b) => (hay(b) - hay(a)) || (b.o.apoya / (b.o.post || 1) - a.o.apoya / (a.o.post || 1)), poco: (a, b) => a.o.n - b.o.n }; return L.sort(cmp[S.orden]); };
+  const red = ['x', 'tiktok', 'instagram', 'facebook'].filter(f => d[f]?.n);
+  $('#sub').innerHTML = `<b>${num(E.clasificacion.pertinentes)} textos</b> sobre la ley, de ${num(d.prensa.medios)} medios y de ${red.map(f => FN[f]).join(', ')}. Toque un tema para ver qué dice el artículo, qué titulares lo cuentan y qué se responde en redes.`;
+  const m = location.hash.match(/tema=(\w+)/); S.tema = m ? m[1] : orden()[0]?.t.id;
+  function ficha() { const t = E.temas.find(x => x.id === S.tema); if (!t) { $('#ficha').innerHTML = ''; return; }
+    const o = suma(t, S.fuente), dias = Object.entries(t.serie || {}).map(([f, v]) => [f, Object.entries(v).reduce((s, [k, n]) => s + (S.fuente === 'todo' || S.fuente === k ? n : 0), 0)]), mx = Math.max(...dias.map(x => x[1]), 1);
+    const tits = (t.titulares || []).filter(() => S.fuente === 'todo' || S.fuente === 'prensa').slice(0, 7), cit = (t.citas || []).filter(c => S.fuente === 'todo' || S.fuente === c.r);
+    $('#ficha').innerHTML = `<div class="ficha"><h3>${esc(t.nombre)}</h3><p class="res">${esc(t.corto)}</p><div class="chips">${t.arts.length ? `<span class="chip">Art. ${t.arts.join(', ')}</span>` : ''}${t.pag ? `<span class="chip">PDF p. ${esc(t.pag)}</span>` : ''}${t.rige ? `<span class="chip">Rige: ${esc(t.rige)}</span>` : ''}<span class="chip">${num(o.n)} textos</span></div>
+      <div class="dos"><div><h4>Titulares recientes</h4>${tits.map(x => `<a class="tit" href="${esc(x.u)}" target="_blank" rel="noopener"><i style="background:${PC[x.p] || PC.i}"></i>${esc(x.t)}<small>${esc(x.m)} · ${x.f ? corta(x.f) : ''}</small></a>`).join('') || '<p class="vacio">Sin titulares en esta fuente.</p>'}</div>
+      <div><h4>Conversación por día</h4><div class="dias">${dias.map(([f, n]) => `<i style="height:${Math.max(3, 100 * n / mx)}%" data-tip="${corta(f)}: ${n} textos"></i>`).join('')}</div>${dias.length ? `<div class="ejes"><span>${corta(dias[0][0])}</span><span>${corta(dias[dias.length - 1][0])}</span></div>` : ''}
+      <h4 style="margin-top:1.1rem">En redes</h4>${cit.map(c => `<div class="tit"><i style="background:${PC[c.p]}"></i>«${esc(c.t)}»<small>${FN[c.r]}${c.a ? ' · @' + esc(c.a) : ''}${c.i ? ' · ' + num(c.i) + ' interacciones' : ''}</small></div>`).join('') || '<p class="vacio">Sin citas de redes para este tema.</p>'}</div></div></div>`; }
+  function pinta() {
+    $('#f-fuente').innerHTML = Object.keys(FN).map(f => { const n = f === 'todo' ? 1 : d[f]?.n; return `<button class="pill ${S.fuente === f ? 'on' : ''}" data-f="${f}" ${n ? '' : 'disabled'}>${FN[f]}${f !== 'todo' && n ? ` · ${num(n)}` : ''}</button>`; }).join('');
+    $('#f-orden').innerHTML = [['n', 'Más discutido'], ['rechazo', 'Más rechazo'], ['apoyo', 'Más apoyo'], ['poco', 'Menos discutido']].map(([k, t]) => `<button class="pill ${S.orden === k ? 'on' : ''}" data-o="${k}">${t}</button>`).join('');
+    const L = orden(), mx = Math.max(...L.map(x => x.o.n), 1);
+    $('#lista').innerHTML = L.map(({ t, o }) => { const seg = [['rechaza', o.rechaza], ['mixta', o.mixta], ['apoya', o.apoya], ['informa', o.informa + o.sin]], lec = o.post >= MIN_POST ? `${o.post} con postura: ${Math.round(100 * dur(o))} % rechaza` : o.post ? `Solo ${o.post} con postura` : 'Casi todo es informativo';
+      return `<button class="tema ${S.tema === t.id ? 'sel' : ''}" data-t="${t.id}" data-tip="${esc(`<b>${esc(t.nombre)}</b><br>Rechaza ${o.rechaza} · con reparos ${o.mixta} · apoya ${o.apoya} · informa ${o.informa + o.sin}`)}"><span class="nm">${esc(t.nombre)}<small>${lec}</small></span><span class="b0" style="width:${Math.max(2, 100 * o.n / mx)}%">${seg.filter(s => s[1]).map(([c, v]) => `<i style="flex:${v};background:var(--${c})"></i>`).join('')}</span><span class="num">${num(o.n)}</span></button>`; }).join('');
+    document.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.fuente = b.dataset.f; pinta(); });
+    document.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { S.orden = b.dataset.o; pinta(); });
+    document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { S.tema = b.dataset.t; history.replaceState(null, '', '#tema=' + S.tema); pinta(); $('#ficha').scrollIntoView({ block: 'nearest' }); });
+    ficha(); }
+  pinta(); if (m) $('#ficha').scrollIntoView({ block: 'center' });
+});
+  </script>
+</body>
+</html>

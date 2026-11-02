@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Los 106 artículos · Ley de Rescate · Caudal × Cauce</title>
+  <meta name="description" content="El Proyecto de Ley 477 de 2026 artículo por artículo, con su página y cómo se recibe cada tema." />
+  <link rel="canonical" href="https://ricardoruiz.co/ley-de-rescate-articulos.html" />
+  <meta property="og:title" content="Los 106 artículos · Ley de Rescate · Caudal × Cauce" />
+  <meta property="og:description" content="El Proyecto de Ley 477 de 2026 artículo por artículo, con su página y cómo se recibe cada tema." />
+  <meta property="og:image" content="https://ricardoruiz.co/imagenes-index/proyectos/legislativo.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102" />
+  <script defer src="/track.js"></script>
+</head>
+<body>
+  <main class="wrap">
+    <div class="k">Ley de Rescate · PL 477 de 2026 Cámara</div>
+    <h1>Los 106 artículos</h1>
+    <p class="lead">Cada cuadro es un artículo. El color dice cómo se recibe su tema entre quienes toman postura, y lo tenue casi no aparece en la discusión. Busque un número o una palabra, y toque un cuadro para abrir su tema.</p>
+    <div id="app" hidden>
+      <div class="panel"><input class="q" id="q" type="search" placeholder="Buscar: renta, IVA, DIAN, 42…" aria-label="Buscar artículo" /><div class="mapa" id="arts"></div>
+      <div class="escala"><span>Más apoyo</span><i></i><span>Más rechazo</span><span style="margin-left:1rem;color:var(--ink3)">Gris: sin postura suficiente</span></div></div>
+    </div>
+    <div id="carga">Cargando el seguimiento…</div>
+  </main>
+  <script src="ley-rescate-base.js?v=20261102"></script>
+  <script>
+LR.pagina('articulos', E => {
+  const { $, esc, num, suma, MIN_POST } = LR, sin = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''), mx = Math.max(...E.temas.filter(t => t.id !== 'general').map(t => suma(t, 'todo').n), 1);
+  const tono = o => { if (o.post < MIN_POST) return null; const r = (o.rechaza + o.mixta / 2) / o.post, az = [61, 110, 184], gr = [185, 192, 203], ro = [200, 85, 61], m = r < .5 ? [az, gr, r * 2] : [gr, ro, (r - .5) * 2]; return m[0].map((c, i) => Math.round(c + (m[1][i] - c) * m[2])); };
+  function pinta() { const q = sin(($('#q').value || '').trim());
+    $('#arts').innerHTML = E.articulos.map(a => { const ts = a.temas.map(id => E.temas.find(t => t.id === id)).filter(Boolean), t = ts[0], o = t ? suma(t, 'todo') : null, c = o ? tono(o) : null, fuera = q && !sin(a.n + ' ' + a.r + ' ' + ts.map(x => x.nombre + ' ' + x.corto).join(' ')).includes(q);
+      const luz = c ? (.299 * c[0] + .587 * c[1] + .114 * c[2]) : 255, est = (c ? `background:rgb(${c.join(',')});color:${luz < 150 ? '#fff' : '#14161c'};` : '') + (!fuera && o ? `opacity:${(.5 + .5 * Math.min(1, Math.sqrt(o.n / mx))).toFixed(2)}` : '');
+      return `<a class="a ${fuera ? 'apag' : ''}" style="${est}" href="${t ? 'ley-de-rescate-discusion.html#tema=' + t.id : E.proyecto.pdf + '#page=' + a.pag}" data-tip="${esc(`<b>Artículo ${a.n}</b> · p. ${a.pag}<br>${esc(a.r)}${t ? `<br><b>${esc(t.nombre)}</b>: ${num(o.n)} textos` : ''}`)}" aria-label="Artículo ${a.n}">${a.n}</a>`; }).join(''); }
+  $('#q').oninput = pinta; pinta();
+});
+  </script>
+</body>
+</html>

@@ -399,12 +399,12 @@ def calcular(corpus, clas, temas, tram, cfg, crudo):
         fuentes[f]['comentarios'] = sum(1 for _, it, _ in items if it['f'] == f and it.get('tipo') == 'comentario')
     return {
         'v': ahora().isoformat(timespec='minutes'), 'hoy': hoy.isoformat(),
-        'proyecto': cfg['proyecto'], 'tramite': tram, 'hitos': cfg['hitos'], 'voces': cfg['voces'], 'votos': cfg['votos'],
+        'proyecto': cfg['proyecto'], 'tramite': tram, 'hitos': cfg['hitos'], 'voces': cfg['voces'], 'votos': cfg['votos'], 'personas': cfg['personas'],
         'temas': salida, 'articulos': cfg['articulos'], 'fuentes': fuentes,
         'serie_total': {d: dict(v) for d, v in sorted(total_dia.items())},
         'clasificacion': {'modelos': dict(Counter(c.get('m', '?') for _, _, c in items)), 'sin_postura': sin_postura,
                           'textos': len(corpus), 'pertinentes': len(items)},
-        'redes': {'usd': crudo.get('usd'), 'generado': crudo.get('generado'), 'informe': crudo.get('informe')} if crudo else None,
+        'redes': {'usd': crudo.get('usd'), 'generado': crudo.get('generado'), 'informe': crudo.get('informe')} if crudo else leer(PUBLICO, {}).get('redes'),
         'lectura': leer(DATOS / 'lectura.json', None),
     }
 
@@ -477,7 +477,7 @@ def main():
     escribir(DATOS / 'corpus.json', corpus)
     escribir(DATOS / 'clasif.json', clas)
     cfg = {'proyecto': leer(AQUI / 'proyecto.json', {}), 'hitos': leer(AQUI / 'hitos.json', []), 'voces': leer(AQUI / 'voces.json', []),
-           'votos': leer(AQUI / 'votos.json', {}), 'articulos': leer(AQUI / 'articulos.json', [])}
+           'votos': leer(AQUI / 'votos.json', {}), 'articulos': leer(AQUI / 'articulos.json', []), 'personas': leer(AQUI / 'personas.json', {})}
     estado = calcular(corpus, clas, temas, tram, cfg, crudo)
     if llave and not o.solo_calcular:
         lect = lectura_llm(estado, llave)

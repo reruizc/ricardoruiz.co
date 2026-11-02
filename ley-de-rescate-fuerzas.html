@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Esquema de fuerzas · Ley de Rescate · Caudal × Cauce</title>
+  <meta name="description" content="Los jugadores de la Ley de Rescate en tres frentes: Congreso, sector público y sector privado, según lo que han dicho." />
+  <link rel="canonical" href="https://ricardoruiz.co/ley-de-rescate-fuerzas.html" />
+  <meta property="og:title" content="Esquema de fuerzas · Ley de Rescate · Caudal × Cauce" />
+  <meta property="og:description" content="Los jugadores de la Ley de Rescate en tres frentes: Congreso, sector público y sector privado, según lo que han dicho." />
+  <meta property="og:image" content="https://ricardoruiz.co/imagenes-index/proyectos/legislativo.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102" />
+  <script defer src="/track.js"></script>
+</head>
+<body>
+  <main class="wrap">
+    <div class="k">Ley de Rescate · PL 477 de 2026 Cámara</div>
+    <h1>Esquema de fuerzas</h1>
+    <p class="lead">Quién empuja, quién frena y quién no ha hablado, en tres frentes. <b>Cada persona está donde la ponen sus propias palabras</b>, y toque cualquiera para ver qué dijo.</p>
+    <div id="app" hidden>
+      <div class="fz-det" id="det"></div><div class="fz" id="fz"></div>
+      <p class="aparte">La marca <b style="color:var(--teal)">T3</b> señala a quien vota primero, en una Comisión Tercera. En Congreso solo aparece quien se ha pronunciado o preside: la cuenta completa, con las 44 personas, está en <a href="ley-de-rescate-votos.html">Los votos</a>. Una declaración no es un voto, y un gremio que no aparece puede estar hablando en privado.</p>
+    </div>
+    <div id="carga">Cargando el seguimiento…</div>
+  </main>
+  <script src="ley-rescate-base.js?v=20261102"></script>
+  <script>
+LR.pagina('fuerzas', E => {
+  const { $, esc, cara, P } = LR;
+  const COLS = [['a', 'Empujan'], ['m', 'Con reparos'], ['i', 'Sin definir'], ['r', 'En contra']], FIL = [['con', 'Congreso', 'Y quienes lideran sus partidos'], ['pub', 'Sector público', 'Gobierno e instituciones'], ['pri', 'Sector privado', 'Gremios, sindicatos, expertos y medios']];
+  const t3 = new Set(E.votos.bloques.flatMap(b => [...b.plantilla.senado, ...b.plantilla.camara]));
+  let sel = E.voces.find(v => v.q === 'Ministerio de Hacienda') || E.voces[0];
+  function det() { $('#det').innerHTML = `${cara(E, sel.s, sel.q, sel.org)}<div><b>${esc(sel.q)}</b><span class="et-p" style="color:${P[sel.p][1]}">${P[sel.p][0]}</span><small>${esc(sel.c)} · ${esc(sel.b)}</small><p>${esc(sel.x)}</p>${sel.u ? `<a href="${esc(sel.u)}" target="_blank" rel="noopener" style="font-size:.76rem">${esc(sel.f)}</a>` : `<small>${esc(sel.f)}</small>`}</div>`; }
+  function pinta() {
+    let h = '<div class="fz-c" style="background:none;border:0"></div>' + COLS.map(([k, t]) => `<div class="fz-c p${k}">${t}</div>`).join('');
+    for (const [g, nom, sub] of FIL) { h += `<div class="fz-f"><b>${nom}</b><small>${sub}</small></div>`;
+      for (const [k, t] of COLS) { const L = E.voces.filter(v => v.g === g && v.p === k);
+        h += `<div class="fz-z p${k}" data-l="${t}">${L.map(v => `<button class="jug ${v === sel ? 'sel' : ''}" data-q="${esc(v.q)}">${cara(E, v.s, v.q, v.org)}<span class="nom">${esc(v.q)}${t3.has(v.s) ? '<em>T3</em>' : ''}</span></button>`).join('')}</div>`; } }
+    $('#fz').innerHTML = h;
+    document.querySelectorAll('.jug').forEach(b => b.onclick = () => { sel = E.voces.find(v => v.q === b.dataset.q); pinta(); det(); if (innerWidth < 880) $('#det').scrollIntoView({ block: 'center' }); }); }
+  pinta(); det();
+});
+  </script>
+</body>
+</html>

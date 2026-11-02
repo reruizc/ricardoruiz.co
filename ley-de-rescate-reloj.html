@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>El reloj · Ley de Rescate · Caudal × Cauce</title>
+  <meta name="description" content="¿Le alcanza el tiempo a la Ley de Rescate? Simulador de plazos con y sin mensaje de urgencia." />
+  <link rel="canonical" href="https://ricardoruiz.co/ley-de-rescate-reloj.html" />
+  <meta property="og:title" content="El reloj · Ley de Rescate · Caudal × Cauce" />
+  <meta property="og:description" content="¿Le alcanza el tiempo a la Ley de Rescate? Simulador de plazos con y sin mensaje de urgencia." />
+  <meta property="og:image" content="https://ricardoruiz.co/imagenes-index/proyectos/legislativo.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102" />
+  <script defer src="/track.js"></script>
+</head>
+<body>
+  <main class="wrap">
+    <div class="k">Ley de Rescate · PL 477 de 2026 Cámara</div>
+    <h1>¿Le alcanza el tiempo?</h1>
+    <p class="lead">El Gobierno quiere la ley antes de terminar 2026. Mueva la fecha del primer debate y vea hasta dónde llega con los plazos mínimos que exige la Constitución.</p>
+    <div id="app" hidden>
+      <div class="panel sim"><div><div class="pills" id="modo"><button class="pill on" data-m="normal">Trámite normal</button><button class="pill" data-m="urgencia">Con mensaje de urgencia</button></div>
+        <label for="d1">Si el primer debate se vota el</label><div class="fd" id="fd1"></div><input type="range" id="d1" /><div class="veredicto" id="ver"></div></div>
+        <ul class="lin" id="lin"></ul></div>
+      <p class="aparte" id="aparte"></p>
+      <section class="bloque"><h2>Si no alcanza</h2><p class="sub"><b>El proyecto no se archiva el 16 de diciembre.</b> Ese día cierra el primer periodo de la legislatura. Sigue desde el 16 de febrero de 2027, y solo se cae si no tiene primer debate antes del 20 de junio de 2027 (arts. 138 y 162 C.P.). Lo que se pierde es tiempo: los impuestos de periodo, como renta, solo aplican desde el periodo siguiente a su vigencia (art. 338 C.P.). Si la ley sale en 2027, esa parte arrancaría en 2028.</p></section>
+    </div>
+    <div id="carga">Cargando el seguimiento…</div>
+  </main>
+  <script src="ley-rescate-base.js?v=20261102"></script>
+  <script>
+LR.pagina('reloj', E => {
+  const { $, fecha, iso, corta, larga, dias, CIERRE, ULT, pasos } = LR; let modo = 'normal';
+  const r = $('#d1'), total = dias(E.hoy, CIERRE); r.min = 1; r.max = total; r.value = Math.max(1, dias(E.hoy, '2026-11-18'));
+  function pinta() { const d1 = iso(new Date(fecha(E.hoy).getTime() + Number(r.value) * 864e5)), P2 = pasos(d1, modo), fin = P2[P2.length - 1][0], ok = fin <= CIERRE, ult = ULT[modo];
+    $('#fd1').textContent = larga(d1);
+    $('#lin').innerHTML = P2.map(([f, t]) => `<li class="${f > CIERRE ? 'tarde' : ''}"><span>${corta(f)}</span><span>${t}</span></li>`).join('') + '<li><span>16 dic</span><span>Terminan las sesiones ordinarias de este periodo</span></li>';
+    $('#ver').className = 'veredicto ' + (ok ? '' : 'no');
+    $('#ver').innerHTML = ok ? `<b>Alcanza</b>, con ${dias(fin, CIERRE)} días de margen y sin contar agenda, fines de semana ni festivos. Último día posible: ${larga(ult)}.` : `<b>No alcanza</b> antes del 16 de diciembre. Se pasa ${dias(CIERRE, fin)} días. Último día posible en este modo: ${larga(ult)}.`;
+    $('#aparte').innerHTML = modo === 'normal' ? `<b>Sin urgencia, la Comisión Tercera de la Cámara tendría que votar a más tardar el ${larga(ULT.normal)}.</b> Por eso importa si llega el mensaje de urgencia. Son plazos mínimos: entre un debate y otro van 8 días, y entre cámaras 15 (art. 160 C.P.).` : `<b>Con urgencia y sesión conjunta solo rige el plazo de 8 días</b>, y las plenarias pueden ser simultáneas (Corte Constitucional, C-784 de 2014). Cada comisión vota por separado, así que basta que una la niegue. El Gobierno no lo ha pedido todavía.`; }
+  r.oninput = pinta; document.querySelectorAll('#modo .pill').forEach(b => b.onclick = () => { modo = b.dataset.m; document.querySelectorAll('#modo .pill').forEach(x => x.classList.toggle('on', x === b)); pinta(); }); pinta();
+});
+  </script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bitácora y método · Ley de Rescate · Caudal × Cauce</title>
+  <meta name="description" content="Lo que ha pasado con la Ley de Rescate y cómo se mide este seguimiento." />
+  <link rel="canonical" href="https://ricardoruiz.co/ley-de-rescate-bitacora.html" />
+  <meta property="og:title" content="Bitácora y método · Ley de Rescate · Caudal × Cauce" />
+  <meta property="og:description" content="Lo que ha pasado con la Ley de Rescate y cómo se mide este seguimiento." />
+  <meta property="og:image" content="https://ricardoruiz.co/imagenes-index/proyectos/legislativo.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261102" />
+  <script defer src="/track.js"></script>
+</head>
+<body>
+  <main class="wrap">
+    <div class="k">Ley de Rescate · PL 477 de 2026 Cámara</div>
+    <h1>Lo que ha pasado</h1>
+    <p class="lead">Los hechos del trámite y las señales de prensa, con su fuente. Lo que viene de prensa y no está confirmado se marca así.</p>
+    <div id="app" hidden>
+      <div class="panel"><div class="bit" id="bit"></div></div>
+      <section class="bloque" id="metodo"><div class="k">Cómo se mide</div><h2>Qué es y qué no es esto</h2><div class="met" id="met"></div></section>
+      <section class="bloque"><h2>Fotos</h2><div class="cred" id="cred"></div></section>
+    </div>
+    <div id="carga">Cargando el seguimiento…</div>
+  </main>
+  <script src="ley-rescate-base.js?v=20261102"></script>
+  <script>
+LR.pagina('bitacora', E => {
+  const { $, esc, corta, FN, MIN_POST } = LR, L = [...(E.hitos || [])], T = E.tramite || {}, red = ['x', 'tiktok', 'instagram', 'facebook'].filter(f => E.fuentes[f]?.n);
+  for (const c of T.cambios || []) L.push({ fecha: c.fecha, t: `La ficha oficial cambió de «${c.antes}» a «${c.ahora}».`, fuente: 'Ficha de la Cámara', url: E.proyecto.ficha });
+  for (const s of E.lectura?.senales || []) L.push({ fecha: E.lectura.fecha, t: s.texto, fuente: 'Detectado en prensa, sin verificar' });
+  L.sort((a, b) => b.fecha.localeCompare(a.fecha));
+  $('#bit').innerHTML = L.map(h => `<div><b>${corta(h.fecha)}</b><span>${esc(h.t)} ${h.url ? `<a href="${esc(h.url)}" target="_blank" rel="noopener">${esc(h.fuente)}</a>` : `<small>${esc(h.fuente)}</small>`}</span></div>`).join('');
+  $('#met').innerHTML = `<p>Esta página mide <b>lo que se publica</b>, no lo que piensa el país. Un titular repetido por veinte medios pesa veinte veces, y en redes hablan quienes ya están interesados.</p><ul>
+    <li><b>Trámite:</b> ficha oficial de la Cámara y órdenes del día, leídos a diario. La ficha manda sobre la prensa. Si un orden del día viene escaneado y no se puede leer, no se da por vacío.</li>
+    <li><b>Prensa:</b> titulares de Google News. Cada titular se asigna a un tema y a una postura frente a la medida, no frente al Gobierno.</li>
+    <li><b>Redes:</b> publicaciones y comentarios públicos de ${red.map(f => FN[f]).join(', ')}. Las cuentas de personas comunes no se nombran. El porcentaje de rechazo solo se muestra con ${MIN_POST} textos con postura o más.</li>
+    <li><b>Clasificación:</b> la hace un modelo de lenguaje con un libro de códigos fijo. Puede equivocarse, sobre todo con el sarcasmo.</li>
+    <li><b>Artículos:</b> los 106 se agrupan en ${E.temas.length - 1} temas, porque casi nadie cita un número de artículo. Tres artículos sin tema propio quedan en gris.</li>
+    <li><b>Votos:</b> composición oficial de las comisiones. Las posturas son declaraciones, no votos.</li>
+    <li><b>Plazos:</b> mínimos de la Constitución. La agenda real, los festivos y las sesiones extraordinarias los mueven.</li>
+    <li><b>Texto:</b> <a href="${esc(E.proyecto.pdf)}" target="_blank" rel="noopener">proyecto radicado</a> · <a href="${esc(E.proyecto.ficha)}" target="_blank" rel="noopener">ficha de la Cámara</a>. Si el Congreso cambia el articulado, las fichas se actualizan con la ponencia.</li></ul>`;
+  const w = Object.values(E.personas).filter(p => p.credito);
+  $('#cred').innerHTML = `Congresistas: fotos oficiales del Senado de la República y la Cámara de Representantes. Quien no tiene foto verificable sale con iniciales. Wikimedia Commons: ${w.map(p => `${esc(p.n)} (<a href="${esc(p.archivo)}" target="_blank" rel="noopener">${esc(p.credito)}, ${esc(p.licencia)}</a>)`).join(' · ')}.`;
+});
+  </script>
+</body>
+</html>
