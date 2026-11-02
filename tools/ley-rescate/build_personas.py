@@ -29,7 +29,10 @@ UA_WIKI = 'ricardoruiz.co-ley-rescate/1.0 (https://ricardoruiz.co)'
 WIKI = {'José Manuel Restrepo': 'José Manuel Restrepo Abondano', 'Miguel Gómez Martínez': 'Miguel Gómez Martínez', 'Álvaro Uribe': 'Álvaro Uribe',
         'Gustavo Petro': 'Gustavo Petro', 'Mauricio Cárdenas': 'Mauricio Cárdenas Santamaría', 'Iván Duque': 'Iván Duque', 'Paloma Valencia': 'Paloma Valencia',
         'Carolina Corcho': 'Carolina Corcho', 'María Fernanda Cabal': 'María Fernanda Cabal', 'Vicky Dávila': 'Vicky Dávila',
-        'María Fernanda Carrascal': 'María Fernanda Carrascal', 'Lisandro Junco': 'Lisandro Junco', 'Fabio Arias': 'Fabio Arias Giraldo'}
+        'María Fernanda Carrascal': 'María Fernanda Carrascal', 'Lisandro Junco': 'Lisandro Junco', 'Fabio Arias': 'Fabio Arias Giraldo',
+        'Iván Cepeda': 'Iván Cepeda Castro', 'José Antonio Ocampo': 'José Antonio Ocampo', 'Alberto Carrasquilla': 'Alberto Carrasquilla Barrera',
+        'Juan Camilo Restrepo': 'Juan Camilo Restrepo Salazar', 'Juan Daniel Oviedo': 'Juan Daniel Oviedo', 'Andrés Julián Rendón': 'Andrés Julián Rendón',
+        'Luis Carlos Reyes': 'Luis Carlos Reyes Hernández', 'María Claudia Lacouture': 'María Claudia Lacouture', 'Jennifer Pedraza': 'Jennifer Pedraza'}
 BLOQUE = [('salvacion', 'sn'), ('centro democratico', 'cd'), ('conservador', 'con'), ('cambio radical', 'cr'), ('partido de la u', 'u'), ('liberal', 'lib'),
           ('alianza social independiente', 'asi'), ('verde', 'verde'), ('pacto historico', 'pacto'), ('pa-vida|uraba|paz es vida', 'paz')]
 
@@ -137,9 +140,13 @@ def main():
     for v in voces:
         if v.get('org'):
             continue
+        v.pop('s', None)  # se recalcula: una foto vieja mal cruzada no puede sobrevivir a la corrida
         t = norm(v['q']).split()
-        s_hit = next((s for n, s in sn if all(x in norm(n) for x in t)), None)
-        r_hit = next((r for r in reps if all(x in norm(r['Nombre']) for x in t)), None)
+        # Solo se busca en el registro del Congreso a quien está en el frente Congreso: un analista homónimo
+        # recibiría la cara de otro (pasó con Simón Gómez contra el representante Simón Molina Gómez).
+        es_con = v.get('g') == 'con'
+        s_hit = next((s for n, s in sn if all(x in norm(n) for x in t)), None) if es_con else None
+        r_hit = next((r for r in reps if all(x in norm(r['Nombre']) for x in t)), None) if es_con else None
         if s_hit:
             v['s'] = persona(nombre_sen(s_hit), s_hit.get('image'), 'Senado de la República')
         elif r_hit:
