@@ -5,9 +5,9 @@ name: Ley de Rescate · rastreo diario
 # ley-rescate-data/, que sirve GitHub Pages a ley-de-rescate-avance.html.
 # Doc: tools/ley-rescate/LEEME.md
 #
-# El estado privado (corpus con comentarios de personas, clasificación) NO va al repo:
-# viaja como artefacto de una corrida a la siguiente (se guarda 90 días; cada corrida lo
-# renueva). Si se pierde, el rastreo arranca de cero y solo pierde el histórico.
+# El corpus no va al repo: viaja como artefacto de una corrida a la siguiente (90 días, cada
+# corrida lo renueva). En un repo público cualquier cuenta de GitHub puede bajar un artefacto,
+# así que rastreo.py lo guarda sin usuarios de personas comunes y redes-crudo.json NO se sube.
 #
 # Secretos: APIFY_TOKEN · DEEPSEEK_API_KEY
 # Variables opcionales: LR_TOPE_USD (por corrida, 1.5) · LR_TOPE_MES_USD (45) · LR_REDES=off apaga Apify
@@ -38,7 +38,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  LR_DATOS: ${{ github.workspace }}/.lr
+  LR_DATOS: ${{ github.workspace }}/lr-datos
   GH_TOKEN: ${{ github.token }}
 
 jobs:
@@ -68,6 +68,7 @@ jobs:
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           LR_TOPE_USD: ${{ inputs.tope_usd || vars.LR_TOPE_USD }}
           LR_TOPE_MES_USD: ${{ vars.LR_TOPE_MES_USD }}
+          LR_DIAS: ${{ inputs.dias || '2' }}
         run: node tools/ley-rescate/redes.mjs
 
       - name: Rastrear, clasificar y publicar
@@ -81,8 +82,11 @@ jobs:
         with:
           name: ley-rescate-estado
           path: |
-            .lr/*.json
-            !.lr/*.tmp
+            lr-datos/corpus.json
+            lr-datos/clasif.json
+            lr-datos/tramite.json
+            lr-datos/lectura.json
+            lr-datos/gasto-redes.json
           retention-days: 90
           if-no-files-found: warn
 

@@ -13,17 +13,18 @@ rastreo.py          trámite + prensa + clasificación + cálculo → estado.jso
 .github/workflows/ley-rescate-rastreo.yml   corrida diaria, 06:15 de Bogotá
 ```
 
-Datos en `Bases de datos/ley-rescate/` (gitignored): `corpus.json` y `clasif.json` son privados porque guardan
-comentarios de personas. Solo `estado.json` se publica, copiado a `ley-rescate-data/estado.json` en el repo (lo sirve
-GitHub Pages; el workflow lo commitea a diario). En Actions el estado privado viaja como **artefacto**
+Solo `estado.json` se publica, copiado a `ley-rescate-data/estado.json` en el repo (lo sirve
+GitHub Pages; el workflow lo commitea a diario). En Actions el corpus viaja como **artefacto**
 `ley-rescate-estado` de una corrida a la siguiente: las llaves de S3 del repositorio no pueden escribir en prefijos
-nuevos. `?local=1` lee el JSON del disco.
+nuevos. ⚠️ En un repo público cualquier cuenta de GitHub puede bajar un artefacto, así que el corpus se guarda sin
+usuarios ni enlaces de personas comunes, y `redes-crudo.json`, que sí los trae, no se sube. ⚠️ `upload-artifact` omite
+las carpetas ocultas: por eso es `lr-datos/` y no `.lr/` (así se perdió la primera lectura). `?local=1` lee el JSON del disco.
 
 ## Operar
 
 - Correr a mano: pestaña Actions → «Ley de Rescate · rastreo diario» → Run workflow (`tope_usd` sube el tope de Apify
   solo esa vez; `sin_redes` no gasta).
-- Bajar el estado privado para mirarlo: `gh run download <id> -n ley-rescate-estado -D "Bases de datos/ley-rescate"`.
+- Bajar el corpus para mirarlo: `gh run download <id> -n ley-rescate-estado -D "Bases de datos/ley-rescate"`.
 - Apagar las redes sin apagar lo demás: variable `LR_REDES=off` en GitHub.
 
 ## Costo
@@ -40,7 +41,7 @@ nuevos. `?local=1` lee el JSON del disco.
 - **La postura es frente a la medida, no frente al Gobierno.** «Informa» no es neutralidad del medio: es que el titular no toma partido.
 - **Sin modelo no hay postura.** Sin `DEEPSEEK_API_KEY` el tema sale por palabras y la postura queda vacía.
 - **Las llaves solo se leen del entorno.** No se traen de la Lambda ni de archivos.
-- **Personas comunes sin nombre.** Citas sin `@`, enlaces ni teléfonos. El autor solo sale si es verificado o tiene 50.000 seguidores.
+- **Personas comunes sin nombre.** Ni en la página ni en el corpus: citas sin `@`, enlaces ni teléfonos. El autor solo se guarda si es verificado o tiene 50.000 seguidores.
 - Un orden del día escaneado no significa que el proyecto no esté: va a `agenda_no_leida`.
 - Al cambiar el libro de códigos o el prompt, subir `CLAS_VERSION`: reclasifica todo.
 - Cuando salga la ponencia, actualizar `temas.json`, porque el articulado cambia.

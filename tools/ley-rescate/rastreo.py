@@ -199,8 +199,10 @@ def mezclar_redes(corpus):
         if k in corpus:
             corpus[k]['inter'] = max(corpus[k].get('inter', 0), it.get('inter') or 0)
             continue
-        corpus[k] = {'f': it.get('red'), 'tipo': it.get('tipo'), 'txt': txt, 'autor': it.get('autor') or '',
-                     'seg': it.get('seguidores') or 0, 'ver': bool(it.get('verificado')), 'url': it.get('url') or '',
+        # El estado viaja en un artefacto que cualquier cuenta de GitHub puede bajar: la gente común va sin nombre.
+        pub = bool(it.get('verificado')) or (it.get('seguidores') or 0) >= 50000
+        corpus[k] = {'f': it.get('red'), 'tipo': it.get('tipo'), 'txt': limpia_cita(txt, 500), 'padre': limpia_cita(it.get('padre') or '', 200),
+                     'autor': it.get('autor') if pub else '', 'url': it.get('url') if pub else '',
                      'pub': normaliza_fecha(it.get('fecha')) or crudo.get('generado'), 'inter': it.get('inter') or 0}
         nuevos += 1
     return nuevos, crudo
@@ -241,6 +243,7 @@ Reglas:
 - La postura es frente a la MEDIDA, no frente al Gobierno. Un uribista que rechaza el IVA a la comida es «r» en iva_alimentos.
 - Un titular que solo cuenta qué dice la norma es «i», aunque la noticia sea mala. «La medicina prepagada podría subir» es «i».
 - Si el titular cita a alguien que apoya o rechaza, la postura es la de esa persona: «No acompañaré estas medidas: Norma Hurtado» es «r».
+- Una línea «[comentario a: …] texto» es una respuesta a esa publicación. Es rel 1 salvo que sea publicidad o spam, y el tema es el de la publicación si el comentario no nombra otro.
 - El sarcasmo existe. Ante la duda, «i». Nunca inventes un tema que el texto no toque.
 Responde SOLO un arreglo JSON, sin texto alrededor."""
 
@@ -269,6 +272,12 @@ def valida(fila, ids):
     return {'rel': rel, 't': t, 'v': str(fila.get('v') or '')[:12]}
 
 
+def texto_de(it):
+    if it.get('tipo') == 'comentario':
+        return f"[comentario a: {(it.get('padre') or 'una publicación sobre la ley')[:130]}] {it['txt'][:220]}"
+    return it['txt'][:300]
+
+
 def clasificar(corpus, clas, temas, llave, lote=40):
     ids = {t['id'] for t in temas} | {'general'}
     faltan = [k for k in corpus if clas.get(k, {}).get('cv') != CLAS_VERSION]
@@ -283,7 +292,7 @@ def clasificar(corpus, clas, temas, llave, lote=40):
     sistema = instrucciones(temas)
 
     def uno(ks):
-        linea = '\n'.join(f"{i}\t{corpus[k]['txt'][:300]}" for i, k in enumerate(ks))
+        linea = '\n'.join(f"{i}\t{texto_de(corpus[k])}" for i, k in enumerate(ks))
         for _ in range(2):
             try:
                 return ks, json_de(deepseek(sistema, linea, llave))
@@ -305,14 +314,14 @@ def clasificar(corpus, clas, temas, llave, lote=40):
 
 # ─────────────────────────────────────────────────────────── cálculo
 
-def limpia_cita(txt):
-    """Lo que se publica de una persona común: sin @, sin enlaces, sin teléfonos ni correos."""
+def limpia_cita(txt, tope=220):
+    """El texto de una persona común: sin @, sin enlaces, sin teléfonos ni correos."""
     txt = re.sub(r'https?://\S+|www\.\S+', '', txt)
     txt = re.sub(r'\S+@\S+\.\S+', '', txt)
     txt = re.sub(r'@\w+', '@…', txt)
     txt = re.sub(r'\+?\d[\d\s\-]{6,}\d', '', txt)
     txt = re.sub(r'\s+', ' ', txt).strip()
-    return ''.join(list(txt)[:220])
+    return ''.join(list(txt)[:tope])
 
 
 def calcular(corpus, clas, temas, tram, cfg, crudo):
@@ -359,9 +368,8 @@ def calcular(corpus, clas, temas, tram, cfg, crudo):
             if f == 'prensa':
                 tit[tema].append({'t': it['txt'], 'm': it['medio'], 'u': it['url'], 'f': dia, 'p': p, 'w': it.get('peso', .4)})
             elif p in ('a', 'r', 'm'):
-                pub = it.get('ver') or (it.get('seg') or 0) >= 50000
                 cit[tema].append({'t': limpia_cita(it['txt']), 'r': f, 'p': p, 'i': it.get('inter') or 0, 'f': dia,
-                                  'a': it.get('autor') if pub else None, 'u': it.get('url') if pub else None})
+                                  'a': it.get('autor') or None, 'u': it.get('url') or None})
     salida = []
     fichas = temas + [{'id': 'general', 'nombre': 'La ley en conjunto', 'corto': 'Lo que se dice del proyecto sin hablar de una medida concreta: el trámite, el default, las negociaciones.', 'arts': [], 'pag': '', 'rige': ''}]
     for t in fichas:

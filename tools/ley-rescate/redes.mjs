@@ -25,20 +25,24 @@ const TOPE_MES = Number(process.env.LR_TOPE_MES_USD || 45);
 
 /* Qué se busca. Son frases, no palabras: «rescate» a secas trae rescatistas. */
 const hoy = new Date();
-const dias = Number(arg('dias') || 2);
+const dias = Number(arg('dias') || process.env.LR_DIAS || 2);
 const desde = new Date(hoy - dias * 864e5).toISOString().slice(0, 10);
 const X_QS = ['"ley de rescate"', '"rescate económico"', '"rescate fiscal"', '#LeyDeRescate', '"reforma tributaria" (Abelardo OR "De la Espriella" OR Gómez)']
   .map(q => `${q} lang:es -filter:retweets since:${desde}`);
+/* Una búsqueda por artículo, ordenada por interacción: los temas callados no salen
+   entre los últimos 500 tweets, y es justo de ellos que se necesita saber si hay voz. */
+const X_TEMAS = ['IVA (comida OR café OR alimentos OR tomate)', '(renta OR "clase media" OR retención)', '(prepagada OR "medicina prepagada")', '(facultades OR ministerios OR "suprimir")',
+  '(amnistía OR normalización OR criptomonedas)', '(RUGE OR "grandes inversiones" OR estabilidad)', '(activos OR privatizar OR vender OR Ecopetrol)', 'patrimonio', '(contratistas OR nómina OR despidos)']
+  .map(q => `"ley de rescate" ${q} lang:es -filter:retweets since:${desde}`);
 const IG_TAGS = ['leyderescate', 'leyderescateeconomico', 'reformatributaria'];
 const TT_TAGS = ['leyderescate', 'leyderescateeconomico', 'reformatributaria'];
 /* Las páginas de los medios nacionales: en Facebook lo que se puede leer son los
    comentarios a sus notas. Es donde comenta más gente que no vive en X. */
-const FB_PAGINAS = ['https://www.facebook.com/RevistaSemana', 'https://www.facebook.com/eltiempo', 'https://www.facebook.com/elespectadorcom',
-  'https://www.facebook.com/NoticiasCaracol', 'https://www.facebook.com/NoticiasRCN', 'https://www.facebook.com/bluradioco', 'https://www.facebook.com/CaracolRadio'];
-const ES_LEY = /(ley de|proyecto de) rescate|rescate (econ[oó]mico|fiscal)|reforma tributaria|tributaria/i;
+const FB_PAGINAS = ['https://www.facebook.com/RevistaSemana', 'https://www.facebook.com/NoticiasCaracol', 'https://www.facebook.com/eltiempo', 'https://www.facebook.com/bluradioco'];
+const ES_LEY = /rescate|reforma tributaria|tributaria|\biva\b|impuestos?\b|hacienda|restrepo|paro nacional/i;
 
 const PLAN = {
-  x: { items: 500, coment: 90 }, tiktok: { items: 45, coment: 80 }, instagram: { items: 40, coment: 60 }, facebook: { items: 70, coment: 100 },
+  x: { items: 500, temas: 360, coment: 120 }, tiktok: { items: 45, coment: 80 }, instagram: { items: 40, coment: 60 }, facebook: { items: 60, coment: 120 },
 };
 
 const texto = it => String(it.text || it.caption || it.desc || it.description || it.message || it.content || '').replace(/\s+/g, ' ').trim();
@@ -46,9 +50,9 @@ const autor = it => String(it.author?.userName || it.author?.username || it.owne
 const fecha = it => it.createdAt || it.createTimeISO || it.timestamp || it.time || it.date || it.createTime || null;
 const seguidores = it => Number(it.author?.followers ?? it.author?.followersCount ?? it.authorMeta?.fans ?? it.user?.followers_count ?? it.followersCount ?? 0) || 0;
 const verificado = it => Boolean(it.author?.isVerified ?? it.author?.isBlueVerified ?? it.authorMeta?.verified ?? it.isVerified ?? false);
-const ficha = (red, tipo, it) => {
+const ficha = (red, tipo, it, padre = '') => {
   const r = referenciaDePost(it) || {};
-  return { red, tipo, texto: Array.from(texto(it)).slice(0, 500).join(''), autor: autor(it), seguidores: seguidores(it), verificado: verificado(it),
+  return { red, tipo, padre, texto: Array.from(texto(it)).slice(0, 500).join(''), autor: autor(it), seguidores: seguidores(it), verificado: verificado(it),
     fecha: fecha(it), url: r.url || '', inter: Number(r.reaccion || 0) + Number(r.comentarios || 0) };
 };
 
@@ -90,23 +94,28 @@ async function main() {
      parte más cara, así que van después de leer las cuatro redes. */
   const paraComentar = [];
   const x = (await correr('x', 'posts', REDES.x.actor, REDES.x.input(X_QS, Math.ceil(PLAN.x.items / X_QS.length)))).filter(i => !/KaitoEasyAPI/i.test(texto(i)));
-  x.forEach(i => items.push(ficha('x', 'post', i)));
-  paraComentar.push(['x', x]);
+  const xt = (await correr('x', 'posts por tema', REDES.x.actor, { ...REDES.x.input(X_TEMAS, Math.ceil(PLAN.x.temas / X_TEMAS.length)), sort: 'Top' })).filter(i => !/KaitoEasyAPI/i.test(texto(i)));
+  [...x, ...xt].forEach(i => items.push(ficha('x', 'post', i)));
+  paraComentar.push(['x', [...xt, ...x]]);
   const tt = await correr('tiktok', 'posts', REDES.tiktok.actor, REDES.tiktok.input(TT_TAGS, Math.ceil(PLAN.tiktok.items / TT_TAGS.length)));
   tt.forEach(i => items.push(ficha('tiktok', 'post', i)));
   paraComentar.push(['tiktok', tt]);
   const ig = await correr('instagram', 'posts', REDES.instagram.actor, REDES.instagram.input(IG_TAGS, Math.ceil(PLAN.instagram.items / IG_TAGS.length)));
   ig.forEach(i => items.push(ficha('instagram', 'post', i)));
   paraComentar.push(['instagram', ig]);
-  const fb = (await correr('facebook', 'posts', REDES.facebook.actor, REDES.facebook.input(FB_PAGINAS, Math.ceil(PLAN.facebook.items / FB_PAGINAS.length)))).filter(i => ES_LEY.test(texto(i)));
+  const fbTodo = await correr('facebook', 'posts', REDES.facebook.actor, REDES.facebook.input(FB_PAGINAS, Math.ceil(PLAN.facebook.items / FB_PAGINAS.length)));
+  const fb = fbTodo.filter(i => ES_LEY.test(texto(i)));
+  (informe.facebook ||= []).push(`sobre la ley: ${fb.length} de ${fbTodo.length}`);
   fb.forEach(i => items.push(ficha('facebook', 'post', i)));
-  paraComentar.push(['facebook', fb]);
+  paraComentar.unshift(['facebook', fb]);
 
+  /* Un comentario suelto («qué horror») no dice de qué habla: se guarda con su publicación. */
   for (const [red, lista] of paraComentar) {
-    const top = lista.map(referenciaDePost).filter(Boolean).sort((a, b) => b.reaccion - a.reaccion).slice(0, 4);
+    const top = lista.map(i => ({ ...referenciaDePost(i), texto: texto(i) })).filter(r => r.url).sort((a, b) => b.reaccion - a.reaccion).slice(0, 6);
     if (!top.length || !COMENTARIOS[red]) continue;
     const cs = await correr(red, 'comentarios', COMENTARIOS[red].actor, COMENTARIOS[red].input(top, Math.ceil(PLAN[red].coment / top.length)));
-    cs.filter(i => !/KaitoEasyAPI/i.test(texto(i))).forEach(i => items.push(ficha(red, 'comentario', i)));
+    const padreDe = c => { const j = JSON.stringify(c); return (top.find(t => (t.id && j.includes(String(t.id))) || j.includes(t.url.replace(/\/$/, '').split('/').pop())) || {}).texto || ''; };
+    cs.filter(i => !/KaitoEasyAPI/i.test(texto(i))).forEach(i => items.push(ficha(red, 'comentario', i, padreDe(i).slice(0, 200))));
   }
   gasto[mes] = Math.round(((gasto[mes] || 0) + usd) * 1000) / 1000;
   await mkdir(DATOS, { recursive: true });
