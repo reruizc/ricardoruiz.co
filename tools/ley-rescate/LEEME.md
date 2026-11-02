@@ -33,7 +33,7 @@ las carpetas ocultas: por eso es `lr-datos/` y no `.lr/` (así se perdió la pri
 |---|---|---|
 | Prensa | gratis | no aplica |
 | Clasificación DeepSeek | centavos por corrida | no aplica |
-| Redes Apify | a medir en la primera corrida; estimado US$1 al día | `LR_TOPE_USD` 1,5 por corrida · `LR_TOPE_MES_USD` 45 |
+| Redes Apify | medido: US$0,97 y US$1,06 solo en publicaciones; con comentarios, hasta US$1,5 | `LR_TOPE_USD` 1,5 por corrida (reserva US$0,40 para comentarios) · `LR_TOPE_MES_USD` 45 |
 
 ## Reglas
 
