@@ -36,6 +36,16 @@
     gestion: ['concejo', 'aprobad', 'aprobamos', 'proyecto de acuerdo', 'plenaria', 'debate', 'gestion', 'logramos', 'radicamos', 'propuesta'],
   };
   const tieneTema = (txt, tema) => { const t = norm(txt); return TEMAS_REDES[tema].some(w => t.includes(' ' + w)); };
+  /* Cada publicación cuenta para UN tema: el que más nombra. Gestión es el
+     residual: el reconocimiento a un pastor «desde el Concejo» es de fe, no de
+     gestión (pasó con Emel, y le daba a «El que resuelve» el mismo puntaje
+     que a «Fe y familia»). */
+  const ORDEN_TEMAS = ['fe', 'seguridad', 'bolsillo', 'gestion'];
+  function temaDe(txt) {
+    const t = norm(txt), hits = k => TEMAS_REDES[k].filter(w => t.includes(' ' + w)).length;
+    const fuertes = ORDEN_TEMAS.slice(0, 3).map(k => [k, hits(k)]).filter(([, n]) => n).sort((a, b) => b[1] - a[1]);
+    return fuertes.length ? fuertes[0][0] : hits('gestion') ? 'gestion' : '';
+  }
 
   /* Lo que una causa escrita por la persona dice de su eje. */
   const CAUSA_EJE = [
@@ -141,7 +151,7 @@
     const total = xs.length, prom = total ? xs.reduce((s, p) => s + inter(p), 0) / total : 0;
     const out = { total, prom, temas: {} };
     Object.keys(TEMAS_REDES).forEach(t => {
-      const ys = xs.filter(p => tieneTema(p.texto, t));
+      const ys = xs.filter(p => temaDe(p.texto) === t);
       out.temas[t] = { n: ys.length, prom: ys.length ? ys.reduce((s, p) => s + inter(p), 0) / ys.length : 0 };
     });
     return out;
@@ -205,5 +215,5 @@
       .sort((a, b) => b.puntos - a.puntos || EJES.indexOf(porId[a.id]) - EJES.indexOf(porId[b.id]));
   }
 
-  global.C360Ejes = { EJES, porId, proponer, redesPorTema, tieneTema };
+  global.C360Ejes = { EJES, porId, proponer, redesPorTema, tieneTema, temaDe };
 })(typeof window !== 'undefined' ? window : globalThis);
