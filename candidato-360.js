@@ -379,8 +379,14 @@ let CAMPANA_ACTUAL = null;
    vuelve a preguntar: se conserva al reescribir la campaña. */
 function camposPropiosCampana() {
   const c = SESSION.vinculo?.campana || CAMPANA_ACTUAL || {}, out = {};
-  if (c.causa) out.causa = c.causa;
-  if (c.eje) out.eje = c.eje;
+  /* En modo pruebas lo escrito vive en la copia local: si se reabre desde el
+     vínculo del servidor (que no lo tiene), se toma de la copia local cuando
+     es la misma candidatura. */
+  const loc = PRUEBAS ? leerVinculoLocal() : null;
+  const mismo = loc && (loc.candidato?.nombre || loc.nuevo?.nombre) === (SESSION.vinculo?.candidato?.nombre || SESSION.vinculo?.nuevo?.nombre);
+  const lc = mismo ? loc.campana || {} : {};
+  if (c.causa || lc.causa) out.causa = c.causa || lc.causa;
+  if (c.eje || lc.eje) out.eje = c.eje || lc.eje;
   return out;
 }
 async function guardarCampana(campana) {
