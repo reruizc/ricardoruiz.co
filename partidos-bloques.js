@@ -62,14 +62,17 @@
   'PARTIDO CAMBIO RADICAL': 'cd',
   'PARTIDO CONSERVADOR COLOMBIANO': 'cd',
   'PARTIDO LIGA GOBERNANTES ANTICORRUPCION - LIGA': 'cd',
-  'MOVIMIENTO SALVACION NACIONAL': 'cd',
-  'MOVIMIENTO  SALVACION NACIONAL': 'cd',
   // derecha
+  /* Salvación Nacional va con la derecha, no con el centro-derecha (corrección
+     de Ricardo, 2-nov-2026): es el partido más conservador del espectro
+     colombiano, a la derecha de Centro Democrático en valores. */
+  'MOVIMIENTO SALVACION NACIONAL': 'd',
+  'MOVIMIENTO  SALVACION NACIONAL': 'd',
   'PARTIDO CENTRO DEMOCRATICO': 'd',
   'PARTIDO POLITICO CREEMOS': 'd',
   'NUEVA FUERZA DEMOCRATICA': 'd',
   /* Coalición al Concejo de Bogotá 2023: Nueva Fuerza Democrática (d) +
-     Salvación Nacional (cd). Va con la derecha porque su elegido (NFD) y su
+     Salvación Nacional (d). Va con la derecha porque su elegido (NFD) y su
      electorado son los de la derecha cristiana de familia, más cerca de
      Colombia Justa Libres que de Cambio Radical. Sin esta entrada caía en `sc`. */
   'BOGOTA MAS FUERTE': 'd',
