@@ -43,7 +43,7 @@ _hoy = datetime.date.today()
 FECHA = f"{_MESES[_hoy.month - 1].capitalize()} de {_hoy.year}"
 
 # ── Precios «desde» por corporación: escalera del brief vigente (tamaño 1,0) ──
-BASE_LISTA, COMPLETO_LISTA = 300_000, 1_100_000
+BASE_LISTA, COMPLETO_LISTA = 300_000, 1_050_000   # 1.100.000 con escucha de dos lecturas, que pasó a «Próximamente» (3-nov-2026)
 SUBIDA = 1.2   # +20 % sobre la escalera del brief web (26-oct-2026)
 FACTOR = [("Junta Administradora Local", 1.0), ("Concejo", 1.4), ("Alcaldía", 1.8),
           ("Asamblea", 2.4), ("Gobernación", 3.0)]
@@ -310,7 +310,7 @@ HTML_DOC = f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><style
     <div>
       <div class="formas">
         <div class="forma"><b>Esencial</b><em>Base + briefing</em><p>Para arrancar con el territorio claro y la meta puesta, con su territorio en el correo cada tres días.</p></div>
-        <div class="forma star"><b>Con escucha</b><em>El más elegido</em><p>La base, el briefing y la escucha social dos veces al día en X, Instagram, TikTok y Facebook.</p></div>
+        <div class="forma star"><b>Con escucha</b><em>El más elegido</em><p>La base, el briefing y la escucha social una vez al día en X, Instagram, TikTok y Facebook.</p></div>
         <div class="forma"><b>Completo</b><em>Todo el tablero</em><p>Briefing, escucha con sentimiento, arquetipos, endoso, estrategia y acciones, en un solo lugar.</p></div>
       </div>
       {precios_html()}

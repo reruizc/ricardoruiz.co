@@ -310,14 +310,20 @@ function textoPrecio() {
   return 'Precio por confirmar';
 }
 /* Los tres planes son las «tres formas frecuentes de armarlo» del brief
-   comercial (candidato-360-brief.html#precios). El precio queda «Por definir»
-   hasta que Ricardo fije la cifra base por corporación; lo que sí decide el
-   modal es el siguiente paso: sin cuenta → registrarse (y volver acá con el
-   plan elegido); con cuenta → el pago si está configurado, o el correo. */
+   comercial (candidato-360-brief.html#precios). El precio es el «desde» de la
+   misma escalera: una JAL en ciudad con comunas (factor 1,0) × SUBIDA 1,2.
+   ⚠️ Si cambia la escalera del brief (BASE_LISTA, MODULOS, SUBIDA), cambiarla
+   también aquí: antes el modal decía «Por definir» mientras la portada y el
+   brief decían «desde $360.000». El modal decide el siguiente paso: sin
+   cuenta → registrarse (y volver acá con el plan elegido); con cuenta → el
+   pago si está configurado, o el correo. */
+const C360_LISTA = { base: 300000, briefing: 100000, escucha1: 100000, sentimiento: 130000, endoso: 100000, estrategia: 200000, acciones: 120000 };
+const C360_SUBIDA = 1.2;
+const c360Desde = mods => '$' + (Math.round((C360_LISTA.base + mods.reduce((s, k) => s + (C360_LISTA[k] || 0), 0)) * C360_SUBIDA / 10000) * 10000).toLocaleString('es-CO');
 const C360_PLANES_UI = [
-  { id: 'esencial', nombre: 'Esencial', desc: 'La base y el briefing en el correo. Para arrancar con el territorio claro y la meta puesta.', incluye: ['Historial mesa a mesa, recortado al territorio', 'Mapa por localidad, comuna y barrio', 'Meta de votos y electorado', 'Briefing cada 3 días en su correo'] },
-  { id: 'escucha', nombre: 'Con escucha diaria', destacado: true, desc: 'La base, el briefing y la escucha social dos veces al día en las cuatro redes. El más elegido.', incluye: ['Todo lo del Esencial', 'Escucha social · X, Instagram, TikTok y Facebook', 'Dos lecturas al día sobre sus ideas y su nombre'] },
-  { id: 'completo', nombre: 'Completo', desc: 'La campaña entera leída y planeada desde un solo lugar.', incluye: ['Todo lo de Con escucha diaria', 'Sentimiento en los comentarios', 'Endoso, estrategia y acciones de campaña', 'Arquetipos del territorio (hoy, Bogotá, Medellín y Cartagena)'] },
+  { id: 'esencial', nombre: 'Esencial', mods: ['briefing'], desc: 'La base y el briefing en el correo. Para arrancar con el territorio claro y la meta puesta.', incluye: ['Historial mesa a mesa, recortado al territorio', 'Mapa por localidad, comuna y barrio', 'Meta de votos y electorado', 'Briefing cada 3 días en su correo'] },
+  { id: 'escucha', nombre: 'Con escucha diaria', mods: ['briefing', 'escucha1'], destacado: true, desc: 'La base, el briefing y la escucha social una vez al día en las cuatro redes. El más elegido.', incluye: ['Todo lo del Esencial', 'Escucha social · X, Instagram, TikTok y Facebook', 'Una lectura al día sobre sus ideas y su nombre'] },
+  { id: 'completo', nombre: 'Completo', mods: ['briefing', 'escucha1', 'sentimiento', 'endoso', 'estrategia', 'acciones'], desc: 'La campaña entera leída y planeada desde un solo lugar.', incluye: ['Todo lo de Con escucha diaria', 'Sentimiento en los comentarios', 'Endoso, estrategia y acciones de campaña', 'Arquetipos del territorio (hoy, Bogotá, Medellín y Cartagena)'] },
 ];
 function abrirPaywall(motivo) {
   const modal = $('c360Paywall'); if (!modal) return;
@@ -328,11 +334,12 @@ function abrirPaywall(motivo) {
   const vencio = SESSION.fuente === 'vencido' && SESSION.expiraEn ? new Date(SESSION.expiraEn) : null;
   const textoVencido = vencio && !isNaN(vencio) ? `Su acceso de prueba terminó el ${vencio.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}. Elija un plan para seguir con su candidatura; lo que configuró se conserva.` : '';
   $('c360PaywallMotivo').textContent = motivo || textoVencido || 'El detalle por barrio y los módulos se abren con un plan activo. Elija uno y su cuenta queda vinculada a este candidato.';
-  $('c360PaywallPlanes').innerHTML = C360_PLANES_UI.map(pl => `<div class="c360-plan${pl.destacado ? ' destacado' : ''}${pl.id === elegido ? ' elegido' : ''}"><h3>${escHtml(pl.nombre)}</h3><div class="c360-plan-precio">Por definir<small> /mes</small></div><p>${escHtml(pl.desc)}</p><ul class="c360-lista">${pl.incluye.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul><button type="button" class="wall-btn primary" onclick="elegirPlan('${pl.id}')">${SESSION.token ? 'Elegir este plan' : 'Crear cuenta y elegir'}</button></div>`).join('');
+  $('c360PaywallPlanes').innerHTML = C360_PLANES_UI.map(pl => `<div class="c360-plan${pl.destacado ? ' destacado' : ''}${pl.id === elegido ? ' elegido' : ''}"><h3>${escHtml(pl.nombre)}</h3><div class="c360-plan-precio"><small>desde </small>${c360Desde(pl.mods || [])}<small> /mes</small></div><p>${escHtml(pl.desc)}</p><ul class="c360-lista">${pl.incluye.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul><button type="button" class="wall-btn primary" onclick="elegirPlan('${pl.id}')">${SESSION.token ? 'Elegir este plan' : 'Crear cuenta y elegir'}</button></div>`).join('');
   const next = encodeURIComponent(`${PAGINA}?comprar=1${elegido ? `&plan=${elegido}` : ''}`);
-  $('c360PaywallBotones').innerHTML = SESSION.token
-    ? (configurado ? '' : `<span class="helper" style="margin:0">Mientras se define el precio, la activación se pide por correo: al elegir un plan se abre el mensaje.</span>`)
-    : `<span class="helper" style="margin:0">¿Ya tiene cuenta en ricardoruiz.co? <a href="login.html?next=${next}">Inicie sesión</a> y elija el plan desde acá.</span>`;
+  const notaPrecio = `<span class="helper" style="margin:0 0 .4rem;display:block">Precios de una Junta Administradora Local en una ciudad con comunas: suben con la corporación y el tamaño del territorio. <a href="candidato-360-brief.html#precios" target="_blank" rel="noopener">Arme el suyo</a>.</span>`;
+  $('c360PaywallBotones').innerHTML = notaPrecio + (SESSION.token
+    ? (configurado ? '' : `<span class="helper" style="margin:0">La activación se pide por correo: al elegir un plan se abre el mensaje.</span>`)
+    : `<span class="helper" style="margin:0">¿Ya tiene cuenta en ricardoruiz.co? <a href="login.html?next=${next}">Inicie sesión</a> y elija el plan desde acá.</span>`);
   modal.classList.add('open');
 }
 function elegirPlan(id) {
