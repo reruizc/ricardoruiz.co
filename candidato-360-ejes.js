@@ -204,6 +204,7 @@
     if (s.figura === 'barrio') { suma('resolver', 2, 'Tu voto es de barrio: se apoya en presencia.'); suma('pertenencia', 1); }
     if (s.figura === 'figura') suma('voz', 2, 'Tu voto es de opinión: llega a toda la ciudad.');
     if (s.historial && s.historial.n >= 2) suma('resolver', 1, `Te has lanzado ${s.historial.n} veces: tienes una trayectoria que contar.`);
+    if (s.cargo) suma('resolver', 1, 'Ocupas hoy el cargo: tienes gestión que contar.');
     if (s.nuevo) suma('cambio', 2, 'Es tu primera candidatura: llegas sin una trayectoria que defender.');
     if (s.edadJoven) suma('cambio', 1);
 

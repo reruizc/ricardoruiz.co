@@ -2221,6 +2221,13 @@ es la fe y la familia, con las iglesias de barrio como puerta de entrada (no las
 - ⚠ «Fiel a la Causa» (arquetipo `partido`) no empuja a ningún eje: es lealtad a la lista, y la
   lista ya cuenta por la familia política. Antes empujaba a «Dignidad y derechos» y a un candidato
   de derecha le salía ese eje como alternativa.
+- **Cargo actual** (`cargoActualEstr`): si la persona ganó en 2023 (sale de
+  `CONT_LECTURA.repartoCompleto.electos`, el reparto de 2023 que lee el panel 10), la historia y la
+  semana reciben `cargoActual` y le piden contar su gestión, sin decir qué hizo. Sin esto Emel salía
+  como alguien que «se ha lanzado» tres veces. `cargos-actuales.js` NO sirve aquí: solo trae
+  Congreso, alcaldías y gobernaciones, no concejos ni asambleas. Prompts `h3` y `v8b`.
+- Cada publicación cuenta para UN tema (el que más nombra; gestión es el residual): el
+  reconocimiento a un pastor «desde el Concejo» contaba como gestión y empataba los dos ejes.
 - Al tocar el catálogo, bumpear `candidato-360-ejes.js?v=` en `candidato-360.html`.
 
 ### Candidaturas por lista cerrada en el historial (oct-19-2026)

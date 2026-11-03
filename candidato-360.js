@@ -5273,6 +5273,21 @@ async function guardarCausaEstr() {
    razones; la persona confirma uno, la IA escribe su historia y sus tres
    pilares (/c360/estrategia/ia, modo «historia») y queda guardado en la
    campaña. Las acciones de cada semana salen de ahí. */
+/* El cargo que la persona ocupa HOY, si ganó en 2023 la elección territorial
+   cuyo periodo corre hasta 2027 (sale del reparto de 2023 que ya leyó el panel
+   10). Sin esto la historia la trataba como alguien que «se ha lanzado», y un
+   concejal en ejercicio tiene gestión que contar. */
+const CARGO_CORP = { CONCEJO: 'una curul en el Concejo', ASAMBLEA: 'una curul en la Asamblea', JAL: 'una curul en la JAL', ALCALDIA: 'la Alcaldía', 'ALCALDÍA': 'la Alcaldía', GOBERNACION: 'la Gobernación', 'GOBERNACIÓN': 'la Gobernación' };
+function cargoActualEstr() {
+  const rp = CONT_LECTURA?.repartoCompleto; if (!rp?.electos?.length || !crmCandidate) return '';
+  const slugs = new Set((crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).concat(crmCandidate.slug).filter(Boolean));
+  const e = rp.electos.find(x => slugs.has(x.slug)); if (!e) return '';
+  const partes = String(e.corp || '').split('·').map(x => x.trim()), anio = Number(partes[partes.length - 1]);
+  if (anio !== 2023) return '';
+  const tipo = (partes[0] || '').toUpperCase(), cargo = CARGO_CORP[tipo]; if (!cargo) return '';
+  const lugar = NOMBRE_BONITO(e.circunscripcion || partes[1] || '').replace(/ D\.c\.$/i, '');
+  return `Ocupa hoy ${cargo}${lugar ? ` de ${lugar}` : ''}, periodo 2024-2027: la ganó en 2023${e.partido ? ` con ${NOMBRE_BONITO(e.partido)}` : ''}.`;
+}
 function ejeActual() { const e = (CAMPANA_ACTUAL || SESSION.vinculo?.campana || {}).eje; return e?.id ? e : null; }
 function temasIdsArquetipo(id) {
   const f = ESTR?.L?.ficha?.(id) || {};
@@ -5294,7 +5309,7 @@ async function senalesEje() {
     partidos: [...new Set([k.partido, ...(crmCandidate?.history || []).map(h => h.partido), crmCandidate?.partido].filter(Boolean).map(NOMBRE_BONITO))],
     arquetipos: (R.arquetipos || []).map(a => ({ id: a.id, nombre: a.nombre, share: a.share, ratio: R.lente === 'ciudad' ? null : a.ratio, temas: temasIdsArquetipo(a.id) })),
     figura: R.figura?.lectura || '', historial: { n: crmCandidate?.history?.length || (crmCandidate ? 1 : 0) },
-    nuevo: !crmCandidate, iglesias, redes: pubs.length ? C360Ejes.redesPorTema(pubs) : null,
+    nuevo: !crmCandidate, iglesias, redes: pubs.length ? C360Ejes.redesPorTema(pubs) : null, cargo: cargoActualEstr(),
   };
 }
 async function prepararEje() {
@@ -5484,6 +5499,7 @@ function contextoIAEstrategia(extra) {
     perfil: PERFIL_ESTR || null,
     causa: causaActual(),
     noticias: NOTICIAS_ESTR.map(x => ({ titulo: x.titulo, medio: x.medio, fecha: x.fecha, medios: x.medios })),
+    cargoActual: cargoActualEstr(),
     ...(() => { const e = ejeVigente(); return e ? { eje: { nombre: e.nombre, idea: e.idea, pilares: e.pilares, no_decir: e.no_decir }, senales: e.razones || [] } : {}; })(),
     ...(extra || {}),
   };
