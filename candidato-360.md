@@ -2229,6 +2229,11 @@ es la fe y la familia, con las iglesias de barrio como puerta de entrada (no las
 - ⚠⚠ **«Ver el CRM» reescribía la campaña desde cero** (`launchCRM` → `campanaActual`) y
   borraba la causa y el eje. `camposPropiosCampana()` los conserva al reescribirla. Todo campo
   nuevo que la persona escriba en el CRM (no en la ruta) tiene que entrar ahí.
+  Además el worker (`c360CampanaSave`) conserva `causa` y `eje` guardados si el navegador no los
+  manda (para quitarlos hay que mandar `causa: ""` o `eje: null`): una pestaña vieja ya no los
+  borra. ⚠ En **modo pruebas** (cuenta admin) todo vive en la copia local
+  (`c360-vinculo-pruebas`), no en el servidor: reabrir desde el vínculo del servidor la reescribía;
+  `camposPropiosCampana` toma la causa y el eje de la copia local si es la misma candidatura.
 - Cada publicación cuenta para UN tema (el que más nombra; gestión es el residual): el
   reconocimiento a un pastor «desde el Concejo» contaba como gestión y empataba los dos ejes.
 - Al tocar el catálogo, bumpear `candidato-360-ejes.js?v=` en `candidato-360.html`.
