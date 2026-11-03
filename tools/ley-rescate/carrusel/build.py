@@ -40,6 +40,7 @@ CSS = f"""
 @font-face{{font-family:H;src:url("{U}/fonts/helveticaneue.woff2");font-weight:400}}
 @font-face{{font-family:H;src:url("{U}/fonts/helveticaneue-medium.woff2");font-weight:500}}
 @font-face{{font-family:H;src:url("{U}/fonts/helveticaneue-bold.woff2");font-weight:700}}
+@font-face{{font-family:Syne;src:url("{U}/tools/build-cotizacion-campana/fonts/Syne-ExtraBold.ttf");font-weight:800}}
 *{{margin:0;padding:0;box-sizing:border-box}}
 html,body{{width:1080px;height:1080px;overflow:hidden}}
 body{{font-family:H,sans-serif;color:#14161c;background:#f0f0f0 url("{U}/caudalxcauce/img/topo-claro.webp") center/cover;position:relative}}
@@ -56,7 +57,7 @@ h2{{font-size:56px;line-height:1.04;letter-spacing:-.03em;font-weight:700;margin
 .nota{{font-size:18px;line-height:1.4;color:#667085}}
 .pie{{position:absolute;left:64px;right:64px;bottom:40px;display:flex;justify-content:space-between;align-items:center;font-size:19px;color:#667085}}
 .pie b{{color:{AZUL};font-weight:700}}
-.marca{{display:flex;align-items:center;gap:9px;font-weight:700;color:#14161c;font-size:21px}}
+.marca{{display:flex;align-items:center;gap:9px;color:#14161c}}.marca>span{{font-family:Syne,sans-serif;font-weight:800;font-size:22px;letter-spacing:-.03em}}
 .marca i{{display:flex;align-items:flex-end;gap:3px;height:20px}}.marca i span{{width:5px;background:{AZUL};border-radius:2px}}
 .marca em{{font-style:normal;color:{AZUL}}}
 """
