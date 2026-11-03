@@ -352,7 +352,7 @@
         const r = await api('/c360/me');
         if (r.status === 401) { localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); SESION.token = null; SESION.user = null; }
         else if (r.ok) {
-          SESION.acceso = !!r.data.acceso; SESION.fuente = r.data.fuente || 'ninguno';
+          SESION.acceso = !!r.data.acceso; SESION.fuente = r.data.fuente || 'ninguno'; SESION.expiraEn = r.data.expiraEn || null;
           SESION.vinculo = r.data.vinculo || null;
           if (r.data.soporte) SESION.soporte = r.data.soporte;
           if (r.data.email) SESION.user = Object.assign({}, SESION.user || {}, { email: r.data.email, plan: r.data.plan });
@@ -362,7 +362,10 @@
     if (SESION.token && esAdmin()) { const local = leerVinculoLocal(); if (local) SESION.vinculo = local; }
     pintarNav(pagina);
     const next = encodeURIComponent(pagina);
-    if (!SESION.token) return muro('Este panel trabaja sobre <b>su</b> candidatura, así que primero hay que saber quién es.', `<a class="wall-btn primary" href="login.html?next=${next}">Iniciar sesión</a>`), false;
+    if (!SESION.token) return muro('Este panel trabaja sobre <b>su</b> candidatura, así que primero hay que saber quién es.', `<a class="wall-btn primary" href="login.html?next=${next}">Iniciar sesión</a><a class="wall-btn" href="register.html?next=${next}">Crear cuenta</a>`), false;
+    /* Prueba o cortesía vencida: su propio mensaje, con la fecha. */
+    const vence = SESION.fuente === 'vencido' && SESION.expiraEn ? new Date(SESION.expiraEn) : null;
+    if (!SESION.acceso && vence && !isNaN(vence)) return muro(`Su acceso de prueba a Candidato 360 terminó el ${vence.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}. Su candidatura y lo que configuró se conservan.`, `<a class="wall-btn primary" href="candidato-360.html?comprar=1">Ver los planes</a>`), false;
     if (!SESION.acceso) return muro('Su cuenta todavía no tiene acceso a Candidato 360.', `<a class="wall-btn primary" href="candidato-360.html?comprar=1">Ver qué incluye</a>`), false;
     completarCampana(SESION.vinculo);
     if (!SESION.vinculo) return muro('Su cuenta todavía no tiene una candidatura abierta: los paneles se arman sobre su territorio y su nombre.', `<a class="wall-btn primary" href="candidato-360.html?abrir=1">Abrir mi candidatura</a>`), false;

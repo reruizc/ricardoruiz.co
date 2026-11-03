@@ -279,7 +279,7 @@ async function cargarSesion() {
     try {
       const r = await apiC360('/c360/me');
       if (r.status === 401) { localStorage.removeItem('rr-token'); localStorage.removeItem('rr-user'); SESSION.token = null; SESSION.user = null; }
-      else if (r.ok) { SESSION.acceso = !!r.data.acceso; SESSION.fuente = r.data.fuente || 'ninguno'; SESSION.vinculo = r.data.vinculo || null; if (r.data.soporte) SESSION.soporte = r.data.soporte; if (r.data.email) SESSION.user = Object.assign({}, SESSION.user || {}, { email: r.data.email, plan: r.data.plan }); }
+      else if (r.ok) { SESSION.acceso = !!r.data.acceso; SESSION.fuente = r.data.fuente || 'ninguno'; SESSION.expiraEn = r.data.expiraEn || null; SESSION.vinculo = r.data.vinculo || null; if (r.data.soporte) SESSION.soporte = r.data.soporte; if (r.data.email) SESSION.user = Object.assign({}, SESSION.user || {}, { email: r.data.email, plan: r.data.plan }); }
       else SESSION.error = r.data?.error || `HTTP ${r.status}`;   /* sin respuesta válida no hay acceso: falla cerrado */
     } catch (e) { SESSION.error = String(e); }
   }
@@ -317,13 +317,17 @@ function textoPrecio() {
 const C360_PLANES_UI = [
   { id: 'esencial', nombre: 'Esencial', desc: 'La base y el briefing en el correo. Para arrancar con el territorio claro y la meta puesta.', incluye: ['Historial mesa a mesa, recortado al territorio', 'Mapa por localidad, comuna y barrio', 'Meta de votos y electorado', 'Briefing cada 3 días en su correo'] },
   { id: 'escucha', nombre: 'Con escucha diaria', destacado: true, desc: 'La base, el briefing y la escucha social dos veces al día en las cuatro redes. El más elegido.', incluye: ['Todo lo del Esencial', 'Escucha social · X, Instagram, TikTok y Facebook', 'Dos lecturas al día sobre sus ideas y su nombre'] },
-  { id: 'completo', nombre: 'Completo', desc: 'La campaña entera leída y planeada desde un solo lugar.', incluye: ['Todo lo de Con escucha diaria', 'Sentimiento en los comentarios', 'Endoso, estrategia y acciones de campaña', 'Arquetipos del territorio (hoy, Medellín y Cartagena)'] },
+  { id: 'completo', nombre: 'Completo', desc: 'La campaña entera leída y planeada desde un solo lugar.', incluye: ['Todo lo de Con escucha diaria', 'Sentimiento en los comentarios', 'Endoso, estrategia y acciones de campaña', 'Arquetipos del territorio (hoy, Bogotá, Medellín y Cartagena)'] },
 ];
 function abrirPaywall(motivo) {
   const modal = $('c360Paywall'); if (!modal) return;
   const configurado = Boolean(SESSION.planes?.configurado && SESSION.planes?.links?.mensual);
   const elegido = new URLSearchParams(location.search).get('plan') || (() => { try { return localStorage.getItem('c360-plan'); } catch { return ''; } })();
-  $('c360PaywallMotivo').textContent = motivo || 'El detalle por barrio y los módulos se abren con un plan activo. Elija uno y su cuenta queda vinculada a este candidato.';
+  /* Una prueba o cortesía vencida tiene su propio mensaje: «todavía no tiene
+     acceso» confundía a quien ya lo tuvo. */
+  const vencio = SESSION.fuente === 'vencido' && SESSION.expiraEn ? new Date(SESSION.expiraEn) : null;
+  const textoVencido = vencio && !isNaN(vencio) ? `Su acceso de prueba terminó el ${vencio.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}. Elija un plan para seguir con su candidatura; lo que configuró se conserva.` : '';
+  $('c360PaywallMotivo').textContent = motivo || textoVencido || 'El detalle por barrio y los módulos se abren con un plan activo. Elija uno y su cuenta queda vinculada a este candidato.';
   $('c360PaywallPlanes').innerHTML = C360_PLANES_UI.map(pl => `<div class="c360-plan${pl.destacado ? ' destacado' : ''}${pl.id === elegido ? ' elegido' : ''}"><h3>${escHtml(pl.nombre)}</h3><div class="c360-plan-precio">Por definir<small> /mes</small></div><p>${escHtml(pl.desc)}</p><ul class="c360-lista">${pl.incluye.map(i => `<li>${escHtml(i)}</li>`).join('')}</ul><button type="button" class="wall-btn primary" onclick="elegirPlan('${pl.id}')">${SESSION.token ? 'Elegir este plan' : 'Crear cuenta y elegir'}</button></div>`).join('');
   const next = encodeURIComponent(`${PAGINA}?comprar=1${elegido ? `&plan=${elegido}` : ''}`);
   $('c360PaywallBotones').innerHTML = SESSION.token
