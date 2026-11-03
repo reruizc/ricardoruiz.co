@@ -375,6 +375,14 @@ async function guardarVinculo(payload) {
   SESSION.vinculo = r.data.vinculo; borrarPendiente(); return { ok: true };
 }
 let CAMPANA_ACTUAL = null;
+/* Lo que la persona escribió o escogió en el CRM y ningún formulario de ruta
+   vuelve a preguntar: se conserva al reescribir la campaña. */
+function camposPropiosCampana() {
+  const c = SESSION.vinculo?.campana || CAMPANA_ACTUAL || {}, out = {};
+  if (c.causa) out.causa = c.causa;
+  if (c.eje) out.eje = c.eje;
+  return out;
+}
 async function guardarCampana(campana) {
   if (!SESSION.vinculo) return;
   CAMPANA_ACTUAL = campana;
@@ -1980,7 +1988,7 @@ async function createNew(e) {
   if (!nuevo.nombre || !campana.corp || !campana.departamento) return;
   if (vitrina) guardarPendiente({ tipo: 'nuevo', nuevo, campana });   /* vista previa: solo en este navegador */
   else if (PRUEBAS) vinculoLocal({ tipo: 'nuevo', nuevo, campana });
-  else if (SESSION.vinculo) guardarCampana(campana);   /* quien vuelve a definir el partido */
+  else if (SESSION.vinculo) guardarCampana({ ...camposPropiosCampana(), ...campana });   /* quien vuelve a definir el partido */
   else {
     const sigue = await confirmarVinculo(nuevo.nombre, `${CRM_CORPORATIONS[campana.corp]} · ${[campana.localidad, campana.municipio, depNombre].filter(Boolean).join(' · ')}`);
     if (!sigue) return;
@@ -2534,7 +2542,10 @@ async function launchCRM(event) {
   const corpKey = isOther ? $('otherCorporation').value : corporacionHistorica(crmCandidate) || 'concejo';
   const corporation = CRM_CORPORATIONS[corpKey], territory = campaignTerritory(corpKey);
   if (territory === null) { irAPaso('lugar', { animar: true }); $('campaignDepartment').focus({ preventScroll: true }); return; }
-  const campana = campanaActual(corpKey);
+  /* La campaña se arma con lo del formulario, pero la causa y el eje son de la
+     persona, no de la ruta: sin conservarlos, volver a pasar por «Ver el CRM»
+     los borraba (le pasó al eje de Emel el día que se confirmó). */
+  const campana = { ...camposPropiosCampana(), ...campanaActual(corpKey) };
   if (CRM_VITRINA) guardarPendiente({ tipo: 'historial', candidato: { id: crmCandidate.id, nombre: crmCandidate.nombre, slugs: (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean), corp: crmCandidate.corp, partido: crmCandidate.partido, circunscripcion: crmCandidate.circunscripcion }, campana });   /* vista previa: solo en este navegador */
   else if (PRUEBAS) vinculoLocal({ tipo: 'historial', candidato: { id: crmCandidate.id, nombre: crmCandidate.nombre, slugs: (crmCandidate.history?.length ? crmCandidate.history : [crmCandidate]).map(c => c.slug).filter(Boolean), corp: crmCandidate.corp, partido: crmCandidate.partido, circunscripcion: crmCandidate.circunscripcion }, campana });
   else if (!SESSION.vinculo) {

@@ -2226,6 +2226,9 @@ es la fe y la familia, con las iglesias de barrio como puerta de entrada (no las
   semana reciben `cargoActual` y le piden contar su gestión, sin decir qué hizo. Sin esto Emel salía
   como alguien que «se ha lanzado» tres veces. `cargos-actuales.js` NO sirve aquí: solo trae
   Congreso, alcaldías y gobernaciones, no concejos ni asambleas. Prompts `h3` y `v8b`.
+- ⚠⚠ **«Ver el CRM» reescribía la campaña desde cero** (`launchCRM` → `campanaActual`) y
+  borraba la causa y el eje. `camposPropiosCampana()` los conserva al reescribirla. Todo campo
+  nuevo que la persona escriba en el CRM (no en la ruta) tiene que entrar ahí.
 - Cada publicación cuenta para UN tema (el que más nombra; gestión es el residual): el
   reconocimiento a un pastor «desde el Concejo» contaba como gestión y empataba los dos ejes.
 - Al tocar el catálogo, bumpear `candidato-360-ejes.js?v=` en `candidato-360.html`.
