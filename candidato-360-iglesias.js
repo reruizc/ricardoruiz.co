@@ -200,5 +200,14 @@
     if (C) pintarMapa(C);
   }
 
-  global.C360Iglesias = { montar, veredicto, cruce };
+  /* Para el eje de campaña: cuántas iglesias pequeñas tiene el mapa y en
+     cuántas coincide su voto. null si la persona no está en el análisis. */
+  async function resumen(slugs) {
+    const D = await cargar(); if (!D?.candidatos || !slugs?.length) return null;
+    const propio = D.candidatos.find(c => slugs.includes(c.slug)); if (!propio) return null;
+    const C = cruce(D, propio.slug); if (!C) return null;
+    return { pequenas: C.pequenas, coinciden: C.coinc.length, top: C.coinc.slice(0, 3).map(x => ({ nombre: nomIg(x.nombre), loc: x.loc || "" })) };
+  }
+
+  global.C360Iglesias = { montar, veredicto, cruce, resumen };
 })(window);
