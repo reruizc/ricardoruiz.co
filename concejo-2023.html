@@ -497,6 +497,25 @@
       for(const it of items) out[it.partido] = it.curules;
       return out;
     }
+    // ─── Reparto del art. 263 + curul de oposición ──────────────
+    // Igual que tools/build-concejo-2023.js: umbral del 50 % del cuociente
+    // (válidos de listas + blanco sobre N curules) y cifra repartidora sobre
+    // N−1, porque una curul es del 2º en la alcaldía (Ley 1909 de 2018, art. 25)
+    // si aceptó. Antes el qué pasaría si repartía las N por D'Hondt puro.
+    function elegiblesConcejo(partidoVotos, md, especiales){
+      const validos = Object.values(partidoVotos).reduce((a, v) => a + (v || 0), 0);
+      const umbral = (validos + ((especiales && especiales.blanco) || 0)) / md.curules / 2;
+      const eleg = {};
+      for(const [p, v] of Object.entries(partidoVotos)) if(v > 0 && v >= umbral) eleg[p] = v;
+      return Object.keys(eleg).length ? eleg : partidoVotos;
+    }
+    function repartoConcejo(partidoVotos, md, especiales){
+      const opos = md.oposicion;
+      const out = dhondt(elegiblesConcejo(partidoVotos, md, especiales), opos ? md.curules - 1 : md.curules);
+      if(opos) out[opos.partido] = (out[opos.partido] || 0) + 1;
+      return out;
+    }
+
     function cifraRepartidora(partidoVotos, seats){
       const items = Object.entries(partidoVotos).filter(([,v]) => v > 0)
         .map(([p, v]) => ({ p, v, c: 0 }));
@@ -666,7 +685,7 @@
       // En INFO con filtro territorial mostramos las cifras del territorio pero NO
       // recalculamos curules. En WHATIF + filtro mostramos curules recalculados.
       const partidosVivos = isWhatIf && territorioActivo
-        ? Object.values(dhondt(wi.partidoVotos, md.curules)).filter(c => c > 0).length
+        ? Object.values(repartoConcejo(wi.partidoVotos, md, wi.especiales)).filter(c => c > 0).length
         : md.partidos.filter(p => p.curules > 0).length;
       root.innerHTML = `
         <div class="kpi-card"><div class="kpi-label">Curules a repartir</div><div class="kpi-val">${fmt(md.curules)}</div><div class="kpi-delta">${md.nombre}</div></div>
@@ -716,11 +735,11 @@
       const isWhatIf = STATE.scope === 'WHATIF';
       let partidos;
       if(isWhatIf && territorioActivo){
-        // WHATIF + filtro: recalcula D'Hondt con votos del territorio
-        const cur = dhondt(wi.partidoVotos, md.curules);
+        // WHATIF + filtro: recalcula el reparto con votos del territorio
+        const cur = repartoConcejo(wi.partidoVotos, md, wi.especiales);
         const orig = new Map(md.partidos.map(p => [p.partido, p]));
-        partidos = Object.entries(wi.partidoVotos).map(([p, v]) => ({
-          partido: p, votos_total: v, curules: cur[p] || 0,
+        partidos = Object.keys(Object.assign({}, wi.partidoVotos, cur)).map(p => [p, wi.partidoVotos[p] || 0]).map(([p, v]) => ({
+          partido: p, votos_total: v, curules: cur[p] || 0, curul_oposicion: (orig.get(p) || {}).curul_oposicion || 0,
           pct: wi.votos_validos > 0 ? (v / wi.votos_validos * 100) : 0,
           tipo_lista: (orig.get(p) || {}).tipo_lista || 'abierta',
           candidatos: (orig.get(p) || {}).candidatos || [],
@@ -746,9 +765,9 @@
 
       const lblExtra = territorioActivo
         ? (isWhatIf
-            ? ` · WHAT IF en ${wi.ambito} · D'Hondt recalculado`
+            ? ` · WHAT IF en ${wi.ambito} · reparto recalculado`
             : ` · ${wi.ambito} · votos del territorio`)
-        : ` · ${fmt(md.curules)} curules · D'Hondt`;
+        : ` · ${fmt(md.curules)} curules · cifra repartidora${md.oposicion ? ' + 1 de oposición' : ''}`;
       lbl.textContent = `Partidos · ${md.nombre}${lblExtra}`;
       badge.className = 'level-badge ' + (isWhatIf ? 'pues' : 'mun');
       badge.textContent = isWhatIf ? 'What If' : 'Concejo';
@@ -787,7 +806,10 @@
     }
 
     function renderElectosRow(p, i){
-      const electos = p.electos || [];
+      // La curul de oposición no sale de la lista: va aparte, con su nombre.
+      const opoE = (p.electos || []).find(e => e.oposicion);
+      const electos = (p.electos || []).filter(e => !e.oposicion);
+      const opoRow = opoE ? `<tr><td></td><td></td><td class="cand-elected">${(opoE.nombre || '—').toUpperCase()}<span style="font-size:.6rem;margin-left:.4rem">✦</span></td><td class="r" style="color:rgba(255,255,255,.3)">—</td><td class="r" style="color:rgba(255,255,255,.4)">curul de oposición · 2º en la Alcaldía</td></tr>` : '';
       let inner;
       if(p.tipo_lista === 'cerrada'){
         const sub = electos.length ? electos.map((e, k) => `
@@ -797,8 +819,8 @@
             <td class="cand-elected">${(e.nombre || '—').toUpperCase()}<span style="font-size:.6rem;margin-left:.4rem">✦</span></td>
             <td class="r" style="color:rgba(255,255,255,.3)">—</td>
             <td class="r" style="color:rgba(255,255,255,.4)">orden inscripción</td>
-          </tr>`).join('') : `<tr><td colspan="5" class="closed-note">Lista cerrada — el orden de los electos sigue el formulario E-6 del CNE (no consta en el escrutinio).</td></tr>`;
-        inner = `<table class="cands-table"><thead><tr><th>#</th><th>Cód</th><th>Candidato</th><th class="r">Votos</th><th class="r">Estado</th></tr></thead><tbody>${sub}</tbody></table>`;
+          </tr>`).join('') : (opoRow ? '' : `<tr><td colspan="5" class="closed-note">Lista cerrada — el orden de los electos sigue el formulario E-6 del CNE (no consta en el escrutinio).</td></tr>`);
+        inner = `<table class="cands-table"><thead><tr><th>#</th><th>Cód</th><th>Candidato</th><th class="r">Votos</th><th class="r">Estado</th></tr></thead><tbody>${sub}${opoRow}</tbody></table>`;
       } else {
         const electosCods = new Set(electos.map(e => String(e.cod)));
         const cands = p.candidatos || [];
@@ -813,7 +835,7 @@
             <td class="r" style="color:rgba(255,255,255,.4)">${isElect ? 'Electo' : ''}</td>
           </tr>`;
         }).join('');
-        inner = `<table class="cands-table"><thead><tr><th>#</th><th>Cód</th><th>Candidato</th><th class="r">Voto preferente</th><th class="r">Estado</th></tr></thead><tbody>${sub}</tbody></table>`;
+        inner = `<table class="cands-table"><thead><tr><th>#</th><th>Cód</th><th>Candidato</th><th class="r">Voto preferente</th><th class="r">Estado</th></tr></thead><tbody>${sub}${opoRow}</tbody></table>`;
       }
       return `<tr><td colspan="7" style="padding:0"><div class="cands-inner" id="cands-inner-${i}">${inner}</div></td></tr>`;
     }
@@ -884,9 +906,10 @@
       leg.innerHTML = top.slice(0,5).map(([p,v], i) => `
         <div class="li"><span class="ld" style="background:${colors[i]}"></span>${p.substr(0,26)}<span class="lv">${pctFmt(v, scopeVotos)}%</span></div>`).join('');
 
-      const cifra = cifraRepartidora(partidoVotos, md.curules);
+      const cifra = cifraRepartidora(elegiblesConcejo(partidoVotos, md, especiales), md.oposicion ? md.curules - 1 : md.curules);
+      const vvU = Object.values(partidoVotos).reduce((a, v) => a + (v || 0), 0) + (especiales.blanco || 0);
       cifraEl.textContent = fmt(Math.round(cifra));
-      umEl.textContent = fmt(Math.round(cifra * 0.5));
+      umEl.textContent = fmt(Math.round(vvU / md.curules / 2));
     }
 
     function drawChart(ctx, labels, data, colors){
@@ -961,8 +984,8 @@
       const territorioActivo = wi && wi.filtered;
       let partidoCurules;
       if(isWhatIf && territorioActivo){
-        // Recalcular D'Hondt con votos del territorio
-        partidoCurules = dhondt(wi.partidoVotos, md.curules);
+        // Recalcular el reparto con votos del territorio
+        partidoCurules = repartoConcejo(wi.partidoVotos, md, wi.especiales);
       } else {
         // INFO sin filtro o con filtro: el hemiciclo muestra el concejo real del mun
         partidoCurules = Object.fromEntries(md.partidos.map(p => [p.partido, p.curules]));

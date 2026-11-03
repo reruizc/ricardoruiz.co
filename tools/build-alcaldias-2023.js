@@ -44,6 +44,9 @@ const FECHA_POR_AÑO = { 2011: '2011-10-30', 2015: '2015-10-25', 2019: '2019-10-
 const unq = s => (s.length > 1 && s[0] === '"' && s[s.length - 1] === '"') ? s.slice(1, -1).replace(/""/g, '"') : s;
 
 const COMUNAS_DATA_PATH = '/Users/ricardoruiz/ricardoruiz.co/Bases de datos/COMUNAS_DATA.csv';
+// Censo DE LA ÉPOCA por puesto (Registraduría, tablero de censos históricos).
+// Existe para 2018 en adelante: 2019 y 2023 lo usan; 2011 y 2015 no tienen.
+const CENSO_EPOCA_PATH = año => `/Users/ricardoruiz/ricardoruiz.co/Bases de datos/censos-registraduria/${año}_datos_censo-electoral-min.json`;
 
 function normName(s){
   return String(s || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -52,7 +55,7 @@ function pad(n, w){ return String(parseInt(n,10) || 0).padStart(w, '0'); }
 
 // ─── Lookup deptos/muns + censo desde COMUNAS_DATA.csv ──────
 // Output: { depto:{cod:nombre}, mun:{"dep-mun":{nombre, censo, mujeres, hombres}}, capitals:{depCod:munCod} }
-function loadDivipole(){
+function loadDivipole(año){
   const raw = fs.readFileSync(COMUNAS_DATA_PATH, 'utf8');
   const lines = raw.split(/\r?\n/);
   const header = lines[0].replace(/^﻿/, '').split(';').map(s => s.trim());
@@ -77,6 +80,33 @@ function loadDivipole(){
     mObj.hombres  += parseInt(p[I_H] || '0', 10) || 0;
     if (!mObj.nombre) mObj.nombre = normName(p[I_MUN]);
     mun[key] = mObj;
+  }
+  // ⚠️ El censo de COMUNAS_DATA es el de 2026. Usarlo para 2011-2023 daba una
+  // participación falsa (2011: 43,9 %; 2019: 55,6 % cuando fue ~60,7 %).
+  // Con el censo de la época se reemplaza; sin él, el censo queda en null y la
+  // página no muestra participación (mejor un hueco que una cifra equivocada).
+  const fEpoca = CENSO_EPOCA_PATH(año);
+  if (fs.existsSync(fEpoca)){
+    const rows = JSON.parse(fs.readFileSync(fEpoca, 'utf8')).data || [];
+    const epoca = {};
+    for (const r of rows){
+      if (!/TERRITORIAL/i.test(r.tipo_eleccion || '')) continue;
+      const k = `${pad(r.cod_depto, 2)}-${pad(r.cod_mun, 3)}`;
+      const e = epoca[k] || (epoca[k] = { censo: 0, mujeres: 0, hombres: 0 });
+      e.censo   += r.potencial_electoral || 0;
+      e.mujeres += (r.sexo && r.sexo.mujeres) || 0;
+      e.hombres += (r.sexo && r.sexo.hombres) || 0;
+    }
+    for (const [k, m] of Object.entries(mun)){
+      const e = epoca[k];
+      if (e){ m.censo = e.censo; m.mujeres = e.mujeres; m.hombres = e.hombres; }
+      else  { m.censo = null; m.mujeres = null; m.hombres = null; }
+    }
+    const tot = Object.values(epoca).reduce((a, e) => a + e.censo, 0);
+    console.log(`  · Censo de ${año}: ${Object.keys(epoca).length} muns · ${tot.toLocaleString('es-CO')}`);
+  } else {
+    for (const m of Object.values(mun)){ m.censo = null; m.mujeres = null; m.hombres = null; }
+    console.log(`  · Sin censo de ${año}: censo y participación quedan en null`);
   }
   // Capital = mun con código '001' en cada depto (convención Registraduría)
   const capitals = {};
@@ -221,7 +251,7 @@ async function main(){
 
   console.log(`\n[alcaldias-${año}] procesando ${path.basename(csvPath)}`);
   const t0 = Date.now();
-  const divipole = loadDivipole();
+  const divipole = loadDivipole(año);
   const { nacional, porDepto, porMun, porPuestoByDep, rowsRead, rowsKept, rowsSkipTotal } = await processCsv(csvPath);
   const dt = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(`  ${rowsRead.toLocaleString('es-CO')} filas leídas · ${rowsKept.toLocaleString('es-CO')} ALCALDE en ${dt}s`);
@@ -263,7 +293,7 @@ async function main(){
     ps.muns++;
     if (isCapital) ps.capitales++;
     ps.votos += top.votos;
-    ps.censo += munInfo.censo;
+    ps.censo += munInfo.censo || 0;
   }
   console.log(`  · municipios con ganador: ${munWinners.length}`);
   console.log(`  · partidos/movimientos únicos en ganadores: ${partidoStats.size}`);
@@ -298,7 +328,7 @@ async function main(){
     votos_validos: nacSer.votos_validos,
     votos_totales: nacSer.votos_totales,
     especiales: nacSer.especiales,
-    censo_total: totalCenso,
+    censo_total: totalCenso || null,
     partidos: partidosNacional,    // ordenado por votos; con muns_ganados, capitales, censo
   };
   writeJson(path.join(outDir, 'nacional', 'resumen.json'), resumen);
@@ -328,7 +358,7 @@ async function main(){
       dep,
       nombre: divipole.depto[dep] || '',
       municipios: munsInDep.length,
-      censo: censoDep,
+      censo: censoDep || null,
       votos_validos: ser.votos_validos,
       votos_totales: ser.votos_totales,
       especiales: ser.especiales,

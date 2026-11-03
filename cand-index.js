@@ -108,6 +108,17 @@
     'ALAN JARA':                   'ALAN JESUS EDMUNDO JARA URZOLA',
     'VIVIANE MORALES':             'VIVIANE ALEYDA MORALES HOYOS',
     'ARELIS URIANA':               'ARELIS MARIA URIANA GUARIYU',
+    // Presidenciales 2026 (nov-2026): el índice presidencial los trae con el
+    // nombre corto y su Senado, Alcaldía o Gobernación con el legal. Verificado
+    // uno por uno en los índices; Miguel Uribe (2026, Londoño) NO es Miguel
+    // Uribe Turbay y queda fuera a propósito.
+    'CLAUDIA LOPEZ HERNANDEZ':     'CLAUDIA NAYIBE LOPEZ HERNANDEZ',
+    'PALOMA VALENCIA LASERNA':     'PALOMA SUSANA VALENCIA LASERNA',
+    'ROY BARRERAS MONTEALEGRE':    'ROY LEONARDO BARRERAS MONTEALEGRE',
+    'CARLOS CAICEDO OMAR':         'CARLOS EDUARDO CAICEDO OMAR',
+    'MAURICIO LIZCANO':            'OSCAR MAURICIO LIZCANO ARANGO',
+    'LUIS GILBERTO MURILLO':       'LUIS GILBERTO MURILLO URRUTIA',
+    'SONDRA MACOLLINS':            'SONDRA MACOLLINS GARVIN PINTO',
   };
 
   function normPersona(s) {
@@ -145,10 +156,16 @@
      "parra" hay 866 personas y la edilesa de Barrios Unidos caía en la posición
      766 — invisible, y parecía que faltaran los datos de JAL.
 
-     Ahora se ordena por relevancia y, a igual relevancia, por votación:
-       4 · el nombre completo empieza por lo que se escribió
-       2 · el primer nombre empieza por la primera palabra escrita
-       1 · la consulta trae más de una palabra (es específica)
+     Ahora se ordena por un puntaje que suma tres cosas:
+       10 · cada palabra escrita casa con una palabra COMPLETA del nombre
+            (proporcional: 2 de 3 palabras completas dan 6,7)
+        1 · el nombre empieza por lo escrito (0,5 si solo el primer nombre)
+        + log10(votos + 1): diez veces más votos suman un punto
+     ⚠️ Antes un prefijo al inicio del nombre pesaba más que todo lo demás y la
+     votación solo desempataba: «petro» mostraba primero a las PETRONA y no a
+     Gustavo Petro, y «fajardo» abría con un concejal de 27 votos llamado
+     FAJARDO. Ahora la palabra completa gana al prefijo, y entre las que casan
+     igual manda la votación.
      Devuelve también el TOTAL, para poder decir cuántos quedaron fuera: con una
      sola palabra el corte es inevitable y lo honesto es avisar, no fingir que
      esos 20 son todo.
@@ -163,8 +180,8 @@
     // ' '+palabra encuentra "¿alguna palabra del nombre empieza por esto?" sin
     // tener que partir el nombre en cada tecla.
     var agujas = palabras.map(function (w) { return ' ' + w; });
+    var enteras = palabras.map(function (w) { return ' ' + w + ' '; });
     var pre = ' ' + qq, a0 = agujas[0], na = agujas.length;
-    var extra = na > 1 ? 1 : 0;
     var out = [];
     for (var i = 0; i < lista.length; i++) {
       var c = lista[i];
@@ -172,8 +189,13 @@
       var ok = true;
       for (var j = 0; j < na; j++) { if (n.indexOf(agujas[j]) < 0) { ok = false; break; } }
       if (!ok) continue;
-      var sc = n.indexOf(pre) === 0 ? 4 : (n.indexOf(a0) === 0 ? 2 : 0);
-      out.push({ c: c, s: sc + extra, v: c.votos || 0 });
+      var completas = 0;
+      for (var k = 0; k < na; k++) { if (n.indexOf(enteras[k]) >= 0) completas++; }
+      var v = c.votos || 0;
+      var sc = 10 * completas / na
+             + (n.indexOf(pre) === 0 ? 1 : (n.indexOf(a0) === 0 ? 0.5 : 0))
+             + Math.log10(v + 1);
+      out.push({ c: c, s: sc, v: v });
     }
     out.sort(function (a, b) {
       return (b.s - a.s) || (b.v - a.v) || a.c.nombre.localeCompare(b.c.nombre, 'es');
@@ -299,10 +321,31 @@
 
   // slug → URL del JSON mesa-a-mesa. Cae a la ruta endoso si el slug no se
   // cargó por el registro (compatibilidad hacia atrás).
+  /* ── FICHA: BOGOTÁ ES UN MUNICIPIO ──────────────────────────────────────
+     Las fichas de presidenciales y Congreso 2014-2022 (y la 2V de 2010 antes
+     de regenerarla) traen en `munNom` de Bogotá la LOCALIDAD, porque el georef
+     la guarda en la columna MUNICIPIO. Las páginas toman el nombre del
+     municipio de la primera mesa, así que la ficha de Petro decía que su
+     municipio más votado era «USAQUÉN» con 2,2 millones. La localidad ya va en
+     `comNom`: aquí solo se devuelve a Bogotá su nombre. Los builders ya lo
+     hacen bien; esto cubre lo publicado antes.                             */
+  function normalizarFicha(d) {
+    var ms = d && d.mesas;
+    if (!ms || !ms.length) return d;
+    for (var i = 0; i < ms.length; i++) {
+      var m = ms[i];
+      if (m && String(m.dep) === '16' && +m.mun === 1 && m.munNom !== 'BOGOTÁ D.C.') {
+        if (!m.comNom || m.comNom === 'NACIONAL') m.comNom = m.munNom;
+        m.munNom = 'BOGOTÁ D.C.';
+      }
+    }
+    return d;
+  }
+
   function dataUrlFor(slug) {
     return (_bySlug[slug] && _bySlug[slug].dataUrl) || `${S3}/endoso/${slug}.json`;
   }
 
   global.CandRegistry = { S3, SOURCES, LOCAL_SOURCES, isPartyEntry, acMatch, acRank, load, loadLocal,
-                          dataUrlFor, normPersona, personaKey, normNombre, padNombre, ALIAS_PERSONA };
+                          dataUrlFor, normalizarFicha, normPersona, personaKey, normNombre, padNombre, ALIAS_PERSONA };
 })(typeof window !== 'undefined' ? window : this);

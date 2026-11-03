@@ -110,6 +110,8 @@ def load_georef():
             if len(code) != 9:
                 continue
             mun = (row.get('MUNICIPIO') or '').strip()
+            if code[:5] == '16001':
+                mun = 'BOGOTÁ D.C.'   # el georef guarda la localidad en MUNICIPIO
             pue = (row.get('NOMBRE PUESTO') or '').strip()
             comC = (row.get('CÓDIGO COMUNA') or '').strip()
             comN = (row.get('NOMBRE COMUNA') or '').strip()

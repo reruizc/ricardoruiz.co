@@ -433,7 +433,7 @@
 
     <footer class="full-footer">
       <span class="footer-brand">© 2026 Ricardo Ruiz · <a href="index.html">ricardoruiz.co</a></span>
-      <span class="footer-brand">Datos: Registraduría (GCS 2019) · censo: Divipole actual, no el de 2019</span>
+      <span class="footer-brand">Datos: Registraduría (GCS 2019) · censo electoral de 2019 (Registraduría)</span>
     </footer>
   </div>
 
@@ -691,6 +691,8 @@
   // ─── Helpers ──────────────────────────────────────────
   const norm = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
   const fmtN = n => (n || 0).toLocaleString('es-CO');
+  // Censo: '—' cuando no hay censo de la época (2011 y 2015) o el municipio no lo trae.
+  const fmtC = n => n ? fmtN(n) : '—';
   const fmtPct = n => (n == null) ? '—' : (Math.round(n * 10) / 10).toFixed(1) + '%';
   function pad(v, w){ return String(parseInt(v,10) || 0).padStart(w, '0'); }
 
@@ -897,12 +899,12 @@
   function renderNacionalView(){
     // KPIs
     setKPI(1, 'Municipios', fmtN(resumen.municipios), '');
-    setKPI(2, 'Censo electoral', fmtN(resumen.censo_total), '');
+    setKPI(2, 'Censo electoral', fmtC(resumen.censo_total), '');
     setKPI(3, 'Votos válidos', fmtN(resumen.votos_validos), '');
-    const part = resumen.votos_totales / resumen.censo_total * 100;
-    setKPI(4, 'Participación', fmtPct(part), '');
+    const part = resumen.censo_total ? resumen.votos_totales / resumen.censo_total * 100 : null;
+    setKPI(4, 'Participación', fmtPct(part), part == null ? 'sin censo de 2019' : '');
 
-    setMeta('27 Oct 2019', fmtN(resumen.municipios), fmtN(resumen.censo_total), fmtN(resumen.votos_validos));
+    setMeta('27 Oct 2019', fmtN(resumen.municipios), fmtC(resumen.censo_total), fmtN(resumen.votos_validos));
     setMapLabel(`Mapa nacional · ${viewLabel()}`);
     setTableLabel(`Resultados nacionales · ${viewLabel()}`);
 
@@ -929,11 +931,11 @@
     const d = deptos.find(x => x.dep === dep);
     if (!d) return renderNacionalView();
     setKPI(1, 'Municipios', fmtN(d.municipios), '');
-    setKPI(2, 'Censo electoral', fmtN(d.censo), '');
+    setKPI(2, 'Censo electoral', fmtC(d.censo), '');
     setKPI(3, 'Votos válidos', fmtN(d.votos_validos), '');
-    const part = d.votos_totales / d.censo * 100;
-    setKPI(4, 'Participación', fmtPct(part), '');
-    setMeta('27 Oct 2019', d.nombre + ' · ' + d.municipios + ' muns', fmtN(d.censo), fmtN(d.votos_validos));
+    const part = d.censo ? d.votos_totales / d.censo * 100 : null;
+    setKPI(4, 'Participación', fmtPct(part), part == null ? 'sin censo de 2019' : '');
+    setMeta('27 Oct 2019', d.nombre + ' · ' + d.municipios + ' muns', fmtC(d.censo), fmtN(d.votos_validos));
     setMapLabel(`${d.nombre} · muns · ${viewLabel()}`);
     setTableLabel(`${d.nombre} · ${viewLabel()}`);
     drawDonut({ votos_totales: d.votos_totales, votos_validos: d.votos_validos, censo: d.censo, especiales: d.especiales });
@@ -1081,7 +1083,7 @@
         <td><div class="row-name"><span class="swatch" style="background:${col}"></span>${BLOQUE_LABEL[r.bloque]}</div>
           ${r.capitales ? `<div class="row-sub">${r.capitales} capital${r.capitales > 1 ? 'es' : ''}</div>` : ''}</td>
         <td class="r"><span class="num">${fmtN(r.muns)}</span></td>
-        <td class="r"><span class="num">${fmtN(r.censo)}</span></td>
+        <td class="r"><span class="num">${fmtC(r.censo)}</span></td>
       </tr>`;
     }
     h += '</tbody></table>';
@@ -1091,15 +1093,15 @@
   // ─── Vista MUN (drill final) ────────
   function renderMunView(mFull, mMeta){
     if (!mFull) return renderDeptoView(currentDep);
-    setKPI(1, 'Censo electoral', fmtN(mFull.censo), '');
+    setKPI(1, 'Censo electoral', fmtC(mFull.censo), '');
     setKPI(2, 'Votos válidos', fmtN(mFull.votos_validos), '');
-    const part = mFull.votos_totales / mFull.censo * 100;
-    setKPI(3, 'Participación', fmtPct(part), '');
+    const part = mFull.censo ? mFull.votos_totales / mFull.censo * 100 : null;
+    setKPI(3, 'Participación', fmtPct(part), part == null ? 'sin censo de 2019' : '');
     const top = mFull.candidatos[0];
     setKPI(4, 'Ganador', top ? top.nombre.split(' ').slice(0,2).join(' ') : '—', top ? fmtPct(top.pct) : '');
     document.getElementById('kpi4-v').classList.remove('gr'); document.getElementById('kpi4-v').classList.add('wh');
     document.getElementById('kpi4-v').style.fontSize = '1.05rem'; document.getElementById('kpi4-v').style.lineHeight = '1.3';
-    setMeta('27 Oct 2019', mFull.nombre + (mFull.es_capital ? ' (capital)' : ''), fmtN(mFull.censo), fmtN(mFull.votos_validos));
+    setMeta('27 Oct 2019', mFull.nombre + (mFull.es_capital ? ' (capital)' : ''), fmtC(mFull.censo), fmtN(mFull.votos_validos));
     setMapLabel(`${mFull.nombre} · candidatos`);
     setTableLabel(`${mFull.nombre} · candidatos`);
     drawDonut({ votos_totales: mFull.votos_totales, votos_validos: mFull.votos_validos, censo: mFull.censo, especiales: mFull.especiales, mujeres: mFull.mujeres, hombres: mFull.hombres });
@@ -1159,7 +1161,7 @@
         <td><div class="row-name"><span class="swatch" style="background:${col}"></span>${(p.partido || '—').slice(0,46)}</div>
           ${p.capitales_ganadas ? `<div class="row-sub">${p.capitales_ganadas} capital${p.capitales_ganadas > 1 ? 'es' : ''}</div>` : ''}</td>
         <td class="r"><span class="num">${fmtN(p.muns_ganados)}</span></td>
-        <td class="r"><span class="num">${fmtN(p.censo_gobernado || 0)}</span></td>
+        <td class="r"><span class="num">${fmtC(p.censo_gobernado)}</span></td>
       </tr>`;
     }
     h += '</tbody></table>';
@@ -1510,7 +1512,7 @@
     const part = d.votos_totales && d.censo ? (d.votos_totales / d.censo * 100) : null;
     const html = `<div class="tt-title">${d.nombre}</div>
       <div class="tt-row"><span>Municipios</span><b>${d.municipios}</b></div>
-      <div class="tt-row"><span>Censo</span><b>${fmtN(d.censo)}</b></div>
+      <div class="tt-row"><span>Censo</span><b>${fmtC(d.censo)}</b></div>
       <div class="tt-row"><span>Válidos</span><b>${fmtN(d.votos_validos)}</b></div>
       <div class="tt-row"><span>Participación</span><b>${fmtPct(part)}</b></div>
       ${dominant ? `<div class="tt-divider"></div>
@@ -1531,7 +1533,7 @@
     const bl = top ? bloqueForCandidato(top) : null;
     const blChip = bl ? `<span style="display:inline-block;font-family:'HelveticaNeue', Helvetica, 'Helvetica Neue', Arial, sans-serif;font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;background:${BLOQUE_COLOR[bl]};color:#fff;padding:.18rem .45rem;margin-top:.4rem">${BLOQUE_LABEL[bl]}</span>` : '';
     const html = `<div class="tt-title">${m.nombre}${m.es_capital ? ' ★' : ''}</div>
-      <div class="tt-row"><span>Censo</span><b>${fmtN(m.censo)}</b></div>
+      <div class="tt-row"><span>Censo</span><b>${fmtC(m.censo)}</b></div>
       <div class="tt-row"><span>Válidos</span><b>${fmtN(m.votos_validos)}</b></div>
       <div class="tt-row"><span>Participación</span><b>${fmtPct(part)}</b></div>
       ${top ? `<div class="tt-divider"></div>

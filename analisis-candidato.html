@@ -1146,7 +1146,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="platform-config.js"></script>
   <script src="data-client.js"></script>
-  <script src="cand-index.js?v=20260919"></script>
+  <script src="cand-index.js?v=20261102"></script>
   <script>
     // ─── CONFIG ───────────────────────────────────────────────
     const S3 = RRData.publicUrl('congreso-2026/output');
@@ -1172,6 +1172,7 @@
       : `${S3}/presidencial`;
     let presIndex = null;             // index-presidencial.json
     let presPersonaBySlug = {};       // slug de consulta (endoso) → persona
+    const otrasBySlug = {};           // candidaturas de un presidencial que salieron del buscador
     let currentPresMeta = null;       // meta activo si es presidencial
     let SCORE_LOG_MAX = Math.log10(12950643);  // votos del presidente (2V) — se refresca con presIndex.vmax
 
@@ -3113,7 +3114,31 @@
                 tipo: 'presidencial', pres: p,
               };
             }).sort((a, b) => b.votos - a.votos);
-            candIndex = presEntries.concat(candIndex);
+            // Una sola ficha por persona también para los presidenciales: su
+            // Senado, Alcaldía, Gobernación o consulta (nombre legal, unido por
+            // personaKey + ALIAS_PERSONA) dejaba de salir como entrada aparte y
+            // pasa al histórico de la ficha presidencial. Antes Cepeda, Fajardo,
+            // Claudia, Paloma y Roy salían dos veces en el buscador.
+            const presPorKey = {};
+            presEntries.forEach(e => { presPorKey[personaKey(e.nombre)] = e; });
+            const fuera = new Set();
+            candIndex.forEach(c => {
+              const e = presPorKey[personaKey(c.nombre)];
+              if (!e) return;
+              (congHistBySlug[c.slug] || [c]).forEach(x => {
+                if (fuera.has(x.slug)) return;
+                fuera.add(x.slug);
+                otrasBySlug[x.slug] = x;
+                presPersonaBySlug[x.slug] = e.pres;
+                if (!e.pres.consulta || e.pres.consulta.slug !== x.slug)
+                  (e.pres.otras = e.pres.otras || []).push(x);
+              });
+            });
+            presEntries.forEach(e => {
+              if (e.pres.otras) e.pres.otras.sort((a, b) =>
+                (SRC_YEAR[b.source] || 0) - (SRC_YEAR[a.source] || 0) || (b.votos || 0) - (a.votos || 0));
+            });
+            candIndex = presEntries.concat(candIndex.filter(c => !fuera.has(c.slug)));
           } catch (e) { console.warn('[Pres] índice presidencial no disponible:', e.message); }
         }
         // A partir de aquí candIndex ya no se reasigna: lo diferido puede apilar.
@@ -3319,7 +3344,7 @@
     });
 
     async function selectCand(slug) {
-      const meta = candIndex.find(c => c.slug === slug);
+      const meta = candIndex.find(c => c.slug === slug) || otrasBySlug[slug];
       if (!meta) return;
       const input = document.getElementById('ac-input');
       input.value = meta.nombre;
@@ -3367,17 +3392,17 @@
       const box  = document.getElementById('historial-items');
       if (!wrap || !box) return;
       const p = meta.pres || presPersonaBySlug[meta.slug];
+      // El corp de endoso no trae año ("SENADO"); en un toggle eso confunde
+      // frente a "SENADO · 2018" → se le añade el año de su fuente.
+      const etiqueta = e => {
+        const c = e.corp || e.circunscripcion || '—';
+        return /\b(19|20)\d{2}\b/.test(c) ? c : `${c} · ${SRC_YEAR[e.source] || ''}`.trim();
+      };
       if (!p) {
         // No es presidencial: ¿la misma persona tiene varias candidaturas
         // (Congreso 2018 / Asamblea 2023 / Congreso 2026)? → misma barra.
         const g = congHistBySlug[meta.slug];
         if (!g || g.length < 2) { wrap.classList.remove('active'); box.innerHTML = ''; return; }
-        // El corp de endoso no trae año ("SENADO"); en un toggle eso confunde
-        // frente a "SENADO · 2018" → se le añade el año de su fuente.
-        const etiqueta = e => {
-          const c = e.corp || e.circunscripcion || '—';
-          return /\b(19|20)\d{2}\b/.test(c) ? c : `${c} · ${SRC_YEAR[e.source] || ''}`.trim();
-        };
         pintarHistorial(wrap, box, g.map(e => ({
           label: etiqueta(e), votos: e.votos || 0, gold: false,
           active: e.slug === meta.slug, onclick: `selectCand('${e.slug}')`,
@@ -3396,6 +3421,12 @@
         votos: el.votos || 0, gold: !!el.presidente,
         active: !!(meta.presElec && meta.presElec.file === el.file),
         onclick: `presHistClick('${p.persona}',${i})`,
+      }));
+      // El resto de su carrera (Senado, Alcaldía, Gobernación, presidenciales
+      // anteriores), unido por personaKey en loadIndex.
+      (p.otras || []).forEach(e => items.push({
+        label: etiqueta(e), votos: e.votos || 0, gold: false,
+        active: meta.slug === e.slug, onclick: `selectCand('${e.slug}')`,
       }));
       if (items.length < 2) { wrap.classList.remove('active'); box.innerHTML = ''; return; }
       pintarHistorial(wrap, box, items, t);
@@ -3515,7 +3546,7 @@
       try {
         const r = await fetch(meta.dataUrl || `${S3}/endoso/${meta.slug}.json`);
         if (!r.ok) throw new Error('No data');
-        const data = await r.json();
+        const data = CandRegistry.normalizarFicha(await r.json());
         currentData = data;
         currentCand = meta;
         processData(data, meta);
@@ -4310,6 +4341,7 @@
         const slug = sp.get('cand'), q = sp.get('q');
         if (slug) {
           let meta = candIndex.find(c => c.slug === slug);
+          if (!meta && otrasBySlug[slug]) { selectCand(slug); return; }
           if (!meta) {
             // slug de una candidatura vieja colapsada por agruparPersonas →
             // abrir la entrada visible de esa misma persona

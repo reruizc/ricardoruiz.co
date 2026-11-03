@@ -46,6 +46,9 @@ function normName(s){
   return String(s || '').trim().toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 function pad(n, w){ return String(parseInt(n,10) || 0).padStart(w, '0'); }
+// 2023 entrecomilla algunos partidos ("LIDERAZGO ... ""LARA BOGOTA"""): se quitan
+// las comillas de borde y se desdoblan las internas (mismo arreglo de alcaldías).
+const unq = s => { s = String(s || '').trim(); return (s.length > 1 && s[0] === '"' && s[s.length - 1] === '"') ? s.slice(1, -1).replace(/""/g, '"') : s; };
 
 // ─── Curules por mun ─────────────────────────────────────────
 // El CSV usa electoral_id Registraduría (Bogotá=16, Antioquia=01, etc.),
@@ -77,6 +80,24 @@ function curulesParaMun(depCod, munCod, censoElectoral){
 const MUN_CURULES_OVERRIDE = {
   // Ejemplo: '76-001': 21 (Cali) — añadir si discrepa con la realidad.
 };
+
+// ─── Reparto del art. 263 + Estatuto de la Oposición ────────────
+// ⚠️ Antes era D'Hondt puro sobre las N curules. El reparto real:
+//   · Umbral: 50 % del cuociente = (válidos de listas + blanco) / N / 2.
+//   · Ley 1909 de 2018 art. 25: el 2º en la alcaldía puede ocupar UNA de las
+//     N curules; si acepta, la cifra repartidora se aplica a las N−1 restantes.
+//     No sabemos quién aceptó en cada municipio: se calcula con el supuesto
+//     «aceptó», igual que vote-target.js y la Asamblea 2023.
+// Sin esto el Concejo de Bogotá 2023 le daba 8 curules al Pacto; fueron 7.
+function reparto263(partidoVotos, seats, blanco, conOposicion){
+  const validos = Object.values(partidoVotos).reduce((a, v) => a + (v || 0), 0);
+  const repartir = Math.max(1, seats - (conOposicion ? 1 : 0));
+  const umbral = (validos + (blanco || 0)) / seats / 2;
+  let elegibles = {};
+  for (const [p, v] of Object.entries(partidoVotos)) if (v >= umbral && v > 0) elegibles[p] = v;
+  if (!Object.keys(elegibles).length) elegibles = partidoVotos;
+  return { curules: dhondt(elegibles, repartir), umbral, repartir };
+}
 
 // ─── D'Hondt ─────────────────────────────────────────────────
 // Devuelve { partido: curules } para los partidos con votos > 0.
@@ -200,7 +221,7 @@ function accumSimple(scope, codCan, candPartido, votos){
 }
 
 // Serialización
-function partidosFromMunScope(munScope, dhondtSeats){
+function partidosFromMunScope(munScope, dhondtSeats, oposicion){
   const partidos = [];
   for (const p of munScope.partidos.values()){
     const cands = Array.from(p.candidatos.values()).sort((a,b) => b.votos - a.votos);
@@ -218,10 +239,11 @@ function partidosFromMunScope(munScope, dhondtSeats){
       curules: 0,
     });
   }
-  // D'Hondt sobre votos_total por partido
+  // Art. 263 sobre votos_total por partido (N−1 si hay 2º en la alcaldía)
   const map = {};
   for (const p of partidos) map[p.partido] = p.votos_total;
-  const cur = dhondt(map, dhondtSeats);
+  const blanco = munScope.especiales.get('blanco') || 0;
+  const { curules: cur } = reparto263(map, dhondtSeats, blanco, !!oposicion);
   for (const p of partidos) p.curules = cur[p.partido] || 0;
   // Electos: para partidos con curules, top-K candidatos
   //   · lista abierta → ordenados por voto preferente desc
@@ -245,6 +267,19 @@ function partidosFromMunScope(munScope, dhondtSeats){
       }));
       p.orden_cerrada = true;
     }
+  }
+  // La curul de oposición va a nombre del 2º en la alcaldía, en la lista de su
+  // partido si existe; si no, como fila propia.
+  if (oposicion){
+    let p = partidos.find(x => x.partido === oposicion.partido);
+    if (!p){
+      p = { partido: oposicion.partido, votos_total: 0, votos_lista: 0, votos_pref: 0, pct: 0,
+            tipo_lista: 'abierta', candidatos: [], curules: 0, electos: [] };
+      partidos.push(p);
+    }
+    p.curules += 1;
+    p.curul_oposicion = 1;
+    p.electos = (p.electos || []).concat([{ cod: 'OPOSICION', nombre: oposicion.nombre, votos: 0, oposicion: true }]);
   }
   partidos.sort((a,b) => b.votos_total - a.votos_total);
   return partidos;
@@ -287,6 +322,8 @@ async function processCsv(csvPath){
   const porPuestoByMun = new Map();
   // porMesaByMun:   "dep-mun" → Map("zz-pp-mesa" → simpleScope)
   const porMesaByMun  = new Map();
+  // alcaldePorMun: "dep-mun" → Map(cod → {nombre, partido, votos}) — para el 2º
+  const alcaldePorMun = new Map();
 
   for await (const rawLine of rl){
     if (idx === null){ idx = parseHeaderLine(rawLine); continue; }
@@ -296,6 +333,18 @@ async function processCsv(csvPath){
 
     const parts = line.split(';');
     const corDes = String(parts[idx['DES_COR']] || '').trim().toUpperCase();
+    if (corDes === 'ALCALDE'){
+      const codA = String(parts[idx['COD_CAN']]).trim();
+      const vA = parseInt(parts[idx['NUM_VOT']] || '0', 10);
+      const nA = normName(unq(parts[idx['DES_CAN']])), pA = normName(unq(parts[idx['DES_PAR']]));
+      if (!SPECIAL_CODES[codA] && codA !== '0' && vA > 0 && nA !== 'CANDIDATOS TOTALES' && pA !== 'CANDIDATOS TOTALES'){
+        const k = `${pad(parts[idx['COD_DDE']], 2)}-${pad(parts[idx['COD_MME']], 3)}`;
+        let m = alcaldePorMun.get(k); if (!m){ m = new Map(); alcaldePorMun.set(k, m); }
+        const c = m.get(codA) || { nombre: nA, partido: pA, votos: 0 };
+        c.votos += vA; m.set(codA, c);
+      }
+      continue;
+    }
     if (corDes !== COR_NAME) continue;
 
     const dep  = pad(parts[idx['COD_DDE']], 2);
@@ -314,10 +363,13 @@ async function processCsv(csvPath){
     // niveles (puesto/mesa/depto/nacional) porque no aportan info.
     const skipAggregations = (votos === 0);
 
-    const candNombre = normName(des);
-    const candPartido = normName(par);
+    const candNombre = normName(unq(des));
+    const candPartido = normName(unq(par));
 
-    if (candNombre === 'CANDIDATOS TOTALES' || candPartido === 'CANDIDATOS TOTALES'){
+    // ⚠️ En 2023 blanco/nulos/no marcados (996-999) llegan con DES_PAR =
+    // 'CANDIDATOS TOTALES': filtrarlos dejaba `especiales` vacío y el voto en
+    // blanco fuera del umbral. Solo se descarta la fila agregada de candidato.
+    if (!SPECIAL_CODES[cod] && (candNombre === 'CANDIDATOS TOTALES' || candPartido === 'CANDIDATOS TOTALES')){
       rowsSkipTotal++;
       continue;
     }
@@ -359,7 +411,7 @@ async function processCsv(csvPath){
     rowsKept++;
   }
 
-  return { nacional, porDepto, porMun, porPuestoByMun, porMesaByMun, rowsRead, rowsKept, rowsSkipTotal };
+  return { nacional, porDepto, porMun, porPuestoByMun, porMesaByMun, alcaldePorMun, rowsRead, rowsKept, rowsSkipTotal };
 }
 
 function writeJson(filePath, obj){
@@ -380,8 +432,23 @@ async function main(){
   console.log(`\n[concejo-2023] procesando ${path.basename(csvPath)}`);
   const t0 = Date.now();
   const divipole = loadDivipole();
+  // Censo DE 2023 por municipio para la participación (el de COMUNAS_DATA es
+  // el de 2026 y la subestimaba). El número de curules sigue saliendo del
+  // censo de COMUNAS_DATA, como antes: cambiarlo movería concejos enteros.
+  const censo2023 = {};
+  {
+    const f = '/Users/ricardoruiz/ricardoruiz.co/Bases de datos/censos-registraduria/2023_datos_censo-electoral-min.json';
+    for (const r of (JSON.parse(fs.readFileSync(f, 'utf8')).data || [])){
+      if (!/TERRITORIAL/i.test(r.tipo_eleccion || '')) continue;
+      const k = `${pad(r.cod_depto, 2)}-${pad(r.cod_mun, 3)}`;
+      const e = censo2023[k] || (censo2023[k] = { censo: 0, mujeres: 0, hombres: 0 });
+      e.censo += r.potencial_electoral || 0;
+      e.mujeres += (r.sexo && r.sexo.mujeres) || 0;
+      e.hombres += (r.sexo && r.sexo.hombres) || 0;
+    }
+  }
   const {
-    nacional, porDepto, porMun, porPuestoByMun, porMesaByMun,
+    nacional, porDepto, porMun, porPuestoByMun, porMesaByMun, alcaldePorMun,
     rowsRead, rowsKept, rowsSkipTotal,
   } = await processCsv(csvPath);
   const dt = ((Date.now() - t0) / 1000).toFixed(1);
@@ -398,7 +465,10 @@ async function main(){
     const [dep, mun] = munKey.split('-');
     const munInfo = divipole.mun[munKey] || { nombre: '', censo: 0, mujeres: 0, hombres: 0 };
     const curules = curulesParaMun(dep, mun, munInfo.censo);
-    const partidos = partidosFromMunScope(munScope, curules);
+    const cE = censo2023[munKey] || { censo: null, mujeres: null, hombres: null };
+    const alc = [...((alcaldePorMun.get(munKey) || new Map()).values())].sort((a, b) => b.votos - a.votos);
+    const oposicion = alc[1] ? { nombre: alc[1].nombre, partido: alc[1].partido, votos: alc[1].votos } : null;
+    const partidos = partidosFromMunScope(munScope, curules, oposicion);
 
     // Top 3 partidos para por-mun.json
     const top3 = partidos.slice(0, 3).map(p => ({
@@ -412,7 +482,7 @@ async function main(){
       dep, mun,
       nombre_dep: divipole.depto[dep] || '',
       nombre_mun: munInfo.nombre,
-      censo: munInfo.censo,
+      censo: cE.censo,
       es_capital: divipole.capitals[dep] === mun,
       curules,
       votos_validos: munScope.votos_validos,
@@ -426,13 +496,14 @@ async function main(){
     let arr = munFullByDep.get(dep);
     if (!arr){ arr = []; munFullByDep.set(dep, arr); }
     arr.push({
-      mun, nombre: munInfo.nombre, censo: munInfo.censo,
-      mujeres: munInfo.mujeres, hombres: munInfo.hombres,
+      mun, nombre: munInfo.nombre, censo: cE.censo,
+      mujeres: cE.mujeres, hombres: cE.hombres,
       es_capital: divipole.capitals[dep] === mun,
       curules,
       votos_validos: munScope.votos_validos,
       votos_totales: munScope.votos_validos + totalEsp,
       especiales,
+      oposicion,
       partidos,
     });
 

@@ -122,6 +122,11 @@ def load_georef():
             if len(code) != 9:
                 continue
             mun = (row.get('MUNICIPIO') or '').strip()
+            if code[:5] == '16001':
+                # En Bogotá el georef guarda la LOCALIDAD en MUNICIPIO; la
+                # localidad ya viaja en comNom. Sin esto la ficha decía que el
+                # municipio más votado de Petro era «USAQUÉN».
+                mun = 'BOGOTÁ D.C.'
             pue = (row.get('NOMBRE PUESTO') or '').strip()
             comC = (row.get('CÓDIGO COMUNA') or '').strip()
             comN = (row.get('NOMBRE COMUNA') or '').strip()
@@ -152,7 +157,17 @@ def procesar(cfg, vuelta, src, by9, munNames, index, out_dir):
     n = 0
     with open(src, encoding='utf-8-sig', errors='replace', newline='') as f:
         for row in csv.reader(f, delimiter=';'):
-            if len(row) < 16 or row[0] == 'FUENTE':
+            if row and row[0] == 'FUENTE':
+                # El bloque geográfico se ubica por ENCABEZADO: GCS_2010PRES1V lo
+                # trae en las columnas 2-5 y GCS_2010PRES2V en las 6-9. Con un
+                # layout fijo por año, la 2V de 2010 quedaba con las 72 mil mesas
+                # en un solo departamento.
+                h = {c.strip(): i for i, c in enumerate(row)}
+                if 'COD_DDE' in h:
+                    L = dict(DDE=h['COD_DDE'], MME=h['COD_MME'], ZZ=h['COD_ZZ'],
+                             PP=h['COD_PP'], MS=h['DES_MS'], DESCIR=h['DES_CIR'])
+                continue
+            if len(row) < 16:
                 continue
             par = row[C_PAR].strip()
             if row[C_CAN].strip() in SPECIAL_CAN:
