@@ -66,10 +66,24 @@
     document.addEventListener('mousemove', e => { const t = e.target.closest?.('[data-tip]'); if (!t) { tip.style.opacity = 0; return; } tip.innerHTML = t.dataset.tip; tip.style.opacity = 1; tip.style.left = Math.min(e.clientX + 14, innerWidth - 300) + 'px'; tip.style.top = (e.clientY + 14) + 'px'; });
     if (LOCAL) document.querySelectorAll('a[href^="ley-de-rescate-"]').forEach(a => { if (!a.href.includes('local=1')) a.href = a.getAttribute('href').replace(/(\.html)(#.*)?$/, '$1?local=1$2'); });
   }
+  // Sello de «última actualización»: la hora real en que corrió el rastreo (E.v, UTC), en hora de Colombia,
+  // con un «hace N» que se refresca solo. Pasadas 30 h se pinta en ámbar: el rastreo diario se atrasó.
+  function sello(E) {
+    const t = Date.parse(E.v); if (!t) return;
+    const lead = document.querySelector('main .lead'); if (!lead) return;
+    const f = new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }).format(new Date(t));
+    lead.insertAdjacentHTML('afterend', `<p class="lr-act" id="lr-act"><i aria-hidden="true"></i><span>Última actualización: <b>${esc(f.replace(/\s*a\.\s*m\./, ' a. m.').replace(/\s*p\.\s*m\./, ' p. m.'))}</b> <span class="lr-act-z">(hora de Colombia)</span> · <span id="lr-hace"></span></span></p>`);
+    const hace = () => {
+      const m = Math.max(0, Math.round((Date.now() - t) / 60000)), h = Math.floor(m / 60);
+      $('#lr-hace').textContent = m < 1 ? 'hace un momento' : m < 60 ? `hace ${m} min` : h < 48 ? `hace ${h} h` : `hace ${Math.floor(h / 24)} días`;
+      $('#lr-act').classList.toggle('vieja', h >= 30);
+    };
+    hace(); setInterval(hace, 60000);
+  }
   function pagina(id, pintar) {
     chasis(id);
     fetch(URL_DATOS, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(E => {
-      $('#carga').hidden = true; $('#app').hidden = false; pintar(E);
+      $('#carga').hidden = true; $('#app').hidden = false; sello(E); pintar(E);
       if (LOCAL) document.querySelectorAll('a[href^="ley-de-rescate-"]').forEach(a => { if (!a.href.includes('local=1')) a.href = a.getAttribute('href').replace(/(\.html)(#.*)?$/, '$1?local=1$2'); });
     }).catch(e => { $('#carga').textContent = 'El seguimiento no está disponible en este momento. Intente de nuevo en unos minutos.'; console.error(e); });
   }
