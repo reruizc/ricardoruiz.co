@@ -5098,15 +5098,23 @@ async function pintarEstrategia() {
     const R = S.evaluar(entrada);
     if (turno !== ESTR_TURNO) return;
     ESTR = { R, banco, huella, L: entrada.L || null, nombre: crmCandidate?.nombre || NUEVO?.nombre || 'Su candidatura', ciudadNombre: { bogota: 'Bogotá', medellin: 'Medellín', cartagena: 'Cartagena' }[ciudad] || '' };
+    REINTENTO_ESTR = 0;
     pintarTarjetaEstrategia();
   } catch (e) {
     if (turno !== ESTR_TURNO) return;
+    /* Una fuente que no responde al abrir (banco, arquetipos, votación) casi
+       siempre responde un momento después: se reintenta sola dos veces antes de
+       dejar el aviso, y el aviso trae su botón. Antes se quedaba en el error
+       hasta recargar la página (pasó el 3-nov-2026). */
+    console.error('estrategia:', e);
+    if (REINTENTO_ESTR < 2) { REINTENTO_ESTR++; setTimeout(() => { if (turno === ESTR_TURNO) pintarEstrategia(); }, 2500 * REINTENTO_ESTR); return; }
     card.classList.add('module-apagado');
     $('crmEstrTitulo').textContent = 'No pudimos armar la estrategia.';
-    $('crmEstrCopy').textContent = 'Una de las fuentes (el banco, los arquetipos o su votación) no respondió. Vuelva a abrir el CRM en un momento.';
+    $('crmEstrCopy').innerHTML = 'Una de las fuentes (el banco, los arquetipos o su votación) no respondió. <button type="button" class="enlace-boton" onclick="REINTENTO_ESTR=0;pintarEstrategia()">Volver a intentar</button>';
     $('crmEstrDato').textContent = '—'; $('crmEstrSub').textContent = 'fuente no disponible';
   }
 }
+let REINTENTO_ESTR = 0;
 /* ── El discurso de la estrategia (oct-20-2026) ──────────────────────────
    La tarjeta 11 abre con un discurso personalizado —corporación, ciudad,
    partido o familia política y lo que dicen sus datos— sobre por qué la
