@@ -2180,6 +2180,49 @@ primera consultoría hecha a mano.
   caja de 0×0 (zoom de calle, sin polígonos). `encuadrarBounds` guarda el último encuadre y
   `reencuadrarMapas()` lo repite al abrir una fase (también `C360Ciclo.reencuadrar`).
 
+#### El eje de la campaña (nov-2-2026 · `candidato-360-ejes.js`)
+
+Pedido de Ricardo: la estrategia no es la lista de lo que la candidatura comparte con su
+electorado ni el banco de principios: es **la idea que la campaña sostiene hasta octubre de
+2027** (el eje), y encima van las acciones, que cambian con la fase, con la prensa de la semana
+y con las emergencias del territorio. Caso de diseño: Emel Rojas (Concejo de Bogotá), cuyo eje
+es la fe y la familia, con las iglesias de barrio como puerta de entrada (no las redes grandes).
+
+- **Tres capas.** (1) **Eje**: fijo, guardado en la campaña (`campana.eje`). (2) **Tres
+  pilares**: el mensaje, el territorio y el público. (3) **Acciones** de cada semana, que salen de
+  un pilar («Sale del pilar «…»» en la tarjeta).
+- **Quién lo elige.** `C360Ejes.proponer(señales)` puntúa 8 ejes de catálogo (fe · orden ·
+  resolver · bolsillo · pertenencia · voz · cambio · derechos) con reglas a la vista y devuelve
+  cada uno con sus razones. Las señales salen de `senalesEje()` en `candidato-360.js`: familia
+  política, los partidos con los que se ha lanzado (los de base cristiana suman 3 a fe;
+  Salvación Nacional y Centro Democrático, 1), las iglesias de barrio donde coincide su voto
+  (`C360Iglesias.resumen`), lo que le rinde en redes (`/c360/captura`, sin retuits; un tema
+  «rinde» si su interacción media es ≥1,1 veces la del total, con al menos 2 publicaciones), los
+  arquetipos de sus barrios y sus temas, si es figura o barrio, el historial y la causa. La
+  persona confirma uno; mientras no confirme, la tarjeta muestra el propuesto.
+- **La historia.** Al confirmar, `/c360/estrategia/ia` con `modo:'historia'` (prompt `h1`,
+  caché 30 días) reescribe la idea con sus datos y escribe tres guías («Cuenta…»: tú, con quién,
+  por qué ahora), los tres pilares y lo que la campaña no hace. **No inventa biografía**: la
+  historia es una guía para que la persona la cuente con su propia vida. Si el modelo no
+  responde, el eje se guarda con el texto del catálogo y la vista ofrece «Escribirla ahora».
+- **La semana.** Con eje (confirmado o propuesto), la lectura semanal usa el prompt `v8`: no
+  reescribe la idea, devuelve `{semana, pilar, temas, noticia}` y atiende la coyuntura «contada
+  desde el eje». Sin eje se sigue usando `v7`.
+- **Fe, con cuidado.** El catálogo y los dos prompts prohíben pedir el voto en un culto, hablarle
+  a una congregación como bloque o usar recursos de una iglesia: la fe es identidad y valores.
+  ⚠ El voto de Emel no sigue el mapa de templos en toda la ciudad (0,94×, sin relación): las 11
+  iglesias pequeñas donde coincide son puertas de entrada, no su electorado.
+- **La vista.** La pestaña nueva **«Tu historia»** abre por defecto: el eje, por qué, la
+  historia, los pilares, lo que no se hace y otros ejes posibles («Cambiar a este» pide
+  confirmación: cambiar de eje es cambiar el relato). Los dos párrafos de antes y los ocho
+  principios quedan en **«En qué se apoya»** (antes «Posicionamiento»).
+- **Worker.** `_c360NormEje` guarda `{id, nombre, idea, historia{yo,nosotros,ahora},
+  pilares[3], no_decir, razones, origen, fecha}`; `_c360EstrIACtx` acepta `eje` y `senales`.
+- ⚠ «Fiel a la Causa» (arquetipo `partido`) no empuja a ningún eje: es lealtad a la lista, y la
+  lista ya cuenta por la familia política. Antes empujaba a «Dignidad y derechos» y a un candidato
+  de derecha le salía ese eje como alternativa.
+- Al tocar el catálogo, bumpear `candidato-360-ejes.js?v=` en `candidato-360.html`.
+
 ### Candidaturas por lista cerrada en el historial (oct-19-2026)
 
 En una lista cerrada la Registraduría solo registra el voto al logo: los

@@ -56,7 +56,7 @@
     proteccion: ['orden'],
     supervivencia: ['bolsillo'],
     castigo: ['cambio'], alternativa: ['cambio'], 'poco-voto': ['cambio'],
-    partido: ['derechos', 'fe'], figuras: ['voz'],
+    figuras: ['voz'],   // «Fiel a la Causa» (partido) no empuja a ningún eje: es lealtad a la lista, y la lista ya cuenta por la familia política
   };
   /* Temas de la agenda (sensibilidad del arquetipo 4-5) que empujan a cada eje. */
   const TEMA_EJE = { seguridad: 'orden', empleo: 'bolsillo', vivienda: 'bolsillo', servicios: 'resolver', movilidad: 'resolver', salud_educacion: 'derechos', corrupcion: 'cambio', participacion: 'pertenencia', cultura: 'pertenencia', ambiente: 'voz', politica: 'voz' };

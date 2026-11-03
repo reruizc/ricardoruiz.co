@@ -5291,7 +5291,7 @@ async function senalesEje() {
   Object.values(cap?.redes || {}).forEach(r => (r?.publicados || []).forEach(p => pubs.push(p)));
   return {
     bloque: k.bloque, causa: causaActual(),
-    partidos: [k.partido, ...(crmCandidate?.history || []).map(h => h.partido), crmCandidate?.partido],
+    partidos: [...new Set([k.partido, ...(crmCandidate?.history || []).map(h => h.partido), crmCandidate?.partido].filter(Boolean).map(NOMBRE_BONITO))],
     arquetipos: (R.arquetipos || []).map(a => ({ id: a.id, nombre: a.nombre, share: a.share, ratio: R.lente === 'ciudad' ? null : a.ratio, temas: temasIdsArquetipo(a.id) })),
     figura: R.figura?.lectura || '', historial: { n: crmCandidate?.history?.length || (crmCandidate ? 1 : 0) },
     nuevo: !crmCandidate, iglesias, redes: pubs.length ? C360Ejes.redesPorTema(pubs) : null,
