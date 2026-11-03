@@ -12,7 +12,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261103b" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261103c" />
   <script defer src="/track.js"></script>
 </head>
 <body>
@@ -40,11 +40,22 @@ LR.pagina('hub', E => {
     ['Fin del periodo', `${dias(E.hoy, CIERRE)} días`, 'Hasta el 16 de diciembre, cuando acaban las sesiones de este semestre', '']];
   $('#kpis').innerHTML = K.map(([l, v, d, c]) => `<div class="kpi ${c}"><div class="l">${l}</div><div class="v">${esc(v)}</div><div class="d">${d}</div></div>`).join('');
   const TT = E.termometro || {}, idx = o => { const p = (o.a || 0) + (o.r || 0) + (o.m || 0); return p ? Math.round(100 * ((o.r || 0) + (o.m || 0) / 2) / p) : null; };
-  const color = v => { const a = [61, 110, 184], g = [185, 192, 203], r = [200, 85, 61], [x, y, t] = v < 50 ? [a, g, v / 50] : [g, r, (v - 50) / 50]; return `rgb(${x.map((c, i) => Math.round(c + (y[i] - c) * t)).join(',')})`; };
-  const termo = (k, t, grande) => { const o = TT[k] || {}, v = idx(o), p = (o.a || 0) + (o.r || 0) + (o.m || 0), h = grande ? 200 : 150, alto = v == null ? 0 : (h - 34) * v / 100;
-    return `<figure class="termo ${grande ? 'g' : ''}"><svg viewBox="0 0 70 ${h + 30}" width="${grande ? 92 : 70}" role="img" aria-label="${t}: índice ${v ?? 'sin dato'} de 100"><rect x="25" y="8" width="20" height="${h - 20}" rx="10" fill="#eef0f3" stroke="#d7dbe2"/><rect x="29" y="${h - 12 - alto}" width="12" height="${alto + 4}" rx="6" fill="${v == null ? '#ccd' : color(v)}"/><circle cx="35" cy="${h + 2}" r="16" fill="${v == null ? '#ccd' : color(v)}" stroke="#d7dbe2"/>${[0, 50, 100].map(q => `<line x1="47" x2="53" y1="${h - 12 - (h - 34) * q / 100}" y2="${h - 12 - (h - 34) * q / 100}" stroke="#9aa"/><text x="56" y="${h - 9 - (h - 34) * q / 100}" font-size="8" fill="#667085">${q}</text>`).join('')}</svg>
-      <figcaption><b style="color:${v == null ? 'inherit' : color(v)}">${v ?? '—'}</b><span>${t}</span><small>${num(p)} textos con postura</small></figcaption></figure>`; };
-  $('#termos').innerHTML = termo('todo', 'Todo', true) + termo('prensa', 'Prensa') + termo('redes', 'Redes') + '<div class="termo-esc"><span>100 · todo rechaza</span><span>50 · empate</span><span>0 · todo apoya</span></div>';
+  // Velocímetro: 0 = todo apoya (frío, azul) · 100 = todo rechaza (caliente, rojo). Cinco tramos con su propio degradé.
+  const RAMPA = [[0, [61, 110, 184]], [25, [154, 184, 222]], [50, [240, 194, 75]], [75, [240, 122, 46]], [100, [209, 38, 43]]];
+  const color = v => { let k = 0; while (k < RAMPA.length - 2 && v > RAMPA[k + 1][0]) k++; const [v0, a] = RAMPA[k], [v1, b] = RAMPA[k + 1], t = Math.min(1, Math.max(0, (v - v0) / (v1 - v0))); return `rgb(${a.map((c, i) => Math.round(c + (b[i] - c) * t)).join(',')})`; };
+  const tramo = v => v == null ? 'Sin dato' : v < 20 ? 'Mayoría apoya' : v < 40 ? 'Más apoyo que rechazo' : v <= 60 ? 'Dividido' : v <= 80 ? 'Más rechazo que apoyo' : 'Mayoría rechaza';
+  let gid = 0;
+  const velo = (k, t, grande) => {
+    const o = TT[k] || {}, v = idx(o), p = (o.a || 0) + (o.r || 0) + (o.m || 0), cx = 110, cy = 112, R = 100, r = 66, id = 'vg' + (gid++);
+    const pt = (q, rad) => { const a = Math.PI * (1 - q / 100); return [cx + rad * Math.cos(a), cy - rad * Math.sin(a)]; }, f = n => n.toFixed(1);
+    const segs = [0, 20, 40, 60, 80].map((q0, n) => { const q1 = q0 + 20, g0 = q0 + (n ? 0.9 : 0), g1 = q1 - (n < 4 ? 0.9 : 0), [x1, y1] = pt(g0, R), [x2, y2] = pt(g1, R), [x3, y3] = pt(g1, r), [x4, y4] = pt(g0, r), [ax, ay] = pt(q0, R), [bx, by] = pt(q1, R);
+      return { grad: `<linearGradient id="${id}-${n}" gradientUnits="userSpaceOnUse" x1="${f(ax)}" y1="${f(ay)}" x2="${f(bx)}" y2="${f(by)}"><stop offset="0" stop-color="${color(q0)}"/><stop offset="1" stop-color="${color(q1)}"/></linearGradient>`,
+        path: `<path d="M${f(x1)} ${f(y1)}A${R} ${R} 0 0 1 ${f(x2)} ${f(y2)}L${f(x3)} ${f(y3)}A${r} ${r} 0 0 0 ${f(x4)} ${f(y4)}Z" fill="url(#${id}-${n})"/>` }; });
+    const [nx, ny] = pt(v ?? 50, 86), ang = Math.PI * (1 - (v ?? 50) / 100), hx = nx - 11 * Math.cos(ang), hy = ny + 11 * Math.sin(ang), px = 5 * Math.sin(ang), py = 5 * Math.cos(ang);
+    const aguja = v == null ? '' : `<line x1="${cx}" y1="${cy}" x2="${f(hx)}" y2="${f(hy)}" stroke="#1f2430" stroke-width="3.2" stroke-linecap="round"/><path d="M${f(nx)} ${f(ny)}L${f(hx + px)} ${f(hy + py)}L${f(hx - px)} ${f(hy - py)}Z" fill="#1f2430"/>`;
+    return `<figure class="velo ${grande ? 'g' : ''}"><svg viewBox="0 0 220 134" role="img" aria-label="${t}: índice ${v ?? 'sin dato'} de 100, ${tramo(v).toLowerCase()}"><defs>${segs.map(x => x.grad).join('')}</defs>${segs.map(x => x.path).join('')}${aguja}<circle cx="${cx}" cy="${cy}" r="8" fill="#fff" stroke="#1f2430" stroke-width="3"/><text x="${cx - R + (R - r) / 2}" y="130" text-anchor="middle" font-size="10" fill="#667085">0</text><text x="${cx + R - (R - r) / 2}" y="130" text-anchor="middle" font-size="10" fill="#667085">100</text></svg>
+      <figcaption><b>${v ?? '—'}</b><em><i style="background:${v == null ? '#ccd' : color(v)}"></i>${tramo(v)}</em><span>${t}</span><small>${num(p)} textos con postura</small></figcaption></figure>`; };
+  $('#termos').innerHTML = velo('todo', 'Todo', true) + '<div class="velo-par">' + velo('prensa', 'Prensa') + velo('redes', 'Redes') + '</div><div class="termo-esc"><span><i style="background:' + color(0) + '"></i>0 · todo apoya</span><span><i style="background:' + color(50) + '"></i>50 · dividido</span><span><i style="background:' + color(100) + '"></i>100 · todo rechaza</span></div>';
   const TD = Object.entries(E.termometro_dia || {}).filter(([d, o]) => (o.a || 0) + (o.r || 0) + (o.m || 0) >= 20).slice(-10);
   $('#tdias').innerHTML = TD.map(([d, o]) => { const v = idx(o); return `<div data-tip="${corta(d)}: ${v} de 100 · ${num((o.a || 0) + (o.r || 0) + (o.m || 0))} textos con postura"><i style="height:${Math.max(4, v)}%;background:${color(v)}"></i><span>${corta(d)}</span></div>`; }).join('') || '<p class="vacio">Hace falta más de un día con datos.</p>';
   const Lc = E.lectura || {}; $('#lect').innerHTML = `<h3>${esc(Lc.titular || 'Seguimiento del proyecto')}</h3>${(Lc.lectura || []).map(p => `<p>${esc(p)}</p>`).join('')}<small>Lectura ${esc(Lc.origen || 'automática')} del ${corta(Lc.fecha || E.hoy)}. No predice el voto.</small>`;
