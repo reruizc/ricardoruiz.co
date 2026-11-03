@@ -81,6 +81,17 @@ def leer(ruta, defecto):
         return defecto
 
 
+PCT = re.compile(r'(\d) %(?! ?\d)')
+
+
+def sin_espacio_pct(x):
+    """Estilo de la casa: «64,2%», no «64,2 %». Cubre también lo que escriben la prensa y el modelo."""
+    if isinstance(x, str): return PCT.sub(r'\1%', x)
+    if isinstance(x, list): return [sin_espacio_pct(v) for v in x]
+    if isinstance(x, dict): return {k: sin_espacio_pct(v) for k, v in x.items()}
+    return x
+
+
 def escribir(ruta, datos):
     Path(ruta).parent.mkdir(parents=True, exist_ok=True)
     t = Path(str(ruta) + '.tmp')
@@ -520,7 +531,7 @@ def main():
             escribir(DATOS / 'lectura.json', lect)
             estado['lectura'] = lect
     ruta = DATOS / 'estado.json'
-    escribir(ruta, estado)
+    escribir(ruta, sin_espacio_pct(estado))
     print(f"estado.json · {ruta.stat().st_size // 1024} KB · pertinentes {estado['clasificacion']['pertinentes']} de {len(corpus)}")
     if o.publicar:
         publicar(ruta)
