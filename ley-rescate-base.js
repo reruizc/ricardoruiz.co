@@ -80,12 +80,19 @@
     };
     hace(); setInterval(hace, 60000);
   }
+  // El barco de Caudal × Cauce mientras carga (mismo dibujo que caudal-comun.js). El CSS vive en ley-rescate-base.css.
+  function mar(msgs, mini) {
+    const m = (msgs && msgs.length ? msgs : ['Cargando…']).slice(0, 3); while (m.length < 3) m.push(m[m.length - 1]);
+    const cresta = y => { let d = `M-80 ${y}`; for (let x = -80; x < 400; x += 80) d += ' q20 -7 40 0 t40 0'; return d; }, ola = y => cresta(y) + ' V70 H-80 Z';
+    return `<div class="cau-mar${mini ? ' mini' : ''}" role="status" aria-live="polite"><svg viewBox="0 0 320 70" aria-hidden="true"><path class="cm-ola o2" d="${ola(44)}"/><g class="cm-barco"><g class="cm-bob"><path class="cm-vela" d="M14 34 V14 L26 32 Z"/><path class="cm-vela" d="M12 34 V20 L5 33 Z" opacity=".6"/><path class="cm-casco" d="M2 35 H30 L25 41 H7 Z"/></g></g><path class="cm-ola" d="${ola(40)}"/><path class="cm-cresta" d="${cresta(40)}"/></svg><div class="cm-msgs">${m.map(t => `<span>${esc(t)}</span>`).join('')}</div></div>`;
+  }
   function pagina(id, pintar) {
     chasis(id);
+    const c = $('#carga'); if (c) c.innerHTML = mar(['Leyendo la ficha de la Cámara…', 'Sumando prensa y redes…', 'Casi listo…']);
     fetch(URL_DATOS, { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(E => {
       $('#carga').hidden = true; $('#app').hidden = false; sello(E); pintar(E);
       if (LOCAL) document.querySelectorAll('a[href^="ley-de-rescate-"]').forEach(a => { if (!a.href.includes('local=1')) a.href = a.getAttribute('href').replace(/(\.html)(#.*)?$/, '$1?local=1$2'); });
     }).catch(e => { $('#carga').textContent = 'El seguimiento no está disponible en este momento. Intente de nuevo en unos minutos.'; console.error(e); });
   }
-  window.LR = { $, esc, num, fecha, iso, mas, corta, larga, dias, FN, P, MIN_POST, CIERRE, ULT, suma, dur, etapas, pasos, cara, pagina, LOCAL };
+  window.LR = { $, esc, num, fecha, iso, mas, corta, larga, dias, FN, P, MIN_POST, CIERRE, ULT, suma, dur, etapas, pasos, cara, pagina, mar, LOCAL };
 })();

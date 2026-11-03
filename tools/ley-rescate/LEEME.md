@@ -50,3 +50,16 @@ las carpetas ocultas: por eso es `lr-datos/` y no `.lr/` (así se perdió la pri
 - Un orden del día escaneado no significa que el proyecto no esté: va a `agenda_no_leida`.
 - Al cambiar el libro de códigos o el prompt, subir `CLAS_VERSION`: reclasifica todo.
 - Cuando salga la ponencia, actualizar `temas.json`, porque el articulado cambia.
+
+## Texto de los artículos y Word (nov-3-2026)
+
+Pedido de Pablo: el PDF radicado pesa 3 MB y tiene 334 páginas, y abrirlo desde el mapa de artículos tardaba mucho.
+`python3 tools/ley-rescate/build_texto_articulos.py` saca el texto de los 106 artículos de
+`Bases de datos/reforma-tributaria/capa-i/pl477-2026.txt` y escribe:
+- `ley-rescate-data/texto-articulos.json` (378 KB): título propio `t` o, si el artículo es «Modifíquese el artículo…»,
+  un rótulo derivado `d` («Modifica el artículo 424 del Estatuto Tributario»), página `p` y párrafos `x`;
+- `ley-rescate-data/word/articulo-NNN.docx` (106) y `articulado-completo.docx` (135 KB).
+`ley-de-rescate-articulos.html` muestra la ficha con el texto en la misma página (`#art=N`), con el Word y el PDF
+oficial como opciones. El texto se recorre en secuencia: hay artículos en mayúscula («ARTÍCULO 51.») y otros que
+citan artículos de otras leyes. Solo hay que volver a correrlo si el proyecto cambia (texto de ponencia).
+El barco de carga (`LR.mar`) es copia del de `caudal-comun.js`; reemplaza el «Cargando…» en las 11 páginas.

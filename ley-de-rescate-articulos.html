@@ -12,21 +12,23 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261103c" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261103d" />
   <script defer src="/track.js"></script>
 </head>
 <body>
   <main class="wrap">
     <div class="k">Ley de Rescate · PL 477 de 2026 Cámara</div>
     <h1>Los 106 artículos</h1>
-    <p class="lead">Cada cuadro es un artículo. El color dice cómo se recibe su tema entre quienes toman postura, y lo tenue casi no aparece en la discusión. Busque un número o una palabra, y toque un cuadro para abrir su tema.</p>
+    <p class="lead">Cada cuadro es un artículo. El color dice cómo se recibe su tema entre quienes toman postura, y lo tenue casi no aparece en la discusión. Busque un número o una palabra, y toque un cuadro para leer el artículo completo y bajarlo en Word.</p>
     <div id="app" hidden>
       <div class="panel"><input class="q" id="q" type="search" placeholder="Buscar: renta, IVA, DIAN, 42…" aria-label="Buscar artículo" /><div class="mapa" id="arts"></div>
-      <div class="escala"><span>Más apoyo</span><i></i><span>Más rechazo</span><span style="margin-left:1rem;color:var(--ink3)">Gris: sin postura suficiente</span></div></div>
+      <div class="escala"><span>Más apoyo</span><i></i><span>Más rechazo</span><span style="margin-left:1rem;color:var(--ink3)">Gris: sin postura suficiente</span></div>
+      <div class="descargas"><a class="lleno" href="ley-rescate-data/word/articulado-completo.docx" download>↓ Los 106 artículos en Word</a><a id="pdf-of" href="#" target="_blank" rel="noopener">PDF oficial de la Cámara</a><small>El Word pesa 135 KB; el PDF oficial, 3 MB y 334 páginas.</small></div></div>
+      <div id="ficha"></div>
     </div>
     <div id="carga">Cargando el seguimiento…</div>
   </main>
-  <script src="ley-rescate-base.js?v=20261103a"></script>
+  <script src="ley-rescate-base.js?v=20261103d"></script>
   <script>
 LR.pagina('articulos', E => {
   const { $, esc, num, suma, MIN_POST } = LR, sin = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''), mx = Math.max(...E.temas.filter(t => t.id !== 'general').map(t => suma(t, 'todo').n), 1);
@@ -34,8 +36,30 @@ LR.pagina('articulos', E => {
   function pinta() { const q = sin(($('#q').value || '').trim());
     $('#arts').innerHTML = E.articulos.map(a => { const ts = a.temas.map(id => E.temas.find(t => t.id === id)).filter(Boolean), t = ts[0], o = t ? suma(t, 'todo') : null, c = o ? tono(o) : null, fuera = q && !sin(a.n + ' ' + a.r + ' ' + ts.map(x => x.nombre + ' ' + x.corto).join(' ')).includes(q);
       const luz = c ? (.299 * c[0] + .587 * c[1] + .114 * c[2]) : 255, est = (c ? `background:rgb(${c.join(',')});color:${luz < 150 ? '#fff' : '#14161c'};` : '') + (!fuera && o ? `opacity:${(.5 + .5 * Math.min(1, Math.sqrt(o.n / mx))).toFixed(2)}` : '');
-      return `<a class="a ${fuera ? 'apag' : ''}" style="${est}" href="${t ? 'ley-de-rescate-discusion.html#tema=' + t.id : E.proyecto.pdf + '#page=' + a.pag}" data-tip="${esc(`<b>Artículo ${a.n}</b> · p. ${a.pag}<br>${esc(a.r)}${t ? `<br><b>${esc(t.nombre)}</b>: ${num(o.n)} textos` : ''}`)}" aria-label="Artículo ${a.n}">${a.n}</a>`; }).join(''); }
+      return `<a class="a ${fuera ? 'apag' : ''}${a.n === SEL ? ' sel' : ''}" style="${est}" href="#art=${a.n}" data-n="${a.n}" data-tip="${esc(`<b>Artículo ${a.n}</b> · p. ${a.pag}<br>${esc(a.r)}${t ? `<br><b>${esc(t.nombre)}</b>: ${num(o.n)} textos` : ''}`)}" aria-label="Artículo ${a.n}: ${esc(a.r)}">${a.n}</a>`; }).join(''); }
+  // Texto de los artículos: se pide al abrir la página para que la ficha salga al instante. Sale de
+  // tools/ley-rescate/build_texto_articulos.py; si no llega, la ficha ofrece el Word y el PDF igual.
+  let SEL = null, TX = null;
+  const txt = fetch('ley-rescate-data/texto-articulos.json').then(r => r.ok ? r.json() : null).then(d => (TX = d)).catch(() => null);
+  $('#pdf-of').href = E.proyecto.pdf;
+  const parr = p => esc(p).replace(/^((?:Parágrafo|PARÁGRAFO)\s*(?:\d+|transitorio|único)?\.?|(?:Artículo|ARTÍCULO)\s+[\d\-– ]+[A-Za-z]?\.|\d+\.|[a-z]\)|[a-z]\.)\s/i, '<b>$1</b> ');
+  function ficha(n) {
+    const a = E.articulos.find(x => x.n === n); if (!a) return;
+    SEL = n; pinta();
+    const ts = a.temas.map(id => E.temas.find(t => t.id === id)).filter(Boolean), num3 = String(n).padStart(3, '0');
+    const cuerpo = () => { const x = TX && TX.arts[n - 1]; return x ? `<div class="art-txt">${x.x.map(p => `<p>${parr(p)}</p>`).join('')}</div>` : `<p class="sub" style="margin-top:1rem">No pudimos cargar el texto aquí. Descárguelo en Word o ábralo en el PDF.</p>`; };
+    const ta = TX && TX.arts[n - 1], titulo = (ta && (ta.t || ta.d)) || a.r;
+    $('#ficha').innerHTML = `<div class="ficha art-ficha" id="art-ficha"><button class="art-cerrar" aria-label="Cerrar">×</button><div class="art-k">Artículo ${n} de 106 · página ${a.pag} del proyecto</div><h3>${esc(titulo)}</h3>
+      ${ts.length ? `<div class="chips">${ts.map(t => `<a class="chip" href="ley-de-rescate-discusion.html#tema=${t.id}">Cómo se discute: ${esc(t.nombre)} →</a>`).join('')}</div>` : ''}
+      <div class="art-acc"><a class="lleno" href="ley-rescate-data/word/articulo-${num3}.docx" download>↓ Este artículo en Word</a><a href="${esc(E.proyecto.pdf)}#page=${a.pag}" target="_blank" rel="noopener">Verlo en el PDF oficial (3 MB)</a></div>
+      <div id="art-cuerpo">${TX ? cuerpo() : LR.mar(['Trayendo el texto del artículo…', 'Ya casi…', 'Un momento más…'], true)}</div></div>`;
+    $('#art-ficha .art-cerrar').onclick = () => { SEL = null; $('#ficha').innerHTML = ''; history.replaceState(null, '', location.pathname + location.search); pinta(); };
+    if (!TX) txt.then(() => { if (SEL !== n) return; $('#art-cuerpo').innerHTML = cuerpo(); const x = TX && TX.arts[n - 1]; if (x && (x.t || x.d)) $('#art-ficha h3').textContent = x.t || x.d; });
+    $('#art-ficha').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  $('#arts').addEventListener('click', e => { const el = e.target.closest('.a[data-n]'); if (!el) return; e.preventDefault(); const n = +el.dataset.n; history.replaceState(null, '', '#art=' + n); ficha(n); });
   $('#q').oninput = pinta; pinta();
+  const h = location.hash.match(/art=(\d+)/); if (h) ficha(+h[1]);
 });
   </script>
 </body>
