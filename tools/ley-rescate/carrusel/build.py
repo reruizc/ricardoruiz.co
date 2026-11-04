@@ -139,6 +139,7 @@ def c01():
 
 # ── 02 · Dónde va ────────────────────────────────────────────────────────────────────────────────────────────
 def c02():
+    U = E['proyecto'].get('urgencia')
     T = E.get('tramite') or {}
     ponentes = sum(len(d.get('ponentes') or []) for d in T.get('debates') or [])
     etapas = [('Radicado', '29 de octubre', 'hecho'), ('Primer debate', 'Comisiones Terceras', 'ahora'), ('Segundo debate', 'Plenaria de Cámara', ''),
@@ -151,7 +152,7 @@ def c02():
 <p class="sub" style="font-size:30px">Una ley necesita cuatro debates: dos en la Cámara y dos en el Senado. Esta todavía no ha tenido el primero.</p>
 <div class="panel" style="margin-top:40px;padding:40px 36px"><div class="ruta">{ruta}</div></div>
 <div class="hoy"><div><b>{esc(T.get('estado') or 'Trámite en comisión')}</b><span>Estado en la ficha oficial de la Cámara</span></div>
-<div class="al"><b>{pon}</b><span>en la ficha oficial</span></div><div class="al"><b>Sin fecha</b><span>de primer debate en los órdenes del día</span></div></div>""", f"""
+<div class="al"><b>{pon}</b><span>en la ficha oficial</span></div>{'<div class="ok"><b>Con urgencia</b><span>mensaje radicado el ' + fc(date.fromisoformat(U['fecha'])) + ': comisiones de Cámara y Senado juntas</span></div>' if U else '<div class="al"><b>Sin fecha</b><span>de primer debate en los órdenes del día</span></div>'}</div>""", f"""
 .ruta{{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;position:relative}}
 .ruta:before{{content:"";position:absolute;left:30px;right:30px;top:27px;height:4px;background:#d7dbe2;border-radius:2px}}
 .et{{position:relative;display:flex;flex-direction:column;gap:5px}}
@@ -161,11 +162,12 @@ def c02():
 .hoy{{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:14px;margin-top:26px}}
 .hoy div{{background:#fff;border:1px solid rgba(17,20,28,.1);border-radius:20px;padding:28px 26px;min-height:190px}}
 .hoy b{{display:block;font-size:36px;letter-spacing:-.02em;line-height:1.1}}.hoy span{{display:block;font-size:21px;color:#4d5462;margin-top:10px;line-height:1.3}}
-.hoy .al b{{color:{ROJO}}}""")
+.hoy .al b{{color:{ROJO}}}.hoy .ok b{{color:{VERDE}}}""")
 
 
 # ── 03 · El tiempo que le queda ──────────────────────────────────────────────────────────────────────────────
 def c03():
+    U = E['proyecto'].get('urgencia')
     falta = (CIERRE - HOY).days
     ini, fin = HOY, CIERRE
     rad = date(2026, 10, 29)
@@ -178,11 +180,11 @@ def c03():
     return pagina(3, f"""
 <div class="k">El tiempo que le queda</div>
 <h2>{falta} días para el 16 de diciembre</h2>
-<p class="sub">Ese día termina este periodo de sesiones. Entre debate y debate la Constitución exige plazos mínimos: 8 días, y 15 entre una cámara y otra.</p>
+<p class="sub">{'El Gobierno radicó mensaje de urgencia el ' + fc(date.fromisoformat(U['fecha'])) + ': las comisiones de Cámara y Senado votan juntas y la Constitución les pide decidir en 30 días.' if U else 'Ese día termina este periodo de sesiones. Entre debate y debate la Constitución exige plazos mínimos: 8 días, y 15 entre una cámara y otra.'}</p>
 <div class="panel" style="margin-top:30px">
   <p class="esc"><span>Hoy · {HOY.day} nov</span><span>16 dic</span></p>
-  {fila('Trámite normal', ULT_NORMAL, f'el primer debate tendría que ser a más tardar el {fl(ULT_NORMAL)}')}
-  {fila('Con mensaje de urgencia', ULT_URG, f'las comisiones de Cámara y Senado votan juntas: aguanta hasta el {fl(ULT_URG)}')}
+  {fila('Con mensaje de urgencia (ya radicado)', ULT_URG, f'el primer debate conjunto puede ser hasta el {fl(ULT_URG)}') if U else fila('Trámite normal', ULT_NORMAL, f'el primer debate tendría que ser a más tardar el {fl(ULT_NORMAL)}')}
+  {fila('Así habría sido sin urgencia', ULT_NORMAL, f'el primer debate tendría que ser a más tardar el {fl(ULT_NORMAL)}') if U else fila('Con mensaje de urgencia', ULT_URG, f'las comisiones de Cámara y Senado votan juntas: aguanta hasta el {fl(ULT_URG)}')}
 </div>
 <div class="rap"><b>{(CIERRE - rad).days}</b><span>días van del 29 de octubre, cuando se radicó, al 16 de diciembre. La tributaria aprobada más rápida desde 2016 tardó <b>{d_rap} días</b> ({esc(rapida['ley'])}, {esc(rapida['gobierno'])}). Si esta pasa a tiempo, sería un récord.</span></div>
 <p class="sub" style="font-size:22px;margin-top:18px"><b>Si no alcanza, no se archiva:</b> sigue en febrero. Pero lo que cobra por año, como la renta, arrancaría en 2028 y no en 2027.</p>""", f"""
