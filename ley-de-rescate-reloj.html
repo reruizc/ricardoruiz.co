@@ -14,6 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="ley-rescate-base.css?v=20261103d" />
   <script defer src="/track.js"></script>
+  <style>.aviso-urg{margin-top:.9rem;background:#fff;border:1px solid var(--line);border-left:5px solid var(--teal);border-radius:12px;padding:.8rem 1rem;font-size:.95rem;line-height:1.5;color:var(--ink2);max-width:72ch}.aviso-urg b{color:var(--ink)}.aviso-urg a{font-size:.85rem}</style>
 </head>
 <body>
   <main class="wrap">
@@ -33,14 +34,15 @@
   <script src="ley-rescate-base.js?v=20261103d"></script>
   <script>
 LR.pagina('reloj', E => {
-  const { $, esc, fecha, iso, corta, larga, dias, CIERRE, ULT, pasos } = LR; let modo = 'normal';
+  const { $, esc, fecha, iso, corta, larga, dias, CIERRE, ULT, pasos } = LR, U = E.proyecto.urgencia; let modo = U ? 'urgencia' : 'normal';
+  if (U) { document.querySelectorAll('#modo .pill').forEach(x => x.classList.toggle('on', x.dataset.m === 'urgencia')); document.querySelector('.lead').insertAdjacentHTML('afterend', `<p class="aviso-urg"><b>Ya hay mensaje de urgencia.</b> El Gobierno lo radicó el ${larga(U.fecha)}: las comisiones económicas de Cámara y Senado estudian la ley juntas, las plenarias pueden debatirla al tiempo y cada cámara tiene 30 días para decidir. ${U.fuentes.map(f => `<a href="${esc(f.u)}" target="_blank" rel="noopener">${esc(f.n)}</a>`).join(' · ')}</p>`); }
   const r = $('#d1'), total = dias(E.hoy, CIERRE); r.min = 1; r.max = total; r.value = Math.max(1, dias(E.hoy, '2026-11-18'));
   function pinta() { const d1 = iso(new Date(fecha(E.hoy).getTime() + Number(r.value) * 864e5)), P2 = pasos(d1, modo), fin = P2[P2.length - 1][0], ok = fin <= CIERRE, ult = ULT[modo];
     $('#fd1').textContent = larga(d1);
     $('#lin').innerHTML = P2.map(([f, t]) => `<li class="${f > CIERRE ? 'tarde' : ''}"><span>${corta(f)}</span><span>${t}</span></li>`).join('') + '<li><span>16 dic</span><span>Terminan las sesiones ordinarias de este periodo</span></li>';
     $('#ver').className = 'veredicto ' + (ok ? '' : 'no');
     $('#ver').innerHTML = ok ? `<b>Alcanza</b>, con ${dias(fin, CIERRE)} días de margen y sin contar agenda, fines de semana ni festivos. Último día posible: ${larga(ult)}.` : `<b>No alcanza</b> antes del 16 de diciembre. Se pasa ${dias(CIERRE, fin)} días. Último día posible en este modo: ${larga(ult)}.`;
-    $('#aparte').innerHTML = modo === 'normal' ? `<b>Sin urgencia, la Comisión Tercera de la Cámara tendría que votar a más tardar el ${larga(ULT.normal)}.</b> Por eso importa si llega el mensaje de urgencia. Son plazos mínimos: entre un debate y otro van 8 días, y entre cámaras 15 (art. 160 C.P.).` : `<b>Con urgencia y sesión conjunta solo rige el plazo de 8 días</b>, y las plenarias pueden ser simultáneas (Corte Constitucional, C-784 de 2014). Cada comisión vota por separado, así que basta que una la niegue. El Gobierno no lo ha pedido todavía.`; }
+    $('#aparte').innerHTML = modo === 'normal' ? (U ? `<b>Así sería sin urgencia</b>, que ya no es el caso: la Comisión Tercera de la Cámara habría tenido que votar a más tardar el ${larga(ULT.normal)}.` : `<b>Sin urgencia, la Comisión Tercera de la Cámara tendría que votar a más tardar el ${larga(ULT.normal)}.</b> Por eso importa si llega el mensaje de urgencia.`) + ` Son plazos mínimos: entre un debate y otro van 8 días, y entre cámaras 15 (art. 160 C.P.).` : `<b>Con urgencia y sesión conjunta solo rige el plazo de 8 días</b>, y las plenarias pueden ser simultáneas (Corte Constitucional, C-784 de 2014). Cada comisión vota por separado, así que basta que una la niegue. El Gobierno no lo ha pedido todavía.`; }
   const T = E.tributarias, d = (a, b) => dias(a, b), lim = d(E.proyecto.radicado, CIERRE), hoyD = d(E.proyecto.radicado, E.hoy), mx = Math.max(...T.map(t => d(t.rad, t.fin)), lim) + 6;
   const ap = T.filter(t => t.res !== 'retirada' && t.res !== 'hundida').map(t => d(t.rad, t.fin)), min = Math.min(...ap);
   $('#cmp-sub').innerHTML = `Días desde que se radicó hasta que se sancionó, se retiró o se hundió. Del 29 de octubre al 16 de diciembre hay <b>${lim} días</b>. La más rápida de las aprobadas tardó <b>${min}</b>: si esta pasa a tiempo, sería la más rápida de esta lista.`;

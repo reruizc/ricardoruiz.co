@@ -33,8 +33,8 @@
   <script src="ley-rescate-base.js?v=20261103d"></script>
   <script>
 LR.pagina('hub', E => {
-  const { $, esc, num, corta, larga, dias, ULT, CIERRE, suma, dur, etapas, cara, MIN_POST } = LR, T = E.tramite || {}, L = etapas(E), ag = (T.agenda || []).filter(a => a.fecha >= E.hoy), pon = (T.debates || []).flatMap(d => d.ponentes || []), ahora = L.find(l => l.ahora);
-  const K = [['Dónde está', T.estado || 'Sin dato', `Sigue: ${ahora ? ahora.nom.toLowerCase() : 'sancionada'}`, ''],
+  const { $, esc, num, corta, larga, dias, ULT, CIERRE, suma, dur, etapas, cara, MIN_POST } = LR, T = E.tramite || {}, L = etapas(E), ag = (T.agenda || []).filter(a => a.fecha >= E.hoy), pon = (T.debates || []).flatMap(d => d.ponentes || []), ahora = L.find(l => l.ahora), U = E.proyecto.urgencia;
+  const K = [['Dónde está', T.estado || 'Sin dato', `Sigue: ${ahora ? ahora.nom.toLowerCase() : 'sancionada'}${U ? ' · con mensaje de urgencia' : ''}`, ''],
     ['Próxima votación', ag.length ? larga(ag[0].fecha) : 'Sin fecha', ag.length ? esc(ag[0].ambito) : 'No aparece en ningún orden del día publicado hasta el ' + corta((T.ordenes_hasta || E.hoy).slice(0, 10)), ag.length ? '' : 'alerta'],
     ['Ponentes', pon.length ? String(pon.length) : 'Sin publicar', pon.length ? esc(pon.slice(0, 2).join(' · ')) : 'La ficha oficial todavía no los trae', ''],
     ['Fin del periodo', `${dias(E.hoy, CIERRE)} días`, 'Hasta el 16 de diciembre, cuando acaban las sesiones de este semestre', '']];
@@ -64,7 +64,7 @@ LR.pagina('hub', E => {
   const apoy = temas.filter(x => x.o.post >= 20).sort((a, b) => b.o.apoya / b.o.post - a.o.apoya / a.o.post)[0];
   const rNorm = dias(E.hoy, ULT.normal), rUrg = dias(E.hoy, ULT.urgencia);
   $('#puntos').innerHTML = [['Trámite', `${esc(T.estado || '')}. ${pon.length ? 'Ya tiene ponentes.' : 'Sin ponentes publicados.'} ${ag.length ? 'Ya está en un orden del día.' : 'Sin fecha de votación.'}`],
-    ['Reloj', rNorm >= 0 ? `Sin mensaje de urgencia, quedan <b>${rNorm} días</b> para el primer debate. Con urgencia, ${rUrg}.` : `Sin urgencia ya no alcanza antes del 16 de diciembre. Con urgencia quedan ${Math.max(rUrg, 0)} días.`],
+    ['Reloj', U ? `El Gobierno radicó <b>mensaje de urgencia</b> el ${corta(U.fecha)}: las comisiones económicas de Cámara y Senado la estudian juntas y quedan <b>${Math.max(rUrg, 0)} días</b> para que el primer debate alcance antes del 16 de diciembre. La Constitución les pide decidir en 30 días.` : rNorm >= 0 ? `Sin mensaje de urgencia, quedan <b>${rNorm} días</b> para el primer debate. Con urgencia, ${rUrg}.` : `Sin urgencia ya no alcanza antes del 16 de diciembre. Con urgencia quedan ${Math.max(rUrg, 0)} días.`],
     ['Votos', `Declarados en contra: ${cuenta('senado', 'no')} de ${camaras.senado.total} en Senado y ${cuenta('camara', 'no')} de ${camaras.camara.total} en Cámara. El resto no se ha definido como bancada.`],
     ['Discusión', `Lo más discutido: <b>${esc(top.t.nombre)}</b>, con ${Math.round(100 * dur(top.o))}% de rechazo entre quienes toman postura.${apoy ? ` Lo que más apoyo recibe: ${esc(apoy.t.nombre.toLowerCase())}.` : ''}`]]
     .map(([a, b]) => `<div class="punto"><b>${a}</b><span>${b}</span></div>`).join('');
@@ -78,7 +78,7 @@ LR.pagina('hub', E => {
   const aj = E.proyecto.ajuste;
   const C = [['ley-de-rescate-generalidades.html', 'imagenes/caudal-ejecutivo.jpg', 'Generalidades', `${String(aj.total[0]).replace('.', ',')}% del PIB en 2027`, `Qué es la ley, cuánto busca, cómo se compara con las ${E.tributarias.length} tributarias anteriores y el dato curioso de sus nombres.`, 'Ver la ley en una página', 'w2'],
     ['ley-de-rescate-fuerzas.html', 'imagenes/mi-congreso-fuerzas.jpg', 'Esquema de fuerzas', `${E.voces.filter(v => v.p === 'r').length} en contra · ${E.voces.filter(v => v.p === 'a').length} a favor`, `Los jugadores en tres frentes: Congreso (${nv('con')}), sector público (${nv('pub')}) y sector privado (${nv('pri')}).`, 'Ver el esquema'],
-    ['ley-de-rescate-reloj.html', 'imagenes/mi-congreso-reloj.jpg', 'El reloj', rNorm >= 0 ? `${rNorm} días` : 'Solo con urgencia', 'Para que el primer debate alcance sin urgencia. Y cuánto tardaron las tributarias anteriores.', 'Abrir el reloj'],
+    ['ley-de-rescate-reloj.html', 'imagenes/mi-congreso-reloj.jpg', 'El reloj', U ? `${Math.max(rUrg, 0)} días` : rNorm >= 0 ? `${rNorm} días` : 'Solo con urgencia', U ? 'Para el primer debate, ya con mensaje de urgencia. Y cuánto tardaron las tributarias anteriores.' : 'Para que el primer debate alcance sin urgencia. Y cuánto tardaron las tributarias anteriores.', 'Abrir el reloj'],
     ['ley-de-rescate-votos.html', 'imagenes/legislativo-congreso.jpg', 'Los votos', `${camaras.senado.mayoria} y ${camaras.camara.mayoria}`, 'Los votos que hacen falta en cada Comisión Tercera. Haga la cuenta usted mismo, con cada congresista.', 'Hacer la cuenta'],
     ['ley-de-rescate-discusion.html', 'imagenes/caudal-medios.jpg', 'La discusión', esc(top.t.nombre), `${num(E.clasificacion.pertinentes)} textos clasificados. Qué apoya y qué rechaza la prensa y las redes.`, 'Ver la discusión'],
     ['ley-de-rescate-articulos.html', 'imagenes/caudal-gacetas.jpg', 'Los 106 artículos', `${E.temas.length - 1} temas`, 'El proyecto completo, artículo por artículo, con buscador y su página en el PDF.', 'Explorar el proyecto'],
