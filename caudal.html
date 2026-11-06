@@ -23,6 +23,17 @@
   // página nueva, no a la vista vieja, que solo listaba titulares.
   if(location.hash==='#medios') location.replace('caudal-medios.html');
 </script>
+<style>
+  /* barra «Buscar actualizaciones» (Congreso y SUCOP) */
+  .act-bar{display:flex; align-items:center; justify-content:center; gap:.8rem; flex-wrap:wrap; margin:.9rem auto 0; max-width:720px;
+    font-size:.74rem; color:var(--ink3); line-height:1.5; text-align:left}
+  .act-bar b{color:var(--ink2)}
+  .act-hor{font-size:.68rem}
+  .act-msg{color:var(--teal); font-weight:600}
+  .act-btn{border:1px solid var(--border2); background:var(--card); color:var(--ink2); border-radius:7px; padding:.42rem .8rem; font-size:.74rem; cursor:none; white-space:nowrap}
+  .act-btn:hover{border-color:var(--teal); color:var(--teal)}
+  .act-btn:disabled{opacity:.6}
+</style>
 </head>
 <body class="caudal-app">
   <a class="skip-link" href="#app">Saltar al contenido</a>
@@ -111,6 +122,7 @@
           <input id="cq" type="text" placeholder="Barguil, Cepeda, Racero…" autocomplete="off" />
           <button id="cgo">Ver voto →</button>
         </div>
+        <div class="act-bar" id="actCongreso" data-fuente="congreso"></div>
         <div class="chips" id="chips"></div>
       </div>
 
@@ -265,6 +277,7 @@
           <button id="sgo">Buscar</button>
         </div>
         <div class="chips" id="sestados"></div>
+        <div class="act-bar" id="actSucop" data-fuente="sucop"></div>
       </div>
 
       <div id="suc-landing"></div>
@@ -1511,7 +1524,59 @@
     else if(k==='gacetas'){ showView('gacetas'); const e=document.getElementById('gq'), b=document.getElementById('ggo'); if(e)e.value=query; if(b) setTimeout(()=>b.click(),0); }
   }
 
+  /* ── «Buscar actualizaciones» en Congreso y SUCOP (nov-2026) ──────────────
+     Dice cuándo se actualizó de verdad la fuente (hora de S3, acción
+     `frescura`), cada cuánto corre el rastreo, y vuelve a consultar el módulo.
+     El rastreo no se dispara desde aquí: corre cada 6 horas en el servidor
+     (Cámara y Senado 02:00 · 08:00 · 14:00 · 19:30; SUCOP 01:40 · 07:40 ·
+     13:40 · 19:10). El botón trae lo último que ya se cosechó. */
+  let _FRESCA=null;
+  function _horaCO(iso){
+    if(!iso) return '—';
+    const d=new Date(iso);
+    return d.toLocaleString('es-CO',{timeZone:'America/Bogota',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+  }
+  function _haceCuanto(iso){
+    if(!iso) return '';
+    const m=Math.round((Date.now()-new Date(iso).getTime())/60000);
+    if(m<60) return `hace ${Math.max(1,m)} min`;
+    const h=Math.round(m/60); return h<48?`hace ${h} h`:`hace ${Math.round(h/24)} días`;
+  }
+  function pintarActualiza(fr, msg){
+    document.querySelectorAll('.act-bar').forEach(el=>{
+      const f=el.dataset.fuente, iso=fr&&fr[f], hor=(fr&&fr.horario&&fr.horario[f])||[];
+      const det=f==='congreso'&&fr?` · Senado ${_horaCO(fr.senado)} · Cámara ${_horaCO(fr.camara)}`:'';
+      el.innerHTML=`<span class="act-txt">${iso?`Datos al <b>${esc(_horaCO(iso))}</b> (${esc(_haceCuanto(iso))})${esc(det)}`:'Consultando cuándo se actualizó…'}
+          ${hor.length?`<br><span class="act-hor">Se revisa cada 6 horas: ${esc(hor.join(' · '))}</span>`:''}
+          ${msg&&msg[f]?`<br><span class="act-msg">${esc(msg[f])}</span>`:''}</span>
+        <button type="button" class="act-btn">↻ Buscar actualizaciones</button>`;
+      el.querySelector('.act-btn').onclick=()=>buscarActualizaciones(f, el);
+    });
+  }
+  async function cargarFrescura(){
+    try{ _FRESCA=await call({action:'frescura'}); }catch(e){ _FRESCA=null; }
+    pintarActualiza(_FRESCA);
+    return _FRESCA;
+  }
+  async function buscarActualizaciones(f, el){
+    const b=el.querySelector('.act-btn'); if(b){ b.disabled=true; b.textContent='Buscando…'; }
+    const antes=_FRESCA&&_FRESCA[f];
+    const fr=await cargarFrescura();
+    const ahora=fr&&fr[f];
+    const msg={}; msg[f]=!ahora?'No pudimos consultar la fuente. Reintenta en un momento.'
+      :(antes&&ahora!==antes)?'Llegaron datos nuevos: la lista de abajo ya los incluye.'
+      :'No hay datos nuevos desde la última revisión. La próxima es en el horario de arriba.';
+    pintarActualiza(fr, msg);
+    // vuelve a consultar el módulo (la Lambda recarga el índice si cambió en S3)
+    if(f==='congreso'){ const qi=document.getElementById('q'); if(qi&&qi.value.trim()) buscar(); }
+    else if(f==='sucop'){
+      const r=document.getElementById('suc-results');
+      if(r&&r.style.display==='block') sucBuscar(); else { SUC_STATS=null; sucLoadStats(); }
+    }
+  }
+
   function initHome(){
+    cargarFrescura();
     renderPillars();
     regInit();
     ejeInit();

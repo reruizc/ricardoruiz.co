@@ -27,6 +27,7 @@
 #   dataset_upload_*          aws s3 cp                   dist/ → metadata/
 #   ritmo                     build_ritmo.py              monitor de ritmo (lee dist, va tras el dataset)
 #   congreso_claro_activos    congreso-claro/build_datos.py  proyectos activos por comisión (página ciudadana)
+#   monitor_congreso          caudal/monitor/build_monitor.py  agenda y movimientos (caudal-monitor.html)
 #   gacetas_enumera/texto/build/upload  enumerar_gacetas.py …  Gaceta del Congreso (ventana de 45 días)
 #   control_fetch/build/upload  harvest_jurisprudencia.py  Corte Constitucional (una vez al día)
 #   anla_fetch/build          harvest_anla.py             Gaceta Ambiental (pilar Regulatorio)
@@ -479,11 +480,21 @@ etapa() {
     etapa --nombre congreso_claro_activos --timeout 600 \
           --desc "Congreso Claro · proyectos activos por comisión" \
           -- python3 tools/congreso-claro/build_datos.py --solo-activos --subir
+
+    # ── Monitoreo del Congreso (caudal-monitor.html) ──
+    # Proyectos vivos de las dos cámaras con su estado y los movimientos de
+    # trámite de los últimos 21 días (diario*/novedades). Lee lo que acaban de
+    # dejar senado_radicados y camara_radicados; si falla, la página sigue con
+    # el JSON anterior.
+    etapa --nombre monitor_congreso --timeout 300 \
+          --desc "Monitoreo del Congreso · proyectos y movimientos" \
+          -- python3 tools/caudal/monitor/build_monitor.py --subir
   else
     etapa --nombre texto_index --omitida "el dataset falló (rc=$rc_ds): indexar sobre un dataset roto sería peor que no indexar"
     etapa --nombre dataset_upload --omitida "el dataset falló (rc=$rc_ds): no hay archivo nuevo que subir"
     etapa --nombre ritmo --omitida "el dataset falló (rc=$rc_ds): el monitor lee dist/proyectos.jsonl; con uno roto publicaría una comparación falsa"
     etapa --nombre congreso_claro_activos --omitida "el dataset falló (rc=$rc_ds): la página conserva el JSON de ayer"
+    etapa --nombre monitor_congreso --omitida "el dataset falló (rc=$rc_ds): el monitoreo conserva el JSON anterior"
   fi
 
   # ── Gaceta del Congreso (tarjeta «Diarios y gacetas») · nov-2026 ──

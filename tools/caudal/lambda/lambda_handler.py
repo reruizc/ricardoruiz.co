@@ -5238,6 +5238,24 @@ def handler(event, context):
         except Exception as e:
             return _resp(500, {'error': f'no se pudo leer stats: {str(e)[:120]}'})
 
+    if action == 'frescura':       # cuándo se actualizó de verdad cada fuente (botón «Buscar actualizaciones»)
+        # Hora de modificación en S3 de lo que alimenta cada módulo. Barato
+        # (head_object) y sin modelo: lo llama el botón de Congreso y SUCOP.
+        claves = {'congreso': 'metadata/indice.json',
+                  'senado': 'metadata/pl-radicados-2026-2027.jsonl',
+                  'camara': 'metadata/pl-radicados-camara-2026-2027.jsonl',
+                  'sucop': 'metadata/sucop.jsonl'}
+        out = {}
+        for k, key in claves.items():
+            try:
+                out[k] = _s3.head_object(Bucket=BUCKET, Key=key)['LastModified'].isoformat()
+            except Exception:
+                out[k] = None
+        # cada cuánto corre el rastreo, para que la página lo diga sin adivinar
+        out['horario'] = {'congreso': ['02:00', '08:00', '14:00', '19:30'],
+                          'sucop': ['01:40', '07:40', '13:40', '19:10']}
+        return _resp(200, out)
+
     if action == 'articulado':
         # QUÉ DICE el articulado. Sin `id` devuelve la cobertura (cuántos
         # proyectos tienen el texto leído, de qué base salió y qué campos
