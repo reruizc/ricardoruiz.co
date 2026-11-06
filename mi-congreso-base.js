@@ -547,8 +547,12 @@
   /* externos: el JSON automático de S3 + los actores curados a mano que vivan
      en el repo (mi-congreso-data/fuerzas-externas/<tok>.json). Mismo nombre
      normalizado → gana el manual. Cualquiera de los dos puede faltar. */
+  /* un mismo proyecto con número en las dos cámaras (urgencia → comisiones
+     conjuntas): los datos se guardan con uno solo y el otro se traduce aquí */
+  const TOK_ALIAS={'S-328-26':'C-477-26'};   // Ley de Rescate: 477/2026C = 328/2026S
+  const tokCanon=x=>{ const t=tokProyecto(x); return t&&(TOK_ALIAS[t]||t); };
   function externosDe(x){
-    const t=tokProyecto(x); if(!t) return Promise.resolve(null);
+    const t=tokCanon(x); if(!t) return Promise.resolve(null);
     return memo('ext:'+t,async()=>{
       const [auto,man]=await Promise.all([
         getJSON(FZ_BASE+'/fuerzas-externas/'+t+'.json',3600000).catch(()=>null),
@@ -582,7 +586,7 @@
     });
   }
   function notaDe(e,x){
-    const t=x&&tokProyecto(x); if(!t) return Promise.resolve(null);
+    const t=x&&tokCanon(x); if(!t) return Promise.resolve(null);
     return memo('nota:'+e.nombre+t,async()=>{
       const d=await getJSON(`mi-congreso-data/notas/${escuchaSlug(e)}/${t}.json`,600000).catch(()=>null);
       return d&&d.congresista&&d.congresista.nombre===e.nombre&&d.congresista.corp===e.corp?d:null;
@@ -729,5 +733,5 @@
     me,guardar,olvidar,requireMe,getJSON,api,comision,ordenes,esMia,etapaDe,etapaEf,numKey,citasDe,numDe,citaTxt,avanceHtml,tipoDe,
     escucha,escuchaSlug,mios,avanceGeneral,indiceElectoral,enSesion,diasHabSesion,diasCal,legislatura,relojDe,puntaje,electoral,fotoDe,voto,prensa,citPanorama,bancadasDisc,bloqueo,stats,
     renderHead,renderNav,pagina,tip,tipOn,porDia,tipDia,calendario,ring,spark,hbar,
-    FZ_CAT,FZ_AFIN,FZ_BISAGRA,COM_KEYS,comKeyDe,internas,oficialDe,bancadaDe,coincidencia,fuerzas,hemiciclo,tipSilla,fichaDe,tokNum,palabrasTema,prensaTema,radicadosTodos,proyectoDe,tokProyecto,externosDe,notasDe,notaDe,puedeVerNota};
+    FZ_CAT,FZ_AFIN,FZ_BISAGRA,COM_KEYS,comKeyDe,internas,oficialDe,bancadaDe,coincidencia,fuerzas,hemiciclo,tipSilla,fichaDe,tokNum,palabrasTema,prensaTema,radicadosTodos,proyectoDe,tokProyecto,externosDe,notasDe,notaDe,puedeVerNota,tokCanon};
 })();
