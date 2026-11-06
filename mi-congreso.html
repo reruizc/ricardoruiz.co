@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
-  <link rel="stylesheet" href="mi-congreso.css?v=20261023" />
+  <link rel="stylesheet" href="mi-congreso.css?v=20261107" />
 </head>
 <body>
   <div class="bg-layer"></div>
@@ -151,7 +151,7 @@
   <script src="legislativo-base.js"></script>
   <script src="legislativo-electos.js"></script>
   <script src="candidato-360-saliencia.js?v=20261019"></script>
-  <script src="mi-congreso-base.js?v=20261027"></script>
+  <script src="mi-congreso-base.js?v=20261107"></script>
   <script>
   /* ── Mi Congreso · hub ─────────────────────────────────────────────
      Ocho tarjetas, cada una con su imagen, un vistazo vivo de su dato y
@@ -219,10 +219,14 @@
     Object.keys(RES).forEach(k=>delete RES[k]);
     document.querySelectorAll('[data-card] [data-b]').forEach(b=>b.innerHTML=SKEL);
     const head=document.getElementById('mc-head');
-    MC.renderHead(head,e,{extra:`<div id="mc-ficha"></div><div class="mc-resumen"><button type="button" onclick="copiarResumen()">Copiar el resumen del día</button><a class="wa" href="#" target="_blank" rel="noopener" onclick="return waResumen(this)">Enviar por WhatsApp</a><span class="ok" id="mc-res-ok"></span></div>`});
+    MC.renderHead(head,e,{extra:`<div id="mc-ficha"></div><div id="mc-notas"></div><div class="mc-resumen"><button type="button" onclick="copiarResumen()">Copiar el resumen del día</button><a class="wa" href="#" target="_blank" rel="noopener" onclick="return waResumen(this)">Enviar por WhatsApp</a><span class="ok" id="mc-res-ok"></span></div>`});
     head.querySelector('[data-mc-cambiar]').onclick=cambiar;
     const misP=MC.mios(e);
     cardAgenda(e,my,misP); cardProyectos(e,my,misP); cardReloj(e,my,misP);
+    MC.notasDe(e).then(async d=>{ if(!ok(my)||!d||!(d.notas||[]).length) return;
+      const ver=await MC.puedeVerNota(d); if(!ok(my)) return;
+      document.getElementById('mc-notas').innerHTML=d.notas.map(n=>`<div class="nt-aviso"><span class="nt-k">Nota de trabajo${ver?'':' · privada'}</span><span><b>${esc(n.p)} · ${esc(n.t)}</b>${ver?' · '+esc(n.k):' · solo para la congresista y su equipo'}</span><a href="mi-congreso-fuerzas.html?p=${encodeURIComponent(n.p)}#nota">${ver?'Abrir':'Ver'} →</a></div>`).join('');
+    }).catch(()=>{});
     cardVotos(e,my); cardControl(e,my); cardPrensa(e,my); cardBancada(e,my); cardFuerzas(e,my,misP); cardRedes(e,my);
     alertaPinta();
   }
