@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-<link href="caudal-base.css?v=20261009b" rel="stylesheet" />
+<link href="caudal-base.css?v=20261106" rel="stylesheet" />
 <link rel="stylesheet" href="caudal-ui.css?v=20261102" />
 <link rel="stylesheet" href="caudal-intro.css?v=20261009b" />
 <script>
@@ -1605,6 +1605,176 @@
     </div>`;
   }
 
+  /* ---------- ficha · esquema de fuerzas ----------
+     Quién empuja y quién frena un proyecto de la legislatura viva. Todo sale de
+     JSON públicos que ya publica Mi Congreso (sin backend nuevo):
+       · externos: legislativo/fuerzas-externas/{C|S}-{num}-{aa}.json + index.json
+         (tools/mi-congreso/build_fuerzas_externas.py). Postura SOLO con cita de
+         prensa; sin cita el actor va a la franja central «sin posición».
+       · internos: legislativo/fuerzas-internas-2026.json — coincidencia de voto
+         ENTRE BANCADAS en las votaciones disputadas del Senado. «En contra» no
+         existe: solo lo diría un voto sobre el proyecto. Cámara no tiene voto
+         nominal de esta legislatura, y se dice.
+       · Ley de Rescate (477/2026C · 328/2026S): su propio rastreo diario
+         (ley-rescate-data/estado.json), con enlace al esquema completo.
+     El proyecto se casa con su archivo por NÚMERO (Cámara o Senado), nunca por
+     el id de la tabla: «477/2026C», «328/26» y «011 de 2025 Senado» → 477-26. */
+  const FZ_S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo';
+  const _fzMemo={}; let _fzSeq=0;
+  function fzJSON(url){
+    if(!_fzMemo[url]) _fzMemo[url]=fetch(url).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); })
+      .catch(e=>{ delete _fzMemo[url]; throw e; });
+    return _fzMemo[url];
+  }
+  const fzTok=s=>{ const m=String(s||'').match(/0*(\d{1,4})\s*(?:\/|\bde\b)\s*(?:20)?(\d{2})(?!\d)/i); return m?`${+m[1]}-${m[2]}`:null; };
+  const fzNorm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const fzToks=s=>fzNorm(s).replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(t=>t.length>2&&!/^(del|las|los)$/.test(t));
+  const fzCasa=(A,B)=>{ if(A.length<2||B.length<2) return false; const [c,l]=A.length<=B.length?[A,B]:[B,A]; return c.every(t=>l.includes(t)); };
+  const fzCorta=(s,n)=>{ s=String(s||''); return s.length>n?s.slice(0,n-1).replace(/\s+\S*$/,'')+'…':s; };
+  const fzFecha=s=>{ const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; const p=String(s||'').slice(0,10).split('-'); return p.length===3?`${+p[2]}-${M[+p[1]-1]}-${p[0]}`:String(s||''); };
+  const FZ_TIPO={entidad:'Entidad pública',gremio:'Gremio',empresa:'Empresa',persona:'Persona',organizacion:'Organización',academia:'Academia',grupo:'Sector o grupo al que le aplica'};
+  const FZ_CERCA={obliga:'el articulado le impone obligaciones',nombrado:'el articulado lo nombra',sector:'su sector está en el proyecto',prensa:'aparece en la conversación pública'};
+  const FZ_ORD={obliga:0,nombrado:1,sector:2,prensa:3};
+
+  /* columnas «en contra · sin posición · a favor»; cada una muestra `max` y
+     esconde el resto detrás de «Ver N más» */
+  function fzCols(cols){
+    return `<div class="fz-cols" style="--fz-n:${cols.length}">${cols.map(c=>{
+      const L=c.items, N=c.max||5;
+      const cuerpo=L.length?L.map((h,i)=>i<N?h:h.replace('class="fz-act"','class="fz-act fz-oculto"')).join('')
+        +(L.length>N?`<button class="fz-mas" type="button">Ver ${L.length-N} más</button>`:'')
+        :`<div class="fz-vacio">${c.vacio}</div>`;
+      return `<div class="fz-col c-${c.k}"><div class="fz-col-h"><span>${c.t}</span><b>${L.length}</b></div>${cuerpo}</div>`;
+    }).join('')}</div>`;
+  }
+  function fzActorExt(a){
+    const c=a.cita;
+    const cita=c?`<q>${esc(c.titulo)}</q><small>${esc(c.medio||'prensa')}${c.fecha?' · '+esc(fzFecha(c.fecha)):''}${c.url?` · <a href="${esc(c.url)}" target="_blank" rel="noopener">fuente ↗</a>`:''}</small>`:'';
+    const ex=!c&&(a.exige||[]).length?`<span class="fz-x">${esc(fzCorta(a.exige[0],150))}</span>`:'';
+    return `<div class="fz-act"><b>${esc(a.n)}</b><small>${esc(FZ_TIPO[a.tipo]||a.tipo||'Actor')} · ${FZ_CERCA[a.cerca_por]||''}${a.peso?` · ${a.peso} titular${a.peso===1?'':'es'}`:''}</small>${cita}${ex}</div>`;
+  }
+  function fzExternos(X){
+    const A=(X.actores||[]).slice();
+    if(!A.length) return `<div class="fz-vacio">El esquema de este proyecto no encontró actores externos: ni el articulado nombra a nadie concreto ni la prensa del tema trae nombres.</div>`;
+    const porPeso=(a,b)=>(b.peso||0)-(a.peso||0)||(b.cerca||0)-(a.cerca||0);
+    const contra=A.filter(a=>a.postura!=null&&a.postura<0).sort(porPeso);
+    const favor=A.filter(a=>a.postura!=null&&a.postura>0).sort(porPeso);
+    const sin=A.filter(a=>a.postura==null||a.postura===0)
+      .sort((a,b)=>(FZ_ORD[a.cerca_por]??4)-(FZ_ORD[b.cerca_por]??4)||(b.peso||0)-(a.peso||0));
+    return fzCols([
+      {k:'r',t:'En contra',items:contra.map(fzActorExt),vacio:'Nadie con rechazo citado en prensa.'},
+      {k:'i',t:'Sin posición',items:sin.map(fzActorExt),vacio:'—',max:4},
+      {k:'a',t:'A favor',items:favor.map(fzActorExt),vacio:'Nadie con apoyo citado en prensa.'},
+    ])+`<div class="cob-note">Postura solo cuando un titular muestra apoyo o rechazo a este proyecto (${X.n_titulares||0} titular${X.n_titulares===1?'':'es'} del tema en los últimos ${X.dias||60} días). Sin cita, el actor va a la franja central aunque el articulado lo toque de lleno. Lo que el texto le exige a cada uno lo resume un modelo de lenguaje sobre el radicado: contrástalo con el documento antes de citarlo. Cálculo del ${esc(fzFecha(X.v))}.</div>`;
+  }
+  function fzRescate(E){
+    const TL={a:'apoyar',m:'apoyar con cambios',r:'rechazar'};
+    const V=(E.voces||[]).slice().sort((a,b)=>(b.n||0)-(a.n||0)||(b.men||0)-(a.men||0));
+    const it=v=>`<div class="fz-act"><b>${esc(v.q)}</b><small>${esc([v.c,v.b].filter(Boolean).join(' · '))}${v.t?` · tiende a ${TL[v.t]||v.t}`:''}</small>${v.x?`<span class="fz-x">${esc(v.x)}</span>`:''}${v.f?`<small>${esc(v.f)}${v.u?` · <a href="${esc(v.u)}" target="_blank" rel="noopener">fuente ↗</a>`:''}</small>`:''}</div>`;
+    const de=k=>V.filter(v=>v.p===k).map(it);
+    return fzCols([
+      {k:'r',t:'En contra',items:de('r'),vacio:'—',max:4},
+      {k:'i',t:'Sin definir',items:de('i'),vacio:'—',max:4},
+      {k:'m',t:'Con reparos',items:de('m'),vacio:'—',max:4},
+      {k:'a',t:'Apoyan',items:de('a'),vacio:'—',max:4},
+    ])+`<div class="cob-note">${V.length} jugadores del rastreo diario de la Ley de Rescate (actualizado el ${esc(fzFecha(E.hoy))}), ordenados por su poder sobre la decisión. Cada postura sale de una declaración con fuente; «sin definir» es quien no ha fijado posición.</div>
+      <a class="fz-link" href="ley-de-rescate-fuerzas.html" target="_blank" rel="noopener">Ver el esquema completo de la Ley de Rescate, con filtros y el plano de poder →</a>`;
+  }
+
+  /* bancada oficial de una persona (registro del Senado y de Cámara); si no
+     está, la del partido declarado — o null si es Gobierno o una entidad */
+  function fzBancadas(I){
+    if(I._fz) return I._fz;
+    const miem=[]; ['senado','camara'].forEach(corp=>(I[corp]&&I[corp].miembros||[]).forEach(m=>miem.push({b:m.b,t:fzToks(m.n)})));
+    const nombres=[...new Set(miem.map(m=>m.b).filter(Boolean))];
+    const tam={}; ((I.senado||{}).miembros||[]).forEach(m=>{ tam[m.b]=(tam[m.b]||0)+1; });
+    return (I._fz={miem,nombres,tam});
+  }
+  function fzBancadaDe(I,a){
+    const Z=fzBancadas(I), T=fzToks(a.nombre);
+    const o=Z.miem.find(m=>fzCasa(T,m.t)); if(o) return o.b;
+    if(/minist|gobierno|presidencia|vicepresiden|departamento administrativo|fiscal|contralor|procurad|defensor|registrad|corte |consejo de estado|superintend/.test(fzNorm(a.nombre))) return null;
+    const p=fzNorm(a.partido); if(!p) return undefined;
+    let best=null; Z.nombres.forEach(n=>{ const core=fzNorm(n).replace(/^partido\s+/,''); if(new RegExp('\\b'+core.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b').test(p)&&(!best||core.length>best[1])) best=[n,core.length]; });
+    return best?best[0]:undefined;
+  }
+  function fzInternos(f,I,tC,tS){
+    const camara=tC?`<div class="fz-callout"><b>Cámara no tiene voto nominal de esta legislatura</b>: sale de las actas de plenaria, con meses de rezago (lo último publicado es de junio). ${tS?'Del lado de Cámara, la lectura':'Esta lectura'} usa la coincidencia entre bancadas medida en el Senado.</div>`:'';
+    if(!I) return camara+'<div class="fz-vacio">No pudimos cargar la coincidencia de voto de esta legislatura.</div>';
+    const Z=fzBancadas(I), cob=(I.senado||{}).cobertura||{};
+    const auts=f.autores||[];
+    const pral=auts.find(a=>a.principal)||auts[0];
+    // firmantes por bancada
+    const cnt={}; let gob=0, sinB=0;
+    auts.forEach(a=>{ const b=fzBancadaDe(I,a); if(b===null) gob++; else if(!b) sinB++; else cnt[b]=(cnt[b]||0)+1; });
+    const firm=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([b,n])=>`<span class="fz-chip">${esc(b)} <small>${n}</small></span>`)
+      .concat(gob?[`<span class="fz-chip k-sd">Gobierno o entidad <small>${gob}</small></span>`]:[])
+      .concat(sinB?[`<span class="fz-chip k-sd">Sin bancada identificada <small>${sinB}</small></span>`]:[]).join('');
+    const filaFirm=auts.length?`<div class="fz-irow"><span>Quién lo firmó</span><div class="fz-banc">${firm}</div></div>`:'';
+    const B=pral?fzBancadaDe(I,pral):undefined;
+    if(!B){
+      const porque=B===null?`El autor (${esc(pral.nombre)}) es Gobierno o una entidad, no una bancada`:pral?`No identificamos la bancada del autor (${esc(pral.nombre)})`:'El proyecto no trae autor registrado';
+      return camara+`<div>${filaFirm}</div><div class="cob-note">${porque}: no hay desde dónde medir coincidencia de voto entre bancadas. Quién lo firma sí es dato.</div>`;
+    }
+    // la coincidencia se mide en el Senado: solo entran bancadas con silla allá
+    const otras=Z.nombres.filter(n=>n!==B&&Z.tam[n]).sort((a,b)=>(Z.tam[b]||0)-(Z.tam[a]||0));
+    const g={af:[],bi:[],di:[],sd:[]};
+    otras.forEach(n=>{ const r=(I.bancadas||{})[[B,n].sort().join('|')];
+      if(!r) g.sd.push(n); else g[r[0]>=60?'af':r[0]>=40?'bi':'di'].push([n,r]); });
+    ['af','bi','di'].forEach(k=>g[k].sort((x,y)=>y[1][0]-x[1][0]));
+    const chips=(L,k)=>L.map(([n,r])=>`<span class="fz-chip k-${k}">${esc(n)} <small>${Math.round(r[0])} % · ${r[1]}</small></span>`).join('');
+    const fila=(t,h)=>h?`<div class="fz-irow"><span>${t}</span><div class="fz-banc">${h}</div></div>`:'';
+    return camara+`<div>${filaFirm}
+      ${fila(`Suele coincidir con ${esc(B)} <small>(≥ 60 %)</small>`,chips(g.af,'af'))}
+      ${fila('A veces coincide <small>(40-60 %)</small>',chips(g.bi,'bi'))}
+      ${fila('Suele votar distinto <small>(&lt; 40 %)</small>',chips(g.di,'di'))}
+      ${fila('Sin dato suficiente',g.sd.map(n=>`<span class="fz-chip k-sd">${esc(n)}</span>`).join(''))}</div>
+      <div class="cob-note">Ancla: la bancada del autor principal (${esc(pral.nombre)} · ${esc(B)}). El porcentaje es cuántas veces la mayoría de cada bancada votó igual que la de ${esc(B)} en las <b>${cob.disputadas||0}</b> votaciones disputadas del Senado (de ${cob.votaciones||0}, ${esc(fzFecha(cob.desde))} a ${esc(fzFecha(cob.hasta))}; disputada = al menos una de cada diez manos del otro lado); después del % va con cuántas se midió (las bancadas sin silla en el Senado no se pueden medir). El Senado de esta legislatura vota casi todo por unanimidad: es señal, no regla. «En contra» no aparece porque solo lo diría un voto sobre este proyecto.</div>`;
+  }
+
+  /* Devuelve el contenedor del bloque (o '' si el proyecto no es de la
+     legislatura viva) y pinta su contenido cuando bajan los JSON. */
+  function fuerzasSlot(f){
+    const tC=fzTok(f.numero_camara), tS=fzTok(f.numero_senado);
+    const esLR=tC==='477-26'||tS==='328-26';
+    const fp=String(f.fecha_presentacion||'');
+    const viva=esLR||/2026\s*[-–]\s*2027/.test(f.legislatura||'')||[tC,tS].some(t=>t&&/-2[67]$/.test(t))||(/^\d{4}-\d{2}/.test(fp)&&fp>='2026-07-20');
+    const reciente=[tC,tS].some(t=>t&&/-2[45]$/.test(t));
+    if(!viva&&!reciente) return '';
+    const seq=++_fzSeq;
+    queueMicrotask(()=>pintarFuerzas(f,{tC,tS,esLR,viva},seq));
+    return `<div class="bloq-card fz-card" id="fz-ficha"><div class="ga-tag" style="color:var(--teal)">◈ Esquema de fuerzas · quién empuja y quién frena</div>
+      <div class="llm-load">Cargando el esquema <span class="dots"><span></span><span></span><span></span></span></div></div>`;
+  }
+  async function pintarFuerzas(f,{tC,tS,esLR,viva},seq){
+    const cand=[tC&&'C-'+tC,tS&&'S-'+tS].filter(Boolean);
+    let idx=null; try{ idx=await fzJSON(FZ_S3+'/fuerzas-externas/index.json'); }catch(e){}
+    const toks=new Set((idx&&idx.toks)||[]);
+    const enIdx=cand.filter(t=>toks.has(t));
+    const box=()=>{ const b=document.getElementById('fz-ficha'); return seq===_fzSeq&&b?b:null; };
+    if(!box()) return;
+    // un proyecto de la legislatura anterior solo entra si tiene esquema
+    if(!viva&&!enIdx.length){ box().remove(); return; }
+    const [exts,I,LR]=await Promise.all([
+      Promise.all(enIdx.map(t=>fzJSON(`${FZ_S3}/fuerzas-externas/${t}.json`).catch(()=>null))),
+      fzJSON(FZ_S3+'/fuerzas-internas-2026.json').catch(()=>null),
+      esLR?fzJSON('ley-rescate-data/estado.json?v='+Math.floor(Date.now()/6e5)).catch(()=>null):null,
+    ]);
+    const b=box(); if(!b) return;
+    // si el proyecto tiene archivo en las dos cámaras, el que trae más evidencia
+    const nPos=x=>(x.actores||[]).filter(a=>a.postura!=null).length;
+    const X=exts.filter(Boolean).sort((a,c)=>nPos(c)-nPos(a)||(c.actores||[]).length-(a.actores||[]).length)[0];
+    let ext;
+    if(esLR&&LR) ext=fzRescate(LR);
+    else if(X) ext=fzExternos(X);
+    else if(!idx) ext='<div class="fz-vacio">No pudimos cargar el esquema de actores externos. Intenta de nuevo en un momento.</div>';
+    else ext=`<div class="fz-vacio">Este proyecto todavía no tiene esquema de actores externos: el cálculo (articulado + prensa) corre por tandas y la última es del ${esc(fzFecha(idx.v))}. Caudal no completa a mano lo que la fuente no trae.</div>${esLR?'<a class="fz-link" href="ley-de-rescate-fuerzas.html" target="_blank" rel="noopener">Ver el esquema de fuerzas de la Ley de Rescate →</a>':''}`;
+    b.innerHTML=`<div class="ga-tag" style="color:var(--teal)">◈ Esquema de fuerzas · quién empuja y quién frena</div>
+      <div class="fz-sub">${esLR&&LR?'Los jugadores · Congreso, Gobierno y sector privado':'Fuera del Congreso · gobierno, gremios, empresas y organizaciones'}</div>${ext}
+      <div class="fz-sub">Dentro del Congreso · lectura por bancadas</div>${fzInternos(f,I,tC,tS)}`;
+    b.querySelectorAll('.fz-mas').forEach(btn=>btn.onclick=()=>{ btn.parentElement.querySelectorAll('.fz-oculto').forEach(el=>el.classList.remove('fz-oculto')); btn.remove(); });
+  }
+
   /* ---------- ficha de proyecto ---------- */
   const modal=document.getElementById('modal'), modalCard=document.getElementById('modalCard');
   modal.onclick=e=>{ if(e.target===modal) cerrar(); };
@@ -1764,6 +1934,7 @@
         ${f.reloj?meta('Reloj de trámite',f.reloj.tipo==='acto_legislativo'?'Acto legislativo · 1 año, 8 debates (2 vueltas)':'Ley ordinaria · 2 legislaturas, 4 debates'):''}
       </div>
       ${impHTML}
+      ${fuerzasSlot(f)}
       ${artHTML(f.articulado,f.articulado_cobertura)}
       <button id="btn-medios" class="btn-medios">◈ Rastreo en medios · ¿tuvo controversia o impopularidad?</button>
       <div id="medios-analisis"></div>
