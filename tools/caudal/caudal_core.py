@@ -197,7 +197,12 @@ SINONIMOS = [
         'saneamiento basico']},
     {'k': 'tributario', 'terms': [
         'estatuto tributario', 'reforma tributaria', 'regimen tributario',
-        'impuesto al consumo', 'beneficios tributarios']},
+        'impuesto al consumo', 'beneficios tributarios',
+        # Las reformas tributarias casi nunca se titulan así: «normas de
+        # financiamiento para el … presupuesto» (2018, 2024, 2025), «ley de
+        # rescate económico» (477/26C, nov-2026). Sin estos términos la reforma
+        # del momento no entraba al radar de NINGÚN cliente que sigue el tema.
+        'financiamiento del presupuesto', 'rescate economico', 'sistema tributario']},
     {'k': 'juegos de suerte y azar', 'terms': [
         'juegos de suerte y azar', 'monopolio rentistico', 'apuestas']},
     {'k': 'educacion superior', 'terms': [
@@ -1600,14 +1605,62 @@ class Caudal:
             if _norm(t) not in vistos:
                 vistos.add(_norm(t))
                 temas.append(t)
-        seen = {}
+        seen, titulo_k, n_temas, temas_de = {}, set(), {}, {}
+        # Un tema puede ser la LLAVE de un tópico del tesauro (los presets de DiDi
+        # y Binance traen 'tributario', 'criptoactivos y activos virtuales',
+        # 'datos personales / habeas data'). Buscada literal, la llave exige sus
+        # palabras en el título («tributario» no casa «reforma tributaria») y la
+        # de varias palabras no casa casi nada. Se reemplaza por el vocabulario
+        # curado del tópico, término por término, cada uno literal.
+        # Lo mismo cuando el tema es uno de los términos curados de un tópico
+        # (Cauce escribe «reforma tributaria», que es término de 'tributario'):
+        # quien lo eligió quiere el tema, no solo los títulos con esas palabras.
+        llaves = {}
+        for s in SINONIMOS:
+            llaves[_norm(s['k'])] = s['terms']
+            for term in s['terms']:
+                llaves.setdefault(_norm(term), s['terms'])
+        # Varios temas pueden caer en el MISMO tópico (Comfama: «sistema de salud»,
+        # «reforma a la salud», «aseguramiento en salud»): se buscan una vez y
+        # cuentan como un solo frente, si no salud pesaba triple.
+        grupos = []
         for t in temas:
+            g = tuple(llaves.get(_norm(t), [t]))
+            if g not in grupos:
+                grupos.append(g)
+        for ti, g in enumerate(grupos):
             # expandir=False + relajar=False: los temas del Radar son frases curadas
             # para PRECISIÓN (AND literal); el tesauro/relajación es solo de la
             # búsqueda libre del usuario, no del Radar.
-            for h in self.buscar(t, expandir=False):
-                seen.setdefault((h.get('tb', 'pdly'), h['id']), h)
+            vistos_t = set()
+            for q in g:
+                for h in self.buscar(q, expandir=False):
+                    k = (h.get('tb', 'pdly'), h['id'])
+                    seen.setdefault(k, h)
+                    if not h.get('mt'):
+                        titulo_k.add(k)
+                    if k not in vistos_t:          # un tema cuenta una vez
+                        vistos_t.add(k)
+                        n_temas[k] = n_temas.get(k, 0) + 1
+                        temas_de.setdefault(k, []).append(ti)
         hits = list(seen.values())
+
+        # Recencia dentro de la legislatura: el número de radicado crece con el
+        # tiempo en cada cámara, pero Cámara numera más rápido que Senado, así
+        # que se usa la posición relativa (número / máximo de esa cámara en esa
+        # legislatura) para no favorecer a una cámara sobre la otra.
+        def _num(h):
+            raw = h.get('nc') or h.get('ns') or ''
+            m = re.match(r'\s*(\d+)', str(raw))
+            return ('c' if h.get('nc') else 's', h.get('leg', ''), int(m.group(1)) if m else 0)
+        tope = {}
+        for h in hits:
+            cam, leg, n = _num(h)
+            tope[(cam, leg)] = max(tope.get((cam, leg), 0), n)
+
+        def _reciente(h):
+            cam, leg, n = _num(h)
+            return n / tope[(cam, leg)] if tope.get((cam, leg)) else 0
 
         def _score(h):
             res, a = h.get('res'), (h.get('a') or 0)
@@ -1621,10 +1674,37 @@ class Caudal:
                 base = 1
             else:
                 base = 0
-            return (base, a)
+            # Dentro del mismo estado y año el orden era el de inserción, así que
+            # la reforma tributaria del momento podía quedar fuera del top 10
+            # detrás de proyectos que solo mencionan el tema en una gaceta (en
+            # Binance salían primero unos honores a García Márquez). Desempata:
+            # lo que nombra el tema en el TÍTULO antes que lo que solo lo trae en
+            # el texto, y luego cuántos temas del cliente toca.
+            k = (h.get('tb', 'pdly'), h['id'])
+            return (base, a, k in titulo_k, n_temas.get(k, 0), _reciente(h))
 
         hits.sort(key=_score, reverse=True)
-        senales = [self._senal_congreso(h, comision_lbl) for h in hits[:cap]]
+        # Corte por turnos: primero la mejor señal accionable (en trámite) de cada
+        # tema, en el orden del perfil; después se llena por puntaje. Sin esto un
+        # tema con mucho volumen (salud) se comía el top y temas del cliente como
+        # consulta previa o protesta social quedaban sin una sola señal.
+        elegidos, usados = [], set()
+        for ti in range(len(grupos)):
+            if len(elegidos) >= cap:
+                break
+            for h in hits:
+                k = (h.get('tb', 'pdly'), h['id'])
+                if k not in usados and ti in temas_de.get(k, ()) and _score(h)[0] >= 3:
+                    elegidos.append(h); usados.add(k)
+                    break
+        for h in hits:
+            if len(elegidos) >= cap:
+                break
+            k = (h.get('tb', 'pdly'), h['id'])
+            if k not in usados:
+                elegidos.append(h); usados.add(k)
+        elegidos.sort(key=_score, reverse=True)
+        senales = [self._senal_congreso(h, comision_lbl) for h in elegidos]
         return {'n_tocados': len(hits), 'n_mostrados': len(senales), 'senales': senales,
                 'temas_usados': temas}
 

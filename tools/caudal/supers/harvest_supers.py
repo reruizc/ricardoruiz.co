@@ -26,6 +26,7 @@ Uso:
 """
 import argparse
 import csv
+import datetime
 import json
 import subprocess
 import sys
@@ -120,8 +121,60 @@ def normalize_row(f, row):
     # POR FILA (lo clasifica el modelo leyendo el PDF) y ese gana.
     t = rec.get('tipo_acto')
     rec['tipo_acto'] = t if t in TIPOS_ACTO else f.get('tipo_acto_default', 'sancion')
+    _corregir_fecha_futura(rec)
     rec['_raw'] = row
     return rec
+
+
+# Fechas del FUTURO en la fuente (medido nov-2026 en SECOP II · it5q-hg94): la
+# fila de M&C Construcciones dice fecha_evento 2026-12-17 y su propia resolución
+# dice «SAF 597 DE 17-12-2025»; hay filas con 2027 y 2028. Como el pilar ordena
+# por fecha, esas filas encabezaban «sanciones más recientes». Si la fecha es
+# posterior a hoy se toma la que trae escrita la resolución; si no trae ninguna,
+# queda sin fecha (al final de la lista) en vez de inventarla. La original se
+# conserva en `_raw` y en `fecha_fuente`.
+_MESES = {m: i for i, m in enumerate(
+    'enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre'.split(), 1)}
+_MESES['setiembre'] = 9
+
+
+def _fecha_en_texto(txt):
+    import re as _re
+    t = (txt or '').lower()
+    cands = []
+    for d, m, a in _re.findall(r'\b(\d{1,2})[-/.](\d{1,2})[-/.](20\d{2})\b', t):
+        cands.append((int(a), int(m), int(d)))
+    for d, mes, a in _re.findall(r'\b(\d{1,2})\s+de\s+([a-záéíóú]+)\s+(?:de|del)?\s*(20\d{2})', t):
+        mes = mes.replace('dicimebre', 'diciembre')
+        if mes in _MESES:
+            cands.append((int(a), _MESES[mes], int(d)))
+    out = []
+    for a, m, d in cands:
+        try:
+            out.append(datetime.date(a, m, d))
+        except ValueError:
+            pass
+    return out
+
+
+def _corregir_fecha_futura(rec):
+    f = str(rec.get('fecha_firmeza') or '')[:10]
+    try:
+        fd = datetime.date.fromisoformat(f)
+    except ValueError:
+        return
+    hoy = datetime.date.today()
+    if fd <= hoy + datetime.timedelta(days=1):
+        return
+    rec['fecha_fuente'] = rec.get('fecha_firmeza')
+    validas = [x for x in _fecha_en_texto(f"{rec.get('resolucion') or ''} {rec.get('tipo_sancion') or ''}")
+               if x <= hoy]
+    if validas:
+        rec['fecha_firmeza'] = max(validas).isoformat() + 'T00:00:00.000'
+        rec['fecha_corregida'] = 'texto de la resolución'
+    else:
+        rec['fecha_firmeza'] = None
+        rec['fecha_corregida'] = 'futura en la fuente, sin fecha en el texto'
 
 
 def normalize_all():
