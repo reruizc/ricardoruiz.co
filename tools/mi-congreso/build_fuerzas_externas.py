@@ -379,6 +379,22 @@ def articulado_index():
         print('  ! no bajó el articulado de S3, se usa la API:', err, file=sys.stderr)
         return _ART['idx']
     _ART['v'], _ART['n'] = d.get('v'), d.get('n')
+    # La extracción de Cámara a veces le pegó a un proyecto el texto de OTRO que
+    # venía en la misma gaceta (nov-2026: el 430 de plataformas y el 435 traían el
+    # resumen y las obligaciones del 369, tarifa diferencial). Se marca todo
+    # resumen repetido; articulado_de() decide de quién es.
+    grupos = {}
+    for a in (d.get('por_proyecto') or {}).values():
+        r = norm(a.get('resumen'))
+        if r:
+            grupos.setdefault(r, []).append(a)
+    for ds in grupos.values():
+        if len(ds) > 1:
+            dueno = max(ds, key=_parecido_resumen)
+            if _parecido_resumen(dueno) < .2:     # no se parece a ninguno: de nadie
+                dueno = None
+            for a in ds:
+                a['_ajeno'] = a is not dueno
     for a in (d.get('por_proyecto') or {}).values():
         for cam, num in (('S', a.get('numero_senado')), ('C', a.get('numero_camara'))):
             t = tok_num(num)
@@ -417,9 +433,21 @@ def articulado_de(x):
     for cam, num in (('S', x.get('numero_senado')), ('C', x.get('numero_camara'))):
         t = tok_num(num)
         for a in (idx.get((cam, t)) or []) if t else []:
-            if _titulo_casa(a, x.get('titulo')):
+            if _titulo_casa(a, x.get('titulo')) and not _texto_ajeno(a):
                 return a
     return None
+
+
+def _parecido_resumen(a):
+    T = _palabras(a.get('titulo_leido') or a.get('titulo'))
+    R = _palabras(a.get('resumen'))
+    return len(T & R) / len(T) if T else 0.0
+
+
+def _texto_ajeno(a):
+    """True si el resumen extraído se repite en otro proyecto que se le parece
+    más: es el texto de ese otro proyecto (ver articulado_index)."""
+    return bool(a.get('_ajeno'))
 
 
 def ficha(x):
@@ -736,6 +764,11 @@ def main():
     print(f'{len(vivos)} proyectos por armar · {len(D.por_primera)} alias en el diccionario')
 
     hechos, t0 = [], time.time()
+    # Se carga ANTES de los hilos: articulado_index() deja el índice vacío
+    # mientras baja el archivo, y un hilo que llegaba en ese momento lo veía
+    # vacío, caía al respaldo de la API y se llevaba el articulado cruzado de
+    # Cámara (pasó con el 283, 284, 220 y 233 el 6-nov-2026).
+    articulado_index()
 
     def uno(x):
         tok = tok_proyecto(x)

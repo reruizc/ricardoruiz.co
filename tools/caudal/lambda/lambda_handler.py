@@ -151,10 +151,41 @@ def _get_jsonl(key, tb):
     return out
 
 
+# ── ¿Cambió el archivo en S3? (nov-2026) ────────────────────────────────────
+# El motor de búsqueda, las fichas y SUCOP se cargaban UNA vez por contenedor:
+# uno que siguiera caliente servía el índice del día en que arrancó aunque el
+# rastreo ya hubiera subido otro. Con el rastreo del Congreso cada 6 horas eso
+# dejaba la búsqueda horas atrás. Ahora se compara el ETag del objeto, con una
+# consulta liviana (head_object) como mucho cada 10 minutos por archivo.
+_VERSION_S3 = {}
+_VERSION_CADA = 600
+
+
+def _version_s3(key):
+    ahora = _time.time()
+    v = _VERSION_S3.get(key)
+    if v and ahora - v[0] < _VERSION_CADA:
+        return v[1]
+    try:
+        etag = _s3.head_object(Bucket=BUCKET, Key=key).get('ETag')
+    except Exception:
+        etag = v[1] if v else None          # si S3 no responde, se queda lo que hay
+    _VERSION_S3[key] = (ahora, etag)
+    return etag
+
+
+_CAUDAL_VER = None
+_FULL_VER = None
+
+
 def _caudal():
     """Motor con índice + roster autor→partido + índice de texto (lazy, cache warm)."""
-    global _CAUDAL
+    global _CAUDAL, _CAUDAL_VER
+    ver = (_version_s3('metadata/indice.json'), _version_s3('metadata/texto-index.json'))
+    if _CAUDAL is not None and ver != _CAUDAL_VER:
+        _CAUDAL = None
     if _CAUDAL is None:
+        _CAUDAL_VER = ver
         indice = _get_json('metadata/indice.json')['proyectos']
         try:
             ap = _get_json('metadata/autor-partido.json')['autor_partido']
@@ -172,8 +203,12 @@ def _caudal():
 
 def _full():
     """Registros completos por 'tb:id' (lazy — solo cuando se pide un proyecto)."""
-    global _FULL
+    global _FULL, _FULL_VER
+    ver = _version_s3('metadata/proyectos.jsonl')
+    if _FULL is not None and ver != _FULL_VER:
+        _FULL = None
     if _FULL is None:
+        _FULL_VER = ver
         _FULL = _get_jsonl('metadata/proyectos.jsonl', 'pdly')
         _FULL.update(_get_jsonl('metadata/actos-legis.jsonl', 'pal'))
     return _FULL
@@ -339,14 +374,49 @@ def _clave_articulado(tb, rec):
 def _art_por_clave():
     """{clave estable → extracción}. Las entradas sin `clave` (artefacto anterior
     al 19-oct-2026) no entran: sin ella no hay cómo saber de quién son."""
-    global _ART_POR_CLAVE
+    global _ART_POR_CLAVE, _ART_DUENO_RESUMEN
     if _ART_POR_CLAVE is None:
-        idx = {}
+        idx, grupos = {}, {}
         for d in (_articulado().get('por_proyecto') or {}).values():
             if d.get('clave'):
                 idx.setdefault(d['clave'], d)
+            r = _resumen_norm(d)
+            if r:
+                grupos.setdefault(r, []).append(d)
         _ART_POR_CLAVE = idx
+        _ART_DUENO_RESUMEN = {}
+        for r, ds in grupos.items():
+            if len(ds) > 1:
+                dueno = max(ds, key=_parecido_resumen)
+                # si no se parece a ninguno, no es de nadie
+                _ART_DUENO_RESUMEN[r] = dueno if _parecido_resumen(dueno) >= 0.2 else False
     return _ART_POR_CLAVE
+
+
+# El radicado de Cámara a veces trae VARIOS proyectos en el mismo archivo y la
+# extracción leyó el primero (nov-2026: el 430 de plataformas y el 435 traían el
+# resumen y las obligaciones del 369, tarifa diferencial para estudiantes; 12
+# proyectos en 5 grupos). La fuente y el título pasan los otros chequeos, así
+# que se mira el CONTENIDO: entre los proyectos que comparten un resumen, el
+# texto es del que más se le parece; los demás no reciben articulado.
+_ART_DUENO_RESUMEN = {}
+
+
+def _resumen_norm(art):
+    return ' '.join(str(art.get('resumen') or '').lower().split())
+
+
+def _parecido_resumen(art):
+    T = {w for w in _palabras_titulo(art.get('titulo_leido') or art.get('titulo')) if len(w) > 4}
+    R = {w for w in _palabras_titulo(art.get('resumen')) if len(w) > 4}
+    return len(T & R) / len(T) if T else 0.0
+
+
+def _texto_ajeno(art):
+    r = _resumen_norm(art)
+    if r not in _ART_DUENO_RESUMEN:
+        return False
+    return _ART_DUENO_RESUMEN[r] is not art
 
 
 def _palabras_titulo(t):
@@ -408,6 +478,9 @@ def _articulado_de(tb, pid, rec=None):
         art = (_articulado().get('por_proyecto') or {}).get(f'{tb}:{pid}')
         if art and art.get('clave') and art['clave'] != clave:
             art = None
+    if art and _texto_ajeno(art):
+        print(f'[articulado] el resumen de {tb}:{pid} ({clave}) es el de otro proyecto · se omite')
+        return None
     if art and _fuente_cuadra(art.get('fuente'), rec) is False:
         print(f'[articulado] el radicado {art.get("fuente")} no es de {tb}:{pid} ({clave}) · se omite')
         return None
@@ -1212,8 +1285,10 @@ def _sucop():
     global _SUCOP
     hoy = _sucop_hoy()
     ent_borr = _entidades_jsonl('borradores')
-    # se rehace al cambiar de día O cuando se relee el índice de entidades
-    if _SUCOP is not None and _SUCOP[0] == (hoy, id(ent_borr)):
+    # se rehace al cambiar de día, cuando se relee el índice de entidades o
+    # cuando el cron sube un sucop.jsonl nuevo (antes esperaba al día siguiente)
+    llave = (hoy, id(ent_borr), _version_s3('metadata/sucop.jsonl'))
+    if _SUCOP is not None and _SUCOP[0] == llave:
         return _SUCOP[1]
     try:
         obj = _s3.get_object(Bucket=BUCKET, Key='metadata/sucop.jsonl')
@@ -1234,7 +1309,7 @@ def _sucop():
                                           r.get('estado'), hoy)
         r['estado_consulta'] = ec
         r['dias_restantes'] = dias
-    _SUCOP = ((hoy, id(ent_borr)), recs)
+    _SUCOP = (llave, recs)
     return recs
 
 
