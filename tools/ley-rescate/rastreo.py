@@ -500,6 +500,11 @@ def main():
     crudo = None
     if not o.solo_calcular:
         tram = tramite(tram)
+        # La ficha de la Cámara no trae el número del Senado; el registro del Senado sí (328/26).
+        _pr = leer(AQUI / 'proyecto.json', {})
+        if not tram.get('nro_senado') and _pr.get('numero_senado'):
+            tram['nro_senado'] = _pr['numero_senado']
+            tram['nro_senado_fuente'] = 'registro de proyectos del Senado'
         escribir(DATOS / 'tramite.json', tram)
         print('Trámite:', tram.get('estado'), '· comisión:', tram.get('comision'), '· agenda:', len(tram.get('agenda', [])), '· ficha ok:', tram.get('ficha_ok'))
         if not o.sin_prensa:
