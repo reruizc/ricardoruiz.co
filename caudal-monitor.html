@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex,nofollow" />
+<title>Monitoreo del Congreso · Caudal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+<link href="caudal-base.css?v=20261009b" rel="stylesheet" />
+<link rel="stylesheet" href="caudal-ui.css?v=20261102" />
+<style>
+  /* ===== Monitoreo del Congreso ===================================
+     Tres preguntas de quien sigue el Congreso para un cliente:
+       ① ¿qué se debate esta semana y la próxima? (órdenes del día)
+       ② ¿qué se movió en los últimos días? (aprobaciones, ponencias, archivos)
+       ③ ¿cómo van los proyectos que sigo?
+     Datos: legislativo/ordenes-vigentes.json + legislativo/monitor-congreso.json
+     (tools/caudal/monitor/build_monitor.py). El cruce con el cliente se hace
+     aquí, con los temas de `perfil_meta` y el tesauro que trae el JSON. */
+  .mo-bar{display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin:1.2rem 0 .4rem}
+  .mo-bar label{font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3); margin-right:.2rem}
+  .mo-chip{border:1px solid var(--border2); background:var(--card); color:var(--ink2); border-radius:999px; padding:.38rem .85rem; font-size:.8rem; cursor:none}
+  .mo-chip.on{background:var(--teal); border-color:var(--teal); color:#fff}
+  .mo-solo{margin-left:auto; display:flex; align-items:center; gap:.4rem; font-size:.78rem; color:var(--ink2)}
+  .mo-sec{margin:2rem 0 1rem}
+  .mo-h{display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap; margin-bottom:.5rem}
+  .mo-h h2{font-family:'HelveticaNeue',Helvetica,Arial,sans-serif; font-weight:800; font-size:1.25rem; letter-spacing:-.01em; margin:0}
+  .mo-h .mo-n{font-size:.75rem; color:var(--ink3)}
+  .mo-dia{margin:1rem 0 .3rem; font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--teal); font-weight:700}
+  .mo-ses{background:var(--card); border:1px solid var(--border); border-radius:10px; padding:.8rem 1rem; margin:.45rem 0}
+  .mo-ses-h{display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; font-size:.85rem; font-weight:700; color:var(--ink)}
+  .mo-ses-h .tag{font-size:.62rem; font-weight:600; padding:.15rem .5rem; border-radius:999px; border:1px solid var(--border2); color:var(--ink3)}
+  .mo-ses-h a{margin-left:auto; font-size:.7rem; font-weight:500}
+  .mo-p{display:flex; gap:.6rem; align-items:flex-start; padding:.45rem 0; border-top:1px dashed var(--border); font-size:.82rem; color:var(--ink2); line-height:1.4}
+  .mo-p:first-of-type{border-top:0}
+  .mo-p.toca{background:linear-gradient(90deg,var(--teal-soft),transparent 70%); margin:0 -1rem; padding:.45rem 1rem}
+  .mo-num{flex:0 0 auto; font-weight:700; color:var(--ink); font-size:.75rem; min-width:5.2rem}
+  .mo-t{flex:1}
+  .mo-t small{display:block; color:var(--ink3); font-size:.7rem; margin-top:.15rem}
+  .mo-badge{display:inline-block; font-size:.6rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:.12rem .45rem; border-radius:4px; margin-right:.35rem; vertical-align:1px}
+  .b-toca{background:var(--teal); color:#fff}
+  .b-sigo{background:#1f2937; color:#fff}
+  .b-aprobado,.b-sancion{background:#15803d; color:#fff}
+  .b-archivado{background:#b91c1c; color:#fff}
+  .b-plenaria{background:#1d4ed8; color:#fff}
+  .b-ponencia,.b-ponentes{background:#e8eef9; color:#1d4ed8}
+  .b-radicado,.b-comision,.b-estado,.b-gaceta{background:var(--card2); color:var(--ink2); border:1px solid var(--border)}
+  .mo-seg{flex:0 0 auto; font-size:.7rem; border:1px solid var(--border2); background:transparent; color:var(--ink2); border-radius:6px; padding:.25rem .55rem; cursor:none; white-space:nowrap}
+  .mo-seg.on{background:#1f2937; color:#fff; border-color:#1f2937}
+  .mo-mov{display:flex; gap:.7rem; align-items:flex-start; padding:.6rem .2rem; border-bottom:1px solid var(--border); font-size:.82rem; line-height:1.4}
+  .mo-mov .mo-f{flex:0 0 4.2rem; color:var(--ink3); font-size:.72rem}
+  .mo-tabs{display:flex; gap:.4rem; flex-wrap:wrap; margin:.3rem 0 .6rem}
+  .mo-vacio{border:1px dashed var(--border2); border-radius:8px; padding:.9rem 1rem; font-size:.84rem; color:var(--ink2); line-height:1.55}
+  .mo-search{display:flex; gap:.5rem; margin:.6rem 0}
+  .mo-search input{flex:1; padding:.6rem .8rem; border:1px solid var(--border2); border-radius:7px; background:var(--card); color:var(--ink); font-size:.86rem}
+  .mo-res{list-style:none; margin:0; padding:0}
+  .mo-etapa{display:flex; gap:3px; margin-top:.35rem}
+  .mo-etapa i{flex:1; height:5px; border-radius:2px; background:var(--border)}
+  .mo-etapa i.on{background:var(--teal)}
+  .mo-kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:.6rem; margin:1rem 0}
+  @media(max-width:700px){ .mo-kpis{grid-template-columns:repeat(2,1fr)} .mo-solo{margin-left:0} .mo-num{min-width:4rem} }
+</style>
+</head>
+<body class="caudal-app">
+  <a class="skip-link" href="#app">Saltar al contenido</a>
+  <div class="cur" id="cur"></div><div class="cur-ring" id="curRing"></div>
+  <div class="gate" id="gate"><div class="gate-text">Cargando</div><div class="gate-bar"></div></div>
+
+  <nav id="topNav" hidden>
+    <div class="e-nav-left"><a href="caudal.html" class="e-btn-back" id="navBack">← Caudal</a></div>
+    <div class="cobrand-cluster">
+      <img class="cobrand" src="caudalxcauce.png" alt="Caudal × Cauce · navegar la complejidad" />
+      <div class="poweredby">
+        <span class="pb-txt">powered by</span>
+        <a href="index.html" class="logo-link">
+          <div class="logo-bars">
+            <div class="logo-bar" style="height:15px"></div><div class="logo-bar" style="height:11px"></div>
+            <div class="logo-bar" style="height:7px"></div><div class="logo-bar" style="height:3px"></div>
+          </div>
+          <span class="logo-text">Ricardo<span>.</span>Ruiz</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="wrap" id="app" tabindex="-1" hidden>
+    <div class="hero">
+      <h1>Monitoreo del <em>Congreso</em>.</h1>
+      <p>Lo que se debate esta semana y la próxima, lo que se movió en los últimos días y cómo van
+         los proyectos que sigues. Escoge para quién lees: los proyectos que tocan sus temas salen marcados.</p>
+      <p class="cob-note" id="mo-estado" role="status"></p>
+    </div>
+
+    <div class="mo-bar" id="mo-bar"><label>Leer para</label></div>
+    <div class="mo-kpis" id="mo-kpis"></div>
+
+    <section class="mo-sec" id="sec-agenda">
+      <div class="mo-h"><h2>① En agenda</h2><span class="mo-n" id="ag-n"></span>
+        <label class="mo-solo"><input type="checkbox" id="ag-solo" /> solo lo que le toca o sigo</label></div>
+      <div class="cob-note" style="margin:0">Órdenes del día publicados por Cámara y Senado. Una comisión que no publica su orden no aparece: eso no significa que no sesione.</div>
+      <div id="ag-lista"></div>
+    </section>
+
+    <section class="mo-sec" id="sec-movs">
+      <div class="mo-h"><h2>② Lo que se movió</h2><span class="mo-n" id="mv-n"></span>
+        <label class="mo-solo"><input type="checkbox" id="mv-solo" /> solo lo que le toca o sigo</label></div>
+      <div class="mo-tabs" id="mv-tabs"></div>
+      <div id="mv-lista"></div>
+    </section>
+
+    <section class="mo-sec" id="sec-sigo">
+      <div class="mo-h"><h2>③ Los que sigues</h2><span class="mo-n" id="sg-n"></span></div>
+      <div class="mo-search"><input id="sg-q" type="search" placeholder="Busca un proyecto de esta legislatura por número o palabras (477, rescate, plataformas…)" /></div>
+      <ul class="mo-res" id="sg-res"></ul>
+      <div id="sg-lista"></div>
+      <div class="cob-note">Por ahora la lista de seguidos se guarda en este navegador.</div>
+    </section>
+
+    <div class="foot">
+      Fuentes: órdenes del día de Cámara y Senado y registro de proyectos de las dos cámaras, leídos a diario por Caudal.
+      Estado según el registro oficial; puede ir unos días detrás de lo que pasó en la sesión.<br />
+      Caudal · una alianza entre <a href="index.html">RicardoRuiz.co</a> y <a href="https://cauce.co/" target="_blank" rel="noopener">Cauce</a>.
+    </div>
+  </main>
+
+<script src="caudal-comun.js?v=20261026b"></script>
+<script src="caudal-base.js?v=20261027"></script>
+<script>
+(function(){
+  'use strict';
+  const $=id=>document.getElementById(id);
+  const S3='https://elecciones-2026.s3.us-east-1.amazonaws.com/ricardoruiz.co/congreso-2026/output/legislativo/';
+  const LS='caudal-monitor-sigo-v1';
+  const norm=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();
+  let D=null, ORD=null, POR_K={}, CLIENTES=[], ACT=null, TERMS=[], MV_TIPO='decisiones';
+  let SIGO=[]; try{ SIGO=JSON.parse(localStorage.getItem(LS)||'[]'); }catch(e){ SIGO=[]; }
+  const guardar=()=>{ try{ localStorage.setItem(LS,JSON.stringify(SIGO)); }catch(e){} };
+
+  /* «477 de 2026 Cámara» · «477/2026C» · «328/26» → «C477-26» */
+  function clave(num,camDef){
+    const m=String(num||'').match(/0*(\d{1,4})\s*(?:de|\/)\s*(?:20)?(\d{2})\s*(c[aá]mara|senado|c|s)?/i);
+    if(!m) return null;
+    const c=m[3]?(/^s/i.test(m[3])?'S':'C'):camDef;
+    return c?`${c}${+m[1]}-${m[2]}`:null;
+  }
+  const numTxt=p=>[p.nc&&`${String(p.nc).replace(/\/(20)?(\d\d)C?$/i,'/$2')} C`, p.ns&&`${String(p.ns).replace(/S$/i,'')} S`].filter(Boolean).join(' · ');
+  const proyDe=ks=>{ for(const k of ks||[]) if(POR_K[k]) return POR_K[k]; return null; };
+  const sigo=ks=>(ks||[]).some(k=>SIGO.includes(k));
+
+  /* Temas del cliente → términos: si el tema es llave o término de un tópico
+     del tesauro, se usa todo el vocabulario del tópico (la misma regla que el
+     radar del Congreso en caudal_core). Una frase casa si sus palabras de más
+     de 3 letras están en el título, por raíz. */
+  function terminosDe(temas){
+    const out=new Set();
+    for(const t of temas||[]){
+      const tn=norm(t);
+      const top=(D.tesauro||[]).find(s=>norm(s.k)===tn||s.terms.some(x=>norm(x)===tn));
+      (top?top.terms:[t]).forEach(x=>out.add(norm(x)));
+    }
+    return [...out].map(f=>f.split(' ').filter(w=>w.length>3).map(w=>w.length>5?w.slice(0,w.length-2):w)).filter(a=>a.length);
+  }
+  function toca(titulo){
+    if(!TERMS.length) return false;
+    const t=norm(titulo);
+    return TERMS.some(ws=>ws.every(w=>t.includes(w)));
+  }
+
+  async function cargar(){
+    const est=$('mo-estado');
+    est.textContent='Cargando agenda y movimientos…';
+    try{
+      const [d,o]=await Promise.all([
+        fetch(S3+'monitor-congreso.json?v='+Math.floor(Date.now()/6e5)).then(r=>r.json()),
+        fetch(S3+'ordenes-vigentes.json?v='+Math.floor(Date.now()/6e5)).then(r=>r.json())]);
+      D=d; ORD=o;
+    }catch(e){ est.textContent='No pudimos cargar los datos del Congreso. Recarga la página.'; return; }
+    D.proyectos.forEach(p=>p.ks.forEach(k=>POR_K[k]=p));
+    const v=new Date(D.v), vo=ORD.v?new Date(ORD.v):null;
+    est.textContent=`Registro de proyectos al ${v.toLocaleDateString('es-CO',{day:'numeric',month:'long'})} · agenda al ${vo?vo.toLocaleDateString('es-CO',{day:'numeric',month:'long'}):'—'} · ${D.n_proyectos} proyectos de la legislatura ${D.legislatura}.`;
+    await cargarClientes();
+    pintarBarra(); pintarTodo(); wire();
+  }
+
+  async function cargarClientes(){
+    CLIENTES=[{k:'',nombre:'Todo el Congreso',temas:[]}];
+    if(!window.HAS_SESSION) return;
+    try{
+      const m=await call({action:'perfil_meta'});
+      const u=(()=>{ try{ return JSON.parse(localStorage.getItem('rr-user')||'null'); }catch(e){ return null; } })();
+      const equipo=!!(u&&Array.isArray(u.accesos)&&u.accesos.includes('caudal-equipo'));
+      (m&&m.plantillas||[]).filter(p=>p.cliente&&(equipo||p.k==='cauce')).forEach(p=>CLIENTES.push({k:p.k,nombre:p.nombre,temas:p.temas||[]}));
+    }catch(e){}
+    const pedido=new URLSearchParams(location.search).get('para');
+    ACT=CLIENTES.find(c=>c.k===pedido)||CLIENTES.find(c=>c.k==='cauce')||CLIENTES[0];
+  }
+  function pintarBarra(){
+    const bar=$('mo-bar');
+    bar.innerHTML='<label>Leer para</label>'+CLIENTES.map(c=>`<button class="mo-chip${c===ACT?' on':''}" data-k="${esc(c.k)}">${esc(c.nombre)}</button>`).join('');
+    bar.querySelectorAll('.mo-chip').forEach(b=>b.onclick=()=>{ ACT=CLIENTES.find(c=>c.k===b.dataset.k); pintarBarra(); pintarTodo();
+      const u=new URL(location.href); ACT.k?u.searchParams.set('para',ACT.k):u.searchParams.delete('para'); history.replaceState(null,'',u); });
+  }
+
+  function pintarTodo(){
+    TERMS=ACT&&ACT.temas.length?terminosDe(ACT.temas):[];
+    pintarKpis(); pintarAgenda(); pintarMovs(); pintarSigo();
+  }
+
+  const hoyISO=new Date(Date.now()-5*3600e3).toISOString().slice(0,10);
+  function sesiones(){
+    const out=[];
+    for(const o of ORD.ordenes||[]){
+      const cam=/senado/i.test(o.corporacion)?'S':'C';
+      const ses=(o.sesiones&&o.sesiones.length)?o.sesiones:[{fecha:o.fecha,hora:o.hora||'',proyectos:o.proyectos||[]}];
+      for(const s of ses) out.push({f:s.fecha||o.fecha, hora:s.hora||'', o, cam, ps:(s.proyectos||[]).map((p,i)=>({...p,i:i+1,k:clave(p.numero,cam),k2:clave(p.otro_numero,cam==='S'?'C':'S')}))});
+    }
+    return out.sort((a,b)=>a.f.localeCompare(b.f)||String(a.o.ambito).localeCompare(String(b.o.ambito)));
+  }
+  function pRow(p){
+    const pr=proyDe([p.k,p.k2]), ks=pr?pr.ks:[p.k,p.k2].filter(Boolean);
+    const t=pr?pr.t:(p.titulo||''), tc=toca(t), sg=sigo(ks);
+    return {html:`<div class="mo-p${tc?' toca':''}"><span class="mo-num">${esc(p.numero||'')}</span>
+      <span class="mo-t">${tc?'<span class="mo-badge b-toca">le toca</span>':''}${sg?'<span class="mo-badge b-sigo">sigues</span>':''}${esc(cap(t))}
+      ${pr?`<small>${esc(pr.est||'')} · puesto ${p.i} en el orden del día</small>`:`<small>puesto ${p.i} en el orden del día</small>`}</span>
+      ${ks.length?`<button class="mo-seg${sg?' on':''}" data-ks="${esc(ks.join(','))}">${sg?'Siguiendo':'Seguir'}</button>`:''}</div>`, tc, sg};
+  }
+  function pintarAgenda(){
+    const solo=$('ag-solo').checked, ses=sesiones().filter(s=>s.f>=hoyISO);
+    let html='', dia='', n=0, nt=0;
+    for(const s of ses){
+      const rows=s.ps.map(pRow), vis=solo?rows.filter(r=>r.tc||r.sg):rows;
+      nt+=rows.filter(r=>r.tc).length;
+      if(solo&&!vis.length) continue;
+      if(s.f!==dia){ dia=s.f; html+=`<div class="mo-dia">${esc(fechaLarga(s.f))}</div>`; }
+      n++;
+      html+=`<div class="mo-ses"><div class="mo-ses-h">${esc(s.o.ambito)} · ${esc(s.o.corporacion)}${s.hora?` <span class="tag">${esc(s.hora)}</span>`:''}${s.o.conjunta?' <span class="tag">conjunta</span>':''}
+        <span class="tag">${s.ps.length} proyecto${s.ps.length===1?'':'s'}</span>${s.o.url?`<a href="${esc(s.o.url)}" target="_blank" rel="noopener">Orden del día ↗</a>`:''}</div>
+        ${vis.map(r=>r.html).join('')||'<div class="mo-p"><span class="mo-t" style="color:var(--ink3)">Sin proyectos de ley en este orden (control político, proposiciones u otros asuntos).</span></div>'}</div>`;
+    }
+    $('ag-n').textContent=ses.length?`${ses.length} sesiones desde hoy${TERMS.length?` · ${nt} proyecto${nt===1?'':'s'} le toca${nt===1?'':'n'} a ${ACT.nombre}`:''}`:'';
+    $('ag-lista').innerHTML=html||`<div class="mo-vacio">${solo?'Ninguna sesión publicada desde hoy trae proyectos de sus temas ni de los que sigues.':'Todavía no hay órdenes del día publicados desde hoy. Cámara y Senado suelen subirlos el fin de semana o el mismo día.'}</div>`;
+    bindSeg($('ag-lista'));
+  }
+
+  const GRUPOS={decisiones:['aprobado','sancion','archivado','plenaria'], ponencias:['ponencia','ponentes'], nuevos:['radicado','comision'], todo:null};
+  const NOM_G={decisiones:'Decisiones',ponencias:'Ponencias y ponentes',nuevos:'Radicados y comisión',todo:'Todo'};
+  const NOM_T={aprobado:'aprobado',sancion:'a sanción',archivado:'archivado',plenaria:'a plenaria',ponencia:'ponencia',ponentes:'ponentes',radicado:'radicado',comision:'comisión',estado:'estado',gaceta:'gaceta'};
+  function pintarMovs(){
+    const solo=$('mv-solo').checked;
+    const base=D.movimientos.filter(m=>!solo||toca(m.t)||sigo(m.ks));
+    $('mv-tabs').innerHTML=Object.keys(GRUPOS).map(g=>{ const n=base.filter(m=>!GRUPOS[g]||GRUPOS[g].includes(m.tipo)).length;
+      return `<button class="mo-chip${g===MV_TIPO?' on':''}" data-g="${g}">${NOM_G[g]} · ${n}</button>`; }).join('');
+    $('mv-tabs').querySelectorAll('.mo-chip').forEach(b=>b.onclick=()=>{ MV_TIPO=b.dataset.g; pintarMovs(); });
+    const lista=base.filter(m=>!GRUPOS[MV_TIPO]||GRUPOS[MV_TIPO].includes(m.tipo)).slice(0,120);
+    $('mv-n').textContent=`últimos ${D.ventana_dias} días`;
+    $('mv-lista').innerHTML=lista.map(m=>{ const pr=proyDe(m.ks), tc=toca(m.t), sg=sigo(m.ks), ks=pr?pr.ks:m.ks;
+      return `<div class="mo-mov"><span class="mo-f">${esc(fechaCorta(m.f))}<br>${esc(m.cam)}</span>
+        <span class="mo-t"><span class="mo-badge b-${esc(m.tipo)}">${esc(NOM_T[m.tipo]||m.tipo)}</span>${tc?'<span class="mo-badge b-toca">le toca</span>':''}${sg?'<span class="mo-badge b-sigo">sigues</span>':''}
+          <b>${esc(pr?numTxt(pr):'')}</b> ${esc(cap(m.t))}<small>${esc(m.txt)}</small></span>
+        ${ks.length?`<button class="mo-seg${sg?' on':''}" data-ks="${esc(ks.join(','))}">${sg?'Siguiendo':'Seguir'}</button>`:''}</div>`; }).join('')
+      ||`<div class="mo-vacio">${solo?'Nada de sus temas ni de lo que sigues se movió en esta categoría.':'Sin movimientos en esta categoría.'}</div>`;
+    bindSeg($('mv-lista'));
+  }
+
+  function citas(p){
+    const out=[];
+    for(const s of sesiones()) s.ps.forEach(x=>{ if(p.ks.includes(x.k)||p.ks.includes(x.k2)) out.push({s,x}); });
+    return out;
+  }
+  function pintarSigo(){
+    const ps=SIGO.map(k=>POR_K[k]).filter((p,i,a)=>p&&a.indexOf(p)===i);
+    $('sg-n').textContent=ps.length?`${ps.length} proyecto${ps.length===1?'':'s'}`:'';
+    $('sg-lista').innerHTML=ps.length?ps.map(p=>{
+      const e=p.etapa||{}, movs=D.movimientos.filter(m=>m.ks.some(k=>p.ks.includes(k))), ult=movs[0];
+      const cs=citas(p).filter(c=>c.s.f>=hoyISO), prox=cs[0];
+      const barra=e.fin?`<small style="color:var(--ink3)">${esc(e.fin)}</small>`:`<div class="mo-etapa">${(D.etapas||[]).map((_,i)=>`<i class="${i<e.n?'on':''}"></i>`).join('')}</div><small>${esc((D.etapas||[])[e.n-1]||'')}</small>`;
+      const rescate=p.ks.includes('C477-26')||p.ks.includes('S328-26');
+      return `<div class="mo-ses"><div class="mo-ses-h">${esc(numTxt(p))}${toca(p.t)?' <span class="mo-badge b-toca">le toca</span>':''}
+          <button class="mo-seg on" data-ks="${esc(p.ks.join(','))}" style="margin-left:auto">Dejar de seguir</button></div>
+        <div class="mo-p"><span class="mo-t">${esc(cap(p.t))}${barra}
+          <small>Estado oficial: ${esc(p.est||'—')}${p.est_c?` · Cámara: ${esc(p.est_c)}`:''}${p.com?` · ${esc(p.com)}`:''}</small>
+          <small>${ult?`Último movimiento (${esc(fechaCorta(ult.f))}): ${esc(ult.txt)}`:'Sin movimientos en los últimos días.'}</small>
+          <small>${prox?`<b>En agenda:</b> ${esc(fechaLarga(prox.s.f))} · ${esc(prox.s.o.ambito)} (${esc(prox.s.o.corporacion)}), puesto ${prox.x.i}`:'No aparece en los órdenes del día publicados.'}</small>
+          <small>${p.url?`<a href="${esc(p.url)}" target="_blank" rel="noopener">Texto o ficha oficial ↗</a> · `:''}<a href="caudal.html?q=${encodeURIComponent(shortQ(p.t))}#congreso">Buscar en Caudal</a>${rescate?' · <a href="ley-de-rescate-fuerzas.html">Esquema de fuerzas</a> · <a href="ley-de-rescate-avance.html">Seguimiento completo</a>':''}</small></span></div></div>`;
+    }).join(''):'<div class="mo-vacio">Todavía no sigues ningún proyecto. Usa «Seguir» en la agenda o en los movimientos, o búscalo arriba por número o palabras.</div>';
+    bindSeg($('sg-lista'));
+  }
+  function pintarKpis(){
+    const ses=sesiones().filter(s=>s.f>=hoyISO), mv=D.movimientos;
+    const dec=mv.filter(m=>['aprobado','sancion'].includes(m.tipo));
+    const tocaAg=TERMS.length?ses.reduce((n,s)=>n+s.ps.filter(p=>{ const pr=proyDe([p.k,p.k2]); return toca(pr?pr.t:p.titulo); }).length,0):null;
+    const kp=[[ses.length,'sesiones con orden del día desde hoy'],[dec.length,`aprobaciones y sanciones en ${D.ventana_dias} días`],
+      [tocaAg,TERMS.length?`proyectos en agenda que tocan a ${ACT.nombre}`:'escoge un cliente para cruzar sus temas'],[SIGO.length?SIGO.map(k=>POR_K[k]).filter((p,i,a)=>p&&a.indexOf(p)===i).length:0,'proyectos que sigues']];
+    $('mo-kpis').innerHTML=kp.map(([n,l])=>`<div class="kpi"><div class="n">${n==null?'—':fmt(n)}</div><div class="l">${esc(l)}</div></div>`).join('');
+  }
+
+  function bindSeg(box){
+    box.querySelectorAll('.mo-seg').forEach(b=>b.onclick=()=>{
+      const ks=b.dataset.ks.split(',').filter(Boolean), ya=sigo(ks);
+      SIGO=ya?SIGO.filter(k=>!ks.includes(k)):[...new Set([...SIGO,...ks])];
+      guardar(); pintarTodo();
+    });
+  }
+  function buscar(q){
+    const qn=norm(q), res=$('sg-res');
+    if(qn.length<2){ res.innerHTML=''; return; }
+    const num=q.match(/\d{1,4}/);
+    const hits=D.proyectos.filter(p=>num?p.ks.some(k=>k.slice(1).split('-')[0]===String(+num[0])):norm(p.t).includes(qn)).slice(0,8);
+    res.innerHTML=hits.map(p=>`<li class="mo-p"><span class="mo-num">${esc(numTxt(p))}</span><span class="mo-t">${esc(cap(p.t))}<small>${esc(p.est||'')}</small></span>
+      <button class="mo-seg${sigo(p.ks)?' on':''}" data-ks="${esc(p.ks.join(','))}">${sigo(p.ks)?'Siguiendo':'Seguir'}</button></li>`).join('')
+      ||'<li class="mo-vacio">Nada con eso en la legislatura 2026-2027.</li>';
+    bindSeg(res);
+  }
+
+  const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  function fechaCorta(f){ const [y,m,d]=String(f).split('-'); return d?`${+d} ${MES[+m-1]}`:f; }
+  function fechaLarga(f){ const x=new Date(f+'T12:00:00'); return isNaN(x)?f:x.toLocaleDateString('es-CO',{weekday:'long',day:'numeric',month:'long'}); }
+  function cap(t){ t=String(t||'').trim(); if(t===t.toUpperCase()) t=t.toLowerCase(); t=t.replace(/^(por medio de la cual|por medio del cual|por la cual|por el cual)\s+/i,''); return t.charAt(0).toUpperCase()+t.slice(1); }
+  function shortQ(t){ return norm(cap(t)).split(' ').filter(w=>w.length>4).slice(0,4).join(' '); }
+
+  function wire(){
+    $('ag-solo').onchange=pintarAgenda; $('mv-solo').onchange=pintarMovs;
+    let tm=null; $('sg-q').addEventListener('input',e=>{ clearTimeout(tm); tm=setTimeout(()=>buscar(e.target.value),120); });
+  }
+
+  window.CAUDAL_BACK={txt:'← Caudal', href:'caudal.html#congreso'};
+  window.initHome=function(){ cargar(); };
+  window.loadStats=function(){};
+  window.pfLoadList=function(){};
+  queueMicrotask(reveal);
+})();
+</script>
+</body>
+</html>

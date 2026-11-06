@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="legislativo-base.css?v=20260901" />
-  <link rel="stylesheet" href="mi-congreso.css?v=20261023" />
+  <link rel="stylesheet" href="mi-congreso.css?v=20261107" />
 </head>
 <body>
   <div class="bg-layer"></div>
@@ -43,6 +43,7 @@
         <div class="fz-busca"><input id="fz-q" class="f-input" type="search" autocomplete="off" placeholder="O busca cualquier proyecto en trámite: número o palabras del título" aria-label="Buscar un proyecto en trámite"><div id="fz-res" class="mc-ac"></div></div></div>
       <div id="fz-proy"><div class="loading">Cargando tus proyectos <span class="dots"><span></span><span></span><span></span></span></div></div>
     </div>
+    <div id="fz-nota"></div>
 
     <div class="fz-vista" id="fz-vista" role="tablist">
       <button data-v="int" class="on" role="tab">Internos <small>la comisión que lo vota</small></button><button data-v="ext" role="tab">Externos <small>gremios, empresas y otros jugadores</small></button>
@@ -98,7 +99,7 @@
 
   <script src="legislativo-base.js"></script>
   <script src="legislativo-electos.js"></script>
-  <script src="mi-congreso-base.js?v=20261027"></script>
+  <script src="mi-congreso-base.js?v=20261107"></script>
   <script>
   (async function(){
     const e=MC.pagina('fuerzas'); if(!e) return;
@@ -141,6 +142,12 @@
       /* un proyecto que no es suyo: se busca entre todos los radicados */
       try{ const T=await MC.radicadosTodos(); const r=T.find(x=>numDe(x)===pIni||x.numero_senado===pIni||x.numero_camara===pIni);
         if(r){ EXTRA=MC.proyectoDe(r,e,ord.vigentes); opciones(); sel.value='extra'; } }catch(err){}
+      /* si el registro no responde pero tenemos una nota de trabajo para ese
+         proyecto, se arma con lo que trae la nota: la nota no depende de la API */
+      if(!EXTRA){ try{ const NN=await MC.notasDe(e); const n=NN&&(NN.notas||[]).find(z=>z.p===pIni);
+        if(n){ const cam=/s$/i.test(n.p)?'Senado':'Cámara';
+          EXTRA=MC.proyectoDe({titulo:n.titulo||n.t,estado:'',_cam:cam,numero_senado:cam==='Senado'?n.p:null,numero_camara:cam==='Cámara'?n.p:null,comision:n.comision||''},e,ord.vigentes);
+          opciones(); sel.value='extra'; } }catch(err){} }
     }
     if(!sel.value&&sel.options.length) sel.selectedIndex=0;
     function setURL(){ const u=new URL(location.href); const v=sel.value; u.searchParams.set('p',v==='mia'?'mia':v==='extra'?numDe(EXTRA):v[0]==='h'?numDe(HOY[+v.slice(1)]):numDe(vivos[+v])); u.searchParams.delete('c'); if(VISTA==='ext') u.searchParams.set('v','ext'); else u.searchParams.delete('v'); history.replaceState(null,'',u); }
@@ -207,7 +214,48 @@
         $('fz-proy').innerHTML=`<div class="mc-empty">Sin un proyecto en el centro, la comisión se lee solo desde tu bancada: quién es de la tuya, qué bancadas suelen votar con ella y cuáles no. Elige un proyecto arriba para sumar quién lo firmó.</div>`;
       }
       cuenta();
-      ventana(my); agenda(my); cae(my); prensa(my); if(VISTA==='ext') externos(my);
+      ventana(my); agenda(my); cae(my); prensa(my); nota(my); if(VISTA==='ext') externos(my);
+    }
+
+    /* ── nota de trabajo para esta persona y este proyecto ──────────────
+       mi-congreso-data/notas/<slug>/<tok>.json · solo existe si la
+       preparamos; sin ella el panel no se ve. */
+    const bil=v=>'$'+v.toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})+' billones';
+    const pct=v=>v.toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:3})+' % del PIB';
+    async function nota(my){
+      const box=$('fz-nota'); box.innerHTML='';
+      if(!X) return;
+      const N=await MC.notaDe(e,X).catch(()=>null);
+      if(my!==SEQ||!N) return;
+      const sec=(t,html,open)=>`<details${open?' open':''}><summary>${esc(t)}</summary><div class="nt-body">${html}</div></details>`;
+      const C=N.cuentas, mx=C?Math.max(...C.quitar.map(q=>q.v),...C.pagar.map(q=>q.v)):1;
+      const barra=(q,col)=>`<div class="nt-bar"><span class="t">${esc(q.t)}${q.aprox?'<span class="nt-tag" style="color:var(--amber)">aproximado</span>':''}${q.choca?'<span class="nt-tag" style="color:var(--red)">choca con lo que dijiste</span>':''}${q.baja?'<span class="nt-tag" style="color:var(--gray)">certeza baja</span>':''}</span><span class="v">${bil(q.v)}</span><span class="b"><i style="width:${(100*q.v/mx).toFixed(1)}%;background:${col}"></i></span><small>${pct(q.pib)} · ${esc(q.d||'')}</small></div>`;
+      const VER=await MC.puedeVerNota(N); if(my!==SEQ) return;
+      box.innerHTML=`<div class="nt${VER?'':' nt-lock'}" id="nota">
+        <div class="nt-k">Nota de trabajo · ${VER?'preparada para ti':'privada'} · ${esc(fechaCorta(N.v)||N.v)}</div>
+        ${VER?'':`<div class="nt-candado"><b>Esta nota es privada.</b> Solo la ven la congresista y su equipo. <a href="login.html?next=${encodeURIComponent(location.pathname.slice(1)+location.search)}">Entra con la cuenta autorizada →</a></div>`}
+        <div class="nt-cont">
+        <div class="nt-h">${esc(N.titulo_corto||'')}: qué le hace a tu electorado y qué puedes proponer</div>
+        <p class="nt-r">${esc(N.resumen||'')}</p>
+        ${C?sec(C.titulo,`<p>${esc(C.intro)}</p>
+          <div class="nt-cols"><div class="nt-col"><h5 style="color:var(--red)">Lo que pides quitar · se deja de recaudar</h5>${C.quitar.map(q=>barra(q,'rgba(185,28,28,.55)')).join('')}</div>
+          <div class="nt-col"><h5 style="color:var(--green)">Con qué se puede pagar · recaudo adicional</h5>${C.pagar.map(q=>barra(q,'rgba(21,128,61,.55)')).join('')}</div></div>
+          <h5 style="margin:.9rem 0 .3rem;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase">Tres paquetes</h5>
+          ${C.paquetes.map(p=>`<div class="nt-paq"><span>${esc(p.t)}</span><b>${bil(p.v)} · ${pct(p.pib)}</b></div>`).join('')}
+          <ul>${C.lectura.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>
+          ${C.critica?`<h5 style="margin:.9rem 0 .3rem;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase">${esc(C.critica.t)}</h5>${C.critica.items.map(([q,r])=>`<div class="nt-crit"><div>${esc(q)}</div><div>${esc(r)}</div></div>`).join('')}`:''}
+          <p class="note">${esc(C.notas||'')}</p>`,true):''}
+        ${(N.dijiste||[]).length?sec('Lo que ya dijiste',N.dijiste.map(q=>`<div class="nt-q">${esc(q.t)}<small>${q.u?`<a href="${esc(q.u)}" target="_blank" rel="noopener">${esc(q.f)} ↗</a>`:esc(q.f)}</small></div>`).join('')):''}
+        ${N.electorado?sec(N.electorado.titulo,`<div class="nt-cif">${N.electorado.cifras.map(c=>`<div><b>${esc(c.v)}</b><small>${esc(c.k)}</small></div>`).join('')}</div><p>${esc(N.electorado.texto)}</p><p class="note">${esc(N.electorado.fuente||'')}</p>`):''}
+        ${N.pega?sec(N.pega.titulo,`<table><thead><tr>${N.pega.cab.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${N.pega.filas.map(f=>`<tr>${f.map((c,i)=>`<td${i?' class="n"':''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table><p class="note">${esc(N.pega.nota)}</p><ul>${N.pega.claves.map(k=>`<li>${esc(k)}</li>`).join('')}</ul>`):''}
+        ${N.proposiciones?sec(N.proposiciones.titulo,`<ol>${N.proposiciones.items.map(p=>`<li><b>${esc(p.t)}.</b> ${esc(p.d)}</li>`).join('')}</ol>`):''}
+        ${N.empujar?sec(N.empujar.titulo,`<ul>${N.empujar.items.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>`):''}
+        ${(N.pendientes||[]).length?sec('Pendiente de verificar antes de presentar',`<ul>${N.pendientes.map(p=>`<li>${esc(p)}</li>`).join('')}</ul>`):''}
+        <p class="note" style="margin-top:.6rem">Fuentes: ${esc(N.fuentes||'')} Los actores del plano de <a href="#" data-ir-ext>externos</a> incluyen los de ${esc(N.region||'tu región')}.</p>
+      </div></div>`;
+      if(!VER) box.querySelectorAll('.nt-cont details').forEach(d=>d.removeAttribute('open'));
+      const ir=box.querySelector('[data-ir-ext]'); if(ir) ir.onclick=ev=>{ ev.preventDefault(); vista('ext'); setURL(); $('fz-vista').scrollIntoView({behavior:'instant',block:'start'}); };
+      if(location.hash==='#nota') box.scrollIntoView({behavior:'instant',block:'start'});
     }
 
     /* ── la cuenta ────────────────────────────────────────────────────── */
@@ -402,7 +450,7 @@
     }
     function tipActor(a){
       const pt=a.postura==null?'No se ha pronunciado en la prensa revisada':a.postura>0?`A favor (${a.postura>=.66?'claro':'con matices'})`:`En contra (${a.postura<=-.66?'claro':'con matices'})`;
-      return `<h5>${esc(a.n)}</h5><div>${esc(TIPO_T[a.tipo]||a.tipo||'')}${a.sector?' · '+esc(a.sector.replace(/_/g,' ')):''}</div><div style="margin-top:.25rem"><b>${esc(pt)}</b></div><div>Le toca: ${esc(CERCA_T[a.cerca_por]||'')}</div>${(a.exige||[]).length?`<div style="margin-top:.3rem">El texto le exige:</div><ul style="margin:.15rem 0 0;padding-left:1rem">${a.exige.map(x=>`<li>${esc(cut(x,150))}</li>`).join('')}</ul>`:''}<div style="margin-top:.25rem">${a.peso||0} titular${a.peso===1?'':'es'} sobre el tema</div>${a.cita?`<div style="margin-top:.3rem;opacity:.85">«${esc(cut(a.cita.titulo,140))}» · ${esc(a.cita.medio||'')}</div>`:''}`;
+      return `<h5>${esc(a.n)}</h5><div>${esc(TIPO_T[a.tipo]||a.tipo||'')}${a.sector?' · '+esc(a.sector.replace(/_/g,' ')):''}${a.region?' · '+esc(a.region):''}</div>${a.quien?`<div style="opacity:.8">${esc(a.quien)}</div>`:''}<div style="margin-top:.25rem"><b>${esc(pt)}</b></div><div>Le toca: ${esc(CERCA_T[a.cerca_por]||'')}</div>${(a.exige||[]).length?`<div style="margin-top:.3rem">El texto le exige:</div><ul style="margin:.15rem 0 0;padding-left:1rem">${a.exige.map(x=>`<li>${esc(cut(x,150))}</li>`).join('')}</ul>`:''}<div style="margin-top:.25rem">${a.peso||0} titular${a.peso===1?'':'es'} sobre el tema</div>${a.cita?`<div style="margin-top:.3rem;opacity:.85">«${esc(cut(a.cita.titulo,140))}» · ${esc(a.cita.medio||'')}</div>`:''}`;
     }
     async function externos(my){
       const pb=$('fz-plano'), ab=$('fz-actores');
@@ -412,15 +460,18 @@
       if(my!==SEQ) return;
       if(!D){ pb.innerHTML='<div class="mc-empty">Todavía no hemos armado el plano de este proyecto. Se arma para los proyectos en trámite que tienen el texto leído o conversación en prensa; los recién radicados entran en la siguiente corrida.</div>'; ab.innerHTML=''; $('fz-ext-t').textContent=''; return; }
       const A=D.actores||[];
-      $('fz-ext-t').textContent=`${A.length} actores · ${D.n_titulares||0} titulares en ${D.dias||60} días`;
+      $('fz-ext-t').textContent=D.manual&&!D.n_titulares?`${A.length} actores · curados a mano el ${fechaCorta(D.curado)||D.curado}`:`${A.length} actores · ${D.n_titulares||0} titulares en ${D.dias||60} días`;
       if(!A.length){ pb.innerHTML='<div class="mc-empty">No encontramos gremios, empresas ni organizaciones que toque este proyecto o que hayan hablado de él. Que nadie se haya movido también es un dato.</div>'; ab.innerHTML=''; return; }
       const conP=A.filter(a=>a.postura!=null), fav=conP.filter(a=>a.postura>0).length, con=conP.length-fav;
       pb.innerHTML=plano(D)+`<div class="mc-legend" style="margin:.5rem 0 .3rem">${Object.keys(TIPO_T).filter(t=>A.some(a=>a.tipo===t)).map(t=>`<span><i style="background:${TIPO_COL[t]}"></i>${esc(TIPO_T[t])}</span>`).join('')}<span>Círculo claro = sin posición pública</span></div>
         <div class="mc-callout">${conP.length?`<b>${fav}</b> se han pronunciado a favor y <b>${con}</b> en contra. `:'Nadie se ha pronunciado en la prensa revisada. '}${A.length-conP.length?`<b>${A.length-conP.length}</b> ${A.length-conP.length===1?'actor no ha dicho':'actores no han dicho'} nada en público`:'Todos los actores encontrados ya se pronunciaron'}${A.filter(a=>a.postura==null&&enTexto(a)).length?`, y de ellos <b>${A.filter(a=>a.postura==null&&enTexto(a)).length}</b> aparecen en el texto${A.filter(a=>a.postura==null&&a.cerca_por==='obliga').length?` (<b>${A.filter(a=>a.postura==null&&a.cerca_por==='obliga').length}</b> con obligaciones que les impone)`:''}: son los primeros a quienes buscar`:''}.</div>
         <p class="note">${esc(D.nota||'')} La postura la lee un modelo de lenguaje en el titular y siempre va con la cita: ábrela antes de usarla.</p>`;
       pb.querySelectorAll('.fz-act').forEach(c=>{ const a=A[+c.dataset.i]; MC.tipOn(c,()=>tipActor(a)); });
+      /* «en tu territorio»: actores de la región de la nota de trabajo de esta persona */
+      const N=await MC.notaDe(e,X).catch(()=>null); if(my!==SEQ) return;
+      const REG=N&&N.region?A.filter(a=>a.region===N.region):[];
       const grupos=[['A favor',a=>a.postura!=null&&a.postura>0],['En contra',a=>a.postura!=null&&a.postura<0],['Sin posición pública',a=>a.postura==null]];
-      ab.innerHTML=grupos.map(([t,f])=>{ const L=A.filter(f).sort((p,q)=>(q.cerca||0)-(p.cerca||0)||((q.cerca_por==='obliga')-(p.cerca_por==='obliga'))||(q.peso||0)-(p.peso||0)); if(!L.length) return '';
+      ab.innerHTML=(REG.length?`<div class="fz-g fz-terr" style="margin-bottom:.9rem"><h4>En tu territorio · ${esc(N.region)} · ${REG.length}</h4>${REG.map(a=>`<div class="fz-p"><span class="dot" style="background:${TIPO_COL[a.tipo]||'#5d6271'}"></span><span class="nm">${esc(a.n)}</span><small>${a.postura==null?'sin posición pública':a.postura>0?'a favor':'en contra'} · ${esc(CERCA_T[a.cerca_por]||'')}${(a.exige||[]).length?` · ${esc(cut(a.exige[0],120))}`:''}${a.cita?` · <a href="${esc(a.cita.url||'#')}" target="_blank" rel="noopener">${esc(a.cita.medio||'cita')} ↗</a>`:''}</small></div>`).join('')}${REG.every(a=>a.postura==null)?`<p class="note">Nadie de ${esc(N.region)} ha fijado posición pública todavía: es el espacio que puedes ocupar.</p>`:''}</div>`:'')+grupos.map(([t,f])=>{ const L=A.filter(f).sort((p,q)=>(q.cerca||0)-(p.cerca||0)||((q.cerca_por==='obliga')-(p.cerca_por==='obliga'))||(q.peso||0)-(p.peso||0)); if(!L.length) return '';
         return `<div class="fz-g" style="margin-bottom:.9rem"><h4>${esc(t)} · ${L.length}</h4>${L.slice(0,12).map(a=>`<div class="fz-p"><span class="dot" style="background:${TIPO_COL[a.tipo]||'#5d6271'}"></span><span class="nm">${esc(a.n)}</span><small>${esc(TIPO_T[a.tipo]||'')} · ${esc(CERCA_T[a.cerca_por]||'')}${(a.exige||[]).length?` · le exige: ${esc(cut(a.exige[0],110))}`:''}${a.cita?` · <a href="${esc(a.cita.url||'#')}" target="_blank" rel="noopener">${esc(a.cita.medio||'cita')} ↗</a>`:''}</small></div>`).join('')}${L.length>12?`<p class="note">y ${L.length-12} más en el plano.</p>`:''}</div>`; }).join('');
     }
 

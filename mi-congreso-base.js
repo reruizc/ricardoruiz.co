@@ -544,9 +544,49 @@
   }
   /* fuerzas externas precalculadas por proyecto (build_fuerzas_externas.py) */
   function tokProyecto(x){ const c=x._cam==='Senado'?'S':'C'; const t=tokNum(c==='S'?(x.numero_senado||x.numero_camara):(x.numero_camara||x.numero_senado)); return t?`${c}-${t.replace('/','-')}`:null; }
+  /* externos: el JSON automático de S3 + los actores curados a mano que vivan
+     en el repo (mi-congreso-data/fuerzas-externas/<tok>.json). Mismo nombre
+     normalizado → gana el manual. Cualquiera de los dos puede faltar. */
   function externosDe(x){
     const t=tokProyecto(x); if(!t) return Promise.resolve(null);
-    return memo('ext:'+t,async()=>{ try{ return await getJSON(FZ_BASE+'/fuerzas-externas/'+t+'.json',3600000); }catch(err){ return null; } });
+    return memo('ext:'+t,async()=>{
+      const [auto,man]=await Promise.all([
+        getJSON(FZ_BASE+'/fuerzas-externas/'+t+'.json',3600000).catch(()=>null),
+        getJSON('mi-congreso-data/fuerzas-externas/'+t+'.json',600000).catch(()=>null)]);
+      if(!man) return auto;
+      const A={}; ((auto&&auto.actores)||[]).forEach(a=>{ A[norm(a.n)]=a; });
+      (man.actores||[]).forEach(a=>{ A[norm(a.n)]=a; });
+      const D=Object.assign({},auto||{},{actores:Object.values(A),manual:true,curado:man.v});
+      D.nota=(man.nota||'')+(auto&&auto.nota?' '+auto.nota:'');
+      return D;
+    });
+  }
+  /* nota de trabajo por congresista y proyecto (mi-congreso-data/notas/<slug>/):
+     solo existe para quien la preparamos; 404 = no hay nota */
+  function notasDe(e){
+    return memo('notas:'+e.nombre,async()=>{
+      const d=await getJSON(`mi-congreso-data/notas/${escuchaSlug(e)}/index.json`,600000).catch(()=>null);
+      return d&&d.congresista&&d.congresista.nombre===e.nombre&&d.congresista.corp===e.corp?d:null;
+    });
+  }
+  /* ¿quien mira puede leer la nota? Ricardo (isAdmin) o la cuenta que tenga la
+     llave de la nota (campo `acceso`, se da en ACCESOS_PRIVADOS del worker
+     rr-auth). Sin sesión, no. Es un gate de producto: el JSON es público. */
+  function puedeVerNota(N){
+    const token=localStorage.getItem('rr-token'); if(!token||!N) return Promise.resolve(false);
+    const vale=u=>!!u&&(u.isAdmin===true||(Array.isArray(u.accesos)&&!!N.acceso&&u.accesos.includes(N.acceso)));
+    return memo('ver:'+(N.acceso||''),async()=>{
+      try{ const r=await fetch('https://rr-auth.reruizc.workers.dev/auth/me',{headers:{Authorization:'Bearer '+token}});
+        const d=await r.json(); return !!(d&&d.ok&&vale(d.user)); }
+      catch(err){ let u=null; try{ u=JSON.parse(localStorage.getItem('rr-user')||'null'); }catch(e2){} return vale(u); }
+    });
+  }
+  function notaDe(e,x){
+    const t=x&&tokProyecto(x); if(!t) return Promise.resolve(null);
+    return memo('nota:'+e.nombre+t,async()=>{
+      const d=await getJSON(`mi-congreso-data/notas/${escuchaSlug(e)}/${t}.json`,600000).catch(()=>null);
+      return d&&d.congresista&&d.congresista.nombre===e.nombre&&d.congresista.corp===e.corp?d:null;
+    });
   }
   /* titulares sobre el TEMA del proyecto: la prensa casi nunca cita el número,
      así que se busca por las palabras del título y se exige que el titular
@@ -689,5 +729,5 @@
     me,guardar,olvidar,requireMe,getJSON,api,comision,ordenes,esMia,etapaDe,etapaEf,numKey,citasDe,numDe,citaTxt,avanceHtml,tipoDe,
     escucha,escuchaSlug,mios,avanceGeneral,indiceElectoral,enSesion,diasHabSesion,diasCal,legislatura,relojDe,puntaje,electoral,fotoDe,voto,prensa,citPanorama,bancadasDisc,bloqueo,stats,
     renderHead,renderNav,pagina,tip,tipOn,porDia,tipDia,calendario,ring,spark,hbar,
-    FZ_CAT,FZ_AFIN,FZ_BISAGRA,COM_KEYS,comKeyDe,internas,oficialDe,bancadaDe,coincidencia,fuerzas,hemiciclo,tipSilla,fichaDe,tokNum,palabrasTema,prensaTema,radicadosTodos,proyectoDe,tokProyecto,externosDe};
+    FZ_CAT,FZ_AFIN,FZ_BISAGRA,COM_KEYS,comKeyDe,internas,oficialDe,bancadaDe,coincidencia,fuerzas,hemiciclo,tipSilla,fichaDe,tokNum,palabrasTema,prensaTema,radicadosTodos,proyectoDe,tokProyecto,externosDe,notasDe,notaDe,puedeVerNota};
 })();
