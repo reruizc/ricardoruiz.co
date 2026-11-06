@@ -95,7 +95,9 @@ def sin_espacio_pct(x):
 def escribir(ruta, datos):
     Path(ruta).parent.mkdir(parents=True, exist_ok=True)
     t = Path(str(ruta) + '.tmp')
-    t.write_text(json.dumps(datos, ensure_ascii=False))
+    # Un texto de redes puede traer medio par sustituto (un emoji o una letra «negrita» de Unicode
+    # cortados): UTF-8 no lo admite y tumbaba la corrida entera (6-nov). Se cambia por «?».
+    t.write_text(json.dumps(datos, ensure_ascii=False).encode('utf-8', 'replace').decode('utf-8'), encoding='utf-8')
     t.replace(ruta)
 
 
