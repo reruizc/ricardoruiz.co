@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Las fuerzas de antes · Ley de Rescate · Caudal × Cauce</title>
+  <meta name="description" content="Cómo se pararon los gremios, los sindicatos y los partidos frente a las ocho tributarias desde 2016, y cómo se paran frente a la Ley de Rescate." />
+  <link rel="canonical" href="https://ricardoruiz.co/ley-de-rescate-antecedentes.html" />
+  <meta property="og:title" content="Las fuerzas de antes · Ley de Rescate · Caudal × Cauce" />
+  <meta property="og:description" content="Cómo se pararon los gremios, los sindicatos y los partidos frente a las ocho tributarias desde 2016, y cómo se paran frente a la Ley de Rescate." />
+  <meta property="og:image" content="https://ricardoruiz.co/imagenes-index/proyectos/legislativo.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261106b" />
+  <script defer src="/track.js"></script>
+</head>
+<body>
+  <main class="wrap">
+    <div class="k">Ley de Rescate · PL 477 de 2026 Cámara</div>
+    <h1>Las fuerzas de antes</h1>
+    <p class="lead">Cómo se pararon los gremios, los sindicatos y los partidos frente a cada tributaria desde 2016, y cómo se paran ahora. <b>Toque cualquier punto</b> para ver de dónde sale: el voto en plenaria, lo que dijo en una audiencia del Congreso o los titulares de esos días.</p>
+    <div id="app" hidden>
+      <div class="kpis" id="akpis"></div>
+      <section class="bloque"><div class="k">Actor por actor</div><h2>Quién apoyó, quién pidió cambios y quién se opuso</h2>
+        <div class="fil"><div class="pills" id="a-g"></div></div>
+        <div class="panel"><div class="ant-scroll"><table class="ant-m" id="mat"></table></div>
+          <div class="ley"><span><i style="background:var(--apoya)"></i>Apoyó</span><span><i style="background:#d9a441"></i>Con reparos</span><span><i style="background:var(--rechaza)"></i>Se opuso</span><span><i class="ant-as"></i>Estuvo en la audiencia, sin postura registrada</span><span><i class="ant-inf"></i>2026: inclinación, no postura declarada</span></div>
+          <div class="fz-det" id="det" hidden></div></div></section>
+      <section class="bloque"><div class="k">Lo que se repite</div><h2>Los de siempre y los que cambiaron de lado</h2><p class="sub">Con al menos tres reformas con postura registrada. Una postura distinta con un gobierno distinto dice tanto como una que se repite.</p><div class="ant-dos"><div class="panel"><h3>Los de siempre</h3><div id="siempre"></div></div><div class="panel"><h3>Cambiaron de lado</h3><div id="cambio"></div></div></div></section>
+      <section class="bloque"><div class="k">El voto en plenaria</div><h2>Cómo votaron las bancadas en la Cámara</h2><p class="sub">Las dos reformas de las que tenemos voto nominal completo en la plenaria de la Cámara. Cada congresista cuenta una vez, según cómo votó el conjunto del proyecto.</p><div class="panel"><div id="vot"></div></div></section>
+      <p class="aparte" id="metodo"></p>
+    </div>
+    <div id="carga">Cargando el seguimiento…</div>
+  </main>
+  <script src="ley-rescate-base.js?v=20261106b"></script>
+  <script>
+LR.pagina('antecedentes', E => {
+  const { $, esc, corta } = LR, F = E.fuerzas_hist || {}, RF = F.reformas || [], AC = F.actores || [], CE = F.celdas || {};
+  if (!RF.length) { $('#app').innerHTML = '<p class="vacio">Este análisis se está cargando.</p>'; return; }
+  const C = { a: ['Apoyó', 'var(--apoya)'], m: ['Con reparos', '#d9a441'], r: ['Se opuso', 'var(--rechaza)'] };
+  const G = { gre: 'Gremios', cen: 'Centros de pensamiento', sin: 'Sindicatos', par: 'Partidos' }, S = { g: new Set(Object.keys(G)) };
+  const SRC = { gaceta: 'Gaceta del Congreso', prensa: 'Titular de prensa', curada: 'Seguimiento 2026' };
+  const anio = r => r.id === 'r2026' ? '2026' : r.nombre.match(/\d{4}/)[0], corto = r => r.nombre.replace(/ \d{4}$/, '');
+  const conP = a => RF.filter(r => CE[a.id]?.[r.id]?.p);
+  const nPost = Object.values(CE).reduce((s, x) => s + Object.values(x).filter(c => c.p).length, 0), nTit = Object.values(F.fuentes?.prensa || {}).reduce((s, n) => s + n, 0);
+  $('#akpis').innerHTML = [['Reformas', RF.length - 1, 'tributarias desde 2016, más la Ley de Rescate'], ['Actores', AC.length, 'gremios, centros de pensamiento, sindicatos y partidos'], ['Posturas', nPost, 'con su evidencia a la vista'], ['Fuentes', nTit, 'titulares leídos, dos ponencias y dos votaciones en plenaria']].map(([l, v, d]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="d">${d}</div></div>`).join('');
+  function mat() {
+    const L = AC.filter(a => S.g.has(a.g));
+    $('#mat').innerHTML = `<thead><tr><th></th>${RF.map(r => `<th title="${esc(r.nombre)}"><b>${anio(r)}</b><small>${esc(corto(r))}</small><small>${esc(r.gobierno || 'De la Espriella')}${r.res ? ' · ' + esc(r.res) : ''}</small></th>`).join('')}</tr></thead><tbody>` +
+      Object.keys(G).filter(g => S.g.has(g)).map(g => `<tr class="gr"><td colspan="${RF.length + 1}">${G[g]}</td></tr>` + L.filter(a => a.g === g).map(a => `<tr><th>${esc(a.nombre)}</th>${RF.map(r => { const c = CE[a.id]?.[r.id]; if (!c) return '<td></td>'; const k = c.p ? 'p' + c.p : 'as'; return `<td><button class="ant-c ${k} ${c.inferida ? 'inf' : ''}" data-a="${a.id}" data-r="${r.id}" aria-label="${esc(a.nombre)}, ${esc(r.nombre)}: ${c.p ? C[c.p][0] : 'estuvo en la audiencia'}"></button></td>`; }).join('')}</tr>`).join('')).join('') + '</tbody>';
+    document.querySelectorAll('.ant-c').forEach(b => b.onclick = () => det(b.dataset.a, b.dataset.r));
+  }
+  function det(a, r) {
+    const c = CE[a][r], A = AC.find(x => x.id === a), R = RF.find(x => x.id === r), d = $('#det'); d.hidden = false;
+    const v = c.voto ? `<p><b>Voto en plenaria de la Cámara:</b> ${c.voto.a_favor || 0} a favor, ${c.voto.en_contra || 0} en contra, ${c.voto.dividido || 0} dividido.</p>` : '';
+    const ev = (c.ev || []).map(e => `<li><span class="et-p" style="color:${C[e.p][1]};margin:0 .4rem 0 0">${C[e.p][0]}</span>${e.src === 'gaceta' ? `«${esc(e.t)}» <small>${esc(e.f)} · ${esc(e.esp)}${e.temas?.length ? ' · ' + esc(e.temas.join(', ')) : ''}</small>` : e.u ? `<a href="${esc(e.u)}" target="_blank" rel="noopener">${esc(e.t)}</a> <small>${esc(e.f)}${e.fecha ? ' · ' + corta(e.fecha) + ' ' + e.fecha.slice(0, 4) : ''}</small>` : `${esc(e.t)} <small>${esc(e.f)}</small>`}</li>`).join('');
+    d.innerHTML = `<div></div><div><b>${esc(A.nombre)} · ${esc(R.nombre)}</b>${c.p ? `<span class="et-p" style="color:${C[c.p][1]}">${C[c.p][0]}${c.inferida ? ' · inclinación' : ''}</span>` : '<span class="et-p">Estuvo en la audiencia</span>'}${v}${c.asistio && !c.ev?.length ? '<p>La ponencia lo registra entre quienes intervinieron, pero no resume su postura.</p>' : ''}${ev ? `<ul class="ant-ev">${ev}</ul>` : ''}</div>`;
+    if (innerWidth < 880) d.scrollIntoView({ block: 'center' });
+  }
+  $('#a-g').innerHTML = Object.entries(G).map(([k, t]) => `<button class="pill tog on" data-g="${k}" aria-pressed="true">${t}</button>`).join('');
+  document.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { const k = b.dataset.g; S.g.has(k) ? S.g.delete(k) : S.g.add(k); b.classList.toggle('on'); b.setAttribute('aria-pressed', S.g.has(k)); mat(); });
+  const linea = a => conP(a).map(r => `<i class="ant-c p${CE[a.id][r.id].p}" title="${esc(r.nombre)}"></i>${anio(r)}`).join(' ');
+  const varios = AC.filter(a => conP(a).length >= 3);
+  const cambian = varios.filter(a => { const ps = new Set(conP(a).map(r => CE[a.id][r.id].p)); return ps.has('a') && ps.has('r'); });
+  const fijos = varios.filter(a => !cambian.includes(a)).map(a => { const ps = conP(a).map(r => CE[a.id][r.id].p), mx = ['a', 'm', 'r'].map(p => [p, ps.filter(x => x === p).length]).sort((x, y) => y[1] - x[1])[0]; return { a, p: mx[0], n: mx[1], t: ps.length }; }).filter(x => x.n / x.t >= .75).sort((x, y) => y.n - x.n);
+  $('#siempre').innerHTML = fijos.map(x => `<div class="ant-l"><b>${esc(x.a.nombre)}</b> <span class="et-p" style="color:${C[x.p][1]};margin:0">${C[x.p][0].toLowerCase()} ${x.n} de ${x.t}</span><div>${linea(x.a)}</div></div>`).join('') || '<p class="vacio">Nadie repite postura en tres reformas o más.</p>';
+  $('#cambio').innerHTML = cambian.map(a => `<div class="ant-l"><b>${esc(a.nombre)}</b><div>${linea(a)}</div></div>`).join('') || '<p class="vacio">Nadie pasó de apoyar a oponerse.</p>';
+  const VT = F.votos || {}, NB = Object.fromEntries(AC.map(a => [a.id, a.nombre]));
+  $('#vot').innerHTML = Object.keys(VT).sort().map(r => { const R = RF.find(x => x.id === r), filas = Object.entries(VT[r]).map(([b, c]) => [b, c, (c.a_favor || 0) + (c.en_contra || 0) + (c.dividido || 0)]).sort((x, y) => y[2] - x[2]);
+    return `<h3>${esc(R.nombre)} · ${esc(R.gobierno || '')}</h3>` + filas.map(([b, c, n]) => `<div class="ant-v"><span>${esc(b === 'pacto' && r === 'r2016' ? 'Izquierda (Polo y otros)' : NB[b] || b)}</span><div class="ant-vb">${[['a_favor', 'var(--apoya)'], ['dividido', '#d9a441'], ['en_contra', 'var(--rechaza)']].map(([k, col]) => c[k] ? `<i style="width:${100 * c[k] / n}%;background:${col}" title="${c[k]} ${k.replace('_', ' ')}"></i>` : '').join('')}</div><small>${c.a_favor || 0} · ${c.dividido || 0} · ${c.en_contra || 0}</small></div>`).join(''); }).join('') + '<p class="sub" style="margin-top:.6rem">A favor · dividido · en contra. «Dividido» es quien votó unas partes sí y otras no.</p>';
+  const fp = F.fuentes?.prensa || {}, fg = F.fuentes?.gacetas || {};
+  $('#metodo').innerHTML = `<b>Cómo se armó.</b> Tres fuentes, de la más firme a la más débil. <b>El voto nominal</b> en la plenaria de la Cámara (2016 y 2022; de las otras no tenemos el voto completo). <b>Las ponencias</b> de la Gaceta del Congreso: la de 2016 resume los foros regionales y la de 2018 la audiencia pública, organización por organización (${Object.values(fg).map(esc).join(' · ')}); las leyó un modelo de lenguaje que corre en nuestro computador, y cada frase se comprobó palabra por palabra contra la gaceta. Las ponencias de 2021, 2022 y 2024 solo listan quién intervino: eso es el círculo vacío. <b>Los titulares de prensa</b> de esos días, uno por uno: el titular tiene que nombrar al actor, y el mismo modelo dice si apoya, pide cambios o se opone. La prensa en línea guarda poco de antes de 2021: hay ${Object.entries(fp).map(([r, n]) => `${n} titulares de ${anio(RF.find(x => x.id === r))}`).join(', ')}. Una postura sale de la mayoría de sus evidencias; con empate entre apoyo y rechazo queda «con reparos». La columna de 2026 es la del resto del seguimiento, curada a mano. Es un mapa de lo que quedó registrado, no de todo lo que cada actor pensó.`;
+  mat();
+});
+  </script>
+</body>
+</html>

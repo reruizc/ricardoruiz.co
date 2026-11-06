@@ -64,3 +64,30 @@ Pedido de Pablo: el PDF radicado pesa 3 MB y tiene 334 páginas, y abrirlo desde
 oficial como opciones. El texto se recorre en secuencia: hay artículos en mayúscula («ARTÍCULO 51.») y otros que
 citan artículos de otras leyes. Solo hay que volver a correrlo si el proyecto cambia (texto de ponencia).
 El barco de carga (`LR.mar`) es copia del de `caudal-comun.js`; reemplaza el «Cargando…» en las 11 páginas.
+
+## Las fuerzas de antes (nov-6-2026)
+
+`ley-de-rescate-antecedentes.html`: postura de 34 actores (gremios, centros de pensamiento, sindicatos y partidos)
+en las ocho tributarias desde 2016 y en la Ley de Rescate. Se arma en `tools/ley-rescate/historia/` y queda en
+`fuerzas-historicas.json`, que `rastreo.py` mete a `estado.json` como `fuerzas_hist`.
+
+```
+actores.py           actores con sus alias (el titular tiene que nombrarlo literal) y la ventana de cada reforma
+prensa.py            titulares de Google Noticias con rango de fechas → Bases de datos/ley-rescate/historia/prensa.json
+gacetas.py           ponencias de s3://caudal-legislativo/gacetas-texto/ leídas con el modelo local (ollama, qwen3.8:27b)
+clasificar.py        postura de cada actor en cada titular, con el mismo modelo local
+build_historia.py    junta voto nominal + gacetas + prensa + lo curado de 2026 → fuerzas-historicas.json
+```
+Orden: `ollama serve` · `prensa.py` · `gacetas.py` (~25 min) · `clasificar.py` (~15 min) · `build_historia.py`. Todo gratis.
+
+- **Fuerza de cada fuente:** el voto nominal en plenaria manda para los partidos (solo Cámara 2016 y 2022 están
+  completos en `congreso-claro/votos`; una bancada de menos de 3 no cuenta). Un resumen de la Gaceta pesa como dos
+  titulares. Empate entre apoyo y rechazo → «con reparos».
+- **Solo las ponencias de 2016 (foros) y 2018 (audiencia) resumen qué dijo cada organización.** Las de 2021, 2022 y
+  2024 solo listan quién intervino: eso es el círculo vacío. Las de 2021a (retirada) y 2025 no están en Caudal.
+  Cada frase de la gaceta se verifica palabra por palabra (sin contar espacios); 59 de 60 pasaron.
+- **La prensa en línea guarda poco antes de 2022** (3 a 7 titulares por reforma). GDELT no sirve: no acepta fechas
+  antes de 2017 y responde 429. Las consultas amplias (actor + tributaria/IVA/impuestos) solo cuentan si el titular
+  es de impuestos (`TEMA`).
+- `EXCLUIR` en `build_historia.py`: titulares que el modelo clasificó con postura y, revisados a mano, son de otro tema.
+- ⚠ `qwen3.8:27b-mlx` responde 501 con `format: json`: usar `qwen3.8:27b`.

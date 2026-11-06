@@ -445,7 +445,7 @@ def calcular(corpus, clas, temas, tram, cfg, crudo):
         fuentes[f]['comentarios'] = sum(1 for _, it, _ in items if it['f'] == f and it.get('tipo') == 'comentario')
     return {
         'v': ahora().isoformat(timespec='minutes'), 'hoy': hoy.isoformat(),
-        'proyecto': cfg['proyecto'], 'tramite': tram, 'hitos': cfg['hitos'], 'voces': voces, 'votos': cfg['votos'], 'personas': cfg['personas'], 'tributarias': cfg['tributarias'], 'analistas': analistas, 'historico': cfg.get('historico', {}), 'analisis': cfg.get('analisis', {}),
+        'proyecto': cfg['proyecto'], 'tramite': tram, 'hitos': cfg['hitos'], 'voces': voces, 'votos': cfg['votos'], 'personas': cfg['personas'], 'tributarias': cfg['tributarias'], 'analistas': analistas, 'historico': cfg.get('historico', {}), 'fuerzas_hist': cfg.get('fuerzas_hist', {}), 'analisis': cfg.get('analisis', {}),
         'temas': salida, 'articulos': cfg['articulos'], 'fuentes': fuentes,
         'serie_total': {d: dict(v) for d, v in sorted(total_dia.items())},
         'termometro': {k: dict(v) for k, v in termo.items()}, 'termometro_dia': {d: dict(v) for d, v in sorted(termo_dia.items())},
@@ -525,7 +525,7 @@ def main():
     escribir(DATOS / 'clasif.json', clas)
     cfg = {'proyecto': leer(AQUI / 'proyecto.json', {}), 'hitos': leer(AQUI / 'hitos.json', []), 'voces': leer(AQUI / 'voces.json', []),
            'votos': leer(AQUI / 'votos.json', {}), 'articulos': leer(AQUI / 'articulos.json', []), 'personas': leer(AQUI / 'personas.json', {}), 'tributarias': leer(AQUI / 'tributarias.json', {}).get('lista', []),
-           'analistas': leer(AQUI / 'analistas.json', {}).get('lista', []), 'historico': leer(AQUI / 'historico.json', {}), 'analisis': leer(AQUI / 'analisis.json', {})}
+           'analistas': leer(AQUI / 'analistas.json', {}).get('lista', []), 'historico': leer(AQUI / 'historico.json', {}), 'fuerzas_hist': leer(AQUI / 'fuerzas-historicas.json', {}), 'analisis': leer(AQUI / 'analisis.json', {})}
     estado = calcular(corpus, clas, temas, tram, cfg, crudo)
     if llave and not o.solo_calcular:
         lect = lectura_llm(estado, llave)
