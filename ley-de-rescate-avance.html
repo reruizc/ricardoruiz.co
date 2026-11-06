@@ -12,7 +12,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261103d" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261106" />
   <script defer src="/track.js"></script>
 </head>
 <body>
@@ -60,12 +60,13 @@ LR.pagina('hub', E => {
   $('#tdias').innerHTML = TD.map(([d, o]) => { const v = idx(o); return `<div data-tip="${corta(d)}: ${v} de 100 · ${num((o.a || 0) + (o.r || 0) + (o.m || 0))} textos con postura"><i style="height:${Math.max(4, v)}%;background:${color(v)}"></i><span>${corta(d)}</span></div>`; }).join('') || '<p class="vacio">Hace falta más de un día con datos.</p>';
   const Lc = E.lectura || {}; $('#lect').innerHTML = `<h3>${esc(Lc.titular || 'Seguimiento del proyecto')}</h3>${(Lc.lectura || []).map(p => `<p>${esc(p)}</p>`).join('')}<small>Lectura ${esc(Lc.origen || 'automática')} del ${corta(Lc.fecha || E.hoy)}. No predice el voto.</small>`;
   const { bloques, camaras } = E.votos, cuenta = (c, p) => bloques.filter(b => b.post === p).reduce((s, b) => s + b[c], 0);
+  const tSi = c => bloques.filter(b => b.post === 'si' || (b.post === 'sin' && ['si', 'aj'].includes(b.tiende))).reduce((s, b) => s + b[c], 0);
   const temas = E.temas.filter(t => t.id !== 'general').map(t => ({ t, o: suma(t, 'todo') })), top = [...temas].sort((a, b) => b.o.n - a.o.n)[0];
   const apoy = temas.filter(x => x.o.post >= 20).sort((a, b) => b.o.apoya / b.o.post - a.o.apoya / a.o.post)[0];
   const rNorm = dias(E.hoy, ULT.normal), rUrg = dias(E.hoy, ULT.urgencia);
   $('#puntos').innerHTML = [['Trámite', `${esc(T.estado || '')}. ${pon.length ? 'Ya tiene ponentes.' : 'Sin ponentes publicados.'} ${ag.length ? 'Ya está en un orden del día.' : 'Sin fecha de votación.'}`],
     ['Reloj', U ? `El Gobierno radicó <b>mensaje de urgencia</b> el ${corta(U.fecha)}: las comisiones económicas de Cámara y Senado la estudian juntas y quedan <b>${Math.max(rUrg, 0)} días</b> para que el primer debate alcance antes del 16 de diciembre. La Constitución les pide decidir en 30 días.` : rNorm >= 0 ? `Sin mensaje de urgencia, quedan <b>${rNorm} días</b> para el primer debate. Con urgencia, ${rUrg}.` : `Sin urgencia ya no alcanza antes del 16 de diciembre. Con urgencia quedan ${Math.max(rUrg, 0)} días.`],
-    ['Votos', `Declarados en contra: ${cuenta('senado', 'no')} de ${camaras.senado.total} en Senado y ${cuenta('camara', 'no')} de ${camaras.camara.total} en Cámara. El resto no se ha definido como bancada.`],
+    ['Votos', `Declarados en contra: ${cuenta('senado', 'no')} de ${camaras.senado.total} en Senado y ${cuenta('camara', 'no')} de ${camaras.camara.total} en Cámara. El resto no se ha definido como bancada. Si cada indecisa vota hacia donde tiende y el Gobierno acepta los ajustes que piden, el sí llegaría a ${tSi('senado')} de ${camaras.senado.total} en Senado y ${tSi('camara')} de ${camaras.camara.total} en Cámara: hacen falta ${camaras.senado.mayoria} y ${camaras.camara.mayoria}.`],
     ['Discusión', `Lo más discutido: <b>${esc(top.t.nombre)}</b>, con ${Math.round(100 * dur(top.o))}% de rechazo entre quienes toman postura.${apoy ? ` Lo que más apoyo recibe: ${esc(apoy.t.nombre.toLowerCase())}.` : ''}`]]
     .map(([a, b]) => `<div class="punto"><b>${a}</b><span>${b}</span></div>`).join('');
   let sel = (L.find(l => l.ahora) || L[L.length - 1]).id;

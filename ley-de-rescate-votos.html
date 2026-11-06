@@ -12,19 +12,19 @@
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="ley-rescate-base.css?v=20261103d" />
+  <link rel="stylesheet" href="ley-rescate-base.css?v=20261106" />
   <script defer src="/track.js"></script>
 </head>
 <body>
   <main class="wrap">
     <div class="k">Ley de Rescate · PL 477 de 2026 Cámara</div>
     <h1>Haga la cuenta usted mismo</h1>
-    <p class="lead">La ley se vota primero en las Comisiones Terceras. <b>Toque a cada congresista</b> para marcar si apoya, rechaza o sigue sin definir, y vea si el proyecto pasa. El punto de partida solo marca a quien habló como bancada: nadie ha votado todavía.</p>
+    <p class="lead">La ley se vota primero en las Comisiones Terceras. <b>Toque a cada congresista</b> para marcar si apoya, rechaza o sigue sin definir, y vea si el proyecto pasa. El punto de partida solo marca a quien habló como bancada: nadie ha votado todavía. El <b>borde punteado</b> dice hacia dónde tiende cada bancada indecisa, con la razón en su tarjeta.</p>
     <div id="app" hidden>
       <div class="esc" id="esc"></div>
       <div class="panel"><div class="esc-top"><div class="pills" id="presets"></div><button class="pill" id="copiar">Copiar enlace del escenario</button></div>
         <div class="hemis" id="com"></div>
-        <div class="ley"><span><i style="background:var(--apoya)"></i>Apoya</span><span><i style="background:var(--rechaza)"></i>Rechaza</span><span><i style="background:var(--informa)"></i>Sin definir</span><span style="color:var(--ink3)">Un toque: apoya · dos: rechaza · tres: sin definir</span></div></div>
+        <div class="ley"><span><i style="background:var(--apoya)"></i>Apoya</span><span><i style="background:var(--rechaza)"></i>Rechaza</span><span><i style="background:var(--informa)"></i>Sin definir</span><span><i class="pt-tsi"></i>Tiende al sí</span><span><i class="pt-tno"></i>Tiende al no</span><span style="color:var(--ink3)">Un toque: apoya · dos: rechaza · tres: sin definir</span></div></div>
       <section class="bloque"><h2>Por bancada</h2><p class="sub">Un toque cambia a toda la bancada de una vez.</p><div class="blq" id="blq"></div></section>
       <p class="aparte">La mayoría de 7 y 16 supone asistencia completa: en la práctica se decide entre los presentes. Con mensaje de urgencia sesionan juntas, pero cada comisión vota por separado. Plantillas y fotos oficiales del Senado y la Cámara.</p>
     </div>
@@ -34,6 +34,7 @@
   <script>
 const ORDEN = ['pacto', 'verde', 'paz', 'lib', 'asi', 'u', 'con', 'cr', 'cd', 'sn'];
 const FILAS = { senado: { f: [[43, 84, 8], [26, 50, 5]], w: 11.2 }, camara: { f: [[46, 88, 14], [34.5, 66, 10], [23, 44, 7]], w: 8.3 } };
+const TD = { si: 'Tiende al sí', aj: 'Tiende al sí con ajustes', no: 'Tiende al no' };
 LR.pagina('votos', E => {
   const { $, esc, cara } = LR, { bloques, camaras } = E.votos, bl = id => bloques.find(b => b.id === id), V = {};
   const miembros = c => ORDEN.flatMap(id => bl(id).plantilla[c].map(s => ({ s, b: bl(id) })));
@@ -48,17 +49,17 @@ LR.pagina('votos', E => {
     document.querySelectorAll('.as').forEach(x => x.onclick = () => { const m = todos.find(y => y.s === x.dataset.s), o = ['sin', 'si', 'no']; V[m.s] = o[(o.indexOf(est(m)) + 1) % 3]; apagar(); pinta(); });
   }
   function pinta() {
-    for (const m of todos) { const n = document.querySelector(`.as[data-s="${m.s}"]`), e = est(m); n.className = 'as ' + e; n.setAttribute('aria-label', `${E.personas[m.s]?.n || m.s}, ${{ si: 'apoya', no: 'rechaza', sin: 'sin definir' }[e]}`); }
+    for (const m of todos) { const n = document.querySelector(`.as[data-s="${m.s}"]`), e = est(m); n.className = 'as ' + e + (e === 'sin' && m.b.tiende ? (m.b.tiende === 'no' ? ' tno' : ' tsi') : ''); n.setAttribute('aria-label', `${E.personas[m.s]?.n || m.s}, ${{ si: 'apoya', no: 'rechaza', sin: 'sin definir' }[e]}${e === 'sin' && m.b.tiende ? ', ' + TD[m.b.tiende].toLowerCase() : ''}`); }
     for (const c of ['senado', 'camara']) { const R = resumen(c), h = document.querySelector(`.hemi[data-c="${c}"]`), k = R.si >= R.C.mayoria ? 'pasa' : R.no > R.C.total - R.C.mayoria ? 'cae' : '';
       h.querySelector('.hemi-c').className = 'hemi-c ' + k; h.querySelector('.hemi-c b').textContent = R.si; h.querySelector('.barra .si').style.width = 100 * R.si / R.C.total + '%'; h.querySelector('.barra .no').style.width = 100 * R.no / R.C.total + '%'; h.querySelector('.c').textContent = `${R.si} apoyan · ${R.no} rechazan · ${R.sin} sin definir`; }
     const S = resumen('senado'), C = resumen('camara'), ok = x => x.si >= x.C.mayoria, ko = x => x.no > x.C.total - x.C.mayoria;
     const txt = ok(S) && ok(C) ? ['pasa', 'Con este escenario, la ley pasa en las dos comisiones.'] : ko(S) || ko(C) ? ['cae', `Con este escenario, la ley se hunde en ${ko(S) && ko(C) ? 'las dos comisiones' : ko(S) ? 'el Senado' : 'la Cámara'}: ya no alcanzan los votos.`] : ['', `Todavía no se define: faltan ${Math.max(S.C.mayoria - S.si, 0)} en Senado y ${Math.max(C.C.mayoria - C.si, 0)} en Cámara.`];
     $('#esc').className = 'esc ' + txt[0]; $('#esc').textContent = txt[1];
-    $('#blq').innerHTML = bloques.map(b => { const ms = todos.filter(m => m.b === b), est3 = new Set(ms.map(est)), e = est3.size === 1 ? [...est3][0] : 'mix'; return `<button class="b ${e}" data-b="${b.id}"><b>${esc(b.nombre)} <small style="color:var(--ink3);font-weight:400">${b.senado} Sen · ${b.camara} Cám</small></b><em>${{ si: 'APOYA', no: 'RECHAZA', sin: 'SIN DEFINIR', mix: 'DIVIDIDA' }[e]}</em><span>${esc(b.nota)}</span></button>`; }).join('');
+    $('#blq').innerHTML = bloques.map(b => { const ms = todos.filter(m => m.b === b), est3 = new Set(ms.map(est)), e = est3.size === 1 ? [...est3][0] : 'mix'; return `<button class="b ${e}" data-b="${b.id}"><b>${esc(b.nombre)} <small style="color:var(--ink3);font-weight:400">${b.senado} Sen · ${b.camara} Cám</small></b><em>${{ si: 'APOYA', no: 'RECHAZA', sin: 'SIN DEFINIR', mix: 'DIVIDIDA' }[e]}${b.post === 'sin' ? `<small class="td ${b.tiende || ''}">${b.tiende ? TD[b.tiende] : 'Sin señal'}</small>` : ''}</em><span>${esc(b.nota)}${b.por ? `<br><b>Inclinación:</b> ${esc(b.por)}` : ''}</span></button>`; }).join('');
     document.querySelectorAll('.b').forEach(x => x.onclick = () => { const ms = todos.filter(m => m.b.id === x.dataset.b), set = new Set(ms.map(est)), a = set.size === 1 ? [...set][0] : 'sin', o = ['sin', 'si', 'no'], n = o[(o.indexOf(a) + 1) % 3]; ms.forEach(m => V[m.s] = n); apagar(); pinta(); });
   }
   const apagar = () => document.querySelectorAll('[data-p]').forEach(y => y.classList.remove('on'));
-  const PRE = [['Punto de partida', () => {}], ['Aliados del Gobierno con el sí', () => ['cd', 'con', 'cr', 'u'].forEach(id => todos.filter(m => m.b.id === id).forEach(m => V[m.s] = 'si'))], ['El CD vota no', () => todos.filter(m => m.b.id === 'cd').forEach(m => V[m.s] = 'no')], ['Indecisos a favor', () => todos.filter(m => m.b.post === 'sin').forEach(m => V[m.s] = 'si')], ['Indecisos en contra', () => todos.filter(m => m.b.post === 'sin').forEach(m => V[m.s] = 'no')]];
+  const PRE = [['Punto de partida', () => {}], ['Hacia dónde tienden', () => todos.filter(m => m.b.post === 'sin' && m.b.tiende).forEach(m => V[m.s] = m.b.tiende === 'no' ? 'no' : 'si')], ['Aliados del Gobierno con el sí', () => ['cd', 'con', 'cr', 'u'].forEach(id => todos.filter(m => m.b.id === id).forEach(m => V[m.s] = 'si'))], ['El CD vota no', () => todos.filter(m => m.b.id === 'cd').forEach(m => V[m.s] = 'no')], ['Indecisos a favor', () => todos.filter(m => m.b.post === 'sin').forEach(m => V[m.s] = 'si')], ['Indecisos en contra', () => todos.filter(m => m.b.post === 'sin').forEach(m => V[m.s] = 'no')]];
   $('#presets').innerHTML = PRE.map(([t], i) => `<button class="pill ${i ? '' : 'on'}" data-p="${i}">${t}</button>`).join('');
   document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { Object.keys(V).forEach(k => delete V[k]); PRE[b.dataset.p][1](); document.querySelectorAll('[data-p]').forEach(x => x.classList.toggle('on', x === b)); pinta(); });
   const m0 = location.hash.match(/e=([sn.]+)/); if (m0 && m0[1].length === todos.length) { todos.forEach((m, i) => { V[m.s] = { s: 'si', n: 'no', '.': 'sin' }[m0[1][i]]; }); apagar(); }

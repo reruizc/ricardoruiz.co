@@ -42,6 +42,7 @@ las carpetas ocultas: por eso es `lr-datos/` y no `.lr/` (así se perdió la pri
 
 - **Eje de poder del esquema de fuerzas:** lectura propia con regla fija, y la página la dice. 5 escribieron el proyecto, presiden o votan en una Comisión Tercera. 4 los demás congresistas y jefes de partido. 3 gremios grandes, sindicatos e instituciones. 2 los demás. El otro eje, presencia, sí es medición.
 
+- **Inclinaciones (nov-6):** una voz `p:'i'` puede llevar `t` (a · m · r) y `tr` (la razón); un bloque `post:'sin'` puede llevar `tiende` (si · aj · no · null) y `por`. Salen de lo que dijo su bancada u organización, nunca del modelo, y la página las pinta con borde punteado: no son postura declarada. Cuando el actor habla, se cambia `p` y se borra `t`.
 - **La ficha manda.** La prensa nunca marca una etapa como hecha. Una señal de prensa va a la bitácora rotulada «sin verificar».
 - **La postura es frente a la medida, no frente al Gobierno.** «Informa» no es neutralidad del medio: es que el titular no toma partido.
 - **Sin modelo no hay postura.** Sin `DEEPSEEK_API_KEY` el tema sale por palabras y la postura queda vacía.
